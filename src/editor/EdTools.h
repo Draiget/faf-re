@@ -3,6 +3,7 @@
 #include "editor/ui/EdUnitCatalog.h"
 #include "editor/ui/EdProperties.h"
 #include "editor/tools/EdHeightBrush.h"
+#include "editor/tools/EdBrushLibrary.h"
 #include "editor/tools/EdMaskBrush.h"
 #include "editor/doc/EdPropPaint.h"
 #include "editor/doc/EdUnits.h"
@@ -20,6 +21,7 @@
 #include <functional>
 #include <cmath>
 #include <array>
+#include <filesystem>
 #include <memory>
 #include <optional>
 #include <set>
@@ -1478,6 +1480,8 @@ namespace faf::editor
       brush.terraceStep = mTerraceStep * 128.0f;
       brush.erodeTalus = mErodeTalus;
       brush.shape = static_cast<BrushShape>(mBrushShape);
+      brush.shapeImage = mShapeImage.get();
+      brush.stampMode = static_cast<StampMode>(mStampMode);
       brush.shapeAngle = mShapeAngle;
       brush.noiseScale = mNoiseScale;
       brush.noiseOctaves = mNoiseOctaves;
@@ -1505,6 +1509,54 @@ namespace faf::editor
     }
     /** The picked points, oldest first, for the view to mark. */
     [[nodiscard]] int PlanePoints(float (&x)[3], float (&height)[3], float (&z)[3]) const noexcept;
+
+    /** Stamp strokes (FAF Studio's stamp.lua): each dab's turn, size and place, and how far apart dabs fall. */
+    struct StampStroke
+    {
+      float turn = 0.0f; // degrees
+      bool randomTurn = false;
+      float sizeJitter = 0.0f;     // each dab's radius varies by up to this share
+      float placeJitter = 0.0f;    // each dab moves by up to this share of the radius
+      float spacing = 0.0f;        // between dabs, a share of the stamp's width; 0: one per click
+      bool baseFromStroke = false; // Max, Min, Replace: from the ground under the stroke's first dab, not each dab's
+    };
+    [[nodiscard]] StampStroke CurrentStampStroke() const noexcept
+    {
+      return {mStampTurn, mStampRandomTurn, mStampSizeJitter, mStampPlaceJitter, mStampSpacing, mStampBaseFromStroke};
+    }
+    /** Test runs (`/stampstroke <spacing>,<random turn>,<size jitter>,<place jitter>,<mode>`; shares, 0/1, a
+     * StampMode). */
+    void SetStampStroke(
+      const float spacing,
+      const bool randomTurn,
+      const float sizeJitter,
+      const float placeJitter,
+      const int mode
+    ) noexcept
+    {
+      mStampSpacing = spacing;
+      mStampRandomTurn = randomTurn;
+      mStampSizeJitter = sizeJitter;
+      mStampPlaceJitter = placeJitter;
+      mStampMode = std::clamp(mode, 0, 4);
+    }
+    /** The brush library's folder (`%LOCALAPPDATA%\FAForever\Editor\brushes`); its images are listed again. */
+    void SetBrushFolder(std::filesystem::path folder);
+    [[nodiscard]] const std::filesystem::path& BrushFolder() const noexcept
+    {
+      return mBrushFolder;
+    }
+    /** Lists the brush folder's images again (after an import). */
+    void RescanBrushes();
+    /** The Import button: pick images to copy into the brush folder. */
+    [[nodiscard]] bool TakeBrushImportRequest() noexcept
+    {
+      return std::exchange(mBrushImportRequested, false);
+    }
+    /** The stamp's source: 1 to 9 a procedural shape (BrushShape), from 10 the brush folder's images in order. */
+    bool ChooseStampSource(int index);
+    /** The brush shape from the brush folder's image `index`. */
+    bool ChooseShapeImage(int index);
 
     /** Stamp mode: the image the Stamp image button loaded. */
     [[nodiscard]] bool TakeStampRequest() noexcept
@@ -1729,6 +1781,18 @@ namespace faf::editor
     double mPlaneZ = 0.0;
     double mPlaneC = 0.0;
     std::shared_ptr<HeightStamp> mStamp;
+    int mStampMode = 0; // StampMode
+    float mStampTurn = 0.0f;
+    bool mStampRandomTurn = false;
+    float mStampSizeJitter = 0.0f;
+    float mStampPlaceJitter = 0.0f;
+    float mStampSpacing = 0.0f;
+    bool mStampBaseFromStroke = false;
+    std::filesystem::path mBrushFolder;
+    std::vector<BrushImage> mBrushImages;
+    std::shared_ptr<ShapeGrid> mShapeImage;
+    std::string mShapeImageName;
+    bool mBrushImportRequested = false;
     std::string mStampName;
     float mStampHeight = 20.0f;
     bool mStampRequested = false;

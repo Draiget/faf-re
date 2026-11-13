@@ -3,6 +3,7 @@
 #include "editor/ui/EdUiScale.h"
 #include "editor/tools/EdShaderSlots.h"
 #include "editor/ui/EdHelp.h"
+#include "gpg/core/utils/Logging.h"
 
 #include <cmath>
 #include <string>
@@ -383,6 +384,65 @@ namespace faf::editor
     ImGui::PopStyleVar();
   }
 
+  void EdTools::SetBrushFolder(
+    std::filesystem::path folder
+  )
+  {
+    mBrushFolder = std::move(folder);
+    RescanBrushes();
+  }
+
+  void EdTools::RescanBrushes()
+  {
+    mBrushImages = ListBrushImages(mBrushFolder);
+  }
+
+  bool EdTools::ChooseStampSource(
+    const int index
+  )
+  {
+    if (index >= 1 && index < kBrushShapeCount) {
+      const auto shape = static_cast<BrushShape>(index);
+      SetStamp(StampFromGrid(RasterizeShape(shape)), BrushShapeName(shape));
+      return true;
+    }
+    const int image = index - kBrushShapeCount;
+    if (image < 0 || image >= static_cast<int>(mBrushImages.size())) {
+      return false;
+    }
+    ShapeGrid grid;
+    std::string error;
+    if (!LoadBrushImage(mBrushImages[static_cast<std::size_t>(image)].path, kShapeGridSize, grid, error)) {
+      gpg::Warnf(
+        "editor: brush image %s: %s", mBrushImages[static_cast<std::size_t>(image)].name.c_str(), error.c_str()
+      );
+      return false;
+    }
+    SetStamp(StampFromGrid(grid), mBrushImages[static_cast<std::size_t>(image)].name);
+    return true;
+  }
+
+  bool EdTools::ChooseShapeImage(
+    const int index
+  )
+  {
+    if (index < 0 || index >= static_cast<int>(mBrushImages.size())) {
+      return false;
+    }
+    auto grid = std::make_shared<ShapeGrid>();
+    std::string error;
+    if (!LoadBrushImage(mBrushImages[static_cast<std::size_t>(index)].path, kShapeGridSize, *grid, error)) {
+      gpg::Warnf(
+        "editor: brush image %s: %s", mBrushImages[static_cast<std::size_t>(index)].name.c_str(), error.c_str()
+      );
+      return false;
+    }
+    mShapeImage = std::move(grid);
+    mShapeImageName = mBrushImages[static_cast<std::size_t>(index)].name;
+    mBrushShape = static_cast<int>(BrushShape::Image);
+    return true;
+  }
+
   void EdTools::DrawBrush(
     const bool withModes
   )
@@ -441,16 +501,75 @@ namespace faf::editor
         }
         break;
       }
-      case HeightBrushMode::Stamp:
-        if (ImGui::Button("Stamp image...")) {
+      case HeightBrushMode::Stamp: {
+        // The source: a picture from a file, one of the procedural shapes, or an image of the brush library.
+        ImGui::SetNextItemWidth(-1.0f);
+        if (ImGui::BeginCombo("##stampsource", mStamp != nullptr ? mStampName.c_str() : "Choose a stamp")) {
+          for (int k = 1; k < kBrushShapeCount; ++k) {
+            if (
+              ImGui::Selectable(
+                BrushShapeName(static_cast<BrushShape>(k)), mStampName == BrushShapeName(static_cast<BrushShape>(k))
+              )
+            ) {
+              (void)ChooseStampSource(k);
+            }
+          }
+          if (!mBrushImages.empty()) {
+            ImGui::Separator();
+          }
+          for (std::size_t i = 0; i < mBrushImages.size(); ++i) {
+            if (ImGui::Selectable(mBrushImages[i].name.c_str(), mStampName == mBrushImages[i].name)) {
+              (void)ChooseStampSource(kBrushShapeCount + static_cast<int>(i));
+            }
+          }
+          ImGui::EndCombo();
+        }
+        if (ImGui::Button("Image file...")) {
           mStampRequested = true;
         }
         ImGui::SameLine();
-        ImGui::TextDisabled("%s", mStamp != nullptr ? mStampName.c_str() : "none");
+        if (ImGui::Button("Import to library...")) {
+          mBrushImportRequested = true;
+        }
+        static const char* const kStampModes[] = {"Add", "Subtract", "Max", "Min", "Replace"};
+        Segmented(kStampModes, 5, mStampMode);
         ImGui::SetNextItemWidth(-1.0f);
         ImGui::DragFloat("##stampheight", &mStampHeight, 0.25f, -200.0f, 200.0f, "Stamp height %.1f");
-        Note("Each click adds the image over the brush's square: white adds the stamp height times strength.");
+        const float half = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) * 0.5f;
+        ImGui::SetNextItemWidth(half);
+        ImGui::SliderFloat("##stampturn", &mStampTurn, -180.0f, 180.0f, "Turn %.0f deg");
+        ImGui::SameLine();
+        ImGui::Checkbox("Random turn", &mStampRandomTurn);
+        float sizeJitter = mStampSizeJitter * 100.0f;
+        float placeJitter = mStampPlaceJitter * 100.0f;
+        float spacing = mStampSpacing * 100.0f;
+        ImGui::SetNextItemWidth(half);
+        if (ImGui::SliderFloat("##stampsize", &sizeJitter, 0.0f, 90.0f, "Size +-%.0f%%")) {
+          mStampSizeJitter = sizeJitter / 100.0f;
+        }
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(-1.0f);
+        if (ImGui::SliderFloat("##stampplace", &placeJitter, 0.0f, 100.0f, "Place +-%.0f%%")) {
+          mStampPlaceJitter = placeJitter / 100.0f;
+        }
+        ImGui::SetNextItemWidth(-1.0f);
+        if (
+          ImGui::SliderFloat(
+            "##stampspacing", &spacing, 0.0f, 300.0f, spacing <= 0.0f ? "One per click" : "Spacing %.0f%%"
+          )
+        ) {
+          mStampSpacing = spacing / 100.0f;
+        }
+        if (mStampMode >= 2) {
+          ImGui::Checkbox("Measure from the stroke's first dab", &mStampBaseFromStroke);
+        }
+        Note(
+          "Add and Subtract press the picture into the ground; Max raises the ground to it, Min lowers it to it upside "
+          "down, Replace sets the ground inside its circle to it, all from the ground under the dab (or the stroke's "
+          "first). White is the stamp height times strength. With a spacing, a drag stamps along its path."
+        );
         break;
+      }
       case HeightBrushMode::Erode:
         ImGui::SetNextItemWidth(-1.0f);
         ImGui::SliderFloat("##talus", &mErodeTalus, 0.05f, 2.0f, "Talus slope %.2f");
@@ -509,10 +628,23 @@ namespace faf::editor
       if (mode != HeightBrushMode::WaterErode && !IsErosionMode(mode)) {
         const float half = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) * 0.5f;
         ImGui::SetNextItemWidth(half);
-        if (ImGui::BeginCombo("##brushshape", BrushShapeName(static_cast<BrushShape>(mBrushShape)))) {
+        const bool image = mBrushShape == static_cast<int>(BrushShape::Image);
+        if (
+          ImGui::BeginCombo(
+            "##brushshape", image ? mShapeImageName.c_str() : BrushShapeName(static_cast<BrushShape>(mBrushShape))
+          )
+        ) {
           for (int k = 0; k < kBrushShapeCount; ++k) {
             if (ImGui::Selectable(BrushShapeName(static_cast<BrushShape>(k)), k == mBrushShape)) {
               mBrushShape = k;
+            }
+          }
+          if (!mBrushImages.empty()) {
+            ImGui::Separator();
+          }
+          for (std::size_t i = 0; i < mBrushImages.size(); ++i) {
+            if (ImGui::Selectable(mBrushImages[i].name.c_str(), image && mShapeImageName == mBrushImages[i].name)) {
+              (void)ChooseShapeImage(static_cast<int>(i));
             }
           }
           ImGui::EndCombo();

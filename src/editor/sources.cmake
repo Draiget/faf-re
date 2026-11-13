@@ -77,6 +77,7 @@ set(FAF_EDITOR_SOURCES
   doc/EdRoundTrip.cpp
   tools/EdHeightBrush.cpp
   tools/EdHeightFile.cpp
+  tools/EdBrushLibrary.cpp
   tools/EdMaskBrush.cpp
   terrain/EdErosion.cpp
   terrain/EdFieldCore.cpp

@@ -70,8 +70,55 @@ namespace faf::editor
     Mountain,
     Rocks,
     Bump,
+    /** A greyscale image of the brush library, on the brush's `shapeImage` grid. */
+    Image,
   };
+  /** Round and the procedural shapes (Image comes from the brush library). */
   inline constexpr int kBrushShapeCount = 10;
+
+  /** A shape on an n x n grid over its square (-1..1 on both axes, corners on the samples), row by row. */
+  struct ShapeGrid
+  {
+    int n = 0;
+    std::vector<float> values;
+    /** Read between samples at (u, v); 0 outside the square. */
+    [[nodiscard]] float Sample(
+      const float u,
+      const float v
+    ) const noexcept
+    {
+      if (n < 2 || u < -1.0f || v < -1.0f || u > 1.0f || v > 1.0f) {
+        return 0.0f;
+      }
+      const float top = static_cast<float>(n - 1);
+      const float fx = (u + 1.0f) * 0.5f * top;
+      const float fz = (v + 1.0f) * 0.5f * top;
+      const int x0 = fx >= top ? n - 2 : static_cast<int>(fx);
+      const int z0 = fz >= top ? n - 2 : static_cast<int>(fz);
+      const float tx = fx - static_cast<float>(x0);
+      const float tz = fz - static_cast<float>(z0);
+      const auto at = [&](const int x, const int z) {
+        return values[static_cast<std::size_t>(z) * static_cast<std::size_t>(n) + static_cast<std::size_t>(x)];
+      };
+      return (at(x0, z0) * (1.0f - tx) + at(x0 + 1, z0) * tx) * (1.0f - tz) +
+        (at(x0, z0 + 1) * (1.0f - tx) + at(x0 + 1, z0 + 1) * tx) * tz;
+    }
+  };
+
+  /** How a stamp meets the ground (FAF Studio's stamp.lua). Max, Min and Replace measure from the brush's `stampBase`.
+   */
+  enum class StampMode
+  {
+    /** The stamp is added to the ground. */
+    Add,
+    Subtract,
+    /** The ground rises to the stamp where the stamp is higher. */
+    Max,
+    /** The ground sinks to the stamp turned upside down where that is lower. */
+    Min,
+    /** Inside its circle the ground becomes the stamp: a mountain set into the landscape. */
+    Replace,
+  };
 
   /** A shape's name for the panel. */
   [[nodiscard]] const char* BrushShapeName(BrushShape shape);
@@ -161,6 +208,12 @@ namespace faf::editor
     /** The brush's shape and how far it is turned (degrees, towards +z); Round uses `falloff`. */
     BrushShape shape = BrushShape::Round;
     float shapeAngle = 0.0f;
+    /** Image: the library image's grid (null: the brush is round). */
+    const ShapeGrid* shapeImage = nullptr;
+    /** Stamp: how it meets the ground, the height Max, Min and Replace measure from (words), its turn (degrees). */
+    StampMode stampMode = StampMode::Add;
+    float stampBase = 0.0f;
+    float stampTurn = 0.0f;
     /**
      * Noise: smooth value noise with a lattice cell of `noiseScale` samples and `noiseOctaves` (1 to 4) layers, each
      * half the cell and `noiseRoughness` as strong as the one before; `noiseSeed` picks the pattern (one per stroke).

@@ -130,7 +130,7 @@ namespace faf::editor
         "/particlenew", "/particleopen", "/materialeditor", "/uiscale",        "/testrun",        "/openall",
         "/roundtrip",   "/vault",        "/vaultsearch",    "/vaultmap",       "/newmap",         "/stamp",
         "/brush",       "/layer",        "/waterbody",      "/ruler",          "/adaptivewindow", "/maskrule",
-        "/shader",      "/brushtest",    "/brushshape",
+        "/shader",      "/brushtest",    "/brushshape",     "/stampsource",    "/stampstroke",
       };
       for (const char* const option : kOptions) {
         if (moho::CFG_GetArgOption(option, 0, nullptr)) {
@@ -2021,6 +2021,7 @@ namespace faf::editor
       std::string mNewMapSpec;
       // `/brush <mode>` and `/stamp <file>` (test runs): the terrain brush's mode and stamp image, set once.
       int mBrushModeArg = -1;
+      bool mStampSourceDone = false;
       // `/masklayer <1-8>` and `/maskrule <layer>,<low>,<high>` (test runs): the Texture tool on that layer;
       // a height rule applied to the whole map once the map has been shown for 120 frames.
       int mMaskLayerArg = -1;
@@ -4831,6 +4832,43 @@ namespace faf::editor
       }
       if (mHeightDialog && mScene.Attached() && ++mHeightFileFrames == 120) {
         tools.RequestImport();
+      }
+      // The brush library's folder, once; the Import button copies picked images into it.
+      if (tools.BrushFolder().empty()) {
+        if (const std::filesystem::path folder = EditorSettingsFolder(); !folder.empty()) {
+          tools.SetBrushFolder(folder / "brushes");
+        }
+      }
+      if (tools.TakeBrushImportRequest()) {
+        if (const std::filesystem::path file = AskHeightFile(HandleOf(mGame.supcomFrame), false); !file.empty()) {
+          std::string error;
+          const int copied = ImportBrushImages({file}, tools.BrushFolder(), error);
+          tools.RescanBrushes();
+          gpg::Logf(
+            "editor: brush library: %d image%s imported%s%s",
+            copied,
+            copied == 1 ? "" : "s",
+            error.empty() ? "" : ": ",
+            error.c_str()
+          );
+        }
+      }
+      // `/stampsource <n>` and `/stampstroke <spacing>,<random turn>,<size>,<place>,<mode>` (test runs, with /brush 8).
+      if (!mStampSourceDone && !tools.BrushFolder().empty()) {
+        mStampSourceDone = true;
+        if (fa::vector<fa::string> source; moho::CFG_GetArgOption("/stampsource", 1, &source) && !source.empty()) {
+          const bool chose = tools.ChooseStampSource(std::atoi(source[0].c_str()));
+          gpg::Logf("editor: stamp source %s: %s", source[0].c_str(), chose ? "chosen" : "not there");
+        }
+        if (fa::vector<fa::string> stroke; moho::CFG_GetArgOption("/stampstroke", 1, &stroke) && !stroke.empty()) {
+          float spacing = 0.0f;
+          int random = 0;
+          float size = 0.0f;
+          float place = 0.0f;
+          int mode = 0;
+          (void)std::sscanf(stroke[0].c_str(), "%f,%d,%f,%f,%d", &spacing, &random, &size, &place, &mode);
+          tools.SetStampStroke(spacing, random != 0, size, place, mode);
+        }
       }
       if (tools.TakeStampRequest()) {
         if (const std::filesystem::path file = AskHeightFile(HandleOf(mGame.supcomFrame), false); !file.empty()) {

@@ -5,6 +5,7 @@
 #include <functional>
 #include <memory>
 #include <optional>
+#include <random>
 #include <string>
 #include <map>
 #include <vector>
@@ -469,6 +470,11 @@ namespace faf::editor
 
     /** A terrain stroke in progress: the brush under the cursor each frame while the left button is held. */
     void PaintStroke(float frameSeconds);
+    /**
+     * Stamp mode: the dabs a stroke puts down as the cursor moved to (x, z), each with its own turn, size and place
+     * (FAF Studio's stamp.lua), undo kept; returns the rectangles written.
+     */
+    std::vector<SampleRect> PaintStamps(const HeightBrush& brush, float x, float z);
     void EndStroke();
     /** Hands written samples back to the height field (its tiers and revision) and redraws their terrain. */
     void RefreshHeights(const std::vector<SampleRect>& rects);
@@ -810,6 +816,14 @@ namespace faf::editor
     bool UndoMasks(bool redo);
     /** Stamp mode: the click's stamp is down. */
     bool mStamped = false;
+    // The stamp stroke in progress: where the last step ended, the way since the last dab, its base, its draws.
+    float mStampLastX = 0.0f;
+    float mStampLastZ = 0.0f;
+    float mStampTravelled = 0.0f;
+    float mStampBase = 0.0f;
+    bool mStampBaseSet = false;
+    std::uint32_t mStampStrokes = 0;
+    std::mt19937 mStampRandom;
 
     /** Draws the brush rings on the terrain from the renderer's editor hook (`ED_SetHook`). */
     void DrawBrushRings();

@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <random>
 #include <cmath>
 #include <cstdlib>
 #include <functional>
@@ -1127,12 +1128,16 @@ namespace faf::editor
     if (IsErosionMode(brush.mode) && mErosionStroke == nullptr) {
       mErosionStroke = MakeErosionStroke();
     }
-    // A stamp goes down once per click.
+    // Stamps go down per dab along the stroke (one per click without a spacing).
     if (brush.mode == HeightBrushMode::Stamp) {
-      if (mStamped || brush.stamp == nullptr) {
+      if (brush.stamp == nullptr) {
         return;
       }
-      mStamped = true;
+      if (const std::vector<SampleRect> rects = PaintStamps(brush, groundX, groundZ); !rects.empty()) {
+        mDocument.SetModified(true);
+        RefreshHeights(rects);
+      }
+      return;
     }
     // Undo keeps the tiles this step writes, as they are, before it writes them.
     for (const SampleRect& rect : HeightBrushRects(field->width, field->height, groundX, groundZ, brush)) {
@@ -1152,6 +1157,67 @@ namespace faf::editor
       mDocument.SetModified(true);
       RefreshHeights(rects);
     }
+  }
+
+  std::vector<SampleRect> EdMapScene::PaintStamps(
+    const HeightBrush& brush,
+    const float x,
+    const float z
+  )
+  {
+    moho::CHeightField* const field = mMap != nullptr ? mMap->mTerrainRes->GetHeightField() : nullptr;
+    if (field == nullptr || mTools == nullptr) {
+      return {};
+    }
+    const EdTools::StampStroke settings = mTools->CurrentStampStroke();
+    // Dabs `spacing` of the stamp's width apart, in samples (at least one).
+    const float spacing = settings.spacing > 0.0f ? std::max(1.0f, 2.0f * brush.radius * settings.spacing) : 0.0f;
+    if (!mStamped) {
+      mStamped = true;
+      mStampTravelled = std::max(spacing, 1.0f); // the first point is a dab
+      mStampLastX = x;
+      mStampLastZ = z;
+      mStampBaseSet = false;
+      mStampRandom.seed(++mStampStrokes);
+    }
+    const std::vector<StampDab> dabs = StampDabsAlong(mStampLastX, mStampLastZ, x, z, spacing, mStampTravelled);
+    mStampLastX = x;
+    mStampLastZ = z;
+    std::uniform_real_distribution<float> unit(0.0f, 1.0f);
+    std::vector<SampleRect> written;
+    for (const StampDab& at : dabs) {
+      HeightBrush dab = brush;
+      dab.stampTurn = settings.turn + (settings.randomTurn ? unit(mStampRandom) * 360.0f : 0.0f);
+      if (settings.sizeJitter > 0.0f) {
+        dab.radius *= 1.0f + (unit(mStampRandom) * 2.0f - 1.0f) * settings.sizeJitter;
+      }
+      float dx = at.x;
+      float dz = at.z;
+      if (settings.placeJitter > 0.0f) {
+        const float angle = unit(mStampRandom) * 6.2831853f;
+        const float reach = brush.radius * settings.placeJitter * std::sqrt(unit(mStampRandom));
+        dx += std::cos(angle) * reach;
+        dz += std::sin(angle) * reach;
+      }
+      // Max, Min and Replace measure from the ground under the dab (or the stroke's first dab).
+      const float here =
+        static_cast<float>(field->data
+                             [static_cast<std::size_t>(std::clamp(static_cast<int>(dz), 0, field->height - 1)) *
+                                static_cast<std::size_t>(field->width) +
+                              static_cast<std::size_t>(std::clamp(static_cast<int>(dx), 0, field->width - 1))]);
+      if (!mStampBaseSet) {
+        mStampBase = here;
+        mStampBaseSet = true;
+      }
+      dab.stampBase = settings.baseFromStroke ? mStampBase : here;
+      for (const SampleRect& rect : HeightBrushRects(field->width, field->height, dx, dz, dab)) {
+        mDocument.Heights().BeforeWrite(field->data, rect);
+      }
+      const std::vector<SampleRect> rects =
+        ApplyHeightBrush(field->data, field->width, field->height, dx, dz, dab, 0.1f);
+      written.insert(written.end(), rects.begin(), rects.end());
+    }
+    return written;
   }
 
   void EdMapScene::EndStroke()
@@ -2308,7 +2374,18 @@ namespace faf::editor
     }
     std::vector<SampleRect> rects;
     const float stepSeconds = raise ? 0.1f : 1.0f / 60.0f;
-    for (float left = seconds; left > 0.0f; left -= stepSeconds) {
+    if (mode == HeightBrushMode::Stamp && brush.stamp != nullptr) {
+      // A drag of 40 samples along +x over `seconds`, as the mouse would make it.
+      mStamped = false;
+      int dabSteps = 0;
+      for (float done = 0.0f; done <= seconds; done += stepSeconds, ++dabSteps) {
+        const std::vector<SampleRect> step = PaintStamps(brush, x + 40.0f * std::min(1.0f, done / seconds), z);
+        rects.insert(rects.end(), step.begin(), step.end());
+      }
+      mStamped = false;
+      gpg::Logf("editor: brush test: stamp stroke of %d steps put down %zu rectangles", dabSteps, rects.size());
+    }
+    for (float left = mode == HeightBrushMode::Stamp ? 0.0f : seconds; left > 0.0f; left -= stepSeconds) {
       if (!raise) {
         // Each step saves what it writes first, as PaintStroke does.
         for (const SampleRect& rect : HeightBrushRects(field->width, field->height, x, z, brush)) {

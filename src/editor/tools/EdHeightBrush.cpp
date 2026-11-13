@@ -414,14 +414,19 @@ namespace faf::editor
     /** The stamp's value (0..1) at offset (dx, dz) from the brush's centre, over the brush's square; 0 outside. */
     [[nodiscard]] float StampAt(
       const HeightStamp& stamp,
-      const float dx,
-      const float dz,
-      const float radius
+      const float rawDx,
+      const float rawDz,
+      const float radius,
+      const float turnDegrees = 0.0f
     )
     {
       if (stamp.width < 2 || stamp.height < 2 || radius <= 0.0f) {
         return 0.0f;
       }
+      // Turned with the stamp: the offset read in the picture's own frame.
+      const double angle = static_cast<double>(turnDegrees) * (kTwoPi / 360.0);
+      const float dx = static_cast<float>(rawDx * std::cos(angle) + rawDz * std::sin(angle));
+      const float dz = static_cast<float>(-rawDx * std::sin(angle) + rawDz * std::cos(angle));
       const float u = (dx / radius * 0.5f + 0.5f) * static_cast<float>(stamp.width - 1);
       const float v = (dz / radius * 0.5f + 0.5f) * static_cast<float>(stamp.height - 1);
       if (u < 0.0f || v < 0.0f || u > static_cast<float>(stamp.width - 1) || v > static_cast<float>(stamp.height - 1)) {
@@ -514,7 +519,28 @@ namespace faf::editor
         if (brush.stamp == nullptr) {
           return current;
         }
-        return current + StampAt(*brush.stamp, dx, dz, brush.radius) * brush.stampHeight * strength * weight;
+        {
+          // The stamp's value here (0..1), turned; `weight` is its edge (the brush's falloff, or its shape).
+          const float m = StampAt(*brush.stamp, dx, dz, brush.radius, brush.stampTurn);
+          const float k = strength * weight;
+          switch (brush.stampMode) {
+          case StampMode::Add:
+            return current + m * brush.stampHeight * k;
+          case StampMode::Subtract:
+            return current - m * brush.stampHeight * k;
+          case StampMode::Max: {
+            const float target = brush.stampBase + m * brush.stampHeight;
+            return target > current ? current + (target - current) * k : current;
+          }
+          case StampMode::Min: {
+            const float target = brush.stampBase - m * brush.stampHeight;
+            return target < current ? current + (target - current) * k : current;
+          }
+          case StampMode::Replace:
+            return current + (brush.stampBase + m * brush.stampHeight - current) * k;
+          }
+          return current;
+        }
       case HeightBrushMode::Erode: {
         // Each of the 8 neighbours: the part of the difference over the talus slope at its distance, towards it. A
         // sixteenth of each (half of a pair's excess, shared by 8 neighbours) keeps a step from overshooting.
@@ -598,6 +624,11 @@ namespace faf::editor
       const double v = (-dx * s + dz * c) / brush.radius;
       if (std::abs(u) > 1.0 || std::abs(v) > 1.0) {
         return 0.0f;
+      }
+      if (brush.shape == BrushShape::Image) {
+        return brush.shapeImage != nullptr
+          ? std::clamp(brush.shapeImage->Sample(static_cast<float>(u), static_cast<float>(v)), 0.0f, 1.0f)
+          : Weight(distance, brush);
       }
       return std::clamp(BrushShapeAt(brush.shape, static_cast<float>(u), static_cast<float>(v)), 0.0f, 1.0f);
     }
@@ -943,6 +974,9 @@ namespace faf::editor
     static const char* const kNames[kBrushShapeCount] = {
       "Round", "Square", "Diamond", "Cone", "Plateau", "Ring", "Ridge", "Mountain", "Rocks", "Bump"
     };
+    if (shape == BrushShape::Image) {
+      return "Image";
+    }
     const int i = static_cast<int>(shape);
     return i >= 0 && i < kBrushShapeCount ? kNames[i] : "Round";
   }
@@ -979,6 +1013,8 @@ namespace faf::editor
         : static_cast<float>(ShapeSmooth(0.5, 0.62, ShapeValueNoise(u * 3.0 + 11.0, v * 3.0 + 5.0)) * (1.0 - d));
     case BrushShape::Bump:
       return d >= 1.0 ? 0.0f : static_cast<float>(0.5 * (1.0 + std::cos(3.14159265358979 * d)));
+    case BrushShape::Image:
+      return 0.0f; // its grid is the brush's (ShapeGrid)
     }
     return 0.0f;
   }
