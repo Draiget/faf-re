@@ -332,7 +332,7 @@ add_test(NAME recon_scroll_packet COMMAND faf_recon_scroll_packet_tests)
 set_tests_properties(recon_scroll_packet PROPERTIES TIMEOUT 120 LABELS "Existing")
 
 # Engine addition: water bodies filled over a height field (.plans/water-levels/PLAN.md).
-add_executable(faf_water_bodies_tests EXCLUDE_FROM_ALL sim/WaterBodiesTests.cpp ${CMAKE_SOURCE_DIR}/src/moho/sim/WaterBodies.cpp)
+add_executable(faf_water_bodies_tests EXCLUDE_FROM_ALL sim/WaterBodiesTests.cpp ${CMAKE_SOURCE_DIR}/src/moho/sim/WaterBodies.cpp ${CMAKE_SOURCE_DIR}/src/moho/sim/WaterRivers.cpp)
 target_include_directories(faf_water_bodies_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
 target_link_libraries(faf_water_bodies_tests PRIVATE gtest_main)
 set_target_properties(faf_water_bodies_tests PROPERTIES FOLDER "Tests/Sim")
@@ -660,7 +660,7 @@ add_executable(faf_editor_brush_tests EXCLUDE_FROM_ALL editor/HeightBrushTests.c
   editor/UnitCatalogTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/ui/EdUnitCatalog.cpp
   editor/LayoutTests.cpp
   editor/WaterBodiesEditTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdWaterBodies.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdLuaText.cpp
-  ${CMAKE_SOURCE_DIR}/src/moho/sim/WaterBodies.cpp
+  ${CMAKE_SOURCE_DIR}/src/moho/sim/WaterBodies.cpp ${CMAKE_SOURCE_DIR}/src/moho/sim/WaterRivers.cpp
   ${CMAKE_SOURCE_DIR}/src/editor/tools/EdHeightBrush.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdSymmetryCheck.cpp
   ${CMAKE_SOURCE_DIR}/src/editor/terrain/EdErosion.cpp ${CMAKE_SOURCE_DIR}/src/editor/terrain/EdFieldCore.cpp
   ${CMAKE_SOURCE_DIR}/src/editor/tools/EdHeightFile.cpp
