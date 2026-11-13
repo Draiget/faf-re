@@ -395,6 +395,47 @@ set_target_properties(existing_tests PROPERTIES FOLDER "Tests/Existing")
 
 add_subdirectory(vulkan)
 
+# Water effect source patch (src/moho/terrain/water/WaterEffectPatch): pure C++, compiled on its own. FAF_STOCK_FX_DIR (the folder with FAF's
+# stock water2.fx) switches on the checks against the real shader.
+#
+#   cmake --build --preset clang-x64-release --target faf_water_tests
+add_executable(faf_water_tests EXCLUDE_FROM_ALL water/WaterEffectPatchTests.cpp
+               ${CMAKE_SOURCE_DIR}/src/moho/terrain/water/WaterEffectPatch.cpp)
+target_include_directories(faf_water_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_compile_features(faf_water_tests PRIVATE cxx_std_20)
+
+add_test(NAME water_effect_patch COMMAND faf_water_tests)
+
+# The terrain's water level map and the terrain.fx patch that computes the tint under water bodies per pixel
+# (src/moho/terrain/water/WaterLevelTexel.h, TerrainWaterLevelPatch): pure C++. FAF_STOCK_FX_DIR (the folder with FAF's stock terrain.fx)
+# switches on the checks against the real shader.
+#
+#   cmake --build --preset clang-x64-release --target faf_terrain_water_tests
+add_executable(faf_terrain_water_tests EXCLUDE_FROM_ALL water/TerrainWaterLevelTests.cpp
+               ${CMAKE_SOURCE_DIR}/src/moho/terrain/water/TerrainWaterLevelPatch.cpp)
+target_include_directories(faf_terrain_water_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_compile_features(faf_terrain_water_tests PRIVATE cxx_std_20)
+
+add_test(NAME terrain_water_levels COMMAND faf_terrain_water_tests)
+
+# The body tracker of the wave simulation (src/moho/terrain/water/HullDisplacement.h): a still body is only kept.
+#
+#   cmake --build --preset clang-x64-release --target faf_water_body_tracker_tests
+add_executable(faf_water_body_tracker_tests EXCLUDE_FROM_ALL water/WaterBodyTrackerTests.cpp)
+target_include_directories(faf_water_body_tracker_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_compile_features(faf_water_body_tracker_tests PRIVATE cxx_std_20)
+
+add_test(NAME water_body_tracker COMMAND faf_water_body_tracker_tests)
+
+# The simulation per water of a map with water bodies, the checks that need no GPU (src/moho/terrain/water/ShoreField.h, WaterDomains.h;
+# the checks that run the compute shader are in the water lab, tools/watersimlab.py domains). Pure C++, no engine objects.
+#
+#   cmake --build --preset clang-x64-release --target faf_water_domain_tests
+add_executable(faf_water_domain_tests EXCLUDE_FROM_ALL water/WaterDomainTests.cpp)
+target_compile_features(faf_water_domain_tests PRIVATE cxx_std_20)
+
+add_test(NAME water_domains COMMAND faf_water_domain_tests)
+
 # Rendering-only bounded terrain splat output; no game data or renderer required.
 add_executable(faf_splat_budget_tests EXCLUDE_FROM_ALL terrain/splat_budget/SplatBudgetTests.cpp)
 target_link_libraries(faf_splat_budget_tests PRIVATE faf_engine gtest_main)
