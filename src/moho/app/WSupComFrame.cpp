@@ -1,7 +1,23 @@
 #include "moho/app/AppPrivate.h"
 
+#if FAFRE_PLATFORM_POSIX
+#include "gpg/core/time/Timer.h"
+#include "moho/app/WinApp.h"
+#endif
+
 namespace
 {
+#if FAFRE_PLATFORM_POSIX
+  // A tiling window manager or a drag sends a size change every frame; the device follows once
+  // they stop for kResizeSettleMs (WSupComFrame::ApplyPendingResize). A bind the device refuses is
+  // tried again kResizeRetries times, then left until the next size change.
+  constexpr float kResizeSettleMs = 150.0f;
+  constexpr int kResizeRetries = 10;
+  bool sResizePending = false;
+  int sResizeFailures = 0;
+  gpg::time::Timer sResizeTimer;
+#endif
+
   // The system-menu items CScApp's AppendLuaDebuggerSystemMenu (0x008D42E0) adds.
   constexpr int kSupComFrameSysCommandToggleLogDialog = 1;
   constexpr int kSupComFrameSysCommandLuaDebugger = 2;
@@ -22,8 +38,14 @@ namespace
    * Clamps SupCom frame client dimensions to drag minima, propagates size to
    * the active viewport, then rebuilds one GAL context head and reinitializes
    * D3D device state.
+   *
+   * Engine addition: returns InitContext's result (retail drops it), so the POSIX frame can try a
+   * failed bind again. On POSIX the window system has already sized the window: the client size is
+   * in pixels while SetClientSize takes the window system's points (SDL_SetWindowSize), so writing
+   * it back would grow the window on a scaled display, and the minimum clamp would fight a tiling
+   * window manager. A zero size (a window being unmapped) is skipped there.
    */
-  void SyncSupComFrameClientSizeAndViewport(
+  bool SyncSupComFrameClientSizeAndViewport(
     WSupComFrame& frame
   )
   {
@@ -31,6 +53,11 @@ namespace
     int height = 0;
     frame.GetClientSize(&width, &height);
 
+#if FAFRE_PLATFORM_POSIX
+    if (width <= 0 || height <= 0) {
+      return false;
+    }
+#else
     if (width < moho::wnd_MinDragWidth) {
       width = moho::wnd_MinDragWidth;
     }
@@ -39,18 +66,19 @@ namespace
     }
 
     frame.SetClientSize(width, height);
+#endif
     if (moho::ren_Viewport != nullptr) {
       moho::ren_Viewport->SetSize(-1, -1, width, height, SHELL_SIZE_USE_EXISTING);
     }
 
     gpg::gal::Device* const galDevice = gpg::gal::Device::GetInstance();
     if (galDevice == nullptr) {
-      return;
+      return false;
     }
 
     gpg::gal::DeviceContext* const activeContext = galDevice->GetDeviceContext();
     if (activeContext == nullptr) {
-      return;
+      return false;
     }
 
     gpg::gal::DeviceContext context(*activeContext);
@@ -62,11 +90,11 @@ namespace
 
     moho::CD3DDevice* const d3dDevice = moho::D3D_GetDevice();
     if (d3dDevice == nullptr) {
-      return;
+      return false;
     }
 
     d3dDevice->Clear();
-    d3dDevice->InitContext(&context);
+    return d3dDevice->InitContext(&context);
   }
 
   /**
@@ -248,8 +276,50 @@ void WSupComFrame::OnSize(
 )
 {
   (void)event;
-  if (!DeviceFollowsFrame() || IsIconized()) {
+#if FAFRE_PLATFORM_POSIX
+  // ApplyPendingResize follows the size from the main loop once the changes stop.
+  if (this == moho::sMainWindow) {
+    sResizePending = true;
+    sResizeFailures = 0;
+    sResizeTimer.Reset();
+  }
+#else
+  (void)FollowClientSize();
+#endif
+}
+
+#if FAFRE_PLATFORM_POSIX
+void WSupComFrame::ApplyPendingResize()
+{
+  if (!sResizePending) {
     return;
+  }
+  const float elapsedMs = sResizeTimer.ElapsedMilliseconds();
+  if (moho::sDeviceLock || elapsedMs < kResizeSettleMs) {
+    // The main loop may wait for messages without a timeout (an idle menu, a paused game): ask it
+    // to come back when the size has settled.
+    moho::WIN_SetWakeupTimer(moho::sDeviceLock ? kResizeSettleMs : kResizeSettleMs - elapsedMs);
+    return;
+  }
+  auto* const frame = dynamic_cast<WSupComFrame*>(moho::sMainWindow);
+  if (frame == nullptr) {
+    sResizePending = false;
+    return;
+  }
+  if (frame->FollowClientSize() || ++sResizeFailures > kResizeRetries) {
+    sResizePending = false;
+    return;
+  }
+  // The device didn't take the size (a lost or busy swap chain): try again after another wait.
+  sResizeTimer.Reset();
+  moho::WIN_SetWakeupTimer(kResizeSettleMs);
+}
+#endif
+
+bool WSupComFrame::FollowClientSize()
+{
+  if (!DeviceFollowsFrame() || IsIconized()) {
+    return true;
   }
 
   int headWidth = 0;
@@ -259,12 +329,16 @@ void WSupComFrame::OnSize(
   const bool maximized = IsMaximized();
   const bool sizeChanged = clientSize.x != headWidth || clientSize.y != headHeight;
   if (!sizeChanged && (maximized ? 1 : 0) == mPersistedMaximizeSync) {
-    return;
+    return true;
   }
 
-  if (sizeChanged) {
-    SyncSupComFrameClientSizeAndViewport(*this);
+  // Retail went on to the preferences whatever InitContext returned; so does Windows here.
+  [[maybe_unused]] const bool bound = !sizeChanged || SyncSupComFrameClientSizeAndViewport(*this);
+#if FAFRE_PLATFORM_POSIX
+  if (!bound) {
+    return false;
   }
+#endif
 
   moho::IUserPrefs* const preferences = moho::USER_GetPreferences();
   if (preferences != nullptr) {
@@ -277,6 +351,7 @@ void WSupComFrame::OnSize(
   }
   mPersistedMaximizeSync = maximized ? 1 : 0;
   mPendingMaximizeSync = 0;
+  return true;
 }
 
 /**

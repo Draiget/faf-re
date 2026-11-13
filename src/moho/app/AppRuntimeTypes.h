@@ -92,6 +92,22 @@ public:
    */
   void OnSize(ShellSizeEvent& event);
 
+#if FAFRE_PLATFORM_POSIX
+  /**
+   * Engine addition: OnSize on POSIX only marks the size as pending; the main loop calls this
+   * between frames, and the device follows once the size has stopped changing for 150 ms. A bind
+   * the device refused is tried again after another wait, up to 10 times.
+   */
+  static void ApplyPendingResize();
+#endif
+
+  /**
+   * OnSize's work: follows the client size with the viewport and the device when it differs from
+   * the device's head, and saves the size and maximized state. False when the device didn't take
+   * the size (only POSIX acts on it).
+   */
+  bool FollowClientSize();
+
   /**
    * WM_ACTIVATEAPP in WSupComFrame::MSWWindowProc (0x008CDD40): records the active flag and
    * clips the cursor to the window (lock_fullscreen_cursor_to_window) or frees it.
