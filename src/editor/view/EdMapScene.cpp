@@ -1664,6 +1664,59 @@ namespace faf::editor
     return true;
   }
 
+  bool EdMapScene::MoveLayer(
+    const int from,
+    const int to
+  )
+  {
+    if (mMap == nullptr || mPainting || mPaintingMask || from == to || from < 0 || from > 7 || to < 0 || to > 7) {
+      return false;
+    }
+    LoadMasks();
+    EdDocument::MaskGrid& masks = mDocument.Masks();
+    if (masks.texels.empty()) {
+      return false;
+    }
+    const std::array<int, 8> arrangement = LayerMoveArrangement(from, to);
+    EdDocument::ConversionEdit edit;
+    edit.masksBefore = masks.texels;
+    const std::size_t changed =
+      MoveLayerMasks(masks.texels.data(), masks.texels.size(), arrangement, RemappedStrata(TerrainShader()));
+    edit.masksAfter = masks.texels;
+    // The textures follow their paint.
+    const std::vector<EdTools::LayerSlot> slots = LayerSlots();
+    for (int j = 0; j < 8; ++j) {
+      const int source = arrangement[static_cast<std::size_t>(j)];
+      if (source == j || static_cast<std::size_t>(std::max(j, source) + 1) >= slots.size()) {
+        continue;
+      }
+      const EdTools::LayerSlot& before = slots[static_cast<std::size_t>(j + 1)];
+      const EdTools::LayerSlot& after = slots[static_cast<std::size_t>(source + 1)];
+      EdDocument::LayerEdit layer;
+      layer.slot = j + 1;
+      layer.albedoBefore = before.albedo;
+      layer.normalsBefore = before.normals;
+      layer.albedoSizeBefore = before.albedoSize;
+      layer.normalsSizeBefore = before.normalsSize;
+      layer.albedoAfter = after.albedo;
+      layer.normalsAfter = after.normals;
+      layer.albedoSizeAfter = after.albedoSize;
+      layer.normalsSizeAfter = after.normalsSize;
+      edit.layers.push_back(layer);
+    }
+    for (const EdDocument::LayerEdit& layer : edit.layers) {
+      SetLayerSlot(layer.slot, layer.albedoAfter, layer.normalsAfter, layer.albedoSizeAfter, layer.normalsSizeAfter);
+    }
+    UploadMasks({SampleRect{0, 0, masks.width - 1, masks.height - 1}}, 0xFFu);
+    UpdateCoverage();
+    mDocument.ConversionUndo().push_back(std::move(edit));
+    mDocument.ConversionRedo().clear();
+    mDocument.EditEnded(EdDocument::EditKind::LayerConversion);
+    mDocument.SetModified(true);
+    gpg::Logf("editor: layer %d moved to %d: %zu mask texels changed, one undo step", from + 1, to + 1, changed);
+    return true;
+  }
+
   bool EdMapScene::UndoConversion(
     const bool redo
   )
@@ -3059,6 +3112,11 @@ namespace faf::editor
       if (mMap != nullptr && mCamera != nullptr && mWidth > 0 && mHeight > 0) {
         float lookX = 0.0f;
         float lookZ = 0.0f;
+        int moveFrom = -1;
+        int moveTo = -1;
+        if (mTools->TakeLayerMove(moveFrom, moveTo)) {
+          (void)MoveLayer(moveFrom, moveTo);
+        }
         if (mTools->TakeCameraAsk(lookX, lookZ)) {
           mTargetX = lookX;
           mTargetZ = lookZ;

@@ -92,6 +92,33 @@ namespace faf::editor
   void EdShell::UpdateTestRun()
   {
     const double now = ImGui::GetTime();
+    // `/movelayer from,to` (test runs, strata 1 to 8): the layer moved once the map is open.
+    {
+      static bool moveDone = false;
+      static double moveUndoAt = 0.0;
+      fa::vector<fa::string> value;
+      if (
+        !moveDone && mDocument.GetState() == EdDocument::State::Open && ImGui::GetTime() > 6.0 &&
+        moho::CFG_GetArgOption("/movelayer", 1, &value) && !value.empty()
+      ) {
+        moveDone = true;
+        int from = 0;
+        int to = 0;
+        if (std::sscanf(value[0].c_str(), "%d,%d", &from, &to) == 2) {
+          mTools.AskLayerMove(from - 1, to - 1);
+          gpg::Logf("editor: /movelayer %d to %d", from, to);
+          // `,undo`: Edit > Undo two seconds after, as a click would.
+          if (std::string(value[0].c_str()).find(",undo") != std::string::npos) {
+            moveUndoAt = ImGui::GetTime() + 2.0;
+          }
+        }
+      }
+      if (moveUndoAt > 0.0 && ImGui::GetTime() > moveUndoAt && mCommands != nullptr) {
+        moveUndoAt = 0.0;
+        gpg::Logf("editor: /movelayer: Edit > Undo");
+        (void)mCommands->Run("edit.undo");
+      }
+    }
     // `/hidegameunits` (test runs): once a play runs, the editor's view in front of it with the game's units hidden.
     {
       static const bool hideTest = moho::CFG_GetArgOption("/hidegameunits", 0, nullptr);

@@ -7,6 +7,7 @@
 
 #include <gtest/gtest.h>
 
+#include <array>
 #include <cstdint>
 #include <vector>
 
@@ -192,5 +193,63 @@ namespace
     EXPECT_NEAR(paint.slopeDegrees[1], 45.0f, 1.0f);
     EXPECT_EQ(paint.strongest[0], 255);
     EXPECT_EQ(paint.strongest[2], 0);
+  }
+
+  // Moving a layer: the strata between shift one place, each carries its paint, and a weight keeps its meaning on a
+  // stratum the shader reads remapped.
+  TEST(
+    LayerMove,
+    TheLayersBetweenShiftOnePlace
+  )
+  {
+    using faf::editor::LayerMoveArrangement;
+    EXPECT_EQ(LayerMoveArrangement(0, 3), (std::array<int, 8>{1, 2, 3, 0, 4, 5, 6, 7}));
+    EXPECT_EQ(LayerMoveArrangement(5, 1), (std::array<int, 8>{0, 5, 1, 2, 3, 4, 6, 7}));
+    EXPECT_EQ(LayerMoveArrangement(7, 0), (std::array<int, 8>{7, 0, 1, 2, 3, 4, 5, 6}));
+    EXPECT_EQ(LayerMoveArrangement(2, 2), (std::array<int, 8>{0, 1, 2, 3, 4, 5, 6, 7})) << "onto itself: nothing moves";
+    EXPECT_EQ(LayerMoveArrangement(-1, 3), (std::array<int, 8>{0, 1, 2, 3, 4, 5, 6, 7})) << "out of range: nothing";
+  }
+
+  TEST(
+    LayerMove,
+    EachLayerCarriesItsPaint
+  )
+  {
+    using faf::editor::LayerMoveArrangement;
+    using faf::editor::MoveLayerMasks;
+    std::vector<std::uint64_t> texels = {
+      Texel({{0, 10}, {1, 20}, {2, 30}, {3, 40}, {4, 50}, {5, 60}, {6, 70}, {7, 80}}),
+      0,
+    };
+    const std::size_t changed = MoveLayerMasks(texels.data(), texels.size(), LayerMoveArrangement(0, 3), 0);
+    EXPECT_EQ(changed, 1U) << "the empty texel stays as it was";
+    const int expected[8] = {20, 30, 40, 10, 50, 60, 70, 80};
+    for (int layer = 0; layer < 8; ++layer) {
+      EXPECT_EQ(MaskByte(texels[0], layer), expected[layer]) << "place " << layer;
+    }
+    EXPECT_EQ(texels[1], 0U);
+    // And back: the same bytes as before.
+    (void)MoveLayerMasks(texels.data(), texels.size(), LayerMoveArrangement(3, 0), 0);
+    for (int layer = 0; layer < 8; ++layer) {
+      EXPECT_EQ(MaskByte(texels[0], layer), 10 * (layer + 1)) << "place " << layer;
+    }
+  }
+
+  TEST(
+    LayerMove,
+    AWeightKeepsItsMeaningOnARemappedPlace
+  )
+  {
+    using faf::editor::LayerMoveArrangement;
+    using faf::editor::MaskWeight;
+    using faf::editor::MoveLayerMasks;
+    // Stratum 4 (place 3) is read remapped (saturate(2m-1)); stratum 1 (place 0) as it is.
+    constexpr std::uint8_t kRemapped = 0x08;
+    std::vector<std::uint64_t> texels = {Texel({{0, 200}, {3, 127}})};
+    (void)MoveLayerMasks(texels.data(), texels.size(), LayerMoveArrangement(0, 3), kRemapped);
+    // Stratum 1's 200 now at place 3, stored so the remapped read gives 200 again.
+    EXPECT_NEAR(MaskWeight(MaskByte(texels[0], 3), true), 200.0f, 1.0f);
+    // The remapped zero (127) that moved to place 2 reads as zero there, where nothing is remapped.
+    EXPECT_EQ(MaskByte(texels[0], 2), 0);
   }
 } // namespace

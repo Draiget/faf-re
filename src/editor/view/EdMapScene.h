@@ -876,6 +876,8 @@ namespace faf::editor
     std::unique_ptr<class EdMiniMapView> mMiniView;
     float mMiniRect[4]{};
     void UpdateMiniMap();
+    /** Moves stratum `from` to place `to` (0..7) with its mask and texture: one undo step (the conversion's). */
+    bool MoveLayer(int from, int to);
     void DropMiniMap();
 
     // The orbit camera: the point it looks at, its heading and pitch (radians) and its distance from it.

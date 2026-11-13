@@ -224,6 +224,8 @@ A window pulled out of the dock layout (the Material Editor, the Maps window, an
 
 The tools are picked in the **tool strip** down the window's left edge (the mockup's: a square per tool with its key in the corner, the chosen one filled with the accent, rules between select, the terrain tools and the object tools, and Measure at the end, which shows the kilometre lines; picking a tool brings the Tools panel forward). The Tools panel, its tab named after the chosen tool with its icon, holds the chosen tool's settings (brush modes, size, strength, falloff, the symmetry modes with their diagrams). The settings are kept but act on a map only from the tool stages of the plan.
 
+**Moving a layer** (the Texture tool's Layers: drag a layer onto another, or Move up / Move down from its right-click menu; `tools/EdLayerConvert.cpp` LayerMoveArrangement, MoveLayerMasks; `EdMapScene::MoveLayer`): strata 1 to 8 move with their masks and textures, the ones between shifting one place; a weight keeps its meaning when it lands on a stratum the shader reads remapped. One undo step. `/movelayer from,to[,undo]` moves one in a test run (and undoes it two seconds later).
+
 ## How it is built
 
 - **Target:** `src/editor/CMakeLists.txt` adds `faf_editor`, which links the engine's object library `faf_engine` whole, as the engine tests do, so the engine's objects are linked in the game's order. The game's `WinMain` is one of them, so the editor starts at its own `main()` (`/ENTRY:mainCRTStartup`). It carries the game's window resources and manifest and the DXC DLLs as the game does.

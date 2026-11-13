@@ -1252,6 +1252,30 @@ namespace faf::editor
           mBrowseSlot = slot;
           mBrowseOpen = true;
         }
+        // Strata 1 to 8 move: dragged onto another (their masks go with them), or from the right-click menu.
+        if (slot >= 1 && slot <= 8) {
+          if (ImGui::BeginDragDropSource()) {
+            const int stratum = slot - 1;
+            ImGui::SetDragDropPayload("EDITOR_LAYER", &stratum, sizeof(stratum));
+            ImGui::Text("Layer %s  %s", kSlotNames[slot], LayerTextureName(layer.albedo).c_str());
+            ImGui::EndDragDropSource();
+          }
+          if (ImGui::BeginDragDropTarget()) {
+            if (const ImGuiPayload* const payload = ImGui::AcceptDragDropPayload("EDITOR_LAYER"); payload != nullptr) {
+              AskLayerMove(*static_cast<const int*>(payload->Data), slot - 1);
+            }
+            ImGui::EndDragDropTarget();
+          }
+          if (ImGui::BeginPopupContextItem("##layermove")) {
+            if (ImGui::MenuItem("Move up", nullptr, false, slot < 8)) {
+              AskLayerMove(slot - 1, slot);
+            }
+            if (ImGui::MenuItem("Move down", nullptr, false, slot > 1)) {
+              AskLayerMove(slot - 1, slot - 2);
+            }
+            ImGui::EndPopup();
+          }
+        }
         ImGui::SameLine();
         ImGui::BeginGroup();
         ImGui::Text("%s  %s", kSlotNames[slot], LayerTextureName(layer.albedo).c_str());

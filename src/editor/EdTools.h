@@ -1256,6 +1256,24 @@ namespace faf::editor
     {
       return mMinimapRect;
     }
+    /** Move stratum `from` to place `to` (0..7) with its mask, next frame (the scene takes it; one undo step). */
+    void AskLayerMove(
+      const int from,
+      const int to
+    ) noexcept
+    {
+      mLayerMoveFrom = from;
+      mLayerMoveTo = to;
+    }
+    [[nodiscard]] bool TakeLayerMove(
+      int& from,
+      int& to
+    ) noexcept
+    {
+      from = std::exchange(mLayerMoveFrom, -1);
+      to = mLayerMoveTo;
+      return from >= 0;
+    }
     /** The minimap's click: the camera looks at (x, z) next frame (the scene takes it). */
     void AskCameraAt(
       const float x,
@@ -1981,6 +1999,8 @@ namespace faf::editor
     int mNWay = 3;
     ViewFrame mViewFrame;
     float mMinimapRect[4]{};
+    int mLayerMoveFrom = -1;
+    int mLayerMoveTo = -1;
     bool mCameraAsk = false;
     float mCameraAskX = 0.0f;
     float mCameraAskZ = 0.0f;

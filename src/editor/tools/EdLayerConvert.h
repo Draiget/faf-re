@@ -98,4 +98,20 @@ namespace faf::editor
 
   /** "layer 3", "layers 5 and 8", "layers 1-7", "layers 1-3, 5 and 8" (indices 0-7 shown 1-8). */
   [[nodiscard]] std::string LayerListText(const std::vector<int>& layers);
+
+  /**
+   * Moving stratum `from` to place `to` (0..7, stratum 1 to 8): which stratum each place holds after it; those between
+   * shift one place toward where it came from.
+   */
+  [[nodiscard]] std::array<int, 8> LayerMoveArrangement(int from, int to);
+  /**
+   * The masks after a move: each place takes the weight of the stratum the arrangement brings to it, stored as that
+   * place reads it (`remapped`: RemappedStrata's bits). Returns the texels changed.
+   */
+  std::size_t MoveLayerMasks(
+    std::uint64_t* texels,
+    std::size_t count,
+    const std::array<int, 8>& arrangement,
+    std::uint8_t remapped
+  );
 } // namespace faf::editor

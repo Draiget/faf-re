@@ -393,4 +393,52 @@ namespace faf::editor
     }
     return changed;
   }
+
+  std::array<int, 8> LayerMoveArrangement(
+    const int from,
+    const int to
+  )
+  {
+    std::vector<int> order = {0, 1, 2, 3, 4, 5, 6, 7};
+    if (from >= 0 && from < 8 && to >= 0 && to < 8 && from != to) {
+      order.erase(order.begin() + from);
+      order.insert(order.begin() + to, from);
+    }
+    std::array<int, 8> arrangement{};
+    for (std::size_t j = 0; j < 8; ++j) {
+      arrangement[j] = order[j];
+    }
+    return arrangement;
+  }
+
+  std::size_t MoveLayerMasks(
+    std::uint64_t* const texels,
+    const std::size_t count,
+    const std::array<int, 8>& arrangement,
+    const std::uint8_t remapped
+  )
+  {
+    if (texels == nullptr) {
+      return 0;
+    }
+    std::size_t changed = 0;
+    for (std::size_t i = 0; i < count; ++i) {
+      const std::uint64_t before = texels[i];
+      std::uint64_t after = 0;
+      for (int place = 0; place < 8; ++place) {
+        const int source = arrangement[static_cast<std::size_t>(place)];
+        const std::uint8_t byte = MaskByte(before, source);
+        // The same weight, stored as the new place reads it (a full-range layer moved onto a remapped one, or back).
+        const std::uint8_t stored = Remapped(remapped, source) == Remapped(remapped, place)
+          ? byte
+          : MaskStoredFor(MaskWeight(byte, Remapped(remapped, source)), Remapped(remapped, place), 0);
+        after = WithMaskByte(after, place, stored);
+      }
+      if (after != before) {
+        texels[i] = after;
+        ++changed;
+      }
+    }
+    return changed;
+  }
 } // namespace faf::editor
