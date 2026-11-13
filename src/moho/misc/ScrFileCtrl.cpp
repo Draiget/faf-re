@@ -76,10 +76,10 @@ moho::ScrFileCtrl::~ScrFileCtrl() = default;
 /**
  * Address: 0x004C2730 (FUN_004C2730)
  *
- * The loop stops on badbit or eofbit only: a line that fills the buffer sets
- * failbit alone, after which every getline fails without reaching either and
- * the loop keeps appending empty lines. A last line with no newline is
- * dropped. Both as shipped.
+ * Reads the script through the file system's memory map (see the engine change in the body) and lists one row
+ * per line. The binary's getline loop dropped a last line with no newline, and this does too. Its loop also
+ * never ended on a line of 1024 characters or more (failbit without badbit or eofbit); such a line is cut
+ * here instead. An empty or unreadable file is not opened, so a pause in it resumes (OnScriptPause).
  */
 bool moho::ScrFileCtrl::Load(
   const fa::string& fileName

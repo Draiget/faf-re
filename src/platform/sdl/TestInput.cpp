@@ -52,7 +52,8 @@ namespace
 
   struct Script
   {
-    bool active = false;
+    // Read by NoteLogLine on any thread that logs; written by Start and Tick on the main thread.
+    std::atomic<bool> active{false};
     platform::window::test::CommandRunner runCommand = nullptr;
     std::vector<std::string> lines;
     std::size_t next = 0;
