@@ -2340,7 +2340,9 @@ namespace moho
       const int mapZ = static_cast<int>(entity->mVariableData.mCurTransform.pos_.z);
       const bool insidePlayableRect =
         mapX >= playableRect.x0 && mapX < playableRect.x1 && mapZ >= playableRect.z0 && mapZ < playableRect.z1;
-      meshInstance->isHidden = insidePlayableRect ? 0u : 1u;
+      // Not in the binary: units the map editor hides stay hidden (ed_HideUserUnits; drawing only).
+      const bool editorHidden = ed_HideUserUnits && entity->IsUserUnit() != nullptr;
+      meshInstance->isHidden = insidePlayableRect && !editorHidden ? 0u : 1u;
     }
   }
 

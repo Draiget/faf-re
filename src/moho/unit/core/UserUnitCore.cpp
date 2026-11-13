@@ -864,6 +864,12 @@ void UserUnit::UpdateVisibility()
   if (meshInstance == nullptr) {
     return;
   }
+  // Not in the binary: the map editor's "Game units" off (ed_HideUserUnits, UserEntity.h) keeps the unit hidden here,
+  // or this update shows it again between the editor's frames and it flickers. Drawing only.
+  if (ed_HideUserUnits) {
+    meshInstance->isHidden = 1u;
+    return;
+  }
 
   switch (entityView->mVariableData.mVisibilityMode) {
   case EUserEntityVisibilityMode::Hidden:

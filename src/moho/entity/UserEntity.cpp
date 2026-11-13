@@ -790,6 +790,8 @@ namespace moho
     return CD3DBatchTexture::FromFile(kSelectionBracketNeutralTexture, 1u);
   }
 
+  bool ed_HideUserUnits = false;
+
   /**
    * Address: 0x008B9580 (FUN_008B9580, ?UpdateVisibility@UserEntity@Moho@@UAEXXZ)
    */
@@ -797,6 +799,12 @@ namespace moho
   {
     auto* const meshInstance = mMeshInstance;
     if (!meshInstance) {
+      return;
+    }
+    // Not in the binary: the map editor's "Game units" off keeps units hidden here too, or this update shows them
+    // again between the editor's frames and they flicker (ed_HideUserUnits; drawing only).
+    if (ed_HideUserUnits && IsUserUnit() != nullptr) {
+      meshInstance->isHidden = 1;
       return;
     }
 
