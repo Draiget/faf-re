@@ -382,11 +382,14 @@ add_executable(faf_editor_field_tests EXCLUDE_FROM_ALL editor/FieldTests.cpp edi
   editor/SlopeRulesTests.cpp
   editor/ErosionSuiteTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdErosionSuite.cpp
   editor/ScToolsTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdScTools.cpp
+  editor/TerrainGraphTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/graph/EdTerrainGraph.cpp ${CMAKE_SOURCE_DIR}/src/editor/graph/EdTerrainNodes.cpp
+  ${CMAKE_SOURCE_DIR}/src/editor/graph/EdNodeGraph.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdJson.cpp
   ${CMAKE_SOURCE_DIR}/src/editor/terrain/EdErosion.cpp ${CMAKE_SOURCE_DIR}/src/editor/terrain/EdFieldEro2.cpp
   ${CMAKE_SOURCE_DIR}/src/editor/terrain/EdFieldCore.cpp ${CMAKE_SOURCE_DIR}/src/editor/terrain/EdFieldFilt.cpp ${CMAKE_SOURCE_DIR}/src/editor/terrain/EdFieldGen.cpp ${CMAKE_SOURCE_DIR}/src/editor/terrain/EdFieldLand.cpp ${CMAKE_SOURCE_DIR}/src/editor/terrain/EdFieldSc.cpp ${CMAKE_SOURCE_DIR}/src/editor/terrain/EdFieldPath.cpp ${CMAKE_SOURCE_DIR}/src/editor/terrain/EdFieldInterop.cpp)
 target_include_directories(faf_editor_field_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
 target_compile_definitions(faf_editor_field_tests PRIVATE FAF_FIELD_CASES="${CMAKE_CURRENT_SOURCE_DIR}/editor/data/field_cases.lua"
-  FAF_EROSION_CASES="${CMAKE_CURRENT_SOURCE_DIR}/editor/data/erosion_cases.lua")
+  FAF_EROSION_CASES="${CMAKE_CURRENT_SOURCE_DIR}/editor/data/erosion_cases.lua"
+  FAF_TERRAIN_GRAPHS="${CMAKE_CURRENT_SOURCE_DIR}/editor/data/graphs")
 target_compile_options(faf_editor_field_tests PRIVATE /EHsc -Wno-unused-function)
 target_link_libraries(faf_editor_field_tests PRIVATE gtest_main)
 set_target_properties(faf_editor_field_tests PROPERTIES FOLDER "Tests/Editor")

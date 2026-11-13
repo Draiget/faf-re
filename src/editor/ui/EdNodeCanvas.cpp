@@ -67,6 +67,14 @@ namespace faf::editor
         return IM_COL32(240, 110, 90, 255);
       case PinType::Texture:
         return IM_COL32(110, 160, 255, 255);
+      case PinType::Height:
+        return IM_COL32(127, 176, 224, 255);
+      case PinType::Mask:
+        return IM_COL32(224, 166, 74, 255);
+      case PinType::Points:
+        return IM_COL32(127, 212, 127, 255);
+      case PinType::Number:
+        return IM_COL32(200, 138, 224, 255);
       default:
         return IM_COL32(190, 190, 190, 255);
       }

@@ -22,6 +22,12 @@ namespace faf::editor
     Curve,
     Emitter,
     Texture,
+    // The terrain graph's (Generate): heights and masks are both fields and link freely; a path's points; one number
+    // that overrides a parameter of the same name.
+    Height,
+    Mask,
+    Points,
+    Number,
   };
   /** Whether an output of `from` may feed an input of `to`. */
   [[nodiscard]] bool PinsCompatible(PinType from, PinType to) noexcept;
@@ -56,6 +62,15 @@ namespace faf::editor
     std::vector<std::string> choices;
     std::string initialText;
     std::string help;
+    /** The inspector's name for it (empty: `name`); a choice's ids as files keep them (empty: the index). */
+    std::string label;
+    std::vector<std::string> choiceIds;
+    /** A slider's step and printf format (0 / empty: the editor's own). */
+    float step = 0.0f;
+    std::string format;
+    /** A terrain node's number that an input pin of the same name can drive; a seed (the graph's seed is mixed in). */
+    bool wire = false;
+    bool seed = false;
   };
 
   struct NodeType
@@ -144,6 +159,8 @@ namespace faf::editor
 
     /** A node of the type at (x, y) with its parameters' initial values; its id, or 0 for an unknown type. */
     int AddNode(const std::string& type, float x, float y);
+    /** The same with the id given (a graph read from another editor's file keeps its ids); 0 when it is taken. */
+    int AddNodeAs(int id, const std::string& type, float x, float y);
     /** Removes the node and its links (not the output node). */
     bool RemoveNode(int id);
     [[nodiscard]] GraphNode* Find(int id);

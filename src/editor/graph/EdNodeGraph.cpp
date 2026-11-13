@@ -60,7 +60,10 @@ namespace faf::editor
     const auto image = [](const PinType type) {
       return type == PinType::Grey || type == PinType::Color;
     };
-    return from == to || (image(from) && image(to));
+    const auto field = [](const PinType type) {
+      return type == PinType::Height || type == PinType::Mask;
+    };
+    return from == to || (image(from) && image(to)) || (field(from) && field(to));
   }
 
   const char* PinTypeName(
@@ -78,6 +81,14 @@ namespace faf::editor
       return "emitter";
     case PinType::Texture:
       return "texture";
+    case PinType::Height:
+      return "height";
+    case PinType::Mask:
+      return "mask";
+    case PinType::Points:
+      return "path";
+    case PinType::Number:
+      return "number";
     }
     return "?";
   }
@@ -108,12 +119,23 @@ namespace faf::editor
     const float y
   )
   {
+    return AddNodeAs(mNextId, typeName, x, y);
+  }
+
+  int NodeGraph::AddNodeAs(
+    const int id,
+    const std::string& typeName,
+    const float x,
+    const float y
+  )
+  {
     const NodeType* type = mRegistry->Find(typeName);
-    if (type == nullptr || (type->isOutput && OutputNode() != 0)) {
+    if (type == nullptr || id <= 0 || Find(id) != nullptr || (type->isOutput && OutputNode() != 0)) {
       return 0;
     }
     GraphNode node;
-    node.id = mNextId++;
+    node.id = id;
+    mNextId = std::max(mNextId, id + 1);
     node.type = type;
     node.x = x;
     node.y = y;
