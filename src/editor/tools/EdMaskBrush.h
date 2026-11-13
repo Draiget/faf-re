@@ -63,9 +63,10 @@ namespace faf::editor
 
   /**
    * Which strata (bit k: the stratum of byte k) a terrain shader reads through `saturate(m * 2 - 1)` rather than as
-   * it is (FAF's effects/terrain.fx): every shader but TerrainPBR does, both masks; the Terrain1xx and Terrain2xx
-   * shaders (Terrain100 to Terrain252, with or without B) only the second mask's colour, its alpha (stratum 8) as it
-   * is. A shader the table doesn't know: all eight, as most do.
+   * it is (FAF's effects/terrain.fx): TTerrain, TTerrainXP, TTerrainGlow, TTerrainXPExt and Terrain301 all eight;
+   * the numbered shaders whose middle digit is 5 (Terrain050, Terrain151, Terrain252B ...) all eight for the 0xx ones
+   * and strata 1-7 for the 1xx / 2xx ones (stratum 8, their roughness multiplier, as it is); the others (middle digit
+   * 0: Terrain000, Terrain101B, Terrain200 ...) and TerrainPBR none. A shader the table doesn't know: all eight.
    */
   [[nodiscard]] std::uint8_t RemappedStrata(std::string_view shader);
 

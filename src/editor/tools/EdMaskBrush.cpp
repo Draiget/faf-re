@@ -694,17 +694,26 @@ namespace faf::editor
     for (char& c : name) {
       c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
     }
+    // From effects/terrain.fx: the original shaders read every mask through saturate(2m - 1); the numbered ones pass
+    // a `halfRange` flag to their pixel shader, set exactly when the name's middle digit is 5 (Terrain050, Terrain151,
+    // Terrain252B ...), and the 1xx / 2xx shaders leave stratum 8 (the second mask's alpha, their roughness multiplier)
+    // out of it; Terrain301 passes it set; TerrainPBR reads the masks as they are.
     if (name == "terrainpbr") {
       return 0;
     }
-    // Terrain100..Terrain252 and their B forms: the second mask's alpha as it is.
+    if (name == "terrain301") {
+      return 0xFF;
+    }
     if (
-      name.size() >= 10 && name.rfind("terrain", 0) == 0 && (name[7] == '1' || name[7] == '2') &&
+      name.size() >= 10 && name.rfind("terrain", 0) == 0 && std::isdigit(static_cast<unsigned char>(name[7])) != 0 &&
       std::isdigit(static_cast<unsigned char>(name[8])) != 0 && std::isdigit(static_cast<unsigned char>(name[9])) != 0
     ) {
-      return 0x7F;
+      if (name[8] != '5') {
+        return 0; // full range
+      }
+      return name[7] == '1' || name[7] == '2' ? std::uint8_t{0x7F} : std::uint8_t{0xFF};
     }
-    return 0xFF;
+    return 0xFF; // TTerrain, TTerrainXP, TTerrainGlow, TTerrainXPExt, and a shader the table doesn't know
   }
 
   MaskRangeReport CheckMaskRange(

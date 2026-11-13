@@ -26,13 +26,24 @@ namespace
     ShadersSayWhichStrataAreRemapped
   )
   {
-    EXPECT_EQ(RemappedStrata("TTerrain"), 0xFF) << "the default shader reads every stratum through 2m-1";
+    // Every composite technique of FAF's effects/terrain.fx, by the halfRange argument its albedo shader gets.
+    EXPECT_EQ(RemappedStrata("TTerrain"), 0xFF) << "the original shader reads every stratum through 2m-1";
     EXPECT_EQ(RemappedStrata("TTerrainXP"), 0xFF);
-    EXPECT_EQ(RemappedStrata("Terrain101B"), 0x7F) << "Terrain1xx: stratum 8 as it is";
+    EXPECT_EQ(RemappedStrata("TTerrainGlow"), 0xFF);
+    EXPECT_EQ(RemappedStrata("TTerrainXPExt"), 0xFF) << "Terrain000AlbedoPS(true)";
+    EXPECT_EQ(RemappedStrata("Terrain000"), 0x00) << "Terrain000AlbedoPS(false): the full range";
+    EXPECT_EQ(RemappedStrata("Terrain050"), 0xFF) << "Terrain000AlbedoPS(true)";
+    EXPECT_EQ(RemappedStrata("Terrain001"), 0x00);
+    EXPECT_EQ(RemappedStrata("Terrain051"), 0xFF);
+    EXPECT_EQ(RemappedStrata("Terrain101B"), 0x00) << "Terrain100BAlbedoPS(false, 1)";
+    EXPECT_EQ(RemappedStrata("Terrain151"), 0x7F) << "half range, stratum 8 as it is";
     EXPECT_EQ(RemappedStrata("terrain250"), 0x7F) << "names compare without case";
+    EXPECT_EQ(RemappedStrata("Terrain252B"), 0x7F);
+    EXPECT_EQ(RemappedStrata("Terrain200"), 0x00);
+    EXPECT_EQ(RemappedStrata("Terrain301"), 0xFF) << "Terrain301AlbedoPS(true)";
     EXPECT_EQ(RemappedStrata("TerrainPBR"), 0x00) << "PBR reads masks as they are";
     EXPECT_EQ(RemappedStrata("SomethingNew"), 0xFF) << "an unknown shader: as most do";
-    EXPECT_EQ(RemappedStrata("Terrain"), 0xFF) << "too short for Terrain1xx";
+    EXPECT_EQ(RemappedStrata("Terrain"), 0xFF) << "too short to be a numbered shader";
   }
 
   TEST(
@@ -64,7 +75,7 @@ namespace
     std::vector<std::uint64_t> texels(4, 0);
     texels[0] = WithMaskByte(0, 0, 100); // hidden under 2m-1
     texels[1] = WithMaskByte(0, 0, 200); // shows
-    texels[2] = WithMaskByte(0, 7, 60);  // stratum 8: hidden under TTerrain, shown under Terrain101B
+    texels[2] = WithMaskByte(0, 7, 60);  // stratum 8: hidden under TTerrain, shown under Terrain151
     texels[3] = WithMaskByte(0, 3, 127); // hidden
     const auto all = CheckMaskRange(texels.data(), texels.size(), 0xFF);
     EXPECT_EQ(all.hidden[0], 1);
@@ -74,7 +85,7 @@ namespace
     EXPECT_TRUE(all.PaintedForAnotherRange(7));
     EXPECT_FALSE(all.PaintedForAnotherRange(5)) << "no paint at all";
     EXPECT_EQ(all.Total(), 2);
-    EXPECT_EQ(CheckMaskRange(texels.data(), texels.size(), 0x7F).Total(), 1) << "Terrain101B shows stratum 8";
+    EXPECT_EQ(CheckMaskRange(texels.data(), texels.size(), 0x7F).Total(), 1) << "Terrain151 shows stratum 8";
     EXPECT_EQ(CheckMaskRange(texels.data(), texels.size(), 0x00).Total(), 0) << "PBR: nothing hidden";
   }
 
