@@ -171,9 +171,9 @@ namespace moho
     DECLARE_EVENT_TABLE()
   };
 
-  // The retail base was the 2.4.2 window library's wxWindow, 0x124 bytes; ShellWindow keeps that size in the
-  // retail-layout build (platform/shell/window.h).
-  static_assert(sizeof(ShellWindow) == 0x124, "ShellWindow size must be 0x124 (retail wxWindow)");
+  // The retail base was the 2.4.2 window library's wxWindow (destructor 0x0096BF40), 0x124 bytes; ShellWindow keeps
+  // that size in the retail-layout build (platform/shell/window.h).
+  static_assert(sizeof(ShellWindow) == 0x124, "ShellWindow size must be 0x124 (the retail window base)");
   static_assert(
     offsetof(WD3DViewport, mBackgroundImage) == 0x124,
     "moho::WD3DViewport::mBackgroundImage offset must be 0x124"

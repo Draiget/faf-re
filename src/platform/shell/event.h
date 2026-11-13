@@ -555,8 +555,9 @@ private:
   bool m_enabled = true;
 #if FAF_RETAIL_LAYOUT
   // The retail-layout build keeps the size of the class this stands in for, the 2.4.2 window library's
-  // wxEvtHandler (0x28 on x86), so the recovered types built on it keep their retail offsets: CUIKeyHandler is
-  // 0x28 and CMauiEventMapper's own fields start at 0x28 (moho/ui/UiRuntimeTypes.h). Nothing reads these bytes.
+  // wxEvtHandler (constructor 0x00979750; 0x28 on x86), so the recovered types built on it keep their retail offsets:
+  // CUIKeyHandler is 0x28 and CMauiEventMapper's own fields start at 0x28 (moho/ui/UiRuntimeTypes.h). Nothing reads
+  // these bytes.
   std::uint8_t m_retailReserved[0x18]{};
 #endif
 };
