@@ -280,6 +280,12 @@ set(FAF_ENGINE_SOURCES
   moho/misc/CombinedMilitaryExtractor.cpp
   moho/misc/CountermeasureExtractor.cpp
   moho/particles/CWorldParticles.cpp
+  moho/render/lights/LightCollector.cpp
+  moho/render/lights/LightGrid.cpp
+  moho/render/lights/LightEffectPatch.cpp
+  moho/render/lights/LightTexture.cpp
+  moho/render/lights/LightTextureCache.cpp
+  moho/render/lights/LightMeshEmission.cpp
   moho/app/WinApp.cpp
   moho/misc/WinPlatform.cpp
   gpg/core/diagnostics/CrashHooks.cpp
