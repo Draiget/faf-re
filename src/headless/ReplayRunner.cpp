@@ -1069,6 +1069,38 @@ namespace faf::headless
             std::fclose(dump);
           }
         }
+        if (!options.syncAlliesPath.empty()) {
+          // `<beat> <army>:<ally>,<ally>;...` (0-based armies, an army not listed with itself), the first beat and
+          // each one whose alliances differ from the last line's. tools/sync-routing/policy_gen.py reads it.
+          static std::string sLastAllies;
+          static bool sAlliesStarted = false;
+          std::string allies;
+          for (std::size_t army = 0; army < packet->mArmyUpdates.size(); ++army) {
+            allies += std::to_string(army);
+            allies += ':';
+            bool first = true;
+            packet->mArmyUpdates[army].mAllies.ForEachValue([&](const unsigned int other) {
+              if (other == army) {
+                return;
+              }
+              if (!first) {
+                allies += ',';
+              }
+              first = false;
+              allies += std::to_string(other);
+            });
+            allies += ';';
+          }
+          if (!sAlliesStarted || allies != sLastAllies) {
+            std::FILE* const file = std::fopen(options.syncAlliesPath.c_str(), sAlliesStarted ? "ab" : "wb");
+            sAlliesStarted = true;
+            sLastAllies = allies;
+            if (file != nullptr) {
+              std::fprintf(file, "%d %s\n", packet->mCurBeat, allies.c_str());
+              std::fclose(file);
+            }
+          }
+        }
         const bool syncSaysEnded = InspectSync(*packet, syncState, options.syncKeysPath.empty() ? nullptr : &syncKeys);
         if (!result.gameEnded && syncSaysEnded) {
           result.gameEnded = true;

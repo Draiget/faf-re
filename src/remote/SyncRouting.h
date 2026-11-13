@@ -89,12 +89,39 @@ namespace faf::remote
     }
     return false;
   }
-  /** "3835, 3840": the validated versions, for messages. */
+  /** "3835, 3840": the validated versions, for messages; with a policy file in use, that file's version. */
   [[nodiscard]] std::string SyncPolicyGameVersionsText();
-  /** That version's keys (`.plans/dedicated-server/research/WP6.1-sync-keys.md`), sorted. */
+  /** Whether the policy in use (the compiled one, or a policy file's) is for `gameVersion`. */
+  [[nodiscard]] bool ActiveSyncPolicyCovers(int gameVersion) noexcept;
+  /** The keys of the policy in use, sorted: the compiled table, or a policy file's (`UseSyncPolicy`). */
   [[nodiscard]] std::span<const SSyncKeyRoute> SyncKeyRoutes() noexcept;
+  /** The compiled table, whatever is in use. */
+  [[nodiscard]] std::span<const SSyncKeyRoute> CompiledSyncKeyRoutes() noexcept;
   /** The route of `key`, or `ESyncRoute::Observers` with `known` false. */
   [[nodiscard]] ESyncRoute RouteOfSyncKey(std::string_view key, bool& known) noexcept;
+
+  /** "Everyone", "EntityOwner", ...: the enumerator's own name, as policy files write it. */
+  [[nodiscard]] std::string_view SyncRouteName(ESyncRoute route) noexcept;
+  [[nodiscard]] bool ParseSyncRouteName(std::string_view name, ESyncRoute& route) noexcept;
+
+  /**
+   * A routing policy read from a file (`tools/sync-routing/policy_gen.py` writes them, one per FAF game version):
+   * `# game-version: <n>` once, then one `<key>\t<route>[\t...]` line per key; `#` lines and blank lines are skipped,
+   * and columns after the route (where the rule came from, how often it was seen) are for the people who review it.
+   */
+  struct SSyncPolicy
+  {
+    int gameVersion = 0;
+    std::vector<std::pair<std::string, ESyncRoute>> routes; // sorted by key
+  };
+  /** Reads a policy file's text; false with `error` set if a line is bad, a key repeats or the version is missing. */
+  [[nodiscard]] bool ParseSyncPolicy(std::string_view text, SSyncPolicy& policy, std::string& error);
+  /** From now on `SyncKeyRoutes` and `RouteOfSyncKey` answer from `policy` (`--sync-policy`); call before routing. */
+  void UseSyncPolicy(SSyncPolicy policy);
+  /** Back to the compiled table (tests). */
+  void UseCompiledSyncPolicy();
+  /** `--sync-policy <file>`, if given: read and put in use. False with `error` set if the file can't be used. */
+  [[nodiscard]] bool UseSyncPolicyFile(const std::string& path, std::string& error);
 
   /** Which players a `Sync` field may name an entity to. */
   enum class ESyncIdAudience : std::uint8_t

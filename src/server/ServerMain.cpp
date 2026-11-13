@@ -119,7 +119,7 @@ namespace
     "[--stats-every <beats>] [--pose-budget-kbps <n>] [--no-effect-ops | --effect-ops-all] [--congestion-control] "
     "[--nftables-out <file> "
     "[--nftables-only] "
-    "[--unlisted-pps <n>] [--unlisted-total-pps <n>]] [--unvalidated-policy] "
+    "[--unlisted-pps <n>] [--unlisted-total-pps <n>]] [--sync-policy <file>] [--unvalidated-policy] "
     "[--control <ip:port> --control-key <file>] [--rest <ip:port> --rest-token-file <file> [--rest-cors-origin "
     "<origin>]] "
     "[--checksum-period <beats>] [--digests <file>] [--state-digests <file>]\n";
@@ -2275,7 +2275,26 @@ namespace
     }
     // Plan WPR.32: each player's Lua `Sync` is routed by a table validated per FAF version (remote/SyncRouting.h); on
     // another version a new key would reach observers only, and the players' UI would miss it without a sign.
-    if (const int dataVersion = moho::FAF_GetSessionGameVersion(); !faf::remote::SyncPolicyValidatedFor(dataVersion)) {
+    // `--sync-policy <file>`: a policy file (tools/sync-routing/policy_gen.py) instead of the compiled table; it is for
+    // the one FAF version it names.
+    if (
+      fa::vector<fa::string> policyArgs; moho::CFG_GetArgOption("--sync-policy", 1, &policyArgs) && !policyArgs.empty()
+    ) {
+      std::string policyError;
+      if (!faf::remote::UseSyncPolicyFile(policyArgs[0].c_str(), policyError)) {
+        end.error = "the Sync routing policy can't be used: " + policyError;
+        Say("Can't host: %s", end.error.c_str());
+        WriteResult(resultPath, end);
+        return kExitBadInput;
+      }
+      Say(
+        "Sync routing policy %s: %zu keys, FAF game version %s",
+        policyArgs[0].c_str(),
+        faf::remote::SyncKeyRoutes().size(),
+        faf::remote::SyncPolicyGameVersionsText().c_str()
+      );
+    }
+    if (const int dataVersion = moho::FAF_GetSessionGameVersion(); !faf::remote::ActiveSyncPolicyCovers(dataVersion)) {
       if (!moho::CFG_GetArgOption("--unvalidated-policy", 0, nullptr)) {
         end.error = "the game data is FAF game version " + std::to_string(dataVersion) +
           ", and the Sync routing policy is validated on " + faf::remote::SyncPolicyGameVersionsText() +

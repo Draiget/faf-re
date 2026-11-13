@@ -394,12 +394,20 @@ add_executable(faf_remote_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/re
   "${PROJECT_SOURCE_DIR}/tests/remote/EffectHostingTests.cpp"
   # Plan WP12.2: the launcher's connection string and the commands a game on a game server ignores.
   "${PROJECT_SOURCE_DIR}/tests/remote/LaunchPathTests.cpp"
+  # The Lua Sync routing policy as a file, and the committed policy against the compiled table.
+  "${PROJECT_SOURCE_DIR}/tests/remote/SyncPolicyTests.cpp"
   # Plan WP9.5: a beam's create parameters from the server's recorder, through the lane, into the client's beam.
   "${PROJECT_SOURCE_DIR}/src/server/EffectOpEncoder.cpp" "${PROJECT_SOURCE_DIR}/src/server/EffectOpRecorder.cpp")
 target_link_libraries(faf_remote_tests PRIVATE faf_sim gtest_main)
-target_compile_definitions(faf_remote_tests PRIVATE FAF_SERVER_MODE=1)
+target_compile_definitions(faf_remote_tests PRIVATE FAF_SERVER_MODE=1
+  FAF_SYNC_POLICY_DIR="${PROJECT_SOURCE_DIR}/tools/sync-routing/policy")
 target_link_options(faf_remote_tests PRIVATE -Wl,--error-limit=0)
 add_test(NAME remote_wire COMMAND faf_remote_tests)
+# The Sync routing policy generator (tools/sync-routing/policy_gen.py) and its acceptance rule.
+find_program(FAF_PYTHON3 NAMES python3 python)
+if(FAF_PYTHON3)
+  add_test(NAME sync_policy_gen COMMAND "${FAF_PYTHON3}" "${PROJECT_SOURCE_DIR}/tools/sync-routing/test_policy_gen.py")
+endif()
 
 # platform::net on BSD sockets (issue #259): loopback sockets and the socket events moho/net's
 # lockstep transport waits on.

@@ -300,13 +300,16 @@ namespace faf::headless
 
   std::string CReplaySyncSpy::Summary() const
   {
-    char text[320];
+    char text[512];
+    // The last two are the router's own: writes of keys the policy doesn't list (observers only), and calls the
+    // fan-out guard (plan WPR.26) flagged.
     std::snprintf(
       text,
       sizeof(text),
       "lua spy: %zu keys over %llu view beats, %llu ids (%llu in marked fields); %llu keys with no route, %llu outside "
       "their audience, "
-      "%llu renumbered ids sent raw, %llu that did not decode; %llu unmarked ids of other armies",
+      "%llu renumbered ids sent raw, %llu that did not decode; %llu unmarked ids of other armies; %llu writes of "
+      "unrouted keys, %llu fan-out guard flags",
       mKeys.size(),
       static_cast<unsigned long long>(mViewBeats),
       static_cast<unsigned long long>(mIds),
@@ -315,7 +318,9 @@ namespace faf::headless
       static_cast<unsigned long long>(mOutsideAudience),
       static_cast<unsigned long long>(mRawRenumbered),
       static_cast<unsigned long long>(mDecodeFailures),
-      static_cast<unsigned long long>(mUnmarked)
+      static_cast<unsigned long long>(mUnmarked),
+      static_cast<unsigned long long>(mRouter.UnknownKeyWrites()),
+      static_cast<unsigned long long>(mRouter.FanOutViolations())
     );
     std::string summary = text;
     for (const std::string& example : mExamples) {

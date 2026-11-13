@@ -61,6 +61,7 @@ namespace faf::headless
     int focusSwitchBeat = -1; // at this beat the sim's focus moves to `focusSwitchArmy`, as a lockstep client's does
     int focusSwitchArmy = 0;
     std::string syncDumpPath;    // when set: each beat's Lua `Sync` bytes go here
+    std::string syncAlliesPath;  // when set: each army's allies, on the first beat and whenever they change
     int viewPipelineThreads = 0; // with `viewBenchPath`: threads that finish the views while the sim goes on
     bool viewTables = false;     // `--view-tables`: the session tables as a server keeps them (plan WP11 step 4)
     int statsEvery = 0;          // `--stats-every <beats>` with `viewTables` (0: the server's default)

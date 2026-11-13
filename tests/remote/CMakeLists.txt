@@ -27,14 +27,24 @@ if(TARGET faf_netchannel)
   endif()
 endif()
 
+# The Sync routing policy generator (tools/sync-routing/policy_gen.py) and its acceptance rule: Python only.
+find_program(FAF_PYTHON3 NAMES python3 python)
+if(FAF_PYTHON3)
+  add_test(NAME sync_policy_gen COMMAND "${FAF_PYTHON3}" "${CMAKE_SOURCE_DIR}/tools/sync-routing/test_policy_gen.py")
+  set_tests_properties(sync_policy_gen PROPERTIES LABELS "Existing")
+endif()
+
 if(FAF_SERVER_MODE)
   # Plan WP9.3: the effect classes hosted outside a sim, and the client's follow targets.
   # Plan WP9.5: a beam's create parameters from the server's recorder, through the lane, into the client's beam.
     # Plan WP12.2: the launcher's connection string and the commands a game on a game server ignores.
+  # The Lua Sync routing policy as a file, and the committed policy against the compiled table.
 add_executable(faf_remote_tests EXCLUDE_FROM_ALL WireTests.cpp EffectHostingTests.cpp LaunchPathTests.cpp
+    SyncPolicyTests.cpp
     ${CMAKE_SOURCE_DIR}/src/server/EffectOpEncoder.cpp ${CMAKE_SOURCE_DIR}/src/server/EffectOpRecorder.cpp)
   target_link_libraries(faf_remote_tests PRIVATE faf_engine gtest_main)
-  target_compile_definitions(faf_remote_tests PRIVATE FAF_SERVER_MODE=1)
+  target_compile_definitions(faf_remote_tests PRIVATE FAF_SERVER_MODE=1
+    FAF_SYNC_POLICY_DIR="${CMAKE_SOURCE_DIR}/tools/sync-routing/policy")
   set_target_properties(faf_remote_tests PROPERTIES FOLDER "Tests/Existing")
   add_test(NAME remote_wire COMMAND faf_remote_tests)
   set_tests_properties(remote_wire PROPERTIES LABELS "Existing")

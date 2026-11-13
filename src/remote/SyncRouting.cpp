@@ -5,6 +5,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <optional>
 #include <utility>
 
 #include "gpg/core/streams/Stream.h"
@@ -773,9 +774,57 @@ namespace faf::remote
     };
   } // namespace
 
+  namespace
+  {
+    // `--sync-policy`'s table, and views of its keys for `SyncKeyRoutes`. Set once before any routing.
+    std::optional<SSyncPolicy> sLoadedPolicy;
+    std::vector<SSyncKeyRoute> sLoadedRoutes;
+
+    constexpr std::pair<std::string_view, ESyncRoute> kRouteNames[] = {
+      {"Everyone", ESyncRoute::Everyone},
+      {"Reclaim", ESyncRoute::Reclaim},
+      {"EntityOwner", ESyncRoute::EntityOwner},
+      {"EntityAllies", ESyncRoute::EntityAllies},
+      {"ReleasedIds", ESyncRoute::ReleasedIds},
+      {"Score", ESyncRoute::Score},
+      {"ScoreAccum", ESyncRoute::ScoreAccum},
+      {"NukeLaunch", ESyncRoute::NukeLaunch},
+      {"Chat", ESyncRoute::Chat},
+      {"Observers", ESyncRoute::Observers},
+    };
+
+    [[nodiscard]] std::string_view TrimSpace(
+      std::string_view text
+    ) noexcept
+    {
+      while (!text.empty() && (text.front() == ' ' || text.front() == '\t')) {
+        text.remove_prefix(1);
+      }
+      while (!text.empty() && (text.back() == ' ' || text.back() == '\t' || text.back() == '\r')) {
+        text.remove_suffix(1);
+      }
+      return text;
+    }
+  } // namespace
+
   std::span<const SSyncKeyRoute> SyncKeyRoutes() noexcept
   {
+    if (sLoadedPolicy.has_value()) {
+      return sLoadedRoutes;
+    }
     return kRoutes;
+  }
+
+  std::span<const SSyncKeyRoute> CompiledSyncKeyRoutes() noexcept
+  {
+    return kRoutes;
+  }
+
+  bool ActiveSyncPolicyCovers(
+    const int gameVersion
+  ) noexcept
+  {
+    return sLoadedPolicy.has_value() ? sLoadedPolicy->gameVersion == gameVersion : SyncPolicyValidatedFor(gameVersion);
   }
 
   std::span<const SSyncIdField> SyncIdFields() noexcept
@@ -788,13 +837,144 @@ namespace faf::remote
     bool& known
   ) noexcept
   {
-    const auto found = std::lower_bound(
-      std::begin(kRoutes), std::end(kRoutes), key, [](const SSyncKeyRoute& entry, const std::string_view value) {
+    const std::span<const SSyncKeyRoute> routes = SyncKeyRoutes();
+    const auto found =
+      std::lower_bound(routes.begin(), routes.end(), key, [](const SSyncKeyRoute& entry, const std::string_view value) {
       return entry.key < value;
-    }
-    );
-    known = found != std::end(kRoutes) && found->key == key;
+    });
+    known = found != routes.end() && found->key == key;
     return known ? found->route : ESyncRoute::Observers;
+  }
+
+  std::string_view SyncRouteName(
+    const ESyncRoute route
+  ) noexcept
+  {
+    for (const auto& [name, value] : kRouteNames) {
+      if (value == route) {
+        return name;
+      }
+    }
+    return "?";
+  }
+
+  bool ParseSyncRouteName(
+    const std::string_view name,
+    ESyncRoute& route
+  ) noexcept
+  {
+    for (const auto& [text, value] : kRouteNames) {
+      if (text == name) {
+        route = value;
+        return true;
+      }
+    }
+    return false;
+  }
+
+  bool ParseSyncPolicy(
+    std::string_view text,
+    SSyncPolicy& policy,
+    std::string& error
+  )
+  {
+    policy = SSyncPolicy{};
+    constexpr std::string_view kVersionTag = "# game-version:";
+    int lineNumber = 0;
+    while (!text.empty()) {
+      const std::size_t end = text.find('\n');
+      std::string_view line = text.substr(0, end);
+      text = end == std::string_view::npos ? std::string_view{} : text.substr(end + 1);
+      ++lineNumber;
+      line = TrimSpace(line);
+      if (line.substr(0, kVersionTag.size()) == kVersionTag) {
+        const std::string_view number = TrimSpace(line.substr(kVersionTag.size()));
+        if (
+          std::from_chars(number.data(), number.data() + number.size(), policy.gameVersion).ptr !=
+            number.data() + number.size() ||
+          policy.gameVersion <= 0
+        ) {
+          error = "line " + std::to_string(lineNumber) + ": bad game version";
+          return false;
+        }
+        continue;
+      }
+      if (line.empty() || line.front() == '#') {
+        continue;
+      }
+      const std::size_t tab = line.find('\t');
+      if (tab == std::string_view::npos) {
+        error = "line " + std::to_string(lineNumber) + ": no route after the key";
+        return false;
+      }
+      const std::string_view key = TrimSpace(line.substr(0, tab));
+      std::string_view routeText = line.substr(tab + 1);
+      routeText = TrimSpace(routeText.substr(0, routeText.find('\t')));
+      ESyncRoute route = ESyncRoute::Observers;
+      if (key.empty() || !ParseSyncRouteName(routeText, route)) {
+        error = "line " + std::to_string(lineNumber) + ": bad key or route '" + std::string(routeText) + "'";
+        return false;
+      }
+      policy.routes.emplace_back(std::string(key), route);
+    }
+    if (policy.gameVersion == 0) {
+      error = "no '# game-version: <n>' line";
+      return false;
+    }
+    std::sort(policy.routes.begin(), policy.routes.end(), [](const auto& a, const auto& b) {
+      return a.first < b.first;
+    });
+    for (std::size_t index = 1; index < policy.routes.size(); ++index) {
+      if (policy.routes[index].first == policy.routes[index - 1].first) {
+        error = "key '" + policy.routes[index].first + "' is listed twice";
+        return false;
+      }
+    }
+    return true;
+  }
+
+  void UseSyncPolicy(
+    SSyncPolicy policy
+  )
+  {
+    sLoadedPolicy = std::move(policy);
+    sLoadedRoutes.clear();
+    sLoadedRoutes.reserve(sLoadedPolicy->routes.size());
+    for (const auto& [key, route] : sLoadedPolicy->routes) {
+      sLoadedRoutes.push_back(SSyncKeyRoute{key, route});
+    }
+  }
+
+  void UseCompiledSyncPolicy()
+  {
+    sLoadedPolicy.reset();
+    sLoadedRoutes.clear();
+  }
+
+  bool UseSyncPolicyFile(
+    const std::string& path,
+    std::string& error
+  )
+  {
+    std::FILE* const file = std::fopen(path.c_str(), "rb");
+    if (file == nullptr) {
+      error = "can't open " + path;
+      return false;
+    }
+    std::string text;
+    char buffer[4096];
+    for (std::size_t read = std::fread(buffer, 1u, sizeof(buffer), file); read != 0u;
+         read = std::fread(buffer, 1u, sizeof(buffer), file)) {
+      text.append(buffer, read);
+    }
+    std::fclose(file);
+    SSyncPolicy policy;
+    if (!ParseSyncPolicy(text, policy, error)) {
+      error = path + ": " + error;
+      return false;
+    }
+    UseSyncPolicy(std::move(policy));
+    return true;
   }
 
   CSyncRouter::CSyncRouter(
@@ -1198,7 +1378,7 @@ namespace faf::remote
       getVersion.PushStack(state);
       lua_call(state, 0, 1);
       const char* const version = lua_isstring(state, -1) ? lua_tostring(state, -1) : nullptr;
-      if (version == nullptr || !SyncPolicyValidatedFor(std::atoi(version))) {
+      if (version == nullptr || !ActiveSyncPolicyCovers(std::atoi(version))) {
         gpg::Warnf(
           "sync routing: the policy was validated on FAF game versions %s, not %s: keys new since then go to observers "
           "only",
@@ -1660,6 +1840,9 @@ namespace faf::remote
 
   std::string SyncPolicyGameVersionsText()
   {
+    if (sLoadedPolicy.has_value()) {
+      return std::to_string(sLoadedPolicy->gameVersion);
+    }
     std::string text;
     for (const int version : kSyncPolicyGameVersions) {
       text += (text.empty() ? "" : ", ") + std::to_string(version);

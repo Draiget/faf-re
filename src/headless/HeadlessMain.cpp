@@ -38,6 +38,9 @@
 #include "headless/HeadlessMain.h"
 #include "headless/ReplayRunner.h"
 #include "moho/animation/CAniActor.h"
+#if FAF_SERVER_MODE
+#include "remote/SyncRouting.h"
+#endif
 
 namespace
 {
@@ -184,6 +187,8 @@ namespace
       "  --digests <file>          write \"beat md5\" for every checksummed beat\n"
       "  --sync-keys <file>        write every top-level Lua Sync key seen, with beat counts\n"
       "  --sync-dump <file>        write each beat's Lua Sync bytes (tools/sync-routing/compare.py)\n"
+      "  --sync-allies <file>      write each army's allies on the first beat and when they change\n"
+      "                            (tools/sync-routing/policy_gen.py)\n"
       "  --lua-routing-dump <pre>  with --lua-routing: each view's Sync bytes, to <pre>_<view>.bin\n"
       "  --lua-move-view <b:v:a>   with --lua-routing: at beat b, view v moves to army a\n"
       "  --lua-resync <b:v>        with --lua-routing: at beat b, view v gets a reconnect's resync\n"
@@ -280,6 +285,8 @@ namespace
       "  --parallel-views          with --view-frames or --view-bench: the views are built on the sim's workers\n"
       "  --cpus <list>             run on these CPUs only, for example 8-15 or 0,2,4,6; a CPU set from taskset or a\n"
       "                            container counts too, and FAF's init scripts cannot change it\n"
+      "  --sync-policy <file>      with --lua-routing: route each Sync key by this policy file instead of the\n"
+      "                            compiled table (tools/sync-routing/policy_gen.py writes them)\n"
       "  --spy                     with --view-bench --lua-routing: every Lua key each view receives checked;\n"
       "                            with --view-frames: every view's decoded frame checked against the oracle and\n"
       "                            for names of entities its client does not hold\n"
@@ -367,6 +374,7 @@ int HEADLESS_Main(
   (void)ReadOption("--effect-record", options.effectRecordPath); // plan WP9.1
   (void)ReadOption("--sync-keys", options.syncKeysPath);
   (void)ReadOption("--sync-dump", options.syncDumpPath);
+  (void)ReadOption("--sync-allies", options.syncAlliesPath);
   (void)ReadOption("--lua-routing-dump", options.luaRoutingDump);
   std::string beatStep;
   if (
@@ -564,6 +572,23 @@ int HEADLESS_Main(
       gLabel.c_str()
     );
     return kExitBadInput;
+  }
+#else
+  // `--sync-policy <file>`: the Lua routing answers from a policy file (tools/sync-routing/policy_gen.py) instead of
+  // the compiled table, so a generated policy runs through the spy without a rebuild.
+  if (std::string policyPath; ReadOption("--sync-policy", policyPath)) {
+    std::string error;
+    if (!faf::remote::UseSyncPolicyFile(policyPath, error)) {
+      std::printf("[%s] --sync-policy: %s\n", gLabel.c_str(), error.c_str());
+      return kExitBadInput;
+    }
+    std::printf(
+      "[%s] sync policy %s: %zu keys, FAF game version %s\n",
+      gLabel.c_str(),
+      policyPath.c_str(),
+      faf::remote::SyncKeyRoutes().size(),
+      faf::remote::SyncPolicyGameVersionsText().c_str()
+    );
   }
 #endif
   std::printf("[%s] replay %s\n", gLabel.c_str(), options.replayPath.c_str());
