@@ -7,7 +7,7 @@
 
 namespace moho
 {
-  class CD3DVertexFormat : public ID3DVertexFormat
+  class CD3DVertexFormat final : public ID3DVertexFormat
   {
   public:
     using FormatHandle = ID3DVertexFormat::FormatHandle;
