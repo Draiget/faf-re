@@ -27,6 +27,7 @@
 #include "moho/render/d3d/CD3DPrimBatcher.h"
 #include "editor/tools/EdArrange.h"
 #include "editor/tools/EdFindReplace.h"
+#include "editor/tools/EdScatter.h"
 #include "editor/tools/EdHeightBrush.h"
 #include "editor/tools/EdMaskGen.h"
 #include "editor/tools/EdRecipes.h"
@@ -174,6 +175,13 @@ namespace faf::editor
     );
     /** `/findtest kind,<type part>,map|selection|half,select|delete|<other type part>` (test runs). */
     void TestFind(const std::string& spec);
+    /**
+     * The Props tool's Fill the map: props (the paint list's, else the chosen one) scattered over the playable area,
+     * drawn in the symmetry's first part and placed with their copies, as one undo step; what it did, in words.
+     */
+    std::string ScatterOverMap(const EdTools::FillOptions& fill);
+    /** `/filltest <density>,<spacing>[,keep]` (test runs): the commonest prop filled, its copies checked, undone. */
+    void TestFill(const std::string& spec);
     /** The panels keep a copy of the minimap (composited view): it is then drawn only every 20 frames. */
     void SetMiniMapCached(
       const bool cached
@@ -626,6 +634,7 @@ namespace faf::editor
     std::vector<std::vector<int>> mDecalFollow;
     bool mDragIsCopy = false;
     bool mNoFollow = false; // Find and replace's delete: exactly the matches
+    bool mFilling = false;  // Fill the map: PlaceProps takes the paint list in any mode
     bool mMiniCached = false;
     bool mMiniDrawNow = true;
     bool mMiniDrewLast = false;

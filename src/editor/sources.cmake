@@ -49,6 +49,7 @@ set(FAF_EDITOR_SOURCES
   tools/EdSymmetryFollow.cpp
   tools/EdArrange.cpp
   tools/EdFindReplace.cpp
+  tools/EdScatter.cpp
   ui/EdMapBrowser.cpp
   doc/EdWaterBodies.cpp
   view/EdWaterBodyView.cpp

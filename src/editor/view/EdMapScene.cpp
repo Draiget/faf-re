@@ -3826,6 +3826,9 @@ namespace faf::editor
       if (mTools->TakeRepairRequest()) {
         RepairSymmetry();
       }
+      if (EdTools::FillOptions fill; mTools->TakeFillRequest(fill)) {
+        mTools->SetFillMessage(ScatterOverMap(fill));
+      }
       ArrangeOp arrange = ArrangeOp::Count;
       float step = 1.0f;
       if (mTools->TakeArrangeRequest(arrange, step)) {
@@ -4197,7 +4200,17 @@ namespace faf::editor
     if (mMap == nullptr) {
       return;
     }
-    if ((key == 'C' || key == 'D') && CopySelection() == 0) {
+    if ((key == 'C' || key == 'D' || key == 'X') && CopySelection() == 0) {
+      return;
+    }
+    if (key == 'X') {
+      // Cut: what was copied goes (not its mirrored copies, which the clipboard doesn't hold), as its own undo step.
+      const std::size_t held =
+        mClipboard.markers.size() + mClipboard.props.size() + mClipboard.units.size() + mClipboard.decals.size();
+      mNoFollow = true;
+      DeleteSelected();
+      mNoFollow = false;
+      gpg::Logf("editor: %zu cut", held);
       return;
     }
     if (key == 'D') {
@@ -8393,7 +8406,7 @@ namespace faf::editor
     float scale = 1.0f;
     float yaw = 0.0f;
     const std::vector<PropPaintEntry>& list = mTools->PaintList();
-    if (fixedYaw <= -100.0f && mTools->CurrentPropMode() == EdTools::PropMode::Scatter && !list.empty()) {
+    if (fixedYaw <= -100.0f && (mFilling || mTools->CurrentPropMode() == EdTools::PropMode::Scatter) && !list.empty()) {
       const int pick = PickPaintEntry(list, roll());
       if (pick < 0) {
         return;
@@ -8457,6 +8470,161 @@ namespace faf::editor
       // Only a prop really placed makes the stroke an undo step (copies off the map are skipped).
       mObjectsChanged = true;
       mDocument.SetModified(true);
+    }
+  }
+
+  std::string EdMapScene::ScatterOverMap(
+    const EdTools::FillOptions& fill
+  )
+  {
+    const moho::CHeightField* const field = mMap != nullptr ? mMap->mTerrainRes->GetHeightField() : nullptr;
+    if (field == nullptr || mTools == nullptr || mMap->mProps == nullptr) {
+      return "no map is open";
+    }
+    if (mTools->PaintList().empty() && mTools->PropBlueprint().empty()) {
+      return "choose a prop or fill the paint list first";
+    }
+    // The playable area (else the whole map), a unit in from its edge.
+    float x0 = 1.0f, z0 = 1.0f;
+    float x1 = static_cast<float>(field->width - 2), z1 = static_cast<float>(field->height - 2);
+    if (const std::optional<EdDocument::PlayableRect> area = mDocument.PlayableArea(); area.has_value()) {
+      x0 = std::max(x0, static_cast<float>(area->x0) + 1.0f);
+      z0 = std::max(z0, static_cast<float>(area->z0) + 1.0f);
+      x1 = std::min(x1, static_cast<float>(area->x1) - 1.0f);
+      z1 = std::min(z1, static_cast<float>(area->z1) - 1.0f);
+    }
+    const HeightBrush brush = mTools->CurrentHeightBrush();
+    const WaterState water = mDocument.WaterNow();
+    const auto height = [this](const float x, const float z) {
+      return mMap->mTerrainRes->GetHeightAt(
+        static_cast<std::int32_t>(std::lround(x)), static_cast<std::int32_t>(std::lround(z))
+      );
+    };
+    int wet = 0, steep = 0, crowded = 0;
+    const auto accept = [&](const float x, const float z) {
+      // Drawn once, in the first part; the copies come from PlaceProps.
+      if (!InFirstPart(field->width, field->height, brush.symmetry, brush.turns, x, z)) {
+        return false;
+      }
+      if (fill.dry && water.enabled && height(x, z) <= water.elevation) {
+        ++wet;
+        return false;
+      }
+      if (
+        SlopeDegrees(height(x - 1.0f, z), height(x + 1.0f, z), height(x, z - 1.0f), height(x, z + 1.0f)) > fill.maxSlope
+      ) {
+        ++steep;
+        return false;
+      }
+      // A point whose own copy would stand nearer than the spacing (by a mirror line) is left out.
+      float cx[kMaxSymmetryCopies], cz[kMaxSymmetryCopies];
+      const int copies = HeightBrushCentres(field->width, field->height, x, z, brush.symmetry, brush.turns, cx, cz);
+      for (int c = 1; c < copies; ++c) {
+        if (std::hypot(cx[c] - x, cz[c] - z) < fill.spacing) {
+          ++crowded;
+          return false;
+        }
+      }
+      return true;
+    };
+    ScatterOptions options;
+    options.x0 = x0;
+    options.z0 = z0;
+    options.x1 = x1;
+    options.z1 = z1;
+    options.density = fill.density;
+    options.spacing = fill.spacing;
+    mScatterSeed = mScatterSeed * 1664525U + 1013904223U;
+    options.seed = mScatterSeed;
+    const std::vector<std::pair<float, float>> points = ScatterPoints(options, accept);
+    const std::size_t before = mMap->mProps->mEntries.size();
+    BeginObjectStroke();
+    mFilling = true;
+    for (const auto& [x, z] : points) {
+      PlaceProps(x, z);
+    }
+    mFilling = false;
+    EndObjectStroke();
+    const std::size_t placed = mMap->mProps->mEntries.size() - before;
+    char text[200];
+    (void)std::snprintf(
+      text,
+      sizeof(text),
+      "%zu props placed (%zu points and their copies); left out: %d under water, %d too steep, %d by a mirror line",
+      placed,
+      points.size(),
+      wet,
+      steep,
+      crowded
+    );
+    gpg::Logf("editor: fill the map: %s", text);
+    return text;
+  }
+
+  void EdMapScene::TestFill(
+    const std::string& spec
+  )
+  {
+    // `<density>,<spacing>[,keep]`: the map's commonest prop filled over the map, its copies checked, then undone.
+    EdTools::FillOptions fill;
+    fill.density = std::strtof(spec.c_str(), nullptr);
+    if (const std::size_t comma = spec.find(','); comma != std::string::npos) {
+      fill.spacing = std::strtof(spec.c_str() + comma + 1, nullptr);
+    }
+    const bool keep = spec.find("keep") != std::string::npos;
+    std::string blueprint;
+    for (const FindTypeCount& t : CountFindTypes(FindObjects())) {
+      if (t.kind == FindKind::Prop) {
+        blueprint = t.type;
+        break;
+      }
+    }
+    if (blueprint.empty() || mMap == nullptr || mMap->mProps == nullptr) {
+      gpg::Logf("editor: fill test: no prop on the map");
+      return;
+    }
+    mTools->SetPropTool(blueprint, 1);
+    const std::size_t before = mMap->mProps->mEntries.size();
+    const std::string message = ScatterOverMap(fill);
+    const auto& entries = mMap->mProps->mEntries;
+    const moho::CHeightField* const field = mMap->mTerrainRes->GetHeightField();
+    const HeightBrush brush = mTools->CurrentHeightBrush();
+    int first = 0, whole = 0;
+    for (std::size_t i = before; i < entries.size(); ++i) {
+      const Wm3::Vec3f& p = entries[i].mTransform.pos_;
+      if (!InFirstPart(field->width, field->height, brush.symmetry, brush.turns, p.x, p.z)) {
+        continue;
+      }
+      ++first;
+      float cx[kMaxSymmetryCopies], cz[kMaxSymmetryCopies];
+      const int copies = HeightBrushCentres(field->width, field->height, p.x, p.z, brush.symmetry, brush.turns, cx, cz);
+      bool all = true;
+      for (int c = 1; c < copies && all; ++c) {
+        bool found = false;
+        for (std::size_t j = before; j < entries.size() && !found; ++j) {
+          found = std::hypot(entries[j].mTransform.pos_.x - cx[c], entries[j].mTransform.pos_.z - cz[c]) <= 1.0f;
+        }
+        all = found;
+      }
+      whole += all ? 1 : 0;
+    }
+    gpg::Logf(
+      "editor: fill test: %s with %.0f per 100 x 100, %.1f apart: %s; %d of the %d in the first part have every copy",
+      blueprint.c_str(),
+      static_cast<double>(fill.density),
+      static_cast<double>(fill.spacing),
+      message.c_str(),
+      whole,
+      first
+    );
+    if (!keep) {
+      const bool undone = Undo();
+      gpg::Logf(
+        "editor: fill test: undo %s; %zu props (%zu before)",
+        undone ? "took it back" : "had nothing",
+        mMap->mProps->mEntries.size(),
+        before
+      );
     }
   }
 

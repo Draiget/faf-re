@@ -3309,6 +3309,29 @@ namespace faf::editor
           "too. "
           "Sets are FAForeverMapEditor's .proppaintset."
         );
+        // Map-wide scatter: the whole map at once, symmetric copies alike.
+        SectionHeader("FILL THE MAP");
+        ImGui::SetNextItemWidth(-1.0f);
+        FillSliderFloat("##filldensity", &mFill.density, 1.0f, 200.0f, "%.0f per 100 x 100");
+        EdSetItemTooltip("How many props each 100 by 100 units gets, before the ground and the spacing drop some.");
+        ImGui::SetNextItemWidth(-1.0f);
+        FillSliderFloat("##fillspacing", &mFill.spacing, 1.0f, 40.0f, "At least %.1f apart");
+        ImGui::SetNextItemWidth(-1.0f);
+        FillSliderFloat("##fillslope", &mFill.maxSlope, 5.0f, 90.0f, "Slopes up to %.0f degrees");
+        ImGui::Checkbox("Only above the water", &mFill.dry);
+        ImGui::BeginDisabled(mPaintList.empty() && mPropBlueprint.empty());
+        if (ImGui::Button("Fill the map", ImVec2(-1.0f, 0.0f))) {
+          mFillRequest = true;
+        }
+        ImGui::EndDisabled();
+        if (!mFillMessage.empty()) {
+          Note(mFillMessage.c_str());
+        }
+        Note(
+          "Props from the paint list (or the chosen prop) over the playable area, drawn once in the symmetry's first "
+          "part "
+          "and copied to the others, so every copy matches; one undo step. A new seed each time."
+        );
       }
       DrawBrush(false);
       DrawSymmetry(false);

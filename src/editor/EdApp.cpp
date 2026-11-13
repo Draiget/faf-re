@@ -140,24 +140,19 @@ namespace faf::editor
     [[nodiscard]] bool IsTestRunCommandLine()
     {
       static const char* const kOptions[] = {
-        "/command",        "/palette",         "/theme",          "/keysfile",
-        "/focuspanel",     "/uiclicks",        "/hidegameunits",  "/movelayer",
-        "/pickfilter",     "/mapwide",         "/tool",           "/proptool",
-        "/play",           "/debugarm",        "/breakpoint",     "/check",
-        "/decaltool",      "/markertool",      "/unittool",       "/hoverprop",
-        "/selectprops",    "/selectunit",      "/propswap",       "/saveas",
-        "/settingsfile",   "/autosavefolder",  "/askunsaved",     "/particlebrowser",
-        "/particlenew",    "/particleopen",    "/materialeditor", "/uiscale",
-        "/testrun",        "/openall",         "/roundtrip",      "/vault",
-        "/vaultsearch",    "/vaultmap",        "/newmap",         "/stamp",
-        "/brush",          "/layer",           "/waterbody",      "/ruler",
-        "/adaptivewindow", "/maskrule",        "/maskgen",        "/symhover",
-        "/stbfont",        "/recipe",          "/texset",         "/layerop",
-        "/slopeview",      "/typesfromlayers", "/uncapped",       "/nominimap",
-        "/followtest",     "/arrangetest",     "/findtest",       "/findopen",
-        "/symmenu",        "/panelbottom",     "/shader",         "/brushtest",
-        "/brushshape",     "/stampsource",     "/stampstroke",    "/symoptions",
-        "/maskoptions",    "/masktest",        "/shaderbrowser",  "/convertlayers",
+        "/command",        "/palette",        "/theme",          "/keysfile",        "/focuspanel",  "/uiclicks",
+        "/hidegameunits",  "/movelayer",      "/pickfilter",     "/mapwide",         "/tool",        "/proptool",
+        "/play",           "/debugarm",       "/breakpoint",     "/check",           "/decaltool",   "/markertool",
+        "/unittool",       "/hoverprop",      "/selectprops",    "/selectunit",      "/propswap",    "/saveas",
+        "/settingsfile",   "/autosavefolder", "/askunsaved",     "/particlebrowser", "/particlenew", "/particleopen",
+        "/materialeditor", "/uiscale",        "/testrun",        "/openall",         "/roundtrip",   "/vault",
+        "/vaultsearch",    "/vaultmap",       "/newmap",         "/stamp",           "/brush",       "/layer",
+        "/waterbody",      "/ruler",          "/adaptivewindow", "/maskrule",        "/maskgen",     "/symhover",
+        "/stbfont",        "/recipe",         "/texset",         "/layerop",         "/slopeview",   "/typesfromlayers",
+        "/uncapped",       "/nominimap",      "/followtest",     "/arrangetest",     "/findtest",    "/findopen",
+        "/filltest",       "/symmenu",        "/panelbottom",    "/shader",          "/brushtest",   "/brushshape",
+        "/stampsource",    "/stampstroke",    "/symoptions",     "/maskoptions",     "/masktest",    "/shaderbrowser",
+        "/convertlayers",
       };
       for (const char* const option : kOptions) {
         if (moho::CFG_GetArgOption(option, 0, nullptr)) {
@@ -2150,6 +2145,8 @@ namespace faf::editor
       std::string mFindMessage;
       std::string mFindTestArg; // `/findtest kind,type,scope,action` (test runs)
       int mFindFrames = 0;
+      std::string mFillTestArg; // `/filltest <density>,<spacing>[,keep]` (test runs)
+      int mFillFrames = 0;
       std::string mFindOpenArg; // `/findopen <n>` (test runs): the dialog opened on the n-th type
       // The "Save changes?" question: what to do once answered.
       std::function<void()> mGuardProceed;
@@ -2846,6 +2843,9 @@ namespace faf::editor
       add("edit.delete", "Delete selection", "Edit", "Delete", [this] {
         mScene.DeleteSelected();
       }, canEdit);
+      add("edit.cut", "Cut", "Edit", "Ctrl+X", [this] {
+        mScene.CtrlKey('X');
+      }, canEdit, {}, "The tool's selection copied, then deleted");
       add("edit.copy", "Copy", "Edit", "Ctrl+C", [this] {
         mScene.CtrlKey('C');
       }, mapOpen, {}, "The tool's selection");
@@ -3143,6 +3143,7 @@ namespace faf::editor
           {cmd("edit.undo"),
            cmd("edit.redo"),
            sep(),
+           cmd("edit.cut"),
            cmd("edit.copy"),
            cmd("edit.paste"),
            cmd("edit.duplicate"),
@@ -4249,6 +4250,9 @@ namespace faf::editor
       if (fa::vector<fa::string> find; moho::CFG_GetArgOption("/findtest", 1, &find) && !find.empty()) {
         mFindTestArg = find[0].c_str();
       }
+      if (fa::vector<fa::string> fill; moho::CFG_GetArgOption("/filltest", 1, &fill) && !fill.empty()) {
+        mFillTestArg = fill[0].c_str();
+      }
       if (fa::vector<fa::string> open; moho::CFG_GetArgOption("/findopen", 1, &open) && !open.empty()) {
         mFindOpenArg = open[0].c_str();
       }
@@ -4841,6 +4845,9 @@ namespace faf::editor
       }
       if (!mArrangeTestArg.empty() && !mScene.ModelsPending() && ++mArrangeFrames >= 150) {
         mScene.TestArrange(std::exchange(mArrangeTestArg, {}));
+      }
+      if (!mFillTestArg.empty() && !mScene.ModelsPending() && ++mFillFrames >= 150) {
+        mScene.TestFill(std::exchange(mFillTestArg, {}));
       }
       if (!mFindTestArg.empty() && !mScene.ModelsPending() && ++mFindFrames >= 150) {
         mScene.TestFind(std::exchange(mFindTestArg, {}));

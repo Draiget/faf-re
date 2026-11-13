@@ -1521,6 +1521,34 @@ namespace faf::editor
     {
       return mFollowSymmetry;
     }
+    /** The Props tool's Fill the map: its options, the button (taken by the view), and what the last fill did. */
+    struct FillOptions
+    {
+      float density = 10.0f; // per 100 x 100 units
+      float spacing = 6.0f;
+      float maxSlope = 30.0f; // degrees
+      bool dry = true;
+    };
+    [[nodiscard]] bool TakeFillRequest(
+      FillOptions& options
+    ) noexcept
+    {
+      options = mFill;
+      return std::exchange(mFillRequest, false);
+    }
+    void RequestFill(
+      const FillOptions& options
+    ) noexcept
+    {
+      mFill = options;
+      mFillRequest = true;
+    }
+    void SetFillMessage(
+      std::string message
+    )
+    {
+      mFillMessage = std::move(message);
+    }
     /** Arrange's buttons (and the Edit menu's): the op asked, taken by the view each frame, and its grid step. */
     void RequestArrange(
       const ArrangeOp op
@@ -2514,6 +2542,9 @@ namespace faf::editor
     std::string mRecipeResult;
     bool mFollowSymmetry = true;
     bool mSelectAny = false; // something is selected (Arrange's buttons)
+    FillOptions mFill;
+    bool mFillRequest = false;
+    std::string mFillMessage;
     ArrangeOp mArrangeRequest = ArrangeOp::Count;
     int mArrangeSnap = 0; // the grid step 1 << n: 1, 2, 4, 8
     std::string mArrangeMessage;
