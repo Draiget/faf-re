@@ -29,11 +29,12 @@ type playerRequest struct {
 const requestTTL = 7 * 24 * time.Hour
 
 type requestBody struct {
-	Host    string         `json:"host"`
-	Region  string         `json:"region"`
-	Map     string         `json:"map"`
-	Seats   []seatIn       `json:"seats"`
-	Options map[string]any `json:"options"`
+	Host      string         `json:"host"`
+	Region    string         `json:"region"`
+	Placement string         `json:"placement"` // "load" (default) or "ping" (rtt.go)
+	Map       string         `json:"map"`
+	Seats     []seatIn       `json:"seats"`
+	Options   map[string]any `json:"options"`
 }
 
 // POST /api/v1/requests: a signed-in player asks for a game they host, on a host with player hosting on (the named
@@ -67,6 +68,17 @@ func (s *server) submitRequest(w http.ResponseWriter, r *http.Request, cfg *Conf
 		return
 	}
 	seats[0].UID, seats[0].Name = who.UID, who.Name
+	switch b.Placement {
+	case "", "load":
+	case "ping":
+		if b.Host != "" {
+			fail(w, http.StatusBadRequest, errors.New(`"placement": "ping" picks the host: leave host empty`))
+			return
+		}
+	default:
+		fail(w, http.StatusBadRequest, fmt.Errorf(`placement is "load" or "ping", not %q`, b.Placement))
+		return
+	}
 	for i := 1; i < len(seats); i++ {
 		if seats[i].UID == who.UID {
 			fail(w, http.StatusBadRequest, fmt.Errorf("seat %d: you are seat 1", i+1))
@@ -79,19 +91,24 @@ func (s *server) submitRequest(w http.ResponseWriter, r *http.Request, cfg *Conf
 	}
 	opts := []option{}
 	reasons := []string{}
+	rows := []hostPlacement{}
 	for _, p := range s.reg.all() {
 		h, _ := p.state()
 		if (b.Host != "" && p.h.cfg.Name != b.Host) || (b.Region != "" && h.Region != b.Region) {
 			continue
 		}
+		row := hostPlacement{Host: p.h.cfg.Name, Region: h.Region, Load: h.Load}
 		if !h.Reachable || !h.PlayerHosting {
 			reasons = append(reasons, p.h.cfg.Name+": doesn't take players' games now")
+			row.Reason = "doesn't take players' games now"
+			rows = append(rows, row)
 			continue
 		}
+		row.Candidate = true
+		rows = append(rows, row)
 		opts = append(opts, option{p, h})
 	}
-	sort.SliceStable(opts, func(i, j int) bool {
-		a, c := opts[i].state, opts[j].state
+	usual := func(a, c HostState) bool {
 		if a.PoolQueued != c.PoolQueued {
 			return a.PoolQueued < c.PoolQueued
 		}
@@ -99,9 +116,35 @@ func (s *server) submitRequest(w http.ResponseWriter, r *http.Request, cfg *Conf
 			return a.PoolGames < c.PoolGames
 		}
 		return a.Load < c.Load
-	})
+	}
+	sort.SliceStable(opts, func(i, j int) bool { return usual(opts[i].state, opts[j].state) })
+	var pl *placement
+	if b.Placement == "ping" {
+		byHost := map[string]option{}
+		for _, o := range opts {
+			byHost[o.p.h.cfg.Name] = o
+		}
+		// The requesting player's own ping only: another seat's FAF id is the requester's word, and its report isn't theirs
+		// to read.
+		order, ranked, err := s.rankByPing(r.Context(), seats[:1], rows, func(i, j int) bool {
+			return usual(byHost[rows[i].Host].state, byHost[rows[j].Host].state)
+		})
+		if err != nil {
+			fail(w, http.StatusServiceUnavailable, fmt.Errorf("store: %w", err))
+			return
+		}
+		pl, opts = ranked, opts[:0]
+		for _, i := range order {
+			opts = append(opts, byHost[rows[i].Host])
+		}
+	}
 	if len(opts) == 0 {
-		fail(w, http.StatusConflict, fmt.Errorf("no host takes players' games now: %s", orNone(strings.Join(reasons, "; "))))
+		err := fmt.Errorf("no host takes players' games now: %s", orNone(strings.Join(reasons, "; ")))
+		if pl != nil {
+			writeJSON(w, http.StatusConflict, map[string]any{"ok": false, "error": err.Error(), "placement": pl})
+			return
+		}
+		fail(w, http.StatusConflict, err)
 		return
 	}
 	p := opts[0].p
@@ -153,7 +196,12 @@ func (s *server) submitRequest(w http.ResponseWriter, r *http.Request, cfg *Conf
 	_ = s.store.Set(r.Context(), "myrequest:"+strconv.Itoa(who.UID)+":"+full, "", requestTTL)
 	p.refreshSoon()
 	log.Printf("request %s by %s (FAF %d): %s, %d seats", full, who.Name, who.UID, b.Map, len(seats))
-	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "request": requestView(pr, doc.Request)})
+	answer := map[string]any{"ok": true, "request": requestView(pr, doc.Request)}
+	if pl != nil {
+		pl.Picked = p.h.cfg.Name
+		answer["placement"] = pl
+	}
+	writeJSON(w, http.StatusOK, answer)
 }
 
 // requestView is the host's request record without its key, with the service's id <host>/<id>.

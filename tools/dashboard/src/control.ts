@@ -90,6 +90,8 @@ export interface ServiceHost {
   pool_games?: number;
   pool_queued?: number;
   pool_max_games?: number;
+  /** Where players probe its ping (UDP, host:port). */
+  rtt_echo?: string;
   checked?: string;
 }
 
@@ -159,12 +161,14 @@ export interface ServiceRequest {
   [key: string]: unknown;
 }
 
-/** `POST /api/v1/lobbies`: the host's lobby fields and the service's own (host, region, tournament). */
+/** `POST /api/v1/lobbies`: the host's lobby fields and the service's own (host, region, placement, tournament). */
 export interface ServiceNewLobby {
   tournament?: string;
-  /** Empty: the least loaded host that fits. */
+  /** Empty: the least loaded host that fits, or by the players' ping with `placement` "ping". */
   host?: string;
   region?: string;
+  /** "load" (default): the least loaded host that fits; "ping": the one whose worst player ping is lowest. */
+  placement?: "load" | "ping";
   name: string;
   map: string;
   seats: NewSeat[];
@@ -177,6 +181,40 @@ export interface ServiceNewLobby {
   cores?: number;
   /** Admins only: past the planner's errors. */
   force?: boolean;
+}
+
+/** One host's row of a placement by ping. */
+export interface ServicePlacementHost {
+  host: string;
+  region?: string;
+  /** The highest ping among the players who reported this host; null when none did. */
+  worst_ms: number | null;
+  worst_player?: string;
+  /** Players with a ping to it. */
+  measured: number;
+  /** Players who reported other hosts but not this one. */
+  unmeasured?: string[];
+  /** Players none of whose probes came back from it. */
+  unreachable_for?: string[];
+  load: number;
+  /** Reachable, has the map and room for it. */
+  candidate: boolean;
+  reason?: string;
+  /** The order the service tries it in, 1 first; absent when it isn't a candidate. */
+  rank?: number;
+}
+
+/** How a lobby was (or would be) placed by the players' ping. */
+export interface ServicePlacement {
+  mode: string;
+  margin_ms: number;
+  /** Human seats. */
+  players: number;
+  measured: number;
+  missing: { seat: number; uid?: number; name: string; why: string }[];
+  basis: string;
+  hosts: ServicePlacementHost[];
+  picked?: string;
 }
 
 export interface ServiceNewRequest {
@@ -331,7 +369,18 @@ export class ControlApi {
 
   /** `POST /api/v1/lobbies`: an organised lobby; 409 with each host's reason when none can take it now. */
   async createLobby(lobby: ServiceNewLobby): Promise<ServiceLobby> {
-    return (await this.request("POST", "/api/v1/lobbies", lobby)).lobby as ServiceLobby;
+    return (await this.createLobbyPlaced(lobby)).lobby;
+  }
+
+  /** `POST /api/v1/lobbies` with the placement table it answers when placed by ping (else null). */
+  async createLobbyPlaced(lobby: ServiceNewLobby): Promise<{ lobby: ServiceLobby; placement: ServicePlacement | null }> {
+    const answer = await this.request("POST", "/api/v1/lobbies", lobby);
+    return { lobby: answer.lobby as ServiceLobby, placement: (answer.placement as ServicePlacement | undefined) ?? null };
+  }
+
+  /** `POST /api/v1/placement`: where a lobby with `placement` "ping" would go now; nothing is made. */
+  async placement(lobby: ServiceNewLobby, signal?: AbortSignal): Promise<ServicePlacement> {
+    return (await this.request("POST", "/api/v1/placement", lobby, signal)).placement as ServicePlacement;
   }
 
   /** `DELETE /api/v1/lobbies/<host>/<id>`: its server stops. */

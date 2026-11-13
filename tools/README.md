@@ -13,6 +13,7 @@ Development tools for the engine. The main one is **mpemu**, a Go multiplayer te
 | `cmd/desync-diff` | Compares players' desync dumps from one game and prints the first value that differs (`compare`), rebuilds a missing side from the replay (`rebuild`), and is the desync server's dump receiver (`serve`). See [cmd/desync-diff/README.md](cmd/desync-diff/README.md) |
 | `cmd/turnsrv` | `turnsrv` on its own (prints its URLs and one set of credentials), for testing ICE agents such as `faf_juice_gather` |
 | `cmd/control-service` | The dedicated servers' web side: FAF sign-in, roles, tournament allowlists, organised lobbies and players' requests across `server-host` machines, live state cached in Redis and pushed as Server-Sent Events. See [docs/CONTROL_SERVICE.md](../docs/CONTROL_SERVICE.md) |
+| `cmd/rtt-probe` | Measures this machine's ping to dedicated-server hosts on their UDP echo (`server-host --rtt-echo`) and prints the median, spread and loss; with `--control` it takes the hosts from `control-service` and reports the result for placement by ping. See [docs/CONTROL_SERVICE.md](../docs/CONTROL_SERVICE.md) |
 | `cmd/oidc-mock` | A local OpenID provider (package `oidcmock`) that signs a configured FAF user in without a password, for trying `control-service` without FAF's provider |
 | `cmd/server-scenario` | Runs a dedicated-server scenario (`scenarios/server/*.yaml`, `kind: server`) on Linux: the server with remote seats played by `faf_server_probe` and the rest by AIs, seats killed and started again, then each seat's decode and frame-check counts and a headless playback of the server's replay. Build with `GOOS=linux go build ./cmd/server-scenario`; usage in its doc comment |
 | `scenarios/` | YAML scenarios for mpemu; `scenarios/server/` holds those for `cmd/server-scenario` |
@@ -37,6 +38,7 @@ The rest of this page covers mpemu. It is one Go module (`faf-main/tools`): shar
 | `scenario` | YAML scenarios, step runner, assertions, interactive console |
 | `procs` | Child processes in a kill-on-close job object: nothing survives mpemu |
 | `fakegame` | Library behind `cmd/fakegame` |
+| `rttprobe` | The ping probe's packet format (shared with `server-host`'s echo) and the prober behind `cmd/rtt-probe`, for the launcher too |
 | `fafclient` | Library behind `cmd/fafclient`: the client's JSON-RPC (JJsonRpc framing), adapter launch, lobby-server pairing and `IceMsg` relay |
 
 ## Build

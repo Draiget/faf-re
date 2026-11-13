@@ -6,7 +6,7 @@
 // create. The host is asked for a plan on every change; nothing starts before Create.
 
 import { ApiError, type HostApi, type MapInfo, type NewLobby, type Plan, type PlanRequest, type SettingKey, type Settings } from "../api.ts";
-import { canOrganise, globalOrganiser, organisedTournaments, topRole, type ServiceNewLobby, type ServiceTournament } from "../control.ts";
+import { canOrganise, globalOrganiser, organisedTournaments, topRole, type ServiceNewLobby, type ServicePlacement, type ServicePlacementHost, type ServiceTournament } from "../control.ts";
 import { byId, fill, h, icon, isNumber, num, type Child } from "../dom.ts";
 import { MapGallery, MapPreview, mapFacts, spotsOf, type PreviewSource } from "../maps.ts";
 import { MachineMap } from "../plane/machine.ts";
@@ -21,6 +21,8 @@ import { hostMaps, pageHead, type View } from "./common.ts";
 const PLAN_DEBOUNCE_MS = 250;
 const REQUEST_MS = 5000;
 const MAX_OBSERVERS = 32;
+/** The host picker's value for placement by the players' ping. */
+const BY_PING = "@ping";
 
 type Kind = "tournament" | "custom";
 type Step = "map" | "slots" | "settings" | "start" | "placement" | "review";
@@ -48,8 +50,15 @@ export function createView(): View {
   let svc = false;
   /** The tournament whose lists apply ("" = outside tournaments). */
   let tournamentId = "";
-  /** The host picked ("" = the least loaded that fits when it's made). */
+  /** The host picked ("" = the least loaded that fits when it's made, or by ping with byPing). */
   let hostChoice = "";
+  /** Through the service, no host picked: the one whose worst player ping is lowest rather than the least loaded. */
+  let byPing = false;
+  /** Where the service would place it by ping now (POST /api/v1/placement), or why it couldn't say. */
+  let pingPlacement: ServicePlacement | null = null;
+  let pingError = "";
+  let pingLoading = false;
+  let pingSeq = 0;
   let kind: Kind = "tournament";
   let step: Step = "map";
   let maps: MapInfo[] = [];
@@ -239,7 +248,7 @@ export function createView(): View {
       case "start":
         return `${observers.length === 0 ? "no observers" : plural(observers.length, "observer")} · ${countdown > 0 ? `${countdown} s countdown` : "no countdown"}`;
       case "placement":
-        if (svc) return planning ? "planning…" : `${hostChoice === "" ? "least loaded" : hostChoice}${plan === null ? "" : plan.fits ? " · fits" : " · doesn't fit now"}`;
+        if (svc) return planning ? "planning…" : `${hostWords()}${plan === null ? "" : plan.fits ? " · fits" : " · doesn't fit now"}`;
         return planning ? "planning…" : plan === null ? "–" : plan.fits ? `fits${auto ? " (Auto)" : ""}` : ifFull === "queue" ? "doesn't fit now: queued" : "doesn't fit now";
       default:
         return "check and create";
@@ -302,7 +311,10 @@ export function createView(): View {
     renderObservers();
   });
   hostSelect.addEventListener("change", () => {
-    hostChoice = hostSelect.value;
+    byPing = hostSelect.value === BY_PING;
+    hostChoice = byPing ? "" : hostSelect.value;
+    pingPlacement = null;
+    pingError = "";
     force = false;
     renderWhere();
     void loadMaps();
@@ -339,6 +351,7 @@ export function createView(): View {
     const least = reachableHosts()[0];
     const options: [string, string, boolean][] = [
       ["", `Least loaded that fits${least === undefined ? "" : ` (now ${least.name})`}`, false],
+      [BY_PING, "Lowest worst ping of the players", false],
       ...hosts.map((host): [string, string, boolean] => [host.name, `${host.name}${host.region ? ` · ${host.region}` : ""}${host.reachable ? (isNumber(host.load) ? ` · ${Math.round(host.load / 5) * 5}% busy` : "") : " · not answering"}`, !host.reachable]),
     ];
     const hsig = JSON.stringify(options);
@@ -347,11 +360,19 @@ export function createView(): View {
       hostSelect.replaceChildren(...options.map(([value, text, off]) => h("option", { value, disabled: off }, text)));
     }
     if (hostChoice !== "" && !hosts.some((host) => host.name === hostChoice)) hostChoice = "";
-    hostSelect.value = hostChoice;
+    hostSelect.value = byPing ? BY_PING : hostChoice;
+    const source = least === undefined ? "from no host: none answers" : `${least.name}'s`;
     hostHelp.textContent =
-      hostChoice === ""
-        ? `When you create it, the service tries the hosts that have the map, least loaded first, until one has room. Maps, settings and the estimate here are ${least === undefined ? "from no host: none answers" : `${least.name}'s`}.`
-        : `It goes to ${hostChoice} or not at all.`;
+      hostChoice !== ""
+        ? `It goes to ${hostChoice} or not at all.`
+        : byPing
+          ? `When you create it, the service tries the hosts that have the map and room for it, lowest worst player ping first, by the pings the players reported in the last 30 minutes; pings within 10 ms go to the less loaded host. Placement shows each host's worst ping. Maps, settings and the estimate here are ${source}.`
+          : `When you create it, the service tries the hosts that have the map, least loaded first, until one has room. Maps, settings and the estimate here are ${source}.`;
+  }
+
+  /** Where it goes, in a few words. */
+  function hostWords(): string {
+    return hostChoice !== "" ? hostChoice : byPing ? "lowest worst ping" : "least loaded";
   }
 
   function renderKind(): void {
@@ -640,6 +661,97 @@ export function createView(): View {
     ),
   );
 
+  /** Through the service, by ping: the hosts with their worst player ping, in the order the service would try them. */
+  const pingBox = h("div", { class: "ping-placement", "aria-live": "polite" });
+
+  function pingNote(row: ServicePlacementHost, picked: string | undefined): Child {
+    if (!row.candidate) return h("span", { class: "dim" }, row.reason ?? "can't take it now");
+    const notes: Child[] = [];
+    if (row.host === picked) notes.push(h("span", { class: "chip tiny tone-ok" }, "goes here"));
+    if ((row.unreachable_for ?? []).length > 0) notes.push(h("span", { class: "chip tiny tone-bad" }, `no reply to ${(row.unreachable_for ?? []).join(", ")}`));
+    if ((row.unmeasured ?? []).length > 0) notes.push(h("span", { class: "chip tiny tone-warn" }, `not measured by ${(row.unmeasured ?? []).join(", ")}`));
+    return notes.length === 0 ? h("span", { class: "dim" }, "–") : h("span", { class: "ping-notes" }, ...notes);
+  }
+
+  function pingTable(pl: ServicePlacement): HTMLElement {
+    const rows = [...pl.hosts].sort((a, b) => (a.rank ?? 1e9) - (b.rank ?? 1e9) || a.host.localeCompare(b.host));
+    return h(
+      "div",
+      { class: "table-wrap" },
+      h(
+        "table",
+        { class: "grid-table ping-table" },
+        h("thead", {}, h("tr", {}, ...["Order", "Host", "Worst ping", "Slowest player", "Load", ""].map((text) => h("th", { scope: "col" }, text)))),
+        h(
+          "tbody",
+          {},
+          ...rows.map((row) =>
+            h(
+              "tr",
+              { "data-picked": row.host === pl.picked ? "yes" : null, "data-candidate": row.candidate ? null : "no" },
+              h("td", { "data-label": "Order" }, row.rank === undefined ? "–" : `#${row.rank}`),
+              h("td", { "data-label": "Host" }, h("strong", {}, row.host), row.region ? h("span", { class: "dim" }, ` · ${row.region}`) : null),
+              h("td", { "data-label": "Worst ping" }, row.worst_ms === null ? "–" : `${num(row.worst_ms)} ms`),
+              h("td", { "data-label": "Slowest player" }, row.worst_player ?? "–"),
+              h("td", { "data-label": "Load" }, `${num(row.load)}%`),
+              h("td", { "data-label": "" }, pingNote(row, pl.picked)),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  function renderPing(): void {
+    const again = h("button", { type: "button", class: "btn small ghost" }, pingLoading ? "Checking…" : "Check again");
+    again.disabled = pingLoading;
+    again.addEventListener("click", () => void loadPing());
+    const pl = pingPlacement;
+    fill(
+      pingBox,
+      h("div", { class: "block-head" }, h("h3", { class: "sub-head" }, "Players' ping to each host"), again),
+      pingError !== ""
+        ? h("p", { class: "form-error" }, `The service couldn't place it: ${pingError}`)
+        : pl === null
+          ? h("p", { class: "dim" }, pingLoading ? "Asking the service…" : selectedMap() === undefined ? "Pick a map first." : "Not checked yet.")
+          : h(
+              "div",
+              {},
+              h("p", { class: "dim small" }, `${pl.basis}.`),
+              pl.missing.length > 0
+                ? h("p", { class: "small warn-text" }, `Without a ping: ${pl.missing.map((m) => `${m.name} (${m.why})`).join(", ")}. They don't change the order.`)
+                : null,
+              pingTable(pl),
+              h("p", { class: "dim small" }, "Players report their ping with rtt-probe; a report counts for 30 minutes. The order is checked again when you create the lobby."),
+            ),
+    );
+  }
+
+  /** Asks the service where the lobby would go by ping now; nothing is made. */
+  async function loadPing(): Promise<void> {
+    const control = service.api;
+    const map = selectedMap();
+    if (!svc || !byPing || control === null || map === undefined) return;
+    const seq = ++pingSeq;
+    pingLoading = true;
+    renderPing();
+    try {
+      const pl = await control.placement(serviceRequest(map), AbortSignal.timeout(REQUEST_MS));
+      if (seq !== pingSeq) return;
+      pingPlacement = pl;
+      pingError = "";
+    } catch (error) {
+      if (seq !== pingSeq) return;
+      pingPlacement = null;
+      pingError = error instanceof Error ? error.message : String(error);
+    } finally {
+      if (seq === pingSeq) {
+        pingLoading = false;
+        renderPing();
+      }
+    }
+  }
+
   function renderServiceWhere(): void {
     serviceWhere.hidden = !svc;
     modeCards.hidden = svc;
@@ -651,17 +763,22 @@ export function createView(): View {
     const reference = formHostName();
     const change = h("button", { type: "button", class: "btn small ghost" }, "Change the host");
     change.addEventListener("click", () => go("map"));
-    serviceWhere.replaceChildren(
+    fill(
+      serviceWhere,
       h(
         "p",
         {},
-        hostChoice === ""
-          ? `The control service places it when you create it: on the least loaded host that has the map and room for it${reference === "" ? "" : ` (now ${reference}, whose estimate is shown)`}. On that host the planner picks whole cores on one NUMA node.`
-          : `It goes to ${hostChoice}, where the planner picks whole cores on one NUMA node. If ${hostChoice} has no room then, it isn't made: nothing waits in a queue.`,
+        hostChoice !== ""
+          ? `It goes to ${hostChoice}, where the planner picks whole cores on one NUMA node. If ${hostChoice} has no room then, it isn't made: nothing waits in a queue.`
+          : byPing
+            ? `The control service places it when you create it: on the host with the lowest worst player ping among those that have the map and room for it. On that host the planner picks whole cores on one NUMA node${reference === "" ? "" : `; the estimate shown is ${reference}'s`}.`
+            : `The control service places it when you create it: on the least loaded host that has the map and room for it${reference === "" ? "" : ` (now ${reference}, whose estimate is shown)`}. On that host the planner picks whole cores on one NUMA node.`,
         " ",
         change,
       ),
+      byPing && hostChoice === "" ? pingBox : null,
     );
+    if (byPing && hostChoice === "") renderPing();
   }
 
   function renderPlacementMode(): void {
@@ -853,7 +970,7 @@ export function createView(): View {
               h("dt", {}, "Tournament"),
               h("dd", {}, tournament()?.name ?? "none (open seats allowed)"),
               h("dt", {}, "Host"),
-              h("dd", {}, hostChoice === "" ? "the least loaded one that fits, when it's made" : hostChoice),
+              h("dd", {}, hostChoice !== "" ? hostChoice : byPing ? `the lowest worst player ping that fits, when it's made${pingPlacement?.picked ? ` (now ${pingPlacement.picked})` : ""}` : "the least loaded one that fits, when it's made"),
               h("dt", {}, "Map"),
               h("dd", {}, map === undefined ? "–" : `${map.name ?? map.id} · ${mapFacts(map)}`),
             )
@@ -895,7 +1012,7 @@ export function createView(): View {
         plan === null
           ? h("p", { class: "dim" }, "Not planned yet.")
           : svc
-            ? h("p", {}, h("span", { class: `chip tone-${plan.fits ? "ok" : hostChoice === "" ? "warn" : "bad"}` }, plan.fits ? `Fits on ${formHostName()} now` : `Doesn't fit on ${formHostName()} now`), " ", hostChoice === "" ? "The service tries every host with the map, least loaded first." : force ? "Started anyway (admin)." : "")
+            ? h("p", {}, h("span", { class: `chip tone-${plan.fits ? "ok" : hostChoice === "" ? "warn" : "bad"}` }, plan.fits ? `Fits on ${formHostName()} now` : `Doesn't fit on ${formHostName()} now`), " ", hostChoice === "" ? (byPing ? "The service tries every host with the map, lowest worst player ping first." : "The service tries every host with the map, least loaded first.") : force ? "Started anyway (admin)." : "")
             : h("p", {}, h("span", { class: `chip tone-${plan.fits ? "ok" : "bad"}` }, plan.fits ? "Fits now" : ifFull === "queue" ? "Doesn't fit now: it will be queued" : "Doesn't fit now"), " ", auto ? "Auto" : "Picked by hand", plan.cpus.length > 0 ? `: CPU ${plan.cpus.join(", ")}, node ${plan.nodes.join(", ")}` : ""),
         plan !== null && plan.warnings.length > 0 ? warningList(plan.warnings) : null,
       ),
@@ -918,7 +1035,7 @@ export function createView(): View {
     };
     fill(summary, 
       h("h2", {}, name.trim() || "New lobby"),
-      h("p", { class: "dim small" }, svc ? `Organised · ${tournament()?.name ?? "no tournament"} · ${hostChoice === "" ? "least loaded host" : hostChoice}` : kind === "tournament" ? "Tournament · the organiser runs it" : "Custom · a player hosts it"),
+      h("p", { class: "dim small" }, svc ? `Organised · ${tournament()?.name ?? "no tournament"} · ${hostChoice === "" ? `${hostWords()} host` : hostChoice}` : kind === "tournament" ? "Tournament · the organiser runs it" : "Custom · a player hosts it"),
       summaryPreview.root,
       row("Seats", map === undefined ? "–" : `${plural(humans, "player")}, ${plural(seats.length - humans, "AI", "AIs")} of ${spotsOf(map).length} spots`, "slots"),
       row("Settings", chosen.size === 0 ? "all default" : `${chosen.size} changed`, "settings"),
@@ -1009,10 +1126,8 @@ export function createView(): View {
     }
   }
 
-  /** `POST /api/v1/lobbies` on the control service: organised, on the host picked or the least loaded one that fits. */
-  async function createThroughService(map: MapInfo): Promise<void> {
-    const control = service.api;
-    if (control === null) return;
+  /** The control service's lobby body for the form as it stands. */
+  function serviceRequest(map: MapInfo): ServiceNewLobby {
     const request: ServiceNewLobby = {
       name: name.trim() || `${tournament()?.name ?? "Organised lobby"} on ${map.name ?? map.id}`,
       map: map.id,
@@ -1035,12 +1150,24 @@ export function createView(): View {
       request.observer_delay_seconds = observers.some((observer) => !observer.referee) ? observerDelay : 0;
     }
     if (force && hostChoice !== "" && plan !== null && !plan.fits) request.force = true;
+    if (byPing && hostChoice === "") request.placement = "ping";
+    return request;
+  }
+
+  /** `POST /api/v1/lobbies` on the control service: organised, on the host picked, the least loaded one that fits, or
+   * the one with the lowest worst player ping. */
+  async function createThroughService(map: MapInfo): Promise<void> {
+    const control = service.api;
+    if (control === null) return;
+    const request = serviceRequest(map);
     creating = true;
     renderFooter();
     renderSummary();
     try {
-      const lobby = await control.createLobby(request);
-      toast("ok", `${lobby.name || request.name} is starting`, `On ${lobby.host}`);
+      const { lobby, placement } = await control.createLobbyPlaced(request);
+      const row = placement?.hosts.find((item) => item.host === lobby.host);
+      const ping = row !== undefined && row.worst_ms !== null ? ` · worst player ping ${num(row.worst_ms)} ms` : "";
+      toast("ok", `${lobby.name || request.name} is starting`, `On ${lobby.host}${ping}`);
       reset();
       actions.refresh();
       location.hash = `#/lobby/${encodeURIComponent(lobby.key)}`;
@@ -1062,6 +1189,7 @@ export function createView(): View {
       preview.update(selectedMap(), slots.marks());
     }
     if (step === "placement") machine.update();
+    if (step === "placement" && svc && byPing && hostChoice === "" && !pingLoading) void loadPing();
     if (step === "review") renderReview();
     customNote.hidden = kind !== "custom" || svc;
     startHelp.textContent =
@@ -1097,6 +1225,8 @@ export function createView(): View {
     force = false;
     plan = null;
     planError = "";
+    pingPlacement = null;
+    pingError = "";
     slots.slots = [];
     countdownInput.value = "10";
     minutesInput.value = "60";
@@ -1142,7 +1272,7 @@ export function createView(): View {
       svc = store.mode === "service";
       if (svc) kind = "tournament";
       headSub.textContent = svc
-        ? "An organised lobby on the host you pick, or the least loaded one that fits; a tournament's lists decide who plays and watches. Every step can be changed again before Create."
+        ? "An organised lobby on the host you pick, the least loaded one that fits, or the one with the lowest worst player ping; a tournament's lists decide who plays and watches. Every step can be changed again before Create."
         : "A tournament lobby the organiser runs, or a custom one a player hosts. Every step can be changed again before Create.";
       if (wasSvc !== svc) {
         maps = [];
@@ -1172,6 +1302,7 @@ export function createView(): View {
       const preset = /^host=(.+)$/.exec(arg ?? "");
       if (svc && preset !== null) {
         hostChoice = preset[1] ?? "";
+        byPing = false;
         mapsFrom = "";
       }
       if (maps.length === 0 || mapsFrom !== (formApi()?.base ?? "")) void loadMaps();

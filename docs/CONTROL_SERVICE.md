@@ -1,6 +1,6 @@
 # Control service
 
-`control-service` (`tools/cmd/control-service`, Go) is the web side of the dedicated servers. It signs users in with their FAF account, gives them roles, keeps the tournaments' allowlists, follows every server host (`server-host`, see [SERVER_DASHBOARD.md](SERVER_DASHBOARD.md)), makes organised lobbies on the host chosen or the least loaded one that fits, sends players' requests for games they host, and pushes the live state of every host and lobby to web clients as Server-Sent Events. The state is cached in Redis, or in memory when the service runs without Redis.
+`control-service` (`tools/cmd/control-service`, Go) is the web side of the dedicated servers. It signs users in with their FAF account, gives them roles, keeps the tournaments' allowlists, follows every server host (`server-host`, see [SERVER_DASHBOARD.md](SERVER_DASHBOARD.md)), makes organised lobbies on the host chosen, the least loaded one that fits or the one with the lowest worst player ping, sends players' requests for games they host, and pushes the live state of every host and lobby to web clients as Server-Sent Events. The state is cached in Redis, or in memory when the service runs without Redis.
 
 It is never in the game's path: players' games connect to the lobby servers the hosts run, and the service only talks to the hosts' REST APIs. When it stops, running lobbies and games go on.
 
@@ -66,6 +66,7 @@ hosts:
     url: http://203.0.113.5:27180
     token_file: eu-1.token   # the host's --token-file
     region: eu
+    rtt_echo: 203.0.113.5:27180   # where players probe its ping; optional, default what the host reports
 ```
 
 Relative file names are read from the configuration file's folder. Token files hold at least 16 characters; spaces and line ends at their end are dropped. Unknown keys are refused.
@@ -107,7 +108,22 @@ Every `poll_seconds` the service reads each host's machine (`/api/v1/host`), pla
 
 A new organised lobby goes to the host named in the request, else to the least loaded host of the request's region that has the map and whose planner (`POST /api/v1/plan`) says it fits now. When a host refuses with a conflict (taken meanwhile), the next one is tried. The service never queues a lobby on a host; when nothing fits, the answer is `409` with each host's reason.
 
+With `"placement": "ping"` the order is the players' ping instead of the load (below, "Placement by the players' ping").
+
 A player's request for a game they host goes to a host with player hosting on (the one named, else the shortest queue, then the fewest games, then the least load), through that host's public request API in the player's name, with the player in seat 1 and their FAF id. The service keeps the request's key and the pool's access code and never shows them.
+
+## Placement by the players' ping
+
+Each host answers ping probes on a UDP echo (`server-host --rtt-echo`, [SERVER_DASHBOARD.md](SERVER_DASHBOARD.md) section 3). A signed-in player measures every host and reports the result; a lobby or request made with `"placement": "ping"` then goes to the host whose worst player ping is lowest.
+
+1. The player's program reads `GET /api/v1/rtt/hosts` (each host's `name`, `region`, `rtt_echo`, `reachable`, and how to probe), sends a few probes to each echo and reports `POST /api/v1/rtt` with each host's median ping and loss. `tools/cmd/rtt-probe --control <url> --token-file <FAF access token file>` does all three; the package `tools/rttprobe` is for other programs (the launcher).
+2. The service keeps the report under the player's FAF id for 30 minutes; a host reported again replaces its entry, others stay until they are 30 minutes old.
+3. With `"placement": "ping"`, the hosts are checked as usual (reachable, in the region, with the map, the planner says it fits). Of those, every human seat's player with a report counts: a host's worst ping is the highest of their pings to it. The hosts every measured player reached come first, then those some player reported but got no reply from; among the first, those a measured player didn't report at all go after those everyone reported. Within each group the lowest worst ping goes first, and hosts within 10 ms of it are a tie that the usual order breaks (organised lobbies: the least load; requests: the shortest queue, then the fewest games, then the least load).
+4. Players without a report (an open seat, or nothing reported in the last 30 minutes) don't block the placement: the order is made from the others, and the answer lists them under `missing`. When nobody reported, the order is the usual one.
+
+The answer carries `placement`: `mode` (`ping`), `margin_ms` (10), `players` (human seats), `measured`, `missing` (each `seat`, `uid`, `name`, `why`), `basis` (the rule in words), `picked` (the host it went to) and `hosts`, each `host`, `region`, `worst_ms` (null when no measured player reported it), `worst_player`, `measured`, `unmeasured` and `unreachable_for` (player names), `load`, `candidate` (it could take the lobby), `reason` (why not) and `rank` (the order it was tried in). A refusal (`409`) carries it too. `POST /api/v1/placement` answers the same for a lobby body without making anything, for a form to show before it creates. A host named by `host` and `"placement": "ping"` don't go together (`400`).
+
+A report is what the player's program measured and sent: a player could claim a worse ping to a host than they have, to move a lobby elsewhere. Organisers see the table with each host's slowest player.
 
 ## The web UI
 
@@ -129,16 +145,20 @@ Lobbies are named `<host>/<id>` (`key`), for example `eu-1/l3`.
 | `POST /auth/logout` | ends the session |
 | `GET /api/v1/me` | `user` (`uid`, `name`, `via`: `session`, `access_token` or `admin_token`), `roles`, `tournaments` (as below), `player_hosting` |
 | `GET /api/v1/tournaments` | admins and global organisers: every tournament with its lists; others: the ones they are in, with `you` (`organiser`, `player`, `observer`), and the lists where they organise |
-| `GET /api/v1/hosts` | each host. Organisers and admins: `name`, `region`, `reachable`, `error`, `machine`, `cpu_model`, `cpus`, `nodes`, `load` (mean CPU % over 10 s), `memory_total_mb`, `memory_available_mb`, `lobbies` (running), `player_hosting`, `pool_games`, `pool_queued`, `pool_max_games`, `checked`. Players: `name`, `region`, `reachable`, `lobbies`, `player_hosting` |
+| `GET /api/v1/hosts` | each host. Organisers and admins: `name`, `region`, `reachable`, `error`, `machine`, `cpu_model`, `cpus`, `nodes`, `load` (mean CPU % over 10 s), `memory_total_mb`, `memory_available_mb`, `lobbies` (running), `player_hosting`, `pool_games`, `pool_queued`, `pool_max_games`, `rtt_echo`, `checked`. Players: `name`, `region`, `reachable`, `lobbies`, `player_hosting`, `rtt_echo` |
 | `GET /api/v1/hosts/<name>` | one host (organisers, admins) |
 | `GET /api/v1/hosts/<name>/maps`, `/settings[?map=<id>]`, `/hint?players=<n>&km=<km>`, `POST /api/v1/hosts/<name>/plan`, `GET /api/v1/hosts/<name>/maps/<id>/preview.png` | the host's own answers ([SERVER_DASHBOARD.md](SERVER_DASHBOARD.md)), for a lobby form (organisers, admins) |
 | `GET /api/v1/lobbies[?host=<name>&tournament=<id>&running=1]` | every lobby, as its viewer may see it (below) |
-| `POST /api/v1/lobbies` | an organised lobby (below); answers `lobby` |
+| `POST /api/v1/lobbies` | an organised lobby (below); answers `lobby`, and `placement` when placed by ping |
+| `POST /api/v1/placement` | a lobby body with `"placement": "ping"`: where it would go now, as `placement` (above); nothing is made. Those who may make the lobby |
+| `GET /api/v1/rtt/hosts` | each host's `name`, `region`, `rtt_echo` and `reachable`, with `probe` (`format`, `count`, `interval_ms`, `timeout_ms`) and `max_age_minutes`; every signed-in user |
+| `POST /api/v1/rtt` | the signed-in player's pings: `{"rtts": [{"host": "eu-1", "ms": 31.5, "loss_pct": 0}, {"host": "eu-2", "loss_pct": 100}]}`; `ms` is the median, 0 to 2000, left out when nothing came back (`loss_pct` 100); known hosts only, each once. One report every 2 s (`429` sooner). Answers `rtt` as kept. FAF users only (`403` for the admin token) |
+| `GET /api/v1/rtt` | the signed-in player's report: `rtt` with `uid`, `name`, `updated` and `hosts` (each `ms`, `loss_pct`, `at`) |
 | `GET /api/v1/lobbies/<host>/<id>` | one lobby |
 | `DELETE /api/v1/lobbies/<host>/<id>` | stops it (its server gets SIGTERM): those who run it, and the player whose request made it |
 | `POST /api/v1/lobbies/<host>/<id>/ops/<op>` | a control op with its fields as a JSON object, passed to the lobby server: `force_start`, `pause`, `resume`, `eject`, `set_options`, `set_player`, `allow`, `disallow`, `substitute`, `extend_timeouts`, `end`, `approve_observer`, `refuse_observer` (fields in [SWITCHES.md](SWITCHES.md) under `--control` and `--rest`). Those who run the lobby |
 | `GET /api/v1/lobbies/<host>/<id>/armies` | during the game, each army's economy and units (the lobby server's `/api/v1/armies`). Those who run the lobby only: a player would see the enemy's |
-| `POST /api/v1/requests` | a game the signed-in player hosts: `{"map": "scmp_007", "seats": [{"kind": "human"}, {"kind": "human", "name": "Bo"}, {"kind": "ai", "ai": "rush"}], "options": {"UnitCap": "500"}, "host": "", "region": ""}`; seat 1 is the player. Answers `request` as the host keeps it (`id`, `state`, `position`, `reason`, `lobby` with its join lines once it runs), with `ref` (`<host>/<id>`) and without its key. `403` with `player_hosting` off, `409` when no host takes players' games now |
+| `POST /api/v1/requests` | a game the signed-in player hosts: `{"map": "scmp_007", "seats": [{"kind": "human"}, {"kind": "human", "name": "Bo"}, {"kind": "ai", "ai": "rush"}], "options": {"UnitCap": "500"}, "host": "", "region": "", "placement": "load"}`; seat 1 is the player; `"placement": "ping"` picks the host by the requesting player's own ping report and answers `placement` too. Answers `request` as the host keeps it (`id`, `state`, `position`, `reason`, `lobby` with its join lines once it runs), with `ref` (`<host>/<id>`) and without its key. `403` with `player_hosting` off, `409` when no host takes players' games now |
 | `GET /api/v1/requests` | the signed-in player's requests, each as the host has it now |
 | `GET /api/v1/requests/<host>/<id>` | one of them |
 | `DELETE /api/v1/requests/<host>/<id>` | cancels it (out of the queue, or its lobby stopped before the game) |
@@ -147,10 +167,10 @@ Lobbies are named `<host>/<id>` (`key`), for example `eu-1/l3`.
 
 ### A new organised lobby
 
-`POST /api/v1/lobbies` takes the host's lobby fields ([SERVER_DASHBOARD.md](SERVER_DASHBOARD.md), `POST /api/v1/lobbies`) and three of its own:
+`POST /api/v1/lobbies` takes the host's lobby fields ([SERVER_DASHBOARD.md](SERVER_DASHBOARD.md), `POST /api/v1/lobbies`) and four of its own:
 
 ```json
-{"tournament": "spring-cup", "host": "", "region": "eu",
+{"tournament": "spring-cup", "host": "", "region": "eu", "placement": "ping",
  "name": "Spring Cup, semi-final 1", "map": "scmp_009",
  "seats": [{"kind": "human", "name": "Ann", "uid": 10, "team": 2, "faction": 1},
            {"kind": "human", "name": "Bo", "uid": 11, "team": 3, "faction": 3}],
@@ -162,6 +182,7 @@ Lobbies are named `<host>/<id>` (`key`), for example `eu-1/l3`.
 - `tournament`: whose lists apply and who may run it; leave it out for a lobby outside tournaments.
 - `host`: a host by name; leave it empty for the least loaded one that fits. CPUs picked by id (`"cpus": [3, 11]`) need a host.
 - `region`: only hosts of this region when picking.
+- `placement`: `load` (the default) tries the least loaded host first; `ping` the one with the lowest worst player ping ("Placement by the players' ping" above). Only without `host`.
 - Observers carry their FAF id here; the host gets their names.
 - The lobby is always organised (`control` `organiser`, `kind` `tournament`): nobody hosts it, and it starts from the ops or by its countdown. `force` is for admins only; `queue` isn't taken.
 
@@ -194,6 +215,7 @@ With `?lobby=<host>/<id>` the stream carries that lobby only. A comment line eve
 | `lobby:<host>/<id>` | a lobby's state: the host's record, the lobby server's status, the service's record | 2 minutes, written every poll; removed when the host no longer lists it |
 | `meta:<host>/<id>` | who made an organised lobby, for which tournament, its observers' FAF ids | 30 days |
 | `request:<host>/<id>`, `myrequest:<uid>:<host>/<id>` | a player's request with its key | 7 days |
+| `rtt:<uid>` | a player's pings to the hosts, each with its time | 30 minutes after the last report |
 | `session:<sha-256 of the cookie>` | a signed-in user's id and name | `session_hours` |
 | `login:<state>` | a sign-in in progress | 10 minutes, used once |
 
@@ -201,4 +223,4 @@ The channel `events` carries the changes. Roles, tournaments and hosts aren't in
 
 ## Tests
 
-`go test ./cmd/control-service` runs the sign-in against the mock provider (`tools/oidcmock`: public and confidential clients, a reused state, a wrong PKCE verifier, a wrong nonce, access tokens with a missing scope, another key, another issuer, expired), roles and allowlists, the host registry against fake hosts (polling, least loaded placement, a host that doesn't fit, a host that stops answering, views per viewer, ops, stopping, players' requests) and the event stream. With `CONTROL_TEST_REDIS=<host:port>` the same tests run on that Redis (each under its own key prefix, removed afterwards).
+`go test ./cmd/control-service` runs the sign-in against the mock provider (`tools/oidcmock`: public and confidential clients, a reused state, a wrong PKCE verifier, a wrong nonce, access tokens with a missing scope, another key, another issuer, expired), roles and allowlists, the host registry against fake hosts (polling, least loaded placement, a host that doesn't fit, a host that stops answering, views per viewer, ops, stopping, players' requests), ping reports and placement by ping (validation, the order with ties, unreachable and unmeasured hosts, open seats, the preview, a request) and the event stream. With `CONTROL_TEST_REDIS=<host:port>` the same tests run on that Redis (each under its own key prefix, removed afterwards).

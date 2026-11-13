@@ -190,6 +190,12 @@ func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			out = append(out, hostView(cfg, who, h))
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "hosts": out})
+	case rest == "rtt/hosts" && r.Method == http.MethodGet:
+		s.rttHosts(w)
+	case rest == "rtt" && (r.Method == http.MethodGet || r.Method == http.MethodPost):
+		s.rttRoute(w, r, cfg, who)
+	case rest == "placement" && r.Method == http.MethodPost:
+		s.previewPlacement(w, r, cfg, who)
 	case strings.HasPrefix(rest, "hosts/"):
 		s.hostRead(w, r, cfg, who, strings.TrimPrefix(rest, "hosts/"))
 	case rest == "tournaments" && r.Method == http.MethodGet:

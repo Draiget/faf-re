@@ -91,8 +91,9 @@ type observerIn struct {
 // createBody is POST /api/v1/lobbies: an organised lobby. The lobby fields are the host's (docs/SERVER_DASHBOARD.md);
 // host, region and tournament are the service's.
 type createBody struct {
-	Host           string          `json:"host"`   // a host by name; empty: the least loaded host that fits
-	Region         string          `json:"region"` // only hosts of this region when picking
+	Host           string          `json:"host"`      // a host by name; empty: the least loaded host that fits
+	Region         string          `json:"region"`    // only hosts of this region when picking
+	Placement      string          `json:"placement"` // "load" (default) or "ping": the lowest worst player ping (rtt.go)
 	Tournament     string          `json:"tournament"`
 	Name           string          `json:"name"`
 	Map            string          `json:"map"`
@@ -175,33 +176,42 @@ type candidate struct {
 	fits   bool
 	load   float64
 	reason string
+	row    int // its row in the placement table
 }
 
 // pickHosts ranks the hosts for a new lobby: reachable, with the map, in the region; then those whose planner says
-// it fits, least loaded first. A named host is the only candidate.
-func (s *server) pickHosts(ctx context.Context, b *createBody) ([]candidate, []string) {
+// it fits, least loaded first, or by the players' worst ping with "placement": "ping" (then the placement table is
+// the answer's too). A named host is the only candidate.
+func (s *server) pickHosts(ctx context.Context, b *createBody) ([]candidate, []string, *placement, error) {
 	var pollers []*poller
 	if b.Host != "" {
 		if p := s.reg.get(b.Host); p != nil {
 			pollers = []*poller{p}
 		}
-		return []candidate{{p: firstOr(pollers), fits: true}}, nil
+		return []candidate{{p: firstOr(pollers), fits: true}}, nil, nil, nil
 	}
 	reasons := []string{}
 	cands := []candidate{}
+	rows := []hostPlacement{}
+	skip := func(row hostPlacement, why string) {
+		row.Reason = why
+		rows = append(rows, row)
+		reasons = append(reasons, row.Host+": "+why)
+	}
 	for _, p := range s.reg.all() {
 		h, _ := p.state()
 		name := p.h.cfg.Name
 		if b.Region != "" && h.Region != b.Region {
 			continue
 		}
+		row := hostPlacement{Host: name, Region: h.Region, Load: h.Load}
 		if !h.Reachable {
-			reasons = append(reasons, name+": not reachable")
+			skip(row, "not reachable")
 			continue
 		}
 		maps, err := p.mapList(ctx)
 		if err != nil {
-			reasons = append(reasons, name+": "+err.Error())
+			skip(row, strings.TrimPrefix(err.Error(), "host "+name+": "))
 			continue
 		}
 		km := 0
@@ -211,7 +221,7 @@ func (s *server) pickHosts(ctx context.Context, b *createBody) ([]candidate, []s
 			}
 		}
 		if km == 0 {
-			reasons = append(reasons, fmt.Sprintf("%s: no map %q", name, b.Map))
+			skip(row, fmt.Sprintf("no map %q", b.Map))
 			continue
 		}
 		plan := map[string]any{"players": max(len(b.Seats), 1), "km": km, "side": "operator"}
@@ -230,7 +240,7 @@ func (s *server) pickHosts(ctx context.Context, b *createBody) ([]candidate, []s
 			} `json:"plan"`
 		}
 		if err != nil || code != http.StatusOK || json.Unmarshal(resp, &doc) != nil {
-			reasons = append(reasons, fmt.Sprintf("%s: its planner didn't answer (%d %v)", name, code, err))
+			skip(row, fmt.Sprintf("its planner didn't answer (%d %v)", code, err))
 			continue
 		}
 		c := candidate{p: p, fits: doc.Plan.Fits, load: h.Load}
@@ -242,13 +252,31 @@ func (s *server) pickHosts(ctx context.Context, b *createBody) ([]candidate, []s
 				}
 			}
 			c.reason = name + ": doesn't fit now: " + strings.Join(why, "; ")
-			reasons = append(reasons, c.reason)
+			skip(row, "doesn't fit now: "+strings.Join(why, "; "))
 			continue
 		}
+		row.Candidate = true
+		c.row = len(rows)
+		rows = append(rows, row)
 		cands = append(cands, c)
 	}
 	sort.SliceStable(cands, func(i, j int) bool { return cands[i].load < cands[j].load })
-	return cands, reasons
+	if b.Placement != "ping" {
+		return cands, reasons, nil, nil
+	}
+	order, pl, err := s.rankByPing(ctx, b.Seats, rows, func(i, j int) bool { return rows[i].Load < rows[j].Load })
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	byRow := map[int]candidate{}
+	for _, c := range cands {
+		byRow[c.row] = c
+	}
+	ranked := make([]candidate, 0, len(order))
+	for _, i := range order {
+		ranked = append(ranked, byRow[i])
+	}
+	return ranked, reasons, pl, nil
 }
 
 func firstOr(ps []*poller) *poller {
@@ -258,37 +286,59 @@ func firstOr(ps []*poller) *poller {
 	return ps[0]
 }
 
-// POST /api/v1/lobbies: an organised lobby (control organiser, kind tournament) on a chosen host or the least loaded
-// one that fits.
-func (s *server) createLobby(w http.ResponseWriter, r *http.Request, cfg *Config, who Principal) {
+// decodeCreate reads and checks a new organised lobby's body (also a placement preview's): the roles, the lists, the
+// host and the placement mode. It has answered when ok is false.
+func (s *server) decodeCreate(w http.ResponseWriter, r *http.Request, cfg *Config, who Principal) (*createBody, bool) {
 	var b createBody
 	dec := json.NewDecoder(io.LimitReader(r.Body, 64<<10))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(&b); err != nil {
 		fail(w, http.StatusBadRequest, fmt.Errorf("body: %w", err))
-		return
+		return nil, false
 	}
 	if !cfg.canOrganise(who, b.Tournament) {
 		fail(w, http.StatusForbidden, fmt.Errorf("%w: organised lobbies of %s are for its organisers and admins", errForbidden,
 			orNone(b.Tournament)))
-		return
+		return nil, false
 	}
 	if b.Force && !who.Admin {
 		fail(w, http.StatusForbidden, errors.New("only an admin may force a lobby past the planner's errors"))
-		return
+		return nil, false
 	}
 	if strings.TrimSpace(b.Map) == "" || len(b.Seats) == 0 {
 		fail(w, http.StatusBadRequest, errors.New("a lobby needs a map and seats"))
-		return
+		return nil, false
 	}
 	if err := checkAllowlist(cfg, &b); err != nil {
 		fail(w, http.StatusBadRequest, err)
-		return
+		return nil, false
 	}
 	if b.Host != "" && cfg.host(b.Host) == nil {
 		fail(w, http.StatusNotFound, fmt.Errorf("no host %q", b.Host))
+		return nil, false
+	}
+	switch b.Placement {
+	case "", "load":
+	case "ping":
+		if b.Host != "" {
+			fail(w, http.StatusBadRequest, errors.New(`"placement": "ping" picks the host: leave host empty`))
+			return nil, false
+		}
+	default:
+		fail(w, http.StatusBadRequest, fmt.Errorf(`placement is "load" or "ping", not %q`, b.Placement))
+		return nil, false
+	}
+	return &b, true
+}
+
+// POST /api/v1/lobbies: an organised lobby (control organiser, kind tournament) on a chosen host, the least loaded
+// one that fits, or the one with the lowest worst player ping.
+func (s *server) createLobby(w http.ResponseWriter, r *http.Request, cfg *Config, who Principal) {
+	pb, ok := s.decodeCreate(w, r, cfg, who)
+	if !ok {
 		return
 	}
+	b := *pb
 	observers := []map[string]any{}
 	for _, o := range b.Observers {
 		observers = append(observers, map[string]any{"name": o.Name, "referee": o.Referee})
@@ -307,9 +357,21 @@ func (s *server) createLobby(w http.ResponseWriter, r *http.Request, cfg *Config
 		forward["name"] = cfg.tournament(b.Tournament).Name
 	}
 	body, _ := json.Marshal(forward)
-	cands, reasons := s.pickHosts(r.Context(), &b)
+	cands, reasons, pl, err := s.pickHosts(r.Context(), &b)
+	if err != nil {
+		fail(w, http.StatusServiceUnavailable, fmt.Errorf("store: %w", err))
+		return
+	}
+	// With "placement": "ping" every answer carries the placement table, a refusal too.
+	refuse := func(code int, err error) {
+		if pl == nil {
+			fail(w, code, err)
+			return
+		}
+		writeJSON(w, code, map[string]any{"ok": false, "error": err.Error(), "placement": pl})
+	}
 	if len(cands) == 0 || cands[0].p == nil {
-		fail(w, http.StatusConflict, fmt.Errorf("no host can take this lobby now: %s", orNone(strings.Join(reasons, "; "))))
+		refuse(http.StatusConflict, fmt.Errorf("no host can take this lobby now: %s", orNone(strings.Join(reasons, "; "))))
 		return
 	}
 	for i, c := range cands {
@@ -326,7 +388,7 @@ func (s *server) createLobby(w http.ResponseWriter, r *http.Request, cfg *Config
 			if code == http.StatusAccepted {
 				code = http.StatusBadGateway // the service never asks to queue; a host shouldn't have queued it
 			}
-			fail(w, code, fmt.Errorf("host %s: %s", c.p.h.cfg.Name, hostError(resp)))
+			refuse(code, fmt.Errorf("host %s: %s", c.p.h.cfg.Name, hostError(resp)))
 			return
 		}
 		var doc struct {
@@ -347,10 +409,16 @@ func (s *server) createLobby(w http.ResponseWriter, r *http.Request, cfg *Config
 		c.p.refreshSoon()
 		log.Printf("lobby %s made by %s (FAF %d) for %s: %s, %d seats", key, who.Name, who.UID, orNone(b.Tournament), b.Map, len(b.Seats))
 		st := &LobbyState{Key: key, Host: c.p.h.cfg.Name, Lobby: doc.Lobby, Meta: meta, Updated: time.Now().UTC().Format(time.RFC3339)}
-		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "lobby": viewLobby(cfg, who, st)})
+		answer := map[string]any{"ok": true, "lobby": viewLobby(cfg, who, st)}
+		if pl != nil {
+			pl.Picked = c.p.h.cfg.Name
+			answer["placement"] = pl
+			log.Printf("lobby %s placed by ping: %s", key, pl.Basis)
+		}
+		writeJSON(w, http.StatusOK, answer)
 		return
 	}
-	fail(w, http.StatusConflict, fmt.Errorf("no host took the lobby: %s", strings.Join(reasons, "; ")))
+	refuse(http.StatusConflict, fmt.Errorf("no host took the lobby: %s", strings.Join(reasons, "; ")))
 }
 
 func orNone(s string) string {

@@ -3565,6 +3565,35 @@ body[data-role="player"] [data-needs="organiser"] {
   margin: 0;
 }
 
+.ping-placement {
+  margin-top: 0.8rem;
+}
+
+.ping-placement .block-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+
+.ping-placement p {
+  margin: 0.4rem 0;
+}
+
+.ping-table tr[data-picked="yes"] td {
+  background: var(--accent-soft);
+}
+
+.ping-table tr[data-candidate="no"] {
+  opacity: 0.75;
+}
+
+.ping-notes {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
 .request-form {
   display: flex;
   flex-direction: column;

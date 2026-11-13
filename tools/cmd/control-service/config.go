@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"net"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -67,6 +68,9 @@ type HostConfig struct {
 	URL       string `yaml:"url"` // e.g. http://203.0.113.5:27180
 	TokenFile string `yaml:"token_file"`
 	Region    string `yaml:"region"`
+	// RTTEcho is where players probe this host's ping (host:port); empty takes what the host reports (its
+	// --rtt-echo on its --public-host). Plan WPR.16.
+	RTTEcho string `yaml:"rtt_echo"`
 
 	token string
 }
@@ -185,6 +189,11 @@ func (c *Config) check() error {
 			return fmt.Errorf("host %s: url %q isn't an http(s) URL", h.Name, h.URL)
 		}
 		h.URL = strings.TrimRight(h.URL, "/")
+		if h.RTTEcho != "" {
+			if _, port, err := net.SplitHostPort(h.RTTEcho); err != nil || port == "" || port == "0" {
+				return fmt.Errorf("host %s: rtt_echo %q isn't host:port", h.Name, h.RTTEcho)
+			}
+		}
 		if h.TokenFile == "" {
 			return fmt.Errorf("host %s needs token_file (its server-host --token-file)", h.Name)
 		}

@@ -32,6 +32,7 @@ type fakeHost struct {
 	fits        bool
 	poolEnabled bool
 	poolAccess  string
+	echo        string // its RTT echo address, as server-host reports it
 	maps        []hostMap
 	lobbies     []map[string]any
 	status      map[string]map[string]any
@@ -117,7 +118,7 @@ func (f *fakeHost) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		f.write(w, 200, map[string]any{"ok": true, "host": map[string]any{"name": "fake", "cpu_model": "Fake CPU",
 			"memory_mb": map[string]int{"total": 16000, "available": 12000}, "cpus": cpus, "lobbies": running,
-			"nodes": []any{map[string]any{"id": 0}}}})
+			"nodes": []any{map[string]any{"id": 0}}, "rtt_echo": f.echo}})
 	case p == "/api/v1/pool":
 		f.write(w, 200, map[string]any{"ok": true, "pool": map[string]any{"enabled": f.poolEnabled, "max_games": 4,
 			"access": f.poolAccess, "code": "c0de"}, "usage": map[string]any{"games": 0, "queued": len(f.requests)}})

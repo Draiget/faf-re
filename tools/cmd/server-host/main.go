@@ -53,6 +53,7 @@ func main() {
 	gameIP := flag.String("game-ip", "0.0.0.0", "address each lobby's server listens on for players")
 	ports := flag.String("ports", "27200-27299", "game ports the lobbies take, first-last")
 	maxLobbies := flag.Int("max-lobbies", 32, "most lobbies running at once")
+	rttEchoFlag := flag.String("rtt-echo", "", "UDP address answering players' RTT probes: empty for the --listen port number on --game-ip, a port, host:port, or off")
 	var maps mapFlags
 	flag.Var(&maps, "maps", "<label>=<folder> holding map folders; repeat for several (e.g. fa=... vault=...)")
 	flag.Parse()
@@ -92,6 +93,10 @@ func main() {
 				c.Close()
 			}
 		}
+	}
+	echoListen, err := rttEchoAddress(*rttEchoFlag, *listen, *gameIP)
+	if err != nil {
+		log.Fatalf("--rtt-echo %q: %v", *rttEchoFlag, err)
 	}
 	if err := os.MkdirAll(*runs, 0o755); err != nil {
 		log.Fatalf("runs folder: %v", err)
@@ -154,6 +159,9 @@ func main() {
 	go m.runMetrics(history, stop)
 	a := &api{token: token, corsOrigin: *cors, m: m, maps: listMaps, procDir: "/proc", hostName: hostName(), settings: settings,
 		hostLog: hostLog, metrics: history}
+	if echoListen != "" {
+		a.echo, a.rttEcho = startRTTEcho(echoListen, *publicHost)
+	}
 	srv := &http.Server{Addr: *listen, Handler: a, ReadHeaderTimeout: 5 * time.Second, MaxHeaderBytes: 16 << 10}
 
 	sig := make(chan os.Signal, 1)
@@ -163,6 +171,9 @@ func main() {
 		log.Printf("stopping: every lobby's server first")
 		m.stopAll()
 		close(stop)
+		if a.echo != nil {
+			_ = a.echo.close()
+		}
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		_ = srv.Shutdown(ctx)

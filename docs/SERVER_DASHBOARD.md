@@ -52,8 +52,11 @@ server-host --listen 127.0.0.1:27180 --token-file admin.token --cors-origin http
 | `--game-ip` | the address each lobby's server listens on for players (default `0.0.0.0`) |
 | `--ports` | the game ports lobbies take, one each (default `27200-27299`); open them for UDP and TCP |
 | `--max-lobbies` | most lobbies at once (default 32) |
+| `--rtt-echo` | the UDP address that answers players' ping probes (below): empty (default) for the `--listen` port number on `--game-ip`, a port number, `host:port`, or `off` |
 
 It says `server-host: REST API on http://127.0.0.1:27180/api/v1 (no lobby running; ...)` and runs no lobby until one is made. Stopping it (SIGTERM, Ctrl+C) stops every lobby's server first.
+
+The host answers players' ping probes on a UDP echo, by default on the API's port number (27180) on the game address: players measure their round-trip time to each host with it (`tools/cmd/rtt-probe`), and the control service can place a lobby on the host whose worst player ping is lowest ([CONTROL_SERVICE.md](CONTROL_SERVICE.md), "Placement by the players' ping"). Players reach it at `--public-host` and its port, which `/api/v1/host` and `/api/v1/public/pool` give as `rtt_echo`; open that port for UDP as well. The echo answers only a well-formed 32-byte probe (the format is in `tools/rttprobe`), with a reply of the same size, never answers a reply, and answers one address at most 10 times a second after a burst of 20, and 2000 times a second in all.
 
 Each lobby's server is started on the CPUs chosen for it and keeps them (the server locks a CPU set it starts with, so FAF's init script can't move it; `--cpus` in [SWITCHES.md](SWITCHES.md)). A lobby on two or more CPUs also gets `/simworkers` (CPUs − 1).
 
@@ -163,7 +166,7 @@ The top bar then shows the hosts answering, their mean load and the lobbies runn
 
 - **Overview**: every host as a card: whether it answers (and why not), its machine, CPUs, NUMA nodes, CPU load and memory (organisers and admins), the lobbies it runs, player hosting with its games and queue, and Create here. Chips pick one host or all; the choice also filters the lobby list. Below: what needs attention (a host not answering or short of memory, a failed lobby, a lobby whose host went quiet), the running lobbies and what changed while the page was open.
 - **Lobbies**: every lobby of every host, with its host, whether the viewer has a seat or a watch line in it, and filters for organised lobbies, player games, those made on a host's own dashboard, and those with a place for the viewer. Stop shows only where the viewer may stop the lobby.
-- **Create lobby** (organisers and admins): the same six steps. Step 1 picks the tournament (its lists decide who plays and watches; admins and global organisers also have "No tournament", with open seats) and the host: one by name, or the least loaded one that fits, which the service picks when the lobby is made (the maps, settings and estimate shown are then those of the least loaded host now). In a tournament every player's seat needs the player's FAF id from its list, and every observer theirs from the observer or organiser lists; the form says which spot is wrong before Create. Placement has no machine map (the service gives no host's CPUs): the planner's estimate and warnings come from the host, the cores are as suggested or fixed, and nothing is queued: a lobby that fits nowhere isn't made, and the page says each host's reason. Only an admin may start one anyway on a host picked by name. A player opening this page is told the role it needs.
+- **Create lobby** (organisers and admins): the same six steps. Step 1 picks the tournament (its lists decide who plays and watches; admins and global organisers also have "No tournament", with open seats) and the host: one by name, the least loaded one that fits, or the one with the lowest worst ping of the players, which the service picks when the lobby is made (the maps, settings and estimate shown are then those of the least loaded host now). By ping, Placement shows each host in the order the service would try it now, with its worst player ping, the slowest player, its load and why a host can't take the lobby, and names the players without a ping report; Check again asks the service once more. In a tournament every player's seat needs the player's FAF id from its list, and every observer theirs from the observer or organiser lists; the form says which spot is wrong before Create. Placement has no machine map (the service gives no host's CPUs): the planner's estimate and warnings come from the host, the cores are as suggested or fixed, and nothing is queued: a lobby that fits nowhere isn't made, and the page says each host's reason. Only an admin may start one anyway on a host picked by name. A player opening this page is told the role it needs.
 - **My games**: the running lobbies with a place for the viewer, the games they asked for (queued with their place, their lobby once it opens, refused with the reason; cancel while it waits or before the game), and, when the service allows player hosting, a form to ask for a game they host (the map's id, the host or any with room, the other seats).
 - **A lobby's page** (`#/lobby/<host>/<id>`): the game tab as above, with the host, who made the lobby and for which tournament. Those who run it (its tournament's organisers, global organisers, admins, whoever made it) get every join and watch line, the events and the controls. Everyone else gets the seats with who joined and is ready, their own join or watch line only, and a note on who runs it instead of the controls; the lobby's own events and armies are for those who run it. The server log and metrics tabs are on the host's own dashboard.
 
@@ -181,7 +184,7 @@ dash.example.org {
 }
 ```
 
-with `npm run build`'s `tools/dashboard/dist/` copied to `/srv/dashboard/dist` and `--cors-origin https://dash.example.org`. On a trusted LAN, binding to the LAN address works without a proxy. The players' game ports (`--ports`) are separate from the API and must be reachable by the players.
+with `npm run build`'s `tools/dashboard/dist/` copied to `/srv/dashboard/dist` and `--cors-origin https://dash.example.org`. On a trusted LAN, binding to the LAN address works without a proxy. The players' game ports (`--ports`) and the ping echo (`--rtt-echo`, UDP) are separate from the API and must be reachable by the players.
 
 ## 6. One server without a host
 
@@ -203,7 +206,7 @@ The host (`server-host`):
 
 | Request | Does |
 |---|---|
-| `GET /api/v1/host` | the machine: `name`, `cpu_model`, `memory_mb`, `cpus` (each `id`, `core`, `socket`, `load` over 1 s and `load10` over 10 s in %, the `lobbies` on it), the number of running `lobbies`, the `ai` personalities; `nodes` (each NUMA node's `id`, `cpus`, `memory_mb` total and free) and `links` (each physical network link's `name`, `speed_mbps`, `in_kbps`, `out_kbps`); each CPU also has its `node` |
+| `GET /api/v1/host` | the machine: `name`, `cpu_model`, `memory_mb`, `cpus` (each `id`, `core`, `socket`, `load` over 1 s and `load10` over 10 s in %, the `lobbies` on it), the number of running `lobbies`, the `ai` personalities; `nodes` (each NUMA node's `id`, `cpus`, `memory_mb` total and free) and `links` (each physical network link's `name`, `speed_mbps`, `in_kbps`, `out_kbps`); each CPU also has its `node`; `rtt_echo` (where players probe its ping, `""` when off) and `rtt_echo_counts` (probes `answered`, packets dropped as `malformed`, probes over the rate `limited`, since the start) |
 | `GET /api/v1/maps` | the maps: `id`, `name`, `file`, `size`, `km`, `players` (start spots), `description`, `source`, `has_options`, `spawns` (each start spot `[x, z]` from the map's `_save.lua` markers, 0..1 over the map's size, in army order; `[]` when a marker is missing) and `preview` (the path of its preview image, when its `.scmap` has one) |
 | `GET /api/v1/maps/<id>/preview.png` | the map's preview: the image its `.scmap` embeds, as PNG (256×256 on the game's and the vault's maps); `404` if it has none. No token needed, so an `<img>` can show it |
 | `GET /api/v1/hint?players=<n>&km=<km>` | a game's cost: `mean_cores`, `worst_cores`, `suggested_cores`, `basis` |
@@ -243,7 +246,7 @@ Players' requests (no `Authorization`; a request's `key` is its player's credent
 
 | Request | Does |
 |---|---|
-| `GET /api/v1/public/pool` | `enabled`, `access` (`open` or `code`), `max_players`, `lobby_minutes`, `options` (the defaults a request starts from), `queue` (`length`: requests waiting, `games` running, `max_games`) |
+| `GET /api/v1/public/pool` | `enabled`, `access` (`open` or `code`), `max_players`, `lobby_minutes`, `options` (the defaults a request starts from), `queue` (`length`: requests waiting, `games` running, `max_games`), `rtt_echo` (where to probe the host's ping) |
 | `GET /api/v1/public/maps` | the maps, as `/api/v1/maps`, with `preview` under `/api/v1/public/maps/<id>/preview.png` |
 | `GET /api/v1/public/maps/<id>/preview.png` | the map's preview, as `/api/v1/maps/<id>/preview.png` |
 | `GET /api/v1/public/settings[?map=<id>]` | the settings, as `/api/v1/settings` |

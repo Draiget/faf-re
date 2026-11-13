@@ -95,6 +95,7 @@ type HostState struct {
 	PoolQueued    int     `json:"pool_queued"`
 	PoolGames     int     `json:"pool_games"`
 	PoolMaxGames  int     `json:"pool_max_games"`
+	RTTEcho       string  `json:"rtt_echo,omitempty"` // where players probe its ping (plan WPR.16)
 	Checked       string  `json:"checked"`
 }
 
@@ -340,6 +341,7 @@ func (p *poller) poll(ctx context.Context) {
 			} `json:"cpus"`
 			Nodes   []json.RawMessage `json:"nodes"`
 			Lobbies int               `json:"lobbies"`
+			RTTEcho string            `json:"rtt_echo"`
 		} `json:"host"`
 	}
 	var lobbiesDoc struct {
@@ -388,6 +390,17 @@ func (p *poller) poll(ctx context.Context) {
 		hs.PlayerHosting, hs.PoolMaxGames = poolDoc.Pool.Enabled, poolDoc.Pool.MaxGames
 		hs.PoolGames, hs.PoolQueued = poolDoc.Usage.Games, poolDoc.Usage.Queued
 		p.updateLobbies(ctx, pctx, lobbiesDoc.Lobbies, now)
+	}
+	// The echo players probe: the configuration's, else what the host says (kept while it doesn't answer).
+	switch {
+	case p.h.cfg.RTTEcho != "":
+		hs.RTTEcho = p.h.cfg.RTTEcho
+	case err == nil:
+		hs.RTTEcho = hostDoc.Host.RTTEcho
+	default:
+		p.mu.Lock()
+		hs.RTTEcho = p.host.RTTEcho
+		p.mu.Unlock()
 	}
 	p.flush(ctx)
 	// The host's summary: stored every poll, pushed when more than its load moved (or the load by 5 points).

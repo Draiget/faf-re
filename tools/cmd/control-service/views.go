@@ -177,13 +177,13 @@ func publicStatus(raw json.RawMessage) map[string]any {
 }
 
 // hostView: organisers and admins see a host's machine and load; players its name, region, reachability, lobby
-// count and whether it takes players' requests.
+// count, whether it takes players' requests and where to probe its ping.
 func hostView(cfg *Config, who Principal, h HostState) any {
 	if who.Admin || cfg.canOrganiseAny(who) {
 		return h
 	}
 	return map[string]any{"name": h.Name, "region": h.Region, "reachable": h.Reachable, "lobbies": h.Lobbies,
-		"player_hosting": h.PlayerHosting && cfg.PlayerHosting}
+		"player_hosting": h.PlayerHosting && cfg.PlayerHosting, "rtt_echo": h.RTTEcho}
 }
 
 // canOrganiseAny: an admin, a global organiser, or an organiser of some tournament.

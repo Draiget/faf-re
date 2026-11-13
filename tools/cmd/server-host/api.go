@@ -28,6 +28,9 @@ type api struct {
 	hostLog    *logRing        // the host's own log lines; nil in tests that don't look
 	metrics    *metricsHistory // every 2 s, the last hour
 	previews   previewCache
+	// Plan WPR.16: the RTT echo players probe (public-host:port), "" when off.
+	rttEcho string
+	echo    *rttEcho
 }
 
 func writeJSON(w http.ResponseWriter, code int, v any) {
@@ -161,6 +164,7 @@ func (a *api) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			"memory_mb": map[string]int{"total": total, "available": avail},
 			"cpus":      a.m.cpusWithLobbies(), "lobbies": a.liveLobbies(), "ai": aiKeys,
 			"nodes": a.m.nodes(), "links": a.m.links(), // plan WP17.16
+			"rtt_echo": a.rttEcho, "rtt_echo_counts": a.echoCounts(),
 		}})
 	case p == "/api/v1/maps" && r.Method == http.MethodGet:
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "maps": a.mapList("/api/v1/maps/")})
@@ -318,7 +322,7 @@ func (a *api) public(w http.ResponseWriter, r *http.Request, rest string) {
 	switch {
 	case rest == "pool" && r.Method == http.MethodGet:
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "enabled": pool.Enabled, "access": pool.Access, "max_players": pool.MaxPlayers,
-			"lobby_minutes": pool.LobbyMinutes, "options": pool.Options,
+			"lobby_minutes": pool.LobbyMinutes, "options": pool.Options, "rtt_echo": a.rttEcho,
 			"queue": map[string]int{"length": usage.Queued, "games": usage.Games, "max_games": pool.MaxGames}})
 	case strings.HasPrefix(rest, "maps/") && strings.HasSuffix(rest, "/preview.png") && r.Method == http.MethodGet:
 		a.preview(w, strings.TrimSuffix(strings.TrimPrefix(rest, "maps/"), "/preview.png"))
@@ -404,6 +408,15 @@ func (a *api) lobbyLog(w http.ResponseWriter, r *http.Request, id string, stream
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "lines": lines, "size": size, "state": l.State})
+}
+
+// echoCounts is what the RTT echo did since the start: probes answered, packets dropped as malformed, probes over the
+// rate limits; nil when it is off.
+func (a *api) echoCounts() map[string]int64 {
+	if a.echo == nil {
+		return nil
+	}
+	return map[string]int64{"answered": a.echo.answered.Load(), "malformed": a.echo.dropped.Load(), "limited": a.echo.limited.Load()}
 }
 
 func (a *api) liveLobbies() int {
