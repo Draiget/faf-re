@@ -110,8 +110,9 @@ namespace faf::server
       return text;
     }
 
-    // Plan WP10.13 (docs/SWITCHES.md, server): on an 8v8's saved stream, level 3 left 54 % of the bytes at about
-    // 30 us a message, level 1 58 % at about 16 us, level 6 51 % at about 60 us (one core of the build machine).
+    // Plan WP10.13 (docs/SWITCHES.md, server): in a 10-minute 8v8 with two remote players, level 3 sent them 30.9 MB
+    // of datagrams for 2.9 s more of the network thread's CPU, level 1 32.8 MB for 1.2 s more, off 56.6 MB. Level 3:
+    // the fewest bytes, and the cost is on the network thread, not the sim's.
     constexpr int kDefaultViewCompression = 3;
     constexpr int kMaxViewCompression = 19;
     std::int32_t srv_ViewCompression = kDefaultViewCompression;
