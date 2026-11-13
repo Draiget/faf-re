@@ -450,6 +450,112 @@ namespace domains
       "a ray that meets the ground first keeps the last centre"
     );
   }
+  // ---- 9 ----------------------------------------------------------------------------------------
+  // A river is a domain whose level is not one number (docs/projects/RIVERS.md): a strip of water whose surface rises
+  // along x. The fields are made against the level of each sample's own block; against the one level of the domain's
+  // first block (the old rule) most of the strip would be land.
+  inline void TestSloped(
+    Check& check
+  )
+  {
+    std::printf("9 sloped domains: the shore fields of a river are made against the level of each block\n");
+    const auto strip = [](const float x, const float z) {
+      return x >= 20.0f && x < 220.0f && z >= 60.0f && z < 120.0f;
+    };
+    const auto levelAtX = [](const float x) {
+      return 10.0f + 0.05f * x;
+    };
+    const World w = MakeWorld([&](const float x, const float z) {
+      return strip(x, z) ? levelAtX(x) - 2.0f : 40.0f; // the bed two units under the surface, land around it
+    }, [&](const std::uint32_t bx, const std::uint32_t bz, float& level, std::uint8_t& body) {
+      const float x = static_cast<float>(bx * 2U);
+      const float z = static_cast<float>(bz * 2U);
+      if (strip(x, z)) {
+        level = levelAtX(x + 1.0f); // the level at the middle of the block
+        body = 1U;
+      } else {
+        level = 25.0f;
+        body = 0U;
+      }
+    }, false);
+    const DomainTable& t = w.table;
+    const std::size_t samples = static_cast<std::size_t>(w.hw) * w.hh;
+    const auto rawAt = [&](const std::uint32_t x, const std::uint32_t z) {
+      return w.raw[static_cast<std::size_t>(z) * w.hw + x];
+    };
+    const auto domainAt = [&](const std::uint32_t x, const std::uint32_t z) {
+      return static_cast<std::uint32_t>(t.domain[moho::water::BlockOfSample(t, x, z)]);
+    };
+    const std::vector<float> levels = moho::water::DomainLevels(t);
+    std::vector<std::uint8_t> sloped(256U, 0U);
+    sloped[1] = 1U;
+    const auto sampleLevel = [&](const std::uint32_t x, const std::uint32_t z) {
+      return t.levelRaw[moho::water::BlockOfSample(t, x, z)];
+    };
+    const std::vector<float> fine =
+      moho::water::ComputeShoreDistanceDomainsSloped(rawAt, domainAt, levels, sloped, sampleLevel, w.hw, w.hh, 0.0f);
+    const std::vector<float> coarse =
+      moho::water::ComputeShoreDistanceDomains(rawAt, domainAt, levels, w.hw, w.hh, 0.0f);
+    // the middle of the strip, near its upper end: water by both rules (the first block is the lowest level)
+    const auto at = [&](const std::vector<float>& field, const std::uint32_t x, const std::uint32_t z) {
+      return field[static_cast<std::size_t>(z) * w.hw + x];
+    };
+    check(
+      at(fine, 40, 90) > 15.0f && at(coarse, 40, 90) > 15.0f,
+      "near the low end the river is water by both rules",
+      at(fine, 40, 90),
+      at(coarse, 40, 90)
+    );
+    // near the high end the surface is 9 units above the first block's: the old rule calls the bed land
+    check(
+      at(coarse, 200, 90) < 1.0f,
+      "(the one level of the first block calls the high end of the river land)",
+      at(coarse, 200, 90)
+    );
+    check(
+      at(fine, 200, 90) > 15.0f && at(fine, 120, 90) > 15.0f,
+      "per block the whole river is water: the middle of the channel is 15 or more units from the bank",
+      at(fine, 200, 90),
+      at(fine, 120, 90)
+    );
+    // the distance to the bank is the same everywhere along the channel (the banks are 30 units either side)
+    double lo = 1e9;
+    double hi = 0.0;
+    for (std::uint32_t x = 60; x < 190; x += 5) {
+      lo = std::min<double>(lo, at(fine, x, 90));
+      hi = std::max<double>(hi, at(fine, x, 90));
+    }
+    check(hi - lo < 2.0 && hi > 20.0, "the distance to the bank is steady along the channel", lo, hi);
+    // the sea domain (0) and everything outside the strip is untouched by the sloped rule
+    bool sameOutside = true;
+    for (std::size_t i = 0; i < samples; ++i) {
+      const std::uint32_t x = static_cast<std::uint32_t>(i % w.hw);
+      const std::uint32_t z = static_cast<std::uint32_t>(i / w.hw);
+      if (domainAt(x, z) == 0U && (fine[i] != coarse[i] || fine[samples + i] != coarse[samples + i])) {
+        sameOutside = false;
+      }
+    }
+    check(sameOutside, "outside the river the fields are exactly what the one level rule makes");
+    // a flat domain through the sloped path (no sloped flag, or a constant level) is bit for bit the old field
+    const std::vector<float> none = moho::water::ComputeShoreDistanceDomainsSloped(
+      rawAt, domainAt, levels, std::vector<std::uint8_t>(), sampleLevel, w.hw, w.hh, 0.0f
+    );
+    check(none == coarse, "no sloped domain: bit for bit the fields of the flat rule");
+    const float flatLevel = levels[1];
+    const std::vector<float> constant = moho::water::ComputeShoreDistanceDomainsSloped(
+      rawAt, domainAt, levels, sloped, [&](const std::uint32_t, const std::uint32_t) {
+      return flatLevel;
+    }, w.hw, w.hh, 0.0f
+    );
+    check(constant == coarse, "a sloped domain whose level is constant: bit for bit the fields of the flat rule");
+    // the table carries the level of every block: it rises along the strip
+    bool rising = true;
+    const std::uint32_t bz = 45U;
+    for (std::uint32_t bx = 11U; bx < 109U; ++bx) {
+      rising = rising && t.levelRaw[bz * t.blocksX + bx] > t.levelRaw[bz * t.blocksX + bx - 1U];
+    }
+    check(rising, "the domain table has the level of each block (it rises along the strip)");
+  }
 } // namespace domains
 
 // runs the checks that need no GPU
@@ -460,4 +566,5 @@ inline void RunDomainsCpu(
   domains::TestFetch(check);
   domains::TestBrute(check);
   domains::TestCentre(check);
+  domains::TestSloped(check);
 }
