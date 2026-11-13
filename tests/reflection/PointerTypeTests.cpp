@@ -654,10 +654,12 @@ namespace
   )
   {
     // RMapStringFloatTypeInfo: registered under std::map<std::string,float> (the unit's armour multipliers,
-    // UnitSave.cpp) and stored as fa::map<fa::string,float>; the count, then each key and value.
+    // UnitSave.cpp) and stored as fa::map<fa::string,float>; the count, then each key and value. Named
+    // `map<string,float>` as retail names it; earlier builds' `map<std::string,float>` still finds it.
     gpg::RType* const type = gpg::RTypeOf<std::map<std::string, float>>();
     ASSERT_NE(type, nullptr);
-    EXPECT_STREQ(type->GetName(), "map<std::string,float>");
+    EXPECT_STREQ(type->GetName(), "map<string,float>");
+    EXPECT_EQ(gpg::REF_FindTypeNamed("map<std::string,float>"), type);
     EXPECT_EQ(type->version_, 1);
 
     fa::map<fa::string, float> armour;
@@ -671,7 +673,7 @@ namespace
       archive.Write(type, &armour, gpg::RRef{});
     });
     const std::string expected = Bytes()
-                                   .NewObject("map<std::string,float>", 1)
+                                   .NewObject("map<string,float>", 1)
                                    .U32(3)
                                    .Str("Commander")
                                    .F32(0.5f)
