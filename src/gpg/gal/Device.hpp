@@ -639,6 +639,13 @@ namespace gpg::gal
     );
 
     /**
+     * FAF addition: copies the whole of `source` (a depth/stencil target) into `destination` (same size and
+     * format family) on the GPU, in command order. `destination` should have been created sampled. False here,
+     * having copied nothing.
+     */
+    virtual bool CopyDepthStencil(DepthStencilTarget& destination, DepthStencilTarget& source);
+
+    /**
      * Engine addition: the owner won't lock this static buffer again, so a backend that keeps a CPU
      * copy of it can free that. Nothing here. A later write lock still works; a later read lock on
      * these backends reads zeros and logs a warning.

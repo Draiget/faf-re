@@ -875,6 +875,16 @@ namespace gpg::gal
     }
   }
 
+  void ProgramEffectVariable::SetDepthStencil(
+    const std::shared_ptr<DepthStencilTarget> depthStencil
+  )
+  {
+    RecordStateChange();
+    if (mParameter >= 0) {
+      mProgram->Parameters().SetDepthStencil(static_cast<std::uint32_t>(mParameter), depthStencil);
+    }
+  }
+
   void ProgramEffectVariable::SetTexture(
     const std::shared_ptr<Texture> texture
   )

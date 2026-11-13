@@ -183,6 +183,7 @@ namespace gpg::gal
     void CopyWrittenOnly(VertexBuffer& buffer) override;
     void CopyLockedRangeOnly(VertexBuffer& buffer) override;
     void CopyLockedRangeOnly(IndexBuffer& buffer) override;
+    bool CopyDepthStencil(DepthStencilTarget& destination, DepthStencilTarget& source) override;
     bool CopyVertexBufferRegion(
       VertexBuffer& destination,
       std::uint32_t destinationOffset,

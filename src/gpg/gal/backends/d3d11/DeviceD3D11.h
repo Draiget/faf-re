@@ -157,6 +157,7 @@ namespace gpg::gal
     void EndProfileRegion(std::uint32_t region) override;
     bool GetRuntimeInfo(DeviceRuntimeInfo& out) override;
     bool ReadGpuBuffer(GpuBuffer& buffer, std::uint32_t firstElement, std::uint32_t count, void* out) override;
+    bool CopyDepthStencil(DepthStencilTarget& destination, DepthStencilTarget& source) override;
     bool CopyVertexBufferRegion(
       VertexBuffer& destination,
       std::uint32_t destinationOffset,
