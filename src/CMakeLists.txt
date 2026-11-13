@@ -98,13 +98,11 @@ endforeach()
 target_compile_definitions(faf_engine PUBLIC
   WIN32 _WINDOWS WIN32_LEAN_AND_MEAN NOMINMAX
   LUAPLUS_LIB LUA_NUMBER=float
-  BOOST_ALL_NO_LIB BOOST_NO_AUTO_PTR
   _CRT_SECURE_NO_WARNINGS
   UNICODE _UNICODE)
 
 target_include_directories(faf_engine PUBLIC
   "${CMAKE_CURRENT_SOURCE_DIR}"
-  "${FAF_DEPENDENCIES_DIR}/boost_1_34_1"
   "${FAF_DEPENDENCIES_DIR}/zlib-1.2.3")
 target_link_libraries(faf_engine PUBLIC faf_codegen Wm3Headers)
 # The application shell (src/platform/shell) over SDL3, and the developer windows' Dear ImGui
@@ -377,7 +375,6 @@ target_compile_definitions(faf_sim_settings INTERFACE
   $<TARGET_PROPERTY:faf_engine,INTERFACE_COMPILE_DEFINITIONS>)
 target_include_directories(faf_sim_settings INTERFACE
   "${CMAKE_CURRENT_SOURCE_DIR}"
-  "${FAF_DEPENDENCIES_DIR}/boost_1_34_1"
   "${FAF_DEPENDENCIES_DIR}/zlib-1.2.3")
 target_compile_options(faf_sim_settings INTERFACE "$<$<COMPILE_LANGUAGE:C,CXX>:${_faf_main_options}>")
 target_link_libraries(faf_sim_settings INTERFACE faf_codegen Wm3Headers)

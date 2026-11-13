@@ -48,7 +48,7 @@ jobs:
           path: dependencies/.downloads
           key: deps-${{ hashFiles('cmake/FafDependencies.cmake') }}
       # The simulation's dependencies and the client's submodules; the client's configure fetches its downloads.
-      - run: cmake -DFAF_DEPENDENCIES_ONLY="WildMagic3p8;zlib-1.2.3;boost_1_34_1;monocypher;zstd;vulkan;ffmpeg" -P cmake/FafDependencies.cmake
+      - run: cmake -DFAF_DEPENDENCIES_ONLY="WildMagic3p8;zlib-1.2.3;monocypher;zstd;vulkan;ffmpeg" -P cmake/FafDependencies.cmake
       - run: cmake --preset linux-clang-x64-release-plain -DFAF_LINUX_CLIENT=ON
       - run: cmake --build --preset linux-clang-x64-release-plain --target faf_client faf_tests
       - run: ctest --test-dir build/linux-clang-x64-release-plain --output-on-failure -j 4 --timeout 600

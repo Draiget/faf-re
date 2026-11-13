@@ -1,7 +1,7 @@
 #include "moho/debug/RDebugRadar.h"
 
 #include "moho/debug/RDebugOverlayReflectionHelpers.h"
-#include "gpg/core/utils/BoostWrappers.h"
+#include "gpg/core/utils/SharedPtrUtils.h"
 #include "moho/ai/IAiReconDB.h"
 #include "moho/collision/CGeomSolid3.h"
 #include "moho/render/camera/GeomCamera3.h"

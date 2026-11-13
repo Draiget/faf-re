@@ -23,7 +23,7 @@
 #include "gpg/core/algorithms/MD5.h"
 #include "gpg/core/containers/FastVector.h"
 #include "legacy/algorithms/Sort.h"
-#include "gpg/core/utils/BoostWrappers.h"
+#include "gpg/core/utils/SharedPtrUtils.h"
 #include "gpg/core/utils/Global.h"
 #include "legacy/containers/HashMap.h"
 #include "legacy/containers/Vector.h"

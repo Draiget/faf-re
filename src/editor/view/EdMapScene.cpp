@@ -48,7 +48,7 @@ namespace moho
 {
   extern bool ren_Ui; // the game's interface drawn (console `ren_Ui`; RuntimeTuningGlobals.cpp)
 }
-#include "gpg/core/utils/BoostWrappers.h"
+#include "gpg/core/utils/SharedPtrUtils.h"
 #include "moho/render/camera/CameraImpl.h"
 #include "moho/render/d3d/CD3DDevice.h"
 #include "moho/render/d3d/CD3DDeviceResources.h"

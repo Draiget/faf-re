@@ -32,11 +32,6 @@
 #include "legacy/containers/String.cpp"
 #include "gpg/gal/GpuDriven.h"
 
-namespace boost
-{
-  template <class T>
-  using shared_ptr = std::shared_ptr<T>;
-}
 #ifndef _WIN32
 // Only the diagnostic environment lookup is platform-adapted. Tests require
 // ordinary batching, not either diagnostic render mode.

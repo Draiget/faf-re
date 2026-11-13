@@ -12,7 +12,7 @@
 #include "gpg/core/containers/ArchiveSerialization.h"
 #include "gpg/core/containers/FastVector.h"
 #include "gpg/core/reflection/Reflection.h"
-#include "gpg/core/utils/BoostWrappers.h"
+#include "gpg/core/utils/SharedPtrUtils.h"
 #include "moho/animation/CAniSkel.h"
 #include "moho/math/QuaternionMath.h"
 #include "moho/console/CConCommand.h"

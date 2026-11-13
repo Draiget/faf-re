@@ -27,12 +27,6 @@ struct UpVal;
 struct Proto;
 struct CClosure;
 
-namespace boost
-{
-  template <class T>
-  class shared_ptr;
-} // namespace boost
-
 namespace Wm3
 {
   template <class Real>

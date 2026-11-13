@@ -19,7 +19,7 @@
 #include <mmreg.h>
 #include <mmsystem.h>
 #include <dsound.h>
-#include <boost/ptr_container/exception.hpp>
+#include "gpg/core/utils/SharedPtrUtils.h"
 #if !FAFRE_PLATFORM_WINDOWS
 // The Linux client's XACT and X3DAudio: FAudio (issue #258).
 #include <F3DAudio.h>
@@ -28,7 +28,6 @@
 
 #include "gpg/core/algorithms/MD5.h"
 #include "gpg/core/streams/BinaryReader.h"
-#include "gpg/core/utils/BoostWrappers.h"
 #include "gpg/core/utils/Logging.h"
 #include "legacy/containers/Map.h"
 #include "legacy/containers/Set.h"

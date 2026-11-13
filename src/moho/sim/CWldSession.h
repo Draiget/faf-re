@@ -8,7 +8,7 @@
 #include "gpg/core/containers/IntrusiveLink.h"
 #include "moho/misc/WeakPtr.h"
 #include "moho/mesh/SpatialDb.h"
-#include "gpg/core/utils/BoostWrappers.h"
+#include "gpg/core/utils/SharedPtrUtils.h"
 #include "legacy/containers/AutoPtr.h"
 #include "legacy/containers/List.h"
 #include "legacy/containers/String.h"

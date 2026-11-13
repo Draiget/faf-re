@@ -7,7 +7,7 @@
 
 #include "gpg/core/containers/FastVector.h"
 #include "gpg/core/containers/Rect2.h"
-#include "gpg/core/utils/BoostWrappers.h"
+#include "gpg/core/utils/SharedPtrUtils.h"
 #include "legacy/containers/Vector.h"
 #include "moho/ai/IAiReconDB.h"
 #include "moho/entity/EntityCategoryLookupResolver.h"

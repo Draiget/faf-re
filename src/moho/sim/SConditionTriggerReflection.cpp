@@ -16,7 +16,7 @@
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/RListType.h"
 #include "gpg/core/utils/Global.h"
-#include "gpg/core/utils/BoostWrappers.h"
+#include "gpg/core/utils/SharedPtrUtils.h"
 #include "moho/misc/Stats.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/sim/CArmyStats.h"

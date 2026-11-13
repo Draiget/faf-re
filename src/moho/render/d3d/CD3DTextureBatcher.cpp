@@ -2,7 +2,7 @@
 #include <algorithm>
 #include <cstring>
 
-#include "gpg/core/utils/BoostWrappers.h"
+#include "gpg/core/utils/SharedPtrUtils.h"
 #include "moho/console/CConCommand.h"
 #include "moho/misc/ID3DDeviceResources.h"
 #include "moho/render/ID3DTextureSheet.h"

@@ -2,7 +2,7 @@
 
 #include <new>
 
-#include "gpg/core/utils/BoostWrappers.h"
+#include "gpg/core/utils/SharedPtrUtils.h"
 #include "gpg/core/utils/Logging.h"
 #include "moho/misc/StartupHelpers.h"
 #include "moho/terrain/HighFidelityTerrain.h"
@@ -85,7 +85,3 @@ namespace moho
 } // namespace moho
 
 // Moved from gpg/core/utils/BoostWrappers.cpp (plan WPL.4): it deletes a render terrain.
-namespace boost
-{
-
-} // namespace boost

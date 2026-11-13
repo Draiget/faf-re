@@ -10,7 +10,7 @@
 
 #include "gpg/core/containers/String.h"
 #include "gpg/core/reflection/Reflection.h"
-#include "gpg/core/utils/BoostWrappers.h"
+#include "gpg/core/utils/SharedPtrUtils.h"
 #include "gpg/core/utils/Global.h"
 #include "gpg/core/utils/Logging.h"
 // The Direct3D 9 backend is Windows-only (the Linux client, issue #255).
@@ -673,7 +673,7 @@ namespace moho
       CD3DDynamicTextureSheet* const replacementSheet = new CD3DDynamicTextureSheet(
         mDevice, false, sourceContext.width_, sourceContext.height_, kTextureFormatRenderTarget, false
       );
-      (void)boost::ResetSharedFromRaw(&currentSheet, replacementSheet);
+      (void)gpg::ResetSharedFromRaw(&currentSheet, replacementSheet);
       sheet = currentSheet.get();
       if (sheet != nullptr) {
         sheet->mContext.usage_ = kTextureUsageRenderTargetCopy;
@@ -694,7 +694,7 @@ namespace moho
       }
     }
 
-    (void)boost::CopySharedRetain(&outSheet, currentSheet);
+    (void)gpg::CopySharedRetain(&outSheet, currentSheet);
     return outSheet;
   }
 

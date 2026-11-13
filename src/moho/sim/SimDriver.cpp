@@ -18,8 +18,7 @@
 #include <new>
 #include <vector>
 
-#include <boost/ptr_container/exception.hpp>
-#include "gpg/core/utils/BoostWrappers.h"
+#include "gpg/core/utils/SharedPtrUtils.h"
 #include "moho/render/camera/CameraImpl.h"
 #include "moho/app/WinApp.h"
 #include "moho/net/CClientBase.h"
@@ -800,7 +799,7 @@ void SSyncDataQueue::PushBack(
   SSyncData* data
 )
 {
-  boost::EnsurePtrContainerPushBackInputNotNull(data);
+  gpg::EnsurePtrContainerPushBackInputNotNull(data);
   mSyncdat.push_back(data);
 }
 
@@ -854,7 +853,7 @@ SSyncData* moho::PopFrontSSyncDataPtrDeque(
 )
 {
   if (queue.Empty()) {
-    throw boost::bad_ptr_container_operation("'pop_front()' on empty container");
+    throw gpg::BadPtrContainerOperation("'pop_front()' on empty container");
   }
 
   return queue.PopFront();

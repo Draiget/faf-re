@@ -210,7 +210,6 @@ target_link_options(faf_sim_settings INTERFACE "-Wl,--wrap=pthread_create")
 # _WINDOWS, WIN32_LEAN_AND_MEAN, NOMINMAX, UNICODE, _CRT_*).
 target_compile_definitions(faf_sim_settings INTERFACE
   LUAPLUS_LIB LUA_NUMBER=float
-  BOOST_ALL_NO_LIB BOOST_NO_AUTO_PTR
   # The server-mode build, as Windows' faf_engine with FAF_SERVER_MODE (src/CMakeLists.txt):
   # the Linux programs are the server and the replay runner.
   FAF_SERVER_MODE=1)
@@ -220,7 +219,6 @@ target_include_directories(faf_sim_settings INTERFACE
   # spelling some files use (the file system is case-sensitive here).
   "${PROJECT_SOURCE_DIR}/src/platform/posix/win32"
   "${CMAKE_BINARY_DIR}/win32-alias"
-  "${FAF_DEPENDENCIES_DIR}/boost_1_34_1"
   "${FAF_DEPENDENCIES_DIR}/zlib-1.2.3")
 target_link_libraries(faf_sim_settings INTERFACE faf_codegen)
 target_link_libraries(faf_sim PUBLIC Wm3Headers zlib123 faf_monocypher faf_zstd)

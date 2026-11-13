@@ -109,7 +109,7 @@ jobs:
           path: dependencies/.downloads
           key: deps-${{ hashFiles('cmake/FafDependencies.cmake') }}
       - if: steps.built.outputs.cache-hit != 'true'
-        run: cmake -DFAF_DEPENDENCIES_ONLY="WildMagic3p8;zlib-1.2.3;boost_1_34_1" -P cmake/FafDependencies.cmake
+        run: cmake -DFAF_DEPENDENCIES_ONLY="WildMagic3p8;zlib-1.2.3" -P cmake/FafDependencies.cmake
       - if: steps.built.outputs.cache-hit != 'true'
         run: cmake --preset linux-clang-x64-release
       - if: steps.built.outputs.cache-hit != 'true'

@@ -21,7 +21,7 @@
 #include "moho/sim/RRuleGameRules.h"
 #include "moho/sim/SPhysBody.h"
 #include "moho/sim/SPhysConstants.h"
-#include "gpg/core/utils/BoostWrappers.h"
+#include "gpg/core/utils/SharedPtrUtils.h"
 #include "gpg/core/utils/Global.h"
 #include "lua/LuaObject.h"
 #include "lua/LuaPrimitives.h"

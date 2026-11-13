@@ -14,7 +14,7 @@
 #include <vector>
 
 #include <memory>
-#include "gpg/core/utils/BoostWrappers.h"
+#include "gpg/core/utils/SharedPtrUtils.h"
 #include "gpg/core/utils/Logging.h"
 #include "moho/app/NetworkTray.h"
 #include "moho/misc/StartupHelpers.h"
@@ -646,7 +646,7 @@ namespace moho
       return;
     }
     std::weak_ptr<CGpgNetInterface> weak;
-    boost::AssignWeakFromShared(weak, GPGNET_GetPtr());
+    gpg::AssignWeakFromShared(weak, GPGNET_GetPtr());
     Links().SetGpgNet(weak);
     gpg::Logf("NETLINK: asking the adapter for in-engine links");
     SNetCommandArg version(faf::netlink::kEngineLinksVersion);
@@ -739,7 +739,7 @@ namespace moho
     // The client's "force relay" setting: only TURN-relayed candidates.
     const bool forceRelay = CFG_GetArgOption("/nativenetrelay", 0u, nullptr);
     std::weak_ptr<CGpgNetInterface> weak;
-    boost::AssignWeakFromShared(weak, GPGNET_GetPtr());
+    gpg::AssignWeakFromShared(weak, GPGNET_GetPtr());
     NETLINK_KeepLogLines(); // issue #322: the panel's log lines
     const bool encrypt = net_NativeNetEncrypt != 0;
     Links().StartNative(weak, bindAddress, forceRelay, net_NativeNetWebRtc != 0, net_NativeNetRedundancy, encrypt);

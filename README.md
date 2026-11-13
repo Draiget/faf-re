@@ -163,7 +163,6 @@ CMake configure fetches all of them at the exact version below and applies the p
 | Wild Magic | 3.8 (original 2006 release) | [Draiget/wild-magic-3-8](https://github.com/Draiget/wild-magic-3-8) (submodule) | `wildmagic3p8_faf_required` |
 | SDL | 3.4.18 (zlib) | [release archive](https://github.com/libsdl-org/SDL/releases/download/release-3.4.18/SDL3-3.4.18.tar.gz) | none; built static by `cmake/deps/sdl3` (Windows) and `cmake/FafLinuxClient.cmake`: the client's windows, input, clipboard, message boxes, pickers and the developer windows' renderer |
 | Dear ImGui | 1.92.4, docking branch (MIT) | [v1.92.4-docking source archive](https://github.com/ocornut/imgui/archive/refs/tags/v1.92.4-docking.tar.gz) | none; the map editor's panels and the developer windows (log window, Lua debugger, emitter and reference editors) |
-| Boost | 1.34.1 | [boost_1_34_1.tar.bz2](https://downloads.sourceforge.net/project/boost/boost/1.34.1/boost_1_34_1.tar.bz2) | `boost_1_34_1_faf_required` |
 | zlib | 1.2.3 | [madler/zlib](https://github.com/madler/zlib/tree/v1.2.3) (submodule) | `zlib_1_2_3_faf_required` |
 | FFmpeg | 7.1.3 (LGPL) | [Draiget/ffmpeg-mirror](https://github.com/Draiget/ffmpeg-mirror) (submodule) | none; linked statically, for SFD movies in place of CRI Sofdec/ADX. Configuration and licence: [SFD compatibility](docs/FAF_SFD_COMPATIBILITY.md#ffmpeg-dependency-and-build) |
 | FX11 | bec3b8fc | [microsoft/FX11](https://github.com/microsoft/FX11) (submodule) | none |

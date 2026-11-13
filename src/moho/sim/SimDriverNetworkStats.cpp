@@ -19,9 +19,8 @@
 #include <new>
 #include <vector>
 
-#include <boost/ptr_container/exception.hpp>
+#include "gpg/core/utils/SharedPtrUtils.h"
 #include "gpg/core/diagnostics/BuildInfo.h"
-#include "gpg/core/utils/BoostWrappers.h"
 #include "moho/render/camera/CameraImpl.h"
 #include "moho/app/WinApp.h"
 #include "moho/net/CClientBase.h"

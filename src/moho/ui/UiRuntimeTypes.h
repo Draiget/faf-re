@@ -9,7 +9,7 @@
 #include <memory>
 #include "gpg/core/containers/FastVector.h"
 #include "gpg/core/containers/String.h"
-#include "gpg/core/utils/BoostWrappers.h"
+#include "gpg/core/utils/SharedPtrUtils.h"
 #include "legacy/containers/Map.h"
 #include "legacy/containers/String.h"
 #include "legacy/containers/Vector.h"

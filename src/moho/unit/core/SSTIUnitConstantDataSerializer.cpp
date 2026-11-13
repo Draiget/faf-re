@@ -7,7 +7,7 @@
 
 #include "gpg/core/containers/ArchiveSerialization.h"
 #include "gpg/core/reflection/SerializationError.h"
-#include "gpg/core/utils/BoostWrappers.h"
+#include "gpg/core/utils/SharedPtrUtils.h"
 #include "gpg/core/utils/Global.h"
 #include "moho/misc/Stats.h"
 #include "moho/unit/core/Unit.h"

@@ -19,7 +19,7 @@
 #include "Common.h"
 #include "gpg/core/containers/String.h"
 #include "gpg/core/streams/BinaryReader.h"
-#include "gpg/core/utils/BoostWrappers.h"
+#include "gpg/core/utils/SharedPtrUtils.h"
 #include "gpg/core/utils/Logging.h"
 #include "IClient.h"
 #include "CClientManagerImpl.h"
@@ -907,7 +907,7 @@ void CGpgNetInterface::SetTraversalHandler(
   (void)port;
   fa::mutex::scoped_lock lock(mLock);
   gpg::Logf("GPGNET: setting nat handler to %p", static_cast<const void*>(handler->get()));
-  boost::AssignWeakFromShared(mNATHandler, *handler);
+  gpg::AssignWeakFromShared(mNATHandler, *handler);
 }
 
 /**
@@ -1692,7 +1692,7 @@ void CGpgNetInterface::CreateLobby(
   // weak_ptr backing the provider).
   LuaPlus::LuaObject natTraversal;
   std::weak_ptr<INetNATTraversalProvider> natProvider;
-  boost::AssignWeakFromShared(natProvider, GPGNET_GetPtr());
+  gpg::AssignWeakFromShared(natProvider, GPGNET_GetPtr());
   (void)moho::NET_MakeNATTraversal(state, &natTraversal, &natProvider);
 
   LuaPlus::LuaFunction<LuaPlus::LuaObject> createLobbyFn(createLobby);

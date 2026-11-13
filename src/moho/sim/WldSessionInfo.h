@@ -15,11 +15,6 @@ namespace LuaPlus
   class LuaState;
 }
 
-namespace boost
-{
-  class thread;
-}
-
 namespace moho
 {
   class CWldMap;

@@ -3,7 +3,7 @@
 #include <cstdint>
 
 #include <memory>
-#include "gpg/core/utils/BoostWrappers.h"
+#include "gpg/core/utils/SharedPtrUtils.h"
 #include "moho/render/d3d/ShaderVar.h"
 
 namespace moho

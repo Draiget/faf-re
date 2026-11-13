@@ -18,7 +18,7 @@
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/SerializationError.h"
 #include "gpg/core/streams/MemBufferStream.h"
-#include "gpg/core/utils/BoostWrappers.h"
+#include "gpg/core/utils/SharedPtrUtils.h"
 #include "gpg/core/utils/Logging.h"
 #include "legacy/containers/Vector.h"
 #include "moho/lua/CScrLuaObjectFactory.h"

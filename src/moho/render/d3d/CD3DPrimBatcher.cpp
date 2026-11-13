@@ -11,7 +11,7 @@
 #include <new>
 #include <stdexcept>
 
-#include "gpg/core/utils/BoostWrappers.h"
+#include "gpg/core/utils/SharedPtrUtils.h"
 #include "gpg/gal/EffectVariable.hpp"
 #include "moho/render/camera/GeomCamera3.h"
 #include "moho/render/ID3DIndexSheet.h"

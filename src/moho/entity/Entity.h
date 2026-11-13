@@ -7,7 +7,7 @@
 #include <utility>
 
 #include <memory>
-#include "gpg/core/utils/BoostWrappers.h"
+#include "gpg/core/utils/SharedPtrUtils.h"
 #include "../script/CScriptObject.h"
 #include "../task/CTask.h"
 #include "EntityId.h"

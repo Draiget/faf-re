@@ -88,10 +88,38 @@ namespace gpg::gal
   class EffectVariableD3D10;
 } // namespace gpg::gal
 
-namespace boost
+namespace gpg
 {
-  class bad_ptr_container_operation;
-  class bad_pointer;
+  /**
+   * The pointer-container errors: what retail throws as `boost::bad_ptr_container_operation` and
+   * `boost::bad_pointer` from Boost 1.34.1's ptr_container/exception.hpp, with the same messages. Nothing in the
+   * engine catches them by type.
+   */
+  class BadPtrContainerOperation : public std::exception
+  {
+  public:
+    explicit BadPtrContainerOperation(
+      const char* const what
+    ) noexcept
+      : mWhat(what)
+    {}
+
+    [[nodiscard]] const char* what() const noexcept override
+    {
+      return mWhat;
+    }
+
+  private:
+    const char* mWhat;
+  };
+
+  class BadPointer : public BadPtrContainerOperation
+  {
+  public:
+    BadPointer() noexcept
+      : BadPtrContainerOperation("Null pointer not allowed in a pointer container!")
+    {}
+  };
 
   /**
    * Address: 0x007BB4E0 (FUN_007BB4E0,
@@ -808,4 +836,4 @@ namespace boost
    *   ex `LegacyCopySharedOwnerPairRetainedRuntimeSlot2` in `WinApiImportThunks.cpp`) What it does: Copies one
    *   `(px,pi)` pair and retains one shared control-block reference.
    */
-} // namespace boost
+} // namespace gpg

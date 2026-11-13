@@ -3,7 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 
-#include "gpg/core/utils/BoostWrappers.h"
+#include "gpg/core/utils/SharedPtrUtils.h"
 #include "moho/entity/EntityPositionWatchEntry.h"
 
 namespace gpg

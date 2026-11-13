@@ -13,7 +13,7 @@ namespace gpg::gal
       const int line
     )
     {
-      std::shared_ptr<EffectD3D9> effect = boost::LockWeak(weakEffect);
+      std::shared_ptr<EffectD3D9> effect = gpg::LockWeak(weakEffect);
       if (!effect) {
         ThrowGalError("EffectVariableD3D9.cpp", line, "attempt to use invalid effect");
       }

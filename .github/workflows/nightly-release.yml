@@ -202,7 +202,7 @@ jobs:
           path: dependencies/.downloads
           key: deps-${{ hashFiles('cmake/FafDependencies.cmake') }}
       # The simulation's dependencies and the client's submodules; the client's configure fetches its downloads.
-      - run: cmake -DFAF_DEPENDENCIES_ONLY="WildMagic3p8;zlib-1.2.3;boost_1_34_1;monocypher;zstd;vulkan;ffmpeg" -P cmake/FafDependencies.cmake
+      - run: cmake -DFAF_DEPENDENCIES_ONLY="WildMagic3p8;zlib-1.2.3;monocypher;zstd;vulkan;ffmpeg" -P cmake/FafDependencies.cmake
       # The tag exists only here until the release creates it: the engine reports it as its version.
       - env:
           TAG: ${{ needs.plan.outputs.tag }}

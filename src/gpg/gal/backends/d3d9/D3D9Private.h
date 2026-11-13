@@ -38,7 +38,7 @@
 
 #include <memory>
 #include <memory>
-#include "gpg/core/utils/BoostWrappers.h"
+#include "gpg/core/utils/SharedPtrUtils.h"
 
 #include <d3d9.h>
 #include <d3dx9.h>

@@ -37,7 +37,7 @@
 #include "gpg/core/containers/BitArray2D.h"
 #include "gpg/core/containers/Rect2.h"
 #include "gpg/core/reflection/Reflection.h"
-#include "gpg/core/utils/BoostWrappers.h"
+#include "gpg/core/utils/SharedPtrUtils.h"
 #include "gpg/core/utils/Logging.h"
 #include "gpg/gal/Device.hpp"
 #include "gpg/gal/DeviceContext.hpp"

@@ -6,7 +6,7 @@
 
 #include <memory>
 
-#include "gpg/core/utils/BoostWrappers.h"
+#include "gpg/core/utils/SharedPtrUtils.h"
 #include "moho/math/Vector3f.h"
 #include "moho/misc/WeakPtr.h"
 #include "moho/ui/UiRuntimeTypes.h"

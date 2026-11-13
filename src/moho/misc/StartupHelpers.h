@@ -1,6 +1,6 @@
 #pragma once
 
-#include "gpg/core/utils/BoostWrappers.h"
+#include "gpg/core/utils/SharedPtrUtils.h"
 
 #include <cstddef>
 #include <cstdint>

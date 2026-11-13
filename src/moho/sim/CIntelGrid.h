@@ -16,12 +16,6 @@ namespace gpg
   class WriteArchive;
 } // namespace gpg
 
-namespace boost
-{
-  template <typename T>
-  class shared_ptr;
-}
-
 namespace gpg
 {
   struct MD5Context;

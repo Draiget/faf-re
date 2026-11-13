@@ -8,7 +8,7 @@
 #include <stdexcept>
 #include <string>
 
-#include "gpg/core/utils/BoostWrappers.h"
+#include "gpg/core/utils/SharedPtrUtils.h"
 #include "gpg/core/utils/Global.h"
 #include "gpg/gal/EffectVariable.hpp"
 #include "moho/console/CConCommand.h"

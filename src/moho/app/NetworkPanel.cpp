@@ -13,7 +13,7 @@
 #include <string>
 #include <vector>
 
-#include "gpg/core/utils/BoostWrappers.h"
+#include "gpg/core/utils/SharedPtrUtils.h"
 #include "gpg/core/utils/Global.h"
 #include "gpg/core/utils/Logging.h"
 #include "lua/LuaObject.h"

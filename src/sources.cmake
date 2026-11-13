@@ -7,7 +7,7 @@
 # linker in this order.
 #
 # Paths are relative to src/. ${FAF_DEPENDENCIES_DIR} is the dependencies/
-# tree (FX11 and the boost.thread sources compile into the engine directly).
+# tree (FX11's sources compile into the engine directly).
 
 set(FAF_ENGINE_SOURCES
   gpg/core/algorithms/Cluster.cpp
@@ -146,7 +146,7 @@ set(FAF_ENGINE_SOURCES
   gpg/core/random/Random.cpp
   gpg/core/reflection/BadRefCast.cpp
   gpg/core/time/Timer.cpp
-  gpg/core/utils/BoostWrappers.cpp
+  gpg/core/utils/SharedPtrUtils.cpp
   moho/audio/CSimSoundManagerSerializer.cpp
   moho/misc/PausedThread.cpp
   moho/app/AppWindows.cpp

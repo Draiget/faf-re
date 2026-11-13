@@ -6,7 +6,7 @@
 #include <typeinfo>
 
 #include "gpg/core/containers/ArchiveSerialization.h"
-#include "gpg/core/utils/BoostWrappers.h"
+#include "gpg/core/utils/SharedPtrUtils.h"
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/WriteArchive.h"
 #include "moho/sim/CIntelGrid.h"

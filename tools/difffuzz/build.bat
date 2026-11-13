@@ -33,7 +33,7 @@ if not exist "%OUT%" mkdir "%OUT%"
 set "WHICH=%~1"
 if "%WHICH%"=="" set "WHICH=all"
 
-set "INC=/I "%SDK%" /I "%FAF_DEPENDENCIES_DIR%\boost_1_34_1" /I "%WM3%" /I "%HERE%src""
+set "INC=/I "%SDK%" /I "%WM3%" /I "%HERE%src""
 for %%D in (Approximation Collision Containment Controllers Curves Detail Distance Effects ImageAnalysis Interpolation Intersection Math Meshes Miscellaneous Numerics ObjectSystem Physics RationalArithmetic SceneGraph Shaders SharedArrays Sorting Surfaces System Terrain Tessellation) do set "INC=!INC! /I "%WM3%\%%D""
 set "COMMON=/nologo /c /std:c++20 /permissive- /Zc:inline /fp:precise /EHsc /W3 /sdl /GS /wd4073 /wd4244 /wd4273 /wd4834 /wd4996 /D WIN32 /D _CONSOLE /D WIN32_LEAN_AND_MEAN /D NOMINMAX /D _CRT_SECURE_NO_WARNINGS /D BOOST_ALL_NO_LIB %INC%"
 

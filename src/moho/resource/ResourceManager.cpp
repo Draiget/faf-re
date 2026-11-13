@@ -4,7 +4,7 @@
 
 #include <Windows.h>
 
-#include "gpg/core/utils/BoostWrappers.h"
+#include "gpg/core/utils/SharedPtrUtils.h"
 #include "gpg/core/utils/Global.h"
 #include "gpg/core/utils/Logging.h"
 #include "moho/console/CConCommand.h"
@@ -229,7 +229,7 @@ namespace moho
       record.mResource.reset();
       record.mLoadFailed = false;
 
-      const std::shared_ptr<PrefetchData> prefetch = boost::LockWeak(record.mPrefetch);
+      const std::shared_ptr<PrefetchData> prefetch = gpg::LockWeak(record.mPrefetch);
       if (prefetch) {
         prefetch->mPrefetchData.reset();
         prefetch->mResource.reset();
@@ -394,7 +394,7 @@ namespace moho
         continue;
       }
 
-      const std::shared_ptr<PrefetchData> prefetch = boost::LockWeak(mPrefetchQueue.front());
+      const std::shared_ptr<PrefetchData> prefetch = gpg::LockWeak(mPrefetchQueue.front());
       mPrefetchQueue.pop_front();
       if (!prefetch) {
         continue;
@@ -405,7 +405,7 @@ namespace moho
         continue;
       }
 
-      prefetch->mResource = boost::LockWeak(record->mResource);
+      prefetch->mResource = gpg::LockWeak(record->mResource);
       if (prefetch->mResource) {
         continue;
       }
@@ -454,13 +454,13 @@ namespace moho
 
     ResourceRecord& record = Record(mRecords.insert(ResourceRecord(name.c_str(), type)).first);
 
-    std::shared_ptr<PrefetchData> prefetch = boost::LockWeak(record.mPrefetch);
+    std::shared_ptr<PrefetchData> prefetch = gpg::LockWeak(record.mPrefetch);
     if (!prefetch) {
       prefetch = std::shared_ptr<PrefetchData>(new PrefetchData(&record));
       record.mPrefetch = prefetch;
     }
 
-    if (const std::shared_ptr<void> resource = boost::LockWeak(record.mResource); !resource) {
+    if (const std::shared_ptr<void> resource = gpg::LockWeak(record.mResource); !resource) {
       mPrefetchQueue.push_back(prefetch);
       if (mPrefetchThread) {
         mPrefetchQueued.notify_all();
@@ -533,12 +533,12 @@ namespace moho
     fa::recursive_mutex::scoped_lock& lock
   )
   {
-    const std::shared_ptr<PrefetchData> prefetch = boost::LockWeak(record.mPrefetch);
+    const std::shared_ptr<PrefetchData> prefetch = gpg::LockWeak(record.mPrefetch);
     while (record.mLoading) {
       mLoadFinished.wait(lock);
     }
 
-    std::shared_ptr<void> resource = boost::LockWeak(record.mResource);
+    std::shared_ptr<void> resource = gpg::LockWeak(record.mResource);
     if (resource || record.mLoadFailed) {
       return resource;
     }
@@ -572,7 +572,7 @@ namespace moho
       record.mReloadPending = false;
     }
 
-    boost::AssignWeakFromShared(record.mResource, resource);
+    gpg::AssignWeakFromShared(record.mResource, resource);
     if (!resource) {
       record.mLoadFailed = true;
     }

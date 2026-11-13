@@ -50,7 +50,7 @@ jobs:
         with:
           path: dependencies/.downloads
           key: deps-${{ hashFiles('cmake/FafDependencies.cmake') }}
-      - run: cmake -DFAF_DEPENDENCIES_ONLY="WildMagic3p8;zlib-1.2.3;boost_1_34_1;googletest;zstd;monocypher" -P cmake/FafDependencies.cmake
+      - run: cmake -DFAF_DEPENDENCIES_ONLY="WildMagic3p8;zlib-1.2.3;googletest;zstd;monocypher" -P cmake/FafDependencies.cmake
       - run: cmake --preset linux-clang-x64-asan
       # The default build, every GoogleTest program (faf_tests, cmake/FafTests.cmake) and headless.
       - run: cmake --build build/linux-clang-x64-asan --target all faf_tests headless

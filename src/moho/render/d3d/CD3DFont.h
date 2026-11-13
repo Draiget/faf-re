@@ -7,7 +7,7 @@
 #include "platform/Platform.h"
 
 #include "gpg/core/containers/String.h"
-#include "gpg/core/utils/BoostWrappers.h"
+#include "gpg/core/utils/SharedPtrUtils.h"
 #include "legacy/containers/Vector.h"
 #include "moho/math/Vector3f.h"
 #include "moho/misc/CountedObject.h"

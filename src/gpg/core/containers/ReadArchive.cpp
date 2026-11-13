@@ -15,7 +15,7 @@
 
 #include <memory>
 #include "gpg/core/reflection/Reflection.h"
-#include "gpg/core/utils/BoostWrappers.h"
+#include "gpg/core/utils/SharedPtrUtils.h"
 #include "gpg/core/reflection/SerializationError.h"
 #include "moho/ai/CAiAttackerImpl.h"
 #include "moho/ai/CAiPathFinder.h"

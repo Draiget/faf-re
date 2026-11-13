@@ -13,7 +13,7 @@
 #include <utility>
 
 #include "gpg/core/utils/Global.h"
-#include "gpg/core/utils/BoostWrappers.h"
+#include "gpg/core/utils/SharedPtrUtils.h"
 #include "legacy/containers/AutoPtr.h"
 #include "gpg/gal/EffectVariable.hpp"
 #include "moho/misc/ID3DDeviceResources.h"

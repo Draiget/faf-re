@@ -7,7 +7,7 @@
 #     missing and moved when their pin changes, always with core.autocrlf=false.
 #     Git for Windows turns autocrlf on system-wide, and converted line endings
 #     break the CR-exact patches.
-#   * Downloads (boost 1.34.1, SDL3, Dear ImGui, DXC, DirectXTex, libjuice, libdatachannel and its deps): pinned by SHA256, cached in
+#   * Downloads (SDL3, Dear ImGui, DXC, DirectXTex, libjuice, libdatachannel and its deps): pinned by SHA256, cached in
 #     dependencies/.downloads and extracted into dependencies/<name>.
 #   * Patches (dependencies/patches): applied in order onto a fresh baseline. A
 #     stamp file in each tree records the patches (and their hashes) it carries,
@@ -21,7 +21,7 @@
 #
 # FAF_DEPENDENCIES_ONLY, a list of names (dxsdk for the DirectX SDK), limits a run to those;
 # the Linux build (cmake/FafLinux.cmake) needs three:
-#   cmake -DFAF_DEPENDENCIES_ONLY="WildMagic3p8;zlib-1.2.3;boost_1_34_1" -P cmake/FafDependencies.cmake
+#   cmake -DFAF_DEPENDENCIES_ONLY="WildMagic3p8;zlib-1.2.3" -P cmake/FafDependencies.cmake
 #
 # FFmpeg (dependencies/ffmpeg, Draiget/ffmpeg-mirror) is the unmodified 7.1.3 source
 # with a faf/ CMake build; src/CMakeLists.txt compiles it into static libraries
@@ -171,10 +171,6 @@ function(faf_dependency_submodule name)
 endfunction()
 
 # --- Downloads ------------------------------------------------------------------------
-set(_faf_download_boost_1_34_1
-    "https://downloads.sourceforge.net/project/boost/boost/1.34.1/boost_1_34_1.tar.bz2"
-    "0f866c75b025a4f1340117a106595cc0675f48ba1e5a9b5c221ec7f19e96ec4c"
-    "boost_1_34_1")
 # libjuice (MPL-2.0): the ICE agent behind src/netlink (issue #228). The tag's
 # source archive; cmake/deps/libjuice builds it.
 set(_faf_download_libjuice
@@ -445,7 +441,6 @@ faf_dependency_submodule(zlib-1.2.3)
 faf_dependency_submodule(FX11)
 faf_dependency_submodule(vulkan)
 faf_dependency_submodule(ffmpeg)
-faf_dependency_download(boost_1_34_1)
 faf_dependency_download(dxc)
 faf_dependency_download(libjuice)
 faf_dependency_download(libdatachannel)
@@ -481,8 +476,6 @@ faf_dependency_patches(WildMagic3p8 submodule
   wildmagic3p8_faf_required.patch)
 faf_dependency_patches(zlib-1.2.3 submodule
   zlib_1_2_3_faf_required.patch)
-faf_dependency_patches(boost_1_34_1 download
-  boost_1_34_1_faf_required.patch)
 faf_dependency_patches(libjuice download
   libjuice_1_7_4_faf_turn_release.patch)
 faf_dependency_patches(libdatachannel download

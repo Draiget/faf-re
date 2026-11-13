@@ -32,7 +32,7 @@
 #include "gpg/gal/OutputContext.hpp"
 #include "gpg/gal/PipelineState.hpp"
 #include "gpg/gal/SafeRelease.h"
-#include "gpg/core/utils/BoostWrappers.h"
+#include "gpg/core/utils/SharedPtrUtils.h"
 #include "gpg/core/utils/Global.h"
 #include "platform/Platform.h"
 

@@ -24,7 +24,7 @@
 #include "StringUtils.h"
 
 #include "gpg/core/streams/MemBufferStream.h"
-#include "gpg/core/utils/BoostWrappers.h"
+#include "gpg/core/utils/SharedPtrUtils.h"
 
 #include <cstring>
 #include <new>

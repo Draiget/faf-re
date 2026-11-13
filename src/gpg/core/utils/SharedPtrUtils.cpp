@@ -1,14 +1,12 @@
-#include "BoostWrappers.h"
+#include "SharedPtrUtils.h"
 
-#include <boost/ptr_container/exception.hpp>
-
-namespace boost
+namespace gpg
 {
   namespace
   {
     [[noreturn]] void ThrowBadPointerForNullPushBack()
     {
-      throw bad_pointer();
+      throw BadPointer();
     }
   } // namespace
 
@@ -17,7 +15,7 @@ namespace boost
    *
    * What it does:
    * Validates one ptr-container `push_back` input pointer and throws
-   * `boost::bad_pointer` when the pointer is null.
+   * `gpg::BadPointer` (retail: `boost::bad_pointer`) when the pointer is null.
    */
   void EnsurePtrContainerPushBackInputNotNull(
     const void* const inputPointer
@@ -27,4 +25,4 @@ namespace boost
       ThrowBadPointerForNullPushBack();
     }
   }
-} // namespace boost
+} // namespace gpg

@@ -35,7 +35,7 @@
 #include <memory>
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/WriteArchive.h"
-#include "gpg/core/utils/BoostWrappers.h"
+#include "gpg/core/utils/SharedPtrUtils.h"
 #include "gpg/core/utils/Logging.h"
 #include "moho/console/CConCommand.h"
 #include "moho/misc/CSaveGameRequestImpl.h"
