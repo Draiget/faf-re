@@ -17,6 +17,22 @@ do
         local data = baseGetOptionsData()
         if GetRenderFeatures then
             local info = GetRenderFeatures()
+            -- The options of the ray-traced shadows (options.lua marks them requiresRayTracing) are listed wherever the engine has the
+            -- commands; they do something only on a device that traces rays, so the others are left out once the device is known.
+            if info.api ~= '' and not info.rayTracing then
+                local video = data and data.video
+                if video and video.items then
+                    local kept = {}
+                    for _, item in video.items do
+                        if item.requiresRayTracing then
+                            optionItemMap[item.key] = nil
+                        else
+                            table.insert(kept, item)
+                        end
+                    end
+                    video.items = kept
+                end
+            end
             if info.api ~= '' and info.api ~= syncedApi then
                 syncedApi = info.api
                 local video = data and data.video
