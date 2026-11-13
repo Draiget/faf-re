@@ -250,6 +250,50 @@ namespace
 
   TEST(
     TerrainGraph,
+    EveryNodeTypeRunsOnASmallMap
+  )
+  {
+    // Every node of the palette (not the generic op nodes) fed with hills where it has an `a` pin: none fails. The ones
+    // that need more than that are left out: the markers' pads, both slopes of Height from slopes.
+    const std::set<std::string> skip = {"pad_flatten", "height_from_gradient", "frame"};
+    const TerrainGround ground = [] {
+      TerrainGround g;
+      g.width = 65;
+      g.height = 65;
+      g.heights = std::make_shared<std::vector<float>>(65 * 65, 30.0f);
+      g.revision = 1;
+      g.water = 20.0f;
+      return g;
+    }();
+    int ran = 0;
+    for (const auto& type : TerrainNodeTypes().All()) {
+      if (type->category == "raw" || skip.count(type->name) != 0) {
+        continue;
+      }
+      NodeGraph graph(TerrainNodeTypes());
+      const int noise = graph.AddNode("perlin", 0, 0);
+      const int range = graph.AddNode("range", 200, 0);
+      ASSERT_EQ(graph.Link(noise, 0, range, 0), LinkResult::Ok);
+      const int node = graph.AddNode(type->name, 400, 0);
+      ASSERT_NE(node, 0) << type->name;
+      const int a = PinOf(type->inputs, "a");
+      if (a >= 0 && type->inputs[static_cast<std::size_t>(a)].type != faf::editor::PinType::Number) {
+        ASSERT_EQ(graph.Link(range, 0, node, a), LinkResult::Ok) << type->name;
+      }
+      if (type->name == "blend") {
+        ASSERT_EQ(graph.Link(noise, 0, node, PinOf(type->inputs, "b")), LinkResult::Ok) << "blend needs b";
+      }
+      TerrainRun run(1);
+      const auto report = run.Evaluate(graph, 3, ground);
+      EXPECT_TRUE(report.errors.empty()) << type->name << ": "
+                                         << (report.errors.empty() ? "" : report.errors.begin()->second);
+      ++ran;
+    }
+    EXPECT_GE(ran, 80) << "the palette's node types";
+  }
+
+  TEST(
+    TerrainGraph,
     SavedGraphReadsBack
   )
   {

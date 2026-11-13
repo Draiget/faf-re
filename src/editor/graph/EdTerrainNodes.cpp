@@ -6,6 +6,8 @@
 #include "editor/tools/EdErosionSuite.h"
 
 #include <algorithm>
+#include <array>
+#include <functional>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -285,6 +287,86 @@ namespace faf::editor::terrain
         at = end;
       }
       return out;
+    }
+
+    /**
+     * The colour ramp's stops as the op takes them (position, r, g, b, a per stop): a named ramp, or the custom text
+     * `pos:#rrggbb;pos:#rrggbb` (an optional alpha byte after the colour); reversed when asked.
+     */
+    std::vector<double> RampStops(
+      const std::string& id,
+      const std::string& custom,
+      const bool reverse,
+      const double alpha
+    )
+    {
+      struct Stop
+      {
+        double at, r, g, b, a;
+      };
+      static const std::map<std::string, std::vector<std::array<double, 4>>> kRamps = {
+        {"terrain",
+         {{0, 0.06, 0.18, 0.4},
+          {0.2, 0.2, 0.45, 0.65},
+          {0.3, 0.76, 0.7, 0.5},
+          {0.4, 0.3, 0.55, 0.2},
+          {0.65, 0.5, 0.4, 0.25},
+          {0.85, 0.7, 0.68, 0.65},
+          {1, 1, 1, 1}}},
+        {"heat", {{0, 0, 0, 0}, {0.25, 0.5, 0, 0.1}, {0.5, 0.9, 0.3, 0}, {0.75, 1, 0.85, 0.1}, {1, 1, 1, 0.9}}},
+        {"ocean", {{0, 0.02, 0.05, 0.2}, {0.5, 0.1, 0.4, 0.6}, {0.85, 0.5, 0.85, 0.9}, {1, 1, 1, 1}}},
+        {"snow", {{0, 0.25, 0.28, 0.33}, {0.5, 0.6, 0.65, 0.72}, {1, 1, 1, 1}}},
+        {"viridis",
+         {{0, 0.27, 0, 0.33},
+          {0.25, 0.23, 0.32, 0.55},
+          {0.5, 0.13, 0.57, 0.55},
+          {0.75, 0.37, 0.79, 0.38},
+          {1, 0.99, 0.91, 0.14}}},
+        {"grey", {{0, 0, 0, 0}, {1, 1, 1, 1}}},
+        {"lush", {{0, 0.55, 0.45, 0.3}, {0.35, 0.45, 0.55, 0.25}, {0.65, 0.2, 0.5, 0.15}, {1, 0.08, 0.3, 0.12}}},
+      };
+      std::vector<Stop> stops;
+      if (const auto found = kRamps.find(id); id != "custom" && found != kRamps.end()) {
+        for (const auto& s : found->second) {
+          stops.push_back({s[0], s[1], s[2], s[3], alpha});
+        }
+      } else {
+        std::size_t at = 0;
+        while (at < custom.size()) {
+          const std::size_t end = std::min(custom.find(';', at), custom.size());
+          const std::string item = custom.substr(at, end - at);
+          at = end + 1;
+          const std::size_t colon = item.find(':');
+          if (colon == std::string::npos) {
+            continue;
+          }
+          std::string hex = item.substr(colon + 1);
+          hex.erase(std::remove(hex.begin(), hex.end(), '#'), hex.end());
+          if (hex.size() < 6) {
+            continue;
+          }
+          const auto byte = [&](const std::size_t i) {
+            return static_cast<double>(std::strtol(hex.substr(i, 2).c_str(), nullptr, 16)) / 255.0;
+          };
+          stops.push_back(
+            {std::atof(item.substr(0, colon).c_str()), byte(0), byte(2), byte(4), hex.size() >= 8 ? byte(6) : alpha}
+          );
+        }
+        if (stops.size() < 2) {
+          Fail("the custom ramp needs two stops like 0:#103060;1:#ffffff");
+        }
+      }
+      if (reverse) {
+        std::reverse(stops.begin(), stops.end());
+        for (Stop& s : stops) {
+          s.at = 1.0 - s.at;
+        }
+      }
+      std::vector<double> flat;
+      for (const Stop& s : stops) {
+        flat.insert(flat.end(), {s.at, s.r, s.g, s.b, s.a});
+      }
+      return flat;
     }
   } // namespace
 
@@ -1507,6 +1589,1109 @@ namespace faf::editor::terrain
     }
     );
 
+    // ---- the terrain generators, filters, erosion variants and analysis masks of FAF Studio's stage T7
+    // (graphnodes_t7.lua): the field library's newer ops as nodes, three composed presets, the colour ramp.
+    {
+      const auto iters = [](const Env& E, const double n) {
+        return E.step > 1 ? std::max(1.0, std::floor(n / E.step + 0.5)) : n;
+      };
+      // An op with several results: `out` and the named extras.
+      const auto multi =
+        [](const Env& E, const char* op, const std::vector<Arg>& args, std::initializer_list<const char*> names) {
+        std::map<std::string, field::Grid> extra;
+        Outputs out;
+        out["out"].grid = E.Op(op, args, &extra);
+        for (const char* name : names) {
+          const auto found = extra.find(name);
+          if (found != extra.end()) {
+            out[name].grid = std::make_shared<field::Grid>(std::move(found->second));
+          }
+        }
+        return out;
+      };
+
+      // -- generators
+      c.Add(
+        "fractal",
+        "Terrain noise",
+        "gen",
+        "Gradient noise built to look like land: every octave in its own turned frame, an optional domain warp, "
+        "rolling, "
+        "rounded or sharp ridged shapes, and finer detail on steep or flat ground. 0..1.",
+        {},
+        kHeightOut,
+        {Seed(),
+         N("scale", "Feature size (units)", 8, 1000, 2, "%.0f", 160, true),
+         N("octaves", "Octaves", 1, 12, 1, "%.0f", 8),
+         N("finest", "Smallest detail (units)", 2, 200, 1, "%.0f", 12),
+         N("persistence", "Persistence", 0.2f, 0.9f, 0.05f, "%.2f", 0.5f),
+         C("kind",
+           "Shape",
+           {"fbm", "billow", "ridged"},
+           {"Rolling (fBm)", "Rounded hills (billow)", "Sharp crests (ridged)"},
+           "fbm"),
+         N("sharpness", "Ridge sharpness", 1, 5, 0.1f, "%.1f", 2),
+         N("warp", "Warp (units)", 0, 300, 1, "%.0f", 20),
+         N("slope_detail", "Detail on slopes (- flat, + steep)", -1, 1, 0.05f, "%.2f", 0),
+         N("warp_levels", "Warp passes", 1, 2, 1, "%.0f", 1),
+         C("style", "Style", {"classic", "erosive"}, {"Classic", "Eroded (smooth slopes)"}, "classic"),
+         N("erosion", "Erosion strength", 0, 6, 0.1f, "%.1f", 1)},
+        [](const Env& E, const Values& v, const Inputs&) {
+        return One(E.Op(
+          "fractal",
+          {{"like", E.like},
+           {"seed", E.Seed(v.N("seed"))},
+           {"scale", v.N("scale")},
+           {"octaves", v.N("octaves")},
+           {"finest", v.N("finest")},
+           {"persistence", v.N("persistence")},
+           {"kind", v.S("kind")},
+           {"sharpness", v.N("sharpness")},
+           {"warp", v.N("warp")},
+           {"slope_detail", v.N("slope_detail")},
+           {"style", v.S("style")},
+           {"erosion", v.N("erosion")},
+           {"warp_levels", v.N("warp_levels")}}
+        ));
+      }
+      );
+      c.Add(
+        "musgrave",
+        "Multifractal (Musgrave)",
+        "gen",
+        "Musgrave multifractals: ridged (sharp crests), hybrid (rough peaks over smooth valleys) and heterogeneous "
+        "terrain.",
+        {},
+        kHeightOut,
+        {Seed(),
+         N("scale", "Feature size (units)", 8, 1000, 2, "%.0f", 160, true),
+         N("octaves", "Octaves", 1, 12, 1, "%.0f", 7),
+         N("lacunarity", "Lacunarity", 1.5f, 3.5f, 0.05f, "%.2f", 2),
+         N("h", "Roughness exponent (H)", 0, 2, 0.05f, "%.2f", 1),
+         N("offset", "Offset", 0.2f, 1.5f, 0.05f, "%.2f", 1),
+         N("gain", "Gain", 0.5f, 4, 0.1f, "%.1f", 2),
+         C("mode", "Mode", {"ridged", "hybrid", "hetero"}, {"Ridged", "Hybrid", "Heterogeneous"}, "ridged")},
+        [](const Env& E, const Values& v, const Inputs&) {
+        const field::GridPtr f = E.Op(
+          "musgrave",
+          {{"like", E.like},
+           {"seed", E.Seed(v.N("seed"))},
+           {"scale", v.N("scale")},
+           {"octaves", v.N("octaves")},
+           {"lacunarity", v.N("lacunarity")},
+           {"h", v.N("h")},
+           {"offset", v.N("offset")},
+           {"gain", v.N("gain")},
+           {"mode", v.S("mode")},
+           {"rotate", 1}}
+        );
+        const std::string& mode = v.S("mode");
+        return One(
+          mode == "ridged"     ? E.Fit(f, 0.05, 0.95)
+            : mode == "hybrid" ? E.Fit(f, 0.0, 0.6)
+                               : E.Fit(f, 0.0, 0.9)
+        );
+      }
+      );
+      c.Add(
+        "fbm_damped",
+        "Eroded noise",
+        "gen",
+        "Fractal noise that smooths itself where it is steep: smooth valley floors, rough crests, the look of eroded "
+        "land. 0..1.",
+        {},
+        kHeightOut,
+        {Seed(),
+         N("scale", "Feature size (units)", 8, 1000, 2, "%.0f", 160, true),
+         N("octaves", "Octaves", 1, 12, 1, "%.0f", 8),
+         N("persistence", "Persistence", 0.2f, 0.9f, 0.05f, "%.2f", 0.5f),
+         N("damp", "Slope damping", 0, 8, 0.1f, "%.1f", 1.5f)},
+        [](const Env& E, const Values& v, const Inputs&) {
+        return One(E.Fit(
+          E.Op(
+            "fbm_damped",
+            {{"like", E.like},
+             {"seed", E.Seed(v.N("seed"))},
+             {"scale", v.N("scale")},
+             {"octaves", v.N("octaves")},
+             {"persistence", v.N("persistence")},
+             {"damp", v.N("damp")},
+             {"rotate", 1}}
+          ),
+          0.15,
+          0.82
+        ));
+      }
+      );
+      c.Add(
+        "cells",
+        "Cells (Voronoi variants)",
+        "gen",
+        "Cell noise with the usual variants: nearest distances, borders, smooth blends, a level per cell with bevelled "
+        "borders "
+        "(plates), tilted facets; several distance metrics; domain warp.",
+        {},
+        kHeightOut,
+        {Seed(),
+         N("scale", "Cell size (units)", 6, 800, 2, "%.0f", 90, true),
+         N("jitter", "Jitter", 0, 1, 0.05f, "%.2f", 1),
+         C("mode",
+           "Mode",
+           {"f1", "f2", "f3", "edge", "crack", "id", "smooth", "border", "plate", "facet"},
+           {"Nearest distance",
+            "Second distance",
+            "Third distance",
+            "Edges (f2 - f1)",
+            "Cracks",
+            "Value per cell",
+            "Smooth minimum",
+            "Distance to the border",
+            "Plates (bevelled)",
+            "Facets"},
+           "plate"),
+         C("metric",
+           "Distance metric",
+           {"euclid", "manhattan", "chebyshev", "minkowski"},
+           {"Euclidean", "Manhattan", "Chebyshev", "Minkowski"},
+           "euclid"),
+         N("p", "Minkowski exponent", 0.3f, 8, 0.1f, "%.1f", 3),
+         N("smooth", "Smooth minimum sharpness", 1, 30, 0.5f, "%.1f", 8),
+         N("thickness", "Crack thickness", 0.02f, 0.5f, 0.01f, "%.2f", 0.12f),
+         N("bevel", "Plate bevel (share of a cell)", 0.01f, 0.5f, 0.01f, "%.2f", 0.12f),
+         N("drop", "Plate bevel depth", 0, 1, 0.05f, "%.2f", 0.4f),
+         N("warp", "Domain warp (units)", 0, 300, 1, "%.0f", 0),
+         N("warp_scale", "Warp feature size (units)", 8, 600, 2, "%.0f", 160)},
+        [](const Env& E, const Values& v, const Inputs&) {
+        return One(E.Op(
+          "cells",
+          {{"like", E.like},
+           {"seed", E.Seed(v.N("seed"))},
+           {"scale", v.N("scale")},
+           {"jitter", v.N("jitter")},
+           {"mode", v.S("mode")},
+           {"metric", v.S("metric")},
+           {"p", v.N("p")},
+           {"smooth", v.N("smooth")},
+           {"thickness", v.N("thickness")},
+           {"bevel", v.N("bevel")},
+           {"drop", v.N("drop")},
+           {"warp", v.N("warp")},
+           {"warp_scale", v.N("warp_scale")}}
+        ));
+      }
+      );
+      c.Add(
+        "craters",
+        "Craters",
+        "gen",
+        "A scatter of impact craters: a bowl with a raised rim. 0.5 is the ground, bowls go down, rims up.",
+        {},
+        kHeightOut,
+        {Seed(),
+         N("scale", "Spacing (units)", 20, 600, 2, "%.0f", 120, true),
+         N("density", "Share of cells with a crater", 0, 1, 0.05f, "%.2f", 0.6f),
+         N("rmin", "Smallest radius (share of a cell)", 0.02f, 0.5f, 0.01f, "%.2f", 0.15f),
+         N("rmax", "Largest radius (share of a cell)", 0.05f, 0.5f, 0.01f, "%.2f", 0.45f),
+         N("depth", "Depth", 0, 0.5f, 0.01f, "%.2f", 0.4f),
+         N("rim", "Rim height (share of depth)", 0, 1, 0.05f, "%.2f", 0.25f),
+         N("shape", "Bowl shape (flat floor above 1)", 0.5f, 6, 0.1f, "%.1f", 1.5f)},
+        [](const Env& E, const Values& v, const Inputs&) {
+        return One(E.Op(
+          "craters",
+          {{"like", E.like},
+           {"seed", E.Seed(v.N("seed"))},
+           {"scale", v.N("scale")},
+           {"density", v.N("density")},
+           {"rmin", v.N("rmin")},
+           {"rmax", v.N("rmax")},
+           {"depth", v.N("depth")},
+           {"rim", v.N("rim")},
+           {"shape", v.N("shape")},
+           {"base", 0.5}}
+        ));
+      }
+      );
+      c.Add(
+        "dunes",
+        "Dunes",
+        "gen",
+        "Asymmetric dune ridges (a gentle windward and a steep slip face) with meandering crests and ripples. 0..1.",
+        {},
+        kHeightOut,
+        {Seed(),
+         N("wavelength", "Wavelength (units)", 8, 600, 1, "%.0f", 70, true),
+         N("angle", "Wind direction (degrees)", 0, 360, 5, "%.0f", 20),
+         N("asym", "Asymmetry", 0, 1.6f, 0.05f, "%.2f", 0.9f),
+         N("warp", "Crest meander (units)", 0, 200, 1, "%.0f", 25),
+         N("warp_size", "Meander size (units)", 10, 600, 5, "%.0f", 140),
+         N("variation", "Crest height variation", 0, 1, 0.05f, "%.2f", 0.4f),
+         N("ripples", "Ripples", 0, 0.6f, 0.02f, "%.2f", 0.12f)},
+        [](const Env& E, const Values& v, const Inputs&) {
+        return One(E.Op(
+          "dunes",
+          {{"like", E.like},
+           {"seed", E.Seed(v.N("seed"))},
+           {"wavelength", v.N("wavelength")},
+           {"angle", v.N("angle")},
+           {"asym", v.N("asym")},
+           {"warp", v.N("warp")},
+           {"warp_size", v.N("warp_size")},
+           {"variation", v.N("variation")},
+           {"ripples", v.N("ripples")}}
+        ));
+      }
+      );
+      c.Add(
+        "cracks",
+        "Cracks",
+        "gen",
+        "A network of cracks (1 in a crack, 0 on the plates), several finer networks, warped. Subtract it from the "
+        "ground to cut fissures.",
+        {},
+        kMaskOut,
+        {Seed(),
+         N("scale", "Plate size (units)", 8, 800, 2, "%.0f", 90, true),
+         N("crack_width", "Crack width (units)", 0.3f, 40, 0.1f, "%.1f", 3),
+         N("levels", "Networks (finer each)", 1, 3, 1, "%.0f", 2),
+         N("warp", "Warp (units)", 0, 200, 1, "%.0f", 12),
+         N("jitter", "Jitter", 0, 1, 0.05f, "%.2f", 0.9f),
+         C("profile", "Profile", {"v", "u", "flat"}, {"V (soft)", "U", "Flat (hard edge)"}, "v")},
+        [](const Env& E, const Values& v, const Inputs&) {
+        return One(E.Op(
+          "cracks",
+          {{"like", E.like},
+           {"seed", E.Seed(v.N("seed"))},
+           {"scale", v.N("scale")},
+           {"crack_width", v.N("crack_width")},
+           {"levels", v.N("levels")},
+           {"warp", v.N("warp")},
+           {"jitter", v.N("jitter")},
+           {"profile", v.S("profile")}}
+        ));
+      }
+      );
+      c.Add(
+        "island",
+        "Island shape",
+        "gen",
+        "A ragged island: height dome (or a mask, or the distance from the coast) from a disc with noisy coast.",
+        {},
+        kHeightOut,
+        {Seed(),
+         N("cx", "Centre x (share of the map)", 0, 1, 0.01f, "%.2f", 0.5f),
+         N("cz", "Centre z (share of the map)", 0, 1, 0.01f, "%.2f", 0.5f),
+         N("radius", "Radius (units, 0 = half the map)", 0, 6000, 4, "%.0f", 0, true),
+         N("aspect", "Aspect (stretch along the angle)", 0.3f, 3, 0.05f, "%.2f", 1),
+         N("angle", "Angle (degrees)", 0, 180, 5, "%.0f", 0),
+         N("roughness", "Coast roughness", 0, 1, 0.05f, "%.2f", 0.35f),
+         N("noise_scale", "Coast feature size (units, 0 = auto)", 0, 2000, 5, "%.0f", 0),
+         N("edge", "Coast softness", 0.005f, 0.5f, 0.005f, "%.3f", 0.08f),
+         N("power", "Profile exponent", 0.2f, 4, 0.05f, "%.2f", 1.4f),
+         C("output",
+           "Output",
+           {"height", "mask", "distance"},
+           {"Height dome", "Land mask", "Distance from the coast"},
+           "height")},
+        [](const Env& E, const Values& v, const Inputs&) {
+        const double radius = v.N("radius") > 0.0 ? v.N("radius") : 0.5 * std::min(E.W, E.H);
+        const double noise = v.N("noise_scale") > 0.0 ? v.N("noise_scale") : radius * 0.5;
+        return One(E.Op(
+          "island",
+          {{"like", E.like},
+           {"seed", E.Seed(v.N("seed"))},
+           {"cx", v.N("cx") * E.W},
+           {"cz", v.N("cz") * E.H},
+           {"radius", radius},
+           {"noise_scale", noise},
+           {"aspect", v.N("aspect")},
+           {"angle", v.N("angle")},
+           {"roughness", v.N("roughness")},
+           {"edge", v.N("edge")},
+           {"power", v.N("power")},
+           {"output", v.S("output")}}
+        ));
+      }
+      );
+
+      // -- composed presets
+      c.Add(
+        "hills",
+        "Hills (preset)",
+        "gen",
+        "Rolling hills: soft billow and fractal noise blended, gentle slopes. 0..1.",
+        {},
+        kHeightOut,
+        {Seed(),
+         N("scale", "Hill size (units)", 30, 1200, 5, "%.0f", 220, true),
+         N("roundness", "Roundness", 0, 1, 0.05f, "%.2f", 0.5f),
+         N("detail", "Detail", 0, 1, 0.05f, "%.2f", 0.3f)},
+        [](const Env& E, const Values& v, const Inputs&) {
+        const int seed = E.Seed(v.N("seed"));
+        const double scale = v.N("scale");
+        const field::GridPtr soft = E.Op(
+          "billow",
+          {{"like", E.like}, {"seed", seed}, {"scale", scale}, {"octaves", 3}, {"persistence", 0.45}, {"rotate", 1}}
+        );
+        const field::GridPtr base = E.Op(
+          "perlin",
+          {{"like", E.like},
+           {"seed", seed + 1},
+           {"scale", scale * 1.4},
+           {"octaves", 4},
+           {"persistence", 0.5},
+           {"rotate", 1}}
+        );
+        const field::GridPtr fine = E.Op(
+          "perlin",
+          {{"like", E.like},
+           {"seed", seed + 2},
+           {"scale", scale * 0.25},
+           {"octaves", 3},
+           {"persistence", 0.5},
+           {"rotate", 1}}
+        );
+        const field::GridPtr mix = E.Op(
+          "blend",
+          {{"a", E.Fit(base, 0.25, 0.75)},
+           {"b", E.Fit(soft, 0.0, 0.5)},
+           {"mode", "normal"},
+           {"opacity", v.N("roundness")}}
+        );
+        return One(
+          E.Op("blend", {{"a", mix}, {"b", E.Fit(fine, 0.25, 0.75)}, {"mode", "overlay"}, {"opacity", v.N("detail")}})
+        );
+      }
+      );
+      c.Add(
+        "mountains",
+        "Mountains (preset)",
+        "gen",
+        "Mountain ranges: ridged multifractal with a domain warp and sharpened peaks. 0..1.",
+        {},
+        kHeightOut,
+        {Seed(),
+         N("scale", "Range size (units)", 60, 1500, 5, "%.0f", 320, true),
+         N("octaves", "Octaves", 3, 10, 1, "%.0f", 7),
+         N("warp", "Warp (units)", 0, 300, 1, "%.0f", 60),
+         N("peaks", "Sharp peaks", 0.5f, 3, 0.05f, "%.2f", 1.5f)},
+        [](const Env& E, const Values& v, const Inputs&) {
+        const int seed = E.Seed(v.N("seed"));
+        const double scale = v.N("scale");
+        field::GridPtr f = E.Fit(
+          E.Op(
+            "musgrave",
+            {{"like", E.like},
+             {"seed", seed},
+             {"scale", scale},
+             {"octaves", v.N("octaves")},
+             {"mode", "ridged"},
+             {"rotate", 1}}
+          ),
+          0.05,
+          0.95
+        );
+        if (v.N("warp") > 0.0) {
+          const field::GridPtr dx = E.Op(
+            "perlin", {{"like", E.like}, {"seed", seed + 11}, {"scale", scale * 0.6}, {"octaves", 3}, {"rotate", 1}}
+          );
+          const field::GridPtr dz = E.Op(
+            "perlin", {{"like", E.like}, {"seed", seed + 12}, {"scale", scale * 0.6}, {"octaves", 3}, {"rotate", 1}}
+          );
+          f = E.Op("warp", {{"a", f}, {"dx", dx}, {"dz", dz}, {"strength", v.N("warp")}});
+        }
+        return One(E.Op("gamma", {{"a", f}, {"gamma", v.N("peaks")}}));
+      }
+      );
+      c.Add(
+        "mesas",
+        "Mesas and terraces (preset)",
+        "gen",
+        "Flat topped hills with stepped sides (a terraced fractal). 0..1.",
+        {},
+        kHeightOut,
+        {Seed(),
+         N("scale", "Mesa size (units)", 40, 1200, 5, "%.0f", 240, true),
+         N("steps", "Steps", 2, 24, 1, "%.0f", 6),
+         N("sharpness", "Sharpness", 0, 1, 0.05f, "%.2f", 0.75f),
+         N("roughness", "Roughness", 0, 1, 0.05f, "%.2f", 0.3f)},
+        [](const Env& E, const Values& v, const Inputs&) {
+        const int seed = E.Seed(v.N("seed"));
+        const double scale = v.N("scale");
+        field::GridPtr f = E.Fit(
+          E.Op(
+            "perlin",
+            {{"like", E.like}, {"seed", seed}, {"scale", scale}, {"octaves", 4}, {"persistence", 0.5}, {"rotate", 1}}
+          ),
+          0.25,
+          0.75
+        );
+        f = E.Op(
+          "terrace", {{"a", f}, {"steps", v.N("steps")}, {"sharpness", v.N("sharpness")}, {"lo", 0.0}, {"hi", 1.0}}
+        );
+        const field::GridPtr grit = E.Op(
+          "perlin", {{"like", E.like}, {"seed", seed + 5}, {"scale", scale * 0.12}, {"octaves", 3}, {"rotate", 1}}
+        );
+        return One(
+          E.Op("blend", {{"a", f}, {"b", E.Fit(grit, 0.25, 0.75)}, {"mode", "overlay"}, {"opacity", v.N("roughness")}})
+        );
+      }
+      );
+
+      // -- shape
+      c.Add(
+        "dwarp",
+        "Domain warp",
+        "shape",
+        "Bends a field: by fractal noise (once or twice), a divergence free curl flow, a swirl, ripples or a pinch / "
+        "bulge.",
+        {Pin("a"), Pin("mask", PinType::Mask)},
+        kHeightOut,
+        {Seed(),
+         C("kind",
+           "Kind",
+           {"fbm", "curl", "swirl", "ripple", "pinch"},
+           {"Noise", "Curl flow", "Swirl", "Ripples", "Pinch / bulge"},
+           "fbm"),
+         N("strength", "Strength (units; swirl: degrees; pinch: factor)", -400, 400, 0.5f, "%.1f", 40, true),
+         N("size", "Size (units; swirl, pinch: radius)", 5, 1500, 5, "%.0f", 120),
+         N("octaves", "Octaves", 1, 8, 1, "%.0f", 3),
+         N("iterations", "Warp of a warp (1 - 3)", 1, 3, 1, "%.0f", 1),
+         N("angle", "Ripple direction (degrees)", 0, 360, 5, "%.0f", 0),
+         N("wavelength", "Ripple wavelength (units)", 4, 600, 1, "%.0f", 60),
+         N("cx", "Centre x (share)", 0, 1, 0.01f, "%.2f", 0.5f),
+         N("cz", "Centre z (share)", 0, 1, 0.01f, "%.2f", 0.5f),
+         C("edge", "Edges", {"clamp", "wrap", "mirror"}, {"Clamp", "Wrap", "Mirror"}, "clamp")},
+        [](const Env& E, const Values& v, const Inputs& ins) {
+        return One(E.Op(
+          "dwarp",
+          {{"a", In(ins, "a")},
+           {"mask", In(ins, "mask")},
+           {"seed", E.Seed(v.N("seed"))},
+           {"kind", v.S("kind")},
+           {"strength", v.N("strength")},
+           {"size", v.N("size")},
+           {"octaves", v.N("octaves")},
+           {"iterations", v.N("iterations")},
+           {"angle", v.N("angle")},
+           {"wavelength", v.N("wavelength")},
+           {"cx", v.N("cx") * E.W},
+           {"cz", v.N("cz") * E.H},
+           {"edge", v.S("edge")}}
+        ));
+      }
+      );
+      // A filter on a and an optional mask, its arguments made from the values.
+      using MakeArgs = std::function<std::vector<Arg>(const Values&, const Env&)>;
+      const auto shape = [&](
+                           const char* id,
+                           const char* label,
+                           const char* help,
+                           std::vector<ParamDef> params,
+                           MakeArgs make,
+                           const std::vector<PinDef>& outputs = kHeightOut
+                         ) {
+        const std::string op = id;
+        c.Add(
+          id,
+          label,
+          "shape",
+          help,
+          {Pin("a"), Pin("mask", PinType::Mask)},
+          outputs,
+          std::move(params),
+          [op, make](const Env& E, const Values& v, const Inputs& ins) {
+          std::vector<Arg> args = make(v, E);
+          args.emplace_back("a", In(ins, "a"));
+          args.emplace_back("mask", In(ins, "mask"));
+          return One(E.Op(op, args));
+        }
+        );
+      };
+      shape(
+        "bilateral",
+        "Smooth (keep edges)",
+        "Averages a window but ignores neighbours that differ by much more than the range: noise goes, cliffs and "
+        "ridges stay.",
+        {N("radius", "Radius (units)", 1, 40, 0.5f, "%.1f", 6),
+         N("sigma_r", "Height range kept (units)", 0.1f, 60, 0.1f, "%.1f", 2, true)},
+        [](const Values& v, const Env&) {
+        return std::vector<Arg>{{"radius", v.N("radius")}, {"sigma_r", v.N("sigma_r")}};
+      }
+      );
+      shape(
+        "diffuse",
+        "Smooth (diffusion)",
+        "Perona-Malik diffusion: flat ground relaxes, steep faces (above the edge threshold) stay sharp.",
+        {N("iterations", "Iterations", 1, 300, 1, "%.0f", 30),
+         N("kappa", "Edge threshold (rise / run)", 0.02f, 3, 0.02f, "%.2f", 0.4f, true),
+         N("rate", "Rate", 0.02f, 0.25f, 0.01f, "%.2f", 0.2f),
+         C("g", "Conduction", {"lorentz", "exp"}, {"Lorentzian", "Exponential (sharper)"}, "lorentz")},
+        [iters](const Values& v, const Env& E) {
+        return std::vector<Arg>{
+          {"iterations", iters(E, v.N("iterations"))}, {"kappa", v.N("kappa")}, {"rate", v.N("rate")}, {"g", v.S("g")}
+        };
+      }
+      );
+      shape(
+        "unsharp",
+        "Sharpen",
+        "Unsharp mask: adds back the difference to a blurred copy.",
+        {N("radius", "Radius (units)", 0.5f, 80, 0.5f, "%.1f", 4),
+         N("amount", "Amount", 0, 4, 0.05f, "%.2f", 1, true),
+         N("threshold", "Ignore differences below (units)", 0, 10, 0.05f, "%.2f", 0)},
+        [](const Values& v, const Env&) {
+        return std::vector<Arg>{{"radius", v.N("radius")}, {"amount", v.N("amount")}, {"threshold", v.N("threshold")}};
+      }
+      );
+      shape(
+        "edge",
+        "Edge detect",
+        "Edge strength: Sobel / Prewitt (rise per run), the Laplacian (creases) or a difference of gaussians. A mask.",
+        {C("mode",
+           "Method",
+           {"sobel", "prewitt", "laplace", "dog"},
+           {"Sobel", "Prewitt", "Laplacian", "Difference of gaussians"},
+           "sobel"),
+         N("gain", "Gain", 0.05f, 100, 0.05f, "%.2f", 2, true),
+         N("smooth", "Smooth first (units)", 0, 40, 0.5f, "%.1f", 0),
+         N("radius", "Gaussian size (units, DoG)", 0.5f, 60, 0.5f, "%.1f", 3),
+         B("signed", "Signed (0.5 = flat)", false)},
+        [](const Values& v, const Env&) {
+        return std::vector<Arg>{
+          {"mode", v.S("mode")},
+          {"gain", v.N("gain")},
+          {"smooth", v.N("smooth")},
+          {"radius", v.N("radius")},
+          {"signed", v.B("signed") ? 1 : 0}
+        };
+      },
+        kMaskOut
+      );
+      shape(
+        "morph",
+        "Morphology",
+        "Grey scale morphology with a square, disc, cross or diamond: dilate, erode, open, close, gradient, top hats.",
+        {C("op",
+           "Operation",
+           {"dilate", "erode", "open", "close", "gradient", "tophat", "bothat"},
+           {"Dilate (max)", "Erode (min)", "Open", "Close", "Gradient", "Top hat (peaks)", "Bottom hat (pits)"},
+           "open"),
+         N("radius", "Radius (units)", 1, 60, 0.5f, "%.1f", 6),
+         C("shape", "Shape", {"square", "disc", "cross", "diamond"}, {"Square", "Disc", "Cross", "Diamond"}, "disc")},
+        [](const Values& v, const Env&) {
+        return std::vector<Arg>{{"op", v.S("op")}, {"radius", v.N("radius")}, {"shape", v.S("shape")}};
+      }
+      );
+      {
+        struct Kernel
+        {
+          const char* id;
+          const char* label;
+          const char* numbers;
+          int normalize;
+        };
+        static constexpr Kernel kKernels[] = {
+          {"identity", "Identity", "0 0 0 0 1 0 0 0 0", 1},
+          {"sharpen", "Sharpen", "0 -1 0 -1 5 -1 0 -1 0", 1},
+          {"emboss", "Emboss", "-2 -1 0 -1 1 1 0 1 2", 0},
+          {"edge", "Edge (Laplacian)", "0 1 0 1 -4 1 0 1 0", 0},
+          {"ridge", "Ridge detect", "-1 -1 -1 -1 8 -1 -1 -1 -1", 0},
+          {"blur3", "Blur 3 x 3", "1 2 1 2 4 2 1 2 1", 1},
+          {"blur5", "Blur 5 x 5", "1 4 6 4 1 4 16 24 16 4 6 24 36 24 6 4 16 24 16 4 1 4 6 4 1", 1},
+          {"sobelx", "Sobel x", "-1 0 1 -2 0 2 -1 0 1", 0},
+          {"custom", "Custom", "", 1},
+        };
+        std::vector<std::string> ids;
+        std::vector<std::string> labels;
+        for (const Kernel& k : kKernels) {
+          ids.emplace_back(k.id);
+          labels.emplace_back(k.label);
+        }
+        shape(
+          "convolve",
+          "Convolution",
+          "Convolves with a 3 x 3 or 5 x 5 kernel: presets or your own numbers (rows separated by ;, values by :).",
+          {C("preset", "Kernel", ids, labels, "sharpen"),
+           T("kernel", "Custom kernel (a:b:c;d:e:f;g:h:i)", "0:-1:0;-1:5:-1;0:-1:0"),
+           N("scale", "Multiply", -10, 10, 0.05f, "%.2f", 1),
+           N("bias", "Add", -300, 600, 0.5f, "%.1f", 0)},
+          [](const Values& v, const Env&) {
+          std::string text = v.S("kernel");
+          int normalize = 1;
+          for (const Kernel& k : kKernels) {
+            if (v.S("preset") == k.id && std::string(k.id) != "custom") {
+              text = k.numbers;
+              normalize = k.normalize;
+            }
+          }
+          std::replace(text.begin(), text.end(), ':', ' ');
+          std::replace(text.begin(), text.end(), ';', ' ');
+          const std::vector<double> flat = NumberList(text);
+          if (flat.size() != 9 && flat.size() != 25 && flat.size() != 49) {
+            Fail("the kernel needs 9, 25 or 49 numbers");
+          }
+          return std::vector<Arg>{
+            {"kernel", flat}, {"normalize", normalize}, {"scale", v.N("scale")}, {"bias", v.N("bias")}
+          };
+        }
+        );
+      }
+      shape(
+        "blur_dir",
+        "Directional blur",
+        "Blurs along a direction: wind-swept streaks, smeared ridges.",
+        {N("angle", "Direction (degrees)", 0, 360, 5, "%.0f", 30),
+         N("length", "Length (units)", 1, 300, 1, "%.0f", 30, true),
+         C("shape", "Weights", {"box", "tri", "gauss"}, {"Even", "Triangle", "Gaussian"}, "tri")},
+        [](const Values& v, const Env&) {
+        return std::vector<Arg>{{"angle", v.N("angle")}, {"length", v.N("length")}, {"shape", v.S("shape")}};
+      }
+      );
+      shape(
+        "blur_slope",
+        "Slope blur",
+        "Blurs only where the ground is flat (or only where it is steep): smooth plains without softening the cliffs.",
+        {N("radius", "Blur radius (units)", 0.5f, 80, 0.5f, "%.1f", 8),
+         C("mode", "Blur where", {"flat", "steep"}, {"The ground is flat", "The ground is steep"}, "flat"),
+         N("lo", "From slope (rise / run)", 0, 3, 0.02f, "%.2f", 0.2f),
+         N("hi", "To slope (rise / run)", 0.02f, 4, 0.02f, "%.2f", 0.6f),
+         N("amount", "Amount", 0, 1, 0.05f, "%.2f", 1)},
+        [](const Values& v, const Env&) {
+        return std::vector<Arg>{
+          {"radius", v.N("radius")},
+          {"mode", v.S("mode")},
+          {"lo", v.N("lo")},
+          {"hi", v.N("hi")},
+          {"amount", v.N("amount")}
+        };
+      }
+      );
+      shape(
+        "stratify",
+        "Rock layers (stratify)",
+        "Pushes the height onto shelves of random thickness: layered cliffs with ledges, optionally dipping and only "
+        "on steep ground.",
+        {Seed(),
+         N("thickness", "Layer thickness (units)", 0.3f, 40, 0.1f, "%.1f", 3, true),
+         N("variation", "Thickness variation", 0, 1, 0.05f, "%.2f", 0.5f),
+         N("sharpness", "Sharpness", 0, 1, 0.05f, "%.2f", 0.8f),
+         N("strength", "Strength", 0, 1, 0.05f, "%.2f", 1),
+         N("slope_lo", "Only on slopes from (rise / run)", 0, 3, 0.02f, "%.2f", 0),
+         N("slope_hi", "... full strength at", 0, 4, 0.02f, "%.2f", 0),
+         N("tilt_x", "Dip along x (rise / run)", -0.5f, 0.5f, 0.005f, "%.3f", 0),
+         N("tilt_z", "Dip along z (rise / run)", -0.5f, 0.5f, 0.005f, "%.3f", 0),
+         N("warp", "Layer waviness (units)", 0, 40, 0.5f, "%.1f", 0),
+         N("warp_size", "Waviness size (units)", 10, 600, 5, "%.0f", 120)},
+        [](const Values& v, const Env& E) {
+        return std::vector<Arg>{
+          {"seed", E.Seed(v.N("seed"))},
+          {"thickness", v.N("thickness")},
+          {"variation", v.N("variation")},
+          {"sharpness", v.N("sharpness")},
+          {"strength", v.N("strength")},
+          {"slope_lo", v.N("slope_lo")},
+          {"slope_hi", v.N("slope_hi")},
+          {"tilt_x", v.N("tilt_x")},
+          {"tilt_z", v.N("tilt_z")},
+          {"warp", v.N("warp")},
+          {"warp_size", v.N("warp_size")}
+        };
+      }
+      );
+
+      // -- erosion variants
+      c.Add(
+        "thermal_map",
+        "Thermal (talus map)",
+        "erosion",
+        "Thermal erosion with a talus angle that varies over the map (link a mask into b: 0 = the soft angle, 1 = the "
+        "hard angle). "
+        "Outputs the debris (scree) and the moved material as masks.",
+        {Pin("a"), Pin("b", PinType::Mask), Pin("mask", PinType::Mask)},
+        {Pin("out"), Pin("scree", PinType::Mask), Pin("moved", PinType::Mask)},
+        {N("iterations", "Iterations", 1, 400, 1, "%.0f", 30),
+         N("talus", "Talus without a map (rise / run)", 0.05f, 2, 0.05f, "%.2f", 0.6f),
+         N("talus_lo", "Soft angle (b = 0)", 0.05f, 2, 0.05f, "%.2f", 0.35f),
+         N("talus_hi", "Hard angle (b = 1)", 0.05f, 3, 0.05f, "%.2f", 1),
+         N("rate", "Rate", 0.05f, 1, 0.05f, "%.2f", 0.5f),
+         N("scree_scale", "Material that reads 1 (units)", 0.05f, 20, 0.05f, "%.2f", 1)},
+        [iters, multi](const Env& E, const Values& v, const Inputs& ins) {
+        return multi(
+          E,
+          "thermal_map",
+          {{"a", In(ins, "a")},
+           {"b", In(ins, "b")},
+           {"mask", In(ins, "mask")},
+           {"iterations", iters(E, v.N("iterations"))},
+           {"talus", v.N("talus")},
+           {"talus_lo", v.N("talus_lo")},
+           {"talus_hi", v.N("talus_hi")},
+           {"rate", v.N("rate")},
+           {"scree_scale", v.N("scree_scale")}},
+          {"scree", "moved"}
+        );
+      }
+      );
+      c.Add(
+        "erode_rocksoil",
+        "Rock and soil",
+        "erosion",
+        "Two layers: rock weathers into soil, the soil slides off steep ground, the rock holds steeper faces. Outputs "
+        "the soil "
+        "thickness and a rock exposure mask. Link a soil thickness into b to start from your own.",
+        {Pin("a"), Pin("b", PinType::Mask)},
+        {Pin("out"), Pin("soil"), Pin("rock", PinType::Mask), Pin("moved", PinType::Mask)},
+        {N("iterations", "Iterations", 1, 400, 1, "%.0f", 60),
+         N("soil", "Start soil thickness (units)", 0, 20, 0.1f, "%.1f", 0.4f),
+         N("weather", "Weathering per step", 0, 0.2f, 0.002f, "%.3f", 0.01f),
+         N("depth0", "Weathering slows at soil depth (units)", 0.1f, 10, 0.1f, "%.1f", 1),
+         N("soil_talus", "Soil talus (rise / run)", 0.05f, 1.5f, 0.05f, "%.2f", 0.7f),
+         N("rock_talus", "Rock talus (0 = rock holds)", 0, 4, 0.05f, "%.2f", 3),
+         N("rock_vis", "Rock shows below soil depth (units)", 0.05f, 5, 0.05f, "%.2f", 0.4f),
+         N("rate", "Rate", 0.05f, 1, 0.05f, "%.2f", 0.5f)},
+        [iters, multi](const Env& E, const Values& v, const Inputs& ins) {
+        return multi(
+          E,
+          "erode_rocksoil",
+          {{"a", In(ins, "a")},
+           {"b", In(ins, "b")},
+           {"iterations", iters(E, v.N("iterations"))},
+           {"soil", v.N("soil")},
+           {"weather", v.N("weather")},
+           {"depth0", v.N("depth0")},
+           {"soil_talus", v.N("soil_talus")},
+           {"rock_talus", v.N("rock_talus")},
+           {"rock_vis", v.N("rock_vis")},
+           {"rate", v.N("rate")}},
+          {"soil", "rock", "moved"}
+        );
+      }
+      );
+      c.Add(
+        "erode_snow",
+        "Snow and slumping",
+        "erosion",
+        "Snow lies above the snow line (not on cliffs, optionally only where a mask allows) and slumps downhill. "
+        "Outputs ground + "
+        "snow, the snow depth and a cover mask for the texture.",
+        {Pin("a"), Pin("mask", PinType::Mask)},
+        {Pin("out"), Pin("snow"), Pin("cover", PinType::Mask), Pin("moved", PinType::Mask)},
+        {N("snowline", "Snow line (height)", -100, 600, 0.5f, "%.1f", 40, true),
+         N("band", "Soft band (units)", 0.5f, 120, 0.5f, "%.1f", 10),
+         N("amount", "Depth (units)", 0, 30, 0.1f, "%.1f", 3),
+         N("steep_lo", "Sheds from slope (rise / run)", 0.1f, 4, 0.05f, "%.2f", 0.8f),
+         N("steep_hi", "... all gone at", 0.2f, 5, 0.05f, "%.2f", 1.4f),
+         N("snow_talus", "Slump talus (rise / run)", 0.05f, 2, 0.05f, "%.2f", 0.9f),
+         N("iterations", "Slump iterations", 0, 300, 1, "%.0f", 40),
+         N("rate", "Rate", 0.05f, 1, 0.05f, "%.2f", 0.5f),
+         N("cover_depth", "Depth that reads covered (units)", 0.05f, 5, 0.05f, "%.2f", 0.5f)},
+        [iters, multi](const Env& E, const Values& v, const Inputs& ins) {
+        return multi(
+          E,
+          "erode_snow",
+          {{"a", In(ins, "a")},
+           {"mask", In(ins, "mask")},
+           {"snowline", v.N("snowline")},
+           {"band", v.N("band")},
+           {"amount", v.N("amount")},
+           {"steep_lo", v.N("steep_lo")},
+           {"steep_hi", v.N("steep_hi")},
+           {"snow_talus", v.N("snow_talus")},
+           {"iterations", iters(E, v.N("iterations"))},
+           {"rate", v.N("rate")},
+           {"cover_depth", v.N("cover_depth")}},
+          {"snow", "cover", "moved"}
+        );
+      }
+      );
+      c.Add(
+        "erode_wind",
+        "Wind erosion",
+        "erosion",
+        "Wind abrades exposed windward rock into sand, carries it (slowed uphill, free in the lee) and the sand slides "
+        "at its "
+        "angle of repose. Outputs the sand depth and an abrasion mask.",
+        {Pin("a"), Pin("b", PinType::Mask)},
+        {Pin("out"), Pin("sand"), Pin("abrasion", PinType::Mask)},
+        {N("azimuth", "Wind blows towards (degrees, 0 = +x, 90 = +z)", 0, 360, 5, "%.0f", 20),
+         N("iterations", "Iterations", 1, 400, 1, "%.0f", 40),
+         N("sand", "Start sand depth (units)", 0, 10, 0.05f, "%.2f", 0.5f),
+         N("abrade", "Abrasion per step (units)", 0, 0.3f, 0.002f, "%.3f", 0.02f),
+         N("speed", "Carry speed (cells per step)", 0.05f, 0.7f, 0.05f, "%.2f", 0.5f),
+         N("drag", "Slowing on windward slopes", 0, 6, 0.1f, "%.1f", 1.5f),
+         N("repose", "Sand angle of repose (rise / run)", 0.2f, 1.2f, 0.02f, "%.2f", 0.62f)},
+        [iters, multi](const Env& E, const Values& v, const Inputs& ins) {
+        return multi(
+          E,
+          "erode_wind",
+          {{"a", In(ins, "a")},
+           {"b", In(ins, "b")},
+           {"azimuth", v.N("azimuth")},
+           {"iterations", iters(E, v.N("iterations"))},
+           {"sand", v.N("sand")},
+           {"abrade", v.N("abrade")},
+           {"speed", v.N("speed")},
+           {"drag", v.N("drag")},
+           {"repose", v.N("repose")}},
+          {"sand", "abrasion"}
+        );
+      }
+      );
+      c.Add(
+        "erode_glacier",
+        "Glacier",
+        "erosion",
+        "Ice builds above the equilibrium line, flows downhill and grinds the bed where it is thick and fast: valleys "
+        "turn U "
+        "shaped. Outputs the ice thickness, a cover mask and the depth carved.",
+        {Pin("a"), Pin("b", PinType::Mask)},
+        {Pin("out"), Pin("ice"), Pin("cover", PinType::Mask), Pin("carve")},
+        {N("ela", "Equilibrium line (height)", -100, 600, 0.5f, "%.1f", 40, true),
+         N("iterations", "Iterations", 10, 2000, 10, "%.0f", 300),
+         N("grad", "Mass balance gradient", 0.001f, 0.2f, 0.001f, "%.3f", 0.02f),
+         N("acc_max", "Most accumulation per step", 0, 5, 0.05f, "%.2f", 0.5f),
+         N("abl_max", "Most melt per step", 0, 5, 0.05f, "%.2f", 1),
+         N("flow", "Flow coefficient", 0.001f, 0.5f, 0.001f, "%.3f", 0.02f),
+         N("max_ice", "Thickest ice (units)", 5, 500, 5, "%.0f", 120),
+         N("erode", "Erosion strength", 0, 0.01f, 0.0001f, "%.4f", 0.0005f),
+         N("erode_pow", "Erosion exponent", 0.5f, 3, 0.05f, "%.2f", 1.5f),
+         N("max_cut", "Deepest cut (units)", 0, 100, 0.5f, "%.1f", 25)},
+        [iters, multi](const Env& E, const Values& v, const Inputs& ins) {
+        return multi(
+          E,
+          "erode_glacier",
+          {{"a", In(ins, "a")},
+           {"b", In(ins, "b")},
+           {"ela", v.N("ela")},
+           {"iterations", iters(E, v.N("iterations"))},
+           {"grad", v.N("grad")},
+           {"acc_max", v.N("acc_max")},
+           {"abl_max", v.N("abl_max")},
+           {"flow", v.N("flow")},
+           {"max_ice", v.N("max_ice")},
+           {"erode", v.N("erode")},
+           {"erode_pow", v.N("erode_pow")},
+           {"max_cut", v.N("max_cut")}},
+          {"ice", "cover", "carve"}
+        );
+      }
+      );
+      c.Add(
+        "settle",
+        "Sediment settling",
+        "erosion",
+        "Hollows fill with sediment where the ground is flat enough: valley floors and basins level out. Outputs a "
+        "deposit mask (alluvium).",
+        {Pin("a"), Pin("mask", PinType::Mask)},
+        {Pin("out"), Pin("deposit", PinType::Mask)},
+        {N("iterations", "Iterations", 1, 300, 1, "%.0f", 20),
+         N("rate", "Rate", 0.05f, 1, 0.05f, "%.2f", 0.4f),
+         N("cap", "Most per step (units)", 0.02f, 5, 0.02f, "%.2f", 0.5f),
+         N("slope_lo", "Fills below slope (rise / run)", 0, 2, 0.02f, "%.2f", 0.2f),
+         N("slope_hi", "... nothing above", 0.02f, 3, 0.02f, "%.2f", 0.6f),
+         N("deposit_scale", "Fill that reads 1 (units)", 0.05f, 20, 0.05f, "%.2f", 1)},
+        [iters, multi](const Env& E, const Values& v, const Inputs& ins) {
+        return multi(
+          E,
+          "settle",
+          {{"a", In(ins, "a")},
+           {"mask", In(ins, "mask")},
+           {"iterations", iters(E, v.N("iterations"))},
+           {"rate", v.N("rate")},
+           {"cap", v.N("cap")},
+           {"slope_lo", v.N("slope_lo")},
+           {"slope_hi", v.N("slope_hi")},
+           {"deposit_scale", v.N("deposit_scale")}},
+          {"deposit"}
+        );
+      }
+      );
+
+      // -- analysis masks
+      const auto analysis =
+        [&](const char* id, const char* label, const char* help, std::vector<ParamDef> params, MakeArgs make) {
+        const std::string op = id;
+        c.Add(
+          id,
+          label,
+          "analysis",
+          help,
+          {Pin("a")},
+          kMaskOut,
+          std::move(params),
+          [op, make](const Env& E, const Values& v, const Inputs& ins) {
+          std::vector<Arg> args = make(v, E);
+          args.emplace_back("a", In(ins, "a"));
+          return One(E.Op(op, args));
+        }
+        );
+      };
+      analysis(
+        "occlusion",
+        "Cavity / occlusion",
+        "Ambient occlusion of the surface: how closed the ground is (pits, gullies, crevices), how exposed (ridges), "
+        "or both around 0.5.",
+        {C("mode",
+           "Mask",
+           {"cavity", "convex", "both"},
+           {"Cavity (concave)", "Exposure (convex)", "Both (0.5 = flat)"},
+           "cavity"),
+         N("radius", "Radius (units)", 2, 300, 1, "%.0f", 40, true),
+         N("directions", "Directions", 4, 32, 1, "%.0f", 12),
+         N("gain", "Gain", 0.1f, 10, 0.1f, "%.1f", 2, true)},
+        [](const Values& v, const Env&) {
+        return std::vector<Arg>{
+          {"mode", v.S("mode")}, {"radius", v.N("radius")}, {"directions", v.N("directions")}, {"gain", v.N("gain")}
+        };
+      }
+      );
+      analysis(
+        "hillshade",
+        "Hillshade / lit sides",
+        "Sun light on the terrain: the shaded relief, only the sun facing and unshadowed ground (lit), or the cast "
+        "shadow.",
+        {C("mode",
+           "Mask",
+           {"shade", "lit", "shadow"},
+           {"Shaded relief", "Lit (facing the sun, not shadowed)", "Cast shadow"},
+           "shade"),
+         N("azimuth", "Towards the sun (degrees, 0 = +x, 90 = +z)", 0, 360, 5, "%.0f", 315),
+         N("altitude", "Sun height (degrees)", 1, 89, 1, "%.0f", 40),
+         N("z", "Vertical exaggeration", 0.1f, 10, 0.1f, "%.1f", 1),
+         B("shadows", "Cast shadows in the shade", false),
+         N("shadow_len", "Shadow length (units)", 5, 800, 5, "%.0f", 200),
+         N("ambient", "Ambient light", 0, 1, 0.02f, "%.2f", 0.15f)},
+        [](const Values& v, const Env&) {
+        return std::vector<Arg>{
+          {"mode", v.S("mode")},
+          {"azimuth", v.N("azimuth")},
+          {"altitude", v.N("altitude")},
+          {"z", v.N("z")},
+          {"shadows", v.B("shadows") ? 1 : 0},
+          {"shadow_len", v.N("shadow_len")},
+          {"ambient", v.N("ambient")}
+        };
+      }
+      );
+      analysis(
+        "wetness",
+        "Wetness (topographic)",
+        "Where water gathers: the topographic wetness index from a multiple flow direction catchment and the slope.",
+        {C("mode", "Result", {"wet", "twi", "area"}, {"Wetness 0..1", "Raw index", "Catchment (log)"}, "wet"),
+         N("p", "Flow spreading exponent", 0.5f, 6, 0.1f, "%.1f", 1.1f),
+         N("lo", "Index that reads 0", -5, 20, 0.5f, "%.1f", 3),
+         N("hi", "Index that reads 1", -5, 25, 0.5f, "%.1f", 11),
+         N("smooth", "Smooth (units)", 0, 40, 0.5f, "%.1f", 2)},
+        [](const Values& v, const Env&) {
+        return std::vector<Arg>{
+          {"mode", v.S("mode")}, {"p", v.N("p")}, {"lo", v.N("lo")}, {"hi", v.N("hi")}, {"smooth", v.N("smooth")}
+        };
+      }
+      );
+      c.Add(
+        "rockiness",
+        "Rockiness",
+        "analysis",
+        "Where bare rock shows: steep ground, convex ridges and (when a soil thickness is linked into b) thin soil, "
+        "with some noise breakup.",
+        {Pin("a"), Pin("b")},
+        kMaskOut,
+        {Seed(),
+         N("slope_lo", "Rock from slope (degrees)", 0, 90, 1, "%.0f", 25),
+         N("slope_hi", "... all rock at", 1, 90, 1, "%.0f", 50),
+         N("radius", "Convexity radius (units)", 1, 60, 1, "%.0f", 6),
+         N("gain", "Convexity gain", 1, 100, 1, "%.0f", 14),
+         N("w_slope", "Weight: slope", 0, 2, 0.05f, "%.2f", 1),
+         N("w_convex", "Weight: convexity", 0, 2, 0.05f, "%.2f", 0.5f),
+         N("w_soil", "Weight: thin soil", 0, 2, 0.05f, "%.2f", 1),
+         N("soil_full", "Soil that hides the rock (units)", 0.05f, 10, 0.05f, "%.2f", 1.5f),
+         N("breakup", "Noise breakup", 0, 0.6f, 0.01f, "%.2f", 0.15f)},
+        [](const Env& E, const Values& v, const Inputs& ins) {
+        return One(E.Op(
+          "rockiness",
+          {{"a", In(ins, "a")},
+           {"b", In(ins, "b")},
+           {"seed", E.Seed(v.N("seed"))},
+           {"slope_lo", v.N("slope_lo")},
+           {"slope_hi", v.N("slope_hi")},
+           {"radius", v.N("radius")},
+           {"gain", v.N("gain")},
+           {"w_slope", v.N("w_slope")},
+           {"w_convex", v.N("w_convex")},
+           {"w_soil", v.N("w_soil")},
+           {"soil_full", v.N("soil_full")},
+           {"breakup", v.N("breakup")}}
+        ));
+      }
+      );
+
+      // -- numbers
+      c.Add(
+        "map_share",
+        "Map share (units)",
+        "numbers",
+        "A length as a share of the map width, in units: link it into noise sizes, radii and widths so that a graph "
+        "looks the "
+        "same on a 256, 512 or 1024 map.",
+        {},
+        kNumberOut,
+        {N("share", "Share of the map width", 0.002f, 2, 0.001f, "%.3f", 0.1f)},
+        [](const Env& E, const Values& v, const Inputs&) {
+        return OneNumber(v.N("share") * E.W);
+      }
+      );
+
+      // -- colour: a gradient map into four masks (r, g, b, a) and their bundle
+      c.Add(
+        "color_ramp",
+        "Colour ramp",
+        "color",
+        "A gradient map: turns a mask (or heights over lo .. hi) into colours. rgba feeds Output: colour image; red, "
+        "green, blue "
+        "and alpha are the channels as masks.",
+        {Pin("a")},
+        {Pin("rgba", PinType::Color),
+         Pin("red", PinType::Mask),
+         Pin("green", PinType::Mask),
+         Pin("blue", PinType::Mask),
+         Pin("alpha", PinType::Mask)},
+        {C("ramp",
+           "Ramp",
+           {"terrain", "heat", "ocean", "snow", "viridis", "grey", "lush", "custom"},
+           {"Terrain", "Heat", "Ocean depth", "Snow and rock", "Viridis", "Grey", "Lush ground", "Custom stops"},
+           "terrain"),
+         T("stops", "Custom stops (pos:#rrggbb;...)", "0:#103060;0.5:#80a060;1:#ffffff"),
+         B("reverse", "Reverse", false),
+         N("lo", "Input that reads 0", -300, 900, 0.5f, "%.1f", 0, true),
+         N("hi", "Input that reads 1", -300, 900, 0.5f, "%.1f", 1, true),
+         C("interp", "Between stops", {"linear", "smooth", "step"}, {"Linear", "Smooth", "Steps"}, "linear"),
+         N("alpha", "Alpha", 0, 1, 0.05f, "%.2f", 1)},
+        [](const Env& E, const Values& v, const Inputs& ins) {
+        const std::vector<double> stops = RampStops(v.S("ramp"), v.S("stops"), v.B("reverse"), v.N("alpha"));
+        std::map<std::string, field::Grid> extra;
+        const field::GridPtr r = E.Op(
+          "color_ramp",
+          {{"a", In(ins, "a")}, {"stops", stops}, {"lo", v.N("lo")}, {"hi", v.N("hi")}, {"interp", v.S("interp")}},
+          &extra
+        );
+        const auto take = [&](const char* name) -> field::GridPtr {
+          const auto found = extra.find(name);
+          return found != extra.end() ? std::make_shared<field::Grid>(std::move(found->second)) : r;
+        };
+        auto colour = std::make_shared<std::array<field::GridPtr, 4>>(
+          std::array<field::GridPtr, 4>{r, take("g"), take("b"), take("a")}
+        );
+        Outputs out;
+        out["rgba"].color = colour;
+        out["red"].grid = (*colour)[0];
+        out["green"].grid = (*colour)[1];
+        out["blue"].grid = (*colour)[2];
+        out["alpha"].grid = (*colour)[3];
+        return out;
+      }
+      );
+    }
+
     // ---- outputs (their inputs are what a build writes; FinalHeight folds the height outputs in)
     c.Add(
       "out_height",
@@ -1527,6 +2712,21 @@ namespace faf::editor::terrain
       return Outputs{};
     },
       "height"
+    );
+
+    c.Add(
+      "out_colormap",
+      "Output: colour image",
+      "outputs",
+      "Writes the colours into a DXT5 DDS file (a texture for a decal or an album cover) on Build.",
+      {Pin("rgba", PinType::Color)},
+      {},
+      {T("path", "File (folder under the editor, .dds)", "graphs/colormap.dds"),
+       N("size", "Size (pixels, square)", 32, 2048, 32, "%.0f", 512)},
+      [](const Env&, const Values&, const Inputs&) {
+      return Outputs{};
+    },
+      "colormap"
     );
 
     // ---- organise

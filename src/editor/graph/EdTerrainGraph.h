@@ -3,6 +3,7 @@
 #include "editor/graph/EdNodeGraph.h"
 #include "editor/terrain/EdFieldCore.h"
 
+#include <array>
 #include <cstdint>
 #include <map>
 #include <memory>
@@ -49,6 +50,8 @@ namespace faf::editor
     double number = 0.0;
     bool isNumber = false;
     std::shared_ptr<const TerrainPath> path;
+    /** A colour: four 0..1 fields, red, green, blue and alpha (the colour ramp's rgba). */
+    std::shared_ptr<const std::array<field::GridPtr, 4>> color;
   };
 
   /** The map a run works on: its heights (map units, (width) x (height) samples a unit apart) and what nodes read. */
