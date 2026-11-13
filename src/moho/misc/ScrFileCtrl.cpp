@@ -1,6 +1,7 @@
 #include "moho/misc/ScrFileCtrl.h"
 
-#include <fstream>
+#include <algorithm>
+#include <string>
 
 #include "imgui.h"
 
@@ -95,17 +96,31 @@ bool moho::ScrFileCtrl::Load(
     return false;
   }
 
-  std::fstream file(diskPath.c_str(), std::ios::in);
-  if (!file.is_open()) {
+  // Engine change: the binary opened the disk path with std::fstream, which reads neither a script inside a
+  // mounted archive (every FAF script, in lua.nx2) nor, on POSIX, the backslashed disk path the file system
+  // gives; a pause in such a file was resumed at once (OnScriptPause). The file is read the way the Lua loader
+  // reads it (DISK_MemoryMapFile). The lines are split as getline split them: no carriage return, and a last
+  // line without a newline dropped. A line of 1024 characters or more is cut there; the binary's getline loop
+  // never ended on one.
+  const gpg::MemBuffer<const char> file = DISK_MemoryMapFile(diskPath.c_str());
+  if (file.mBegin == nullptr) {
     return false;
   }
 
-  char buffer[1024];
+  constexpr std::size_t kMaxLineLength = 1023;
   int lineNumber = 1;
-  file.getline(buffer, sizeof(buffer));
-  while (!file.bad() && !file.eof()) {
-    mLines.push_back(ScrFileLine(lineNumber++, buffer));
-    file.getline(buffer, sizeof(buffer));
+  const char* lineStart = file.mBegin;
+  for (const char* cursor = file.mBegin; cursor != file.mEnd; ++cursor) {
+    if (*cursor != '\n') {
+      continue;
+    }
+    std::size_t length = static_cast<std::size_t>(cursor - lineStart);
+    if (length > 0 && lineStart[length - 1] == '\r') {
+      --length;
+    }
+    const std::string line(lineStart, std::min(length, kMaxLineLength));
+    mLines.push_back(ScrFileLine(lineNumber++, line.c_str()));
+    lineStart = cursor + 1;
   }
 
   mSourcePath = fileName;
