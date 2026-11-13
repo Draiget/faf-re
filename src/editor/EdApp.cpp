@@ -131,7 +131,7 @@ namespace faf::editor
         "/roundtrip",   "/vault",        "/vaultsearch",    "/vaultmap",       "/newmap",         "/stamp",
         "/brush",       "/layer",        "/waterbody",      "/ruler",          "/adaptivewindow", "/maskrule",
         "/shader",      "/brushtest",    "/brushshape",     "/stampsource",    "/stampstroke",    "/symoptions",
-        "/maskoptions", "/masktest",
+        "/maskoptions", "/masktest",     "/shaderbrowser",
       };
       for (const char* const option : kOptions) {
         if (moho::CFG_GetArgOption(option, 0, nullptr)) {
@@ -2025,6 +2025,7 @@ namespace faf::editor
       bool mStampSourceDone = false;
       bool mSymOptionsDone = false;
       bool mMaskOptionsDone = false;
+      bool mShaderBrowserDone = false;
       std::string mMaskTestArg;
       int mMaskTestFrames = 0;
       // `/masklayer <1-8>` and `/maskrule <layer>,<low>,<high>` (test runs): the Texture tool on that layer;
@@ -4818,6 +4819,13 @@ namespace faf::editor
         (void)std::sscanf(mMaskTestArg.c_str(), "%d,%f,%f,%f", &layer, &x, &z, &seconds);
         mScene.TestMaskStroke(layer - 1, x, z, seconds);
         mMaskTestArg.clear();
+      }
+      // `/shaderbrowser <name>` (test runs): the shader browser open on that shader.
+      if (!mShaderBrowserDone && mScene.Attached()) {
+        mShaderBrowserDone = true;
+        if (fa::vector<fa::string> shader; moho::CFG_GetArgOption("/shaderbrowser", 1, &shader) && !shader.empty()) {
+          tools.OpenShaderBrowser(shader[0].c_str());
+        }
       }
       // `/maskoptions <target>,<scatter>,<min slope degrees>,<build up>` (test runs): the mask brush's options.
       if (!mMaskOptionsDone) {

@@ -443,6 +443,103 @@ namespace faf::editor
     return true;
   }
 
+  void EdTools::DrawShaderBrowser()
+  {
+    if (!mShaderBrowserOpen) {
+      return;
+    }
+    ImGui::SetNextWindowSize(ImVec2(Em(980.0f), Em(640.0f)), ImGuiCond_FirstUseEver);
+    if (!ImGui::Begin("Terrain shaders###ShaderBrowser", &mShaderBrowserOpen)) {
+      ImGui::End();
+      return;
+    }
+    if (mBrowsedShader.empty()) {
+      mBrowsedShader = mShader;
+    }
+    // The shaders the game data has, by family.
+    ImGui::BeginChild("##families", ImVec2(Em(260.0f), 0.0f), ImGuiChildFlags_Borders);
+    for (const ShaderFamily family : {
+           ShaderFamily::Original, ShaderFamily::Extended, ShaderFamily::Pbr, ShaderFamily::Splat, ShaderFamily::Older
+         }) {
+      bool header = false;
+      for (const std::string& shader : mShaders) {
+        if (ShaderProfileOf(shader).family != family) {
+          continue;
+        }
+        if (!header) {
+          SectionHeader(ShaderFamilyName(family));
+          header = true;
+        }
+        const std::string label = shader + (shader == mShader ? "  (the map's)" : "");
+        if (ImGui::Selectable(label.c_str(), shader == mBrowsedShader)) {
+          mBrowsedShader = shader;
+        }
+      }
+    }
+    ImGui::EndChild();
+    ImGui::SameLine();
+
+    // The chosen shader's profile.
+    const ShaderProfile profile = ShaderProfileOf(mBrowsedShader);
+    ImGui::BeginChild("##profile", ImVec2(0.0f, 0.0f));
+    ImGui::TextUnformatted(profile.name.c_str());
+    ImGui::TextWrapped("%s", profile.summary.c_str());
+    ImGui::TextDisabled(
+      "%s. Masks: %s. Paints %d layers.",
+      ShaderFamilyName(profile.family),
+      MaskRangeText(profile.remapped).c_str(),
+      profile.painted
+    );
+    if (profile.remapped != RemappedStrata(mShader) && profile.name != mShader) {
+      ImGui::TextColored(
+        ImVec4(0.95f, 0.75f, 0.35f, 1.0f),
+        "It reads the masks differently from %s: the paint so far would look different until the layers are converted.",
+        mShader.c_str()
+      );
+    }
+    ImGui::Separator();
+    ImGui::TextWrapped("%s", profile.instructions.c_str());
+    if (!profile.layout.empty()) {
+      ImGui::Spacing();
+      ImGui::TextWrapped("%s", profile.layout.c_str());
+    }
+    if (
+      !profile.rows.empty() &&
+      ImGui::BeginTable(
+        "##layers", 3, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp
+      )
+    ) {
+      ImGui::TableSetupColumn("Layer", ImGuiTableColumnFlags_WidthFixed, Em(90.0f));
+      ImGui::TableSetupColumn("Albedo (colour)");
+      ImGui::TableSetupColumn("Normal map");
+      ImGui::TableHeadersRow();
+      for (const ShaderLayerRow& row : profile.rows) {
+        ImGui::TableNextRow();
+        ImGui::TableNextColumn();
+        ImGui::TextUnformatted(row.layer.c_str());
+        ImGui::TableNextColumn();
+        ImGui::TextWrapped("%s", row.albedo.c_str());
+        ImGui::TableNextColumn();
+        ImGui::TextWrapped("%s", row.normal.c_str());
+      }
+      ImGui::EndTable();
+    }
+    for (const std::string& note : profile.notes) {
+      ImGui::Bullet();
+      ImGui::TextWrapped("%s", note.c_str());
+    }
+    ImGui::Spacing();
+    ImGui::BeginDisabled(profile.name == mShader || profile.name.empty());
+    if (ImGui::Button("Use this shader")) {
+      mShaderChange = profile.name;
+    }
+    ImGui::EndDisabled();
+    ImGui::SameLine();
+    ImGui::TextDisabled("One undo step. The paint keeps its bytes.");
+    ImGui::EndChild();
+    ImGui::End();
+  }
+
   void EdTools::DrawShapePicker()
   {
     const float half = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) * 0.5f;
@@ -1052,7 +1149,7 @@ namespace faf::editor
     }
     Note("Click a thumbnail to choose its texture.");
     if (!mShaders.empty()) {
-      ImGui::SetNextItemWidth(-1.0f);
+      ImGui::SetNextItemWidth(-Em(80.0f));
       if (ImGui::BeginCombo("##shader", ("Shader " + mShader).c_str())) {
         for (const std::string& shader : mShaders) {
           if (ImGui::Selectable(shader.c_str(), shader == mShader) && shader != mShader) {
@@ -1061,6 +1158,12 @@ namespace faf::editor
         }
         ImGui::EndCombo();
       }
+      ImGui::SameLine();
+      if (ImGui::Button("Browse...", ImVec2(-1.0f, 0.0f))) {
+        mShaderBrowserOpen = true;
+        mBrowsedShader = mShader;
+      }
+      DrawShaderBrowser();
     }
 
     SectionHeader("LAYER FILES");

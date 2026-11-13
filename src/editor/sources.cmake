@@ -79,6 +79,7 @@ set(FAF_EDITOR_SOURCES
   tools/EdHeightFile.cpp
   tools/EdBrushLibrary.cpp
   tools/EdMaskBrush.cpp
+  tools/EdShaderProfiles.cpp
   tools/EdSymmetrize.cpp
   terrain/EdErosion.cpp
   terrain/EdFieldCore.cpp

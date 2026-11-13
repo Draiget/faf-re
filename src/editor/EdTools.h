@@ -5,6 +5,7 @@
 #include "editor/tools/EdHeightBrush.h"
 #include "editor/tools/EdBrushLibrary.h"
 #include "editor/tools/EdSymmetrize.h"
+#include "editor/tools/EdShaderProfiles.h"
 #include "editor/tools/EdSymmetryCheck.h"
 #include "editor/tools/EdMaskBrush.h"
 #include "editor/doc/EdPropPaint.h"
@@ -1422,6 +1423,15 @@ namespace faf::editor
       mShaders = std::move(shaders);
       mShader = std::move(current);
     }
+    /** Test runs (`/shaderbrowser <name>`): the shader browser open on that shader. */
+    void OpenShaderBrowser(
+      std::string shader
+    )
+    {
+      mShaderBrowserOpen = true;
+      mBrowsedShader = std::move(shader);
+    }
+    void DrawShaderBrowser();
     [[nodiscard]] bool TakeShaderChange(
       std::string& shader
     )
@@ -1914,6 +1924,8 @@ namespace faf::editor
     int mMaskLayer = 0;
     int mMaskMode = 0;
     bool mLowerAbove = true;
+    bool mShaderBrowserOpen = false;
+    std::string mBrowsedShader;
     float mMaskTarget = 1.0f;
     float mMaskScatter = 0.0f;
     float mMaskMinSlopeDegrees = 0.0f;
