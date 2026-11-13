@@ -418,6 +418,8 @@ set(FAF_ENGINE_SOURCES
   moho/sim/UserStartupRegistrations.cpp
   moho/sim/Sim.cpp
   moho/sim/SimTick.cpp
+  moho/sim/SimWaterEvents.cpp
+  moho/sim/SimWaterEvents.cpp
   moho/sim/SimLuaGetters.cpp
   moho/sim/SimLuaFunctions.cpp
   moho/sim/SimLuaSetters.cpp
