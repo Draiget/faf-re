@@ -65,6 +65,10 @@ namespace gpg
     /**
      * What it does:
      * `boost::shared_ptr<` + the pointee type's name + `>`, formatted once.
+     *
+     * The engine holds `std::shared_ptr` since Boost was removed; this name keeps Boost's spelling on purpose. It
+     * is the type name saved games carry, so saves written by the retail game and by earlier builds still load,
+     * and new saves still load in them. Writing a neutral name while still reading this one is a separate change.
      */
     [[nodiscard]] const char* GetName() const override
     {

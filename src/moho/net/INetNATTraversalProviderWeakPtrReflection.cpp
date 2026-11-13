@@ -212,6 +212,8 @@ gpg::RWeakPointerType<moho::INetNATTraversalProvider>::~RWeakPointerType() = def
  */
 const char* gpg::RWeakPointerType<moho::INetNATTraversalProvider>::GetName() const
 {
+  // The engine holds std::weak_ptr since Boost was removed; this name keeps Boost's spelling on purpose, as the type
+  // name saved games carry (see RSharedPointerType::GetName).
   static const fa::string sName = gpg::STR_Printf("boost::weak_ptr<%s>", CachedProviderType()->GetName());
   return sName.c_str();
 }
