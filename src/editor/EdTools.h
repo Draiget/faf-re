@@ -1477,6 +1477,11 @@ namespace faf::editor
       brush.setTo = mSetHeight * 128.0f;
       brush.terraceStep = mTerraceStep * 128.0f;
       brush.erodeTalus = mErodeTalus;
+      brush.shape = static_cast<BrushShape>(mBrushShape);
+      brush.shapeAngle = mShapeAngle;
+      brush.noiseScale = mNoiseScale;
+      brush.noiseOctaves = mNoiseOctaves;
+      brush.noiseRoughness = mNoiseRoughness;
       brush.planeSet = mPlaneSet;
       brush.planeX = mPlaneX;
       brush.planeZ = mPlaneZ;
@@ -1556,6 +1561,15 @@ namespace faf::editor
     {
       mTool = 1;
       mBrushMode = mode;
+    }
+    /** Test runs (`/brushshape`): the height brush's shape (a BrushShape) and turn in degrees. */
+    void SetBrushShape(
+      const int shape,
+      const float angle
+    ) noexcept
+    {
+      mBrushShape = shape < 0 || shape >= kBrushShapeCount ? 0 : shape;
+      mShapeAngle = angle;
     }
     /** Test runs (`/erodetalus`): the Erode brush's talus slope. */
     void SetErodeTalus(
@@ -1701,6 +1715,11 @@ namespace faf::editor
     float mSetHeight = 20.0f;
     float mTerraceStep = 5.0f;
     float mErodeTalus = 0.6f;
+    int mBrushShape = 0; // BrushShape
+    float mShapeAngle = 0.0f;
+    float mNoiseScale = 8.0f;
+    int mNoiseOctaves = 2;
+    float mNoiseRoughness = 0.5f;
     float mPlanePointX[3]{};
     float mPlanePointH[3]{};
     float mPlanePointZ[3]{};

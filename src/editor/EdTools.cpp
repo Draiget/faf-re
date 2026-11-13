@@ -395,10 +395,10 @@ namespace faf::editor
         {"Flatten", "Set height", "Noise"},
         {"Terrace", "Plane", "Stamp"},
         {"Erode", "Water erode", "Rain"},
-        {"Deposit", nullptr, nullptr}
+        {"Deposit", "Plateau", "Sharpen"}
       };
-      static constexpr int kModeOf[5][3] = {{0, 1, 2}, {3, 5, 4}, {6, 7, 8}, {9, 10, 11}, {12, -1, -1}};
-      static constexpr int kRowSize[5] = {3, 3, 3, 3, 1};
+      static constexpr int kModeOf[5][3] = {{0, 1, 2}, {3, 5, 4}, {6, 7, 8}, {9, 10, 11}, {12, 13, 14}};
+      static constexpr int kRowSize[5] = {3, 3, 3, 3, 3};
       for (int row = 0; row < 5; ++row) {
         int chosen = -1;
         for (int i = 0; i < kRowSize[row]; ++i) {
@@ -478,8 +478,50 @@ namespace faf::editor
           "like washed-in ground. Ground is made."
         );
         break;
+      case HeightBrushMode::Smooth:
+        Note("Evens the ground out; a stronger brush blurs wider. Right-drag sharpens.");
+        break;
+      case HeightBrushMode::Sharpen:
+        Note("Pushes the ground away from its blurred self: edges, ridges and gullies stand out.");
+        break;
+      case HeightBrushMode::Plateau:
+        Note(
+          "Brings the ground to the height under the stroke's first point in one go where the brush is full; the "
+          "falloff shapes the shoulder. Builds flat tops with soft edges."
+        );
+        break;
+      case HeightBrushMode::Noise:
+        ImGui::SetNextItemWidth(-1.0f);
+        ImGui::SliderFloat("##noisescale", &mNoiseScale, 1.0f, 64.0f, "Bump size %.0f");
+        ImGui::SetNextItemWidth(-1.0f);
+        ImGui::SliderInt("##noiseoctaves", &mNoiseOctaves, 1, 4, "Detail layers %d");
+        ImGui::SetNextItemWidth(-1.0f);
+        ImGui::SliderFloat("##noiserough", &mNoiseRoughness, 0.0f, 1.0f, "Roughness %.2f");
+        Note(
+          "Smooth bumps, a new pattern each stroke; detail layers add smaller bumps, roughness how strong they are."
+        );
+        break;
       default:
         break;
+      }
+      // The brush's shape: every mode that paints sample by sample (the droplet brushes keep a round brush).
+      const auto mode = static_cast<HeightBrushMode>(mBrushMode);
+      if (mode != HeightBrushMode::WaterErode && !IsErosionMode(mode)) {
+        const float half = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) * 0.5f;
+        ImGui::SetNextItemWidth(half);
+        if (ImGui::BeginCombo("##brushshape", BrushShapeName(static_cast<BrushShape>(mBrushShape)))) {
+          for (int k = 0; k < kBrushShapeCount; ++k) {
+            if (ImGui::Selectable(BrushShapeName(static_cast<BrushShape>(k)), k == mBrushShape)) {
+              mBrushShape = k;
+            }
+          }
+          ImGui::EndCombo();
+        }
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(-1.0f);
+        ImGui::BeginDisabled(mBrushShape == 0);
+        ImGui::SliderFloat("##shapeangle", &mShapeAngle, -180.0f, 180.0f, "Turn %.0f deg");
+        ImGui::EndDisabled();
       }
     }
     ImGui::SetNextItemWidth(-1.0f);

@@ -130,7 +130,7 @@ namespace faf::editor
         "/particlenew", "/particleopen", "/materialeditor", "/uiscale",        "/testrun",        "/openall",
         "/roundtrip",   "/vault",        "/vaultsearch",    "/vaultmap",       "/newmap",         "/stamp",
         "/brush",       "/layer",        "/waterbody",      "/ruler",          "/adaptivewindow", "/maskrule",
-        "/shader",      "/brushtest",
+        "/shader",      "/brushtest",    "/brushshape",
       };
       for (const char* const option : kOptions) {
         if (moho::CFG_GetArgOption(option, 0, nullptr)) {
@@ -4783,7 +4783,7 @@ namespace faf::editor
         float z = 0.0f;
         float seconds = 1.0f;
         (void)std::sscanf(mBrushTestArg.c_str(), "%d,%f,%f,%f", &mode, &x, &z, &seconds);
-        (void)mScene.TestBrush(static_cast<HeightBrushMode>(std::clamp(mode, 0, 12)), x, z, seconds);
+        (void)mScene.TestBrush(static_cast<HeightBrushMode>(std::clamp(mode, 0, 14)), x, z, seconds);
         mBrushTestArg.clear();
       }
       if (!mMaskRuleArg.empty() && mScene.Attached() && ++mMaskRuleFrames == 120) {
@@ -4803,6 +4803,13 @@ namespace faf::editor
       if (mBrushModeArg >= 0) {
         tools.SetBrushMode(mBrushModeArg);
         mBrushModeArg = -1;
+        // `/brushshape <shape>,<degrees>` (test runs, with /brush): the brush's shape (a BrushShape) and turn.
+        if (fa::vector<fa::string> shape; moho::CFG_GetArgOption("/brushshape", 1, &shape) && !shape.empty()) {
+          int kind = 0;
+          float angle = 0.0f;
+          (void)std::sscanf(shape[0].c_str(), "%d,%f", &kind, &angle);
+          tools.SetBrushShape(kind, angle);
+        }
         // `/erodetalus <slope>` (test runs, with /brush 9): the Erode brush's talus slope.
         if (fa::vector<fa::string> talus; moho::CFG_GetArgOption("/erodetalus", 1, &talus) && !talus.empty()) {
           tools.SetErodeTalus(static_cast<float>(std::atof(talus[0].c_str())));

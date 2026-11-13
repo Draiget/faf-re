@@ -44,7 +44,40 @@ namespace faf::editor
      * like washed-in ground (FAF Studio's Deposit brush). Ground is made. Right-dragging Water erode does this.
      */
     Deposit,
+    /**
+     * Towards the stroke's level (the ground under its first point) in one go where the brush is full, the falloff
+     * shaping the shoulder (FAF Studio's Plateau): a flat top with a soft edge.
+     */
+    Plateau,
+    /** Away from the blurred ground, the opposite of Smooth: edges and ridges stand out. Right-dragging Smooth does it.
+     */
+    Sharpen,
   };
+
+  /**
+   * The brush's shape (FAF Studio's brushes.lua): Round follows the falloff; the others are masks over the brush's
+   * square, read at (u, v) in -1..1 and turned by the brush's angle.
+   */
+  enum class BrushShape
+  {
+    Round,
+    Square,
+    Diamond,
+    Cone,
+    Plateau,
+    Ring,
+    Ridge,
+    Mountain,
+    Rocks,
+    Bump,
+  };
+  inline constexpr int kBrushShapeCount = 10;
+
+  /** A shape's name for the panel. */
+  [[nodiscard]] const char* BrushShapeName(BrushShape shape);
+
+  /** A shape's weight (0..1) at (u, v) of its square (-1..1 on both axes); Round: 1 inside the unit circle. */
+  [[nodiscard]] float BrushShapeAt(BrushShape shape, float u, float v);
 
   /**
    * Rain and Deposit: droplets on FAF Studio's erosion session (src/editor/terrain/EdErosion.h). Water erode keeps the
@@ -125,6 +158,17 @@ namespace faf::editor
     float stampHeight = 2560.0f;
     /** Erode: the steepest slope (rise over run, game units) the ground keeps. */
     float erodeTalus = 0.6f;
+    /** The brush's shape and how far it is turned (degrees, towards +z); Round uses `falloff`. */
+    BrushShape shape = BrushShape::Round;
+    float shapeAngle = 0.0f;
+    /**
+     * Noise: smooth value noise with a lattice cell of `noiseScale` samples and `noiseOctaves` (1 to 4) layers, each
+     * half the cell and `noiseRoughness` as strong as the one before; `noiseSeed` picks the pattern (one per stroke).
+     */
+    float noiseScale = 8.0f;
+    int noiseOctaves = 2;
+    float noiseRoughness = 0.5f;
+    std::uint32_t noiseSeed = 0;
     /** Water erode: where this step's droplets start and how it rounds (the caller changes it every step). */
     std::uint32_t seed = 1;
     /** Limits: only samples between these heights (height words), and only where the slope (rise over run) is at most

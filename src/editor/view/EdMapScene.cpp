@@ -1114,11 +1114,13 @@ namespace faf::editor
     HeightBrush brush = mTools->CurrentHeightBrush();
     brush.flattenTo = mFlattenTo;
     brush.seed = ++mWaterErodeSeed; // Water erode: new droplets every step
+    brush.noiseSeed = mNoiseSeed;   // Noise: one pattern for the stroke
     // A right-button stroke does the opposite: Raise lowers, Lower raises, Water erode deposits.
     if (mPaintInverted) {
       brush.mode = brush.mode == HeightBrushMode::Raise ? HeightBrushMode::Lower
         : brush.mode == HeightBrushMode::Lower          ? HeightBrushMode::Raise
         : brush.mode == HeightBrushMode::WaterErode     ? HeightBrushMode::Deposit
+        : brush.mode == HeightBrushMode::Smooth         ? HeightBrushMode::Sharpen
                                                         : brush.mode;
     }
     // The erosion brushes keep the map as floats for the whole stroke (ground moves in fractions of a word).
@@ -1185,6 +1187,9 @@ namespace faf::editor
       }
     }
     mErosionStroke.reset();
+    if (mPainting) {
+      ++mNoiseSeed;
+    }
     mPainting = false;
   }
 
@@ -2263,14 +2268,15 @@ namespace faf::editor
     if (field == nullptr) {
       return false;
     }
-    return TestBrush(HeightBrushMode::Raise, x, z, seconds);
+    return TestBrush(HeightBrushMode::Raise, x, z, seconds, false);
   }
 
   bool EdMapScene::TestBrush(
     const HeightBrushMode mode,
     const float x,
     const float z,
-    const float seconds
+    const float seconds,
+    const bool panelBrush
   )
   {
     moho::CHeightField* const field = mMap != nullptr ? mMap->mTerrainRes->GetHeightField() : nullptr;
@@ -2281,12 +2287,20 @@ namespace faf::editor
     HeightBrush brush = mTools != nullptr ? mTools->CurrentHeightBrush() : HeightBrush{};
     brush.mode = mode;
     brush.strength = 1.0f;
-    const bool raise = mode == HeightBrushMode::Raise;
+    // TestRaise (the play tests): the default brush, as before; /brushtest: the panel's brush.
+    const bool raise = !panelBrush;
     if (raise) {
       brush = HeightBrush{};
       brush.mode = mode;
       brush.strength = 1.0f;
     }
+    // Flatten and Plateau: the ground under the stroke's first point, as a stroke takes it.
+    brush.flattenTo =
+      static_cast<float>(field->data
+                           [static_cast<std::size_t>(std::clamp(static_cast<int>(z), 0, field->height - 1)) *
+                              static_cast<std::size_t>(field->width) +
+                            static_cast<std::size_t>(std::clamp(static_cast<int>(x), 0, field->width - 1))]);
+    brush.noiseSeed = mNoiseSeed++;
     const ErosionStrokePtr stroke = IsErosionMode(mode) ? MakeErosionStroke() : nullptr;
     mDocument.Heights().BeginStroke();
     for (const SampleRect& rect : HeightBrushRects(field->width, field->height, x, z, brush)) {

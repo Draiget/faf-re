@@ -95,7 +95,7 @@ namespace faf::editor
      * makes it (undo kept; Rain and Deposit on one erosion session), with the map's symmetry; logs the samples it
      * changed, the ground added or taken, and the farthest change from x,z. False if nothing changed.
      */
-    bool TestBrush(HeightBrushMode mode, float x, float z, float seconds);
+    bool TestBrush(HeightBrushMode mode, float x, float z, float seconds, bool panelBrush = true);
     /**
      * Test runs: stratum 4 painted full in a square of 24 mask texels around world x,z, as the mask brush uploads it,
      * then the editor's and (in front of a play) the play's mask read back at its middle, logged.
@@ -680,6 +680,8 @@ namespace faf::editor
     bool mOverPlay = false;
     bool mLiveMaskSizeWarned = false;
     std::uint32_t mWaterErodeSeed = 0;
+    /** Noise: the pattern of the stroke in progress (the next stroke takes the next one). */
+    std::uint32_t mNoiseSeed = 0;
     /** Rain and Deposit: the erosion session of the stroke in progress (made at its first step). */
     ErosionStrokePtr mErosionStroke;
     /** The camera left by the last Detach, and the map it was on (kept for that map's next Attach). */
