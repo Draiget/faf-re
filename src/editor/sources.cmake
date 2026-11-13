@@ -43,6 +43,7 @@ set(FAF_EDITOR_SOURCES
   tools/EdMapTextures.cpp
   tools/EdGroundKind.cpp
   tools/EdMaskGen.cpp
+  tools/EdRecipes.cpp
   ui/EdMapBrowser.cpp
   doc/EdWaterBodies.cpp
   view/EdWaterBodyView.cpp
