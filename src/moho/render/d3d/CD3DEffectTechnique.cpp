@@ -28,6 +28,8 @@
 #include "gpg/gal/GpuDriven.h"
 #include "gpg/gal/TextureContext.h"
 #include "moho/console/CConCommand.h"
+#include "moho/render/lights/LightEffectPatch.h"
+#include "moho/render/lights/LightFeeds.h"
 #include "moho/misc/FileWaitHandleSet.h"
 #include "moho/misc/StartupHelpers.h"
 #include "moho/render/d3d/CD3DDevice.h"
@@ -1411,6 +1413,60 @@ technique EditorMeshFill
           }
         }
       }
+      // FAF addition (Dynamic Lights, docs/DYNAMIC_LIGHTS.md): mesh.fx and terrain.fx get the light pass on the
+      // Direct3D 10 dialect backends (Direct3D 11, 12, Vulkan) while the Dynamic Lights option is not Off (or
+      // /dynlights is on the command line). The cache name carries a tag, so the lit and the shipped effect compile to
+      // files of their own. The lit text is built here, from the source as the file has it; a lit effect the backend
+      // compiler rejects is built again without the sun shadow reads of the terrain's PBR shaders, then without the
+      // light pass (see createEffect below).
+      std::string lightVariant;
+      // the terrain's PBR shadow reads sample the light field; dropped when that does not compile (sampler limit).
+      // Direct3D 11 has 16 samplers and never compiles them, so it does not try (the failed compile took 20 s at every
+      // start with lights on, and when they are switched on).
+      bool lightsSunReads = deviceContext == nullptr || deviceContext->mDeviceType != gpg::gal::DeviceApi::Direct3D11;
+      const gpg::MemBuffer<char> unlitBuffer = mergedBuffer;
+      const auto assembleLit = [&]() {
+        lightVariant.clear();
+        mergedBuffer = unlitBuffer;
+        if (
+          deviceContext == nullptr || !gpg::gal::UsesD3D10EffectDialect(deviceContext->mDeviceType) ||
+          effectByteCount == 0U
+        ) {
+          return;
+        }
+        const lights::PatchedEffect which = lights::EffectForName(std::string(effectBaseName.c_str()));
+        if (
+          which == lights::PatchedEffect::None ||
+          !(CFG_GetArgOption("/dynlights", 0U, nullptr) || lights::LightsWanted(deviceContext->mDeviceType))
+        ) {
+          return;
+        }
+        const int flood = CFG_GetArgOption("/dynlightsflood2", 0U, nullptr)
+          ? 2
+          : (CFG_GetArgOption("/dynlightsflood", 0U, nullptr) ? 1 : 0);
+        std::string text(effectSourceBuffer.GetPtr(0U, 0U), effectByteCount);
+        const lights::EffectPatchResult patch = which == lights::PatchedEffect::Mesh
+          ? lights::PatchMeshEffect(text, flood)
+          : lights::PatchTerrainEffect(text, flood, lightsSunReads);
+        if (!patch.patched) {
+          gpg::Warnf("DynLights: %s not patched: %s", effectBaseName.c_str(), patch.error.c_str());
+          return;
+        }
+        gpg::Logf(
+          "DynLights: %s patched, %d techniques have the light pass, terrain sun shadow: %d reads",
+          effectBaseName.c_str(),
+          patch.techniques,
+          patch.sunShadowSites
+        );
+        mergedBuffer = gpg::AllocMemBuffer(compatByteCount + text.size());
+        if (compatByteCount > 0U) {
+          std::copy_n(compatStateBuffer.GetPtr(0U, 0U), compatByteCount, mergedBuffer.GetPtr(0U, 0U));
+        }
+        std::copy_n(text.data(), text.size(), mergedBuffer.GetPtr(compatByteCount, 0U));
+        lightVariant = ".dynlights4";
+      };
+      assembleLit();
+
       // Builds the effect, from its compiled copy in the cache when that is at
       // least as new as the source. FAF: `boneTexture` compiles the variant
       // with FAF_BONE_TEXTURE defined (see WantsBoneTextureVariant); it turns
@@ -1421,13 +1477,13 @@ technique EditorMeshFill
       gpg::MemBuffer<const char> waterDetail{};
       gpg::MemBuffer<char> waterMerged{};
       std::string waterVariant; // the patches water2.fx got (see below), part of its cache name
-      const auto createEffect = [&](
-                                  const bool boneTexture,
-                                  const bool msdfText = false,
-                                  const bool withTerrainTess = false,
-                                  const bool editorOutline = false,
-                                  const bool withWaterDetail = false
-                                ) {
+      const auto createEffectOnce = [&](
+                                      const bool boneTexture,
+                                      const bool msdfText = false,
+                                      const bool withTerrainTess = false,
+                                      const bool editorOutline = false,
+                                      const bool withWaterDetail = false
+                                    ) {
         const auto fnv1a = [](const std::string_view text) {
           std::uint32_t hash = 2166136261u;
           for (const char c : text) {
@@ -1457,8 +1513,8 @@ technique EditorMeshFill
           ? ".bonetex."
           : (msdfText ? ".msdf."
                       : (withTerrainTess ? ".tess." : ((editorOutline || withWaterDetail) ? outlineVariant : ".")));
-        const fa::string cachePath =
-          cacheDirectory + "/" + mName + terrainLevelVariant.c_str() + waterVariant.c_str() + variant + engineVersion;
+        const fa::string cachePath = cacheDirectory + "/" + mName + terrainLevelVariant.c_str() + lightVariant.c_str() +
+          waterVariant.c_str() + variant + engineVersion;
         SDiskFileInfo cacheInfo{};
         bool useCachePayload = false;
         if (waitHandleSet->GetFileInfo(cachePath.c_str(), &cacheInfo, false)) {
@@ -1481,6 +1537,58 @@ technique EditorMeshFill
           effectMacros
         );
         mEffect = gpg::gal::Effect::Create(context);
+      };
+
+      // FAF addition (Dynamic Lights): a lit effect the backend compiler rejects is built again without the sun shadow
+      // reads of the terrain's PBR shaders (each such read samples the light field: a shader model with 16 samplers
+      // cannot take them in a technique that already uses 15), and if that does not compile either, without the light
+      // pass. When the unlit build fails as well, the failure is not the lights': the lit state is put back for the
+      // caller (a variant that falls back on its own, such as the tessellated terrain), and the error goes on.
+      const auto createEffect = [&](
+                                  const bool boneTexture,
+                                  const bool msdfText = false,
+                                  const bool withTerrainTess = false,
+                                  const bool editorOutline = false,
+                                  const bool withWaterDetail = false
+                                ) {
+        if (lightVariant.empty()) {
+          createEffectOnce(boneTexture, msdfText, withTerrainTess, editorOutline, withWaterDetail);
+          return;
+        }
+        try {
+          createEffectOnce(boneTexture, msdfText, withTerrainTess, editorOutline, withWaterDetail);
+          return;
+        } catch (const std::exception& exception) {
+          mEffect.reset();
+          if (lightsSunReads && std::strcmp(mName.c_str(), "terrain") == 0) {
+            gpg::Warnf(
+              "%s: %s; building it without the sun shadow reads of the PBR shaders", effectFilePath, exception.what()
+            );
+            lightsSunReads = false;
+            assembleLit();
+            if (!lightVariant.empty()) {
+              try {
+                createEffectOnce(boneTexture, msdfText, withTerrainTess, editorOutline, withWaterDetail);
+                return;
+              } catch (const std::exception&) {
+                mEffect.reset();
+              }
+            }
+          } else {
+            gpg::Warnf("%s: %s; building it without the light pass", effectFilePath, exception.what());
+          }
+        }
+        const gpg::MemBuffer<char> litBuffer = mergedBuffer;
+        const std::string litVariant = lightVariant;
+        lightVariant.clear();
+        mergedBuffer = unlitBuffer;
+        try {
+          createEffectOnce(boneTexture, msdfText, withTerrainTess, editorOutline, withWaterDetail);
+        } catch (...) {
+          lightVariant = litVariant;
+          mergedBuffer = litBuffer;
+          throw;
+        }
       };
 
       // A bone texture variant that fails to build falls back to the plain
@@ -1603,10 +1711,25 @@ technique EditorMeshFill
       ) {
         const bool wantsSim = water::SimWanted();
         const bool wantsFilter = water::EffectPatchWanted(deviceContext->mDeviceType);
-        if (wantsSim || wantsFilter) {
+        // Dynamic Lights: the water is lit by the light field (glints, scatter). First of the chain: the light patch
+        // anchors on lines the other two leave alone, and their anchors are untouched by it.
+        const bool wantsLit =
+          CFG_GetArgOption("/dynlights", 0U, nullptr) || lights::LightsWanted(deviceContext->mDeviceType);
+        if (wantsSim || wantsFilter || wantsLit) {
           const gpg::MemBuffer<char> unpatchedBuffer = mergedBuffer;
           std::string text(effectSourceBuffer.GetPtr(0U, 0U), effectByteCount);
           std::string tags;
+          if (wantsLit) {
+            std::string lit = text;
+            const lights::EffectPatchResult patch = lights::PatchWaterEffect(lit);
+            if (patch.patched) {
+              text = std::move(lit);
+              tags += ".waterl1";
+              gpg::Logf("DynLights: %s patched, the water is lit by the light field", effectBaseName.c_str());
+            } else {
+              gpg::Warnf("DynLights: %s not patched: %s", effectBaseName.c_str(), patch.error.c_str());
+            }
+          }
           if (wantsSim) {
             std::string simmed = text;
             const water::SimPatchResult patch = water::PatchWaterSimulation(simmed);
@@ -1689,6 +1812,11 @@ technique EditorMeshFill
       }
       if (!mEffect) {
         createEffect(false);
+      }
+
+      // FAF addition (Dynamic Lights): the lights system learns whether the effect in use carries the light pass.
+      if (lights::EffectForName(std::string(effectBaseName.c_str())) != lights::PatchedEffect::None) {
+        lights::NoteEffectPatched(std::string(effectBaseName.c_str()), !lightVariant.empty());
       }
 
       mTechniques.clear();

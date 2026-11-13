@@ -9,6 +9,9 @@
 #include "moho/render/TemporalAA.h"
 #include "moho/render/PostRenderer.h"
 #include "moho/render/WideBloomRenderer.h"
+#include "moho/render/lights/LightBinding.h"
+#include "moho/render/lights/LightDebugView.h"
+#include "moho/render/lights/LightFeeds.h"
 #include "moho/sim/STIMap.h"
 #include "moho/terrain/water/TerrainWaterLevels.h"
 #include "moho/terrain/water/WaterBodySurfaces.h"
@@ -1584,10 +1587,12 @@ void moho::WRenViewport::D3DWindowOnDeviceRender()
   // with the previous frame's submissions (CD3DDevice::PublishDrawStatistics).
   moho::D3D_GetDevice()->PublishDrawStatistics();
 
-  // The terrain renderers set the water and terrain variables once, when they are made: when the terrain effect of a
-  // map with water bodies is built again (the water level patch, TerrainWaterLevels.h) the new effect has lost them, so
-  // they are made again.
-  if (moho::water::ApplyTerrainWaterLevelsLive()) {
+  // Dynamic Lights switched on after the effects were built without the light pass: rebuild them now, before anything
+  // of this frame is drawn. The terrain renderers set the water and terrain variables once, when they are made: the new
+  // effects have lost them, so they are made again.
+  // The same for the terrain effect of a map with water bodies (the water level patch, TerrainWaterLevels.h).
+  const bool lightsRebuilt = moho::lights::ApplyLiveLevel();
+  if (moho::water::ApplyTerrainWaterLevelsLive() || lightsRebuilt) {
     for (SWorldViewInfo& worldView : mWorldViews) {
       if (worldView.mTerrain && moho::REN_GetTerrainRes() != nullptr) {
         worldView.mTerrain.reset(IRenTerrain::Create());
@@ -2072,6 +2077,17 @@ void moho::WRenViewport::RenderWorldView(
       mShadowRenderer.RenderFrameShadows(terrain, *unjitteredCamera, worldView->mView->CameraGetTargetZoom());
     }
 
+    // The sun's shadow camera for the light field: the shaders rebuild a pixel's world position from its shadow
+    // coordinates (docs/LIGHTING_V2.md).
+    moho::lights::SetSunShadowCamera(mShadowRenderer.mCamera.inverseViewProjection, mShadowRenderer.mShadowCameraValid);
+
+    // Dynamic lights: evaluate the pool for this frame before anything is lit (docs/DYNAMIC_LIGHTS.md).
+    {
+      const gpg::gal::RenderProfileScope profileLights("LightsFrame"); // render profile: the lights of the frame
+      moho::lights::BeginFrame(moho::REN_GetGameTick(), moho::REN_GetSimDeltaSeconds());
+      moho::lights::SetView(*mCam);
+    }
+
     FogOn(worldView->mView->CameraGetZoom());
     if (moho::ren_TerrainSurface) {
       const gpg::gal::RenderProfileScope profileTerrain("Terrain");
@@ -2119,6 +2135,12 @@ void moho::WRenViewport::RenderWorldView(
   {
     const gpg::gal::RenderProfileScope profileMeshBatch("MeshBatch");
     meshRenderer->Batch(moho::REN_GetGameTick(), moho::REN_GetSimDeltaSeconds(), *mCam, mCam->viewport.r[1]);
+  }
+  // Dynamic lights: the glowing unit and projectile meshes on screen become lights, and the shadow casters of the next
+  // frame are listed.
+  {
+    const gpg::gal::RenderProfileScope profileLightMeshes("LightsMeshes"); // render profile: glowing meshes as lights
+    moho::lights::FeedMeshes(static_cast<float>(moho::REN_GetGameTick()) + moho::REN_GetSimDeltaSeconds());
   }
   // FAF: the wave simulation of the water, before RenderWater reads it: the hulls and bodies of the batch push it first
   {
@@ -2562,6 +2584,11 @@ void moho::WRenViewport::Render(
   {
     const gpg::gal::RenderProfileScope profileCartographic("Cartographic");
     (void)RenderCartographic(head, worldViews);
+  }
+
+  // Dynamic lights debug view (ren_DynLightsView): the light grid over the world, before the UI.
+  if (mCam != nullptr) {
+    moho::lights::DrawDebugView(*mCam, mPrimBatcher.get());
   }
 
   // Draw the UI control tree over the rendered viewport. The binary does this
