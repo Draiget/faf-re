@@ -4,6 +4,8 @@
 
 #include "moho/lua/SCR_String.h"
 #include "moho/sim/FafGameVersion.h"
+#include "moho/lua/CScrLuaObjectFactory.h"
+#include "gpg/core/utils/Logging.h"
 
 namespace
 {
@@ -678,6 +680,12 @@ void Sim::Load(
     throw;
   }
   loadInfo->mReadArchive->EndSection(false);
+
+  // Engine addition: new Lua objects take their class's metatable from the loaded `__factory_objects`, numbered in
+  // the order the writing exe built its factories, which isn't this engine's (see RebindLoadedFactoryObjects).
+  if (const std::size_t rebound = CScrLuaObjectFactory::RebindLoadedFactoryObjects(mLuaState); rebound != 0) {
+    gpg::Logf("Saved game: %zu Lua class tables numbered by another build, matched by name", rebound);
+  }
 
   // Refresh the heightfield bounds to the full grid.
   {

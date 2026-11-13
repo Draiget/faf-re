@@ -1,5 +1,10 @@
 #include "moho/lua/CScrLuaObjectFactory.h"
 
+#include <vector>
+
+#include "moho/lua/CScrLuaClassBinder.h"
+#include "moho/lua/CScrLuaInitForm.h"
+
 #include <cmath>
 #include <cstdint>
 #include <cstdlib>
@@ -1738,6 +1743,73 @@ namespace moho
     }
 
     return value;
+  }
+
+  /**
+   * Engine addition, see the declaration.
+   */
+  std::size_t CScrLuaObjectFactory::RebindLoadedFactoryObjects(
+    LuaPlus::LuaState* const state
+  )
+  {
+    if (state == nullptr) {
+      return 0;
+    }
+    const LuaPlus::LuaObject loaded = state->GetGlobal(kFactoryObjectsGlobalName);
+    if (!loaded.IsTable()) {
+      return 0;
+    }
+
+    struct Slot
+    {
+      std::int32_t index;
+      LuaPlus::LuaObject table;
+    };
+    std::vector<Slot> slots;
+    bool differs = false;
+    for (const char* const setName : {"Core", "Sim"}) {
+      CScrLuaInitFormSet* const set = SCR_FindLuaInitFormSet(setName);
+      if (set == nullptr) {
+        continue;
+      }
+      for (CScrLuaInitForm* form = set->mForms; form != nullptr; form = form->mNextInSet) {
+        const auto* const binder = dynamic_cast<const CScrLuaClassBinder*>(form);
+        if (binder == nullptr || binder->mClassFactory == nullptr || binder->GetName() == nullptr) {
+          continue;
+        }
+        // The dotted name, as CScrLuaClassBinder::Run walks it.
+        LuaPlus::LuaObject table = state->GetGlobals();
+        const char* segment = binder->GetName();
+        for (const char* dot = std::strchr(segment, '.'); table.IsTable(); dot = std::strchr(segment, '.')) {
+          if (dot == nullptr) {
+            table = table.GetByName(segment);
+            break;
+          }
+          table = table.GetByName(std::string(segment, static_cast<std::size_t>(dot - segment)).c_str());
+          segment = dot + 1;
+        }
+        if (!table.IsTable()) {
+          continue;
+        }
+        const std::int32_t index = binder->mClassFactory->mFactoryObjectIndex;
+        if (!(loaded.GetByIndex(index) == table)) {
+          differs = true;
+        }
+        slots.push_back(Slot{index, table});
+      }
+    }
+    if (!differs) {
+      return 0;
+    }
+
+    LuaPlus::LuaObject rebuilt;
+    rebuilt.AssignNewTable(state, 0, 0);
+    for (const Slot& slot : slots) {
+      rebuilt.SetObject(slot.index, slot.table);
+    }
+    LuaPlus::LuaObject globals = state->GetGlobals();
+    globals.SetObject(kFactoryObjectsGlobalName, rebuilt);
+    return slots.size();
   }
 
   CScrLuaMetatableFactory<CScriptObject*>& CScrLuaMetatableFactory<CScriptObject*>::Instance()

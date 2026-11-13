@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 
 #include "gpg/core/containers/String.h"
@@ -263,6 +264,20 @@ namespace moho
      * creating/storing a new entry when the indexed slot is nil.
      */
     LuaPlus::LuaObject Get(LuaPlus::LuaState* state);
+
+    /**
+     * Engine addition, not in the binary: after a saved game's Lua state is loaded into `state`, points the slot of
+     * every class factory that a `Core` or `Sim` class binder publishes (`moho.IEffect`) at the table the save holds
+     * under that name, and drops the other slots so they are built again on first use.
+     *
+     * The slots are numbered in the order factories are constructed at startup, and the save keeps the numbers of
+     * the exe that wrote it. This engine's order is not retail's, so after a retail save loaded, a new emitter got
+     * another class's metatable. Nothing changes when every published slot already matches, as for a save from this
+     * same build.
+     *
+     * Returns how many slots were pointed at their table, or 0 when nothing changed.
+     */
+    static std::size_t RebindLoadedFactoryObjects(LuaPlus::LuaState* state);
 
   protected:
     virtual LuaPlus::LuaObject Create(LuaPlus::LuaState* state) = 0;
