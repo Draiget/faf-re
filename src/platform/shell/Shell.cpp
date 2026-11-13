@@ -637,6 +637,22 @@ namespace
     return top;
   }
 
+  // The window a native window's keys and text go to. Windows sends them to the focus window (the
+  // game's viewport, a native child of the frame on Windows), but the window system gives the
+  // keyboard only to top-level windows, so they arrive at the frame: the focused window inside it
+  // takes them, native child or not.
+  [[nodiscard]] ShellWindow* KeyTarget(
+    ShellWindow* const top
+  )
+  {
+    for (const ShellWindow* window = sFocusWindow; window != nullptr; window = window->GetParent()) {
+      if (window == top) {
+        return sFocusWindow;
+      }
+    }
+    return InputTarget(top);
+  }
+
   void Deliver(
     ShellWindow* const window,
     ShellEvent& event
@@ -710,7 +726,7 @@ namespace
     const bool controlOverride
   )
   {
-    ShellWindow* const target = InputTarget(top);
+    ShellWindow* const target = KeyTarget(top);
     ShellKeyEvent event(type);
     event.m_keyCode = keyCode;
     FillModifiers(source.modifiers, event.m_controlDown, event.m_shiftDown, event.m_altDown, event.m_metaDown);
