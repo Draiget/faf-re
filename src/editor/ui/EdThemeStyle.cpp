@@ -31,7 +31,11 @@ namespace faf::editor
       c[ImGuiCol_ButtonActive] = with(0.55f);
       c[ImGuiCol_SeparatorActive] = with(1.0f);
       c[ImGuiCol_ResizeGripActive] = with(1.0f);
-      c[ImGuiCol_TabSelectedOverline] = with(1.0f);
+      // Dock tabs: the picked one filled (selection by fill), no line over it.
+      c[ImGuiCol_TabSelected] = with(0.34f);
+      c[ImGuiCol_TabDimmedSelected] = with(0.22f);
+      c[ImGuiCol_TabSelectedOverline] = ImVec4(0.0f, 0.0f, 0.0f, 0.0f);
+      c[ImGuiCol_TabDimmedSelectedOverline] = ImVec4(0.0f, 0.0f, 0.0f, 0.0f);
       c[ImGuiCol_DockingPreview] = with(0.55f);
       c[ImGuiCol_TextSelectedBg] = with(0.35f);
       c[ImGuiCol_DragDropTarget] = with(1.0f);

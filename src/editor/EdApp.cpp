@@ -115,6 +115,30 @@ namespace faf::editor
       return error ? std::filesystem::path{} : folder;
     }
 
+    /**
+     * Whether the command line is a test run's: any of the editor's test options. A test run writes back the
+     * workspace, panels and settings it read, never what it showed (so it leaves the user's alone). `/open` alone is
+     * a user's (a map opened from outside).
+     */
+    [[nodiscard]] bool IsTestRunCommandLine()
+    {
+      static const char* const kOptions[] = {
+        "/command",     "/palette",      "/theme",          "/keysfile",       "/focuspanel",     "/uiclicks",
+        "/tool",        "/proptool",     "/play",           "/debugarm",       "/breakpoint",     "/check",
+        "/decaltool",   "/markertool",   "/unittool",       "/hoverprop",      "/selectprops",    "/selectunit",
+        "/propswap",    "/saveas",       "/settingsfile",   "/autosavefolder", "/askunsaved",     "/particlebrowser",
+        "/particlenew", "/particleopen", "/materialeditor", "/uiscale",        "/testrun",        "/openall",
+        "/roundtrip",   "/vault",        "/vaultsearch",    "/vaultmap",       "/newmap",         "/stamp",
+        "/brush",       "/layer",        "/waterbody",      "/ruler",          "/adaptivewindow",
+      };
+      for (const char* const option : kOptions) {
+        if (moho::CFG_GetArgOption(option, 0, nullptr)) {
+          return true;
+        }
+      }
+      return false;
+    }
+
     // The panels' scale the user chose (the toolbar's - / % / +), kept in layout.ini as [FafEditor][Ui] Scale=<x>: read
     // there at the first frame (-1 until then), the one in use written back.
     float gUiScaleRead = -1.0f;
@@ -1269,10 +1293,7 @@ namespace faf::editor
           mSettingsFile = std::filesystem::path(value[0].c_str());
         } else if (const std::filesystem::path folder = EditorSettingsFolder(); !folder.empty()) {
           mSettingsFile = folder / "settings.ini";
-          for (const char* const option :
-               {"/command", "/palette", "/theme", "/keysfile", "/focuspanel", "/uiclicks", "/tool", "/proptool"}) {
-            mSettingsWritable = mSettingsWritable && !moho::CFG_GetArgOption(option, 0, nullptr);
-          }
+          mSettingsWritable = !IsTestRunCommandLine();
         }
         if (std::ifstream in(mSettingsFile, std::ios::binary); !mSettingsFile.empty() && in) {
           std::ostringstream text;
@@ -2365,10 +2386,7 @@ namespace faf::editor
         ImGui::AddSettingsHandler(&handler);
       }
       // A test run (its options) writes back the workspace and panels it read, not the ones it showed.
-      for (const char* const option :
-           {"/command", "/palette", "/theme", "/keysfile", "/focuspanel", "/uiclicks", "/tool", "/proptool"}) {
-        gTestRun = gTestRun || moho::CFG_GetArgOption(option, 0, nullptr);
-      }
+      gTestRun = IsTestRunCommandLine();
       ImGuiIO& io = ImGui::GetIO();
       io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard | ImGuiConfigFlags_DockingEnable;
       const std::filesystem::path settings = EditorSettingsFolder();

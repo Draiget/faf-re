@@ -3,6 +3,7 @@
 
 #include <cctype>
 #include "editor/ui/EdThemeColors.h"
+#include "editor/ui/EdUiScale.h"
 #include "editor/ui/EdWorkspaces.h"
 #include <cstdint>
 #include <cstdio>
@@ -620,7 +621,11 @@ namespace faf::editor
     const float labelHeight = ImGui::GetTextLineHeight() + 2.0f;
     const float spacing = ImGui::GetStyle().ItemSpacing.x;
     if (
-      ImGui::BeginChild("##propbrowser", ImVec2(0.0f, (tile + labelHeight + spacing) * 3.5f), ImGuiChildFlags_Borders)
+      ImGui::BeginChild(
+        "##propbrowser",
+        ImVec2(0.0f, FillHeight(ImGui::GetFrameHeightWithSpacing() * 4.0f, (tile + labelHeight + spacing) * 2.5f)),
+        ImGuiChildFlags_Borders
+      )
     ) {
       const int columns =
         std::max(1, static_cast<int>((ImGui::GetContentRegionAvail().x + spacing) / (tile + spacing)));

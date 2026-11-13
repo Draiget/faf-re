@@ -69,10 +69,7 @@ namespace faf::editor
     ImGui::TextDisabled("%zu units", shown.size());
 
     // The list fills what the panel has left (at least eight rows).
-    const float height = std::max(
-      ImGui::GetContentRegionAvail().y - ImGui::GetFrameHeightWithSpacing() * 6.0f,
-      ImGui::GetFrameHeight() * 1.6f * 8.0f
-    );
+    const float height = FillHeight(ImGui::GetFrameHeightWithSpacing() * 6.0f, ImGui::GetFrameHeight() * 1.6f * 8.0f);
     if (!ImGui::BeginChild("##unitbrowser", ImVec2(0.0f, height), ImGuiChildFlags_Borders)) {
       ImGui::EndChild();
       return;

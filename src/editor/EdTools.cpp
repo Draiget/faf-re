@@ -356,8 +356,8 @@ namespace faf::editor
         }
         const ImVec2 q(p.x + cell, p.y + cell);
         if (i == mTool) {
-          draw->AddRectFilled(p, q, AccentU32(0.16f), 4.0f);
-          draw->AddRectFilled(p, ImVec2(p.x + 2.0f, q.y), AccentU32());
+          // Selection by fill, as everywhere (no bar beside it).
+          draw->AddRectFilled(p, q, AccentU32(0.32f), 4.0f);
         } else if (hovered) {
           draw->AddRectFilled(p, q, SurfaceHotU32(), 4.0f);
         }
@@ -891,7 +891,11 @@ namespace faf::editor
       }
       if (
         ImGui::BeginChild(
-          "##terraintypes", ImVec2(0.0f, ImGui::GetTextLineHeightWithSpacing() * 12.0f), ImGuiChildFlags_Borders
+          "##terraintypes",
+          ImVec2(
+            0.0f, FillHeight(ImGui::GetFrameHeightWithSpacing() * 4.0f, ImGui::GetTextLineHeightWithSpacing() * 8.0f)
+          ),
+          ImGuiChildFlags_Borders
         )
       ) {
         for (const TerrainTypeInfo& type : mTerrainTypes) {
@@ -1648,7 +1652,11 @@ namespace faf::editor
     if (mPropBlueprints.empty()) {
       Note("The prop list comes once the game's rules are built after startup.");
     } else if (
-      ImGui::BeginChild("##props", ImVec2(0.0f, ImGui::GetFrameHeight() * 1.8f * 8.0f), ImGuiChildFlags_Borders)
+      ImGui::BeginChild(
+        "##props",
+        ImVec2(0.0f, FillHeight(ImGui::GetFrameHeightWithSpacing() * 10.0f, ImGui::GetFrameHeight() * 1.8f * 6.0f)),
+        ImGuiChildFlags_Borders
+      )
     ) {
       // Each prop with a picture of its model (only the rows in view ask for theirs).
       const float picture = ImGui::GetFrameHeight() * 1.8f;
@@ -1853,7 +1861,13 @@ namespace faf::editor
     }
     mLibrary.Pump(4);
     const float cell = ImGui::GetFrameHeight() * 2.6f;
-    if (ImGui::BeginChild("##decaltextures", ImVec2(0.0f, cell * 4.6f), ImGuiChildFlags_Borders)) {
+    if (
+      ImGui::BeginChild(
+        "##decaltextures",
+        ImVec2(0.0f, FillHeight(ImGui::GetFrameHeightWithSpacing() * 10.0f, cell * 3.2f)),
+        ImGuiChildFlags_Borders
+      )
+    ) {
       const int columns = std::max(1, static_cast<int>(ImGui::GetContentRegionAvail().x / (cell + 4.0f)));
       int column = 0;
       static constexpr int kTypeOf[] = {0, 1, 2, 6};
@@ -1890,11 +1904,17 @@ namespace faf::editor
           mDecalTexture = texture.path;
           mDecalMode = 0;
         }
-        if (const std::uint64_t image = mLibrary.Thumbnail(texture.path, true); image != 0U) {
-          draw->AddImage(static_cast<ImTextureID>(image), p, ImVec2(p.x + cell, p.y + cell));
-        }
+        // The picked one filled under its picture (selection by fill).
         if (texture.path == mDecalTexture) {
-          draw->AddRect(p, ImVec2(p.x + cell, p.y + cell), AccentU32(), 3.0f, 0, 2.0f);
+          draw->AddRectFilled(p, ImVec2(p.x + cell, p.y + cell), AccentU32(0.55f), 3.0f);
+        }
+        if (const std::uint64_t image = mLibrary.Thumbnail(texture.path, true); image != 0U) {
+          const float inset = texture.path == mDecalTexture ? 4.0f : 0.0f;
+          draw->AddImage(
+            static_cast<ImTextureID>(image),
+            ImVec2(p.x + inset, p.y + inset),
+            ImVec2(p.x + cell - inset, p.y + cell - inset)
+          );
         }
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) {
           ImGui::SetTooltip(
@@ -2066,7 +2086,11 @@ namespace faf::editor
       // The army's groups (the INITIAL group the game starts it with, and those under it), each with its units' count.
       if (
         ImGui::BeginChild(
-          "##unitgroups", ImVec2(0.0f, ImGui::GetTextLineHeightWithSpacing() * 8.0f), ImGuiChildFlags_Borders
+          "##unitgroups",
+          ImVec2(
+            0.0f, FillHeight(ImGui::GetFrameHeightWithSpacing() * 6.0f, ImGui::GetTextLineHeightWithSpacing() * 6.0f)
+          ),
+          ImGuiChildFlags_Borders
         )
       ) {
         std::vector<std::string> path;

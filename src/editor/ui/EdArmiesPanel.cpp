@@ -136,11 +136,11 @@ namespace faf::editor
         mArmySelected = army.name;
       }
       ImDrawList* const draw = ImGui::GetWindowDrawList();
-      const ImU32 background = ImGui::GetColorU32(ImGui::IsItemHovered() ? ImGuiCol_FrameBgHovered : ImGuiCol_FrameBg);
+      // The chosen army filled in the accent (selection by fill), the others the frame colour.
+      const ImU32 background = chosen
+        ? AccentU32(0.32f)
+        : ImGui::GetColorU32(ImGui::IsItemHovered() ? ImGuiCol_FrameBgHovered : ImGuiCol_FrameBg);
       draw->AddRectFilled(at, ImVec2(at.x + width, at.y + height), background, 5.0f);
-      if (chosen) {
-        draw->AddRect(at, ImVec2(at.x + width, at.y + height), AccentU32(), 5.0f, 0, 1.5f);
-      }
       // The badge: the slot number, or a tag for an extra army.
       const ImVec2 badgeAt(at.x + pad, at.y + ImGui::GetStyle().FramePadding.y);
       const ImVec2 badgeSize = ImGui::CalcTextSize(badge);
