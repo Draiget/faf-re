@@ -53,7 +53,12 @@ var (
 	tokensArg = flag.String("tokens", "", "scenario dedicated: id=token,... to use (the game server's), else random")
 	seatExe   = flag.String("seat-exe", "", "scenario dedicated: start this per player with --server --uid --token "+
 		"taken from its game_launch args (faf_server_probe), plus -seat-args; all must exit 0")
-	seatArgs = flag.String("seat-args", "", "scenario dedicated: extra args for -seat-exe, space separated")
+	seatArgs     = flag.String("seat-args", "", "scenario dedicated: extra args for -seat-exe, space separated")
+	serverResult = flag.String("server-result", "", "scenario dedicated: after the seats, wait for the game server's "+
+		"result.json here and report its army results to -control's /dedicated_games/<id>/results, as the "+
+		"server's operator would; every army must end with a result")
+	seatArgsFor = flag.String("seat-args-for", "", "scenario dedicated: id=args;... extra args for one player's seat "+
+		"(after -seat-args), e.g. 3=--leave-at 30")
 )
 
 type player struct {
@@ -285,6 +290,9 @@ func runDedicated(ids []int) bool {
 	if *seatExe != "" {
 		runSeats(launches)
 	}
+	if *serverResult != "" {
+		reportServerResult(fmt.Sprint(launches[ps[0].id]["uid"]))
+	}
 	// A join string reaches its own player in game_launch and nowhere else: not in another player's messages (game
 	// lists, game_info, chat), and not in its own player's other messages either.
 	for _, p := range ps {
@@ -308,6 +316,69 @@ func runDedicated(ids []int) bool {
 	return true
 }
 
+// reportServerResult waits for the game server's result.json (-server-result) and posts its army results to the
+// lobby server, as an operator's reporter would with the server's result events.
+func reportServerResult(gameID string) {
+	var res struct {
+		Ended   bool `json:"ended"`
+		Players []struct {
+			Army   int    `json:"army"`
+			Name   string `json:"name"`
+			Result string `json:"result"`
+		} `json:"players"`
+		Stats json.RawMessage `json:"stats"`
+	}
+	deadline := time.Now().Add(90 * time.Second)
+	for {
+		b, err := os.ReadFile(*serverResult)
+		if err == nil && json.Unmarshal(b, &res) == nil {
+			break
+		}
+		if time.Now().After(deadline) {
+			fail("no game server result at %s: %v", *serverResult, err)
+			return
+		}
+		time.Sleep(time.Second)
+	}
+	var results []map[string]any
+	for _, p := range res.Players {
+		words := strings.Fields(strings.ToLower(p.Result))
+		if len(words) < 2 {
+			fail("army %d (%s) has no result in the game server's result (%q, ended=%v)", p.Army, p.Name, p.Result,
+				res.Ended)
+			continue
+		}
+		score, _ := strconv.Atoi(words[len(words)-1])
+		results = append(results, map[string]any{"army": p.Army, "result": words[len(words)-2], "score": score,
+			"metadata": words[:len(words)-2]})
+		logf("game server: army %d (%s): %s", p.Army, p.Name, p.Result)
+	}
+	if len(results) == 0 {
+		return
+	}
+	report := map[string]any{"results": results}
+	// The server's stats are what each game would send as JsonStats ({"stats": [...]}).
+	if len(res.Stats) > 0 && string(res.Stats) != "null" {
+		report["stats"] = map[string]json.RawMessage{"stats": res.Stats}
+	}
+	body, _ := json.Marshal(report)
+	resp, err := (&http.Client{Timeout: 10 * time.Second}).Post(
+		strings.TrimRight(*control, "/")+"/dedicated_games/"+gameID+"/results", "application/json",
+		strings.NewReader(string(body)))
+	if err != nil {
+		fail("report the results: %v", err)
+		return
+	}
+	answer, _ := io.ReadAll(io.LimitReader(resp.Body, 2048))
+	resp.Body.Close()
+	logf("control <- %s %s", resp.Status, strings.TrimSpace(string(answer)))
+	if resp.StatusCode != http.StatusOK {
+		fail("report the results: %s", resp.Status)
+	} else if _, sent := report["stats"]; sent && !strings.Contains(string(answer), `"stats": true`) {
+		fail("the lobby server didn't take the army stats: %s", answer)
+	}
+}
+
 // runSeats starts -seat-exe for every player with the join string from its own game_launch, as the game would get
 // it on its command line, and waits for all of them.
 func runSeats(launches map[int]map[string]any) {
@@ -327,11 +398,16 @@ func runSeats(launches map[int]map[string]any) {
 		}
 		cmdArgs := []string{"--server", value("/connectserver"), "--uid", value("/serveruid"), "--token", value("/servertoken")}
 		cmdArgs = append(cmdArgs, strings.Fields(*seatArgs)...)
+		for _, part := range strings.Split(*seatArgsFor, ";") {
+			if who, extra, ok := strings.Cut(strings.TrimSpace(part), "="); ok && who == strconv.Itoa(id) {
+				cmdArgs = append(cmdArgs, strings.Fields(extra)...)
+			}
+		}
 		wg.Add(1)
 		go func(id int, cmdArgs []string) {
 			defer wg.Done()
 			logf("p%d starts its seat: %s --server %s --uid %s --token <token> %s", id, *seatExe, cmdArgs[1], cmdArgs[3],
-				*seatArgs)
+				strings.Join(cmdArgs[6:], " "))
 			out, err := exec.Command(*seatExe, cmdArgs...).CombinedOutput()
 			lines := strings.Split(strings.TrimSpace(string(out)), "\n")
 			if len(lines) > 6 {
