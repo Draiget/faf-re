@@ -2211,6 +2211,9 @@ namespace faf::editor
       void MapTexturesUpdate();
       void MakeMapTexture(MapTextureKind kind);
       void ClearMapTexture(MapTextureKind kind);
+      /** Export (true) the slot's texture to a .dds, or import one into the map's folder and the slot. */
+      void TransferMapTexture(MapTextureKind kind, bool exporting, const std::string& testFile);
+      bool mMapTexturesStale[2]{};
       [[nodiscard]] std::uint64_t HeightsChecksum();
       [[nodiscard]] static std::string LowerPath(std::string path);
       int mMapTextureFrame = 0;
@@ -4075,8 +4078,22 @@ namespace faf::editor
         const MapTextureKind which = kind == 0 ? MapTextureKind::Normals : MapTextureKind::Lighting;
         if (op == EdTools::MapTextureOp::Make) {
           MakeMapTexture(which);
-        } else {
+          // `/mapwide <kind>,stale` (test runs): the ground raised after it, so the row goes out of date.
+          if (tools.MapTextureRaiseAfter()) {
+            const float middle = static_cast<float>(std::max(mDocument.Facts().sizeX, mDocument.Facts().sizeZ)) * 0.5f;
+            gpg::Logf(
+              "editor: /mapwide: the ground raised after Make: %s",
+              mScene.TestRaise(middle, middle, 1.0f) ? "done" : "not done"
+            );
+          }
+          // `/mapwide <kind>,make,export=<file>` (test runs): the texture just made, exported.
+          if (!tools.MapTextureFile().empty()) {
+            TransferMapTexture(which, true, tools.MapTextureFile());
+          }
+        } else if (op == EdTools::MapTextureOp::Clear) {
           ClearMapTexture(which);
+        } else {
+          TransferMapTexture(which, op == EdTools::MapTextureOp::Export, tools.MapTextureFile());
         }
         mMapTextureFrame = 0; // the rows at once
       }
@@ -4109,7 +4126,13 @@ namespace faf::editor
             summed = true;
           }
           row.stale = sum != made->second;
+          if (row.stale && !mMapTexturesStale[kind]) {
+            gpg::Logf(
+              "editor: map-wide texture %s is out of date: the heights changed since it was made", path.c_str()
+            );
+          }
         }
+        mMapTexturesStale[kind] = row.stale;
         const std::size_t slash = path.find_last_of('/');
         const std::string leaf = slash == std::string::npos ? path : path.substr(slash + 1);
         row.state = !row.present
@@ -4229,6 +4252,87 @@ namespace faf::editor
         seen ? "" : "; the game's files don't see it yet"
       );
       PostStatusMessage(std::string("Made ") + file + " from the heights");
+    }
+
+    void EditorApp::TransferMapTexture(
+      const MapTextureKind kind,
+      const bool exporting,
+      const std::string& testFile
+    )
+    {
+      const MapTextureTarget target = MapTextureTargetOf(mScene.TerrainShader(), kind);
+      const std::filesystem::path scmap = mDocument.MapDiskFile();
+      if (!target.Valid() || scmap.empty()) {
+        PostStatusMessage("No map-wide slot or no map folder");
+        gpg::Warnf("editor: map-wide texture: no slot for this shader or no map folder");
+        return;
+      }
+      EdTools::LayerSlot value = mScene.LayerSlots()[static_cast<std::size_t>(target.slot)];
+      const std::string current = target.normalsPath ? value.normals : value.albedo;
+      const wchar_t* const filter = L"DirectDraw surface (*.dds)\0*.dds\0All files\0*.*\0";
+      std::filesystem::path file = testFile.empty()
+        ? AskFile(
+            HandleOf(mGame.supcomFrame),
+            exporting,
+            filter,
+            L"dds",
+            exporting ? L"Export the map-wide texture" : L"Import a map-wide texture"
+          )
+        : PathFromUtf8(testFile);
+      if (file.empty()) {
+        return;
+      }
+      if (exporting) {
+        std::string bytes;
+        if (current.empty() || !ReadGameFile(current, bytes)) {
+          PostStatusMessage("The slot has no texture to export");
+          gpg::Warnf("editor: map-wide texture: slot %d has no texture to export", target.slot);
+          return;
+        }
+        std::ofstream out(file, std::ios::binary | std::ios::trunc);
+        out.write(bytes.data(), static_cast<std::streamsize>(bytes.size()));
+        gpg::Logf(
+          "editor: map-wide texture %s exported to %s (%zu bytes)", current.c_str(), file.string().c_str(), bytes.size()
+        );
+        PostStatusMessage(out ? "Exported " + file.filename().string() : "Can't write " + file.string());
+        return;
+      }
+      // Import: a DDS as it is (its packing is the shader's), copied into the map's folder.
+      std::ifstream in(file, std::ios::binary);
+      const std::string bytes((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+      if (bytes.size() < 128 || bytes.compare(0, 4, "DDS ") != 0) {
+        PostStatusMessage(file.filename().string() + " isn't a DDS file");
+        gpg::Warnf("editor: map-wide texture: %s isn't a DDS file (%zu bytes)", file.string().c_str(), bytes.size());
+        return;
+      }
+      const std::filesystem::path folder = scmap.parent_path() / "env" / "layers";
+      std::error_code ec;
+      std::filesystem::create_directories(folder, ec);
+      std::string name = file.filename().string();
+      {
+        std::ofstream out(folder / name, std::ios::binary | std::ios::trunc);
+        out.write(bytes.data(), static_cast<std::streamsize>(bytes.size()));
+        if (!out) {
+          PostStatusMessage("Can't write " + (folder / name).string());
+          return;
+        }
+      }
+      const std::string game = "/maps/" + mDocument.FolderName() + "/env/layers/" + name;
+      if (target.normalsPath) {
+        value.normals = game;
+      } else {
+        value.albedo = game;
+      }
+      const float mapSize = static_cast<float>(std::max(mDocument.Facts().sizeX, mDocument.Facts().sizeZ));
+      value.albedoSize = mapSize + 1.0f;
+      value.normalsSize = mapSize + 1.0f;
+      mScene.ChangeLayerSlot(target.slot, value);
+      mMapTexturesMade.erase(LowerPath(game));
+      mMapTextureFrame = 0;
+      gpg::Logf(
+        "editor: map-wide texture imported from %s as %s (slot %d)", file.string().c_str(), game.c_str(), target.slot
+      );
+      PostStatusMessage("Imported " + name);
     }
 
     void EditorApp::ClearMapTexture(

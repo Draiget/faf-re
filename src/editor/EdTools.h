@@ -1292,6 +1292,8 @@ namespace faf::editor
       None,
       Make,
       Clear,
+      Export,
+      Import,
     };
     struct MapTextureRow
     {
@@ -1302,13 +1304,27 @@ namespace faf::editor
       bool stale = false;     // made here, and the heights changed since
       std::string state;      // one line for the panel
     };
+    /** `file`: a test run's path instead of the dialog (Export, Import); `raiseAfter`: a test run's height edit after
+     * Make. */
     void AskMapTexture(
       const int kind,
-      const MapTextureOp op
-    ) noexcept
+      const MapTextureOp op,
+      std::string file = {},
+      const bool raiseAfter = false
+    )
     {
       mMapTextureKind = kind;
       mMapTextureOp = op;
+      mMapTextureFile = std::move(file);
+      mMapTextureRaise = raiseAfter;
+    }
+    [[nodiscard]] const std::string& MapTextureFile() const noexcept
+    {
+      return mMapTextureFile;
+    }
+    [[nodiscard]] bool MapTextureRaiseAfter() const noexcept
+    {
+      return mMapTextureRaise;
     }
     [[nodiscard]] bool TakeMapTextureAsk(
       int& kind,
@@ -2055,6 +2071,8 @@ namespace faf::editor
     MapTextureRow mMapTextureRows[2];
     int mMapTextureKind = 0;
     MapTextureOp mMapTextureOp = MapTextureOp::None;
+    std::string mMapTextureFile;
+    bool mMapTextureRaise = false;
     int mLayerMoveTo = -1;
     bool mCameraAsk = false;
     float mCameraAskX = 0.0f;

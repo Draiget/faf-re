@@ -1546,8 +1546,18 @@ namespace faf::editor
         if (ImGui::Button("Clear")) {
           AskMapTexture(kind, MapTextureOp::Clear);
         }
-        ImGui::EndDisabled();
         ImGui::SetItemTooltip("Take it out of the slot (the shader then reads none)");
+        ImGui::SameLine();
+        if (ImGui::Button("Export...")) {
+          AskMapTexture(kind, MapTextureOp::Export);
+        }
+        ImGui::SetItemTooltip("Save the slot's texture as a .dds file");
+        ImGui::EndDisabled();
+        ImGui::SameLine();
+        if (ImGui::Button("Import...")) {
+          AskMapTexture(kind, MapTextureOp::Import);
+        }
+        ImGui::SetItemTooltip("A .dds made elsewhere (packed as this shader reads it), copied into the map's folder");
         ImGui::EndGroup();
         ImGui::Spacing();
         ImGui::PopID();

@@ -102,10 +102,27 @@ namespace faf::editor
       ) {
         mapWideDone = true;
         const std::string what = value[0].c_str();
-        mTools.AskMapTexture(
-          what.rfind("lighting", 0) == 0 ? 1 : 0,
-          what.find(",clear") != std::string::npos ? EdTools::MapTextureOp::Clear : EdTools::MapTextureOp::Make
-        );
+        const int kind = what.rfind("lighting", 0) == 0 ? 1 : 0;
+        const auto fileAfter = [&](const char* const key) {
+          const std::size_t at = what.find(key);
+          return at == std::string::npos ? std::string() : what.substr(at + std::string(key).size());
+        };
+        if (const std::string out = fileAfter(",export="); !out.empty()) {
+          mTools.AskMapTexture(
+            kind,
+            what.find(",make,") != std::string::npos ? EdTools::MapTextureOp::Make : EdTools::MapTextureOp::Export,
+            out
+          );
+        } else if (const std::string in = fileAfter(",import="); !in.empty()) {
+          mTools.AskMapTexture(kind, EdTools::MapTextureOp::Import, in);
+        } else {
+          mTools.AskMapTexture(
+            kind,
+            what.find(",clear") != std::string::npos ? EdTools::MapTextureOp::Clear : EdTools::MapTextureOp::Make,
+            {},
+            what.find(",stale") != std::string::npos
+          );
+        }
         gpg::Logf("editor: /mapwide %s", what.c_str());
       }
     }
