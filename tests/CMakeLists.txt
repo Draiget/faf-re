@@ -339,6 +339,14 @@ set_target_properties(faf_water_bodies_tests PROPERTIES FOLDER "Tests/Sim")
 add_test(NAME water_bodies COMMAND faf_water_bodies_tests)
 set_tests_properties(water_bodies PROPERTIES LABELS "Sim")
 
+# Engine addition: the derivation of a river's level field, flow and falls (docs/projects/RIVERS.md).
+add_executable(faf_water_rivers_tests EXCLUDE_FROM_ALL sim/WaterRiversTests.cpp ${CMAKE_SOURCE_DIR}/src/moho/sim/WaterBodies.cpp ${CMAKE_SOURCE_DIR}/src/moho/sim/WaterRivers.cpp)
+target_include_directories(faf_water_rivers_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_link_libraries(faf_water_rivers_tests PRIVATE gtest_main)
+set_target_properties(faf_water_rivers_tests PROPERTIES FOLDER "Tests/Sim")
+add_test(NAME water_rivers COMMAND faf_water_rivers_tests)
+set_tests_properties(water_rivers PROPERTIES LABELS "Sim")
+
 # Engine addition: the map's water queries with water bodies.
 add_executable(faf_water_bodies_map_tests EXCLUDE_FROM_ALL sim/WaterBodiesMapTests.cpp)
 target_link_libraries(faf_water_bodies_map_tests PRIVATE faf_engine gtest_main)
