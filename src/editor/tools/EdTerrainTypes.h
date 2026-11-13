@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -37,4 +38,31 @@ namespace faf::editor
 
   /** Sets the cells whose centres lie within `radius` of (x, z) to `code`; returns how many changed. */
   int PaintTerrainType(std::uint8_t* grid, int width, int height, float x, float z, float radius, std::uint8_t code);
+
+  /**
+   * The terrain type a layer texture gets by default (FAF Studio's terraintype.lua RULES): the first word of a list
+   * found in its file name (lava 230, snow 200, ice 201, wet sand 41, sand 40, tarmac 151, grass 80, rock 150, cliff
+   * 158, gravel 4, dirt 2, mud 3 ...), when `types` has that code; 1 (Default) otherwise.
+   */
+  [[nodiscard]] int DefaultTerrainTypeFor(const std::string& albedo, const std::vector<TerrainTypeInfo>& types);
+
+  /**
+   * The terrain types from the texture layers: each type cell (`gridWidth` x `gridHeight`, over the same map as the
+   * masks) takes the type of the layer seen most at its middle: a painted layer's share is its mask weight (in the
+   * shader's range: `remapped`, RemappedStrata's bits) times what the layers above leave free, the base layer's what
+   * nothing covers. `types[layer]` (0 the base, 1..8); layers without a texture (`textured`) show nothing.
+   * `onlyDefault` leaves cells that have a type other than Default (1). Returns how many cells changed.
+   */
+  std::size_t TerrainTypesFromLayers(
+    const std::uint64_t* texels,
+    int maskWidth,
+    int maskHeight,
+    std::uint8_t remapped,
+    const std::array<bool, 9>& textured,
+    const std::array<int, 9>& types,
+    std::uint8_t* grid,
+    int gridWidth,
+    int gridHeight,
+    bool onlyDefault
+  );
 } // namespace faf::editor
