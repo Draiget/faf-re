@@ -1246,6 +1246,12 @@ namespace faf::editor
 
   void EdTools::DrawSelect()
   {
+    ImGui::Checkbox("Follow symmetry", &mFollowSymmetry);
+    EdSetItemTooltip(
+      "Follow symmetry\nMoving, turning or deleting an object does the same to its mirrored copies: the objects of its "
+      "kind "
+      "at the images of its place under the map's symmetry (the toolbar's)."
+    );
     // What a click, the hover and a box may pick is in the view, under the camera row (EdShell::DrawViewOverlays).
     if (!mPickable.All()) {
       Note("Some kinds aren't picked (the Pick pills in the view): they stay drawn but can't be grabbed or moved.");

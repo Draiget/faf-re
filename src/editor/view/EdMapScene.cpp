@@ -1,6 +1,7 @@
 #include "editor/view/EdMapScene.h"
 #include "editor/tools/EdShaderProfiles.h"
 #include "editor/tools/EdSlopeRules.h"
+#include "editor/tools/EdSymmetryFollow.h"
 #include "editor/doc/EdUnitFate.h"
 
 #include <algorithm>
@@ -5521,6 +5522,7 @@ namespace faf::editor
       for (const int index : mSelection) {
         mDragStart.push_back(mMap->mProps->mEntries[static_cast<std::size_t>(index)].mTransform.pos_);
       }
+      mPropFollow = FollowOn() ? PropPartners() : std::vector<std::vector<int>>{};
       break;
     case PickKind::Marker:
       mDragMarkers = true;
@@ -5529,6 +5531,7 @@ namespace faf::editor
       mMarkerDragFromZ = groundZ;
       mMarkerBefore = mDocument.SaveDataNow();
       mMarkerDragStart.clear();
+      mMarkerFollow = FollowOn() ? MarkerPartners() : std::vector<std::vector<std::string>>{};
       for (const std::string& selected : mMarkerSelection) {
         std::array<float, 3> start{};
         for (const SaveEntry& marker : mDocument.SaveData().Markers()) {
@@ -6505,6 +6508,18 @@ namespace faf::editor
       return;
     }
     EdDocument::SaveSnapshot before = mDocument.SaveDataNow();
+    // Follow symmetry: the mirrored copies go too.
+    if (FollowOn()) {
+      for (const std::vector<std::string>& copies : MarkerPartners()) {
+        for (const std::string& name : copies) {
+          if (
+            !name.empty() && std::find(mMarkerSelection.begin(), mMarkerSelection.end(), name) == mMarkerSelection.end()
+          ) {
+            mMarkerSelection.push_back(name);
+          }
+        }
+      }
+    }
     std::vector<SaveEntry>& markers = mDocument.SaveData().Markers();
     const std::size_t count = markers.size();
     for (const SaveEntry& marker : markers) {
@@ -7213,21 +7228,271 @@ namespace faf::editor
       return;
     }
     BeginObjectStroke();
+    const std::vector<std::vector<int>> partners = FollowOn() ? PropPartners() : std::vector<std::vector<int>>{};
     const Wm3::Quatf turn(std::cos(radians * 0.5f), 0.0f, std::sin(radians * 0.5f), 0.0f);
     auto& entries = mMap->mProps->mEntries;
-    for (const int index : mSelection) {
+    const auto setOrient = [&](const int index, const Wm3::Quatf& orient) {
       moho::CWldPropEntry& entry = entries[static_cast<std::size_t>(index)];
-      entry.mTransform.orient_ = turn * entry.mTransform.orient_;
+      entry.mTransform.orient_ = orient;
       const PropRecord record = PropRecordFor(entry.mBlueprintPath.c_str(), entry.mTransform);
       entry.mTransform = record.loaded;
       mDocument.SetPropRecord(static_cast<std::size_t>(index), record);
       if (static_cast<std::size_t>(index) < mProps.size() && mProps[static_cast<std::size_t>(index)] != nullptr) {
         mProps[static_cast<std::size_t>(index)]->SetStance(entry.mTransform, entry.mTransform);
       }
+    };
+    const moho::CHeightField* const field = mMap->mTerrainRes->GetHeightField();
+    const HeightBrush brush = mTools != nullptr ? mTools->CurrentHeightBrush() : HeightBrush{};
+    for (std::size_t i = 0; i < mSelection.size(); ++i) {
+      const int index = mSelection[i];
+      setOrient(index, turn * entries[static_cast<std::size_t>(index)].mTransform.orient_);
+      // Its mirrored copies take the image of its new heading.
+      if (i < partners.size() && field != nullptr) {
+        const moho::CWldPropEntry& entry = entries[static_cast<std::size_t>(index)];
+        const float heading = 2.0f * std::atan2(entry.mTransform.orient_.y, entry.mTransform.orient_.w);
+        float cx[kMaxSymmetryCopies], cz[kMaxSymmetryCopies], ch[kMaxSymmetryCopies];
+        const int copies = SymmetricPlaces(
+          field->width,
+          field->height,
+          brush.symmetry,
+          brush.turns,
+          entry.mTransform.pos_.x,
+          entry.mTransform.pos_.z,
+          heading,
+          cx,
+          cz,
+          ch
+        );
+        for (int c = 1; c < copies && static_cast<std::size_t>(c - 1) < partners[i].size(); ++c) {
+          if (const int partner = partners[i][static_cast<std::size_t>(c - 1)]; partner >= 0) {
+            setOrient(partner, Wm3::Quatf(std::cos(ch[c] * 0.5f), 0.0f, std::sin(ch[c] * 0.5f), 0.0f));
+          }
+        }
+      }
     }
     mObjectsChanged = true;
     mDocument.SetModified(true);
     EndObjectStroke();
+  }
+
+  bool EdMapScene::FollowOn() const
+  {
+    return mTools != nullptr && mMap != nullptr && mTools->FollowSymmetry() &&
+      mTools->CurrentHeightBrush().symmetry != Symmetry::None;
+  }
+
+  std::vector<std::vector<int>> EdMapScene::PropPartners() const
+  {
+    const moho::CHeightField* const field = mMap != nullptr ? mMap->mTerrainRes->GetHeightField() : nullptr;
+    if (field == nullptr || mMap->mProps == nullptr) {
+      return {};
+    }
+    std::vector<FollowItem> items;
+    items.reserve(mMap->mProps->mEntries.size());
+    for (const moho::CWldPropEntry& entry : mMap->mProps->mEntries) {
+      std::string key = entry.mBlueprintPath.c_str();
+      for (char& c : key) {
+        c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+      }
+      items.push_back({entry.mTransform.pos_.x, entry.mTransform.pos_.z, std::move(key)});
+    }
+    const HeightBrush brush = mTools->CurrentHeightBrush();
+    return FindSymmetryPartners(items, mSelection, field->width, field->height, brush.symmetry, brush.turns, 1.5f);
+  }
+
+  std::vector<std::vector<std::string>> EdMapScene::MarkerPartners() const
+  {
+    const moho::CHeightField* const field = mMap != nullptr ? mMap->mTerrainRes->GetHeightField() : nullptr;
+    if (field == nullptr) {
+      return {};
+    }
+    const std::vector<SaveEntry>& markers = mDocument.SaveData().Markers();
+    std::vector<FollowItem> items;
+    std::vector<int> selected;
+    items.reserve(markers.size());
+    for (const SaveEntry& marker : markers) {
+      const std::vector<double> at = ValueNumbers(marker.Get("position"));
+      items.push_back(
+        {at.size() >= 3 ? static_cast<float>(at[0]) : -1e9f,
+         at.size() >= 3 ? static_cast<float>(at[2]) : -1e9f,
+         MarkerTypeOf(marker)}
+      );
+    }
+    for (const std::string& name : mMarkerSelection) {
+      for (std::size_t i = 0; i < markers.size(); ++i) {
+        if (markers[i].name == name) {
+          selected.push_back(static_cast<int>(i));
+        }
+      }
+    }
+    const HeightBrush brush = mTools->CurrentHeightBrush();
+    const std::vector<std::vector<int>> found =
+      FindSymmetryPartners(items, selected, field->width, field->height, brush.symmetry, brush.turns, 1.5f);
+    std::vector<std::vector<std::string>> names(found.size());
+    for (std::size_t s = 0; s < found.size(); ++s) {
+      for (const int index : found[s]) {
+        names[s].push_back(index >= 0 ? markers[static_cast<std::size_t>(index)].name : std::string());
+      }
+    }
+    return names;
+  }
+
+  void EdMapScene::FollowPropMove(
+    const std::size_t selected,
+    const Wm3::Vec3f& position
+  )
+  {
+    const moho::CHeightField* const field = mMap->mTerrainRes->GetHeightField();
+    if (selected >= mPropFollow.size() || field == nullptr) {
+      return;
+    }
+    const HeightBrush brush = mTools->CurrentHeightBrush();
+    float cx[kMaxSymmetryCopies], cz[kMaxSymmetryCopies];
+    const int copies =
+      HeightBrushCentres(field->width, field->height, position.x, position.z, brush.symmetry, brush.turns, cx, cz);
+    for (int c = 1; c < copies && static_cast<std::size_t>(c - 1) < mPropFollow[selected].size(); ++c) {
+      if (const int partner = mPropFollow[selected][static_cast<std::size_t>(c - 1)]; partner >= 0) {
+        MovePropTo(
+          partner,
+          Wm3::Vec3f{
+            cx[c],
+            mMap->mTerrainRes->GetHeightAt(
+              static_cast<std::int32_t>(std::lround(cx[c])), static_cast<std::int32_t>(std::lround(cz[c]))
+            ),
+            cz[c]
+          }
+        );
+      }
+    }
+  }
+
+  void EdMapScene::FollowMarkerMove(
+    const std::size_t selected,
+    const float x,
+    const float z
+  )
+  {
+    const moho::CHeightField* const field = mMap->mTerrainRes->GetHeightField();
+    if (selected >= mMarkerFollow.size() || field == nullptr) {
+      return;
+    }
+    const HeightBrush brush = mTools->CurrentHeightBrush();
+    float cx[kMaxSymmetryCopies], cz[kMaxSymmetryCopies];
+    const int copies = HeightBrushCentres(field->width, field->height, x, z, brush.symmetry, brush.turns, cx, cz);
+    std::vector<SaveEntry>& markers = mDocument.SaveData().Markers();
+    for (int c = 1; c < copies && static_cast<std::size_t>(c - 1) < mMarkerFollow[selected].size(); ++c) {
+      const std::string& name = mMarkerFollow[selected][static_cast<std::size_t>(c - 1)];
+      if (name.empty()) {
+        continue;
+      }
+      for (SaveEntry& marker : markers) {
+        if (marker.name == name) {
+          const float y =
+            mMap->mTerrainRes->GetHeightAt(static_cast<std::int32_t>(cx[c]), static_cast<std::int32_t>(cz[c]));
+          marker.Set("position", Vector3Value(cx[c], y, cz[c]));
+        }
+      }
+    }
+  }
+
+  void EdMapScene::TestFollow(
+    const std::string& kind
+  )
+  {
+    if (!FollowOn()) {
+      gpg::Logf("editor: follow test: no symmetry chosen (or Follow symmetry off)");
+      return;
+    }
+    const moho::CHeightField* const field = mMap->mTerrainRes->GetHeightField();
+    const HeightBrush brush = mTools->CurrentHeightBrush();
+    if (kind == "props" && mMap->mProps != nullptr) {
+      const std::size_t before = mMap->mProps->mEntries.size();
+      // The first prop that has a mirrored copy.
+      for (int index = 0; index < static_cast<int>(before); ++index) {
+        mSelection = {index};
+        const std::vector<std::vector<int>> partners = PropPartners();
+        if (partners.empty() || partners[0].empty() || partners[0][0] < 0) {
+          continue;
+        }
+        const int partner = partners[0][0];
+        const Wm3::Vec3f from = mMap->mProps->mEntries[static_cast<std::size_t>(index)].mTransform.pos_;
+        const Wm3::Vec3f to{from.x + 6.0f, from.y, from.z + 4.0f};
+        BeginObjectStroke();
+        mPropFollow = partners;
+        MovePropTo(index, to);
+        FollowPropMove(0, to);
+        EndObjectStroke();
+        float cx[kMaxSymmetryCopies], cz[kMaxSymmetryCopies];
+        (void)HeightBrushCentres(field->width, field->height, to.x, to.z, brush.symmetry, brush.turns, cx, cz);
+        const Wm3::Vec3f moved = mMap->mProps->mEntries[static_cast<std::size_t>(partner)].mTransform.pos_;
+        gpg::Logf(
+          "editor: follow test: prop %d moved by (6, 4); its copy %d is at %.2f, %.2f (the image: %.2f, %.2f)",
+          index,
+          partner,
+          static_cast<double>(moved.x),
+          static_cast<double>(moved.z),
+          static_cast<double>(cx[1]),
+          static_cast<double>(cz[1])
+        );
+        DeleteSelection();
+        gpg::Logf(
+          "editor: follow test: deleted with its copy: %zu props -> %zu", before, mMap->mProps->mEntries.size()
+        );
+        return;
+      }
+      gpg::Logf("editor: follow test: no prop with a mirrored copy");
+      return;
+    }
+    if (kind == "markers") {
+      std::vector<SaveEntry>& markers = mDocument.SaveData().Markers();
+      const std::size_t before = markers.size();
+      for (const SaveEntry& marker : markers) {
+        if (MarkerTypeOf(marker) != "Mass") {
+          continue;
+        }
+        mMarkerSelection = {marker.name};
+        const std::vector<std::vector<std::string>> partners = MarkerPartners();
+        if (partners.empty() || partners[0].empty() || partners[0][0].empty()) {
+          continue;
+        }
+        const std::string leader = marker.name;
+        const std::string partner = partners[0][0];
+        const std::vector<double> at = ValueNumbers(marker.Get("position"));
+        const float x = static_cast<float>(at[0]) + 6.0f;
+        const float z = static_cast<float>(at[2]) + 4.0f;
+        mMarkerFollow = partners;
+        for (SaveEntry& m : markers) {
+          if (m.name == leader) {
+            m.Set("position", Vector3Value(x, static_cast<float>(at[1]), z));
+          }
+        }
+        FollowMarkerMove(0, x, z);
+        float cx[kMaxSymmetryCopies], cz[kMaxSymmetryCopies];
+        (void)HeightBrushCentres(field->width, field->height, x, z, brush.symmetry, brush.turns, cx, cz);
+        for (const SaveEntry& m : markers) {
+          if (m.name == partner) {
+            const std::vector<double> p = ValueNumbers(m.Get("position"));
+            gpg::Logf(
+              "editor: follow test: %s moved by (6, 4); its copy %s is at %.2f, %.2f (the image: %.2f, %.2f)",
+              leader.c_str(),
+              partner.c_str(),
+              p[0],
+              p[2],
+              static_cast<double>(cx[1]),
+              static_cast<double>(cz[1])
+            );
+          }
+        }
+        DeleteSelectedMarkers();
+        gpg::Logf(
+          "editor: follow test: deleted with its copy: %zu markers -> %zu",
+          before,
+          mDocument.SaveData().Markers().size()
+        );
+        return;
+      }
+      gpg::Logf("editor: follow test: no mass marker with a mirrored copy");
+    }
   }
 
   void EdMapScene::DeleteSelection()
@@ -7237,6 +7502,16 @@ namespace faf::editor
     }
     BeginObjectStroke();
     std::vector<int> doomed = mSelection;
+    // Follow symmetry: the mirrored copies go too.
+    if (FollowOn()) {
+      for (const std::vector<int>& copies : PropPartners()) {
+        for (const int partner : copies) {
+          if (partner >= 0) {
+            doomed.push_back(partner);
+          }
+        }
+      }
+    }
     std::sort(doomed.begin(), doomed.end(), std::greater<>());
     doomed.erase(std::unique(doomed.begin(), doomed.end()), doomed.end());
     for (const int index : doomed) {
@@ -8253,6 +8528,7 @@ namespace faf::editor
           mMarkersMoved = false;
           mMarkerBefore = mDocument.SaveDataNow();
           mMarkerDragStart.clear();
+          mMarkerFollow = FollowOn() ? MarkerPartners() : std::vector<std::vector<std::string>>{};
           for (const std::string& selected : mMarkerSelection) {
             std::array<float, 3> start{};
             for (const SaveEntry& marker : mDocument.SaveData().Markers()) {
@@ -8307,6 +8583,7 @@ namespace faf::editor
         mMarkerDragFromZ = groundZ;
         mMarkerBefore = mDocument.SaveDataNow();
         mMarkerDragStart.clear();
+        mMarkerFollow = FollowOn() ? MarkerPartners() : std::vector<std::vector<std::string>>{};
         for (const std::string& selected : mMarkerSelection) {
           std::array<float, 3> start{};
           for (const SaveEntry& marker : markers) {
@@ -9006,6 +9283,7 @@ namespace faf::editor
                   mMap->mTerrainRes->GetHeightAt(static_cast<std::int32_t>(x), static_cast<std::int32_t>(z));
                 marker.Set("position", Vector3Value(x, y, z));
               }
+              FollowMarkerMove(i, x, z);
             }
             mMarkersMoved = true;
           }
@@ -9059,7 +9337,9 @@ namespace faf::editor
           const Wm3::Vec3f move = GizmoDisplacement(at);
           if (move.x != 0.0f || move.y != 0.0f || move.z != 0.0f) {
             for (std::size_t i = 0; i < mSelection.size() && i < mDragStart.size(); ++i) {
-              MovePropTo(mSelection[i], GizmoPlace(mDragStart[i], move, false));
+              const Wm3::Vec3f place = GizmoPlace(mDragStart[i], move, false);
+              MovePropTo(mSelection[i], place);
+              FollowPropMove(i, place);
             }
           }
           return true;
@@ -9075,16 +9355,15 @@ namespace faf::editor
             for (std::size_t i = 0; i < mSelection.size() && i < mDragStart.size(); ++i) {
               const float x = SnapToGrid(mDragStart[i].x + groundX - mDragFromX);
               const float z = SnapToGrid(mDragStart[i].z + groundZ - mDragFromZ);
-              MovePropTo(
-                mSelection[i],
-                Wm3::Vec3f{
-                  x,
-                  mMap->mTerrainRes->GetHeightAt(
-                    static_cast<std::int32_t>(std::lround(x)), static_cast<std::int32_t>(std::lround(z))
-                  ),
-                  z
-                }
-              );
+              const Wm3::Vec3f place{
+                x,
+                mMap->mTerrainRes->GetHeightAt(
+                  static_cast<std::int32_t>(std::lround(x)), static_cast<std::int32_t>(std::lround(z))
+                ),
+                z
+              };
+              MovePropTo(mSelection[i], place);
+              FollowPropMove(i, place);
             }
           }
           return true;

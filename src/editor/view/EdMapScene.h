@@ -148,6 +148,8 @@ namespace faf::editor
     [[nodiscard]] std::vector<EdTools::LayerSlot> LayerSlots() const;
     /** The paint layer's mask cleared, or read from / written to a grey image (PNG, RAW: 0-255 as 0-65535). */
     bool ClearMaskLayer(int layer, std::string& message);
+    /** `/followtest props|markers` (test runs): an object with a mirrored copy moved, then deleted, both followed. */
+    void TestFollow(const std::string& kind);
     /** The panels keep a copy of the minimap (composited view): it is then drawn only every 20 frames. */
     void SetMiniMapCached(
       const bool cached
@@ -580,6 +582,14 @@ namespace faf::editor
     std::vector<TerrainTypeRun> mSlopeRuns;
     std::uint64_t mSlopeHeights = 0;
     std::uint64_t mSlopeKey = 0;
+    // Follow symmetry (EdSymmetryFollow): the selected objects' mirrored copies, found when an edit starts.
+    [[nodiscard]] bool FollowOn() const;
+    [[nodiscard]] std::vector<std::vector<int>> PropPartners() const;
+    [[nodiscard]] std::vector<std::vector<std::string>> MarkerPartners() const;
+    void FollowPropMove(std::size_t selected, const Wm3::Vec3f& position);
+    void FollowMarkerMove(std::size_t selected, float x, float z);
+    std::vector<std::vector<int>> mPropFollow;
+    std::vector<std::vector<std::string>> mMarkerFollow;
     bool mMiniCached = false;
     bool mMiniDrawNow = true;
     bool mMiniDrewLast = false;

@@ -149,9 +149,9 @@ namespace faf::editor
         "/vaultsearch",    "/vaultmap",       "/newmap",         "/stamp",           "/brush",       "/layer",
         "/waterbody",      "/ruler",          "/adaptivewindow", "/maskrule",        "/maskgen",     "/symhover",
         "/stbfont",        "/recipe",         "/texset",         "/layerop",         "/slopeview",   "/typesfromlayers",
-        "/uncapped",       "/nominimap",      "/symmenu",        "/panelbottom",     "/shader",      "/brushtest",
-        "/brushshape",     "/stampsource",    "/stampstroke",    "/symoptions",      "/maskoptions", "/masktest",
-        "/shaderbrowser",  "/convertlayers",
+        "/uncapped",       "/nominimap",      "/followtest",     "/symmenu",         "/panelbottom", "/shader",
+        "/brushtest",      "/brushshape",     "/stampsource",    "/stampstroke",     "/symoptions",  "/maskoptions",
+        "/masktest",       "/shaderbrowser",  "/convertlayers",
       };
       for (const char* const option : kOptions) {
         if (moho::CFG_GetArgOption(option, 0, nullptr)) {
@@ -2267,6 +2267,7 @@ namespace faf::editor
       std::string mLayerOpArg; // `/layerop <slot>,fill|remove|optimal` (test runs)
       std::string mSlopeViewArg;       // `/slopeview units,<n>[,<limit>]|buildings,<n>,ring|area[,<limit>]` (test runs)
       std::string mTypesFromLayersArg; // `/typesfromlayers[,only]` (test runs)
+      std::string mFollowTestArg;      // `/followtest props|markers` (test runs)
       int mD2gFrames = 0;
       int mLayerOpFrames = 0;
       int mThemeArgFrames = 0;
@@ -4058,6 +4059,9 @@ namespace faf::editor
       if (fa::vector<fa::string> test; moho::CFG_GetArgOption("/brushtest", 1, &test) && !test.empty()) {
         mBrushTestArg = test[0].c_str();
       }
+      if (fa::vector<fa::string> follow; moho::CFG_GetArgOption("/followtest", 1, &follow) && !follow.empty()) {
+        mFollowTestArg = follow[0].c_str();
+      }
       if (fa::vector<fa::string> slope; moho::CFG_GetArgOption("/slopeview", 1, &slope) && !slope.empty()) {
         mSlopeViewArg = slope[0].c_str();
       }
@@ -4642,6 +4646,9 @@ namespace faf::editor
         mThemeArg.clear();
       }
       // `/slopeview ...` and `/typesfromlayers` (test runs).
+      if (!mFollowTestArg.empty() && !mScene.ModelsPending() && ++mD2gFrames >= 150) {
+        mScene.TestFollow(std::exchange(mFollowTestArg, {}));
+      }
       if ((!mSlopeViewArg.empty() || !mTypesFromLayersArg.empty()) && ++mD2gFrames == 120) {
         if (!mSlopeViewArg.empty()) {
           EdTools::SlopeView& slope = tools.SlopeSettings();

@@ -1513,6 +1513,11 @@ namespace faf::editor
       mTypesFromLayersAsk = true;
       mTypesOnlyDefault = onlyDefault;
     }
+    /** Follow symmetry: moving, turning or deleting an object does the same to its mirrored copies. */
+    [[nodiscard]] bool FollowSymmetry() const noexcept
+    {
+      return mFollowSymmetry;
+    }
     [[nodiscard]] bool ShowSlope() const noexcept
     {
       return mShowSlope;
@@ -2480,6 +2485,7 @@ namespace faf::editor
     bool mRecipeApply = false;
     bool mRecipesOpen = false;
     std::string mRecipeResult;
+    bool mFollowSymmetry = true;
     std::uint64_t mMinimapImage = 0;
     SlopeView mSlopeView;
     std::array<int, 9> mLayerTypeOverride{-1, -1, -1, -1, -1, -1, -1, -1, -1};
