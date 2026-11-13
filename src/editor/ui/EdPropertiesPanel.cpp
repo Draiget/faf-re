@@ -336,6 +336,14 @@ namespace faf::editor
             if (ImGui::IsItemDeactivatedAfterEdit()) {
               ask(held);
             }
+          } else if (held.rfind("STRING(", 0) == 0 && key == "prop" && FindMarkerType(now.type) != nullptr) {
+            // A known type's model: the type sets it (editors draw it; the game doesn't read it), so it isn't typed in.
+            ImGui::AlignTextToFramePadding();
+            ImGui::TextDisabled("%s", ValueString(held).c_str());
+            ImGui::SetItemTooltip(
+              "Set by the marker's type (%s): the model editors draw for it. The game doesn't read it.",
+              now.type.c_str()
+            );
           } else if (held.rfind("STRING(", 0) == 0) {
             char buffer[512];
             (void)std::snprintf(buffer, sizeof(buffer), "%s", ValueString(held).c_str());
