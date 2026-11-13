@@ -30,6 +30,7 @@
 #include "imgui_internal.h"
 #include "legacy/containers/String.h"
 #include "moho/misc/StartupHelpers.h"
+#include "moho/sim/CWldSession.h"
 
 namespace faf::editor
 {
@@ -91,6 +92,17 @@ namespace faf::editor
   void EdShell::UpdateTestRun()
   {
     const double now = ImGui::GetTime();
+    // `/hidegameunits` (test runs): once a play runs, the editor's view in front of it with the game's units hidden.
+    {
+      static const bool hideTest = moho::CFG_GetArgOption("/hidegameunits", 0, nullptr);
+      static bool hideDone = false;
+      if (hideTest && !hideDone && mPlay.Active() && moho::WLD_GetFrameAction() == moho::EWldFrameAction::Playing) {
+        hideDone = true;
+        mEditorViewInPlay = true;
+        mTools.ShowGameUnits() = false;
+        gpg::Logf("editor: /hidegameunits: the editor's view in front of the play, its units hidden");
+      }
+    }
     switch (mTestRunStep) {
     case 1: {
       // The open map, picked in the Map panel's list, and played.
@@ -640,7 +652,7 @@ namespace faf::editor
       const ImVec4 dim = ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled);
       // The mockup's text-1: the toolbar's words, between the bright and the dimmed text.
       const ImU32 ink1 = ImGui::GetColorU32(
-        ImVec4((text.x * 2.0f + dim.x) / 3.0f, (text.y * 2.0f + dim.y) / 3.0f, (text.z * 2.0f + dim.z) / 3.0f, 1.0f)
+        ImVec4((text.x * 3.0f + dim.x) / 4.0f, (text.y * 3.0f + dim.y) / 4.0f, (text.z * 3.0f + dim.z) / 4.0f, 1.0f)
       );
       {
         // The line under the toolbar.
@@ -689,7 +701,7 @@ namespace faf::editor
         }
         ImU32 ink = pressed ? AccentU32() : hovered ? ImGui::GetColorU32(ImGuiCol_Text) : ink1;
         if (!enabled) {
-          ink = withAlpha(ink, 0.4f);
+          ink = withAlpha(ink, 0.55f);
         } else if (inkAlpha < 1.0f && !hovered) {
           ink = withAlpha(ink, inkAlpha);
         }
@@ -908,11 +920,7 @@ namespace faf::editor
         const ImVec2 word = font->CalcTextSizeA(wordSize, FLT_MAX, 0.0f, "Symmetry");
         const ImVec2 at = ImGui::GetCursorScreenPos();
         draw->AddText(
-          font,
-          wordSize,
-          ImVec2(at.x + Em(2.0f), std::round(at.y + (buttonHeight - word.y) * 0.5f)),
-          ImGui::GetColorU32(ImGuiCol_TextDisabled),
-          "Symmetry"
+          font, wordSize, ImVec2(at.x + Em(2.0f), std::round(at.y + (buttonHeight - word.y) * 0.5f)), ink1, "Symmetry"
         );
         ImGui::Dummy(ImVec2(word.x + Em(5.0f), buttonHeight));
         ImGui::SameLine(0.0f, 0.0f);

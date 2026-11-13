@@ -155,7 +155,16 @@ namespace faf::editor
       ImDrawList* const dl = ImGui::GetWindowDrawList();
       const float rowTop = viewport->WorkPos.y;
       const float rowMid = rowTop + height * 0.5f;
-      const ImVec4 text = style.Colors[chrome.active ? ImGuiCol_Text : ImGuiCol_TextDisabled];
+      // Behind another window the row greys a little, as VS Code's does (the dimmed text was hard to read).
+      const ImVec4 bright = style.Colors[ImGuiCol_Text];
+      const ImVec4 dimmed = style.Colors[ImGuiCol_TextDisabled];
+      const ImVec4 text = chrome.active ? bright
+                                        : ImVec4(
+                                            (bright.x * 3.0f + dimmed.x) / 4.0f,
+                                            (bright.y * 3.0f + dimmed.y) / 4.0f,
+                                            (bright.z * 3.0f + dimmed.z) / 4.0f,
+                                            1.0f
+                                          );
 
       // Where the title and the menus' cursor goes so their text sits on the row's middle, as the tabs' does: the
       // menu bar draws text its line's text offset (the row's tall frame padding) below the cursor.
@@ -312,7 +321,14 @@ namespace faf::editor
           } else if (hovered) {
             dl->AddRectFilled(at, max, ImGui::GetColorU32(ImGuiCol_WindowBg), Em(6.0f));
           }
-          const ImU32 ink = active ? AccentU32() : ImGui::GetColorU32(hovered ? ImGuiCol_Text : ImGuiCol_TextDisabled);
+          // Inactive ones a light grey (three parts the bright text to one the dimmed), readable as VS Code's are.
+          const ImU32 quiet = ImGui::GetColorU32(ImVec4(
+            (bright.x * 3.0f + dimmed.x) / 4.0f,
+            (bright.y * 3.0f + dimmed.y) / 4.0f,
+            (bright.z * 3.0f + dimmed.z) / 4.0f,
+            1.0f
+          ));
+          const ImU32 ink = active ? AccentU32() : hovered ? ImGui::GetColorU32(ImGuiCol_Text) : quiet;
           dl->AddText(ImVec2(at.x + Em(10.0f), (at.y + max.y - fontSize) * 0.5f), ink, text.c_str());
           if (hovered && ImGui::BeginTooltip()) {
             // "Layout workspace · Alt+4", then what it is for.
@@ -359,7 +375,15 @@ namespace faf::editor
           ImGui::PushStyleColor(ImGuiCol_Button, style.Colors[ImGuiCol_FrameBg]);
           ImGui::PushStyleColor(ImGuiCol_ButtonHovered, style.Colors[ImGuiCol_FrameBgHovered]);
           ImGui::PushStyleColor(ImGuiCol_ButtonActive, style.Colors[ImGuiCol_FrameBgActive]);
-          ImGui::PushStyleColor(ImGuiCol_Text, style.Colors[ImGuiCol_TextDisabled]);
+          ImGui::PushStyleColor(
+            ImGuiCol_Text,
+            ImVec4(
+              (style.Colors[ImGuiCol_Text].x + style.Colors[ImGuiCol_TextDisabled].x) * 0.5f,
+              (style.Colors[ImGuiCol_Text].y + style.Colors[ImGuiCol_TextDisabled].y) * 0.5f,
+              (style.Colors[ImGuiCol_Text].z + style.Colors[ImGuiCol_TextDisabled].z) * 0.5f,
+              1.0f
+            )
+          );
           if (ImGui::Button("##search", ImVec2(width, h)) && openPalette) {
             openPalette();
           }
