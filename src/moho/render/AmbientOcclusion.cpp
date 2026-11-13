@@ -91,6 +91,7 @@ namespace moho
       using render::Api;
       render::Feature feature;
       feature.key = "ambient_occlusion";
+      feature.after = "shadow_filter";
       feature.title = "Ambient Occlusion";
       feature.tip = "Darkens the creases and the places where terrain, buildings and units meet, which gives the scene "
                     "depth. Standard is the "
