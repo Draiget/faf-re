@@ -1447,6 +1447,18 @@ namespace faf::editor
     mModified = true;
   }
 
+  void EdDocument::LookApplied(
+    LookEnvironment before
+  )
+  {
+    mLookUndo.emplace_back(std::move(before), LookEnvironmentNow());
+    if (mLookUndo.size() > 100) {
+      mLookUndo.erase(mLookUndo.begin());
+    }
+    EditEnded(EditKind::Look);
+    mModified = true;
+  }
+
   WaterState EdDocument::WaterNow() const
   {
     WaterState water;
@@ -1675,6 +1687,7 @@ namespace faf::editor
     mDecalRedo.clear();
     mWaterRedo.clear();
     mLightingRedo.clear();
+    mLookRedo.clear();
     mSkyboxRedo.clear();
     mWavesRedo.clear();
     mTerrainTypesRedo.clear();

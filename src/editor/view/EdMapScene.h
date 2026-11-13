@@ -956,6 +956,7 @@ namespace faf::editor
     bool UndoDecals(bool redo);
     bool UndoWater(bool redo);
     bool UndoLighting(bool redo);
+    bool UndoLook(bool redo);
     bool UndoSkybox(bool redo);
     bool UndoWaves(bool redo);
     bool UndoTerrainTypes(bool redo);

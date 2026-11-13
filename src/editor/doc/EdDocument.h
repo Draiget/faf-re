@@ -274,7 +274,38 @@ namespace faf::editor
       TerrainTypes,
       /** Convert layers: the masks, the layer slots and the shader, together. */
       LayerConversion,
+      /** A look applied: the lighting, the water and the sky, together. */
+      Look,
     };
+    /** What a look changes: the map's lighting, water and sky. */
+    struct LookEnvironment
+    {
+      LightingState lighting;
+      WaterState water;
+      SkyboxState sky;
+    };
+    [[nodiscard]] LookEnvironment LookEnvironmentNow() const
+    {
+      return {LightingNow(), WaterNow(), SkyboxNow()};
+    }
+    /** Puts a look's lighting, water and sky on the map (no undo step; LookApplied records one). */
+    void ApplyLookEnvironment(
+      const LookEnvironment& look
+    )
+    {
+      ApplyLighting(look.lighting);
+      ApplyWater(look.water);
+      ApplySkybox(look.sky);
+    }
+    void LookApplied(LookEnvironment before);
+    [[nodiscard]] std::vector<std::pair<LookEnvironment, LookEnvironment>>& LookUndo() noexcept
+    {
+      return mLookUndo;
+    }
+    [[nodiscard]] std::vector<std::pair<LookEnvironment, LookEnvironment>>& LookRedo() noexcept
+    {
+      return mLookRedo;
+    }
     /** The map's terrain type grid (a byte a cell, STIMap::mTerrainType, saved with the terrain): its cells, or null.
      */
     [[nodiscard]] std::uint8_t* TerrainTypeCells(int& width, int& height) const;
@@ -648,6 +679,8 @@ namespace faf::editor
         return "terrain types";
       case EditKind::LayerConversion:
         return "layer conversion";
+      case EditKind::Look:
+        return "look";
       }
       return "edit";
     }
@@ -756,6 +789,8 @@ namespace faf::editor
     std::vector<std::pair<SkyboxState, SkyboxState>> mSkyboxRedo;
     std::vector<std::pair<LightingState, LightingState>> mLightingUndo;
     std::vector<std::pair<LightingState, LightingState>> mLightingRedo;
+    std::vector<std::pair<LookEnvironment, LookEnvironment>> mLookUndo;
+    std::vector<std::pair<LookEnvironment, LookEnvironment>> mLookRedo;
     std::vector<std::pair<WaterState, WaterState>> mWaterUndo;
     std::vector<std::pair<WaterState, WaterState>> mWaterRedo;
     std::vector<std::pair<DecalSnapshot, DecalSnapshot>> mDecalUndo;

@@ -10,6 +10,7 @@
 #include "editor/doc/EdAdaptiveModel.h"
 #include "editor/tools/EdChecks.h"
 #include "editor/doc/EdLighting.h"
+#include "editor/doc/EdLooks.h"
 #include "editor/doc/EdNewMap.h"
 #include "editor/doc/EdPackage.h"
 #include "editor/doc/EdSaveFile.h"
@@ -174,6 +175,68 @@ namespace faf::editor
     [[nodiscard]] bool TakeSkyboxImport() noexcept
     {
       return std::exchange(mSkyboxImport, false);
+    }
+    /** The Looks section's asks, taken by the app: try one, apply or revert the one tried, save or delete one. */
+    struct LookRequest
+    {
+      enum class What
+      {
+        None,
+        Try,
+        Apply,
+        Revert,
+        Save,
+        Delete,
+      };
+      What what = What::None;
+      std::string id; // a map's scenario path, or "mine:<name>"
+      unsigned sections = kLookAll;
+      float blend = 1.0f;
+      std::string name; // Save: the new look's name
+    };
+    [[nodiscard]] bool TakeLookRequest(
+      LookRequest& request
+    )
+    {
+      request = std::exchange(mLookRequest, LookRequest{});
+      return request.what != LookRequest::What::None;
+    }
+    void RequestLook(
+      LookRequest request
+    )
+    {
+      mLookRequest = std::move(request);
+    }
+    /** What the app says of the looks: the one tried (empty: none), its words, the user's own looks. */
+    void SetLookState(
+      std::string tried,
+      std::string status
+    )
+    {
+      mLookTried = std::move(tried);
+      mLookStatus = std::move(status);
+    }
+    void SetMyLooks(
+      std::vector<std::string> names
+    )
+    {
+      mMyLooks = std::move(names);
+    }
+    /** A look's colours once it has been read (sky horizon and zenith, sun, water), for its row. */
+    struct LookSwatch
+    {
+      float colours[4][3]{};
+    };
+    void SetLookSwatch(
+      const std::string& id,
+      const LookSwatch& swatch
+    )
+    {
+      mLookSwatches[id] = swatch;
+    }
+    [[nodiscard]] bool LookTrying() const noexcept
+    {
+      return !mLookTried.empty();
     }
     [[nodiscard]] std::string TakeLightingFromMap()
     {
@@ -548,6 +611,17 @@ namespace faf::editor
     /** The Lighting panel's "from another map": the scenario picked, taken by the app. */
     std::string mLightingFromMap;
     char mLightingFromFilter[64]{};
+    LookRequest mLookRequest;
+    unsigned mLookSections = kLookAll;
+    float mLookBlend = 1.0f;
+    bool mLookTryOnClick = true;
+    std::string mLookChosen;
+    std::string mLookTried;
+    std::string mLookStatus;
+    std::vector<std::string> mMyLooks;
+    std::map<std::string, LookSwatch> mLookSwatches;
+    char mLookSaveName[64]{};
+    void DrawLooks();
     bool mSkyboxExport = false;
     bool mShowScript = false;
     bool mFocusScript = false;

@@ -150,9 +150,9 @@ namespace faf::editor
         "/waterbody",      "/ruler",          "/adaptivewindow", "/maskrule",        "/maskgen",     "/symhover",
         "/stbfont",        "/recipe",         "/texset",         "/layerop",         "/slopeview",   "/typesfromlayers",
         "/uncapped",       "/nominimap",      "/followtest",     "/arrangetest",     "/findtest",    "/findopen",
-        "/filltest",       "/modaltest",      "/symmenu",        "/panelbottom",     "/shader",      "/brushtest",
-        "/brushshape",     "/stampsource",    "/stampstroke",    "/symoptions",      "/maskoptions", "/masktest",
-        "/shaderbrowser",  "/convertlayers",
+        "/filltest",       "/modaltest",      "/looktest",       "/looksfolder",     "/symmenu",     "/panelbottom",
+        "/shader",         "/brushtest",      "/brushshape",     "/stampsource",     "/stampstroke", "/symoptions",
+        "/maskoptions",    "/masktest",       "/shaderbrowser",  "/convertlayers",
       };
       for (const char* const option : kOptions) {
         if (moho::CFG_GetArgOption(option, 0, nullptr)) {
@@ -1885,6 +1885,319 @@ namespace faf::editor
         }
       }
 
+      /** The user's looks: `<settings>\Looks` (or `/looksfolder <dir>` in test runs), three FAFME files a look. */
+      [[nodiscard]] static std::filesystem::path LooksFolder()
+      {
+        if (fa::vector<fa::string> value; moho::CFG_GetArgOption("/looksfolder", 1, &value) && !value.empty()) {
+          return std::filesystem::path(value[0].c_str());
+        }
+        const std::filesystem::path settings = EditorSettingsFolder();
+        return settings.empty() ? settings : settings / "Looks";
+      }
+
+      void ListMyLooks()
+      {
+        std::vector<std::string> names;
+        std::error_code error;
+        const std::filesystem::path folder = LooksFolder();
+        if (!folder.empty() && std::filesystem::is_directory(folder, error)) {
+          for (const auto& entry : std::filesystem::directory_iterator(folder, error)) {
+            if (entry.path().extension() == ".scmlighting") {
+              names.push_back(entry.path().stem().string());
+            }
+          }
+        }
+        std::sort(names.begin(), names.end());
+        mShell->SetMyLooks(std::move(names));
+      }
+
+      [[nodiscard]] static Look LookOfEnvironment(
+        const EdDocument::LookEnvironment& environment
+      )
+      {
+        Look look;
+        look.lighting = environment.lighting;
+        look.water = environment.water;
+        look.sky = environment.sky;
+        look.hasSky = true;
+        return look;
+      }
+
+      /** A look by id: a map's scenario path (its .scmap read through the game's files) or "mine:<name>". */
+      bool LoadLook(
+        const std::string& id,
+        Look& look,
+        std::string& error
+      )
+      {
+        if (const auto cached = mLookCache.find(id); cached != mLookCache.end()) {
+          look = cached->second;
+          return true;
+        }
+        if (id.rfind("mine:", 0) == 0) {
+          // The map's own look under the user's files (each file the look has).
+          const std::string name = id.substr(5);
+          const std::filesystem::path base = LooksFolder() / name;
+          look = LookOfEnvironment(mDocument.LookEnvironmentNow());
+          look.name = name;
+          const auto read = [](const std::filesystem::path& path, std::string& text) {
+            std::ifstream in(path, std::ios::binary);
+            text.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+            return in.good() || !text.empty();
+          };
+          std::string text;
+          if (!read(std::filesystem::path(base).replace_extension(".scmlighting"), text)) {
+            error = "no look named " + name;
+            return false;
+          }
+          (void)LightingFromScmlighting(text, look.lighting, error);
+          if (read(std::filesystem::path(base).replace_extension(".scmwtr"), text)) {
+            (void)WaterFromScmwtr(text, look.water, error);
+          }
+          if (read(std::filesystem::path(base).replace_extension(".scmskybox"), text)) {
+            look.hasSky = SkyboxFromScmskybox(text, look.sky, error);
+          }
+          error.clear();
+        } else {
+          std::string text;
+          std::string bytes;
+          std::smatch path;
+          if (
+            !ReadGameFile(id, text) ||
+            !std::regex_search(text, path, std::regex(R"(\bmap\s*=\s*['"]([^'"]+\.scmap)['"])"))
+          ) {
+            error = id + " names no map file";
+            return false;
+          }
+          if (!ReadGameFile(path[1].str(), bytes)) {
+            error = "can't read " + path[1].str();
+            return false;
+          }
+          if (!LookFromScmap(bytes, look, error)) {
+            error = path[1].str() + ": " + error;
+            return false;
+          }
+          look.name = MapDisplayName(id);
+          gpg::Logf(
+            "editor: look %s read: multiplier %.2f, water colour %.2f %.2f %.2f, %s (horizon %.2f %.2f %.2f, %zu "
+            "planets, "
+            "%s)",
+            look.name.c_str(),
+            static_cast<double>(look.lighting.multiplier),
+            static_cast<double>(look.water.shader.mWaterColor[0]),
+            static_cast<double>(look.water.shader.mWaterColor[1]),
+            static_cast<double>(look.water.shader.mWaterColor[2]),
+            look.hasSky ? "with its sky" : "no sky in the file",
+            static_cast<double>(look.sky.horizonColor[0]),
+            static_cast<double>(look.sky.horizonColor[1]),
+            static_cast<double>(look.sky.horizonColor[2]),
+            look.sky.planets.size(),
+            look.sky.albedo.c_str()
+          );
+        }
+        EdShell::LookSwatch swatch;
+        std::memcpy(swatch.colours[0], look.sky.horizonColor, sizeof(swatch.colours[0]));
+        std::memcpy(swatch.colours[1], look.sky.zenithColor, sizeof(swatch.colours[1]));
+        std::memcpy(swatch.colours[2], look.lighting.sunColor, sizeof(swatch.colours[2]));
+        std::memcpy(swatch.colours[3], look.water.shader.mWaterColor, sizeof(swatch.colours[3]));
+        mShell->SetLookSwatch(id, swatch);
+        mLookCache[id] = look;
+        return true;
+      }
+
+      /** The Looks section's asks: try (no undo step), apply (one), revert, save the map's own, delete one. */
+      void UpdateLooks()
+      {
+        if (!mLooksListed) {
+          mLooksListed = true;
+          ListMyLooks();
+        }
+        if (mDocument.GetState() != EdDocument::State::Open) {
+          mLookOriginal.reset();
+          mLookCache.clear();
+          if (mShell->LookTrying()) {
+            mShell->SetLookState({}, {});
+          }
+          return;
+        }
+        EdShell::LookRequest ask;
+        if (!mShell->TakeLookRequest(ask)) {
+          return;
+        }
+        using What = EdShell::LookRequest::What;
+        const auto tryLook = [&]() {
+          Look look;
+          std::string error;
+          if (!LoadLook(ask.id, look, error)) {
+            mShell->SetLookState(mShell->LookTrying() ? mLookTriedId : std::string(), error);
+            gpg::Warnf("editor: look: %s", error.c_str());
+            return false;
+          }
+          if (!mLookOriginal.has_value()) {
+            mLookOriginal = mDocument.LookEnvironmentNow();
+          }
+          const Look mixed = BlendLook(LookOfEnvironment(*mLookOriginal), look, ask.blend, ask.sections);
+          mDocument.ApplyLookEnvironment({mixed.lighting, mixed.water, mixed.sky});
+          mLookTriedId = ask.id;
+          mLookTriedName = look.name;
+          mShell->SetLookState(
+            ask.id, "Trying " + look.name + ": Apply keeps it (one undo step), Revert takes it off."
+          );
+          gpg::Logf(
+            "editor: trying look %s (blend %.2f, sections %u): multiplier %.2f",
+            look.name.c_str(),
+            static_cast<double>(ask.blend),
+            ask.sections,
+            static_cast<double>(mDocument.LightingNow().multiplier)
+          );
+          return true;
+        };
+        switch (ask.what) {
+        case What::Try:
+          (void)tryLook();
+          break;
+        case What::Apply:
+          if (!mLookOriginal.has_value() && !tryLook()) {
+            break;
+          }
+          mDocument.LookApplied(*mLookOriginal);
+          mLookOriginal.reset();
+          mShell->SetLookState({}, mLookTriedName + " applied: one undo step.");
+          gpg::Logf("editor: look %s applied", mLookTriedName.c_str());
+          break;
+        case What::Revert:
+          if (mLookOriginal.has_value()) {
+            mDocument.ApplyLookEnvironment(*mLookOriginal);
+            mLookOriginal.reset();
+            mShell->SetLookState({}, "Reverted: the map's own look again.");
+            gpg::Logf("editor: look %s reverted", mLookTriedName.c_str());
+          }
+          break;
+        case What::Save: {
+          const std::filesystem::path folder = LooksFolder();
+          std::error_code error;
+          std::filesystem::create_directories(folder, error);
+          const EdDocument::LookEnvironment now = mDocument.LookEnvironmentNow();
+          const std::filesystem::path base = folder / ask.name;
+          const auto write = [](const std::filesystem::path& path, const std::string& text) {
+            std::ofstream out(path, std::ios::binary | std::ios::trunc);
+            out << text;
+            return out.good();
+          };
+          const bool saved = !folder.empty() &&
+            write(std::filesystem::path(base).replace_extension(".scmlighting"), LightingToScmlighting(now.lighting)) &&
+            write(std::filesystem::path(base).replace_extension(".scmwtr"), WaterToScmwtr(now.water)) &&
+            write(std::filesystem::path(base).replace_extension(".scmskybox"), SkyboxToScmskybox(now.sky));
+          mLookCache.erase("mine:" + ask.name);
+          mShell->SetLookState({}, saved ? "Saved as " + ask.name + "." : "Couldn't write to " + folder.string());
+          gpg::Logf(
+            "editor: look %s %s in %s", ask.name.c_str(), saved ? "saved" : "not saved", folder.string().c_str()
+          );
+          ListMyLooks();
+          break;
+        }
+        case What::Delete: {
+          const std::string name = ask.id.rfind("mine:", 0) == 0 ? ask.id.substr(5) : std::string();
+          if (!name.empty()) {
+            std::error_code error;
+            for (const char* const extension : {".scmlighting", ".scmwtr", ".scmskybox"}) {
+              std::filesystem::remove(std::filesystem::path(LooksFolder() / name).replace_extension(extension), error);
+            }
+            mLookCache.erase(ask.id);
+            mShell->SetLookState(mShell->LookTrying() ? mLookTriedId : std::string(), "Deleted " + name + ".");
+            ListMyLooks();
+          }
+          break;
+        }
+        case What::None:
+          break;
+        }
+      }
+
+      /** `/looktest <map folder>,<sections>,<blend>,apply|revert|keep` (test runs): that map's look tried, then ended.
+       */
+      void TestLooks()
+      {
+        if (mLookTestArg.empty() || mScene.ModelsPending() || ++mLookTestFrames < 150) {
+          return;
+        }
+        std::vector<std::string> parts;
+        for (std::size_t from = 0;;) {
+          const std::size_t comma = mLookTestArg.find(',', from);
+          parts.push_back(mLookTestArg.substr(from, comma == std::string::npos ? std::string::npos : comma - from));
+          if (comma == std::string::npos) {
+            break;
+          }
+          from = comma + 1;
+        }
+        mLookTestArg.clear();
+        // `/looktest save:<name>` saves the map's own look; `/looktest mine:<name>,...` tries a saved one.
+        if (parts[0].rfind("save:", 0) == 0) {
+          EdShell::LookRequest save;
+          save.what = EdShell::LookRequest::What::Save;
+          save.name = parts[0].substr(5);
+          mShell->RequestLook(save);
+          UpdateLooks();
+          return;
+        }
+        std::string scenario = parts[0].rfind("mine:", 0) == 0 ? parts[0] : std::string();
+        for (const std::string& map : mPlay.Maps()) {
+          std::string folder = MapDisplayName(map);
+          std::transform(folder.begin(), folder.end(), folder.begin(), [](const unsigned char c) {
+            return static_cast<char>(std::tolower(c));
+          });
+          if (folder == parts[0]) {
+            scenario = map;
+          }
+        }
+        if (scenario.empty()) {
+          gpg::Logf("editor: look test: no map %s", parts[0].c_str());
+          return;
+        }
+        const auto state = [this](const char* const when) {
+          const EdDocument::LookEnvironment now = mDocument.LookEnvironmentNow();
+          gpg::Logf(
+            "editor: look test %s: multiplier %.2f, sun colour %.2f %.2f %.2f, water colour %.2f %.2f %.2f, water "
+            "level "
+            "%.2f, sky horizon %.2f %.2f %.2f, %zu planets; undo: %s",
+            when,
+            static_cast<double>(now.lighting.multiplier),
+            static_cast<double>(now.lighting.sunColor[0]),
+            static_cast<double>(now.lighting.sunColor[1]),
+            static_cast<double>(now.lighting.sunColor[2]),
+            static_cast<double>(now.water.shader.mWaterColor[0]),
+            static_cast<double>(now.water.shader.mWaterColor[1]),
+            static_cast<double>(now.water.shader.mWaterColor[2]),
+            static_cast<double>(now.water.elevation),
+            static_cast<double>(now.sky.horizonColor[0]),
+            static_cast<double>(now.sky.horizonColor[1]),
+            static_cast<double>(now.sky.horizonColor[2]),
+            now.sky.planets.size(),
+            mDocument.UndoStepName() != nullptr ? mDocument.UndoStepName() : "-"
+          );
+        };
+        state("before");
+        EdShell::LookRequest ask;
+        ask.what = EdShell::LookRequest::What::Try;
+        ask.id = scenario;
+        ask.sections = parts.size() > 1 ? static_cast<unsigned>(std::atoi(parts[1].c_str())) : kLookAll;
+        ask.blend = parts.size() > 2 ? std::strtof(parts[2].c_str(), nullptr) : 1.0f;
+        mShell->RequestLook(ask);
+        UpdateLooks();
+        state("trying");
+        const std::string end = parts.size() > 3 ? parts[3] : "keep";
+        if (end == "apply" || end == "revert") {
+          ask.what = end == "apply" ? EdShell::LookRequest::What::Apply : EdShell::LookRequest::What::Revert;
+          mShell->RequestLook(ask);
+          UpdateLooks();
+          state(end == "apply" ? "applied" : "reverted");
+          if (end == "apply") {
+            (void)mScene.Undo();
+            state("after undo");
+          }
+        }
+      }
+
       /**
        * Find and replace objects (Edit, Ctrl+F; the mockup's dialog): a type found on the map, where (the whole map,
        * the selection, the symmetry's first part), and Select matches or Replace all, with another type or deleting.
@@ -2139,6 +2452,14 @@ namespace faf::editor
       double mModifiedSince = -1.0;
       std::vector<EdAutosaveEntry> mRecoverable;
       bool mShowRecover = false;
+      // Looks: the map's own environment while one is tried, the looks read so far, the test switch.
+      std::optional<EdDocument::LookEnvironment> mLookOriginal;
+      std::string mLookTriedId;
+      std::string mLookTriedName;
+      std::map<std::string, Look> mLookCache;
+      bool mLooksListed = false;
+      std::string mLookTestArg; // `/looktest <map>,<sections>,<blend>,apply|revert|keep` (test runs)
+      int mLookTestFrames = 0;
       // Find and replace objects: asked (Ctrl+F), the objects and types when it opened, the choices.
       bool mFindAsk = false;
       std::vector<FindObject> mFindObjects;
@@ -4259,6 +4580,9 @@ namespace faf::editor
       if (fa::vector<fa::string> modal; moho::CFG_GetArgOption("/modaltest", 1, &modal) && !modal.empty()) {
         mModalTestArg = modal[0].c_str();
       }
+      if (fa::vector<fa::string> look; moho::CFG_GetArgOption("/looktest", 1, &look) && !look.empty()) {
+        mLookTestArg = look[0].c_str();
+      }
       if (fa::vector<fa::string> fill; moho::CFG_GetArgOption("/filltest", 1, &fill) && !fill.empty()) {
         mFillTestArg = fill[0].c_str();
       }
@@ -5326,7 +5650,18 @@ namespace faf::editor
     void EditorApp::SaveDocument()
     {
       std::string message;
-      if (mDocument.Save(message)) {
+      // A look being tried isn't saved: the map's own is written, then the tried one put back on the map.
+      std::optional<EdDocument::LookEnvironment> tried;
+      if (mLookOriginal.has_value()) {
+        tried = mDocument.LookEnvironmentNow();
+        mDocument.ApplyLookEnvironment(*mLookOriginal);
+        gpg::Logf("editor: saving without the look being tried (%s)", mLookTriedName.c_str());
+      }
+      const bool saved = mDocument.Save(message);
+      if (tried.has_value()) {
+        mDocument.ApplyLookEnvironment(*tried);
+      }
+      if (saved) {
         gpg::Logf("editor: %s", message.c_str());
         PostStatusMessage("Saved " + mDocument.FolderName());
         // Saved: its autosave is behind it now.
@@ -6323,6 +6658,8 @@ namespace faf::editor
           }
         }
       }
+      UpdateLooks();
+      TestLooks();
       // The Lighting panel's "from another map", or `/lightingfrom <map folder>` for test runs: that map's lighting,
       // read from its .scmap.
       {

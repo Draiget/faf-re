@@ -1387,6 +1387,175 @@ namespace faf::editor
     }
     ImGui::End();
   }
+  void EdShell::DrawLooks()
+  {
+    if (!Section("Looks")) {
+      return;
+    }
+    // Every map the game lists is a look (its lighting, water and sky, read from its .scmap when first tried), and the
+    // user's own saved ones. A click tries one on the map (no undo step); Apply keeps it as one, Revert takes it off.
+    const auto request = [&](const LookRequest::What what, const std::string& id) {
+      LookRequest ask;
+      ask.what = what;
+      ask.id = id;
+      ask.sections = mLookSections;
+      ask.blend = mLookBlend;
+      ask.name = mLookSaveName;
+      RequestLook(std::move(ask));
+    };
+    // What of a look is taken, and how much.
+    bool retry = false;
+    // The ticks on one row while they fit, wrapping in a narrow panel.
+    bool first = true;
+    const float rightEdge = ImGui::GetCursorScreenPos().x + ImGui::GetContentRegionAvail().x;
+    const auto sectionBox = [&](const char* label, const LookSection bit) {
+      const ImGuiStyle& style = ImGui::GetStyle();
+      const float width = ImGui::GetFrameHeight() + style.ItemInnerSpacing.x + ImGui::CalcTextSize(label).x;
+      if (!first && ImGui::GetItemRectMax().x + style.ItemSpacing.x + width <= rightEdge) {
+        ImGui::SameLine();
+      }
+      first = false;
+      bool on = (mLookSections & bit) != 0u;
+      if (ImGui::Checkbox(label, &on)) {
+        mLookSections = on ? (mLookSections | bit) : (mLookSections & ~static_cast<unsigned>(bit));
+        retry = true;
+      }
+    };
+    sectionBox("Lighting", kLookLighting);
+    sectionBox("Water", kLookWater);
+    sectionBox("Waves", kLookWaves);
+    sectionBox("Sky", kLookSky);
+    ImGui::SetNextItemWidth(-1.0f);
+    if (FillSliderFloat("##lookblend", &mLookBlend, 0.0f, 1.0f, "Blend %.2f")) {
+      retry = true;
+    }
+    EdSetItemTooltip(
+      "How much of the look: 0 keeps the map's own, 1 is the look. Numbers mix; textures switch at 0.5."
+    );
+    ImGui::Checkbox("Try on click", &mLookTryOnClick);
+    if (retry && !mLookTried.empty()) {
+      request(LookRequest::What::Try, mLookTried);
+    }
+    ImGui::SetNextItemWidth(-1.0f);
+    ImGui::InputTextWithHint(
+      "##lookfilter", "search looks (maps and your own)", mLightingFromFilter, sizeof(mLightingFromFilter)
+    );
+    std::string filter = mLightingFromFilter;
+    for (char& c : filter) {
+      c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    }
+    const float swatch = ImGui::GetTextLineHeight();
+    const auto row = [&](const std::string& id, const std::string& title, const std::string& detail) {
+      ImGui::PushID(id.c_str());
+      const ImVec2 at = ImGui::GetCursorScreenPos();
+      const bool chosen = id == mLookChosen || id == mLookTried;
+      if (ImGui::Selectable("##look", chosen, ImGuiSelectableFlags_AllowOverlap)) {
+        mLookChosen = id;
+        if (mLookTryOnClick) {
+          request(LookRequest::What::Try, id);
+        }
+      }
+      // Its colours once read: sky horizon and zenith, sun, water.
+      ImDrawList* const draw = ImGui::GetWindowDrawList();
+      if (const auto known = mLookSwatches.find(id); known != mLookSwatches.end()) {
+        for (int c = 0; c < 4; ++c) {
+          const float* const rgb = known->second.colours[c];
+          const ImU32 colour = ImGui::ColorConvertFloat4ToU32(
+            ImVec4(std::clamp(rgb[0], 0.0f, 1.0f), std::clamp(rgb[1], 0.0f, 1.0f), std::clamp(rgb[2], 0.0f, 1.0f), 1.0f)
+          );
+          const float x = at.x + static_cast<float>(c) * swatch * 0.5f;
+          draw->AddRectFilled(ImVec2(x, at.y + 1.0f), ImVec2(x + swatch * 0.5f, at.y + swatch - 1.0f), colour);
+        }
+      } else {
+        draw->AddRect(ImVec2(at.x, at.y + 1.0f), ImVec2(at.x + swatch * 2.0f, at.y + swatch - 1.0f), LineU32());
+      }
+      draw->AddText(ImVec2(at.x + swatch * 2.0f + Em(6.0f), at.y), ImGui::GetColorU32(ImGuiCol_Text), title.c_str());
+      if (!detail.empty()) {
+        const float width = ImGui::CalcTextSize(detail.c_str()).x;
+        draw->AddText(
+          ImVec2(at.x + ImGui::GetContentRegionAvail().x - width, at.y),
+          ImGui::GetColorU32(ImGuiCol_TextDisabled),
+          detail.c_str()
+        );
+      }
+      ImGui::PopID();
+    };
+    if (
+      ImGui::BeginChild("##looks", ImVec2(0.0f, ImGui::GetTextLineHeightWithSpacing() * 9.0f), ImGuiChildFlags_Borders)
+    ) {
+      for (const std::string& name : mMyLooks) {
+        std::string key = name;
+        for (char& c : key) {
+          c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+        }
+        if (filter.empty() || key.find(filter) != std::string::npos) {
+          row("mine:" + name, name, "yours");
+        }
+      }
+      const std::vector<std::string>& maps = mPlay.Maps();
+      const std::vector<std::string>& titles = mPlay.Titles();
+      for (std::size_t i = 0; i < maps.size(); ++i) {
+        const std::string folder = MapDisplayName(maps[i]);
+        const std::string title = i < titles.size() && !titles[i].empty() ? titles[i] : folder;
+        std::string key = folder + " " + title;
+        for (char& c : key) {
+          c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+        }
+        if (filter.empty() || key.find(filter) != std::string::npos) {
+          row(maps[i], title, folder);
+        }
+      }
+    }
+    ImGui::EndChild();
+    // Apply keeps the one tried (or the one chosen) as one undo step; Revert takes it off.
+    const std::string target = !mLookTried.empty() ? mLookTried : mLookChosen;
+    ImGui::BeginDisabled(target.empty());
+    if (ImGui::Button("Apply")) {
+      request(LookRequest::What::Apply, target);
+    }
+    ImGui::EndDisabled();
+    ImGui::SameLine();
+    ImGui::BeginDisabled(mLookTried.empty());
+    if (ImGui::Button("Revert")) {
+      request(LookRequest::What::Revert, mLookTried);
+    }
+    ImGui::EndDisabled();
+    ImGui::SameLine();
+    ImGui::BeginDisabled(mLookChosen.empty() || !mLookTried.empty());
+    if (ImGui::Button("Try")) {
+      request(LookRequest::What::Try, mLookChosen);
+    }
+    ImGui::EndDisabled();
+    if (!mLookStatus.empty()) {
+      ImGui::PushTextWrapPos(0.0f);
+      ImGui::TextUnformatted(mLookStatus.c_str());
+      ImGui::PopTextWrapPos();
+    }
+    // The map's own look saved under a name (FAForeverMapEditor's three files, in the editor's Looks folder).
+    ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x * 0.55f);
+    ImGui::InputTextWithHint("##lookname", "name for this map's look", mLookSaveName, sizeof(mLookSaveName));
+    ImGui::SameLine();
+    ImGui::BeginDisabled(mLookSaveName[0] == '\0' || !mLookTried.empty());
+    if (ImGui::Button("Save look")) {
+      request(LookRequest::What::Save, {});
+    }
+    ImGui::EndDisabled();
+    if (mLookChosen.rfind("mine:", 0) == 0) {
+      ImGui::SameLine();
+      if (ImGui::Button("Delete")) {
+        request(LookRequest::What::Delete, mLookChosen);
+        mLookChosen.clear();
+      }
+    }
+    HelpNote(
+      "A look is a map's lighting, water and sky. A click tries it on this map (no undo step, and a save writes the "
+      "map "
+      "without it); Apply keeps it as one undo step, Revert takes it off. The ticks choose what is taken; Blend mixes "
+      "it "
+      "with the map's own."
+    );
+  }
+
   void EdShell::DrawLightingPanel()
   {
     if (const ImGuiWindow* const map = ImGui::FindWindowByName(Panel(kMapWindow)); map != nullptr && map->DockId != 0) {
@@ -1415,6 +1584,7 @@ namespace faf::editor
       finished = finished || ImGui::IsItemDeactivatedAfterEdit();
     };
     // The sun as the mockup shows it: its direction as an azimuth and an elevation (the vector the map keeps).
+    DrawLooks();
     float azimuth = 0.0f;
     float elevation = 0.0f;
     SunAnglesOf(mLighting.sunDirection, azimuth, elevation);
@@ -1483,43 +1653,6 @@ namespace faf::editor
           static_cast<double>(mLighting.fogEnd)
         );
       }
-    }
-    if (Section("From another map", false)) {
-      // Any map the game lists: its lighting read from its .scmap, as FAForeverMapEditor's retail presets are.
-      const std::vector<std::string>& maps = mPlay.Maps();
-      const std::vector<std::string>& titles = mPlay.Titles();
-      ImGui::SetNextItemWidth(-1.0f);
-      ImGui::InputTextWithHint("##lightingfromfilter", "search maps", mLightingFromFilter, sizeof(mLightingFromFilter));
-      std::string filter = mLightingFromFilter;
-      for (char& c : filter) {
-        c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-      }
-      if (
-        ImGui::BeginChild(
-          "##lightingfrom", ImVec2(0.0f, ImGui::GetTextLineHeightWithSpacing() * 6.0f), ImGuiChildFlags_Borders
-        )
-      ) {
-        for (std::size_t i = 0; i < maps.size(); ++i) {
-          const std::string folder = MapDisplayName(maps[i]);
-          const std::string title = i < titles.size() && !titles[i].empty() ? titles[i] : folder;
-          std::string key = folder + " " + title;
-          for (char& c : key) {
-            c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-          }
-          if (!filter.empty() && key.find(filter) == std::string::npos) {
-            continue;
-          }
-          ImGui::PushID(static_cast<int>(i));
-          if (ImGui::Selectable(title.c_str())) {
-            mLightingFromMap = maps[i];
-          }
-          ImGui::SameLine();
-          ImGui::TextDisabled("%s", folder.c_str());
-          ImGui::PopID();
-        }
-      }
-      ImGui::EndChild();
-      HelpNote("A click takes that map's sun, ambience, shadow, specular, bloom and fog, as one undo step.");
     }
     if (Section("Settings file", false)) {
       if (ImGui::Button("Import .scmlighting...")) {

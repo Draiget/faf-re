@@ -1752,6 +1752,7 @@ namespace faf::editor
       : kind == EdDocument::EditKind::Waves               ? UndoWaves(false)
       : kind == EdDocument::EditKind::TerrainTypes        ? UndoTerrainTypes(false)
       : kind == EdDocument::EditKind::LayerConversion     ? UndoConversion(false)
+      : kind == EdDocument::EditKind::Look                ? UndoLook(false)
                                                           : UndoHeights(false);
     if (done) {
       mDocument.PushRedo(kind);
@@ -1776,6 +1777,7 @@ namespace faf::editor
       : kind == EdDocument::EditKind::Waves               ? UndoWaves(true)
       : kind == EdDocument::EditKind::TerrainTypes        ? UndoTerrainTypes(true)
       : kind == EdDocument::EditKind::LayerConversion     ? UndoConversion(true)
+      : kind == EdDocument::EditKind::Look                ? UndoLook(true)
                                                           : UndoHeights(true);
     if (done) {
       mDocument.PushUndo(kind);
@@ -4763,6 +4765,23 @@ namespace faf::editor
       redo ? "redid" : "undid",
       static_cast<double>(mDocument.LightingNow().multiplier)
     );
+    return true;
+  }
+
+  bool EdMapScene::UndoLook(
+    const bool redo
+  )
+  {
+    auto& from = redo ? mDocument.LookRedo() : mDocument.LookUndo();
+    auto& to = redo ? mDocument.LookUndo() : mDocument.LookRedo();
+    if (from.empty()) {
+      return false;
+    }
+    auto step = std::move(from.back());
+    from.pop_back();
+    mDocument.ApplyLookEnvironment(redo ? step.second : step.first);
+    to.push_back(std::move(step));
+    gpg::Logf("editor: %s a look", redo ? "redid" : "undid");
     return true;
   }
 

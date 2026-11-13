@@ -26,6 +26,7 @@ set(FAF_EDITOR_SOURCES
   doc/EdLayerPreset.cpp
   doc/EdPropPaint.cpp
   doc/EdSkybox.cpp
+  doc/EdLooks.cpp
   doc/EdImageChunks.cpp
   tools/EdWaves.cpp
   tools/EdTerrainTypes.cpp
