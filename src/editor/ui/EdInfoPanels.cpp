@@ -1304,8 +1304,58 @@ namespace faf::editor
       }
       ImGui::SetItemTooltip("%s", mScriptErrorLine > 0 ? "Click to go to the line (marked red)" : "");
     }
-    // The code, coloured as Lua, line numbers beside it; the error line marked.
-    (void)LuaCodeInput("##script", mScriptBuffer, mScriptErrorLine, std::max(ImGui::GetContentRegionAvail().y, 120.0f));
+    // Checked as you type: compiled again once the typing stops for 0.6 s (and when a file loads), the error line
+    // marked; the likely typos of known functions listed under the code, each with its fix.
+    const double now = ImGui::GetTime();
+    if (
+      const std::size_t hash = std::hash<std::string>{}(mScriptBuffer);
+      hash != mScriptCheckedHash && now - mScriptTypedAt >= 0.6
+    ) {
+      mScriptCheckedHash = hash;
+      const CheckIssue issue = mDocument.CheckLuaText(mScriptBuffer, fileName);
+      mScriptErrorLine = issue.text.empty() ? 0 : std::max(issue.line, 1);
+      mScriptMessage =
+        issue.text.empty() ? std::string("compiles") : "line " + std::to_string(issue.line) + ": " + issue.text;
+      mScriptTypos = LuaTypos(mScriptBuffer);
+    }
+    const std::size_t shownTypos = std::min<std::size_t>(mScriptTypos.size(), 3);
+    const float typosHeight =
+      shownTypos == 0 ? 0.0f : ImGui::GetFrameHeightWithSpacing() * static_cast<float>(shownTypos) + 4.0f;
+    // The code, coloured as Lua, line numbers beside it; the error line marked; completions, signatures and hover
+    // from the engine's annotated functions (doc/EdLuaApi).
+    if (
+      LuaCodeInput(
+        "##script", mScriptBuffer, mScriptErrorLine, std::max(ImGui::GetContentRegionAvail().y - typosHeight, 120.0f)
+      )
+    ) {
+      mScriptTypedAt = now;
+    }
+    for (std::size_t i = 0; i < shownTypos; ++i) {
+      const EdLuaTypo typo = mScriptTypos[i];
+      ImGui::PushID(static_cast<int>(i));
+      ImGui::TextColored(
+        ImVec4(0.95f, 0.75f, 0.30f, 1.0f), "Line %d: %s is no known function", typo.line, typo.written.c_str()
+      );
+      ImGui::SameLine();
+      if (ImGui::SmallButton(("Use " + typo.suggestion).c_str())) {
+        if (
+          typo.at + typo.written.size() <= mScriptBuffer.size() &&
+          mScriptBuffer.compare(typo.at, typo.written.size(), typo.written) == 0
+        ) {
+          mScriptBuffer.replace(typo.at, typo.written.size(), typo.suggestion);
+          gpg::Logf(
+            "editor: script: %s replaced by %s on line %d", typo.written.c_str(), typo.suggestion.c_str(), typo.line
+          );
+        }
+        mScriptCheckedHash = 0; // checked again at once
+        mScriptTypedAt = 0.0;
+      }
+      ImGui::SameLine();
+      if (ImGui::SmallButton("Go to")) {
+        LuaCodeScrollTo(typo.line);
+      }
+      ImGui::PopID();
+    }
     ImGui::End();
   }
   void EdShell::DrawLightingPanel()

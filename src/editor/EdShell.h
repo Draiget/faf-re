@@ -5,6 +5,7 @@
 #include <string>
 #include <utility>
 
+#include "editor/doc/EdLuaApi.h"
 #include "editor/EdTools.h"
 #include "editor/doc/EdAdaptiveModel.h"
 #include "editor/tools/EdChecks.h"
@@ -357,6 +358,10 @@ namespace faf::editor
     /** View > History (ui/EdHistoryPanel.cpp): the edits, a click goes back or forward to one. */
     void DrawHistoryPanel();
     bool mShowHistory = false;
+    // The Script panel's check as you type: the text it last checked, when it was last typed in, the typos found.
+    std::size_t mScriptCheckedHash = 0;
+    double mScriptTypedAt = 0.0;
+    std::vector<EdLuaTypo> mScriptTypos;
     void DrawHelpWindow();
     /** The Effects workspace's stage: the effect's view where the map view is. */
     void DrawEffectStage();
