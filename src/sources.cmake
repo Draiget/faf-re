@@ -339,9 +339,15 @@ set(FAF_ENGINE_SOURCES
   moho/terrain/water/LowFidelityWater.cpp
   moho/terrain/water/WaterFactory.cpp
   moho/terrain/water/WaterShaderVars.cpp
+  moho/terrain/water/WaterQuality.cpp
+  moho/terrain/water/WaterEffectPatch.cpp
+  moho/terrain/water/WaterSimulation.cpp
+  moho/terrain/water/WaterMeshFeed.cpp
   moho/terrain/water/WaveSystem.cpp
   moho/terrain/water/Shoreline.cpp
   moho/terrain/water/WaterBodySurfaces.cpp
+  moho/terrain/water/TerrainWaterLevelPatch.cpp
+  moho/terrain/water/TerrainWaterLevels.cpp
   moho/ui/CUIWorldView.cpp
   moho/ui/CUIManager.cpp
   moho/ui/UiDisplayScale.cpp
@@ -418,7 +424,6 @@ set(FAF_ENGINE_SOURCES
   moho/sim/UserStartupRegistrations.cpp
   moho/sim/Sim.cpp
   moho/sim/SimTick.cpp
-  moho/sim/SimWaterEvents.cpp
   moho/sim/SimWaterEvents.cpp
   moho/sim/SimLuaGetters.cpp
   moho/sim/SimLuaFunctions.cpp
