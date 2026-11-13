@@ -1070,7 +1070,11 @@ namespace gpg
 
     TypeMap::const_iterator it = GetRTypeMap().find(name);
     if (it == GetRTypeMap().end()) {
-      // Engine change (#422): the boost:: pointer names older saves carry.
+      // Engine change (#422): the boost:: pointer names older saves carry. Any other missing name returns at once,
+      // as it did before: lookups that expect a miss (a first spelling of two) stay as cheap.
+      if (std::strstr(name, "boost::") == nullptr) {
+        return nullptr;
+      }
       const fa::string current = REF_CurrentTypeName(name);
       if (std::strcmp(current.c_str(), name) == 0) {
         return nullptr;
