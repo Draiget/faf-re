@@ -48,11 +48,14 @@ namespace moho
   CUnitPodAssistTypeInfo::~CUnitPodAssistTypeInfo() = default;
 
   /**
-   * Address: 0x0061D640 (FUN_0061D640, Moho::CUnitPodAssistTypeInfo::GetName)
+   * Address: 0x0061D640 (FUN_0061D640, Moho::CUnitPodAssistTypeInfo::GetName: `mov eax, ... ; "CUnitPodAssist"`)
+   *
+   * Retail's name, without a namespace, so its saves load; saves from builds that said `moho::CUnitPodAssist` are read
+   * through `REF_CurrentTypeName`.
    */
   const char* CUnitPodAssistTypeInfo::GetName() const
   {
-    return "moho::CUnitPodAssist";
+    return "CUnitPodAssist";
   }
 
   /**

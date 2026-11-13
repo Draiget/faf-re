@@ -49,11 +49,14 @@ namespace moho
   CUnitWaitForFerryTaskTypeInfo::~CUnitWaitForFerryTaskTypeInfo() = default;
 
   /**
-   * Address: 0x0060F8D0 (FUN_0060F8D0)
+   * Address: 0x0060F8D0 (FUN_0060F8D0: `mov eax, ... ; "CUnitWaitForFerryTask"`)
+   *
+   * Retail's name, without a namespace, so its saves load; saves from builds that said `moho::CUnitWaitForFerryTask`
+   * are read through `REF_CurrentTypeName`.
    */
   const char* CUnitWaitForFerryTaskTypeInfo::GetName() const
   {
-    return "moho::CUnitWaitForFerryTask";
+    return "CUnitWaitForFerryTask";
   }
 
   /**

@@ -49,11 +49,14 @@ namespace moho
   CUnitFireAtTaskTypeInfo::~CUnitFireAtTaskTypeInfo() = default;
 
   /**
-   * Address: 0x0060B040 (FUN_0060B040)
+   * Address: 0x0060B040 (FUN_0060B040: `mov eax, ... ; "CUnitFireAtTask"`)
+   *
+   * Retail's name, without a namespace, so its saves load; saves from builds that said `moho::CUnitFireAtTask` are read
+   * through `REF_CurrentTypeName`.
    */
   const char* CUnitFireAtTaskTypeInfo::GetName() const
   {
-    return "moho::CUnitFireAtTask";
+    return "CUnitFireAtTask";
   }
 
   /**

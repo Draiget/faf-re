@@ -52,11 +52,14 @@ namespace moho
   CUnitCarrierRetrieveTypeInfo::~CUnitCarrierRetrieveTypeInfo() = default;
 
   /**
-   * Address: 0x006062E0 (FUN_006062E0)
+   * Address: 0x006062E0 (FUN_006062E0: `mov eax, ... ; "CUnitCarrierRetrieve"`)
+   *
+   * Retail's name, without a namespace, so its saves load; saves from builds that said `moho::CUnitCarrierRetrieve` are
+   * read through `REF_CurrentTypeName`.
    */
   const char* CUnitCarrierRetrieveTypeInfo::GetName() const
   {
-    return "moho::CUnitCarrierRetrieve";
+    return "CUnitCarrierRetrieve";
   }
 
   /**

@@ -51,11 +51,14 @@ namespace moho
   CUnitTeleportTaskTypeInfo::~CUnitTeleportTaskTypeInfo() = default;
 
   /**
-   * Address: 0x0060A950 (FUN_0060A950)
+   * Address: 0x0060A950 (FUN_0060A950: `mov eax, ... ; "CUnitTeleportTask"`)
+   *
+   * Retail's name, without a namespace, so its saves load; saves from builds that said `moho::CUnitTeleportTask` are
+   * read through `REF_CurrentTypeName`.
    */
   const char* CUnitTeleportTaskTypeInfo::GetName() const
   {
-    return "moho::CUnitTeleportTask";
+    return "CUnitTeleportTask";
   }
 
   /**

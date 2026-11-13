@@ -36,11 +36,13 @@ TStringTypeInfo::TStringTypeInfo()
 }
 
 /**
- * Address: 0x00922020 (FUN_00922020, TStringTypeInfo::GetName)
+ * Address: 0x00922020 (FUN_00922020, TStringTypeInfo::GetName: `mov eax, ... ; "TString"`)
+ *
+ * Retail's name, so its saves load; saves from builds that said `TStr` are read through `REF_CurrentTypeName`.
  */
 const char* TStringTypeInfo::GetName() const
 {
-  return "TStr";
+  return "TString";
 }
 
 /**

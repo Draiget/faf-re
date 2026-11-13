@@ -1053,6 +1053,59 @@ namespace gpg
     return GetRTypeMap().size();
   }
 
+  namespace
+  {
+    // Engine addition (#422): `boost::shared_ptr<` / `boost::weak_ptr<` become `shared_ptr<` / `weak_ptr<` wherever
+    // they start, as retail and earlier builds wrote them.
+    constexpr const char* kOldPointerPrefixes[] = {"boost::shared_ptr<", "boost::weak_ptr<"};
+    constexpr std::size_t kBoostLength = 7; // "boost::"
+
+    struct OldTypeName
+    {
+      const char* old;
+      const char* current;
+    };
+
+    // Engine addition (#422): names earlier builds of this engine wrote for types retail names otherwise, each
+    // replaced as a whole word only (`std::string`, not `std::stringstream`). The current names are retail's.
+    constexpr OldTypeName kOldWords[] = {
+      {"std::string", "string"},                                    // 0x008E0500
+      {"TStr", "TString"},                                          // 0x00922020
+      {"gpg::MemBuffer<const char>", "gpg::MemBuffer<char const>"}, // 0x0094E820
+      {"moho::CUnitCarrierRetrieve", "CUnitCarrierRetrieve"},       // 0x006062E0
+      {"moho::CUnitFireAtTask", "CUnitFireAtTask"},                 // 0x0060B040
+      {"moho::CUnitPodAssist", "CUnitPodAssist"},                   // 0x0061D640
+      {"moho::CUnitTeleportTask", "CUnitTeleportTask"},             // 0x0060A950
+      {"moho::CUnitWaitForFerryTask", "CUnitWaitForFerryTask"},     // 0x0060F8D0
+    };
+
+    [[nodiscard]] bool IsNameChar(
+      const char c
+    )
+    {
+      return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' || c == ':';
+    }
+
+    /**
+     * Whether `name` holds anything REF_CurrentTypeName would rewrite (or a near miss of it); a cheap test so a name
+     * without one is never copied.
+     */
+    [[nodiscard]] bool HasOldTypeName(
+      const char* const name
+    )
+    {
+      if (std::strstr(name, "boost::") != nullptr) {
+        return true;
+      }
+      for (const OldTypeName& word : kOldWords) {
+        if (std::strstr(name, word.old) != nullptr) {
+          return true;
+        }
+      }
+      return false;
+    }
+  } // namespace
+
   /**
    * Address: 0x008DF910 (FUN_008DF910, gpg::REF_FindTypeNamed `_0` overload)
    *
@@ -1070,9 +1123,9 @@ namespace gpg
 
     TypeMap::const_iterator it = GetRTypeMap().find(name);
     if (it == GetRTypeMap().end()) {
-      // Engine change (#422): the boost:: pointer names older saves carry. Any other missing name returns at once,
-      // as it did before: lookups that expect a miss (a first spelling of two) stay as cheap.
-      if (std::strstr(name, "boost::") == nullptr && std::strstr(name, "std::string") == nullptr) {
+      // Engine change (#422): the old names saves carry (see REF_CurrentTypeName). Any other missing name returns at
+      // once, as it did before: lookups that expect a miss (a first spelling of two) stay as cheap.
+      if (!HasOldTypeName(name)) {
         return nullptr;
       }
       const fa::string current = REF_CurrentTypeName(name);
@@ -1099,18 +1152,10 @@ namespace gpg
     if (name == nullptr) {
       return out;
     }
-    static constexpr const char* kOldPrefixes[] = {"boost::shared_ptr<", "boost::weak_ptr<"};
-    constexpr std::size_t kBoostLength = 7; // "boost::"
-    // Earlier builds named retail's `string` type `std::string`; a whole word only (not `std::stringstream`).
-    constexpr const char* kOldString = "std::string";
-    constexpr std::size_t kOldStringLength = 11;
-    const auto isNameChar = [](const char c) {
-      return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' || c == ':';
-    };
     const char* cursor = name;
     while (*cursor != '\0') {
       bool replaced = false;
-      for (const char* const prefix : kOldPrefixes) {
+      for (const char* const prefix : kOldPointerPrefixes) {
         const std::size_t length = std::strlen(prefix);
         if (std::strncmp(cursor, prefix, length) == 0) {
           (void)out.append(prefix + kBoostLength, length - kBoostLength);
@@ -1119,13 +1164,16 @@ namespace gpg
           break;
         }
       }
-      if (
-        !replaced && std::strncmp(cursor, kOldString, kOldStringLength) == 0 &&
-        (cursor == name || !isNameChar(cursor[-1])) && !isNameChar(cursor[kOldStringLength])
-      ) {
-        (void)out.append("string", 6);
-        cursor += kOldStringLength;
-        replaced = true;
+      if (!replaced && (cursor == name || !IsNameChar(cursor[-1]))) {
+        for (const OldTypeName& word : kOldWords) {
+          const std::size_t length = std::strlen(word.old);
+          if (std::strncmp(cursor, word.old, length) == 0 && !IsNameChar(cursor[length])) {
+            (void)out.append(word.current, std::strlen(word.current));
+            cursor += length;
+            replaced = true;
+            break;
+          }
+        }
       }
       if (!replaced) {
         (void)out.append(cursor, 1);

@@ -146,9 +146,15 @@ MemBufferCharConstTypeInfo::MemBufferCharConstTypeInfo()
   gpg::PreRegisterRType(typeid(MemBuffer<const char>), this);
 }
 
+/**
+ * Address: 0x0094E820 (`mov eax, 0xD48A88 ; "gpg::MemBuffer<char const>"`)
+ *
+ * Retail's spelling, so its saves load; saves from builds that said `gpg::MemBuffer<const char>` are read through
+ * `REF_CurrentTypeName`.
+ */
 const char* MemBufferCharConstTypeInfo::GetName() const
 {
-  return "gpg::MemBuffer<const char>";
+  return "gpg::MemBuffer<char const>";
 }
 
 /**

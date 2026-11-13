@@ -303,6 +303,16 @@ namespace
     EXPECT_EQ(current("std::stringstream"), "std::stringstream");
     EXPECT_EQ(current("Moho::std::string_view"), "Moho::std::string_view");
     EXPECT_EQ(gpg::REF_FindTypeNamed("std::string"), gpg::RTypeOf<fa::string>());
+    // The other names earlier builds wrote for types retail names otherwise; whole words only.
+    EXPECT_EQ(current("TStr"), "TString");
+    EXPECT_EQ(current("map<TStr,int>"), "map<TString,int>");
+    EXPECT_EQ(current("TString"), "TString");
+    EXPECT_EQ(current("TStrings"), "TStrings");
+    EXPECT_EQ(current("gpg::MemBuffer<const char>"), "gpg::MemBuffer<char const>");
+    EXPECT_EQ(current("moho::CUnitPodAssist"), "CUnitPodAssist");
+    EXPECT_EQ(current("moho::CUnitWaitForFerryTask"), "CUnitWaitForFerryTask");
+    EXPECT_EQ(current("moho::CUnitPodAssistX"), "moho::CUnitPodAssistX");
+    EXPECT_EQ(current("Moho::CUnitPodAssist"), "Moho::CUnitPodAssist");
     // An old name whose current form isn't registered finds nothing.
     EXPECT_EQ(gpg::REF_FindTypeNamed("boost::shared_ptr<faf_reflection_tests::NoSuchType>"), nullptr);
   }
