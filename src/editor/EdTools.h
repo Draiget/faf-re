@@ -1286,6 +1286,45 @@ namespace faf::editor
     {
       return mPickable;
     }
+    /** The Layers panel's map-wide textures: what a row asks (kind 0 the normal map, 1 the lighting), and its state. */
+    enum class MapTextureOp : std::uint8_t
+    {
+      None,
+      Make,
+      Clear,
+    };
+    struct MapTextureRow
+    {
+      bool available = false; // the shader reads this kind
+      bool shared = false;    // one texture holds both kinds (TerrainPBR, Terrain301)
+      bool present = false;   // the slot holds a texture
+      bool made = false;      // made here from the heights
+      bool stale = false;     // made here, and the heights changed since
+      std::string state;      // one line for the panel
+    };
+    void AskMapTexture(
+      const int kind,
+      const MapTextureOp op
+    ) noexcept
+    {
+      mMapTextureKind = kind;
+      mMapTextureOp = op;
+    }
+    [[nodiscard]] bool TakeMapTextureAsk(
+      int& kind,
+      MapTextureOp& op
+    ) noexcept
+    {
+      kind = mMapTextureKind;
+      op = std::exchange(mMapTextureOp, MapTextureOp::None);
+      return op != MapTextureOp::None;
+    }
+    [[nodiscard]] MapTextureRow& MapTextureState(
+      const int kind
+    ) noexcept
+    {
+      return mMapTextureRows[kind == 0 ? 0 : 1];
+    }
     /** The minimap's click: the camera looks at (x, z) next frame (the scene takes it). */
     void AskCameraAt(
       const float x,
@@ -2013,6 +2052,9 @@ namespace faf::editor
     float mMinimapRect[4]{};
     int mLayerMoveFrom = -1;
     PickFilter mPickable;
+    MapTextureRow mMapTextureRows[2];
+    int mMapTextureKind = 0;
+    MapTextureOp mMapTextureOp = MapTextureOp::None;
     int mLayerMoveTo = -1;
     bool mCameraAsk = false;
     float mCameraAskX = 0.0f;

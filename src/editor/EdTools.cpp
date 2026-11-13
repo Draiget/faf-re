@@ -1458,7 +1458,8 @@ namespace faf::editor
           about.c_str()
         );
         dl->PopClipRect();
-        if (stratum && mHasCoverage && !layer.albedo.empty()) {
+        // A map-wide slot holds data, not paint: no share of the map.
+        if (stratum && mHasCoverage && !layer.albedo.empty() && !ShaderSlotUseOf(mShader, slot).mapWide) {
           char share[16];
           (void)std::snprintf(share, sizeof(share), "%.0f %%", static_cast<double>(mCoverage[slot - 1] * 100.0f));
           const ImVec2 size = ImGui::GetFont()->CalcTextSizeA(small, FLT_MAX, 0.0f, share);
@@ -1509,6 +1510,58 @@ namespace faf::editor
         ImGui::EndPopup();
       }
       DrawTextureBrowser();
+    }
+
+    if (Section("Map-wide textures")) {
+      const MapTextureRow& normals = mMapTextureRows[0];
+      const MapTextureRow& lighting = mMapTextureRows[1];
+      if (!normals.available && !lighting.available) {
+        Note(
+          "This shader draws no map-wide textures; TerrainPBR, Terrain301 and the numbered shaders (Terrain250...) do."
+        );
+      }
+      // A row: its state's sign, its name and state, Make (or Remake) and Clear.
+      const auto row = [this](const int kind, const char* const name, const MapTextureRow& state) {
+        ImGui::PushID(kind);
+        const char* const sign = state.stale ? ICON_WARN : state.present ? ICON_OK : ICON_MINUS;
+        ImGui::PushStyleColor(
+          ImGuiCol_Text,
+          state.stale ? ImVec4(0xF0 / 255.0f, 0xB0 / 255.0f, 0x4A / 255.0f, 1.0f)
+                      : ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled)
+        );
+        ImGui::TextUnformatted(sign);
+        ImGui::PopStyleColor();
+        ImGui::SameLine();
+        ImGui::BeginGroup();
+        ImGui::TextUnformatted(name);
+        ImGui::PushTextWrapPos(0.0f);
+        ImGui::TextDisabled("%s", state.state.c_str());
+        ImGui::PopTextWrapPos();
+        if (ImGui::Button(state.made || state.present ? "Remake" : "Make")) {
+          AskMapTexture(kind, MapTextureOp::Make);
+        }
+        ImGui::SetItemTooltip("Draw it from the map's heights, its sun and its sea, into the map's folder");
+        ImGui::SameLine();
+        ImGui::BeginDisabled(!state.present);
+        if (ImGui::Button("Clear")) {
+          AskMapTexture(kind, MapTextureOp::Clear);
+        }
+        ImGui::EndDisabled();
+        ImGui::SetItemTooltip("Take it out of the slot (the shader then reads none)");
+        ImGui::EndGroup();
+        ImGui::Spacing();
+        ImGui::PopID();
+      };
+      if (normals.available && normals.shared) {
+        row(0, "Normals and lighting (shadow, water depth)", normals);
+      } else {
+        if (normals.available) {
+          row(0, "Normal map", normals);
+        }
+        if (lighting.available) {
+          row(1, "Lighting (shadow, occlusion, water depth)", lighting);
+        }
+      }
     }
   }
 

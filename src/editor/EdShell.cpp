@@ -92,6 +92,23 @@ namespace faf::editor
   void EdShell::UpdateTestRun()
   {
     const double now = ImGui::GetTime();
+    // `/mapwide normals|lighting[,clear]` (test runs): the Layers panel's Make (or Clear) once the map is open.
+    {
+      static bool mapWideDone = false;
+      fa::vector<fa::string> value;
+      if (
+        !mapWideDone && mDocument.GetState() == EdDocument::State::Open && ImGui::GetTime() > 8.0 &&
+        moho::CFG_GetArgOption("/mapwide", 1, &value) && !value.empty()
+      ) {
+        mapWideDone = true;
+        const std::string what = value[0].c_str();
+        mTools.AskMapTexture(
+          what.rfind("lighting", 0) == 0 ? 1 : 0,
+          what.find(",clear") != std::string::npos ? EdTools::MapTextureOp::Clear : EdTools::MapTextureOp::Make
+        );
+        gpg::Logf("editor: /mapwide %s", what.c_str());
+      }
+    }
     // `/pickfilter <kinds>` (test runs): the Select tool picks only these (markers, pathnodes, units, props, decals).
     {
       static bool pickDone = false;

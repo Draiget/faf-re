@@ -45,6 +45,10 @@
 #include "editor/tools/EdTextureLibrary.h"
 #include "editor/ui/EdCommands.h"
 #include "editor/ui/EdFonts.h"
+#include "editor/graph/EdTextureBake.h"
+#include "editor/doc/EdLighting.h"
+#include "editor/tools/EdShaderSlots.h"
+#include "editor/tools/EdMapTextures.h"
 #include "editor/ui/EdIconFont.h"
 #include "editor/ui/EdHelp.h"
 #include "editor/ui/EdHomeModel.h"
@@ -125,16 +129,16 @@ namespace faf::editor
     [[nodiscard]] bool IsTestRunCommandLine()
     {
       static const char* const kOptions[] = {
-        "/command",        "/palette",        "/theme",           "/keysfile",    "/focuspanel",   "/uiclicks",
-        "/hidegameunits",  "/movelayer",      "/pickfilter",      "/tool",        "/proptool",     "/play",
-        "/debugarm",       "/breakpoint",     "/check",           "/decaltool",   "/markertool",   "/unittool",
-        "/hoverprop",      "/selectprops",    "/selectunit",      "/propswap",    "/saveas",       "/settingsfile",
-        "/autosavefolder", "/askunsaved",     "/particlebrowser", "/particlenew", "/particleopen", "/materialeditor",
-        "/uiscale",        "/testrun",        "/openall",         "/roundtrip",   "/vault",        "/vaultsearch",
-        "/vaultmap",       "/newmap",         "/stamp",           "/brush",       "/layer",        "/waterbody",
-        "/ruler",          "/adaptivewindow", "/maskrule",        "/shader",      "/brushtest",    "/brushshape",
-        "/stampsource",    "/stampstroke",    "/symoptions",      "/maskoptions", "/masktest",     "/shaderbrowser",
-        "/convertlayers",
+        "/command",        "/palette",        "/theme",          "/keysfile",        "/focuspanel",  "/uiclicks",
+        "/hidegameunits",  "/movelayer",      "/pickfilter",     "/mapwide",         "/tool",        "/proptool",
+        "/play",           "/debugarm",       "/breakpoint",     "/check",           "/decaltool",   "/markertool",
+        "/unittool",       "/hoverprop",      "/selectprops",    "/selectunit",      "/propswap",    "/saveas",
+        "/settingsfile",   "/autosavefolder", "/askunsaved",     "/particlebrowser", "/particlenew", "/particleopen",
+        "/materialeditor", "/uiscale",        "/testrun",        "/openall",         "/roundtrip",   "/vault",
+        "/vaultsearch",    "/vaultmap",       "/newmap",         "/stamp",           "/brush",       "/layer",
+        "/waterbody",      "/ruler",          "/adaptivewindow", "/maskrule",        "/shader",      "/brushtest",
+        "/brushshape",     "/stampsource",    "/stampstroke",    "/symoptions",      "/maskoptions", "/masktest",
+        "/shaderbrowser",  "/convertlayers",
       };
       for (const char* const option : kOptions) {
         if (moho::CFG_GetArgOption(option, 0, nullptr)) {
@@ -2202,6 +2206,15 @@ namespace faf::editor
       /** The material editor's Live Update and Apply, with the open map's slots. */
       void DriveMaterialEditor();
       void ApplyMaterial(const EdMaterialEditor::Bake& bake);
+      /** The Layers panel's map-wide textures: its asks, and its rows' states (once a second). */
+      void MapTexturesUpdate();
+      void MakeMapTexture(MapTextureKind kind);
+      void ClearMapTexture(MapTextureKind kind);
+      [[nodiscard]] std::uint64_t HeightsChecksum();
+      [[nodiscard]] static std::string LowerPath(std::string path);
+      int mMapTextureFrame = 0;
+      std::map<std::string, std::uint64_t>
+        mMapTexturesMade; // a texture made here, by its game path: the heights' checksum
       std::string mIniPath;
       bool mImGuiReady = false;
     };
@@ -4047,6 +4060,198 @@ namespace faf::editor
       }
     }
 
+    void EditorApp::MapTexturesUpdate()
+    {
+      EdTools& tools = mShell->Tools();
+      const std::vector<EdTools::LayerSlot> slots = mScene.LayerSlots();
+      if (slots.size() != 10) {
+        return;
+      }
+      int askedKind = 0;
+      EdTools::MapTextureOp op = EdTools::MapTextureOp::None;
+      if (tools.TakeMapTextureAsk(askedKind, op)) {
+        const int kind = askedKind;
+        const MapTextureKind which = kind == 0 ? MapTextureKind::Normals : MapTextureKind::Lighting;
+        if (op == EdTools::MapTextureOp::Make) {
+          MakeMapTexture(which);
+        } else {
+          ClearMapTexture(which);
+        }
+        mMapTextureFrame = 0; // the rows at once
+      }
+      // The rows, once a second (the heights' checksum is the costly part, and only when one was made here).
+      if (mMapTextureFrame++ % 60 != 0) {
+        return;
+      }
+      const std::string shader = mScene.TerrainShader();
+      const float mapSize = static_cast<float>(std::max(mDocument.Facts().sizeX, mDocument.Facts().sizeZ));
+      std::uint64_t sum = 0;
+      bool summed = false;
+      for (int kind = 0; kind < 2; ++kind) {
+        const MapTextureTarget target =
+          MapTextureTargetOf(shader, kind == 0 ? MapTextureKind::Normals : MapTextureKind::Lighting);
+        EdTools::MapTextureRow& row = tools.MapTextureState(kind);
+        row = {};
+        row.available = target.Valid();
+        row.shared = target.pack == MapTexturePack::Light301;
+        if (!row.available) {
+          continue;
+        }
+        const EdTools::LayerSlot& slot = slots[static_cast<std::size_t>(target.slot)];
+        const std::string& path = target.normalsPath ? slot.normals : slot.albedo;
+        row.present = !path.empty() && MapWideOn(slot.albedoSize, mapSize);
+        const auto made = mMapTexturesMade.find(LowerPath(path));
+        row.made = row.present && made != mMapTexturesMade.end();
+        if (row.made) {
+          if (!summed) {
+            sum = HeightsChecksum();
+            summed = true;
+          }
+          row.stale = sum != made->second;
+        }
+        const std::size_t slash = path.find_last_of('/');
+        const std::string leaf = slash == std::string::npos ? path : path.substr(slash + 1);
+        row.state = !row.present
+          ? (path.empty() ? std::string("Not made: Make draws it from the heights, the sun and the sea.")
+                          : "Off: " + leaf + " is in the slot, but its size isn't above the map's.")
+          : row.stale ? std::string("Out of date: the heights changed since it was made. Remake it.")
+          : row.made  ? std::string("From the heights \xC2\xB7 up to date")
+                      : "Made elsewhere: " + leaf;
+      }
+    }
+
+    std::uint64_t EditorApp::HeightsChecksum()
+    {
+      const std::shared_ptr<TerrainSource> terrain = mScene.TerrainHeights();
+      std::uint64_t hash = 1469598103934665603ULL;
+      if (terrain != nullptr) {
+        for (const float h : terrain->heights) {
+          std::uint32_t bits = 0;
+          std::memcpy(&bits, &h, sizeof(bits));
+          hash = (hash ^ bits) * 1099511628211ULL;
+        }
+      }
+      return hash;
+    }
+
+    std::string EditorApp::LowerPath(
+      std::string path
+    )
+    {
+      for (char& c : path) {
+        c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+      }
+      return path;
+    }
+
+    void EditorApp::MakeMapTexture(
+      const MapTextureKind kind
+    )
+    {
+      const std::shared_ptr<TerrainSource> terrain = mScene.TerrainHeights();
+      const std::filesystem::path scmap = mDocument.MapDiskFile();
+      const MapTextureTarget target = MapTextureTargetOf(mScene.TerrainShader(), kind);
+      if (terrain == nullptr || scmap.empty() || !target.Valid()) {
+        PostStatusMessage(
+          target.Valid() ? "No map folder to write the texture into" : "This shader draws no map-wide textures"
+        );
+        return;
+      }
+      // The map's own sun and sea.
+      MapTextureOptions options;
+      const LightingState lighting = mDocument.LightingNow();
+      SunAnglesOf(lighting.sunDirection, options.azimuth, options.altitude);
+      options.altitude = std::clamp(options.altitude, 5.0f, 85.0f);
+      const WaterState water = mDocument.WaterNow();
+      options.waterOn = water.enabled;
+      options.waterElevation = water.elevation;
+      options.abyss = water.abyss;
+      const int mapSize = std::max(terrain->width, terrain->height) - 1;
+      const int size = std::clamp(mapSize, 64, 1024);
+      const auto started = std::chrono::steady_clock::now();
+      std::vector<float> rgba;
+      std::string error;
+      if (!faf::editor::MakeMapTexture(
+            terrain->heights, terrain->width, terrain->height, target, options, size, rgba, error
+          )) {
+        PostStatusMessage("The map-wide texture wasn't made: " + error);
+        gpg::Warnf("editor: map-wide texture: %s", error.c_str());
+        return;
+      }
+      TexImage image;
+      image.Reset(size, 4, 0.0f);
+      image.data = std::move(rgba);
+      std::vector<std::uint8_t> dds;
+      if (!EncodeDds(image, DdsKind::Bgra, dds, error)) {
+        PostStatusMessage("The map-wide texture wasn't encoded: " + error);
+        return;
+      }
+      const char* const file = target.pack == MapTexturePack::Normal7 ? "map_normals.dds"
+        : target.pack == MapTexturePack::Info7                        ? "map_lighting.dds"
+                                                                      : "map_normals_lighting.dds";
+      const std::filesystem::path folder = scmap.parent_path() / "env" / "layers";
+      std::error_code ec;
+      std::filesystem::create_directories(folder, ec);
+      {
+        std::ofstream out(folder / file, std::ios::binary | std::ios::trunc);
+        out.write(reinterpret_cast<const char*>(dds.data()), static_cast<std::streamsize>(dds.size()));
+        if (!out) {
+          PostStatusMessage("Can't write " + (folder / file).string());
+          return;
+        }
+      }
+      const std::string game = "/maps/" + mDocument.FolderName() + "/env/layers/" + file;
+      EdTools::LayerSlot value = mScene.LayerSlots()[static_cast<std::size_t>(target.slot)];
+      if (target.normalsPath) {
+        value.normals = game;
+      } else {
+        value.albedo = game;
+      }
+      // Above the map's size: the shader reads the slot as map-wide data.
+      value.albedoSize = static_cast<float>(mapSize + 1);
+      value.normalsSize = static_cast<float>(mapSize + 1);
+      mScene.ChangeLayerSlot(target.slot, value);
+      mMapTexturesMade[LowerPath(game)] = HeightsChecksum();
+      std::string read;
+      const bool seen = ReadGameFile(game, read) && read.size() == dds.size();
+      const double seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - started).count();
+      gpg::Logf(
+        "editor: map-wide texture %s made in %.1f s: %dx%d, sun %.0f / %.0f, slot %d%s%s",
+        game.c_str(),
+        seconds,
+        size,
+        size,
+        static_cast<double>(options.azimuth),
+        static_cast<double>(options.altitude),
+        target.slot,
+        target.normalsPath ? " (its normal map)" : "",
+        seen ? "" : "; the game's files don't see it yet"
+      );
+      PostStatusMessage(std::string("Made ") + file + " from the heights");
+    }
+
+    void EditorApp::ClearMapTexture(
+      const MapTextureKind kind
+    )
+    {
+      const MapTextureTarget target = MapTextureTargetOf(mScene.TerrainShader(), kind);
+      if (!target.Valid()) {
+        return;
+      }
+      EdTools::LayerSlot value = mScene.LayerSlots()[static_cast<std::size_t>(target.slot)];
+      if (target.normalsPath) {
+        value.normals.clear();
+      } else {
+        value.albedo.clear();
+      }
+      value.albedoSize = 4.0f;
+      value.normalsSize = 4.0f;
+      mScene.ChangeLayerSlot(target.slot, value);
+      gpg::Logf(
+        "editor: map-wide texture cleared from slot %d%s", target.slot, target.normalsPath ? " (its normal map)" : ""
+      );
+    }
+
     void EditorApp::ApplyMaterial(
       const EdMaterialEditor::Bake& bake
     )
@@ -4260,6 +4465,7 @@ namespace faf::editor
           mScene.ChangeLayerSlot(slot, value);
         }
         tools.SetLayerSlots(mScene.LayerSlots());
+        MapTexturesUpdate();
         DriveMaterialEditor();
         tools.SetMapSizeUnits(static_cast<float>(std::max(mDocument.Facts().sizeX, mDocument.Facts().sizeZ)));
         {
