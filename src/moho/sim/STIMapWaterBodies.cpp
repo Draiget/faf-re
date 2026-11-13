@@ -51,6 +51,63 @@ namespace moho
       }
       return true;
     }
+
+    /**
+     * `River = { Points = { { x, z, Level = , HalfWidth = , Fall = , Below = }, ... }, Steps = , Margin = ,
+     * FlowScale = }` into `out`; false with `why` set when it is not that. The values are checked by
+     * `ValidateRiver` when the river is built.
+     */
+    [[nodiscard]] bool ReadRiver(
+      const LuaPlus::LuaObject& river,
+      SRiverDesc& out,
+      std::string& why
+    )
+    {
+      if (!river.IsTable()) {
+        why = "River is not a table";
+        return false;
+      }
+      const LuaPlus::LuaObject points = river["Points"];
+      if (!points.IsTable()) {
+        why = "River.Points is not a list of points";
+        return false;
+      }
+      const std::int32_t count = points.GetCount();
+      for (std::int32_t index = 1; index <= count; ++index) {
+        const LuaPlus::LuaObject entry = points[index];
+        float xz[2] = {0.0f, 0.0f};
+        if (!NumberList(entry, xz, 2)) {
+          why = "River.Points[" + std::to_string(index) + "] is not { x, z, Level = , HalfWidth = }";
+          return false;
+        }
+        SRiverPoint point;
+        point.x = xz[0];
+        point.z = xz[1];
+        bool present = false;
+        point.level = NumberField(entry, "Level", 0.0f, &present);
+        if (!present) {
+          why = "River.Points[" + std::to_string(index) + "] has no Level";
+          return false;
+        }
+        point.halfWidth = NumberField(entry, "HalfWidth", 0.0f, &present);
+        if (!present) {
+          why = "River.Points[" + std::to_string(index) + "] has no HalfWidth";
+          return false;
+        }
+        const LuaPlus::LuaObject fall = entry["Fall"];
+        point.fall = fall.IsBoolean() && fall.GetBoolean();
+        point.below = NumberField(entry, "Below", point.level, &present);
+        if (point.fall && !present) {
+          why = "River.Points[" + std::to_string(index) + "] is a Fall without Below";
+          return false;
+        }
+        out.points.push_back(point);
+      }
+      out.steps = static_cast<std::int32_t>(NumberField(river, "Steps", static_cast<float>(kRiverDefaultSteps)));
+      out.margin = NumberField(river, "Margin", kRiverDefaultMargin);
+      out.flowScale = NumberField(river, "FlowScale", 1.0f);
+      return true;
+    }
   } // namespace
 
   void STIMap::InstallWaterBodies(
@@ -90,6 +147,37 @@ namespace moho
       SWaterBodyDesc desc;
       const LuaPlus::LuaObject dry = entry["Dry"];
       desc.dry = dry.IsBoolean() && dry.GetBoolean();
+
+      // A river: the surface runs along a centreline and falls block movement. With the switch off the
+      // body is a flat lake at its Elevation (below), if it has one.
+      const LuaPlus::LuaObject riverObject = entry["River"];
+      if (!riverObject.IsNil() && FAF_IsSimFixActive(EFafSimFix::WaterRivers)) {
+        std::string why;
+        if (!ReadRiver(riverObject, desc.river, why)) {
+          log.push_back("water body " + std::to_string(index) + " skipped: " + why);
+          continue;
+        }
+        desc.isRiver = true;
+        desc.hasSeed = false;
+        float highest = -1.0e30f;
+        for (const SRiverPoint& point : desc.river.points) {
+          highest = point.level > highest ? point.level : highest;
+        }
+        desc.elevation = highest;
+        desc.deep = NumberField(entry, "Deep", highest - deepBelow);
+        desc.abyss = NumberField(entry, "Abyss", highest - abyssBelow);
+        if (desc.deep >= highest || desc.abyss >= highest) {
+          log.push_back(
+            "water body " + std::to_string(index) +
+            ": Deep and Abyss must be below the river's highest level; using 2.5 and 15 below it"
+          );
+          desc.deep = highest - kDefaultDeepBelow;
+          desc.abyss = highest - kDefaultAbyssBelow;
+        }
+        descs.push_back(desc);
+        continue;
+      }
+
       bool hasElevation = false;
       desc.elevation = NumberField(entry, "Elevation", 0.0f, &hasElevation);
       bool hasFillTo = false;
@@ -97,7 +185,9 @@ namespace moho
       if (desc.dry ? !hasFillTo : !hasElevation) {
         log.push_back(
           "water body " + std::to_string(index) +
-          (desc.dry ? " skipped: a dry body needs FillTo" : " skipped: no Elevation")
+          (desc.dry ? " skipped: a dry body needs FillTo"
+                    : (riverObject.IsNil() ? " skipped: no Elevation"
+                                           : " skipped: a River needs sim_FixRivers, or an Elevation for a flat lake"))
         );
         continue;
       }
@@ -129,8 +219,15 @@ namespace moho
         }
       }
 
-      const LuaPlus::LuaObject seedObject = entry["Seed"];
+      LuaPlus::LuaObject seedObject = entry["Seed"];
       float seed[2] = {0.0f, 0.0f};
+      if (seedObject.IsNil() && desc.outline.empty() && riverObject.IsTable()) {
+        // A river as a flat lake (sim_FixRivers off) starts at its first point.
+        const LuaPlus::LuaObject riverPoints = riverObject["Points"];
+        if (riverPoints.IsTable()) {
+          seedObject = riverPoints[1];
+        }
+      }
       if (seedObject.IsNil() && !desc.outline.empty()) {
         desc.hasSeed = false;
       } else if (!NumberList(seedObject, seed, 2)) {
@@ -170,6 +267,22 @@ namespace moho
     }
     for (std::size_t number = 1; number <= mWaterBodies->BodyCount(); ++number) {
       const SWaterBody& body = mWaterBodies->Body(static_cast<std::uint8_t>(number));
+      if (const CWaterRiver* const river = mWaterBodies->River(static_cast<std::uint8_t>(number)); river != nullptr) {
+        gpg::Logf(
+          "Water bodies: %zu river at %g to %g, %zu falls (%u fall cells), %u cells in [%d, %d] x [%d, %d]",
+          number,
+          static_cast<double>(body.levelMax),
+          static_cast<double>(body.levelMin),
+          river->Falls().size(),
+          river->FallCellCount(),
+          body.cellCount,
+          body.x0,
+          body.x1,
+          body.z0,
+          body.z1
+        );
+        continue;
+      }
       gpg::Logf(
         "Water bodies: %zu at %g, %u cells in [%d, %d] x [%d, %d]",
         number,

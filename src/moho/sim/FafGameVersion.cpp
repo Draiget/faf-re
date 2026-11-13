@@ -41,6 +41,7 @@ namespace moho
     int sim_FixShieldRepair = -1;
     int sim_FixProjectileMapEdgeCollision = -1;
     int sim_FixWaterBodies = -1;
+    int sim_FixRivers = -1;
 
     TConVar<int> gTConVar_sim_FixAimLeadOncePerTick(
       "sim_FixAimLeadOncePerTick",
@@ -82,6 +83,13 @@ namespace moho
       "has it yet, 0 off, 1 on). Every player of a game must use the same value.",
       &sim_FixWaterBodies
     );
+    TConVar<int> gTConVar_sim_FixRivers(
+      "sim_FixRivers",
+      "Rivers: a water body with a River key has a sloped surface along its centreline and falls that block "
+      "movement (-1 game version: no release has it yet, 0 off: a flat lake, 1 on). Needs sim_FixWaterBodies. "
+      "Every player of a game must use the same value.",
+      &sim_FixRivers
+    );
 
     struct SFafSimFixInfo
     {
@@ -106,6 +114,7 @@ namespace moho
       {"sim_FixShieldRepair", 3840, &sim_FixShieldRepair},
       {"sim_FixProjectileMapEdgeCollision", 3841, &sim_FixProjectileMapEdgeCollision},
       {"sim_FixWaterBodies", kFafGameVersionUnreleased, &sim_FixWaterBodies},
+      {"sim_FixRivers", kFafGameVersionUnreleased, &sim_FixRivers},
     }};
 
     int sSessionGameVersion = kFafGameVersionLatest;
