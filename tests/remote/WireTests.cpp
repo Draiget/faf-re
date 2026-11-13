@@ -3505,13 +3505,16 @@ TEST(
     return message;
   };
 
+  // The view's lanes are spans into the message, so each message outlives the checks that read them.
   SViewMessage view;
-  ASSERT_TRUE(ReadViewMessage(make(0u, false), view));
+  const std::vector<std::uint8_t> five = make(0u, false);
+  ASSERT_TRUE(ReadViewMessage(five, view));
   EXPECT_EQ(view.beat, 1234u);
   EXPECT_FALSE(view.hasPoses);
   EXPECT_TRUE(view.effects.empty());
 
-  ASSERT_TRUE(ReadViewMessage(make(1u, false), view));
+  const std::vector<std::uint8_t> six = make(1u, false);
+  ASSERT_TRUE(ReadViewMessage(six, view));
   EXPECT_TRUE(view.hasPoses);
   ASSERT_EQ(view.poses.size(), 3u);
   EXPECT_EQ(view.poses[0], 5u);
