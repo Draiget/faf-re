@@ -198,6 +198,8 @@ namespace faf::editor
       mDistance = distance;
       ApplyCamera();
     }
+    /** Test runs: a checksum of the height words (FNV-1a), to tell "as before" from "changed". */
+    [[nodiscard]] std::uint64_t HeightsHash() const;
     /** G or R is moving or turning the selection: the view takes every key until it ends. */
     [[nodiscard]] bool ModalOn() const noexcept
     {
@@ -973,6 +975,11 @@ namespace faf::editor
     bool UndoLighting(bool redo);
     bool UndoLook(bool redo);
     bool UndoWaterMasks(bool redo);
+    // The Erosion window: its preview is an ordinary height undo step, taken off by Revert while it is the newest step.
+    bool mErosionPreviewShown = false;
+    std::size_t mErosionPreviewDepth = 0;
+    std::string RunErosion(const std::string& solver, const ErosionValues& values, bool preview);
+    bool RevertErosionPreview();
     // The Water tool's mask brush: a stroke's before, and the overlay's runs for the mask shown.
     bool mPaintingWaterMask = false;
     EdDocument::WaterMaskSnapshot mWaterMaskBefore;

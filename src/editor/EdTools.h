@@ -4,6 +4,7 @@
 #include "editor/ui/EdProperties.h"
 #include "editor/tools/EdArrange.h"
 #include "editor/tools/EdWaterMasks.h"
+#include "editor/tools/EdErosionSuite.h"
 #include "editor/tools/EdHeightBrush.h"
 #include "editor/tools/EdBrushLibrary.h"
 #include "editor/tools/EdSymmetrize.h"
@@ -1561,6 +1562,63 @@ namespace faf::editor
     {
       return mFollowSymmetry;
     }
+    /** The Erosion window: open it, what it asks the view (with the solver and its settings), and what it hears back.
+     */
+    enum class ErosionAsk
+    {
+      None,
+      Preview,
+      Revert,
+      Apply,
+    };
+    void OpenErosion() noexcept
+    {
+      mErosionOpen = true;
+    }
+    [[nodiscard]] bool TakeErosionAsk(
+      ErosionAsk& ask,
+      std::string& solver,
+      ErosionValues& values
+    )
+    {
+      ask = std::exchange(mErosionAsk, ErosionAsk::None);
+      if (ask == ErosionAsk::None) {
+        return false;
+      }
+      solver = mErosionSolver;
+      values = mErosionValues[mErosionSolver];
+      if (values.empty()) {
+        if (const ErosionSolver* const s = FindErosionSolver(solver); s != nullptr) {
+          values = ErosionDefaults(*s);
+        }
+      }
+      return true;
+    }
+    /** Test runs (`/erosiontest`): a preset chosen and an ask made, as the window's buttons do. */
+    void AskErosion(
+      const std::string& preset,
+      const ErosionAsk ask
+    )
+    {
+      for (const ErosionPreset& p : ErosionPresets()) {
+        if (preset == p.id) {
+          mErosionPreset = p.id;
+          mErosionSolver = p.solver;
+          mErosionValues[p.solver] = ErosionPresetValues(p);
+        }
+      }
+      mErosionOpen = true;
+      mErosionAsk = ask;
+    }
+    void SetErosionStatus(
+      std::string status,
+      const bool previewShown
+    )
+    {
+      mErosionStatus = std::move(status);
+      mErosionPreviewShown = previewShown;
+    }
+    void DrawErosionWindow();
     /** How many of each kind the map has now (the view gives them each frame), for Properties with nothing chosen. */
     void SetMapCounts(
       const int markers,
@@ -2608,6 +2666,13 @@ namespace faf::editor
     bool mFollowSymmetry = true;
     bool mSelectAny = false; // something is selected (Arrange's buttons)
     std::string mHudOverride;
+    bool mErosionOpen = false;
+    ErosionAsk mErosionAsk = ErosionAsk::None;
+    std::string mErosionSolver = "hydraulic";
+    std::string mErosionPreset = "hills";
+    std::map<std::string, ErosionValues> mErosionValues;
+    std::string mErosionStatus;
+    bool mErosionPreviewShown = false;
     int mMapCounts[4] = {0, 0, 0, 0};
     FillOptions mFill;
     bool mFillRequest = false;

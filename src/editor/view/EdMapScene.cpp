@@ -3891,6 +3891,20 @@ namespace faf::editor
       if (mTools->TakeRepairRequest()) {
         RepairSymmetry();
       }
+      if (EdTools::ErosionAsk ask = EdTools::ErosionAsk::None; true) {
+        std::string solver;
+        ErosionValues values;
+        if (mTools->TakeErosionAsk(ask, solver, values)) {
+          std::string status;
+          if (ask == EdTools::ErosionAsk::Revert) {
+            status = RevertErosionPreview() ? "Reverted." : "Nothing to revert (other edits came after the preview).";
+            gpg::Logf("editor: erosion: %s", status.c_str());
+          } else {
+            status = RunErosion(solver, values, ask == EdTools::ErosionAsk::Preview);
+          }
+          mTools->SetErosionStatus(status, mErosionPreviewShown);
+        }
+      }
       if (EdTools::FillOptions fill; mTools->TakeFillRequest(fill)) {
         mTools->SetFillMessage(ScatterOverMap(fill));
       }
@@ -4806,6 +4820,99 @@ namespace faf::editor
       static_cast<double>(mDocument.LightingNow().multiplier)
     );
     return true;
+  }
+
+  std::uint64_t EdMapScene::HeightsHash() const
+  {
+    const moho::CHeightField* const field = mMap != nullptr ? mMap->mTerrainRes->GetHeightField() : nullptr;
+    std::uint64_t hash = 1469598103934665603ULL;
+    if (field != nullptr) {
+      const std::size_t count = static_cast<std::size_t>(field->width) * static_cast<std::size_t>(field->height);
+      for (std::size_t i = 0; i < count; ++i) {
+        hash = (hash ^ field->data[i]) * 1099511628211ULL;
+      }
+    }
+    return hash;
+  }
+
+  bool EdMapScene::RevertErosionPreview()
+  {
+    if (!mErosionPreviewShown) {
+      return false;
+    }
+    mErosionPreviewShown = false;
+    // Only while the preview is still the newest edit: else it stays, as any edit would.
+    if (
+      mDocument.UndoOrder().size() == mErosionPreviewDepth && !mDocument.UndoOrder().empty() &&
+      mDocument.UndoOrder().back() == EdDocument::EditKind::Heights
+    ) {
+      return Undo();
+    }
+    return false;
+  }
+
+  std::string EdMapScene::RunErosion(
+    const std::string& solverId,
+    const ErosionValues& values,
+    const bool preview
+  )
+  {
+    moho::CHeightField* const field = mMap != nullptr ? mMap->mTerrainRes->GetHeightField() : nullptr;
+    const ErosionSolver* const solver = FindErosionSolver(solverId);
+    if (field == nullptr || solver == nullptr || mPainting) {
+      return "No map, or a stroke is under way.";
+    }
+    (void)RevertErosionPreview();
+    const int step = preview ? ErosionPreviewStep(field->width, field->height) : 1;
+    const SampleRect whole{0, 0, field->width - 1, field->height - 1};
+    const auto started = std::chrono::steady_clock::now();
+    mDocument.Heights().BeginStroke();
+    mDocument.Heights().BeforeWrite(field->data, whole);
+    std::string error;
+    const bool made = ErodeHeights(
+      reinterpret_cast<std::uint16_t*>(field->data),
+      field->width,
+      field->height,
+      1.0f / 128.0f,
+      *solver,
+      values,
+      step,
+      error
+    );
+    mDocument.Heights().EndStroke(field->data);
+    if (!made) {
+      gpg::Warnf("editor: erosion: %s", error.c_str());
+      return "The solver stopped: " + error;
+    }
+    mDocument.EditEnded(EdDocument::EditKind::Heights);
+    RefreshHeights({whole});
+    mDocument.SetModified(true);
+    const double seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - started).count();
+    const std::size_t changed = mDocument.Heights().NewestChangedSamples();
+    if (preview) {
+      mErosionPreviewShown = true;
+      mErosionPreviewDepth = mDocument.UndoOrder().size();
+    }
+    gpg::Logf(
+      "editor: erosion %s (%s, every %d%s sample): %zu samples changed in %.2f s",
+      preview ? "preview" : "applied",
+      solver->label,
+      step,
+      step == 1 ? "st" : "th",
+      changed,
+      seconds
+    );
+    char text[160];
+    (void)std::snprintf(
+      text,
+      sizeof(text),
+      "%s: %zu samples changed in %.1f s%s",
+      preview ? "Preview" : "Applied",
+      changed,
+      seconds,
+      preview ? "; Revert takes it off" : "; one undo step"
+    );
+    return text;
   }
 
   bool EdMapScene::UndoWaterMasks(

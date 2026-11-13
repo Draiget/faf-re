@@ -1058,6 +1058,97 @@ namespace faf::editor
     }
   }
 
+  void EdTools::DrawErosionWindow()
+  {
+    if (!mErosionOpen) {
+      return;
+    }
+    ImGui::SetNextWindowSize(ImVec2(Em(380.0f), Em(560.0f)), ImGuiCond_FirstUseEver);
+    if (!ImGui::Begin("Erosion###ErosionWindow", &mErosionOpen)) {
+      ImGui::End();
+      return;
+    }
+    // Presets: a solver and the settings that give its look.
+    ImGui::TextDisabled("Presets");
+    const float gap = ImGui::GetStyle().ItemSpacing.x;
+    const float width = (ImGui::GetContentRegionAvail().x - gap * 2.0f) / 3.0f;
+    int column = 0;
+    for (const ErosionPreset& preset : ErosionPresets()) {
+      if (column++ % 3 != 0) {
+        ImGui::SameLine(0.0f, gap);
+      }
+      if (ModeTile(preset.label, mErosionPreset == preset.id, ImVec2(width, 0.0f))) {
+        mErosionPreset = preset.id;
+        mErosionSolver = preset.solver;
+        mErosionValues[preset.solver] = ErosionPresetValues(preset);
+      }
+    }
+    // The solver and its settings.
+    const ErosionSolver* solver = FindErosionSolver(mErosionSolver);
+    if (solver == nullptr) {
+      solver = &ErosionSolvers().front();
+      mErosionSolver = solver->id;
+    }
+    ImGui::Spacing();
+    ImGui::SetNextItemWidth(-1.0f);
+    if (EdBeginCombo("##erosionsolver", solver->label)) {
+      for (const ErosionSolver& s : ErosionSolvers()) {
+        if (ImGui::Selectable(s.label, &s == solver)) {
+          mErosionSolver = s.id;
+          mErosionPreset.clear();
+        }
+      }
+      ImGui::EndCombo();
+    }
+    solver = FindErosionSolver(mErosionSolver);
+    ErosionValues& values = mErosionValues[mErosionSolver];
+    if (values.empty()) {
+      values = ErosionDefaults(*solver);
+    }
+    if (
+      ImGui::BeginChild(
+        "##erosionsettings", ImVec2(0.0f, -ImGui::GetFrameHeightWithSpacing() * 3.2f), ImGuiChildFlags_Borders
+      )
+    ) {
+      for (const ErosionParam& param : solver->params) {
+        float value = static_cast<float>(values[param.key]);
+        char format[96];
+        (void)std::snprintf(format, sizeof(format), "%s %s", param.label, param.format);
+        ImGui::SetNextItemWidth(-1.0f);
+        if (FillSliderFloat(param.key, &value, static_cast<float>(param.min), static_cast<float>(param.max), format)) {
+          values[param.key] = param.step >= 1.0 ? std::round(value) : value;
+          mErosionPreset.clear();
+        }
+        if (param.tip != nullptr) {
+          EdSetItemTooltip("%s\n%s", param.label, param.tip);
+        }
+      }
+    }
+    ImGui::EndChild();
+    // Preview (a coarse run on the map, as an undo step), Revert, Apply (the full run).
+    if (PrimaryButton("Apply")) {
+      mErosionAsk = ErosionAsk::Apply;
+    }
+    EdSetItemTooltip("The full run on the whole map, as one undo step (a preview shown is taken off first).");
+    ImGui::SameLine();
+    if (ImGui::Button("Preview")) {
+      mErosionAsk = ErosionAsk::Preview;
+    }
+    EdSetItemTooltip("A quick run on every few samples, its change put on the map (the fine detail stays).");
+    ImGui::SameLine();
+    ImGui::BeginDisabled(!mErosionPreviewShown);
+    if (ImGui::Button("Revert")) {
+      mErosionAsk = ErosionAsk::Revert;
+    }
+    ImGui::EndDisabled();
+    if (!mErosionStatus.empty()) {
+      ImGui::PushTextWrapPos(0.0f);
+      ImGui::TextDisabled("%s", mErosionStatus.c_str());
+      ImGui::PopTextWrapPos();
+    }
+    ImGui::End();
+  }
+
   void EdTools::DrawFalloffCurve()
   {
     // The mockup's curve under the sliders: the brush's weight across its middle (BrushWeightAt, so its shape and
@@ -1381,6 +1472,10 @@ namespace faf::editor
   void EdTools::DrawTerrain()
   {
     DrawBrush(true);
+    if (ImGui::Button("Erosion...", ImVec2(-1.0f, 0.0f))) {
+      mErosionOpen = true;
+    }
+    EdSetItemTooltip("The Erosion window: a solver run over the whole map, with presets, a preview and Apply.");
     DrawSymmetry();
     DrawLimits();
     if (Section("Height field")) {

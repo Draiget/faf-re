@@ -152,9 +152,9 @@ namespace faf::editor
         "/stbfont",        "/recipe",         "/texset",         "/layerop",         "/slopeview",   "/typesfromlayers",
         "/uncapped",       "/nominimap",      "/followtest",     "/arrangetest",     "/findtest",    "/findopen",
         "/filltest",       "/modaltest",      "/looktest",       "/looksfolder",     "/envtest",     "/watermasktest",
-        "/nowaterhires",   "/camat",          "/symmenu",        "/panelbottom",     "/shader",      "/brushtest",
-        "/brushshape",     "/stampsource",    "/stampstroke",    "/symoptions",      "/maskoptions", "/masktest",
-        "/shaderbrowser",  "/convertlayers",
+        "/nowaterhires",   "/camat",          "/erosiontest",    "/symmenu",         "/panelbottom", "/shader",
+        "/brushtest",      "/brushshape",     "/stampsource",    "/stampstroke",     "/symoptions",  "/maskoptions",
+        "/masktest",       "/shaderbrowser",  "/convertlayers",
       };
       for (const char* const option : kOptions) {
         if (moho::CFG_GetArgOption(option, 0, nullptr)) {
@@ -2531,6 +2531,8 @@ namespace faf::editor
       std::string mWaterMaskTestArg; // `/watermasktest foam|flatness|bias,<value>,<radius>[,keep]` (test runs)
       int mWaterMaskTestFrames = 0;
       bool mCamAtDone = false;
+      int mErosionTestStage = 0;
+      int mErosionTestFrames = 0;
       int mEnvTestFrames = 0;
       int mLookTestFrames = 0;
       // Find and replace objects: asked (Ctrl+F), the objects and types when it opened, the choices.
@@ -3252,6 +3254,9 @@ namespace faf::editor
       add("edit.paste", "Paste at the cursor", "Edit", "Ctrl+V", [this] {
         mScene.CtrlKey('V');
       }, canEdit);
+      add("terrain.erosion", "Erosion...", "Terrain", "", [this] {
+        mShell->Tools().OpenErosion();
+      }, mapOpen, {}, "A solver run over the whole map: presets, a preview on the map, Apply as one undo step");
       add("edit.find", "Find and replace objects...", "Edit", "Ctrl+F", [this] {
         mFindAsk = true;
       }, mapOpen, {}, "Every object of one type: select them, delete them or change them to another");
@@ -3558,6 +3563,7 @@ namespace faf::editor
            cmd("edit.find"),
            arrange}
         },
+        EdMenu{"&Terrain", {cmd("terrain.erosion")}},
         EdMenu{
           "&View",
           {cmd("view.tools"),
@@ -6765,6 +6771,25 @@ namespace faf::editor
       UpdateLooks();
       TestLooks();
       TestEnvironment();
+      // `/erosiontest <preset>` (test runs): the window's Preview, Revert, Apply, then Undo, a second apart.
+      if (
+        fa::vector<fa::string> ero; mErosionTestStage < 4 && !mScene.ModelsPending() && mScene.Attached() &&
+        moho::CFG_GetArgOption("/erosiontest", 1, &ero) && !ero.empty() && ++mErosionTestFrames % 60 == 0
+      ) {
+        using Ask = EdTools::ErosionAsk;
+        const Ask asks[3] = {Ask::Preview, Ask::Revert, Ask::Apply};
+        gpg::Logf(
+          "editor: erosion test stage %d: heights %016llx",
+          mErosionTestStage,
+          static_cast<unsigned long long>(mScene.HeightsHash())
+        );
+        if (mErosionTestStage < 3) {
+          mShell->Tools().AskErosion(ero[0].c_str(), asks[mErosionTestStage]);
+        } else {
+          gpg::Logf("editor: erosion test: undo %s", mScene.Undo() ? "took the apply back" : "had nothing");
+        }
+        ++mErosionTestStage;
+      }
       if (
         fa::vector<fa::string> at; !mCamAtDone && !mScene.ModelsPending() && mScene.Attached() &&
         moho::CFG_GetArgOption("/camat", 1, &at) && !at.empty()

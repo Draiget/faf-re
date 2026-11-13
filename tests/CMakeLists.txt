@@ -380,6 +380,7 @@ add_executable(faf_editor_field_tests EXCLUDE_FROM_ALL editor/FieldTests.cpp edi
   editor/RecipeTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdRecipes.cpp
   editor/TextureSetsTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdTexScale.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdTextureSets.cpp
   editor/SlopeRulesTests.cpp
+  editor/ErosionSuiteTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdErosionSuite.cpp
   ${CMAKE_SOURCE_DIR}/src/editor/terrain/EdErosion.cpp ${CMAKE_SOURCE_DIR}/src/editor/terrain/EdFieldEro2.cpp
   ${CMAKE_SOURCE_DIR}/src/editor/terrain/EdFieldCore.cpp ${CMAKE_SOURCE_DIR}/src/editor/terrain/EdFieldFilt.cpp ${CMAKE_SOURCE_DIR}/src/editor/terrain/EdFieldGen.cpp ${CMAKE_SOURCE_DIR}/src/editor/terrain/EdFieldLand.cpp ${CMAKE_SOURCE_DIR}/src/editor/terrain/EdFieldSc.cpp ${CMAKE_SOURCE_DIR}/src/editor/terrain/EdFieldPath.cpp ${CMAKE_SOURCE_DIR}/src/editor/terrain/EdFieldInterop.cpp)
 target_include_directories(faf_editor_field_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)

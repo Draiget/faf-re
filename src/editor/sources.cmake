@@ -53,6 +53,7 @@ set(FAF_EDITOR_SOURCES
   tools/EdScatter.cpp
   tools/EdModalTransform.cpp
   tools/EdWaterMasks.cpp
+  tools/EdErosionSuite.cpp
   ui/EdMapBrowser.cpp
   doc/EdWaterBodies.cpp
   view/EdWaterBodyView.cpp
