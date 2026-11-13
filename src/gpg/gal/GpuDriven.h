@@ -227,7 +227,7 @@ namespace gpg::gal
     GpuBuffer* readBuffers[kGpuMaxReadBuffers]{}; ///< t0..t3
     Texture* textures[kGpuMaxTextures]{};         ///< t4..t5
     /// t4..t5 where `textures` leaves the slot empty: a colour target's current buffer, read as a
-    /// texture (Direct3D 12 and Vulkan). It must not be the target the call draws into.
+    /// texture (Direct3D 11, 12 and Vulkan). It must not be the target the call draws into.
     RenderTarget* targets[kGpuMaxTextures]{};
     GpuBuffer* writeBuffers[kGpuMaxWriteBuffers]{}; ///< u0..u1, compute only
     /// t6 (Vulkan binding 10): the depth target bound when the call runs, as `Texture2D<float>`.

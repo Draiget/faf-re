@@ -8,6 +8,8 @@
 #include "moho/render/FxaaRenderer.h"
 #include "moho/render/TemporalAA.h"
 #include "moho/render/PostRenderer.h"
+#include "moho/render/RenderScale.h"
+#include "moho/render/SmaaRenderer.h"
 #include "moho/render/WideBloomRenderer.h"
 #include "moho/render/lights/LightBinding.h"
 #include "moho/render/lights/LightDebugView.h"
@@ -1548,6 +1550,10 @@ void moho::WRenViewport::D3DWindowOnDeviceExit(
   mBloomRenderers[0].ResetRenderTargets();
   mBloomRenderers[1].ResetRenderTargets();
 
+  // Engine addition: the render scale's targets and SMAA's working targets belong to the device that is going away.
+  moho::REN_ReleaseRenderScale();
+  moho::SmaaRenderer::Get().Release();
+
   // Release order is the binary's: the shared dynamic sheet first, then the
   // six per-head locks. These are the default-pool surfaces that make
   // `IDirect3DDevice9::Reset` fail if any of them outlives this call.
@@ -1851,6 +1857,98 @@ namespace
     }();
     return disabled;
   }
+
+  // Engine addition (render scale): the scaled frame's state while the world loop runs (render thread only).
+  // UpdateRenderViewportCoordinates reads it to hand the world pass the scaled view rectangle; null whenever the world
+  // is drawn at the window's size.
+  moho::ScaledWorldFrame* sActiveScaledWorld = nullptr;
+
+  // The scope of the frame being drawn, for RenderWorldView, which runs once per view inside the loop of Render.
+  class ScaledWorldScope;
+  ScaledWorldScope* sScaledWorldScope = nullptr;
+
+  // Scaled drawing of the world loop: begins when the level asks for it, always puts the engine's lanes back, even when
+  // the loop throws.
+  class ScaledWorldScope
+  {
+  public:
+    ScaledWorldScope(
+      moho::CD3DDevice& device,
+      const int head,
+      std::shared_ptr<moho::CD3DRenderTarget>& primary,
+      std::shared_ptr<moho::CD3DRenderTarget>& secondary,
+      std::shared_ptr<moho::CD3DDepthStencil>& viewportDepth
+    )
+      : mDevice(device)
+      , mPrimary(primary)
+      , mSecondary(secondary)
+      , mViewportDepth(viewportDepth)
+    {
+      if (moho::REN_BeginScaledWorld(mFrame, device, head, primary, secondary, viewportDepth)) {
+        sActiveScaledWorld = &mFrame;
+      }
+      sScaledWorldScope = this;
+    }
+    ScaledWorldScope(const ScaledWorldScope&) = delete;
+    ScaledWorldScope& operator=(const ScaledWorldScope&) = delete;
+    ~ScaledWorldScope()
+    {
+      End();
+      sScaledWorldScope = nullptr;
+    }
+
+    // The world part of a view is drawn: native lanes back, then the view is upscaled into the back buffer. What is
+    // drawn after this (post effects, the unit overlay: life bars, names, icons) is at the window's size and stays
+    // sharp. True when a scaled view was resolved.
+    bool Suspend(
+      gpg::gal::Device* const galDevice
+    )
+    {
+      if (!mFrame.active || !mFrame.swapped) {
+        return false;
+      }
+      End();
+      if (galDevice != nullptr) {
+        // The post effects sharpen the upscaled view (ren_Sharpen), so the upscale does not sharpen it a second time.
+        const bool postSharpens = !RenderAdditionsDisabled() && moho::ren_Sharpen > 0.0f;
+        moho::REN_ResolveScaledWorld(mFrame, *galDevice, postSharpens ? 0.0f : moho::ren_RenderScaleSharpness);
+      }
+      return true;
+    }
+
+    // The next view of the frame: the scaled targets again (not cleared).
+    void Resume()
+    {
+      if (mFrame.active && !mFrame.swapped) {
+        moho::REN_ResumeScaledWorld(mFrame, mDevice, mPrimary, mSecondary, mViewportDepth);
+        sActiveScaledWorld = &mFrame;
+      }
+    }
+
+    // The world loop is done.
+    void Finish(
+      gpg::gal::Device* const galDevice
+    )
+    {
+      (void)Suspend(galDevice);
+      mFrame.active = false;
+    }
+
+  private:
+    void End()
+    {
+      if (sActiveScaledWorld == &mFrame) {
+        sActiveScaledWorld = nullptr;
+      }
+      moho::REN_EndScaledWorld(mFrame, mDevice, mPrimary, mSecondary, mViewportDepth);
+    }
+
+    moho::CD3DDevice& mDevice;
+    std::shared_ptr<moho::CD3DRenderTarget>& mPrimary;
+    std::shared_ptr<moho::CD3DRenderTarget>& mSecondary;
+    std::shared_ptr<moho::CD3DDepthStencil>& mViewportDepth;
+    moho::ScaledWorldFrame mFrame;
+  };
 } // namespace
 
 /**
@@ -1859,7 +1957,7 @@ namespace
  */
 /**
  * Engine addition (ren_Fxaa, ren_Sharpen, ren_Grade): anti-aliasing, sharpening and grading for a
- * world view on Direct3D 12 and Vulkan, which have no multisampled back buffer. The head is copied
+ * world view on Direct3D 11, 12 and Vulkan, which have no multisampled back buffer. The head is copied
  * into the refraction target (the view's refraction pass is done with it) and drawn back through each
  * pass inside the view's viewport, colour only. It runs before the view's overlay pass, so strategic
  * icons, range rings and the other overlays stay pixel-exact, as the interface does.
@@ -1918,6 +2016,10 @@ void moho::WRenViewport::RenderWorldViewPostEffects()
   if (moho::FxaaRenderer& fxaa = moho::FxaaRenderer::Get(); !temporal && fxaa.IsActive()) {
     overHeadCopy("Fxaa", [&](gpg::gal::RenderTarget& copy, const int width, const int height) {
       fxaa.Render(copy, width, height);
+    });
+  } else if (moho::SmaaRenderer& smaa = moho::SmaaRenderer::Get(); !temporal && smaa.IsActive()) {
+    overHeadCopy("Smaa", [&](gpg::gal::RenderTarget& copy, const int width, const int height) {
+      smaa.Render(copy, width, height);
     });
   }
   if (moho::PostRenderer& post = moho::PostRenderer::Get(); post.IsActive()) {
@@ -2030,6 +2132,12 @@ void moho::WRenViewport::RenderWorldView(
   // origin) - every view, main and minimap alike, rendered its
   // terrain/mesh/water passes through that full-screen rect instead of
   // this view's own CameraSetViewport-pushed one.
+  //
+  // Engine addition (render scale): with a level below 100 % the world of this view is drawn into the scaled targets
+  // (the scope swaps the head's lanes in Render), and the rectangle read below is the scaled one.
+  if (sScaledWorldScope != nullptr) {
+    sScaledWorldScope->Resume();
+  }
   UpdateRenderViewportCoordinates();
 
   // Render the atmosphere/cloud sky dome for this world view before the
@@ -2340,9 +2448,27 @@ void moho::WRenViewport::RenderWorldView(
   // one in `Cartographic::Render` only ever runs for a view whose
   // orthographic flag is set, which is the minimap and whichever view the
   // player has toggled into cartographic mode.
+  //
+  // Engine addition (render scale): the view's world is finished. It is upscaled into the back buffer first; the post
+  // effects then run on the upscaled image (they sharpen it, and ren_RenderScaleSharpness stays out of the way), and
+  // the overlay is drawn at the window's size.
+  bool scaledViewResolved = false;
+  if (sScaledWorldScope != nullptr) {
+    const gpg::gal::RenderProfileScope profileRenderScale("RenderScale");
+    scaledViewResolved = sScaledWorldScope->Suspend(gpg::gal::Device::GetInstance());
+  }
+  if (scaledViewResolved) {
+    UpdateRenderViewportCoordinates();
+  }
   RenderWorldViewPostEffects();
   mCam = unjitteredCamera;           // ren_Taa: overlays stay pixel-exact
   UpdateRenderViewportCoordinates(); // ren_RenderScale: the view's full rectangle again
+  if (scaledViewResolved) {
+    // Putting the native head back (REN_EndScaledWorld) and the upscale reset the device's viewport to the whole head;
+    // the overlay below is built for this view's rectangle (its pixel projection spans the view), so in a split screen
+    // its icons, life bars and rings came out stretched over the whole window.
+    SetViewportToLocalScreen();
+  }
   moho::TemporalAA::Get().EndView(); // a frame the resolve didn't take is not left pending for another view
 
   if (moho::ren_Ui && worldView->mView != nullptr) {
@@ -2551,8 +2677,24 @@ void moho::WRenViewport::Render(
   SWorldViewInfo* const begin = worldViews.begin();
   SWorldViewInfo* const end = worldViews.end();
 
+  // Engine addition (render scale): with a level below 100 % the world views are drawn into smaller targets (the head,
+  // the viewport's frame-copy and normal targets and the view rectangles are swapped for scaled ones) and each view is
+  // upscaled into the back buffer when its world is done; the frames drawn above and everything after the loop
+  // (cartographic view, interface, bloom) stay at the window's size.
+  ScaledWorldScope scaledWorld(
+    *device, head, mPrimaryTargetLocks[head], mSecondaryTargetLocks[head], mDepthStencilLocks[head]
+  );
+  if (begin == end) {
+    scaledWorld.Finish(nullptr);
+  }
+
   for (SWorldViewInfo* worldView = begin; worldView != end; ++worldView) {
     RenderWorldView(worldView, head, begin, regenerateShoreline);
+  }
+
+  {
+    const gpg::gal::RenderProfileScope profileRenderScale("RenderScale");
+    scaledWorld.Finish(galDevice);
   }
 
   // Every world view has consumed this frame's decal set, so drop the decal
@@ -3202,6 +3344,18 @@ void moho::WRenViewport::UpdateRenderViewportCoordinates()
     mScreenPos.y = static_cast<int>(camera->viewport.r[3].y);
     mScreenSize.x = static_cast<int>(camera->viewport.r[3].z);
     mScreenSize.y = static_cast<int>(camera->viewport.r[3].w);
+    if (sActiveScaledWorld != nullptr && sActiveScaledWorld->active && sActiveScaledWorld->head == mHead) {
+      // Engine addition (render scale): the world pass sees a smaller window - the view's rectangle and the target size
+      // are scaled together.
+      const gpg::gal::RenderScaleRect scaled =
+        moho::REN_ScaledViewRect(*sActiveScaledWorld, mScreenPos.x, mScreenPos.y, mScreenSize.x, mScreenSize.y);
+      mScreenPos.x = scaled.x;
+      mScreenPos.y = scaled.y;
+      mScreenSize.x = scaled.width;
+      mScreenSize.y = scaled.height;
+      mFullScreen.x = sActiveScaledWorld->width;
+      mFullScreen.y = sActiveScaledWorld->height;
+    }
     return;
   }
 
@@ -3359,8 +3513,18 @@ void moho::WRenViewport::TransformTerrainNormals()
   const std::int32_t head = mHead;
   device->SetRenderTarget1(mPrimaryTargetLocks[head].get(), mDepthStencilLocks[head].get(), false, 0, 1.0f, 0);
 
-  const int headWidth = device->GetHeadWidth(static_cast<unsigned int>(head));
-  const int headHeight = device->GetHeadHeight(static_cast<unsigned int>(head));
+  int headWidth = device->GetHeadWidth(static_cast<unsigned int>(head));
+  int headHeight = device->GetHeadHeight(static_cast<unsigned int>(head));
+  if (
+    sActiveScaledWorld != nullptr && sActiveScaledWorld->active && sActiveScaledWorld->swapped &&
+    sActiveScaledWorld->head == head
+  ) {
+    // Engine addition (render scale): the lane this pass draws into is the scaled one. A quad of the window's size
+    // would fill only the top-left part of it with the lower-left part of the normal buffer (zoomed by 1 / scale), and
+    // the ground's lighting would sample the wrong normals.
+    headWidth = sActiveScaledWorld->width;
+    headHeight = sActiveScaledWorld->height;
+  }
   mFrame.mName = "TCreateBasis";
   mFrame.InitTransformedVerts(static_cast<float>(headWidth), static_cast<float>(headHeight));
   mFrame.SetTexture(0u, mSecondaryTargetLocks[head]);
