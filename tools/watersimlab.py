@@ -16,6 +16,9 @@
   watersimlab.py impact   [--size 6] [--impacts 1] [--gap 0.25] [--seconds 8] [--legacy] [--capillary 100] [--damping 100] [--out DIR]
                           open sea, impacts at the middle: runs the lab and prints the numbers of the splash (ringing of the middle, volume, energy,
                           front speed, roughness of the rings, foam); --check exits 1 when a number is out of its range
+  watersimlab.py caustic [--src FILE] [--rate 0.25] [--check]
+                          the caustic web of the water shader (WaterReflectionPatch.cpp) on a 64 unit square at a few times: mean and spread, fine-scale
+                          noise, how fast it changes, whether it repeats; --check exits 1 when a number is out of its range
   watersimlab.py wake     [--speed 5] [--length 2.9] [--beam 0.6] [--radius 3.4] [--scale 2] [--seconds 40] [--out DIR]
                           open sea, one hull sails through the middle: the wave height and the foam across the track at distances behind it
 
@@ -317,6 +320,74 @@ def cmd_impact(args):
     return 0 if ok else 1
 
 
+def read_grid(path):
+    import array
+    a = array.array('f')
+    with open(path, 'rb') as f:
+        a.fromfile(f, 256 * 256)
+    return a
+
+
+def correlation(a, b):
+    n = len(a)
+    ma = sum(a) / n
+    mb = sum(b) / n
+    num = sum((x - ma) * (y - mb) for x, y in zip(a, b))
+    da = sum((x - ma) ** 2 for x in a)
+    db = sum((y - mb) ** 2 for y in b)
+    return num / math.sqrt(da * db) if da > 0 and db > 0 else 0.0
+
+
+def autocorrelation(a, lag, axis):
+    """Correlation of the grid with itself shifted by `lag` samples along x (axis 0) or z (axis 1), over the part that overlaps."""
+    xs, ys = [], []
+    for j in range(256 if axis == 0 else 256 - lag):
+        for i in range(256 - lag if axis == 0 else 256):
+            xs.append(a[j * 256 + i])
+            ys.append(a[(j * 256 + i + lag) if axis == 0 else ((j + lag) * 256 + i)])
+    return correlation(xs, ys)
+
+
+def cmd_caustic(args):
+    out = args.out
+    os.makedirs(out, exist_ok=True)
+    src = args.src
+    cmd = [EXE, '--caustic', src, '--caustic-rate', str(args.rate), '--out', out]
+    subprocess.run(cmd, check=True)
+    grids = [read_grid(os.path.join(out, 'caustic_%d.bin' % i)) for i in range(7)]
+    g0 = grids[3]  # t = 0.5 s
+    vals = sorted(g0)
+    n = len(vals)
+    mean = sum(vals) / n
+    print('caustic web of %s, clock rate %.3f radians per second:' % (os.path.basename(src), args.rate))
+    print('  value: mean %.2f, p10 %.2f, p50 %.2f, p90 %.2f, p99 %.2f, max %.2f' %
+          (mean, vals[n // 10], vals[n // 2], vals[n * 9 // 10], vals[n * 99 // 100], vals[-1]))
+    # fine-scale noise: the mean absolute difference of neighbouring samples (0.25 units) relative to the spread
+    spread = math.sqrt(sum((v - mean) ** 2 for v in g0) / n)
+    grad = sum(abs(g0[j * 256 + i + 1] - g0[j * 256 + i]) for j in range(256) for i in range(255)) / (256 * 255)
+    print('  spread (std) %.2f; mean step between neighbours 0.25 u: %.3f (%.2f of the spread: lower is smoother)' % (spread, grad, grad / spread if spread else 0))
+    names = ['0', '1/30 s', '0.1 s (a tick)', '0.5 s', '1 s', '2 s', '4 s']
+    print('  picture at t=0 against the picture later (correlation 1 = unchanged, 0 = a new picture):')
+    print('    ' + '   '.join('%s %.2f' % (names[i], correlation(grids[0], grids[i])) for i in range(1, 7)))
+    r10 = (autocorrelation(g0, 40, 0) + autocorrelation(g0, 40, 1)) / 2
+    controls = [(autocorrelation(g0, lag, 0) + autocorrelation(g0, lag, 1)) / 2 for lag in (28, 52, 60)]
+    print('  repeat: autocorrelation at 10.0 u (the tile of one layer) %.2f, at 7 / 13 / 15 u (controls) %.2f %.2f %.2f' % (r10, controls[0], controls[1], controls[2]))
+    ok = True
+    if args.check:
+        checks = [
+            ('mean 1 (0.9 .. 1.1): the caustics neither brighten nor darken the sea bed', 0.9 <= mean <= 1.1),
+            ('the same picture a tick later (correlation > 0.95)', correlation(grids[0], grids[2]) > 0.95),
+            ('a second later still similar (> 0.6): it does not boil', correlation(grids[0], grids[4]) > 0.6),
+            ('no tile (autocorrelation at 10 u < 0.2)', r10 < 0.2),
+            ('smooth (neighbour step < 0.45 of the spread)', grad / spread < 0.45 if spread else False),
+        ]
+        for name, passed in checks:
+            print('  [%s] %s' % ('ok' if passed else 'FAIL', name))
+            ok &= passed
+        print('  checks:', 'ok' if ok else 'FAILED')
+    return 0 if ok else 1
+
+
 def cmd_wake(args):
     out = args.out
     os.makedirs(out, exist_ok=True)
@@ -395,6 +466,11 @@ def main():
     i.add_argument('--scale', type=float, default=1.0)
     i.add_argument('--visc', type=float, default=-1.0)
     i.add_argument('--out', default=os.path.join(LAB_ROOT, 'lab_impact', 'run'))
+    cc = sub.add_parser('caustic')
+    cc.add_argument('--src', default=os.path.join(HERE, '..', 'src', 'moho', 'terrain', 'water', 'WaterReflectionPatch.cpp'))
+    cc.add_argument('--rate', type=float, default=0.125, help='radians per second of the slowest clock of the web (the shader: Time * 0.0125, Time in ticks of 0.1 s)')
+    cc.add_argument('--check', action='store_true')
+    cc.add_argument('--out', default=os.path.join(LAB_ROOT, 'lab_caustic', 'run'))
     wk = sub.add_parser('wake')
     wk.add_argument('--speed', type=float, default=5.0)
     wk.add_argument('--length', type=float, default=2.9)
@@ -415,6 +491,8 @@ def main():
     wk.add_argument('--foam-kept', type=float, default=-1.0)
     wk.add_argument('--out', default=os.path.join(LAB_ROOT, 'lab_wake', 'run'))
     a = ap.parse_args()
+    if a.cmd == 'caustic':
+        sys.exit(cmd_caustic(a))
     if a.cmd == 'wake':
         sys.exit(cmd_wake(a))
     if a.cmd == 'impact':

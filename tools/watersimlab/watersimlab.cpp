@@ -154,7 +154,9 @@ namespace
     bool body = false; // --body: the hull is a volume (HullDisplacement.h) of draft `hullDraft` that displaces the
                        // water, not the hand-made wake
     float hullDraft = 1.2f, bodyPush = -1.0f, bodyFoam = 1.0f;
-    float visc = -1.0f;   // replaces kViscosity of the shader (to try values)
+    float visc = -1.0f;     // replaces kViscosity of the shader (to try values)
+    std::string causticSrc; // --caustic <file>: evaluate the caustic web of that shader source (no simulation)
+    float causticRate = 0.25f, causticX = 100.0f, causticZ = 100.0f;
     bool legacy = false;  // the first impact model (one lump of discs, height only), for comparison
     bool domains = false; // --domains: the tests of the simulation per water (domains.h)
     bool dxbc = false; // --dxbc: the hash of the compiled compute shader and copy pixel shader (the same source gives
@@ -272,6 +274,106 @@ int RunGate()
   return ok ? 0 : 1;
 }
 
+// ---- caustic web: evaluates FafCausticWeb of the water shader patch on a grid at a few times (writes caustic_<n>.bin,
+// raw float32, size x size) ----
+int RunCaustic(
+  const Args& args
+)
+{
+  std::string text = ReadFile(args.causticSrc);
+  std::string snippet;
+  const std::size_t begin = text.find("// ---- CAUSTIC WEB BEGIN");
+  const std::size_t end = text.find("// ---- CAUSTIC WEB END");
+  if (begin != std::string::npos && end != std::string::npos) {
+    snippet = text.substr(begin, end - begin);
+  } else {
+    std::fprintf(stderr, "no caustic web block in %s\n", args.causticSrc.c_str());
+    return 2;
+  }
+  const std::string hlsl = snippet + R"HLSL(
+cbuffer C : register(b0) { float4 a; };   // origin x, z, step, t
+RWStructuredBuffer<float> Out : register(u0);
+[numthreads(8, 8, 1)]
+void CausticCS(uint3 id : SV_DispatchThreadID)
+{
+    float2 xz = a.xy + (float2)id.xy * a.z;
+    Out[id.y * 256 + id.x] = FafCausticWeb(xz, a.w);
+}
+)HLSL";
+  ComPtr<ID3D11Device> device;
+  ComPtr<ID3D11DeviceContext> context;
+  D3D_FEATURE_LEVEL level{};
+  if (
+    FAILED(D3D11CreateDevice(
+      nullptr, D3D_DRIVER_TYPE_WARP, nullptr, 0, nullptr, 0, D3D11_SDK_VERSION, &device, &level, &context
+    ))
+  ) {
+    return 3;
+  }
+  ComPtr<ID3DBlob> code, errors;
+  if (
+    FAILED(D3DCompile(
+      hlsl.data(), hlsl.size(), "Caustic.hlsl", nullptr, nullptr, "CausticCS", "cs_5_0", 0, 0, &code, &errors
+    ))
+  ) {
+    std::fprintf(
+      stderr, "caustic shader: %s\n", errors != nullptr ? static_cast<const char*>(errors->GetBufferPointer()) : "?"
+    );
+    return 4;
+  }
+  ComPtr<ID3D11ComputeShader> cs;
+  device->CreateComputeShader(code->GetBufferPointer(), code->GetBufferSize(), nullptr, &cs);
+  const UINT count = 256U * 256U;
+  D3D11_BUFFER_DESC bd{};
+  bd.ByteWidth = 4U * count;
+  bd.BindFlags = D3D11_BIND_UNORDERED_ACCESS;
+  bd.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
+  bd.StructureByteStride = 4;
+  ComPtr<ID3D11Buffer> buffer, staging, constants;
+  device->CreateBuffer(&bd, nullptr, &buffer);
+  bd.BindFlags = 0;
+  bd.Usage = D3D11_USAGE_STAGING;
+  bd.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+  device->CreateBuffer(&bd, nullptr, &staging);
+  D3D11_UNORDERED_ACCESS_VIEW_DESC uv{};
+  uv.Format = DXGI_FORMAT_UNKNOWN;
+  uv.ViewDimension = D3D11_UAV_DIMENSION_BUFFER;
+  uv.Buffer.NumElements = count;
+  ComPtr<ID3D11UnorderedAccessView> uav;
+  device->CreateUnorderedAccessView(buffer.Get(), &uv, &uav);
+  D3D11_BUFFER_DESC cb{};
+  cb.ByteWidth = 16;
+  cb.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+  device->CreateBuffer(&cb, nullptr, &constants);
+  std::filesystem::create_directories(args.out);
+  int index = 0;
+  for (const float seconds : {0.0f, 1.0f / 30.0f, 0.1f, 0.5f, 1.0f, 2.0f, 4.0f}) {
+    const float a[4] = {args.causticX, args.causticZ, 0.25f, seconds * args.causticRate};
+    context->UpdateSubresource(constants.Get(), 0, nullptr, a, 0, 0);
+    context->CSSetShader(cs.Get(), nullptr, 0);
+    context->CSSetConstantBuffers(0, 1, constants.GetAddressOf());
+    ID3D11UnorderedAccessView* uavs[1] = {uav.Get()};
+    context->CSSetUnorderedAccessViews(0, 1, uavs, nullptr);
+    context->Dispatch(32, 32, 1);
+    ID3D11UnorderedAccessView* none[1] = {};
+    context->CSSetUnorderedAccessViews(0, 1, none, nullptr);
+    context->CopyResource(staging.Get(), buffer.Get());
+    D3D11_MAPPED_SUBRESOURCE map{};
+    if (SUCCEEDED(context->Map(staging.Get(), 0, D3D11_MAP_READ, 0, &map))) {
+      char name[512];
+      std::snprintf(name, sizeof(name), "%s/caustic_%d.bin", args.out.c_str(), index);
+      if (FILE* const f = std::fopen(name, "wb")) {
+        std::fwrite(map.pData, 4, count, f);
+        std::fclose(f);
+      }
+      context->Unmap(staging.Get(), 0);
+    }
+    ++index;
+  }
+  std::printf("watersimlab: %d caustic grids (256 x 256, 0.25 unit) in %s\n", index, args.out.c_str());
+  return 0;
+}
+
 int main(
   int argc,
   char** argv
@@ -358,6 +460,17 @@ int main(
       args.wakeScale = static_cast<float>(std::atof(next().c_str()));
     else if (key == "--visc")
       args.visc = static_cast<float>(std::atof(next().c_str()));
+    else if (key == "--caustic")
+      args.causticSrc = next();
+    else if (key == "--caustic-rate")
+      args.causticRate = static_cast<float>(std::atof(next().c_str()));
+    else if (key == "--caustic-x")
+      args.causticX = static_cast<float>(std::atof(next().c_str()));
+    else if (key == "--caustic-z")
+      args.causticZ = static_cast<float>(std::atof(next().c_str()));
+  }
+  if (!args.causticSrc.empty()) {
+    return RunCaustic(args);
   }
   if (args.src.empty()) {
     std::fprintf(
