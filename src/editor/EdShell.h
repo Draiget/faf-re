@@ -15,6 +15,7 @@
 #include "editor/doc/EdPackage.h"
 #include "editor/doc/EdSaveFile.h"
 #include "editor/ui/EdMapBrowser.h"
+#include "editor/ui/EdGenerate.h"
 #include "editor/ui/EdMaterialEditor.h"
 #include "editor/ui/EdParticleEditor.h"
 #include "imgui.h"
@@ -128,6 +129,20 @@ namespace faf::editor
     bool& ShowLighting() noexcept
     {
       return mShowLighting;
+    }
+    /** The Generate workspace's terrain graph and its three panels. */
+    [[nodiscard]] EdGenerate& Generate() noexcept
+    {
+      return mGenerate;
+    }
+    /** Shows the terrain graph's panels (Terrain > Generate). */
+    void ShowGenerate() noexcept
+    {
+      mShowGenNodes = mShowGenGraph = mShowGenInspector = true;
+    }
+    [[nodiscard]] bool GenerateShown() const noexcept
+    {
+      return mShowGenGraph || mShowGenNodes || mShowGenInspector;
     }
     /** The material editor (View > Material Editor): node graphs that make terrain textures. */
     bool& ShowMaterialEditor() noexcept
@@ -437,6 +452,9 @@ namespace faf::editor
     /** The Debugger panel (ui/EdDebuggerPanel.cpp): arm, breakpoints, a pause's place, locals, watches, stack. */
     void DrawDebuggerPanel();
     bool mShowDebugger = false;
+    bool mShowGenNodes = false;
+    bool mShowGenGraph = false;
+    bool mShowGenInspector = false;
     bool mDebugWasPaused = false;
     char mWatchInput[160] = {};
     std::vector<std::string> mWatches;
@@ -684,6 +702,7 @@ namespace faf::editor
     EdTools mTools;
     EdMaterialEditor mMaterialEditor;
     EdParticleEditor mParticleEditor;
+    EdGenerate mGenerate;
     ImVec4 mGameView{0.0f, 0.0f, 0.0f, 0.0f};
     /** The document path the Info tab was last brought to the front for. */
     std::string mInfoShownFor;

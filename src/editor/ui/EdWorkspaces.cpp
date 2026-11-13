@@ -82,12 +82,12 @@ namespace faf::editor
       {"generate",
        "Generate",
        "Alt+5",
-       "Making terrain from rules (the node graphs come with their own panels)",
-       "Tools",
+       "Making terrain from rules: the terrain graph's nodes, its canvas and the selected node's settings",
+       "Nodes###GenerateNodes",
        "",
-       "Info",
+       "Inspector###GenerateInspector",
        "",
-       "Log",
+       "Graph###GenerateGraph,Log",
        0.21f,
        0.22f,
        false},
@@ -214,6 +214,9 @@ namespace faf::editor
       {"Particle Editor", ICON_PARTICLES},
       {"ScriptEditor", ICON_SCRIPT},
       {"AdaptiveMap", ICON_GENERATE},
+      {"GenerateNodes", ICON_GENERATE},
+      {"GenerateGraph", ICON_GRAPH},
+      {"GenerateInspector", ICON_INFO},
     };
     for (const auto& [panel, icon] : kIcons) {
       if (panel == id) {
@@ -229,7 +232,8 @@ namespace faf::editor
   {
     // Raised when a workspace's first layout changes, so a layout saved before is laid out again once.
     // 2: Terrain's right dock as the mockup's (Layers and Info, Properties under them).
-    return key == "terrain" ? 2 : 1;
+    // 2: Generate's terrain graph panels (Nodes, Inspector, Graph).
+    return key == "terrain" || key == "generate" ? 2 : 1;
   }
 
   std::map<std::string, int>& LayoutVersions()

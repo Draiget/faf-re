@@ -1,0 +1,120 @@
+-- Reads the heights of the map and paints all kinds of ground (grass, dirt, wet ground, sand, rock, dark rock, high rock, snow) with the stratum recipe for the shader of the map: 4, 7 or 8 layers, the base layer, side-mapped layers, terrain types and roughness. The Terrain shader node shows what the shader paints.
+Graph = {
+    ['name'] = 'Texture the existing terrain (ground kinds for any shader)',
+    ['nextId'] = 5,
+    ['nodes'] = {
+        {
+            ['id'] = 1,
+            ['params'] = {
+            },
+            ['type'] = 'terrain',
+            ['x'] = 0,
+            ['y'] = 0,
+        },
+        {
+            ['id'] = 2,
+            ['params'] = {
+                ['beach'] = 3,
+                ['breakup'] = 0.5,
+                ['cliff'] = 52,
+                ['crisp'] = 0.45,
+                ['dark'] = 0.5,
+                ['dirt'] = 0.38,
+                ['erosion'] = 0.7,
+                ['fine'] = 0.35,
+                ['high'] = 0.5,
+                ['patch'] = 50,
+                ['rock'] = 34,
+                ['seed'] = 1,
+                ['snow'] = 0.08,
+                ['style'] = 'temperate',
+                ['wet'] = 1.5,
+            },
+            ['type'] = 'ground_kinds',
+            ['x'] = 224,
+            ['y'] = 0,
+        },
+        {
+            ['id'] = 3,
+            ['params'] = {
+                ['amount'] = 0.6,
+                ['roughness'] = true,
+                ['types'] = true,
+            },
+            ['type'] = 'out_kinds',
+            ['x'] = 554,
+            ['y'] = 0,
+        },
+        {
+            ['id'] = 4,
+            ['params'] = {
+            },
+            ['type'] = 'terrain_shader',
+            ['x'] = 0,
+            ['y'] = 304,
+        },
+    },
+    ['seed'] = 1,
+    ['version'] = 1,
+    ['view'] = {
+        ['x'] = 0,
+        ['y'] = 0,
+        ['zoom'] = 1,
+    },
+    ['wires'] = {
+        {
+            1,
+            'out',
+            2,
+            'a',
+        },
+        {
+            2,
+            'grass',
+            3,
+            'grass',
+        },
+        {
+            2,
+            'dirt',
+            3,
+            'dirt',
+        },
+        {
+            2,
+            'wet',
+            3,
+            'wet',
+        },
+        {
+            2,
+            'sand',
+            3,
+            'sand',
+        },
+        {
+            2,
+            'rock',
+            3,
+            'rock',
+        },
+        {
+            2,
+            'darkrock',
+            3,
+            'darkrock',
+        },
+        {
+            2,
+            'highrock',
+            3,
+            'highrock',
+        },
+        {
+            2,
+            'snow',
+            3,
+            'snow',
+        },
+    },
+}

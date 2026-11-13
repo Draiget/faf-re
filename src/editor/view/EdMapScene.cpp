@@ -5051,6 +5051,165 @@ namespace faf::editor
     }
   }
 
+  bool EdMapScene::GraphPreviewNewest() const
+  {
+    return mGraphPreviewDepth > 0 && mDocument.UndoOrder().size() == mGraphPreviewDepth &&
+      !mDocument.UndoOrder().empty() && mDocument.UndoOrder().back() == EdDocument::EditKind::Heights &&
+      HeightsHash() == mGraphPreviewHash;
+  }
+
+  bool EdMapScene::GraphGround(
+    TerrainGround& out
+  )
+  {
+    const moho::CHeightField* const field = mMap != nullptr ? mMap->mTerrainRes->GetHeightField() : nullptr;
+    if (field == nullptr || mTools == nullptr || field->width < 2 || field->height < 2) {
+      return false;
+    }
+    const std::size_t count = static_cast<std::size_t>(field->width) * static_cast<std::size_t>(field->height);
+    if (!GraphPreviewNewest() || mGraphBase == nullptr || mGraphBase->size() != count) {
+      // The ground is the map as it is now (nothing of the graph's is on it, or it was edited since).
+      mGraphPreviewDepth = 0;
+      auto base = std::make_shared<std::vector<float>>(count);
+      const auto* const words = reinterpret_cast<const std::uint16_t*>(field->data);
+      for (std::size_t k = 0; k < count; ++k) {
+        (*base)[k] = static_cast<float>(words[k]) / 128.0f;
+      }
+      mGraphBase = std::move(base);
+      mGraphBaseHash = HeightsHash();
+    }
+    out = TerrainGround{};
+    out.width = field->width;
+    out.height = field->height;
+    out.heights = mGraphBase;
+    out.revision = mGraphBaseHash;
+    const WaterState water = mDocument.WaterNow();
+    out.water = water.enabled ? water.elevation : 0.0f;
+    const PadSettings& settings = mTools->PadSettingsNow();
+    const std::vector<Pad> pads = CollectPads(PadMarkers(), settings);
+    for (const Pad& pad : pads) {
+      out.pads.insert(
+        out.pads.end(),
+        {static_cast<double>(pad.x),
+         static_cast<double>(pad.z),
+         static_cast<double>(pad.half),
+         static_cast<double>(pad.skirt),
+         0.0,
+         static_cast<double>(pad.group)}
+      );
+    }
+    out.padSignature = PadSignature(pads, settings);
+    return true;
+  }
+
+  std::string EdMapScene::ApplyGraphHeights(
+    const field::Grid& result,
+    const bool plain,
+    const bool preview
+  )
+  {
+    moho::CHeightField* const field = mMap != nullptr ? mMap->mTerrainRes->GetHeightField() : nullptr;
+    if (field == nullptr || mPainting || result.w < 2 || result.h < 2) {
+      return "No map, or a stroke is under way.";
+    }
+    const bool replaced = GraphPreviewNewest() && Undo();
+    mGraphPreviewDepth = 0;
+    const int width = field->width;
+    const int height = field->height;
+    const std::size_t count = static_cast<std::size_t>(width) * static_cast<std::size_t>(height);
+    auto* const words = reinterpret_cast<std::uint16_t*>(field->data);
+    std::vector<float> target;
+    std::string error;
+    if (result.w == width && result.h == height) {
+      target = result.v;
+    } else {
+      // A coarse result onto the map's samples.
+      auto fine = std::make_shared<field::Grid>(width, height, 1.0f, 0.0f, 0.0f);
+      for (std::size_t k = 0; k < count; ++k) {
+        fine->v[k] = static_cast<float>(words[k]) / 128.0f;
+      }
+      field::GridPtr source = std::make_shared<field::Grid>(result);
+      if (!plain) {
+        // Only the change the graph made at the coarse samples: the fine detail of the ground stays.
+        field::OpArgs down;
+        down.in["a"] = fine;
+        down.in["like"] = source;
+        field::Grid coarseBase;
+        if (!field::RunOpCpu("resample", down, coarseBase, error) || !coarseBase.SameShape(result)) {
+          return "Preview: " + error;
+        }
+        auto delta = std::make_shared<field::Grid>(result);
+        for (std::size_t k = 0; k < delta->v.size(); ++k) {
+          delta->v[k] -= coarseBase.v[k];
+        }
+        source = delta;
+      }
+      field::OpArgs up;
+      up.in["a"] = source;
+      up.in["like"] = fine;
+      field::Grid upsampled;
+      if (!field::RunOpCpu("upsample", up, upsampled, error) || upsampled.v.size() != count) {
+        return "Preview: " + error;
+      }
+      target = std::move(upsampled.v);
+      if (!plain) {
+        for (std::size_t k = 0; k < count; ++k) {
+          target[k] += fine->v[k];
+        }
+      }
+    }
+    std::size_t changed = 0;
+    std::vector<std::uint16_t> next(count);
+    for (std::size_t k = 0; k < count; ++k) {
+      next[k] = static_cast<std::uint16_t>(std::clamp(std::lround(target[k] * 128.0f), 0L, 65535L));
+      changed += next[k] != words[k] ? 1u : 0u;
+    }
+    const SampleRect whole{0, 0, width - 1, height - 1};
+    mDocument.Heights().BeginStroke();
+    mDocument.Heights().BeforeWrite(field->data, whole);
+    std::copy(next.begin(), next.end(), words);
+    mDocument.Heights().EndStroke(field->data);
+    if (changed > 0) {
+      mDocument.EditEnded(EdDocument::EditKind::Heights);
+      RefreshHeights({whole});
+      mDocument.SetModified(true);
+      if (mCheckDone) {
+        RunSymmetryCheck();
+      }
+      if (preview) {
+        mGraphPreviewDepth = mDocument.UndoOrder().size();
+        mGraphPreviewHash = HeightsHash();
+      }
+    }
+    const char* const how = changed == 0 ? ""
+      : replaced ? (preview ? ", in place of the last preview" : ", one undo step in place of the preview")
+                 : ", one undo step";
+    char text[256];
+    (void)std::snprintf(
+      text,
+      sizeof(text),
+      "%s: %zu samples changed%s%s.",
+      preview ? "Preview on the map" : "Built",
+      changed,
+      result.w == width ? "" : " (a coarse run, upsampled)",
+      how
+    );
+    gpg::Logf("editor: generate: %s", text);
+    return text;
+  }
+
+  bool EdMapScene::RevertGraphPreview()
+  {
+    if (!GraphPreviewNewest()) {
+      mGraphPreviewDepth = 0;
+      return false;
+    }
+    mGraphPreviewDepth = 0;
+    const bool undone = Undo();
+    gpg::Logf("editor: generate: the preview %s", undone ? "was taken off" : "couldn't be taken off");
+    return undone;
+  }
+
   bool EdMapScene::ImportIsNewest(
     const bool exact
   ) const

@@ -7,7 +7,9 @@
 #include <gtest/gtest.h>
 
 #include <cmath>
+#include <cstdio>
 #include <fstream>
+#include <set>
 #include <sstream>
 #include <string>
 
@@ -216,6 +218,57 @@ namespace
     const field::Stats stats = field::Measure(heights);
     EXPECT_GT(stats.min, 20.0f);
     EXPECT_LT(stats.max, 66.0f);
+  }
+
+  TEST(
+    TerrainGraph,
+    EveryShippedGraphReads
+  )
+  {
+    const auto& shipped = faf::editor::ShippedTerrainGraphs();
+    EXPECT_EQ(shipped.size(), 40U) << "Studio's 40 graphs, by its index";
+    std::set<std::string> missing;
+    int complete = 0;
+    for (const auto& entry : shipped) {
+      EXPECT_FALSE(entry.name.empty()) << entry.id;
+      NodeGraph graph(TerrainNodeTypes());
+      StudioGraphFacts facts;
+      std::string error;
+      ASSERT_TRUE(ReadStudioGraph(entry.text, graph, facts, error)) << entry.id << ": " << error;
+      EXPECT_FALSE(graph.Nodes().empty()) << entry.id;
+      complete += facts.unknownTypes.empty() ? 1 : 0;
+      missing.insert(facts.unknownTypes.begin(), facts.unknownTypes.end());
+    }
+    std::string list;
+    for (const std::string& type : missing) {
+      list += " " + type;
+    }
+    std::printf(
+      "[ shipped  ] %d of %zu graphs read whole; node types still to come:%s\n", complete, shipped.size(), list.c_str()
+    );
+  }
+
+  TEST(
+    TerrainGraph,
+    SavedGraphReadsBack
+  )
+  {
+    NodeGraph graph(TerrainNodeTypes());
+    StudioGraphFacts facts;
+    std::string error;
+    ASSERT_TRUE(ReadStudioGraph(ReadFile(FAF_TERRAIN_GRAPHS "/hills.lua"), graph, facts, error)) << error;
+    const std::string text = faf::editor::SaveTerrainGraph(graph, 77, "My hills");
+    NodeGraph back(TerrainNodeTypes());
+    int seed = 0;
+    std::string name;
+    ASSERT_TRUE(faf::editor::LoadTerrainGraph(text, back, seed, name, error)) << error;
+    EXPECT_EQ(seed, 77);
+    EXPECT_EQ(name, "My hills");
+    EXPECT_EQ(back.Nodes().size(), graph.Nodes().size());
+    EXPECT_EQ(back.Links().size(), graph.Links().size());
+    ASSERT_NE(back.Find(4), nullptr);
+    EXPECT_FLOAT_EQ(back.Find(4)->params[ParamOf(*back.Find(4)->type, "hi")].value[0], 62.0f);
+    EXPECT_EQ(faf::editor::TerrainParamText(*back.Find(3), "mode"), "normal");
   }
 
   TEST(

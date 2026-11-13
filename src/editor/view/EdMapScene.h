@@ -12,6 +12,7 @@
 
 #include <Windows.h>
 
+#include "editor/graph/EdTerrainGraph.h"
 #include "editor/graph/EdTextureGraph.h"
 #include "editor/view/EdLiveUnits.h"
 #include "editor/tools/EdViewAids.h"
@@ -1031,6 +1032,29 @@ namespace faf::editor
     bool UndoSkybox(bool redo);
     bool UndoWaves(bool redo);
     bool UndoTerrainTypes(bool redo);
+
+  public:
+    /**
+     * The terrain graph's ground (Generate): the heights as they were before its preview while that preview is still
+     * the newest step (a repeated preview or Build starts from the same ground), else the map's heights now; the water,
+     * the markers' pads.
+     */
+    bool GraphGround(TerrainGround& out);
+    /**
+     * The graph's heights onto the map as one undo step: a full-resolution result as it is, a coarse preview upsampled
+     * (as the new ground when `plain`, else its change added to the fine heights). The last preview, while it is the
+     * newest step, is taken off first, so previews replace each other and Build replaces the preview.
+     */
+    std::string ApplyGraphHeights(const field::Grid& result, bool plain, bool preview);
+    /** Takes the preview off (while it is the newest step). */
+    bool RevertGraphPreview();
+    [[nodiscard]] bool GraphPreviewNewest() const;
+
+  private:
+    std::shared_ptr<std::vector<float>> mGraphBase;
+    std::uint64_t mGraphBaseHash = 0;
+    std::size_t mGraphPreviewDepth = 0;
+    std::uint64_t mGraphPreviewHash = 0;
 
   public:
     /** The ruler between two points (test runs, `/ruler`). */

@@ -505,6 +505,15 @@ namespace faf::editor
       if (mShowMaterialEditor) {
         mMaterialEditor.Draw(mShowMaterialEditor);
       }
+      if (mShowGenNodes) {
+        mGenerate.DrawNodesPanel(mShowGenNodes);
+      }
+      if (mShowGenGraph) {
+        mGenerate.DrawGraphPanel(mShowGenGraph);
+      }
+      if (mShowGenInspector) {
+        mGenerate.DrawInspectorPanel(mShowGenInspector);
+      }
       if (mShowParticleEditor) {
         mParticleEditor.Draw(mShowParticleEditor);
       }
@@ -689,6 +698,9 @@ namespace faf::editor
       {"History", &EdShell::mShowHistory},
       {"Problems", &EdShell::mShowProblems},
       {"Debugger", &EdShell::mShowDebugger},
+      {"Nodes###GenerateNodes", &EdShell::mShowGenNodes},
+      {"Graph###GenerateGraph", &EdShell::mShowGenGraph},
+      {"Inspector###GenerateInspector", &EdShell::mShowGenInspector},
     };
     return kFlags;
   }

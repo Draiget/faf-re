@@ -13,6 +13,9 @@ if(NOT TARGET faf_imgui)
 endif()
 
 include(sources.cmake)
+include(graph/presets/EmbedGraphs.cmake)
+faf_embed_terrain_graphs(_faf_terrain_graph_files)
+list(APPEND FAF_EDITOR_SOURCES "${_faf_terrain_graph_files}")
 
 add_executable(faf_editor WIN32 ${FAF_EDITOR_SOURCES})
 if(FAF_TARGET_ARCH STREQUAL "x64")

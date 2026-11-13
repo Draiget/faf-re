@@ -147,6 +147,23 @@ namespace faf::editor
   };
   bool ReadStudioGraph(const std::string& text, NodeGraph& graph, StudioGraphFacts& facts, std::string& error);
 
+  /** The graphs the editor ships (Studio's graphpresets with their index): id, title, what it makes, the file. */
+  struct ShippedGraph
+  {
+    std::string id;
+    std::string name;
+    std::string note;
+    bool library = false; // a competitive layout (Studio's library graphs)
+    std::string text;     // the graph file
+  };
+  [[nodiscard]] const std::vector<ShippedGraph>& ShippedTerrainGraphs();
+  /** The files built into the editor (a generated source): file name and text. */
+  [[nodiscard]] const std::vector<std::pair<std::string, std::string>>& EmbeddedTerrainGraphFiles();
+
+  /** The editor's own graph file (`.fafgraph.json`): the node graph with the graph's seed and name. */
+  [[nodiscard]] std::string SaveTerrainGraph(const NodeGraph& graph, int seed, const std::string& name);
+  bool LoadTerrainGraph(const std::string& text, NodeGraph& graph, int& seed, std::string& name, std::string& error);
+
   /** A node's parameter by name as the evaluations read it (numbers, a choice's id, text). */
   [[nodiscard]] double TerrainParamNumber(const GraphNode& node, const std::string& name, double fallback);
   [[nodiscard]] std::string TerrainParamText(const GraphNode& node, const std::string& name);

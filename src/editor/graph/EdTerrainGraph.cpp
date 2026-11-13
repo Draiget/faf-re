@@ -1,5 +1,6 @@
 #include "editor/graph/EdTerrainGraph.h"
 
+#include "editor/doc/EdJson.h"
 #include "editor/graph/EdTerrainEval.h"
 
 #include <algorithm>
@@ -906,6 +907,82 @@ namespace faf::editor
           ++facts.droppedLinks;
         }
       }
+    }
+    return true;
+  }
+
+  const std::vector<ShippedGraph>& ShippedTerrainGraphs()
+  {
+    static const std::vector<ShippedGraph> kGraphs = [] {
+      std::vector<ShippedGraph> list;
+      const auto& files = EmbeddedTerrainGraphFiles();
+      const auto file = [&](const std::string& name) -> const std::string* {
+        for (const auto& [n, text] : files) {
+          if (n == name) {
+            return &text;
+          }
+        }
+        return nullptr;
+      };
+      const std::string* index = file("index.lua");
+      if (index == nullptr) {
+        return list;
+      }
+      LuaReader reader(*index);
+      LuaValue root;
+      if (!reader.Assignment("List", root)) {
+        return list;
+      }
+      for (const LuaValue& entry : root.list) {
+        ShippedGraph graph;
+        graph.id = entry.Str("id");
+        graph.name = entry.Str("name");
+        graph.note = entry.Str("note");
+        const LuaValue* library = entry.Get("library");
+        graph.library = library != nullptr && library->kind == LuaValue::Kind::Bool && library->flag;
+        if (const std::string* text = file(graph.id + ".lua")) {
+          graph.text = *text;
+          list.push_back(std::move(graph));
+        }
+      }
+      return list;
+    }();
+    return kGraphs;
+  }
+
+  std::string SaveTerrainGraph(
+    const NodeGraph& graph,
+    const int seed,
+    const std::string& name
+  )
+  {
+    // The graph's own fields before the nodes: JsonValue finds a key's first use, and the nodes have seeds too.
+    std::string text = graph.Save();
+    const std::string anchor = "\"version\": 1,\n";
+    const std::size_t at = text.find(anchor);
+    if (at != std::string::npos) {
+      text.insert(
+        at + anchor.size(), "  \"seed\": " + std::to_string(seed) + ",\n  \"name\": " + JsonQuoted(name) + ",\n"
+      );
+    }
+    return text;
+  }
+
+  bool LoadTerrainGraph(
+    const std::string& text,
+    NodeGraph& graph,
+    int& seed,
+    std::string& name,
+    std::string& error
+  )
+  {
+    if (!graph.Load(text, error)) {
+      return false;
+    }
+    float s = 1.0f;
+    seed = JsonFloat(text, "seed", s) ? static_cast<int>(s) : 1;
+    if (!JsonValue(text, "name", name)) {
+      name.clear();
     }
     return true;
   }

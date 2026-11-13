@@ -154,7 +154,7 @@ namespace faf::editor
         "/filltest",       "/modaltest",      "/looktest",       "/looksfolder",     "/envtest",     "/watermasktest",
         "/nowaterhires",   "/camat",          "/erosiontest",    "/sctest",          "/symmenu",     "/panelbottom",
         "/shader",         "/brushtest",      "/brushshape",     "/stampsource",     "/stampstroke", "/symoptions",
-        "/maskoptions",    "/masktest",       "/shaderbrowser",  "/convertlayers",   "/interoptest",
+        "/maskoptions",    "/masktest",       "/shaderbrowser",  "/convertlayers",   "/interoptest", "/gentest",
       };
       for (const char* const option : kOptions) {
         if (moho::CFG_GetArgOption(option, 0, nullptr)) {
@@ -2118,6 +2118,103 @@ namespace faf::editor
       }
 
       /**
+       * The Generate workspace's terrain graph, each frame while its panels are shown: it runs on the view's ground,
+       * and what it asks (a preview on the map, a build, taking the preview off) goes to the view.
+       */
+      void DriveGenerate()
+      {
+        EdGenerate& generate = mShell->Generate();
+        if (!mGenerateWired) {
+          mGenerateWired = true;
+          generate.SetGroundSource([this](TerrainGround& ground) {
+            return mScene.Attached() && !mScene.ModelsPending() && mScene.GraphGround(ground);
+          });
+        }
+        if (!mShell->GenerateShown()) {
+          return;
+        }
+        generate.Tick(ImGui::GetIO().DeltaTime, mScene.Attached());
+        EdGenerate::HeightsAsk ask;
+        if (generate.TakeHeightsAsk(ask)) {
+          switch (ask.kind) {
+          case EdGenerate::HeightsAsk::Kind::Preview:
+            generate.SetStatus(mScene.ApplyGraphHeights(ask.result, ask.plain, true));
+            break;
+          case EdGenerate::HeightsAsk::Kind::Build:
+            generate.SetStatus(mScene.ApplyGraphHeights(ask.result, ask.plain, false));
+            break;
+          case EdGenerate::HeightsAsk::Kind::Revert:
+            generate.SetStatus(
+              mScene.RevertGraphPreview() ? "The preview was taken off."
+                                          : "The preview stays: other edits came after it."
+            );
+            break;
+          default:
+            break;
+          }
+        }
+      }
+
+      /**
+       * `/gentest <graph>` (test runs): the shipped graph opened in the Generate workspace, its preview shown on the
+       * map, another seed (the preview replaced), Build, then undo; the heights' checksum and the undo steps at each
+       * stage, two and a half seconds apart.
+       */
+      void TestGenerate()
+      {
+        fa::vector<fa::string> arg;
+        if (
+          mGenTestStage >= 6 || mScene.ModelsPending() || !mScene.Attached() ||
+          !moho::CFG_GetArgOption("/gentest", 1, &arg) || arg.empty() || ++mGenTestFrames % 150 != 0
+        ) {
+          return;
+        }
+        EdGenerate& generate = mShell->Generate();
+        const std::uint64_t hash = mScene.HeightsHash();
+        if (mGenTestStage == 0) {
+          mGenTestStart = hash;
+        }
+        gpg::Logf(
+          "editor: generate test stage %d: heights %016llx%s, %zu undo steps; undo: %s; %d nodes ran, %zu errors",
+          mGenTestStage,
+          static_cast<unsigned long long>(hash),
+          hash == mGenTestStart ? " (the original)" : "",
+          mDocument.UndoOrder().size(),
+          mDocument.UndoStepName() != nullptr ? mDocument.UndoStepName() : "-",
+          generate.LastReport().evaluated,
+          generate.LastReport().errors.size()
+        );
+        for (const auto& [id, error] : generate.LastReport().errors) {
+          gpg::Logf("editor: generate test: node %d: %s", id, error.c_str());
+        }
+        switch (mGenTestStage) {
+        case 0:
+          mShell->SwitchWorkspace(4);
+          mShell->ShowGenerate();
+          gpg::Logf(
+            "editor: generate test: open %s: %s",
+            arg[0].c_str(),
+            generate.OpenShipped(arg[0].c_str()) ? "yes" : "no such graph"
+          );
+          generate.SetShowOnMap(true);
+          generate.SelectFirst("range");
+          break;
+        case 1:
+          generate.SetSeed(generate.Seed() + 1);
+          break;
+        case 2:
+          generate.AskBuild();
+          break;
+        case 3:
+          gpg::Logf("editor: generate test: undo %s", mScene.Undo() ? "took the build back" : "had nothing");
+          break;
+        default:
+          break;
+        }
+        ++mGenTestStage;
+      }
+
+      /**
        * `/interoptest <folder>` (test runs): the Import / Export window's buttons in turn, a second and a half apart,
        * with another tool's saves played by writing the linked file here; the heights' checksum and the undo steps at
        * each stage. The files go in `<folder>` only.
@@ -2628,6 +2725,10 @@ namespace faf::editor
       int mScTestStage = 0;
       int mScTestFrames = 0;
       int mInteropTestStage = 0;
+      bool mGenerateWired = false;
+      int mGenTestStage = 0;
+      int mGenTestFrames = 0;
+      std::uint64_t mGenTestStart = 0;
       int mInteropTestFrames = 0;
       std::uint64_t mInteropTestStart = 0;
       int mErosionTestStage = 0;
@@ -3353,6 +3454,13 @@ namespace faf::editor
       add("edit.paste", "Paste at the cursor", "Edit", "Ctrl+V", [this] {
         mScene.CtrlKey('V');
       }, canEdit);
+      add(
+        "terrain.generate", "Generate (node graph)...", "Terrain", "", [this] {
+        mShell->SwitchWorkspace(4);
+        mShell->HideHome();
+        mShell->ShowGenerate();
+      }, mapOpen, {}, "The terrain graph in the Generate workspace: nodes, a preview on the map, Build as one undo step"
+      );
       add("terrain.interop", "Import / Export...", "Terrain", "", [this] {
         mShell->Tools().OpenInterop();
       }, mapOpen, {}, "Heightmaps from and to other tools: mapping, turns and blends, a live link, a sidecar");
@@ -3668,7 +3776,9 @@ namespace faf::editor
            cmd("edit.find"),
            arrange}
         },
-        EdMenu{"&Terrain", {cmd("terrain.interop"), cmd("terrain.erosion"), cmd("terrain.sctools")}},
+        EdMenu{
+          "&Terrain", {cmd("terrain.generate"), cmd("terrain.interop"), cmd("terrain.erosion"), cmd("terrain.sctools")}
+        },
         EdMenu{
           "&View",
           {cmd("view.tools"),
@@ -6880,6 +6990,8 @@ namespace faf::editor
       TestLooks();
       TestEnvironment();
       TestInterop();
+      DriveGenerate();
+      TestGenerate();
       // `/sctest` (test runs): the SC tools window's buttons in turn, a second apart, the heights' checksum each time.
       if (
         mScTestStage < 8 && moho::CFG_GetArgOption("/sctest", 0, nullptr) && !mScene.ModelsPending() &&

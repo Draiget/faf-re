@@ -371,6 +371,8 @@ set_target_properties(faf_occupation_manager_tests PROPERTIES FOLDER "Tests/Sim"
 add_test(NAME occupation_manager COMMAND faf_occupation_manager_tests)
 set_tests_properties(occupation_manager PROPERTIES LABELS "Sim")
 
+include(${CMAKE_SOURCE_DIR}/src/editor/graph/presets/EmbedGraphs.cmake)
+faf_embed_terrain_graphs(_faf_terrain_graph_files)
 # The map editor's terrain field library (src/editor/terrain, from FAF Studio): golden checksums at every thread count,
 # the Generate ops, the interop ops. Engine independent.
 add_executable(faf_editor_field_tests EXCLUDE_FROM_ALL editor/FieldTests.cpp editor/FieldLandTests.cpp editor/FieldInteropTests.cpp editor/ErosionTests.cpp
@@ -382,7 +384,7 @@ add_executable(faf_editor_field_tests EXCLUDE_FROM_ALL editor/FieldTests.cpp edi
   editor/SlopeRulesTests.cpp
   editor/ErosionSuiteTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdErosionSuite.cpp
   editor/ScToolsTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdScTools.cpp
-  editor/TerrainGraphTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/graph/EdTerrainGraph.cpp ${CMAKE_SOURCE_DIR}/src/editor/graph/EdTerrainNodes.cpp
+  editor/TerrainGraphTests.cpp ${_faf_terrain_graph_files} ${CMAKE_SOURCE_DIR}/src/editor/graph/EdTerrainGraph.cpp ${CMAKE_SOURCE_DIR}/src/editor/graph/EdTerrainNodes.cpp
   ${CMAKE_SOURCE_DIR}/src/editor/graph/EdNodeGraph.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdJson.cpp
   ${CMAKE_SOURCE_DIR}/src/editor/terrain/EdErosion.cpp ${CMAKE_SOURCE_DIR}/src/editor/terrain/EdFieldEro2.cpp
   ${CMAKE_SOURCE_DIR}/src/editor/terrain/EdFieldCore.cpp ${CMAKE_SOURCE_DIR}/src/editor/terrain/EdFieldFilt.cpp ${CMAKE_SOURCE_DIR}/src/editor/terrain/EdFieldGen.cpp ${CMAKE_SOURCE_DIR}/src/editor/terrain/EdFieldLand.cpp ${CMAKE_SOURCE_DIR}/src/editor/terrain/EdFieldSc.cpp ${CMAKE_SOURCE_DIR}/src/editor/terrain/EdFieldPath.cpp ${CMAKE_SOURCE_DIR}/src/editor/terrain/EdFieldInterop.cpp)
