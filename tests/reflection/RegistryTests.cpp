@@ -278,6 +278,31 @@ namespace
 
   TEST(
     ReflectionRegistry,
+    OldBoostPointerNamesBecomeTheCurrentOnes
+  )
+  {
+    const auto current = [](const char* const name) {
+      return std::string(gpg::REF_CurrentTypeName(name).c_str());
+    };
+    EXPECT_EQ(current("boost::shared_ptr<Moho::CIntelGrid>"), "shared_ptr<Moho::CIntelGrid>");
+    EXPECT_EQ(current("boost::weak_ptr<Moho::INetNATTraversalProvider>"), "weak_ptr<Moho::INetNATTraversalProvider>");
+    // Containers wrap their element's name, so the old names also sit inside other names.
+    EXPECT_EQ(current("list<boost::shared_ptr<Moho::STrigger>>"), "list<shared_ptr<Moho::STrigger>>");
+    EXPECT_EQ(
+      current("vector<boost::shared_ptr<boost::weak_ptr<Moho::Entity>>>"), "vector<shared_ptr<weak_ptr<Moho::Entity>>>"
+    );
+    // Anything else comes back as it was.
+    EXPECT_EQ(current("shared_ptr<Moho::CIntelGrid>"), "shared_ptr<Moho::CIntelGrid>");
+    EXPECT_EQ(current("Moho::Entity"), "Moho::Entity");
+    EXPECT_EQ(current("boost::thread"), "boost::thread");
+    EXPECT_EQ(current(""), "");
+    EXPECT_EQ(current(nullptr), "");
+    // An old name whose current form isn't registered finds nothing.
+    EXPECT_EQ(gpg::REF_FindTypeNamed("boost::shared_ptr<faf_reflection_tests::NoSuchType>"), nullptr);
+  }
+
+  TEST(
+    ReflectionRegistry,
     UnknownAndNullNamesFindNothing
   )
   {

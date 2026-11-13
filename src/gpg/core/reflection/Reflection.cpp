@@ -1068,12 +1068,53 @@ namespace gpg
       return nullptr;
     }
 
-    const TypeMap::const_iterator it = GetRTypeMap().find(name);
+    TypeMap::const_iterator it = GetRTypeMap().find(name);
     if (it == GetRTypeMap().end()) {
-      return nullptr;
+      // Engine change (#422): the boost:: pointer names older saves carry.
+      const fa::string current = REF_CurrentTypeName(name);
+      if (std::strcmp(current.c_str(), name) == 0) {
+        return nullptr;
+      }
+      it = GetRTypeMap().find(current.c_str());
+      if (it == GetRTypeMap().end()) {
+        return nullptr;
+      }
     }
 
     return it->second;
+  }
+
+  /**
+   * Engine addition (#422), see the declaration.
+   */
+  fa::string REF_CurrentTypeName(
+    const char* const name
+  )
+  {
+    fa::string out;
+    if (name == nullptr) {
+      return out;
+    }
+    static constexpr const char* kOldPrefixes[] = {"boost::shared_ptr<", "boost::weak_ptr<"};
+    constexpr std::size_t kBoostLength = 7; // "boost::"
+    const char* cursor = name;
+    while (*cursor != '\0') {
+      bool replaced = false;
+      for (const char* const prefix : kOldPrefixes) {
+        const std::size_t length = std::strlen(prefix);
+        if (std::strncmp(cursor, prefix, length) == 0) {
+          (void)out.append(prefix + kBoostLength, length - kBoostLength);
+          cursor += length;
+          replaced = true;
+          break;
+        }
+      }
+      if (!replaced) {
+        (void)out.append(cursor, 1);
+        ++cursor;
+      }
+    }
+    return out;
   }
 
   /**

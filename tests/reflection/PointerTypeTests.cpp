@@ -561,7 +561,10 @@ namespace
   {
     gpg::RType* const type = gpg::RTypeOf<std::shared_ptr<ReflPair>>();
     ASSERT_EQ(type, &gPairSharedType);
-    EXPECT_EQ(std::string(type->GetName()), std::string("boost::shared_ptr<") + kPairName + ">");
+    EXPECT_EQ(std::string(type->GetName()), std::string("shared_ptr<") + kPairName + ">");
+    // Saves written by retail and by earlier builds name it the Boost way; loading still finds it by that name.
+    EXPECT_EQ(gpg::REF_FindTypeNamed(type->GetName()), type);
+    EXPECT_EQ(gpg::REF_FindTypeNamed((std::string("boost::shared_ptr<") + kPairName + ">").c_str()), type);
     EXPECT_EQ(type->size_, static_cast<int>(sizeof(std::shared_ptr<ReflPair>)));
     ASSERT_NE(type->IsPointer(), nullptr);
     EXPECT_EQ(type->IsPointer(), type->IsIndexed());
