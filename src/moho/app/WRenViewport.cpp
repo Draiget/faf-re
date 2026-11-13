@@ -11,6 +11,7 @@
 #include "moho/render/RenderScale.h"
 #include "moho/render/SmaaRenderer.h"
 #include "moho/render/WideBloomRenderer.h"
+#include "moho/particles/ParticleLowRes.h"
 #include "moho/render/lights/LightBinding.h"
 #include "moho/render/lights/LightDebugView.h"
 #include "moho/render/lights/LightFeeds.h"
@@ -1597,6 +1598,9 @@ void moho::WRenViewport::D3DWindowOnDeviceRender()
   // of this frame is drawn. The terrain renderers set the water and terrain variables once, when they are made: the new
   // effects have lost them, so they are made again.
   // The same for the terrain effect of a map with water bodies (the water level patch, TerrainWaterLevels.h).
+  // The particle effect is patched only while the soft particles or the large-particle quality are on: built again when
+  // that changes (its variables find the new effect by name, nothing else holds on to it).
+  (void)moho::particlelowres::ApplyLive();
   const bool lightsRebuilt = moho::lights::ApplyLiveLevel();
   if (moho::water::ApplyTerrainWaterLevelsLive() || lightsRebuilt) {
     for (SWorldViewInfo& worldView : mWorldViews) {

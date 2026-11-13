@@ -959,6 +959,7 @@ set(FAF_ENGINE_SOURCES
   moho/render/BounceLight.cpp
   moho/render/DynamicLights.cpp
   moho/render/TemporalAA.cpp
+  moho/render/FrameLimiter.cpp
   moho/render/RenderFeatures.cpp
   moho/render/ImageQualityFeatures.cpp
   moho/render/RenderScale.cpp
