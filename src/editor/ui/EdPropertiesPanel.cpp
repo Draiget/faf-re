@@ -428,7 +428,7 @@ namespace faf::editor
             return a == 0 ? std::string("Always (any players)") : "ARMY_" + std::to_string(a);
           };
           row("Spawns with");
-          if (ImGui::BeginCombo("##adaptivearmy", armyName(army).c_str())) {
+          if (EdBeginCombo("##adaptivearmy", armyName(army).c_str())) {
             for (int a = 0; a <= armyCount; ++a) {
               if (ImGui::Selectable(armyName(a).c_str(), a == army) && a != army) {
                 for (std::vector<std::string>& list : byArmy) {
@@ -488,7 +488,7 @@ namespace faf::editor
             edited = true;
           };
           row("Option");
-          if (ImGui::BeginCombo("##adaptivetable", labelOf(table).c_str())) {
+          if (EdBeginCombo("##adaptivetable", labelOf(table).c_str())) {
             if (ImGui::Selectable("None", table.empty()) && !table.empty()) {
               place("", 0);
             }

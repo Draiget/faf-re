@@ -76,6 +76,15 @@ namespace faf::editor
    * when clicked.
    */
   bool PillToggle(const char* label, bool on);
+  /**
+   * The mockup's select: ImGui's combo with its value, and a small chevron at its right on the field's own colour where
+   * ImGui draws a button-coloured box with a white triangle. Same arguments as ImGui::BeginCombo; ImGui::EndCombo ends
+   * it.
+   */
+  bool EdBeginCombo(const char* label, const char* preview, ImGuiComboFlags flags = 0);
+  /** ImGui::Combo over a list of names, drawn as EdBeginCombo. */
+  bool EdCombo(const char* label, int* current, const char* const items[], int count, int popupItems = -1);
+
   /** A pill toggle's width, to lay a row of them out. */
   [[nodiscard]] float PillWidth(const char* label);
 

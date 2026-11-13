@@ -572,4 +572,86 @@ namespace faf::editor
     );
     return result;
   }
+
+  bool EdBeginCombo(
+    const char* const label,
+    const char* const preview,
+    const ImGuiComboFlags flags
+  )
+  {
+    // Where ImGui will draw the field: in this window, at the cursor, the item's width, a frame high.
+    ImDrawList* const dl = ImGui::GetWindowDrawList();
+    const ImVec2 at = ImGui::GetCursorScreenPos();
+    const float width = ImGui::CalcItemWidth();
+    const float height = ImGui::GetFrameHeight();
+    const bool open = ImGui::BeginCombo(label, preview, flags);
+    if ((flags & (ImGuiComboFlags_NoArrowButton | ImGuiComboFlags_NoPreview)) != 0) {
+      return open;
+    }
+    // Over ImGui's arrow box: the field's colour (inside its border), then the chevron.
+    const float side = height;
+    const ImVec2 box0(at.x + width - side, at.y);
+    const ImVec2 box1(at.x + width, at.y + height);
+    const bool hovered = ImGui::IsMouseHoveringRect(at, box1, true);
+    const ImGuiStyle& style = ImGui::GetStyle();
+    const float border = style.FrameBorderSize;
+    dl->AddRectFilled(
+      ImVec2(box0.x, box0.y + border),
+      ImVec2(box1.x - border, box1.y - border),
+      ImGui::GetColorU32(hovered || open ? ImGuiCol_FrameBgHovered : ImGuiCol_FrameBg),
+      std::max(0.0f, style.FrameRounding - border),
+      ImDrawFlags_RoundCornersRight
+    );
+    const ImVec2 chevron = ImGui::CalcTextSize(ICON_CHEVRON);
+    const ImVec4 bright = style.Colors[ImGuiCol_Text];
+    const ImVec4 dim = style.Colors[ImGuiCol_TextDisabled];
+    dl->AddText(
+      ImVec2(std::round(box0.x + (side - chevron.x) * 0.5f), std::round(at.y + (height - ImGui::GetFontSize()) * 0.5f)),
+      hovered || open ? ImGui::GetColorU32(ImGuiCol_Text)
+                      : ImGui::GetColorU32(
+                          ImVec4((bright.x + dim.x) * 0.5f, (bright.y + dim.y) * 0.5f, (bright.z + dim.z) * 0.5f, 1.0f)
+                        ),
+      ICON_CHEVRON
+    );
+    return open;
+  }
+
+  bool EdCombo(
+    const char* const label,
+    int* const current,
+    const char* const items[],
+    const int count,
+    const int popupItems
+  )
+  {
+    const char* const preview = *current >= 0 && *current < count ? items[*current] : nullptr;
+    if (popupItems != -1) {
+      const float rows = static_cast<float>(popupItems);
+      ImGui::SetNextWindowSizeConstraints(
+        ImVec2(0.0f, 0.0f),
+        ImVec2(FLT_MAX, ImGui::GetTextLineHeightWithSpacing() * rows + ImGui::GetStyle().WindowPadding.y * 2.0f)
+      );
+    }
+    if (!EdBeginCombo(label, preview, ImGuiComboFlags_None)) {
+      return false;
+    }
+    bool changed = false;
+    for (int i = 0; i < count; ++i) {
+      ImGui::PushID(i);
+      const bool picked = i == *current;
+      if (ImGui::Selectable(items[i], picked) && !picked) {
+        *current = i;
+        changed = true;
+      }
+      if (picked) {
+        ImGui::SetItemDefaultFocus();
+      }
+      ImGui::PopID();
+    }
+    ImGui::EndCombo();
+    if (changed) {
+      ImGui::MarkItemEdited(ImGui::GetID(label));
+    }
+    return changed;
+  }
 } // namespace faf::editor

@@ -953,7 +953,7 @@ namespace faf::editor
         const float framePad = std::max(0.0f, std::round((buttonHeight - fontSize) * 0.5f) - 1.0f);
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(Em(7.0f), framePad));
         ImGui::SetNextItemWidth(std::round(Em(52.0f)));
-        const bool stepOpen = ImGui::BeginCombo("##gridstep", kStepNames[current], ImGuiComboFlags_NoArrowButton);
+        const bool stepOpen = EdBeginCombo("##gridstep", kStepNames[current], ImGuiComboFlags_NoArrowButton);
         {
           // The mockup's select: the value and a small chevron at the right.
           const ImVec2 max = ImGui::GetItemRectMax();
@@ -1276,7 +1276,7 @@ namespace faf::editor
     {
       const std::vector<PlayProfile> profiles = mPlay.Profiles();
       ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x * 0.55f);
-      if (ImGui::BeginCombo("##profile", "Profile...")) {
+      if (EdBeginCombo("##profile", "Profile...")) {
         bool savedHeader = false;
         for (const PlayProfile& profile : profiles) {
           if (!profile.builtIn && !savedHeader) {
@@ -1350,7 +1350,7 @@ namespace faf::editor
     };
     if (!custom) {
       label("Start");
-      if (ImGui::BeginCombo("##slot", slotName(setup.slot).c_str())) {
+      if (EdBeginCombo("##slot", slotName(setup.slot).c_str())) {
         for (int i = 0; i < slotCount; ++i) {
           if (ImGui::Selectable(slotName(i).c_str(), i == setup.slot)) {
             setup.slot = i;
@@ -1366,7 +1366,7 @@ namespace faf::editor
     setup.faction = std::clamp(setup.faction, 0, static_cast<int>(factions.size()));
     label("Faction");
     if (
-      ImGui::BeginCombo(
+      EdBeginCombo(
         "##faction", setup.faction == 0 ? "Random" : factions[static_cast<std::size_t>(setup.faction - 1)].name.c_str()
       )
     ) {
@@ -1384,7 +1384,7 @@ namespace faf::editor
     if (setup.withAi && !aiTypes.empty()) {
       setup.ai = std::clamp(setup.ai, 0, static_cast<int>(aiTypes.size()) - 1);
       label("AI");
-      if (ImGui::BeginCombo("##ai", aiTypes[static_cast<std::size_t>(setup.ai)].name.c_str())) {
+      if (EdBeginCombo("##ai", aiTypes[static_cast<std::size_t>(setup.ai)].name.c_str())) {
         for (int i = 0; i < static_cast<int>(aiTypes.size()); ++i) {
           if (ImGui::Selectable(aiTypes[static_cast<std::size_t>(i)].name.c_str(), i == setup.ai)) {
             setup.ai = i;
@@ -1397,7 +1397,7 @@ namespace faf::editor
         setup.aiCount = std::clamp(setup.aiCount, 0, slotCount - 1);
         label("AI opponents");
         const std::string count = setup.aiCount == 0 ? std::string("Every other slot") : std::to_string(setup.aiCount);
-        if (ImGui::BeginCombo("##aicount", count.c_str())) {
+        if (EdBeginCombo("##aicount", count.c_str())) {
           if (ImGui::Selectable("Every other slot", setup.aiCount == 0)) {
             setup.aiCount = 0;
           }
@@ -1429,7 +1429,7 @@ namespace faf::editor
         ImGui::SameLine(ImGui::GetFontSize() * 1.6f);
         int role = static_cast<int>(slot.role);
         ImGui::SetNextItemWidth(roleWidth);
-        if (ImGui::Combo("##role", &role, kRoles, 3)) {
+        if (EdCombo("##role", &role, kRoles, 3)) {
           slot.role = static_cast<PlaySlot::Role>(role);
           if (slot.role == PlaySlot::Role::You) {
             for (std::size_t k = 0; k < setup.slots.size(); ++k) {
@@ -1446,7 +1446,7 @@ namespace faf::editor
         if (slot.role == PlaySlot::Role::Ai) {
           slot.ai = std::clamp(slot.ai, 0, static_cast<int>(aiTypes.size()) - 1);
           ImGui::SetNextItemWidth(aiWidth);
-          if (ImGui::BeginCombo("##slotai", aiTypes[static_cast<std::size_t>(slot.ai)].name.c_str())) {
+          if (EdBeginCombo("##slotai", aiTypes[static_cast<std::size_t>(slot.ai)].name.c_str())) {
             for (int k = 0; k < static_cast<int>(aiTypes.size()); ++k) {
               if (ImGui::Selectable(aiTypes[static_cast<std::size_t>(k)].name.c_str(), k == slot.ai)) {
                 slot.ai = k;
@@ -1464,7 +1464,7 @@ namespace faf::editor
           slot.faction = std::clamp(slot.faction, 0, static_cast<int>(factions.size()));
           ImGui::SetNextItemWidth(factionWidth);
           if (
-            ImGui::BeginCombo(
+            EdBeginCombo(
               "##slotfaction",
               slot.faction == 0 ? "Random" : factions[static_cast<std::size_t>(slot.faction - 1)].name.c_str()
             )
@@ -1485,7 +1485,7 @@ namespace faf::editor
         ImGui::SameLine();
         slot.team = std::clamp(slot.team, 0, 4);
         ImGui::SetNextItemWidth(teamWidth);
-        changed = ImGui::Combo("##team", &slot.team, kTeams, 5) || changed;
+        changed = EdCombo("##team", &slot.team, kTeams, 5) || changed;
         ImGui::PopID();
       }
       if (changed) {
@@ -1548,7 +1548,7 @@ namespace faf::editor
         victory = setup.victory == kVictoryKeys[i] ? i : victory;
       }
       label("Victory");
-      if (ImGui::Combo("##victory", &victory, kVictoryNames, 5)) {
+      if (EdCombo("##victory", &victory, kVictoryNames, 5)) {
         setup.victory = kVictoryKeys[victory];
       }
       label("Unit cap");

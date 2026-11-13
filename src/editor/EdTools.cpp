@@ -602,7 +602,7 @@ namespace faf::editor
           static const char* const kLost[] = {"Move to a free layer", "Merge into a layer", "Drop"};
           int lost = static_cast<int>(mConvertOptions.lost);
           ImGui::SetNextItemWidth(Em(240.0f));
-          if (ImGui::Combo("Paint it can't draw", &lost, kLost, 3)) {
+          if (EdCombo("Paint it can't draw", &lost, kLost, 3)) {
             mConvertOptions.lost = static_cast<LostLayers>(lost);
           }
           if (mConvertOptions.lost == LostLayers::Merge) {
@@ -640,7 +640,7 @@ namespace faf::editor
     ImGui::SetNextItemWidth(half);
     const bool image = mBrushShape == static_cast<int>(BrushShape::Image);
     if (
-      ImGui::BeginCombo(
+      EdBeginCombo(
         "##brushshape", image ? mShapeImageName.c_str() : BrushShapeName(static_cast<BrushShape>(mBrushShape))
       )
     ) {
@@ -730,7 +730,7 @@ namespace faf::editor
         case HeightBrushMode::Stamp: {
           // The source: a picture from a file, one of the procedural shapes, or an image of the brush library.
           ImGui::SetNextItemWidth(-1.0f);
-          if (ImGui::BeginCombo("##stampsource", mStamp != nullptr ? mStampName.c_str() : "Choose a stamp")) {
+          if (EdBeginCombo("##stampsource", mStamp != nullptr ? mStampName.c_str() : "Choose a stamp")) {
             for (int k = 1; k < kBrushShapeCount; ++k) {
               if (
                 ImGui::Selectable(
@@ -1026,7 +1026,7 @@ namespace faf::editor
         ImGui::SameLine();
         static const char* const kCombine[] = {"Copy it", "Average", "Highest", "Lowest"};
         ImGui::SetNextItemWidth(-1.0f);
-        (void)ImGui::Combo("##symcombine", &mSymCombine, kCombine, 4);
+        (void)EdCombo("##symcombine", &mSymCombine, kCombine, 4);
         ImGui::BeginDisabled(mSymCombine != 0);
         ImGui::SetNextItemWidth(-1.0f);
         FillSliderFloat("##symseam", &mSymSeam, 0.0f, 32.0f, mSymSeam <= 0.0f ? "Hard seam" : "Seam %.0f");
@@ -1086,7 +1086,7 @@ namespace faf::editor
         "Export 4097 wide"
       };
       ImGui::SetNextItemWidth(-1.0f);
-      ImGui::Combo("##exportsize", &mExportSize, kSizes, IM_ARRAYSIZE(kSizes));
+      EdCombo("##exportsize", &mExportSize, kSizes, IM_ARRAYSIZE(kSizes));
       Note(
         "Import reads .png, .raw, .r16 (World Machine), .bmp or .tif, resampled to the map's size; export writes .png "
         "(16-bit grey), "
@@ -1261,7 +1261,7 @@ namespace faf::editor
       Note("Click a thumbnail to choose its texture.");
       if (!mShaders.empty()) {
         ImGui::SetNextItemWidth(-Em(80.0f));
-        if (ImGui::BeginCombo("##shader", ("Shader " + mShader).c_str())) {
+        if (EdBeginCombo("##shader", ("Shader " + mShader).c_str())) {
           for (const std::string& shader : mShaders) {
             if (ImGui::Selectable(shader.c_str(), shader == mShader) && shader != mShader) {
               mShaderChange = shader;
@@ -1282,7 +1282,7 @@ namespace faf::editor
         static const char* const kFileSlots[10] = {"Lower", "1", "2", "3", "4", "5", "6", "7", "8", "Upper"};
         mLayerFileSlot = std::clamp(mLayerFileSlot, 0, 9);
         ImGui::SetNextItemWidth(-1.0f);
-        if (ImGui::BeginCombo("##layerfileslot", (std::string("Layer ") + kFileSlots[mLayerFileSlot]).c_str())) {
+        if (EdBeginCombo("##layerfileslot", (std::string("Layer ") + kFileSlots[mLayerFileSlot]).c_str())) {
           for (int slot = 0; slot < 10; ++slot) {
             if (ImGui::Selectable(kFileSlots[slot], slot == mLayerFileSlot)) {
               mLayerFileSlot = slot;
@@ -1811,7 +1811,7 @@ namespace faf::editor
         (void)std::snprintf(count, sizeof(count), "%d wave generator%s", mWaveCount, mWaveCount == 1 ? "" : "s");
         ImGui::TextUnformatted(count);
         ImGui::SetNextItemWidth(-1.0f);
-        if (ImGui::BeginCombo("##wavepattern", mWavePatterns[static_cast<std::size_t>(mWavePattern)].name.c_str())) {
+        if (EdBeginCombo("##wavepattern", mWavePatterns[static_cast<std::size_t>(mWavePattern)].name.c_str())) {
           for (std::size_t i = 0; i < mWavePatterns.size(); ++i) {
             if (ImGui::Selectable(mWavePatterns[i].name.c_str(), static_cast<int>(i) == mWavePattern)) {
               mWavePattern = static_cast<int>(i);
@@ -2504,7 +2504,7 @@ namespace faf::editor
         mUnitArmy = armies.back();
       }
       ImGui::SetNextItemWidth(-1.0f);
-      if (ImGui::BeginCombo("##unitarmy", mUnitArmy.empty() ? "(none)" : mUnitArmy.c_str())) {
+      if (EdBeginCombo("##unitarmy", mUnitArmy.empty() ? "(none)" : mUnitArmy.c_str())) {
         for (const std::string& army : armies) {
           if (ImGui::Selectable(army.c_str(), army == mUnitArmy)) {
             mUnitArmy = army;
@@ -2754,7 +2754,7 @@ namespace faf::editor
       const std::vector<MarkerType>& types = MarkerTypes();
       mMarkerType = std::clamp(mMarkerType, 0, static_cast<int>(types.size()) - 1);
       ImGui::SetNextItemWidth(-1.0f);
-      if (ImGui::BeginCombo("##markertype", types[static_cast<std::size_t>(mMarkerType)].type)) {
+      if (EdBeginCombo("##markertype", types[static_cast<std::size_t>(mMarkerType)].type)) {
         std::string group;
         for (std::size_t i = 0; i < types.size(); ++i) {
           if (group != types[i].group) {

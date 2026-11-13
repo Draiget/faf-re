@@ -781,7 +781,7 @@ namespace faf::editor
       ImGui::SetItemTooltip("Reads the open map's heights again for the Map Height and Map Slope nodes");
       ImGui::SetNextItemWidth(Em(90.0f));
       static const int kSizes[] = {128, 256, 512, 1024};
-      if (ImGui::BeginCombo("##size", (std::to_string(mPreviewSize) + " px").c_str())) {
+      if (EdBeginCombo("##size", (std::to_string(mPreviewSize) + " px").c_str())) {
         for (const int size : kSizes) {
           if (ImGui::Selectable((std::to_string(size) + " px").c_str(), size == mPreviewSize)) {
             mPreviewSize = size;
@@ -799,7 +799,7 @@ namespace faf::editor
       const std::string current = haveMap && mTargetSlot < static_cast<int>(mSlotNames.size())
         ? mSlotNames[static_cast<std::size_t>(mTargetSlot)]
         : std::string("(no map open)");
-      if (ImGui::BeginCombo("##slot", current.c_str())) {
+      if (EdBeginCombo("##slot", current.c_str())) {
         for (std::size_t s = 0; s < mSlotNames.size(); ++s) {
           if (ImGui::Selectable(mSlotNames[s].c_str(), static_cast<int>(s) == mTargetSlot)) {
             mTargetSlot = static_cast<int>(s);
@@ -832,7 +832,7 @@ namespace faf::editor
             "changed; File > Save as new map folder makes one)"
       );
       ImGui::SetNextItemWidth(Em(80.0f));
-      if (ImGui::BeginCombo("##bake", (std::to_string(mBakeSize) + " px").c_str())) {
+      if (EdBeginCombo("##bake", (std::to_string(mBakeSize) + " px").c_str())) {
         for (const int size : {512, 1024, 2048}) {
           if (ImGui::Selectable((std::to_string(size) + " px").c_str(), size == mBakeSize)) {
             mBakeSize = size;
@@ -852,7 +852,7 @@ namespace faf::editor
   {
     static const char* const kModes[] = {"Sphere", "Plane 2x2", "Albedo", "Normal", "Mask"};
     ImGui::SetNextItemWidth(Em(110.0f));
-    if (ImGui::Combo("##mode", &mPreviewMode, kModes, IM_ARRAYSIZE(kModes))) {
+    if (EdCombo("##mode", &mPreviewMode, kModes, IM_ARRAYSIZE(kModes))) {
       mPreviewStale = true;
     }
     ImGui::SameLine();
@@ -1010,7 +1010,7 @@ namespace faf::editor
         const char* current = v >= 0 && static_cast<std::size_t>(v) < def.choices.size()
           ? def.choices[static_cast<std::size_t>(v)].c_str()
           : "?";
-        if (ImGui::BeginCombo(def.name.c_str(), current)) {
+        if (EdBeginCombo(def.name.c_str(), current)) {
           for (std::size_t c = 0; c < def.choices.size(); ++c) {
             if (ImGui::Selectable(def.choices[c].c_str(), static_cast<int>(c) == v)) {
               value.value[0] = static_cast<float>(c);

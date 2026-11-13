@@ -131,7 +131,7 @@ namespace faf::editor
       ImGui::SameLine();
       ImGui::SetNextItemWidth(Em(260.0f));
       if (
-        ImGui::BeginCombo(
+        EdBeginCombo(
           "##folder",
           mFolder == 0 ? "All folders" : mFolders[static_cast<std::size_t>(mFolder - 1)].c_str(),
           ImGuiComboFlags_HeightLarge

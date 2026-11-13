@@ -224,6 +224,23 @@ namespace faf::editor
       ImGui::Dummy(ImVec2(size.x + pad.x * 2.0f, size.y + pad.y * 2.0f));
     }
 
+    /**
+     * A vault filter as the mockup's pill: "Width: any" and a chevron, lit while it filters; a click opens its popup
+     * (EndPopup closes it).
+     */
+    bool FilterPill(
+      const char* const id,
+      const std::string& text,
+      const bool set
+    )
+    {
+      const std::string label = text + "  " ICON_CHEVRON "###" + id;
+      if (PillToggle(label.c_str(), set)) {
+        ImGui::OpenPopup(id);
+      }
+      return ImGui::BeginPopup(id);
+    }
+
     /** A card in the middle of the panel, `width` wide at most. */
     bool BeginCard(
       const char* const id,
@@ -624,10 +641,9 @@ namespace faf::editor
       ReadSavedQueries();
     }
     bool changed = false;
-    const float field = std::max(ImGui::GetContentRegionAvail().x / 4.0f - ImGui::GetStyle().ItemSpacing.x, 120.0f);
+    const float gap = Em(6.0f);
     const auto sizes = [&](const char* id, const char* label, unsigned& bits) {
-      ImGui::SetNextItemWidth(field);
-      if (ImGui::BeginCombo(id, (std::string(label) + ": " + SizesText(bits, "any")).c_str())) {
+      if (FilterPill(id, std::string(label) + ": " + SizesText(bits, "any"), bits != 0U)) {
         for (int k = 0; k < 7; ++k) {
           bool on = (bits & (1U << k)) != 0;
           if (ImGui::Checkbox(kVaultSizeNames[k], &on)) {
@@ -635,19 +651,30 @@ namespace faf::editor
             changed = true;
           }
         }
-        ImGui::EndCombo();
+        ImGui::EndPopup();
       }
     };
-    // Row 1: author, uploaded from/to, width (the name is the search box above).
-    ImGui::SetNextItemWidth(field);
-    changed |= ImGui::InputTextWithHint(
-      "##author", "Author", mAuthorText, sizeof(mAuthorText), ImGuiInputTextFlags_EnterReturnsTrue
-    );
-    ImGui::SameLine();
-    ImGui::SetNextItemWidth(field);
-    const std::string uploaded =
-      std::string("Uploaded: ") + (mFromText[0] ? mFromText : "any") + " to " + (mToText[0] ? mToText : "any");
-    if (ImGui::BeginCombo("##uploaded", uploaded.c_str())) {
+    // One row of pills: author, uploaded, width, height, players, score, only ranked (the name is the search above).
+    if (FilterPill("##author", std::string("Author: ") + (mAuthorText[0] ? mAuthorText : "any"), mAuthorText[0] != 0)) {
+      ImGui::SetNextItemWidth(Em(200.0f));
+      if (ImGui::IsWindowAppearing()) {
+        ImGui::SetKeyboardFocusHere();
+      }
+      changed |= ImGui::InputTextWithHint(
+        "##authortext",
+        "Author's name, then Enter",
+        mAuthorText,
+        sizeof(mAuthorText),
+        ImGuiInputTextFlags_EnterReturnsTrue
+      );
+      ImGui::EndPopup();
+    }
+    ImGui::SameLine(0.0f, gap);
+    const bool dated = mFromText[0] != 0 || mToText[0] != 0;
+    const std::string uploaded = dated
+      ? std::string("Uploaded: ") + (mFromText[0] ? mFromText : "any") + " to " + (mToText[0] ? mToText : "any")
+      : std::string("Uploaded: any");
+    if (FilterPill("##uploaded", uploaded, dated)) {
       ImGui::TextDisabled("Updated after and before (YYYY-MM-DD)");
       ImGui::SetNextItemWidth(Em(130.0f));
       changed |= ImGui::InputTextWithHint(
@@ -661,43 +688,57 @@ namespace faf::editor
         mToText[0] = '\0';
         changed = true;
       }
-      ImGui::EndCombo();
+      ImGui::EndPopup();
     }
-    ImGui::SameLine();
+    ImGui::SameLine(0.0f, gap);
     sizes("##width", "Width", mFilters.widths);
-    // Row 2: height, max players, review score, only ranked.
+    ImGui::SameLine(0.0f, gap);
     sizes("##height", "Height", mFilters.heights);
-    ImGui::SameLine();
-    ImGui::SetNextItemWidth(field);
-    const std::string players =
-      "Max. players: " + (mFilters.minPlayers > 0 ? std::to_string(mFilters.minPlayers) : std::string("")) + " to " +
-      (mFilters.maxPlayers > 0 && mFilters.maxPlayers < 16 ? std::to_string(mFilters.maxPlayers) : std::string(""));
-    if (ImGui::BeginCombo("##players", players.c_str())) {
-      changed |= FillSliderInt("from##p", &mFilters.minPlayers, 0, 16, mFilters.minPlayers == 0 ? "any" : "%d");
+    ImGui::SameLine(0.0f, gap);
+    const bool playersSet = mFilters.minPlayers > 0 || (mFilters.maxPlayers > 0 && mFilters.maxPlayers < 16);
+    const std::string players = playersSet
+      ? "Players: " + (mFilters.minPlayers > 0 ? std::to_string(mFilters.minPlayers) : std::string("any")) + " to " +
+        (mFilters.maxPlayers > 0 && mFilters.maxPlayers < 16 ? std::to_string(mFilters.maxPlayers) : std::string("any"))
+      : std::string("Players: any");
+    if (FilterPill("##players", players, playersSet)) {
+      ImGui::SetNextItemWidth(Em(200.0f));
+      changed |= FillSliderInt(
+        "##pfrom", &mFilters.minPlayers, 0, 16, mFilters.minPlayers == 0 ? "At least: any" : "At least %d"
+      );
       int to = mFilters.maxPlayers == 0 ? 16 : mFilters.maxPlayers;
-      if (FillSliderInt("to##p", &to, 0, 16, to >= 16 ? "any" : "%d")) {
+      ImGui::SetNextItemWidth(Em(200.0f));
+      if (FillSliderInt("##pto", &to, 0, 16, to >= 16 ? "At most: any" : "At most %d")) {
         mFilters.maxPlayers = to >= 16 ? 0 : to;
         changed = true;
       }
-      ImGui::EndCombo();
+      ImGui::EndPopup();
     }
-    ImGui::SameLine();
-    ImGui::SetNextItemWidth(field);
+    ImGui::SameLine(0.0f, gap);
+    const bool scored = mFilters.minScore > 0.0f || mFilters.maxScore < 5.0f;
     char score[64];
     (void)std::snprintf(
       score,
       sizeof(score),
-      "Average reviews score: %s to %s",
-      mFilters.minScore > 0.0f ? std::to_string(mFilters.minScore).substr(0, 3).c_str() : "",
-      mFilters.maxScore < 5.0f ? std::to_string(mFilters.maxScore).substr(0, 3).c_str() : ""
+      scored ? "Rating: %s to %s" : "Rating: any",
+      mFilters.minScore > 0.0f ? std::to_string(mFilters.minScore).substr(0, 3).c_str() : "any",
+      mFilters.maxScore < 5.0f ? std::to_string(mFilters.maxScore).substr(0, 3).c_str() : "any"
     );
-    if (ImGui::BeginCombo("##score", score)) {
-      changed |= FillSliderFloat("from##s", &mFilters.minScore, 0.0f, 5.0f, mFilters.minScore <= 0.0f ? "any" : "%.1f");
-      changed |= FillSliderFloat("to##s", &mFilters.maxScore, 0.0f, 5.0f, mFilters.maxScore >= 5.0f ? "any" : "%.1f");
-      ImGui::EndCombo();
+    if (FilterPill("##score", score, scored)) {
+      ImGui::SetNextItemWidth(Em(200.0f));
+      changed |= FillSliderFloat(
+        "##sfrom", &mFilters.minScore, 0.0f, 5.0f, mFilters.minScore <= 0.0f ? "From: any" : "From %.1f"
+      );
+      ImGui::SetNextItemWidth(Em(200.0f));
+      changed |=
+        FillSliderFloat("##sto", &mFilters.maxScore, 0.0f, 5.0f, mFilters.maxScore >= 5.0f ? "To: any" : "To %.1f");
+      ImGui::EndPopup();
     }
-    ImGui::SameLine();
-    changed |= ImGui::Checkbox("Only ranked", &mFilters.rankedOnly);
+    ImGui::SameLine(0.0f, gap);
+    if (PillToggle("Only ranked", mFilters.rankedOnly)) {
+      mFilters.rankedOnly = !mFilters.rankedOnly;
+      changed = true;
+    }
+    ImGui::Dummy(ImVec2(0.0f, Em(2.0f)));
     // Row 3: reset, sort by and order, save query, favorites, display search query.
     if (RoundButton("Reset")) {
       const VaultQuery fresh;
@@ -711,7 +752,7 @@ namespace faf::editor
     ImGui::TextDisabled("Sort by");
     ImGui::SameLine();
     ImGui::SetNextItemWidth(Em(150.0f));
-    if (ImGui::BeginCombo("##sortby", SortLabel(mFilters.sortProperty))) {
+    if (EdBeginCombo("##sortby", SortLabel(mFilters.sortProperty))) {
       for (const VaultSortKey& key : kVaultSortKeys) {
         if (ImGui::Selectable(key.label, mFilters.sortProperty == key.property)) {
           mFilters.sortProperty = key.property;
@@ -724,7 +765,7 @@ namespace faf::editor
     ImGui::SetNextItemWidth(Em(120.0f));
     int order = mFilters.descending ? 1 : 0;
     static const char* const kOrders[] = {"ascending", "descending"};
-    if (ImGui::Combo("##order", &order, kOrders, 2)) {
+    if (EdCombo("##order", &order, kOrders, 2)) {
       mFilters.descending = order == 1;
       changed = true;
     }
@@ -784,7 +825,7 @@ namespace faf::editor
           }
         }
         ImGui::SameLine();
-        if (ImGui::SmallButton("x")) {
+        if (ImGui::Button(ICON_CLOSE)) {
           mSavedQueries.erase(mSavedQueries.begin() + static_cast<std::ptrdiff_t>(i));
           WriteSavedQueries();
           ImGui::PopID();
@@ -795,7 +836,9 @@ namespace faf::editor
       ImGui::EndPopup();
     }
     ImGui::SameLine();
-    ImGui::Checkbox("Display search query", &mShowQuery);
+    if (PillToggle("Display search query", mShowQuery)) {
+      mShowQuery = !mShowQuery;
+    }
     if (mShowQuery) {
       VaultQuery query = Query();
       query.text = mSearchText;

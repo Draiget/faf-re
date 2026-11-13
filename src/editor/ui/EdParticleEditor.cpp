@@ -484,7 +484,7 @@ namespace faf::editor
       ImGui::CalcTextSize("Black").x + style.FramePadding.x * 2.0f + ImGui::GetFrameHeight() + style.ItemInnerSpacing.x;
     flow(comboWidth);
     ImGui::SetNextItemWidth(comboWidth);
-    (void)ImGui::Combo("##bg", &options.background, kBackgrounds, 4);
+    (void)EdCombo("##bg", &options.background, kBackgrounds, 4);
     ImGui::SetItemTooltip("The view's background");
     flow(checkboxWidth("Ground"));
     ImGui::Checkbox("Ground", &options.ground);

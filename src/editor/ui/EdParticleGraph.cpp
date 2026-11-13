@@ -494,7 +494,7 @@ namespace faf::editor
       }
       case ParamKind::Choice: {
         const int current = std::clamp(static_cast<int>(value.value[0]), 0, static_cast<int>(def.choices.size()) - 1);
-        if (ImGui::BeginCombo(def.name.c_str(), def.choices[static_cast<std::size_t>(current)].c_str())) {
+        if (EdBeginCombo(def.name.c_str(), def.choices[static_cast<std::size_t>(current)].c_str())) {
           for (std::size_t c = 0; c < def.choices.size(); ++c) {
             if (ImGui::Selectable(def.choices[c].c_str(), static_cast<int>(c) == current)) {
               value.value[0] = static_cast<float>(c);

@@ -472,8 +472,7 @@ namespace faf::editor
           );
           ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - 8.0f);
           if (
-            !info.values.empty() &&
-            ImGui::BeginCombo("##preview", info.values[static_cast<std::size_t>(pick)].text.c_str())
+            !info.values.empty() && EdBeginCombo("##preview", info.values[static_cast<std::size_t>(pick)].text.c_str())
           ) {
             for (std::size_t v = 0; v < info.values.size(); ++v) {
               if (ImGui::Selectable(info.values[v].text.c_str(), static_cast<int>(v) == pick)) {

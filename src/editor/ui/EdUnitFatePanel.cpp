@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "editor/EdShell.h"
+#include "editor/ui/EdControls.h"
 #include "editor/doc/EdDocument.h"
 #include "editor/doc/EdGroupOptions.h"
 #include "editor/doc/EdUnitFate.h"
@@ -148,7 +149,7 @@ namespace faf::editor
     if (never) {
       ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.95f, 0.75f, 0.30f, 1.0f));
     }
-    const bool open = ImGui::BeginCombo("##spawns", preview.c_str(), ImGuiComboFlags_HeightLarge);
+    const bool open = EdBeginCombo("##spawns", preview.c_str(), ImGuiComboFlags_HeightLarge);
     if (never) {
       ImGui::PopStyleColor();
     }

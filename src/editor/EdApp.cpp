@@ -1541,7 +1541,7 @@ namespace faf::editor
             SettingLabel("Theme", "The editor's colours. Your own themes are Lua files in the themes folder.");
             const std::string current = gThemeNow;
             ImGui::SetNextItemWidth(Em(260.0f));
-            if (ImGui::BeginCombo("##theme", current.c_str())) {
+            if (EdBeginCombo("##theme", current.c_str())) {
               for (const EdTheme& theme : mThemes) {
                 if (ImGui::Selectable(theme.name.c_str(), theme.name == current)) {
                   SetTheme(theme.name, true);
