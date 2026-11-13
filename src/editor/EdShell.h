@@ -56,6 +56,10 @@ namespace faf::editor
     {
       return mShowMap;
     }
+    bool& ShowLayers() noexcept
+    {
+      return mShowLayers;
+    }
     bool& ShowInfo() noexcept
     {
       return mShowInfo;
@@ -411,6 +415,7 @@ namespace faf::editor
     /** The status bar's height at the current scale. */
     [[nodiscard]] static float StatusBarHeight();
     bool mPanelPlacesCarried = false;
+    std::vector<std::string> mFrontPanels; // a layout just built: the windows to bring in front once
     bool mFocusTools = false; // the strip picked a tool: the Tools panel comes forward
     Command mCommand = Command::None;
     void DrawToolsPanel();
@@ -602,6 +607,7 @@ namespace faf::editor
     bool mShowTools = true;
     bool mShowMap = true;
     bool mShowInfo = true;
+    bool mShowLayers = true;
     bool mShowLog = true;
     bool mPanelsWhilePlaying = true;
     bool mLayoutBuilt = false;

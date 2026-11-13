@@ -36,10 +36,10 @@ namespace faf::editor
        "Alt+1",
        "Heights, textures and water: the sculpt and paint tools",
        "Tools",
-       "Properties",
-       "Map,Info,Markers,Check",
        "",
-       "Problems,Log,History",
+       "Layers,Info",
+       "Properties",
+       "Problems,Log,History,Markers,Check,Map",
        0.21f,
        0.22f,
        false},
@@ -200,6 +200,7 @@ namespace faf::editor
       {"Properties", ICON_INFO},
       {"Map", ICON_VAULT},
       {"Info", ICON_INFO},
+      {"Layers", ICON_LAYERS},
       {"Markers", ICON_MARKER},
       {"Check", ICON_CHECK},
       {"Log", ICON_CONSOLE},
@@ -220,6 +221,21 @@ namespace faf::editor
       }
     }
     return nullptr;
+  }
+
+  int LayoutVersionOf(
+    const std::string_view key
+  )
+  {
+    // Raised when a workspace's first layout changes, so a layout saved before is laid out again once.
+    // 2: Terrain's right dock as the mockup's (Layers and Info, Properties under them).
+    return key == "terrain" ? 2 : 1;
+  }
+
+  std::map<std::string, int>& LayoutVersions()
+  {
+    static std::map<std::string, int> versions;
+    return versions;
   }
 
   const char* WorkspaceIcon(

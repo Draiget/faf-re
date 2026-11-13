@@ -1,5 +1,6 @@
 #include "editor/EdTools.h"
 #include "editor/ui/EdControls.h"
+#include "editor/ui/EdFonts.h"
 #include "editor/ui/EdIconFont.h"
 #include "editor/ui/EdThemeColors.h"
 #include "editor/ui/EdUiScale.h"
@@ -1220,6 +1221,276 @@ namespace faf::editor
     }
   }
 
+  void EdTools::DrawLayersPanel()
+  {
+    // The mockup's Layers panel (the right dock): the shader, the ten layers top to bottom as the terrain stacks them,
+    // the paint layer picked here, a layer dragged to another place with its mask.
+    if (mSlots.size() != 10) {
+      Note("Open a map to see its layers.");
+      return;
+    }
+    mLibrary.Pump(3);
+    if (Section("Shader")) {
+      RowLabel("Terrain shader");
+      if (EdBeginCombo("##layersshader", mShader.c_str())) {
+        for (const std::string& shader : mShaders) {
+          if (ImGui::Selectable(shader.c_str(), shader == mShader) && shader != mShader) {
+            mShaderChange = shader;
+          }
+        }
+        ImGui::EndCombo();
+      }
+      if (ImGui::Button("Browse...")) {
+        mShaderBrowserOpen = true;
+        mBrowsedShader = mShader;
+      }
+      ImGui::SetItemTooltip("Every terrain shader: what each draws, how it reads the masks, which layers it uses");
+      ImGui::SameLine();
+      if (ImGui::Button("Convert...")) {
+        mShaderBrowserOpen = true;
+        mBrowsedShader = mShader;
+      }
+      ImGui::SetItemTooltip("Change the shader and carry the paint over (in the shader browser)");
+      DrawShaderBrowser();
+    }
+
+    if (Section("Layers")) {
+      static const char* const kSlotNames[10] = {"Lower", "1", "2", "3", "4", "5", "6", "7", "8", "Upper"};
+      // The biome from the texture's folder: "/env/evergreen2/layers/..." is Evergreen2.
+      const auto biomeOf = [](const std::string& path) {
+        std::string lower = path;
+        for (char& c : lower) {
+          c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+        }
+        const std::size_t env = lower.find("/env/");
+        if (env == std::string::npos) {
+          return std::string();
+        }
+        const std::size_t end = path.find('/', env + 5);
+        std::string biome = path.substr(env + 5, end == std::string::npos ? std::string::npos : end - env - 5);
+        if (!biome.empty()) {
+          biome[0] = static_cast<char>(std::toupper(static_cast<unsigned char>(biome[0])));
+        }
+        return biome;
+      };
+      const float rowHeight = std::round(Em(42.0f));
+      const float thumb = std::round(Em(28.0f));
+      const float width = ImGui::GetContentRegionAvail().x;
+      ImDrawList* const dl = ImGui::GetWindowDrawList();
+      const ImVec2 listAt = ImGui::GetCursorScreenPos();
+      const ImVec4 bright = ImGui::GetStyleColorVec4(ImGuiCol_Text);
+      const ImVec4 dim = ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled);
+      const ImU32 soft = ImGui::GetColorU32(ImVec4(
+        (bright.x * 2.0f + dim.x) / 3.0f, (bright.y * 2.0f + dim.y) / 3.0f, (bright.z * 2.0f + dim.z) / 3.0f, 1.0f
+      ));
+      const float small = std::round(ImGui::GetFontSize() * 0.84f);
+      ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 0.0f));
+      for (int slot = 9; slot >= 0; --slot) {
+        const LayerSlot& layer = mSlots[static_cast<std::size_t>(slot)];
+        const bool stratum = slot >= 1 && slot <= 8;
+        const bool painting = stratum && mMaskLayer == slot - 1;
+        ImGui::PushID(slot);
+        const ImVec2 at = ImGui::GetCursorScreenPos();
+        const ImVec2 to(at.x + width, at.y + rowHeight);
+        const bool clicked = ImGui::InvisibleButton("##row", ImVec2(width, rowHeight));
+        const bool hovered = ImGui::IsItemHovered();
+        // Drag a stratum onto another place: it moves there with its mask.
+        if (stratum) {
+          if (ImGui::BeginDragDropSource()) {
+            const int from = slot - 1;
+            ImGui::SetDragDropPayload("EDITOR_LAYER", &from, sizeof(from));
+            ImGui::Text("Layer %s  %s", kSlotNames[slot], LayerTextureName(layer.albedo).c_str());
+            ImGui::EndDragDropSource();
+          }
+          if (ImGui::BeginDragDropTarget()) {
+            if (const ImGuiPayload* const payload = ImGui::AcceptDragDropPayload("EDITOR_LAYER"); payload != nullptr) {
+              AskLayerMove(*static_cast<const int*>(payload->Data), slot - 1);
+            }
+            ImGui::EndDragDropTarget();
+          }
+        }
+        // Its menu: the texture, moving it, its paint.
+        if (ImGui::BeginPopupContextItem("##layermenu")) {
+          if (ImGui::MenuItem("Choose a texture...")) {
+            mBrowseSlot = slot;
+            mBrowseOpen = true;
+          }
+          if (stratum) {
+            ImGui::Separator();
+            if (ImGui::MenuItem("Move up", nullptr, false, slot < 8)) {
+              AskLayerMove(slot - 1, slot);
+            }
+            if (ImGui::MenuItem("Move down", nullptr, false, slot > 1)) {
+              AskLayerMove(slot - 1, slot - 2);
+            }
+            ImGui::Separator();
+            if (ImGui::MenuItem("Clear its paint")) {
+              mMaskLayer = slot - 1;
+              mMaskOp = MaskOp::Clear;
+            }
+            if (ImGui::MenuItem("Import its mask...")) {
+              mMaskLayer = slot - 1;
+              mMaskOp = MaskOp::Import;
+            }
+            if (ImGui::MenuItem("Export its mask...")) {
+              mMaskLayer = slot - 1;
+              mMaskOp = MaskOp::Export;
+            }
+          }
+          ImGui::Separator();
+          ImGui::SetNextItemWidth(Em(180.0f));
+          float size = layer.albedoSize;
+          if (FillDragFloat("##size", &size, 0.05f, 0.1f, 1024.0f, "Size %.2f") && size > 0.0f) {
+            // Albedo and normal map keep their ratio (most maps have them equal).
+            const float ratio = layer.albedoSize > 0.0f ? layer.normalsSize / layer.albedoSize : 1.0f;
+            mChangedSlot = slot;
+            mChangedValue = layer;
+            mChangedValue.albedoSize = size;
+            mChangedValue.normalsSize = size * ratio;
+          }
+          ImGui::EndPopup();
+        }
+        if (painting) {
+          dl->AddRectFilled(at, to, AccentU32(0.16f));
+          dl->AddRectFilled(at, ImVec2(at.x + Em(2.0f), to.y), AccentU32());
+        } else if (hovered) {
+          dl->AddRectFilled(at, to, ImGui::GetColorU32(ImGuiCol_Button));
+        }
+        if (slot > 0) {
+          dl->AddLine(
+            ImVec2(at.x, to.y - 0.5f), ImVec2(to.x, to.y - 0.5f), ImGui::GetColorU32(ImGuiCol_TableBorderLight)
+          );
+        }
+        // The grip (strata move), the thumbnail (a click chooses its texture), the words, its share of the map.
+        const float midY = at.y + rowHeight * 0.5f;
+        if (stratum) {
+          dl->AddText(
+            ImVec2(at.x + Em(8.0f), std::round(midY - ImGui::GetFontSize() * 0.55f)),
+            ImGui::GetColorU32(ImGuiCol_TextDisabled),
+            ICON_GRIP
+          );
+        }
+        const ImVec2 t0(at.x + Em(28.0f), std::round(midY - thumb * 0.5f));
+        const ImVec2 t1(t0.x + thumb, t0.y + thumb);
+        const std::uint64_t image = mLibrary.Thumbnail(layer.albedo);
+        if (image != 0U) {
+          dl->AddImageRounded(
+            static_cast<ImTextureID>(image), t0, t1, ImVec2(0, 0), ImVec2(1, 1), IM_COL32_WHITE, Em(5.0f)
+          );
+        } else {
+          // Empty: the mockup's hatched square.
+          dl->AddRectFilled(t0, t1, ImGui::GetColorU32(ImGuiCol_FrameBg), Em(5.0f));
+          dl->PushClipRect(t0, t1, true);
+          for (float k = -thumb; k < thumb; k += Em(6.0f)) {
+            dl->AddLine(
+              ImVec2(t0.x + k, t1.y), ImVec2(t0.x + k + thumb, t0.y), ImGui::GetColorU32(ImGuiCol_Button), 1.0f
+            );
+          }
+          dl->PopClipRect();
+          dl->AddRect(t0, t1, ImGui::GetColorU32(ImGuiCol_Border), Em(5.0f));
+        }
+        const bool onThumb = ImGui::IsMouseHoveringRect(t0, t1);
+        if (clicked && onThumb) {
+          mBrowseSlot = slot;
+          mBrowseOpen = true;
+        } else if (clicked && stratum) {
+          mMaskLayer = slot - 1;
+          gpg::Logf("editor: Layers: painting layer %d", slot);
+        }
+        const float tx = t1.x + Em(10.0f);
+        const std::string name = layer.albedo.empty() ? std::string("(empty)") : LayerTextureName(layer.albedo);
+        const float titleY = midY - Em(17.0f);
+        dl->AddText(
+          gBoldFont != nullptr ? gBoldFont : ImGui::GetFont(),
+          ImGui::GetFontSize(),
+          ImVec2(tx, titleY),
+          InkU32(),
+          kSlotNames[slot]
+        );
+        const float nameX = tx +
+          (gBoldFont != nullptr ? gBoldFont : ImGui::GetFont())
+            ->CalcTextSizeA(ImGui::GetFontSize(), FLT_MAX, 0.0f, kSlotNames[slot])
+            .x +
+          Em(6.0f);
+        const float right = to.x - Em(56.0f);
+        dl->PushClipRect(ImVec2(tx, at.y), ImVec2(right, to.y), true);
+        dl->AddText(ImVec2(nameX, titleY), InkU32(), name.c_str());
+        std::string about;
+        if (slot == 0) {
+          about = "under every layer";
+        } else if (slot == 9) {
+          about = "over every layer, by its alpha";
+        } else if (layer.albedo.empty()) {
+          about = "choose a texture to paint this layer";
+        } else {
+          const std::string biome = biomeOf(layer.albedo);
+          about = (biome.empty() ? std::string() : biome + " \xC2\xB7 ") + mShader;
+        }
+        if (const ShaderSlotUse use = ShaderSlotUseOf(mShader, slot); use.mapWide) {
+          about = "map-wide: " + use.text;
+        }
+        dl->AddText(
+          ImGui::GetFont(),
+          small,
+          ImVec2(tx, titleY + Em(19.0f)),
+          ImGui::GetColorU32(ImGuiCol_TextDisabled),
+          about.c_str()
+        );
+        dl->PopClipRect();
+        if (stratum && mHasCoverage && !layer.albedo.empty()) {
+          char share[16];
+          (void)std::snprintf(share, sizeof(share), "%.0f %%", static_cast<double>(mCoverage[slot - 1] * 100.0f));
+          const ImVec2 size = ImGui::GetFont()->CalcTextSizeA(small, FLT_MAX, 0.0f, share);
+          dl->AddText(
+            ImGui::GetFont(), small, ImVec2(to.x - size.x - Em(12.0f), std::round(midY - size.y * 0.5f)), soft, share
+          );
+        }
+        if (hovered && !layer.albedo.empty()) {
+          ImGui::SetTooltip(
+            "%s\n%s\nClick: paint this layer. Thumbnail: choose its texture. Drag: move it. Right-click: more.",
+            layer.albedo.c_str(),
+            layer.normals.empty() ? "(no normal map)" : layer.normals.c_str()
+          );
+        }
+        ImGui::PopID();
+      }
+      ImGui::PopStyleVar();
+      const ImVec2 listEnd(listAt.x + width, ImGui::GetCursorScreenPos().y);
+      dl->AddRect(listAt, listEnd, ImGui::GetColorU32(ImGuiCol_Border), Em(6.0f));
+      ImGui::Dummy(ImVec2(0.0f, Em(6.0f)));
+      if (ImGui::Button(ICON_MATERIAL "  Material editor...")) {
+        mMaterialAsk = std::clamp(mMaskLayer + 1, 1, 8);
+      }
+      ImGui::SetItemTooltip("A texture for the paint layer, built from nodes, shown on the map as you edit");
+      ImGui::SameLine();
+      if (ImGui::Button(".scmst  " ICON_CHEVRON)) {
+        ImGui::OpenPopup("##layersets");
+      }
+      ImGui::SetItemTooltip(
+        "FAForeverMapEditor's layer files: the shader and all ten layers (.scmst), or one layer (.scmsl)"
+      );
+      if (ImGui::BeginPopup("##layersets")) {
+        if (ImGui::MenuItem("Import a layer set (.scmst)...")) {
+          mLayerFileAsk = LayerFileAsk::ImportSet;
+        }
+        if (ImGui::MenuItem("Export the layer set (.scmst)...")) {
+          mLayerFileAsk = LayerFileAsk::ExportSet;
+        }
+        ImGui::Separator();
+        if (ImGui::MenuItem("Import the paint layer (.scmsl)...")) {
+          mLayerFileSlot = std::clamp(mMaskLayer + 1, 1, 8);
+          mLayerFileAsk = LayerFileAsk::ImportLayer;
+        }
+        if (ImGui::MenuItem("Export the paint layer (.scmsl)...")) {
+          mLayerFileSlot = std::clamp(mMaskLayer + 1, 1, 8);
+          mLayerFileAsk = LayerFileAsk::ExportLayer;
+        }
+        ImGui::EndPopup();
+      }
+      DrawTextureBrowser();
+    }
+  }
+
   void EdTools::DrawLayerSlots()
   {
     if (Section("Layers")) {
@@ -1582,52 +1853,13 @@ namespace faf::editor
         DrawTerrainTypes();
         return;
       }
-      DrawLayerSlots();
     }
-    if (Section("Paint layer")) {
-      // Strata 1-8 have masks; the lower layer is under everything and the upper one is blended by its alpha.
-      for (int layer = 0; layer < 8; ++layer) {
-        // The slots as the terrain has them now (a swapped texture shows at once), else the names read at open.
-        const std::string path = mSlots.size() == 10 ? mSlots[static_cast<std::size_t>(layer + 1)].albedo
-          : static_cast<std::size_t>(layer + 1) < mLayerNames.size() ? mLayerNames[static_cast<std::size_t>(layer + 1)]
-                                                                     : "";
-        char label[160];
-        if (mHasCoverage) {
-          (void)std::snprintf(
-            label,
-            sizeof(label),
-            "%d  %s  %.0f%%##layer%d",
-            layer + 1,
-            LayerLabel(path).c_str(),
-            static_cast<double>(mCoverage[layer] * 100.0f),
-            layer
-          );
-        } else {
-          (void)std::snprintf(label, sizeof(label), "%d  %s##layer%d", layer + 1, LayerLabel(path).c_str(), layer);
-        }
-        if (ImGui::Selectable(label, mMaskLayer == layer)) {
-          mMaskLayer = layer;
-        }
-        if (!path.empty() && ImGui::IsItemHovered()) {
-          ImGui::SetTooltip("%s", path.c_str());
-        }
-      }
-      if (mSlots.size() == 10) {
-        ImGui::TextDisabled("Under all: %s", LayerLabel(mSlots.front().albedo).c_str());
-      } else if (!mLayerNames.empty()) {
-        ImGui::TextDisabled("Under all: %s", LayerLabel(mLayerNames.front()).c_str());
-      }
-      if (ImGui::SmallButton("Clear")) {
-        mMaskOp = MaskOp::Clear;
-      }
-      ImGui::SameLine();
-      if (ImGui::SmallButton("Import...")) {
-        mMaskOp = MaskOp::Import;
-      }
-      ImGui::SameLine();
-      if (ImGui::SmallButton("Export...")) {
-        mMaskOp = MaskOp::Export;
-      }
+    {
+      // The paint layer is picked in the Layers panel (the right dock), where the layers are.
+      const std::string path =
+        mSlots.size() == 10 ? mSlots[static_cast<std::size_t>(mMaskLayer + 1)].albedo : std::string();
+      ImGui::TextDisabled("Painting layer %d  %s", mMaskLayer + 1, LayerLabel(path).c_str());
+      ImGui::SetItemTooltip("Pick the layer to paint, its texture and its order in the Layers panel");
     }
     if (Section("Brush")) {
       static const char* const kMaskModes[] = {"Paint", "Erase", "Smooth"};

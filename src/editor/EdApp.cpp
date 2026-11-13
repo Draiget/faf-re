@@ -168,6 +168,7 @@ namespace faf::editor
     constexpr const char* kReviewOnlyLooks = "the Review workspace only looks (Alt+1 to edit)";
     std::string gWorkspaceRead;
     std::map<std::string, std::vector<std::string>> gPanelsRead;
+    std::map<std::string, int> gLayoutsRead;
     bool gTestRun = false;
 
     void UiSettingsLine(
@@ -187,6 +188,15 @@ namespace faf::editor
       if (std::strncmp(line, "Workspace=", 10) == 0 && WorkspaceByKey(line + 10) >= 0) {
         gWorkspaceRead = line + 10;
         SetActiveWorkspace(WorkspaceByKey(gWorkspaceRead));
+      }
+      if (
+        const char* const equals = std::strchr(line, '='); std::strncmp(line, "Layout.", 7) == 0 && equals != nullptr
+      ) {
+        const std::string key(line + 7, equals);
+        if (WorkspaceByKey(key) >= 0) {
+          LayoutVersions()[key] = std::atoi(equals + 1);
+          gLayoutsRead[key] = LayoutVersions()[key];
+        }
       }
       if (
         const char* const equals = std::strchr(line, '='); std::strncmp(line, "Panels.", 7) == 0 && equals != nullptr
@@ -215,6 +225,9 @@ namespace faf::editor
       }
       for (const auto& [key, panels] : gTestRun ? gPanelsRead : ShownPanels()) {
         out->appendf("Panels.%s=%s\n", key.c_str(), JoinPanelList(panels).c_str());
+      }
+      for (const auto& [key, version] : gTestRun ? gLayoutsRead : LayoutVersions()) {
+        out->appendf("Layout.%s=%d\n", key.c_str(), version);
       }
       out->append("\n");
     }
@@ -2640,6 +2653,7 @@ namespace faf::editor
       panel("view.tools", "Tools", &EdShell::ShowTools);
       panel("view.map", "Map", &EdShell::ShowMap);
       panel("view.info", "Info", &EdShell::ShowInfo);
+      panel("view.layers", "Layers", &EdShell::ShowLayers);
       panel("view.markers", "Markers", &EdShell::ShowMarkers);
       panel("view.check", "Check", &EdShell::ShowCheck);
       panel("view.script", "Script", &EdShell::ShowScript);
@@ -4751,7 +4765,8 @@ namespace faf::editor
         if (float coverage[8]; mScene.MaskCoverage(coverage)) {
           tools.SetCoverage(coverage);
         }
-        if (tools.TextureToolActive()) {
+        // The Texture tool and the Layers panel show the shader (the panel with any tool).
+        if (tools.TextureToolActive() || mShell->ShowLayers()) {
           tools.SetShaders(mScene.TerrainShaders(), mScene.TerrainShader());
         }
         if (!mShaderArg.empty()) {

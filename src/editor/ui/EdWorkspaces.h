@@ -58,6 +58,10 @@ namespace faf::editor
   [[nodiscard]] const char* PanelIcon(std::string_view id);
   /** A workspace's icon by its key, or nullptr. */
   [[nodiscard]] const char* WorkspaceIcon(std::string_view key);
+  /** A workspace's layout version now (raised when its first layout changes). */
+  [[nodiscard]] int LayoutVersionOf(std::string_view key);
+  /** The layout version each workspace's saved layout has (layout.ini `Layout.<key>=`; missing reads as 0). */
+  [[nodiscard]] std::map<std::string, int>& LayoutVersions();
   /** The same for the active workspace, kept until the program ends (ImGui takes the name as a C string). */
   [[nodiscard]] const char* Panel(const char* panel);
   /** The dock space a workspace lays its panels out in: "EditorDockSpace", "EditorDockSpace@objects", ... */

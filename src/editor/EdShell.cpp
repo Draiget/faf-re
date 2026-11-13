@@ -321,12 +321,21 @@ namespace faf::editor
     }
     const ImGuiID dockspaceId = ImGui::GetID(DockSpaceName(workspace).c_str());
     if (!mWorkspaceBuilt[static_cast<std::size_t>(workspace)] || mResetLayout) {
-      if (mResetLayout || ImGui::DockBuilderGetNode(dockspaceId) == nullptr) {
+      // A layout saved before this workspace's first layout changed is laid out again once.
+      const std::string key = Workspaces()[static_cast<std::size_t>(workspace)].key;
+      const auto kept = LayoutVersions().find(key);
+      const bool stale = (kept == LayoutVersions().end() ? 0 : kept->second) < LayoutVersionOf(key);
+      if (mResetLayout || stale || ImGui::DockBuilderGetNode(dockspaceId) == nullptr) {
         BuildDefaultLayout(dockspaceId);
-        if (mResetLayout) {
+        if (mResetLayout || stale) {
           ShowPanels(DefaultPanels(workspace));
         }
+        if (stale) {
+          gpg::Logf("editor: workspace %s laid out again (its layout changed)", key.c_str());
+        }
       }
+      LayoutVersions()[key] = LayoutVersionOf(key);
+      ImGui::MarkIniSettingsDirty();
       mWorkspaceBuilt[static_cast<std::size_t>(workspace)] = true;
       mLayoutBuilt = true;
       mResetLayout = false;
@@ -419,6 +428,12 @@ namespace faf::editor
       if (mShowMap) {
         DrawMapPanel();
       }
+      if (mShowLayers) {
+        if (ImGui::Begin(Panel("Layers"), &mShowLayers)) {
+          mTools.DrawLayersPanel();
+        }
+        ImGui::End();
+      }
       if (mShowInfo) {
         DrawInfoPanel();
       }
@@ -497,6 +512,15 @@ namespace faf::editor
         DrawViewOverlays();
       }
     }
+    // A layout just built: each group's first panel in front, once its window exists.
+    for (auto it = mFrontPanels.begin(); it != mFrontPanels.end();) {
+      if (ImGuiWindow* const window = ImGui::FindWindowByName(it->c_str()); window != nullptr && window->WasActive) {
+        ImGui::FocusWindow(window);
+        it = mFrontPanels.erase(it);
+      } else {
+        ++it;
+      }
+    }
     DrawSaveAsDialog();
     DrawHome(top, statusHeight);
     DrawHelpWindow();
@@ -515,9 +539,15 @@ namespace faf::editor
     ImGui::DockBuilderRemoveNode(dockspaceId);
     ImGui::DockBuilderAddNode(dockspaceId, ImGuiDockNodeFlags_DockSpace);
     ImGui::DockBuilderSetNodeSize(dockspaceId, viewport->WorkSize);
-    const auto dock = [](const char* const list, const ImGuiID node) {
-      for (const std::string& panel : SplitPanelList(list)) {
+    mFrontPanels.clear();
+    const auto dock = [this](const char* const list, const ImGuiID node) {
+      const std::vector<std::string> panels = SplitPanelList(list);
+      for (const std::string& panel : panels) {
         ImGui::DockBuilderDockWindow(PanelWindowName(panel, ActiveWorkspace()).c_str(), node);
+      }
+      // The group's first panel goes in front once its window is up (ImGui shows the last one made).
+      if (!panels.empty()) {
+        mFrontPanels.push_back(PanelWindowName(panels.front(), ActiveWorkspace()));
       }
     };
     // Left and right columns (each split in two when the workspace has a lower part), then the bottom row under the
@@ -592,6 +622,7 @@ namespace faf::editor
       {"Properties", &EdShell::mShowProperties},
       {kMapWindow, &EdShell::mShowMap},
       {kInfoWindow, &EdShell::mShowInfo},
+      {"Layers", &EdShell::mShowLayers},
       {kMarkersWindow, &EdShell::mShowMarkers},
       {kCheckWindow, &EdShell::mShowCheck},
       {"Armies", &EdShell::mShowArmies},

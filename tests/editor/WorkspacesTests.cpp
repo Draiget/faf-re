@@ -81,8 +81,13 @@ namespace
     EXPECT_EQ(JoinPanelList({"Tools", "Log"}), "Tools,Log");
     EXPECT_EQ(
       DefaultPanels(0),
-      (std::vector<std::string>{"Tools", "Properties", "Map", "Info", "Markers", "Check", "Problems", "Log", "History"})
-    ) << "Terrain starts as the editor did before workspaces, with Problems and History beside the Log";
+      (std::vector<std::string>{
+        "Tools", "Layers", "Info", "Properties", "Problems", "Log", "History", "Markers", "Check", "Map"
+      })
+    ) << "Terrain: the tool at the left, Layers and Info at the right with Properties under them, the rest below";
+    // A layout saved before Terrain's changed is laid out again once; the others keep theirs.
+    EXPECT_EQ(faf::editor::LayoutVersionOf("terrain"), 2);
+    EXPECT_EQ(faf::editor::LayoutVersionOf("objects"), 1);
     const std::vector<std::string> mission = DefaultPanels(5);
     EXPECT_NE(std::find(mission.begin(), mission.end(), "ScriptEditor"), mission.end()) << "ids, not window names";
     EXPECT_TRUE(DefaultPanels(42).empty());

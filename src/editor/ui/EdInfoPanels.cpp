@@ -176,11 +176,14 @@ namespace faf::editor
       ImGui::SetNextWindowDockID(map->DockId, ImGuiCond_FirstUseEver);
     }
     // A map that starts opening (the Map panel's button, `/open`) brings this tab to the front once, after the
-    // first frames: on those the saved layout picks each dock's front tab and would override it.
+    // first frames: on those the saved layout picks each dock's front tab and would override it. Not where the
+    // Layers panel shows (Terrain): the layers stay in front there, as the mockup has them.
     if (!mDocument.Path().empty() && mDocument.Path() != mInfoShownFor && ImGui::GetFrameCount() > 3) {
       mInfoShownFor = mDocument.Path();
       mShowInfo = true;
-      ImGui::SetNextWindowFocus();
+      if (!mShowLayers) {
+        ImGui::SetNextWindowFocus();
+      }
     }
     if (!ImGui::Begin(Panel(kInfoWindow), &mShowInfo)) {
       ImGui::End();

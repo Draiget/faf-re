@@ -1196,6 +1196,8 @@ namespace faf::editor
      * button. True when a tool was picked.
      */
     bool DrawStrip(float width);
+    /** The Layers panel (the right dock): the shader, the ten layers, the paint layer, moving one. */
+    void DrawLayersPanel();
     /** The symmetry the brushes and the check use (the Terrain panel's tiles: 0 None ... 9 N-way). */
     [[nodiscard]] int SymmetryIndex() const noexcept
     {
