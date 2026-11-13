@@ -425,7 +425,7 @@ set_target_properties(existing_tests PROPERTIES FOLDER "Tests/Existing")
 
 add_subdirectory(vulkan)
 
-# Water effect source patch (src/moho/terrain/water/WaterEffectPatch): pure C++, compiled on its own. FAF_STOCK_FX_DIR (the folder with FAF's
+# Water effect source patches (src/moho/terrain/water/WaterEffectPatch, WaterReflectionPatch): pure C++, compiled on its own. FAF_STOCK_FX_DIR (the folder with FAF's
 # stock water2.fx) switches on the checks against the real shader.
 #
 #   cmake --build --preset clang-x64-release --target faf_water_tests
