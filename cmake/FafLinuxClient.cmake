@@ -103,6 +103,9 @@ set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
 set(SDL3_INCLUDE_DIRS "${FAF_DEPENDENCIES_DIR}/SDL3/include")
 set(SDL3_LIBRARIES SDL3-static)
 add_subdirectory("${FAF_DEPENDENCIES_DIR}/FAudio" "${CMAKE_BINARY_DIR}/deps/FAudio" EXCLUDE_FROM_ALL SYSTEM)
+# FAudio is a pinned dependency: warnings from its own sources stay out of the build log, as FFmpeg's and
+# Wild Magic's do on Windows (cmake/FafWarnings.cmake).
+target_compile_options(FAudio-static PRIVATE -w)
 
 # Lowercase spellings of POSIX stand-in headers the client includes (the file system is
 # case-sensitive here, and a Windows checkout can't hold both spellings), as FafLinux.cmake writes
@@ -219,8 +222,9 @@ ExternalProject_Add(faf_ffmpeg_build
   CONFIGURE_COMMAND "${_faf_ffmpeg}/configure" --prefix=<INSTALL_DIR>
     "--cc=${CMAKE_C_COMPILER}" "--ar=${CMAKE_AR}" "--ranlib=${CMAKE_RANLIB}" "--nm=${CMAKE_NM}"
     --enable-pic --disable-autodetect --pkg-config=false
-    # hypot bound to the version glibc 2.34 has (see the header).
-    "--extra-cflags=-include ${PROJECT_SOURCE_DIR}/cmake/deps/ffmpeg-linux-glibc.h"
+    # hypot bound to the version glibc 2.34 has (see the header); -w keeps FFmpeg's own warnings out of
+    # the build log, as on Windows (cmake/FafWarnings.cmake).
+    "--extra-cflags=-w -include ${PROJECT_SOURCE_DIR}/cmake/deps/ffmpeg-linux-glibc.h"
     --disable-x86asm --disable-everything --disable-programs --disable-doc --disable-network
     --enable-static --disable-shared
     --enable-avcodec --enable-avformat --enable-avutil --enable-swscale --enable-swresample
