@@ -335,8 +335,7 @@ namespace faf::editor
       if (mTools->EditingBorder()) {
         float gx = 0.0f;
         float gz = 0.0f;
-        const int hot =
-          GroundAt(static_cast<float>(mCursor.x), static_cast<float>(mCursor.y), gx, gz) ? BorderEdgesAt(gx, gz) : 0;
+        const int hot = CursorGround(gx, gz) ? BorderEdgesAt(gx, gz) : 0;
         constexpr std::uint32_t kHot = 0xFFFFE040u;
         const auto litEdge = [&](const float ax, const float az, const float bx, const float bz) {
           for (const float lift : {1.0f, 1.4f, 1.8f}) {
@@ -401,7 +400,7 @@ namespace faf::editor
     if (mTools->ShowGrid()) {
       float gx = 0.0f;
       float gz = 0.0f;
-      if (GroundAt(static_cast<float>(mCursor.x), static_cast<float>(mCursor.y), gx, gz)) {
+      if (CursorGround(gx, gz)) {
         const float step = mTools->GridStep();
         const int reach = std::max(4, static_cast<int>(std::ceil(28.0f / step)));
         const float radius = static_cast<float>(reach) * step;
@@ -842,6 +841,7 @@ namespace faf::editor
       // With `/selectprops` the cursor stays clear of them, at the view's top left corner (nothing outlined for hover).
       mCursor =
         mTestSelectNearest > 0 ? POINT{20, 20} : POINT{static_cast<LONG>(screen.x), static_cast<LONG>(screen.y)};
+      mCursorInView = true; // a test run's cursor, as a real one over the view
     }
     // `/hovermarker` (test runs): the cursor on that marker, as a real mouse over it would be.
     if (!mTestHover.empty() && mCamera != nullptr) {
@@ -872,6 +872,7 @@ namespace faf::editor
         if (marker.name == mTestHover && ShownMarkerPosition(marker, x, y, z)) {
           const Wm3::Vector2f at = mCamera->Project(Wm3::Vec3f{x, y, z});
           mCursor = POINT{static_cast<LONG>(at.x), static_cast<LONG>(at.y)};
+          mCursorInView = true;
         }
       }
     }
@@ -884,7 +885,7 @@ namespace faf::editor
     ) {
       float mx = 0.0f;
       float mz = 0.0f;
-      if (GroundAt(static_cast<float>(mCursor.x), static_cast<float>(mCursor.y), mx, mz)) {
+      if (CursorGround(mx, mz)) {
         const std::vector<SaveEntry>& markers = mDocument.SaveData().Markers();
         const int hit = PickMarker(mx, mz);
         if (hit >= 0 && static_cast<std::size_t>(hit) < markers.size()) {
@@ -1039,7 +1040,7 @@ namespace faf::editor
 
     float groundX = 0.0f;
     float groundZ = 0.0f;
-    if (!GroundAt(static_cast<float>(mCursor.x), static_cast<float>(mCursor.y), groundX, groundZ)) {
+    if (!CursorGround(groundX, groundZ)) {
       batcher->Flush();
       return;
     }
@@ -1194,10 +1195,7 @@ namespace faf::editor
     float groundX = 0.0f;
     float groundZ = 0.0f;
     moho::CHeightField* const field = mMap->mTerrainRes->GetHeightField();
-    if (
-      mTools == nullptr || field == nullptr ||
-      !GroundAt(static_cast<float>(mCursor.x), static_cast<float>(mCursor.y), groundX, groundZ)
-    ) {
+    if (mTools == nullptr || field == nullptr || !CursorGround(groundX, groundZ)) {
       return;
     }
     HeightBrush brush = mTools->CurrentHeightBrush();
@@ -1314,7 +1312,7 @@ namespace faf::editor
     if (mMap != nullptr && mDocument.Heights().Stroking()) {
       float groundX = 0.0f;
       float groundZ = 0.0f;
-      if (GroundAt(static_cast<float>(mCursor.x), static_cast<float>(mCursor.y), groundX, groundZ)) {
+      if (CursorGround(groundX, groundZ)) {
         const float now = mMap->mTerrainRes->GetHeightAt(
           static_cast<std::int32_t>(std::lround(groundX)), static_cast<std::int32_t>(std::lround(groundZ))
         );
@@ -2280,10 +2278,7 @@ namespace faf::editor
     float groundZ = 0.0f;
     EdDocument::MaskGrid& masks = mDocument.Masks();
     const moho::CHeightField* const field = mMap->mTerrainRes->GetHeightField();
-    if (
-      mTools == nullptr || field == nullptr || masks.texels.empty() ||
-      !GroundAt(static_cast<float>(mCursor.x), static_cast<float>(mCursor.y), groundX, groundZ)
-    ) {
+    if (mTools == nullptr || field == nullptr || masks.texels.empty() || !CursorGround(groundX, groundZ)) {
       return;
     }
     MaskBrush brush = mTools->CurrentMaskBrush();
@@ -3017,10 +3012,8 @@ namespace faf::editor
       float groundZ = 0.0f;
       const moho::CHeightField* const heights = mMap->mTerrainRes->GetHeightField();
       if (
-        heights != nullptr &&
-        GroundAt(static_cast<float>(mCursor.x), static_cast<float>(mCursor.y), groundX, groundZ) && groundX >= 0.0f &&
-        groundZ >= 0.0f && groundX < static_cast<float>(heights->width - 1) &&
-        groundZ < static_cast<float>(heights->height - 1)
+        heights != nullptr && CursorGround(groundX, groundZ) && groundX >= 0.0f && groundZ >= 0.0f &&
+        groundX < static_cast<float>(heights->width - 1) && groundZ < static_cast<float>(heights->height - 1)
       ) {
         if (mRuling) {
           if ((::GetKeyState(VK_LBUTTON) & 0x8000) != 0) {
@@ -3154,9 +3147,8 @@ namespace faf::editor
       const std::uint8_t* const cells = mDocument.TerrainTypeCells(width, height);
       int under = -1;
       if (
-        cells != nullptr && GroundAt(static_cast<float>(mCursor.x), static_cast<float>(mCursor.y), groundX, groundZ) &&
-        groundX >= 0.0f && groundZ >= 0.0f && groundX < static_cast<float>(width) &&
-        groundZ < static_cast<float>(height)
+        cells != nullptr && CursorGround(groundX, groundZ) && groundX >= 0.0f && groundZ >= 0.0f &&
+        groundX < static_cast<float>(width) && groundZ < static_cast<float>(height)
       ) {
         under = cells
           [static_cast<std::size_t>(groundZ) * static_cast<std::size_t>(width) + static_cast<std::size_t>(groundX)];
@@ -3169,7 +3161,7 @@ namespace faf::editor
     ) {
       float groundX = 0.0f;
       float groundZ = 0.0f;
-      if (GroundAt(static_cast<float>(mCursor.x), static_cast<float>(mCursor.y), groundX, groundZ)) {
+      if (CursorGround(groundX, groundZ)) {
         if (mTools->CurrentPropMode() == EdTools::PropMode::Erase || (::GetKeyState(VK_SHIFT) & 0x8000) != 0) {
           EraseProps(groundX, groundZ);
         } else {
@@ -3605,7 +3597,7 @@ namespace faf::editor
     } else if (key == 'V') {
       float groundX = 0.0f;
       float groundZ = 0.0f;
-      if (GroundAt(static_cast<float>(mCursor.x), static_cast<float>(mCursor.y), groundX, groundZ)) {
+      if (CursorGround(groundX, groundZ)) {
         PasteAt(groundX, groundZ);
       }
     }
@@ -4034,10 +4026,7 @@ namespace faf::editor
     int height = 0;
     std::uint8_t* const cells = mDocument.TerrainTypeCells(width, height);
     const moho::CHeightField* const field = mMap->mTerrainRes->GetHeightField();
-    if (
-      mTools == nullptr || cells == nullptr || field == nullptr ||
-      !GroundAt(static_cast<float>(mCursor.x), static_cast<float>(mCursor.y), groundX, groundZ)
-    ) {
+    if (mTools == nullptr || cells == nullptr || field == nullptr || !CursorGround(groundX, groundZ)) {
       return;
     }
     const HeightBrush brush = mTools->CurrentHeightBrush();
@@ -5292,7 +5281,7 @@ namespace faf::editor
   {
     float gx = 0.0f;
     float gz = 0.0f;
-    if (mMap == nullptr || !GroundAt(static_cast<float>(mCursor.x), static_cast<float>(mCursor.y), gx, gz)) {
+    if (mMap == nullptr || !CursorGround(gx, gz)) {
       return {};
     }
     const PickHit hit = PickAnything(mCursor);
@@ -6454,7 +6443,7 @@ namespace faf::editor
     }
     float gx = 0.0f;
     float gz = 0.0f;
-    if (mDragDecals || !GroundAt(static_cast<float>(mCursor.x), static_cast<float>(mCursor.y), gx, gz)) {
+    if (mDragDecals || !CursorGround(gx, gz)) {
       mDecalPathPreview = 0;
       return;
     }
@@ -6817,8 +6806,7 @@ namespace faf::editor
     if (
       field == nullptr || mTools == nullptr || !mTools->PropsToolActive() ||
       mTools->CurrentPropMode() != EdTools::PropMode::Single || mTools->PropBlueprint().empty() ||
-      (::GetKeyState(VK_SHIFT) & 0x8000) != 0 ||
-      !GroundAt(static_cast<float>(mCursor.x), static_cast<float>(mCursor.y), gx, gz)
+      (::GetKeyState(VK_SHIFT) & 0x8000) != 0 || !CursorGround(gx, gz)
     ) {
       hide();
       return;
@@ -7485,6 +7473,14 @@ namespace faf::editor
     mMiniRect[2] = 0.0f;
   }
 
+  bool EdMapScene::CursorGround(
+    float& x,
+    float& z
+  ) const
+  {
+    return mCursorInView && GroundAt(static_cast<float>(mCursor.x), static_cast<float>(mCursor.y), x, z);
+  }
+
   bool EdMapScene::GroundAt(
     const float x,
     const float y,
@@ -7588,6 +7584,7 @@ namespace faf::editor
     const POINT at{GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
     if (message == WM_MOUSEMOVE || message == WM_LBUTTONDOWN || message == WM_RBUTTONDOWN) {
       mCursor = at;
+      mCursorInView = true; // the view's own message
     }
     switch (message) {
     case WM_LBUTTONDOWN: {

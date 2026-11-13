@@ -378,6 +378,13 @@ namespace faf::editor
 
     /** The game viewport window's messages while attached; true when the scene used one. */
     bool OnWindowMessage(HWND window, UINT message, WPARAM wParam, LPARAM lParam);
+    /** Whether the real cursor is over the view this frame (the app's MouseOverView): the cursor's rings show then. */
+    void SetCursorInView(
+      const bool inView
+    ) noexcept
+    {
+      mCursorInView = inView;
+    }
 
   private:
     void Attach(moho::CWldMap& map);
@@ -848,6 +855,10 @@ namespace faf::editor
     std::unique_ptr<RingHook> mRingHook;
     float mFlattenTo = 0.0f;
     POINT mCursor{};
+    // Whether the cursor is over the view now (the app's each frame; mouse messages and test runs that place it).
+    bool mCursorInView = false;
+    /** The ground under the cursor, only while it is over the view. */
+    [[nodiscard]] bool CursorGround(float& x, float& z) const;
 
     // Held movement keys (WASD and the arrows), and Shift for speed.
     bool mForward = false;

@@ -3540,6 +3540,7 @@ namespace faf::editor
           againDone = false;
         }
       }
+      mScene.SetCursorInView(MouseOverView());
       mScene.Update(
         frameSeconds,
         playIdle,
