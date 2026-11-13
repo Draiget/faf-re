@@ -25,7 +25,7 @@ set(_faf_client_only_patterns
   "^moho/terrain/"
   "^moho/mesh/"
   # Particle and beam drawing (the particle buffers the sim fills stay).
-  "^moho/particles/(BeamRenderHelpers|ParticleRenderBuckets|ParticleRenderWorkItem|CWorldParticles)\\.cpp$"
+  "^moho/particles/(BeamRenderHelpers|ParticleRenderBuckets|ParticleRenderWorkItem|CWorldParticles|ParticleEffectPatch|ParticleLowRes)\\.cpp$"
   # Audio output (the sim's sound manager and parameters stay).
   "^moho/audio/(AudioEngine|AudioOutputWatch|CUserSoundManager|IUserSoundManager|XactClock|SofdecRuntime|SoundEngineResolve)\\.cpp$"
   # The script debugger's windows (Dear ImGui, issue #413).

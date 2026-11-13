@@ -725,6 +725,26 @@ if(FAFRE_PLATFORM_WINDOWS)
   set_tests_properties(dxgi_swap_chain_policy PROPERTIES LABELS "Existing")
 endif()
 
+# Engine addition: the particle.fx source patch of the low-resolution and soft particles (src/moho/particles/ParticleEffectPatch): pure text,
+# no engine objects. FAF_STOCK_FX_DIR (a folder with FAF's particle.fx) switches on the check of the real file.
+add_executable(faf_particle_tests EXCLUDE_FROM_ALL particles/ParticleEffectPatchTests.cpp
+  ${CMAKE_SOURCE_DIR}/src/moho/particles/ParticleEffectPatch.cpp)
+target_include_directories(faf_particle_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_compile_features(faf_particle_tests PRIVATE cxx_std_20)
+target_link_libraries(faf_particle_tests PRIVATE gtest_main)
+set_target_properties(faf_particle_tests PROPERTIES FOLDER "Tests/Render")
+add_test(NAME particle_effect_patch COMMAND faf_particle_tests)
+set_tests_properties(particle_effect_patch PROPERTIES LABELS "Render")
+
+# Engine addition: the stratum mask size rules (src/moho/terrain/StratumMaskSize.h), header-only.
+add_executable(faf_stratum_mask_tests EXCLUDE_FROM_ALL terrain/StratumMaskSizeTests.cpp)
+target_include_directories(faf_stratum_mask_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_compile_features(faf_stratum_mask_tests PRIVATE cxx_std_20)
+target_link_libraries(faf_stratum_mask_tests PRIVATE gtest_main)
+set_target_properties(faf_stratum_mask_tests PROPERTIES FOLDER "Tests/Render")
+add_test(NAME stratum_mask_size COMMAND faf_stratum_mask_tests)
+set_tests_properties(stratum_mask_size PROPERTIES LABELS "Render")
+
 # Every GoogleTest executable above and in the subdirectories. Keep this last: it sees only the
 # targets defined before it, so a test added below it is never built by faf_tests and ctest
 # reports it as Not Run.
