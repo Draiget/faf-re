@@ -424,6 +424,44 @@ namespace faf::editor
     DrawSymmetryIcon(draw, mode, mNWay, p, s);
   }
 
+  const char* EdTools::HudMode() const noexcept
+  {
+    // By HeightBrushMode, as the panel's tiles name them.
+    static constexpr const char* kModes[] = {
+      "Raise",
+      "Lower",
+      "Smooth",
+      "Flatten",
+      "Noise",
+      "Set height",
+      "Terrace",
+      "Plane",
+      "Stamp",
+      "Erode",
+      "Water erode",
+      "Rain",
+      "Deposit",
+      "Plateau",
+      "Sharpen",
+    };
+    if (mTool != 1 || mBrushMode < 0 || mBrushMode >= static_cast<int>(std::size(kModes))) {
+      return nullptr;
+    }
+    return kModes[mBrushMode];
+  }
+
+  int EdTools::HudCopies() const noexcept
+  {
+    // The brushes mirror (terrain heights, texture paint).
+    if (mTool != 1 && mTool != 2) {
+      return 1;
+    }
+    if (mSymmetry < 0 || mSymmetry >= static_cast<int>(IM_ARRAYSIZE(kSymmetry))) {
+      return 1;
+    }
+    return kSymmetry[mSymmetry].copies > 0 ? kSymmetry[mSymmetry].copies : mNWay;
+  }
+
   const char* EdTools::SymmetryName(
     const int mode
   ) noexcept

@@ -1208,6 +1208,10 @@ namespace faf::editor
       mSymmetry = mode;
     }
     [[nodiscard]] static const char* SymmetryName(int mode) noexcept;
+    /** The view's HUD: the terrain brush's mode by name ("Raise"), or null for the other tools. */
+    [[nodiscard]] const char* HudMode() const noexcept;
+    /** The view's HUD: how many copies an edit makes (the symmetry's), 1 for tools that don't mirror. */
+    [[nodiscard]] int HudCopies() const noexcept;
     /** A symmetry's picture (its tile's) in the square at `p`, `s` wide. */
     void DrawSymmetryPicture(ImDrawList* draw, int mode, ImVec2 p, float s) const;
     /** The key each tool's command has (Settings > Keys), shown in the strip's corner and its tooltip. */

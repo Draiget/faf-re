@@ -446,6 +446,17 @@ namespace faf::editor
     if (mShowDemo) {
       ImGui::ShowDemoWindow(&mShowDemo);
     }
+    // The view's overlays: a map open, its view showing (not the start screen, not the effect or material stage).
+    {
+      const std::string key = Workspaces()[static_cast<std::size_t>(ActiveWorkspace())].key;
+      const bool stage = key == "effects" || key == "materials";
+      if (
+        panels && !mShowHome && !stage && mDocument.GetState() == EdDocument::State::Open &&
+        (!playing || mEditorViewInPlay) && mGameView.z > Em(320.0f) && mGameView.w > Em(200.0f)
+      ) {
+        DrawViewOverlays();
+      }
+    }
     DrawSaveAsDialog();
     DrawHome(top, statusHeight);
     DrawHelpWindow();
@@ -682,7 +693,8 @@ namespace faf::editor
           ink = withAlpha(ink, inkAlpha);
         }
         float x = at.x + (label != nullptr ? pad : (width - iconSize.x) * 0.5f);
-        const float y = at.y + (buttonHeight - fontSize) * 0.5f;
+        // Segoe UI's capitals centre 0.55 of the size below the line's top: that point on the button's middle.
+        const float y = std::round(at.y + buttonHeight * 0.5f - fontSize * 0.55f);
         if (icon != nullptr) {
           draw->AddText(ImVec2(std::round(x), std::round(y)), ink, icon);
           x += iconSize.x + gap;
@@ -716,10 +728,15 @@ namespace faf::editor
         const char* const word = playing ? "Stop" : "Play";
         const ImVec2 iconSize = ImGui::CalcTextSize(icon);
         const ImVec2 wordSize = ImGui::CalcTextSize(word);
-        const ImVec2 keySize = ImGui::CalcTextSize("F5");
-        const float pad = Em(10.0f);
-        const float width =
-          std::round(pad + iconSize.x + Em(6.0f) + wordSize.x + Em(8.0f) + keySize.x + Em(8.0f) + pad * 0.6f);
+        const float pad = Em(11.0f);
+        const float keyFont = fontSize * 0.85f;
+        const ImVec2 keyText = font->CalcTextSizeA(keyFont, FLT_MAX, 0.0f, "F5");
+        const float capWidth = std::round(keyText.x + Em(10.0f));
+        // The same room at both ends (the cap ended nearer the edge than the icon began).
+        const float width = std::round(
+          pad - std::round(iconSize.y * 7.0f / 24.0f * 0.8f) + iconSize.x + Em(6.0f) + wordSize.x + Em(9.0f) +
+          capWidth + pad
+        );
         const ImVec2 at = ImGui::GetCursorScreenPos();
         const bool clicked = ImGui::InvisibleButton("##playstop", ImVec2(width, buttonHeight)) && canPlay;
         const bool hovered = canPlay && ImGui::IsItemHovered();
@@ -761,8 +778,9 @@ namespace faf::editor
         draw->AddLine(
           ImVec2(splitAt.x + 0.5f, splitAt.y), ImVec2(splitAt.x + 0.5f, splitAt.y + buttonHeight), IM_COL32(0, 0, 0, 46)
         );
-        const float y = std::round(at.y + (buttonHeight - fontSize) * 0.5f);
-        float x = at.x + pad;
+        const float y = std::round(at.y + buttonHeight * 0.5f - fontSize * 0.55f);
+        // The play glyph has empty space at its left (7 of 24 units): it counts toward the padding.
+        float x = at.x + pad - std::round(iconSize.y * 7.0f / 24.0f * 0.8f);
         draw->AddText(ImVec2(x, y), onBase, icon);
         x += iconSize.x + Em(6.0f);
         if (gBoldFont != nullptr) {
@@ -770,20 +788,22 @@ namespace faf::editor
         } else {
           draw->AddText(ImVec2(x, y), onBase, word);
         }
-        x += wordSize.x + Em(8.0f);
+        x += wordSize.x + Em(9.0f);
         // The key on an outlined cap, as the mockup's kbd.
-        const ImVec2 capMin(std::round(x - Em(4.0f)), std::round(at.y + Em(5.0f)));
-        const ImVec2 capMax(std::round(x + keySize.x + Em(4.0f)), std::round(at.y + buttonHeight - Em(5.0f)));
+        // The cap on the words' line (centred on their capitals, as the icon is), not on the button's middle.
+        const float lineMid = y + fontSize * 0.55f;
+        const float capHalf = std::round((buttonHeight - Em(10.0f)) * 0.5f);
+        const ImVec2 capMin(std::round(x), std::round(lineMid - capHalf));
+        const ImVec2 capMax(std::round(x + capWidth), std::round(lineMid + capHalf));
         draw->AddRect(capMin, capMax, IM_COL32(0, 0, 0, 64), Em(3.0f));
-        // Its capitals on the cap's middle (Segoe UI's sit 0.55 of the size below the line's top).
-        const float keyFont = fontSize * 0.85f;
-        const ImVec2 keyText = font->CalcTextSizeA(keyFont, FLT_MAX, 0.0f, "F5");
+        // Its capitals on the cap's middle: at this smaller size they sit 0.63 of it below the line's top (measured
+        // on a capture; 0.55 left them 1.3 px low).
         draw->AddText(
           font,
           keyFont,
           ImVec2(
             std::round(capMin.x + (capMax.x - capMin.x - keyText.x) * 0.5f),
-            std::round((capMin.y + capMax.y) * 0.5f - keyFont * 0.55f)
+            std::round((capMin.y + capMax.y) * 0.5f - keyFont * 0.63f)
           ),
           onBase,
           "F5"
@@ -925,14 +945,8 @@ namespace faf::editor
       }
       group();
 
-      // The build grid, snapping, keeping things on the ground, the slope overlay.
-      if (button("##grid", ICON_GRID, "Grid", mTools.ShowGrid())) {
-        mTools.SetShowGrid(!mTools.ShowGrid());
-      }
-      tip(
-        "The build grid on the ground around the cursor: cells of the step's size, one unit being the cell units are "
-        "built on"
-      );
+      // Snapping to the build grid and its step, keeping things on the ground.
+      // Grid and Slope change what the view shows: they are the view's pills (DrawViewOverlays), not here twice.
       if (button("##snap", ICON_MAGNET, "Snap", mTools.SnapToGrid())) {
         mTools.SetSnapToGrid(!mTools.SnapToGrid());
       }
@@ -984,17 +998,10 @@ namespace faf::editor
         "The move arrows keep markers and props on the ground when they move across it; off, they keep their height. "
         "Nothing is moved under the ground either way."
       );
-      if (button("##slope", ICON_SLOPE, "Slope", mTools.ShowSlope())) {
-        mTools.SetShowSlope(!mTools.ShowSlope());
-      }
-      tip(
-        "Each cell's slope as the game's pathing reads it (its steepest edge): yellow above 0.25 (too steep to build "
-        "on), orange above 0.5, red above 0.75 (steeper than most land units climb)"
-      );
       group();
 
       // What the view shows, one toggle per kind (Blender's object type visibility); hidden things aren't picked.
-      if (button("##border", ICON_FRAME, nullptr, mTools.EditingBorder())) {
+      if (button("##border", ICON_AREA, nullptr, mTools.EditingBorder())) {
         mTools.EditingBorder() = !mTools.EditingBorder();
         mShowProperties = mShowProperties || mTools.EditingBorder();
       }
@@ -1002,61 +1009,6 @@ namespace faf::editor
         mTools.EditingBorder() ? "Map border: on. Drag its edges in the view; its settings are in the Properties panel"
                                : "Map border (the playable area): edit it from any tool"
       );
-      // Shown: the icon as any; hidden: dimmed (Blender's visibility toggles).
-      constexpr float kHidden = 0.32f;
-      if (button("##showprops", ICON_TREE, nullptr, false, true, mTools.ShowProps() ? 1.0f : kHidden)) {
-        mTools.ShowProps() = !mTools.ShowProps();
-      }
-      tip(
-        mTools.ShowProps() ? "Props shown (trees, rocks, wrecks): click to hide them"
-                           : "Props hidden: click to show them"
-      );
-      if (button("##showunits", ICON_UNIT, nullptr, false, true, mTools.ShowUnits() ? 1.0f : kHidden)) {
-        mTools.ShowUnits() = !mTools.ShowUnits();
-      }
-      tip(
-        mTools.ShowUnits() ? "Units shown (the armies' and civilians' units): click to hide them"
-                           : "Units hidden: click to show them"
-      );
-      // Markers by the palette's groups: shown while none of the group's types is hidden; a click shows or hides all
-      // of them.
-      struct MarkerGroup
-      {
-        const char* group;
-        const char* icon;
-        const char* what;
-      };
-      static constexpr MarkerGroup kGroups[] = {
-        {"Resources", ICON_STATS, "Mass and hydrocarbon markers"},
-        {"Starts", ICON_FLAG, "Start positions"},
-        {"AI", ICON_COMPASS, "AI markers (expansions, rally points, defensive points...)"},
-        {"Path nodes", ICON_PATH, "Path nodes and their links (land, air, water, amphibious)"},
-        {"Other", ICON_PIN, "Other markers (camera, weather, effects...)"},
-      };
-      std::set<std::string>& hidden = mTools.HiddenMarkerTypes();
-      for (const MarkerGroup& markerGroup : kGroups) {
-        bool shown = true;
-        for (const MarkerType& type : MarkerTypes()) {
-          shown = shown && (std::string(markerGroup.group) != type.group || hidden.count(type.type) == 0);
-        }
-        if (button(markerGroup.group, markerGroup.icon, nullptr, false, true, shown ? 1.0f : kHidden)) {
-          for (const MarkerType& type : MarkerTypes()) {
-            if (std::string(markerGroup.group) == type.group) {
-              if (shown) {
-                hidden.insert(type.type);
-              } else {
-                hidden.erase(type.type);
-              }
-            }
-          }
-        }
-        if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) {
-          ImGui::SetTooltip(
-            "%s %s: click to %s them", markerGroup.what, shown ? "shown" : "hidden", shown ? "hide" : "show"
-          );
-        }
-      }
-
       // At the right: Check and Release, then the panels' scale.
       const float scaleWidth = DrawUiScaleButtons(true);
       const auto width = [&](const char* const icon, const char* const label) {
@@ -1166,6 +1118,189 @@ namespace faf::editor
     ImGui::End();
     ImGui::PopStyleColor();
     ImGui::PopStyleVar(3);
+  }
+
+  void EdShell::DrawViewOverlays()
+  {
+    // The mockup's view overlays (styles.css .vp-header .pill-group, .vp-hud): dark see-through pill bars at the
+    // view's top-left, the tool's line at its bottom. They are floating windows, so the mouse over them is theirs
+    // (EdApp cuts them out of the view's input).
+    const ImGuiViewport* const viewport = ImGui::GetMainViewport();
+    const ImVec2 view(viewport->Pos.x + mGameView.x, viewport->Pos.y + mGameView.y);
+    const ImVec2 viewSize(mGameView.z, mGameView.w);
+    const ImU32 ground = IM_COL32(13, 16, 20, 184);
+    const ImU32 edge = IM_COL32(255, 255, 255, 18);
+    const ImU32 ink = IM_COL32(0xD6, 0xDD, 0xE6, 0xFF);
+    constexpr ImGuiWindowFlags kFlags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize |
+      ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoDocking |
+      ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav;
+    const float margin = std::round(Em(8.0f));
+    const float pillHeight = std::round(Em(28.0f));
+    const float fontSize = ImGui::GetFontSize();
+
+    const auto begin = [&](const char* const id, const ImVec2 at, const ImVec2 pivot) {
+      ImGui::SetNextWindowPos(at, ImGuiCond_Always, pivot);
+      ImGui::SetNextWindowViewport(viewport->ID);
+      ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(Em(3.0f), Em(3.0f)));
+      ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, Em(9.0f));
+      ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 1.0f);
+      ImGui::PushStyleVar(ImGuiStyleVar_WindowMinSize, ImVec2(1.0f, 1.0f));
+      ImGui::PushStyleColor(ImGuiCol_WindowBg, ImGui::ColorConvertU32ToFloat4(ground));
+      ImGui::PushStyleColor(ImGuiCol_Border, ImGui::ColorConvertU32ToFloat4(edge));
+      const bool shown = ImGui::Begin(id, nullptr, kFlags);
+      ImGui::PopStyleColor(2);
+      ImGui::PopStyleVar(4);
+      ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(Em(2.0f), 0.0f));
+      return shown;
+    };
+    const auto end = [] {
+      ImGui::PopStyleVar();
+      ImGui::End();
+    };
+    // A pill (.pill-group button): an icon and maybe a word; on, the accent's fill and white words.
+    const auto pill = [&](const char* const id, const char* const icon, const char* const label, const bool on) {
+      const ImVec2 iconSize = ImGui::CalcTextSize(icon);
+      const ImVec2 labelSize = label != nullptr ? ImGui::CalcTextSize(label) : ImVec2(0.0f, 0.0f);
+      const float pad = Em(9.0f);
+      const float gap = label != nullptr ? Em(6.0f) : 0.0f;
+      const float width = std::round(pad * 2.0f + iconSize.x + gap + labelSize.x);
+      const ImVec2 at = ImGui::GetCursorScreenPos();
+      ImGui::PushID(id);
+      const bool clicked = ImGui::InvisibleButton("##pill", ImVec2(width, pillHeight));
+      const bool hovered = ImGui::IsItemHovered();
+      ImGui::PopID();
+      ImDrawList* const dl = ImGui::GetWindowDrawList();
+      const ImVec2 to(at.x + width, at.y + pillHeight);
+      if (on) {
+        dl->AddRectFilled(at, to, AccentU32(hovered ? 0.34f : 0.25f), Em(7.0f));
+      } else if (hovered) {
+        dl->AddRectFilled(at, to, IM_COL32(255, 255, 255, 20), Em(7.0f));
+      }
+      const ImU32 words = on ? IM_COL32_WHITE : ink;
+      // The capitals on the pill's middle (Segoe UI's centre 0.55 of the size below the line's top).
+      const float y = std::round(at.y + pillHeight * 0.5f - fontSize * 0.55f);
+      dl->AddText(ImVec2(std::round(at.x + pad), y), words, icon);
+      if (label != nullptr) {
+        dl->AddText(ImVec2(std::round(at.x + pad + iconSize.x + gap), y), words, label);
+      }
+      ImGui::SameLine();
+      return clicked;
+    };
+    const auto tip = [](const char* const words) {
+      if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) {
+        ImGui::SetTooltip("%s", words);
+      }
+    };
+
+    // The top-left: the camera, then what the view shows.
+    float x = view.x + margin;
+    if (begin("##viewcamera", ImVec2(x, view.y + margin), ImVec2(0.0f, 0.0f))) {
+      if (pill("camera", ICON_CAMERA, "Camera", false)) {
+        ImGui::OpenPopup("##cameramenu");
+      }
+      tip("The camera: WASD moves, the right button turns, the wheel zooms");
+      if (pill("frame", ICON_FRAME, nullptr, false) && mCommands != nullptr) {
+        (void)mCommands->Run("view.frame");
+      }
+      tip("Frame the whole map (Home)");
+      if (ImGui::BeginPopup("##cameramenu")) {
+        if (ImGui::MenuItem("Frame the whole map", "Home") && mCommands != nullptr) {
+          (void)mCommands->Run("view.frame");
+        }
+        ImGui::Separator();
+        ImGui::TextDisabled("WASD moves, the right button turns, the wheel zooms");
+        ImGui::EndPopup();
+      }
+      x += ImGui::GetWindowWidth() + Em(6.0f);
+    }
+    end();
+    if (begin("##viewshows", ImVec2(x, view.y + margin), ImVec2(0.0f, 0.0f))) {
+      if (pill("grid", ICON_GRID, "Grid", mTools.ShowGrid())) {
+        mTools.SetShowGrid(!mTools.ShowGrid());
+      }
+      tip("The build grid on the ground around the cursor");
+      if (pill("slope", ICON_SLOPE, "Slope", mTools.ShowSlope())) {
+        mTools.SetShowSlope(!mTools.ShowSlope());
+      }
+      tip("Each cell's slope as the game's pathing reads it: yellow, orange, red as it gets steeper");
+      if (pill("weight", ICON_LAYERS, "Weight", mTools.ShowLayerWeight())) {
+        mTools.SetShowLayerWeight(!mTools.ShowLayerWeight());
+      }
+      tip("The paint layer's weight on the terrain");
+      if (pill("pathing", ICON_PATH, "Pathing", mTools.ShowPathing())) {
+        mTools.ShowPathing() = !mTools.ShowPathing();
+      }
+      tip("Where units can go: the land unit's or the ship's pathing (the layer is in the Check panel)");
+      // Markers by the palette's groups: Paths are the path nodes, Markers the rest.
+      std::set<std::string>& hidden = mTools.HiddenMarkerTypes();
+      const auto groupShown = [&](const bool paths) {
+        for (const MarkerType& type : MarkerTypes()) {
+          if ((std::string(type.group) == "Path nodes") == paths && hidden.count(type.type) != 0) {
+            return false;
+          }
+        }
+        return true;
+      };
+      const auto setGroup = [&](const bool paths, const bool show) {
+        for (const MarkerType& type : MarkerTypes()) {
+          if ((std::string(type.group) == "Path nodes") == paths) {
+            if (show) {
+              hidden.erase(type.type);
+            } else {
+              hidden.insert(type.type);
+            }
+          }
+        }
+      };
+      const bool markers = groupShown(false);
+      if (pill("markers", ICON_MARKER, "Markers", markers)) {
+        setGroup(false, !markers);
+      }
+      tip("Start positions, resources, AI and other markers");
+      const bool paths = groupShown(true);
+      if (pill("paths", ICON_CHAIN, "Paths", paths)) {
+        setGroup(true, !paths);
+      }
+      tip("Path nodes and their links (land, air, water, amphibious)");
+      if (pill("props", ICON_TREE, "Props", mTools.ShowProps())) {
+        mTools.ShowProps() = !mTools.ShowProps();
+      }
+      tip("Trees, rocks and wrecks");
+      if (pill("units", ICON_UNIT, "Units", mTools.ShowUnits())) {
+        mTools.ShowUnits() = !mTools.ShowUnits();
+      }
+      tip("The armies' and civilians' units");
+    }
+    end();
+
+    // The bottom: the tool, its mode, how many copies an edit makes (.vp-hud).
+    if (begin("##viewhud", ImVec2(view.x + viewSize.x * 0.5f, view.y + viewSize.y - margin), ImVec2(0.5f, 1.0f))) {
+      const int tool = mTools.Tool();
+      ImGui::Dummy(ImVec2(Em(6.0f), pillHeight));
+      ImGui::SameLine(0.0f, 0.0f);
+      const float y = std::round(ImGui::GetCursorScreenPos().y + pillHeight * 0.5f - fontSize * 0.55f);
+      const auto words = [&](const char* const text, ImFont* const font, const ImU32 colour, const float after) {
+        const ImVec2 at = ImGui::GetCursorScreenPos();
+        ImFont* const use = font != nullptr ? font : ImGui::GetFont();
+        const ImVec2 size = use->CalcTextSizeA(fontSize, FLT_MAX, 0.0f, text);
+        ImGui::GetWindowDrawList()->AddText(use, fontSize, ImVec2(at.x, y), colour, text);
+        ImGui::Dummy(ImVec2(size.x, pillHeight));
+        ImGui::SameLine(0.0f, after);
+      };
+      words(EdTools::ToolIcon(tool), nullptr, ink, Em(7.0f));
+      words(EdTools::ToolName(tool), gBoldFont, IM_COL32_WHITE, Em(12.0f));
+      if (const char* const mode = mTools.HudMode(); mode != nullptr) {
+        words(mode, nullptr, ink, Em(12.0f));
+      }
+      if (const int copies = mTools.HudCopies(); copies > 1) {
+        char text[32];
+        (void)std::snprintf(text, sizeof(text), "%d copies", copies);
+        words(ICON_SYM, nullptr, IM_COL32(0x8E, 0x9A, 0xA7, 0xFF), Em(5.0f));
+        words(text, nullptr, IM_COL32(0x8E, 0x9A, 0xA7, 0xFF), Em(6.0f));
+      }
+      ImGui::Dummy(ImVec2(0.0f, pillHeight));
+    }
+    end();
   }
 
   void EdShell::CarryPanelPlaces()

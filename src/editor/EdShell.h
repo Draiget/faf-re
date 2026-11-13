@@ -406,6 +406,8 @@ namespace faf::editor
     void DrawToolStrip(float top, float width, float bottom);
     /** The first frame: the first workspace's panels' saved places under the names their tabs have now. */
     void CarryPanelPlaces();
+    /** The view's overlays: the camera and show pills at its top-left, the tool's line at its bottom. */
+    void DrawViewOverlays();
     /** The status bar's height at the current scale. */
     [[nodiscard]] static float StatusBarHeight();
     bool mPanelPlacesCarried = false;
