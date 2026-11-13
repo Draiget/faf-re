@@ -430,7 +430,8 @@ add_subdirectory(vulkan)
 #
 #   cmake --build --preset clang-x64-release --target faf_water_tests
 add_executable(faf_water_tests EXCLUDE_FROM_ALL water/WaterEffectPatchTests.cpp
-               ${CMAKE_SOURCE_DIR}/src/moho/terrain/water/WaterEffectPatch.cpp)
+               ${CMAKE_SOURCE_DIR}/src/moho/terrain/water/WaterEffectPatch.cpp
+               ${CMAKE_SOURCE_DIR}/src/moho/terrain/water/WaterReflectionPatch.cpp)
 target_include_directories(faf_water_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
 target_compile_features(faf_water_tests PRIVATE cxx_std_20)
 target_link_libraries(faf_water_tests PRIVATE gtest_main)

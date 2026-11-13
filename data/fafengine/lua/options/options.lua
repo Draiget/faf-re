@@ -250,9 +250,9 @@ end
 
 -- Ray-traced shadows (ren_RayTracedShadows) and ray-traced ambient occlusion (ren_RayAo), on Direct3D 12 and Vulkan
 -- devices that can trace rays. Shown only by an engine that has the commands, as the others.
--- Ray-traced shadows and the explosion and weapon lights are off until the player turns them on. Their keys changed
--- when the default went from on to off: the options screen saves every value, defaults too, so the old keys hold
--- 1 for everyone who ran a build that had them on.
+-- Ray-traced shadows, the ray-traced ambient light and the explosion and weapon lights are off until the player turns
+-- them on. Their keys changed when the default went from on to off: the options screen saves every value, defaults
+-- too, so the old keys hold 1 for everyone who ran a build that had them on.
 do
     local function Supported(command)
         -- The engine's Lua reports C functions as 'cfunction'.
@@ -303,10 +303,10 @@ do
         if Supported('ren_RayAo') then
             table.insert(video.items, position + 1, {
                 title = 'Ray-traced ambient light',
-                key = 'ray_traced_ao',
+                key = 'ray_traced_ao_optin',
                 requiresRayTracing = true,
                 type = 'toggle',
-                default = 1,
+                default = 0,
                 tip = 'With ray-traced shadows on: the shading of nooks, the ground around buildings and units '
                     .. 'under each other, traced by ray instead of read from the screen.',
                 set = function(key, value, startup)
@@ -581,5 +581,84 @@ do
                 },
             },
         })
+    end
+end
+
+-- What the water shows of the scene around it (docs/WATER_REFLECTIONS.md): screen-space reflections and caustics on the sea bed. The water shader
+-- patch is always in the effect on the renderers that can run it and both are shader constants set every frame, so they change at once. Shown only
+-- by an engine that has the command, as the ones above.
+do
+    local function Supported(command)
+        local kind = type(ConTextMatches)
+        if kind ~= 'function' and kind ~= 'cfunction' then
+            return false
+        end
+        local ok, matches = pcall(ConTextMatches, command)
+        if not ok or type(matches) ~= 'table' then
+            return false
+        end
+        for _, name in ipairs(matches) do
+            if name == command then
+                return true
+            end
+        end
+        return false
+    end
+
+    local video = options and options.video
+    if video and video.items then
+        local function Insert(item, afterKey)
+            local position = table.getn(video.items) + 1
+            for index, other in ipairs(video.items) do
+                if other.key == afterKey then
+                    position = index + 1
+                end
+            end
+            table.insert(video.items, position, item)
+        end
+
+        if Supported('ren_WaterSSR') then
+            local values = { [0] = '0', [1] = '1' }
+            Insert({
+                title = 'Water Reflections',
+                key = 'water_reflections',
+                type = 'toggle',
+                default = 1,
+                tip = 'The water reflects the terrain, buildings and units around it (screen-space reflections), not only the sky '
+                    .. 'and the mirrored units. Changes apply at once. Off is the shipped look.',
+                set = function(key, value, startup)
+                    ConExecute('ren_WaterSSR ' .. (values[value] or values[1]))
+                end,
+                custom = {
+                    states = {
+                        { text = '<LOC _Off>', key = 0 },
+                        { text = '<LOC _On>', key = 1 },
+                    },
+                },
+            }, 'water_quality')
+        end
+
+        if Supported('ren_WaterCaustics') then
+            local values = { [0] = '0', [1] = '25', [2] = '50', [3] = '100' }
+            Insert({
+                title = 'Water Caustics',
+                key = 'water_caustics',
+                type = 'toggle',
+                default = 2,
+                tip = 'Moving light patterns on the sea bed seen through shallow water. They follow the wave simulation. '
+                    .. 'Changes apply at once.',
+                set = function(key, value, startup)
+                    ConExecute('ren_WaterCaustics ' .. (values[value] or values[2]))
+                end,
+                custom = {
+                    states = {
+                        { text = '<LOC _Off>', key = 0 },
+                        { text = 'Low', key = 1 },
+                        { text = 'Medium', key = 2 },
+                        { text = 'High', key = 3 },
+                    },
+                },
+            }, 'water_reflections')
+        end
     end
 end
