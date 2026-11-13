@@ -109,7 +109,7 @@ namespace faf::editor
       if (ImGui::Button("Full")) {
         each("u:SetHealth(u, u:GetMaxHealth())");
       }
-      ImGui::SetItemTooltip("Health to its most (%.0f)", static_cast<double>(info.maxHealth));
+      EdSetItemTooltip("Health to its most (%.0f)", static_cast<double>(info.maxHealth));
       // Veterancy: FAF's veterancy component (SetVeterancy), levels 0 to 5.
       row("Veterancy");
       int vet = info.veteran;
@@ -135,7 +135,7 @@ namespace faf::editor
           const bool bit = inverted ? !on : on;
           each("u:SetScriptBit('" + toggle.cap + "', " + (bit ? "true" : "false") + ")");
         }
-        ImGui::SetItemTooltip(
+        EdSetItemTooltip(
           "%s: the unit's script bit %s, as the game's order button sets it",
           toggle.cap.c_str(),
           toggle.on ? "set" : "clear"
@@ -160,7 +160,7 @@ namespace faf::editor
           }
           ImGui::EndDisabled();
           if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-            ImGui::SetTooltip(
+            EdSetTooltip(
               "%s%s%s",
               e->has ? (e->removable ? "Click to take it off (its Remove enhancement)"
                                      : "The blueprint has no way to take it off")
@@ -178,12 +178,12 @@ namespace faf::editor
       if (ImGui::Button("Kill")) {
         each("u:Kill()");
       }
-      ImGui::SetItemTooltip("Dies as in the game (its wreck and death effects)");
+      EdSetItemTooltip("Dies as in the game (its wreck and death effects)");
       ImGui::SameLine();
       if (ImGui::Button("Remove")) {
         each("u:Destroy()");
       }
-      ImGui::SetItemTooltip("Taken out of the game at once, no wreck");
+      EdSetItemTooltip("Taken out of the game at once, no wreck");
     }
     HelpNote(
       "The game's own unit, live in the running play: a drag in the view moves it (Warp), and each change here is "

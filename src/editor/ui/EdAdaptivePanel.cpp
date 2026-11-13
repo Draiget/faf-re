@@ -3,6 +3,7 @@
 // the script reads them by; the Properties panel keeps the one-marker view of the same tables.
 
 #include <algorithm>
+#include "editor/ui/EdControls.h"
 #include <cstdio>
 #include <functional>
 #include <initializer_list>
@@ -174,7 +175,7 @@ namespace faf::editor
         ShowLuaFile(file);
       }
       ImGui::PopID();
-      ImGui::SetItemTooltip("This file's text in the Script panel");
+      EdSetItemTooltip("This file's text in the Script panel");
     };
     Status(kGood, "Tables: " + mDocument.Facts().tablesPath);
     editLink("tables", 2);
@@ -242,7 +243,7 @@ namespace faf::editor
         changed.maxPlayers = players;
         edited = true;
       }
-      ImGui::SetItemTooltip(
+      EdSetItemTooltip(
         "maxPlayerOnMap: the script reads the armies' lists up to it (never fewer than the %d slots)", slots
       );
     }
@@ -307,7 +308,7 @@ namespace faf::editor
         TakeOut(changed.hydroArmy, selected);
         edited = true;
       }
-      ImGui::SetItemTooltip("Takes the selected resources out of every army's list");
+      EdSetItemTooltip("Takes the selected resources out of every army's list");
     }
 
     // The lobby's options (mexes, hydrocarbons, wrecks, units): the Adaptive Map window, by what the player picks.
@@ -318,7 +319,7 @@ namespace faf::editor
         mAdaptivePick.clear();
       }
     }
-    ImGui::SetItemTooltip("The Adaptive Map window: each lobby option with its choices and what each puts on the map");
+    EdSetItemTooltip("The Adaptive Map window: each lobby option with its choices and what each puts on the map");
 
     // Crazyrush: the script's two flat lists.
     Header("CRAZYRUSH");
@@ -327,7 +328,7 @@ namespace faf::editor
         ImGui::PushID(label);
         ImGui::AlignTextToFramePadding();
         ImGui::TextUnformatted(label);
-        ImGui::SetItemTooltip("%s", help);
+        EdSetItemTooltip("%s", help);
         ImGui::SameLine(ImGui::GetFontSize() * 9.0f);
         ImGui::TextDisabled("%zu mass", names.size());
         RowButtons buttons(right, {"Remove selected", "Add selected", "Select"});

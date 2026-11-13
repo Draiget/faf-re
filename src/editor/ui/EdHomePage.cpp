@@ -395,7 +395,7 @@ namespace faf::editor
         }
         ImGui::PopID();
         if (!why.empty() && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-          ImGui::SetTooltip(
+          EdSetTooltip(
             "Not yet: %s", why == "no such command" ? "it comes with a later part of the editor" : why.c_str()
           );
         }
@@ -589,7 +589,7 @@ namespace faf::editor
         to.x - Em(8.0f)
       );
       if (hovered && !ready) {
-        ImGui::SetTooltip("Not yet: %s", why.c_str());
+        EdSetTooltip("Not yet: %s", why.c_str());
       } else if (hovered) {
         ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
       }
@@ -678,7 +678,7 @@ namespace faf::editor
         KindCard("##recent", ImVec2(grid.cardWidth, cardHeight), pictureHeight, picture, "Map", 0x4EA1FFU, text);
       ImGui::PopID();
       if (card.hovered) {
-        ImGui::SetTooltip("%s", listed[i].c_str());
+        EdSetTooltip("%s", listed[i].c_str());
       }
       if (card.clicked) {
         gpg::Logf("editor: start screen: recent %s", listed[i].c_str());

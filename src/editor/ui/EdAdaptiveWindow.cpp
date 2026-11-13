@@ -364,7 +364,7 @@ namespace faf::editor
                         ) {
         ImGui::PushID(name);
         ImGui::TextColored(good ? kGood : kWarn, "%s %s", good ? "\xE2\x97\x8F" : "\xE2\x97\x8B", name);
-        ImGui::SetItemTooltip("%s\nClick to see its text in the Script Editor", good ? goodText : badText);
+        EdSetItemTooltip("%s\nClick to see its text in the Script Editor", good ? goodText : badText);
         if (ImGui::IsItemClicked()) {
           ShowLuaFile(which);
         }
@@ -388,7 +388,7 @@ namespace faf::editor
       );
       // The preview of a game: the view shows only what these lobby choices and players start with.
       ImGui::Checkbox("Preview a game", &mAdaptivePreview);
-      ImGui::SetItemTooltip(
+      EdSetItemTooltip(
         "The view shows what a game with the choices picked on the left starts with: the resources and units a choice "
         "doesn't make are hidden (not drawn, not picked) while this is on"
       );
@@ -400,7 +400,7 @@ namespace faf::editor
         if (FillSliderInt("##players", &players, 1, most, players == most ? "all %d players" : "%d players")) {
           mAdaptivePreviewPlayers = players == most ? 0 : players;
         }
-        ImGui::SetItemTooltip(
+        EdSetItemTooltip(
           "Players in the game: ARMY_1 up to this one (the resources of the armies past it don't spawn)"
         );
         ImGui::SameLine();
@@ -481,7 +481,7 @@ namespace faf::editor
             }
             ImGui::EndCombo();
           }
-          ImGui::SetItemTooltip("The preview's choice for it");
+          EdSetItemTooltip("The preview's choice for it");
         } else {
           const LobbyOptionInfo& info = lobby[static_cast<std::size_t>(option.lobby)];
           const int d = info.defaultIndex;
@@ -532,7 +532,7 @@ namespace faf::editor
             mDocument.SetOptionsText(WithOption(mDocument.OptionsText(), info));
             mAdaptivePick = key;
           }
-          ImGui::SetItemTooltip(
+          EdSetItemTooltip(
             "%s: a lobby option whose choices add groups of %s (its table %s)%s",
             table.label,
             table.hydro ? "hydrocarbons" : "mexes",
@@ -548,7 +548,7 @@ namespace faf::editor
       if (ImGui::Selectable("Players' resources and crazyrush", mAdaptivePick == "#players")) {
         mAdaptivePick = "#players";
       }
-      ImGui::SetItemTooltip("Which resources spawn only with which player, the most players, and the crazyrush lists");
+      EdSetItemTooltip("Which resources spawn only with which player, the most players, and the crazyrush lists");
     }
     ImGui::EndChild();
 
@@ -787,7 +787,7 @@ namespace faf::editor
         }
         writeOption(fixed);
       }
-      ImGui::SetItemTooltip("One choice per group, and none: the choices there keep their names");
+      EdSetItemTooltip("One choice per group, and none: the choices there keep their names");
     } else if (levels && highestLevel > 0) {
       int reach = 0;
       for (const LobbyOptionInfo::Value& value : info.values) {
@@ -854,14 +854,14 @@ namespace faf::editor
       if (EditText("##label", edited.label, std::min(ImGui::GetContentRegionAvail().x, 420.0f))) {
         writeOption(edited);
       }
-      ImGui::SetItemTooltip("The option's name in the lobby");
+      EdSetItemTooltip("The option's name in the lobby");
       ImGui::AlignTextToFramePadding();
       ImGui::TextDisabled("Description");
       ImGui::SameLine(ImGui::GetFontSize() * 7.0f);
       if (EditText("##help", edited.help, ImGui::GetContentRegionAvail().x, true)) {
         writeOption(edited);
       }
-      ImGui::SetItemTooltip("What the lobby shows when the option is hovered");
+      EdSetItemTooltip("What the lobby shows when the option is hovered");
     }
 
     // The choices.
@@ -890,14 +890,14 @@ namespace faf::editor
           changed.defaultIndex = static_cast<int>(v) + 1;
           writeOption(changed);
         }
-        ImGui::SetItemTooltip("The lobby's choice until a player changes it");
+        EdSetItemTooltip("The lobby's choice until a player changes it");
         ImGui::TableSetColumnIndex(1);
         {
           LobbyOptionInfo changed = info;
           if (EditText("##text", changed.values[v].text, -1.0f)) {
             writeOption(changed);
           }
-          ImGui::SetItemTooltip(
+          EdSetItemTooltip(
             "%s\nkey %s", value.help.empty() ? "(no description)" : value.help.c_str(), value.key.c_str()
           );
         }
@@ -941,7 +941,7 @@ namespace faf::editor
               ImGui::SameLine();
               ImGui::TextDisabled("%.0f mass (%.0f in all)", mass, total);
             }
-            ImGui::SetItemTooltip("The group %s of %s", levelGroup.c_str(), option.loop.army.c_str());
+            EdSetItemTooltip("The group %s of %s", levelGroup.c_str(), option.loop.army.c_str());
           } else {
             ImGui::TextDisabled("+ nothing yet (%s)", levelGroup.c_str());
           }
@@ -1008,7 +1008,7 @@ namespace faf::editor
             );
             writeTable(changed);
           }
-          ImGui::SetItemTooltip(
+          EdSetItemTooltip(
             "Puts the %zu selected %s in this choice's group (out of any other)",
             selectedResources.size(),
             hydro ? "hydrocarbons" : "mexes"
@@ -1021,7 +1021,7 @@ namespace faf::editor
             changed[static_cast<std::size_t>(group)] = one.front();
             writeTable(changed);
           }
-          ImGui::SetItemTooltip("Takes the selected ones out of this group (they then spawn in every game)");
+          EdSetItemTooltip("Takes the selected ones out of this group (they then spawn in every game)");
           ImGui::EndDisabled();
         } else if (levels && !levelGroup.empty()) {
           ImGui::BeginDisabled(levelUnits.empty());
@@ -1043,7 +1043,7 @@ namespace faf::editor
             ask.path = levelPath.empty() ? std::vector<std::string>{levelGroup} : levelPath;
             mTools.AskUnitGroup(std::move(ask));
           }
-          ImGui::SetItemTooltip(
+          EdSetItemTooltip(
             "Moves the %zu selected units of %s into this level", selectedUnits.size(), option.loop.army.c_str()
           );
           ImGui::EndDisabled();
@@ -1057,7 +1057,7 @@ namespace faf::editor
         }
         ImGui::EndDisabled();
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-          ImGui::SetTooltip(
+          EdSetTooltip(
             "%s",
             !deletable ? (v == 0 ? "The first choice is the one that adds nothing" : "Levels are deleted from the top")
               : table  ? "Deletes the choice and its group (the groups after it move down)"

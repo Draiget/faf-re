@@ -1,6 +1,7 @@
 // The Debugger panel (View > Debugger, the Mission workspace): EdShell's members.
 
 #include <algorithm>
+#include "editor/ui/EdControls.h"
 #include <string>
 #include <vector>
 
@@ -44,7 +45,7 @@ namespace faf::editor
       debugger.SetArmed(armed);
       gpg::Logf("editor: debugger %s", armed ? "armed" : "off");
     }
-    ImGui::SetItemTooltip(
+    EdSetItemTooltip(
       "From the next play (F5 or Check's test run): the map's scripts stop at their breakpoints. Off, plays run as "
       "always."
     );

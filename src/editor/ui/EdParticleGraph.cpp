@@ -418,7 +418,7 @@ namespace faf::editor
           ImGui::Text("%s", type->title.c_str());
           ImGui::EndDragDropSource();
         }
-        ImGui::SetItemTooltip("%s\n\nDouble-click or drag into the graph.", type->help.c_str());
+        EdSetItemTooltip("%s\n\nDouble-click or drag into the graph.", type->help.c_str());
       }
     }
   }
@@ -523,7 +523,7 @@ namespace faf::editor
         break;
       }
       if (!def.help.empty()) {
-        ImGui::SetItemTooltip("%s", def.help.c_str());
+        EdSetItemTooltip("%s", def.help.c_str());
       }
       ImGui::PopID();
       if (changed) {
@@ -542,7 +542,7 @@ namespace faf::editor
     bool changed = false;
     ImGui::SetNextItemWidth(Em(120.0f));
     changed |= FillDragFloat("Time range", &range, 0.1f, 0.1f, 1000.0f, "%.2f");
-    ImGui::SetItemTooltip("The curve's time axis in ticks (10 a second)");
+    EdSetItemTooltip("The curve's time axis in ticks (10 a second)");
     const float span = range > 0.0f ? range : 1.0f;
     float low = info != nullptr ? info->viewMin : 0.0f;
     float high = info != nullptr ? info->viewMax : 1.0f;
@@ -614,7 +614,7 @@ namespace faf::editor
       );
     }
     if (hovered) {
-      ImGui::SetTooltip("%s", hoverKey >= 0 ? "Drag to move; right-click removes" : "Double-click to add a key");
+      EdSetTooltip("%s", hoverKey >= 0 ? "Drag to move; right-click removes" : "Double-click to add a key");
     }
     if (mKeySelected >= 0 && static_cast<std::size_t>(mKeySelected) < keys.size()) {
       EmitterKey& key = keys[static_cast<std::size_t>(mKeySelected)];

@@ -121,7 +121,7 @@ namespace faf::editor
         proceed();
       }
     }
-    ImGui::SetItemTooltip("Saves it into %s, then opens the other", Folder().string().c_str());
+    EdSetItemTooltip("Saves it into %s, then opens the other", Folder().string().c_str());
     ImGui::SameLine();
     if (ImGui::Button("Don't save")) {
       mDirty = false;
@@ -440,7 +440,7 @@ namespace faf::editor
       if (ImGui::IsMouseDragging(ImGuiMouseButton_Left, 0.0f) || ImGui::IsMouseDragging(ImGuiMouseButton_Right, 0.0f)) {
         mViewport.Turn(io.MouseDelta.x, io.MouseDelta.y);
       }
-      ImGui::SetTooltip("Drag to turn round the effect, the wheel to come closer");
+      EdSetTooltip("Drag to turn round the effect, the wheel to come closer");
     }
     DrawPreviewOptions();
   }
@@ -477,7 +477,7 @@ namespace faf::editor
     }
     flow(checkboxWidth("Loop"));
     ImGui::Checkbox("Loop", &mLoop);
-    ImGui::SetItemTooltip("Starts the effect again each time its Lifetime ends");
+    EdSetItemTooltip("Starts the effect again each time its Lifetime ends");
 
     static const char* const kBackgrounds[] = {"Night", "Grey", "Sky", "Black"};
     const float comboWidth =
@@ -485,22 +485,22 @@ namespace faf::editor
     flow(comboWidth);
     ImGui::SetNextItemWidth(comboWidth);
     (void)EdCombo("##bg", &options.background, kBackgrounds, 4);
-    ImGui::SetItemTooltip("The view's background");
+    EdSetItemTooltip("The view's background");
     flow(checkboxWidth("Ground"));
     ImGui::Checkbox("Ground", &options.ground);
     flow(checkboxWidth("Grid"));
     ImGui::Checkbox("Grid", &options.grid);
-    ImGui::SetItemTooltip("A line every game unit, stronger every five; the emitter's spot in orange");
+    EdSetItemTooltip("A line every game unit, stronger every five; the emitter's spot in orange");
     flow(checkboxWidth("Turn"));
     ImGui::Checkbox("Turn", &options.turn);
-    ImGui::SetItemTooltip("The camera turns slowly round the effect");
+    EdSetItemTooltip("The camera turns slowly round the effect");
     // As wide as its longest text, and a little for the grab.
     const float sliderWidth =
       ImGui::CalcTextSize("above ground 30.0").x + style.FramePadding.x * 2.0f + ImGui::GetFrameHeight();
     flow(sliderWidth);
     ImGui::SetNextItemWidth(sliderWidth);
     FillSliderFloat("##height", &options.height, 0.0f, 30.0f, "above ground %.1f");
-    ImGui::SetItemTooltip("The emitter this high above the ground (most effects play on a unit, some way up)");
+    EdSetItemTooltip("The emitter this high above the ground (most effects play on a unit, some way up)");
     flow(buttonWidth("Front"));
     if (ImGui::Button("Front")) {
       mViewport.Look(3.14159265f, 0.15f);
@@ -601,7 +601,7 @@ namespace faf::editor
         mPlaceAsk = place;
       }
       ImGui::EndDisabled();
-      ImGui::SetItemTooltip(
+      EdSetItemTooltip(
         "%s",
         place.empty()
           ? "Save the effect into the map's folder first (or open a game effect): the map plays it by its path"
@@ -609,7 +609,7 @@ namespace faf::editor
             "at"
       );
     }
-    ImGui::SetItemTooltip("Starts the emitter again each time its Lifetime ends");
+    EdSetItemTooltip("Starts the emitter again each time its Lifetime ends");
     {
       float age = mPreview.Age();
       unsigned long long emitted = mPreview.Emitted();
@@ -622,7 +622,7 @@ namespace faf::editor
       }
       ImGui::TextDisabled("age %.0f ticks, %llu particles", static_cast<double>(age), emitted);
     }
-    ImGui::SetItemTooltip("The preview emits at the centre of the map's view (10 ticks a second)");
+    EdSetItemTooltip("The preview emits at the centre of the map's view (10 ticks a second)");
     if (!mStatus.empty()) {
       ImGui::TextDisabled("%s", mStatus.c_str());
     }
@@ -686,7 +686,7 @@ namespace faf::editor
       case FlatValue::Kind::Raw:
         break;
       }
-      ImGui::SetItemTooltip("%s", field.help);
+      EdSetItemTooltip("%s", field.help);
       if (present == nullptr) {
         ImGui::SameLine();
         ImGui::TextDisabled("(not in the file: the engine's default)");

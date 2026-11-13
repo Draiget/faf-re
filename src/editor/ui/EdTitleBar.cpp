@@ -1,4 +1,5 @@
 #include "editor/ui/EdTitleBar.h"
+#include "editor/ui/EdControls.h"
 
 #include <algorithm>
 #include <cmath>
@@ -107,9 +108,9 @@ namespace faf::editor
       );
       if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled | ImGuiHoveredFlags_DelayNormal)) {
         if (!why.empty()) {
-          ImGui::SetTooltip("Not now: %s", why.c_str());
+          EdSetTooltip("Not now: %s", why.c_str());
         } else if (!command->description.empty()) {
-          ImGui::SetTooltip("%s", command->description.c_str());
+          EdSetTooltip("%s", command->description.c_str());
         }
       }
       ImGui::PopID();
@@ -191,7 +192,7 @@ namespace faf::editor
             ImGui::GetColorU32(ImGui::IsItemActive() ? ImGuiCol_ButtonActive : ImGuiCol_ButtonHovered),
             Em(6.0f)
           );
-          ImGui::SetTooltip("Open the start screen");
+          EdSetTooltip("Open the start screen");
         }
         dl->AddRectFilledMultiColor(
           at, ImVec2(at.x + size, at.y + size), Mix(a, b, 0.0f), Mix(a, b, 0.5f), Mix(a, b, 1.0f), Mix(a, b, 0.5f)
@@ -223,7 +224,7 @@ namespace faf::editor
           ImGui::SameLine(0.0f, Em(5.0f));
           ImGui::TextColored(ImVec4(0.96f, 0.70f, 0.28f, 1.0f), "\xE2\x97\x8F");
           if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("Unsaved changes");
+            EdSetTooltip("Unsaved changes");
           }
         }
         if (!info.state.empty()) {
@@ -330,7 +331,7 @@ namespace faf::editor
           ));
           const ImU32 ink = active ? AccentU32() : hovered ? ImGui::GetColorU32(ImGuiCol_Text) : quiet;
           dl->AddText(ImVec2(at.x + Em(10.0f), (at.y + max.y - fontSize) * 0.5f), ink, text.c_str());
-          if (hovered && ImGui::BeginTooltip()) {
+          if (hovered && EdBeginTooltip()) {
             // "Layout workspace · Alt+4", then what it is for.
             const std::string title =
               tab.label + " workspace" + (tab.keys.empty() ? std::string() : " \xC2\xB7 " + tab.keys);
@@ -345,8 +346,10 @@ namespace faf::editor
             const std::string& about =
               !tab.about.empty() ? tab.about : (command != nullptr ? command->description : tab.about);
             if (!about.empty()) {
-              ImGui::PushTextWrapPos(ImGui::GetFontSize() * 24.0f);
+              ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + Em(340.0f));
+              ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(0xAE, 0xB8, 0xC4, 0xFF));
               ImGui::TextUnformatted(about.c_str());
+              ImGui::PopStyleColor();
               ImGui::PopTextWrapPos();
             }
             ImGui::EndTooltip();

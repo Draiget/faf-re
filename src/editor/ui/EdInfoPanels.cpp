@@ -135,7 +135,7 @@ namespace faf::editor
         draw->AddLine(ImVec2(c.x - w, c.y + w * 0.8f), ImVec2(c.x + w, c.y - w * 0.8f), ink, 1.6f);
       }
       if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) {
-        ImGui::SetTooltip(
+        EdSetTooltip(
           hidden ? "Hidden in the view (not drawn, not picked). Click to show." : "Shown in the view. Click to hide."
         );
       }
@@ -342,7 +342,7 @@ namespace faf::editor
           ImGui::GetWindowDrawList()->AddRectFilled(at, ImVec2(at.x + thumb, at.y + thumb), ChipU32(), 3.0f);
         }
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) {
-          ImGui::SetTooltip("%s", facts.layers[i].c_str());
+          EdSetTooltip("%s", facts.layers[i].c_str());
         }
         ImGui::SameLine();
         ImGui::BeginGroup();
@@ -397,7 +397,7 @@ namespace faf::editor
       }
       ImGui::TextUnformatted(FileName(*path).c_str());
       if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) {
-        ImGui::SetTooltip("%s", path->c_str());
+        EdSetTooltip("%s", path->c_str());
       }
     }
     ImGui::TextDisabled("in %s", MapDisplayName(facts.scenarioPath).c_str());
@@ -543,7 +543,7 @@ namespace faf::editor
                 }
               }
               if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) {
-                ImGui::SetTooltip("%s\nClick selects (Ctrl adds), double-click goes to it", marker.name.c_str());
+                EdSetTooltip("%s\nClick selects (Ctrl adds), double-click goes to it", marker.name.c_str());
               }
               ImDrawList* const draw = ImGui::GetWindowDrawList();
               const float line = ImGui::GetTextLineHeight();
@@ -1084,7 +1084,7 @@ namespace faf::editor
     }
     ImGui::EndDisabled();
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled | ImGuiHoveredFlags_DelayShort)) {
-      ImGui::SetTooltip(
+      EdSetTooltip(
         "Plays the map as saved (solo, the Map panel's setup) for 8 s of game time, then stops; the warnings logged "
         "meanwhile "
         "join the findings: errors that name the map's folder, warnings from other Lua, the rest as notes. Save first "
@@ -1096,7 +1096,7 @@ namespace faf::editor
     }
     ImGui::Checkbox("Show pathing", &mTools.ShowPathing());
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) {
-      ImGui::SetTooltip(
+      EdSetTooltip(
         "After a run. Land: red where a T1 tank (uel0201) can't go (too steep, too deep), amber where it can but no "
         "start "
         "reaches. Ships: blue where a T1 frigate (ues0103) can go in a start's water, purple where it can but no "
@@ -1149,7 +1149,7 @@ namespace faf::editor
         GoToIssue(issue);
       }
       if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) {
-        ImGui::SetTooltip(
+        EdSetTooltip(
           "%s: %s\n%s\nClick to go to it", CheckLevelName(issue.level), issue.marker.c_str(), issue.text.c_str()
         );
       }
@@ -1233,7 +1233,7 @@ namespace faf::editor
             }
             ImGui::EndTabItem();
           }
-          ImGui::SetItemTooltip("%s", kTabs[t].help);
+          EdSetItemTooltip("%s", kTabs[t].help);
         }
         ImGui::EndTabBar();
       }
@@ -1308,7 +1308,7 @@ namespace faf::editor
       if (mScriptErrorLine > 0 && ImGui::IsItemClicked()) {
         LuaCodeScrollTo(mScriptErrorLine);
       }
-      ImGui::SetItemTooltip("%s", mScriptErrorLine > 0 ? "Click to go to the line (marked red)" : "");
+      EdSetItemTooltip("%s", mScriptErrorLine > 0 ? "Click to go to the line (marked red)" : "");
     }
     // Checked as you type: compiled again once the typing stops for 0.6 s (and when a file loads), the error line
     // marked; the likely typos of known functions listed under the code, each with its fix.

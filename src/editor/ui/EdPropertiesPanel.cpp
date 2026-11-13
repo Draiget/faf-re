@@ -340,7 +340,7 @@ namespace faf::editor
             // A known type's model: the type sets it (editors draw it; the game doesn't read it), so it isn't typed in.
             ImGui::AlignTextToFramePadding();
             ImGui::TextDisabled("%s", ValueString(held).c_str());
-            ImGui::SetItemTooltip(
+            EdSetItemTooltip(
               "Set by the marker's type (%s): the model editors draw for it. The game doesn't read it.",
               now.type.c_str()
             );
@@ -362,7 +362,7 @@ namespace faf::editor
           }
           active = active || ImGui::IsItemActive();
           if (const char* const use = MarkerFieldUse(key); use[0] != '\0') {
-            ImGui::SetItemTooltip("%s", use);
+            EdSetItemTooltip("%s", use);
           }
           ImGui::PopID();
         }
@@ -567,7 +567,7 @@ namespace faf::editor
             mShowMap = true;
             ImGui::SetWindowFocus(Panel("Map"));
           }
-          ImGui::SetItemTooltip(
+          EdSetItemTooltip(
             "Every army's resources, the option tables and their groups, and the lobby options in _options.lua"
           );
         }
@@ -696,7 +696,7 @@ namespace faf::editor
           name.c_str()
         );
         if (hovered) {
-          ImGui::SetTooltip(
+          EdSetTooltip(
             "%s\nclick: %s",
             blueprint.c_str(),
             selected > 1 ? "every selected prop becomes this one" : "the prop becomes this one"

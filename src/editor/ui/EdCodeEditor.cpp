@@ -1,4 +1,5 @@
 #include "editor/ui/EdCodeEditor.h"
+#include "editor/ui/EdControls.h"
 
 #include "editor/doc/EdLuaApi.h"
 #include "editor/doc/EdLuaSyntax.h"
@@ -497,7 +498,7 @@ namespace faf::editor
         if (wordEnd > at || (at > start && (std::isalnum(static_cast<unsigned char>(text[at - 1])) != 0))) {
           const EdLuaWord word = LuaWordBefore(text, wordEnd);
           if (const EdLuaApiEntry* const entry = LuaApiForCall(word.qualifier, word.separator, word.prefix)) {
-            ImGui::BeginTooltip();
+            EdBeginTooltip();
             DrawSignature(*entry, -1);
             if (entry->doc[0] != 0) {
               ImGui::PushTextWrapPos(ImGui::GetFontSize() * 34.0f);

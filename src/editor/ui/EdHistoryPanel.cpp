@@ -1,6 +1,7 @@
 // The History panel (View > History): EdShell's member that draws it.
 
 #include <string>
+#include "editor/ui/EdControls.h"
 #include <vector>
 
 #include "editor/EdShell.h"
@@ -65,7 +66,7 @@ namespace faf::editor
       }
       if (ImGui::IsItemHovered() && !now) {
         const int steps = StepsTo(current, row.position);
-        ImGui::SetTooltip(
+        EdSetTooltip(
           "%s %d step%s",
           steps < 0 ? "Undo" : "Redo",
           steps < 0 ? -steps : steps,

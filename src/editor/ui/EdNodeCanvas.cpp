@@ -1,4 +1,5 @@
 #include "editor/ui/EdNodeCanvas.h"
+#include "editor/ui/EdControls.h"
 #include "editor/ui/EdCanvasFit.h"
 #include "editor/ui/EdUiScale.h"
 
@@ -589,7 +590,7 @@ namespace faf::editor
         }
       }
       if (hovered && nodeHit == node.id && pinHit.node == 0 && mDrag == Drag::None && mouseGY <= node.y + kHeader) {
-        ImGui::SetTooltip("%s%s%s", type.help.c_str(), warning.empty() ? "" : "\n\n", warning.c_str());
+        EdSetTooltip("%s%s%s", type.help.c_str(), warning.empty() ? "" : "\n\n", warning.c_str());
       }
     }
     ImGui::PopFont();
@@ -603,7 +604,7 @@ namespace faf::editor
       const GraphNode* node = graph.Find(pinHit.node);
       const PinDef& pin = pinHit.output ? node->type->outputs[static_cast<std::size_t>(pinHit.pin)]
                                         : node->type->inputs[static_cast<std::size_t>(pinHit.pin)];
-      ImGui::SetTooltip(
+      EdSetTooltip(
         "%s (%s)%s",
         pin.name.c_str(),
         PinTypeName(pin.type),
@@ -666,7 +667,7 @@ namespace faf::editor
           return true;
         }
         if (ImGui::IsItemHovered() && !type->help.empty()) {
-          ImGui::SetTooltip("%s", type->help.c_str());
+          EdSetTooltip("%s", type->help.c_str());
         }
       }
     }

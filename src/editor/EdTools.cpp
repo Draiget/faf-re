@@ -386,12 +386,12 @@ namespace faf::editor
         picked = true;
       }
       if (hovered && !enabled) {
-        ImGui::SetTooltip("%s: not in Review, which only looks (Alt+1 to edit)", kTools[i].name);
+        EdSetTooltip("%s: not in Review, which only looks (Alt+1 to edit)", kTools[i].name);
       } else if (hovered) {
         if (key.empty()) {
-          ImGui::SetTooltip("%s", kTools[i].name);
+          EdSetTooltip("%s", kTools[i].name);
         } else {
-          ImGui::SetTooltip("%s (%s)", kTools[i].name, key.c_str());
+          EdSetTooltip("%s (%s)", kTools[i].name, key.c_str());
         }
       }
       ImGui::PopID();
@@ -404,7 +404,7 @@ namespace faf::editor
         mShowKmGrid = !mShowKmGrid;
       }
       if (hovered) {
-        ImGui::SetTooltip(
+        EdSetTooltip(
           "Measure: lines every kilometre (51.2 units, the game's scale) and the map's centre lines %s. Alt+drag in "
           "the view measures a distance.",
           mShowKmGrid ? "shown" : "hidden"
@@ -455,7 +455,13 @@ namespace faf::editor
       "Turned a quarter at a time round the middle: four copies, each facing a quarter turn on.",
       nullptr,
     };
+    if (gBoldFont != nullptr) {
+      ImGui::PushFont(gBoldFont, 0.0f);
+    }
     ImGui::Text("Symmetry: %s", kSymmetry[mode].name);
+    if (gBoldFont != nullptr) {
+      ImGui::PopFont();
+    }
     ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + Em(250.0f));
     ImGui::TextDisabled(
       "%s%s", kAbout[mode] != nullptr ? kAbout[mode] : nway, kSymmetry[mode].square ? " Square maps only." : ""
@@ -1061,7 +1067,7 @@ namespace faf::editor
         const bool on = i == mSymmetry;
         const bool hovered = ImGui::IsItemHovered();
         if (hovered) {
-          ImGui::BeginTooltip();
+          EdBeginTooltip();
           DrawSymmetryTooltip(i, false);
           ImGui::EndTooltip();
         }
@@ -1223,26 +1229,9 @@ namespace faf::editor
 
   void EdTools::DrawSelect()
   {
-    // What a click, the hover and a box may pick: the others stay drawn but can't be grabbed or moved.
-    if (Section("Pick")) {
-      const auto pill = [](const char* const label, bool& on, const char* const tip) {
-        if (PillToggle(label, on)) {
-          on = !on;
-          gpg::Logf("editor: Select picks %s: %s", label, on ? "on" : "off");
-        }
-        ImGui::SetItemTooltip("%s", tip);
-        ImGui::SameLine(0.0f, Em(6.0f));
-      };
-      pill("Markers", mPickable.markers, "Start positions, resources, AI and other markers");
-      pill("Path nodes", mPickable.pathNodes, "Land, water, amphibious and air path nodes");
-      pill("Units", mPickable.units, "The armies' and civilians' units");
-      ImGui::NewLine();
-      pill("Props", mPickable.props, "Trees, rocks and wrecks (a box selects props)");
-      pill("Decals", mPickable.decals, "Decals on the ground");
-      ImGui::NewLine();
-      if (!mPickable.All()) {
-        Note("Kinds switched off stay in the view but can't be picked or moved.");
-      }
+    // What a click, the hover and a box may pick is in the view, under the camera row (EdShell::DrawViewOverlays).
+    if (!mPickable.All()) {
+      Note("Some kinds aren't picked (the Pick pills in the view): they stay drawn but can't be grabbed or moved.");
     }
     // What is selected, and what a click would pick (the white ring in the view).
     ImGui::TextUnformatted(mSelectSelected.empty() ? "Nothing selected" : mSelectSelected.c_str());
@@ -1398,13 +1387,13 @@ namespace faf::editor
         mShaderBrowserOpen = true;
         mBrowsedShader = mShader;
       }
-      ImGui::SetItemTooltip("Every terrain shader: what each draws, how it reads the masks, which layers it uses");
+      EdSetItemTooltip("Every terrain shader: what each draws, how it reads the masks, which layers it uses");
       ImGui::SameLine();
       if (ImGui::Button("Convert...")) {
         mShaderBrowserOpen = true;
         mBrowsedShader = mShader;
       }
-      ImGui::SetItemTooltip("Change the shader and carry the paint over (in the shader browser)");
+      EdSetItemTooltip("Change the shader and carry the paint over (in the shader browser)");
       DrawShaderBrowser();
     }
 
@@ -1601,7 +1590,7 @@ namespace faf::editor
           );
         }
         if (hovered && !layer.albedo.empty()) {
-          ImGui::SetTooltip(
+          EdSetTooltip(
             "%s\n%s\nClick: paint this layer. Thumbnail: choose its texture. Drag: move it. Right-click: more.",
             layer.albedo.c_str(),
             layer.normals.empty() ? "(no normal map)" : layer.normals.c_str()
@@ -1616,12 +1605,12 @@ namespace faf::editor
       if (ImGui::Button(ICON_MATERIAL "  Material editor...")) {
         mMaterialAsk = std::clamp(mMaskLayer + 1, 1, 8);
       }
-      ImGui::SetItemTooltip("A texture for the paint layer, built from nodes, shown on the map as you edit");
+      EdSetItemTooltip("A texture for the paint layer, built from nodes, shown on the map as you edit");
       ImGui::SameLine();
       if (ImGui::Button(".scmst  " ICON_CHEVRON)) {
         ImGui::OpenPopup("##layersets");
       }
-      ImGui::SetItemTooltip(
+      EdSetItemTooltip(
         "FAForeverMapEditor's layer files: the shader and all ten layers (.scmst), or one layer (.scmsl)"
       );
       if (ImGui::BeginPopup("##layersets")) {
@@ -1679,7 +1668,7 @@ namespace faf::editor
         if (ImGui::Button(state.made || state.present ? "Remake" : "Make")) {
           AskMapTexture(kind, MapTextureOp::Make);
         }
-        ImGui::SetItemTooltip(
+        EdSetItemTooltip(
           "%s",
           fromPaint ? "Draw it from the paint (each layer's colour and kind of ground) and the heights, into the map's "
                       "folder"
@@ -1690,18 +1679,18 @@ namespace faf::editor
         if (ImGui::Button("Clear")) {
           AskMapTexture(kind, MapTextureOp::Clear);
         }
-        ImGui::SetItemTooltip("Take it out of the slot (the shader then reads none)");
+        EdSetItemTooltip("Take it out of the slot (the shader then reads none)");
         ImGui::SameLine();
         if (ImGui::Button("Export...")) {
           AskMapTexture(kind, MapTextureOp::Export);
         }
-        ImGui::SetItemTooltip("Save the slot's texture as a .dds file");
+        EdSetItemTooltip("Save the slot's texture as a .dds file");
         ImGui::EndDisabled();
         ImGui::SameLine();
         if (ImGui::Button("Import...")) {
           AskMapTexture(kind, MapTextureOp::Import);
         }
-        ImGui::SetItemTooltip("A .dds made elsewhere (packed as this shader reads it), copied into the map's folder");
+        EdSetItemTooltip("A .dds made elsewhere (packed as this shader reads it), copied into the map's folder");
         ImGui::EndGroup();
         ImGui::Spacing();
         ImGui::PopID();
@@ -1735,7 +1724,7 @@ namespace faf::editor
       if (ImGui::Button("Make a texture with nodes...", ImVec2(-1.0f, 0.0f))) {
         mMaterialAsk = std::clamp(mMaskLayer + 1, 1, 8);
       }
-      ImGui::SetItemTooltip(
+      EdSetItemTooltip(
         "The Material Editor (View > Material Editor), on the paint layer: textures built from nodes as in UE4, "
         "shown on the map as you edit"
       );
@@ -1785,7 +1774,7 @@ namespace faf::editor
         ImGui::BeginGroup();
         ImGui::Text("%s  %s", kSlotNames[slot], LayerTextureName(layer.albedo).c_str());
         if (ImGui::IsItemHovered() && !layer.albedo.empty()) {
-          ImGui::SetTooltip(
+          EdSetTooltip(
             "%s\n%s", layer.albedo.c_str(), layer.normals.empty() ? "(no normal map)" : layer.normals.c_str()
           );
         }
@@ -1806,7 +1795,7 @@ namespace faf::editor
                  : "Off, read as an ordinary layer: its size isn't above the map's (%.0f).",
               mMapSizeUnits
             );
-            ImGui::SetItemTooltip(
+            EdSetItemTooltip(
               "terrain.fx reads the slot as map-wide data only when its size is above the map's, so the tile value is "
               "under 1; FAF's map tools bake the texture."
             );
@@ -1947,7 +1936,7 @@ namespace faf::editor
               mTerrainTypeCode = type.code;
             }
             if (ImGui::IsItemHovered()) {
-              ImGui::SetTooltip("%s, %s", type.name.c_str(), type.style.empty() ? "no style" : type.style.c_str());
+              EdSetTooltip("%s, %s", type.name.c_str(), type.style.empty() ? "no style" : type.style.c_str());
             }
             ImGui::PopID();
           }
@@ -2005,7 +1994,7 @@ namespace faf::editor
       mMaterialAsk = mBrowseSlot;
       ImGui::CloseCurrentPopup();
     }
-    ImGui::SetItemTooltip(
+    EdSetItemTooltip(
       "Opens the Material Editor on this layer: build its texture from nodes (noise, textures, blends) and see it on "
       "the map "
       "as you go; Apply writes it into the map"
@@ -2054,7 +2043,7 @@ namespace faf::editor
         ImGui::PopTextWrapPos();
         ImGui::EndGroup();
         if (ImGui::IsItemHovered()) {
-          ImGui::SetTooltip(
+          EdSetTooltip(
             "%s\n%s",
             texture.path.c_str(),
             texture.normals.empty() ? "(no normal map beside it)" : texture.normals.c_str()
@@ -2093,7 +2082,7 @@ namespace faf::editor
       const std::string path =
         mSlots.size() == 10 ? mSlots[static_cast<std::size_t>(mMaskLayer + 1)].albedo : std::string();
       ImGui::TextDisabled("Painting layer %d  %s", mMaskLayer + 1, LayerLabel(path).c_str());
-      ImGui::SetItemTooltip("Pick the layer to paint, its texture and its order in the Layers panel");
+      EdSetItemTooltip("Pick the layer to paint, its texture and its order in the Layers panel");
     }
     if (Section("Brush")) {
       static const char* const kMaskModes[] = {"Paint", "Erase", "Smooth"};
@@ -2238,7 +2227,7 @@ namespace faf::editor
         ImGui::Indent(indent);
       }
       changed |= ImGui::Checkbox("##on", &rule.enabled);
-      ImGui::SetItemTooltip("Use this rule");
+      EdSetItemTooltip("Use this rule");
       ImGui::SameLine();
       const bool open =
         ImGui::TreeNodeEx("##rule", ImGuiTreeNodeFlags_AllowOverlap, "%s", DescribeMaskRule(rule).c_str());
@@ -2469,7 +2458,7 @@ namespace faf::editor
         }
         active = active || ImGui::IsItemActive();
         if (ImGui::IsItemHovered() && !mWater.textures[i].empty()) {
-          ImGui::SetTooltip("%s", mWater.textures[i].c_str());
+          EdSetTooltip("%s", mWater.textures[i].c_str());
         }
         ImGui::PopID();
       }
@@ -2492,7 +2481,7 @@ namespace faf::editor
               mWavePattern = static_cast<int>(i);
             }
             if (ImGui::IsItemHovered()) {
-              ImGui::SetTooltip("%s\n%s", mWavePatterns[i].texture.c_str(), mWavePatterns[i].ramp.c_str());
+              EdSetTooltip("%s\n%s", mWavePatterns[i].texture.c_str(), mWavePatterns[i].ramp.c_str());
             }
           }
           ImGui::EndCombo();
@@ -2609,7 +2598,7 @@ namespace faf::editor
                 ImGui::TextDisabled("%s", line.c_str());
               }
               if (ImGui::IsItemHovered()) {
-                ImGui::SetTooltip("%s", line.c_str());
+                EdSetTooltip("%s", line.c_str());
               }
             }
             ImGui::PopID();
@@ -2621,7 +2610,7 @@ namespace faf::editor
         AddWaterBody();
       }
       if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("Then click the map where the water goes: its level starts a little above the ground there.");
+        EdSetTooltip("Then click the map where the water goes: its level starts a little above the ground there.");
       }
       const bool chosen = mBody >= 0 && mBody < static_cast<int>(mBodies.size());
       ImGui::SameLine();
@@ -2643,7 +2632,7 @@ namespace faf::editor
       }
       ImGui::EndDisabled();
       if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-        ImGui::SetTooltip("Earlier bodies fill first: where two meet, ground goes to the earlier one.");
+        EdSetTooltip("Earlier bodies fill first: where two meet, ground goes to the earlier one.");
       }
       ImGui::SameLine();
       ImGui::BeginDisabled(!chosen || mBody + 1 >= static_cast<int>(mBodies.size()));
@@ -2722,7 +2711,7 @@ namespace faf::editor
             clicked();
           }
           if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip(
+            EdSetTooltip(
               "The fill spreads from here over all connected ground below its level. An outline alone (no seed) "
               "takes every low point inside it."
             );
@@ -2862,7 +2851,7 @@ namespace faf::editor
             );
           }
           if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("%s", blueprint.c_str());
+            EdSetTooltip("%s", blueprint.c_str());
           }
         }
       }
@@ -2898,7 +2887,7 @@ namespace faf::editor
           }
           ImGui::TextUnformatted(label.c_str());
           if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("%s", entry.blueprint.c_str());
+            EdSetTooltip("%s", entry.blueprint.c_str());
           }
           ImGui::SameLine(ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x - ImGui::GetFrameHeight());
           if (ImGui::SmallButton("x")) {
@@ -3092,7 +3081,7 @@ namespace faf::editor
             );
           }
           if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) {
-            ImGui::SetTooltip(
+            EdSetTooltip(
               "%s\n%s, placed as %s%s",
               texture.name.c_str(),
               texture.biome.c_str(),
@@ -3120,7 +3109,7 @@ namespace faf::editor
         ImGui::Checkbox("With its spec map", &mDecalWithPair);
         ImGui::EndDisabled();
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled | ImGuiHoveredFlags_DelayShort)) {
-          ImGui::SetTooltip(
+          EdSetTooltip(
             hasPair ? "The decal's second texture is its _spec map, as the game's maps keep albedo decals"
                     : "Only an _albedo texture with a _spec next to it has one"
           );
@@ -3512,7 +3501,7 @@ namespace faf::editor
           ImGui::PushID(key.c_str());
           ImGui::AlignTextToFramePadding();
           ImGui::TextDisabled("%s", key.c_str());
-          ImGui::SetItemTooltip("%s", MarkerFieldUse(key));
+          EdSetItemTooltip("%s", MarkerFieldUse(key));
           ImGui::SameLine(labelColumn);
           badge(kind, kindColour);
           ImGui::SameLine();
@@ -3571,7 +3560,7 @@ namespace faf::editor
           ImGui::AlignTextToFramePadding();
           ImGui::TextDisabled("%s", key.c_str());
           if (key != "name") {
-            ImGui::SetItemTooltip("%s", MarkerFieldUse(key));
+            EdSetItemTooltip("%s", MarkerFieldUse(key));
           }
           ImGui::SameLine(labelColumn);
           badge(

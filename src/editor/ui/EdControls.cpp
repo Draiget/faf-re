@@ -1,6 +1,7 @@
 #include "editor/ui/EdControls.h"
 
 #include "editor/ui/EdColourText.h"
+#include "editor/ui/EdFonts.h"
 #include "editor/ui/EdIconFont.h"
 #include "editor/ui/EdUiScale.h"
 #include "editor/ui/EdThemeColors.h"
@@ -8,6 +9,7 @@
 
 #include <algorithm>
 #include <cfloat>
+#include <cstdarg>
 #include <cmath>
 #include <cstdio>
 #include <cstring>
@@ -653,5 +655,91 @@ namespace faf::editor
       ImGui::MarkItemEdited(ImGui::GetID(label));
     }
     return changed;
+  }
+  bool EdBeginTooltip()
+  {
+    // .tooltip: background #05070a, padding .4rem .55rem, radius .35rem, a soft edge.
+    ImGui::PushStyleColor(ImGuiCol_PopupBg, IM_COL32(0x05, 0x07, 0x0A, 0xF5));
+    ImGui::PushStyleColor(ImGuiCol_Border, IM_COL32(0xFF, 0xFF, 0xFF, 0x1A));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(Em(9.0f), Em(6.5f)));
+    ImGui::PushStyleVar(ImGuiStyleVar_PopupRounding, Em(6.0f));
+    ImGui::PushStyleVar(ImGuiStyleVar_PopupBorderSize, 1.0f);
+    const bool open = ImGui::BeginTooltip();
+    ImGui::PopStyleVar(3);
+    ImGui::PopStyleColor(2);
+    return open;
+  }
+
+  void EdTooltipText(
+    const char* const text
+  )
+  {
+    if (text == nullptr || *text == 0) {
+      return;
+    }
+    // .tooltip { max-width: 22rem }
+    ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + Em(340.0f));
+    const char* const newline = std::strchr(text, '\n');
+    if (newline == nullptr) {
+      ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(0xE8, 0xED, 0xF3, 0xFF));
+      ImGui::TextUnformatted(text);
+      ImGui::PopStyleColor();
+    } else {
+      // The title, semibold and bright; the rest quieter.
+      if (gBoldFont != nullptr) {
+        ImGui::PushFont(gBoldFont, 0.0f);
+      }
+      ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(0xF2, 0xF5, 0xF8, 0xFF));
+      ImGui::TextUnformatted(text, newline);
+      ImGui::PopStyleColor();
+      if (gBoldFont != nullptr) {
+        ImGui::PopFont();
+      }
+      ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(0xAE, 0xB8, 0xC4, 0xFF));
+      ImGui::TextUnformatted(newline + 1);
+      ImGui::PopStyleColor();
+    }
+    ImGui::PopTextWrapPos();
+  }
+
+  namespace
+  {
+    void TooltipV(
+      const char* const format,
+      va_list args
+    )
+    {
+      char text[2048];
+      std::vsnprintf(text, sizeof(text), format, args);
+      if (EdBeginTooltip()) {
+        EdTooltipText(text);
+        ImGui::EndTooltip();
+      }
+    }
+  } // namespace
+
+  void EdSetTooltip(
+    const char* const format,
+    ...
+  )
+  {
+    va_list args;
+    va_start(args, format);
+    TooltipV(format, args);
+    va_end(args);
+  }
+
+  void EdSetItemTooltip(
+    const char* const format,
+    ...
+  )
+  {
+    if (!ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip)) {
+      return;
+    }
+    va_list args;
+    va_start(args, format);
+    TooltipV(format, args);
+    va_end(args);
   }
 } // namespace faf::editor

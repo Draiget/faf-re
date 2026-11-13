@@ -777,7 +777,7 @@ namespace faf::editor
       }
       const auto tip = [](const char* const words) {
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled | ImGuiHoveredFlags_DelayShort)) {
-          ImGui::SetTooltip("%s", words);
+          EdSetTooltip("%s", words);
         }
       };
       const auto withAlpha = [](const ImU32 colour, const float alpha) {
@@ -1067,7 +1067,7 @@ namespace faf::editor
             if (mode == testHover) {
               ImGui::SetNextWindowPos(ImVec2(p.x, p.y + side + Em(8.0f)));
             }
-            ImGui::BeginTooltip();
+            EdBeginTooltip();
             mTools.DrawSymmetryTooltip(mode, true);
             ImGui::EndTooltip();
           }
@@ -1198,21 +1198,21 @@ namespace faf::editor
       mUiScale = smaller;
     }
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled | ImGuiHoveredFlags_DelayShort)) {
-      ImGui::SetTooltip("Smaller panels and text");
+      EdSetTooltip("Smaller panels and text");
     }
     ImGui::SameLine(0.0f, 1.0f);
     if (EdTextSegment("##uiscale", percent, EdSegment::Middle, true, middle)) {
       mUiScale = 1.0f;
     }
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) {
-      ImGui::SetTooltip("The panels' scale (kept over restarts); click for 100%%");
+      EdSetTooltip("The panels' scale (kept over restarts); click for 100%%");
     }
     ImGui::SameLine(0.0f, 1.0f);
     if (EdTextSegment("##uiscaleup", "+", EdSegment::Last, mUiScale < kSteps[std::size(kSteps) - 1] - 0.01f, side)) {
       mUiScale = larger;
     }
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled | ImGuiHoveredFlags_DelayShort)) {
-      ImGui::SetTooltip("Larger panels and text");
+      EdSetTooltip("Larger panels and text");
     }
     return 0.0f;
   }
@@ -1320,7 +1320,7 @@ namespace faf::editor
     };
     const auto tip = [](const char* const words) {
       if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) {
-        ImGui::SetTooltip("%s", words);
+        EdSetTooltip("%s", words);
       }
     };
 
@@ -1405,6 +1405,50 @@ namespace faf::editor
     }
     end();
 
+    // The Select tool: what a click, the hover and a box may pick, under the camera row (it was the panel's Pick
+    // section). Kinds switched off stay drawn but can't be grabbed or moved.
+    if (mTools.SelectToolActive()) {
+      const float below = view.y + margin + pillHeight + Em(6.0f) * 2.0f + Em(4.0f);
+      if (begin("##viewpick", ImVec2(view.x + margin, below), ImVec2(0.0f, 0.0f))) {
+        // Its name, dim: a label, not a button.
+        {
+          const char* const word = ICON_SELECT "  Pick";
+          const ImVec2 size = ImGui::CalcTextSize(word);
+          const ImVec2 at = ImGui::GetCursorScreenPos();
+          ImGui::GetWindowDrawList()->AddText(
+            ImVec2(std::round(at.x + Em(8.0f)), std::round(at.y + pillHeight * 0.5f - fontSize * 0.55f)),
+            IM_COL32(0xD6, 0xDD, 0xE6, 0x99),
+            word
+          );
+          ImGui::Dummy(ImVec2(size.x + Em(14.0f), pillHeight));
+          ImGui::SameLine();
+        }
+        PickFilter& pick = mTools.Pickable();
+        const auto kind =
+          [&](const char* const id, const char* const icon, const char* const name, bool& on, const char* const what) {
+          if (pill(id, icon, nullptr, on)) {
+            on = !on;
+            gpg::Logf("editor: Select picks %s: %s", name, on ? "on" : "off");
+          }
+          if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) {
+            EdSetTooltip(
+              "%s: %s\n%s\nClick to %s.",
+              name,
+              on ? "picked" : "not picked (drawn, but a click, the hover and a box pass them by)",
+              what,
+              on ? "stop picking them" : "pick them again"
+            );
+          }
+        };
+        kind("pickmarkers", ICON_MARKER, "Markers", pick.markers, "Start positions, resources, AI and other markers");
+        kind("pickpaths", ICON_CHAIN, "Path nodes", pick.pathNodes, "Land, water, amphibious and air path nodes");
+        kind("pickunits", ICON_UNIT, "Units", pick.units, "The armies' and civilians' units");
+        kind("pickprops", ICON_TREE, "Props", pick.props, "Trees, rocks and wrecks (a box selects props)");
+        kind("pickdecals", ICON_DECAL, "Decals", pick.decals, "Decals on the ground");
+      }
+      end();
+    }
+
     // The bottom: the tool, its mode, how many copies an edit makes (.vp-hud).
     if (begin("##viewhud", ImVec2(view.x + viewSize.x * 0.5f, view.y + viewSize.y - margin), ImVec2(0.5f, 1.0f))) {
       const int tool = mTools.Tool();
@@ -1477,7 +1521,7 @@ namespace faf::editor
         axis(onScreen(0.0f, -1.0f), IM_COL32(0xFF, 0x5D, 0x5D, 0xFF), "N");
         dl->AddCircleFilled(centre, Em(5.0f), IM_COL32(0xE9, 0xED, 0xF2, 0xFF), 16);
         if (ImGui::IsWindowHovered()) {
-          ImGui::SetTooltip("Where the map's north and east are");
+          EdSetTooltip("Where the map's north and east are");
         }
       }
       ImGui::End();
@@ -1527,7 +1571,7 @@ namespace faf::editor
           mTools.AskCameraAt(frame.minX + u * mapW, frame.minZ + v * mapH);
         }
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) {
-          ImGui::SetTooltip("The map: click or drag to look there");
+          EdSetTooltip("The map: click or drag to look there");
         }
       }
       ImGui::End();
@@ -1670,7 +1714,7 @@ namespace faf::editor
       }
       ImGui::EndDisabled();
       if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-        ImGui::SetTooltip("Keep this setup as a profile of that name (play_setups.ini)");
+        EdSetTooltip("Keep this setup as a profile of that name (play_setups.ini)");
       }
     }
 
@@ -1680,12 +1724,12 @@ namespace faf::editor
     ImGui::SameLine();
     ImGui::RadioButton("Against AI", &mode, 1);
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-      ImGui::SetTooltip("Other slots get an AI. The AI's map analysis adds about 2 s to each start.");
+      EdSetTooltip("Other slots get an AI. The AI's map analysis adds about 2 s to each start.");
     }
     ImGui::SameLine();
     ImGui::RadioButton("Custom", &mode, 2);
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-      ImGui::SetTooltip("Slot by slot: you, an AI or empty, and teams (a team's armies start allied)");
+      EdSetTooltip("Slot by slot: you, an AI or empty, and teams (a team's armies start allied)");
     }
     if (mode != modeBefore) {
       setup.withAi = mode != 0;
@@ -1727,7 +1771,7 @@ namespace faf::editor
         ImGui::EndCombo();
       }
       if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-        ImGui::SetTooltip("The lobby slot you play (its army's start position)");
+        EdSetTooltip("The lobby slot you play (its army's start position)");
       }
     }
     const std::vector<PlayChoice>& factions = mPlay.Factions();
@@ -1777,7 +1821,7 @@ namespace faf::editor
           ImGui::EndCombo();
         }
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-          ImGui::SetTooltip("How many slots get an AI, taken in slot order; the rest stay empty");
+          EdSetTooltip("How many slots get an AI, taken in slot order; the rest stay empty");
         }
       }
     }
@@ -1889,17 +1933,17 @@ namespace faf::editor
     }
     ImGui::Checkbox("Fog of war", &setup.fog);
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-      ImGui::SetTooltip("The game's Fog of War option (explored, or none), set when the play starts");
+      EdSetTooltip("The game's Fog of War option (explored, or none), set when the play starts");
     }
     ImGui::SameLine();
     ImGui::Checkbox("Prebuilt units", &setup.prebuilt);
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-      ImGui::SetTooltip("The game's Prebuilt Units option: each army starts with a small base");
+      EdSetTooltip("The game's Prebuilt Units option: each army starts with a small base");
     }
     ImGui::SameLine();
     ImGui::Checkbox("Quick start", &setup.quickStart);
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-      ImGui::SetTooltip(
+      EdSetTooltip(
         "The commanders are there and take orders at once, without the game's warp-in\n"
         "(about 5 s), and the camera starts over yours. Off: the game's own start."
       );
@@ -1925,7 +1969,7 @@ namespace faf::editor
       label("AI cheat x");
       FillSliderFloat("##cheatmult", &setup.cheatMult, 1.0f, 5.0f, "%.1f");
       if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-        ImGui::SetTooltip("The cheating AIs' resource and build multiplier (the lobby's AIx options)");
+        EdSetTooltip("The cheating AIs' resource and build multiplier (the lobby's AIx options)");
       }
       setup.cheatMult = std::round(setup.cheatMult * 10.0f) / 10.0f;
     }
@@ -1934,7 +1978,7 @@ namespace faf::editor
       mPlay.SetKeepsOwnSetup(keepOwn);
     }
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-      ImGui::SetTooltip(
+      EdSetTooltip(
         "On: this map plays with its own setup, saved at each Play.\n"
         "Off: it plays with the setup of the last Play on any map."
       );
@@ -1948,7 +1992,7 @@ namespace faf::editor
       mPlay.SetFogHidden(noFog);
     }
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-      ImGui::SetTooltip(
+      EdSetTooltip(
         "While playing: the view leaves out the fog's shading and you keep your army.\n"
         "Enemy units your army has no intel on stay unseen; Observer view shows them."
       );
@@ -1959,9 +2003,7 @@ namespace faf::editor
       mPlay.SetSeesWholeMap(wholeMap);
     }
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-      ImGui::SetTooltip(
-        "While playing: view the map as an observer (every army's units, no fog), then back to your army."
-      );
+      EdSetTooltip("While playing: view the map as an observer (every army's units, no fog), then back to your army.");
     }
     ImGui::EndDisabled();
   }
@@ -1993,7 +2035,7 @@ namespace faf::editor
     if (ImGui::Button("Open a map...", ImVec2(-1.0f, 0.0f))) {
       mBrowser.Show();
     }
-    ImGui::SetItemTooltip(
+    EdSetItemTooltip(
       "Every map on this computer and the FAF vault (File > Open, Ctrl+O); recent ones are in File > Open Recent"
     );
     ImGui::Separator();
@@ -2399,7 +2441,7 @@ namespace faf::editor
               ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), ImGui::GetColorU32(ImGuiCol_Button), Em(4.0f)
             );
             ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
-            ImGui::SetTooltip("Show the problems");
+            EdSetTooltip("Show the problems");
           }
         }
         float at = x;

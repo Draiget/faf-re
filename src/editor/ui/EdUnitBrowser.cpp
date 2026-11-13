@@ -1,6 +1,7 @@
 // The Units tool's unit browser (design §7 Units, like the game's build menu): EdTools' member.
 
 #include <algorithm>
+#include "editor/ui/EdControls.h"
 #include <cctype>
 #include <cstdio>
 #include <string>
@@ -128,7 +129,7 @@ namespace faf::editor
           }
         }
         if (hovered) {
-          ImGui::SetTooltip(
+          EdSetTooltip(
             "%s  %s\n%s, %s, %s",
             unit.id.c_str(),
             unit.name.c_str(),

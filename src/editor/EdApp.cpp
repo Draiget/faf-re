@@ -79,6 +79,7 @@
 #include "imgui.h"
 #include "imgui_impl_win32.h"
 #include "imgui_internal.h"
+#include "misc/freetype/imgui_freetype.h"
 #include "moho/app/CScApp.h"
 #include "moho/app/WinApp.h"
 #include "moho/app/AppRuntimeTypes.h"
@@ -134,16 +135,16 @@ namespace faf::editor
     [[nodiscard]] bool IsTestRunCommandLine()
     {
       static const char* const kOptions[] = {
-        "/command",        "/palette",        "/theme",          "/keysfile",        "/focuspanel",  "/uiclicks",
-        "/hidegameunits",  "/movelayer",      "/pickfilter",     "/mapwide",         "/tool",        "/proptool",
-        "/play",           "/debugarm",       "/breakpoint",     "/check",           "/decaltool",   "/markertool",
-        "/unittool",       "/hoverprop",      "/selectprops",    "/selectunit",      "/propswap",    "/saveas",
-        "/settingsfile",   "/autosavefolder", "/askunsaved",     "/particlebrowser", "/particlenew", "/particleopen",
-        "/materialeditor", "/uiscale",        "/testrun",        "/openall",         "/roundtrip",   "/vault",
-        "/vaultsearch",    "/vaultmap",       "/newmap",         "/stamp",           "/brush",       "/layer",
-        "/waterbody",      "/ruler",          "/adaptivewindow", "/maskrule",        "/maskgen",     "/symhover",
-        "/shader",         "/brushtest",      "/brushshape",     "/stampsource",     "/stampstroke", "/symoptions",
-        "/maskoptions",    "/masktest",       "/shaderbrowser",  "/convertlayers",
+        "/command",        "/palette",        "/theme",          "/keysfile",        "/focuspanel",    "/uiclicks",
+        "/hidegameunits",  "/movelayer",      "/pickfilter",     "/mapwide",         "/tool",          "/proptool",
+        "/play",           "/debugarm",       "/breakpoint",     "/check",           "/decaltool",     "/markertool",
+        "/unittool",       "/hoverprop",      "/selectprops",    "/selectunit",      "/propswap",      "/saveas",
+        "/settingsfile",   "/autosavefolder", "/askunsaved",     "/particlebrowser", "/particlenew",   "/particleopen",
+        "/materialeditor", "/uiscale",        "/testrun",        "/openall",         "/roundtrip",     "/vault",
+        "/vaultsearch",    "/vaultmap",       "/newmap",         "/stamp",           "/brush",         "/layer",
+        "/waterbody",      "/ruler",          "/adaptivewindow", "/maskrule",        "/maskgen",       "/symhover",
+        "/stbfont",        "/shader",         "/brushtest",      "/brushshape",      "/stampsource",   "/stampstroke",
+        "/symoptions",     "/maskoptions",    "/masktest",       "/shaderbrowser",   "/convertlayers",
       };
       for (const char* const option : kOptions) {
         if (moho::CFG_GetArgOption(option, 0, nullptr)) {
@@ -2464,6 +2465,12 @@ namespace faf::editor
       LoadThemeList();
       SetTheme(mThemes.empty() ? std::string() : mThemes.front().name);
 
+      // FreeType with light hinting draws the panels' text (imgui_freetype): the stems land on whole pixels as a
+      // browser's text does, where ImGui's own rasterizer leaves them soft. `/stbfont` keeps ImGui's for comparison.
+      if (!moho::CFG_GetArgOption("/stbfont", 0, nullptr)) {
+        io.Fonts->SetFontLoader(ImGuiFreeType::GetFontLoader());
+        io.Fonts->FontLoaderFlags = ImGuiFreeTypeLoaderFlags_LightHinting;
+      }
       std::error_code error;
       const std::filesystem::path segoe = "C:\\Windows\\Fonts\\segoeui.ttf";
       ImFont* body = nullptr;
@@ -2485,9 +2492,12 @@ namespace faf::editor
         icons.GlyphOffset = ImVec2(0.0f, -1.0f);
         (void)io.Fonts->AddFontFromMemoryTTF(const_cast<unsigned char*>(IconFontData()), IconFontSize(), 13.5f, &icons);
       }
-      // Headings and codes (the FAF sign-in's): Segoe UI Bold and Consolas, when Windows has them.
-      if (const std::filesystem::path bold = "C:\\Windows\\Fonts\\segoeuib.ttf"; std::filesystem::exists(bold, error)) {
-        gBoldFont = io.Fonts->AddFontFromFileTTF(bold.string().c_str(), 16.0f);
+      // Headings and codes (the FAF sign-in's): Segoe UI Semibold (the mockup's weight 600; Bold when Windows has no
+      // Semibold) and Consolas, when Windows has them.
+      for (const char* const name : {"C:\\Windows\\Fonts\\seguisb.ttf", "C:\\Windows\\Fonts\\segoeuib.ttf"}) {
+        if (const std::filesystem::path bold = name; gBoldFont == nullptr && std::filesystem::exists(bold, error)) {
+          gBoldFont = io.Fonts->AddFontFromFileTTF(bold.string().c_str(), 16.0f);
+        }
       }
       if (const std::filesystem::path mono = "C:\\Windows\\Fonts\\consola.ttf"; std::filesystem::exists(mono, error)) {
         gMonoFont = io.Fonts->AddFontFromFileTTF(mono.string().c_str(), 16.0f);

@@ -253,7 +253,7 @@ namespace faf::editor
       }
       ImGui::EndDisabled();
       if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-        ImGui::SetTooltip(
+        EdSetTooltip(
           "Orders the slots so each start is followed by its mirror under the map's symmetry (the Tools\n"
           "panel's): slots 1 and 2, 3 and 4... face each other, so the lobby's \"odd vs even\" auto teams\n"
           "are fair. Players then pick slots knowing which start faces which."
@@ -302,7 +302,7 @@ namespace faf::editor
         mTools.AskExtraArmiesChange(list);
       }
       if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("Take %s off the extra armies (its units stay in _save.lua)", extra[i].c_str());
+        EdSetTooltip("Take %s off the extra armies (its units stay in _save.lua)", extra[i].c_str());
       }
       endCard(next);
       ImGui::PopID();
@@ -332,7 +332,7 @@ namespace faf::editor
           mTools.AskExtraArmiesChange(list + offers[i]);
         }
         if (ImGui::IsItemHovered()) {
-          ImGui::SetTooltip(
+          EdSetTooltip(
             "Add %s as an extra army: an owner for neutral or civilian units, not a lobby slot", offers[i].c_str()
           );
         }

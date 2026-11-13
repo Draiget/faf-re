@@ -86,7 +86,7 @@ namespace faf::editor
     ) {
       ImGui::OpenPopup("Pick a texture");
     }
-    ImGui::SetItemTooltip("%s\nClick to browse the textures", path.empty() ? "(none)" : path.c_str());
+    EdSetItemTooltip("%s\nClick to browse the textures", path.empty() ? "(none)" : path.c_str());
     {
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const float pad = ImGui::GetStyle().FramePadding.y;
@@ -156,7 +156,7 @@ namespace faf::editor
         path.clear();
         ImGui::CloseCurrentPopup();
       }
-      ImGui::SetItemTooltip("No texture");
+      EdSetItemTooltip("No texture");
 
       const std::string search = Lower(mSearch);
       const std::string folder = mFolder == 0 ? std::string() : mFolders[static_cast<std::size_t>(mFolder - 1)];
@@ -218,7 +218,7 @@ namespace faf::editor
               ImGui::TextUnformatted(name.c_str());
               ImGui::EndGroup();
               if (hovered) {
-                ImGui::BeginTooltip();
+                EdBeginTooltip();
                 Picture(library, choice, withAlpha, 256.0f);
                 ImGui::TextUnformatted(choice.c_str());
                 ImGui::EndTooltip();

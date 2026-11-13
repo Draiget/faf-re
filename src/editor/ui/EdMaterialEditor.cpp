@@ -764,21 +764,21 @@ namespace faf::editor
       if (ImGui::Button("Save") && doc != nullptr) {
         (void)Save(*doc);
       }
-      ImGui::SetItemTooltip(
+      EdSetItemTooltip(
         "Writes the graph to %s",
         (Folder() / ((doc != nullptr ? doc->name : std::string("name")) + kExtension)).string().c_str()
       );
       if (ImGui::Button("Home") && doc != nullptr) {
         doc->canvas.FrameAll();
       }
-      ImGui::SetItemTooltip("Frames the whole graph (F frames the selection)");
+      EdSetItemTooltip("Frames the whole graph (F frames the selection)");
       if (ImGui::Button("Refresh map")) {
         mTerrain.reset();
         for (const auto& each : mDocs) {
           each->eval->SetTerrain(nullptr);
         }
       }
-      ImGui::SetItemTooltip("Reads the open map's heights again for the Map Height and Map Slope nodes");
+      EdSetItemTooltip("Reads the open map's heights again for the Map Height and Map Slope nodes");
       ImGui::SetNextItemWidth(Em(90.0f));
       static const int kSizes[] = {128, 256, 512, 1024};
       if (EdBeginCombo("##size", (std::to_string(mPreviewSize) + " px").c_str())) {
@@ -789,7 +789,7 @@ namespace faf::editor
         }
         ImGui::EndCombo();
       }
-      ImGui::SetItemTooltip("The graph's working size: larger is finer and slower");
+      EdSetItemTooltip("The graph's working size: larger is finer and slower");
 
       // The slot the result goes into, live and on Apply.
       ImGui::Separator();
@@ -808,12 +808,12 @@ namespace faf::editor
         }
         ImGui::EndCombo();
       }
-      ImGui::SetItemTooltip("The map's texture slot the graph's result goes into");
+      EdSetItemTooltip("The map's texture slot the graph's result goes into");
       if (ImGui::Checkbox("Live Update", &mLive) && !mLive) {
         StopLive();
       }
       mLiveStale = mLiveStale || ImGui::IsItemDeactivatedAfterEdit();
-      ImGui::SetItemTooltip(
+      EdSetItemTooltip(
         "Shows the result on the map's terrain in that slot as you edit (not saved: Apply writes it into the map)"
       );
       ImGui::EndDisabled();
@@ -823,7 +823,7 @@ namespace faf::editor
         ApplyBake(*doc);
       }
       ImGui::EndDisabled();
-      ImGui::SetItemTooltip(
+      EdSetItemTooltip(
         "%s",
         canApply
           ? "Bakes the graph at the bake size into DDS files in the map's env/layers folder and sets the slot to them "
@@ -840,7 +840,7 @@ namespace faf::editor
         }
         ImGui::EndCombo();
       }
-      ImGui::SetItemTooltip("The size Apply bakes at");
+      EdSetItemTooltip("The size Apply bakes at");
       if (!mStatus.empty()) {
         ImGui::TextDisabled("%s", mStatus.c_str());
       }
@@ -886,7 +886,7 @@ namespace faf::editor
         mPreviewYaw -= ImGui::GetIO().MouseDelta.x * 0.01f;
         mPreviewStale = mPreviewStale || ImGui::GetIO().MouseDelta.x != 0.0f;
       }
-      ImGui::SetItemTooltip("The output's albedo lit through its normal map. Drag to turn the sphere.");
+      EdSetItemTooltip("The output's albedo lit through its normal map. Drag to turn the sphere.");
     }
   }
 
@@ -946,7 +946,7 @@ namespace faf::editor
         mPreviewYaw -= ImGui::GetIO().MouseDelta.x * 0.01f;
         mPreviewStale = mPreviewStale || ImGui::GetIO().MouseDelta.x != 0.0f;
       }
-      ImGui::SetItemTooltip("The output's albedo lit through its normal map. Drag to turn the sphere.");
+      EdSetItemTooltip("The output's albedo lit through its normal map. Drag to turn the sphere.");
     }
   }
 
@@ -1041,7 +1041,7 @@ namespace faf::editor
       }
       }
       if (!def.help.empty()) {
-        ImGui::SetItemTooltip("%s", def.help.c_str());
+        EdSetItemTooltip("%s", def.help.c_str());
       }
       ImGui::PopID();
       if (changed) {
@@ -1115,7 +1115,7 @@ namespace faf::editor
         if (ImGui::Selectable(name.c_str(), open)) {
           (void)Open(entry.path());
         }
-        ImGui::SetItemTooltip("%s", entry.path().string().c_str());
+        EdSetItemTooltip("%s", entry.path().string().c_str());
       }
       if (folder == OwnFolder()) {
         break;
@@ -1167,7 +1167,7 @@ namespace faf::editor
           ImGui::Text("%s", type->title.c_str());
           ImGui::EndDragDropSource();
         }
-        ImGui::SetItemTooltip("%s\n\nDouble-click or drag into the graph.", type->help.c_str());
+        EdSetItemTooltip("%s\n\nDouble-click or drag into the graph.", type->help.c_str());
       }
       ImGui::TreePop();
     }

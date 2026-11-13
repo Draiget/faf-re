@@ -100,4 +100,14 @@ namespace faf::editor
     float width = -1.0f,
     ImGuiInputTextFlags flags = 0
   );
+  /**
+   * Tooltips as the mockup draws them (styles.css .tooltip): near-black, rounded, a little padding, at most about 22 em
+   * wide with the words wrapped. A text with more than one line shows its first line as a semibold title and the rest
+   * in the quieter grey. EdBeginTooltip opens one for a body of the caller's own (ImGui::EndTooltip closes it).
+   */
+  bool EdBeginTooltip();
+  void EdTooltipText(const char* text);
+  void EdSetTooltip(const char* format, ...) IM_FMTARGS(1);
+  /** When the last item is hovered as ImGui's SetItemTooltip waits for. */
+  void EdSetItemTooltip(const char* format, ...) IM_FMTARGS(1);
 } // namespace faf::editor

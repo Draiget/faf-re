@@ -160,14 +160,14 @@ namespace faf::editor
         if (ImGui::Button("Edit in the Particle Editor", ImVec2(-1.0f, 0.0f))) {
           mOpenEditorAsk = true; // the editor opens and this browser closes (EdShell)
         }
-        ImGui::SetItemTooltip(
+        EdSetItemTooltip(
           "Opens it in the Particle Editor to change (this browser closes); Save there writes a copy into the map's "
           "folder"
         );
         if (ImGui::Button("Place on the map", ImVec2(-1.0f, 0.0f))) {
           mPlaceAsk = mBrowserPick;
         }
-        ImGui::SetItemTooltip(
+        EdSetItemTooltip(
           "An effect decoration at the middle of the map's view (an Effect marker: move it with the Markers tool; "
           "the map's script plays it in the game)"
         );
@@ -187,7 +187,7 @@ namespace faf::editor
       ImGui::SameLine();
       ImGui::SetNextItemWidth(Em(110.0f));
       (void)EdCombo("##type", &mBrowseType, kTypes, 4);
-      ImGui::SetItemTooltip("Types are read from the files as their tiles show");
+      EdSetItemTooltip("Types are read from the files as their tiles show");
       ImGui::SameLine();
       ImGui::SetNextItemWidth(-1.0f);
       ImGui::InputTextWithHint("##search", "Search names", mGridFilter, sizeof(mGridFilter));
@@ -274,7 +274,7 @@ namespace faf::editor
               ImGui::PopTextWrapPos();
               ImGui::EndGroup();
               if (hovered) {
-                ImGui::SetTooltip(
+                EdSetTooltip(
                   "%s\n%s, %s, %s\nClick to play it in the preview",
                   info.path.c_str(),
                   kEffectFactions[info.faction],

@@ -1085,7 +1085,7 @@ namespace faf::editor
         mWhere = i;
       }
       if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) {
-        ImGui::SetTooltip("%s", kWhereNames[i]);
+        EdSetTooltip("%s", kWhereNames[i]);
       }
     }
     for (int i = 0; i < 2; ++i) {
@@ -1099,7 +1099,7 @@ namespace faf::editor
       mOpenFileAsk = true;
     }
     if (ImGui::IsItemHovered()) {
-      ImGui::SetTooltip(
+      EdSetTooltip(
         "A map folder anywhere on disk: pick its _scenario.lua. The editor adds it to the game's maps until it closes."
       );
     }
@@ -1207,7 +1207,7 @@ namespace faf::editor
                 current
               );
               if (card.hovered && !details.disk.empty()) {
-                ImGui::SetTooltip("%s\n%s\nClick to open for editing", scenario.c_str(), details.disk.c_str());
+                EdSetTooltip("%s\n%s\nClick to open for editing", scenario.c_str(), details.disk.c_str());
               }
               if (card.clicked) {
                 OpenMap(scenario);
@@ -1259,7 +1259,7 @@ namespace faf::editor
             OpenMap(scenario);
           }
           if (ImGui::IsItemHovered() && !details.disk.empty()) {
-            ImGui::SetTooltip("%s\n%s\nDouble-click to open for editing", scenario.c_str(), details.disk.c_str());
+            EdSetTooltip("%s\n%s\nDouble-click to open for editing", scenario.c_str(), details.disk.c_str());
           }
           rowMenu(scenario, index, details);
           ImGui::SameLine(0.0f, 0.0f);
@@ -1663,7 +1663,7 @@ namespace faf::editor
           text
         );
         if (card.hovered && !map.description.empty()) {
-          ImGui::SetTooltip("%s", map.description.c_str());
+          EdSetTooltip("%s", map.description.c_str());
         }
         if (card.clicked && !working) {
           Download(map.folder);

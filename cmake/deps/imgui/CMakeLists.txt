@@ -35,10 +35,11 @@ endif()
 set_target_properties(faf_imgui_core PROPERTIES FOLDER "dependencies")
 
 if(NOT FAF_LINUX)
-  add_library(faf_imgui STATIC "${_imgui}/backends/imgui_impl_win32.cpp")
+  # The editor's panels draw their text through FreeType with hinting (misc/freetype; the editor sets the loader).
+  add_library(faf_imgui STATIC "${_imgui}/backends/imgui_impl_win32.cpp" "${_imgui}/misc/freetype/imgui_freetype.cpp")
   target_compile_options(faf_imgui PRIVATE /W0)
   target_link_libraries(faf_imgui PRIVATE faf_codegen)
-  target_link_libraries(faf_imgui PUBLIC faf_imgui_core dwmapi)
+  target_link_libraries(faf_imgui PUBLIC faf_imgui_core dwmapi faf_freetype)
   set_target_properties(faf_imgui PROPERTIES FOLDER "dependencies")
 endif()
 

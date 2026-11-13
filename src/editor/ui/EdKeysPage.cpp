@@ -1,4 +1,5 @@
 #include "editor/ui/EdKeysPage.h"
+#include "editor/ui/EdControls.h"
 
 #include <algorithm>
 #include <cstdio>
@@ -237,9 +238,9 @@ namespace faf::editor
       ImGui::AlignTextToFramePadding();
       ImGui::TextUnformatted(command.title.c_str());
       if (!command.description.empty() && ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("%s\n%s", command.id.c_str(), command.description.c_str());
+        EdSetTooltip("%s\n%s", command.id.c_str(), command.description.c_str());
       } else if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("%s", command.id.c_str());
+        EdSetTooltip("%s", command.id.c_str());
       }
       std::vector<std::pair<std::string, const EdCommand*>> shared;
       for (int slot = 0; slot < kKeySlots; ++slot) {
@@ -284,7 +285,7 @@ namespace faf::editor
           changed = true;
         }
         if (ImGui::IsItemHovered()) {
-          ImGui::SetTooltip("Back to %s", base.empty() ? "no key" : base.c_str());
+          EdSetTooltip("Back to %s", base.empty() ? "no key" : base.c_str());
         }
       }
       // A key another command has: said under the row, with a button that takes it from the other.

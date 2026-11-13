@@ -1,4 +1,5 @@
 #include "editor/EdLog.h"
+#include "editor/ui/EdControls.h"
 
 #include <cstdio>
 
@@ -108,7 +109,7 @@ namespace faf::editor
     ImGui::SameLine();
     ImGui::Checkbox("Times", &mShowTimes);
     if (ImGui::IsItemHovered()) {
-      ImGui::SetTooltip("Each line's time, in seconds since the editor started");
+      EdSetTooltip("Each line's time, in seconds since the editor started");
     }
     ImGui::SameLine();
     ImGui::Checkbox("Follow", &mAutoScroll);

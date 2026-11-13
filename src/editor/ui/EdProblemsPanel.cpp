@@ -1,6 +1,7 @@
 // The Problems panel (View > Problems, the status bar's count): EdShell's members.
 
 #include <string>
+#include "editor/ui/EdControls.h"
 #include <vector>
 
 #include "editor/EdLog.h"
@@ -130,7 +131,7 @@ namespace faf::editor
         }
       }
       if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) {
-        ImGui::SetTooltip("%s\n%s\nClick to go to it", row.title.c_str(), row.text.c_str());
+        EdSetTooltip("%s\n%s\nClick to go to it", row.title.c_str(), row.text.c_str());
       }
       ImDrawList* const dl = ImGui::GetWindowDrawList();
       dl->AddCircleFilled(
