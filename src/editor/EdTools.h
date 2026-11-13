@@ -17,6 +17,7 @@
 #include "editor/doc/EdWaterBodies.h"
 #include "editor/tools/EdDecals.h"
 #include "editor/tools/EdMarkers.h"
+#include "editor/tools/EdPickFilter.h"
 #include "editor/doc/EdViewState.h"
 #include "editor/tools/EdTextureLibrary.h"
 
@@ -1276,6 +1277,15 @@ namespace faf::editor
       to = mLayerMoveTo;
       return from >= 0;
     }
+    /** What the Select tool may pick (its panel's Pick pills). */
+    [[nodiscard]] PickFilter& Pickable() noexcept
+    {
+      return mPickable;
+    }
+    [[nodiscard]] const PickFilter& Pickable() const noexcept
+    {
+      return mPickable;
+    }
     /** The minimap's click: the camera looks at (x, z) next frame (the scene takes it). */
     void AskCameraAt(
       const float x,
@@ -2002,6 +2012,7 @@ namespace faf::editor
     ViewFrame mViewFrame;
     float mMinimapRect[4]{};
     int mLayerMoveFrom = -1;
+    PickFilter mPickable;
     int mLayerMoveTo = -1;
     bool mCameraAsk = false;
     float mCameraAskX = 0.0f;

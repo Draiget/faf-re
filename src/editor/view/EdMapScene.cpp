@@ -875,6 +875,20 @@ namespace faf::editor
           mCursorInView = true;
         }
       }
+      // Once, after the camera has settled: what a click there would pick (the Select tool's pick filter applies).
+      if (++mTestHoverFrames == 90) {
+        const PickHit hit = PickAnything(mCursor);
+        const std::vector<SaveEntry>& markers = mDocument.SaveData().Markers();
+        const char* const kinds[] = {"nothing", "prop", "marker", "unit", "decal"};
+        gpg::Logf(
+          "editor: /hovermarker: a click would pick %s%s%s",
+          kinds[static_cast<int>(hit.kind)],
+          hit.kind == PickKind::Marker ? " " : "",
+          hit.kind == PickKind::Marker && hit.index >= 0 && static_cast<std::size_t>(hit.index) < markers.size()
+            ? markers[static_cast<std::size_t>(hit.index)].name.c_str()
+            : ""
+        );
+      }
     }
     // The marker under the cursor, drawn in the hover colour next frame (the Select and Markers tools).
     std::string hoverMarker;
@@ -4022,7 +4036,7 @@ namespace faf::editor
           ++count;
         }
       }
-    } else if (mTools->SelectToolActive() && mMap->mProps != nullptr) {
+    } else if (mTools->SelectToolActive() && mMap->mProps != nullptr && mTools->Pickable().props) {
       kind = "props";
       if (!add) {
         mSelection.clear();
@@ -4845,14 +4859,19 @@ namespace faf::editor
         best = PickHit{kind, index};
       }
     };
+    // What the Select tool's Pick pills let through (all of it without the tools).
+    const PickFilter pickable = mTools != nullptr ? mTools->Pickable() : PickFilter{};
     const std::vector<SaveEntry>& markers = mDocument.SaveData().Markers();
     for (std::size_t i = 0; i < markers.size(); ++i) {
       float x = 0.0f, y = 0.0f, z = 0.0f;
-      if (!MarkerHidden(markers[i]) && ShownMarkerPosition(markers[i], x, y, z)) {
+      if (
+        pickable.Marker(MarkerGroupOf(markers[i])) && !MarkerHidden(markers[i]) &&
+        ShownMarkerPosition(markers[i], x, y, z)
+      ) {
         consider(PickKind::Marker, static_cast<int>(i), Wm3::Vec3f{x, y, z}, 4.0f, 14.0f);
       }
     }
-    for (std::size_t i = 0; i < mUnitRefs.size() && (mTools == nullptr || mTools->ShowUnits()); ++i) {
+    for (std::size_t i = 0; i < mUnitRefs.size() && pickable.units && (mTools == nullptr || mTools->ShowUnits()); ++i) {
       if (
         mTools != nullptr && !mTools->PreviewHiddenUnits().empty() &&
         mTools->PreviewHiddenUnits().count({mUnitRefs[i].army, mUnitRefs[i].name}) != 0
@@ -4861,7 +4880,7 @@ namespace faf::editor
       }
       consider(PickKind::Unit, static_cast<int>(i), mUnitRefs[i].position, 2.5f, 16.0f);
     }
-    if (mMap->mProps != nullptr && (mTools == nullptr || mTools->ShowProps())) {
+    if (mMap->mProps != nullptr && pickable.props && (mTools == nullptr || mTools->ShowProps())) {
       const auto& entries = mMap->mProps->mEntries;
       for (std::size_t i = 0; i < entries.size(); ++i) {
         consider(PickKind::Prop, static_cast<int>(i), entries[i].mTransform.pos_, 3.0f, 12.0f);
@@ -4870,7 +4889,7 @@ namespace faf::editor
     // Nothing near: the decal under the cursor.
     float gx = 0.0f;
     float gz = 0.0f;
-    if (best.kind == PickKind::None && GroundAt(cursor.x, cursor.y, gx, gz)) {
+    if (best.kind == PickKind::None && pickable.decals && GroundAt(cursor.x, cursor.y, gx, gz)) {
       if (const int decal = PickDecal(gx, gz); decal >= 0) {
         best = PickHit{PickKind::Decal, decal};
       }

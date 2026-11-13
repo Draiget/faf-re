@@ -228,6 +228,8 @@ The tools are picked in the **tool strip** down the window's left edge (the mock
 
 **Moving a layer** (the Layers panel: drag a layer onto another, or Move up / Move down from its right-click menu; `tools/EdLayerConvert.cpp` LayerMoveArrangement, MoveLayerMasks; `EdMapScene::MoveLayer`): strata 1 to 8 move with their masks and textures, the ones between shifting one place; a weight keeps its meaning when it lands on a stratum the shader reads remapped. One undo step. `/movelayer from,to[,undo]` moves one in a test run (and undoes it two seconds later).
 
+**Pick filter** (the Select tool's Pick pills; `tools/EdPickFilter.h`): which kinds a click, the hover and a box may pick: Markers, Path nodes (their own kind), Units, Props, Decals. Kinds switched off stay drawn but can't be picked or moved, so working on units or props doesn't grab a decal or a path node. `/pickfilter <kinds>` sets it in a test run (markers, pathnodes, units, props, decals); with `/hovermarker` the log says what a click there would pick.
+
 ## How it is built
 
 - **Target:** `src/editor/CMakeLists.txt` adds `faf_editor`, which links the engine's object library `faf_engine` whole, as the engine tests do, so the engine's objects are linked in the game's order. The game's `WinMain` is one of them, so the editor starts at its own `main()` (`/ENTRY:mainCRTStartup`). It carries the game's window resources and manifest and the DXC DLLs as the game does.

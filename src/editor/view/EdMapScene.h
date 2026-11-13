@@ -704,6 +704,7 @@ namespace faf::editor
 
   private:
     std::string mTestHover;
+    int mTestHoverFrames = 0;
     bool mOverPlay = false;
     bool mLiveMaskSizeWarned = false;
     std::uint32_t mWaterErodeSeed = 0;

@@ -2,6 +2,7 @@
 // carries its type's properties in the saves' order, and positions, colours and path links read back.
 
 #include "editor/tools/EdMarkers.h"
+#include "editor/tools/EdPickFilter.h"
 
 #include <algorithm>
 
@@ -108,6 +109,25 @@ namespace
     // A type the palette doesn't know (a mod's) goes to Other.
     SaveEntry odd{"x", {{"type", faf::editor::StringValue("Weather Generator")}}};
     EXPECT_EQ(faf::editor::MarkerGroupOf(odd), MarkerGroup::Other);
+  }
+
+  TEST(
+    Markers,
+    PickFilterSeparatesPathNodesFromOtherMarkers
+  )
+  {
+    using faf::editor::MarkerGroup;
+    faf::editor::PickFilter filter;
+    EXPECT_TRUE(filter.All()) << "everything pickable at first";
+    filter.markers = false;
+    EXPECT_FALSE(filter.Marker(MarkerGroup::Resources));
+    EXPECT_FALSE(filter.Marker(MarkerGroup::Starts));
+    EXPECT_TRUE(filter.Marker(MarkerGroup::PathNodes)) << "path nodes are their own kind";
+    filter.markers = true;
+    filter.pathNodes = false;
+    EXPECT_FALSE(filter.Marker(MarkerGroup::PathNodes));
+    EXPECT_TRUE(filter.Marker(MarkerGroup::Ai));
+    EXPECT_FALSE(filter.All());
   }
 
   TEST(

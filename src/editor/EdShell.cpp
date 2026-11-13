@@ -92,6 +92,22 @@ namespace faf::editor
   void EdShell::UpdateTestRun()
   {
     const double now = ImGui::GetTime();
+    // `/pickfilter <kinds>` (test runs): the Select tool picks only these (markers, pathnodes, units, props, decals).
+    {
+      static bool pickDone = false;
+      fa::vector<fa::string> value;
+      if (!pickDone && moho::CFG_GetArgOption("/pickfilter", 1, &value) && !value.empty()) {
+        pickDone = true;
+        const std::string kinds = std::string(",") + value[0].c_str() + ",";
+        PickFilter& pickable = mTools.Pickable();
+        pickable.markers = kinds.find(",markers,") != std::string::npos;
+        pickable.pathNodes = kinds.find(",pathnodes,") != std::string::npos;
+        pickable.units = kinds.find(",units,") != std::string::npos;
+        pickable.props = kinds.find(",props,") != std::string::npos;
+        pickable.decals = kinds.find(",decals,") != std::string::npos;
+        gpg::Logf("editor: /pickfilter %s", value[0].c_str());
+      }
+    }
     // `/movelayer from,to` (test runs, strata 1 to 8): the layer moved once the map is open.
     {
       static bool moveDone = false;

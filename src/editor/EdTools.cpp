@@ -1090,6 +1090,27 @@ namespace faf::editor
 
   void EdTools::DrawSelect()
   {
+    // What a click, the hover and a box may pick: the others stay drawn but can't be grabbed or moved.
+    if (Section("Pick")) {
+      const auto pill = [](const char* const label, bool& on, const char* const tip) {
+        if (PillToggle(label, on)) {
+          on = !on;
+          gpg::Logf("editor: Select picks %s: %s", label, on ? "on" : "off");
+        }
+        ImGui::SetItemTooltip("%s", tip);
+        ImGui::SameLine(0.0f, Em(6.0f));
+      };
+      pill("Markers", mPickable.markers, "Start positions, resources, AI and other markers");
+      pill("Path nodes", mPickable.pathNodes, "Land, water, amphibious and air path nodes");
+      pill("Units", mPickable.units, "The armies' and civilians' units");
+      ImGui::NewLine();
+      pill("Props", mPickable.props, "Trees, rocks and wrecks (a box selects props)");
+      pill("Decals", mPickable.decals, "Decals on the ground");
+      ImGui::NewLine();
+      if (!mPickable.All()) {
+        Note("Kinds switched off stay in the view but can't be picked or moved.");
+      }
+    }
     // What is selected, and what a click would pick (the white ring in the view).
     ImGui::TextUnformatted(mSelectSelected.empty() ? "Nothing selected" : mSelectSelected.c_str());
     ImGui::TextDisabled("Under the cursor: %s", mSelectHover.empty() ? "-" : mSelectHover.c_str());
