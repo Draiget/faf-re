@@ -5,7 +5,12 @@
 //
 //	GOOS=linux go build -o server-scenario ./cmd/server-scenario
 //	server-scenario --build <dir with server, headless, faf_server_probe> --data <game data, as server --data>
-//	    --out <dir> scenarios/server/server-1v1.yaml
+//	    --out <dir> [--sync-policy <file>] [--no-spy] scenarios/server/server-1v1.yaml
+//
+// The playback runs the spy client too (headless --view-bench --lua-routing --spy): every Lua Sync key and id each
+// player's client would get in that game is checked against its audience, and one outside it, a renumbered id sent
+// raw, a view that doesn't decode or a fan-out guard flag fails the scenario. --sync-policy gives the server and the
+// spy a routing policy file (tools/sync-routing/policy_gen.py) in place of the compiled table.
 //
 // The scenario files are tools/scenarios/server/*.yaml (a folder of their own: mpemu loads tools/scenarios/*.yaml) (format below, in Scenario). Exit code 0 when every check
 // passed, 1 when one failed, 2 for bad input.
@@ -102,6 +107,10 @@ var (
 	viewsRe    = regexp.MustCompile(`(\d+) views, (\d+) didn't decode`)
 	verdictRe  = regexp.MustCompile(`VERDICT ended=(\w+) mismatches=(\d+) crash=(\w+)`)
 	beatsRe    = regexp.MustCompile(`beats=(\d+)`)
+	// headless --spy's line (src/headless/ReplaySyncSpy.cpp).
+	spyRe = regexp.MustCompile(`lua spy: (\d+) keys over (\d+) view beats, \d+ ids \(\d+ in marked fields\); ` +
+		`(\d+) keys with no route, (\d+) outside their audience, (\d+) renumbered ids sent raw, (\d+) that did not ` +
+		`decode; (\d+) unmarked ids of other armies; (\d+) writes of unrouted keys, (\d+) fan-out guard flags`)
 	failures   []string
 	failuresMu sync.Mutex
 )
@@ -157,9 +166,13 @@ func main() {
 	data := flag.String("data", "", "game data folder (server --data; headless uses <data>/faf/bin/init_replay.lua)")
 	outDir := flag.String("out", "", "output folder (made empty first)")
 	port := flag.Int("port", 27100, "the server's UDP port on 127.0.0.1")
+	syncPolicy := flag.String("sync-policy", "", "a Lua Sync routing policy file for the server and the spy "+
+		"(tools/sync-routing/policy_gen.py); default the compiled table")
+	noSpy := flag.Bool("no-spy", false, "play the replay back without the spy")
 	flag.Parse()
 	if flag.NArg() != 1 || *build == "" || *data == "" || *outDir == "" {
-		fmt.Fprintln(os.Stderr, "usage: server-scenario --build <dir> --data <dir> --out <dir> [--port n] <scenario.yaml>")
+		fmt.Fprintln(os.Stderr, "usage: server-scenario --build <dir> --data <dir> --out <dir> [--port n] "+
+			"[--sync-policy <file>] [--no-spy] <scenario.yaml>")
 		os.Exit(2)
 	}
 	raw, err := os.ReadFile(flag.Arg(0))
@@ -200,6 +213,9 @@ func main() {
 		"/nosound", "--status-minutes", "0.25"}
 	if s.Server.StopBeat > 0 {
 		args = append(args, "--stop-beat", strconv.Itoa(s.Server.StopBeat))
+	}
+	if *syncPolicy != "" {
+		args = append(args, "--sync-policy", *syncPolicy)
 	}
 	args = append(args, s.Server.Args...)
 	serverOut := filepath.Join(*outDir, "server.out")
@@ -327,9 +343,18 @@ func main() {
 	if s.Expect.Playback {
 		replay := filepath.Join(*outDir, "game", "game.scfareplay")
 		playOut := filepath.Join(*outDir, "playback.out")
-		_, done, err := start(filepath.Join(*build, "headless"), []string{"--label", "playback", "--replay", replay,
+		playArgs := []string{"--label", "playback", "--replay", replay,
 			"/init", filepath.Join(*data, "faf", "bin", "init_replay.lua"), "/nobugreport", "/nosound",
-			"/log", filepath.Join(*outDir, "playback.log"), "--timeout", "30"}, playOut)
+			"/log", filepath.Join(*outDir, "playback.log"), "--timeout", "30"}
+		if !*noSpy {
+			// The spy client (plan WP16.3) in every scenario game: the same game's views built again with the Lua
+			// routing, and every Lua key and id each player's client would receive checked against its audience.
+			playArgs = append(playArgs, "--view-bench", filepath.Join(*outDir, "playback.bench"), "--lua-routing", "--spy")
+			if *syncPolicy != "" {
+				playArgs = append(playArgs, "--sync-policy", *syncPolicy)
+			}
+		}
+		_, done, err := start(filepath.Join(*build, "headless"), playArgs, playOut)
 		if err != nil {
 			fail("playback: %v", err)
 		} else {
@@ -348,6 +373,21 @@ func main() {
 					b = beats[1]
 				}
 				fmt.Printf("playback: %s beats, mismatches 0\n", b)
+			}
+			if !*noSpy {
+				spy := lastMatch(spyRe, body)
+				switch {
+				case spy == nil:
+					fail("spy: no summary line")
+				case spy[4] != "0" || spy[5] != "0" || spy[6] != "0" || spy[9] != "0":
+					fail("spy: %s outside their audience, %s renumbered ids sent raw, %s didn't decode, %s fan-out "+
+						"guard flags", spy[4], spy[5], spy[6], spy[9])
+				default:
+					// Keys with no route reach observers only (never a leak); unmarked ids are reported for a look.
+					fmt.Printf("spy: %s keys over %s view beats, 0 outside their audience, 0 sent raw, 0 undecoded, "+
+						"0 guard flags; %s keys with no route (%s writes, observers only), %s unmarked ids of other "+
+						"armies\n", spy[1], spy[2], spy[3], spy[8], spy[7])
+				}
 			}
 		}
 	}
