@@ -1548,7 +1548,8 @@ namespace moho
 
     auto* const terrainRes = mTerrainResource;
 
-    bool dirty = terrainRes->IsInEditMode();
+    // Engine addition: in edit mode only when the heights moved (TerrainHeightsMoved), not every frame.
+    bool dirty = terrainRes->IsInEditMode() && TerrainHeightsMoved(this);
     if (!dirty) {
       dirty = mCamera->tranform.Compare(mOverlayTransform);
     }

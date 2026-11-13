@@ -148,6 +148,22 @@ namespace faf::editor
     [[nodiscard]] std::vector<EdTools::LayerSlot> LayerSlots() const;
     /** The paint layer's mask cleared, or read from / written to a grey image (PNG, RAW: 0-255 as 0-65535). */
     bool ClearMaskLayer(int layer, std::string& message);
+    /** The panels keep a copy of the minimap (composited view): it is then drawn only every 20 frames. */
+    void SetMiniMapCached(
+      const bool cached
+    ) noexcept
+    {
+      mMiniCached = cached;
+    }
+    /** Whether the frame the game's output holds now has the minimap drawn, and where (view pixels: x, y, w, h). */
+    [[nodiscard]] bool MiniMapInLastFrame() const noexcept
+    {
+      return mMiniView != nullptr && mMiniDrewLast;
+    }
+    [[nodiscard]] const float* MiniMapRect() const noexcept
+    {
+      return mMiniRect;
+    }
     /**
      * The terrain types from the texture layers (TerrainTypesFromLayers): `types[layer]` for layer 0 (the base) to 8,
      * the layers the shader paints and that have a texture; `onlyDefault` leaves painted types. One undo step. Returns
@@ -564,6 +580,10 @@ namespace faf::editor
     std::vector<TerrainTypeRun> mSlopeRuns;
     std::uint64_t mSlopeHeights = 0;
     std::uint64_t mSlopeKey = 0;
+    bool mMiniCached = false;
+    bool mMiniDrawNow = true;
+    bool mMiniDrewLast = false;
+    unsigned mMiniFrame = 0;
     int mSlopeBlock = 1;                                    // cells per drawn block of the slope view
     std::vector<moho::CD3DPrimBatcher::Vertex> mSlopeQuads; // the slope view's quads drawn this frame
     std::vector<std::vector<moho::CD3DPrimBatcher::Vertex>>
@@ -926,7 +946,11 @@ namespace faf::editor
     EdDocument& mDocument;
     moho::CWldMap* mMap = nullptr;
     moho::CameraImpl* mCamera = nullptr;
-    std::unique_ptr<moho::SimpleRenderWorldView> mWorldView;
+    std::unique_ptr<class EdMainView> mWorldView;
+    friend class EdMainView;
+    /** The editor's overlays, drawn in the main view's overlay pass (EdMainView::Render). */
+    void DrawViewOverlays();
+    bool mOverlaysDrawn = false;
     // The minimap: an overhead orthographic camera over the whole map, drawn in the rectangle the shell keeps for it.
     moho::CameraImpl* mMiniCamera = nullptr;
     std::unique_ptr<class EdMiniMapView> mMiniView;

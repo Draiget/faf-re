@@ -80,6 +80,7 @@
 #include "gpg/gal/backends/common/ImageCodec.h"
 #include "gpg/gal/Device.hpp"
 #include "gpg/gal/Error.hpp"
+#include "gpg/gal/RenderProfiler.h"
 #include "imgui.h"
 #include "imgui_impl_win32.h"
 #include "imgui_internal.h"
@@ -148,9 +149,9 @@ namespace faf::editor
         "/vaultsearch",    "/vaultmap",       "/newmap",         "/stamp",           "/brush",       "/layer",
         "/waterbody",      "/ruler",          "/adaptivewindow", "/maskrule",        "/maskgen",     "/symhover",
         "/stbfont",        "/recipe",         "/texset",         "/layerop",         "/slopeview",   "/typesfromlayers",
-        "/uncapped",       "/symmenu",        "/panelbottom",    "/shader",          "/brushtest",   "/brushshape",
-        "/stampsource",    "/stampstroke",    "/symoptions",     "/maskoptions",     "/masktest",    "/shaderbrowser",
-        "/convertlayers",
+        "/uncapped",       "/nominimap",      "/symmenu",        "/panelbottom",     "/shader",      "/brushtest",
+        "/brushshape",     "/stampsource",    "/stampstroke",    "/symoptions",      "/maskoptions", "/masktest",
+        "/shaderbrowser",  "/convertlayers",
       };
       for (const char* const option : kOptions) {
         if (moho::CFG_GetArgOption(option, 0, nullptr)) {
@@ -2080,6 +2081,16 @@ namespace faf::editor
       std::uint64_t mFramesRun = 0;
       /** The game's head copied for the panels (CopyGameView), and its image for the draw lists. */
       void CopyGameView();
+      /** The minimap's rectangle of the game's last frame into a target of its own, when it was drawn in that frame. */
+      void CopyMiniMap(
+        gpg::gal::Device& device,
+        moho::CD3DDevice& d3d,
+        const boost::shared_ptr<gpg::gal::RenderTarget>& output
+      );
+      moho::ID3DDeviceResources::RenderTargetHandle mMiniCopy;
+      moho::ID3DRenderTarget::SurfaceHandle mMiniSurface;
+      int mMiniCopyWidth = 0;
+      int mMiniCopyHeight = 0;
       moho::ID3DDeviceResources::RenderTargetHandle mViewCopy;
       moho::ID3DRenderTarget::SurfaceHandle mViewSurface;
       std::uint32_t mViewCopyWidth = 0;
@@ -3638,11 +3649,15 @@ namespace faf::editor
         }
       }
       mScene.SetCursorInView(MouseOverView());
-      mScene.Update(
-        frameSeconds,
-        playIdle,
-        mShell->EditorViewInPlay() && moho::WLD_GetFrameAction() == moho::EWldFrameAction::Playing
-      );
+      {
+        // FAF_GPU_PROFILE=<frames> lists the editor's own frame stages beside the render passes.
+        const gpg::gal::RenderProfileScope profileScene("EdSceneUpdate");
+        mScene.Update(
+          frameSeconds,
+          playIdle,
+          mShell->EditorViewInPlay() && moho::WLD_GetFrameAction() == moho::EWldFrameAction::Playing
+        );
+      }
       KeepViewState();
       KeepSoundToFocus();
       mShell->Tools().SetModelsLoading(mScene.ModelsPending());
@@ -3771,7 +3786,10 @@ namespace faf::editor
             mScene.PlaceEffect(effect);
           }
         }
-        mShell->Draw();
+        {
+          const gpg::gal::RenderProfileScope profileShell("EdPanels");
+          mShell->Draw();
+        }
         SyncSettings();
         DrawSettings();
         DrawRecover();
@@ -3874,12 +3892,18 @@ namespace faf::editor
           const ImVec2 to(static_cast<float>(gViewRect.right), static_cast<float>(gViewRect.bottom));
           ImGui::GetBackgroundDrawList()->AddImage(static_cast<ImTextureID>(EdImGuiRenderer::kGameViewImage), from, to);
         }
-        ImGui::Render();
-        FitGameView();
-        RenderPanels();
+        {
+          const gpg::gal::RenderProfileScope profilePanels("EdPanelsRender");
+          ImGui::Render();
+          FitGameView();
+          RenderPanels();
+        }
       }
 
-      mGame.Main();
+      {
+        const gpg::gal::RenderProfileScope profileGame("GameMain");
+        mGame.Main();
+      }
       CapBackgroundFrames();
 
       // Lua asked the app to quit (ExitApplication from a game menu) while the window stays open: that ends the
@@ -7029,6 +7053,51 @@ namespace faf::editor
       mViewImage = EdImGuiRenderer::TargetImage(copy.get());
       mViewSurface = copy;
       gViewSurface = copy.get();
+      CopyMiniMap(*device, *d3d, output->surface);
+    }
+
+    void EditorApp::CopyMiniMap(
+      gpg::gal::Device& device,
+      moho::CD3DDevice& d3d,
+      const boost::shared_ptr<gpg::gal::RenderTarget>& output
+    )
+    {
+      EdTools& tools = mShell->Tools();
+      const float* const rect = mScene.MiniMapRect();
+      const int width = static_cast<int>(rect[2]);
+      const int height = static_cast<int>(rect[3]);
+      if (width < 8 || height < 8) {
+        tools.SetMinimapImage(0);
+        mScene.SetMiniMapCached(false);
+        return;
+      }
+      if (mScene.MiniMapInLastFrame()) {
+        if (!mMiniCopy || mMiniCopyWidth != width || mMiniCopyHeight != height) {
+          mMiniCopy.reset();
+          moho::ID3DDeviceResources::RenderTargetHandle target;
+          (void)d3d.GetResources()->CreateRenderTarget(target, width, height, 2);
+          mMiniCopy = target;
+          mMiniCopyWidth = width;
+          mMiniCopyHeight = height;
+        }
+        moho::ID3DRenderTarget::SurfaceHandle surface;
+        if (mMiniCopy) {
+          (void)mMiniCopy->GetSurface(surface);
+        }
+        if (surface) {
+          const RECT from{
+            static_cast<LONG>(rect[0]),
+            static_cast<LONG>(rect[1]),
+            static_cast<LONG>(rect[0]) + width,
+            static_cast<LONG>(rect[1]) + height
+          };
+          device.StretchRect(output, surface, &from, nullptr);
+          mMiniSurface = surface;
+          tools.SetMinimapImage(EdImGuiRenderer::TargetImage(surface.get()));
+        }
+      }
+      // Once a copy exists the minimap needn't be drawn every frame.
+      mScene.SetMiniMapCached(tools.MinimapImage() != 0);
     }
 
     void EditorApp::FitGameView()

@@ -1687,10 +1687,56 @@ namespace faf::editor
         const ImVec2 at = ImGui::GetWindowPos();
         // The map itself is the scene's: an overhead camera draws it into this rectangle of the view (no cursor, no
         // markers), so the window only frames it.
-        mTools.SetMinimapRect(at.x - view.x, at.y - view.y, size.x, size.y);
+        // `/nominimap` (test runs): no overhead camera, to measure what the minimap's second world view costs.
+        static const bool noMinimap = moho::CFG_GetArgOption("/nominimap", 0, nullptr);
+        mTools.SetMinimapRect(at.x - view.x, at.y - view.y, noMinimap ? 0.0f : size.x, noMinimap ? 0.0f : size.y);
         const auto toMini = [&](const float x, const float z) {
           return ImVec2(at.x + (x - frame.minX) / mapW * size.x, at.y + (z - frame.minZ) / mapH * size.y);
         };
+        // The concept's .vp-mini: a drop shadow (0 .6rem 2rem / .45 and 0 .1rem .3rem / .35), the map with rounded
+        // corners, the start positions as white dots; the window draws the 1 px border at 14 % white.
+        const float radius = Em(8.0f);
+        if (const std::uint64_t image = mTools.MinimapImage(); image != 0) {
+          dl->PushClipRectFullScreen();
+          const auto shadow = [&](const float offsetY, const float blur, const float alpha) {
+            constexpr int kLayers = 8;
+            for (int i = kLayers; i >= 1; --i) {
+              const float grow = blur * static_cast<float>(i) / kLayers;
+              const float a = alpha / kLayers * (1.0f - static_cast<float>(i - 1) / kLayers);
+              dl->AddRectFilled(
+                ImVec2(at.x - grow, at.y + offsetY - grow),
+                ImVec2(at.x + size.x + grow, at.y + size.y + offsetY + grow),
+                IM_COL32(0, 0, 0, static_cast<int>(a * 255.0f)),
+                radius + grow
+              );
+            }
+          };
+          shadow(Em(9.6f), Em(20.0f), 0.45f);
+          shadow(Em(1.6f), Em(3.0f), 0.35f);
+          dl->PopClipRect();
+          dl->AddImageRounded(
+            static_cast<ImTextureID>(image),
+            at,
+            ImVec2(at.x + size.x, at.y + size.y),
+            ImVec2(0.0f, 0.0f),
+            ImVec2(1.0f, 1.0f),
+            IM_COL32_WHITE,
+            radius
+          );
+        }
+        for (const SaveEntry& marker : mDocument.SaveData().Markers()) {
+          if (marker.name.rfind("ARMY_", 0) != 0) {
+            continue;
+          }
+          const std::vector<double> position = ValueNumbers(marker.Get("position"));
+          if (position.size() >= 3) {
+            dl->AddCircleFilled(
+              toMini(static_cast<float>(position[0]), static_cast<float>(position[2])),
+              Em(2.2f),
+              IM_COL32(255, 255, 255, 230)
+            );
+          }
+        }
         if (frame.corners >= 3) {
           ImVec2 points[4];
           for (int i = 0; i < frame.corners; ++i) {

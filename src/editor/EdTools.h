@@ -1257,6 +1257,17 @@ namespace faf::editor
      * Where the minimap sits in the view, in the view's pixels (x, y, width, height; zero size when it isn't shown):
      * the scene draws the map from above into it.
      */
+    /** The minimap's last copy as an image (0: none; the scene's view then draws under the frame every frame). */
+    void SetMinimapImage(
+      const std::uint64_t image
+    ) noexcept
+    {
+      mMinimapImage = image;
+    }
+    [[nodiscard]] std::uint64_t MinimapImage() const noexcept
+    {
+      return mMinimapImage;
+    }
     void SetMinimapRect(
       const float x,
       const float y,
@@ -2469,6 +2480,7 @@ namespace faf::editor
     bool mRecipeApply = false;
     bool mRecipesOpen = false;
     std::string mRecipeResult;
+    std::uint64_t mMinimapImage = 0;
     SlopeView mSlopeView;
     std::array<int, 9> mLayerTypeOverride{-1, -1, -1, -1, -1, -1, -1, -1, -1};
     bool mTypesFromLayersAsk = false;

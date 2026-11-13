@@ -72,7 +72,11 @@ namespace faf::editor
     {}
     void Render() override
     {
-      mScene.DrawBrushRings();
+      // Drawn by the main view's own overlay pass (EdMainView) when it ran this frame; here only otherwise.
+      if (!mScene.mOverlaysDrawn) {
+        mScene.DrawBrushRings();
+      }
+      mScene.mOverlaysDrawn = false;
     }
 
   private:
@@ -160,10 +164,113 @@ namespace faf::editor
     {
       return false;
     }
+    /** True: the renderer skips this view this frame (the panels draw its last copy). */
+    [[nodiscard]] bool Func2() override
+    {
+      return mSkip;
+    }
+    void SetSkip(
+      const bool skip
+    ) noexcept
+    {
+      mSkip = skip;
+    }
 
   private:
     moho::SimpleRenderWorldView mInner;
+    bool mSkip = false;
   };
+
+  /**
+   * The main view: the simple view's drawing, with the editor's overlays (rings, slope, markers ...) drawn in its own
+   * overlay pass. They used to draw at the end of the UI pass, over every view, so the minimap (drawn after the main
+   * view) got the main view's overlays laid over it.
+   */
+  class EdMainView final : public moho::IRenderWorldView
+  {
+  public:
+    EdMainView(
+      moho::GeomCamera3* const cameraView,
+      EdMapScene& scene
+    )
+      : mInner(cameraView)
+      , mScene(scene)
+    {}
+    void Render(
+      moho::CD3DPrimBatcher* const batcher,
+      const int gameTick,
+      const float tickFraction,
+      const float frameSeconds
+    ) override
+    {
+      mInner.Render(batcher, gameTick, tickFraction, frameSeconds);
+      mScene.DrawViewOverlays();
+    }
+    void RenderCommandGraph(
+      moho::CD3DPrimBatcher* const batcher,
+      const int gameTick,
+      const float tickFraction,
+      const float frameSeconds
+    ) override
+    {
+      mInner.RenderCommandGraph(batcher, gameTick, tickFraction, frameSeconds);
+    }
+    [[nodiscard]] moho::CameraImpl* GetCamera() override
+    {
+      return mInner.GetCamera();
+    }
+    [[nodiscard]] moho::GeomCamera3* GetCameraView() override
+    {
+      return mInner.GetCameraView();
+    }
+    [[nodiscard]] Wm3::Vector3f* GetCameraOffset() override
+    {
+      return mInner.GetCameraOffset();
+    }
+    [[nodiscard]] float CameraGetTargetZoom() override
+    {
+      return mInner.CameraGetTargetZoom();
+    }
+    [[nodiscard]] float GetMaxZoom() override
+    {
+      return mInner.GetMaxZoom();
+    }
+    [[nodiscard]] float CameraGetZoom() override
+    {
+      return mInner.CameraGetZoom();
+    }
+    [[nodiscard]] bool IsMiniMap() override
+    {
+      return mInner.IsMiniMap();
+    }
+    void SetOrthographic(
+      const bool enabled
+    ) override
+    {
+      mInner.SetOrthographic(enabled);
+    }
+    [[nodiscard]] bool CanShake() override
+    {
+      return mInner.CanShake();
+    }
+    [[nodiscard]] bool Func2() override
+    {
+      return mInner.Func2();
+    }
+
+  private:
+    moho::SimpleRenderWorldView mInner;
+    EdMapScene& mScene;
+  };
+
+  void EdMapScene::DrawViewOverlays()
+  {
+    DrawBrushRings();
+    if (moho::ren_Viewport != nullptr) {
+      moho::ren_Viewport->GetPrimBatcher()->Flush();
+    }
+    mOverlaysDrawn = true;
+  }
 
   EdMapScene::~EdMapScene()
   {
@@ -1364,8 +1471,7 @@ namespace faf::editor
     } else {
       FrameWholeMap();
     }
-    mWorldView =
-      std::make_unique<moho::SimpleRenderWorldView>(const_cast<moho::GeomCamera3*>(&mCamera->CameraGetView()));
+    mWorldView = std::make_unique<EdMainView>(const_cast<moho::GeomCamera3*>(&mCamera->CameraGetView()), *this);
     moho::ren_Viewport->AddWorldView(mWorldView.get(), 0, 0);
     if (mRingHook == nullptr) {
       mRingHook = std::make_unique<RingHook>(*this);
@@ -7942,7 +8048,14 @@ namespace faf::editor
       mMiniRect[2] = 0.0f;
       gpg::Logf("editor: the minimap draws the map from above");
     }
-    if (rect[0] != mMiniRect[0] || rect[1] != mMiniRect[1] || rect[2] != mMiniRect[2] || rect[3] != mMiniRect[3]) {
+    // Drawn again every 20 frames, when its rectangle changes, or every frame while the panels can't keep a copy: the
+    // map changes slowly, and a second world view costs as much as the first.
+    mMiniDrewLast = mMiniDrawNow;
+    const bool moved =
+      rect[0] != mMiniRect[0] || rect[1] != mMiniRect[1] || rect[2] != mMiniRect[2] || rect[3] != mMiniRect[3];
+    mMiniDrawNow = !mMiniCached || moved || ++mMiniFrame % 20 == 0;
+    mMiniView->SetSkip(!mMiniDrawNow);
+    if (moved) {
       for (int i = 0; i < 4; ++i) {
         mMiniRect[i] = rect[i];
       }
