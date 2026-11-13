@@ -207,6 +207,10 @@ namespace gpg::gal
     void CheckAvailableFormats(DeviceContext* context);
     void CreateRenderTargets();
     void ReleaseRenderTargets() noexcept;
+    void BindDefaultOutput();
+    void FlushImmediate() noexcept;
+    /** Logs why and ends the process: nothing can be drawn on a removed device. */
+    void ExitOnDeviceRemoved(HRESULT result, const char* during);
     void Shutdown() noexcept;
     void BindOutputContext();
     void DumpBackBufferIfDue();
@@ -296,6 +300,10 @@ namespace gpg::gal
     Microsoft::WRL::ComPtr<ID3D11BlendState> mClearBlend[2];
     Microsoft::WRL::ComPtr<ID3D11DepthStencilState> mClearDepthStencil[4];
     std::uint32_t mFrameIndex = 0U;
+    // A present the chain keeps refusing asks the engine for a Reset
+    // (TestCooperativeLevel answers 1), which builds the chains again.
+    bool mRecoverRequested = false;
+    std::uint32_t mConsecutiveRecoveries = 0U;
     bool mTracing = false;
     std::uint32_t mDumpSequence = 0U;
     std::int32_t mStreamFrequencies[16]{};
