@@ -371,6 +371,17 @@ set_target_properties(faf_occupation_manager_tests PROPERTIES FOLDER "Tests/Sim"
 add_test(NAME occupation_manager COMMAND faf_occupation_manager_tests)
 set_tests_properties(occupation_manager PROPERTIES LABELS "Sim")
 
+# The map editor's terrain field library (src/editor/terrain, from FAF Studio): golden checksums at every thread count,
+# the Generate ops, the interop ops. Engine independent.
+add_executable(faf_editor_field_tests EXCLUDE_FROM_ALL editor/FieldTests.cpp editor/FieldLandTests.cpp editor/FieldInteropTests.cpp
+  ${CMAKE_SOURCE_DIR}/src/editor/terrain/EdFieldCore.cpp ${CMAKE_SOURCE_DIR}/src/editor/terrain/EdFieldFilt.cpp ${CMAKE_SOURCE_DIR}/src/editor/terrain/EdFieldGen.cpp ${CMAKE_SOURCE_DIR}/src/editor/terrain/EdFieldLand.cpp ${CMAKE_SOURCE_DIR}/src/editor/terrain/EdFieldSc.cpp ${CMAKE_SOURCE_DIR}/src/editor/terrain/EdFieldPath.cpp ${CMAKE_SOURCE_DIR}/src/editor/terrain/EdFieldInterop.cpp)
+target_include_directories(faf_editor_field_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_compile_definitions(faf_editor_field_tests PRIVATE FAF_FIELD_CASES="${CMAKE_CURRENT_SOURCE_DIR}/editor/data/field_cases.lua")
+target_compile_options(faf_editor_field_tests PRIVATE /EHsc)
+target_link_libraries(faf_editor_field_tests PRIVATE gtest_main)
+set_target_properties(faf_editor_field_tests PROPERTIES FOLDER "Tests/Editor")
+add_test(NAME editor_field COMMAND faf_editor_field_tests)
+
 # The map editor height brush, symmetry check, height files and undo (src/editor/tools, src/editor/undo): exact symmetry,
 # byte-exact undo, height images read back as written.
 add_executable(faf_editor_brush_tests EXCLUDE_FROM_ALL editor/HeightBrushTests.cpp editor/HeightHistoryTests.cpp editor/SymmetryCheckTests.cpp editor/HeightFileTests.cpp

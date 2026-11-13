@@ -78,6 +78,13 @@ set(FAF_EDITOR_SOURCES
   tools/EdHeightBrush.cpp
   tools/EdHeightFile.cpp
   tools/EdMaskBrush.cpp
+  terrain/EdFieldCore.cpp
+  terrain/EdFieldFilt.cpp
+  terrain/EdFieldGen.cpp
+  terrain/EdFieldLand.cpp
+  terrain/EdFieldSc.cpp
+  terrain/EdFieldPath.cpp
+  terrain/EdFieldInterop.cpp
   tools/EdMarkers.cpp
   tools/EdDecalShape.cpp
   tools/EdDecals.cpp
