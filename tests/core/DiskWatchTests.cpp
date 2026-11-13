@@ -274,7 +274,9 @@ TEST(
     moho::DISK_AddWatchListener(nullptr);
     moho::DISK_RemoveWatchListener(nullptr);
   }
-  moho::DISK_ResetWatch();
+  // The global watch stays: the resource manager, which the engine's static resource factories build before
+  // main, listens on it, and a watch deleted under it left ~ResourceManager locking freed memory at exit
+  // (DISK_ResetWatch, like retail's ~CDiskWatch, doesn't detach listeners). Its atexit handler deletes it last.
   std::error_code ignored;
   std::filesystem::remove_all(folder, ignored);
 }
