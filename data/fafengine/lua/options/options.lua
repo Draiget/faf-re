@@ -917,3 +917,60 @@ do
         end
     end
 end
+
+-- Water quality (ren_WaterQuality): the size of the reflection target and the filtered reflection and refraction lookups of the water.
+-- It takes effect at once: the water shader patch is always in the effect on the renderers that can run it, the tap counts are shader
+-- constants set every frame and the reflection target is made again when its size changes, so changing it needs no restart. Shown only
+-- by an engine that has the command, as the ones above.
+do
+    local command = 'ren_WaterQuality'
+    local function Supported()
+        -- The engine's Lua reports C functions as 'cfunction'.
+        local kind = type(ConTextMatches)
+        if kind ~= 'function' and kind ~= 'cfunction' then
+            return false
+        end
+        local ok, matches = pcall(ConTextMatches, command)
+        if not ok or type(matches) ~= 'table' then
+            return false
+        end
+        for _, name in ipairs(matches) do
+            if name == command then
+                return true
+            end
+        end
+        return false
+    end
+
+    local video = options and options.video
+    if video and video.items and Supported() then
+        local position = table.getn(video.items) + 1
+        for index, item in ipairs(video.items) do
+            if item.key == 'texture_anisotropy' then
+                position = index + 1
+            end
+        end
+        -- Option values are levels, so a saved preference never reaches the command as text.
+        local levels = { [0] = '0', [1] = '1', [2] = '2', [3] = '3' }
+        table.insert(video.items, position, {
+            title = 'Water Quality',
+            key = 'water_quality',
+            type = 'toggle',
+            default = 1,
+            tip = 'Reflection and refraction of the water. Low draws the mirrored units at half the screen size and filters '
+                .. 'their lookup, Medium also filters the refraction and softens the shoreline, High draws the reflection at '
+                .. '1.5 times the screen size. Changes apply at once. Off is the shipped look.',
+            set = function(key, value, startup)
+                ConExecute(command .. ' ' .. (levels[value] or levels[1]))
+            end,
+            custom = {
+                states = {
+                    { text = 'Off (shipped)', key = 0 },
+                    { text = 'Low (half size)', key = 1 },
+                    { text = 'Medium', key = 2 },
+                    { text = 'High (1.5x)', key = 3 },
+                },
+            },
+        })
+    end
+end
