@@ -349,10 +349,12 @@ namespace gpg::gal::d3d11
       Translator(
         std::string text,
         const bool shaderModel41,
-        const std::string_view original
+        const std::string_view original,
+        const bool functionMath
       )
         : mText(std::move(text))
         , mShaderModel41(shaderModel41)
+        , mFunctionMath(functionMath)
       {
         CollectAlphaTests(original);
       }
@@ -370,7 +372,11 @@ namespace gpg::gal::d3d11
         RewritePasses();
         RestoreD3D9RasterizerSemantics();
         RestoreD3D9AlphaBlending();
-        PrependD3D9IntrinsicDomains();
+        if (mFunctionMath) {
+          PrependD3D9IntrinsicFunctions();
+        } else {
+          PrependD3D9IntrinsicDomains();
+        }
         if (mWrappers != 0U) {
           mNotes.push_back("pixel shader inputs re-linked through " + std::to_string(mWrappers) + " wrapper(s)");
         }
@@ -1118,6 +1124,41 @@ namespace gpg::gal::d3d11
           "#define rsqrt(x) rsqrt(abs(x))\n"
           "#define pow(x, y) (pow(abs(x), (y)) * (((x) < 0 && frac((y) * 0.5) == 0.5) ? -1 : 1))\n"
         );
+      }
+
+      /**
+       * The same emulation for D3DCompile (fxc). Its preprocessor does not
+       * expand a macro whose replacement contains the macro's own name, so
+       * PrependD3D9IntrinsicDomains' `#define sqrt(x) sqrt(abs(x))` leaves
+       * every sqrt as the shader model 4 one: NaN for a negative operand, which
+       * stores as black (the UEF shield's normal reconstruction
+       * sqrt(1 - dot(xy, xy)) went black this way). Here the macros name
+       * helper functions, defined before the macros so they use the real
+       * intrinsics; pow keeps D3D9's |x|^y and the sign of a negative base for
+       * an odd integer exponent.
+       */
+      void PrependD3D9IntrinsicFunctions()
+      {
+        std::string text;
+        for (const char* const type : {"float", "float2", "float3", "float4"}) {
+          const std::string t = type;
+          text += t + " faf_sqrt(" + t + " x) { return sqrt(abs(x)); }\n";
+          text += t + " faf_rsqrt(" + t + " x) { return rsqrt(abs(x)); }\n";
+        }
+        text += "float faf_pow(float x, float y) { float r = pow(abs(x), y); return (x < 0 && frac(y * 0.5) == 0.5) ? "
+                "-r : r; }\n"
+                "float2 faf_pow(float2 x, float2 y) { return float2(faf_pow(x.x, y.x), faf_pow(x.y, y.y)); }\n"
+                "float3 faf_pow(float3 x, float3 y) { return float3(faf_pow(x.x, y.x), faf_pow(x.y, y.y), faf_pow(x.z, "
+                "y.z)); }\n"
+                "float4 faf_pow(float4 x, float4 y) { return float4(faf_pow(x.x, y.x), faf_pow(x.y, y.y), faf_pow(x.z, "
+                "y.z), faf_pow(x.w, y.w)); }\n"
+                "float2 faf_pow(float2 x, float y) { return faf_pow(x, float2(y, y)); }\n"
+                "float3 faf_pow(float3 x, float y) { return faf_pow(x, float3(y, y, y)); }\n"
+                "float4 faf_pow(float4 x, float y) { return faf_pow(x, float4(y, y, y, y)); }\n"
+                "#define sqrt(x) faf_sqrt(x)\n"
+                "#define rsqrt(x) faf_rsqrt(x)\n"
+                "#define pow(x, y) faf_pow(x, y)\n";
+        mText.insert(0U, text);
       }
 
       void DropUndefinedFixedFunctionTechniques()
@@ -1982,6 +2023,7 @@ namespace gpg::gal::d3d11
       std::map<std::string, std::string> mAlphaTestWrappers; // pixel shader | function | reference -> wrapper
       std::size_t mAlphaTestedPasses = 0U;
       bool mShaderModel41 = false;
+      bool mFunctionMath = false;
     };
   } // namespace
 
@@ -1990,7 +2032,8 @@ namespace gpg::gal::d3d11
   TranslatedEffectSource TranslateEffectSource(
     const std::string_view preprocessed,
     const bool shaderModel41,
-    const std::string_view original
+    const std::string_view original,
+    const bool functionMath
   )
   {
     static const bool sStartupFlagRead = [] {
@@ -2002,7 +2045,8 @@ namespace gpg::gal::d3d11
     }();
     (void)sStartupFlagRead;
 
-    TranslatedEffectSource result = Translator(StripDirectives(preprocessed), shaderModel41, original).Run();
+    TranslatedEffectSource result =
+      Translator(StripDirectives(preprocessed), shaderModel41, original, functionMath).Run();
 
     static const bool sVerify = [] {
       const char* const value = std::getenv("FAF_FX_SCAN_VERIFY");
@@ -2011,7 +2055,8 @@ namespace gpg::gal::d3d11
     if (sVerify) {
       const bool wasFast = gEffectFastScan;
       gEffectFastScan = !wasFast;
-      const TranslatedEffectSource other = Translator(StripDirectives(preprocessed), shaderModel41, original).Run();
+      const TranslatedEffectSource other =
+        Translator(StripDirectives(preprocessed), shaderModel41, original, functionMath).Run();
       gEffectFastScan = wasFast;
       gpg::Logf(
         "effect scan verify: %zu bytes, %s",
