@@ -2215,6 +2215,10 @@ void moho::WIN_AppExecute(
       continue;
     }
 
+#if FAFRE_PLATFORM_POSIX
+    // Engine addition: a window size that has settled reaches the device between frames.
+    WSupComFrame::ApplyPendingResize();
+#endif
     // Engine addition: where the frame's WM_PAINT would come, after the messages and before idle.
     if (moho::D3D_RunDirectPaint()) {
       success = true;
