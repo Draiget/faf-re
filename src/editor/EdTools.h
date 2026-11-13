@@ -1448,6 +1448,60 @@ namespace faf::editor
       return 0xFFFF00FFu;
     }
     /** The view aids: the slope bands, the km grid with the centre lines, and the status bar's cursor and ruler. */
+    /** The slope view's rule: mobile units by footprint, or structures by skirt and building rule, against a limit. */
+    struct SlopeView
+    {
+      bool buildings = false;
+      int footprint = 1; // cells
+      int skirt = 2;     // cells
+      bool ring = true;  // a flattened skirt (most buildings); else the whole area
+      float unitLimit = 0.75f;
+      float ringLimit = 1.0f;
+      float areaLimit = 1.0f;
+      /** The rule as the ratings name it: 0 path, 1 area, 2 ring; its window in cells; its limit in world units. */
+      [[nodiscard]] int Kind() const noexcept
+      {
+        return !buildings ? 0 : ring ? 2 : 1;
+      }
+      [[nodiscard]] int Window() const noexcept
+      {
+        return buildings ? skirt : footprint;
+      }
+      [[nodiscard]] float Limit() const noexcept
+      {
+        return !buildings ? unitLimit : ring ? ringLimit : areaLimit;
+      }
+    };
+    [[nodiscard]] SlopeView& SlopeSettings() noexcept
+    {
+      return mSlopeView;
+    }
+    /** Terrain types from the layers: Generate asked, with each layer's type (0 the base) and whether only Default
+     * cells change. */
+    [[nodiscard]] bool TakeTypesFromLayers(
+      std::array<int, 9>& types,
+      bool& onlyDefault
+    )
+    {
+      if (!mTypesFromLayersAsk) {
+        return false;
+      }
+      mTypesFromLayersAsk = false;
+      for (std::size_t layer = 0; layer < types.size(); ++layer) {
+        types[layer] = mLayerTypeOverride[layer] >= 0 || layer >= mSlots.size()
+          ? std::max(1, mLayerTypeOverride[layer])
+          : DefaultTerrainTypeFor(mSlots[layer].albedo, mTerrainTypes);
+      }
+      onlyDefault = mTypesOnlyDefault;
+      return true;
+    }
+    void AskTypesFromLayers(
+      const bool onlyDefault
+    ) noexcept
+    {
+      mTypesFromLayersAsk = true;
+      mTypesOnlyDefault = onlyDefault;
+    }
     [[nodiscard]] bool ShowSlope() const noexcept
     {
       return mShowSlope;
@@ -2415,6 +2469,11 @@ namespace faf::editor
     bool mRecipeApply = false;
     bool mRecipesOpen = false;
     std::string mRecipeResult;
+    SlopeView mSlopeView;
+    std::array<int, 9> mLayerTypeOverride{-1, -1, -1, -1, -1, -1, -1, -1, -1};
+    bool mTypesFromLayersAsk = false;
+    bool mTypesOnlyDefault = false;
+    void DrawTypesFromLayers();
     std::array<float, 10> mOptimalTiles{};
     int mThemeIndex = 1;
     ThemeOp mThemeOp = ThemeOp::None;

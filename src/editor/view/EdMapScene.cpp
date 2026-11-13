@@ -1,4 +1,6 @@
 #include "editor/view/EdMapScene.h"
+#include "editor/tools/EdShaderProfiles.h"
+#include "editor/tools/EdSlopeRules.h"
 #include "editor/doc/EdUnitFate.h"
 
 #include <algorithm>
@@ -167,6 +169,38 @@ namespace faf::editor
   {
     Detach();
   }
+
+  namespace
+  {
+    /**
+     * A run of overlay cells (`scale` world units each) as quads on the ground, cut every 8 units: one long quad
+     * between the heights at its two ends cut through ridges and floated over valleys (the slope and terrain-type views
+     * showed streaks of ground through them).
+     */
+    template <class GroundVertex>
+    void AddGroundRun(
+      std::vector<moho::CD3DPrimBatcher::Vertex>& quads,
+      const GroundVertex& groundVertex,
+      const TerrainTypeRun& run,
+      const std::uint32_t color,
+      const float scale,
+      const float pieceUnits = 8.0f
+    )
+    {
+      const float z0 = static_cast<float>(run.z) * scale;
+      const float z1 = z0 + scale;
+      // `pieceUnits` a quad: short enough to follow the ground, few enough to draw a whole map.
+      const int piece = std::max(1, static_cast<int>(pieceUnits / scale));
+      for (int x = run.x0; x < run.x1; x += piece) {
+        const float x0 = static_cast<float>(x) * scale;
+        const float x1 = static_cast<float>(std::min(x + piece, run.x1)) * scale;
+        quads.push_back(groundVertex(x0, z0, color, 0.3f));
+        quads.push_back(groundVertex(x1, z0, color, 0.3f));
+        quads.push_back(groundVertex(x1, z1, color, 0.3f));
+        quads.push_back(groundVertex(x0, z1, color, 0.3f));
+      }
+    }
+  } // namespace
 
   void EdMapScene::DrawBrushRings()
   {
@@ -577,38 +611,202 @@ namespace faf::editor
         }
       }
     }
-    // The slope view: each run of cells in its band's colour (flat ones left out), rebuilt when the heights change.
+    // The slope view: each cell rated by the sim's rule (EdSlopeRules: a unit footprint's steps, a structure's area or
+    // its levelled skirt's ring) and coloured green to red up to the limit, darker red beyond; rebuilt when the heights
+    // or the rule change. Flat cells are left out.
+    const auto slopeStarted = std::chrono::steady_clock::now();
     if (mTools->ShowSlope()) {
-      if (mSlopeRuns.empty() || ++mSlopeFrames % 15 == 0) {
-        std::uint64_t hash = 1469598103934665603ULL;
+      const EdTools::SlopeView& rule = mTools->SlopeSettings();
+      const std::uint64_t key = (static_cast<std::uint64_t>(rule.Kind()) << 40) |
+        (static_cast<std::uint64_t>(rule.Window()) << 32) |
+        static_cast<std::uint32_t>(std::lround(rule.Limit() * 1000.0f));
+      if (mSlopeSteps.empty() || key != mSlopeKey || ++mSlopeFrames % 15 == 0) {
+        std::uint64_t hash = 1469598103934665603ULL ^ key;
         const std::size_t count = static_cast<std::size_t>(field->width) * static_cast<std::size_t>(field->height);
         for (std::size_t i = 0; i < count; i += 7) {
           hash = (hash ^ field->data[i]) * 1099511628211ULL;
         }
-        if (hash != mSlopeHeights || mSlopeRuns.empty()) {
+        if (hash != mSlopeHeights || mSlopeSteps.empty()) {
           mSlopeHeights = hash;
-          const std::vector<std::uint8_t> bands = SlopeBands(field->data, field->width, field->height, 1.0f / 128.0f);
-          mSlopeRuns = TerrainTypeRuns(bands.data(), field->width - 1, field->height - 1, 0);
+          mSlopeKey = key;
+          const auto started = std::chrono::steady_clock::now();
+          const int cellsX = field->width - 1;
+          const int cellsZ = field->height - 1;
+          const auto sample = [field](const int x, const int z) {
+            const int cx = std::clamp(x, 0, field->width - 1);
+            const int cz = std::clamp(z, 0, field->height - 1);
+            return static_cast<int>(
+              field->data
+                [static_cast<std::size_t>(cz) * static_cast<std::size_t>(field->width) + static_cast<std::size_t>(cx)]
+            );
+          };
+          std::vector<std::uint8_t> steps(static_cast<std::size_t>(cellsX) * static_cast<std::size_t>(cellsZ), 0);
+          std::vector<std::uint16_t> tile(static_cast<std::size_t>(sloperules::kTile) * sloperules::kTile);
+          std::size_t beyond = 0;
+          for (int tz = 0; tz * sloperules::kTile < cellsZ; ++tz) {
+            for (int tx = 0; tx * sloperules::kTile < cellsX; ++tx) {
+              sloperules::RateTile(
+                rule.Kind(), rule.Window(), tx * sloperules::kTile, tz * sloperules::kTile, sample, tile.data()
+              );
+              for (int j = 0; j < sloperules::kTile; ++j) {
+                const int z = tz * sloperules::kTile + j;
+                if (z >= cellsZ) {
+                  break;
+                }
+                for (int i = 0; i < sloperules::kTile; ++i) {
+                  const int x = tx * sloperules::kTile + i;
+                  if (x >= cellsX) {
+                    break;
+                  }
+                  const float units =
+                    static_cast<float>(tile[static_cast<std::size_t>(j) * sloperules::kTile + i]) / 128.0f;
+                  const int step = sloperules::ColorStep(units, rule.Limit());
+                  steps[static_cast<std::size_t>(z) * static_cast<std::size_t>(cellsX) + static_cast<std::size_t>(x)] =
+                    static_cast<std::uint8_t>(step);
+                  beyond += step > sloperules::kSteps ? 1U : 0U;
+                }
+              }
+            }
+          }
+          mSlopeSteps = std::move(steps);
+          mSlopeCellsX = cellsX;
+          mSlopeCellsZ = cellsZ;
+          mSlopeQuadsFor = 0; // the drawing is rebuilt below
+          gpg::Logf(
+            "editor: slope view (%s, %d x %d, up to %.2f) rated in %.2f s: %.1f %% of the cells beyond the limit",
+            rule.Kind() == 0     ? "units"
+              : rule.Kind() == 2 ? "levelled skirt"
+                                 : "whole area",
+            rule.Window(),
+            rule.Window(),
+            static_cast<double>(rule.Limit()),
+            std::chrono::duration<double>(std::chrono::steady_clock::now() - started).count(),
+            100.0 * static_cast<double>(beyond) / std::max<double>(1.0, static_cast<double>(mSlopeSteps.size()))
+          );
         }
       }
-      static constexpr std::uint32_t kBand[4] = {0u, 0x70F0E040u, 0x80F09030u, 0x90F04030u};
-      std::vector<moho::CD3DPrimBatcher::Vertex> quads;
-      quads.reserve(mSlopeRuns.size() * 4);
-      for (const TerrainTypeRun& run : mSlopeRuns) {
-        const std::uint32_t color = kBand[run.code & 3];
-        const float x0 = static_cast<float>(run.x0);
-        const float x1 = static_cast<float>(run.x1);
-        const float z0 = static_cast<float>(run.z);
-        quads.push_back(groundVertex(x0, z0, color, 0.3f));
-        quads.push_back(groundVertex(x1, z0, color, 0.3f));
-        quads.push_back(groundVertex(x1, z0 + 1.0f, color, 0.3f));
-        quads.push_back(groundVertex(x0, z0 + 1.0f, color, 0.3f));
+      // The ground the view shows (the corners' box; the whole map when sky shows) sets the block size: about 256
+      // blocks across it, kept until the view needs a quarter more or would fit at the next finer size (so zooming
+      // doesn't flip it back and forth). A block shows its steepest cell, so a thin cliff never disappears.
+      const EdTools::ViewFrame& frame = mTools->View();
+      float vx0 = 0.0f;
+      float vz0 = 0.0f;
+      float vx1 = static_cast<float>(mSlopeCellsX);
+      float vz1 = static_cast<float>(mSlopeCellsZ);
+      if (frame.valid && frame.corners == 4) {
+        vx0 = std::min({frame.cornerX[0], frame.cornerX[1], frame.cornerX[2], frame.cornerX[3]});
+        vx1 = std::max({frame.cornerX[0], frame.cornerX[1], frame.cornerX[2], frame.cornerX[3]});
+        vz0 = std::min({frame.cornerZ[0], frame.cornerZ[1], frame.cornerZ[2], frame.cornerZ[3]});
+        vz1 = std::max({frame.cornerZ[0], frame.cornerZ[1], frame.cornerZ[2], frame.cornerZ[3]});
       }
-      if (!quads.empty()) {
-        batcher->DrawQuads(quads.data(), static_cast<std::uint32_t>(quads.size() / 4));
+      const float span = std::max(
+        1.0f,
+        std::max(
+          std::min(vx1, static_cast<float>(mSlopeCellsX)) - std::max(vx0, 0.0f),
+          std::min(vz1, static_cast<float>(mSlopeCellsZ)) - std::max(vz0, 0.0f)
+        )
+      );
+      int block = mSlopeBlock < 1 ? 1 : mSlopeBlock;
+      while (block < 16 && span / static_cast<float>(block) > 320.0f) {
+        block *= 2;
       }
-    } else if (!mSlopeRuns.empty()) {
+      while (block > 1 && span / static_cast<float>(block / 2) <= 200.0f) {
+        block /= 2;
+      }
+      // Green to yellow to red up to the limit (ARGB), darker red beyond it: bands 1 (flat) .. 6, 7 beyond.
+      const auto colourOf = [](const int band) -> std::uint32_t {
+        if (band >= 7) {
+          return 0xB0D02828u;
+        }
+        const float t = static_cast<float>(band - 1) / 5.0f;
+        const float r = t < 0.5f ? 70.0f + (235.0f - 70.0f) * t * 2.0f : 235.0f;
+        const float g =
+          t < 0.5f ? 200.0f + (215.0f - 200.0f) * t * 2.0f : 215.0f - (215.0f - 110.0f) * (t - 0.5f) * 2.0f;
+        const float a = 70.0f + 70.0f * t;
+        return (static_cast<std::uint32_t>(a) << 24) | (static_cast<std::uint32_t>(r) << 16) |
+          (static_cast<std::uint32_t>(g) << 8) | 50u;
+      };
+      // The quads, by block row: built once per rating and block size; flat blocks too (the lightest band), so no
+      // holes.
+      if (!mSlopeSteps.empty() && (mSlopeQuadsFor != mSlopeHeights || block != mSlopeBlock)) {
+        mSlopeBlock = block;
+        const int bw = (mSlopeCellsX + block - 1) / block;
+        const int bh = (mSlopeCellsZ + block - 1) / block;
+        std::vector<std::uint8_t> bands(static_cast<std::size_t>(bw) * static_cast<std::size_t>(bh), 1);
+        for (int z = 0; z < mSlopeCellsZ; ++z) {
+          for (int x = 0; x < mSlopeCellsX; ++x) {
+            const int step = mSlopeSteps
+              [static_cast<std::size_t>(z) * static_cast<std::size_t>(mSlopeCellsX) + static_cast<std::size_t>(x)];
+            const int band = step > sloperules::kSteps ? 7 : 1 + step * 5 / sloperules::kSteps;
+            std::uint8_t& cell = bands
+              [static_cast<std::size_t>(z / block) * static_cast<std::size_t>(bw) +
+               static_cast<std::size_t>(x / block)];
+            cell = static_cast<std::uint8_t>(std::max<int>(cell, band));
+          }
+        }
+        mSlopeRuns = TerrainTypeRuns(bands.data(), bw, bh, 0);
+        mSlopeRows.assign(static_cast<std::size_t>(bh), {});
+        const float piece = std::max(8.0f, 4.0f * static_cast<float>(block));
+        for (const TerrainTypeRun& run : mSlopeRuns) {
+          AddGroundRun(
+            mSlopeRows[static_cast<std::size_t>(run.z)],
+            groundVertex,
+            run,
+            colourOf(run.code),
+            static_cast<float>(block),
+            piece
+          );
+        }
+        mSlopeQuadsFor = mSlopeHeights;
+      }
+      // Only the rows and pieces over the visible ground; while the camera and the drawing hold still, last frame's
+      // list.
+      const float pad = static_cast<float>(mSlopeBlock) * 2.0f;
+      const int row0 = std::max(0, static_cast<int>((vz0 - pad) / static_cast<float>(mSlopeBlock)));
+      const int row1 = std::min(
+        static_cast<int>(mSlopeRows.size()) - 1, static_cast<int>((vz1 + pad) / static_cast<float>(mSlopeBlock))
+      );
+      const std::array<float, 4> visible{vx0, vz0, vx1, vz1};
+      const bool same =
+        visible == mSlopeVisible && mSlopeVisibleFor == mSlopeQuadsFor && mSlopeVisibleBlock == mSlopeBlock;
+      mSlopeVisible = visible;
+      mSlopeVisibleFor = mSlopeQuadsFor;
+      mSlopeVisibleBlock = mSlopeBlock;
+      if (!same) {
+        mSlopeQuads.clear();
+      }
+      for (int row = same ? row1 + 1 : row0; row <= row1; ++row) {
+        const std::vector<moho::CD3DPrimBatcher::Vertex>& quads = mSlopeRows[static_cast<std::size_t>(row)];
+        for (std::size_t q = 0; q + 3 < quads.size(); q += 4) {
+          if (quads[q + 1].mX >= vx0 - pad && quads[q].mX <= vx1 + pad) {
+            mSlopeQuads.insert(
+              mSlopeQuads.end(),
+              quads.begin() + static_cast<std::ptrdiff_t>(q),
+              quads.begin() + static_cast<std::ptrdiff_t>(q + 4)
+            );
+          }
+        }
+      }
+      if (!mSlopeQuads.empty()) {
+        batcher->DrawQuads(mSlopeQuads.data(), static_cast<std::uint32_t>(mSlopeQuads.size() / 4));
+      }
+      // What the view costs: once, after 300 frames, its average time a frame and what it drew.
+      mSlopeSeconds += std::chrono::duration<double>(std::chrono::steady_clock::now() - slopeStarted).count();
+      if (++mSlopeDrawn == 300) {
+        gpg::Logf(
+          "editor: slope view drawing: %.2f ms a frame (300 frames), %zu quads, blocks of %d cells, %zu runs",
+          mSlopeSeconds / 300.0 * 1000.0,
+          mSlopeQuads.size() / 4,
+          mSlopeBlock,
+          mSlopeRuns.size()
+        );
+      }
+    } else if (!mSlopeSteps.empty()) {
+      mSlopeSteps.clear();
       mSlopeRuns.clear();
+      mSlopeRows.clear();
+      mSlopeQuads.clear();
+      mSlopeQuadsFor = 0;
     }
     // The km grid (lines every 51.2 units) and the map's centre lines, along the ground.
     if (mTools->ShowKmGrid()) {
@@ -738,16 +936,9 @@ namespace faf::editor
         mTypeRunsRevision = mDocument.TerrainTypeRevision();
       }
       std::vector<moho::CD3DPrimBatcher::Vertex> quads;
-      quads.reserve(mTypeRuns.size() * 4);
+      quads.reserve(mTypeRuns.size() * 8);
       for (const TerrainTypeRun& run : mTypeRuns) {
-        const std::uint32_t color = (mTools->TerrainTypeColor(run.code) & 0x00FFFFFFu) | 0x90000000u;
-        const float x0 = static_cast<float>(run.x0);
-        const float x1 = static_cast<float>(run.x1);
-        const float z0 = static_cast<float>(run.z);
-        quads.push_back(groundVertex(x0, z0, color, 0.3f));
-        quads.push_back(groundVertex(x1, z0, color, 0.3f));
-        quads.push_back(groundVertex(x1, z0 + 1.0f, color, 0.3f));
-        quads.push_back(groundVertex(x0, z0 + 1.0f, color, 0.3f));
+        AddGroundRun(quads, groundVertex, run, (mTools->TerrainTypeColor(run.code) & 0x00FFFFFFu) | 0x90000000u, 1.0f);
       }
       if (!quads.empty()) {
         batcher->DrawQuads(quads.data(), static_cast<std::uint32_t>(quads.size() / 4));
@@ -2203,6 +2394,50 @@ namespace faf::editor
     WholeMaskChanged(whole);
     message = "Cleared the mask of layer " + std::to_string(layer + 1);
     return true;
+  }
+
+  int EdMapScene::TerrainTypesFromTextures(
+    const std::array<int, 9>& types,
+    const bool onlyDefault,
+    std::string& message
+  )
+  {
+    LoadMasks();
+    const EdDocument::MaskGrid& masks = mDocument.Masks();
+    int width = 0;
+    int height = 0;
+    std::uint8_t* const cells = mDocument.TerrainTypeCells(width, height);
+    if (masks.texels.empty() || cells == nullptr) {
+      message = cells == nullptr ? "The map has no terrain type grid." : "No map's masks to read.";
+      return -1;
+    }
+    const std::vector<EdTools::LayerSlot> slots = LayerSlots();
+    const int painted = ShaderProfileOf(TerrainShader()).painted;
+    std::array<bool, 9> textured{};
+    for (int layer = 0; layer <= 8 && layer < static_cast<int>(slots.size()); ++layer) {
+      textured[static_cast<std::size_t>(layer)] =
+        !slots[static_cast<std::size_t>(layer)].albedo.empty() && layer <= painted;
+    }
+    std::vector<std::uint8_t> before = mDocument.TerrainTypesNow();
+    const std::size_t changed = TerrainTypesFromLayers(
+      masks.texels.data(),
+      masks.width,
+      masks.height,
+      RemappedStrata(TerrainShader()),
+      textured,
+      types,
+      cells,
+      width,
+      height,
+      onlyDefault
+    );
+    if (changed > 0) {
+      mDocument.TerrainTypesEdited(std::move(before));
+      mDocument.TerrainTypesChanged();
+      mDocument.SetModified(true);
+    }
+    message = std::to_string(changed) + " terrain type cells changed";
+    return static_cast<int>(changed);
   }
 
   bool EdMapScene::FillMaskLayer(

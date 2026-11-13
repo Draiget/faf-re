@@ -1494,6 +1494,99 @@ namespace faf::editor
       end();
     }
 
+    // The slope view's rule (shown with the Slope pill): the sim's rule for mobile units or for buildings.
+    if (mTools.ShowSlope()) {
+      const float row = pillHeight + Em(6.0f) * 2.0f + Em(4.0f);
+      const float below = view.y + margin + row * (mTools.SelectToolActive() ? 2.0f : 1.0f);
+      if (begin("##viewslope", ImVec2(view.x + margin, below), ImVec2(0.0f, 0.0f))) {
+        EdTools::SlopeView& slope = mTools.SlopeSettings();
+        if (pill("slopeunits", ICON_UNIT, "Units", !slope.buildings)) {
+          slope.buildings = false;
+        }
+        tip(
+          "Mobile units: the steepest step between neighbouring samples under a footprint, against its MaxSlope (0.75 "
+          "for every land, amphibious and hover footprint)"
+        );
+        if (pill("slopebuild", ICON_BOX, "Buildings", slope.buildings)) {
+          slope.buildings = true;
+        }
+        tip(
+          "Structures: the ground under the skirt against the blueprint's MaxGroundVariation (1.0 for most, 1.1 for "
+          "factories)"
+        );
+        const auto small = [&](const char* const id, const char* const preview, const float width) {
+          ImGui::SetNextItemWidth(Em(width));
+          ImGui::SetCursorPosY(ImGui::GetCursorPosY() + (pillHeight - ImGui::GetFrameHeight()) * 0.5f);
+          return EdBeginCombo(id, preview);
+        };
+        char sizeText[32];
+        if (!slope.buildings) {
+          std::snprintf(sizeText, sizeof(sizeText), "Footprint %d x %d", slope.footprint, slope.footprint);
+          if (small("##slopefoot", sizeText, 120.0f)) {
+            for (const int n : {1, 2, 3, 4, 5, 6}) {
+              char label[32];
+              std::snprintf(label, sizeof(label), "%d x %d", n, n);
+              if (ImGui::Selectable(label, slope.footprint == n)) {
+                slope.footprint = n;
+              }
+            }
+            ImGui::EndCombo();
+          }
+        } else {
+          std::snprintf(sizeText, sizeof(sizeText), "Skirt %d x %d", slope.skirt, slope.skirt);
+          if (small("##slopeskirt", sizeText, 110.0f)) {
+            static constexpr std::pair<int, const char*> kSkirts[] = {
+              {1, "point defence, radar"},
+              {2, "power, T2 defences"},
+              {3, "T2 / T3 defences"},
+              {5, "campaign"},
+              {6, "shields, missile launchers"},
+              {8, "factories, T3 power"},
+              {10, "gateways, Paragon"},
+              {12, "naval factory (short side)"},
+              {15, "naval factory (long side)"},
+            };
+            for (const auto& [n, what] : kSkirts) {
+              char label[80];
+              std::snprintf(label, sizeof(label), "%d x %d  %s", n, n, what);
+              if (ImGui::Selectable(label, slope.skirt == n)) {
+                slope.skirt = n;
+              }
+            }
+            ImGui::EndCombo();
+          }
+          ImGui::SameLine();
+          if (small("##sloperule", slope.ring ? "Levelled skirt" : "Whole area", 110.0f)) {
+            if (ImGui::Selectable("Levelled skirt (most buildings)", slope.ring)) {
+              slope.ring = true;
+            }
+            if (ImGui::Selectable("Whole area (point defence, radar, naval factories)", !slope.ring)) {
+              slope.ring = false;
+            }
+            ImGui::EndCombo();
+          }
+        }
+        ImGui::SameLine();
+        float& limit = !slope.buildings ? slope.unitLimit : slope.ring ? slope.ringLimit : slope.areaLimit;
+        char limitText[32];
+        std::snprintf(limitText, sizeof(limitText), "Up to %.2f", static_cast<double>(limit));
+        if (small("##slopelimit", limitText, 90.0f)) {
+          for (const float value : slope.buildings ? std::initializer_list<float>{1.0f, 1.1f, 1.2f}
+                                                   : std::initializer_list<float>{0.5f, 0.75f, 1.0f}) {
+            char label[16];
+            std::snprintf(label, sizeof(label), "%.2f", static_cast<double>(value));
+            if (ImGui::Selectable(label, std::fabs(limit - value) < 0.001f)) {
+              limit = value;
+            }
+          }
+          ImGui::EndCombo();
+        }
+        tip("Green to red up to this limit (world units); darker red beyond it: there the rule refuses");
+        ImGui::SameLine();
+      }
+      end();
+    }
+
     // The bottom: the tool, its mode, how many copies an edit makes (.vp-hud).
     if (begin("##viewhud", ImVec2(view.x + viewSize.x * 0.5f, view.y + viewSize.y - margin), ImVec2(0.5f, 1.0f))) {
       const int tool = mTools.Tool();

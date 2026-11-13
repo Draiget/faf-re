@@ -2145,6 +2145,7 @@ namespace faf::editor
       Segmented(kTargets, 2, mTexturePaint);
       if (mTexturePaint == 1) {
         DrawTerrainTypes();
+        DrawTypesFromLayers();
         return;
       }
     }
@@ -2297,6 +2298,59 @@ namespace faf::editor
       return true;
     }
     return false;
+  }
+
+  void EdTools::DrawTypesFromLayers()
+  {
+    if (!Section("From the textures")) {
+      return;
+    }
+    Note(
+      "Each layer has a terrain type: by default the one its texture's name suggests (sand, rock, snow, lava ...). "
+      "Generate "
+      "gives every cell the type of the layer seen most there. One undo step."
+    );
+    const auto nameOf = [this](const int code) -> std::string {
+      for (const TerrainTypeInfo& type : mTerrainTypes) {
+        if (type.code == code) {
+          return type.name.empty() ? "type " + std::to_string(code) : type.name;
+        }
+      }
+      return "type " + std::to_string(code);
+    };
+    static const char* const kSlotNames[] = {"Base", "1", "2", "3", "4", "5", "6", "7", "8"};
+    for (int layer = 0; layer <= 8 && layer < static_cast<int>(mSlots.size()); ++layer) {
+      const LayerSlot& slot = mSlots[static_cast<std::size_t>(layer)];
+      if (slot.albedo.empty()) {
+        continue;
+      }
+      ImGui::PushID(layer);
+      ImGui::AlignTextToFramePadding();
+      ImGui::TextUnformatted(kSlotNames[layer]);
+      ImGui::SameLine(Em(40.0f));
+      ImGui::TextUnformatted(LayerTextureName(slot.albedo).c_str());
+      ImGui::SameLine(std::max(Em(150.0f), ImGui::GetContentRegionAvail().x * 0.5f));
+      int& chosen = mLayerTypeOverride[static_cast<std::size_t>(layer)];
+      const std::string automatic = "Auto: " + nameOf(DefaultTerrainTypeFor(slot.albedo, mTerrainTypes));
+      ImGui::SetNextItemWidth(-1.0f);
+      if (EdBeginCombo("##type", chosen < 0 ? automatic.c_str() : nameOf(chosen).c_str())) {
+        if (ImGui::Selectable(automatic.c_str(), chosen < 0)) {
+          chosen = -1;
+        }
+        for (const TerrainTypeInfo& type : mTerrainTypes) {
+          if (ImGui::Selectable(nameOf(type.code).c_str(), chosen == type.code)) {
+            chosen = type.code;
+          }
+        }
+        ImGui::EndCombo();
+      }
+      ImGui::PopID();
+    }
+    ImGui::Checkbox("Only cells with the Default type", &mTypesOnlyDefault);
+    ImGui::SetItemTooltip("Keep the types already painted; only cells still Default take their layer's type");
+    if (ImGui::Button("Generate from the textures")) {
+      mTypesFromLayersAsk = true;
+    }
   }
 
   void EdTools::DrawThemes()

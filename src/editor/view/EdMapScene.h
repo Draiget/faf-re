@@ -148,6 +148,12 @@ namespace faf::editor
     [[nodiscard]] std::vector<EdTools::LayerSlot> LayerSlots() const;
     /** The paint layer's mask cleared, or read from / written to a grey image (PNG, RAW: 0-255 as 0-65535). */
     bool ClearMaskLayer(int layer, std::string& message);
+    /**
+     * The terrain types from the texture layers (TerrainTypesFromLayers): `types[layer]` for layer 0 (the base) to 8,
+     * the layers the shader paints and that have a texture; `onlyDefault` leaves painted types. One undo step. Returns
+     * the cells changed, or -1 with `message`.
+     */
+    int TerrainTypesFromTextures(const std::array<int, 9>& types, bool onlyDefault, std::string& message);
     /** Stratum `layer`'s (0-7) mask full over the whole map, as one undo step. */
     bool FillMaskLayer(int layer, std::string& message);
     bool ImportMaskLayer(int layer, const std::filesystem::path& file, std::string& message);
@@ -557,6 +563,20 @@ namespace faf::editor
     /** The slope view's runs (rebuilt when the heights change), and the ruler (Alt+drag): its ends, on while held. */
     std::vector<TerrainTypeRun> mSlopeRuns;
     std::uint64_t mSlopeHeights = 0;
+    std::uint64_t mSlopeKey = 0;
+    int mSlopeBlock = 1;                                    // cells per drawn block of the slope view
+    std::vector<moho::CD3DPrimBatcher::Vertex> mSlopeQuads; // the slope view's quads drawn this frame
+    std::vector<std::vector<moho::CD3DPrimBatcher::Vertex>>
+      mSlopeRows;                          // its quads by block row, per rating and block size
+    std::vector<std::uint8_t> mSlopeSteps; // each cell's colour step by the rule
+    int mSlopeCellsX = 0;
+    int mSlopeCellsZ = 0;
+    std::array<float, 4> mSlopeVisible{};
+    std::uint64_t mSlopeVisibleFor = 0;
+    int mSlopeVisibleBlock = 0;
+    double mSlopeSeconds = 0.0;
+    int mSlopeDrawn = 0;
+    std::uint64_t mSlopeQuadsFor = 0;
     int mSlopeFrames = 0;
     bool mRuling = false;
     /** Box select (Shift + right drag): its corners on the screen while it is drawn. */

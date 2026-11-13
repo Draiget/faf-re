@@ -147,9 +147,10 @@ namespace faf::editor
         "/materialeditor", "/uiscale",        "/testrun",        "/openall",         "/roundtrip",   "/vault",
         "/vaultsearch",    "/vaultmap",       "/newmap",         "/stamp",           "/brush",       "/layer",
         "/waterbody",      "/ruler",          "/adaptivewindow", "/maskrule",        "/maskgen",     "/symhover",
-        "/stbfont",        "/recipe",         "/texset",         "/layerop",         "/symmenu",     "/panelbottom",
-        "/shader",         "/brushtest",      "/brushshape",     "/stampsource",     "/stampstroke", "/symoptions",
-        "/maskoptions",    "/masktest",       "/shaderbrowser",  "/convertlayers",
+        "/stbfont",        "/recipe",         "/texset",         "/layerop",         "/slopeview",   "/typesfromlayers",
+        "/uncapped",       "/symmenu",        "/panelbottom",    "/shader",          "/brushtest",   "/brushshape",
+        "/stampsource",    "/stampstroke",    "/symoptions",     "/maskoptions",     "/masktest",    "/shaderbrowser",
+        "/convertlayers",
       };
       for (const char* const option : kOptions) {
         if (moho::CFG_GetArgOption(option, 0, nullptr)) {
@@ -1405,7 +1406,9 @@ namespace faf::editor
        */
       void CapBackgroundFrames()
       {
-        const int cap = mSettings.GetInt(EdSettings::kBackgroundFps);
+        // `/uncapped` (test runs): no background limit, so a capture behind other windows measures the real frame rate.
+        static const bool uncapped = moho::CFG_GetArgOption("/uncapped", 0, nullptr);
+        const int cap = uncapped ? 0 : mSettings.GetInt(EdSettings::kBackgroundFps);
         const auto now = std::chrono::steady_clock::now();
         const HWND front = ::GetForegroundWindow();
         const HWND frame = HandleOf(mGame.supcomFrame);
@@ -2251,6 +2254,9 @@ namespace faf::editor
       std::vector<std::string> mThemePreviewLines;
       std::string mThemeArg;   // `/texset <index>[,try|,back]` (test runs)
       std::string mLayerOpArg; // `/layerop <slot>,fill|remove|optimal` (test runs)
+      std::string mSlopeViewArg;       // `/slopeview units,<n>[,<limit>]|buildings,<n>,ring|area[,<limit>]` (test runs)
+      std::string mTypesFromLayersArg; // `/typesfromlayers[,only]` (test runs)
+      int mD2gFrames = 0;
       int mLayerOpFrames = 0;
       int mThemeArgFrames = 0;
       /** Export (true) the slot's texture to a .dds, or import one into the map's folder and the slot. */
@@ -4028,6 +4034,15 @@ namespace faf::editor
       if (fa::vector<fa::string> test; moho::CFG_GetArgOption("/brushtest", 1, &test) && !test.empty()) {
         mBrushTestArg = test[0].c_str();
       }
+      if (fa::vector<fa::string> slope; moho::CFG_GetArgOption("/slopeview", 1, &slope) && !slope.empty()) {
+        mSlopeViewArg = slope[0].c_str();
+      }
+      if (moho::CFG_GetArgOption("/typesfromlayers", 0, nullptr)) {
+        fa::vector<fa::string> value;
+        mTypesFromLayersArg = moho::CFG_GetArgOption("/typesfromlayers", 1, &value) && !value.empty()
+          ? std::string(value[0].c_str())
+          : std::string("all");
+      }
       if (fa::vector<fa::string> op; moho::CFG_GetArgOption("/layerop", 1, &op) && !op.empty()) {
         mLayerOpArg = op[0].c_str();
       }
@@ -4601,6 +4616,56 @@ namespace faf::editor
       if (!mThemeArg.empty() && mThemeArgFrames == 240 && mThemeArg.find(",back") != std::string::npos) {
         tools.AskTheme(EdTools::ThemeOp::Back);
         mThemeArg.clear();
+      }
+      // `/slopeview ...` and `/typesfromlayers` (test runs).
+      if ((!mSlopeViewArg.empty() || !mTypesFromLayersArg.empty()) && ++mD2gFrames == 120) {
+        if (!mSlopeViewArg.empty()) {
+          EdTools::SlopeView& slope = tools.SlopeSettings();
+          std::vector<std::string> parts;
+          for (std::size_t at = 0; at <= mSlopeViewArg.size();) {
+            const std::size_t comma = std::min(mSlopeViewArg.find(',', at), mSlopeViewArg.size());
+            parts.push_back(mSlopeViewArg.substr(at, comma - at));
+            at = comma + 1;
+          }
+          slope.buildings = !parts.empty() && parts[0] == "buildings";
+          if (parts.size() > 1) {
+            (slope.buildings ? slope.skirt : slope.footprint) = std::clamp(std::atoi(parts[1].c_str()), 1, 16);
+          }
+          std::size_t limitAt = 2;
+          if (slope.buildings && parts.size() > 2 && (parts[2] == "ring" || parts[2] == "area")) {
+            slope.ring = parts[2] == "ring";
+            limitAt = 3;
+          }
+          if (parts.size() > limitAt) {
+            (!slope.buildings ? slope.unitLimit
+               : slope.ring   ? slope.ringLimit
+                              : slope.areaLimit) = static_cast<float>(std::atof(parts[limitAt].c_str()));
+          }
+          tools.SetShowSlope(true);
+          mSlopeViewArg.clear();
+        }
+        if (!mTypesFromLayersArg.empty()) {
+          tools.AskTypesFromLayers(mTypesFromLayersArg.find("only") != std::string::npos);
+          mTypesFromLayersArg.clear();
+        }
+      }
+      std::array<int, 9> layerTypes{};
+      bool onlyDefault = false;
+      if (tools.TakeTypesFromLayers(layerTypes, onlyDefault)) {
+        const std::array<int, 9>& types = layerTypes;
+        std::string message;
+        const int changed = mScene.TerrainTypesFromTextures(types, onlyDefault, message);
+        PostStatusMessage(changed < 0 ? message : "Terrain types from the textures: " + message);
+        std::string list;
+        for (std::size_t layer = 0; layer < types.size(); ++layer) {
+          list += (layer == 0 ? "" : " ") + std::to_string(types[layer]);
+        }
+        gpg::Logf(
+          "editor: terrain types from the textures (layer types %s%s): %s",
+          list.c_str(),
+          onlyDefault ? ", Default cells only" : "",
+          message.c_str()
+        );
       }
       // `/layerop <slot>,<item>` (test runs): after the optimal tiles are known (a second in).
       if (!mLayerOpArg.empty() && ++mLayerOpFrames == 120) {
