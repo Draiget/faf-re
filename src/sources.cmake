@@ -951,6 +951,7 @@ set(FAF_ENGINE_SOURCES
   moho/render/CDecalBufferTypeInfo.cpp
   moho/render/CWldTerrainDecal.cpp
   moho/render/CDecalHandleTypeInfo.cpp
+  moho/render/AmbientOcclusion.cpp
   moho/render/AmbientOcclusionRenderer.cpp
   moho/render/Atmosphere.cpp
   moho/render/BounceLight.cpp
