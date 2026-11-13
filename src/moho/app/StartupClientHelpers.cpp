@@ -2014,7 +2014,9 @@ fa::string moho::OPTIONS_GetString(
     LuaPlus::LuaObject getOptionFnObject = prefsModule[kGetOptionMethodName];
     LuaPlus::LuaFunction<LuaPlus::LuaObject> getOptionFn(getOptionFnObject);
     LuaPlus::LuaObject optionValue = getOptionFn(key);
-    const char* const optionText = optionValue.GetString();
+    // An option the profile never set is nil (a new profile, a feature added since): the empty string, not an error in
+    // the log each time the renderer asks for the level of a feature.
+    const char* const optionText = !optionValue.IsNil() ? optionValue.GetString() : nullptr;
     fa::string result;
     result.assign_owned(optionText != nullptr ? optionText : "");
     return result;
