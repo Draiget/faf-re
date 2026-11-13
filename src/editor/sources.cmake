@@ -46,6 +46,7 @@ set(FAF_EDITOR_SOURCES
   tools/EdRecipes.cpp
   tools/EdTexScale.cpp
   tools/EdTextureSets.cpp
+  tools/EdSymmetryFollow.cpp
   ui/EdMapBrowser.cpp
   doc/EdWaterBodies.cpp
   view/EdWaterBodyView.cpp
