@@ -256,7 +256,8 @@ namespace faf::probe
     const std::span<const std::uint8_t> grids,
     const std::span<const std::uint8_t> poses,
     const bool hasPoses,
-    const std::span<const std::uint8_t> effects
+    const std::span<const std::uint8_t> effects,
+    const std::span<const std::uint8_t> commands
   )
   {
     if (!mState || !mState->client) {
@@ -269,7 +270,8 @@ namespace faf::probe
     view.grids = grids;
     view.poses = poses;
     view.hasPoses = hasPoses;
-    view.effects = effects; // plan WP9.3: applied as the game client applies them, with its rules' blueprints
+    view.effects = effects;   // plan WP9.3: applied as the game client applies them, with its rules' blueprints
+    view.commands = commands; // plan WP5.14: into the packet's command lists, blueprints from its rules
     // A fresh packet each beat: a client with no sim has nothing else to start from.
     moho::SSyncData packet{};
     (void)mState->client->Apply(view, packet);
@@ -291,6 +293,26 @@ namespace faf::probe
     const remote::client::CServerViewClient& client = *mState->client;
     const remote::client::SServerViewStats& v = client.Stats();
     const remote::client::SRebuildStats& s = client.RebuildStats();
+    {
+      // Plan WP5.14: the command-records lane as the game client's view client applied it.
+      const remote::wire::SCommandLaneCounts& c = client.Commands().Counts();
+      std::printf(
+        "probe %d: rebuild: commands: %llu lanes (%llu didn't decode), %llu descriptors (%llu naming a blueprint not "
+        "held), %llu updates, %llu removals, %llu releases; dropped %llu updates and %llu removals of commands not "
+        "sent; %zu held at the end\n",
+        uid,
+        static_cast<unsigned long long>(c.lanes),
+        static_cast<unsigned long long>(c.failures),
+        static_cast<unsigned long long>(c.descriptors),
+        static_cast<unsigned long long>(client.Commands().UnknownBlueprints()),
+        static_cast<unsigned long long>(c.updates),
+        static_cast<unsigned long long>(c.removals),
+        static_cast<unsigned long long>(c.releases),
+        static_cast<unsigned long long>(c.droppedUpdates),
+        static_cast<unsigned long long>(c.droppedRemovals),
+        client.Commands().Receiver().Held()
+      );
+    }
     {
       // Plan WP9.3: the effects lane as the game client's view client applied it.
       using remote::client::EEffectSkip;

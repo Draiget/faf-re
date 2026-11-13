@@ -8,7 +8,14 @@
 #include "headless/ReplayEffectDump.h"
 #include "headless/ReplayPoseDump.h"
 #include "headless/ReplaySyncSpy.h"
+#include "moho/command/SSTICommandConstantData.h"
+#include "moho/command/SSTICommandVariableData.h"
+#include "moho/entity/EntityDb.h"
+#include "moho/sim/CArmyImpl.h"
 #include "moho/sim/Sim.h"
+#include "moho/sim/SimDriver.h"
+#include "moho/unit/core/Unit.h"
+#include "remote/CommandRecords.h"
 #include "remote/VisibilityOracle.h"
 #include "server/EffectOpRecorder.h"
 
@@ -98,6 +105,7 @@ namespace faf::headless
 
   void CReplayViewBench::Uninstall()
   {
+    StopCommandWaits(); // the sim stopped: no beat's command records are still to come
     (void)FinishViews();
     UninstallRouting();
     moho::Sim::SetSyncObserver(nullptr);
@@ -119,6 +127,141 @@ namespace faf::headless
   )
   {
     mPoseDump = std::make_unique<CReplayPoseDump>(prefix, army, mMapSizeX, mMapSizeZ);
+  }
+
+  void CReplayViewBench::EnableCommands()
+  {
+    EnableCommandRecords();
+  }
+
+  bool CReplayViewBench::EnableCommandDump(
+    const std::string& path,
+    const std::int32_t army,
+    const bool lockstep
+  )
+  {
+    mCommandDump = std::make_unique<CReplayCommandDump>(path, army, lockstep);
+    return mCommandDump->IsOpen();
+  }
+
+  void CReplayViewBench::OnCommandsPublished(
+    moho::Sim& sim,
+    const moho::SSyncData& packet
+  )
+  {
+    const auto start = std::chrono::steady_clock::now();
+    remote::CViewLanes::OnCommandsPublished(sim, packet); // serial views: their lanes go out now
+    if (!CommandRecordsOn()) {
+      return;
+    }
+    if (!PipelineOn() && ViewBeat() == static_cast<std::uint32_t>(sim.mCurBeat)) {
+      mBeat.sendMs += MillisecondsBetween(start, std::chrono::steady_clock::now());
+      OnViewsFinished(); // the beat's lanes are all out (`OnViewFrames` left this for now)
+    }
+    if (mCommandDump) {
+      if (mCommandDump->Lockstep()) {
+        // The sim is focused on the dump's army: its own packet is that army's lockstep client's.
+        std::vector<remote::wire::SCommandDescriptor> descriptors;
+        std::vector<std::pair<std::uint32_t, remote::wire::SCommandData>> updates;
+        std::vector<std::uint32_t> removals;
+        std::vector<std::uint32_t> releases;
+        const remote::CCommandBook::BlueprintRef blueprint = [this](const moho::REntityBlueprint* const bp) {
+          return CommandBlueprint(bp);
+        };
+        for (const moho::SSTICommandConstantData& descriptor : packet.mPublishedCommandDescriptors) {
+          descriptors.push_back(remote::CommandDescriptorFromSim(descriptor, blueprint));
+        }
+        for (const moho::SSyncPublishedCommandPacket& published : packet.mPublishedCommandPackets) {
+          updates.emplace_back(
+            static_cast<std::uint32_t>(published.commandId), remote::CommandDataFromSim(published.variableData)
+          );
+        }
+        for (const moho::CmdId id : packet.mPendingCommandEventRemovals) {
+          removals.push_back(static_cast<std::uint32_t>(id));
+        }
+        for (const moho::CmdId id : packet.mPendingReleasedCommandIds) {
+          releases.push_back(static_cast<std::uint32_t>(id));
+        }
+        mCommandDump->ApplyBeat(descriptors, updates, removals, releases);
+      }
+      DumpCommandQueues(sim);
+    }
+  }
+
+  void CReplayViewBench::DumpCommandQueues(
+    moho::Sim& sim
+  )
+  {
+    if (sim.mEntityDB == nullptr) {
+      return;
+    }
+    const std::int32_t army = mCommandDump->Army();
+    const auto beat = static_cast<std::uint32_t>(sim.mCurBeat);
+    const bool lockstep = mCommandDump->Lockstep();
+    if (!lockstep && ViewBeat() != beat) {
+      return; // no views this beat (the replay's last): the client got no lane, and the own-command test has no army
+    }
+    const bool haveView = !lockstep && army >= 0 && static_cast<std::size_t>(army) < ViewCount();
+    const remote::CViewIdMap* const ids = haveView ? &IdMap(army) : nullptr;
+    const remote::CViewIdMap::OwnCommandTest isOwn =
+      haveView ? OwnCommandsOf(static_cast<std::size_t>(army)) : remote::CViewIdMap::OwnCommandTest{};
+    const remote::CCommandBook* const book = CommandBook();
+
+    // A target's entity as each side has it: lockstep the sim's id; the server-mode client its view's id turned back
+    // into the sim's, or, where the server sent none, the sim's id marked `~` (the view holds no record of it now, so
+    // a lockstep client's lookup finds nothing either) or `!` (it does: a difference the UI would show).
+    const auto entityText = [&](const std::uint32_t simCommand, const int which, const std::uint32_t entity) {
+      if (lockstep) {
+        return entity == remote::wire::kNoCommandEntity ? std::string("none") : std::to_string(entity);
+      }
+      if (entity != remote::wire::kNoCommandEntity) {
+        std::uint32_t simId = 0;
+        return ids != nullptr && ids->EntityToSim(entity, simId) ? std::to_string(simId)
+                                                                 : "lost:" + std::to_string(entity);
+      }
+      const remote::CCommandBook::SCommand* const original = book != nullptr ? book->Find(simCommand) : nullptr;
+      const std::uint32_t simEntity = original == nullptr
+        ? remote::wire::kNoCommandEntity
+        : (which == 1 ? original->data.target1.entity : original->data.target2.entity);
+      if (simEntity == remote::wire::kNoCommandEntity) {
+        return std::string("none");
+      }
+      return (ViewHoldsEntityNow(static_cast<std::size_t>(army), simEntity) ? "!" : "~") + std::to_string(simEntity);
+    };
+    const auto entries = [&](const auto& queue) {
+      std::string text;
+      for (const moho::CmdId id : queue) {
+        const auto simCommand = static_cast<std::uint32_t>(id);
+        std::uint32_t key = simCommand;
+        bool known = true;
+        if (!lockstep) {
+          known = ids != nullptr && ids->CommandToHeldView(simCommand, isOwn, key);
+        }
+        const CReplayCommandDump::SHelper* const helper = known ? mCommandDump->Find(key) : nullptr;
+        if (helper == nullptr) {
+          text += CReplayCommandDump::Entry(simCommand, nullptr, {}, {});
+          continue;
+        }
+        text += CReplayCommandDump::Entry(
+          simCommand,
+          helper,
+          CReplayCommandDump::Target(helper->data.target1, entityText(simCommand, 1, helper->data.target1.entity)),
+          CReplayCommandDump::Target(helper->data.target2, entityText(simCommand, 2, helper->data.target2.entity))
+        );
+      }
+      return text;
+    };
+    for (const auto& [id, entity] : sim.mEntityDB->mAllUnits) {
+      moho::Unit* const unit = entity != nullptr ? entity->IsUnit() : nullptr;
+      if (unit == nullptr || unit->ArmyRef == nullptr || unit->ArmyRef->mConstDat.mArmyIndex != army) {
+        continue;
+      }
+      const moho::SSTIUnitVariableData& data = unit->mUnitVarDat;
+      mCommandDump->Unit(
+        beat, static_cast<std::uint32_t>(id), "Q[" + entries(data.mCommands) + "] B[" + entries(data.mBuildQueue) + "]"
+      );
+    }
+    mCommandDump->EndBeat(beat);
   }
 
   void CReplayViewBench::EnableEffects()
@@ -149,6 +292,18 @@ namespace faf::headless
   {
     if (lanes.poses != nullptr && army < mPoseLaneBytes.size()) {
       mPoseLaneBytes[army].push_back(static_cast<std::uint32_t>(lanes.poses->Bytes().size()));
+    }
+    if (lanes.commands != nullptr && army < mCommandClients.size()) {
+      // Plan WP5.14: the lane's bytes, and its client reading it back (decodes, records of commands not sent).
+      SCommandClient& client = mCommandClients[army];
+      client.beatBytes.push_back(static_cast<std::uint32_t>(lanes.commands->size()));
+      client.lanes += lanes.commands->empty() ? 0u : 1u;
+      (void)client.receiver.Apply(*lanes.commands, client.beat);
+      if (mCommandDump && !mCommandDump->Lockstep() && static_cast<std::int32_t>(army) == mCommandDump->Army()) {
+        mCommandDump->ApplyBeat(
+          client.beat.descriptors, client.beat.updates, client.beat.removals, client.beat.releases
+        );
+      }
     }
     if (mPoseDump && mRules != nullptr && static_cast<std::int32_t>(army) == mPoseDump->Army()) {
       // Plan WP8.4: this army's client, applied on the runner's thread with lockstep's packet of the same beat.
@@ -316,6 +471,9 @@ namespace faf::headless
     if (PosesOn() && mPoseLaneBytes.size() < static_cast<std::size_t>(ArmyCount())) {
       mPoseLaneBytes.resize(static_cast<std::size_t>(ArmyCount())); // before any view's job runs
     }
+    if (CommandRecordsOn() && mCommandClients.size() < static_cast<std::size_t>(ArmyCount())) {
+      mCommandClients = std::vector<SCommandClient>(static_cast<std::size_t>(ArmyCount())); // likewise
+    }
     if (mEffectDump) {
       if (PipelineOn()) {
         // The last beat's views are done (`OnBeatStarting`): its client applies the dump army's view now.
@@ -369,8 +527,8 @@ namespace faf::headless
     mBeat.intervalMs = mHaveLastFrames ? MillisecondsBetween(mLastFrames, sendEnd) : 0.0;
     mLastBuildSeconds = BuildSeconds();
     mLastFrames = sendEnd;
-    if (!PipelineOn()) {
-      OnViewsFinished();
+    if (!PipelineOn() && !CommandRecordsOn()) {
+      OnViewsFinished(); // with command records the lanes go once the sim has published them (`OnCommandsPublished`)
     }
   }
 
@@ -444,7 +602,12 @@ namespace faf::headless
 
   std::uint64_t CReplayViewBench::Failures() const noexcept
   {
-    return mEncodeFailures + HeldMismatches() + (mSyncSpy != nullptr ? mSyncSpy->Failures() : 0u);
+    std::uint64_t commandFailures = CommandWaitsTimedOut(); // plan WP5.14: each must stay 0
+    for (const SCommandClient& client : mCommandClients) {
+      const remote::wire::SCommandLaneCounts& read = client.receiver.Counts();
+      commandFailures += read.failures + read.droppedUpdates + read.droppedRemovals;
+    }
+    return mEncodeFailures + HeldMismatches() + (mSyncSpy != nullptr ? mSyncSpy->Failures() : 0u) + commandFailures;
   }
 
   std::string CReplayViewBench::Summary() const
@@ -568,6 +731,78 @@ namespace faf::headless
     if (mPoseDump) {
       summary += "\n  ";
       summary += mPoseDump->Finish();
+    }
+    if (const remote::CCommandBook* const book = CommandBook(); book != nullptr) {
+      // Plan WP5.14: what the sim published, and each view's command-records lane as its client read it back.
+      std::snprintf(
+        text,
+        sizeof(text),
+        "\n  commands: the sim published %llu descriptors, %llu packets, %llu removals, %llu releases in %llu beats "
+        "(%zu commands live at the end); %llu packets without a descriptor, %llu units of no army, %llu waits for a "
+        "beat's records timed out",
+        static_cast<unsigned long long>(book->Descriptors()),
+        static_cast<unsigned long long>(book->Packets()),
+        static_cast<unsigned long long>(book->Removals()),
+        static_cast<unsigned long long>(book->Releases()),
+        static_cast<unsigned long long>(book->Beats()),
+        book->Live(),
+        static_cast<unsigned long long>(book->Orphans()),
+        static_cast<unsigned long long>(book->UnitsWithoutArmy()),
+        static_cast<unsigned long long>(CommandWaitsTimedOut())
+      );
+      summary += text;
+      for (std::size_t army = 0; army < mCommandClients.size(); ++army) {
+        const SCommandClient& client = mCommandClients[army];
+        const remote::CCommandViewRoute* const route = CommandRoute(army);
+        if (client.beatBytes.empty() || route == nullptr) {
+          continue;
+        }
+        std::uint64_t bytes = 0;
+        std::vector<double> perSecond;
+        perSecond.reserve(client.beatBytes.size());
+        for (const std::uint32_t beatBytes : client.beatBytes) {
+          bytes += beatBytes;
+          perSecond.push_back(static_cast<double>(beatBytes) * 10.0);
+        }
+        const remote::CCommandViewRoute::SCounts& sent = route->Counts();
+        const remote::wire::SCommandLaneCounts& read = client.receiver.Counts();
+        std::snprintf(
+          text,
+          sizeof(text),
+          "\n  commands view %zu: %llu bytes in %zu beats (%.1f a beat), %llu lanes with records; sent %llu "
+          "descriptors, %llu updates (%llu with no change), %llu removals, %llu releases (%llu of its own never "
+          "shown), "
+          "%llu whole; %llu units of other armies left out, %llu targets sent as none, %llu under its own ids; read "
+          "back: %llu lanes didn't decode, %llu updates and %llu removals of commands not sent, %zu held at the end "
+          "(the server counts %zu)",
+          army,
+          static_cast<unsigned long long>(bytes),
+          client.beatBytes.size(),
+          static_cast<double>(bytes) / static_cast<double>(client.beatBytes.size()),
+          static_cast<unsigned long long>(client.lanes),
+          static_cast<unsigned long long>(sent.descriptors),
+          static_cast<unsigned long long>(sent.updates),
+          static_cast<unsigned long long>(sent.emptyUpdates),
+          static_cast<unsigned long long>(sent.removals),
+          static_cast<unsigned long long>(sent.releases + sent.ownReleases),
+          static_cast<unsigned long long>(sent.ownReleases),
+          static_cast<unsigned long long>(sent.wholes),
+          static_cast<unsigned long long>(sent.unitsLeftOut),
+          static_cast<unsigned long long>(sent.targetsWithheld),
+          static_cast<unsigned long long>(sent.targetsRenumbered),
+          static_cast<unsigned long long>(read.failures),
+          static_cast<unsigned long long>(read.droppedUpdates),
+          static_cast<unsigned long long>(read.droppedRemovals),
+          client.receiver.Held(),
+          route->Shown()
+        );
+        summary += text;
+        summary += "; per second " + Distribution(perSecond, "B/s");
+      }
+      if (mCommandDump) {
+        summary += "\n  ";
+        summary += mCommandDump->Summary();
+      }
     }
     if (mEffectRoutes) {
       // Plan WP9.2: each view's effects lane, KB/s at 10 beats a second, with every op against routed.

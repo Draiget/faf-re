@@ -57,11 +57,13 @@ namespace faf::remote::client
       }
       *lane = std::span<const std::uint8_t>(bytes, static_cast<std::size_t>(size));
     }
-    // Plan WP8.1: a server that sends poses adds them as a sixth lane; plan WP9.1 step 3: the effect ops as a seventh.
-    // Any lane after those is a newer server's, skipped.
+    // Plan WP8.1: a server that sends poses adds them as a sixth lane; plan WP9.1 step 3: the effect ops as a seventh;
+    // plan WP5.14: the command records as an eighth. Any lane after those is a newer server's, skipped.
     out.poses = {};
     out.hasPoses = false;
     out.effects = {};
+    out.commands = {};
+    out.hasCommands = false;
     out.lanesSkipped = 0;
     for (std::size_t lane = 0; !reader.AtEnd(); ++lane) {
       const std::uint64_t size = reader.Varint();
@@ -75,6 +77,9 @@ namespace faf::remote::client
         out.hasPoses = true;
       } else if (lane == 1u) {
         out.effects = span;
+      } else if (lane == 2u) {
+        out.commands = span;
+        out.hasCommands = true;
       } else {
         ++out.lanesSkipped;
       }
@@ -115,6 +120,7 @@ namespace faf::remote::client
     for (const moho::REntityBlueprint* const blueprint : blueprints) {
       mStats.blueprintsKnown += blueprint != nullptr ? 1u : 0u;
     }
+    mCommands = std::make_unique<CCommandLaneApplier>(blueprints); // plan WP5.14: build orders name them
     mRebuilder = std::make_unique<CSyncRebuilder>(mCodec, std::move(blueprints), ResolveMeshes(rules, tables));
     mRebuilder->SetRules(&rules);
     mRebuilder->SetNoSim();
@@ -247,6 +253,11 @@ namespace faf::remote::client
       // One tick of every effect, as the sim's manager ticks once a beat; its particles go with this view's packet.
       mHosted->EndBeat(&packet);
     }
+    // Plan WP5.14: the beat's command records into the packet's command lists. `DoBeat` makes the helpers from the
+    // descriptors before the units' updates resolve their queues, as a lockstep sim's beat does; the applier drops (and
+    // counts) any record of a command this client wasn't sent.
+    mStats.commandBytes += view.commands.size();
+    (void)mCommands->Apply(view.commands, packet);
     return true;
   }
 

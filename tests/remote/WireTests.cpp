@@ -3521,14 +3521,25 @@ TEST(
   ASSERT_TRUE(ReadViewMessage(seven, view));
   ASSERT_EQ(view.effects.size(), 3u);
   EXPECT_EQ(view.effects[0], 6u);
+  EXPECT_FALSE(view.hasCommands);
   EXPECT_EQ(view.lanesSkipped, 0u);
 
-  const std::vector<std::uint8_t> nine = make(4u, false);
-  ASSERT_TRUE(ReadViewMessage(nine, view));
+  // Plan WP5.14: the command-records lane is the eighth.
+  const std::vector<std::uint8_t> eight = make(3u, false);
+  ASSERT_TRUE(ReadViewMessage(eight, view));
+  EXPECT_TRUE(view.hasCommands);
+  ASSERT_EQ(view.commands.size(), 3u);
+  EXPECT_EQ(view.commands[0], 7u);
+  EXPECT_EQ(view.lanesSkipped, 0u);
+
+  const std::vector<std::uint8_t> ten = make(5u, false);
+  ASSERT_TRUE(ReadViewMessage(ten, view));
   EXPECT_EQ(view.effects[0], 6u);
+  EXPECT_EQ(view.commands[0], 7u);
   EXPECT_EQ(view.lanesSkipped, 2u);
   EXPECT_EQ(view.grids[0], 3u);
 
   EXPECT_FALSE(ReadViewMessage(make(2u, true), view)); // the effects lane cut short
-  EXPECT_FALSE(ReadViewMessage(make(4u, true), view)); // a later lane cut short
+  EXPECT_FALSE(ReadViewMessage(make(3u, true), view)); // the command-records lane cut short
+  EXPECT_FALSE(ReadViewMessage(make(5u, true), view)); // a later lane cut short
 }

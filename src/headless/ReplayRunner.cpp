@@ -695,6 +695,28 @@ namespace faf::headless
         result.error = "--effect-dump needs --view-effects";
         return result;
       }
+      if (options.viewCommands) {
+        // Plan WP5.14: each view's command-records lane, read back as its client reads it.
+        viewBench->EnableCommands();
+        if (!options.commandDumpPath.empty()) {
+          // Focused, the sim's own packets are that army's lockstep client's; unfocused (as a server), the dump is
+          // that army's view's client. Serial views: the queues are read off the sim once the beat's lanes are out.
+          const bool lockstep = options.focusArmy >= 0;
+          const int army = lockstep ? options.focusArmy : options.commandDumpArmy;
+          if (army < 0 || options.viewPipelineThreads > 0) {
+            result.error = "--command-dump needs --focus <army> (lockstep) or --command-dump-army <army> (unfocused, "
+                           "the server-mode client), and not --view-pipeline";
+            return result;
+          }
+          if (!viewBench->EnableCommandDump(options.commandDumpPath, army, lockstep)) {
+            result.error = "cannot write " + options.commandDumpPath;
+            return result;
+          }
+        }
+      } else if (!options.commandDumpPath.empty()) {
+        result.error = "--command-dump needs --view-commands";
+        return result;
+      }
       if (options.poseBudgetKbps > 0) {
         // Plan WP8.2/WP8.4: each view's pose lane within the budget, as the server's --pose-budget-kbps.
         viewBench->SetPoseBudget(static_cast<std::size_t>(options.poseBudgetKbps) * 1024u / 10u);

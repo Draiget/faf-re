@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 
+#include "remote/client/CommandLaneApplier.h"
 #include "remote/client/EffectHosting.h"
 #include "remote/client/EffectLaneApplier.h"
 #include "remote/client/SyncRebuilder.h"
@@ -55,12 +56,14 @@ namespace faf::remote::client
     std::span<const std::uint8_t> poses; // plan WP8.1: the sixth lane, when the server sends poses
     bool hasPoses = false;
     std::span<const std::uint8_t> effects; // plan WP9.1 step 3: the seventh (wire/EffectLane.h); empty: no op
-    std::uint32_t lanesSkipped = 0;        // lanes after those this build knows, skipped
+    std::span<const std::uint8_t> commands; // plan WP5.14: the eighth (wire/CommandLane.h); empty: no change
+    bool hasCommands = false;               // the server sends command records
+    std::uint32_t lanesSkipped = 0;         // lanes after those this build knows, skipped
   };
 
   /**
    * Reads a whole `View` message (its kind byte first); its lanes must end at the message's last byte. Lanes after the
-   * effects lane, from a newer server, are skipped.
+   * command-records lane, from a newer server, are skipped.
    */
   [[nodiscard]] bool ReadViewMessage(std::span<const std::uint8_t> message, SViewMessage& out);
 
@@ -98,6 +101,7 @@ namespace faf::remote::client
     std::uint64_t poseFailures = 0; // pose lanes that didn't decode
     std::uint64_t poseBytes = 0;
     std::uint64_t effectFailures = 0; // effects lanes that didn't decode
+    std::uint64_t commandBytes = 0;   // plan WP5.14: the command-records lanes
   };
 
   class CServerViewClient
@@ -172,6 +176,14 @@ namespace faf::remote::client
     {
       return *mEffects;
     }
+    /**
+     * Plan WP5.14: each view's command-records lane, into its packet's command lists (`CWldSession::DoBeat` keeps the
+     * command helpers from them, as from a lockstep sim's).
+     */
+    [[nodiscard]] const CCommandLaneApplier& Commands() const noexcept
+    {
+      return *mCommands;
+    }
 
     /**
      * Plan WP9.3 (hosting): from now on the effects lane makes real effects (EffectHosting.h): the sim's effect classes
@@ -208,5 +220,6 @@ namespace faf::remote::client
     std::unique_ptr<SEffectTarget> mEffectTarget;
     std::unique_ptr<CClientEffects> mHosted; // `HostEffects`; declared before the applier that drives it
     std::unique_ptr<CEffectLaneApplier> mEffects;
+    std::unique_ptr<CCommandLaneApplier> mCommands;
   };
 } // namespace faf::remote::client

@@ -70,6 +70,9 @@ namespace faf::headless
     std::string effectDumpPath;  // `--effect-dump <prefix>`: the focus army's effects, lockstep against its client's
     bool effectDumpCentred = false; // `--effect-dump-centred`: effect curves' random spread held at its centre
     std::string poseDumpPath;       // `--pose-dump <prefix>`: the focus army's units drawn, lockstep against its client
+    bool viewCommands = false;      // `--view-commands`: each view's command-records lane (plan WP5.14)
+    std::string commandDumpPath;    // `--command-dump <file>`: an army's command queues per beat and unit
+    int commandDumpArmy = -1;       // `--command-dump-army <army>`: unfocused, whose view's client the dump is
     float poseCameraX = 0.0f;       // `--pose-camera x,z,half-width`: the focus army's client's camera for the pose
     float poseCameraZ = 0.0f;       // budget (a top-down square, as faf_server_probe --camera-at), and the dump's
     float poseCameraHalf = 0.0f;    // on-screen units; 0: none

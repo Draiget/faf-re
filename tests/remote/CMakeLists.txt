@@ -38,9 +38,11 @@ if(FAF_SERVER_MODE)
   # Plan WP9.3: the effect classes hosted outside a sim, and the client's follow targets.
   # Plan WP9.5: a beam's create parameters from the server's recorder, through the lane, into the client's beam.
     # Plan WP12.2: the launcher's connection string and the commands a game on a game server ignores.
-  # The Lua Sync routing policy as a file, and the committed policy against the compiled table.
+  # The Lua Sync routing policy as a file, and the committed policy against the compiled table;
+  # plan WP5.14: the command-records lane, the server's per-view routes and the client's applier.
 add_executable(faf_remote_tests EXCLUDE_FROM_ALL WireTests.cpp EffectHostingTests.cpp LaunchPathTests.cpp
     SyncPolicyTests.cpp
+    CommandLaneTests.cpp
     ${CMAKE_SOURCE_DIR}/src/server/EffectOpEncoder.cpp ${CMAKE_SOURCE_DIR}/src/server/EffectOpRecorder.cpp)
   target_link_libraries(faf_remote_tests PRIVATE faf_engine gtest_main)
   target_compile_definitions(faf_remote_tests PRIVATE FAF_SERVER_MODE=1

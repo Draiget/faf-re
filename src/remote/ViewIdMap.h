@@ -69,6 +69,14 @@ namespace faf::remote
     }
     /** `Translate` for one record, without the sort. */
     void TranslateRecord(wire::SEntityRecord& record, const OwnCommandTest& isOwnCommand);
+    /** Plan WP5.14: a command's id as this view's client knows it, allocating on first appearance as `Translate`. */
+    [[nodiscard]] std::uint32_t CommandId(
+      const std::uint32_t simId,
+      const OwnCommandTest& isOwnCommand
+    )
+    {
+      return Command(simId, isOwnCommand);
+    }
 
     /**
      * Beats a retired view id still translates inbound: a client's command can name an entity it

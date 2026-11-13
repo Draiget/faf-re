@@ -52,7 +52,8 @@ namespace faf::probe
       std::span<const std::uint8_t> grids,
       std::span<const std::uint8_t> poses = {},
       bool hasPoses = false,
-      std::span<const std::uint8_t> effects = {}
+      std::span<const std::uint8_t> effects = {},
+      std::span<const std::uint8_t> commands = {}
     );
 
     /** A whole `SessionTables` message (plan WP11 step 4). */

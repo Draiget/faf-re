@@ -26,9 +26,11 @@ set(FAF_REMOTE_SOURCES
   remote/ServerClient.cpp
   remote/FrameWindow.cpp
   remote/ArmyRecords.cpp
+  remote/CommandRecords.cpp
   remote/wire/ArmyLane.cpp
   remote/wire/LuaSyncLane.cpp
   remote/wire/BitStream.cpp
+  remote/wire/CommandLane.cpp
   remote/wire/EffectLane.cpp
   remote/wire/EntityFrame.cpp
   remote/wire/IntelGridDelta.cpp
@@ -45,6 +47,7 @@ set(FAF_REMOTE_SOURCES
 set(FAF_REMOTE_CLIENT_SOURCES
   remote/client/BeatClock.cpp
   remote/client/BeatSynthesis.cpp
+  remote/client/CommandLaneApplier.cpp
   remote/client/DisplayModel.cpp
   remote/client/InterpBuffer.cpp
   remote/client/EffectBlueprint.cpp

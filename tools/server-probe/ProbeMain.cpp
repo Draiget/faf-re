@@ -52,6 +52,7 @@
 #include "remote/client/BeatSynthesis.h"
 #include "remote/client/DisplayModel.h"
 #include "remote/client/EffectLaneApplier.h"
+#include "remote/wire/CommandLane.h"
 #include "remote/wire/EffectLane.h"
 #include "remote/wire/EntityFrame.h"
 #include "remote/wire/LuaSyncLane.h"
@@ -668,7 +669,13 @@ namespace
     std::uint64_t effectOpsByKind[static_cast<std::size_t>(moho::EEffectOp::Count)]{};
     std::uint64_t effectMaxLane = 0;
     std::uint64_t effectFailed = 0;
-    std::uint64_t lanesSkipped = 0; // past the effects lane: a newer server's
+    std::uint64_t lanesSkipped = 0; // past the command-records lane: a newer server's
+    // Plan WP5.14: the views' command-records lanes (remote/wire/CommandLane.h), each applied as the game client's view
+    // client applies them: a record of a command it wasn't sent is dropped and counted (must stay 0).
+    faf::remote::wire::CCommandLaneReceiver commands;
+    faf::remote::wire::CCommandLaneReceiver::SBeat commandBeat;
+    std::uint64_t commandLaneViews = 0; // views with the lane
+    std::uint64_t commandMaxLane = 0;
     // Plan WP9.3: the lanes applied as the game client applies them (remote/client/EffectLaneApplier.h), against the
     // entities this probe's frames hold: ops on an effect it doesn't hold and creates on an entity it doesn't hold
     // (routing and the server's id translation must make both 0), creates of one held already (sent whole again after
@@ -882,6 +889,8 @@ namespace
     std::span<const std::uint8_t> poses;
     bool hasPoses = false;
     std::span<const std::uint8_t> effectLane;
+    std::span<const std::uint8_t> commandLane; // plan WP5.14: the eighth
+    bool hasCommands = false;
     for (int lane = 0; ok && !reader.AtEnd(); ++lane) {
       const std::uint64_t size = reader.Varint();
       const std::uint8_t* const bytes = reader.Bytes(size);
@@ -895,8 +904,25 @@ namespace
         out.poseBytes += size;
       } else if (lane == 1) {
         effectLane = std::span<const std::uint8_t>(bytes, size);
+      } else if (lane == 2) {
+        commandLane = std::span<const std::uint8_t>(bytes, size);
+        hasCommands = true;
       } else {
         ++out.lanesSkipped;
+      }
+    }
+    if (ok && hasCommands) {
+      ++out.commandLaneViews;
+      out.commandMaxLane = std::max<std::uint64_t>(out.commandMaxLane, commandLane.size());
+      const std::uint64_t failedBefore = out.commands.Counts().failures;
+      (void)out.commands.Apply(commandLane, out.commandBeat);
+      if (out.commands.Counts().failures != failedBefore && out.commands.Counts().failures <= 3u) {
+        std::printf(
+          "probe: %.1f s: the command-records lane of beat %llu didn't decode (%zu bytes)\n",
+          elapsed,
+          static_cast<unsigned long long>(beat),
+          commandLane.size()
+        );
       }
     }
     if (ok) {
@@ -947,7 +973,8 @@ namespace
           lanes[1],
           poses,
           hasPoses,
-          effectLane
+          effectLane,
+          commandLane
         );
       }
       faf::remote::wire::SViewFrame decoded;
@@ -2332,6 +2359,35 @@ int main(
       static_cast<unsigned long long>(applied.skipped[static_cast<std::size_t>(EEffectSkip::UnknownEffect)]),
       static_cast<unsigned long long>(applied.skipped[static_cast<std::size_t>(EEffectSkip::UnknownName)]),
       views.effectApplier.Live()
+    );
+  }
+  {
+    // Plan WP5.14: what the command-records lanes carried, and what applying them did.
+    const faf::remote::wire::SCommandLaneCounts& commands = views.commands.Counts();
+    const double perView = views.views != 0u ? 1.0 / static_cast<double>(views.views) : 0.0;
+    std::printf(
+      "probe %d: commands: %llu of %llu views with the lane, %llu bytes (%.1f a view, the most %llu), %.2f KB/s at 10 "
+      "beats a second; %llu lanes with records, %llu didn't decode, %llu whole; %llu descriptors, %llu updates, %llu "
+      "removals, %llu releases, %llu forgotten at a whole lane; dropped: %llu updates and %llu removals of commands "
+      "not sent; %zu held at the end\n",
+      options.uid,
+      static_cast<unsigned long long>(views.commandLaneViews),
+      static_cast<unsigned long long>(views.views),
+      static_cast<unsigned long long>(commands.bytes),
+      static_cast<double>(commands.bytes) * perView,
+      static_cast<unsigned long long>(views.commandMaxLane),
+      static_cast<double>(commands.bytes) * perView * 10.0 / 1024.0,
+      static_cast<unsigned long long>(commands.lanes),
+      static_cast<unsigned long long>(commands.failures),
+      static_cast<unsigned long long>(commands.wholes),
+      static_cast<unsigned long long>(commands.descriptors),
+      static_cast<unsigned long long>(commands.updates),
+      static_cast<unsigned long long>(commands.removals),
+      static_cast<unsigned long long>(commands.releases),
+      static_cast<unsigned long long>(commands.forgotten),
+      static_cast<unsigned long long>(commands.droppedUpdates),
+      static_cast<unsigned long long>(commands.droppedRemovals),
+      views.commands.Held()
     );
   }
   std::printf(

@@ -313,6 +313,29 @@ namespace faf::remote::client
       static_cast<double>(mLaneBytes[4]) / 1024.0,
       static_cast<double>(mLaneBytes[5]) / 1024.0
     );
+    // Plan WP5.14: the command-records lanes as this client applied them.
+    if (mViews) {
+      const wire::SCommandLaneCounts& commands = mViews->Commands().Counts();
+      gpg::Logf(
+        "server driver %s: command records %.1f KB in %llu lanes (%llu bad, %llu whole): %llu descriptors, %llu "
+        "updates, %llu removals, %llu releases, %llu forgotten at a whole lane; dropped %llu updates and %llu removals "
+        "of commands not sent; %llu unknown blueprints; %zu commands held",
+        when,
+        static_cast<double>(mLaneBytes[static_cast<std::size_t>(EServerLane::Commands)]) / 1024.0,
+        static_cast<unsigned long long>(commands.lanes),
+        static_cast<unsigned long long>(commands.failures),
+        static_cast<unsigned long long>(commands.wholes),
+        static_cast<unsigned long long>(commands.descriptors),
+        static_cast<unsigned long long>(commands.updates),
+        static_cast<unsigned long long>(commands.removals),
+        static_cast<unsigned long long>(commands.releases),
+        static_cast<unsigned long long>(commands.forgotten),
+        static_cast<unsigned long long>(commands.droppedUpdates),
+        static_cast<unsigned long long>(commands.droppedRemovals),
+        static_cast<unsigned long long>(mViews->Commands().UnknownBlueprints()),
+        mViews->Commands().Receiver().Held()
+      );
+    }
     // Plan WP10.9, WPR.14: the view buffer: its depth, the views' lateness, and what late views cost the display.
     const SInterpStats& buffer = mInterp.Stats();
     const SSynthStats& made = mSynth.Stats();
@@ -824,6 +847,7 @@ namespace faf::remote::client
     laneBytes[static_cast<std::size_t>(EServerLane::Lua)] = lua.size();
     laneBytes[static_cast<std::size_t>(EServerLane::Poses)] = view.hasPoses ? view.poses.size() : 0u;
     laneBytes[static_cast<std::size_t>(EServerLane::Effects)] = view.effects.size();
+    laneBytes[static_cast<std::size_t>(EServerLane::Commands)] = view.commands.size();
     if (mViewsTaken == 1u) {
       CServerLaneMeter::Get().Reset(); // a new game
     }

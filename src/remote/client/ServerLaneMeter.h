@@ -21,7 +21,8 @@ namespace faf::remote::client
     Grids,
     Lua,
     Poses,
-    Effects, // plan WP9.3
+    Effects,  // plan WP9.3
+    Commands, // plan WP5.14: the command records
     Count,
   };
 
@@ -44,6 +45,8 @@ namespace faf::remote::client
       return "poses";
     case EServerLane::Effects:
       return "effects";
+    case EServerLane::Commands:
+      return "commands";
     case EServerLane::Count:
       break;
     }

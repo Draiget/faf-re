@@ -306,6 +306,23 @@ namespace faf::remote
     {
       return mViewBeat;
     }
+    /**
+     * Plan WP5.14: `army`'s id map to hand out ids from, on the view's own work (its job, which with teams also runs
+     * its team's view, sharing the map), or on the sim thread with no view work under way.
+     */
+    [[nodiscard]] CViewIdMap& IdMapForWork(
+      const std::int32_t army
+    )
+    {
+      return *mIdMaps[TeamSlotOf(static_cast<std::size_t>(army))];
+    }
+    /** Plan WP5.14: the commands `army`'s view keeps the ids of (its army's command sources, with teams its team's). */
+    [[nodiscard]] CViewIdMap::OwnCommandTest OwnCommandsOf(
+      const std::size_t army
+    ) const
+    {
+      return OwnCommands(army);
+    }
     /** How long the sim thread waited for the last beat's view work (in `OnViewsFinished`). */
     [[nodiscard]] double ViewWaitSeconds() const noexcept
     {

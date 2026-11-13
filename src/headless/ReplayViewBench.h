@@ -9,8 +9,10 @@
 #include <unordered_map>
 #include <vector>
 
+#include "headless/ReplayCommandDump.h"
 #include "remote/ViewLanes.h"
 #include "remote/client/EffectLaneApplier.h"
+#include "remote/wire/CommandLane.h"
 #include "remote/wire/EffectLane.h"
 #include "server/EffectOpEncoder.h"
 #include "server/EffectOpRouter.h"
@@ -115,6 +117,17 @@ namespace faf::headless
     {
       return mPoseDump.get();
     }
+    /**
+     * Plan WP5.14, `--view-commands`, before the first beat: each view's command-records lane as a server sends it
+     * (remote/CommandRecords.h), read back as its client does (`CCommandLaneReceiver`), and counted.
+     */
+    void EnableCommands();
+    /**
+     * Plan WP5.14, `--command-dump <file>` (after `EnableCommands`, serial views): per beat and unit, `army`'s command
+     * queues as its client holds them (ReplayCommandDump.h): `lockstep` (the sim focused on `army`) from the sim's own
+     * packets, else from that army's view's lane. False when the file can't be written.
+     */
+    [[nodiscard]] bool EnableCommandDump(const std::string& path, std::int32_t army, bool lockstep);
     [[nodiscard]] std::string Summary() const;
     /** Lanes that did not encode, and what the check found (should stay 0). */
     [[nodiscard]] std::uint64_t Failures() const noexcept;
@@ -125,8 +138,23 @@ namespace faf::headless
     void OnLuaRouterMade(remote::CSyncRouter& router) override;
     void OnLuaRouterBeat(moho::Sim& sim, remote::CSyncRouter& router) override;
     void OnLanesEncoded(std::size_t army, const SLanes& lanes) override;
+    void OnCommandsPublished(moho::Sim& sim, const moho::SSyncData& packet) override;
 
   private:
+    /** Plan WP5.14: the dump army's units' queues this beat (sim thread, after the beat's lanes). */
+    void DumpCommandQueues(moho::Sim& sim);
+
+    // Plan WP5.14 (`EnableCommands`): each army's client of the lanes, as it reads them (each by its view's job).
+    struct SCommandClient
+    {
+      remote::wire::CCommandLaneReceiver receiver;
+      remote::wire::CCommandLaneReceiver::SBeat beat;
+      std::vector<std::uint32_t> beatBytes; // one entry per beat
+      std::uint64_t lanes = 0;              // with any record
+    };
+    std::vector<SCommandClient> mCommandClients; // by army
+    std::unique_ptr<CReplayCommandDump> mCommandDump;
+
     /** One beat's measurements. */
     struct SBeat
     {

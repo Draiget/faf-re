@@ -1,6 +1,7 @@
 #pragma once
 
 #include <atomic>
+#include <condition_variable>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
@@ -10,10 +11,12 @@
 #include <utility>
 #include <vector>
 
+#include "remote/CommandRecords.h"
 #include "remote/SyncRouting.h"
 #include "remote/ViewFrames.h"
 #include "remote/wire/ArmyLane.h"
 #include "remote/wire/BitStream.h"
+#include "remote/wire/CommandLane.h"
 #include "remote/wire/LuaSyncLane.h"
 
 // Engine addition, server mode (plan WP5.2, WP16.5, WPR.35): every beat, what a dedicated server
@@ -40,6 +43,41 @@ namespace faf::remote
   {
   public:
     CViewLanes(const wire::SContentTables& tables, float mapSizeX, float mapSizeZ);
+    ~CViewLanes() override;
+
+    /**
+     * Plan WP5.14, before the first beat: each army's view gets its command-records lane (remote/wire/CommandLane.h,
+     * remote/CommandRecords.h). The sim publishes a beat's command records after the walk the views are built from
+     * (`Sim::CSyncObserver::OnCommandsPublished`), so with a pipeline a view's job waits for them before its lanes go
+     * out; without one the views' lanes are encoded once the sim has published them.
+     */
+    void EnableCommandRecords()
+    {
+      if (!mCommandBook) {
+        mCommandBook = std::make_unique<CCommandBook>();
+      }
+    }
+    [[nodiscard]] bool CommandRecordsOn() const noexcept
+    {
+      return mCommandBook != nullptr;
+    }
+    /** The book of the sim's commands (null without `EnableCommandRecords`); read it between beats. */
+    [[nodiscard]] const CCommandBook* CommandBook() const noexcept
+    {
+      return mCommandBook.get();
+    }
+    /** A view's route of the command records (null before its first lane); read it between beats. */
+    [[nodiscard]] const CCommandViewRoute* CommandRoute(
+      const std::size_t army
+    ) const noexcept
+    {
+      return army < mClients.size() ? mClients[army].commandRoute.get() : nullptr;
+    }
+    /** Views' jobs that gave up waiting for a beat's command records (should stay 0; the next lane is whole). */
+    [[nodiscard]] std::uint64_t CommandWaitsTimedOut() const noexcept
+    {
+      return mCommandTimeouts.load(std::memory_order_relaxed);
+    }
 
     /** The Lua lane too, each player's `Sync` as `remote/SyncRouting.h` routes it. */
     void EnableLuaRouting(
@@ -69,6 +107,10 @@ namespace faf::remote
       bool ok;
       const wire::BitWriter* team = nullptr;  // the player's team's frame, with teams and not cut from it
       const wire::BitWriter* poses = nullptr; // with `EnablePoses`: the units' bones (wire/PoseLane.h)
+      // Plan WP5.14, with `EnableCommandRecords`: the command-records lane's bytes (wire/CommandLane.h), and what it
+      // says (for checks).
+      const std::vector<std::uint8_t>* commands = nullptr;
+      const wire::SCommandLane* commandLane = nullptr;
       std::size_t teamEntities = 0;
       bool fresh = false; // `RequestFresh`: every lane but Lua's is whole, for a client that holds nothing
       // Plan WPR.30, every `kCheckEveryBeats`: what the client should hold after this beat, by
@@ -96,6 +138,12 @@ namespace faf::remote
     }
 
     void OnViewFrames(moho::Sim& sim) override;
+    /** Plan WP5.14: the beat's command records into the book; without a pipeline, the views' lanes go out now. */
+    void OnCommandsPublished(moho::Sim& sim, const moho::SSyncData& packet) override;
+    /** Plan WP5.14: the sim won't publish another beat (it stopped): views' jobs stop waiting for command records. */
+    void StopCommandWaits();
+    /** Plan WP5.14: a blueprint as the command-records lane names it: 0 none, else its content-table ordinal + 1. */
+    [[nodiscard]] std::uint32_t CommandBlueprint(const moho::REntityBlueprint* blueprint) const;
     /** The grids, encoded in the frames' batch of jobs. */
     std::size_t PrepareSideJobs(moho::Sim& sim) override;
     void RunSideJob(std::size_t index) override;
@@ -209,6 +257,11 @@ namespace faf::remote
       bool fresh = false;                                                       // `RequestFresh`
       std::uint32_t bytes = 0;                                                  // this beat
       std::uint64_t failures = 0;                                               // since `TakeClientFailures`
+      // Plan WP5.14: what its client holds of the command records, and this beat's lane.
+      std::unique_ptr<CCommandViewRoute> commandRoute;
+      wire::SCommandLane commandLane;
+      std::vector<std::uint8_t> commandBytes;
+      bool commandsWhole = false; // a beat's records were missed: the next lane is whole
     };
 
     /** One grid: every client that holds last beat's gets the same delta, encoded once. */
@@ -226,8 +279,24 @@ namespace faf::remote
     };
 
     void Send(std::size_t army);
+    /** Every army's view's `Send`, on the sim's workers with `Parallel`. */
+    void SendAll();
+    /** Plan WP5.14: `army`'s command-records lane into its client's, once the beat's records are in the book. */
+    void WriteCommandLane(std::size_t army, SClient& client, bool fresh);
 
+    const wire::SContentTables& mTables;
     std::vector<SClient> mClients;
+    // Plan WP5.14 (`EnableCommandRecords`). The book is written on the sim thread in `OnCommandsPublished`, read by the
+    // views' work after `mCommandBeat` names their beat (under `mCommandLock`).
+    std::unique_ptr<CCommandBook> mCommandBook;
+    std::mutex mCommandLock;
+    std::condition_variable mCommandReady;
+    std::uint32_t mCommandBeat = 0;
+    bool mCommandBeatSet = false;
+    bool mCommandWaitsStopped = false;
+    bool mSendAfterCommands = false;     // without a pipeline: this beat's lanes wait for the records
+    std::uint32_t mCommandWatching = 0u; // armies whose players watch everything, as of this beat's views
+    std::atomic<std::uint64_t> mCommandTimeouts{0};
     std::size_t mPoseBudgetBytes = 0;
     bool mPoseCheck = false;
     std::atomic<std::uint64_t> mPoseCheckUnits{0};

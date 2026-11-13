@@ -130,6 +130,7 @@ namespace faf::server
       return;
     }
     mInstalled = false;
+    StopCommandWaits(); // the sim stopped: no beat's command records are still to come
     (void)FinishViews();
     UninstallRouting();
     moho::Sim::SetSyncObserver(nullptr);
@@ -278,7 +279,9 @@ namespace faf::server
       WriteLane(writer, *lanes.poses);
       // Plan WP9.1 step 3: the seventh, the beat's effect ops (remote/wire/EffectLane.h). It needs the pose lane before
       // it, which the server always sends; a client that doesn't know it skips it.
+      bool effectsWritten = false;
       if (const auto receiver = mEffectReceivers.find(army); mEffects && receiver != mEffectReceivers.end()) {
+        effectsWritten = true;
         std::vector<std::uint8_t>& lane = receiver->second.lane;
         if (mEffectRoutes) {
           // Plan WP9.2: the effects whose place this client holds (its frame and its team's, as just encoded); plan
@@ -307,6 +310,17 @@ namespace faf::server
         writer.Bytes(lane.data(), lane.size());
         mEffectBytes.fetch_add(lane.size(), std::memory_order_relaxed);
         mEffectLanes.fetch_add(lane.empty() ? 0u : 1u, std::memory_order_relaxed);
+      }
+      // Plan WP5.14: the eighth, the command records of the units its army has (remote/wire/CommandLane.h). Without the
+      // effects lane an empty one stands in its place (no op), so the client finds this one where it looks.
+      if (lanes.commands != nullptr) {
+        if (!effectsWritten) {
+          writer.Varint(0u);
+        }
+        writer.Varint(lanes.commands->size());
+        writer.Bytes(lanes.commands->data(), lanes.commands->size());
+        mCommandBytes.fetch_add(lanes.commands->size(), std::memory_order_relaxed);
+        mCommandLanes.fetch_add(lanes.commands->empty() ? 0u : 1u, std::memory_order_relaxed);
       }
     }
     mNet.QueueView(player->second, std::move(message), lanes.fresh);
@@ -490,9 +504,70 @@ namespace faf::server
     };
     return "views so far: entities " + megabytes(mFrameBytes) + " MB, armies " + megabytes(mArmyBytes) + " MB, grids " +
       megabytes(mGridBytes) + " MB, Lua " + megabytes(mLuaBytes) + " MB, poses " + megabytes(mPoseBytes) +
-      (mEffects ? " MB, effects " + megabytes(mEffectBytes) : std::string()) + " MB, session tables " +
-      std::to_string(mTableRecords.load(std::memory_order_relaxed)) + " records of " +
+      (mEffects ? " MB, effects " + megabytes(mEffectBytes) : std::string()) +
+      (CommandRecordsOn()
+         ? " MB, commands " + std::to_string(mCommandBytes.load(std::memory_order_relaxed) / 1024u) + " KB"
+         : std::string(" MB")) +
+      ", session tables " + std::to_string(mTableRecords.load(std::memory_order_relaxed)) + " records of " +
       std::to_string(mTableBytes.load(std::memory_order_relaxed) / 1024u) + " KB to each player";
+  }
+
+  std::string CServerViews::CommandReport() const
+  {
+    const remote::CCommandBook* const book = CommandBook();
+    if (book == nullptr) {
+      return {};
+    }
+    char line[512];
+    std::snprintf(
+      line,
+      sizeof(line),
+      "command records: %llu beats, %llu descriptors, %llu packets, %llu removals, %llu releases from the sim, %zu "
+      "commands live at the end; %llu KB in %llu lanes to the %zu players; %llu packets without a descriptor, %llu "
+      "units of no army, %llu waits for a beat's records timed out",
+      static_cast<unsigned long long>(book->Beats()),
+      static_cast<unsigned long long>(book->Descriptors()),
+      static_cast<unsigned long long>(book->Packets()),
+      static_cast<unsigned long long>(book->Removals()),
+      static_cast<unsigned long long>(book->Releases()),
+      book->Live(),
+      static_cast<unsigned long long>(mCommandBytes.load(std::memory_order_relaxed) / 1024u),
+      static_cast<unsigned long long>(mCommandLanes.load(std::memory_order_relaxed)),
+      mPlayers.size(),
+      static_cast<unsigned long long>(book->Orphans()),
+      static_cast<unsigned long long>(book->UnitsWithoutArmy()),
+      static_cast<unsigned long long>(CommandWaitsTimedOut())
+    );
+    std::string report = line;
+    for (const auto& [army, uid] : mPlayers) {
+      const remote::CCommandViewRoute* const route = CommandRoute(army);
+      if (route == nullptr) {
+        continue;
+      }
+      const remote::CCommandViewRoute::SCounts& counts = route->Counts();
+      std::snprintf(
+        line,
+        sizeof(line),
+        "\ncommand records, army index %zu: %llu descriptors, %llu updates (%llu with no change), %llu removals, %llu "
+        "releases (%llu of its own never shown), %llu whole; %llu units of other armies left out, %llu targets it "
+        "holds "
+        "no record of sent as none, %llu under its own ids; %zu shown at the end",
+        army,
+        static_cast<unsigned long long>(counts.descriptors),
+        static_cast<unsigned long long>(counts.updates),
+        static_cast<unsigned long long>(counts.emptyUpdates),
+        static_cast<unsigned long long>(counts.removals),
+        static_cast<unsigned long long>(counts.releases + counts.ownReleases),
+        static_cast<unsigned long long>(counts.ownReleases),
+        static_cast<unsigned long long>(counts.wholes),
+        static_cast<unsigned long long>(counts.unitsLeftOut),
+        static_cast<unsigned long long>(counts.targetsWithheld),
+        static_cast<unsigned long long>(counts.targetsRenumbered),
+        route->Shown()
+      );
+      report += line;
+    }
+    return report;
   }
 
   void CServerViews::OnViewsFinished()

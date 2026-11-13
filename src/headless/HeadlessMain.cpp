@@ -280,6 +280,13 @@ namespace
       "                            this square (the pose budget's order; --pose-dump also compares the units in it)\n"
       "  --effect-dump-centred     with --effect-dump: the effect curves' random spread held at its centre in both\n"
       "                            runtimes, so each emitter's counts compare one for one\n"
+      "  --view-commands           with --view-bench: each view's command-records lane as a server sends it, read "
+      "back\n"
+      "  --command-dump <file>     with --view-commands (serial views): per beat and unit, an army's command queues "
+      "as\n"
+      "                            its client holds them: with --focus <army> lockstep's, unfocused with\n"
+      "                            --command-dump-army <army> its server-mode client's; two runs compare line for "
+      "line\n"
       "  --view-dump <file>       with --view-bench: what each player's client holds every 2000 beats, to compare two "
       "runs\n"
       "  --parallel-views          with --view-frames or --view-bench: the views are built on the sim's workers\n"
@@ -468,6 +475,9 @@ int HEADLESS_Main(
   (void)ReadOption("--effect-dump", options.effectDumpPath); // plan WP9.5
   options.effectDumpCentred = moho::CFG_GetArgOption("--effect-dump-centred", 0, nullptr);
   (void)ReadOption("--pose-dump", options.poseDumpPath); // plan WP8.4
+  options.viewCommands = moho::CFG_GetArgOption("--view-commands", 0, nullptr); // plan WP5.14
+  (void)ReadOption("--command-dump", options.commandDumpPath);
+  (void)ReadIntOption("--command-dump-army", options.commandDumpArmy, bad);
   if (std::string camera; ReadOption("--pose-camera", camera)) {
     if (
       std::sscanf(camera.c_str(), "%f,%f,%f", &options.poseCameraX, &options.poseCameraZ, &options.poseCameraHalf) !=

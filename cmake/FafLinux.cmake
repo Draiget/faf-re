@@ -394,6 +394,8 @@ add_executable(faf_remote_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/re
   "${PROJECT_SOURCE_DIR}/tests/remote/LaunchPathTests.cpp"
   # The Lua Sync routing policy as a file, and the committed policy against the compiled table.
   "${PROJECT_SOURCE_DIR}/tests/remote/SyncPolicyTests.cpp"
+  # Plan WP5.14: the command-records lane, the server's per-view routes and the client's applier.
+  "${PROJECT_SOURCE_DIR}/tests/remote/CommandLaneTests.cpp"
   # Plan WP9.5: a beam's create parameters from the server's recorder, through the lane, into the client's beam.
   "${PROJECT_SOURCE_DIR}/src/server/EffectOpEncoder.cpp" "${PROJECT_SOURCE_DIR}/src/server/EffectOpRecorder.cpp")
 target_link_libraries(faf_remote_tests PRIVATE faf_sim gtest_main)

@@ -112,6 +112,8 @@ namespace faf::server
     void Uninstall();
     /** What the effects lanes carried, for the console; empty without `EnableEffectOps`. After `Uninstall`. */
     [[nodiscard]] std::string EffectReport() const;
+    /** Plan WP5.14: what the command-records lanes carried; empty without `EnableCommandRecords`. After `Uninstall`. */
+    [[nodiscard]] std::string CommandReport() const;
 
     [[nodiscard]] std::uint64_t Failures() const noexcept
     {
@@ -163,6 +165,8 @@ namespace faf::server
     std::atomic<std::uint64_t> mGridBytes{0};
     std::atomic<std::uint64_t> mLuaBytes{0};
     std::atomic<std::uint64_t> mPoseBytes{0};
+    std::atomic<std::uint64_t> mCommandBytes{0}; // plan WP5.14: summed over the views
+    std::atomic<std::uint64_t> mCommandLanes{0}; // lanes with any record
     std::atomic<int> mFrameSimRate{0};
     std::chrono::steady_clock::time_point mStart = std::chrono::steady_clock::now();
     std::atomic<std::uint64_t> mTableBytes{0}; // one player's share

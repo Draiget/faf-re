@@ -116,7 +116,8 @@ namespace
     "[--warn-beat-ms <n>] [--listen <ip:port>] [--join-seconds <n>] [--reconnect-seconds <n>] [--lead-ms <n>] "
     "[--view-threads <n>] [--per-player-views] [--team-views] [--away-pause-seconds <n>] [--defeated-view "
     "observe|disconnect] [--lobby-seconds <n> [--start-when-ready <seconds>]] [--lobby-away-seconds <n>] "
-    "[--stats-every <beats>] [--pose-budget-kbps <n>] [--no-effect-ops | --effect-ops-all] [--congestion-control] "
+    "[--stats-every <beats>] [--pose-budget-kbps <n>] [--no-effect-ops | --effect-ops-all] [--no-command-records] "
+    "[--congestion-control] "
     "[--nftables-out <file> "
     "[--nftables-only] "
     "[--unlisted-pps <n>] [--unlisted-total-pps <n>]] [--sync-policy <file>] [--unvalidated-policy] "
@@ -2419,6 +2420,12 @@ namespace
           all ? "every op to every player (--effect-ops-all)" : "routed to the players who can place them"
         );
       }
+      // Plan WP5.14: each player's view carries the command records of their army's units (queues, rally points,
+      // enhancement queues), as their lockstep client's beat would.
+      if (!moho::CFG_GetArgOption("--no-command-records", 0, nullptr)) {
+        views->EnableCommandRecords();
+        Say("Command records lane: each player gets their army's units' command records");
+      }
       views->Install();
       Say(
         "Views: %s",
@@ -3250,6 +3257,9 @@ namespace
       Say("%s", views->LaneReport().c_str());
       if (const std::string effects = views->EffectReport(); !effects.empty()) {
         Say("%s", effects.c_str());
+      }
+      if (const std::string commands = views->CommandReport(); !commands.empty()) {
+        Say("%s", commands.c_str());
       }
     }
     if (net) {

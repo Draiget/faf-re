@@ -577,6 +577,15 @@ void Sim::Sync(
   if (mCommandDB != nullptr) {
     mCommandDB->PublishSyncData(outSyncData, focusArmyChanged);
   }
+#if FAF_SERVER_MODE
+  // Engine addition (plan WP5.14): a server's views take the beat's command records from here. Only read.
+  {
+    const std::lock_guard<std::mutex> commandsLock(sSyncObserverLock);
+    if (sSyncObserver != nullptr) {
+      sSyncObserver->OnCommandsPublished(*this, *outSyncData);
+    }
+  }
+#endif
 
   // 0x00747B23 onward: republish the per-beat state Lua reads off the global
   // `Sync` table. lua/SimSync.lua consumes these every beat; nothing wrote

@@ -110,6 +110,19 @@ namespace moho
       (void)sim;
       (void)packet;
     }
+
+    /**
+     * Plan WP5.14: `CCommandDB::PublishSyncData` has run, so the beat's packet holds its command records (descriptors,
+     * packets, removals, releases). After `OnSyncWalkDone`, on every beat, before the `Sync` table is written.
+     */
+    virtual void OnCommandsPublished(
+      Sim& sim,
+      const SSyncData& packet
+    )
+    {
+      (void)sim;
+      (void)packet;
+    }
   };
 #endif
 

@@ -1,7 +1,11 @@
 #include "remote/ViewLanes.h"
 
 #include <algorithm>
+#include <chrono>
 
+#include "moho/entity/Entity.h"
+#include "moho/entity/EntityDb.h"
+#include "moho/entity/REntityBlueprint.h"
 #include "moho/sim/CArmyImpl.h"
 #include "moho/sim/CIntelGrid.h"
 #include "moho/sim/Sim.h"
@@ -27,11 +31,152 @@ namespace faf::remote
     const float mapSizeZ
   )
     : CViewFrames(tables, MakeViewCodec(mapSizeX, mapSizeZ))
+    , mTables(tables)
   {}
+
+  CViewLanes::~CViewLanes()
+  {
+    StopCommandWaits(); // before the views' jobs are waited for (CViewFrames)
+  }
 
   void CViewLanes::UninstallRouting()
   {
     moho::Sim::SetSyncRouting(nullptr);
+  }
+
+  void CViewLanes::StopCommandWaits()
+  {
+    {
+      const std::scoped_lock lock(mCommandLock);
+      mCommandWaitsStopped = true;
+    }
+    mCommandReady.notify_all();
+  }
+
+  void CViewLanes::OnCommandsPublished(
+    moho::Sim& sim,
+    const moho::SSyncData& packet
+  )
+  {
+    if (!mCommandBook) {
+      return;
+    }
+    const auto beat = static_cast<std::uint32_t>(sim.mCurBeat);
+    if (PipelineOn() && beat != ViewBeat()) {
+      // No views this beat: the last beat's may still read the book (their records came long since).
+      (void)FinishViews();
+    }
+    // On the sim thread; this beat's views, if any, wait for `mCommandBeat` before they read the book.
+    mCommandBook->TakeBeat(packet, [&sim](const std::uint32_t unit) -> std::uint8_t {
+      const moho::Entity* const entity = sim.mEntityDB != nullptr ? sim.mEntityDB->FindEntityById(unit) : nullptr;
+      if (entity == nullptr || entity->ArmyRef == nullptr) {
+        return CCommandBook::kNoArmy;
+      }
+      const std::int32_t army = entity->ArmyRef->mConstDat.mArmyIndex;
+      return army >= 0 && army < CCommandBook::kNoArmy ? static_cast<std::uint8_t>(army) : CCommandBook::kNoArmy;
+    }, [this](const moho::REntityBlueprint* const blueprint) {
+      return CommandBlueprint(blueprint);
+    });
+    {
+      const std::scoped_lock lock(mCommandLock);
+      mCommandBeat = beat;
+      mCommandBeatSet = true;
+    }
+    mCommandReady.notify_all();
+    if (std::exchange(mSendAfterCommands, false)) {
+      SendAll(); // without a pipeline the views' lanes waited for this
+    }
+  }
+
+  std::uint32_t CViewLanes::CommandBlueprint(
+    const moho::REntityBlueprint* const blueprint
+  ) const
+  {
+    if (blueprint == nullptr) {
+      return 0u;
+    }
+    const std::uint32_t ordinal = mTables.blueprints.Ordinal(blueprint->mBlueprintId.c_str());
+    return ordinal == wire::COrdinalTable::kNone ? 0u : ordinal + 1u;
+  }
+
+  void CViewLanes::WriteCommandLane(
+    const std::size_t army,
+    SClient& client,
+    const bool fresh
+  )
+  {
+    client.commandLane.Clear();
+    client.commandBytes.clear();
+    bool ready = false;
+    {
+      // With a pipeline this is the view's job, which may run before the sim has published the beat's records (they
+      // come after the walk the views were built from); that is a short wait on a beat's last steps.
+      std::unique_lock lock(mCommandLock);
+      const auto have = [this] {
+        return mCommandBeatSet && mCommandBeat == ViewBeat();
+      };
+      (void)mCommandReady.wait_for(lock, std::chrono::seconds(30), [&] {
+        return have() || mCommandWaitsStopped;
+      });
+      ready = have();
+    }
+    if (!ready) {
+      // The beat's records never came (the sim stopped): its client gets them whole once they do.
+      mCommandTimeouts.fetch_add(mCommandWaitsStopped ? 0u : 1u, std::memory_order_relaxed);
+      client.commandsWhole = true;
+      return;
+    }
+    if (!client.commandRoute) {
+      client.commandRoute = std::make_unique<CCommandViewRoute>();
+    }
+    const auto view = static_cast<std::int32_t>(army);
+    const bool everything = army < 32u && ((mCommandWatching >> army) & 1u) != 0u;
+    const CViewIdMap::OwnCommandTest isOwn = OwnCommandsOf(army);
+    const bool idMaps = IdMapsOn() && army < ViewCount();
+    CViewIdMap* const ids = idMaps ? &IdMapForWork(view) : nullptr;
+    CCommandViewRoute::STranslate translate;
+    translate.isOwn = isOwn;
+    translate.command = [ids, &isOwn](const std::uint32_t simId) {
+      return ids != nullptr ? ids->CommandId(simId, isOwn) : simId;
+    };
+    translate.entity = [this, ids, army](const std::uint32_t simId) -> std::uint32_t {
+      // The view's id of a record its client holds (now, or lately: it may still show it), else none, as its frames
+      // name an entity they hold no record of (plan WP5.12).
+      if (ids != nullptr && ids->MapsEntity(simId)) {
+        std::uint32_t viewId = 0;
+        return ids->EntityToHeldView(simId, viewId) ? viewId : wire::kNoCommandEntity;
+      }
+      if (HeldFramesOn() && !ViewHoldsEntity(army, simId)) {
+        return wire::kNoCommandEntity;
+      }
+      return simId;
+    };
+    client.commandRoute->Write(
+      *mCommandBook,
+      view,
+      everything,
+      fresh || std::exchange(client.commandsWhole, false),
+      translate,
+      client.commandLane
+    );
+    wire::EncodeCommandLane(client.commandLane, client.commandBytes);
+    client.bytes += static_cast<std::uint32_t>(client.commandBytes.size());
+  }
+
+  void CViewLanes::SendAll()
+  {
+    const auto armyCount = static_cast<std::size_t>(ArmyCount());
+    if (Parallel() && armyCount > 1u) {
+      moho::CSimWorkerPool::Get().ParallelFor(armyCount, 1u, [this](const std::size_t begin, const std::size_t end) {
+        for (std::size_t army = begin; army < end; ++army) {
+          Send(army);
+        }
+      });
+    } else {
+      for (std::size_t army = 0; army < armyCount; ++army) {
+        Send(army);
+      }
+    }
   }
 
   void CViewLanes::OnViewFrames(
@@ -74,17 +219,17 @@ namespace faf::remote
     }
     MarkPhase(EViewPhase::Lua);
 
+    // Plan WP5.14: who watches everything, as this beat's views have it, for their command records (read by their
+    // work, which this beat's next call waits for).
+    mCommandWatching = 0u;
+    for (std::size_t army = 0; army < armyCount && army < 32u; ++army) {
+      mCommandWatching |= WatchesEverything(army) ? std::uint32_t{1} << army : 0u;
+    }
     if (!PipelineOn()) {
-      if (Parallel() && armyCount > 1u) {
-        moho::CSimWorkerPool::Get().ParallelFor(armyCount, 1u, [this](const std::size_t begin, const std::size_t end) {
-          for (std::size_t army = begin; army < end; ++army) {
-            Send(army);
-          }
-        });
+      if (mCommandBook) {
+        mSendAfterCommands = true; // the beat's command records come after this walk (`OnCommandsPublished`)
       } else {
-        for (std::size_t army = 0; army < armyCount; ++army) {
-          Send(army);
-        }
+        SendAll();
       }
     }
   }
@@ -395,9 +540,18 @@ namespace faf::remote
       client.poseUnits.swap(client.poseUnitsNext);
     }
 
+    // Command-records lane (plan WP5.14): what its client holds of them, against the beat's records.
+    if (mCommandBook) {
+      WriteCommandLane(army, client, fresh);
+    }
+
     SLanes lanes{frameWriter, armyWriter, gridWriter, client.lua, ok};
     lanes.poses = PosesOn() ? &poseWriter : nullptr;
     lanes.fresh = fresh;
+    if (mCommandBook) {
+      lanes.commands = &client.commandBytes;
+      lanes.commandLane = &client.commandLane;
+    }
     // A whole view carries its check, so a client that asked for one knows at once that it holds the right frames.
     lanes.check = check || fresh;
     lanes.frameHash = lanes.check ? HeldFrameHash(view) : 0u;
