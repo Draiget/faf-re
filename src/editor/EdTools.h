@@ -1879,6 +1879,30 @@ namespace faf::editor
     {
       mShowSlope = on;
     }
+    /** The heights view: the ground coloured by height in bands, the sea's ground blue (the view's shading: Heights).
+     */
+    [[nodiscard]] bool ShowHeights() const noexcept
+    {
+      return mShowHeights;
+    }
+    void SetShowHeights(
+      const bool on
+    ) noexcept
+    {
+      mShowHeights = on;
+    }
+    /** The view's shading as its corner button cycles it: 0 lit, 1 heights, 2 slope. */
+    [[nodiscard]] int Shading() const noexcept
+    {
+      return mShowSlope ? 2 : mShowHeights ? 1 : 0;
+    }
+    void SetShading(
+      const int shading
+    ) noexcept
+    {
+      mShowHeights = shading == 1;
+      mShowSlope = shading == 2;
+    }
     [[nodiscard]] bool ShowKmGrid() const noexcept
     {
       return mShowKmGrid;
@@ -2778,6 +2802,7 @@ namespace faf::editor
     int mTerrainTypeCode = 81;
     bool mShowTerrainTypes = true;
     bool mShowSlope = false;
+    bool mShowHeights = false;
     bool mShowKmGrid = false;
     std::string mCursorText;
     std::string mRulerText;

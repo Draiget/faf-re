@@ -453,6 +453,7 @@ namespace faf::editor
     void DrawDebuggerPanel();
     bool mShowDebugger = false;
     bool mShowGenNodes = false;
+    float mCornerBottom = 0.0f; // the view's top-right buttons' lower edge (the compass goes under them)
     bool mShowGenGraph = false;
     bool mShowGenInspector = false;
     bool mDebugWasPaused = false;

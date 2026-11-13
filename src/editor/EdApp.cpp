@@ -3457,6 +3457,10 @@ namespace faf::editor
       add("edit.paste", "Paste at the cursor", "Edit", "Ctrl+V", [this] {
         mScene.CtrlKey('V');
       }, canEdit);
+      add("view.shading", "Shading: lit / heights / slope", "View", "", [this] {
+        EdTools& tools = mShell->Tools();
+        tools.SetShading((tools.Shading() + 1) % 3);
+      }, mapOpen, {}, "The view's shading in turn: lit, the ground by height, the ground by slope");
       add(
         "terrain.generate", "Generate (node graph)...", "Terrain", "", [this] {
         mShell->SwitchWorkspace(4);

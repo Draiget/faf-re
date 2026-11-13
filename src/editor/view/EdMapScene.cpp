@@ -322,7 +322,7 @@ namespace faf::editor
        mDocument.SaveData().Chains().empty() && !mTools->ShowGrid() && !mTools->DecalsToolActive() &&
        !mTools->UnitsToolActive() && !mTools->EditingBorder() && !mTools->WaterToolActive() &&
        mTools->SymmetryHover() < 0 && mTools->CheckPins().empty() && !mTools->ShowingPathing() &&
-       !mTools->ShowSlope() && !mTools->ShowKmGrid() && !mRulerShown && !mBoxing) ||
+       !mTools->ShowSlope() && !mTools->ShowHeights() && !mTools->ShowKmGrid() && !mRulerShown && !mBoxing) ||
       moho::ren_Viewport == nullptr
     ) {
       return;
@@ -724,11 +724,13 @@ namespace faf::editor
     // The slope view: each cell rated by the sim's rule (EdSlopeRules: a unit footprint's steps, a structure's area or
     // its levelled skirt's ring) and coloured green to red up to the limit, darker red beyond; rebuilt when the heights
     // or the rule change. Flat cells are left out.
+    // The heights view uses the same bands and drawing: each cell's height instead of its slope.
     const auto slopeStarted = std::chrono::steady_clock::now();
-    if (mTools->ShowSlope()) {
+    const bool heightsView = mTools->ShowHeights() && !mTools->ShowSlope();
+    if (mTools->ShowSlope() || heightsView) {
       const EdTools::SlopeView& rule = mTools->SlopeSettings();
-      const std::uint64_t key = (static_cast<std::uint64_t>(rule.Kind()) << 40) |
-        (static_cast<std::uint64_t>(rule.Window()) << 32) |
+      const std::uint64_t key = (heightsView ? (std::uint64_t{1} << 48) : 0U) |
+        (static_cast<std::uint64_t>(rule.Kind()) << 40) | (static_cast<std::uint64_t>(rule.Window()) << 32) |
         static_cast<std::uint32_t>(std::lround(rule.Limit() * 1000.0f));
       if (mSlopeSteps.empty() || key != mSlopeKey || ++mSlopeFrames % 15 == 0) {
         std::uint64_t hash = 1469598103934665603ULL ^ key;
@@ -751,29 +753,59 @@ namespace faf::editor
             );
           };
           std::vector<std::uint8_t> steps(static_cast<std::size_t>(cellsX) * static_cast<std::size_t>(cellsZ), 0);
-          std::vector<std::uint16_t> tile(static_cast<std::size_t>(sloperules::kTile) * sloperules::kTile);
           std::size_t beyond = 0;
-          for (int tz = 0; tz * sloperules::kTile < cellsZ; ++tz) {
-            for (int tx = 0; tx * sloperules::kTile < cellsX; ++tx) {
-              sloperules::RateTile(
-                rule.Kind(), rule.Window(), tx * sloperules::kTile, tz * sloperules::kTile, sample, tile.data()
-              );
-              for (int j = 0; j < sloperules::kTile; ++j) {
-                const int z = tz * sloperules::kTile + j;
-                if (z >= cellsZ) {
-                  break;
-                }
-                for (int i = 0; i < sloperules::kTile; ++i) {
-                  const int x = tx * sloperules::kTile + i;
-                  if (x >= cellsX) {
+          if (heightsView) {
+            // Band 1 the sea's ground, 2 .. 13 the land from its lowest to its highest (a cell's mean of its corners).
+            const WaterState water = mDocument.WaterNow();
+            const int sea = water.enabled ? static_cast<int>(std::lround(water.elevation * 128.0f)) : -1;
+            int lo = 65535;
+            int hi = 0;
+            const std::size_t samples =
+              static_cast<std::size_t>(field->width) * static_cast<std::size_t>(field->height);
+            for (std::size_t i = 0; i < samples; ++i) {
+              const int h = static_cast<int>(field->data[i]);
+              if (h > sea) {
+                lo = std::min(lo, h);
+                hi = std::max(hi, h);
+              }
+            }
+            const float span = static_cast<float>(std::max(1, hi - lo));
+            for (int z = 0; z < cellsZ; ++z) {
+              for (int x = 0; x < cellsX; ++x) {
+                const int mean = (sample(x, z) + sample(x + 1, z) + sample(x, z + 1) + sample(x + 1, z + 1)) / 4;
+                const int band = mean <= sea
+                  ? 1
+                  : 2 + std::clamp(static_cast<int>(static_cast<float>(mean - lo) / span * 12.0f), 0, 11);
+                steps[static_cast<std::size_t>(z) * static_cast<std::size_t>(cellsX) + static_cast<std::size_t>(x)] =
+                  static_cast<std::uint8_t>(band);
+                beyond += band == 1 ? 1U : 0U;
+              }
+            }
+          } else {
+            std::vector<std::uint16_t> tile(static_cast<std::size_t>(sloperules::kTile) * sloperules::kTile);
+            for (int tz = 0; tz * sloperules::kTile < cellsZ; ++tz) {
+              for (int tx = 0; tx * sloperules::kTile < cellsX; ++tx) {
+                sloperules::RateTile(
+                  rule.Kind(), rule.Window(), tx * sloperules::kTile, tz * sloperules::kTile, sample, tile.data()
+                );
+                for (int j = 0; j < sloperules::kTile; ++j) {
+                  const int z = tz * sloperules::kTile + j;
+                  if (z >= cellsZ) {
                     break;
                   }
-                  const float units =
-                    static_cast<float>(tile[static_cast<std::size_t>(j) * sloperules::kTile + i]) / 128.0f;
-                  const int step = sloperules::ColorStep(units, rule.Limit());
-                  steps[static_cast<std::size_t>(z) * static_cast<std::size_t>(cellsX) + static_cast<std::size_t>(x)] =
-                    static_cast<std::uint8_t>(step);
-                  beyond += step > sloperules::kSteps ? 1U : 0U;
+                  for (int i = 0; i < sloperules::kTile; ++i) {
+                    const int x = tx * sloperules::kTile + i;
+                    if (x >= cellsX) {
+                      break;
+                    }
+                    const float units =
+                      static_cast<float>(tile[static_cast<std::size_t>(j) * sloperules::kTile + i]) / 128.0f;
+                    const int step = sloperules::ColorStep(units, rule.Limit());
+                    steps
+                      [static_cast<std::size_t>(z) * static_cast<std::size_t>(cellsX) + static_cast<std::size_t>(x)] =
+                        static_cast<std::uint8_t>(step);
+                    beyond += step > sloperules::kSteps ? 1U : 0U;
+                  }
                 }
               }
             }
@@ -824,7 +856,21 @@ namespace faf::editor
         block /= 2;
       }
       // Green to yellow to red up to the limit (ARGB), darker red beyond it: bands 1 (flat) .. 6, 7 beyond.
-      const auto colourOf = [](const int band) -> std::uint32_t {
+      const auto colourOf = [heightsView](const int band) -> std::uint32_t {
+        if (heightsView) {
+          // The sea's ground blue; the land green, yellow, brown, then pale at the top.
+          if (band <= 1) {
+            return 0xA02F6FB8u;
+          }
+          static constexpr float kStops[4][3] = {{60, 150, 70}, {210, 200, 90}, {150, 110, 70}, {240, 240, 240}};
+          const float t = static_cast<float>(band - 2) / 11.0f * 3.0f;
+          const int i = std::min(2, static_cast<int>(t));
+          const float f = t - static_cast<float>(i);
+          const auto mix = [&](const int c) {
+            return static_cast<std::uint32_t>(kStops[i][c] + (kStops[i + 1][c] - kStops[i][c]) * f);
+          };
+          return 0x9C000000u | (mix(0) << 16) | (mix(1) << 8) | mix(2);
+        }
         if (band >= 7) {
           return 0xB0D02828u;
         }
@@ -847,7 +893,7 @@ namespace faf::editor
           for (int x = 0; x < mSlopeCellsX; ++x) {
             const int step = mSlopeSteps
               [static_cast<std::size_t>(z) * static_cast<std::size_t>(mSlopeCellsX) + static_cast<std::size_t>(x)];
-            const int band = step > sloperules::kSteps ? 7 : 1 + step * 5 / sloperules::kSteps;
+            const int band = heightsView ? step : step > sloperules::kSteps ? 7 : 1 + step * 5 / sloperules::kSteps;
             std::uint8_t& cell = bands
               [static_cast<std::size_t>(z / block) * static_cast<std::size_t>(bw) +
                static_cast<std::size_t>(x / block)];

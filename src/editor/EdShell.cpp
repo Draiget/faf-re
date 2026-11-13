@@ -979,15 +979,6 @@ namespace faf::editor
             editorView ? "The editor's view of the map, the play running on behind it: F6 for the game's view"
                        : "The game's view: F6 for the editor's view of the map (the play keeps running)"
           );
-          if (editorView) {
-            if (button("##gameunits", ICON_UNIT, "Game units", mTools.ShowGameUnits())) {
-              mTools.ShowGameUnits() = !mTools.ShowGameUnits();
-            }
-            tip(
-              "The play's own units in the editor's view: shown (click one to select it, drag to move it, change it "
-              "in Properties) or hidden"
-            );
-          }
         }
       }
       group();
@@ -1462,6 +1453,51 @@ namespace faf::editor
     }
     end();
 
+    // The top-right (.vp-header's last pill group): the view's shading, and during play the fog and the play's units.
+    if (begin("##viewcorner", ImVec2(view.x + viewSize.x - margin, view.y + margin), ImVec2(1.0f, 0.0f))) {
+      static constexpr const char* kShading[] = {"Lit", "Heights", "Slope"};
+      const int shading = mTools.Shading();
+      if (pill("shading", ICON_SUN, kShading[shading], shading != 0)) {
+        mTools.SetShading((shading + 1) % 3);
+        gpg::Logf("editor: the view's shading: %s", kShading[(shading + 1) % 3]);
+      }
+      tip(
+        "Shading: lit / heights / slope. Heights colours the ground by height, the sea's ground blue; slope rates it "
+        "as "
+        "the game's pathing does"
+      );
+      const bool playing = moho::WLD_GetFrameAction() == moho::EWldFrameAction::Playing;
+      ImGui::BeginDisabled(!playing);
+      const bool fog = !mPlay.FogHidden();
+      if (pill("fog", ICON_EYE, nullptr, playing && fog)) {
+        mPlay.SetFogHidden(fog);
+      }
+      if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort | ImGuiHoveredFlags_AllowWhenDisabled)) {
+        EdSetTooltip(
+          "%s",
+          playing ? (fog ? "Fog of war: shown. Click to leave out the fog's shading (the player keeps their army)"
+                         : "Fog of war: left out. Click to show it again")
+                  : "Fog of war during play (Play, F5)"
+        );
+      }
+      const bool units = mTools.ShowGameUnits();
+      if (pill("gameunits", ICON_UNIT, nullptr, playing && units)) {
+        mTools.ShowGameUnits() = !units;
+      }
+      if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort | ImGuiHoveredFlags_AllowWhenDisabled)) {
+        EdSetTooltip(
+          "%s",
+          playing ? (units ? "Show the game units during play: shown (click one to select it, drag to move it). Click "
+                             "to hide them"
+                           : "The game units are hidden. Click to show them")
+                  : "Show the game units during play (Play, F5)"
+        );
+      }
+      ImGui::EndDisabled();
+      mCornerBottom = ImGui::GetWindowPos().y + ImGui::GetWindowHeight();
+    }
+    end();
+
     // The Select tool: what a click, the hover and a box may pick, under the camera row (it was the panel's Pick
     // section). Kinds switched off stay drawn but can't be grabbed or moved.
     if (mTools.SelectToolActive()) {
@@ -1633,9 +1669,9 @@ namespace faf::editor
     if (frame.valid && frame.maxX > frame.minX && frame.maxZ > frame.minZ) {
       // The compass: where the map's north (-z) and east (+x) are on the screen.
       const float radius = std::round(Em(30.0f));
-      ImGui::SetNextWindowPos(
-        ImVec2(view.x + viewSize.x - margin, view.y + margin), ImGuiCond_Always, ImVec2(1.0f, 0.0f)
-      );
+      // Under the corner's buttons.
+      const float compassTop = std::max(view.y + margin, mCornerBottom + Em(8.0f));
+      ImGui::SetNextWindowPos(ImVec2(view.x + viewSize.x - margin, compassTop), ImGuiCond_Always, ImVec2(1.0f, 0.0f));
       ImGui::SetNextWindowSize(ImVec2(radius * 2.0f, radius * 2.0f));
       ImGui::SetNextWindowViewport(viewport->ID);
       ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
