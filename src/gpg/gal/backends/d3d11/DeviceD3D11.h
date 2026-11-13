@@ -15,6 +15,7 @@
 #include <memory>
 #include <mutex>
 #include <set>
+#include <utility>
 #include <vector>
 
 #include <d3d11.h>
@@ -268,6 +269,14 @@ namespace gpg::gal
       const char* sourceName,
       const D3D_SHADER_MACRO* defines,
       const char* cachePath
+    );
+
+    /** (sampler name, texture parameter) pairs of an effect's source, for anisotropic filtering (EffectD3D11.h). */
+    [[nodiscard]] std::vector<std::pair<std::string, std::string>> SamplerTextures(
+      const char* source,
+      std::size_t sourceBytes,
+      const char* sourceName,
+      const D3D_SHADER_MACRO* defines
     );
 
     int mCurThreadId = 0;
