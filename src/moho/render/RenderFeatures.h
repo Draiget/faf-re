@@ -38,8 +38,9 @@ namespace moho::render
 
   struct FeatureState
   {
-    std::string text; // what the Options screen shows
-    std::string key;  // stored in the profile
+    std::string text;    // what the Options screen shows
+    std::string key;     // stored in the profile
+    std::string value{}; // what is sent to the console variable when the state is chosen; empty = the level index
   };
 
   struct ApiSupport
@@ -56,9 +57,14 @@ namespace moho::render
     std::string title;
     std::string tip;
     std::string console;              // console variable that takes the level live ("ren_DynLights"); empty = none
+    std::string after;                // key of the entry this one is listed after; empty or absent = after Graphics API
+    bool numericKeys = false;         // the state keys are numbers in the profile (0, 1, 2), not strings
     std::vector<FeatureState> states; // index = level
     int defaultLevel = 0;
     bool needsRestart = false;
+    // The feature does something only on a device that traces rays (inline ray queries): the others do not list it
+    // (it shows in `unsupported` with that reason), whatever the API.
+    bool needsRayTracing = false;
     ApiSupport apis[static_cast<int>(Api::Count)];
     // Called once after the device exists, with the level the player chose, when the feature is supported on the active
     // API.
