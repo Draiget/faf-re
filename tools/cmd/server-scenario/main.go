@@ -5,7 +5,11 @@
 //
 //	GOOS=linux go build -o server-scenario ./cmd/server-scenario
 //	server-scenario --build <dir with server, headless, faf_server_probe> --data <game data, as server --data>
-//	    --out <dir> [--sync-policy <file>] [--no-spy] scenarios/server/server-1v1.yaml
+//	    --out <dir> [--sync-policy <file>] [--no-spy] [--no-view-audit] scenarios/server/server-1v1.yaml
+//
+// The server runs with --view-audit (srv_ViewAudit): it checks what it sends each player against the rules for that
+// player's view. Its count of incidents is printed, and a scenario that expects a clean game fails on any.
+// --no-view-audit leaves the audit off.
 //
 // The playback runs the spy client too (headless --view-bench --lua-routing --spy): every Lua Sync key and id each
 // player's client would get in that game is checked against its audience, and one outside it, a renumbered id sent
@@ -83,7 +87,7 @@ type Step struct {
 type Expect struct {
 	ServerExit *int `yaml:"serverExit"` // default 0
 	// Clean: every seat run that was not killed exits 0 (joined, saw beats, every view decoded) and reports
-	// "(0 didn't match)" for its frame checks.
+	// "(0 didn't match)" for its frame checks; and the server's view audit, when on, counts no incident.
 	Clean bool `yaml:"clean"`
 	// Playback: headless plays the server's replay and every recorded checksum matches.
 	Playback bool `yaml:"playback"`
@@ -103,10 +107,12 @@ type seatRun struct {
 }
 
 var (
-	checksRe   = regexp.MustCompile(`(\d+) checks \((\d+) didn't match\)`)
-	viewsRe    = regexp.MustCompile(`(\d+) views, (\d+) didn't decode`)
-	verdictRe  = regexp.MustCompile(`VERDICT ended=(\w+) mismatches=(\d+) crash=(\w+)`)
-	beatsRe    = regexp.MustCompile(`beats=(\d+)`)
+	checksRe  = regexp.MustCompile(`(\d+) checks \((\d+) didn't match\)`)
+	viewsRe   = regexp.MustCompile(`(\d+) views, (\d+) didn't decode`)
+	verdictRe = regexp.MustCompile(`VERDICT ended=(\w+) mismatches=(\d+) crash=(\w+)`)
+	beatsRe   = regexp.MustCompile(`beats=(\d+)`)
+	// The server's view audit summary (src/remote/ViewAudit.cpp, CViewAudit::Summary).
+	auditRe = regexp.MustCompile(`view audit: (\d+) incidents;[^\n]*`)
 	// headless --spy's line (src/headless/ReplaySyncSpy.cpp).
 	spyRe = regexp.MustCompile(`lua spy: (\d+) keys over (\d+) view beats, \d+ ids \(\d+ in marked fields\); ` +
 		`(\d+) keys with no route, (\d+) outside their audience, (\d+) renumbered ids sent raw, (\d+) that did not ` +
@@ -169,10 +175,11 @@ func main() {
 	syncPolicy := flag.String("sync-policy", "", "a Lua Sync routing policy file for the server and the spy "+
 		"(tools/sync-routing/policy_gen.py); default the compiled table")
 	noSpy := flag.Bool("no-spy", false, "play the replay back without the spy")
+	noAudit := flag.Bool("no-view-audit", false, "run the server without --view-audit")
 	flag.Parse()
 	if flag.NArg() != 1 || *build == "" || *data == "" || *outDir == "" {
 		fmt.Fprintln(os.Stderr, "usage: server-scenario --build <dir> --data <dir> --out <dir> [--port n] "+
-			"[--sync-policy <file>] [--no-spy] <scenario.yaml>")
+			"[--sync-policy <file>] [--no-spy] [--no-view-audit] <scenario.yaml>")
 		os.Exit(2)
 	}
 	raw, err := os.ReadFile(flag.Arg(0))
@@ -216,6 +223,9 @@ func main() {
 	}
 	if *syncPolicy != "" {
 		args = append(args, "--sync-policy", *syncPolicy)
+	}
+	if !*noAudit {
+		args = append(args, "--view-audit")
 	}
 	args = append(args, s.Server.Args...)
 	serverOut := filepath.Join(*outDir, "server.out")
@@ -314,6 +324,19 @@ func main() {
 	for _, text := range s.Expect.Absent {
 		if strings.Contains(string(console), text) {
 			fail("server output has %q", text)
+		}
+	}
+	if !*noAudit {
+		if audit := lastMatch(auditRe, console); audit == nil {
+			fmt.Println("server: no view audit line")
+			if s.Expect.Clean {
+				fail("server: no view audit line (the game built no views, or the server predates --view-audit)")
+			}
+		} else {
+			fmt.Println("server:", audit[0])
+			if s.Expect.Clean && audit[1] != "0" {
+				fail("server: view audit counted %s incidents (the server's \"view audit:\" warnings name them)", audit[1])
+			}
 		}
 	}
 	for _, r := range runs {

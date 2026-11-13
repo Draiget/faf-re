@@ -223,8 +223,10 @@ namespace faf::remote
       return ids != nullptr ? ids->CommandId(simId, isOwn) : simId;
     };
     translate.entity = [this, ids, army](const std::uint32_t simId) -> std::uint32_t {
-      // The view's id of a record its client holds (now, or lately: it may still show it), else none, as its frames
-      // name an entity they hold no record of (plan WP5.12).
+      // A renumbered entity (a blip, another army's projectile): the id the view's id map gave the client, live or
+      // retired within the grace, whether or not the client holds its record now; else none. No new id is handed out.
+      // A kept id: the entity when the client holds its record (now, or lately), else none, as its frames name an
+      // entity they hold no record of (plan WP5.12).
       if (ids != nullptr && ids->MapsEntity(simId)) {
         std::uint32_t viewId = 0;
         return ids->EntityToHeldView(simId, viewId) ? viewId : wire::kNoCommandEntity;

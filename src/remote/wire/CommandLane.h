@@ -39,8 +39,11 @@
 // data changed (`ApplyBeatCommandPackets`).
 //
 // Ids are those the view's client knows (remote/ViewIdMap.h): its own commands keep their ids, any other command has
-// the view's own number, the same its frames give it in a unit's queue; a target entity is the view's id of a record
-// the client holds, or 0xF0000000 (the sim's "none") for one it holds no record of.
+// the view's own number, the same its frames give it in a unit's queue. A target entity the view keeps the sim's id
+// of (units, props, its own projectiles) is named when the client holds its record; a renumbered one (blips, other
+// armies' projectiles) when the view's id map gave the client an id for it, live or retired within the grace, even if
+// the client holds no record of it now (a lockstep client names that blip whether or not it still shows it). Any
+// other target is 0xF0000000 (the sim's "none").
 
 namespace faf::remote::wire
 {
