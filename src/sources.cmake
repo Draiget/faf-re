@@ -364,6 +364,9 @@ set(FAF_ENGINE_SOURCES
   moho/terrain/water/WaterBodySurfaces.cpp
   moho/terrain/water/RiverFlow.cpp
   moho/terrain/water/RiverFlowPatch.cpp
+  moho/terrain/water/WaterBankPatch.cpp
+  moho/terrain/water/WaterBankGrowth.cpp
+  moho/terrain/water/WaterBanksBind.cpp
   moho/terrain/water/TerrainWaterLevelPatch.cpp
   moho/terrain/water/TerrainWaterLevels.cpp
   moho/ui/CUIWorldView.cpp
