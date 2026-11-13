@@ -17,6 +17,8 @@
 #include "moho/sim/CWldMap.h"
 #include "moho/sim/CWldSession.h"
 #include "moho/terrain/water/CWaterShaderProperties.h"
+#include "moho/terrain/water/RiverFlowBind.h"
+#include "moho/terrain/water/WaterBanksBind.h"
 #include "moho/terrain/water/WaterBodySurfaces.h"
 #include "moho/terrain/water/WaterQuality.h"
 #include "moho/terrain/water/WaterShaderVars.h"
@@ -400,15 +402,19 @@ namespace moho
     GetWater2UtilityTextureCShaderVar().GetTexture(utilityTexture);
 
     std::int32_t primitiveType = kTriangleListPrimitiveToken;
-    // Engine addition (water bodies): the mask is laid at each water's own level.
+    // Engine addition (water bodies): the mask is laid at each water's own level. FAF (banks): the mask of a lake or
+    // a river is the depth test alone, so its edge is where the surface meets the ground (docs/WATER_SIMULATION.md,
+    // "Banks"); the sea's is the shipped one.
     if (const auto* const levels = WaterBodySurfaces::For(terrainRes); levels != nullptr) {
       bool drawn = true;
       for (const WaterBodySurfaces::Level& level : *levels) {
         GetWater2WaterElevationShaderVar().SetFloat(level.elevation);
+        water::BindBankMask(!level.sea);
         for (const WaterBodySurfaces::Chunk& chunk : level.chunks) {
           drawn = device->DrawIndexedSheetPrimitive(chunk.vertices, chunk.indices, &primitiveType) && drawn;
         }
       }
+      water::BindBankMask(false);
       return drawn;
     }
     return device->DrawIndexedSheetPrimitive(mVertexSheet, mIndexSheet, &primitiveType);
@@ -538,11 +544,25 @@ namespace moho
       const std::shared_ptr<ID3DTextureSheet> owner =
         std::static_pointer_cast<ID3DTextureSheet>(WaterBodySurfaces::OwnerTexture(mTerrainRes));
       const bool gridSheet = owner != nullptr && EnsureWaterGrid();
+      // FAF (rivers): the flow of the map's rivers; a river is drawn as its own mesh (the sloped surface, the vertices
+      // keep their heights), never as a grid, and never mirrors at a plane (docs/projects/RIVERS.md)
+      water::BindRiverFlow(mTerrainRes);
       for (const WaterBodySurfaces::Level& level : *levels) {
         GetWater2WaterElevationShaderVar().SetFloat(level.elevation);
         GetWater2ReflectionMapShaderVar().SetRenderTargetTexture(
-          level.sea ? reflectionTexture : WaterBodySurfaces::ReflectionFor(level.elevation)
+          level.sea
+            ? reflectionTexture
+            : (level.river ? WaterBodySurfaces::EmptyReflection() : WaterBodySurfaces::ReflectionFor(level.elevation))
         );
+        if (level.river) {
+          water::BindWaterGridLevelOff();
+          water::BindRiverMesh(true);
+          for (const WaterBodySurfaces::Chunk& chunk : level.chunks) {
+            drawn = device->DrawIndexedSheetPrimitive(chunk.vertices, chunk.indices, &primitiveType) && drawn;
+          }
+          water::BindRiverMesh(false);
+          continue;
+        }
         water::GridLevel grid;
         grid.elevation = level.elevation;
         grid.body = level.body;

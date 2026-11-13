@@ -61,12 +61,15 @@ namespace moho::water
   // contours of a distance field have cusps where the shores of a bay or two islands meet, and crests that follow them
   // show V shapes) so that neither those nor the staircase of a one-unit coast show in the contours the waves follow;
   // 1e4 where the map has no land.
-  template <class RawAt>
-  std::vector<float> ComputeShoreDistance(
+  //
+  // `levelAt(x, z)` is the level (raw height units) a sample is compared with: one number for a flat water (the
+  // overload below), the level of the sample's own place for a sloped one (a river).
+  template <class RawAt, class LevelAt>
+  std::vector<float> ComputeShoreDistanceLevels(
     RawAt&& rawAt,
+    LevelAt&& levelAt,
     const std::uint32_t width,
     const std::uint32_t height,
-    const float level,
     const float windAngle = 0.0f
   )
   {
@@ -75,7 +78,7 @@ namespace moho::water
     for (std::uint32_t z = 0; z < height; ++z) {
       for (std::uint32_t x = 0; x < width; ++x) {
         const float raw = static_cast<float>(rawAt(x, z));
-        grid[static_cast<std::size_t>(z) * width + x] = raw > level ? 0.0 : kInf;
+        grid[static_cast<std::size_t>(z) * width + x] = raw > static_cast<float>(levelAt(x, z)) ? 0.0 : kInf;
       }
     }
     const std::size_t longest = std::max(width, height);
@@ -141,7 +144,8 @@ namespace moho::water
       std::vector<std::uint8_t> land(static_cast<std::size_t>(width) * height, 0U);
       for (std::uint32_t z = 0; z < height; ++z) {
         for (std::uint32_t x = 0; x < width; ++x) {
-          land[static_cast<std::size_t>(z) * width + x] = static_cast<float>(rawAt(x, z)) > level ? 1U : 0U;
+          land[static_cast<std::size_t>(z) * width + x] =
+            static_cast<float>(rawAt(x, z)) > static_cast<float>(levelAt(x, z)) ? 1U : 0U;
         }
       }
       const float ux = -std::cos(windAngle);
@@ -204,6 +208,21 @@ namespace moho::water
     return dist;
   }
 
+  // The same for one flat level.
+  template <class RawAt>
+  std::vector<float> ComputeShoreDistance(
+    RawAt&& rawAt,
+    const std::uint32_t width,
+    const std::uint32_t height,
+    const float level,
+    const float windAngle = 0.0f
+  )
+  {
+    return ComputeShoreDistanceLevels(rawAt, [level](const std::uint32_t, const std::uint32_t) {
+      return level;
+    }, width, height, windAngle);
+  }
+
   // The level a domain has when it holds no water (a dry body, or the sea of a map that has none): every sample of it
   // counts as land.
   constexpr float kDryLevelRaw = -1.0e30f;
@@ -216,16 +235,26 @@ namespace moho::water
   // samples with a margin (a lake costs a small fraction of the map) and its samples are copied into the result: one
   // number per sample, the layout of ComputeShoreDistance. A map that has one domain only calls ComputeShoreDistance
   // itself, so the result is bit for bit the old one.
-  template <class RawAt, class DomainAt>
-  std::vector<float> ComputeShoreDistanceDomains(
+  //
+  // A river is a sloped domain: its level is not one number. `sloped[d]` (empty: none is) marks such a domain and
+  // `sampleLevel(x, z)` gives the level of a height sample (raw units, the level of its block): the sample is land when
+  // it is higher than that. A flat domain is computed as ever (the same instructions), so a map without rivers gets
+  // the very fields it got.
+  template <class RawAt, class DomainAt, class SampleLevel>
+  std::vector<float> ComputeShoreDistanceDomainsSloped(
     RawAt&& rawAt,
     DomainAt&& domainAt,
     const std::vector<float>& levelRaw,
+    const std::vector<std::uint8_t>& sloped,
+    SampleLevel&& sampleLevel,
     const std::uint32_t width,
     const std::uint32_t height,
     const float windAngle = 0.0f
   )
   {
+    const auto isSloped = [&sloped](const std::size_t d) {
+      return d < sloped.size() && sloped[d] != 0U;
+    };
     const std::size_t samples = static_cast<std::size_t>(width) * height;
     struct Box
     {
@@ -261,6 +290,9 @@ namespace moho::water
       if (levelRaw[only] <= kDryLevelRaw * 0.5f) {
         return std::vector<float>(samples * 2U, 0.0f);
       }
+      if (isSloped(only)) {
+        return ComputeShoreDistanceLevels(rawAt, sampleLevel, width, height, windAngle);
+      }
       return ComputeShoreDistance(rawAt, width, height, levelRaw[only], windAngle);
     }
     // The fetch is worked out on a grid of every fourth sample: the box starts on one of that grid so the result
@@ -278,11 +310,21 @@ namespace moho::water
       const int z1 = std::min(box.z1 + 1 + kMargin, static_cast<int>(height));
       const std::uint32_t rw = static_cast<std::uint32_t>(x1 - x0);
       const std::uint32_t rh = static_cast<std::uint32_t>(z1 - z0);
-      const std::vector<float> part = ComputeShoreDistance([&](const std::uint32_t x, const std::uint32_t z) {
+      const auto partRaw = [&](const std::uint32_t x, const std::uint32_t z) {
         const std::uint32_t gx = static_cast<std::uint32_t>(x0) + x;
         const std::uint32_t gz = static_cast<std::uint32_t>(z0) + z;
         return owner[static_cast<std::size_t>(gz) * width + gx] == d ? static_cast<float>(rawAt(gx, gz)) : 1.0e9f;
-      }, rw, rh, levelRaw[d], windAngle);
+      };
+      const std::vector<float> part = isSloped(d) ? ComputeShoreDistanceLevels(
+                                                      partRaw,
+                                                      [&](const std::uint32_t x, const std::uint32_t z) {
+        return sampleLevel(static_cast<std::uint32_t>(x0) + x, static_cast<std::uint32_t>(z0) + z);
+      },
+                                                      rw,
+                                                      rh,
+                                                      windAngle
+                                                    )
+                                                  : ComputeShoreDistance(partRaw, rw, rh, levelRaw[d], windAngle);
       const std::size_t partSamples = static_cast<std::size_t>(rw) * rh;
       for (int z = box.z0; z <= box.z1; ++z) {
         for (int x = box.x0; x <= box.x1; ++x) {
@@ -297,5 +339,23 @@ namespace moho::water
       }
     }
     return result;
+  }
+
+  // The fields of a map whose domains are all flat.
+  template <class RawAt, class DomainAt>
+  std::vector<float> ComputeShoreDistanceDomains(
+    RawAt&& rawAt,
+    DomainAt&& domainAt,
+    const std::vector<float>& levelRaw,
+    const std::uint32_t width,
+    const std::uint32_t height,
+    const float windAngle = 0.0f
+  )
+  {
+    return ComputeShoreDistanceDomainsSloped(
+      rawAt, domainAt, levelRaw, std::vector<std::uint8_t>(), [](const std::uint32_t, const std::uint32_t) {
+      return 0.0f;
+    }, width, height, windAngle
+    );
   }
 } // namespace moho::water
