@@ -104,6 +104,21 @@ set_target_properties(faf_profiler_tests PROPERTIES FOLDER "Tests/Existing")
 add_test(NAME profiler_facade COMMAND faf_profiler_tests)
 set_tests_properties(profiler_facade PROPERTIES LABELS "Existing")
 
+# Post-process shaders (src/moho/render/SmaaShader.h, PostShader.h, FxaaShader.h): the real HLSL runs on a software Direct3D 11
+# device (WARP) over synthetic images whose answer is known.
+#
+#   cmake --build --preset clang-x64-release --target faf_postprocess_tests
+add_executable(faf_postprocess_tests EXCLUDE_FROM_ALL postprocess/PostProcessTests.cpp)
+target_include_directories(faf_postprocess_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_compile_features(faf_postprocess_tests PRIVATE cxx_std_20)
+target_link_libraries(faf_postprocess_tests PRIVATE gtest_main)
+if(WIN32)
+  target_link_libraries(faf_postprocess_tests PRIVATE d3d11 d3dcompiler)
+endif()
+set_target_properties(faf_postprocess_tests PROPERTIES FOLDER "Tests/Render")
+add_test(NAME post_process_shaders COMMAND faf_postprocess_tests)
+set_tests_properties(post_process_shaders PROPERTIES LABELS "Render")
+
 # Render scale (src/gpg/gal/backends/common/RenderScale.h): the arithmetic, and the upscale / sharpen shaders run on a software
 # Direct3D 11 device (WARP).
 #
