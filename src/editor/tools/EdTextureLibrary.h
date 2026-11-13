@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <array>
 #include <deque>
 #include <set>
 #include <string>
@@ -47,6 +48,9 @@ namespace faf::editor
     /** Decodes up to `count` asked-for thumbnails; called once a frame. */
     void Pump(int count);
 
+    /** A texture's average colour (0..1 r, g, b), decoded now and kept; false when it can't be read. */
+    bool AverageColour(const std::string& path, float (&rgb)[3]);
+
     /** Thumbnails are this many pixels on a side. */
     static constexpr int kThumbnail = 64;
 
@@ -56,6 +60,7 @@ namespace faf::editor
     std::unordered_map<std::string, std::uint64_t> mThumbnails; // 0: asked, not decoded (or failed)
     std::deque<std::string> mWanted;
     std::set<std::string> mWithAlpha;
+    std::unordered_map<std::string, std::array<float, 3>> mAverages; // r < 0: couldn't be read
   };
 
   /** "grass001" from ".../grass001_albedo.dds"; "(empty)" for none. */

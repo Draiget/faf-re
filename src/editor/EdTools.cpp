@@ -1515,13 +1515,19 @@ namespace faf::editor
     if (Section("Map-wide textures")) {
       const MapTextureRow& normals = mMapTextureRows[0];
       const MapTextureRow& lighting = mMapTextureRows[1];
-      if (!normals.available && !lighting.available) {
+      const MapTextureRow& specular = mMapTextureRows[2];
+      const MapTextureRow& macro = mMapTextureRows[3];
+      if (!normals.available && !lighting.available && !specular.available && !macro.available) {
         Note(
-          "This shader draws no map-wide textures; TerrainPBR, Terrain301 and the numbered shaders (Terrain250...) do."
+          "This shader draws no map-wide textures. The numbered shaders (Terrain250...), TerrainPBR and Terrain301 "
+          "read "
+          "normals and lighting; Terrain001 and 051 a specular; TTerrain(XP), TTerrainXPExt, Terrain000 and 050 a "
+          "macrotexture."
         );
       }
       // A row: its state's sign, its name and state, Make (or Remake) and Clear.
       const auto row = [this](const int kind, const char* const name, const MapTextureRow& state) {
+        const bool fromPaint = kind >= 2;
         ImGui::PushID(kind);
         const char* const sign = state.stale ? ICON_WARN : state.present ? ICON_OK : ICON_MINUS;
         ImGui::PushStyleColor(
@@ -1540,7 +1546,12 @@ namespace faf::editor
         if (ImGui::Button(state.made || state.present ? "Remake" : "Make")) {
           AskMapTexture(kind, MapTextureOp::Make);
         }
-        ImGui::SetItemTooltip("Draw it from the map's heights, its sun and its sea, into the map's folder");
+        ImGui::SetItemTooltip(
+          "%s",
+          fromPaint ? "Draw it from the paint (each layer's colour and kind of ground) and the heights, into the map's "
+                      "folder"
+                    : "Draw it from the map's heights, its sun and its sea, into the map's folder"
+        );
         ImGui::SameLine();
         ImGui::BeginDisabled(!state.present);
         if (ImGui::Button("Clear")) {
@@ -1571,6 +1582,12 @@ namespace faf::editor
         if (lighting.available) {
           row(1, "Lighting (shadow, occlusion, water depth)", lighting);
         }
+      }
+      if (specular.available) {
+        row(2, "Specular (shine colour, sharpness)", specular);
+      }
+      if (macro.available) {
+        row(3, "Macrotexture (colour laid over the ground)", macro);
       }
     }
   }

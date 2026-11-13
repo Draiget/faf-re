@@ -1286,7 +1286,8 @@ namespace faf::editor
     {
       return mPickable;
     }
-    /** The Layers panel's map-wide textures: what a row asks (kind 0 the normal map, 1 the lighting), and its state. */
+    /** The Layers panel's map-wide textures: what a row asks (kind 0 the normal map, 1 the lighting, 2 the specular, 3
+     * the macrotexture), and its state. */
     enum class MapTextureOp : std::uint8_t
     {
       None,
@@ -1300,8 +1301,8 @@ namespace faf::editor
       bool available = false; // the shader reads this kind
       bool shared = false;    // one texture holds both kinds (TerrainPBR, Terrain301)
       bool present = false;   // the slot holds a texture
-      bool made = false;      // made here from the heights
-      bool stale = false;     // made here, and the heights changed since
+      bool made = false;      // made here
+      bool stale = false;     // made here, and what it was made from changed since
       std::string state;      // one line for the panel
     };
     /** `file`: a test run's path instead of the dialog (Export, Import); `raiseAfter`: a test run's height edit after
@@ -1339,7 +1340,7 @@ namespace faf::editor
       const int kind
     ) noexcept
     {
-      return mMapTextureRows[kind == 0 ? 0 : 1];
+      return mMapTextureRows[std::clamp(kind, 0, 3)];
     }
     /** The minimap's click: the camera looks at (x, z) next frame (the scene takes it). */
     void AskCameraAt(
@@ -2068,7 +2069,7 @@ namespace faf::editor
     float mMinimapRect[4]{};
     int mLayerMoveFrom = -1;
     PickFilter mPickable;
-    MapTextureRow mMapTextureRows[2];
+    MapTextureRow mMapTextureRows[4];
     int mMapTextureKind = 0;
     MapTextureOp mMapTextureOp = MapTextureOp::None;
     std::string mMapTextureFile;

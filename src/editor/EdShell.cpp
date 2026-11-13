@@ -102,7 +102,10 @@ namespace faf::editor
       ) {
         mapWideDone = true;
         const std::string what = value[0].c_str();
-        const int kind = what.rfind("lighting", 0) == 0 ? 1 : 0;
+        const int kind = what.rfind("lighting", 0) == 0 ? 1
+          : what.rfind("specular", 0) == 0              ? 2
+          : what.rfind("macro", 0) == 0                 ? 3
+                                                        : 0;
         const auto fileAfter = [&](const char* const key) {
           const std::size_t at = what.find(key);
           return at == std::string::npos ? std::string() : what.substr(at + std::string(key).size());

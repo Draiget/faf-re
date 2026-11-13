@@ -375,6 +375,7 @@ set_tests_properties(occupation_manager PROPERTIES LABELS "Sim")
 # the Generate ops, the interop ops. Engine independent.
 add_executable(faf_editor_field_tests EXCLUDE_FROM_ALL editor/FieldTests.cpp editor/FieldLandTests.cpp editor/FieldInteropTests.cpp editor/ErosionTests.cpp
   editor/MapTexturesTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdMapTextures.cpp
+  editor/GroundKindTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdGroundKind.cpp
   ${CMAKE_SOURCE_DIR}/src/editor/terrain/EdErosion.cpp ${CMAKE_SOURCE_DIR}/src/editor/terrain/EdFieldEro2.cpp
   ${CMAKE_SOURCE_DIR}/src/editor/terrain/EdFieldCore.cpp ${CMAKE_SOURCE_DIR}/src/editor/terrain/EdFieldFilt.cpp ${CMAKE_SOURCE_DIR}/src/editor/terrain/EdFieldGen.cpp ${CMAKE_SOURCE_DIR}/src/editor/terrain/EdFieldLand.cpp ${CMAKE_SOURCE_DIR}/src/editor/terrain/EdFieldSc.cpp ${CMAKE_SOURCE_DIR}/src/editor/terrain/EdFieldPath.cpp ${CMAKE_SOURCE_DIR}/src/editor/terrain/EdFieldInterop.cpp)
 target_include_directories(faf_editor_field_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)

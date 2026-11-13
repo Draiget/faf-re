@@ -150,6 +150,13 @@ namespace faf::editor
     bool ExportMaskLayer(int layer, const std::filesystem::path& file, std::string& message);
     /** Each stratum's share of the map, once the masks are read. */
     [[nodiscard]] bool MaskCoverage(float (&coverage)[8]) const;
+    /** The map's masks, read now if they weren't (edit mode on, as the Texture tool does); empty when there are none.
+     */
+    const EdDocument::MaskGrid& ReadMasks()
+    {
+      LoadMasks();
+      return mDocument.Masks();
+    }
     /** The terrain shaders the game's terrain effect marks composite (the ones a map may name), and the map's. */
     [[nodiscard]] std::vector<std::string> TerrainShaders();
     [[nodiscard]] std::string TerrainShader() const;

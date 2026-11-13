@@ -49,6 +49,8 @@
 #include "editor/doc/EdLighting.h"
 #include "editor/tools/EdShaderSlots.h"
 #include "editor/tools/EdMapTextures.h"
+#include "editor/tools/EdGroundKind.h"
+#include "editor/tools/EdShaderProfiles.h"
 #include "editor/ui/EdIconFont.h"
 #include "editor/ui/EdHelp.h"
 #include "editor/ui/EdHomeModel.h"
@@ -2213,7 +2215,9 @@ namespace faf::editor
       void ClearMapTexture(MapTextureKind kind);
       /** Export (true) the slot's texture to a .dds, or import one into the map's folder and the slot. */
       void TransferMapTexture(MapTextureKind kind, bool exporting, const std::string& testFile);
-      bool mMapTexturesStale[2]{};
+      bool mMapTexturesStale[4]{};
+      /** The paint's textures: the heights, the masks and the layers' textures in one sum. */
+      [[nodiscard]] std::uint64_t PaintChecksum(std::uint64_t heights);
       [[nodiscard]] std::uint64_t HeightsChecksum();
       [[nodiscard]] static std::string LowerPath(std::string path);
       int mMapTextureFrame = 0;
@@ -4075,7 +4079,7 @@ namespace faf::editor
       EdTools::MapTextureOp op = EdTools::MapTextureOp::None;
       if (tools.TakeMapTextureAsk(askedKind, op)) {
         const int kind = askedKind;
-        const MapTextureKind which = kind == 0 ? MapTextureKind::Normals : MapTextureKind::Lighting;
+        const MapTextureKind which = static_cast<MapTextureKind>(std::clamp(kind, 0, kMapTextureKinds - 1));
         if (op == EdTools::MapTextureOp::Make) {
           MakeMapTexture(which);
           // `/mapwide <kind>,stale` (test runs): the ground raised after it, so the row goes out of date.
@@ -4105,9 +4109,9 @@ namespace faf::editor
       const float mapSize = static_cast<float>(std::max(mDocument.Facts().sizeX, mDocument.Facts().sizeZ));
       std::uint64_t sum = 0;
       bool summed = false;
-      for (int kind = 0; kind < 2; ++kind) {
-        const MapTextureTarget target =
-          MapTextureTargetOf(shader, kind == 0 ? MapTextureKind::Normals : MapTextureKind::Lighting);
+      for (int kind = 0; kind < kMapTextureKinds; ++kind) {
+        const bool fromPaint = kind >= 2;
+        const MapTextureTarget target = MapTextureTargetOf(shader, static_cast<MapTextureKind>(kind));
         EdTools::MapTextureRow& row = tools.MapTextureState(kind);
         row = {};
         row.available = target.Valid();
@@ -4125,10 +4129,12 @@ namespace faf::editor
             sum = HeightsChecksum();
             summed = true;
           }
-          row.stale = sum != made->second;
+          row.stale = (fromPaint ? PaintChecksum(sum) : sum) != made->second;
           if (row.stale && !mMapTexturesStale[kind]) {
             gpg::Logf(
-              "editor: map-wide texture %s is out of date: the heights changed since it was made", path.c_str()
+              "editor: map-wide texture %s is out of date: the %s changed since it was made",
+              path.c_str(),
+              fromPaint ? "heights or the paint" : "heights"
             );
           }
         }
@@ -4136,11 +4142,18 @@ namespace faf::editor
         const std::size_t slash = path.find_last_of('/');
         const std::string leaf = slash == std::string::npos ? path : path.substr(slash + 1);
         row.state = !row.present
-          ? (path.empty() ? std::string("Not made: Make draws it from the heights, the sun and the sea.")
+          ? (path.empty() ? std::string(
+                              fromPaint ? "Not made: Make draws it from the paint."
+                                        : "Not made: Make draws it from the heights, the sun and the sea."
+                            )
                           : "Off: " + leaf + " is in the slot, but its size isn't above the map's.")
-          : row.stale ? std::string("Out of date: the heights changed since it was made. Remake it.")
-          : row.made  ? std::string("From the heights \xC2\xB7 up to date")
-                      : "Made elsewhere: " + leaf;
+          : row.stale ? std::string(
+                          fromPaint ? "Out of date: the heights or the paint changed since it was made. Remake it."
+                                    : "Out of date: the heights changed since it was made. Remake it."
+                        )
+          : row.made
+          ? std::string(fromPaint ? "From the paint \xC2\xB7 up to date" : "From the heights \xC2\xB7 up to date")
+          : "Made elsewhere: " + leaf;
       }
     }
 
@@ -4153,6 +4166,23 @@ namespace faf::editor
           std::uint32_t bits = 0;
           std::memcpy(&bits, &h, sizeof(bits));
           hash = (hash ^ bits) * 1099511628211ULL;
+        }
+      }
+      return hash;
+    }
+
+    std::uint64_t EditorApp::PaintChecksum(
+      const std::uint64_t heights
+    )
+    {
+      std::uint64_t hash = heights;
+      const EdDocument::MaskGrid& masks = mDocument.Masks();
+      for (const std::uint64_t texel : masks.texels) {
+        hash = (hash ^ texel) * 1099511628211ULL;
+      }
+      for (const EdTools::LayerSlot& slot : mScene.LayerSlots()) {
+        for (const char c : slot.albedo) {
+          hash = (hash ^ static_cast<unsigned char>(c)) * 1099511628211ULL;
         }
       }
       return hash;
@@ -4195,9 +4225,52 @@ namespace faf::editor
       const auto started = std::chrono::steady_clock::now();
       std::vector<float> rgba;
       std::string error;
-      if (!faf::editor::MakeMapTexture(
-            terrain->heights, terrain->width, terrain->height, target, options, size, rgba, error
-          )) {
+      const bool fromPaint = target.pack == MapTexturePack::Specular || target.pack == MapTexturePack::Macro;
+      std::string kinds;
+      bool made = false;
+      if (fromPaint) {
+        // The paint: what each layer shows, its colour and its kind of ground.
+        const EdDocument::MaskGrid& masks = mScene.ReadMasks();
+        const std::vector<EdTools::LayerSlot> slots = mScene.LayerSlots();
+        const ShaderProfile profile = ShaderProfileOf(mScene.TerrainShader());
+        MapPaint paint;
+        EdTextureLibrary& library = mShell->Tools().Library();
+        for (int layer = 0; layer <= 8 && layer < static_cast<int>(slots.size()); ++layer) {
+          MapPaintLayer& entry = paint.layers[static_cast<std::size_t>(layer)];
+          const std::string& albedo = slots[static_cast<std::size_t>(layer)].albedo;
+          entry.textured = !albedo.empty();
+          if (!entry.textured) {
+            continue;
+          }
+          float rgb[3] = {0.4f, 0.4f, 0.4f};
+          const bool read = library.AverageColour(albedo, rgb);
+          entry.colour = {rgb[0], rgb[1], rgb[2]};
+          entry.kind = GroundKindOf(albedo, read ? rgb : nullptr).kind;
+          kinds += (kinds.empty() ? "" : ", ") + std::to_string(layer) + " " + GroundKindName(entry.kind);
+        }
+        if (masks.texels.empty()) {
+          error = "the map's masks couldn't be read";
+        } else {
+          VisibleWeights(masks.texels.data(), masks.width, masks.height, profile.painted, profile.remapped, paint);
+          made = MakePaintTexture(
+            terrain->heights,
+            terrain->width,
+            terrain->height,
+            paint,
+            target,
+            options,
+            MapPaintOptions{},
+            size,
+            rgba,
+            error
+          );
+        }
+      } else {
+        made = faf::editor::MakeMapTexture(
+          terrain->heights, terrain->width, terrain->height, target, options, size, rgba, error
+        );
+      }
+      if (!made) {
         PostStatusMessage("The map-wide texture wasn't made: " + error);
         gpg::Warnf("editor: map-wide texture: %s", error.c_str());
         return;
@@ -4212,6 +4285,8 @@ namespace faf::editor
       }
       const char* const file = target.pack == MapTexturePack::Normal7 ? "map_normals.dds"
         : target.pack == MapTexturePack::Info7                        ? "map_lighting.dds"
+        : target.pack == MapTexturePack::Specular                     ? "map_specular.dds"
+        : target.pack == MapTexturePack::Macro                        ? "map_macro.dds"
                                                                       : "map_normals_lighting.dds";
       const std::filesystem::path folder = scmap.parent_path() / "env" / "layers";
       std::error_code ec;
@@ -4235,7 +4310,7 @@ namespace faf::editor
       value.albedoSize = static_cast<float>(mapSize + 1);
       value.normalsSize = static_cast<float>(mapSize + 1);
       mScene.ChangeLayerSlot(target.slot, value);
-      mMapTexturesMade[LowerPath(game)] = HeightsChecksum();
+      mMapTexturesMade[LowerPath(game)] = fromPaint ? PaintChecksum(HeightsChecksum()) : HeightsChecksum();
       std::string read;
       const bool seen = ReadGameFile(game, read) && read.size() == dds.size();
       const double seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - started).count();
@@ -4251,7 +4326,10 @@ namespace faf::editor
         target.normalsPath ? " (its normal map)" : "",
         seen ? "" : "; the game's files don't see it yet"
       );
-      PostStatusMessage(std::string("Made ") + file + " from the heights");
+      if (fromPaint) {
+        gpg::Logf("editor: map-wide texture %s: the layers' kinds of ground: %s", game.c_str(), kinds.c_str());
+      }
+      PostStatusMessage(std::string("Made ") + file + (fromPaint ? " from the paint" : " from the heights"));
     }
 
     void EditorApp::TransferMapTexture(

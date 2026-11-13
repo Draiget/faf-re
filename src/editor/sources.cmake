@@ -41,6 +41,7 @@ set(FAF_EDITOR_SOURCES
   ui/EdIconFont.cpp
   ui/EdCards.cpp
   tools/EdMapTextures.cpp
+  tools/EdGroundKind.cpp
   ui/EdMapBrowser.cpp
   doc/EdWaterBodies.cpp
   view/EdWaterBodyView.cpp
