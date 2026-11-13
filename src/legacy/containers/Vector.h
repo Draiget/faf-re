@@ -5065,7 +5065,7 @@ namespace fa
      * 0x00516100; formerly `AppendLoadedEmitterCurveKey` in moho/resource/blueprints/REmitterCurveTypeInfo.cpp (RULE
      * ONE), removed 2026-09-11.) Address: 0x00423EB0 (FUN_00423EB0 -- `push_back` -- reached from
      * `CAnimTexture::AppendFrameRef`'s `mFrames.push_back(retainedFrame)` for
-     * `fa::vector<boost::SharedPtrRaw<moho::ID3DTextureSheet>>` (`CAnimTexture::mFrames` at +0x08; the 8-byte `{px,
+     * `fa::vector<boost::shared_ptr<moho::ID3DTextureSheet>>` (`CAnimTexture::mFrames` at +0x08; the 8-byte `{px,
      * pi}` element retains and releases its control block on every copy); callers 0x00423310, 0x0042392A, 0x008A8430;
      * formerly `AppendAnimTextureFrameStorage` in moho/animation/CAnimTexture.cpp (RULE ONE), removed 2026-09-11.)
      * Address: 0x009009D0 (FUN_009009D0 -- `push_back` -- reached from the adapter probe's
@@ -7973,19 +7973,19 @@ namespace fa
      * is 0x007CA300); zero callers, unreachable; formerly `CopyAssignLaunchPlayerOptionEntryRangeFromPointer` in
      * moho/net/CLobby.cpp (RULE ONE), removed 2026-09-11.) Address: 0x004DE570 (FUN_004DE570 -- that insert's gap
      * fill-assign sub-step (VC8's `std::fill`), retain-then-release per slot for the ICF-folded emission every 8-byte
-     * `{px, pi}` element shares -- `fa::vector<boost::SharedPtrRaw<T>>` for every engine `T`, which is why one body
+     * `{px, pi}` element shares -- `fa::vector<boost::shared_ptr<T>>` for every engine `T`, which is why one body
      * carries addresses from unrelated subsystems; callers 0x004DC3B0, 0x004DDFA0; formerly
      * `FillAssignSharedPairRangeRetain` in gpg/core/utils/BoostWrappers.cpp (RULE ONE), removed 2026-09-11.) Address:
      * 0x007840E0 (FUN_007840E0 -- a second address on that gap fill-assign for the ICF-folded emission every 8-byte
-     * `{px, pi}` element shares -- `fa::vector<boost::SharedPtrRaw<T>>` for every engine `T`, which is why one body
+     * `{px, pi}` element shares -- `fa::vector<boost::shared_ptr<T>>` for every engine `T`, which is why one body
      * carries addresses from unrelated subsystems; callers 0x007832D0, 0x00783E30; formerly
      * `FillAssignSharedPairRangeRetain` in gpg/core/utils/BoostWrappers.cpp (RULE ONE), removed 2026-09-11.) Address:
      * 0x004DDFA0 (FUN_004DDFA0 -- a bridge into it for the ICF-folded emission every 8-byte `{px, pi}` element shares
-     * -- `fa::vector<boost::SharedPtrRaw<T>>` for every engine `T`, which is why one body carries addresses from
+     * -- `fa::vector<boost::shared_ptr<T>>` for every engine `T`, which is why one body carries addresses from
      * unrelated subsystems; zero callers, unreachable; formerly `FillAssignSharedPairRangeRetainAlias` in
      * gpg/core/utils/BoostWrappers.cpp (RULE ONE), removed 2026-09-11.) Address: 0x00783E30 (FUN_00783E30 -- a second
      * bridge into it for the ICF-folded emission every 8-byte `{px, pi}` element shares --
-     * `fa::vector<boost::SharedPtrRaw<T>>` for every engine `T`, which is why one body carries addresses from unrelated
+     * `fa::vector<boost::shared_ptr<T>>` for every engine `T`, which is why one body carries addresses from unrelated
      * subsystems; zero callers, unreachable; formerly `FillAssignSharedPairRangeRetainAlias` in
      * gpg/core/utils/BoostWrappers.cpp (RULE ONE), removed 2026-09-11.) Address: 0x0075FCA0 (FUN_0075FCA0 -- the gap
      * fill-assign for the same emission for the 0x0C `{lane0, lane1, control}` element -- one body shared by every
@@ -8741,7 +8741,7 @@ namespace fa
      * `CLobby::LaunchGame`; `push_back` 0x007C8F30, `insert` 0x007CA300); callers 0x007CA300; formerly
      * `DestroyEmbeddedLuaObjectRangeIn24ByteRecords` in lua/LuaObject.cpp (RULE ONE), removed 2026-09-11.) Address:
      * 0x00424DC0 (FUN_00424DC0 -- `destroy_range` -- release each slot's control block for
-     * `fa::vector<boost::SharedPtrRaw<moho::ID3DTextureSheet>>` (`CAnimTexture::mFrames` at +0x08; the 8-byte `{px,
+     * `fa::vector<boost::shared_ptr<moho::ID3DTextureSheet>>` (`CAnimTexture::mFrames` at +0x08; the 8-byte `{px,
      * pi}` element retains and releases its control block on every copy); callers 0x00422D20, 0x00422D90, 0x00423990;
      * formerly `ReleaseAnimTextureFrameRefRange` in moho/animation/CAnimTexture.cpp (RULE ONE), removed 2026-09-11.)
      * Address: 0x00891700 (FUN_00891700 -- `destroy_range` -- each element's blueprint-path string tidied for
@@ -10098,7 +10098,7 @@ namespace fa
      * routes through its virtual destructor or its copy constructor); zero callers, unreachable; formerly
      * `CopyEmitterCurveKeyRangeCdeclAdapterLaneD` in moho/resource/blueprints/REmitterCurveTypeInfo.cpp (RULE ONE),
      * removed 2026-09-11.) Address: 0x004250E0 (FUN_004250E0 -- `uninit_copy_n` -- placement-copy the range, retaining
-     * each control block for `fa::vector<boost::SharedPtrRaw<moho::ID3DTextureSheet>>` (`CAnimTexture::mFrames` at
+     * each control block for `fa::vector<boost::shared_ptr<moho::ID3DTextureSheet>>` (`CAnimTexture::mFrames` at
      * +0x08; the 8-byte `{px, pi}` element retains and releases its control block on every copy); callers 0x00423EB0,
      * 0x00424BD0, 0x00424E10; formerly `CopyConstructAnimTextureFrameRefRange` in moho/animation/CAnimTexture.cpp (RULE
      * ONE), removed 2026-09-11.) Address: 0x00706D70 (FUN_00706D70 -- `uninit_copy_n` -- placement-copy the range,
@@ -10173,63 +10173,63 @@ namespace fa
      * unreachable; formerly `CopyConstructLaunchPlayerOptionEntryRangeAdapterC` in moho/net/CLobby.cpp (RULE ONE),
      * removed 2026-09-11.) Address: 0x004DEA20 (FUN_004DEA20 -- `uninit_copy_n` -- placement-copy each slot and retain
      * its control block; seven addresses on this one body for the ICF-folded emission every 8-byte `{px, pi}` element
-     * shares -- `fa::vector<boost::SharedPtrRaw<T>>` for every engine `T`, which is why one body carries addresses from
+     * shares -- `fa::vector<boost::shared_ptr<T>>` for every engine `T`, which is why one body carries addresses from
      * unrelated subsystems; callers 0x004DC3B0, 0x004DDF70, 0x004DE550; formerly
      * `UninitializedCopySharedPairRangeRetain` in gpg/core/utils/BoostWrappers.cpp (RULE ONE), removed 2026-09-11.)
      * Address: 0x007840C0 (FUN_007840C0 -- a second address on that same copy for the ICF-folded emission every 8-byte
-     * `{px, pi}` element shares -- `fa::vector<boost::SharedPtrRaw<T>>` for every engine `T`, which is why one body
+     * `{px, pi}` element shares -- `fa::vector<boost::shared_ptr<T>>` for every engine `T`, which is why one body
      * carries addresses from unrelated subsystems; zero callers, unreachable; formerly
      * `UninitializedCopySharedPairRangeRetain` in gpg/core/utils/BoostWrappers.cpp (RULE ONE), removed 2026-09-11.)
      * Address: 0x00784240 (FUN_00784240 -- a third address on it for the ICF-folded emission every 8-byte `{px, pi}`
-     * element shares -- `fa::vector<boost::SharedPtrRaw<T>>` for every engine `T`, which is why one body carries
+     * element shares -- `fa::vector<boost::shared_ptr<T>>` for every engine `T`, which is why one body carries
      * addresses from unrelated subsystems; zero callers, unreachable; formerly `UninitializedCopySharedPairRangeRetain`
      * in gpg/core/utils/BoostWrappers.cpp (RULE ONE), removed 2026-09-11.) Address: 0x00784620 (FUN_00784620 -- a
      * fourth address on it for the ICF-folded emission every 8-byte `{px, pi}` element shares --
-     * `fa::vector<boost::SharedPtrRaw<T>>` for every engine `T`, which is why one body carries addresses from unrelated
+     * `fa::vector<boost::shared_ptr<T>>` for every engine `T`, which is why one body carries addresses from unrelated
      * subsystems; zero callers, unreachable; formerly `UninitializedCopySharedPairRangeRetain` in
      * gpg/core/utils/BoostWrappers.cpp (RULE ONE), removed 2026-09-11.) Address: 0x00784700 (FUN_00784700 -- a fifth
      * address on it for the ICF-folded emission every 8-byte `{px, pi}` element shares --
-     * `fa::vector<boost::SharedPtrRaw<T>>` for every engine `T`, which is why one body carries addresses from unrelated
+     * `fa::vector<boost::shared_ptr<T>>` for every engine `T`, which is why one body carries addresses from unrelated
      * subsystems; zero callers, unreachable; formerly `UninitializedCopySharedPairRangeRetain` in
      * gpg/core/utils/BoostWrappers.cpp (RULE ONE), removed 2026-09-11.) Address: 0x007846C0 (FUN_007846C0 -- a sixth
      * address on it for the ICF-folded emission every 8-byte `{px, pi}` element shares --
-     * `fa::vector<boost::SharedPtrRaw<T>>` for every engine `T`, which is why one body carries addresses from unrelated
+     * `fa::vector<boost::shared_ptr<T>>` for every engine `T`, which is why one body carries addresses from unrelated
      * subsystems; callers 0x007832D0, 0x00783E00, 0x007840C0; formerly `UninitializedCopySharedPairRangeRetain` in
      * gpg/core/utils/BoostWrappers.cpp (RULE ONE), removed 2026-09-11.) Address: 0x00784800 (FUN_00784800 -- a seventh
      * address on it for the ICF-folded emission every 8-byte `{px, pi}` element shares --
-     * `fa::vector<boost::SharedPtrRaw<T>>` for every engine `T`, which is why one body carries addresses from unrelated
+     * `fa::vector<boost::shared_ptr<T>>` for every engine `T`, which is why one body carries addresses from unrelated
      * subsystems; callers 0x00784650, 0x00784700; formerly `UninitializedCopySharedPairRangeRetain` in
      * gpg/core/utils/BoostWrappers.cpp (RULE ONE), removed 2026-09-11.) Address: 0x004DDF70 (FUN_004DDF70 -- a bridge
      * into that copy for the ICF-folded emission every 8-byte `{px, pi}` element shares --
-     * `fa::vector<boost::SharedPtrRaw<T>>` for every engine `T`, which is why one body carries addresses from unrelated
+     * `fa::vector<boost::shared_ptr<T>>` for every engine `T`, which is why one body carries addresses from unrelated
      * subsystems; callers 0x004DC3B0; formerly `UninitializedCopySharedPairRangeRetainAlias` in
      * gpg/core/utils/BoostWrappers.cpp (RULE ONE), removed 2026-09-11.) Address: 0x00784040 (FUN_00784040 -- the
      * counted entry into it for the ICF-folded emission every 8-byte `{px, pi}` element shares --
-     * `fa::vector<boost::SharedPtrRaw<T>>` for every engine `T`, which is why one body carries addresses from unrelated
+     * `fa::vector<boost::shared_ptr<T>>` for every engine `T`, which is why one body carries addresses from unrelated
      * subsystems; callers 0x00782F80, 0x00783220, 0x007832D0; formerly `UninitializedCopySharedPairCountRetain` in
      * gpg/core/utils/BoostWrappers.cpp (RULE ONE), removed 2026-09-11.) Address: 0x00783220 (FUN_00783220 -- a bridge
      * into the counted entry for the ICF-folded emission every 8-byte `{px, pi}` element shares --
-     * `fa::vector<boost::SharedPtrRaw<T>>` for every engine `T`, which is why one body carries addresses from unrelated
+     * `fa::vector<boost::shared_ptr<T>>` for every engine `T`, which is why one body carries addresses from unrelated
      * subsystems; zero callers, unreachable; formerly `UninitializedCopySharedPairCountRetainAlias` in
      * gpg/core/utils/BoostWrappers.cpp (RULE ONE), removed 2026-09-11.) Address: 0x00783D70 (FUN_00783D70 -- a second
      * bridge into the counted entry for the ICF-folded emission every 8-byte `{px, pi}` element shares --
-     * `fa::vector<boost::SharedPtrRaw<T>>` for every engine `T`, which is why one body carries addresses from unrelated
+     * `fa::vector<boost::shared_ptr<T>>` for every engine `T`, which is why one body carries addresses from unrelated
      * subsystems; zero callers, unreachable; formerly `UninitializedCopySharedPairCountRetainAlias` in
      * gpg/core/utils/BoostWrappers.cpp (RULE ONE), removed 2026-09-11.) Address: 0x004DE550 (FUN_004DE550 -- an
      * empty-source entry into that copy for the ICF-folded emission every 8-byte `{px, pi}` element shares --
-     * `fa::vector<boost::SharedPtrRaw<T>>` for every engine `T`, which is why one body carries addresses from unrelated
+     * `fa::vector<boost::shared_ptr<T>>` for every engine `T`, which is why one body carries addresses from unrelated
      * subsystems; zero callers, unreachable; formerly `UninitializedCopySharedPairEmptySourceAdapterA` in
      * gpg/core/utils/BoostWrappers.cpp (RULE ONE), removed 2026-09-11.) Address: 0x004DE810 (FUN_004DE810 -- a second
      * empty-source entry for the ICF-folded emission every 8-byte `{px, pi}` element shares --
-     * `fa::vector<boost::SharedPtrRaw<T>>` for every engine `T`, which is why one body carries addresses from unrelated
+     * `fa::vector<boost::shared_ptr<T>>` for every engine `T`, which is why one body carries addresses from unrelated
      * subsystems; zero callers, unreachable; formerly `UninitializedCopySharedPairEmptySourceAdapterB` in
      * gpg/core/utils/BoostWrappers.cpp (RULE ONE), removed 2026-09-11.) Address: 0x004DE9D0 (FUN_004DE9D0 -- a third
      * empty-source entry for the ICF-folded emission every 8-byte `{px, pi}` element shares --
-     * `fa::vector<boost::SharedPtrRaw<T>>` for every engine `T`, which is why one body carries addresses from unrelated
+     * `fa::vector<boost::shared_ptr<T>>` for every engine `T`, which is why one body carries addresses from unrelated
      * subsystems; zero callers, unreachable; formerly `UninitializedCopySharedPairEmptySourceAdapterC` in
      * gpg/core/utils/BoostWrappers.cpp (RULE ONE), removed 2026-09-11.) Address: 0x00783E00 (FUN_00783E00 -- the
      * tail-range entry into it for the ICF-folded emission every 8-byte `{px, pi}` element shares --
-     * `fa::vector<boost::SharedPtrRaw<T>>` for every engine `T`, which is why one body carries addresses from unrelated
+     * `fa::vector<boost::shared_ptr<T>>` for every engine `T`, which is why one body carries addresses from unrelated
      * subsystems; callers 0x007832D0, 0x00784380; formerly `UninitializedCopySharedPairTailRangeRetain` in
      * gpg/core/utils/BoostWrappers.cpp (RULE ONE), removed 2026-09-11.) Address: 0x0075FF10 (FUN_0075FF10 --
      * `uninit_copy_n` for the same emission for the 0x0C `{lane0, lane1, control}` element -- one body shared by every
@@ -11796,11 +11796,11 @@ namespace fa
      * or its copy constructor); callers 0x00516970; formerly `InitializeEmitterCurveKeyRangeWithZeroTuple` in
      * moho/resource/blueprints/REmitterCurveTypeInfo.cpp (RULE ONE), removed 2026-09-11.) Address: 0x00424D90
      * (FUN_00424D90 -- `uninit_fill_n` -- placement-copy one ref into `count` slots, retaining per slot for
-     * `fa::vector<boost::SharedPtrRaw<moho::ID3DTextureSheet>>` (`CAnimTexture::mFrames` at +0x08; the 8-byte `{px,
+     * `fa::vector<boost::shared_ptr<moho::ID3DTextureSheet>>` (`CAnimTexture::mFrames` at +0x08; the 8-byte `{px,
      * pi}` element retains and releases its control block on every copy); callers 0x00423310, 0x004239D1, 0x00423EB0;
      * formerly `FillAnimTextureFrameRefRange` in moho/animation/CAnimTexture.cpp (RULE ONE), removed 2026-09-11.)
      * Address: 0x008140C0 (FUN_008140C0 -- a second emission of that fill for
-     * `fa::vector<boost::SharedPtrRaw<moho::ID3DTextureSheet>>` (`CAnimTexture::mFrames` at +0x08; the 8-byte `{px,
+     * `fa::vector<boost::shared_ptr<moho::ID3DTextureSheet>>` (`CAnimTexture::mFrames` at +0x08; the 8-byte `{px,
      * pi}` element retains and releases its control block on every copy); callers 0x008135A0, 0x00813851, 0x00813900;
      * formerly `FillAnimTextureFrameRefRange` in moho/animation/CAnimTexture.cpp (RULE ONE), removed 2026-09-11.)
      * Address: 0x009000F0 (FUN_009000F0 -- `uninit_fill_n` -- placement-copy one adapter into `count` slots, destroying
@@ -12999,23 +12999,23 @@ namespace fa
      * source-first shape of that move for `fa::vector<std::int32_t>` (the transport's index vector); zero callers,
      * unreachable; formerly `CopyDwordRangeNullableSourceFirstAdapter` in moho/ai/CAiTransportImpl.cpp (RULE ONE),
      * removed 2026-09-10.) Address: 0x00424E30 (FUN_00424E30 -- `copy_or_move_assign` -- assign each slot with
-     * retain-then-release ownership for `fa::vector<boost::SharedPtrRaw<moho::ID3DTextureSheet>>`
+     * retain-then-release ownership for `fa::vector<boost::shared_ptr<moho::ID3DTextureSheet>>`
      * (`CAnimTexture::mFrames` at +0x08; the 8-byte `{px, pi}` element retains and releases its control block on every
      * copy); callers 0x00423EB0, 0x00424C00; formerly `AssignAnimTextureFrameRefRange` in
      * moho/animation/CAnimTexture.cpp (RULE ONE), removed 2026-09-11.) Address: 0x00814160 (FUN_00814160 -- a second
-     * emission of that assign for `fa::vector<boost::SharedPtrRaw<moho::ID3DTextureSheet>>` (`CAnimTexture::mFrames` at
+     * emission of that assign for `fa::vector<boost::shared_ptr<moho::ID3DTextureSheet>>` (`CAnimTexture::mFrames` at
      * +0x08; the 8-byte `{px, pi}` element retains and releases its control block on every copy); callers 0x00813900,
      * 0x00813E70; formerly `AssignAnimTextureFrameRefRange` in moho/animation/CAnimTexture.cpp (RULE ONE), removed
      * 2026-09-11.) Address: 0x00813E70 (FUN_00813E70 -- a third emission of that assign for
-     * `fa::vector<boost::SharedPtrRaw<moho::ID3DTextureSheet>>` (`CAnimTexture::mFrames` at +0x08; the 8-byte `{px,
+     * `fa::vector<boost::shared_ptr<moho::ID3DTextureSheet>>` (`CAnimTexture::mFrames` at +0x08; the 8-byte `{px,
      * pi}` element retains and releases its control block on every copy); zero callers, unreachable; formerly
      * `AssignAnimTextureFrameRefRange` in moho/animation/CAnimTexture.cpp (RULE ONE), removed 2026-09-11.) Address:
      * 0x008576A0 (FUN_008576A0 -- a fourth emission of that assign for
-     * `fa::vector<boost::SharedPtrRaw<moho::ID3DTextureSheet>>` (`CAnimTexture::mFrames` at +0x08; the 8-byte `{px,
+     * `fa::vector<boost::shared_ptr<moho::ID3DTextureSheet>>` (`CAnimTexture::mFrames` at +0x08; the 8-byte `{px,
      * pi}` element retains and releases its control block on every copy); callers 0x00855DF0, 0x00857220; formerly
      * `AssignAnimTextureFrameRefRange` in moho/animation/CAnimTexture.cpp (RULE ONE), removed 2026-09-11.) Address:
      * 0x00857220 (FUN_00857220 -- a fifth emission of that assign for
-     * `fa::vector<boost::SharedPtrRaw<moho::ID3DTextureSheet>>` (`CAnimTexture::mFrames` at +0x08; the 8-byte `{px,
+     * `fa::vector<boost::shared_ptr<moho::ID3DTextureSheet>>` (`CAnimTexture::mFrames` at +0x08; the 8-byte `{px,
      * pi}` element retains and releases its control block on every copy); zero callers, unreachable; formerly
      * `AssignAnimTextureFrameRefRange` in moho/animation/CAnimTexture.cpp (RULE ONE), removed 2026-09-11.) Address:
      * 0x007518A0 (FUN_007518A0 -- `copy_or_move_assign` -- one `AssignArmyConstantData` per slot; caller 0x0074E720 for
@@ -13024,19 +13024,19 @@ namespace fa
      * `AssignArmyConstantData` 0x007000A0); callers 0x0074E720; formerly `CopySSTIArmyConstantDataRangeForwardAssign`
      * in moho/sim/SSTIArmyConstantData.cpp (RULE ONE), removed 2026-09-11.) Address: 0x004DE370 (FUN_004DE370 --
      * `copy_or_move_assign` -- retain the incoming control, release the outgoing one, per slot for the ICF-folded
-     * emission every 8-byte `{px, pi}` element shares -- `fa::vector<boost::SharedPtrRaw<T>>` for every engine `T`,
+     * emission every 8-byte `{px, pi}` element shares -- `fa::vector<boost::shared_ptr<T>>` for every engine `T`,
      * which is why one body carries addresses from unrelated subsystems; callers 0x004DA2A0, 0x004DB240, 0x004DDDC0;
      * formerly `CopyAssignSharedPairRangeRetain` in gpg/core/utils/BoostWrappers.cpp (RULE ONE), removed 2026-09-11.)
      * Address: 0x00783FC0 (FUN_00783FC0 -- a second address on that assign for the ICF-folded emission every 8-byte
-     * `{px, pi}` element shares -- `fa::vector<boost::SharedPtrRaw<T>>` for every engine `T`, which is why one body
+     * `{px, pi}` element shares -- `fa::vector<boost::shared_ptr<T>>` for every engine `T`, which is why one body
      * carries addresses from unrelated subsystems; callers 0x00783130, 0x00783D40; formerly
      * `CopyAssignSharedPairRangeRetain` in gpg/core/utils/BoostWrappers.cpp (RULE ONE), removed 2026-09-11.) Address:
      * 0x004DDDC0 (FUN_004DDDC0 -- a bridge into it for the ICF-folded emission every 8-byte `{px, pi}` element shares
-     * -- `fa::vector<boost::SharedPtrRaw<T>>` for every engine `T`, which is why one body carries addresses from
+     * -- `fa::vector<boost::shared_ptr<T>>` for every engine `T`, which is why one body carries addresses from
      * unrelated subsystems; zero callers, unreachable; formerly `CopyAssignSharedPairRangeRetainAlias` in
      * gpg/core/utils/BoostWrappers.cpp (RULE ONE), removed 2026-09-11.) Address: 0x00783D40 (FUN_00783D40 -- a second
      * bridge into it for the ICF-folded emission every 8-byte `{px, pi}` element shares --
-     * `fa::vector<boost::SharedPtrRaw<T>>` for every engine `T`, which is why one body carries addresses from unrelated
+     * `fa::vector<boost::shared_ptr<T>>` for every engine `T`, which is why one body carries addresses from unrelated
      * subsystems; zero callers, unreachable; formerly `CopyAssignSharedPairRangeRetainAlias` in
      * gpg/core/utils/BoostWrappers.cpp (RULE ONE), removed 2026-09-11.) Address: 0x00755C50 (FUN_00755C50 --
      * `copy_or_move_assign` for the same emission for the 0x0C `{lane0, lane1, control}` element -- one body shared by
@@ -13437,43 +13437,43 @@ namespace fa
      * 0x00516970; formerly `CopyEmitterCurveKeyPayloadRangeBackward` in
      * moho/resource/blueprints/REmitterCurveTypeInfo.cpp (RULE ONE), removed 2026-09-11.) Address: 0x00424FA0
      * (FUN_00424FA0 -- `copy_backward_assign` -- the tail shift an insert makes, retain-then-release per slot for
-     * `fa::vector<boost::SharedPtrRaw<moho::ID3DTextureSheet>>` (`CAnimTexture::mFrames` at +0x08; the 8-byte `{px,
+     * `fa::vector<boost::shared_ptr<moho::ID3DTextureSheet>>` (`CAnimTexture::mFrames` at +0x08; the 8-byte `{px,
      * pi}` element retains and releases its control block on every copy); callers 0x00424C10, 0x00424EC0; formerly
      * `CopyBackwardAssignAnimTextureFrameRefRange` in moho/animation/CAnimTexture.cpp (RULE ONE), removed 2026-09-11.)
      * Address: 0x00814340 (FUN_00814340 -- a second emission of that backward assign for
-     * `fa::vector<boost::SharedPtrRaw<moho::ID3DTextureSheet>>` (`CAnimTexture::mFrames` at +0x08; the 8-byte `{px,
+     * `fa::vector<boost::shared_ptr<moho::ID3DTextureSheet>>` (`CAnimTexture::mFrames` at +0x08; the 8-byte `{px,
      * pi}` element retains and releases its control block on every copy); callers 0x00813E80, 0x008141E0; formerly
      * `CopyBackwardAssignAnimTextureFrameRefRange` in moho/animation/CAnimTexture.cpp (RULE ONE), removed 2026-09-11.)
      * Address: 0x0084FA80 (FUN_0084FA80 -- a third emission of that backward assign for
-     * `fa::vector<boost::SharedPtrRaw<moho::ID3DTextureSheet>>` (`CAnimTexture::mFrames` at +0x08; the 8-byte `{px,
+     * `fa::vector<boost::shared_ptr<moho::ID3DTextureSheet>>` (`CAnimTexture::mFrames` at +0x08; the 8-byte `{px,
      * pi}` element retains and releases its control block on every copy); callers 0x0084E570, 0x0084F740; formerly
      * `CopyBackwardAssignAnimTextureFrameRefRange` in moho/animation/CAnimTexture.cpp (RULE ONE), removed 2026-09-11.)
      * Address: 0x0084FB20 (FUN_0084FB20 -- a fourth emission of that backward assign for
-     * `fa::vector<boost::SharedPtrRaw<moho::ID3DTextureSheet>>` (`CAnimTexture::mFrames` at +0x08; the 8-byte `{px,
+     * `fa::vector<boost::shared_ptr<moho::ID3DTextureSheet>>` (`CAnimTexture::mFrames` at +0x08; the 8-byte `{px,
      * pi}` element retains and releases its control block on every copy); callers 0x0084E570, 0x0084F770; formerly
      * `CopyBackwardAssignAnimTextureFrameRefRange` in moho/animation/CAnimTexture.cpp (RULE ONE), removed 2026-09-11.)
      * Address: 0x00857880 (FUN_00857880 -- a fifth emission of that backward assign for
-     * `fa::vector<boost::SharedPtrRaw<moho::ID3DTextureSheet>>` (`CAnimTexture::mFrames` at +0x08; the 8-byte `{px,
+     * `fa::vector<boost::shared_ptr<moho::ID3DTextureSheet>>` (`CAnimTexture::mFrames` at +0x08; the 8-byte `{px,
      * pi}` element retains and releases its control block on every copy); callers 0x00857230, 0x00857720; formerly
      * `CopyBackwardAssignAnimTextureFrameRefRange` in moho/animation/CAnimTexture.cpp (RULE ONE), removed 2026-09-11.)
      * Address: 0x008141E0 (FUN_008141E0 -- a register-shape bridge into that backward assign for
-     * `fa::vector<boost::SharedPtrRaw<moho::ID3DTextureSheet>>` (`CAnimTexture::mFrames` at +0x08; the 8-byte `{px,
+     * `fa::vector<boost::shared_ptr<moho::ID3DTextureSheet>>` (`CAnimTexture::mFrames` at +0x08; the 8-byte `{px,
      * pi}` element retains and releases its control block on every copy); zero callers, unreachable; formerly
      * `CopyBackwardAssignAnimTextureFrameRefRangeAdapterA` in moho/animation/CAnimTexture.cpp (RULE ONE), removed
      * 2026-09-11.) Address: 0x00813E80 (FUN_00813E80 -- a second register-shape bridge into it for
-     * `fa::vector<boost::SharedPtrRaw<moho::ID3DTextureSheet>>` (`CAnimTexture::mFrames` at +0x08; the 8-byte `{px,
+     * `fa::vector<boost::shared_ptr<moho::ID3DTextureSheet>>` (`CAnimTexture::mFrames` at +0x08; the 8-byte `{px,
      * pi}` element retains and releases its control block on every copy); callers 0x00813900; formerly
      * `CopyBackwardAssignAnimTextureFrameRefRangeAdapterB` in moho/animation/CAnimTexture.cpp (RULE ONE), removed
      * 2026-09-11.) Address: 0x0084F740 (FUN_0084F740 -- a third register-shape bridge into it for
-     * `fa::vector<boost::SharedPtrRaw<moho::ID3DTextureSheet>>` (`CAnimTexture::mFrames` at +0x08; the 8-byte `{px,
+     * `fa::vector<boost::shared_ptr<moho::ID3DTextureSheet>>` (`CAnimTexture::mFrames` at +0x08; the 8-byte `{px,
      * pi}` element retains and releases its control block on every copy); zero callers, unreachable; formerly
      * `CopyBackwardAssignAnimTextureFrameRefRangeAdapterC` in moho/animation/CAnimTexture.cpp (RULE ONE), removed
      * 2026-09-11.) Address: 0x0084F770 (FUN_0084F770 -- a fourth register-shape bridge into it for
-     * `fa::vector<boost::SharedPtrRaw<moho::ID3DTextureSheet>>` (`CAnimTexture::mFrames` at +0x08; the 8-byte `{px,
+     * `fa::vector<boost::shared_ptr<moho::ID3DTextureSheet>>` (`CAnimTexture::mFrames` at +0x08; the 8-byte `{px,
      * pi}` element retains and releases its control block on every copy); zero callers, unreachable; formerly
      * `CopyBackwardAssignAnimTextureFrameRefRangeAdapterC` in moho/animation/CAnimTexture.cpp (RULE ONE), removed
      * 2026-09-11.) Address: 0x00857720 (FUN_00857720 -- a fifth register-shape bridge into it for
-     * `fa::vector<boost::SharedPtrRaw<moho::ID3DTextureSheet>>` (`CAnimTexture::mFrames` at +0x08; the 8-byte `{px,
+     * `fa::vector<boost::shared_ptr<moho::ID3DTextureSheet>>` (`CAnimTexture::mFrames` at +0x08; the 8-byte `{px,
      * pi}` element retains and releases its control block on every copy); zero callers, unreachable; formerly
      * `CopyBackwardAssignAnimTextureFrameRefRangeAdapterC` in moho/animation/CAnimTexture.cpp (RULE ONE), removed
      * 2026-09-11.) Address: 0x00751920 (FUN_00751920 -- `copy_backward_assign` -- the tail shift an insert makes;
@@ -13491,27 +13491,27 @@ namespace fa
      * `AssignEffectMacroRangeBackwardDispatchA` in gpg/gal/ContextInterfaces.cpp (RULE ONE), removed 2026-09-11.)
      * Address: 0x004DE830 (FUN_004DE830 -- `copy_backward_assign` -- the tail shift an insert makes,
      * retain-then-release per slot for the ICF-folded emission every 8-byte `{px, pi}` element shares --
-     * `fa::vector<boost::SharedPtrRaw<T>>` for every engine `T`, which is why one body carries addresses from unrelated
+     * `fa::vector<boost::shared_ptr<T>>` for every engine `T`, which is why one body carries addresses from unrelated
      * subsystems; callers 0x004DDFB0, 0x004DE5F0; formerly `CopyAssignSharedPairRangeBackwardRetain` in
      * gpg/core/utils/BoostWrappers.cpp (RULE ONE), removed 2026-09-11.) Address: 0x00784260 (FUN_00784260 -- a second
      * address on that backward assign for the ICF-folded emission every 8-byte `{px, pi}` element shares --
-     * `fa::vector<boost::SharedPtrRaw<T>>` for every engine `T`, which is why one body carries addresses from unrelated
+     * `fa::vector<boost::shared_ptr<T>>` for every engine `T`, which is why one body carries addresses from unrelated
      * subsystems; callers 0x00783E40, 0x00784160; formerly `CopyAssignSharedPairRangeBackwardRetain` in
      * gpg/core/utils/BoostWrappers.cpp (RULE ONE), removed 2026-09-11.) Address: 0x00783E40 (FUN_00783E40 -- a
      * register-shape bridge into it for the ICF-folded emission every 8-byte `{px, pi}` element shares --
-     * `fa::vector<boost::SharedPtrRaw<T>>` for every engine `T`, which is why one body carries addresses from unrelated
+     * `fa::vector<boost::shared_ptr<T>>` for every engine `T`, which is why one body carries addresses from unrelated
      * subsystems; callers 0x007832D0, 0x00784380; formerly `CopyAssignSharedPairRangeBackwardRetainAdapterA` in
      * gpg/core/utils/BoostWrappers.cpp (RULE ONE), removed 2026-09-11.) Address: 0x004DDFB0 (FUN_004DDFB0 -- a second
      * bridge into it for the ICF-folded emission every 8-byte `{px, pi}` element shares --
-     * `fa::vector<boost::SharedPtrRaw<T>>` for every engine `T`, which is why one body carries addresses from unrelated
+     * `fa::vector<boost::shared_ptr<T>>` for every engine `T`, which is why one body carries addresses from unrelated
      * subsystems; callers 0x004DC3B0; formerly `CopyAssignSharedPairRangeBackwardRetainAlias` in
      * gpg/core/utils/BoostWrappers.cpp (RULE ONE), removed 2026-09-11.) Address: 0x00784160 (FUN_00784160 -- a third
      * bridge into it for the ICF-folded emission every 8-byte `{px, pi}` element shares --
-     * `fa::vector<boost::SharedPtrRaw<T>>` for every engine `T`, which is why one body carries addresses from unrelated
+     * `fa::vector<boost::shared_ptr<T>>` for every engine `T`, which is why one body carries addresses from unrelated
      * subsystems; zero callers, unreachable; formerly `CopyAssignSharedPairRangeBackwardRetainAlias` in
      * gpg/core/utils/BoostWrappers.cpp (RULE ONE), removed 2026-09-11.) Address: 0x004DE5F0 (FUN_004DE5F0 -- a fourth
      * bridge into it, taking an unused tail argument for the ICF-folded emission every 8-byte `{px, pi}` element shares
-     * -- `fa::vector<boost::SharedPtrRaw<T>>` for every engine `T`, which is why one body carries addresses from
+     * -- `fa::vector<boost::shared_ptr<T>>` for every engine `T`, which is why one body carries addresses from
      * unrelated subsystems; zero callers, unreachable; formerly
      * `CopyAssignSharedPairRangeBackwardRetainAliasWithUnusedTail` in gpg/core/utils/BoostWrappers.cpp (RULE ONE),
      * removed 2026-09-11.) Address: 0x0075FFC0 (FUN_0075FFC0 -- `copy_backward_assign` for the same emission for the
@@ -14388,11 +14388,11 @@ namespace fa
      * `max_size()` for an 8-byte node element; zero callers, unreachable; formerly
      * `ReadLegacyNodeVectorGrowthMax_004AE0C0` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
      * Address: 0x00423E80 (FUN_00423E80 -- `max_size()` -- 0x1FFFFFFF, `0xFFFFFFFF / 8` for the 8-byte element for
-     * `fa::vector<boost::SharedPtrRaw<moho::ID3DTextureSheet>>` (`CAnimTexture::mFrames` at +0x08; the 8-byte `{px,
+     * `fa::vector<boost::shared_ptr<moho::ID3DTextureSheet>>` (`CAnimTexture::mFrames` at +0x08; the 8-byte `{px,
      * pi}` element retains and releases its control block on every copy); zero callers, unreachable; formerly
      * `MaxAnimTextureFrameCount` in moho/animation/CAnimTexture.cpp (RULE ONE), removed 2026-09-11.) Address:
      * 0x00424780 (FUN_00424780 -- a second emission of that `max_size()` for
-     * `fa::vector<boost::SharedPtrRaw<moho::ID3DTextureSheet>>` (`CAnimTexture::mFrames` at +0x08; the 8-byte `{px,
+     * `fa::vector<boost::shared_ptr<moho::ID3DTextureSheet>>` (`CAnimTexture::mFrames` at +0x08; the 8-byte `{px,
      * pi}` element retains and releases its control block on every copy); zero callers, unreachable; formerly
      * `MaxAnimTextureFrameCount` in moho/animation/CAnimTexture.cpp (RULE ONE), removed 2026-09-11.)
      */
@@ -14551,7 +14551,7 @@ namespace fa
      * Address: 0x004ADFF0 (FUN_004ADFF0 -- `_Xlen` for a 4-byte element; callers 0x004AD098, 0x004ADDE0; formerly
      * `ThrowVectorTooLong_004ADFF0` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.) Address:
      * 0x004241C0 (FUN_004241C0 -- `throw_too_long` -- the length_error the growth cap raises for
-     * `fa::vector<boost::SharedPtrRaw<moho::ID3DTextureSheet>>` (`CAnimTexture::mFrames` at +0x08; the 8-byte `{px,
+     * `fa::vector<boost::shared_ptr<moho::ID3DTextureSheet>>` (`CAnimTexture::mFrames` at +0x08; the 8-byte `{px,
      * pi}` element retains and releases its control block on every copy); callers 0x00423948, 0x00423EB0; formerly
      * `ThrowAnimTextureFrameVectorTooLong` in moho/animation/CAnimTexture.cpp (RULE ONE), removed 2026-09-11.) Address:
      * 0x004331F0 (FUN_004331F0 -- `_Xlen`, `length_error("vector<T> too long")`, for

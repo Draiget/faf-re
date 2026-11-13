@@ -349,15 +349,8 @@ namespace gpg::HaStar
    * (`operator new(0x10)`, `use_count_=1`, `weak_count_=1`, `px_` set to
    * the fresh `ClusterCacheImpl*` -- FUN_009356E0), matching
    * `boost::shared_ptr<ClusterCacheImpl>(new ClusterCacheImpl())`'s
-   * observable state. Writes the two-word `(mCacheTree, mCacheRefs)`
-   * pair directly into `outCache` -- an out-parameter rather than a
-   * by-value return so no transient `ClusterCache` temporary is ever
-   * constructed/destroyed: `ClusterCache` only has the implicit trivial
-   * copy constructor (callers `RetainSharedCount` by hand, see
-   * `ClusterMap::ClusterMap`), not a real move, so a by-value return
-   * would let the temporary's `~ClusterCache()` release the reference
-   * this function just created before the caller ever sees it.
-   * Points `outCache` at a fresh `ClusterCacheImpl`, releasing any cache it held.
+   * observable state. Points `outCache.mImpl` at the fresh
+   * `ClusterCacheImpl`, releasing any cache it held.
    *
    * Reached from `PathTables::Impl::Impl()`
    * (`moho/path/PathTables.cpp`, `FUN_0076BA40` calls `FUN_009356E0`

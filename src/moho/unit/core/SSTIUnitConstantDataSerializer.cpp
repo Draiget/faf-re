@@ -115,8 +115,9 @@ namespace moho
     }
 
     // Address: 0x005CAD60 (FUN_005CAD60, func_InitStatItemParent -- the `shared_count` half of this
-    // `shared_ptr<Stats<StatItem>>` construction: a new `sp_counted_impl_p<Stats<StatItem>>` for a non-null root,
-    // deleting the root if that allocation throws; formerly `InitializeStatsRootSharedControl` here.)
+    // `shared_ptr<Stats<StatItem>>` construction: a new 0x10-byte `sp_counted_impl_p<Stats<StatItem>>` holding the
+    // root, made whether or not the root is null (0x005CAD81..0x005CADB0 store it without a test), deleting the root
+    // if that allocation throws; formerly `InitializeStatsRootSharedControl` here.)
     mStatsRoot.reset(statsRoot);
   }
 
