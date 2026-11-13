@@ -63,7 +63,7 @@ namespace
     return x >= rect.minX && x < rect.maxX && z >= rect.minZ && z < rect.maxZ;
   }
 
-  /**
+  /*
    * Address: 0x0063CA40 (FUN_0063CA40, boost::shared_ptr<Moho::CAniPose> helper)
    *
    * A second call site reaches this same `shared_ptr<CAniPose>::operator=`/
@@ -74,14 +74,9 @@ namespace
    *
    * What it does:
    * Rebinds one `boost::shared_ptr<CAniPose>` to the supplied pose pointer.
+   *
+   * Callers call `pose.reset(raw)`.
    */
-  void CreateCAniPoseSharedPtr(
-    moho::CAniPose* const pose,
-    std::shared_ptr<moho::CAniPose>& out
-  )
-  {
-    out.reset(pose);
-  }
 
   void CopyPoseState(
     moho::CAniPose& dst,
@@ -673,10 +668,10 @@ namespace moho
     const std::shared_ptr<const CAniSkel> skeleton = resource->GetSkeleton();
 
     auto* const primaryPose = new CAniPose(skeleton, mVariableData.mCurImpactValue);
-    CreateCAniPoseSharedPtr(primaryPose, mPosePrimary);
+    mPosePrimary.reset(primaryPose);
 
     auto* const secondaryPose = new CAniPose(skeleton, mVariableData.mCurImpactValue);
-    CreateCAniPoseSharedPtr(secondaryPose, mPoseSecondary);
+    mPoseSecondary.reset(secondaryPose);
   }
 
   /**

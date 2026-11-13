@@ -121,7 +121,7 @@ namespace gpg
     {}
   };
 
-  /**
+  /*
    * Address: 0x007BB4E0 (FUN_007BB4E0,
    * boost::weak_ptr<Moho::INetNATTraversalHandler>::weak_ptr(const shared_ptr&))
    * Address: 0x007BC5C0 (FUN_007BC5C0,
@@ -164,22 +164,13 @@ namespace gpg
    * What it does:
    * Per-T binding of `boost::weak_ptr<TWeak>`'s converting constructor
    * from `boost::shared_ptr<TShared>` -- generic across same-type and
-   * base/derived-aliasing instantiations. Named explicitly (rather than
-   * left as the natural `destination = source;` expression at each call
-   * site) so the MSVC8 per-T template emission symbol stays
-   * source-reachable even when a modern compiler would inline the
-   * assignment.
+   * base/derived-aliasing instantiations.
+   *
+   * Callers assign the weak_ptr from the shared_ptr (`weak = shared;`); the
+   * former per-T wrapper `AssignWeakFromShared` only did that.
    */
-  template <class TWeak, class TShared>
-  void AssignWeakFromShared(
-    std::weak_ptr<TWeak>& destination,
-    const std::shared_ptr<TShared>& source
-  )
-  {
-    destination = source;
-  }
 
-  /**
+  /*
    * Address: 0x008F3950 (FUN_008F3950 -- `weak_ptr<gpg::gal::EffectD3D9>::lock()`: an
    * empty result when `pn` is null or its use count is zero, otherwise
    * `shared_count(weak_count const&)` into the result and `px` copied. Every
@@ -204,18 +195,12 @@ namespace gpg
    *
    * What it does:
    * `boost::weak_ptr<T>::lock()`, per T: a retained `shared_ptr` while an owner
-   * is alive, an empty one after. Named for the same reason as
-   * `AssignWeakFromShared` above.
+   * is alive, an empty one after.
+   *
+   * Callers call `weak.lock()` (formerly through `gpg::LockWeak`).
    */
-  template <class T>
-  [[nodiscard]] inline std::shared_ptr<T> LockWeak(
-    const std::weak_ptr<T>& weak
-  ) noexcept
-  {
-    return weak.lock();
-  }
 
-  /**
+  /*
    * Address: 0x00941B90 (FUN_00941B90 --
    * `enable_shared_from_this<gpg::gal::EffectD3D9>::shared_from_this()`: `shared_ptr<T>
    * p(_internal_weak_this)`, so `pn(weak.pn)` first -- 0x00447030, which throws
@@ -227,16 +212,11 @@ namespace gpg
    *
    * What it does:
    * `boost::enable_shared_from_this<T>::shared_from_this()`, per T.
+   *
+   * Callers call `shared_from_this()`.
    */
-  template <class T>
-  [[nodiscard]] inline std::shared_ptr<T> SharedFromThis(
-    std::enable_shared_from_this<T>& object
-  )
-  {
-    return object.shared_from_this();
-  }
 
-  /**
+  /*
    * Address: 0x00445880 (FUN_00445880)
    *
    * `shared_ptr<Base>::reset(Y*)` for the per-head back-buffer targets: a
@@ -264,18 +244,11 @@ namespace gpg
    * swap, then the old count released inline; `MeshLOD::Load`'s `lodBlueprintCopy.reset(new
    * RMeshBlueprintLOD(blueprintLod))` at 0x007DCF32; formerly `AssignSharedRefWithEnableRuntime` in
    * moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
+   *
+   * Callers call `shared.reset(raw)`.
    */
-  template <class T>
-  [[nodiscard]] inline std::shared_ptr<T>* ResetSharedFromRaw(
-    std::shared_ptr<T>* const outShared,
-    T* const rawPointer
-  )
-  {
-    outShared->reset(rawPointer);
-    return outShared;
-  }
 
-  /**
+  /*
    * Address: 0x00446010 (FUN_00446010)
    * Address: 0x0086EDD0 (FUN_0086EDD0 -- `shared_ptr<Moho::UICommandGraph>::operator=`:
    * `px` first, then retain the incoming count and release the old one
@@ -284,16 +257,9 @@ namespace gpg
    *
    * What it does:
    * Copies one `boost::shared_ptr<T>` into caller-provided output storage.
+   *
+   * Callers copy-assign the shared_ptr.
    */
-  template <class T>
-  [[nodiscard]] inline std::shared_ptr<T>* CopySharedRetain(
-    std::shared_ptr<T>* const outShared,
-    const std::shared_ptr<T>& sourceShared
-  )
-  {
-    *outShared = sourceShared;
-    return outShared;
-  }
 
   /**
    * Address: 0x004DBBC0 (FUN_004DBBC0)

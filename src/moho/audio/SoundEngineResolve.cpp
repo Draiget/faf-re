@@ -25,19 +25,15 @@ namespace
   constexpr std::uint32_t kResolvePolicyUnresolved = 0u;
   constexpr const char* kSndParamsSourcePath = "c:\\work\\rts\\main\\code\\src\\core\\SndParams.cpp";
   constexpr int kSndParamsUnreachableLine = 387;
-  /**
+  /*
    * Address: 0x004E14C0 (FUN_004E14C0)
    *
    * What it does:
    * Promotes one weak `AudioEngine` handle to a shared handle when the engine
    * is still alive.
+   *
+   * Callers call `mEngine.lock()`.
    */
-  [[nodiscard]] std::shared_ptr<moho::AudioEngine> LockWeakAudioEngine(
-    const std::weak_ptr<moho::AudioEngine>& weakEngine
-  )
-  {
-    return weakEngine.lock();
-  }
 } // namespace
 
 namespace moho
@@ -63,7 +59,7 @@ namespace moho
       return outEngine;
     }
 
-    std::shared_ptr<AudioEngine> resolvedEngine = LockWeakAudioEngine(mEngine);
+    std::shared_ptr<AudioEngine> resolvedEngine = mEngine.lock();
     switch (mResolvePolicy) {
     case kResolvePolicyUnresolved:
       *outEngine = DoResolve();
@@ -109,7 +105,7 @@ namespace moho
    */
   std::shared_ptr<AudioEngine> CSndParams::DoResolve() const
   {
-    std::shared_ptr<AudioEngine> resolvedEngine = LockWeakAudioEngine(mEngine);
+    std::shared_ptr<AudioEngine> resolvedEngine = mEngine.lock();
     if (resolvedEngine.get() == nullptr) {
       resolvedEngine = SND_FindEngine(mBank.c_str());
       mEngine = resolvedEngine;

@@ -342,7 +342,7 @@ namespace moho
     "moho::CD3DPrimBatcher::mAlphaMultiplier offset must be 0x120"
   );
 
-  /**
+  /*
    * Address: 0x0043A8B0 (FUN_0043A8B0)
    * Mangled: ??1WeakPtr_CD3DBatchTexture@Moho@@QAE@@Z
    *          (the IDB label is the analyst's; the emitted body is the
@@ -358,10 +358,11 @@ namespace moho
    * detaches the control block, then drops one *strong* owner reference from
    * the detached block - disposing the pointee when `use_count_` reaches zero
    * and destroying the block when `weak_count_` follows it to zero.
+   *
+   * Callers call `handle.reset()`.
    */
-  void ResetSharedBatchTextureHandle(std::shared_ptr<CD3DBatchTexture>& handle) noexcept;
 
-  /**
+  /*
    * Address: 0x0043A860 (FUN_0043A860)
    * Mangled: ??1WeakPtr_CD3DDynamicTextureSheet@Moho@@QAE@@Z
    *          (the IDB label is the analyst's; the emitted body is the
@@ -378,8 +379,9 @@ namespace moho
    * `px`, detaches the control block, then drops one *strong* owner reference
    * from the detached block - disposing the sheet when `use_count_` reaches
    * zero and destroying the block when `weak_count_` follows it to zero.
+   *
+   * Callers call `handle.reset()`.
    */
-  void ResetSharedDynamicTextureSheetHandle(std::shared_ptr<CD3DDynamicTextureSheet>& handle) noexcept;
 
   /** The two corner rings of a `DRAW_Rect` border, each top-left, top-right, bottom-right, bottom-left. */
   struct DrawRectRing

@@ -673,7 +673,7 @@ namespace moho
       CD3DDynamicTextureSheet* const replacementSheet = new CD3DDynamicTextureSheet(
         mDevice, false, sourceContext.width_, sourceContext.height_, kTextureFormatRenderTarget, false
       );
-      (void)gpg::ResetSharedFromRaw(&currentSheet, replacementSheet);
+      currentSheet.reset(replacementSheet);
       sheet = currentSheet.get();
       if (sheet != nullptr) {
         sheet->mContext.usage_ = kTextureUsageRenderTargetCopy;
@@ -694,7 +694,7 @@ namespace moho
       }
     }
 
-    (void)gpg::CopySharedRetain(&outSheet, currentSheet);
+    outSheet = currentSheet;
     return outSheet;
   }
 

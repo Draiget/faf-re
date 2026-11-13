@@ -9827,7 +9827,7 @@ namespace moho
 
   [[nodiscard]] const VMatrix4& UI_IdentityMatrix();
 
-  /**
+  /*
    * Address: 0x00855040 (FUN_00855040, fa::vector<boost::shared_ptr<MeshInstance>>::push_back)
    *
    * What it does:
@@ -9836,9 +9836,7 @@ namespace moho
    * body (8-byte element stride: shared_ptr `(px, pi)` pair). Used by
    * `CBuildDragPreview::AppendBuildPreviewMesh` to preserve
    * the MSVC8 per-T template emission symbol shape.
+   *
+   * The caller calls `mMeshes.push_back(meshInstance)`.
    */
-  void PushBackMeshInstanceSharedPtrVector(
-    fa::vector<std::shared_ptr<MeshInstance>>& destination,
-    const std::shared_ptr<MeshInstance>& value
-  );
 } // namespace moho

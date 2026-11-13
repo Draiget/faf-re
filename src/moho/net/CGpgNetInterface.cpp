@@ -907,7 +907,7 @@ void CGpgNetInterface::SetTraversalHandler(
   (void)port;
   fa::mutex::scoped_lock lock(mLock);
   gpg::Logf("GPGNET: setting nat handler to %p", static_cast<const void*>(handler->get()));
-  gpg::AssignWeakFromShared(mNATHandler, *handler);
+  mNATHandler = *handler;
 }
 
 /**
@@ -1023,15 +1023,15 @@ namespace
    * below). IDA's own analysis names the bind assembler
    * `boost::bind_CGpgNetInterfaceConnect`, confirming the correspondence.
    */
-  [[nodiscard]] std::function<void()> MakeConnectThreadLaunchCallback(
+  [[nodiscard]] auto MakeConnectThreadLaunchCallback(
     CGpgNetInterface* const self,
     const u_long address,
     const u_short port
   )
   {
-    return std::function<void()>([self, address, port]() {
+    return [self, address, port]() {
       self->ConnectThread(address, port);
-    });
+    };
   }
 } // namespace
 
@@ -1136,14 +1136,14 @@ namespace
    * (manager 0x007BEEE0) by 0x007BEA4B (FUN_007BE9F0) and by the second install at 0x007BECA5; formerly
    * `DispatchSsoPayloadToDestinationRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
    */
-  [[nodiscard]] std::function<void()> MakeConnectThreadLaunchCallback(
+  [[nodiscard]] auto MakeConnectThreadLaunchCallback(
     CGpgNetInterface* const self,
     const fa::string& launchCommandTemplate
   )
   {
-    return std::function<void()>([self, launchCommandTemplate]() {
+    return [self, launchCommandTemplate]() {
       self->ConnectThread(launchCommandTemplate);
-    });
+    };
   }
 } // namespace
 
@@ -1692,7 +1692,7 @@ void CGpgNetInterface::CreateLobby(
   // weak_ptr backing the provider).
   LuaPlus::LuaObject natTraversal;
   std::weak_ptr<INetNATTraversalProvider> natProvider;
-  gpg::AssignWeakFromShared(natProvider, GPGNET_GetPtr());
+  natProvider = GPGNET_GetPtr();
   (void)moho::NET_MakeNATTraversal(state, &natTraversal, &natProvider);
 
   LuaPlus::LuaFunction<LuaPlus::LuaObject> createLobbyFn(createLobby);

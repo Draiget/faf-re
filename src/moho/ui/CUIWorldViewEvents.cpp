@@ -421,7 +421,7 @@ void moho::CBuildDragPreview::AppendBuildPreviewMesh(
 )
 {
   std::shared_ptr<moho::MeshInstance> meshInstance = CreateBuildPreviewMeshInstance(blueprint);
-  moho::PushBackMeshInstanceSharedPtrVector(mMeshes, meshInstance);
+  mMeshes.push_back(meshInstance);
   mBlueprints.push_back(blueprint);
 }
 

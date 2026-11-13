@@ -149,44 +149,32 @@ namespace
     }
   }
 
-  /**
+  /*
    * Alias of FUN_0042AC30 (non-canonical helper lane).
    *
    * What it does:
    * No-op helper reached from shared-pointer setup path.
+   *
+   * The empty `sp_enable_shared_from_this` overload; nothing calls it now.
    */
-  void NullSub() {}
 
-  /**
+  /*
    * Address: 0x005790E0 (FUN_005790E0, func_CreateBoostPtrCHeightField)
    *
    * What it does:
    * Creates a shared ownership control block for `CHeightField*`.
+   *
+   * `STIMap` calls `mHeightField.reset(field)`.
    */
-  void CreateBoostPtrCHeightField(
-    std::shared_ptr<moho::CHeightField>& out,
-    moho::CHeightField* field
-  )
-  {
-    out = std::shared_ptr<moho::CHeightField>(field);
-  }
 
-  /**
+  /*
    * Address: 0x00578DC0 (FUN_00578DC0, func_CreateCHeightFieldPtr)
    *
    * What it does:
    * Assigns `CHeightField` shared pointer into STIMap with prior-reference release.
+   *
+   * `STIMap` calls `mHeightField.reset(field)`.
    */
-  void CreateCHeightFieldPtr(
-    moho::CHeightField* field,
-    std::shared_ptr<moho::CHeightField>& out
-  )
-  {
-    std::shared_ptr<moho::CHeightField> tmp;
-    CreateBoostPtrCHeightField(tmp, field);
-    NullSub();
-    out = tmp;
-  }
 
   /**
    * Address: 0x005419F0 (FUN_005419F0)
@@ -2678,7 +2666,7 @@ namespace moho
     }
 
     CHeightField* const field = new CHeightField(static_cast<std::int32_t>(width), static_cast<std::int32_t>(height));
-    CreateCHeightFieldPtr(field, mHeightField);
+    mHeightField.reset(field);
 
     std::memset(mBlocking, 0, sizeof(mBlocking));
   }
@@ -2731,7 +2719,7 @@ namespace moho
     }
 
     CHeightField* const copiedField = new CHeightField(sourceWidth - 1, sourceHeight - 1);
-    CreateCHeightFieldPtr(copiedField, mHeightField);
+    mHeightField.reset(copiedField);
 
     if (src && sourceField && copiedField && sourceField->data && copiedField->data) {
       const std::size_t sampleCount =

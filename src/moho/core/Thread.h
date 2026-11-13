@@ -58,8 +58,9 @@ namespace moho
   void THREAD_SetAffinity(bool preferLowest) noexcept;
 
   /**
-   * The callback's box. The binary's box is 32 bytes (a boost::function); THREAD_InvokeAsync allocates
-   * max(32, sizeof(InvokePayload)), as std::function is larger.
+   * What THREAD_InvokeAsync queues: the callback, in one allocation. The binary queues an 8-byte pair of a 32-byte
+   * `boost::function` box and a waiter that only a synchronous invoke sets; nothing in the engine invokes
+   * synchronously.
    */
   struct InvokePayload
   {
@@ -67,60 +68,10 @@ namespace moho
   };
 
   /**
-   * Minimal wait context mirroring sub_104DB6C0/7F0/790 trio.
-   */
-  struct WaitCtx
-  {
-    HANDLE evt{nullptr};
-
-    /**
-     * Initialize context (asm passes '2'; ignored here, kept for parity).
-     */
-    void begin(
-      int /*mode*/
-    ) noexcept
-    {
-      // Auto-reset, initially non-signaled
-      evt = ::CreateEventW(nullptr, FALSE, FALSE, nullptr);
-    }
-
-    /**
-     * Alertable wait until signaled by the APC side.
-     */
-    void block() noexcept
-    {
-      if (!evt)
-        return;
-      ::WaitForSingleObjectEx(evt, INFINITE, TRUE);
-    }
-
-    /**
-     * Signal completion from APC.
-     */
-    void signal() noexcept
-    {
-      if (evt)
-        ::SetEvent(evt);
-    }
-
-    /**
-     * Cleanup.
-     */
-    void end() noexcept
-    {
-      if (evt) {
-        ::CloseHandle(evt);
-        evt = nullptr;
-      }
-    }
-  };
-
-  /**
    * Address: 0x00413AE0 (FUN_00413AE0)
    *
    * What it does:
-   * APC thunk that runs one queued callback payload, signals optional waiting
-   * context, and releases heap payload storage.
+   * APC thunk that runs one queued callback payload and frees it.
    */
   VOID CALLBACK pfnAPC(ULONG_PTR dwData);
 

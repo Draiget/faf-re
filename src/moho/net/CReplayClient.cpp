@@ -1,5 +1,4 @@
 #include "CReplayClient.h"
-#include <functional>
 
 #include <cstdint>
 #include <mutex>
@@ -74,13 +73,13 @@ namespace
    * An earlier reconstruction modelled this as a `void (*)(CReplayClient*)` /
    * self-pointer pair, which has the same size but the wrong call shape.
    */
-  [[nodiscard]] std::function<void()> MakeReplayThreadCallback(
+  [[nodiscard]] auto MakeReplayThreadCallback(
     CReplayClient* const self
   )
   {
-    return std::function<void()>([self]() {
+    return [self]() {
       self->ReplayThread();
-    });
+    };
   }
 } // namespace
 
@@ -118,11 +117,7 @@ void CReplayClient::DestroyNonDeleting()
       mReplayWorkerCondition.notify_all();
     }
 
-    try {
-      mReplayThread->join();
-    } catch (...) {
-      // Boost 1.34 does not expose joinable(); preserve best-effort shutdown.
-    }
+    mReplayThread->join();
   }
 
   delete mReplayThread;

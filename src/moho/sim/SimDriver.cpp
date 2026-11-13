@@ -1030,12 +1030,7 @@ void CSimDriver::JoinAndDeleteThread(
     return;
   }
 
-  try {
-    thread->join();
-  } catch (...) {
-    // Boost 1.34 does not expose joinable(); preserve best-effort shutdown.
-  }
-
+  thread->join();
   delete thread;
   thread = nullptr;
 }

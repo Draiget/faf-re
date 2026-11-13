@@ -418,7 +418,7 @@ namespace moho
    */
   [[nodiscard]] CArmyStatItem* ResolveArmyStatItemCachedCreate(CArmyStats* armyStats, const char* statPath);
 
-  /**
+  /*
    * Address: 0x007134C0 (FUN_007134C0, boost::shared_ptr<Moho::STrigger>::shared_ptr(STrigger*))
    *
    * What it does:
@@ -432,8 +432,9 @@ namespace moho
    * caller site to invoke this helper by name so the MSVC8 per-T template
    * emission symbol is preserved even when the modern compiler would inline
    * the natural ctor-arg construction.
+   *
+   * The caller calls `created.reset(new STrigger())`.
    */
-  void ConstructSharedSTriggerFromRaw(std::shared_ptr<STrigger>& out, STrigger* raw);
 
   /**
    * Engine addition (dedicated-server plan WPL.4): the folder prompt

@@ -1,6 +1,8 @@
 #include "moho/resource/ResourceManager.h"
 
 #include <algorithm>
+#include <chrono>
+#include <thread>
 
 #include <Windows.h>
 
@@ -27,9 +29,6 @@ namespace moho
 
 namespace
 {
-  // boost's TIME_UTC (fa::kXtimeUtc), spelled by value: C11's TIME_UTC macro has the same value.
-  constexpr int kClockUtc = 1;
-
   moho::ResourceManager* sResourceManager = nullptr;       // 0x010A6398
   std::once_flag sResourceManagerOnce;                     // 0x010A639C
 
@@ -116,11 +115,11 @@ namespace
    */
   void SleepUnlocked(
     fa::recursive_mutex::scoped_lock& lock,
-    const fa::xtime& until
+    const std::chrono::steady_clock::time_point until
   )
   {
     lock.unlock();
-    fa::thread::sleep(until);
+    std::this_thread::sleep_until(until);
     lock.lock();
   }
 } // namespace
@@ -174,7 +173,7 @@ namespace moho
     , mRunning(false)
     , mLoadsInProgress(0)
   {
-    fa::xtime_get(&mLastLoadTime, kClockUtc);
+    mLastLoadTime = std::chrono::steady_clock::now();
     DISK_AddWatchListener(this);
   }
 
@@ -229,7 +228,7 @@ namespace moho
       record.mResource.reset();
       record.mLoadFailed = false;
 
-      const std::shared_ptr<PrefetchData> prefetch = gpg::LockWeak(record.mPrefetch);
+      const std::shared_ptr<PrefetchData> prefetch = record.mPrefetch.lock();
       if (prefetch) {
         prefetch->mPrefetchData.reset();
         prefetch->mResource.reset();
@@ -368,10 +367,7 @@ namespace moho
     fa::recursive_mutex::scoped_lock lock(mLock);
     while (mRunning) {
       if (!res_EnablePrefetching) {
-        fa::xtime until;
-        fa::xtime_get(&until, kClockUtc);
-        until.sec += 10;
-        SleepUnlocked(lock, until);
+        SleepUnlocked(lock, std::chrono::steady_clock::now() + std::chrono::seconds(10));
         continue;
       }
 
@@ -385,16 +381,13 @@ namespace moho
         continue;
       }
 
-      fa::xtime now;
-      fa::xtime_get(&now, kClockUtc);
-      fa::xtime quietUntil = mLastLoadTime;
-      quietUntil.sec += res_PrefetcherActivityDelay;
-      if (fa::xtime_cmp(now, quietUntil) < 0) {
+      const auto quietUntil = mLastLoadTime + std::chrono::seconds(res_PrefetcherActivityDelay);
+      if (std::chrono::steady_clock::now() < quietUntil) {
         SleepUnlocked(lock, quietUntil);
         continue;
       }
 
-      const std::shared_ptr<PrefetchData> prefetch = gpg::LockWeak(mPrefetchQueue.front());
+      const std::shared_ptr<PrefetchData> prefetch = mPrefetchQueue.front().lock();
       mPrefetchQueue.pop_front();
       if (!prefetch) {
         continue;
@@ -405,7 +398,7 @@ namespace moho
         continue;
       }
 
-      prefetch->mResource = gpg::LockWeak(record->mResource);
+      prefetch->mResource = record->mResource.lock();
       if (prefetch->mResource) {
         continue;
       }
@@ -426,14 +419,7 @@ namespace moho
       mLoadFinished.notify_all();
       record->mLoading = false;
 
-      fa::xtime napUntil;
-      fa::xtime_get(&napUntil, kClockUtc);
-      napUntil.nsec += res_AfterPrefetchDelay * 1000000;
-      while (napUntil.nsec >= 1000000000) {
-        napUntil.nsec -= 1000000000;
-        ++napUntil.sec;
-      }
-      SleepUnlocked(lock, napUntil);
+      SleepUnlocked(lock, std::chrono::steady_clock::now() + std::chrono::milliseconds(res_AfterPrefetchDelay));
     }
   }
 
@@ -454,13 +440,13 @@ namespace moho
 
     ResourceRecord& record = Record(mRecords.insert(ResourceRecord(name.c_str(), type)).first);
 
-    std::shared_ptr<PrefetchData> prefetch = gpg::LockWeak(record.mPrefetch);
+    std::shared_ptr<PrefetchData> prefetch = record.mPrefetch.lock();
     if (!prefetch) {
       prefetch = std::shared_ptr<PrefetchData>(new PrefetchData(&record));
       record.mPrefetch = prefetch;
     }
 
-    if (const std::shared_ptr<void> resource = gpg::LockWeak(record.mResource); !resource) {
+    if (const std::shared_ptr<void> resource = record.mResource.lock(); !resource) {
       mPrefetchQueue.push_back(prefetch);
       if (mPrefetchThread) {
         mPrefetchQueued.notify_all();
@@ -533,12 +519,12 @@ namespace moho
     fa::recursive_mutex::scoped_lock& lock
   )
   {
-    const std::shared_ptr<PrefetchData> prefetch = gpg::LockWeak(record.mPrefetch);
+    const std::shared_ptr<PrefetchData> prefetch = record.mPrefetch.lock();
     while (record.mLoading) {
       mLoadFinished.wait(lock);
     }
 
-    std::shared_ptr<void> resource = gpg::LockWeak(record.mResource);
+    std::shared_ptr<void> resource = record.mResource.lock();
     if (resource || record.mLoadFailed) {
       return resource;
     }
@@ -572,13 +558,13 @@ namespace moho
       record.mReloadPending = false;
     }
 
-    gpg::AssignWeakFromShared(record.mResource, resource);
+    record.mResource = resource;
     if (!resource) {
       record.mLoadFailed = true;
     }
     record.mLoading = false;
     --mLoadsInProgress;
-    fa::xtime_get(&mLastLoadTime, kClockUtc);
+    mLastLoadTime = std::chrono::steady_clock::now();
     mLoadFinished.notify_all();
     return resource;
   }

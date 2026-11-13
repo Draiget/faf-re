@@ -1,5 +1,6 @@
 #pragma once
 
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -277,7 +278,10 @@ namespace moho
     fa::map<const gpg::RType*, ResourceFactoryBase*> mFactories; // +0x4C
     bool mRunning;                                               // +0x58
     int mLoadsInProgress;                                        // +0x5C
-    fa::xtime mLastLoadTime;                                     // +0x60
+    // The binary's `boost::xtime` (UTC seconds and nanoseconds, 16 bytes); a steady clock here, so a change of the
+    // system time doesn't stall or rush the prefetcher.
+    std::chrono::steady_clock::time_point mLastLoadTime;         // +0x60
+    std::uint8_t pad_0068_006F[8]{};                             // the rest of the binary's xtime
     ResourceRecordSet mRecords;                                  // +0x70
     fa::deque<std::weak_ptr<PrefetchData>> mPrefetchQueue;       // +0x7C
     fa::condition mPrefetchQueued;                               // +0x90
@@ -285,8 +289,8 @@ namespace moho
     std::unique_ptr<fa::thread> mPrefetchThread;                 // +0xC0
   };
 
-  // The members end at 0xC4; `boost::xtime`'s 64-bit `sec` makes the class
-  // 8-aligned, which rounds it to 0xC8.
+  // The members end at 0xC4; `boost::xtime`'s 64-bit `sec` (the time point's
+  // 64-bit count here) makes the class 8-aligned, which rounds it to 0xC8.
   static_assert(sizeof(ResourceManager) == 0xC8, "ResourceManager size must be 0xC8");
 
   /**

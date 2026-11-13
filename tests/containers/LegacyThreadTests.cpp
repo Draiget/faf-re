@@ -1,4 +1,4 @@
-// fa::mutex, fa::recursive_mutex, fa::condition, fa::thread and fa::xtime (src/legacy/thread): the behaviour the
+// fa::mutex, fa::recursive_mutex, fa::condition and fa::thread (src/legacy/thread): the behaviour the
 // engine relied on from boost 1.34.1's versions of them.
 
 #include "legacy/thread/Condition.h"
@@ -216,28 +216,21 @@ TEST(
 
 TEST(
   LegacyThread,
-  XtimeIsUtcAndSleepWaitsUntilIt
+  JoinOnItsOwnThreadDetachesInsteadOfThrowing
 )
 {
-  fa::xtime now{};
-  EXPECT_EQ(fa::xtime_get(&now, fa::kXtimeUtc), fa::kXtimeUtc);
-  const auto systemSeconds =
-    std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count();
-  EXPECT_LE(std::abs(now.sec - static_cast<std::int64_t>(systemSeconds)), 1);
-  EXPECT_GE(now.nsec, 0);
-  EXPECT_LT(now.nsec, 1000000000);
-
-  fa::xtime later = now;
-  later.nsec += 50 * 1000000;
-  if (later.nsec >= 1000000000) {
-    later.nsec -= 1000000000;
-    ++later.sec;
-  }
-  EXPECT_LT(fa::xtime_cmp(now, later), 0);
-  EXPECT_GT(fa::xtime_cmp(later, now), 0);
-  EXPECT_EQ(fa::xtime_cmp(now, now), 0);
-
-  const auto start = std::chrono::steady_clock::now();
-  fa::thread::sleep(later);
-  EXPECT_GE(std::chrono::steady_clock::now() - start, 40ms);
+  std::atomic<bool> finished{false};
+  std::atomic<bool> start{false};
+  fa::thread* worker = nullptr;
+  worker = new fa::thread([&] {
+    while (!start.load()) {
+      std::this_thread::sleep_for(1ms);
+    }
+    worker->join(); // std::thread::join would throw resource_deadlock_would_occur here
+    finished = true;
+  });
+  start = true;
+  EXPECT_TRUE(WaitFor(finished));
+  worker->join(); // detached by the self-join: nothing left to wait for
+  delete worker;
 }

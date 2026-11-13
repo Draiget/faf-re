@@ -2,7 +2,8 @@
 
 #include "platform/Platform.h"
 
-#include <algorithm>
+#include <memory>
+#include <new>
 using namespace moho;
 
 namespace
@@ -51,27 +52,10 @@ void moho::THREAD_InvokeAsync(
     return;
   }
 
-  // Allocate pair (8 bytes) and box (32 bytes)
-  auto pair = static_cast<void**>(::operator new(2 * sizeof(void*), std::nothrow));
-  if (!pair) {
-    ::CloseHandle(hThread);
-    return;
+  auto* const payload = new (std::nothrow) InvokePayload{std::move(fn)};
+  if (payload != nullptr && ::QueueUserAPC(&pfnAPC, hThread, reinterpret_cast<ULONG_PTR>(payload)) == 0) {
+    delete payload; // never queued, so pfnAPC won't free it
   }
-
-  void* raw = ::operator new((std::max)(std::size_t{32}, sizeof(InvokePayload)), std::nothrow);
-  if (!raw) {
-    ::operator delete(pair);
-    ::CloseHandle(hThread);
-    return;
-  }
-
-  // Construct payload in-place inside the 32-byte box
-  auto* box = ::new (raw) InvokePayload{std::move(fn)};
-
-  pair[0] = box;
-  pair[1] = nullptr; // async: no waiter
-
-  (void)::QueueUserAPC(&pfnAPC, hThread, reinterpret_cast<ULONG_PTR>(pair));
   ::CloseHandle(hThread);
 }
 
@@ -136,29 +120,10 @@ void __stdcall moho::pfnAPC(
   const ULONG_PTR dwData
 )
 {
-  // pair[0] = box (InvokePayload*), pair[1] = WaitCtx*
-  const auto pair = reinterpret_cast<void**>(dwData);
-  if (!pair) {
-    return;
+  const std::unique_ptr<InvokePayload> payload(reinterpret_cast<InvokePayload*>(dwData));
+  if (payload && payload->fn) {
+    payload->fn();
   }
-
-  auto* box = static_cast<InvokePayload*>(pair[0]);
-  auto* ctx = static_cast<WaitCtx*>(pair[1]);
-
-  if (box) {
-    if (box->fn)
-      box->fn();
-
-    // Explicitly call dtor then free the 32-byte box
-    box->~InvokePayload();
-    ::operator delete(box);
-  }
-
-  if (ctx)
-    ctx->signal();
-
-  // Free the 8-byte pair
-  ::operator delete(pair);
 }
 
 DWORD moho::ResolveTid(

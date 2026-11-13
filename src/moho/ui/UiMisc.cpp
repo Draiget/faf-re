@@ -811,7 +811,7 @@ int moho::cfunc_CMauiBitMapGetNumFramesL(
   return 1;
 }
 
-/**
+/*
  * Address: 0x00855040 (FUN_00855040, fa::vector<boost::shared_ptr<MeshInstance>>::push_back)
  *
  * What it does:
@@ -823,14 +823,9 @@ int moho::cfunc_CMauiBitMapGetNumFramesL(
  * `mMeshes.push_back(meshInstance);` form to an explicit-name invocation
  * so the MSVC8 per-T template emission symbol shape is preserved even
  * when the modern compiler would inline the natural push_back call.
+ *
+ * The caller calls `mMeshes.push_back(meshInstance)`.
  */
-void moho::PushBackMeshInstanceSharedPtrVector(
-  fa::vector<std::shared_ptr<moho::MeshInstance>>& destination,
-  const std::shared_ptr<moho::MeshInstance>& value
-)
-{
-  destination.push_back(value);
-}
 
 /**
  * Address: 0x0086DDF0 (FUN_0086DDF0, sub_86DDF0)

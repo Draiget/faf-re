@@ -22,22 +22,16 @@ using namespace moho;
 
 namespace
 {
-  /**
+  /*
    * Address: 0x00481D70 (FUN_00481D70, func_NatTravProvPtr)
    *
    * What it does:
    * Copies NAT traversal provider weak pointer only when the provider still has
    * a live strong-reference count.
+   *
+   * boost's `weak_ptr` copy, which takes `px` through `lock()` so a dead pointee isn't copied. Callers lock
+   * `mNatTraversalProvider` directly, which gives the same empty result once the provider is gone.
    */
-  std::weak_ptr<INetNATTraversalProvider> CopyLiveNatTraversalProviderWeakPtr(
-    const std::weak_ptr<INetNATTraversalProvider>& provider
-  )
-  {
-    if (provider.expired()) {
-      return std::weak_ptr<INetNATTraversalProvider>{};
-    }
-    return provider;
-  }
 } // namespace
 
 /**
@@ -172,7 +166,7 @@ CNetUDPConnector::CNetUDPConnector(
     });
   }
 
-  const auto natProviderWeak = CopyLiveNatTraversalProviderWeakPtr(mNatTraversalProvider);
+  const auto natProviderWeak = mNatTraversalProvider;
   if (const auto natProvider = natProviderWeak.lock()) {
     std::shared_ptr<INetNATTraversalHandler> natHandler = std::static_pointer_cast<INetNATTraversalHandler>(selfOwner);
     const int port = GetLocalPort();
@@ -190,7 +184,7 @@ CNetUDPConnector::CNetUDPConnector(
  */
 void CNetUDPConnector::Destroy()
 {
-  const auto natProviderWeak = CopyLiveNatTraversalProviderWeakPtr(mNatTraversalProvider);
+  const auto natProviderWeak = mNatTraversalProvider;
   if (const auto natProvider = natProviderWeak.lock()) {
     std::shared_ptr<INetNATTraversalHandler> nullHandler{};
     const int port = GetLocalPort();
@@ -355,7 +349,7 @@ void CNetUDPConnector::Pull()
     mIsPulling = true;
 
     if (!mInboundTraversalPackets.empty()) {
-      const auto natProvider = CopyLiveNatTraversalProviderWeakPtr(mNatTraversalProvider).lock();
+      const auto natProvider = mNatTraversalProvider.lock();
 
       while (!mInboundTraversalPackets.empty()) {
         const auto [packet, address, port] = mInboundTraversalPackets.front();
@@ -599,10 +593,7 @@ void CNetUDPConnector::HandleReceivedDatagram(
   if (n > 0 && packet->header.mType == PT_NATTraversal) {
     // Only `Pull` drains this queue, and the game thread may not call it
     // for a while (loading); past the cap the packet is recycled unread.
-    if (
-      CopyLiveNatTraversalProviderWeakPtr(mNatTraversalProvider).lock() &&
-      mInboundTraversalPackets.size() < kMaxQueuedTraversalPackets
-    ) {
+    if (mNatTraversalProvider.lock() && mInboundTraversalPackets.size() < kMaxQueuedTraversalPackets) {
       packet->ListUnlink();
       mInboundTraversalPackets.push_back({packet, addrHost, portHost});
       if (mSelectedEvent) {

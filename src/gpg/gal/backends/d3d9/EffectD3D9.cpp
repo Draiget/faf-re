@@ -116,9 +116,7 @@ namespace gpg::gal
       }
 
       outTechniques.push_back(
-        std::shared_ptr<EffectTechnique>(
-          new EffectTechniqueD3D9(description.Name, gpg::SharedFromThis(*this), technique)
-        )
+        std::shared_ptr<EffectTechnique>(new EffectTechniqueD3D9(description.Name, shared_from_this(), technique))
       );
       result = dxEffect_->FindNextValidTechnique(technique, &technique);
     }
@@ -149,9 +147,7 @@ namespace gpg::gal
       ThrowGalError("EffectD3D9.cpp", 79, message);
     }
 
-    return std::shared_ptr<EffectVariable>(
-      new EffectVariableD3D9(variableName, gpg::SharedFromThis(*this), parameterHandle)
-    );
+    return std::shared_ptr<EffectVariable>(new EffectVariableD3D9(variableName, shared_from_this(), parameterHandle));
   }
 
   /**
@@ -183,7 +179,7 @@ namespace gpg::gal
     }
 
     return std::shared_ptr<EffectTechnique>(
-      new EffectTechniqueD3D9(techniqueName, gpg::SharedFromThis(*this), techniqueHandle)
+      new EffectTechniqueD3D9(techniqueName, shared_from_this(), techniqueHandle)
     );
   }
 

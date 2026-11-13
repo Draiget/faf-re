@@ -1232,7 +1232,7 @@ namespace moho
     // (FUN_007134C0) so the MSVC8 `shared_ptr<STrigger>(STrigger*)`
     // template emission symbol is preserved.
     std::shared_ptr<STrigger> created;
-    ConstructSharedSTriggerFromRaw(created, new STrigger());
+    created.reset(new STrigger());
     created->mName = triggerName ? triggerName : "";
 
     mTriggers.push_back(created);
@@ -1334,7 +1334,7 @@ namespace moho
     item->SetValue(value);
   }
 
-  /**
+  /*
    * Address: 0x007134C0 (FUN_007134C0, boost::shared_ptr<Moho::STrigger>::shared_ptr(STrigger*))
    *
    * What it does:
@@ -1348,14 +1348,9 @@ namespace moho
    *
    * Wiring at the `EnsureTriggerExists` caller site preserves the MSVC8
    * per-T template emission symbol for `T = STrigger`.
+   *
+   * The caller calls `created.reset(new STrigger())`.
    */
-  void ConstructSharedSTriggerFromRaw(
-    std::shared_ptr<STrigger>& out,
-    STrigger* const raw
-  )
-  {
-    out.reset(raw);
-  }
 } // namespace moho
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of

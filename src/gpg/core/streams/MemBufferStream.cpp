@@ -78,28 +78,15 @@ namespace
 
   constexpr std::uint64_t kMaxStreamPosition = 0x7FFFFFFFULL;
 
-  using SharedByteDeleter = void(__cdecl*)(void*);
-
-  /**
+  /*
    * Address: 0x0094E2F0 (FUN_0094E2F0, boost::shared_ptr_char_P_void_P::shared_ptr_char_P_void_P)
    *
    * What it does:
    * Constructs one `boost::shared_ptr<char>` from raw pointer + deleter,
    * preserving `sp_enable_shared_from_this` setup done by Boost internals.
+   *
+   * `AllocMemBuffer` constructs `std::shared_ptr<char>(buff, &std::free)` itself.
    */
-  std::shared_ptr<char>* ConstructSharedByteOwnerWithDeleter(
-    std::shared_ptr<char>* const outOwner,
-    char* const pointer,
-    const SharedByteDeleter deleter
-  )
-  {
-    if (outOwner == nullptr) {
-      return nullptr;
-    }
-
-    *outOwner = std::shared_ptr<char>(pointer, deleter);
-    return outOwner;
-  }
 } // namespace
 
 /**
@@ -268,8 +255,7 @@ MemBuffer<char> gpg::AllocMemBuffer(
     std::memset(buff, 0, size);
   }
 
-  std::shared_ptr<char> ptr;
-  (void)ConstructSharedByteOwnerWithDeleter(&ptr, buff, static_cast<SharedByteDeleter>(&std::free));
+  const std::shared_ptr<char> ptr(buff, &std::free);
   char* const end = (buff == nullptr) ? nullptr : (buff + size);
   return MemBuffer<char>(ptr, buff, end);
 }

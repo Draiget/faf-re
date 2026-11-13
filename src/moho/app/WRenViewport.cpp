@@ -17,7 +17,7 @@
 
 namespace
 {
-  /**
+  /*
    * Address: 0x007FB7C0 (FUN_007FB7C0, boost::shared_ptr_IRenTerrain::operator=)
    * Address: 0x007FBA60 (FUN_007FBA60, boost::detail::shared_count_IRenTerrain::shared_count_IRenTerrain)
    *
@@ -27,15 +27,9 @@ namespace
    * this delegates to internally constructs a fresh `shared_count(T*)`
    * control block (0x007FBA60) before releasing the old one; this single
    * call covers both.
+   *
+   * Callers call `mTerrain.reset(IRenTerrain::Create())`.
    */
-  std::shared_ptr<moho::TerrainCommon>* AssignSharedTerrainFromRaw(
-    std::shared_ptr<moho::TerrainCommon>* const outTerrain,
-    moho::TerrainCommon* const terrain
-  )
-  {
-    outTerrain->reset(terrain);
-    return outTerrain;
-  }
 } // namespace
 
 bool moho::gViewportLeaveKeepsFocus = false;
@@ -301,7 +295,7 @@ void moho::WRenViewport::AddWorldView(
   entry.mView = view;
   entry.mHead = head;
   entry.mDepth = depth;
-  (void)AssignSharedTerrainFromRaw(&entry.mTerrain, IRenTerrain::Create());
+  entry.mTerrain.reset(IRenTerrain::Create());
   if (entry.mTerrain) {
     (void)entry.mTerrain->Create(REN_GetTerrainRes());
   }
@@ -1732,7 +1726,7 @@ void moho::WRenViewport::RenderPreviewImage(
 
   SWorldViewInfo worldViewEntry{};
   worldViewEntry.mView = &previewView;
-  (void)AssignSharedTerrainFromRaw(&worldViewEntry.mTerrain, moho::IRenTerrain::Create());
+  worldViewEntry.mTerrain.reset(moho::IRenTerrain::Create());
   if (worldViewEntry.mTerrain) {
     (void)worldViewEntry.mTerrain->Create(terrainRes);
   }

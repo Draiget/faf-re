@@ -520,18 +520,12 @@ void Sim::RegisterEntitySet(
   mEntityDB->RegisterEntitySet(*set);
 }
 
-/**
+/*
  * Address: 0x00751220 (FUN_00751220, boost::shared_ptr_SParticleBuffer::operator=)
  *
  * What it does:
  * Rebinds one `shared_ptr<SParticleBuffer>` from a raw pointer and releases
  * prior ownership.
+ *
+ * `Sim::GetParticleBuffer` calls `mParticleBuffer.reset(new SParticleBuffer())`.
  */
-std::shared_ptr<SParticleBuffer>* AssignSharedParticleBufferFromRaw(
-  std::shared_ptr<SParticleBuffer>* const outBuffer,
-  SParticleBuffer* const buffer
-)
-{
-  outBuffer->reset(buffer);
-  return outBuffer;
-}

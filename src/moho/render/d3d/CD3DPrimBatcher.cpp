@@ -287,7 +287,7 @@ namespace moho
     runtime->mResetComposite = 1;
   }
 
-  /**
+  /*
    * Address: 0x0043A8B0 (FUN_0043A8B0)
    * Mangled: ??1WeakPtr_CD3DBatchTexture@Moho@@QAE@@Z
    *          (analyst label; the emitted body is the out-of-line
@@ -308,15 +308,11 @@ namespace moho
    * lanes at all. The release path (`lock xadd [pi+4], -1` -> vslot +0x04
    * `dispose()` -> `lock xadd [pi+8], -1` -> vslot +0x08 `destroy()`) is
    * `sp_counted_base::release()` with `weak_release()` inlined into it.
+   *
+   * Callers call `handle.reset()`.
    */
-  void ResetSharedBatchTextureHandle(
-    std::shared_ptr<CD3DBatchTexture>& handle
-  ) noexcept
-  {
-    handle.reset();
-  }
 
-  /**
+  /*
    * Address: 0x0043A860 (FUN_0043A860)
    * Mangled: ??1WeakPtr_CD3DDynamicTextureSheet@Moho@@QAE@@Z
    *          (analyst label; the emitted body is the out-of-line
@@ -335,13 +331,9 @@ namespace moho
    * 597fd943...); the two remain distinct functions because they are distinct
    * template instantiations, and the caller picks them per lane - +0x44 for
    * the batch texture, +0x3C for the sheet.
+   *
+   * Callers call `handle.reset()`.
    */
-  void ResetSharedDynamicTextureSheetHandle(
-    std::shared_ptr<CD3DDynamicTextureSheet>& handle
-  ) noexcept
-  {
-    handle.reset();
-  }
 
   /**
    * Address: 0x004386A0 (?SetTexture@CD3DPrimBatcher@Moho@@QAEXABV?$shared_ptr@VCD3DBatchTexture@Moho@@@boost@@@Z)
@@ -399,8 +391,8 @@ namespace moho
     // texture lane), then 0x00438730 `lea eax, [edi+3Ch]` -> call 0x0043A860
     // (dynamic sheet lane). Both lanes are dropped before the atlas UV rect is
     // published, so a subsequent Flush takes the composite-atlas branch.
-    ResetSharedBatchTextureHandle(runtime->mTexture);
-    ResetSharedDynamicTextureSheetHandle(runtime->mDynamicTexSheet);
+    runtime->mTexture.reset();
+    runtime->mDynamicTexSheet.reset();
 
     runtime->mP2x = uvRect->x0;
     runtime->mP2y = uvRect->z0;
@@ -440,7 +432,7 @@ namespace moho
     // 0x004388C0-0x004388E8 inlines the very same lane reset the atlas path
     // reaches through 0x0043A8B0; expressed here through the named recovery so
     // both emissions share one source body.
-    ResetSharedBatchTextureHandle(runtime->mTexture);
+    runtime->mTexture.reset();
     runtime->mDynamicTexSheet = derivedSheet;
 
     runtime->mP2x = 0.0f;

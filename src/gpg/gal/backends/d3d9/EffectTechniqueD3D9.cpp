@@ -42,7 +42,7 @@ namespace gpg::gal
       const int line
     )
     {
-      std::shared_ptr<EffectD3D9> effect = gpg::LockWeak(weakEffect);
+      std::shared_ptr<EffectD3D9> effect = weakEffect.lock();
       if (!effect) {
         ThrowGalError("EffectTechniqueD3D9.cpp", line, "attempt to use invalid effect");
       }

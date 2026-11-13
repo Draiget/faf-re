@@ -206,24 +206,15 @@ namespace
     retired.swap(gRetiredFrames);
   }
 
-  /**
+  /*
    * Address: 0x00796F30 (FUN_00796F30, boost::shared_ptr<Moho::CMauiFrame>::shared_ptr(CMauiFrame*))
    *
    * What it does:
    * Constructs one `boost::shared_ptr<CMauiFrame>` from one raw frame pointer
    * in caller-provided storage.
+   *
+   * Nothing in the engine builds a frame's shared_ptr this way; the helper had no callers.
    */
-  [[maybe_unused]] std::shared_ptr<moho::CMauiFrame>* ConstructSharedFrameFromRaw(
-    std::shared_ptr<moho::CMauiFrame>* const outSharedFrame,
-    moho::CMauiFrame* const rawFrame
-  )
-  {
-    if (outSharedFrame == nullptr) {
-      return nullptr;
-    }
-
-    return ::new (outSharedFrame) std::shared_ptr<moho::CMauiFrame>(rawFrame);
-  }
 
   [[nodiscard]] bool IsValidFrameIndex(
     const moho::CUIManager& manager,

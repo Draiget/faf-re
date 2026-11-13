@@ -16,7 +16,7 @@ SParticleBuffer* Sim::GetParticleBuffer()
   }
 
   if (!mParticleBuffer) {
-    (void)AssignSharedParticleBufferFromRaw(&mParticleBuffer, new SParticleBuffer());
+    mParticleBuffer.reset(new SParticleBuffer());
   }
 
   return mParticleBuffer.get();
