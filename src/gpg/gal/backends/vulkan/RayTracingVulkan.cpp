@@ -352,6 +352,10 @@ namespace gpg::gal
       mRayGarbage.push_back(garbage);
     }
     mRayGeometries.clear();
+    mRayBuiltInstances.clear();
+    mRayBuiltRecords.clear();
+    mRayBuiltTextures.clear();
+    mRayBuiltChanges = ~0ULL;
     if (mRayPool != VK_NULL_HANDLE) {
       CollectRayGarbage(true);
     }
@@ -514,6 +518,7 @@ namespace gpg::gal
     }
     const RayGeometryId id = mNextRayGeometry++;
     mRayGeometries.emplace(id, piece);
+    ++mRayGeometryChanges;
     return id;
   }
 
@@ -532,6 +537,7 @@ namespace gpg::gal
     garbage.range = found->second.range;
     mRayGarbage.push_back(garbage);
     mRayGeometries.erase(found);
+    ++mRayGeometryChanges;
   }
 
   bool DeviceVulkan::SetRayInstances(
@@ -588,7 +594,37 @@ namespace gpg::gal
       mRayRecords.push_back(slot);
       mRayRecords.push_back(alphaTested ? 1U : 0U);
     }
-    return BuildRayScene();
+    // The same list over the same pieces as the last build (an idle scene: nothing moved): the structure and the
+    // set built then are still right. Only the textures' layouts are put back (a mip update can have moved one).
+    const bool unchanged = mTlas != VK_NULL_HANDLE && mRaySet != VK_NULL_HANDLE &&
+      mRayBuiltChanges == mRayGeometryChanges && mRayBuiltInstances.size() == mRayInstances.size() &&
+      mRayBuiltRecords == mRayRecords && mRayBuiltTextures == mRayTextures &&
+      (mRayInstances.empty() ||
+       std::memcmp(
+         mRayBuiltInstances.data(),
+         mRayInstances.data(),
+         mRayInstances.size() * sizeof(VkAccelerationStructureInstanceKHR)
+       ) == 0);
+    if (unchanged) {
+      CollectRayGarbage(false);
+      EndRendering();
+      for (const std::shared_ptr<Texture>& texture : mRayTextures) {
+        auto* const textureVk = static_cast<TextureVulkan*>(texture.get());
+        if (!textureVk->IsCube() && !textureVk->IsVolume()) {
+          Transition(textureVk->Image(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        }
+      }
+      return true;
+    }
+    if (!BuildRayScene()) {
+      mRayBuiltChanges = ~0ULL;
+      return false;
+    }
+    mRayBuiltChanges = mRayGeometryChanges;
+    mRayBuiltInstances = mRayInstances;
+    mRayBuiltRecords = mRayRecords;
+    mRayBuiltTextures = mRayTextures;
+    return true;
   }
 
   bool DeviceVulkan::AppendRayAttributes(

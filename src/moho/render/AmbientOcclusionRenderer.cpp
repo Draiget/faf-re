@@ -91,14 +91,14 @@ namespace moho
 
   // Engine addition (ren_RayAo): ambient occlusion by rays against the ray-traced scene (RayScene.h) while
   // ray-traced shadows are on.
-  int ren_RayAo = 1;
+  int ren_RayAo = 0;
   int ren_RayAoRays = 6;
   TConVar<int> gTConVar_ren_RayAo(
     "ren_RayAo",
     "Direct3D 12 and Vulkan with ray tracing, while ren_RayTracedShadows is on: ambient occlusion by short rays over "
     "the half-sphere above each point (ren_RayAoRays of them, ren_AoRadius long) instead of from the screen's depth, "
-    "so units, buildings and ground off the screen or behind others shade too. 1 on (default; nothing while "
-    "ren_RayTracedShadows is off), 0 off.",
+    "so units, buildings and ground off the screen or behind others shade too. 1 on, 0 off (default: everything "
+    "that traces rays is off until the player turns it on; nothing happens while ren_RayTracedShadows is off).",
     &ren_RayAo
   );
   TConVar<int> gTConVar_ren_RayAoRays("ren_RayAoRays", "Rays per point for ren_RayAo (1-16).", &ren_RayAoRays);
@@ -111,12 +111,12 @@ namespace moho
     &ren_RayAoLift
   );
 
-  float ren_TerrainShadows = 0.45f;
+  float ren_TerrainShadows = 0.0f;
   TConVar<float> gTConVar_ren_TerrainShadows(
     "ren_TerrainShadows",
     "Terrain shadows from the heightfield beyond the shadow map's reach (part of ren_Ao): how much of the sun's "
-    "direct light they take, 0 to 1 (0 off). Off on maps that bake their own (stratum 7 terrain info) and when "
-    "shadows are off.",
+    "direct light they take, 0 to 1 (0 off, the default; 0.45 was the old default). Off on maps that bake their own "
+    "(stratum 7 terrain info), when shadows are off and while the light field of Dynamic Lights shades the hills.",
     &ren_TerrainShadows
   );
 

@@ -2,11 +2,13 @@
 
 #include <algorithm>
 #include <cmath>
+#include <chrono>
 #include <cstring>
 
 #include "gpg/core/utils/Logging.h"
 #include "gpg/gal/Device.hpp"
 #include "gpg/gal/GpuDriven.h"
+#include "gpg/gal/RenderProfiler.h"
 #include "gpg/gal/effects/RayTracedShadows.h"
 #include "moho/console/CConCommand.h"
 #include "moho/mesh/Mesh.h"
@@ -35,6 +37,8 @@ namespace moho
   int ren_RaySoftRays = 4;
   // Engine addition (ren_RayAlphaShadows): alpha-tested meshes (trees) in the scene too.
   int ren_RayAlphaShadows = 1;
+  // The most triangles of meshes seen for the first time that go into the scene in one frame (see PiecesFor).
+  int ren_RayBuildBudget = 24000;
 
   namespace
   {
@@ -95,6 +99,13 @@ namespace moho
       "Ray-traced shadows: trees and other meshes cut out by their texture's alpha are traced too (rays test the "
       "texture where they meet them), instead of drawn into the shadow map. 1 on, 0 off.",
       &ren_RayAlphaShadows
+    );
+    TConVar<int> gTConVar_ren_RayBuildBudget(
+      "ren_RayBuildBudget",
+      "Ray-traced shadows: the most triangles of meshes seen for the first time that are built into the scene in one "
+      "frame (default 24000, about 2 ms; a single larger mesh is still built whole). The meshes left over are built "
+      "in the next frames and the shadow map holds them until then. 0 builds everything at once.",
+      &ren_RayBuildBudget
     );
     TConVar<int> gTConVar_ren_RayShadowFailTest(
       "ren_RayShadowFailTest",
@@ -261,10 +272,22 @@ namespace moho
       mMeshes.erase(found);
     }
 
+    const SScmFile& file = *resource->mFile;
+    // First sight of a mesh builds one structure per skin bone in the middle of the frame: a hitch when many new
+    // meshes appear at once (the scene switched on, a battle of many unit types coming into view). Past the frame's
+    // budget the mesh waits for a later frame (its caller keeps the mesh in the shadow map meanwhile, as for a mesh
+    // the device could not build); the first mesh of a frame is built whole whatever its size.
+    const std::uint32_t resourceTriangles = file.mIndexCount / 3U;
+    if (
+      ren_RayBuildBudget > 0 && mBuiltTriangles > 0U &&
+      mBuiltTriangles + resourceTriangles > static_cast<std::uint32_t>(ren_RayBuildBudget)
+    ) {
+      return nullptr;
+    }
+    const auto buildStart = std::chrono::steady_clock::now();
     MeshPieces mesh;
     mesh.resource = resource;
     mesh.skinned = skinned;
-    const SScmFile& file = *resource->mFile;
     const SScmVertex* const vertices = scm_file::GetVertices(file);
     const std::uint16_t* const indices = scm_file::GetIndices(file);
     const std::uint32_t vertexCount = file.mVertexCount;
@@ -323,7 +346,11 @@ namespace moho
       }
       mesh.pieces[bone] = mDevice->CreateRayGeometry(desc);
       mesh.incomplete = mesh.incomplete || mesh.pieces[bone] == 0U;
+      ++mBuiltPieces;
+      mBuiltTriangles += static_cast<std::uint32_t>(pieceIndices.size() / 3U);
     }
+    mBuildMilliseconds +=
+      std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - buildStart).count();
     return &mMeshes.emplace(key, std::move(mesh)).first->second;
   }
 
@@ -572,6 +599,10 @@ namespace moho
       mSweepFrames = 0U;
       SweepMeshes();
     }
+    const gpg::gal::RenderProfileScope profile("RayScene");
+    mBuiltPieces = 0U;
+    mBuiltTriangles = 0U;
+    mBuildMilliseconds = 0.0;
     mInstances.clear();
     mMeshesMissing = false;
     mAlphaMissing = ren_RayAlphaShadows <= 0;
@@ -592,6 +623,15 @@ namespace moho
     ) {
       PublishOff();
       return false;
+    }
+    if (mBuildMilliseconds > 2.0 && mBuildLogs < 24U) {
+      ++mBuildLogs;
+      gpg::Logf(
+        "Ray-traced shadows: first sight of meshes built %u pieces (%u triangles) in %.2f ms on the render thread",
+        mBuiltPieces,
+        mBuiltTriangles,
+        mBuildMilliseconds
+      );
     }
     if (mLoggedFrames < 3U) {
       ++mLoggedFrames;
