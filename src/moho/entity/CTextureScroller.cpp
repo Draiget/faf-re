@@ -644,7 +644,8 @@ namespace moho
 
     (void)archive->ReadPointer(&mEntity, &nullOwner);
 
-    mScroller.MemberDeserialize(archive);
+    // A reflected object of its own, as retail reads it (0x007784C3, `ReadArchive::Read` of `SScroller`).
+    archive->Read(gpg::RTypeOf<SScroller>(), &mScroller, nullOwner);
 
     bool dir0 = false;
     bool dir1 = false;
@@ -684,7 +685,8 @@ namespace moho
 
     archive->WritePointer<moho::Entity>(mEntity, gpg::TrackedPointerState::Unowned, nullOwner);
 
-    mScroller.MemberSerialize(archive);
+    // A reflected object of its own, as retail writes it (0x0077856D, `WriteArchive::Write` of `SScroller`).
+    archive->Write(gpg::RTypeOf<SScroller>(), &mScroller, nullOwner);
 
     archive->WriteBool(mDir[0] != 0u);
     archive->WriteBool(mDir[1] != 0u);
