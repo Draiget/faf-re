@@ -406,6 +406,21 @@ target_compile_features(faf_water_tests PRIVATE cxx_std_20)
 
 add_test(NAME water_effect_patch COMMAND faf_water_tests)
 
+# Dynamic light pool (src/moho/render/lights): pure C++, compiled on its own, no engine objects.
+#
+#   cmake --build --preset clang-x64-release --target faf_light_tests
+add_executable(faf_light_tests EXCLUDE_FROM_ALL lights/LightCollectorTests.cpp lights/LightGridTests.cpp lights/LightEffectPatchTests.cpp lights/LightTextureTests.cpp lights/LightMeshEmissionTests.cpp lights/LightWaterLevelTests.cpp
+               ${CMAKE_SOURCE_DIR}/src/moho/render/lights/LightCollector.cpp
+               ${CMAKE_SOURCE_DIR}/src/moho/render/lights/LightGrid.cpp
+               ${CMAKE_SOURCE_DIR}/src/moho/render/lights/LightEffectPatch.cpp
+               ${CMAKE_SOURCE_DIR}/src/moho/render/lights/LightTexture.cpp
+               ${CMAKE_SOURCE_DIR}/src/moho/render/lights/LightMeshEmission.cpp
+               ${CMAKE_SOURCE_DIR}/src/moho/terrain/water/WaterEffectPatch.cpp)
+target_include_directories(faf_light_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_compile_features(faf_light_tests PRIVATE cxx_std_20)
+
+add_test(NAME dynamic_lights COMMAND faf_light_tests)
+
 # The terrain's water level map and the terrain.fx patch that computes the tint under water bodies per pixel
 # (src/moho/terrain/water/WaterLevelTexel.h, TerrainWaterLevelPatch): pure C++. FAF_STOCK_FX_DIR (the folder with FAF's stock terrain.fx)
 # switches on the checks against the real shader.
