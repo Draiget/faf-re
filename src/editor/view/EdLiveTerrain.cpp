@@ -1,6 +1,7 @@
 #include "editor/view/EdLiveTerrain.h"
 
 #include <algorithm>
+#include <atomic>
 #include <cstdint>
 #include <mutex>
 #include <utility>
@@ -32,8 +33,9 @@ namespace faf::editor
 
     std::mutex gMutex;
     std::vector<Patch> gQueue;
-    bool gNoReseat = false;
-    bool gNoPathDirty = false;
+    // Set on the editor's thread, read on the sim's (ApplyQueued).
+    std::atomic<bool> gNoReseat{false};
+    std::atomic<bool> gNoPathDirty{false};
 
     /** Water levels for the sim, waiting for its next beat. */
     struct WaterLevels
@@ -240,7 +242,7 @@ namespace faf::editor
         gQueue.push_back(std::move(patch));
       }
     }
-    moho::gSimBeforeBeat = &ApplyQueued;
+    moho::gSimBeforeBeat.store(&ApplyQueued, std::memory_order_release);
   }
 
   void LiveWaterLevels(
@@ -258,7 +260,7 @@ namespace faf::editor
       gWater.deep = deep;
       gWater.abyss = abyss;
     }
-    moho::gSimBeforeBeat = &ApplyQueued;
+    moho::gSimBeforeBeat.store(&ApplyQueued, std::memory_order_release);
   }
 
   void SetLiveHeightsNoReseat(
@@ -277,10 +279,9 @@ namespace faf::editor
 
   void DropLiveHeights()
   {
-    if (moho::gSimBeforeBeat == nullptr) {
+    if (moho::gSimBeforeBeat.exchange(nullptr, std::memory_order_acq_rel) == nullptr) {
       return;
     }
-    moho::gSimBeforeBeat = nullptr;
     const std::lock_guard<std::mutex> lock(gMutex);
     gQueue.clear();
     gWater.pending = false;
