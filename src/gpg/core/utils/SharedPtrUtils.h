@@ -775,7 +775,7 @@ namespace gpg
    *   `(px,pi)` prefix lane from a heap object and deletes that owning heap object.
    * - DeleteSharedOwnerIfPresent (BoostWrappers.h): Address: 0x004468C0 (FUN_004468C0) Address: 0x00446A70
    *   (FUN_00446A70) What it does: Deletes one heap owner carrying a shared `(px,pi)` prefix when present.
-   * - /** (BoostWrappers.h): Address: 0x00491350 (FUN_00491350 -- `mov eax, [ecx+0x0C]; ret`: the body of
+   * - / ** (BoostWrappers.h): Address: 0x00491350 (FUN_00491350 -- `mov eax, [ecx+0x0C]; ret`: the body of
    *   `boost::bad_ptr_container_operation::what()`, which boost 1.34.1 defines inline in ptr_container/exception.hpp
    *   as `return what_;` over the `const char*` that follows the 0x0C `std::exception` sub-object. Zero callers in
    *   the binary and none in source; formerly `GetBadPtrContainerMessage` reading through a a deleted overlay copy of
