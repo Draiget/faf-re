@@ -35,7 +35,7 @@ if "%WHICH%"=="" set "WHICH=all"
 
 set "INC=/I "%SDK%" /I "%WM3%" /I "%HERE%src""
 for %%D in (Approximation Collision Containment Controllers Curves Detail Distance Effects ImageAnalysis Interpolation Intersection Math Meshes Miscellaneous Numerics ObjectSystem Physics RationalArithmetic SceneGraph Shaders SharedArrays Sorting Surfaces System Terrain Tessellation) do set "INC=!INC! /I "%WM3%\%%D""
-set "COMMON=/nologo /c /std:c++20 /permissive- /Zc:inline /fp:precise /EHsc /W3 /sdl /GS /wd4073 /wd4244 /wd4273 /wd4834 /wd4996 /D WIN32 /D _CONSOLE /D WIN32_LEAN_AND_MEAN /D NOMINMAX /D _CRT_SECURE_NO_WARNINGS /D BOOST_ALL_NO_LIB %INC%"
+set "COMMON=/nologo /c /std:c++20 /permissive- /Zc:inline /fp:precise /EHsc /W3 /sdl /GS /wd4073 /wd4244 /wd4273 /wd4834 /wd4996 /D WIN32 /D _CONSOLE /D WIN32_LEAN_AND_MEAN /D NOMINMAX /D _CRT_SECURE_NO_WARNINGS %INC%"
 
 rem Recovered engine sources under test - compiled from src, not copied.
 set "SDK_SRCS="%SDK%\moho\math\QuaternionMath.cpp" "%SDK%\moho\math\Vector3f.cpp" "%SDK%\moho\math\Vector2f.cpp" "%SDK%\legacy\math\X87Math.cpp" "%SDK%\legacy\math\Libm.cpp" "%SDK%\moho\math\GridPos.cpp" "%SDK%\moho\math\Wm3Segment3FafExtras.cpp" "%SDK%\moho\math\Wm3AxisAlignedBox3FafExtras.cpp" "%SDK%\moho\math\Vector4f.cpp" "%SDK%\moho\math\Wm3Queries.cpp" "%SDK%\moho\math\Wm3FoundationStatics.cpp" "%SDK%\moho\collision\CColPrimitiveBase.cpp" "%SDK%\gpg\core\containers\BitArray2D.cpp""

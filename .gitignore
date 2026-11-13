@@ -92,3 +92,5 @@ tools/tracy/
 
 # Local secrets (S3 keys and the like); never commit.
 .env/
+# The Boost 1.34.1 download older checkouts still have (the engine no longer uses it).
+dependencies/boost_1_34_1/**/*
