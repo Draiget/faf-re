@@ -1,0 +1,107 @@
+Sync routing policy review: FAF game version 3835, 10 games (vault_26881085, vault_26897073, vault_26902315, vault_26928211, vault_26930624, vault_26943656, vault_26953273, vault_26989770, vault_27004084, vault_27034831), K=5
+totals: BELOW-K 10, CONFIRMED 14, CONTEXT 2, CONTRADICTED 3, SPECIAL 5, UNSEEN 69
+
+status                 key                          accepted       generated                          note
+UNSEEN                 AIBrainData                  Everyone       -                                  kept: no game of the corpus wrote it
+BELOW-K                AIChat                       Everyone       Everyone                           kept: Everyone in 1 games, below K=5
+UNSEEN                 AIPlatoonInfo                Observers      -                                  kept: no game of the corpus wrote it
+UNSEEN                 Abilities                    Everyone       -                                  kept: no game of the corpus wrote it
+UNSEEN                 AddCameraMarkers             Everyone       -                                  kept: no game of the corpus wrote it
+UNSEEN                 AddPingGroups                Everyone       -                                  kept: no game of the corpus wrote it
+UNSEEN                 AddTransmissions             Everyone       -                                  kept: no game of the corpus wrote it
+BELOW-K                ArmyTransfer                 Everyone       Everyone                           kept: Everyone in 2 games, below K=5
+UNSEEN                 BenchmarkInfo                Observers      -                                  kept: no game of the corpus wrote it
+UNSEEN                 BenchmarkModules             Observers      -                                  kept: no game of the corpus wrote it
+UNSEEN                 BenchmarkOutput              Observers      -                                  kept: no game of the corpus wrote it
+UNSEEN                 BrokenAlliances              Everyone       -                                  kept: no game of the corpus wrote it
+UNSEEN                 Buffs                        Everyone       -                                  kept: no game of the corpus wrote it
+BELOW-K                CameraRequests               Everyone       Everyone                           kept: Everyone in 2 games, below K=5
+UNSEEN                 CampaignMode                 Everyone       -                                  kept: no game of the corpus wrote it
+CONTEXT                CancelCountdown              Everyone       Observers (context)                kept: never at focus -1 in the corpus, so the route is unused there; only ever written under a player's focus (1 games)
+UNSEEN                 ChangeCameraZoom             Everyone       -                                  kept: no game of the corpus wrote it
+UNSEEN                 ChatMessages                 Chat           -                                  kept: no game of the corpus wrote it
+BELOW-K                Cheaters                     Everyone       Everyone                           kept: Everyone in 1 games, below K=5
+UNSEEN                 CreateSimDialogue            Everyone       -                                  kept: no game of the corpus wrote it
+UNSEEN                 DestroyDialogue              Everyone       -                                  kept: no game of the corpus wrote it
+UNSEEN                 DiplomacyAction              Everyone       -                                  kept: no game of the corpus wrote it
+CONTRADICTED (held)    DiplomacyAnnouncement        Everyone       Observers (unclassified)           no generic route explains it (focus-dependent on 1 beats); counterexample game vault_26943656 beat 9142 army 0: lockstep None, route {1.0: {'Team': 'Chabberwocky', 'Action': 'recall'}}
+UNSEEN                 EndDemo                      Everyone       -                                  kept: no game of the corpus wrote it
+UNSEEN                 EndGameMovie                 Everyone       -                                  kept: no game of the corpus wrote it
+CONFIRMED              EnforceRating                Everyone       Everyone                           8 games
+CONFIRMED              EnhanceMessage               Observers      Observers (unclassified)           no generic route explains it (focus-dependent on 738 beats)
+BELOW-K                EnhanceRestrict              Everyone       Everyone                           kept: Everyone in 1 games, below K=5
+CONFIRMED              Events                       Everyone       Everyone                           8 games
+UNSEEN                 FloatingEntityText           Everyone       -                                  kept: no game of the corpus wrote it
+UNSEEN                 FocusArmyChanged             Everyone       -                                  kept: no game of the corpus wrote it
+UNSEEN                 FormedAlliances              Everyone       -                                  kept: no game of the corpus wrote it
+CONFIRMED              GameEnded                    Everyone       Everyone                           8 games
+CONFIRMED              GameHasAIs                   Everyone       Everyone                           10 games
+CONFIRMED              GameResult                   Everyone       Everyone                           8 games
+UNSEEN                 GridPresenceUIDebugCell      Observers      -                                  kept: no game of the corpus wrote it
+UNSEEN                 GridPresenceUIDebugUpdate    Observers      -                                  kept: no game of the corpus wrote it
+UNSEEN                 GridReclaimUIDebugCell       Observers      -                                  kept: no game of the corpus wrote it
+UNSEEN                 GridReclaimUIDebugUpdate     Observers      -                                  kept: no game of the corpus wrote it
+UNSEEN                 GridReconUIDebugCell         Observers      -                                  kept: no game of the corpus wrote it
+UNSEEN                 GridReconUIDebugUpdate       Observers      -                                  kept: no game of the corpus wrote it
+UNSEEN                 HelpPrompt                   Everyone       -                                  kept: no game of the corpus wrote it
+UNSEEN                 HighlightUIPanel             Everyone       -                                  kept: no game of the corpus wrote it
+UNSEEN                 IsSavedGame                  Everyone       -                                  kept: no game of the corpus wrote it
+UNSEEN                 LockInput                    Everyone       -                                  kept: no game of the corpus wrote it
+UNSEEN                 MPTaunt                      Everyone       -                                  kept: no game of the corpus wrote it
+CONFIRMED              MassFabs                     Observers      Observers (context)                only ever written under a player's focus (5 games)
+CONFIRMED              MaxPingMarkers               Everyone       Everyone                           10 games
+UNSEEN                 MissionText                  Everyone       -                                  kept: no game of the corpus wrote it
+UNSEEN                 NISMode                      Everyone       -                                  kept: no game of the corpus wrote it
+UNSEEN                 NISVideo                     Everyone       -                                  kept: no game of the corpus wrote it
+UNSEEN                 NavCanPathToDebug            Observers      -                                  kept: no game of the corpus wrote it
+UNSEEN                 NavDebugGetLabel             Observers      -                                  kept: no game of the corpus wrote it
+UNSEEN                 NavDebugGetLabelMetadata     Observers      -                                  kept: no game of the corpus wrote it
+BELOW-K                NavLayerData                 Everyone       Everyone                           kept: Everyone in 4 games, below K=5
+CONFIRMED              NewPlayableArea              Everyone       Everyone                           10 games
+UNSEEN                 NewTech                      Everyone       -                                  kept: no game of the corpus wrote it
+SPECIAL                NukeLaunchData               NukeLaunch     Observers (unclassified, 1 games)  kept: a route of its own; no generic route explains it (focus-dependent on 1 beats)
+UNSEEN                 ObjectiveTimer               Everyone       -                                  kept: no game of the corpus wrote it
+UNSEEN                 ObjectivesTable              Everyone       -                                  kept: no game of the corpus wrote it
+UNSEEN                 ObjectivesUpdateTable        Everyone       -                                  kept: no game of the corpus wrote it
+UNSEEN                 OperationComplete            Everyone       -                                  kept: no game of the corpus wrote it
+UNSEEN                 Paused                       Everyone       -                                  kept: no game of the corpus wrote it
+BELOW-K                PausedBy                     Everyone       Everyone                           kept: Everyone in 2 games, below K=5
+BELOW-K                Ping                         Everyone       Everyone                           kept: Everyone in 1 games, below K=5
+UNSEEN                 PlayMFDMovie                 Everyone       -                                  kept: no game of the corpus wrote it
+UNSEEN                 PlayerQueries                Everyone       -                                  kept: no game of the corpus wrote it
+BELOW-K                PrintText                    Everyone       Everyone                           kept: Everyone in 1 games, below K=5
+UNSEEN                 ProfilerData                 Observers      -                                  kept: no game of the corpus wrote it
+UNSEEN                 QueryResults                 Everyone       -                                  kept: no game of the corpus wrote it
+CONFIRMED              RecallRequest                Observers      Observers (unclassified)           no generic route explains it (focus-dependent on 10 beats)
+SPECIAL                Reclaim                      Reclaim        Everyone (generated, 10 games)     kept: a route of its own; generic finding only
+SPECIAL                ReleaseIds                   ReleasedIds    EntityOwner (generated, 10 games)  kept: a route of its own; generic finding only
+UNSEEN                 RemoveCameraMarkers          Everyone       -                                  kept: no game of the corpus wrote it
+UNSEEN                 RemovePingGroups             Everyone       -                                  kept: no game of the corpus wrote it
+UNSEEN                 RequestPlayerFaction         Everyone       -                                  kept: no game of the corpus wrote it
+UNSEEN                 RequestingExit               Everyone       -                                  kept: no game of the corpus wrote it
+CONFIRMED              Restrictions                 Everyone       Everyone                           10 games
+SPECIAL                Score                        Score          Observers (unclassified, 10 games) kept: a route of its own; no generic route explains it (focus-dependent on 9409 beats)
+SPECIAL                ScoreAccum                   ScoreAccum     Observers (unclassified, 10 games) kept: a route of its own; no generic route explains it (focus-dependent on 10 beats)
+UNSEEN                 SetAlliedVictory             Observers      -                                  kept: no game of the corpus wrote it
+UNSEEN                 SetButtonDisabled            Everyone       -                                  kept: no game of the corpus wrote it
+UNSEEN                 SetDialogueText              Everyone       -                                  kept: no game of the corpus wrote it
+CONTRADICTED (held)    SharePaintingBrushStroke     Everyone       Observers (unclassified)           no generic route explains it (focus-dependent on 43 beats); counterexample game vault_26881085 beat 1637 army 0: lockstep None, route {1.0: {'ShareablePainting': {'PaintingAdapterIdentifier': 'table: 21399C08', 'Pe
+UNSEEN                 Sounds                       Everyone       -                                  kept: no game of the corpus wrote it
+CONTEXT                StartCountdown               Everyone       Observers (context)                kept: never at focus -1 in the corpus, so the route is unused there; only ever written under a player's focus (4 games)
+UNSEEN                 StartPositions               Everyone       -                                  kept: no game of the corpus wrote it
+CONFIRMED              StatsToSend                  Everyone       Everyone                           10 games
+UNSEEN                 Teamkill                     Everyone       -                                  kept: no game of the corpus wrote it
+BELOW-K                TimeoutsRemaining            Everyone       Everyone                           kept: Everyone in 2 games, below K=5
+UNSEEN                 ToggleGamePanels             Everyone       -                                  kept: no game of the corpus wrote it
+UNSEEN                 ToggleLifeBarsOff            Everyone       -                                  kept: no game of the corpus wrote it
+UNSEEN                 ToggleLifeBarsOn             Everyone       -                                  kept: no game of the corpus wrote it
+CONFIRMED              UnitData                     EntityOwner    EntityOwner                        10 games
+UNSEEN                 UnlockInput                  Everyone       -                                  kept: no game of the corpus wrote it
+UNSEEN                 UpdateButtonText             Everyone       -                                  kept: no game of the corpus wrote it
+UNSEEN                 UpdatePosition               Everyone       -                                  kept: no game of the corpus wrote it
+UNSEEN                 UserConRequests              Everyone       -                                  kept: no game of the corpus wrote it
+CONFIRMED              UserUnitEnhancements         EntityAllies   EntityAllies                       8 games
+UNSEEN                 VideoText                    Everyone       -                                  kept: no game of the corpus wrote it
+CONTRADICTED (held)    Voice                        Observers      Observers (unclassified)           Everyone in 2 games, below K=5; counterexample game vault_26897073 beat 20543 army 0: lockstep {1.0: {'Bank': 'XGG', 'Cue': 'Computer_Computer_MissileLaunch_01351'}}, route None
+UNSEEN                 WepPriority                  Observers      -                                  kept: no game of the corpus wrote it
+UNSEEN                 __ArmyStats                  Observers      -                                  kept: no game of the corpus wrote it

@@ -350,16 +350,25 @@ def generate(summaries, accepted, game_version, min_games, accept):
     """The generated policy, the merged one and the review lines."""
     agg, games = aggregate(summaries, game_version)
     generated = {}
+    findings = {}
     for key in sorted(agg):
         route, source, n, note = classify(agg[key], min_games)
-        generated[key] = {"route": route, "source": source, "games": n, "note": note}
+        findings[key] = {"route": route, "source": source, "games": n, "note": note}
+        generated[key] = dict(findings[key])
+    # The generated policy is one a server can run: the routes with code of their own come from the accepted file, as
+    # the generator can't produce them; every other key is the generator's alone.
+    for key, acc in accepted.items():
+        if acc["route"] in SPECIAL_ROUTES:
+            seen = findings.get(key, {}).get("games", 0)
+            generated[key] = {"route": acc["route"], "source": "special", "games": seen,
+                              "note": "a route of its own, kept from the accepted policy"}
 
     merged = {}
     review = []
     held = 0
-    for key in sorted(set(accepted) | set(generated)):
+    for key in sorted(set(accepted) | set(findings)):
         acc = accepted.get(key)
-        gen = generated.get(key)
+        gen = findings.get(key)
         k = agg.get(key)
         if acc is None:
             merged[key] = dict(gen)
@@ -478,12 +487,17 @@ def callers(lua, name):
     """The functions of the sim's Lua that call `name` (by its short name), as {function: "path:line"}."""
     out = {}
     pattern = re.compile(r"(?<!\w)%s\s*\(" % re.escape(name))
+    # `self.Field = ForkThread(self.Name, ...)`: the thread is known by the field it is kept in.
+    forked = re.compile(r"([\w.]+)\s*=\s*[\w.:]*ForkThread\(\s*[\w.:]*(?<!\w)%s\b" % re.escape(name))
     for path, lines in lua.items():
         if path.startswith(("lua/ui/", "lua/user/")):
             continue
         for number, line in enumerate(lines, 1):
             code = line.split("--", 1)[0]
-            if pattern.search(code) and not FUNCTION_RE.match(code):
+            fork = forked.search(code)
+            if fork:
+                out.setdefault(re.split(r"[.:]", fork.group(1))[-1], "%s:%d" % (path, number))
+            elif pattern.search(code) and not FUNCTION_RE.match(code):
                 out.setdefault(enclosing_function(lines, number), "%s:%d" % (path, number))
     return out
 
@@ -504,12 +518,31 @@ def coverage(lua, covered, function, depth=2):
     return None
 
 
+LUA_TOKEN_RE = re.compile(r"\b(function|if|do|repeat|end|until)\b")
+LUA_STRING_RE = re.compile(r"\"(?:\\.|[^\"\\])*\"|'(?:\\.|[^'\\])*'")
+
+
 def enclosing_function(lines, line_number):
-    """The name of the function a 1-based line is in: the nearest definition above it, or '(main chunk)'."""
-    for i in range(min(line_number, len(lines)) - 1, -1, -1):
-        m = FUNCTION_RE.match(lines[i])
-        if m:
-            return m.group(1) or m.group(2)
+    """The name of the innermost named function a 1-based line is in, or '(main chunk)'. Blocks are followed by their
+    keywords (`function`, `if`, `do`, `repeat` against `end`, `until`), with strings and `--` comments left out; a
+    function without a name of its own (`ForkThread(function() ... end)`) is skipped over to the one around it."""
+    stack = []
+    for i in range(min(line_number, len(lines))):
+        code = LUA_STRING_RE.sub('""', lines[i]).split("--", 1)[0]
+        named = FUNCTION_RE.match(lines[i])
+        for token in LUA_TOKEN_RE.findall(code):
+            if i == line_number - 1 and token in ("end", "until"):
+                break  # the line itself counts as inside the block it closes
+            if token == "function":
+                stack.append(named.group(1) or named.group(2) if named else None)
+                named = None
+            elif token in ("if", "do", "repeat"):
+                stack.append(False)
+            elif stack:
+                stack.pop()
+    for frame in reversed(stack):
+        if frame:
+            return frame
     return "(main chunk)"
 
 
@@ -554,6 +587,9 @@ def wrapped_functions(cpp_path):
     block = re.search(r"constexpr SOwnedThread kOwnedThreads\[\] = \{(.*?)\n    \};", text, re.S)
     for module, cls, name in re.findall(r'\{"([^"]*)", "(\w+)", "(\w+)"\}', block.group(1) if block else ""):
         out[name] = "owned thread (%s)" % cls
+    block = re.search(r"constexpr const char\* kOwnedThreadFields\[\] = \{([^}]*)\}", text)
+    for name in re.findall(r'"(\w+)"', block.group(1) if block else ""):
+        out[name] = "owned thread (the brain's %s field)" % name
     # Sim callbacks (`Callbacks.<name>`, run by `DoCallback`) that DoCallbackThunk runs for each view itself.
     for name in re.findall(r'std::strcmp\(name, "(\w+)"\) == 0', text):
         out.setdefault("Callbacks." + name, "callback run by DoCallbackThunk for each view")
@@ -590,7 +626,7 @@ def cmd_candidates(args):
         k = agg[key]
         # Focus-dependent and no generic route explains it, or only ever written under a player's focus.
         explained = k["games"] and any(not k["counter"][r] for r in GENERIC_ROUTES)
-        dependent = (k["focus_dependent"] > 0 and not explained) or (not k["games"] and k["context_games"])
+        dependent = (k["focus_dependent"] > 0 and not explained) or bool(k["context_games"])
         if not dependent:
             continue
         route = policy.get(key, {}).get("route", "-")

@@ -218,6 +218,8 @@ class GenerateTests(unittest.TestCase):
         self.assertEqual(held, 1)
         self.assertEqual(status["Score"], "SPECIAL")
         self.assertEqual(merged["Score"]["route"], "Score")
+        # The generated policy keeps the route with code of its own, so a server can run it.
+        self.assertEqual((gen["Score"]["route"], gen["Score"]["source"]), ("Score", "special"))
         self.assertEqual(status["HelpPrompt"], "UNSEEN")
         self.assertEqual(merged["HelpPrompt"]["route"], "Everyone")
         self.assertEqual(status["UserUnitEnhancements"], "NEW")
@@ -281,6 +283,13 @@ class FileTests(unittest.TestCase):
         self.assertEqual(pg.enclosing_function(lines, 3), "A")
         self.assertEqual(pg.enclosing_function(lines, 7), "Notify")
         self.assertEqual(pg.enclosing_function(lines, 1), "(main chunk)")
+        nested = ["Brain = Class {", "  Toggle = function(self)", "    local function Inner(u)", "      u:Off()", "    end",
+                  "    while true do", "      if x then", "        Sync.MassFabs = 'end'", "      end", "    end", "  end,",
+                  "  Start = function(self)", "    self.EnergyThread = ForkThread(self.Toggle, self)", "  end,", "}"]
+        self.assertEqual(pg.enclosing_function(nested, 4), "Inner")
+        self.assertEqual(pg.enclosing_function(nested, 8), "Toggle")
+        self.assertEqual(pg.coverage({"lua/b.lua": nested}, {"EnergyThread": "owned thread (field)"}, "Toggle"),
+                         "via EnergyThread (lua/b.lua:13): owned thread (field)")
 
 
 if __name__ == "__main__":
