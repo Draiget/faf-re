@@ -105,7 +105,7 @@ namespace
     std::string error;
     ASSERT_TRUE(RecipeRoles(context, plan, st, knobs, style, roles, error)) << error;
     std::map<int, field::Grid> target;
-    ASSERT_TRUE(ResolveRecipe(context, plan, roles, knobs, target, error)) << error;
+    ASSERT_TRUE(ResolveRecipe(context, plan, roles, knobs, style, target, error)) << error;
     ASSERT_EQ(target.count(1) + target.count(2) + target.count(3), 3U);
     // The weights where they belong: sand on the shore, rock on the steep ring, snow on the top.
     const float c = (kSide - 1) * 0.5f;
@@ -149,11 +149,71 @@ namespace
     std::string error;
     ASSERT_TRUE(RecipeRoles(context, plan, st, RecipeKnobsOf(desert), desert, roles, error)) << error;
     std::map<int, field::Grid> target;
-    ASSERT_TRUE(ResolveRecipe(context, plan, roles, RecipeKnobsOf(desert), target, error)) << error;
+    ASSERT_TRUE(ResolveRecipe(context, plan, roles, RecipeKnobsOf(desert), desert, target, error)) << error;
     std::vector<std::uint64_t> texels(16, 0xFF); // layer 1 (snow) painted everywhere
     std::array<float, 9> shares{};
     (void)WriteRecipe(texels.data(), 4, 4, 64.0f, 0, 8, textured, target, shares);
     EXPECT_EQ(texels[5] & 0xFF, 0U) << "the desert has no snow: its layer is cleared";
     EXPECT_NEAR(shares[0], 1.0f, 1e-4f);
+  }
+  TEST(
+    Recipes,
+    ErosionPaintCutsItsMasksAtAShareOfTheMap
+  )
+  {
+    std::vector<float> values(1000);
+    for (std::size_t i = 0; i < values.size(); ++i) {
+      values[i] = static_cast<float>(i);
+    }
+    EXPECT_NEAR(RecipeValueAbove(values, 0.1f), 900.0f, 1.0f) << "a tenth of the values lie above 900";
+
+    constexpr int kSide = 129;
+    MaskGenContext context;
+    context.heights = Island(kSide);
+    context.water = 20.0f;
+    std::array<GroundKind, 9> kinds{};
+    std::array<bool, 9> textured{};
+    kinds[0] = GroundKind::Grass;
+    kinds[1] = GroundKind::Rock;
+    kinds[2] = GroundKind::Rock;
+    kinds[3] = GroundKind::Dirt;
+    kinds[4] = GroundKind::Wet;
+    for (const int l : {0, 1, 2, 3, 4}) {
+      textured[static_cast<std::size_t>(l)] = true;
+    }
+    const RecipePlan plan = PlanRecipe(kinds, textured, 8, false);
+    std::array<std::vector<float>, 9> selection;
+    std::map<std::pair<int, int>, std::vector<float>> variants;
+    std::string error;
+    int erosion = -1;
+    for (std::size_t i = 0; i < RecipeStyles().size(); ++i) {
+      if (std::string(RecipeStyles()[i].id) == "erosion") {
+        erosion = static_cast<int>(i);
+      }
+    }
+    ASSERT_GE(erosion, 0);
+    const RecipeKnobs knobs = RecipeKnobsOf(erosion);
+    ASSERT_TRUE(RecipeErosionSelections(context, plan, knobs, selection, variants, error)) << error;
+    // The channels cover about the share asked for (the band's edge adds a little).
+    const std::vector<float>& wet = selection[static_cast<std::size_t>(GroundKind::Wet)];
+    ASSERT_EQ(wet.size(), static_cast<std::size_t>(kSide) * kSide);
+    const float wetShare = std::accumulate(wet.begin(), wet.end(), 0.0f) / static_cast<float>(wet.size());
+    EXPECT_NEAR(wetShare, knobs.chan, 0.03f);
+    // Rock on the steep ring.
+    const float c = (kSide - 1) * 0.5f;
+    const auto at = [&](const std::vector<float>& f, const float r) {
+      return f[static_cast<std::size_t>(c) * kSide + static_cast<std::size_t>(c + r * c)];
+    };
+    EXPECT_GT(at(selection[static_cast<std::size_t>(GroundKind::Rock)], 0.37f), 0.5f);
+    EXPECT_EQ(variants.count({static_cast<int>(GroundKind::Rock), 1}), 1U) << "the strongest wear: the second rock";
+    EXPECT_EQ(variants.count({static_cast<int>(GroundKind::Grass), 1}), 1U) << "the ridge tops: a second grass";
+    // The whole style resolves, and the second rock layer gets a share.
+    std::vector<RecipeRole> roles;
+    const RecipeStats st = RecipeStatsOf(context.heights->v, 20.0f, true);
+    ASSERT_TRUE(RecipeRoles(context, plan, st, knobs, erosion, roles, error)) << error;
+    std::map<int, field::Grid> target;
+    ASSERT_TRUE(ResolveRecipe(context, plan, roles, knobs, erosion, target, error)) << error;
+    ASSERT_EQ(target.count(2), 1U);
+    EXPECT_GT(*std::max_element(target[2].v.begin(), target[2].v.end()), 0.1f);
   }
 } // namespace

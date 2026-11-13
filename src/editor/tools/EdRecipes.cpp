@@ -489,6 +489,10 @@ namespace faf::editor
       {&RecipeKnobs::mix, "Variant mix (a second texture of a kind)", 0.1f, 0.95f, "%.2f"},
       {&RecipeKnobs::soft, "Blend width between kinds (units)", 0, 20, "%.1f"},
       {&RecipeKnobs::seed, "Seed", 0, 9999, "%.0f"},
+      {&RecipeKnobs::wear, "Erosion paint: worn rock (share of the ground)", 0.02f, 0.5f, "%.2f"},
+      {&RecipeKnobs::sed, "Erosion paint: sediment (share of the ground)", 0.02f, 0.6f, "%.2f"},
+      {&RecipeKnobs::chan, "Erosion paint: drainage channels (share of the ground)", 0.01f, 0.3f, "%.2f"},
+      {&RecipeKnobs::edge, "Erosion paint: edge softness (share of a mask's range)", 0.005f, 0.3f, "%.3f"},
     };
     return list;
   }
@@ -504,6 +508,7 @@ namespace faf::editor
       {"rocky", "Rocky (cliffs, dark rock, little grass)"},
       {"valley", "Open valley (bare plains, green ridges, rock on the steep)", kNoSnow, false, false, true},
       {"layered", "Layered (soft wide blends)", kNoSnow},
+      {"erosion", "Erosion paint (rock, sediment and channels from the water)", kNoSnow, false, false, false, true},
       {"coast", "Coast and wetland (wide beach, wet ground)", kNoSnow},
     };
     return styles;
@@ -531,6 +536,8 @@ namespace faf::editor
     } else if (id == "layered") {
       k.mix = 0.8f, k.soft = 4, k.patch = 36, k.crisp = 0.3f, k.breakup = 0.7f, k.fine = 0.55f, k.dirt = 0.4f,
       k.rock = 20, k.cliff = 40, k.wet = 3, k.dark = 0.5f, k.snow = 0;
+    } else if (id == "erosion") {
+      k.soft = 0, k.edge = 0.012f, k.wear = 0.12f, k.sed = 0.22f, k.chan = 0.07f, k.rock = 26, k.cliff = 44, k.snow = 0;
     } else if (id == "coast") {
       k.beach = 6, k.wet = 3, k.dirt = 0.36f, k.snow = 0, k.rock = 38, k.cliff = 56, k.crisp = 0.3f;
     }
@@ -734,16 +741,211 @@ namespace faf::editor
     return true;
   }
 
+  float RecipeValueAbove(
+    const std::vector<float>& values,
+    const float share
+  )
+  {
+    if (values.empty()) {
+      return 0.0f;
+    }
+    std::vector<float> sorted = values;
+    const double s = std::clamp(static_cast<double>(share), 0.0005, 0.9995);
+    const std::size_t at =
+      std::min(sorted.size() - 1, static_cast<std::size_t>((1.0 - s) * static_cast<double>(sorted.size())));
+    std::nth_element(sorted.begin(), sorted.begin() + static_cast<std::ptrdiff_t>(at), sorted.end());
+    return sorted[at];
+  }
+
+  namespace
+  {
+    float SmoothStep(
+      const float x,
+      const float e0,
+      const float e1
+    )
+    {
+      const float t = std::clamp((x - e0) / std::max(1e-9f, e1 - e0), 0.0f, 1.0f);
+      return t * t * (3.0f - 2.0f * t);
+    }
+
+    /** One field op on the heights' grid; false with `error`. */
+    bool Run(
+      const char* const name,
+      const std::shared_ptr<field::Grid>& a,
+      std::initializer_list<std::pair<const char*, double>> numbers,
+      std::initializer_list<std::pair<const char*, const char*>> strings,
+      std::vector<float>& out,
+      std::string& error
+    )
+    {
+      field::OpArgs args;
+      args.in["a"] = a;
+      for (const auto& [key, value] : numbers) {
+        args.p.num[key] = value;
+      }
+      for (const auto& [key, value] : strings) {
+        args.p.str[key] = value;
+      }
+      field::Grid result;
+      if (!field::RunOpCpu(name, args, result, error)) {
+        error = std::string(name) + ": " + error;
+        return false;
+      }
+      out = std::move(result.v);
+      return true;
+    }
+
+    void Normalize(
+      std::vector<float>& f
+    )
+    {
+      if (f.empty()) {
+        return;
+      }
+      const auto [lo, hi] = std::minmax_element(f.begin(), f.end());
+      const float low = *lo;
+      const float span = *hi - low;
+      for (float& v : f) {
+        v = span > 1e-9f ? (v - low) / span : 0.0f;
+      }
+    }
+
+    /** 1 above the value `share` of the cells lie above, with an edge `edge` of the range wide, squeezed twice (the
+     * edge is where the mask crosses, not a blur round it). */
+    std::vector<float> BandAt(
+      const std::vector<float>& f,
+      const float share,
+      const float edge
+    )
+    {
+      std::vector<float> out(f.size(), 0.0f);
+      if (f.empty()) {
+        return out;
+      }
+      const auto [lo, hi] = std::minmax_element(f.begin(), f.end());
+      const float t = RecipeValueAbove(f, share);
+      const float w = std::max(1e-4f, (*hi - *lo) * edge);
+      for (std::size_t i = 0; i < f.size(); ++i) {
+        float m = SmoothStep(f[i], t - w, t + w);
+        for (int pass = 0; pass < 2; ++pass) {
+          m = SmoothStep(m, 0.3f, 0.7f);
+        }
+        out[i] = m;
+      }
+      return out;
+    }
+  } // namespace
+
+  bool RecipeErosionSelections(
+    MaskGenContext& context,
+    const RecipePlan& plan,
+    const RecipeKnobs& knobs,
+    std::array<std::vector<float>, 9>& selection,
+    std::map<std::pair<int, int>, std::vector<float>>& variants,
+    std::string& error
+  )
+  {
+    const std::shared_ptr<field::Grid>& h = context.heights;
+    if (h == nullptr || h->v.empty()) {
+      error = "no heights";
+      return false;
+    }
+    const std::size_t n = h->v.size();
+    // The three masks from the heights.
+    std::vector<float> flow;
+    std::vector<float> wear;
+    std::vector<float> wetness;
+    std::vector<float> slope;
+    if (
+      !Run("flow", h, {}, {}, flow, error) || !Run("rockiness", h, {}, {}, wear, error) ||
+      !Run("wetness", h, {}, {}, wetness, error) ||
+      !Run("slope", h, {{"radius", 1}}, {{"mode", "degrees"}}, slope, error)
+    ) {
+      return false;
+    }
+    Normalize(flow);
+    Normalize(wear);
+    Normalize(wetness);
+    std::vector<float> deposit(n);
+    for (std::size_t i = 0; i < n; ++i) {
+      deposit[i] = wetness[i] * (1.0f - SmoothStep(slope[i], 4.0f, 10.0f));
+    }
+    Normalize(deposit);
+    // A kind with layers gets its bands; its own selection only when it isn't the base kind (that is what the others
+    // leave), as FAF Studio's Override and Resolve do.
+    const auto has = [&](const GroundKind kind) {
+      return plan.Has(kind);
+    };
+    const auto select = [&](const GroundKind kind, std::vector<float> field) {
+      if (plan.base != kind) {
+        selection[static_cast<std::size_t>(kind)] = std::move(field);
+      }
+    };
+    const auto key = [](const GroundKind kind, const int layer) {
+      return std::pair<int, int>{static_cast<int>(kind), layer};
+    };
+    // Rock: the cliffs by slope, and the worn ground where it leans at all; the strongest wear its second layer, the
+    // convex steep ground its third.
+    if (has(GroundKind::Rock)) {
+      const std::vector<float> worn = BandAt(wear, knobs.wear, knobs.edge);
+      std::vector<float> rock(n);
+      for (std::size_t i = 0; i < n; ++i) {
+        rock[i] = std::max(SmoothStep(slope[i], knobs.rock, knobs.cliff), worn[i] * SmoothStep(slope[i], 3.0f, 8.0f));
+      }
+      select(GroundKind::Rock, std::move(rock));
+      variants[key(GroundKind::Rock, 1)] = BandAt(wear, knobs.wear * 0.35f, knobs.edge);
+      std::vector<float> curvature;
+      if (!Run("curvature", h, {{"radius", 4}, {"gain", 25}}, {}, curvature, error)) {
+        return false;
+      }
+      std::vector<float> convex(n);
+      for (std::size_t i = 0; i < n; ++i) {
+        convex[i] = SmoothStep(1.0f - curvature[i], 0.56f, 0.64f) * SmoothStep(slope[i], 10.0f, 20.0f);
+      }
+      variants[key(GroundKind::Rock, 2)] = std::move(convex);
+    }
+    // Dirt: where the sediment settled on flat ground; the thickest its second layer.
+    if (has(GroundKind::Dirt)) {
+      const std::vector<float> settled = BandAt(deposit, knobs.sed, knobs.edge);
+      std::vector<float> dirt(n);
+      for (std::size_t i = 0; i < n; ++i) {
+        dirt[i] = settled[i] * (1.0f - SmoothStep(slope[i], 6.0f, 12.0f));
+      }
+      select(GroundKind::Dirt, std::move(dirt));
+      variants[key(GroundKind::Dirt, 1)] = BandAt(deposit, knobs.sed * 0.35f, knobs.edge);
+    }
+    // Wet ground: the drainage network; its core the second layer.
+    if (has(GroundKind::Wet)) {
+      select(GroundKind::Wet, BandAt(flow, knobs.chan, knobs.edge));
+      variants[key(GroundKind::Wet, 1)] = BandAt(flow, knobs.chan * 0.4f, knobs.edge);
+    }
+    // The open ground's second texture: the ridge tops, higher than their surroundings.
+    std::vector<float> blurred;
+    if (!Run("blur", h, {{"radius", 24}}, {}, blurred, error)) {
+      return false;
+    }
+    std::vector<float> relief(n);
+    for (std::size_t i = 0; i < n; ++i) {
+      relief[i] = h->v[i] - blurred[i];
+    }
+    variants[key(GroundKind::Grass, 1)] = BandAt(relief, 0.2f, knobs.edge);
+    return true;
+  }
+
   bool ResolveRecipe(
     MaskGenContext& context,
     const RecipePlan& plan,
     const std::vector<RecipeRole>& roles,
     const RecipeKnobs& knobs,
+    const int style,
     std::map<int, field::Grid>& target,
     std::string& error
   )
   {
     target.clear();
+    const bool erosion = style >= 0 && style < static_cast<int>(RecipeStyles().size()) &&
+      RecipeStyles()[static_cast<std::size_t>(style)].erosion;
     const field::Grid& h = *context.heights;
     const std::size_t n = h.v.size();
     const auto empty = [&] {
@@ -788,6 +990,12 @@ namespace faf::editor
       }
       selection[K(role.kind)] = std::move(mask.v);
     }
+    // Erosion paint: rock, dirt and wet ground (and the bands of their second layers) from what the water did.
+    std::map<std::pair<int, int>, std::vector<float>> variants;
+    if (erosion && !RecipeErosionSelections(context, plan, knobs, selection, variants, error)) {
+      error = "erosion paint: " + error;
+      return false;
+    }
     // The priority cascade: each kind takes its selection of what the kinds above it left.
     std::vector<float> rest(n, 1.0f);
     std::array<std::vector<float>, 9> region;
@@ -814,6 +1022,19 @@ namespace faf::editor
       }
       std::vector<float> left = region[K(kind)];
       for (std::size_t gi = 1; gi < layers.size(); ++gi) {
+        // A band of the erosion masks decides the second, third ... layer; noise patches when there is none.
+        if (
+          const auto band = variants.find({static_cast<int>(kind), static_cast<int>(gi)}); band != variants.end() &&
+          band->second.size() == n && *std::max_element(band->second.begin(), band->second.end()) > 1e-4f
+        ) {
+          field::Grid t = empty();
+          for (std::size_t i = 0; i < n; ++i) {
+            t.v[i] = left[i] * std::clamp(band->second[i], 0.0f, 1.0f);
+            left[i] -= t.v[i];
+          }
+          target[layers[gi]] = std::move(t);
+          continue;
+        }
         const float seed = knobs.seed + 91.0f + static_cast<float>(gi) * 17.0f + static_cast<float>(order + 1) * 7.0f;
         const float size = std::max(60.0f, knobs.patch * 2.2f);
         // FAF Studio's PatchField: a wide smoothstep of fractal noise, at most `mix`, blurred.

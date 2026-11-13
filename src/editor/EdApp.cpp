@@ -4587,7 +4587,7 @@ namespace faf::editor
       std::string message;
       if (
         !RecipeRoles(context, plan, stats, tools.RecipeSettings(), tools.RecipeStyle(), roles, error) ||
-        !ResolveRecipe(context, plan, roles, tools.RecipeSettings(), target, error) ||
+        !ResolveRecipe(context, plan, roles, tools.RecipeSettings(), tools.RecipeStyle(), target, error) ||
         mScene.WriteRecipeMasks(target, textured, plan.cap, shares, message) < 0
       ) {
         const std::string why = error.empty() ? message : error;

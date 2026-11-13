@@ -36,6 +36,10 @@ namespace faf::editor
     float mix = 0.55f;    // how much of a kind a second texture of it takes
     float soft = 0.0f;    // blend width between kinds (units)
     float seed = 1.0f;
+    float wear = 0.12f; // erosion paint: worn rock (share of the ground)
+    float sed = 0.22f;  // erosion paint: sediment (share of the ground)
+    float chan = 0.07f; // erosion paint: drainage channels (share of the ground)
+    float edge = 0.04f; // erosion paint: edge softness (share of a mask's range)
   };
 
   struct RecipeKnobInfo
@@ -56,6 +60,7 @@ namespace faf::editor
     bool altForce = false; // altitude counts on any map (alpine, arctic)
     bool drySand = false;  // sand in dry basins on a map without water (desert)
     bool relief = false;   // dirt on the floor of valleys (open valley)
+    bool erosion = false;  // rock, dirt and wet ground read off the water's work (erosion paint)
   };
   [[nodiscard]] const std::vector<RecipeStyle>& RecipeStyles();
   /** The defaults with a style's own values on top. */
@@ -135,9 +140,32 @@ namespace faf::editor
     const RecipePlan& plan,
     const std::vector<RecipeRole>& roles,
     const RecipeKnobs& knobs,
+    int style,
     std::map<int, field::Grid>& target,
     std::string& error
   );
+
+  /**
+   * Erosion paint (FAF Studio's erosionpaint.lua): the paint read off what the water did, as a World Machine or Gaea
+   * project paints its map. Three masks on the heights' grid, made from the heights (a solver-free stand-in): wear
+   * (rockiness), deposit (topographic wetness on flat ground) and flow (drainage). Each is cut at a SHARE of the map
+   * with an edge `edge` of its range wide, so it means the same on any map. Rock becomes the cliffs by slope plus the
+   * worn ground, dirt the settled sediment on flat ground, wet ground the drainage network; their second layers take
+   * bands of the same masks (the strongest wear, the thickest sediment, the channel core; a third rock the convex steep
+   * ground; a second grass the ridge tops) instead of noise. Replaces `selection[kind]` for the kinds that have layers
+   * and fills `variants[{kind, n}]`: the share of the kind's region its (n + 1)th layer takes.
+   */
+  bool RecipeErosionSelections(
+    MaskGenContext& context,
+    const RecipePlan& plan,
+    const RecipeKnobs& knobs,
+    std::array<std::vector<float>, 9>& selection,
+    std::map<std::pair<int, int>, std::vector<float>>& variants,
+    std::string& error
+  );
+
+  /** The value `share` (0..1) of the values lie above. */
+  [[nodiscard]] float RecipeValueAbove(const std::vector<float>& values, float share);
 
   /**
    * Writes the visible weights into the masks: from the top layer down each gets the opacity that shows its weight (the
