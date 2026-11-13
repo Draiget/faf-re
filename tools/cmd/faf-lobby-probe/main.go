@@ -47,6 +47,8 @@ var (
 	timeout   = flag.Duration("timeout", 30*time.Second, "how long each expected message may take")
 	expectArg = flag.String("expect-arg", "", "a word every game_launch's args must contain (e.g. /connectserver)")
 	tokenArg  = flag.String("token-arg", "/servertoken", "the arg whose value must differ per player and never leak")
+	control   = flag.String("control", "", "scenario dedicated: the lobby server's control URL (http://host:4000)")
+	dedicated = flag.String("dedicated", "", "scenario dedicated: the game server's host:port the game is created for")
 )
 
 type player struct {
@@ -92,9 +94,13 @@ func main() {
 		fmt.Fprintln(os.Stderr, "faf-lobby-probe: the pair scenario needs two players")
 		os.Exit(2)
 	}
+	scenario, run := "pair", run
+	if *dedicated != "" {
+		scenario, run = "dedicated", runDedicated
+	}
 	ok := run(ids)
 	if ok && len(fails) == 0 {
-		fmt.Printf("RESULT lobby-probe PASS players=%d in %.1fs\n", len(ids), time.Since(start).Seconds())
+		fmt.Printf("RESULT lobby-probe PASS %s players=%d in %.1fs\n", scenario, len(ids), time.Since(start).Seconds())
 		return
 	}
 	fmt.Printf("RESULT lobby-probe FAIL %d: %s\n", len(fails), strings.Join(fails, "; "))
@@ -161,6 +167,98 @@ func run(ids []int) bool {
 	checkLaunchArgs(launches)
 
 	// Leave cleanly: the game ends and closes.
+	for _, p := range ps {
+		p.game("GameState", "Ended")
+	}
+	time.Sleep(500 * time.Millisecond)
+	return true
+}
+
+// runDedicated: the players sign in, the game is created on the lobby server's control endpoint for the game server
+// -dedicated with a fresh token per player, and each player must get game_launch with
+// "/connectserver <server> /servertoken <own token> /serveruid <own id>", and after GameState Idle and Lobby no peer
+// setup (HostGame, JoinGame, ConnectToPeer) at all.
+func runDedicated(ids []int) bool {
+	var ps []*player
+	for _, id := range ids {
+		p, err := login(id)
+		if err != nil {
+			fail("player %d login: %v", id, err)
+			return false
+		}
+		ps = append(ps, p)
+		defer p.ws.Close()
+	}
+	tokens := map[int]string{}
+	var parts []map[string]any
+	for i, p := range ps {
+		b := make([]byte, 16)
+		_, _ = rand.Read(b)
+		tokens[p.id] = hex.EncodeToString(b)
+		parts = append(parts, map[string]any{"player_id": p.id, "token": tokens[p.id], "team": 2 + i%2, "start_spot": i + 1})
+	}
+	body, _ := json.Marshal(map[string]any{"name": "faf-lobby-probe dedicated", "mapname": *mapName, "mod": *mod,
+		"address": *dedicated, "participants": parts})
+	resp, err := (&http.Client{Timeout: 10 * time.Second}).Post(strings.TrimRight(*control, "/")+"/dedicated_games",
+		"application/json", strings.NewReader(string(body)))
+	if err != nil {
+		fail("create the game: %v", err)
+		return false
+	}
+	answer, _ := io.ReadAll(io.LimitReader(resp.Body, 2048))
+	resp.Body.Close()
+	logf("control <- %s %s", resp.Status, strings.TrimSpace(string(answer)))
+	if resp.StatusCode != http.StatusAccepted {
+		fail("create the game: %s", resp.Status)
+		return false
+	}
+	launches := map[int]map[string]any{}
+	// The first player is launched first (the game's nominal host), the rest once its game reports Lobby.
+	for _, p := range ps {
+		l, ok := p.expect("game_launch", nil)
+		if !ok {
+			return false
+		}
+		launches[p.id] = l
+		want := []string{"/connectserver", *dedicated, "/servertoken", tokens[p.id], "/serveruid", strconv.Itoa(p.id)}
+		a := args(l)
+		got := make([]string, 0, len(want))
+		if len(a) >= len(want) {
+			for _, v := range a[len(a)-len(want):] {
+				got = append(got, fmt.Sprint(v))
+			}
+		}
+		if strings.Join(got, " ") != strings.Join(want, " ") {
+			fail("player %d's game_launch args end %v, want %v", p.id, got, want)
+		}
+		p.game("GameState", "Idle")
+		p.game("GameState", "Lobby")
+	}
+	*expectArg = "/connectserver"
+	checkLaunchArgs(launches)
+	// No peer setup may follow.
+	quiet := 3 * time.Second
+	for _, p := range ps {
+		deadline := time.After(quiet)
+	wait:
+		for {
+			select {
+			case m, open := <-p.in:
+				if !open {
+					fail("player %d: connection closed", p.id)
+					break wait
+				}
+				if isGame(m) {
+					switch m["command"] {
+					case "HostGame", "JoinGame", "ConnectToPeer", "DisconnectFromPeer":
+						fail("player %d got %v for a dedicated-server game", p.id, m["command"])
+					}
+				}
+			case <-deadline:
+				break wait
+			}
+		}
+	}
 	for _, p := range ps {
 		p.game("GameState", "Ended")
 	}
