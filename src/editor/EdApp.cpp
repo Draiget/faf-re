@@ -130,7 +130,7 @@ namespace faf::editor
         "/particlenew", "/particleopen", "/materialeditor", "/uiscale",        "/testrun",        "/openall",
         "/roundtrip",   "/vault",        "/vaultsearch",    "/vaultmap",       "/newmap",         "/stamp",
         "/brush",       "/layer",        "/waterbody",      "/ruler",          "/adaptivewindow", "/maskrule",
-        "/shader",      "/brushtest",    "/brushshape",     "/stampsource",    "/stampstroke",
+        "/shader",      "/brushtest",    "/brushshape",     "/stampsource",    "/stampstroke",    "/symoptions",
       };
       for (const char* const option : kOptions) {
         if (moho::CFG_GetArgOption(option, 0, nullptr)) {
@@ -2022,6 +2022,7 @@ namespace faf::editor
       // `/brush <mode>` and `/stamp <file>` (test runs): the terrain brush's mode and stamp image, set once.
       int mBrushModeArg = -1;
       bool mStampSourceDone = false;
+      bool mSymOptionsDone = false;
       // `/masklayer <1-8>` and `/maskrule <layer>,<low>,<high>` (test runs): the Texture tool on that layer;
       // a height rule applied to the whole map once the map has been shown for 120 frames.
       int mMaskLayerArg = -1;
@@ -4800,6 +4801,19 @@ namespace faf::editor
         tools.AddRule(rule);
         tools.RequestRules();
         mMaskRuleArg.clear();
+      }
+      // `/symoptions <part>,<combine>,<seam>,<masks>,<types>` (test runs): Make symmetric's options.
+      if (!mSymOptionsDone) {
+        mSymOptionsDone = true;
+        if (fa::vector<fa::string> sym; moho::CFG_GetArgOption("/symoptions", 1, &sym) && !sym.empty()) {
+          int part = 0;
+          int combine = 0;
+          float seam = 0.0f;
+          int masks = 0;
+          int types = 0;
+          (void)std::sscanf(sym[0].c_str(), "%d,%d,%f,%d,%d", &part, &combine, &seam, &masks, &types);
+          tools.SetSymmetrizeOptions(part, combine, seam, masks != 0, types != 0);
+        }
       }
       if (mBrushModeArg >= 0) {
         tools.SetBrushMode(mBrushModeArg);

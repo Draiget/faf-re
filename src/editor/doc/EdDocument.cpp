@@ -173,7 +173,6 @@ namespace faf::editor
       if (const moho::CHeightField* const field = terrain->GetHeightField(); field != nullptr) {
         facts.fieldWidth = field->width;
         facts.fieldHeight = field->height;
-        facts.symmetry = DetectSymmetry(field->data, field->width, field->height);
       }
       facts.water = terrain->IsWaterEnabled();
       facts.waterElevation = terrain->GetWaterElevation();
@@ -413,6 +412,35 @@ namespace faf::editor
         if (ReadGameFile(beside, load.options)) {
           facts.optionsPath = beside;
         }
+      }
+      // The symmetry the map was made with: its heights, start positions and resource markers.
+      if (
+        const moho::CHeightField* const field =
+          load.map->mTerrainRes != nullptr ? load.map->mTerrainRes->GetHeightField() : nullptr;
+        field != nullptr
+      ) {
+        std::vector<SymmetryMarker> markers;
+        for (const SaveEntry& marker : load.save.Markers()) {
+          const std::vector<double> at = ValueNumbers(marker.Get("position"));
+          if (at.size() < 3) {
+            continue;
+          }
+          const std::string type = ValueString(marker.Get("type"));
+          SymmetryMarker m;
+          m.x = static_cast<float>(at[0]);
+          m.z = static_cast<float>(at[2]);
+          if (marker.name.rfind("ARMY_", 0) == 0) {
+            m.kind = SymmetryMarker::Kind::Start;
+          } else if (type == "Mass") {
+            m.kind = SymmetryMarker::Kind::Mass;
+          } else if (type == "Hydrocarbon") {
+            m.kind = SymmetryMarker::Kind::Hydrocarbon;
+          } else {
+            continue;
+          }
+          markers.push_back(m);
+        }
+        facts.symmetry = DetectSymmetry(field->data, field->width, field->height, markers);
       }
       (void)ReadGameFile(load.scenarioPath, load.scenario);
       if (!facts.savePath.empty()) {

@@ -1041,8 +1041,22 @@ namespace faf::editor
     // The symmetry the map was made with, from its heights, for the brushes and the object tools.
     if (mTools != nullptr) {
       const DetectedSymmetry& found = mDocument.Facts().symmetry;
-      mTools->SetDetectedSymmetry(
-        found.symmetry == Symmetry::None ? -1 : static_cast<int>(found.symmetry), found.turns, found.matched
+      const moho::CHeightField* const field = mMap->mTerrainRes->GetHeightField();
+      const float middleX = field != nullptr ? 0.5f * static_cast<float>(field->width - 1) : found.centreX;
+      const float middleZ = field != nullptr ? 0.5f * static_cast<float>(field->height - 1) : found.centreZ;
+      mTools->SetDetectedSymmetry(found, found.centreX - middleX, found.centreZ - middleZ);
+      gpg::Logf(
+        "editor: symmetry found: mode %d (%d turns), %.1f%% of points, %d starts and %d resource markers fit, centre "
+        "%.1f,%.1f (middle %.1f,%.1f)",
+        static_cast<int>(found.symmetry),
+        found.turns,
+        static_cast<double>(found.matched) * 100.0,
+        found.startsMatched,
+        found.resourcesMatched,
+        static_cast<double>(found.centreX),
+        static_cast<double>(found.centreZ),
+        static_cast<double>(middleX),
+        static_cast<double>(middleZ)
       );
     }
   }
@@ -2199,32 +2213,89 @@ namespace faf::editor
     if (EffectiveSymmetry(brush.symmetry, field->width, field->height) == Symmetry::None) {
       return;
     }
+    // Make symmetric's options; the detected centre when the chosen symmetry is the detected one.
+    float offsetX = 0.0f;
+    float offsetZ = 0.0f;
+    SymmetrizeOptions options = mTools->CurrentSymmetrize(offsetX, offsetZ);
+    options.centreX = 0.5f * static_cast<float>(field->width - 1) + offsetX;
+    options.centreZ = 0.5f * static_cast<float>(field->height - 1) + offsetZ;
     if (mTools->TextureToolActive()) {
       LoadMasks();
       EdDocument::MaskGrid& masks = mDocument.Masks();
       if (masks.texels.empty()) {
         return;
       }
-      const SampleRect whole{0, 0, masks.width - 1, masks.height - 1};
-      mDocument.MaskUndo().BeginStroke();
-      mDocument.MaskUndo().BeforeWrite(masks.texels.data(), whole);
-      (void)MakeMasksSymmetric(masks.texels.data(), masks.width, masks.height, brush.symmetry, brush.turns);
-      WholeMaskChanged(whole);
-      gpg::Logf("editor: copied the source part of the masks to their other copies");
-      RunSymmetryCheck();
+      if (SymmetrizeMaskLayers(options)) {
+        RunSymmetryCheck();
+      }
       return;
     }
     // One undo step over the whole map.
     const SampleRect whole{0, 0, field->width - 1, field->height - 1};
     mDocument.Heights().BeginStroke();
     mDocument.Heights().BeforeWrite(field->data, whole);
-    (void)MakeSymmetric(field->data, field->width, field->height, brush.symmetry, brush.turns);
+    std::string error;
+    const bool made = SymmetrizeHeights(field->data, field->width, field->height, options, error);
     mDocument.Heights().EndStroke(field->data);
+    if (!made) {
+      gpg::Warnf("editor: make symmetric: %s", error.c_str());
+      return;
+    }
     mDocument.EditEnded(EdDocument::EditKind::Heights);
     RefreshHeights({whole});
     mDocument.SetModified(true);
-    gpg::Logf("editor: copied the source part of the map to its other copies");
+    gpg::Logf(
+      "editor: made the heights symmetric (mode %d, part %d, combine %d, seam %.0f, centre %.1f,%.1f)",
+      static_cast<int>(options.symmetry),
+      options.part + 1,
+      static_cast<int>(options.combine),
+      static_cast<double>(options.seam),
+      static_cast<double>(options.centreX),
+      static_cast<double>(options.centreZ)
+    );
+    if (mTools->SymmetrizeMasksToo()) {
+      (void)SymmetrizeMaskLayers(options);
+    }
+    if (mTools->SymmetrizeTypesToo()) {
+      int typesWidth = 0;
+      int typesHeight = 0;
+      if (std::uint8_t* const cells = mDocument.TerrainTypeCells(typesWidth, typesHeight); cells != nullptr) {
+        std::vector<std::uint8_t> before = mDocument.TerrainTypesNow();
+        if (SymmetrizeCells(cells, typesWidth, typesHeight, field->width, field->height, options, error)) {
+          mDocument.TerrainTypesEdited(std::move(before));
+          mDocument.TerrainTypesChanged();
+          gpg::Logf("editor: made the terrain types symmetric (%d x %d cells)", typesWidth, typesHeight);
+        } else {
+          gpg::Warnf("editor: make symmetric, terrain types: %s", error.c_str());
+        }
+      }
+    }
     RunSymmetryCheck();
+  }
+
+  bool EdMapScene::SymmetrizeMaskLayers(
+    const SymmetrizeOptions& options
+  )
+  {
+    const moho::CHeightField* const field = mMap != nullptr ? mMap->mTerrainRes->GetHeightField() : nullptr;
+    LoadMasks();
+    EdDocument::MaskGrid& masks = mDocument.Masks();
+    if (field == nullptr || masks.texels.empty()) {
+      return false;
+    }
+    const SampleRect whole{0, 0, masks.width - 1, masks.height - 1};
+    mDocument.MaskUndo().BeginStroke();
+    mDocument.MaskUndo().BeforeWrite(masks.texels.data(), whole);
+    std::string error;
+    const bool made =
+      SymmetrizeMasks(masks.texels.data(), masks.width, masks.height, field->width, field->height, options, error);
+    WholeMaskChanged(whole);
+    if (!made) {
+      gpg::Warnf("editor: make symmetric, masks: %s", error.c_str());
+      return false;
+    }
+    gpg::Logf("editor: made the texture masks symmetric (%d x %d texels)", masks.width, masks.height);
+    return true;
   }
 
   bool EdMapScene::ImportHeights(

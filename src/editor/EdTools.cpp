@@ -731,8 +731,23 @@ namespace faf::editor
         );
       }
       ImGui::TextColored(ImVec4(0.55f, 0.80f, 0.55f, 1.0f), "%s", found);
+      if (mDetectedStarts + mDetectedResources > 0) {
+        ImGui::TextDisabled(
+          "Markers that fit it: %d start position%s, %d resource marker%s.",
+          mDetectedStarts,
+          mDetectedStarts == 1 ? "" : "s",
+          mDetectedResources,
+          mDetectedResources == 1 ? "" : "s"
+        );
+      }
+      if (mDetectedOffsetX != 0.0f || mDetectedOffsetZ != 0.0f) {
+        Note(
+          "Its centre is off the map's middle (by the markers' partners): Make symmetric uses that centre; the brushes "
+          "still mirror about the middle."
+        );
+      }
     } else if (mDetectedSymmetry == -1) {
-      ImGui::TextDisabled("The map's heights fit no symmetry.");
+      ImGui::TextDisabled("The map's heights and markers fit no symmetry.");
     }
     const int copies = mSymmetry == 9 ? mNWay : kSymmetry[mSymmetry].copies;
     char note[300];
@@ -791,13 +806,35 @@ namespace faf::editor
     }
     ImGui::TextWrapped("%s", result);
     if (mDiffering > 0) {
-      if (ImGui::Button("Copy the source part to the other copies")) {
+      SectionHeader("MAKE SYMMETRIC");
+      const int parts = SymmetryParts(static_cast<Symmetry>(mSymmetry), mNWay);
+      mSymPart = std::clamp(mSymPart, 0, parts - 1);
+      const float half = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) * 0.5f;
+      int part = mSymPart + 1;
+      ImGui::SetNextItemWidth(half);
+      if (ImGui::SliderInt("##sympart", &part, 1, parts, "Source part %d")) {
+        mSymPart = part - 1;
+      }
+      ImGui::SameLine();
+      static const char* const kCombine[] = {"Copy it", "Average", "Highest", "Lowest"};
+      ImGui::SetNextItemWidth(-1.0f);
+      (void)ImGui::Combo("##symcombine", &mSymCombine, kCombine, 4);
+      ImGui::BeginDisabled(mSymCombine != 0);
+      ImGui::SetNextItemWidth(-1.0f);
+      ImGui::SliderFloat("##symseam", &mSymSeam, 0.0f, 32.0f, mSymSeam <= 0.0f ? "Hard seam" : "Seam %.0f");
+      ImGui::EndDisabled();
+      if (mTool == 1) {
+        ImGui::Checkbox("Texture masks too", &mSymMasks);
+        ImGui::SameLine();
+        ImGui::Checkbox("Terrain types too", &mSymTypes);
+      }
+      if (ImGui::Button("Make symmetric")) {
         mRepairRequested = true;
       }
       Note(
-        mSymmetry == 9
-          ? "The source part is the first sector. One undo step."
-          : "The source part is the top or left one (the copy nearest the map's top-left corner). One undo step."
+        "Part 1 is the left or top one, the others follow round the centre. Copy it takes the source part; Average, "
+        "Highest and Lowest combine every copy instead. A seam cross-fades the part's borders into the copies next to "
+        "them. Heights, masks and terrain types are each one undo step."
       );
     }
   }

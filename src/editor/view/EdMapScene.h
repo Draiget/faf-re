@@ -470,6 +470,8 @@ namespace faf::editor
 
     /** A terrain stroke in progress: the brush under the cursor each frame while the left button is held. */
     void PaintStroke(float frameSeconds);
+    /** Make symmetric on the eight texture masks (one undo step); false when there are none or the op refused. */
+    bool SymmetrizeMaskLayers(const SymmetrizeOptions& options);
     /**
      * Stamp mode: the dabs a stroke puts down as the cursor moved to (x, z), each with its own turn, size and place
      * (FAF Studio's stamp.lua), undo kept; returns the rectangles written.

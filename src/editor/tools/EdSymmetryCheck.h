@@ -46,21 +46,64 @@ namespace faf::editor
    */
   SampleRect MakeSymmetric(std::uint16_t* heights, int width, int height, Symmetry symmetry, int turns);
 
-  /** The symmetry a height field was made with, as DetectSymmetry finds it. */
+  /** The symmetry a map was made with, as DetectSymmetry finds it. */
   struct DetectedSymmetry
   {
     Symmetry symmetry = Symmetry::None;
     /** For N-way turns, how many. */
     int turns = 0;
-    /** The share of sampled points whose copies are within the tolerance (0 to 1). */
+    /** The share of sampled points whose copies are within the tolerance (0 to 1); 0 when the heights are flat. */
     float matched = 0.0f;
+    /** The centre in height samples: the map's middle, or a little off it as the markers' partners show. */
+    float centreX = 0.0f;
+    float centreZ = 0.0f;
+    /** Start positions and resource markers whose copy lands on another marker of their kind. */
+    int startsMatched = 0;
+    int resourcesMatched = 0;
+  };
+
+  /** A marker the detection reads (height samples, as the map's markers are in game units). */
+  struct SymmetryMarker
+  {
+    enum class Kind
+    {
+      Start,
+      Mass,
+      Hydrocarbon,
+    };
+    float x = 0.0f;
+    float z = 0.0f;
+    Kind kind = Kind::Start;
   };
 
   /**
-   * Finds the symmetry a map was made with from its heights: points on a grid are compared with their copies under
-   * each mode (within half a game unit), and of the modes where at least 97% match, the one with the most copies wins
-   * (the closest match among equals). A field with less than 2 units between its lowest and highest point (a new,
-   * flat map) fits every mode, so it gets none.
+   * The images of (x, z) under `symmetry` about the centre (cx, cz), the point itself first; about the map's middle
+   * they are the brush's copies (HeightBrushCentres). Returns how many.
    */
-  DetectedSymmetry DetectSymmetry(const std::uint16_t* heights, int width, int height);
+  int SymmetryImages(
+    Symmetry symmetry,
+    int turns,
+    float cx,
+    float cz,
+    float x,
+    float z,
+    float (&outX)[kMaxSymmetryCopies],
+    float (&outZ)[kMaxSymmetryCopies]
+  );
+
+  /**
+   * Finds the symmetry a map was made with (FAF Studio's symmetry detection on the editor's height check):
+   *  - the markers: every start position and resource marker is mapped by each copy of a mode, and the copy must
+   *    land on another marker of its kind (within about a percent of the map); one on the axis maps onto itself and
+   *    counts neither way. Every start must find its partner, a quarter of the resource markers may be missing;
+   *  - the heights: points on a grid are compared with their copies (within half a game unit); a map with less than
+   *    2 units between its lowest and highest point says nothing.
+   * A mode the markers rule out (a start without its partner, or more than half the resource markers) is out. Else 97%
+   * of the points matching settles it; with fewer, the markers must prove it: every start paired, three quarters of
+   * the resources, and 90% of the points (or flat ground). For the mirrors and the half turn, a centre a little off the
+   * middle is measured from the partners and tried. The mode with the most matched markers wins, then (on flat ground)
+   * the fewer copies or (else) the more, then the closer match.
+   */
+  DetectedSymmetry
+  DetectSymmetry(const std::uint16_t* heights, int width, int height, const std::vector<SymmetryMarker>& markers = {});
 } // namespace faf::editor

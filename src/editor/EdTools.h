@@ -4,6 +4,8 @@
 #include "editor/ui/EdProperties.h"
 #include "editor/tools/EdHeightBrush.h"
 #include "editor/tools/EdBrushLibrary.h"
+#include "editor/tools/EdSymmetrize.h"
+#include "editor/tools/EdSymmetryCheck.h"
 #include "editor/tools/EdMaskBrush.h"
 #include "editor/doc/EdPropPaint.h"
 #include "editor/doc/EdUnits.h"
@@ -1582,15 +1584,24 @@ namespace faf::editor
       mSymmetry = index;
       mNWay = turns;
     }
-    /** A newly opened map's symmetry as DetectSymmetry found it (the panel's index and turns; -1: none found). */
+    /**
+     * A newly opened map's symmetry as DetectSymmetry found it, and how far its centre is off the map's middle (height
+     * samples).
+     */
     void SetDetectedSymmetry(
-      const int index,
-      const int turns,
-      const float matched
+      const DetectedSymmetry& found,
+      const float offsetX,
+      const float offsetZ
     ) noexcept
     {
+      const int index = found.symmetry == Symmetry::None ? -1 : static_cast<int>(found.symmetry);
+      const int turns = found.turns;
       mDetectedSymmetry = index;
-      mDetectedMatch = matched;
+      mDetectedMatch = found.matched;
+      mDetectedStarts = found.startsMatched;
+      mDetectedResources = found.resourcesMatched;
+      mDetectedOffsetX = offsetX;
+      mDetectedOffsetZ = offsetZ;
       if (index >= 0) {
         mSymmetry = index;
         mNWay = index == 9 ? turns : mNWay;
@@ -1694,6 +1705,49 @@ namespace faf::editor
     [[nodiscard]] bool TakeCheckRequest() noexcept
     {
       return std::exchange(mCheckRequested, false);
+    }
+    /**
+     * Make symmetric's options for the chosen symmetry; the centre is the detected one (as its offset from the middle,
+     * `offsetX` / `offsetZ`) when the chosen symmetry is the detected one, else the middle (both 0).
+     */
+    [[nodiscard]] SymmetrizeOptions CurrentSymmetrize(
+      float& offsetX,
+      float& offsetZ
+    ) const noexcept
+    {
+      SymmetrizeOptions options;
+      options.symmetry = static_cast<Symmetry>(mSymmetry);
+      options.turns = mNWay;
+      options.part = mSymPart;
+      options.combine = static_cast<SymmetryCombine>(mSymCombine);
+      options.seam = mSymSeam;
+      const bool detected = mSymmetry == mDetectedSymmetry;
+      offsetX = detected ? mDetectedOffsetX : 0.0f;
+      offsetZ = detected ? mDetectedOffsetZ : 0.0f;
+      return options;
+    }
+    [[nodiscard]] bool SymmetrizeMasksToo() const noexcept
+    {
+      return mSymMasks;
+    }
+    [[nodiscard]] bool SymmetrizeTypesToo() const noexcept
+    {
+      return mSymTypes;
+    }
+    /** Test runs (`/symoptions <part>,<combine>,<seam>,<masks>,<types>`). */
+    void SetSymmetrizeOptions(
+      const int part,
+      const int combine,
+      const float seam,
+      const bool masks,
+      const bool types
+    ) noexcept
+    {
+      mSymPart = std::max(0, part);
+      mSymCombine = std::clamp(combine, 0, 3);
+      mSymSeam = std::max(0.0f, seam);
+      mSymMasks = masks;
+      mSymTypes = types;
     }
     [[nodiscard]] bool TakeRepairRequest() noexcept
     {
@@ -1954,6 +2008,16 @@ namespace faf::editor
     bool mAskPointSet = false;
     int mDetectedSymmetry = -2; // -2: no map opened yet
     float mDetectedMatch = 0.0f;
+    int mDetectedStarts = 0;
+    int mDetectedResources = 0;
+    float mDetectedOffsetX = 0.0f;
+    float mDetectedOffsetZ = 0.0f;
+    // Make symmetric: the source part, how copies combine (SymmetryCombine), the seam, and the layers it reaches.
+    int mSymPart = 0;
+    int mSymCombine = 0;
+    float mSymSeam = 0.0f;
+    bool mSymMasks = false;
+    bool mSymTypes = false;
     std::vector<std::string> mArmies;
     std::vector<std::string> mExtraArmies;
     std::vector<ScenarioTeam> mTeams;
