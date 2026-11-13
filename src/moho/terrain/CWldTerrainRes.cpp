@@ -59,6 +59,7 @@
 #include "moho/sim/CWldSession.h"
 #include "moho/sim/STIMap.h"
 #include "moho/sim/UserArmy.h"
+#include "moho/terrain/StratumMaskSize.h"
 #include "moho/sim/WldSessionInfo.h"
 #include "moho/terrain/StratumMaterial.h"
 #include "moho/terrain/splat/CWldSplat.h"
@@ -214,6 +215,75 @@ namespace
   ) noexcept
   {
     return static_cast<moho::CD3DDynamicTextureSheet*>(mask.get());
+  }
+
+  /// The loaded mask's size, 0 x 0 without one.
+  void SavedMaskExtent(
+    moho::CD3DDynamicTextureSheet* const loaded,
+    std::int32_t& width,
+    std::int32_t& height
+  )
+  {
+    width = 0;
+    height = 0;
+    if (loaded != nullptr) {
+      Wm3::Vector3f dimensions{};
+      (void)loaded->GetDimensions(&dimensions);
+      width = static_cast<std::int32_t>(dimensions.x);
+      height = static_cast<std::int32_t>(dimensions.y);
+    }
+  }
+
+  // Debug only (FAF_STRATUM_MASK_TEST): writes a fine pattern into a stratum mask sheet, standing in for a mapper's
+  // high-resolution mask. The map is cut into 64-texel tiles; each tile is one of four patterns, so there are hard
+  // edges between them and detail down to a single texel: vertical one-texel stripes (blue channel), horizontal
+  // one-texel stripes (green), a four-texel checker (red), a one-texel diagonal hatch (blue). `variant` 1 (the second
+  // mask) shifts the tiles by one.
+  void FillStratumMaskTestPattern(
+    moho::CD3DDynamicTextureSheet* const sheet,
+    const int variant
+  )
+  {
+    if (sheet == nullptr) {
+      return;
+    }
+    std::int32_t width = 0;
+    std::int32_t height = 0;
+    SavedMaskExtent(sheet, width, height);
+    std::uint32_t pitchBytes = 0;
+    void* mappedBits = nullptr;
+    if (!sheet->Lock(&pitchBytes, &mappedBits) || mappedBits == nullptr) {
+      gpg::Logf("Terrain: the stratum mask test pattern cannot be written (the sheet is not lockable)");
+      return;
+    }
+    for (std::int32_t y = 0; y < height; ++y) {
+      auto* const row = reinterpret_cast<std::uint32_t*>(
+        static_cast<std::uint8_t*>(mappedBits) + static_cast<std::size_t>(y) * pitchBytes
+      );
+      for (std::int32_t x = 0; x < width; ++x) {
+        const int tile = ((x >> 6) + (y >> 6) + variant) & 3;
+        std::uint32_t r = 0;
+        std::uint32_t g = 0;
+        std::uint32_t b = 0;
+        switch (tile) {
+        case 0:
+          b = (x & 1) != 0 ? 255u : 0u;
+          break;
+        case 1:
+          g = (y & 1) != 0 ? 255u : 0u;
+          break;
+        case 2:
+          r = (((x >> 2) ^ (y >> 2)) & 1) != 0 ? 255u : 0u;
+          break;
+        default:
+          b = ((x + y) & 1) != 0 ? 255u : 0u;
+          break;
+        }
+        row[x] = (r << 16) | (g << 8) | b;
+      }
+    }
+    (void)sheet->Unlock();
+    gpg::Logf("Terrain: stratum mask test pattern written into a %dx%d mask", width, height);
   }
   /**
    * Address: 0x0089E790 (FUN_0089E790)
@@ -1028,8 +1098,20 @@ namespace moho
    */
   bool ren_NormalMapOnLoader = true;
 
+  int ren_StratumMaskMax = kStratumMaskCeiling;
+
   namespace
   {
+    TConVar<int> gTConVar_ren_StratumMaskMax(
+      "ren_StratumMaskMax",
+      "The largest stratum mask size in texels per side (default 8192; 2048 on any map, 4096 only from a 40 km map, "
+      "8192 only on an 81 km "
+      "one: see StratumMaskSize.h). A mask a mapper saved larger than half the map's size keeps its resolution up to "
+      "this. 0 resamples "
+      "every mask to half the map's size, as the shipped game does. Read as a map's terrain finishes loading.",
+      &ren_StratumMaskMax
+    );
+
     TConVar<bool> gTConVar_ren_NormalMapOnLoader(
       "ren_NormalMapOnLoader",
       "The map loader encodes the terrain normal map (1, the default), or the first frame after a map "
@@ -4113,13 +4195,77 @@ namespace moho
     const std::int32_t maskTileX = (field->width - 1) >> 1;
     const std::int32_t maskTileY = (field->height - 1) >> 1;
 
-    mStrata.mStratumMaskWidth = static_cast<std::uint32_t>(maskTileX);
-    mStrata.mStratumMaskHeight = static_cast<std::uint32_t>(maskTileY);
+    // Engine addition (StratumMaskSize.h): a stratum mask keeps the resolution it was saved with. The shipped code
+    // copied both masks into sheets of half the map's size, which resampled every mask a mapper made at a higher
+    // resolution down to that preset (and the copy of a mask of another size is a resample on every API). A mask below
+    // half the map's size is still raised to it, as before; above it the sheet takes the mask's own size, but at most
+    // StratumMaskExtent allows for the map's size (ren_StratumMaskMax).
+    const std::int32_t mapCellsX = field->width - 1;
+    const std::int32_t mapCellsY = field->height - 1;
+    std::int32_t saved0Width = 0;
+    std::int32_t saved0Height = 0;
+    std::int32_t saved1Width = 0;
+    std::int32_t saved1Height = 0;
+    SavedMaskExtent(AsDynamicSheet(mStrata.mStratumMask0), saved0Width, saved0Height);
+    SavedMaskExtent(AsDynamicSheet(mStrata.mStratumMask1), saved1Width, saved1Height);
 
-    // Stratum mask 0: create a half-res dynamic sheet, blit the current mask
+    // FAF_STRATUM_MASK_TEST=1 fills the loaded masks with a fine test pattern before they are copied: the resolution
+    // the copy keeps is then visible on any map.
+    if (
+      const char* const testSwitch = std::getenv("FAF_STRATUM_MASK_TEST");
+      testSwitch != nullptr && testSwitch[0] != '\0' && testSwitch[0] != '0'
+    ) {
+      // The loaded sheets are not lockable: the pattern goes into a lockable sheet of the same size that takes the
+      // loaded one's place as the source of the copy below.
+      const auto substitute = [resources](
+                                std::shared_ptr<ID3DTextureSheet>& mask,
+                                const std::int32_t width,
+                                const std::int32_t height,
+                                const int variant
+                              ) {
+        if (width <= 0 || height <= 0) {
+          return;
+        }
+        std::shared_ptr<CD3DDynamicTextureSheet> sheet;
+        resources->NewDynamicTextureSheet(sheet, width, height, 2);
+        if (sheet.get() == nullptr) {
+          return;
+        }
+        FillStratumMaskTestPattern(sheet.get(), variant);
+        AdoptDynamicSheetAsStratumMask(mask, sheet);
+      };
+      substitute(mStrata.mStratumMask0, saved0Width, saved0Height, 0);
+      substitute(mStrata.mStratumMask1, saved1Width, saved1Height, 1);
+    }
+
+    const std::int32_t mask0Width = StratumMaskExtent(saved0Width, maskTileX, mapCellsX, ren_StratumMaskMax);
+    const std::int32_t mask0Height = StratumMaskExtent(saved0Height, maskTileY, mapCellsY, ren_StratumMaskMax);
+    const std::int32_t mask1Width = StratumMaskExtent(saved1Width, maskTileX, mapCellsX, ren_StratumMaskMax);
+    const std::int32_t mask1Height = StratumMaskExtent(saved1Height, maskTileY, mapCellsY, ren_StratumMaskMax);
+    gpg::Logf(
+      "Terrain: stratum masks %dx%d and %dx%d (saved in the map as %dx%d and %dx%d; half the map is %dx%d, the most "
+      "%dx%d)",
+      mask0Width,
+      mask0Height,
+      mask1Width,
+      mask1Height,
+      saved0Width,
+      saved0Height,
+      saved1Width,
+      saved1Height,
+      maskTileX,
+      maskTileY,
+      StratumMaskExtent(kStratumMaskCeiling, maskTileX, mapCellsX, ren_StratumMaskMax),
+      StratumMaskExtent(kStratumMaskCeiling, maskTileY, mapCellsY, ren_StratumMaskMax)
+    );
+
+    mStrata.mStratumMaskWidth = static_cast<std::uint32_t>(mask0Width);
+    mStrata.mStratumMaskHeight = static_cast<std::uint32_t>(mask0Height);
+
+    // Stratum mask 0: create a dynamic sheet of the mask's size, blit the current mask
     // surface into it, then adopt it as the live mask.
     std::shared_ptr<CD3DDynamicTextureSheet> newSheet;
-    resources->NewDynamicTextureSheet(newSheet, maskTileX, maskTileY, 2);
+    resources->NewDynamicTextureSheet(newSheet, mask0Width, mask0Height, 2);
     if (newSheet.get() == nullptr) {
       throw gpg::gal::Error{};
     }
@@ -4128,7 +4274,7 @@ namespace moho
 
     // Stratum mask 1: same pattern, reusing the temporary sheet slot.
     std::shared_ptr<CD3DDynamicTextureSheet> spareSheet;
-    resources->NewDynamicTextureSheet(spareSheet, maskTileX, maskTileY, 2);
+    resources->NewDynamicTextureSheet(spareSheet, mask1Width, mask1Height, 2);
     newSheet = spareSheet;
     spareSheet.reset();
     if (newSheet.get() == nullptr) {
