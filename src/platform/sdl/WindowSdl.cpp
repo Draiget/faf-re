@@ -726,6 +726,33 @@ namespace platform::window
     }
   }
 
+  bool GetMousePosition(
+    const Handle window,
+    int& x,
+    int& y
+  )
+  {
+    SDL_Window* const native = AsWindow(window);
+    if (native == nullptr || SDL_GetMouseFocus() != native || SDL_GetKeyboardFocus() != native) {
+      return false;
+    }
+    float mouseX = 0.0f;
+    float mouseY = 0.0f;
+    (void)SDL_GetMouseState(&mouseX, &mouseY);
+    // Cursor coordinates identify a point inside a pixel, not its nearest pixel boundary.
+    // Rounding makes the penultimate row/column scroll and rejects part of the last one.
+    const float density = SDL_GetWindowPixelDensity(native);
+    const float scale = density > 0.0f ? density : 1.0f;
+    x = static_cast<int>(std::floor(mouseX * scale));
+    y = static_cast<int>(std::floor(mouseY * scale));
+    int width = 0;
+    int height = 0;
+    if (!SDL_GetWindowSizeInPixels(native, &width, &height)) {
+      return false;
+    }
+    return x >= 0 && y >= 0 && x < width && y < height;
+  }
+
   void SetTitle(
     const Handle window,
     const char* const utf8Title
