@@ -29,6 +29,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
 	"strconv"
 	"strings"
 	"sync"
@@ -49,6 +50,10 @@ var (
 	tokenArg  = flag.String("token-arg", "/servertoken", "the arg whose value must differ per player and never leak")
 	control   = flag.String("control", "", "scenario dedicated: the lobby server's control URL (http://host:4000)")
 	dedicated = flag.String("dedicated", "", "scenario dedicated: the game server's host:port the game is created for")
+	tokensArg = flag.String("tokens", "", "scenario dedicated: id=token,... to use (the game server's), else random")
+	seatExe   = flag.String("seat-exe", "", "scenario dedicated: start this per player with --server --uid --token "+
+		"taken from its game_launch args (faf_server_probe), plus -seat-args; all must exit 0")
+	seatArgs = flag.String("seat-args", "", "scenario dedicated: extra args for -seat-exe, space separated")
 )
 
 type player struct {
@@ -190,11 +195,19 @@ func runDedicated(ids []int) bool {
 		defer p.ws.Close()
 	}
 	tokens := map[int]string{}
+	for _, kv := range strings.Split(*tokensArg, ",") {
+		if id, tok, ok := strings.Cut(strings.TrimSpace(kv), "="); ok {
+			n, _ := strconv.Atoi(id)
+			tokens[n] = tok
+		}
+	}
 	var parts []map[string]any
 	for i, p := range ps {
-		b := make([]byte, 16)
-		_, _ = rand.Read(b)
-		tokens[p.id] = hex.EncodeToString(b)
+		if tokens[p.id] == "" {
+			b := make([]byte, 16)
+			_, _ = rand.Read(b)
+			tokens[p.id] = hex.EncodeToString(b)
+		}
 		parts = append(parts, map[string]any{"player_id": p.id, "token": tokens[p.id], "team": 2 + i%2, "start_spot": i + 1})
 	}
 	body, _ := json.Marshal(map[string]any{"name": "faf-lobby-probe dedicated", "mapname": *mapName, "mod": *mod,
@@ -259,11 +272,54 @@ func runDedicated(ids []int) bool {
 			}
 		}
 	}
+	if *seatExe != "" {
+		runSeats(launches)
+	}
 	for _, p := range ps {
 		p.game("GameState", "Ended")
 	}
 	time.Sleep(500 * time.Millisecond)
 	return true
+}
+
+// runSeats starts -seat-exe for every player with the join string from its own game_launch, as the game would get
+// it on its command line, and waits for all of them.
+func runSeats(launches map[int]map[string]any) {
+	var wg sync.WaitGroup
+	for id, l := range launches {
+		words := []string{}
+		for _, v := range args(l) {
+			words = append(words, fmt.Sprint(v))
+		}
+		value := func(name string) string {
+			for i, w := range words {
+				if w == name && i+1 < len(words) {
+					return words[i+1]
+				}
+			}
+			return ""
+		}
+		cmdArgs := []string{"--server", value("/connectserver"), "--uid", value("/serveruid"), "--token", value("/servertoken")}
+		cmdArgs = append(cmdArgs, strings.Fields(*seatArgs)...)
+		wg.Add(1)
+		go func(id int, cmdArgs []string) {
+			defer wg.Done()
+			logf("p%d starts its seat: %s --server %s --uid %s --token <token> %s", id, *seatExe, cmdArgs[1], cmdArgs[3],
+				*seatArgs)
+			out, err := exec.Command(*seatExe, cmdArgs...).CombinedOutput()
+			lines := strings.Split(strings.TrimSpace(string(out)), "\n")
+			if len(lines) > 6 {
+				lines = lines[len(lines)-6:]
+			}
+			for _, line := range lines {
+				logf("p%d seat | %s", id, line)
+			}
+			if err != nil {
+				fail("player %d's seat (%s): %v", id, *seatExe, err)
+			}
+		}(id, cmdArgs)
+	}
+	wg.Wait()
 }
 
 // checkLaunchArgs: -expect-arg in every player's args; each player's -token-arg value its own.
