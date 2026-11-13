@@ -162,6 +162,13 @@ namespace faf::editor
        "What the editor and the game say: info, warnings (amber) and errors. The filter finds lines; Times shows "
        "when each came. The status bar's warning count opens it.",
        "view.log"},
+      {"Debugger",
+       "Debugger",
+       "Stops a play's map scripts at their breakpoints: tick Stop at breakpoints in plays, click a line's number in "
+       "the Script Editor to set one, then play (F5 or Check's test run). Paused, the sim waits: the Script Editor "
+       "shows the line, this panel the locals, your watched expressions and the stack; Continue, Step into, Step over "
+       "or Step out go on. Stopping the play lets the sim go.",
+       "view.debugger,play.toggle"},
       {"Problems",
        "Problems",
        "One list of the check's findings and the log's warnings (each different warning once, with how many times "

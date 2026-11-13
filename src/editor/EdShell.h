@@ -249,6 +249,10 @@ namespace faf::editor
     {
       return mShowHistory;
     }
+    bool& ShowDebugger() noexcept
+    {
+      return mShowDebugger;
+    }
     bool& ShowProblems() noexcept
     {
       return mShowProblems;
@@ -363,6 +367,12 @@ namespace faf::editor
     double mScriptTypedAt = 0.0;
     std::vector<EdLuaTypo> mScriptTypos;
     void DrawHelpWindow();
+    /** The Debugger panel (ui/EdDebuggerPanel.cpp): arm, breakpoints, a pause's place, locals, watches, stack. */
+    void DrawDebuggerPanel();
+    bool mShowDebugger = false;
+    bool mDebugWasPaused = false;
+    char mWatchInput[160] = {};
+    std::vector<std::string> mWatches;
     /** The Effects workspace's stage: the effect's view where the map view is. */
     void DrawEffectStage();
     /** The Problems panel (ui/EdProblemsPanel.cpp): the check's findings and the log's warnings in one list. */

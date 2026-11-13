@@ -1,4 +1,5 @@
 #include "editor/EdPlay.h"
+#include "editor/EdLuaDebugger.h"
 #include "editor/EdMemTrace.h"
 
 #ifndef NOMINMAX
@@ -1454,6 +1455,10 @@ end
 
   void EdPlay::BeforeGameFrame()
   {
+    // A stop while the script debugger holds the sim: let the sim thread go first, so the session can end.
+    if (mStopRequested) {
+      EdLuaDebugger::Get().Release();
+    }
     LogPhases();
     DriveCommandLineRuns();
     DriveQuickStart();

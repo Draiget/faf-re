@@ -58,6 +58,9 @@ set(FAF_EDITOR_SOURCES
   ui/EdProblemsPanel.cpp
   ui/EdCanvasFit.cpp
   doc/EdLuaApi.cpp
+  EdLuaDebugger.cpp
+  EdDebugRules.cpp
+  ui/EdDebuggerPanel.cpp
   ui/EdWindowChrome.cpp
   ui/EdTitleBar.cpp
   ui/EdPalette.cpp

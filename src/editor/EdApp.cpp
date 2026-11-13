@@ -37,6 +37,7 @@
 #include "editor/doc/EdWaterPreset.h"
 #include "editor/EdLog.h"
 #include "editor/EdMemTrace.h"
+#include "editor/EdLuaDebugger.h"
 #include "editor/EdPlay.h"
 #include "editor/EdShell.h"
 #include "editor/tools/EdHeightFile.h"
@@ -716,6 +717,9 @@ namespace faf::editor
         return 0;
       }
       if (message == WM_CLOSE) {
+        // A sim held at a breakpoint goes on now: the main loop ends before the next frame, and the session's end
+        // waits for the sim thread.
+        EdLuaDebugger::Get().Release();
         gWindowClosing = true;
         if (gShellApp != nullptr) {
           gShellApp->ExitMainLoop();
@@ -2322,6 +2326,16 @@ namespace faf::editor
       RegisterCommands();
       LoadKeymap();
       SetUpAutosave();
+      // The script debugger's hook installer, before any sim makes its Lua state; `/debugarm` and
+      // `/breakpoint <file>:<line>` for test runs.
+      EdLuaDebugger::Get().Register();
+      EdLuaDebugger::Get().SetArmed(moho::CFG_GetArgOption("/debugarm", 0, nullptr));
+      if (fa::vector<fa::string> value; moho::CFG_GetArgOption("/breakpoint", 1, &value) && !value.empty()) {
+        const std::string spec = value[0].c_str();
+        if (const std::size_t colon = spec.rfind(':'); colon != std::string::npos) {
+          EdLuaDebugger::Get().ToggleBreakpoint(spec.substr(0, colon), std::atoi(spec.c_str() + colon + 1));
+        }
+      }
       mShell->SetCommands(&mCommands, &mMenus);
       SetUpWindowChrome(frame);
       // The game view's ambient occlusion makes its GPU programs on first use, which the editor's own view never
@@ -2592,6 +2606,7 @@ namespace faf::editor
       panel("view.adaptive", "Adaptive Map", &EdShell::ShowAdaptiveWindow);
       panel("view.log", "Log", &EdShell::ShowLog);
       panel("view.history", "History", &EdShell::ShowHistory);
+      panel("view.debugger", "Debugger", &EdShell::ShowDebugger);
       add("view.problems", "Problems", "View", "", [this] {
         if (mShell->ShowProblems()) {
           mShell->ShowProblems() = false;
@@ -2831,6 +2846,7 @@ namespace faf::editor
            cmd("view.log"),
            cmd("view.history"),
            cmd("view.problems"),
+           cmd("view.debugger"),
            cmd("view.panelsplaying"),
            sep(),
            workspaces,
@@ -3727,6 +3743,10 @@ namespace faf::editor
       if (!ShellGetApp().KeepGoing() && !gWindowClosing && !mShell->ExitRequested() && !mPlay.QuitRequested()) {
         ShellGetApp().SetKeepGoing();
         mPlay.Stop();
+      }
+      // Leaving: a sim held by the script debugger goes on, so it can end.
+      if (gWindowClosing || mShell->ExitRequested()) {
+        EdLuaDebugger::Get().Release();
       }
       if ((mShell->ExitRequested() || mPlay.QuitRequested()) && ShellGetApp().KeepGoing()) {
         gShellApp->ExitMainLoop();

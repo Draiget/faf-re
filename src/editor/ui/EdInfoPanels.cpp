@@ -2,6 +2,7 @@
 
 #include "editor/EdShell.h"
 #include "editor/ui/EdWorkspaces.h"
+#include "editor/EdLuaDebugger.h"
 #include "editor/ui/EdThemeColors.h"
 #include "editor/ui/EdUiScale.h"
 #include "editor/doc/EdAdaptiveTables.h"
@@ -1321,14 +1322,37 @@ namespace faf::editor
     const std::size_t shownTypos = std::min<std::size_t>(mScriptTypos.size(), 3);
     const float typosHeight =
       shownTypos == 0 ? 0.0f : ImGui::GetFrameHeightWithSpacing() * static_cast<float>(shownTypos) + 4.0f;
+    // The debugger's marks: this file's breakpoints (a click on a line's number sets or clears one) and the line a
+    // play is paused at.
+    EdCodeMarks marks;
+    const std::string debugFile = fileName.substr(fileName.find_last_of("/\\") + 1);
+    for (const EdLuaDebugger::Breakpoint& b : EdLuaDebugger::Get().Breakpoints()) {
+      if (SourceIsFile(b.file, debugFile) || SourceIsFile(debugFile, b.file)) {
+        marks.breakpoints.push_back(b.line);
+      }
+    }
+    if (
+      const EdLuaDebugger::Pause pause = EdLuaDebugger::Get().Snapshot();
+      pause.paused && SourceIsFile(debugFile, pause.file)
+    ) {
+      marks.pausedLine = pause.line;
+    }
     // The code, coloured as Lua, line numbers beside it; the error line marked; completions, signatures and hover
     // from the engine's annotated functions (doc/EdLuaApi).
     if (
       LuaCodeInput(
-        "##script", mScriptBuffer, mScriptErrorLine, std::max(ImGui::GetContentRegionAvail().y - typosHeight, 120.0f)
+        "##script",
+        mScriptBuffer,
+        mScriptErrorLine,
+        std::max(ImGui::GetContentRegionAvail().y - typosHeight, 120.0f),
+        &marks
       )
     ) {
       mScriptTypedAt = now;
+    }
+    if (marks.clickedLine > 0) {
+      EdLuaDebugger::Get().ToggleBreakpoint(debugFile, marks.clickedLine);
+      gpg::Logf("editor: breakpoint %s line %d", debugFile.c_str(), marks.clickedLine);
     }
     for (std::size_t i = 0; i < shownTypos; ++i) {
       const EdLuaTypo typo = mScriptTypos[i];

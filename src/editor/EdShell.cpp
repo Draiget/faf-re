@@ -18,6 +18,7 @@
 #include "editor/doc/EdDocument.h"
 #include "gpg/gal/Device.hpp"
 #include "gpg/core/utils/Logging.h"
+#include "editor/EdLuaDebugger.h"
 #include "editor/ui/EdProblems.h"
 #include "editor/ui/EdStatus.h"
 #include "editor/ui/EdThemeColors.h"
@@ -404,6 +405,11 @@ namespace faf::editor
       if (mShowProblems) {
         DrawProblemsPanel();
       }
+      // The debugger's pause brings its panel up, whether shown or not.
+      if (mShowDebugger || EdLuaDebugger::Get().Snapshot().paused) {
+        mShowDebugger = true;
+        DrawDebuggerPanel();
+      }
       if (mShowLog) {
         if (ImGui::Begin(Panel(kLogWindow), &mShowLog)) {
           mLog.Draw();
@@ -521,6 +527,7 @@ namespace faf::editor
       {kLogWindow, &EdShell::mShowLog},
       {"History", &EdShell::mShowHistory},
       {"Problems", &EdShell::mShowProblems},
+      {"Debugger", &EdShell::mShowDebugger},
     };
     return kFlags;
   }

@@ -174,7 +174,8 @@ namespace faf::editor
     const char* const id,
     std::string& text,
     const int errorLine,
-    const float height
+    const float height,
+    EdCodeMarks* const marks
   )
   {
     static Cache cache;
@@ -316,6 +317,9 @@ namespace faf::editor
       if (line + 1 == errorLine) {
         dl->AddRectFilled(ImVec2(clip.Min.x, y), ImVec2(clip.Max.x, y + lineHeight), IM_COL32(200, 60, 50, 70));
       }
+      if (marks != nullptr && line + 1 == marks->pausedLine) {
+        dl->AddRectFilled(ImVec2(clip.Min.x, y), ImVec2(clip.Max.x, y + lineHeight), IM_COL32(220, 190, 60, 70));
+      }
       float x = origin.x;
       while (s < cache.spans.size() && cache.spans[s].start < lineEnd) {
         const LuaSpan& span = cache.spans[s];
@@ -349,10 +353,32 @@ namespace faf::editor
     gutter->PushClipRect(
       ImVec2(gutterAt.x, child->Pos.y), ImVec2(gutterAt.x + gutterWidth, child->Pos.y + child->Size.y), true
     );
+    // A click on a line's number: the debugger's breakpoint there (EdCodeMarks).
+    if (marks != nullptr) {
+      marks->clickedLine = 0;
+      const ImVec2 mouse = ImGui::GetIO().MousePos;
+      if (
+        ImGui::IsMouseClicked(ImGuiMouseButton_Left) && mouse.x >= gutterAt.x && mouse.x < gutterAt.x + gutterWidth &&
+        mouse.y >= child->Pos.y && mouse.y < child->Pos.y + child->Size.y && ImGui::IsWindowHovered()
+      ) {
+        const int line = static_cast<int>((mouse.y - origin.y) / lineHeight);
+        if (line >= 0 && line < static_cast<int>(cache.lineStarts.size())) {
+          marks->clickedLine = line + 1;
+        }
+      }
+    }
     for (int line = first; line <= last; ++line) {
       const std::string number = std::to_string(line + 1);
       const float y = origin.y + static_cast<float>(line) * lineHeight;
       const float w = ImGui::CalcTextSize(number.c_str()).x;
+      if (
+        marks != nullptr &&
+        std::find(marks->breakpoints.begin(), marks->breakpoints.end(), line + 1) != marks->breakpoints.end()
+      ) {
+        gutter->AddCircleFilled(
+          ImVec2(gutterAt.x + 6.0f, y + lineHeight * 0.5f), lineHeight * 0.28f, IM_COL32(220, 70, 60, 255)
+        );
+      }
       gutter->AddText(
         ImVec2(gutterAt.x + gutterWidth - 8.0f - w, y),
         line + 1 == errorLine ? IM_COL32(240, 110, 90, 255) : IM_COL32(110, 118, 129, 255),

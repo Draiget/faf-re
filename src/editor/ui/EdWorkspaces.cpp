@@ -97,7 +97,7 @@ namespace faf::editor
        "Properties",
        "Script Editor###ScriptEditor,Adaptive Map###AdaptiveMap",
        "",
-       "Check,Log",
+       "Check,Log,Debugger",
        0.20f,
        0.42f,
        false},
