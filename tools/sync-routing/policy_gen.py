@@ -38,7 +38,7 @@ import sys
 import zipfile
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from compare import decode, normal, records  # noqa: E402  (the Lua byte stream, as compare.py reads it)
+from compare import decode, normal, records, without_addresses  # noqa: E402  (as compare.py reads and compares)
 
 # Narrowest first: the generator picks the first one without a counterexample.
 GENERIC_ROUTES = ("Observers", "EntityOwner", "EntityAllies", "Everyone")
@@ -106,18 +106,6 @@ def drop_releases(lockstep, routed, army, key, release_keys):
             continue
         kept[k] = v
     return kept
-
-
-ADDRESS_RE = re.compile(r"^(table|function|userdata|thread|cfunction): ?[0-9A-Fa-fx]+$")
-
-
-def without_addresses(value):
-    """`tostring` of a Lua table (`table: 21399C08`) differs from run to run: all such strings made one."""
-    if isinstance(value, dict):
-        return {without_addresses(k): without_addresses(v) for k, v in value.items()}
-    if isinstance(value, str) and ADDRESS_RE.match(value):
-        return value.split(":", 1)[0] + ": *"
-    return value
 
 
 def same(a, b):
@@ -576,14 +564,13 @@ def static_writers(lua, keys):
 
 
 def wrapped_functions(cpp_path):
-    """kWrapped and kOwnedThreads of SyncRouting.cpp: {function name: how it is covered}."""
+    """kWrapped, kWrappedIfLoaded and kOwnedThreads of SyncRouting.cpp: {function name: how it is covered}."""
     with open(cpp_path, encoding="utf-8") as f:
         text = f.read()
     out = {}
-    block = re.search(r"constexpr SWrappedFunction kWrapped\[\] = \{(.*?)\n    \};", text, re.S)
-    for module, cls, name, thunk in re.findall(
-            r'\{(nullptr|"[^"]*"), (nullptr|"[^"]*"), "(\w+)", &(\w+)\}', block.group(1) if block else ""):
-        out[name] = "wrapped (%s%s)" % (thunk, ", " + cls.strip('"') if cls != "nullptr" else "")
+    for block in re.findall(r"constexpr SWrappedFunction kWrapped(?:IfLoaded)?\[\] = \{(.*?)\n    \};", text, re.S):
+        for module, cls, name, thunk in re.findall(r'\{(nullptr|"[^"]*"), (nullptr|"[^"]*"), "(\w+)", &(\w+)\}', block):
+            out[name] = "wrapped (%s%s)" % (thunk, ", " + cls.strip('"') if cls != "nullptr" else "")
     block = re.search(r"constexpr SOwnedThread kOwnedThreads\[\] = \{(.*?)\n    \};", text, re.S)
     for module, cls, name in re.findall(r'\{"([^"]*)", "(\w+)", "(\w+)"\}', block.group(1) if block else ""):
         out[name] = "owned thread (%s)" % cls

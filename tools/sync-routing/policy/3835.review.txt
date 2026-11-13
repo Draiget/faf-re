@@ -1,5 +1,5 @@
 Sync routing policy review: FAF game version 3835, 10 games (vault_26881085, vault_26897073, vault_26902315, vault_26928211, vault_26930624, vault_26943656, vault_26953273, vault_26989770, vault_27004084, vault_27034831), K=5
-totals: BELOW-K 10, CONFIRMED 14, CONTEXT 2, CONTRADICTED 3, SPECIAL 5, UNSEEN 69
+totals: BELOW-K 11, CONFIRMED 14, CONTEXT 2, CONTRADICTED 2, SPECIAL 5, UNSEEN 69
 
 status                 key                          accepted       generated                          note
 UNSEEN                 AIBrainData                  Everyone       -                                  kept: no game of the corpus wrote it
@@ -102,6 +102,6 @@ UNSEEN                 UpdatePosition               Everyone       -            
 UNSEEN                 UserConRequests              Everyone       -                                  kept: no game of the corpus wrote it
 CONFIRMED              UserUnitEnhancements         EntityAllies   EntityAllies                       8 games
 UNSEEN                 VideoText                    Everyone       -                                  kept: no game of the corpus wrote it
-CONTRADICTED (held)    Voice                        Observers      Observers (unclassified)           Everyone in 2 games, below K=5; counterexample game vault_26897073 beat 20543 army 0: lockstep {1.0: {'Bank': 'XGG', 'Cue': 'Computer_Computer_MissileLaunch_01351'}}, route None
+BELOW-K                Voice                        Everyone       Everyone                           kept: Everyone in 2 games, below K=5
 UNSEEN                 WepPriority                  Observers      -                                  kept: no game of the corpus wrote it
 UNSEEN                 __ArmyStats                  Observers      -                                  kept: no game of the corpus wrote it

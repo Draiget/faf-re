@@ -258,6 +258,15 @@ class FileTests(unittest.TestCase):
             self.assertEqual(name, "%d.tsv" % version)
             self.assertEqual({k: r["route"] for k, r in rules.items()}, compiled, name)
 
+    def test_wrapped_functions_of_the_router(self):
+        """Both wrapper tables and the owned threads of src/remote/SyncRouting.cpp are read: the chat relay, wrapped only
+        where the game version has it, counts as covered."""
+        root = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..")
+        covered = pg.wrapped_functions(os.path.join(root, "src", "remote", "SyncRouting.cpp"))
+        self.assertEqual(covered.get("RelayChatMessage"), "wrapped (SimOwnThunk)")
+        self.assertEqual(covered.get("SendData"), "wrapped (FanOutThunk)")
+        self.assertEqual(covered.get("PlayVOSoundThread"), "owned thread (AIBrain)")
+
     def test_static_writers(self):
         lua = {"lua/sim/a.lua": ["function F()", "  Sync.Ping = {}", "  if Sync.Ping == nil then end",
                                  "  table.insert(Sync.Voice, 1)", "  local s = Sync.Score", "  s[1] = 2", "end"],

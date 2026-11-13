@@ -35,7 +35,7 @@
 //
 // 7. Threads of one player: a forked thread reads focus -1, and can't be wrapped, since it can't
 //    yield across a C call. The few that belong to one army wholly run under its focus, each time
-//    they run (`kOwnedThreads`).
+//    they run (`kOwnedThreads`). One of an army no view is on writes for no player.
 //
 // Every player's payload is put together from encoded pieces of those tables, so routing creates
 // no Lua tables on the way out, and the sim's own heap sees only the writes the game makes.
@@ -122,6 +122,43 @@ namespace faf::remote
   void UseCompiledSyncPolicy();
   /** `--sync-policy <file>`, if given: read and put in use. False with `error` set if the file can't be used. */
   [[nodiscard]] bool UseSyncPolicyFile(const std::string& path, std::string& error);
+
+  /** A chat message's `to`: `'all'`, `'allies'`, an army number, or anything else (`'notify'`, nil). */
+  enum class EChatTo : std::uint8_t
+  {
+    All,
+    Allies,
+    Army,
+    Other,
+  };
+  /**
+   * Whether game version 3840's `ChatUtils.IsLocalRecipient` (`lua/ChatUtils.lua:30`) lets a message through on a
+   * lockstep client focused on `focus`: an observer (-1) everything; `all` everyone; `allies` the sender and whoever
+   * counts the sender as an ally (`focusAlliedWithSender`); an army the sender and that army (`toArmy`); else nobody.
+   * Armies here are 0-based; the message's `From` and a numeric `to` are Lua's, from 1.
+   */
+  [[nodiscard]] constexpr bool ChatReachesFocus(
+    const std::int32_t focus,
+    const std::int32_t from,
+    const EChatTo to,
+    const std::int32_t toArmy,
+    const bool focusAlliedWithSender
+  ) noexcept
+  {
+    if (focus < 0) {
+      return true;
+    }
+    switch (to) {
+    case EChatTo::All:
+      return true;
+    case EChatTo::Allies:
+      return focus == from || focusAlliedWithSender;
+    case EChatTo::Army:
+      return focus == from || focus == toArmy;
+    default:
+      return false;
+    }
+  }
 
   /** Which players a `Sync` field may name an entity to. */
   enum class ESyncIdAudience : std::uint8_t
@@ -277,6 +314,11 @@ namespace faf::remote
       mForkingRecallVote = forking;
     }
 
+    /**
+     * Not a view: the `Sync` of an owned thread whose army no view is on (`kOwnedThreads`), focus -1. A lockstep client
+     * focused on another army gets nothing of it; one at focus -1 is an observer's. No player is sent this table.
+     */
+    static constexpr std::int32_t kUnviewedThread = -2;
     /** From here to `LeaveView`, `Sync` and `GetFocusArmy()` are those of view `view` (-1: the sim's own). */
     void EnterView(moho::Sim& sim, std::int32_t view);
     void LeaveView(moho::Sim& sim);
@@ -333,6 +375,8 @@ namespace faf::remote
     void CloseKey(LuaPlus::LuaObject& key, std::string_view name);
 
     std::vector<SPlayerSync> mPlayers;
+    LuaPlus::LuaObject mUnviewedSync; // `kUnviewedThread`'s table, emptied each beat
+    bool mUnviewedSyncUsed = false;
     std::vector<SFrame> mFrames;
     std::unordered_map<lua_State*, std::int32_t> mThreadViews; // threads that belong to one player
     std::vector<const void*> mOwnedThreadFunctions;            // what such a thread starts with

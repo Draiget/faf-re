@@ -1,5 +1,5 @@
-// The Lua Sync routing policy as a file (remote/SyncRouting.h, tools/sync-routing/policy_gen.py): the reader, and the
-// committed policy of each validated FAF version against the compiled table.
+// The Lua Sync routing policy as a file (remote/SyncRouting.h, tools/sync-routing/policy_gen.py): the reader, the
+// committed policy of each validated FAF version against the compiled table, and the routes of voice cues and chat.
 
 #include <cstdio>
 #include <string>
@@ -118,6 +118,44 @@ TEST(
       EXPECT_EQ(policy.routes[index].second, compiled[index].route) << path << " " << policy.routes[index].first;
     }
   }
+}
+
+// A voice cue the sim writes at focus -1 (a map's voice-over through `ScenarioFramework.Dialogue`) is written by every
+// lockstep client; an army's own cues come from its brain's thread, which runs under that army's view.
+TEST(
+  SyncPolicy,
+  VoiceReachesEveryPlayer
+)
+{
+  bool known = false;
+  EXPECT_EQ(faf::remote::RouteOfSyncKey("Voice", known), ESyncRoute::Everyone);
+  EXPECT_TRUE(known);
+  EXPECT_EQ(faf::remote::RouteOfSyncKey("ChatMessages", known), ESyncRoute::Chat);
+}
+
+// `ChatReachesFocus` is 3840's `ChatUtils.IsLocalRecipient`, case by case (armies 0-based here).
+TEST(
+  SyncPolicy,
+  ChatReachesWhomIsLocalRecipientLetsThrough
+)
+{
+  using faf::remote::ChatReachesFocus;
+  using faf::remote::EChatTo;
+  // An observer gets every line, a private one or one with no recipient too.
+  EXPECT_TRUE(ChatReachesFocus(-1, 2, EChatTo::Army, 3, false));
+  EXPECT_TRUE(ChatReachesFocus(-1, 2, EChatTo::Other, -1, false));
+  // `to = 'all'`: everyone.
+  EXPECT_TRUE(ChatReachesFocus(5, 0, EChatTo::All, -1, false));
+  // `to = 'allies'`: the sender and those who count the sender as an ally, no one else.
+  EXPECT_TRUE(ChatReachesFocus(0, 0, EChatTo::Allies, -1, false));
+  EXPECT_TRUE(ChatReachesFocus(2, 0, EChatTo::Allies, -1, true));
+  EXPECT_FALSE(ChatReachesFocus(1, 0, EChatTo::Allies, -1, false));
+  // A whisper: the sender and the army it names.
+  EXPECT_TRUE(ChatReachesFocus(0, 0, EChatTo::Army, 2, false));
+  EXPECT_TRUE(ChatReachesFocus(2, 0, EChatTo::Army, 2, true));
+  EXPECT_FALSE(ChatReachesFocus(4, 0, EChatTo::Army, 2, true)); // an ally of both, but not named
+  // Anything else (`'notify'`, no `to`): no player.
+  EXPECT_FALSE(ChatReachesFocus(0, 0, EChatTo::Other, -1, true));
 }
 
 // A policy file in use answers every lookup; the compiled table stays as it is.

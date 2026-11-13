@@ -136,7 +136,7 @@ namespace faf::remote
       {"UserConRequests", ESyncRoute::Everyone},
       {"UserUnitEnhancements", ESyncRoute::EntityAllies},
       {"VideoText", ESyncRoute::Everyone},
-      {"Voice", ESyncRoute::Observers},
+      {"Voice", ESyncRoute::Everyone},
       {"WepPriority", ESyncRoute::Observers},
       {"__ArmyStats", ESyncRoute::Observers},
     };
@@ -446,7 +446,14 @@ namespace faf::remote
       return 0;
     }
 
-    /** `SendChatToReplay(data)` (`lua/SimUtils.lua:1453`) writes for every client, whoever sent it. */
+    /**
+     * A function whose write every client makes, or that filters by the focus itself, run once with the sim's own
+     * table and focus -1, also inside a player's command. `SendChatToReplay(data)` (3835's `lua/SimUtils.lua:1453`)
+     * writes for every client, whoever sent it. 3840's `ChatUtils.RelayChatMessage(msg)` (`lua/ChatUtils.lua:53`)
+     * writes `Sync.ChatMessages` on each client its `IsLocalRecipient` lets the message reach; a player's
+     * `SendChatMessage` callback calls it under that player's focus, which would keep the line from everyone else. At
+     * focus -1 every message passes, and `RouteChat` gives each view what its focus lets through.
+     */
     int SimOwnThunk(
       lua_State* const state
     )
@@ -771,6 +778,14 @@ namespace faf::remote
       {"/lua/sim/recall.lua", nullptr, "SyncRecallStatus", &RecallStatusThunk},
       {"/lua/sim/recall.lua", nullptr, "ResyncRecallVoting", &RecallResyncThunk},
       {"/lua/aibrain.lua", "AIBrain", "SetDefeatStatus", &RecallDefeatThunk},
+    };
+    /**
+     * Functions of modules some game versions don't have, wrapped only when the game has loaded the module: importing a
+     * missing one would leave a broken module behind. 3840's `lua/aibrain.lua` loads `ChatUtils` (through its chat
+     * component) before the first beat; 3835 has none.
+     */
+    constexpr SWrappedFunction kWrappedIfLoaded[] = {
+      {"/lua/chatutils.lua", nullptr, "RelayChatMessage", &SimOwnThunk},
     };
   } // namespace
 
@@ -1222,6 +1237,20 @@ namespace faf::remote
       }
       target.contextUsed = true;
       globals.SetObject("Sync", target.context);
+    } else if (view == kUnviewedThread) {
+      LuaPlus::LuaState* const state = sim.mLuaState;
+      LuaPlus::LuaObject globals = state->GetGlobals();
+      frame.previousSync = globals["Sync"];
+      if (!mUnviewedSync.IsTable()) {
+        mUnviewedSync.AssignNewTable(state, 0, 4u);
+        for (const char* const key : {"AIBrainData", "UnitData", "ReleaseIds", "Reclaim"}) {
+          LuaPlus::LuaObject inner;
+          inner.AssignNewTable(state, 0, 0u);
+          mUnviewedSync.SetObject(key, inner);
+        }
+      }
+      mUnviewedSyncUsed = true;
+      globals.SetObject("Sync", mUnviewedSync);
     }
     mFrames.push_back(std::move(frame));
   }
@@ -1268,10 +1297,15 @@ namespace faf::remote
     ) {
       return;
     }
-    const std::int32_t view = ViewOfArmy(ArmyOfSelf(parent, 2) - 1);
-    if (view >= 0) {
-      mThreadViews[thread] = view;
+    const int army = ArmyOfSelf(parent, 2);
+    if (army <= 0) {
+      return;
     }
+    // An army no view is on (its player moved away, `MoveView`): what a lockstep client focused on another army
+    // gets of it, nothing. Run at focus -1 into the sim's own table it would write an observer's line
+    // (`lua/aibrain.lua:299`, army 1's warning of a nuclear launch) that every player would then get as well.
+    const std::int32_t view = ViewOfArmy(army - 1);
+    mThreadViews[thread] = view >= 0 ? view : kUnviewedThread;
   }
 
   bool CSyncRouter::EnterThread(
@@ -1390,7 +1424,18 @@ namespace faf::remote
     }
 
     LuaPlus::LuaObject modules = globals["__modules"];
+    std::vector<const SWrappedFunction*> toWrap;
     for (const SWrappedFunction& wrapped : kWrapped) {
+      toWrap.push_back(&wrapped);
+    }
+    for (const SWrappedFunction& wrapped : kWrappedIfLoaded) {
+      // `import` keeps a module under its lower-case path (`lua/system/import.lua`).
+      if (modules.IsTable() && modules[wrapped.module].IsTable()) {
+        toWrap.push_back(&wrapped);
+      }
+    }
+    for (const SWrappedFunction* const entry : toWrap) {
+      const SWrappedFunction& wrapped = *entry;
       LuaPlus::LuaObject owner = wrapped.module != nullptr ? moho::SCR_Import(luaState, wrapped.module) : globals;
       if (wrapped.className != nullptr && owner.IsTable()) {
         owner = owner[wrapped.className];
@@ -1857,11 +1902,10 @@ namespace faf::remote
   )
   {
     // Game version 3840's `lua/ChatUtils.lua` `RelayChatMessage` writes a message only on a client whose focus
-    // `IsLocalRecipient` lets it through, and the server's own sync runs at focus -1, where every message passes. So
-    // each view gets what its focus would: focus -1 everything; `to == 'all'` everyone; `'allies'` the sender and
-    // whoever the view's army is allied with (`IsAlly(focus, msg.From)`); a number the sender and that army. `From`
-    // and a numeric `to` are Lua's army numbers, from 1. The list is numbered again per view: the UI walks it
-    // (`ChatController.OnSyncChatMessages`), and a dropped entry must leave no hole.
+    // `IsLocalRecipient` lets it through. Here it runs once at focus -1, where every message passes, also for a
+    // player's own `SendChatMessage` callback (`SimOwnThunk`), so each view gets what its focus would
+    // (`ChatReachesFocus`). The list is numbered again per view: the UI walks it (`ChatController.OnSyncChatMessages`),
+    // and a dropped entry must leave no hole.
     const std::string_view name = "ChatMessages";
     mScratch.clear();
     Encode(key, mScratch);
@@ -1878,12 +1922,17 @@ namespace faf::remote
           LuaPlus::LuaObject fromField = message["From"];
           LuaPlus::LuaObject toField = message["to"];
           const std::int32_t from = fromField.IsNumber() ? static_cast<std::int32_t>(fromField.GetNumber()) - 1 : -1;
+          EChatTo to = EChatTo::Other;
+          std::int32_t toArmy = -1;
           if (toField.IsString()) {
-            const std::string_view to = toField.GetString();
-            wanted = to == "all" || (to == "allies" && (focus == from || Allied(sim, index, from)));
+            const std::string_view text = toField.GetString();
+            to = text == "all" ? EChatTo::All : text == "allies" ? EChatTo::Allies : EChatTo::Other;
           } else if (toField.IsNumber()) {
-            wanted = focus == from || focus == static_cast<std::int32_t>(toField.GetNumber()) - 1;
+            to = EChatTo::Army;
+            toArmy = static_cast<std::int32_t>(toField.GetNumber()) - 1;
           }
+          wanted =
+            ChatReachesFocus(focus, from, to, toArmy, to == EChatTo::Allies && from >= 0 && Allied(sim, index, from));
         }
         if (wanted) {
           AppendNumber(view.body, static_cast<float>(next++));
@@ -2107,6 +2156,15 @@ namespace faf::remote
         (void)moho::SCR_LuaDoString("ResetSyncTable()", sim.mLuaState);
         view.contextUsed = false;
       }
+    }
+    if (mUnviewedSyncUsed) {
+      if (!swapped) {
+        canonical = globals["Sync"];
+        swapped = true;
+      }
+      globals.SetObject("Sync", mUnviewedSync);
+      (void)moho::SCR_LuaDoString("ResetSyncTable()", sim.mLuaState);
+      mUnviewedSyncUsed = false;
     }
     if (swapped) {
       globals.SetObject("Sync", canonical);

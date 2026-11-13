@@ -9,7 +9,8 @@ that army builds, per beat and per key (plan §8, WP6.9, WPR.39).
 Both files hold one record per beat: beat and size as little-endian 32-bit numbers, then the table as
 `LuaObject::ToByteStream` encodes it. Prints each key with beats in which it matches, beats it's
 missing from the routed table, beats it's extra, and beats it differs, with an example of each.
-Exit code 1 if any key differs in any way.
+Exit code 1 if any key differs in any way. Address strings (`table: 0x...`) count as equal, as they differ between
+any two processes.
 
 A lockstep client gets every unit's death in `UnitData` and `ReleaseIds`, and the server keeps those
 with the unit's owner. `--army` (0-based, the view's army) leaves other armies' out of the reference.
@@ -20,6 +21,7 @@ got by then; the map's first ones must arrive on their beat; the rest is printed
 """
 import argparse
 import collections
+import re
 import struct
 import sys
 
@@ -57,6 +59,19 @@ def records(path):
         pos += 8
         yield beat, data[pos:pos + size]
         pos += size
+
+
+ADDRESS_RE = re.compile(r"^(table|function|userdata|thread|cfunction): ?[0-9A-Fa-fx]+$")
+
+
+def without_addresses(value):
+    """`tostring` of a Lua table (`table: 21399C08`) differs from run to run, and from one lockstep client to another
+    (a chat line's `Id`): all such strings made one."""
+    if isinstance(value, dict):
+        return {without_addresses(k): without_addresses(v) for k, v in value.items()}
+    if isinstance(value, str) and ADDRESS_RE.match(value):
+        return value.split(":", 1)[0] + ": *"
+    return value
 
 
 def normal(value):
@@ -125,7 +140,7 @@ def main():
             elif b is None or empty(b):
                 kind = "missing"
             else:
-                kind = "same" if normal(a) == normal(b) else "differs"
+                kind = "same" if normal(without_addresses(a)) == normal(without_addresses(b)) else "differs"
             counts[key][kind] += 1
             if kind != "same" and len(examples[(key, kind)]) < args.examples:
                 examples[(key, kind)].append((beat, a, b))

@@ -101,6 +101,6 @@ UpdatePosition	Everyone	hand	0
 UserConRequests	Everyone	hand	0
 UserUnitEnhancements	EntityAllies	generated	8
 VideoText	Everyone	hand	0
-Voice	Observers	hand	0
+Voice	Everyone	hand	0	every lockstep client writes the focus -1 cues (map voice-overs); a brain's own cues come from its thread under its army's view
 WepPriority	Observers	hand	0
 __ArmyStats	Observers	hand	0
