@@ -49,7 +49,9 @@
 #include "moho/core/Thread.h"
 
 #include "gpg/core/reflection/StaticInitPhase.h"
+#include "moho/console/CConCommand.h"
 #include "platform/Window.h"
+#include "platform/sdl/TestInput.h"
 #if FAFRE_PLATFORM_POSIX
 #include "platform/posix/Win32WindowPosix.h" // the window system's clipboard (issue #256)
 #endif
@@ -2130,6 +2132,49 @@ void moho::WIN_SetMainWindow(
   sMainWindow = mainWindow;
 }
 
+namespace
+{
+  // Engine addition: `/testinput <file>`, a test run's scripted input (platform/sdl/TestInput.h). Its
+  // console steps run through CON_Execute, and every logged line reaches its waits.
+  class TestInputLogTarget final : public gpg::LogTarget
+  {
+  public:
+    TestInputLogTarget()
+      : gpg::LogTarget(true)
+    {}
+
+    void OnMessage(
+      const gpg::LogSeverity level,
+      const fa::string& message,
+      const fa::vector<fa::string>& context,
+      const int previousDepth
+    ) override
+    {
+      (void)level;
+      (void)context;
+      (void)previousDepth;
+      platform::window::test::NoteLogLine(message.c_str());
+    }
+  };
+
+  void RunTestInputCommand(
+    const char* const command
+  )
+  {
+    moho::CON_Execute(command);
+  }
+
+  void StartTestInput()
+  {
+    fa::vector<fa::string> args;
+    if (!moho::CFG_GetArgOption("/testinput", 1, &args) || args.empty()) {
+      return;
+    }
+    static TestInputLogTarget sLogTarget; // registered for the rest of the process
+    (void)platform::window::test::Start(args[0].c_str(), &RunTestInputCommand);
+  }
+} // namespace
+
 /**
  * Address: 0x004F20B0 (FUN_004F20B0)
  *
@@ -2196,6 +2241,7 @@ void moho::WIN_AppExecute(
   // m_keepGoing (+0x5C) = TRUE, the flag this loop runs on.
   gShellApp->SetExitOnFrameDelete(true);
   ShellGetApp().SetKeepGoing();
+  StartTestInput();
 
   platform::SetX87PrecisionControl(_PC_24); // _controlfp(0x20000, 0x30000)
 
@@ -2240,6 +2286,8 @@ void moho::WIN_AppExecute(
     app->Main();
     // Engine addition (issue #412): the developer windows draw once a frame.
     platform::tools::RenderAll();
+    // Engine addition: a test run's scripted input takes its next steps.
+    platform::window::test::Tick();
     success = true;
     acceptNewEvent = true;
 
@@ -2526,6 +2574,8 @@ namespace
     // Engine addition (issue #412): the developer windows (the Lua debugger that holds the main
     // thread here) draw while it waits.
     platform::tools::RenderAll();
+    // Engine addition: a test run's scripted input goes on while the debugger holds the thread.
+    platform::window::test::Tick();
     if (processIdle && gShellApp != nullptr) {
       processIdle = gShellApp->ProcessIdle();
     }

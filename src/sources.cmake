@@ -1133,5 +1133,6 @@ set(FAF_ENGINE_SOURCES
   platform/shell/Shell.cpp
   platform/sdl/WindowSdl.cpp
   platform/sdl/ToolWindow.cpp
+  platform/sdl/TestInput.cpp
   platform/windows/WindowSdlWindows.cpp
 )

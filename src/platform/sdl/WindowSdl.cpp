@@ -18,6 +18,7 @@
 #include <Windows.h>
 
 #include "gpg/core/utils/Logging.h"
+#include "platform/sdl/TestInput.h"
 #include "platform/sdl/WindowSdlPlatform.h"
 
 namespace
@@ -557,6 +558,23 @@ namespace platform::window::sdl
   {
     return gCursorRequestHandler != nullptr && gCursorRequestHandler(window);
   }
+
+  bool KeyOfVirtualKey(
+    const int virtualKey,
+    unsigned int& keycode,
+    int& scancode
+  )
+  {
+    for (int code = 0; code < SDL_SCANCODE_COUNT; ++code) {
+      const SDL_Keycode key = SDL_GetKeyFromScancode(static_cast<SDL_Scancode>(code), SDL_KMOD_NONE, true);
+      if (key != SDLK_UNKNOWN && VirtualKeyOf(key) == virtualKey) {
+        keycode = key;
+        scancode = code;
+        return true;
+      }
+    }
+    return false;
+  }
 } // namespace platform::window::sdl
 
 namespace platform::window
@@ -1084,6 +1102,16 @@ namespace platform::window
       SDL_DestroyProperties(properties);
     }
 
+    // A test script's answer for the next pick (platform/sdl/TestInput.h), in place of the dialog.
+    struct FolderPickAnswer
+    {
+      bool pending = false;
+      bool chosen = false;
+      std::string path;
+    };
+    std::mutex gFolderPickAnswerMutex;
+    FolderPickAnswer gFolderPickAnswer;
+
     SDL_Window* gSplashWindow = nullptr;
     SDL_Renderer* gSplashRenderer = nullptr;
   } // namespace
@@ -1095,6 +1123,22 @@ namespace platform::window
   {
     if (!gInitialized) {
       return false; // headless: no dialog, the path stays as it is
+    }
+    {
+      std::lock_guard<std::mutex> lock(gFolderPickAnswerMutex);
+      if (gFolderPickAnswer.pending) {
+        gFolderPickAnswer.pending = false;
+        gpg::Logf(
+          "Folder picker '%s' answered by the test script: %s",
+          utf8Title != nullptr ? utf8Title : "",
+          gFolderPickAnswer.chosen ? gFolderPickAnswer.path.c_str() : "cancel"
+        );
+        if (!gFolderPickAnswer.chosen) {
+          return false;
+        }
+        utf8Path = gFolderPickAnswer.path;
+        return true;
+      }
     }
     FolderPick pick;
     pick.title = utf8Title != nullptr ? utf8Title : "";
@@ -1129,6 +1173,17 @@ namespace platform::window
     }
     utf8Path = pick.path;
     return true;
+  }
+
+  void sdl::AnswerNextFolderPick(
+    const bool chosen,
+    const char* const utf8Path
+  )
+  {
+    std::lock_guard<std::mutex> lock(gFolderPickAnswerMutex);
+    gFolderPickAnswer.pending = true;
+    gFolderPickAnswer.chosen = chosen;
+    gFolderPickAnswer.path = utf8Path != nullptr ? utf8Path : "";
   }
 
   bool ShowSplash(
