@@ -3800,6 +3800,86 @@ namespace faf::editor::terrain
       );
     }
 
+    // ---- terrain from other tools (FAF Studio's graphnodes_ext.lua) and the map layout (graphnodes_layout.lua)
+    {
+      c.Add(
+        "external_terrain",
+        "External terrain (Gaea / World Machine)",
+        "sources",
+        "The heightmap of the Import / Export window (its file and the mapping of its values to heights, flips, turns) "
+        "as a "
+        "height field at the graph's resolution. A file typed here replaces the window's. The graph runs again when "
+        "the other "
+        "tool writes the file.",
+        {},
+        kHeightOut,
+        {T("file", "File (empty: the Import / Export window's)", "")},
+        [](const Env& E, const Values& v, const Inputs&) {
+        if (!E.ground->loadExternal) {
+          Fail("no map to import onto");
+        }
+        auto full = std::make_shared<field::Grid>();
+        std::string error;
+        if (!E.ground->loadExternal(v.S("file"), *full, error)) {
+          Fail(error);
+        }
+        return One(E.Op("resample", {{"a", field::GridPtr(full)}, {"like", E.like}}));
+      }
+      );
+      c.Add(
+        "external_mask",
+        "External mask (Gaea / World Machine)",
+        "sources",
+        "A named mask imported from another tool (flow, wear, deposit). This editor imports no named masks yet: with "
+        "Optional "
+        "the output is empty, else the node fails.",
+        {},
+        kMaskOut,
+        {T("name", "Name of the named mask", "wear"), B("optional", "Empty when there is no such mask", true)},
+        [](const Env& E, const Values& v, const Inputs&) {
+        if (!v.B("optional")) {
+          Fail("this editor imports no named masks yet (" + v.S("name") + ")");
+        }
+        return One(E.Const(0.0));
+      }
+      );
+      const auto noLayout = [](const Env&, const Values&, const Inputs&) -> Outputs {
+        Fail("this editor has no map layout yet (the Layout canvas comes later)");
+      };
+      c.Add(
+        "layout_height",
+        "Map layout: heights",
+        "sources",
+        "The height field the Layout workspace makes from the layers drawn on its canvas (not in this editor yet).",
+        {},
+        kHeightOut,
+        {N("weather", "Weathering (gullies)", 0, 1, 0.05f, "%.2f", 0), B("sym", "Apply the editor symmetry", true)},
+        noLayout
+      );
+      c.Add(
+        "layout_mask",
+        "Map layout: layer mask",
+        "sources",
+        "The mask of one layer of the layout (not in this editor yet).",
+        {},
+        kMaskOut,
+        {N("layer", "Layer (its number in the list)", 1, 16, 1, "%.0f", 1),
+         B("soft", "Use the soft edge of the layer", true)},
+        noLayout
+      );
+      c.Add(
+        "layout_bases",
+        "Map layout: bases",
+        "sources",
+        "The bases drawn on Base layers as a mask and their number (not in this editor yet).",
+        {},
+        {Pin("out", PinType::Mask), Pin("count", PinType::Number)},
+        {N("radius", "Disc radius (units)", 2, 200, 1, "%.0f", 30),
+         N("edge", "Soft edge (units)", 0, 100, 1, "%.0f", 12)},
+        noLayout
+      );
+    }
+
     c.Add(
       "out_colormap",
       "Output: colour image",

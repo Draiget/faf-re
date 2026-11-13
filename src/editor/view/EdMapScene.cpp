@@ -5195,6 +5195,55 @@ namespace faf::editor
     out.macro = profile.summary.find("macro") != std::string::npos;
     out.specular = profile.summary.find("specular") != std::string::npos;
     out.roughness = out.pbr && profile.painted == 7;
+    // Heights from another tool: the Import / Export window's file (or a node's own) mapped as that window says.
+    {
+      const std::string windowFile = mTools->InteropFile(false);
+      const ImportSettings mapping = mTools->InteropSettings();
+      const FileStamp stamp = StampOf(windowFile);
+      char key[256];
+      (void)std::snprintf(
+        key,
+        sizeof(key),
+        "%s|%llu|%lld|%d|%g|%g|%g|%d|%d|%d",
+        windowFile.c_str(),
+        static_cast<unsigned long long>(stamp.size),
+        stamp.written,
+        static_cast<int>(mapping.mapping),
+        static_cast<double>(mapping.low),
+        static_cast<double>(mapping.high),
+        static_cast<double>(mapping.scale),
+        mapping.flipX ? 1 : 0,
+        mapping.flipZ ? 1 : 0,
+        mapping.turns
+      );
+      out.externalKey = key;
+      const int width = field->width;
+      const int height = field->height;
+      out.loadExternal =
+        [windowFile, mapping, width, height](const std::string& file, field::Grid& grid, std::string& error) {
+        const std::string path = file.empty() ? windowFile : file;
+        if (path.empty()) {
+          error = "no heightmap: choose one in Terrain > Import / Export, or type a file in the node";
+          return false;
+        }
+        HeightImage image;
+        if (!ReadHeightImage(path, width, height, image, error)) {
+          error = path + ": " + error;
+          return false;
+        }
+        ImportSettings settings = mapping;
+        settings.blend = ImportSettings::Blend::Replace;
+        settings.strength = 1.0f;
+        const std::vector<std::uint16_t> words = ImportedHeights(
+          image, std::vector<std::uint16_t>(static_cast<std::size_t>(width) * height, 0), width, height, settings
+        );
+        grid = field::Grid(width, height, 1.0f, 0.0f, 0.0f);
+        for (std::size_t k = 0; k < words.size(); ++k) {
+          grid.v[k] = static_cast<float>(words[k]) / 128.0f;
+        }
+        return true;
+      };
+    }
     // The map's light.
     const LightingState lighting = mDocument.LightingNow();
     SunAnglesOf(lighting.sunDirection, out.sunAzimuth, out.sunAltitude);

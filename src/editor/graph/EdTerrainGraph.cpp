@@ -9,6 +9,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <filesystem>
 
 namespace faf::editor
 {
@@ -403,6 +404,16 @@ namespace faf::editor
       }
       if (node->type->name == "pad_flatten") {
         key += "|pads" + ground.padSignature;
+      }
+      if (node->type->name == "external_terrain") {
+        // The window's file and mapping, or the node's own file's stamp: a new save of the other tool runs it again.
+        key += "|ext" + ground.externalKey;
+        const std::string file = values.S("file");
+        std::error_code stampError;
+        if (!file.empty()) {
+          key += "|" + std::to_string(std::filesystem::file_size(file, stampError)) + ":" +
+            std::to_string(std::filesystem::last_write_time(file, stampError).time_since_epoch().count());
+        }
       }
       if (entry.key == key && entry.error.empty()) {
         ++report.cached;

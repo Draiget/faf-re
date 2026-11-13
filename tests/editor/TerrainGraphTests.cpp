@@ -256,7 +256,16 @@ namespace
   {
     // Every node of the palette (not the generic op nodes) fed with hills where it has an `a` pin: none fails. The ones
     // that need more than that are left out: the markers' pads, both slopes of Height from slopes.
-    const std::set<std::string> skip = {"pad_flatten", "height_from_gradient", "frame", "path_drawn"};
+    const std::set<std::string> skip = {
+      "pad_flatten",
+      "height_from_gradient",
+      "frame",
+      "path_drawn",
+      "external_terrain",
+      "layout_height",
+      "layout_mask",
+      "layout_bases"
+    };
     const TerrainGround ground = [] {
       TerrainGround g;
       g.width = 65;
@@ -554,6 +563,65 @@ namespace
     const int alone = lonely.AddNode("path_mask", 0, 0);
     TerrainRun other(1);
     EXPECT_EQ(other.Evaluate(lonely, 1, ground).errors.count(alone), 1U);
+  }
+
+  TEST(
+    TerrainGraph,
+    ExternalTerrainTakesTheImportAndFollowsItsFile
+  )
+  {
+    // The window's heightmap, as the view would map it: a ramp 10 .. 74 over a 129 x 129 map.
+    TerrainGround ground = Ground();
+    int loads = 0;
+    std::string asked;
+    ground.loadExternal = [&](const std::string& file, field::Grid& out, std::string& error) {
+      ++loads;
+      asked = file;
+      if (file == "missing.png") {
+        error = "missing.png: no such file";
+        return false;
+      }
+      out = field::Grid(129, 129, 1.0f, 0.0f, 0.0f);
+      for (int z = 0; z < 129; ++z) {
+        for (int x = 0; x < 129; ++x) {
+          out.At(x, z) = 10.0f + static_cast<float>(x) * 0.5f;
+        }
+      }
+      return true;
+    };
+    ground.externalKey = "a.png|1";
+    NodeGraph graph(TerrainNodeTypes());
+    const int ext = graph.AddNode("external_terrain", 0, 0);
+    const int mask = graph.AddNode("external_mask", 0, 200);
+    TerrainRun run(4);
+    auto report = run.Evaluate(graph, 1, ground);
+    ASSERT_TRUE(report.errors.empty()) << report.errors.begin()->second;
+    EXPECT_EQ(asked, "") << "the window's file";
+    const field::Grid& h = *run.Value(ext, "out")->grid;
+    EXPECT_EQ(h.w, 33) << "at the graph's resolution";
+    EXPECT_NEAR(h.At(0, 0), 10.0f, 0.01f);
+    EXPECT_NEAR(h.At(32, 0), 74.0f, 0.01f);
+    EXPECT_FLOAT_EQ(field::Measure(*run.Value(mask, "out")->grid).max, 0.0f) << "no named masks: empty";
+    // Unchanged: kept. The other tool saved again: run again.
+    (void)run.Evaluate(graph, 1, ground);
+    EXPECT_EQ(loads, 1);
+    ground.externalKey = "a.png|2";
+    (void)run.Evaluate(graph, 1, ground);
+    EXPECT_EQ(loads, 2);
+    // A file of the node's own, missing: the node shows why.
+    ParamValue file;
+    file.text = "missing.png";
+    graph.SetParam(ext, ParamOf(*graph.Find(ext)->type, "file"), file);
+    ParamValue strict;
+    strict.value[0] = 0.0f;
+    graph.SetParam(mask, ParamOf(*graph.Find(mask)->type, "optional"), strict);
+    report = run.Evaluate(graph, 1, ground);
+    EXPECT_EQ(run.Error(ext), "missing.png: no such file");
+    EXPECT_EQ(report.errors.count(mask), 1U) << "not optional: an error";
+    // A layout node says there is no layout yet.
+    const int layout = graph.AddNode("layout_height", 0, 400);
+    (void)run.Evaluate(graph, 1, ground);
+    EXPECT_NE(run.Error(layout).find("no map layout"), std::string::npos) << run.Error(layout);
   }
 
   TEST(

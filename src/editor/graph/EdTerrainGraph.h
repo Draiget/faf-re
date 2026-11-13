@@ -6,6 +6,7 @@
 
 #include <array>
 #include <cstdint>
+#include <functional>
 #include <map>
 #include <memory>
 #include <set>
@@ -90,6 +91,13 @@ namespace faf::editor
     std::array<float, 3> sunColour{1.0f, 1.0f, 1.0f};
     std::array<float, 3> ambient{0.0f, 0.0f, 0.0f};
     std::array<float, 3> shadowFill{0.0f, 0.0f, 0.0f};
+    /**
+     * Heights from another tool over the whole map, in map units (`file` empty: the Import / Export window's file),
+     * mapped as that window says; false with `error` when there is none or it can't be read. `externalKey` changes when
+     * the window's file, its stamp or the mapping does.
+     */
+    std::function<bool(const std::string& file, field::Grid& out, std::string& error)> loadExternal;
+    std::string externalKey;
   };
 
   /** The eight kinds of ground by the names graph files use, bottom to top, with their roughness (0 shiny .. 1 rough).
