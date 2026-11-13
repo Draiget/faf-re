@@ -20,6 +20,7 @@ set(FAF_REMOTE_SOURCES
   remote/ViewFrames.cpp
   remote/ViewLanes.cpp
   remote/SyncRouting.cpp
+  remote/ViewAudit.cpp
   remote/ViewIdMap.cpp
   remote/ViewJobs.cpp
   remote/InboundIds.cpp

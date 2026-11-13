@@ -2138,6 +2138,9 @@ namespace faf::remote
     }
 
     // The beat's payloads and print lines are all there (a server sends them now, plan WP11 `LuaSync`).
+    if (mPayloadAudit) {
+      mPayloadAudit(sim);
+    }
     if (mPayloadObserver) {
       mPayloadObserver(sim);
     }

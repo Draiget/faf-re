@@ -40,6 +40,7 @@
 #include "moho/animation/CAniActor.h"
 #if FAF_SERVER_MODE
 #include "remote/SyncRouting.h"
+#include "remote/ViewAudit.h"
 #endif
 
 namespace
@@ -297,6 +298,8 @@ namespace
       "  --spy                     with --view-bench --lua-routing: every Lua key each view receives checked;\n"
       "                            with --view-frames: every view's decoded frame checked against the oracle and\n"
       "                            for names of entities its client does not hold\n"
+      "  --view-audit              with --view-bench: srv_ViewAudit 1, the server's own audit of every view's Lua\n"
+      "                            keys and ids, command records and army records (counted as failures)\n"
       "  --inbound-check           with --view-ids: every command sent again in its army's view ids and translated\n"
       "                            back as the server would; it must marshal to the same bytes\n"
       "  --launch-check           rebuild the header's launch with BuildLaunchInfo and compare (plays nothing)\n"
@@ -599,6 +602,10 @@ int HEADLESS_Main(
       faf::remote::SyncKeyRoutes().size(),
       faf::remote::SyncPolicyGameVersionsText().c_str()
     );
+  }
+  // `--view-audit` (plan WP6.9): `srv_ViewAudit 1`, as `/con srv_ViewAudit=1` sets it, for the views a run builds.
+  if (moho::CFG_GetArgOption("--view-audit", 0, nullptr)) {
+    faf::remote::SetViewAuditSwitch(true);
   }
 #endif
   std::printf("[%s] replay %s\n", gLabel.c_str(), options.replayPath.c_str());

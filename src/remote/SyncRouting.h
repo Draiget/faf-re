@@ -210,6 +210,13 @@ namespace faf::remote
     {
       mPayloadObserver = std::move(observer);
     }
+    /** Plan WP6.9 (`srv_ViewAudit`, remote/ViewAudit.h): called as the payload observer is, just before it. */
+    void SetPayloadAudit(
+      std::function<void(moho::Sim&)> audit
+    )
+    {
+      mPayloadAudit = std::move(audit);
+    }
     /**
      * Plan WP13.6: called on the sim thread with a view whose command source has left every army (a defeat, once the
      * whole team is out and the game allows observers: `lua/sim/MatchState.lua` `ObserverAfterDeath`).
@@ -263,6 +270,11 @@ namespace faf::remote
     [[nodiscard]] std::uint64_t UnknownKeyWrites() const noexcept
     {
       return mUnknownKeyWrites;
+    }
+    /** Those keys, each once, in the order first written. */
+    [[nodiscard]] std::span<const std::string> UnknownKeys() const noexcept
+    {
+      return mLoggedKeys;
     }
 
     /** The army `view` is focused on, or -1. Each starts on the army of its own index. */
@@ -406,6 +418,7 @@ namespace faf::remote
     int mSingleViewRecallStatus = 0;
     bool mForkingRecallVote = false;
     std::function<void(moho::Sim&)> mPayloadObserver;
+    std::function<void(moho::Sim&)> mPayloadAudit;
     std::function<void(std::size_t)> mSourceGone;
     IdTranslator mTranslate;
     moho::Sim* mSim = nullptr;

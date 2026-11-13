@@ -1349,6 +1349,9 @@ namespace faf::headless
       }
       (void)viewBench->FinishViews();
       result.viewBenchSummary = viewBench->Summary();
+      if (const std::string audit = viewBench->FinishViewAudit(); !audit.empty()) {
+        result.viewBenchSummary += "\n  " + audit; // plan WP6.9, `--view-audit`
+      }
       result.viewBenchFailures = viewBench->Failures();
     }
     if (inboundCheck) {

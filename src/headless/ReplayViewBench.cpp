@@ -607,7 +607,10 @@ namespace faf::headless
       const remote::wire::SCommandLaneCounts& read = client.receiver.Counts();
       commandFailures += read.failures + read.droppedUpdates + read.droppedRemovals;
     }
-    return mEncodeFailures + HeldMismatches() + (mSyncSpy != nullptr ? mSyncSpy->Failures() : 0u) + commandFailures;
+    // Plan WP6.9: every incident of the view audit (`--view-audit`) too.
+    const std::uint64_t auditIncidents = ViewAudit() != nullptr ? ViewAudit()->Incidents() : 0u;
+    return mEncodeFailures + HeldMismatches() + (mSyncSpy != nullptr ? mSyncSpy->Failures() : 0u) + commandFailures +
+      auditIncidents;
   }
 
   std::string CReplayViewBench::Summary() const

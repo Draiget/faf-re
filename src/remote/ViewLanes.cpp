@@ -2,15 +2,19 @@
 
 #include <algorithm>
 #include <chrono>
+#include <string>
 
+#include "gpg/core/utils/Logging.h"
 #include "moho/entity/Entity.h"
 #include "moho/entity/EntityDb.h"
+#include "moho/entity/EntityId.h"
 #include "moho/entity/REntityBlueprint.h"
 #include "moho/sim/CArmyImpl.h"
 #include "moho/sim/CIntelGrid.h"
 #include "moho/sim/Sim.h"
 #include "moho/sim/SimWorkerPool.h"
 #include "remote/ArmyRecords.h"
+#include "remote/VisibilityOracle.h"
 
 namespace faf::remote
 {
@@ -32,7 +36,86 @@ namespace faf::remote
   )
     : CViewFrames(tables, MakeViewCodec(mapSizeX, mapSizeZ))
     , mTables(tables)
-  {}
+  {
+    // Plan WP6.9: read once, with the game's views, so the views' work never sees the audit come or go.
+    if (ViewAuditSwitchOn()) {
+      mAudit = std::make_unique<CViewAudit>();
+      gpg::Logf("view audit: on (srv_ViewAudit)");
+    }
+  }
+
+  void CViewLanes::OnBeatStarting()
+  {
+    CViewFrames::OnBeatStarting(); // the last beat's views are done
+    AuditHeldIds();
+  }
+
+  void CViewLanes::AuditHeldIds()
+  {
+    if (mAudit) {
+      mAudit->CheckHeldIds([this](const std::size_t view, const std::uint32_t simId) {
+        return view < ViewCount() && ViewHoldsEntity(view, simId);
+      });
+    }
+  }
+
+  std::string CViewLanes::FinishViewAudit()
+  {
+    if (!mAudit) {
+      return {};
+    }
+    AuditHeldIds();
+    std::string summary = mAudit->Summary();
+    gpg::Logf("%s", summary.c_str());
+    return summary;
+  }
+
+  void CViewLanes::AuditLua(
+    moho::Sim& sim
+  )
+  {
+    const auto beat = static_cast<std::uint32_t>(sim.mCurBeat);
+    mAudit->NoteUnroutedWrites(beat, mRouter->UnknownKeyWrites(), mRouter->UnknownKeys());
+    for (std::size_t view = 0; view < mRouter->ViewCount() && view < static_cast<std::size_t>(ArmyCount()); ++view) {
+      if (!HasView(static_cast<std::int32_t>(view))) {
+        continue; // no client gets it
+      }
+      const std::int32_t army = mRouter->ViewArmy(view);
+      const CViewIdMap* const ids =
+        IdMapsOn() && view < ViewCount() ? &IdMap(static_cast<std::int32_t>(view)) : nullptr;
+      const auto find = [&sim](const std::uint32_t id) -> const moho::Entity* {
+        return sim.mEntityDB != nullptr ? sim.mEntityDB->FindEntityById(id) : nullptr;
+      };
+      SViewAuditLuaFacts facts;
+      facts.entity = [&find, ids](const std::uint32_t id) {
+        SAuditEntity out;
+        const moho::Entity* const entity = find(id);
+        out.exists = entity != nullptr;
+        // A dead unit's id still says whose it was.
+        out.owner = entity != nullptr                                       ? entity->GetArmyIndex()
+          : moho::ClassifyEntityIdFamily(id) == moho::EEntityIdFamily::Unit ? moho::ExtractEntityIdSourceIndex(id)
+                                                                            : -1;
+        out.renumbered = entity != nullptr && ids != nullptr && ids->MapsEntity(id);
+        return out;
+      };
+      facts.allied = [this, &sim, view](const std::int32_t other) {
+        return mRouter->Allied(sim, view, other);
+      };
+      facts.labelSeen = [&sim, &find, army](const std::uint32_t id) {
+        // The map's first labels go to everyone; a label's end may name an id the sim has since given another prop.
+        const moho::Entity* const entity = find(id);
+        if (sim.mCurBeat <= 1u || entity == nullptr) {
+          return true;
+        }
+        const Wm3::Vec3f position = entity->GetPositionWm3();
+        return ViewCanSeePoint(sim, army, position, false) || ViewCanSeePoint(sim, army, position, true);
+      };
+      facts.wroteUnderFocus = [this, view](const std::string_view key) {
+        return mRouter->WroteUnderFocus(view, std::string(key).c_str());
+      };
+      mAudit->CheckLuaPayload(beat, view, army, mRouter->Payload(view), facts);
+    }
+  }
 
   CViewLanes::~CViewLanes()
   {
@@ -193,6 +276,11 @@ namespace faf::remote
         return ViewEntityId(view, simId);
       });
       mRouter->SetDumpPrefix(mLuaRoutingDump);
+      if (mAudit) {
+        mRouter->SetPayloadAudit([this](moho::Sim& routed) {
+          AuditLua(routed);
+        });
+      }
       OnLuaRouterMade(*mRouter);
       moho::Sim::SetSyncRouting(mRouter.get());
     }
@@ -463,6 +551,9 @@ namespace faf::remote
       ++client.failures;
       ok = false;
     }
+    if (mAudit) {
+      mAudit->CheckArmyRecords(ViewBeat(), army, records);
+    }
     client.armies = std::move(records);
     client.haveArmies = true;
 
@@ -543,6 +634,31 @@ namespace faf::remote
     // Command-records lane (plan WP5.14): what its client holds of them, against the beat's records.
     if (mCommandBook) {
       WriteCommandLane(army, client, fresh);
+      if (mAudit) {
+        // Plan WP6.9: every entity a record names is one its client knows (plan §6, command events: "units known to
+        // a"); its frames are done (this is its own work). A unit, prop or own projectile keeps its sim id: a record
+        // its frames hold, now or lately. A blip or another army's projectile goes by the view id its frames gave it,
+        // live or retired within the grace, as `WriteCommandLane` names it (`EntityToHeldView`): a lockstep client's
+        // target names that blip too, whether or not its user world still shows it, and the client learns no new id.
+        const CViewIdMap* const ids = IdMapsOn() && army < ViewCount() ? &IdMapForWork(view) : nullptr;
+        mAudit->CheckCommandLane(
+          ViewBeat(), army, client.commandLane, [this, ids, army](const std::uint32_t viewId, std::string& why) {
+          std::uint32_t simId = viewId;
+          if (ids != nullptr && ids->MapsEntity(viewId)) {
+            if (ids->EntityToSim(viewId, simId)) {
+              return true;
+            }
+            why = "a renumbered id the view's id map never gave";
+            return false;
+          }
+          if (!HeldFramesOn() || ViewHoldsEntity(army, simId)) {
+            return true;
+          }
+          why = "a sim id the view's frames hold no record of";
+          return false;
+        }
+        );
+      }
     }
 
     SLanes lanes{frameWriter, armyWriter, gridWriter, client.lua, ok};

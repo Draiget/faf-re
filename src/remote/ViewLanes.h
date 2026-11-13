@@ -13,6 +13,7 @@
 
 #include "remote/CommandRecords.h"
 #include "remote/SyncRouting.h"
+#include "remote/ViewAudit.h"
 #include "remote/ViewFrames.h"
 #include "remote/wire/ArmyLane.h"
 #include "remote/wire/BitStream.h"
@@ -96,6 +97,17 @@ namespace faf::remote
       mLuaSeparately = true;
     }
 
+    /** Plan WP6.9: the views' audit (remote/ViewAudit.h), made with the views when `srv_ViewAudit` is on; else null. */
+    [[nodiscard]] const CViewAudit* ViewAudit() const noexcept
+    {
+      return mAudit.get();
+    }
+    /**
+     * Plan WP6.9, with the views finished (after the last beat, or `FinishViews`): the audit's last checks, then its
+     * summary line; empty with the audit off.
+     */
+    [[nodiscard]] std::string FinishViewAudit();
+
   protected:
     /** One view's beat. `ok`: every lane encoded. */
     struct SLanes
@@ -138,6 +150,8 @@ namespace faf::remote
     }
 
     void OnViewFrames(moho::Sim& sim) override;
+    /** The last beat's views are done: with the audit, the ids its Lua lanes named are checked against them. */
+    void OnBeatStarting() override;
     /** Plan WP5.14: the beat's command records into the book; without a pipeline, the views' lanes go out now. */
     void OnCommandsPublished(moho::Sim& sim, const moho::SSyncData& packet) override;
     /** Plan WP5.14: the sim won't publish another beat (it stopped): views' jobs stop waiting for command records. */
@@ -283,6 +297,10 @@ namespace faf::remote
     void SendAll();
     /** Plan WP5.14: `army`'s command-records lane into its client's, once the beat's records are in the book. */
     void WriteCommandLane(std::size_t army, SClient& client, bool fresh);
+    /** Plan WP6.9: every view's routed `Sync`, on the sim thread as the router finishes a beat. */
+    void AuditLua(moho::Sim& sim);
+    /** Plan WP6.9: the ids `AuditLua` kept against what each view's client holds; with the views' work done. */
+    void AuditHeldIds();
 
     const wire::SContentTables& mTables;
     std::vector<SClient> mClients;
@@ -311,5 +329,6 @@ namespace faf::remote
     bool mLuaSeparately = false;
     std::string mLuaRoutingDump;
     std::unique_ptr<CSyncRouter> mRouter; // made once the army count is known
+    std::unique_ptr<CViewAudit> mAudit;   // plan WP6.9, `srv_ViewAudit`: made with the views, or never
   };
 } // namespace faf::remote

@@ -70,6 +70,7 @@
 #include "moho/net/LaunchInfoBuilder.h"
 #include "moho/sim/CWldMap.h"
 #include "remote/ServerClient.h"
+#include "remote/ViewAudit.h"
 #include "moho/console/CConCommand.h"
 #include "moho/sim/CWldSession.h"
 #include "moho/sim/CWldSessionLoaderImpl.h"
@@ -117,7 +118,7 @@ namespace
     "[--view-threads <n>] [--per-player-views] [--team-views] [--away-pause-seconds <n>] [--defeated-view "
     "observe|disconnect] [--lobby-seconds <n> [--start-when-ready <seconds>]] [--lobby-away-seconds <n>] "
     "[--stats-every <beats>] [--pose-budget-kbps <n>] [--no-effect-ops | --effect-ops-all] [--no-command-records] "
-    "[--congestion-control] "
+    "[--view-audit] [--congestion-control] "
     "[--nftables-out <file> "
     "[--nftables-only] "
     "[--unlisted-pps <n>] [--unlisted-total-pps <n>]] [--sync-policy <file>] [--unvalidated-policy] "
@@ -2370,6 +2371,12 @@ namespace
         net->SetFocusRule(client.uid, playerArmy); // plan WP11.1: their SetFocusArmy keeps them on it
       }
       armyUids = viewPlayers;
+      // Plan WP6.9: `--view-audit` is `srv_ViewAudit 1`: the views check what they send each player against the
+      // rules for that player's view, and log what breaks them (remote/ViewAudit.h).
+      if (moho::CFG_GetArgOption("--view-audit", 0, nullptr)) {
+        faf::remote::SetViewAuditSwitch(true);
+        Say("View audit: on (--view-audit)");
+      }
       views = std::make_unique<faf::server::CServerViews>(
         contentTables,
         *rules,
@@ -3260,6 +3267,9 @@ namespace
       }
       if (const std::string commands = views->CommandReport(); !commands.empty()) {
         Say("%s", commands.c_str());
+      }
+      if (const std::string audit = views->FinishViewAudit(); !audit.empty()) {
+        Say("%s", audit.c_str());
       }
     }
     if (net) {
