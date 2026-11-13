@@ -42,7 +42,7 @@ const usage = `usage:
   mpemu lobby [-n 2] [-mode direct|relay|ice] [-lobby auto|normal] [-map SCMP_009]
               [-exe game.exe] [-no-spawn] [-agents a,b] [-hub URL]
   mpemu agent -hub URL [-name pc2] [-advertise host] [-exe game.exe] [-adapter faf-adapter.exe]
-  mpemu selftest [-fakegame fakegame.exe] [-adapter faf-adapter.exe] [-only name] [-remote] [-v]
+  mpemu selftest [-fakegame fakegame.exe] [-adapter faf-adapter.exe] [-only name] [-remote] [-bindip addr] [-v]
   mpemu token -uid 1 [-game-id 100]
 
   hub secret: MPEMU_SECRET, or -secret-file / MPEMU_SECRET_FILE
@@ -255,7 +255,16 @@ func cmdSelftest(ctx context.Context, args []string) int {
 	fake := fs.String("fakegame", "", "fakegame executable (default: next to mpemu.exe)")
 	only := fs.String("only", "", "run only scenarios whose name contains this")
 	remote := fs.Bool("remote", false, "run only the hub selftests, against the hub in -hub / MPEMU_HUB (agents start here)")
+	bindIP := fs.String("bindip", "", "bind every fakegame's lobby port to this address (/bindip), for a host where a socket bound to every interface can't reach 127.0.0.1")
 	_ = fs.Parse(args)
+	withBind := func(list []*scenario.Scenario) []*scenario.Scenario {
+		if *bindIP != "" {
+			for _, sc := range list {
+				sc.Game.Args = append(sc.Game.Args, "/bindip", *bindIP)
+			}
+		}
+		return list
+	}
 
 	if *fake == "" {
 		*fake = siblingExe("fakegame.exe")
@@ -302,10 +311,10 @@ func cmdSelftest(ctx context.Context, args []string) int {
 		host, _ := os.Hostname()
 		agents = [2]string{"st-a-" + strings.ToLower(host), "st-b-" + strings.ToLower(host)}
 	} else {
-		runAll(scenario.Selftests(*fake, adapter), "", "")
+		runAll(withBind(scenario.Selftests(*fake, adapter)), "", "")
 	}
 
-	hubList := scenario.HubSelftests(*fake, adapter, agents, *remote)
+	hubList := withBind(scenario.HubSelftests(*fake, adapter, agents, *remote))
 	wanted := false
 	for _, sc := range hubList {
 		wanted = wanted || *only == "" || strings.Contains(sc.Name, *only)
@@ -316,7 +325,7 @@ func cmdSelftest(ctx context.Context, args []string) int {
 		if *remote {
 			stack, err = remoteHub(ctx, filepath.Join(root, "agents"), c.hubURL, c.secretFile, adapter, agents)
 		} else {
-			stack, err = startLocalHub(ctx, filepath.Join(root, "hub"), adapter, agents)
+			stack, err = startLocalHub(ctx, filepath.Join(root, "hub"), adapter, *bindIP, agents)
 		}
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "mpemu: hub selftests:", err)
@@ -374,7 +383,8 @@ func remoteHub(ctx context.Context, dir, url, secretFile, adapter string, agents
 	return h, nil
 }
 
-func startLocalHub(ctx context.Context, dir, adapter string, agents [2]string) (*hubStack, error) {
+// relayIP, when set, binds the hub's game relay to that address (selftest -bindip).
+func startLocalHub(ctx context.Context, dir, adapter, relayIP string, agents [2]string) (*hubStack, error) {
 	server := siblingExe("mpemu-server.exe")
 	if server == "" {
 		return nil, fmt.Errorf("mpemu-server.exe not found next to mpemu.exe (run build.ps1)")
@@ -405,8 +415,12 @@ func startLocalHub(ctx context.Context, dir, adapter string, agents [2]string) (
 	// With a secret the hub serves TLS under the secret-derived key, exactly as
 	// a deployed hub does; the ICE seats reach it through the gateway.
 	h := &hubStack{url: "https://" + httpAddr, secret: secret, job: job}
+	hubArgs := []string{"-http", httpAddr, "-turn-port", strconv.Itoa(turnPort), "-logs", dir}
+	if relayIP != "" {
+		hubArgs = append(hubArgs, "-relay-ip", relayIP)
+	}
 	if _, err = procs.Start(procs.Spec{Name: "hub", Exe: server, Dir: dir, Env: env,
-		Args:   []string{"-http", httpAddr, "-turn-port", strconv.Itoa(turnPort), "-logs", dir},
+		Args:   hubArgs,
 		Output: filepath.Join(dir, "hub.log")}, job); err != nil {
 		job.Close()
 		return nil, err

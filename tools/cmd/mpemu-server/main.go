@@ -49,6 +49,7 @@ func main() {
 		turnPort    = flag.Int("turn-port", 3478, "TURN/STUN UDP port (0 disables TURN)")
 		turnRange   = flag.String("turn-relay-ports", "", "TURN relay allocation ports, e.g. 40000-40015 (default: any)")
 		relayRange  = flag.String("relay-ports", "", "game relay ports, e.g. 40100-40131 (default: any)")
+		relayIP     = flag.String("relay-ip", "", "address the game relay's sockets bind to (default: every interface)")
 		forceRelay  = flag.Bool("force-relay", false, "tell ICE adapters to use TURN relay candidates only")
 		secretFile  = flag.String("secret-file", os.Getenv("MPEMU_SECRET_FILE"), "file holding the shared secret")
 		logDir      = flag.String("logs", "mpemu-server-logs", "directory for the journal and uploaded adapter logs")
@@ -113,8 +114,14 @@ func main() {
 	if hubHost == "" {
 		hubHost, _, _ = net.SplitHostPort(*httpAddr)
 	}
+	var relayListen net.IP
+	if *relayIP != "" {
+		if relayListen = net.ParseIP(*relayIP); relayListen == nil {
+			fail(fmt.Errorf("-relay-ip %q is not an IP address", *relayIP))
+		}
+	}
 	hubSrv = hub.New(hub.Options{Secret: secret, PublicHost: hubHost,
-		RelayMinPort: relayMin, RelayMaxPort: relayMax}, j, queue)
+		RelayMinPort: relayMin, RelayMaxPort: relayMax, RelayListenIP: relayListen}, j, queue)
 
 	mux := http.NewServeMux()
 	ice.Routes(mux)
