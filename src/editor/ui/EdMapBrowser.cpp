@@ -1,4 +1,5 @@
 #include "editor/ui/EdMapBrowser.h"
+#include "editor/ui/EdControls.h"
 #include "editor/ui/EdThemeColors.h"
 #include "editor/ui/EdUiScale.h"
 #include "editor/EdPath.h"
@@ -676,9 +677,9 @@ namespace faf::editor
       "Max. players: " + (mFilters.minPlayers > 0 ? std::to_string(mFilters.minPlayers) : std::string("")) + " to " +
       (mFilters.maxPlayers > 0 && mFilters.maxPlayers < 16 ? std::to_string(mFilters.maxPlayers) : std::string(""));
     if (ImGui::BeginCombo("##players", players.c_str())) {
-      changed |= ImGui::SliderInt("from##p", &mFilters.minPlayers, 0, 16, mFilters.minPlayers == 0 ? "any" : "%d");
+      changed |= FillSliderInt("from##p", &mFilters.minPlayers, 0, 16, mFilters.minPlayers == 0 ? "any" : "%d");
       int to = mFilters.maxPlayers == 0 ? 16 : mFilters.maxPlayers;
-      if (ImGui::SliderInt("to##p", &to, 0, 16, to >= 16 ? "any" : "%d")) {
+      if (FillSliderInt("to##p", &to, 0, 16, to >= 16 ? "any" : "%d")) {
         mFilters.maxPlayers = to >= 16 ? 0 : to;
         changed = true;
       }
@@ -695,10 +696,8 @@ namespace faf::editor
       mFilters.maxScore < 5.0f ? std::to_string(mFilters.maxScore).substr(0, 3).c_str() : ""
     );
     if (ImGui::BeginCombo("##score", score)) {
-      changed |=
-        ImGui::SliderFloat("from##s", &mFilters.minScore, 0.0f, 5.0f, mFilters.minScore <= 0.0f ? "any" : "%.1f");
-      changed |=
-        ImGui::SliderFloat("to##s", &mFilters.maxScore, 0.0f, 5.0f, mFilters.maxScore >= 5.0f ? "any" : "%.1f");
+      changed |= FillSliderFloat("from##s", &mFilters.minScore, 0.0f, 5.0f, mFilters.minScore <= 0.0f ? "any" : "%.1f");
+      changed |= FillSliderFloat("to##s", &mFilters.maxScore, 0.0f, 5.0f, mFilters.maxScore >= 5.0f ? "any" : "%.1f");
       ImGui::EndCombo();
     }
     ImGui::SameLine();

@@ -43,24 +43,24 @@ Theme = {
     colors = {
         Text = '#e9edf2',
         TextDisabled = '#7f8a97',
-        WindowBg = '#14181e',
-        ChildBg = '#14181e00',
+        WindowBg = '#1b2028',
+        ChildBg = '#1b202800',
         PopupBg = '#1b2028',
         Border = '#2a313b',
-        FrameBg = '#1b2028',
-        FrameBgHovered = '#242b35',
-        FrameBgActive = '#2e3743',
-        TitleBg = '#0d1014',
-        TitleBgActive = '#0d1014',
+        FrameBg = '#14181e',
+        FrameBgHovered = '#1e242c',
+        FrameBgActive = '#242b35',
+        TitleBg = '#14181e',
+        TitleBgActive = '#14181e',
         MenuBarBg = '#14181e',
-        ScrollbarBg = '#14181e00',
+        ScrollbarBg = '#1b202800',
         Button = '#242b35',
         ButtonHovered = '#2e3743',
         Separator = '#2a313b',
-        Tab = '#14181e',
-        TabHovered = '#242b35',
+        Tab = '#14181e00',
+        TabHovered = '#1b2028',
         TabSelected = '#1b2028',
-        TabDimmed = '#14181e',
+        TabDimmed = '#14181e00',
         TabDimmedSelected = '#1b2028',
         TableBorderStrong = '#2a313b',
         TableBorderLight = '#20262e',
@@ -242,7 +242,8 @@ Theme = {
 
   const std::vector<std::string_view>& BuiltInThemeSources()
   {
-    static const std::vector<std::string_view> sources = {kEditorDark, kFafBlue, kLight};
+    // FAF Blue first: the mockup's look is the default.
+    static const std::vector<std::string_view> sources = {kFafBlue, kEditorDark, kLight};
     return sources;
   }
 

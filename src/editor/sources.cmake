@@ -37,6 +37,7 @@ set(FAF_EDITOR_SOURCES
   doc/EdVault.cpp
   doc/EdHttp.cpp
   doc/EdFafApi.cpp
+  ui/EdControls.cpp
   ui/EdMapBrowser.cpp
   doc/EdWaterBodies.cpp
   view/EdWaterBodyView.cpp

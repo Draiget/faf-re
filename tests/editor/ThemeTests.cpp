@@ -114,9 +114,10 @@ namespace
     std::ofstream(folder / "notes.txt") << "not a theme";
     const std::vector<EdTheme> themes = LoadThemes(folder);
     ASSERT_EQ(themes.size(), 4u);
-    EXPECT_EQ(themes[0].name, "Editor Dark");
-    EXPECT_TRUE(Near(themes[0].accent[1], 1.0f)) << "the folder's Editor Dark replaced the built-in";
-    EXPECT_FALSE(themes[0].file.empty());
+    EXPECT_EQ(themes[0].name, "FAF Blue") << "the mockup's look comes first: the default";
+    EXPECT_EQ(themes[1].name, "Editor Dark");
+    EXPECT_TRUE(Near(themes[1].accent[1], 1.0f)) << "the folder's Editor Dark replaced the built-in";
+    EXPECT_FALSE(themes[1].file.empty());
     EXPECT_EQ(themes[3].name, "mine") << "a theme without a name is called by its file";
     EXPECT_TRUE(themes[3].light);
     std::filesystem::remove_all(folder);

@@ -141,6 +141,7 @@ namespace faf::editor
       ImGuiWindowFlags_NoBringToFrontOnFocus;
     const ImGuiStyle& style = ImGui::GetStyle();
     const ImVec4 bar = style.Colors[chrome.active ? ImGuiCol_TitleBgActive : ImGuiCol_TitleBg];
+    const ImVec2 panelFramePadding = style.FramePadding; // the panels', for the menus' rows
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
     ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
     ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
@@ -154,22 +155,57 @@ namespace faf::editor
       const float rowMid = rowTop + height * 0.5f;
       const ImVec4 text = style.Colors[chrome.active ? ImGuiCol_Text : ImGuiCol_TextDisabled];
 
+      // Where the title and the menus' cursor goes so their text sits on the row's middle, as the tabs' does: the
+      // menu bar draws text its line's text offset (the row's tall frame padding) below the cursor.
+      const float textTop = std::round(rowMid - fontSize * 0.5f) - ImGui::GetCurrentWindow()->DC.CurrLineTextBaseOffset;
+
       // The app's mark: a rounded square in the accent's colours (the mockup's logo).
       {
         const float size = std::round(Em(18.0f));
         const ImVec2 at(ImGui::GetCursorScreenPos().x + Em(10.0f), std::round(rowMid - size * 0.5f));
         const ImVec4 a = style.Colors[ImGuiCol_CheckMark];
         const ImVec4 b = style.Colors[ImGuiCol_PlotHistogram];
+        // A button: the start screen (File > Start screen), lit under the mouse.
+        const ImVec2 cursor = ImGui::GetCursorScreenPos();
+        const ImVec2 hitMin(cursor.x + Em(4.0f), rowTop + Em(4.0f));
+        const ImVec2 hitMax(at.x + size + Em(6.0f), rowTop + height - Em(4.0f));
+        ImGui::SetCursorScreenPos(hitMin);
+        const bool pressed = ImGui::InvisibleButton("##appmark", ImVec2(hitMax.x - hitMin.x, hitMax.y - hitMin.y));
+        const bool hovered = ImGui::IsItemHovered();
+        chrome.controls.push_back(RectOf(ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), origin));
+        if (hovered || ImGui::IsItemActive()) {
+          dl->AddRectFilled(
+            hitMin,
+            hitMax,
+            ImGui::GetColorU32(ImGui::IsItemActive() ? ImGuiCol_ButtonActive : ImGuiCol_ButtonHovered),
+            Em(6.0f)
+          );
+          ImGui::SetTooltip("Open the start screen");
+        }
         dl->AddRectFilledMultiColor(
           at, ImVec2(at.x + size, at.y + size), Mix(a, b, 0.0f), Mix(a, b, 0.5f), Mix(a, b, 1.0f), Mix(a, b, 0.5f)
         );
-        dl->AddRect(at, ImVec2(at.x + size, at.y + size), ImGui::ColorConvertFloat4ToU32(bar), Em(4.0f), 0, Em(3.0f));
+        dl->AddRect(
+          at,
+          ImVec2(at.x + size, at.y + size),
+          hovered ? ImGui::GetColorU32(ImGui::IsItemActive() ? ImGuiCol_ButtonActive : ImGuiCol_ButtonHovered)
+                  : ImGui::ColorConvertFloat4ToU32(bar),
+          Em(4.0f),
+          0,
+          Em(3.0f)
+        );
+        if (pressed) {
+          (void)commands.Run("file.home");
+        }
+        ImGui::SetCursorScreenPos(cursor);
         ImGui::Dummy(ImVec2(size + Em(18.0f), fontSize));
       }
 
       // The map's name, a dot while it has unsaved changes, and what a play is doing.
       {
         ImGui::PushStyleColor(ImGuiCol_Text, text);
+        // On the row's middle, as the workspace tabs are (the menu bar's own line sat a few pixels lower).
+        ImGui::SetCursorScreenPos(ImVec2(ImGui::GetCursorScreenPos().x, textTop));
         ImGui::TextUnformatted(info.document.empty() ? "FAF Map Editor" : info.document.c_str());
         ImGui::PopStyleColor();
         if (info.modified) {
@@ -186,19 +222,58 @@ namespace faf::editor
         ImGui::SameLine(0.0f, Em(14.0f));
       }
 
-      // The menus. Alt or F10 opens one through the window's message handler (chrome.openMenu).
+      // The menus. Alt or F10 opens one through the window's message handler (chrome.openMenu). Each label sits on
+      // the row's middle with room around it (ImGui spaces menu labels by the item spacing, which the row keeps
+      // small), lit the tabs' height and shape under the mouse or while open (ImGui's own light is the text's box).
+      // (A menu label takes about two and a half times the item spacing round it.)
+      // The light reaches Em(7) past a label's text on each side; the labels' gap (about 2.5 times this spacing) leaves
+      // room between two lights.
+      ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(Em(9.0f), style.ItemSpacing.y));
+      dl->ChannelsSplit(2);
+      const float litHeight = std::round(Em(24.0f));
       for (std::size_t i = 0; i < menus.size(); ++i) {
         const std::string label = MenuLabelText(menus[i].label);
         if (chrome.openMenu == static_cast<int>(i)) {
           ImGui::OpenPopup(label.c_str());
         }
+        dl->ChannelsSetCurrent(1);
+        ImGui::SetCursorScreenPos(ImVec2(ImGui::GetCursorScreenPos().x, textTop));
+        // The menu's popup is made inside BeginMenu: it takes the padding pushed here, not the row's (none).
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(Em(10.0f), Em(7.0f)));
+        ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
+        ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
+        ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
         const bool open = ImGui::BeginMenu(label.c_str());
-        chrome.controls.push_back(RectOf(ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), origin));
+        ImGui::PopStyleColor(3);
+        ImGui::PopStyleVar();
+        const ImVec2 labelMin = ImGui::GetItemRectMin();
+        const ImVec2 labelMax = ImGui::GetItemRectMax();
+        chrome.controls.push_back(RectOf(labelMin, labelMax, origin));
+        if (open || ImGui::IsItemHovered()) {
+          dl->ChannelsSetCurrent(0);
+          // Round the text, not the item: ImGui's item already spans half the gap to each neighbour.
+          const float middle = (labelMin.x + labelMax.x) * 0.5f;
+          const float half = ImGui::CalcTextSize(label.c_str()).x * 0.5f + Em(7.0f);
+          dl->AddRectFilled(
+            ImVec2(std::round(middle - half), std::round(rowMid - litHeight * 0.5f)),
+            ImVec2(std::round(middle + half), std::round(rowMid + litHeight * 0.5f)),
+            ImGui::GetColorU32(open ? ImGuiCol_ButtonActive : ImGuiCol_ButtonHovered),
+            Em(6.0f)
+          );
+          dl->ChannelsSetCurrent(1);
+        }
         if (open) {
+          // The mockup's menu rows: room between them and to their sides (the row's frame padding is its own).
+          ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, panelFramePadding);
+          ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(Em(12.0f), Em(9.0f)));
+          ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(Em(10.0f), Em(7.0f)));
           DrawMenuItems(commands, menus[i].items);
+          ImGui::PopStyleVar(3);
           ImGui::EndMenu();
         }
       }
+      dl->ChannelsMerge();
+      ImGui::PopStyleVar();
       chrome.openMenu = -1;
 
       // The workspace tabs: the one shown filled, the others as text; each runs its command (so its keys and the

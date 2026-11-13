@@ -5,6 +5,7 @@
 // doc/EdAdaptiveModel.
 
 #include <algorithm>
+#include "editor/ui/EdControls.h"
 #include <cstdio>
 #include <functional>
 #include <set>
@@ -396,7 +397,7 @@ namespace faf::editor
         ImGui::SetNextItemWidth(ImGui::GetFontSize() * 9.0f);
         const int most = std::max(tables.maxPlayers, 1);
         int players = mAdaptivePreviewPlayers == 0 ? most : mAdaptivePreviewPlayers;
-        if (ImGui::SliderInt("##players", &players, 1, most, players == most ? "all %d players" : "%d players")) {
+        if (FillSliderInt("##players", &players, 1, most, players == most ? "all %d players" : "%d players")) {
           mAdaptivePreviewPlayers = players == most ? 0 : players;
         }
         ImGui::SetItemTooltip(

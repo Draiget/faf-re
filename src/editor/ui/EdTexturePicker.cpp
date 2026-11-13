@@ -1,4 +1,5 @@
 #include "editor/ui/EdTexturePicker.h"
+#include "editor/ui/EdControls.h"
 #include "editor/ui/EdThemeColors.h"
 #include "editor/ui/EdUiScale.h"
 
@@ -148,7 +149,7 @@ namespace faf::editor
       }
       ImGui::SameLine();
       ImGui::SetNextItemWidth(Em(140.0f));
-      ImGui::SliderFloat("##tile", &mTile, 64.0f, 192.0f, "tiles %.0f px");
+      FillSliderFloat("##tile", &mTile, 64.0f, 192.0f, "tiles %.0f px");
       ImGui::SameLine();
       if (ImGui::Button("None")) {
         picked = !path.empty();

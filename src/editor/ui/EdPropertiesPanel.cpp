@@ -2,6 +2,7 @@
 // header with its kind and name, its transform as labelled rows, then what its kind has.
 
 #include <cctype>
+#include "editor/ui/EdControls.h"
 #include "editor/ui/EdThemeColors.h"
 #include "editor/ui/EdUiScale.h"
 #include "editor/ui/EdWorkspaces.h"
@@ -195,22 +196,22 @@ namespace faf::editor
     if (ImGui::CollapsingHeader("Transform", ImGuiTreeNodeFlags_DefaultOpen)) {
       bool moved = false;
       row("Location X");
-      ImGui::DragFloat("##x", &edit.position[0], 0.1f, 0.0f, 0.0f, "%.2f");
+      FillDragFloat("##x", &edit.position[0], 0.1f, 0.0f, 0.0f, "%.2f");
       moved = moved || ImGui::IsItemDeactivatedAfterEdit();
       active = active || ImGui::IsItemActive();
       row("Height");
-      ImGui::DragFloat("##y", &edit.position[1], 0.05f, 0.0f, 0.0f, "%.2f");
+      FillDragFloat("##y", &edit.position[1], 0.05f, 0.0f, 0.0f, "%.2f");
       moved = moved || ImGui::IsItemDeactivatedAfterEdit();
       active = active || ImGui::IsItemActive();
       row("Z");
-      ImGui::DragFloat("##z", &edit.position[2], 0.1f, 0.0f, 0.0f, "%.2f");
+      FillDragFloat("##z", &edit.position[2], 0.1f, 0.0f, 0.0f, "%.2f");
       moved = moved || ImGui::IsItemDeactivatedAfterEdit();
       active = active || ImGui::IsItemActive();
       if (moved) {
         send(PropertyEdit::What::Position, edit.position[0], edit.position[1], edit.position[2]);
       }
       row("Heading");
-      ImGui::DragFloat("##heading", &edit.heading, 0.5f, -180.0f, 180.0f, "%.1f deg");
+      FillDragFloat("##heading", &edit.heading, 0.5f, -180.0f, 180.0f, "%.1f deg");
       if (ImGui::IsItemDeactivatedAfterEdit()) {
         send(PropertyEdit::What::Heading, edit.heading, 0.0f, 0.0f);
       }
@@ -218,11 +219,11 @@ namespace faf::editor
       if (now.kind == SelectionProperties::Kind::Decal) {
         bool sized = false;
         row("Size X");
-        ImGui::DragFloat("##sx", &edit.size[0], 0.1f, 0.1f, 4096.0f, "%.2f");
+        FillDragFloat("##sx", &edit.size[0], 0.1f, 0.1f, 4096.0f, "%.2f");
         sized = sized || ImGui::IsItemDeactivatedAfterEdit();
         active = active || ImGui::IsItemActive();
         row("Size Z");
-        ImGui::DragFloat("##sz", &edit.size[1], 0.1f, 0.1f, 4096.0f, "%.2f");
+        FillDragFloat("##sz", &edit.size[1], 0.1f, 0.1f, 4096.0f, "%.2f");
         sized = sized || ImGui::IsItemDeactivatedAfterEdit();
         active = active || ImGui::IsItemActive();
         if (sized) {
@@ -270,7 +271,7 @@ namespace faf::editor
           if (held.rfind("FLOAT(", 0) == 0) {
             const std::vector<double> numbers = ValueNumbers(held);
             float number = numbers.empty() ? 0.0f : static_cast<float>(numbers.front());
-            if (ImGui::DragFloat("##float", &number, 0.1f, 0.0f, 0.0f, "%.2f")) {
+            if (FillDragFloat("##float", &number, 0.1f, 0.0f, 0.0f, "%.2f")) {
               held = FloatValue(number);
             }
             if (ImGui::IsItemDeactivatedAfterEdit()) {

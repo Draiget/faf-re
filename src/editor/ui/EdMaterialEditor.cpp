@@ -1,4 +1,5 @@
 #include "editor/ui/EdMaterialEditor.h"
+#include "editor/ui/EdControls.h"
 #include "editor/ui/EdWorkspaces.h"
 #include "editor/ui/EdUiScale.h"
 
@@ -857,7 +858,7 @@ namespace faf::editor
     ImGui::SameLine();
     ImGui::SetNextItemWidth(mStaged ? Em(220.0f) : -1.0f);
     float lightDegrees = mLightYaw * 180.0f / kPi;
-    if (ImGui::SliderFloat("##light", &lightDegrees, -180.0f, 180.0f, "Light %.0f deg")) {
+    if (FillSliderFloat("##light", &lightDegrees, -180.0f, 180.0f, "Light %.0f deg")) {
       mLightYaw = lightDegrees * kPi / 180.0f;
       mPreviewStale = true;
     }
@@ -987,11 +988,11 @@ namespace faf::editor
       ImGui::SetNextItemWidth(-100.0f);
       switch (def.kind) {
       case ParamKind::Float:
-        changed = ImGui::SliderFloat(def.name.c_str(), &value.value[0], def.min, def.max, "%.3f");
+        changed = FillSliderFloat(def.name.c_str(), &value.value[0], def.min, def.max, "%.3f");
         break;
       case ParamKind::Int: {
         int v = static_cast<int>(std::lround(value.value[0]));
-        changed = ImGui::SliderInt(def.name.c_str(), &v, static_cast<int>(def.min), static_cast<int>(def.max));
+        changed = FillSliderInt(def.name.c_str(), &v, static_cast<int>(def.min), static_cast<int>(def.max));
         value.value[0] = static_cast<float>(v);
         break;
       }

@@ -3,6 +3,7 @@
 // canvas, with Details for the selected node and a palette; every emitter plays in the particle view.
 
 #include "editor/ui/EdParticleEditor.h"
+#include "editor/ui/EdControls.h"
 #include "editor/ui/EdUiScale.h"
 
 #include "editor/doc/EdMapFile.h"
@@ -482,7 +483,7 @@ namespace faf::editor
       case ParamKind::Float:
       case ParamKind::Int: {
         const float speed = std::max((def.max - def.min) / 400.0f, 0.001f);
-        changed = ImGui::DragFloat(def.name.c_str(), &value.value[0], speed, def.min, def.max, "%.3f");
+        changed = FillDragFloat(def.name.c_str(), &value.value[0], speed, def.min, def.max, "%.3f");
         break;
       }
       case ParamKind::Bool: {
@@ -540,7 +541,7 @@ namespace faf::editor
   {
     bool changed = false;
     ImGui::SetNextItemWidth(Em(120.0f));
-    changed |= ImGui::DragFloat("Time range", &range, 0.1f, 0.1f, 1000.0f, "%.2f");
+    changed |= FillDragFloat("Time range", &range, 0.1f, 0.1f, 1000.0f, "%.2f");
     ImGui::SetItemTooltip("The curve's time axis in ticks (10 a second)");
     const float span = range > 0.0f ? range : 1.0f;
     float low = info != nullptr ? info->viewMin : 0.0f;
@@ -618,13 +619,13 @@ namespace faf::editor
     if (mKeySelected >= 0 && static_cast<std::size_t>(mKeySelected) < keys.size()) {
       EmitterKey& key = keys[static_cast<std::size_t>(mKeySelected)];
       ImGui::SetNextItemWidth(Em(90.0f));
-      changed |= ImGui::DragFloat("Time", &key.x, 0.05f, 0.0f, span, "%.3f");
+      changed |= FillDragFloat("Time", &key.x, 0.05f, 0.0f, span, "%.3f");
       ImGui::SameLine();
       ImGui::SetNextItemWidth(Em(90.0f));
-      changed |= ImGui::DragFloat("Value", &key.y, 0.01f, 0.0f, 0.0f, "%.3f");
+      changed |= FillDragFloat("Value", &key.y, 0.01f, 0.0f, 0.0f, "%.3f");
       ImGui::SameLine();
       ImGui::SetNextItemWidth(Em(90.0f));
-      changed |= ImGui::DragFloat("Spread", &key.z, 0.01f, 0.0f, 0.0f, "%.3f");
+      changed |= FillDragFloat("Spread", &key.z, 0.01f, 0.0f, 0.0f, "%.3f");
     } else {
       ImGui::TextDisabled("%zu key(s). Click a key to edit its numbers.", keys.size());
     }

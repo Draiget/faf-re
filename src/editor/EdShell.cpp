@@ -1,4 +1,5 @@
 #include "editor/EdShell.h"
+#include "editor/ui/EdControls.h"
 #include "editor/ui/EdCommands.h"
 #include "editor/ui/EdPalette.h"
 #include "editor/ui/EdTitleBar.h"
@@ -1274,10 +1275,10 @@ namespace faf::editor
         setup.victory = kVictoryKeys[victory];
       }
       label("Unit cap");
-      ImGui::SliderInt("##unitcap", &setup.unitCap, 250, 1500, "%d units");
+      FillSliderInt("##unitcap", &setup.unitCap, 250, 1500, "%d units");
       setup.unitCap = std::clamp(setup.unitCap / 50 * 50, 250, 1500);
       label("AI cheat x");
-      ImGui::SliderFloat("##cheatmult", &setup.cheatMult, 1.0f, 5.0f, "%.1f");
+      FillSliderFloat("##cheatmult", &setup.cheatMult, 1.0f, 5.0f, "%.1f");
       if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
         ImGui::SetTooltip("The cheating AIs' resource and build multiplier (the lobby's AIx options)");
       }
@@ -1528,14 +1529,14 @@ namespace faf::editor
       }
     }
     ImGui::SetNextItemWidth(kWidth);
-    ImGui::SliderInt("Players", &mNewMap.players, 1, kNewMapMaxPlayers);
+    FillSliderInt("Players", &mNewMap.players, 1, kNewMapMaxPlayers);
     ImGui::SetNextItemWidth(kWidth);
-    ImGui::DragFloat("Ground height", &mNewMap.height, 0.25f, 0.0f, 500.0f, "%.1f");
+    FillDragFloat("Ground height", &mNewMap.height, 0.25f, 0.0f, 500.0f, "%.1f");
     ImGui::Checkbox("Sea", &mNewMap.sea);
     if (mNewMap.sea) {
       ImGui::SameLine();
       ImGui::SetNextItemWidth(kWidth - 60.0f);
-      ImGui::DragFloat("Sea level", &mNewMap.seaLevel, 0.25f, 0.0f, 500.0f, "%.1f");
+      FillDragFloat("Sea level", &mNewMap.seaLevel, 0.25f, 0.0f, 500.0f, "%.1f");
     }
     ImGui::TextDisabled(
       "Start positions ARMY_1 to ARMY_%d in a ring; ARMY_17 and NEUTRAL_CIVILIAN as extra armies.", mNewMap.players

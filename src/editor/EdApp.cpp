@@ -1,4 +1,5 @@
 #include "editor/EdApp.h"
+#include "editor/ui/EdControls.h"
 #include "editor/EdPath.h"
 #include "editor/view/EdPropThumbnails.h"
 #include "editor/doc/EdAdaptiveTables.h"
@@ -969,7 +970,7 @@ namespace faf::editor
         std::error_code error;
         if (!mThemeFolder.empty() && !std::filesystem::exists(mThemeFolder, error)) {
           std::filesystem::create_directories(mThemeFolder, error);
-          std::string example(BuiltInThemeSources()[1]);
+          std::string example(BuiltInThemeSources().front()); // FAF Blue
           const std::size_t at = example.find("name = 'FAF Blue'");
           if (at != std::string::npos) {
             example.replace(at, 17, "name = 'My theme'");
@@ -1007,10 +1008,7 @@ namespace faf::editor
             theme = &candidate;
           }
         }
-        ImGuiStyle style; // ImGui's own sizes at 100 %
-        style.WindowRounding = 2.0f;
-        style.FrameRounding = 3.0f;
-        style.TabRounding = 3.0f;
+        ImGuiStyle style; // ImGui's own sizes at 100 %, the mockup's frames over them (ApplyTheme)
         for (const std::string& unknown : ApplyTheme(*theme, style)) {
           gpg::Warnf("editor: theme %s: ImGui has no colour %s", theme->name.c_str(), unknown.c_str());
         }
@@ -1563,7 +1561,7 @@ namespace faf::editor
             float& scale = mShell->UiScale();
             int percent = static_cast<int>(std::lround(scale * 100.0f));
             ImGui::SetNextItemWidth(Em(260.0f));
-            if (ImGui::SliderInt("##uiscale", &percent, 75, 200, "%d %%", ImGuiSliderFlags_AlwaysClamp)) {
+            if (FillSliderInt("##uiscale", &percent, 75, 200, "%d %%", ImGuiSliderFlags_AlwaysClamp)) {
               scale = static_cast<float>(percent) / 100.0f;
             }
             ImGui::SameLine();
@@ -2410,8 +2408,8 @@ namespace faf::editor
         io.IniFilename = mIniPath.c_str();
       }
 
-      // The look is a theme (ui/EdTheme: Lua files, built-in and the user's); the first built-in, Editor Dark, is the
-      // editor's look from before themes. The theme in layout.ini replaces it at the first frame.
+      // The look is a theme (ui/EdTheme: Lua files, built-in and the user's); the first built-in, FAF Blue, is the
+      // mockup's look. The theme in layout.ini replaces it at the first frame.
       mDpiScale = ImGui_ImplWin32_GetDpiScaleForHwnd(gPanelWindow);
       io.ConfigDpiScaleFonts = true;
       LoadThemeList();

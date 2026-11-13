@@ -2,6 +2,7 @@
 // settings.
 
 #include <algorithm>
+#include "editor/ui/EdControls.h"
 #include "editor/ui/EdThemeColors.h"
 #include "editor/ui/EdWorkspaces.h"
 #include <cstdio>
@@ -395,13 +396,13 @@ namespace faf::editor
       float energy = static_cast<float>(edit.energy);
       ImGui::SetNextItemWidth(half);
       ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.20f, 0.30f, 0.16f, 1.0f));
-      ImGui::DragFloat("##mass", &mass, 10.0f, 0.0f, 1000000.0f, "Mass %.0f");
+      FillDragFloat("##mass", &mass, 10.0f, 0.0f, 1000000.0f, "Mass %.0f");
       ImGui::PopStyleColor();
       watch();
       ImGui::SameLine();
       ImGui::SetNextItemWidth(half);
       ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.32f, 0.28f, 0.10f, 1.0f));
-      ImGui::DragFloat("##energy", &energy, 10.0f, 0.0f, 1000000.0f, "Energy %.0f");
+      FillDragFloat("##energy", &energy, 10.0f, 0.0f, 1000000.0f, "Energy %.0f");
       ImGui::PopStyleColor();
       watch();
       edit.mass = mass;
@@ -428,7 +429,7 @@ namespace faf::editor
       }
 
       ImGui::SetNextItemWidth(half);
-      ImGui::DragInt("##colour", &edit.color, 0.1f, 0, 32, "Colour %d");
+      FillDragInt("##colour", &edit.color, 0.1f, 0, 32, "Colour %d");
       watch();
       ImGui::SameLine();
       ImGui::TextDisabled("a palette number");

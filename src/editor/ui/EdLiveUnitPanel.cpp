@@ -4,6 +4,7 @@
 // game's UI Lua, changed through the sim's own Lua (view/EdLiveUnits).
 
 #include <algorithm>
+#include "editor/ui/EdControls.h"
 #include <cctype>
 #include <cstdio>
 #include <map>
@@ -97,7 +98,7 @@ namespace faf::editor
       ImGui::SetNextItemWidth(
         -ImGui::CalcTextSize("Full").x - ImGui::GetStyle().FramePadding.x * 2.0f - ImGui::GetStyle().ItemSpacing.x
       );
-      ImGui::SliderFloat("##health", &health, 1.0f, std::max(info.maxHealth, 1.0f), "%.0f");
+      FillSliderFloat("##health", &health, 1.0f, std::max(info.maxHealth, 1.0f), "%.0f");
       editingHealth = ImGui::IsItemActive();
       if (ImGui::IsItemDeactivatedAfterEdit()) {
         char lua[96];
@@ -113,7 +114,7 @@ namespace faf::editor
       row("Veterancy");
       int vet = info.veteran;
       ImGui::SetNextItemWidth(-1.0f);
-      if (ImGui::SliderInt("##vet", &vet, 0, 5, vet == 0 ? "none" : "level %d")) {
+      if (FillSliderInt("##vet", &vet, 0, 5, vet == 0 ? "none" : "level %d")) {
         char lua[96];
         (void)std::snprintf(lua, sizeof(lua), "if u.SetVeterancy then u:SetVeterancy(%d) end", vet);
         each(lua);

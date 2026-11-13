@@ -1,6 +1,7 @@
 // The Info panel (what the open map is) and the Markers panel (its markers as a tree), EdShell's right-hand panels.
 
 #include "editor/EdShell.h"
+#include "editor/ui/EdControls.h"
 #include "editor/ui/EdWorkspaces.h"
 #include "editor/EdLuaDebugger.h"
 #include "editor/ui/EdThemeColors.h"
@@ -1411,7 +1412,7 @@ namespace faf::editor
     };
     ImGui::SeparatorText("Sun");
     ImGui::SetNextItemWidth(-1.0f);
-    watch(ImGui::DragFloat("##multiplier", &mLighting.multiplier, 0.01f, 0.0f, 10.0f, "Light multiplier %.2f"));
+    watch(FillDragFloat("##multiplier", &mLighting.multiplier, 0.01f, 0.0f, 10.0f, "Light multiplier %.2f"));
     ImGui::SetNextItemWidth(-1.0f);
     watch(ImGui::DragFloat3("##sundirection", mLighting.sunDirection, 0.005f, -1.0f, 1.0f, "%.3f"));
     ImGui::TextDisabled("Direction (x, y, z)");
@@ -1428,14 +1429,14 @@ namespace faf::editor
     watch(ImGui::ColorEdit4("##specular", mLighting.specular, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR));
     ImGui::TextDisabled("Specular");
     ImGui::SetNextItemWidth(-1.0f);
-    watch(ImGui::DragFloat("##bloom", &mLighting.bloom, 0.005f, 0.0f, 5.0f, "Bloom %.3f"));
+    watch(FillDragFloat("##bloom", &mLighting.bloom, 0.005f, 0.0f, 5.0f, "Bloom %.3f"));
     ImGui::SeparatorText("Fog");
     ImGui::SetNextItemWidth(-1.0f);
     watch(ImGui::ColorEdit3("##fogcolor", mLighting.fogColor, ImGuiColorEditFlags_Float));
     ImGui::SetNextItemWidth(-1.0f);
-    watch(ImGui::DragFloat("##fogstart", &mLighting.fogStart, 1.0f, -1000.0f, 10000.0f, "Start %.0f"));
+    watch(FillDragFloat("##fogstart", &mLighting.fogStart, 1.0f, -1000.0f, 10000.0f, "Start %.0f"));
     ImGui::SetNextItemWidth(-1.0f);
-    watch(ImGui::DragFloat("##fogend", &mLighting.fogEnd, 1.0f, -1000.0f, 10000.0f, "End %.0f"));
+    watch(FillDragFloat("##fogend", &mLighting.fogEnd, 1.0f, -1000.0f, 10000.0f, "End %.0f"));
     if (changed) {
       if (!mLightingEditing) {
         mLightingBefore = mDocument.LightingNow();

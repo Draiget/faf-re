@@ -1,4 +1,5 @@
 #include "editor/EdTools.h"
+#include "editor/ui/EdControls.h"
 #include "editor/ui/EdThemeColors.h"
 #include "editor/ui/EdUiScale.h"
 #include "editor/tools/EdShaderSlots.h"
@@ -247,26 +248,41 @@ namespace faf::editor
       int& chosen
     )
     {
-      const float width =
-        (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x * static_cast<float>(count - 1)) /
-        static_cast<float>(count);
+      // The mockup's segmented control: a bordered track, the buttons flat on it, the chosen one filled with the
+      // accent.
+      const float inset = 2.0f;
+      const ImVec2 start = ImGui::GetCursorScreenPos();
+      const float total = ImGui::GetContentRegionAvail().x;
+      const float height = ImGui::GetFrameHeight() + inset * 2.0f;
+      ImDrawList* const draw = ImGui::GetWindowDrawList();
+      const float rounding = ImGui::GetStyle().FrameRounding + 1.0f;
+      draw->AddRectFilled(
+        start, ImVec2(start.x + total, start.y + height), ImGui::GetColorU32(ImGuiCol_FrameBg), rounding
+      );
+      draw->AddRect(start, ImVec2(start.x + total, start.y + height), ImGui::GetColorU32(ImGuiCol_Border), rounding);
+      const float gap = 2.0f;
+      const float width = (total - inset * 2.0f - gap * static_cast<float>(count - 1)) / static_cast<float>(count);
+      ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
+      ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(gap, 0.0f));
+      ImGui::SetCursorScreenPos(ImVec2(start.x + inset, start.y + inset));
       for (int i = 0; i < count; ++i) {
         if (i > 0) {
           ImGui::SameLine();
         }
         const bool on = i == chosen;
-        if (on) {
-          // The chosen one filled with the accent, its text the theme's (readable on both light and dark themes).
-          ImGui::PushStyleColor(ImGuiCol_Button, AccentColor(0.30f));
-          ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_Text));
-        }
+        ImGui::PushStyleColor(ImGuiCol_Button, on ? AccentColor(1.0f) : ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
+        ImGui::PushStyleColor(
+          ImGuiCol_ButtonHovered, on ? AccentColor(0.9f) : ImGui::GetStyleColorVec4(ImGuiCol_FrameBgHovered)
+        );
+        ImGui::PushStyleColor(ImGuiCol_Text, on ? AccentText() : ImGui::GetStyleColorVec4(ImGuiCol_Text));
         if (ImGui::Button(labels[i], ImVec2(width, 0.0f))) {
           chosen = i;
         }
-        if (on) {
-          ImGui::PopStyleColor(2);
-        }
+        ImGui::PopStyleColor(3);
       }
+      ImGui::PopStyleVar(2);
+      ImGui::SetCursorScreenPos(ImVec2(start.x, start.y + height + ImGui::GetStyle().ItemSpacing.y));
+      ImGui::Dummy(ImVec2(0.0f, 0.0f));
     }
   } // namespace
 
@@ -530,7 +546,7 @@ namespace faf::editor
     }
     ImGui::Spacing();
     ImGui::BeginDisabled(profile.name == mShader || profile.name.empty());
-    if (ImGui::Button("Use this shader")) {
+    if (PrimaryButton("Use this shader")) {
       mShaderChange = profile.name;
     }
     ImGui::EndDisabled();
@@ -561,7 +577,7 @@ namespace faf::editor
           if (mConvertOptions.lost == LostLayers::Merge) {
             int into = mConvertOptions.mergeInto + 1;
             ImGui::SetNextItemWidth(Em(240.0f));
-            if (ImGui::SliderInt("Into layer", &into, 1, std::max(1, mConvertPlan.toPainted))) {
+            if (FillSliderInt("Into layer", &into, 1, std::max(1, mConvertPlan.toPainted))) {
               mConvertOptions.mergeInto = into - 1;
             }
           }
@@ -569,7 +585,7 @@ namespace faf::editor
         if (mConvertPlan.toBiplanar) {
           ImGui::Checkbox("Move the cliff layers to layers 3 and 4", &mConvertOptions.arrange);
         }
-        if (ImGui::Button("Convert and switch")) {
+        if (PrimaryButton("Convert and switch")) {
           mConvertRequested = true;
         }
         ImGui::SameLine();
@@ -615,7 +631,7 @@ namespace faf::editor
     ImGui::SameLine();
     ImGui::SetNextItemWidth(-1.0f);
     ImGui::BeginDisabled(mBrushShape == 0);
-    ImGui::SliderFloat("##shapeangle", &mShapeAngle, -180.0f, 180.0f, "Turn %.0f deg");
+    FillSliderFloat("##shapeangle", &mShapeAngle, -180.0f, 180.0f, "Turn %.0f deg");
     ImGui::EndDisabled();
   }
 
@@ -635,15 +651,18 @@ namespace faf::editor
       };
       static constexpr int kModeOf[5][3] = {{0, 1, 2}, {3, 5, 4}, {6, 7, 8}, {9, 10, 11}, {12, 13, 14}};
       static constexpr int kRowSize[5] = {3, 3, 3, 3, 3};
+      // The mockup's mode grid: bordered tiles, three a row, the picked one in the accent's soft fill.
+      const float gap = ImGui::GetStyle().ItemSpacing.x;
+      const float tileWidth = (ImGui::GetContentRegionAvail().x - gap * 2.0f) / 3.0f;
       for (int row = 0; row < 5; ++row) {
-        int chosen = -1;
         for (int i = 0; i < kRowSize[row]; ++i) {
-          chosen = kModeOf[row][i] == mBrushMode ? i : chosen;
-        }
-        const int before = chosen;
-        Segmented(kRows[row], kRowSize[row], chosen);
-        if (chosen != before && chosen >= 0) {
-          mBrushMode = kModeOf[row][chosen];
+          if (i > 0) {
+            ImGui::SameLine();
+          }
+          const int mode = kModeOf[row][i];
+          if (ModeTile(kRows[row][i], mode == mBrushMode, ImVec2(tileWidth, ImGui::GetFrameHeight() + 4.0f))) {
+            mBrushMode = mode;
+          }
         }
       }
       switch (static_cast<HeightBrushMode>(mBrushMode)) {
@@ -656,11 +675,11 @@ namespace faf::editor
         break;
       case HeightBrushMode::SetHeight:
         ImGui::SetNextItemWidth(-1.0f);
-        ImGui::DragFloat("##setheight", &mSetHeight, 0.25f, 0.0f, 500.0f, "Height %.1f");
+        FillDragFloat("##setheight", &mSetHeight, 0.25f, 0.0f, 500.0f, "Height %.1f");
         break;
       case HeightBrushMode::Terrace:
         ImGui::SetNextItemWidth(-1.0f);
-        ImGui::DragFloat("##terrace", &mTerraceStep, 0.1f, 0.5f, 100.0f, "Step %.1f");
+        FillDragFloat("##terrace", &mTerraceStep, 0.1f, 0.5f, 100.0f, "Step %.1f");
         break;
       case HeightBrushMode::Plane: {
         char text[120];
@@ -710,27 +729,27 @@ namespace faf::editor
         static const char* const kStampModes[] = {"Add", "Subtract", "Max", "Min", "Replace"};
         Segmented(kStampModes, 5, mStampMode);
         ImGui::SetNextItemWidth(-1.0f);
-        ImGui::DragFloat("##stampheight", &mStampHeight, 0.25f, -200.0f, 200.0f, "Stamp height %.1f");
+        FillDragFloat("##stampheight", &mStampHeight, 0.25f, -200.0f, 200.0f, "Stamp height %.1f");
         const float half = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) * 0.5f;
         ImGui::SetNextItemWidth(half);
-        ImGui::SliderFloat("##stampturn", &mStampTurn, -180.0f, 180.0f, "Turn %.0f deg");
+        FillSliderFloat("##stampturn", &mStampTurn, -180.0f, 180.0f, "Turn %.0f deg");
         ImGui::SameLine();
         ImGui::Checkbox("Random turn", &mStampRandomTurn);
         float sizeJitter = mStampSizeJitter * 100.0f;
         float placeJitter = mStampPlaceJitter * 100.0f;
         float spacing = mStampSpacing * 100.0f;
         ImGui::SetNextItemWidth(half);
-        if (ImGui::SliderFloat("##stampsize", &sizeJitter, 0.0f, 90.0f, "Size +-%.0f%%")) {
+        if (FillSliderFloat("##stampsize", &sizeJitter, 0.0f, 90.0f, "Size +-%.0f%%")) {
           mStampSizeJitter = sizeJitter / 100.0f;
         }
         ImGui::SameLine();
         ImGui::SetNextItemWidth(-1.0f);
-        if (ImGui::SliderFloat("##stampplace", &placeJitter, 0.0f, 100.0f, "Place +-%.0f%%")) {
+        if (FillSliderFloat("##stampplace", &placeJitter, 0.0f, 100.0f, "Place +-%.0f%%")) {
           mStampPlaceJitter = placeJitter / 100.0f;
         }
         ImGui::SetNextItemWidth(-1.0f);
         if (
-          ImGui::SliderFloat(
+          FillSliderFloat(
             "##stampspacing", &spacing, 0.0f, 300.0f, spacing <= 0.0f ? "One per click" : "Spacing %.0f%%"
           )
         ) {
@@ -748,7 +767,7 @@ namespace faf::editor
       }
       case HeightBrushMode::Erode:
         ImGui::SetNextItemWidth(-1.0f);
-        ImGui::SliderFloat("##talus", &mErodeTalus, 0.05f, 2.0f, "Talus slope %.2f");
+        FillSliderFloat("##talus", &mErodeTalus, 0.05f, 2.0f, "Talus slope %.2f");
         Note(
           "Slopes steeper than the talus slope slump towards it; gentler ground stays. Ground moves downhill, none is "
           "made."
@@ -787,11 +806,11 @@ namespace faf::editor
         break;
       case HeightBrushMode::Noise:
         ImGui::SetNextItemWidth(-1.0f);
-        ImGui::SliderFloat("##noisescale", &mNoiseScale, 1.0f, 64.0f, "Bump size %.0f");
+        FillSliderFloat("##noisescale", &mNoiseScale, 1.0f, 64.0f, "Bump size %.0f");
         ImGui::SetNextItemWidth(-1.0f);
-        ImGui::SliderInt("##noiseoctaves", &mNoiseOctaves, 1, 4, "Detail layers %d");
+        FillSliderInt("##noiseoctaves", &mNoiseOctaves, 1, 4, "Detail layers %d");
         ImGui::SetNextItemWidth(-1.0f);
-        ImGui::SliderFloat("##noiserough", &mNoiseRoughness, 0.0f, 1.0f, "Roughness %.2f");
+        FillSliderFloat("##noiserough", &mNoiseRoughness, 0.0f, 1.0f, "Roughness %.2f");
         Note(
           "Smooth bumps, a new pattern each stroke; detail layers add smaller bumps, roughness how strong they are."
         );
@@ -806,11 +825,11 @@ namespace faf::editor
       }
     }
     ImGui::SetNextItemWidth(-1.0f);
-    ImGui::SliderFloat("##radius", &mRadius, 3.0f, 40.0f, "Radius %.0f");
+    FillSliderFloat("##radius", &mRadius, 3.0f, 40.0f, "Radius %.0f");
     ImGui::SetNextItemWidth(-1.0f);
-    ImGui::SliderFloat("##strength", &mStrength, 0.05f, 1.0f, "Strength %.2f");
+    FillSliderFloat("##strength", &mStrength, 0.05f, 1.0f, "Strength %.2f");
     ImGui::SetNextItemWidth(-1.0f);
-    ImGui::SliderFloat("##falloff", &mFalloff, 0.0f, 1.0f, "Falloff %.2f");
+    FillSliderFloat("##falloff", &mFalloff, 0.0f, 1.0f, "Falloff %.2f");
   }
 
   void EdTools::DrawSymmetry(
@@ -858,7 +877,7 @@ namespace faf::editor
     }
     if (mSymmetry == 9) {
       ImGui::SetNextItemWidth(-1.0f);
-      ImGui::SliderInt("##nway", &mNWay, 3, 8, "Copies %d");
+      FillSliderInt("##nway", &mNWay, 3, 8, "Copies %d");
     }
     if (mDetectedSymmetry >= 0) {
       char found[120];
@@ -961,7 +980,7 @@ namespace faf::editor
       const float half = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) * 0.5f;
       int part = mSymPart + 1;
       ImGui::SetNextItemWidth(half);
-      if (ImGui::SliderInt("##sympart", &part, 1, parts, "Source part %d")) {
+      if (FillSliderInt("##sympart", &part, 1, parts, "Source part %d")) {
         mSymPart = part - 1;
       }
       ImGui::SameLine();
@@ -970,14 +989,14 @@ namespace faf::editor
       (void)ImGui::Combo("##symcombine", &mSymCombine, kCombine, 4);
       ImGui::BeginDisabled(mSymCombine != 0);
       ImGui::SetNextItemWidth(-1.0f);
-      ImGui::SliderFloat("##symseam", &mSymSeam, 0.0f, 32.0f, mSymSeam <= 0.0f ? "Hard seam" : "Seam %.0f");
+      FillSliderFloat("##symseam", &mSymSeam, 0.0f, 32.0f, mSymSeam <= 0.0f ? "Hard seam" : "Seam %.0f");
       ImGui::EndDisabled();
       if (mTool == 1) {
         ImGui::Checkbox("Texture masks too", &mSymMasks);
         ImGui::SameLine();
         ImGui::Checkbox("Terrain types too", &mSymTypes);
       }
-      if (ImGui::Button("Make symmetric")) {
+      if (PrimaryButton("Make symmetric")) {
         mRepairRequested = true;
       }
       Note(
@@ -1015,7 +1034,7 @@ namespace faf::editor
       mExportRequested = true;
     }
     ImGui::SetNextItemWidth(-1.0f);
-    ImGui::DragFloat("##heightscale", &mHeightScale, 0.01f, 0.01f, 16.0f, "Height scale %.2f");
+    FillDragFloat("##heightscale", &mHeightScale, 0.01f, 0.01f, 16.0f, "Height scale %.2f");
     static constexpr const char* kSizes[] = {
       "Export at the map's size",
       "Export 257 wide",
@@ -1115,7 +1134,7 @@ namespace faf::editor
     ImGui::Checkbox("Only below slope", &mLimitSlope);
     if (mLimitSlope) {
       ImGui::SetNextItemWidth(-1.0f);
-      ImGui::SliderFloat("##limitslope", &mLimitSlopeDegrees, 1.0f, 85.0f, "%.0f degrees");
+      FillSliderFloat("##limitslope", &mLimitSlopeDegrees, 1.0f, 85.0f, "%.0f degrees");
     }
   }
 
@@ -1183,7 +1202,7 @@ namespace faf::editor
       }
       ImGui::SetNextItemWidth(-1.0f);
       float size = layer.albedoSize;
-      if (ImGui::DragFloat("##size", &size, 0.05f, 0.1f, 1024.0f, "Size %.2f") && size > 0.0f) {
+      if (FillDragFloat("##size", &size, 0.05f, 0.1f, 1024.0f, "Size %.2f") && size > 0.0f) {
         // Albedo and normal map keep their ratio (most maps have them equal).
         const float ratio = layer.albedoSize > 0.0f ? layer.normalsSize / layer.albedoSize : 1.0f;
         mChangedSlot = slot;
@@ -1506,19 +1525,17 @@ namespace faf::editor
       const float half = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) * 0.5f;
       float target = mMaskTarget * 100.0f;
       ImGui::SetNextItemWidth(half);
-      if (ImGui::SliderFloat("##masktarget", &target, 5.0f, 100.0f, "Up to %.0f%%")) {
+      if (FillSliderFloat("##masktarget", &target, 5.0f, 100.0f, "Up to %.0f%%")) {
         mMaskTarget = target / 100.0f;
       }
       ImGui::SameLine();
       float scatter = mMaskScatter * 100.0f;
       ImGui::SetNextItemWidth(-1.0f);
-      if (
-        ImGui::SliderFloat("##maskscatter", &scatter, 0.0f, 100.0f, scatter <= 0.0f ? "No scatter" : "Scatter %.0f%%")
-      ) {
+      if (FillSliderFloat("##maskscatter", &scatter, 0.0f, 100.0f, scatter <= 0.0f ? "No scatter" : "Scatter %.0f%%")) {
         mMaskScatter = scatter / 100.0f;
       }
       ImGui::SetNextItemWidth(half);
-      ImGui::SliderFloat(
+      FillSliderFloat(
         "##maskminslope",
         &mMaskMinSlopeDegrees,
         0.0f,
@@ -1618,11 +1635,11 @@ namespace faf::editor
     }
     ImGui::BeginDisabled(!mWater.enabled);
     ImGui::SetNextItemWidth(-1.0f);
-    changed(ImGui::DragFloat("##level", &mWater.elevation, 0.1f, 0.0f, 512.0f, "Level %.2f"));
+    changed(FillDragFloat("##level", &mWater.elevation, 0.1f, 0.0f, 512.0f, "Level %.2f"));
     ImGui::SetNextItemWidth(-1.0f);
-    changed(ImGui::DragFloat("##deep", &mWater.deep, 0.1f, 0.0f, 512.0f, "Deep %.2f"));
+    changed(FillDragFloat("##deep", &mWater.deep, 0.1f, 0.0f, 512.0f, "Deep %.2f"));
     ImGui::SetNextItemWidth(-1.0f);
-    changed(ImGui::DragFloat("##abyss", &mWater.abyss, 0.1f, 0.0f, 512.0f, "Abyss %.2f"));
+    changed(FillDragFloat("##abyss", &mWater.abyss, 0.1f, 0.0f, 512.0f, "Abyss %.2f"));
     if (mWater.enabled && (mWater.deep >= mWater.elevation || mWater.abyss >= mWater.deep)) {
       ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.95f, 0.75f, 0.30f, 1.0f));
       ImGui::TextWrapped(
@@ -1645,15 +1662,15 @@ namespace faf::editor
     ImGui::SetNextItemWidth(-1.0f);
     changed(ImGui::DragFloat2("##waterlerp", s.mWaterLerp, 0.005f, 0.0f, 1.0f, "Lerp %.3f"));
     ImGui::SetNextItemWidth(-1.0f);
-    changed(ImGui::DragFloat("##refraction", &s.mRefractionScale, 0.005f, 0.0f, 2.0f, "Refraction %.3f"));
+    changed(FillDragFloat("##refraction", &s.mRefractionScale, 0.005f, 0.0f, 2.0f, "Refraction %.3f"));
     ImGui::SetNextItemWidth(-1.0f);
-    changed(ImGui::DragFloat("##fresnelbias", &s.mFresnelBias, 0.005f, 0.0f, 1.0f, "Fresnel bias %.3f"));
+    changed(FillDragFloat("##fresnelbias", &s.mFresnelBias, 0.005f, 0.0f, 1.0f, "Fresnel bias %.3f"));
     ImGui::SetNextItemWidth(-1.0f);
-    changed(ImGui::DragFloat("##fresnelpower", &s.mFresnelPower, 0.01f, 0.0f, 10.0f, "Fresnel power %.2f"));
+    changed(FillDragFloat("##fresnelpower", &s.mFresnelPower, 0.01f, 0.0f, 10.0f, "Fresnel power %.2f"));
     ImGui::SetNextItemWidth(-1.0f);
-    changed(ImGui::DragFloat("##unitreflection", &s.mUnitReflectionAmount, 0.005f, 0.0f, 1.0f, "Unit reflection %.3f"));
+    changed(FillDragFloat("##unitreflection", &s.mUnitReflectionAmount, 0.005f, 0.0f, 1.0f, "Unit reflection %.3f"));
     ImGui::SetNextItemWidth(-1.0f);
-    changed(ImGui::DragFloat("##skyreflection", &s.mSkyReflectionAmount, 0.005f, 0.0f, 3.0f, "Sky reflection %.3f"));
+    changed(FillDragFloat("##skyreflection", &s.mSkyReflectionAmount, 0.005f, 0.0f, 3.0f, "Sky reflection %.3f"));
 
     SectionHeader("SUN ON THE WATER");
     ImGui::SetNextItemWidth(-1.0f);
@@ -1661,11 +1678,11 @@ namespace faf::editor
     ImGui::SetNextItemWidth(-1.0f);
     changed(ImGui::DragFloat3("##sundirection", s.mSunDirection, 0.01f, -1.0f, 1.0f, "%.2f"));
     ImGui::SetNextItemWidth(-1.0f);
-    changed(ImGui::DragFloat("##sunshininess", &s.mSunShininess, 0.5f, 0.0f, 500.0f, "Shininess %.1f"));
+    changed(FillDragFloat("##sunshininess", &s.mSunShininess, 0.5f, 0.0f, 500.0f, "Shininess %.1f"));
     ImGui::SetNextItemWidth(-1.0f);
-    changed(ImGui::DragFloat("##sunreflection", &s.mSunReflectionAmount, 0.01f, 0.0f, 10.0f, "Reflection %.2f"));
+    changed(FillDragFloat("##sunreflection", &s.mSunReflectionAmount, 0.01f, 0.0f, 10.0f, "Reflection %.2f"));
     ImGui::SetNextItemWidth(-1.0f);
-    changed(ImGui::DragFloat("##sunglow", &s.mSunGlow, 0.01f, 0.0f, 10.0f, "Glow %.2f"));
+    changed(FillDragFloat("##sunglow", &s.mSunGlow, 0.01f, 0.0f, 10.0f, "Glow %.2f"));
 
     SectionHeader("WAVES");
     ImGui::SetNextItemWidth(-1.0f);
@@ -1741,14 +1758,14 @@ namespace faf::editor
         ImGui::EndCombo();
       }
       ImGui::SetNextItemWidth(-1.0f);
-      ImGui::DragFloat("##wavedepth", &mWaveDepth, 0.05f, 0.0f, 50.0f, "Depth below the sea %.2f");
+      FillDragFloat("##wavedepth", &mWaveDepth, 0.05f, 0.0f, 50.0f, "Depth below the sea %.2f");
       ImGui::SetNextItemWidth(-1.0f);
       float percent = mWaveDensity * 100.0f;
-      if (ImGui::SliderFloat("##wavedensity", &percent, 1.0f, 100.0f, "Density %.0f%%")) {
+      if (FillSliderFloat("##wavedensity", &percent, 1.0f, 100.0f, "Density %.0f%%")) {
         mWaveDensity = percent / 100.0f;
       }
       ImGui::SetNextItemWidth(-1.0f);
-      ImGui::DragFloat("##wavespacing", &mWaveSpacing, 0.1f, 0.0f, 64.0f, "Spacing %.1f");
+      FillDragFloat("##wavespacing", &mWaveSpacing, 0.1f, 0.0f, 64.0f, "Spacing %.1f");
       ImGui::SetNextItemWidth(-1.0f);
       ImGui::DragFloat2("##wavedirection", &mWaveCentre, 1.0f, 0.0f, 360.0f, "%.0f");
       ImGui::TextDisabled("Facing (degrees) and how far from it");
@@ -1926,7 +1943,7 @@ namespace faf::editor
         }
         if (!body.dry) {
           ImGui::SetNextItemWidth(-1.0f);
-          changed(ImGui::DragFloat("##elevation", &body.elevation, 0.05f, -100.0f, 512.0f, "Level %.2f"));
+          changed(FillDragFloat("##elevation", &body.elevation, 0.05f, -100.0f, 512.0f, "Level %.2f"));
           body.hasElevation = true;
         }
         // The fill takes ground below this; the level by default (a dry body needs it).
@@ -1940,7 +1957,7 @@ namespace faf::editor
         ImGui::EndDisabled();
         if (ownFill) {
           ImGui::SetNextItemWidth(-1.0f);
-          changed(ImGui::DragFloat("##fillto", &body.fillTo, 0.05f, -100.0f, 512.0f, "Fill below %.2f"));
+          changed(FillDragFloat("##fillto", &body.fillTo, 0.05f, -100.0f, 512.0f, "Fill below %.2f"));
         }
         if (!body.dry) {
           bool ownShade = body.hasDeep || body.hasAbyss;
@@ -1952,9 +1969,9 @@ namespace faf::editor
           }
           if (ownShade) {
             ImGui::SetNextItemWidth(-1.0f);
-            changed(ImGui::DragFloat("##deep", &body.deep, 0.05f, -100.0f, 512.0f, "Deep %.2f"));
+            changed(FillDragFloat("##deep", &body.deep, 0.05f, -100.0f, 512.0f, "Deep %.2f"));
             ImGui::SetNextItemWidth(-1.0f);
-            changed(ImGui::DragFloat("##abyss", &body.abyss, 0.05f, -100.0f, 512.0f, "Abyss %.2f"));
+            changed(FillDragFloat("##abyss", &body.abyss, 0.05f, -100.0f, 512.0f, "Abyss %.2f"));
             body.hasDeep = body.hasAbyss = true;
           }
         }
@@ -2117,7 +2134,7 @@ namespace faf::editor
     Segmented(kModes, 3, mPropMode);
     if (mPropMode == 1) {
       ImGui::SetNextItemWidth(-1.0f);
-      ImGui::SliderFloat("##density", &mPropDensity, 0.5f, 60.0f, "%.1f props a second");
+      FillSliderFloat("##density", &mPropDensity, 0.5f, 60.0f, "%.1f props a second");
     }
     if (mPropMode != 1 || mPaintList.empty()) {
       ImGui::Checkbox("Random turn", &mPropRandomTurn);
@@ -2144,7 +2161,7 @@ namespace faf::editor
           remove = static_cast<int>(i);
         }
         ImGui::SetNextItemWidth(-1.0f);
-        ImGui::DragInt("##chance", &entry.chance, 1.0f, 0, 1000, "Chance %d");
+        FillDragInt("##chance", &entry.chance, 1.0f, 0, 1000, "Chance %d");
         ImGui::SetNextItemWidth(-1.0f);
         ImGui::DragIntRange2("##turn", &entry.rotationMin, &entry.rotationMax, 1.0f, 0, 360, "Turn %d", "to %d");
         ImGui::SetNextItemWidth(-1.0f);
@@ -2235,7 +2252,7 @@ namespace faf::editor
       }
       ImGui::EndDisabled();
       ImGui::SetNextItemWidth(-1.0f);
-      ImGui::SliderFloat("##decaloverlap", &mDecalOverlap, 0.0f, 0.9f, "Overlap %.2f");
+      FillSliderFloat("##decaloverlap", &mDecalOverlap, 0.0f, 0.9f, "Overlap %.2f");
       Note(
         "Click the ground to lay the curve's points; the decals follow it end to end, each its length along the curve "
         "and its width across, turned with it. Enter or Place lays them (one undo step), Backspace drops the last "
@@ -2368,10 +2385,10 @@ namespace faf::editor
     ImGui::SetNextItemWidth(-1.0f);
     ImGui::DragFloat2("##decalsize", mDecalSize, 0.25f, 0.5f, 1024.0f, "%.1f");
     ImGui::SetNextItemWidth(-1.0f);
-    ImGui::SliderFloat("##decalturn", &mDecalTurn, -180.0f, 180.0f, "Turn %.0f deg");
+    FillSliderFloat("##decalturn", &mDecalTurn, -180.0f, 180.0f, "Turn %.0f deg");
     ImGui::Checkbox("Random turn", &mDecalRandomTurn);
     ImGui::SetNextItemWidth(-1.0f);
-    ImGui::DragFloat(
+    FillDragFloat(
       "##decalcutoff",
       &mDecalCutoff,
       5.0f,
@@ -2622,7 +2639,7 @@ namespace faf::editor
       for (int i = 0; i < 4; ++i) {
         ImGui::SetNextItemWidth(-1.0f);
         const int limit = i % 2 == 0 ? mMapWidth : mMapHeight;
-        if (ImGui::DragInt(kEdges[i], &area[static_cast<std::size_t>(i)], 1.0f, 0, limit, kFormats[i])) {
+        if (FillDragInt(kEdges[i], &area[static_cast<std::size_t>(i)], 1.0f, 0, limit, kFormats[i])) {
           area[static_cast<std::size_t>(i)] = std::clamp(area[static_cast<std::size_t>(i)] / 4 * 4, 0, limit);
           // Centred: the opposite edge as far in from its side.
           if (mBorderCentred) {
@@ -2764,7 +2781,7 @@ namespace faf::editor
             "##value", mMarkerTypedColour, ImGuiColorEditFlags_AlphaBar | ImGuiColorEditFlags_AlphaPreviewHalf
           );
         } else if (parsed.kind == MarkerValue::Kind::Float) {
-          edited = ImGui::DragFloat("##value", &mMarkerTyped.number[0], 0.1f, 0.0f, 0.0f, "%.3f");
+          edited = FillDragFloat("##value", &mMarkerTyped.number[0], 0.1f, 0.0f, 0.0f, "%.3f");
         } else if (parsed.kind == MarkerValue::Kind::Vector3) {
           edited = ImGui::DragFloat3("##value", mMarkerTyped.number, 0.1f, 0.0f, 0.0f, "%.2f");
         } else if (parsed.kind == MarkerValue::Kind::Bool) {
@@ -2845,7 +2862,7 @@ namespace faf::editor
 
     SectionHeader("AIR PATH NODES");
     ImGui::SetNextItemWidth(-1.0f);
-    ImGui::SliderInt("##airgrid", &mAirGridCount, 4, 32, "%d nodes a side");
+    FillSliderInt("##airgrid", &mAirGridCount, 4, 32, "%d nodes a side");
     ImGui::Checkbox("Replace the map's air nodes", &mAirGridReplace);
     if (ImGui::Button("Fill the map with an air node grid", ImVec2(-1.0f, 0.0f))) {
       mAirGridAsked = true;

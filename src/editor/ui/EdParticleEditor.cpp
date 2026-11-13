@@ -1,4 +1,5 @@
 #include "editor/ui/EdParticleEditor.h"
+#include "editor/ui/EdControls.h"
 #include "editor/ui/EdWorkspaces.h"
 #include "editor/ui/EdUiScale.h"
 
@@ -498,7 +499,7 @@ namespace faf::editor
       ImGui::CalcTextSize("above ground 30.0").x + style.FramePadding.x * 2.0f + ImGui::GetFrameHeight();
     flow(sliderWidth);
     ImGui::SetNextItemWidth(sliderWidth);
-    ImGui::SliderFloat("##height", &options.height, 0.0f, 30.0f, "above ground %.1f");
+    FillSliderFloat("##height", &options.height, 0.0f, 30.0f, "above ground %.1f");
     ImGui::SetItemTooltip("The emitter this high above the ground (most effects play on a unit, some way up)");
     flow(buttonWidth("Front"));
     if (ImGui::Button("Front")) {
@@ -658,7 +659,7 @@ namespace faf::editor
       ImGui::SetNextItemWidth(Em(260.0f));
       switch (field.kind) {
       case FlatValue::Kind::Number:
-        edited = ImGui::DragFloat(field.key, &value.number, 0.01f, 0.0f, 0.0f, "%.4g");
+        edited = FillDragFloat(field.key, &value.number, 0.01f, 0.0f, 0.0f, "%.4g");
         break;
       case FlatValue::Kind::Bool:
         edited = ImGui::Checkbox(field.key, &value.flag);
