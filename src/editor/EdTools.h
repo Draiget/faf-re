@@ -9,6 +9,7 @@
 #include "editor/tools/EdLayerConvert.h"
 #include "editor/tools/EdSymmetryCheck.h"
 #include "editor/tools/EdMaskBrush.h"
+#include "editor/tools/EdMaskGen.h"
 #include "editor/doc/EdPropPaint.h"
 #include "editor/doc/EdUnits.h"
 #include "editor/tools/EdWaves.h"
@@ -1689,6 +1690,79 @@ namespace faf::editor
     {
       mRulesRequested = true;
     }
+    /** The Mask generator: its rules, where it writes, and what the panel asks of the app. */
+    struct MaskGenTarget
+    {
+      int layer = 1;
+      MaskWriteMode mode = MaskWriteMode::Replace;
+      float strength = 1.0f;
+      bool takeAway = false; // only where the layers above leave the ground free
+    };
+    [[nodiscard]] const std::vector<MaskGenRule>& GenRules() const noexcept
+    {
+      return mGenRules;
+    }
+    void SetGenRules(
+      std::vector<MaskGenRule> rules
+    )
+    {
+      mGenRules = std::move(rules);
+      ++mGenRevision;
+    }
+    [[nodiscard]] MaskGenTarget& GenTarget() noexcept
+    {
+      return mGenTarget;
+    }
+    /** Changes to the rules: the app re-evaluates the preview when it moves. */
+    [[nodiscard]] int GenRevision() const noexcept
+    {
+      return mGenRevision;
+    }
+    /** A starting point picked ("cliffs" ...): the app fills its rules (it knows the map's heights). */
+    [[nodiscard]] bool TakeGenPresetAsk(
+      std::string& id
+    )
+    {
+      if (mGenPresetAsk.empty()) {
+        return false;
+      }
+      id = std::exchange(mGenPresetAsk, {});
+      return true;
+    }
+    void AskGenPreset(
+      std::string id
+    )
+    {
+      mGenPresetAsk = std::move(id);
+    }
+    [[nodiscard]] bool TakeGenApply() noexcept
+    {
+      return std::exchange(mGenApply, false);
+    }
+    void AskGenApply() noexcept
+    {
+      mGenApply = true;
+    }
+    /** The preview the app made: an image (0: none), its share of the map, or why there is none. */
+    void SetGenPreview(
+      const std::uint64_t image,
+      const float coverage,
+      std::string note
+    )
+    {
+      mGenPreviewImage = image;
+      mGenCoverage = coverage;
+      mGenNote = std::move(note);
+    }
+    [[nodiscard]] std::uint64_t GenPreviewImage() const noexcept
+    {
+      return mGenPreviewImage;
+    }
+    [[nodiscard]] bool GenSectionOpen() const noexcept
+    {
+      return mGenOpen;
+    }
+
     /** Test runs (`/browse`): the texture browser opened for a slot. */
     void OpenBrowser(
       const int slot
@@ -2185,6 +2259,16 @@ namespace faf::editor
     int mMaterialAsk = -1;
     char mBrowseFilter[64]{};
     std::vector<MaskRule> mRules;
+    void DrawMaskGenerator();
+    std::vector<MaskGenRule> mGenRules;
+    MaskGenTarget mGenTarget;
+    int mGenRevision = 0;
+    std::string mGenPresetAsk;
+    bool mGenApply = false;
+    bool mGenOpen = false;
+    std::uint64_t mGenPreviewImage = 0;
+    float mGenCoverage = 0.0f;
+    std::string mGenNote;
     bool mRulesRequested = false;
 
     bool mCheckedMasks = false;

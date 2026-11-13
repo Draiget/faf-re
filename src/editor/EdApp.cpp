@@ -49,6 +49,8 @@
 #include "editor/doc/EdLighting.h"
 #include "editor/tools/EdShaderSlots.h"
 #include "editor/tools/EdMapTextures.h"
+#include "editor/tools/EdMaskBrush.h"
+#include "editor/tools/EdMaskGen.h"
 #include "editor/tools/EdGroundKind.h"
 #include "editor/tools/EdShaderProfiles.h"
 #include "editor/ui/EdIconFont.h"
@@ -139,9 +141,9 @@ namespace faf::editor
         "/settingsfile",   "/autosavefolder", "/askunsaved",     "/particlebrowser", "/particlenew", "/particleopen",
         "/materialeditor", "/uiscale",        "/testrun",        "/openall",         "/roundtrip",   "/vault",
         "/vaultsearch",    "/vaultmap",       "/newmap",         "/stamp",           "/brush",       "/layer",
-        "/waterbody",      "/ruler",          "/adaptivewindow", "/maskrule",        "/shader",      "/brushtest",
-        "/brushshape",     "/stampsource",    "/stampstroke",    "/symoptions",      "/maskoptions", "/masktest",
-        "/shaderbrowser",  "/convertlayers",
+        "/waterbody",      "/ruler",          "/adaptivewindow", "/maskrule",        "/maskgen",     "/shader",
+        "/brushtest",      "/brushshape",     "/stampsource",    "/stampstroke",     "/symoptions",  "/maskoptions",
+        "/masktest",       "/shaderbrowser",  "/convertlayers",
       };
       for (const char* const option : kOptions) {
         if (moho::CFG_GetArgOption(option, 0, nullptr)) {
@@ -2213,6 +2215,15 @@ namespace faf::editor
       void MapTexturesUpdate();
       void MakeMapTexture(MapTextureKind kind);
       void ClearMapTexture(MapTextureKind kind);
+      /** The Texture tool's Mask generator: starting points, the preview (when the rules change), Write. */
+      void MaskGenUpdate();
+      /** The rules' context: the heights (and the paint when a rule reads it). False with `error`. */
+      bool MaskGenContextOf(const std::vector<MaskGenRule>& rules, MaskGenContext& context, std::string& error);
+      int mMaskGenEvaluated = -1;
+      int mMaskGenWait = 0;
+      std::uint64_t mMaskGenImage = 0;
+      std::string mMaskGenArg; // `/maskgen <preset>,<layer>[,add|sub][,free]`
+      int mMaskGenFrames = 0;
       /** Export (true) the slot's texture to a .dds, or import one into the map's folder and the slot. */
       void TransferMapTexture(MapTextureKind kind, bool exporting, const std::string& testFile);
       bool mMapTexturesStale[4]{};
@@ -3970,6 +3981,9 @@ namespace faf::editor
       if (fa::vector<fa::string> test; moho::CFG_GetArgOption("/brushtest", 1, &test) && !test.empty()) {
         mBrushTestArg = test[0].c_str();
       }
+      if (fa::vector<fa::string> gen; moho::CFG_GetArgOption("/maskgen", 1, &gen) && !gen.empty()) {
+        mMaskGenArg = gen[0].c_str();
+      }
       if (fa::vector<fa::string> rule; moho::CFG_GetArgOption("/maskrule", 1, &rule) && !rule.empty()) {
         mMaskRuleArg = rule[0].c_str();
       }
@@ -4332,6 +4346,153 @@ namespace faf::editor
       PostStatusMessage(std::string("Made ") + file + (fromPaint ? " from the paint" : " from the heights"));
     }
 
+    bool EditorApp::MaskGenContextOf(
+      const std::vector<MaskGenRule>& rules,
+      MaskGenContext& context,
+      std::string& error
+    )
+    {
+      const std::shared_ptr<TerrainSource> terrain = mScene.TerrainHeights();
+      if (terrain == nullptr || terrain->width < 2) {
+        error = "no terrain";
+        return false;
+      }
+      context.heights = std::make_shared<field::Grid>(terrain->width, terrain->height, 1.0f, 0.0f, 0.0f);
+      context.heights->v = terrain->heights;
+      const WaterState water = mDocument.WaterNow();
+      context.water = water.elevation;
+      const bool readsPaint = std::any_of(rules.begin(), rules.end(), [](const MaskGenRule& rule) {
+        return rule.enabled && (rule.type == "layer" || rule.type == "free_above" || rule.type == "near_layer");
+      });
+      if (readsPaint) {
+        const EdDocument::MaskGrid& masks = mScene.ReadMasks();
+        if (!masks.texels.empty()) {
+          MaskLayerFields(
+            masks.texels.data(),
+            masks.width,
+            masks.height,
+            static_cast<float>(terrain->width - 1),
+            RemappedStrata(mScene.TerrainShader()),
+            context
+          );
+        }
+      }
+      return true;
+    }
+
+    void EditorApp::MaskGenUpdate()
+    {
+      EdTools& tools = mShell->Tools();
+      const std::shared_ptr<TerrainSource> terrain = mScene.TerrainHeights();
+      // `/maskgen <preset>,<layer>[,add|sub][,free]` (test runs): that starting point written into the layer.
+      if (!mMaskGenArg.empty() && terrain != nullptr && ++mMaskGenFrames == 150) {
+        const std::string arg = std::exchange(mMaskGenArg, {});
+        const std::size_t comma = arg.find(',');
+        tools.AskGenPreset(arg.substr(0, comma));
+        EdTools::MaskGenTarget& target = tools.GenTarget();
+        target.layer = comma == std::string::npos ? 1 : std::clamp(std::atoi(arg.c_str() + comma + 1), 1, 8);
+        target.mode = arg.find(",add") != std::string::npos ? MaskWriteMode::AddTo
+          : arg.find(",sub") != std::string::npos           ? MaskWriteMode::SubtractFrom
+                                                            : MaskWriteMode::Replace;
+        target.takeAway = arg.find(",free") != std::string::npos;
+        tools.AskGenApply();
+      }
+      if (std::string id; tools.TakeGenPresetAsk(id) && terrain != nullptr && !terrain->heights.empty()) {
+        const auto [low, high] = std::minmax_element(terrain->heights.begin(), terrain->heights.end());
+        tools.SetGenRules(MaskPresetRules(id, *low, *high));
+        gpg::Logf("editor: mask generator: starting point %s, %zu rules", id.c_str(), tools.GenRules().size());
+      }
+      if (tools.TakeGenApply()) {
+        const EdTools::MaskGenTarget target = tools.GenTarget();
+        MaskGenContext context;
+        field::Grid mask;
+        std::string error;
+        const auto started = std::chrono::steady_clock::now();
+        if (
+          !MaskGenContextOf(tools.GenRules(), context, error) ||
+          !EvaluateMaskRules(context, tools.GenRules(), mask, error)
+        ) {
+          PostStatusMessage("The mask wasn't made: " + error);
+          gpg::Warnf("editor: mask generator: %s", error.c_str());
+        } else {
+          float before[8] = {};
+          (void)mScene.MaskCoverage(before);
+          std::string message;
+          const int changed =
+            mScene.WriteGeneratedMask(mask, target.layer, target.mode, target.strength, target.takeAway, message);
+          float after[8] = {};
+          (void)mScene.MaskCoverage(after);
+          PostStatusMessage(message);
+          gpg::Logf(
+            "editor: mask generator: %s in %.2f s; layer %d covers %.1f %% (was %.1f %%)",
+            message.c_str(),
+            std::chrono::duration<double>(std::chrono::steady_clock::now() - started).count(),
+            target.layer,
+            static_cast<double>(after[target.layer - 1] * 100.0f),
+            static_cast<double>(before[target.layer - 1] * 100.0f)
+          );
+          (void)changed;
+        }
+      }
+      // The preview: when the rules changed and the section is open, a moment after the last change.
+      if (!tools.GenSectionOpen() || tools.GenRevision() == mMaskGenEvaluated) {
+        mMaskGenWait = 0;
+        return;
+      }
+      if (++mMaskGenWait < 8 || ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
+        return;
+      }
+      mMaskGenWait = 0;
+      mMaskGenEvaluated = tools.GenRevision();
+      if (mMaskGenImage != 0) {
+        EdImGuiRenderer::DestroyImage(mMaskGenImage);
+        mMaskGenImage = 0;
+      }
+      if (tools.GenRules().empty()) {
+        tools.SetGenPreview(0, 0.0f, "Pick a starting point or add a rule.");
+        return;
+      }
+      MaskGenContext context;
+      field::Grid mask;
+      std::string error;
+      if (
+        !MaskGenContextOf(tools.GenRules(), context, error) ||
+        !EvaluateMaskRules(context, tools.GenRules(), mask, error)
+      ) {
+        tools.SetGenPreview(0, 0.0f, error);
+        return;
+      }
+      // A small picture: the mask in red over a dark ground, as the map shows it from above.
+      constexpr int kSide = 160;
+      std::vector<std::uint32_t> pixels(static_cast<std::size_t>(kSide) * kSide);
+      const float span = static_cast<float>(context.heights->w - 1);
+      double sum = 0.0;
+      for (const float value : mask.v) {
+        sum += std::clamp(value, 0.0f, 1.0f);
+      }
+      for (int y = 0; y < kSide; ++y) {
+        for (int x = 0; x < kSide; ++x) {
+          const float m = std::clamp(
+            SampleField(
+              mask, (static_cast<float>(x) + 0.5f) / kSide * span, (static_cast<float>(y) + 0.5f) / kSide * span
+            ),
+            0.0f,
+            1.0f
+          );
+          const auto lerp = [m](const int from, const int to) {
+            return static_cast<std::uint32_t>(static_cast<float>(from) + (static_cast<float>(to - from)) * m);
+          };
+          // BGRA: from the panel's dark grey to red.
+          pixels[static_cast<std::size_t>(y) * kSide + static_cast<std::size_t>(x)] =
+            0xFF000000u | (lerp(0x2A, 0xF0) << 16) | (lerp(0x2E, 0x40) << 8) | lerp(0x34, 0x40);
+        }
+      }
+      mMaskGenImage = EdImGuiRenderer::CreateImage(kSide, kSide, pixels.data());
+      tools.SetGenPreview(
+        mMaskGenImage, mask.v.empty() ? 0.0f : static_cast<float>(sum / static_cast<double>(mask.v.size())), {}
+      );
+    }
+
     void EditorApp::TransferMapTexture(
       const MapTextureKind kind,
       const bool exporting,
@@ -4649,6 +4810,7 @@ namespace faf::editor
         }
         tools.SetLayerSlots(mScene.LayerSlots());
         MapTexturesUpdate();
+        MaskGenUpdate();
         DriveMaterialEditor();
         tools.SetMapSizeUnits(static_cast<float>(std::max(mDocument.Facts().sizeX, mDocument.Facts().sizeZ)));
         {

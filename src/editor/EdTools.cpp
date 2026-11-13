@@ -2064,6 +2064,153 @@ namespace faf::editor
       }
       ImGui::EndDisabled();
     }
+    DrawMaskGenerator();
+  }
+
+  void EdTools::DrawMaskGenerator()
+  {
+    mGenOpen = Section("Mask generator");
+    if (!mGenOpen) {
+      return;
+    }
+    Note(
+      "Rules make a mask over the whole map from the ground: each source rule combines with what the rules above made, "
+      "each modifier changes it. The preview shows it; Write puts it into a layer as one undo step."
+    );
+    // Starting points.
+    ImGui::SetNextItemWidth(-1.0f);
+    if (EdBeginCombo("##genpreset", "Start from...")) {
+      for (const MaskPreset& preset : MaskPresets()) {
+        if (ImGui::Selectable(preset.name)) {
+          AskGenPreset(preset.id);
+        }
+      }
+      ImGui::EndCombo();
+    }
+    // The rules.
+    bool changed = false;
+    int remove = -1;
+    int moveUp = -1;
+    for (std::size_t i = 0; i < mGenRules.size(); ++i) {
+      MaskGenRule& rule = mGenRules[i];
+      const MaskRuleSpec* const spec = MaskRuleSpecOf(rule.type);
+      if (spec == nullptr) {
+        continue;
+      }
+      ImGui::PushID(static_cast<int>(i));
+      const float rightEdge = ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x;
+      // A modifier works on the rules above it: indented under them.
+      const float indent = spec->modifier ? Em(16.0f) : 0.0f;
+      if (indent > 0.0f) {
+        ImGui::Indent(indent);
+      }
+      changed |= ImGui::Checkbox("##on", &rule.enabled);
+      ImGui::SetItemTooltip("Use this rule");
+      ImGui::SameLine();
+      const bool open =
+        ImGui::TreeNodeEx("##rule", ImGuiTreeNodeFlags_AllowOverlap, "%s", DescribeMaskRule(rule).c_str());
+      const ImGuiStyle& style = ImGui::GetStyle();
+      const float buttons = ImGui::CalcTextSize("Up").x + ImGui::CalcTextSize("Remove").x +
+        style.FramePadding.x * 4.0f + style.ItemSpacing.x;
+      ImGui::SameLine(rightEdge - buttons);
+      ImGui::BeginDisabled(i == 0);
+      if (ImGui::SmallButton("Up")) {
+        moveUp = static_cast<int>(i);
+      }
+      ImGui::EndDisabled();
+      ImGui::SameLine();
+      if (ImGui::SmallButton("Remove")) {
+        remove = static_cast<int>(i);
+      }
+      if (open) {
+        if (!spec->modifier) {
+          if (i > 0) {
+            static const char* const kOps[] = {
+              "AND (the smaller)", "OR (the larger)", "Multiply", "Difference (minus)", "Add"
+            };
+            int op = static_cast<int>(rule.op);
+            ImGui::SetNextItemWidth(Em(150.0f));
+            if (EdCombo("With the rules above", &op, kOps, 5)) {
+              rule.op = static_cast<MaskCombine>(op);
+              changed = true;
+            }
+          }
+          changed |= ImGui::Checkbox("Invert (not)", &rule.invert);
+        }
+        for (const MaskParamSpec& param : spec->params) {
+          float value = rule.Value(param.key);
+          ImGui::SetNextItemWidth(Em(120.0f));
+          if (ImGui::SliderFloat(param.label, &value, param.min, param.max, param.format)) {
+            if (param.step >= 1.0f) {
+              value = std::round(value / param.step) * param.step;
+            }
+            rule.v[param.key] = value;
+            changed = true;
+          }
+        }
+        ImGui::TreePop();
+      }
+      if (indent > 0.0f) {
+        ImGui::Unindent(indent);
+      }
+      ImGui::PopID();
+    }
+    if (remove >= 0) {
+      mGenRules.erase(mGenRules.begin() + remove);
+      changed = true;
+    } else if (moveUp > 0) {
+      std::swap(mGenRules[static_cast<std::size_t>(moveUp)], mGenRules[static_cast<std::size_t>(moveUp - 1)]);
+      changed = true;
+    }
+    ImGui::SetNextItemWidth(-1.0f);
+    if (EdBeginCombo("##genadd", "Add a rule...")) {
+      bool modifiers = false;
+      for (const MaskRuleSpec& spec : MaskRuleCatalogue()) {
+        if (spec.modifier && !modifiers) {
+          ImGui::SeparatorText("Change the result");
+          modifiers = true;
+        }
+        if (ImGui::Selectable(spec.label)) {
+          mGenRules.push_back(NewMaskRule(spec.id));
+          changed = true;
+        }
+      }
+      ImGui::EndCombo();
+    }
+    if (changed) {
+      ++mGenRevision;
+    }
+    // The preview.
+    if (mGenPreviewImage != 0) {
+      const float side = std::min(ImGui::GetContentRegionAvail().x, Em(180.0f));
+      ImGui::Image(static_cast<ImTextureID>(mGenPreviewImage), ImVec2(side, side));
+    }
+    if (!mGenNote.empty()) {
+      ImGui::TextDisabled("%s", mGenNote.c_str());
+    } else if (!mGenRules.empty()) {
+      ImGui::TextDisabled("The mask covers %.1f %% of the map", static_cast<double>(mGenCoverage * 100.0f));
+    }
+    // Where it goes.
+    ImGui::SetNextItemWidth(Em(70.0f));
+    if (ImGui::InputInt("Layer", &mGenTarget.layer)) {
+      mGenTarget.layer = std::clamp(mGenTarget.layer, 1, 8);
+    }
+    static const char* const kModes[] = {"Replace", "Add to", "Subtract from"};
+    int mode = static_cast<int>(mGenTarget.mode);
+    ImGui::SetNextItemWidth(Em(120.0f));
+    if (EdCombo("How", &mode, kModes, 3)) {
+      mGenTarget.mode = static_cast<MaskWriteMode>(mode);
+    }
+    ImGui::SetNextItemWidth(Em(120.0f));
+    ImGui::SliderFloat("Strength", &mGenTarget.strength, 0.0f, 1.0f, "%.2f");
+    ImGui::Checkbox("Only where the layers above leave it free", &mGenTarget.takeAway);
+    ImGui::BeginDisabled(mGenRules.empty());
+    char label[48];
+    std::snprintf(label, sizeof(label), "Write into layer %d", mGenTarget.layer);
+    if (ImGui::Button(label)) {
+      mGenApply = true;
+    }
+    ImGui::EndDisabled();
   }
 
   void EdTools::DrawWater()

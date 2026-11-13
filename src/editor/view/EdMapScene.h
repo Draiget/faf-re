@@ -26,6 +26,7 @@
 #include "editor/doc/EdUnits.h"
 #include "moho/render/d3d/CD3DPrimBatcher.h"
 #include "editor/tools/EdHeightBrush.h"
+#include "editor/tools/EdMaskGen.h"
 #include "editor/tools/EdLayerConvert.h"
 #include "editor/tools/EdMarkers.h"
 
@@ -150,6 +151,18 @@ namespace faf::editor
     bool ExportMaskLayer(int layer, const std::filesystem::path& file, std::string& message);
     /** Each stratum's share of the map, once the masks are read. */
     [[nodiscard]] bool MaskCoverage(float (&coverage)[8]) const;
+    /**
+     * Writes a generated mask (0..1 on any grid over the map) into layer `layer` (1..8) as one undo step, made
+     * symmetric as the Tools panel's symmetry asks. Returns the texels changed, or -1 with `message`.
+     */
+    int WriteGeneratedMask(
+      const field::Grid& mask,
+      int layer,
+      MaskWriteMode mode,
+      float strength,
+      bool takeAway,
+      std::string& message
+    );
     /** The map's masks, read now if they weren't (edit mode on, as the Texture tool does); empty when there are none.
      */
     const EdDocument::MaskGrid& ReadMasks()

@@ -2496,6 +2496,57 @@ namespace faf::editor
     gpg::Logf("editor: %zu texture rules applied to the whole map", mTools->Rules().size());
   }
 
+  int EdMapScene::WriteGeneratedMask(
+    const field::Grid& mask,
+    const int layer,
+    const MaskWriteMode mode,
+    const float strength,
+    const bool takeAway,
+    std::string& message
+  )
+  {
+    LoadMasks();
+    EdDocument::MaskGrid& masks = mDocument.Masks();
+    if (masks.texels.empty() || mPaintingMask) {
+      message = "No map's masks to write into.";
+      return -1;
+    }
+    const SampleRect whole{0, 0, masks.width - 1, masks.height - 1};
+    mDocument.MaskUndo().BeginStroke();
+    mDocument.MaskUndo().BeforeWrite(masks.texels.data(), whole);
+    const float mapSize = static_cast<float>(std::max(mDocument.Facts().sizeX, mDocument.Facts().sizeZ));
+    const std::size_t changed = WriteMaskLayer(
+      masks.texels.data(),
+      masks.width,
+      masks.height,
+      mapSize,
+      layer,
+      RemappedStrata(TerrainShader()),
+      mask,
+      mode,
+      strength,
+      takeAway
+    );
+    // The brush's symmetry, on this layer only: its byte copied from the source part to every copy.
+    if (mTools != nullptr) {
+      const HeightBrush brush = mTools->CurrentHeightBrush();
+      if (brush.symmetry != Symmetry::None) {
+        const int byte = layer - 1;
+        std::vector<std::uint64_t> one(masks.texels.size());
+        for (std::size_t i = 0; i < one.size(); ++i) {
+          one[i] = MaskByte(masks.texels[i], byte);
+        }
+        (void)MakeMasksSymmetric(one.data(), masks.width, masks.height, brush.symmetry, brush.turns);
+        for (std::size_t i = 0; i < one.size(); ++i) {
+          masks.texels[i] = WithMaskByte(masks.texels[i], byte, static_cast<std::uint8_t>(one[i]));
+        }
+      }
+    }
+    WholeMaskChanged(whole);
+    message = "Wrote the mask into layer " + std::to_string(layer) + ": " + std::to_string(changed) + " texels changed";
+    return static_cast<int>(changed);
+  }
+
   void EdMapScene::RunSymmetryCheck()
   {
     const moho::CHeightField* const field = mMap != nullptr ? mMap->mTerrainRes->GetHeightField() : nullptr;
