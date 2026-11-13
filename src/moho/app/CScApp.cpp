@@ -57,6 +57,7 @@
 #include "moho/sim/CWldSession.h"
 #include "moho/sim/CWldSessionLoaderImpl.h"
 #include "moho/sim/SimDriver.h"
+#include "moho/render/FrameLimiter.h"
 #include "moho/render/RenderFeatures.h"
 #include "moho/task/CTaskThread.h"
 #include "moho/ui/IUIManager.h"
@@ -1491,12 +1492,14 @@ void CScApp::Main()
       // Engine change (sc_FrameTimeCarry): a wait ends late, as it sleeps in whole milliseconds, and
       // each frame's clock starts over. The next frame gets that time back, or a 4 ms cap holds 215 FPS
       // with frames to spare. At most half the cap, so a long frame isn't followed by a burst.
-      const float shortestFrame = moho::sc_FrameTimeClamp - sFrameCapCarryMs;
+      // Engine addition (ren_FpsLimit, ren_MaxFps, /maxfps): the clamp is the limit's frame time while one is set.
+      const float frameClamp = moho::FrameLimiterShortestFrameMs();
+      const float shortestFrame = frameClamp - sFrameCapCarryMs;
       if (shortestFrame > elapsed) {
         moho::WIN_SetWakeupTimer(shortestFrame - elapsed);
         return;
       }
-      sFrameCapCarryMs = sc_FrameTimeCarry ? std::min(elapsed - shortestFrame, moho::sc_FrameTimeClamp * 0.5f) : 0.0f;
+      sFrameCapCarryMs = sc_FrameTimeCarry ? std::min(elapsed - shortestFrame, frameClamp * 0.5f) : 0.0f;
       frameSeconds = static_cast<float>(elapsed * 0.001);
     }
 
