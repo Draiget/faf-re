@@ -141,7 +141,7 @@ namespace gpg::gal
     // HLSL flags as DeviceD3D10::CreateEffect.
     constexpr const char* kEffectProfile = "fx_5_0";
     // Bump when EffectSourceD3D11's output changes, to retire cached blobs.
-    constexpr const char* kTranslatorVersion = "translator 9";
+    constexpr const char* kTranslatorVersion = "translator 10";
     // Added to every viewport origin: D3D9 pixel centres in D3D11 (see SetViewport).
     constexpr float kD3D9PixelCentreOffset = 0.5f;
     constexpr UINT kEffectCompileFlags = D3DCOMPILE_ENABLE_BACKWARDS_COMPATIBILITY;
