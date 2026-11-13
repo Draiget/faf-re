@@ -1132,6 +1132,7 @@ void moho::CBuildDragPreview::UpdateDragPreview()
  * What it does:
  * While scrub mode is active, accumulates mouse delta into scrub lanes,
  * recenters the cursor to scrub anchor, and hides cursor texture state.
+ * Engine addition: POSIX consumes SDL relative motion without recentering.
  */
 static void func_ProcessMouseScrubbing()
 {
@@ -1139,6 +1140,17 @@ static void func_ProcessMouseScrubbing()
     return;
   }
 
+#if FAFRE_PLATFORM_POSIX
+  int deltaX = 0;
+  int deltaY = 0;
+  if (!platform::window::GetRelativeMouseDelta(deltaX, deltaY)) {
+    func_StartMouseScrubbing(false, nullptr);
+    return;
+  }
+  const LONG scrubSign = sInvertMidMouseScrub ? -1 : 1;
+  sMouseScrubDelta.x += scrubSign * deltaX;
+  sMouseScrubDelta.y += scrubSign * deltaY;
+#else
   POINT cursorPoint{};
   ::GetCursorPos(&cursorPoint);
   // The shipped build flips these two accumulations from `add` to `sub` by
@@ -1149,6 +1161,7 @@ static void func_ProcessMouseScrubbing()
   sMouseScrubDelta.y += scrubSign * (cursorPoint.y - sMouseScrubLanded.y);
   ::SetCursorPos(sMouseScrubAnchor.x, sMouseScrubAnchor.y);
   ::GetCursorPos(&sMouseScrubLanded);
+#endif
 
   auto* const cursor = moho::g_UIManager->GetCursor();
   (void)SetCursorShowingAndMarkDirty(cursor, false);
@@ -3178,6 +3191,10 @@ bool moho::CUIWorldView::HandleEvent(
 
   // --- pointer motion (0x00870963) ---------------------------------------
   if (eventData.mEventType == MET_MouseMotion) {
+#if FAFRE_PLATFORM_POSIX
+    // Consume this SDL event's relative motion before the camera handles it, not next frame.
+    func_ProcessMouseScrubbing();
+#endif
     const bool spaceDragActive =
       MAUI_KeyIsDown(MKEY_SPACE) && (cam_Free || ren_BgLowerBound > mCamera->CameraGetTargetZoom());
 
@@ -3426,6 +3443,11 @@ void moho::CUIWorldView::Frame(
     }
 
     if (!MAUI_KeyIsDown(MKEY_SPACE)) {
+#if FAFRE_PLATFORM_POSIX
+      if (mCameraRotationActive) {
+        func_StartMouseScrubbing(false, nullptr);
+      }
+#endif
       if (mCameraRotationActive && !cam_Free) {
         mCamera->CameraRevertRotation();
       }
@@ -3445,7 +3467,8 @@ void moho::CUIWorldView::Frame(
         float panX = 0.0f;
         float panY = 0.0f;
 
-        if (ui_ScreenEdgeScrollView) {
+        // Captured camera motion must not also pan at a screen edge.
+        if (ui_ScreenEdgeScrollView && (!FAFRE_PLATFORM_POSIX || sMouseIsScrubbing == 0)) {
           gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
           const gpg::gal::Head& head = device->GetDeviceContext()->GetHead(0u);
           // SDL's focus-checked cursor query works in both native window modes.
@@ -3903,6 +3926,9 @@ void CameraDragger::DragMove(
   const moho::SMauiEventData* const eventData
 )
 {
+#if FAFRE_PLATFORM_POSIX
+  func_ProcessMouseScrubbing();
+#endif
   if (moho::ui_DisableCursorFixing) {
     const Wm3::Vector2f currentMousePos(eventData->mMousePos.x, eventData->mMousePos.y);
     const Wm3::Vector2f dragDelta(currentMousePos.x - mPos.x, currentMousePos.y - mPos.y);

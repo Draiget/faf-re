@@ -32,6 +32,15 @@ namespace
   platform::window::sdl::ToolEventHook gToolEventHook = nullptr;
   platform::window::CursorRequestHandler gCursorRequestHandler = nullptr;
 
+  struct RelativeMouse
+  {
+    SDL_Window* window = nullptr;
+    float anchorX = 0.0f;
+    float anchorY = 0.0f;
+    float deltaX = 0.0f;
+    float deltaY = 0.0f;
+  } gRelativeMouse;
+
   [[nodiscard]] SDL_Window* AsWindow(
     void* const handle
   )
@@ -366,6 +375,14 @@ namespace
       out.type = EventType::MouseMove;
       out.window = window;
       ToPixels(window, source.motion.x, source.motion.y, out.x, out.y);
+      if (window != nullptr && window == gRelativeMouse.window) {
+        const float density = SDL_GetWindowPixelDensity(window);
+        const float scale = density > 0.0f ? density : 1.0f;
+        gRelativeMouse.deltaX += source.motion.xrel * scale;
+        gRelativeMouse.deltaY += source.motion.yrel * scale;
+        // Keep UI hit testing on the dragged control while the hidden cursor moves freely.
+        ToPixels(window, gRelativeMouse.anchorX, gRelativeMouse.anchorY, out.x, out.y);
+      }
       out.buttonsDown = ButtonsDownOf(source.motion.state);
       out.modifiers = ModifiersOf(SDL_GetModState());
       float globalX = 0.0f;
@@ -574,6 +591,7 @@ namespace platform::window
     if (!gInitialized) {
       return;
     }
+    (void)SetRelativeMouseMode(false);
     for (SDL_Window* const window : gWindows) {
       sdl::OnWindowDestroyed(window);
       SDL_DestroyWindow(window);
@@ -698,6 +716,9 @@ namespace platform::window
     if (window == nullptr) {
       return;
     }
+    if (window == gRelativeMouse.window) {
+      (void)SetRelativeMouseMode(false);
+    }
     void* const native = sdl::IsChild(AsWindow(window)) ? sdl::NativeHandleOf(AsWindow(window)) : nullptr;
     for (auto it = gWindows.begin(); it != gWindows.end(); ++it) {
       if (*it == window) {
@@ -724,6 +745,57 @@ namespace platform::window
     if (window != nullptr) {
       (void)(show ? SDL_ShowWindow(AsWindow(window)) : SDL_HideWindow(AsWindow(window)));
     }
+  }
+
+  bool SetRelativeMouseMode(
+    const bool enabled
+  )
+  {
+    if (!enabled) {
+      if (gRelativeMouse.window != nullptr) {
+        // SDL accepts a window-local warp in relative mode, including on Wayland.
+        SDL_WarpMouseInWindow(gRelativeMouse.window, gRelativeMouse.anchorX, gRelativeMouse.anchorY);
+        const bool released = SDL_SetWindowRelativeMouseMode(gRelativeMouse.window, false);
+        gRelativeMouse = {};
+        return released;
+      }
+      return true;
+    }
+    if (gRelativeMouse.window != nullptr) {
+      return true;
+    }
+    SDL_Window* const window = SDL_GetMouseFocus();
+    if (window == nullptr || SDL_GetKeyboardFocus() != window) {
+      return false;
+    }
+    float x = 0.0f;
+    float y = 0.0f;
+    (void)SDL_GetMouseState(&x, &y);
+    if (!SDL_SetWindowRelativeMouseMode(window, true)) {
+      gpg::Warnf("Relative mouse mode: %s", SDL_GetError());
+      return false;
+    }
+    gRelativeMouse = {window, x, y, 0.0f, 0.0f};
+    return true;
+  }
+
+  bool GetRelativeMouseDelta(
+    int& x,
+    int& y
+  )
+  {
+    x = y = 0;
+    if (
+      gRelativeMouse.window == nullptr || SDL_GetMouseFocus() != gRelativeMouse.window ||
+      SDL_GetKeyboardFocus() != gRelativeMouse.window
+    ) {
+      return false;
+    }
+    x = static_cast<int>(std::trunc(gRelativeMouse.deltaX));
+    y = static_cast<int>(std::trunc(gRelativeMouse.deltaY));
+    gRelativeMouse.deltaX -= static_cast<float>(x);
+    gRelativeMouse.deltaY -= static_cast<float>(y);
+    return true;
   }
 
   bool GetMousePosition(
