@@ -55,6 +55,7 @@ set(FAF_EDITOR_SOURCES
   tools/EdWaterMasks.cpp
   tools/EdErosionSuite.cpp
   tools/EdScTools.cpp
+  tools/EdTerrainChecks.cpp
   tools/EdInterop.cpp
   graph/EdTerrainGraph.cpp
   graph/EdTerrainNodes.cpp

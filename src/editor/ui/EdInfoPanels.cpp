@@ -11,6 +11,7 @@
 
 #include <algorithm>
 #include <array>
+#include <chrono>
 #include <functional>
 #include <cctype>
 #include <cstdio>
@@ -24,6 +25,7 @@
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/sim/RRuleGameRules.h"
 #include "editor/tools/EdPathing.h"
+#include "editor/tools/EdTerrainChecks.h"
 #include "gpg/core/utils/Logging.h"
 #include "moho/sim/CWldMap.h"
 #include <cmath>
@@ -841,6 +843,47 @@ namespace faf::editor
       issue.level = start.mass < bestMass ? CheckIssue::Level::Warning : CheckIssue::Level::Note;
       issue.text = text;
       mCheckIssues.push_back(issue);
+    }
+
+    // The terrain checks: steep ground in the base areas, uneven ground under the resources, and the land route
+    // length from the first start to the others on its ground.
+    {
+      const auto t0 = std::chrono::steady_clock::now();
+      field::Grid heights(field->width, field->height, 1.0f, 0.0f, 0.0f);
+      for (std::size_t k = 0; k < heights.v.size(); ++k) {
+        heights.v[k] = static_cast<float>(field->data[k]) / 128.0f;
+      }
+      std::vector<TerrainCheckPoint> points;
+      std::vector<TerrainCheckPoint> resources;
+      for (const Start& start : starts) {
+        points.push_back({start.marker->name, start.x, start.z});
+      }
+      for (const SaveEntry& marker : *input.markers) {
+        const std::string type = MarkerTypeOf(marker);
+        float x = 0.0f, y = 0.0f, z = 0.0f;
+        if ((type == "Mass" || type == "Hydrocarbon") && MarkerPosition(marker, x, y, z)) {
+          resources.push_back({marker.name, x, z});
+        }
+      }
+      TerrainCheckSettings settings;
+      settings.limit = land.maxSlope > 0.0f ? land.maxSlope : settings.limit;
+      std::size_t found = 0;
+      for (CheckIssue& issue : CheckTerrainGround(heights, points, resources, settings)) {
+        mCheckIssues.push_back(std::move(issue));
+        ++found;
+      }
+      const float water = input.water ? input.waterLevel : -1e9f;
+      for (CheckIssue& issue : CheckTerrainRoutes(heights, water, points, settings)) {
+        mCheckIssues.push_back(std::move(issue));
+        ++found;
+      }
+      gpg::Logf(
+        "editor: terrain checks: %zu starts, %zu resources, %zu findings in %.0f ms",
+        points.size(),
+        resources.size(),
+        found,
+        std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count()
+      );
     }
 
     // Naval: the ship water nearest each start (within 64 units), and whether the starts' waters meet.
