@@ -1175,6 +1175,11 @@ namespace moho
     });
   }
 
+  void RULE_FinishPreparingKept()
+  {
+    FinishPreparing();
+  }
+
   RRuleGameRules* RULE_TakeOrCreate(
     const fa::string& gameMods,
     CBackgroundTaskControl* const loadControl

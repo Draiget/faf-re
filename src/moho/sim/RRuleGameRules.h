@@ -936,4 +936,7 @@ namespace moho
    * rules are kept or lent; rules for other mods are deleted by the session that finds them.
    */
   void RULE_PrepareKept(const fa::string& gameMods);
+
+  /** Waits for a RULE_PrepareKept thread, if one runs (it reads the file system's mounts). */
+  void RULE_FinishPreparingKept();
 } // namespace moho

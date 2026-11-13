@@ -95,6 +95,7 @@
 #include "moho/sim/CWldMap.h"
 #include "moho/sim/RRuleGameRules.h"
 #include "moho/sim/STIMap.h"
+#include "moho/sim/Sim.h"
 #include "moho/terrain/splat/CWldSplat.h"
 #include "moho/ui/IUIManager.h"
 #include <cstring>
@@ -6110,6 +6111,10 @@ namespace faf::editor
       if (finished && mDocument.TakeCreated(folder, scenario)) {
         // The game's file system is always a CVFSImpl (VFS_Create, 0x00467F90).
         if (auto* const vfs = static_cast<moho::CVFSImpl*>(moho::DISK_GetVFS()); vfs != nullptr) {
+          // The rules and the sim's Lua built ahead read the mounts on their threads, and the mounts
+          // have no lock: a push that moves them under such a reader crashed it (EnumerateFiles).
+          moho::RULE_FinishPreparingKept();
+          moho::SIM_FinishPreparingLuaState();
           vfs->MountDirectoryLate(folder, ("/maps/" + folder.filename().string()).c_str());
         }
         mPlay.FindMaps();
