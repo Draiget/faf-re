@@ -435,7 +435,7 @@ namespace faf::editor
       ImGui::TextDisabled("a palette number");
 
       // Alliances: this army's stance toward each other one.
-      if (ImGui::CollapsingHeader("Alliances")) {
+      if (Section("Alliances", false)) {
         static const char* const kStances[4] = {"-", "Enemy", "Ally", "Neutral"};
         static const ImVec4 kStanceColours[4] = {
           ImVec4(0.30f, 0.32f, 0.36f, 1.0f),
@@ -490,7 +490,7 @@ namespace faf::editor
           ImGui::PopID();
         }
       }
-      if (ImGui::CollapsingHeader("Scripting")) {
+      if (Section("Scripting", false)) {
         char plans[256];
         (void)std::snprintf(plans, sizeof(plans), "%s", edit.plans.c_str());
         ImGui::SetNextItemWidth(-1.0f);

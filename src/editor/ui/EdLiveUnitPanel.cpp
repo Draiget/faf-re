@@ -87,7 +87,7 @@ namespace faf::editor
       ImGui::SameLine(labelWidth + ImGui::GetStyle().WindowPadding.x);
     };
 
-    if (ImGui::CollapsingHeader("State##live", ImGuiTreeNodeFlags_DefaultOpen)) {
+    if (Section("State##live")) {
       // Health: dragged, set when let go.
       static float health = 0.0f;
       static bool editingHealth = false;
@@ -122,7 +122,7 @@ namespace faf::editor
     }
 
     // Toggles the blueprint has: the game's own switches (as the order panel's).
-    if (!info.toggles.empty() && ImGui::CollapsingHeader("Toggles##live", ImGuiTreeNodeFlags_DefaultOpen)) {
+    if (!info.toggles.empty() && Section("Toggles##live")) {
       for (const LiveUnitInfo::Toggle& toggle : info.toggles) {
         // The game's script bit: set means off for the shield, intel, jamming, production, stealth and cloak switches
         // (setting the shield's bit disables it), so those show "on" while the bit is clear; the weapon, generic and
@@ -144,7 +144,7 @@ namespace faf::editor
     }
 
     // Enhancements by slot: has it, add, remove (through its <name>Remove where the blueprint has one).
-    if (!info.enhancements.empty() && ImGui::CollapsingHeader("Enhancements##live", ImGuiTreeNodeFlags_DefaultOpen)) {
+    if (!info.enhancements.empty() && Section("Enhancements##live")) {
       std::map<std::string, std::vector<const LiveUnitInfo::Enhancement*>> slots;
       for (const LiveUnitInfo::Enhancement& e : info.enhancements) {
         slots[e.slot.empty() ? std::string("(no slot)") : e.slot].push_back(&e);
@@ -174,7 +174,7 @@ namespace faf::editor
       }
     }
 
-    if (ImGui::CollapsingHeader("Actions##live", ImGuiTreeNodeFlags_DefaultOpen)) {
+    if (Section("Actions##live")) {
       if (ImGui::Button("Kill")) {
         each("u:Kill()");
       }

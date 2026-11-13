@@ -1498,7 +1498,7 @@ namespace faf::editor
   void EdMapBrowser::DrawVaultByName()
   {
     ImGui::Dummy(ImVec2(0.0f, ImGui::GetFrameHeight()));
-    if (!ImGui::CollapsingHeader("Know a map's folder name or link?")) {
+    if (!Section("Know a map's folder name or link?", false)) {
       return;
     }
     const bool working = mDownload.GetState() == EdVaultDownload::State::Working;

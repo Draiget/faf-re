@@ -73,7 +73,7 @@ namespace faf::editor
     }
     // The map border while the toolbar's border button is on.
     if (mTools.EditingBorder()) {
-      if (ImGui::CollapsingHeader("Map border", ImGuiTreeNodeFlags_DefaultOpen)) {
+      if (Section("Map border")) {
         mTools.DrawPlayableArea();
       }
       ImGui::Spacing();
@@ -155,13 +155,32 @@ namespace faf::editor
     }
     // The header: its kind as a chip, its name (a marker's can be renamed), how many more are selected.
     {
+      // The mockup's pill: the kind's colour faint behind its words in that colour, as tall as the name field beside
+      // it.
       const ImVec4 colour = KindColour(now.kind);
-      ImGui::PushStyleColor(ImGuiCol_Button, colour);
-      ImGui::PushStyleColor(ImGuiCol_ButtonHovered, colour);
-      ImGui::PushStyleColor(ImGuiCol_ButtonActive, colour);
-      // Its own id: the section header below has the same word ("Unit"), and two items with one id are an ImGui error.
-      ImGui::SmallButton((std::string(KindName(now.kind)) + "##kindtag").c_str());
-      ImGui::PopStyleColor(3);
+      const char* const kind = KindName(now.kind);
+      const ImVec2 words = ImGui::CalcTextSize(kind);
+      const float height = ImGui::GetFrameHeight();
+      const float width = std::round(words.x + ImGui::GetStyle().FramePadding.x * 2.0f);
+      const ImVec2 at = ImGui::GetCursorScreenPos();
+      // Its own id: the section below has the same word ("Unit"), and two items with one id are an ImGui error.
+      ImGui::Dummy(ImVec2(width, height));
+      ImDrawList* const draw = ImGui::GetWindowDrawList();
+      draw->AddRectFilled(
+        at,
+        ImVec2(at.x + width, at.y + height),
+        ImGui::GetColorU32(ImVec4(colour.x, colour.y, colour.z, 0.22f)),
+        ImGui::GetStyle().FrameRounding
+      );
+      const ImVec4 ink(
+        colour.x + (1.0f - colour.x) * 0.35f,
+        colour.y + (1.0f - colour.y) * 0.35f,
+        colour.z + (1.0f - colour.z) * 0.35f,
+        1.0f
+      );
+      draw->AddText(
+        ImVec2(at.x + (width - words.x) * 0.5f, at.y + (height - words.y) * 0.5f), ImGui::GetColorU32(ink), kind
+      );
       ImGui::SameLine();
       if (now.kind == SelectionProperties::Kind::Marker) {
         ImGui::SetNextItemWidth(-1.0f);
@@ -193,7 +212,7 @@ namespace faf::editor
       ImGui::SameLine(labelWidth + ImGui::GetStyle().WindowPadding.x);
       ImGui::SetNextItemWidth(-1.0f);
     };
-    if (ImGui::CollapsingHeader("Transform", ImGuiTreeNodeFlags_DefaultOpen)) {
+    if (Section("Transform")) {
       bool moved = false;
       row("Location X");
       FillDragFloat("##x", &edit.position[0], 0.1f, 0.0f, 0.0f, "%.2f");
@@ -235,7 +254,7 @@ namespace faf::editor
     // What the kind has.
     switch (now.kind) {
     case SelectionProperties::Kind::Marker:
-      if (ImGui::CollapsingHeader("Marker", ImGuiTreeNodeFlags_DefaultOpen)) {
+      if (Section("Marker")) {
         row("Type");
         ImGui::TextUnformatted(now.type.c_str());
         if (const MarkerType* const type = FindMarkerType(now.type); type != nullptr) {
@@ -341,10 +360,7 @@ namespace faf::editor
         }
       }
       // An adaptive map: which army this resource spawns with, which option group it belongs to (_tables.lua).
-      if (
-        (now.type == "Mass" || now.type == "Hydrocarbon") &&
-        ImGui::CollapsingHeader("Adaptive map", ImGuiTreeNodeFlags_DefaultOpen)
-      ) {
+      if ((now.type == "Mass" || now.type == "Hydrocarbon") && Section("Adaptive map")) {
         const bool hydro = now.type == "Hydrocarbon";
         const std::vector<ScenarioTeam> teams = mDocument.Teams();
         const int slots = teams.empty() ? 0 : static_cast<int>(teams.front().armies.size());
@@ -550,7 +566,7 @@ namespace faf::editor
       }
       break;
     case SelectionProperties::Kind::Unit:
-      if (ImGui::CollapsingHeader("Unit", ImGuiTreeNodeFlags_DefaultOpen)) {
+      if (Section("Unit")) {
         row("Blueprint");
         ImGui::TextUnformatted(now.type.c_str());
         row("Army");
@@ -559,7 +575,7 @@ namespace faf::editor
       }
       break;
     case SelectionProperties::Kind::Prop:
-      if (ImGui::CollapsingHeader("Prop", ImGuiTreeNodeFlags_DefaultOpen)) {
+      if (Section("Prop")) {
         ImGui::TextWrapped("%s", now.type.c_str());
         if (!now.details.empty()) {
           ImGui::TextDisabled("%s", now.details.c_str());
@@ -576,7 +592,7 @@ namespace faf::editor
       }
       break;
     case SelectionProperties::Kind::Decal:
-      if (ImGui::CollapsingHeader("Decal", ImGuiTreeNodeFlags_DefaultOpen)) {
+      if (Section("Decal")) {
         ImGui::TextWrapped("%s", now.type.c_str());
       }
       break;

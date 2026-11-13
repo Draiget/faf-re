@@ -1955,7 +1955,7 @@ namespace faf::editor
     if (mDocument.GetState() == EdDocument::State::Open) {
       const MapFacts& facts = mDocument.Facts();
       ImGui::Separator();
-      if (ImGui::CollapsingHeader("Map", ImGuiTreeNodeFlags_DefaultOpen)) {
+      if (Section("Map")) {
         const auto row = [](const char* const label) {
           ImGui::AlignTextToFramePadding();
           ImGui::TextDisabled("%s", label);
@@ -2007,11 +2007,7 @@ namespace faf::editor
           ImGui::SetWindowFocus(Panel(kInfoWindow));
         }
       }
-      if (
-        ImGui::CollapsingHeader(
-          "Adaptive map", mDocument.Adaptive() ? ImGuiTreeNodeFlags_DefaultOpen : ImGuiTreeNodeFlags_None
-        )
-      ) {
+      if (Section("Adaptive map", mDocument.Adaptive())) {
         ImGui::PushID("adaptive");
         DrawAdaptivePanel();
         ImGui::PopID();

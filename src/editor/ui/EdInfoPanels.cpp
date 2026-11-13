@@ -588,7 +588,7 @@ namespace faf::editor
     std::vector<MarkerChain>& chains = mDocument.SaveData().Chains();
     char header[64];
     (void)std::snprintf(header, sizeof(header), "Chains (%zu)###chains", chains.size());
-    if (!ImGui::CollapsingHeader(header)) {
+    if (!Section(header, false)) {
       return;
     }
     // Each change is one undo step: the save as it was, the change, then the step.
