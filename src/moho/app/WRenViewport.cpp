@@ -3237,7 +3237,8 @@ namespace
         }
         const std::uint8_t number =
           bodies.BodyOfCell(static_cast<std::int32_t>(hit.x), static_cast<std::int32_t>(hit.z));
-        if (number != 0u && bodies.Body(number).elevation != moho::kWaterBodyNoWater) {
+        // A river's sloped surface is no mirror plane: it reflects the sky, not units.
+        if (number != 0u && !bodies.IsRiver(number) && bodies.Body(number).elevation != moho::kWaterBodyNoWater) {
           // 4 for each hit, plus 1 more the nearer the ray is to the centre (at most 2 away).
           score[number] += 4 + (2 - std::max(std::abs(row - 2), std::abs(column - 2)));
         }
