@@ -478,6 +478,15 @@ set_tests_properties(skeleton_build_threads PROPERTIES LABELS "Sim")
 target_compile_definitions(faf_occupation_manager_tests PRIVATE FAF_OCCUPATION_DELETE_TRACE=1)
 target_link_options(faf_occupation_manager_tests PRIVATE -Wl,--wrap=_Znwm -Wl,--wrap=_Znam -Wl,--wrap=_ZdlPv -Wl,--wrap=_ZdaPv)
 
+# Production terrain splat budget/container regression; no game data or renderer required.
+# Link faf_sim for the real engine headers, WildMagic types and platform compile settings.
+add_executable(faf_splat_budget_tests EXCLUDE_FROM_ALL
+  "${PROJECT_SOURCE_DIR}/tests/terrain/splat_budget/SplatBudgetTests.cpp")
+target_link_libraries(faf_splat_budget_tests PRIVATE faf_sim gtest_main)
+set_target_properties(faf_splat_budget_tests PROPERTIES FOLDER "Tests/Terrain")
+add_test(NAME splat_budget COMMAND faf_splat_budget_tests)
+set_tests_properties(splat_budget PROPERTIES TIMEOUT 120 LABELS "Terrain")
+
 # --- Portable unit tests ------------------------------------------------------------------
 # The suites Windows builds that need no Windows API: header-only ones on their own, and the
 # gpg/core and container suites on faf_sim's objects, as Windows runs them on faf_engine.
