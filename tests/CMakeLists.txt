@@ -391,6 +391,7 @@ add_executable(faf_editor_brush_tests EXCLUDE_FROM_ALL editor/HeightBrushTests.c
   editor/MaskBrushTests.cpp editor/MaskEncodingTests.cpp editor/MaskBrushOptionsTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdMaskBrush.cpp
   editor/BrushLibraryTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdBrushLibrary.cpp
   editor/ShaderProfileTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdShaderProfiles.cpp
+  editor/LayerConvertTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdLayerConvert.cpp
   editor/SymmetrizeTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdSymmetrize.cpp ${CMAKE_SOURCE_DIR}/src/editor/terrain/EdFieldSc.cpp
   editor/SaveFileTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdSaveFile.cpp
   editor/MarkerTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdMarkers.cpp

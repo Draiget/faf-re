@@ -536,6 +536,53 @@ namespace faf::editor
     ImGui::EndDisabled();
     ImGui::SameLine();
     ImGui::TextDisabled("One undo step. The paint keeps its bytes.");
+
+    // Convert the paint to the chosen shader (FAF Studio's Convert layers, the masks part).
+    if (profile.name != mShader && mConvertPlan.to == profile.name) {
+      SectionHeader("CONVERT THE PAINT TO THIS SHADER");
+      if (!mConvertPlan.refused.empty()) {
+        ImGui::TextWrapped("%s", mConvertPlan.refused.c_str());
+      } else {
+        for (const std::string& line : mConvertPlan.lines) {
+          ImGui::Bullet();
+          ImGui::TextWrapped("%s", line.c_str());
+        }
+        for (const std::string& warning : mConvertPlan.warnings) {
+          ImGui::Bullet();
+          ImGui::TextColored(ImVec4(0.95f, 0.75f, 0.35f, 1.0f), "%s", warning.c_str());
+        }
+        if (!mConvertPlan.lost.empty()) {
+          static const char* const kLost[] = {"Move to a free layer", "Merge into a layer", "Drop"};
+          int lost = static_cast<int>(mConvertOptions.lost);
+          ImGui::SetNextItemWidth(Em(240.0f));
+          if (ImGui::Combo("Paint it can't draw", &lost, kLost, 3)) {
+            mConvertOptions.lost = static_cast<LostLayers>(lost);
+          }
+          if (mConvertOptions.lost == LostLayers::Merge) {
+            int into = mConvertOptions.mergeInto + 1;
+            ImGui::SetNextItemWidth(Em(240.0f));
+            if (ImGui::SliderInt("Into layer", &into, 1, std::max(1, mConvertPlan.toPainted))) {
+              mConvertOptions.mergeInto = into - 1;
+            }
+          }
+        }
+        if (mConvertPlan.toBiplanar) {
+          ImGui::Checkbox("Move the cliff layers to layers 3 and 4", &mConvertOptions.arrange);
+        }
+        if (ImGui::Button("Convert and switch")) {
+          mConvertRequested = true;
+        }
+        ImGui::SameLine();
+        ImGui::TextDisabled("Masks and layers only; the textures stay. One undo step.");
+      }
+    }
+    if (!mConvertReport.empty()) {
+      SectionHeader("LAST CONVERSION");
+      for (const std::string& line : mConvertReport) {
+        ImGui::Bullet();
+        ImGui::TextWrapped("%s", line.c_str());
+      }
+    }
     ImGui::EndChild();
     ImGui::End();
   }

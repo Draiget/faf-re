@@ -78,6 +78,7 @@ set(FAF_EDITOR_SOURCES
   tools/EdHeightBrush.cpp
   tools/EdHeightFile.cpp
   tools/EdBrushLibrary.cpp
+  tools/EdLayerConvert.cpp
   tools/EdMaskBrush.cpp
   tools/EdShaderProfiles.cpp
   tools/EdSymmetrize.cpp

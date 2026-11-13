@@ -272,6 +272,8 @@ namespace faf::editor
       Skybox,
       Waves,
       TerrainTypes,
+      /** Convert layers: the masks, the layer slots and the shader, together. */
+      LayerConversion,
     };
     /** The map's terrain type grid (a byte a cell, STIMap::mTerrainType, saved with the terrain): its cells, or null.
      */
@@ -565,6 +567,22 @@ namespace faf::editor
       /** Edits made together (a layer set imported) share a non-zero batch and are one undo step. */
       int batch = 0;
     };
+    /** Convert layers: the masks before and after, and the layer slot and shader edits it made (slot -1: the shader).
+     */
+    struct ConversionEdit
+    {
+      std::vector<std::uint64_t> masksBefore;
+      std::vector<std::uint64_t> masksAfter;
+      std::vector<LayerEdit> layers;
+    };
+    [[nodiscard]] std::vector<ConversionEdit>& ConversionUndo() noexcept
+    {
+      return mConversionUndo;
+    }
+    [[nodiscard]] std::vector<ConversionEdit>& ConversionRedo() noexcept
+    {
+      return mConversionRedo;
+    }
     [[nodiscard]] std::vector<LayerEdit>& LayerUndo() noexcept
     {
       return mLayerUndo;
@@ -628,6 +646,8 @@ namespace faf::editor
         return "waves";
       case EditKind::TerrainTypes:
         return "terrain types";
+      case EditKind::LayerConversion:
+        return "layer conversion";
       }
       return "edit";
     }
@@ -724,6 +744,8 @@ namespace faf::editor
     std::vector<std::pair<PropSnapshot, PropSnapshot>> mPropUndo;
     std::vector<std::pair<PropSnapshot, PropSnapshot>> mPropRedo;
     std::vector<LayerEdit> mLayerUndo;
+    std::vector<ConversionEdit> mConversionUndo;
+    std::vector<ConversionEdit> mConversionRedo;
     std::vector<LayerEdit> mLayerRedo;
     std::vector<std::pair<std::vector<std::uint8_t>, std::vector<std::uint8_t>>> mTerrainTypesUndo;
     std::vector<std::pair<std::vector<std::uint8_t>, std::vector<std::uint8_t>>> mTerrainTypesRedo;

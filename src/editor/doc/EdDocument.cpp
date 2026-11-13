@@ -2245,6 +2245,8 @@ namespace faf::editor
     mRedoOrder.clear();
     mLayerUndo.clear();
     mLayerRedo.clear();
+    mConversionUndo.clear();
+    mConversionRedo.clear();
     mPropUndo.clear();
     mPropRedo.clear();
     mSave = {};

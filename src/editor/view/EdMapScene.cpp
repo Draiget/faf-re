@@ -1289,6 +1289,7 @@ namespace faf::editor
       : kind == EdDocument::EditKind::Skybox              ? UndoSkybox(false)
       : kind == EdDocument::EditKind::Waves               ? UndoWaves(false)
       : kind == EdDocument::EditKind::TerrainTypes        ? UndoTerrainTypes(false)
+      : kind == EdDocument::EditKind::LayerConversion     ? UndoConversion(false)
                                                           : UndoHeights(false);
     if (done) {
       mDocument.PushRedo(kind);
@@ -1312,6 +1313,7 @@ namespace faf::editor
       : kind == EdDocument::EditKind::Skybox              ? UndoSkybox(true)
       : kind == EdDocument::EditKind::Waves               ? UndoWaves(true)
       : kind == EdDocument::EditKind::TerrainTypes        ? UndoTerrainTypes(true)
+      : kind == EdDocument::EditKind::LayerConversion     ? UndoConversion(true)
                                                           : UndoHeights(true);
     if (done) {
       mDocument.PushUndo(kind);
@@ -1491,6 +1493,134 @@ namespace faf::editor
       value.albedo.empty() ? "(empty)" : value.albedo.c_str(),
       static_cast<double>(value.albedoSize)
     );
+  }
+
+  LayerConvertPlan EdMapScene::PlanConversion(
+    const std::string& shader,
+    const LayerConvertOptions& options
+  )
+  {
+    LoadMasks();
+    const EdDocument::MaskGrid& masks = mDocument.Masks();
+    const moho::CHeightField* const field = mMap != nullptr ? mMap->mTerrainRes->GetHeightField() : nullptr;
+    LayerPaint paint;
+    if (field != nullptr && !masks.texels.empty()) {
+      const std::vector<EdTools::LayerSlot> slots = LayerSlots();
+      std::array<bool, 8> textured{};
+      for (std::size_t i = 0; i < 8 && i + 1 < slots.size(); ++i) {
+        textured[i] = !slots[i + 1].albedo.empty();
+      }
+      paint = ReadLayerPaint(
+        masks.texels.data(),
+        masks.width,
+        masks.height,
+        MaskTerrain{field->data, field->width, field->height},
+        RemappedStrata(TerrainShader()),
+        textured
+      );
+    }
+    return PlanLayerConversion(TerrainShader(), shader, paint, options);
+  }
+
+  bool EdMapScene::ConvertLayers(
+    const std::string& shader,
+    const LayerConvertOptions& options,
+    std::vector<std::string>& report
+  )
+  {
+    report.clear();
+    if (mMap == nullptr || mPainting || mPaintingMask) {
+      report.emplace_back("No map to convert.");
+      return false;
+    }
+    const LayerConvertPlan plan = PlanConversion(shader, options);
+    if (!plan.refused.empty()) {
+      report.push_back("Not converted: " + plan.refused);
+      return false;
+    }
+    EdDocument::MaskGrid& masks = mDocument.Masks();
+    EdDocument::ConversionEdit edit;
+    edit.masksBefore = masks.texels;
+    const std::size_t changed = ConvertMasks(masks.texels.data(), masks.texels.size(), plan, options);
+    edit.masksAfter = masks.texels;
+    // The layer slots follow their paint.
+    const std::vector<EdTools::LayerSlot> slots = LayerSlots();
+    for (int j = 0; j < 8; ++j) {
+      const int source = plan.arrangement[static_cast<std::size_t>(j)];
+      if (source == j || static_cast<std::size_t>(source + 1) >= slots.size()) {
+        continue;
+      }
+      EdDocument::LayerEdit layer;
+      layer.slot = j + 1;
+      const EdTools::LayerSlot& before = slots[static_cast<std::size_t>(j + 1)];
+      const EdTools::LayerSlot& after = slots[static_cast<std::size_t>(source + 1)];
+      layer.albedoBefore = before.albedo;
+      layer.normalsBefore = before.normals;
+      layer.albedoSizeBefore = before.albedoSize;
+      layer.normalsSizeBefore = before.normalsSize;
+      layer.albedoAfter = after.albedo;
+      layer.normalsAfter = after.normals;
+      layer.albedoSizeAfter = after.albedoSize;
+      layer.normalsSizeAfter = after.normalsSize;
+      edit.layers.push_back(layer);
+    }
+    EdDocument::LayerEdit switched;
+    switched.slot = -1;
+    switched.albedoBefore = TerrainShader();
+    switched.albedoAfter = shader;
+    edit.layers.push_back(switched);
+    for (const EdDocument::LayerEdit& layer : edit.layers) {
+      if (layer.slot >= 0) {
+        SetLayerSlot(layer.slot, layer.albedoAfter, layer.normalsAfter, layer.albedoSizeAfter, layer.normalsSizeAfter);
+      }
+    }
+    SetTerrainShaderName(shader, true);
+    UploadMasks({SampleRect{0, 0, masks.width - 1, masks.height - 1}}, 0xFFu);
+    UpdateCoverage();
+    mDocument.ConversionUndo().push_back(std::move(edit));
+    mDocument.ConversionRedo().clear();
+    mDocument.EditEnded(EdDocument::EditKind::LayerConversion);
+    mDocument.SetModified(true);
+    report = plan.lines;
+    for (const std::string& warning : plan.warnings) {
+      report.push_back("Look at: " + warning);
+    }
+    report.push_back(std::to_string(changed) + " mask texels changed. One undo step.");
+    for (const std::string& line : report) {
+      gpg::Logf("editor: convert layers %s -> %s: %s", plan.from.c_str(), plan.to.c_str(), line.c_str());
+    }
+    return true;
+  }
+
+  bool EdMapScene::UndoConversion(
+    const bool redo
+  )
+  {
+    std::vector<EdDocument::ConversionEdit>& from = redo ? mDocument.ConversionRedo() : mDocument.ConversionUndo();
+    std::vector<EdDocument::ConversionEdit>& to = redo ? mDocument.ConversionUndo() : mDocument.ConversionRedo();
+    EdDocument::MaskGrid& masks = mDocument.Masks();
+    if (from.empty() || mMap == nullptr || masks.texels.size() != from.back().masksBefore.size()) {
+      return false;
+    }
+    EdDocument::ConversionEdit edit = std::move(from.back());
+    from.pop_back();
+    masks.texels = redo ? edit.masksAfter : edit.masksBefore;
+    for (const EdDocument::LayerEdit& layer : edit.layers) {
+      if (layer.slot < 0) {
+        SetTerrainShaderName(redo ? layer.albedoAfter : layer.albedoBefore, true);
+      } else if (redo) {
+        SetLayerSlot(layer.slot, layer.albedoAfter, layer.normalsAfter, layer.albedoSizeAfter, layer.normalsSizeAfter);
+      } else {
+        SetLayerSlot(
+          layer.slot, layer.albedoBefore, layer.normalsBefore, layer.albedoSizeBefore, layer.normalsSizeBefore
+        );
+      }
+    }
+    UploadMasks({SampleRect{0, 0, masks.width - 1, masks.height - 1}}, 0xFFu);
+    UpdateCoverage();
+    to.push_back(std::move(edit));
+    gpg::Logf("editor: %s the layer conversion", redo ? "redid" : "undid");
+    return true;
   }
 
   bool EdMapScene::UndoLayers(
@@ -2016,7 +2146,8 @@ namespace faf::editor
   }
 
   void EdMapScene::SetTerrainShaderName(
-    const std::string& shader
+    const std::string& shader,
+    const bool converted
   )
   {
     moho::StratumMaterial& strata = mMap->mTerrainRes->GetStratumMaterial();
@@ -2024,7 +2155,7 @@ namespace faf::editor
     // old one shows differently when the two read masks differently.
     if (
       const std::uint8_t before = RemappedStrata(strata.mShaderName.c_str()), after = RemappedStrata(shader);
-      before != after && !mDocument.Masks().texels.empty()
+      !converted && before != after && !mDocument.Masks().texels.empty()
     ) {
       gpg::Warnf(
         "editor: terrain shader %s reads masks differently from %s (strata as 2m-1: 0x%02X, was 0x%02X): the "

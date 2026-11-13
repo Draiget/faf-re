@@ -131,7 +131,7 @@ namespace faf::editor
         "/roundtrip",   "/vault",        "/vaultsearch",    "/vaultmap",       "/newmap",         "/stamp",
         "/brush",       "/layer",        "/waterbody",      "/ruler",          "/adaptivewindow", "/maskrule",
         "/shader",      "/brushtest",    "/brushshape",     "/stampsource",    "/stampstroke",    "/symoptions",
-        "/maskoptions", "/masktest",     "/shaderbrowser",
+        "/maskoptions", "/masktest",     "/shaderbrowser",  "/convertlayers",
       };
       for (const char* const option : kOptions) {
         if (moho::CFG_GetArgOption(option, 0, nullptr)) {
@@ -2026,6 +2026,8 @@ namespace faf::editor
       bool mSymOptionsDone = false;
       bool mMaskOptionsDone = false;
       bool mShaderBrowserDone = false;
+      std::string mConvertLayersArg;
+      int mConvertLayersFrames = 0;
       std::string mMaskTestArg;
       int mMaskTestFrames = 0;
       // `/masklayer <1-8>` and `/maskrule <layer>,<low>,<high>` (test runs): the Texture tool on that layer;
@@ -3907,6 +3909,9 @@ namespace faf::editor
       if (fa::vector<fa::string> layer; moho::CFG_GetArgOption("/layer", 1, &layer) && !layer.empty()) {
         mLayerArg = layer[0].c_str();
       }
+      if (fa::vector<fa::string> convert; moho::CFG_GetArgOption("/convertlayers", 1, &convert) && !convert.empty()) {
+        mConvertLayersArg = convert[0].c_str();
+      }
       if (fa::vector<fa::string> mask; moho::CFG_GetArgOption("/masktest", 1, &mask) && !mask.empty()) {
         mMaskTestArg = mask[0].c_str();
       }
@@ -4738,6 +4743,63 @@ namespace faf::editor
         }
         if (std::string shader; tools.TakeShaderChange(shader)) {
           mScene.ChangeTerrainShader(shader);
+        }
+        // The shader browser's Convert section.
+        {
+          std::string shader;
+          LayerConvertOptions options;
+          if (tools.TakeConversionPlanRequest(shader, options)) {
+            tools.SetConversionPlan(mScene.PlanConversion(shader, options));
+          }
+          if (tools.TakeConversionRequest(shader, options)) {
+            std::vector<std::string> report;
+            (void)mScene.ConvertLayers(shader, options, report);
+            tools.SetConversionReport(std::move(report));
+          }
+        }
+        // `/convertlayers <shader>[,move|merge|drop][,undo]` (test runs): a conversion, logged; with undo, Undo and
+        // Redo checked against the masks and shader before and after.
+        if (!mConvertLayersArg.empty() && mScene.Attached() && ++mConvertLayersFrames == 140) {
+          const std::string arg = std::exchange(mConvertLayersArg, {});
+          const std::string shader = arg.substr(0, arg.find(','));
+          LayerConvertOptions options;
+          options.lost = arg.find(",merge") != std::string::npos ? LostLayers::Merge
+            : arg.find(",drop") != std::string::npos             ? LostLayers::Drop
+                                                                 : LostLayers::Move;
+          const auto hash = [&] {
+            std::uint64_t h = 1469598103934665603ULL;
+            for (const std::uint64_t texel : mDocument.Masks().texels) {
+              h = (h ^ texel) * 1099511628211ULL;
+            }
+            return h;
+          };
+          const std::string shaderBefore = mScene.TerrainShader();
+          (void)mScene.PlanConversion(shader, options); // reads the masks
+          const std::uint64_t before = hash();
+          std::vector<std::string> report;
+          const bool converted = mScene.ConvertLayers(shader, options, report);
+          const std::uint64_t after = hash();
+          gpg::Logf(
+            "editor: convert test: %s -> %s %s, masks %016llx -> %016llx",
+            shaderBefore.c_str(),
+            shader.c_str(),
+            converted ? "converted" : "refused",
+            static_cast<unsigned long long>(before),
+            static_cast<unsigned long long>(after)
+          );
+          if (converted && arg.find(",undo") != std::string::npos) {
+            const bool undone = mScene.Undo();
+            const bool backAgain = hash() == before && mScene.TerrainShader() == shaderBefore;
+            const bool redone = mScene.Redo();
+            const bool forwardAgain = hash() == after && mScene.TerrainShader() == shader;
+            gpg::Logf(
+              "editor: convert test: undo %s (masks and shader as before: %s), redo %s (as converted: %s)",
+              undone ? "done" : "refused",
+              backAgain ? "yes" : "no",
+              redone ? "done" : "refused",
+              forwardAgain ? "yes" : "no"
+            );
+          }
         }
         switch (tools.TakeMaskOp()) {
         case EdTools::MaskOp::Clear: {

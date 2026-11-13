@@ -26,6 +26,7 @@
 #include "editor/doc/EdUnits.h"
 #include "moho/render/d3d/CD3DPrimBatcher.h"
 #include "editor/tools/EdHeightBrush.h"
+#include "editor/tools/EdLayerConvert.h"
 #include "editor/tools/EdMarkers.h"
 
 namespace moho
@@ -97,6 +98,13 @@ namespace faf::editor
      * changed, the ground added or taken, and the farthest change from x,z. False if nothing changed.
      */
     bool TestBrush(HeightBrushMode mode, float x, float z, float seconds, bool panelBrush = true);
+    /** What converting the paint to `shader` would do (Convert layers). */
+    [[nodiscard]] LayerConvertPlan PlanConversion(const std::string& shader, const LayerConvertOptions& options);
+    /**
+     * Converts the paint to `shader` and switches to it, as one undo step: masks re-encoded, layers moved, layer 8 set,
+     * the layer slots following their paint. `report` gets what it did and what needs a look; false when refused.
+     */
+    bool ConvertLayers(const std::string& shader, const LayerConvertOptions& options, std::vector<std::string>& report);
     /** Test runs (`/masktest`): the panel's mask brush on stratum `layer` (0-7) at world x,z for `seconds`, logged. */
     void TestMaskStroke(int layer, float x, float z, float seconds);
     /**
@@ -567,7 +575,9 @@ namespace faf::editor
     bool mWeightStale = true;
     void BuildWeightQuads(int layer);
     /** The map's terrain shader by name; the engine checks it again when it next draws (byte0, its latch). */
-    void SetTerrainShaderName(const std::string& shader);
+    /** `converted`: the masks were re-encoded for it (Convert layers), so the switch doesn't warn about them. */
+    void SetTerrainShaderName(const std::string& shader, bool converted = false);
+    bool UndoConversion(bool redo);
     std::uint32_t mMaskSteps = 0;
     std::vector<std::uint8_t> mMaskPlane;
     bool UndoHeights(bool redo);

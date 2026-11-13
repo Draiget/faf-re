@@ -6,6 +6,7 @@
 #include "editor/tools/EdBrushLibrary.h"
 #include "editor/tools/EdSymmetrize.h"
 #include "editor/tools/EdShaderProfiles.h"
+#include "editor/tools/EdLayerConvert.h"
 #include "editor/tools/EdSymmetryCheck.h"
 #include "editor/tools/EdMaskBrush.h"
 #include "editor/doc/EdPropPaint.h"
@@ -1432,6 +1433,49 @@ namespace faf::editor
       mBrowsedShader = std::move(shader);
     }
     void DrawShaderBrowser();
+    /** The browser's Convert section: the shader and options it shows a plan for (changed since the last plan). */
+    [[nodiscard]] bool TakeConversionPlanRequest(
+      std::string& shader,
+      LayerConvertOptions& options
+    )
+    {
+      const std::string key = mBrowsedShader + "|" + std::to_string(static_cast<int>(mConvertOptions.lost)) + "|" +
+        std::to_string(mConvertOptions.mergeInto) + "|" + (mConvertOptions.arrange ? "1" : "0");
+      if (!mShaderBrowserOpen || mBrowsedShader.empty() || key == mConvertPlanKey) {
+        return false;
+      }
+      mConvertPlanKey = key;
+      shader = mBrowsedShader;
+      options = mConvertOptions;
+      return true;
+    }
+    void SetConversionPlan(
+      LayerConvertPlan plan
+    )
+    {
+      mConvertPlan = std::move(plan);
+    }
+    /** Convert was pressed: the shader and options. */
+    [[nodiscard]] bool TakeConversionRequest(
+      std::string& shader,
+      LayerConvertOptions& options
+    )
+    {
+      if (!mConvertRequested) {
+        return false;
+      }
+      mConvertRequested = false;
+      shader = mBrowsedShader;
+      options = mConvertOptions;
+      return true;
+    }
+    void SetConversionReport(
+      std::vector<std::string> report
+    )
+    {
+      mConvertReport = std::move(report);
+      mConvertPlanKey.clear(); // the map changed: plan again
+    }
     [[nodiscard]] bool TakeShaderChange(
       std::string& shader
     )
@@ -1925,6 +1969,11 @@ namespace faf::editor
     int mMaskMode = 0;
     bool mLowerAbove = true;
     bool mShaderBrowserOpen = false;
+    LayerConvertOptions mConvertOptions;
+    LayerConvertPlan mConvertPlan;
+    std::string mConvertPlanKey;
+    std::vector<std::string> mConvertReport;
+    bool mConvertRequested = false;
     std::string mBrowsedShader;
     float mMaskTarget = 1.0f;
     float mMaskScatter = 0.0f;
