@@ -2187,6 +2187,95 @@ namespace faf::editor
       ImGui::EndDisabled();
     }
     DrawMaskGenerator();
+    DrawRecipes();
+  }
+
+  void EdTools::DrawRecipes()
+  {
+    mRecipesOpen = Section("Stratum recipes");
+    if (!mRecipesOpen) {
+      return;
+    }
+    Note(
+      "Paints the layers with the kinds of ground a landscape is made of (grass, dirt, wet ground, sand, rock, dark "
+      "rock, "
+      "high rock, snow), from the map's own heights, slopes and water. Each layer's kind comes from its texture; "
+      "correct "
+      "it below. One undo step."
+    );
+    // The style.
+    std::vector<const char*> styles;
+    for (const faf::editor::RecipeStyle& style : RecipeStyles()) {
+      styles.push_back(style.name);
+    }
+    int style = mRecipeStyle;
+    ImGui::SetNextItemWidth(-1.0f);
+    if (EdCombo("##recipestyle", &style, styles.data(), static_cast<int>(styles.size()))) {
+      SetRecipeStyle(style);
+    }
+    // The layers and their kinds.
+    SectionHeader("Kind of ground of each layer");
+    static const char* const kKinds[] = {
+      "Not used", "Grass", "Rock", "Sand", "Dirt", "Wet ground", "High rock", "Dark rock", "Snow"
+    };
+    for (int layer = 0; layer <= mRecipeCap && layer < 9; ++layer) {
+      const std::string& name = mRecipeNames[static_cast<std::size_t>(layer)];
+      if (name.empty()) {
+        continue;
+      }
+      ImGui::PushID(layer);
+      ImGui::AlignTextToFramePadding();
+      if (layer == 0) {
+        ImGui::TextUnformatted("Base");
+      } else {
+        ImGui::Text("%d", layer);
+      }
+      ImGui::SameLine(Em(40.0f));
+      ImGui::TextUnformatted(name.c_str());
+      ImGui::SameLine(std::max(Em(150.0f), ImGui::GetContentRegionAvail().x * 0.5f));
+      int& chosen = mRecipeOverride[static_cast<std::size_t>(layer)];
+      const GroundKind detected = mRecipeDetected[static_cast<std::size_t>(layer)];
+      char automatic[48];
+      std::snprintf(automatic, sizeof(automatic), "Auto: %s", kKinds[static_cast<int>(detected)]);
+      ImGui::SetNextItemWidth(-1.0f);
+      if (EdBeginCombo("##kind", chosen < 0 ? automatic : kKinds[chosen])) {
+        if (ImGui::Selectable(automatic, chosen < 0)) {
+          chosen = -1;
+        }
+        for (int k = 1; k <= 8; ++k) {
+          if (ImGui::Selectable(kKinds[k], chosen == k)) {
+            chosen = k;
+          }
+        }
+        if (ImGui::Selectable("Not used (leave this layer alone)", chosen == 0)) {
+          chosen = 0;
+        }
+        ImGui::EndCombo();
+      }
+      ImGui::PopID();
+    }
+    // The settings.
+    if (ImGui::TreeNode("Settings")) {
+      for (const RecipeKnobInfo& knob : RecipeKnobList()) {
+        ImGui::SetNextItemWidth(Em(120.0f));
+        ImGui::SliderFloat(knob.label, &(mRecipeKnobs.*knob.member), knob.min, knob.max, knob.format);
+      }
+      if (ImGui::Button("Back to the style's values")) {
+        mRecipeKnobs = RecipeKnobsOf(mRecipeStyle);
+      }
+      ImGui::TreePop();
+    }
+    if (ImGui::Button("Paint the map")) {
+      mRecipeApply = true;
+    }
+    EdSetItemTooltip(
+      "Paint every layer of a known kind over the whole map\nOne undo step; the brush's symmetry applies."
+    );
+    if (!mRecipeResult.empty()) {
+      ImGui::PushTextWrapPos(0.0f);
+      ImGui::TextDisabled("%s", mRecipeResult.c_str());
+      ImGui::PopTextWrapPos();
+    }
   }
 
   void EdTools::DrawMaskGenerator()

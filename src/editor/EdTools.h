@@ -10,6 +10,7 @@
 #include "editor/tools/EdSymmetryCheck.h"
 #include "editor/tools/EdMaskBrush.h"
 #include "editor/tools/EdMaskGen.h"
+#include "editor/tools/EdRecipes.h"
 #include "editor/doc/EdPropPaint.h"
 #include "editor/doc/EdUnits.h"
 #include "editor/tools/EdWaves.h"
@@ -1780,6 +1781,56 @@ namespace faf::editor
       return mGenOpen;
     }
 
+    /** The Stratum recipes section: the style, its settings, each layer's kind (detected by the app, or chosen). */
+    [[nodiscard]] int RecipeStyle() const noexcept
+    {
+      return mRecipeStyle;
+    }
+    [[nodiscard]] const RecipeKnobs& RecipeSettings() const noexcept
+    {
+      return mRecipeKnobs;
+    }
+    void SetRecipeStyle(
+      const int style
+    )
+    {
+      mRecipeStyle = style;
+      mRecipeKnobs = RecipeKnobsOf(style);
+    }
+    /** -1: as detected; 0: not used; 1..8: the GroundKind chosen for the layer. */
+    [[nodiscard]] const std::array<int, 9>& RecipeOverrides() const noexcept
+    {
+      return mRecipeOverride;
+    }
+    void SetRecipeDetected(
+      const std::array<GroundKind, 9>& kinds,
+      const std::array<std::string, 9>& names,
+      const int cap
+    )
+    {
+      mRecipeDetected = kinds;
+      mRecipeNames = names;
+      mRecipeCap = cap;
+    }
+    [[nodiscard]] bool TakeRecipeApply() noexcept
+    {
+      return std::exchange(mRecipeApply, false);
+    }
+    void AskRecipeApply() noexcept
+    {
+      mRecipeApply = true;
+    }
+    void SetRecipeResult(
+      std::string text
+    )
+    {
+      mRecipeResult = std::move(text);
+    }
+    [[nodiscard]] bool RecipesOpen() const noexcept
+    {
+      return mRecipesOpen;
+    }
+
     /** Test runs (`/browse`): the texture browser opened for a slot. */
     void OpenBrowser(
       const int slot
@@ -2296,6 +2347,16 @@ namespace faf::editor
     std::uint64_t mGenPreviewImage = 0;
     float mGenCoverage = 0.0f;
     std::string mGenNote;
+    void DrawRecipes();
+    int mRecipeStyle = 0;
+    RecipeKnobs mRecipeKnobs;
+    std::array<int, 9> mRecipeOverride{-1, -1, -1, -1, -1, -1, -1, -1, -1};
+    std::array<GroundKind, 9> mRecipeDetected{};
+    std::array<std::string, 9> mRecipeNames;
+    int mRecipeCap = 8;
+    bool mRecipeApply = false;
+    bool mRecipesOpen = false;
+    std::string mRecipeResult;
     bool mRulesRequested = false;
 
     bool mCheckedMasks = false;

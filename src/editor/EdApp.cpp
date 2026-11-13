@@ -49,6 +49,7 @@
 #include "editor/doc/EdLighting.h"
 #include "editor/tools/EdShaderSlots.h"
 #include "editor/tools/EdMapTextures.h"
+#include "editor/tools/EdRecipes.h"
 #include "editor/tools/EdMaskBrush.h"
 #include "editor/tools/EdMaskGen.h"
 #include "editor/tools/EdGroundKind.h"
@@ -143,8 +144,8 @@ namespace faf::editor
         "/materialeditor", "/uiscale",        "/testrun",        "/openall",         "/roundtrip",     "/vault",
         "/vaultsearch",    "/vaultmap",       "/newmap",         "/stamp",           "/brush",         "/layer",
         "/waterbody",      "/ruler",          "/adaptivewindow", "/maskrule",        "/maskgen",       "/symhover",
-        "/stbfont",        "/shader",         "/brushtest",      "/brushshape",      "/stampsource",   "/stampstroke",
-        "/symoptions",     "/maskoptions",    "/masktest",       "/shaderbrowser",   "/convertlayers",
+        "/stbfont",        "/recipe",         "/shader",         "/brushtest",       "/brushshape",    "/stampsource",
+        "/stampstroke",    "/symoptions",     "/maskoptions",    "/masktest",        "/shaderbrowser", "/convertlayers",
       };
       for (const char* const option : kOptions) {
         if (moho::CFG_GetArgOption(option, 0, nullptr)) {
@@ -2227,6 +2228,11 @@ namespace faf::editor
       std::uint64_t mMaskGenImage = 0;
       std::string mMaskGenArg; // `/maskgen <preset>,<layer>[,add|sub][,free]`
       int mMaskGenFrames = 0;
+      /** The Stratum recipes: each layer's kind (once a second while the section is open), Paint the map. */
+      void RecipesUpdate();
+      int mRecipeFrame = 0;
+      int mRecipeArg = -1; // `/recipe <style>` (test runs)
+      int mRecipeArgFrames = 0;
       /** Export (true) the slot's texture to a .dds, or import one into the map's folder and the slot. */
       void TransferMapTexture(MapTextureKind kind, bool exporting, const std::string& testFile);
       bool mMapTexturesStale[4]{};
@@ -4002,6 +4008,9 @@ namespace faf::editor
       if (fa::vector<fa::string> test; moho::CFG_GetArgOption("/brushtest", 1, &test) && !test.empty()) {
         mBrushTestArg = test[0].c_str();
       }
+      if (fa::vector<fa::string> recipe; moho::CFG_GetArgOption("/recipe", 1, &recipe) && !recipe.empty()) {
+        mRecipeArg = std::max(0, std::atoi(recipe[0].c_str()));
+      }
       if (fa::vector<fa::string> gen; moho::CFG_GetArgOption("/maskgen", 1, &gen) && !gen.empty()) {
         mMaskGenArg = gen[0].c_str();
       }
@@ -4514,6 +4523,112 @@ namespace faf::editor
       );
     }
 
+    void EditorApp::RecipesUpdate()
+    {
+      EdTools& tools = mShell->Tools();
+      const std::shared_ptr<TerrainSource> terrain = mScene.TerrainHeights();
+      if (terrain == nullptr) {
+        return;
+      }
+      // `/recipe <style>` (test runs): that style painted over the map.
+      if (mRecipeArg >= 0 && ++mRecipeArgFrames == 150) {
+        tools.SetRecipeStyle(std::exchange(mRecipeArg, -1));
+        tools.AskRecipeApply();
+        mRecipeFrame = 0;
+      }
+      const bool apply = tools.TakeRecipeApply();
+      if (!apply && (!tools.RecipesOpen() || mRecipeFrame++ % 60 != 0)) {
+        return;
+      }
+      // Each layer's kind: its texture's name and average colour, or what the panel chose.
+      const std::vector<EdTools::LayerSlot> slots = mScene.LayerSlots();
+      const ShaderProfile profile = ShaderProfileOf(mScene.TerrainShader());
+      std::array<GroundKind, 9> detected{};
+      std::array<std::string, 9> names;
+      std::array<bool, 9> textured{};
+      EdTextureLibrary& library = tools.Library();
+      for (int layer = 0; layer <= 8 && layer < static_cast<int>(slots.size()); ++layer) {
+        const std::string& albedo = slots[static_cast<std::size_t>(layer)].albedo;
+        if (albedo.empty()) {
+          continue;
+        }
+        textured[static_cast<std::size_t>(layer)] = true;
+        names[static_cast<std::size_t>(layer)] = LayerTextureName(albedo);
+        float rgb[3] = {};
+        detected[static_cast<std::size_t>(layer)] =
+          GroundKindOf(albedo, library.AverageColour(albedo, rgb) ? rgb : nullptr).kind;
+      }
+      tools.SetRecipeDetected(detected, names, profile.painted);
+      if (!apply) {
+        return;
+      }
+      const auto started = std::chrono::steady_clock::now();
+      std::array<GroundKind, 9> kinds = detected;
+      for (std::size_t layer = 0; layer < kinds.size(); ++layer) {
+        const int chosen = tools.RecipeOverrides()[layer];
+        if (chosen >= 0) {
+          kinds[layer] = static_cast<GroundKind>(chosen);
+        }
+      }
+      const RecipePlan plan =
+        PlanRecipe(kinds, textured, profile.painted, profile.summary.find("biplanar") != std::string::npos);
+      MaskGenContext context;
+      std::string error;
+      if (!MaskGenContextOf({}, context, error)) {
+        PostStatusMessage("The recipe wasn't painted: " + error);
+        return;
+      }
+      const WaterState water = mDocument.WaterNow();
+      const RecipeStats stats = RecipeStatsOf(terrain->heights, water.elevation, water.enabled);
+      std::vector<RecipeRole> roles;
+      std::map<int, field::Grid> target;
+      std::array<float, 9> shares{};
+      std::string message;
+      if (
+        !RecipeRoles(context, plan, stats, tools.RecipeSettings(), tools.RecipeStyle(), roles, error) ||
+        !ResolveRecipe(context, plan, roles, tools.RecipeSettings(), target, error) ||
+        mScene.WriteRecipeMasks(target, textured, plan.cap, shares, message) < 0
+      ) {
+        const std::string why = error.empty() ? message : error;
+        PostStatusMessage("The recipe wasn't painted: " + why);
+        gpg::Warnf("editor: stratum recipe: %s", why.c_str());
+        return;
+      }
+      // What each kind shows now.
+      std::string summary;
+      for (const GroundKind kind : RecipeOrder()) {
+        float share = 0.0f;
+        for (const int layer : plan.byKind[static_cast<std::size_t>(kind)]) {
+          share += shares[static_cast<std::size_t>(layer)];
+        }
+        if (!plan.byKind[static_cast<std::size_t>(kind)].empty()) {
+          char part[64];
+          std::snprintf(
+            part,
+            sizeof(part),
+            "%s%s %.0f %%",
+            summary.empty() ? "" : ", ",
+            GroundKindName(kind),
+            static_cast<double>(share * 100.0f)
+          );
+          summary += part;
+        }
+      }
+      const double seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - started).count();
+      const std::string style = RecipeStyles()[static_cast<std::size_t>(tools.RecipeStyle())].name;
+      tools.SetRecipeResult("Painted (" + style + "): " + summary + ". " + message + ".");
+      PostStatusMessage("Painted the map with the recipe: " + message);
+      gpg::Logf(
+        "editor: stratum recipe %s in %.2f s: %s; %s; layers outside the recipe %zu, beyond the shader %zu",
+        style.c_str(),
+        seconds,
+        summary.c_str(),
+        message.c_str(),
+        plan.unknown.size(),
+        plan.beyond.size()
+      );
+    }
+
     void EditorApp::TransferMapTexture(
       const MapTextureKind kind,
       const bool exporting,
@@ -4832,6 +4947,7 @@ namespace faf::editor
         tools.SetLayerSlots(mScene.LayerSlots());
         MapTexturesUpdate();
         MaskGenUpdate();
+        RecipesUpdate();
         DriveMaterialEditor();
         tools.SetMapSizeUnits(static_cast<float>(std::max(mDocument.Facts().sizeX, mDocument.Facts().sizeZ)));
         {

@@ -27,6 +27,7 @@
 #include "moho/render/d3d/CD3DPrimBatcher.h"
 #include "editor/tools/EdHeightBrush.h"
 #include "editor/tools/EdMaskGen.h"
+#include "editor/tools/EdRecipes.h"
 #include "editor/tools/EdLayerConvert.h"
 #include "editor/tools/EdMarkers.h"
 
@@ -161,6 +162,18 @@ namespace faf::editor
       MaskWriteMode mode,
       float strength,
       bool takeAway,
+      std::string& message
+    );
+    /**
+     * Writes a recipe's visible weights (layer -> field on the heights' grid) into the masks as one undo step
+     * (WriteRecipe), the recipe's layers made symmetric together as the brush's symmetry asks. `shares` what each layer
+     * shows. Returns the texels changed, or -1 with `message`.
+     */
+    int WriteRecipeMasks(
+      const std::map<int, field::Grid>& target,
+      const std::array<bool, 9>& textured,
+      int cap,
+      std::array<float, 9>& shares,
       std::string& message
     );
     /** The map's masks, read now if they weren't (edit mode on, as the Texture tool does); empty when there are none.
