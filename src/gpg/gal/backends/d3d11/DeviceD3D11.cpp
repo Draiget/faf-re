@@ -141,7 +141,7 @@ namespace gpg::gal
     // HLSL flags as DeviceD3D10::CreateEffect.
     constexpr const char* kEffectProfile = "fx_5_0";
     // Bump when EffectSourceD3D11's output changes, to retire cached blobs.
-    constexpr const char* kTranslatorVersion = "translator 7";
+    constexpr const char* kTranslatorVersion = "translator 8";
     // Added to every viewport origin: D3D9 pixel centres in D3D11 (see SetViewport).
     constexpr float kD3D9PixelCentreOffset = 0.5f;
     constexpr UINT kEffectCompileFlags = D3DCOMPILE_ENABLE_BACKWARDS_COMPATIBILITY;
@@ -497,23 +497,9 @@ namespace gpg::gal
     for (int headIndex = 0; headIndex < context.GetHeadCount(); ++headIndex) {
       const Head& head = context.GetHead(static_cast<std::uint32_t>(headIndex));
 
-      dxgi::SwapChainDesc desc{};
-      desc.window = static_cast<HWND>(head.mWindow);
-      desc.width = head.mWidth;
-      desc.height = head.mHeight;
-      desc.format = DXGI_FORMAT_B8G8R8A8_UNORM;
       // `Head::mWindowed` is a full-screen flag: the D3D10 backend writes
       // DXGI's Windowed as its negation (`BuildSwapChainDescFromHead`).
-      desc.fullscreen = head.mWindowed;
-      desc.refreshHz = head.framesPerSecond;
-      desc.usage = DXGI_USAGE_RENDER_TARGET_OUTPUT | DXGI_USAGE_SHADER_INPUT;
-      desc.allowFlipModel = allowFlip;
-      if (desc.width == 0U || desc.height == 0U) {
-        RECT client{};
-        ::GetClientRect(desc.window, &client);
-        desc.width = static_cast<std::uint32_t>(std::max<LONG>(client.right - client.left, 1));
-        desc.height = static_cast<std::uint32_t>(std::max<LONG>(client.bottom - client.top, 1));
-      }
+      const dxgi::SwapChainDesc desc = dxgi::DescribeHeadChain(head, 2U, allowFlip);
 
       auto swapChain = std::make_unique<dxgi::SwapChain>();
       CheckHresult("DeviceD3D11.cpp", __LINE__, swapChain->Create(mFactory, mDevice.Get(), desc));
@@ -596,12 +582,28 @@ namespace gpg::gal
           static_cast<const char*>(preprocessed->GetBufferPointer()), preprocessed->GetBufferSize() - 1U
         ),
         mFeatureLevel >= D3D_FEATURE_LEVEL_10_1,
-        std::string_view(source, sourceBytes)
+        std::string_view(source, sourceBytes),
+        true // D3DCompile: sqrt / rsqrt / pow on |x| as functions (fxc ignores self-referencing macros)
       );
       for (const std::string& note : result.notes) {
         gpg::Logf("D3D11: %s: %s", sourceName, note.c_str());
       }
       translated = std::move(result.source);
+      // Diagnostics: FAF_EFFECT_DUMP_DIR=dir writes the text handed to D3DCompile (as the D3D12 and Vulkan layers do
+      // for theirs).
+      if (
+        const char* const dumpDirectory = std::getenv("FAF_EFFECT_DUMP_DIR");
+        dumpDirectory != nullptr && dumpDirectory[0] != '\0'
+      ) {
+        const std::string name = sourceName;
+        const std::size_t slash = name.find_last_of("\\/");
+        const std::string path = std::string(dumpDirectory) + "\\" +
+          (slash == std::string::npos ? name : name.substr(slash + 1U)) + ".d3d11.fx";
+        if (FILE* const file = std::fopen(path.c_str(), "wb")) {
+          std::fwrite(translated.data(), 1U, translated.size(), file);
+          std::fclose(file);
+        }
+      }
       compileSource = translated.data();
       compileBytes = translated.size();
       compileDefines = nullptr;
@@ -788,6 +790,12 @@ namespace gpg::gal
       output.depthStencil = CreateDepthStencilTarget(&depthContext);
     }
 
+    BindDefaultOutput();
+  }
+
+  void DeviceD3D11::BindDefaultOutput()
+  {
+    // What a Reset leaves bound, as D3D9's does: head 0 and a viewport over all of it.
     if (!mHeadOutputContexts.empty()) {
       ClearTarget(&mHeadOutputContexts.front());
       D3DVIEWPORT9 viewport{};
@@ -803,11 +811,38 @@ namespace gpg::gal
   {
     outputContext_ = OutputContext();
     mHeadOutputContexts.clear();
+    FlushImmediate();
+  }
+
+  void DeviceD3D11::FlushImmediate() noexcept
+  {
     if (mImmediate != nullptr) {
       mImmediate->OMSetRenderTargets(0U, nullptr, nullptr);
       mImmediate->ClearState();
       mImmediate->Flush();
     }
+  }
+
+  void DeviceD3D11::ExitOnDeviceRemoved(
+    const HRESULT result,
+    const char* const during
+  )
+  {
+    // Nothing drawn after this reaches the screen, and every later call
+    // fails too: throwing here flooded the log with the same warning
+    // until the session aborted behind a crash dialog. Say why once and
+    // leave with the reason as the exit code, without the dialog or the
+    // exit-time destructors that would touch the dead device.
+    const HRESULT reason = mDevice->GetDeviceRemovedReason();
+    gpg::Warnf(
+      "D3D11: device removed during %s (reason 0x%08lX, call 0x%08lX); exiting. Run with /d3d11debug for the cause, or "
+      "without /d3d11 for Direct3D 9.",
+      during,
+      static_cast<unsigned long>(reason),
+      static_cast<unsigned long>(result)
+    );
+    LogDebugLayerMessages();
+    ::TerminateProcess(::GetCurrentProcess(), static_cast<UINT>(reason != S_OK ? reason : result));
   }
 
   void DeviceD3D11::Setup(
@@ -1770,9 +1805,12 @@ namespace gpg::gal
     if (mDevice == nullptr) {
       return;
     }
-    gpg::Logf("D3D11: Reset requested");
+    const bool force = mRecoverRequested;
+    mRecoverRequested = false;
 
+    bool vsyncChanged = false;
     if (context != nullptr && context != &mDeviceContext) {
+      vsyncChanged = mDeviceContext.mVSync != context->mVSync;
       mDeviceContext.mVSync = context->mVSync;
       const int heads = std::min(context->GetHeadCount(), mDeviceContext.GetHeadCount());
       for (int headIndex = 0; headIndex < heads; ++headIndex) {
@@ -1780,30 +1818,67 @@ namespace gpg::gal
         Head& head = mDeviceContext.GetHead(static_cast<std::uint32_t>(headIndex));
         head.mWidth = requested.mWidth;
         head.mHeight = requested.mHeight;
+        head.mWindowed = requested.mWindowed;
+        head.framesPerSecond = requested.framesPerSecond;
       }
     }
+
+    // What each chain has to do. Vsync is only the present interval: when no
+    // chain changes (a vsync or anti-aliasing option, a resolution set again)
+    // the back buffers stay as they are and nothing is released or flushed.
+    const bool allowFlip = !CommandLineHas("/d3d11blt");
+    std::vector<dxgi::SwapChainDesc> wanted;
+    bool anyChange = force;
+    for (std::size_t headIndex = 0U; headIndex < mSwapChains.size(); ++headIndex) {
+      wanted.push_back(
+        dxgi::DescribeHeadChain(mDeviceContext.GetHead(static_cast<std::uint32_t>(headIndex)), 2U, allowFlip)
+      );
+      const dxgi::SwapChainDesc& desc = wanted.back();
+      const dxgi::ResetAction action = dxgi::PlanReset(
+        mSwapChains[headIndex]->State(),
+        dxgi::ChainState{desc.width, desc.height, desc.fullscreen, desc.fullscreen ? desc.refreshHz : 0U},
+        dxgi::IsWindowMinimized(desc.window),
+        false
+      );
+      anyChange = anyChange || action != dxgi::ResetAction::None;
+    }
+    if (!anyChange) {
+      gpg::Logf(
+        "D3D11: Reset requested, swap chains unchanged%s: nothing to rebuild", vsyncChanged ? " (vsync only)" : ""
+      );
+      // The back buffers stay; the state a Reset hands back does not.
+      mPipelineState->SetDeviceState();
+      BindDefaultOutput();
+      return;
+    }
+    gpg::Logf("D3D11: Reset requested%s", force ? " (swap chain recovery)" : "");
 
     // `CD3DDevice::InitContext` drops its references to the back-buffer
     // targets before it calls Reset and asks for them again after.
     ReleaseRenderTargets();
     for (std::size_t headIndex = 0U; headIndex < mSwapChains.size(); ++headIndex) {
-      Head& head = mDeviceContext.GetHead(static_cast<std::uint32_t>(headIndex));
-      std::uint32_t width = head.mWidth;
-      std::uint32_t height = head.mHeight;
-      if (width == 0U || height == 0U) {
-        RECT client{};
-        ::GetClientRect(static_cast<HWND>(head.mWindow), &client);
-        width = static_cast<std::uint32_t>(std::max<LONG>(client.right - client.left, 1));
-        height = static_cast<std::uint32_t>(std::max<LONG>(client.bottom - client.top, 1));
-      }
-      const HRESULT result = mSwapChains[headIndex]->Resize(width, height);
+      const dxgi::SwapChainDesc& desc = wanted[headIndex];
+      dxgi::ResetAction action = dxgi::ResetAction::None;
+      const HRESULT result = mSwapChains[headIndex]->Reconfigure(
+        mFactory, mDevice.Get(), desc, force, dxgi::IsWindowMinimized(desc.window), [this] {
+        FlushImmediate();
+      }, &action
+      );
       if (FAILED(result)) {
-        gpg::Warnf(
-          "D3D11: resizing head %u to %ux%u failed (HRESULT 0x%08lX)",
+        if (dxgi::ClassifyPresent(result) == dxgi::PresentStatus::DeviceLost) {
+          ExitOnDeviceRemoved(result, "swap chain reset");
+        }
+        d3d11::ThrowHresult("DeviceD3D11.cpp", __LINE__, result);
+      }
+      if (action != dxgi::ResetAction::None) {
+        const dxgi::ChainState state = mSwapChains[headIndex]->State();
+        gpg::Logf(
+          "D3D11: head %u swap chain %s to %ux%u %s",
           static_cast<unsigned>(headIndex),
-          width,
-          height,
-          static_cast<unsigned long>(result)
+          (action == dxgi::ResetAction::Recreate) ? "recreated" : "resized",
+          state.width,
+          state.height,
+          state.fullscreen ? "full screen" : "windowed"
         );
       }
     }
@@ -1818,7 +1893,9 @@ namespace gpg::gal
 
   int DeviceD3D11::TestCooperativeLevel()
   {
-    return 0;
+    // 1 = "needs a Reset": CD3DDevice::Paint then rebinds the context, which
+    // builds the swap chains again (see Present).
+    return mRecoverRequested ? 1 : 0;
   }
 
   void DeviceD3D11::BeginScene() {}
@@ -2000,26 +2077,39 @@ namespace gpg::gal
     const bool vsync = mDeviceContext.mVSync;
     bool flipModel = false;
     for (const std::unique_ptr<dxgi::SwapChain>& swapChain : mSwapChains) {
-      const HRESULT result = swapChain->Present(vsync);
-      if (FAILED(result)) {
-        if (result == DXGI_ERROR_DEVICE_REMOVED || result == DXGI_ERROR_DEVICE_RESET) {
-          // Nothing drawn after this reaches the screen, and every later call
-          // fails too: throwing here flooded the log with the same warning
-          // until the session aborted behind a crash dialog. Say why once and
-          // leave with the reason as the exit code, without the dialog or the
-          // exit-time destructors that would touch the dead device.
-          const HRESULT reason = mDevice->GetDeviceRemovedReason();
+      const dxgi::PresentResult present = swapChain->Present(vsync);
+      switch (present.status) {
+      case dxgi::PresentStatus::Presented:
+      case dxgi::PresentStatus::Occluded: // success: nothing is shown and Present did not wait
+        mConsecutiveRecoveries = 0U;
+        break;
+      case dxgi::PresentStatus::Skipped:
+        break; // the frame is dropped, the next one goes through
+      case dxgi::PresentStatus::InvalidCall:
+        // The chain refuses even a plain present: build it again through the
+        // engine's own Reset (TestCooperativeLevel), a few times at most.
+        if (++mConsecutiveRecoveries <= 3U) {
           gpg::Warnf(
-            "D3D11: device removed (reason 0x%08lX); exiting. Run with /d3d11debug for the cause, or without /d3d11 "
-            "for Direct3D 9.",
-            static_cast<unsigned long>(reason)
+            "D3D11: the swap chain refuses to present (0x%08lX); it is rebuilt",
+            static_cast<unsigned long>(present.result)
           );
-          LogDebugLayerMessages();
-          ::TerminateProcess(::GetCurrentProcess(), static_cast<UINT>(reason != S_OK ? reason : result));
+          mRecoverRequested = true;
+          break;
         }
-        d3d11::ThrowHresult("DeviceD3D11.cpp", __LINE__, result);
+        d3d11::ThrowHresult("DeviceD3D11.cpp", __LINE__, present.result);
+        break;
+      case dxgi::PresentStatus::DeviceLost:
+        ExitOnDeviceRemoved(present.result, "present");
+        break;
+      case dxgi::PresentStatus::Failed:
+        d3d11::ThrowHresult("DeviceD3D11.cpp", __LINE__, present.result);
+        break;
       }
       flipModel = flipModel || swapChain->IsFlipModel();
+    }
+    // Frame-latency chains wait here, before the next frame is recorded.
+    for (const std::unique_ptr<dxgi::SwapChain>& swapChain : mSwapChains) {
+      static_cast<void>(swapChain->WaitForFrameLatency(100U));
     }
 
     // A flip-model present unbinds the back buffer from the output merger;
