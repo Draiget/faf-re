@@ -2,6 +2,7 @@
 
 #include "editor/EdShell.h"
 #include "editor/ui/EdControls.h"
+#include "editor/doc/EdLighting.h"
 #include "editor/ui/EdWorkspaces.h"
 #include "editor/EdLuaDebugger.h"
 #include "editor/ui/EdThemeColors.h"
@@ -1410,33 +1411,56 @@ namespace faf::editor
       changed = changed || edited;
       finished = finished || ImGui::IsItemDeactivatedAfterEdit();
     };
-    ImGui::SeparatorText("Sun");
-    ImGui::SetNextItemWidth(-1.0f);
-    watch(FillDragFloat("##multiplier", &mLighting.multiplier, 0.01f, 0.0f, 10.0f, "Light multiplier %.2f"));
-    ImGui::SetNextItemWidth(-1.0f);
-    watch(ImGui::DragFloat3("##sundirection", mLighting.sunDirection, 0.005f, -1.0f, 1.0f, "%.3f"));
-    ImGui::TextDisabled("Direction (x, y, z)");
-    ImGui::SetNextItemWidth(-1.0f);
-    watch(ImGui::ColorEdit3("##suncolor", mLighting.sunColor, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR));
-    ImGui::TextDisabled("Sun colour");
-    ImGui::SetNextItemWidth(-1.0f);
-    watch(ImGui::ColorEdit3("##ambience", mLighting.sunAmbience, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR));
-    ImGui::TextDisabled("Ambience");
-    ImGui::SetNextItemWidth(-1.0f);
-    watch(ImGui::ColorEdit3("##shadow", mLighting.shadowFill, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR));
-    ImGui::TextDisabled("Shadow fill");
-    ImGui::SetNextItemWidth(-1.0f);
-    watch(ImGui::ColorEdit4("##specular", mLighting.specular, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR));
-    ImGui::TextDisabled("Specular");
-    ImGui::SetNextItemWidth(-1.0f);
-    watch(FillDragFloat("##bloom", &mLighting.bloom, 0.005f, 0.0f, 5.0f, "Bloom %.3f"));
-    ImGui::SeparatorText("Fog");
-    ImGui::SetNextItemWidth(-1.0f);
-    watch(ImGui::ColorEdit3("##fogcolor", mLighting.fogColor, ImGuiColorEditFlags_Float));
-    ImGui::SetNextItemWidth(-1.0f);
-    watch(FillDragFloat("##fogstart", &mLighting.fogStart, 1.0f, -1000.0f, 10000.0f, "Start %.0f"));
-    ImGui::SetNextItemWidth(-1.0f);
-    watch(FillDragFloat("##fogend", &mLighting.fogEnd, 1.0f, -1000.0f, 10000.0f, "End %.0f"));
+    // The sun as the mockup shows it: its direction as an azimuth and an elevation (the vector the map keeps).
+    float azimuth = 0.0f;
+    float elevation = 0.0f;
+    SunAnglesOf(mLighting.sunDirection, azimuth, elevation);
+    if (Section("Sun")) {
+      ImGui::SetNextItemWidth(-1.0f);
+      const bool turned = FillSliderFloat("##azimuth", &azimuth, -180.0f, 180.0f, "Azimuth %.0f\xC2\xB0");
+      watch(turned);
+      ImGui::SetNextItemWidth(-1.0f);
+      const bool raised = FillSliderFloat("##elevation", &elevation, 0.0f, 90.0f, "Elevation %.0f\xC2\xB0");
+      watch(raised);
+      if (turned || raised) {
+        SunDirectionOf(azimuth, elevation, mLighting.sunDirection);
+      }
+      ImGui::SetNextItemWidth(-1.0f);
+      watch(FillDragFloat("##multiplier", &mLighting.multiplier, 0.01f, 0.0f, 4.0f, "Multiplier %.2f"));
+      RowLabel("Sun colour");
+      watch(ColourField("##suncolor", mLighting.sunColor, true));
+    }
+    if (Section("Ambient and shadow")) {
+      RowLabel("Ambient");
+      watch(ColourField("##ambience", mLighting.sunAmbience, true));
+      RowLabel("Shadow fill");
+      watch(ColourField("##shadow", mLighting.shadowFill, true));
+    }
+    if (Section("Specular", false)) {
+      float colour[3] = {mLighting.specular[0], mLighting.specular[1], mLighting.specular[2]};
+      RowLabel("Colour");
+      const bool tinted = ColourField("##specular", colour, true);
+      watch(tinted);
+      if (tinted) {
+        mLighting.specular[0] = colour[0];
+        mLighting.specular[1] = colour[1];
+        mLighting.specular[2] = colour[2];
+      }
+      ImGui::SetNextItemWidth(-1.0f);
+      watch(FillDragFloat("##specularpower", &mLighting.specular[3], 0.01f, 0.0f, 10.0f, "Power %.2f"));
+    }
+    if (Section("Bloom and fog", false)) {
+      ImGui::SetNextItemWidth(-1.0f);
+      watch(FillDragFloat("##bloom", &mLighting.bloom, 0.005f, 0.0f, 1.0f, "Bloom %.3f"));
+      RowLabel("Fog colour");
+      watch(ColourField("##fogcolor", mLighting.fogColor));
+      ImGui::SetNextItemWidth(-1.0f);
+      watch(FillDragFloat("##fogstart", &mLighting.fogStart, 1.0f, -1000.0f, 10000.0f, "Fog start %.0f"));
+      ImGui::SetNextItemWidth(-1.0f);
+      watch(FillDragFloat("##fogend", &mLighting.fogEnd, 1.0f, -1000.0f, 10000.0f, "Fog end %.0f"));
+    }
+    // A colour picker is a popup: its drag is "any item active", not the last item's.
+    active = active || ImGui::IsAnyItemActive();
     if (changed) {
       if (!mLightingEditing) {
         mLightingBefore = mDocument.LightingNow();
@@ -1457,8 +1481,7 @@ namespace faf::editor
         );
       }
     }
-    ImGui::SeparatorText("From another map");
-    {
+    if (Section("From another map", false)) {
       // Any map the game lists: its lighting read from its .scmap, as FAForeverMapEditor's retail presets are.
       const std::vector<std::string>& maps = mPlay.Maps();
       const std::vector<std::string>& titles = mPlay.Titles();
@@ -1495,17 +1518,17 @@ namespace faf::editor
       ImGui::EndChild();
       HelpNote("A click takes that map's sun, ambience, shadow, specular, bloom and fog, as one undo step.");
     }
-    ImGui::SeparatorText("Settings file");
-    if (ImGui::Button("Import .scmlighting...")) {
-      mLightingImport = true;
+    if (Section("Settings file", false)) {
+      if (ImGui::Button("Import .scmlighting...")) {
+        mLightingImport = true;
+      }
+      ImGui::SameLine();
+      if (ImGui::Button("Export...")) {
+        mLightingExport = true;
+      }
+      HelpNote("FAForeverMapEditor's lighting settings file: the sun, ambience, shadow, specular, bloom and fog.");
     }
-    ImGui::SameLine();
-    if (ImGui::Button("Export...")) {
-      mLightingExport = true;
-    }
-    HelpNote("FAForeverMapEditor's lighting settings file: the sun, ambience, shadow, specular, bloom and fog.");
-    ImGui::SeparatorText("Sky");
-    {
+    if (Section("Sky")) {
       const SkyboxState sky = mDocument.SkyboxNow();
       ImGui::Text(
         "Dome %.0f across, %d x %d segments",

@@ -20,6 +20,8 @@
 #include "editor/doc/EdViewState.h"
 #include "editor/tools/EdTextureLibrary.h"
 
+#include "imgui.h"
+
 #include <algorithm>
 #include <cstdio>
 #include <functional>
@@ -36,9 +38,10 @@
 namespace faf::editor
 {
   /**
-   * The tool box, as the mockup lays it out (tmp/claude/map-editor/editor-mockup.html): a strip of tool icons
-   * and, beside it, the chosen tool's settings (brush modes, size, strength, falloff, the symmetry modes with
-   * their diagrams, limits). The settings are kept here; the tools act on a map from stages 3 to 6 of the plan.
+   * The tool box, as the mockup lays it out: a strip of tool icons at the window's left edge (DrawStrip, drawn by
+   * the shell) and the chosen tool's settings in the Tools panel (brush modes, size, strength, falloff, the symmetry
+   * modes with their diagrams, limits). The settings are kept here; the tools act on a map from stages 3 to 6 of the
+   * plan.
    */
   class EdTools
   {
@@ -1186,6 +1189,27 @@ namespace faf::editor
     /** How many tools the strip has, and each one's name ("Select", "Terrain", ...). */
     [[nodiscard]] static int ToolCount() noexcept;
     [[nodiscard]] static const char* ToolName(int tool) noexcept;
+    /** A tool's icon (ui/EdIconFont.h). */
+    [[nodiscard]] static const char* ToolIcon(int tool) noexcept;
+    /**
+     * The tool strip (the shell's, at the window's left edge, `width` wide): a button per tool and the measuring
+     * button. True when a tool was picked.
+     */
+    bool DrawStrip(float width);
+    /** The symmetry the brushes and the check use (the Terrain panel's tiles: 0 None ... 9 N-way). */
+    [[nodiscard]] int SymmetryIndex() const noexcept
+    {
+      return mSymmetry;
+    }
+    void PickSymmetry(
+      const int mode
+    ) noexcept
+    {
+      mSymmetry = mode;
+    }
+    [[nodiscard]] static const char* SymmetryName(int mode) noexcept;
+    /** A symmetry's picture (its tile's) in the square at `p`, `s` wide. */
+    void DrawSymmetryPicture(ImDrawList* draw, int mode, ImVec2 p, float s) const;
     /** The key each tool's command has (Settings > Keys), shown in the strip's corner and its tooltip. */
     void SetToolKeys(
       std::vector<std::string> keys
@@ -1856,7 +1880,6 @@ namespace faf::editor
     }
 
   private:
-    void DrawStrip();
     void DrawTerrain();
     void DrawTexture();
     void DrawWater();

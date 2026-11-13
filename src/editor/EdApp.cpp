@@ -45,6 +45,7 @@
 #include "editor/tools/EdTextureLibrary.h"
 #include "editor/ui/EdCommands.h"
 #include "editor/ui/EdFonts.h"
+#include "editor/ui/EdIconFont.h"
 #include "editor/ui/EdHelp.h"
 #include "editor/ui/EdHomeModel.h"
 #include "editor/ui/EdKeymap.h"
@@ -2417,8 +2418,22 @@ namespace faf::editor
 
       std::error_code error;
       const std::filesystem::path segoe = "C:\\Windows\\Fonts\\segoeui.ttf";
+      ImFont* body = nullptr;
       if (std::filesystem::exists(segoe, error)) {
-        (void)io.Fonts->AddFontFromFileTTF(segoe.string().c_str(), 16.0f);
+        body = io.Fonts->AddFontFromFileTTF(segoe.string().c_str(), 16.0f);
+      }
+      if (body == nullptr) {
+        body = io.Fonts->AddFontDefault();
+      }
+      // The icons (ui/EdIconFont.h, the mockup's line icons) are characters of the panels' font, so any label can
+      // carry one. At 13.5 of the text's 16 an icon is about 1.1 em of Segoe UI, as the mockup sizes them.
+      {
+        ImFontConfig icons;
+        icons.MergeMode = true;
+        icons.FontDataOwnedByAtlas = false;
+        icons.GlyphMinAdvanceX = 13.5f;
+        icons.GlyphOffset = ImVec2(0.0f, 1.0f);
+        (void)io.Fonts->AddFontFromMemoryTTF(const_cast<unsigned char*>(IconFontData()), IconFontSize(), 13.5f, &icons);
       }
       // Headings and codes (the FAF sign-in's): Segoe UI Bold and Consolas, when Windows has them.
       if (const std::filesystem::path bold = "C:\\Windows\\Fonts\\segoeuib.ttf"; std::filesystem::exists(bold, error)) {

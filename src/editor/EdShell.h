@@ -402,6 +402,14 @@ namespace faf::editor
      * map. `top` is where it starts (the title row's height). */
     EdMapBrowser mBrowser;
     void DrawToolbar(float height, float top);
+    /** The tool strip down the window's left edge, `width` wide, between the toolbar and the status bar. */
+    void DrawToolStrip(float top, float width, float bottom);
+    /** The first frame: the first workspace's panels' saved places under the names their tabs have now. */
+    void CarryPanelPlaces();
+    /** The status bar's height at the current scale. */
+    [[nodiscard]] static float StatusBarHeight();
+    bool mPanelPlacesCarried = false;
+    bool mFocusTools = false; // the strip picked a tool: the Tools panel comes forward
     Command mCommand = Command::None;
     void DrawToolsPanel();
     void DrawMapPanel();

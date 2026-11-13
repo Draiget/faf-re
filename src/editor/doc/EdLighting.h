@@ -1,5 +1,7 @@
 #pragma once
 
+#include <algorithm>
+#include <cmath>
 #include <cstring>
 #include <string>
 
@@ -12,6 +14,44 @@ namespace faf::editor
    * colour packed from the first three, the start from the fourth, the end from the fifth), whatever their recovered
    * names say.
    */
+  /**
+   * The sun's direction as the Lighting panel shows it (the mockup's): its azimuth, the angle round the vertical from
+   * +x towards +z, and its elevation above the horizon, both in degrees. The direction is the unit vector to the sun
+   * (y up); a zero vector reads as straight up.
+   */
+  inline void SunAnglesOf(
+    const float (&direction)[3],
+    float& azimuthDegrees,
+    float& elevationDegrees
+  )
+  {
+    const double x = direction[0];
+    const double y = direction[1];
+    const double z = direction[2];
+    const double length = std::sqrt(x * x + y * y + z * z);
+    if (length <= 0.0) {
+      azimuthDegrees = 0.0f;
+      elevationDegrees = 90.0f;
+      return;
+    }
+    azimuthDegrees = static_cast<float>(std::atan2(z, x) * 57.29577951308232);
+    elevationDegrees = static_cast<float>(std::asin(std::clamp(y / length, -1.0, 1.0)) * 57.29577951308232);
+  }
+
+  /** The unit direction for an azimuth and an elevation in degrees (SunAnglesOf's inverse). */
+  inline void SunDirectionOf(
+    const float azimuthDegrees,
+    const float elevationDegrees,
+    float (&direction)[3]
+  )
+  {
+    const double az = static_cast<double>(azimuthDegrees) / 57.29577951308232;
+    const double el = static_cast<double>(elevationDegrees) / 57.29577951308232;
+    direction[0] = static_cast<float>(std::cos(el) * std::cos(az));
+    direction[1] = static_cast<float>(std::sin(el));
+    direction[2] = static_cast<float>(std::cos(el) * std::sin(az));
+  }
+
   struct LightingState
   {
     float multiplier = 1.0f;

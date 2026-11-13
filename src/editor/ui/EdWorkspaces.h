@@ -49,6 +49,15 @@ namespace faf::editor
    * window with its own place in its own layout, and the title stays the panel's.
    */
   [[nodiscard]] std::string PanelWindowName(std::string_view panel, int workspace);
+  /**
+   * The same before the panels' titles had icons (the first workspace's windows were named by the bare title, which
+   * was their id): a saved layout's places are under these.
+   */
+  [[nodiscard]] std::string PanelWindowNameBeforeIcons(std::string_view panel, int workspace);
+  /** A panel's icon (ui/EdIconFont.h) by its id, or nullptr. */
+  [[nodiscard]] const char* PanelIcon(std::string_view id);
+  /** A workspace's icon by its key, or nullptr. */
+  [[nodiscard]] const char* WorkspaceIcon(std::string_view key);
   /** The same for the active workspace, kept until the program ends (ImGui takes the name as a C string). */
   [[nodiscard]] const char* Panel(const char* panel);
   /** The dock space a workspace lays its panels out in: "EditorDockSpace", "EditorDockSpace@objects", ... */

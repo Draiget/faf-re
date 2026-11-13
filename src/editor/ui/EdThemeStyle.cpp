@@ -95,6 +95,10 @@ namespace faf::editor
     style.WindowBorderSize = 1.0f;
     style.PopupBorderSize = 1.0f;
     style.TabBorderSize = 0.0f;
+    // The mockup's tabs: a tab's close button shows on hover only; the panel's menu at the tab row's right end.
+    style.TabCloseButtonMinWidthSelected = 0.0f;
+    style.TabCloseButtonMinWidthUnselected = 0.0f;
+    style.WindowMenuButtonPosition = ImGuiDir_Right;
     style.WindowRounding = 6.0f;
     style.ChildRounding = 5.0f;
     style.FrameRounding = 4.0f;

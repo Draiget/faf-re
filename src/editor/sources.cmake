@@ -38,6 +38,7 @@ set(FAF_EDITOR_SOURCES
   doc/EdHttp.cpp
   doc/EdFafApi.cpp
   ui/EdControls.cpp
+  ui/EdIconFont.cpp
   ui/EdMapBrowser.cpp
   doc/EdWaterBodies.cpp
   view/EdWaterBodyView.cpp

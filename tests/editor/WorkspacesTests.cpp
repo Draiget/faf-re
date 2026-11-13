@@ -3,6 +3,7 @@
 // the panels a workspace starts with.
 
 #include "editor/ui/EdCommands.h"
+#include "editor/ui/EdIconFont.h"
 #include "editor/ui/EdWorkspaces.h"
 
 #include <set>
@@ -15,6 +16,7 @@ using faf::editor::DockSpaceName;
 using faf::editor::JoinPanelList;
 using faf::editor::PanelId;
 using faf::editor::PanelWindowName;
+using faf::editor::PanelWindowNameBeforeIcons;
 using faf::editor::SplitPanelList;
 using faf::editor::WorkspaceByKey;
 using faf::editor::Workspaces;
@@ -52,11 +54,17 @@ namespace
     EachPanelIsAWindowOfItsOwnPerWorkspace
   )
   {
-    EXPECT_EQ(PanelWindowName("Tools", 0), "Tools") << "the first keeps the names saved layouts have";
-    EXPECT_EQ(PanelWindowName("Tools", 1), "Tools###Tools@objects");
-    EXPECT_EQ(PanelWindowName("Script Editor###ScriptEditor", 5), "Script Editor###ScriptEditor@mission");
-    EXPECT_EQ(PanelWindowName("Script Editor###ScriptEditor", 0), "Script Editor###ScriptEditor");
-    EXPECT_EQ(PanelWindowName("Log", 99), "Log") << "no such workspace: the panel's own name";
+    // The titles carry the panel's icon; the id after ### is the one the window had before icons.
+    EXPECT_EQ(PanelWindowName("Tools", 0), ICON_WAND "  Tools###Tools") << "the first: the bare title as its id";
+    EXPECT_EQ(PanelWindowName("Tools", 1), ICON_WAND "  Tools###Tools@objects");
+    EXPECT_EQ(PanelWindowName("Script Editor###ScriptEditor", 5), ICON_SCRIPT "  Script Editor###ScriptEditor@mission");
+    EXPECT_EQ(PanelWindowName("Script Editor###ScriptEditor", 0), ICON_SCRIPT "  Script Editor###ScriptEditor");
+    EXPECT_EQ(PanelWindowName("Log", 99), ICON_CONSOLE "  Log###Log") << "no such workspace: the panel's own id";
+    EXPECT_EQ(PanelWindowName("Nameless", 1), "Nameless###Nameless@objects") << "no icon: the name as before";
+    // Where a saved layout has them.
+    EXPECT_EQ(PanelWindowNameBeforeIcons("Tools", 0), "Tools");
+    EXPECT_EQ(PanelWindowNameBeforeIcons("Tools", 1), "Tools###Tools@objects");
+    EXPECT_EQ(PanelWindowNameBeforeIcons("Script Editor###ScriptEditor", 5), "Script Editor###ScriptEditor@mission");
     EXPECT_EQ(DockSpaceName(0), "EditorDockSpace");
     EXPECT_EQ(DockSpaceName(6), "EditorDockSpace@effects");
     EXPECT_EQ(PanelId("Script Editor###ScriptEditor"), "ScriptEditor");

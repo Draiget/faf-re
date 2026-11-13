@@ -50,6 +50,22 @@ namespace faf::editor
   /** A tile of a mode grid: bordered, the picked one in the accent's soft fill and border. */
   bool ModeTile(const char* label, bool picked, const ImVec2& size);
 
+  /**
+   * A section of a panel as the mockup heads it: a chevron and the title in small dimmed capitals, brighter under the
+   * mouse; a click folds it. Returns whether it is open (its content follows only then). The fold is kept per panel.
+   */
+  bool Section(const char* title, bool openAtFirst = true);
+
+  /** A row's label in the left 38 % of the panel (the mockup's `.row > label`); the control takes the rest. */
+  void RowLabel(const char* label);
+
+  /**
+   * A colour as the mockup's fields show it: a swatch (a click opens a picker) and its hex. Colours brighter than
+   * white (the map's lighting) keep their brightness: the hex is the hue at the brightest component 1, a Brightness
+   * row under it the scale. Returns whether it changed.
+   */
+  bool ColourField(const char* id, float (&rgb)[3], bool brighterThanWhite = false);
+
   /** Text that reads on the accent: dark on a light accent, white on a dark one. */
   [[nodiscard]] ImVec4 AccentText();
 } // namespace faf::editor

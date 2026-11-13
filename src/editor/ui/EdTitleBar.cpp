@@ -4,6 +4,8 @@
 #include <cmath>
 
 #include "editor/ui/EdCommands.h"
+#include "editor/ui/EdFonts.h"
+#include "editor/ui/EdThemeColors.h"
 #include "editor/ui/EdUiScale.h"
 #include "editor/ui/EdWindowChrome.h"
 #include "gpg/core/utils/Logging.h"
@@ -284,7 +286,18 @@ namespace faf::editor
         for (std::size_t i = 0; i < info.tabs.size(); ++i) {
           const EdTitleInfo::Tab& tab = info.tabs[i];
           const bool active = static_cast<int>(i) == info.activeTab;
-          const ImVec2 size(ImGui::CalcTextSize(tab.label.c_str()).x + Em(18.0f), h);
+          if (tab.groupStart && i > 0) {
+            // The rule between groups (the mockup's: Terrain to Mission, Effects to Materials, Review).
+            const float x = std::round(ImGui::GetCursorScreenPos().x + Em(4.0f));
+            dl->AddLine(
+              ImVec2(x + 0.5f, std::round(rowMid - Em(9.0f))),
+              ImVec2(x + 0.5f, std::round(rowMid + Em(9.0f))),
+              ImGui::GetColorU32(ImGuiCol_Border)
+            );
+            ImGui::SetCursorScreenPos(ImVec2(x + Em(6.0f), ImGui::GetCursorScreenPos().y));
+          }
+          const std::string text = tab.icon.empty() ? tab.label : tab.icon + "  " + tab.label;
+          const ImVec2 size(ImGui::CalcTextSize(text.c_str()).x + Em(20.0f), h);
           const ImVec2 at(ImGui::GetCursorScreenPos().x, std::round(rowMid - h * 0.5f));
           ImGui::SetCursorScreenPos(at);
           ImGui::PushID(tab.command.c_str());
@@ -293,20 +306,34 @@ namespace faf::editor
           ImGui::PopID();
           const ImVec2 max(at.x + size.x, at.y + size.y);
           chrome.controls.push_back(RectOf(at, max, origin));
+          // The mockup's: the shown one in the accent's soft fill and colour, a hovered one on the panels' grey.
           if (active) {
-            dl->AddRectFilled(at, max, ImGui::GetColorU32(ImGuiCol_Header), Em(6.0f));
+            dl->AddRectFilled(at, max, AccentU32(0.16f), Em(6.0f));
           } else if (hovered) {
-            dl->AddRectFilled(at, max, ImGui::GetColorU32(ImGuiCol_FrameBgHovered), Em(6.0f));
+            dl->AddRectFilled(at, max, ImGui::GetColorU32(ImGuiCol_WindowBg), Em(6.0f));
           }
-          const ImU32 ink = ImGui::GetColorU32(active || hovered ? ImGuiCol_Text : ImGuiCol_TextDisabled);
-          dl->AddText(ImVec2(at.x + Em(9.0f), (at.y + max.y - fontSize) * 0.5f), ink, tab.label.c_str());
-          if (hovered) {
-            const EdCommand* const command = commands.Find(tab.command);
-            if (command != nullptr && !command->keys.empty()) {
-              ImGui::SetTooltip("%s (%s)", command->description.c_str(), command->keys.c_str());
-            } else if (command != nullptr) {
-              ImGui::SetTooltip("%s", command->description.c_str());
+          const ImU32 ink = active ? AccentU32() : ImGui::GetColorU32(hovered ? ImGuiCol_Text : ImGuiCol_TextDisabled);
+          dl->AddText(ImVec2(at.x + Em(10.0f), (at.y + max.y - fontSize) * 0.5f), ink, text.c_str());
+          if (hovered && ImGui::BeginTooltip()) {
+            // "Layout workspace · Alt+4", then what it is for.
+            const std::string title =
+              tab.label + " workspace" + (tab.keys.empty() ? std::string() : " \xC2\xB7 " + tab.keys);
+            if (gBoldFont != nullptr) {
+              ImGui::PushFont(gBoldFont, 0.0f);
             }
+            ImGui::TextUnformatted(title.c_str());
+            if (gBoldFont != nullptr) {
+              ImGui::PopFont();
+            }
+            const EdCommand* const command = commands.Find(tab.command);
+            const std::string& about =
+              !tab.about.empty() ? tab.about : (command != nullptr ? command->description : tab.about);
+            if (!about.empty()) {
+              ImGui::PushTextWrapPos(ImGui::GetFontSize() * 24.0f);
+              ImGui::TextUnformatted(about.c_str());
+              ImGui::PopTextWrapPos();
+            }
+            ImGui::EndTooltip();
           }
           if (clicked) {
             (void)commands.Run(tab.command);

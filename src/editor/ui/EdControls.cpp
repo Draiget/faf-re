@@ -1,5 +1,6 @@
 #include "editor/ui/EdControls.h"
 
+#include "editor/ui/EdColourText.h"
 #include "editor/ui/EdThemeColors.h"
 #include "imgui_internal.h"
 
@@ -344,5 +345,152 @@ namespace faf::editor
     const bool pressed = ImGui::Button(label, size);
     ImGui::PopStyleColor(5);
     return pressed;
+  }
+  bool Section(
+    const char* const title,
+    const bool openAtFirst
+  )
+  {
+    ImGuiWindow* const window = ImGui::GetCurrentWindow();
+    ImGuiStorage* const storage = ImGui::GetStateStorage();
+    const ImGuiID id = window->GetID(title);
+    bool open = storage->GetBool(id, openAtFirst);
+    ImGui::Spacing();
+    const float fontSize = ImGui::GetFontSize();
+    const float small = std::round(fontSize * 0.85f);
+    const ImVec2 at = ImGui::GetCursorScreenPos();
+    const float width = ImGui::GetContentRegionAvail().x;
+    const float height = small + 6.0f;
+    ImGui::PushID(title);
+    const bool clicked = ImGui::InvisibleButton("##section", ImVec2(width, height));
+    const bool hovered = ImGui::IsItemHovered();
+    ImGui::PopID();
+    if (clicked) {
+      open = !open;
+      storage->SetBool(id, open);
+    }
+    ImDrawList* const draw = ImGui::GetWindowDrawList();
+    const ImU32 ink = ImGui::GetColorU32(hovered ? ImGuiCol_Text : ImGuiCol_TextDisabled);
+    // The chevron: down when open, right when folded.
+    const float c = std::round(small * 0.32f);
+    const ImVec2 mid(at.x + c + 2.0f, at.y + height * 0.5f);
+    if (open) {
+      draw->AddTriangleFilled(
+        ImVec2(mid.x - c, mid.y - c * 0.5f), ImVec2(mid.x + c, mid.y - c * 0.5f), ImVec2(mid.x, mid.y + c * 0.6f), ink
+      );
+    } else {
+      draw->AddTriangleFilled(
+        ImVec2(mid.x - c * 0.5f, mid.y - c), ImVec2(mid.x - c * 0.5f, mid.y + c), ImVec2(mid.x + c * 0.6f, mid.y), ink
+      );
+    }
+    // The title in capitals, a little smaller and spaced.
+    std::string caps = title;
+    if (const std::size_t hash = caps.find("##"); hash != std::string::npos) {
+      caps.resize(hash);
+    }
+    for (char& ch : caps) {
+      ch = static_cast<char>(std::toupper(static_cast<unsigned char>(ch)));
+    }
+    float x = at.x + c * 2.0f + 8.0f;
+    const float y = at.y + (height - small) * 0.5f;
+    for (const char ch : caps) {
+      const char glyph[2] = {ch, 0};
+      draw->AddText(nullptr, small, ImVec2(x, y), ink, glyph);
+      x += ImGui::GetFont()->CalcTextSizeA(small, 1.0e9f, 0.0f, glyph).x + small * 0.06f;
+    }
+    return open;
+  }
+
+  void RowLabel(
+    const char* const label
+  )
+  {
+    const float width = ImGui::GetContentRegionAvail().x;
+    const ImVec4 ink = ImGui::GetStyleColorVec4(ImGuiCol_Text);
+    const ImVec4 dim = ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled);
+    ImGui::AlignTextToFramePadding();
+    ImGui::PushStyleColor(
+      ImGuiCol_Text, ImVec4((ink.x + dim.x) * 0.5f, (ink.y + dim.y) * 0.5f, (ink.z + dim.z) * 0.5f, 1.0f)
+    );
+    ImGui::TextUnformatted(label);
+    ImGui::PopStyleColor();
+    ImGui::SameLine(std::round(width * 0.38f) + ImGui::GetStyle().WindowPadding.x);
+    ImGui::SetNextItemWidth(-1.0f);
+  }
+
+  bool ColourField(
+    const char* const id,
+    float (&rgb)[3],
+    const bool brighterThanWhite
+  )
+  {
+    bool changed = false;
+    ImGui::PushID(id);
+    const float scale = brighterThanWhite ? ColourBrightness(rgb) : 1.0f;
+    const ImVec4 shown(rgb[0] / scale, rgb[1] / scale, rgb[2] / scale, 1.0f);
+    const float side = ImGui::GetFrameHeight();
+    if (
+      ImGui::ColorButton(
+        "##swatch", shown, ImGuiColorEditFlags_NoTooltip | ImGuiColorEditFlags_NoAlpha, ImVec2(side, side)
+      )
+    ) {
+      ImGui::OpenPopup("##picker");
+    }
+    if (ImGui::BeginPopup("##picker")) {
+      float picked[3] = {shown.x, shown.y, shown.z};
+      if (
+        ImGui::ColorPicker3("##pick", picked, ImGuiColorEditFlags_NoSidePreview | ImGuiColorEditFlags_NoSmallPreview)
+      ) {
+        for (int i = 0; i < 3; ++i) {
+          rgb[i] = picked[i] * scale;
+        }
+        changed = true;
+      }
+      if (brighterThanWhite) {
+        // A colour past white is set here (the hex can't say it); the row under the field shows it once it is.
+        float brightness = scale;
+        ImGui::SetNextItemWidth(-1.0f);
+        if (
+          FillDragFloat("##popupbrightness", &brightness, 0.01f, 0.0f, 4.0f, "Brightness %.2f") && brightness > 0.0f
+        ) {
+          for (int i = 0; i < 3; ++i) {
+            rgb[i] = rgb[i] / scale * brightness;
+          }
+          changed = true;
+        }
+      }
+      ImGui::EndPopup();
+    }
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(-1.0f);
+    // The hex: typed in, applied on Enter or when the field is left.
+    char text[16];
+    std::snprintf(text, sizeof(text), "%s", HexOfColour(rgb).c_str());
+    if (
+      ImGui::InputText(
+        "##hex", text, sizeof(text), ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll
+      ) ||
+      ImGui::IsItemDeactivatedAfterEdit()
+    ) {
+      float typed[3] = {rgb[0], rgb[1], rgb[2]};
+      if (ColourOfHex(text, scale, typed)) {
+        changed = changed || typed[0] != rgb[0] || typed[1] != rgb[1] || typed[2] != rgb[2];
+        rgb[0] = typed[0];
+        rgb[1] = typed[1];
+        rgb[2] = typed[2];
+      }
+    }
+    if (brighterThanWhite && scale > 1.0005f) {
+      float brightness = scale;
+      RowLabel("Brightness");
+      if (FillDragFloat("##brightness", &brightness, 0.01f, 0.0f, 4.0f, "%.2f") && brightness > 0.0f) {
+        for (int i = 0; i < 3; ++i) {
+          rgb[i] = rgb[i] / scale * brightness;
+        }
+        changed = true;
+      }
+    }
+    ImGui::PopID();
+    return changed;
   }
 } // namespace faf::editor

@@ -21,6 +21,10 @@ namespace faf::editor
     {
       std::string command;
       std::string label;
+      std::string icon;        // ui/EdIconFont.h, or empty
+      std::string keys;        // "Alt+4", for the tooltip
+      std::string about;       // what it is for, for the tooltip
+      bool groupStart = false; // a thin rule before it
     };
     std::vector<Tab> tabs;
     int activeTab = -1;

@@ -1,5 +1,7 @@
 #include "editor/ui/EdWorkspaces.h"
 
+#include "editor/ui/EdIconFont.h"
+
 #include <algorithm>
 #include <cctype>
 #include <unordered_map>
@@ -188,7 +190,63 @@ namespace faf::editor
     return std::string(hashes == std::string_view::npos ? panel : panel.substr(hashes + 3));
   }
 
-  std::string PanelWindowName(
+  const char* PanelIcon(
+    const std::string_view id
+  )
+  {
+    // The mockup's icons for its panels (data_panels.ts), by our panels' ids.
+    static constexpr std::pair<std::string_view, const char*> kIcons[] = {
+      {"Tools", ICON_WAND},
+      {"Properties", ICON_INFO},
+      {"Map", ICON_VAULT},
+      {"Info", ICON_INFO},
+      {"Markers", ICON_MARKER},
+      {"Check", ICON_CHECK},
+      {"Log", ICON_CONSOLE},
+      {"History", ICON_HISTORY},
+      {"Problems", ICON_WARN},
+      {"Lighting", ICON_LIGHT},
+      {"Debugger", ICON_PLAY},
+      {"Armies", ICON_FLAG},
+      {"Material Editor", ICON_MATERIAL},
+      {"Particle Browser", ICON_IMAGE},
+      {"Particle Editor", ICON_PARTICLES},
+      {"ScriptEditor", ICON_SCRIPT},
+      {"AdaptiveMap", ICON_GENERATE},
+    };
+    for (const auto& [panel, icon] : kIcons) {
+      if (panel == id) {
+        return icon;
+      }
+    }
+    return nullptr;
+  }
+
+  const char* WorkspaceIcon(
+    const std::string_view key
+  )
+  {
+    static constexpr std::pair<std::string_view, const char*> kIcons[] = {
+      {"terrain", ICON_TERRAIN},
+      {"objects", ICON_OBJECTS},
+      {"environment", ICON_ENV},
+      {"layout", ICON_LAYOUT},
+      {"generate", ICON_GENERATE},
+      {"mission", ICON_MISSION},
+      {"effects", ICON_PARTICLES},
+      {"units", ICON_MOD},
+      {"materials", ICON_MATERIAL},
+      {"review", ICON_REVIEW},
+    };
+    for (const auto& [workspace, icon] : kIcons) {
+      if (workspace == key) {
+        return icon;
+      }
+    }
+    return nullptr;
+  }
+
+  std::string PanelWindowNameBeforeIcons(
     std::string_view panel,
     const int workspace
   )
@@ -201,6 +259,24 @@ namespace faf::editor
       return std::string(panel) + "@" + key;
     }
     return std::string(panel) + "###" + std::string(panel) + "@" + key;
+  }
+
+  std::string PanelWindowName(
+    std::string_view panel,
+    const int workspace
+  )
+  {
+    const char* const icon = PanelIcon(PanelId(panel));
+    if (icon == nullptr) {
+      return PanelWindowNameBeforeIcons(panel, workspace);
+    }
+    // The title with its icon in front; the id after ### stays what it was, so the window keeps its place.
+    const std::size_t hashes = panel.find("###");
+    const std::string_view title = hashes == std::string_view::npos ? panel : panel.substr(0, hashes);
+    const std::string before = PanelWindowNameBeforeIcons(panel, workspace);
+    const std::size_t idAt = before.find("###");
+    const std::string id = idAt == std::string::npos ? "###" + before : before.substr(idAt);
+    return std::string(icon) + "  " + std::string(title) + id;
   }
 
   const char* Panel(

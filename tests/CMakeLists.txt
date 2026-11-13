@@ -411,7 +411,7 @@ add_executable(faf_editor_brush_tests EXCLUDE_FROM_ALL editor/HeightBrushTests.c
   editor/PathingTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdPathing.cpp
   editor/PackageTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdPackage.cpp
   editor/WaterPresetTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdWaterPreset.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdJson.cpp
-  editor/LightingTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdLighting.cpp
+  editor/LightingTests.cpp editor/ColourTextTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdLighting.cpp
   editor/MarkerPresetTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdMarkerPreset.cpp
   editor/UnitPresetTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdUnitPreset.cpp
   editor/LayerPresetTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdLayerPreset.cpp

@@ -1,5 +1,7 @@
 #include "editor/EdShell.h"
 #include "editor/ui/EdControls.h"
+#include "editor/ui/EdFonts.h"
+#include "editor/ui/EdIconFont.h"
 #include "editor/ui/EdCommands.h"
 #include "editor/ui/EdPalette.h"
 #include "editor/ui/EdTitleBar.h"
@@ -198,8 +200,13 @@ namespace faf::editor
     // The dock space over the window. Its middle stays empty: the game's viewport is put over it (EdApp.cpp), so
     // the game's picture and input are there, inside the panels.
     const ImGuiViewport* const viewport = ImGui::GetMainViewport();
-    const float statusHeight = ImGui::GetFrameHeight();
-    const float toolbarHeight = ImGui::GetFrameHeight() + 12.0f;
+    const float statusHeight = StatusBarHeight();
+    const float toolbarHeight = std::round(Em(38.0f));
+    // The first frame: the first workspace's panels' saved places under the names their tabs have now.
+    if (!mPanelPlacesCarried) {
+      mPanelPlacesCarried = true;
+      CarryPanelPlaces();
+    }
     // The title row first (the editor draws its own: map name, menus, search, the window's buttons), always, also
     // while a play runs, so the window can be moved and closed.
     float titleHeight = 0.0f;
@@ -225,7 +232,17 @@ namespace faf::editor
         info.state = mPlay.StateText();
       }
       for (std::size_t i = 0; i < Workspaces().size(); ++i) {
-        info.tabs.push_back({"workspace." + std::to_string(i), Workspaces()[i].name});
+        const EdWorkspace& workspace = Workspaces()[i];
+        EdTitleInfo::Tab tab;
+        tab.command = "workspace." + std::to_string(i);
+        tab.label = workspace.name;
+        const char* const icon = WorkspaceIcon(workspace.key);
+        tab.icon = icon != nullptr ? icon : "";
+        tab.keys = workspace.keys;
+        tab.about = workspace.about;
+        // The mockup's groups: making the map (Terrain to Mission), its assets (Effects to Materials), Review.
+        tab.groupStart = std::string_view(workspace.key) == "effects" || std::string_view(workspace.key) == "review";
+        info.tabs.push_back(std::move(tab));
       }
       info.activeTab = ActiveWorkspace();
       titleHeight = DrawTitleBar(*mCommands, *mMenus, info, [] {
@@ -235,8 +252,13 @@ namespace faf::editor
     }
     DrawToolbar(toolbarHeight, titleHeight);
     const float top = titleHeight + toolbarHeight;
-    ImGui::SetNextWindowPos(ImVec2(viewport->WorkPos.x, viewport->WorkPos.y + top));
-    ImGui::SetNextWindowSize(ImVec2(viewport->WorkSize.x, viewport->WorkSize.y - statusHeight - top));
+    // The tool strip down the window's left edge (the mockup's), the panels and the view beside it.
+    const float stripWidth = panels ? std::round(Em(40.0f)) : 0.0f;
+    if (stripWidth > 0.0f) {
+      DrawToolStrip(top, stripWidth, statusHeight);
+    }
+    ImGui::SetNextWindowPos(ImVec2(viewport->WorkPos.x + stripWidth, viewport->WorkPos.y + top));
+    ImGui::SetNextWindowSize(ImVec2(viewport->WorkSize.x - stripWidth, viewport->WorkSize.y - statusHeight - top));
     ImGui::SetNextWindowViewport(viewport->ID);
     constexpr ImGuiWindowFlags kHostFlags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse |
       ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus |
@@ -280,11 +302,14 @@ namespace faf::editor
     if (!mPropertiesPlaced && workspace == 0) {
       if (const ImGuiWindow* const tools = ImGui::FindWindowByName(Panel(kToolsWindow)); tools != nullptr) {
         mPropertiesPlaced = true;
-        if (ImGui::FindWindowSettingsByID(ImHashStr("Properties")) == nullptr && tools->DockId != 0) {
+        if (
+          ImGui::FindWindowSettingsByID(ImHashStr(PanelWindowName("Properties", 0).c_str())) == nullptr &&
+          tools->DockId != 0
+        ) {
           ImGuiID top = 0;
           ImGuiID bottom = 0;
           ImGui::DockBuilderSplitNode(tools->DockId, ImGuiDir_Down, 0.42f, &bottom, &top);
-          ImGui::DockBuilderDockWindow("Properties", bottom);
+          ImGui::DockBuilderDockWindow(PanelWindowName("Properties", 0).c_str(), bottom);
           ImGui::DockBuilderFinish(dockspaceId);
         }
       }
@@ -577,6 +602,8 @@ namespace faf::editor
     const float top
   )
   {
+    // The mockup's toolbar (styles.css .toolbar): flat buttons (an icon, maybe a word) in groups with thin rules
+    // between them; a pressed toggle in the accent's soft fill and colour; Play in green.
     const ImGuiViewport* const viewport = ImGui::GetMainViewport();
     ImGui::SetNextWindowPos(ImVec2(viewport->WorkPos.x, viewport->WorkPos.y + top));
     ImGui::SetNextWindowSize(ImVec2(viewport->WorkSize.x, height));
@@ -584,80 +611,181 @@ namespace faf::editor
     constexpr ImGuiWindowFlags kFlags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove |
       ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing |
       ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoScrollbar;
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8.0f, 6.0f));
+    const float buttonHeight = std::round(Em(26.0f));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(Em(7.0f), std::round((height - buttonHeight) * 0.5f)));
     ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
-    ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 4.0f);
-    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(Em(10.0f), ImGui::GetStyle().FramePadding.y));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, Em(4.0f));
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(Em(2.0f), 0.0f));
+    ImGui::PushStyleColor(ImGuiCol_WindowBg, ImGui::GetStyleColorVec4(ImGuiCol_FrameBg));
     if (ImGui::Begin("##Toolbar", nullptr, kFlags)) {
       const bool playing = mPlay.Active();
       const bool open = mDocument.GetState() == EdDocument::State::Open;
-      const float buttonHeight = ImGui::GetFrameHeight();
-      const auto tip = [](const char* const text) {
+      ImDrawList* const draw = ImGui::GetWindowDrawList();
+      ImFont* const font = ImGui::GetFont();
+      const float fontSize = ImGui::GetFontSize();
+      const ImVec4 text = ImGui::GetStyleColorVec4(ImGuiCol_Text);
+      const ImVec4 dim = ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled);
+      // The mockup's text-1: the toolbar's words, between the bright and the dimmed text.
+      const ImU32 ink1 = ImGui::GetColorU32(
+        ImVec4((text.x * 2.0f + dim.x) / 3.0f, (text.y * 2.0f + dim.y) / 3.0f, (text.z * 2.0f + dim.z) / 3.0f, 1.0f)
+      );
+      {
+        // The line under the toolbar.
+        const ImVec2 at = ImGui::GetWindowPos();
+        const ImVec2 size = ImGui::GetWindowSize();
+        draw->AddLine(
+          ImVec2(at.x, at.y + size.y - 0.5f),
+          ImVec2(at.x + size.x, at.y + size.y - 0.5f),
+          ImGui::GetColorU32(ImGuiCol_Border)
+        );
+      }
+      const auto tip = [](const char* const words) {
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled | ImGuiHoveredFlags_DelayShort)) {
-          ImGui::SetTooltip("%s", text);
+          ImGui::SetTooltip("%s", words);
         }
       };
-      const auto divider = [] {
+      const auto withAlpha = [](const ImU32 colour, const float alpha) {
+        const auto a = static_cast<ImU32>(static_cast<float>((colour >> IM_COL32_A_SHIFT) & 0xFFU) * alpha);
+        return (colour & ~IM_COL32_A_MASK) | (a << IM_COL32_A_SHIFT);
+      };
+      // A flat button: its icon, then its word if any. `pressed` (toggles) fills it with the accent's soft colour.
+      const auto button = [&](
+                            const char* const id,
+                            const char* const icon,
+                            const char* const label,
+                            const bool pressed = false,
+                            const bool enabled = true,
+                            const float inkAlpha = 1.0f
+                          ) {
+        const ImVec2 iconSize = icon != nullptr ? ImGui::CalcTextSize(icon) : ImVec2(0.0f, 0.0f);
+        const ImVec2 labelSize = label != nullptr ? ImGui::CalcTextSize(label) : ImVec2(0.0f, 0.0f);
+        const float pad = label != nullptr ? Em(8.0f) : Em(6.0f);
+        const float gap = icon != nullptr && label != nullptr ? Em(5.0f) : 0.0f;
+        const float width = std::round(std::max(buttonHeight, pad * 2.0f + iconSize.x + gap + labelSize.x));
+        const ImVec2 at = ImGui::GetCursorScreenPos();
+        ImGui::PushID(id);
+        const bool clicked = ImGui::InvisibleButton("##tb", ImVec2(width, buttonHeight)) && enabled;
+        const bool hovered = enabled && ImGui::IsItemHovered();
+        const bool held = enabled && ImGui::IsItemActive();
+        ImGui::PopID();
+        const ImVec2 end(at.x + width, at.y + buttonHeight);
+        if (pressed) {
+          draw->AddRectFilled(at, end, AccentU32(held ? 0.30f : hovered ? 0.24f : 0.16f), Em(4.0f));
+        } else if (hovered) {
+          draw->AddRectFilled(at, end, ImGui::GetColorU32(held ? ImGuiCol_ButtonHovered : ImGuiCol_Button), Em(4.0f));
+        }
+        ImU32 ink = pressed ? AccentU32() : hovered ? ImGui::GetColorU32(ImGuiCol_Text) : ink1;
+        if (!enabled) {
+          ink = withAlpha(ink, 0.4f);
+        } else if (inkAlpha < 1.0f && !hovered) {
+          ink = withAlpha(ink, inkAlpha);
+        }
+        float x = at.x + (label != nullptr ? pad : (width - iconSize.x) * 0.5f);
+        const float y = at.y + (buttonHeight - fontSize) * 0.5f;
+        if (icon != nullptr) {
+          draw->AddText(ImVec2(std::round(x), std::round(y)), ink, icon);
+          x += iconSize.x + gap;
+        }
+        if (label != nullptr) {
+          draw->AddText(ImVec2(std::round(x), std::round(y)), ink, label);
+        }
         ImGui::SameLine();
-        ImGui::SeparatorEx(ImGuiSeparatorFlags_Vertical);
-        ImGui::SameLine();
+        return clicked;
+      };
+      // The rule between groups (the mockup's .tb-group border).
+      const auto group = [&] {
+        ImGui::SameLine(0.0f, Em(5.0f));
+        const ImVec2 at = ImGui::GetCursorScreenPos();
+        const float x = std::round(at.x) + 0.5f;
+        draw->AddLine(
+          ImVec2(x, at.y + Em(4.0f)),
+          ImVec2(x, at.y + buttonHeight - Em(4.0f)),
+          ImGui::GetColorU32(ImGuiCol_TableBorderLight)
+        );
+        ImGui::Dummy(ImVec2(1.0f, buttonHeight));
+        ImGui::SameLine(0.0f, Em(5.0f));
       };
 
-      // Play / Stop: green or red, its icon drawn, the key beside the word.
+      // Play / Stop: the mockup's green (red to stop) with dark words, the key beside them; the setup at its side.
       {
-        const ImVec4 base = playing ? kStopRed : kPlayGreen;
-        ImGui::PushStyleColor(ImGuiCol_Button, base);
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(base.x * 1.25f, base.y * 1.25f, base.z * 1.25f, 1.0f));
-        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(base.x * 0.85f, base.y * 0.85f, base.z * 0.85f, 1.0f));
-        ImGui::BeginDisabled(!playing && !mPlay.CanPlay());
+        const ImU32 base = playing ? IM_COL32(0xFF, 0x5D, 0x5D, 0xFF) : IM_COL32(0x3F, 0xCF, 0x7A, 0xFF);
+        const ImU32 onBase = playing ? IM_COL32(0x2A, 0x06, 0x06, 0xFF) : IM_COL32(0x06, 0x21, 0x0F, 0xFF);
+        const bool canPlay = playing || mPlay.CanPlay();
+        const char* const icon = playing ? ICON_STOP : ICON_PLAY;
+        const char* const word = playing ? "Stop" : "Play";
+        const ImVec2 iconSize = ImGui::CalcTextSize(icon);
+        const ImVec2 wordSize = ImGui::CalcTextSize(word);
+        const ImVec2 keySize = ImGui::CalcTextSize("F5");
+        const float pad = Em(10.0f);
+        const float width =
+          std::round(pad + iconSize.x + Em(6.0f) + wordSize.x + Em(8.0f) + keySize.x + Em(8.0f) + pad * 0.6f);
         const ImVec2 at = ImGui::GetCursorScreenPos();
-        const ImVec2 size(Em(118.0f), buttonHeight);
-        if (ImGui::Button("##playstop", size)) {
+        const bool clicked = ImGui::InvisibleButton("##playstop", ImVec2(width, buttonHeight)) && canPlay;
+        const bool hovered = canPlay && ImGui::IsItemHovered();
+        tip(playing ? "Stop the session and go back to editing (F5)" : "Play the map picked in the Map panel (F5)");
+        ImGui::SameLine(0.0f, 0.0f);
+        const float splitWidth = std::round(Em(22.0f));
+        const ImVec2 splitAt = ImGui::GetCursorScreenPos();
+        if (ImGui::InvisibleButton("##playsetup", ImVec2(splitWidth, buttonHeight))) {
+          ImGui::OpenPopup("##playsetuppopup");
+        }
+        const bool splitHovered = ImGui::IsItemHovered();
+        tip(
+          "Play options: start slot, faction, AI opponents, fog, prebuilt units; while playing, hide the fog or watch "
+          "as an observer"
+        );
+        // One green shape, the split a step lighter when hovered, a thin dark line between the halves.
+        const float brighten = 1.08f;
+        const auto lit = [&](const ImU32 colour, const bool on) {
+          if (!on) {
+            return colour;
+          }
+          ImVec4 c = ImGui::ColorConvertU32ToFloat4(colour);
+          c.x = std::min(1.0f, c.x * brighten);
+          c.y = std::min(1.0f, c.y * brighten);
+          c.z = std::min(1.0f, c.z * brighten);
+          return ImGui::ColorConvertFloat4ToU32(c);
+        };
+        const ImU32 shown = canPlay ? base : withAlpha(base, 0.45f);
+        draw->AddRectFilled(
+          at, ImVec2(at.x + width, at.y + buttonHeight), lit(shown, hovered), Em(4.0f), ImDrawFlags_RoundCornersLeft
+        );
+        draw->AddRectFilled(
+          splitAt,
+          ImVec2(splitAt.x + splitWidth, splitAt.y + buttonHeight),
+          lit(base, splitHovered),
+          Em(4.0f),
+          ImDrawFlags_RoundCornersRight
+        );
+        draw->AddLine(
+          ImVec2(splitAt.x + 0.5f, splitAt.y), ImVec2(splitAt.x + 0.5f, splitAt.y + buttonHeight), IM_COL32(0, 0, 0, 46)
+        );
+        const float y = std::round(at.y + (buttonHeight - fontSize) * 0.5f);
+        float x = at.x + pad;
+        draw->AddText(ImVec2(x, y), onBase, icon);
+        x += iconSize.x + Em(6.0f);
+        if (gBoldFont != nullptr) {
+          draw->AddText(gBoldFont, fontSize, ImVec2(x, y), onBase, word);
+        } else {
+          draw->AddText(ImVec2(x, y), onBase, word);
+        }
+        x += wordSize.x + Em(8.0f);
+        // The key on an outlined cap, as the mockup's kbd.
+        const ImVec2 capMin(std::round(x - Em(4.0f)), std::round(at.y + Em(5.0f)));
+        const ImVec2 capMax(std::round(x + keySize.x + Em(4.0f)), std::round(at.y + buttonHeight - Em(5.0f)));
+        draw->AddRect(capMin, capMax, IM_COL32(0, 0, 0, 64), Em(3.0f));
+        draw->AddText(font, fontSize * 0.85f, ImVec2(x, y + fontSize * 0.08f), onBase, "F5");
+        const char* const chevron = ICON_CHEVRON;
+        const ImVec2 chevronSize = ImGui::CalcTextSize(chevron);
+        draw->AddText(ImVec2(std::round(splitAt.x + (splitWidth - chevronSize.x) * 0.5f), y), onBase, chevron);
+        if (clicked) {
           if (playing) {
             mPlay.Stop();
           } else {
             mPlay.Play();
           }
         }
-        ImDrawList* const draw = ImGui::GetWindowDrawList();
-        const ImU32 white = ImGui::GetColorU32(ImGuiCol_Text);
-        const float cy = at.y + size.y * 0.5f;
-        const float r = size.y * 0.24f;
-        const float left = Em(12.0f);
-        if (playing) {
-          draw->AddRectFilled(ImVec2(at.x + left, cy - r), ImVec2(at.x + left + 2.0f * r, cy + r), white, 1.5f);
-        } else {
-          draw->AddTriangleFilled(
-            ImVec2(at.x + left, cy - r * 1.1f),
-            ImVec2(at.x + left, cy + r * 1.1f),
-            ImVec2(at.x + left + 2.0f * r, cy),
-            white
-          );
-        }
-        const char* const word = playing ? "Stop" : "Play";
-        const float textY = at.y + (size.y - ImGui::GetTextLineHeight()) * 0.5f;
-        draw->AddText(ImVec2(at.x + Em(20.0f) + 2.0f * r, textY), white, word);
-        // The key, on a darker cap so it reads on the green and the red.
-        const ImVec2 keySize = ImGui::CalcTextSize("F5");
-        const ImVec2 capMin(at.x + size.x - keySize.x - Em(14.0f), at.y + Em(4.0f));
-        const ImVec2 capMax(at.x + size.x - Em(6.0f), at.y + size.y - Em(4.0f));
-        draw->AddRectFilled(capMin, capMax, IM_COL32(0, 0, 0, 90), 3.0f);
-        draw->AddRect(capMin, capMax, IM_COL32(255, 255, 255, 70), 3.0f);
-        draw->AddText(ImVec2(capMin.x + Em(4.0f), textY), IM_COL32(255, 255, 255, 230), "F5");
-        ImGui::EndDisabled();
-        tip(playing ? "Stop the session and go back to editing (F5)" : "Play the map picked in the Map panel (F5)");
-        // The setup, one click away.
-        ImGui::SameLine(0.0f, 1.0f);
-        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(4.0f, ImGui::GetStyle().FramePadding.y));
-        if (ImGui::ArrowButton("##playsetup", ImGuiDir_Down)) {
-          ImGui::OpenPopup("##playsetuppopup");
-        }
-        ImGui::PopStyleVar();
-        ImGui::PopStyleColor(3);
-        tip(
-          "Play options: start slot, faction, AI opponents, fog, prebuilt units; while playing, hide the fog or watch "
-          "as an observer"
-        );
         ImGui::SetNextWindowSize(ImVec2(ImGui::GetFontSize() * 22.0f, 0.0f));
         if (ImGui::BeginPopup("##playsetuppopup")) {
           const std::vector<std::string>& playMaps = mPlay.Maps();
@@ -670,127 +798,136 @@ namespace faf::editor
           DrawPlaySetup();
           ImGui::EndPopup();
         }
+        ImGui::SameLine();
         // While a play runs: the editor's view or the game's (F6); the game runs on behind the editor's.
         if (playing) {
-          ImGui::SameLine();
+          ImGui::SameLine(0.0f, Em(6.0f));
           const bool editorView = mEditorViewInPlay;
-          ImGui::PushStyleColor(
-            ImGuiCol_Button, editorView ? ImVec4(0.75f, 0.50f, 0.15f, 1.0f) : ImGui::GetStyleColorVec4(ImGuiCol_Button)
-          );
-          if (ImGui::Button(editorView ? "Editor view  F6" : "Game view  F6", ImVec2(0.0f, buttonHeight))) {
+          if (button("##view", ICON_REVIEW, editorView ? "Editor view" : "Game view", editorView)) {
             mEditorViewInPlay = !mEditorViewInPlay;
             gpg::Logf("editor: the toolbar: the %s view", mEditorViewInPlay ? "editor's" : "game's");
           }
-          ImGui::PopStyleColor();
           tip(
             editorView ? "The editor's view of the map, the play running on behind it: F6 for the game's view"
                        : "The game's view: F6 for the editor's view of the map (the play keeps running)"
           );
           if (editorView) {
-            ImGui::SameLine();
-            ImGui::Checkbox("Game units", &mTools.ShowGameUnits());
+            if (button("##gameunits", ICON_UNIT, "Game units", mTools.ShowGameUnits())) {
+              mTools.ShowGameUnits() = !mTools.ShowGameUnits();
+            }
             tip(
-              "The play's own units in the editor's view: shown (click one to select it, drag to move it, change it in "
-              "Properties) or hidden"
+              "The play's own units in the editor's view: shown (click one to select it, drag to move it, change it "
+              "in Properties) or hidden"
             );
           }
         }
       }
-      divider();
+      group();
 
       // File.
-      ImGui::BeginDisabled(playing);
-      if (EdToolButton("##new", EdIcon::NewFile, "New", false, false)) {
+      const std::vector<std::string>& maps = mPlay.Maps();
+      if (button("##new", ICON_NEW, nullptr, false, !playing)) {
         mOpenNewMap = true;
       }
-      tip("A new map: size, players, height and sea (Ctrl+N)");
-      ImGui::SameLine();
-      const std::vector<std::string>& maps = mPlay.Maps();
-      ImGui::BeginDisabled(maps.empty() || mDocument.GetState() == EdDocument::State::Loading);
-      if (EdToolButton("##open", EdIcon::Folder, "Open", false, false)) {
+      tip("New map: size, players, height and sea (Ctrl+N)");
+      if (
+        button(
+          "##open",
+          ICON_OPEN,
+          "Open",
+          false,
+          !playing && !maps.empty() && mDocument.GetState() != EdDocument::State::Loading
+        )
+      ) {
         mBrowser.Show();
       }
-      ImGui::EndDisabled();
       tip("Browse maps: every map on this computer (the game's, FAF's folder, your vault) and maps from the FAF vault");
-      ImGui::SameLine();
-      ImGui::BeginDisabled(!open);
-      if (EdToolButton("##save", EdIcon::Save, "Save", false, false)) {
+      if (button("##save", ICON_SAVE, "Save", false, !playing && open)) {
         mCommand = Command::Save;
       }
-      tip("Save the map into its folder (Ctrl+S)");
-      ImGui::SameLine();
-      if (EdToolButton("##saveas", EdIcon::SaveAs, "Save as", false, false)) {
-        mOpenSaveAs = true;
-      }
-      tip("Save the map as a new folder in your vault");
-      ImGui::EndDisabled();
-      divider();
+      tip("Save the map into its folder (Ctrl+S). Save as a new folder is in the File menu.");
+      group();
 
-      // Edit.
-      ImGui::BeginDisabled(!open || !mDocument.CanUndo());
-      if (EdToolButton("##undo", EdIcon::Undo, "Undo", false, false, EdSegment::First)) {
-        mCommand = Command::Undo;
+      // Edit: Undo names its step, as the mockup's.
+      {
+        const bool canUndo = open && !playing && mDocument.CanUndo();
+        std::string undo = "Undo";
+        if (const char* const step = mDocument.UndoStepName(); canUndo && step != nullptr) {
+          undo = std::string("Undo ") + step;
+          if (undo.size() > 27) {
+            undo = undo.substr(0, 26) + "...";
+          }
+        }
+        if (button("##undo", ICON_UNDO, undo.c_str(), false, canUndo)) {
+          mCommand = Command::Undo;
+        }
+        tip("Undo the last edit (Ctrl+Z)");
+        if (button("##redo", ICON_REDO, nullptr, false, open && !playing && mDocument.CanRedo())) {
+          mCommand = Command::Redo;
+        }
+        tip("Redo (Ctrl+Y)");
       }
-      ImGui::EndDisabled();
-      tip("Undo the last edit (Ctrl+Z)");
-      ImGui::SameLine(0.0f, 1.0f);
-      ImGui::BeginDisabled(!open || !mDocument.CanRedo());
-      if (EdToolButton("##redo", EdIcon::Redo, "Redo", false, false, EdSegment::Last)) {
-        mCommand = Command::Redo;
-      }
-      ImGui::EndDisabled();
-      tip("Redo (Ctrl+Y)");
-      ImGui::EndDisabled();
-      divider();
+      group();
 
-      // The build grid and snapping.
-      const auto toggle = [](const char* const label, const EdIcon icon, const bool on) {
-        ImGui::PushID(label);
-        const bool clicked = EdToolButton("##toggle", icon, label, true, on);
-        ImGui::PopID();
-        return clicked;
-      };
-      if (toggle("Grid", EdIcon::Grid, mTools.ShowGrid())) {
+      // Symmetry: the five common modes as pictures; all ten are in the Terrain tool's settings.
+      {
+        const float wordSize = std::round(fontSize * 0.85f);
+        const ImVec2 word = font->CalcTextSizeA(wordSize, FLT_MAX, 0.0f, "Symmetry");
+        const ImVec2 at = ImGui::GetCursorScreenPos();
+        draw->AddText(
+          font,
+          wordSize,
+          ImVec2(at.x + Em(2.0f), std::round(at.y + (buttonHeight - word.y) * 0.5f)),
+          ImGui::GetColorU32(ImGuiCol_TextDisabled),
+          "Symmetry"
+        );
+        ImGui::Dummy(ImVec2(word.x + Em(5.0f), buttonHeight));
+        ImGui::SameLine(0.0f, 0.0f);
+        static constexpr int kModes[] = {0, 1, 5, 6, 8};
+        for (const int mode : kModes) {
+          ImGui::PushID(mode);
+          const ImVec2 p = ImGui::GetCursorScreenPos();
+          const float side = buttonHeight;
+          const bool on = mTools.SymmetryIndex() == mode;
+          if (ImGui::InvisibleButton("##sym", ImVec2(side, side)) && !playing) {
+            mTools.PickSymmetry(mode);
+          }
+          const bool hovered = ImGui::IsItemHovered();
+          if (on) {
+            draw->AddRectFilled(p, ImVec2(p.x + side, p.y + side), AccentU32(0.16f), Em(4.0f));
+          } else if (hovered) {
+            draw->AddRectFilled(p, ImVec2(p.x + side, p.y + side), ImGui::GetColorU32(ImGuiCol_Button), Em(4.0f));
+          }
+          const float picture = std::round(side * 0.92f);
+          mTools.DrawSymmetryPicture(
+            draw, mode, ImVec2(p.x + (side - picture) * 0.5f, p.y + (side - picture) * 0.5f), picture
+          );
+          if (hovered) {
+            ImGui::SetTooltip(
+              "Symmetry: %s\nAll ten modes are in the Terrain tool's settings", EdTools::SymmetryName(mode)
+            );
+          }
+          ImGui::PopID();
+          ImGui::SameLine();
+        }
+      }
+      group();
+
+      // The build grid, snapping, keeping things on the ground, the slope overlay.
+      if (button("##grid", ICON_GRID, "Grid", mTools.ShowGrid())) {
         mTools.SetShowGrid(!mTools.ShowGrid());
       }
       tip(
         "The build grid on the ground around the cursor: cells of the step's size, one unit being the cell units are "
         "built on"
       );
-      ImGui::SameLine();
-      if (toggle("Snap", EdIcon::Magnet, mTools.SnapToGrid())) {
+      if (button("##snap", ICON_MAGNET, "Snap", mTools.SnapToGrid())) {
         mTools.SetSnapToGrid(!mTools.SnapToGrid());
       }
       tip(
         "Markers and props placed or dragged go to the middle of a grid cell (mass and hydrocarbon points always sit "
         "on half units, as the game's saves place them)"
       );
-      ImGui::SameLine();
-      if (toggle("On ground", EdIcon::OnGround, mTools.KeepOnGround())) {
-        mTools.SetKeepOnGround(!mTools.KeepOnGround());
-      }
-      tip(
-        "The move arrows keep markers and props on the ground when they move across it; off, they keep their height. "
-        "Nothing is moved under the ground either way."
-      );
-      ImGui::SameLine();
-      if (toggle("Slope", EdIcon::Slope, mTools.ShowSlope())) {
-        mTools.SetShowSlope(!mTools.ShowSlope());
-      }
-      tip(
-        "Each cell's slope as the game's pathing reads it (its steepest edge): yellow above 0.25 (too steep to build "
-        "on), orange "
-        "above 0.5, red above 0.75 (steeper than most land units climb)"
-      );
-      ImGui::SameLine();
-      if (toggle("Km grid", EdIcon::Ruler, mTools.ShowKmGrid())) {
-        mTools.SetShowKmGrid(!mTools.ShowKmGrid());
-      }
-      tip(
-        "Lines every kilometre (51.2 units, the game's scale) and the map's centre lines. Alt+drag in the view "
-        "measures a distance."
-      );
-      ImGui::SameLine();
       {
         static constexpr float kSteps[] = {0.5f, 1.0f, 2.0f, 4.0f, 8.0f};
         static constexpr const char* kStepNames[] = {"0.5", "1", "2", "4", "8"};
@@ -800,8 +937,23 @@ namespace faf::editor
             current = i;
           }
         }
-        ImGui::SetNextItemWidth(ImGui::CalcTextSize("0.5").x + ImGui::GetFrameHeight() * 2.0f);
-        if (ImGui::BeginCombo("##gridstep", kStepNames[current])) {
+        ImGui::SameLine(0.0f, Em(4.0f));
+        const float framePad = std::max(0.0f, std::round((buttonHeight - fontSize) * 0.5f) - 1.0f);
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(Em(7.0f), framePad));
+        ImGui::SetNextItemWidth(std::round(Em(52.0f)));
+        const bool stepOpen = ImGui::BeginCombo("##gridstep", kStepNames[current], ImGuiComboFlags_NoArrowButton);
+        {
+          // The mockup's select: the value and a small chevron at the right.
+          const ImVec2 max = ImGui::GetItemRectMax();
+          const ImVec2 min = ImGui::GetItemRectMin();
+          const ImVec2 chevron = ImGui::CalcTextSize(ICON_CHEVRON);
+          draw->AddText(
+            ImVec2(std::round(max.x - chevron.x - Em(6.0f)), std::round((min.y + max.y - fontSize) * 0.5f)),
+            ink1,
+            ICON_CHEVRON
+          );
+        }
+        if (stepOpen) {
           for (int i = 0; i < 5; ++i) {
             if (ImGui::Selectable(kStepNames[i], i == current)) {
               mTools.SetGridStep(kSteps[i]);
@@ -809,12 +961,28 @@ namespace faf::editor
           }
           ImGui::EndCombo();
         }
+        ImGui::PopStyleVar();
         tip("The grid's step in game units");
+        ImGui::SameLine(0.0f, Em(4.0f));
       }
-      ImGui::SameLine();
-      divider();
-      // The map border, edited from any tool.
-      if (IconToggle("##border", EdIcon::Border, mTools.EditingBorder())) {
+      if (button("##onground", ICON_GROUND, "On ground", mTools.KeepOnGround())) {
+        mTools.SetKeepOnGround(!mTools.KeepOnGround());
+      }
+      tip(
+        "The move arrows keep markers and props on the ground when they move across it; off, they keep their height. "
+        "Nothing is moved under the ground either way."
+      );
+      if (button("##slope", ICON_SLOPE, "Slope", mTools.ShowSlope())) {
+        mTools.SetShowSlope(!mTools.ShowSlope());
+      }
+      tip(
+        "Each cell's slope as the game's pathing reads it (its steepest edge): yellow above 0.25 (too steep to build "
+        "on), orange above 0.5, red above 0.75 (steeper than most land units climb)"
+      );
+      group();
+
+      // What the view shows, one toggle per kind (Blender's object type visibility); hidden things aren't picked.
+      if (button("##border", ICON_FRAME, nullptr, mTools.EditingBorder())) {
         mTools.EditingBorder() = !mTools.EditingBorder();
         mShowProperties = mShowProperties || mTools.EditingBorder();
       }
@@ -822,51 +990,46 @@ namespace faf::editor
         mTools.EditingBorder() ? "Map border: on. Drag its edges in the view; its settings are in the Properties panel"
                                : "Map border (the playable area): edit it from any tool"
       );
-      divider();
-      // What the view shows, one toggle per kind (Blender's object type visibility); hidden things aren't picked.
-      // One joined row (1 px apart, rounded at its ends), as Blender's and the image editors' toggle groups.
-      if (IconToggle("##showprops", EdIcon::Tree, mTools.ShowProps(), EdSegment::First)) {
+      // Shown: the icon as any; hidden: dimmed (Blender's visibility toggles).
+      constexpr float kHidden = 0.32f;
+      if (button("##showprops", ICON_TREE, nullptr, false, true, mTools.ShowProps() ? 1.0f : kHidden)) {
         mTools.ShowProps() = !mTools.ShowProps();
       }
       tip(
         mTools.ShowProps() ? "Props shown (trees, rocks, wrecks): click to hide them"
                            : "Props hidden: click to show them"
       );
-      ImGui::SameLine(0.0f, 1.0f);
-      if (IconToggle("##showunits", EdIcon::Tank, mTools.ShowUnits(), EdSegment::Middle)) {
+      if (button("##showunits", ICON_UNIT, nullptr, false, true, mTools.ShowUnits() ? 1.0f : kHidden)) {
         mTools.ShowUnits() = !mTools.ShowUnits();
       }
       tip(
         mTools.ShowUnits() ? "Units shown (the armies' and civilians' units): click to hide them"
                            : "Units hidden: click to show them"
       );
-      // Markers by the palette's groups: shown while none of the group's types is hidden; a click shows or hides all of
-      // them.
+      // Markers by the palette's groups: shown while none of the group's types is hidden; a click shows or hides all
+      // of them.
       struct MarkerGroup
       {
         const char* group;
-        EdIcon icon;
+        const char* icon;
         const char* what;
       };
       static constexpr MarkerGroup kGroups[] = {
-        {"Resources", EdIcon::Resource, "Mass and hydrocarbon markers"},
-        {"Starts", EdIcon::Flag, "Start positions"},
-        {"AI", EdIcon::Crosshair, "AI markers (expansions, rally points, defensive points...)"},
-        {"Path nodes", EdIcon::PathNodes, "Path nodes and their links (land, air, water, amphibious)"},
-        {"Other", EdIcon::Pin, "Other markers (camera, weather, effects...)"},
+        {"Resources", ICON_STATS, "Mass and hydrocarbon markers"},
+        {"Starts", ICON_FLAG, "Start positions"},
+        {"AI", ICON_COMPASS, "AI markers (expansions, rally points, defensive points...)"},
+        {"Path nodes", ICON_PATH, "Path nodes and their links (land, air, water, amphibious)"},
+        {"Other", ICON_PIN, "Other markers (camera, weather, effects...)"},
       };
       std::set<std::string>& hidden = mTools.HiddenMarkerTypes();
-      for (const MarkerGroup& group : kGroups) {
-        const EdSegment segment = &group == &kGroups[std::size(kGroups) - 1] ? EdSegment::Last : EdSegment::Middle;
+      for (const MarkerGroup& markerGroup : kGroups) {
         bool shown = true;
         for (const MarkerType& type : MarkerTypes()) {
-          shown = shown && (std::string(group.group) != type.group || hidden.count(type.type) == 0);
+          shown = shown && (std::string(markerGroup.group) != type.group || hidden.count(type.type) == 0);
         }
-        ImGui::SameLine(0.0f, 1.0f);
-        ImGui::PushID(group.group);
-        if (IconToggle("##showmarkers", group.icon, shown, segment)) {
+        if (button(markerGroup.group, markerGroup.icon, nullptr, false, true, shown ? 1.0f : kHidden)) {
           for (const MarkerType& type : MarkerTypes()) {
-            if (std::string(group.group) == type.group) {
+            if (std::string(markerGroup.group) == type.group) {
               if (shown) {
                 hidden.insert(type.type);
               } else {
@@ -875,46 +1038,42 @@ namespace faf::editor
             }
           }
         }
-        ImGui::PopID();
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) {
-          ImGui::SetTooltip("%s %s: click to %s them", group.what, shown ? "shown" : "hidden", shown ? "hide" : "show");
+          ImGui::SetTooltip(
+            "%s %s: click to %s them", markerGroup.what, shown ? "shown" : "hidden", shown ? "hide" : "show"
+          );
         }
       }
 
-      // At the right: the open map (its name, its folder, "edited" while it has unsaved edits), then the UI scale.
+      // At the right: Check and Release, then the panels' scale.
       const float scaleWidth = DrawUiScaleButtons(true);
-      if (open) {
-        const MapFacts& facts = mDocument.Facts();
-        const std::string name = facts.name.empty() ? MapDisplayName(facts.scenarioPath) : facts.name;
-        const std::string folder = MapDisplayName(facts.scenarioPath);
-        const char* const edited = mDocument.Modified() ? "  edited" : "";
-        const ImGuiStyle& style = ImGui::GetStyle();
-        const float width = ImGui::CalcTextSize(name.c_str()).x + style.ItemSpacing.x +
-          ImGui::CalcTextSize(folder.c_str()).x + (mDocument.Modified() ? 4.0f + ImGui::CalcTextSize(edited).x : 0.0f) +
-          Em(16.0f) + scaleWidth;
-        ImGui::SameLine(
-          std::max(ImGui::GetCursorPosX() + Em(16.0f), ImGui::GetWindowWidth() - width - style.WindowPadding.x)
-        );
-        ImGui::AlignTextToFramePadding();
-        ImGui::TextUnformatted(name.c_str());
-        ImGui::SameLine();
-        ImGui::TextDisabled("%s", folder.c_str());
-        if (mDocument.Modified()) {
-          ImGui::SameLine(0.0f, 4.0f);
-          ImGui::TextColored(ImVec4(0.95f, 0.75f, 0.30f, 1.0f), "%s", edited);
-        }
-        ImGui::SameLine(0.0f, Em(16.0f));
-      } else {
-        ImGui::SameLine(
-          std::max(
-            ImGui::GetCursorPosX() + Em(16.0f), ImGui::GetWindowWidth() - scaleWidth - ImGui::GetStyle().WindowPadding.x
-          )
-        );
+      const auto width = [&](const char* const icon, const char* const label) {
+        return std::round(Em(16.0f) + ImGui::CalcTextSize(icon).x + Em(5.0f) + ImGui::CalcTextSize(label).x);
+      };
+      const float rightWidth =
+        width(ICON_OK, "Check") + width(ICON_PACKAGE, "Release") + Em(2.0f) + Em(11.0f) + 1.0f + scaleWidth;
+      ImGui::SameLine(
+        std::max(
+          ImGui::GetCursorPosX() + Em(10.0f), ImGui::GetWindowWidth() - rightWidth - ImGui::GetStyle().WindowPadding.x
+        )
+      );
+      if (button("##check", ICON_OK, "Check", false, open)) {
+        mShowCheck = true;
+        mRunCheck = true;
       }
+      tip("Run the map check and show its findings in the Check panel");
+      if (button("##release", ICON_PACKAGE, "Release", false, open && !playing) && mCommands != nullptr) {
+        (void)mCommands->Run("file.package");
+      }
+      tip("Package the map for the FAF vault");
+      group();
+      ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(Em(7.0f), std::round((buttonHeight - fontSize) * 0.5f)));
       (void)DrawUiScaleButtons(false);
+      ImGui::PopStyleVar();
     }
     ImGui::End();
-    ImGui::PopStyleVar(4);
+    ImGui::PopStyleColor();
+    ImGui::PopStyleVar(5);
   }
 
   float EdShell::DrawUiScaleButtons(
@@ -962,9 +1121,115 @@ namespace faf::editor
     return 0.0f;
   }
 
+  void EdShell::DrawToolStrip(
+    const float top,
+    const float width,
+    const float bottom
+  )
+  {
+    const ImGuiViewport* const viewport = ImGui::GetMainViewport();
+    ImGui::SetNextWindowPos(ImVec2(viewport->WorkPos.x, viewport->WorkPos.y + top));
+    ImGui::SetNextWindowSize(ImVec2(width, viewport->WorkSize.y - top - bottom));
+    ImGui::SetNextWindowViewport(viewport->ID);
+    constexpr ImGuiWindowFlags kFlags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove |
+      ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing |
+      ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoBringToFrontOnFocus;
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, Em(7.0f)));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+    ImGui::PushStyleColor(ImGuiCol_WindowBg, ImGui::GetStyleColorVec4(ImGuiCol_FrameBg));
+    if (ImGui::Begin("##ToolStrip", nullptr, kFlags)) {
+      const ImVec2 at = ImGui::GetWindowPos();
+      const ImVec2 size = ImGui::GetWindowSize();
+      ImGui::GetWindowDrawList()->AddLine(
+        ImVec2(at.x + size.x - 0.5f, at.y),
+        ImVec2(at.x + size.x - 0.5f, at.y + size.y),
+        ImGui::GetColorU32(ImGuiCol_Border)
+      );
+      if (mTools.DrawStrip(width - 1.0f)) {
+        mShowTools = true;
+        mFocusTools = true;
+      }
+    }
+    ImGui::End();
+    ImGui::PopStyleColor();
+    ImGui::PopStyleVar(3);
+  }
+
+  void EdShell::CarryPanelPlaces()
+  {
+    // Before the tabs had icons, the first workspace's windows were named by their titles alone, which were their
+    // ids. Their places in layout.ini (dock node, order, size) go to the new names once.
+    static constexpr const char* kPanels[] = {
+      "Tools",
+      "Properties",
+      "Map",
+      "Info",
+      "Markers",
+      "Check",
+      "Log",
+      "History",
+      "Problems",
+      "Lighting",
+      "Debugger",
+      "Armies",
+      "Material Editor",
+      "Particle Browser",
+      "Particle Editor",
+    };
+    ImGuiContext& g = *GImGui;
+    int carried = 0;
+    for (const char* const panel : kPanels) {
+      const std::string before = PanelWindowNameBeforeIcons(panel, 0);
+      const std::string now = PanelWindowName(panel, 0);
+      const ImGuiID oldId = ImHashStr(before.c_str());
+      const ImGuiID newId = ImHashStr(now.c_str());
+      if (oldId == newId || ImGui::FindWindowSettingsByID(newId) != nullptr) {
+        continue;
+      }
+      const ImGuiWindowSettings* const old = ImGui::FindWindowSettingsByID(oldId);
+      if (old == nullptr) {
+        continue;
+      }
+      // Copied first: a new entry can move the settings' storage.
+      const ImGuiWindowSettings kept = *old;
+      ImGuiWindowSettings* const moved = ImGui::CreateNewWindowSettings(now.c_str());
+      moved->Pos = kept.Pos;
+      moved->Size = kept.Size;
+      moved->ViewportPos = kept.ViewportPos;
+      moved->ViewportId = kept.ViewportId;
+      moved->DockId = kept.DockId;
+      moved->ClassId = kept.ClassId;
+      moved->DockOrder = kept.DockOrder;
+      moved->Collapsed = kept.Collapsed;
+      // The tab a dock node shows is kept by the window's id (the nodes are built from layout.ini by now).
+      for (const ImGuiStoragePair& pair : g.DockContext.Nodes.Data) {
+        if (
+          auto* const node = static_cast<ImGuiDockNode*>(pair.val_p); node != nullptr && node->SelectedTabId == oldId
+        ) {
+          node->SelectedTabId = newId;
+        }
+      }
+      ++carried;
+    }
+    if (carried > 0) {
+      gpg::Logf("editor: %d panels' places carried to their names with icons", carried);
+      ImGui::MarkIniSettingsDirty();
+    }
+  }
+
   void EdShell::DrawToolsPanel()
   {
-    if (ImGui::Begin(Panel(kToolsWindow), &mShowTools)) {
+    // The tab is the chosen tool's name and icon (the mockup's), the window's id staying the panel's.
+    const std::string panel = Panel(kToolsWindow);
+    const std::size_t id = panel.find("###");
+    const std::string window = std::string(EdTools::ToolIcon(mTools.Tool())) + "  " + EdTools::ToolName(mTools.Tool()) +
+      (id == std::string::npos ? "###" + panel : panel.substr(id));
+    if (mFocusTools) {
+      mFocusTools = false;
+      ImGui::SetNextWindowFocus();
+    }
+    if (ImGui::Begin(window.c_str(), &mShowTools)) {
       mTools.Draw();
       if (int slot = -1; mTools.TakeMaterialAsk(slot)) {
         mShowMaterialEditor = true;
@@ -1622,124 +1887,166 @@ namespace faf::editor
     ImGui::EndPopup();
   }
 
+  float EdShell::StatusBarHeight()
+  {
+    return std::round(Em(24.0f));
+  }
+
   void EdShell::DrawStatusBar()
   {
+    // The mockup's status bar (styles.css .statusbar): a live dot by the renderer, the items in the dimmed text with
+    // room between them, the problems count in the warning colour with its icon (a click shows them), the last message
+    // and the frame rate at the right.
     const ImGuiViewport* const viewport = ImGui::GetMainViewport();
-    const float height = ImGui::GetFrameHeight();
+    const float height = StatusBarHeight();
     ImGui::SetNextWindowPos(ImVec2(viewport->WorkPos.x, viewport->WorkPos.y + viewport->WorkSize.y - height));
     ImGui::SetNextWindowSize(ImVec2(viewport->WorkSize.x, height));
     ImGui::SetNextWindowViewport(viewport->ID);
     constexpr ImGuiWindowFlags kFlags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove |
       ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing |
       ImGuiWindowFlags_NoNav;
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8.0f, 2.0f));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(Em(10.0f), 0.0f));
     ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 0.0f));
+    ImGui::PushStyleColor(ImGuiCol_WindowBg, ImGui::GetStyleColorVec4(ImGuiCol_FrameBg));
     if (ImGui::Begin("##StatusBar", nullptr, kFlags)) {
+      ImDrawList* const draw = ImGui::GetWindowDrawList();
+      const ImVec2 origin = ImGui::GetWindowPos();
+      const float barWidth = ImGui::GetWindowWidth();
+      draw->AddLine(
+        ImVec2(origin.x, origin.y + 0.5f),
+        ImVec2(origin.x + barWidth, origin.y + 0.5f),
+        ImGui::GetColorU32(ImGuiCol_Border)
+      );
+      ImFont* const font = ImGui::GetFont();
+      const float size = std::round(ImGui::GetFontSize() * 0.9f);
+      const float textY = std::round(origin.y + (height - size) * 0.5f);
+      const ImVec4 text = ImGui::GetStyleColorVec4(ImGuiCol_Text);
+      const ImVec4 dimmed = ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled);
+      const ImU32 dim = ImGui::GetColorU32(ImGuiCol_TextDisabled);
+      const ImU32 plain = ImGui::GetColorU32(ImVec4(
+        (text.x * 2.0f + dimmed.x) / 3.0f, (text.y * 2.0f + dimmed.y) / 3.0f, (text.z * 2.0f + dimmed.z) / 3.0f, 1.0f
+      ));
+      const ImU32 warn = IM_COL32(0xF0, 0xB0, 0x4A, 0xFF);
+      const ImU32 ok = IM_COL32(0x4F, 0xD1, 0x8B, 0xFF);
+
       // The items (design §3), each with how much it is wanted when the window is narrow (0 always stays; the
-      // highest number goes first): the mode, warnings, cursor and ruler, selection, the last message, the undo step,
-      // then the renderer and the GPU.
-      enum class Look
-      {
-        Plain,
-        Dim,
-        Warn,
-        Accent
-      };
+      // highest number goes first): the mode, the problems, cursor and ruler, selection, the undo step, then the
+      // renderer and the GPU.
       struct Item
       {
         std::string text;
         int priority;
-        Look look;
+        ImU32 ink;
+        const char* icon = nullptr; // drawn before the text, in its colour
+        bool live = false;          // the green dot before it (the renderer)
+        bool problems = false;      // a click shows the problems
       };
       std::vector<Item> items;
       const EdWorkspace& workspace = Workspaces()[static_cast<std::size_t>(ActiveWorkspace())];
-      std::string mode = mPlay.Active() ? mPlay.StateText() : workspace.readOnly ? "Review (read-only)" : "Editing";
-      items.push_back({mApi.empty() ? "?" : mApi, 7, Look::Plain});
+      const std::string mode = mPlay.Active() ? mPlay.StateText()
+        : workspace.readOnly                  ? "Review (read-only)"
+                                              : "Editing";
+      items.push_back({mApi.empty() ? "?" : mApi, 7, plain, nullptr, true});
       if (!mAdapter.empty()) {
-        items.push_back({mAdapter, 8, Look::Dim});
+        items.push_back({mAdapter, 8, dim});
       }
-      items.push_back({mode, 0, mPlay.Active() || workspace.readOnly ? Look::Accent : Look::Dim});
+      items.push_back({mode, 0, mPlay.Active() || workspace.readOnly ? AccentU32() : plain});
       // The Problems panel's count: the check's findings (for this map) and each different log warning once.
       const bool checked = mCheckRan && mCheckedPath == mDocument.Path();
       static const std::vector<CheckIssue> kNoChecks;
       const EdProblemCounts problems =
         CountProblems(ProblemRows(checked ? mCheckIssues : kNoChecks, mLog.Warnings(), 0x7U, 0x3U));
       const int warnings = problems.errors + problems.warnings + problems.notes;
-      const std::size_t warningsAt = items.size();
       if (warnings > 0) {
-        items.push_back({std::to_string(warnings) + (warnings == 1 ? " problem" : " problems"), 1, Look::Warn});
+        items.push_back(
+          {std::to_string(warnings) + (warnings == 1 ? " warning" : " warnings"), 1, warn, ICON_WARN, false, true}
+        );
+      } else {
+        items.push_back({"no warnings", 1, dim, ICON_OK, false, true});
       }
       if (!mTools.CursorText().empty()) {
-        items.push_back({mTools.CursorText(), 2, Look::Dim});
+        items.push_back({mTools.CursorText(), 2, dim});
       }
       if (!mTools.RulerText().empty()) {
-        items.push_back({"ruler " + mTools.RulerText(), 2, Look::Warn});
+        items.push_back({"ruler " + mTools.RulerText(), 2, warn, ICON_RULER});
       }
-      if (const std::string count = SelectionCountText(mStatusSelection); !count.empty()) {
-        items.push_back({count + " selected", 3, Look::Plain});
-      }
-      if (const char* const step = mDocument.UndoStepName(); step != nullptr) {
-        items.push_back({std::string("Undo: ") + step, 5, Look::Dim});
-      }
-      if (!StatusMessage().empty()) {
-        items.push_back({StatusMessage() + " (" + AgoText(StatusClock() - StatusMessageTime()) + ")", 4, Look::Dim});
-      }
+      const std::string count = SelectionCountText(mStatusSelection);
+      items.push_back({count.empty() ? std::string("nothing selected") : count + " selected", 3, dim});
+      const char* const step = mDocument.UndoStepName();
+      items.push_back({std::string("undo: ") + (step != nullptr ? step : "\xE2\x80\x94"), 5, dim});
+
+      const auto measure = [&](const Item& item) {
+        float width = font->CalcTextSizeA(size, FLT_MAX, 0.0f, item.text.c_str()).x;
+        if (item.icon != nullptr) {
+          width += font->CalcTextSizeA(size, FLT_MAX, 0.0f, item.icon).x + Em(5.0f);
+        }
+        if (item.live) {
+          width += Em(13.0f);
+        }
+        return width;
+      };
+      // At the right: the last message (shown while there is room for it), then the frame rate.
       char fps[32];
       (void)std::snprintf(fps, sizeof(fps), "%.0f fps", ImGui::GetIO().Framerate);
-      const float fpsWidth = ImGui::CalcTextSize(fps).x;
+      const float fpsWidth = font->CalcTextSizeA(size, FLT_MAX, 0.0f, fps).x;
+      const std::string message = StatusMessage().empty()
+        ? std::string(mDocument.Modified() ? "Unsaved changes" : "")
+        : StatusMessage() + " (" + AgoText(StatusClock() - StatusMessageTime()) + ")";
+      const float messageWidth = message.empty() ? 0.0f : font->CalcTextSizeA(size, FLT_MAX, 0.0f, message.c_str()).x;
 
-      const float gap = Em(18.0f);
+      const float gap = Em(14.0f);
+      const float left = origin.x + ImGui::GetStyle().WindowPadding.x;
+      const float right = origin.x + barWidth - ImGui::GetStyle().WindowPadding.x;
       std::vector<float> widths;
       std::vector<int> priorities;
       for (const Item& item : items) {
-        widths.push_back(ImGui::CalcTextSize(item.text.c_str()).x);
+        widths.push_back(measure(item));
         priorities.push_back(item.priority);
       }
-      const float room = ImGui::GetContentRegionAvail().x - fpsWidth - gap;
-      const ImU32 dot = ImGui::GetColorU32(ImGuiCol_TextDisabled);
-      bool first = true;
-      for (const std::size_t i : FitStatusItems(widths, priorities, room, gap)) {
+      const float room = right - left - fpsWidth - gap;
+      const std::vector<std::size_t> shown = FitStatusItems(widths, priorities, room, gap);
+      float x = left;
+      for (const std::size_t i : shown) {
         const Item& item = items[i];
-        if (!first) {
-          ImGui::SameLine(0.0f, gap * 0.5f);
-          // A dot between items.
-          const ImVec2 at = ImGui::GetCursorScreenPos();
-          ImGui::GetWindowDrawList()->AddCircleFilled(
-            ImVec2(at.x - gap * 0.25f, at.y + ImGui::GetTextLineHeight() * 0.5f), Em(1.5f), dot
-          );
-          ImGui::SameLine(0.0f, gap * 0.5f);
-        }
-        first = false;
-        switch (item.look) {
-        case Look::Plain:
-          ImGui::TextUnformatted(item.text.c_str());
-          break;
-        case Look::Dim:
-          ImGui::TextDisabled("%s", item.text.c_str());
-          break;
-        case Look::Warn:
-          ImGui::TextColored(ImVec4(0.95f, 0.75f, 0.30f, 1.0f), "%s", item.text.c_str());
-          break;
-        case Look::Accent:
-          ImGui::TextColored(AccentColor(), "%s", item.text.c_str());
-          break;
-        }
-        // The count opens the Problems panel.
-        if (i == warningsAt && warnings > 0) {
-          if (ImGui::IsItemHovered()) {
-            ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
-            ImGui::SetTooltip("Show the problems");
-          }
-          if (ImGui::IsItemClicked()) {
+        const float width = widths[i];
+        if (item.problems) {
+          // A button: the mockup's hover fill, a click opens the Problems panel.
+          ImGui::SetCursorScreenPos(ImVec2(x - Em(4.0f), origin.y + Em(3.0f)));
+          if (ImGui::InvisibleButton("##problems", ImVec2(width + Em(8.0f), height - Em(6.0f)))) {
             OpenProblems();
             gpg::Logf("editor: status bar: the problems, %d", warnings);
           }
+          if (ImGui::IsItemHovered()) {
+            draw->AddRectFilled(
+              ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), ImGui::GetColorU32(ImGuiCol_Button), Em(4.0f)
+            );
+            ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+            ImGui::SetTooltip("Show the problems");
+          }
         }
+        float at = x;
+        if (item.live) {
+          const ImVec2 centre(at + Em(4.0f), origin.y + height * 0.5f);
+          draw->AddCircleFilled(centre, Em(6.0f), (ok & ~IM_COL32_A_MASK) | (0x2EU << IM_COL32_A_SHIFT));
+          draw->AddCircleFilled(centre, Em(4.0f), ok);
+          at += Em(13.0f);
+        }
+        if (item.icon != nullptr) {
+          draw->AddText(font, size, ImVec2(at, textY), item.ink, item.icon);
+          at += font->CalcTextSizeA(size, FLT_MAX, 0.0f, item.icon).x + Em(5.0f);
+        }
+        draw->AddText(font, size, ImVec2(at, textY), item.ink, item.text.c_str());
+        x += width + gap;
       }
-      ImGui::SameLine(ImGui::GetWindowWidth() - fpsWidth - Em(12.0f));
-      ImGui::TextUnformatted(fps);
+      draw->AddText(font, size, ImVec2(right - fpsWidth, textY), dim, fps);
+      if (!message.empty() && x + messageWidth < right - fpsWidth - gap) {
+        draw->AddText(font, size, ImVec2(right - fpsWidth - gap - messageWidth, textY), plain, message.c_str());
+      }
     }
     ImGui::End();
-    ImGui::PopStyleVar(2);
+    ImGui::PopStyleColor();
+    ImGui::PopStyleVar(4);
   }
 } // namespace faf::editor

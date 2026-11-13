@@ -1,0 +1,107 @@
+# The editor's icons (ui/EdIconFont): name, a tab, SVG elements in a 24 x 24 view. Elements are stroked 1.7 wide
+# with round ends and joins; fill="currentColor" fills one (stroke="none" then leaves its outline off).
+# make_icon_font.py turns this list into the font the editor embeds.
+play	<path d="M7 5l12 7-12 7z" fill="currentColor" stroke="none"/>
+stop	<rect x="6" y="6" width="12" height="12" rx="1.5" fill="currentColor" stroke="none"/>
+chevron	<path d="M6 9l6 6 6-6"/>
+right	<path d="M9 6l6 6-6 6"/>
+file	<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/>
+new	<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M12 11v6M9 14h6"/>
+open	<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v1"/><path d="M3 7v11a2 2 0 0 0 2 2h13l3-9H6l-3 7"/>
+save	<path d="M5 3h11l5 5v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M7 3v5h8M7 21v-7h10v7"/>
+undo	<path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/>
+redo	<path d="M15 14l5-5-5-5"/><path d="M20 9H10a6 6 0 0 0 0 12h3"/>
+grid	<path d="M3 3h18v18H3zM3 9h18M3 15h18M9 3v18M15 3v18"/>
+magnet	<path d="M6 3v8a6 6 0 0 0 12 0V3"/><path d="M6 7h4M14 7h4"/>
+slope	<path d="M3 20h18L3 6z"/>
+ground	<path d="M12 3v12M8 11l4 4 4-4"/><path d="M3 20h18"/>
+search	<circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/>
+sun	<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>
+moon	<path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/>
+settings	<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>
+help	<circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6V14M12 17h.01"/>
+info	<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7h.01"/>
+warn	<path d="M12 3l10 18H2z"/><path d="M12 10v5M12 18h.01"/>
+err	<circle cx="12" cy="12" r="9"/><path d="M15 9l-6 6M9 9l6 6"/>
+ok	<circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/>
+close	<path d="M6 6l12 12M18 6L6 18"/>
+menu	<path d="M4 6h16M4 12h16M4 18h16"/>
+panelL	<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/>
+panelR	<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 4v16"/>
+panelB	<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 14h18"/>
+select	<path d="M5 3l14 8-6 2-2 6z"/>
+box	<rect x="4" y="4" width="16" height="16" rx="1" stroke-dasharray="3 2"/>
+raise	<path d="M3 19c3-1 4-9 9-9s6 8 9 9"/><path d="M12 3v5M9.5 5.5L12 3l2.5 2.5"/>
+lower	<path d="M3 9c3 1 4 9 9 9s6-8 9-9"/><path d="M12 3v5M9.5 5.5L12 8l2.5-2.5"/>
+smooth	<path d="M3 15c4-6 6 2 9-2s5-4 9 0"/>
+flatten	<path d="M3 17c3 0 4-5 6-5h6c2 0 3 5 6 5"/>
+noise	<path d="M3 15l2-4 2 6 2-8 2 5 2-3 2 6 2-7 2 4 2-1"/>
+plateau	<path d="M3 18l5-8h8l5 8"/>
+terrace	<path d="M3 19h4v-4h4v-4h4V7h6"/>
+ramp	<path d="M3 18L21 8M3 18h18"/>
+stamp	<path d="M8 3h8v6l3 3v3H5v-3l3-3z"/><path d="M5 19h14"/>
+erode	<path d="M3 18c2-6 4-9 6-9s2 5 4 5 3-7 5-7 2 6 3 11"/><path d="M9 13v3M13 15v2"/>
+rain	<path d="M7 15a4 4 0 0 1-.6-8 6 6 0 0 1 11.3 1.8A3.5 3.5 0 0 1 17 15"/><path d="M8 19l1-2M12 21l1-2M16 19l1-2"/>
+path	<path d="M4 20c4-1 2-7 7-8s4-7 9-8"/><circle cx="4" cy="20" r="1.5"/><circle cx="20" cy="4" r="1.5"/>
+brush	<path d="M14 4l6 6-9 9H5v-6z"/><path d="M12 6l6 6"/>
+eraser	<path d="M7 21h13M4 15l9-9 6 6-7 7H8z"/>
+layers	<path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5"/>
+texture	<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 15l5-5 4 4 3-3 6 6"/><circle cx="16" cy="8" r="1.5"/>
+water	<path d="M12 3s6 7 6 11a6 6 0 0 1-12 0c0-4 6-11 6-11z"/>
+wave	<path d="M2 10c2.5 0 2.5-3 5-3s2.5 3 5 3 2.5-3 5-3 2.5 3 5 3M2 16c2.5 0 2.5-3 5-3s2.5 3 5 3 2.5-3 5-3 2.5 3 5 3"/>
+tree	<path d="M12 3l6 9h-4l4 6H6l4-6H6z"/><path d="M12 18v3"/>
+decal	<rect x="4" y="4" width="16" height="16" rx="2" transform="rotate(12 12 12)"/><path d="M8 14l3-3 2 2 3-3"/>
+marker	<path d="M12 21s7-6.5 7-12a7 7 0 0 0-14 0c0 5.5 7 12 7 12z"/><circle cx="12" cy="9" r="2.5"/>
+unit	<path d="M4 15h16l-2 4H6z"/><path d="M7 15V11h10v4M12 11V7h6"/>
+flag	<path d="M5 21V4M5 4h12l-2 4 2 4H5"/>
+chain	<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>
+area	<rect x="4" y="6" width="16" height="12" rx="1" stroke-dasharray="4 2"/>
+ruler	<path d="M3 17L17 3l4 4L7 21z"/><path d="M7 13l2 2M10 10l2 2M13 7l2 2"/>
+camera	<path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/>
+light	<path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-4 10.5c.7.6 1 1.4 1 2.5h6c0-1.1.3-1.9 1-2.5A6 6 0 0 0 12 3z"/>
+sky	<path d="M3 17h18M5 13a7 7 0 0 1 14 0"/><circle cx="16" cy="7" r="1.5"/>
+graph	<rect x="3" y="4" width="6" height="5" rx="1"/><rect x="15" y="4" width="6" height="5" rx="1"/><rect x="9" y="15" width="6" height="5" rx="1"/><path d="M6 9v3h12V9M12 12v3"/>
+layout	<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 9v12"/>
+mission	<path d="M4 4h16v10H4z"/><path d="M8 18h8M12 14v4"/><path d="M8 9l2 2 4-4"/>
+mod	<path d="M12 2l3 6 6 .9-4.5 4.3 1 6.3L12 16.8 6.5 19.5l1-6.3L3 8.9 9 8z"/>
+review	<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>
+terrain	<path d="M3 19l6-10 4 6 3-4 5 8z"/>
+objects	<rect x="4" y="4" width="7" height="7" rx="1"/><circle cx="16.5" cy="7.5" r="3.5"/><path d="M4 20l3.5-6 3.5 6zM14 14h6v6h-6z"/>
+env	<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>
+generate	<path d="M5 3v4M3 5h4M6 17v4M4 19h4M14 3l2 5 5 2-5 2-2 5-2-5-5-2 5-2z"/>
+sym	<path d="M12 3v18"/><path d="M8 7L4 12l4 5M16 7l4 5-4 5"/>
+check	<path d="M4 12l5 5L20 6"/>
+eye	<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="2.5"/>
+lock	<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>
+plus	<path d="M12 5v14M5 12h14"/>
+minus	<path d="M5 12h14"/>
+dots	<circle cx="5" cy="12" r="1.3" fill="currentColor"/><circle cx="12" cy="12" r="1.3" fill="currentColor"/><circle cx="19" cy="12" r="1.3" fill="currentColor"/>
+grip	<circle cx="9" cy="6" r="1" fill="currentColor"/><circle cx="15" cy="6" r="1" fill="currentColor"/><circle cx="9" cy="12" r="1" fill="currentColor"/><circle cx="15" cy="12" r="1" fill="currentColor"/><circle cx="9" cy="18" r="1" fill="currentColor"/><circle cx="15" cy="18" r="1" fill="currentColor"/>
+console	<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9l3 3-3 3M12 15h5"/>
+history	<path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 3"/>
+outliner	<path d="M4 6h16M8 12h12M8 18h12M4 12h.01M4 18h.01"/>
+props	<path d="M4 7h16M4 12h10M4 17h7"/><circle cx="18" cy="15" r="3"/>
+stats	<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>
+vault	<path d="M3 7h18v13H3z"/><path d="M3 7l3-4h12l3 4M10 12h4"/>
+package	<path d="M3 7l9-4 9 4v10l-9 4-9-4z"/><path d="M3 7l9 4 9-4M12 11v10"/>
+script	<path d="M8 4h11v12a4 4 0 0 1-4 4H6a3 3 0 0 1-3-3v-1h11v1a3 3 0 0 0 3 3"/><path d="M8 4a3 3 0 0 0-3 3v9"/>
+particles	<circle cx="7" cy="8" r="2"/><circle cx="16" cy="6" r="1.5"/><circle cx="12" cy="14" r="2.5"/><circle cx="18" cy="16" r="1.5"/><circle cx="6" cy="18" r="1"/>
+material	<circle cx="12" cy="12" r="8"/><path d="M5 9c4 2 10 2 14 0M5 15c4-2 10-2 14 0"/>
+mesh	<path d="M12 3l8 5v8l-8 5-8-5V8z"/><path d="M4 8l8 5 8-5M12 13v8"/>
+wand	<path d="M4 20L16 8M15 4V2M15 10V8M19 6h2M11 6h2M17.5 3.5l1-1M17.5 8.5l1 1"/>
+link	<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>
+image	<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-9 9"/>
+pin	<path d="M9 4h6l-1 6 4 3H6l4-3zM12 13v8"/>
+keyboard	<rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"/>
+star	<path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/>
+align	<path d="M4 4v16M8 7h12v4H8zM8 13h7v4H8z"/>
+scale	<path d="M4 20h16M4 20V4M8 16l8-8M12 8h4v4"/>
+scatter	<circle cx="6" cy="7" r="1.5"/><circle cx="12" cy="5" r="1.5"/><circle cx="18" cy="9" r="1.5"/><circle cx="8" cy="14" r="1.5"/><circle cx="15" cy="15" r="1.5"/><circle cx="10" cy="20" r="1.5"/><circle cx="19" cy="19" r="1.5"/>
+gpu	<rect x="4" y="6" width="16" height="12" rx="2"/><path d="M8 10h3v4H8zM14 10h2M14 14h2M7 3v3M12 3v3M17 3v3M7 18v3M12 18v3M17 18v3"/>
+user	<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>
+frame	<path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/>
+compass	<circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/>
+tag	<path d="M3 12V3h9l9 9-9 9z"/><circle cx="7.5" cy="7.5" r="1.5"/>
+copy	<rect x="8" y="8" width="13" height="13" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/>
+trash	<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/>
+heights	<path d="M3 20h18M6 20V12M10 20V7M14 20v-5M18 20V9"/>
