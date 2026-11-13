@@ -2902,6 +2902,23 @@ namespace gpg::gal
     }
   }
 
+  bool DeviceD3D11::CopyDepthStencil(
+    DepthStencilTarget& destination,
+    DepthStencilTarget& source
+  )
+  {
+    auto& to = static_cast<DepthStencilTargetD3D11&>(destination);
+    auto& from = static_cast<DepthStencilTargetD3D11&>(source);
+    if (
+      &to == &from || to.GetContext()->width_ != from.GetContext()->width_ ||
+      to.GetContext()->height_ != from.GetContext()->height_
+    ) {
+      return false;
+    }
+    mImmediate->CopyResource(to.GetTexture(), from.GetTexture());
+    return true;
+  }
+
   bool DeviceD3D11::CopyVertexBufferRegion(
     VertexBuffer& destination,
     const std::uint32_t destinationOffset,

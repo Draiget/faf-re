@@ -59,12 +59,17 @@ namespace gpg::gal
       const std::int32_t parameter = slotParameters[index];
       const Texture* texture = nullptr;
       const RenderTarget* renderTarget = nullptr;
+      const DepthStencilTarget* depthStencil = nullptr;
       if (parameter >= 0) {
         const effects::TextureBinding& binding = parameters.Binding(static_cast<std::uint32_t>(parameter));
         texture = binding.texture.get();
         renderTarget = binding.renderTarget.get();
+        depthStencil = binding.depthStencil.get();
       }
-      if (texture != kept[index].texture.get() || renderTarget != kept[index].renderTarget.get()) {
+      if (
+        texture != kept[index].texture.get() || renderTarget != kept[index].renderTarget.get() ||
+        depthStencil != kept[index].depthStencil.get()
+      ) {
         return false;
       }
     }

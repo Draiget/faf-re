@@ -14,6 +14,7 @@
 #include "RenderTargetD3D11.h"
 #include "TextureD3D11.h"
 
+#include "gpg/gal/DepthStencilTargetContext.hpp"
 #include "gpg/gal/Device.hpp"
 #include "gpg/gal/DrawStatistics.h"
 #include "gpg/gal/Matrix.h"
@@ -432,6 +433,21 @@ namespace gpg::gal
     }
     ID3D11ShaderResourceView* const view = (renderTarget != nullptr)
       ? static_cast<RenderTargetD3D11*>(renderTarget.get())->GetShaderResourceView()
+      : nullptr;
+    CheckHresult("EffectVariableD3D11.cpp", __LINE__, mVariable->AsShaderResource()->SetResource(view));
+    RecordStateChange();
+  }
+
+  void EffectVariableD3D11::SetDepthStencil(
+    const std::shared_ptr<DepthStencilTarget> depthStencil
+  )
+  {
+    if (ActiveDevice().Tracing()) {
+      ActiveDevice().Trace("var %s SetDepthStencil %p", mName.c_str(), depthStencil.get());
+    }
+    // A target created without the sampled flag has no view: bind nothing rather than fail.
+    ID3D11ShaderResourceView* const view = (depthStencil != nullptr && depthStencil->GetContext()->field0x10_)
+      ? static_cast<DepthStencilTargetD3D11*>(depthStencil.get())->GetShaderResourceView()
       : nullptr;
     CheckHresult("EffectVariableD3D11.cpp", __LINE__, mVariable->AsShaderResource()->SetResource(view));
     RecordStateChange();
