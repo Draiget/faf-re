@@ -445,6 +445,9 @@ target_compile_features(faf_water_tests PRIVATE cxx_std_20)
 
 add_test(NAME water_effect_patch COMMAND faf_water_tests)
 
+
+add_test(NAME water_banks COMMAND faf_water_bank_tests)
+
 # Dynamic light pool (src/moho/render/lights): pure C++, compiled on its own, no engine objects.
 #
 #   cmake --build --preset clang-x64-release --target faf_light_tests
@@ -512,6 +515,7 @@ add_executable(faf_water_domain_tests EXCLUDE_FROM_ALL water/WaterDomainTests.cp
 target_compile_features(faf_water_domain_tests PRIVATE cxx_std_20)
 
 add_test(NAME water_domains COMMAND faf_water_domain_tests)
+
 
 # Rendering-only bounded terrain splat output; no game data or renderer required.
 add_executable(faf_splat_budget_tests EXCLUDE_FROM_ALL terrain/splat_budget/SplatBudgetTests.cpp)
