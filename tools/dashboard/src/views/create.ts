@@ -5,16 +5,18 @@
 // planner's estimate and warnings live, and what to do when it doesn't fit (queue it or refuse); 6. review, then
 // create. The host is asked for a plan on every change; nothing starts before Create.
 
-import { ApiError, type MapInfo, type NewLobby, type Plan, type PlanRequest, type SettingKey, type Settings } from "../api.ts";
+import { ApiError, type HostApi, type MapInfo, type NewLobby, type Plan, type PlanRequest, type SettingKey, type Settings } from "../api.ts";
+import { canOrganise, globalOrganiser, organisedTournaments, topRole, type ServiceNewLobby, type ServiceTournament } from "../control.ts";
 import { byId, fill, h, icon, isNumber, num, type Child } from "../dom.ts";
-import { MapGallery, MapPreview, mapArt, mapFacts, spotsOf } from "../maps.ts";
+import { MapGallery, MapPreview, mapFacts, spotsOf, type PreviewSource } from "../maps.ts";
 import { MachineMap } from "../plane/machine.ts";
 import { countChanges, FALLBACK_OPTIONS, filterOptions, pruneChosen, renderOptions, sameKey } from "../plane/options.ts";
-import { rate, warningList } from "../plane/parts.ts";
+import { emptyState, rate, warningList } from "../plane/parts.ts";
 import { actions, coresOf, nodeOf, cpuById, on, plural, poolCpus, store } from "../plane/store.ts";
-import { SlotsEditor, type SlotKind } from "../slots.ts";
+import { hostByName, reachableHosts, service } from "../service.ts";
+import { SlotsEditor, type SlotKind, type UidRule } from "../slots.ts";
 import { toast } from "../ui.ts";
-import { hostMaps, hostPreview, pageHead, type View } from "./common.ts";
+import { hostMaps, pageHead, type View } from "./common.ts";
 
 const PLAN_DEBOUNCE_MS = 250;
 const REQUEST_MS = 5000;
@@ -34,12 +36,20 @@ const STEPS: [Step, string, string][] = [
 interface ObserverDraft {
   name: string;
   referee: boolean;
+  /** Through the control service: the observer's FAF id (a tournament's observers need it). */
+  uid: string;
 }
 
 export function createView(): View {
   const root = byId<HTMLElement>("view-create");
 
   // ---------------------------------------------------------------- state
+  /** Through the control service: an organised lobby on the host picked, or the least loaded one that fits. */
+  let svc = false;
+  /** The tournament whose lists apply ("" = outside tournaments). */
+  let tournamentId = "";
+  /** The host picked ("" = the least loaded that fits when it's made). */
+  let hostChoice = "";
   let kind: Kind = "tournament";
   let step: Step = "map";
   let maps: MapInfo[] = [];
@@ -75,11 +85,31 @@ export function createView(): View {
     return (list.length > 0 ? list : ["adaptive"]).map((key): [string, string] => [key, key]);
   };
 
+  // ---------------------------------------------------------------- the host the form reads from
+  /** Through the service: the host picked, else the least loaded one answering (the maps, settings and plan come from it). */
+  const formHostName = (): string => (hostChoice !== "" ? hostChoice : (reachableHosts()[0]?.name ?? ""));
+  const formApi = (): HostApi | null => {
+    if (!svc) return store.api;
+    const name = formHostName();
+    return name === "" || service.api === null ? null : service.api.hostApi(name);
+  };
+  const formPreview: PreviewSource = (map) => Promise.resolve(formApi()?.previewUrl(map) ?? null);
+  const tournament = (): ServiceTournament | undefined => service.me?.tournaments.find((item) => item.id === tournamentId);
+  const uidRule = (): UidRule | null => {
+    const chosen = svc ? tournament() : undefined;
+    return chosen === undefined ? null : { allowed: chosen.players ?? [], list: `${chosen.name}'s player list` };
+  };
+  /** Who may watch a tournament's lobby: its observers and organisers. */
+  const observerIds = (): number[] | null => {
+    const chosen = svc ? tournament() : undefined;
+    return chosen === undefined ? null : [...(chosen.observers ?? []), ...(chosen.organisers ?? [])];
+  };
+
   // ---------------------------------------------------------------- pieces
-  const slots = new SlotsEditor({ ais: aiChoices, uid: true, onChange: () => onSlotsChanged() });
-  const preview = new MapPreview(hostPreview, (spot) => slots.focusSpot(spot));
-  const summaryPreview = new MapPreview(hostPreview);
-  const gallery = new MapGallery({ source: hostPreview, onSelect: (map) => selectMap(map.id), minSpots: () => Math.max(1, slots.filled()) });
+  const slots = new SlotsEditor({ ais: aiChoices, uid: true, uidRule, onChange: () => onSlotsChanged() });
+  const preview = new MapPreview(formPreview, (spot) => slots.focusSpot(spot));
+  const summaryPreview = new MapPreview(formPreview);
+  const gallery = new MapGallery({ source: formPreview, onSelect: (map) => selectMap(map.id), minSpots: () => Math.max(1, slots.filled()) });
   const machine = new MachineMap({
     mode: "pick",
     selected: () => picked,
@@ -107,10 +137,11 @@ export function createView(): View {
   const footer = h("div", { class: "step-footer" }, back, stepNote, next);
   const summary = h("aside", { class: "create-summary card", "aria-label": "Summary" });
   const startOver = h("button", { type: "button", class: "btn ghost" }, "Start over");
-  root.replaceChildren(
-    pageHead("Create lobby", "A tournament lobby the organiser runs, or a custom one a player hosts. Every step can be changed again before Create.", startOver, h("a", { class: "btn", href: "#/lobbies" }, "Cancel")),
-    h("div", { class: "create-layout" }, h("div", { class: "create-main" }, stepper, ...panels.values(), footer), summary),
-  );
+  const headSub = h("span", {}, "A tournament lobby the organiser runs, or a custom one a player hosts. Every step can be changed again before Create.");
+  const layout = h("div", { class: "create-layout" }, h("div", { class: "create-main" }, stepper, ...panels.values(), footer), summary);
+  /** Through the service, for a viewer who may not make lobbies: why, instead of the flow. */
+  const refusal = h("div", { hidden: true });
+  root.replaceChildren(pageHead("Create lobby", headSub, startOver, h("a", { class: "btn", href: "#/lobbies" }, "Cancel")), refusal, layout);
   back.addEventListener("click", () => go(STEPS[Math.max(0, stepIndex() - 1)]?.[0] ?? "map"));
   next.addEventListener("click", () => {
     if (step === "review") void create();
@@ -135,12 +166,27 @@ export function createView(): View {
   function stepProblem(id: Step): string {
     switch (id) {
       case "map":
+        if (svc && formHostName() === "") return "No host answers the control service now.";
+        if (svc && hostChoice !== "" && hostByName(hostChoice)?.reachable !== true) return `${hostChoice} doesn't answer: pick another host, or the least loaded one.`;
         return selectedMap() === undefined ? "Pick a map." : "";
       case "slots":
         return slots.problem();
-      case "start":
-        return observers.some((observer) => observer.name.trim().length > 40) ? "An observer's name is longer than 40 characters." : "";
+      case "start": {
+        if (observers.some((observer) => observer.name.trim().length > 40)) return "An observer's name is longer than 40 characters.";
+        const allowed = observerIds();
+        for (const [index, observer] of observers.entries()) {
+          const raw = observer.uid.trim();
+          if (raw !== "" && !(Number.isInteger(Number(raw)) && Number(raw) > 0)) return `Observer ${index + 1}'s FAF id is a whole number above 0.`;
+          if (allowed !== null && raw === "") return `Observer ${index + 1}: a tournament's observers are listed users: give the FAF id.`;
+          if (allowed !== null && !allowed.includes(Number(raw))) return `Observer ${index + 1}: FAF user ${raw} isn't on ${tournament()?.name ?? "the tournament"}'s observer or organiser list.`;
+        }
+        return "";
+      }
       case "placement":
+        if (svc) {
+          if (plan !== null && !plan.fits && hostChoice !== "" && !force) return `It doesn't fit on ${hostChoice} now: pick another host, or the least loaded one.`;
+          return "";
+        }
         if (!auto && picked.size === 0) return "Pick CPUs on the machine map, or use Auto.";
         if (plan !== null && !plan.fits && ifFull === "refuse" && !force) return "It doesn't fit now: queue it, or start it anyway.";
         return "";
@@ -166,7 +212,7 @@ export function createView(): View {
           "button",
           { type: "button", class: `step${id === step ? " current" : ""}${done ? " done" : ""}${problem !== "" && index < stepIndex() ? " problem" : ""}`, "aria-current": id === step ? "step" : null },
           h("span", { class: "step-num" }, done ? icon("check", "icon tiny") : String(index + 1)),
-          h("span", { class: "step-text" }, h("span", { class: "step-label" }, label), h("span", { class: "step-sub" }, stepSub(id))),
+          h("span", { class: "step-text" }, h("span", { class: "step-label" }, svc && id === "map" ? "Tournament and map" : label), h("span", { class: "step-sub" }, stepSub(id))),
         );
         button.prepend(icon(iconName, "icon step-icon"));
         button.addEventListener("click", () => go(id));
@@ -179,6 +225,7 @@ export function createView(): View {
     const map = selectedMap();
     switch (id) {
       case "map":
+        if (svc) return map === undefined ? "not picked" : `${tournament()?.name ?? "No tournament"} · ${map.name ?? map.id}`;
         return map === undefined ? "not picked" : `${kind === "tournament" ? "Tournament" : "Custom"} · ${map.name ?? map.id}`;
       case "slots": {
         const seats = slots.seats();
@@ -192,10 +239,16 @@ export function createView(): View {
       case "start":
         return `${observers.length === 0 ? "no observers" : plural(observers.length, "observer")} · ${countdown > 0 ? `${countdown} s countdown` : "no countdown"}`;
       case "placement":
+        if (svc) return planning ? "planning…" : `${hostChoice === "" ? "least loaded" : hostChoice}${plan === null ? "" : plan.fits ? " · fits" : " · doesn't fit now"}`;
         return planning ? "planning…" : plan === null ? "–" : plan.fits ? `fits${auto ? " (Auto)" : ""}` : ifFull === "queue" ? "doesn't fit now: queued" : "doesn't fit now";
       default:
         return "check and create";
     }
+  }
+
+  function createLabel(): string {
+    if (svc) return "Create lobby";
+    return plan !== null && !plan.fits && ifFull === "queue" && !force ? "Create and queue" : "Create lobby";
   }
 
   function renderFooter(): void {
@@ -205,7 +258,7 @@ export function createView(): View {
     stepNote.classList.toggle("bad-text", problem !== "");
     if (step === "review") {
       const blocker = firstProblem();
-      next.replaceChildren(icon("rocket", "icon"), plan !== null && !plan.fits && ifFull === "queue" && !force ? "Create and queue" : "Create lobby");
+      next.replaceChildren(icon("rocket", "icon"), createLabel());
       next.disabled = creating || blocker !== null || planning;
     } else {
       next.replaceChildren(`Next: ${STEPS[stepIndex() + 1]?.[1] ?? ""}`, h("span", { class: "flip" }, icon("chevron", "icon")));
@@ -222,11 +275,84 @@ export function createView(): View {
     renderSummary();
   });
   const galleryNote = h("p", { class: "dim small" });
+  const kindBlock = h("div", { class: "form-block" }, h("h2", {}, "What kind of lobby"), kindCards);
+  // Through the service: the tournament whose lists apply, and the host.
+  const tournamentSelect = h("select", { id: "create-tournament" });
+  const hostSelect = h("select", { id: "create-host" });
+  const tournamentHelp = h("span", { class: "dim small" });
+  const hostHelp = h("span", { class: "dim small" });
+  const whereBlock = h(
+    "div",
+    { class: "form-block", hidden: true },
+    h("h2", {}, "Tournament and host"),
+    h("p", { class: "dim small section-help" }, "Made through the control service, a lobby is organised: nobody hosts it; it starts from its page, or by itself once every player is ready."),
+    h(
+      "div",
+      { class: "two-col tight" },
+      h("div", { class: "field" }, h("label", { for: "create-tournament" }, "Tournament"), tournamentSelect, tournamentHelp),
+      h("div", { class: "field" }, h("label", { for: "create-host" }, "Host"), hostSelect, hostHelp),
+    ),
+  );
+  tournamentSelect.addEventListener("change", () => {
+    tournamentId = tournamentSelect.value;
+    if (!nameTouched) defaultName();
+    renderWhere();
+    slots.render();
+    onSlotsChanged();
+    renderObservers();
+  });
+  hostSelect.addEventListener("change", () => {
+    hostChoice = hostSelect.value;
+    force = false;
+    renderWhere();
+    void loadMaps();
+    schedulePlan();
+  });
   panels.get("map")?.append(
-    h("div", { class: "form-block" }, h("h2", {}, "What kind of lobby"), kindCards),
+    kindBlock,
+    whereBlock,
     h("div", { class: "form-block narrow-field" }, h("label", { for: "create-name", class: "field-label" }, "Name ", h("span", { class: "dim" }, "(shown on the dashboard and in the players' lobby)")), nameInput),
     h("div", { class: "form-block" }, h("div", { class: "block-head" }, h("h2", {}, "Map"), galleryNote), gallery.root),
   );
+
+  /** The tournament and host pickers, through the service. */
+  function renderWhere(): void {
+    kindBlock.hidden = svc;
+    whereBlock.hidden = !svc;
+    if (!svc) return;
+    const me = service.me;
+    const list = organisedTournaments(me);
+    const choices: [string, string][] = [...(globalOrganiser(me) ? [["", "No tournament (open seats allowed)"] as [string, string]] : []), ...list.map((item): [string, string] => [item.id, item.name])];
+    if (!choices.some(([id]) => id === tournamentId)) tournamentId = choices[0]?.[0] ?? "";
+    const tsig = JSON.stringify(choices);
+    if (tournamentSelect.dataset.sig !== tsig) {
+      tournamentSelect.dataset.sig = tsig;
+      tournamentSelect.replaceChildren(...choices.map(([id, text]) => h("option", { value: id }, text)));
+    }
+    tournamentSelect.value = tournamentId;
+    const chosen = tournament();
+    tournamentHelp.textContent =
+      chosen === undefined
+        ? "Outside tournaments: any player may take a seat, named or open."
+        : `Seats only for its ${plural((chosen.players ?? []).length, "listed player")}, each with their FAF id; observers from its observer or organiser lists.`;
+    const hosts = [...service.hosts].sort((a, b) => a.name.localeCompare(b.name));
+    const least = reachableHosts()[0];
+    const options: [string, string, boolean][] = [
+      ["", `Least loaded that fits${least === undefined ? "" : ` (now ${least.name})`}`, false],
+      ...hosts.map((host): [string, string, boolean] => [host.name, `${host.name}${host.region ? ` · ${host.region}` : ""}${host.reachable ? (isNumber(host.load) ? ` · ${Math.round(host.load / 5) * 5}% busy` : "") : " · not answering"}`, !host.reachable]),
+    ];
+    const hsig = JSON.stringify(options);
+    if (hostSelect.dataset.sig !== hsig) {
+      hostSelect.dataset.sig = hsig;
+      hostSelect.replaceChildren(...options.map(([value, text, off]) => h("option", { value, disabled: off }, text)));
+    }
+    if (hostChoice !== "" && !hosts.some((host) => host.name === hostChoice)) hostChoice = "";
+    hostSelect.value = hostChoice;
+    hostHelp.textContent =
+      hostChoice === ""
+        ? `When you create it, the service tries the hosts that have the map, least loaded first, until one has room. Maps, settings and the estimate here are ${least === undefined ? "from no host: none answers" : `${least.name}'s`}.`
+        : `It goes to ${hostChoice} or not at all.`;
+  }
 
   function renderKind(): void {
     const option = (value: Kind, title: string, text: string, iconName: string): HTMLElement => {
@@ -249,7 +375,8 @@ export function createView(): View {
 
   function defaultName(): void {
     const map = selectedMap();
-    name = `${kind === "tournament" ? "Tournament" : "Custom game"}${map === undefined ? "" : ` on ${map.name ?? map.id}`}`;
+    const what = svc ? (tournament()?.name ?? "Organised lobby") : kind === "tournament" ? "Tournament" : "Custom game";
+    name = `${what}${map === undefined ? "" : ` on ${map.name ?? map.id}`}`;
     nameInput.value = name;
   }
 
@@ -262,14 +389,28 @@ export function createView(): View {
     renderAll();
   }
 
+  let mapsFrom = "";
+
   async function loadMaps(): Promise<void> {
-    galleryNote.textContent = "Loading the host's maps…";
+    const api = formApi();
+    if (api === null) {
+      galleryNote.textContent = svc ? "No host answers the control service: no maps to show." : "";
+      return;
+    }
+    if (api.base === mapsFrom && maps.length > 0) return;
+    galleryNote.textContent = svc ? `Loading ${formHostName()}'s maps…` : "Loading the host's maps…";
     try {
-      maps = await hostMaps();
-      galleryNote.textContent = "Dots are the start spots. Sizes are the map's side.";
-      if (mapId === "" && maps.length > 0) {
+      const list = await hostMaps(api);
+      if (formApi()?.base !== api.base) return;
+      maps = list;
+      mapsFrom = api.base;
+      galleryNote.textContent = `${svc ? `${formHostName()}'s maps. ` : ""}Dots are the start spots. Sizes are the map's side.`;
+      if ((mapId === "" || selectedMap() === undefined) && maps.length > 0) {
         const preferred = maps.find((map) => map.preview && (map.players ?? 0) >= 2 && (map.players ?? 0) <= 8) ?? maps[0];
         if (preferred !== undefined) selectMap(preferred.id);
+      } else if (mapId !== "") {
+        void loadSettings();
+        schedulePlan();
       }
       gallery.setMaps(maps, mapId);
     } catch (error) {
@@ -319,10 +460,11 @@ export function createView(): View {
   panels.get("settings")?.append(h("div", { class: "block-head" }, h("h2", {}, "Game settings"), settingsMeta), customNote, settingsNote, h("div", { class: "settings-tools" }, settingsFilter, settingsReset), settingsBox);
 
   async function loadSettings(): Promise<void> {
-    const api = store.api;
+    const api = formApi();
     if (api === null || mapId === "") return;
     const key = mapId;
-    const cached = settingsCache.get(key);
+    const cacheKey = `${api.base} ${key}`;
+    const cached = settingsCache.get(cacheKey);
     if (cached !== undefined) {
       useSettings(cached);
       return;
@@ -330,8 +472,8 @@ export function createView(): View {
     settingsMeta.textContent = "loading…";
     try {
       const answer = await api.settings(key, AbortSignal.timeout(REQUEST_MS));
-      settingsCache.set(key, answer);
-      if (key === mapId) useSettings(answer);
+      settingsCache.set(cacheKey, answer);
+      if (key === mapId && formApi()?.base === api.base) useSettings(answer);
     } catch (error) {
       if (error instanceof ApiError && error.status === 404 && !/map/i.test(error.message)) {
         settingsFallback = true;
@@ -390,9 +532,9 @@ export function createView(): View {
   });
   observerAdd.addEventListener("click", () => {
     if (observers.length >= MAX_OBSERVERS) return;
-    observers.push({ name: "", referee: false });
+    observers.push({ name: "", referee: false, uid: "" });
     renderObservers();
-    observerRows.querySelectorAll("input")[observers.length * 2 - 2]?.focus();
+    observerRows.lastElementChild?.querySelector("input")?.focus();
   });
   panels.get("start")?.append(
     h(
@@ -418,7 +560,11 @@ export function createView(): View {
     ),
   );
 
+  const observerUids = h("datalist", { id: "create-observer-uids" });
+  observerRows.after(observerUids);
+
   function renderObservers(): void {
+    observerUids.replaceChildren(...(observerIds() ?? []).map((uid) => h("option", { value: String(uid) })));
     observerRows.replaceChildren(
       ...observers.map((observer, index) => {
         const n = index + 1;
@@ -439,13 +585,26 @@ export function createView(): View {
           observers.splice(index, 1);
           renderObservers();
         });
-        return h("div", { class: "observer-row" }, nameField, h("label", { class: "check" }, referee, h("span", {}, "Referee (live)")), remove);
+        let uidField: HTMLInputElement | null = null;
+        if (svc) {
+          const listed = observerIds();
+          uidField = h("input", { type: "number", inputmode: "numeric", class: "slot-uid", placeholder: listed === null ? "uid" : "uid *", list: listed === null ? null : "create-observer-uids", "aria-label": `Observer ${n}: FAF id${listed === null ? " (optional)" : " (required)"}`, title: listed === null ? "The observer's FAF id (optional): their watch line then shows on their page" : "The observer's FAF id, from the tournament's observer or organiser list" });
+          uidField.value = observer.uid;
+          uidField.addEventListener("input", () => {
+            observer.uid = uidField?.value ?? "";
+            renderSummary();
+            renderStepper();
+            renderFooter();
+          });
+        }
+        return h("div", { class: `observer-row${svc ? " with-uid" : ""}` }, nameField, uidField, h("label", { class: "check" }, referee, h("span", {}, "Referee (live)")), remove);
       }),
     );
     observerAdd.disabled = observers.length >= MAX_OBSERVERS;
     delayField.hidden = !observers.some((observer) => !observer.referee);
     renderSummary();
     renderStepper();
+    renderFooter();
   }
 
   // ---------------------------------------------------------------- step 5: placement
@@ -468,32 +627,42 @@ export function createView(): View {
     renderPlacementMode();
     schedulePlan();
   });
+  const pickedRow = h("div", { class: "picked-row" }, pickedLine, clearPicks);
+  const fullHead = h("h3", { class: "sub-head" }, "If it doesn't fit now");
+  /** Through the service: where it goes, in words (no machine map: the service gives no host's CPUs). */
+  const serviceWhere = h("div", { class: "service-where", hidden: true });
   panels.get("placement")?.append(
     h(
       "div",
       { class: "placement-layout" },
-      h(
-        "div",
-        { class: "placement-main" },
-        h("h2", {}, "Where it runs"),
-        modeCards,
-        coresBox,
-        h("div", { class: "picked-row" }, pickedLine, clearPicks),
-        machine.root,
-      ),
-      h(
-        "div",
-        { class: "placement-side" },
-        h("h2", {}, "What it needs"),
-        estimateBox,
-        h("h3", { class: "sub-head" }, "Warnings"),
-        warningsBox,
-        h("h3", { class: "sub-head" }, "If it doesn't fit now"),
-        fullCards,
-        forceBox,
-      ),
+      h("div", { class: "placement-main" }, h("h2", {}, "Where it runs"), serviceWhere, modeCards, coresBox, pickedRow, machine.root),
+      h("div", { class: "placement-side" }, h("h2", {}, "What it needs"), estimateBox, h("h3", { class: "sub-head" }, "Warnings"), warningsBox, fullHead, fullCards, forceBox),
     ),
   );
+
+  function renderServiceWhere(): void {
+    serviceWhere.hidden = !svc;
+    modeCards.hidden = svc;
+    pickedRow.hidden = svc;
+    machine.root.hidden = svc;
+    fullHead.hidden = svc;
+    fullCards.hidden = svc;
+    if (!svc) return;
+    const reference = formHostName();
+    const change = h("button", { type: "button", class: "btn small ghost" }, "Change the host");
+    change.addEventListener("click", () => go("map"));
+    serviceWhere.replaceChildren(
+      h(
+        "p",
+        {},
+        hostChoice === ""
+          ? `The control service places it when you create it: on the least loaded host that has the map and room for it${reference === "" ? "" : ` (now ${reference}, whose estimate is shown)`}. On that host the planner picks whole cores on one NUMA node.`
+          : `It goes to ${hostChoice}, where the planner picks whole cores on one NUMA node. If ${hostChoice} has no room then, it isn't made: nothing waits in a queue.`,
+        " ",
+        change,
+      ),
+    );
+  }
 
   function renderPlacementMode(): void {
     const option = (value: boolean, title: string, text: string): HTMLElement => {
@@ -565,7 +734,7 @@ export function createView(): View {
 
   function renderPlan(): void {
     if (planError !== "") {
-      fill(estimateBox, h("p", { class: "form-error" }, `The host couldn't plan it: ${planError}`));
+      fill(estimateBox, h("p", { class: "form-error" }, `${svc ? formHostName() : "The host"} couldn't plan it: ${planError}`));
       warningsBox.replaceChildren();
     } else if (plan === null) {
       fill(estimateBox, h("p", { class: "dim" }, selectedMap() === undefined ? "Pick a map to see what it needs." : "Planning…"));
@@ -594,8 +763,10 @@ export function createView(): View {
     }
     const blocked = plan !== null && !plan.fits;
     fullCards.classList.toggle("dim-block", !blocked);
-    forceBox.hidden = !blocked;
+    // Through the service only an admin may force, and only on a host picked by name.
+    forceBox.hidden = !blocked || (svc && (topRole(service.me) !== "admin" || hostChoice === ""));
     forceInput.checked = force;
+    renderServiceWhere();
     renderPlacementMode();
     renderSummary();
   }
@@ -611,13 +782,13 @@ export function createView(): View {
 
   function schedulePlan(): void {
     window.clearTimeout(planTimer);
-    if (store.api === null || selectedMap() === undefined) return;
+    if (formApi() === null || selectedMap() === undefined) return;
     planning = true;
     planTimer = window.setTimeout(() => void runPlan(), PLAN_DEBOUNCE_MS);
   }
 
   async function runPlan(): Promise<void> {
-    const api = store.api;
+    const api = formApi();
     const request = planRequest();
     if (api === null || request === null) return;
     const seq = ++planSeq;
@@ -671,7 +842,22 @@ export function createView(): View {
       reviewSection(
         "Lobby",
         "map",
-        h("dl", { class: "review-facts" }, h("dt", {}, "Name"), h("dd", {}, name.trim() || "(the host names it)"), h("dt", {}, "Kind"), h("dd", {}, kind === "tournament" ? "Tournament: the organiser runs it, nobody hosts" : "Custom: the player on spot 1 hosts"), h("dt", {}, "Map"), h("dd", {}, map === undefined ? "–" : `${map.name ?? map.id} · ${mapFacts(map)}`)),
+        svc
+          ? h(
+              "dl",
+              { class: "review-facts" },
+              h("dt", {}, "Name"),
+              h("dd", {}, name.trim() || "(the tournament's name)"),
+              h("dt", {}, "Kind"),
+              h("dd", {}, "Organised: the organisers run it, nobody hosts"),
+              h("dt", {}, "Tournament"),
+              h("dd", {}, tournament()?.name ?? "none (open seats allowed)"),
+              h("dt", {}, "Host"),
+              h("dd", {}, hostChoice === "" ? "the least loaded one that fits, when it's made" : hostChoice),
+              h("dt", {}, "Map"),
+              h("dd", {}, map === undefined ? "–" : `${map.name ?? map.id} · ${mapFacts(map)}`),
+            )
+          : h("dl", { class: "review-facts" }, h("dt", {}, "Name"), h("dd", {}, name.trim() || "(the host names it)"), h("dt", {}, "Kind"), h("dd", {}, kind === "tournament" ? "Tournament: the organiser runs it, nobody hosts" : "Custom: the player on spot 1 hosts"), h("dt", {}, "Map"), h("dd", {}, map === undefined ? "–" : `${map.name ?? map.id} · ${mapFacts(map)}`)),
       ),
       reviewSection(
         "Slots",
@@ -684,7 +870,7 @@ export function createView(): View {
               ...seats.map((seat) => {
                 const badge = h("span", { class: "slot-badge" }, String(seat.seat));
                 badge.style.setProperty("--team", seat.team > 1 ? `var(--series-${((seat.team - 2) % 8) + 1})` : "var(--neutral)");
-                return h("li", {}, badge, h("span", {}, seat.kind === "ai" ? (ais.get(seat.ai ?? "") ?? seat.ai ?? "AI") : (seat.name ?? "Open seat")), h("span", { class: "dim" }, `${seat.team > 1 ? `team ${seat.team - 1}` : "no team"} · ${["", "UEF", "Aeon", "Cybran", "Seraphim", "random faction"][seat.faction] ?? ""}`));
+                return h("li", {}, badge, h("span", {}, seat.kind === "ai" ? (ais.get(seat.ai ?? "") ?? seat.ai ?? "AI") : (seat.name ?? "Open seat"), isNumber(seat.uid) ? h("span", { class: "dim" }, ` · uid ${seat.uid}`) : null), h("span", { class: "dim" }, `${seat.team > 1 ? `team ${seat.team - 1}` : "no team"} · ${["", "UEF", "Aeon", "Cybran", "Seraphim", "random faction"][seat.faction] ?? ""}`));
               }),
             ),
       ),
@@ -700,13 +886,17 @@ export function createView(): View {
           h("dt", {}, "Open for"),
           h("dd", {}, `${lobbyMinutes} minutes`),
           h("dt", {}, "Observers"),
-          h("dd", {}, observers.length === 0 ? "none" : observers.map((observer, i) => `${observer.name.trim() || `Observer ${i + 1}`}${observer.referee ? " (referee)" : ""}`).join(", ") + (observers.some((observer) => !observer.referee) && observerDelay > 0 ? ` · ${observerDelay} s delay` : "")),
+          h("dd", {}, observers.length === 0 ? "none" : observers.map((observer, i) => `${observer.name.trim() || `Observer ${i + 1}`}${svc && observer.uid.trim() !== "" ? ` (uid ${observer.uid.trim()})` : ""}${observer.referee ? " (referee)" : ""}`).join(", ") + (observers.some((observer) => !observer.referee) && observerDelay > 0 ? ` · ${observerDelay} s delay` : "")),
         ),
       ),
       reviewSection(
         "Placement",
         "placement",
-        plan === null ? h("p", { class: "dim" }, "Not planned yet.") : h("p", {}, h("span", { class: `chip tone-${plan.fits ? "ok" : "bad"}` }, plan.fits ? "Fits now" : ifFull === "queue" ? "Doesn't fit now: it will be queued" : "Doesn't fit now"), " ", auto ? "Auto" : "Picked by hand", plan.cpus.length > 0 ? `: CPU ${plan.cpus.join(", ")}, node ${plan.nodes.join(", ")}` : ""),
+        plan === null
+          ? h("p", { class: "dim" }, "Not planned yet.")
+          : svc
+            ? h("p", {}, h("span", { class: `chip tone-${plan.fits ? "ok" : hostChoice === "" ? "warn" : "bad"}` }, plan.fits ? `Fits on ${formHostName()} now` : `Doesn't fit on ${formHostName()} now`), " ", hostChoice === "" ? "The service tries every host with the map, least loaded first." : force ? "Started anyway (admin)." : "")
+            : h("p", {}, h("span", { class: `chip tone-${plan.fits ? "ok" : "bad"}` }, plan.fits ? "Fits now" : ifFull === "queue" ? "Doesn't fit now: it will be queued" : "Doesn't fit now"), " ", auto ? "Auto" : "Picked by hand", plan.cpus.length > 0 ? `: CPU ${plan.cpus.join(", ")}, node ${plan.nodes.join(", ")}` : ""),
         plan !== null && plan.warnings.length > 0 ? warningList(plan.warnings) : null,
       ),
     );
@@ -718,7 +908,7 @@ export function createView(): View {
     const seats = slots.seats();
     const humans = seats.filter((seat) => seat.kind === "human").length;
     const blocker = firstProblem();
-    const create = h("button", { type: "button", class: "btn primary block" }, icon("rocket", "icon"), plan !== null && !plan.fits && ifFull === "queue" && !force ? "Create and queue" : "Create lobby");
+    const create = h("button", { type: "button", class: "btn primary block" }, icon("rocket", "icon"), createLabel());
     create.disabled = creating || blocker !== null || planning;
     create.addEventListener("click", () => void create_());
     const row = (label: string, value: Child, target: Step): HTMLElement => {
@@ -728,7 +918,7 @@ export function createView(): View {
     };
     fill(summary, 
       h("h2", {}, name.trim() || "New lobby"),
-      h("p", { class: "dim small" }, kind === "tournament" ? "Tournament · the organiser runs it" : "Custom · a player hosts it"),
+      h("p", { class: "dim small" }, svc ? `Organised · ${tournament()?.name ?? "no tournament"} · ${hostChoice === "" ? "least loaded host" : hostChoice}` : kind === "tournament" ? "Tournament · the organiser runs it" : "Custom · a player hosts it"),
       summaryPreview.root,
       row("Seats", map === undefined ? "–" : `${plural(humans, "player")}, ${plural(seats.length - humans, "AI", "AIs")} of ${spotsOf(map).length} spots`, "slots"),
       row("Settings", chosen.size === 0 ? "all default" : `${chosen.size} changed`, "settings"),
@@ -736,7 +926,13 @@ export function createView(): View {
       row("Countdown", countdown > 0 ? `${countdown} s` : "off", "start"),
       row(
         "Placement",
-        planning ? "planning…" : plan === null ? "–" : h("span", {}, h("span", { class: `chip tiny tone-${plan.fits ? "ok" : "bad"}` }, plan.fits ? "fits" : "doesn't fit"), plan.cpus.length > 0 ? ` CPU ${plan.cpus.join(", ")}` : ""),
+        planning
+          ? "planning…"
+          : plan === null
+            ? "–"
+            : svc
+              ? h("span", {}, h("span", { class: `chip tiny tone-${plan.fits ? "ok" : hostChoice === "" ? "warn" : "bad"}` }, plan.fits ? "fits" : "doesn't fit"), ` on ${formHostName()}`)
+              : h("span", {}, h("span", { class: `chip tiny tone-${plan.fits ? "ok" : "bad"}` }, plan.fits ? "fits" : "doesn't fit"), plan.cpus.length > 0 ? ` CPU ${plan.cpus.join(", ")}` : ""),
         "placement",
       ),
       plan !== null && plan.warnings.length > 0 ? row("Warnings", `${plan.warnings.length}`, "placement") : null,
@@ -758,6 +954,10 @@ export function createView(): View {
     const blocker = firstProblem();
     if (blocker !== null) {
       go(blocker.step);
+      return;
+    }
+    if (svc) {
+      await createThroughService(map);
       return;
     }
     const request: NewLobby = {
@@ -809,6 +1009,52 @@ export function createView(): View {
     }
   }
 
+  /** `POST /api/v1/lobbies` on the control service: organised, on the host picked or the least loaded one that fits. */
+  async function createThroughService(map: MapInfo): Promise<void> {
+    const control = service.api;
+    if (control === null) return;
+    const request: ServiceNewLobby = {
+      name: name.trim() || `${tournament()?.name ?? "Organised lobby"} on ${map.name ?? map.id}`,
+      map: map.id,
+      seats: slots.seats(),
+      options: Object.fromEntries(chosen),
+      start_when_ready: countdown,
+      lobby_minutes: lobbyMinutes,
+      cpus: "auto",
+    };
+    if (tournamentId !== "") request.tournament = tournamentId;
+    if (hostChoice !== "") request.host = hostChoice;
+    // On a named host, what the plan showed is what starts; else the service plans it on the host it picks.
+    if (hostChoice !== "" && plan !== null && plan.fits && plan.cpus.length > 0) request.cpus = [...plan.cpus];
+    else request.cores = coresFixed > 0 ? coresFixed : (plan?.estimate.suggested_cores ?? 1);
+    if (observers.length > 0) {
+      request.observers = observers.map((observer, index) => {
+        const uid = Number(observer.uid.trim());
+        return { name: observer.name.trim() || `Observer ${index + 1}`, ...(observer.uid.trim() !== "" && uid > 0 ? { uid } : {}), ...(observer.referee ? { referee: true } : {}) };
+      });
+      request.observer_delay_seconds = observers.some((observer) => !observer.referee) ? observerDelay : 0;
+    }
+    if (force && hostChoice !== "" && plan !== null && !plan.fits) request.force = true;
+    creating = true;
+    renderFooter();
+    renderSummary();
+    try {
+      const lobby = await control.createLobby(request);
+      toast("ok", `${lobby.name || request.name} is starting`, `On ${lobby.host}`);
+      reset();
+      actions.refresh();
+      location.hash = `#/lobby/${encodeURIComponent(lobby.key)}`;
+    } catch (error) {
+      const why = error instanceof Error ? error.message : String(error);
+      const status = error instanceof ApiError ? error.status : 0;
+      toast("bad", status === 409 ? "No host can take the lobby now" : status === 403 ? "Your role doesn't allow this lobby" : "The control service didn't create the lobby", why);
+    } finally {
+      creating = false;
+      renderFooter();
+      renderSummary();
+    }
+  }
+
   // ---------------------------------------------------------------- everything
   function renderStep(): void {
     if (step === "slots") {
@@ -817,12 +1063,13 @@ export function createView(): View {
     }
     if (step === "placement") machine.update();
     if (step === "review") renderReview();
-    customNote.hidden = kind !== "custom";
+    customNote.hidden = kind !== "custom" || svc;
     startHelp.textContent =
-      kind === "tournament" ? "Nobody hosts a tournament lobby: it starts from its page (Start now), or by itself after the countdown once every player is ready." : "The host player launches a custom lobby from their lobby screen; the countdown starts it by itself once every player is ready.";
+      kind === "tournament" || svc ? "Nobody hosts an organised lobby: it starts from its page (Start now), or by itself after the countdown once every player is ready." : "The host player launches a custom lobby from their lobby screen; the countdown starts it by itself once every player is ready.";
   }
 
   function renderAll(): void {
+    renderWhere();
     renderKind();
     gallery.select(mapId);
     gallery.refreshFit();
@@ -870,8 +1117,41 @@ export function createView(): View {
   renderObservers();
   renderFull();
 
+  /** Through the service, for a viewer who may not make lobbies: what they can do instead. */
+  function renderRefusal(): boolean {
+    const me = service.me;
+    const allowed = !svc || canOrganise(me, "") || (me?.tournaments ?? []).some((item) => canOrganise(me, item.id));
+    refusal.hidden = allowed;
+    layout.hidden = !allowed;
+    startOver.hidden = !allowed;
+    if (!allowed) {
+      refusal.replaceChildren(
+        emptyState(
+          "Making lobbies is for organisers",
+          `You are signed in as a player. Organised lobbies are made by admins and the organisers of a tournament (the service's configuration lists them).${me?.player_hosting ? " You can ask for a game you host under My games." : ""}`,
+          me?.player_hosting ? h("a", { class: "btn primary", href: "#/games" }, "My games") : null,
+        ),
+      );
+    }
+    return allowed;
+  }
+
   return {
     show(arg): void {
+      const wasSvc = svc;
+      svc = store.mode === "service";
+      if (svc) kind = "tournament";
+      headSub.textContent = svc
+        ? "An organised lobby on the host you pick, or the least loaded one that fits; a tournament's lists decide who plays and watches. Every step can be changed again before Create."
+        : "A tournament lobby the organiser runs, or a custom one a player hosts. Every step can be changed again before Create.";
+      if (wasSvc !== svc) {
+        maps = [];
+        mapsFrom = "";
+        mapId = "";
+        plan = null;
+        gallery.setMaps([], "");
+      }
+      if (!renderRefusal()) return;
       if (offs.length === 0) {
         offs = [
           on("host", () => {
@@ -881,11 +1161,22 @@ export function createView(): View {
             // Lobbies coming or going change what fits.
             schedulePlan();
           }),
+          on("service", () => {
+            if (!svc) return;
+            if (!renderRefusal()) return;
+            renderWhere();
+            if (mapsFrom !== (formApi()?.base ?? "")) void loadMaps();
+          }),
         ];
       }
-      if (maps.length === 0) void loadMaps();
+      const preset = /^host=(.+)$/.exec(arg ?? "");
+      if (svc && preset !== null) {
+        hostChoice = preset[1] ?? "";
+        mapsFrom = "";
+      }
+      if (maps.length === 0 || mapsFrom !== (formApi()?.base ?? "")) void loadMaps();
       const target = STEPS.find(([id]) => id === arg)?.[0];
-      go(target ?? step);
+      go(target ?? (preset !== null ? "map" : step));
       renderAll();
     },
     hide(): void {

@@ -109,6 +109,12 @@ A new organised lobby goes to the host named in the request, else to the least l
 
 A player's request for a game they host goes to a host with player hosting on (the one named, else the shortest queue, then the fewest games, then the least load), through that host's public request API in the player's name, with the player in seat 1 and their FAF id. The service keeps the request's key and the pool's access code and never shows them.
 
+## The web UI
+
+The server dashboard (`tools/dashboard`, [SERVER_DASHBOARD.md](SERVER_DASHBOARD.md) section 4, "Through the control service") is the service's web UI as well as one host's: its connect form takes the service's address, signs in through `/auth/login` with the page as `return`, and then shows every host and lobby live from `/api/v1/events`, as the viewer's role allows. Serve it from `cors_origin` (or from `public_url` behind the same proxy), on the same site as the service: the session cookie is `SameSite=Lax`, so a page on another site doesn't get it. The preview images go through `/api/v1/hosts/<name>/maps/<id>/preview.png` with the cookie, so only organisers and admins see them.
+
+`npm run smoke-control -- <service url> <admin token file> [--organiser <uid> --player <uid>] [--origin <web UI origin>]` (in `tools/dashboard`) runs the page's client against a running service: with the admin token, the health, a request without credentials, the hosts and the lobbies; with `--organiser` and `--player`, against `oidc-mock` only (its authorize step takes `login_as`), both sign in through `/auth/login`, the organiser reads a host's maps, settings, plan and a preview, makes an organised lobby with the player in it, and the checks follow it as each sees it (every line for the organiser; the player's own line, no ops, no armies, no other seat's line in their event stream), then stop it.
+
 ## API
 
 Every request under `/api/v1/` needs a session cookie or a bearer token (above), except `GET /api/v1/health`; otherwise the answer is `401`. Answers are `200 {"ok": true, ...}`, or `{"ok": false, "error": "..."}` with `400` (refused, with the reason), `401` (not signed in), `403` (the roles don't allow it, or a cookie change from another origin), `404` (no such path, host, lobby or request), `409` (no host can take it now), `502` (a host didn't answer) or `503` (the cache didn't answer). A host's own refusal is passed on with its status and reason.

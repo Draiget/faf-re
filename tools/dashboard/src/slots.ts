@@ -28,8 +28,19 @@ export interface SlotsOptions {
   maxSeats?: () => number;
   /** Offer a uid field for players (the operator's lobbies). */
   uid?: boolean;
+  /** A tournament's player list: every player needs a FAF id from it (the control service refuses others). */
+  uidRule?: () => UidRule | null;
   onChange(): void;
 }
+
+export interface UidRule {
+  /** The FAF ids allowed in a player's seat. */
+  allowed: number[];
+  /** Whose list it is, for the messages: "Spring Cup's player list". */
+  list: string;
+}
+
+let datalistSeq = 0;
 
 export const FACTIONS: [number, string][] = [
   [5, "Random"],
@@ -53,11 +64,13 @@ export class SlotsEditor {
   private readonly rows: HTMLElement;
   private readonly summary: HTMLElement;
   private readonly options: SlotsOptions;
+  private readonly allowedList: HTMLDataListElement;
 
   constructor(options: SlotsOptions) {
     this.options = options;
     this.rows = h("div", { class: "slot-rows", role: "list" });
     this.summary = h("span", { class: "dim small" });
+    this.allowedList = h("datalist", { id: `slot-uids-${++datalistSeq}` });
     const split = h("button", { type: "button", class: "btn small" }, icon("users", "icon tiny"), "Two teams: odd vs even spots");
     split.addEventListener("click", () => {
       this.slots.forEach((slot, index) => (slot.team = index % 2 === 0 ? 2 : 3));
@@ -93,6 +106,7 @@ export class SlotsEditor {
       h("div", { class: "slots-tools" }, this.summary, h("div", { class: "slots-buttons" }, split, noTeams, fill, clear)),
       h("div", { class: "slot-head", "aria-hidden": "true" }, h("span", {}, "Spot"), h("span", {}, "Who"), h("span", {}, "Name or AI"), h("span", {}, "Team"), h("span", {}, "Faction")),
       this.rows,
+      this.allowedList,
     );
   }
 
@@ -171,13 +185,23 @@ export class SlotsEditor {
   problem(): string {
     if (this.slots.every((slot) => slot.kind !== "human")) return "Give at least one spot to a player: a game of AIs alone has nobody to host or watch it.";
     if (this.filled() > this.limit()) return `At most ${this.limit()} seats here.`;
+    const rule = this.options.uidRule?.() ?? null;
+    const seen = new Set<number>();
     for (const [index, slot] of this.slots.entries()) {
-      if (slot.kind === "human" && slot.uid.trim() !== "" && !(Number.isInteger(Number(slot.uid)) && Number(slot.uid) > 0)) return `Spot ${index + 1}'s uid is a whole number above 0.`;
+      if (slot.kind !== "human") continue;
+      const raw = slot.uid.trim();
+      if (raw !== "" && !(Number.isInteger(Number(raw)) && Number(raw) > 0)) return `Spot ${index + 1}'s uid is a whole number above 0.`;
+      if (rule !== null && raw === "") return `Spot ${index + 1}: a tournament's seats are for its listed players: give the player's FAF id (uid).`;
+      if (rule !== null && !rule.allowed.includes(Number(raw))) return `Spot ${index + 1}: FAF user ${raw} isn't on ${rule.list}.`;
+      if (raw !== "" && seen.has(Number(raw))) return `FAF user ${raw} has two spots.`;
+      if (raw !== "") seen.add(Number(raw));
     }
     return "";
   }
 
   render(): void {
+    const rule = this.options.uidRule?.() ?? null;
+    this.allowedList.replaceChildren(...(rule?.allowed ?? []).map((uid) => h("option", { value: String(uid) })));
     const ais = this.options.ais();
     const full = this.filled() >= this.limit();
     const humans = this.slots.filter((slot) => slot.kind === "human").length;
@@ -213,9 +237,21 @@ export class SlotsEditor {
             });
             const parts: HTMLElement[] = [name];
             if (this.options.uid === true) {
-              const uid = h("input", { type: "number", inputmode: "numeric", placeholder: "uid", class: "slot-uid", "aria-label": `Spot ${n}: uid (optional)`, title: "The player's FAF id (optional)" });
+              const rule = this.options.uidRule?.() ?? null;
+              const uid = h("input", {
+                type: "number",
+                inputmode: "numeric",
+                placeholder: rule === null ? "uid" : "uid *",
+                class: "slot-uid",
+                list: rule === null ? null : this.allowedList.id,
+                "aria-label": `Spot ${n}: uid${rule === null ? " (optional)" : ` (required, from ${rule.list})`}`,
+                title: rule === null ? "The player's FAF id (optional)" : `The player's FAF id, from ${rule.list}`,
+              });
               uid.value = slot.uid;
-              uid.addEventListener("input", () => (slot.uid = uid.value));
+              uid.addEventListener("input", () => {
+                slot.uid = uid.value;
+                this.options.onChange();
+              });
               parts.push(uid);
             }
             who = h("span", { class: "slot-who" }, ...parts);

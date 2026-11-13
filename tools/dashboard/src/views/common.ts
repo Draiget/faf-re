@@ -1,7 +1,7 @@
 // What the dashboard's views share: the host's maps (loaded once per connection) with their previews fetched with the
 // admin token, a page header, cards, tiles with a sparkline, and the view interface the router drives.
 
-import type { MapInfo } from "../api.ts";
+import type { HostApi, MapInfo } from "../api.ts";
 import { h, isNumber, type Child } from "../dom.ts";
 import type { PreviewSource } from "../maps.ts";
 import { store } from "../plane/store.ts";
@@ -12,45 +12,48 @@ export interface View {
   hide(): void;
 }
 
-let maps: MapInfo[] | null = null;
-let mapsLoading: Promise<MapInfo[]> | null = null;
-let mapsBase = "";
+/** Each host's maps by its address (through the control service, one per host), and those being asked for. */
+const mapCache = new Map<string, MapInfo[]>();
+const mapLoads = new Map<string, Promise<MapInfo[]>>();
 
-/** The host's maps, asked for once per connection. */
-export function hostMaps(): Promise<MapInfo[]> {
-  const api = store.api;
+/** The host's maps (`from`, else the store's host), asked for once per host. */
+export function hostMaps(from?: HostApi | null): Promise<MapInfo[]> {
+  const api = from ?? store.api;
   if (api === null) return Promise.resolve([]);
-  if (api.base !== mapsBase) {
-    maps = null;
-    mapsLoading = null;
-    mapsBase = api.base;
+  const base = api.base;
+  const cached = mapCache.get(base);
+  if (cached !== undefined) return Promise.resolve(cached);
+  let loading = mapLoads.get(base);
+  if (loading === undefined) {
+    loading = api.maps(AbortSignal.timeout(15000)).then(
+      (list) => {
+        const sorted = [...list].sort((a, b) => (a.name ?? a.id).localeCompare(b.name ?? b.id));
+        mapCache.set(base, sorted);
+        mapLoads.delete(base);
+        return sorted;
+      },
+      (error: unknown) => {
+        mapLoads.delete(base);
+        throw error;
+      },
+    );
+    mapLoads.set(base, loading);
   }
-  if (maps !== null) return Promise.resolve(maps);
-  mapsLoading ??= api.maps(AbortSignal.timeout(15000)).then(
-    (list) => {
-      maps = [...list].sort((a, b) => (a.name ?? a.id).localeCompare(b.name ?? b.id));
-      return maps;
-    },
-    (error: unknown) => {
-      mapsLoading = null;
-      throw error;
-    },
-  );
-  return mapsLoading;
+  return loading;
 }
 
-/** A map the host listed, if the list is in. */
+/** A map the store's host listed, if the list is in. */
 export function knownMap(id: string | undefined): MapInfo | undefined {
-  return id === undefined ? undefined : maps?.find((map) => map.id === id);
+  const base = store.api?.base;
+  return id === undefined || base === undefined ? undefined : mapCache.get(base)?.find((map) => map.id === id);
 }
 
 /** Previews straight from the host (they need no token). */
 export const hostPreview: PreviewSource = (map) => Promise.resolve(store.api?.previewUrl(map) ?? null);
 
 export function forgetHostData(): void {
-  maps = null;
-  mapsLoading = null;
-  mapsBase = "";
+  mapCache.clear();
+  mapLoads.clear();
 }
 
 export function pageHead(title: string, sub: Child, ...actions: Child[]): HTMLElement {

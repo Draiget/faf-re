@@ -2,7 +2,10 @@
 // hosting pool, the queue, metrics and logs), each lobby's own server through the host's proxy (ServerApi: status,
 // the armies of a running game, control ops, the event stream; docs/SWITCHES.md `--rest`), and the public request API
 // players use to ask for a server (RequestApi). The admin token goes as a bearer token; the public API has none. No
-// browser-only API here, so Node runs it too (scripts/smoke.ts, scripts/smoke-host.ts).
+// browser-only API here, so Node runs it too (scripts/smoke.ts, scripts/smoke-host.ts). The control service's client
+// is control.ts.
+
+import type { ServiceLobby } from "./control.ts";
 
 export interface Seat {
   uid: number;
@@ -307,6 +310,8 @@ export interface Lobby {
   /** The placement's warnings when it was made. */
   warnings?: PlacementWarning[] | null;
   usage?: Usage | null;
+  /** Through the control service: the service's view of the lobby (its host, who runs it, the viewer's place). */
+  service?: ServiceLobby | null;
   [key: string]: unknown;
 }
 
@@ -498,7 +503,7 @@ async function requestJson(base: string, token: string | null, method: string, p
  * Reads a Server-Sent Events body until it ends or `signal` aborts: each event's `data:` lines, joined, to `onData`.
  * Read with fetch, as the browser's EventSource can't send a token.
  */
-async function readSse(response: Response, onData: (data: string, event: string) => void): Promise<void> {
+export async function readSse(response: Response, onData: (data: string, event: string) => void): Promise<void> {
   if (response.body === null) return;
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
@@ -868,6 +873,11 @@ export class HostApi {
   /** The lobby's own server API, proxied by the host with the host's token. */
   lobbyApi(id: string): ServerApi {
     return new ServerApi(`${this.base}/api/v1/lobbies/${encodeURIComponent(id)}`, this.token);
+  }
+
+  /** The host a lobby runs on, for its maps and settings: this one (through the control service, the lobby's own). */
+  lobbyHost(_id: string): HostApi {
+    return this;
   }
 }
 

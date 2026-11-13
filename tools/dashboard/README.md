@@ -13,6 +13,8 @@ The page uses the whole window: a top bar (the host, its CPU, memory and network
 - **Metrics**: charts over 5 minutes, 15 minutes or an hour: the machine's CPU, CPU by node, memory, free memory by node, each link, each lobby's CPU and memory. Drawn as SVG by the page itself.
 - **A lobby's page** (`#/lobby/<id>`, `/log`, `/metrics`): the game (phase, countdown, clock, armies, seats, facts with join and watch lines, events, controls: start, settings, pause, end, player ops, the allowlist), its server log live, and its CPU and memory over time.
 
+The same page also connects to the control service (`tools/cmd/control-service`, [docs/CONTROL_SERVICE.md](../../docs/CONTROL_SERVICE.md)) in front of several hosts: the connect form recognises its address, signs in with FAF through it (no token typed; the service's session cookie), and the views then cover every host, live from its event stream, as the viewer's role allows: an overview of the hosts with a host filter, the lobbies of every host, Create lobby for organisers (a tournament's lists, the host by name or the least loaded that fits), My games for players (their places, the games they asked for, asking for one), and a lobby's page with the controls for those who run it and only their own join line for everyone else. The client is `src/control.ts` (with adapters so the host views run on it), the live state `src/service.ts`; the overview is `src/views/service.ts`, My games `src/views/games.ts`.
+
 Light and dark follow the system unless the theme button picks one. Plain TypeScript with Vite; no framework, no chart library. The whole setup (building the server and server-host, the admin token, starting them, a TLS proxy, troubleshooting) is in [docs/SERVER_DASHBOARD.md](../../docs/SERVER_DASHBOARD.md).
 
 ## Run it
@@ -31,7 +33,7 @@ VITE_HOST_URL=http://192.0.2.10:27180
 VITE_HOST_TOKEN=<the admin token>
 ```
 
-They are used only when the browser has nothing stored. `VITE_HOST_TOKEN` is read by the dev server only: `npm run build` never puts a token into `dist/`. `VITE_HOST_URL` does go into a build, as the address it starts with.
+They are used only when the browser has nothing stored. `VITE_HOST_TOKEN` is read by the dev server only: `npm run build` never puts a token into `dist/`. `VITE_HOST_URL` does go into a build, as the address it starts with. `VITE_SERVICE_URL` is the control service's address to start with (else the page's own host name on port 27190). The service must list the page's origin as its `cors_origin`, on the same site as the service (the session cookie is `SameSite=Lax`): `http://localhost:5173` with the service at `http://localhost:27190` works, `http://127.0.0.1:5173` with it doesn't.
 
 `npm run build` type-checks and writes the static pages to `dist/`, to be served from the origin given to `--cors-origin`.
 
@@ -40,6 +42,8 @@ They are used only when the browser has nothing stored. `VITE_HOST_TOKEN` is rea
 `npm run check` type-checks.
 
 `npm run smoke-host -- <host url> <token file> [map id]` runs `src/api.ts` (the pages' client) against a running server-host: the machine with its NUMA nodes and links, a wrong token (401), the maps with their start spots, a preview loaded without a token (and 404 for an unknown map), a hint, the planner (auto, by hand across nodes, an unknown CPU), a lobby refused without `force`, a lobby that doesn't fit queued with `queue: true` (202, listed in the queue, cancelled), then a tournament lobby with an observer and a referee: its kind and side, join and watch lines, its status through the host's proxy, its log (tail and stream), the metrics with its own series, the host's log (tail and stream), stopped, its log still there, and removed; the settings catalog. Then player hosting, with the pool saved first and put back at the end: a one-core pool for one game with open access, the planner on the pool's side and Auto keeping off it, the public pool, maps (with a preview) and settings, a request that becomes a lobby on the pool with a join line and the pool's and the request's options, a duplicate refused (409), a wrong key (404), two more requests queued behind it (listed with their requests, one moved up and cancelled, which the player sees), the first cancelled so the queue moves, and the pool turned off (public maps and requests refused with 403). It makes five requests, under the host's per-address limit.
+
+`npm run smoke-control -- <service url> <admin token file> [--organiser <uid> --player <uid>] [--origin <web UI origin>]` runs `src/control.ts` against a running control service, as described in [docs/CONTROL_SERVICE.md](../../docs/CONTROL_SERVICE.md) ("The web UI"). The sign-ins need `tools/cmd/oidc-mock` as the service's provider.
 
 `npm run smoke -- <host url> <token file> <lobby id>` runs the lobby client against one lobby through the host's proxy, as a lobby's page reaches it: the lobby listed, its status, a refused op, a wrong token (401), then `force_start` with the event stream open, which must show `game_started`. The lobby must be one the organiser starts, still in its lobby: the check starts its game.
 

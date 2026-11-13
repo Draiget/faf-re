@@ -2,14 +2,15 @@
   "name": "faf-server-dashboard",
   "private": true,
   "version": "0.1.0",
-  "description": "A web dashboard for server-host: a machine's dedicated-server lobbies, open slots and CPUs",
+  "description": "A web dashboard for server-host (one machine's dedicated-server lobbies, open slots and CPUs) and for the control service in front of several hosts",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "check": "tsc --noEmit",
     "smoke": "node scripts/smoke.ts",
-    "smoke-host": "node scripts/smoke-host.ts"
+    "smoke-host": "node scripts/smoke-host.ts",
+    "smoke-control": "node scripts/smoke-control.ts"
   },
   "devDependencies": {
     "@types/node": "24.19.2",

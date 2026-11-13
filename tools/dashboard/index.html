@@ -27,6 +27,7 @@
         <div class="top-health when-online" id="top-health" aria-label="The machine now"></div>
         <div class="topbar-right">
           <a id="top-alerts" class="top-alerts when-online" href="#/" hidden></a>
+          <div id="top-user" class="top-user" hidden></div>
           <a id="connection" class="pill pill-idle" href="#/connect" title="Change the host or token"><span class="pill-dot" aria-hidden="true"></span><span id="connection-text">Not connected</span></a>
           <button id="theme" class="icon-btn" type="button" aria-label="Theme: automatic" title="Theme: automatic"></button>
         </div>
@@ -35,11 +36,12 @@
       <nav class="sidenav" aria-label="Sections" id="sidenav">
         <a class="nav-item" href="#/" data-nav="overview"><span class="nav-icon" data-icon="chart"></span><span class="nav-text">Overview</span></a>
         <a class="nav-item" href="#/lobbies" data-nav="lobbies"><span class="nav-icon" data-icon="server"></span><span class="nav-text">Lobbies</span><span class="nav-count" id="nav-count-lobbies"></span></a>
-        <a class="nav-item nav-create" href="#/create" data-nav="create"><span class="nav-icon" data-icon="plus"></span><span class="nav-text">Create lobby</span></a>
-        <a class="nav-item" href="#/queue" data-nav="queue"><span class="nav-icon" data-icon="timer"></span><span class="nav-text">Queue</span><span class="nav-count" id="nav-count-queue"></span></a>
-        <a class="nav-item" href="#/hosting" data-nav="hosting"><span class="nav-icon" data-icon="users"></span><span class="nav-text">Player hosting</span><span class="nav-count" id="nav-count-hosting"></span></a>
-        <a class="nav-item" href="#/logs" data-nav="logs"><span class="nav-icon" data-icon="terminal"></span><span class="nav-text">Logs</span></a>
-        <a class="nav-item" href="#/metrics" data-nav="metrics"><span class="nav-icon" data-icon="sliders"></span><span class="nav-text">Metrics</span></a>
+        <a class="nav-item nav-create" href="#/create" data-nav="create" data-needs="organiser"><span class="nav-icon" data-icon="plus"></span><span class="nav-text">Create lobby</span></a>
+        <a class="nav-item" href="#/games" data-nav="games" data-only="service"><span class="nav-icon" data-icon="crown"></span><span class="nav-text">My games</span><span class="nav-count" id="nav-count-games"></span></a>
+        <a class="nav-item" href="#/queue" data-nav="queue" data-only="host"><span class="nav-icon" data-icon="timer"></span><span class="nav-text">Queue</span><span class="nav-count" id="nav-count-queue"></span></a>
+        <a class="nav-item" href="#/hosting" data-nav="hosting" data-only="host"><span class="nav-icon" data-icon="users"></span><span class="nav-text">Player hosting</span><span class="nav-count" id="nav-count-hosting"></span></a>
+        <a class="nav-item" href="#/logs" data-nav="logs" data-only="host"><span class="nav-icon" data-icon="terminal"></span><span class="nav-text">Logs</span></a>
+        <a class="nav-item" href="#/metrics" data-nav="metrics" data-only="host"><span class="nav-icon" data-icon="sliders"></span><span class="nav-text">Metrics</span></a>
         <div class="nav-lobbies when-online" id="nav-lobbies" aria-label="Running lobbies"></div>
       </nav>
 
@@ -47,21 +49,27 @@
         <section id="view-connect" class="view" data-view="connect" hidden>
           <div class="connect-wrap">
             <section class="card connect-card" aria-labelledby="connect-title">
-              <h1 id="connect-title">Connect to a host</h1>
-              <p class="dim" id="connect-summary">The machine's server-host, with its address and admin token.</p>
+              <h1 id="connect-title">Connect</h1>
+              <p class="dim" id="connect-summary">One machine's server-host with its admin token, or the control service for every host, signed in with FAF.</p>
               <form id="connect-form" class="connect-form" novalidate>
-                <div class="field">
-                  <label for="url">server-host address</label>
-                  <input id="url" type="url" spellcheck="false" autocomplete="url" placeholder="http://<host>:27180" />
+                <div class="segmented connect-kind" role="radiogroup" aria-label="What to connect to">
+                  <label><input type="radio" name="connect-kind" value="host" checked /><span>One host</span></label>
+                  <label><input type="radio" name="connect-kind" value="service" /><span>Control service</span></label>
                 </div>
                 <div class="field">
+                  <label for="url" id="url-label">server-host address</label>
+                  <input id="url" type="url" spellcheck="false" autocomplete="url" placeholder="http://<host>:27180" />
+                  <span class="dim small" id="url-detected" aria-live="polite"></span>
+                </div>
+                <div class="field" id="token-field">
                   <label for="token">Admin token <span class="dim">(the file server-host's --token-file names)</span></label>
                   <input id="token" type="password" autocomplete="off" spellcheck="false" />
                 </div>
+                <p class="dim small" id="service-help" hidden>No token here: the service signs you in with your FAF account and keeps the session in this browser. What you see and may do follows your role (admin, organiser or player).</p>
                 <button id="connect" class="btn primary" type="submit">Connect</button>
               </form>
               <p id="connect-error" class="form-error" role="alert" hidden></p>
-              <p class="dim small">The address is kept in this browser; the token only for this tab.</p>
+              <p class="dim small" id="connect-note">The address is kept in this browser; the token only for this tab.</p>
             </section>
           </div>
         </section>
@@ -73,6 +81,8 @@
         <section id="view-hosting" class="view" data-view="hosting" hidden></section>
         <section id="view-logs" class="view" data-view="logs" hidden></section>
         <section id="view-metrics" class="view" data-view="metrics" hidden></section>
+        <section id="view-service" class="view" data-view="service" hidden></section>
+        <section id="view-games" class="view" data-view="games" hidden></section>
 
         <!-- One lobby (#/lobby/<id>[/log|/metrics]): through the host's proxy to its own server. -->
         <section id="lobby-view" class="view lobby-view" data-view="lobby" hidden>
@@ -88,7 +98,7 @@
               <span id="lobby-bar-state"></span>
               <span id="stream-pill" class="pill pill-stream" hidden><span class="pill-dot" aria-hidden="true"></span><span id="stream-text">Events</span></span>
             </div>
-            <nav class="tabs" aria-label="Lobby">
+            <nav class="tabs" id="lobby-tabs" aria-label="Lobby">
               <a class="tab current" data-lobby-tab="game" href="#/">Game</a>
               <a class="tab" data-lobby-tab="log" href="#/">Server log</a>
               <a class="tab" data-lobby-tab="metrics" href="#/">Metrics</a>
@@ -184,6 +194,7 @@
                   <h2 id="controls-title">Control</h2>
                   <span class="dim" id="controls-meta"></span>
                 </div>
+                <div id="controls-note" class="role-note" hidden></div>
                 <fieldset id="controls" class="controls-set" disabled>
                   <legend class="sr-only">Control ops</legend>
 

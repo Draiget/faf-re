@@ -203,11 +203,13 @@ async function loadCatalog(mapId: string): Promise<void> {
     return;
   }
   const api = store.api;
-  if (api === null) return;
+  if (api === null || optionsLobby === null) return;
+  // Through the control service only those who run the lobby read its host's settings (and see this form).
+  if (ctx?.lobby()?.service?.can_operate === false) return;
   catalogState = "loading";
   renderOptionsState();
   try {
-    const answer = await api.settings(mapId === "" ? undefined : mapId, AbortSignal.timeout(REQUEST_MS));
+    const answer = await api.lobbyHost(optionsLobby).settings(mapId === "" ? undefined : mapId, AbortSignal.timeout(REQUEST_MS));
     if (catalogMap !== mapId || store.api !== api) return;
     catalogCache.set(mapId, answer);
     catalog = answer;

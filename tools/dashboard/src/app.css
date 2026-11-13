@@ -3291,3 +3291,451 @@ a.btn {
   max-height: none;
   overflow: visible;
 }
+
+/* ------------------------------------------------------------ the control service: modes, roles, hosts, my games */
+
+body[data-mode="service"] [data-only="host"],
+body[data-mode="host"] [data-only="service"],
+body[data-role="player"] [data-needs="organiser"] {
+  display: none !important;
+}
+
+.connect-kind {
+  margin-bottom: 0.2rem;
+}
+
+.top-user {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
+}
+
+.top-user[hidden] {
+  display: none;
+}
+
+.top-user-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  max-width: 12rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.86rem;
+  font-weight: 650;
+}
+
+.role-chip.role-admin {
+  --tone: var(--bad);
+  --tone-soft: var(--bad-soft);
+}
+
+.role-chip.role-organiser {
+  --tone: var(--accent);
+  --tone-soft: var(--accent-soft);
+}
+
+.role-chip.role-player {
+  --tone: var(--ok);
+  --tone-soft: var(--ok-soft);
+}
+
+.role-chip {
+  color: var(--tone);
+  background: var(--tone-soft);
+  border: 1px solid color-mix(in srgb, var(--tone) 35%, transparent);
+}
+
+.card-subhead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+  margin: -0.2rem 0 0.8rem;
+}
+
+.host-chip-text {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.dot {
+  display: inline-block;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--neutral);
+}
+
+.dot.ok {
+  background: var(--ok);
+}
+
+.dot.bad {
+  background: var(--bad);
+}
+
+.seg-chip.bad:not([aria-pressed="true"]) {
+  border-color: color-mix(in srgb, var(--bad) 45%, transparent);
+}
+
+.host-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 21rem), 1fr));
+  gap: 0.9rem;
+}
+
+.host-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  margin: 0;
+  padding: 1rem 1.1rem;
+  box-shadow: none;
+}
+
+.host-card.unreachable {
+  border-color: color-mix(in srgb, var(--bad) 45%, var(--line));
+  background: color-mix(in srgb, var(--bad) 4%, var(--surface));
+}
+
+.host-card.picked {
+  border-color: var(--accent);
+}
+
+.host-card-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.host-card-head h3 {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0 auto 0 0;
+  font-size: 1.05rem;
+}
+
+.host-card p {
+  margin: 0;
+}
+
+.host-machine {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.host-meters {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.8rem;
+}
+
+.host-meter {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  min-width: 0;
+}
+
+.host-meter-label {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.4rem;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.host-meter-label b {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.host-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr));
+  gap: 0.5rem 1rem;
+  margin: 0.15rem 0 0;
+}
+
+.host-facts dt {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.host-facts dd {
+  margin: 0.1rem 0 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.host-error {
+  overflow-wrap: anywhere;
+}
+
+.host-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: auto;
+  padding-top: 0.3rem;
+}
+
+.host-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-weight: 600;
+}
+
+.warn-text {
+  color: var(--warn);
+}
+
+.role-note {
+  display: flex;
+  gap: 0.6rem;
+  align-items: flex-start;
+  padding: 0.75rem 0.85rem;
+  border-radius: var(--radius-sm);
+  background: var(--accent-soft);
+  color: var(--text);
+  font-size: 0.9rem;
+}
+
+.role-note[hidden] {
+  display: none;
+}
+
+.role-note p {
+  margin: 0;
+}
+
+.role-note .icon {
+  color: var(--accent);
+  flex: none;
+  margin-top: 0.1rem;
+}
+
+.your-line {
+  padding: 0.75rem 0.85rem;
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--line));
+  border-radius: var(--radius-sm);
+  background: var(--accent-soft);
+}
+
+.your-line .join-cmd {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.your-line .cmd {
+  flex: 1 1 18rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.two-col.tight {
+  gap: 1rem 1.5rem;
+}
+
+.observer-row.with-uid {
+  grid-template-columns: minmax(0, 1fr) 7rem auto auto;
+}
+
+.service-where {
+  margin: 0 0 0.8rem;
+  padding: 0.75rem 0.9rem;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+
+.service-where p {
+  margin: 0;
+}
+
+.request-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.request-form .btn-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.4rem;
+}
+
+.request-seats {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.request-seat {
+  display: grid;
+  grid-template-columns: auto 3rem minmax(0, 1fr) 6.5rem 6.5rem auto;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.request-seat.you {
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+.request-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.request-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+
+.request-item p {
+  margin: 0;
+}
+
+.request-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+@media (max-width: 40rem) {
+  .top-user-name {
+    display: none;
+  }
+
+  .host-meters {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .request-seat {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
+  .request-seat > .dim {
+    display: none;
+  }
+
+  .request-seat select {
+    grid-column: 2 / 3;
+  }
+
+  .observer-row.with-uid {
+    grid-template-columns: minmax(0, 1fr) 6rem auto;
+  }
+
+  .observer-row.with-uid .check {
+    grid-column: 1 / 2;
+  }
+}
+
+.connect-card .connect-form {
+  align-items: stretch;
+}
+
+.connect-card .connect-kind {
+  align-self: flex-start;
+}
+
+.host-card-head h3 {
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.host-error {
+  font-size: 0.8rem;
+  font-family: var(--mono, ui-monospace, monospace);
+  color: var(--bad);
+}
+
+.request-seat .slot-badge {
+  --team: var(--accent);
+}
+
+.request-seat.you .slot-badge {
+  --team: var(--ok);
+}
+
+.request-seat {
+  grid-template-columns: auto 2.4rem minmax(6rem, 1fr) minmax(0, 6.5rem) minmax(0, 6.5rem) auto;
+}
+
+.request-seat input,
+.request-seat select {
+  width: 100%;
+  min-width: 0;
+}
+
+@media (max-width: 40rem) {
+  .request-seat {
+    grid-template-columns: auto minmax(0, 1fr) minmax(0, 1fr) auto;
+  }
+
+  .request-seat > .dim {
+    display: none;
+  }
+
+  .request-seat > input {
+    grid-column: 2 / 4;
+  }
+}
+
+@media (max-width: 40rem) {
+  .request-seat > input {
+    grid-column: 2 / 4;
+    grid-row: 1;
+  }
+
+  .request-seat > button {
+    grid-column: 4;
+    grid-row: 1;
+  }
+
+  .request-seat > select {
+    grid-row: 2;
+    grid-column: auto;
+  }
+
+  .request-seat > select:first-of-type {
+    grid-column: 2;
+  }
+
+  .request-seat > select:last-of-type {
+    grid-column: 3;
+  }
+}
+
+.segmented.connect-kind {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-self: stretch;
+}
+
+.segmented.connect-kind span {
+  padding: 0.45rem 0.6rem;
+  font-size: 0.86rem;
+}

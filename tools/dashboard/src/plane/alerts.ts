@@ -2,6 +2,7 @@
 // pool's CPUs, low memory, a busy machine or link, long waits in the queue, a full queue, a pool without CPUs.
 
 import { isNumber } from "../dom.ts";
+import { service } from "../service.ts";
 import { ageSeconds, cpuLoad, displayName, duration, RUNNING, store } from "./store.ts";
 
 export interface Alert {
@@ -13,7 +14,29 @@ export interface Alert {
 
 const LONG_WAIT_S = 15 * 60;
 
+/** Through the control service: hosts that don't answer or run short, failed lobbies, lobbies of a silent host. */
+function serviceAlerts(): Alert[] {
+  const out: Alert[] = [];
+  for (const host of service.hosts) {
+    if (!host.reachable) {
+      out.push({ tone: "bad", text: `Host ${host.name} doesn't answer the control service`, href: "#/" });
+      continue;
+    }
+    if (isNumber(host.load) && host.load > 85) out.push({ tone: "warn", text: `Host ${host.name} is ${Math.round(host.load)}% busy`, href: "#/" });
+    const total = host.memory_total_mb;
+    const available = host.memory_available_mb;
+    if (isNumber(total) && isNumber(available) && total > 0 && available / total < 0.1) out.push({ tone: "warn", text: `Host ${host.name} has ${Math.round((available / total) * 100)}% of its memory free`, href: "#/" });
+  }
+  for (const lobby of store.lobbies) {
+    const href = `#/lobby/${encodeURIComponent(lobby.id)}`;
+    if (lobby.state === "failed" && lobby.service?.can_stop === true) out.push({ tone: "bad", text: `${displayName(lobby)} failed${lobby.exit ? `: ${lobby.exit}` : ""}`, href });
+    if (lobby.service?.stale === true && RUNNING.has(lobby.state)) out.push({ tone: "warn", text: `${displayName(lobby)}: its host didn't answer at the last look; what's shown may be old`, href });
+  }
+  return out;
+}
+
 export function currentAlerts(): Alert[] {
+  if (store.mode === "service") return serviceAlerts();
   const out: Alert[] = [];
   const info = store.info;
   if (info === null) return out;

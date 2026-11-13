@@ -6,13 +6,15 @@
 
 import { ApiError, type Lobby, type Seat, type ServerApi, type ServerEvent, type Status } from "../api.ts";
 import { renderArmies } from "../armies.ts";
+import type { ServiceLobby } from "../control.ts";
 import { byId, clock, fill, h, icon, initials, isNumber, type Child } from "../dom.ts";
 import { CATEGORIES, eventItem, kindOf, type Category, type EventContext } from "../events.ts";
 import { followLobbyLog, LogView } from "../logview.ts";
+import { service } from "../service.ts";
 import { toast } from "../ui.ts";
 import { LobbyCharts } from "../views/metrics.ts";
 import { bindControls, enableControls, followLobby, optionsChanged, renderSeatPicker, resetControls, showPhase, showSelection } from "./controls.ts";
-import { cpuChips, fact, forgetLobby, joinBlock, kindChip, stateChip, stopLobby, timeOf, usageLine, warningSummary, watchBlock } from "./parts.ts";
+import { cpuChips, fact, forgetLobby, joinBlock, kindChip, stateChip, stopLobby, timeOf, usageLine, warningSummary, watchBlock, yourBlock } from "./parts.ts";
 import { colour, displayName, isPoolLobby, LIVE, lobbyById, on, plural, RUNNING, store } from "./store.ts";
 
 const MAX_EVENTS = 300;
@@ -73,6 +75,10 @@ const eventSearch = byId<HTMLInputElement>("event-search");
 const eventsClear = byId<HTMLButtonElement>("events-clear");
 
 const view = byId<HTMLElement>("lobby-view");
+const tabsNav = byId<HTMLElement>("lobby-tabs");
+const controlsNote = byId<HTMLElement>("controls-note");
+const controlsSet = byId<HTMLFieldSetElement>("controls");
+const backLink = view.querySelector<HTMLAnchorElement>(".back-link");
 
 // ---------------------------------------------------------------- state
 
@@ -96,6 +102,50 @@ export function openLobbyId(): string | null {
 
 function currentLobby(): Lobby | undefined {
   return lobbyId === null ? undefined : lobbyById(lobbyId);
+}
+
+// ---------------------------------------------------------------- through the control service: what the role allows
+
+/** The service's view of the open lobby; null on one host's dashboard (or before the service lists it). */
+function serviceView(): ServiceLobby | null {
+  return currentLobby()?.service ?? null;
+}
+
+/** May the viewer run the lobby (its ops, its armies)? Always on one host's dashboard (the admin token). */
+function mayRun(): boolean {
+  return store.mode !== "service" || serviceView()?.can_operate === true;
+}
+
+/** Does the viewer see the lobby whole (every join line, the lobby server's events)? */
+function seesAll(): boolean {
+  if (store.mode !== "service") return true;
+  const view = serviceView();
+  return view !== null && view.host_record !== undefined && view.host_record !== null;
+}
+
+/** Why the viewer can't run this lobby, in plain words. */
+function roleReason(view: ServiceLobby): Child[] {
+  const tournament = service.me?.tournaments.find((item) => item.id === view.tournament)?.name ?? view.tournament;
+  switch (view.origin) {
+    case "organised":
+      return [h("strong", {}, "Run by its organisers. "), `${tournament ? `The organisers of ${tournament}` : "Its organisers"} and admins start it, change its settings, pause, end the game and eject players. You see its seats and your own place.`];
+    case "hosted":
+      return view.can_stop
+        ? [h("strong", {}, "Your game. "), "You run it from your own lobby screen in the game: start, settings and slots. Here you can stop it."]
+        : [h("strong", {}, "A player's game. "), `${view.created_by?.name ?? "The player who asked for it"} runs it from their own lobby screen in the game.`];
+    default:
+      return [h("strong", {}, "Made on the host's own dashboard. "), "Only admins run it through the control service."];
+  }
+}
+
+function renderRole(): void {
+  const view = serviceView();
+  const blocked = store.mode === "service" && view !== null && !view.can_operate;
+  controlsSet.hidden = blocked;
+  controlsNote.hidden = !blocked;
+  if (blocked && view !== null) controlsNote.replaceChildren(icon("shield", "icon"), h("p", {}, ...roleReason(view)));
+  tabsNav.hidden = store.mode === "service";
+  if (backLink !== null) backLink.href = "#/lobbies";
 }
 
 function setStream(live: boolean | null): void {
@@ -317,7 +367,9 @@ function renderHero(status: Status): void {
   const tiles: HTMLElement[] = [tile("Players", `${joined.length} / ${seats.length}`)];
   if (!inGame) tiles.push(tile("Ready", `${ready} / ${seats.length}`, seats.length > 0 && ready === seats.length ? "ok" : ""));
   tiles.push(tile("Host", status.host === undefined ? "–" : status.host === 0 ? "nobody (the organiser runs it)" : nameOf(status.host)));
-  tiles.push(tile("Start when ready", isNumber(swr) && swr > 0 ? `${swr} s` : "off"));
+  // Through the control service a player's status leaves the countdown's setting out: the lobby's record may have it.
+  const configured = isNumber(swr) ? swr : currentLobby()?.start_when_ready;
+  if (isNumber(configured) || store.mode !== "service") tiles.push(tile("Start when ready", isNumber(configured) && configured > 0 ? `${configured} s` : "off"));
   if (inGame && isNumber(status.beat)) tiles.push(tile("Beat", status.beat.toLocaleString()));
   heroTiles.replaceChildren(...tiles);
 
@@ -345,7 +397,7 @@ function showStatus(status: Status): void {
   view.classList.remove("stale");
   renderHero(status);
   renderSeats(status);
-  enableControls(true);
+  enableControls(mayRun(), "not yours to run");
   showPhase(status);
   if (status.phase !== "game") armiesCard.hidden = true;
 }
@@ -392,11 +444,12 @@ async function poll(): Promise<void> {
     if (api !== current) return;
     showStatus(status);
     if (status.phase === "game") void pollArmies(current);
-  } catch {
+  } catch (error) {
     if (api !== current) return;
     view.classList.add("stale");
     // The host knows why: a lobby still starting, stopped, or failed with its exit.
     const lobby = currentLobby();
+    const viaService = store.mode === "service";
     if (lobby?.state === "failed") {
       renderIdle(`The lobby's server failed${lobby.exit ? `: ${lobby.exit}` : ""}`);
       enableControls(false, "not running");
@@ -404,7 +457,8 @@ async function poll(): Promise<void> {
       renderIdle("The lobby was stopped");
       enableControls(false, "not running");
     } else if (lastStatus === null) {
-      renderIdle(lobby === undefined && store.lobbies.length > 0 ? "The host doesn't list this lobby" : lobby?.state === "starting" ? "The lobby's server is starting…" : "The lobby's server isn't answering");
+      const unlisted = viaService ? (error instanceof ApiError && error.status === 404) || (lobby === undefined && store.lobbies.length > 0) : lobby === undefined && store.lobbies.length > 0;
+      renderIdle(unlisted ? (viaService ? "The control service doesn't list this lobby (yet)" : "The host doesn't list this lobby") : lobby?.state === "starting" ? "The lobby's server is starting…" : viaService && lobby?.service?.stale ? `Its host ${lobby.service.host} isn't answering the control service` : "The lobby's server isn't answering");
     }
   } finally {
     polling = false;
@@ -438,7 +492,8 @@ function applyFilters(): void {
     if (show) visible += 1;
   }
   eventsEmpty.hidden = visible > 0;
-  eventsEmpty.textContent = eventsList.children.length === 0 ? "No events yet." : "No events match the filter.";
+  eventsEmpty.textContent =
+    eventsList.children.length > 0 ? "No events match the filter." : seesAll() ? "No events yet." : "The lobby's own events (players joining, readiness, the game's log) go to those who run it. The seats above follow the lobby live.";
 }
 
 function renderFilterCounts(): void {
@@ -574,6 +629,11 @@ function renderInfo(lobby: Lobby | undefined): void {
   const humans = seats.filter((seat) => seat.kind === "human").length;
   const observers = lobby.observers ?? [];
   const host = seats.find((seat) => seat.seat === 1 && seat.kind === "human")?.name ?? "";
+  const sv = lobby.service ?? null;
+  if (sv !== null) {
+    renderServiceInfo(lobby, sv);
+    return;
+  }
   fill(
     infoFacts,
     fact("Map", h("span", {}, map?.name ?? map?.id ?? "unknown", isNumber(map?.km) ? h("span", { class: "dim" }, ` · ${map.km} km`) : null)),
@@ -603,6 +663,48 @@ function renderInfo(lobby: Lobby | undefined): void {
   }
 }
 
+/** Through the control service: the lobby's host, who made it and for what, and the lines the viewer may see. */
+function renderServiceInfo(lobby: Lobby, sv: ServiceLobby): void {
+  const map = lobby.map;
+  const seats = lobby.seats ?? [];
+  const humans = seats.filter((seat) => seat.kind === "human").length;
+  const observers = lobby.observers ?? [];
+  const cpus = (lobby.cpus ?? []).filter(isNumber);
+  const tournament = service.me?.tournaments.find((item) => item.id === sv.tournament)?.name ?? sv.tournament;
+  const origin = sv.origin === "organised" ? `organised${tournament ? ` for ${tournament}` : ", outside tournaments"}` : sv.origin === "hosted" ? "a player's game (asked for through the service)" : "made on the host's own dashboard";
+  fill(
+    infoFacts,
+    fact("Host", h("span", {}, sv.host, sv.stale ? h("span", { class: "warn-text small" }, " · not answering") : null)),
+    fact("Map", h("span", {}, map?.name ?? map?.id ?? "unknown", isNumber(map?.km) ? h("span", { class: "dim" }, ` · ${map.km} km`) : null)),
+    fact("Seats", `${plural(humans, "player")}${seats.length > humans ? ` + ${plural(seats.length - humans, "AI", "AIs")}` : ""}${observers.length > 0 ? ` · ${plural(observers.length, "observer")}` : ""}`),
+    fact("Made", origin),
+    sv.created_by ? fact("By", sv.created_by.name || `FAF user ${sv.created_by.uid}`) : null,
+    fact("Who starts it", lobby.control === "organiser" ? "the organiser (nobody hosts)" : lobby.control === "player" ? `the host player${seats.find((seat) => seat.seat === 1)?.name ? ` (${seats.find((seat) => seat.seat === 1)?.name ?? ""})` : ""}` : "–"),
+    cpus.length > 0 ? fact("CPUs", cpuChips(cpus, lobby.id)) : null,
+    RUNNING.has(lobby.state) && lobby.usage ? fact("Use now", usageLine(cpus.length, lobby.usage), true) : null,
+    fact("Started", timeOf(lobby.started_at ?? lobby.created)),
+  );
+  const warnings = lobby.warnings ?? [];
+  const wsig = JSON.stringify(warnings);
+  if (wsig !== warnSignature) {
+    warnSignature = wsig;
+    fill(infoWarnings, warningSummary(warnings));
+  }
+  infoExit.hidden = !lobby.exit;
+  infoExit.textContent = lobby.exit ? `Exit: ${lobby.exit}` : "";
+  stopButton.hidden = !LIVE.has(lobby.state) || !sv.can_stop;
+  forgetButton.hidden = true;
+  const all = seesAll();
+  const lsig = JSON.stringify([all, lobby.state, sv.you, seats.map((seat) => [seat.name, seat.join]), observers.map((observer) => [observer.name, observer.referee, observer.watch]), lobby.observer_delay_seconds]);
+  if (lsig !== linesSignature) {
+    linesSignature = lsig;
+    if (!LIVE.has(lobby.state)) fill(infoLines);
+    else if (all) fill(infoLines, joinBlock(lobby), observers.length > 0 ? watchBlock(lobby) : null);
+    else fill(infoLines, yourBlock(lobby));
+  }
+  renderRole();
+}
+
 function renderBar(): void {
   if (lobbyId === null) return;
   const lobby = currentLobby();
@@ -612,13 +714,14 @@ function renderBar(): void {
   bar.style.setProperty("--lobby", tint);
   barSwatch.style.setProperty("--swatch", tint);
   if (lobby === undefined) {
-    barMeta.textContent = store.api === null ? "" : "not on the host's list";
+    barMeta.textContent = store.api === null ? "" : store.mode === "service" ? "not on the control service's list" : "not on the host's list";
     barState.replaceChildren();
     barKind.replaceChildren();
   } else {
     const cpus = (lobby.cpus ?? []).filter(isNumber);
     const map = lobby.map;
-    barMeta.textContent = `${map?.name ?? map?.id ?? "map ?"}${isNumber(map?.km) ? ` · ${map.km} km` : ""}${cpus.length > 0 ? ` · CPU ${cpus.join(", ")}` : ""}${(lobby.nodes ?? []).length > 0 ? ` · node ${(lobby.nodes ?? []).join(", ")}` : ""}`;
+    const where = lobby.service ? `on ${lobby.service.host} · ` : "";
+    barMeta.textContent = `${where}${map?.name ?? map?.id ?? "map ?"}${isNumber(map?.km) ? ` · ${map.km} km` : ""}${cpus.length > 0 ? ` · CPU ${cpus.join(", ")}` : ""}${(lobby.nodes ?? []).length > 0 ? ` · node ${(lobby.nodes ?? []).join(", ")}` : ""}`;
     barState.replaceChildren(stateChip(lobby.state));
     barKind.replaceChildren(kindChip(lobby));
   }
@@ -630,6 +733,8 @@ function renderFromHost(): void {
   const lobby = currentLobby();
   renderBar();
   renderInfo(lobby);
+  renderRole();
+  if (eventsList.children.length === 0) applyFilters();
   followLobby(lobbyId, lobby);
 }
 

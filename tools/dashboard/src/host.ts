@@ -179,8 +179,10 @@ actions.refresh = (): void => void poll();
 /** Shows this host: its first answer, then polls until `stopHost`. */
 export function startHost(api: HostApi, info: HostInfo, events: HostCallbacks): void {
   stopHost();
+  store.mode = "host";
   store.api = api;
   store.info = info;
+  actions.refresh = (): void => void poll();
   callbacks = events;
   first = true;
   emit("host");

@@ -3,6 +3,7 @@
 
 import type { Lobby, PlacementWarning } from "../api.ts";
 import { h, icon, isNumber, num, type Child } from "../dom.ts";
+import { service } from "../service.ts";
 import { confirmAction, copyButton, toast } from "../ui.ts";
 import { actions, colour, displayName, kindOf, plural, store } from "./store.ts";
 
@@ -23,6 +24,15 @@ export function stateChip(state: string): HTMLElement {
 }
 
 export function kindChip(lobby: Lobby): HTMLElement {
+  const view = lobby.service;
+  if (view !== undefined && view !== null) {
+    if (view.origin === "hosted") return h("span", { class: "chip kind-chip kind-request", title: `A player's game${view.created_by ? `, asked for by ${view.created_by.name}` : ""}: seat 1 hosts it` }, icon("users", "icon tiny"), "Player game");
+    if (view.origin === "organised") {
+      const tournament = service.me?.tournaments.find((item) => item.id === view.tournament)?.name ?? view.tournament;
+      return h("span", { class: "chip kind-chip kind-tournament", title: `Organised${view.created_by ? ` by ${view.created_by.name}` : ""}: nobody hosts it` }, icon("trophy", "icon tiny"), tournament ? tournament : "Organised");
+    }
+    return h("span", { class: "chip kind-chip kind-custom", title: "Made on the host's own dashboard: its admins run it" }, icon(kindOf(lobby) === "tournament" ? "trophy" : "crown", "icon tiny"), kindOf(lobby) === "tournament" ? "Tournament (host)" : "Custom (host)");
+  }
   const kind = kindOf(lobby);
   if (typeof lobby.request === "string" && lobby.request !== "") return h("span", { class: "chip kind-chip kind-request", title: `Asked for by a player (request ${lobby.request})` }, icon("users", "icon tiny"), "Player request");
   return kind === "tournament"
@@ -127,6 +137,37 @@ export function watchBlock(lobby: Lobby): HTMLElement {
   );
 }
 
+/**
+ * Through the control service, for a viewer who doesn't run the lobby: their own join or watch line only (the others'
+ * are theirs, and the service doesn't give them out).
+ */
+export function yourBlock(lobby: Lobby): HTMLElement {
+  const view = lobby.service;
+  const you = view?.you ?? null;
+  const delay = isNumber(lobby.observer_delay_seconds) ? lobby.observer_delay_seconds : 0;
+  const note = h("p", { class: "dim small join-help" }, "Other players' lines are their own: each sees only theirs here, and the organisers see them all.");
+  if (you !== null && typeof you.join === "string" && you.join !== "") {
+    return h(
+      "div",
+      { class: "join your-line" },
+      h("p", { class: "join-help" }, h("strong", {}, `Your seat: start spot ${you.seat ?? "?"}. `), "Start the game (our engine) with this line to join:"),
+      h("div", { class: "join-cmd" }, h("code", { class: "cmd" }, you.join), copyButton(you.join, "Copy your join switches"), copyButton(`${GAME_EXE} ${you.join}`, "Copy your whole start command", "Command")),
+      note,
+    );
+  }
+  if (you !== null && typeof you.watch === "string" && you.watch !== "") {
+    return h(
+      "div",
+      { class: "join watch your-line" },
+      h("p", { class: "join-help" }, h("strong", {}, "You watch this game. "), `Open the game with this line${delay > 0 ? `; you see it ${delay} s late unless you referee` : ""}:`),
+      h("div", { class: "join-cmd" }, h("code", { class: "cmd" }, you.watch), copyButton(you.watch, "Copy your watch switches"), copyButton(`${GAME_EXE} ${you.watch}`, "Copy your whole start command", "Command")),
+      note,
+    );
+  }
+  if (you !== null && isNumber(you.seat)) return h("p", { class: "dim join-help" }, `Your seat is start spot ${you.seat}; its join line isn't given out yet.`);
+  return h("p", { class: "dim join-help" }, view?.origin === "organised" ? "You have no seat or watch line in this lobby. Seats go to the tournament's listed players; ask its organisers." : "You have no seat or watch line in this lobby.");
+}
+
 export function cpuChips(cpus: number[], id: string): Child {
   if (cpus.length === 0) return h("span", { class: "dim" }, "–");
   const box = h("span", { class: "cpu-chips" }, ...cpus.map((cpu) => h("span", { class: "cpu-chip" }, String(cpu))));
@@ -167,7 +208,9 @@ export async function stopLobby(id: string, button: HTMLButtonElement): Promise<
   if (lobby === undefined || api === null) return;
   const ok = await confirmAction(
     `Stop ${displayName(lobby)}?`,
-    `Its server stops${lobby.state === "game" ? " in the middle of the game" : ""}, and everyone in it is disconnected. Its CPUs are free again; it stays listed as stopped until you forget it.`,
+    lobby.service
+      ? `Its server on ${lobby.service.host} stops${lobby.state === "game" ? " in the middle of the game" : ""}, and everyone in it is disconnected. Its CPUs are free again; it stays listed as stopped until its host forgets it.`
+      : `Its server stops${lobby.state === "game" ? " in the middle of the game" : ""}, and everyone in it is disconnected. Its CPUs are free again; it stays listed as stopped until you forget it.`,
     "Stop the lobby",
   );
   if (!ok) return;

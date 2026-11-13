@@ -4,9 +4,13 @@
 import type { HostApi, HostCpu, HostInfo, HostNode, Lobby, Metrics, PoolView, QueueItem } from "../api.ts";
 import { isNumber } from "../dom.ts";
 
-export type Topic = "host" | "lists" | "pool" | "queue" | "metrics" | "alerts";
+export type Topic = "host" | "lists" | "pool" | "queue" | "metrics" | "alerts" | "service";
+
+/** host: one machine's server-host with its admin token; service: the control service, signed in with FAF. */
+export type Mode = "host" | "service";
 
 export interface Store {
+  mode: Mode;
   api: HostApi | null;
   info: HostInfo | null;
   lobbies: Lobby[];
@@ -22,6 +26,7 @@ export interface Store {
 }
 
 export const store: Store = {
+  mode: "host",
   api: null,
   info: null,
   lobbies: [],
@@ -133,6 +138,7 @@ export function poolCpus(): Set<number> {
 
 /** A lobby made from a player's request runs on the pool. */
 export function isPoolLobby(lobby: Lobby): boolean {
+  if (lobby.service?.origin === "hosted") return true;
   return lobby.side === "pool" || (typeof lobby.request === "string" && lobby.request !== "");
 }
 
