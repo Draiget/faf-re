@@ -279,6 +279,8 @@ namespace faf::editor
       Look,
       /** The water's foam, flatness and depth-bias masks (a brush stroke). */
       WaterMasks,
+      /** The heights and the texture masks together (an erosion run painting its masks into layers). */
+      HeightsAndMasks,
     };
     /** The water's three masks, a byte for every 2 x 2 units (the map's size halved). */
     struct WaterMaskSnapshot
@@ -724,6 +726,8 @@ namespace faf::editor
         return "environment";
       case EditKind::WaterMasks:
         return "water masks";
+      case EditKind::HeightsAndMasks:
+        return "heights and texture masks";
       }
       return "edit";
     }

@@ -1783,6 +1783,7 @@ namespace faf::editor
       : kind == EdDocument::EditKind::LayerConversion     ? UndoConversion(false)
       : kind == EdDocument::EditKind::Look                ? UndoLook(false)
       : kind == EdDocument::EditKind::WaterMasks          ? UndoWaterMasks(false)
+      : kind == EdDocument::EditKind::HeightsAndMasks     ? UndoHeightsAndMasks(false)
                                                           : UndoHeights(false);
     if (done) {
       mDocument.PushRedo(kind);
@@ -1809,6 +1810,7 @@ namespace faf::editor
       : kind == EdDocument::EditKind::LayerConversion     ? UndoConversion(true)
       : kind == EdDocument::EditKind::Look                ? UndoLook(true)
       : kind == EdDocument::EditKind::WaterMasks          ? UndoWaterMasks(true)
+      : kind == EdDocument::EditKind::HeightsAndMasks     ? UndoHeightsAndMasks(true)
                                                           : UndoHeights(true);
     if (done) {
       mDocument.PushUndo(kind);
@@ -4835,6 +4837,26 @@ namespace faf::editor
     return hash;
   }
 
+  bool EdMapScene::UndoHeightsAndMasks(
+    const bool redo
+  )
+  {
+    // Both stacks took one entry for the step; both give it back.
+    const bool heights = UndoHeights(redo);
+    const bool masks = UndoMasks(redo);
+    return heights || masks;
+  }
+
+  std::uint64_t EdMapScene::MasksHash()
+  {
+    LoadMasks();
+    std::uint64_t hash = 1469598103934665603ULL;
+    for (const std::uint64_t texel : mDocument.Masks().texels) {
+      hash = (hash ^ texel) * 1099511628211ULL;
+    }
+    return hash;
+  }
+
   bool EdMapScene::RevertErosionPreview()
   {
     if (!mErosionPreviewShown) {
@@ -4869,6 +4891,9 @@ namespace faf::editor
     mDocument.Heights().BeginStroke();
     mDocument.Heights().BeforeWrite(field->data, whole);
     std::string error;
+    const EdTools::ErosionMaskChoice& choice = mTools->ErosionMasksChosen();
+    const bool wantMasks = !preview && (choice.on[0] || choice.on[1] || choice.on[2] || choice.on[3]);
+    ErosionMasks made_masks;
     const bool made = ErodeHeights(
       reinterpret_cast<std::uint16_t*>(field->data),
       field->width,
@@ -4877,14 +4902,62 @@ namespace faf::editor
       *solver,
       values,
       step,
-      error
+      error,
+      wantMasks ? &made_masks : nullptr
     );
     mDocument.Heights().EndStroke(field->data);
     if (!made) {
       gpg::Warnf("editor: erosion: %s", error.c_str());
       return "The solver stopped: " + error;
     }
-    mDocument.EditEnded(EdDocument::EditKind::Heights);
+    // The chosen masks into their layers, in the same undo step as the heights.
+    int painted = 0;
+    if (wantMasks) {
+      LoadMasks();
+      EdDocument::MaskGrid& masks = mDocument.Masks();
+      if (!masks.texels.empty()) {
+        const SampleRect all{0, 0, masks.width - 1, masks.height - 1};
+        mDocument.MaskUndo().BeginStroke();
+        mDocument.MaskUndo().BeforeWrite(masks.texels.data(), all);
+        const std::vector<float>* const lists[4] = {
+          &made_masks.wear, &made_masks.deposit, &made_masks.flow, &made_masks.accum
+        };
+        const std::uint32_t remapped = RemappedStrata(TerrainShader());
+        for (int m = 0; m < 4; ++m) {
+          const std::vector<float>& list = *lists[m];
+          const int layer = std::clamp(choice.layer[m], 1, 8) - 1;
+          if (!choice.on[m] || list.size() != static_cast<std::size_t>(field->width) * field->height) {
+            continue;
+          }
+          const bool remappedLayer = (remapped & (1U << layer)) != 0;
+          // The mask grid's texel (x, y) over the map's samples, bilinear.
+          for (int y = 0; y < masks.height; ++y) {
+            const float sz = (static_cast<float>(y) + 0.5f) / masks.height * static_cast<float>(field->height - 1);
+            const int z0 = std::min(field->height - 2, static_cast<int>(sz));
+            const float fz = sz - static_cast<float>(z0);
+            for (int x = 0; x < masks.width; ++x) {
+              const float sx = (static_cast<float>(x) + 0.5f) / masks.width * static_cast<float>(field->width - 1);
+              const int x0 = std::min(field->width - 2, static_cast<int>(sx));
+              const float fx = sx - static_cast<float>(x0);
+              const auto at = [&](const int i, const int j) {
+                return list[static_cast<std::size_t>(j) * field->width + i];
+              };
+              const float v = (at(x0, z0) * (1.0f - fx) + at(x0 + 1, z0) * fx) * (1.0f - fz) +
+                (at(x0, z0 + 1) * (1.0f - fx) + at(x0 + 1, z0 + 1) * fx) * fz;
+              std::uint64_t& texel = masks.texels[static_cast<std::size_t>(y) * masks.width + x];
+              texel = WithMaskByte(
+                texel, layer, MaskStoredFor(std::clamp(v, 0.0f, 1.0f) * 255.0f, remappedLayer, MaskByte(texel, layer))
+              );
+            }
+          }
+          ++painted;
+        }
+        mDocument.MaskUndo().EndStroke(masks.texels.data());
+        UploadMasks({all}, 0xFFu);
+        UpdateCoverage();
+      }
+    }
+    mDocument.EditEnded(painted > 0 ? EdDocument::EditKind::HeightsAndMasks : EdDocument::EditKind::Heights);
     RefreshHeights({whole});
     mDocument.SetModified(true);
     const double seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - started).count();
@@ -4894,13 +4967,14 @@ namespace faf::editor
       mErosionPreviewDepth = mDocument.UndoOrder().size();
     }
     gpg::Logf(
-      "editor: erosion %s (%s, every %d%s sample): %zu samples changed in %.2f s",
+      "editor: erosion %s (%s, every %d%s sample): %zu samples changed in %.2f s, %d masks painted",
       preview ? "preview" : "applied",
       solver->label,
       step,
       step == 1 ? "st" : "th",
       changed,
-      seconds
+      seconds,
+      painted
     );
     char text[160];
     (void)std::snprintf(

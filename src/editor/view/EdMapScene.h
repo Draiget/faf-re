@@ -200,6 +200,8 @@ namespace faf::editor
     }
     /** Test runs: a checksum of the height words (FNV-1a), to tell "as before" from "changed". */
     [[nodiscard]] std::uint64_t HeightsHash() const;
+    /** Test runs: the same of the texture masks (loaded first). */
+    [[nodiscard]] std::uint64_t MasksHash();
     /** G or R is moving or turning the selection: the view takes every key until it ends. */
     [[nodiscard]] bool ModalOn() const noexcept
     {
@@ -980,6 +982,7 @@ namespace faf::editor
     std::size_t mErosionPreviewDepth = 0;
     std::string RunErosion(const std::string& solver, const ErosionValues& values, bool preview);
     bool RevertErosionPreview();
+    bool UndoHeightsAndMasks(bool redo);
     // The Water tool's mask brush: a stroke's before, and the overlay's runs for the mask shown.
     bool mPaintingWaterMask = false;
     EdDocument::WaterMaskSnapshot mWaterMaskBefore;

@@ -1594,6 +1594,23 @@ namespace faf::editor
       }
       return true;
     }
+    /** Which of a full run's masks go to which texture layer (1 to 8): wear, deposit, flow, drainage. */
+    struct ErosionMaskChoice
+    {
+      bool on[4] = {false, false, false, false};
+      int layer[4] = {1, 2, 3, 4};
+    };
+    [[nodiscard]] const ErosionMaskChoice& ErosionMasksChosen() const noexcept
+    {
+      return mErosionMasks;
+    }
+    /** Test runs: masks to layers as the window's ticks set them. */
+    void SetErosionMasks(
+      const ErosionMaskChoice& choice
+    ) noexcept
+    {
+      mErosionMasks = choice;
+    }
     /** Test runs (`/erosiontest`): a preset chosen and an ask made, as the window's buttons do. */
     void AskErosion(
       const std::string& preset,
@@ -2673,6 +2690,7 @@ namespace faf::editor
     std::map<std::string, ErosionValues> mErosionValues;
     std::string mErosionStatus;
     bool mErosionPreviewShown = false;
+    ErosionMaskChoice mErosionMasks;
     int mMapCounts[4] = {0, 0, 0, 0};
     FillOptions mFill;
     bool mFillRequest = false;

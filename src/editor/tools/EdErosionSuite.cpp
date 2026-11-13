@@ -393,6 +393,36 @@ namespace faf::editor
     return step;
   }
 
+  std::vector<float> ErosionNormalised(
+    const std::vector<float>& raw,
+    const float gamma
+  )
+  {
+    std::vector<float> out(raw.size(), 0.0f);
+    if (raw.empty()) {
+      return out;
+    }
+    double sum = 0.0;
+    double squares = 0.0;
+    float most = 0.0f;
+    for (const float v : raw) {
+      sum += v;
+      squares += static_cast<double>(v) * v;
+      most = std::max(most, v);
+    }
+    const double mean = sum / static_cast<double>(raw.size());
+    const double sd = std::sqrt(std::max(0.0, squares / static_cast<double>(raw.size()) - mean * mean));
+    double hi = mean + 3.0 * sd;
+    if (hi <= 1e-9) {
+      hi = std::max(static_cast<double>(most), 1e-6);
+    }
+    for (std::size_t k = 0; k < raw.size(); ++k) {
+      const double scaled = std::clamp(static_cast<double>(raw[k]) / hi, 0.0, 1.0);
+      out[k] = static_cast<float>(std::pow(scaled, static_cast<double>(gamma)));
+    }
+    return out;
+  }
+
   bool ErodeHeights(
     std::uint16_t* const heights,
     const int width,
@@ -401,7 +431,8 @@ namespace faf::editor
     const ErosionSolver& solver,
     const ErosionValues& values,
     int step,
-    std::string& error
+    std::string& error,
+    ErosionMasks* const masks
   )
   {
     if (heights == nullptr || width < 3 || height < 3 || !(scale > 0.0f)) {
@@ -440,6 +471,24 @@ namespace faf::editor
     if (step == 1) {
       for (std::size_t k = 0; k < out.v.size(); ++k) {
         heights[k] = toWord(out.v[k]);
+      }
+      if (masks != nullptr) {
+        const auto take = [&](const char* const name) -> const std::vector<float>* {
+          const auto found = extra.find(name);
+          return found != extra.end() && found->second.v.size() == out.v.size() ? &found->second.v : nullptr;
+        };
+        if (const auto* const wear = take("wear")) {
+          masks->wear = ErosionNormalised(*wear, 0.7f);
+        }
+        if (const auto* const deposit = take("deposit")) {
+          masks->deposit = ErosionNormalised(*deposit, 0.7f);
+        }
+        if (const auto* const flow = take("flow")) {
+          masks->flow = ErosionNormalised(*flow, 0.5f);
+        }
+        if (const auto* const accum = take("accum")) {
+          masks->accum = *accum;
+        }
       }
       return true;
     }

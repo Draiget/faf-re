@@ -1107,7 +1107,7 @@ namespace faf::editor
     }
     if (
       ImGui::BeginChild(
-        "##erosionsettings", ImVec2(0.0f, -ImGui::GetFrameHeightWithSpacing() * 3.2f), ImGuiChildFlags_Borders
+        "##erosionsettings", ImVec2(0.0f, -ImGui::GetFrameHeightWithSpacing() * 8.4f), ImGuiChildFlags_Borders
       )
     ) {
       for (const ErosionParam& param : solver->params) {
@@ -1125,6 +1125,32 @@ namespace faf::editor
       }
     }
     ImGui::EndChild();
+    // What Apply also paints: each mask a full run leaves, into a texture layer, in the same undo step.
+    static constexpr const char* kMaskNames[4] = {"Wear", "Deposit", "Flow", "Rivers"};
+    static constexpr const char* kMaskTips[4] = {
+      "Where ground was worn away: steep flanks and gullies (rock, scree).",
+      "Where sediment settled: valley floors and fans (sand, soil).",
+      "Where the water ran (wet ground, river beds).",
+      "Where rivers gather (the drainage): the bigger the catchment, the stronger.",
+    };
+    static constexpr const char* kLayers[] = {
+      "Layer 1", "Layer 2", "Layer 3", "Layer 4", "Layer 5", "Layer 6", "Layer 7", "Layer 8"
+    };
+    ImGui::TextDisabled("Masks to layers (Apply)");
+    for (int m = 0; m < 4; ++m) {
+      ImGui::PushID(m);
+      ImGui::Checkbox(kMaskNames[m], &mErosionMasks.on[m]);
+      EdSetItemTooltip("%s", kMaskTips[m]);
+      ImGui::SameLine(Em(110.0f));
+      ImGui::SetNextItemWidth(-1.0f);
+      ImGui::BeginDisabled(!mErosionMasks.on[m]);
+      int index = mErosionMasks.layer[m] - 1;
+      if (EdCombo("##masklayer", &index, kLayers, IM_ARRAYSIZE(kLayers))) {
+        mErosionMasks.layer[m] = index + 1;
+      }
+      ImGui::EndDisabled();
+      ImGui::PopID();
+    }
     // Preview (a coarse run on the map, as an undo step), Revert, Apply (the full run).
     if (PrimaryButton("Apply")) {
       mErosionAsk = ErosionAsk::Apply;

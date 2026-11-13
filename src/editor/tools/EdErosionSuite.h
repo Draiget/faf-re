@@ -68,6 +68,23 @@ namespace faf::editor
    * written back in place. Step 1 is the full run; a larger step runs every step-th sample and adds the change it
    * made, upsampled, to the full heights (the terrain's fine detail stays). False with `error` when the op fails.
    */
+  /**
+   * What a full run leaves besides the heights, each 0..1 over the map's samples (`width` x `height`): where ground was
+   * worn away, where sediment settled, where water ran, and the drainage (where rivers gather). Wear and deposit are
+   * scaled to their mean plus three deviations and curved by 0.7, flow by 0.5 (Studio's Normalised); the drainage is
+   * the solver's own 0..1. A list is empty when the solver made none.
+   */
+  struct ErosionMasks
+  {
+    std::vector<float> wear;
+    std::vector<float> deposit;
+    std::vector<float> flow;
+    std::vector<float> accum;
+  };
+
+  /** Raw amounts as a 0..1 mask: over their mean plus three deviations, clamped, then to the power `gamma`. */
+  [[nodiscard]] std::vector<float> ErosionNormalised(const std::vector<float>& raw, float gamma);
+
   bool ErodeHeights(
     std::uint16_t* heights,
     int width,
@@ -76,6 +93,7 @@ namespace faf::editor
     const ErosionSolver& solver,
     const ErosionValues& values,
     int step,
-    std::string& error
+    std::string& error,
+    ErosionMasks* masks = nullptr
   );
 } // namespace faf::editor

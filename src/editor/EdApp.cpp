@@ -6773,19 +6773,31 @@ namespace faf::editor
       TestEnvironment();
       // `/erosiontest <preset>` (test runs): the window's Preview, Revert, Apply, then Undo, a second apart.
       if (
-        fa::vector<fa::string> ero; mErosionTestStage < 4 && !mScene.ModelsPending() && mScene.Attached() &&
+        fa::vector<fa::string> ero; mErosionTestStage < 5 && !mScene.ModelsPending() && mScene.Attached() &&
         moho::CFG_GetArgOption("/erosiontest", 1, &ero) && !ero.empty() && ++mErosionTestFrames % 60 == 0
       ) {
         using Ask = EdTools::ErosionAsk;
         const Ask asks[3] = {Ask::Preview, Ask::Revert, Ask::Apply};
         gpg::Logf(
-          "editor: erosion test stage %d: heights %016llx",
+          "editor: erosion test stage %d: heights %016llx, masks %016llx; undo: %s",
           mErosionTestStage,
-          static_cast<unsigned long long>(mScene.HeightsHash())
+          static_cast<unsigned long long>(mScene.HeightsHash()),
+          static_cast<unsigned long long>(mScene.MasksHash()),
+          mDocument.UndoStepName() != nullptr ? mDocument.UndoStepName() : "-"
         );
+        // `/erosiontest <preset>,masks`: Apply paints wear into layer 5 and deposit into layer 6.
+        if (std::string(ero[0].c_str()).find(",masks") != std::string::npos) {
+          EdTools::ErosionMaskChoice choice;
+          choice.on[0] = true;
+          choice.layer[0] = 5;
+          choice.on[1] = true;
+          choice.layer[1] = 6;
+          mShell->Tools().SetErosionMasks(choice);
+        }
         if (mErosionTestStage < 3) {
-          mShell->Tools().AskErosion(ero[0].c_str(), asks[mErosionTestStage]);
-        } else {
+          const std::string preset = std::string(ero[0].c_str()).substr(0, std::string(ero[0].c_str()).find(','));
+          mShell->Tools().AskErosion(preset, asks[mErosionTestStage]);
+        } else if (mErosionTestStage == 3) {
           gpg::Logf("editor: erosion test: undo %s", mScene.Undo() ? "took the apply back" : "had nothing");
         }
         ++mErosionTestStage;

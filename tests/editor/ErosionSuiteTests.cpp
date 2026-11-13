@@ -150,4 +150,41 @@ namespace
     }
     EXPECT_GE(ripples, 4) << "the fine ripple survives a coarse preview";
   }
+  TEST(
+    ErosionSuite,
+    MasksComeFromAFullRunScaledToOne
+  )
+  {
+    using faf::editor::ErosionMasks;
+    using faf::editor::ErosionNormalised;
+    // Scaled to mean + 3 deviations and clamped: a lone spike reaches 1, the rest stay small.
+    std::vector<float> raw(100, 1.0f);
+    raw[7] = 100.0f;
+    const auto scaled = ErosionNormalised(raw, 1.0f);
+    EXPECT_FLOAT_EQ(scaled[7], 1.0f);
+    EXPECT_LT(scaled[0], 0.1f);
+    EXPECT_TRUE(ErosionNormalised({}, 0.7f).empty());
+    EXPECT_FLOAT_EQ(ErosionNormalised({0.0f, 0.0f}, 0.7f)[0], 0.0f) << "nothing worn: all zero, no division by zero";
+    // A full run hands its masks back, one value a sample, each 0..1.
+    const auto& droplet = *FindErosionSolver("droplet");
+    auto values = ErosionDefaults(droplet);
+    values["rounds"] = 4;
+    auto words = Cone();
+    ErosionMasks masks;
+    std::string error;
+    ASSERT_TRUE(ErodeHeights(words.data(), 65, 65, kScale, droplet, values, 1, error, &masks)) << error;
+    for (const std::vector<float>* list : {&masks.wear, &masks.deposit, &masks.flow, &masks.accum}) {
+      ASSERT_EQ(list->size(), words.size());
+      for (const float v : *list) {
+        ASSERT_GE(v, 0.0f);
+        ASSERT_LE(v, 1.0f);
+      }
+    }
+    EXPECT_GT(*std::max_element(masks.wear.begin(), masks.wear.end()), 0.5f) << "the cone's flanks were worn";
+    // A preview makes none.
+    ErosionMasks none;
+    auto again = Cone();
+    ASSERT_TRUE(ErodeHeights(again.data(), 65, 65, kScale, droplet, values, 4, error, &none)) << error;
+    EXPECT_TRUE(none.wear.empty());
+  }
 } // namespace
