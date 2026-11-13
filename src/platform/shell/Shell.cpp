@@ -18,6 +18,7 @@
 #include "platform/shell/dc.h"
 #include "platform/shell/event.h"
 #include "platform/shell/frame.h"
+#include "platform/shell/mouse.h"
 #include "platform/shell/string.h"
 #include "platform/shell/window.h"
 
@@ -494,6 +495,19 @@ ShellPoint ShellWindow::ScreenToClient(
   return ShellPoint(point.x - m_screenX, point.y - m_screenY);
 }
 
+void ShellWindow::ClientToScreen(
+  int* const x,
+  int* const y
+) const
+{
+  if (x != nullptr) {
+    *x += m_screenX;
+  }
+  if (y != nullptr) {
+    *y += m_screenY;
+  }
+}
+
 void ShellWindow::SetClientArea(
   const int screenX,
   const int screenY,
@@ -684,18 +698,7 @@ namespace
   {
     ShellWindow* const target = InputTarget(top);
     ShellMouseEvent event(type);
-    event.m_x = source.x;
-    event.m_y = source.y;
-    event.m_leftDown = (source.buttonsDown & platform::window::kLeftDown) != 0;
-    event.m_middleDown = (source.buttonsDown & platform::window::kMiddleDown) != 0;
-    event.m_rightDown = (source.buttonsDown & platform::window::kRightDown) != 0;
-    FillModifiers(source.modifiers, event.m_controlDown, event.m_shiftDown, event.m_altDown, event.m_metaDown);
-    if (type == SHELL_EVT_MOUSEWHEEL) {
-      // WM_MOUSEWHEEL: 120 per notch, three lines each (the Windows default).
-      event.m_wheelRotation = static_cast<int>(std::lround(source.wheel * 120.0f));
-      event.m_wheelDelta = 120;
-      event.m_linesPerAction = 3;
-    }
+    ShellFillMouseEvent(event, *target, source);
     Deliver(target, event);
   }
 
@@ -937,6 +940,29 @@ namespace
     }
   }
 } // namespace
+
+void ShellFillMouseEvent(
+  ShellMouseEvent& event,
+  const ShellWindow& target,
+  const platform::window::Event& source
+)
+{
+  event.m_x = source.x;
+  event.m_y = source.y;
+  event.m_leftDown = (source.buttonsDown & platform::window::kLeftDown) != 0;
+  event.m_middleDown = (source.buttonsDown & platform::window::kMiddleDown) != 0;
+  event.m_rightDown = (source.buttonsDown & platform::window::kRightDown) != 0;
+  FillModifiers(source.modifiers, event.m_controlDown, event.m_shiftDown, event.m_altDown, event.m_metaDown);
+  if (event.GetEventType() == SHELL_EVT_MOUSEWHEEL) {
+    // WM_MOUSEWHEEL's position is on the screen, unlike the window system's client pixels;
+    // CMauiEventMapper takes it back to the client with ScreenToClient.
+    target.ClientToScreen(&event.m_x, &event.m_y);
+    // WM_MOUSEWHEEL: 120 per notch, three lines each (the Windows default).
+    event.m_wheelRotation = static_cast<int>(std::lround(source.wheel * 120.0f));
+    event.m_wheelDelta = 120;
+    event.m_linesPerAction = 3;
+  }
+}
 
 bool ShellApp::Pending()
 {
