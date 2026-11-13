@@ -390,15 +390,16 @@ namespace faf::editor
     SectionHeader("BRUSH");
     if (withModes) {
       // Rows of up to three; each entry is its HeightBrushMode.
-      static const char* const kRows[4][3] = {
+      static const char* const kRows[5][3] = {
         {"Raise", "Lower", "Smooth"},
         {"Flatten", "Set height", "Noise"},
         {"Terrace", "Plane", "Stamp"},
-        {"Erode", "Water erode", nullptr}
+        {"Erode", "Water erode", "Rain"},
+        {"Deposit", nullptr, nullptr}
       };
-      static constexpr int kModeOf[4][3] = {{0, 1, 2}, {3, 5, 4}, {6, 7, 8}, {9, 10, -1}};
-      static constexpr int kRowSize[4] = {3, 3, 3, 2};
-      for (int row = 0; row < 4; ++row) {
+      static constexpr int kModeOf[5][3] = {{0, 1, 2}, {3, 5, 4}, {6, 7, 8}, {9, 10, 11}, {12, -1, -1}};
+      static constexpr int kRowSize[5] = {3, 3, 3, 3, 1};
+      for (int row = 0; row < 5; ++row) {
         int chosen = -1;
         for (int i = 0; i < kRowSize[row]; ++i) {
           chosen = kModeOf[row][i] == mBrushMode ? i : chosen;
@@ -460,9 +461,21 @@ namespace faf::editor
         break;
       case HeightBrushMode::WaterErode:
         Note(
-          "Rain on the brush: droplets run downhill, carry ground away where they speed up and leave it where they "
-          "slow, "
-          "carving channels and fans. Strength sets how much rain. Ground is moved, none is made."
+          "Droplets released over the brush run downhill, carry ground away where they speed up and leave it where "
+          "they slow, carving gullies and fans, on harder and softer patches of ground. What runs out of the brush is "
+          "mostly put back low inside it. Strength sets how much water. Right-drag deposits."
+        );
+        break;
+      case HeightBrushMode::Rain:
+        Note(
+          "Like Water erode, but the water runs on past the brush and keeps digging downhill, up to 0.8 of the radius "
+          "beyond it: valleys that lead away from where you paint."
+        );
+        break;
+      case HeightBrushMode::Deposit:
+        Note(
+          "Lays sediment under the brush as an even heap; the water carries a little of it downhill, so it settles "
+          "like washed-in ground. Ground is made."
         );
         break;
       default:

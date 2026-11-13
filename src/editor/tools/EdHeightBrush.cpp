@@ -1,5 +1,7 @@
 #include "editor/tools/EdHeightBrush.h"
 
+#include "editor/terrain/EdErosion.h"
+
 #include <algorithm>
 #include <cmath>
 #include <type_traits>
@@ -345,7 +347,9 @@ namespace faf::editor
         return current + change * 0.0625f * steps * weight;
       }
       case HeightBrushMode::WaterErode:
-        return current; // simulated over the whole area at once (ApplyWater), not sample by sample
+      case HeightBrushMode::Rain:
+      case HeightBrushMode::Deposit:
+        return current; // simulated over the whole area at once (ApplyErosion), not sample by sample
       }
       return current;
     }
@@ -607,6 +611,162 @@ namespace faf::editor
       }
     }
 
+    namespace erosion = faf::editor::field::erosion;
+
+    // The erosion brushes' settings (FAF Studio's erosionbrush.lua Values). Studio puts down a dab every so often
+    // along a stroke; here a step lasts a frame, so a dab's rounds of droplets and its deposit follow the step's time
+    // as if 15 dabs a second were put down.
+    constexpr double kErosionDabsPerSecond = 15.0;
+    constexpr double kErosionRoundsPerDab = 4.0;
+    constexpr double kDepositPerDab = 0.5; // game units at the centre
+
+    [[nodiscard]] int ErosionModeOf(
+      const HeightBrushMode mode
+    )
+    {
+      return mode == HeightBrushMode::Rain ? 1 : (mode == HeightBrushMode::Deposit ? 2 : 0);
+    }
+
+    /** How far from its centre an erosion step can write: the brush, Rain's reach past it, and the window's rim. */
+    [[nodiscard]] float ErosionReach(
+      const HeightBrush& brush
+    )
+    {
+      const double radius = std::max(1.0, static_cast<double>(brush.radius));
+      return static_cast<float>(radius + erosion::BrushDefaultMargin(ErosionModeOf(brush.mode), radius) + 2.0);
+    }
+
+    [[nodiscard]] erosion::HydroParams ErosionParams(
+      const HeightBrush& brush
+    )
+    {
+      erosion::HydroParams p;
+      p.rain = 0.006f;
+      p.evaporation = 0.02f;
+      p.capacity = 1.0f;
+      p.erosion = 0.2f;
+      p.deposition = 0.1f;
+      p.inertia = 0.3f;
+      p.conserve = 0.7f;
+      p.thermal = 0.15f;
+      p.talus = 0.8f;
+      p.vary = 0.5f;
+      p.vary_scale = 24.0f;
+      p.track = false;
+      p.seed = brush.seed;
+      return p;
+    }
+  } // namespace
+
+  class ErosionStroke
+  {
+  public:
+    erosion::ErodeSession session;
+  };
+
+  void ErosionStrokeDelete::operator()(
+    ErosionStroke* const stroke
+  ) const noexcept
+  {
+    delete stroke;
+  }
+
+  ErosionStrokePtr MakeErosionStroke()
+  {
+    return ErosionStrokePtr(new ErosionStroke);
+  }
+
+  namespace
+  {
+    /**
+     * Rain and Deposit: one dab of the erosion session on the cursor's copy (centred on cx, cz), then
+     * every sample it changed written to every member of its symmetry group, and the session told what was written.
+     * A change the limits turn down is put back in the session too.
+     */
+    void ApplyErosion(
+      std::uint16_t* const heights,
+      const int width,
+      const int height,
+      const float cx,
+      const float cz,
+      const Symmetry symmetry,
+      const HeightBrush& brush,
+      const float seconds,
+      ErosionStroke* const stroke
+    )
+    {
+      ErosionStroke own;
+      ErosionStroke& state = stroke != nullptr ? *stroke : own;
+      if (!state.session.Active()) {
+        state.session.Begin(width, height, heights, ErosionParams(brush));
+      }
+      const double strength = std::clamp(static_cast<double>(brush.strength), 0.0, 1.0);
+      const double dabs = static_cast<double>(seconds) * kErosionDabsPerSecond;
+      erosion::BrushDab dab;
+      dab.cx = cx;
+      dab.cz = cz;
+      dab.radius = brush.radius;
+      dab.falloff = brush.falloff;
+      dab.mode = ErosionModeOf(brush.mode);
+      dab.iterations = std::clamp(static_cast<int>(std::lround(strength * kErosionRoundsPerDab * dabs)), 1, 60);
+      dab.strength = 1.0;
+      dab.amount = kDepositPerDab * strength * dabs;
+      int x0 = 0;
+      int z0 = 0;
+      int x1 = 0;
+      int z1 = 0;
+      std::vector<std::uint16_t> words;
+      if (!state.session.Dab(dab, x0, z0, x1, z1, words)) {
+        return;
+      }
+      const int windowW = x1 - x0 + 1;
+      const auto at = [&](const int x, const int z) -> std::uint16_t& {
+        return heights[static_cast<std::size_t>(z) * static_cast<std::size_t>(width) + static_cast<std::size_t>(x)];
+      };
+      // The heights before this step, for the limits (the window plus a sample around it for the slope).
+      const auto before = [&](const int x, const int z) {
+        return static_cast<float>(at(std::clamp(x, 0, width - 1), std::clamp(z, 0, height - 1)));
+      };
+      std::vector<std::uint16_t> original(words.size());
+      for (int z = z0; z <= z1; ++z) {
+        for (int x = x0; x <= x1; ++x) {
+          original
+            [static_cast<std::size_t>(z - z0) * static_cast<std::size_t>(windowW) + static_cast<std::size_t>(x - x0)] =
+              at(x, z);
+        }
+      }
+      for (int z = z0; z <= z1; ++z) {
+        for (int x = x0; x <= x1; ++x) {
+          const std::size_t i =
+            static_cast<std::size_t>(z - z0) * static_cast<std::size_t>(windowW) + static_cast<std::size_t>(x - x0);
+          const std::uint16_t word = words[i];
+          if (word == original[i]) {
+            continue;
+          }
+          const float was = static_cast<float>(original[i]);
+          bool allowed = !brush.limitHeight || (was >= brush.limitLow && was <= brush.limitHigh);
+          if (allowed && brush.limitSlope) {
+            const float sx = (before(x + 1, z) - before(x - 1, z)) * 0.5f / kWordsPerUnit;
+            const float sz = (before(x, z + 1) - before(x, z - 1)) * 0.5f / kWordsPerUnit;
+            allowed = std::hypot(sx, sz) <= brush.limitMaxSlope;
+          }
+          if (!allowed) {
+            state.session.Store(x, z, original[i]);
+            continue;
+          }
+          int memberX[kMaxSymmetryCopies];
+          int memberZ[kMaxSymmetryCopies];
+          const int members = Copies<int>(symmetry, brush.turns, width - 1, height - 1, x, z, memberX, memberZ);
+          for (int m = 0; m < members; ++m) {
+            at(memberX[m], memberZ[m]) = word;
+            if (memberX[m] != x || memberZ[m] != z) {
+              state.session.Store(memberX[m], memberZ[m], word);
+            }
+          }
+        }
+      }
+    }
+
     /** N-way turns: see ApplyHeightBrush. */
     void ApplyTurned(
       std::uint16_t* const heights,
@@ -823,7 +983,8 @@ namespace faf::editor
     float centreZ[kMaxSymmetryCopies];
     const int centres = HeightBrushCentres(width, height, x, z, brush.symmetry, brush.turns, centreX, centreZ);
     const bool turned = EffectiveSymmetry(brush.symmetry, width, height) == Symmetry::NWay;
-    return RectsAround(width, height, centreX, centreZ, centres, brush.radius + (turned ? kTurnRim : 0.0f));
+    const float reach = IsErosionMode(brush.mode) ? ErosionReach(brush) : brush.radius;
+    return RectsAround(width, height, centreX, centreZ, centres, reach + (turned ? kTurnRim : 0.0f));
   }
 
   std::vector<SampleRect> ApplyHeightBrush(
@@ -833,7 +994,8 @@ namespace faf::editor
     const float x,
     const float z,
     const HeightBrush& brush,
-    const float seconds
+    const float seconds,
+    ErosionStroke* const stroke
   )
   {
     if (heights == nullptr || width < 2 || height < 2 || brush.radius <= 0.0f || seconds <= 0.0f) {
@@ -845,13 +1007,19 @@ namespace faf::editor
     float centreX[kMaxSymmetryCopies];
     float centreZ[kMaxSymmetryCopies];
     const int centres = HeightBrushCentres(width, height, x, z, symmetry, brush.turns, centreX, centreZ);
-    const std::vector<SampleRect> rects = RectsAround(
-      width, height, centreX, centreZ, centres, brush.radius + (symmetry == Symmetry::NWay ? kTurnRim : 0.0f)
-    );
+    const float reach = IsErosionMode(brush.mode) ? ErosionReach(brush) : brush.radius;
+    const std::vector<SampleRect> rects =
+      RectsAround(width, height, centreX, centreZ, centres, reach + (symmetry == Symmetry::NWay ? kTurnRim : 0.0f));
+    // Simulated around the cursor's copy; its changes written to every symmetric copy.
     if (brush.mode == HeightBrushMode::WaterErode) {
-      // Simulated around the cursor's copy; its changes written to every symmetric copy.
       if (!rects.empty()) {
         ApplyWater(heights, width, height, rects.front(), centreX[0], centreZ[0], symmetry, brush, seconds);
+      }
+      return rects;
+    }
+    if (IsErosionMode(brush.mode)) {
+      if (!rects.empty()) {
+        ApplyErosion(heights, width, height, centreX[0], centreZ[0], symmetry, brush, seconds, stroke);
       }
       return rects;
     }

@@ -1093,6 +1093,7 @@ namespace faf::editor
     mMap = nullptr;
     mDrag = Drag::None;
     mPainting = false;
+    mErosionStroke.reset();
     mWaterBodiesStale = true;
     mWaterBodyHandle = -2;
   }
@@ -1113,11 +1114,16 @@ namespace faf::editor
     HeightBrush brush = mTools->CurrentHeightBrush();
     brush.flattenTo = mFlattenTo;
     brush.seed = ++mWaterErodeSeed; // Water erode: new droplets every step
-    // A right-button stroke does the opposite: Raise lowers, Lower raises.
+    // A right-button stroke does the opposite: Raise lowers, Lower raises, Water erode deposits.
     if (mPaintInverted) {
       brush.mode = brush.mode == HeightBrushMode::Raise ? HeightBrushMode::Lower
         : brush.mode == HeightBrushMode::Lower          ? HeightBrushMode::Raise
+        : brush.mode == HeightBrushMode::WaterErode     ? HeightBrushMode::Deposit
                                                         : brush.mode;
+    }
+    // The erosion brushes keep the map as floats for the whole stroke (ground moves in fractions of a word).
+    if (IsErosionMode(brush.mode) && mErosionStroke == nullptr) {
+      mErosionStroke = MakeErosionStroke();
     }
     // A stamp goes down once per click.
     if (brush.mode == HeightBrushMode::Stamp) {
@@ -1130,8 +1136,16 @@ namespace faf::editor
     for (const SampleRect& rect : HeightBrushRects(field->width, field->height, groundX, groundZ, brush)) {
       mDocument.Heights().BeforeWrite(field->data, rect);
     }
-    const std::vector<SampleRect> rects =
-      ApplyHeightBrush(field->data, field->width, field->height, groundX, groundZ, brush, std::min(frameSeconds, 0.1f));
+    const std::vector<SampleRect> rects = ApplyHeightBrush(
+      field->data,
+      field->width,
+      field->height,
+      groundX,
+      groundZ,
+      brush,
+      std::min(frameSeconds, 0.1f),
+      IsErosionMode(brush.mode) ? mErosionStroke.get() : nullptr
+    );
     if (!rects.empty()) {
       mDocument.SetModified(true);
       RefreshHeights(rects);
@@ -1170,6 +1184,7 @@ namespace faf::editor
         }
       }
     }
+    mErosionStroke.reset();
     mPainting = false;
   }
 
@@ -2248,20 +2263,88 @@ namespace faf::editor
     if (field == nullptr) {
       return false;
     }
-    HeightBrush brush;
-    brush.mode = HeightBrushMode::Raise;
+    return TestBrush(HeightBrushMode::Raise, x, z, seconds);
+  }
+
+  bool EdMapScene::TestBrush(
+    const HeightBrushMode mode,
+    const float x,
+    const float z,
+    const float seconds
+  )
+  {
+    moho::CHeightField* const field = mMap != nullptr ? mMap->mTerrainRes->GetHeightField() : nullptr;
+    if (field == nullptr) {
+      return false;
+    }
+    const std::vector<std::uint16_t> start(field->data, field->data + field->width * field->height);
+    HeightBrush brush = mTools != nullptr ? mTools->CurrentHeightBrush() : HeightBrush{};
+    brush.mode = mode;
     brush.strength = 1.0f;
+    const bool raise = mode == HeightBrushMode::Raise;
+    if (raise) {
+      brush = HeightBrush{};
+      brush.mode = mode;
+      brush.strength = 1.0f;
+    }
+    const ErosionStrokePtr stroke = IsErosionMode(mode) ? MakeErosionStroke() : nullptr;
     mDocument.Heights().BeginStroke();
     for (const SampleRect& rect : HeightBrushRects(field->width, field->height, x, z, brush)) {
       mDocument.Heights().BeforeWrite(field->data, rect);
     }
     std::vector<SampleRect> rects;
-    for (float left = seconds; left > 0.0f; left -= 0.1f) {
-      const std::vector<SampleRect> step =
-        ApplyHeightBrush(field->data, field->width, field->height, x, z, brush, std::min(left, 0.1f));
+    const float stepSeconds = raise ? 0.1f : 1.0f / 60.0f;
+    for (float left = seconds; left > 0.0f; left -= stepSeconds) {
+      if (!raise) {
+        // Each step saves what it writes first, as PaintStroke does.
+        for (const SampleRect& rect : HeightBrushRects(field->width, field->height, x, z, brush)) {
+          mDocument.Heights().BeforeWrite(field->data, rect);
+        }
+        brush.seed = ++mWaterErodeSeed;
+      }
+      const std::vector<SampleRect> step = ApplyHeightBrush(
+        field->data, field->width, field->height, x, z, brush, std::min(left, stepSeconds), stroke.get()
+      );
       rects.insert(rects.end(), step.begin(), step.end());
     }
     mDocument.Heights().EndStroke(field->data);
+    if (!raise) {
+      std::size_t changed = 0;
+      std::int64_t words = 0;
+      float farthest = 0.0f;
+      for (int sz = 0; sz < field->height; ++sz) {
+        for (int sx = 0; sx < field->width; ++sx) {
+          const std::size_t i = static_cast<std::size_t>(sz) * static_cast<std::size_t>(field->width) + sx;
+          if (field->data[i] != start[i]) {
+            ++changed;
+            words += static_cast<std::int64_t>(field->data[i]) - static_cast<std::int64_t>(start[i]);
+            // The nearest of the brush's copies.
+            float centreX[kMaxSymmetryCopies];
+            float centreZ[kMaxSymmetryCopies];
+            const int centres =
+              HeightBrushCentres(field->width, field->height, x, z, brush.symmetry, brush.turns, centreX, centreZ);
+            float nearest = 1.0e9f;
+            for (int c = 0; c < centres; ++c) {
+              nearest =
+                std::min(nearest, std::hypot(static_cast<float>(sx) - centreX[c], static_cast<float>(sz) - centreZ[c]));
+            }
+            farthest = std::max(farthest, nearest);
+          }
+        }
+      }
+      gpg::Logf(
+        "editor: brush test: mode %d at %.0f,%.0f, radius %.0f, symmetry %d: %zu samples changed, ground %+.1f units, "
+        "farthest change %.1f from a centre",
+        static_cast<int>(mode),
+        static_cast<double>(x),
+        static_cast<double>(z),
+        static_cast<double>(brush.radius),
+        static_cast<int>(brush.symmetry),
+        changed,
+        static_cast<double>(words) / 128.0,
+        static_cast<double>(farthest)
+      );
+    }
     if (rects.empty()) {
       return false;
     }

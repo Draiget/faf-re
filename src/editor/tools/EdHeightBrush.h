@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <memory>
 #include <vector>
 
 namespace faf::editor
@@ -33,7 +34,42 @@ namespace faf::editor
      * ground is moved, not made.
      */
     WaterErode,
+    /**
+     * Like Water erode, but the water runs on past the brush and keeps digging downhill, up to 0.8 of the radius
+     * beyond it (FAF Studio's Rain brush).
+     */
+    Rain,
+    /**
+     * Sediment laid under the brush as an even heap that the water then carries a little downhill, so it settles
+     * like washed-in ground (FAF Studio's Deposit brush). Ground is made. Right-dragging Water erode does this.
+     */
+    Deposit,
   };
+
+  /**
+   * Rain and Deposit: droplets on FAF Studio's erosion session (src/editor/terrain/EdErosion.h). Water erode keeps the
+   * editor's own droplets: Studio's carries part of what runs out of the brush away, and Water erode moves ground
+   * without losing any.
+   */
+  [[nodiscard]] constexpr bool IsErosionMode(
+    const HeightBrushMode mode
+  ) noexcept
+  {
+    return mode == HeightBrushMode::Rain || mode == HeightBrushMode::Deposit;
+  }
+
+  /**
+   * The erosion brushes' state for one stroke: the map's heights as floats, so ground a droplet moves keeps its
+   * fractions from step to step, and the stroke's droplet seed. The caller makes one when a stroke starts and drops it
+   * when the stroke ends; without one, each step starts afresh from the map's words.
+   */
+  class ErosionStroke;
+  struct ErosionStrokeDelete
+  {
+    void operator()(ErosionStroke* stroke) const noexcept;
+  };
+  using ErosionStrokePtr = std::unique_ptr<ErosionStroke, ErosionStrokeDelete>;
+  [[nodiscard]] ErosionStrokePtr MakeErosionStroke();
 
   /** A height image for stamps: `width` x `height` words, read between samples over the brush's square. */
   struct HeightStamp
@@ -140,7 +176,8 @@ namespace faf::editor
     float x,
     float z,
     const HeightBrush& brush,
-    float seconds
+    float seconds,
+    ErosionStroke* stroke = nullptr
   );
 
   /** The rectangles `ApplyHeightBrush` would write for the same arguments, without writing (undo saves them first). */

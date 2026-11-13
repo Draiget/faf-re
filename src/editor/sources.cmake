@@ -78,7 +78,9 @@ set(FAF_EDITOR_SOURCES
   tools/EdHeightBrush.cpp
   tools/EdHeightFile.cpp
   tools/EdMaskBrush.cpp
+  terrain/EdErosion.cpp
   terrain/EdFieldCore.cpp
+  terrain/EdFieldEro2.cpp
   terrain/EdFieldFilt.cpp
   terrain/EdFieldGen.cpp
   terrain/EdFieldLand.cpp

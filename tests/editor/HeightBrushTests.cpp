@@ -437,6 +437,121 @@ namespace
     EXPECT_TRUE(CopiesEqual(field, Symmetry::LeftRight));
   }
 
+  // Rain and Deposit (FAF Studio's erosion session) and the session that lives for a stroke.
+
+  HeightBrush ErosionBrush(
+    const HeightBrushMode mode
+  )
+  {
+    HeightBrush brush = Rain();
+    brush.mode = mode;
+    brush.radius = 9.0f;
+    return brush;
+  }
+
+  /** Left-right mirrored hills sloping along z (the slope the water follows). */
+  Field MirroredHills()
+  {
+    Field field(65, 65, 0);
+    for (int z = 0; z < 65; ++z) {
+      for (int x = 0; x < 65; ++x) {
+        const int mx = std::min(x, 64 - x);
+        field.words[static_cast<std::size_t>(z) * 65 + static_cast<std::size_t>(x)] =
+          static_cast<std::uint16_t>(8000 + 60 * mx + 40 * z);
+      }
+    }
+    return field;
+  }
+
+  TEST(
+    HeightBrush,
+    ErosionStrokeKeepsAMirroredMapMirroredOnTheMirrorLine
+  )
+  {
+    // One session for the stroke: a dab across the mirror line reads ground the previous step's copy wrote, which the
+    // session has only because the copies written are stored back into it.
+    for (const HeightBrushMode mode : {HeightBrushMode::WaterErode, HeightBrushMode::Rain, HeightBrushMode::Deposit}) {
+      Field field = MirroredHills();
+      HeightBrush brush = ErosionBrush(mode);
+      brush.symmetry = Symmetry::LeftRight;
+      faf::editor::ErosionStrokePtr stroke = faf::editor::MakeErosionStroke();
+      for (int step = 0; step < 40; ++step) {
+        brush.seed = static_cast<std::uint32_t>(step + 1);
+        (void)ApplyHeightBrush(
+          field.words.data(), 65, 65, 29.0f + static_cast<float>(step % 7), 30.0f, brush, 1.0f / 60.0f, stroke.get()
+        );
+      }
+      EXPECT_TRUE(CopiesEqual(field, Symmetry::LeftRight)) << "mode " << static_cast<int>(mode);
+      EXPECT_NE(field.words, MirroredHills().words) << "mode " << static_cast<int>(mode) << " changed nothing";
+    }
+  }
+
+  TEST(
+    HeightBrush,
+    ErosionWritesOnlyWhereUndoSaved
+  )
+  {
+    // Rain digs past the brush: the rectangles undo saves first (HeightBrushRects) cover all it writes.
+    for (const HeightBrushMode mode : {HeightBrushMode::WaterErode, HeightBrushMode::Rain, HeightBrushMode::Deposit}) {
+      Field field = MirroredHills();
+      HeightBrush brush = ErosionBrush(mode);
+      brush.symmetry = Symmetry::LeftRight;
+      faf::editor::ErosionStrokePtr stroke = faf::editor::MakeErosionStroke();
+      for (int step = 0; step < 20; ++step) {
+        const Field before = field;
+        brush.seed = static_cast<std::uint32_t>(step + 1);
+        const float x = 12.0f + static_cast<float>(step);
+        const std::vector<SampleRect> saved = faf::editor::HeightBrushRects(65, 65, x, 20.0f, brush);
+        (void)ApplyHeightBrush(field.words.data(), 65, 65, x, 20.0f, brush, 1.0f / 30.0f, stroke.get());
+        for (int z = 0; z < 65; ++z) {
+          for (int sx = 0; sx < 65; ++sx) {
+            if (field.At(sx, z) == before.At(sx, z)) {
+              continue;
+            }
+            const bool inside = std::any_of(saved.begin(), saved.end(), [&](const SampleRect& r) {
+              return sx >= r.x0 && sx <= r.x1 && z >= r.z0 && z <= r.z1;
+            });
+            ASSERT_TRUE(inside) << "mode " << static_cast<int>(mode) << " wrote " << sx << "," << z << " unsaved";
+          }
+        }
+      }
+    }
+  }
+
+  TEST(
+    HeightBrush,
+    DepositMakesGroundAndRainDigsPastTheBrush
+  )
+  {
+    Field deposit = MirroredHills();
+    const Field start = deposit;
+    HeightBrush brush = ErosionBrush(HeightBrushMode::Deposit);
+    faf::editor::ErosionStrokePtr stroke = faf::editor::MakeErosionStroke();
+    for (int step = 0; step < 30; ++step) {
+      (void)ApplyHeightBrush(deposit.words.data(), 65, 65, 32.0f, 24.0f, brush, 1.0f / 60.0f, stroke.get());
+    }
+    EXPECT_GT(TotalOf(deposit), TotalOf(start) + 128 * 50) << "a heap was laid";
+    EXPECT_GT(deposit.At(32, 24), start.At(32, 24)) << "the centre rose";
+
+    // Rain on the high end of the slope: ground changes farther than the brush's radius from its centre.
+    Field rain = MirroredHills();
+    brush = ErosionBrush(HeightBrushMode::Rain);
+    stroke = faf::editor::MakeErosionStroke();
+    for (int step = 0; step < 60; ++step) {
+      brush.seed = static_cast<std::uint32_t>(step + 1);
+      (void)ApplyHeightBrush(rain.words.data(), 65, 65, 20.0f, 52.0f, brush, 1.0f / 60.0f, stroke.get());
+    }
+    float farthest = 0.0f;
+    for (int z = 0; z < 65; ++z) {
+      for (int x = 0; x < 65; ++x) {
+        if (rain.At(x, z) != start.At(x, z)) {
+          farthest = std::max(farthest, std::hypot(static_cast<float>(x) - 20.0f, static_cast<float>(z) - 52.0f));
+        }
+      }
+    }
+    EXPECT_GT(farthest, brush.radius + 1.0f) << "Rain dug past the brush";
+  }
+
   TEST(
     HeightBrush,
     ErodeLeavesGroundGentlerThanTheTalusAlone

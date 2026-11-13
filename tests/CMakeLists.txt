@@ -373,11 +373,13 @@ set_tests_properties(occupation_manager PROPERTIES LABELS "Sim")
 
 # The map editor's terrain field library (src/editor/terrain, from FAF Studio): golden checksums at every thread count,
 # the Generate ops, the interop ops. Engine independent.
-add_executable(faf_editor_field_tests EXCLUDE_FROM_ALL editor/FieldTests.cpp editor/FieldLandTests.cpp editor/FieldInteropTests.cpp
+add_executable(faf_editor_field_tests EXCLUDE_FROM_ALL editor/FieldTests.cpp editor/FieldLandTests.cpp editor/FieldInteropTests.cpp editor/ErosionTests.cpp
+  ${CMAKE_SOURCE_DIR}/src/editor/terrain/EdErosion.cpp ${CMAKE_SOURCE_DIR}/src/editor/terrain/EdFieldEro2.cpp
   ${CMAKE_SOURCE_DIR}/src/editor/terrain/EdFieldCore.cpp ${CMAKE_SOURCE_DIR}/src/editor/terrain/EdFieldFilt.cpp ${CMAKE_SOURCE_DIR}/src/editor/terrain/EdFieldGen.cpp ${CMAKE_SOURCE_DIR}/src/editor/terrain/EdFieldLand.cpp ${CMAKE_SOURCE_DIR}/src/editor/terrain/EdFieldSc.cpp ${CMAKE_SOURCE_DIR}/src/editor/terrain/EdFieldPath.cpp ${CMAKE_SOURCE_DIR}/src/editor/terrain/EdFieldInterop.cpp)
 target_include_directories(faf_editor_field_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
-target_compile_definitions(faf_editor_field_tests PRIVATE FAF_FIELD_CASES="${CMAKE_CURRENT_SOURCE_DIR}/editor/data/field_cases.lua")
-target_compile_options(faf_editor_field_tests PRIVATE /EHsc)
+target_compile_definitions(faf_editor_field_tests PRIVATE FAF_FIELD_CASES="${CMAKE_CURRENT_SOURCE_DIR}/editor/data/field_cases.lua"
+  FAF_EROSION_CASES="${CMAKE_CURRENT_SOURCE_DIR}/editor/data/erosion_cases.lua")
+target_compile_options(faf_editor_field_tests PRIVATE /EHsc -Wno-unused-function)
 target_link_libraries(faf_editor_field_tests PRIVATE gtest_main)
 set_target_properties(faf_editor_field_tests PROPERTIES FOLDER "Tests/Editor")
 add_test(NAME editor_field COMMAND faf_editor_field_tests)
@@ -439,9 +441,12 @@ add_executable(faf_editor_brush_tests EXCLUDE_FROM_ALL editor/HeightBrushTests.c
   editor/WaterBodiesEditTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdWaterBodies.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdLuaText.cpp
   ${CMAKE_SOURCE_DIR}/src/moho/sim/WaterBodies.cpp
   ${CMAKE_SOURCE_DIR}/src/editor/tools/EdHeightBrush.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdSymmetryCheck.cpp
+  ${CMAKE_SOURCE_DIR}/src/editor/terrain/EdErosion.cpp ${CMAKE_SOURCE_DIR}/src/editor/terrain/EdFieldCore.cpp
   ${CMAKE_SOURCE_DIR}/src/editor/tools/EdHeightFile.cpp
   ${CMAKE_SOURCE_DIR}/src/editor/undo/EdHeightHistory.cpp)
 target_include_directories(faf_editor_brush_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
+# The terrain library (Water erode, Rain and Deposit) turns running out of memory into an op error.
+target_compile_options(faf_editor_brush_tests PRIVATE /EHsc)
 # The zlib the engine links: 1.2.3 on both architectures (src/CMakeLists.txt).
 target_link_libraries(faf_editor_brush_tests PRIVATE gtest_main ole32 windowscodecs zlib123 winhttp crypt32 shell32)
 set_target_properties(faf_editor_brush_tests PROPERTIES FOLDER "Tests/Editor")

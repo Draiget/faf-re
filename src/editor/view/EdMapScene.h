@@ -91,6 +91,12 @@ namespace faf::editor
      */
     bool TestRaise(float x, float z, float seconds);
     /**
+     * Test runs (`/brushtest`): a stroke of `mode` lasting `seconds` at world x,z in 60 steps a second, as PaintStroke
+     * makes it (undo kept; Rain and Deposit on one erosion session), with the map's symmetry; logs the samples it
+     * changed, the ground added or taken, and the farthest change from x,z. False if nothing changed.
+     */
+    bool TestBrush(HeightBrushMode mode, float x, float z, float seconds);
+    /**
      * Test runs: stratum 4 painted full in a square of 24 mask texels around world x,z, as the mask brush uploads it,
      * then the editor's and (in front of a play) the play's mask read back at its middle, logged.
      */
@@ -674,6 +680,8 @@ namespace faf::editor
     bool mOverPlay = false;
     bool mLiveMaskSizeWarned = false;
     std::uint32_t mWaterErodeSeed = 0;
+    /** Rain and Deposit: the erosion session of the stroke in progress (made at its first step). */
+    ErosionStrokePtr mErosionStroke;
     /** The camera left by the last Detach, and the map it was on (kept for that map's next Attach). */
     bool mCameraKept = false;
     std::string mCameraKeptFor;

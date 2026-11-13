@@ -130,7 +130,7 @@ namespace faf::editor
         "/particlenew", "/particleopen", "/materialeditor", "/uiscale",        "/testrun",        "/openall",
         "/roundtrip",   "/vault",        "/vaultsearch",    "/vaultmap",       "/newmap",         "/stamp",
         "/brush",       "/layer",        "/waterbody",      "/ruler",          "/adaptivewindow", "/maskrule",
-        "/shader",
+        "/shader",      "/brushtest",
       };
       for (const char* const option : kOptions) {
         if (moho::CFG_GetArgOption(option, 0, nullptr)) {
@@ -2025,6 +2025,9 @@ namespace faf::editor
       // a height rule applied to the whole map once the map has been shown for 120 frames.
       int mMaskLayerArg = -1;
       std::string mMaskRuleArg;
+      // `/brushtest <mode>,<x>,<z>[,<seconds>]` (test runs): a scripted stroke of that height brush mode.
+      std::string mBrushTestArg;
+      int mBrushTestFrames = 0;
       int mMaskRuleFrames = 0;
       std::string mLayerNamesOf;
       // `/layer <slot>,<albedo path>[,<size>]` with `/open` (test runs): one texture slot changed.
@@ -3897,6 +3900,9 @@ namespace faf::editor
       if (fa::vector<fa::string> layer; moho::CFG_GetArgOption("/layer", 1, &layer) && !layer.empty()) {
         mLayerArg = layer[0].c_str();
       }
+      if (fa::vector<fa::string> test; moho::CFG_GetArgOption("/brushtest", 1, &test) && !test.empty()) {
+        mBrushTestArg = test[0].c_str();
+      }
       if (fa::vector<fa::string> rule; moho::CFG_GetArgOption("/maskrule", 1, &rule) && !rule.empty()) {
         mMaskRuleArg = rule[0].c_str();
       }
@@ -4770,6 +4776,15 @@ namespace faf::editor
         tools.SetShowLayerWeight(moho::CFG_GetArgOption("/layerweight", 0, nullptr));
         tools.SetMaskLayer(mMaskLayerArg);
         mMaskLayerArg = -1;
+      }
+      if (!mBrushTestArg.empty() && mScene.Attached() && ++mBrushTestFrames == 120) {
+        int mode = 0;
+        float x = 0.0f;
+        float z = 0.0f;
+        float seconds = 1.0f;
+        (void)std::sscanf(mBrushTestArg.c_str(), "%d,%f,%f,%f", &mode, &x, &z, &seconds);
+        (void)mScene.TestBrush(static_cast<HeightBrushMode>(std::clamp(mode, 0, 12)), x, z, seconds);
+        mBrushTestArg.clear();
       }
       if (!mMaskRuleArg.empty() && mScene.Attached() && ++mMaskRuleFrames == 120) {
         MaskRule rule;
