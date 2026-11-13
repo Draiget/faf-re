@@ -479,6 +479,7 @@ namespace faf::editor
       std::string name;
       Wm3::Vec3f position;
       float orientation[3];
+      std::string type; // the blueprint id, lower case
     };
     std::vector<moho::MeshInstance*> mUnits;
     std::vector<UnitRef> mUnitRefs;
@@ -588,8 +589,18 @@ namespace faf::editor
     [[nodiscard]] std::vector<std::vector<std::string>> MarkerPartners() const;
     void FollowPropMove(std::size_t selected, const Wm3::Vec3f& position);
     void FollowMarkerMove(std::size_t selected, float x, float z);
+    /** Units by type (the copies may be in another army); decals by texture, matched at their middles. */
+    [[nodiscard]] std::vector<std::vector<std::pair<std::string, std::string>>> UnitPartners() const;
+    [[nodiscard]] std::vector<std::vector<int>> DecalPartners() const;
+    void FollowUnitMove(std::size_t selected, const Wm3::Vec3f& position);
+    void FollowDecalMove(std::size_t selected, const Wm3::Vec3f& corner);
+    /** For a drag that starts now: follow on, unless the drag moves a Shift copy (the originals keep their copies). */
+    [[nodiscard]] bool FollowDrag();
     std::vector<std::vector<int>> mPropFollow;
     std::vector<std::vector<std::string>> mMarkerFollow;
+    std::vector<std::vector<std::pair<std::string, std::string>>> mUnitFollow;
+    std::vector<std::vector<int>> mDecalFollow;
+    bool mDragIsCopy = false;
     bool mMiniCached = false;
     bool mMiniDrawNow = true;
     bool mMiniDrewLast = false;

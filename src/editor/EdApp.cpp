@@ -2267,7 +2267,7 @@ namespace faf::editor
       std::string mLayerOpArg; // `/layerop <slot>,fill|remove|optimal` (test runs)
       std::string mSlopeViewArg;       // `/slopeview units,<n>[,<limit>]|buildings,<n>,ring|area[,<limit>]` (test runs)
       std::string mTypesFromLayersArg; // `/typesfromlayers[,only]` (test runs)
-      std::string mFollowTestArg;      // `/followtest props|markers` (test runs)
+      std::string mFollowTestArg;      // `/followtest props|markers|units|decals` (test runs)
       int mD2gFrames = 0;
       int mLayerOpFrames = 0;
       int mThemeArgFrames = 0;

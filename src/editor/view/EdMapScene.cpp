@@ -3935,7 +3935,11 @@ namespace faf::editor
         instance->isHidden = 0;
         mUnits.push_back(instance);
         UnitRef ref{
-          army.name, unit->name, transform.pos_, {unit->orientation[0], unit->orientation[1], unit->orientation[2]}
+          army.name,
+          unit->name,
+          transform.pos_,
+          {unit->orientation[0], unit->orientation[1], unit->orientation[2]},
+          lower
         };
         mUnitRefs.push_back(std::move(ref));
         ++drawn;
@@ -4283,6 +4287,7 @@ namespace faf::editor
     const bool shift
   )
   {
+    mDragIsCopy = false;
     if (!shift) {
       return false;
     }
@@ -4294,6 +4299,7 @@ namespace faf::editor
     }
     PasteAt(mClipboard.centre[0], mClipboard.centre[1]);
     mClipboard = kept;
+    mDragIsCopy = true; // a copy in place would take the original's mirrored copies as its own
     gpg::Logf("editor: Shift+drag: %zu copied in place, the copies move", copied);
     return true;
   }
@@ -5522,7 +5528,7 @@ namespace faf::editor
       for (const int index : mSelection) {
         mDragStart.push_back(mMap->mProps->mEntries[static_cast<std::size_t>(index)].mTransform.pos_);
       }
-      mPropFollow = FollowOn() ? PropPartners() : std::vector<std::vector<int>>{};
+      mPropFollow = FollowDrag() ? PropPartners() : std::vector<std::vector<int>>{};
       break;
     case PickKind::Marker:
       mDragMarkers = true;
@@ -5531,7 +5537,7 @@ namespace faf::editor
       mMarkerDragFromZ = groundZ;
       mMarkerBefore = mDocument.SaveDataNow();
       mMarkerDragStart.clear();
-      mMarkerFollow = FollowOn() ? MarkerPartners() : std::vector<std::vector<std::string>>{};
+      mMarkerFollow = FollowDrag() ? MarkerPartners() : std::vector<std::vector<std::string>>{};
       for (const std::string& selected : mMarkerSelection) {
         std::array<float, 3> start{};
         for (const SaveEntry& marker : mDocument.SaveData().Markers()) {
@@ -5555,6 +5561,7 @@ namespace faf::editor
           index >= 0 ? mUnitRefs[static_cast<std::size_t>(index)].position : Wm3::Vec3f{0.0f, 0.0f, 0.0f}
         );
       }
+      mUnitFollow = FollowDrag() ? UnitPartners() : decltype(mUnitFollow){};
       break;
     case PickKind::Decal: {
       moho::IDecalManager* const decals = mDocument.Decals();
@@ -5574,6 +5581,7 @@ namespace faf::editor
         }
         mDecalDragStart.push_back(start);
       }
+      mDecalFollow = FollowDrag() ? DecalPartners() : std::vector<std::vector<int>>{};
       break;
     }
     default:
@@ -7005,6 +7013,18 @@ namespace faf::editor
     }
     EdDocument::DecalSnapshot before = mDocument.DecalsNow();
     int deleted = 0;
+    // Follow symmetry: the mirrored copies go too.
+    if (FollowOn()) {
+      std::vector<int> doomed = mDecalSelection;
+      for (const std::vector<int>& copies : DecalPartners()) {
+        for (const int partner : copies) {
+          if (partner >= 0 && std::find(doomed.begin(), doomed.end(), partner) == doomed.end()) {
+            doomed.push_back(partner);
+          }
+        }
+      }
+      mDecalSelection = std::move(doomed);
+    }
     for (const int index : mDecalSelection) {
       if (moho::CWldTerrainDecal* const decal = FindDecal(*decals, index); decal != nullptr) {
         decals->DestroyDecal(decal);
@@ -7395,6 +7415,161 @@ namespace faf::editor
     }
   }
 
+  namespace
+  {
+    moho::VTransform UnitTransform(const Wm3::Vec3f& position, const float (&orientation)[3]); // below
+  } // namespace
+
+  bool EdMapScene::FollowDrag()
+  {
+    const bool on = FollowOn() && !mDragIsCopy;
+    mDragIsCopy = false;
+    return on;
+  }
+
+  std::vector<std::vector<std::pair<std::string, std::string>>> EdMapScene::UnitPartners() const
+  {
+    const moho::CHeightField* const field = mMap != nullptr ? mMap->mTerrainRes->GetHeightField() : nullptr;
+    if (field == nullptr) {
+      return {};
+    }
+    std::vector<FollowItem> items;
+    items.reserve(mUnitRefs.size());
+    for (const UnitRef& ref : mUnitRefs) {
+      items.push_back({ref.position.x, ref.position.z, ref.type});
+    }
+    std::vector<int> selected;
+    for (const auto& [army, name] : mUnitSelection) {
+      selected.push_back(UnitRefIndex(army, name));
+    }
+    const HeightBrush brush = mTools->CurrentHeightBrush();
+    const std::vector<std::vector<int>> found =
+      FindSymmetryPartners(items, selected, field->width, field->height, brush.symmetry, brush.turns, 1.5f);
+    std::vector<std::vector<std::pair<std::string, std::string>>> keys(found.size());
+    for (std::size_t s = 0; s < found.size(); ++s) {
+      for (const int index : found[s]) {
+        if (index >= 0) {
+          const UnitRef& ref = mUnitRefs[static_cast<std::size_t>(index)];
+          keys[s].emplace_back(ref.army, ref.name);
+        } else {
+          keys[s].emplace_back();
+        }
+      }
+    }
+    return keys;
+  }
+
+  std::vector<std::vector<int>> EdMapScene::DecalPartners() const
+  {
+    const moho::CHeightField* const field = mMap != nullptr ? mMap->mTerrainRes->GetHeightField() : nullptr;
+    moho::IDecalManager* const decals = mDocument.Decals();
+    if (field == nullptr || decals == nullptr) {
+      return {};
+    }
+    // Matched at their middles: a decal's position is a corner, which a mirror moves to another corner.
+    std::vector<FollowItem> items;
+    std::vector<int> indices;
+    for (int i = 0; i < decals->GetDecalCount(); ++i) {
+      const moho::CWldTerrainDecal* const decal = decals->GetDecal(i);
+      if (decal == nullptr) {
+        continue;
+      }
+      float cx = 0.0f, cz = 0.0f;
+      DecalCentre(FootprintOf(*decal), cx, cz);
+      std::string key = decal->mNames[0].c_str();
+      for (char& c : key) {
+        c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+      }
+      items.push_back({cx, cz, std::move(key)});
+      indices.push_back(decal->mIndex);
+    }
+    std::vector<int> selected;
+    for (const int index : mDecalSelection) {
+      const auto at = std::find(indices.begin(), indices.end(), index);
+      selected.push_back(at != indices.end() ? static_cast<int>(at - indices.begin()) : -1);
+    }
+    const HeightBrush brush = mTools->CurrentHeightBrush();
+    std::vector<std::vector<int>> found =
+      FindSymmetryPartners(items, selected, field->width, field->height, brush.symmetry, brush.turns, 1.5f);
+    for (std::vector<int>& copies : found) {
+      for (int& index : copies) {
+        index = index >= 0 ? indices[static_cast<std::size_t>(index)] : -1;
+      }
+    }
+    return found;
+  }
+
+  void EdMapScene::FollowUnitMove(
+    const std::size_t selected,
+    const Wm3::Vec3f& position
+  )
+  {
+    const moho::CHeightField* const field = mMap->mTerrainRes->GetHeightField();
+    if (selected >= mUnitFollow.size() || field == nullptr) {
+      return;
+    }
+    const HeightBrush brush = mTools->CurrentHeightBrush();
+    float cx[kMaxSymmetryCopies], cz[kMaxSymmetryCopies];
+    const int copies =
+      HeightBrushCentres(field->width, field->height, position.x, position.z, brush.symmetry, brush.turns, cx, cz);
+    for (int c = 1; c < copies && static_cast<std::size_t>(c - 1) < mUnitFollow[selected].size(); ++c) {
+      const auto& [army, name] = mUnitFollow[selected][static_cast<std::size_t>(c - 1)];
+      const int index = name.empty() ? -1 : UnitRefIndex(army, name);
+      if (index < 0) {
+        continue;
+      }
+      UnitRef& ref = mUnitRefs[static_cast<std::size_t>(index)];
+      ref.position = Wm3::Vec3f{
+        cx[c],
+        mMap->mTerrainRes->GetHeightAt(
+          static_cast<std::int32_t>(std::lround(cx[c])), static_cast<std::int32_t>(std::lround(cz[c]))
+        ),
+        cz[c]
+      };
+      if (moho::MeshInstance* const instance = mUnits[static_cast<std::size_t>(index)]; instance != nullptr) {
+        const moho::VTransform transform = UnitTransform(ref.position, ref.orientation);
+        instance->SetStance(transform, transform);
+      }
+    }
+  }
+
+  void EdMapScene::FollowDecalMove(
+    const std::size_t selected,
+    const Wm3::Vec3f& corner
+  )
+  {
+    const moho::CHeightField* const field = mMap->mTerrainRes->GetHeightField();
+    moho::IDecalManager* const decals = mDocument.Decals();
+    if (
+      selected >= mDecalFollow.size() || field == nullptr || decals == nullptr || selected >= mDecalSelection.size()
+    ) {
+      return;
+    }
+    const moho::CWldTerrainDecal* const leader = FindDecal(*decals, mDecalSelection[selected]);
+    if (leader == nullptr) {
+      return;
+    }
+    DecalFootprint footprint = FootprintOf(*leader);
+    footprint.x = corner.x;
+    footprint.z = corner.z;
+    float mx = 0.0f, mz = 0.0f;
+    DecalCentre(footprint, mx, mz);
+    const HeightBrush brush = mTools->CurrentHeightBrush();
+    float cx[kMaxSymmetryCopies], cz[kMaxSymmetryCopies];
+    const int copies = HeightBrushCentres(field->width, field->height, mx, mz, brush.symmetry, brush.turns, cx, cz);
+    for (int c = 1; c < copies && static_cast<std::size_t>(c - 1) < mDecalFollow[selected].size(); ++c) {
+      const int partner = mDecalFollow[selected][static_cast<std::size_t>(c - 1)];
+      moho::CWldTerrainDecal* const decal = partner >= 0 ? FindDecal(*decals, partner) : nullptr;
+      if (decal == nullptr) {
+        continue;
+      }
+      // The copy keeps its own size and heading; its middle goes to the image of the leader's.
+      const DecalFootprint own = FootprintOf(*decal);
+      const DecalFootprint placed = DecalAround(cx[c], cz[c], own.sizeX, own.sizeZ, own.yaw);
+      decal->SetPosition(Wm3::Vec3f{placed.x, decal->mPosition.y, placed.z});
+    }
+  }
+
   void EdMapScene::TestFollow(
     const std::string& kind
   )
@@ -7492,6 +7667,121 @@ namespace faf::editor
         return;
       }
       gpg::Logf("editor: follow test: no mass marker with a mirrored copy");
+      return;
+    }
+    if (kind == "units") {
+      // A map whose units have no mirrored copies (SCMP_009's wrecks): the first unit gets one, in its own army, at
+      // its image, the way a symmetric map would have it.
+      bool paired = false;
+      for (const UnitRef& unit : mUnitRefs) {
+        mUnitSelection = {{unit.army, unit.name}};
+        const auto partners = UnitPartners();
+        paired = paired || (!partners.empty() && !partners[0].empty() && !partners[0][0].second.empty());
+      }
+      if (!paired && !mUnitRefs.empty()) {
+        const UnitRef first = mUnitRefs.front();
+        float cx[kMaxSymmetryCopies], cz[kMaxSymmetryCopies];
+        if (
+          HeightBrushCentres(
+            field->width, field->height, first.position.x, first.position.z, brush.symmetry, brush.turns, cx, cz
+          ) > 1
+        ) {
+          (void)EditArmyUnits(first.army, [&](UnitGroup& group) {
+            if (const SaveUnit* const unit = FindUnit(group, first.name); unit != nullptr) {
+              SaveUnit copy = *unit;
+              copy.name = "UNIT_99001";
+              copy.position[0] = cx[1];
+              copy.position[2] = cz[1];
+              AddUnit(group, copy);
+            }
+          });
+          ReloadUnits();
+          gpg::Logf(
+            "editor: follow test: %s/%s given a copy at its image %.2f, %.2f",
+            first.army.c_str(),
+            first.name.c_str(),
+            static_cast<double>(cx[1]),
+            static_cast<double>(cz[1])
+          );
+        }
+      }
+      const std::size_t before = mUnitRefs.size();
+      for (const UnitRef& unit : mUnitRefs) {
+        mUnitSelection = {{unit.army, unit.name}};
+        const auto partners = UnitPartners();
+        if (partners.empty() || partners[0].empty() || partners[0][0].second.empty()) {
+          continue;
+        }
+        const std::pair<std::string, std::string> leader{unit.army, unit.name};
+        const std::pair<std::string, std::string> partner = partners[0][0];
+        const int index = UnitRefIndex(leader.first, leader.second);
+        const Wm3::Vec3f to{unit.position.x + 6.0f, unit.position.y, unit.position.z + 4.0f};
+        mUnitFollow = partners;
+        mUnitRefs[static_cast<std::size_t>(index)].position = to;
+        FollowUnitMove(0, to);
+        float cx[kMaxSymmetryCopies], cz[kMaxSymmetryCopies];
+        (void)HeightBrushCentres(field->width, field->height, to.x, to.z, brush.symmetry, brush.turns, cx, cz);
+        const Wm3::Vec3f moved =
+          mUnitRefs[static_cast<std::size_t>(UnitRefIndex(partner.first, partner.second))].position;
+        gpg::Logf(
+          "editor: follow test: unit %s/%s moved by (6, 4); its copy %s/%s is at %.2f, %.2f (the image: %.2f, %.2f)",
+          leader.first.c_str(),
+          leader.second.c_str(),
+          partner.first.c_str(),
+          partner.second.c_str(),
+          static_cast<double>(moved.x),
+          static_cast<double>(moved.z),
+          static_cast<double>(cx[1]),
+          static_cast<double>(cz[1])
+        );
+        DeleteSelectedUnits();
+        gpg::Logf("editor: follow test: deleted with its copy: %zu units -> %zu", before, mUnitRefs.size());
+        return;
+      }
+      gpg::Logf("editor: follow test: no unit with a mirrored copy (%zu units)", before);
+      return;
+    }
+    if (kind == "decals") {
+      moho::IDecalManager* const decals = mDocument.Decals();
+      if (decals == nullptr) {
+        return;
+      }
+      const int before = decals->GetDecalCount();
+      for (int i = 0; i < before; ++i) {
+        const moho::CWldTerrainDecal* const decal = decals->GetDecal(i);
+        if (decal == nullptr) {
+          continue;
+        }
+        mDecalSelection = {decal->mIndex};
+        const std::vector<std::vector<int>> partners = DecalPartners();
+        if (partners.empty() || partners[0].empty() || partners[0][0] < 0) {
+          continue;
+        }
+        const int partner = partners[0][0];
+        mDecalFollow = partners;
+        moho::CWldTerrainDecal* const leader = FindDecal(*decals, mDecalSelection[0]);
+        leader->SetPosition(Wm3::Vec3f{leader->mPosition.x + 6.0f, leader->mPosition.y, leader->mPosition.z + 4.0f});
+        FollowDecalMove(0, leader->mPosition);
+        float lx = 0.0f, lz = 0.0f, px = 0.0f, pz = 0.0f;
+        DecalCentre(FootprintOf(*leader), lx, lz);
+        DecalCentre(FootprintOf(*FindDecal(*decals, partner)), px, pz);
+        float cx[kMaxSymmetryCopies], cz[kMaxSymmetryCopies];
+        (void)HeightBrushCentres(field->width, field->height, lx, lz, brush.symmetry, brush.turns, cx, cz);
+        gpg::Logf(
+          "editor: follow test: decal %d moved by (6, 4); its copy %d's middle is at %.2f, %.2f (the image: %.2f, "
+          "%.2f)",
+          mDecalSelection[0],
+          partner,
+          static_cast<double>(px),
+          static_cast<double>(pz),
+          static_cast<double>(cx[1]),
+          static_cast<double>(cz[1])
+        );
+        DeleteSelectedDecals();
+        gpg::Logf("editor: follow test: deleted with its copy: %d decals -> %d", before, decals->GetDecalCount());
+        return;
+      }
+      gpg::Logf("editor: follow test: no decal with a mirrored copy (%d decals)", before);
     }
   }
 
@@ -8089,6 +8379,18 @@ namespace faf::editor
     }
     EdDocument::SaveSnapshot before = mDocument.SaveDataNow();
     int deleted = 0;
+    // Follow symmetry: the mirrored copies go too.
+    if (FollowOn()) {
+      std::vector<std::pair<std::string, std::string>> doomed = mUnitSelection;
+      for (const auto& copies : UnitPartners()) {
+        for (const auto& copy : copies) {
+          if (!copy.second.empty() && std::find(doomed.begin(), doomed.end(), copy) == doomed.end()) {
+            doomed.push_back(copy);
+          }
+        }
+      }
+      mUnitSelection = std::move(doomed);
+    }
     for (const auto& [army, name] : mUnitSelection) {
       bool removed = false;
       if (
@@ -8528,7 +8830,7 @@ namespace faf::editor
           mMarkersMoved = false;
           mMarkerBefore = mDocument.SaveDataNow();
           mMarkerDragStart.clear();
-          mMarkerFollow = FollowOn() ? MarkerPartners() : std::vector<std::vector<std::string>>{};
+          mMarkerFollow = FollowDrag() ? MarkerPartners() : std::vector<std::vector<std::string>>{};
           for (const std::string& selected : mMarkerSelection) {
             std::array<float, 3> start{};
             for (const SaveEntry& marker : mDocument.SaveData().Markers()) {
@@ -8583,7 +8885,7 @@ namespace faf::editor
         mMarkerDragFromZ = groundZ;
         mMarkerBefore = mDocument.SaveDataNow();
         mMarkerDragStart.clear();
-        mMarkerFollow = FollowOn() ? MarkerPartners() : std::vector<std::vector<std::string>>{};
+        mMarkerFollow = FollowDrag() ? MarkerPartners() : std::vector<std::vector<std::string>>{};
         for (const std::string& selected : mMarkerSelection) {
           std::array<float, 3> start{};
           for (const SaveEntry& marker : markers) {
@@ -8659,6 +8961,7 @@ namespace faf::editor
             index >= 0 ? mUnitRefs[static_cast<std::size_t>(index)].position : Wm3::Vec3f{0.0f, 0.0f, 0.0f}
           );
         }
+        mUnitFollow = FollowDrag() ? UnitPartners() : decltype(mUnitFollow){};
         ::SetCapture(window);
         ::SetFocus(window);
         return true;
@@ -8732,6 +9035,7 @@ namespace faf::editor
           }
           mDecalDragStart.push_back(start);
         }
+        mDecalFollow = FollowDrag() ? DecalPartners() : std::vector<std::vector<int>>{};
         ::SetCapture(window);
         ::SetFocus(window);
         return true;
@@ -8973,7 +9277,15 @@ namespace faf::editor
         mDragUnits = false;
         ::ReleaseCapture();
         if (mUnitsMoved) {
-          for (const auto& [army, name] : mUnitSelection) {
+          std::vector<std::pair<std::string, std::string>> moved = mUnitSelection;
+          for (const auto& copies : mUnitFollow) {
+            for (const auto& copy : copies) {
+              if (!copy.second.empty()) {
+                moved.push_back(copy);
+              }
+            }
+          }
+          for (const auto& [army, name] : moved) {
             const int index = UnitRefIndex(army, name);
             if (index < 0) {
               continue;
@@ -9195,6 +9507,7 @@ namespace faf::editor
                 const moho::VTransform transform = UnitTransform(ref.position, ref.orientation);
                 instance->SetStance(transform, transform);
               }
+              FollowUnitMove(i, ref.position);
             }
             mUnitsMoved = true;
           }
@@ -9214,6 +9527,7 @@ namespace faf::editor
                   static_cast<std::int32_t>(std::lround(x)), static_cast<std::int32_t>(std::lround(z))
                 );
                 decal->SetPosition(Wm3::Vec3f{x, std::max(mDecalDragStart[i][1] + move.y, ground), z});
+                FollowDecalMove(i, decal->mPosition);
               }
             }
             mDecalsMoved = true;
@@ -9233,6 +9547,7 @@ namespace faf::editor
                 const float x = SnapToGrid(mDecalDragStart[i][0] + groundX - mDecalDragFromX);
                 const float z = SnapToGrid(mDecalDragStart[i][2] + groundZ - mDecalDragFromZ);
                 decal->SetPosition(Wm3::Vec3f{x, mDecalDragStart[i][1], z});
+                FollowDecalMove(i, decal->mPosition);
               }
             }
             mDecalsMoved = true;
@@ -9251,6 +9566,8 @@ namespace faf::editor
               const Wm3::Vec3f start{mMarkerDragStart[i][0], mMarkerDragStart[i][1], mMarkerDragStart[i][2]};
               const Wm3::Vec3f place = GizmoPlace(start, move, type == "Mass" || type == "Hydrocarbon");
               marker.Set("position", Vector3Value(place.x, place.y, place.z));
+              FollowMarkerMove(i, place.x, place.z);
+              break; // FollowMarkerMove sets other entries of `markers`; names are unique
             }
           }
           mMarkersMoved = mMarkersMoved || move.x != 0.0f || move.y != 0.0f || move.z != 0.0f;
