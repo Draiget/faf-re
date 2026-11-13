@@ -3,6 +3,7 @@
 
 #include <cctype>
 #include "editor/ui/EdControls.h"
+#include "editor/ui/EdFonts.h"
 #include "editor/ui/EdThemeColors.h"
 #include "editor/ui/EdUiScale.h"
 #include "editor/ui/EdWorkspaces.h"
@@ -89,6 +90,40 @@ namespace faf::editor
       mPropertiesEditing = false;
       ImGui::TextDisabled("Nothing selected.");
       HelpNote("Select a marker, unit, prop or decal (the Select tool picks any of them) to see and edit it here.");
+      // The mockup's cards: what the map holds, a big number over its kind.
+      static constexpr const char* kKinds[4] = {"markers", "props", "units", "decals"};
+      const int* const counts = mTools.MapCounts();
+      const float gap = ImGui::GetStyle().ItemSpacing.x;
+      const float cardWidth = (ImGui::GetContentRegionAvail().x - gap * 3.0f) / 4.0f;
+      const float big = std::round(ImGui::GetFontSize() * 1.45f);
+      const float small = std::round(ImGui::GetFontSize() * 0.85f);
+      const float cardHeight = std::round(big + small + ImGui::GetStyle().FramePadding.y * 4.0f);
+      ImDrawList* const draw = ImGui::GetWindowDrawList();
+      for (int k = 0; k < 4; ++k) {
+        if (k > 0) {
+          ImGui::SameLine(0.0f, gap);
+        }
+        const ImVec2 at = ImGui::GetCursorScreenPos();
+        ImGui::Dummy(ImVec2(cardWidth, cardHeight));
+        const ImVec2 end(at.x + cardWidth, at.y + cardHeight);
+        const float rounding = ImGui::GetStyle().FrameRounding;
+        draw->AddRectFilled(at, end, ImGui::GetColorU32(ImGuiCol_FrameBg), rounding);
+        draw->AddRect(at, end, ImGui::GetColorU32(ImGuiCol_Border), rounding);
+        char number[24];
+        (void)std::snprintf(number, sizeof(number), "%d", counts[k]);
+        const float left = at.x + ImGui::GetStyle().FramePadding.x + 2.0f;
+        const float top = at.y + ImGui::GetStyle().FramePadding.y * 1.5f;
+        draw->AddText(
+          gBoldFont != nullptr ? gBoldFont : ImGui::GetFont(),
+          big,
+          ImVec2(left, top),
+          ImGui::GetColorU32(ImGuiCol_Text),
+          number
+        );
+        draw->AddText(
+          ImGui::GetFont(), small, ImVec2(left, top + big), ImGui::GetColorU32(ImGuiCol_TextDisabled), kKinds[k]
+        );
+      }
       ImGui::End();
       return;
     }

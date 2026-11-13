@@ -3835,6 +3835,15 @@ namespace faf::editor
     if (mTools != nullptr && mTools->SelectToolActive()) {
       mTools->SetSelectInfo(SelectionText(), HoverText(), SelectedKind() != PickKind::None);
     }
+    if (mTools != nullptr && mMap != nullptr) {
+      moho::IDecalManager* const decals = mDocument.Decals();
+      mTools->SetMapCounts(
+        static_cast<int>(mDocument.SaveData().Markers().size()),
+        mMap->mProps != nullptr ? static_cast<int>(mMap->mProps->mEntries.size()) : 0,
+        static_cast<int>(mUnitRefs.size()),
+        decals != nullptr ? decals->GetDecalCount() : 0
+      );
+    }
     // The Show menu: prop and unit models hidden by culling their instances (each frame while hidden, so new ones
     // follow).
     if (mTools != nullptr) {

@@ -51,6 +51,9 @@ namespace faf::editor
 
   /** A tile of a mode grid: bordered, the picked one in the accent's soft fill and border. */
   bool ModeTile(const char* label, bool picked, const ImVec2& size);
+  /** The mockup's tool-mode tile: the icon above its name, bordered, the picked one in the accent (`size.y` 0: two
+   * text lines and the padding). */
+  bool ModeTile(const char* icon, const char* label, bool picked, ImVec2 size);
 
   /**
    * A section of a panel as the mockup heads it: a chevron and the title in small dimmed capitals, brighter under the

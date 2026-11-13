@@ -351,6 +351,57 @@ namespace faf::editor
     ImGui::PopStyleColor(5);
     return pressed;
   }
+  bool ModeTile(
+    const char* const icon,
+    const char* const label,
+    const bool picked,
+    ImVec2 size
+  )
+  {
+    const float fontSize = ImGui::GetFontSize();
+    const float small = std::round(fontSize * 0.85f);
+    if (size.y <= 0.0f) {
+      size.y = std::round(fontSize * 1.15f + small + ImGui::GetStyle().FramePadding.y * 3.0f);
+    }
+    ImGui::PushID(label);
+    const ImVec2 at = ImGui::GetCursorScreenPos();
+    const bool pressed = ImGui::InvisibleButton("##modetile", size);
+    const bool hovered = ImGui::IsItemHovered();
+    const bool held = ImGui::IsItemActive();
+    ImGui::PopID();
+    ImDrawList* const draw = ImGui::GetWindowDrawList();
+    const ImVec4 fill = picked ? AccentColor(hovered ? 0.22f : 0.16f)
+      : held                   ? AccentColor(0.30f)
+      : hovered                ? ImGui::GetStyleColorVec4(ImGuiCol_FrameBgHovered)
+                               : ImGui::GetStyleColorVec4(ImGuiCol_FrameBg);
+    const float rounding = ImGui::GetStyle().FrameRounding;
+    const ImVec2 end(at.x + size.x, at.y + size.y);
+    draw->AddRectFilled(at, end, ImGui::ColorConvertFloat4ToU32(fill), rounding);
+    draw->AddRect(
+      at,
+      end,
+      ImGui::ColorConvertFloat4ToU32(picked ? AccentColor(1.0f) : ImGui::GetStyleColorVec4(ImGuiCol_Border)),
+      rounding
+    );
+    const ImVec4 ink = ImGui::GetStyleColorVec4(ImGuiCol_Text);
+    const ImVec4 dim = ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled);
+    const ImU32 colour = ImGui::ColorConvertFloat4ToU32(
+      picked || hovered ? ink : ImVec4((ink.x + dim.x) * 0.5f, (ink.y + dim.y) * 0.5f, (ink.z + dim.z) * 0.5f, 1.0f)
+    );
+    // The icon a size above the text, its name small below, both centred.
+    ImFont* const font = ImGui::GetFont();
+    const float iconSize = std::round(fontSize * 1.15f);
+    const ImVec2 iconText = font->CalcTextSizeA(iconSize, FLT_MAX, 0.0f, icon);
+    const ImVec2 labelText = font->CalcTextSizeA(small, FLT_MAX, 0.0f, label);
+    const float total = iconText.y + labelText.y;
+    const float top = std::round(at.y + (size.y - total) * 0.5f);
+    draw->AddText(font, iconSize, ImVec2(std::round(at.x + (size.x - iconText.x) * 0.5f), top), colour, icon);
+    draw->AddText(
+      font, small, ImVec2(std::round(at.x + (size.x - labelText.x) * 0.5f), top + iconText.y), colour, label
+    );
+    return pressed;
+  }
+
   bool Section(
     const char* const title,
     const bool openAtFirst

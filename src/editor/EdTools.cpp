@@ -863,7 +863,15 @@ namespace faf::editor
         };
         static constexpr int kModeOf[5][3] = {{0, 1, 2}, {3, 5, 4}, {6, 7, 8}, {9, 10, 11}, {12, 13, 14}};
         static constexpr int kRowSize[5] = {3, 3, 3, 3, 3};
-        // The mockup's mode grid: bordered tiles, three a row, the picked one in the accent's soft fill.
+        // The mockup's mode grid: bordered tiles, three a row, each its icon above its name, the picked one in the
+        // accent's soft fill.
+        static const char* const kIcons[5][3] = {
+          {ICON_RAISE, ICON_LOWER, ICON_SMOOTH},
+          {ICON_FLATTEN, ICON_HEIGHTS, ICON_NOISE},
+          {ICON_TERRACE, ICON_RAMP, ICON_STAMP},
+          {ICON_ERODE, ICON_WATER, ICON_RAIN},
+          {ICON_LAYERS, ICON_PLATEAU, ICON_SLOPE}
+        };
         const float gap = ImGui::GetStyle().ItemSpacing.x;
         const float tileWidth = (ImGui::GetContentRegionAvail().x - gap * 2.0f) / 3.0f;
         for (int row = 0; row < 5; ++row) {
@@ -872,7 +880,7 @@ namespace faf::editor
               ImGui::SameLine();
             }
             const int mode = kModeOf[row][i];
-            if (ModeTile(kRows[row][i], mode == mBrushMode, ImVec2(tileWidth, ImGui::GetFrameHeight() + 4.0f))) {
+            if (ModeTile(kIcons[row][i], kRows[row][i], mode == mBrushMode, ImVec2(tileWidth, 0.0f))) {
               mBrushMode = mode;
             }
           }
@@ -1046,6 +1054,47 @@ namespace faf::editor
       FillSliderFloat("##strength", &mStrength, 0.05f, 1.0f, "Strength %.2f");
       ImGui::SetNextItemWidth(-1.0f);
       FillSliderFloat("##falloff", &mFalloff, 0.0f, 1.0f, "Falloff %.2f");
+      DrawFalloffCurve();
+    }
+  }
+
+  void EdTools::DrawFalloffCurve()
+  {
+    // The mockup's curve under the sliders: the brush's weight across its middle (BrushWeightAt, so its shape and
+    // angle too), on a frame with quarter lines, the area under it in the accent's soft fill.
+    const float width = ImGui::GetContentRegionAvail().x;
+    const float height = std::round(ImGui::GetFrameHeight() * 2.6f);
+    const ImVec2 at = ImGui::GetCursorScreenPos();
+    ImGui::Dummy(ImVec2(width, height));
+    ImDrawList* const draw = ImGui::GetWindowDrawList();
+    const ImVec2 end(at.x + width, at.y + height);
+    const float rounding = ImGui::GetStyle().FrameRounding;
+    draw->AddRectFilled(at, end, ImGui::GetColorU32(ImGuiCol_FrameBg), rounding);
+    const ImU32 grid = ImGui::GetColorU32(ImGuiCol_Border, 0.6f);
+    for (int q = 1; q < 4; ++q) {
+      const float x = at.x + width * static_cast<float>(q) / 4.0f;
+      draw->AddLine(ImVec2(x, at.y + 1.0f), ImVec2(x, end.y - 1.0f), grid);
+    }
+    const HeightBrush brush = CurrentHeightBrush();
+    constexpr int kSamples = 64;
+    const float pad = 4.0f;
+    ImVec2 points[kSamples + 1];
+    for (int i = 0; i <= kSamples; ++i) {
+      const float t = static_cast<float>(i) / kSamples;
+      const float weight = std::clamp(BrushWeightAt(brush, (t * 2.0f - 1.0f) * brush.radius, 0.0f), 0.0f, 1.0f);
+      points[i] = ImVec2(at.x + width * t, end.y - pad - (height - pad * 2.0f) * weight);
+    }
+    const ImU32 line = ImGui::ColorConvertFloat4ToU32(AccentColor(1.0f));
+    const ImU32 fill = ImGui::ColorConvertFloat4ToU32(AccentColor(0.18f));
+    for (int i = 0; i < kSamples; ++i) {
+      draw->AddQuadFilled(
+        ImVec2(points[i].x, end.y - 1.0f), points[i], points[i + 1], ImVec2(points[i + 1].x, end.y - 1.0f), fill
+      );
+    }
+    draw->AddPolyline(points, kSamples + 1, line, ImDrawFlags_None, 2.0f);
+    draw->AddRect(at, end, ImGui::GetColorU32(ImGuiCol_Border), rounding);
+    if (ImGui::IsItemHovered()) {
+      EdSetTooltip("The brush's strength across its middle: full in the middle, fading by the falloff to its edge.");
     }
   }
 

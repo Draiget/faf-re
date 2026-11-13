@@ -1561,6 +1561,23 @@ namespace faf::editor
     {
       return mFollowSymmetry;
     }
+    /** How many of each kind the map has now (the view gives them each frame), for Properties with nothing chosen. */
+    void SetMapCounts(
+      const int markers,
+      const int props,
+      const int units,
+      const int decals
+    ) noexcept
+    {
+      mMapCounts[0] = markers;
+      mMapCounts[1] = props;
+      mMapCounts[2] = units;
+      mMapCounts[3] = decals;
+    }
+    [[nodiscard]] const int* MapCounts() const noexcept
+    {
+      return mMapCounts;
+    }
     /** The view's HUD while G or R runs: what it is doing (empty: the tool's own mode). */
     void SetHudOverride(
       std::string text
@@ -2426,6 +2443,7 @@ namespace faf::editor
     void DrawMarkers();
     void DrawUnits();
     void DrawSelect();
+    void DrawFalloffCurve();
     void DrawArrange();
     void DrawBrush(bool withModes);
     void DrawSymmetry(bool withCheck = true);
@@ -2590,6 +2608,7 @@ namespace faf::editor
     bool mFollowSymmetry = true;
     bool mSelectAny = false; // something is selected (Arrange's buttons)
     std::string mHudOverride;
+    int mMapCounts[4] = {0, 0, 0, 0};
     FillOptions mFill;
     bool mFillRequest = false;
     std::string mFillMessage;
