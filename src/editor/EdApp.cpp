@@ -7718,6 +7718,11 @@ namespace faf::editor
       bool fresh = false;
       if (!mViewCopy || mViewCopyWidth != game.mWidth || mViewCopyHeight != game.mHeight) {
         fresh = true;
+        // The old copy goes: nothing may still point at it (a return below, before the new one is filled, would leave
+        // the panels' renderer reading a freed target).
+        gViewSurface = nullptr;
+        mViewSurface.reset();
+        mViewImage = 0;
         mViewCopy.reset();
         moho::ID3DDeviceResources::RenderTargetHandle target;
         (void)d3d->GetResources()->CreateRenderTarget(
