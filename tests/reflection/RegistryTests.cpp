@@ -273,7 +273,7 @@ namespace
     ExpectPrimitive<long>("long");
     ExpectPrimitive<unsigned long>("unsigned long");
     ExpectPrimitive<float>("float");
-    ExpectPrimitive<fa::string>("std::string");
+    ExpectPrimitive<fa::string>("string"); // retail's name, 0x008E0500
   }
 
   TEST(
@@ -297,6 +297,12 @@ namespace
     EXPECT_EQ(current("boost::thread"), "boost::thread");
     EXPECT_EQ(current(""), "");
     EXPECT_EQ(current(nullptr), "");
+    // Earlier builds named retail's `string` `std::string`; a whole word only.
+    EXPECT_EQ(current("std::string"), "string");
+    EXPECT_EQ(current("vector<std::string>"), "vector<string>");
+    EXPECT_EQ(current("std::stringstream"), "std::stringstream");
+    EXPECT_EQ(current("Moho::std::string_view"), "Moho::std::string_view");
+    EXPECT_EQ(gpg::REF_FindTypeNamed("std::string"), gpg::RTypeOf<fa::string>());
     // An old name whose current form isn't registered finds nothing.
     EXPECT_EQ(gpg::REF_FindTypeNamed("boost::shared_ptr<faf_reflection_tests::NoSuchType>"), nullptr);
   }

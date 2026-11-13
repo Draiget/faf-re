@@ -74,10 +74,15 @@ stringTypeInfo::stringTypeInfo()
 
 stringTypeInfo::~stringTypeInfo() = default;
 
-/** Address: 0x008E0500 */
+/**
+ * Address: 0x008E0500 (`mov eax, 0xE01694 ; "string"`, `ret`)
+ *
+ * Retail's name, so its saves (`string`, `vector<string>`) load; saves from builds that said `std::string` are still
+ * read through `REF_CurrentTypeName`.
+ */
 const char* stringTypeInfo::GetName() const
 {
-  return "std::string";
+  return "string";
 }
 
 /**

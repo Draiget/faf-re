@@ -1313,15 +1313,16 @@ namespace gpg
    * Returns registered reflection descriptor by exact type-name lookup.
    *
    * Engine change (#422): a name that isn't registered is tried once more as `REF_CurrentTypeName` spells it, so the
-   * `boost::shared_ptr<T>` / `boost::weak_ptr<T>` names in retail saves and saves from earlier builds still resolve.
+   * `boost::shared_ptr<T>` / `boost::weak_ptr<T>` names in retail saves and saves from earlier builds, and the
+   * `std::string` that earlier builds wrote for retail's `string`, still resolve.
    */
   RType* REF_FindTypeNamed(const char* name);
 
   /**
    * Engine addition (#422): `name` with every `boost::shared_ptr<` and `boost::weak_ptr<` in it written as
-   * `shared_ptr<` / `weak_ptr<`, the names the engine registers those types under; anywhere in the name, as the
-   * container types wrap their element's name (`list<boost::shared_ptr<Moho::STrigger>>`). Any other name comes
-   * back unchanged.
+   * `shared_ptr<` / `weak_ptr<`, and every whole-word `std::string` as `string`, the names the engine registers those
+   * types under; anywhere in the name, as the container types wrap their element's name
+   * (`list<boost::shared_ptr<Moho::STrigger>>`, `vector<std::string>`). Any other name comes back unchanged.
    */
   [[nodiscard]] fa::string REF_CurrentTypeName(const char* name);
 

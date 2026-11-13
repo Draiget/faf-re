@@ -1072,7 +1072,7 @@ namespace gpg
     if (it == GetRTypeMap().end()) {
       // Engine change (#422): the boost:: pointer names older saves carry. Any other missing name returns at once,
       // as it did before: lookups that expect a miss (a first spelling of two) stay as cheap.
-      if (std::strstr(name, "boost::") == nullptr) {
+      if (std::strstr(name, "boost::") == nullptr && std::strstr(name, "std::string") == nullptr) {
         return nullptr;
       }
       const fa::string current = REF_CurrentTypeName(name);
@@ -1101,6 +1101,12 @@ namespace gpg
     }
     static constexpr const char* kOldPrefixes[] = {"boost::shared_ptr<", "boost::weak_ptr<"};
     constexpr std::size_t kBoostLength = 7; // "boost::"
+    // Earlier builds named retail's `string` type `std::string`; a whole word only (not `std::stringstream`).
+    constexpr const char* kOldString = "std::string";
+    constexpr std::size_t kOldStringLength = 11;
+    const auto isNameChar = [](const char c) {
+      return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' || c == ':';
+    };
     const char* cursor = name;
     while (*cursor != '\0') {
       bool replaced = false;
@@ -1112,6 +1118,14 @@ namespace gpg
           replaced = true;
           break;
         }
+      }
+      if (
+        !replaced && std::strncmp(cursor, kOldString, kOldStringLength) == 0 &&
+        (cursor == name || !isNameChar(cursor[-1])) && !isNameChar(cursor[kOldStringLength])
+      ) {
+        (void)out.append("string", 6);
+        cursor += kOldStringLength;
+        replaced = true;
       }
       if (!replaced) {
         (void)out.append(cursor, 1);
