@@ -86,6 +86,7 @@
 #include "imgui_internal.h"
 #include "misc/freetype/imgui_freetype.h"
 #include "moho/app/CScApp.h"
+#include "moho/console/CConCommand.h"
 #include "moho/app/WinApp.h"
 #include "moho/app/AppRuntimeTypes.h"
 #include "moho/audio/AudioEngine.h"
@@ -140,25 +141,19 @@ namespace faf::editor
     [[nodiscard]] bool IsTestRunCommandLine()
     {
       static const char* const kOptions[] = {
-        "/command",        "/palette",         "/theme",          "/keysfile",
-        "/focuspanel",     "/uiclicks",        "/hidegameunits",  "/movelayer",
-        "/pickfilter",     "/mapwide",         "/tool",           "/proptool",
-        "/play",           "/debugarm",        "/breakpoint",     "/check",
-        "/decaltool",      "/markertool",      "/unittool",       "/hoverprop",
-        "/selectprops",    "/selectunit",      "/propswap",       "/saveas",
-        "/settingsfile",   "/autosavefolder",  "/askunsaved",     "/particlebrowser",
-        "/particlenew",    "/particleopen",    "/materialeditor", "/uiscale",
-        "/testrun",        "/openall",         "/roundtrip",      "/vault",
-        "/vaultsearch",    "/vaultmap",        "/newmap",         "/stamp",
-        "/brush",          "/layer",           "/waterbody",      "/ruler",
-        "/adaptivewindow", "/maskrule",        "/maskgen",        "/symhover",
-        "/stbfont",        "/recipe",          "/texset",         "/layerop",
-        "/slopeview",      "/typesfromlayers", "/uncapped",       "/nominimap",
-        "/followtest",     "/arrangetest",     "/findtest",       "/findopen",
-        "/filltest",       "/modaltest",       "/looktest",       "/looksfolder",
-        "/envtest",        "/watermasktest",   "/symmenu",        "/panelbottom",
-        "/shader",         "/brushtest",       "/brushshape",     "/stampsource",
-        "/stampstroke",    "/symoptions",      "/maskoptions",    "/masktest",
+        "/command",        "/palette",        "/theme",          "/keysfile",        "/focuspanel",  "/uiclicks",
+        "/hidegameunits",  "/movelayer",      "/pickfilter",     "/mapwide",         "/tool",        "/proptool",
+        "/play",           "/debugarm",       "/breakpoint",     "/check",           "/decaltool",   "/markertool",
+        "/unittool",       "/hoverprop",      "/selectprops",    "/selectunit",      "/propswap",    "/saveas",
+        "/settingsfile",   "/autosavefolder", "/askunsaved",     "/particlebrowser", "/particlenew", "/particleopen",
+        "/materialeditor", "/uiscale",        "/testrun",        "/openall",         "/roundtrip",   "/vault",
+        "/vaultsearch",    "/vaultmap",       "/newmap",         "/stamp",           "/brush",       "/layer",
+        "/waterbody",      "/ruler",          "/adaptivewindow", "/maskrule",        "/maskgen",     "/symhover",
+        "/stbfont",        "/recipe",         "/texset",         "/layerop",         "/slopeview",   "/typesfromlayers",
+        "/uncapped",       "/nominimap",      "/followtest",     "/arrangetest",     "/findtest",    "/findopen",
+        "/filltest",       "/modaltest",      "/looktest",       "/looksfolder",     "/envtest",     "/watermasktest",
+        "/nowaterhires",   "/camat",          "/symmenu",        "/panelbottom",     "/shader",      "/brushtest",
+        "/brushshape",     "/stampsource",    "/stampstroke",    "/symoptions",      "/maskoptions", "/masktest",
         "/shaderbrowser",  "/convertlayers",
       };
       for (const char* const option : kOptions) {
@@ -2150,6 +2145,20 @@ namespace faf::editor
           );
         };
         log("before");
+        if (what == "level") {
+          // The sea raised by 3, kept (the finer water map follows: its whole-map refresh is logged).
+          const WaterState before = mDocument.WaterNow();
+          WaterState raised = before;
+          raised.elevation += 3.0f;
+          mDocument.ApplyWater(raised);
+          mDocument.WaterEdited(before);
+          gpg::Logf(
+            "editor: env test: the sea from %.2f to %.2f",
+            static_cast<double>(before.elevation),
+            static_cast<double>(raised.elevation)
+          );
+          return;
+        }
         if (what == "cubes") {
           const EdDocument::LookEnvironment before = mDocument.LookEnvironmentNow();
           std::vector<std::pair<std::string, std::string>> cubes = before.cubes;
@@ -2521,6 +2530,7 @@ namespace faf::editor
       std::string mEnvTestArg;  // `/envtest cubes|sky` (test runs)
       std::string mWaterMaskTestArg; // `/watermasktest foam|flatness|bias,<value>,<radius>[,keep]` (test runs)
       int mWaterMaskTestFrames = 0;
+      bool mCamAtDone = false;
       int mEnvTestFrames = 0;
       int mLookTestFrames = 0;
       // Find and replace objects: asked (Ctrl+F), the objects and types when it opened, the choices.
@@ -4650,6 +4660,8 @@ namespace faf::editor
       if (fa::vector<fa::string> modal; moho::CFG_GetArgOption("/modaltest", 1, &modal) && !modal.empty()) {
         mModalTestArg = modal[0].c_str();
       }
+      // Lake shores drawn from the ground's own height (the engine's finer water map), unless `/nowaterhires`.
+      moho::CON_Execute(moho::CFG_GetArgOption("/nowaterhires", 0, nullptr) ? "ren_WaterHiRes 0" : "ren_WaterHiRes 2");
       if (fa::vector<fa::string> mask; moho::CFG_GetArgOption("/watermasktest", 1, &mask) && !mask.empty()) {
         mWaterMaskTestArg = mask[0].c_str();
       }
@@ -6753,6 +6765,21 @@ namespace faf::editor
       UpdateLooks();
       TestLooks();
       TestEnvironment();
+      if (
+        fa::vector<fa::string> at; !mCamAtDone && !mScene.ModelsPending() && mScene.Attached() &&
+        moho::CFG_GetArgOption("/camat", 1, &at) && !at.empty()
+      ) {
+        mCamAtDone = true;
+        float x = 0.0f, z = 0.0f, distance = 60.0f;
+        (void)std::sscanf(at[0].c_str(), "%f,%f,%f", &x, &z, &distance);
+        mScene.TestCameraAt(x, z, distance);
+        gpg::Logf(
+          "editor: /camat %.1f, %.1f, %.1f",
+          static_cast<double>(x),
+          static_cast<double>(z),
+          static_cast<double>(distance)
+        );
+      }
       if (!mWaterMaskTestArg.empty() && !mScene.ModelsPending() && ++mWaterMaskTestFrames >= 150) {
         mScene.TestWaterMask(std::exchange(mWaterMaskTestArg, {}));
       }

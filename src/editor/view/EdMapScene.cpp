@@ -4832,21 +4832,16 @@ namespace faf::editor
     const HeightBrush symmetry = mTools->CurrentHeightBrush();
     float cx[kMaxSymmetryCopies], cz[kMaxSymmetryCopies];
     const int copies = HeightBrushCentres(field->width, field->height, x, z, symmetry.symmetry, symmetry.turns, cx, cz);
-    WaterMaskRect all{width, height, 0, 0};
+    // Each copy's cells on their own: one box around copies across the map would rebuild half of it.
+    int changed = 0;
     for (int c = 0; c < copies; ++c) {
       const WaterMaskRect rect = PaintWaterMask(cells, width, height, cx[c], cz[c], brush);
       if (!rect.Empty()) {
-        all.x0 = std::min(all.x0, rect.x0);
-        all.z0 = std::min(all.z0, rect.z0);
-        all.x1 = std::max(all.x1, rect.x1);
-        all.z1 = std::max(all.z1, rect.z1);
+        mDocument.WaterMasksChanged(rect.x0, rect.z0, rect.x1, rect.z1);
+        changed += (rect.x1 - rect.x0) * (rect.z1 - rect.z0);
       }
     }
-    if (all.Empty()) {
-      return 0;
-    }
-    mDocument.WaterMasksChanged(all.x0, all.z0, all.x1, all.z1);
-    return (all.x1 - all.x0) * (all.z1 - all.z0);
+    return changed;
   }
 
   void EdMapScene::TestWaterMask(

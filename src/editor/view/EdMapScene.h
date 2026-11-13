@@ -186,6 +186,18 @@ namespace faf::editor
     void TestWaterMask(const std::string& spec);
     /** `/filltest <density>,<spacing>[,keep]` (test runs): the commonest prop filled, its copies checked, undone. */
     void TestFill(const std::string& spec);
+    /** `/camat x,z,distance` (test runs): the camera over that ground point. */
+    void TestCameraAt(
+      const float x,
+      const float z,
+      const float distance
+    )
+    {
+      mTargetX = x;
+      mTargetZ = z;
+      mDistance = distance;
+      ApplyCamera();
+    }
     /** G or R is moving or turning the selection: the view takes every key until it ends. */
     [[nodiscard]] bool ModalOn() const noexcept
     {
