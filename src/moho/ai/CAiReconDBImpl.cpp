@@ -1268,14 +1268,15 @@ void CAiReconDBImpl::RefreshBlip(
 namespace
 {
   /// True when `target = source` would leave `target` unchanged: the same pointer and the same
-  /// control block (boost 1.34 orders shared_ptrs by owner).
+  /// control block. boost 1.34's `operator<` ordered shared_ptrs by owner; std's orders by `get()`,
+  /// so the owner test is `owner_before`.
   template <class T>
   [[nodiscard]] bool SameHandle(
     const std::shared_ptr<T>& target,
     const std::shared_ptr<T>& source
   ) noexcept
   {
-    return target.get() == source.get() && !(target < source) && !(source < target);
+    return target.get() == source.get() && !target.owner_before(source) && !source.owner_before(target);
   }
 
   /// True when RefreshBlip's LOS branch would change any of the three handles.
