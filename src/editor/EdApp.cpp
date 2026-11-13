@@ -2432,7 +2432,9 @@ namespace faf::editor
         icons.MergeMode = true;
         icons.FontDataOwnedByAtlas = false;
         icons.GlyphMinAdvanceX = 13.5f;
-        icons.GlyphOffset = ImVec2(0.0f, 1.0f);
+        // A pixel up: measured beside Segoe UI the icons sat about a pixel below the capitals (the Play button, the
+        // start screen's rows; user reports).
+        icons.GlyphOffset = ImVec2(0.0f, -1.0f);
         (void)io.Fonts->AddFontFromMemoryTTF(const_cast<unsigned char*>(IconFontData()), IconFontSize(), 13.5f, &icons);
       }
       // Headings and codes (the FAF sign-in's): Segoe UI Bold and Consolas, when Windows has them.

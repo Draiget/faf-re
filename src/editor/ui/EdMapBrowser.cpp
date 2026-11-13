@@ -1,5 +1,8 @@
 #include "editor/ui/EdMapBrowser.h"
+#include "editor/ui/EdIconFont.h"
+#include "editor/ui/EdCards.h"
 #include "editor/ui/EdControls.h"
+#include "editor/ui/EdHomeModel.h"
 #include "editor/ui/EdThemeColors.h"
 #include "editor/ui/EdUiScale.h"
 #include "editor/EdPath.h"
@@ -131,8 +134,9 @@ namespace faf::editor
 
   namespace
   {
-    const ImVec4 kGood(0.45f, 0.80f, 0.45f, 1.0f);
-    const ImVec4 kBad(0.95f, 0.45f, 0.40f, 1.0f);
+    // The mockup's ok and error colours (styles.css --ok, --err).
+    const ImVec4 kGood(0x4F / 255.0f, 0xD1 / 255.0f, 0x8B / 255.0f, 1.0f);
+    const ImVec4 kBad(1.0f, 0x6B / 255.0f, 0x6B / 255.0f, 1.0f);
 
     /** Text in the bold font at `scale` times the panel's size. */
     void Heading(
@@ -145,37 +149,22 @@ namespace faf::editor
       ImGui::PopFont();
     }
 
-    /** The editor's orange call-to-action button. */
+    /** A page's one main action: the mockup's primary button (the accent, its dark text). */
     bool AccentButton(
       const char* const label,
       const ImVec2& size = ImVec2(0.0f, 0.0f)
     )
     {
-      ImGui::PushStyleColor(
-        ImGuiCol_Button, ImVec4(AccentColor().x * 0.85f, AccentColor().y * 0.85f, AccentColor().z * 0.85f, 1.0f)
-      );
-      ImGui::PushStyleColor(ImGuiCol_ButtonHovered, AccentColor());
-      ImGui::PushStyleColor(
-        ImGuiCol_ButtonActive, ImVec4(AccentColor().x * 0.7f, AccentColor().y * 0.7f, AccentColor().z * 0.7f, 1.0f)
-      );
-      ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.08f, 0.08f, 0.09f, 1.0f));
-      ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, ImGui::GetFrameHeight() * 0.25f);
-      const bool pressed = ImGui::Button(label, size);
-      ImGui::PopStyleVar();
-      ImGui::PopStyleColor(4);
-      return pressed;
+      return PrimaryButton(label, size);
     }
 
-    /** An ordinary button with the cards' rounded corners and the usual padding (SmallButton has none). */
+    /** Any other action: the mockup's raised button (.btn), the same everywhere. */
     bool RoundButton(
       const char* const label,
       const ImVec2& size = ImVec2(0.0f, 0.0f)
     )
     {
-      ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, ImGui::GetFrameHeight() * 0.25f);
-      const bool pressed = ImGui::Button(label, size);
-      ImGui::PopStyleVar();
-      return pressed;
+      return ImGui::Button(label, size);
     }
 
     /** A turning arc, `radius` pixels, in line with the text after it. */
@@ -202,11 +191,18 @@ namespace faf::editor
     void Chip(
       const char* const text,
       const ImVec4& color,
-      const bool onPicture = false
+      const bool onPicture = false,
+      const bool besideButtons = false
     )
     {
-      const ImVec2 size = ImGui::CalcTextSize(text);
-      const ImVec2 pad(ImGui::GetStyle().FramePadding.x * 0.8f, ImGui::GetStyle().FramePadding.y * 0.4f);
+      // The mockup's pill (.hm-pill): small words on their colour, faint. Beside buttons it takes their height and
+      // text size, so the row reads as one (the signed-in pill was smaller than Sign out beside it; user report).
+      const float fontSize = besideButtons ? ImGui::GetFontSize() : std::round(ImGui::GetFontSize() * 0.84f);
+      const ImVec2 size = ImGui::GetFont()->CalcTextSizeA(fontSize, FLT_MAX, 0.0f, text);
+      const ImVec2 pad(
+        besideButtons ? ImGui::GetStyle().FramePadding.x * 0.8f : std::round(Em(8.0f)),
+        besideButtons ? (ImGui::GetFrameHeight() - size.y) * 0.5f : std::round(Em(3.0f))
+      );
       const ImVec2 at = ImGui::GetCursorScreenPos();
       if (onPicture) {
         ImGui::GetWindowDrawList()->AddRectFilled(
@@ -219,12 +215,12 @@ namespace faf::editor
       ImGui::GetWindowDrawList()->AddRectFilled(
         at,
         ImVec2(at.x + size.x + pad.x * 2.0f, at.y + size.y + pad.y * 2.0f),
-        ImGui::GetColorU32(ImVec4(color.x, color.y, color.z, 0.18f)),
+        ImGui::GetColorU32(ImVec4(color.x, color.y, color.z, 0.14f)),
         size.y
       );
-      ImGui::SetCursorScreenPos(ImVec2(at.x + pad.x, at.y + pad.y));
-      ImGui::TextColored(color, "%s", text);
-      ImGui::SetCursorScreenPos(at);
+      ImGui::GetWindowDrawList()->AddText(
+        ImGui::GetFont(), fontSize, ImVec2(at.x + pad.x, at.y + pad.y), ImGui::GetColorU32(color), text
+      );
       ImGui::Dummy(ImVec2(size.x + pad.x * 2.0f, size.y + pad.y * 2.0f));
     }
 
@@ -237,11 +233,11 @@ namespace faf::editor
       const float avail = ImGui::GetContentRegionAvail().x;
       const float w = std::min(width, avail);
       ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (avail - w) * 0.5f);
-      ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, ImGui::GetFrameHeight() * 0.4f);
-      ImGui::PushStyleVar(
-        ImGuiStyleVar_WindowPadding, ImVec2(ImGui::GetFrameHeight() * 1.1f, ImGui::GetFrameHeight() * 0.9f)
-      );
-      ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.135f, 0.150f, 0.180f, 1.0f));
+      // The mockup's card (.hm-card): the inputs' ground, a soft line round it.
+      ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, Em(9.0f));
+      ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(Em(18.0f), Em(16.0f)));
+      ImGui::PushStyleColor(ImGuiCol_ChildBg, ImGui::GetStyleColorVec4(ImGuiCol_FrameBg));
+      ImGui::PushStyleColor(ImGuiCol_Border, ImGui::GetStyleColorVec4(ImGuiCol_TableBorderLight));
       const bool open = ImGui::BeginChild(
         id,
         ImVec2(w, 0.0f),
@@ -253,7 +249,7 @@ namespace faf::editor
     void EndCard()
     {
       ImGui::EndChild();
-      ImGui::PopStyleColor();
+      ImGui::PopStyleColor(2);
       ImGui::PopStyleVar(2);
     }
 
@@ -660,7 +656,7 @@ namespace faf::editor
       ImGui::SetNextItemWidth(Em(130.0f));
       changed |=
         ImGui::InputTextWithHint("to", "2026-12-31", mToText, sizeof(mToText), ImGuiInputTextFlags_EnterReturnsTrue);
-      if (ImGui::SmallButton("Any date")) {
+      if (RoundButton("Any date")) {
         mFromText[0] = '\0';
         mToText[0] = '\0';
         changed = true;
@@ -1017,13 +1013,55 @@ namespace faf::editor
   {
     const std::vector<std::string>& maps = mPlay.Maps();
     const std::vector<std::string>& titles = mPlay.Titles();
-    ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x * 0.55f);
-    ImGui::InputTextWithHint("##browserfilter", "Filter by name or folder", mFilter, sizeof(mFilter));
-    ImGui::SameLine();
-    ImGui::SetNextItemWidth(-1.0f);
-    ImGui::Combo("##where", &mWhere, kWhereNames, 5);
 
-    // The rows that pass the filter (where a map is shows once its details are read).
+    // The top row (the mockup's): the filter, where the maps are as pills, Grid or List, and Open from a folder.
+    static constexpr const char* kWherePills[] = {"All", "Game", "FAF folder", "Vault", "Other"};
+    static constexpr const char* kViews[] = {"Grid", "List"};
+    const char* const openLabel = ICON_OPEN "  Open from a folder...";
+    const float gap = Em(6.0f);
+    float rightWidth = Em(14.0f) + ImGui::CalcTextSize(openLabel).x + ImGui::GetStyle().FramePadding.x * 2.0f;
+    for (const char* const pill : kWherePills) {
+      rightWidth += PillWidth(pill) + gap;
+    }
+    rightWidth += Em(14.0f);
+    for (const char* const view : kViews) {
+      rightWidth += PillWidth(view) + gap;
+    }
+    (void)SearchField(
+      "##browserfilter", "Filter what is on this computer", mFilter, sizeof(mFilter), -std::max(Em(120.0f), rightWidth)
+    );
+    const float rowMid = (ImGui::GetItemRectMin().y + ImGui::GetItemRectMax().y) * 0.5f;
+    const float pillHeight = std::round(Em(26.0f));
+    const auto onRow = [&](const float height, const float spacing) {
+      ImGui::SameLine(0.0f, spacing);
+      ImGui::SetCursorScreenPos(ImVec2(ImGui::GetCursorScreenPos().x, std::round(rowMid - height * 0.5f)));
+    };
+    for (int i = 0; i < 5; ++i) {
+      onRow(pillHeight, i == 0 ? Em(14.0f) : gap);
+      if (PillToggle(kWherePills[i], mWhere == i)) {
+        mWhere = i;
+      }
+      if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) {
+        ImGui::SetTooltip("%s", kWhereNames[i]);
+      }
+    }
+    for (int i = 0; i < 2; ++i) {
+      onRow(pillHeight, i == 0 ? Em(14.0f) : gap);
+      if (PillToggle(kViews[i], mListView == (i == 1))) {
+        mListView = i == 1;
+      }
+    }
+    onRow(ImGui::GetFrameHeight(), Em(14.0f));
+    if (RoundButton(openLabel)) {
+      mOpenFileAsk = true;
+    }
+    if (ImGui::IsItemHovered()) {
+      ImGui::SetTooltip(
+        "A map folder anywhere on disk: pick its _scenario.lua. The editor adds it to the game's maps until it closes."
+      );
+    }
+
+    // The maps that pass the filter (where a map is shows once its details are read).
     std::vector<int> rows;
     for (int i = 0; i < static_cast<int>(maps.size()); ++i) {
       const std::size_t at = static_cast<std::size_t>(i);
@@ -1045,18 +1083,101 @@ namespace faf::editor
       }
       rows.push_back(i);
     }
-    ImGui::TextDisabled("%zu of %zu maps; double-click one to open it for editing", rows.size(), maps.size());
-    ImGui::SameLine();
-    if (RoundButton("Open from a folder...")) {
-      mOpenFileAsk = true;
-    }
-    if (ImGui::IsItemHovered()) {
-      ImGui::SetTooltip(
-        "A map folder anywhere on disk: pick its _scenario.lua. The editor adds it to the game's maps until it closes."
-      );
-    }
+    ImGui::Dummy(ImVec2(0.0f, Em(4.0f)));
+    ImGui::TextDisabled(
+      "%zu of %zu maps \xC2\xB7 %s",
+      rows.size(),
+      maps.size(),
+      mListView ? "double-click one to open it for editing" : "click one to open it for editing"
+    );
     if (!mStatus.empty()) {
       ImGui::TextWrapped("%s", mStatus.c_str());
+    }
+    ImGui::Dummy(ImVec2(0.0f, Em(4.0f)));
+
+    // A map's menu (a card's or a row's right-click).
+    const auto rowMenu = [this](const std::string& scenario, const int index, const Details& details) {
+      if (ImGui::BeginPopupContextItem("##rowmenu")) {
+        if (ImGui::MenuItem("Open for editing")) {
+          OpenMap(scenario);
+        }
+        if (ImGui::MenuItem("Pick for Play")) {
+          mPlay.Select(index);
+        }
+        ImGui::BeginDisabled(details.disk.empty());
+        if (ImGui::MenuItem("Show its folder")) {
+          const std::filesystem::path folder = PathFromUtf8(details.disk).parent_path();
+          (void)::ShellExecuteW(nullptr, L"open", folder.wstring().c_str(), nullptr, nullptr, SW_SHOWNORMAL);
+        }
+        ImGui::EndDisabled();
+        ImGui::EndPopup();
+      }
+    };
+
+    if (!mListView) {
+      // The cards (the start screen's Recent ones), as many rows as are on screen drawn.
+      if (ImGui::BeginChild("##localgrid", ImVec2(0.0f, 0.0f))) {
+        const float cardGap = Em(12.0f);
+        const EdCardGrid grid = CardGrid(ImGui::GetContentRegionAvail().x, Em(210.0f), cardGap, 8);
+        const float pictureHeight = std::round(grid.cardWidth * 9.0f / 16.0f);
+        const float cardHeight = KindCardHeight(pictureHeight);
+        const int columns = std::max(1, grid.columns);
+        const int lines = (static_cast<int>(rows.size()) + columns - 1) / columns;
+        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(cardGap, cardGap));
+        ImGuiListClipper clipper;
+        clipper.Begin(lines, cardHeight + cardGap);
+        while (clipper.Step()) {
+          for (int line = clipper.DisplayStart; line < clipper.DisplayEnd; ++line) {
+            for (int column = 0; column < columns; ++column) {
+              const int r = line * columns + column;
+              if (r >= static_cast<int>(rows.size())) {
+                break;
+              }
+              if (column > 0) {
+                ImGui::SameLine(0.0f, cardGap);
+              }
+              const int index = rows[static_cast<std::size_t>(r)];
+              const std::size_t at = static_cast<std::size_t>(index);
+              const std::string& scenario = maps[at];
+              Details& details = DetailsOf(scenario);
+              EdCardText text;
+              text.title = titles[at];
+              text.meta = MapDisplayName(scenario);
+              if (!details.size.empty()) {
+                text.meta += " \xC2\xB7 " + details.size;
+              }
+              if (details.players > 0) {
+                text.meta += " \xC2\xB7 " + std::to_string(details.players) + " players";
+              }
+              text.third = details.where + (details.version.empty() ? "" : " \xC2\xB7 version " + details.version);
+              const bool current =
+                mDocument.GetState() == EdDocument::State::Open && Lower(mDocument.Path()) == Lower(scenario);
+              ImGui::PushID(index);
+              const EdCardResult card = KindCard(
+                "##card",
+                ImVec2(grid.cardWidth, cardHeight),
+                pictureHeight,
+                details.picture,
+                "Map",
+                0x4EA1FFU,
+                text,
+                current
+              );
+              if (card.hovered && !details.disk.empty()) {
+                ImGui::SetTooltip("%s\n%s\nClick to open for editing", scenario.c_str(), details.disk.c_str());
+              }
+              if (card.clicked) {
+                OpenMap(scenario);
+              }
+              rowMenu(scenario, index, details);
+              ImGui::PopID();
+            }
+          }
+        }
+        ImGui::PopStyleVar();
+      }
+      ImGui::EndChild();
+      return;
     }
 
     const float picture = ImGui::GetTextLineHeight() * 3.6f;
@@ -1097,21 +1218,7 @@ namespace faf::editor
           if (ImGui::IsItemHovered() && !details.disk.empty()) {
             ImGui::SetTooltip("%s\n%s\nDouble-click to open for editing", scenario.c_str(), details.disk.c_str());
           }
-          if (ImGui::BeginPopupContextItem("##rowmenu")) {
-            if (ImGui::MenuItem("Open for editing")) {
-              OpenMap(scenario);
-            }
-            if (ImGui::MenuItem("Pick for Play")) {
-              mPlay.Select(index);
-            }
-            ImGui::BeginDisabled(details.disk.empty());
-            if (ImGui::MenuItem("Show its folder")) {
-              const std::filesystem::path folder = PathFromUtf8(details.disk).parent_path();
-              (void)::ShellExecuteW(nullptr, L"open", folder.wstring().c_str(), nullptr, nullptr, SW_SHOWNORMAL);
-            }
-            ImGui::EndDisabled();
-            ImGui::EndPopup();
-          }
+          rowMenu(scenario, index, details);
           ImGui::SameLine(0.0f, 0.0f);
           if (details.picture != 0) {
             ImGui::Image(static_cast<ImTextureID>(details.picture), ImVec2(picture, picture));
@@ -1159,7 +1266,7 @@ namespace faf::editor
       const float outW = ImGui::CalcTextSize("Sign out").x + ImGui::GetStyle().FramePadding.x * 2.0f;
       const float chipW = ImGui::CalcTextSize(who.c_str()).x + ImGui::GetStyle().FramePadding.x * 1.6f;
       ImGui::SameLine(headerRight - chipW - (in ? outW + ImGui::GetStyle().ItemSpacing.x : 0.0f));
-      Chip(who.c_str(), in ? kGood : ImVec4(0.6f, 0.62f, 0.66f, 1.0f));
+      Chip(who.c_str(), in ? kGood : ImVec4(0.6f, 0.62f, 0.66f, 1.0f), false, true);
       if (in) {
         ImGui::SameLine();
         if (RoundButton("Sign out")) {
@@ -1377,29 +1484,41 @@ namespace faf::editor
 
   void EdMapBrowser::DrawVaultSearch()
   {
-    // The search bar: large, the first thing to use.
-    ImGui::PushStyleVar(
-      ImGuiStyleVar_FramePadding,
-      ImVec2(ImGui::GetStyle().FramePadding.x * 1.5f, ImGui::GetStyle().FramePadding.y * 2.0f)
-    );
-    ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, ImGui::GetFrameHeight() * 0.3f);
-    const float searchW = ImGui::CalcTextSize("Search").x + ImGui::GetStyle().FramePadding.x * 4.0f;
-    ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - searchW - ImGui::GetStyle().ItemSpacing.x);
-    if (!mSearchedOnce && !mFaf.Searching() && mSearchText[0] == '\0') {
+    // The search bar (the mockup's .hm-search): large, the first thing to use; Enter searches.
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(Em(36.0f), Em(10.0f)));
+    ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, Em(8.0f));
+    ImGui::PushStyleColor(ImGuiCol_FrameBg, ImGui::GetStyleColorVec4(ImGuiCol_WindowBg));
+    ImGui::SetNextItemWidth(-1.0f);
+    // The keyboard goes to the search when the bar appears, once: asked every frame, it took every click's press away
+    // from the buttons around it (the start screen's pages couldn't be left; user report).
+    const int frame = ImGui::GetFrameCount();
+    if (frame - std::exchange(mVaultSearchDrawnFrame, frame) > 1 && mSearchText[0] == '\0') {
       ImGui::SetKeyboardFocusHere();
     }
     const bool entered = ImGui::InputTextWithHint(
-      "##vaultsearch", "Search maps by name", mSearchText, sizeof(mSearchText), ImGuiInputTextFlags_EnterReturnsTrue
+      "##vaultsearch",
+      "Search the vault's maps by name, then Enter",
+      mSearchText,
+      sizeof(mSearchText),
+      ImGuiInputTextFlags_EnterReturnsTrue
     );
-    ImGui::SameLine();
-    ImGui::BeginDisabled(mFaf.Searching());
-    if (AccentButton("Search", ImVec2(searchW, 0.0f)) || (entered && !mFaf.Searching())) {
+    {
+      const ImVec2 min = ImGui::GetItemRectMin();
+      const ImVec2 max = ImGui::GetItemRectMax();
+      ImGui::GetWindowDrawList()->AddText(
+        ImVec2(min.x + Em(14.0f), std::round((min.y + max.y - ImGui::GetFontSize()) * 0.5f)),
+        ImGui::GetColorU32(ImGuiCol_TextDisabled),
+        ICON_SEARCH
+      );
+    }
+    if (entered && !mFaf.Searching()) {
       mSearchedText = mSearchText;
       mSearchPage = 1;
       mFaf.Search(Query(), mSearchPage);
     }
-    ImGui::EndDisabled();
+    ImGui::PopStyleColor();
     ImGui::PopStyleVar(2);
+    ImGui::Dummy(ImVec2(0.0f, Em(4.0f)));
 
     // The filters and order (the FAF client's): a change searches again from the first page.
     {
@@ -1475,7 +1594,7 @@ namespace faf::editor
           const VaultMap& map = mFound[i];
           ImGui::TableNextColumn();
           ImGui::PushID(static_cast<int>(i));
-          ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg, ImGui::GetColorU32(ImVec4(0.135f, 0.150f, 0.180f, 1.0f)));
+          ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg, ImGui::GetColorU32(ImGuiCol_FrameBg));
           const float w = ImGui::GetContentRegionAvail().x;
           const std::uint64_t image = VaultPicture(map.thumbnail);
           const ImVec2 at = ImGui::GetCursorScreenPos();
@@ -1533,8 +1652,8 @@ namespace faf::editor
           } else {
             ImGui::BeginDisabled(working);
             if (
-              here ? ImGui::Button("Open", ImVec2(-FLT_MIN, 0.0f))
-                   : AccentButton("Download and open", ImVec2(-FLT_MIN, 0.0f))
+              here ? RoundButton(ICON_OPEN "  Open", ImVec2(-FLT_MIN, 0.0f))
+                   : RoundButton(ICON_GROUND "  Download and open", ImVec2(-FLT_MIN, 0.0f))
             ) {
               Download(map.folder);
             }

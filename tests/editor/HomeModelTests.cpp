@@ -71,7 +71,11 @@ namespace
     WhenAMapChanged
   )
   {
-    EXPECT_EQ(WhenText(3600.0), "today");
+    EXPECT_EQ(WhenText(20.0), "Just now");
+    EXPECT_EQ(WhenText(61.0), "1 minute ago");
+    EXPECT_EQ(WhenText(60.0 * 25.0), "25 minutes ago");
+    EXPECT_EQ(WhenText(3600.0), "1 hour ago");
+    EXPECT_EQ(WhenText(3600.0 * 2.5), "2 hours ago");
     EXPECT_EQ(WhenText(86400.0 * 1.5), "yesterday");
     EXPECT_EQ(WhenText(86400.0 * 3.2), "3 days ago");
     EXPECT_EQ(WhenText(86400.0 * 21.0), "3 weeks ago");

@@ -41,6 +41,8 @@ namespace faf::editor
     const char* command;
     const char* title;
     const char* about;
+    const char* icon; // ui/EdIconFont.h
+    unsigned int rgb; // its colour, 0xRRGGBB
   };
   [[nodiscard]] const std::vector<EdNewKind>& NewKinds();
 } // namespace faf::editor

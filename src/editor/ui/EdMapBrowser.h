@@ -148,6 +148,7 @@ namespace faf::editor
     bool mOpen = false;
     char mFilter[96]{};
     int mWhere = 0;
+    bool mListView = false; // the maps on this computer as a table (else cards)
     char mVaultName[256]{};
     std::map<std::string, Details> mDetails;
     int mReadsThisFrame = 0;
@@ -190,6 +191,7 @@ namespace faf::editor
     int mSearchPages = 0;
     std::vector<VaultMap> mFound;
     bool mSearchedOnce = false;
+    int mVaultSearchDrawnFrame = -10; // the last frame the vault's search bar was drawn: focused when it appears
     std::string mAskedSearch;
     std::map<std::string, std::uint64_t> mVaultPictures;
     /** The links whose picture can't be had (shown as such, not as loading). */

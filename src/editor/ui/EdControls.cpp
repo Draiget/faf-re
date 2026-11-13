@@ -1,10 +1,13 @@
 #include "editor/ui/EdControls.h"
 
 #include "editor/ui/EdColourText.h"
+#include "editor/ui/EdIconFont.h"
+#include "editor/ui/EdUiScale.h"
 #include "editor/ui/EdThemeColors.h"
 #include "imgui_internal.h"
 
 #include <algorithm>
+#include <cfloat>
 #include <cmath>
 #include <cstdio>
 #include <cstring>
@@ -492,5 +495,81 @@ namespace faf::editor
     }
     ImGui::PopID();
     return changed;
+  }
+
+  float PillWidth(
+    const char* const label
+  )
+  {
+    const float size = std::round(ImGui::GetFontSize() * 0.86f);
+    return std::round(
+      ImGui::GetFont()->CalcTextSizeA(size, FLT_MAX, 0.0f, label, ImGui::FindRenderedTextEnd(label)).x + Em(22.0f)
+    );
+  }
+
+  bool PillToggle(
+    const char* const label,
+    const bool on
+  )
+  {
+    const float size = std::round(ImGui::GetFontSize() * 0.86f);
+    const float height = std::round(Em(26.0f));
+    const float width = PillWidth(label);
+    const ImVec2 at = ImGui::GetCursorScreenPos();
+    const bool clicked = ImGui::InvisibleButton(label, ImVec2(width, height));
+    const bool hovered = ImGui::IsItemHovered();
+    ImDrawList* const dl = ImGui::GetWindowDrawList();
+    const ImVec2 to(at.x + width, at.y + height);
+    const float round = height * 0.5f;
+    if (on) {
+      dl->AddRectFilled(at, to, AccentU32(0.16f), round);
+      dl->AddRect(at, to, AccentU32(), round);
+    } else {
+      dl->AddRect(at, to, ImGui::GetColorU32(hovered ? ImGuiCol_TextDisabled : ImGuiCol_Border), round);
+    }
+    const ImVec4 bright = ImGui::GetStyleColorVec4(ImGuiCol_Text);
+    const ImVec4 dim = ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled);
+    const ImU32 ink = on || hovered
+      ? ImGui::GetColorU32(ImGuiCol_Text)
+      : ImGui::GetColorU32(ImVec4(
+          (bright.x * 2.0f + dim.x) / 3.0f, (bright.y * 2.0f + dim.y) / 3.0f, (bright.z * 2.0f + dim.z) / 3.0f, 1.0f
+        ));
+    const char* const end = ImGui::FindRenderedTextEnd(label);
+    const ImVec2 words = ImGui::GetFont()->CalcTextSizeA(size, FLT_MAX, 0.0f, label, end);
+    dl->AddText(
+      ImGui::GetFont(),
+      size,
+      ImVec2(std::round(at.x + (width - words.x) * 0.5f), std::round(at.y + (height - words.y) * 0.5f)),
+      ink,
+      label,
+      end
+    );
+    return clicked;
+  }
+
+  bool SearchField(
+    const char* const id,
+    const char* const hint,
+    char* const buffer,
+    const std::size_t size,
+    const float width,
+    const ImGuiInputTextFlags flags
+  )
+  {
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(Em(36.0f), Em(10.0f)));
+    ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, Em(8.0f));
+    ImGui::PushStyleColor(ImGuiCol_FrameBg, ImGui::GetStyleColorVec4(ImGuiCol_WindowBg));
+    ImGui::SetNextItemWidth(width);
+    const bool result = ImGui::InputTextWithHint(id, hint, buffer, size, flags);
+    const ImVec2 min = ImGui::GetItemRectMin();
+    const ImVec2 max = ImGui::GetItemRectMax();
+    ImGui::PopStyleColor();
+    ImGui::PopStyleVar(2);
+    ImGui::GetWindowDrawList()->AddText(
+      ImVec2(min.x + Em(14.0f), std::round((min.y + max.y - ImGui::GetFontSize()) * 0.5f)),
+      ImGui::GetColorU32(ImGuiCol_TextDisabled),
+      ICON_SEARCH
+    );
+    return result;
   }
 } // namespace faf::editor

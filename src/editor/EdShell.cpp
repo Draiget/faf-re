@@ -775,7 +775,19 @@ namespace faf::editor
         const ImVec2 capMin(std::round(x - Em(4.0f)), std::round(at.y + Em(5.0f)));
         const ImVec2 capMax(std::round(x + keySize.x + Em(4.0f)), std::round(at.y + buttonHeight - Em(5.0f)));
         draw->AddRect(capMin, capMax, IM_COL32(0, 0, 0, 64), Em(3.0f));
-        draw->AddText(font, fontSize * 0.85f, ImVec2(x, y + fontSize * 0.08f), onBase, "F5");
+        // Its capitals on the cap's middle (Segoe UI's sit 0.55 of the size below the line's top).
+        const float keyFont = fontSize * 0.85f;
+        const ImVec2 keyText = font->CalcTextSizeA(keyFont, FLT_MAX, 0.0f, "F5");
+        draw->AddText(
+          font,
+          keyFont,
+          ImVec2(
+            std::round(capMin.x + (capMax.x - capMin.x - keyText.x) * 0.5f),
+            std::round((capMin.y + capMax.y) * 0.5f - keyFont * 0.55f)
+          ),
+          onBase,
+          "F5"
+        );
         const char* const chevron = ICON_CHEVRON;
         const ImVec2 chevronSize = ImGui::CalcTextSize(chevron);
         draw->AddText(ImVec2(std::round(splitAt.x + (splitWidth - chevronSize.x) * 0.5f), y), onBase, chevron);

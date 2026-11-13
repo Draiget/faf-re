@@ -1,5 +1,7 @@
 #include "editor/ui/EdHomeModel.h"
 
+#include "editor/ui/EdIconFont.h"
+
 #include <algorithm>
 #include <cmath>
 
@@ -83,9 +85,17 @@ namespace faf::editor
     const double secondsAgo
   )
   {
+    if (secondsAgo < 60.0) {
+      return "Just now";
+    }
+    if (secondsAgo < 3600.0) {
+      const int minutes = static_cast<int>(secondsAgo / 60.0);
+      return minutes == 1 ? "1 minute ago" : std::to_string(minutes) + " minutes ago";
+    }
     const double days = secondsAgo / 86400.0;
     if (days < 1.0) {
-      return "today";
+      const int hours = static_cast<int>(secondsAgo / 3600.0);
+      return hours == 1 ? "1 hour ago" : std::to_string(hours) + " hours ago";
     }
     if (days < 2.0) {
       return "yesterday";
@@ -105,11 +115,12 @@ namespace faf::editor
   const std::vector<EdNewKind>& NewKinds()
   {
     static const std::vector<EdNewKind> kKinds = {
-      {"file.new", "Map", "A skirmish map: size, players, height and sea"},
-      {"new.mission", "Mission", "A campaign or coop mission"},
-      {"new.mod", "Mod", "Units and other game changes"},
-      {"new.effect", "Effect", "A particle effect in the Effects workspace"},
-      {"new.material", "Material", "A texture layer's node graph in the Materials workspace"},
+      // The mockup's kinds: their icons and colours.
+      {"file.new", "Map", "Skirmish, any size", ICON_TERRAIN, 0x4EA1FFU},
+      {"new.mission", "Mission", "Campaign or coop", ICON_MISSION, 0xE3A33BU},
+      {"new.mod", "Mod", "Units and balance", ICON_MOD, 0xA77BFFU},
+      {"new.effect", "Effect", "Particles, beams, trails", ICON_PARTICLES, 0xFF7A59U},
+      {"new.material", "Material", "Layer textures from nodes", ICON_MATERIAL, 0x35C39BU},
     };
     return kKinds;
   }

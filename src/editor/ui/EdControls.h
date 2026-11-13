@@ -8,6 +8,8 @@
 
 #include "imgui.h"
 
+#include <cstddef>
+
 namespace faf::editor
 {
   /**
@@ -68,4 +70,25 @@ namespace faf::editor
 
   /** Text that reads on the accent: dark on a light accent, white on a dark one. */
   [[nodiscard]] ImVec4 AccentText();
+
+  /**
+   * The mockup's pill toggle (.hm-chip): a rounded outline, the chosen one in the accent's soft fill and outline. True
+   * when clicked.
+   */
+  bool PillToggle(const char* label, bool on);
+  /** A pill toggle's width, to lay a row of them out. */
+  [[nodiscard]] float PillWidth(const char* label);
+
+  /**
+   * The mockup's search field (.hm-search): tall, rounded, on the panels' grey, a magnifier inside at its left.
+   * `width` < 0 fills the line up to that much from its end, as ImGui's item widths do.
+   */
+  bool SearchField(
+    const char* id,
+    const char* hint,
+    char* buffer,
+    std::size_t size,
+    float width = -1.0f,
+    ImGuiInputTextFlags flags = 0
+  );
 } // namespace faf::editor
