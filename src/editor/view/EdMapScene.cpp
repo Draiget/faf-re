@@ -3777,7 +3777,7 @@ namespace faf::editor
       }
     }
     if (mTools != nullptr && mTools->SelectToolActive()) {
-      mTools->SetSelectInfo(SelectionText(), HoverText());
+      mTools->SetSelectInfo(SelectionText(), HoverText(), SelectedKind() != PickKind::None);
     }
     // The Show menu: prop and unit models hidden by culling their instances (each frame while hidden, so new ones
     // follow).
@@ -3825,6 +3825,13 @@ namespace faf::editor
       }
       if (mTools->TakeRepairRequest()) {
         RepairSymmetry();
+      }
+      ArrangeOp arrange = ArrangeOp::Count;
+      float step = 1.0f;
+      if (mTools->TakeArrangeRequest(arrange, step)) {
+        std::string message = ArrangeSelection(arrange, step);
+        gpg::Logf("editor: %s: %s", ArrangeTitle(arrange), message.empty() ? "done" : message.c_str());
+        mTools->SetArrangeMessage(std::move(message));
       }
     }
     // A session runs the camera manager from its own frame; between plays the editor does.
@@ -7419,6 +7426,242 @@ namespace faf::editor
   {
     moho::VTransform UnitTransform(const Wm3::Vec3f& position, const float (&orientation)[3]); // below
   } // namespace
+
+  std::string EdMapScene::ArrangeSelection(
+    const ArrangeOp op,
+    const float step
+  )
+  {
+    const moho::CHeightField* const field = mMap != nullptr ? mMap->mTerrainRes->GetHeightField() : nullptr;
+    if (field == nullptr || op >= ArrangeOp::Count) {
+      return "no map is open";
+    }
+    const float maxX = static_cast<float>(field->width - 1);
+    const float maxZ = static_cast<float>(field->height - 1);
+    const auto ground = [this](const float x, const float z) {
+      return mMap->mTerrainRes->GetHeightAt(
+        static_cast<std::int32_t>(std::lround(x)), static_cast<std::int32_t>(std::lround(z))
+      );
+    };
+    const auto tooFew = [&](const std::size_t count) -> std::string {
+      if (static_cast<int>(count) >= ArrangeMinimum(op)) {
+        return {};
+      }
+      return std::string(ArrangeTitle(op)) + " needs " + std::to_string(ArrangeMinimum(op)) + " or more selected";
+    };
+    ArrangePlaces places;
+    std::string error;
+    const PickKind kind = SelectedKind();
+    switch (kind) {
+    case PickKind::Prop: {
+      if (mMap->mProps == nullptr || !(error = tooFew(mSelection.size())).empty()) {
+        break;
+      }
+      auto& entries = mMap->mProps->mEntries;
+      for (const int index : mSelection) {
+        const moho::VTransform& t = entries[static_cast<std::size_t>(index)].mTransform;
+        places.x.push_back(t.pos_.x);
+        places.z.push_back(t.pos_.z);
+        places.heading.push_back(2.0f * std::atan2(t.orient_.y, t.orient_.w));
+      }
+      const std::vector<float> headings = places.heading;
+      if (!Arrange(op, places, step)) {
+        break;
+      }
+      BeginObjectStroke();
+      for (std::size_t i = 0; i < mSelection.size(); ++i) {
+        const int index = mSelection[i];
+        const float x = std::clamp(places.x[i], 0.0f, maxX);
+        const float z = std::clamp(places.z[i], 0.0f, maxZ);
+        MovePropTo(index, Wm3::Vec3f{x, ground(x, z), z});
+        if (places.heading[i] != headings[i]) {
+          // A mirror: the prop faces the mirrored way (its own tilt dropped, as Q/E's copies are).
+          moho::CWldPropEntry& entry = entries[static_cast<std::size_t>(index)];
+          entry.mTransform.orient_ =
+            Wm3::Quatf(std::cos(places.heading[i] * 0.5f), 0.0f, std::sin(places.heading[i] * 0.5f), 0.0f);
+          const PropRecord record = PropRecordFor(entry.mBlueprintPath.c_str(), entry.mTransform);
+          entry.mTransform = record.loaded;
+          mDocument.SetPropRecord(static_cast<std::size_t>(index), record);
+          if (static_cast<std::size_t>(index) < mProps.size() && mProps[static_cast<std::size_t>(index)] != nullptr) {
+            mProps[static_cast<std::size_t>(index)]->SetStance(entry.mTransform, entry.mTransform);
+          }
+          mObjectsChanged = true;
+        }
+      }
+      EndObjectStroke();
+      return {};
+    }
+    case PickKind::Marker: {
+      if (!(error = tooFew(mMarkerSelection.size())).empty()) {
+        break;
+      }
+      std::vector<SaveEntry>& markers = mDocument.SaveData().Markers();
+      std::vector<std::size_t> indices;
+      for (const std::string& name : mMarkerSelection) {
+        for (std::size_t i = 0; i < markers.size(); ++i) {
+          float x = 0.0f, y = 0.0f, z = 0.0f;
+          if (markers[i].name == name && ShownMarkerPosition(markers[i], x, y, z)) {
+            indices.push_back(i);
+            places.x.push_back(x);
+            places.z.push_back(z);
+          }
+        }
+      }
+      if (!Arrange(op, places, step)) {
+        error = tooFew(indices.size());
+        break;
+      }
+      EdDocument::SaveSnapshot before = mDocument.SaveDataNow();
+      for (std::size_t k = 0; k < indices.size(); ++k) {
+        SaveEntry& marker = markers[indices[k]];
+        float x = std::clamp(places.x[k], 0.0f, maxX);
+        float z = std::clamp(places.z[k], 0.0f, maxZ);
+        if (const std::string type = MarkerTypeOf(marker); type == "Mass" || type == "Hydrocarbon") {
+          x = std::floor(x) + 0.5f; // on a cell's middle, as a drag puts them
+          z = std::floor(z) + 0.5f;
+        }
+        marker.Set("position", Vector3Value(x, ground(x, z), z));
+      }
+      mDocument.SaveDataEdited(std::move(before));
+      mOutsideStale = true;
+      return {};
+    }
+    case PickKind::Unit: {
+      if (!(error = tooFew(mUnitSelection.size())).empty()) {
+        break;
+      }
+      std::vector<std::pair<std::string, std::string>> units;
+      for (const auto& [army, name] : mUnitSelection) {
+        if (const int index = UnitRefIndex(army, name); index >= 0) {
+          units.emplace_back(army, name);
+          places.x.push_back(mUnitRefs[static_cast<std::size_t>(index)].position.x);
+          places.z.push_back(mUnitRefs[static_cast<std::size_t>(index)].position.z);
+        }
+      }
+      // Units keep their headings: only their places are arranged.
+      if (!Arrange(op, places, step)) {
+        error = tooFew(units.size());
+        break;
+      }
+      EdDocument::SaveSnapshot before = mDocument.SaveDataNow();
+      for (std::size_t k = 0; k < units.size(); ++k) {
+        const float x = std::clamp(places.x[k], 0.0f, maxX);
+        const float z = std::clamp(places.z[k], 0.0f, maxZ);
+        const float y = UnitRestHeight(x, z);
+        (void)EditArmyUnits(units[k].first, [&](UnitGroup& group) {
+          if (SaveUnit* const unit = FindUnit(group, units[k].second); unit != nullptr) {
+            unit->position[0] = x;
+            unit->position[1] = y;
+            unit->position[2] = z;
+          }
+        });
+      }
+      mDocument.SaveDataEdited(std::move(before));
+      ReloadUnits();
+      return {};
+    }
+    case PickKind::Decal: {
+      moho::IDecalManager* const decals = mDocument.Decals();
+      if (decals == nullptr || !(error = tooFew(mDecalSelection.size())).empty()) {
+        break;
+      }
+      // By their middles (a decal's position is a corner); each keeps its size and heading.
+      std::vector<moho::CWldTerrainDecal*> chosen;
+      for (const int index : mDecalSelection) {
+        if (moho::CWldTerrainDecal* const decal = FindDecal(*decals, index); decal != nullptr) {
+          float cx = 0.0f, cz = 0.0f;
+          DecalCentre(FootprintOf(*decal), cx, cz);
+          chosen.push_back(decal);
+          places.x.push_back(cx);
+          places.z.push_back(cz);
+        }
+      }
+      if (!Arrange(op, places, step)) {
+        error = tooFew(chosen.size());
+        break;
+      }
+      EdDocument::DecalSnapshot before = mDocument.DecalsNow();
+      for (std::size_t k = 0; k < chosen.size(); ++k) {
+        const DecalFootprint own = FootprintOf(*chosen[k]);
+        const DecalFootprint placed = DecalAround(
+          std::clamp(places.x[k], 0.0f, maxX), std::clamp(places.z[k], 0.0f, maxZ), own.sizeX, own.sizeZ, own.yaw
+        );
+        chosen[k]->SetPosition(Wm3::Vec3f{placed.x, chosen[k]->mPosition.y, placed.z});
+      }
+      mDocument.DecalsEdited(std::move(before));
+      return {};
+    }
+    default:
+      return "nothing is selected";
+    }
+    return error.empty() ? std::string(ArrangeTitle(op)) + " can't arrange this selection" : error;
+  }
+
+  void EdMapScene::TestArrange(
+    const std::string& spec
+  )
+  {
+    // `kind,op[,step]`: the first five of the kind (props from the map's middle, mass markers) selected and arranged.
+    const std::size_t comma = spec.find(',');
+    const std::string kind = spec.substr(0, comma);
+    std::string rest = comma == std::string::npos ? std::string() : spec.substr(comma + 1);
+    float step = 4.0f;
+    if (const std::size_t second = rest.find(','); second != std::string::npos) {
+      step = std::strtof(rest.c_str() + second + 1, nullptr);
+      rest.resize(second);
+    }
+    const ArrangeOp op = ArrangeFromId(rest);
+    if (op == ArrangeOp::Count) {
+      gpg::Logf("editor: arrange test: no op %s", rest.c_str());
+      return;
+    }
+    ClearAllSelections();
+    std::string listed;
+    const auto list = [&](const float x, const float z) {
+      char text[48];
+      std::snprintf(text, sizeof(text), "%s(%.2f, %.2f)", listed.empty() ? "" : " ", x, z);
+      listed += text;
+    };
+    if (kind == "props" && mMap != nullptr && mMap->mProps != nullptr) {
+      mSelectKind = PickKind::Prop;
+      for (int i = 0; i < static_cast<int>(mMap->mProps->mEntries.size()) && mSelection.size() < 5; i += 97) {
+        mSelection.push_back(i);
+      }
+    } else if (kind == "markers") {
+      mSelectKind = PickKind::Marker;
+      for (const SaveEntry& marker : mDocument.SaveData().Markers()) {
+        if (MarkerTypeOf(marker) == "Mass" && mMarkerSelection.size() < 5) {
+          mMarkerSelection.push_back(marker.name);
+        }
+      }
+    } else {
+      gpg::Logf("editor: arrange test: kind %s isn't props or markers", kind.c_str());
+      return;
+    }
+    const std::string message = ArrangeSelection(op, step);
+    if (!message.empty()) {
+      gpg::Logf("editor: arrange test: %s", message.c_str());
+      return;
+    }
+    if (kind == "props") {
+      for (const int index : mSelection) {
+        const moho::VTransform& t = mMap->mProps->mEntries[static_cast<std::size_t>(index)].mTransform;
+        list(t.pos_.x, t.pos_.z);
+      }
+    } else {
+      for (const std::string& name : mMarkerSelection) {
+        for (const SaveEntry& marker : mDocument.SaveData().Markers()) {
+          float x = 0.0f, y = 0.0f, z = 0.0f;
+          if (marker.name == name && ShownMarkerPosition(marker, x, y, z)) {
+            list(x, z);
+          }
+        }
+      }
+    }
+    gpg::Logf("editor: arrange test: %s %s: %s", kind.c_str(), ArrangeTitle(op), listed.c_str());
+    const bool undone = Undo();
+    gpg::Logf("editor: arrange test: undo %s", undone ? "took it back" : "had nothing");
+  }
 
   bool EdMapScene::FollowDrag()
   {

@@ -25,6 +25,7 @@
 #include "editor/doc/EdDocument.h"
 #include "editor/doc/EdUnits.h"
 #include "moho/render/d3d/CD3DPrimBatcher.h"
+#include "editor/tools/EdArrange.h"
 #include "editor/tools/EdHeightBrush.h"
 #include "editor/tools/EdMaskGen.h"
 #include "editor/tools/EdRecipes.h"
@@ -150,6 +151,13 @@ namespace faf::editor
     bool ClearMaskLayer(int layer, std::string& message);
     /** `/followtest props|markers` (test runs): an object with a mirrored copy moved, then deleted, both followed. */
     void TestFollow(const std::string& kind);
+    /**
+     * Arrange (EdArrange) on the selection of whichever kind is selected, as one undo step; "" when done, else why not.
+     * Props, markers and decals (by their middles) stay on the map; props take the mirrored heading, units keep theirs.
+     */
+    std::string ArrangeSelection(ArrangeOp op, float step);
+    /** `/arrangetest props|markers,<op>[,<step>]` (test runs): five selected, arranged, logged, undone. */
+    void TestArrange(const std::string& spec);
     /** The panels keep a copy of the minimap (composited view): it is then drawn only every 20 frames. */
     void SetMiniMapCached(
       const bool cached

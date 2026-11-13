@@ -149,9 +149,9 @@ namespace faf::editor
         "/vaultsearch",    "/vaultmap",       "/newmap",         "/stamp",           "/brush",       "/layer",
         "/waterbody",      "/ruler",          "/adaptivewindow", "/maskrule",        "/maskgen",     "/symhover",
         "/stbfont",        "/recipe",         "/texset",         "/layerop",         "/slopeview",   "/typesfromlayers",
-        "/uncapped",       "/nominimap",      "/followtest",     "/symmenu",         "/panelbottom", "/shader",
-        "/brushtest",      "/brushshape",     "/stampsource",    "/stampstroke",     "/symoptions",  "/maskoptions",
-        "/masktest",       "/shaderbrowser",  "/convertlayers",
+        "/uncapped",       "/nominimap",      "/followtest",     "/arrangetest",     "/symmenu",     "/panelbottom",
+        "/shader",         "/brushtest",      "/brushshape",     "/stampsource",     "/stampstroke", "/symoptions",
+        "/maskoptions",    "/masktest",       "/shaderbrowser",  "/convertlayers",
       };
       for (const char* const option : kOptions) {
         if (moho::CFG_GetArgOption(option, 0, nullptr)) {
@@ -2268,6 +2268,8 @@ namespace faf::editor
       std::string mSlopeViewArg;       // `/slopeview units,<n>[,<limit>]|buildings,<n>,ring|area[,<limit>]` (test runs)
       std::string mTypesFromLayersArg; // `/typesfromlayers[,only]` (test runs)
       std::string mFollowTestArg;      // `/followtest props|markers|units|decals` (test runs)
+      std::string mArrangeTestArg;     // `/arrangetest props|markers,<op>[,<step>]` (test runs)
+      int mArrangeFrames = 0;
       int mD2gFrames = 0;
       int mLayerOpFrames = 0;
       int mThemeArgFrames = 0;
@@ -2705,6 +2707,12 @@ namespace faf::editor
       add("edit.duplicate", "Duplicate beside", "Edit", "Ctrl+D", [this] {
         mScene.CtrlKey('D');
       }, canEdit, {}, "A copy of the selection 8 units beside it");
+      for (int i = 0; i < static_cast<int>(ArrangeOp::Count); ++i) {
+        const ArrangeOp op = static_cast<ArrangeOp>(i);
+        add((std::string("arrange.") + ArrangeId(op)).c_str(), ArrangeTitle(op), "Edit", "", [this, op] {
+          mShell->Tools().RequestArrange(op);
+        }, canEdit, {}, "The selection, as one undo step (Select tool > Arrange)");
+      }
 
       // Tools: 1 to 8, as the strip lists them; in Review only Select.
       for (int i = 0; i < EdTools::ToolCount(); ++i) {
@@ -2910,6 +2918,24 @@ namespace faf::editor
       for (std::size_t i = 0; i < Workspaces().size(); ++i) {
         workspaces.items.push_back(cmd(("workspace." + std::to_string(i)).c_str()));
       }
+      EdMenuItem arrange;
+      arrange.label = "&Arrange";
+      arrange.provider = [] {
+        std::vector<EdMenuItem> items;
+        for (int i = 0; i < static_cast<int>(ArrangeOp::Count); ++i) {
+          const ArrangeOp op = static_cast<ArrangeOp>(i);
+          if (op == ArrangeOp::DistributeX || op == ArrangeOp::Snap || op == ArrangeOp::MirrorX) {
+            EdMenuItem line;
+            line.separator = true;
+            items.push_back(std::move(line));
+          }
+          EdMenuItem item;
+          item.command = std::string("arrange.") + ArrangeId(op);
+          item.label = ArrangeTitle(op);
+          items.push_back(std::move(item));
+        }
+        return items;
+      };
       EdMenuItem themes;
       themes.label = "&Theme";
       themes.provider = [this] {
@@ -2969,7 +2995,9 @@ namespace faf::editor
            cmd("edit.copy"),
            cmd("edit.paste"),
            cmd("edit.duplicate"),
-           cmd("edit.delete")}
+           cmd("edit.delete"),
+           sep(),
+           arrange}
         },
         EdMenu{
           "&View",
@@ -4062,6 +4090,9 @@ namespace faf::editor
       if (fa::vector<fa::string> follow; moho::CFG_GetArgOption("/followtest", 1, &follow) && !follow.empty()) {
         mFollowTestArg = follow[0].c_str();
       }
+      if (fa::vector<fa::string> arrange; moho::CFG_GetArgOption("/arrangetest", 1, &arrange) && !arrange.empty()) {
+        mArrangeTestArg = arrange[0].c_str();
+      }
       if (fa::vector<fa::string> slope; moho::CFG_GetArgOption("/slopeview", 1, &slope) && !slope.empty()) {
         mSlopeViewArg = slope[0].c_str();
       }
@@ -4648,6 +4679,9 @@ namespace faf::editor
       // `/slopeview ...` and `/typesfromlayers` (test runs).
       if (!mFollowTestArg.empty() && !mScene.ModelsPending() && ++mD2gFrames >= 150) {
         mScene.TestFollow(std::exchange(mFollowTestArg, {}));
+      }
+      if (!mArrangeTestArg.empty() && !mScene.ModelsPending() && ++mArrangeFrames >= 150) {
+        mScene.TestArrange(std::exchange(mArrangeTestArg, {}));
       }
       if ((!mSlopeViewArg.empty() || !mTypesFromLayersArg.empty()) && ++mD2gFrames == 120) {
         if (!mSlopeViewArg.empty()) {

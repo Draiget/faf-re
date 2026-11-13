@@ -1265,6 +1265,64 @@ namespace faf::editor
       "a drag or the arrows move the selection, Delete removes it, Q and E turn props by 15 degrees. Each is one undo "
       "step."
     );
+    DrawArrange();
+  }
+
+  void EdTools::DrawArrange()
+  {
+    if (!Section("Arrange")) {
+      return;
+    }
+    // Rows of equal buttons; each one undo step on the selection of whichever kind is selected.
+    const float gap = ImGui::GetStyle().ItemSpacing.x;
+    const bool none = !mSelectAny;
+    if (none) {
+      Note("Select two or more markers, units, props or decals to line them up.");
+    }
+    ImGui::BeginDisabled(none);
+    const auto row = [&](const char* label, std::initializer_list<std::pair<const char*, ArrangeOp>> buttons) {
+      if (label[0] != '\0') {
+        ImGui::TextDisabled("%s", label);
+      }
+      const float width = (ImGui::GetContentRegionAvail().x - gap * static_cast<float>(buttons.size() - 1)) /
+        static_cast<float>(buttons.size());
+      bool first = true;
+      for (const auto& [text, op] : buttons) {
+        if (!first) {
+          ImGui::SameLine(0.0f, gap);
+        }
+        first = false;
+        if (ImGui::Button(text, ImVec2(width, 0.0f))) {
+          mArrangeRequest = op;
+        }
+        EdSetItemTooltip("%s", ArrangeTitle(op));
+      }
+    };
+    row(
+      "Align", {{"Left", ArrangeOp::AlignLeft}, {"Centre X", ArrangeOp::AlignCentreX}, {"Right", ArrangeOp::AlignRight}}
+    );
+    row("", {{"Top", ArrangeOp::AlignTop}, {"Centre Z", ArrangeOp::AlignCentreZ}, {"Bottom", ArrangeOp::AlignBottom}});
+    row(
+      "Spread",
+      {{"Distribute X", ArrangeOp::DistributeX},
+       {"Distribute Z", ArrangeOp::DistributeZ},
+       {"Circle", ArrangeOp::Circle}}
+    );
+    row("Mirror", {{"Left-right", ArrangeOp::MirrorX}, {"Top-bottom", ArrangeOp::MirrorZ}});
+    ImGui::AlignTextToFramePadding();
+    ImGui::TextDisabled("Snap to grid");
+    static constexpr const char* kSteps[] = {"Every 1", "Every 2", "Every 4", "Every 8"};
+    ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x * 0.5f);
+    ImGui::Combo("##arrangesnap", &mArrangeSnap, kSteps, IM_ARRAYSIZE(kSteps));
+    ImGui::SameLine(0.0f, gap);
+    if (ImGui::Button("Snap", ImVec2(-1.0f, 0.0f))) {
+      mArrangeRequest = ArrangeOp::Snap;
+    }
+    EdSetItemTooltip("Snap to grid\nEvery selected one to the nearest point of the grid, in map units.");
+    ImGui::EndDisabled();
+    if (!none && !mArrangeMessage.empty()) {
+      Note(mArrangeMessage.c_str());
+    }
   }
 
   void EdTools::DrawTerrain()

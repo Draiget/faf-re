@@ -2,6 +2,7 @@
 
 #include "editor/ui/EdUnitCatalog.h"
 #include "editor/ui/EdProperties.h"
+#include "editor/tools/EdArrange.h"
 #include "editor/tools/EdHeightBrush.h"
 #include "editor/tools/EdBrushLibrary.h"
 #include "editor/tools/EdSymmetrize.h"
@@ -1133,11 +1134,13 @@ namespace faf::editor
     /** The Select tool's panel: what is selected and what a click would pick, in words (the view gives them). */
     void SetSelectInfo(
       std::string selected,
-      std::string hover
+      std::string hover,
+      const bool any
     )
     {
       mSelectSelected = std::move(selected);
       mSelectHover = std::move(hover);
+      mSelectAny = any;
     }
     /** Test runs (`/proptool`): the Props tool with this blueprint and mode, the list filtered to its name. */
     void SetPropTool(
@@ -1517,6 +1520,29 @@ namespace faf::editor
     [[nodiscard]] bool FollowSymmetry() const noexcept
     {
       return mFollowSymmetry;
+    }
+    /** Arrange's buttons (and the Edit menu's): the op asked, taken by the view each frame, and its grid step. */
+    void RequestArrange(
+      const ArrangeOp op
+    ) noexcept
+    {
+      mArrangeRequest = op;
+    }
+    [[nodiscard]] bool TakeArrangeRequest(
+      ArrangeOp& op,
+      float& step
+    ) noexcept
+    {
+      op = std::exchange(mArrangeRequest, ArrangeOp::Count);
+      step = static_cast<float>(1 << mArrangeSnap);
+      return op != ArrangeOp::Count;
+    }
+    /** Why the last arrange did nothing ("" when it was done), shown under the buttons. */
+    void SetArrangeMessage(
+      std::string message
+    )
+    {
+      mArrangeMessage = std::move(message);
     }
     [[nodiscard]] bool ShowSlope() const noexcept
     {
@@ -2325,6 +2351,7 @@ namespace faf::editor
     void DrawMarkers();
     void DrawUnits();
     void DrawSelect();
+    void DrawArrange();
     void DrawBrush(bool withModes);
     void DrawSymmetry(bool withCheck = true);
     void DrawLimits();
@@ -2486,6 +2513,10 @@ namespace faf::editor
     bool mRecipesOpen = false;
     std::string mRecipeResult;
     bool mFollowSymmetry = true;
+    bool mSelectAny = false; // something is selected (Arrange's buttons)
+    ArrangeOp mArrangeRequest = ArrangeOp::Count;
+    int mArrangeSnap = 0; // the grid step 1 << n: 1, 2, 4, 8
+    std::string mArrangeMessage;
     std::uint64_t mMinimapImage = 0;
     SlopeView mSlopeView;
     std::array<int, 9> mLayerTypeOverride{-1, -1, -1, -1, -1, -1, -1, -1, -1};
