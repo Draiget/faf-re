@@ -446,6 +446,26 @@ target_link_libraries(faf_water_tests PRIVATE gtest_main)
 
 add_test(NAME water_effect_patch COMMAND faf_water_tests)
 
+# Rivers, render side (src/moho/terrain/water/RiverFlow.h, RiverFlowPatch.cpp; docs/projects/RIVERS.md): the speed, the white water, the flow texture's texels, the two
+# phases of the scrolled normals and the water2.fx patch. Pure C++. FAF_STOCK_FX_DIR (the folder with FAF's stock water2.fx) switches on the checks against the real shader.
+#
+#   cmake --build --preset clang-x64-release --target faf_river_flow_tests
+add_executable(faf_river_flow_tests EXCLUDE_FROM_ALL water/RiverFlowTests.cpp
+               ${CMAKE_SOURCE_DIR}/src/moho/terrain/water/RiverFlowPatch.cpp)
+target_include_directories(faf_river_flow_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_compile_features(faf_river_flow_tests PRIVATE cxx_std_20)
+
+add_test(NAME river_flow COMMAND faf_river_flow_tests)
+# Banks of the water bodies (src/moho/terrain/water/WaterBanks.h, WaterBankGrowth.cpp, WaterBankPatch.cpp; docs/WATER_SIMULATION.md, "Banks"): the growth of a river's water over the
+# pits beside it and the water2.fx patch of the cut-out mask. Pure C++. FAF_STOCK_FX_DIR (the folder with FAF's stock water2.fx) switches on the checks against the real shader.
+#
+#   cmake --build --preset clang-x64-release --target faf_water_bank_tests
+add_executable(faf_water_bank_tests EXCLUDE_FROM_ALL water/WaterBankTests.cpp
+               ${CMAKE_SOURCE_DIR}/src/moho/terrain/water/WaterBankGrowth.cpp
+               ${CMAKE_SOURCE_DIR}/src/moho/terrain/water/WaterBankPatch.cpp
+               ${CMAKE_SOURCE_DIR}/src/moho/terrain/water/RiverFlowPatch.cpp)
+target_include_directories(faf_water_bank_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_compile_features(faf_water_bank_tests PRIVATE cxx_std_20)
 
 add_test(NAME water_banks COMMAND faf_water_bank_tests)
 
@@ -519,6 +539,18 @@ target_compile_features(faf_water_domain_tests PRIVATE cxx_std_20)
 target_link_libraries(faf_water_domain_tests PRIVATE gtest_main)
 
 add_test(NAME water_domains COMMAND faf_water_domain_tests)
+# Engine addition: the waterfalls and rapids of a river (src/moho/terrain/water/WaterfallPlan, docs/projects/RIVERS.md): the emitters a river gives,
+# the curtain strips, rates, budget, frustum test, game clock. Pure C++, no engine objects.
+#
+#   cmake --build --preset clang-x64-release --target faf_waterfall_tests
+add_executable(faf_waterfall_tests EXCLUDE_FROM_ALL water/WaterfallTests.cpp
+               ${CMAKE_SOURCE_DIR}/src/moho/terrain/water/WaterfallPlan.cpp
+               ${CMAKE_SOURCE_DIR}/src/moho/sim/WaterRivers.cpp)
+target_include_directories(faf_waterfall_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_compile_features(faf_waterfall_tests PRIVATE cxx_std_20)
+target_link_libraries(faf_waterfall_tests PRIVATE gtest_main)
+set_target_properties(faf_waterfall_tests PROPERTIES FOLDER "Tests/Water")
+add_test(NAME water_waterfalls COMMAND faf_waterfall_tests)
 
 
 # Rendering-only bounded terrain splat output; no game data or renderer required.

@@ -179,6 +179,7 @@ Reports of crashes on vsync changes and presents on NVIDIA and Intel led to a re
 | `FAF_IMAGECODEC_OWN_DDS=1` | Direct3D 12 and Vulkan: DDS files are always written by the engine, not D3DX11, which exercises on Windows the route Wine takes |
 | `FAF_GAL_NO_BC=1` | Vulkan: the device is made without BC textures, and BC1 to BC3 textures decode on the CPU, the route a GPU without them takes |
 | `FAF_GAL_DUMP_DIR`, `FAF_GAL_DUMP_SECONDS` | Writes the back buffer as BMP every N seconds |
+| `FAF_GAL_DUMP_MS` | With `FAF_GAL_DUMP_DIR`: an interval in milliseconds instead (clips of a moving effect); the files are then numbered 0, 1, 2, ... |
 | `FAF_GAL_TRACE_START`, `FAF_GAL_TRACE_FRAMES` | Logs every gal call of those frames |
 | `FAF_GAL_TRACE_FILE` | Direct3D 12: traces the frame after that file appears |
 | `FAF_GAL_NO_BGRA=1` | Vulkan: the window surface's B8G8R8A8 format is left out and the swap chain takes R8G8B8A8, the route Android's window surfaces take: copies between the back buffer and B8G8R8A8 images blit, readbacks swap red and blue |
@@ -320,3 +321,4 @@ The map file stores the stratum masks (the two textures that blend the eight ter
 - **Not changed:** the water map and the water masks stay at half the map's size, and the editing calls (`UpdateStratumMask`, `GetStratumMask`) take their rectangle from the mask 0 size.
 
 **Verified 2026-11-12** (windowed 1600x900, `MKLOUD1`, an 81 km map whose masks are saved at 4096 x 4096, `FAF_STRATUM_MASK_TEST=1`, camera at four zoom levels over the same ground): `ren_StratumMaskMax 0` logs `stratum masks 2048x2048 and 2048x2048 (saved in the map as 4096x4096 ...)` and the one-texel pattern is averaged away; the default logs `4096x4096 and 4096x4096`, the map loads and renders on Direct3D 11, 12 and Vulkan, and the stripes, checker and hatch are in the picture on all three. Direct3D 12, the two builds of the setting against each other: mean largest-channel difference 10 to 14 levels, 13 to 23 % of the pixels over 24, at the closer zooms. Not verified: an 8192 mask (no such map at hand), a 10 km or 20 km map with a 2048 mask in the game (the size rule is covered by the host test only), video memory and load time at 4096 (two 4096 masks are 128 MB of sheets), the water map (unchanged).
+
