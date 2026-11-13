@@ -283,11 +283,13 @@ do
         table.insert(video.items, position, {
             title = 'Ray-traced shadows',
             key = 'ray_traced_shadows_optin',
+            requiresRayTracing = true,
             type = 'toggle',
             default = 0,
-            tip = 'Sun shadows of the ground, units and buildings traced by ray: exact at every distance, and hills '
-                .. 'shade the ground. Needs a graphics card that can trace rays, on Direct3D 12 or Vulkan; '
-                .. 'elsewhere the shadow map stays.',
+            tip = 'Experimental. Sun shadows of the ground, units and buildings traced by ray instead of read from the shadow map: '
+                .. 'no map resolution, and hills shade the ground, within the range the shadow map covers. Needs a graphics card '
+                .. 'that can trace rays, on Direct3D 12 or Vulkan; elsewhere the shadow map stays. It replaces Shadow Filtering and '
+                .. 'the contact shadows while it is on, and can show dark patches on slopes at low sun.',
             set = function(key, value, startup)
                 ConExecute('ren_RayTracedShadows ' .. tostring(value))
             end,
@@ -302,6 +304,7 @@ do
             table.insert(video.items, position + 1, {
                 title = 'Ray-traced ambient light',
                 key = 'ray_traced_ao',
+                requiresRayTracing = true,
                 type = 'toggle',
                 default = 1,
                 tip = 'With ray-traced shadows on: the shading of nooks, the ground around buildings and units '
@@ -341,6 +344,7 @@ do
             table.insert(video.items, math.min(position + 2, table.getn(video.items) + 1), {
                 title = 'Ray-traced bounce light',
                 key = 'ray_bounce_optin',
+                requiresRayTracing = true,
                 type = 'toggle',
                 default = 0,
                 tip = 'With ray-traced shadows on: light bounces once off the ground, cliffs and buildings onto what '
@@ -360,6 +364,7 @@ do
             table.insert(video.items, math.min(position + 2, table.getn(video.items) + 1), {
                 title = 'Ray-traced water reflections',
                 key = 'ray_water_optin',
+                requiresRayTracing = true,
                 type = 'toggle',
                 default = 0,
                 tip = 'With ray-traced shadows on: lakes and the sea reflect the hills, ground and units around them, '
@@ -378,11 +383,14 @@ do
         if Supported('ren_RaySunAngle') then
             table.insert(video.items, math.min(position + 2, table.getn(video.items) + 1), {
                 title = 'Soft ray-traced shadows',
-                key = 'ray_soft_shadows',
+                key = 'ray_soft_shadows_optin',
+                requiresRayTracing = true,
                 type = 'toggle',
-                default = 1,
+                default = 0,
                 tip = 'With ray-traced shadows on: the sun is a disc, not a point, so shadows are sharp where '
-                    .. 'they start and soften further from their caster.',
+                    .. 'they start and soften further from their caster. Costs several times the hard shadows '
+                    .. '(about 10 ms a frame on a Radeon RX 7900 XTX with a few hundred units on screen) and the '
+                    .. 'soft edge is grainy.',
                 set = function(key, value, startup)
                     ConExecute('ren_RaySunAngle ' .. ((value == 1) and '3' or '0'))
                 end,
@@ -484,7 +492,7 @@ do
     if video and video.items and Supported('ren_Atmosphere') then
         local position = table.getn(video.items) + 1
         for index, item in ipairs(video.items) do
-            if item.key == 'dynamic_lights_optin' or item.key == 'ray_soft_shadows' or item.key == 'ray_traced_ao'
+            if item.key == 'dynamic_lights_optin' or item.key == 'ray_soft_shadows_optin' or item.key == 'ray_traced_ao'
                 or item.key == 'ray_traced_shadows_optin' or item.key == 'shadow_resolution' then
                 position = index + 1
             end
@@ -611,57 +619,10 @@ do
     end
 end
 
--- Ambient occlusion (ren_Ao), on Direct3D 12 and Vulkan. Shown only by an engine that has the command,
--- as the splat limit above.
-do
-    local command = 'ren_Ao'
-    local function Supported()
-        -- The engine's Lua reports C functions as 'cfunction'.
-        local kind = type(ConTextMatches)
-        if kind ~= 'function' and kind ~= 'cfunction' then
-            return false
-        end
-        local ok, matches = pcall(ConTextMatches, command)
-        if not ok or type(matches) ~= 'table' then
-            return false
-        end
-        for _, name in ipairs(matches) do
-            if name == command then
-                return true
-            end
-        end
-        return false
-    end
-
-    local video = options and options.video
-    if video and video.items and Supported() then
-        local position = table.getn(video.items) + 1
-        for index, item in ipairs(video.items) do
-            if item.key == 'shadow_resolution' then
-                position = index + 1
-            end
-        end
-        table.insert(video.items, position, {
-            title = 'Ambient occlusion',
-            key = 'ambient_occlusion',
-            type = 'toggle',
-            default = -1,
-            tip = 'Darkens creases and the ground under units. Direct3D 12 and Vulkan only; other renderers keep the original look.',
-            set = function(key, value, startup)
-                if value ~= 0 and value ~= -1 then
-                    value = -1
-                end
-                ConExecute(command .. ' ' .. tostring(value))
-            end,
-            custom = {
-                states = {
-                    { text = '<LOC _On>', key = -1 },
-                    { text = '<LOC _Off>', key = 0 },
-                },
-            },
-        })
-    end
-end
+-- Ambient occlusion: the entry (key 'ambient_occlusion') is built from the engine's render feature registry
+-- (src/moho/render/AmbientOcclusion.cpp, optionslogic.lua) for the graphics API that runs, one option for every
+-- occlusion kernel: Off, Standard (ren_Ao's own, the old On), and the GTAO levels Low, Medium and High. The keys of
+-- Off ("0") and Standard ("-1") are the values the old On / Off toggle stored.
 
 -- FXAA (ren_Fxaa) on Direct3D 12 and Vulkan, which list no multisampled anti-aliasing. Shown only by an
 -- engine that has the command.
