@@ -15,12 +15,14 @@ add_library(faf_netchannel STATIC
   LobbySignals.cpp
   NetChannel.cpp
   ReliableStream.cpp
+  StreamCompression.cpp
   StyleProof.cpp
   UdpSocket.cpp
 )
 target_include_directories(faf_netchannel PUBLIC "${PROJECT_SOURCE_DIR}/src")
 target_compile_features(faf_netchannel PUBLIC cxx_std_20)
-target_link_libraries(faf_netchannel PRIVATE faf_monocypher faf_codegen)
+# zstd: the server's player channels compress what they send (StreamCompression.h, plan WP10.13).
+target_link_libraries(faf_netchannel PRIVATE faf_monocypher faf_zstd faf_codegen)
 if(FAF_LINUX)
   target_compile_options(faf_netchannel PRIVATE -Wall -Wextra)
 else()

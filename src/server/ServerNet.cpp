@@ -1,15 +1,30 @@
+#include "platform/PlatformDefines.h"
 #include "server/ServerNet.h"
 #include "remote/SpeedLimit.h"
 
 #include <algorithm>
 #include <chrono>
+#include <cstdio>
 #include <iterator>
 #include <span>
 #include <utility>
 
+#include "moho/console/CConCommand.h"
 #include "moho/net/ELobbyMsg.h"
 #include "remote/ServerClient.h"
 #include "remote/net/Datagram.h"
+
+#if FAFRE_PLATFORM_WINDOWS
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#else
+#include <time.h>
+#endif
 
 namespace faf::server
 {
@@ -46,7 +61,79 @@ namespace faf::server
           .count()
       );
     }
+
+    /** Plan WP10.13: the calling thread's CPU time, user and system; 0 when the system doesn't say. */
+    [[nodiscard]] std::uint64_t ThreadCpuNs() noexcept
+    {
+#if FAFRE_PLATFORM_WINDOWS
+      FILETIME created{};
+      FILETIME exited{};
+      FILETIME kernel{};
+      FILETIME user{};
+      if (::GetThreadTimes(::GetCurrentThread(), &created, &exited, &kernel, &user) == 0) {
+        return 0u;
+      }
+      const auto ticks = [](const FILETIME& time) {
+        return (static_cast<std::uint64_t>(time.dwHighDateTime) << 32u) | time.dwLowDateTime;
+      };
+      return (ticks(kernel) + ticks(user)) * 100u; // 100 ns ticks
+#else
+      timespec spent{};
+      if (clock_gettime(CLOCK_THREAD_CPUTIME_ID, &spent) != 0) {
+        return 0u;
+      }
+      return static_cast<std::uint64_t>(spent.tv_sec) * 1'000'000'000u + static_cast<std::uint64_t>(spent.tv_nsec);
+#endif
+    }
+
+    [[nodiscard]] std::string Megabytes(
+      const std::uint64_t bytes
+    )
+    {
+      char text[32];
+      std::snprintf(text, sizeof(text), "%.2f MB", static_cast<double>(bytes) / (1024.0 * 1024.0));
+      return text;
+    }
+
+    [[nodiscard]] std::string Percent(
+      const std::uint64_t part,
+      const std::uint64_t whole
+    )
+    {
+      char text[32];
+      std::snprintf(
+        text,
+        sizeof(text),
+        "%.1f %%",
+        whole == 0u ? 0.0 : 100.0 * static_cast<double>(part) / static_cast<double>(whole)
+      );
+      return text;
+    }
+
+    // Plan WP10.13 (docs/SWITCHES.md, server): on an 8v8's saved stream, level 3 left 54 % of the bytes at about
+    // 30 us a message, level 1 58 % at about 16 us, level 6 51 % at about 60 us (one core of the build machine).
+    constexpr int kDefaultViewCompression = 3;
+    constexpr int kMaxViewCompression = 19;
+    std::int32_t srv_ViewCompression = kDefaultViewCompression;
+    moho::TConVar<std::int32_t> gTConVar_srv_ViewCompression(
+      "srv_ViewCompression",
+      "Game server: the zstd level each player's reliable stream (views, Lua sync, tables) is compressed at on the "
+      "network thread, for a client that offers it; 0 sends it as it is. Read when the server starts listening.",
+      &srv_ViewCompression
+    );
   } // namespace
+
+  int ViewCompressionSwitch() noexcept
+  {
+    return std::clamp(static_cast<int>(srv_ViewCompression), 0, kMaxViewCompression);
+  }
+
+  void SetViewCompressionSwitch(
+    const int level
+  ) noexcept
+  {
+    srv_ViewCompression = std::clamp(level, 0, kMaxViewCompression);
+  }
 
   CServerNet::CServerNet(
     const SServerNetConfig& config
@@ -59,6 +146,7 @@ namespace faf::server
     }())
   {
     mLobby.SetControl(config.lobbyControl);
+    mLinks.SetCompression(config.viewCompression); // plan WP10.13
   }
 
   CServerNet::~CServerNet()
@@ -146,6 +234,7 @@ namespace faf::server
       Tick(mNowUs);
       mLinks.Wait(kWaitMilliseconds);
     }
+    mThreadCpuNs = ThreadCpuNs(); // read after `Stop` joins
   }
 
   namespace
@@ -280,9 +369,11 @@ namespace faf::server
       }
       for (std::size_t i = first; i < mViewSending.size(); ++i) {
         const std::vector<std::uint8_t>& bytes = mViewSending[i].bytes;
-        (void)mLinks.SendReliable(uid, bytes.data(), bytes.size());
-        // Plan WP10.7: where this view ends in the stream, to tell how many beats the player's link is behind.
-        seat.viewBytesQueued += bytes.size();
+        std::size_t streamBytes = 0;
+        (void)mLinks.SendReliable(uid, bytes.data(), bytes.size(), &streamBytes);
+        // Plan WP10.7: where this view ends in the stream, to tell how many beats the player's link is behind. As the
+        // stream has it, compressed when the player's channel is (plan WP10.13), as the unacked count has it.
+        seat.viewBytesQueued += streamBytes;
         if (!bytes.empty() && bytes[0] == static_cast<std::uint8_t>(remote::net::ESeatMessage::View)) {
           remote::net::ByteReader reader(bytes.data() + 1, bytes.size() - 1u);
           const auto beat = static_cast<std::uint32_t>(reader.Varint());
@@ -863,6 +954,59 @@ namespace faf::server
       std::to_string(mCamerasDropped);
   }
 
+  std::vector<std::string> CServerNet::CompressionReport() const
+  {
+    // Plan WP10.13: what each player was sent, before and after compression, and what it cost the network thread.
+    remote::net::SLinkTraffic all;
+    std::vector<std::string> lines(1u);
+    for (const auto& [uid, seat] : mSeats) {
+      const remote::net::SLinkTraffic traffic = mLinks.TrafficOf(uid);
+      if (traffic.channels == 0u) {
+        continue;
+      }
+      all.datagramsSent += traffic.datagramsSent;
+      all.datagramBytesSent += traffic.datagramBytesSent;
+      all.messages += traffic.messages;
+      all.messageBytes += traffic.messageBytes;
+      all.streamBytes += traffic.streamBytes;
+      all.compressedMessages += traffic.compressedMessages;
+      all.compressedMessageBytes += traffic.compressedMessageBytes;
+      all.compressedStreamBytes += traffic.compressedStreamBytes;
+      all.compressNs += traffic.compressNs;
+      lines.push_back(
+        "compression: " + seat.name + " (uid " + std::to_string(uid) + "): " + Megabytes(traffic.datagramBytesSent) +
+        " in " + std::to_string(traffic.datagramsSent) + " datagrams; " + std::to_string(traffic.messages) +
+        " messages, " + Megabytes(traffic.messageBytes) + " as given, " + Megabytes(traffic.streamBytes) +
+        " in the stream (" + Percent(traffic.streamBytes, traffic.messageBytes) + "); " +
+        std::to_string(traffic.compressedMessages) + " compressed, " + Megabytes(traffic.compressedMessageBytes) +
+        " to " + Megabytes(traffic.compressedStreamBytes) + "; " + std::to_string(traffic.compressedChannels) + " of " +
+        std::to_string(traffic.channels) + " channels compressed"
+      );
+    }
+    const remote::net::SGameLinkStats& stats = mLinks.Stats();
+    char cost[192];
+    std::snprintf(
+      cost,
+      sizeof(cost),
+      "%.1f ms in the compressor (%.1f us a message), network thread %.2f s CPU",
+      static_cast<double>(all.compressNs) * 1e-6,
+      all.compressedMessages == 0u
+        ? 0.0
+        : static_cast<double>(all.compressNs) * 1e-3 / static_cast<double>(all.compressedMessages),
+      static_cast<double>(mThreadCpuNs) * 1e-9
+    );
+    lines[0] = "compression: level " + std::to_string(mConfig.viewCompression) + ", " +
+      std::to_string(stats.compressOffers) + " offers taken, " + std::to_string(stats.compressOffersIgnored) +
+      " set aside, " + std::to_string(stats.compressFailures) + " failures; to players " +
+      Megabytes(all.datagramBytesSent) + " in " + std::to_string(all.datagramsSent) + " datagrams; " +
+      std::to_string(all.messages) + " messages, " + Megabytes(all.messageBytes) + " as given, " +
+      Megabytes(all.streamBytes) + " in the stream (" + Percent(all.streamBytes, all.messageBytes) + "); " +
+      std::to_string(all.compressedMessages) + " compressed, " + Megabytes(all.compressedMessageBytes) + " to " +
+      Megabytes(all.compressedStreamBytes) + " (" + Percent(all.compressedStreamBytes, all.compressedMessageBytes) +
+      "); " + cost;
+    return lines;
+  }
+
   std::vector<std::int32_t> CServerNet::TakeReturned()
   {
     const std::scoped_lock lock(mNewsLock);
@@ -1198,7 +1342,10 @@ namespace faf::server
     case remote::net::ESeatMessage::SessionTables:
     case remote::net::ESeatMessage::CommandAnswer:
     case remote::net::ESeatMessage::ViewCheck:
+    case remote::net::ESeatMessage::Compressed:
       break; // the server's own to send
+    case remote::net::ESeatMessage::CompressOffer:
+      break; // the links take it (plan WP10.13); none reaches here
     }
     ++mBadMessages;
   }

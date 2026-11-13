@@ -651,6 +651,207 @@ namespace
       "and comes back through an unlisted flood"
     );
   }
+
+  /** Plan WP10.13: a message as a view might be, `size` bytes, its content from `seed`. */
+  [[nodiscard]] std::vector<std::uint8_t> ViewLike(
+    const std::size_t size,
+    const std::uint32_t seed
+  )
+  {
+    std::vector<std::uint8_t> message(size);
+    std::minstd_rand random(seed / 8u); // eight in a row alike, as a beat's views are like the last beat's
+    for (std::uint8_t& byte : message) {
+      byte = static_cast<std::uint8_t>(random() % 23u);
+    }
+    message[0] = static_cast<std::uint8_t>(ESeatMessage::View);
+    message[size / 2u] = static_cast<std::uint8_t>(seed);
+    return message;
+  }
+
+  /** Takes what has come for `client` into `got`. */
+  void TakeAll(
+    CClientLink& client,
+    std::vector<std::vector<std::uint8_t>>& got
+  )
+  {
+    std::vector<std::uint8_t> message;
+    while (client.TakeReliable(message)) {
+      got.push_back(message);
+    }
+  }
+
+  void CompressionOverRealSockets()
+  {
+    CServerLinks server;
+    server.SetCompression(3);
+    std::string error;
+    Check(server.Open(kLoopbackAnyPort, error), "the server binds");
+    server.AddPlayer(1, MakeToken("one"));
+    server.AddPlayer(2, MakeToken("two"));
+    CEvents events;
+    std::uint64_t nowUs = 1000u;
+
+    CClientLink one(1, MakeToken("one"), server.Local());
+    CClientLink two(2, MakeToken("two"), server.Local());
+    two.SetCompressionOffer(false); // as a client from before compression
+    Check(one.Open(error) && two.Open(error), "the clients open");
+    Check(
+      RunUntil(
+        server,
+        events,
+        {&one, &two},
+        nowUs,
+        2'000'000u,
+        [&] {
+      return server.Compresses(1) && two.State() == CClientLink::EState::Connected;
+    }
+      ),
+      "the client that offers gets a compressed channel"
+    );
+    Check(!server.Compresses(2), "the one that doesn't, doesn't");
+    Check(server.Stats().compressOffers == 1u, "one offer taken");
+    Check(events.messages[1].empty(), "and the offer never reaches the server's owner");
+
+    // Many messages to both, small ones among them, in order.
+    std::vector<std::vector<std::uint8_t>> sent;
+    for (std::uint32_t i = 0; i < 400u; ++i) {
+      sent.push_back(
+        i % 9u == 4u ? std::vector<std::uint8_t>{static_cast<std::uint8_t>(ESeatMessage::Beat), 1u, 2u}
+                     : ViewLike(1500u + (i % 5u) * 300u, i)
+      );
+    }
+    std::size_t streamBytes = 0;
+    for (const std::vector<std::uint8_t>& message : sent) {
+      std::size_t inStream = 0;
+      Check(server.SendReliable(1, message.data(), message.size(), &inStream), "the server sends to one");
+      streamBytes += inStream;
+      Check(server.SendReliable(2, message.data(), message.size()), "and to two");
+    }
+    std::vector<std::vector<std::uint8_t>> gotOne;
+    std::vector<std::vector<std::uint8_t>> gotTwo;
+    Check(
+      RunUntil(
+        server,
+        events,
+        {&one, &two},
+        nowUs,
+        5'000'000u,
+        [&] {
+      TakeAll(one, gotOne);
+      TakeAll(two, gotTwo);
+      return gotOne.size() == sent.size() && gotTwo.size() == sent.size();
+    }
+      ),
+      "everything arrives"
+    );
+    Check(gotOne == sent, "one gets every message as sent, in order");
+    Check(gotTwo == sent, "and so does two");
+    const SLinkTraffic toOne = server.TrafficOf(1);
+    const SLinkTraffic toTwo = server.TrafficOf(2);
+    Check(toOne.messages == sent.size() && toTwo.messages == sent.size(), "the server counts each message");
+    Check(toOne.compressedMessages > 300u && toOne.compressedMessages < sent.size(), "the small ones go as they are");
+    Check(toOne.streamBytes == streamBytes, "what went into the stream is what SendReliable said");
+    Check(toOne.streamBytes * 2u < toOne.messageBytes, "the compressed stream is less than half");
+    Check(toTwo.compressedMessages == 0u && toTwo.streamBytes == toTwo.messageBytes, "two's goes as it is");
+    Check(toOne.compressorBytes > 0u && toTwo.compressorBytes == 0u, "only one's channel holds a compressor");
+    Check(toOne.datagramBytesSent < toTwo.datagramBytesSent, "fewer bytes go to one");
+    Check(
+      one.CompressionStats().messages == toOne.compressedMessages && one.CompressionStats().failures == 0u,
+      "one decoded each compressed message"
+    );
+    Check(two.CompressionStats().messages == 0u, "two got none");
+
+    // A reconnect: a new channel, a new stream at both ends, and the messages after it decode.
+    one.Reconnect();
+    Check(
+      RunUntil(
+        server,
+        events,
+        {&one, &two},
+        nowUs,
+        2'000'000u,
+        [&] {
+      return one.State() == CClientLink::EState::Connected && server.Compresses(1);
+    }
+      ),
+      "one comes back, compressed again"
+    );
+    gotOne.clear();
+    for (std::size_t i = 0; i < 50u; ++i) {
+      Check(server.SendReliable(1, sent[i].data(), sent[i].size()), "the server sends after the return");
+    }
+    Check(
+      RunUntil(
+        server,
+        events,
+        {&one, &two},
+        nowUs,
+        3'000'000u,
+        [&] {
+      TakeAll(one, gotOne);
+      return gotOne.size() == 50u;
+    }
+      ),
+      "and they arrive"
+    );
+    Check(std::equal(gotOne.begin(), gotOne.end(), sent.begin()), "as sent");
+    Check(one.CompressionStats().failures == 0u, "with nothing that didn't decode");
+    Check(
+      server.TrafficOf(1).channels == 2u && server.TrafficOf(1).compressedChannels == 2u,
+      "two channels, both compressed"
+    );
+    Check(server.Stats().compressOffers == 2u && server.Stats().compressOffersIgnored == 0u, "one offer each");
+
+    // Removed, the uid's traffic stays for the report.
+    server.RemovePlayer(1);
+    Check(server.TrafficOf(1).messages == sent.size() + 50u, "a removed player's counts stay");
+  }
+
+  void CompressionOffOnTheServer()
+  {
+    // A server with compression off (or one from before it): the offer is counted and nothing is compressed.
+    CServerLinks server;
+    std::string error;
+    Check(server.Open(kLoopbackAnyPort, error), "the server binds");
+    server.AddPlayer(1, MakeToken("one"));
+    CEvents events;
+    std::uint64_t nowUs = 1000u;
+    CClientLink one(1, MakeToken("one"), server.Local());
+    Check(one.Open(error), "the client opens");
+    Check(
+      RunUntil(
+        server,
+        events,
+        {&one},
+        nowUs,
+        2'000'000u,
+        [&] {
+      return server.Stats().compressOffersIgnored == 1u;
+    }
+      ),
+      "the offer arrives and is set aside"
+    );
+    Check(!server.Compresses(1), "nothing is compressed");
+    const std::vector<std::uint8_t> message = ViewLike(2000u, 1u);
+    Check(server.SendReliable(1, message.data(), message.size()), "the server sends");
+    std::vector<std::vector<std::uint8_t>> got;
+    Check(
+      RunUntil(
+        server,
+        events,
+        {&one},
+        nowUs,
+        2'000'000u,
+        [&] {
+      TakeAll(one, got);
+      return got.size() == 1u;
+    }
+      ),
+      "the client gets it"
+    );
+    Check(got.size() == 1u && got[0] == message, "as it is");
+    Check(events.messages[1].empty(), "and the server's owner never saw the offer");
+  }
 } // namespace
 
 TEST(
@@ -701,4 +902,18 @@ TEST(
 )
 {
   AllowlistAndAddressLimits();
+}
+TEST(
+  Existing_GameLink,
+  CompressionOverRealSockets
+)
+{
+  CompressionOverRealSockets();
+}
+TEST(
+  Existing_GameLink,
+  CompressionOffOnTheServer
+)
+{
+  CompressionOffOnTheServer();
 }

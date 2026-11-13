@@ -53,6 +53,11 @@ namespace faf::server
      */
     bool congestionControl = false;
     /**
+     * Plan WP10.13: the zstd level each player's reliable stream is compressed at, on the network thread, for a client
+     * that offers it (remote/net/StreamCompression.h); 0 sends everything as it is. `srv_ViewCompression`.
+     */
+    int viewCompression = 0;
+    /**
      * Plan WPR.50: in the lobby, a participant heard from for this long counts as away (`TakeLobbyPresence`), well
      * before its channel's own 10 s timeout, so a logical host that is gone is succeeded within 10 s. A client sends
      * a keepalive every quarter second, also while its game thread is busy (loading the lobby screen takes seconds),
@@ -68,6 +73,11 @@ namespace faf::server
      */
     std::optional<std::vector<std::string>> uiModsAllowed;
   };
+
+  /** Plan WP10.13: `srv_ViewCompression` (docs/SWITCHES.md), the zstd level of each player's stream; 0 off. */
+  [[nodiscard]] int ViewCompressionSwitch() noexcept;
+  /** `--view-compression <level>` sets it; the level is kept within zstd's (1 to 19) or 0. */
+  void SetViewCompressionSwitch(int level) noexcept;
 
   class CServerNet final : private remote::net::CServerLinks::IEvents
   {
@@ -271,6 +281,11 @@ namespace faf::server
 
     /** What arrived that wasn't a player's, for the console; after `Stop`. */
     [[nodiscard]] std::string LinkReport() const;
+    /**
+     * Plan WP10.13: what each player was sent (datagrams, messages as given, the stream after compression) and the
+     * compressor's time on the network thread; after `Stop`. Lines: the whole, then one per player.
+     */
+    [[nodiscard]] std::vector<std::string> CompressionReport() const;
 
     /** Lines for the console since the last call. */
     [[nodiscard]] std::vector<std::string> TakeNews();
@@ -383,6 +398,7 @@ namespace faf::server
     std::mutex mCameraSinkLock;
     std::function<void(std::int32_t, const std::vector<remote::SCameraReport>&)> mCameraSink; // plan WP8.2
     std::uint64_t mViewMismatches = 0;
+    std::uint64_t mThreadCpuNs = 0;    // plan WP10.13: the network thread's CPU time, when it stopped; 0 unknown
     remote::wire::SRoster mRosterSent; // the last sent to everyone, without a local index
     bool mRosterSentEver = false;
     std::uint64_t mRosterSentUs = 0;

@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <array>
+#include <chrono>
 #include <cstring>
 #include <utility>
 
@@ -112,7 +113,47 @@ namespace faf::remote::net
     if (found->second.channel) {
       mByAddress.erase(found->second.from.Key());
     }
+    RetireChannel(uid, found->second);
     mPlayers.erase(found);
+  }
+
+  void CServerLinks::RetireChannel(
+    const std::int32_t uid,
+    SPlayer& player
+  )
+  {
+    if (player.channel) {
+      SLinkTraffic& traffic = mTraffic[uid];
+      traffic.datagramsSent += player.channel->Stats().datagramsSent;
+      traffic.datagramBytesSent += player.channel->Stats().bytesSent;
+    }
+    player.channel.reset();
+    player.compressor.reset();
+    player.offerSeen = false;
+  }
+
+  void CServerLinks::TakeCompressOffer(
+    const std::int32_t uid,
+    SPlayer& player,
+    const std::vector<std::uint8_t>& message
+  )
+  {
+    // Plan WP10.13: the first offer on a channel starts its stream; a repeat can't, as the client's decoder is past it.
+    const std::optional<int> windowLog = ReadCompressOffer(message.data(), message.size());
+    if (!windowLog || player.offerSeen || mCompressionLevel <= 0) {
+      ++mStats.compressOffersIgnored;
+      return;
+    }
+    player.offerSeen = true;
+    auto compressor =
+      std::make_unique<CStreamCompressor>(mCompressionLevel, std::min(kCompressionWindowLog, *windowLog));
+    if (!compressor->Ok()) {
+      ++mStats.compressFailures;
+      return;
+    }
+    player.compressor = std::move(compressor);
+    ++mStats.compressOffers;
+    ++mTraffic[uid].compressedChannels;
   }
 
   bool CServerLinks::TakeHandshakeBudget(
@@ -186,6 +227,9 @@ namespace faf::remote::net
     if (returning) {
       mByAddress.erase(player.from.Key());
     }
+    // A new channel starts a new compression stream, once its client offers (plan WP10.13).
+    RetireChannel(request.uid, player);
+    ++mTraffic[request.uid].channels;
     player.channel = std::make_unique<NetChannel>(mChannelConfig);
     (void)player.channel->SetKeys(session->keys);
     WipeKey(session->keys.send);
@@ -203,7 +247,7 @@ namespace faf::remote::net
     // Someone else's channel at this address, as when one machine restarts a game on the port another left.
     if (const auto other = mByAddress.find(from.Key()); other != mByAddress.end() && other->second != request.uid) {
       if (const auto otherPlayer = mPlayers.find(other->second); otherPlayer != mPlayers.end()) {
-        otherPlayer->second.channel.reset();
+        RetireChannel(other->second, otherPlayer->second);
       }
     }
     mByAddress[from.Key()] = request.uid;
@@ -281,6 +325,10 @@ namespace faf::remote::net
         continue;
       }
       while (player.channel && player.channel->TakeReliable(mMessage)) {
+        if (!mMessage.empty() && mMessage[0] == static_cast<std::uint8_t>(ESeatMessage::CompressOffer)) {
+          TakeCompressOffer(uid, player, mMessage); // the links' own (plan WP10.13)
+          continue;
+        }
         events.OnMessage(uid, mMessage);
       }
       if (!player.channel) {
@@ -302,11 +350,79 @@ namespace faf::remote::net
   bool CServerLinks::SendReliable(
     const std::int32_t uid,
     const void* const data,
-    const std::size_t size
+    const std::size_t size,
+    std::size_t* const streamBytes
   )
   {
     const auto found = mPlayers.find(uid);
-    return found != mPlayers.end() && found->second.channel && found->second.channel->SendReliable(data, size);
+    if (found == mPlayers.end() || !found->second.channel) {
+      return false;
+    }
+    SPlayer& player = found->second;
+    SLinkTraffic& traffic = mTraffic[uid];
+    const void* sent = data;
+    std::size_t sentSize = size;
+    bool compressed = false;
+    // Plan WP10.13: into the channel's stream, in the order sent; a resend sends these bytes again. A message the
+    // channel couldn't take compressed (its bound past the largest message) goes as it is.
+    if (player.compressor && size >= kCompressMinBytes && size + size / 128u + 64u <= mChannelConfig.maxMessageSize) {
+      const auto start = std::chrono::steady_clock::now();
+      const bool packed = player.compressor->Compress(data, size, mCompressed);
+      traffic.compressNs += static_cast<std::uint64_t>(
+        std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now() - start).count()
+      );
+      if (packed) {
+        sent = mCompressed.data();
+        sentSize = mCompressed.size();
+        compressed = true;
+      } else {
+        // Its state may hold what never went out: nothing more is compressed on this channel.
+        ++mStats.compressFailures;
+        player.compressor.reset();
+      }
+    }
+    if (!player.channel->SendReliable(sent, sentSize)) {
+      if (compressed) {
+        player.compressor.reset(); // the client's decoder never saw it; the stream can't go on
+      }
+      return false;
+    }
+    ++traffic.messages;
+    traffic.messageBytes += size;
+    traffic.streamBytes += sentSize;
+    if (compressed) {
+      ++traffic.compressedMessages;
+      traffic.compressedMessageBytes += size;
+      traffic.compressedStreamBytes += sentSize;
+    }
+    if (streamBytes != nullptr) {
+      *streamBytes = sentSize;
+    }
+    return true;
+  }
+
+  SLinkTraffic CServerLinks::TrafficOf(
+    const std::int32_t uid
+  ) const
+  {
+    SLinkTraffic traffic;
+    if (const auto found = mTraffic.find(uid); found != mTraffic.end()) {
+      traffic = found->second;
+    }
+    if (const auto player = mPlayers.find(uid); player != mPlayers.end() && player->second.channel) {
+      traffic.datagramsSent += player->second.channel->Stats().datagramsSent;
+      traffic.datagramBytesSent += player->second.channel->Stats().bytesSent;
+      traffic.compressorBytes = player->second.compressor ? player->second.compressor->MemoryBytes() : 0u;
+    }
+    return traffic;
+  }
+
+  bool CServerLinks::Compresses(
+    const std::int32_t uid
+  ) const
+  {
+    const auto found = mPlayers.find(uid);
+    return found != mPlayers.end() && found->second.channel && found->second.compressor;
   }
 
   void CServerLinks::SendUnreliableToAll(
@@ -370,6 +486,7 @@ namespace faf::remote::net
   {
     mHandshake = std::make_unique<CClientHandshake>(mUid, mToken);
     mChannel.reset();
+    mDecompressor.reset(); // the new channel's stream starts again (plan WP10.13)
     mConnect.clear();
     mState = EState::Connecting;
     mRefusal.reset();
@@ -416,6 +533,15 @@ namespace faf::remote::net
           WipeKey(keys->send);
           WipeKey(keys->receive);
           mState = EState::Connected;
+          // Plan WP10.13: the channel's first message, so the server may compress what it sends from its next on.
+          mDecompressor.reset();
+          if (mOfferCompression) {
+            auto decompressor = std::make_unique<CStreamDecompressor>(kDecompressionWindowLogMax);
+            const std::vector<std::uint8_t> offer = WriteCompressOffer(kDecompressionWindowLogMax);
+            if (decompressor->Ok() && mChannel->SendReliable(offer.data(), offer.size())) {
+              mDecompressor = std::move(decompressor);
+            }
+          }
         }
       } else if (type == EHandshakeType::Reject && size == kRejectSize) {
         mRefusal = static_cast<EHandshakeRefusal>(buffer[2]);
@@ -469,6 +595,27 @@ namespace faf::remote::net
     std::vector<std::uint8_t>& out
   )
   {
-    return mChannel && mChannel->TakeReliable(out);
+    if (!mChannel || !mChannel->TakeReliable(out)) {
+      return false;
+    }
+    if (out.empty() || out[0] != static_cast<std::uint8_t>(ESeatMessage::Compressed)) {
+      return true;
+    }
+    // Plan WP10.13: the stream hands the pieces out in the order they were compressed, so each decodes now.
+    if (mDecompressor && mDecompressor->Decompress(out.data(), out.size(), mChannelConfig.maxMessageSize, mPacked)) {
+      ++mCompression.messages;
+      mCompression.compressedBytes += out.size();
+      mCompression.messageBytes += mPacked.size();
+      mCompression.decompressorBytes = mDecompressor->MemoryBytes();
+      out.swap(mPacked);
+      return true;
+    }
+    // Nothing after it can be read: the link is lost, and a new channel starts both streams again.
+    ++mCompression.failures;
+    mChannel.reset();
+    mDecompressor.reset();
+    mState = EState::Lost;
+    out.clear();
+    return false;
   }
 } // namespace faf::remote::net

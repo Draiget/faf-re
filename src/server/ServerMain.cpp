@@ -118,7 +118,7 @@ namespace
     "[--view-threads <n>] [--per-player-views] [--team-views] [--away-pause-seconds <n>] [--defeated-view "
     "observe|disconnect] [--lobby-seconds <n> [--start-when-ready <seconds>]] [--lobby-away-seconds <n>] "
     "[--stats-every <beats>] [--pose-budget-kbps <n>] [--no-effect-ops | --effect-ops-all] [--no-command-records] "
-    "[--view-audit] [--congestion-control] "
+    "[--view-audit] [--congestion-control] [--view-compression <level>] "
     "[--nftables-out <file> "
     "[--nftables-only] "
     "[--unlisted-pps <n>] [--unlisted-total-pps <n>]] [--sync-policy <file>] [--unvalidated-policy] "
@@ -1294,6 +1294,11 @@ namespace
     }
     netConfig.congestionControl =
       moho::CFG_GetArgOption("--congestion-control", 0, nullptr); // plan WP10.7, off by default
+    // Plan WP10.13: `--view-compression <level>` is `srv_ViewCompression`; each player's stream at that zstd level.
+    if (ReadOption("--view-compression", text)) {
+      faf::server::SetViewCompressionSwitch(std::atoi(text.c_str()));
+    }
+    netConfig.viewCompression = faf::server::ViewCompressionSwitch();
     const bool awayPauseGiven = ReadOption("--away-pause-seconds", text);
     double awayPauseSeconds = awayPauseGiven ? std::atof(text.c_str()) : 0.0;
     std::string defeatedView; // plan WP13.4
@@ -1803,10 +1808,12 @@ namespace
         return kExitBadInput;
       }
       Say(
-        "Listening on %s, %d seats, %.0f s to join",
+        "Listening on %s, %d seats, %.0f s to join; view compression %s (srv_ViewCompression %d)",
         net->Local().Text().c_str(),
         static_cast<int>(roster.Remotes().size()),
-        netConfig.joinSeconds
+        netConfig.joinSeconds,
+        netConfig.viewCompression > 0 ? "on" : "off",
+        netConfig.viewCompression
       );
       if (lobbySeconds > 0.0) {
         // Plan WP2.2, WP2.12: the server signals each participant's game as FAF's lobby server does over GPGNet; the
@@ -3275,6 +3282,9 @@ namespace
     if (net) {
       net->Stop(); // its counters are the network thread's
       Say("%s", net->LinkReport().c_str());
+      for (const std::string& line : net->CompressionReport()) {
+        Say("%s", line.c_str()); // plan WP10.13
+      }
     }
     while (driver->HasSyncData()) {
       moho::SSyncData* rawPacket = nullptr;

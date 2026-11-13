@@ -125,7 +125,8 @@ add_subdirectory("${PROJECT_SOURCE_DIR}/cmake/deps/zstd" "${CMAKE_BINARY_DIR}/de
 add_subdirectory("${PROJECT_SOURCE_DIR}/cmake/deps/googletest" "${CMAKE_BINARY_DIR}/deps/googletest")
 add_subdirectory("${PROJECT_SOURCE_DIR}/src/remote/net" "${CMAKE_BINARY_DIR}/remote/net")
 if(TARGET faf_netchannel)
-  add_executable(faf_netchannel_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/remote/net/NetChannelTests.cpp")
+  add_executable(faf_netchannel_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/remote/net/NetChannelTests.cpp"
+    "${PROJECT_SOURCE_DIR}/tests/remote/net/StreamCompressionTests.cpp")
   target_link_libraries(faf_netchannel_tests PRIVATE faf_netchannel faf_monocypher gtest_main)
   add_executable(faf_gamelink_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/remote/net/GameLinkTests.cpp")
   target_link_libraries(faf_gamelink_tests PRIVATE faf_netchannel faf_monocypher gtest_main)

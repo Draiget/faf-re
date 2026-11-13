@@ -14,6 +14,7 @@
 
 #include "remote/net/Handshake.h"
 #include "remote/net/NetChannel.h"
+#include "remote/net/StreamCompression.h"
 #include "remote/net/UdpSocket.h"
 
 // Engine addition, net channel (plan WP10.1, WP10.5): the two ends of a game's links, handshake and
@@ -136,6 +137,18 @@ namespace faf::remote::net
      * (WP8.2).
      */
     Cameras = 20,
+    /**
+     * Player to server, reliable, the first message on each new channel (plan WP10.13, StreamCompression.h): varint
+     * format (1), then a byte, the largest zstd window (log 2) the player's decoder takes. The player's client decodes
+     * `Compressed` messages from then on. Taken by the links (`CServerLinks`), never handed to the server's owner.
+     */
+    CompressOffer = 21,
+    /**
+     * Server to player, reliable (plan WP10.13), only on a channel whose player offered: varint the message's size,
+     * then the next piece of the channel's zstd stream, which decodes to that message (any other kind above).
+     * `CClientLink::TakeReliable` hands out the message it holds.
+     */
+    Compressed = 22,
   };
 
   /** What became of a player's command. */
@@ -161,6 +174,35 @@ namespace faf::remote::net
     std::uint64_t unlistedDropped = 0;
     std::uint64_t badCookies = 0;
     std::uint64_t refused = 0;
+    /** Plan WP10.13: compression offers taken (one per channel), and those not taken (compression off, a repeat). */
+    std::uint64_t compressOffers = 0;
+    std::uint64_t compressOffersIgnored = 0;
+    /** Compressors that failed (zstd); their channel sends the rest as it is. */
+    std::uint64_t compressFailures = 0;
+  };
+
+  /**
+   * Plan WP10.13: what the server sent one player on the reliable stream, over every channel it had. `messageBytes`
+   * are the messages as given; `streamBytes` what went into the stream for them (`Compressed` messages for those that
+   * were compressed, the rest as they are). The datagrams add the stream's framing, headers, acks and resends.
+   */
+  struct SLinkTraffic
+  {
+    std::uint64_t messages = 0;
+    std::uint64_t messageBytes = 0;
+    std::uint64_t streamBytes = 0;
+    std::uint64_t compressedMessages = 0;
+    std::uint64_t compressedMessageBytes = 0; // those messages as given
+    std::uint64_t compressedStreamBytes = 0;  // and as `Compressed` messages
+    /** Time in the compressor, on the thread that sends. */
+    std::uint64_t compressNs = 0;
+    /** The channels' datagrams out (`ChannelStats`), the live one's included. */
+    std::uint64_t datagramsSent = 0;
+    std::uint64_t datagramBytesSent = 0;
+    std::uint64_t channels = 0;
+    std::uint64_t compressedChannels = 0;
+    /** The live channel's compressor (`ZSTD_sizeof_CCtx`); 0 without one. */
+    std::uint64_t compressorBytes = 0;
   };
 
   /** A game server's end: one channel per player in the match. */
@@ -221,7 +263,22 @@ namespace faf::remote::net
       mSocket.Wait(milliseconds);
     }
 
-    bool SendReliable(std::int32_t uid, const void* data, std::size_t size);
+    /**
+     * Plan WP10.13: from the next channel on, a player whose client offers it gets the server's reliable messages
+     * compressed (StreamCompression.h) at this zstd level; 0 (the default) sends them as they are.
+     */
+    void SetCompression(
+      const int level
+    ) noexcept
+    {
+      mCompressionLevel = level;
+    }
+
+    /**
+     * `streamBytes`: what went into the stream, the message as `Compressed` when it was compressed. On the thread
+     * that pumps.
+     */
+    bool SendReliable(std::int32_t uid, const void* data, std::size_t size, std::size_t* streamBytes = nullptr);
     /** To every player with a live channel. */
     void SendUnreliableToAll(const void* data, std::size_t size);
 
@@ -230,6 +287,10 @@ namespace faf::remote::net
       return mStats;
     }
     [[nodiscard]] const ChannelStats* StatsOf(std::int32_t uid) const;
+    /** Plan WP10.13: what a uid was sent over all its channels, also after it was removed; zeros for a stranger. */
+    [[nodiscard]] SLinkTraffic TrafficOf(std::int32_t uid) const;
+    /** Whether the uid's live channel compresses (its client offered, and compression is on). */
+    [[nodiscard]] bool Compresses(std::int32_t uid) const;
     /** Reliable bytes the uid hasn't acknowledged. */
     [[nodiscard]] std::uint64_t ReliableUnacked(std::int32_t uid) const;
     /**
@@ -248,7 +309,16 @@ namespace faf::remote::net
       std::vector<PublicKey> usedPublics;
       std::vector<std::uint8_t> accept;
       bool lost = false;
+      // Plan WP10.13: the live channel's compressor, once its client offered; none before, or with compression off.
+      std::unique_ptr<CStreamCompressor> compressor;
+      bool offerSeen = false; // on the live channel
     };
+
+    /** The channel goes (replaced, taken by another, removed): its counts into the uid's traffic, its compressor too.
+     */
+    void RetireChannel(std::int32_t uid, SPlayer& player);
+    /** Plan WP10.13: a `CompressOffer` from the uid's live channel. */
+    void TakeCompressOffer(std::int32_t uid, SPlayer& player, const std::vector<std::uint8_t>& message);
 
     void HandleDatagram(
       const std::uint8_t* data,
@@ -292,6 +362,9 @@ namespace faf::remote::net
     std::uint64_t mUnlistedBudgetUs = 0;
     std::vector<std::vector<std::uint8_t>> mOut;
     std::vector<std::uint8_t> mMessage;
+    int mCompressionLevel = 0;                     // plan WP10.13
+    std::map<std::int32_t, SLinkTraffic> mTraffic; // retired channels' and the sends so far, by uid
+    std::vector<std::uint8_t> mCompressed;         // the message being sent, compressed
   };
 
   /** A player's end. */
@@ -335,7 +408,33 @@ namespace faf::remote::net
 
     bool SendReliable(const void* data, std::size_t size);
     bool TakeUnreliable(std::vector<std::uint8_t>& out);
+    /** The next message, a `Compressed` one decoded (plan WP10.13). A message that doesn't decode loses the link. */
     bool TakeReliable(std::vector<std::uint8_t>& out);
+
+    /**
+     * Plan WP10.13: offer the server compression on each new channel (StreamCompression.h); on by default. Off, the
+     * client is as one from before it: the server sends everything as it is. Takes effect at the next channel.
+     */
+    void SetCompressionOffer(
+      const bool offer
+    ) noexcept
+    {
+      mOfferCompression = offer;
+    }
+
+    /** Plan WP10.13: what came compressed, over every channel. */
+    struct SCompressionStats
+    {
+      std::uint64_t messages = 0;
+      std::uint64_t compressedBytes = 0; // as `Compressed` messages
+      std::uint64_t messageBytes = 0;    // decoded
+      std::uint64_t failures = 0;        // didn't decode (each lost the link)
+      std::uint64_t decompressorBytes = 0;
+    };
+    [[nodiscard]] const SCompressionStats& CompressionStats() const noexcept
+    {
+      return mCompression;
+    }
 
   private:
     std::int32_t mUid;
@@ -350,5 +449,9 @@ namespace faf::remote::net
     std::optional<EHandshakeRefusal> mRefusal;
     std::uint64_t mNextSendUs = 0;
     std::vector<std::vector<std::uint8_t>> mOut;
+    bool mOfferCompression = true;
+    std::unique_ptr<CStreamDecompressor> mDecompressor; // the live channel's, once offered
+    std::vector<std::uint8_t> mPacked;
+    SCompressionStats mCompression;
   };
 } // namespace faf::remote::net

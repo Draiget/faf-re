@@ -255,8 +255,9 @@ namespace
     double damageAt = -1.0; // changes a kept record on purpose (WPR.31), which the server's next check should catch
     std::int32_t breakWith = -1; // the army index to stop being allied with, as FAF's diplomacy screen asks
 
-    double beatMs = 0.0;   // the game's beat, to tell how late views come; 0: no telling
-    bool noDecode = false; // the channel's limit alone, as decoding takes a while
+    double beatMs = 0.0;            // the game's beat, to tell how late views come; 0: no telling
+    bool noDecode = false;          // the channel's limit alone, as decoding takes a while
+    bool noViewCompression = false; // plan WP10.13: offer the server no compression, as a client from before it
     // Plan WP10.9, WPR.14: each view's arrival to this file, and at the end the game client's display played over them
     // (remote/client/DisplayModel.h) with the view buffer off, as before it, and on.
     std::string displayModel;
@@ -363,6 +364,10 @@ namespace
       }
       if (name == "--no-decode") {
         out.noDecode = true;
+        continue;
+      }
+      if (name == "--no-view-compression") {
+        out.noViewCompression = true; // plan WP10.13: as a client from before it
         continue;
       }
       if (name == "--host-effects") {
@@ -1358,7 +1363,8 @@ int main(
       "[--pause-every <s>]] [--resume-at <s>] [--forge-at <s>] "
       "[--vanish-at <s> [--vanish-for <s>]] [--leave-at <s>] [--rate-every <s>] [--order-at <s>] [--attack-blip-at "
       "<s>] [--forge-id-at <s>] [--attack-hidden-at <s> --hidden-id <id>] [--fuzz-at <s> [--fuzz-count <n>]] "
-      "[--flood-at <s>] [--break-alliance-at <s> --break-with <army>] [--save-views <file>] [--damage-at <s>] "
+      "[--flood-at <s>] [--break-alliance-at <s> --break-with <army>] [--save-views <file>] [--no-view-compression] "
+      "[--damage-at <s>] "
       "[--lobby-name <name> [--lobby-say-to <uid> --lobby-say-at <s>] [--lobby-launch <match.lua> --lobby-launch-at "
       "<s>] [--lobby-options <key=value,...> --lobby-options-at <s>] [--lobby-player-options <key=value,...> "
       "--lobby-player-options-at <s>] [--lobby-request <Type> --lobby-request-at <s>] [--lobby-assign-slot <n> "
@@ -1398,6 +1404,7 @@ int main(
     server = path.PlayerSide();
   }
   CClientLink link(options.uid, MakeToken(options.token), server);
+  link.SetCompressionOffer(!options.noViewCompression);
   if (!link.Open(error)) {
     std::printf("probe %d: %s\n", options.uid, error.c_str());
     return 3;
@@ -2289,6 +2296,24 @@ int main(
     static_cast<unsigned long long>(beatMessages),
     static_cast<unsigned long long>(lastBeat)
   );
+  {
+    // Plan WP10.13: what came compressed (`--no-view-compression`: nothing was offered).
+    const CClientLink::SCompressionStats& compression = link.CompressionStats();
+    std::printf(
+      "probe %d: compression: %s, %llu messages came compressed, %llu bytes from %llu (%.1f %%), %llu failed, "
+      "decoder %llu KB\n",
+      options.uid,
+      options.noViewCompression ? "not offered" : "offered",
+      static_cast<unsigned long long>(compression.messages),
+      static_cast<unsigned long long>(compression.messageBytes),
+      static_cast<unsigned long long>(compression.compressedBytes),
+      compression.messageBytes == 0u
+        ? 0.0
+        : 100.0 * static_cast<double>(compression.compressedBytes) / static_cast<double>(compression.messageBytes),
+      static_cast<unsigned long long>(compression.failures),
+      static_cast<unsigned long long>(compression.decompressorBytes / 1024u)
+    );
+  }
   const double viewSeconds = views.lastAt - views.firstAt;
   std::printf(
     "probe %d: %llu views, %llu didn't decode, %llu whole after the first, %llu game infos, %llu launch infos, %llu "

@@ -8,7 +8,7 @@
 #
 #   cmake --build --preset clang-x64-release --target faf_netchannel_tests
 if(TARGET faf_netchannel)
-  add_executable(faf_netchannel_tests EXCLUDE_FROM_ALL net/NetChannelTests.cpp)
+  add_executable(faf_netchannel_tests EXCLUDE_FROM_ALL net/NetChannelTests.cpp net/StreamCompressionTests.cpp)
   # Monocypher directly too: the known-answer test calls it.
   target_link_libraries(faf_netchannel_tests PRIVATE faf_netchannel faf_monocypher gtest_main)
   target_compile_options(faf_netchannel_tests PRIVATE /EHsc)
