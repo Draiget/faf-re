@@ -324,7 +324,8 @@ do
                 type = 'toggle',
                 default = 0,
                 tip = 'Direct3D 12 and Vulkan: explosions, muzzle flashes, engines, projectiles and beams light the '
-                    .. 'ground and the units around them.',
+                    .. 'ground and the units around them (a simple screen-space version). It does nothing while the '
+                    .. '"Dynamic Lights" option is not Off: those lights, with shadows, replace it and the two never run together.',
                 set = function(key, value, startup)
                     ConExecute('ren_DynamicLights ' .. tostring(value))
                 end,
