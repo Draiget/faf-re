@@ -388,14 +388,20 @@ float4 tex2D(faf_shadow_sampler s, float2 uv, float4 full)
     // Engine addition (ren_RayWaterReflections): water2.fx reflects the sky cubemap and a mirrored copy of the units.
     // `faf_ray_water` traces the reflected ray into the ray-traced scene (ground and meshes); where it meets
     // something that is on the screen, it returns where (in the refraction copy's coordinates, the frame drawn
-    // before the water) and how much to take of it (less towards the screen's edges); otherwise zero, and the
-    // sky stays. The call site mixes the copy's colour there into the sky reflection.
-    constexpr const char* kRayWaterHelpers = R"hlsl(
+    // before the water), how much to take of it (less towards the screens edges) and how far along the view axis
+    // the hit lies; otherwise zero, and the sky stays. The call site mixes the copy's colour there into the sky
+    // reflection, after checking against the scene depth that the copy shows the hit there and not something nearer
+    // the camera (the copy holds what the camera sees: an occluder at that pixel would be mirrored in its place).
+    // The scene's declaration is apart: the shadow lookups' helpers declare it too (water2.fx with the shadow map of
+    // the units on the water, WaterReflectionPatch.cpp, has both), and a name is declared once.
+    constexpr const char* kRayWaterScene = R"hlsl(
 [[vk::binding(0, 2)]] RaytracingAccelerationStructure faf_RayScene : register(t0, space1);
-float3 faf_ray_water(float3 surface, float3 direction, float4x4 worldToClip, float4 viewportScaleOffset)
+)hlsl";
+    constexpr const char* kRayWaterHelpers = R"hlsl(
+float4 faf_ray_water(float3 surface, float3 direction, float4x4 worldToClip, float4 viewportScaleOffset)
 {
     if (faf_RayShadows[8].x <= 0 || direction.y <= 0.01) {
-        return float3(0, 0, 0);
+        return float4(0, 0, 0, 0);
     }
     RayDesc ray;
     ray.Origin = surface + float3(0, 0.05, 0);
@@ -406,16 +412,16 @@ float3 faf_ray_water(float3 surface, float3 direction, float4x4 worldToClip, flo
     query.TraceRayInline(faf_RayScene, RAY_FLAG_NONE, 3, ray);
     query.Proceed();
     if (query.CommittedStatus() != COMMITTED_TRIANGLE_HIT) {
-        return float3(0, 0, 0);
+        return float4(0, 0, 0, 0);
     }
     const float3 hit = ray.Origin + ray.Direction * query.CommittedRayT();
     const float4 clip = mul(float4(hit, 1), worldToClip);
     if (clip.w <= 0) {
-        return float3(0, 0, 0);
+        return float4(0, 0, 0, 0);
     }
     const float2 ndc = clip.xy / clip.w;
     const float edge = saturate((1 - max(abs(ndc.x), abs(ndc.y))) * 8);
-    return float3(ndc * viewportScaleOffset.xy + viewportScaleOffset.zw, edge);
+    return float4(ndc * viewportScaleOffset.xy + viewportScaleOffset.zw, edge, clip.w);
 }
 )hlsl";
 
@@ -425,7 +431,8 @@ float3 faf_ray_water(float3 surface, float3 direction, float4x4 worldToClip, flo
      * reflection mixed over the sky. Returns the body unchanged when it doesn't have that shape.
      */
     [[nodiscard]] std::string PassWaterRays(
-      const std::string& body
+      const std::string& body,
+      const bool sceneDepth
     )
     {
       const auto skipSpace = [&](std::size_t at) {
@@ -500,8 +507,16 @@ float3 faf_ray_water(float3 surface, float3 direction, float4x4 worldToClip, flo
         }
         const std::string call_text = body.substr(call, semicolon - 1U - call);
         std::string out = body.substr(0U, begin);
-        out += " float3 faf_water_hit = faf_ray_water(ViewPosition - " + input + ".mViewVec, " + direction +
+        out += " float4 faf_water_hit = faf_ray_water(ViewPosition - " + input + ".mViewVec, " + direction +
           ", mul(WorldToView, Projection), ViewportScaleOffset);";
+        if (sceneDepth) {
+          // The copy shows the hit only where the scene depth there is the hit's own (a tolerance of 0.75 units and
+          // two percent of the distance, faded out over as much again); elsewhere the sky stays. waterSsrParams2.w
+          // is 1 while the scene depth copy is bound (WaterReflections.cpp).
+          out += " if (waterSsrParams2.w > 0.5) { const float faf_tolerance = 0.75 + 0.02 * faf_water_hit.w; "
+                 "faf_water_hit.z *= 1 - saturate((abs(FafWaterSceneZ(faf_water_hit.xy) - faf_water_hit.w) - "
+                 "faf_tolerance) / faf_tolerance); }";
+        }
         out += head + "lerp(" + call_text + ", tex2D(RefractionSampler, faf_water_hit.xy), faf_water_hit.z);";
         out += body.substr(semicolon);
         return out;
@@ -1567,7 +1582,7 @@ float4 tex3Dlod(faf_sampler s, float4 uv) { return s.t3.SampleLevel(s.s, uv.xyz,
         return sampler.name == name;
       });
     };
-    const bool rayWater = gRayQueryShaders && !shadowCascades && hasParameter(kRayShadowParameter) &&
+    const bool rayWater = gRayQueryShaders && (!shadowCascades || rayShadows) && hasParameter(kRayShadowParameter) &&
       hasSampler("SkySampler") && hasSampler("RefractionSampler") && hasParameter("ViewPosition") &&
       hasParameter("WorldToView") && hasParameter("Projection") && hasParameter("ViewportScaleOffset");
 
@@ -1683,13 +1698,17 @@ float4 tex3Dlod(faf_sampler s, float4 uv) { return s.t3.SampleLevel(s.s, uv.xyz,
           }
         } else if (numericParameters.contains(parameter->name) || parameter->parameterClass == ParameterClass::Struct) {
           body += GlobalDeclaration(*parameter) + "\n";
-          if (rayWater && parameter->name == kRayShadowParameter) {
+          if (rayWater && !shadowCascades && parameter->name == kRayShadowParameter) {
+            body += kRayWaterScene;
             body += kRayWaterHelpers;
           }
           if (shadowCascades && parameter->name == kShadowCascadeParameter) {
             body += kShadowCascadeHelpers;
             body += kShadowCoordinateHelpers;
             body += rayShadows ? kRayShadowHelpers : kRayShadowFallback;
+            if (rayWater) {
+              body += kRayWaterHelpers; // after the helpers that declare faf_RayScene
+            }
           }
         }
         // Anything else (strings, sampler parameters without state) has no shader-side form.
@@ -1746,7 +1765,7 @@ float4 tex3Dlod(faf_sampler s, float4 uv) { return s.t3.SampleLevel(s.s, uv.xyz,
           functionBody = PassShadowCoordinates(functionBody, shadowLookupSamplers);
         }
         if (rayWater) {
-          functionBody = PassWaterRays(functionBody);
+          functionBody = PassWaterRays(functionBody, body.find("FafWaterSceneZ(") != std::string::npos);
         }
         body += ReplaceSamplerTypes(original.substr(0U, open)) + "{" + copies + ReplaceSamplerTypes(functionBody) + "}";
         continue;

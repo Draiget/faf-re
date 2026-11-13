@@ -658,6 +658,14 @@ namespace gpg::gal
     std::unordered_map<RayGeometryId, RayGeometryVulkan> mRayGeometries;
     RayGeometryId mNextRayGeometry = 1U;
     std::vector<VkAccelerationStructureInstanceKHR> mRayInstances;
+    // The top-level structure is kept while nothing it was built from changed: the instance list, the records and
+    // the textures of the last build, and a count of the pieces made or destroyed since (a piece's memory can be
+    // reused by another one at the same address, which the instance list alone would not show).
+    std::uint64_t mRayGeometryChanges = 0U;
+    std::uint64_t mRayBuiltChanges = ~0ULL;
+    std::vector<VkAccelerationStructureInstanceKHR> mRayBuiltInstances;
+    std::vector<std::uint32_t> mRayBuiltRecords;
+    std::vector<std::shared_ptr<Texture>> mRayBuiltTextures;
     VkDescriptorSetLayout mGpuSetLayout = VK_NULL_HANDLE;
     VkDescriptorSetLayout mGpuEmptySetLayout = VK_NULL_HANDLE; // set 1 of mGpuPipelineLayout, which no program uses
     VkPipelineLayout mGpuPipelineLayout = VK_NULL_HANDLE;
