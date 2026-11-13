@@ -48,6 +48,10 @@ namespace moho::lights
   // the background compile of a live switch, which builds throw-away effects.
   void NoteEffectPatched(const std::string& baseName, bool patched);
 
+  // The calling thread is one of the background compiles of a live switch, which build throw-away effects (not to be
+  // reported to the renderer features as the effects in use).
+  bool OnWarmupThread();
+
   // Called once at the start of a rendered frame, before anything is drawn. When the lights were switched on (Options
   // or ren_DynLights) after the effects were built without the light pass, the effects that carry it (mesh, terrain,
   // water2) are rebuilt once with it: the game stands still for the compile, and the lights are on afterwards without a

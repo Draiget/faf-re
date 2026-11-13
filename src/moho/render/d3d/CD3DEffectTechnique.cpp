@@ -30,6 +30,8 @@
 #include "moho/console/CConCommand.h"
 #include "moho/render/lights/LightEffectPatch.h"
 #include "moho/render/lights/LightFeeds.h"
+#include "moho/render/shadow/ShadowEffectPatch.h"
+#include "moho/render/shadow/ShadowFilter.h"
 #include "moho/misc/FileWaitHandleSet.h"
 #include "moho/misc/StartupHelpers.h"
 #include "moho/render/d3d/CD3DDevice.h"
@@ -1413,6 +1415,43 @@ technique EditorMeshFill
           }
         }
       }
+      // FAF addition (Shadow Filtering, docs/SHADOW_FILTERING.md): mesh.fx and terrain.fx get the filtered shadow-map
+      // lookup on the Direct3D 10 dialect backends (Direct3D 11, 12, Vulkan) while the Shadow Filtering option is not
+      // Off. It is the first patch of the chain: the light patch below continues from its text (and knows the lookups
+      // it leaves). The cache name carries a tag; a patched effect the backend compiler rejects is built again without
+      // the patch (see createEffect below). Unrecognised text compiles unpatched.
+      std::string shadowVariant;
+      std::string shadowSource; // the effect's text with the shadow patch, when it has one
+      const bool shadowEffect = deviceContext != nullptr && shadowfilter::Supported(deviceContext->mDeviceType) &&
+        effectByteCount > 0U && shadowfilter::HandlesEffect(std::string(effectBaseName.c_str()));
+      const auto assembleShadow = [&]() {
+        shadowVariant.clear();
+        shadowSource.clear();
+        if (!shadowEffect || !shadowfilter::EffectPatchWanted(deviceContext->mDeviceType)) {
+          return;
+        }
+        const std::string baseName(effectBaseName.c_str());
+        const bool terrain = baseName == "terrain";
+        std::string text(effectSourceBuffer.GetPtr(0U, 0U), effectByteCount);
+        const bool tileAware = shadowfilter::TileAware(deviceContext->mDeviceType);
+        const shadowfilter::PatchResult patch =
+          terrain ? shadowfilter::PatchTerrainEffect(text, tileAware) : shadowfilter::PatchMeshEffect(text, tileAware);
+        if (!patch.patched) {
+          gpg::Warnf("ShadowFilter: %s not patched: %s", baseName.c_str(), patch.error.c_str());
+          return;
+        }
+        gpg::Logf("ShadowFilter: %s patched, %d shadow lookups go through the filter", baseName.c_str(), patch.lookups);
+        shadowSource = std::move(text);
+        shadowVariant = tileAware ? ".shadowf1t" : ".shadowf1";
+        mergedBuffer = gpg::AllocMemBuffer(compatByteCount + shadowSource.size());
+        if (compatByteCount > 0U) {
+          std::copy_n(compatStateBuffer.GetPtr(0U, 0U), compatByteCount, mergedBuffer.GetPtr(0U, 0U));
+        }
+        std::copy_n(shadowSource.data(), shadowSource.size(), mergedBuffer.GetPtr(compatByteCount, 0U));
+      };
+      const gpg::MemBuffer<char> plainBuffer = mergedBuffer;
+      assembleShadow();
+
       // FAF addition (Dynamic Lights, docs/DYNAMIC_LIGHTS.md): mesh.fx and terrain.fx get the light pass on the
       // Direct3D 10 dialect backends (Direct3D 11, 12, Vulkan) while the Dynamic Lights option is not Off (or
       // /dynlights is on the command line). The cache name carries a tag, so the lit and the shipped effect compile to
@@ -1424,7 +1463,7 @@ technique EditorMeshFill
       // Direct3D 11 has 16 samplers and never compiles them, so it does not try (the failed compile took 20 s at every
       // start with lights on, and when they are switched on).
       bool lightsSunReads = deviceContext == nullptr || deviceContext->mDeviceType != gpg::gal::DeviceApi::Direct3D11;
-      const gpg::MemBuffer<char> unlitBuffer = mergedBuffer;
+      gpg::MemBuffer<char> unlitBuffer = mergedBuffer; // with the shadow patch, without the light pass
       const auto assembleLit = [&]() {
         lightVariant.clear();
         mergedBuffer = unlitBuffer;
@@ -1444,7 +1483,8 @@ technique EditorMeshFill
         const int flood = CFG_GetArgOption("/dynlightsflood2", 0U, nullptr)
           ? 2
           : (CFG_GetArgOption("/dynlightsflood", 0U, nullptr) ? 1 : 0);
-        std::string text(effectSourceBuffer.GetPtr(0U, 0U), effectByteCount);
+        std::string text =
+          shadowSource.empty() ? std::string(effectSourceBuffer.GetPtr(0U, 0U), effectByteCount) : shadowSource;
         const lights::EffectPatchResult patch = which == lights::PatchedEffect::Mesh
           ? lights::PatchMeshEffect(text, flood)
           : lights::PatchTerrainEffect(text, flood, lightsSunReads);
@@ -1513,8 +1553,8 @@ technique EditorMeshFill
           ? ".bonetex."
           : (msdfText ? ".msdf."
                       : (withTerrainTess ? ".tess." : ((editorOutline || withWaterDetail) ? outlineVariant : ".")));
-        const fa::string cachePath = cacheDirectory + "/" + mName + terrainLevelVariant.c_str() + lightVariant.c_str() +
-          waterVariant.c_str() + variant + engineVersion;
+        const fa::string cachePath = cacheDirectory + "/" + mName + terrainLevelVariant.c_str() +
+          shadowVariant.c_str() + lightVariant.c_str() + waterVariant.c_str() + variant + engineVersion;
         SDiskFileInfo cacheInfo{};
         bool useCachePayload = false;
         if (waitHandleSet->GetFileInfo(cachePath.c_str(), &cacheInfo, false)) {
@@ -1544,13 +1584,13 @@ technique EditorMeshFill
       // cannot take them in a technique that already uses 15), and if that does not compile either, without the light
       // pass. When the unlit build fails as well, the failure is not the lights': the lit state is put back for the
       // caller (a variant that falls back on its own, such as the tessellated terrain), and the error goes on.
-      const auto createEffect = [&](
-                                  const bool boneTexture,
-                                  const bool msdfText = false,
-                                  const bool withTerrainTess = false,
-                                  const bool editorOutline = false,
-                                  const bool withWaterDetail = false
-                                ) {
+      const auto createEffectLit = [&](
+                                     const bool boneTexture,
+                                     const bool msdfText = false,
+                                     const bool withTerrainTess = false,
+                                     const bool editorOutline = false,
+                                     const bool withWaterDetail = false
+                                   ) {
         if (lightVariant.empty()) {
           createEffectOnce(boneTexture, msdfText, withTerrainTess, editorOutline, withWaterDetail);
           return;
@@ -1588,6 +1628,48 @@ technique EditorMeshFill
           lightVariant = litVariant;
           mergedBuffer = litBuffer;
           throw;
+        }
+      };
+
+      // FAF addition (Shadow Filtering): an effect with the shadow patch that the backend compiler rejects (with or
+      // without the light pass: createEffectLit tries that) is built again without the shadow patch, and the filter
+      // stays off (Active() needs both effects patched).
+      const auto createEffect = [&](
+                                  const bool boneTexture,
+                                  const bool msdfText = false,
+                                  const bool withTerrainTess = false,
+                                  const bool editorOutline = false,
+                                  const bool withWaterDetail = false
+                                ) {
+        if (shadowVariant.empty()) {
+          createEffectLit(boneTexture, msdfText, withTerrainTess, editorOutline, withWaterDetail);
+          return;
+        }
+        try {
+          createEffectLit(boneTexture, msdfText, withTerrainTess, editorOutline, withWaterDetail);
+        } catch (const std::exception& exception) {
+          mEffect.reset();
+          gpg::Warnf("%s: %s; building it without the shadow filter", effectFilePath, exception.what());
+          const std::string patchedVariant = shadowVariant;
+          const std::string patchedSource = shadowSource;
+          const gpg::MemBuffer<char> patchedUnlit = unlitBuffer;
+          shadowVariant.clear();
+          shadowSource.clear();
+          unlitBuffer = plainBuffer;
+          mergedBuffer = plainBuffer;
+          assembleLit();
+          try {
+            createEffectLit(boneTexture, msdfText, withTerrainTess, editorOutline, withWaterDetail);
+          } catch (...) {
+            // not the filter's failure (a variant that falls back on its own, such as the tessellated terrain): its
+            // state is put back
+            shadowVariant = patchedVariant;
+            shadowSource = patchedSource;
+            unlitBuffer = patchedUnlit;
+            mergedBuffer = patchedUnlit;
+            assembleLit();
+            throw;
+          }
         }
       };
 
@@ -1812,6 +1894,11 @@ technique EditorMeshFill
       }
       if (!mEffect) {
         createEffect(false);
+      }
+
+      // FAF addition (Shadow Filtering): the filter learns whether the effect in use carries the patch.
+      if (shadowEffect) {
+        shadowfilter::NoteEffectPatched(std::strcmp(mName.c_str(), "terrain") == 0, !shadowVariant.empty());
       }
 
       // FAF addition (Dynamic Lights): the lights system learns whether the effect in use carries the light pass.
