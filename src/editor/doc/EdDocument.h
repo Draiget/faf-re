@@ -281,6 +281,9 @@ namespace faf::editor
       WaterMasks,
       /** The heights and the texture masks together (an erosion run painting its masks into layers). */
       HeightsAndMasks,
+      /** A terrain graph's Build: the heights, its mask strokes and the terrain types it changed (BuildUndo says
+         which). */
+      GraphBuild,
     };
     /** The water's three masks, a byte for every 2 x 2 units (the map's size halved). */
     struct WaterMaskSnapshot
@@ -354,7 +357,28 @@ namespace faf::editor
     [[nodiscard]] std::uint8_t* TerrainTypeCells(int& width, int& height) const;
     [[nodiscard]] std::vector<std::uint8_t> TerrainTypesNow() const;
     void ApplyTerrainTypes(const std::vector<std::uint8_t>& cells);
-    void TerrainTypesEdited(std::vector<std::uint8_t> before);
+    /** `ownStep` false: the change joins a step its caller ends (a terrain graph's Build). */
+    void TerrainTypesEdited(std::vector<std::uint8_t> before, bool ownStep = true);
+    /**
+     * A Build's parts, one entry per GraphBuild step: bit 0 a heights stroke, bits 1-5 how many mask strokes, bit 6 a
+     * terrain type change. The view undoes and redoes those parts together.
+     */
+    void BuildEdited(
+      const std::uint8_t parts
+    )
+    {
+      mBuildUndo.push_back(parts);
+      EditEnded(EditKind::GraphBuild);
+      mModified = true;
+    }
+    [[nodiscard]] std::vector<std::uint8_t>& BuildUndo() noexcept
+    {
+      return mBuildUndo;
+    }
+    [[nodiscard]] std::vector<std::uint8_t>& BuildRedo() noexcept
+    {
+      return mBuildRedo;
+    }
     /** Counts each change to the grid, for the overlay. */
     [[nodiscard]] int TerrainTypeRevision() const noexcept
     {
@@ -728,6 +752,8 @@ namespace faf::editor
         return "water masks";
       case EditKind::HeightsAndMasks:
         return "heights and texture masks";
+      case EditKind::GraphBuild:
+        return "terrain graph build";
       }
       return "edit";
     }
@@ -828,6 +854,8 @@ namespace faf::editor
     std::vector<ConversionEdit> mConversionRedo;
     std::vector<LayerEdit> mLayerRedo;
     std::vector<std::pair<std::vector<std::uint8_t>, std::vector<std::uint8_t>>> mTerrainTypesUndo;
+    std::vector<std::uint8_t> mBuildUndo;
+    std::vector<std::uint8_t> mBuildRedo;
     std::vector<std::pair<std::vector<std::uint8_t>, std::vector<std::uint8_t>>> mTerrainTypesRedo;
     int mTerrainTypeRevision = 0;
     std::vector<std::pair<std::vector<WaveRecord>, std::vector<WaveRecord>>> mWavesUndo;

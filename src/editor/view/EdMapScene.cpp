@@ -1832,6 +1832,7 @@ namespace faf::editor
       : kind == EdDocument::EditKind::Look                ? UndoLook(false)
       : kind == EdDocument::EditKind::WaterMasks          ? UndoWaterMasks(false)
       : kind == EdDocument::EditKind::HeightsAndMasks     ? UndoHeightsAndMasks(false)
+      : kind == EdDocument::EditKind::GraphBuild          ? UndoGraphBuild(false)
                                                           : UndoHeights(false);
     if (done) {
       mDocument.PushRedo(kind);
@@ -1859,6 +1860,7 @@ namespace faf::editor
       : kind == EdDocument::EditKind::Look                ? UndoLook(true)
       : kind == EdDocument::EditKind::WaterMasks          ? UndoWaterMasks(true)
       : kind == EdDocument::EditKind::HeightsAndMasks     ? UndoHeightsAndMasks(true)
+      : kind == EdDocument::EditKind::GraphBuild          ? UndoGraphBuild(true)
                                                           : UndoHeights(true);
     if (done) {
       mDocument.PushUndo(kind);
@@ -3028,7 +3030,8 @@ namespace faf::editor
     const MaskWriteMode mode,
     const float strength,
     const bool takeAway,
-    std::string& message
+    std::string& message,
+    const bool ownStep
   )
   {
     LoadMasks();
@@ -3068,7 +3071,15 @@ namespace faf::editor
         }
       }
     }
-    WholeMaskChanged(whole);
+    if (ownStep) {
+      WholeMaskChanged(whole);
+    } else {
+      // The caller ends the step (a terrain graph's Build).
+      mDocument.MaskUndo().EndStroke(masks.texels.data());
+      UploadMasks({whole}, 0xFFu);
+      mDocument.SetModified(true);
+      UpdateCoverage();
+    }
     message = "Wrote the mask into layer " + std::to_string(layer) + ": " + std::to_string(changed) + " texels changed";
     return static_cast<int>(changed);
   }
@@ -5189,42 +5200,123 @@ namespace faf::editor
   std::string EdMapScene::ApplyGraphBuild(
     const field::Grid& heights,
     const bool plain,
-    const std::map<int, field::Grid>& paint,
-    const std::array<bool, 9>& textured,
-    const int cap
+    const TerrainBuildWrites& writes
   )
   {
-    if (paint.empty()) {
+    if (writes.Empty()) {
       return heights.w > 1 ? ApplyGraphHeights(heights, plain, false) : "Nothing to build.";
     }
-    // The heights' stroke and the paint's, ended as one step.
+    // The heights' stroke, the mask strokes and the terrain types, ended as one step (BuildEdited).
+    std::uint8_t parts = 0;
     std::string message;
-    std::size_t heightsChanged = 0;
     if (heights.w > 1) {
-      message = ApplyGraphHeights(heights, plain, false, false, &heightsChanged);
+      message = ApplyGraphHeights(heights, plain, false, false);
+      parts |= 1;
     } else if (GraphPreviewNewest()) {
       (void)RevertGraphPreview();
     }
-    std::array<float, 9> shares{};
-    std::string paintMessage;
+    int strokes = 0;
+    std::string paintText;
     LoadMasks();
-    const int painted =
-      mDocument.Masks().texels.empty() ? -1 : WriteRecipeMasks(paint, textured, cap, shares, paintMessage, false);
-    if (painted < 0 && paintMessage.empty()) {
-      paintMessage = "the map has no masks";
+    const bool masks = !mDocument.Masks().texels.empty();
+    if (!writes.kinds.empty()) {
+      std::array<float, 9> shares{};
+      std::string text;
+      if (masks && WriteRecipeMasks(writes.kinds, writes.textured, writes.cap, shares, text, false) >= 0) {
+        ++strokes;
+        paintText += " Ground kinds: " + text + ".";
+      } else {
+        paintText += " The ground kinds weren't written: " + (masks ? text : std::string("the map has no masks")) + ".";
+      }
     }
-    if (heightsChanged > 0 || painted > 0) {
-      mDocument.EditEnded(
-        heightsChanged > 0 && painted > 0 ? EdDocument::EditKind::HeightsAndMasks
-          : heightsChanged > 0            ? EdDocument::EditKind::Heights
-                                          : EdDocument::EditKind::Masks
-      );
+    for (const TerrainBuildWrites::Layer& layer : writes.layers) {
+      std::string text;
+      if (
+        masks && strokes < 31 &&
+        WriteGeneratedMask(layer.mask, layer.layer, layer.mode, layer.strength, layer.takeAway, text, false) >= 0
+      ) {
+        ++strokes;
+        paintText += " Layer " + std::to_string(layer.layer) + ": " + text + ".";
+      }
     }
-    std::string text = (message.empty() ? std::string("Built.") : message) +
-      (painted < 0 ? " The paint wasn't written: " + paintMessage + "."
-                   : " Paint: " + paintMessage + ", the same undo step.");
+    parts |= static_cast<std::uint8_t>(strokes << 1);
+    if (!writes.types.empty()) {
+      int width = 0;
+      int height = 0;
+      std::uint8_t* const cells = mDocument.TerrainTypeCells(width, height);
+      if (cells != nullptr && width > 0 && height > 0) {
+        std::vector<std::uint8_t> before = mDocument.TerrainTypesNow();
+        const float sizeX = static_cast<float>(mDocument.Facts().sizeX);
+        const float sizeZ = static_cast<float>(mDocument.Facts().sizeZ);
+        std::size_t changed = 0;
+        for (const TerrainBuildWrites::Types& t : writes.types) {
+          for (int j = 0; j < height; ++j) {
+            const double z = (static_cast<double>(j) + 0.5) * sizeZ / height;
+            for (int i = 0; i < width; ++i) {
+              const double x = (static_cast<double>(i) + 0.5) * sizeX / width;
+              if (field::SampleWorld(t.mask, x, z) > t.threshold) {
+                std::uint8_t& cell = cells[static_cast<std::size_t>(j) * width + i];
+                changed += cell != static_cast<std::uint8_t>(t.code) ? 1u : 0u;
+                cell = static_cast<std::uint8_t>(t.code);
+              }
+            }
+          }
+        }
+        if (changed > 0) {
+          mDocument.TerrainTypesEdited(std::move(before), false);
+          mDocument.TerrainTypesChanged();
+          parts |= 64;
+        }
+        paintText += " Terrain types: " + std::to_string(changed) + " cells.";
+      }
+    }
+    if (parts != 0) {
+      mDocument.BuildEdited(parts);
+    }
+    for (const std::string& note : writes.notes) {
+      paintText += " Left out: " + note + ".";
+    }
+    std::string text = (message.empty() ? std::string("Built.") : message) + paintText + " One undo step.";
     gpg::Logf("editor: generate: %s", text.c_str());
     return text;
+  }
+
+  bool EdMapScene::UndoGraphBuild(
+    const bool redo
+  )
+  {
+    std::vector<std::uint8_t>& from = redo ? mDocument.BuildRedo() : mDocument.BuildUndo();
+    std::vector<std::uint8_t>& to = redo ? mDocument.BuildUndo() : mDocument.BuildRedo();
+    if (from.empty()) {
+      return false;
+    }
+    const std::uint8_t parts = from.back();
+    from.pop_back();
+    const int strokes = (parts >> 1) & 31;
+    // Undo in the reverse order of the build (types, masks, heights); redo in its order.
+    if (!redo) {
+      if ((parts & 64) != 0) {
+        (void)UndoTerrainTypes(false);
+      }
+      for (int s = 0; s < strokes; ++s) {
+        (void)UndoMasks(false);
+      }
+      if ((parts & 1) != 0) {
+        (void)UndoHeights(false);
+      }
+    } else {
+      if ((parts & 1) != 0) {
+        (void)UndoHeights(true);
+      }
+      for (int s = 0; s < strokes; ++s) {
+        (void)UndoMasks(true);
+      }
+      if ((parts & 64) != 0) {
+        (void)UndoTerrainTypes(true);
+      }
+    }
+    to.push_back(parts);
+    return true;
   }
 
   std::string EdMapScene::ApplyGraphHeights(

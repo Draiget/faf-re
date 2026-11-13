@@ -617,6 +617,89 @@ namespace faf::editor
     return false;
   }
 
+  bool TerrainRun::BuildWrites(
+    const NodeGraph& graph,
+    const TerrainGround& ground,
+    const field::Grid& heights,
+    TerrainBuildWrites& writes,
+    std::string& error
+  ) const
+  {
+    writes = TerrainBuildWrites{};
+    writes.textured = ground.textured;
+    writes.cap = ground.painted;
+    std::string kindsError;
+    if (!KindsPaint(graph, ground, heights, writes.kinds, kindsError) && !kindsError.empty()) {
+      error = kindsError;
+      return false;
+    }
+    std::vector<int> order;
+    (void)graph.Order(order);
+    for (const int id : order) {
+      const GraphNode* node = graph.Find(id);
+      if (node == nullptr) {
+        continue;
+      }
+      const std::string& type = node->type->name;
+      if (type != "out_layer" && type != "out_role" && type != "out_types") {
+        continue;
+      }
+      const TerrainValue* a = Input(graph, id, "a");
+      const auto number = [&](const char* name, const double fallback) {
+        const TerrainValue* wired = Input(graph, id, name);
+        return wired != nullptr && wired->isNumber ? wired->number : TerrainParamNumber(*node, name, fallback);
+      };
+      if (a == nullptr || a->grid == nullptr) {
+        writes.notes.push_back(node->type->title + ": nothing is linked into it");
+        continue;
+      }
+      if (type == "out_types") {
+        writes.types.push_back(
+          {*a->grid, static_cast<int>(std::lround(number("code", 2.0))), static_cast<float>(number("threshold", 0.5))}
+        );
+        continue;
+      }
+      int layer = static_cast<int>(std::lround(TerrainParamNumber(*node, "layer", 1.0)));
+      if (type == "out_role") {
+        const std::string role = TerrainParamText(*node, "role");
+        const TerrainKind* kind = nullptr;
+        for (const TerrainKind& k : TerrainKinds()) {
+          if (role == k.id) {
+            kind = &k;
+          }
+        }
+        const std::vector<int>* layers =
+          kind != nullptr ? &ground.plan.byKind[static_cast<std::size_t>(kind->kind)] : nullptr;
+        if (layers == nullptr || layers->empty()) {
+          writes.notes.push_back(node->type->title + " (" + role + "): no layer holds " + role);
+          continue;
+        }
+        if (ground.plan.base == kind->kind && layers->front() == 0) {
+          writes.notes.push_back(
+            node->type->title + " (" + role + "): " + role + " is the base layer, which has no mask"
+          );
+          continue;
+        }
+        layer = layers->front() == 0 && layers->size() > 1 ? (*layers)[1] : layers->front();
+      }
+      if (layer < 1 || layer > std::min(8, ground.painted)) {
+        writes.notes.push_back(node->type->title + ": the shader doesn't paint layer " + std::to_string(layer));
+        continue;
+      }
+      const std::string mode = TerrainParamText(*node, "mode");
+      TerrainBuildWrites::Layer write;
+      write.mask = *a->grid;
+      write.layer = layer;
+      write.mode = mode == "add" ? MaskWriteMode::AddTo
+        : mode == "subtract"     ? MaskWriteMode::SubtractFrom
+                                 : MaskWriteMode::Replace;
+      write.strength = static_cast<float>(std::clamp(number("strength", 1.0), 0.0, 1.0));
+      write.takeAway = TerrainParamNumber(*node, "takeAway", 0.0) >= 0.5;
+      writes.layers.push_back(std::move(write));
+    }
+    return true;
+  }
+
   // ---- Studio's graph files ---------------------------------------------------------------------------------------
 
   namespace

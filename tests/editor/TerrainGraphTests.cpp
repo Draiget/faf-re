@@ -370,6 +370,69 @@ namespace
 
   TEST(
     TerrainGraph,
+    BuildWritesCollectLayersKindsAndTypes
+  )
+  {
+    // Rock on layer 1, sand on 2; a 4-layer shader.
+    TerrainGround ground;
+    ground.width = 65;
+    ground.height = 65;
+    ground.heights = std::make_shared<std::vector<float>>(65 * 65, 30.0f);
+    ground.revision = 3;
+    std::array<faf::editor::GroundKind, 9> kinds{};
+    kinds[0] = faf::editor::GroundKind::Grass;
+    kinds[1] = faf::editor::GroundKind::Rock;
+    kinds[2] = faf::editor::GroundKind::Sand;
+    for (int l = 0; l <= 2; ++l) {
+      ground.textured[static_cast<std::size_t>(l)] = true;
+    }
+    ground.painted = 4;
+    ground.plan = faf::editor::PlanRecipe(kinds, ground.textured, 4, false);
+    ground.hasPaint = true;
+
+    NodeGraph graph(TerrainNodeTypes());
+    const int noise = graph.AddNode("perlin", 0, 0);
+    const int layer = graph.AddNode("out_layer", 300, 0);
+    const int rock = graph.AddNode("out_role", 300, 100);
+    const int snow = graph.AddNode("out_role", 300, 200);
+    const int high = graph.AddNode("out_layer", 300, 300);
+    const int types = graph.AddNode("out_types", 300, 400);
+    const int lonely = graph.AddNode("out_types", 300, 500);
+    for (const int out : {layer, rock, snow, high, types}) {
+      ASSERT_EQ(graph.Link(noise, 0, out, 0), LinkResult::Ok);
+    }
+    const auto set = [&](const int id, const char* name, const float value) {
+      ParamValue v;
+      v.value[0] = value;
+      graph.SetParam(id, ParamOf(*graph.Find(id)->type, name), v);
+    };
+    set(layer, "layer", 3);
+    set(layer, "mode", 1); // add
+    set(layer, "strength", 0.5f);
+    set(rock, "role", 4);  // rock (grass, dirt, wet, sand, rock, ...)
+    set(snow, "role", 7);  // snow: no layer holds it
+    set(high, "layer", 6); // beyond the 4-layer shader
+    set(types, "code", 33);
+    TerrainRun run(1);
+    const auto report = run.Evaluate(graph, 1, ground);
+    EXPECT_EQ(report.errors.count(lonely), 1U) << "an output with nothing linked shows an error";
+    faf::editor::TerrainBuildWrites writes;
+    std::string error;
+    ASSERT_TRUE(run.BuildWrites(graph, ground, field::Grid(65, 65, 1.0f, 0.0f, 0.0f), writes, error)) << error;
+    ASSERT_EQ(writes.layers.size(), 2U) << "layer 3 and rock's layer";
+    EXPECT_EQ(writes.layers[0].layer, 3);
+    EXPECT_EQ(writes.layers[0].mode, faf::editor::MaskWriteMode::AddTo);
+    EXPECT_FLOAT_EQ(writes.layers[0].strength, 0.5f);
+    EXPECT_EQ(writes.layers[1].layer, 1) << "rock is on layer 1";
+    ASSERT_EQ(writes.types.size(), 1U);
+    EXPECT_EQ(writes.types[0].code, 33);
+    EXPECT_TRUE(writes.kinds.empty()) << "no Output: ground kinds";
+    EXPECT_EQ(writes.notes.size(), 3U) << "snow has no layer, layer 6 isn't painted, one output has nothing linked";
+    EXPECT_FALSE(writes.Empty());
+  }
+
+  TEST(
+    TerrainGraph,
     SavedGraphReadsBack
   )
   {

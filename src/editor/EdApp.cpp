@@ -2141,7 +2141,7 @@ namespace faf::editor
             generate.SetStatus(mScene.ApplyGraphHeights(ask.result, ask.plain, true));
             break;
           case EdGenerate::HeightsAsk::Kind::Build:
-            generate.SetStatus(mScene.ApplyGraphBuild(ask.result, ask.plain, ask.paint, ask.textured, ask.cap));
+            generate.SetStatus(mScene.ApplyGraphBuild(ask.result, ask.plain, ask.writes));
             break;
           case EdGenerate::HeightsAsk::Kind::Revert:
             generate.SetStatus(
@@ -2175,13 +2175,20 @@ namespace faf::editor
           mGenTestStart = hash;
         }
         gpg::Logf(
-          "editor: generate test stage %d: heights %016llx%s, masks %016llx, %zu undo steps; undo: %s; %d nodes ran, "
-          "%zu "
-          "errors",
+          "editor: generate test stage %d: heights %016llx%s, masks %016llx, types %016llx, %zu undo steps; undo: %s; "
+          "%d "
+          "nodes ran, %zu errors",
           mGenTestStage,
           static_cast<unsigned long long>(hash),
           hash == mGenTestStart ? " (the original)" : "",
           static_cast<unsigned long long>(mScene.MasksHash()),
+          [this] {
+          std::uint64_t h = 1469598103934665603ULL;
+          for (const std::uint8_t cell : mDocument.TerrainTypesNow()) {
+            h = (h ^ cell) * 1099511628211ULL;
+          }
+          return static_cast<unsigned long long>(h);
+        }(),
           mDocument.UndoOrder().size(),
           mDocument.UndoStepName() != nullptr ? mDocument.UndoStepName() : "-",
           generate.LastReport().evaluated,
@@ -2197,7 +2204,11 @@ namespace faf::editor
           gpg::Logf(
             "editor: generate test: open %s: %s",
             arg[0].c_str(),
-            generate.OpenShipped(arg[0].c_str()) ? "yes" : "no such graph"
+            (std::string(arg[0].c_str()).rfind("file:", 0) == 0
+               ? generate.OpenFile(std::filesystem::path(std::string(arg[0].c_str()).substr(5)))
+               : generate.OpenShipped(arg[0].c_str()))
+              ? "yes"
+              : "no such graph"
           );
           generate.SetShowOnMap(true);
           generate.SelectFirst("range");

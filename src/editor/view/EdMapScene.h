@@ -265,7 +265,8 @@ namespace faf::editor
       MaskWriteMode mode,
       float strength,
       bool takeAway,
-      std::string& message
+      std::string& message,
+      bool ownStep = true
     );
     /**
      * Writes a recipe's visible weights (layer -> field on the heights' grid) into the masks as one undo step
@@ -1057,13 +1058,9 @@ namespace faf::editor
      * A build: the heights (when `heights` has samples) and the paint (layer -> visible weight, as a recipe writes it)
      * as one undo step, in place of the preview while it is the newest step.
      */
-    std::string ApplyGraphBuild(
-      const field::Grid& heights,
-      bool plain,
-      const std::map<int, field::Grid>& paint,
-      const std::array<bool, 9>& textured,
-      int cap
-    );
+    std::string ApplyGraphBuild(const field::Grid& heights, bool plain, const TerrainBuildWrites& writes);
+    /** A Build's parts undone (or redone) together. */
+    bool UndoGraphBuild(bool redo);
     /** Takes the preview off (while it is the newest step). */
     bool RevertGraphPreview();
     [[nodiscard]] bool GraphPreviewNewest() const;

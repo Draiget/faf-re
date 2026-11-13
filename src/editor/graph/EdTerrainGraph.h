@@ -110,6 +110,8 @@ namespace faf::editor
     std::map<int, std::string> errors; // by node id: the node's own error (not one passed on from upstream)
   };
 
+  struct TerrainBuildWrites;
+
   /**
    * A run of a graph on one grid: step 1 is the map's own samples, a larger step every step-th one. Each node's result
    * is kept with a key of its parameters, the versions of its inputs and the grid, so evaluating again after a change
@@ -154,6 +156,15 @@ namespace faf::editor
      * (layer -> field on this run's grid, `heights` its shape), overlaps settled by the kinds' priority, the base layer
      * what is left, the layers of a kind with no link cleared. False (and `error` empty) when the graph has none.
      */
+    /** Everything a Build writes besides the heights (`heights`: the run's grid, for the kinds' resolution). False with
+     * `error` when the ground kinds can't be resolved. */
+    bool BuildWrites(
+      const NodeGraph& graph,
+      const TerrainGround& ground,
+      const field::Grid& heights,
+      TerrainBuildWrites& writes,
+      std::string& error
+    ) const;
     bool KindsPaint(
       const NodeGraph& graph,
       const TerrainGround& ground,
@@ -184,6 +195,39 @@ namespace faf::editor
     std::string mLikeKey;
     field::GridPtr mBase;
     std::uint64_t mBaseRevision = ~0ULL;
+  };
+
+  /** What a Build writes besides the heights, from the graph's paint and terrain type outputs. */
+  struct TerrainBuildWrites
+  {
+    /** Output: ground kinds as the recipes resolve it (layer -> visible weight on the run's grid). */
+    std::map<int, field::Grid> kinds;
+    std::array<bool, 9> textured{};
+    int cap = 8;
+    /** Output: texture layer and Output: ground kind, in node order: a mask into one layer (1..8). */
+    struct Layer
+    {
+      field::Grid mask;
+      int layer = 1;
+      MaskWriteMode mode = MaskWriteMode::Replace;
+      float strength = 1.0f;
+      bool takeAway = false;
+    };
+    std::vector<Layer> layers;
+    /** Output: terrain type: the code where the mask is above the threshold. */
+    struct Types
+    {
+      field::Grid mask;
+      int code = 0;
+      float threshold = 0.5f;
+    };
+    std::vector<Types> types;
+    /** Outputs left out, with why ("Output: ground kind (snow): no layer holds snow"). */
+    std::vector<std::string> notes;
+    [[nodiscard]] bool Empty() const noexcept
+    {
+      return kinds.empty() && layers.empty() && types.empty();
+    }
   };
 
   /** A graph file of FAF Studio (`graphpresets/*.lua`, `Graph = { ... }`) read into `graph` with its node ids. */

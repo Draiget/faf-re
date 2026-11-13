@@ -1160,7 +1160,8 @@ namespace faf::editor
   }
 
   void EdDocument::TerrainTypesEdited(
-    std::vector<std::uint8_t> before
+    std::vector<std::uint8_t> before,
+    const bool ownStep
   )
   {
     mTerrainTypesUndo.emplace_back(std::move(before), TerrainTypesNow());
@@ -1168,7 +1169,9 @@ namespace faf::editor
     if (mTerrainTypesUndo.size() > 20) {
       mTerrainTypesUndo.erase(mTerrainTypesUndo.begin());
     }
-    EditEnded(EditKind::TerrainTypes);
+    if (ownStep) {
+      EditEnded(EditKind::TerrainTypes);
+    }
     mModified = true;
   }
 
@@ -1817,6 +1820,7 @@ namespace faf::editor
     mSkyboxRedo.clear();
     mWavesRedo.clear();
     mTerrainTypesRedo.clear();
+    mBuildRedo.clear();
   }
 
   bool EdDocument::PopUndo(

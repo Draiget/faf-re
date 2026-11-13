@@ -54,11 +54,8 @@ namespace faf::editor
       } kind = Kind::None;
       field::Grid result; // no samples: the graph writes no heights
       bool plain = true;
-      /** Build: the paint of Output: ground kinds (layer -> visible weight), the layers with a texture, the shader's.
-       */
-      std::map<int, field::Grid> paint;
-      std::array<bool, 9> textured{};
-      int cap = 8;
+      /** Build: what it writes besides the heights (the ground kinds, layers, terrain types). */
+      TerrainBuildWrites writes;
     };
     [[nodiscard]] bool TakeHeightsAsk(HeightsAsk& out);
     /** What the view made of it (shown under the toolbar). */
@@ -73,6 +70,8 @@ namespace faf::editor
 
     // Test runs (`/gentest`).
     bool OpenShipped(const std::string& id);
+    /** A saved graph (`.fafgraph.json`) opened (test runs: `/gentest file:<path>`). */
+    bool OpenFile(const std::filesystem::path& file);
     void SetShowOnMap(
       const bool show
     ) noexcept
