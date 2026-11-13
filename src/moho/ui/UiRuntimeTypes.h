@@ -1282,6 +1282,9 @@ namespace moho
     DECLARE_EVENT_TABLE()
   };
 
+  // The retail base was the 2.4.2 window library's wxEvtHandler, 0x28 bytes; ShellEvtHandler keeps that size in the
+  // retail-layout build (platform/shell/event.h).
+  static_assert(sizeof(ShellEvtHandler) == 0x28, "ShellEvtHandler size must be 0x28 (retail wxEvtHandler)");
   static_assert(sizeof(CUIKeyHandler) == 0x28, "moho::CUIKeyHandler size must be 0x28");
 
   /**

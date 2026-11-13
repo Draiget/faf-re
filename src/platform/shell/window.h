@@ -141,4 +141,10 @@ private:
   int m_screenY = 0;
   int m_clientWidth = 0;
   int m_clientHeight = 0;
+#if FAF_RETAIL_LAYOUT
+  // The retail-layout build keeps the size of the class this stands in for, the 2.4.2 window library's wxWindow
+  // (0x124 on x86), so WD3DViewport's and WRenViewport's fields keep their retail offsets (WD3DViewport.h).
+  // Nothing reads these bytes.
+  std::uint8_t m_retailReserved[0xC8]{};
+#endif
 };

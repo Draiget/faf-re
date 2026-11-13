@@ -6,6 +6,9 @@
 
 #include "platform/shell/defs.h"
 #include "platform/shell/object.h"
+#include "legacy/containers/Layout.h"
+
+#include <cstdint>
 
 class ShellEvent;
 class ShellEvtHandler;
@@ -550,6 +553,12 @@ private:
   ShellEvtHandler* m_nextHandler = nullptr;
   ShellEvtHandler* m_previousHandler = nullptr;
   bool m_enabled = true;
+#if FAF_RETAIL_LAYOUT
+  // The retail-layout build keeps the size of the class this stands in for, the 2.4.2 window library's
+  // wxEvtHandler (0x28 on x86), so the recovered types built on it keep their retail offsets: CUIKeyHandler is
+  // 0x28 and CMauiEventMapper's own fields start at 0x28 (moho/ui/UiRuntimeTypes.h). Nothing reads these bytes.
+  std::uint8_t m_retailReserved[0x18]{};
+#endif
 };
 
 #define DECLARE_EVENT_TABLE_ENTRY(type, id, idLast, fn, obj) {type, id, idLast, fn, obj}
