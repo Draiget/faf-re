@@ -1137,6 +1137,7 @@ set(FAF_ENGINE_SOURCES
   gpg/core/utils/LocalCache.cpp
   gpg/gal/ContextInterfaces.cpp
   gpg/gal/Device.cpp
+  gpg/gal/AmbientOcclusionPass.cpp
   gpg/gal/RenderProfiler.cpp
   gpg/gal/DxgiAdapterInfo.cpp
   gpg/gal/Effect.cpp

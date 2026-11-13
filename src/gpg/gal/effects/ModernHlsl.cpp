@@ -84,6 +84,31 @@ float2 faf_shadow_uv(float2 uv)
     return faf_ShadowCascades[0].zw;
 }
 float4 faf_shadow_read(faf_shadow_sampler s, float2 uv) { return s.t2.SampleLevel(s.s, faf_shadow_uv(uv), 0); }
+// ---- engine addition (shadow filtering): a filter that reads the atlas in the texels of the tile that holds its
+// centre. tex2Dtile gives that tile's move into the texture (texture uv = uv * xy + zw; x of 0 for a point past the
+// shadowed volume, which is lit), tex2Dtilesize the texture's size in texels (the atlas's, not a tile's) and
+// tex2Dtileload a read at texture coordinates, which skips the per-lookup remap above. The same names exist for
+// faf_sampler (the prelude), where the move is the identity, so a filter written against them also works without
+// cascades. ----
+float4 tex2Dtile(faf_shadow_sampler s, float2 uv)
+{
+    const int count = (int)faf_ShadowCascades[0].x;
+    if (count <= 0) return float4(1, 1, 0, 0);
+    [unroll] for (int k = 0; k < 4; ++k) {
+        if (k < count) {
+            const float4 box = faf_ShadowCascades[1 + 2 * k];
+            if (all(uv >= box.xy) && all(uv <= box.zw)) return faf_ShadowCascades[2 + 2 * k];
+        }
+    }
+    return float4(0, 0, faf_ShadowCascades[0].zw);
+}
+float2 tex2Dtilesize(faf_shadow_sampler s)
+{
+    uint w, h;
+    s.t2.GetDimensions(w, h);
+    return float2(w, h);
+}
+float4 tex2Dtileload(faf_shadow_sampler s, float2 p) { return s.t2.SampleLevel(s.s, p, 0); }
 float4 tex2D(faf_shadow_sampler s, float2 uv) { return faf_shadow_read(s, uv); }
 float4 tex2D(faf_shadow_sampler s, float2 uv, float2 dx, float2 dy) { return faf_shadow_read(s, uv); }
 float4 tex2Dbias(faf_shadow_sampler s, float4 uv) { return faf_shadow_read(s, uv.xy); }
@@ -260,6 +285,9 @@ float2 faf_ray_pair(float3 start, float3 toSun, float meshT, float terrainT, flo
     return float2(1, 1);
 }
 static float2 faf_ray_key_tap = float2(-1e31, -1e31);
+// The ground's shadow on a mesh point doesn't depend on the filter tap: kept for the point's other taps.
+static float4 faf_ray_ground_key = float4(-1e31, -1e31, -1e31, -1e31);
+static bool faf_ray_ground_value = false;
 // x: sunlit for a mesh point at full.z; y: sunlit for a terrain point whose z is 0.01 short. `tap` is the
 // lookup's offset from the point (mesh.fx's filter taps): with a sun disc each tap traces towards its own
 // point of it, and mesh.fx's average of the taps makes the soft edge.
@@ -300,7 +328,11 @@ float2 faf_ray_light(float4 full, float2 tap)
         }
         bool shaded = faf_ray_mesh_blocked(meshPoint, meshRay, faf_RayShadows[4].y, tMax);
         if (!shaded) {
-            shaded = faf_ray_ground_blocked(meshPoint, toSun, faf_RayShadows[4].y + faf_RayShadows[7].x, tMax);
+            if (!all(full == faf_ray_ground_key)) {
+                faf_ray_ground_value = faf_ray_ground_blocked(meshPoint, toSun, faf_RayShadows[4].y + faf_RayShadows[7].x, tMax);
+                faf_ray_ground_key = full;
+            }
+            shaded = faf_ray_ground_value;
         }
         lit = shaded ? float2(0, 1) : float2(1, 1);
     } else if (full.w < 2.5) {
@@ -639,7 +671,9 @@ float3 faf_ray_water(float3 surface, float3 direction, float4x4 worldToClip, flo
       const SamplerDesc& sampler
     )
     {
-      static constexpr std::string_view kCalls[] = {"tex2D", "tex2Dbias", "tex2Dproj", "tex2Dlod", "tex2Dgrad"};
+      static constexpr std::string_view kCalls[] = {
+        "tex2D", "tex2Dbias", "tex2Dproj", "tex2Dlod", "tex2Dgrad", "tex2Dtile", "tex2Dtilesize", "tex2Dtileload"
+      };
       const std::string_view name = sampler.name;
       std::size_t index = 0U;
       while (index < source.size()) {
@@ -748,6 +782,15 @@ float4 tex3Dproj(faf_sampler s, float4 uv) { return s.t3.Sample(s.s, uv.xyz / uv
 float4 tex2D(faf_sampler s, float2 uv, float2 dx, float2 dy) { return s.t2.SampleGrad(s.s, uv, dx, dy); }
 float4 tex2Dgrad(faf_sampler s, float2 uv, float2 dx, float2 dy) { return s.t2.SampleGrad(s.s, uv, dx, dy); }
 float4 tex2Dlod(faf_sampler s, float4 uv) { return s.t2.SampleLevel(s.s, uv.xy, uv.w); }
+// Engine addition (shadow filtering): the plain-texture twins of faf_shadow_sampler's tile reads (see there).
+float4 tex2Dtile(faf_sampler s, float2 uv) { return float4(1, 1, 0, 0); }
+float2 tex2Dtilesize(faf_sampler s)
+{
+    uint w, h;
+    s.t2.GetDimensions(w, h);
+    return float2(w, h);
+}
+float4 tex2Dtileload(faf_sampler s, float2 p) { return s.t2.SampleLevel(s.s, p, 0); }
 float4 texCUBE(faf_sampler s, float3 uv, float3 dx, float3 dy) { return s.tc.SampleGrad(s.s, uv, dx, dy); }
 float4 texCUBEgrad(faf_sampler s, float3 uv, float3 dx, float3 dy) { return s.tc.SampleGrad(s.s, uv, dx, dy); }
 float4 texCUBElod(faf_sampler s, float4 uv) { return s.tc.SampleLevel(s.s, uv.xyz, uv.w); }

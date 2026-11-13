@@ -787,7 +787,9 @@ namespace gpg::gal
         desc.Width,
         desc.Height
       );
-      const DepthStencilTargetContext depthContext(desc.Width, desc.Height, 3U, false);
+      // Engine change: sampled, so the ambient occlusion pass (GpuBindings::depthTarget) can read the scene depth, as
+      // on Direct3D 12 and Vulkan.
+      const DepthStencilTargetContext depthContext(desc.Width, desc.Height, 3U, true);
       output.depthStencil = CreateDepthStencilTarget(&depthContext);
     }
 
