@@ -3041,6 +3041,32 @@ namespace faf::editor
             ++frame.corners;
           }
         }
+        // The ground's forward from the view's far edge to its near one (the corners'), and right square to it: the
+        // compass's axes stay a right angle apart (picked 40 px apart near the horizon, they skewed; user report).
+        if (frame.corners == 4) {
+          const float farX = (frame.cornerX[0] + frame.cornerX[1]) * 0.5f;
+          const float farZ = (frame.cornerZ[0] + frame.cornerZ[1]) * 0.5f;
+          const float nearX = (frame.cornerX[2] + frame.cornerX[3]) * 0.5f;
+          const float nearZ = (frame.cornerZ[2] + frame.cornerZ[3]) * 0.5f;
+          const float length = std::hypot(farX - nearX, farZ - nearZ);
+          if (length > 1e-3f) {
+            frame.upX = (farX - nearX) / length;
+            frame.upZ = (farZ - nearZ) / length;
+          }
+        }
+        {
+          // Right: square to up, on the side the view's bottom edge runs (bottom-left to bottom-right).
+          float rightX = -frame.upZ;
+          float rightZ = frame.upX;
+          const float edgeX = frame.corners == 4 ? frame.cornerX[2] - frame.cornerX[3] : frame.rightX;
+          const float edgeZ = frame.corners == 4 ? frame.cornerZ[2] - frame.cornerZ[3] : frame.rightZ;
+          if (rightX * edgeX + rightZ * edgeZ < 0.0f) {
+            rightX = -rightX;
+            rightZ = -rightZ;
+          }
+          frame.rightX = rightX;
+          frame.rightZ = rightZ;
+        }
         frame.valid = true;
       }
     }
