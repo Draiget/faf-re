@@ -938,7 +938,8 @@ namespace faf::editor
   }
 
   void EdDocument::PropsEdited(
-    PropSnapshot before
+    PropSnapshot before,
+    const bool ownStep
   )
   {
     mPropUndo.emplace_back(std::move(before), PropsNow());
@@ -946,7 +947,9 @@ namespace faf::editor
     if (mPropUndo.size() > 200) {
       mPropUndo.erase(mPropUndo.begin());
     }
-    EditEnded(EditKind::Props);
+    if (ownStep) {
+      EditEnded(EditKind::Props);
+    }
     mModified = true;
   }
 

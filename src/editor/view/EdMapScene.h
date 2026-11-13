@@ -622,7 +622,8 @@ namespace faf::editor
     /** A stroke's props painted from the paint list, by blueprint (for the log). */
     std::map<std::string, int> mPaintCounts;
     void BeginObjectStroke();
-    void EndObjectStroke();
+    /** True when it kept a props change; `ownStep` false: the caller ends the step (a terrain graph's Build). */
+    bool EndObjectStroke(bool ownStep = true);
 
     /** A terrain stroke in progress: the brush under the cursor each frame while the left button is held. */
     void PaintStroke(float frameSeconds);
@@ -704,6 +705,9 @@ namespace faf::editor
     void UpdateModal();
     void EndModal(bool keep);
     bool mFilling = false;  // Fill the map: PlaceProps takes the paint list in any mode
+    const std::vector<PropPaintEntry>* mFillList = nullptr; // a terrain graph's scatter: its own list
+    /** A terrain graph's scatter, inside the Build's props stroke: the props placed (with their copies). */
+    int ScatterFromGraph(const TerrainBuildWrites::Scatter& scatter, std::string& note);
     bool mMiniCached = false;
     bool mMiniDrawNow = true;
     bool mMiniDrewLast = false;

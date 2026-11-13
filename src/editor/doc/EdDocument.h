@@ -361,7 +361,7 @@ namespace faf::editor
     void TerrainTypesEdited(std::vector<std::uint8_t> before, bool ownStep = true);
     /**
      * A Build's parts, one entry per GraphBuild step: bit 0 a heights stroke, bits 1-5 how many mask strokes, bit 6 a
-     * terrain type change. The view undoes and redoes those parts together.
+     * terrain type change, bit 7 a props change. The view undoes and redoes those parts together.
      */
     void BuildEdited(
       const std::uint8_t parts
@@ -643,7 +643,8 @@ namespace faf::editor
     /** Puts a snapshot back as the map's props (the view rebuilds their meshes). */
     void RestoreProps(const PropSnapshot& props);
     /** A prop edit ended: its before and the props now become the newest undo step. */
-    void PropsEdited(PropSnapshot before);
+    /** `ownStep` false: the change joins a step its caller ends (a terrain graph's Build). */
+    void PropsEdited(PropSnapshot before, bool ownStep = true);
     [[nodiscard]] std::vector<std::pair<PropSnapshot, PropSnapshot>>& PropUndo() noexcept
     {
       return mPropUndo;

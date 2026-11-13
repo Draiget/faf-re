@@ -189,6 +189,7 @@ namespace faf::editor
     field::GridPtr BaseHere(const TerrainGround& ground);
 
     int mStep = 1;
+    int mSeed = 1; // the graph's seed of the last Evaluate
     std::map<int, Entry> mCache;
     std::uint64_t mVersion = 0;
     field::GridPtr mLike;
@@ -222,11 +223,27 @@ namespace faf::editor
       float threshold = 0.5f;
     };
     std::vector<Types> types;
+    /** Output: scatter props: points no nearer than the spacing where the density mask (none: everywhere) allows. */
+    struct Scatter
+    {
+      field::Grid density;                              // no samples: 1 everywhere
+      std::vector<std::pair<std::string, int>> entries; // blueprint and weight; empty: the Props tool's list or prop
+      int count = 800;
+      float minDist = 6.0f;
+      float fill = 1.0f;
+      float slopeMax = 35.0f; // degrees
+      float scaleMin = 0.8f;
+      float scaleMax = 1.2f;
+      float margin = 4.0f;
+      bool underWater = false;
+      std::uint32_t seed = 1;
+    };
+    std::vector<Scatter> scatters;
     /** Outputs left out, with why ("Output: ground kind (snow): no layer holds snow"). */
     std::vector<std::string> notes;
     [[nodiscard]] bool Empty() const noexcept
     {
-      return kinds.empty() && layers.empty() && types.empty();
+      return kinds.empty() && layers.empty() && types.empty() && scatters.empty();
     }
   };
 

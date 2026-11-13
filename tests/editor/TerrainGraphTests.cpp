@@ -429,6 +429,27 @@ namespace
     EXPECT_TRUE(writes.kinds.empty()) << "no Output: ground kinds";
     EXPECT_EQ(writes.notes.size(), 3U) << "snow has no layer, layer 6 isn't painted, one output has nothing linked";
     EXPECT_FALSE(writes.Empty());
+
+    // A scatter with no density mask (everywhere) and two blueprints, one weighted.
+    const int scatter = graph.AddNode("out_scatter", 300, 600);
+    ParamValue entries;
+    entries.text = "/env/common/props/rocks/rock01_prop.bp:3; /env/common/props/trees/tree01_prop.bp";
+    graph.SetParam(scatter, ParamOf(*graph.Find(scatter)->type, "entries"), entries);
+    set(scatter, "count", 50);
+    const auto again = run.Evaluate(graph, 1, ground);
+    EXPECT_EQ(again.errors.count(scatter), 0U) << "its density mask is optional";
+    ASSERT_TRUE(run.BuildWrites(graph, ground, field::Grid(65, 65, 1.0f, 0.0f, 0.0f), writes, error)) << error;
+    ASSERT_EQ(writes.scatters.size(), 1U);
+    const auto& s = writes.scatters[0];
+    EXPECT_EQ(s.density.w, 0) << "everywhere";
+    ASSERT_EQ(s.entries.size(), 2U);
+    EXPECT_EQ(s.entries[0].first, "/env/common/props/rocks/rock01_prop.bp");
+    EXPECT_EQ(s.entries[0].second, 3);
+    EXPECT_EQ(s.entries[1].second, 100) << "no weight: 100";
+    EXPECT_EQ(s.count, 50);
+    EXPECT_FLOAT_EQ(s.scaleMin, 0.8f) << "the node's 80 %";
+    EXPECT_EQ(s.seed, static_cast<std::uint32_t>((1 * 1009 + scatter * 101 + 1) % 1000003))
+      << "the graph's seed mixed in";
   }
 
   TEST(

@@ -2175,9 +2175,8 @@ namespace faf::editor
           mGenTestStart = hash;
         }
         gpg::Logf(
-          "editor: generate test stage %d: heights %016llx%s, masks %016llx, types %016llx, %zu undo steps; undo: %s; "
-          "%d "
-          "nodes ran, %zu errors",
+          "editor: generate test stage %d: heights %016llx%s, masks %016llx, types %016llx, %d props, %zu undo steps; "
+          "undo: %s; %d nodes ran, %zu errors",
           mGenTestStage,
           static_cast<unsigned long long>(hash),
           hash == mGenTestStart ? " (the original)" : "",
@@ -2189,6 +2188,7 @@ namespace faf::editor
           }
           return static_cast<unsigned long long>(h);
         }(),
+          mShell->Tools().MapCount(1),
           mDocument.UndoOrder().size(),
           mDocument.UndoStepName() != nullptr ? mDocument.UndoStepName() : "-",
           generate.LastReport().evaluated,

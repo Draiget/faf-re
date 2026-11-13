@@ -280,6 +280,7 @@ namespace faf::editor
       return report;
     }
     const field::GridPtr like = Like(ground);
+    mSeed = seed;
     const auto& behaviours = terrain::Behaviours();
     std::vector<int> order;
     if (!graph.Order(order)) {
@@ -345,7 +346,8 @@ namespace faf::editor
       }
       // The inputs a node can't run without: `a` (but a generic op node's are all optional), both slopes of Height
       // from slopes, a path node's points. The others (b, mask, the noise of Warp) have a fallback.
-      if (blocked.empty() && node->type->category != "raw") {
+      // (The scatter's density mask is optional too: without it, everywhere.)
+      if (blocked.empty() && node->type->category != "raw" && node->type->name != "out_scatter") {
         for (const PinDef& def : node->type->inputs) {
           if (def.name == "a" && def.type != PinType::Number && ins.count("a") == 0) {
             blocked = "input a is not linked";
@@ -641,7 +643,7 @@ namespace faf::editor
         continue;
       }
       const std::string& type = node->type->name;
-      if (type != "out_layer" && type != "out_role" && type != "out_types") {
+      if (type != "out_layer" && type != "out_role" && type != "out_types" && type != "out_scatter") {
         continue;
       }
       const TerrainValue* a = Input(graph, id, "a");
@@ -649,6 +651,52 @@ namespace faf::editor
         const TerrainValue* wired = Input(graph, id, name);
         return wired != nullptr && wired->isNumber ? wired->number : TerrainParamNumber(*node, name, fallback);
       };
+      if (type == "out_scatter") {
+        if (TerrainParamText(*node, "kind") == "decals") {
+          writes.notes.push_back(node->type->title + ": scattering decals isn't written yet");
+          continue;
+        }
+        TerrainBuildWrites::Scatter scatter;
+        if (a != nullptr && a->grid != nullptr) {
+          scatter.density = *a->grid; // (no link: everywhere)
+        }
+        // "blueprint[:weight]" separated by ';' or new lines.
+        const std::string text = TerrainParamText(*node, "entries");
+        std::size_t at = 0;
+        while (at < text.size()) {
+          const std::size_t end = std::min(text.find_first_of(";\n", at), text.size());
+          std::string item = text.substr(at, end - at);
+          at = end + 1;
+          item.erase(0, item.find_first_not_of(" \t\r"));
+          item.erase(item.find_last_not_of(" \t\r") + 1);
+          if (item.empty()) {
+            continue;
+          }
+          int weight = 100;
+          if (
+            const std::size_t colon = item.rfind(':'); colon != std::string::npos && colon + 1 < item.size() &&
+            std::isdigit(static_cast<unsigned char>(item[colon + 1])) != 0
+          ) {
+            weight = std::max(1, std::atoi(item.c_str() + colon + 1));
+            item.resize(colon);
+          }
+          scatter.entries.emplace_back(item, weight);
+        }
+        scatter.count = std::max(1, static_cast<int>(std::lround(number("count", 800.0))));
+        scatter.minDist = static_cast<float>(number("minDist", 6.0));
+        scatter.fill = static_cast<float>(std::clamp(number("fill", 1.0), 0.0, 1.0));
+        scatter.slopeMax = static_cast<float>(number("slopeMax", 35.0));
+        scatter.scaleMin = static_cast<float>(number("scaleMin", 80.0) / 100.0);
+        scatter.scaleMax = static_cast<float>(number("scaleMax", 120.0) / 100.0);
+        scatter.margin = static_cast<float>(number("margin", 4.0));
+        scatter.underWater = TerrainParamNumber(*node, "underWater", 0.0) >= 0.5;
+        // The node's seed mixed with the graph's, as the nodes' noise takes it.
+        const long long s = static_cast<long long>(mSeed) * 1009 + static_cast<long long>(id) * 101 +
+          static_cast<long long>(std::floor(number("seed", 1.0)));
+        scatter.seed = static_cast<std::uint32_t>(s % 1000003);
+        writes.scatters.push_back(std::move(scatter));
+        continue;
+      }
       if (a == nullptr || a->grid == nullptr) {
         writes.notes.push_back(node->type->title + ": nothing is linked into it");
         continue;

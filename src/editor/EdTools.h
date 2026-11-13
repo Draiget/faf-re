@@ -1795,6 +1795,13 @@ namespace faf::editor
     }
     void DrawInteropWindow();
     /** How many of each kind the map has now (the view gives them each frame), for Properties with nothing chosen. */
+    /** The map's counts as the view gave them last: 0 markers, 1 props, 2 units, 3 decals. */
+    [[nodiscard]] int MapCount(
+      const int kind
+    ) const noexcept
+    {
+      return kind >= 0 && kind < 4 ? mMapCounts[kind] : 0;
+    }
     void SetMapCounts(
       const int markers,
       const int props,

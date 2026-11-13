@@ -5270,6 +5270,21 @@ namespace faf::editor
         paintText += " Terrain types: " + std::to_string(changed) + " cells.";
       }
     }
+    if (!writes.scatters.empty() && mMap != nullptr && mMap->mProps != nullptr) {
+      BeginObjectStroke();
+      int placed = 0;
+      for (const TerrainBuildWrites::Scatter& scatter : writes.scatters) {
+        std::string note;
+        placed += ScatterFromGraph(scatter, note);
+        if (!note.empty()) {
+          paintText += " " + note + ".";
+        }
+      }
+      if (EndObjectStroke(false)) {
+        parts |= 128;
+      }
+      paintText += " Props: " + std::to_string(placed) + " placed.";
+    }
     if (parts != 0) {
       mDocument.BuildEdited(parts);
     }
@@ -5293,8 +5308,11 @@ namespace faf::editor
     const std::uint8_t parts = from.back();
     from.pop_back();
     const int strokes = (parts >> 1) & 31;
-    // Undo in the reverse order of the build (types, masks, heights); redo in its order.
+    // Undo in the reverse order of the build (props, types, masks, heights); redo in its order.
     if (!redo) {
+      if ((parts & 128) != 0) {
+        (void)UndoProps(false);
+      }
       if ((parts & 64) != 0) {
         (void)UndoTerrainTypes(false);
       }
@@ -5313,6 +5331,9 @@ namespace faf::editor
       }
       if ((parts & 64) != 0) {
         (void)UndoTerrainTypes(true);
+      }
+      if ((parts & 128) != 0) {
+        (void)UndoProps(true);
       }
     }
     to.push_back(parts);
@@ -8412,11 +8433,14 @@ namespace faf::editor
     mObjectsChanged = false;
   }
 
-  void EdMapScene::EndObjectStroke()
+  bool EdMapScene::EndObjectStroke(
+    const bool ownStep
+  )
   {
-    if (mObjectStroke && mObjectsChanged) {
+    const bool kept = mObjectStroke && mObjectsChanged;
+    if (kept) {
       const std::size_t before = mObjectBefore.entries.size();
-      mDocument.PropsEdited(std::move(mObjectBefore));
+      mDocument.PropsEdited(std::move(mObjectBefore), ownStep);
       gpg::Logf(
         "editor: prop edit: %zu props before, %zu now",
         before,
@@ -8436,6 +8460,7 @@ namespace faf::editor
     mObjectStroke = false;
     mObjectsChanged = false;
     mDragSelection = false;
+    return kept;
   }
 
   void EdMapScene::MovePropTo(
@@ -10022,7 +10047,7 @@ namespace faf::editor
     std::string blueprint = mTools->PropBlueprint();
     float scale = 1.0f;
     float yaw = 0.0f;
-    const std::vector<PropPaintEntry>& list = mTools->PaintList();
+    const std::vector<PropPaintEntry>& list = mFillList != nullptr ? *mFillList : mTools->PaintList();
     if (fixedYaw <= -100.0f && (mFilling || mTools->CurrentPropMode() == EdTools::PropMode::Scatter) && !list.empty()) {
       const int pick = PickPaintEntry(list, roll());
       if (pick < 0) {
@@ -10088,6 +10113,118 @@ namespace faf::editor
       mObjectsChanged = true;
       mDocument.SetModified(true);
     }
+  }
+
+  int EdMapScene::ScatterFromGraph(
+    const TerrainBuildWrites::Scatter& scatter,
+    std::string& note
+  )
+  {
+    const moho::CHeightField* const field = mMap != nullptr ? mMap->mTerrainRes->GetHeightField() : nullptr;
+    if (field == nullptr || mTools == nullptr || mMap->mProps == nullptr) {
+      return 0;
+    }
+    // The node's blueprints with their weights, turned freely, scaled between its bounds; else the Props tool's.
+    std::vector<PropPaintEntry> list;
+    std::string unknown;
+    for (const auto& [blueprint, weight] : scatter.entries) {
+      // A blueprint the game hasn't got is named (PlaceProps would skip it without a word).
+      if (mTools->HasPropBlueprints() && mTools->PropBlueprintNamed(blueprint).empty()) {
+        unknown += (unknown.empty() ? "" : ", ") + blueprint;
+        continue;
+      }
+      PropPaintEntry entry;
+      entry.blueprint = blueprint;
+      entry.chance = weight;
+      entry.scaleMin = scatter.scaleMin;
+      entry.scaleMax = scatter.scaleMax;
+      list.push_back(std::move(entry));
+    }
+    if (!unknown.empty()) {
+      note = "Scatter: the game has no " + unknown;
+      if (list.empty()) {
+        return 0;
+      }
+    }
+    if (list.empty() && mTools->PaintList().empty() && mTools->PropBlueprint().empty()) {
+      note = "Scatter: no blueprints in the node and no prop in the Props tool";
+      return 0;
+    }
+    // The playable area (else the whole map), the margin in from its edge.
+    float x0 = scatter.margin;
+    float z0 = scatter.margin;
+    float x1 = static_cast<float>(field->width - 1) - scatter.margin;
+    float z1 = static_cast<float>(field->height - 1) - scatter.margin;
+    if (const std::optional<EdDocument::PlayableRect> area = mDocument.PlayableArea(); area.has_value()) {
+      x0 = std::max(x0, static_cast<float>(area->x0) + scatter.margin);
+      z0 = std::max(z0, static_cast<float>(area->z0) + scatter.margin);
+      x1 = std::min(x1, static_cast<float>(area->x1) - scatter.margin);
+      z1 = std::min(z1, static_cast<float>(area->z1) - scatter.margin);
+    }
+    const HeightBrush brush = mTools->CurrentHeightBrush();
+    const WaterState water = mDocument.WaterNow();
+    const auto height = [this](const float x, const float z) {
+      return mMap->mTerrainRes->GetHeightAt(
+        static_cast<std::int32_t>(std::lround(x)), static_cast<std::int32_t>(std::lround(z))
+      );
+    };
+    // The density mask's chance, by a hash of the place and the seed (the same build places the same props).
+    const auto chance = [&](const float x, const float z) {
+      std::uint32_t h = scatter.seed * 2654435761u ^ static_cast<std::uint32_t>(std::lround(x * 16.0f)) * 40503u ^
+        static_cast<std::uint32_t>(std::lround(z * 16.0f)) * 2246822519u;
+      h ^= h >> 15;
+      h *= 2654435761u;
+      h ^= h >> 13;
+      return static_cast<float>(h & 0xFFFFFFu) / 16777216.0f;
+    };
+    const auto accept = [&](const float x, const float z) {
+      if (!InFirstPart(field->width, field->height, brush.symmetry, brush.turns, x, z)) {
+        return false;
+      }
+      if (!scatter.underWater && water.enabled && height(x, z) <= water.elevation) {
+        return false;
+      }
+      if (
+        SlopeDegrees(height(x - 1.0f, z), height(x + 1.0f, z), height(x, z - 1.0f), height(x, z + 1.0f)) >
+        scatter.slopeMax
+      ) {
+        return false;
+      }
+      const float density =
+        scatter.density.w > 1 ? std::clamp(field::SampleWorld(scatter.density, x, z), 0.0f, 1.0f) : 1.0f;
+      if (chance(x, z) >= density * scatter.fill) {
+        return false;
+      }
+      float cx[kMaxSymmetryCopies], cz[kMaxSymmetryCopies];
+      const int copies = HeightBrushCentres(field->width, field->height, x, z, brush.symmetry, brush.turns, cx, cz);
+      for (int c = 1; c < copies; ++c) {
+        if (std::hypot(cx[c] - x, cz[c] - z) < scatter.minDist) {
+          return false;
+        }
+      }
+      return true;
+    };
+    ScatterOptions options;
+    options.x0 = x0;
+    options.z0 = z0;
+    options.x1 = x1;
+    options.z1 = z1;
+    // A candidate in every spacing-sized cell; the mask, the ground and the count decide.
+    options.density = 10000.0f / std::max(1.0f, scatter.minDist * scatter.minDist);
+    options.spacing = scatter.minDist;
+    options.seed = scatter.seed;
+    options.limit = scatter.count;
+    const std::vector<std::pair<float, float>> points = ScatterPoints(options, accept);
+    const std::size_t before = mMap->mProps->mEntries.size();
+    mFilling = true;
+    mFillList = list.empty() ? nullptr : &list;
+    mScatterSeed = scatter.seed;
+    for (const auto& [x, z] : points) {
+      PlaceProps(x, z);
+    }
+    mFillList = nullptr;
+    mFilling = false;
+    return static_cast<int>(mMap->mProps->mEntries.size() - before);
   }
 
   std::string EdMapScene::ScatterOverMap(
