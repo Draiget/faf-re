@@ -1617,14 +1617,8 @@ namespace faf::editor
     }
     ImGui::Spacing();
 
-    // The maps as cards: picture, name, size and players, one button.
-    const float cardW = ImGui::GetFontSize() * 13.0f;
-    const int columns = std::max(
-      1,
-      static_cast<int>(
-        (ImGui::GetContentRegionAvail().x + ImGui::GetStyle().ItemSpacing.x) / (cardW + ImGui::GetStyle().ItemSpacing.x)
-      )
-    );
+    // The maps as the start screen's cards (ui/EdCards): picture, Ranked or Map, the name, author, size and players,
+    // games and version; Open or Download under each.
     const bool working = mDownload.GetState() == EdVaultDownload::State::Working;
     if (
       !mFound.empty() &&
@@ -1632,80 +1626,65 @@ namespace faf::editor
         "##vaultcards", ImVec2(0.0f, 0.0f), ImGuiChildFlags_None, ImGuiWindowFlags_AlwaysVerticalScrollbar
       )
     ) {
-      if (ImGui::BeginTable("##vaultgrid", columns, ImGuiTableFlags_SizingStretchSame | ImGuiTableFlags_PadOuterX)) {
-        for (std::size_t i = 0; i < mFound.size(); ++i) {
-          const VaultMap& map = mFound[i];
-          ImGui::TableNextColumn();
-          ImGui::PushID(static_cast<int>(i));
-          ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg, ImGui::GetColorU32(ImGuiCol_FrameBg));
-          const float w = ImGui::GetContentRegionAvail().x;
-          const std::uint64_t image = VaultPicture(map.thumbnail);
-          const ImVec2 at = ImGui::GetCursorScreenPos();
-          if (image != 0) {
-            ImGui::Image(static_cast<ImTextureID>(image), ImVec2(w, w));
-          } else {
-            ImGui::GetWindowDrawList()->AddRectFilled(
-              at, ImVec2(at.x + w, at.y + w), ImGui::GetColorU32(ImVec4(0.10f, 0.11f, 0.13f, 1.0f))
-            );
-            const bool none = map.thumbnail.empty() || mVaultNoPicture.count(map.thumbnail) != 0;
-            if (none) {
-              const ImVec2 text = ImGui::CalcTextSize("No picture");
-              ImGui::GetWindowDrawList()->AddText(
-                ImVec2(at.x + (w - text.x) * 0.5f, at.y + (w - text.y) * 0.5f),
-                ImGui::GetColorU32(ImGuiCol_TextDisabled),
-                "No picture"
-              );
-            } else {
-              const float radius = w * 0.08f;
-              ImGui::SetCursorScreenPos(ImVec2(at.x + w * 0.5f - radius, at.y + w * 0.5f - radius));
-              Spinner(radius);
-              ImGui::SetCursorScreenPos(at);
-            }
-            ImGui::Dummy(ImVec2(w, w));
-          }
-          if (map.ranked) {
-            ImGui::SetCursorScreenPos(
-              ImVec2(at.x + ImGui::GetStyle().FramePadding.x, at.y + ImGui::GetStyle().FramePadding.y)
-            );
-            Chip("Ranked", AccentColor(), true);
-            ImGui::SetCursorScreenPos(ImVec2(at.x, at.y + w + ImGui::GetStyle().ItemSpacing.y));
-          }
-          ImGui::PushFont(gBoldFont, 0.0f);
-          ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + w);
-          ImGui::TextUnformatted(map.name.c_str());
-          ImGui::PopTextWrapPos();
-          ImGui::PopFont();
-          if (ImGui::IsItemHovered() && !map.description.empty()) {
-            ImGui::SetTooltip("%s", map.description.c_str());
-          }
-          ImGui::TextDisabled("%s%s", map.author.empty() ? "" : "by ", map.author.c_str());
-          char size[32] = "";
-          if (map.width > 0) {
-            (void)std::snprintf(size, sizeof(size), "%g km", std::round(map.width / 51.2 * 10.0) / 10.0);
-            Chip(size, ImVec4(0.55f, 0.75f, 0.95f, 1.0f));
-            ImGui::SameLine();
-          }
-          char players[32];
-          (void)std::snprintf(players, sizeof(players), "%d players", map.players);
-          Chip(players, ImVec4(0.75f, 0.75f, 0.80f, 1.0f));
-          ImGui::TextDisabled("%d games played", map.gamesPlayed);
-          const bool here = !ListedScenario(map.folder).empty();
-          if (working && mDownload.Map().folder == map.folder) {
-            DrawDownloadProgress(-FLT_MIN);
-          } else {
-            ImGui::BeginDisabled(working);
-            if (
-              here ? RoundButton(ICON_OPEN "  Open", ImVec2(-FLT_MIN, 0.0f))
-                   : RoundButton(ICON_GROUND "  Download and open", ImVec2(-FLT_MIN, 0.0f))
-            ) {
-              Download(map.folder);
-            }
-            ImGui::EndDisabled();
-          }
-          ImGui::Spacing();
-          ImGui::PopID();
+      const float gap = Em(12.0f);
+      const EdCardGrid grid = CardGrid(ImGui::GetContentRegionAvail().x, Em(210.0f), gap, 8);
+      const int columns = std::max(1, grid.columns);
+      const float pictureHeight = std::round(grid.cardWidth * 9.0f / 16.0f);
+      const float cardHeight = KindCardHeight(pictureHeight);
+      for (std::size_t i = 0; i < mFound.size(); ++i) {
+        const VaultMap& map = mFound[i];
+        if (i % static_cast<std::size_t>(columns) != 0) {
+          ImGui::SameLine(0.0f, gap);
         }
-        ImGui::EndTable();
+        ImGui::PushID(static_cast<int>(i));
+        ImGui::BeginGroup();
+        EdCardText text;
+        text.title = map.name;
+        text.meta = map.author.empty() ? std::string() : "by " + map.author;
+        if (map.width > 0) {
+          char size[32];
+          (void)std::snprintf(size, sizeof(size), "%g km", std::round(map.width / 51.2 * 10.0) / 10.0);
+          text.meta += (text.meta.empty() ? "" : " \xC2\xB7 ") + std::string(size);
+        }
+        if (map.players > 0) {
+          text.meta += (text.meta.empty() ? "" : " \xC2\xB7 ") + std::to_string(map.players) + " players";
+        }
+        const bool here = !ListedScenario(map.folder).empty();
+        text.third = std::to_string(map.gamesPlayed) + " games" +
+          (map.version.empty() ? std::string() : " \xC2\xB7 version " + map.version) +
+          (here ? " \xC2\xB7 on this computer" : "");
+        const EdCardResult card = KindCard(
+          "##card",
+          ImVec2(grid.cardWidth, cardHeight),
+          pictureHeight,
+          VaultPicture(map.thumbnail),
+          map.ranked ? "Ranked" : "Map",
+          map.ranked ? 0xF0B04AU : 0x4EA1FFU,
+          text
+        );
+        if (card.hovered && !map.description.empty()) {
+          ImGui::SetTooltip("%s", map.description.c_str());
+        }
+        if (card.clicked && !working) {
+          Download(map.folder);
+        }
+        // Its action under it: Open (it is here) or Download and open, or the download's progress.
+        ImGui::Dummy(ImVec2(0.0f, Em(2.0f)));
+        if (working && mDownload.Map().folder == map.folder) {
+          DrawDownloadProgress(grid.cardWidth);
+        } else {
+          ImGui::BeginDisabled(working);
+          if (
+            here ? RoundButton(ICON_OPEN "  Open", ImVec2(grid.cardWidth, 0.0f))
+                 : RoundButton(ICON_GROUND "  Download and open", ImVec2(grid.cardWidth, 0.0f))
+          ) {
+            Download(map.folder);
+          }
+          ImGui::EndDisabled();
+        }
+        ImGui::Dummy(ImVec2(0.0f, gap - ImGui::GetStyle().ItemSpacing.y));
+        ImGui::EndGroup();
+        ImGui::PopID();
       }
     }
     if (!mFound.empty()) {
