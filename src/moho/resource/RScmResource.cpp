@@ -242,7 +242,7 @@ namespace moho
     return std::shared_ptr<const CAniSkel>(skeleton, keepOwner);
   }
 
-  /**
+  /*
    * Address: 0x00539EC0 (FUN_00539EC0)
    * Mangled: ??4shared_ptr_RScmResource@boost@@QAE@@Z
    * Address: 0x0053A100 (FUN_0053A100, boost::detail::shared_count_RScmResource::shared_count_RScmResource)
@@ -258,14 +258,9 @@ namespace moho
    * Wired from `CScmResourceFactory::Load` (ResourceFactory.cpp), whose
    * `outResource` is guaranteed null at this call site (explicitly reset at
    * function entry), matching the binary's fresh-construction shape.
+   *
+   * `CScmResourceFactory::LoadImpl` (ResourceFactory.cpp) constructs the shared_ptr itself.
    */
-  std::shared_ptr<RScmResource>* ConstructSharedRScmResourceFromRaw(
-    std::shared_ptr<RScmResource>* const outResource,
-    RScmResource* const resource
-  )
-  {
-    return ::new (outResource) std::shared_ptr<RScmResource>(resource);
-  }
 
   /**
    * Address: 0x00BC91A0 (FUN_00BC91A0)

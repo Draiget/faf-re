@@ -1,8 +1,5 @@
 #include "moho/resource/ResourceFactory.h"
 
-#include <algorithm>
-#include <cstring>
-
 #include "moho/misc/FileWaitHandleSet.h"
 #include "moho/resource/RScmResource.h"
 #include "moho/resource/ResourceManager.h"
@@ -10,13 +7,6 @@
 
 namespace
 {
-  void DeleteScmFileBuffer(
-    const moho::SScmFile* const scmFile
-  ) noexcept
-  {
-    delete[] reinterpret_cast<const char*>(scmFile);
-  }
-
   /**
    * Address: 0x00BC9180 (FUN_00BC9180, dynamic initializer for `sScmResourceFactory`)
    * Address: 0x00BF3CA0 (FUN_00BF3CA0, dynamic atexit destructor for `sScmResourceFactory`)
@@ -47,9 +37,15 @@ namespace moho
    * Reads one SCM file and wraps it in an `RScmResource`; a missing file or
    * one shorter than the 0x30-byte header loads as nothing.
    *
-   * The binary hands the file buffer's own control block to the resource
-   * (0x00539E40 aliases `mBegin` onto it); this copies the bytes into a buffer
-   * the resource owns instead, since boost 1.34 has no aliasing constructor.
+   * The resource shares the file buffer's own owner, as the binary does
+   * (0x00539E7A: `px = mBegin`, then the buffer's `pn` retained at 0x00539E93).
+   *
+   * Address: 0x00539E40 (FUN_00539E40 -- that aliasing `shared_ptr<SScmFile const>`
+   * construction from the `MemBuffer<char>`.)
+   * Address: 0x0053A100 (FUN_0053A100 -- `shared_count(RScmResource*)`) and
+   * 0x00539EC0 (FUN_00539EC0 -- the `shared_ptr<RScmResource>(RScmResource*)`
+   * wrapper around it that also binds `enable_shared_from_this`); formerly
+   * `ConstructSharedRScmResourceFromRaw` in RScmResource.cpp.
    */
   std::shared_ptr<RScmResource> CScmResourceFactory::LoadImpl(
     const gpg::StrArg path
@@ -65,13 +61,9 @@ namespace moho
       return {};
     }
 
-    auto* const scmBytes = new char[byteCount];
-    // Raw SCM file blob copy from the loaded buffer.
-    std::copy_n(fileBytes.mBegin, byteCount, scmBytes);
-    const std::shared_ptr<const SScmFile> scmFile(reinterpret_cast<const SScmFile*>(scmBytes), &DeleteScmFileBuffer);
+    const std::shared_ptr<const SScmFile> scmFile(fileBytes.mData, reinterpret_cast<const SScmFile*>(fileBytes.mBegin));
 
-    std::shared_ptr<RScmResource> resource;
-    (void)ConstructSharedRScmResourceFromRaw(&resource, new RScmResource(path, scmFile));
+    const std::shared_ptr<RScmResource> resource(new RScmResource(path, scmFile));
     if (!RScmResource::KeepGeometry()) {
       resource->DropGeometry();
     }

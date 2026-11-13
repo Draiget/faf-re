@@ -136,14 +136,14 @@ namespace moho
    */
   void register_RScmResourceModelPrefetchType();
 
-  /**
+  /*
    * Address: 0x00539EC0 (FUN_00539EC0, ??4shared_ptr_RScmResource@boost@@QAE@@Z,
    * boost::shared_ptr_RScmResource::operator=)
    *
    * What it does:
    * Constructs one `shared_ptr<RScmResource>` from one raw resource lane,
    * including `enable_shared_from_this` ownership binding.
+   *
+   * `CScmResourceFactory::LoadImpl` (ResourceFactory.cpp) constructs the shared_ptr itself.
    */
-  std::shared_ptr<RScmResource>*
-  ConstructSharedRScmResourceFromRaw(std::shared_ptr<RScmResource>* outResource, RScmResource* resource);
 } // namespace moho
