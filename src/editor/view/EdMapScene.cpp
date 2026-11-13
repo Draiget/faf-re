@@ -3911,6 +3911,10 @@ namespace faf::editor
         mTools->SetScStatus(RunScTool(sc));
       }
       TickPads(frameSeconds);
+      if (const EdTools::InteropAsk ask = mTools->TakeInteropAsk(); ask != EdTools::InteropAsk::None) {
+        mTools->SetInteropStatus(RunInterop(ask));
+      }
+      TickInterop(frameSeconds);
       if (EdTools::FillOptions fill; mTools->TakeFillRequest(fill)) {
         mTools->SetFillMessage(ScatterOverMap(fill));
       }
@@ -5045,6 +5049,242 @@ namespace faf::editor
     if (stale && settings.autoApply && mPadQuietSeconds > 0.5f && !mDragMarkers && mDocument.RedoOrder().empty()) {
       mTools->SetScStatus(RunScTool(EdTools::ScAsk::PadsApply));
     }
+  }
+
+  bool EdMapScene::ImportIsNewest(
+    const bool exact
+  ) const
+  {
+    // `exact` also checks the heights are the ones the import left (a whole-map hash: on asks, not every frame).
+    return mImportDepth > 0 && mDocument.UndoOrder().size() == mImportDepth && !mDocument.UndoOrder().empty() &&
+      mDocument.UndoOrder().back() == EdDocument::EditKind::Heights && (!exact || HeightsHash() == mImportHash);
+  }
+
+  std::string EdMapScene::InteropImport(
+    const bool live
+  )
+  {
+    moho::CHeightField* const field = mMap != nullptr ? mMap->mTerrainRes->GetHeightField() : nullptr;
+    if (field == nullptr || mTools == nullptr || mPainting) {
+      return "No map, or a stroke is under way.";
+    }
+    const std::string file = mTools->InteropFile(false);
+    HeightImage image;
+    std::string error;
+    if (!ReadHeightImage(file, field->width, field->height, image, error)) {
+      return "Import failed: " + error;
+    }
+    // The link's import replaces its last one while that is still the newest step: the history keeps one.
+    const bool replace = live && mImportLive && ImportIsNewest() && Undo();
+    auto* const words = reinterpret_cast<std::uint16_t*>(field->data);
+    const std::size_t count = static_cast<std::size_t>(field->width) * static_cast<std::size_t>(field->height);
+    const std::vector<std::uint16_t> current(words, words + count);
+    const std::vector<std::uint16_t> next =
+      ImportedHeights(image, current, field->width, field->height, mTools->InteropSettings());
+    std::size_t changed = 0;
+    for (std::size_t k = 0; k < count; ++k) {
+      changed += next[k] != current[k] ? 1u : 0u;
+    }
+    const SampleRect whole{0, 0, field->width - 1, field->height - 1};
+    mDocument.Heights().BeginStroke();
+    mDocument.Heights().BeforeWrite(field->data, whole);
+    std::copy(next.begin(), next.end(), words);
+    mDocument.Heights().EndStroke(field->data);
+    if (changed > 0) {
+      mDocument.EditEnded(EdDocument::EditKind::Heights);
+      RefreshHeights({whole});
+      mDocument.SetModified(true);
+      if (mCheckDone) {
+        RunSymmetryCheck();
+      }
+      mImportDepth = mDocument.UndoOrder().size();
+      mImportHash = HeightsHash();
+      mImportLive = live;
+    } else if (replace) {
+      // The file went back to what the map had before the link: the undone step stays undone.
+      mImportDepth = 0;
+    }
+    char text[512];
+    (void)std::snprintf(
+      text,
+      sizeof(text),
+      "%s %s (%d x %d%s): %zu samples changed%s.",
+      live ? "Linked" : "Imported",
+      std::filesystem::path(file).filename().string().c_str(),
+      image.width,
+      image.height,
+      image.width != field->width || image.height != field->height ? ", resampled" : "",
+      changed,
+      changed == 0 ? ""
+        : replace  ? ", in place of the last link import"
+                   : ", one undo step"
+    );
+    gpg::Logf("editor: interop: %s", text);
+    return text;
+  }
+
+  std::string EdMapScene::RunInterop(
+    const EdTools::InteropAsk ask
+  )
+  {
+    moho::CHeightField* const field = mMap != nullptr ? mMap->mTerrainRes->GetHeightField() : nullptr;
+    if (field == nullptr || mTools == nullptr) {
+      return "No map is open in the view.";
+    }
+    char text[512];
+    switch (ask) {
+    case EdTools::InteropAsk::Probe: {
+      const std::string file = mTools->InteropFile(false);
+      HeightImage image;
+      std::string error;
+      if (!ReadHeightImage(file, field->width, field->height, image, error)) {
+        mTools->SetInteropProbe("Can't read it: " + error);
+        return {};
+      }
+      std::uint16_t darkest = 0, brightest = 0;
+      HeightImageRange(image, darkest, brightest);
+      const ImportSettings& s = mTools->InteropSettings();
+      const bool stretched = s.mapping == ImportSettings::Mapping::Normalised;
+      const float low = stretched ? s.low : static_cast<float>(darkest) * s.scale / 128.0f;
+      const float high = stretched ? s.high : static_cast<float>(brightest) * s.scale / 128.0f;
+      std::uint16_t mapLow = 0, mapHigh = 0;
+      HeightImage map;
+      map.width = field->width;
+      map.height = field->height;
+      map.words.assign(
+        reinterpret_cast<const std::uint16_t*>(field->data),
+        reinterpret_cast<const std::uint16_t*>(field->data) + static_cast<std::size_t>(field->width) * field->height
+      );
+      HeightImageRange(map, mapLow, mapHigh);
+      (void)std::snprintf(
+        text,
+        sizeof(text),
+        "%d x %d%s, values %u to %u: heights %.1f to %.1f (the map has %.1f to %.1f).",
+        image.width,
+        image.height,
+        image.width != field->width || image.height != field->height ? " (resampled to the map's)" : "",
+        static_cast<unsigned>(darkest),
+        static_cast<unsigned>(brightest),
+        static_cast<double>(low),
+        static_cast<double>(high),
+        static_cast<double>(mapLow) / 128.0,
+        static_cast<double>(mapHigh) / 128.0
+      );
+      mTools->SetInteropProbe(text);
+      gpg::Logf("editor: interop: probe: %s", text);
+      return {};
+    }
+    case EdTools::InteropAsk::Import:
+      return InteropImport(false);
+    case EdTools::InteropAsk::Revert: {
+      if (!ImportIsNewest()) {
+        return "Nothing to revert (other edits came after the import).";
+      }
+      const bool undone = Undo();
+      mImportDepth = 0;
+      gpg::Logf("editor: interop: reverted the last import");
+      return undone ? "Reverted the last import." : "Couldn't revert now (a stroke is under way).";
+    }
+    case EdTools::InteropAsk::Export:
+    case EdTools::InteropAsk::SendAndWatch: {
+      const std::string file = mTools->InteropFile(true);
+      std::string message;
+      const float scale = mTools->InteropExportScale();
+      if (!ExportHeights(file, mTools->InteropExportWidth(), scale, message)) {
+        return message;
+      }
+      if (mTools->InteropSidecar()) {
+        ExportFacts facts;
+        facts.map = mDocument.FolderName();
+        facts.mapWidth = field->width - 1;
+        facts.mapHeight = field->height - 1;
+        const int width = mTools->InteropExportWidth();
+        facts.imageWidth = width > 1 ? width : field->width;
+        facts.imageHeight = width > 1
+          ? std::max(
+              2,
+              static_cast<int>(std::lround(static_cast<double>(width - 1) * (field->height - 1) / (field->width - 1))) +
+                1
+            )
+          : field->height;
+        facts.scale = scale;
+        std::uint16_t low = 0, high = 0;
+        HeightImage map;
+        map.words.assign(
+          reinterpret_cast<const std::uint16_t*>(field->data),
+          reinterpret_cast<const std::uint16_t*>(field->data) + static_cast<std::size_t>(field->width) * field->height
+        );
+        HeightImageRange(map, low, high);
+        facts.lowest = static_cast<float>(low) / 128.0f;
+        facts.highest = static_cast<float>(high) / 128.0f;
+        const WaterState water = mDocument.WaterNow();
+        facts.sea = water.enabled ? water.elevation : 0.0f;
+        facts.symmetry = EdTools::SymmetryName(mTools->SymmetryIndex());
+        const std::filesystem::path sidecar = std::filesystem::path(file).string() + ".json";
+        if (std::FILE* out = std::fopen(sidecar.string().c_str(), "wb"); out != nullptr) {
+          const std::string json = ExportSidecar(facts);
+          (void)std::fwrite(json.data(), 1, json.size(), out);
+          (void)std::fclose(out);
+          message += ", with " + sidecar.filename().string();
+        } else {
+          message += "; the sidecar couldn't be written";
+        }
+      }
+      gpg::Logf("editor: interop: %s", message.c_str());
+      if (ask == EdTools::InteropAsk::SendAndWatch) {
+        // The same file back as heights, exactly: its words divided by the export's scale, nothing turned or blended.
+        ImportSettings& s = mTools->InteropSettings();
+        s = ImportSettings{};
+        s.mapping = ImportSettings::Mapping::Absolute;
+        s.scale = 1.0f / std::max(0.01f, scale);
+        mTools->SetInteropFile(false, file);
+        mTools->SetInteropLive(true);
+        mLinkOn = false; // restarts on the file as it is now
+        message += ". Watching it: save it from the other tool and the map follows.";
+      }
+      return message + ".";
+    }
+    default:
+      return {};
+    }
+  }
+
+  void EdMapScene::TickInterop(
+    const float frameSeconds
+  )
+  {
+    if (mTools == nullptr) {
+      return;
+    }
+    mLinkClock += static_cast<double>(frameSeconds);
+    const bool on = mTools->InteropLive();
+    const std::string file = on ? mTools->InteropFile(false) : std::string();
+    if (!on || file.empty()) {
+      mLinkOn = false;
+      mTools->SetInteropState(ImportIsNewest(false), {});
+      return;
+    }
+    // Four looks a second at the file's size and time.
+    mLinkPollSeconds += frameSeconds;
+    if (mLinkOn && file == mLinkFile && mLinkPollSeconds < 0.25f) {
+      return;
+    }
+    mLinkPollSeconds = 0.0f;
+    const FileStamp stamp = StampOf(file);
+    if (!mLinkOn || file != mLinkFile) {
+      // Linking starts from the file as it is: the next save imports.
+      mLinkOn = true;
+      mLinkFile = file;
+      mLinkImports = 0;
+      mLink.Start(stamp);
+    } else if (mLink.Poll(stamp, mLinkClock) && !mPainting) {
+      mTools->SetInteropStatus(InteropImport(true));
+      ++mLinkImports;
+    }
+    std::string note = stamp.written == 0 ? "the file is missing"
+      : mLinkImports == 0                 ? "watching"
+                                          : std::to_string(mLinkImports) + (mLinkImports == 1 ? " import" : " imports");
+    mTools->SetInteropState(ImportIsNewest(false), std::move(note));
   }
 
   bool EdMapScene::UndoHeightsAndMasks(

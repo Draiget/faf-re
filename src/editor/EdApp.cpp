@@ -154,7 +154,7 @@ namespace faf::editor
         "/filltest",       "/modaltest",      "/looktest",       "/looksfolder",     "/envtest",     "/watermasktest",
         "/nowaterhires",   "/camat",          "/erosiontest",    "/sctest",          "/symmenu",     "/panelbottom",
         "/shader",         "/brushtest",      "/brushshape",     "/stampsource",     "/stampstroke", "/symoptions",
-        "/maskoptions",    "/masktest",       "/shaderbrowser",  "/convertlayers",
+        "/maskoptions",    "/masktest",       "/shaderbrowser",  "/convertlayers",   "/interoptest",
       };
       for (const char* const option : kOptions) {
         if (moho::CFG_GetArgOption(option, 0, nullptr)) {
@@ -2118,6 +2118,99 @@ namespace faf::editor
       }
 
       /**
+       * `/interoptest <folder>` (test runs): the Import / Export window's buttons in turn, a second and a half apart,
+       * with another tool's saves played by writing the linked file here; the heights' checksum and the undo steps at
+       * each stage. The files go in `<folder>` only.
+       */
+      void TestInterop()
+      {
+        fa::vector<fa::string> arg;
+        if (
+          mInteropTestStage >= 10 || mScene.ModelsPending() || !mScene.Attached() ||
+          !moho::CFG_GetArgOption("/interoptest", 1, &arg) || arg.empty() || ++mInteropTestFrames % 90 != 0
+        ) {
+          return;
+        }
+        using Ask = EdTools::InteropAsk;
+        EdTools& tools = mShell->Tools();
+        const std::filesystem::path file = std::filesystem::path(arg[0].c_str()) / "interop_test.png";
+        const std::uint64_t hash = mScene.HeightsHash();
+        if (mInteropTestStage == 0) {
+          mInteropTestStart = hash;
+        }
+        gpg::Logf(
+          "editor: interop test stage %d: heights %016llx%s, %zu undo steps; undo: %s",
+          mInteropTestStage,
+          static_cast<unsigned long long>(hash),
+          hash == mInteropTestStart ? " (the original)" : "",
+          mDocument.UndoOrder().size(),
+          mDocument.UndoStepName() != nullptr ? mDocument.UndoStepName() : "-"
+        );
+        // Another tool's save: the linked file read, a square of it raised by 10 units, written back.
+        const auto raiseInFile = [&] {
+          HeightImage image;
+          std::string error;
+          if (!ReadHeightImage(file, 0, 0, image, error)) {
+            gpg::Warnf("editor: interop test: can't read %s: %s", file.string().c_str(), error.c_str());
+            return;
+          }
+          for (int z = 200; z < 300 && z < image.height; ++z) {
+            for (int x = 200; x < 300 && x < image.width; ++x) {
+              std::uint16_t& w = image.words[static_cast<std::size_t>(z) * image.width + x];
+              w = static_cast<std::uint16_t>(std::min(65535, w + 1280));
+            }
+          }
+          if (!WriteHeightImage(file, image, error)) {
+            gpg::Warnf("editor: interop test: can't write %s: %s", file.string().c_str(), error.c_str());
+            return;
+          }
+          gpg::Logf("editor: interop test: raised a square of %s by 10 units", file.filename().string().c_str());
+        };
+        switch (mInteropTestStage) {
+        case 0:
+          tools.SetInteropFile(true, file.string());
+          tools.AskInterop(Ask::Export);
+          break;
+        case 1: {
+          std::error_code error;
+          const auto size = std::filesystem::file_size(file.string() + ".json", error);
+          gpg::Logf("editor: interop test: sidecar %s bytes", error ? "missing," : std::to_string(size).c_str());
+          tools.AskInterop(Ask::SendAndWatch);
+          break;
+        }
+        case 2:
+        case 4:
+          raiseInFile();
+          break;
+        case 5:
+          tools.SetInteropLive(false);
+          gpg::Logf("editor: interop test: undo %s", mScene.Undo() ? "took the link's import back" : "had nothing");
+          break;
+        case 6: {
+          tools.SetInteropFile(false, file.string());
+          ImportSettings& s = tools.InteropSettings();
+          s = ImportSettings{};
+          s.low = 0.0f;
+          s.high = 60.0f;
+          s.flipX = true;
+          s.turns = 1;
+          s.blend = ImportSettings::Blend::Max;
+          tools.AskInterop(Ask::Probe);
+          break;
+        }
+        case 7:
+          tools.AskInterop(Ask::Import);
+          break;
+        case 8:
+          tools.AskInterop(Ask::Revert);
+          break;
+        default:
+          break;
+        }
+        ++mInteropTestStage;
+      }
+
+      /**
        * `/envtest cubes|sky` (test runs): a reflection cube added, or the sky's horizon reddened and a planet taken, as
        * the Lighting panel does them (one undo step), then undone; each state logged.
        */
@@ -2533,6 +2626,9 @@ namespace faf::editor
       bool mCamAtDone = false;
       int mScTestStage = 0;
       int mScTestFrames = 0;
+      int mInteropTestStage = 0;
+      int mInteropTestFrames = 0;
+      std::uint64_t mInteropTestStart = 0;
       int mErosionTestStage = 0;
       int mErosionTestFrames = 0;
       int mEnvTestFrames = 0;
@@ -3256,6 +3352,9 @@ namespace faf::editor
       add("edit.paste", "Paste at the cursor", "Edit", "Ctrl+V", [this] {
         mScene.CtrlKey('V');
       }, canEdit);
+      add("terrain.interop", "Import / Export...", "Terrain", "", [this] {
+        mShell->Tools().OpenInterop();
+      }, mapOpen, {}, "Heightmaps from and to other tools: mapping, turns and blends, a live link, a sidecar");
       add("terrain.sctools", "SC tools...", "Terrain", "", [this] {
         mShell->Tools().OpenScTools();
       }, mapOpen, {}, "Base pads under the markers, the pathable slope limit, the grade along a route");
@@ -3568,7 +3667,7 @@ namespace faf::editor
            cmd("edit.find"),
            arrange}
         },
-        EdMenu{"&Terrain", {cmd("terrain.erosion"), cmd("terrain.sctools")}},
+        EdMenu{"&Terrain", {cmd("terrain.interop"), cmd("terrain.erosion"), cmd("terrain.sctools")}},
         EdMenu{
           "&View",
           {cmd("view.tools"),
@@ -6776,6 +6875,7 @@ namespace faf::editor
       UpdateLooks();
       TestLooks();
       TestEnvironment();
+      TestInterop();
       // `/sctest` (test runs): the SC tools window's buttons in turn, a second apart, the heights' checksum each time.
       if (
         mScTestStage < 8 && moho::CFG_GetArgOption("/sctest", 0, nullptr) && !mScene.ModelsPending() &&
@@ -7597,6 +7697,12 @@ namespace faf::editor
         mTerrainTypeArgDone = true;
         if (fa::vector<fa::string> value; moho::CFG_GetArgOption("/terraintype", 1, &value) && !value.empty()) {
           tools.SetTerrainTypeTool(std::atoi(value[0].c_str()));
+        }
+      }
+      if (const int browse = tools.TakeInteropBrowse(); browse != 0) {
+        // The Import / Export window's Browse buttons: 1 the file to import, 2 the file to export to.
+        if (const std::filesystem::path file = AskHeightFile(HandleOf(mGame.supcomFrame), browse == 2); !file.empty()) {
+          tools.SetInteropFile(browse == 2, file.string());
         }
       }
       const bool importAsked = tools.TakeImportRequest();

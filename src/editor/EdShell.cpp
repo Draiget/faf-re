@@ -1847,6 +1847,7 @@ namespace faf::editor
     ImGui::End();
     mTools.DrawErosionWindow();
     mTools.DrawScToolsWindow();
+    mTools.DrawInteropWindow();
   }
 
   void EdShell::DrawPlaySetup()

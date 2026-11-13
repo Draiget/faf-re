@@ -5,6 +5,7 @@
 #include "editor/tools/EdArrange.h"
 #include "editor/tools/EdWaterMasks.h"
 #include "editor/tools/EdErosionSuite.h"
+#include "editor/tools/EdInterop.h"
 #include "editor/tools/EdScTools.h"
 #include "editor/tools/EdHeightBrush.h"
 #include "editor/tools/EdBrushLibrary.h"
@@ -1700,6 +1701,99 @@ namespace faf::editor
       mRampReport = std::move(report);
     }
     void DrawScToolsWindow();
+    /**
+     * The Import / Export window (Terrain > Import / Export...): a heightmap from another tool mapped, turned and
+     * blended onto the map's heights, a live link that imports it again whenever that tool saves it, and an export with
+     * a sidecar telling that tool what the image is.
+     */
+    enum class InteropAsk
+    {
+      None,
+      Probe,        // read the import file and say what it holds
+      Import,       // one undo step
+      Revert,       // the last import undone, while it is the newest step
+      Export,       // the export file (and its sidecar)
+      SendAndWatch, // export, then link the same file back in (a round trip through another tool)
+    };
+    void OpenInterop() noexcept
+    {
+      mInteropOpen = true;
+    }
+    [[nodiscard]] InteropAsk TakeInteropAsk() noexcept
+    {
+      return std::exchange(mInteropAsk, InteropAsk::None);
+    }
+    /** Test runs (`/interoptest`): an ask as the window's buttons make it. */
+    void AskInterop(
+      const InteropAsk ask
+    ) noexcept
+    {
+      mInteropOpen = true;
+      mInteropAsk = ask;
+    }
+    /** The Browse buttons, taken by the app (it asks for the file): 1 the import file, 2 the export file. */
+    [[nodiscard]] int TakeInteropBrowse() noexcept
+    {
+      return std::exchange(mInteropBrowse, 0);
+    }
+    void SetInteropFile(bool exportFile, const std::string& file);
+    [[nodiscard]] std::string InteropFile(
+      const bool exportFile
+    ) const
+    {
+      return exportFile ? mInteropExportPath : mInteropImportPath;
+    }
+    [[nodiscard]] ImportSettings& InteropSettings() noexcept
+    {
+      return mImport;
+    }
+    [[nodiscard]] bool InteropLive() const noexcept
+    {
+      return mInteropLive;
+    }
+    void SetInteropLive(
+      const bool on
+    ) noexcept
+    {
+      mInteropLive = on;
+    }
+    [[nodiscard]] bool InteropSidecar() const noexcept
+    {
+      return mInteropSidecar;
+    }
+    /** The export's width in samples (0 for the map's own) and its words per height. */
+    [[nodiscard]] int InteropExportWidth() const noexcept
+    {
+      return kExportWidths[mInteropExportSize];
+    }
+    [[nodiscard]] float InteropExportScale() const noexcept
+    {
+      return mInteropExportScale;
+    }
+    void SetInteropStatus(
+      std::string status
+    )
+    {
+      if (!status.empty()) {
+        mInteropStatus = std::move(status);
+      }
+    }
+    void SetInteropProbe(
+      std::string probe
+    )
+    {
+      mInteropProbe = std::move(probe);
+    }
+    /** The view says whether the last import can still be reverted and when the link last imported. */
+    void SetInteropState(
+      const bool canRevert,
+      std::string linkNote
+    )
+    {
+      mInteropCanRevert = canRevert;
+      mInteropLinkNote = std::move(linkNote);
+    }
+    void DrawInteropWindow();
     /** How many of each kind the map has now (the view gives them each frame), for Properties with nothing chosen. */
     void SetMapCounts(
       const int markers,
@@ -2757,6 +2851,20 @@ namespace faf::editor
     std::string mScStatus;
     std::string mSlopeReport;
     std::string mRampReport;
+    bool mInteropOpen = false;
+    InteropAsk mInteropAsk = InteropAsk::None;
+    int mInteropBrowse = 0;
+    char mInteropImportPath[1024]{};
+    char mInteropExportPath[1024]{};
+    ImportSettings mImport;
+    bool mInteropLive = false;
+    bool mInteropSidecar = true;
+    int mInteropExportSize = 0;
+    float mInteropExportScale = 1.0f;
+    bool mInteropCanRevert = false;
+    std::string mInteropLinkNote;
+    std::string mInteropStatus;
+    std::string mInteropProbe;
     ErosionAsk mErosionAsk = ErosionAsk::None;
     std::string mErosionSolver = "hydraulic";
     std::string mErosionPreset = "hills";

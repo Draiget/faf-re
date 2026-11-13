@@ -1005,6 +1005,21 @@ namespace faf::editor
     [[nodiscard]] std::vector<PadMarker> PadMarkers() const;
     std::string RunScTool(EdTools::ScAsk ask);
     void TickPads(float frameSeconds);
+    // Import / Export: the last import (its undo depth and the heights it left, to revert or replace it while it is
+    // the newest step; whether the live link made it) and the link's watch.
+    std::size_t mImportDepth = 0;
+    std::uint64_t mImportHash = 0;
+    bool mImportLive = false;
+    LiveLink mLink;
+    std::string mLinkFile;
+    bool mLinkOn = false;
+    double mLinkClock = 0.0;
+    float mLinkPollSeconds = 0.0f;
+    int mLinkImports = 0;
+    std::string RunInterop(EdTools::InteropAsk ask);
+    std::string InteropImport(bool live);
+    [[nodiscard]] bool ImportIsNewest(bool exact = true) const;
+    void TickInterop(float frameSeconds);
     // The Water tool's mask brush: a stroke's before, and the overlay's runs for the mask shown.
     bool mPaintingWaterMask = false;
     EdDocument::WaterMaskSnapshot mWaterMaskBefore;

@@ -1300,6 +1300,148 @@ namespace faf::editor
     ImGui::End();
   }
 
+  void EdTools::SetInteropFile(
+    const bool exportFile,
+    const std::string& file
+  )
+  {
+    char* const path = exportFile ? mInteropExportPath : mInteropImportPath;
+    const std::size_t size = exportFile ? sizeof(mInteropExportPath) : sizeof(mInteropImportPath);
+    (void)std::snprintf(path, size, "%s", file.c_str());
+  }
+
+  void EdTools::DrawInteropWindow()
+  {
+    if (!mInteropOpen) {
+      return;
+    }
+    ImGui::SetNextWindowSize(ImVec2(Em(400.0f), Em(640.0f)), ImGuiCond_FirstUseEver);
+    if (!ImGui::Begin("Import / Export###InteropWindow", &mInteropOpen)) {
+      ImGui::End();
+      return;
+    }
+    ImportSettings& s = mImport;
+    const float browseWidth = ImGui::CalcTextSize("Browse...").x + ImGui::GetStyle().FramePadding.x * 2.0f;
+    if (Section("Import a heightmap")) {
+      ImGui::SetNextItemWidth(-browseWidth - ImGui::GetStyle().ItemSpacing.x);
+      ImGui::InputTextWithHint(
+        "##interopin", "PNG, TIFF or raw 16-bit file", mInteropImportPath, sizeof(mInteropImportPath)
+      );
+      ImGui::SameLine();
+      if (ImGui::Button("Browse...##in")) {
+        mInteropBrowse = 1;
+      }
+      static constexpr const char* kMappings[] = {
+        "Values: stretched over a height range", "Values: heights (1/128 unit a step)"
+      };
+      int mapping = static_cast<int>(s.mapping);
+      ImGui::SetNextItemWidth(-1.0f);
+      if (EdCombo("##interopmapping", &mapping, kMappings, IM_ARRAYSIZE(kMappings))) {
+        s.mapping = static_cast<ImportSettings::Mapping>(mapping);
+      }
+      if (s.mapping == ImportSettings::Mapping::Normalised) {
+        ImGui::SetNextItemWidth(-1.0f);
+        FillSliderFloat("##interoplow", &s.low, 0.0f, 256.0f, "Darkest at %.1f");
+        ImGui::SetNextItemWidth(-1.0f);
+        FillSliderFloat("##interophigh", &s.high, 0.0f, 512.0f, "Brightest at %.1f");
+      } else {
+        ImGui::SetNextItemWidth(-1.0f);
+        FillSliderFloat("##interopscale", &s.scale, 0.05f, 4.0f, "Heights times %.2f");
+      }
+      ImGui::Checkbox("Flip left-right", &s.flipX);
+      ImGui::SameLine();
+      ImGui::Checkbox("Flip top-bottom", &s.flipZ);
+      static constexpr const char* kTurns[] = {
+        "Not turned", "Turned 90 clockwise", "Turned 180", "Turned 90 anticlockwise"
+      };
+      ImGui::SetNextItemWidth(-1.0f);
+      (void)EdCombo("##interopturns", &s.turns, kTurns, IM_ARRAYSIZE(kTurns));
+      static constexpr const char* kBlends[] = {
+        "Replace the heights", "Add to the heights", "Keep the higher", "Keep the lower"
+      };
+      int blend = static_cast<int>(s.blend);
+      ImGui::SetNextItemWidth(-1.0f);
+      if (EdCombo("##interopblend", &blend, kBlends, IM_ARRAYSIZE(kBlends))) {
+        s.blend = static_cast<ImportSettings::Blend>(blend);
+      }
+      ImGui::SetNextItemWidth(-1.0f);
+      FillSliderFloat("##interopstrength", &s.strength, 0.0f, 1.0f, "Strength %.2f");
+      const bool haveFile = mInteropImportPath[0] != '\0';
+      ImGui::BeginDisabled(!haveFile);
+      if (PrimaryButton("Import")) {
+        mInteropAsk = InteropAsk::Import;
+      }
+      ImGui::SameLine();
+      if (ImGui::Button("Probe")) {
+        mInteropAsk = InteropAsk::Probe;
+      }
+      EdSetItemTooltip("Read the file and say its size and what its values become.");
+      ImGui::EndDisabled();
+      ImGui::SameLine();
+      ImGui::BeginDisabled(!mInteropCanRevert);
+      if (ImGui::Button("Revert")) {
+        mInteropAsk = InteropAsk::Revert;
+      }
+      EdSetItemTooltip("Undo the last import (while nothing was edited after it).");
+      ImGui::EndDisabled();
+      ImGui::BeginDisabled(!haveFile);
+      ImGui::Checkbox("Live link", &mInteropLive);
+      ImGui::EndDisabled();
+      EdSetItemTooltip(
+        "Import again, with these settings, a second after another tool saved the file. While the last link import is "
+        "the newest step it is replaced, so the history keeps one step."
+      );
+      if (mInteropLive && !mInteropLinkNote.empty()) {
+        ImGui::SameLine();
+        ImGui::TextDisabled("%s", mInteropLinkNote.c_str());
+      }
+      if (!mInteropProbe.empty()) {
+        ImGui::PushTextWrapPos(0.0f);
+        ImGui::TextUnformatted(mInteropProbe.c_str());
+        ImGui::PopTextWrapPos();
+      }
+    }
+    if (Section("Export the heights")) {
+      ImGui::SetNextItemWidth(-browseWidth - ImGui::GetStyle().ItemSpacing.x);
+      ImGui::InputTextWithHint(
+        "##interopout", "16-bit PNG or .raw / .r16 file", mInteropExportPath, sizeof(mInteropExportPath)
+      );
+      ImGui::SameLine();
+      if (ImGui::Button("Browse...##out")) {
+        mInteropBrowse = 2;
+      }
+      static constexpr const char* kSizes[] = {"The map's size", "257", "513", "1025", "2049", "4097"};
+      ImGui::SetNextItemWidth(-1.0f);
+      (void)EdCombo("##interopsize", &mInteropExportSize, kSizes, IM_ARRAYSIZE(kSizes));
+      ImGui::SetNextItemWidth(-1.0f);
+      FillSliderFloat("##interopexportscale", &mInteropExportScale, 0.05f, 4.0f, "Heights times %.2f");
+      ImGui::Checkbox("Write a sidecar (.json)", &mInteropSidecar);
+      EdSetItemTooltip(
+        "The map, the image's size, the sea level and how a value becomes a height, for the other tool."
+      );
+      const bool haveFile = mInteropExportPath[0] != '\0';
+      ImGui::BeginDisabled(!haveFile);
+      if (PrimaryButton("Export")) {
+        mInteropAsk = InteropAsk::Export;
+      }
+      ImGui::SameLine();
+      if (ImGui::Button("Send and watch")) {
+        mInteropAsk = InteropAsk::SendAndWatch;
+      }
+      EdSetItemTooltip(
+        "Export, then link the same file back in as heights: edit it in another tool, save, and the map follows."
+      );
+      ImGui::EndDisabled();
+    }
+    if (!mInteropStatus.empty()) {
+      ImGui::Separator();
+      ImGui::PushTextWrapPos(0.0f);
+      ImGui::TextDisabled("%s", mInteropStatus.c_str());
+      ImGui::PopTextWrapPos();
+    }
+    ImGui::End();
+  }
+
   void EdTools::DrawFalloffCurve()
   {
     // The mockup's curve under the sliders: the brush's weight across its middle (BrushWeightAt, so its shape and

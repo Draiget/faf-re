@@ -55,6 +55,7 @@ set(FAF_EDITOR_SOURCES
   tools/EdWaterMasks.cpp
   tools/EdErosionSuite.cpp
   tools/EdScTools.cpp
+  tools/EdInterop.cpp
   ui/EdMapBrowser.cpp
   doc/EdWaterBodies.cpp
   view/EdWaterBodyView.cpp
