@@ -5,6 +5,8 @@
 #include <string>
 
 #include "gpg/core/utils/Logging.h"
+#include "gpg/gal/Device.hpp"
+#include "gpg/gal/GpuDriven.h"
 #include "lua/LuaObject.h"
 #include "moho/lua/CScrLuaBinder.h"
 #include "moho/lua/CScrLuaInitForm.h"
@@ -56,10 +58,10 @@ namespace moho::render
       return fallbackSet;
     }
 
-    // GetRenderFeatures() -> { api = "d3d12", features = { { key, title, tip, console, default, restart, states = { {
-    // text, key }, ... } }, ... } } Only the features the active API supports, each with the states and the default of
-    // that API; the unsupported ones are listed in `unsupported` with the reason, so that the Options screen can say
-    // why a setting is missing.
+    // GetRenderFeatures() -> { api = "d3d12", rayTracing = true, features = { { key, title, tip, console, default,
+    // restart, states = { { text, key }, ... } }, ... } } Only the features the active API supports, each with the
+    // states and the default of that API; the unsupported ones are listed in `unsupported` with the reason, so that the
+    // Options screen can say why a setting is missing.
     int cfunc_GetRenderFeaturesL(
       LuaPlus::LuaState* const state
     )
@@ -70,6 +72,12 @@ namespace moho::render
       // Before the device exists the API is not known: an empty name and no features, so that the caller asks again
       // later.
       result.SetString("api", ActiveApiKnown() ? ApiName(api) : "");
+      // Whether the device traces rays (inline ray queries): the options of the ray-traced shadows and occlusion are
+      // shown only where it does.
+      gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
+      result.SetBoolean(
+        "rayTracing", device != nullptr && (device->GetGpuDrivenFeatures() & gpg::gal::kGpuFeatureRayQuery) != 0U
+      );
       LuaPlus::LuaObject list;
       list.AssignNewTable(state, 0, 0);
       LuaPlus::LuaObject missing;

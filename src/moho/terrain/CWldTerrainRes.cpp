@@ -1002,6 +1002,26 @@ namespace
 
 namespace moho
 {
+  // Test aid: the sun's elevation (degrees above the horizon, 0 = the map's own sun) and compass heading.
+  float ren_SunTestElevation = 0.0f;
+  float ren_SunTestAzimuth = 0.0f;
+  namespace
+  {
+    TConVar<float> gTConVar_ren_SunTestElevation(
+      "ren_SunTestElevation",
+      "Test: the sun's elevation in degrees (0 = the map's own sun).",
+      &ren_SunTestElevation
+    );
+    TConVar<float> gTConVar_ren_SunTestAzimuth(
+      "ren_SunTestAzimuth",
+      "Test: the sun's compass heading in degrees, with ren_SunTestElevation.",
+      &ren_SunTestAzimuth
+    );
+  } // namespace
+} // namespace moho
+
+namespace moho
+{
   /**
    * Engine addition: the map loader encodes the normal map, so that `Finalize` on the render
    * thread only copies it. Encoding there held the loading screen still for 6.7 s on an 81 km map.
@@ -2110,6 +2130,16 @@ namespace moho
    */
   Wm3::Vector3f CWldTerrainRes::GetSunDirection() const
   {
+    // Test aid (ren_SunTestElevation): a sun at a chosen height and compass heading, whatever the map says.
+    if (ren_SunTestElevation > 0.0f) {
+      const float elevation = ren_SunTestElevation * 0.0174532925f;
+      const float azimuth = ren_SunTestAzimuth * 0.0174532925f;
+      Wm3::Vector3f sun;
+      sun.x = std::cos(elevation) * std::sin(azimuth);
+      sun.y = std::sin(elevation);
+      sun.z = std::cos(elevation) * std::cos(azimuth);
+      return sun;
+    }
     return mSunDirection;
   }
 

@@ -1059,6 +1059,8 @@ set(FAF_ENGINE_SOURCES
   moho/render/RenderInfo.cpp
   moho/render/RayScene.cpp
   moho/render/Shadow.cpp
+  moho/render/shadow/ShadowEffectPatch.cpp
+  moho/render/shadow/ShadowFilter.cpp
   moho/render/SelectionBracketParams.cpp
   moho/render/SelectionBracketRenderer.cpp
   moho/render/RenderGeometryBuffers.cpp

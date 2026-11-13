@@ -23,6 +23,7 @@
 #include "moho/render/d3d/CD3DDevice.h"
 #include "moho/render/d3d/CD3DDeviceResources.h"
 #include "moho/render/d3d/CD3DEffectTechnique.h"
+#include "moho/render/shadow/ShadowFilter.h"
 #include "moho/render/lights/LightBinding.h"
 #include "moho/render/lights/LightCensus.h"
 #include "moho/render/lights/LightDebugView.h"
@@ -540,25 +541,44 @@ namespace moho::lights
     }
   }
 
+  bool OnWarmupThread()
+  {
+    return tWarmupThread;
+  }
+
   bool ApplyLiveLevel()
   {
-    if (ren_DynLights <= 0 || gEffectsBuiltLit) {
-      return false;
-    }
-    if (CFG_GetArgOption("/dynlights", 0U, nullptr)) {
+    // The lights and the shadow filter (shadowfilter::EffectPatchWanted) patch effects as they load; either one
+    // switched on after the effects were built without its patch rebuilds them, in one go when both were.
+    bool lightsNeed = ren_DynLights > 0 && !gEffectsBuiltLit;
+    if (lightsNeed && CFG_GetArgOption("/dynlights", 0U, nullptr)) {
       gEffectsBuiltLit = true; // /dynlights builds the effects lit whatever the option says
+      lightsNeed = false;
+    }
+    bool shadowNeed = shadowfilter::LiveRebuildWanted();
+    if (!lightsNeed && !shadowNeed) {
       return false;
     }
     gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
     const gpg::gal::DeviceContext* const context = device != nullptr ? device->GetDeviceContext() : nullptr;
     const render::Feature* const feature = render::FindFeature("dynlights_quality");
     if (
-      context == nullptr || feature == nullptr || !gpg::gal::UsesD3D10EffectDialect(context->mDeviceType) ||
-      !render::Supported(*feature, render::ApiFromDevice(context->mDeviceType))
+      lightsNeed &&
+      (context == nullptr || feature == nullptr || !gpg::gal::UsesD3D10EffectDialect(context->mDeviceType) ||
+       !render::Supported(*feature, render::ApiFromDevice(context->mDeviceType)))
     ) {
       gEffectsBuiltLit = true; // nothing to rebuild on this API: do not look again
+      lightsNeed = false;
+    }
+    if (shadowNeed && (context == nullptr || !shadowfilter::Supported(context->mDeviceType))) {
+      shadowfilter::NoteRebuilt();
+      shadowNeed = false;
+    }
+    if (!lightsNeed && !shadowNeed) {
       return false;
     }
+    const std::vector<const char*> names =
+      lightsNeed ? std::vector<const char*>{"mesh", "terrain", "water2"} : std::vector<const char*>{"mesh", "terrain"};
     CD3DDevice* const d3dDevice = D3D_GetDevice();
     ID3DDeviceResources* const resources = d3dDevice != nullptr ? d3dDevice->GetResources() : nullptr;
     if (resources == nullptr) {
@@ -568,7 +588,7 @@ namespace moho::lights
     if (context->mDeviceType == gpg::gal::DeviceApi::Direct3D11 && gWarmupState < 2) {
       if (gWarmupState == 0) {
         std::vector<std::string> paths;
-        for (const char* const name : {"mesh", "terrain", "water2"}) {
+        for (const char* const name : names) {
           if (CD3DEffect* const effect = deviceResources->FindEffect(name)) {
             paths.emplace_back(effect->mFile.c_str());
           }
@@ -583,13 +603,16 @@ namespace moho::lights
               CD3DEffect compiled;
               (void)compiled.InitEffectFromFile(path.c_str());
             } catch (...) {
-              gpg::Warnf("DynLights: the background compile of %s failed", path.c_str());
+              gpg::Warnf("Live switch: the background compile of %s failed", path.c_str());
             }
             --gWarmupPending;
           });
         }
         gpg::Logf(
-          "DynLights: switched on, compiling the lit effects in the background (%d)", static_cast<int>(paths.size())
+          "Live switch (%s%s): compiling the patched effects in the background (%d)",
+          lightsNeed ? "dynamic lights" : "",
+          shadowNeed ? (lightsNeed ? ", shadow filter" : "shadow filter") : "",
+          static_cast<int>(paths.size())
         );
         if (paths.empty()) {
           gWarmupState = 2;
@@ -605,24 +628,33 @@ namespace moho::lights
         gWarmup.threads.clear();
         gWarmupState = 2;
         gpg::Logf(
-          "DynLights: the background compile took %.1f s",
+          "Live switch: the background compile took %.1f s",
           std::chrono::duration<double>(std::chrono::steady_clock::now() - gWarmupStarted).count()
         );
       }
     }
     const auto started = std::chrono::steady_clock::now();
-    gEffectsBuiltLit =
-      true; // set first: the rebuilds below ask LightsWanted again, and a failed rebuild must not repeat every frame
+    // set first: the rebuilds below ask LightsWanted / EffectPatchWanted again, and a failed rebuild must not repeat
+    // every frame
+    if (lightsNeed) {
+      gEffectsBuiltLit = true;
+    }
+    if (shadowNeed) {
+      shadowfilter::NoteRebuilt();
+    }
     int rebuilt = 0;
-    for (const char* const name : {"mesh", "terrain", "water2"}) {
+    for (const char* const name : names) {
       if (deviceResources->ReloadEffectNamed(name)) {
         ++rebuilt;
       } else {
-        gpg::Warnf("DynLights: %s could not be rebuilt with the light pass", name);
+        gpg::Warnf("Live switch: %s could not be rebuilt with its patch", name);
       }
     }
+    gWarmupState = 0; // a later switch compiles in the background again
     gpg::Logf(
-      "DynLights: switched on in the running game, %d effects rebuilt in %.0f ms",
+      "Live switch (%s%s): switched on in the running game, %d effects rebuilt in %.0f ms",
+      lightsNeed ? "dynamic lights" : "",
+      shadowNeed ? (lightsNeed ? ", shadow filter" : "shadow filter") : "",
       rebuilt,
       std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count()
     );
