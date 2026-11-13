@@ -43,6 +43,7 @@
 #include "moho/math/Vector4f.h"
 #include "moho/math/MathReflection.h"
 #include "moho/math/QuaternionMath.h"
+#include "moho/app/UserWorkerPool.h"
 #include "moho/console/CConCommand.h"
 #include "moho/console/CVarAccess.h"
 #include "moho/render/Cartographic.h"
@@ -350,6 +351,273 @@ namespace
    * lake gets its depth and shoreline as the sea does, and a dry body none. Only the texels
    * `RebuildWaterMapRect` would write are written, with the same packing.
    */
+  // ---- Engine addition: the water map at a finer resolution, for rendering only ----
+  // The water map has a texel for every 2 x 2 cells, and its shore flag is "a corner of the four is land": a lake's
+  // edge is a staircase of 2-unit steps, a texel out from the real shore. With `ren_WaterHiRes` texels a cell (0, the
+  // default, keeps the map's own; the map editor turns it on) the renderers get a second water map whose every texel
+  // reads the ground's bilinear height there: the shore flag is "the ground here is above its water", the depth byte
+  // the depth here, foam and flatness from the half resolution masks. What is saved and what the masks paint is the
+  // half resolution map, untouched; the sim never reads either. RebuildWaterMapRect marks the cells it rebuilt and
+  // GetWaterMap refreshes those before handing the finer map out. Ported from the FAF Studio editor's CWldMap patch,
+  // with each texel's own water level (water bodies) from WaterOfBlock.
+  float gWaterHiResTexels = 0.0f;
+
+  struct WaterHiRes
+  {
+    std::shared_ptr<moho::CD3DDynamicTextureSheet> sheet;
+    std::int32_t texelsPerCell = 0;
+    bool dirtyAll = true;
+    /// Dirty cells, inclusive, apart: a stroke and its mirrored copies are far from each other, and one box around
+    /// them would rebuild half the map. Past 16 the nearest two merge.
+    std::vector<gpg::Rect2i> dirty;
+    /// When it was last refreshed: an edit's refreshes come at most every 100 ms (the hand-over to the GPU is the
+    /// whole texture each time); the last change always lands.
+    std::chrono::steady_clock::time_point refreshed{};
+  };
+
+  std::mutex gWaterHiResLock;
+  std::unordered_map<const moho::CWldTerrainRes*, WaterHiRes> gWaterHiRes;
+
+  void MarkWaterHiResDirty(
+    const moho::CWldTerrainRes* const res,
+    const std::int32_t x0,
+    const std::int32_t z0,
+    const std::int32_t x1,
+    const std::int32_t z1
+  )
+  {
+    if (gWaterHiResTexels < 0.5f || x1 < x0 || z1 < z0) {
+      return;
+    }
+    const std::lock_guard<std::mutex> lock(gWaterHiResLock);
+    const auto found = gWaterHiRes.find(res);
+    if (found == gWaterHiRes.end() || found->second.dirtyAll) {
+      return; // built whole the first time it is asked for
+    }
+    WaterHiRes& st = found->second;
+    // UpdateWaterMap() marks the whole map with x1 = z1 = 0x7FFFFFFF: kept in range, so a cell's margin can't wrap.
+    constexpr std::int32_t kMost = 1 << 20;
+    gpg::Rect2i rect{};
+    rect.x0 = std::clamp(x0, 0, kMost);
+    rect.z0 = std::clamp(z0, 0, kMost);
+    rect.x1 = std::clamp(x1, 0, kMost);
+    rect.z1 = std::clamp(z1, 0, kMost);
+    // One that overlaps (or touches) a kept rect grows it; else it is kept apart.
+    for (gpg::Rect2i& kept : st.dirty) {
+      if (rect.x0 <= kept.x1 + 1 && kept.x0 <= rect.x1 + 1 && rect.z0 <= kept.z1 + 1 && kept.z0 <= rect.z1 + 1) {
+        kept.x0 = std::min(kept.x0, rect.x0);
+        kept.z0 = std::min(kept.z0, rect.z0);
+        kept.x1 = std::max(kept.x1, rect.x1);
+        kept.z1 = std::max(kept.z1, rect.z1);
+        return;
+      }
+    }
+    st.dirty.push_back(rect);
+    if (st.dirty.size() > 16u) {
+      gpg::Rect2i& a = st.dirty[st.dirty.size() - 2];
+      const gpg::Rect2i& b = st.dirty.back();
+      a.x0 = std::min(a.x0, b.x0);
+      a.z0 = std::min(a.z0, b.z0);
+      a.x1 = std::max(a.x1, b.x1);
+      a.z1 = std::max(a.z1, b.z1);
+      st.dirty.pop_back();
+    }
+  }
+
+  void ForgetWaterHiRes(
+    const moho::CWldTerrainRes* const res
+  )
+  {
+    const std::lock_guard<std::mutex> lock(gWaterHiResLock);
+    gWaterHiRes.erase(res);
+  }
+
+  /// How long a refresh took: computing the texels, and handing them to the GPU (the unlock).
+  struct WaterHiResTimes
+  {
+    double fillMs = 0.0;
+    double uploadMs = 0.0;
+  };
+
+  /// The texels of each cell rect (inclusive), a cell more each side (the bilinear taps reach over the border), under
+  /// one lock of the sheet.
+  WaterHiResTimes FillWaterHiRes(
+    const moho::CWldTerrainRes& res,
+    WaterHiRes& st,
+    const std::vector<gpg::Rect2i>& rects
+  )
+  {
+    WaterHiResTimes times;
+    const moho::STIMap* const map = res.mMap;
+    const moho::CHeightField* const field = map != nullptr ? map->mHeightField.get() : nullptr;
+    if (st.sheet.get() == nullptr || field == nullptr || rects.empty()) {
+      return times;
+    }
+    const std::int32_t cellsX = field->width - 1;
+    const std::int32_t cellsZ = field->height - 1;
+    const std::int32_t k = st.texelsPerCell;
+    const std::int32_t halfWidth = std::max(1, cellsX >> 1);
+    const std::int32_t halfHeight = std::max(1, cellsZ >> 1);
+    std::uint32_t pitchBytes = 0;
+    void* mappedBits = nullptr;
+    const auto started = std::chrono::steady_clock::now();
+    // The sheet keeps its texels between locks (the backends' CPU copy), so only the dirty ones are written.
+    if (!st.sheet->Lock(&pitchBytes, &mappedBits)) {
+      return times;
+    }
+    auto* const bits = static_cast<std::uint8_t*>(mappedBits);
+    const float inv = 1.0f / static_cast<float>(k);
+    for (const gpg::Rect2i& rect : rects) {
+      const std::int32_t cx0 = std::max(0, rect.x0 - 1);
+      const std::int32_t cz0 = std::max(0, rect.z0 - 1);
+      const std::int32_t cx1 = std::min(cellsX - 1, rect.x1 + 1);
+      const std::int32_t cz1 = std::min(cellsZ - 1, rect.z1 + 1);
+      if (cx1 < cx0 || cz1 < cz0) {
+        continue;
+      }
+      const std::int32_t tz0 = cz0 * k;
+      const std::int32_t tz1 = (cz1 + 1) * k - 1;
+      const std::int32_t tx0 = cx0 * k;
+      const std::int32_t tx1 = (cx1 + 1) * k - 1;
+      const auto rows = [&](const std::size_t begin, const std::size_t end) {
+        for (std::size_t index = begin; index < end; ++index) {
+          const std::int32_t tz = tz0 + static_cast<std::int32_t>(index);
+          const float z = (static_cast<float>(tz) + 0.5f) * inv;
+          const std::int32_t iz = static_cast<std::int32_t>(std::floor(z));
+          const float fz = z - static_cast<float>(iz);
+          const std::int32_t halfZ = std::min(halfHeight - 1, iz >> 1);
+          auto* const out = reinterpret_cast<std::uint32_t*>(bits + static_cast<std::size_t>(tz) * pitchBytes);
+          for (std::int32_t tx = tx0; tx <= tx1; ++tx) {
+            const float x = (static_cast<float>(tx) + 0.5f) * inv;
+            const std::int32_t ix = static_cast<std::int32_t>(std::floor(x));
+            const float fx = x - static_cast<float>(ix);
+            const float h00 = SampleTerrainHeightWordScaled(*field, ix, iz);
+            const float h10 = SampleTerrainHeightWordScaled(*field, ix + 1, iz);
+            const float h01 = SampleTerrainHeightWordScaled(*field, ix, iz + 1);
+            const float h11 = SampleTerrainHeightWordScaled(*field, ix + 1, iz + 1);
+            const float h = (h00 * (1.0f - fx) + h10 * fx) * (1.0f - fz) + (h01 * (1.0f - fx) + h11 * fx) * fz;
+            // This texel's water: the sea's, or the water body its 2 x 2 block belongs to.
+            const moho::SWaterOfBlock water = moho::WaterOfBlock(*map, ix & ~1, iz & ~1);
+            const float depthDenominator = water.level - water.abyss;
+            float depthByte = depthDenominator != 0.0f ? ((water.level - h) / depthDenominator) * 255.0f : 0.0f;
+            depthByte = std::clamp(depthByte, 0.0f, 255.0f);
+            const std::int32_t halfX = std::min(halfWidth - 1, ix >> 1);
+            const std::size_t maskIndex =
+              static_cast<std::size_t>(halfX) + static_cast<std::size_t>(halfZ) * static_cast<std::size_t>(halfWidth);
+            std::uint32_t packed = 0;
+            if (res.mWaterFoam != nullptr) {
+              packed |= static_cast<std::uint32_t>(res.mWaterFoam[maskIndex]) << 24u;
+            }
+            if (res.mWaterFlatness != nullptr) {
+              packed |= static_cast<std::uint32_t>(res.mWaterFlatness[maskIndex]) << 16u;
+            }
+            if (h < water.level) {
+              packed |= static_cast<std::uint32_t>(static_cast<std::uint8_t>(depthByte)) << 8u;
+            } else {
+              packed |= 0xFFu;
+            }
+            out[tx] = packed;
+          }
+        }
+      };
+      const auto count = static_cast<std::size_t>(tz1 - tz0 + 1);
+      if (
+        count * static_cast<std::size_t>(tx1 - tx0 + 1) >= 65536u &&
+        moho::CUserWorkerPool::ConfiguredWorkerCount() != 0u
+      ) {
+        moho::CUserWorkerPool::Get().ParallelFor(count, 16, rows);
+      } else {
+        rows(0, count);
+      }
+    }
+    const auto filled = std::chrono::steady_clock::now();
+    (void)st.sheet->Unlock();
+    times.fillMs = std::chrono::duration<double, std::milli>(filled - started).count();
+    times.uploadMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - filled).count();
+    return times;
+  }
+
+  /// The finer water map (made and brought up to date here), or null for the map's own half resolution one.
+  [[nodiscard]] std::shared_ptr<moho::CD3DDynamicTextureSheet> WaterHiResSheet(
+    const moho::CWldTerrainRes& res
+  )
+  {
+    const float want = gWaterHiResTexels;
+    const std::lock_guard<std::mutex> lock(gWaterHiResLock);
+    if (want < 0.5f) {
+      gWaterHiRes.erase(&res);
+      return {};
+    }
+    const moho::CHeightField* const field = res.mMap != nullptr ? res.mMap->mHeightField.get() : nullptr;
+    if (field == nullptr || res.mWaterMapTexture.get() == nullptr) {
+      return {};
+    }
+    const std::int32_t cellsX = field->width - 1;
+    const std::int32_t cellsZ = field->height - 1;
+    std::int32_t k = std::clamp(static_cast<std::int32_t>(want + 0.5f), 1, 4);
+    while (k > 1 && (cellsX * k > 4096 || cellsZ * k > 4096)) {
+      --k;
+    }
+    if (cellsX * k > 4096 || cellsZ * k > 4096 || cellsX < 2 || cellsZ < 2) {
+      return {}; // a map this big keeps its half resolution water map
+    }
+    WaterHiRes& st = gWaterHiRes[&res];
+    if (st.sheet.get() == nullptr || st.texelsPerCell != k) {
+      moho::CD3DDevice* const device = moho::D3D_GetDevice();
+      moho::ID3DDeviceResources* const resources = device != nullptr ? device->GetResources() : nullptr;
+      if (resources == nullptr) {
+        return {};
+      }
+      moho::ID3DDeviceResources::DynamicTextureSheetHandle sheet;
+      st.sheet = resources->NewDynamicTextureSheet(sheet, cellsX * k, cellsZ * k, 2);
+      if (st.sheet.get() == nullptr) {
+        gWaterHiRes.erase(&res);
+        return {};
+      }
+      st.texelsPerCell = k;
+      st.dirtyAll = true;
+    }
+    if (st.dirtyAll) {
+      gpg::Rect2i all{};
+      all.x0 = 0;
+      all.z0 = 0;
+      all.x1 = cellsX - 1;
+      all.z1 = cellsZ - 1;
+      const WaterHiResTimes times = FillWaterHiRes(res, st, {all});
+      st.dirtyAll = false;
+      st.dirty.clear();
+      gpg::Logf(
+        "Water map for rendering: %d x %d (%d texels a cell), built in %.0f ms and handed over in %.0f ms",
+        cellsX * k,
+        cellsZ * k,
+        k,
+        times.fillMs,
+        times.uploadMs
+      );
+    } else if (!st.dirty.empty() && std::chrono::steady_clock::now() - st.refreshed >= std::chrono::milliseconds(100)) {
+      st.refreshed = std::chrono::steady_clock::now();
+      const WaterHiResTimes times = FillWaterHiRes(res, st, st.dirty);
+      // An edit's refresh is a frame's work: one that takes long is worth knowing about.
+      if (times.fillMs + times.uploadMs >= 4.0) {
+        std::int64_t cells = 0;
+        for (const gpg::Rect2i& rect : st.dirty) {
+          const std::int64_t w = std::min(rect.x1, cellsX - 1) - rect.x0 + 1;
+          const std::int64_t h = std::min(rect.z1, cellsZ - 1) - rect.z0 + 1;
+          cells += std::max<std::int64_t>(0, w) * std::max<std::int64_t>(0, h);
+        }
+        gpg::Logf(
+          "Water map for rendering: %zu rects, %lld cells refreshed in %.1f ms and handed over in %.1f ms",
+          st.dirty.size(),
+          static_cast<long long>(cells),
+          times.fillMs,
+          times.uploadMs
+        );
+      }
+      st.dirty.clear();
+    }
+    return st.sheet;
+  }
+
   void RebuildWaterMapRectWithBodies(
     moho::CWldTerrainRes& terrainRes,
     const gpg::Rect2i& updateRect
@@ -415,6 +683,8 @@ namespace
     const gpg::Rect2i& updateRect
   )
   {
+    // The finer water map (ren_WaterHiRes) follows, rebuilt there when a renderer next asks for it.
+    MarkWaterHiResDirty(&terrainRes, updateRect.x0, updateRect.z0, updateRect.x1, updateRect.z1);
     constexpr float kNoWaterElevation = -10000.0f;
     moho::STIMap* const map = terrainRes.mMap;
     if (map->HasWaterBodies()) {
@@ -746,6 +1016,12 @@ namespace moho
       "load does as in the original (0). Read when a map loads.",
       &ren_NormalMapOnLoader
     );
+    TConVar<float> gTConVar_ren_WaterHiRes(
+      "ren_WaterHiRes",
+      "Texels a cell of the water map the renderers use (1 to 4; at most 4096 a side): lake shores follow the ground "
+      "instead of 2-unit steps. 0 (the default) keeps the map's own half resolution water map. Rendering only.",
+      &gWaterHiResTexels
+    );
   } // namespace
 } // namespace moho
 
@@ -993,6 +1269,7 @@ namespace moho
   CWldTerrainRes::~CWldTerrainRes()
   {
     DropPrebuiltNormalMap(this); // engine addition, for a map loaded and never drawn
+    ForgetWaterHiRes(this);      // engine addition: the finer water map (ren_WaterHiRes)
 
     // mDecalManager: virtual scalar-deleting dtor dispatch (delete p).
     if (mDecalManager != nullptr) {
@@ -1503,6 +1780,10 @@ namespace moho
    */
   std::shared_ptr<ID3DTextureSheet> CWldTerrainRes::GetWaterMap() const
   {
+    // Engine addition: the finer water map for rendering when `ren_WaterHiRes` asks for one.
+    if (const std::shared_ptr<CD3DDynamicTextureSheet> fine = WaterHiResSheet(*this); fine.get() != nullptr) {
+      return std::static_pointer_cast<ID3DTextureSheet>(fine);
+    }
     return std::static_pointer_cast<ID3DTextureSheet>(mWaterMapTexture);
   }
 
