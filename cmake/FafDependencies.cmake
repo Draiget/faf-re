@@ -484,3 +484,8 @@ if(NOT FAF_FREETYPE_DIR AND NOT DEFINED ENV{FAF_FREETYPE_DIR})
   faf_dependency_patches(freetype download
     freetype_2_15_0_faf_oom.patch)
 endif()
+if(FAF_DEPENDENCIES_ONLY)
+  # Linux only, as its download above.
+  faf_dependency_patches(FAudio download
+    faudio_26_10_faf_instance_count.patch)
+endif()

@@ -1,0 +1,147 @@
+diff --git a/src/FACT.c b/src/FACT.c
+index ae299fb..dd85f25 100644
+--- a/src/FACT.c
++++ b/src/FACT.c
+@@ -2427,7 +2427,7 @@ uint32_t FACTCue_Stop(FACTCue *pCue, uint32_t dwFlags)
+ 			FACTWave_Destroy(pCue->simpleWave);
+ 			pCue->simpleWave = NULL;
+ 
+-			pCue->data->instanceCount -= 1;
++			FACT_INTERNAL_ReleaseCueInstance(pCue);
+ 		}
+ 		else if (pCue->playingSound != NULL)
+ 		{
+diff --git a/src/FACT_internal.c b/src/FACT_internal.c
+index 1cdb334..39a25bb 100644
+--- a/src/FACT_internal.c
++++ b/src/FACT_internal.c
+@@ -840,7 +840,11 @@ bool play_sound(FACTCue *cue)
+ 		return true;
+ 	sound = cue->playingSound;
+ 
+-	if (cue->data->instanceCount >= cue->data->instanceLimit)
++	/* faf-re: a Cue that already holds its Cue count (an interactive
++	 * transition plays a new Sound on the same Cue) is one of the instances
++	 * already, so it is neither checked nor counted again.
++	 */
++	if (!cue->countedInstance && cue->data->instanceCount >= cue->data->instanceLimit)
+ 	{
+ 		if (!handle_instance_limit(cue, NULL))
+ 			return false;
+@@ -858,8 +862,13 @@ bool play_sound(FACTCue *cue)
+ 		}
+ 
+ 		++category->instanceCount;
++		cue->countedCategory = category;
++	}
++	if (!cue->countedInstance)
++	{
++		++cue->data->instanceCount;
++		cue->countedInstance = true;
+ 	}
+-	++cue->data->instanceCount;
+ 
+ 	if (fade_in_ms)
+ 	{
+@@ -875,6 +884,29 @@ bool play_sound(FACTCue *cue)
+ 	return true;
+ }
+ 
++/* faf-re: lower the counts only for a Cue that raised them in play_sound().
++ * Lowering them for a Cue that never played (refused by a FAIL instance
++ * limit, or prepared and destroyed) wrapped the uint8_t counts to 255, after
++ * which every later play of that Cue or Category was refused.
++ */
++void FACT_INTERNAL_ReleaseCueInstance(FACTCue *cue)
++{
++	if (cue->countedInstance)
++	{
++		cue->data->instanceCount -= 1;
++		cue->countedInstance = false;
++	}
++}
++
++void FACT_INTERNAL_ReleaseCueCategory(FACTCue *cue)
++{
++	if (cue->countedCategory != NULL)
++	{
++		cue->countedCategory->instanceCount -= 1;
++		cue->countedCategory = NULL;
++	}
++}
++
+ void FACT_INTERNAL_DestroySound(FACTSoundInstance *sound)
+ {
+ 	uint8_t i;
+@@ -900,18 +932,13 @@ void FACT_INTERNAL_DestroySound(FACTSoundInstance *sound)
+ 	}
+ 	sound->parentCue->parentBank->parentEngine->pFree(sound->tracks);
+ 
+-	if (sound->sound->category != FACTCATEGORY_INVALID)
+-	{
+-		sound->parentCue->parentBank->parentEngine->categories[
+-			sound->sound->category
+-		].instanceCount -= 1;
+-	}
++	FACT_INTERNAL_ReleaseCueCategory(sound->parentCue);
+ 
+ 	/* TODO: if (sound->parentCue->playingSounds == NULL) */
+ 	{
+ 		sound->parentCue->state |= FACT_STATE_STOPPED;
+ 		sound->parentCue->state &= ~(FACT_STATE_PLAYING | FACT_STATE_PAUSED | FACT_STATE_STOPPING);
+-		sound->parentCue->data->instanceCount -= 1;
++		FACT_INTERNAL_ReleaseCueInstance(sound->parentCue);
+ 
+ 		FACT_INTERNAL_SendCueNotification(sound->parentCue, FACTNOTIFICATIONTYPE_CUESTOP);
+ 	}
+@@ -1662,12 +1689,7 @@ static void FACT_INTERNAL_UpdateCue(FACTCue *cue)
+ 				}
+ 				cue->parentBank->parentEngine->pFree(sound->tracks);
+ 
+-				if (sound->sound->category != FACTCATEGORY_INVALID)
+-				{
+-					sound->parentCue->parentBank->parentEngine->categories[
+-						sound->sound->category
+-					].instanceCount -= 1;
+-				}
++				FACT_INTERNAL_ReleaseCueCategory(cue);
+ 			}
+ 
+ 			/* TODO: Reset cue times? Transition tables...?
+@@ -1930,7 +1952,7 @@ void FACT_INTERNAL_OnStreamEnd(FAudioVoiceCallback *callback)
+ 			FACT_STATE_PLAYING |
+ 			FACT_STATE_STOPPING
+ 		);
+-		c->wave->parentCue->data->instanceCount -= 1;
++		FACT_INTERNAL_ReleaseCueInstance(c->wave->parentCue);
+ 	}
+ }
+ 
+diff --git a/src/FACT_internal.h b/src/FACT_internal.h
+index 864d369..e2f3fe1 100644
+--- a/src/FACT_internal.h
++++ b/src/FACT_internal.h
+@@ -637,6 +637,14 @@ struct FACTCue
+ 	FACTSoundInstance *playingSound;
+ 	uint32_t maxRpcReleaseTime;
+ 
++	/* faf-re: the instance counts this Cue holds. play_sound() sets them
++	 * when it raises a count; a count is only lowered for a Cue that holds
++	 * it. A Cue refused by its instance limit, or prepared and destroyed
++	 * without playing, holds neither.
++	 */
++	bool countedInstance;
++	FACTAudioCategory *countedCategory;
++
+ 	/* 3D Data */
+ 	bool active3D;
+ 	uint32_t srcChannels;
+@@ -654,6 +662,8 @@ void FACT_INTERNAL_GetNextWave(FACTCue *cue, const FACTSound *sound, const FACTT
+ 	FACTTrackInstance *trackInst, const FACTEvent *evt, FACTEventInstance *evtInst);
+ void create_sound(FACTCue *cue);
+ bool play_sound(FACTCue *cue);
++void FACT_INTERNAL_ReleaseCueInstance(FACTCue *cue);
++void FACT_INTERNAL_ReleaseCueCategory(FACTCue *cue);
+ void FACT_INTERNAL_DestroySound(FACTSoundInstance *sound);
+ void FACT_INTERNAL_BeginFadeOut(FACTSoundInstance *sound, uint16_t fadeOutMS);
+ void FACT_INTERNAL_BeginReleaseRPC(FACTSoundInstance *sound, uint16_t releaseMS);

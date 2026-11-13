@@ -3,7 +3,7 @@
 // FAudio's FACT, which reimplements XACT call for call (Wine's XACT engines are built the same
 // way).
 //
-// Three things differ from passing calls straight through:
+// Four things differ from passing calls straight through:
 //  - XACT hands the engine its own interface pointers, in notifications too. Each FACT object the
 //    engine sees is wrapped once, and notifications get the wrappers in place of FACT's objects
 //    (and descriptors the engine registers get FACT's objects back).
@@ -11,6 +11,9 @@
 //    is the POSIX <Windows.h>'s. FACT reads through file callbacks; these read that handle at the
 //    requested offset with SetFilePointerEx and ReadFile, one read at a time.
 //  - The renderer ID is a wchar_t string, 32-bit on Linux; FACT wants UTF-16.
+//  - A sound bank play its instance limit refuses fails and hands back no cue, as XACT's does;
+//    FACT reports success with a stopped cue. And a stopped cue reports stopped alone, where
+//    FACT can leave its prepared bit set too.
 
 #include "platform/posix/XactOverFact.h"
 
@@ -31,6 +34,8 @@ namespace
   constexpr std::int32_t kNotImplemented = static_cast<std::int32_t>(0x80004001u);  // E_NOTIMPL
   constexpr std::int32_t kNoInterface = static_cast<std::int32_t>(0x80004002u);     // E_NOINTERFACE
   constexpr std::int32_t kInvalidArgument = static_cast<std::int32_t>(0x80070057u); // E_INVALIDARG
+  constexpr std::int32_t kInstanceLimitFailToPlay =
+    static_cast<std::int32_t>(FACTENGINE_E_INSTANCELIMITFAILTOPLAY); // XACTENGINE_E_INSTANCELIMITFAILTOPLAY
 
   class CueOverFact;
   class SoundBankOverFact;
@@ -112,12 +117,19 @@ namespace
       (void)FACTCue_Stop(mCue, static_cast<std::uint32_t>(stopFlags));
     }
 
+    // A stopped cue reports XACT_CUESTATE_STOPPED alone. FACT keeps FACT_STATE_PREPARED set on a
+    // cue it stops before it played (a play the instance limit refused, a Stop on a preloaded cue),
+    // and the engine reaps cues that compare equal to stopped (0x20): CUserSoundManager's pending
+    // destroys and entity loops. Stopped is final, so nothing else of the state matters then.
     std::int32_t __stdcall GetState(
       std::int32_t* const outState
     ) override
     {
       std::uint32_t state = 0;
       const std::uint32_t result = FACTCue_GetState(mCue, &state);
+      if ((state & FACT_STATE_STOPPED) != 0u) {
+        state = FACT_STATE_STOPPED;
+      }
       if (outState != nullptr) {
         *outState = static_cast<std::int32_t>(state);
       }
@@ -166,6 +178,20 @@ namespace
 
     FACTCue* const mCue;
   };
+
+  // A play that went through clears FACT's prepared state; one refused by an instance limit is
+  // stopped while still prepared (FACTCue_Play returns before clearing it). A cue that played and
+  // already ended is stopped without it, so it doesn't count as refused.
+  bool WasRefused(
+    FACTCue* const cue
+  )
+  {
+    std::uint32_t state = 0;
+    if (FACTCue_GetState(cue, &state) != 0u) {
+      return false;
+    }
+    return (state & FACT_STATE_STOPPED) != 0u && (state & FACT_STATE_PREPARED) != 0u;
+  }
 
   // A cue the engine asked for gets a wrapper; a fire-and-forget play (no out pointer) doesn't.
   std::int32_t WrapCue(
@@ -222,6 +248,12 @@ namespace
       return WrapCue(result, cue, outCue);
     }
 
+    // XACT fails a play its instance limit refuses (XACTENGINE_E_INSTANCELIMITFAILTOPLAY) and hands
+    // back no cue; the engine counts on that (AudioEngine::Play, 0x004D9B30, and the one-shot
+    // requests, which keep every cue they get until it reports stopped). FACTSoundBank_Play returns
+    // success either way, with the refused cue left prepared and stopped, a state XACT never reports.
+    // Such a cue is destroyed here and the play fails, as on XACT. A play without an out pointer
+    // stays FACT's to clean up: FACT destroys its own stopped cues.
     std::int32_t __stdcall Play(
       const std::uint16_t cueIndex,
       const std::uint32_t flags,
@@ -233,6 +265,11 @@ namespace
       const std::uint32_t result = FACTSoundBank_Play(
         mBank, cueIndex, flags, static_cast<std::int32_t>(timeOffset), outCue != nullptr ? &cue : nullptr
       );
+      if (result == 0u && cue != nullptr && WasRefused(cue)) {
+        (void)FACTCue_Destroy(cue);
+        *outCue = nullptr;
+        return kInstanceLimitFailToPlay;
+      }
       return WrapCue(result, cue, outCue);
     }
 

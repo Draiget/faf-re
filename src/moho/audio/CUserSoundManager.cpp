@@ -53,7 +53,8 @@ namespace
   using LoopNode = moho::TDatListItem<moho::HSound, void>;
   using LoopList = moho::TDatList<moho::HSound, void>;
 
-  constexpr int kXactErrCuePreparedOnly = static_cast<int>(0x8AC70008u);
+  // XACTENGINE_E_INSTANCELIMITFAILTOPLAY: the cue's or its category's instance limit refused the play.
+  constexpr int kXactErrInstanceLimitFailToPlay = static_cast<int>(0x8AC70008u);
   constexpr int kCueStatePlaying = 16;
   constexpr int kCueStateStopped = 32;
   constexpr float kHalfPi = 1.5707964f;
@@ -411,7 +412,7 @@ namespace
     const fa::string& bankName
   )
   {
-    if (xactResult >= 0 || xactResult == kXactErrCuePreparedOnly) {
+    if (xactResult >= 0 || xactResult == kXactErrInstanceLimitFailToPlay) {
       return;
     }
 

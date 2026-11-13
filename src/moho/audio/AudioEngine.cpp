@@ -128,7 +128,8 @@ namespace moho
 
 namespace
 {
-  constexpr int kXactErrCuePreparedOnly = static_cast<int>(0x8AC70008u);
+  // XACTENGINE_E_INSTANCELIMITFAILTOPLAY: the cue's or its category's instance limit refused the play.
+  constexpr int kXactErrInstanceLimitFailToPlay = static_cast<int>(0x8AC70008u);
   constexpr int kHresultPointer = static_cast<int>(0x80004003u);
   constexpr int kHresultFail = static_cast<int>(0x80004005u);
   constexpr std::uint32_t kX3dCalculateFlags = 0x61u;
@@ -2350,12 +2351,18 @@ namespace moho
 
     const int result =
       preloadOnly != 0 ? loader->mBank->Prepare(cueId, 0u, 0u, outCue) : loader->mBank->Play(cueId, 0u, 0u, outCue);
-    if (result >= 0 || result == kXactErrCuePreparedOnly) {
+    if (result >= 0) {
       return result;
     }
 
+    // Every failure clears the cue, a play the instance limit refused too; only that one isn't
+    // logged (0x004D9B77: `mov [edi], 0`, then 0x004D9B81: `cmp esi, 0x8ac70008` / `je` past the
+    // warning).
     if (outCue != nullptr) {
       *outCue = nullptr;
+    }
+    if (result == kXactErrInstanceLimitFailToPlay) {
+      return result;
     }
 
     gpg::Warnf(
