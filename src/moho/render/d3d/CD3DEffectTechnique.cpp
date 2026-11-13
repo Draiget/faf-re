@@ -34,6 +34,8 @@
 #include "moho/render/shadow/ShadowFilter.h"
 #include "moho/misc/FileWaitHandleSet.h"
 #include "moho/misc/StartupHelpers.h"
+#include "moho/particles/ParticleEffectPatch.h"
+#include "moho/particles/ParticleLowRes.h"
 #include "moho/render/d3d/CD3DDevice.h"
 #include "moho/render/ID3DTextureSheet.h"
 #include "moho/terrain/water/TerrainWaterLevelPatch.h"
@@ -1507,6 +1509,41 @@ technique EditorMeshFill
       };
       assembleLit();
 
+      // Engine addition (ParticleEffectPatch.h): particle.fx gets the low-resolution twins of its large-particle
+      // techniques and the soft-particle pixel shaders on the Direct3D 10 dialect backends, while the soft particles or
+      // the large-particle quality are on (particlelowres::PatchWanted; the live switch builds it again when that
+      // changes). With both off, with a viewport too small for the low-resolution path, with /noparticlelowres or
+      // FAF_NO_RENDER_ADDITIONS=1 the effect is the file's own; if the patched effect does not build, the original does
+      // (below).
+      bool patchedParticles = false;
+      const gpg::MemBuffer<char> unpatchedBuffer = mergedBuffer;
+      if (
+        deviceContext != nullptr && gpg::gal::UsesD3D10EffectDialect(deviceContext->mDeviceType) &&
+        effectByteCount > 0U && std::strcmp(effectBaseName.c_str(), "particle") == 0 && particlelowres::PatchWanted()
+      ) {
+        std::string text(effectSourceBuffer.GetPtr(0U, 0U), effectByteCount);
+        const ParticleEffectPatchResult patch = PatchParticleEffect(text);
+        if (patch.patched) {
+          mergedBuffer = gpg::AllocMemBuffer(compatByteCount + text.size());
+          if (compatByteCount > 0U) {
+            std::copy_n(compatStateBuffer.GetPtr(0U, 0U), compatByteCount, mergedBuffer.GetPtr(0U, 0U));
+          }
+          std::copy_n(text.data(), text.size(), mergedBuffer.GetPtr(compatByteCount, 0U));
+          patchedParticles = true;
+          gpg::Logf(
+            "ParticleLowRes: %s patched, %d low-resolution techniques, %d soft",
+            effectBaseName.c_str(),
+            patch.techniques,
+            patch.softened
+          );
+        } else {
+          gpg::Warnf("ParticleLowRes: %s not patched: %s", effectBaseName.c_str(), patch.error.c_str());
+        }
+      }
+      if (std::strcmp(effectBaseName.c_str(), "particle") == 0) {
+        SetParticleEffectPatched(patchedParticles);
+      }
+
       // Builds the effect, from its compiled copy in the cache when that is at
       // least as new as the source. FAF: `boneTexture` compiles the variant
       // with FAF_BONE_TEXTURE defined (see WantsBoneTextureVariant); it turns
@@ -1554,7 +1591,8 @@ technique EditorMeshFill
           : (msdfText ? ".msdf."
                       : (withTerrainTess ? ".tess." : ((editorOutline || withWaterDetail) ? outlineVariant : ".")));
         const fa::string cachePath = cacheDirectory + "/" + mName + terrainLevelVariant.c_str() +
-          shadowVariant.c_str() + lightVariant.c_str() + waterVariant.c_str() + variant + engineVersion;
+          shadowVariant.c_str() + lightVariant.c_str() + (patchedParticles ? ".lowres" : "") + waterVariant.c_str() +
+          variant + engineVersion;
         SDiskFileInfo cacheInfo{};
         bool useCachePayload = false;
         if (waitHandleSet->GetFileInfo(cachePath.c_str(), &cacheInfo, false)) {
@@ -1893,7 +1931,22 @@ technique EditorMeshFill
         }
       }
       if (!mEffect) {
-        createEffect(false);
+        if (patchedParticles) {
+          try {
+            createEffect(false);
+          } catch (const std::exception& exception) {
+            gpg::Warnf(
+              "%s: %s; building it without the low-resolution particle techniques", effectFilePath, exception.what()
+            );
+            mEffect.reset();
+            patchedParticles = false;
+            SetParticleEffectPatched(false);
+            mergedBuffer = unpatchedBuffer;
+            createEffect(false);
+          }
+        } else {
+          createEffect(false);
+        }
       }
 
       // FAF addition (Shadow Filtering): the filter learns whether the effect in use carries the patch.
