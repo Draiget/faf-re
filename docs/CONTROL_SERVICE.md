@@ -123,7 +123,7 @@ Each host answers ping probes on a UDP echo (`server-host --rtt-echo`, [SERVER_D
 
 The answer carries `placement`: `mode` (`ping`), `margin_ms` (10), `players` (human seats), `measured`, `missing` (each `seat`, `uid`, `name`, `why`), `basis` (the rule in words), `picked` (the host it went to) and `hosts`, each `host`, `region`, `worst_ms` (null when no measured player reported it), `worst_player`, `measured`, `unmeasured` and `unreachable_for` (player names), `load`, `candidate` (it could take the lobby), `reason` (why not) and `rank` (the order it was tried in). A refusal (`409`) carries it too. `POST /api/v1/placement` answers the same for a lobby body without making anything, for a form to show before it creates. A host named by `host` and `"placement": "ping"` don't go together (`400`).
 
-A report is what the player's program measured and sent: a player could claim a worse ping to a host than they have, to move a lobby elsewhere. Organisers see the table with each host's slowest player.
+A report is what the player's program measured and sent; nothing checks it against the network, so a player could report other numbers to move a lobby. Organisers see the table with each host's slowest player.
 
 ## The web UI
 
