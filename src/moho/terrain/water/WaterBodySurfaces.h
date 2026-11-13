@@ -11,6 +11,7 @@
 
 namespace moho
 {
+  class CD3DDynamicTextureSheet;
   class CD3DIndexSheet;
   class CD3DVertexSheet;
   class ID3DRenderTarget;
@@ -62,11 +63,32 @@ namespace moho
       float elevation{0.0f};
       /// The sea: the only level the planar reflection is mirrored at.
       bool sea{false};
+      /// The number of the water: 0 the sea, else the body (`SWaterOfBlock::body`).
+      std::uint8_t body{0};
+      /// The rectangle of its blocks in world units, for the projected grid's screen window.
+      float x0{0.0f};
+      float z0{0.0f};
+      float x1{0.0f};
+      float z1{0.0f};
       std::vector<Chunk> chunks;
     };
 
     /// The levels of `terrainRes`'s map, rebuilt when its bodies changed; null without bodies.
     [[nodiscard]] static const std::vector<Level>* For(IWldTerrainRes* terrainRes);
+
+    /**
+     * One 8-bit texel per 2 x 2 block (the layout of the water map): the number of the water that owns the block
+     * (`WaterOfBlock(...).body`, 0 the sea). The water pixel shader of a projected grid drops the pixels of blocks it
+     * does not own. Rebuilt with the levels when the bodies change; null without bodies.
+     */
+    [[nodiscard]] static std::shared_ptr<CD3DDynamicTextureSheet> OwnerTexture(IWldTerrainRes* terrainRes);
+
+    /**
+     * The terrain's water level map: one 32-bit texel per 2 x 2 block with the level and abyss of the water that owns
+     * the block (WaterLevelTexel.h), which the patched terrain effect reads instead of the water map's baked depth.
+     * Rebuilt with the bodies; null without bodies.
+     */
+    [[nodiscard]] static std::shared_ptr<CD3DDynamicTextureSheet> LevelTexture(IWldTerrainRes* terrainRes);
 
     /// Drops the meshes and targets, with the device (`WRenViewport::D3DWindowOnDeviceExit`).
     static void Release();

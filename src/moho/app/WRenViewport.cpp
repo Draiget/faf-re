@@ -10,7 +10,11 @@
 #include "moho/render/PostRenderer.h"
 #include "moho/render/WideBloomRenderer.h"
 #include "moho/sim/STIMap.h"
+#include "moho/terrain/water/TerrainWaterLevels.h"
 #include "moho/terrain/water/WaterBodySurfaces.h"
+#include "moho/terrain/water/WaterMeshFeed.h"
+#include "moho/terrain/water/WaterQuality.h"
+#include "moho/terrain/water/WaterSimulation.h"
 
 #include <array>
 #include <cstdlib>
@@ -1516,6 +1520,7 @@ void moho::WRenViewport::D3DWindowOnDeviceExit(
     meshRenderer->Reset();
   }
   ReleaseWaterBodyReflections();
+  moho::water::ReleaseReflectionTargets(); // FAF: the Water Quality reflection targets are device resources too
 
   mFrame.ResetTransientResources();
 
@@ -1578,6 +1583,20 @@ void moho::WRenViewport::D3DWindowOnDeviceRender()
   // FAF instrumentation, not in the binary: refill the draw stats just zeroed
   // with the previous frame's submissions (CD3DDevice::PublishDrawStatistics).
   moho::D3D_GetDevice()->PublishDrawStatistics();
+
+  // The terrain renderers set the water and terrain variables once, when they are made: when the terrain effect of a
+  // map with water bodies is built again (the water level patch, TerrainWaterLevels.h) the new effect has lost them, so
+  // they are made again.
+  if (moho::water::ApplyTerrainWaterLevelsLive()) {
+    for (SWorldViewInfo& worldView : mWorldViews) {
+      if (worldView.mTerrain && moho::REN_GetTerrainRes() != nullptr) {
+        worldView.mTerrain.reset(IRenTerrain::Create());
+        if (worldView.mTerrain) {
+          (void)worldView.mTerrain->Create(REN_GetTerrainRes());
+        }
+      }
+    }
+  }
 
   for (SWorldViewInfo& worldView : mWorldViews) {
     worldView.mView->Func1();
@@ -2100,6 +2119,19 @@ void moho::WRenViewport::RenderWorldView(
   {
     const gpg::gal::RenderProfileScope profileMeshBatch("MeshBatch");
     meshRenderer->Batch(moho::REN_GetGameTick(), moho::REN_GetSimDeltaSeconds(), *mCam, mCam->viewport.r[1]);
+  }
+  // FAF: the wave simulation of the water, before RenderWater reads it: the hulls and bodies of the batch push it first
+  {
+    const gpg::gal::RenderProfileScope profileWaterFeed(
+      "WaterFeed"
+    ); // render profile: the hulls and bodies of the batch
+    moho::water::FeedWaterFromMeshes(*meshRenderer);
+  }
+  {
+    const gpg::gal::RenderProfileScope profileWaterStep(
+      "WaterStep"
+    ); // render profile: the CPU side of the wave simulation
+    moho::water::StepWaterSimulation(*mCam);
   }
 
   {
@@ -2878,8 +2910,16 @@ void moho::WRenViewport::RenderWater(
   // refraction from mPrimaryTargetLocks[head], reflection from
   // mSecondaryTargetLocks[head].
   const std::int32_t head = mHead;
+  // FAF: with a Water Quality level that resizes the reflection target the sea samples that target instead
+  // (docs/WATER_SIMULATION.md).
+  const moho::water::ReflectionTarget scaledReflection = moho::water::AcquireReflectionTarget(
+    head, device->GetHeadWidth(static_cast<unsigned int>(head)), device->GetHeadHeight(static_cast<unsigned int>(head))
+  );
   terrain->DrawWaterTerrain(
-    moho::REN_GetGameTick(), moho::REN_GetSimDeltaSeconds(), mPrimaryTargetLocks[head], mSecondaryTargetLocks[head]
+    moho::REN_GetGameTick(),
+    moho::REN_GetSimDeltaSeconds(),
+    mPrimaryTargetLocks[head],
+    scaledReflection.color ? scaledReflection.color : mSecondaryTargetLocks[head]
   );
 }
 
@@ -2899,8 +2939,22 @@ void moho::WRenViewport::RenderReflections()
   moho::CD3DDevice* const colorDevice = moho::D3D_GetDevice();
   moho::CD3DDevice* const targetDevice = moho::D3D_GetDevice();
   const std::size_t reflectionIndex = static_cast<std::size_t>(mHead);
+  // FAF: the Water Quality level may give the reflection pass a target of its own, smaller or larger than the screen
+  // (docs/WATER_SIMULATION.md).
+  const moho::water::ReflectionTarget scaledReflection = moho::water::AcquireReflectionTarget(
+    mHead,
+    targetDevice->GetHeadWidth(static_cast<unsigned int>(mHead)),
+    targetDevice->GetHeadHeight(static_cast<unsigned int>(mHead))
+  );
   targetDevice->SetRenderTarget1(
-    mSecondaryTargetLocks[reflectionIndex].get(), mDepthStencilLocks[reflectionIndex].get(), true, 0, 1.0f, 0
+    scaledReflection.color ? static_cast<moho::ID3DRenderTarget*>(scaledReflection.color.get())
+                           : static_cast<moho::ID3DRenderTarget*>(mSecondaryTargetLocks[reflectionIndex].get()),
+    scaledReflection.depth ? static_cast<moho::ID3DDepthStencil*>(scaledReflection.depth.get())
+                           : static_cast<moho::ID3DDepthStencil*>(mDepthStencilLocks[reflectionIndex].get()),
+    true,
+    0,
+    1.0f,
+    0
   );
 
   // TEMPORARY: FAF_NO_REFLECTION=1 skips the mirrored mesh pass (black-wedge
@@ -2933,7 +2987,32 @@ void moho::WRenViewport::RenderReflections()
     RenderWaterBodyReflection(false);
     return;
   }
-  SetViewportToLocalScreen();
+  if (scaledReflection.color) {
+    // the local screen rectangle in the pixels of the resized target
+    Wm3::Vector2i scaledPos{
+      static_cast<int>(static_cast<float>(mScreenPos.x) * scaledReflection.scale),
+      static_cast<int>(static_cast<float>(mScreenPos.y) * scaledReflection.scale)
+    };
+    Wm3::Vector2i scaledSize{
+      std::max(
+        1,
+        std::min(
+          static_cast<int>(static_cast<float>(mScreenSize.x) * scaledReflection.scale),
+          scaledReflection.width - scaledPos.x
+        )
+      ),
+      std::max(
+        1,
+        std::min(
+          static_cast<int>(static_cast<float>(mScreenSize.y) * scaledReflection.scale),
+          scaledReflection.height - scaledPos.y
+        )
+      )
+    };
+    targetDevice->SetViewport(&scaledPos, &scaledSize, 0.0f, 1.0f);
+  } else {
+    SetViewportToLocalScreen();
+  }
   colorDevice->SetColorWriteState(true, true);
 
   moho::MeshRenderer* const renderer = moho::MeshRenderer::GetInstance();
