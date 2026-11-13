@@ -860,6 +860,12 @@ namespace faf::editor
     moho::CWldMap* mMap = nullptr;
     moho::CameraImpl* mCamera = nullptr;
     std::unique_ptr<moho::SimpleRenderWorldView> mWorldView;
+    // The minimap: an overhead orthographic camera over the whole map, drawn in the rectangle the shell keeps for it.
+    moho::CameraImpl* mMiniCamera = nullptr;
+    std::unique_ptr<class EdMiniMapView> mMiniView;
+    float mMiniRect[4]{};
+    void UpdateMiniMap();
+    void DropMiniMap();
 
     // The orbit camera: the point it looks at, its heading and pitch (radians) and its distance from it.
     /** The Effect markers' effects, playing where they stand (by marker name; remade when the effect changes). */

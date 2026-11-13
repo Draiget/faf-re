@@ -448,6 +448,7 @@ namespace faf::editor
     }
     // The view's overlays: a map open, its view showing (not the start screen, not the effect or material stage).
     {
+      mTools.SetMinimapRect(0.0f, 0.0f, 0.0f, 0.0f);
       const std::string key = Workspaces()[static_cast<std::size_t>(ActiveWorkspace())].key;
       const bool stage = key == "effects" || key == "materials";
       if (
@@ -1366,27 +1367,14 @@ namespace faf::editor
       ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
       ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, Em(8.0f));
       ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 1.0f);
-      ImGui::PushStyleColor(ImGuiCol_WindowBg, ImGui::ColorConvertU32ToFloat4(ground));
+      ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
       ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(1.0f, 1.0f, 1.0f, 0.14f));
       if (ImGui::Begin("##viewminimap", nullptr, kFlags & ~ImGuiWindowFlags_AlwaysAutoResize)) {
         ImDrawList* const dl = ImGui::GetWindowDrawList();
         const ImVec2 at = ImGui::GetWindowPos();
-        std::string title;
-        std::string mapSize;
-        int players = 0;
-        std::uint64_t picture = 0;
-        (void)mBrowser.MapCard(mDocument.Path(), title, mapSize, players, picture);
-        if (picture != 0) {
-          dl->AddImageRounded(
-            static_cast<ImTextureID>(picture),
-            at,
-            ImVec2(at.x + size.x, at.y + size.y),
-            ImVec2(0.0f, 0.0f),
-            ImVec2(1.0f, 1.0f),
-            IM_COL32_WHITE,
-            Em(8.0f)
-          );
-        }
+        // The map itself is the scene's: an overhead camera draws it into this rectangle of the view (no cursor, no
+        // markers), so the window only frames it.
+        mTools.SetMinimapRect(at.x - view.x, at.y - view.y, size.x, size.y);
         const auto toMini = [&](const float x, const float z) {
           return ImVec2(at.x + (x - frame.minX) / mapW * size.x, at.y + (z - frame.minZ) / mapH * size.y);
         };

@@ -90,6 +90,79 @@ namespace faf::editor
     : mDocument(document)
   {}
 
+  /**
+   * The minimap's world view: the simple view's drawing, said to be a minimap (IsMiniMap), so the terrain draws its
+   * minimap pass as the game's own minimap does. Held by its own type: the interface has no virtual destructor.
+   */
+  class EdMiniMapView final : public moho::IRenderWorldView
+  {
+  public:
+    explicit EdMiniMapView(
+      moho::GeomCamera3* const cameraView
+    )
+      : mInner(cameraView)
+    {}
+    void Render(
+      moho::CD3DPrimBatcher* const batcher,
+      const int gameTick,
+      const float tickFraction,
+      const float frameSeconds
+    ) override
+    {
+      mInner.Render(batcher, gameTick, tickFraction, frameSeconds);
+    }
+    void RenderCommandGraph(
+      moho::CD3DPrimBatcher* const batcher,
+      const int gameTick,
+      const float tickFraction,
+      const float frameSeconds
+    ) override
+    {
+      mInner.RenderCommandGraph(batcher, gameTick, tickFraction, frameSeconds);
+    }
+    [[nodiscard]] moho::CameraImpl* GetCamera() override
+    {
+      return mInner.GetCamera();
+    }
+    [[nodiscard]] moho::GeomCamera3* GetCameraView() override
+    {
+      return mInner.GetCameraView();
+    }
+    [[nodiscard]] Wm3::Vector3f* GetCameraOffset() override
+    {
+      return mInner.GetCameraOffset();
+    }
+    [[nodiscard]] float CameraGetTargetZoom() override
+    {
+      return mInner.CameraGetTargetZoom();
+    }
+    [[nodiscard]] float GetMaxZoom() override
+    {
+      return mInner.GetMaxZoom();
+    }
+    [[nodiscard]] float CameraGetZoom() override
+    {
+      return mInner.CameraGetZoom();
+    }
+    [[nodiscard]] bool IsMiniMap() override
+    {
+      return true;
+    }
+    void SetOrthographic(
+      const bool enabled
+    ) override
+    {
+      mInner.SetOrthographic(enabled);
+    }
+    [[nodiscard]] bool CanShake() override
+    {
+      return false;
+    }
+
+  private:
+    moho::SimpleRenderWorldView mInner;
+  };
+
   EdMapScene::~EdMapScene()
   {
     Detach();
@@ -1092,6 +1165,7 @@ namespace faf::editor
       }
       gpg::Logf("editor: the game's view again");
     }
+    DropMiniMap();
     if (moho::ren_Viewport != nullptr && mWorldView != nullptr) {
       moho::ren_Viewport->RemoveWorldView(mWorldView.get());
     }
@@ -2911,6 +2985,7 @@ namespace faf::editor
         ApplyCamera();
       }
     }
+    UpdateMiniMap();
     if (!mPropsDone) {
       // `/holdmodels <seconds>` (test runs): the models made that long after the map shows, so the view's
       // "Loading models" notice can be seen on a machine where the blueprints are ready at once.
@@ -7362,6 +7437,52 @@ namespace faf::editor
     }
     mProps.clear();
     mPropsDone = false;
+  }
+
+  void EdMapScene::UpdateMiniMap()
+  {
+    if (mTools == nullptr || mMap == nullptr || moho::ren_Viewport == nullptr) {
+      return;
+    }
+    const float* const rect = mTools->MinimapRect();
+    if (rect[2] < 8.0f || rect[3] < 8.0f) {
+      DropMiniMap();
+      return;
+    }
+    if (mMiniView == nullptr) {
+      mMiniCamera =
+        moho::CAM_GetManager()->CreateCamera("Map editor minimap", *mMap->mTerrainRes->mMap, mDocument.Lua());
+      mMiniCamera->CameraSetOrtho(true);
+      mMiniView = std::make_unique<EdMiniMapView>(const_cast<moho::GeomCamera3*>(&mMiniCamera->CameraGetView()));
+      // After the main view (depth 0), so it draws over its corner.
+      moho::ren_Viewport->AddWorldView(mMiniView.get(), 0, 1);
+      mMiniRect[2] = 0.0f;
+      gpg::Logf("editor: the minimap draws the map from above");
+    }
+    if (rect[0] != mMiniRect[0] || rect[1] != mMiniRect[1] || rect[2] != mMiniRect[2] || rect[3] != mMiniRect[3]) {
+      for (int i = 0; i < 4; ++i) {
+        mMiniRect[i] = rect[i];
+      }
+      mMiniCamera->CameraSetViewport(Wm3::Vector2f(rect[0], rect[1]), Wm3::Vector2f(rect[2], rect[3]));
+      // The whole map across the rectangle: an orthographic camera spans its target zoom across its width.
+      const Wm3::AxisAlignedBox3f bounds = mMap->mTerrainRes->mMap->GetBounds3D();
+      const float x = (bounds.Min.x + bounds.Max.x) * 0.5f;
+      const float z = (bounds.Min.z + bounds.Max.z) * 0.5f;
+      const float y = mMap->mTerrainRes->GetHeightAt(static_cast<std::int32_t>(x), static_cast<std::int32_t>(z));
+      mMiniCamera->TargetManual(Wm3::Vec3f{x, y, z}, kPi, kPi * 0.5f, bounds.Max.x - bounds.Min.x, 0.0f);
+    }
+  }
+
+  void EdMapScene::DropMiniMap()
+  {
+    if (mMiniView != nullptr && moho::ren_Viewport != nullptr) {
+      moho::ren_Viewport->RemoveWorldView(mMiniView.get());
+    }
+    mMiniView.reset();
+    // ~CameraImpl takes the camera out of the camera manager.
+    delete mMiniCamera;
+    mMiniCamera = nullptr;
+    mMiniRect[2] = 0.0f;
   }
 
   bool EdMapScene::GroundAt(

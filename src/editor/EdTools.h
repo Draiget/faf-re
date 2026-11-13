@@ -1236,6 +1236,26 @@ namespace faf::editor
     {
       return mViewFrame;
     }
+    /**
+     * Where the minimap sits in the view, in the view's pixels (x, y, width, height; zero size when it isn't shown):
+     * the scene draws the map from above into it.
+     */
+    void SetMinimapRect(
+      const float x,
+      const float y,
+      const float width,
+      const float height
+    ) noexcept
+    {
+      mMinimapRect[0] = x;
+      mMinimapRect[1] = y;
+      mMinimapRect[2] = width;
+      mMinimapRect[3] = height;
+    }
+    [[nodiscard]] const float* MinimapRect() const noexcept
+    {
+      return mMinimapRect;
+    }
     /** The minimap's click: the camera looks at (x, z) next frame (the scene takes it). */
     void AskCameraAt(
       const float x,
@@ -1960,6 +1980,7 @@ namespace faf::editor
     int mSymmetry = 6; // both axes
     int mNWay = 3;
     ViewFrame mViewFrame;
+    float mMinimapRect[4]{};
     bool mCameraAsk = false;
     float mCameraAskX = 0.0f;
     float mCameraAskZ = 0.0f;
