@@ -140,18 +140,24 @@ namespace faf::editor
     [[nodiscard]] bool IsTestRunCommandLine()
     {
       static const char* const kOptions[] = {
-        "/command",        "/palette",        "/theme",          "/keysfile",        "/focuspanel",  "/uiclicks",
-        "/hidegameunits",  "/movelayer",      "/pickfilter",     "/mapwide",         "/tool",        "/proptool",
-        "/play",           "/debugarm",       "/breakpoint",     "/check",           "/decaltool",   "/markertool",
-        "/unittool",       "/hoverprop",      "/selectprops",    "/selectunit",      "/propswap",    "/saveas",
-        "/settingsfile",   "/autosavefolder", "/askunsaved",     "/particlebrowser", "/particlenew", "/particleopen",
-        "/materialeditor", "/uiscale",        "/testrun",        "/openall",         "/roundtrip",   "/vault",
-        "/vaultsearch",    "/vaultmap",       "/newmap",         "/stamp",           "/brush",       "/layer",
-        "/waterbody",      "/ruler",          "/adaptivewindow", "/maskrule",        "/maskgen",     "/symhover",
-        "/stbfont",        "/recipe",         "/texset",         "/layerop",         "/slopeview",   "/typesfromlayers",
-        "/uncapped",       "/nominimap",      "/followtest",     "/arrangetest",     "/symmenu",     "/panelbottom",
-        "/shader",         "/brushtest",      "/brushshape",     "/stampsource",     "/stampstroke", "/symoptions",
-        "/maskoptions",    "/masktest",       "/shaderbrowser",  "/convertlayers",
+        "/command",        "/palette",         "/theme",          "/keysfile",
+        "/focuspanel",     "/uiclicks",        "/hidegameunits",  "/movelayer",
+        "/pickfilter",     "/mapwide",         "/tool",           "/proptool",
+        "/play",           "/debugarm",        "/breakpoint",     "/check",
+        "/decaltool",      "/markertool",      "/unittool",       "/hoverprop",
+        "/selectprops",    "/selectunit",      "/propswap",       "/saveas",
+        "/settingsfile",   "/autosavefolder",  "/askunsaved",     "/particlebrowser",
+        "/particlenew",    "/particleopen",    "/materialeditor", "/uiscale",
+        "/testrun",        "/openall",         "/roundtrip",      "/vault",
+        "/vaultsearch",    "/vaultmap",        "/newmap",         "/stamp",
+        "/brush",          "/layer",           "/waterbody",      "/ruler",
+        "/adaptivewindow", "/maskrule",        "/maskgen",        "/symhover",
+        "/stbfont",        "/recipe",          "/texset",         "/layerop",
+        "/slopeview",      "/typesfromlayers", "/uncapped",       "/nominimap",
+        "/followtest",     "/arrangetest",     "/findtest",       "/findopen",
+        "/symmenu",        "/panelbottom",     "/shader",         "/brushtest",
+        "/brushshape",     "/stampsource",     "/stampstroke",    "/symoptions",
+        "/maskoptions",    "/masktest",        "/shaderbrowser",  "/convertlayers",
       };
       for (const char* const option : kOptions) {
         if (moho::CFG_GetArgOption(option, 0, nullptr)) {
@@ -1880,6 +1886,137 @@ namespace faf::editor
         }
       }
 
+      /**
+       * Find and replace objects (Edit, Ctrl+F; the mockup's dialog): a type found on the map, where (the whole map,
+       * the selection, the symmetry's first part), and Select matches or Replace all, with another type or deleting.
+       */
+      void DrawFind()
+      {
+        constexpr const char* kTitle = "Find and replace objects";
+        if (std::exchange(mFindAsk, false) && mDocument.GetState() == EdDocument::State::Open) {
+          mFindObjects = mScene.FindObjects();
+          mFindTypes = CountFindTypes(mFindObjects);
+          mFindChoice = std::clamp(mFindChoice, 0, std::max(0, static_cast<int>(mFindTypes.size()) - 1));
+          mFindMessage.clear();
+          ImGui::OpenPopup(kTitle);
+        }
+        ImGui::SetNextWindowSize(ImVec2(Em(560.0f), 0.0f), ImGuiCond_Appearing);
+        if (!ImGui::BeginPopupModal(kTitle, nullptr, ImGuiWindowFlags_NoSavedSettings)) {
+          return;
+        }
+        if (mFindTypes.empty()) {
+          ImGui::TextUnformatted("The map has no objects.");
+          if (ImGui::Button("Close")) {
+            ImGui::CloseCurrentPopup();
+          }
+          ImGui::EndPopup();
+          return;
+        }
+        const FindTypeCount& found = mFindTypes[static_cast<std::size_t>(mFindChoice)];
+        const auto typeText = [](const FindTypeCount& t) {
+          return std::string(FindKindName(t.kind)) + ": " + FindTypeLabel(t.kind, t.type) + "  (" +
+            std::to_string(t.count) + ")";
+        };
+        const float labelWidth = Em(110.0f);
+        const auto label = [&](const char* text) {
+          ImGui::AlignTextToFramePadding();
+          ImGui::TextUnformatted(text);
+          ImGui::SameLine(labelWidth);
+          ImGui::SetNextItemWidth(-1.0f);
+        };
+        bool changed = false;
+        label("Find");
+        if (ImGui::BeginCombo("##findtype", typeText(found).c_str(), ImGuiComboFlags_HeightLarge)) {
+          for (int i = 0; i < static_cast<int>(mFindTypes.size()); ++i) {
+            if (ImGui::Selectable(typeText(mFindTypes[static_cast<std::size_t>(i)]).c_str(), i == mFindChoice)) {
+              mFindChoice = i;
+              mFindReplace = 0;
+              changed = true;
+            }
+          }
+          ImGui::EndCombo();
+        }
+        static constexpr const char* kScopes[] = {"The whole map", "The selection", "One part (the symmetry's first)"};
+        label("In");
+        changed = ImGui::Combo("##findscope", &mFindScope, kScopes, IM_ARRAYSIZE(kScopes)) || changed;
+        // Replace with: delete, or another type of the kind (markers: any type but a start position).
+        const FindTypeCount& chosen = mFindTypes[static_cast<std::size_t>(mFindChoice)];
+        std::vector<std::string> others;
+        if (chosen.kind == FindKind::Marker) {
+          if (chosen.type != "Blank Marker") {
+            for (const MarkerType& type : MarkerTypes()) {
+              if (type.type != chosen.type && std::string(type.type) != "Blank Marker") {
+                others.emplace_back(type.type);
+              }
+            }
+          }
+        } else {
+          for (const FindTypeCount& t : mFindTypes) {
+            if (t.kind == chosen.kind && t.type != chosen.type && t.group == chosen.group) {
+              others.push_back(t.type);
+            }
+          }
+        }
+        mFindReplace = std::clamp(mFindReplace, 0, static_cast<int>(others.size()));
+        label("Replace with");
+        const std::string shown = mFindReplace == 0
+          ? "(delete)"
+          : FindTypeLabel(chosen.kind, others[static_cast<std::size_t>(mFindReplace - 1)]);
+        if (ImGui::BeginCombo("##findwith", shown.c_str(), ImGuiComboFlags_HeightLarge)) {
+          if (ImGui::Selectable("(delete)", mFindReplace == 0)) {
+            mFindReplace = 0;
+          }
+          for (int i = 0; i < static_cast<int>(others.size()); ++i) {
+            if (
+              ImGui::Selectable(
+                FindTypeLabel(chosen.kind, others[static_cast<std::size_t>(i)]).c_str(), mFindReplace == i + 1
+              )
+            ) {
+              mFindReplace = i + 1;
+            }
+          }
+          ImGui::EndCombo();
+        }
+        const auto scope = static_cast<FindScope>(mFindScope);
+        const std::size_t matches = FindMatches(mFindObjects, chosen.kind, chosen.type, scope).size();
+        (void)changed;
+        ImGui::Spacing();
+        ImGui::TextDisabled(
+          "%zu matches. Position, turn and scale are kept; one undo step.%s",
+          matches,
+          chosen.kind == FindKind::Marker && chosen.type == "Blank Marker" ? " Start positions can only be selected."
+                                                                           : ""
+        );
+        if (!mFindMessage.empty()) {
+          ImGui::TextUnformatted(mFindMessage.c_str());
+        }
+        ImGui::Spacing();
+        const auto run = [&](const FindAction action) {
+          const std::string with =
+            mFindReplace == 0 ? std::string() : others[static_cast<std::size_t>(mFindReplace - 1)];
+          const std::string message = mScene.FindApply(chosen.kind, chosen.type, scope, action, with);
+          gpg::Logf("editor: find and replace: %s", message.c_str());
+          PostStatusMessage(message);
+          ImGui::CloseCurrentPopup();
+        };
+        ImGui::BeginDisabled(matches == 0);
+        if (ImGui::Button("Select matches")) {
+          run(FindAction::Select);
+        }
+        ImGui::SameLine();
+        ImGui::BeginDisabled(chosen.kind == FindKind::Marker && chosen.type == "Blank Marker");
+        if (ImGui::Button(mFindReplace == 0 ? "Delete all" : "Replace all")) {
+          run(mFindReplace == 0 ? FindAction::Delete : FindAction::Replace);
+        }
+        ImGui::EndDisabled();
+        ImGui::EndDisabled();
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel") || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+          ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+      }
+
       /** The "Save changes?" question before unsaved changes are dropped: Save, Don't save, Cancel. */
       void DrawUnsavedQuestion()
       {
@@ -2003,6 +2140,17 @@ namespace faf::editor
       double mModifiedSince = -1.0;
       std::vector<EdAutosaveEntry> mRecoverable;
       bool mShowRecover = false;
+      // Find and replace objects: asked (Ctrl+F), the objects and types when it opened, the choices.
+      bool mFindAsk = false;
+      std::vector<FindObject> mFindObjects;
+      std::vector<FindTypeCount> mFindTypes;
+      int mFindChoice = 0;
+      int mFindScope = 0;
+      int mFindReplace = 0;
+      std::string mFindMessage;
+      std::string mFindTestArg; // `/findtest kind,type,scope,action` (test runs)
+      int mFindFrames = 0;
+      std::string mFindOpenArg; // `/findopen <n>` (test runs): the dialog opened on the n-th type
       // The "Save changes?" question: what to do once answered.
       std::function<void()> mGuardProceed;
       bool mGuardAsk = false;
@@ -2704,6 +2852,9 @@ namespace faf::editor
       add("edit.paste", "Paste at the cursor", "Edit", "Ctrl+V", [this] {
         mScene.CtrlKey('V');
       }, canEdit);
+      add("edit.find", "Find and replace objects...", "Edit", "Ctrl+F", [this] {
+        mFindAsk = true;
+      }, mapOpen, {}, "Every object of one type: select them, delete them or change them to another");
       add("edit.duplicate", "Duplicate beside", "Edit", "Ctrl+D", [this] {
         mScene.CtrlKey('D');
       }, canEdit, {}, "A copy of the selection 8 units beside it");
@@ -2997,6 +3148,7 @@ namespace faf::editor
            cmd("edit.duplicate"),
            cmd("edit.delete"),
            sep(),
+           cmd("edit.find"),
            arrange}
         },
         EdMenu{
@@ -3823,6 +3975,7 @@ namespace faf::editor
         DrawSettings();
         DrawRecover();
         DrawUnsavedQuestion();
+        DrawFind();
         DriveAutosave();
         // `/focuspanel <window>` (test runs): that panel in front, a while after the map opened (opening fronts Info).
         if (mFocusPanelFrames < 90 && mDocument.GetState() == EdDocument::State::Open) {
@@ -4092,6 +4245,12 @@ namespace faf::editor
       }
       if (fa::vector<fa::string> arrange; moho::CFG_GetArgOption("/arrangetest", 1, &arrange) && !arrange.empty()) {
         mArrangeTestArg = arrange[0].c_str();
+      }
+      if (fa::vector<fa::string> find; moho::CFG_GetArgOption("/findtest", 1, &find) && !find.empty()) {
+        mFindTestArg = find[0].c_str();
+      }
+      if (fa::vector<fa::string> open; moho::CFG_GetArgOption("/findopen", 1, &open) && !open.empty()) {
+        mFindOpenArg = open[0].c_str();
       }
       if (fa::vector<fa::string> slope; moho::CFG_GetArgOption("/slopeview", 1, &slope) && !slope.empty()) {
         mSlopeViewArg = slope[0].c_str();
@@ -4682,6 +4841,13 @@ namespace faf::editor
       }
       if (!mArrangeTestArg.empty() && !mScene.ModelsPending() && ++mArrangeFrames >= 150) {
         mScene.TestArrange(std::exchange(mArrangeTestArg, {}));
+      }
+      if (!mFindTestArg.empty() && !mScene.ModelsPending() && ++mFindFrames >= 150) {
+        mScene.TestFind(std::exchange(mFindTestArg, {}));
+      }
+      if (!mFindOpenArg.empty() && !mScene.ModelsPending() && ++mFindFrames >= 150) {
+        mFindChoice = std::atoi(std::exchange(mFindOpenArg, {}).c_str());
+        mFindAsk = true;
       }
       if ((!mSlopeViewArg.empty() || !mTypesFromLayersArg.empty()) && ++mD2gFrames == 120) {
         if (!mSlopeViewArg.empty()) {

@@ -26,6 +26,7 @@
 #include "editor/doc/EdUnits.h"
 #include "moho/render/d3d/CD3DPrimBatcher.h"
 #include "editor/tools/EdArrange.h"
+#include "editor/tools/EdFindReplace.h"
 #include "editor/tools/EdHeightBrush.h"
 #include "editor/tools/EdMaskGen.h"
 #include "editor/tools/EdRecipes.h"
@@ -158,6 +159,21 @@ namespace faf::editor
     std::string ArrangeSelection(ArrangeOp op, float step);
     /** `/arrangetest props|markers,<op>[,<step>]` (test runs): five selected, arranged, logged, undone. */
     void TestArrange(const std::string& spec);
+    /** Find and replace objects: every object on the map with its kind, type, selection and symmetry part. */
+    [[nodiscard]] std::vector<FindObject> FindObjects() const;
+    /**
+     * The matches selected, deleted, or changed to `replacement` where they stand (position, turn and scale kept), as
+     * one undo step; what it did, in words. Delete takes exactly the matches (no follow symmetry).
+     */
+    std::string FindApply(
+      FindKind kind,
+      const std::string& type,
+      FindScope scope,
+      FindAction action,
+      const std::string& replacement
+    );
+    /** `/findtest kind,<type part>,map|selection|half,select|delete|<other type part>` (test runs). */
+    void TestFind(const std::string& spec);
     /** The panels keep a copy of the minimap (composited view): it is then drawn only every 20 frames. */
     void SetMiniMapCached(
       const bool cached
@@ -609,6 +625,7 @@ namespace faf::editor
     std::vector<std::vector<std::pair<std::string, std::string>>> mUnitFollow;
     std::vector<std::vector<int>> mDecalFollow;
     bool mDragIsCopy = false;
+    bool mNoFollow = false; // Find and replace's delete: exactly the matches
     bool mMiniCached = false;
     bool mMiniDrawNow = true;
     bool mMiniDrewLast = false;

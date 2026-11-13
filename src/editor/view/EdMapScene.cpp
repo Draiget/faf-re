@@ -7304,7 +7304,7 @@ namespace faf::editor
 
   bool EdMapScene::FollowOn() const
   {
-    return mTools != nullptr && mMap != nullptr && mTools->FollowSymmetry() &&
+    return !mNoFollow && mTools != nullptr && mMap != nullptr && mTools->FollowSymmetry() &&
       mTools->CurrentHeightBrush().symmetry != Symmetry::None;
   }
 
@@ -7595,6 +7595,319 @@ namespace faf::editor
       return "nothing is selected";
     }
     return error.empty() ? std::string(ArrangeTitle(op)) + " can't arrange this selection" : error;
+  }
+
+  std::vector<FindObject> EdMapScene::FindObjects() const
+  {
+    std::vector<FindObject> objects;
+    const moho::CHeightField* const field = mMap != nullptr ? mMap->mTerrainRes->GetHeightField() : nullptr;
+    if (field == nullptr) {
+      return objects;
+    }
+    const HeightBrush brush = mTools != nullptr ? mTools->CurrentHeightBrush() : HeightBrush{};
+    const auto first = [&](const float x, const float z) {
+      return InFirstPart(field->width, field->height, brush.symmetry, brush.turns, x, z);
+    };
+    const std::vector<SaveEntry>& markers = mDocument.SaveData().Markers();
+    for (std::size_t i = 0; i < markers.size(); ++i) {
+      float x = 0.0f, y = 0.0f, z = 0.0f;
+      if (!ShownMarkerPosition(markers[i], x, y, z)) {
+        continue;
+      }
+      const bool selected =
+        std::find(mMarkerSelection.begin(), mMarkerSelection.end(), markers[i].name) != mMarkerSelection.end();
+      objects.push_back({FindKind::Marker, MarkerTypeOf(markers[i]), static_cast<int>(i), selected, first(x, z)});
+    }
+    for (std::size_t i = 0; i < mUnitRefs.size(); ++i) {
+      const UnitRef& ref = mUnitRefs[i];
+      const bool selected =
+        std::find(
+          mUnitSelection.begin(), mUnitSelection.end(), std::pair<std::string, std::string>{ref.army, ref.name}
+        ) != mUnitSelection.end();
+      objects.push_back(
+        {FindKind::Unit, ref.type, static_cast<int>(i), selected, first(ref.position.x, ref.position.z)}
+      );
+    }
+    if (mMap->mProps != nullptr) {
+      const auto& entries = mMap->mProps->mEntries;
+      for (std::size_t i = 0; i < entries.size(); ++i) {
+        const bool selected = std::find(mSelection.begin(), mSelection.end(), static_cast<int>(i)) != mSelection.end();
+        objects.push_back(
+          {FindKind::Prop,
+           entries[i].mBlueprintPath.c_str(),
+           static_cast<int>(i),
+           selected,
+           first(entries[i].mTransform.pos_.x, entries[i].mTransform.pos_.z)}
+        );
+      }
+    }
+    if (moho::IDecalManager* const decals = mDocument.Decals(); decals != nullptr) {
+      for (int i = 0; i < decals->GetDecalCount(); ++i) {
+        const moho::CWldTerrainDecal* const decal = decals->GetDecal(i);
+        if (decal == nullptr) {
+          continue;
+        }
+        float cx = 0.0f, cz = 0.0f;
+        DecalCentre(FootprintOf(*decal), cx, cz);
+        const bool selected =
+          std::find(mDecalSelection.begin(), mDecalSelection.end(), decal->mIndex) != mDecalSelection.end();
+        objects.push_back(
+          {FindKind::Decal,
+           decal->mNames[0].c_str(),
+           decal->mIndex,
+           selected,
+           first(cx, cz),
+           static_cast<int>(decal->mType)}
+        );
+      }
+    }
+    return objects;
+  }
+
+  std::string EdMapScene::FindApply(
+    const FindKind kind,
+    const std::string& type,
+    const FindScope scope,
+    const FindAction action,
+    const std::string& replacement
+  )
+  {
+    const std::vector<FindObject> objects = FindObjects();
+    const std::vector<int> matches = FindMatches(objects, kind, type, scope);
+    if (matches.empty()) {
+      return "nothing matches";
+    }
+    if (action == FindAction::Replace && (replacement.empty() || replacement == type)) {
+      return "choose another type to replace it with";
+    }
+    const std::string label = FindTypeLabel(kind, type);
+    const std::size_t count = matches.size();
+    // The matches as the selection of their kind (Select matches keeps it; delete and replace work on it).
+    ClearAllSelections();
+    for (const int match : matches) {
+      const FindObject& object = objects[static_cast<std::size_t>(match)];
+      switch (kind) {
+      case FindKind::Marker:
+        mMarkerSelection.push_back(mDocument.SaveData().Markers()[static_cast<std::size_t>(object.ref)].name);
+        break;
+      case FindKind::Unit:
+        mUnitSelection.emplace_back(
+          mUnitRefs[static_cast<std::size_t>(object.ref)].army, mUnitRefs[static_cast<std::size_t>(object.ref)].name
+        );
+        break;
+      case FindKind::Prop:
+        mSelection.push_back(object.ref);
+        break;
+      default:
+        mDecalSelection.push_back(object.ref);
+        break;
+      }
+    }
+    mSelectKind = kind == FindKind::Marker ? PickKind::Marker
+      : kind == FindKind::Unit             ? PickKind::Unit
+      : kind == FindKind::Prop             ? PickKind::Prop
+                                           : PickKind::Decal;
+    if (action == FindAction::Select) {
+      return std::to_string(count) + " " + label + " selected";
+    }
+    if (action == FindAction::Delete) {
+      // Exactly the matches: follow symmetry would take copies outside the chosen part or selection too.
+      mNoFollow = true;
+      switch (kind) {
+      case FindKind::Marker:
+        DeleteSelectedMarkers();
+        break;
+      case FindKind::Unit:
+        DeleteSelectedUnits();
+        break;
+      case FindKind::Prop:
+        DeleteSelection();
+        break;
+      default:
+        DeleteSelectedDecals();
+        break;
+      }
+      mNoFollow = false;
+      ClearAllSelections();
+      return std::to_string(count) + " " + label + " deleted";
+    }
+    switch (kind) {
+    case FindKind::Prop: {
+      PropertyEdit edit;
+      edit.what = PropertyEdit::What::Blueprint;
+      edit.value = replacement;
+      ApplyPropertyEdit(edit);
+      break;
+    }
+    case FindKind::Unit: {
+      EdDocument::SaveSnapshot before = mDocument.SaveDataNow();
+      for (const auto& [army, name] : mUnitSelection) {
+        (void)EditArmyUnits(army, [&, name = name](UnitGroup& group) {
+          if (SaveUnit* const unit = FindUnit(group, name); unit != nullptr) {
+            unit->type = replacement;
+          }
+        });
+      }
+      mDocument.SaveDataEdited(std::move(before));
+      ReloadUnits();
+      break;
+    }
+    case FindKind::Marker: {
+      const MarkerType* const to = FindMarkerType(replacement);
+      if (to == nullptr || std::string(to->type) == "Blank Marker" || type == "Blank Marker") {
+        return "start positions are kept: they belong to the armies";
+      }
+      EdDocument::SaveSnapshot before = mDocument.SaveDataNow();
+      std::vector<SaveEntry>& markers = mDocument.SaveData().Markers();
+      for (const int match : matches) {
+        SaveEntry& marker = markers[static_cast<std::size_t>(objects[static_cast<std::size_t>(match)].ref)];
+        float x = 0.0f, y = 0.0f, z = 0.0f;
+        (void)ShownMarkerPosition(marker, x, y, z);
+        // The new type's properties, its name, place, turn and path links kept.
+        SaveEntry made = NewMarker(*to, marker.name, x, y, z);
+        for (const char* const key : {"orientation", "adjacentTo"}) {
+          if (const std::string kept = marker.Get(key); !kept.empty()) {
+            made.Set(key, kept);
+          }
+        }
+        marker = std::move(made);
+      }
+      mDocument.SaveDataEdited(std::move(before));
+      mOutsideStale = true;
+      break;
+    }
+    default: {
+      moho::IDecalManager* const decals = mDocument.Decals();
+      if (decals == nullptr) {
+        return "no decals";
+      }
+      EdDocument::DecalSnapshot before = mDocument.DecalsNow();
+      std::vector<DecalState> states = before;
+      // The other texture's normal map and type, from a decal that has it.
+      const auto model = std::find_if(states.begin(), states.end(), [&](const DecalState& state) {
+        return state.names[0] == replacement;
+      });
+      if (model == states.end()) {
+        return "no decal on the map has " + replacement;
+      }
+      const DecalState example = *model;
+      if (
+        const auto own = std::find_if(
+          states.begin(),
+          states.end(),
+          [&](const DecalState& state) {
+        return state.names[0] == type;
+      }
+        );
+        own != states.end() && own->type != example.type
+      ) {
+        return "a decal is replaced only by one of its kind (albedo by albedo, normals by normals)";
+      }
+      for (DecalState& state : states) {
+        if (std::find(mDecalSelection.begin(), mDecalSelection.end(), state.index) != mDecalSelection.end()) {
+          state.names[0] = example.names[0];
+          state.names[1] = example.names[1];
+          state.type = example.type;
+        }
+      }
+      RestoreDecals(*decals, states);
+      mDocument.DecalsEdited(std::move(before));
+      break;
+    }
+    }
+    return std::to_string(count) + " " + label + " now " + FindTypeLabel(kind, replacement);
+  }
+
+  void EdMapScene::TestFind(
+    const std::string& spec
+  )
+  {
+    // `kind,<part of the type>,map|selection|half,select|delete|<part of the other type>`: the first type of the kind
+    // whose name has the part; the result logged, then undone.
+    std::vector<std::string> parts;
+    for (std::size_t from = 0;;) {
+      const std::size_t comma = spec.find(',', from);
+      parts.push_back(spec.substr(from, comma == std::string::npos ? std::string::npos : comma - from));
+      if (comma == std::string::npos) {
+        break;
+      }
+      from = comma + 1;
+    }
+    if (parts.size() < 4) {
+      gpg::Logf("editor: find test: want kind,type,scope,action");
+      return;
+    }
+    FindKind kind = FindKind::Count;
+    for (int k = 0; k < static_cast<int>(FindKind::Count); ++k) {
+      if (
+        parts[0] == FindKindName(static_cast<FindKind>(k)) ||
+        parts[0] == std::string(FindKindName(static_cast<FindKind>(k))) + "s"
+      ) {
+        kind = static_cast<FindKind>(k);
+      }
+    }
+    const std::vector<FindTypeCount> types = CountFindTypes(FindObjects());
+    int group = -1;
+    const auto pick = [&](const std::string& part, const std::string& not_) -> std::string {
+      for (const FindTypeCount& t : types) {
+        if (
+          t.kind == kind && t.type != not_ && t.type.find(part) != std::string::npos && (group < 0 || t.group == group)
+        ) {
+          group = t.group;
+          return t.type;
+        }
+      }
+      return {};
+    };
+    const std::string type = pick(parts[1], {});
+    const FindScope scope = parts[2] == "selection" ? FindScope::Selection
+      : parts[2] == "half"                          ? FindScope::FirstPart
+                                                    : FindScope::Map;
+    const FindAction action = parts[3] == "select" ? FindAction::Select
+      : parts[3] == "delete"                       ? FindAction::Delete
+                                                   : FindAction::Replace;
+    std::string replacement;
+    if (action == FindAction::Replace) {
+      replacement = kind == FindKind::Marker ? parts[3] : pick(parts[3], type);
+    }
+    int total = 0;
+    for (const FindTypeCount& t : types) {
+      total += t.kind == kind ? 1 : 0;
+    }
+    const auto count = [&](const std::string& of) {
+      int n = 0;
+      for (const FindObject& object : FindObjects()) {
+        n += object.kind == kind && object.type == of ? 1 : 0;
+      }
+      return n;
+    };
+    const int before = count(type);
+    const int otherBefore = replacement.empty() ? 0 : count(replacement);
+    gpg::Logf(
+      "editor: find test: %d %s types; %s: %d on the map, %zu in scope %s",
+      total,
+      FindKindName(kind),
+      type.c_str(),
+      before,
+      FindMatches(FindObjects(), kind, type, scope).size(),
+      parts[2].c_str()
+    );
+    const std::string message = FindApply(kind, type, scope, action, replacement);
+    gpg::Logf(
+      "editor: find test: %s; %s now %d%s",
+      message.c_str(),
+      type.c_str(),
+      count(type),
+      replacement.empty()
+        ? ""
+        : (", " + replacement + " " + std::to_string(otherBefore) + " -> " + std::to_string(count(replacement))).c_str()
+    );
+    if (action != FindAction::Select) {
+      const bool undone = Undo();
+      gpg::Logf(
+        "editor: find test: undo %s; %s back to %d", undone ? "took it back" : "had nothing", type.c_str(), count(type)
+      );
+    }
   }
 
   void EdMapScene::TestArrange(
