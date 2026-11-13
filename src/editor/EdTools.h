@@ -1521,6 +1521,13 @@ namespace faf::editor
     {
       return mFollowSymmetry;
     }
+    /** The view's HUD while G or R runs: what it is doing (empty: the tool's own mode). */
+    void SetHudOverride(
+      std::string text
+    )
+    {
+      mHudOverride = std::move(text);
+    }
     /** The Props tool's Fill the map: its options, the button (taken by the view), and what the last fill did. */
     struct FillOptions
     {
@@ -2542,6 +2549,7 @@ namespace faf::editor
     std::string mRecipeResult;
     bool mFollowSymmetry = true;
     bool mSelectAny = false; // something is selected (Arrange's buttons)
+    std::string mHudOverride;
     FillOptions mFill;
     bool mFillRequest = false;
     std::string mFillMessage;

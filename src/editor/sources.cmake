@@ -50,6 +50,7 @@ set(FAF_EDITOR_SOURCES
   tools/EdArrange.cpp
   tools/EdFindReplace.cpp
   tools/EdScatter.cpp
+  tools/EdModalTransform.cpp
   ui/EdMapBrowser.cpp
   doc/EdWaterBodies.cpp
   view/EdWaterBodyView.cpp

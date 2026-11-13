@@ -28,6 +28,7 @@
 #include "editor/tools/EdArrange.h"
 #include "editor/tools/EdFindReplace.h"
 #include "editor/tools/EdScatter.h"
+#include "editor/tools/EdModalTransform.h"
 #include "editor/tools/EdHeightBrush.h"
 #include "editor/tools/EdMaskGen.h"
 #include "editor/tools/EdRecipes.h"
@@ -182,6 +183,16 @@ namespace faf::editor
     std::string ScatterOverMap(const EdTools::FillOptions& fill);
     /** `/filltest <density>,<spacing>[,keep]` (test runs): the commonest prop filled, its copies checked, undone. */
     void TestFill(const std::string& spec);
+    /** G or R is moving or turning the selection: the view takes every key until it ends. */
+    [[nodiscard]] bool ModalOn() const noexcept
+    {
+      return mModal.on;
+    }
+    /**
+     * `/modaltest props|markers|units,g|r,<keys>[,cancel]` (test runs): five selected, G or R begun, the keys typed
+     * (x, z, digits, '-', '.'), then Enter (or Escape), the places logged.
+     */
+    void TestModal(const std::string& spec);
     /** The panels keep a copy of the minimap (composited view): it is then drawn only every 20 frames. */
     void SetMiniMapCached(
       const bool cached
@@ -634,6 +645,28 @@ namespace faf::editor
     std::vector<std::vector<int>> mDecalFollow;
     bool mDragIsCopy = false;
     bool mNoFollow = false; // Find and replace's delete: exactly the matches
+    // G and R (EdModalTransform): the selection as it was, what the keys and cursor ask, and its before-snapshots.
+    struct Modal
+    {
+      bool on = false;
+      PickKind kind = PickKind::None;
+      ModalInput input;
+      float fromX = 0.0f, fromZ = 0.0f; // the cursor's ground point when it started
+      float cx = 0.0f, cz = 0.0f;       // the selection's middle
+      ArrangePlaces start;
+      ArrangePlaces now;
+      std::vector<std::size_t> sel; // each place's position in its kind's selection (for follow symmetry)
+      std::vector<int> refs;        // props: index; decals: mIndex
+      std::vector<std::pair<std::string, std::string>> units;
+      std::vector<std::string> markers;
+      EdDocument::SaveSnapshot saveBefore;
+      EdDocument::DecalSnapshot decalBefore;
+      bool moved = false;
+    };
+    Modal mModal;
+    bool BeginModal(bool rotate);
+    void UpdateModal();
+    void EndModal(bool keep);
     bool mFilling = false;  // Fill the map: PlaceProps takes the paint list in any mode
     bool mMiniCached = false;
     bool mMiniDrawNow = true;

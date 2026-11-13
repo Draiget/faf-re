@@ -1086,7 +1086,30 @@ namespace faf::editor
     // While a move is under way: where each moved thing started, dim, and a line to where it is now.
     {
       std::vector<std::pair<Wm3::Vec3f, Wm3::Vec3f>> moved;
-      if (mDragMarkers && mMarkersMoved) {
+      if (mModal.on) {
+        // G or R: the old places and lines to the new; a locked axis drawn through the middle, the map across.
+        for (std::size_t k = 0; k < mModal.start.x.size() && k < mModal.now.x.size(); ++k) {
+          moved.push_back(
+            {Wm3::Vec3f{mModal.start.x[k], 0.0f, mModal.start.z[k]}, Wm3::Vec3f{mModal.now.x[k], 0.0f, mModal.now.z[k]}}
+          );
+        }
+        if (mModal.input.axis != 0 && !mModal.input.rotate) {
+          const bool alongX = mModal.input.axis == 'X';
+          const std::uint32_t colour = alongX ? 0xE0FF5D5Du : 0xE04FD18Bu; // the gizmo's X red, Z green
+          const float extent = mMapExtent;
+          const int pieces = 256;
+          for (int p = 0; p < pieces; ++p) {
+            const float a = -extent + 2.0f * extent * static_cast<float>(p) / pieces;
+            const float b = -extent + 2.0f * extent * static_cast<float>(p + 1) / pieces;
+            const float x0 = alongX ? mModal.cx + a : mModal.cx, z0 = alongX ? mModal.cz : mModal.cz + a;
+            const float x1 = alongX ? mModal.cx + b : mModal.cx, z1 = alongX ? mModal.cz : mModal.cz + b;
+            if (x0 < 0.0f || z0 < 0.0f || x1 > extent || z1 > extent) {
+              continue;
+            }
+            batcher->DrawLine(groundVertex(x0, z0, colour, 0.8f), groundVertex(x1, z1, colour, 0.8f));
+          }
+        }
+      } else if (mDragMarkers && mMarkersMoved) {
         for (std::size_t i = 0; i < mMarkerSelection.size() && i < mMarkerDragStart.size(); ++i) {
           for (const SaveEntry& marker : mDocument.SaveData().Markers()) {
             float x = 0.0f, y = 0.0f, z = 0.0f;
@@ -7989,6 +8012,424 @@ namespace faf::editor
     gpg::Logf("editor: arrange test: undo %s", undone ? "took it back" : "had nothing");
   }
 
+  bool EdMapScene::BeginModal(
+    const bool rotate
+  )
+  {
+    float gx = 0.0f, gz = 0.0f;
+    if (mMap == nullptr || !CursorGround(gx, gz)) {
+      return false;
+    }
+    Modal m;
+    m.kind = SelectedKind();
+    m.input.rotate = rotate;
+    switch (m.kind) {
+    case PickKind::Prop:
+      if (mMap->mProps == nullptr) {
+        return false;
+      }
+      for (std::size_t s = 0; s < mSelection.size(); ++s) {
+        const moho::VTransform& t = mMap->mProps->mEntries[static_cast<std::size_t>(mSelection[s])].mTransform;
+        m.sel.push_back(s);
+        m.refs.push_back(mSelection[s]);
+        m.start.x.push_back(t.pos_.x);
+        m.start.z.push_back(t.pos_.z);
+        m.start.heading.push_back(2.0f * std::atan2(t.orient_.y, t.orient_.w));
+      }
+      break;
+    case PickKind::Marker:
+      for (std::size_t s = 0; s < mMarkerSelection.size(); ++s) {
+        for (const SaveEntry& marker : mDocument.SaveData().Markers()) {
+          float x = 0.0f, y = 0.0f, z = 0.0f;
+          if (marker.name == mMarkerSelection[s] && ShownMarkerPosition(marker, x, y, z)) {
+            m.sel.push_back(s);
+            m.markers.push_back(marker.name);
+            m.start.x.push_back(x);
+            m.start.z.push_back(z);
+            m.start.heading.push_back(0.0f);
+          }
+        }
+      }
+      break;
+    case PickKind::Unit:
+      for (std::size_t s = 0; s < mUnitSelection.size(); ++s) {
+        if (const int index = UnitRefIndex(mUnitSelection[s].first, mUnitSelection[s].second); index >= 0) {
+          const UnitRef& ref = mUnitRefs[static_cast<std::size_t>(index)];
+          m.sel.push_back(s);
+          m.units.push_back(mUnitSelection[s]);
+          m.start.x.push_back(ref.position.x);
+          m.start.z.push_back(ref.position.z);
+          m.start.heading.push_back(ref.orientation[1]); // the save's Orientation y is the heading
+        }
+      }
+      break;
+    case PickKind::Decal:
+      if (mDocument.Decals() == nullptr) {
+        return false;
+      }
+      for (std::size_t s = 0; s < mDecalSelection.size(); ++s) {
+        if (const moho::CWldTerrainDecal* const decal = FindDecal(*mDocument.Decals(), mDecalSelection[s]); decal) {
+          float cx = 0.0f, cz = 0.0f;
+          DecalCentre(FootprintOf(*decal), cx, cz);
+          m.sel.push_back(s);
+          m.refs.push_back(mDecalSelection[s]);
+          m.start.x.push_back(cx);
+          m.start.z.push_back(cz);
+          m.start.heading.push_back(0.0f);
+        }
+      }
+      break;
+    default:
+      return false;
+    }
+    if (m.start.x.empty()) {
+      return false;
+    }
+    for (std::size_t k = 0; k < m.start.x.size(); ++k) {
+      m.cx += m.start.x[k];
+      m.cz += m.start.z[k];
+    }
+    m.cx /= static_cast<float>(m.start.x.size());
+    m.cz /= static_cast<float>(m.start.z.size());
+    m.fromX = gx;
+    m.fromZ = gz;
+    m.input.startAngle = std::atan2(gz - m.cz, gx - m.cx);
+    m.input.nowAngle = m.input.startAngle;
+    m.now = m.start;
+    // The edit's before, and the mirrored copies that follow it.
+    const bool follow = FollowOn();
+    switch (m.kind) {
+    case PickKind::Prop:
+      BeginObjectStroke();
+      mPropFollow = follow ? PropPartners() : std::vector<std::vector<int>>{};
+      break;
+    case PickKind::Marker:
+      m.saveBefore = mDocument.SaveDataNow();
+      mMarkerFollow = follow ? MarkerPartners() : std::vector<std::vector<std::string>>{};
+      break;
+    case PickKind::Unit:
+      m.saveBefore = mDocument.SaveDataNow();
+      mUnitFollow = follow ? UnitPartners() : decltype(mUnitFollow){};
+      break;
+    default:
+      m.decalBefore = mDocument.DecalsNow();
+      mDecalFollow = follow ? DecalPartners() : std::vector<std::vector<int>>{};
+      break;
+    }
+    m.on = true;
+    mModal = std::move(m);
+    UpdateModal();
+    gpg::Logf(
+      "editor: %s %zu: X or Z locks an axis, a number types it, a click or Enter keeps it, Escape puts it back",
+      rotate ? "turning" : "moving",
+      mModal.start.x.size()
+    );
+    return true;
+  }
+
+  void EdMapScene::UpdateModal()
+  {
+    if (!mModal.on) {
+      return;
+    }
+    const moho::CHeightField* const field = mMap->mTerrainRes->GetHeightField();
+    float gx = 0.0f, gz = 0.0f;
+    if (CursorGround(gx, gz)) {
+      mModal.input.cursorDX = gx - mModal.fromX;
+      mModal.input.cursorDZ = gz - mModal.fromZ;
+      mModal.input.nowAngle = std::atan2(gz - mModal.cz, gx - mModal.cx);
+    }
+    const ModalDelta delta = ModalDeltaFor(mModal.input);
+    ArrangePlaces places = ApplyModalDelta(mModal.start, mModal.cx, mModal.cz, delta);
+    const float maxX = static_cast<float>(field->width - 1);
+    const float maxZ = static_cast<float>(field->height - 1);
+    for (std::size_t k = 0; k < places.x.size(); ++k) {
+      places.x[k] = std::clamp(places.x[k], 0.0f, maxX);
+      places.z[k] = std::clamp(places.z[k], 0.0f, maxZ);
+    }
+    const auto ground = [this](const float x, const float z) {
+      return mMap->mTerrainRes->GetHeightAt(
+        static_cast<std::int32_t>(std::lround(x)), static_cast<std::int32_t>(std::lround(z))
+      );
+    };
+    const bool turned = delta.turn != 0.0f;
+    for (std::size_t k = 0; k < places.x.size(); ++k) {
+      const float x = places.x[k];
+      const float z = places.z[k];
+      switch (mModal.kind) {
+      case PickKind::Prop: {
+        const int index = mModal.refs[k];
+        MovePropTo(index, Wm3::Vec3f{x, ground(x, z), z});
+        moho::CWldPropEntry& entry = mMap->mProps->mEntries[static_cast<std::size_t>(index)];
+        const float heading = places.heading[k];
+        entry.mTransform.orient_ = Wm3::Quatf(std::cos(heading * 0.5f), 0.0f, std::sin(heading * 0.5f), 0.0f);
+        if (static_cast<std::size_t>(index) < mProps.size() && mProps[static_cast<std::size_t>(index)] != nullptr) {
+          mProps[static_cast<std::size_t>(index)]->SetStance(entry.mTransform, entry.mTransform);
+        }
+        if (turned) {
+          mObjectsChanged = true;
+        }
+        FollowPropMove(mModal.sel[k], entry.mTransform.pos_);
+        break;
+      }
+      case PickKind::Marker: {
+        for (SaveEntry& marker : mDocument.SaveData().Markers()) {
+          if (marker.name != mModal.markers[k]) {
+            continue;
+          }
+          float mx = x, mz = z;
+          if (const std::string type = MarkerTypeOf(marker); type == "Mass" || type == "Hydrocarbon") {
+            mx = std::floor(mx) + 0.5f;
+            mz = std::floor(mz) + 0.5f;
+          }
+          marker.Set("position", Vector3Value(mx, ground(mx, mz), mz));
+          places.x[k] = mx;
+          places.z[k] = mz;
+          FollowMarkerMove(mModal.sel[k], mx, mz);
+          break;
+        }
+        break;
+      }
+      case PickKind::Unit: {
+        const int index = UnitRefIndex(mModal.units[k].first, mModal.units[k].second);
+        if (index < 0) {
+          break;
+        }
+        UnitRef& ref = mUnitRefs[static_cast<std::size_t>(index)];
+        ref.position = Wm3::Vec3f{x, UnitRestHeight(x, z), z};
+        ref.orientation[1] = places.heading[k];
+        if (moho::MeshInstance* const instance = mUnits[static_cast<std::size_t>(index)]; instance != nullptr) {
+          const moho::VTransform transform = UnitTransform(ref.position, ref.orientation);
+          instance->SetStance(transform, transform);
+        }
+        FollowUnitMove(mModal.sel[k], ref.position);
+        break;
+      }
+      default: {
+        // Decals move by their middles and keep their own heading.
+        if (moho::CWldTerrainDecal* const decal = FindDecal(*mDocument.Decals(), mModal.refs[k]); decal != nullptr) {
+          const DecalFootprint own = FootprintOf(*decal);
+          const DecalFootprint placed = DecalAround(x, z, own.sizeX, own.sizeZ, own.yaw);
+          decal->SetPosition(Wm3::Vec3f{placed.x, decal->mPosition.y, placed.z});
+          FollowDecalMove(mModal.sel[k], decal->mPosition);
+        }
+        break;
+      }
+      }
+    }
+    mModal.now = std::move(places);
+    mModal.moved = mModal.moved || delta.dx != 0.0f || delta.dz != 0.0f || turned;
+    if (mTools != nullptr) {
+      mTools->SetHudOverride(
+        ModalHudText(mModal.input, delta) + (mModal.input.rotate ? "" : "   X / Z lock") +
+        "   Enter keeps, Esc puts back"
+      );
+    }
+  }
+
+  void EdMapScene::EndModal(
+    const bool keep
+  )
+  {
+    if (!mModal.on) {
+      return;
+    }
+    mModal.on = false;
+    if (mTools != nullptr) {
+      mTools->SetHudOverride({});
+    }
+    const bool moved = mModal.moved;
+    switch (mModal.kind) {
+    case PickKind::Prop:
+      // The turned props' records (what gets saved) as Q/E keeps them.
+      if (mModal.input.rotate) {
+        for (const int index : mModal.refs) {
+          moho::CWldPropEntry& entry = mMap->mProps->mEntries[static_cast<std::size_t>(index)];
+          const PropRecord record = PropRecordFor(entry.mBlueprintPath.c_str(), entry.mTransform);
+          entry.mTransform = record.loaded;
+          mDocument.SetPropRecord(static_cast<std::size_t>(index), record);
+        }
+      }
+      EndObjectStroke();
+      break;
+    case PickKind::Marker:
+      if (moved) {
+        mDocument.SaveDataEdited(std::move(mModal.saveBefore));
+        mOutsideStale = true;
+      }
+      break;
+    case PickKind::Unit:
+      if (moved) {
+        // The units and their followed copies written to the save.
+        std::vector<std::pair<std::string, std::string>> touched = mModal.units;
+        for (const auto& copies : mUnitFollow) {
+          for (const auto& copy : copies) {
+            if (!copy.second.empty()) {
+              touched.push_back(copy);
+            }
+          }
+        }
+        for (const auto& [army, name] : touched) {
+          const int index = UnitRefIndex(army, name);
+          if (index < 0) {
+            continue;
+          }
+          const UnitRef ref = mUnitRefs[static_cast<std::size_t>(index)];
+          (void)EditArmyUnits(army, [&, name = name](UnitGroup& group) {
+            if (SaveUnit* const unit = FindUnit(group, name); unit != nullptr) {
+              unit->position[0] = ref.position.x;
+              unit->position[1] = ref.position.y;
+              unit->position[2] = ref.position.z;
+              unit->orientation[1] = ref.orientation[1];
+            }
+          });
+        }
+        mDocument.SaveDataEdited(std::move(mModal.saveBefore));
+        ReloadUnits();
+      }
+      break;
+    default:
+      if (moved) {
+        mDocument.DecalsEdited(std::move(mModal.decalBefore));
+      }
+      break;
+    }
+    mPropFollow.clear();
+    mMarkerFollow.clear();
+    mUnitFollow.clear();
+    mDecalFollow.clear();
+    // Escape: the edit was kept as one step; undoing it puts back everything it touched, copies too.
+    const bool undone = !keep && moved && Undo();
+    gpg::Logf(
+      "editor: %s %zu %s",
+      mModal.input.rotate ? "turn of" : "move of",
+      mModal.start.x.size(),
+      keep ? "kept" : (undone ? "put back" : "had nothing to put back")
+    );
+  }
+
+  void EdMapScene::TestModal(
+    const std::string& spec
+  )
+  {
+    // `kind,g|r,<keys>[,cancel]`: five of the kind selected (props from the map's middle, mass markers, units), the
+    // cursor kept where it is, the keys typed, then Enter or Escape; the first one's place logged before and after.
+    std::vector<std::string> parts;
+    for (std::size_t from = 0;;) {
+      const std::size_t comma = spec.find(',', from);
+      parts.push_back(spec.substr(from, comma == std::string::npos ? std::string::npos : comma - from));
+      if (comma == std::string::npos) {
+        break;
+      }
+      from = comma + 1;
+    }
+    if (parts.size() < 3) {
+      gpg::Logf("editor: modal test: want kind,g|r,keys[,cancel]");
+      return;
+    }
+    ClearAllSelections();
+    if (parts[0] == "props" && mMap->mProps != nullptr) {
+      mSelectKind = PickKind::Prop;
+      for (int i = 0; i < static_cast<int>(mMap->mProps->mEntries.size()) && mSelection.size() < 5; i += 97) {
+        mSelection.push_back(i);
+      }
+    } else if (parts[0] == "markers") {
+      mSelectKind = PickKind::Marker;
+      for (const SaveEntry& marker : mDocument.SaveData().Markers()) {
+        if (MarkerTypeOf(marker) == "Mass" && mMarkerSelection.size() < 5) {
+          mMarkerSelection.push_back(marker.name);
+        }
+      }
+    } else {
+      mSelectKind = PickKind::Unit;
+      for (const UnitRef& ref : mUnitRefs) {
+        if (mUnitSelection.size() < 5) {
+          mUnitSelection.emplace_back(ref.army, ref.name);
+        }
+      }
+    }
+    // The cursor over the view's middle (it stays there: the typed number decides).
+    mCursor = POINT{400, 300};
+    mCursorInView = true;
+    if (!BeginModal(parts[1] == "r")) {
+      gpg::Logf("editor: modal test: G/R didn't begin (no ground under the cursor?)");
+      return;
+    }
+    const auto place = [this](const std::size_t k) {
+      char text[96];
+      (void)std::snprintf(
+        text,
+        sizeof(text),
+        "(%.2f, %.2f, heading %.1f)",
+        static_cast<double>(mModal.now.x[k]),
+        static_cast<double>(mModal.now.z[k]),
+        static_cast<double>(mModal.now.heading[k] * 180.0f / kPi)
+      );
+      return std::string(text);
+    };
+    const std::string before = place(0);
+    for (const char c : parts[2]) {
+      if (c == 'x' || c == 'z') {
+        mModal.input.axis = static_cast<char>(c - 'a' + 'A');
+      } else {
+        (void)TypeIntoNumber(mModal.input.typed, c);
+      }
+    }
+    UpdateModal();
+    const std::string during = place(0);
+    const std::string hud = ModalHudText(mModal.input, ModalDeltaFor(mModal.input));
+    if (parts.size() > 3 && parts[3] == "hold") {
+      // Left running, for a picture of the ghosts, the axis and the HUD.
+      gpg::Logf(
+        "editor: modal test: %s held: HUD \"%s\"; first %s -> %s",
+        parts[0].c_str(),
+        hud.c_str(),
+        before.c_str(),
+        during.c_str()
+      );
+      return;
+    }
+    const bool cancel = parts.size() > 3 && parts[3] == "cancel";
+    // Where the first one is after it ends, read back from the map.
+    const std::size_t first = 0;
+    const PickKind kind = mModal.kind;
+    const int ref = mModal.refs.empty() ? -1 : mModal.refs[first];
+    const std::string marker = mModal.markers.empty() ? std::string() : mModal.markers[first];
+    const auto unit = mModal.units.empty() ? std::pair<std::string, std::string>{} : mModal.units[first];
+    EndModal(!cancel);
+    float x = 0.0f, z = 0.0f, heading = 0.0f;
+    if (kind == PickKind::Prop) {
+      const moho::VTransform& t = mMap->mProps->mEntries[static_cast<std::size_t>(ref)].mTransform;
+      x = t.pos_.x;
+      z = t.pos_.z;
+      heading = 2.0f * std::atan2(t.orient_.y, t.orient_.w);
+    } else if (kind == PickKind::Marker) {
+      for (const SaveEntry& m : mDocument.SaveData().Markers()) {
+        float y = 0.0f;
+        if (m.name == marker) {
+          (void)ShownMarkerPosition(m, x, y, z);
+        }
+      }
+    } else if (const int index = UnitRefIndex(unit.first, unit.second); index >= 0) {
+      x = mUnitRefs[static_cast<std::size_t>(index)].position.x;
+      z = mUnitRefs[static_cast<std::size_t>(index)].position.z;
+      heading = mUnitRefs[static_cast<std::size_t>(index)].orientation[1];
+    }
+    gpg::Logf(
+      "editor: modal test: %s %s keys \"%s\": HUD \"%s\"; first %s -> %s; after %s: (%.2f, %.2f, heading %.1f)",
+      parts[0].c_str(),
+      parts[1].c_str(),
+      parts[2].c_str(),
+      hud.c_str(),
+      before.c_str(),
+      during.c_str(),
+      cancel ? "Escape" : "Enter",
+      static_cast<double>(x),
+      static_cast<double>(z),
+      static_cast<double>(heading * 180.0f / kPi)
+    );
+  }
+
   bool EdMapScene::FollowDrag()
   {
     const bool on = FollowOn() && !mDragIsCopy;
@@ -9495,6 +9936,25 @@ namespace faf::editor
       mCursor = at;
       mCursorInView = true; // the view's own message
     }
+    // G or R running: the cursor moves or turns the selection; a click keeps it, a right click puts it back.
+    if (mModal.on) {
+      switch (message) {
+      case WM_MOUSEMOVE:
+        UpdateModal();
+        return true;
+      case WM_LBUTTONDOWN:
+        EndModal(true);
+        return true;
+      case WM_RBUTTONDOWN:
+        EndModal(false);
+        return true;
+      case WM_LBUTTONUP:
+      case WM_RBUTTONUP:
+        return true;
+      default:
+        break;
+      }
+    }
     switch (message) {
     case WM_LBUTTONDOWN: {
       // Alt+drag measures, whatever the tool.
@@ -10462,6 +10922,39 @@ namespace faf::editor
       // Undo, redo, copy, paste, duplicate and framing the map are commands with keys (EdApp.cpp runs them before
       // the scene sees the key); the keys here are the tools' own: paths, the camera, Delete and Q/E for a tool.
       mFast = (::GetKeyState(VK_SHIFT) & 0x8000) != 0;
+      // G and R: the selection follows the cursor until a click or Enter (Escape puts it back); X or Z locks an axis,
+      // digits type an exact distance or angle.
+      if (mModal.on) {
+        if (!down) {
+          return true;
+        }
+        if (wParam == VK_RETURN) {
+          EndModal(true);
+        } else if (wParam == VK_ESCAPE) {
+          EndModal(false);
+        } else if (wParam == 'X' || wParam == 'Z') {
+          const char axis = static_cast<char>(wParam);
+          mModal.input.axis = mModal.input.axis == axis ? 0 : axis;
+          UpdateModal();
+        } else {
+          const int key = wParam == VK_OEM_PERIOD || wParam == VK_DECIMAL ? '.'
+            : wParam == VK_OEM_MINUS || wParam == VK_SUBTRACT             ? '-'
+            : wParam >= VK_NUMPAD0 && wParam <= VK_NUMPAD9 ? static_cast<int>('0' + (wParam - VK_NUMPAD0))
+            : wParam == VK_BACK                            ? 8
+                                                           : static_cast<int>(wParam);
+          if (TypeIntoNumber(mModal.input.typed, key)) {
+            UpdateModal();
+          }
+        }
+        return true;
+      }
+      if (
+        down && (wParam == 'G' || wParam == 'R') && (::GetKeyState(VK_CONTROL) & 0x8000) == 0 && mTools != nullptr &&
+        mTools->SelectToolActive() && SelectedKind() != PickKind::None
+      ) {
+        (void)BeginModal(wParam == 'R');
+        return true;
+      }
       if (
         down && mTools != nullptr && mTools->DecalsToolActive() && mTools->DecalPathMode() &&
         (wParam == VK_RETURN || wParam == VK_BACK || wParam == VK_ESCAPE)

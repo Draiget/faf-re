@@ -565,6 +565,9 @@ namespace faf::editor
 
   const char* EdTools::HudMode() const noexcept
   {
+    if (!mHudOverride.empty()) {
+      return mHudOverride.c_str();
+    }
     // By HeightBrushMode, as the panel's tiles name them.
     static constexpr const char* kModes[] = {
       "Raise",

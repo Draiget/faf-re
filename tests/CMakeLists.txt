@@ -400,6 +400,7 @@ add_executable(faf_editor_brush_tests EXCLUDE_FROM_ALL editor/HeightBrushTests.c
   editor/ArrangeTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdArrange.cpp
   editor/FindReplaceTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdFindReplace.cpp
   editor/ScatterTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdScatter.cpp
+  editor/ModalTransformTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdModalTransform.cpp
   editor/ShaderProfileTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdShaderProfiles.cpp
   editor/LayerConvertTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdLayerConvert.cpp
   editor/SymmetrizeTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdSymmetrize.cpp ${CMAKE_SOURCE_DIR}/src/editor/terrain/EdFieldSc.cpp

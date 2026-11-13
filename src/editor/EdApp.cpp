@@ -150,9 +150,9 @@ namespace faf::editor
         "/waterbody",      "/ruler",          "/adaptivewindow", "/maskrule",        "/maskgen",     "/symhover",
         "/stbfont",        "/recipe",         "/texset",         "/layerop",         "/slopeview",   "/typesfromlayers",
         "/uncapped",       "/nominimap",      "/followtest",     "/arrangetest",     "/findtest",    "/findopen",
-        "/filltest",       "/symmenu",        "/panelbottom",    "/shader",          "/brushtest",   "/brushshape",
-        "/stampsource",    "/stampstroke",    "/symoptions",     "/maskoptions",     "/masktest",    "/shaderbrowser",
-        "/convertlayers",
+        "/filltest",       "/modaltest",      "/symmenu",        "/panelbottom",     "/shader",      "/brushtest",
+        "/brushshape",     "/stampsource",    "/stampstroke",    "/symoptions",      "/maskoptions", "/masktest",
+        "/shaderbrowser",  "/convertlayers",
       };
       for (const char* const option : kOptions) {
         if (moho::CFG_GetArgOption(option, 0, nullptr)) {
@@ -871,6 +871,10 @@ namespace faf::editor
       {
         // A key bound to a command runs it (Settings > Keys). While a play has the view only F5's and F6's commands
         // do; the game keeps every other key. The key's release goes nowhere either, as its press didn't.
+        // G or R running in the view takes every key (digits type a number there, not a tool's key).
+        if (mScene.ModalOn() && (message == WM_KEYDOWN || message == WM_KEYUP)) {
+          return mScene.OnWindowMessage(window, message, wParam, lParam);
+        }
         if (message == WM_KEYDOWN || message == WM_SYSKEYDOWN) {
           const std::string chord = ChordOf(
             VirtualKeyName(static_cast<unsigned>(wParam)),
@@ -2146,6 +2150,8 @@ namespace faf::editor
       std::string mFindTestArg; // `/findtest kind,type,scope,action` (test runs)
       int mFindFrames = 0;
       std::string mFillTestArg; // `/filltest <density>,<spacing>[,keep]` (test runs)
+      std::string mModalTestArg; // `/modaltest kind,g|r,keys[,cancel]` (test runs)
+      int mModalFrames = 0;
       int mFillFrames = 0;
       std::string mFindOpenArg; // `/findopen <n>` (test runs): the dialog opened on the n-th type
       // The "Save changes?" question: what to do once answered.
@@ -4062,7 +4068,7 @@ namespace faf::editor
         }
         // The panels' keys run their commands too (the view's reach HandleViewportMessage): not the ones a text field
         // or the panels' keyboard navigation use themselves, and not in the material editor, which keeps its own.
-        if (!mShell->MaterialEditor().Focused()) {
+        if (!mShell->MaterialEditor().Focused() && !mScene.ModalOn()) {
           if (
             const std::string chord = PanelChordPressed();
             !chord.empty() && !PanelsKeepChord(chord, ImGui::GetIO().WantTextInput)
@@ -4249,6 +4255,9 @@ namespace faf::editor
       }
       if (fa::vector<fa::string> find; moho::CFG_GetArgOption("/findtest", 1, &find) && !find.empty()) {
         mFindTestArg = find[0].c_str();
+      }
+      if (fa::vector<fa::string> modal; moho::CFG_GetArgOption("/modaltest", 1, &modal) && !modal.empty()) {
+        mModalTestArg = modal[0].c_str();
       }
       if (fa::vector<fa::string> fill; moho::CFG_GetArgOption("/filltest", 1, &fill) && !fill.empty()) {
         mFillTestArg = fill[0].c_str();
@@ -4845,6 +4854,9 @@ namespace faf::editor
       }
       if (!mArrangeTestArg.empty() && !mScene.ModelsPending() && ++mArrangeFrames >= 150) {
         mScene.TestArrange(std::exchange(mArrangeTestArg, {}));
+      }
+      if (!mModalTestArg.empty() && !mScene.ModelsPending() && ++mModalFrames >= 150) {
+        mScene.TestModal(std::exchange(mModalTestArg, {}));
       }
       if (!mFillTestArg.empty() && !mScene.ModelsPending() && ++mFillFrames >= 150) {
         mScene.TestFill(std::exchange(mFillTestArg, {}));
