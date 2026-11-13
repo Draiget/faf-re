@@ -20,7 +20,7 @@ namespace gpg::gal
   class RenderProfiler
   {
   public:
-    static constexpr std::uint32_t kMaxRegions = 48U;
+    static constexpr std::uint32_t kMaxRegions = 64U;
 
     /** True when FAF_GPU_PROFILE is set (read once). */
     [[nodiscard]] static bool Enabled() noexcept

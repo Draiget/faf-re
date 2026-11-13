@@ -453,6 +453,7 @@ target_link_libraries(faf_dxgi_tests PRIVATE gtest_main)
 set_target_properties(faf_dxgi_tests PROPERTIES FOLDER "Tests/Existing")
 add_test(NAME dxgi_swap_chain_policy COMMAND faf_dxgi_tests)
 set_tests_properties(dxgi_swap_chain_policy PROPERTIES LABELS "Existing")
+
 # Every GoogleTest executable above and in the subdirectories. Keep this last: it sees only the
 # targets defined before it, so a test added below it is never built by faf_tests and ctest
 # reports it as Not Run.
