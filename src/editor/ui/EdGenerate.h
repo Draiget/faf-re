@@ -52,8 +52,13 @@ namespace faf::editor
         Build,
         Revert,
       } kind = Kind::None;
-      field::Grid result;
+      field::Grid result; // no samples: the graph writes no heights
       bool plain = true;
+      /** Build: the paint of Output: ground kinds (layer -> visible weight), the layers with a texture, the shader's.
+       */
+      std::map<int, field::Grid> paint;
+      std::array<bool, 9> textured{};
+      int cap = 8;
     };
     [[nodiscard]] bool TakeHeightsAsk(HeightsAsk& out);
     /** What the view made of it (shown under the toolbar). */

@@ -1,5 +1,7 @@
 #include "editor/view/EdMapScene.h"
 #include "editor/tools/EdShaderProfiles.h"
+#include "editor/tools/EdGroundKind.h"
+#include "editor/tools/EdRecipes.h"
 #include "editor/tools/EdSlopeRules.h"
 #include "editor/tools/EdSymmetryFollow.h"
 #include "editor/doc/EdUnitFate.h"
@@ -3030,7 +3032,8 @@ namespace faf::editor
     const std::array<bool, 9>& textured,
     const int cap,
     std::array<float, 9>& shares,
-    std::string& message
+    std::string& message,
+    const bool ownStep
   )
   {
     LoadMasks();
@@ -3074,7 +3077,15 @@ namespace faf::editor
         }
       }
     }
-    WholeMaskChanged(whole);
+    if (ownStep) {
+      WholeMaskChanged(whole);
+    } else {
+      // The caller ends the step (with the heights of the same build).
+      mDocument.MaskUndo().EndStroke(masks.texels.data());
+      UploadMasks({whole}, 0xFFu);
+      mDocument.SetModified(true);
+      UpdateCoverage();
+    }
     message = std::to_string(changed) + " texels changed";
     return static_cast<int>(changed);
   }
@@ -5099,13 +5110,83 @@ namespace faf::editor
       );
     }
     out.padSignature = PadSignature(pads, settings);
+    out.waterOn = water.enabled;
+    // The paint: each layer's kind from its texture (or what the Recipes panel chose), and the shader's facts.
+    const ShaderProfile profile = ShaderProfileOf(TerrainShader());
+    std::array<GroundKind, 9> kinds{};
+    const std::vector<EdTools::LayerSlot> slots = LayerSlots();
+    for (int layer = 0; layer <= 8 && layer < static_cast<int>(slots.size()); ++layer) {
+      const std::string& albedo = slots[static_cast<std::size_t>(layer)].albedo;
+      if (albedo.empty()) {
+        continue;
+      }
+      out.textured[static_cast<std::size_t>(layer)] = true;
+      float rgb[3] = {};
+      kinds[static_cast<std::size_t>(layer)] =
+        GroundKindOf(albedo, mTools->Library().AverageColour(albedo, rgb) ? rgb : nullptr).kind;
+      if (const int chosen = mTools->RecipeOverrides()[static_cast<std::size_t>(layer)]; chosen >= 0) {
+        kinds[static_cast<std::size_t>(layer)] = static_cast<GroundKind>(chosen);
+      }
+    }
+    out.painted = profile.painted;
+    out.biplanar = profile.summary.find("biplanar") != std::string::npos;
+    out.plan = PlanRecipe(kinds, out.textured, profile.painted, out.biplanar);
+    out.hasPaint = true;
+    out.pbr = profile.family == ShaderFamily::Pbr || profile.family == ShaderFamily::Splat;
+    out.splat = profile.family == ShaderFamily::Splat;
+    out.macro = profile.summary.find("macro") != std::string::npos;
+    out.specular = profile.summary.find("specular") != std::string::npos;
+    out.roughness = out.pbr && profile.painted == 7;
     return true;
+  }
+
+  std::string EdMapScene::ApplyGraphBuild(
+    const field::Grid& heights,
+    const bool plain,
+    const std::map<int, field::Grid>& paint,
+    const std::array<bool, 9>& textured,
+    const int cap
+  )
+  {
+    if (paint.empty()) {
+      return heights.w > 1 ? ApplyGraphHeights(heights, plain, false) : "Nothing to build.";
+    }
+    // The heights' stroke and the paint's, ended as one step.
+    std::string message;
+    std::size_t heightsChanged = 0;
+    if (heights.w > 1) {
+      message = ApplyGraphHeights(heights, plain, false, false, &heightsChanged);
+    } else if (GraphPreviewNewest()) {
+      (void)RevertGraphPreview();
+    }
+    std::array<float, 9> shares{};
+    std::string paintMessage;
+    LoadMasks();
+    const int painted =
+      mDocument.Masks().texels.empty() ? -1 : WriteRecipeMasks(paint, textured, cap, shares, paintMessage, false);
+    if (painted < 0 && paintMessage.empty()) {
+      paintMessage = "the map has no masks";
+    }
+    if (heightsChanged > 0 || painted > 0) {
+      mDocument.EditEnded(
+        heightsChanged > 0 && painted > 0 ? EdDocument::EditKind::HeightsAndMasks
+          : heightsChanged > 0            ? EdDocument::EditKind::Heights
+                                          : EdDocument::EditKind::Masks
+      );
+    }
+    std::string text = (message.empty() ? std::string("Built.") : message) +
+      (painted < 0 ? " The paint wasn't written: " + paintMessage + "."
+                   : " Paint: " + paintMessage + ", the same undo step.");
+    gpg::Logf("editor: generate: %s", text.c_str());
+    return text;
   }
 
   std::string EdMapScene::ApplyGraphHeights(
     const field::Grid& result,
     const bool plain,
-    const bool preview
+    const bool preview,
+    const bool endStep,
+    std::size_t* changedOut
   )
   {
     moho::CHeightField* const field = mMap != nullptr ? mMap->mTerrainRes->GetHeightField() : nullptr;
@@ -5169,8 +5250,13 @@ namespace faf::editor
     mDocument.Heights().BeforeWrite(field->data, whole);
     std::copy(next.begin(), next.end(), words);
     mDocument.Heights().EndStroke(field->data);
+    if (changedOut != nullptr) {
+      *changedOut = changed;
+    }
     if (changed > 0) {
-      mDocument.EditEnded(EdDocument::EditKind::Heights);
+      if (endStep) {
+        mDocument.EditEnded(EdDocument::EditKind::Heights);
+      }
       RefreshHeights({whole});
       mDocument.SetModified(true);
       if (mCheckDone) {

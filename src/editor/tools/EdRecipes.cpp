@@ -933,6 +933,32 @@ namespace faf::editor
     return true;
   }
 
+  const std::vector<const char*>& RecipeKnobKeys()
+  {
+    static const std::vector<const char*> kKeys = {
+      "cliff",
+      "rock",
+      "snow",
+      "high",
+      "beach",
+      "wet",
+      "dirt",
+      "dark",
+      "breakup",
+      "patch",
+      "crisp",
+      "fine",
+      "mix",
+      "soft",
+      "seed",
+      "wear",
+      "sed",
+      "chan",
+      "edge"
+    };
+    return kKeys;
+  }
+
   bool ResolveRecipe(
     MaskGenContext& context,
     const RecipePlan& plan,
@@ -943,18 +969,35 @@ namespace faf::editor
     std::string& error
   )
   {
-    target.clear();
+    std::array<std::vector<float>, 9> selection;
+    std::map<std::pair<int, int>, std::vector<float>> variants;
+    if (!RecipeSelections(context, plan, roles, knobs, style, selection, variants, error)) {
+      return false;
+    }
+    std::array<bool, 9> cleared{};
+    for (const RecipeRole& role : roles) {
+      cleared[K(role.kind)] = role.off;
+    }
+    return ResolveSelections(context, plan, selection, variants, cleared, knobs, target, error);
+  }
+
+  bool RecipeSelections(
+    MaskGenContext& context,
+    const RecipePlan& plan,
+    const std::vector<RecipeRole>& roles,
+    const RecipeKnobs& knobs,
+    const int style,
+    std::array<std::vector<float>, 9>& selection,
+    std::map<std::pair<int, int>, std::vector<float>>& variants,
+    std::string& error
+  )
+  {
     const bool erosion = style >= 0 && style < static_cast<int>(RecipeStyles().size()) &&
       RecipeStyles()[static_cast<std::size_t>(style)].erosion;
-    const field::Grid& h = *context.heights;
-    const std::size_t n = h.v.size();
-    const auto empty = [&] {
-      field::Grid g = h;
-      std::fill(g.v.begin(), g.v.end(), 0.0f);
-      return g;
-    };
+    const std::size_t n = context.heights->v.size();
+    selection = {};
+    variants.clear();
     // Each kind's selection on the heights' grid.
-    std::array<std::vector<float>, 9> selection;
     for (const RecipeRole& role : roles) {
       const std::vector<int>& layers = plan.byKind[K(role.kind)];
       if (layers.empty() || role.off || role.base || role.rules.empty()) {
@@ -991,11 +1034,32 @@ namespace faf::editor
       selection[K(role.kind)] = std::move(mask.v);
     }
     // Erosion paint: rock, dirt and wet ground (and the bands of their second layers) from what the water did.
-    std::map<std::pair<int, int>, std::vector<float>> variants;
     if (erosion && !RecipeErosionSelections(context, plan, knobs, selection, variants, error)) {
       error = "erosion paint: " + error;
       return false;
     }
+    return true;
+  }
+
+  bool ResolveSelections(
+    MaskGenContext& context,
+    const RecipePlan& plan,
+    const std::array<std::vector<float>, 9>& selection,
+    const std::map<std::pair<int, int>, std::vector<float>>& variants,
+    const std::array<bool, 9>& cleared,
+    const RecipeKnobs& knobs,
+    std::map<int, field::Grid>& target,
+    std::string& error
+  )
+  {
+    target.clear();
+    const field::Grid& h = *context.heights;
+    const std::size_t n = h.v.size();
+    const auto empty = [&] {
+      field::Grid g = h;
+      std::fill(g.v.begin(), g.v.end(), 0.0f);
+      return g;
+    };
     // The priority cascade: each kind takes its selection of what the kinds above it left.
     std::vector<float> rest(n, 1.0f);
     std::array<std::vector<float>, 9> region;
@@ -1061,11 +1125,11 @@ namespace faf::editor
       target[layers[0]] = std::move(first);
     }
     // Kinds that are off: their layers cleared (an earlier run's paint would cover the others).
-    for (const RecipeRole& role : roles) {
-      if (!role.off) {
+    for (const GroundKind kind : RecipeOrder()) {
+      if (!cleared[K(kind)]) {
         continue;
       }
-      for (const int layer : plan.byKind[K(role.kind)]) {
+      for (const int layer : plan.byKind[K(kind)]) {
         if (layer >= 1 && target.count(layer) == 0) {
           target[layer] = empty();
         }

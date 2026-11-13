@@ -2,6 +2,7 @@
 
 #include "editor/graph/EdNodeGraph.h"
 #include "editor/terrain/EdFieldCore.h"
+#include "editor/tools/EdRecipes.h"
 
 #include <array>
 #include <cstdint>
@@ -66,7 +67,40 @@ namespace faf::editor
     /** The markers' pads (x, z, half, skirt, height, group per pad), as the SC tools collect them. */
     std::vector<double> pads;
     std::string padSignature;
+    bool waterOn = false;
+    /** The map's paint: which layer holds which kind of ground (the stratum recipes' plan), the layers with a texture.
+     */
+    RecipePlan plan;
+    std::array<bool, 9> textured{};
+    bool hasPaint = false; // the masks can be written (a map is open)
+    /** The terrain shader: the layers it paints, PBR, height splatting, side-mapped layers 3 and 4, the map-wide
+     * pictures it reads, a roughness multiplier in layer 8. */
+    int painted = 8;
+    bool pbr = false;
+    bool splat = false;
+    bool biplanar = false;
+    bool macro = false;
+    bool specular = false;
+    bool roughness = false;
   };
+
+  /** The eight kinds of ground by the names graph files use, bottom to top, with their roughness (0 shiny .. 1 rough).
+   */
+  struct TerrainKind
+  {
+    const char* id;
+    GroundKind kind;
+    float roughness;
+  };
+  [[nodiscard]] const std::vector<TerrainKind>& TerrainKinds();
+  /** The bands that split a kind between its layers (`rock2` is rock's second layer). */
+  struct TerrainKindVariant
+  {
+    const char* id;
+    GroundKind kind;
+    int layer; // 1: the kind's second layer
+  };
+  [[nodiscard]] const std::vector<TerrainKindVariant>& TerrainKindVariants();
 
   struct TerrainReport
   {
@@ -115,6 +149,18 @@ namespace faf::editor
      * applied as a change, not as the new ground).
      */
     bool FinalHeight(const NodeGraph& graph, const TerrainGround& ground, field::Grid& out, bool* plain = nullptr);
+    /**
+     * What the graph's Output: ground kinds node paints, as the recipes resolve it: the visible weight of every layer
+     * (layer -> field on this run's grid, `heights` its shape), overlaps settled by the kinds' priority, the base layer
+     * what is left, the layers of a kind with no link cleared. False (and `error` empty) when the graph has none.
+     */
+    bool KindsPaint(
+      const NodeGraph& graph,
+      const TerrainGround& ground,
+      const field::Grid& heights,
+      std::map<int, field::Grid>& target,
+      std::string& error
+    ) const;
 
     void Clear();
 

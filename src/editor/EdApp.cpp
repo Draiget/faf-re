@@ -2141,7 +2141,7 @@ namespace faf::editor
             generate.SetStatus(mScene.ApplyGraphHeights(ask.result, ask.plain, true));
             break;
           case EdGenerate::HeightsAsk::Kind::Build:
-            generate.SetStatus(mScene.ApplyGraphHeights(ask.result, ask.plain, false));
+            generate.SetStatus(mScene.ApplyGraphBuild(ask.result, ask.plain, ask.paint, ask.textured, ask.cap));
             break;
           case EdGenerate::HeightsAsk::Kind::Revert:
             generate.SetStatus(
@@ -2175,10 +2175,13 @@ namespace faf::editor
           mGenTestStart = hash;
         }
         gpg::Logf(
-          "editor: generate test stage %d: heights %016llx%s, %zu undo steps; undo: %s; %d nodes ran, %zu errors",
+          "editor: generate test stage %d: heights %016llx%s, masks %016llx, %zu undo steps; undo: %s; %d nodes ran, "
+          "%zu "
+          "errors",
           mGenTestStage,
           static_cast<unsigned long long>(hash),
           hash == mGenTestStart ? " (the original)" : "",
+          static_cast<unsigned long long>(mScene.MasksHash()),
           mDocument.UndoOrder().size(),
           mDocument.UndoStepName() != nullptr ? mDocument.UndoStepName() : "-",
           generate.LastReport().evaluated,

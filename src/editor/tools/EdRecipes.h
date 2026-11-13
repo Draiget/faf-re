@@ -51,6 +51,8 @@ namespace faf::editor
     const char* format;
   };
   [[nodiscard]] const std::vector<RecipeKnobInfo>& RecipeKnobList();
+  /** The knobs' names as FAF Studio's graph files keep them, in RecipeKnobList's order ("cliff", "rock", ...). */
+  [[nodiscard]] const std::vector<const char*>& RecipeKnobKeys();
 
   struct RecipeStyle
   {
@@ -155,6 +157,33 @@ namespace faf::editor
    * ground; a second grass the ridge tops) instead of noise. Replaces `selection[kind]` for the kinds that have layers
    * and fills `variants[{kind, n}]`: the share of the kind's region its (n + 1)th layer takes.
    */
+  /**
+   * ResolveRecipe's two halves. The first: each kind's selection on the heights' grid (a kind with layers, not off,
+   * not the base; on a B shader's side layers only steep ground) and, for erosion paint, the bands of the second
+   * layers (`variants[{kind, n}]`). The second: the priority cascade (each kind takes its selection of what the kinds
+   * above it left, the base the rest), every layer of a kind, the layers of `cleared` kinds emptied, the soft blend.
+   */
+  bool RecipeSelections(
+    MaskGenContext& context,
+    const RecipePlan& plan,
+    const std::vector<RecipeRole>& roles,
+    const RecipeKnobs& knobs,
+    int style,
+    std::array<std::vector<float>, 9>& selection,
+    std::map<std::pair<int, int>, std::vector<float>>& variants,
+    std::string& error
+  );
+  bool ResolveSelections(
+    MaskGenContext& context,
+    const RecipePlan& plan,
+    const std::array<std::vector<float>, 9>& selection,
+    const std::map<std::pair<int, int>, std::vector<float>>& variants,
+    const std::array<bool, 9>& cleared,
+    const RecipeKnobs& knobs,
+    std::map<int, field::Grid>& target,
+    std::string& error
+  );
+
   bool RecipeErosionSelections(
     MaskGenContext& context,
     const RecipePlan& plan,

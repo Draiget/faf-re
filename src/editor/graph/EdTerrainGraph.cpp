@@ -545,6 +545,78 @@ namespace faf::editor
     return true;
   }
 
+  const std::vector<TerrainKind>& TerrainKinds()
+  {
+    static const std::vector<TerrainKind> kKinds = {
+      {"grass", GroundKind::Grass, 0.55f},
+      {"dirt", GroundKind::Dirt, 0.68f},
+      {"wet", GroundKind::Wet, 0.12f},
+      {"sand", GroundKind::Sand, 0.72f},
+      {"rock", GroundKind::Rock, 0.88f},
+      {"darkrock", GroundKind::DarkRock, 0.92f},
+      {"highrock", GroundKind::HighRock, 0.82f},
+      {"snow", GroundKind::Snow, 0.2f},
+    };
+    return kKinds;
+  }
+
+  const std::vector<TerrainKindVariant>& TerrainKindVariants()
+  {
+    static const std::vector<TerrainKindVariant> kVariants = {
+      {"rock2", GroundKind::Rock, 1},
+      {"rock3", GroundKind::Rock, 2},
+      {"dirt2", GroundKind::Dirt, 1},
+      {"wet2", GroundKind::Wet, 1},
+      {"grass2", GroundKind::Grass, 1},
+    };
+    return kVariants;
+  }
+
+  bool TerrainRun::KindsPaint(
+    const NodeGraph& graph,
+    const TerrainGround& ground,
+    const field::Grid& heights,
+    std::map<int, field::Grid>& target,
+    std::string& error
+  ) const
+  {
+    target.clear();
+    error.clear();
+    std::vector<int> order;
+    (void)graph.Order(order);
+    for (const int id : order) {
+      const GraphNode* node = graph.Find(id);
+      if (node == nullptr || node->type->name != "out_kinds") {
+        continue;
+      }
+      const std::size_t n = heights.v.size();
+      std::array<std::vector<float>, 9> selection;
+      std::array<bool, 9> cleared{};
+      for (const TerrainKind& k : TerrainKinds()) {
+        const TerrainValue* value = Input(graph, id, k.id);
+        const std::size_t at = static_cast<std::size_t>(k.kind);
+        if (value != nullptr && value->grid != nullptr && value->grid->v.size() == n) {
+          selection[at] = value->grid->v;
+        } else if (ground.plan.Has(k.kind) && ground.plan.base != k.kind) {
+          cleared[at] = true; // a kind with a layer and no link: its layers cleared
+        }
+      }
+      std::map<std::pair<int, int>, std::vector<float>> variants;
+      for (const TerrainKindVariant& vr : TerrainKindVariants()) {
+        const TerrainValue* value = Input(graph, id, vr.id);
+        if (value != nullptr && value->grid != nullptr && value->grid->v.size() == n) {
+          variants[{static_cast<int>(vr.kind), vr.layer}] = value->grid->v;
+        }
+      }
+      MaskGenContext context;
+      context.heights = std::make_shared<field::Grid>(heights);
+      context.water = ground.water;
+      return ResolveSelections(context, ground.plan, selection, variants, cleared, RecipeKnobs{}, target, error) &&
+        !target.empty();
+    }
+    return false;
+  }
+
   // ---- Studio's graph files ---------------------------------------------------------------------------------------
 
   namespace

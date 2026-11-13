@@ -360,13 +360,25 @@ namespace faf::editor
       const TerrainReport report = full.Evaluate(*mGraph, mSeed, ground);
       field::Grid heights;
       bool plain = true;
+      const bool hasHeights = report.errors.empty() && full.FinalHeight(*mGraph, ground, heights, &plain);
+      // The paint of Output: ground kinds, on the heights it is built with (the map's when the graph writes none).
+      std::map<int, field::Grid> paint;
+      std::string paintError;
+      const field::Grid shape = hasHeights ? heights : field::Grid(ground.width, ground.height, 1.0f, 0.0f, 0.0f);
+      const bool hasPaint =
+        report.errors.empty() && ground.hasPaint && full.KindsPaint(*mGraph, ground, shape, paint, paintError);
       if (!report.errors.empty()) {
         mStatus = "Build stopped: " + std::to_string(report.errors.size()) + " node(s) have errors (" +
           report.errors.begin()->second + ").";
-      } else if (!full.FinalHeight(*mGraph, ground, heights, &plain)) {
-        mStatus = "Nothing to build: no Output: heights node with an input.";
+      } else if (!paintError.empty()) {
+        mStatus = "Build stopped: the ground kinds couldn't be resolved (" + paintError + ").";
+      } else if (!hasHeights && !hasPaint) {
+        mStatus = "Nothing to build: no Output: heights or Output: ground kinds node with an input.";
       } else {
-        mAsk = HeightsAsk{HeightsAsk::Kind::Build, std::move(heights), plain};
+        mAsk = HeightsAsk{HeightsAsk::Kind::Build, hasHeights ? std::move(heights) : field::Grid{}, plain};
+        mAsk.paint = std::move(paint);
+        mAsk.textured = ground.textured;
+        mAsk.cap = ground.painted;
         mAsked = true;
         mShowOnMap = false;
         mShownOnMap = false;

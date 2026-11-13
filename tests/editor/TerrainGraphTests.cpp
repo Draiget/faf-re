@@ -6,6 +6,8 @@
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdio>
 #include <fstream>
@@ -128,16 +130,15 @@ namespace
     ASSERT_TRUE(ReadStudioGraph(ReadFile(FAF_TERRAIN_GRAPHS "/hills.lua"), graph, facts, error)) << error;
     EXPECT_EQ(facts.name, "Rolling hills (two noises, hydraulic erosion)");
     EXPECT_EQ(facts.seed, 4);
-    // The texturing nodes come later: the height chain is all there, with Studio's ids.
-    EXPECT_EQ(graph.Nodes().size(), 7U);
+    // Every node, with Studio's ids: the height chain and the texturing (ground kinds into their output).
+    EXPECT_EQ(graph.Nodes().size(), 9U);
+    EXPECT_TRUE(facts.unknownTypes.empty());
     ASSERT_NE(graph.Find(11), nullptr);
     EXPECT_EQ(graph.Find(11)->type->name, "flatten");
     EXPECT_FLOAT_EQ(graph.Find(4)->params[ParamOf(*graph.Find(4)->type, "hi")].value[0], 62.0f);
     EXPECT_EQ(faf::editor::TerrainParamText(*graph.Find(3), "mode"), "normal") << "a choice by its id";
-    EXPECT_EQ(
-      graph.Links().size(), 6U
-    ) << "simplex and billow into blend, then blend > range > erosion > flatten > output";
-    EXPECT_EQ(facts.droppedLinks, 12) << "the links to and from the two texturing nodes";
+    EXPECT_EQ(graph.Links().size(), 18U) << "the height chain's 6, the texturing's 12";
+    EXPECT_EQ(facts.droppedLinks, 0);
     EXPECT_FALSE(ReadStudioGraph("Graph = { nodes = { { id = 1, ", graph, facts, error));
     EXPECT_NE(error.find("line"), std::string::npos) << error;
   }
@@ -155,7 +156,7 @@ namespace
     TerrainRun run(1);
     const auto report = run.Evaluate(graph, facts.seed, ground);
     EXPECT_TRUE(report.errors.empty()) << report.errors.begin()->second;
-    EXPECT_EQ(report.evaluated, 7);
+    EXPECT_EQ(report.evaluated, 9);
     field::Grid heights;
     bool plain = false;
     ASSERT_TRUE(run.FinalHeight(graph, ground, heights, &plain));
@@ -177,15 +178,15 @@ namespace
     // Nothing changed: everything comes from the cache.
     const auto cached = run.Evaluate(graph, facts.seed, ground);
     EXPECT_EQ(cached.evaluated, 0);
-    EXPECT_EQ(cached.cached, 7);
+    EXPECT_EQ(cached.cached, 9);
 
-    // The range's top changed: the range and what it feeds run again (range, erosion, flatten, output), the noises
-    // don't.
+    // The range's top changed: the range and what it feeds run again (range, erosion, flatten, the height output, the
+    // ground kinds and their output), the noises and the blend don't.
     ParamValue hi;
     hi.value[0] = 80.0f;
     graph.SetParam(4, ParamOf(*graph.Find(4)->type, "hi"), hi);
     const auto changed = run.Evaluate(graph, facts.seed, ground);
-    EXPECT_EQ(changed.evaluated, 4);
+    EXPECT_EQ(changed.evaluated, 6);
     EXPECT_EQ(changed.cached, 3);
     field::Grid higher;
     ASSERT_TRUE(run.FinalHeight(graph, ground, higher));
@@ -290,6 +291,81 @@ namespace
       ++ran;
     }
     EXPECT_GE(ran, 80) << "the palette's node types";
+  }
+
+  TEST(
+    TerrainGraph,
+    GroundKindsPaintTheLayersThatHoldThem
+  )
+  {
+    // A map with grass as the base, rock on layer 1, sand on layer 2, snow on layer 3; rolling ground with a cliff.
+    TerrainGround ground;
+    ground.width = 129;
+    ground.height = 129;
+    auto heights = std::make_shared<std::vector<float>>(129 * 129);
+    for (int z = 0; z < 129; ++z) {
+      for (int x = 0; x < 129; ++x) {
+        const float cliff = x < 60 ? 0.0f : (x < 66 ? static_cast<float>(x - 60) * 8.0f : 48.0f);
+        (*heights)[static_cast<std::size_t>(z * 129 + x)] =
+          20.0f + cliff + 2.0f * std::sin(static_cast<float>(z) * 0.1f);
+      }
+    }
+    ground.heights = heights;
+    ground.revision = 7;
+    std::array<faf::editor::GroundKind, 9> kinds{};
+    kinds[0] = faf::editor::GroundKind::Grass;
+    kinds[1] = faf::editor::GroundKind::Rock;
+    kinds[2] = faf::editor::GroundKind::Sand;
+    kinds[3] = faf::editor::GroundKind::Snow;
+    for (int l = 0; l <= 3; ++l) {
+      ground.textured[static_cast<std::size_t>(l)] = true;
+    }
+    ground.plan = faf::editor::PlanRecipe(kinds, ground.textured, 8, false);
+    ground.hasPaint = true;
+
+    NodeGraph graph(TerrainNodeTypes());
+    const int terrain = graph.AddNode("terrain", 0, 0);
+    const int detect = graph.AddNode("ground_kinds", 200, 0);
+    const int out = graph.AddNode("out_kinds", 400, 0);
+    const auto& kindsType = *graph.Find(detect)->type;
+    const auto& outType = *graph.Find(out)->type;
+    ASSERT_EQ(graph.Link(terrain, 0, detect, PinOf(kindsType.inputs, "a")), LinkResult::Ok);
+    ASSERT_EQ(graph.Link(detect, PinOf(kindsType.outputs, "rock"), out, PinOf(outType.inputs, "rock")), LinkResult::Ok);
+    ASSERT_EQ(graph.Link(detect, PinOf(kindsType.outputs, "snow"), out, PinOf(outType.inputs, "snow")), LinkResult::Ok);
+    TerrainRun run(1);
+    const auto report = run.Evaluate(graph, 1, ground);
+    ASSERT_TRUE(report.errors.empty()) << report.errors.begin()->second;
+    const faf::editor::TerrainValue* rock = run.Value(detect, "rock");
+    ASSERT_NE(rock, nullptr);
+    ASSERT_NE(rock->grid, nullptr);
+    EXPECT_GT(*std::max_element(rock->grid->v.begin(), rock->grid->v.end()), 0.5f) << "rock on the cliff";
+    const faf::editor::TerrainValue* grass = run.Value(detect, "grass");
+    ASSERT_NE(grass, nullptr);
+    EXPECT_FLOAT_EQ(grass->grid->v[0], 1.0f) << "the base kind: everything the others leave";
+
+    field::Grid shape(129, 129, 1.0f, 0.0f, 0.0f);
+    std::map<int, field::Grid> target;
+    std::string error;
+    ASSERT_TRUE(run.KindsPaint(graph, ground, shape, target, error)) << error;
+    ASSERT_EQ(target.count(1), 1U) << "rock's layer";
+    ASSERT_EQ(target.count(2), 1U) << "sand has a layer and no link: cleared";
+    EXPECT_FLOAT_EQ(*std::max_element(target[2].v.begin(), target[2].v.end()), 0.0f);
+    EXPECT_GT(*std::max_element(target[1].v.begin(), target[1].v.end()), 0.5f);
+    // The visible weights never add up to more than the whole.
+    for (std::size_t k = 0; k < shape.v.size(); ++k) {
+      float sum = 0.0f;
+      for (const auto& [layer, weight] : target) {
+        sum += weight.v[k];
+      }
+      ASSERT_LE(sum, 1.0001f) << "sample " << k;
+    }
+    // A graph without Output: ground kinds paints nothing.
+    NodeGraph none(TerrainNodeTypes());
+    (void)none.AddNode("perlin", 0, 0);
+    TerrainRun other(1);
+    (void)other.Evaluate(none, 1, ground);
+    EXPECT_FALSE(other.KindsPaint(none, ground, shape, target, error));
+    EXPECT_TRUE(error.empty());
   }
 
   TEST(

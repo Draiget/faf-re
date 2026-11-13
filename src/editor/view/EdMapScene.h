@@ -277,7 +277,8 @@ namespace faf::editor
       const std::array<bool, 9>& textured,
       int cap,
       std::array<float, 9>& shares,
-      std::string& message
+      std::string& message,
+      bool ownStep = true
     );
     /** The map's masks, read now if they weren't (edit mode on, as the Texture tool does); empty when there are none.
      */
@@ -1045,7 +1046,24 @@ namespace faf::editor
      * (as the new ground when `plain`, else its change added to the fine heights). The last preview, while it is the
      * newest step, is taken off first, so previews replace each other and Build replaces the preview.
      */
-    std::string ApplyGraphHeights(const field::Grid& result, bool plain, bool preview);
+    std::string ApplyGraphHeights(
+      const field::Grid& result,
+      bool plain,
+      bool preview,
+      bool endStep = true,
+      std::size_t* changedOut = nullptr
+    );
+    /**
+     * A build: the heights (when `heights` has samples) and the paint (layer -> visible weight, as a recipe writes it)
+     * as one undo step, in place of the preview while it is the newest step.
+     */
+    std::string ApplyGraphBuild(
+      const field::Grid& heights,
+      bool plain,
+      const std::map<int, field::Grid>& paint,
+      const std::array<bool, 9>& textured,
+      int cap
+    );
     /** Takes the preview off (while it is the newest step). */
     bool RevertGraphPreview();
     [[nodiscard]] bool GraphPreviewNewest() const;

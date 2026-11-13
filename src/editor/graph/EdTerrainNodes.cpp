@@ -4,6 +4,8 @@
 
 #include "editor/graph/EdTerrainEval.h"
 #include "editor/tools/EdErosionSuite.h"
+#include "editor/tools/EdMaskGen.h"
+#include "editor/tools/EdRecipes.h"
 
 #include <algorithm>
 #include <array>
@@ -2713,6 +2715,334 @@ namespace faf::editor::terrain
     },
       "height"
     );
+
+    // ---- texturing by the map's shader (FAF Studio's graphnodes_kinds.lua) and the mask generator's presets
+    {
+      // The shader's facts as numbers.
+      c.Add(
+        "terrain_shader",
+        "Terrain shader",
+        "sources",
+        "The terrain shader of the map as numbers, so a graph can adapt to it: how many layers it paints (4, 7 or 8), "
+        "whether "
+        "it is a PBR shader, whether it splats by height (2xx), whether it draws layers 3 and 4 from the side only "
+        "(the B "
+        "shaders), and which map-wide pictures it reads.",
+        {},
+        {Pin("layers", PinType::Number),
+         Pin("pbr", PinType::Number),
+         Pin("splat", PinType::Number),
+         Pin("biplanar", PinType::Number),
+         Pin("macro", PinType::Number),
+         Pin("specular", PinType::Number),
+         Pin("roughness", PinType::Number)},
+        {},
+        [](const Env& E, const Values&, const Inputs&) {
+        const TerrainGround& g = *E.ground;
+        Outputs out;
+        const auto put = [&](const char* name, const double value) {
+          out[name].number = value;
+          out[name].isNumber = true;
+        };
+        put("layers", g.painted);
+        put("pbr", g.pbr ? 1.0 : 0.0);
+        put("splat", g.splat ? 1.0 : 0.0);
+        put("biplanar", g.biplanar ? 1.0 : 0.0);
+        put("macro", g.macro ? 1.0 : 0.0);
+        put("specular", g.specular ? 1.0 : 0.0);
+        put("roughness", g.roughness ? 1.0 : 0.0);
+        return out;
+      }
+      );
+
+      // The eight kinds as masks, from the stratum recipe for this map's layers and shader.
+      std::vector<PinDef> kindInputs = {
+        Pin("a"), Pin("wear", PinType::Mask), Pin("deposit", PinType::Mask), Pin("flow", PinType::Mask)
+      };
+      std::vector<PinDef> kindOutputs;
+      for (const TerrainKind& k : TerrainKinds()) {
+        kindOutputs.push_back(Pin(k.id, PinType::Mask));
+      }
+      for (const TerrainKindVariant& vr : TerrainKindVariants()) {
+        kindOutputs.push_back(Pin(vr.id, PinType::Mask));
+      }
+      std::vector<std::string> styleIds;
+      std::vector<std::string> styleNames;
+      for (const RecipeStyle& s : RecipeStyles()) {
+        styleIds.emplace_back(s.id);
+        styleNames.emplace_back(s.name);
+      }
+      std::vector<ParamDef> kindParams = {
+        C("style", "Style", styleIds, styleNames, styleIds.front().c_str()),
+        N("erosion", "Erosion masks decide (when linked)", 0, 1, 0.05f, "%.2f", 0.7f)
+      };
+      const RecipeKnobs defaults;
+      for (std::size_t i = 0; i < RecipeKnobList().size(); ++i) {
+        const RecipeKnobInfo& info = RecipeKnobList()[i];
+        kindParams.push_back(
+          N(RecipeKnobKeys()[i], info.label, info.min, info.max, 0.0f, info.format, defaults.*info.member)
+        );
+      }
+      c.Add(
+        "ground_kinds",
+        "Ground kinds",
+        "analysis",
+        "Where each of the eight kinds of ground belongs on these heights: the stratum recipe as masks. It follows the "
+        "map: "
+        "the kinds that have a layer, the base layer, and the shader (a kind on layer 3 or 4 of a B shader gets steep "
+        "ground "
+        "only). Kinds the map has no layer for come out empty. A slider left at its default takes the value of the "
+        "style.",
+        kindInputs,
+        kindOutputs,
+        kindParams,
+        [](const Env& E, const Values& v, const Inputs& ins) {
+        const field::GridPtr a = In(ins, "a");
+        const TerrainGround& g = *E.ground;
+        int style = 0;
+        for (std::size_t s = 0; s < RecipeStyles().size(); ++s) {
+          if (v.S("style") == RecipeStyles()[s].id) {
+            style = static_cast<int>(s);
+          }
+        }
+        RecipeKnobs knobs = RecipeKnobsOf(style);
+        const RecipeKnobs defaults;
+        for (std::size_t i = 0; i < RecipeKnobList().size(); ++i) {
+          const RecipeKnobInfo& info = RecipeKnobList()[i];
+          const double value = v.N(RecipeKnobKeys()[i]);
+          if (std::fabs(value - static_cast<double>(defaults.*info.member)) > 1e-6) {
+            knobs.*info.member = static_cast<float>(value);
+          }
+        }
+        MaskGenContext context;
+        context.heights = std::make_shared<field::Grid>(*a);
+        context.water = E.water;
+        const RecipeStats stats = RecipeStatsOf(a->v, E.water, g.waterOn);
+        std::vector<RecipeRole> roles;
+        std::array<std::vector<float>, 9> selection;
+        std::map<std::pair<int, int>, std::vector<float>> variants;
+        std::string error;
+        if (
+          !RecipeRoles(context, g.plan, stats, knobs, style, roles, error) ||
+          !RecipeSelections(context, g.plan, roles, knobs, style, selection, variants, error)
+        ) {
+          Fail(error);
+        }
+        const auto grid = [&](std::vector<float> values) {
+          auto out = std::make_shared<field::Grid>(*a);
+          out->v = std::move(values);
+          return out;
+        };
+        // What the erosion did decides too: wear bares rock, sediment settles as dirt, the flow is wet ground.
+        if (!RecipeStyles()[static_cast<std::size_t>(style)].erosion && v.N("erosion") > 0.0) {
+          const auto lift = [&](const GroundKind kind, const char* pin) {
+            const field::GridPtr m = In(ins, pin);
+            std::vector<float>& s = selection[static_cast<std::size_t>(kind)];
+            if (m == nullptr || s.size() != m->v.size()) {
+              return;
+            }
+            for (std::size_t k = 0; k < s.size(); ++k) {
+              s[k] = std::max(s[k], std::clamp(m->v[k] * static_cast<float>(v.N("erosion")), 0.0f, 1.0f));
+            }
+          };
+          lift(GroundKind::Rock, "wear");
+          lift(GroundKind::Dirt, "deposit");
+          lift(GroundKind::Wet, "flow");
+        }
+        Outputs out;
+        for (const TerrainKind& k : TerrainKinds()) {
+          std::vector<float>& s = selection[static_cast<std::size_t>(k.kind)];
+          out[k.id].grid = s.size() == a->v.size() ? grid(std::move(s)) : E.Const(g.plan.base == k.kind ? 1.0 : 0.0);
+        }
+        for (const TerrainKindVariant& vr : TerrainKindVariants()) {
+          const auto found = variants.find({static_cast<int>(vr.kind), vr.layer});
+          out[vr.id].grid =
+            found != variants.end() && found->second.size() == a->v.size() ? grid(found->second) : E.Const(0.0);
+        }
+        return out;
+      }
+      );
+
+      // Roughness from the kinds: rock and sand rough, wet ground and snow shiny.
+      std::vector<PinDef> roughInputs;
+      for (const TerrainKind& k : TerrainKinds()) {
+        roughInputs.push_back(Pin(k.id, PinType::Mask));
+      }
+      c.Add(
+        "surface_roughness",
+        "Surface roughness",
+        "analysis",
+        "A roughness mask (0.5 = neutral, lower = shinier, higher = rougher) from the kind masks: dry rock, dark rock "
+        "and sand "
+        "rough, wet ground and snow shiny; the kinds linked are laid over each other from the lowest priority up.",
+        roughInputs,
+        kMaskOut,
+        {N("contrast", "How far the kinds differ", 0, 1, 0.05f, "%.2f", 0.8f),
+         N("base", "Where no kind is linked", 0, 1, 0.05f, "%.2f", 0.5f)},
+        [](const Env& E, const Values& v, const Inputs& ins) {
+        field::GridPtr current = E.Const(v.N("base"));
+        for (const TerrainKind& k : TerrainKinds()) {
+          const field::GridPtr m = In(ins, k.id);
+          if (m == nullptr) {
+            continue;
+          }
+          const double r = 0.5 + (k.roughness - 0.5) * v.N("contrast");
+          current =
+            E.Op("blend", {{"a", current}, {"b", E.Const(r)}, {"mask", m}, {"mode", "normal"}, {"opacity", 1.0}});
+        }
+        return One(current);
+      }
+      );
+
+      // A ready made mask of the mask generator from the heights linked in.
+      std::vector<std::string> presetIds;
+      std::vector<std::string> presetNames;
+      for (const MaskPreset& p : MaskPresets()) {
+        presetIds.emplace_back(p.id);
+        presetNames.emplace_back(p.name);
+      }
+      c.Add(
+        "mask_preset",
+        "Mask preset",
+        "analysis",
+        "A ready made mask of the Mask generator (cliffs, beach, snow caps, buildable ground, ground land units cannot "
+        "cross "
+        "...) from the heights linked in.",
+        {Pin("a")},
+        kMaskOut,
+        {C("preset", "Preset", presetIds, presetNames, "cliffs")},
+        [](const Env& E, const Values& v, const Inputs& ins) {
+        const field::GridPtr a = In(ins, "a");
+        const field::Stats s = field::Measure(*a);
+        MaskGenContext context;
+        context.heights = std::make_shared<field::Grid>(*a);
+        context.water = E.water;
+        auto out = std::make_shared<field::Grid>();
+        std::string error;
+        if (!EvaluateMaskRules(context, MaskPresetRules(v.S("preset"), s.min, s.max), *out, error)) {
+          Fail(error);
+        }
+        return One(out);
+      }
+      );
+
+      // The outputs that paint (their inputs are what Build writes).
+      std::vector<PinDef> outKindInputs;
+      for (const TerrainKind& k : TerrainKinds()) {
+        outKindInputs.push_back(Pin(k.id, PinType::Mask));
+      }
+      for (const TerrainKindVariant& vr : TerrainKindVariants()) {
+        outKindInputs.push_back(Pin(vr.id, PinType::Mask));
+      }
+      const Eval none = [](const Env&, const Values&, const Inputs&) {
+        return Outputs{};
+      };
+      c.Add(
+        "out_kinds",
+        "Output: ground kinds",
+        "outputs",
+        "Build paints the whole ground from the kind masks: overlaps are settled the way the recipes do (snow over "
+        "high rock "
+        "over dark rock over rock over wet ground over sand over dirt over grass), every kind goes to the layer that "
+        "holds "
+        "it whatever the shader, the base layer is what is left, side-mapped layers get steep ground only. A kind with "
+        "a "
+        "layer but no link is cleared from its layer. One undo step with the rest of the build.",
+        outKindInputs,
+        {},
+        {B("types", "Set the terrain types too", true),
+         B("roughness", "Roughness multiplier too (PBR shaders)", true),
+         N("amount", "How much the roughness varies", 0, 1, 0.05f, "%.2f", 0.6f)},
+        none,
+        "kinds"
+      );
+      std::vector<std::string> kindIds;
+      std::vector<std::string> kindNames;
+      for (const TerrainKind& k : TerrainKinds()) {
+        kindIds.emplace_back(k.id);
+        kindNames.emplace_back(RecipeKindLabel(k.kind));
+      }
+      std::vector<std::string> textureIds = {"keep"};
+      std::vector<std::string> textureNames = {"Keep the layer's texture"};
+      textureIds.insert(textureIds.end(), kindIds.begin(), kindIds.end());
+      textureNames.insert(textureNames.end(), kindNames.begin(), kindNames.end());
+      c.Add(
+        "out_layer",
+        "Output: texture layer",
+        "outputs",
+        "Writes a mask into the paint mask of a texture layer (1..8). Replace, add (the larger) or subtract, with a "
+        "strength.",
+        {Pin("a", PinType::Mask)},
+        {},
+        {N("layer", "Layer", 1, 8, 1, "%.0f", 2),
+         C("mode",
+           "Mode",
+           {"replace", "add", "subtract"},
+           {"Replace", "Add to (the larger)", "Subtract from"},
+           "replace"),
+         N("strength", "Strength", 0, 1, 0.05f, "%.2f", 1, true),
+         B("takeAway", "Layers above take away", false),
+         C("texture", "Layer texture", textureIds, textureNames, "keep")},
+        none,
+        "layer"
+      );
+      c.Add(
+        "out_role",
+        "Output: ground kind",
+        "outputs",
+        "Writes a mask into the paint of the layer that holds this kind of ground (found from the textures of the "
+        "map), "
+        "whatever the layer order and the shader.",
+        {Pin("a", PinType::Mask)},
+        {},
+        {C("role", "Kind of ground", kindIds, kindNames, "rock"),
+         C("mode",
+           "Mode",
+           {"replace", "add", "subtract"},
+           {"Replace", "Add to (the larger)", "Subtract from"},
+           "replace"),
+         N("strength", "Strength", 0, 1, 0.05f, "%.2f", 1, true),
+         B("takeAway", "Layers above take away", false),
+         B("texture", "Give an empty layer its texture", true)},
+        none,
+        "layer"
+      );
+      c.Add(
+        "out_types",
+        "Output: terrain type",
+        "outputs",
+        "Sets a terrain type code in the terrain-type grid where the mask is above a threshold.",
+        {Pin("a", PinType::Mask)},
+        {},
+        {N("code", "Type code", 0, 255, 1, "%.0f", 2),
+         N("threshold", "Where the mask is above", 0, 1, 0.01f, "%.2f", 0.5f, true)},
+        none,
+        "types"
+      );
+      c.Add(
+        "out_scatter",
+        "Output: scatter props",
+        "outputs",
+        "Scatters props (or decals) where the density mask allows: Poisson disc sampling with a minimum distance, "
+        "seeded, "
+        "symmetry aware. Runs on Build only.",
+        {Pin("a", PinType::Mask)},
+        {},
+        {C("kind", "Scatter", {"props", "decals"}, {"Props", "Decals"}, "props"),
+         T("entries", "Blueprints (weights)", ""),
+         N("count", "Most to place", 1, 20000, 10, "%.0f", 800),
+         N("minDist", "Minimum distance (units)", 0.5f, 80, 0.5f, "%.1f", 6),
+         N("fill", "Fill (acceptance)", 0, 1, 0.05f, "%.2f", 1),
+         N("slopeMax", "Steepest slope (degrees)", 0, 90, 1, "%.0f", 35),
+         N("scaleMin", "Smallest scale (%)", 10, 400, 5, "%.0f", 80),
+         N("scaleMax", "Largest scale (%)", 10, 400, 5, "%.0f", 120),
+         N("margin", "Margin from the edge (units)", 0, 100, 1, "%.0f", 4),
+         B("underWater", "Also under water", false),
+         Seed()},
+        none,
+        "scatter"
+      );
+    }
 
     c.Add(
       "out_colormap",
