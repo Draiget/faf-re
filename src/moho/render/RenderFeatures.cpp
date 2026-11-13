@@ -75,9 +75,9 @@ namespace moho::render
       // Whether the device traces rays (inline ray queries): the options of the ray-traced shadows and occlusion are
       // shown only where it does.
       gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
-      result.SetBoolean(
-        "rayTracing", device != nullptr && (device->GetGpuDrivenFeatures() & gpg::gal::kGpuFeatureRayQuery) != 0U
-      );
+      const bool rayTracing =
+        device != nullptr && (device->GetGpuDrivenFeatures() & gpg::gal::kGpuFeatureRayQuery) != 0U;
+      result.SetBoolean("rayTracing", rayTracing);
       LuaPlus::LuaObject list;
       list.AssignNewTable(state, 0, 0);
       LuaPlus::LuaObject missing;
@@ -89,12 +89,13 @@ namespace moho::render
           break;
         }
         const ApiSupport& support = feature.apis[static_cast<int>(api)];
-        if (!support.supported) {
+        const bool noRays = feature.needsRayTracing && support.supported && !rayTracing;
+        if (!support.supported || noRays) {
           LuaPlus::LuaObject entry;
           entry.AssignNewTable(state, 0, 0);
           entry.SetString("key", feature.key.c_str());
           entry.SetString("title", feature.title.c_str());
-          entry.SetString("reason", support.reason.c_str());
+          entry.SetString("reason", noRays ? "needs a graphics card that can trace rays" : support.reason.c_str());
           missing.SetObject(missingIndex++, entry);
           continue;
         }
@@ -108,6 +109,8 @@ namespace moho::render
         }
         entry.SetString("tip", tip.c_str());
         entry.SetString("console", feature.console.c_str());
+        entry.SetString("after", feature.after.c_str());
+        entry.SetBoolean("numericKeys", feature.numericKeys);
         entry.SetBoolean("restart", feature.needsRestart);
         const int top = LimitLevel(feature, api, static_cast<int>(feature.states.size()) - 1);
         const int defaultLevel = DefaultLevel(feature, api);
@@ -119,6 +122,7 @@ namespace moho::render
           stateEntry.AssignNewTable(state, 0, 0);
           stateEntry.SetString("text", feature.states[static_cast<std::size_t>(level)].text.c_str());
           stateEntry.SetString("key", feature.states[static_cast<std::size_t>(level)].key.c_str());
+          stateEntry.SetString("value", feature.states[static_cast<std::size_t>(level)].value.c_str());
           stateEntry.SetNumber("level", static_cast<float>(level));
           states.SetObject(level + 1, stateEntry);
         }
@@ -250,7 +254,9 @@ namespace moho::render
       return -1;
     }
     int level = DefaultLevel(*feature, api);
-    if (fromOption) {
+    // A profile stores numeric keys as numbers, which the string read below would refuse: the options screen applies
+    // such a feature (its set function), the level here is the default.
+    if (fromOption && !feature->numericKeys) {
       const fa::string chosen = moho::OPTIONS_GetString(feature->key.c_str());
       if (!chosen.empty()) {
         for (std::size_t i = 0; i < feature->states.size(); ++i) {

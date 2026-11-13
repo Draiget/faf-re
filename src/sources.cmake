@@ -958,6 +958,7 @@ set(FAF_ENGINE_SOURCES
   moho/render/DynamicLights.cpp
   moho/render/TemporalAA.cpp
   moho/render/RenderFeatures.cpp
+  moho/render/ImageQualityFeatures.cpp
   moho/render/RenderScale.cpp
   moho/render/BoundaryRenderer.cpp
   moho/render/FxaaRenderer.cpp
