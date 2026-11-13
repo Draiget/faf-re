@@ -32,7 +32,7 @@ chmod 600 admin.token
 ## 3. Start the host
 
 ```
-server-host --listen 127.0.0.1:27180 --token-file admin.token --cors-origin http://localhost:5173 \
+server-host --listen 127.0.0.1:27180 --token-file admin.token --cors-origin http://localhost:5173,http://127.0.0.1:5173 \
   --server build/server --runs /var/lib/faf/lobbies \
   --maps fa=/data/fa/maps --maps vault=/data/vault/maps \
   --public-host 203.0.113.5 --ports 27200-27299 \
@@ -43,7 +43,7 @@ server-host --listen 127.0.0.1:27180 --token-file admin.token --cors-origin http
 |---|---|
 | `--listen` | where the host's REST API listens (`http://<ip:port>/api/v1`) |
 | `--token-file` | the admin token (at least 16 characters) |
-| `--cors-origin` | the one web origin whose pages may call the API: the dashboard's address |
+| `--cors-origin` | the web origins whose pages may call the API, comma-separated: the dashboard's address, as many spellings of it as browsers use |
 | `--server` | the `server` binary each lobby runs |
 | `--engine-args` | engine switches every lobby's server gets; `/init` names the init file of the game data |
 | `--maps <label>=<folder>` | a folder of map folders (each with a `*_scenario.lua`); repeat it; the label shows as the map's source |
@@ -65,7 +65,7 @@ npm ci
 npm run dev
 ```
 
-Open `http://localhost:5173` (exactly the `--cors-origin` origin: `http://127.0.0.1:5173` is another origin and the browser refuses it). Before it is connected the page asks what to connect to: **One host** (below) or **Control service** (section "Through the control service"). An address typed in is asked whether it is a control service (`GET /api/v1/health`), and the form switches to match. For one host the address starts as `http://<the page's own host name>:27180` (server-host's port unless `--listen` says otherwise); change it if the host runs on another machine, enter the admin token (the content of the `--token-file` file), and press Connect. The address stays in the browser, the token in the tab only; with both at hand the page connects by itself the next time it opens. If nothing answers, the page names the address it tried and says what to check (the port, that server-host runs, its `--cors-origin`). The host's name in the top bar leads back to this form.
+Open `http://localhost:5173` or `http://127.0.0.1:5173` (the page's origin must be one of the `--cors-origin` origins, or the browser refuses the API's answers). If another program on the machine already listens on `localhost:5173` over IPv6, `localhost` reaches that program instead: use `127.0.0.1`. Before it is connected the page asks what to connect to: **One host** (below) or **Control service** (section "Through the control service"). An address typed in is asked whether it is a control service (`GET /api/v1/health`), and the form switches to match. For one host the address starts as `http://<the page's own host name>:27180` (server-host's port unless `--listen` says otherwise); change it if the host runs on another machine, enter the admin token (the content of the `--token-file` file), and press Connect. The address stays in the browser, the token in the tab only; with both at hand the page connects by itself the next time it opens. If nothing answers, the page names the address it tried and says what to check (the port, that server-host runs, its `--cors-origin`). The host's name in the top bar leads back to this form.
 
 For development, `tools/dashboard/.env.local` (ignored by git) may hold `VITE_HOST_URL=http://<host>:27180` and `VITE_HOST_TOKEN=<token>`: the page starts from them when the browser has nothing stored. The token is read by `npm run dev` only and never goes into a build.
 
@@ -257,7 +257,7 @@ Ended requests are kept 6 hours; the queue and the requests aren't kept when the
 
 - **Token refused** (401) in the dashboard: the token differs from the `--token-file` file's (spaces and line ends at its end are dropped).
 - **Not a host**: the address answered but has no `/api/v1/host`, for example a lone server's `--rest` port; the dashboard needs `server-host`'s address (port 27180 unless `--listen` says otherwise).
-- **The page can't reach the API** (the browser's console shows a CORS error): the page's address isn't exactly the `--cors-origin` origin, scheme and port included.
+- **The page can't reach the API** (the browser's console shows a CORS error): the page's address isn't exactly one of the `--cors-origin` origins, scheme and port included.
 - **No answer at all**: the address or port is wrong, server-host isn't running, the API is bound to `127.0.0.1` and the page runs on another machine, or a firewall closes the port.
 - **A lobby is `failed`**: its card shows how the server ended; its `server.log` in the lobby's folder under `--runs` says why.
 - **A lobby's CPUs**: the kernel's view is in `cpus_allowed` on the lobby (from `/proc/<pid>/status`); inside a container, CPUs outside the container's set can't be used.

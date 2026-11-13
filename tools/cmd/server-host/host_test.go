@@ -238,3 +238,21 @@ func TestSeatsKeepTheirStartSpots(t *testing.T) {
 		}
 	}
 }
+
+func TestCORSOriginList(t *testing.T) {
+	m := testManager(t)
+	a := &api{token: "0123456789abcdef0123", corsOrigin: "http://localhost:5173, http://127.0.0.1:5173", m: m, maps: m.maps, procDir: t.TempDir(), hostName: "h"}
+	for origin, want := range map[string]string{
+		"http://localhost:5173": "http://localhost:5173",
+		"http://127.0.0.1:5173": "http://127.0.0.1:5173",
+		"http://evil.example":   "",
+	} {
+		r := httptest.NewRequest("OPTIONS", "/api/v1/lobbies", nil)
+		r.Header.Set("Origin", origin)
+		w := httptest.NewRecorder()
+		a.ServeHTTP(w, r)
+		if got := w.Header().Get("Access-Control-Allow-Origin"); got != want {
+			t.Errorf("origin %s: allowed %q, want %q", origin, got, want)
+		}
+	}
+}

@@ -47,9 +47,20 @@ func (a *api) authorized(r *http.Request) bool {
 	return ok && subtle.ConstantTimeCompare([]byte(strings.TrimSpace(given)), []byte(a.token)) == 1
 }
 
+// originAllowed says whether a web page at origin may call the API: --cors-origin takes one origin or several,
+// comma-separated (e.g. http://localhost:5173,http://127.0.0.1:5173, as browsers may reach a dev server by either).
+func (a *api) originAllowed(origin string) bool {
+	for _, allowed := range strings.Split(a.corsOrigin, ",") {
+		if strings.TrimSpace(allowed) == origin {
+			return true
+		}
+	}
+	return false
+}
+
 func (a *api) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if a.corsOrigin != "" && r.Header.Get("Origin") == a.corsOrigin {
-		w.Header().Set("Access-Control-Allow-Origin", a.corsOrigin)
+	if origin := r.Header.Get("Origin"); origin != "" && a.originAllowed(origin) {
+		w.Header().Set("Access-Control-Allow-Origin", origin)
 		w.Header().Set("Vary", "Origin")
 		w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")

@@ -45,7 +45,7 @@ func (m *mapFlags) Set(v string) error {
 func main() {
 	listen := flag.String("listen", "127.0.0.1:27180", "address of the REST API")
 	tokenFile := flag.String("token-file", "", "file holding the admin token (required; at least 16 characters)")
-	cors := flag.String("cors-origin", "", "a web page's origin allowed to call the API (e.g. http://localhost:5173)")
+	cors := flag.String("cors-origin", "", "web page origins allowed to call the API, comma-separated (e.g. http://localhost:5173,http://127.0.0.1:5173)")
 	serverBin := flag.String("server", "", "the server binary each lobby runs (required)")
 	engineArgs := flag.String("engine-args", "", "engine switches every lobby's server gets, e.g. \"/init <init.lua> /nobugreport /nosound\"")
 	runs := flag.String("runs", "lobbies", "folder for each lobby's match file, log, replay and result")
