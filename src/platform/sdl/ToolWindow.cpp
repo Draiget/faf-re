@@ -94,7 +94,9 @@ namespace platform::tools
       gpg::Warnf("Tool window \"%s\": %s", utf8Title != nullptr ? utf8Title : "", SDL_GetError());
       return;
     }
-    mRenderer = SDL_CreateRenderer(mWindow, nullptr);
+    // SDL's software renderer, not its default GPU one: a GPU renderer opens a second graphics device
+    // (Direct3D 11 on Windows) next to the game's, and an injected overlay can crash creating it (#418).
+    mRenderer = SDL_CreateRenderer(mWindow, SDL_SOFTWARE_RENDERER);
     if (mRenderer == nullptr) {
       gpg::Warnf("Tool window \"%s\": no renderer: %s", utf8Title != nullptr ? utf8Title : "", SDL_GetError());
       SDL_DestroyWindow(mWindow);

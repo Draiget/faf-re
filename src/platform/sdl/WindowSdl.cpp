@@ -1150,7 +1150,8 @@ namespace platform::window
     );
     if (gSplashWindow != nullptr) {
       (void)SDL_SetWindowPosition(gSplashWindow, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
-      gSplashRenderer = SDL_CreateRenderer(gSplashWindow, nullptr);
+      // Software, like the tool windows: no second graphics device next to the game's (#418).
+      gSplashRenderer = SDL_CreateRenderer(gSplashWindow, SDL_SOFTWARE_RENDERER);
     }
     if (gSplashRenderer != nullptr) {
       SDL_Texture* const texture = SDL_CreateTextureFromSurface(gSplashRenderer, image);
