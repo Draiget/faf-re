@@ -1211,6 +1211,17 @@ namespace faf::editor
     {
       mSymmetry = mode;
     }
+    /** The symmetry mode the toolbar's pointer is over (-1: none): the map previews it. Set every frame. */
+    void SetSymmetryHover(
+      const int mode
+    ) noexcept
+    {
+      mSymmetryHover = mode;
+    }
+    [[nodiscard]] int SymmetryHover() const noexcept
+    {
+      return mSymmetryHover;
+    }
     [[nodiscard]] static const char* SymmetryName(int mode) noexcept;
     /**
      * The view's camera for its overlays, the scene's each frame: the directions on the ground of the view's up and
@@ -1368,6 +1379,12 @@ namespace faf::editor
     [[nodiscard]] int HudCopies() const noexcept;
     /** A symmetry's picture (its tile's) in the square at `p`, `s` wide. */
     void DrawSymmetryPicture(ImDrawList* draw, int mode, ImVec2 p, float s) const;
+    /**
+     * A symmetry mode's tooltip body (call between BeginTooltip and EndTooltip): its name, what it does in a sentence,
+     * and a small map in motion with its mirror lines or turn centre and a dab painting with its copies. `fromToolbar`
+     * adds where the other modes are.
+     */
+    void DrawSymmetryTooltip(int mode, bool fromToolbar) const;
     /** The key each tool's command has (Settings > Keys), shown in the strip's corner and its tooltip. */
     void SetToolKeys(
       std::vector<std::string> keys
@@ -1782,6 +1799,15 @@ namespace faf::editor
     }
 
     /** The terrain brush as the panel sets it (Flatten's height is the stroke's, set by the viewport). */
+    /** The brush with the hovered symmetry mode when one is hovered (the map's preview), else the current one. */
+    [[nodiscard]] HeightBrush PreviewHeightBrush() const noexcept
+    {
+      HeightBrush brush = CurrentHeightBrush();
+      if (mSymmetryHover >= 0) {
+        brush.symmetry = static_cast<Symmetry>(mSymmetryHover);
+      }
+      return brush;
+    }
     [[nodiscard]] HeightBrush CurrentHeightBrush() const noexcept
     {
       HeightBrush brush;
@@ -2259,6 +2285,7 @@ namespace faf::editor
     int mMaterialAsk = -1;
     char mBrowseFilter[64]{};
     std::vector<MaskRule> mRules;
+    int mSymmetryHover = -1;
     void DrawMaskGenerator();
     std::vector<MaskGenRule> mGenRules;
     MaskGenTarget mGenTarget;

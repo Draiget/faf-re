@@ -141,9 +141,9 @@ namespace faf::editor
         "/settingsfile",   "/autosavefolder", "/askunsaved",     "/particlebrowser", "/particlenew", "/particleopen",
         "/materialeditor", "/uiscale",        "/testrun",        "/openall",         "/roundtrip",   "/vault",
         "/vaultsearch",    "/vaultmap",       "/newmap",         "/stamp",           "/brush",       "/layer",
-        "/waterbody",      "/ruler",          "/adaptivewindow", "/maskrule",        "/maskgen",     "/shader",
-        "/brushtest",      "/brushshape",     "/stampsource",    "/stampstroke",     "/symoptions",  "/maskoptions",
-        "/masktest",       "/shaderbrowser",  "/convertlayers",
+        "/waterbody",      "/ruler",          "/adaptivewindow", "/maskrule",        "/maskgen",     "/symhover",
+        "/shader",         "/brushtest",      "/brushshape",     "/stampsource",     "/stampstroke", "/symoptions",
+        "/maskoptions",    "/masktest",       "/shaderbrowser",  "/convertlayers",
       };
       for (const char* const option : kOptions) {
         if (moho::CFG_GetArgOption(option, 0, nullptr)) {
@@ -2157,6 +2157,8 @@ namespace faf::editor
         bool doubleClick;
         /** `^D`: a Ctrl+<key> for the view instead of a click. */
         char key = 0;
+        /** `h<x>,<y>`: the pointer moved there, no button (a hover). */
+        bool hoverOnly = false;
       };
       std::vector<UiClick> mUiClicks;
       int mUiClickFrame = 0;
@@ -3011,6 +3013,12 @@ namespace faf::editor
       }
       ImGuiIO& io = ImGui::GetIO();
       io.AddMousePosEvent(click.x, click.y);
+      if (click.hoverOnly) {
+        if (step == 1) {
+          gpg::Logf("editor: test pointer at %.0f,%.0f", click.x, click.y);
+        }
+        return;
+      }
       if (step == 1 || (click.doubleClick && step == 3)) {
         io.AddMouseButtonEvent(ImGuiMouseButton_Left, true);
         gpg::Logf(
@@ -3891,16 +3899,19 @@ namespace faf::editor
             continue;
           }
           const bool twice = !point.empty() && point[0] == 'd';
-          if (twice) {
+          const bool hover = !point.empty() && point[0] == 'h';
+          if (twice || hover) {
             point.erase(0, 1);
           }
           const std::size_t comma = point.find(',');
           if (comma != std::string::npos) {
-            mUiClicks.push_back(
-              {static_cast<float>(std::atof(point.c_str())),
-               static_cast<float>(std::atof(point.c_str() + comma + 1)),
-               twice}
-            );
+            UiClick click{
+              static_cast<float>(std::atof(point.c_str())),
+              static_cast<float>(std::atof(point.c_str() + comma + 1)),
+              twice
+            };
+            click.hoverOnly = hover;
+            mUiClicks.push_back(click);
           }
         }
       }

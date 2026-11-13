@@ -158,8 +158,8 @@ namespace faf::editor
         line(at(1.0f, 0.0f), at(0.0f, 1.0f));
       if (mode == 5 || mode == 8 || mode == 9)
         draw->AddCircleFilled(at(0.5f, 0.5f), s * 0.05f, AccentU32());
-      ImVec2 copies[8];
-      const int count = SymmetryCopies(mode, 0.27f, 0.22f, n, copies);
+      ImVec2 copies[kMaxSymmetryCopies];
+      const int count = SymmetryCopies(mode, 0.27f, 0.22f, std::clamp(n, 2, kMaxSymmetryCopies), copies);
       for (int i = 0; i < count; ++i) {
         draw->AddCircleFilled(at(copies[i].x, copies[i].y), s * 0.075f, i == 0 ? InkU32() : AccentU32());
       }
@@ -423,6 +423,137 @@ namespace faf::editor
   ) const
   {
     DrawSymmetryIcon(draw, mode, mNWay, p, s);
+  }
+
+  void EdTools::DrawSymmetryTooltip(
+    const int mode,
+    const bool fromToolbar
+  ) const
+  {
+    if (mode < 0 || mode >= static_cast<int>(IM_ARRAYSIZE(kSymmetry))) {
+      return;
+    }
+    const int turns = std::clamp(mNWay, 2, kMaxSymmetryCopies);
+    char nway[160];
+    std::snprintf(
+      nway,
+      sizeof(nway),
+      "Turned round the middle %d times (set in the Terrain tool): %d copies, each turned 1/%d further.",
+      turns,
+      turns,
+      turns
+    );
+    static constexpr const char* kAbout[] = {
+      "Each edit stays where you make it; nothing is copied.",
+      "Mirrored across the vertical middle line: the right half copies the left, facing the other way.",
+      "Mirrored across the horizontal middle line: the bottom half copies the top, facing the other way.",
+      "Mirrored across the diagonal from the top-left corner to the bottom-right.",
+      "Mirrored across the diagonal from the top-right corner to the bottom-left.",
+      "Turned half way round the middle: the copy sits opposite and faces the other way, as on most 1v1 maps.",
+      "Mirrored across both middle lines: four copies, one in each quarter.",
+      "Mirrored across both diagonals: four copies.",
+      "Turned a quarter at a time round the middle: four copies, each facing a quarter turn on.",
+      nullptr,
+    };
+    ImGui::Text("Symmetry: %s", kSymmetry[mode].name);
+    ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + Em(250.0f));
+    ImGui::TextDisabled(
+      "%s%s", kAbout[mode] != nullptr ? kAbout[mode] : nway, kSymmetry[mode].square ? " Square maps only." : ""
+    );
+    ImGui::PopTextWrapPos();
+
+    // The map in motion.
+    ImDrawList* const draw = ImGui::GetWindowDrawList();
+    const float side = Em(150.0f);
+    const ImVec2 p = ImGui::GetCursorScreenPos();
+    ImGui::Dummy(ImVec2(side, side));
+    const ImVec2 q(p.x + side, p.y + side);
+    draw->AddRectFilledMultiColor(
+      p,
+      q,
+      IM_COL32(0x3C, 0x55, 0x38, 0xFF),
+      IM_COL32(0x4A, 0x5E, 0x3A, 0xFF),
+      IM_COL32(0x2E, 0x4E, 0x5E, 0xFF),
+      IM_COL32(0x38, 0x4C, 0x40, 0xFF)
+    );
+    for (int k = 1; k < 4; ++k) {
+      const float f = side * static_cast<float>(k) / 4.0f;
+      draw->AddLine(ImVec2(p.x + f, p.y), ImVec2(p.x + f, q.y), IM_COL32(0xFF, 0xFF, 0xFF, 0x14));
+      draw->AddLine(ImVec2(p.x, p.y + f), ImVec2(q.x, p.y + f), IM_COL32(0xFF, 0xFF, 0xFF, 0x14));
+    }
+    draw->AddRect(p, q, LineU32());
+    const auto at = [&](const float u, const float v) {
+      return ImVec2(p.x + u * side, p.y + v * side);
+    };
+    // The mirror lines, or the turn centre.
+    const ImU32 axis = AccentU32();
+    if (mode == 1 || mode == 6)
+      draw->AddLine(at(0.5f, 0.0f), at(0.5f, 1.0f), axis, 1.6f);
+    if (mode == 2 || mode == 6)
+      draw->AddLine(at(0.0f, 0.5f), at(1.0f, 0.5f), axis, 1.6f);
+    if (mode == 3 || mode == 7)
+      draw->AddLine(at(0.0f, 0.0f), at(1.0f, 1.0f), axis, 1.6f);
+    if (mode == 4 || mode == 7)
+      draw->AddLine(at(1.0f, 0.0f), at(0.0f, 1.0f), axis, 1.6f);
+    if (mode == 9) {
+      for (int k = 0; k < turns; ++k) {
+        const float a = 6.2831853f * static_cast<float>(k) / static_cast<float>(turns) - 1.5707963f;
+        draw->AddLine(at(0.5f, 0.5f), at(0.5f + 0.7f * std::cos(a), 0.5f + 0.7f * std::sin(a)), AccentU32(0.35f), 1.0f);
+      }
+    }
+    if (mode == 5 || mode == 8 || mode == 9) {
+      draw->AddCircleFilled(at(0.5f, 0.5f), Em(3.0f), axis);
+    }
+    draw->PushClipRect(p, q, true);
+    // A dab painting a loop in the first sector; the stroke it leaves fades behind it, at every copy.
+    const float time = static_cast<float>(ImGui::GetTime());
+    const auto path = [](const float t, float& u, float& v) {
+      u = 0.30f + 0.11f * std::cos(t * 1.6f);
+      v = 0.22f + 0.08f * std::sin(t * 3.2f);
+    };
+    ImVec2 copies[kMaxSymmetryCopies];
+    constexpr int kTrail = 22;
+    for (int k = kTrail; k >= 1; --k) {
+      float u = 0.0f;
+      float v = 0.0f;
+      path(time - static_cast<float>(k) * 0.05f, u, v);
+      const int count = SymmetryCopies(mode, u, v, turns, copies);
+      const float fade = 1.0f - static_cast<float>(k) / static_cast<float>(kTrail + 1);
+      for (int c = 0; c < count; ++c) {
+        draw->AddCircleFilled(
+          at(copies[c].x, copies[c].y),
+          side * 0.028f,
+          c == 0 ? IM_COL32(0xFF, 0xFF, 0xFF, static_cast<int>(110.0f * fade))
+                 : (AccentU32() & 0x00FFFFFFu) | (static_cast<ImU32>(130.0f * fade) << 24)
+        );
+      }
+    }
+    float u = 0.0f;
+    float v = 0.0f;
+    float u2 = 0.0f;
+    float v2 = 0.0f;
+    path(time, u, v);
+    path(time + 0.12f, u2, v2);
+    ImVec2 ahead[kMaxSymmetryCopies];
+    const int count = SymmetryCopies(mode, u, v, turns, copies);
+    (void)SymmetryCopies(mode, u2, v2, turns, ahead);
+    for (int c = 0; c < count; ++c) {
+      const ImU32 colour = c == 0 ? IM_COL32(0xFF, 0xFF, 0xFF, 0xFF) : AccentU32();
+      const ImVec2 centre = at(copies[c].x, copies[c].y);
+      const ImVec2 next = at(ahead[c].x, ahead[c].y);
+      const float r = side * 0.06f;
+      draw->AddCircle(centre, r, colour, 0, 1.6f);
+      // Its heading: a mirror turns the copies' way round, a turn keeps it.
+      const float dx = next.x - centre.x;
+      const float dy = next.y - centre.y;
+      const float length = std::max(0.001f, std::hypot(dx, dy));
+      draw->AddLine(centre, ImVec2(centre.x + dx / length * r * 1.5f, centre.y + dy / length * r * 1.5f), colour, 2.0f);
+    }
+    draw->PopClipRect();
+    ImGui::TextDisabled("White: where you edit. Blue: its copies.");
+    if (fromToolbar) {
+      ImGui::TextDisabled("All ten modes are in the Terrain tool's settings.");
+    }
   }
 
   const char* EdTools::HudMode() const noexcept
@@ -930,7 +1061,9 @@ namespace faf::editor
         const bool on = i == mSymmetry;
         const bool hovered = ImGui::IsItemHovered();
         if (hovered) {
-          ImGui::SetTooltip("%s%s", kSymmetry[i].name, kSymmetry[i].square ? " (square maps)" : "");
+          ImGui::BeginTooltip();
+          DrawSymmetryTooltip(i, false);
+          ImGui::EndTooltip();
         }
         draw->AddRectFilled(
           p, ImVec2(p.x + cell, p.y + cell + labelHeight), on ? AccentU32(0.16f) : SurfaceU32(), 4.0f

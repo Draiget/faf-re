@@ -1036,6 +1036,12 @@ namespace faf::editor
         ImGui::Dummy(ImVec2(word.x + Em(5.0f), buttonHeight));
         ImGui::SameLine(0.0f, 0.0f);
         static constexpr int kModes[] = {0, 1, 5, 6, 8};
+        mTools.SetSymmetryHover(-1);
+        // `/symhover <mode>` (test runs): that button held as hovered, its tooltip under it.
+        static const int testHover = [] {
+          fa::vector<fa::string> value;
+          return moho::CFG_GetArgOption("/symhover", 1, &value) && !value.empty() ? std::atoi(value[0].c_str()) : -1;
+        }();
         for (const int mode : kModes) {
           ImGui::PushID(mode);
           const ImVec2 p = ImGui::GetCursorScreenPos();
@@ -1044,7 +1050,8 @@ namespace faf::editor
           if (ImGui::InvisibleButton("##sym", ImVec2(side, side)) && !playing) {
             mTools.PickSymmetry(mode);
           }
-          const bool hovered = ImGui::IsItemHovered();
+          const bool hovered =
+            ImGui::IsItemHovered() || (mode == testHover && mDocument.GetState() == EdDocument::State::Open);
           if (on) {
             draw->AddRectFilled(p, ImVec2(p.x + side, p.y + side), AccentU32(0.16f), Em(4.0f));
           } else if (hovered) {
@@ -1055,9 +1062,14 @@ namespace faf::editor
             draw, mode, ImVec2(p.x + (side - picture) * 0.5f, p.y + (side - picture) * 0.5f), picture
           );
           if (hovered) {
-            ImGui::SetTooltip(
-              "Symmetry: %s\nAll ten modes are in the Terrain tool's settings", EdTools::SymmetryName(mode)
-            );
+            // The map previews the mode while the pointer is here (EdMapScene::DrawBrushRings).
+            mTools.SetSymmetryHover(mode);
+            if (mode == testHover) {
+              ImGui::SetNextWindowPos(ImVec2(p.x, p.y + side + Em(8.0f)));
+            }
+            ImGui::BeginTooltip();
+            mTools.DrawSymmetryTooltip(mode, true);
+            ImGui::EndTooltip();
           }
           ImGui::PopID();
           ImGui::SameLine();

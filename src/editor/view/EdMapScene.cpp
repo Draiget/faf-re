@@ -177,8 +177,8 @@ namespace faf::editor
        !mTools->SelectToolActive() && mSelection.empty() && !area && mDocument.SaveData().Markers().empty() &&
        mDocument.SaveData().Chains().empty() && !mTools->ShowGrid() && !mTools->DecalsToolActive() &&
        !mTools->UnitsToolActive() && !mTools->EditingBorder() && !mTools->WaterToolActive() &&
-       mTools->CheckPins().empty() && !mTools->ShowingPathing() && !mTools->ShowSlope() && !mTools->ShowKmGrid() &&
-       !mRulerShown && !mBoxing) ||
+       mTools->SymmetryHover() < 0 && mTools->CheckPins().empty() && !mTools->ShowingPathing() &&
+       !mTools->ShowSlope() && !mTools->ShowKmGrid() && !mRulerShown && !mBoxing) ||
       moho::ren_Viewport == nullptr
     ) {
       return;
@@ -187,7 +187,8 @@ namespace faf::editor
     if (field == nullptr) {
       return;
     }
-    const HeightBrush brush = mTools->CurrentHeightBrush();
+    // A hovered toolbar symmetry button: its mode's lines (and the moving preview below) instead of the current one's.
+    const HeightBrush brush = mTools->PreviewHeightBrush();
 
     moho::CD3DPrimBatcher* const batcher = moho::ren_Viewport->GetPrimBatcher();
     (void)batcher->Setup("TAlphaBlendLinearSampleNoDepth");
@@ -301,6 +302,60 @@ namespace faf::editor
 
     if (!walls.empty()) {
       batcher->DrawQuads(walls.data(), static_cast<std::uint32_t>(walls.size() / 4));
+    }
+
+    // The hovered mode in motion: a ring loops through the source part and every copy follows as the mode copies
+    // it; a tick shows each one's heading, so a mirror (copies turn the other way) reads apart from a turn.
+    if (mTools->SymmetryHover() >= 0) {
+      const float seconds =
+        static_cast<float>(std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count());
+      const float t = std::fmod(seconds, 600.0f) * 0.9f;
+      const auto pathAt = [&](const float time, float& x, float& z) {
+        // A loop in the first quarter-turn sector's middle (the source part of every mode).
+        x = w * (0.30f + 0.11f * std::cos(time));
+        z = h * (0.24f + 0.08f * std::sin(time * 2.0f));
+      };
+      float x = 0.0f;
+      float z = 0.0f;
+      float ahead[2] = {};
+      pathAt(t, x, z);
+      pathAt(t + 0.18f, ahead[0], ahead[1]);
+      float cx[kMaxSymmetryCopies];
+      float cz[kMaxSymmetryCopies];
+      float tx[kMaxSymmetryCopies];
+      float tz[kMaxSymmetryCopies];
+      const int copies = HeightBrushCentres(field->width, field->height, x, z, brush.symmetry, brush.turns, cx, cz);
+      const int tips =
+        HeightBrushCentres(field->width, field->height, ahead[0], ahead[1], brush.symmetry, brush.turns, tx, tz);
+      const float radius = std::max(w, h) * 0.035f;
+      for (int c = 0; c < copies; ++c) {
+        const std::uint32_t colour = c == 0 ? 0xFFFFFFFFu : 0xFF5CD2FFu;
+        constexpr int kSegments = 40;
+        for (const float r : {radius, radius * 0.94f}) {
+          for (int s = 0; s < kSegments; ++s) {
+            const float a0 = 2.0f * kPi * static_cast<float>(s) / kSegments;
+            const float a1 = 2.0f * kPi * static_cast<float>(s + 1) / kSegments;
+            batcher->DrawLine(
+              groundVertex(cx[c] + std::cos(a0) * r, cz[c] + std::sin(a0) * r, colour, 1.0f),
+              groundVertex(cx[c] + std::cos(a1) * r, cz[c] + std::sin(a1) * r, colour, 1.0f)
+            );
+          }
+        }
+        if (c < tips) {
+          // The heading: from the ring's middle towards where it goes next, as long as the radius.
+          const float dx = tx[c] - cx[c];
+          const float dz = tz[c] - cz[c];
+          const float length = std::max(0.001f, std::hypot(dx, dz));
+          for (const float side : {-0.6f, 0.0f, 0.6f}) {
+            const float nx = -dz / length * side;
+            const float nz = dx / length * side;
+            batcher->DrawLine(
+              groundVertex(cx[c] + nx, cz[c] + nz, colour, 1.0f),
+              groundVertex(cx[c] + dx / length * radius + nx, cz[c] + dz / length * radius + nz, colour, 1.0f)
+            );
+          }
+        }
+      }
     }
 
     // The playable area: the ground outside it darkened as the game shows it, its border in amber.
