@@ -104,6 +104,21 @@ set_target_properties(faf_profiler_tests PROPERTIES FOLDER "Tests/Existing")
 add_test(NAME profiler_facade COMMAND faf_profiler_tests)
 set_tests_properties(profiler_facade PROPERTIES LABELS "Existing")
 
+# Render scale (src/gpg/gal/backends/common/RenderScale.h): the arithmetic, and the upscale / sharpen shaders run on a software
+# Direct3D 11 device (WARP).
+#
+#   cmake --build --preset clang-x64-release --target faf_renderscale_tests
+add_executable(faf_renderscale_tests EXCLUDE_FROM_ALL renderscale/RenderScaleTests.cpp)
+target_include_directories(faf_renderscale_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_compile_features(faf_renderscale_tests PRIVATE cxx_std_20)
+target_link_libraries(faf_renderscale_tests PRIVATE gtest_main)
+if(WIN32)
+  target_link_libraries(faf_renderscale_tests PRIVATE d3d11 d3dcompiler)
+endif()
+set_target_properties(faf_renderscale_tests PROPERTIES FOLDER "Tests/Render")
+add_test(NAME render_scale COMMAND faf_renderscale_tests)
+set_tests_properties(render_scale PROPERTIES LABELS "Render")
+
 # Engine addition: the stable shadow box (ren_ShadowStable), pure maths with no device.
 add_executable(faf_shadow_fit_tests EXCLUDE_FROM_ALL render/ShadowStableFitTests.cpp)
 target_include_directories(faf_shadow_fit_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
