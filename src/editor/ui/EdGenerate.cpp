@@ -575,7 +575,10 @@ namespace faf::editor
     }
     EdSetItemTooltip("Runs every node again, with the map's ground as it is now.");
     if (!mStatus.empty()) {
+      // Wrapped: a build's status names everything it wrote and left out.
+      ImGui::PushTextWrapPos(0.0f);
       ImGui::TextDisabled("%s", mStatus.c_str());
+      ImGui::PopTextWrapPos();
     }
   }
 

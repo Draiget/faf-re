@@ -347,7 +347,10 @@ namespace faf::editor
       // The inputs a node can't run without: `a` (but a generic op node's are all optional), both slopes of Height
       // from slopes, a path node's points. The others (b, mask, the noise of Warp) have a fallback.
       // (The scatter's density mask is optional too: without it, everywhere.)
-      if (blocked.empty() && node->type->category != "raw" && node->type->name != "out_scatter") {
+      if (
+        blocked.empty() && node->type->category != "raw" && node->type->name != "out_scatter" &&
+        node->type->name != "out_roughness"
+      ) {
         for (const PinDef& def : node->type->inputs) {
           if (def.name == "a" && def.type != PinType::Number && ins.count("a") == 0) {
             blocked = "input a is not linked";
@@ -690,9 +693,43 @@ namespace faf::editor
         continue;
       }
       const std::string& type = node->type->name;
+      if (type == "out_normalmap" || type == "out_maplight" || type == "out_specular" || type == "out_macro") {
+        if (TerrainParamNumber(*node, "assign", 1.0) >= 0.5) {
+          writes.mapTextures.push_back(
+            type == "out_normalmap"    ? 0
+              : type == "out_maplight" ? 1
+              : type == "out_specular" ? 2
+                                       : 3
+          );
+        }
+        continue;
+      }
+      if (type == "out_atlas" || type == "out_texalpha") {
+        writes.notes.push_back(node->type->title + ": not written by this editor yet");
+        continue;
+      }
+      if (type == "out_roughness") {
+        const TerrainValue* rough = Input(graph, id, "a");
+        if (!ground.roughness) {
+          writes.notes.push_back(node->type->title + ": the map's shader has no roughness layer");
+        } else if (rough != nullptr && rough->grid != nullptr) {
+          const float amount = static_cast<float>(TerrainParamNumber(*node, "amount", 0.6));
+          TerrainBuildWrites::Layer layer8;
+          layer8.mask = *rough->grid;
+          for (float& x : layer8.mask.v) {
+            x = std::clamp(0.5f + (x - 0.5f) * amount, 0.0f, 1.0f);
+          }
+          layer8.layer = 8;
+          writes.layers.push_back(std::move(layer8));
+        } else if (writes.kinds.empty()) {
+          writes.notes.push_back(node->type->title + ": nothing linked and no Output: ground kinds to take it from");
+        }
+        continue;
+      }
       if (type != "out_layer" && type != "out_role" && type != "out_types" && type != "out_scatter") {
         continue;
       }
+      // (The map-wide textures are made from the built map; the atlas and the texture alpha aren't written yet.)
       const TerrainValue* a = Input(graph, id, "a");
       const auto number = [&](const char* name, const double fallback) {
         const TerrainValue* wired = Input(graph, id, name);

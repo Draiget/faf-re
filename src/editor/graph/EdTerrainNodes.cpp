@@ -3044,6 +3044,319 @@ namespace faf::editor::terrain
       );
     }
 
+    // ---- the map-wide textures (FAF Studio's graphnodes_map.lua): normals and baked lighting from heights, the map's
+    // light as numbers, and the outputs that make the map-wide textures on Build
+    {
+      const std::vector<std::string> sizeIds = {"auto", "256", "512", "1024", "2048", "4096", "8192", "grid"};
+      const std::vector<std::string> sizeNames = {
+        "Map size (at most 1024)",
+        "256",
+        "512",
+        "1024",
+        "2048 (big)",
+        "4096 (very big)",
+        "8192 (huge)",
+        "As fine as the finest input"
+      };
+      c.Add(
+        "normal_map",
+        "Height to normal map",
+        "color",
+        "Turns heights into a normal map the way the engine does, one normal per map square. rgba is the picture (R = "
+        "x, G = z, "
+        "B = y: flat ground is blue); x, y and z are the three parts as masks (0.5 = no lean).",
+        {Pin("a")},
+        {Pin("rgba", PinType::Color), Pin("x", PinType::Mask), Pin("y", PinType::Mask), Pin("z", PinType::Mask)},
+        {N("strength", "Slope strength", 0.1f, 8, 0.1f, "%.1f", 1, true),
+         N("span", "Sample distance (units)", 0.5f, 16, 0.5f, "%.1f", 1),
+         B("squares", "Place on the map squares", true)},
+        [](const Env& E, const Values& v, const Inputs& ins) {
+        std::map<std::string, field::Grid> extra;
+        const field::GridPtr x = E.Op(
+          "normal_map",
+          {{"a", In(ins, "a")},
+           {"span", v.N("span")},
+           {"strength", v.N("strength")},
+           {"shift", v.B("squares") ? 0.5 : 0.0}},
+          &extra
+        );
+        const auto take = [&](const char* name) -> field::GridPtr {
+          const auto found = extra.find(name);
+          return found != extra.end() ? std::make_shared<field::Grid>(std::move(found->second)) : E.Const(0.5);
+        };
+        const field::GridPtr y = take("y");
+        const field::GridPtr z = take("z");
+        Outputs out;
+        out["rgba"].color =
+          std::make_shared<std::array<field::GridPtr, 4>>(std::array<field::GridPtr, 4>{x, z, y, E.Const(1.0)});
+        out["x"].grid = x;
+        out["y"].grid = y;
+        out["z"].grid = z;
+        return out;
+      }
+      );
+      c.Add(
+        "env_lighting",
+        "Environment lighting",
+        "numbers",
+        "The map's sun and ambient light (the Lighting panel) as numbers: the sun's direction in degrees (azimuth 0 = "
+        "+x, 90 = "
+        "+z; altitude above the horizon), the brightness multiplier and the sun, ambient and shadow fill colours.",
+        {},
+        {Pin("azimuth", PinType::Number),
+         Pin("altitude", PinType::Number),
+         Pin("multiplier", PinType::Number),
+         Pin("sun_r", PinType::Number),
+         Pin("sun_g", PinType::Number),
+         Pin("sun_b", PinType::Number),
+         Pin("ambient_r", PinType::Number),
+         Pin("ambient_g", PinType::Number),
+         Pin("ambient_b", PinType::Number),
+         Pin("fill_r", PinType::Number),
+         Pin("fill_g", PinType::Number),
+         Pin("fill_b", PinType::Number)},
+        {},
+        [](const Env& E, const Values&, const Inputs&) {
+        const TerrainGround& g = *E.ground;
+        Outputs out;
+        const auto put = [&](const char* name, const double value) {
+          out[name].number = value;
+          out[name].isNumber = true;
+        };
+        put("azimuth", g.sunAzimuth);
+        put("altitude", g.sunAltitude);
+        put("multiplier", g.lightMultiplier);
+        const char* const names[3][3] = {
+          {"sun_r", "sun_g", "sun_b"}, {"ambient_r", "ambient_g", "ambient_b"}, {"fill_r", "fill_g", "fill_b"}
+        };
+        const std::array<float, 3>* const colours[3] = {&g.sunColour, &g.ambient, &g.shadowFill};
+        for (int k = 0; k < 3; ++k) {
+          for (int c3 = 0; c3 < 3; ++c3) {
+            put(names[k][c3], (*colours[k])[static_cast<std::size_t>(c3)]);
+          }
+        }
+        return out;
+      }
+      );
+      c.Add(
+        "lighting_tex",
+        "Lighting texture",
+        "analysis",
+        "Bakes the sun onto the ground. shadow: 1 where the sun shines, 0 in cast shadow, with soft edges (the sun is "
+        "sampled "
+        "as a disc). light: shaded relief (angle to the sun times shadow, plus ambient). ao: how open the ground is (1 "
+        "= "
+        "open). An optional mask limits where shadows and occlusion apply.",
+        {Pin("a"), Pin("mask", PinType::Mask)},
+        {Pin("shadow", PinType::Mask), Pin("light", PinType::Mask), Pin("ao", PinType::Mask)},
+        {B("useMap", "Use the map's sun direction", true),
+         N("azimuth", "Towards the sun (degrees, 0 = +x, 90 = +z)", 0, 360, 5, "%.0f", 315, true),
+         N("altitude", "Sun height (degrees)", 1, 89, 1, "%.0f", 40, true),
+         N("soft", "Softness (size of the sun, degrees)", 0, 8, 0.25f, "%.2f", 1, true),
+         C("quality", "Shadow quality", {"1", "5", "9"}, {"Draft (hard edges)", "Normal", "Fine"}, "5"),
+         N("reach", "Longest shadow (units)", 20, 1500, 10, "%.0f", 400),
+         N("ambient", "Ambient light (light output)", 0, 1, 0.02f, "%.2f", 0.25f),
+         N("ao", "Ambient occlusion strength", 0, 1, 0.05f, "%.2f", 0.5f),
+         N("aoRadius", "Occlusion radius (units)", 2, 300, 1, "%.0f", 40)},
+        [](const Env& E, const Values& v, const Inputs& ins) {
+        const field::GridPtr a = In(ins, "a");
+        double azimuth = v.N("azimuth");
+        double altitude = v.N("altitude");
+        if (v.B("useMap")) {
+          if (ins.count("azimuth") == 0) {
+            azimuth = E.ground->sunAzimuth;
+          }
+          if (ins.count("altitude") == 0) {
+            altitude = E.ground->sunAltitude;
+          }
+        }
+        altitude = std::clamp(altitude, 1.0, 89.0);
+        const double soft = v.N("soft");
+        const int quality = std::atoi(v.S("quality").c_str());
+        std::vector<std::pair<double, double>> suns = {{azimuth, altitude}};
+        if (quality >= 5 && soft > 0.0) {
+          for (const auto& [da, dl] : {std::pair{soft, 0.0}, {-soft, 0.0}, {0.0, soft}, {0.0, -soft}}) {
+            suns.emplace_back(azimuth + da, std::clamp(altitude + dl, 1.0, 89.0));
+          }
+        }
+        if (quality >= 9 && soft > 0.0) {
+          const double s = soft * 0.7;
+          for (const auto& [da, dl] : {std::pair{s, s}, {s, -s}, {-s, s}, {-s, -s}}) {
+            suns.emplace_back(azimuth + da, std::clamp(altitude + dl, 1.0, 89.0));
+          }
+        }
+        // The shadow is 1 where cast: lit is 1 minus its average over the sun's disc.
+        auto lit = std::make_shared<field::Grid>(*a);
+        std::fill(lit->v.begin(), lit->v.end(), 0.0f);
+        for (const auto& [az, alt] : suns) {
+          const field::GridPtr shadow = E.Op(
+            "hillshade",
+            {{"a", a}, {"mode", "shadow"}, {"azimuth", az}, {"altitude", alt}, {"shadow_len", v.N("reach")}}
+          );
+          for (std::size_t i = 0; i < lit->v.size() && i < shadow->v.size(); ++i) {
+            lit->v[i] += shadow->v[i];
+          }
+        }
+        for (float& x : lit->v) {
+          x = 1.0f - x / static_cast<float>(suns.size());
+        }
+        field::GridPtr litOut = lit;
+        field::GridPtr ao;
+        if (E.wanted.count("ao") != 0) {
+          ao = v.N("ao") > 0.0
+            ? E.Op(
+                "affine",
+                {{"a",
+                  E.Op(
+                    "occlusion",
+                    {{"a", a}, {"mode", "cavity"}, {"radius", v.N("aoRadius")}, {"directions", 12}, {"gain", 2}}
+                  )},
+                 {"mul", -v.N("ao")},
+                 {"add", 1.0}}
+              )
+            : E.Const(1.0);
+        }
+        if (const field::GridPtr mask = In(ins, "mask")) {
+          const field::GridPtr one = E.Const(1.0);
+          litOut = E.Op("blend", {{"a", one}, {"b", litOut}, {"mask", mask}, {"mode", "normal"}, {"opacity", 1.0}});
+          if (ao != nullptr) {
+            ao = E.Op("blend", {{"a", one}, {"b", ao}, {"mask", mask}, {"mode", "normal"}, {"opacity", 1.0}});
+          }
+        }
+        Outputs out;
+        out["shadow"].grid = litOut;
+        if (E.wanted.count("light") != 0) {
+          const field::GridPtr shade = E.Op(
+            "hillshade",
+            {{"a", a}, {"mode", "shade"}, {"azimuth", azimuth}, {"altitude", altitude}, {"ambient", v.N("ambient")}}
+          );
+          out["light"].grid = E.Op("mul", {{"a", shade}, {"b", litOut}});
+        }
+        if (ao != nullptr) {
+          out["ao"].grid = ao;
+        }
+        return out;
+      }
+      );
+      const Eval nothing = [](const Env&, const Values&, const Inputs&) {
+        return Outputs{};
+      };
+      c.Add(
+        "out_normalmap",
+        "Output: map normal map",
+        "outputs",
+        "Build gives the whole map a normal map made from the built heights, where the shader reads the map-wide "
+        "normal map "
+        "(layer 8's normal map; Terrain000 and later). With Use it on the map off, nothing is made.",
+        {Pin("normal", PinType::Color)},
+        {},
+        {C("size", "Texture size (pixels)", sizeIds, sizeNames, "auto"), B("assign", "Use it on the map", true)},
+        nothing,
+        "mapnormal"
+      );
+      c.Add(
+        "out_macro",
+        "Output: macrotexture",
+        "outputs",
+        "Build makes a macrotexture from the paint and gives it to the Upper layer: the colour the ground has, lighter "
+        "and "
+        "darker in broad patches, to break up the repetition of the layer textures (TTerrain, TTerrainXP, Terrain000 / "
+        "050).",
+        {},
+        {},
+        {C("size", "Texture size (pixels)", sizeIds, sizeNames, "auto"),
+         N("scale", "Patch size (units)", 40, 600, 10, "%.0f", 180),
+         N("contrast", "Lighter and darker patches", 0, 0.6f, 0.05f, "%.2f", 0.25f),
+         N("cavity", "Darker cavities", 0, 1, 0.05f, "%.2f", 0.3f),
+         N("opacity", "How much it covers the ground", 0.05f, 0.9f, 0.05f, "%.2f", 0.35f)},
+        nothing,
+        "mapmacro"
+      );
+      c.Add(
+        "out_specular",
+        "Output: specular texture",
+        "outputs",
+        "Build makes the specular picture of the map from the paint: wet ground, snow and the waterline shine, rock "
+        "and sand do "
+        "not (Terrain001 and Terrain051 read it from the Upper layer).",
+        {},
+        {},
+        {C("size", "Texture size (pixels)", sizeIds, sizeNames, "auto"),
+         N("strength", "How much wet ground and snow shine", 0, 1, 0.05f, "%.2f", 0.8f),
+         N("sharpness", "Sharpness of the highlights", 0, 1.5f, 0.05f, "%.2f", 1)},
+        nothing,
+        "mapspecular"
+      );
+      c.Add(
+        "out_atlas",
+        "Output: roughness / height atlas",
+        "outputs",
+        "The roughness / height atlas of the Upper layer for the Terrain1xx and Terrain2xx shaders (not written by "
+        "this editor "
+        "yet).",
+        {},
+        {},
+        {C("size", "Texture size (pixels)", {"512", "1024"}, {"512", "1024"}, "1024"),
+         C("style",
+           "Style of the blending",
+           {"default", "soft", "patchy", "custom"},
+           {"Default", "Soft", "Patchy", "Custom"},
+           "default"),
+         N("spread", "Height contrast inside a texture", 0.25f, 2.5f, 0.05f, "%.2f", 1),
+         N("biasScale", "Height step between the kinds of ground", 0, 2.5f, 0.05f, "%.2f", 1),
+         N("cavity", "Relief of the normal map in the heights", 0, 1, 0.05f, "%.2f", 0.35f),
+         N("roughDetail", "Roughness from the detail of the texture", 0, 2, 0.05f, "%.2f", 1),
+         N("splatSoft", "Splat softness of the shader (0 = leave)", 0, 2, 0.05f, "%.2f", 0),
+         N("splatContrast", "Splat height contrast of the shader (0 = leave)", 0, 3, 0.05f, "%.2f", 0)},
+        nothing,
+        "mapatlas"
+      );
+      c.Add(
+        "out_texalpha",
+        "Output: texture alpha",
+        "outputs",
+        "The layer textures' alpha their shader reads as specularity (not written by this editor yet).",
+        {},
+        {},
+        {C("mode",
+           "Specularity alpha",
+           {"generate", "adjust", "off"},
+           {"Generate from the kind of ground", "Adjust the alpha the texture has", "Off (original textures)"},
+           "generate"),
+         N("detail", "Detail of the texture in the alpha", 0, 0.6f, 0.05f, "%.2f", 0.35f),
+         N("amount", "Adjust: pull towards the kind of ground", 0, 1, 0.05f, "%.2f", 0.6f),
+         N("baseOpacity", "Base texture as macrotexture (Terrain x1 / x2)", 0, 0.9f, 0.05f, "%.2f", 0)},
+        nothing,
+        "texalpha"
+      );
+      c.Add(
+        "out_roughness",
+        "Output: roughness mask",
+        "outputs",
+        "Build writes the roughness multiplier of layer 8 for the Terrain1xx and Terrain2xx shaders (0.5 = neutral): "
+        "rougher "
+        "where the mask is above one half, shinier below. Without a link: the roughness of Output: ground kinds.",
+        {Pin("a", PinType::Mask)},
+        {},
+        {N("amount", "How much the roughness varies", 0, 1, 0.05f, "%.2f", 0.6f)},
+        nothing,
+        "roughness"
+      );
+      c.Add(
+        "out_maplight",
+        "Output: map lighting",
+        "outputs",
+        "Build gives the whole map baked lighting made from the built heights and the map's sun and sea (shadow, "
+        "ambient "
+        "occlusion, water depth), where the shader reads it (layer 8's albedo; Terrain000 and later).",
+        {Pin("shadow", PinType::Mask), Pin("ao", PinType::Mask), Pin("height")},
+        {},
+        {C("size", "Texture size (pixels)", sizeIds, sizeNames, "auto"), B("assign", "Use it on the map", true)},
+        nothing,
+        "maplight"
+      );
+    }
+
     c.Add(
       "out_colormap",
       "Output: colour image",

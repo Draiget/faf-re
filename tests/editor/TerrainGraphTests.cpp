@@ -465,6 +465,38 @@ namespace
     EXPECT_FLOAT_EQ(s.scaleMin, 0.8f) << "the node's 80 %";
     EXPECT_EQ(s.seed, static_cast<std::uint32_t>((1 * 1009 + scatter * 101 + 1) % 1000003))
       << "the graph's seed mixed in";
+
+    // The map-wide textures to make from the built map, the atlas not written yet, the roughness mask into layer 8.
+    (void)graph.AddNode("out_normalmap", 300, 700);
+    (void)graph.AddNode("out_macro", 300, 800);
+    (void)graph.AddNode("out_atlas", 300, 900);
+    const int rough = graph.AddNode("out_roughness", 300, 1000);
+    ASSERT_EQ(graph.Link(noise, 0, rough, 0), LinkResult::Ok);
+    ground.roughness = true;
+    (void)run.Evaluate(graph, 1, ground);
+    ASSERT_TRUE(run.BuildWrites(graph, ground, field::Grid(65, 65, 1.0f, 0.0f, 0.0f), writes, error)) << error;
+    EXPECT_EQ(std::count(writes.mapTextures.begin(), writes.mapTextures.end(), 0), 1) << "the normal map";
+    EXPECT_EQ(std::count(writes.mapTextures.begin(), writes.mapTextures.end(), 3), 1) << "the macrotexture";
+    EXPECT_EQ(
+      std::count_if(
+        writes.notes.begin(),
+        writes.notes.end(),
+        [](const std::string& note) {
+      return note.find("atlas") != std::string::npos;
+    }
+      ),
+      1
+    );
+    EXPECT_EQ(
+      std::count_if(
+        writes.layers.begin(),
+        writes.layers.end(),
+        [](const auto& layer) {
+      return layer.layer == 8;
+    }
+      ),
+      1
+    ) << "the roughness mask";
   }
 
   TEST(

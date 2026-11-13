@@ -1,5 +1,6 @@
 #include "editor/view/EdMapScene.h"
 #include "editor/tools/EdShaderProfiles.h"
+#include "editor/doc/EdLighting.h"
 #include "editor/tools/EdGroundKind.h"
 #include "editor/tools/EdRecipes.h"
 #include "editor/tools/EdSlopeRules.h"
@@ -5194,6 +5195,15 @@ namespace faf::editor
     out.macro = profile.summary.find("macro") != std::string::npos;
     out.specular = profile.summary.find("specular") != std::string::npos;
     out.roughness = out.pbr && profile.painted == 7;
+    // The map's light.
+    const LightingState lighting = mDocument.LightingNow();
+    SunAnglesOf(lighting.sunDirection, out.sunAzimuth, out.sunAltitude);
+    out.lightMultiplier = lighting.multiplier;
+    for (std::size_t c = 0; c < 3; ++c) {
+      out.sunColour[c] = lighting.sunColor[c];
+      out.ambient[c] = lighting.sunAmbience[c];
+      out.shadowFill[c] = lighting.shadowFill[c];
+    }
     return true;
   }
 

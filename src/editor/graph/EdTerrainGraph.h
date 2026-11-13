@@ -82,6 +82,14 @@ namespace faf::editor
     bool macro = false;
     bool specular = false;
     bool roughness = false;
+    /** The map's sun (degrees towards it: azimuth 0 = +x, 90 = +z; altitude above the horizon), its brightness, the
+     * sun, ambient and shadow fill colours. */
+    float sunAzimuth = 315.0f;
+    float sunAltitude = 40.0f;
+    float lightMultiplier = 1.0f;
+    std::array<float, 3> sunColour{1.0f, 1.0f, 1.0f};
+    std::array<float, 3> ambient{0.0f, 0.0f, 0.0f};
+    std::array<float, 3> shadowFill{0.0f, 0.0f, 0.0f};
   };
 
   /** The eight kinds of ground by the names graph files use, bottom to top, with their roughness (0 shiny .. 1 rough).
@@ -241,11 +249,14 @@ namespace faf::editor
       std::uint32_t seed = 1;
     };
     std::vector<Scatter> scatters;
+    /** The map-wide textures to make from the built map: 0 normals, 1 lighting, 2 specular, 3 macro (MapTextureKind).
+     */
+    std::vector<int> mapTextures;
     /** Outputs left out, with why ("Output: ground kind (snow): no layer holds snow"). */
     std::vector<std::string> notes;
     [[nodiscard]] bool Empty() const noexcept
     {
-      return kinds.empty() && layers.empty() && types.empty() && scatters.empty();
+      return kinds.empty() && layers.empty() && types.empty() && scatters.empty() && mapTextures.empty();
     }
   };
 

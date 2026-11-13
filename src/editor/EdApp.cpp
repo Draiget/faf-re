@@ -2140,9 +2140,22 @@ namespace faf::editor
           case EdGenerate::HeightsAsk::Kind::Preview:
             generate.SetStatus(mScene.ApplyGraphHeights(ask.result, ask.plain, true));
             break;
-          case EdGenerate::HeightsAsk::Kind::Build:
-            generate.SetStatus(mScene.ApplyGraphBuild(ask.result, ask.plain, ask.writes));
+          case EdGenerate::HeightsAsk::Kind::Build: {
+            std::string status = mScene.ApplyGraphBuild(ask.result, ask.plain, ask.writes);
+            // The map-wide textures from the built map (each its own step, as the Map-wide textures panel makes them).
+            for (const int kind : ask.writes.mapTextures) {
+              const bool made = MakeMapTexture(static_cast<MapTextureKind>(std::clamp(kind, 0, kMapTextureKinds - 1)));
+              status += std::string(" Map-wide ") +
+                (kind == 0     ? "normal map"
+                   : kind == 1 ? "lighting"
+                   : kind == 2 ? "specular"
+                               : "macrotexture") +
+                (made ? " made (its own undo step)."
+                      : " not made: the map's shader doesn't read it, or it couldn't be written.");
+            }
+            generate.SetStatus(status);
             break;
+          }
           case EdGenerate::HeightsAsk::Kind::Revert:
             generate.SetStatus(
               mScene.RevertGraphPreview() ? "The preview was taken off."
@@ -2996,7 +3009,8 @@ namespace faf::editor
       void ApplyMaterial(const EdMaterialEditor::Bake& bake);
       /** The Layers panel's map-wide textures: its asks, and its rows' states (once a second). */
       void MapTexturesUpdate();
-      void MakeMapTexture(MapTextureKind kind);
+      /** True when it made and set the texture (false with a status message saying why not). */
+      bool MakeMapTexture(MapTextureKind kind);
       void ClearMapTexture(MapTextureKind kind);
       /** The Texture tool's Mask generator: starting points, the preview (when the rules change), Write. */
       void MaskGenUpdate();
@@ -5168,7 +5182,7 @@ namespace faf::editor
       return path;
     }
 
-    void EditorApp::MakeMapTexture(
+    bool EditorApp::MakeMapTexture(
       const MapTextureKind kind
     )
     {
@@ -5179,7 +5193,7 @@ namespace faf::editor
         PostStatusMessage(
           target.Valid() ? "No map folder to write the texture into" : "This shader draws no map-wide textures"
         );
-        return;
+        return false;
       }
       // The map's own sun and sea.
       MapTextureOptions options;
@@ -5243,7 +5257,7 @@ namespace faf::editor
       if (!made) {
         PostStatusMessage("The map-wide texture wasn't made: " + error);
         gpg::Warnf("editor: map-wide texture: %s", error.c_str());
-        return;
+        return false;
       }
       TexImage image;
       image.Reset(size, 4, 0.0f);
@@ -5251,7 +5265,7 @@ namespace faf::editor
       std::vector<std::uint8_t> dds;
       if (!EncodeDds(image, DdsKind::Bgra, dds, error)) {
         PostStatusMessage("The map-wide texture wasn't encoded: " + error);
-        return;
+        return false;
       }
       const char* const file = target.pack == MapTexturePack::Normal7 ? "map_normals.dds"
         : target.pack == MapTexturePack::Info7                        ? "map_lighting.dds"
@@ -5266,7 +5280,7 @@ namespace faf::editor
         out.write(reinterpret_cast<const char*>(dds.data()), static_cast<std::streamsize>(dds.size()));
         if (!out) {
           PostStatusMessage("Can't write " + (folder / file).string());
-          return;
+          return false;
         }
       }
       const std::string game = "/maps/" + mDocument.FolderName() + "/env/layers/" + file;
@@ -5300,6 +5314,7 @@ namespace faf::editor
         gpg::Logf("editor: map-wide texture %s: the layers' kinds of ground: %s", game.c_str(), kinds.c_str());
       }
       PostStatusMessage(std::string("Made ") + file + (fromPaint ? " from the paint" : " from the heights"));
+      return true;
     }
 
     bool EditorApp::MaskGenContextOf(
