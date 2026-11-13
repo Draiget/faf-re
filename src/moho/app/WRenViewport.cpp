@@ -20,6 +20,7 @@
 #include "moho/terrain/water/WaterBodySurfaces.h"
 #include "moho/terrain/water/WaterMeshFeed.h"
 #include "moho/terrain/water/WaterQuality.h"
+#include "moho/terrain/water/WaterReflections.h"
 #include "moho/terrain/water/WaterSimulation.h"
 
 #include <array>
@@ -1527,6 +1528,7 @@ void moho::WRenViewport::D3DWindowOnDeviceExit(
   }
   ReleaseWaterBodyReflections();
   moho::water::ReleaseReflectionTargets(); // FAF: the Water Quality reflection targets are device resources too
+  moho::water::ReleaseWaterReflections();  // and so is the copy of the scene depth the water reads
 
   mFrame.ResetTransientResources();
 
@@ -3087,6 +3089,13 @@ void moho::WRenViewport::RenderWater(
   // (docs/WATER_SIMULATION.md).
   const moho::water::ReflectionTarget scaledReflection = moho::water::AcquireReflectionTarget(
     head, device->GetHeadWidth(static_cast<unsigned int>(head)), device->GetHeadHeight(static_cast<unsigned int>(head))
+  );
+  // FAF: the scene depth, the parameters and the sun shadow map for what the water shows of the scene around it
+  // (docs/WATER_REFLECTIONS.md). They are bound once for every level the water pass then draws.
+  moho::water::BindWaterReflections(
+    device->GetGalDevice(),
+    *mCam,
+    mShadowRenderer.mShadowFidelity != 0 && !ShadowsDisabledByEnv() ? &mShadowRenderer : nullptr
   );
   terrain->DrawWaterTerrain(
     moho::REN_GetGameTick(),

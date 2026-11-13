@@ -42,6 +42,8 @@
 #include "moho/terrain/water/TerrainWaterLevels.h"
 #include "moho/terrain/water/WaterEffectPatch.h"
 #include "moho/terrain/water/WaterQuality.h"
+#include "moho/terrain/water/WaterReflectionPatch.h"
+#include "moho/terrain/water/WaterReflections.h"
 #include "moho/terrain/water/WaterSimulation.h"
 
 namespace moho
@@ -1821,10 +1823,12 @@ technique EditorMeshFill
       }
       // FAF addition: water2.fx is patched as it is read, on the Direct3D 10 dialect backends
       // (docs/WATER_SIMULATION.md): the wave simulation (ripples that bend the normal, the projected grid, foam;
-      // WaterSimulation.cpp) and the filtered reflection / refraction lookups (Water Quality, WaterEffectPatch.cpp).
-      // The two chain, each continues from the text of the one before; a source a patch does not recognise is left
-      // without it. A patched source the backend compiler rejects falls back to the shipped effect. The cache name
-      // carries a tag per patch applied, so every combination compiles to its own cached effect.
+      // WaterSimulation.cpp), the filtered reflection / refraction lookups (Water Quality, WaterEffectPatch.cpp) and
+      // what the water shows of the scene around it (screen-space reflections, real-depth thickness, caustics, sheen
+      // and the sun shadow; WaterReflectionPatch.cpp, docs/WATER_REFLECTIONS.md), after the light patch of Dynamic
+      // Lights (docs/DYNAMIC_LIGHTS.md). They chain, each continues from the text of the one before; a source a patch
+      // does not recognise is left without it. A patched source the backend compiler rejects falls back to the shipped
+      // effect. The cache name carries a tag per patch applied, so every combination compiles to its own cached effect.
       if (
         !mEffect && deviceContext != nullptr && effectByteCount > 0U && std::strcmp(mName.c_str(), "water2") == 0 &&
         gpg::gal::UsesD3D10EffectDialect(deviceContext->mDeviceType)
@@ -1832,10 +1836,11 @@ technique EditorMeshFill
         const bool wantsSim = water::SimWanted();
         const bool wantsFilter = water::EffectPatchWanted(deviceContext->mDeviceType);
         // Dynamic Lights: the water is lit by the light field (glints, scatter). First of the chain: the light patch
-        // anchors on lines the other two leave alone, and their anchors are untouched by it.
+        // anchors on lines the other three leave alone, and their anchors are untouched by it.
         const bool wantsLit =
           CFG_GetArgOption("/dynlights", 0U, nullptr) || lights::LightsWanted(deviceContext->mDeviceType);
-        if (wantsSim || wantsFilter || wantsLit) {
+        const bool wantsReflect = water::ReflectionPatchWanted(deviceContext->mDeviceType);
+        if (wantsSim || wantsFilter || wantsLit || wantsReflect) {
           const gpg::MemBuffer<char> unpatchedBuffer = mergedBuffer;
           std::string text(effectSourceBuffer.GetPtr(0U, 0U), effectByteCount);
           std::string tags;
@@ -1874,6 +1879,19 @@ technique EditorMeshFill
               );
             } else {
               gpg::Warnf("Water: %s not patched: %s", effectBaseName.c_str(), patch.error.c_str());
+            }
+          }
+          if (wantsReflect) {
+            std::string reflected = text;
+            const water::ReflectionPatchResult patch = water::PatchWaterReflections(reflected);
+            if (patch.patched) {
+              text = std::move(reflected);
+              tags += ".waterssr1";
+              gpg::Logf("Water: %s patched, the water reflects and shades the scene around it", effectBaseName.c_str());
+            } else {
+              gpg::Warnf(
+                "Water: %s not patched with the scene reflections: %s", effectBaseName.c_str(), patch.error.c_str()
+              );
             }
           }
           if (!tags.empty()) {
