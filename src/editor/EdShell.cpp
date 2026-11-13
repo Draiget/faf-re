@@ -1074,6 +1074,51 @@ namespace faf::editor
           ImGui::PopID();
           ImGui::SameLine();
         }
+        // The other five modes, the N-way count and what the map fits: a menu. Lit when the mode in use is one of them.
+        {
+          const ImVec2 p = ImGui::GetCursorScreenPos();
+          const float width = std::round(buttonHeight * 0.62f);
+          const bool other =
+            std::find(std::begin(kModes), std::end(kModes), mTools.SymmetryIndex()) == std::end(kModes);
+          // `/symmenu` (test runs): the menu opened once the map is open.
+          static bool testMenu = moho::CFG_GetArgOption("/symmenu", 0, nullptr);
+          const bool openForTest =
+            testMenu && mDocument.GetState() == EdDocument::State::Open && ImGui::GetTime() > 6.0;
+          if ((ImGui::InvisibleButton("##symmore", ImVec2(width, buttonHeight)) && !playing) || openForTest) {
+            ImGui::OpenPopup("##symmenu");
+            testMenu = false;
+          }
+          const bool hovered = ImGui::IsItemHovered();
+          if (other) {
+            draw->AddRectFilled(p, ImVec2(p.x + width, p.y + buttonHeight), AccentU32(0.16f), Em(4.0f));
+          } else if (hovered) {
+            draw->AddRectFilled(
+              p, ImVec2(p.x + width, p.y + buttonHeight), ImGui::GetColorU32(ImGuiCol_Button), Em(4.0f)
+            );
+          }
+          const ImVec2 glyph = ImGui::CalcTextSize(ICON_CHEVRON);
+          draw->AddText(
+            ImVec2(std::round(p.x + (width - glyph.x) * 0.5f), std::round(p.y + (buttonHeight - glyph.y) * 0.5f)),
+            other ? AccentU32() : ink1,
+            ICON_CHEVRON
+          );
+          if (hovered) {
+            if (other) {
+              EdSetTooltip(
+                "Symmetry: %s\nAll ten modes, the N-way count and what the map's heights fit",
+                EdTools::SymmetryName(mTools.SymmetryIndex())
+              );
+            } else {
+              EdSetTooltip("All ten symmetry modes\nThe N-way count and what the map's heights fit");
+            }
+          }
+          ImGui::SetNextWindowPos(ImVec2(p.x, p.y + buttonHeight + Em(4.0f)), ImGuiCond_Appearing);
+          if (ImGui::BeginPopup("##symmenu")) {
+            mTools.DrawSymmetryMenu();
+            ImGui::EndPopup();
+          }
+          ImGui::SameLine();
+        }
       }
       group();
 

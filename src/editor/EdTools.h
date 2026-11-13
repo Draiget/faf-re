@@ -1386,6 +1386,8 @@ namespace faf::editor
      * adds where the other modes are.
      */
     void DrawSymmetryTooltip(int mode, bool fromToolbar) const;
+    /** The toolbar's symmetry menu body: the ten modes as pictures, the N-way count, what the map's heights fit. */
+    void DrawSymmetryMenu();
     /** The key each tool's command has (Settings > Keys), shown in the strip's corner and its tooltip. */
     void SetToolKeys(
       std::vector<std::string> keys

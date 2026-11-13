@@ -1,4 +1,5 @@
 #include "editor/EdTools.h"
+#include "moho/misc/StartupHelpers.h"
 #include "editor/ui/EdControls.h"
 #include "editor/ui/EdFonts.h"
 #include "editor/ui/EdIconFont.h"
@@ -558,7 +559,7 @@ namespace faf::editor
     draw->PopClipRect();
     ImGui::TextDisabled("White: where you edit. Blue: its copies.");
     if (fromToolbar) {
-      ImGui::TextDisabled("All ten modes are in the Terrain tool's settings.");
+      ImGui::TextDisabled("All ten modes: the arrow beside these pictures.");
     }
   }
 
@@ -1044,15 +1045,13 @@ namespace faf::editor
     }
   }
 
-  void EdTools::DrawSymmetry(
-    const bool withCheck
-  )
+  void EdTools::DrawSymmetryMenu()
   {
-    if (Section("Symmetry")) {
-      const float available = ImGui::GetContentRegionAvail().x;
+    // The toolbar's symmetry menu: all ten modes, what the map's heights fit, what an edit writes.
+    {
       const int columns = 5;
       const float spacing = ImGui::GetStyle().ItemSpacing.x * 0.6f;
-      const float cell = (available - spacing * static_cast<float>(columns - 1)) / static_cast<float>(columns);
+      const float cell = Em(68.0f);
       const float labelHeight = ImGui::GetFontSize() * 1.6f;
       ImDrawList* const draw = ImGui::GetWindowDrawList();
       for (int i = 0; i < static_cast<int>(IM_ARRAYSIZE(kSymmetry)); ++i) {
@@ -1092,7 +1091,7 @@ namespace faf::editor
         ImGui::PopID();
       }
       if (mSymmetry == 9) {
-        ImGui::SetNextItemWidth(-1.0f);
+        ImGui::SetNextItemWidth(cell * columns + spacing * (columns - 1));
         FillSliderInt("##nway", &mNWay, 3, 8, "Copies %d");
       }
       if (mDetectedSymmetry >= 0) {
@@ -1154,14 +1153,32 @@ namespace faf::editor
           copies
         );
       }
-      Note(note);
-      if (!withCheck) {
-        return;
-      }
+      ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + cell * columns + spacing * (columns - 1));
+      ImGui::TextDisabled("%s", note);
+      ImGui::PopTextWrapPos();
+    }
+  }
+
+  void EdTools::DrawSymmetry(
+    const bool withCheck
+  )
+  {
+    // The mode is picked in the toolbar (its pictures and its menu); a tool panel keeps the check.
+    if (!withCheck) {
+      return;
     }
     if (Section("Symmetry check")) {
+      ImGui::TextDisabled("Symmetry: %s (set in the toolbar)", kSymmetry[mSymmetry].name);
+      if (mDetectedSymmetry >= 0) {
+        ImGui::TextColored(
+          ImVec4(0.55f, 0.80f, 0.55f, 1.0f),
+          "The map's heights: %s (%.1f%% of points match).",
+          mDetectedSymmetry == 9 ? "N-way turn" : kSymmetry[mDetectedSymmetry].name,
+          static_cast<double>(mDetectedMatch) * 100.0
+        );
+      }
       if (mSymmetry == 0) {
-        Note("Pick a symmetry to check the map against it.");
+        Note("Pick a symmetry in the toolbar to check the map against it.");
         return;
       }
       if (ImGui::Button("Check")) {
@@ -2214,7 +2231,7 @@ namespace faf::editor
       SetRecipeStyle(style);
     }
     // The layers and their kinds.
-    SectionHeader("Kind of ground of each layer");
+    ImGui::TextDisabled("Kind of ground of each layer");
     static const char* const kKinds[] = {
       "Not used", "Grass", "Rock", "Sand", "Dirt", "Wet ground", "High rock", "Dark rock", "Snow"
     };
@@ -2275,6 +2292,11 @@ namespace faf::editor
       ImGui::PushTextWrapPos(0.0f);
       ImGui::TextDisabled("%s", mRecipeResult.c_str());
       ImGui::PopTextWrapPos();
+    }
+    // `/panelbottom` (test runs): the panel kept scrolled to its end, so this section shows in a capture.
+    static const bool toBottom = moho::CFG_GetArgOption("/panelbottom", 0, nullptr);
+    if (toBottom) {
+      ImGui::SetScrollHereY(1.0f);
     }
   }
 
@@ -2402,7 +2424,7 @@ namespace faf::editor
       ImGui::TextDisabled("The mask covers %.1f %% of the map", static_cast<double>(mGenCoverage * 100.0f));
     }
     // Where it goes.
-    ImGui::SetNextItemWidth(Em(70.0f));
+    ImGui::SetNextItemWidth(Em(120.0f));
     if (ImGui::InputInt("Layer", &mGenTarget.layer)) {
       mGenTarget.layer = std::clamp(mGenTarget.layer, 1, 8);
     }

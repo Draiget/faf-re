@@ -136,16 +136,17 @@ namespace faf::editor
     [[nodiscard]] bool IsTestRunCommandLine()
     {
       static const char* const kOptions[] = {
-        "/command",        "/palette",        "/theme",          "/keysfile",        "/focuspanel",    "/uiclicks",
-        "/hidegameunits",  "/movelayer",      "/pickfilter",     "/mapwide",         "/tool",          "/proptool",
-        "/play",           "/debugarm",       "/breakpoint",     "/check",           "/decaltool",     "/markertool",
-        "/unittool",       "/hoverprop",      "/selectprops",    "/selectunit",      "/propswap",      "/saveas",
-        "/settingsfile",   "/autosavefolder", "/askunsaved",     "/particlebrowser", "/particlenew",   "/particleopen",
-        "/materialeditor", "/uiscale",        "/testrun",        "/openall",         "/roundtrip",     "/vault",
-        "/vaultsearch",    "/vaultmap",       "/newmap",         "/stamp",           "/brush",         "/layer",
-        "/waterbody",      "/ruler",          "/adaptivewindow", "/maskrule",        "/maskgen",       "/symhover",
-        "/stbfont",        "/recipe",         "/shader",         "/brushtest",       "/brushshape",    "/stampsource",
-        "/stampstroke",    "/symoptions",     "/maskoptions",    "/masktest",        "/shaderbrowser", "/convertlayers",
+        "/command",        "/palette",        "/theme",          "/keysfile",        "/focuspanel",  "/uiclicks",
+        "/hidegameunits",  "/movelayer",      "/pickfilter",     "/mapwide",         "/tool",        "/proptool",
+        "/play",           "/debugarm",       "/breakpoint",     "/check",           "/decaltool",   "/markertool",
+        "/unittool",       "/hoverprop",      "/selectprops",    "/selectunit",      "/propswap",    "/saveas",
+        "/settingsfile",   "/autosavefolder", "/askunsaved",     "/particlebrowser", "/particlenew", "/particleopen",
+        "/materialeditor", "/uiscale",        "/testrun",        "/openall",         "/roundtrip",   "/vault",
+        "/vaultsearch",    "/vaultmap",       "/newmap",         "/stamp",           "/brush",       "/layer",
+        "/waterbody",      "/ruler",          "/adaptivewindow", "/maskrule",        "/maskgen",     "/symhover",
+        "/stbfont",        "/recipe",         "/symmenu",        "/panelbottom",     "/shader",      "/brushtest",
+        "/brushshape",     "/stampsource",    "/stampstroke",    "/symoptions",      "/maskoptions", "/masktest",
+        "/shaderbrowser",  "/convertlayers",
       };
       for (const char* const option : kOptions) {
         if (moho::CFG_GetArgOption(option, 0, nullptr)) {
