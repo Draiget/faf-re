@@ -4649,7 +4649,7 @@ void moho::USER_SavePreferences()
     gpg::STR_Utf8ToWide(preferencesPathText != nullptr ? preferencesPathText : "");
   const std::wstring temporaryPathWide = preferencesPathWide + L".new";
 
-  std::ofstream outputStream(temporaryPathWide.c_str());
+  std::ofstream outputStream{std::filesystem::path(temporaryPathWide)};
   if (!outputStream.is_open()) {
     const std::wstring warningWide = std::wstring(L"Unable to open preference file: ") + temporaryPathWide;
     const fa::string warningUtf8 = gpg::STR_WideToUtf8(warningWide.c_str());

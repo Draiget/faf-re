@@ -68,6 +68,9 @@ set(CMAKE_CXX_COMPILER "${FAF_LINUX_LLVM_ROOT}/bin/clang++")
 # libc++, linked statically (-static-libstdc++ links libc++.a and libc++abi.a
 # with -stdlib=libc++); glibc, libm and libgcc_s stay shared. lld links.
 set(CMAKE_CXX_FLAGS_INIT "-stdlib=libc++")
+# Some distributions' clang drivers do not add libc++abi for static libc++.
+# Name both archives explicitly so those builds resolve the C++ ABI as well.
+set(CMAKE_CXX_STANDARD_LIBRARIES_INIT "-Wl,--start-group -l:libc++.a -l:libc++abi.a -Wl,--end-group")
 foreach(_kind EXE SHARED MODULE)
   set(CMAKE_${_kind}_LINKER_FLAGS_INIT "-fuse-ld=lld -stdlib=libc++ -static-libstdc++ -pthread")
 endforeach()

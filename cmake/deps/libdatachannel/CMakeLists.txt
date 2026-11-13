@@ -1,8 +1,8 @@
 # libdatachannel 0.24.6 (MPL-2.0) with what WebRTC data channels need (issue
 # #238): usrsctp (BSD-3-Clause) for SCTP, Mbed TLS 3.6.7 (Apache-2.0) for
 # DTLS, plog (MIT, headers only) for its log, and faf_juice (libjuice 1.7.4,
-# the tag libdatachannel 0.24.6 pins) for ICE. Every tree is the unmodified
-# archive, see cmake/FafDependencies.cmake; their own CMakeLists.txt files are
+# the tag libdatachannel 0.24.6 pins) for ICE. Source archives and required
+# patches are pinned in cmake/FafDependencies.cmake; their own CMakeLists.txt files are
 # not used, so their options are the definitions below.
 #
 #   RTC_ENABLE_MEDIA=0       no media tracks, RTP or SRTP (libsrtp not needed)
