@@ -968,8 +968,10 @@ namespace
     return true;
   }();
 
+#if FAFRE_PLATFORM_WINDOWS
   constexpr wchar_t kDxdiagOutputFileName[] = L"dxdiag.txt";
   constexpr wchar_t kDxdiagCommandPrefix[] = L"dxdiag.exe ";
+#endif // FAFRE_PLATFORM_WINDOWS: dxdiag
 
   /**
    * Address: 0x004A0EC0 (FUN_004A0EC0, sub_4A0EC0)
@@ -1347,6 +1349,15 @@ namespace
   }
 #endif // FAFRE_PLATFORM_WINDOWS: the registry
 
+  [[nodiscard]]
+  std::wstring GetErrorReportOutputDirSnapshot()
+  {
+    // Engine addition (dedicated-server plan WPL.4): the attachment registry
+    // is moho/misc/WinPlatform.cpp's.
+    return moho::PLAT_GetErrorReportOutputDir();
+  }
+
+#if FAFRE_PLATFORM_WINDOWS
   /**
    * Address: 0x004A1CA0 (FUN_004A1CA0, sub_4A1CA0)
    *
@@ -1362,14 +1373,6 @@ namespace
     return BuildWideStringPlusWideLiteral(std::wstring(kDxdiagCommandPrefix), outputPath.c_str());
   }
 
-  [[nodiscard]]
-  std::wstring GetErrorReportOutputDirSnapshot()
-  {
-    // Engine addition (dedicated-server plan WPL.4): the attachment registry
-    // is moho/misc/WinPlatform.cpp's.
-    return moho::PLAT_GetErrorReportOutputDir();
-  }
-
   /**
    * Address: 0x004A1030 (FUN_004A1030, sub_4A1030)
    *
@@ -1377,7 +1380,6 @@ namespace
    * Launches `dxdiag.exe` with an output path under the report directory, waits
    * up to 60 seconds for completion, then registers the file when it exists.
    */
-#if FAFRE_PLATFORM_WINDOWS
   void PLAT_CreateDxdiagForReport()
   {
     const std::wstring outputPath = GetErrorReportOutputDirSnapshot() + kDxdiagOutputFileName;
@@ -1511,7 +1513,7 @@ namespace
     return ::CallNextHookEx(sWindowHook, code, wParam, lParam);
   }
 
-  constexpr WORD kCrashDialogTemplateId = 0x7A;
+  [[maybe_unused]] constexpr WORD kCrashDialogTemplateId = 0x7A;
   constexpr int kCrashTextControlId = 1065;
   constexpr int kCrashCopyButtonId = 1066;
   constexpr int kCrashDisableButtonId = 1067;
@@ -1576,7 +1578,7 @@ namespace
    * Handles crash dialog init/commands, normalizes/copies UTF-8 crash text,
    * and routes copy/close/terminate control actions.
    */
-  INT_PTR CALLBACK CrashDialogProc(
+  [[maybe_unused]] INT_PTR CALLBACK CrashDialogProc(
     HWND hWnd,
     const UINT message,
     const WPARAM wParam,

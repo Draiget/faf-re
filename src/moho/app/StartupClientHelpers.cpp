@@ -97,7 +97,6 @@ namespace
   constexpr char kProfileNetNameFieldName[] = "NetName";
   constexpr char kProfileProfilesPath[] = "profile.profiles";
   constexpr char kProfileRootKey[] = "profile";
-  constexpr char kProfilesExistMethodName[] = "ProfilesExist";
   constexpr char kSetCustomDataMethodName[] = "SetCustomData";
   constexpr char kUserPrefsGetOptionLuaRunErrorPrefix[] = "Error running '/lua/user/prefs.lua:GetOption' : %s";
   constexpr char kUserPrefsLuaRunErrorPrefix[] = "Error running '/lua/user/prefs.lua' : %s";

@@ -51,14 +51,6 @@ namespace
   constexpr const char* kCMauiControlAboveOneAlphaWarning =
     "Attempting to set an alpha value higher than 1.0 (%d) on control %s, are you sure you wan to do that?";
 
-  [[nodiscard]] std::uint32_t PackVertexAlphaFromScalar(
-    const float alpha
-  ) noexcept
-  {
-    const std::int32_t truncatedLane = static_cast<std::int32_t>(alpha * -255.0f);
-    return 0x00FFFFFFu - (static_cast<std::uint32_t>(truncatedLane) << 24u);
-  }
-
   [[nodiscard]] moho::CMauiControl* FirstChildControl(
     moho::CMauiControl* const control
   ) noexcept

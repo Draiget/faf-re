@@ -851,7 +851,7 @@ namespace moho
 
   namespace
   {
-    [[nodiscard]] bool FlushBeamQuadDrawImpl(
+    [[nodiscard, maybe_unused]] bool FlushBeamQuadDrawImpl(
       moho::BeamDrawContext& context,
       const int quadCount
     )

@@ -15,12 +15,6 @@ namespace
     return sType;
   }
 
-  gpg::RType*& CachedCSimSoundManagerType()
-  {
-    static gpg::RType* sType = nullptr;
-    return sType;
-  }
-
   gpg::RType*& CachedCScriptEventType()
   {
     static gpg::RType* sType = nullptr;

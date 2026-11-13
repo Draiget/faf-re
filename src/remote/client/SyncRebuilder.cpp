@@ -9,6 +9,7 @@
 #include <unordered_set>
 #include <utility>
 
+#include "gpg/core/utils/Global.h"
 #include "gpg/core/utils/Logging.h"
 #include "moho/animation/CAniPose.h"
 #include "moho/audio/CSndParams.h"
@@ -765,8 +766,12 @@ namespace faf::remote::client
       held.live = true;
       if (record.isUnit) {
         // The unit's constants from the frame and a stats tree of the client's own, filled from
-        // the frame's stats (below).
-        held.stats.reset(new moho::Stats<moho::StatItem>());
+        // the frame's stats (below). `Stats<StatItem>` keeps the binary's non-virtual destructor
+        // (its vftable holds only `Delete`), so the deleter deletes the exact type, as
+        // `SSTIUnitConstantData`'s constructor does.
+        held.stats.reset(new moho::Stats<moho::StatItem>(), [](moho::Stats<moho::StatItem>* const root) {
+          GPG_NONVIRTUAL_DESTROY(delete root);
+        });
         moho::SCreateUnitParams params{};
         params.mEntityId = record.id;
         params.mBlueprint = blueprint;

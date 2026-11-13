@@ -4186,7 +4186,7 @@ namespace
    * Maps one `errno` value to disk-error text and publishes it to the
    * thread-local file wait-handle error slot.
    */
-  void func_FWaitSetError(
+  [[maybe_unused]] void func_FWaitSetError(
     const int err
   )
   {

@@ -10,21 +10,6 @@ namespace moho
     constexpr std::uint8_t kDxt5AlphaCodeTable[6] = {0, 2, 3, 4, 5, 1}; // byte_DFFFF4
     constexpr std::uint8_t kDxtColorCodeTable[5] = {1, 3, 2, 0, 0x0A};  // byte_DFFFFC
 
-    [[nodiscard]] std::uint32_t ExpandRgb565ToArgb8888(
-      const std::uint16_t packed
-    )
-    {
-      const std::uint32_t b5 = (packed & 0x001Fu);
-      const std::uint32_t g6 = (packed >> 5u) & 0x003Fu;
-      const std::uint32_t r5 = (packed >> 11u) & 0x001Fu;
-
-      const std::uint32_t b8 = (b5 << 3u) | (b5 >> 2u);
-      const std::uint32_t g8 = (g6 << 2u) | (g6 >> 4u);
-      const std::uint32_t r8 = (r5 << 3u) | (r5 >> 2u);
-
-      return 0xFF000000u | (r8 << 16u) | (g8 << 8u) | b8;
-    }
-
     [[nodiscard]] std::uint32_t ReadU32(
       const std::uint8_t* const bytes
     )

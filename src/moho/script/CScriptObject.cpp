@@ -103,27 +103,6 @@ namespace
     return static_cast<bool>(value);
   }
 
-  [[nodiscard]] float LuaValueToFloat(
-    const LuaPlus::LuaObject& value
-  ) noexcept
-  {
-    LuaPlus::LuaState* const state = value.GetActiveState();
-    if (!state) {
-      return 0.0f;
-    }
-
-    lua_State* const lstate = state->GetCState();
-    if (!lstate) {
-      return 0.0f;
-    }
-
-    const int stackTop = lua_gettop(lstate);
-    const_cast<LuaPlus::LuaObject&>(value).PushStack(lstate);
-    const float out = static_cast<float>(lua_tonumber(lstate, -1));
-    lua_settop(lstate, stackTop);
-    return out;
-  }
-
   /**
    * A weak link that no longer resolves becomes Lua `nil` -- never an unbound
    * `LuaObject`. Every `LuaFunction::Call_Object*Weak*` body in the binary

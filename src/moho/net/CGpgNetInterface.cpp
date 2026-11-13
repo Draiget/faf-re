@@ -2135,6 +2135,7 @@ namespace
 {
   constexpr const char* kLaunchGPGNetName = "LaunchGPGNet";
   constexpr const char* kLaunchGPGNetHelpText = "LaunchGPGNet()";
+#if FAFRE_PLATFORM_WINDOWS
   constexpr const wchar_t* kGPGNetDefaultPath =
     L"c:\\Program Files\\THQ\\Gas Powered Games\\GPGNet\\GPG.Multiplayer.Client.exe";
   constexpr const wchar_t* kGPGNetDevExePath =
@@ -2161,6 +2162,7 @@ namespace
 
     return GetFileAttributesW(outPath.c_str()) != INVALID_FILE_ATTRIBUTES;
   }
+#endif // FAFRE_PLATFORM_WINDOWS: GPGNet is a Windows program
 } // namespace
 
 /**

@@ -57,7 +57,6 @@ namespace
   constexpr const char* kHookDirFieldName = "hookdir";
   constexpr const char* kDefaultHookDirPath = "/hook";
   constexpr const char kConcatSyntheticNewline[] = "\n";
-  std::int32_t gRecoveredCScrLuaMetatableFactoryCScriptObjectIndex = 0;
   fa::vector<fa::string> gScriptHookDirectories{};
 
   struct LuaFileLoaderDat final

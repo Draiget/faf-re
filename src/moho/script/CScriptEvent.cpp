@@ -85,18 +85,6 @@ namespace
     return cached;
   }
 
-  gpg::RType* CachedCRotateManipulatorType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::REF_FindTypeNamed("CRotateManipulator");
-    }
-    if (!cached) {
-      cached = gpg::REF_FindTypeNamed("Moho::CRotateManipulator");
-    }
-    return cached;
-  }
-
   gpg::RType* CachedCSlaveManipulatorType()
   {
     static gpg::RType* cached = nullptr;

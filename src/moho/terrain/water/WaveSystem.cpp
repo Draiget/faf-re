@@ -93,45 +93,6 @@ namespace
   }
 
   /**
-   * Address: 0x0088ACB0 (FUN_0088ACB0, sub_88ACB0)
-   *
-   * What it does:
-   * Search-and-compact lane that walks a `WaveGenerator**` range and shifts
-   * elements left to remove every occurrence of `target`. Records the new
-   * compacted-end pointer through `outEnd`. The binary emits this body
-   * out-of-line; wiring it through the named helper preserves the per-T
-   * shape used by `WaveSystem::RemoveAndDeleteGenerator`.
-   */
-  [[nodiscard]] moho::WaveGenerator*** CompactWaveGeneratorPointerRangeWithoutTarget(
-    moho::WaveGenerator*** const outEnd,
-    moho::WaveGenerator** begin,
-    moho::WaveGenerator** const end,
-    moho::WaveGenerator* const target
-  ) noexcept
-  {
-    moho::WaveGenerator** cursor = begin;
-    while (cursor != end && *cursor != target) {
-      ++cursor;
-    }
-
-    if (cursor == end) {
-      *outEnd = cursor;
-      return outEnd;
-    }
-
-    moho::WaveGenerator** write = cursor;
-    for (moho::WaveGenerator** read = cursor + 1; read != end; ++read) {
-      if (*read != target) {
-        *write = *read;
-        ++write;
-      }
-    }
-
-    *outEnd = write;
-    return outEnd;
-  }
-
-  /**
    * Address: 0x0088A7B0 (FUN_0088A7B0, sub_88A7B0)
    * Mangled: (out-of-line std::vector<Moho::WaveGenerator*>::_Insert_n grow lane)
    *

@@ -37,34 +37,6 @@ namespace
 
   constexpr std::uint32_t kOccupationKeySalt = 0x7BEF2693u;
 
-  class OccupationSourceVTableProbe final : public gpg::HaStar::IOccupationSource
-  {
-  public:
-    void GetOccupationData(
-      const int,
-      const int,
-      gpg::HaStar::OccupationData&
-    ) override
-    {}
-  };
-
-  [[nodiscard]] void* RecoveredOccupationSourceVTable() noexcept
-  {
-    static OccupationSourceVTableProbe probe;
-    return *reinterpret_cast<void**>(&probe);
-  }
-
-  [[nodiscard]] gpg::HaStar::IOccupationSource* WriteOccupationSourceVTable(
-    gpg::HaStar::IOccupationSource* const source
-  )
-  {
-    // The vptr is the object's first word; `IOccupationSource` is
-    // polymorphic, so this writes through the interface itself rather than
-    // through a one-field stand-in for it.
-    *reinterpret_cast<void**>(source) = RecoveredOccupationSourceVTable();
-    return source;
-  }
-
   constexpr std::array<std::uint8_t, 4> kOccupationEdgeStartBit = {0u, 0u, 0u, 8u};
   constexpr std::array<std::uint8_t, 4> kOccupationEdgeStartLayer = {0u, 8u, 0u, 0u};
   constexpr std::array<std::uint8_t, 4> kOccupationEdgeBitStep = {1u, 1u, 0u, 0u};

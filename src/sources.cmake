@@ -25,7 +25,6 @@ set(FAF_ENGINE_SOURCES
   gpg/core/reflection/RFloatType.cpp
   gpg/core/reflection/RStringType.cpp
   moho/command/SSTICommandIssueData.cpp
-  moho/render/d3d/D3DResUnreachableStubs.cpp
   gpg/core/reflection/RTypeTypeInfo.cpp
   gpg/core/reflection/RObjectTypeInfo.cpp
   gpg/gal/backends/d3d9/D3D9BaseClasses.cpp
@@ -196,7 +195,6 @@ set(FAF_ENGINE_SOURCES
   moho/misc/TimeBarRender.cpp
   moho/misc/StartupHelpers.cpp
   moho/app/StartupClientHelpers.cpp
-  moho/misc/StrSafeRuntime.cpp
   moho/misc/IConOutputHandler.cpp
   moho/misc/MiscellaneousExtractor.cpp
   moho/misc/OmniExtractor.cpp

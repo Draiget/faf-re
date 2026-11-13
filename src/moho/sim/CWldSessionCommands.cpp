@@ -1856,7 +1856,7 @@ namespace moho
       CWldSession& session,
       WeakSet<UserEntity>& selection,
       const bool attackMoveModifier,
-      const bool queueModifier,
+      [[maybe_unused]] const bool queueModifier,
       const bool clearQueue
     )
     {

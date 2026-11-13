@@ -307,106 +307,6 @@ namespace
     delete guardFormation;
   }
 
-  [[nodiscard]] const char* UnitStateToDebugLexical(
-    const EUnitState state
-  ) noexcept
-  {
-    switch (state) {
-    case UNITSTATE_Immobile:
-      return "Immobile";
-    case UNITSTATE_Moving:
-      return "Moving";
-    case UNITSTATE_Attacking:
-      return "Attacking";
-    case UNITSTATE_Guarding:
-      return "Guarding";
-    case UNITSTATE_Building:
-      return "Building";
-    case UNITSTATE_Upgrading:
-      return "Upgrading";
-    case UNITSTATE_WaitingForTransport:
-      return "WaitingForTransport";
-    case UNITSTATE_TransportLoading:
-      return "TransportLoading";
-    case UNITSTATE_TransportUnloading:
-      return "TransportUnloading";
-    case UNITSTATE_MovingDown:
-      return "MovingDown";
-    case UNITSTATE_MovingUp:
-      return "MovingUp";
-    case UNITSTATE_Patrolling:
-      return "Patrolling";
-    case UNITSTATE_Busy:
-      return "Busy";
-    case UNITSTATE_Attached:
-      return "Attached";
-    case UNITSTATE_BeingReclaimed:
-      return "BeingReclaimed";
-    case UNITSTATE_Repairing:
-      return "Repairing";
-    case UNITSTATE_Diving:
-      return "Diving";
-    case UNITSTATE_Surfacing:
-      return "Surfacing";
-    case UNITSTATE_Teleporting:
-      return "Teleporting";
-    case UNITSTATE_Ferrying:
-      return "Ferrying";
-    case UNITSTATE_WaitForFerry:
-      return "WaitForFerry";
-    case UNITSTATE_AssistMoving:
-      return "AssistMoving";
-    case UNITSTATE_PathFinding:
-      return "PathFinding";
-    case UNITSTATE_ProblemGettingToGoal:
-      return "ProblemGettingToGoal";
-    case UNITSTATE_NeedToTerminateTask:
-      return "NeedToTerminateTask";
-    case UNITSTATE_Capturing:
-      return "Capturing";
-    case UNITSTATE_BeingCaptured:
-      return "BeingCaptured";
-    case UNITSTATE_Reclaiming:
-      return "Reclaiming";
-    case UNITSTATE_AssistingCommander:
-      return "AssistingCommander";
-    case UNITSTATE_Refueling:
-      return "Refueling";
-    case UNITSTATE_GuardBusy:
-      return "GuardBusy";
-    case UNITSTATE_ForceSpeedThrough:
-      return "ForceSpeedThrough";
-    case UNITSTATE_UnSelectable:
-      return "UnSelectable";
-    case UNITSTATE_DoNotTarget:
-      return "DoNotTarget";
-    case UNITSTATE_LandingOnPlatform:
-      return "LandingOnPlatform";
-    case UNITSTATE_CannotFindPlaceToLand:
-      return "CannotFindPlaceToLand";
-    case UNITSTATE_BeingUpgraded:
-      return "BeingUpgraded";
-    case UNITSTATE_Enhancing:
-      return "Enhancing";
-    case UNITSTATE_BeingBuilt:
-      return "BeingBuilt";
-    case UNITSTATE_NoReclaim:
-      return "NoReclaim";
-    case UNITSTATE_NoCost:
-      return "NoCost";
-    case UNITSTATE_BlockCommandQueue:
-      return "BlockCommandQueue";
-    case UNITSTATE_MakingAttackRun:
-      return "MakingAttackRun";
-    case UNITSTATE_HoldingPattern:
-      return "HoldingPattern";
-    case UNITSTATE_SiloBuildingAmmo:
-      return "SiloBuildingAmmo";
-    default:
-      return "";
-    }
-  }
-
   void AddIntStatCounter(
     StatItem* const statItem,
     const long delta
@@ -493,24 +393,6 @@ namespace
       static_cast<float>(playableRect.x0) > position.x || static_cast<float>(playableRect.z0) > position.z ||
       position.x > static_cast<float>(playableRect.x1) || position.z > static_cast<float>(playableRect.z1)
     );
-  }
-
-  void IncrementAIDebugStateStat(
-    CArmyStats* const armyStats,
-    const fa::string& statPath
-  )
-  {
-    if (!armyStats || statPath.empty()) {
-      return;
-    }
-
-    CArmyStatItem* const item = armyStats->TraverseTables(statPath.c_str(), true);
-    if (!item) {
-      return;
-    }
-
-    item->SynchronizeAsInt();
-    AddIntStatCounter(item, 1L);
   }
 
   [[nodiscard]] std::int32_t PickUniformIndexFromU32(
@@ -681,20 +563,6 @@ namespace
   ) noexcept
   {
     return fa::FloorToIntX87(value + 0.5f);
-  }
-
-  void DrawRaisedPlatformEdge(
-    CDebugCanvas& canvas,
-    const Wm3::Vector3f& a,
-    const Wm3::Vector3f& b
-  )
-  {
-    SDebugLine line{};
-    line.p0 = a;
-    line.p1 = b;
-    line.depth0 = -16711936;
-    line.depth1 = -16711936;
-    canvas.DebugDrawLine(line);
   }
 
   /**

@@ -26,7 +26,7 @@ namespace
     return &sInstance;
   }
 
-  [[nodiscard]] gpg::RType* ResolveEntitySetTemplateUnitType()
+  [[nodiscard, maybe_unused]] gpg::RType* ResolveEntitySetTemplateUnitType()
   {
     // UnitSetTypeInfo pre-registers this descriptor under
     // typeid(EntitySetTemplate<Unit>), and the binary resolves it the same way

@@ -94,19 +94,6 @@ namespace
     return moho::SCR_DecodeColor(state, colorObject);
   }
 
-  [[nodiscard]] fa::string ResolvePlayerColorNameByIndex(
-    LuaPlus::LuaState* const /*state*/,
-    const int colorIndex
-  )
-  {
-    LuaPlus::LuaObject* const gameColorsRoot = moho::GetColors();
-
-    const LuaPlus::LuaObject gameColors = (*gameColorsRoot)[kGameColorsTableName];
-    const LuaPlus::LuaObject playerColors = gameColors[kPlayerColorsTableName];
-    const LuaPlus::LuaObject colorObject = playerColors.GetByIndex(colorIndex + 1);
-    return fa::string(colorObject.GetString());
-  }
-
   [[nodiscard]] std::uint32_t ResolvePlayerColorCount(
     LuaPlus::LuaState* const /*state*/
   )

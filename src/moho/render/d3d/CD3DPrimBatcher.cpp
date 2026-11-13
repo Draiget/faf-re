@@ -42,15 +42,10 @@ namespace moho
 
 namespace
 {
-  constexpr float kTau = 6.28318530717958647692f;
   // Fixed queue capacity the constructor reserves for both batcher queues
   // (0x00438433/0x0043843B); Draw*/Add* flush before a primitive would
   // overflow it.
   constexpr std::uint32_t kPrimQueueCapacity = 0x8000u;
-  constexpr std::uint32_t kAxisColorX = 0xFFFF0000u;
-  constexpr std::uint32_t kAxisColorY = 0xFF00FF00u;
-  constexpr std::uint32_t kAxisColorZ = 0xFF0000FFu;
-  constexpr std::int32_t kMode1PrimitiveType = 1;
   constexpr std::int32_t kLineListPrimitiveType = 2;
   constexpr std::int32_t kTriangleListPrimitiveType = 4;
   constexpr std::uint32_t kRectEdgeSubdivisionCount = 10u;
@@ -70,7 +65,6 @@ namespace
   constexpr float kOvalBandHalfWidth = 0.1f;
   std::uint32_t sCircleBandColor = kOvalBandColor;
   float sCircleBandHalfWidth = kOvalBandHalfWidth;
-  constexpr std::uint16_t kUnmappedIndexedVertex = 0xFFFFu;
 
   static_assert(
     sizeof(moho::VMatrix4) == sizeof(gpg::gal::Matrix),
@@ -96,22 +90,6 @@ namespace
   ) noexcept
   {
     return {position.x, position.y, position.z, color, u, v};
-  }
-
-  void DrawLine(
-    moho::CD3DPrimBatcher* const primBatcher,
-    const moho::Vector3f& start,
-    const moho::Vector3f& end,
-    const std::uint32_t color
-  )
-  {
-    if (primBatcher == nullptr) {
-      return;
-    }
-
-    const moho::CD3DPrimBatcher::Vertex startVertex = MakeVertex(start, color, 0.0f, 0.0f);
-    const moho::CD3DPrimBatcher::Vertex endVertex = MakeVertex(end, color, 1.0f, 0.0f);
-    primBatcher->DrawLine(startVertex, endVertex);
   }
 
   // `QuatCrossAdd` used to be duplicated here with the textbook `.w`-scalar
@@ -158,28 +136,6 @@ namespace
   )
   {
     runtime.mPrimitives.push_back(static_cast<std::int16_t>(index));
-  }
-
-  void InitializeIndexedVertexRemap(
-    gpg::fastvector<std::uint16_t>& remap,
-    const std::uint32_t sourceVertexCount
-  )
-  {
-    remap.Clear();
-    remap.Reserve(sourceVertexCount);
-    for (std::uint32_t index = 0; index < sourceVertexCount; ++index) {
-      remap.PushBack(kUnmappedIndexedVertex);
-    }
-  }
-
-  void ResetIndexedVertexRemap(
-    gpg::fastvector<std::uint16_t>& remap
-  ) noexcept
-  {
-    const std::size_t remapSize = remap.size();
-    for (std::size_t index = 0; index < remapSize; ++index) {
-      remap[index] = kUnmappedIndexedVertex;
-    }
   }
 } // namespace
 

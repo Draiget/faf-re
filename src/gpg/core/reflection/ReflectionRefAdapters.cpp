@@ -315,7 +315,6 @@ namespace
   }
   gpg::RType* gCFootPlantManipulatorRRefType = nullptr;
   thread_local TypeInfoCache3 gCFootPlantManipulatorRRefCache{false, {}};
-  thread_local TypeInfoCache3 gCAnimationManipulatorRRefCache{false, {}};
   gpg::RType* gCStorageManipulatorRRefType = nullptr;
   thread_local TypeInfoCache3 gCStorageManipulatorRRefCache{false, {}};
   gpg::RType* gCThrustManipulatorRRefType = nullptr;

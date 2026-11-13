@@ -57,7 +57,7 @@ namespace
    * Resolves and caches the reflected runtime type for
    * `CUnitAttackTargetTask`.
    */
-  [[nodiscard]] gpg::RType* CachedCUnitAttackTargetTaskType()
+  [[nodiscard, maybe_unused]] gpg::RType* CachedCUnitAttackTargetTaskType()
   {
     gpg::RType* type = moho::CUnitAttackTargetTask::sType;
     if (type == nullptr) {

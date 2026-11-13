@@ -1679,7 +1679,7 @@ bool UserUnit::DoOnDetectAdjacencyBonusFor(
  * wires animation poses from shared unit pose lanes when skeletons match.
  */
 void UserUnit::CreateMeshInstance(
-  const bool forUnitPose
+  [[maybe_unused]] const bool forUnitPose
 )
 {
   UserEntity* const entityView = this;

@@ -764,21 +764,6 @@ namespace
     return childOrParent;
   }
 
-  moho::CEntityDbAllUnitsNode* EraseAllUnitsTreeRange(
-    moho::EntityDB* const entityDb,
-    moho::CEntityDbAllUnitsNode** const outPosition,
-    moho::CEntityDbAllUnitsNode* const first,
-    moho::CEntityDbAllUnitsNode* const last
-  )
-  {
-    using Map = fa::map<std::uint32_t, moho::Entity*>;
-    const Map::const_iterator firstIt(reinterpret_cast<Map::const_iterator::node_type*>(first));
-    const Map::const_iterator lastIt(reinterpret_cast<Map::const_iterator::node_type*>(last));
-    const Map::iterator next = entityDb->mAllUnits.erase(firstIt, lastIt);
-    *outPosition = reinterpret_cast<moho::CEntityDbAllUnitsNode*>(next.node());
-    return *outPosition;
-  }
-
   struct BackRefListNode
   {
     BackRefListNode* next;
@@ -1245,7 +1230,7 @@ namespace moho
    * (every tracked `Unit`) on every `EntityDB` teardown. Routing through the
    * already- recovered `EraseAllUnitsRange` (which internally calls
    * `DestroyAllUnitsSubtreeRecursive(head->parent)`, the correct root, via
-   * `EraseAllUnitsTreeRange`'s whole-tree fast path) fixes the leak and matches
+   * the map erase's whole-tree fast path) fixes the leak and matches
    * the real call target.
    */
   EntityDB::~EntityDB()
@@ -1434,8 +1419,8 @@ namespace moho
    *
    * What it does:
    * Erases `[first, last)` from `AllUnitsHead()` and returns the node that
-   * followed the erased range (see `EraseAllUnitsTreeRange` for the full
-   * recovery, and `EraseAllUnitsTreeNode`/FUN_00685410 for the single-node
+   * followed the erased range (`fa::map::erase(first, last)` is the full
+   * recovery; see `EraseAllUnitsTreeNode`/FUN_00685410 for the single-node
    * erase it loops on).
    */
   CEntityDbAllUnitsNode* EntityDB::AllUnitsHead() const noexcept

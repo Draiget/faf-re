@@ -73,8 +73,8 @@ namespace
    * `.scmap` container header, written at 0x008911D2/0x008911DA by
    * `CWldMap::MapSave` and validated at 0x00890E81 by `CWldMap::MapLoad`.
    */
-  constexpr std::uint32_t kWorldMapFileMagic = 0x1A70614DU; // 'Map' + 0x1A
-  constexpr std::uint32_t kWorldMapFileVersion = 2U;
+  [[maybe_unused]] constexpr std::uint32_t kWorldMapFileMagic = 0x1A70614DU; // 'Map' + 0x1A
+  [[maybe_unused]] constexpr std::uint32_t kWorldMapFileVersion = 2U;
   /**
    * The two header lanes are staged adjacently on the stack at 0x008911D2 and
    * flushed by a single 8-byte `BinaryWriter::Write` (0x008915F0), so they are

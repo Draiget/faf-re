@@ -669,7 +669,7 @@ gpg::RRef* BuildWrapFileRef(
  * the same `(out->mObj = object; out->mType = CachedType<WrapFile>())`
  * assignment as the caller-pack entry at 0x00917100.
  */
-gpg::RRef* RRefWrapFileImpl(
+[[maybe_unused]] gpg::RRef* RRefWrapFileImpl(
   gpg::RRef* const out,
   WrapFile* const object
 )
