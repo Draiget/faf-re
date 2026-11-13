@@ -1489,6 +1489,11 @@ namespace faf::editor
     {
       mTerrainTypes = std::move(types);
     }
+    /** The game's terrain types (codes and names). */
+    [[nodiscard]] const std::vector<TerrainTypeInfo>& TerrainTypeList() const noexcept
+    {
+      return mTerrainTypes;
+    }
     [[nodiscard]] bool HasTerrainTypes() const noexcept
     {
       return !mTerrainTypes.empty();

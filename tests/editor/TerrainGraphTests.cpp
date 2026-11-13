@@ -359,6 +359,21 @@ namespace
       }
       ASSERT_LE(sum, 1.0001f) << "sample " << k;
     }
+    // On a PBR shader with a roughness multiplier in layer 8 the build writes it too: rock rough, the rest neutral.
+    ground.roughness = true;
+    faf::editor::TerrainBuildWrites writes;
+    ASSERT_TRUE(run.BuildWrites(graph, ground, shape, writes, error)) << error;
+    EXPECT_TRUE(writes.kindsTypes) << "the node's \"Set the terrain types too\" is on by default";
+    ASSERT_EQ(writes.layers.size(), 1U);
+    EXPECT_EQ(writes.layers[0].layer, 8);
+    const auto [lowest, highest] = std::minmax_element(writes.layers[0].mask.v.begin(), writes.layers[0].mask.v.end());
+    EXPECT_GT(*highest, 0.65f) << "rock (0.88) at the default amount 0.6: 0.5 + 0.38 x 0.6";
+    EXPECT_LT(*lowest, 0.45f) << "snow (0.2) is linked too: shiny on the top";
+    EXPECT_GE(*lowest, 0.31f) << "no shinier than snow at the amount: 0.5 - 0.3 x 0.6";
+    ground.roughness = false;
+    ASSERT_TRUE(run.BuildWrites(graph, ground, shape, writes, error)) << error;
+    EXPECT_TRUE(writes.layers.empty()) << "no roughness layer on other shaders";
+
     // A graph without Output: ground kinds paints nothing.
     NodeGraph none(TerrainNodeTypes());
     (void)none.AddNode("perlin", 0, 0);

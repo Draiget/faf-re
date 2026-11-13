@@ -203,6 +203,8 @@ namespace faf::editor
   {
     /** Output: ground kinds as the recipes resolve it (layer -> visible weight on the run's grid). */
     std::map<int, field::Grid> kinds;
+    /** Output: ground kinds' "Set the terrain types too": the types follow what the paint shows most. */
+    bool kindsTypes = false;
     std::array<bool, 9> textured{};
     int cap = 8;
     /** Output: texture layer and Output: ground kind, in node order: a mask into one layer (1..8). */

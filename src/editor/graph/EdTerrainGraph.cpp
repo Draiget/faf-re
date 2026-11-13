@@ -635,6 +635,53 @@ namespace faf::editor
       error = kindsError;
       return false;
     }
+    // Output: ground kinds' terrain types and, on a PBR shader with a roughness multiplier in layer 8, the roughness:
+    // each kind's (wet ground and snow shiny, rock rough) by the visible weight of its layers, neutral where none
+    // shows, varied by the node's amount.
+    if (!writes.kinds.empty()) {
+      std::vector<int> kindsOrder;
+      (void)graph.Order(kindsOrder);
+      for (const int id : kindsOrder) {
+        const GraphNode* node = graph.Find(id);
+        if (node == nullptr || node->type->name != "out_kinds") {
+          continue;
+        }
+        writes.kindsTypes = TerrainParamNumber(*node, "types", 1.0) >= 0.5;
+        if (TerrainParamNumber(*node, "roughness", 1.0) >= 0.5 && ground.roughness) {
+          const float amount = static_cast<float>(TerrainParamNumber(*node, "amount", 0.6));
+          std::array<float, 9> roughOf;
+          roughOf.fill(0.5f);
+          for (const TerrainKind& k : TerrainKinds()) {
+            for (const int layer : ground.plan.byKind[static_cast<std::size_t>(k.kind)]) {
+              if (layer >= 0 && layer <= 8) {
+                roughOf[static_cast<std::size_t>(layer)] = k.roughness;
+              }
+            }
+          }
+          field::Grid rough = heights;
+          std::fill(rough.v.begin(), rough.v.end(), 0.0f);
+          std::vector<float> shown(rough.v.size(), 0.0f);
+          for (const auto& [layer, weight] : writes.kinds) {
+            if (layer < 0 || layer > 8 || weight.v.size() != rough.v.size()) {
+              continue;
+            }
+            for (std::size_t i = 0; i < rough.v.size(); ++i) {
+              rough.v[i] += weight.v[i] * roughOf[static_cast<std::size_t>(layer)];
+              shown[i] += weight.v[i];
+            }
+          }
+          for (std::size_t i = 0; i < rough.v.size(); ++i) {
+            const float r = rough.v[i] + (1.0f - std::min(1.0f, shown[i])) * 0.5f;
+            rough.v[i] = std::clamp(0.5f + (r - 0.5f) * amount, 0.0f, 1.0f);
+          }
+          TerrainBuildWrites::Layer layer8;
+          layer8.mask = std::move(rough);
+          layer8.layer = 8;
+          writes.layers.push_back(std::move(layer8));
+        }
+        break;
+      }
+    }
     std::vector<int> order;
     (void)graph.Order(order);
     for (const int id : order) {

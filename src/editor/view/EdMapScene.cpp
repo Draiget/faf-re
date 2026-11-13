@@ -5240,15 +5240,37 @@ namespace faf::editor
       }
     }
     parts |= static_cast<std::uint8_t>(strokes << 1);
-    if (!writes.types.empty()) {
+    if (!writes.types.empty() || (writes.kindsTypes && !writes.kinds.empty())) {
       int width = 0;
       int height = 0;
       std::uint8_t* const cells = mDocument.TerrainTypeCells(width, height);
       if (cells != nullptr && width > 0 && height > 0) {
         std::vector<std::uint8_t> before = mDocument.TerrainTypesNow();
+        std::size_t changed = 0;
+        // The ground kinds' types first: each cell what its paint shows most, by the layers' textures' types.
+        if (writes.kindsTypes && !writes.kinds.empty() && masks && mTools != nullptr) {
+          const std::vector<EdTools::LayerSlot> slots = LayerSlots();
+          std::array<int, 9> layerTypes{};
+          for (int layer = 0; layer <= 8 && layer < static_cast<int>(slots.size()); ++layer) {
+            layerTypes[static_cast<std::size_t>(layer)] =
+              DefaultTerrainTypeFor(slots[static_cast<std::size_t>(layer)].albedo, mTools->TerrainTypeList());
+          }
+          const EdDocument::MaskGrid& grid = mDocument.Masks();
+          changed += TerrainTypesFromLayers(
+            grid.texels.data(),
+            grid.width,
+            grid.height,
+            RemappedStrata(TerrainShader()),
+            writes.textured,
+            layerTypes,
+            cells,
+            width,
+            height,
+            false
+          );
+        }
         const float sizeX = static_cast<float>(mDocument.Facts().sizeX);
         const float sizeZ = static_cast<float>(mDocument.Facts().sizeZ);
-        std::size_t changed = 0;
         for (const TerrainBuildWrites::Types& t : writes.types) {
           for (int j = 0; j < height; ++j) {
             const double z = (static_cast<double>(j) + 0.5) * sizeZ / height;
@@ -5262,7 +5284,7 @@ namespace faf::editor
             }
           }
         }
-        if (changed > 0) {
+        if (mDocument.TerrainTypesNow() != before) {
           mDocument.TerrainTypesEdited(std::move(before), false);
           mDocument.TerrainTypesChanged();
           parts |= 64;
