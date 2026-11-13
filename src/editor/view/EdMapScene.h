@@ -200,6 +200,20 @@ namespace faf::editor
     }
     /** Test runs: a checksum of the height words (FNV-1a), to tell "as before" from "changed". */
     [[nodiscard]] std::uint64_t HeightsHash() const;
+    /** Test runs: the ruler laid from (x0, z0) to (x1, z1), as an Alt+drag would. */
+    void TestRuler(
+      const float x0,
+      const float z0,
+      const float x1,
+      const float z1
+    ) noexcept
+    {
+      mRulerFrom[0] = x0;
+      mRulerFrom[1] = z0;
+      mRulerTo[0] = x1;
+      mRulerTo[1] = z1;
+      mRulerShown = true;
+    }
     /** Test runs: the same of the texture masks (loaded first). */
     [[nodiscard]] std::uint64_t MasksHash();
     /** G or R is moving or turning the selection: the view takes every key until it ends. */
@@ -983,6 +997,14 @@ namespace faf::editor
     std::string RunErosion(const std::string& solver, const ErosionValues& values, bool preview);
     bool RevertErosionPreview();
     bool UndoHeightsAndMasks(bool redo);
+    // SC tools: the last pads on the map (their change, and the undo depth they were applied at), and the auto tick.
+    PadResult mPadResult;
+    std::size_t mPadDepth = 0;
+    std::string mPadQuietSignature;
+    float mPadQuietSeconds = 0.0f;
+    [[nodiscard]] std::vector<PadMarker> PadMarkers() const;
+    std::string RunScTool(EdTools::ScAsk ask);
+    void TickPads(float frameSeconds);
     // The Water tool's mask brush: a stroke's before, and the overlay's runs for the mask shown.
     bool mPaintingWaterMask = false;
     EdDocument::WaterMaskSnapshot mWaterMaskBefore;

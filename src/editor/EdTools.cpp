@@ -1175,6 +1175,131 @@ namespace faf::editor
     ImGui::End();
   }
 
+  void EdTools::DrawScToolsWindow()
+  {
+    if (!mScToolsOpen) {
+      return;
+    }
+    ImGui::SetNextWindowSize(ImVec2(Em(380.0f), Em(620.0f)), ImGuiCond_FirstUseEver);
+    if (!ImGui::Begin("SC tools###ScToolsWindow", &mScToolsOpen)) {
+      ImGui::End();
+      return;
+    }
+    PadSettings& p = mPadSettings;
+    if (Section("Base pads and resource rings")) {
+      ImGui::Checkbox("Start positions", &p.startPads);
+      ImGui::BeginDisabled(!p.startPads);
+      ImGui::SetNextItemWidth(-1.0f);
+      FillSliderFloat("##starthalf", &p.startHalf, 2.0f, 40.0f, "Flat half-width %.0f");
+      ImGui::SetNextItemWidth(-1.0f);
+      FillSliderFloat("##startskirt", &p.startSkirt, 0.0f, 40.0f, "Skirt %.0f");
+      ImGui::EndDisabled();
+      ImGui::Checkbox("Mass points", &p.massPads);
+      ImGui::BeginDisabled(!p.massPads);
+      ImGui::SetNextItemWidth(-1.0f);
+      FillSliderFloat("##masshalf", &p.massHalf, 1.0f, 10.0f, "Flat half-width %.0f");
+      ImGui::SetNextItemWidth(-1.0f);
+      FillSliderFloat("##massskirt", &p.massSkirt, 0.0f, 20.0f, "Skirt %.0f");
+      ImGui::EndDisabled();
+      ImGui::Checkbox("Hydrocarbons", &p.hydroPads);
+      ImGui::BeginDisabled(!p.hydroPads);
+      ImGui::SetNextItemWidth(-1.0f);
+      FillSliderFloat("##hydrohalf", &p.hydroHalf, 1.0f, 12.0f, "Flat half-width %.0f");
+      ImGui::SetNextItemWidth(-1.0f);
+      FillSliderFloat("##hydroskirt", &p.hydroSkirt, 0.0f, 20.0f, "Skirt %.0f");
+      ImGui::EndDisabled();
+      ImGui::Checkbox("Resource rings", &p.ring);
+      EdSetItemTooltip("Mass and hydrocarbons within this distance of a start share its pad's height.");
+      ImGui::SameLine();
+      ImGui::SetNextItemWidth(-1.0f);
+      ImGui::BeginDisabled(!p.ring);
+      FillSliderFloat("##ringradius", &p.ringRadius, 5.0f, 80.0f, "Within %.0f");
+      ImGui::EndDisabled();
+      ImGui::Checkbox("Clusters", &p.cluster);
+      EdSetItemTooltip("Other resources of a kind closer than this share one height.");
+      ImGui::SameLine();
+      ImGui::SetNextItemWidth(-1.0f);
+      ImGui::BeginDisabled(!p.cluster);
+      FillSliderFloat("##clusterdist", &p.clusterDist, 2.0f, 60.0f, "Within %.0f");
+      ImGui::EndDisabled();
+      static constexpr const char* kLevels[] = {
+        "Pad height: the mean", "Pad height: the lowest", "Pad height: the highest"
+      };
+      ImGui::SetNextItemWidth(-1.0f);
+      (void)EdCombo("##padlevel", &p.level, kLevels, IM_ARRAYSIZE(kLevels));
+      ImGui::SetNextItemWidth(-1.0f);
+      FillSliderFloat("##padstrength", &p.strength, 0.0f, 1.0f, "Strength %.2f");
+      if (PrimaryButton("Apply pads")) {
+        mScAsk = ScAsk::PadsApply;
+      }
+      ImGui::SameLine();
+      ImGui::BeginDisabled(!mPadsApplied);
+      if (ImGui::Button("Remove")) {
+        mScAsk = ScAsk::PadsRemove;
+      }
+      ImGui::EndDisabled();
+      ImGui::SameLine();
+      ImGui::Checkbox("Auto", &p.autoApply);
+      EdSetItemTooltip("Re-apply by itself half a second after a marker stopped moving.");
+      if (mPadsStale) {
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.95f, 0.75f, 0.30f, 1.0f));
+        ImGui::TextWrapped("The markers or settings changed since the pads were applied.");
+        ImGui::PopStyleColor();
+      }
+      Note(
+        "Each pad is flat under its marker and blends into the ground over its skirt; applying again replaces the last "
+        "pads (they come off first), one undo step each time."
+      );
+    }
+    if (Section("Slope limit")) {
+      ImGui::SetNextItemWidth(-1.0f);
+      FillSliderFloat("##slopelimit", &mSlope.limit, 0.2f, 1.5f, "Limit (rating) %.2f");
+      EdSetItemTooltip("The slope rating land units can't cross over: 0.75 is the game's.");
+      static constexpr const char* kModes[] = {"Lower the high side", "Raise the low side", "Both"};
+      int mode = mSlope.mode == "lower" ? 0 : mSlope.mode == "raise" ? 1 : 2;
+      ImGui::SetNextItemWidth(-1.0f);
+      if (EdCombo("##slopemode", &mode, kModes, IM_ARRAYSIZE(kModes))) {
+        mSlope.mode = mode == 0 ? "lower" : mode == 1 ? "raise" : "both";
+      }
+      ImGui::SetNextItemWidth(-1.0f);
+      FillSliderFloat("##slopebalance", &mSlope.balance, 0.0f, 1.0f, "Balance %.2f");
+      ImGui::SetNextItemWidth(-1.0f);
+      FillSliderFloat("##slopemargin", &mSlope.margin, 0.0f, 0.2f, "Margin %.2f");
+      ImGui::SetNextItemWidth(-1.0f);
+      FillSliderFloat("##slopestrength", &mSlope.strength, 0.0f, 1.0f, "Strength %.2f");
+      if (PrimaryButton("Limit slopes")) {
+        mScAsk = ScAsk::SlopeApply;
+      }
+      ImGui::SameLine();
+      if (ImGui::Button("Report")) {
+        mScAsk = ScAsk::SlopeReport;
+      }
+      if (!mSlopeReport.empty()) {
+        ImGui::PushTextWrapPos(0.0f);
+        ImGui::TextUnformatted(mSlopeReport.c_str());
+        ImGui::PopTextWrapPos();
+      }
+    }
+    if (Section("Ramp check")) {
+      if (ImGui::Button("Check the ruler's route", ImVec2(-1.0f, 0.0f))) {
+        mScAsk = ScAsk::Ramp;
+      }
+      Note("Alt+drag lays the ruler; this measures the grade along it (rise over 3 units) against the slope limit.");
+      if (!mRampReport.empty()) {
+        ImGui::PushTextWrapPos(0.0f);
+        ImGui::TextUnformatted(mRampReport.c_str());
+        ImGui::PopTextWrapPos();
+      }
+    }
+    if (!mScStatus.empty()) {
+      ImGui::Separator();
+      ImGui::PushTextWrapPos(0.0f);
+      ImGui::TextDisabled("%s", mScStatus.c_str());
+      ImGui::PopTextWrapPos();
+    }
+    ImGui::End();
+  }
+
   void EdTools::DrawFalloffCurve()
   {
     // The mockup's curve under the sliders: the brush's weight across its middle (BrushWeightAt, so its shape and
@@ -1498,10 +1623,16 @@ namespace faf::editor
   void EdTools::DrawTerrain()
   {
     DrawBrush(true);
-    if (ImGui::Button("Erosion...", ImVec2(-1.0f, 0.0f))) {
+    const float half = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) * 0.5f;
+    if (ImGui::Button("Erosion...", ImVec2(half, 0.0f))) {
       mErosionOpen = true;
     }
     EdSetItemTooltip("The Erosion window: a solver run over the whole map, with presets, a preview and Apply.");
+    ImGui::SameLine();
+    if (ImGui::Button("SC tools...", ImVec2(-1.0f, 0.0f))) {
+      mScToolsOpen = true;
+    }
+    EdSetItemTooltip("Base pads under the markers, the pathable slope limit, the grade along a route.");
     DrawSymmetry();
     DrawLimits();
     if (Section("Height field")) {

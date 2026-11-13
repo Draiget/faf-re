@@ -152,9 +152,9 @@ namespace faf::editor
         "/stbfont",        "/recipe",         "/texset",         "/layerop",         "/slopeview",   "/typesfromlayers",
         "/uncapped",       "/nominimap",      "/followtest",     "/arrangetest",     "/findtest",    "/findopen",
         "/filltest",       "/modaltest",      "/looktest",       "/looksfolder",     "/envtest",     "/watermasktest",
-        "/nowaterhires",   "/camat",          "/erosiontest",    "/symmenu",         "/panelbottom", "/shader",
-        "/brushtest",      "/brushshape",     "/stampsource",    "/stampstroke",     "/symoptions",  "/maskoptions",
-        "/masktest",       "/shaderbrowser",  "/convertlayers",
+        "/nowaterhires",   "/camat",          "/erosiontest",    "/sctest",          "/symmenu",     "/panelbottom",
+        "/shader",         "/brushtest",      "/brushshape",     "/stampsource",     "/stampstroke", "/symoptions",
+        "/maskoptions",    "/masktest",       "/shaderbrowser",  "/convertlayers",
       };
       for (const char* const option : kOptions) {
         if (moho::CFG_GetArgOption(option, 0, nullptr)) {
@@ -2531,6 +2531,8 @@ namespace faf::editor
       std::string mWaterMaskTestArg; // `/watermasktest foam|flatness|bias,<value>,<radius>[,keep]` (test runs)
       int mWaterMaskTestFrames = 0;
       bool mCamAtDone = false;
+      int mScTestStage = 0;
+      int mScTestFrames = 0;
       int mErosionTestStage = 0;
       int mErosionTestFrames = 0;
       int mEnvTestFrames = 0;
@@ -3254,6 +3256,9 @@ namespace faf::editor
       add("edit.paste", "Paste at the cursor", "Edit", "Ctrl+V", [this] {
         mScene.CtrlKey('V');
       }, canEdit);
+      add("terrain.sctools", "SC tools...", "Terrain", "", [this] {
+        mShell->Tools().OpenScTools();
+      }, mapOpen, {}, "Base pads under the markers, the pathable slope limit, the grade along a route");
       add("terrain.erosion", "Erosion...", "Terrain", "", [this] {
         mShell->Tools().OpenErosion();
       }, mapOpen, {}, "A solver run over the whole map: presets, a preview on the map, Apply as one undo step");
@@ -3563,7 +3568,7 @@ namespace faf::editor
            cmd("edit.find"),
            arrange}
         },
-        EdMenu{"&Terrain", {cmd("terrain.erosion")}},
+        EdMenu{"&Terrain", {cmd("terrain.erosion"), cmd("terrain.sctools")}},
         EdMenu{
           "&View",
           {cmd("view.tools"),
@@ -6771,6 +6776,45 @@ namespace faf::editor
       UpdateLooks();
       TestLooks();
       TestEnvironment();
+      // `/sctest` (test runs): the SC tools window's buttons in turn, a second apart, the heights' checksum each time.
+      if (
+        mScTestStage < 8 && moho::CFG_GetArgOption("/sctest", 0, nullptr) && !mScene.ModelsPending() &&
+        mScene.Attached() && ++mScTestFrames % 60 == 0
+      ) {
+        using Ask = EdTools::ScAsk;
+        gpg::Logf(
+          "editor: sc test stage %d: heights %016llx; undo: %s",
+          mScTestStage,
+          static_cast<unsigned long long>(mScene.HeightsHash()),
+          mDocument.UndoStepName() != nullptr ? mDocument.UndoStepName() : "-"
+        );
+        EdTools& tools = mShell->Tools();
+        switch (mScTestStage) {
+        case 0:
+        case 1:
+          tools.AskSc(Ask::PadsApply); // twice: the second replaces the first
+          break;
+        case 2:
+          tools.AskSc(Ask::PadsRemove);
+          break;
+        case 3:
+          tools.AskSc(Ask::SlopeReport);
+          break;
+        case 4:
+          tools.AskSc(Ask::SlopeApply);
+          break;
+        case 5:
+          gpg::Logf("editor: sc test: undo %s", mScene.Undo() ? "took the slope limit back" : "had nothing");
+          break;
+        case 6:
+          mScene.TestRuler(780.0f, 380.0f, 830.0f, 420.0f);
+          tools.AskSc(Ask::Ramp);
+          break;
+        default:
+          break;
+        }
+        ++mScTestStage;
+      }
       // `/erosiontest <preset>` (test runs): the window's Preview, Revert, Apply, then Undo, a second apart.
       if (
         fa::vector<fa::string> ero; mErosionTestStage < 5 && !mScene.ModelsPending() && mScene.Attached() &&

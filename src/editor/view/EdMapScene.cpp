@@ -3907,6 +3907,10 @@ namespace faf::editor
           mTools->SetErosionStatus(status, mErosionPreviewShown);
         }
       }
+      if (const EdTools::ScAsk sc = mTools->TakeScAsk(); sc != EdTools::ScAsk::None) {
+        mTools->SetScStatus(RunScTool(sc));
+      }
+      TickPads(frameSeconds);
       if (EdTools::FillOptions fill; mTools->TakeFillRequest(fill)) {
         mTools->SetFillMessage(ScatterOverMap(fill));
       }
@@ -4835,6 +4839,212 @@ namespace faf::editor
       }
     }
     return hash;
+  }
+
+  std::vector<PadMarker> EdMapScene::PadMarkers() const
+  {
+    std::vector<PadMarker> list;
+    for (const SaveEntry& marker : mDocument.SaveData().Markers()) {
+      float x = 0.0f, y = 0.0f, z = 0.0f;
+      if (ShownMarkerPosition(marker, x, y, z)) {
+        list.push_back({marker.name, MarkerTypeOf(marker), x, z});
+      }
+    }
+    return list;
+  }
+
+  std::string EdMapScene::RunScTool(
+    const EdTools::ScAsk ask
+  )
+  {
+    moho::CHeightField* const field = mMap != nullptr ? mMap->mTerrainRes->GetHeightField() : nullptr;
+    if (field == nullptr || mTools == nullptr || mPainting) {
+      return "No map, or a stroke is under way.";
+    }
+    auto* const words = reinterpret_cast<std::uint16_t*>(field->data);
+    const float scale = 1.0f / 128.0f;
+    // The last pads are still on the map unless their step was undone.
+    if (!mPadResult.Empty() && mDocument.UndoOrder().size() < mPadDepth) {
+      mPadResult = PadResult{};
+    }
+    const auto heightsStep = [&](const SampleRect& rect, const auto& change) {
+      mDocument.Heights().BeginStroke();
+      mDocument.Heights().BeforeWrite(field->data, rect);
+      const int changed = change();
+      mDocument.Heights().EndStroke(field->data);
+      if (changed > 0) {
+        mDocument.EditEnded(EdDocument::EditKind::Heights);
+        RefreshHeights({rect});
+        mDocument.SetModified(true);
+      }
+      return changed;
+    };
+    const SampleRect whole{0, 0, field->width - 1, field->height - 1};
+    char text[256];
+    switch (ask) {
+    case EdTools::ScAsk::PadsApply: {
+      const PadSettings& settings = mTools->PadSettingsNow();
+      const std::vector<Pad> pads = CollectPads(PadMarkers(), settings);
+      PadResult result;
+      std::string error;
+      const PadResult previous = mPadResult;
+      const int changed = heightsStep(whole, [&] {
+        return ApplyPads(words, field->width, field->height, scale, pads, settings, previous, result, error);
+      });
+      if (changed < 0) {
+        return "Pads: " + error;
+      }
+      mPadResult = std::move(result);
+      mPadDepth = mDocument.UndoOrder().size();
+      int groups = 0;
+      for (const Pad& pad : pads) {
+        groups = std::max(groups, pad.group);
+      }
+      (void)std::snprintf(
+        text,
+        sizeof(text),
+        changed > 0 ? "Pads: %zu pads (%d shared heights), %d samples changed, one undo step."
+                    : "Pads: %zu pads (%d shared heights), %d samples changed: the ground already had them.",
+        pads.size(),
+        groups,
+        changed
+      );
+      gpg::Logf("editor: sc tools: %s", text);
+      return text;
+    }
+    case EdTools::ScAsk::PadsRemove: {
+      if (mPadResult.Empty()) {
+        return "There are no pads to remove.";
+      }
+      const int changed = heightsStep(whole, [&] {
+        return RemovePads(words, field->width, field->height, scale, mPadResult);
+      });
+      mPadResult = PadResult{};
+      (void)std::snprintf(text, sizeof(text), "Pads removed: %d samples changed, one undo step.", changed);
+      gpg::Logf("editor: sc tools: %s", text);
+      return text;
+    }
+    case EdTools::ScAsk::SlopeReport:
+    case EdTools::ScAsk::SlopeApply: {
+      const SlopeLimitSettings& slope = mTools->SlopeSettingsNow();
+      const std::vector<float> before = BlockedShares(words, field->width, field->height, scale, slope.limit);
+      std::string report = "Ground units can't cross (rating over " + std::to_string(slope.limit).substr(0, 4) + "):";
+      if (ask == EdTools::ScAsk::SlopeApply) {
+        std::string error;
+        const int changed = heightsStep(whole, [&] {
+          return LimitSlopes(words, field->width, field->height, scale, slope, error);
+        });
+        if (changed < 0) {
+          return "Slope limit: " + error;
+        }
+        const std::vector<float> after = BlockedShares(words, field->width, field->height, scale, slope.limit);
+        for (std::size_t c = 0; c < after.size() && c < before.size(); ++c) {
+          (void)std::snprintf(
+            text,
+            sizeof(text),
+            "\n  %s %.1f%% -> %.1f%%",
+            SlopeClasses()[c].name,
+            static_cast<double>(before[c] * 100.0f),
+            static_cast<double>(after[c] * 100.0f)
+          );
+          report += text;
+        }
+        (void)std::snprintf(text, sizeof(text), "\n%d samples changed, one undo step.", changed);
+        report += text;
+      } else {
+        for (std::size_t c = 0; c < before.size(); ++c) {
+          (void)std::snprintf(
+            text, sizeof(text), "\n  %s %.1f%%", SlopeClasses()[c].name, static_cast<double>(before[c] * 100.0f)
+          );
+          report += text;
+        }
+      }
+      mTools->SetSlopeReport(report);
+      gpg::Logf("editor: sc tools: %s", report.c_str());
+      return {};
+    }
+    case EdTools::ScAsk::Ramp: {
+      if (!mRulerShown) {
+        mTools->SetRampReport("Lay the ruler first (Alt+drag over the route).");
+        return {};
+      }
+      const float limit = mTools->SlopeSettingsNow().limit;
+      const RampReport ramp = RampProfile(
+        words,
+        field->width,
+        field->height,
+        scale,
+        {{mRulerFrom[0], mRulerFrom[1]}, {mRulerTo[0], mRulerTo[1]}},
+        1.0f,
+        3.0f,
+        limit
+      );
+      std::string report;
+      (void)std::snprintf(
+        text,
+        sizeof(text),
+        "%.0f units, %.1f to %.1f high; steepest grade %.2f, mean %.2f; %.0f%% over %.2f",
+        static_cast<double>(ramp.length),
+        static_cast<double>(ramp.minHeight),
+        static_cast<double>(ramp.maxHeight),
+        static_cast<double>(ramp.maxGrade),
+        static_cast<double>(ramp.meanGrade),
+        static_cast<double>(ramp.over * 100.0f),
+        static_cast<double>(limit)
+      );
+      report = text;
+      for (const RampReport::Run& run : ramp.runs) {
+        (void)std::snprintf(
+          text,
+          sizeof(text),
+          "\n  too steep from %.0f to %.0f along it (%.2f at %.0f, %.0f)",
+          static_cast<double>(run.from),
+          static_cast<double>(run.to),
+          static_cast<double>(run.grade),
+          static_cast<double>(run.x),
+          static_cast<double>(run.z)
+        );
+        report += text;
+      }
+      mTools->SetRampReport(report);
+      gpg::Logf("editor: sc tools: ramp: %s", report.c_str());
+      return {};
+    }
+    default:
+      return {};
+    }
+  }
+
+  void EdMapScene::TickPads(
+    const float frameSeconds
+  )
+  {
+    // Auto: the pads re-applied half a second after the markers stopped moving.
+    if (mTools == nullptr) {
+      return;
+    }
+    if (mPadResult.Empty()) {
+      mTools->SetPadsState(false, false);
+      return;
+    }
+    if (mDocument.UndoOrder().size() < mPadDepth) {
+      mPadResult = PadResult{};
+      mTools->SetPadsState(false, false);
+      return;
+    }
+    const PadSettings& settings = mTools->PadSettingsNow();
+    const std::string signature = PadSignature(CollectPads(PadMarkers(), settings), settings);
+    const bool stale = signature != mPadResult.signature;
+    mTools->SetPadsState(true, stale);
+    if (signature != mPadQuietSignature) {
+      mPadQuietSignature = signature;
+      mPadQuietSeconds = 0.0f;
+      return;
+    }
+    mPadQuietSeconds += frameSeconds;
+    if (stale && settings.autoApply && mPadQuietSeconds > 0.5f && !mDragMarkers && mDocument.RedoOrder().empty()) {
+      mTools->SetScStatus(RunScTool(EdTools::ScAsk::PadsApply));
+    }
   }
 
   bool EdMapScene::UndoHeightsAndMasks(

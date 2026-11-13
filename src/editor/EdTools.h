@@ -5,6 +5,7 @@
 #include "editor/tools/EdArrange.h"
 #include "editor/tools/EdWaterMasks.h"
 #include "editor/tools/EdErosionSuite.h"
+#include "editor/tools/EdScTools.h"
 #include "editor/tools/EdHeightBrush.h"
 #include "editor/tools/EdBrushLibrary.h"
 #include "editor/tools/EdSymmetrize.h"
@@ -1636,6 +1637,69 @@ namespace faf::editor
       mErosionPreviewShown = previewShown;
     }
     void DrawErosionWindow();
+    /** The SC tools window: open it, what it asks the view, and what the view says back. */
+    enum class ScAsk
+    {
+      None,
+      PadsApply,
+      PadsRemove,
+      SlopeReport,
+      SlopeApply,
+      Ramp,
+    };
+    void OpenScTools() noexcept
+    {
+      mScToolsOpen = true;
+    }
+    [[nodiscard]] ScAsk TakeScAsk() noexcept
+    {
+      return std::exchange(mScAsk, ScAsk::None);
+    }
+    /** Test runs (`/sctest`): an ask as the window's buttons make it. */
+    void AskSc(
+      const ScAsk ask
+    ) noexcept
+    {
+      mScToolsOpen = true;
+      mScAsk = ask;
+    }
+    [[nodiscard]] PadSettings& PadSettingsNow() noexcept
+    {
+      return mPadSettings;
+    }
+    [[nodiscard]] const SlopeLimitSettings& SlopeSettingsNow() const noexcept
+    {
+      return mSlope;
+    }
+    void SetPadsState(
+      const bool applied,
+      const bool stale
+    ) noexcept
+    {
+      mPadsApplied = applied;
+      mPadsStale = stale;
+    }
+    void SetScStatus(
+      std::string status
+    )
+    {
+      if (!status.empty()) {
+        mScStatus = std::move(status);
+      }
+    }
+    void SetSlopeReport(
+      std::string report
+    )
+    {
+      mSlopeReport = std::move(report);
+    }
+    void SetRampReport(
+      std::string report
+    )
+    {
+      mRampReport = std::move(report);
+    }
+    void DrawScToolsWindow();
     /** How many of each kind the map has now (the view gives them each frame), for Properties with nothing chosen. */
     void SetMapCounts(
       const int markers,
@@ -2684,6 +2748,15 @@ namespace faf::editor
     bool mSelectAny = false; // something is selected (Arrange's buttons)
     std::string mHudOverride;
     bool mErosionOpen = false;
+    bool mScToolsOpen = false;
+    ScAsk mScAsk = ScAsk::None;
+    PadSettings mPadSettings;
+    SlopeLimitSettings mSlope;
+    bool mPadsApplied = false;
+    bool mPadsStale = false;
+    std::string mScStatus;
+    std::string mSlopeReport;
+    std::string mRampReport;
     ErosionAsk mErosionAsk = ErosionAsk::None;
     std::string mErosionSolver = "hydraulic";
     std::string mErosionPreset = "hills";
