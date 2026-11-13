@@ -77,8 +77,7 @@ namespace moho
     [[nodiscard]] virtual const fa::string* GetSubtitleText() = 0;
 
     /// Slot 14.
-    virtual boost::shared_ptr<ID3DTextureSheet>*
-    GetTextureSheetHandle(boost::shared_ptr<ID3DTextureSheet>* outHandle) = 0;
+    virtual std::shared_ptr<ID3DTextureSheet>* GetTextureSheetHandle(std::shared_ptr<ID3DTextureSheet>* outHandle) = 0;
   };
 
   static_assert(sizeof(IMovie) == 0x04, "IMovie size must be 0x04");
@@ -99,7 +98,7 @@ namespace moho
   class CMovie : public IMovie, public Listener<const SD3DDeviceEvent&>
   {
   public:
-    using TextureSheetHandle = boost::shared_ptr<ID3DTextureSheet>;
+    using TextureSheetHandle = std::shared_ptr<ID3DTextureSheet>;
 
     /**
      * Address: 0x00873CA0 (FUN_00873CA0, Moho::CMovie::CMovie)
@@ -321,7 +320,7 @@ namespace moho
      * result straight to `CD3DPrimBatcher::SetTexture(shared_ptr<...>)`, which
      * the binary calls at 0x00438870 by pushing the pair as two words.
      */
-    boost::shared_ptr<ID3DTextureSheet>* GetTextureSheetHandle(boost::shared_ptr<ID3DTextureSheet>* outHandle) override;
+    std::shared_ptr<ID3DTextureSheet>* GetTextureSheetHandle(std::shared_ptr<ID3DTextureSheet>* outHandle) override;
 
   public:
     // +0x04 vptr and the +0x08 node come from the Listener base above.
@@ -329,7 +328,7 @@ namespace moho
     std::uint8_t mReserved11_13[0x3]{};       // +0x11
     TextureSheetHandle mTextureSheet{};       // +0x14
     gpg::MemBuffer<char> mSubtitleBuffer{};   // +0x1C
-    boost::shared_ptr<void> mWorkbuffer{};    // +0x2C (Sofdec work buffer shared owner)
+    std::shared_ptr<void> mWorkbuffer{};      // +0x2C (Sofdec work buffer shared owner)
     std::int32_t mWidth = 0;                  // +0x34
     std::int32_t mHeight = 0;                 // +0x38
     std::int32_t mFrameCount = 0;             // +0x3C

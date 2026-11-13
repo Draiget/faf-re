@@ -2,7 +2,7 @@
 
 #include <cstdint>
 
-#include "boost/shared_ptr.h"
+#include <memory>
 
 namespace gpg::gal
 {
@@ -39,12 +39,12 @@ namespace moho
      * `glowHeight`) onto `head`'s back buffer, and leaves that back buffer bound with the
      * viewport it found.
      */
-    void Render(int head, const boost::shared_ptr<ID3DRenderTarget>& glow, int glowWidth, int glowHeight);
+    void Render(int head, const std::shared_ptr<ID3DRenderTarget>& glow, int glowWidth, int glowHeight);
 
   private:
     struct Level
     {
-      boost::shared_ptr<ID3DRenderTarget> target;
+      std::shared_ptr<ID3DRenderTarget> target;
       int width = 0;
       int height = 0;
     };
@@ -53,8 +53,8 @@ namespace moho
 
     gpg::gal::Device* mDevice = nullptr;
     bool mSupported = false;
-    boost::shared_ptr<gpg::gal::GpuProgram> mDown;
-    boost::shared_ptr<gpg::gal::GpuProgram> mUp;
+    std::shared_ptr<gpg::gal::GpuProgram> mDown;
+    std::shared_ptr<gpg::gal::GpuProgram> mUp;
     Level mLevels[kLevels];
     int mGlowWidth = 0;
     int mGlowHeight = 0;

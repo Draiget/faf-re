@@ -32,7 +32,7 @@
 #include <Windows.h>
 #include <zstd.h>
 
-#include "boost/shared_ptr.h"
+#include <memory>
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/utils/BoostWrappers.h"
@@ -152,7 +152,7 @@ namespace moho
     bool sLaunchPending = false;
     bool sRestartWanted = false;
     bool sRestarting = false;
-    boost::shared_ptr<std::FILE> sRestoreFile;
+    std::shared_ptr<std::FILE> sRestoreFile;
     SSimKeyframeHeader sRestoreHeader{};
     // Keyframes hold the flattened rects only, so each new sim starts from the map as it loaded.
     std::unique_ptr<STIMap> sStartMap;
@@ -883,7 +883,7 @@ namespace moho
         if (fopen_s(&file, mPath.c_str(), replay_KeyframeQuietDisk ? "wbT" : "wb") != 0 || file == nullptr) {
           throw std::runtime_error("cannot write " + mPath);
         }
-        mFile = boost::shared_ptr<std::FILE>(file, SFileStarCloser{});
+        mFile = std::shared_ptr<std::FILE>(file, SFileStarCloser{});
         SSimKeyframeHeader header{};
         SIM_CaptureKeyframeHeader(mSim, header);
         mTick = static_cast<std::int32_t>(header.tick);
@@ -927,7 +927,7 @@ namespace moho
       std::string mPath;
       Clock::time_point mAsked = Clock::now();
       std::int32_t mTick = 0;
-      boost::shared_ptr<std::FILE> mFile;
+      std::shared_ptr<std::FILE> mFile;
       gpg::WriteArchive* mArchive = nullptr;
     };
 
@@ -964,7 +964,7 @@ namespace moho
       while (keyframe != sKeyframes.begin()) {
         --keyframe;
         if (std::FILE* const file = OpenKeyframeFile(keyframe->second.path); file != nullptr) {
-          boost::shared_ptr<std::FILE> opened(file, SFileStarCloser{});
+          std::shared_ptr<std::FILE> opened(file, SFileStarCloser{});
           SSimKeyframeHeader header{};
           if (SIM_ReadKeyframeHeader(file, header)) {
             sRestoreFile = opened;
@@ -1339,7 +1339,7 @@ namespace moho
     }
 
     LaunchInfoBase* const launchInfo = sessionInfo.mLaunchInfo.get();
-    boost::shared_ptr<LaunchInfoLoad> loadInfo(new LaunchInfoLoad());
+    std::shared_ptr<LaunchInfoLoad> loadInfo(new LaunchInfoLoad());
     loadInfo->mGameRules = launchInfo->mGameRules;
     loadInfo->mMap = launchInfo->mMap;
     launchInfo->mMap = nullptr;
@@ -1352,7 +1352,7 @@ namespace moho
     loadInfo->mReadArchive = gpg::CreateBinaryReadArchive(sRestoreFile);
     sRestoreFile.reset();
     SIM_BeginKeyframeRestore(sRestoreHeader);
-    sessionInfo.mLaunchInfo = boost::static_pointer_cast<LaunchInfoBase>(loadInfo);
+    sessionInfo.mLaunchInfo = std::static_pointer_cast<LaunchInfoBase>(loadInfo);
     gpg::Logf("Replay timeline: restoring the keyframe of beat %u", sRestoreHeader.beat);
   }
 } // namespace moho

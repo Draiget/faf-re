@@ -3,7 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 
-#include "boost/shared_ptr.h"
+#include <memory>
 #include "legacy/containers/Vector.h"
 #include "moho/render/camera/VTransform.h"
 
@@ -85,13 +85,13 @@ namespace moho
      * quaternion transform, sorts the name table (strcmp, index tie-break),
      * and rebuilds per-bone bounds.
      */
-    explicit CAniSkel(const boost::shared_ptr<const SScmFile>& file);
+    explicit CAniSkel(const std::shared_ptr<const SScmFile>& file);
 
     /**
      * Engine addition (`RScmResource::DropGeometry`): the same file's start in another buffer. The
      * bone names point into it. Nothing recomputes the bone bounds afterwards.
      */
-    void RebindFile(const boost::shared_ptr<const SScmFile>& file);
+    void RebindFile(const std::shared_ptr<const SScmFile>& file);
 
     /**
      * Address: 0x0054A370 (FUN_0054A370, scalar deleting destructor thunk)
@@ -134,7 +134,7 @@ namespace moho
      * What it does:
      * Returns a shared pointer to process-global default skeleton storage.
      */
-    [[nodiscard]] static boost::shared_ptr<const CAniSkel> GetDefaultSkeleton();
+    [[nodiscard]] static std::shared_ptr<const CAniSkel> GetDefaultSkeleton();
 
     /**
      * Address: 0x0054A540 (FUN_0054A540)
@@ -161,7 +161,7 @@ namespace moho
     void CollectChildBoneIndices(std::int32_t parentBoneIndex, fa::vector<std::int32_t>& outIndices) const;
 
   public:
-    boost::shared_ptr<const SScmFile> mFile;            // +0x04
+    std::shared_ptr<const SScmFile> mFile;              // +0x04
     fa::vector<SAniSkelBone> mBones;                    // +0x0C
     fa::vector<SAniSkelBoneNameIndex> mBoneNameToIndex; // +0x1C
 

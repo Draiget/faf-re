@@ -86,7 +86,7 @@ namespace gpg::gal
    * `shared_count(EffectTechniqueD3D10*)` 0x0094B6C0.
    */
   void EffectD3D10::GetTechniques(
-    fa::vector<boost::shared_ptr<EffectTechnique>>& outTechniques
+    fa::vector<std::shared_ptr<EffectTechnique>>& outTechniques
   )
   {
     if (dxEffect_ == nullptr) {
@@ -112,7 +112,7 @@ namespace gpg::gal
       }
 
       outTechniques.push_back(
-        boost::shared_ptr<EffectTechnique>(new EffectTechniqueD3D10(techniqueDesc.Name, dxEffect_, techniqueHandle))
+        std::shared_ptr<EffectTechnique>(new EffectTechniqueD3D10(techniqueDesc.Name, dxEffect_, techniqueHandle))
       );
     }
   }
@@ -126,7 +126,7 @@ namespace gpg::gal
    * Wraps the effect variable called `variableName`; throws when the effect
    * or the variable is missing.
    */
-  boost::shared_ptr<EffectVariable> EffectD3D10::GetVariable(
+  std::shared_ptr<EffectVariable> EffectD3D10::GetVariable(
     const char* const variableName
   )
   {
@@ -143,7 +143,7 @@ namespace gpg::gal
       ThrowGalError("EffectD3D10.cpp", 82, message);
     }
 
-    return boost::shared_ptr<EffectVariable>(new EffectVariableD3D10(variableName, dxEffect_, variableHandle));
+    return std::shared_ptr<EffectVariable>(new EffectVariableD3D10(variableName, dxEffect_, variableHandle));
   }
 
   /**
@@ -155,7 +155,7 @@ namespace gpg::gal
    * Wraps the technique called `techniqueName`; throws when the effect or
    * the technique is missing.
    */
-  boost::shared_ptr<EffectTechnique> EffectD3D10::GetTechnique(
+  std::shared_ptr<EffectTechnique> EffectD3D10::GetTechnique(
     const char* const techniqueName
   )
   {
@@ -175,7 +175,7 @@ namespace gpg::gal
       ThrowGalError("EffectD3D10.cpp", 92, message);
     }
 
-    return boost::shared_ptr<EffectTechnique>(new EffectTechniqueD3D10(techniqueName, dxEffect_, techniqueHandle));
+    return std::shared_ptr<EffectTechnique>(new EffectTechniqueD3D10(techniqueName, dxEffect_, techniqueHandle));
   }
 
   /**

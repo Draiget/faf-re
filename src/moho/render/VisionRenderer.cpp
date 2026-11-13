@@ -171,8 +171,8 @@ namespace
 
     gpg::gal::Device* mDevice = nullptr;
     bool mSupported = false;
-    boost::shared_ptr<gpg::gal::GpuProgram> mProgram;
-    boost::shared_ptr<gpg::gal::GpuBuffer> mCylinder;
+    std::shared_ptr<gpg::gal::GpuProgram> mProgram;
+    std::shared_ptr<gpg::gal::GpuBuffer> mCylinder;
     const gpg::gal::VertexBuffer* mCylinderSource = nullptr;
     const moho::VisionDB* mEmitterSource = nullptr;
     std::uint64_t mEmitterVersion = ~0ull;
@@ -397,7 +397,7 @@ namespace moho
    * Resolves one `"vision"` D3D effect from device resources and returns its
    * base GAL effect handle.
    */
-  boost::shared_ptr<gpg::gal::Effect> AcquireVisionBaseEffect()
+  std::shared_ptr<gpg::gal::Effect> AcquireVisionBaseEffect()
   {
     ID3DDeviceResources* const resources = D3D_GetDevice()->GetResources();
     CD3DEffect* const effect = resources->FindEffect("vision");
@@ -635,8 +635,8 @@ namespace moho
     auto* const device = gpg::gal::Device::GetInstance();
     const gpg::gal::Head& head = device->GetDeviceContext()->GetHead(headIndex);
 
-    const boost::shared_ptr<gpg::gal::Effect> effect = AcquireVisionBaseEffect();
-    const boost::shared_ptr<gpg::gal::EffectTechnique> technique = effect->GetTechnique("CastVision");
+    const std::shared_ptr<gpg::gal::Effect> effect = AcquireVisionBaseEffect();
+    const std::shared_ptr<gpg::gal::EffectTechnique> technique = effect->GetTechnique("CastVision");
 
     VisionDB& visionDb = session.mVisionDb;
     const CHeightField* const heightField = session.GetSTIMap()->mHeightField.get();
@@ -680,8 +680,8 @@ namespace moho
 
     device->Clear(false, false, true, 0xFFFFFFFFu, 1.0f, 0);
 
-    const boost::shared_ptr<gpg::gal::EffectVariable> viewMatrix = effect->GetVariable("viewMatrix");
-    const boost::shared_ptr<gpg::gal::EffectVariable> projMatrix = effect->GetVariable("projMatrix");
+    const std::shared_ptr<gpg::gal::EffectVariable> viewMatrix = effect->GetVariable("viewMatrix");
+    const std::shared_ptr<gpg::gal::EffectVariable> projMatrix = effect->GetVariable("projMatrix");
     viewMatrix->SetMatrix4x4(&camera.view);
     projMatrix->SetMatrix4x4(&camera.projection);
 

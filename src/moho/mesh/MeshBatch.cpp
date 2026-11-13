@@ -105,8 +105,8 @@ namespace moho
   void MeshBatch::Initialize(
     const MeshLOD* const lod,
     const bool remapToReferenceResource,
-    const boost::shared_ptr<RScmResource> referenceResource,
-    const boost::shared_ptr<RScmResource> currentResource
+    const std::shared_ptr<RScmResource> referenceResource,
+    const std::shared_ptr<RScmResource> currentResource
   )
   {
     mUseBoneRemap = static_cast<std::uint8_t>(remapToReferenceResource ? 1u : 0u);

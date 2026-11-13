@@ -36,8 +36,8 @@
 #include "gpg/gal/DrawIndexedContext.hpp"
 #include "gpg/gal/OutputContext.hpp"
 
-#include "boost/shared_ptr.h"
-#include "boost/weak_ptr.h"
+#include <memory>
+#include <memory>
 #include "gpg/core/utils/BoostWrappers.h"
 
 #include <d3d9.h>

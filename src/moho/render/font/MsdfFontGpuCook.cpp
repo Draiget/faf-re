@@ -9,7 +9,7 @@
 #include <mutex>
 #include <vector>
 
-#include "boost/shared_ptr.h"
+#include <memory>
 #include "gpg/core/utils/Logging.h"
 #include "gpg/gal/Device.hpp"
 #include "gpg/gal/GpuDriven.h"
@@ -430,9 +430,9 @@ void CookFontCS(uint3 id : SV_DispatchThreadID)
 
       // On the frame thread only.
       const gpg::gal::Device* mDevice = nullptr;
-      boost::shared_ptr<gpg::gal::GpuProgram> mProgram;
-      boost::shared_ptr<gpg::gal::GpuBuffer> mEdges;
-      boost::shared_ptr<gpg::gal::GpuBuffer> mOutput;
+      std::shared_ptr<gpg::gal::GpuProgram> mProgram;
+      std::shared_ptr<gpg::gal::GpuBuffer> mEdges;
+      std::shared_ptr<gpg::gal::GpuBuffer> mOutput;
       std::vector<SMsdfGpuEdge> mBatchEdges;
       std::vector<float> mReadBack;
     };

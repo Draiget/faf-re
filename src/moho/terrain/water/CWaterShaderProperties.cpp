@@ -366,7 +366,7 @@ namespace moho
    * lane at `mTextures[5]`, then returns one retained shared texture-sheet
    * handle to the caller.
    */
-  boost::shared_ptr<ID3DTextureSheet> CWaterShaderProperties::GetWaterRamp() const
+  std::shared_ptr<ID3DTextureSheet> CWaterShaderProperties::GetWaterRamp() const
   {
     if (mTextures[5].get() == nullptr) {
       if (CD3DDevice* const device = D3D_GetDevice(); device != nullptr) {
@@ -392,7 +392,7 @@ namespace moho
    * at `mTextures[4]`, then returns one retained shared texture-sheet handle to
    * the caller.
    */
-  boost::shared_ptr<ID3DTextureSheet> CWaterShaderProperties::GetCubeMap() const
+  std::shared_ptr<ID3DTextureSheet> CWaterShaderProperties::GetCubeMap() const
   {
     if (mTextures[4].get() == nullptr) {
       if (CD3DDevice* const device = D3D_GetDevice(); device != nullptr) {
@@ -418,11 +418,11 @@ namespace moho
    * caches it in `mTextures[index]`, and returns one retained shared texture
    * sheet handle.
    */
-  boost::shared_ptr<ID3DTextureSheet> CWaterShaderProperties::GetNormalMap(
+  std::shared_ptr<ID3DTextureSheet> CWaterShaderProperties::GetNormalMap(
     const int index
   ) const
   {
-    boost::shared_ptr<ID3DTextureSheet>& cachedTexture = mTextures[index];
+    std::shared_ptr<ID3DTextureSheet>& cachedTexture = mTextures[index];
     if (cachedTexture.get() == nullptr) {
       if (CD3DDevice* const device = D3D_GetDevice(); device != nullptr) {
         if (ID3DDeviceResources* const resources = device->GetResources(); resources != nullptr) {

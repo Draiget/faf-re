@@ -3,7 +3,7 @@
 #include <atomic>
 #include <cstddef>
 
-#include "boost/shared_ptr.h"
+#include <memory>
 #include "gpg/core/containers/String.h"
 #include "legacy/containers/String.h"
 #include "Wm3AxisAlignedBox3.h"
@@ -28,7 +28,7 @@ namespace moho
   struct SScmFile;
   class CAniSkel;
 
-  class RScmResource : public boost::enable_shared_from_this<RScmResource>
+  class RScmResource : public std::enable_shared_from_this<RScmResource>
   {
   public:
     /**
@@ -62,7 +62,7 @@ namespace moho
      * Binds one SCM data-owner lane + resource path and computes cached
      * bounds/size from embedded bone-bounds samples.
      */
-    RScmResource(gpg::StrArg resourcePath, const boost::shared_ptr<const SScmFile>& scmFile);
+    RScmResource(gpg::StrArg resourcePath, const std::shared_ptr<const SScmFile>& scmFile);
 
     /**
      * Address: 0x00539FB0 (FUN_00539FB0)
@@ -76,7 +76,7 @@ namespace moho
      * Address: 0x00538DB0 (FUN_00538DB0,
      * ?GetSkeleton@RScmResource@Moho@@QAE?AV?$shared_ptr@$$CBVCAniSkel@Moho@@@boost@@XZ)
      */
-    [[nodiscard]] boost::shared_ptr<const CAniSkel> GetSkeleton();
+    [[nodiscard]] std::shared_ptr<const CAniSkel> GetSkeleton();
 
     /**
      * Engine addition (plan WPR.35): whether models keep their vertices and indices after they
@@ -94,7 +94,7 @@ namespace moho
 
   public:
     fa::string mName;                        // +0x08
-    boost::shared_ptr<const SScmFile> mFile; // +0x24
+    std::shared_ptr<const SScmFile> mFile;   // +0x24
     // Engine addition: atomic so the lazy build below can claim it for one
     // thread. `std::atomic<T*>` has the same size and alignment as `T*` on
     // every target this builds for, so the +0x2C offset and the 0x4C size
@@ -126,7 +126,7 @@ namespace moho
    * as a live owning handle. Yields an empty pointer when the path is empty,
    * unmounted, or the lookup resolved to a dead handle.
    */
-  [[nodiscard]] boost::shared_ptr<RScmResource> GetModel(gpg::StrArg path, CResourceWatcher* resourceWatcher);
+  [[nodiscard]] std::shared_ptr<RScmResource> GetModel(gpg::StrArg path, CResourceWatcher* resourceWatcher);
 
   /**
    * Address: 0x00BC91A0 (FUN_00BC91A0)
@@ -144,6 +144,6 @@ namespace moho
    * Constructs one `shared_ptr<RScmResource>` from one raw resource lane,
    * including `enable_shared_from_this` ownership binding.
    */
-  boost::shared_ptr<RScmResource>*
-  ConstructSharedRScmResourceFromRaw(boost::shared_ptr<RScmResource>* outResource, RScmResource* resource);
+  std::shared_ptr<RScmResource>*
+  ConstructSharedRScmResourceFromRaw(std::shared_ptr<RScmResource>* outResource, RScmResource* resource);
 } // namespace moho

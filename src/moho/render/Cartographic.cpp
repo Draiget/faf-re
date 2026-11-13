@@ -165,7 +165,7 @@ namespace
    * its gal effect -- the same body as `Cartographic::GetEffect` (0x007D1E50),
    * emitted a second time for the decal renderer (called at 0x007D5126).
    */
-  [[nodiscard]] boost::shared_ptr<gpg::gal::Effect> GetCartographicEffect()
+  [[nodiscard]] std::shared_ptr<gpg::gal::Effect> GetCartographicEffect()
   {
     moho::CD3DDevice* const device = moho::D3D_GetDevice();
     moho::ID3DDeviceResources* const resources = device->GetResources();
@@ -799,7 +799,7 @@ namespace moho
    * there is no owning header for it yet. Called by `Cartographic::Render` at
    * 0x007D1BE0 with the head index in `ecx`.
    */
-  void REN_DebugStuff(boost::shared_ptr<CD3DPrimBatcher> batcher, int head);
+  void REN_DebugStuff(std::shared_ptr<CD3DPrimBatcher> batcher, int head);
 
   /**
    * Address: 0x007D4A00 (FUN_007D4A00, sub_7D4A00)
@@ -1294,7 +1294,7 @@ namespace moho
 
     auto* const device = gpg::gal::Device::GetInstance();
 
-    boost::shared_ptr<gpg::gal::VertexFormat> vertexFormat;
+    std::shared_ptr<gpg::gal::VertexFormat> vertexFormat;
     vertexFormat = device->CreateVertexFormat(kCartographicVertexFormatToken);
     mVertexFormat = vertexFormat;
 
@@ -1304,7 +1304,7 @@ namespace moho
     quadVertexContext.vertexCount_ = kCartographicQuadVertexCount;
     quadVertexContext.stride_ = static_cast<std::uint32_t>(sizeof(float) * 2U);
 
-    boost::shared_ptr<gpg::gal::VertexBuffer> quadVertexBuffer;
+    std::shared_ptr<gpg::gal::VertexBuffer> quadVertexBuffer;
     quadVertexBuffer = device->CreateVertexBuffer(&quadVertexContext);
     mQuadVertexBuffer = quadVertexBuffer;
 
@@ -1319,7 +1319,7 @@ namespace moho
     instanceVertexContext.vertexCount_ = kCartographicMaxDecalInstances;
     instanceVertexContext.stride_ = static_cast<std::uint32_t>(sizeof(float) * kCartographicInstanceFloatCount);
 
-    boost::shared_ptr<gpg::gal::VertexBuffer> instanceVertexBuffer;
+    std::shared_ptr<gpg::gal::VertexBuffer> instanceVertexBuffer;
     instanceVertexBuffer = device->CreateVertexBuffer(&instanceVertexContext);
     mInstanceVertexBuffer = instanceVertexBuffer;
 
@@ -1328,7 +1328,7 @@ namespace moho
     indexContext.format_ = 1U;
     indexContext.size_ = kCartographicQuadIndexCount;
 
-    boost::shared_ptr<gpg::gal::IndexBuffer> indexBuffer;
+    std::shared_ptr<gpg::gal::IndexBuffer> indexBuffer;
     indexBuffer = device->CreateIndexBuffer(&indexContext);
     mIndexBuffer = indexBuffer;
 
@@ -1410,8 +1410,8 @@ namespace moho
     UploadDecalVerticesIfDirty();
 
     auto* const device = gpg::gal::Device::GetInstance();
-    boost::shared_ptr<gpg::gal::Effect> effect = GetCartographicEffect();
-    boost::shared_ptr<gpg::gal::EffectTechnique> technique = effect->GetTechnique(mTechniqueName.c_str());
+    std::shared_ptr<gpg::gal::Effect> effect = GetCartographicEffect();
+    std::shared_ptr<gpg::gal::EffectTechnique> technique = effect->GetTechnique(mTechniqueName.c_str());
 
     device->SetVertexDeclaration(mVertexFormat);
     device->SetVertexBuffer(0U, mQuadVertexBuffer, decalCount, 0);
@@ -1440,7 +1440,7 @@ namespace moho
    * What it does:
    * Returns the gal effect of the device resources' `"cartographic"` effect.
    */
-  boost::shared_ptr<gpg::gal::Effect> Cartographic::GetEffect()
+  std::shared_ptr<gpg::gal::Effect> Cartographic::GetEffect()
   {
     return D3D_GetDevice()->GetResources()->FindEffect("cartographic")->GetBaseEffect();
   }
@@ -1478,7 +1478,7 @@ namespace moho
   {
     auto* const device = gpg::gal::Device::GetInstance();
 
-    boost::shared_ptr<gpg::gal::VertexFormat> frameVertexFormat;
+    std::shared_ptr<gpg::gal::VertexFormat> frameVertexFormat;
     frameVertexFormat = device->CreateVertexFormat(kCartographicFrameVertexFormatToken);
     mFrameVertexFormat = frameVertexFormat;
 
@@ -1489,7 +1489,7 @@ namespace moho
       kCartographicBufferUsageDynamic
     );
 
-    boost::shared_ptr<gpg::gal::VertexBuffer> frameVertexBuffer;
+    std::shared_ptr<gpg::gal::VertexBuffer> frameVertexBuffer;
     frameVertexBuffer = device->CreateVertexBuffer(&frameVertexContext);
     mFrameVertexBuffer = frameVertexBuffer;
 
@@ -1497,7 +1497,7 @@ namespace moho
       kCartographicQuadIndexCount, kCartographicIndexFormat16Bit, kCartographicBufferUsageStatic
     );
 
-    boost::shared_ptr<gpg::gal::IndexBuffer> quadIndexBuffer;
+    std::shared_ptr<gpg::gal::IndexBuffer> quadIndexBuffer;
     quadIndexBuffer = device->CreateIndexBuffer(&quadIndexContext);
     mQuadIndexBuffer = quadIndexBuffer;
 
@@ -1810,7 +1810,7 @@ namespace moho
     }
     sCartographicWaterBodies = WaterBodiesGeneration(map);
 
-    boost::shared_ptr<gpg::gal::VertexFormat> terrainVertexFormat;
+    std::shared_ptr<gpg::gal::VertexFormat> terrainVertexFormat;
     terrainVertexFormat = device->CreateVertexFormat(kCartographicTerrainVertexFormatToken);
     mTerrainVertexFormat = terrainVertexFormat;
 
@@ -1847,7 +1847,7 @@ namespace moho
       kCartographicBufferUsageStatic
     );
 
-    boost::shared_ptr<gpg::gal::VertexBuffer> terrainVertexBuffer;
+    std::shared_ptr<gpg::gal::VertexBuffer> terrainVertexBuffer;
     terrainVertexBuffer = device->CreateVertexBuffer(&terrainVertexContext);
     mTerrainVertexBuffer = terrainVertexBuffer;
 
@@ -1942,8 +1942,8 @@ namespace moho
     ID3DDeviceResources* const resources = device->GetResources();
     CD3DEffect* const meshEffect = resources->FindEffect("mesh");
 
-    const boost::shared_ptr<gpg::gal::Effect> meshBaseEffect = meshEffect->GetBaseEffect();
-    const boost::shared_ptr<gpg::gal::EffectVariable> hypsometricTextureVar =
+    const std::shared_ptr<gpg::gal::Effect> meshBaseEffect = meshEffect->GetBaseEffect();
+    const std::shared_ptr<gpg::gal::EffectVariable> hypsometricTextureVar =
       meshBaseEffect->GetVariable("hypsometricTexture");
     hypsometricTextureVar->SetTexture(mHypsometricTexture);
 
@@ -1982,25 +1982,24 @@ namespace moho
     auto* const device = gpg::gal::Device::GetInstance();
     device->Clear(true, true, true, kCartographicFrameClearColor, kCartographicClearDepth, kCartographicClearStencil);
 
-    const boost::shared_ptr<gpg::gal::Effect> effect = GetEffect();
+    const std::shared_ptr<gpg::gal::Effect> effect = GetEffect();
     gpg::gal::Effect& cartographicEffect = *effect;
 
-    const boost::shared_ptr<gpg::gal::EffectTechnique> technique = cartographicEffect.GetTechnique("Terrain_Stage0");
+    const std::shared_ptr<gpg::gal::EffectTechnique> technique = cartographicEffect.GetTechnique("Terrain_Stage0");
 
-    const boost::shared_ptr<gpg::gal::EffectVariable> viewMatrixVar = cartographicEffect.GetVariable("viewMatrix");
-    const boost::shared_ptr<gpg::gal::EffectVariable> projMatrixVar = cartographicEffect.GetVariable("projMatrix");
-    const boost::shared_ptr<gpg::gal::EffectVariable> gridSizeCoeffVar =
-      cartographicEffect.GetVariable("gridSizeCoeff");
-    const boost::shared_ptr<gpg::gal::EffectVariable> terrainSizeCoeffVar =
+    const std::shared_ptr<gpg::gal::EffectVariable> viewMatrixVar = cartographicEffect.GetVariable("viewMatrix");
+    const std::shared_ptr<gpg::gal::EffectVariable> projMatrixVar = cartographicEffect.GetVariable("projMatrix");
+    const std::shared_ptr<gpg::gal::EffectVariable> gridSizeCoeffVar = cartographicEffect.GetVariable("gridSizeCoeff");
+    const std::shared_ptr<gpg::gal::EffectVariable> terrainSizeCoeffVar =
       cartographicEffect.GetVariable("terrainSizeCoeff");
-    const boost::shared_ptr<gpg::gal::EffectVariable> terrainHeightScaleVar =
+    const std::shared_ptr<gpg::gal::EffectVariable> terrainHeightScaleVar =
       cartographicEffect.GetVariable("terrainHeightScale");
-    const boost::shared_ptr<gpg::gal::EffectVariable> elevMaximumVar = cartographicEffect.GetVariable("elevMaximum");
-    const boost::shared_ptr<gpg::gal::EffectVariable> elevMinimumVar = cartographicEffect.GetVariable("elevMinimum");
-    const boost::shared_ptr<gpg::gal::EffectVariable> elevTextureVar = cartographicEffect.GetVariable("elevTexture");
-    const boost::shared_ptr<gpg::gal::EffectVariable> hypsometricTextureVar =
+    const std::shared_ptr<gpg::gal::EffectVariable> elevMaximumVar = cartographicEffect.GetVariable("elevMaximum");
+    const std::shared_ptr<gpg::gal::EffectVariable> elevMinimumVar = cartographicEffect.GetVariable("elevMinimum");
+    const std::shared_ptr<gpg::gal::EffectVariable> elevTextureVar = cartographicEffect.GetVariable("elevTexture");
+    const std::shared_ptr<gpg::gal::EffectVariable> hypsometricTextureVar =
       cartographicEffect.GetVariable("hypsometricTexture");
-    const boost::shared_ptr<gpg::gal::EffectVariable> topographicTextureVar =
+    const std::shared_ptr<gpg::gal::EffectVariable> topographicTextureVar =
       cartographicEffect.GetVariable("topographicTexture");
 
     viewMatrixVar->SetMatrix4x4(&camera.view);
@@ -2054,7 +2053,7 @@ namespace moho
    */
   void Cartographic::RenderTerrainStage1(
     const std::int32_t headIndex,
-    const boost::shared_ptr<gpg::gal::RenderTarget> colorTarget
+    const std::shared_ptr<gpg::gal::RenderTarget> colorTarget
   )
   {
     auto* const device = gpg::gal::Device::GetInstance();
@@ -2077,13 +2076,13 @@ namespace moho
     std::copy(frameQuad.begin(), frameQuad.end(), static_cast<float*>(vertexData));
     (void)mFrameVertexBuffer->Unlock();
 
-    const boost::shared_ptr<gpg::gal::Effect> effect = GetEffect();
+    const std::shared_ptr<gpg::gal::Effect> effect = GetEffect();
     gpg::gal::Effect& cartographicEffect = *effect;
 
-    const boost::shared_ptr<gpg::gal::EffectTechnique> technique = cartographicEffect.GetTechnique("Terrain_Stage1");
-    const boost::shared_ptr<gpg::gal::EffectVariable> frameWidthVar = cartographicEffect.GetVariable("frameWidth");
-    const boost::shared_ptr<gpg::gal::EffectVariable> frameHeightVar = cartographicEffect.GetVariable("frameHeight");
-    const boost::shared_ptr<gpg::gal::EffectVariable> frameTextureVar = cartographicEffect.GetVariable("frameTexture");
+    const std::shared_ptr<gpg::gal::EffectTechnique> technique = cartographicEffect.GetTechnique("Terrain_Stage1");
+    const std::shared_ptr<gpg::gal::EffectVariable> frameWidthVar = cartographicEffect.GetVariable("frameWidth");
+    const std::shared_ptr<gpg::gal::EffectVariable> frameHeightVar = cartographicEffect.GetVariable("frameHeight");
+    const std::shared_ptr<gpg::gal::EffectVariable> frameTextureVar = cartographicEffect.GetVariable("frameTexture");
 
     device->SetVertexDeclaration(mFrameVertexFormat);
     device->SetVertexBuffer(0U, mFrameVertexBuffer, 1, 0);
@@ -2173,9 +2172,9 @@ namespace moho
     RangeRenderer* const rangeRenderer,
     VisionRenderer* const visionRenderer,
     BoundaryRenderer* const boundaryRenderer,
-    const boost::shared_ptr<gpg::gal::RenderTarget> colorTarget,
-    const boost::shared_ptr<gpg::gal::DepthStencilTarget> depthStencilTarget,
-    const boost::shared_ptr<CD3DPrimBatcher> primBatcher
+    const std::shared_ptr<gpg::gal::RenderTarget> colorTarget,
+    const std::shared_ptr<gpg::gal::DepthStencilTarget> depthStencilTarget,
+    const std::shared_ptr<CD3DPrimBatcher> primBatcher
   )
   {
     const bool previousAlwaysRenderStrategicIcons = ui_AlwaysRenderStrategicIcons;

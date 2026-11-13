@@ -1271,8 +1271,8 @@ namespace
   /// control block (boost 1.34 orders shared_ptrs by owner).
   template <class T>
   [[nodiscard]] bool SameHandle(
-    const boost::shared_ptr<T>& target,
-    const boost::shared_ptr<T>& source
+    const std::shared_ptr<T>& target,
+    const std::shared_ptr<T>& source
   ) noexcept
   {
     return target.get() == source.get() && !(target < source) && !(source < target);
@@ -1291,7 +1291,7 @@ namespace
       return !SameHandle(perArmy.mPriorPose, actor->mPriorPose) || !SameHandle(perArmy.mPose, actor->mPose);
     }
     // `reset()` changes a handle only when it is not already empty.
-    const boost::shared_ptr<CAniPose> empty;
+    const std::shared_ptr<CAniPose> empty;
     return !SameHandle(perArmy.mPriorPose, empty) || !SameHandle(perArmy.mPose, empty);
   }
 
@@ -1300,9 +1300,9 @@ namespace
   /// here cannot free it.
   template <class T>
   void ExchangeHandle(
-    boost::shared_ptr<T>& target,
-    const boost::shared_ptr<T>& source,
-    boost::shared_ptr<T>& released,
+    std::shared_ptr<T>& target,
+    const std::shared_ptr<T>& source,
+    std::shared_ptr<T>& released,
     const bool sourceKeepsOld
   )
   {
@@ -1329,11 +1329,11 @@ namespace
       ExchangeHandle(perArmy.mMesh, sourceUnit.mVarDat.mScmResource, released.mMesh, false);
     }
 
-    const boost::shared_ptr<CAniPose> noPose;
+    const std::shared_ptr<CAniPose> noPose;
     const CAniActor* const actor = sourceUnit.AniActor;
-    const boost::shared_ptr<CAniPose>& priorPose = actor != nullptr ? actor->mPriorPose : noPose;
-    const boost::shared_ptr<CAniPose>& pose = actor != nullptr ? actor->mPose : noPose;
-    const auto sourceHolds = [&](const boost::shared_ptr<CAniPose>& handle) {
+    const std::shared_ptr<CAniPose>& priorPose = actor != nullptr ? actor->mPriorPose : noPose;
+    const std::shared_ptr<CAniPose>& pose = actor != nullptr ? actor->mPose : noPose;
+    const auto sourceHolds = [&](const std::shared_ptr<CAniPose>& handle) {
       return actor != nullptr && handle.get() != nullptr && (SameHandle(handle, priorPose) || SameHandle(handle, pose));
     };
     ExchangeHandle(perArmy.mPriorPose, priorPose, released.mPriorPose, sourceHolds(perArmy.mPriorPose));
@@ -2100,7 +2100,7 @@ const fa::vector<ReconBlip*>& CAiReconDBImpl::ReconGetBlips() const
 /**
  * Address: 0x005C1A10 (FUN_005C1A10)
  */
-boost::shared_ptr<CIntelGrid> CAiReconDBImpl::ReconGetVisionGrid() const
+std::shared_ptr<CIntelGrid> CAiReconDBImpl::ReconGetVisionGrid() const
 {
   return mVisionGrid;
 }
@@ -2108,7 +2108,7 @@ boost::shared_ptr<CIntelGrid> CAiReconDBImpl::ReconGetVisionGrid() const
 /**
  * Address: 0x005C1A40 (FUN_005C1A40)
  */
-boost::shared_ptr<CIntelGrid> CAiReconDBImpl::ReconGetWaterGrid() const
+std::shared_ptr<CIntelGrid> CAiReconDBImpl::ReconGetWaterGrid() const
 {
   return mWaterGrid;
 }
@@ -2116,7 +2116,7 @@ boost::shared_ptr<CIntelGrid> CAiReconDBImpl::ReconGetWaterGrid() const
 /**
  * Address: 0x005C1A70 (FUN_005C1A70)
  */
-boost::shared_ptr<CIntelGrid> CAiReconDBImpl::ReconGetRadarGrid() const
+std::shared_ptr<CIntelGrid> CAiReconDBImpl::ReconGetRadarGrid() const
 {
   return mRadarGrid;
 }
@@ -2124,7 +2124,7 @@ boost::shared_ptr<CIntelGrid> CAiReconDBImpl::ReconGetRadarGrid() const
 /**
  * Address: 0x005C1AA0 (FUN_005C1AA0)
  */
-boost::shared_ptr<CIntelGrid> CAiReconDBImpl::ReconGetSonarGrid() const
+std::shared_ptr<CIntelGrid> CAiReconDBImpl::ReconGetSonarGrid() const
 {
   return mSonarGrid;
 }
@@ -2132,7 +2132,7 @@ boost::shared_ptr<CIntelGrid> CAiReconDBImpl::ReconGetSonarGrid() const
 /**
  * Address: 0x005C1AD0 (FUN_005C1AD0)
  */
-boost::shared_ptr<CIntelGrid> CAiReconDBImpl::ReconGetOmniGrid() const
+std::shared_ptr<CIntelGrid> CAiReconDBImpl::ReconGetOmniGrid() const
 {
   return mOmniGrid;
 }
@@ -2140,7 +2140,7 @@ boost::shared_ptr<CIntelGrid> CAiReconDBImpl::ReconGetOmniGrid() const
 /**
  * Address: 0x005C1B00 (FUN_005C1B00)
  */
-boost::shared_ptr<CIntelGrid> CAiReconDBImpl::ReconGetRCIGrid() const
+std::shared_ptr<CIntelGrid> CAiReconDBImpl::ReconGetRCIGrid() const
 {
   return mRCIGrid;
 }
@@ -2148,7 +2148,7 @@ boost::shared_ptr<CIntelGrid> CAiReconDBImpl::ReconGetRCIGrid() const
 /**
  * Address: 0x005C1B30 (FUN_005C1B30)
  */
-boost::shared_ptr<CIntelGrid> CAiReconDBImpl::ReconGetSCIGrid() const
+std::shared_ptr<CIntelGrid> CAiReconDBImpl::ReconGetSCIGrid() const
 {
   return mSCIGrid;
 }
@@ -2156,7 +2156,7 @@ boost::shared_ptr<CIntelGrid> CAiReconDBImpl::ReconGetSCIGrid() const
 /**
  * Address: 0x005C1B60 (FUN_005C1B60)
  */
-boost::shared_ptr<CIntelGrid> CAiReconDBImpl::ReconGetVCIGrid() const
+std::shared_ptr<CIntelGrid> CAiReconDBImpl::ReconGetVCIGrid() const
 {
   return mVCIGrid;
 }

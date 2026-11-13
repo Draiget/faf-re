@@ -955,7 +955,7 @@ namespace gpg::gal
    * What it does:
    * Returns a new reference to the device's pipeline state.
    */
-  boost::shared_ptr<PipelineState> DeviceD3D10::GetPipelineState()
+  std::shared_ptr<PipelineState> DeviceD3D10::GetPipelineState()
   {
     return mPipelineState;
   }
@@ -972,7 +972,7 @@ namespace gpg::gal
    * `new` at 0x008FEF5A), and the define array is never freed -- the binary
    * has no `delete[]` for it on any path, the same as the D3D9 builder's.
    */
-  boost::shared_ptr<Effect> DeviceD3D10::CreateEffect(
+  std::shared_ptr<Effect> DeviceD3D10::CreateEffect(
     const EffectContext& context
   )
   {
@@ -1037,7 +1037,7 @@ namespace gpg::gal
       }
     }
 
-    return boost::shared_ptr<Effect>(new EffectD3D10(context, dxEffect));
+    return std::shared_ptr<Effect>(new EffectD3D10(context, dxEffect));
   }
 
   /**
@@ -1048,7 +1048,7 @@ namespace gpg::gal
    * size and format) with its shader-resource view and wraps both in a
    * `TextureD3D10`.
    */
-  boost::shared_ptr<Texture> DeviceD3D10::CreateTexture(
+  std::shared_ptr<Texture> DeviceD3D10::CreateTexture(
     const TextureContext* const context
   )
   {
@@ -1129,7 +1129,7 @@ namespace gpg::gal
       }
     }
 
-    return boost::shared_ptr<Texture>(new TextureD3D10(context, nativeTexture, shaderResourceView));
+    return std::shared_ptr<Texture>(new TextureD3D10(context, nativeTexture, shaderResourceView));
   }
 
   /**
@@ -1140,7 +1140,7 @@ namespace gpg::gal
    * SRV, sets a viewport covering it, and wraps all three in a
    * `RenderTargetD3D10`.
    */
-  boost::shared_ptr<RenderTarget> DeviceD3D10::CreateRenderTarget(
+  std::shared_ptr<RenderTarget> DeviceD3D10::CreateRenderTarget(
     const RenderTargetContext* const context
   )
   {
@@ -1189,7 +1189,7 @@ namespace gpg::gal
     viewport.MaxZ = 1.0f;
     SetViewport(&viewport);
 
-    return boost::shared_ptr<RenderTarget>(
+    return std::shared_ptr<RenderTarget>(
       new RenderTargetD3D10(context, nativeTexture, renderTargetView, shaderResourceView)
     );
   }
@@ -1202,11 +1202,11 @@ namespace gpg::gal
    * takes the context but only default-constructs its own copy, and the
    * D3D10 backend never creates a native cube texture.
    */
-  boost::shared_ptr<CubeRenderTarget> DeviceD3D10::CreateCubeRenderTarget(
+  std::shared_ptr<CubeRenderTarget> DeviceD3D10::CreateCubeRenderTarget(
     const CubeRenderTargetContext* const context
   )
   {
-    return boost::shared_ptr<CubeRenderTarget>(new CubeRenderTargetD3D10(context));
+    return std::shared_ptr<CubeRenderTarget>(new CubeRenderTargetD3D10(context));
   }
 
   /**
@@ -1216,7 +1216,7 @@ namespace gpg::gal
    * Creates one depth texture with its DSV (plus an SRV when the context asks
    * for a sampleable target) and wraps them in a `DepthStencilTargetD3D10`.
    */
-  boost::shared_ptr<DepthStencilTarget> DeviceD3D10::CreateDepthStencilTarget(
+  std::shared_ptr<DepthStencilTarget> DeviceD3D10::CreateDepthStencilTarget(
     const DepthStencilTargetContext* const context
   )
   {
@@ -1269,7 +1269,7 @@ namespace gpg::gal
       }
     }
 
-    return boost::shared_ptr<DepthStencilTarget>(
+    return std::shared_ptr<DepthStencilTarget>(
       new DepthStencilTargetD3D10(context, depthTexture, depthStencilView, shaderResourceView)
     );
   }
@@ -1282,7 +1282,7 @@ namespace gpg::gal
    * signature effect's pass for that format and wraps it in a
    * `VertexFormatD3D10`.
    */
-  boost::shared_ptr<VertexFormat> DeviceD3D10::CreateVertexFormat(
+  std::shared_ptr<VertexFormat> DeviceD3D10::CreateVertexFormat(
     const std::uint32_t formatToken
   )
   {
@@ -1300,7 +1300,7 @@ namespace gpg::gal
       ThrowGalErrorFromHresult("DeviceD3D10.cpp", 1029, createInputLayoutResult);
     }
 
-    return boost::shared_ptr<VertexFormat>(new VertexFormatD3D10(formatToken, inputLayout));
+    return std::shared_ptr<VertexFormat>(new VertexFormatD3D10(formatToken, inputLayout));
   }
 
   /**
@@ -1310,7 +1310,7 @@ namespace gpg::gal
    * Creates one GPU vertex buffer and the staging buffer `Lock` maps, and
    * wraps both in a `VertexBufferD3D10`.
    */
-  boost::shared_ptr<VertexBuffer> DeviceD3D10::CreateVertexBuffer(
+  std::shared_ptr<VertexBuffer> DeviceD3D10::CreateVertexBuffer(
     const VertexBufferContext* const context
   )
   {
@@ -1342,7 +1342,7 @@ namespace gpg::gal
       ThrowGalErrorFromHresult("DeviceD3D10.cpp", 1056, createStagingBufferResult);
     }
 
-    return boost::shared_ptr<VertexBuffer>(new VertexBufferD3D10(context, mDevice, gpuBuffer, stagingBuffer));
+    return std::shared_ptr<VertexBuffer>(new VertexBufferD3D10(context, mDevice, gpuBuffer, stagingBuffer));
   }
 
   /**
@@ -1352,7 +1352,7 @@ namespace gpg::gal
    * Creates one GPU index buffer and the staging buffer `Lock` maps, and
    * wraps both in an `IndexBufferD3D10`.
    */
-  boost::shared_ptr<IndexBuffer> DeviceD3D10::CreateIndexBuffer(
+  std::shared_ptr<IndexBuffer> DeviceD3D10::CreateIndexBuffer(
     const IndexBufferContext* const context
   )
   {
@@ -1385,7 +1385,7 @@ namespace gpg::gal
       ThrowGalErrorFromHresult("DeviceD3D10.cpp", 1083, createStagingBufferResult);
     }
 
-    return boost::shared_ptr<IndexBuffer>(new IndexBufferD3D10(context, mDevice, gpuBuffer, stagingBuffer));
+    return std::shared_ptr<IndexBuffer>(new IndexBufferD3D10(context, mDevice, gpuBuffer, stagingBuffer));
   }
 
   /**
@@ -1396,8 +1396,8 @@ namespace gpg::gal
    * `CopyResource` from the target's texture into the destination's.
    */
   void DeviceD3D10::GetRenderTargetData(
-    const boost::shared_ptr<RenderTarget>& source,
-    const boost::shared_ptr<Texture>& destination
+    const std::shared_ptr<RenderTarget>& source,
+    const std::shared_ptr<Texture>& destination
   )
   {
     if (source.get() == nullptr) {
@@ -1423,8 +1423,8 @@ namespace gpg::gal
    * top-left corner is used.
    */
   void DeviceD3D10::StretchRect(
-    const boost::shared_ptr<RenderTarget>& source,
-    const boost::shared_ptr<RenderTarget>& destination,
+    const std::shared_ptr<RenderTarget>& source,
+    const std::shared_ptr<RenderTarget>& destination,
     const RECT* const sourceRect,
     const RECT* const destinationRect
   )
@@ -1546,8 +1546,8 @@ namespace gpg::gal
    * memory-encode/decode fallback before the final destination copy.
    */
   void DeviceD3D10::UpdateSurface(
-    const boost::shared_ptr<Texture>& source,
-    const boost::shared_ptr<Texture>& destination,
+    const std::shared_ptr<Texture>& source,
+    const std::shared_ptr<Texture>& destination,
     const RECT* const sourceRect,
     const RECT* const destinationRect
   )
@@ -1653,7 +1653,7 @@ namespace gpg::gal
    * through the image-format table at `DAT_00D430A0`.
    */
   void DeviceD3D10::SaveRenderTarget(
-    const boost::shared_ptr<RenderTarget>& renderTarget,
+    const std::shared_ptr<RenderTarget>& renderTarget,
     const fa::string& filePath,
     const int fileFormat
   )
@@ -1677,7 +1677,7 @@ namespace gpg::gal
    * blob.
    */
   void DeviceD3D10::SaveTexture(
-    const boost::shared_ptr<Texture>& texture,
+    const std::shared_ptr<Texture>& texture,
     const fa::string& filePath,
     const int fileFormat,
     gpg::MemBuffer<char>* const outBuffer
@@ -1840,9 +1840,9 @@ namespace gpg::gal
    * Clears caller weak-handle output lane and consumes one temporary shared
    * handle by value.
    */
-  boost::weak_ptr<void>* DeviceD3D10::Func7(
-    boost::weak_ptr<void>* const outWeakHandle,
-    boost::shared_ptr<void> temporarySharedHandle
+  std::weak_ptr<void>* DeviceD3D10::Func7(
+    std::weak_ptr<void>* const outWeakHandle,
+    std::shared_ptr<void> temporarySharedHandle
   )
   {
     static_cast<void>(temporarySharedHandle);
@@ -1857,7 +1857,7 @@ namespace gpg::gal
    * D3D10 cannot save a cube target: the body is a bare `ret 8`.
    */
   void DeviceD3D10::SaveCubeRenderTarget(
-    const boost::shared_ptr<CubeRenderTarget>& cubeTarget,
+    const std::shared_ptr<CubeRenderTarget>& cubeTarget,
     const fa::string& filePath
   )
   {
@@ -2242,7 +2242,7 @@ namespace gpg::gal
    * `VertexFormatD3D10::ValidateLayoutOrThrow`, 0x008F962B).
    */
   void DeviceD3D10::SetVertexDeclaration(
-    const boost::shared_ptr<VertexFormat> vertexFormat
+    const std::shared_ptr<VertexFormat> vertexFormat
   )
   {
     mDevice->IASetInputLayout(static_cast<VertexFormatD3D10*>(vertexFormat.get())->ValidateLayoutOrThrow());
@@ -2259,7 +2259,7 @@ namespace gpg::gal
    */
   void DeviceD3D10::SetVertexBuffer(
     const std::uint32_t streamSlot,
-    const boost::shared_ptr<VertexBuffer> vertexBuffer,
+    const std::shared_ptr<VertexBuffer> vertexBuffer,
     const int streamFrequencyToken,
     const int startVertex
   )
@@ -2282,7 +2282,7 @@ namespace gpg::gal
    * format 2 and 16-bit otherwise.
    */
   void DeviceD3D10::SetBufferIndices(
-    const boost::shared_ptr<IndexBuffer> indexBuffer
+    const std::shared_ptr<IndexBuffer> indexBuffer
   )
   {
     const IndexBufferContext* const context = indexBuffer->GetContext();

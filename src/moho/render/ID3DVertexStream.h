@@ -1,6 +1,6 @@
 #pragma once
 
-#include "boost/shared_ptr.h"
+#include <memory>
 
 namespace gpg::gal
 {
@@ -12,7 +12,7 @@ namespace moho
   class ID3DVertexStream
   {
   public:
-    using BufferHandle = boost::shared_ptr<gpg::gal::VertexBuffer>;
+    using BufferHandle = std::shared_ptr<gpg::gal::VertexBuffer>;
 
     /**
      * Address: 0x0043FB00 (FUN_0043FB00, sub_43FB00)

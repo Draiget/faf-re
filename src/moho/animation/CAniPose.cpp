@@ -464,7 +464,7 @@ namespace moho
    */
   const SAniSkelBone* CAniPoseBone::ResolveSkeletonBone() const
   {
-    const boost::shared_ptr<const CAniSkel> skeletonHandle = mPose->GetSkeleton();
+    const std::shared_ptr<const CAniSkel> skeletonHandle = mPose->GetSkeleton();
     const CAniSkel* const skeleton = skeletonHandle.get();
     const SAniSkelBone* const bonesBegin = skeleton->mBones.begin();
     const std::uint32_t boneIndex = static_cast<std::uint32_t>(mIdx);
@@ -487,7 +487,7 @@ namespace moho
    */
   const char* CAniPoseBone::GetBoneName() const
   {
-    const boost::shared_ptr<const CAniSkel> skeletonHandle = mPose->GetSkeleton();
+    const std::shared_ptr<const CAniSkel> skeletonHandle = mPose->GetSkeleton();
     const CAniSkel* const skeleton = skeletonHandle.get();
     const SAniSkelBone* const bonesBegin = skeleton->mBones.begin();
     const std::uint32_t boneIndex = static_cast<std::uint32_t>(mIdx);
@@ -584,7 +584,7 @@ namespace moho
    * (0x0054AF4C..0x0054AFE9), so a pose always has a skeleton to size against.
    */
   CAniPose::CAniPose(
-    const boost::shared_ptr<const CAniSkel> skeleton,
+    const std::shared_ptr<const CAniSkel> skeleton,
     const float scale
   )
     : mSkeleton(skeleton)
@@ -1071,7 +1071,7 @@ namespace moho
    * Address: 0x005E3B10 (FUN_005E3B10, ?GetSkeleton@CAniPose@Moho@@QBE?AV?$shared_ptr@$$CBVCAniSkel@Moho@@@boost@@XZ)
    * Address: 0x007DB020 (FUN_007DB020)
    */
-  boost::shared_ptr<const CAniSkel> CAniPose::GetSkeleton() const
+  std::shared_ptr<const CAniSkel> CAniPose::GetSkeleton() const
   {
     return mSkeleton;
   }

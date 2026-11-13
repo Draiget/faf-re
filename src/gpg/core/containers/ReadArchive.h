@@ -8,7 +8,7 @@
 #include <iosfwd>
 
 #include "ArchiveSerialization.h"
-#include "boost/shared_ptr.h"
+#include <memory>
 #include "legacy/containers/Vector.h"
 #include "moho/path/PathTables.h" // PathQueue::Impl is nested, so the enclosing class must be complete
 
@@ -307,7 +307,7 @@ namespace gpg
      * control block.
      */
     template <class T>
-    ReadArchive* ReadPointerShared(boost::shared_ptr<T>* outValue, const gpg::RRef* ownerRef);
+    ReadArchive* ReadPointerShared(std::shared_ptr<T>* outValue, const gpg::RRef* ownerRef);
 
     /**
      * Address: 0x0065A810 (FUN_0065A810, gpg::ReadArchive::ReadPointer_CParticleTexture)
@@ -387,7 +387,7 @@ namespace gpg
    * What it does:
    * Creates one file-backed concrete `ReadArchive` for save/load serializers.
    */
-  ReadArchive* CreateBinaryReadArchive(const boost::shared_ptr<std::FILE>& file);
+  ReadArchive* CreateBinaryReadArchive(const std::shared_ptr<std::FILE>& file);
 
   /**
    * Address: 0x00939800 (FUN_00939800,
@@ -397,5 +397,5 @@ namespace gpg
    * Creates one stream-backed concrete `ReadArchive` (TextReadArchive) for
    * the Lua-facing `serialize.fromstring` text-deserialization path.
    */
-  ReadArchive* CreateTextReadArchive(const boost::shared_ptr<std::istream>& stream);
+  ReadArchive* CreateTextReadArchive(const std::shared_ptr<std::istream>& stream);
 } // namespace gpg

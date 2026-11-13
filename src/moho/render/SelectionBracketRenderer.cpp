@@ -4,7 +4,7 @@
 #include <cstddef>
 #include <vector>
 
-#include "boost/shared_ptr.h"
+#include <memory>
 #include "moho/collision/CColPrimitiveBox3f.h"
 #include "moho/entity/REntityBlueprint.h"
 #include "moho/entity/UserEntity.h"
@@ -132,7 +132,7 @@ namespace
     moho::CD3DPrimBatcher& batcher,
     const moho::GeomCamera3& camera,
     const float interpolationAlpha,
-    const boost::shared_ptr<moho::CD3DBatchTexture>& texture
+    const std::shared_ptr<moho::CD3DBatchTexture>& texture
   )
   {
     moho::SelectionBracketGpuRenderer& renderer = moho::SelectionBracketGpuRenderer::Get();
@@ -207,7 +207,7 @@ namespace
       return;
     }
 
-    const boost::shared_ptr<moho::CD3DBatchTexture> bracketTexture = entity->GetSelectionBracketTexture(viewingArmy);
+    const std::shared_ptr<moho::CD3DBatchTexture> bracketTexture = entity->GetSelectionBracketTexture(viewingArmy);
     if (!bracketTexture) {
       return;
     }
@@ -474,7 +474,7 @@ namespace moho
     // 0x007FD4E5..0x007FD4FC: the shared-texture pass runs whenever *either*
     // set still holds a live entry.
     if (!session->mSelection.Empty() || !sSelectionBrackets.Empty()) {
-      const boost::shared_ptr<CD3DBatchTexture> playerBrackets =
+      const std::shared_ptr<CD3DBatchTexture> playerBrackets =
         CD3DBatchTexture::FromFile(kSelectionBracketTexturePath, 1u);
 
       (void)batcher->Setup(kSelectionBracketTechnique);
@@ -496,7 +496,7 @@ namespace moho
       if (
         session->mSelection.Find(hoveredEntity) == session->mSelection.end() && hoveredEntity->IsUserUnit() != nullptr
       ) {
-        const boost::shared_ptr<CD3DBatchTexture> bracketTexture =
+        const std::shared_ptr<CD3DBatchTexture> bracketTexture =
           hoveredEntity->GetSelectionBracketTexture(session->GetFocusArmy());
 
         if (bracketTexture) {

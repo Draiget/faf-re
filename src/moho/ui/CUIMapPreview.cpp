@@ -81,7 +81,7 @@ bool moho::CUIMapPreview::SetTexture(
     }
   }
 
-  mTexture = boost::static_pointer_cast<ID3DTextureSheet>(loadedTexture);
+  mTexture = std::static_pointer_cast<ID3DTextureSheet>(loadedTexture);
   return mTexture.get() != nullptr;
 }
 

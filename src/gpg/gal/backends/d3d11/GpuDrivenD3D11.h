@@ -10,7 +10,7 @@
 #include <d3d11.h>
 #include <wrl/client.h>
 
-#include "boost/shared_ptr.h"
+#include <memory>
 #include "gpg/gal/GpuDriven.h"
 
 namespace gpg::gal
@@ -70,11 +70,11 @@ namespace gpg::gal
       return mFeatures;
     }
 
-    [[nodiscard]] boost::shared_ptr<GpuBuffer> CreateBuffer(const GpuBufferDesc& desc);
+    [[nodiscard]] std::shared_ptr<GpuBuffer> CreateBuffer(const GpuBufferDesc& desc);
     void UpdateBuffer(GpuBuffer& buffer, std::uint32_t firstElement, std::uint32_t count, const void* data);
     /** Diagnostics: copies elements of `buffer` to `out` through a staging buffer, waiting for the GPU. */
     bool ReadBuffer(GpuBuffer& buffer, std::uint32_t firstElement, std::uint32_t count, void* out);
-    [[nodiscard]] boost::shared_ptr<GpuProgram> CreateProgram(const GpuProgramDesc& desc);
+    [[nodiscard]] std::shared_ptr<GpuProgram> CreateProgram(const GpuProgramDesc& desc);
     void Draw(const GpuDrawCall& call);
     void Dispatch(const GpuDispatch& dispatch);
 

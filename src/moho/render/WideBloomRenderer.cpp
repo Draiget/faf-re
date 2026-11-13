@@ -126,7 +126,7 @@ namespace moho
 
   void WideBloomRenderer::Render(
     const int head,
-    const boost::shared_ptr<ID3DRenderTarget>& glow,
+    const std::shared_ptr<ID3DRenderTarget>& glow,
     const int glowWidth,
     const int glowHeight
   )
@@ -142,14 +142,14 @@ namespace moho
     float savedMaxZ = 1.0f;
     device->GetView(&savedPos, &savedSize, &savedMinZ, &savedMaxZ);
 
-    boost::shared_ptr<CD3DDepthStencil> activeDepthStencil;
+    std::shared_ptr<CD3DDepthStencil> activeDepthStencil;
     ID3DDepthStencil* const depthStencil = device->GetDepthStencil(activeDepthStencil).get();
 
     // One full-target triangle from `source` (`sourceWidth` by `sourceHeight`) into the bound
     // target (`width` by `height`) with `program`.
     const auto pass = [&](
                         gpg::gal::GpuProgram* const program,
-                        const boost::shared_ptr<ID3DRenderTarget>& source,
+                        const std::shared_ptr<ID3DRenderTarget>& source,
                         const int sourceWidth,
                         const int sourceHeight,
                         const int width,
@@ -190,7 +190,7 @@ namespace moho
     };
 
     // Down: glow -> level 0 -> ... -> level 3, the threshold on the first step only.
-    const boost::shared_ptr<ID3DRenderTarget>* source = &glow;
+    const std::shared_ptr<ID3DRenderTarget>* source = &glow;
     int sourceWidth = glowWidth;
     int sourceHeight = glowHeight;
     float threshold = std::clamp(ren_BloomWideThreshold, 0.0f, 0.5f);

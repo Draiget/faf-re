@@ -90,10 +90,10 @@ namespace moho
 
     void BindTextureShaderVar(
       ShaderVar& shaderVar,
-      const boost::shared_ptr<ID3DTextureSheet>& texture
+      const std::shared_ptr<ID3DTextureSheet>& texture
     )
     {
-      shaderVar.GetTexture(boost::static_pointer_cast<CD3DDynamicTextureSheet>(texture));
+      shaderVar.GetTexture(std::static_pointer_cast<CD3DDynamicTextureSheet>(texture));
     }
 
     /**
@@ -103,7 +103,7 @@ namespace moho
      * Builds one 128x128 two-lane Fresnel lookup texture from the supplied
      * water shader scalars and returns one retained sheet handle.
      */
-    [[nodiscard]] boost::shared_ptr<CD3DDynamicTextureSheet> BuildFresnelLookupTexture(
+    [[nodiscard]] std::shared_ptr<CD3DDynamicTextureSheet> BuildFresnelLookupTexture(
       const float fresnelBias,
       const float fresnelPower,
       const float sunShininess,
@@ -274,8 +274,8 @@ namespace moho
     device->SelectTechnique("TWaterLayAlphaMask");
 
     IWldTerrainRes* const terrainRes = mTerrainRes;
-    boost::shared_ptr<CD3DDynamicTextureSheet> utilityTexture =
-      boost::static_pointer_cast<CD3DDynamicTextureSheet>(terrainRes->GetWaterMap());
+    std::shared_ptr<CD3DDynamicTextureSheet> utilityTexture =
+      std::static_pointer_cast<CD3DDynamicTextureSheet>(terrainRes->GetWaterMap());
     GetWater2UtilityTextureCShaderVar().GetTexture(utilityTexture);
 
     std::int32_t primitiveType = kTriangleListPrimitiveToken;
@@ -306,8 +306,8 @@ namespace moho
     const float tickLerp,
     const GeomCamera3* const camera,
     const CWaterShaderProperties* const shaderProperties,
-    const boost::shared_ptr<ID3DRenderTarget>& refractionTexture,
-    const boost::shared_ptr<ID3DRenderTarget>& reflectionTexture
+    const std::shared_ptr<ID3DRenderTarget>& refractionTexture,
+    const std::shared_ptr<ID3DRenderTarget>& reflectionTexture
   )
   {
     CD3DDevice* const device = D3D_GetDevice();
@@ -344,7 +344,7 @@ namespace moho
       const auto fresnelLookupTexture = BuildFresnelLookupTexture(
         shaderState.mFresnelBias, shaderState.mFresnelPower, shaderState.mSunShininess, shaderState.mSunReflectionAmount
       );
-      mFresnelLookupTexture = boost::static_pointer_cast<ID3DTextureSheet>(fresnelLookupTexture);
+      mFresnelLookupTexture = std::static_pointer_cast<ID3DTextureSheet>(fresnelLookupTexture);
 
       mCachedFresnelBias = shaderState.mFresnelBias;
       mCachedFresnelPower = shaderState.mFresnelPower;

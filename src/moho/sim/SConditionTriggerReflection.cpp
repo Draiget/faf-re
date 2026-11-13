@@ -9,7 +9,7 @@
 #include <string>
 #include <typeinfo>
 
-#include "boost/shared_ptr.h"
+#include <memory>
 #include "gpg/core/containers/ArchiveSerialization.h"
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/String.h"
@@ -902,7 +902,7 @@ namespace
    * Address: 0x00710720 (FUN_00710720 -- `SerSave`; each trigger written `Shared` through `MakeRRef<STrigger>`
    * 0x00713700.)
    */
-  gpg::RListType<boost::shared_ptr<moho::STrigger>> gListSharedPtrSTriggerTypeInfo;
+  gpg::RListType<std::shared_ptr<moho::STrigger>> gListSharedPtrSTriggerTypeInfo;
   RMapUnitBlueprintFloatTypeInfo gMapUnitBlueprintFloatTypeInfo;
   StatsCArmyStatItemTypeInfo gStatsCArmyStatItemTypeInfo;
   RMapStringArmyStatItemPtrTypeInfo gMapStringArmyStatItemPtrTypeInfo;

@@ -5,7 +5,7 @@
 #include <cstdint>
 #include <type_traits>
 
-#include "boost/shared_ptr.h"
+#include <memory>
 #include "Stream.h"
 
 namespace gpg
@@ -23,7 +23,7 @@ namespace gpg
     using type = T;
 
   public:
-    boost::shared_ptr<type> mData{};
+    std::shared_ptr<type> mData{};
     type* mBegin{nullptr};
     type* mEnd{nullptr};
 
@@ -81,7 +81,7 @@ namespace gpg
      * Copies one shared owner lane and binds explicit begin/end pointers.
      */
     MemBuffer(
-      boost::shared_ptr<type> ptr,
+      std::shared_ptr<type> ptr,
       type* begin,
       type* end
     ) noexcept
@@ -100,7 +100,7 @@ namespace gpg
      * `[ptr.get(), ptr.get() + len)`.
      */
     MemBuffer(
-      boost::shared_ptr<type> ptr,
+      std::shared_ptr<type> ptr,
       std::size_t len
     ) noexcept
       : mData{ptr}
@@ -183,12 +183,12 @@ namespace gpg
      * Returns one shared owner that aliases this view's begin pointer while
      * retaining the original control block.
      */
-    [[nodiscard]] boost::shared_ptr<type> GetSharedPtr() const
+    [[nodiscard]] std::shared_ptr<type> GetSharedPtr() const
     {
       if (!mData) {
         return {};
       }
-      return boost::shared_ptr<type>(mData, mBegin);
+      return std::shared_ptr<type>(mData, mBegin);
     }
 
     /**

@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-#include "boost/shared_ptr.h"
+#include <memory>
 
 namespace moho
 {
@@ -41,7 +41,7 @@ namespace faf::editor
   private:
     struct Entry
     {
-      boost::shared_ptr<moho::CD3DDynamicTextureSheet> sheet;
+      std::shared_ptr<moho::CD3DDynamicTextureSheet> sheet;
       bool failed = false;
     };
     std::map<std::string, Entry> mEntries;

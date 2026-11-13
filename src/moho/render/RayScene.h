@@ -19,8 +19,8 @@
 #include <map>
 #include <vector>
 
-#include "boost/shared_ptr.h"
-#include "boost/weak_ptr.h"
+#include <memory>
+#include <memory>
 #include "gpg/gal/RayTracing.h"
 #include "moho/mesh/MeshBatchKey.h"
 
@@ -72,7 +72,7 @@ namespace moho
   private:
     struct MeshPieces
     {
-      boost::weak_ptr<RScmResource> resource;
+      std::weak_ptr<RScmResource> resource;
       std::vector<gpg::gal::RayGeometryId> pieces; // per skin bone, or one for an unskinned batch
       bool skinned = false;
       bool incomplete = false; // a piece with triangles got no geometry (out of memory)
@@ -88,14 +88,13 @@ namespace moho
     void SweepMeshes();
     void AddTerrain(const CHeightField& field);
     /** `alpha`: the pieces carry texture coordinates (an alpha-tested material). */
-    [[nodiscard]] MeshPieces* PiecesFor(const boost::shared_ptr<RScmResource>& resource, bool skinned, bool alpha);
+    [[nodiscard]] MeshPieces* PiecesFor(const std::shared_ptr<RScmResource>& resource, bool skinned, bool alpha);
 
     gpg::gal::Device* mDevice = nullptr;
     std::uint64_t mEpoch = ~0ULL; // gpg::gal::gRaySceneEpoch the pieces belong to
     std::uint32_t mSweepFrames = 0U;
     std::map<std::pair<const RScmResource*, int>, MeshPieces> mMeshes; // resource, 1 skinned | 2 alpha-tested
-    std::vector<boost::shared_ptr<gpg::gal::Texture>>
-      mAlphaTextures;           // this frame's, indexed by RayInstance::texture - 1
+    std::vector<std::shared_ptr<gpg::gal::Texture>> mAlphaTextures; // this frame's, indexed by RayInstance::texture - 1
     bool mAlphaMissing = false; // this frame, an alpha-tested mesh isn't in the scene
     const CHeightField* mTerrainField = nullptr;
     std::uint64_t mTerrainRevision = ~0ULL;

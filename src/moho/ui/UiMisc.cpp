@@ -825,8 +825,8 @@ int moho::cfunc_CMauiBitMapGetNumFramesL(
  * when the modern compiler would inline the natural push_back call.
  */
 void moho::PushBackMeshInstanceSharedPtrVector(
-  fa::vector<boost::shared_ptr<moho::MeshInstance>>& destination,
-  const boost::shared_ptr<moho::MeshInstance>& value
+  fa::vector<std::shared_ptr<moho::MeshInstance>>& destination,
+  const std::shared_ptr<moho::MeshInstance>& value
 )
 {
   destination.push_back(value);

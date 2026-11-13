@@ -51,7 +51,7 @@ namespace moho
    * (0x00539E40 aliases `mBegin` onto it); this copies the bytes into a buffer
    * the resource owns instead, since boost 1.34 has no aliasing constructor.
    */
-  boost::shared_ptr<RScmResource> CScmResourceFactory::LoadImpl(
+  std::shared_ptr<RScmResource> CScmResourceFactory::LoadImpl(
     const gpg::StrArg path
   )
   {
@@ -68,9 +68,9 @@ namespace moho
     auto* const scmBytes = new char[byteCount];
     // Raw SCM file blob copy from the loaded buffer.
     std::copy_n(fileBytes.mBegin, byteCount, scmBytes);
-    const boost::shared_ptr<const SScmFile> scmFile(reinterpret_cast<const SScmFile*>(scmBytes), &DeleteScmFileBuffer);
+    const std::shared_ptr<const SScmFile> scmFile(reinterpret_cast<const SScmFile*>(scmBytes), &DeleteScmFileBuffer);
 
-    boost::shared_ptr<RScmResource> resource;
+    std::shared_ptr<RScmResource> resource;
     (void)ConstructSharedRScmResourceFromRaw(&resource, new RScmResource(path, scmFile));
     if (!RScmResource::KeepGeometry()) {
       resource->DropGeometry();

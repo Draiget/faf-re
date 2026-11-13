@@ -179,7 +179,7 @@ namespace moho
     while (true) {
       ID3DDeviceResources::TextureResourceHandle textureResource{};
       D3D_GetDevice()->GetResources()->GetTexture(textureResource, frameName.c_str(), nullptr, true);
-      AppendFrameRef(boost::static_pointer_cast<ID3DTextureSheet>(textureResource));
+      AppendFrameRef(std::static_pointer_cast<ID3DTextureSheet>(textureResource));
 
       if (!IncrementFrameNameSuffix(frameName)) {
         break;

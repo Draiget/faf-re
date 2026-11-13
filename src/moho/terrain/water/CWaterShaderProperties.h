@@ -166,7 +166,7 @@ namespace moho
      * string, caches it in mTextures[5], and returns one retained shared
      * texture-sheet handle.
      */
-    [[nodiscard]] boost::shared_ptr<ID3DTextureSheet> GetWaterRamp() const;
+    [[nodiscard]] std::shared_ptr<ID3DTextureSheet> GetWaterRamp() const;
 
     /**
      * Address: 0x0089FC40 (FUN_0089FC40,
@@ -178,7 +178,7 @@ namespace moho
      * it in mTextures[4], and returns one retained shared texture-sheet
      * handle.
      */
-    [[nodiscard]] boost::shared_ptr<ID3DTextureSheet> GetCubeMap() const;
+    [[nodiscard]] std::shared_ptr<ID3DTextureSheet> GetCubeMap() const;
 
     /**
      * Address: 0x0089FB00 (FUN_0089FB00,
@@ -190,7 +190,7 @@ namespace moho
      * caches it in mTextures[index], and returns one retained shared texture
      * sheet handle.
      */
-    [[nodiscard]] boost::shared_ptr<ID3DTextureSheet> GetNormalMap(int index) const;
+    [[nodiscard]] std::shared_ptr<ID3DTextureSheet> GetNormalMap(int index) const;
 
     // -------------------------------------------------------------------------
     // Layout - offsets confirmed from binary evidence (ctor/copy/dtor).
@@ -208,7 +208,7 @@ namespace moho
 
     // Six texture-sheet handles.
     // Confirmed by: releaseTextures() iterating mTextures[0..5].
-    mutable boost::shared_ptr<ID3DTextureSheet> mTextures[6]{}; // +0x12C
+    mutable std::shared_ptr<ID3DTextureSheet> mTextures[6]{}; // +0x12C
 
   private:
     /**

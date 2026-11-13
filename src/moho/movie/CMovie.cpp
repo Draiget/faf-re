@@ -185,7 +185,7 @@ namespace moho
     ID3DDeviceResources* const resources = D3D_GetDevice()->GetResources();
     (void)resources->CreateDynamicTextureSheet2(dynamicSheet, mWidth, mHeight, 2);
 
-    mTextureSheet = boost::static_pointer_cast<ID3DTextureSheet>(dynamicSheet);
+    mTextureSheet = std::static_pointer_cast<ID3DTextureSheet>(dynamicSheet);
 
     bool textureReady = false;
     if (mTextureSheet.get() != nullptr) {
@@ -446,8 +446,8 @@ namespace moho
    * Copies the movie texture shared-handle pair into caller output storage and
    * increments the shared owner refcount.
    */
-  boost::shared_ptr<ID3DTextureSheet>* CMovie::GetTextureSheetHandle(
-    boost::shared_ptr<ID3DTextureSheet>* const outHandle
+  std::shared_ptr<ID3DTextureSheet>* CMovie::GetTextureSheetHandle(
+    std::shared_ptr<ID3DTextureSheet>* const outHandle
   )
   {
     *outHandle = mTextureSheet;

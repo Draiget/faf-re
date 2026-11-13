@@ -164,11 +164,11 @@ namespace
    * Creates a shared ownership control block for `CHeightField*`.
    */
   void CreateBoostPtrCHeightField(
-    boost::shared_ptr<moho::CHeightField>& out,
+    std::shared_ptr<moho::CHeightField>& out,
     moho::CHeightField* field
   )
   {
-    out = boost::shared_ptr<moho::CHeightField>(field);
+    out = std::shared_ptr<moho::CHeightField>(field);
   }
 
   /**
@@ -179,10 +179,10 @@ namespace
    */
   void CreateCHeightFieldPtr(
     moho::CHeightField* field,
-    boost::shared_ptr<moho::CHeightField>& out
+    std::shared_ptr<moho::CHeightField>& out
   )
   {
-    boost::shared_ptr<moho::CHeightField> tmp;
+    std::shared_ptr<moho::CHeightField> tmp;
     CreateBoostPtrCHeightField(tmp, field);
     NullSub();
     out = tmp;
@@ -3761,7 +3761,7 @@ namespace moho
    * `outHeightField`.
    */
   void STIMap::GetHeightField(
-    boost::shared_ptr<CHeightField>& outHeightField
+    std::shared_ptr<CHeightField>& outHeightField
   ) const
   {
     outHeightField = mHeightField;
@@ -3824,7 +3824,7 @@ namespace moho
    * it at each site, so it needs a named source equivalent to survive.
    */
   float GetHeightFieldElevation(
-    const boost::shared_ptr<CHeightField>& heightField,
+    const std::shared_ptr<CHeightField>& heightField,
     const float x,
     const float z
   )

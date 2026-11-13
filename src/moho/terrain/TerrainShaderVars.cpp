@@ -109,7 +109,7 @@ namespace moho
 
   void BindTextureShaderVar(
     ShaderVar& shaderVar,
-    const boost::shared_ptr<ID3DTextureSheet>& textureSheet
+    const std::shared_ptr<ID3DTextureSheet>& textureSheet
   )
   {
     // The sheet binder resolves the texture off the sheet's own vtable and

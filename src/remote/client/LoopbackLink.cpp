@@ -150,7 +150,7 @@ namespace faf::remote::client
         continue;
       }
       moho::UserArmy& army = *session->userArmies[slot.army];
-      boost::shared_ptr<moho::CIntelGrid>& held = slot.kind == 0 ? army.mVisionReconGrid : army.mWaterReconGrid;
+      std::shared_ptr<moho::CIntelGrid>& held = slot.kind == 0 ? army.mVisionReconGrid : army.mWaterReconGrid;
       auto& owned = mUserGrids[{slot.army, slot.kind}];
       if (!owned || owned->mWidth != slot.bits.width || owned->mHeight != slot.bits.height) {
         owned.reset(new moho::CIntelGrid(map, slot.gridSize));

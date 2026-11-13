@@ -573,7 +573,7 @@ namespace
   )
   {
     moho::SSavedGameHeader source = MakeHeader();
-    source.mLaunchInfo = boost::shared_ptr<moho::LaunchInfoBase>(new moho::LaunchInfoNew());
+    source.mLaunchInfo = std::shared_ptr<moho::LaunchInfoBase>(new moho::LaunchInfoNew());
     EXPECT_EQ(source.mLaunchInfo.use_count(), 1);
     {
       const moho::SSavedGameHeader copy(source);
@@ -595,7 +595,7 @@ namespace
     auto* const info = new moho::LaunchInfoNew();
     info->mLanguage = fa::string("fr");
     info->mCheatsEnabled = true;
-    source.mLaunchInfo = boost::shared_ptr<moho::LaunchInfoBase>(info);
+    source.mLaunchInfo = std::shared_ptr<moho::LaunchInfoBase>(info);
 
     const std::string bytes = Write([&](gpg::WriteArchive& archive) {
       archive.Write(HeaderType(), &source, gpg::RRef{});

@@ -37,12 +37,12 @@ namespace gpg::gal
      * `boost::LockWeak`), then "attempt to use invalid effect" from the
      * caller's line when the effect is gone.
      */
-    boost::shared_ptr<EffectD3D9> LockEffectOrThrow(
-      const boost::weak_ptr<EffectD3D9>& weakEffect,
+    std::shared_ptr<EffectD3D9> LockEffectOrThrow(
+      const std::weak_ptr<EffectD3D9>& weakEffect,
       const int line
     )
     {
-      boost::shared_ptr<EffectD3D9> effect = boost::LockWeak(weakEffect);
+      std::shared_ptr<EffectD3D9> effect = boost::LockWeak(weakEffect);
       if (!effect) {
         ThrowGalError("EffectTechniqueD3D9.cpp", line, "attempt to use invalid effect");
       }
@@ -62,7 +62,7 @@ namespace gpg::gal
    */
   EffectTechniqueD3D9::EffectTechniqueD3D9(
     const char* const name,
-    const boost::shared_ptr<EffectD3D9> effect,
+    const std::shared_ptr<EffectD3D9> effect,
     const D3DXHANDLE handle
   )
     : name_(name)
@@ -108,7 +108,7 @@ namespace gpg::gal
       ThrowGalError("EffectTechniqueD3D9.cpp", 50, "effect technique begin/end mismatch");
     }
 
-    boost::shared_ptr<EffectD3D9> effect = LockEffectOrThrow(effect_, 53);
+    std::shared_ptr<EffectD3D9> effect = LockEffectOrThrow(effect_, 53);
     ID3DXEffect* const dxEffect = effect->GetDxEffect();
     const HRESULT setTechniqueResult = dxEffect->SetTechnique(handle_);
     if (setTechniqueResult < 0) {
@@ -139,7 +139,7 @@ namespace gpg::gal
       ThrowGalError("EffectTechniqueD3D9.cpp", 76, "effect technique begin/end mismatch");
     }
 
-    boost::shared_ptr<EffectD3D9> effect = LockEffectOrThrow(effect_, 79);
+    std::shared_ptr<EffectD3D9> effect = LockEffectOrThrow(effect_, 79);
     const HRESULT result = effect->GetDxEffect()->End();
     if (result < 0) {
       ThrowGalErrorFromHresult("EffectTechniqueD3D9.cpp", 84, result);
@@ -163,7 +163,7 @@ namespace gpg::gal
       ThrowGalError("EffectTechniqueD3D9.cpp", 94, "effect technique begin/end mismatch");
     }
 
-    boost::shared_ptr<EffectD3D9> effect = LockEffectOrThrow(effect_, 97);
+    std::shared_ptr<EffectD3D9> effect = LockEffectOrThrow(effect_, 97);
     const HRESULT result = effect->GetDxEffect()->BeginPass(static_cast<unsigned int>(pass));
     if (result < 0) {
       ThrowGalErrorFromHresult("EffectTechniqueD3D9.cpp", 102, result);
@@ -183,7 +183,7 @@ namespace gpg::gal
       ThrowGalError("EffectTechniqueD3D9.cpp", 107, "effect technique begin/end mismatch");
     }
 
-    boost::shared_ptr<EffectD3D9> effect = LockEffectOrThrow(effect_, 110);
+    std::shared_ptr<EffectD3D9> effect = LockEffectOrThrow(effect_, 110);
     const HRESULT result = effect->GetDxEffect()->EndPass();
     if (result < 0) {
       ThrowGalErrorFromHresult("EffectTechniqueD3D9.cpp", 115, result);
@@ -205,7 +205,7 @@ namespace gpg::gal
       ThrowGalError("EffectTechniqueD3D9.cpp", 0, "effect technique begin/end mismatch");
     }
 
-    boost::shared_ptr<EffectD3D9> effect = LockEffectOrThrow(effect_, 0);
+    std::shared_ptr<EffectD3D9> effect = LockEffectOrThrow(effect_, 0);
     const HRESULT result = effect->GetDxEffect()->CommitChanges();
     if (result < 0) {
       ThrowGalErrorFromHresult("EffectTechniqueD3D9.cpp", 0, result);
@@ -223,7 +223,7 @@ namespace gpg::gal
     const fa::string& annotationName
   )
   {
-    boost::shared_ptr<EffectD3D9> effect = LockEffectOrThrow(effect_, 121);
+    std::shared_ptr<EffectD3D9> effect = LockEffectOrThrow(effect_, 121);
     ID3DXEffect* const dxEffect = effect->GetDxEffect();
     const D3DXHANDLE annotationHandle = dxEffect->GetAnnotationByName(handle_, annotationName.c_str());
     if (annotationHandle == nullptr) {
@@ -251,7 +251,7 @@ namespace gpg::gal
     const fa::string& annotationName
   )
   {
-    boost::shared_ptr<EffectD3D9> effect = LockEffectOrThrow(effect_, 141);
+    std::shared_ptr<EffectD3D9> effect = LockEffectOrThrow(effect_, 141);
     ID3DXEffect* const dxEffect = effect->GetDxEffect();
     const D3DXHANDLE annotationHandle = dxEffect->GetAnnotationByName(handle_, annotationName.c_str());
     if (annotationHandle == nullptr) {
@@ -277,7 +277,7 @@ namespace gpg::gal
     const fa::string& annotationName
   )
   {
-    boost::shared_ptr<EffectD3D9> effect = LockEffectOrThrow(effect_, 158);
+    std::shared_ptr<EffectD3D9> effect = LockEffectOrThrow(effect_, 158);
     ID3DXEffect* const dxEffect = effect->GetDxEffect();
     const D3DXHANDLE annotationHandle = dxEffect->GetAnnotationByName(handle_, annotationName.c_str());
     if (annotationHandle == nullptr) {
@@ -303,7 +303,7 @@ namespace gpg::gal
     const fa::string& annotationName
   )
   {
-    boost::shared_ptr<EffectD3D9> effect = LockEffectOrThrow(effect_, 175);
+    std::shared_ptr<EffectD3D9> effect = LockEffectOrThrow(effect_, 175);
     ID3DXEffect* const dxEffect = effect->GetDxEffect();
     const D3DXHANDLE annotationHandle = dxEffect->GetAnnotationByName(handle_, annotationName.c_str());
     if (annotationHandle == nullptr) {

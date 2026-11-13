@@ -3,7 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 
-#include "boost/shared_ptr.h"
+#include <memory>
 
 namespace gpg
 {
@@ -33,11 +33,11 @@ namespace moho
   class ID3DDeviceResources
   {
   public:
-    using RenderTargetHandle = boost::shared_ptr<CD3DRenderTarget>;
-    using DepthStencilHandle = boost::shared_ptr<CD3DDepthStencil>;
-    using DynamicTextureSheetHandle = boost::shared_ptr<CD3DDynamicTextureSheet>;
-    using TextureResourceHandle = boost::shared_ptr<RD3DTextureResource>;
-    using PrefetchDataHandle = boost::shared_ptr<PrefetchData>;
+    using RenderTargetHandle = std::shared_ptr<CD3DRenderTarget>;
+    using DepthStencilHandle = std::shared_ptr<CD3DDepthStencil>;
+    using DynamicTextureSheetHandle = std::shared_ptr<CD3DDynamicTextureSheet>;
+    using TextureResourceHandle = std::shared_ptr<RD3DTextureResource>;
+    using PrefetchDataHandle = std::shared_ptr<PrefetchData>;
 
     /**
      * Address: 0x00440630 (FUN_00440630, sub_440630)

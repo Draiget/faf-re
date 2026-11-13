@@ -121,7 +121,7 @@ namespace moho
     )
     {
       gpg::RType* const resourceType = resource_reflection::ResolveRD3DTextureResourceType();
-      outTexture = boost::static_pointer_cast<RD3DTextureResource>(
+      outTexture = std::static_pointer_cast<RD3DTextureResource>(
         RES_GetResource(path != nullptr ? path : "", resourceWatcher, resourceType)
       );
       return outTexture;

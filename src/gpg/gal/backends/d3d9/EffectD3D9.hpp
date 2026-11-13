@@ -4,8 +4,8 @@
 
 #include <d3dx9effect.h>
 
-#include "boost/enable_shared_from_this.h"
-#include "boost/shared_ptr.h"
+#include <memory>
+#include <memory>
 #include "gpg/gal/Effect.hpp"
 #include "gpg/gal/EffectContext.hpp"
 #include "legacy/containers/Vector.h"
@@ -27,7 +27,7 @@ namespace gpg::gal
    * at +0x00. The techniques and variables it hands out hold it weakly
    * through `shared_from_this()` and lock it on every call.
    */
-  class EffectD3D9 : public boost::enable_shared_from_this<EffectD3D9>, public Effect
+  class EffectD3D9 : public std::enable_shared_from_this<EffectD3D9>, public Effect
   {
   public:
     /**
@@ -73,7 +73,7 @@ namespace gpg::gal
      * Walks the D3DX effect's valid techniques and appends a wrapper for
      * each to `outTechniques`.
      */
-    void GetTechniques(fa::vector<boost::shared_ptr<EffectTechnique>>& outTechniques) override;
+    void GetTechniques(fa::vector<std::shared_ptr<EffectTechnique>>& outTechniques) override;
 
     /**
      * Address: 0x00941D70 (FUN_00941D70)
@@ -82,7 +82,7 @@ namespace gpg::gal
      * What it does:
      * Wraps the effect parameter called `name`; throws when there is none.
      */
-    boost::shared_ptr<EffectVariable> GetVariable(const char* name) override;
+    std::shared_ptr<EffectVariable> GetVariable(const char* name) override;
 
     /**
      * Address: 0x00941F60 (FUN_00941F60)
@@ -91,7 +91,7 @@ namespace gpg::gal
      * What it does:
      * Wraps the technique called `name`; throws when there is none.
      */
-    boost::shared_ptr<EffectTechnique> GetTechnique(const char* name) override;
+    std::shared_ptr<EffectTechnique> GetTechnique(const char* name) override;
 
     /**
      * Address: 0x00942150 (FUN_00942150)

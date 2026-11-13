@@ -8,12 +8,12 @@ namespace gpg::gal
     /**
      * The same lock-and-check for the `EffectVariableD3D9` entry points.
      */
-    boost::shared_ptr<EffectD3D9> LockEffectVariableOrThrow(
-      const boost::weak_ptr<EffectD3D9>& weakEffect,
+    std::shared_ptr<EffectD3D9> LockEffectVariableOrThrow(
+      const std::weak_ptr<EffectD3D9>& weakEffect,
       const int line
     )
     {
-      boost::shared_ptr<EffectD3D9> effect = boost::LockWeak(weakEffect);
+      std::shared_ptr<EffectD3D9> effect = boost::LockWeak(weakEffect);
       if (!effect) {
         ThrowGalError("EffectVariableD3D9.cpp", line, "attempt to use invalid effect");
       }
@@ -32,7 +32,7 @@ namespace gpg::gal
    */
   EffectVariableD3D9::EffectVariableD3D9(
     const char* const name,
-    const boost::shared_ptr<EffectD3D9> effect,
+    const std::shared_ptr<EffectD3D9> effect,
     const D3DXHANDLE handle
   )
     : name_(name)
@@ -75,7 +75,7 @@ namespace gpg::gal
     const bool value
   )
   {
-    boost::shared_ptr<EffectD3D9> effect = LockEffectVariableOrThrow(effect_, 52);
+    std::shared_ptr<EffectD3D9> effect = LockEffectVariableOrThrow(effect_, 52);
     const HRESULT result = effect->GetDxEffect()->SetBool(handle_, value ? TRUE : FALSE);
     if (result < 0) {
       ThrowGalErrorFromHresult("EffectVariableD3D9.cpp", 57, result);
@@ -92,7 +92,7 @@ namespace gpg::gal
     const int value
   )
   {
-    boost::shared_ptr<EffectD3D9> effect = LockEffectVariableOrThrow(effect_, 63);
+    std::shared_ptr<EffectD3D9> effect = LockEffectVariableOrThrow(effect_, 63);
     const HRESULT result = effect->GetDxEffect()->SetInt(handle_, value);
     if (result < 0) {
       ThrowGalErrorFromHresult("EffectVariableD3D9.cpp", 68, result);
@@ -109,7 +109,7 @@ namespace gpg::gal
     const float* const vector4
   )
   {
-    boost::shared_ptr<EffectD3D9> effect = LockEffectVariableOrThrow(effect_, 85);
+    std::shared_ptr<EffectD3D9> effect = LockEffectVariableOrThrow(effect_, 85);
     const HRESULT result = effect->GetDxEffect()->SetVector(handle_, reinterpret_cast<const D3DXVECTOR4*>(vector4));
     if (result < 0) {
       ThrowGalErrorFromHresult("EffectVariableD3D9.cpp", 90, result);
@@ -131,7 +131,7 @@ namespace gpg::gal
     const float* const vectors4
   )
   {
-    boost::shared_ptr<EffectD3D9> effect = LockEffectVariableOrThrow(effect_, 96);
+    std::shared_ptr<EffectD3D9> effect = LockEffectVariableOrThrow(effect_, 96);
     const HRESULT result =
       effect->GetDxEffect()->SetVectorArray(handle_, reinterpret_cast<const D3DXVECTOR4*>(&vectors4), count);
     if (result < 0) {
@@ -149,7 +149,7 @@ namespace gpg::gal
     const float value
   )
   {
-    boost::shared_ptr<EffectD3D9> effect = LockEffectVariableOrThrow(effect_, 74);
+    std::shared_ptr<EffectD3D9> effect = LockEffectVariableOrThrow(effect_, 74);
     const HRESULT result = effect->GetDxEffect()->SetFloat(handle_, value);
     if (result < 0) {
       ThrowGalErrorFromHresult("EffectVariableD3D9.cpp", 79, result);
@@ -167,7 +167,7 @@ namespace gpg::gal
     const float* const values
   )
   {
-    boost::shared_ptr<EffectD3D9> effect = LockEffectVariableOrThrow(effect_, 107);
+    std::shared_ptr<EffectD3D9> effect = LockEffectVariableOrThrow(effect_, 107);
     const HRESULT result = effect->GetDxEffect()->SetFloatArray(handle_, values, count);
     if (result < 0) {
       ThrowGalErrorFromHresult("EffectVariableD3D9.cpp", 112, result);
@@ -185,7 +185,7 @@ namespace gpg::gal
     const std::uint32_t byteCount
   )
   {
-    boost::shared_ptr<EffectD3D9> effect = LockEffectVariableOrThrow(effect_, 118);
+    std::shared_ptr<EffectD3D9> effect = LockEffectVariableOrThrow(effect_, 118);
     const HRESULT result = effect->GetDxEffect()->SetValue(handle_, data, byteCount);
     if (result < 0) {
       ThrowGalErrorFromHresult("EffectVariableD3D9.cpp", 123, result);
@@ -202,7 +202,7 @@ namespace gpg::gal
     const Matrix* const matrix
   )
   {
-    boost::shared_ptr<EffectD3D9> effect = LockEffectVariableOrThrow(effect_, 129);
+    std::shared_ptr<EffectD3D9> effect = LockEffectVariableOrThrow(effect_, 129);
     const HRESULT result = effect->GetDxEffect()->SetMatrix(handle_, reinterpret_cast<const D3DXMATRIX*>(matrix));
     if (result < 0) {
       ThrowGalErrorFromHresult("EffectVariableD3D9.cpp", 134, result);
@@ -220,7 +220,7 @@ namespace gpg::gal
     const Matrix* const matrices
   )
   {
-    boost::shared_ptr<EffectD3D9> effect = LockEffectVariableOrThrow(effect_, 140);
+    std::shared_ptr<EffectD3D9> effect = LockEffectVariableOrThrow(effect_, 140);
     const HRESULT result =
       effect->GetDxEffect()->SetMatrixArray(handle_, reinterpret_cast<const D3DXMATRIX*>(matrices), count);
     if (result < 0) {
@@ -235,10 +235,10 @@ namespace gpg::gal
    * Binds a texture wrapper lane (2D/volume/cube) to the backing D3DX effect parameter.
    */
   void EffectVariableD3D9::SetTexture(
-    const boost::shared_ptr<Texture> texture
+    const std::shared_ptr<Texture> texture
   )
   {
-    boost::shared_ptr<EffectD3D9> effect = LockEffectVariableOrThrow(effect_, 151);
+    std::shared_ptr<EffectD3D9> effect = LockEffectVariableOrThrow(effect_, 151);
     IDirect3DBaseTexture9* textureHandle = nullptr;
 
     if (texture) {
@@ -266,10 +266,10 @@ namespace gpg::gal
    * not its surface) to this effect parameter; a null target unbinds it.
    */
   void EffectVariableD3D9::SetRenderTarget(
-    const boost::shared_ptr<RenderTarget> renderTarget
+    const std::shared_ptr<RenderTarget> renderTarget
   )
   {
-    boost::shared_ptr<EffectD3D9> effect = LockEffectVariableOrThrow(effect_, 189);
+    std::shared_ptr<EffectD3D9> effect = LockEffectVariableOrThrow(effect_, 189);
     IDirect3DTexture9* const textureHandle =
       (renderTarget.get() != nullptr) ? static_cast<RenderTargetD3D9*>(renderTarget.get())->GetTexture() : nullptr;
 
@@ -288,10 +288,10 @@ namespace gpg::gal
    * target unbinds it.
    */
   void EffectVariableD3D9::SetCubeRenderTarget(
-    const boost::shared_ptr<CubeRenderTarget> cubeTarget
+    const std::shared_ptr<CubeRenderTarget> cubeTarget
   )
   {
-    boost::shared_ptr<EffectD3D9> effect = LockEffectVariableOrThrow(effect_, 207);
+    std::shared_ptr<EffectD3D9> effect = LockEffectVariableOrThrow(effect_, 207);
     IDirect3DCubeTexture9* const textureHandle =
       (cubeTarget.get() != nullptr) ? static_cast<CubeRenderTargetD3D9*>(cubeTarget.get())->GetTexture() : nullptr;
 
@@ -312,7 +312,7 @@ namespace gpg::gal
     const fa::string& annotationName
   )
   {
-    boost::shared_ptr<EffectD3D9> effect = LockEffectVariableOrThrow(effect_, 225);
+    std::shared_ptr<EffectD3D9> effect = LockEffectVariableOrThrow(effect_, 225);
     ID3DXEffect* const dxEffect = effect->GetDxEffect();
     const D3DXHANDLE annotationHandle = dxEffect->GetAnnotationByName(handle_, annotationName.c_str());
     if (annotationHandle == nullptr) {
@@ -340,7 +340,7 @@ namespace gpg::gal
     const fa::string& annotationName
   )
   {
-    boost::shared_ptr<EffectD3D9> effect = LockEffectVariableOrThrow(effect_, 245);
+    std::shared_ptr<EffectD3D9> effect = LockEffectVariableOrThrow(effect_, 245);
     ID3DXEffect* const dxEffect = effect->GetDxEffect();
     const D3DXHANDLE annotationHandle = dxEffect->GetAnnotationByName(handle_, annotationName.c_str());
     if (annotationHandle == nullptr) {
@@ -366,7 +366,7 @@ namespace gpg::gal
     const fa::string& annotationName
   )
   {
-    boost::shared_ptr<EffectD3D9> effect = LockEffectVariableOrThrow(effect_, 262);
+    std::shared_ptr<EffectD3D9> effect = LockEffectVariableOrThrow(effect_, 262);
     ID3DXEffect* const dxEffect = effect->GetDxEffect();
     const D3DXHANDLE annotationHandle = dxEffect->GetAnnotationByName(handle_, annotationName.c_str());
     if (annotationHandle == nullptr) {
@@ -392,7 +392,7 @@ namespace gpg::gal
     const fa::string& annotationName
   )
   {
-    boost::shared_ptr<EffectD3D9> effect = LockEffectVariableOrThrow(effect_, 279);
+    std::shared_ptr<EffectD3D9> effect = LockEffectVariableOrThrow(effect_, 279);
     ID3DXEffect* const dxEffect = effect->GetDxEffect();
     const D3DXHANDLE annotationHandle = dxEffect->GetAnnotationByName(handle_, annotationName.c_str());
     if (annotationHandle == nullptr) {

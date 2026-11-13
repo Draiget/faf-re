@@ -395,14 +395,14 @@ namespace gpg::gal
       kGpuPathWorldShapes | kGpuPathMsdfText | fontCook;
   }
 
-  boost::shared_ptr<GpuBuffer> DeviceVulkan::CreateGpuBuffer(
+  std::shared_ptr<GpuBuffer> DeviceVulkan::CreateGpuBuffer(
     const GpuBufferDesc& desc
   )
   {
     if ((mGpuFeatures & kGpuFeatureVertexPulling) == 0U) {
       return {};
     }
-    return boost::shared_ptr<GpuBuffer>(new GpuBufferVulkan(*this, desc));
+    return std::shared_ptr<GpuBuffer>(new GpuBufferVulkan(*this, desc));
   }
 
   void DeviceVulkan::UpdateGpuBuffer(
@@ -468,14 +468,14 @@ namespace gpg::gal
     return true;
   }
 
-  boost::shared_ptr<GpuProgram> DeviceVulkan::CreateGpuProgram(
+  std::shared_ptr<GpuProgram> DeviceVulkan::CreateGpuProgram(
     const GpuProgramDesc& desc
   )
   {
     if ((mGpuFeatures & kGpuFeatureVertexPulling) == 0U || desc.source == nullptr) {
       return {};
     }
-    boost::shared_ptr<GpuProgramVulkan> program(new GpuProgramVulkan());
+    std::shared_ptr<GpuProgramVulkan> program(new GpuProgramVulkan());
     program->mDesc = desc;
     program->mName = (desc.name != nullptr) ? desc.name : "";
     program->mDesc.name = nullptr;

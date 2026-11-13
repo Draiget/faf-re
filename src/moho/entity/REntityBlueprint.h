@@ -3,7 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 
-#include "boost/shared_ptr.h"
+#include <memory>
 #include "legacy/containers/String.h"
 #include "legacy/containers/Vector.h"
 #include "moho/collision/ECollisionShape.h"
@@ -166,10 +166,10 @@ namespace moho
      * `shared_ptr` copy-construct (unconditional increment when the control
      * block pointer is non-null), not a weak-to-shared promotion.
      */
-    boost::shared_ptr<CD3DBatchTexture> mStrategicIconRest;         // +0x15C
-    boost::shared_ptr<CD3DBatchTexture> mStrategicIconSelected;     // +0x164
-    boost::shared_ptr<CD3DBatchTexture> mStrategicIconOver;         // +0x16C
-    boost::shared_ptr<CD3DBatchTexture> mStrategicIconSelectedOver; // +0x174
+    std::shared_ptr<CD3DBatchTexture> mStrategicIconRest;         // +0x15C
+    std::shared_ptr<CD3DBatchTexture> mStrategicIconSelected;     // +0x164
+    std::shared_ptr<CD3DBatchTexture> mStrategicIconOver;         // +0x16C
+    std::shared_ptr<CD3DBatchTexture> mStrategicIconSelectedOver; // +0x174
 
     static gpg::RType* sType;
 

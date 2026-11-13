@@ -32,8 +32,8 @@ namespace
    * Promotes one weak `AudioEngine` handle to a shared handle when the engine
    * is still alive.
    */
-  [[nodiscard]] boost::shared_ptr<moho::AudioEngine> LockWeakAudioEngine(
-    const boost::weak_ptr<moho::AudioEngine>& weakEngine
+  [[nodiscard]] std::shared_ptr<moho::AudioEngine> LockWeakAudioEngine(
+    const std::weak_ptr<moho::AudioEngine>& weakEngine
   )
   {
     return weakEngine.lock();
@@ -49,8 +49,8 @@ namespace moho
    * Returns a resolved engine handle according to cached resolve state and
    * current sound-configuration availability.
    */
-  boost::shared_ptr<AudioEngine>* CSndParams::GetEngine(
-    boost::shared_ptr<AudioEngine>* const outEngine
+  std::shared_ptr<AudioEngine>* CSndParams::GetEngine(
+    std::shared_ptr<AudioEngine>* const outEngine
   ) const
   {
     if (outEngine == nullptr) {
@@ -63,7 +63,7 @@ namespace moho
       return outEngine;
     }
 
-    boost::shared_ptr<AudioEngine> resolvedEngine = LockWeakAudioEngine(mEngine);
+    std::shared_ptr<AudioEngine> resolvedEngine = LockWeakAudioEngine(mEngine);
     switch (mResolvePolicy) {
     case kResolvePolicyUnresolved:
       *outEngine = DoResolve();
@@ -107,9 +107,9 @@ namespace moho
    * Resolves one engine/bank/cue tuple and caches ids/resolve policy for
    * subsequent cue playback requests.
    */
-  boost::shared_ptr<AudioEngine> CSndParams::DoResolve() const
+  std::shared_ptr<AudioEngine> CSndParams::DoResolve() const
   {
-    boost::shared_ptr<AudioEngine> resolvedEngine = LockWeakAudioEngine(mEngine);
+    std::shared_ptr<AudioEngine> resolvedEngine = LockWeakAudioEngine(mEngine);
     if (resolvedEngine.get() == nullptr) {
       resolvedEngine = SND_FindEngine(mBank.c_str());
       mEngine = resolvedEngine;

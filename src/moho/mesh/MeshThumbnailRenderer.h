@@ -3,7 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 
-#include "boost/shared_ptr.h"
+#include <memory>
 #include "gpg/core/containers/Rect2.h"
 #include "moho/mesh/MeshThumbnail.h"
 #include "Wm3Vector3.h"
@@ -69,7 +69,7 @@ namespace moho
       const Wm3::Quatf& orientation,
       std::uint32_t color,
       const gpg::Rect2f& outputRect,
-      const boost::shared_ptr<ID3DTextureSheet>& outputSheet
+      const std::shared_ptr<ID3DTextureSheet>& outputSheet
     );
 
     /**
@@ -84,7 +84,7 @@ namespace moho
       const Wm3::Quatf& orientation,
       std::uint32_t color,
       const Wm3::Vec3f& viewOffsetHint,
-      const boost::shared_ptr<ID3DTextureSheet>& outputSheet,
+      const std::shared_ptr<ID3DTextureSheet>& outputSheet,
       const gpg::Rect2f& outputRect
     );
 
@@ -132,9 +132,9 @@ namespace moho
     std::uint8_t mRenderResourcesInitialized; // +0x04
     std::uint8_t mPad05_07[0x03]{};
     /** The read-back copy of the colour target, 512 x 512 (EnsureTargets). */
-    boost::shared_ptr<gpg::gal::Texture> mThumbnailTexture; // +0x08
-    boost::shared_ptr<ID3DRenderTarget> mColorTarget;       // +0x10
-    boost::shared_ptr<ID3DDepthStencil> mDepthStencil;      // +0x18
+    std::shared_ptr<gpg::gal::Texture> mThumbnailTexture;   // +0x08
+    std::shared_ptr<ID3DRenderTarget> mColorTarget;         // +0x10
+    std::shared_ptr<ID3DDepthStencil> mDepthStencil;        // +0x18
     std::uint32_t mNextRequestId;                           // +0x20
     MeshThumbnailQueue mPendingRequests;                    // +0x24
     MeshThumbnailQueue mCompletedRequests;                  // +0x30
@@ -154,20 +154,20 @@ namespace moho
     const Wm3::Quatf& orientation,
     std::uint32_t color,
     const Wm3::Vec3f& viewOffsetHint,
-    boost::shared_ptr<ID3DTextureSheet> outputSheet,
+    std::shared_ptr<ID3DTextureSheet> outputSheet,
     const gpg::Rect2f& outputRect
   );
 
   static_assert(
-    sizeof(boost::shared_ptr<gpg::gal::Texture>) == 0x08,
+    sizeof(std::shared_ptr<gpg::gal::Texture>) == 0x08,
     "boost::shared_ptr<gpg::gal::Texture> size must be 0x08"
   );
   static_assert(
-    sizeof(boost::shared_ptr<ID3DRenderTarget>) == 0x08,
+    sizeof(std::shared_ptr<ID3DRenderTarget>) == 0x08,
     "boost::shared_ptr<ID3DRenderTarget> size must be 0x08"
   );
   static_assert(
-    sizeof(boost::shared_ptr<ID3DDepthStencil>) == 0x08,
+    sizeof(std::shared_ptr<ID3DDepthStencil>) == 0x08,
     "boost::shared_ptr<ID3DDepthStencil> size must be 0x08"
   );
   static_assert(offsetof(MeshThumbnailNode, next) == 0x00, "MeshThumbnailNode::next offset must be 0x00");

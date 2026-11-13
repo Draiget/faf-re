@@ -5,7 +5,7 @@
 #include <cstdint>
 #include <memory>
 
-#include "boost/shared_ptr.h"
+#include <memory>
 #include "gpg/core/containers/Rect2.h"
 #include "legacy/containers/Vector.h"
 #include "moho/sim/CBackgroundTaskControl.h"
@@ -546,7 +546,7 @@ namespace moho
    * out-of-line copy of `heightField->GetElevation(x, z)` that the binary emits
    * once and calls from several places rather than inlining the dereference.
    */
-  [[nodiscard]] float GetHeightFieldElevation(const boost::shared_ptr<CHeightField>& heightField, float x, float z);
+  [[nodiscard]] float GetHeightFieldElevation(const std::shared_ptr<CHeightField>& heightField, float x, float z);
 
   /**
    * The 256 terrain-type Lua objects, held inline behind the usual
@@ -832,7 +832,7 @@ namespace moho
      * Copies this map's shared height-field ownership lane into
      * `outHeightField`.
      */
-    void GetHeightField(boost::shared_ptr<CHeightField>& outHeightField) const;
+    void GetHeightField(std::shared_ptr<CHeightField>& outHeightField) const;
 
     [[nodiscard]] CHeightField* GetHeightField() const noexcept;
     /**
@@ -921,7 +921,7 @@ namespace moho
     STIMap* SetWaterElevationAbyss(float elevation) noexcept;
 
   public:
-    boost::shared_ptr<CHeightField> mHeightField; // +0x0000
+    std::shared_ptr<CHeightField> mHeightField;   // +0x0000
     gpg::Rect2i mPlayableRect;                    // +0x0008
     TerrainTypes mTerrainTypes;                   // +0x0018
     TerrainTypeGrid mTerrainType;                 // +0x1428

@@ -746,7 +746,7 @@ namespace moho
     struct ParticleGatherBuffer
     {
       gpg::gal::Device* mDevice = nullptr;
-      boost::shared_ptr<gpg::gal::VertexBuffer> mBuffer;
+      std::shared_ptr<gpg::gal::VertexBuffer> mBuffer;
       std::uint32_t mCapacity = 0U;
       std::uint32_t mCursor = 0U;
 
@@ -767,7 +767,7 @@ namespace moho
           context.stride_ = sizeof(ParticleBuffer::Instanced);
           context.vertexCount_ = std::max<std::uint32_t>(16384U, count * 2U);
           mBuffer =
-            device != nullptr ? device->CreateVertexBuffer(&context) : boost::shared_ptr<gpg::gal::VertexBuffer>();
+            device != nullptr ? device->CreateVertexBuffer(&context) : std::shared_ptr<gpg::gal::VertexBuffer>();
           mCapacity = mBuffer != nullptr ? context.vertexCount_ : 0U;
           mCursor = 0U;
           if (count > mCapacity) {
@@ -805,7 +805,7 @@ namespace moho
       static constexpr std::uint32_t kSlotInstances = 256U;
 
       gpg::gal::Device* mDevice = nullptr;
-      boost::shared_ptr<gpg::gal::VertexBuffer> mBuffer;
+      std::shared_ptr<gpg::gal::VertexBuffer> mBuffer;
       std::unordered_map<const ParticleBuffer*, std::uint32_t> mSlotOf;
       std::unordered_map<const ParticleBuffer*, bool> mMirrored;
       std::vector<std::uint32_t> mFreeSlots; // slots given back by buffers returned to the pool

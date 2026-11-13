@@ -244,7 +244,7 @@ namespace
   {
   public:
     explicit TextWriteArchive(
-      const boost::shared_ptr<std::ostream>& stream
+      const std::shared_ptr<std::ostream>& stream
     )
       : mStreamRef(stream)
       , mStream(stream.get())
@@ -495,7 +495,7 @@ namespace
     }
 
   private:
-    boost::shared_ptr<std::ostream> mStreamRef; // +0x20
+    std::shared_ptr<std::ostream> mStreamRef;   // +0x20
     std::ostream* mStream;                      // +0x28
   };
 
@@ -508,7 +508,7 @@ namespace
   {
   public:
     explicit BinaryWriteArchive(
-      const boost::shared_ptr<std::FILE>& file
+      const std::shared_ptr<std::FILE>& file
     )
       : mFile(file)
       , mCachedFile(file.get())
@@ -787,7 +787,7 @@ namespace
     // duplicate: `BinaryWriteArchive::WriteBytes` (0x00904A60) decompiles as
     // `fwrite(Buffer, ElementSize, 1u, *(this + 10))` on a `FILE**`, and
     // 10 * 4 == 0x28. Carrying it is what makes this class 0x2C, not 0x28.
-    boost::shared_ptr<std::FILE> mFile; // +0x20
+    std::shared_ptr<std::FILE> mFile;   // +0x20
     std::FILE* mCachedFile = nullptr;   // +0x28
   };
 
@@ -798,7 +798,7 @@ namespace
   {
   public:
     explicit FastBinaryWriteArchive(
-      const boost::shared_ptr<std::FILE>& file
+      const std::shared_ptr<std::FILE>& file
     )
       : mFile(file)
       , mBuffer(std::make_unique<char[]>(kBufferBytes))
@@ -983,7 +983,7 @@ namespace
       return byteCount == 0u || std::fwrite(bytes, byteCount, 1u, mFile.get()) == 1u;
     }
 
-    boost::shared_ptr<std::FILE> mFile;
+    std::shared_ptr<std::FILE> mFile;
     gpg::WriteArchiveSink* mSink = nullptr;
     std::unique_ptr<char[]> mBuffer;
     std::size_t mUsed = 0u;
@@ -1373,14 +1373,14 @@ void WriteArchive::Close()
  * sibling CreateTextWriteArchive.
  */
 WriteArchive* gpg::CreateBinaryWriteArchive(
-  const boost::shared_ptr<std::FILE>& file
+  const std::shared_ptr<std::FILE>& file
 )
 {
   return new (std::nothrow) BinaryWriteArchive(file);
 }
 
 WriteArchive* gpg::CreateFastBinaryWriteArchive(
-  const boost::shared_ptr<std::FILE>& file
+  const std::shared_ptr<std::FILE>& file
 )
 {
   return new FastBinaryWriteArchive(file);
@@ -1401,7 +1401,7 @@ WriteArchive* gpg::CreateFastBinaryWriteArchive(
  * Creates one text-backed concrete `WriteArchive` bound to an output stream.
  */
 WriteArchive* gpg::CreateTextWriteArchive(
-  const boost::shared_ptr<std::ostream>& stream
+  const std::shared_ptr<std::ostream>& stream
 )
 {
   return new (std::nothrow) TextWriteArchive(stream);

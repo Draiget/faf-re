@@ -3,7 +3,7 @@
 #include <cstdint>
 #include <string>
 
-#include "boost/shared_ptr.h"
+#include <memory>
 
 namespace gpg::gal
 {
@@ -51,11 +51,11 @@ namespace moho
 
     gpg::gal::Device* mDevice = nullptr;
     bool mSupported = false;
-    boost::shared_ptr<gpg::gal::GpuProgram> mCompute;
+    std::shared_ptr<gpg::gal::GpuProgram> mCompute;
     std::string mRaySource; // the compute source, with FAF_RAY_QUERY defined where the device traces rays (ren_RayAo)
-    boost::shared_ptr<gpg::gal::GpuProgram> mBake;
-    boost::shared_ptr<gpg::gal::GpuBuffer> mHeights;
-    boost::shared_ptr<gpg::gal::GpuBuffer> mTerrainShadow;
+    std::shared_ptr<gpg::gal::GpuProgram> mBake;
+    std::shared_ptr<gpg::gal::GpuBuffer> mHeights;
+    std::shared_ptr<gpg::gal::GpuBuffer> mTerrainShadow;
     const void* mBakedField = nullptr;
     float mBakedSun[3]{};
     std::int32_t mFieldWidth = 0;
@@ -63,8 +63,8 @@ namespace moho
     std::uint32_t mShadowCellSize = 1U;
     std::uint32_t mShadowAcross = 0U;
     std::uint32_t mShadowDown = 0U;
-    boost::shared_ptr<gpg::gal::GpuProgram> mComposite;
-    boost::shared_ptr<gpg::gal::GpuBuffer> mTerms;
+    std::shared_ptr<gpg::gal::GpuProgram> mComposite;
+    std::shared_ptr<gpg::gal::GpuBuffer> mTerms;
     std::uint32_t mTermCapacity = 0U;
   };
 } // namespace moho

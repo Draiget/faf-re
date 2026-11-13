@@ -1,6 +1,6 @@
 #pragma once
 
-#include "boost/shared_ptr.h"
+#include <memory>
 
 namespace gpg::gal
 {
@@ -12,7 +12,7 @@ namespace moho
   class ID3DRenderTarget
   {
   public:
-    using SurfaceHandle = boost::shared_ptr<gpg::gal::RenderTarget>;
+    using SurfaceHandle = std::shared_ptr<gpg::gal::RenderTarget>;
 
     /**
      * Address: 0x0043EC50 (FUN_0043EC50, sub_43EC50)

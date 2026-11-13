@@ -98,9 +98,9 @@ namespace moho
     // Address: 0x006FDDE0 (FUN_006FDDE0)
     virtual void* GetPathFinder() = 0;
     // Address: 0x006FDDF0 (FUN_006FDDF0)
-    virtual boost::shared_ptr<void>* SetUnknownSharedRef(boost::shared_ptr<void>* value) = 0;
+    virtual std::shared_ptr<void>* SetUnknownSharedRef(std::shared_ptr<void>* value) = 0;
     // Address: 0x006FDE40 (FUN_006FDE40)
-    virtual boost::shared_ptr<void>* GetUnknownSharedRef(boost::shared_ptr<void>* outValue) = 0;
+    virtual std::shared_ptr<void>* GetUnknownSharedRef(std::shared_ptr<void>* outValue) = 0;
     // Address: 0x006FDE70 (FUN_006FDE70)
     virtual std::uint32_t SetUnknownVectorWithMeta(const SArmyVectorWithMeta* value) = 0;
     // Address: 0x006FDE90 (FUN_006FDE90)

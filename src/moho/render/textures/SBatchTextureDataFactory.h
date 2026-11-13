@@ -39,7 +39,7 @@ namespace moho
      * Decodes one mapped texture payload through the active D3D9 device and
      * stores DXT blocks into `SBatchTextureData`.
      */
-    boost::shared_ptr<SBatchTextureData> LoadImpl(gpg::StrArg path) override;
+    std::shared_ptr<SBatchTextureData> LoadImpl(gpg::StrArg path) override;
   };
 
   static_assert(

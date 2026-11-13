@@ -169,7 +169,7 @@ namespace moho
    * block ownership counts.
    */
   void ReleaseSharedFileHandle(
-    boost::shared_ptr<std::FILE>* const fileHandle
+    std::shared_ptr<std::FILE>* const fileHandle
   )
   {
     if (fileHandle == nullptr) {

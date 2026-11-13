@@ -309,7 +309,7 @@ void moho::CLuaWldUIProvider::CreateGameInterface(
       }
 
       const char* const texturePath = iter.m_valueObj.GetString();
-      boost::shared_ptr<PrefetchData> handle{};
+      std::shared_ptr<PrefetchData> handle{};
       resources->LoadPrefetchData(handle, texturePath);
       mPrefetchData.push_back(handle);
     }

@@ -16,7 +16,7 @@
 #include <unordered_map>
 #include <vector>
 
-#include "boost/shared_ptr.h"
+#include <memory>
 #include "moho/render/GpuArrayStream.h"
 #include "moho/render/ProjectileIconShader.h"
 
@@ -47,7 +47,7 @@ namespace moho
 
     /** Appends one icon: the quad `DrawQuad` would draw around `(centerX, centerY)` with `texture`. */
     void Add(
-      const boost::shared_ptr<CD3DBatchTexture>& texture,
+      const std::shared_ptr<CD3DBatchTexture>& texture,
       float centerX,
       float centerY,
       float halfWidth,
@@ -78,15 +78,15 @@ namespace moho
     bool mInitialized = false;
     bool mSupported = false;
     std::uint64_t mDraws = 0U;
-    boost::shared_ptr<gpg::gal::GpuProgram> mProgram;
-    boost::shared_ptr<gpg::gal::GpuBuffer> mSlotBuffer;
+    std::shared_ptr<gpg::gal::GpuProgram> mProgram;
+    std::shared_ptr<gpg::gal::GpuBuffer> mSlotBuffer;
     std::uint32_t mSlotCapacity = 0U;
     std::vector<ViewStream> mStreams;
 
     // The pending icons and the textures they use, by first use.
     const void* mViewKey = nullptr;
     std::vector<ProjectileIconInstance> mPending;
-    std::vector<boost::shared_ptr<CD3DBatchTexture>> mTextures;
+    std::vector<std::shared_ptr<CD3DBatchTexture>> mTextures;
     std::unordered_map<const CD3DBatchTexture*, std::uint32_t> mSlotOf;
     std::vector<ProjectileIconSlot> mSlots;
     const CD3DBatchTexture* mLastTexture = nullptr;

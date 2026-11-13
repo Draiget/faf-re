@@ -1209,7 +1209,7 @@ namespace moho
     std::int32_t bone,
     float thickness,
     float lifetime,
-    boost::shared_ptr<RD3DTextureResource> textureSheet
+    std::shared_ptr<RD3DTextureResource> textureSheet
   )
   {
     (void)textureSheet; // Owned handle intentionally unused (see doc block).

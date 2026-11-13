@@ -463,7 +463,7 @@ namespace moho
    * What it does:
    * Looks up the "sky" shader effect from the active D3D device resources.
    */
-  boost::shared_ptr<gpg::gal::Effect> SkyDome::GetEffect()
+  std::shared_ptr<gpg::gal::Effect> SkyDome::GetEffect()
   {
     // The binary returns the same shared_ptr backing-store that
     // CD3DEffect::GetBaseEffect() does, but the recovered SDK currently models
@@ -514,7 +514,7 @@ namespace moho
     // Each texture: resolve the resource by path (with fallback), then extract
     // its base GAL texture into the destination lane. Path -> lane mapping is
     // taken verbatim from the store offsets in FUN_00817850.
-    const auto loadTexture = [&](const fa::string& path, boost::shared_ptr<gpg::gal::Texture>& lane) {
+    const auto loadTexture = [&](const fa::string& path, std::shared_ptr<gpg::gal::Texture>& lane) {
       ID3DDeviceResources::TextureResourceHandle textureResource;
       resources->GetTexture(textureResource, path.c_str(), watcher, true);
       textureResource->GetTexture(lane);
@@ -539,7 +539,7 @@ namespace moho
   void SkyDome::CreateDomeFormat()
   {
     if (!mDomeFormat) {
-      mDomeFormat = boost::shared_ptr<CD3DVertexFormat>(new CD3DVertexFormat(3U));
+      mDomeFormat = std::shared_ptr<CD3DVertexFormat>(new CD3DVertexFormat(3U));
     }
   }
 
@@ -553,8 +553,8 @@ namespace moho
   void SkyDome::CreateDecalFormat()
   {
     if (!mDecalFormat1) {
-      mDecalFormat1 = boost::shared_ptr<CD3DVertexFormat>(new CD3DVertexFormat(20U));
-      mDecalFormat2 = boost::shared_ptr<CD3DVertexFormat>(new CD3DVertexFormat(21U));
+      mDecalFormat1 = std::shared_ptr<CD3DVertexFormat>(new CD3DVertexFormat(20U));
+      mDecalFormat2 = std::shared_ptr<CD3DVertexFormat>(new CD3DVertexFormat(21U));
     }
   }
 
@@ -790,7 +790,7 @@ namespace moho
      * need. The base/derived `Effect`/`EffectD3D9` relationship is not yet
      * recovered; once it is, these passes can call `GetEffect()` by name.
      */
-    [[nodiscard]] boost::shared_ptr<gpg::gal::Effect> ResolveSkyEffect()
+    [[nodiscard]] std::shared_ptr<gpg::gal::Effect> ResolveSkyEffect()
     {
       moho::CD3DEffect* const skyEffect = moho::D3D_GetDevice()->GetResources()->FindEffect("sky");
       return skyEffect->GetBaseEffect();
@@ -814,7 +814,7 @@ namespace moho
    * skeleton whose inheritance from `EffectTechniqueD3D9` is not yet recovered.
    */
   void SkyDome::RenderDomeUsing(
-    boost::shared_ptr<gpg::gal::EffectTechnique> technique
+    std::shared_ptr<gpg::gal::EffectTechnique> technique
   )
   {
     auto* const device = gpg::gal::Device::GetInstance();
@@ -851,8 +851,8 @@ namespace moho
     const GeomCamera3& cam
   )
   {
-    boost::shared_ptr<gpg::gal::Effect> effect = ResolveSkyEffect();
-    boost::shared_ptr<gpg::gal::EffectTechnique> technique = effect->GetTechnique("Atmosphere");
+    std::shared_ptr<gpg::gal::Effect> effect = ResolveSkyEffect();
+    std::shared_ptr<gpg::gal::EffectTechnique> technique = effect->GetTechnique("Atmosphere");
 
     const Vector4f& cameraPosition = cam.inverseView.r[3];
     const float viewPosition[3] = {cameraPosition.x, cameraPosition.y, cameraPosition.z};
@@ -885,8 +885,8 @@ namespace moho
     const GeomCamera3& cam
   )
   {
-    boost::shared_ptr<gpg::gal::Effect> effect = ResolveSkyEffect();
-    boost::shared_ptr<gpg::gal::EffectTechnique> technique = effect->GetTechnique("Cirrus");
+    std::shared_ptr<gpg::gal::Effect> effect = ResolveSkyEffect();
+    std::shared_ptr<gpg::gal::EffectTechnique> technique = effect->GetTechnique("Cirrus");
 
     effect->GetVariable("tick")->SetInt(tick);
     effect->GetVariable("interpolant")->SetFloat(interpolant);
@@ -940,8 +940,8 @@ namespace moho
     }
 
     auto* const device = gpg::gal::Device::GetInstance();
-    boost::shared_ptr<gpg::gal::Effect> effect = ResolveSkyEffect();
-    boost::shared_ptr<gpg::gal::EffectTechnique> technique = effect->GetTechnique("Cumulus");
+    std::shared_ptr<gpg::gal::Effect> effect = ResolveSkyEffect();
+    std::shared_ptr<gpg::gal::EffectTechnique> technique = effect->GetTechnique("Cumulus");
 
     // Upload the per-cloud instance records into the instanced cumulus stream.
     void* const instanceData = mDecalVertBuf3->Lock(0u, 0u, static_cast<gpg::gal::MohoD3DLockFlags>(0));
@@ -1002,8 +1002,8 @@ namespace moho
     UpdateDecalBuffer();
 
     auto* const device = gpg::gal::Device::GetInstance();
-    boost::shared_ptr<gpg::gal::Effect> effect = ResolveSkyEffect();
-    boost::shared_ptr<gpg::gal::EffectTechnique> technique = effect->GetTechnique("Decal");
+    std::shared_ptr<gpg::gal::Effect> effect = ResolveSkyEffect();
+    std::shared_ptr<gpg::gal::EffectTechnique> technique = effect->GetTechnique("Decal");
 
     device->SetVertexDeclaration(mDecalFormat1->mFormat);
     device->SetVertexBuffer(0u, mDecalVertBuf1, static_cast<int>(mDecalUploads.size()), 0);

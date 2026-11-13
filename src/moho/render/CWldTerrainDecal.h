@@ -3,7 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 
-#include "boost/shared_ptr.h"
+#include <memory>
 #include "legacy/containers/String.h"
 #include "moho/math/VMatrix4.h"
 #include "moho/mesh/Mesh.h"
@@ -158,7 +158,7 @@ namespace moho
      * `(frameSeed + phaseOffset) * mFadeDistance * 0.1 + mUnknown94`, and
      * returns one retained texture-sheet handle.
      */
-    [[nodiscard]] boost::shared_ptr<ID3DTextureSheet> GetTexture(int slot, float phaseOffset, int frameSeed) const;
+    [[nodiscard]] std::shared_ptr<ID3DTextureSheet> GetTexture(int slot, float phaseOffset, int frameSeed) const;
 
     /**
      * Address: 0x0089D9C0 (Moho::CWldTerrainDecal::ComputeCorner)

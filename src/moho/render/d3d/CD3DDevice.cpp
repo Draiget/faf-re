@@ -138,9 +138,9 @@ namespace
   }
 
   template <class T>
-  boost::shared_ptr<T>& CopyRetainedHandle(
-    const boost::shared_ptr<T>& source,
-    boost::shared_ptr<T>& out
+  std::shared_ptr<T>& CopyRetainedHandle(
+    const std::shared_ptr<T>& source,
+    std::shared_ptr<T>& out
   )
   {
     out = source;
@@ -913,9 +913,9 @@ namespace moho
    * Creates one dynamic texture sheet from source dimensions (archive or
    * runtime lane) and copies source pixels into the destination texture.
    */
-  boost::shared_ptr<CD3DDynamicTextureSheet>& CD3DDevice::CreateDynamicTextureSheetFromSource(
-    boost::shared_ptr<CD3DDynamicTextureSheet>& outSheet,
-    const boost::shared_ptr<ID3DTextureSheet> sourceTextureSheet,
+  std::shared_ptr<CD3DDynamicTextureSheet>& CD3DDevice::CreateDynamicTextureSheetFromSource(
+    std::shared_ptr<CD3DDynamicTextureSheet>& outSheet,
+    const std::shared_ptr<ID3DTextureSheet> sourceTextureSheet,
     const int format,
     const bool archiveMode
   )
@@ -968,7 +968,7 @@ namespace moho
   bool CD3DDevice::SetCursor(
     const int hotspotX,
     const int hotspotY,
-    const boost::shared_ptr<ID3DTextureSheet> cursorTexture
+    const std::shared_ptr<ID3DTextureSheet> cursorTexture
   )
   {
     bool isSet = false;
@@ -1037,8 +1037,8 @@ namespace moho
    * What it does:
    * Copies one retained render-target writer lock from indexed device storage.
    */
-  boost::shared_ptr<ID3DRenderTarget>& CD3DDevice::GetWriterLock1(
-    boost::shared_ptr<ID3DRenderTarget>& outLock,
+  std::shared_ptr<ID3DRenderTarget>& CD3DDevice::GetWriterLock1(
+    std::shared_ptr<ID3DRenderTarget>& outLock,
     const int index
   )
   {
@@ -1054,8 +1054,8 @@ namespace moho
    * What it does:
    * Copies one retained depth-stencil writer lock from indexed device storage.
    */
-  boost::shared_ptr<ID3DDepthStencil>& CD3DDevice::GetWriterLock2(
-    boost::shared_ptr<ID3DDepthStencil>& outLock,
+  std::shared_ptr<ID3DDepthStencil>& CD3DDevice::GetWriterLock2(
+    std::shared_ptr<ID3DDepthStencil>& outLock,
     const int index
   )
   {
@@ -1071,8 +1071,8 @@ namespace moho
    * What it does:
    * Copies one retained generic shared handle from runtime state lane #1.
    */
-  boost::shared_ptr<void>& CD3DDevice::Func16(
-    boost::shared_ptr<void>& outHandle
+  std::shared_ptr<void>& CD3DDevice::Func16(
+    std::shared_ptr<void>& outHandle
   )
   {
     return CopyRetainedHandle(mWriterLockContext1, outHandle);
@@ -1086,8 +1086,8 @@ namespace moho
    * What it does:
    * Copies one retained generic shared handle from runtime state lane #2.
    */
-  boost::shared_ptr<void>& CD3DDevice::Func17(
-    boost::shared_ptr<void>& outHandle
+  std::shared_ptr<void>& CD3DDevice::Func17(
+    std::shared_ptr<void>& outHandle
   )
   {
     return CopyRetainedHandle(mWriterLockContext2, outHandle);
@@ -1099,8 +1099,8 @@ namespace moho
    * What it does:
    * Copies the device's own render-target wrapper handle from runtime state.
    */
-  boost::shared_ptr<CD3DRenderTarget>& CD3DDevice::GetRenderTarget(
-    boost::shared_ptr<CD3DRenderTarget>& outTarget
+  std::shared_ptr<CD3DRenderTarget>& CD3DDevice::GetRenderTarget(
+    std::shared_ptr<CD3DRenderTarget>& outTarget
   )
   {
     return CopyRetainedHandle(mRenderTarget, outTarget);
@@ -1114,8 +1114,8 @@ namespace moho
    * What it does:
    * Copies one active depth-stencil handle from runtime state.
    */
-  boost::shared_ptr<CD3DDepthStencil>& CD3DDevice::GetDepthStencil(
-    boost::shared_ptr<CD3DDepthStencil>& outDepthStencil
+  std::shared_ptr<CD3DDepthStencil>& CD3DDevice::GetDepthStencil(
+    std::shared_ptr<CD3DDepthStencil>& outDepthStencil
   )
   {
     return CopyRetainedHandle(mDepthStencil, outDepthStencil);
@@ -1137,10 +1137,10 @@ namespace moho
     const int stencil
   )
   {
-    boost::shared_ptr<ID3DDepthStencil> writerLock2{};
+    std::shared_ptr<ID3DDepthStencil> writerLock2{};
     (void)GetWriterLock2(writerLock2, index);
 
-    boost::shared_ptr<ID3DRenderTarget> writerLock1{};
+    std::shared_ptr<ID3DRenderTarget> writerLock1{};
     (void)GetWriterLock1(writerLock1, index);
 
     BeginScene1(writerLock1.get(), writerLock2.get(), clear, color, zValue, stencil);
@@ -1232,10 +1232,10 @@ namespace moho
     const int stencil
   )
   {
-    boost::shared_ptr<ID3DDepthStencil> writerLock2{};
+    std::shared_ptr<ID3DDepthStencil> writerLock2{};
     (void)GetWriterLock2(writerLock2, index);
 
-    boost::shared_ptr<ID3DRenderTarget> writerLock1{};
+    std::shared_ptr<ID3DRenderTarget> writerLock1{};
     (void)GetWriterLock1(writerLock1, index);
 
     SetRenderTarget1(writerLock1.get(), writerLock2.get(), clear, color, zValue, stencil);

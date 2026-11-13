@@ -3,7 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 
-#include "boost/shared_ptr.h"
+#include <memory>
 #include "legacy/containers/Vector.h"
 #include "moho/mesh/MeshThumbnailRenderer.h"
 #include "moho/misc/CountedObject.h"
@@ -128,7 +128,7 @@ namespace moho
      * What it does:
      * Draws the composite quad at half size with `technique`, sampling `texture`.
      */
-    void RenderToBlur(const char* technique, boost::shared_ptr<ID3DRenderTarget> texture);
+    void RenderToBlur(const char* technique, std::shared_ptr<ID3DRenderTarget> texture);
 
     /**
      * Address: 0x007F5070 (FUN_007F5070)
@@ -139,13 +139,13 @@ namespace moho
      * `texture`. The mangled name carries a technique argument the body never
      * reads; DoBloom does not pass one.
      */
-    void RenderToBackBuffer(boost::shared_ptr<ID3DRenderTarget> texture);
+    void RenderToBackBuffer(std::shared_ptr<ID3DRenderTarget> texture);
 
   public:
     // Half the head's extent (0x007F4D2E..0x007F4D49 shift the head size by 1).
     std::uint32_t mWidth;                                  // +0x00
     std::uint32_t mHeight;                                 // +0x04
-    boost::shared_ptr<ID3DRenderTarget> mRenderTargets[2]; // +0x08
+    std::shared_ptr<ID3DRenderTarget> mRenderTargets[2];   // +0x08
     CRenFrame mExtractFrame;                               // +0x18
     CRenFrame mCompositeFrame;                             // +0x60
     std::uint32_t mHead;                                   // +0xA8
@@ -177,7 +177,7 @@ namespace moho
     IRenderWorldView* mView;                   // +0x00
     std::int32_t mHead;                        // +0x04
     std::int32_t mDepth;                       // +0x08
-    boost::shared_ptr<TerrainCommon> mTerrain; // +0x0C
+    std::shared_ptr<TerrainCommon> mTerrain;   // +0x0C
   };
 
   static_assert(offsetof(SWorldViewInfo, mDepth) == 0x08, "moho::SWorldViewInfo::mDepth offset must be 0x08");
@@ -281,7 +281,7 @@ namespace moho
      * What it does:
      * Returns the dynamic texture sheet the preview is rendered into.
      */
-    boost::shared_ptr<ID3DTextureSheet> GetPreviewImage() override;
+    std::shared_ptr<ID3DTextureSheet> GetPreviewImage() override;
 
     /**
      * Address: 0x007F6600 (FUN_007F6600)
@@ -519,14 +519,14 @@ namespace moho
     // the same register, CWldSession::FocusArmy, which pins the type.
     CWldSession* mSession;                             // +0x2140
     fa::vector<SWorldViewInfo> mWorldViews;            // +0x2144
-    boost::shared_ptr<CD3DTextureBatcher> mTexBatcher; // +0x2154
-    boost::shared_ptr<CD3DPrimBatcher> mPrimBatcher;   // +0x215C
+    std::shared_ptr<CD3DTextureBatcher> mTexBatcher;   // +0x2154
+    std::shared_ptr<CD3DPrimBatcher> mPrimBatcher;     // +0x215C
     // Concrete types, not the interfaces: D3DWindowOnDeviceInit fills them
     // from ID3DDeviceResources::CreateRenderTarget / CreateDepthStencil.
-    boost::shared_ptr<CD3DRenderTarget> mPrimaryTargetLocks[2];      // +0x2164
-    boost::shared_ptr<CD3DRenderTarget> mSecondaryTargetLocks[2];    // +0x2174
-    boost::shared_ptr<CD3DDepthStencil> mDepthStencilLocks[2];       // +0x2184
-    boost::shared_ptr<CD3DDynamicTextureSheet> mDynamicTextureSheet; // +0x2194
+    std::shared_ptr<CD3DRenderTarget> mPrimaryTargetLocks[2];        // +0x2164
+    std::shared_ptr<CD3DRenderTarget> mSecondaryTargetLocks[2];      // +0x2174
+    std::shared_ptr<CD3DDepthStencil> mDepthStencilLocks[2];         // +0x2184
+    std::shared_ptr<CD3DDynamicTextureSheet> mDynamicTextureSheet;   // +0x2194
     GeomCamera3* mCam;                                               // +0x219C
     CountedPtr<CD3DFont> mFont;                                      // +0x21A0
 

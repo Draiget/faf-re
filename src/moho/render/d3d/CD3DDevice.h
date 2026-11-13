@@ -3,7 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 
-#include "boost/shared_ptr.h"
+#include <memory>
 #include "gpg/gal/CursorContext.hpp"
 #include "moho/render/d3d/CD3DDeviceResources.h"
 #include "moho/unit/Broadcaster.h"
@@ -210,7 +210,7 @@ namespace moho
      * Updates cursor hotspot/source state and forwards one cursor-context payload
      * to the active GAL backend.
      */
-    virtual bool SetCursor(int hotspotX, int hotspotY, boost::shared_ptr<ID3DTextureSheet> cursorTexture);
+    virtual bool SetCursor(int hotspotX, int hotspotY, std::shared_ptr<ID3DTextureSheet> cursorTexture);
 
     /**
      * Address: 0x0042EB00 (FUN_0042EB00)
@@ -271,9 +271,9 @@ namespace moho
      * Creates one dynamic texture sheet from source texture dimensions, copies
      * source texture pixels into the destination sheet, and returns retained ownership.
      */
-    virtual boost::shared_ptr<CD3DDynamicTextureSheet>& CreateDynamicTextureSheetFromSource(
-      boost::shared_ptr<CD3DDynamicTextureSheet>& outSheet,
-      boost::shared_ptr<ID3DTextureSheet> sourceTextureSheet,
+    virtual std::shared_ptr<CD3DDynamicTextureSheet>& CreateDynamicTextureSheetFromSource(
+      std::shared_ptr<CD3DDynamicTextureSheet>& outSheet,
+      std::shared_ptr<ID3DTextureSheet> sourceTextureSheet,
       int format,
       bool archiveMode
     );
@@ -384,8 +384,7 @@ namespace moho
      * What it does:
      * Copies one retained render-target writer lock from indexed device storage.
      */
-    virtual boost::shared_ptr<ID3DRenderTarget>&
-    GetWriterLock1(boost::shared_ptr<ID3DRenderTarget>& outLock, int index);
+    virtual std::shared_ptr<ID3DRenderTarget>& GetWriterLock1(std::shared_ptr<ID3DRenderTarget>& outLock, int index);
 
     /**
      * Address: 0x0042EEB0 (FUN_0042EEB0)
@@ -397,8 +396,7 @@ namespace moho
      * What it does:
      * Copies one retained depth-stencil writer lock from indexed device storage.
      */
-    virtual boost::shared_ptr<ID3DDepthStencil>&
-    GetWriterLock2(boost::shared_ptr<ID3DDepthStencil>& outLock, int index);
+    virtual std::shared_ptr<ID3DDepthStencil>& GetWriterLock2(std::shared_ptr<ID3DDepthStencil>& outLock, int index);
 
     /**
      * Address: 0x0042EEE0 (FUN_0042EEE0)
@@ -410,7 +408,7 @@ namespace moho
      * What it does:
      * Copies one retained generic shared handle from device runtime state lane #1.
      */
-    virtual boost::shared_ptr<void>& Func16(boost::shared_ptr<void>& outHandle);
+    virtual std::shared_ptr<void>& Func16(std::shared_ptr<void>& outHandle);
 
     /**
      * Address: 0x0042EF10 (FUN_0042EF10)
@@ -422,7 +420,7 @@ namespace moho
      * What it does:
      * Copies one retained generic shared handle from device runtime state lane #2.
      */
-    virtual boost::shared_ptr<void>& Func17(boost::shared_ptr<void>& outHandle);
+    virtual std::shared_ptr<void>& Func17(std::shared_ptr<void>& outHandle);
 
     /**
      * Address: 0x0042EF40 (FUN_0042EF40)
@@ -433,7 +431,7 @@ namespace moho
      * Copies the device's own render-target wrapper handle (+0x244), the
      * `CD3DRenderTarget` that `SetRenViewport` allocates (0x0042DFC8).
      */
-    virtual boost::shared_ptr<CD3DRenderTarget>& GetRenderTarget(boost::shared_ptr<CD3DRenderTarget>& outTarget);
+    virtual std::shared_ptr<CD3DRenderTarget>& GetRenderTarget(std::shared_ptr<CD3DRenderTarget>& outTarget);
 
     /**
      * Address: 0x0042EF70 (FUN_0042EF70)
@@ -445,7 +443,7 @@ namespace moho
      * What it does:
      * Copies the active depth-stencil shared handle from device state.
      */
-    virtual boost::shared_ptr<CD3DDepthStencil>& GetDepthStencil(boost::shared_ptr<CD3DDepthStencil>& outDepthStencil);
+    virtual std::shared_ptr<CD3DDepthStencil>& GetDepthStencil(std::shared_ptr<CD3DDepthStencil>& outDepthStencil);
 
     /**
      * Address: 0x0042F0C0 (FUN_0042F0C0)
@@ -815,15 +813,15 @@ namespace moho
     /// Embedded resource owner; `GetResources` is `lea eax,[ecx+0x1C]`. +0x1C
     CD3DDeviceResources mResources; // +0x1C
     /// Render-target writer locks, one per head (`GetWriterLock1`). +0x214
-    boost::shared_ptr<ID3DRenderTarget> mRenderTargetLocks[2]; // +0x214
+    std::shared_ptr<ID3DRenderTarget> mRenderTargetLocks[2]; // +0x214
     /// Depth-stencil writer locks, one per head (`GetWriterLock2`). +0x224
-    boost::shared_ptr<ID3DDepthStencil> mDepthStencilLocks[2]; // +0x224
+    std::shared_ptr<ID3DDepthStencil> mDepthStencilLocks[2]; // +0x224
     /// Retained generic handle lanes mirrored by `Func16`/`Func17`. +0x234
-    boost::shared_ptr<void> mWriterLockContext1; // +0x234
-    boost::shared_ptr<void> mWriterLockContext2; // +0x23C
+    std::shared_ptr<void> mWriterLockContext1; // +0x234
+    std::shared_ptr<void> mWriterLockContext2; // +0x23C
     /// The device's own default render target/depth stencil (`SetRenViewport`). +0x244
-    boost::shared_ptr<CD3DRenderTarget> mRenderTarget; // +0x244
-    boost::shared_ptr<CD3DDepthStencil> mDepthStencil; // +0x24C
+    std::shared_ptr<CD3DRenderTarget> mRenderTarget; // +0x244
+    std::shared_ptr<CD3DDepthStencil> mDepthStencil; // +0x24C
     /// Effect selected by `SetCurEffect`; null-checks gate technique passes. +0x254
     CD3DEffect* mCurEffect; // +0x254
     /// Hotspot + texture of the hardware cursor (`SetCursor`/`InitContext`). +0x258

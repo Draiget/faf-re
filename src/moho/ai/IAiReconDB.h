@@ -134,7 +134,7 @@ namespace moho
      * VFTable SLOT: 8
      */
     [[nodiscard]]
-    virtual boost::shared_ptr<CIntelGrid> ReconGetVisionGrid() const = 0;
+    virtual std::shared_ptr<CIntelGrid> ReconGetVisionGrid() const = 0;
 
     /**
      * Address: 0x005C1A40 (FUN_005C1A40)
@@ -142,7 +142,7 @@ namespace moho
      * VFTable SLOT: 9
      */
     [[nodiscard]]
-    virtual boost::shared_ptr<CIntelGrid> ReconGetWaterGrid() const = 0;
+    virtual std::shared_ptr<CIntelGrid> ReconGetWaterGrid() const = 0;
 
     /**
      * Address: 0x005C1A70 (FUN_005C1A70)
@@ -150,7 +150,7 @@ namespace moho
      * VFTable SLOT: 10
      */
     [[nodiscard]]
-    virtual boost::shared_ptr<CIntelGrid> ReconGetRadarGrid() const = 0;
+    virtual std::shared_ptr<CIntelGrid> ReconGetRadarGrid() const = 0;
 
     /**
      * Address: 0x005C1AA0 (FUN_005C1AA0)
@@ -158,7 +158,7 @@ namespace moho
      * VFTable SLOT: 11
      */
     [[nodiscard]]
-    virtual boost::shared_ptr<CIntelGrid> ReconGetSonarGrid() const = 0;
+    virtual std::shared_ptr<CIntelGrid> ReconGetSonarGrid() const = 0;
 
     /**
      * Address: 0x005C1AD0 (FUN_005C1AD0)
@@ -166,7 +166,7 @@ namespace moho
      * VFTable SLOT: 12
      */
     [[nodiscard]]
-    virtual boost::shared_ptr<CIntelGrid> ReconGetOmniGrid() const = 0;
+    virtual std::shared_ptr<CIntelGrid> ReconGetOmniGrid() const = 0;
 
     /**
      * Address: 0x005C1B00 (FUN_005C1B00)
@@ -174,7 +174,7 @@ namespace moho
      * VFTable SLOT: 13
      */
     [[nodiscard]]
-    virtual boost::shared_ptr<CIntelGrid> ReconGetRCIGrid() const = 0;
+    virtual std::shared_ptr<CIntelGrid> ReconGetRCIGrid() const = 0;
 
     /**
      * Address: 0x005C1B30 (FUN_005C1B30)
@@ -182,7 +182,7 @@ namespace moho
      * VFTable SLOT: 14
      */
     [[nodiscard]]
-    virtual boost::shared_ptr<CIntelGrid> ReconGetSCIGrid() const = 0;
+    virtual std::shared_ptr<CIntelGrid> ReconGetSCIGrid() const = 0;
 
     /**
      * Address: 0x005C1B60 (FUN_005C1B60)
@@ -190,7 +190,7 @@ namespace moho
      * VFTable SLOT: 15
      */
     [[nodiscard]]
-    virtual boost::shared_ptr<CIntelGrid> ReconGetVCIGrid() const = 0;
+    virtual std::shared_ptr<CIntelGrid> ReconGetVCIGrid() const = 0;
 
     /**
      * Address: 0x005C08F0 (FUN_005C08F0)

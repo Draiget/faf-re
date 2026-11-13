@@ -3,7 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 
-#include "boost/shared_ptr.h"
+#include <memory>
 #include "legacy/containers/String.h"
 #include "legacy/containers/Vector.h"
 #include "moho/misc/WeakObject.h"
@@ -82,7 +82,7 @@ namespace moho
      * What it does:
      * Returns a retained shared-pointer view of the explored recon grid.
      */
-    [[nodiscard]] boost::shared_ptr<CIntelGrid> GetExploredReconGrid() const;
+    [[nodiscard]] std::shared_ptr<CIntelGrid> GetExploredReconGrid() const;
 
     /**
      * Address: 0x008B14F0 (FUN_008B14F0, Moho::UserArmy::GetFogReconGrid)
@@ -90,7 +90,7 @@ namespace moho
      * What it does:
      * Returns a retained shared-pointer view of the fog recon grid.
      */
-    [[nodiscard]] boost::shared_ptr<CIntelGrid> GetFogReconGrid() const;
+    [[nodiscard]] std::shared_ptr<CIntelGrid> GetFogReconGrid() const;
 
     /**
      * Address: 0x005BD630 (FUN_005BD630, Moho::IArmy::IsAlly)
@@ -215,7 +215,7 @@ namespace moho
    */
   [[nodiscard]] UserArmy* USER_ResolveArmyFromLuaState(LuaPlus::LuaState* state, const LuaPlus::LuaObject& armyObject);
 
-  static_assert(sizeof(boost::shared_ptr<CIntelGrid>) == 0x08, "shared_ptr<CIntelGrid> size must be 0x08");
+  static_assert(sizeof(std::shared_ptr<CIntelGrid>) == 0x08, "shared_ptr<CIntelGrid> size must be 0x08");
   // The constant-data payload is the base subobject; its own field offsets are
   // asserted in SSTIArmyConstantData.h.
   static_assert(sizeof(SSTIArmyConstantData) == 0x80, "UserArmy constant-data base must occupy 0x00..0x80");

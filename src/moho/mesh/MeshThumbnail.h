@@ -3,7 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 
-#include "boost/shared_ptr.h"
+#include <memory>
 #include "gpg/core/containers/Rect2.h"
 #include "moho/render/camera/GeomCamera3.h"
 #include "Wm3Quaternion.h"
@@ -65,7 +65,7 @@ namespace moho
       const Wm3::Quatf& orientation,
       std::uint32_t color,
       const gpg::Rect2f& outputRect,
-      const boost::shared_ptr<ID3DTextureSheet>& outputSheet
+      const std::shared_ptr<ID3DTextureSheet>& outputSheet
     );
 
     /**
@@ -86,7 +86,7 @@ namespace moho
     Wm3::Quatf orientation;                          // +0x2DC
     std::uint32_t color;                             // +0x2EC
     gpg::Rect2f outputRect;                          // +0x2F0
-    boost::shared_ptr<ID3DTextureSheet> outputSheet; // +0x300
+    std::shared_ptr<ID3DTextureSheet> outputSheet;   // +0x300
   };
 
   static_assert(offsetof(MeshThumbnail, requestId) == 0x08, "MeshThumbnail::requestId offset must be 0x08");

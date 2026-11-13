@@ -120,7 +120,7 @@ namespace moho
   bool SelectionBracketGpuRenderer::Draw(
     CD3DPrimBatcher& batcher,
     const void* const viewKey,
-    const boost::shared_ptr<CD3DBatchTexture>& texture,
+    const std::shared_ptr<CD3DBatchTexture>& texture,
     const std::uint32_t color,
     const std::span<const SelectionBracketInstance> instances
   )
@@ -156,7 +156,7 @@ namespace moho
 
     // Anything the batcher still holds was submitted before the brackets.
     batcher.Flush();
-    const boost::shared_ptr<ID3DTextureSheet> sheet = atlas.GetCompositeTexture();
+    const std::shared_ptr<ID3DTextureSheet> sheet = atlas.GetCompositeTexture();
     if (sheet.get() == nullptr) {
       return false;
     }

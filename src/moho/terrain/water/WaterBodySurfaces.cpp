@@ -50,8 +50,8 @@ namespace moho
 
       bool mirrored{false};
       float mirroredLevel{0.0f};
-      boost::shared_ptr<ID3DRenderTarget> bodyTarget;
-      boost::shared_ptr<ID3DRenderTarget> emptyTarget;
+      std::shared_ptr<ID3DRenderTarget> bodyTarget;
+      std::shared_ptr<ID3DRenderTarget> emptyTarget;
     };
 
     /// Never destroyed: the sheets it holds must not outlive the device at exit.
@@ -254,7 +254,7 @@ namespace moho
     state.emptyTarget.reset();
   }
 
-  boost::shared_ptr<ID3DRenderTarget> WaterBodySurfaces::ReflectionFor(
+  std::shared_ptr<ID3DRenderTarget> WaterBodySurfaces::ReflectionFor(
     const float level
   )
   {
@@ -268,8 +268,8 @@ namespace moho
   void WaterBodySurfaces::SetBodyReflection(
     const bool mirrored,
     const float level,
-    const boost::shared_ptr<ID3DRenderTarget>& bodyTarget,
-    const boost::shared_ptr<ID3DRenderTarget>& emptyTarget
+    const std::shared_ptr<ID3DRenderTarget>& bodyTarget,
+    const std::shared_ptr<ID3DRenderTarget>& emptyTarget
   )
   {
     SState& state = State();

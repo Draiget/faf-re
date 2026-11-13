@@ -15,7 +15,7 @@
 
 #include "EffectDescription.h"
 #include "ModernHlsl.h"
-#include "boost/shared_ptr.h"
+#include <memory>
 
 namespace gpg::gal
 {
@@ -28,8 +28,8 @@ namespace gpg::gal::effects
   /** What one texture parameter is bound to. */
   struct TextureBinding
   {
-    boost::shared_ptr<Texture> texture;
-    boost::shared_ptr<RenderTarget> renderTarget;
+    std::shared_ptr<Texture> texture;
+    std::shared_ptr<RenderTarget> renderTarget;
 
     [[nodiscard]] bool Empty() const noexcept
     {
@@ -77,8 +77,8 @@ namespace gpg::gal::effects
     /** SetFloat / SetInt / SetBool: converted to the parameter's type; a vector gets it in every component. */
     void SetScalar(std::uint32_t parameter, double value);
 
-    void SetTexture(std::uint32_t parameter, const boost::shared_ptr<Texture>& texture);
-    void SetRenderTarget(std::uint32_t parameter, const boost::shared_ptr<RenderTarget>& renderTarget);
+    void SetTexture(std::uint32_t parameter, const std::shared_ptr<Texture>& texture);
+    void SetRenderTarget(std::uint32_t parameter, const std::shared_ptr<RenderTarget>& renderTarget);
     [[nodiscard]] const TextureBinding& Binding(std::uint32_t parameter) const;
 
   private:

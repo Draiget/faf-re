@@ -121,12 +121,12 @@ namespace
     const moho::CAniPoseBone& bone
   )
   {
-    const boost::shared_ptr<const moho::CAniSkel> skeleton = bone.mPose->GetSkeleton();
+    const std::shared_ptr<const moho::CAniSkel> skeleton = bone.mPose->GetSkeleton();
     return skeleton->GetBone(static_cast<std::uint32_t>(bone.mIdx));
   }
 
   [[nodiscard]] const AnimationClipHeader* GetAnimationClipHeader(
-    const boost::shared_ptr<moho::RScaResource>& ref
+    const std::shared_ptr<moho::RScaResource>& ref
   )
   {
     if (!ref) {
@@ -195,8 +195,8 @@ namespace
 
       const moho::CAniActor* const ownerActor = manipulator.mOwnerActor;
       GPG_ASSERT(ownerActor != nullptr);
-      const boost::shared_ptr<const moho::CAniSkel> skeleton =
-        ownerActor ? ownerActor->GetSkeleton() : boost::shared_ptr<const moho::CAniSkel>{};
+      const std::shared_ptr<const moho::CAniSkel> skeleton =
+        ownerActor ? ownerActor->GetSkeleton() : std::shared_ptr<const moho::CAniSkel>{};
       const int boneIndex = skeleton ? skeleton->FindBoneIndex(boneName) : -1;
       if (boneIndex < 0) {
         const fa::string msg = gpg::STR_Printf("Unknown bone %s", boneName);
@@ -212,8 +212,8 @@ namespace
     const int boneIndex = boneArg.GetInteger();
     const moho::CAniActor* const ownerActor = manipulator.mOwnerActor;
     GPG_ASSERT(ownerActor != nullptr);
-    const boost::shared_ptr<const moho::CAniSkel> skeleton =
-      ownerActor ? ownerActor->GetSkeleton() : boost::shared_ptr<const moho::CAniSkel>{};
+    const std::shared_ptr<const moho::CAniSkel> skeleton =
+      ownerActor ? ownerActor->GetSkeleton() : std::shared_ptr<const moho::CAniSkel>{};
     const moho::SAniSkelBone* const bone =
       (skeleton != nullptr && boneIndex >= 0) ? skeleton->GetBone(static_cast<std::uint32_t>(boneIndex)) : nullptr;
     if (bone == nullptr) {
@@ -1159,7 +1159,7 @@ namespace moho
     // 0x0063F4A3..0x0063F4C1: size the bone mask to the owner's skeleton and enable
     // every bone (sub_641B70 is the inlined SBitStorage32::Resize(count, true) that
     // InitializeBoneMask (0x0063EFA0) also wraps).
-    const boost::shared_ptr<const CAniSkel> skeleton = ownerActor->GetSkeleton();
+    const std::shared_ptr<const CAniSkel> skeleton = ownerActor->GetSkeleton();
     InitializeBoneMask(static_cast<std::uint32_t>(skeleton->mBones.size()));
     // Size the bone mask to the owner skeleton and set every bit, so a fresh
     // manipulator starts out affecting all bones. sub_641B70 computes the
@@ -1169,7 +1169,7 @@ namespace moho
     // The previous stand-in only fetched the skeleton and dropped it, so the
     // mask was left at its default size regardless of the skeleton.
     if (CAniActor* const actor = ownerActor) {
-      const boost::shared_ptr<const CAniSkel> skeleton = actor->GetSkeleton();
+      const std::shared_ptr<const CAniSkel> skeleton = actor->GetSkeleton();
       if (skeleton) {
         mBoneMask.Resize(static_cast<std::uint32_t>(skeleton->mBones.size()), true);
       }
@@ -1480,13 +1480,13 @@ namespace moho
    */
   void CAnimationManipulator::SetAnimationResource(
     const bool looping,
-    boost::shared_ptr<RScaResource> resource
+    std::shared_ptr<RScaResource> resource
   )
   {
     if (resource) {
       // 0x0063FBC1..0x0063FC5A: rebuild the watch-bone bindings from the clip's
       // bone-name table, resolving each name against the owner's skeleton.
-      const boost::shared_ptr<const CAniSkel> skeleton = mOwnerActor->GetSkeleton();
+      const std::shared_ptr<const CAniSkel> skeleton = mOwnerActor->GetSkeleton();
       const AnimationClipHeader* const clip = ScaClipHeader(*resource);
       const std::uint32_t boneTrackCount = clip->mBoneTrackCount;
       const char* boneName = reinterpret_cast<const char*>(clip) + clip->mBoneNameTableOffset;
@@ -1533,7 +1533,7 @@ namespace moho
       return;
     }
 
-    const boost::shared_ptr<const CAniSkel> skeleton = mOwnerActor->GetSkeleton();
+    const std::shared_ptr<const CAniSkel> skeleton = mOwnerActor->GetSkeleton();
     if (!skeleton) {
       return;
     }

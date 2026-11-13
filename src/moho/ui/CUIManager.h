@@ -3,7 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 
-#include "boost/shared_ptr.h"
+#include <memory>
 #include "gpg/core/containers/FastVector.h"
 #include "moho/ui/IUIManager.h"
 
@@ -149,7 +149,7 @@ namespace moho
 
   public:
     std::uint32_t mUnknown04 = 0;                                // +0x04
-    gpg::fastvector_n<boost::shared_ptr<CMauiFrame>, 2> mFrames; // +0x08
+    gpg::fastvector_n<std::shared_ptr<CMauiFrame>, 2> mFrames;   // +0x08
     WeakPtr<CMauiCursor> mCursor;                                // +0x28
     LuaPlus::LuaState* mLuaState = nullptr;                      // +0x30
     std::uint32_t mUnknown34 = 0;                                // +0x34

@@ -13,7 +13,7 @@
 #include <cstdint>
 #include <vector>
 
-#include "boost/shared_ptr.h"
+#include <memory>
 
 namespace gpg::gal
 {
@@ -48,10 +48,10 @@ namespace moho
 
     gpg::gal::Device* mDevice = nullptr;
     bool mSupported = false;
-    boost::shared_ptr<gpg::gal::GpuProgram> mCompute;
-    boost::shared_ptr<gpg::gal::GpuProgram> mBake;
-    boost::shared_ptr<gpg::gal::GpuProgram> mComposite;
-    boost::shared_ptr<gpg::gal::GpuBuffer> mTerms;
+    std::shared_ptr<gpg::gal::GpuProgram> mCompute;
+    std::shared_ptr<gpg::gal::GpuProgram> mBake;
+    std::shared_ptr<gpg::gal::GpuProgram> mComposite;
+    std::shared_ptr<gpg::gal::GpuBuffer> mTerms;
     std::uint32_t mTermCapacity = 0U;
 
     // The bake: the heightfield it was made from, the sun, the buffers.
@@ -60,8 +60,8 @@ namespace moho
     std::int32_t mFieldWidth = 0;
     std::int32_t mFieldHeight = 0;
     float mBakedSun[3]{};
-    boost::shared_ptr<gpg::gal::GpuBuffer> mHeights;
-    boost::shared_ptr<gpg::gal::GpuBuffer> mSunHeights;
+    std::shared_ptr<gpg::gal::GpuBuffer> mHeights;
+    std::shared_ptr<gpg::gal::GpuBuffer> mSunHeights;
     std::uint32_t mCellSize = 1U;
     std::uint32_t mCellsAcross = 0U;
     std::uint32_t mCellsDown = 0U;

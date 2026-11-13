@@ -28,8 +28,8 @@ namespace
    * control block (0x007FBA60) before releasing the old one; this single
    * call covers both.
    */
-  boost::shared_ptr<moho::TerrainCommon>* AssignSharedTerrainFromRaw(
-    boost::shared_ptr<moho::TerrainCommon>* const outTerrain,
+  std::shared_ptr<moho::TerrainCommon>* AssignSharedTerrainFromRaw(
+    std::shared_ptr<moho::TerrainCommon>* const outTerrain,
     moho::TerrainCommon* const terrain
   )
   {
@@ -188,7 +188,7 @@ moho::WD3DViewport* moho::REN_CreateGameViewport(
  * Returns the dynamic texture sheet RenderPreviewImage renders into (the
  * converting shared_ptr copy is the interlocked increment the binary shows).
  */
-boost::shared_ptr<moho::ID3DTextureSheet> moho::WRenViewport::GetPreviewImage()
+std::shared_ptr<moho::ID3DTextureSheet> moho::WRenViewport::GetPreviewImage()
 {
   return mDynamicTextureSheet;
 }
@@ -344,11 +344,11 @@ namespace
    * previous sheet as its `currentSheet` argument and returning the (possibly
    * recreated) destination that is stored back into the lane.
    */
-  boost::shared_ptr<moho::CD3DDynamicTextureSheet>& RenDumpFrameSheetLane() noexcept
+  std::shared_ptr<moho::CD3DDynamicTextureSheet>& RenDumpFrameSheetLane() noexcept
   {
     // Function-local static: constructed empty on first use and released once
     // at process exit, matching the binary's init-once + atexit semantics.
-    static boost::shared_ptr<moho::CD3DDynamicTextureSheet> sDumpFrameSheet{};
+    static std::shared_ptr<moho::CD3DDynamicTextureSheet> sDumpFrameSheet{};
     return sDumpFrameSheet;
   }
 
@@ -437,14 +437,14 @@ void moho::REN_MaybeDumpFrame(
 
   // Copy the current head's screen writer-lock surface into the caller's
   // render target (whole-surface StretchRect: null source/dest rectangles).
-  boost::shared_ptr<moho::ID3DRenderTarget> screenLock{};
+  std::shared_ptr<moho::ID3DRenderTarget> screenLock{};
   device->GetWriterLock1(screenLock, 0);
   device->SetViewRect(screenLock.get(), renderTarget, nullptr, nullptr);
 
   // Accumulate the render target into the persistent dump sheet. Func10 takes
   // the previous sheet as `currentSheet` (reused/recreated as needed) and
   // returns the destination sheet, which we store back into the static lane.
-  boost::shared_ptr<moho::CD3DDynamicTextureSheet>& dumpSheet = RenDumpFrameSheetLane();
+  std::shared_ptr<moho::CD3DDynamicTextureSheet>& dumpSheet = RenDumpFrameSheetLane();
   moho::ID3DDeviceResources* const resources = device->GetResources();
   resources->Func10(dumpSheet, renderTarget, dumpSheet);
 
@@ -460,7 +460,7 @@ void moho::REN_MaybeDumpFrame(
   // image format and no in-memory output buffer. A GAL error is caught and
   // reported rather than propagated, matching the binary's inline EH funclet.
   if (device9 != nullptr) {
-    boost::shared_ptr<gpg::gal::Texture> texture{};
+    std::shared_ptr<gpg::gal::Texture> texture{};
     dumpSheet->GetTexture(texture);
     try {
       device9->SaveTexture(texture, dest, 0, nullptr);
@@ -499,7 +499,7 @@ namespace moho
   extern int snd_index;
 
   // Defined below, called from WRenViewport::RenderUI.
-  void REN_DebugStuff(boost::shared_ptr<CD3DPrimBatcher> batcher, int head);
+  void REN_DebugStuff(std::shared_ptr<CD3DPrimBatcher> batcher, int head);
 } // namespace moho
 
 namespace
@@ -601,7 +601,7 @@ namespace
 
     // ---- Backdrop quad, asm 0x007F421B..0x007F4393. Color 0x80000000 --------
     {
-      const boost::shared_ptr<CD3DBatchTexture> whiteTex = CD3DBatchTexture::FromSolidColor(0xFFFFFFFFu);
+      const std::shared_ptr<CD3DBatchTexture> whiteTex = CD3DBatchTexture::FromSolidColor(0xFFFFFFFFu);
       batcher->SetTexture(whiteTex);
 
       constexpr std::uint32_t kBackdropColor = 0x80000000u; // 0x007F4297
@@ -736,7 +736,7 @@ namespace
 
     // ---- Grid frame + horizontal grid lines, asm 0x007F4775..0x007F4AC9. ----
     {
-      const boost::shared_ptr<CD3DBatchTexture> whiteTex = CD3DBatchTexture::FromSolidColor(0xFFFFFFFFu);
+      const std::shared_ptr<CD3DBatchTexture> whiteTex = CD3DBatchTexture::FromSolidColor(0xFFFFFFFFu);
       batcher->SetTexture(whiteTex); // 0x007F4799
 
       // UNRESOLVED: the four frame-rectangle corner scalars (v72.info,
@@ -840,7 +840,7 @@ namespace
  * overlay, then flushes. A no-op when every flag is clear.
  */
 void moho::REN_DebugStuff(
-  boost::shared_ptr<CD3DPrimBatcher> batcher,
+  std::shared_ptr<CD3DPrimBatcher> batcher,
   const int head
 )
 {
@@ -1760,17 +1760,17 @@ void moho::WRenViewport::RenderPreviewImage(
   mFrame.SetTexture(0, mPrimaryTargetLocks[0]);
   mFrame.Render(headWidth, headHeight);
 
-  boost::shared_ptr<moho::ID3DRenderTarget> screenLock{};
+  std::shared_ptr<moho::ID3DRenderTarget> screenLock{};
   device->GetWriterLock1(screenLock, 0);
   device->SetViewRect(screenLock.get(), mPrimaryTargetLocks[0].get(), nullptr, nullptr);
 
   moho::ID3DDeviceResources* const resources = device->GetResources();
-  boost::shared_ptr<moho::CD3DDynamicTextureSheet> previewSheet{};
+  std::shared_ptr<moho::CD3DDynamicTextureSheet> previewSheet{};
   resources->Func10(previewSheet, mPrimaryTargetLocks[0].get(), moho::ID3DDeviceResources::DynamicTextureSheetHandle{});
   moho::CD3DDynamicTextureSheet* const resolvedSheet = previewSheet.get();
 
   const RECT sourceRect{0, 0, 256, 256};
-  const boost::shared_ptr<moho::ID3DTextureSheet> previewImage = GetPreviewImage();
+  const std::shared_ptr<moho::ID3DTextureSheet> previewImage = GetPreviewImage();
   device->UpdateSurface(
     resolvedSheet, static_cast<moho::CD3DDynamicTextureSheet*>(previewImage.get()), &sourceRect, nullptr
   );
@@ -1864,7 +1864,7 @@ void moho::WRenViewport::RenderWorldViewPostEffects()
     float viewMinZ = 0.0f;
     float viewMaxZ = 1.0f;
     device->GetView(&viewPos, &viewSize, &viewMinZ, &viewMaxZ);
-    boost::shared_ptr<moho::ID3DRenderTarget> headTarget{};
+    std::shared_ptr<moho::ID3DRenderTarget> headTarget{};
     device->GetWriterLock1(headTarget, mHead);
     device->SetViewRect(headTarget.get(), mPrimaryTargetLocks[mHead].get(), nullptr, nullptr);
     moho::ID3DRenderTarget::SurfaceHandle copy{};
@@ -2130,7 +2130,7 @@ void moho::WRenViewport::RenderWorldView(
   ) {
     const gpg::gal::RenderProfileScope profileBounce("BounceLight");
     moho::CD3DDevice* const bounceDevice = moho::D3D_GetDevice();
-    boost::shared_ptr<moho::ID3DRenderTarget> headTarget{};
+    std::shared_ptr<moho::ID3DRenderTarget> headTarget{};
     bounceDevice->GetWriterLock1(headTarget, mHead);
     bounceDevice->SetViewRect(headTarget.get(), mPrimaryTargetLocks[mHead].get(), nullptr, nullptr);
     moho::ID3DRenderTarget::SurfaceHandle frameCopy{};
@@ -2309,16 +2309,14 @@ void moho::WRenViewport::RenderWorldView(
   SetViewportToLocalScreen();
   if (moho::CWldSession* const activeSession = moho::WLD_GetActiveSession(); activeSession != nullptr) {
     if (
-      boost::shared_ptr<moho::CDebugCanvas> tickCanvas = activeSession->GetTickDebugCanvas();
-      tickCanvas.get() != nullptr
+      std::shared_ptr<moho::CDebugCanvas> tickCanvas = activeSession->GetTickDebugCanvas(); tickCanvas.get() != nullptr
     ) {
       tickCanvas.get()->Render(mPrimBatcher.get(), *mCam, mScreenSize.x, mScreenSize.y);
       tickCanvas.reset();
     }
 
     if (
-      boost::shared_ptr<moho::CDebugCanvas> beatCanvas = activeSession->GetBeatDebugCanvas();
-      beatCanvas.get() != nullptr
+      std::shared_ptr<moho::CDebugCanvas> beatCanvas = activeSession->GetBeatDebugCanvas(); beatCanvas.get() != nullptr
     ) {
       beatCanvas.get()->Render(mPrimBatcher.get(), *mCam, mScreenSize.x, mScreenSize.y);
       beatCanvas.reset();
@@ -2749,10 +2747,10 @@ void moho::WRenViewport::RenderCopyForRefraction(
 
   moho::CD3DDevice* const device = moho::D3D_GetDevice();
 
-  boost::shared_ptr<moho::ID3DRenderTarget> sourceLock{};
+  std::shared_ptr<moho::ID3DRenderTarget> sourceLock{};
   device->GetWriterLock1(sourceLock, mHead);
 
-  boost::shared_ptr<moho::ID3DRenderTarget> destinationLock = mPrimaryTargetLocks[mHead];
+  std::shared_ptr<moho::ID3DRenderTarget> destinationLock = mPrimaryTargetLocks[mHead];
 
   RECT sourceRect{};
   sourceRect.left = mScreenPos.x;
@@ -2953,9 +2951,9 @@ namespace
   /// Engine addition (water bodies): a head's lake reflection and the cleared target other lakes sample.
   struct SWaterBodyReflection
   {
-    boost::shared_ptr<moho::CD3DRenderTarget> body;
-    boost::shared_ptr<moho::CD3DRenderTarget> empty;
-    boost::shared_ptr<moho::CD3DDepthStencil> emptyDepth;
+    std::shared_ptr<moho::CD3DRenderTarget> body;
+    std::shared_ptr<moho::CD3DRenderTarget> empty;
+    std::shared_ptr<moho::CD3DDepthStencil> emptyDepth;
     int width = 0;
     int height = 0;
   };

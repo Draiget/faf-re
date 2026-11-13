@@ -24,7 +24,7 @@
 #include <unordered_map>
 #include <vector>
 
-#include "boost/shared_ptr.h"
+#include <memory>
 #include "moho/render/GpuArrayStream.h"
 
 namespace gpg::gal
@@ -78,7 +78,7 @@ namespace moho
     [[nodiscard]] std::uint16_t FindSlot(const CD3DBatchTexture* texture) const noexcept;
 
     /** Main thread: the slot of `texture`, registering it on first use. */
-    [[nodiscard]] std::uint16_t AddSlot(const boost::shared_ptr<CD3DBatchTexture>& texture);
+    [[nodiscard]] std::uint16_t AddSlot(const std::shared_ptr<CD3DBatchTexture>& texture);
 
     /**
      * Main thread, after the records of a frame are built: draws `instances` for
@@ -124,7 +124,7 @@ namespace moho
   private:
     struct Slot
     {
-      boost::shared_ptr<CD3DBatchTexture> mTexture; // keeps the address from being reused
+      std::shared_ptr<CD3DBatchTexture> mTexture;   // keeps the address from being reused
       float mUv[4] = {};                            // origin and extent in the atlas
       float mHalfSize[2] = {};
       float mUnused[2] = {};
@@ -157,8 +157,8 @@ namespace moho
     bool mInitialized = false;
     bool mSupported = false;
     std::uint64_t mFrame = 0U;
-    boost::shared_ptr<gpg::gal::GpuProgram> mProgram;
-    boost::shared_ptr<gpg::gal::GpuBuffer> mSlotBuffer;
+    std::shared_ptr<gpg::gal::GpuProgram> mProgram;
+    std::shared_ptr<gpg::gal::GpuBuffer> mSlotBuffer;
     std::uint32_t mSlotCapacity = 0U;
     bool mSlotsDirty = false;
     float mUploadedIconScale = 1.0f; // `ui_StrategicIconScale` the slot buffer was built with
@@ -168,13 +168,13 @@ namespace moho
 
     bool mClassifyInitialized = false;
     bool mClassifySupported = false;
-    boost::shared_ptr<gpg::gal::GpuProgram> mClassifyProgram;
-    boost::shared_ptr<gpg::gal::GpuProgram> mCompactProgram;
+    std::shared_ptr<gpg::gal::GpuProgram> mClassifyProgram;
+    std::shared_ptr<gpg::gal::GpuProgram> mCompactProgram;
     std::uint32_t mClassifyCapacity = 0U;
-    boost::shared_ptr<gpg::gal::GpuBuffer> mStaged; // one record per source
-    boost::shared_ptr<gpg::gal::GpuBuffer> mRunOf;  // one run per source
-    boost::shared_ptr<gpg::gal::GpuBuffer> mOutput; // the records in draw order
-    boost::shared_ptr<gpg::gal::GpuBuffer> mDrawArgs;
+    std::shared_ptr<gpg::gal::GpuBuffer> mStaged; // one record per source
+    std::shared_ptr<gpg::gal::GpuBuffer> mRunOf;  // one run per source
+    std::shared_ptr<gpg::gal::GpuBuffer> mOutput; // the records in draw order
+    std::shared_ptr<gpg::gal::GpuBuffer> mDrawArgs;
     std::uint32_t mLastClassifiedSources = 0U;
   };
 } // namespace moho

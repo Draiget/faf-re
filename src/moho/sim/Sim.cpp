@@ -1245,11 +1245,11 @@ namespace moho
     sim->mContext.Update(&armyConstData.mArmyIndex, sizeof(armyConstData.mArmyIndex));
     sim->Logf("path preview for army %d\n", armyConstData.mArmyIndex);
 
-    boost::shared_ptr<PathPreviewFinder> previewFinder{};
+    std::shared_ptr<PathPreviewFinder> previewFinder{};
     {
-      boost::shared_ptr<void> armySlot;
+      std::shared_ptr<void> armySlot;
       focusArmy->GetUnknownSharedRef(&armySlot);
-      previewFinder = boost::static_pointer_cast<PathPreviewFinder>(armySlot);
+      previewFinder = std::static_pointer_cast<PathPreviewFinder>(armySlot);
     }
 
     Unit* const unit = PathPreviewSelectLargestUnit(selectedUnits);
@@ -1261,8 +1261,8 @@ namespace moho
       sim->Logf("  unit=0x%08x\n", static_cast<std::uint32_t>(unitId));
 
       if (!previewFinder) {
-        previewFinder = boost::shared_ptr<PathPreviewFinder>(new PathPreviewFinder(focusArmy));
-        boost::shared_ptr<void> armySlot = previewFinder;
+        previewFinder = std::shared_ptr<PathPreviewFinder>(new PathPreviewFinder(focusArmy));
+        std::shared_ptr<void> armySlot = previewFinder;
         focusArmy->SetUnknownSharedRef(&armySlot);
       }
 
@@ -1300,7 +1300,7 @@ namespace moho
       if (previewFinder) {
         previewFinder->ResetQueuedFootprint();
 
-        boost::shared_ptr<void> clearedSlot;
+        std::shared_ptr<void> clearedSlot;
         focusArmy->SetUnknownSharedRef(&clearedSlot);
 
         SArmyVectorWithMeta clearedPayload{};

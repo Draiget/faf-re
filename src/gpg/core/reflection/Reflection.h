@@ -1198,12 +1198,12 @@ namespace gpg
    */
   template <class T>
   void SerConstructResult::SetShared(
-    const boost::shared_ptr<T>& object,
+    const std::shared_ptr<T>& object,
     const unsigned int flags
   )
   {
     using Object = std::remove_const_t<T>;
-    SetShared(boost::shared_ptr<void>(boost::const_pointer_cast<Object>(object)), RTypeOf<Object>(), flags);
+    SetShared(std::shared_ptr<void>(std::const_pointer_cast<Object>(object)), RTypeOf<Object>(), flags);
   }
 
   RRef REF_UpcastPtr(const RRef& source, const RType* targetType);
@@ -5650,7 +5650,7 @@ namespace gpg
    */
   template <class T>
   ReadArchive* ReadArchive::ReadPointerShared(
-    boost::shared_ptr<T>* const outValue,
+    std::shared_ptr<T>* const outValue,
     const RRef* const ownerRef
   )
   {
@@ -5666,7 +5666,7 @@ namespace gpg
       if (tracked.type->deleteFunc_ == nullptr) {
         HandleAssertFailure("ptrinfo.mObj.GetRType()->mDelete", 392, detail::kSerializationHeaderPath);
       }
-      tracked.sharedPtr = boost::shared_ptr<void>(tracked.object, tracked.type->deleteFunc_);
+      tracked.sharedPtr = std::shared_ptr<void>(tracked.object, tracked.type->deleteFunc_);
       tracked.state = TrackedPointerState::Shared;
     } else if (tracked.state != TrackedPointerState::Shared) {
       throw SerializationError("Ownership conflict while loading archive");
@@ -5687,7 +5687,7 @@ namespace gpg
       );
     }
 
-    *outValue = boost::static_pointer_cast<T>(tracked.sharedPtr);
+    *outValue = std::static_pointer_cast<T>(tracked.sharedPtr);
     return this;
   }
   // Declared ahead of its definition below: WritePointer names it with
@@ -7328,7 +7328,7 @@ namespace gpg
   template <class T>
   void ReadElement(
     ReadArchive* const archive,
-    boost::shared_ptr<T>& value,
+    std::shared_ptr<T>& value,
     const RRef* const ownerRef
   )
   {
@@ -7371,7 +7371,7 @@ namespace gpg
   template <class T>
   void WriteElement(
     WriteArchive* const archive,
-    const boost::shared_ptr<T>& value,
+    const std::shared_ptr<T>& value,
     const RRef* const ownerRef
   )
   {

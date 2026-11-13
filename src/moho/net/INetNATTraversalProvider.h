@@ -2,7 +2,7 @@
 
 #include <cstddef>
 
-#include "boost/shared_ptr.h"
+#include <memory>
 #include "INetNATTraversalHandler.h"
 
 namespace gpg
@@ -34,7 +34,7 @@ namespace moho
      * What it does:
      * Registers or clears NAT traversal send handler for a local UDP port.
      */
-    virtual void SetTraversalHandler(int port, boost::shared_ptr<INetNATTraversalHandler>* handler) = 0;
+    virtual void SetTraversalHandler(int port, std::shared_ptr<INetNATTraversalHandler>* handler) = 0;
 
     /**
      * Address: 0x00A82547 (_purecall)

@@ -2,7 +2,7 @@
 
 #include <cstddef>
 
-#include "boost/shared_ptr.h"
+#include <memory>
 #include "gpg/gal/IndexBuffer.hpp"
 #include "gpg/gal/VertexBuffer.hpp"
 #include "gpg/gal/VertexFormat.hpp"
@@ -14,9 +14,9 @@ namespace moho
    */
   struct RenderGeometryBuffers
   {
-    boost::shared_ptr<gpg::gal::VertexFormat> mVertexFormat; // +0x00
-    boost::shared_ptr<gpg::gal::VertexBuffer> mVertexBuffer; // +0x08
-    boost::shared_ptr<gpg::gal::IndexBuffer> mIndexBuffer;   // +0x10
+    std::shared_ptr<gpg::gal::VertexFormat> mVertexFormat; // +0x00
+    std::shared_ptr<gpg::gal::VertexBuffer> mVertexBuffer; // +0x08
+    std::shared_ptr<gpg::gal::IndexBuffer> mIndexBuffer;   // +0x10
 
     void Reset() noexcept;
   };

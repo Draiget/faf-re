@@ -3,7 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 
-#include "boost/shared_ptr.h"
+#include <memory>
 #include "gpg/core/utils/NonCopyable.h"
 #include "moho/entity/EntityCategoryReflection.h"
 #include "../misc/StatItem.h"
@@ -80,7 +80,7 @@ namespace moho
    * `fa::list`'s node for an 8-byte element: the sentinel allocator at
    * 0x00702090 asks for 16 bytes and self-links `{next, prev}`.
    */
-  using ArmyTriggerList = fa::list<boost::shared_ptr<STrigger>>;
+  using ArmyTriggerList = fa::list<std::shared_ptr<STrigger>>;
   static_assert(sizeof(ArmyTriggerList) == 0x0C, "ArmyTriggerList size must be 0x0C");
 
   class CArmyStatItem : public StatItem
@@ -325,7 +325,7 @@ namespace moho
      * Finds one trigger by case-insensitive name from trigger-list lanes and
      * returns one retained shared pointer in `outTrigger`.
      */
-    boost::shared_ptr<STrigger>* GetTrigger(boost::shared_ptr<STrigger>* outTrigger, const char* triggerName);
+    std::shared_ptr<STrigger>* GetTrigger(std::shared_ptr<STrigger>* outTrigger, const char* triggerName);
 
     /**
      * Address: 0x0070BCA0 (FUN_0070BCA0, Moho::CArmyStats::SetArmyStatsTrigger)
@@ -433,7 +433,7 @@ namespace moho
    * emission symbol is preserved even when the modern compiler would inline
    * the natural ctor-arg construction.
    */
-  void ConstructSharedSTriggerFromRaw(boost::shared_ptr<STrigger>& out, STrigger* raw);
+  void ConstructSharedSTriggerFromRaw(std::shared_ptr<STrigger>& out, STrigger* raw);
 
   /**
    * Engine addition (dedicated-server plan WPL.4): the folder prompt

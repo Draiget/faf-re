@@ -354,7 +354,7 @@ namespace moho
    * `sp_counted_base::release()` with `weak_release()` inlined into it.
    */
   void ResetSharedBatchTextureHandle(
-    boost::shared_ptr<CD3DBatchTexture>& handle
+    std::shared_ptr<CD3DBatchTexture>& handle
   ) noexcept
   {
     handle.reset();
@@ -381,7 +381,7 @@ namespace moho
    * the batch texture, +0x3C for the sheet.
    */
   void ResetSharedDynamicTextureSheetHandle(
-    boost::shared_ptr<CD3DDynamicTextureSheet>& handle
+    std::shared_ptr<CD3DDynamicTextureSheet>& handle
   ) noexcept
   {
     handle.reset();
@@ -395,7 +395,7 @@ namespace moho
    * primitives on mode changes and updating UV scale/border lanes.
    */
   void CD3DPrimBatcher::SetTexture(
-    const boost::shared_ptr<CD3DBatchTexture>& texture
+    const std::shared_ptr<CD3DBatchTexture>& texture
   )
   {
     auto* const runtime = this;
@@ -469,13 +469,13 @@ namespace moho
    * without a virtual downcast guard).
    */
   void CD3DPrimBatcher::SetTexture(
-    boost::shared_ptr<ID3DTextureSheet> sheet
+    std::shared_ptr<ID3DTextureSheet> sheet
   )
   {
     auto* const runtime = this;
 
-    const boost::shared_ptr<CD3DDynamicTextureSheet> derivedSheet =
-      boost::static_pointer_cast<CD3DDynamicTextureSheet>(sheet);
+    const std::shared_ptr<CD3DDynamicTextureSheet> derivedSheet =
+      std::static_pointer_cast<CD3DDynamicTextureSheet>(sheet);
 
     if (!runtime->mVertices.empty() && runtime->mDynamicTexSheet.get() != derivedSheet.get()) {
       Flush();

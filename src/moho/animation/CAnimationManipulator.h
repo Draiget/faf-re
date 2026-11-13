@@ -140,7 +140,7 @@ namespace moho
      * clip's bone names (or clears them when there is no clip), adopts the
      * clip, and resets the playback time.
      */
-    void SetAnimationResource(bool looping, boost::shared_ptr<RScaResource> resource);
+    void SetAnimationResource(bool looping, std::shared_ptr<RScaResource> resource);
 
     /**
      * Address: 0x006412C0 (FUN_006412C0)
@@ -184,7 +184,7 @@ namespace moho
 
     WeakPtr<Unit> mGoal;                           // +0x80 (intrusive weak link into goalMotionScaleUnit chain)
     SAniManipBitStorage mBoneMask;                 // +0x88
-    boost::shared_ptr<RScaResource> mAnimationRef; // +0x9C
+    std::shared_ptr<RScaResource> mAnimationRef;   // +0x9C
     float mRate;                                   // +0xA4
     float mAnimationTime;                          // +0xA8
     float mLastFramePosition;                      // +0xAC

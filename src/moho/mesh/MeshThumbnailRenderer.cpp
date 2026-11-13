@@ -222,7 +222,7 @@ namespace
     const Wm3::Quatf& orientation,
     const std::uint32_t color,
     const moho::GeomCamera3& camera,
-    const boost::shared_ptr<moho::ID3DTextureSheet>& outputSheet,
+    const std::shared_ptr<moho::ID3DTextureSheet>& outputSheet,
     const gpg::Rect2f& outputRect
   )
   {
@@ -231,7 +231,7 @@ namespace
     if (meshRenderer != nullptr && blueprint != nullptr) {
       const Wm3::Vec3f unitScale{1.0f, 1.0f, 1.0f};
       meshInstance = meshRenderer->CreateMeshInstance(
-        0, static_cast<std::int32_t>(color), blueprint, unitScale, false, boost::shared_ptr<moho::MeshMaterial>()
+        0, static_cast<std::int32_t>(color), blueprint, unitScale, false, std::shared_ptr<moho::MeshMaterial>()
       );
     }
 
@@ -256,11 +256,11 @@ namespace moho
     const Wm3::Quatf& orientation,
     const std::uint32_t color,
     const Wm3::Vec3f& viewOffsetHint,
-    boost::shared_ptr<ID3DTextureSheet> outputSheet,
+    std::shared_ptr<ID3DTextureSheet> outputSheet,
     const gpg::Rect2f& outputRect
   )
   {
-    boost::shared_ptr<ID3DTextureSheet> retainedOutputSheet(outputSheet);
+    std::shared_ptr<ID3DTextureSheet> retainedOutputSheet(outputSheet);
     return ren_Viewport->mThumbnailRenderer.PushRequest(
       blueprint, orientation, color, viewOffsetHint, retainedOutputSheet, outputRect
     );
@@ -384,7 +384,7 @@ namespace moho
     const Wm3::Quatf& orientation,
     const std::uint32_t color,
     const gpg::Rect2f& outputRect,
-    const boost::shared_ptr<ID3DTextureSheet>& outputSheet
+    const std::shared_ptr<ID3DTextureSheet>& outputSheet
   )
   {
     const std::uint32_t requestId = mNextRequestId++;
@@ -405,7 +405,7 @@ namespace moho
     const Wm3::Quatf& orientation,
     const std::uint32_t color,
     const Wm3::Vec3f& viewOffsetHint,
-    const boost::shared_ptr<ID3DTextureSheet>& outputSheet,
+    const std::shared_ptr<ID3DTextureSheet>& outputSheet,
     const gpg::Rect2f& outputRect
   )
   {
@@ -414,7 +414,7 @@ namespace moho
     if (meshRenderer != nullptr && blueprint != nullptr) {
       const Wm3::Vec3f unitScale{1.0f, 1.0f, 1.0f};
       meshInstance = meshRenderer->CreateMeshInstance(
-        0, static_cast<std::int32_t>(color), blueprint, unitScale, false, boost::shared_ptr<MeshMaterial>()
+        0, static_cast<std::int32_t>(color), blueprint, unitScale, false, std::shared_ptr<MeshMaterial>()
       );
     }
 
@@ -488,7 +488,7 @@ namespace moho
     // 0x007EB806..0x007EB919: the colour target read back into the thumbnail texture (gal Device +0x44,
     // GetRenderTargetData), then that copied into the output sheet's rectangle (+0x4C, UpdateSurface, no source
     // rect): the rectangle is the request's 0..1 rect times the sheet's dimensions (sheet vtable +0x04).
-    const boost::shared_ptr<ID3DTextureSheet> sheet = request.outputSheet;
+    const std::shared_ptr<ID3DTextureSheet> sheet = request.outputSheet;
     gpg::gal::Device* const gal = gpg::gal::Device::GetInstance();
     if (sheet && mColorTarget && mThumbnailTexture && gal != nullptr) {
       Wm3::Vector3f dimensions{};

@@ -61,7 +61,7 @@ namespace gpg::gal
    * `shared_ptr` release semantics.
    */
   void EffectVariableD3D10::SetCubeRenderTarget(
-    const boost::shared_ptr<CubeRenderTarget> cubeTarget
+    const std::shared_ptr<CubeRenderTarget> cubeTarget
   )
   {
     static_cast<void>(cubeTarget);
@@ -74,7 +74,7 @@ namespace gpg::gal
    * Binds a render-target-backed shader-resource view into this effect slot.
    */
   void EffectVariableD3D10::SetRenderTarget(
-    const boost::shared_ptr<RenderTarget> renderTarget
+    const std::shared_ptr<RenderTarget> renderTarget
   )
   {
     ID3D10ShaderResourceView* const shaderResourceView = (renderTarget.get() != nullptr)
@@ -93,7 +93,7 @@ namespace gpg::gal
    * Binds a texture shader-resource view into this effect slot.
    */
   void EffectVariableD3D10::SetTexture(
-    const boost::shared_ptr<Texture> texture
+    const std::shared_ptr<Texture> texture
   )
   {
     ID3D10ShaderResourceView* const shaderResourceView =

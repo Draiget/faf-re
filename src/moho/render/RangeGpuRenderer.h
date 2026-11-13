@@ -11,7 +11,7 @@
 #include <cstdint>
 #include <span>
 
-#include "boost/shared_ptr.h"
+#include <memory>
 #include "moho/misc/RangeExtractor.h"
 #include "moho/render/GpuArrayStream.h"
 
@@ -55,8 +55,8 @@ namespace moho
 
     gpg::gal::Device* mDevice = nullptr;
     bool mSupported = false;
-    boost::shared_ptr<gpg::gal::GpuProgram> mProgram;
-    boost::shared_ptr<gpg::gal::GpuBuffer> mCylinder;
+    std::shared_ptr<gpg::gal::GpuProgram> mProgram;
+    std::shared_ptr<gpg::gal::GpuBuffer> mCylinder;
     const gpg::gal::VertexBuffer* mCylinderSource = nullptr;
     gpg::gal::GpuBuffer* mPayloadBuffer = nullptr;
     GpuArrayStream mPayloadStream{"RangePayloads", sizeof(SRangeExtractionPayload)};

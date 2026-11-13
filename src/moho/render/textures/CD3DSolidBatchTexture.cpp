@@ -2,14 +2,14 @@
 
 #include <map>
 
-#include "boost/weak_ptr.h"
+#include <memory>
 
 namespace moho
 {
   namespace
   {
-    using SolidTextureHandle = boost::shared_ptr<CD3DSolidBatchTexture>;
-    using SolidTextureWeakHandle = boost::weak_ptr<CD3DSolidBatchTexture>;
+    using SolidTextureHandle = std::shared_ptr<CD3DSolidBatchTexture>;
+    using SolidTextureWeakHandle = std::weak_ptr<CD3DSolidBatchTexture>;
     using SolidTextureMap = std::map<std::uint32_t, SolidTextureWeakHandle>;
 
     constexpr std::uint32_t kSolidTextureWidth = 2u;
@@ -248,12 +248,12 @@ namespace moho
      * Locks one weak cached solid-texture handle into a shared handle only when
      * the control block still has live owners.
      */
-    [[nodiscard]] boost::shared_ptr<CD3DBatchTexture> LockSolidTextureWeakHandle(
+    [[nodiscard]] std::shared_ptr<CD3DBatchTexture> LockSolidTextureWeakHandle(
       const SolidTextureWeakHandle& weakTexture
     )
     {
       const SolidTextureHandle lockedTexture = weakTexture.lock();
-      boost::shared_ptr<CD3DBatchTexture> outTexture = lockedTexture;
+      std::shared_ptr<CD3DBatchTexture> outTexture = lockedTexture;
       return outTexture;
     }
 
@@ -398,7 +398,7 @@ namespace moho
    * Returns one cached shared batch-texture handle for a solid RGBA color,
    * creating/inserting a `CD3DSolidBatchTexture` instance on cache miss.
    */
-  boost::shared_ptr<CD3DBatchTexture> CD3DBatchTexture::FromSolidColor(
+  std::shared_ptr<CD3DBatchTexture> CD3DBatchTexture::FromSolidColor(
     const std::uint32_t rgba
   )
   {
@@ -406,7 +406,7 @@ namespace moho
     (void)InitializeSolidTextureMapStorage();
 
     SolidTextureMap& solidTextureMap = GetSolidTextureMap();
-    boost::shared_ptr<CD3DBatchTexture> outTexture;
+    std::shared_ptr<CD3DBatchTexture> outTexture;
     SolidTextureMap::iterator it = FindSolidTextureEntry(rgba);
     if (it != SolidTextureMapEnd()) {
       outTexture = LockSolidTextureWeakHandle(it->second);

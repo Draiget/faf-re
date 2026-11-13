@@ -3,7 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 
-#include "boost/shared_ptr.h"
+#include <memory>
 #include "legacy/containers/Map.h"
 #include "legacy/containers/Vector.h"
 #include "moho/mesh/SpatialDb.h"
@@ -138,7 +138,7 @@ namespace moho
 
   public:
     SplatVertex mSplatVertices[4];            // +0x170
-    boost::shared_ptr<CD3DBatchTexture> mTex; // +0x1E0
+    std::shared_ptr<CD3DBatchTexture> mTex;   // +0x1E0
   };
 
   static_assert(

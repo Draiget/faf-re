@@ -3,7 +3,7 @@
 #include <cstdint>
 
 #include "gpg/core/utils/NonCopyable.h"
-#include "boost/shared_ptr.h"
+#include <memory>
 #include "gpg/gal/D3D9Utils.h"
 
 namespace gpg::gal
@@ -47,7 +47,7 @@ namespace gpg::gal
      * Creates one index buffer on the active device (slot 16,
      * `[vtbl+0x40]`).
      */
-    static boost::shared_ptr<IndexBuffer> Create(const IndexBufferContext& context);
+    static std::shared_ptr<IndexBuffer> Create(const IndexBufferContext& context);
 
     /**
      * Slot: 1

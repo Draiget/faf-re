@@ -832,7 +832,7 @@ bool moho::NET_Init()
  */
 INetConnector* moho::NET_MakeUDPConnector(
   const u_short port,
-  boost::weak_ptr<INetNATTraversalProvider> prov
+  std::weak_ptr<INetNATTraversalProvider> prov
 )
 {
   if (!NET_Init()) {

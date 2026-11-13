@@ -214,7 +214,7 @@ void Sim::Setup(
  * is neither a `LaunchInfoNew` nor a `LaunchInfoLoad`.
  */
 Sim* Sim::Create(
-  const boost::shared_ptr<LaunchInfoBase>& launchInfo
+  const std::shared_ptr<LaunchInfoBase>& launchInfo
 )
 {
   LaunchInfoBase* const info = launchInfo.get();
@@ -527,8 +527,8 @@ void Sim::RegisterEntitySet(
  * Rebinds one `shared_ptr<SParticleBuffer>` from a raw pointer and releases
  * prior ownership.
  */
-boost::shared_ptr<SParticleBuffer>* AssignSharedParticleBufferFromRaw(
-  boost::shared_ptr<SParticleBuffer>* const outBuffer,
+std::shared_ptr<SParticleBuffer>* AssignSharedParticleBufferFromRaw(
+  std::shared_ptr<SParticleBuffer>* const outBuffer,
   SParticleBuffer* const buffer
 )
 {

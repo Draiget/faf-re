@@ -10,7 +10,7 @@
 #include <unordered_map>
 #include <vector>
 
-#include "boost/shared_ptr.h"
+#include <memory>
 #include "gpg/core/containers/ChunkedVector.h"
 #include "gpg/core/containers/FlatGenerationMap.h"
 #include "gpg/core/containers/Rect2.h"
@@ -297,7 +297,7 @@ namespace faf::remote
   private:
     std::uint64_t mDepositOverflows = 0;
     std::uint64_t mTerrainEditOverflows = 0;
-    boost::shared_ptr<moho::CHeightField> mSentTerrain; // the client's heights, as the edits sent leave them
+    std::shared_ptr<moho::CHeightField> mSentTerrain; // the client's heights, as the edits sent leave them
   };
 
   /**
@@ -719,11 +719,11 @@ namespace faf::remote
     std::vector<std::uint32_t> mBeforeSlots;                // the slots with one
     gpg::core::ChunkedVector<wire::SEntityRecord> mBefore;  // the local ones among them, which change in place
     std::map<std::uint32_t, std::uint32_t> mOrphanedAt;     // id -> beat of its erase
-    std::map<std::uint32_t, boost::shared_ptr<moho::Stats<moho::StatItem>>> mUnitStats; // the sim's live trees
+    std::map<std::uint32_t, std::shared_ptr<moho::Stats<moho::StatItem>>> mUnitStats; // the sim's live trees
     // With `mSharedStats`: the ids of each tree's records, and the records whose stats aren't set yet.
     std::unordered_multimap<const moho::Stats<moho::StatItem>*, std::uint32_t> mStatsIds;
     std::vector<std::uint32_t> mFreshStats;
-    std::vector<boost::shared_ptr<moho::Stats<moho::StatItem>>> mDroppedStats; // until `ReleaseDropped`
+    std::vector<std::shared_ptr<moho::Stats<moho::StatItem>>> mDroppedStats; // until `ReleaseDropped`
     std::uint32_t mNextFrameId = 1;
     std::uint64_t mUnknownBlueprints = 0;
     std::uint64_t mUnknownUnderlays = 0;

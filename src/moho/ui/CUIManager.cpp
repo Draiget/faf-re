@@ -68,7 +68,7 @@ namespace
    * Frames whose owning reference was dropped while a MAUI event was being
    * dispatched. Released by `ReleaseRetiredFrames` on the next UI tick.
    */
-  std::vector<boost::shared_ptr<moho::CMauiFrame>> gRetiredFrames;
+  std::vector<std::shared_ptr<moho::CMauiFrame>> gRetiredFrames;
 
   /**
    * Pacing state for the incremental (5.1-style) Lua collector that the UI VM
@@ -166,8 +166,8 @@ namespace
    * Releases one half-open range of `boost::shared_ptr<CMauiFrame>` elements.
    */
   void ReleaseFrameSharedPtrRange(
-    boost::shared_ptr<moho::CMauiFrame>* begin,
-    boost::shared_ptr<moho::CMauiFrame>* end
+    std::shared_ptr<moho::CMauiFrame>* begin,
+    std::shared_ptr<moho::CMauiFrame>* end
   )
   {
     // Dropping the last owner here runs ~CMauiFrame inline. That is safe on a
@@ -186,7 +186,7 @@ namespace
     // tick. The frames are already destroyed and unhooked by then - only the
     // `operator delete` moves.
     const bool deferDelete = moho::MAUI_EventDispatchInProgress();
-    for (boost::shared_ptr<moho::CMauiFrame>* it = begin; it != end; ++it) {
+    for (std::shared_ptr<moho::CMauiFrame>* it = begin; it != end; ++it) {
       if (deferDelete && *it) {
         gRetiredFrames.push_back(*it);
       }
@@ -202,7 +202,7 @@ namespace
   {
     // Swap first: ~CMauiFrame runs script (`OnDestroy` on any control still
     // queued) and must not mutate the container being iterated.
-    std::vector<boost::shared_ptr<moho::CMauiFrame>> retired;
+    std::vector<std::shared_ptr<moho::CMauiFrame>> retired;
     retired.swap(gRetiredFrames);
   }
 
@@ -213,8 +213,8 @@ namespace
    * Constructs one `boost::shared_ptr<CMauiFrame>` from one raw frame pointer
    * in caller-provided storage.
    */
-  [[maybe_unused]] boost::shared_ptr<moho::CMauiFrame>* ConstructSharedFrameFromRaw(
-    boost::shared_ptr<moho::CMauiFrame>* const outSharedFrame,
+  [[maybe_unused]] std::shared_ptr<moho::CMauiFrame>* ConstructSharedFrameFromRaw(
+    std::shared_ptr<moho::CMauiFrame>* const outSharedFrame,
     moho::CMauiFrame* const rawFrame
   )
   {
@@ -222,7 +222,7 @@ namespace
       return nullptr;
     }
 
-    return ::new (outSharedFrame) boost::shared_ptr<moho::CMauiFrame>(rawFrame);
+    return ::new (outSharedFrame) std::shared_ptr<moho::CMauiFrame>(rawFrame);
   }
 
   [[nodiscard]] bool IsValidFrameIndex(
@@ -398,7 +398,7 @@ bool moho::CUIManager::SetNewLuaState(
   (void)globals.CreateTable("__EngineStats", 0, 0);
 
   for (std::size_t head = 0; head < mInputWindows.Size(); ++head) {
-    boost::shared_ptr<CMauiFrame> frame = CMauiFrame::Create(mLuaState);
+    std::shared_ptr<CMauiFrame> frame = CMauiFrame::Create(mLuaState);
     if (!frame) {
       gpg::Die("CUIManager::Init - unable to create root frame for head %d.", static_cast<int>(head));
     }
@@ -641,7 +641,7 @@ void moho::CUIManager::OnResize(
     return;
   }
 
-  boost::shared_ptr<CMauiFrame>& frame = mFrames[static_cast<std::size_t>(frameIdx)];
+  std::shared_ptr<CMauiFrame>& frame = mFrames[static_cast<std::size_t>(frameIdx)];
   if (!frame) {
     return;
   }
@@ -697,7 +697,7 @@ void moho::CUIManager::ValidateFrame(
     return;
   }
 
-  boost::shared_ptr<CMauiFrame>& frame = mFrames[static_cast<std::size_t>(frameIdx)];
+  std::shared_ptr<CMauiFrame>& frame = mFrames[static_cast<std::size_t>(frameIdx)];
   if (frame) {
     frame->Render();
   }
@@ -850,7 +850,7 @@ void moho::CUIManager::DebugMouseOverControl(
     return;
   }
 
-  const boost::shared_ptr<CD3DBatchTexture> texture = CD3DBatchTexture::FromSolidColor(0xFFFF00FFu);
+  const std::shared_ptr<CD3DBatchTexture> texture = CD3DBatchTexture::FromSolidColor(0xFFFF00FFu);
   primBatcher->SetTexture(texture);
 
   const float left = CScriptLazyVar_float::GetValue(&control->mLeftLV);

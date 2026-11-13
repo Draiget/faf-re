@@ -101,7 +101,7 @@ namespace
     // `shared_count::operator=`, which releases the garbage control block those
     // bytes decode to. Constructing in place reproduces the binary's empty
     // {px, pi_} pair without touching it.
-    ::new (static_cast<void*>(&pose.mSkeleton)) boost::shared_ptr<const CAniSkel>();
+    ::new (static_cast<void*>(&pose.mSkeleton)) std::shared_ptr<const CAniSkel>();
     pose.mScale = 1.0f;
 
     pose.mLocalTransform.orient_.w = 1.0f;

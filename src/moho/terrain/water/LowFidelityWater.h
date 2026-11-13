@@ -67,8 +67,8 @@ namespace moho
       float tickLerp,
       const GeomCamera3* camera,
       const CWaterShaderProperties* shaderProperties,
-      const boost::shared_ptr<ID3DRenderTarget>& refractionTexture,
-      const boost::shared_ptr<ID3DRenderTarget>& reflectionTexture
+      const std::shared_ptr<ID3DRenderTarget>& refractionTexture,
+      const std::shared_ptr<ID3DRenderTarget>& reflectionTexture
     ) override;
 
     IWldTerrainRes* mTerrainRes = nullptr;   // +0x04

@@ -875,7 +875,7 @@ namespace moho
     const float right = left + width;
     const float bottom = std::min(top + height, std::max(top + rowStep, headHeight - 5.0f));
 
-    const boost::shared_ptr<CD3DBatchTexture> white = CD3DBatchTexture::FromSolidColor(0xFFFFFFFFu);
+    const std::shared_ptr<CD3DBatchTexture> white = CD3DBatchTexture::FromSolidColor(0xFFFFFFFFu);
     const auto quad = [&](const Box& box, const std::uint32_t color) {
       batcher->SetTexture(white);
       batcher->DrawQuad(

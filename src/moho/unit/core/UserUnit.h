@@ -23,7 +23,7 @@
 
 #include <cstddef>
 #include <cstdint>
-#include "boost/shared_ptr.h"
+#include <memory>
 
 struct lua_State;
 

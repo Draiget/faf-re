@@ -3,8 +3,8 @@
 #include <cstddef>
 #include <cstdint>
 
-#include "boost/shared_ptr.h"
-#include "boost/weak_ptr.h"
+#include <memory>
+#include <memory>
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/streams/MemBufferStream.h"
 #include "legacy/containers/String.h"
@@ -204,7 +204,7 @@ namespace moho
      * Default-constructs an `RScaResource`, parses the SCA file via
      * `LoadScaFile`, and returns nothing on failure.
      */
-    boost::shared_ptr<RScaResource> LoadImpl(gpg::StrArg path) override;
+    std::shared_ptr<RScaResource> LoadImpl(gpg::StrArg path) override;
   };
 
   /**
@@ -214,7 +214,7 @@ namespace moho
    * Returns the animation at `path` through the resource manager, as an
    * owning handle (empty when it cannot be loaded).
    */
-  [[nodiscard]] boost::shared_ptr<RScaResource> GetScaResource(gpg::StrArg path);
+  [[nodiscard]] std::shared_ptr<RScaResource> GetScaResource(gpg::StrArg path);
 
   /**
    * Address: 0x00BC9280 (FUN_00BC9280)

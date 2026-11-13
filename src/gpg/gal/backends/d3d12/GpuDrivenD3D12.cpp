@@ -411,7 +411,7 @@ namespace gpg::gal
     return nvidia ? kGpuPathMsdfCook : 0U;
   }
 
-  boost::shared_ptr<GpuBuffer> DeviceD3D12::CreateGpuBuffer(
+  std::shared_ptr<GpuBuffer> DeviceD3D12::CreateGpuBuffer(
     const GpuBufferDesc& desc
   )
   {
@@ -419,7 +419,7 @@ namespace gpg::gal
       return {};
     }
     const std::lock_guard<std::recursive_mutex> lock(mMutex);
-    return boost::shared_ptr<GpuBuffer>(new GpuBufferD3D12(*this, desc));
+    return std::shared_ptr<GpuBuffer>(new GpuBufferD3D12(*this, desc));
   }
 
   void DeviceD3D12::UpdateGpuBuffer(
@@ -494,14 +494,14 @@ namespace gpg::gal
     return true;
   }
 
-  boost::shared_ptr<GpuProgram> DeviceD3D12::CreateGpuProgram(
+  std::shared_ptr<GpuProgram> DeviceD3D12::CreateGpuProgram(
     const GpuProgramDesc& desc
   )
   {
     if ((mGpuFeatures & kGpuFeatureVertexPulling) == 0U || desc.source == nullptr) {
       return {};
     }
-    boost::shared_ptr<GpuProgramD3D12> program(new GpuProgramD3D12());
+    std::shared_ptr<GpuProgramD3D12> program(new GpuProgramD3D12());
     program->mDesc = desc;
     program->mName = (desc.name != nullptr) ? desc.name : "";
     program->mDesc.name = nullptr;

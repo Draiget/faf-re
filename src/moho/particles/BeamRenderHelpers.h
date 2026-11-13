@@ -3,7 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 
-#include "boost/shared_ptr.h"
+#include <memory>
 #include "legacy/containers/Map.h"
 #include "legacy/containers/Vector.h"
 #include "legacy/containers/String.h"
@@ -92,7 +92,7 @@ namespace moho
   static_assert(offsetof(BeamDrawContext, writeCursor) == 0x10, "BeamDrawContext::writeCursor offset must be 0x10");
   static_assert(sizeof(BeamDrawContext) == 0x14, "BeamDrawContext size must be 0x14");
 
-  using TextureSheetHandle = boost::shared_ptr<ID3DTextureSheet>;
+  using TextureSheetHandle = std::shared_ptr<ID3DTextureSheet>;
 
   /**
    * What it does:

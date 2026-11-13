@@ -26,7 +26,7 @@
 
 namespace
 {
-  using ShoreCellRef = boost::shared_ptr<moho::ShoreCell>;
+  using ShoreCellRef = std::shared_ptr<moho::ShoreCell>;
 
   /**
    * Address: 0x00813DB0 (FUN_00813DB0, boost::shared_ptr_ShoreCell::shared_ptr_ShoreCell)
@@ -799,7 +799,7 @@ namespace moho
     CD3DVertexSheet* const vertexSheet = resources->NewVertexSheet(
       sShorelineGpuSheet ? 0U : kShorelineVertexSheetUsageToken, kShorelineVertexSheetVertexCount, vertexFormat
     );
-    mVertexSheet = boost::shared_ptr<ID3DVertexSheet>(static_cast<ID3DVertexSheet*>(vertexSheet));
+    mVertexSheet = std::shared_ptr<ID3DVertexSheet>(static_cast<ID3DVertexSheet*>(vertexSheet));
 
     const float seaElevation = (map->mWaterEnabled != 0u) ? map->mWaterElevation : kNoWaterElevation;
     CHeightField* const heightField = map->mHeightField.get();

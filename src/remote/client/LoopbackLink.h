@@ -140,7 +140,7 @@ namespace faf::remote::client
     // The army lane and the view army's grids (WP5.13).
     void PassArmiesAndGrids(moho::SSyncData& packet);
     void InstallUserGrids();
-    std::map<std::pair<std::uint8_t, std::uint8_t>, boost::shared_ptr<moho::CIntelGrid>> mUserGrids; // (army, kind)
+    std::map<std::pair<std::uint8_t, std::uint8_t>, std::shared_ptr<moho::CIntelGrid>> mUserGrids; // (army, kind)
     moho::RRuleGameRules* mRules = nullptr;
     CGridSnapshots mGridSnapshots;
     std::vector<wire::SArmyRecord> mSentArmies;   // the server's copy of what the client holds

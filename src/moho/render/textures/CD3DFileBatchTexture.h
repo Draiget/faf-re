@@ -3,7 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 
-#include "boost/shared_ptr.h"
+#include <memory>
 #include "gpg/core/containers/String.h"
 #include "legacy/containers/String.h"
 #include "moho/render/textures/CD3DRawBatchTexture.h"

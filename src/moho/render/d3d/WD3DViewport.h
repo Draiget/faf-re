@@ -7,7 +7,7 @@
 #include "platform/shell/event.h"
 #include "platform/shell/window.h"
 
-#include "boost/shared_ptr.h"
+#include <memory>
 #include "gpg/core/containers/String.h"
 
 class ShellBitmap;
@@ -102,7 +102,7 @@ namespace moho
      * What it does:
      * Returns an empty sheet. Slot 135.
      */
-    virtual boost::shared_ptr<ID3DTextureSheet> GetPreviewImage();
+    virtual std::shared_ptr<ID3DTextureSheet> GetPreviewImage();
 
     /**
      * Address: 0x0042BB50 (FUN_0042BB50)

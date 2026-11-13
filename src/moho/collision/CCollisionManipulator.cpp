@@ -727,7 +727,7 @@ namespace moho
     // `CAniSkel::GetBone` 0x00549E20 -> `mBoneName`).
     CAniPose* const pose = mOwnerActor->mPose.get();
     const auto lookupBoneName = [this](const int boneIndex) -> const char* {
-      const boost::shared_ptr<const CAniSkel> skeleton = mOwnerActor->GetSkeleton();
+      const std::shared_ptr<const CAniSkel> skeleton = mOwnerActor->GetSkeleton();
       return skeleton->GetBone(static_cast<std::uint32_t>(boneIndex))->mBoneName;
     };
 

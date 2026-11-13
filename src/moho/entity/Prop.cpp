@@ -591,7 +591,7 @@ namespace moho
   {
     constexpr float kQ = 0.70710677f; // sqrt(2)/2; fixed 90-degree rotation lane.
 
-    const boost::shared_ptr<RScmResource> meshResource = original->GetMesh();
+    const std::shared_ptr<RScmResource> meshResource = original->GetMesh();
     if (!meshResource) {
       return;
     }
@@ -600,7 +600,7 @@ namespace moho
     {
       // Binary grabs the raw skeleton pointer then drops the shared owner; the
       // mesh resource keeps the skeleton alive for the loop.
-      const boost::shared_ptr<const CAniSkel> handle = meshResource->GetSkeleton();
+      const std::shared_ptr<const CAniSkel> handle = meshResource->GetSkeleton();
       sourceSkeleton = handle.get();
     }
     if (sourceSkeleton == nullptr) {
@@ -645,7 +645,7 @@ namespace moho
       const VTransform composed = VTransform::Compose(invTransform, original->GetTransformWm3());
       Prop* const child = Prop::CreateFromBlueprintResolved(original->SimulationRef, childBlueprint, composed);
 
-      if (const boost::shared_ptr<RScmResource> childMeshResource = child->GetMesh()) {
+      if (const std::shared_ptr<RScmResource> childMeshResource = child->GetMesh()) {
         const RScmResource* const childMesh = childMeshResource.get();
 
         // Per-axis child scale = source-bone-bounds extent / child-mesh-box extent.
@@ -658,7 +658,7 @@ namespace moho
           (scaleZ * (bone.mBoundsMaxZ - bone.mBoundsMinZ)) / (childMesh->mBounds.Max.z - childMesh->mBounds.Min.z);
 
         {
-          const boost::shared_ptr<const CAniSkel> childHandle = childMeshResource->GetSkeleton();
+          const std::shared_ptr<const CAniSkel> childHandle = childMeshResource->GetSkeleton();
           const CAniSkel* const childSkeleton = childHandle.get();
           if (childSkeleton != nullptr && childSkeleton->mBones.begin() != childSkeleton->mBones.end()) {
             const SAniSkelBone* const rootBone = childSkeleton->GetBone(0);

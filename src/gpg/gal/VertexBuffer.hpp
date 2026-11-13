@@ -1,7 +1,7 @@
 #pragma once
 
 #include "gpg/core/utils/NonCopyable.h"
-#include "boost/shared_ptr.h"
+#include <memory>
 #include "gpg/gal/D3D9Utils.h"
 
 namespace gpg::gal
@@ -45,7 +45,7 @@ namespace gpg::gal
      * Creates one vertex buffer on the active device (slot 15,
      * `[vtbl+0x3C]`).
      */
-    static boost::shared_ptr<VertexBuffer> Create(const VertexBufferContext& context);
+    static std::shared_ptr<VertexBuffer> Create(const VertexBufferContext& context);
 
     /**
      * Slot: 1

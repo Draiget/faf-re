@@ -36,8 +36,8 @@
 #include "gpg/core/utils/Global.h"
 #include "platform/Platform.h"
 
-#include "boost/shared_ptr.h"
-#include "boost/weak_ptr.h"
+#include <memory>
+#include <memory>
 
 #include <algorithm>
 #include <cstddef>

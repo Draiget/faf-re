@@ -82,7 +82,7 @@ namespace gpg::gal
   }
 
   void EffectD3D11::GetTechniques(
-    fa::vector<boost::shared_ptr<EffectTechnique>>& outTechniques
+    fa::vector<std::shared_ptr<EffectTechnique>>& outTechniques
   )
   {
     if (mEffect == nullptr) {
@@ -99,12 +99,12 @@ namespace gpg::gal
       D3DX11_TECHNIQUE_DESC techniqueDesc{};
       CheckHresult("EffectD3D11.cpp", __LINE__, technique->GetDesc(&techniqueDesc));
       outTechniques.push_back(
-        boost::shared_ptr<EffectTechnique>(new EffectTechniqueD3D11(techniqueDesc.Name, mEffect.Get(), technique))
+        std::shared_ptr<EffectTechnique>(new EffectTechniqueD3D11(techniqueDesc.Name, mEffect.Get(), technique))
       );
     }
   }
 
-  boost::shared_ptr<EffectVariable> EffectD3D11::GetVariable(
+  std::shared_ptr<EffectVariable> EffectD3D11::GetVariable(
     const char* const name
   )
   {
@@ -115,10 +115,10 @@ namespace gpg::gal
     if (variable == nullptr || !variable->IsValid()) {
       ThrowMissing("EffectD3D11.cpp", __LINE__, "variable", name);
     }
-    return boost::shared_ptr<EffectVariable>(new EffectVariableD3D11(name, mEffect.Get(), variable));
+    return std::shared_ptr<EffectVariable>(new EffectVariableD3D11(name, mEffect.Get(), variable));
   }
 
-  boost::shared_ptr<EffectTechnique> EffectD3D11::GetTechnique(
+  std::shared_ptr<EffectTechnique> EffectD3D11::GetTechnique(
     const char* const name
   )
   {
@@ -129,7 +129,7 @@ namespace gpg::gal
     if (technique == nullptr || !technique->IsValid()) {
       ThrowMissing("EffectD3D11.cpp", __LINE__, "technique", name);
     }
-    return boost::shared_ptr<EffectTechnique>(new EffectTechniqueD3D11(name, mEffect.Get(), technique));
+    return std::shared_ptr<EffectTechnique>(new EffectTechniqueD3D11(name, mEffect.Get(), technique));
   }
 
   void EffectD3D11::OnReset() {}
@@ -321,14 +321,14 @@ namespace gpg::gal
   }
 
   void EffectVariableD3D11::SetCubeRenderTarget(
-    const boost::shared_ptr<CubeRenderTarget> cubeTarget
+    const std::shared_ptr<CubeRenderTarget> cubeTarget
   )
   {
     static_cast<void>(cubeTarget);
   }
 
   void EffectVariableD3D11::SetRenderTarget(
-    const boost::shared_ptr<RenderTarget> renderTarget
+    const std::shared_ptr<RenderTarget> renderTarget
   )
   {
     if (ActiveDevice().Tracing()) {
@@ -342,7 +342,7 @@ namespace gpg::gal
   }
 
   void EffectVariableD3D11::SetTexture(
-    const boost::shared_ptr<Texture> texture
+    const std::shared_ptr<Texture> texture
   )
   {
     if (ActiveDevice().Tracing()) {

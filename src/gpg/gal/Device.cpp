@@ -444,7 +444,7 @@ namespace gpg::gal
     return 0U;
   }
 
-  boost::shared_ptr<GpuBuffer> Device::CreateGpuBuffer(
+  std::shared_ptr<GpuBuffer> Device::CreateGpuBuffer(
     const GpuBufferDesc&
   )
   {
@@ -459,7 +459,7 @@ namespace gpg::gal
   )
   {}
 
-  boost::shared_ptr<GpuProgram> Device::CreateGpuProgram(
+  std::shared_ptr<GpuProgram> Device::CreateGpuProgram(
     const GpuProgramDesc&
   )
   {
@@ -543,7 +543,7 @@ namespace gpg::gal
   bool Device::SetRayInstances(
     const RayInstance*,
     std::uint32_t,
-    const boost::shared_ptr<Texture>*,
+    const std::shared_ptr<Texture>*,
     std::uint32_t
   )
   {

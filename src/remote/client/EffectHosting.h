@@ -9,7 +9,7 @@
 #include <unordered_map>
 #include <vector>
 
-#include "boost/shared_ptr.h"
+#include <memory>
 #include "legacy/containers/Vector.h"
 #include "moho/effects/rendering/CHostedEffectManager.h"
 #include "moho/effects/rendering/EffectHost.h"
@@ -71,10 +71,10 @@ namespace faf::remote::client
       moho::VTransform current; // the sim's `mCurTransform` in its effect tick: the beat before the one shown
       moho::VTransform pending; // the beat shown
       float velocityScale = 1.0f;
-      boost::shared_ptr<moho::RScmResource> mesh;
+      std::shared_ptr<moho::RScmResource> mesh;
       Wm3::Vector3f scale{1.0f, 1.0f, 1.0f};
       const moho::REntityBlueprint* blueprint = nullptr;
-      boost::shared_ptr<moho::CAniPose> pose; // a unit's client pose this beat (its world at `pending`)
+      std::shared_ptr<moho::CAniPose> pose; // a unit's client pose this beat (its world at `pending`)
       bool isUnit = false;
     };
 
@@ -267,7 +267,7 @@ namespace faf::remote::client
     std::unordered_map<std::uint32_t, moho::IEffect*> mEffects;
     std::unordered_map<const moho::IEffect*, std::uint32_t> mIds;
     std::unordered_map<std::uint32_t, TargetPtr> mTargets; // by client entity id, while held
-    boost::shared_ptr<moho::SParticleBuffer> mParticles;
+    std::shared_ptr<moho::SParticleBuffer> mParticles;
     fa::vector<moho::GeomCamera3> mCameras;
     std::uint32_t mBeat = 0;
     bool mUnticked = false;           // this beat's lane said the sim didn't tick (`Unticked`)

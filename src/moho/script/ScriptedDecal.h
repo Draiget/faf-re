@@ -3,7 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 
-#include "boost/shared_ptr.h"
+#include <memory>
 
 #include "gpg/core/reflection/Reflection.h"
 #include "moho/lua/CScrLuaBinderFwd.h"
@@ -125,7 +125,7 @@ namespace moho
      * binary's `slot - 4` downcasts and `0x008679E0` relinks decode).
      */
     WeakPtr<CWldTerrainDecal> mDecal;                       // +0x34
-    boost::shared_ptr<RD3DTextureResource> mDynamicTexture; // +0x3C
+    std::shared_ptr<RD3DTextureResource> mDynamicTexture;   // +0x3C
     IDecalManager* mDecalManager;                           // +0x44
     CameraImpl* mWorldCamera;                               // +0x48
     Wm3::Vector3f mScale;                                   // +0x4C

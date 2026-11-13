@@ -795,7 +795,7 @@ void gpg::SerConstructResult::SetShared(
  * member-load flag when bit 0 in `flags` is set.
  */
 void gpg::SerConstructResult::SetShared(
-  const boost::shared_ptr<void>& object,
+  const std::shared_ptr<void>& object,
   RType* const type,
   const unsigned int flags
 )
@@ -1696,7 +1696,7 @@ int LuaSerializeFromString(
   std::size_t length = 0;
   const char* const data = luaL_checklstring(L, 1, &length);
 
-  const boost::shared_ptr<std::istream> stream(
+  const std::shared_ptr<std::istream> stream(
     new std::stringstream(std::string(data, length), std::ios_base::in | std::ios_base::out)
   );
 
@@ -1765,7 +1765,7 @@ int LuaSerializeToString(
   // control block owns the whole stringstream, so `buffer` stays valid for
   // the str() read below.
   std::stringstream* const buffer = new std::stringstream(std::ios_base::in | std::ios_base::out);
-  const boost::shared_ptr<std::ostream> stream(buffer);
+  const std::shared_ptr<std::ostream> stream(buffer);
 
   gpg::WriteArchive* const archive = gpg::CreateTextWriteArchive(stream);
 

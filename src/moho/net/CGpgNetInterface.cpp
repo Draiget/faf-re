@@ -64,7 +64,7 @@ namespace
   constexpr const char* kGpgNetActiveHelpText = "bool GpgNetActive()";
   constexpr const char* kGpgNetSendHelpText = "GpgNetSend(cmd,args...)";
 
-  boost::shared_ptr<CGpgNetInterface> sGPGNet;
+  std::shared_ptr<CGpgNetInterface> sGPGNet;
 
   /**
    * Address: 0x007BDB70 (FUN_007BDB70, register_WeakPtr_INetNATTraversalProvider_Type_00)
@@ -395,13 +395,13 @@ namespace
  * Replaces the process-global GPGNet shared-pointer lane (`sGPGNet`).
  */
 void moho::GPGNET_SetPtr(
-  const boost::shared_ptr<CGpgNetInterface>& ptr
+  const std::shared_ptr<CGpgNetInterface>& ptr
 )
 {
   sGPGNet = ptr;
 }
 
-boost::shared_ptr<moho::CGpgNetInterface> moho::GPGNET_GetPtr()
+std::shared_ptr<moho::CGpgNetInterface> moho::GPGNET_GetPtr()
 {
   return sGPGNet;
 }
@@ -417,7 +417,7 @@ void moho::GPGNET_ReportBottleneck(
   const SClientBottleneckInfo& info
 )
 {
-  const boost::shared_ptr<CGpgNetInterface> active = GPGNET_GetPtr();
+  const std::shared_ptr<CGpgNetInterface> active = GPGNET_GetPtr();
   ISTIDriver* const activeDriver = WLD_GetDriver();
   if (!active || activeDriver == nullptr) {
     return;
@@ -480,7 +480,7 @@ void moho::GPGNET_ReportBottleneck(
  */
 void moho::GPGNET_ReportBottleneckCleared()
 {
-  const boost::shared_ptr<CGpgNetInterface> active = GPGNET_GetPtr();
+  const std::shared_ptr<CGpgNetInterface> active = GPGNET_GetPtr();
   if (!active) {
     return;
   }
@@ -502,7 +502,7 @@ void moho::GPGNET_ReportDesync(
   const fa::string& hash2
 )
 {
-  const boost::shared_ptr<CGpgNetInterface> active = GPGNET_GetPtr();
+  const std::shared_ptr<CGpgNetInterface> active = GPGNET_GetPtr();
   if (!active) {
     return;
   }
@@ -525,7 +525,7 @@ void moho::GPGNET_SubmitArmyStats(
   const fa::string& statsPayload
 )
 {
-  const boost::shared_ptr<CGpgNetInterface> active = GPGNET_GetPtr();
+  const std::shared_ptr<CGpgNetInterface> active = GPGNET_GetPtr();
   if (!active) {
     return;
   }
@@ -542,7 +542,7 @@ void moho::GPGNET_ReportRejoinOffer(
   const fa::string& seats
 )
 {
-  const boost::shared_ptr<CGpgNetInterface> active = GPGNET_GetPtr();
+  const std::shared_ptr<CGpgNetInterface> active = GPGNET_GetPtr();
   if (!active) {
     return;
   }
@@ -567,7 +567,7 @@ void moho::GPGNET_Attach(
     throw std::runtime_error("Can't attach to a gpg.net if we already are.");
   }
 
-  boost::shared_ptr<CGpgNetInterface> created = CGpgNetInterface::CreatePtr(new CGpgNetInterface{});
+  std::shared_ptr<CGpgNetInterface> created = CGpgNetInterface::CreatePtr(new CGpgNetInterface{});
   created->Connect(addr, port);
   GPGNET_SetPtr(created);
 }
@@ -731,7 +731,7 @@ int moho::cfunc_GpgNetSendL(
     LuaPlus::LuaState::Error(state, "invalid kind of argument to GpgNetSend(): can only deal with ints and strings.");
   }
 
-  if (const boost::shared_ptr<CGpgNetInterface> active = GPGNET_GetPtr(); active) {
+  if (const std::shared_ptr<CGpgNetInterface> active = GPGNET_GetPtr(); active) {
     active->WriteCommand(commandName, args);
   }
 
@@ -793,11 +793,11 @@ moho::SNetCommand::~SNetCommand()
  * Creates one owning `boost::shared_ptr<CGpgNetInterface>` from a raw instance
  * pointer and binds `enable_shared_from_this` ownership lanes.
  */
-boost::shared_ptr<moho::CGpgNetInterface> moho::CGpgNetInterface::CreatePtr(
+std::shared_ptr<moho::CGpgNetInterface> moho::CGpgNetInterface::CreatePtr(
   CGpgNetInterface* const inter
 )
 {
-  return boost::shared_ptr<CGpgNetInterface>(inter);
+  return std::shared_ptr<CGpgNetInterface>(inter);
 }
 
 /**
@@ -901,7 +901,7 @@ bool CGpgNetInterface::Shutdown()
  */
 void CGpgNetInterface::SetTraversalHandler(
   const int port,
-  boost::shared_ptr<INetNATTraversalHandler>* handler
+  std::shared_ptr<INetNATTraversalHandler>* handler
 )
 {
   (void)port;
@@ -1621,7 +1621,7 @@ void CGpgNetInterface::Connected(
 LuaPlus::LuaObject* moho::NET_MakeNATTraversal(
   LuaPlus::LuaState* const state,
   LuaPlus::LuaObject* const out,
-  boost::weak_ptr<INetNATTraversalProvider>* const provider
+  std::weak_ptr<INetNATTraversalProvider>* const provider
 )
 {
   LuaPlus::LuaObject metatable = moho::CScrLuaMetatableFactory<INetNATTraversalProvider>::Instance().Get(state);
@@ -1691,7 +1691,7 @@ void CGpgNetInterface::CreateLobby(
   // public binder; the `sGPGNet` shared_ptr is the natural source for the
   // weak_ptr backing the provider).
   LuaPlus::LuaObject natTraversal;
-  boost::weak_ptr<INetNATTraversalProvider> natProvider;
+  std::weak_ptr<INetNATTraversalProvider> natProvider;
   boost::AssignWeakFromShared(natProvider, GPGNET_GetPtr());
   (void)moho::NET_MakeNATTraversal(state, &natTraversal, &natProvider);
 

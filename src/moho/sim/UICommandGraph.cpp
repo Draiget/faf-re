@@ -406,14 +406,15 @@ namespace moho
 
   namespace
   {
-    /// The bucket tree's key order: by the texture's control block, which is what `boost::shared_ptr`'s `operator<`
-    /// compares (`sp_counted_base*` ordering in FUN_0082B8B0 and its insert helpers).
+    /// The bucket tree's key order: by the texture's control block, which is what retail's `boost::shared_ptr`
+    /// `operator<` compares (`sp_counted_base*` ordering in FUN_0082B8B0 and its insert helpers), and what
+    /// `owner_before` compares.
     [[nodiscard]] bool TextureOwnerBefore(
-      const boost::shared_ptr<ID3DTextureSheet>& lhs,
-      const boost::shared_ptr<ID3DTextureSheet>& rhs
+      const std::shared_ptr<ID3DTextureSheet>& lhs,
+      const std::shared_ptr<ID3DTextureSheet>& rhs
     ) noexcept
     {
-      return lhs < rhs;
+      return lhs.owner_before(rhs);
     }
   } // namespace
 
@@ -423,7 +424,7 @@ namespace moho
    */
   UICommandGraph::CommandGraphTreeBucket* UICommandGraph::InitCommandGraphTreeBucketValue(
     CommandGraphTreeBucket* const destination,
-    const boost::shared_ptr<ID3DTextureSheet>& texture
+    const std::shared_ptr<ID3DTextureSheet>& texture
   )
   {
     ::new (static_cast<void*>(destination)) CommandGraphTreeBucket();
@@ -497,7 +498,7 @@ namespace moho
     CommandGraphTree& tree,
     const bool addLeft,
     CommandGraphTreeNode* const where,
-    const boost::shared_ptr<ID3DTextureSheet>& texture
+    const std::shared_ptr<ID3DTextureSheet>& texture
   )
   {
     if (0xAAAAAA9u <= tree.mSize) {
@@ -584,7 +585,7 @@ namespace moho
    */
   UICommandGraph::CommandGraphTreeNode* UICommandGraph::AttachCommandGraphNodeUnique(
     CommandGraphTree& tree,
-    const boost::shared_ptr<ID3DTextureSheet>& texture
+    const std::shared_ptr<ID3DTextureSheet>& texture
   )
   {
     CommandGraphTreeNode* where = tree.mHead;
@@ -616,7 +617,7 @@ namespace moho
   UICommandGraph::CommandGraphTreeNode* UICommandGraph::AttachCommandGraphNodeHinted(
     CommandGraphTree& tree,
     CommandGraphTreeNode* const hint,
-    const boost::shared_ptr<ID3DTextureSheet>& texture
+    const std::shared_ptr<ID3DTextureSheet>& texture
   )
   {
     if (tree.mSize == 0u) {
@@ -655,7 +656,7 @@ namespace moho
    */
   fa::vector<UICommandGraph::CommandGraphEdge*>& UICommandGraph::FindOrInsertCommandGraphBucket(
     CommandGraphTree& tree,
-    const boost::shared_ptr<ID3DTextureSheet>& texture
+    const std::shared_ptr<ID3DTextureSheet>& texture
   )
   {
     CommandGraphTreeNode* candidate = tree.mHead;
@@ -862,7 +863,7 @@ namespace moho
     const fa::string shaderName("UnitPlace");
     const fa::string emptyLookupName;
     const fa::string emptySecondaryName;
-    const boost::shared_ptr<MeshMaterial> material = MeshMaterial::Create(
+    const std::shared_ptr<MeshMaterial> material = MeshMaterial::Create(
       shaderName, lod->mAlbedoName, lod->mNormalsName, lod->mSpecularName, emptyLookupName, emptySecondaryName, nullptr
     );
 
@@ -1387,7 +1388,7 @@ namespace moho
     const auto commandType = ResolveCommandIssueHelperCommandType(*helper);
     const CommandGraphNode& node = mNodes[static_cast<std::size_t>(commandType)];
 
-    boost::shared_ptr<CD3DBatchTexture> texture = node.mWaypointTexture;
+    std::shared_ptr<CD3DBatchTexture> texture = node.mWaypointTexture;
 
     std::uint32_t color = 0;
     float styleScale = 0.0f;
@@ -2748,7 +2749,7 @@ namespace moho
       const auto commandType = ResolveCommandIssueHelperCommandType(*helper);
       const UICommandGraph::CommandGraphNode& style = graph.mNodes[static_cast<std::size_t>(commandType)];
 
-      const boost::shared_ptr<ID3DTextureSheet>& texture = style.mOrderlineTexture;
+      const std::shared_ptr<ID3DTextureSheet>& texture = style.mOrderlineTexture;
       if (texture) {
         fa::vector<UICommandGraph::CommandGraphEdge*>& bucket =
           UICommandGraph::FindOrInsertCommandGraphBucket(graph.mCommandGraphTree, texture);
@@ -2967,7 +2968,7 @@ namespace moho
     const float tickFraction
   )
   {
-    if (const boost::shared_ptr<UICommandGraph> graph = GetCommandGraph(false)) {
+    if (const std::shared_ptr<UICommandGraph> graph = GetCommandGraph(false)) {
       graph->DrawCommandGraphMesh(camera, *batcher, gameTick, tickFraction);
     }
   }

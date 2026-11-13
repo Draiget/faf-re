@@ -16,7 +16,7 @@ namespace moho
 
   namespace
   {
-    using BatchTextureHandle = boost::shared_ptr<CD3DBatchTexture>;
+    using BatchTextureHandle = std::shared_ptr<CD3DBatchTexture>;
 
     // The atlas holds a shared handle to each of its textures, so an address here can't have been
     // reused while the entry exists; Reset and the destructor, which free entries, clear the table.
@@ -105,9 +105,9 @@ namespace moho
     const TextureAtlasEntry& rhs
   ) const noexcept
   {
-    // `boost::shared_ptr`'s `operator<` is this Boost's owner order (control-block pointers).
-    const bool lhsOwnerFirst = lhs.mTexture < rhs.mTexture;
-    const bool rhsOwnerFirst = rhs.mTexture < lhs.mTexture;
+    // Retail's `boost::shared_ptr` `operator<` is the owner order (control-block pointers): `owner_before`.
+    const bool lhsOwnerFirst = lhs.mTexture.owner_before(rhs.mTexture);
+    const bool rhsOwnerFirst = rhs.mTexture.owner_before(lhs.mTexture);
     if (!lhsOwnerFirst && !rhsOwnerFirst) {
       return lhs.mTexture.get() < rhs.mTexture.get();
     }
@@ -170,7 +170,7 @@ namespace moho
    * uploads the texture payload, and stores one new UV mapping.
    */
   const gpg::Rect2f* CD3DTextureBatcher::AddTexture(
-    const boost::shared_ptr<CD3DBatchTexture>& texture
+    const std::shared_ptr<CD3DBatchTexture>& texture
   )
   {
     if (!texture) {
@@ -251,7 +251,7 @@ namespace moho
    * Uploads dirty atlas bytes to the dynamic texture and returns the retained
    * sheet handle as `ID3DTextureSheet`.
    */
-  boost::shared_ptr<ID3DTextureSheet> CD3DTextureBatcher::GetCompositeTexture()
+  std::shared_ptr<ID3DTextureSheet> CD3DTextureBatcher::GetCompositeTexture()
   {
     const std::uint32_t dirtyLane = static_cast<std::uint32_t>(mDirty);
     if (!IsZero(&dirtyLane)) {
@@ -288,7 +288,7 @@ namespace moho
       mDirty = 0;
     }
 
-    boost::shared_ptr<ID3DTextureSheet> outTexture = mDynTexSheet;
+    std::shared_ptr<ID3DTextureSheet> outTexture = mDynTexSheet;
     return outTexture;
   }
 

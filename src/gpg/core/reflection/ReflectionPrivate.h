@@ -14,7 +14,7 @@
 #include <stdexcept>
 #include <utility>
 
-#include <boost/shared_ptr.hpp>
+#include <memory>
 
 #include "BadRefCast.h"
 #include "gpg/core/containers/Rect2.h"

@@ -1226,11 +1226,11 @@ namespace moho
    * `shared_ptr::reset(Y*)` and `weak_ptr::operator=`, emitted for
    * `UICommandGraph` (cited in BoostWrappers.h).
    */
-  boost::shared_ptr<UICommandGraph> CWldSession::GetCommandGraph(
+  std::shared_ptr<UICommandGraph> CWldSession::GetCommandGraph(
     const bool allowCreate
   )
   {
-    boost::shared_ptr<UICommandGraph> graph = mCommandGraph.lock();
+    std::shared_ptr<UICommandGraph> graph = mCommandGraph.lock();
     if (!graph && allowCreate) {
       graph.reset(new UICommandGraph(this));
       mCommandGraph = graph;
@@ -1247,7 +1247,7 @@ namespace moho
    */
   void CWldSession::DirtyCommandGraph()
   {
-    if (const boost::shared_ptr<UICommandGraph> graph = mCommandGraph.lock()) {
+    if (const std::shared_ptr<UICommandGraph> graph = mCommandGraph.lock()) {
       graph->MarkDirty();
     }
   }
@@ -1527,7 +1527,7 @@ namespace moho
    * Returns a retained copy of `mDebugCanvas` (+0x0414/+0x0418) - the tick
    * debug canvas `DoBeat` re-seats every beat from `beat.mTickDebugCanvas`.
    */
-  boost::shared_ptr<CDebugCanvas> CWldSession::GetTickDebugCanvas() const
+  std::shared_ptr<CDebugCanvas> CWldSession::GetTickDebugCanvas() const
   {
     return mDebugCanvas;
   }
@@ -1542,7 +1542,7 @@ namespace moho
    * What it does:
    * Returns a retained copy of `mBeatDebugCanvas` (+0x041C/+0x0420).
    */
-  boost::shared_ptr<CDebugCanvas> CWldSession::GetBeatDebugCanvas() const
+  std::shared_ptr<CDebugCanvas> CWldSession::GetBeatDebugCanvas() const
   {
     return mBeatDebugCanvas;
   }
@@ -2173,7 +2173,7 @@ namespace moho
       mTimeSinceLastTick = std::max(0.0f, std::min(remainder, 1.0f));
     }
 
-    if (const boost::shared_ptr<UICommandGraph> commandGraph = GetCommandGraph(false)) {
+    if (const std::shared_ptr<UICommandGraph> commandGraph = GetCommandGraph(false)) {
       commandGraph->CreateMeshes();
     }
 
@@ -2392,9 +2392,9 @@ namespace moho
    * Alias of FUN_00896F00 (non-canonical helper lane).
    * ?GetSaveData@CWldSession@Moho@@QBE?AV?$shared_ptr@USSessionSaveData@Moho@@@boost@@XZ)
    */
-  boost::shared_ptr<SSessionSaveData> CWldSession::GetSaveData() const
+  std::shared_ptr<SSessionSaveData> CWldSession::GetSaveData() const
   {
-    boost::shared_ptr<SSessionSaveData> saveData{new SSessionSaveData()};
+    std::shared_ptr<SSessionSaveData> saveData{new SSessionSaveData()};
     // Every unit's named selection sets, keyed by the unit's entity id. This
     // walked the entity map through a third private node layout, called
     // vtable +0x0C through an invented `ISessionSaveSourceProvider` -- that

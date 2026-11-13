@@ -10,7 +10,7 @@
 #include <d3dx11effect.h>
 #include <wrl/client.h>
 
-#include "boost/shared_ptr.h"
+#include <memory>
 #include "gpg/gal/Effect.hpp"
 #include "gpg/gal/EffectContext.hpp"
 #include "gpg/gal/EffectTechnique.hpp"
@@ -27,9 +27,9 @@ namespace gpg::gal
     ~EffectD3D11() override;
 
     EffectContext* GetContext() override;
-    void GetTechniques(fa::vector<boost::shared_ptr<EffectTechnique>>& outTechniques) override;
-    boost::shared_ptr<EffectVariable> GetVariable(const char* name) override;
-    boost::shared_ptr<EffectTechnique> GetTechnique(const char* name) override;
+    void GetTechniques(fa::vector<std::shared_ptr<EffectTechnique>>& outTechniques) override;
+    std::shared_ptr<EffectVariable> GetVariable(const char* name) override;
+    std::shared_ptr<EffectTechnique> GetTechnique(const char* name) override;
     /** Nothing to do: Direct3D 11 resources survive a mode change. */
     void OnReset() override;
     void OnLost() override;
@@ -71,9 +71,9 @@ namespace gpg::gal
 
     fa::string* GetName() override;
     /** No cube targets on this backend yet, as on D3D10. */
-    void SetCubeRenderTarget(boost::shared_ptr<CubeRenderTarget> cubeTarget) override;
-    void SetRenderTarget(boost::shared_ptr<RenderTarget> renderTarget) override;
-    void SetTexture(boost::shared_ptr<Texture> texture) override;
+    void SetCubeRenderTarget(std::shared_ptr<CubeRenderTarget> cubeTarget) override;
+    void SetRenderTarget(std::shared_ptr<RenderTarget> renderTarget) override;
+    void SetTexture(std::shared_ptr<Texture> texture) override;
     void SetMatrix4x4(const Matrix* matrix) override;
     void SetFloatArray(std::uint32_t count, const float* values) override;
     void SetVector(const float* vector4) override;

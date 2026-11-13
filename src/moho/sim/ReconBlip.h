@@ -52,9 +52,9 @@ namespace moho
       const RMeshBlueprint* mMeshTypeClassId; // +0x08
       RMeshBlueprint* mStiMesh;               // +0x08
     };
-    boost::shared_ptr<RScmResource> mMesh;  // +0x0C
-    boost::shared_ptr<CAniPose> mPriorPose; // +0x14
-    boost::shared_ptr<CAniPose> mPose;      // +0x1C
+    std::shared_ptr<RScmResource> mMesh;    // +0x0C
+    std::shared_ptr<CAniPose> mPriorPose;   // +0x14
+    std::shared_ptr<CAniPose> mPose;        // +0x1C
     float mHealth;                          // +0x24
     float mMaxHealth;                       // +0x28
     float mFractionComplete;                // +0x2C
@@ -140,7 +140,7 @@ namespace moho
   {
     std::uint8_t mBuildStateTag = 0;                 // +0x00
     std::uint8_t mPad01[3] = {};                     // +0x01
-    boost::shared_ptr<Stats<StatItem>> mStatsRoot{}; // +0x04
+    std::shared_ptr<Stats<StatItem>> mStatsRoot{};   // +0x04
     std::uint8_t mFake = 0;                          // +0x0C
     std::uint8_t mPad0D[3] = {};                     // +0x0D
   };

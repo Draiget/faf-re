@@ -126,12 +126,12 @@ namespace
    * Builds the shared-pointer control lane for the process-global default
    * animation skeleton and binds the no-delete deleter.
    */
-  boost::shared_ptr<const moho::CAniSkel>* BuildDefaultAniSkelSharedPtr(
-    boost::shared_ptr<const moho::CAniSkel>* const outShared
+  std::shared_ptr<const moho::CAniSkel>* BuildDefaultAniSkelSharedPtr(
+    std::shared_ptr<const moho::CAniSkel>* const outShared
   )
   {
     if (outShared != nullptr) {
-      *outShared = boost::shared_ptr<const moho::CAniSkel>(
+      *outShared = std::shared_ptr<const moho::CAniSkel>(
         static_cast<const moho::CAniSkel*>(&DefaultAniSkelSingleton()), NoDeleteAniSkel{}
       );
     }
@@ -164,7 +164,7 @@ namespace moho
    * can binary-search it, and per-bone bounds are rebuilt.
    */
   CAniSkel::CAniSkel(
-    const boost::shared_ptr<const SScmFile>& file
+    const std::shared_ptr<const SScmFile>& file
   )
     : mFile(file)
   {
@@ -352,9 +352,9 @@ namespace moho
    * What it does:
    * Returns a shared pointer to process-global default skeleton storage.
    */
-  boost::shared_ptr<const CAniSkel> CAniSkel::GetDefaultSkeleton()
+  std::shared_ptr<const CAniSkel> CAniSkel::GetDefaultSkeleton()
   {
-    boost::shared_ptr<const CAniSkel> result{};
+    std::shared_ptr<const CAniSkel> result{};
     (void)BuildDefaultAniSkelSharedPtr(&result);
     return result;
   }
@@ -374,7 +374,7 @@ namespace moho
    * transform's quaternion is always in `VMatrix4::Set`'s convention).
    */
   void CAniSkel::RebindFile(
-    const boost::shared_ptr<const SScmFile>& file
+    const std::shared_ptr<const SScmFile>& file
   )
   {
     const char* const oldBase = reinterpret_cast<const char*>(mFile.get());

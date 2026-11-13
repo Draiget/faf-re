@@ -343,7 +343,7 @@ namespace gpg::gal
   bool DeviceD3D12::SetRayInstances(
     const RayInstance* const instances,
     const std::uint32_t count,
-    const boost::shared_ptr<Texture>* const textures,
+    const std::shared_ptr<Texture>* const textures,
     const std::uint32_t textureCount
   )
   {
@@ -480,7 +480,7 @@ namespace gpg::gal
     const std::lock_guard<std::recursive_mutex> lock(mMutex);
     // The textures in the read state (a new one, or one a mip update put back into copy-dest).
     bool moved = false;
-    for (const boost::shared_ptr<Texture>& texture : mRayTextures) {
+    for (const std::shared_ptr<Texture>& texture : mRayTextures) {
       d3d12::TrackedResource& resource = static_cast<TextureD3D12*>(texture.get())->Resource();
       constexpr D3D12_RESOURCE_STATES kRead =
         D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
@@ -503,7 +503,7 @@ namespace gpg::gal
     mRayTextureTable = AllocateTable(kRayTextureSlots, cpu);
     const UINT increment = mDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
     std::uint32_t written = 0U;
-    for (const boost::shared_ptr<Texture>& texture : mRayTextures) {
+    for (const std::shared_ptr<Texture>& texture : mRayTextures) {
       D3D12_CPU_DESCRIPTOR_HANDLE destination = cpu;
       destination.ptr += static_cast<SIZE_T>(written) * increment;
       const auto* const texture12 = static_cast<const TextureD3D12*>(texture.get());

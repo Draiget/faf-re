@@ -338,7 +338,7 @@ namespace faf::remote::client
     out.mesh = data.mScmResource;
     out.scale = data.mScale;
     out.blueprint = view.blueprint;
-    out.pose = view.removed ? boost::shared_ptr<moho::CAniPose>() : view.pose;
+    out.pose = view.removed ? std::shared_ptr<moho::CAniPose>() : view.pose;
     out.isUnit = view.isUnit;
     return true;
   }

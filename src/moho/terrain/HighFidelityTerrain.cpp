@@ -54,8 +54,8 @@
 
 namespace
 {
-  using TextureSheetHandle = boost::shared_ptr<moho::CD3DDynamicTextureSheet>;
-  using TextureResourceHandle = boost::shared_ptr<moho::RD3DTextureResource>;
+  using TextureSheetHandle = std::shared_ptr<moho::CD3DDynamicTextureSheet>;
+  using TextureResourceHandle = std::shared_ptr<moho::RD3DTextureResource>;
 
   moho::WaterSurface* sHighFidelityWaterSurface = nullptr;
   TextureSheetHandle sHighFidelityNoiseFillTexture{};
@@ -440,7 +440,7 @@ namespace moho
    * the optional terrain-normal map texture handle for terrain normal passes.
    */
   void HighFidelityTerrain::LoadShaderVars(
-    const boost::shared_ptr<ID3DRenderTarget>& terrainNormalTexture
+    const std::shared_ptr<ID3DRenderTarget>& terrainNormalTexture
   )
   {
     auto& shaderVars = GetTerrainShaderVars();
@@ -449,9 +449,7 @@ namespace moho
     StratumMaterial& strata = terrainRes->GetStratumMaterial();
     strata.SetSizeTo(terrainRes);
 
-    BindTextureShaderVar(
-      shaderVars.skirtTexture, boost::static_pointer_cast<ID3DTextureSheet>(sHighFidelityGridTexture)
-    );
+    BindTextureShaderVar(shaderVars.skirtTexture, std::static_pointer_cast<ID3DTextureSheet>(sHighFidelityGridTexture));
     BindTextureShaderVar(shaderVars.utilityTextureA, strata.mStratumMask0);
     BindTextureShaderVar(shaderVars.utilityTextureB, strata.mStratumMask1);
     BindTextureShaderVar(shaderVars.utilityTextureC, terrainRes->GetWaterMap());
@@ -632,7 +630,7 @@ namespace moho
         shaderVars.shadowMatrix.SetMatrix4x4(&shadowContext->mCamera.viewProjection);
       }
 
-      const boost::shared_ptr<CD3DRenderTarget> shadowTexture = shadowContext->GetShadowTexture();
+      const std::shared_ptr<CD3DRenderTarget> shadowTexture = shadowContext->GetShadowTexture();
       shaderVars.shadowTexture.SetRenderTargetTexture(shadowTexture);
 
     } else {
@@ -642,7 +640,7 @@ namespace moho
 
     shaderVars.noiseTexture.GetTexture(sHighFidelityNoiseFillTexture);
     shaderVars.decalMaskTexture.GetTexture(
-      boost::static_pointer_cast<CD3DDynamicTextureSheet>(boost::static_pointer_cast<ID3DTextureSheet>(mDecalMask))
+      std::static_pointer_cast<CD3DDynamicTextureSheet>(std::static_pointer_cast<ID3DTextureSheet>(mDecalMask))
     );
     shaderVars.biCubicLookup.GetTexture(sHighFidelityCubicBlendLookupTexture);
   }
@@ -1001,8 +999,8 @@ namespace moho
       // GetTexture(slot, phaseOffset, frameSeed): the float is the frame delta
       // and the int seed is the game tick, which is the only type-consistent
       // reading of the two values the caller threads through.
-      const boost::shared_ptr<ID3DTextureSheet> texture = decal.GetTexture(0, deltaSeconds, gameTick);
-      shaderVars.decalNormalTexture.GetTexture(boost::static_pointer_cast<CD3DDynamicTextureSheet>(texture));
+      const std::shared_ptr<ID3DTextureSheet> texture = decal.GetTexture(0, deltaSeconds, gameTick);
+      shaderVars.decalNormalTexture.GetTexture(std::static_pointer_cast<CD3DDynamicTextureSheet>(texture));
 
       std::int32_t primitiveType = kTriangleListPrimitiveToken;
 
@@ -1201,10 +1199,10 @@ namespace moho
         shaderVars.decalMatrix.SetMatrix4x4(&decal.mTexMatrix);
       }
 
-      const boost::shared_ptr<ID3DTextureSheet> albedoSheet = decal.GetTexture(0, deltaSeconds, gameTick);
-      const boost::shared_ptr<ID3DTextureSheet> specSheet = decal.GetTexture(1, deltaSeconds, gameTick);
-      shaderVars.decalAlbedoTexture.GetTexture(boost::static_pointer_cast<CD3DDynamicTextureSheet>(albedoSheet));
-      shaderVars.decalSpecTexture.GetTexture(boost::static_pointer_cast<CD3DDynamicTextureSheet>(specSheet));
+      const std::shared_ptr<ID3DTextureSheet> albedoSheet = decal.GetTexture(0, deltaSeconds, gameTick);
+      const std::shared_ptr<ID3DTextureSheet> specSheet = decal.GetTexture(1, deltaSeconds, gameTick);
+      shaderVars.decalAlbedoTexture.GetTexture(std::static_pointer_cast<CD3DDynamicTextureSheet>(albedoSheet));
+      shaderVars.decalSpecTexture.GetTexture(std::static_pointer_cast<CD3DDynamicTextureSheet>(specSheet));
 
       if (shaderVars.decalAlpha.Exists()) {
         shaderVars.decalAlpha.SetFloat(command.alpha);
@@ -1248,7 +1246,7 @@ namespace moho
     if (splatVertexCount > 10000U) {
       D3D_GetDevice()->SelectTechnique("TSplats");
       GetTerrainShaderVars().decalAlbedoTexture.GetTexture(
-        boost::static_pointer_cast<CD3DDynamicTextureSheet>(sHighFidelityTextureBatcher->GetCompositeTexture())
+        std::static_pointer_cast<CD3DDynamicTextureSheet>(sHighFidelityTextureBatcher->GetCompositeTexture())
       );
       DrawSplatChunksPassMajor(
         D3D_GetDevice(), mDynamicVertexSheet, mDynamicIndexSheet, mSplatVertices.data(), splatVertexCount, 2500
@@ -1265,7 +1263,7 @@ namespace moho
 
     auto& shaderVars = GetTerrainShaderVars();
     shaderVars.decalAlbedoTexture.GetTexture(
-      boost::static_pointer_cast<CD3DDynamicTextureSheet>(sHighFidelityTextureBatcher->GetCompositeTexture())
+      std::static_pointer_cast<CD3DDynamicTextureSheet>(sHighFidelityTextureBatcher->GetCompositeTexture())
     );
 
     std::int32_t primitiveType = kTriangleListPrimitiveToken;
@@ -1317,7 +1315,7 @@ namespace moho
       }
 
       shaderVars.decalAlbedoTexture.GetTexture(
-        boost::static_pointer_cast<CD3DDynamicTextureSheet>(decal.GetTexture(0, deltaSeconds, gameTick))
+        std::static_pointer_cast<CD3DDynamicTextureSheet>(decal.GetTexture(0, deltaSeconds, gameTick))
       );
 
       if (shaderVars.decalAlpha.Exists()) {
@@ -1367,7 +1365,7 @@ namespace moho
   bool HighFidelityTerrain::DrawNormals(
     const std::int32_t gameTick,
     const float deltaSeconds,
-    const boost::shared_ptr<ID3DRenderTarget>& terrainNormalTexture,
+    const std::shared_ptr<ID3DRenderTarget>& terrainNormalTexture,
     Shadow* const shadowContext
   )
   {
@@ -1489,7 +1487,7 @@ namespace moho
       }
 
       shaderVars.decalAlbedoTexture.GetTexture(
-        boost::static_pointer_cast<CD3DDynamicTextureSheet>(decal.GetTexture(0, deltaSeconds, gameTick))
+        std::static_pointer_cast<CD3DDynamicTextureSheet>(decal.GetTexture(0, deltaSeconds, gameTick))
       );
 
       if (shaderVars.decalAlpha.Exists()) {
@@ -1530,8 +1528,8 @@ namespace moho
   void HighFidelityTerrain::DrawWaterTerrain(
     const std::int32_t tick,
     const float tickLerp,
-    const boost::shared_ptr<ID3DRenderTarget> refractionTexture,
-    const boost::shared_ptr<ID3DRenderTarget> reflectionTexture
+    const std::shared_ptr<ID3DRenderTarget> refractionTexture,
+    const std::shared_ptr<ID3DRenderTarget> reflectionTexture
   )
   {
     const float inverseRenderWidth = 1.0F / static_cast<float>(mViewportRenderWidth);
@@ -1771,7 +1769,7 @@ namespace moho
    * `MediumFidelityTerrain::DrawTerrain` (0x00807660).
    */
   void HighFidelityTerrain::DrawTerrain(
-    boost::shared_ptr<CD3DDynamicTextureSheet> overlayTexture,
+    std::shared_ptr<CD3DDynamicTextureSheet> overlayTexture,
     const fa::string* const techniqueName
   )
   {

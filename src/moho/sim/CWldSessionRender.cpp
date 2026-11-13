@@ -240,9 +240,9 @@ namespace moho
       float mWorldX = 0.0f;                                // +0x08
       float mWorldY = 0.0f;                                // +0x0C
       float mWorldZ = 0.0f;                                // +0x10
-      boost::shared_ptr<CD3DBatchTexture> mIconTexture;    // +0x14
-      boost::shared_ptr<CD3DBatchTexture> mPausedTexture;  // +0x1C
-      boost::shared_ptr<CD3DBatchTexture> mStunnedTexture; // +0x24
+      std::shared_ptr<CD3DBatchTexture> mIconTexture;      // +0x14
+      std::shared_ptr<CD3DBatchTexture> mPausedTexture;    // +0x1C
+      std::shared_ptr<CD3DBatchTexture> mStunnedTexture;   // +0x24
       /// Own or allied unit: the only ones whose icon blinks while fresh.
       bool mIsFriendly = false; // +0x2C
       /// Draw the pause/toggle-off overlay over the icon.
@@ -334,10 +334,10 @@ namespace moho
       const GeomCamera3* mCamera = nullptr; // +0x18
       /// Sub-tick interpolant for this frame; see the `+0x1C` note above.
       float mTickFraction = 0.0f;                                    // +0x1C
-      boost::shared_ptr<CD3DBatchTexture> mWhiteTexture;             // +0x20
-      fa::vector<boost::shared_ptr<CD3DBatchTexture>> mGenericIcons; // +0x28
-      boost::shared_ptr<CD3DBatchTexture> mPauseRestTexture;         // +0x38
-      boost::shared_ptr<CD3DBatchTexture> mStunnedRestTexture;       // +0x40
+      std::shared_ptr<CD3DBatchTexture> mWhiteTexture;               // +0x20
+      fa::vector<std::shared_ptr<CD3DBatchTexture>> mGenericIcons;   // +0x28
+      std::shared_ptr<CD3DBatchTexture> mPauseRestTexture;           // +0x38
+      std::shared_ptr<CD3DBatchTexture> mStunnedRestTexture;         // +0x40
       fa::vector<UnitIconData> mGroundIcons;                         // +0x48
       fa::vector<UnitIconData> mAirIcons;                            // +0x58
       fa::vector<UnitIconData> mHighPriorityIcons;                   // +0x68
@@ -474,7 +474,7 @@ namespace moho
       StrategicIconAux& aux,
       const EStrategicIconRun run,
       const UnitIconData& data,
-      const boost::shared_ptr<CD3DBatchTexture>* const icon
+      const std::shared_ptr<CD3DBatchTexture>* const icon
     )
     {
       if (run == EStrategicIconRun::Hovered) {
@@ -532,7 +532,7 @@ namespace moho
     struct StrategicIconCandidate
     {
       UnitIconData mData;
-      const boost::shared_ptr<CD3DBatchTexture>* mIcon;
+      const std::shared_ptr<CD3DBatchTexture>* mIcon;
       EStrategicIconRun mRun;
     };
 
@@ -592,11 +592,11 @@ namespace moho
       Wm3::Vector3f mCurrentPosition{};
       float mImpact = 0.0f;
       /// The icon `PickUnitStrategicIconTexture` picks for an unhovered unit, unselected and selected.
-      const boost::shared_ptr<CD3DBatchTexture>* mIcon = nullptr;
-      const boost::shared_ptr<CD3DBatchTexture>* mSelectedIcon = nullptr;
+      const std::shared_ptr<CD3DBatchTexture>* mIcon = nullptr;
+      const std::shared_ptr<CD3DBatchTexture>* mSelectedIcon = nullptr;
       /// The same for a hovered unit (`Over` / `SelectedOver`, or the highlighted generic icon).
-      const boost::shared_ptr<CD3DBatchTexture>* mHoveredIcon = nullptr;
-      const boost::shared_ptr<CD3DBatchTexture>* mHoveredSelectedIcon = nullptr;
+      const std::shared_ptr<CD3DBatchTexture>* mHoveredIcon = nullptr;
+      const std::shared_ptr<CD3DBatchTexture>* mHoveredSelectedIcon = nullptr;
       std::uint16_t mFlags = 0U;
 
       [[nodiscard]] bool Has(
@@ -758,7 +758,7 @@ namespace moho
      * ++src.pn->use_count_`) from one of `aux->mGenericIcons`'s eight slots
      * or `aux->mWhiteTexture` - never a weak-to-shared promotion.
      */
-    [[nodiscard]] const boost::shared_ptr<CD3DBatchTexture>& PickGenericStrategicIconTexture(
+    [[nodiscard]] const std::shared_ptr<CD3DBatchTexture>& PickGenericStrategicIconTexture(
       const StrategicIconAux& aux,
       const UnitIconData& iconData,
       const bool wantHighlightVariant
@@ -816,7 +816,7 @@ namespace moho
      *    `mStrategicIconRest/Selected/Over/SelectedOver` exactly (see the
      *    retype note on those fields in `REntityBlueprint.h`).
      */
-    [[nodiscard]] const boost::shared_ptr<CD3DBatchTexture>& PickUnitStrategicIconTexture(
+    [[nodiscard]] const std::shared_ptr<CD3DBatchTexture>& PickUnitStrategicIconTexture(
       const StrategicIconAux& aux,
       const UnitIconData& iconData,
       const bool isSelected,
@@ -900,7 +900,7 @@ namespace moho
         return false;
       }
 
-      const boost::shared_ptr<CAniPose> pose = entity.mMeshInstance->ComputeDebugPose();
+      const std::shared_ptr<CAniPose> pose = entity.mMeshInstance->ComputeDebugPose();
       if (!pose) {
         return false;
       }
@@ -934,7 +934,7 @@ namespace moho
       ID3DDeviceResources* const resources = device->GetResources();
       ID3DDeviceResources::TextureResourceHandle textureHandle{};
       (void)resources->GetTexture(textureHandle, path, nullptr, true);
-      batcher.SetTexture(boost::shared_ptr<ID3DTextureSheet>(textureHandle));
+      batcher.SetTexture(std::shared_ptr<ID3DTextureSheet>(textureHandle));
     }
 
     /**
@@ -1214,7 +1214,7 @@ namespace moho
             );
 
             const float uniformScale = blueprint->Display.UniformScale;
-            preview.mMesh = boost::shared_ptr<MeshInstance>(renderer->CreateMeshInstance(
+            preview.mMesh = std::shared_ptr<MeshInstance>(renderer->CreateMeshInstance(
               0, 0, meshBlueprint, Wm3::Vec3f{uniformScale, uniformScale, uniformScale}, false, preview.mMaterial
             ));
 
@@ -1841,7 +1841,7 @@ namespace moho
       std::uint32_t mColor = 0u;
       bool mVisible = true;
       /// The identified underlay to draw under the icon, or null (the entity's own handle).
-      const boost::shared_ptr<CD3DBatchTexture>* mUnderlay = nullptr;
+      const std::shared_ptr<CD3DBatchTexture>* mUnderlay = nullptr;
     };
 
     [[nodiscard]] UnitIconPlacement PlaceUnitIcon(
@@ -1904,7 +1904,7 @@ namespace moho
 
         // `UserEntity::GetStrategicUnderlayTexture` returns a copy of this handle; the draw only
         // needs to read it.
-        const boost::shared_ptr<CD3DBatchTexture>& underlay = icon.mUnit->mVariableData.mUnderlayTexture;
+        const std::shared_ptr<CD3DBatchTexture>& underlay = icon.mUnit->mVariableData.mUnderlayTexture;
         if (hasIdentifiedOwner && underlay) {
           placement.mUnderlay = &underlay;
         }
@@ -1962,9 +1962,7 @@ namespace moho
       EmitUnitIconQuads(
         icon,
         placement,
-        [&](
-          const boost::shared_ptr<CD3DBatchTexture>& texture, const float x, const float y, const std::uint32_t color
-        ) {
+        [&](const std::shared_ptr<CD3DBatchTexture>& texture, const float x, const float y, const std::uint32_t color) {
         aux.mBatcher->SetTexture(texture);
         DrawStrategicIconQuad(*aux.mBatcher, x, y, *texture, color);
       }
@@ -1998,7 +1996,7 @@ namespace moho
       }
 
       void operator()(
-        const boost::shared_ptr<CD3DBatchTexture>& texture,
+        const std::shared_ptr<CD3DBatchTexture>& texture,
         const float centerX,
         const float centerY,
         const std::uint32_t color
@@ -2060,7 +2058,7 @@ namespace moho
       // The textures `StoreStrategicIcon` would attach: the picked icon, and the paused and
       // stunned rest textures when the flags ask for them.
       const UnitIconData& icon = candidate.mData;
-      const boost::shared_ptr<CD3DBatchTexture>* layers[StrategicIconInstance::kLayerCount] = {
+      const std::shared_ptr<CD3DBatchTexture>* layers[StrategicIconInstance::kLayerCount] = {
         placement.mUnderlay,
         icon.mSuppressBaseIcon ? nullptr : candidate.mIcon,
         (icon.mShowPausedOverlay && aux.mPauseRestTexture) ? &aux.mPauseRestTexture : nullptr,
@@ -2103,7 +2101,7 @@ namespace moho
       sGpuPlacements.resize(count);
       sIncomplete.assign(count, 0U);
 
-      const auto findSlot = [&renderer](const boost::shared_ptr<CD3DBatchTexture>& texture) {
+      const auto findSlot = [&renderer](const std::shared_ptr<CD3DBatchTexture>& texture) {
         return renderer.FindSlot(texture.get());
       };
       const auto build = [&](const std::size_t begin, const std::size_t end) {
@@ -2121,7 +2119,7 @@ namespace moho
       }
 
       // Textures seen for the first time get their slot here, on this thread.
-      const auto addSlot = [&renderer](const boost::shared_ptr<CD3DBatchTexture>& texture) {
+      const auto addSlot = [&renderer](const std::shared_ptr<CD3DBatchTexture>& texture) {
         return renderer.AddSlot(texture);
       };
       for (std::size_t i = 0; i < count; ++i) {
@@ -2228,7 +2226,7 @@ namespace moho
       const auto recorder = [](std::vector<Stored>& out) {
         return
           [&out](
-            const EStrategicIconRun run, const UnitIconData& data, const boost::shared_ptr<CD3DBatchTexture>* const icon
+            const EStrategicIconRun run, const UnitIconData& data, const std::shared_ptr<CD3DBatchTexture>* const icon
           ) {
           out.push_back(
             Stored{
@@ -2535,7 +2533,7 @@ namespace moho
         const bool isSelected = session.mSelection.Find(entity) != session.mSelection.end();
 
         // The texture handles are attached where the record is stored (`StoreStrategicIcon`).
-        const boost::shared_ptr<CD3DBatchTexture>& icon =
+        const std::shared_ptr<CD3DBatchTexture>& icon =
           PickUnitStrategicIconTexture(aux, iconData, isSelected, selectedVariantEligible, isHovered);
         if (!icon) {
           return;
@@ -2738,7 +2736,7 @@ namespace moho
         record.mColor = iconColor;
         record.mLastFocusDamageTick = entity->mLastFocusDamageGameTick;
 
-        const auto findSlot = [this](const boost::shared_ptr<CD3DBatchTexture>* const texture) -> std::uint32_t {
+        const auto findSlot = [this](const std::shared_ptr<CD3DBatchTexture>* const texture) -> std::uint32_t {
           return (texture != nullptr && *texture) ? gpuIcons.FindSlot(texture->get()) : StrategicIconInstance::kNoLayer;
         };
         const std::uint32_t iconSlot = findSlot(source.mIcon);
@@ -2748,7 +2746,7 @@ namespace moho
         record.mIconSlots = iconSlot | (findSlot(source.mSelectedIcon) << 16U);
         // The hovered textures get their slots when the unit is first hovered.
         record.mHoveredIconSlots = findSlot(source.mHoveredIcon) | (findSlot(source.mHoveredSelectedIcon) << 16U);
-        const boost::shared_ptr<CD3DBatchTexture>& underlay = entity->mVariableData.mUnderlayTexture;
+        const std::shared_ptr<CD3DBatchTexture>& underlay = entity->mVariableData.mUnderlayTexture;
         if (hasIdentifiedOwner && underlay) {
           const std::uint32_t underlaySlot = gpuIcons.FindSlot(underlay.get());
           if (underlaySlot == StrategicIconInstance::kNoLayer) {
@@ -2830,14 +2828,14 @@ namespace moho
 
         const bool isSelected = session.mSelection.Find(entity) != session.mSelection.end();
         if (entity == hoveredEntity) {
-          const boost::shared_ptr<CD3DBatchTexture>* const hoveredIcon =
+          const std::shared_ptr<CD3DBatchTexture>* const hoveredIcon =
             isSelected ? source.mHoveredSelectedIcon : source.mHoveredIcon;
           if (hoveredIcon != nullptr && *hoveredIcon) {
             store(EStrategicIconRun::Hovered, iconData, hoveredIcon);
           }
           return;
         }
-        const boost::shared_ptr<CD3DBatchTexture>* const icon = isSelected ? source.mSelectedIcon : source.mIcon;
+        const std::shared_ptr<CD3DBatchTexture>* const icon = isSelected ? source.mSelectedIcon : source.mIcon;
         if (icon == nullptr || !*icon) {
           return;
         }
@@ -2910,7 +2908,7 @@ namespace moho
               if (source.mIcon != nullptr && *source.mIcon) {
                 record.mIconSlots = (record.mIconSlots & 0xFFFF0000u) | gpuIcons.AddSlot(*source.mIcon);
               }
-              const boost::shared_ptr<CD3DBatchTexture>& underlay = source.mEntity->mVariableData.mUnderlayTexture;
+              const std::shared_ptr<CD3DBatchTexture>& underlay = source.mEntity->mVariableData.mUnderlayTexture;
               const UserUnit* const asUnit = source.mEntity->IsUserUnit();
               constexpr std::uint32_t kHasBlueprintIconDataMask = 0x10u;
               if (underlay && (asUnit == nullptr || (asUnit->mIntelStateFlags & kHasBlueprintIconDataMask) != 0u)) {
@@ -2957,11 +2955,10 @@ namespace moho
         bool drawnByClassifier = false;
         StrategicIconSourceSet& sourceSet = *activeSourceSet;
         if (ui_RenderUnitBars && ui_LifebarLOD > currentZoomValue) {
-          const auto storeLifebar = [this](
-                                      const EStrategicIconRun run,
-                                      const UnitIconData& data,
-                                      const boost::shared_ptr<CD3DBatchTexture>* const icon
-                                    ) {
+          const auto storeLifebar =
+            [this](
+              const EStrategicIconRun run, const UnitIconData& data, const std::shared_ptr<CD3DBatchTexture>* const icon
+            ) {
             if (run == EStrategicIconRun::Lifebar) {
               StoreStrategicIcon(aux, run, data, icon);
             }
@@ -3009,7 +3006,7 @@ namespace moho
               for (std::uint32_t bits = sourceSet.mSelectionBits[word]; bits != 0u; bits &= bits - 1u) {
                 const std::size_t i = word * 32u + static_cast<std::size_t>(std::countr_zero(bits));
                 StrategicIconSourceRecord& record = sourceSet.mGpuSources[i];
-                const boost::shared_ptr<CD3DBatchTexture>* const selectedIcon = iconSources[i].mSelectedIcon;
+                const std::shared_ptr<CD3DBatchTexture>* const selectedIcon = iconSources[i].mSelectedIcon;
                 if (
                   (record.mIconSlots >> 16u) == StrategicIconInstance::kNoLayer && selectedIcon != nullptr &&
                   *selectedIcon
@@ -3043,7 +3040,7 @@ namespace moho
             StrategicIconSourceRecord& record = sourceSet.mGpuSources[sourceSet.mHoveredIndex];
             std::uint32_t slots = record.mHoveredIconSlots;
             const auto ensure =
-              [this](const boost::shared_ptr<CD3DBatchTexture>* const texture, const std::uint32_t slot) {
+              [this](const std::shared_ptr<CD3DBatchTexture>* const texture, const std::uint32_t slot) {
               return (slot == StrategicIconInstance::kNoLayer && texture != nullptr && *texture)
                 ? gpuIcons.AddSlot(*texture)
                 : slot;
@@ -3133,11 +3130,10 @@ namespace moho
         if (drawnByClassifier && checkInterval != 0u && ++sClassifiedDraws[isMiniMap ? 1 : 0] % checkInterval == 0u) {
           // What the CPU path would have drawn this frame: classify, runs in draw order, place, build.
           std::vector<StrategicIconCandidate> candidates;
-          const auto record = [&candidates](
-                                const EStrategicIconRun run,
-                                const UnitIconData& data,
-                                const boost::shared_ptr<CD3DBatchTexture>* const icon
-                              ) {
+          const auto record =
+            [&candidates](
+              const EStrategicIconRun run, const UnitIconData& data, const std::shared_ptr<CD3DBatchTexture>* const icon
+            ) {
             if (run != EStrategicIconRun::Lifebar) {
               candidates.push_back(StrategicIconCandidate{data, icon, run});
             }
@@ -3147,7 +3143,7 @@ namespace moho
           }
           std::vector<StrategicIconInstance> expected;
           expected.reserve(candidates.size());
-          const auto findSlot = [this](const boost::shared_ptr<CD3DBatchTexture>& texture) {
+          const auto findSlot = [this](const std::shared_ptr<CD3DBatchTexture>& texture) {
             return gpuIcons.FindSlot(texture.get());
           };
           for (const EStrategicIconRun run :
@@ -3214,7 +3210,7 @@ namespace moho
             const auto record = [&chunk](
                                   const EStrategicIconRun run,
                                   const UnitIconData& data,
-                                  const boost::shared_ptr<CD3DBatchTexture>* const icon
+                                  const std::shared_ptr<CD3DBatchTexture>* const icon
                                 ) {
               chunk.push_back(StrategicIconCandidate{data, icon, run});
             };
@@ -3260,11 +3256,10 @@ namespace moho
             sGpuIcons.push_back(hoveredCandidate);
           }
         } else if (!UseParallelIcons(frustumUnitCount)) {
-          const auto storeInAux = [this](
-                                    const EStrategicIconRun run,
-                                    const UnitIconData& data,
-                                    const boost::shared_ptr<CD3DBatchTexture>* const icon
-                                  ) {
+          const auto storeInAux =
+            [this](
+              const EStrategicIconRun run, const UnitIconData& data, const std::shared_ptr<CD3DBatchTexture>* const icon
+            ) {
             StoreStrategicIcon(aux, run, data, icon);
           };
           for (std::size_t i = 0; i < frustumUnitCount; ++i) {
@@ -3282,7 +3277,7 @@ namespace moho
             const auto record = [&chunk](
                                   const EStrategicIconRun run,
                                   const UnitIconData& data,
-                                  const boost::shared_ptr<CD3DBatchTexture>* const icon
+                                  const std::shared_ptr<CD3DBatchTexture>* const icon
                                 ) {
               chunk.push_back(StrategicIconCandidate{data, icon, run});
             };
@@ -3696,7 +3691,7 @@ namespace moho
       gpuIcons.Begin(camera);
     }
     // The solid-colour icons this pass has looked up, by colour.
-    std::vector<std::pair<std::uint32_t, boost::shared_ptr<CD3DBatchTexture>>> solidIcons;
+    std::vector<std::pair<std::uint32_t, std::shared_ptr<CD3DBatchTexture>>> solidIcons;
     const auto flushGpuIcons = [&]() {
       if (iconsOnGpu && !gpuIcons.Flush(*primBatcher)) {
         gpuIcons.DrawWithBatcher(*primBatcher);
@@ -3786,7 +3781,7 @@ namespace moho
       const RProjectileBlueprint* const blueprint = tested.mBlueprint;
       const Wm3::Vec3f worldPosition = tested.mPosition;
 
-      boost::shared_ptr<CD3DBatchTexture> icon{};
+      std::shared_ptr<CD3DBatchTexture> icon{};
       float halfWidth = 0.0f;
       float halfHeight = 0.0f;
       bool usesIconTexture = false;
@@ -3943,7 +3938,7 @@ namespace moho
      */
     void DrawResourceSplats(
       CD3DPrimBatcher& primBatcher,
-      const boost::shared_ptr<CD3DBatchTexture>& splat,
+      const std::shared_ptr<CD3DBatchTexture>& splat,
       const gpg::fastvector<Wm3::Vector2f>& screenPoints
     )
     {
@@ -4105,10 +4100,10 @@ namespace moho
     // hydrocarbon one at 0x00863469 and the mass one at 0x008634A6, both past
     // `Flush`. The `1` border argument asks `FromFile` for a one-texel guard
     // band so the atlas neighbours cannot bleed into the splat.
-    const boost::shared_ptr<CD3DBatchTexture> massSplat = CD3DBatchTexture::FromFile(kMassStrategicSplat, 1u);
+    const std::shared_ptr<CD3DBatchTexture> massSplat = CD3DBatchTexture::FromFile(kMassStrategicSplat, 1u);
     DrawResourceSplats(*primBatcher, massSplat, massPoints);
 
-    const boost::shared_ptr<CD3DBatchTexture> hydrocarbonSplat =
+    const std::shared_ptr<CD3DBatchTexture> hydrocarbonSplat =
       CD3DBatchTexture::FromFile(kHydrocarbonStrategicSplat, 1u);
     DrawResourceSplats(*primBatcher, hydrocarbonSplat, hydrocarbonPoints);
 
@@ -4138,9 +4133,9 @@ namespace moho
     // initial values are the ones the shipped .data holds.
     std::uint32_t gEconOverlayPositiveColor = 0xFF00D800u;          // 0x00F57C00
     std::uint32_t gEconOverlayNegativeColor = 0xFFD80000u;          // 0x00F57BFC
-    boost::shared_ptr<CD3DBatchTexture> gEconOverlayLeftTexture{};  // 0x010C4230
-    boost::shared_ptr<CD3DBatchTexture> gEconOverlayRightTexture{}; // 0x010C4238
-    boost::shared_ptr<CD3DBatchTexture> gEconOverlayMidTexture{};   // 0x010C4244
+    std::shared_ptr<CD3DBatchTexture> gEconOverlayLeftTexture{};    // 0x010C4230
+    std::shared_ptr<CD3DBatchTexture> gEconOverlayRightTexture{};   // 0x010C4238
+    std::shared_ptr<CD3DBatchTexture> gEconOverlayMidTexture{};     // 0x010C4244
     fa::string gEconOverlayFontName{};                              // 0x00F5B210
     std::int32_t gEconOverlayFontSize = 12;                         // 0x00F57C04
     float gEconOverlayEnergyTopOffset = 0.0f;                       // 0x010A6458

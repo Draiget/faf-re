@@ -2,7 +2,7 @@
 
 #include <typeinfo>
 
-#include "boost/shared_ptr.h"
+#include <memory>
 #include "gpg/core/containers/String.h"
 #include "gpg/core/reflection/Reflection.h"
 
@@ -55,7 +55,7 @@ namespace gpg
   template <class T>
   struct RSharedPointerType : RType, RIndexed
   {
-    using pointer_type = boost::shared_ptr<T>;
+    using pointer_type = std::shared_ptr<T>;
 
     RSharedPointerType()
     {

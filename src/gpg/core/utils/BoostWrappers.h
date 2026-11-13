@@ -5,9 +5,9 @@
 #include <typeinfo>
 #include <new>
 
-#include "boost/enable_shared_from_this.h"
-#include "boost/shared_ptr.h"
-#include "boost/weak_ptr.h"
+#include <memory>
+#include <memory>
+#include <memory>
 
 namespace moho
 {
@@ -144,8 +144,8 @@ namespace boost
    */
   template <class TWeak, class TShared>
   void AssignWeakFromShared(
-    boost::weak_ptr<TWeak>& destination,
-    const boost::shared_ptr<TShared>& source
+    std::weak_ptr<TWeak>& destination,
+    const std::shared_ptr<TShared>& source
   )
   {
     destination = source;
@@ -180,8 +180,8 @@ namespace boost
    * `AssignWeakFromShared` above.
    */
   template <class T>
-  [[nodiscard]] inline boost::shared_ptr<T> LockWeak(
-    const boost::weak_ptr<T>& weak
+  [[nodiscard]] inline std::shared_ptr<T> LockWeak(
+    const std::weak_ptr<T>& weak
   ) noexcept
   {
     return weak.lock();
@@ -201,8 +201,8 @@ namespace boost
    * `boost::enable_shared_from_this<T>::shared_from_this()`, per T.
    */
   template <class T>
-  [[nodiscard]] inline boost::shared_ptr<T> SharedFromThis(
-    boost::enable_shared_from_this<T>& object
+  [[nodiscard]] inline std::shared_ptr<T> SharedFromThis(
+    std::enable_shared_from_this<T>& object
   )
   {
     return object.shared_from_this();
@@ -238,8 +238,8 @@ namespace boost
    * moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
    */
   template <class T>
-  [[nodiscard]] inline boost::shared_ptr<T>* ResetSharedFromRaw(
-    boost::shared_ptr<T>* const outShared,
+  [[nodiscard]] inline std::shared_ptr<T>* ResetSharedFromRaw(
+    std::shared_ptr<T>* const outShared,
     T* const rawPointer
   )
   {
@@ -258,9 +258,9 @@ namespace boost
    * Copies one `boost::shared_ptr<T>` into caller-provided output storage.
    */
   template <class T>
-  [[nodiscard]] inline boost::shared_ptr<T>* CopySharedRetain(
-    boost::shared_ptr<T>* const outShared,
-    const boost::shared_ptr<T>& sourceShared
+  [[nodiscard]] inline std::shared_ptr<T>* CopySharedRetain(
+    std::shared_ptr<T>* const outShared,
+    const std::shared_ptr<T>& sourceShared
   )
   {
     *outShared = sourceShared;

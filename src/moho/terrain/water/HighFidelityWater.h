@@ -80,8 +80,8 @@ namespace moho
       float tickLerp,
       const GeomCamera3* camera,
       const CWaterShaderProperties* shaderProperties,
-      const boost::shared_ptr<ID3DRenderTarget>& refractionTexture,
-      const boost::shared_ptr<ID3DRenderTarget>& reflectionTexture
+      const std::shared_ptr<ID3DRenderTarget>& refractionTexture,
+      const std::shared_ptr<ID3DRenderTarget>& reflectionTexture
     ) override;
 
     IWldTerrainRes* mTerrainRes = nullptr;                       // +0x04
@@ -90,10 +90,10 @@ namespace moho
     float mCachedFresnelPower = 0.0F;                            // +0x10
     float mCachedSunShininess = 0.0F;                            // +0x14
     float mCachedSunReflectionAmount = 0.0F;                     // +0x18
-    boost::shared_ptr<ID3DTextureSheet> mFresnelLookupTexture;   // +0x1C
+    std::shared_ptr<ID3DTextureSheet> mFresnelLookupTexture;     // +0x1C
     CD3DVertexSheet* mVertexSheet = nullptr;                     // +0x24
     CD3DIndexSheet* mIndexSheet = nullptr;                       // +0x28
-    boost::shared_ptr<ID3DTextureSheet> mWaterMapTexture;        // +0x2C
+    std::shared_ptr<ID3DTextureSheet> mWaterMapTexture;          // +0x2C
   };
 
   static_assert(offsetof(HighFidelityWater, mTerrainRes) == 0x04, "HighFidelityWater::mTerrainRes offset must be 0x04");

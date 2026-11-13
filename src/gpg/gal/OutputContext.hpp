@@ -3,7 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 
-#include "boost/shared_ptr.h"
+#include <memory>
 #include "gpg/gal/CubeRenderTarget.hpp"
 #include "gpg/gal/DepthStencilTarget.hpp"
 #include "gpg/gal/RenderTarget.hpp"
@@ -38,7 +38,7 @@ namespace gpg::gal
      * Binds a 2D colour target and its depth/stencil target; the cube
      * handle stays empty. Both handles arrive by value (`ret 0x10`).
      */
-    OutputContext(boost::shared_ptr<RenderTarget> surface, boost::shared_ptr<DepthStencilTarget> depthStencil);
+    OutputContext(std::shared_ptr<RenderTarget> surface, std::shared_ptr<DepthStencilTarget> depthStencil);
 
     /**
      * Address: 0x008E78C0 (FUN_008E78C0)
@@ -48,9 +48,9 @@ namespace gpg::gal
      * surface handle stays empty. `ret 0x14`: two handles and the face.
      */
     OutputContext(
-      boost::shared_ptr<CubeRenderTarget> cubeTarget,
+      std::shared_ptr<CubeRenderTarget> cubeTarget,
       std::int32_t face,
-      boost::shared_ptr<DepthStencilTarget> depthStencil
+      std::shared_ptr<DepthStencilTarget> depthStencil
     );
 
     /**
@@ -73,10 +73,10 @@ namespace gpg::gal
 
     OutputContext& operator=(const OutputContext&) = default;
 
-    boost::shared_ptr<CubeRenderTarget> cubeTarget;     // +0x04
+    std::shared_ptr<CubeRenderTarget> cubeTarget;       // +0x04
     std::int32_t face;                                  // +0x0C
-    boost::shared_ptr<RenderTarget> surface;            // +0x10
-    boost::shared_ptr<DepthStencilTarget> depthStencil; // +0x18
+    std::shared_ptr<RenderTarget> surface;              // +0x10
+    std::shared_ptr<DepthStencilTarget> depthStencil;   // +0x18
   };
 
   /**

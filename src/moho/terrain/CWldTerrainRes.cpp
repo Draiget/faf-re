@@ -101,7 +101,7 @@ namespace
   }
 
   void CloneTerrainDynamicTextureForEdit(
-    boost::shared_ptr<moho::CD3DDynamicTextureSheet>& slot,
+    std::shared_ptr<moho::CD3DDynamicTextureSheet>& slot,
     const bool archiveMode
   )
   {
@@ -110,7 +110,7 @@ namespace
       return;
     }
 
-    boost::shared_ptr<moho::CD3DDynamicTextureSheet> replacement;
+    std::shared_ptr<moho::CD3DDynamicTextureSheet> replacement;
     (void)device->CreateDynamicTextureSheetFromSource(replacement, slot, 2, archiveMode);
     slot = replacement;
   }
@@ -147,7 +147,7 @@ namespace
    */
   void SaveTerrainSheetToArchive(
     gpg::BinaryWriter& writer,
-    const boost::shared_ptr<moho::ID3DTextureSheet>& sourceSheet,
+    const std::shared_ptr<moho::ID3DTextureSheet>& sourceSheet,
     const int formatToken
   )
   {
@@ -155,21 +155,21 @@ namespace
 
     // The binary copies the source handle into the by-value parameter (an interlocked add on its control block) and
     // the callee releases it again.
-    boost::shared_ptr<moho::CD3DDynamicTextureSheet> archiveSheet;
+    std::shared_ptr<moho::CD3DDynamicTextureSheet> archiveSheet;
     (void)device->CreateDynamicTextureSheetFromSource(archiveSheet, sourceSheet, formatToken, true);
 
     (void)archiveSheet->SaveToArchive(writer.stream(), true);
   }
-  [[nodiscard]] boost::shared_ptr<moho::CD3DDynamicTextureSheet> ShareAsDynamicSheet(
-    const boost::shared_ptr<moho::ID3DTextureSheet>& mask
+  [[nodiscard]] std::shared_ptr<moho::CD3DDynamicTextureSheet> ShareAsDynamicSheet(
+    const std::shared_ptr<moho::ID3DTextureSheet>& mask
   ) noexcept
   {
-    return boost::static_pointer_cast<moho::CD3DDynamicTextureSheet>(mask);
+    return std::static_pointer_cast<moho::CD3DDynamicTextureSheet>(mask);
   }
 
   void AdoptDynamicSheetAsStratumMask(
-    boost::shared_ptr<moho::ID3DTextureSheet>& mask,
-    const boost::shared_ptr<moho::CD3DDynamicTextureSheet>& sheet
+    std::shared_ptr<moho::ID3DTextureSheet>& mask,
+    const std::shared_ptr<moho::CD3DDynamicTextureSheet>& sheet
   ) noexcept
   {
     mask = sheet;
@@ -184,13 +184,12 @@ namespace
    * helper makes that same shared copy, cast through the common `ID3DTextureSheet` base.
    */
   void AdoptWaterMapSheetFromResource(
-    boost::shared_ptr<moho::CD3DDynamicTextureSheet>& waterMap,
+    std::shared_ptr<moho::CD3DDynamicTextureSheet>& waterMap,
     const moho::ID3DDeviceResources::TextureResourceHandle& sheet
   ) noexcept
   {
-    waterMap = boost::static_pointer_cast<moho::CD3DDynamicTextureSheet>(
-      boost::static_pointer_cast<moho::ID3DTextureSheet>(sheet)
-    );
+    waterMap =
+      std::static_pointer_cast<moho::CD3DDynamicTextureSheet>(std::static_pointer_cast<moho::ID3DTextureSheet>(sheet));
   }
   [[nodiscard]] std::int32_t AlignDownTo4(
     const std::int32_t value
@@ -210,7 +209,7 @@ namespace
    * cast in one place.
    */
   [[nodiscard]] moho::CD3DDynamicTextureSheet* AsDynamicSheet(
-    const boost::shared_ptr<moho::ID3DTextureSheet>& mask
+    const std::shared_ptr<moho::ID3DTextureSheet>& mask
   ) noexcept
   {
     return static_cast<moho::CD3DDynamicTextureSheet*>(mask.get());
@@ -262,11 +261,11 @@ namespace
   }
   /// `CloneTerrainDynamicTextureForEdit` for a stratum-mask lane.
   void CloneStratumMaskForEdit(
-    boost::shared_ptr<moho::ID3DTextureSheet>& mask,
+    std::shared_ptr<moho::ID3DTextureSheet>& mask,
     const bool archiveMode
   )
   {
-    boost::shared_ptr<moho::CD3DDynamicTextureSheet> sheet = ShareAsDynamicSheet(mask);
+    std::shared_ptr<moho::CD3DDynamicTextureSheet> sheet = ShareAsDynamicSheet(mask);
     CloneTerrainDynamicTextureForEdit(sheet, archiveMode);
     AdoptDynamicSheetAsStratumMask(mask, sheet);
   }
@@ -1202,9 +1201,9 @@ namespace moho
    * What it does:
    * Returns one retained shared texture handle for terrain background.
    */
-  boost::shared_ptr<ID3DTextureSheet> CWldTerrainRes::GetBackground() const
+  std::shared_ptr<ID3DTextureSheet> CWldTerrainRes::GetBackground() const
   {
-    return boost::static_pointer_cast<ID3DTextureSheet>(mBackgroundTexture);
+    return std::static_pointer_cast<ID3DTextureSheet>(mBackgroundTexture);
   }
 
   /**
@@ -1214,9 +1213,9 @@ namespace moho
    * What it does:
    * Returns one retained shared texture handle for terrain skycube.
    */
-  boost::shared_ptr<ID3DTextureSheet> CWldTerrainRes::GetSkycube() const
+  std::shared_ptr<ID3DTextureSheet> CWldTerrainRes::GetSkycube() const
   {
-    return boost::static_pointer_cast<ID3DTextureSheet>(mSkycubeTexture);
+    return std::static_pointer_cast<ID3DTextureSheet>(mSkycubeTexture);
   }
 
   /**
@@ -1303,7 +1302,7 @@ namespace moho
    * What it does:
    * Returns one environment texture by key, with `<default>` fallback.
    */
-  boost::shared_ptr<ID3DTextureSheet> CWldTerrainRes::GetEnvLookup(
+  std::shared_ptr<ID3DTextureSheet> CWldTerrainRes::GetEnvLookup(
     const fa::string& environmentKey
   ) const
   {
@@ -1317,7 +1316,7 @@ namespace moho
     if (entry == map.end()) {
       return {};
     }
-    return boost::static_pointer_cast<ID3DTextureSheet>(entry->second.mTexture);
+    return std::static_pointer_cast<ID3DTextureSheet>(entry->second.mTexture);
   }
 
   /**
@@ -1504,9 +1503,9 @@ namespace moho
    * What it does:
    * Returns one retained shared texture handle for the terrain water map.
    */
-  boost::shared_ptr<ID3DTextureSheet> CWldTerrainRes::GetWaterMap() const
+  std::shared_ptr<ID3DTextureSheet> CWldTerrainRes::GetWaterMap() const
   {
-    return boost::static_pointer_cast<ID3DTextureSheet>(mWaterMapTexture);
+    return std::static_pointer_cast<ID3DTextureSheet>(mWaterMapTexture);
   }
 
   /**
@@ -2288,7 +2287,7 @@ namespace moho
     mNormalMapHeight = tileHeight;
 
     if (tileWidth <= 0 || tileHeight <= 0 || widthMinusOne <= 0 || heightMinusOne <= 0) {
-      mNormalMap.resize(0u, boost::shared_ptr<CD3DDynamicTextureSheet>{});
+      mNormalMap.resize(0u, std::shared_ptr<CD3DDynamicTextureSheet>{});
       return;
     }
 
@@ -2296,13 +2295,13 @@ namespace moho
     const std::size_t tileCountY = static_cast<std::size_t>((tileHeight + heightMinusOne - 1) / tileHeight);
     const std::size_t tileCount = tileCountX * tileCountY;
 
-    mNormalMap.resize(tileCount, boost::shared_ptr<CD3DDynamicTextureSheet>{});
+    mNormalMap.resize(tileCount, std::shared_ptr<CD3DDynamicTextureSheet>{});
 
     moho::CD3DDevice* const device = moho::D3D_GetDevice();
     moho::ID3DDeviceResources* const resources = device != nullptr ? device->GetResources() : nullptr;
 
     for (std::size_t i = 0; i < tileCount; ++i) {
-      boost::shared_ptr<CD3DDynamicTextureSheet> texture{};
+      std::shared_ptr<CD3DDynamicTextureSheet> texture{};
       if (resources != nullptr) {
         (void)resources->NewDynamicTextureSheet(texture, tileWidth, tileHeight, 12);
       }
@@ -2502,7 +2501,7 @@ namespace moho
           continue;
         }
 
-        boost::shared_ptr<CD3DDynamicTextureSheet> texture = mNormalMap[tileIndex];
+        std::shared_ptr<CD3DDynamicTextureSheet> texture = mNormalMap[tileIndex];
         CD3DDynamicTextureSheet* const sheet = texture.get();
         if (sheet == nullptr) {
           continue;
@@ -2701,7 +2700,7 @@ namespace moho
           continue;
         }
 
-        boost::shared_ptr<CD3DDynamicTextureSheet> texture = mNormalMap[tileIndex];
+        std::shared_ptr<CD3DDynamicTextureSheet> texture = mNormalMap[tileIndex];
         CD3DDynamicTextureSheet* const sheet = texture.get();
         if (sheet == nullptr) {
           continue;
@@ -2738,7 +2737,7 @@ namespace moho
    * each destination pitch row before unlocking.
    */
   void CWldTerrainRes::UpdateTexture(
-    boost::shared_ptr<CD3DDynamicTextureSheet> textureSheet,
+    std::shared_ptr<CD3DDynamicTextureSheet> textureSheet,
     const std::uint32_t* const sourcePixels
   )
   {
@@ -2785,7 +2784,7 @@ namespace moho
    * Clears one lockable texture-sheet payload to zero over every mapped row.
    */
   void CWldTerrainRes::ClearTexture(
-    boost::shared_ptr<CD3DDynamicTextureSheet> textureSheet
+    std::shared_ptr<CD3DDynamicTextureSheet> textureSheet
   )
   {
     CD3DDynamicTextureSheet* const sheet = textureSheet.get();
@@ -2823,7 +2822,7 @@ namespace moho
   void CWldTerrainRes::UpdateTextureChannel(
     const std::int32_t rowStart,
     const std::int32_t columnEnd,
-    boost::shared_ptr<CD3DDynamicTextureSheet> textureSheet,
+    std::shared_ptr<CD3DDynamicTextureSheet> textureSheet,
     const std::int32_t columnStart,
     const std::int32_t rowEnd,
     const std::uint32_t channelMask,
@@ -2875,7 +2874,7 @@ namespace moho
    * from each texel, writes unpacked bytes row-by-row, then unlocks.
    */
   void CWldTerrainRes::GetTextureChannel(
-    boost::shared_ptr<CD3DDynamicTextureSheet> textureSheet,
+    std::shared_ptr<CD3DDynamicTextureSheet> textureSheet,
     const std::uint32_t channelMask,
     const std::uint32_t channelShift,
     std::uint8_t* const outChannelData
@@ -2941,7 +2940,7 @@ namespace moho
 
     const std::int32_t channel = static_cast<std::int32_t>(static_cast<std::uint32_t>(stratumIndex) & 3u);
 
-    const boost::shared_ptr<CD3DDynamicTextureSheet> targetTexture = ((stratumIndex / 4) != 0)
+    const std::shared_ptr<CD3DDynamicTextureSheet> targetTexture = ((stratumIndex / 4) != 0)
       ? ShareAsDynamicSheet(mStrata.mStratumMask1)
       : ShareAsDynamicSheet(mStrata.mStratumMask0);
 
@@ -2986,7 +2985,7 @@ namespace moho
     static constexpr std::uint32_t kChannelShift[4] = {16u, 8u, 0u, 24u};
 
     const std::int32_t channel = static_cast<std::int32_t>(static_cast<std::uint32_t>(stratumIndex) & 3u);
-    const boost::shared_ptr<CD3DDynamicTextureSheet> sourceTexture = ((stratumIndex / 4) != 0)
+    const std::shared_ptr<CD3DDynamicTextureSheet> sourceTexture = ((stratumIndex / 4) != 0)
       ? ShareAsDynamicSheet(mStrata.mStratumMask1)
       : ShareAsDynamicSheet(mStrata.mStratumMask0);
 
@@ -3810,7 +3809,7 @@ namespace moho
 
     // Stratum mask 0: create a half-res dynamic sheet, blit the current mask
     // surface into it, then adopt it as the live mask.
-    boost::shared_ptr<CD3DDynamicTextureSheet> newSheet;
+    std::shared_ptr<CD3DDynamicTextureSheet> newSheet;
     resources->NewDynamicTextureSheet(newSheet, maskTileX, maskTileY, 2);
     if (newSheet.get() == nullptr) {
       throw gpg::gal::Error{};
@@ -3819,7 +3818,7 @@ namespace moho
     AdoptDynamicSheetAsStratumMask(mStrata.mStratumMask0, newSheet);
 
     // Stratum mask 1: same pattern, reusing the temporary sheet slot.
-    boost::shared_ptr<CD3DDynamicTextureSheet> spareSheet;
+    std::shared_ptr<CD3DDynamicTextureSheet> spareSheet;
     resources->NewDynamicTextureSheet(spareSheet, maskTileX, maskTileY, 2);
     newSheet = spareSheet;
     spareSheet.reset();
@@ -3864,7 +3863,7 @@ namespace
   // Engine addition (dedicated-server plan WPL.4): RWldMapPreviewChunk::Load's preview
   // texture (moho/sim/CWldMap.cpp, 0x008904C0), the device-resources calls it made
   // before the move.
-  boost::shared_ptr<moho::ID3DTextureSheet> LoadMapPreviewTexture(
+  std::shared_ptr<moho::ID3DTextureSheet> LoadMapPreviewTexture(
     char* const payload,
     const std::size_t payloadSize
   )
@@ -3880,7 +3879,7 @@ namespace
     } else {
       resources->GetTexture(previewTexture, kFallbackPreviewTexture, 0, true);
     }
-    return boost::static_pointer_cast<moho::ID3DTextureSheet>(previewTexture);
+    return std::static_pointer_cast<moho::ID3DTextureSheet>(previewTexture);
   }
 
   [[maybe_unused]] const bool gPreviewTextureLoadSet = (moho::sPreviewTextureLoad = &LoadMapPreviewTexture, true);

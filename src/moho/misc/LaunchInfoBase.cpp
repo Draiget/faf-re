@@ -1007,7 +1007,7 @@ namespace moho
    * Allocates and populates a new LaunchInfoNew shared object from this source.
    */
   void LaunchInfoNew::Create(
-    boost::shared_ptr<void>& outCreated
+    std::shared_ptr<void>& outCreated
   )
   {
     LaunchInfoNew* const createdInfo = new LaunchInfoNew();
@@ -1028,7 +1028,7 @@ namespace moho
     createdInfo->mInitSeed = static_cast<std::int32_t>(gpg::time::GetSystemTimer().ElapsedCycles());
 
     outCreated.reset(); // FUN_00542040: the previous owner goes first
-    outCreated = boost::shared_ptr<LaunchInfoNew>(createdInfo);
+    outCreated = std::shared_ptr<LaunchInfoNew>(createdInfo);
   }
 
   /**
@@ -1118,10 +1118,10 @@ namespace moho
    * Returns retained shared payload lane for session creation.
    */
   void LaunchInfoLoad::Create(
-    boost::shared_ptr<void>& outCreated
+    std::shared_ptr<void>& outCreated
   )
   {
-    outCreated = boost::static_pointer_cast<void>(mSharedLaunchInfo);
+    outCreated = std::static_pointer_cast<void>(mSharedLaunchInfo);
   }
 
   /**

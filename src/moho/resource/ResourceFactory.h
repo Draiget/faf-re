@@ -1,7 +1,7 @@
 #pragma once
 
 #include "gpg/core/utils/NonCopyable.h"
-#include "boost/shared_ptr.h"
+#include <memory>
 #include "gpg/core/containers/String.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "moho/resource/RScmResource.h"
@@ -34,21 +34,21 @@ namespace moho
      * Slot 1. `ResourceManager::LoadRequest` (0x004AAA24) calls it with the
      * request's type when nothing was prefetched.
      */
-    virtual boost::shared_ptr<void> Load(gpg::StrArg path, const gpg::RType* type) = 0;
+    virtual std::shared_ptr<void> Load(gpg::StrArg path, const gpg::RType* type) = 0;
 
     /**
      * Slot 2. The prefetch thread (0x004AB441) calls it with `mPrefetchType`.
      */
-    virtual boost::shared_ptr<void> Preload(gpg::StrArg path, const gpg::RType* type) = 0;
+    virtual std::shared_ptr<void> Preload(gpg::StrArg path, const gpg::RType* type) = 0;
 
     /**
      * Slot 3. `ResourceManager::LoadRequest` (0x004AA845) calls it when the
      * prefetch thread already produced `prefetchData`.
      */
-    virtual boost::shared_ptr<void> LoadFrom(
+    virtual std::shared_ptr<void> LoadFrom(
       gpg::StrArg path,
       const gpg::RType* type,
-      boost::shared_ptr<void> prefetchData,
+      std::shared_ptr<void> prefetchData,
       const gpg::RType* prefetchType
     ) = 0;
 
@@ -118,7 +118,7 @@ namespace moho
      * Address: 0x005397F0 (FUN_005397F0, Moho::ResourceFactory_RScmResource::Load)
      * Address: 0x0053AE00 (FUN_0053AE00, Moho::ResourceFactory_RScaResource::Load)
      */
-    boost::shared_ptr<void> Load(
+    std::shared_ptr<void> Load(
       const gpg::StrArg path,
       const gpg::RType*
     ) override
@@ -131,7 +131,7 @@ namespace moho
      * Address: 0x005398A0 (FUN_005398A0, Moho::ResourceFactory_RScmResource::Preload)
      * Address: 0x0053AEB0 (FUN_0053AEB0, Moho::ResourceFactory_RScaResource::Preload)
      */
-    boost::shared_ptr<void> Preload(
+    std::shared_ptr<void> Preload(
       const gpg::StrArg path,
       const gpg::RType*
     ) override
@@ -144,25 +144,25 @@ namespace moho
      * Address: 0x00539950 (FUN_00539950, Moho::ResourceFactory_RScmResource::LoadFrom)
      * Address: 0x0053AF60 (FUN_0053AF60, Moho::ResourceFactory_RScaResource::LoadFrom)
      */
-    boost::shared_ptr<void> LoadFrom(
+    std::shared_ptr<void> LoadFrom(
       const gpg::StrArg path,
       const gpg::RType*,
-      const boost::shared_ptr<void> prefetchData,
+      const std::shared_ptr<void> prefetchData,
       const gpg::RType*
     ) override
     {
-      return LoadFromImpl(path, boost::static_pointer_cast<T>(prefetchData));
+      return LoadFromImpl(path, std::static_pointer_cast<T>(prefetchData));
     }
 
     /** Slot 4, pure here; the concrete factory's loader. */
-    virtual boost::shared_ptr<T> LoadImpl(gpg::StrArg path) = 0;
+    virtual std::shared_ptr<T> LoadImpl(gpg::StrArg path) = 0;
 
     /**
      * Address: 0x0044A360 (FUN_0044A360, Moho::ResourceFactory_SBatchTextureData::PreloadImpl)
      * Address: 0x00539730 (FUN_00539730, Moho::ResourceFactory_RScmResource::PreloadImpl)
      * Address: 0x0053AD40 (FUN_0053AD40, Moho::ResourceFactory_RScaResource::PreloadImpl)
      */
-    virtual boost::shared_ptr<T> PreloadImpl(
+    virtual std::shared_ptr<T> PreloadImpl(
       const gpg::StrArg path
     )
     {
@@ -174,9 +174,9 @@ namespace moho
      * Address: 0x00539760 (FUN_00539760, Moho::ResourceFactory_RScmResource::LoadFromImpl)
      * Address: 0x0053AD70 (FUN_0053AD70, Moho::ResourceFactory_RScaResource::LoadFromImpl)
      */
-    virtual boost::shared_ptr<T> LoadFromImpl(
+    virtual std::shared_ptr<T> LoadFromImpl(
       gpg::StrArg,
-      const boost::shared_ptr<T> prefetchData
+      const std::shared_ptr<T> prefetchData
     )
     {
       return prefetchData;
@@ -209,7 +209,7 @@ namespace moho
     /**
      * Address: 0x00443530 (FUN_00443530, Moho::ResourceFactoryPreload_RD3DTextureResource::Load)
      */
-    boost::shared_ptr<void> Load(
+    std::shared_ptr<void> Load(
       const gpg::StrArg path,
       const gpg::RType*
     ) override
@@ -220,7 +220,7 @@ namespace moho
     /**
      * Address: 0x004435E0 (FUN_004435E0, Moho::ResourceFactoryPreload_RD3DTextureResource::Preload)
      */
-    boost::shared_ptr<void> Preload(
+    std::shared_ptr<void> Preload(
       const gpg::StrArg path,
       const gpg::RType*
     ) override
@@ -231,19 +231,19 @@ namespace moho
     /**
      * Address: 0x00443690 (FUN_00443690, Moho::ResourceFactoryPreload_RD3DTextureResource::LoadFrom)
      */
-    boost::shared_ptr<void> LoadFrom(
+    std::shared_ptr<void> LoadFrom(
       const gpg::StrArg path,
       const gpg::RType*,
-      const boost::shared_ptr<void> prefetchData,
+      const std::shared_ptr<void> prefetchData,
       const gpg::RType*
     ) override
     {
-      return LoadFromImpl(path, boost::static_pointer_cast<P>(prefetchData));
+      return LoadFromImpl(path, std::static_pointer_cast<P>(prefetchData));
     }
 
-    virtual boost::shared_ptr<T> LoadImpl(gpg::StrArg path) = 0;
-    virtual boost::shared_ptr<P> PreloadImpl(gpg::StrArg path) = 0;
-    virtual boost::shared_ptr<T> LoadFromImpl(gpg::StrArg path, boost::shared_ptr<P> prefetchData) = 0;
+    virtual std::shared_ptr<T> LoadImpl(gpg::StrArg path) = 0;
+    virtual std::shared_ptr<P> PreloadImpl(gpg::StrArg path) = 0;
+    virtual std::shared_ptr<T> LoadFromImpl(gpg::StrArg path, std::shared_ptr<P> prefetchData) = 0;
   };
 
   class CScmResourceFactory final : public ResourceFactory<RScmResource>
@@ -277,7 +277,7 @@ namespace moho
      * Reads one SCM file and wraps it in an `RScmResource`; files shorter than
      * the 0x30-byte header load as nothing.
      */
-    boost::shared_ptr<RScmResource> LoadImpl(gpg::StrArg path) override;
+    std::shared_ptr<RScmResource> LoadImpl(gpg::StrArg path) override;
   };
 
   static_assert(sizeof(CScmResourceFactory) == 0x0C, "CScmResourceFactory size must be 0x0C");

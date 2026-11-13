@@ -1,6 +1,6 @@
 #pragma once
 
-#include "boost/shared_ptr.h"
+#include <memory>
 #include "gpg/core/streams/MemBufferStream.h"
 #include "moho/resource/ResourceFactory.h"
 
@@ -43,7 +43,7 @@ namespace moho
      * Maps the file and builds an `RD3DTextureResource` from it; nothing when
      * the path is empty, the file cannot be mapped, or the texture rejects it.
      */
-    boost::shared_ptr<RD3DTextureResource> LoadImpl(gpg::StrArg path) override;
+    std::shared_ptr<RD3DTextureResource> LoadImpl(gpg::StrArg path) override;
 
     /**
      * Address: 0x0043E0C0 (FUN_0043E0C0)
@@ -51,7 +51,7 @@ namespace moho
      * What it does:
      * Maps the file and hands back a shared copy of the mapping.
      */
-    boost::shared_ptr<gpg::MemBuffer<const char>> PreloadImpl(gpg::StrArg path) override;
+    std::shared_ptr<gpg::MemBuffer<const char>> PreloadImpl(gpg::StrArg path) override;
 
     /**
      * Address: 0x0043E200 (FUN_0043E200)
@@ -59,8 +59,8 @@ namespace moho
      * What it does:
      * Builds an `RD3DTextureResource` from bytes the prefetch step mapped.
      */
-    boost::shared_ptr<RD3DTextureResource>
-    LoadFromImpl(gpg::StrArg path, boost::shared_ptr<gpg::MemBuffer<const char>> prefetchData) override;
+    std::shared_ptr<RD3DTextureResource>
+    LoadFromImpl(gpg::StrArg path, std::shared_ptr<gpg::MemBuffer<const char>> prefetchData) override;
   };
 
   /**

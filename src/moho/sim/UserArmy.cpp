@@ -128,7 +128,7 @@ namespace moho
   /**
    * Address: 0x008B14D0 (FUN_008B14D0, Moho::UserArmy::GetExploredReconGrid)
    */
-  boost::shared_ptr<CIntelGrid> UserArmy::GetExploredReconGrid() const
+  std::shared_ptr<CIntelGrid> UserArmy::GetExploredReconGrid() const
   {
     return mVisionReconGrid;
   }
@@ -136,7 +136,7 @@ namespace moho
   /**
    * Address: 0x008B14F0 (FUN_008B14F0, Moho::UserArmy::GetFogReconGrid)
    */
-  boost::shared_ptr<CIntelGrid> UserArmy::GetFogReconGrid() const
+  std::shared_ptr<CIntelGrid> UserArmy::GetFogReconGrid() const
   {
     return mWaterReconGrid;
   }
@@ -208,14 +208,14 @@ namespace moho
       }
 
       if (useExplored) {
-        const boost::shared_ptr<CIntelGrid> allyExploredGrid = ally->GetExploredReconGrid();
+        const std::shared_ptr<CIntelGrid> allyExploredGrid = ally->GetExploredReconGrid();
         if (!allyExploredGrid || allyExploredGrid->IsVisible(x, z)) {
           return true;
         }
       }
 
       if (useFog) {
-        const boost::shared_ptr<CIntelGrid> allyFogGrid = ally->GetFogReconGrid();
+        const std::shared_ptr<CIntelGrid> allyFogGrid = ally->GetFogReconGrid();
         if (!allyFogGrid || allyFogGrid->IsVisible(x, z)) {
           return true;
         }

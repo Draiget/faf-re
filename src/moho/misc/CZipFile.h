@@ -6,7 +6,7 @@
 #include <cstddef>
 #include <cstdint>
 
-#include "boost/shared_ptr.h"
+#include <memory>
 #include "gpg/core/containers/String.h"
 #include "gpg/core/streams/MemBufferStream.h"
 #include "legacy/containers/AutoPtr.h"
@@ -42,8 +42,8 @@ namespace moho
 
   struct SZipFileCachedEntry
   {
-    boost::shared_ptr<CZipFileEntry> mEntry{}; // +0x00
-    boost::shared_ptr<const char> mData{};     // +0x08
+    std::shared_ptr<CZipFileEntry> mEntry{}; // +0x00
+    std::shared_ptr<const char> mData{};     // +0x08
   };
 
   static_assert(offsetof(SZipFileCachedEntry, mData) == 0x08, "SZipFileCachedEntry::mData offset must be 0x08");

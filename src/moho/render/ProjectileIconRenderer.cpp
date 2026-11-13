@@ -107,7 +107,7 @@ namespace moho
   }
 
   void ProjectileIconRenderer::Add(
-    const boost::shared_ptr<CD3DBatchTexture>& texture,
+    const std::shared_ptr<CD3DBatchTexture>& texture,
     const float centerX,
     const float centerY,
     const float halfWidth,
@@ -172,7 +172,7 @@ namespace moho
     const auto refresh = [&]() -> bool {
       mSlots.resize(mTextures.size());
       for (std::size_t index = 0; index < mTextures.size(); ++index) {
-        const boost::shared_ptr<CD3DBatchTexture>& texture = mTextures[index];
+        const std::shared_ptr<CD3DBatchTexture>& texture = mTextures[index];
         if (!texture || texture->mWidth >= atlasHalfWidth || texture->mHeight >= atlasHalfHeight) {
           return false;
         }
@@ -196,7 +196,7 @@ namespace moho
         return false;
       }
     }
-    const boost::shared_ptr<ID3DTextureSheet> sheet = atlas.GetCompositeTexture();
+    const std::shared_ptr<ID3DTextureSheet> sheet = atlas.GetCompositeTexture();
     if (sheet.get() == nullptr) {
       return false;
     }

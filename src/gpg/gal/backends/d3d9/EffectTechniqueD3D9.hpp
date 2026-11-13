@@ -5,8 +5,8 @@
 
 #include <d3dx9effect.h>
 
-#include "boost/shared_ptr.h"
-#include "boost/weak_ptr.h"
+#include <memory>
+#include <memory>
 #include "gpg/gal/EffectTechnique.hpp"
 #include "legacy/containers/String.h"
 
@@ -36,7 +36,7 @@ namespace gpg::gal
      * already gone. The by-value `effect` is what `shared_from_this()`
      * builds at the `EffectD3D9` call sites.
      */
-    EffectTechniqueD3D9(const char* name, boost::shared_ptr<EffectD3D9> effect, D3DXHANDLE handle);
+    EffectTechniqueD3D9(const char* name, std::shared_ptr<EffectD3D9> effect, D3DXHANDLE handle);
 
     /**
      * Address: 0x008F3A20 (FUN_008F3A20, ??1EffectTechniqueD3D9@gal@gpg@@QAE@XZ)
@@ -143,7 +143,7 @@ namespace gpg::gal
 
   public:
     fa::string name_;                    // +0x04
-    boost::weak_ptr<EffectD3D9> effect_; // +0x20
+    std::weak_ptr<EffectD3D9> effect_;   // +0x20
     D3DXHANDLE handle_ = nullptr;        // +0x28
     bool beginEndActive_ = false;        // +0x2C
     std::uint8_t beginEndPadding_[3]{};  // +0x2D

@@ -925,7 +925,7 @@ SSyncData* moho::PopFrontSSyncDataPtrDeque(
 CSimDriver::CSimDriver(
   fa::auto_ptr<gpg::Stream> stream,
   fa::auto_ptr<CClientManagerImpl> clientManager,
-  const boost::shared_ptr<LaunchInfoBase>& launchInfo,
+  const std::shared_ptr<LaunchInfoBase>& launchInfo,
   const uint32_t commandSourceId
 )
   : mSim()
@@ -1435,7 +1435,7 @@ void CSimDriver::ThreadCreateSim()
 
   // The launch info was only needed to build the sim; the sim owns whatever it
   // kept from it.
-  mLaunchInfo = boost::shared_ptr<LaunchInfoBase>{};
+  mLaunchInfo = std::shared_ptr<LaunchInfoBase>{};
 
   if (!mSim) {
     fa::mutex::scoped_lock lock(mLock);
@@ -2352,7 +2352,7 @@ DWORD CSimDriver::PerformNextEvent()
 ISTIDriver* moho::SIM_CreateDriver(
   CClientManagerImpl* clientManager,
   gpg::Stream* stream,
-  const boost::shared_ptr<LaunchInfoBase>& launchInfo,
+  const std::shared_ptr<LaunchInfoBase>& launchInfo,
   const uint32_t commandSourceId
 )
 {

@@ -43,8 +43,8 @@
 
 namespace
 {
-  using TextureSheetHandle = boost::shared_ptr<moho::CD3DDynamicTextureSheet>;
-  using TextureResourceHandle = boost::shared_ptr<moho::RD3DTextureResource>;
+  using TextureSheetHandle = std::shared_ptr<moho::CD3DDynamicTextureSheet>;
+  using TextureResourceHandle = std::shared_ptr<moho::RD3DTextureResource>;
 
   TextureResourceHandle sMediumFidelityGridTexture{};
   moho::WaterSurface* sMediumFidelityWaterSurface = nullptr;
@@ -418,7 +418,7 @@ namespace moho
    * the optional terrain-normal map texture handle for terrain normal passes.
    */
   void MediumFidelityTerrain::LoadShaderVars(
-    const boost::shared_ptr<ID3DRenderTarget>& terrainNormalTexture
+    const std::shared_ptr<ID3DRenderTarget>& terrainNormalTexture
   )
   {
     auto& shaderVars = GetTerrainShaderVars();
@@ -428,7 +428,7 @@ namespace moho
     strata.SetSizeTo(terrainRes);
 
     BindTextureShaderVar(
-      shaderVars.skirtTexture, boost::static_pointer_cast<ID3DTextureSheet>(sMediumFidelityGridTexture)
+      shaderVars.skirtTexture, std::static_pointer_cast<ID3DTextureSheet>(sMediumFidelityGridTexture)
     );
     BindTextureShaderVar(shaderVars.utilityTextureA, strata.mStratumMask0);
     BindTextureShaderVar(shaderVars.utilityTextureB, strata.mStratumMask1);
@@ -605,7 +605,7 @@ namespace moho
         shaderVars.shadowMatrix.SetMatrix4x4(&shadowContext->mCamera.viewProjection);
       }
 
-      const boost::shared_ptr<CD3DRenderTarget> shadowTexture = shadowContext->GetShadowTexture();
+      const std::shared_ptr<CD3DRenderTarget> shadowTexture = shadowContext->GetShadowTexture();
       shaderVars.shadowTexture.SetRenderTargetTexture(shadowTexture);
     } else {
       const std::uint32_t shadowsDisabledBlob = 0U;
@@ -620,7 +620,7 @@ namespace moho
     // ID3DTextureSheet base (both derive from it at offset 0).
     shaderVars.noiseTexture.GetTexture(sMediumFidelityNoiseFillTexture);
     shaderVars.decalMaskTexture.GetTexture(
-      boost::static_pointer_cast<CD3DDynamicTextureSheet>(boost::static_pointer_cast<ID3DTextureSheet>(mDecalMask))
+      std::static_pointer_cast<CD3DDynamicTextureSheet>(std::static_pointer_cast<ID3DTextureSheet>(mDecalMask))
     );
     shaderVars.biCubicLookup.GetTexture(sMediumFidelityCubicBlendLookupTexture);
   }
@@ -728,7 +728,7 @@ namespace moho
    * released as the by-value shared_ptr parameter goes out of scope.
    */
   void MediumFidelityTerrain::DrawTerrain(
-    boost::shared_ptr<CD3DDynamicTextureSheet> overlayTexture,
+    std::shared_ptr<CD3DDynamicTextureSheet> overlayTexture,
     const fa::string* const techniqueName
   )
   {
@@ -957,8 +957,8 @@ namespace moho
       const std::int32_t gameTick
     )
     {
-      const boost::shared_ptr<ID3DTextureSheet> texture = decal.GetTexture(slot, lod, gameTick);
-      target.GetTexture(boost::static_pointer_cast<CD3DDynamicTextureSheet>(texture));
+      const std::shared_ptr<ID3DTextureSheet> texture = decal.GetTexture(slot, lod, gameTick);
+      target.GetTexture(std::static_pointer_cast<CD3DDynamicTextureSheet>(texture));
     }
   } // namespace
 
@@ -1040,7 +1040,7 @@ namespace moho
     if (splatVertexCount > 10000U) {
       D3D_GetDevice()->SelectTechnique("TSplats");
       GetTerrainShaderVars().decalAlbedoTexture.GetTexture(
-        boost::static_pointer_cast<CD3DDynamicTextureSheet>(sMediumFidelityTextureBatcher->GetCompositeTexture())
+        std::static_pointer_cast<CD3DDynamicTextureSheet>(sMediumFidelityTextureBatcher->GetCompositeTexture())
       );
       DrawSplatChunksPassMajor(
         D3D_GetDevice(), mOverlayVertexSheet, mOverlayIndexSheet, mSplatVertices.data(), splatVertexCount, 2500
@@ -1058,7 +1058,7 @@ namespace moho
 
     auto& shaderVars = GetTerrainShaderVars();
     shaderVars.decalAlbedoTexture.GetTexture(
-      boost::static_pointer_cast<CD3DDynamicTextureSheet>(sMediumFidelityTextureBatcher->GetCompositeTexture())
+      std::static_pointer_cast<CD3DDynamicTextureSheet>(sMediumFidelityTextureBatcher->GetCompositeTexture())
     );
 
     std::int32_t primitiveType = kTriangleListPrimitiveType;
@@ -1397,8 +1397,8 @@ namespace moho
   void MediumFidelityTerrain::DrawWaterTerrain(
     const std::int32_t tick,
     const float tickLerp,
-    const boost::shared_ptr<ID3DRenderTarget> refractionTexture,
-    const boost::shared_ptr<ID3DRenderTarget> reflectionTexture
+    const std::shared_ptr<ID3DRenderTarget> refractionTexture,
+    const std::shared_ptr<ID3DRenderTarget> reflectionTexture
   )
   {
     const float inverseRenderWidth = 1.0F / static_cast<float>(mViewportRenderWidth);
@@ -1447,7 +1447,7 @@ namespace moho
   bool MediumFidelityTerrain::DrawNormals(
     const std::int32_t gameTick,
     const float deltaSeconds,
-    const boost::shared_ptr<ID3DRenderTarget>& terrainNormalTexture,
+    const std::shared_ptr<ID3DRenderTarget>& terrainNormalTexture,
     Shadow* const shadowContext
   )
   {
@@ -1468,9 +1468,7 @@ namespace moho
 
     // Water ramp texture from the terrain's water shader properties.
     CWaterShaderProperties* const waterProperties = terrainRes->GetWaterShaderProperties();
-    shaderVars.waterRamp.GetTexture(
-      boost::static_pointer_cast<CD3DDynamicTextureSheet>(waterProperties->GetWaterRamp())
-    );
+    shaderVars.waterRamp.GetTexture(std::static_pointer_cast<CD3DDynamicTextureSheet>(waterProperties->GetWaterRamp()));
 
     // Select the active stratum-material technique.
     const StratumMaterial& stratumMaterial = terrainRes->GetStratumMaterial();

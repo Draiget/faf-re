@@ -7,7 +7,7 @@
 #include "legacy/thread/Condition.h"
 #include "legacy/thread/Thread.h"
 #include <memory>
-#include "boost/shared_ptr.h"
+#include <memory>
 #include "gpg/core/containers/FastVector.h"
 #include "gpg/core/containers/Rect2.h"
 #include "gpg/core/streams/Stream.h"
@@ -96,7 +96,7 @@ namespace moho
   struct SEntityPoseUpdateEntry
   {
     EntId mEntityId = 0;               // +0x00
-    boost::shared_ptr<CAniPose> mPose; // +0x04
+    std::shared_ptr<CAniPose> mPose;   // +0x04
   };
 
   /**
@@ -142,7 +142,7 @@ namespace moho
   {
     std::uint8_t mBuildStateTag = 0;               // +0x00
     std::uint8_t pad_01_03[0x03]{};                // +0x01
-    boost::shared_ptr<Stats<StatItem>> mStatsRoot; // +0x04
+    std::shared_ptr<Stats<StatItem>> mStatsRoot;   // +0x04
     std::uint8_t mFake = 0;                        // +0x0C
     std::uint8_t pad_0D_0F[0x03]{};                // +0x0D
   };
@@ -251,7 +251,7 @@ namespace moho
     fa::vector<CmdId> mPendingCommandEventRemovals; // +0x1A8
     /// Consumed by `CWldSession::DoBeat` as the erase-command id run.
     fa::vector<CmdId> mPendingReleasedCommandIds; // +0x1B8
-    boost::shared_ptr<void> mParticleBuffer;      // +0x1C8
+    std::shared_ptr<void> mParticleBuffer;        // +0x1C8
     /// Handed straight to `CDecalManager::AddDecals` / `RemoveDecals` by
     /// `CWldSession::DoBeat`; the removal run carries decal handles, not
     /// entity ids.
@@ -275,8 +275,8 @@ namespace moho
     bool mGameOver = false;                                   // +0x270
     bool mFogOfWar = false;                                   // +0x271
     std::uint8_t pad_0272_0274[0x02]{};                       // +0x272
-    boost::shared_ptr<CHeightField> mTerrainUpdate;           // +0x274
-    boost::shared_ptr<CSimResources> mSimResources;           // +0x27C
+    std::shared_ptr<CHeightField> mTerrainUpdate;             // +0x274
+    std::shared_ptr<CSimResources> mSimResources;             // +0x27C
     fa::vector<fa::string> mPrintField;                       // +0x284
     /// Copied wholesale onto `CWldSession::mSyncExtraUnitData` by
     /// `CWldSession::DoBeat` via `fa::vector<SExtraUnitData>::operator=`
@@ -285,8 +285,8 @@ namespace moho
     /// on `CWldSession::mSyncExtraUnitData` (`CWldSession.h`) for the full
     /// citation-correction evidence.
     fa::vector<SExtraUnitData> mSyncExtraUnitData;      // +0x294
-    boost::shared_ptr<CDebugCanvas> mTickDebugCanvas;   // +0x2A4
-    boost::shared_ptr<CDebugCanvas> mBeatDebugCanvas;   // +0x2AC
+    std::shared_ptr<CDebugCanvas> mTickDebugCanvas;     // +0x2A4
+    std::shared_ptr<CDebugCanvas> mBeatDebugCanvas;     // +0x2AC
     std::uint8_t pad_02B4_02B8[0x04]{};                 // +0x2B4
 
     /**
@@ -578,7 +578,7 @@ namespace moho
     CSimDriver(
       fa::auto_ptr<gpg::Stream> stream,
       fa::auto_ptr<CClientManagerImpl> clientManager,
-      const boost::shared_ptr<LaunchInfoBase>& launchInfo,
+      const std::shared_ptr<LaunchInfoBase>& launchInfo,
       uint32_t commandSourceId
     );
 
@@ -893,7 +893,7 @@ namespace moho
     std::unique_ptr<Sim> mSim;                       // +0x04
     fa::auto_ptr<CClientManagerImpl> mClientManager; // +0x08
     fa::auto_ptr<gpg::Stream> mStream;               // +0x0C
-    boost::shared_ptr<LaunchInfoBase> mLaunchInfo;   // +0x10
+    std::shared_ptr<LaunchInfoBase> mLaunchInfo;     // +0x10
     uint32_t mCommandSourceId = 0;                   // +0x18
     int32_t mLastDequeuedBeat = -1;                  // +0x1C
     int32_t mDispatchBeat = 1;                       // +0x20
@@ -987,7 +987,7 @@ namespace moho
   ISTIDriver* SIM_CreateDriver(
     CClientManagerImpl* clientManager,
     gpg::Stream* stream,
-    const boost::shared_ptr<LaunchInfoBase>& launchInfo,
+    const std::shared_ptr<LaunchInfoBase>& launchInfo,
     uint32_t commandSourceId
   );
 

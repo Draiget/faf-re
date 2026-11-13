@@ -9,7 +9,7 @@
 #include <cstdint>
 #include <cstring>
 
-#include "boost/weak_ptr.h"
+#include <memory>
 #include "gpg/core/utils/Global.h"
 #include "gpg/core/utils/Logging.h"
 #include "gpg/gal/Device.hpp"
@@ -225,7 +225,7 @@ namespace moho
     // shared_ptr<ID3DRenderTarget> as-is - no cast, and nothing to lock.
     void BindFrameTexture(
       ShaderVar& shaderVar,
-      const boost::shared_ptr<ID3DRenderTarget>& renderTarget
+      const std::shared_ptr<ID3DRenderTarget>& renderTarget
     )
     {
       shaderVar.SetRenderTargetTexture(renderTarget);
@@ -259,7 +259,7 @@ namespace moho
    */
   void CRenFrame::SetTexture(
     const unsigned int textureSlot,
-    boost::shared_ptr<ID3DRenderTarget> texture
+    std::shared_ptr<ID3DRenderTarget> texture
   )
   {
     (void)textureSlot;

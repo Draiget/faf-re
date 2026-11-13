@@ -8,7 +8,7 @@
 #include <d3d11.h>
 #include <wrl/client.h>
 
-#include "boost/shared_ptr.h"
+#include <memory>
 #include "gpg/gal/PipelineState.hpp"
 #include "platform/Platform.h"
 

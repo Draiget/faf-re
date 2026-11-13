@@ -334,7 +334,7 @@ namespace moho
     /// `AudioEngine::Create`) and 0x004DB240 (FUN_004DB240 -- `erase`) are this vector's
     /// `fa::vector<boost::shared_ptr<AudioEngine>>` members; formerly hand-written over an `AudioEngineRef`
     /// `{engine, control block}` pair in AudioEngine.cpp.
-    fa::vector<boost::shared_ptr<AudioEngine>> mEngines; // +0x08
+    fa::vector<std::shared_ptr<AudioEngine>> mEngines; // +0x08
     gpg::MemBuffer<char> mGlobalSettingsBuffer; // +0x18
     std::uint8_t mNoSound;                      // +0x28
     std::uint8_t mReserved29[0x03];             // +0x29
@@ -505,7 +505,7 @@ namespace moho
      * Ensures global sound-configuration ownership is available, creates an
      * `AudioEngine` instance, and registers it into the global engine lane.
      */
-    [[nodiscard]] static boost::shared_ptr<AudioEngine> Create(gpg::StrArg voicePath);
+    [[nodiscard]] static std::shared_ptr<AudioEngine> Create(gpg::StrArg voicePath);
 
     /**
      * Address: 0x004D9760 (FUN_004D9760)
@@ -657,7 +657,7 @@ namespace moho
    * Finds one loaded `AudioEngine` that owns a bank matching the supplied
    * bank name.
    */
-  boost::shared_ptr<AudioEngine> SND_FindEngine(gpg::StrArg bankName);
+  std::shared_ptr<AudioEngine> SND_FindEngine(gpg::StrArg bankName);
 
   /**
    * Address: 0x004D9040 (FUN_004D9040, ?SND_GetGlobalVarIndex@Moho@@...)

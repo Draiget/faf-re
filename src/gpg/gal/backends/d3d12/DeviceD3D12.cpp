@@ -2051,12 +2051,12 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     return &mHeadOutputContexts[headIndex];
   }
 
-  boost::shared_ptr<PipelineState> DeviceD3D12::GetPipelineState()
+  std::shared_ptr<PipelineState> DeviceD3D12::GetPipelineState()
   {
     return mPipelineState;
   }
 
-  boost::shared_ptr<Effect> DeviceD3D12::CreateEffect(
+  std::shared_ptr<Effect> DeviceD3D12::CreateEffect(
     const EffectContext& context
   )
   {
@@ -2122,7 +2122,7 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
       static_cast<unsigned>(program->Parameters().Constants().size()),
       ::GetTickCount() - started
     );
-    return boost::shared_ptr<Effect>(new ProgramEffect(context, program, *this));
+    return std::shared_ptr<Effect>(new ProgramEffect(context, program, *this));
   }
 
   namespace
@@ -2177,7 +2177,7 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     }
   } // namespace
 
-  boost::shared_ptr<Texture> DeviceD3D12::CreateTexture(
+  std::shared_ptr<Texture> DeviceD3D12::CreateTexture(
     const TextureContext* const context
   )
   {
@@ -2310,12 +2310,10 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     }
     const D3D12_CPU_DESCRIPTOR_HANDLE handle = mSrvPool.Allocate();
     mDevice->CreateShaderResourceView(resource.resource.Get(), &view, handle);
-    return boost::shared_ptr<Texture>(
-      new TextureD3D12(*context, std::move(resource), handle, cube, contentsFromEngine)
-    );
+    return std::shared_ptr<Texture>(new TextureD3D12(*context, std::move(resource), handle, cube, contentsFromEngine));
   }
 
-  boost::shared_ptr<RenderTarget> DeviceD3D12::CreateRenderTarget(
+  std::shared_ptr<RenderTarget> DeviceD3D12::CreateRenderTarget(
     const RenderTargetContext* const context
   )
   {
@@ -2363,17 +2361,17 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
 
     std::vector<RenderTargetD3D12::Buffer> buffers;
     buffers.push_back(std::move(buffer));
-    return boost::shared_ptr<RenderTarget>(new RenderTargetD3D12(std::move(buffers), nullptr));
+    return std::shared_ptr<RenderTarget>(new RenderTargetD3D12(std::move(buffers), nullptr));
   }
 
-  boost::shared_ptr<CubeRenderTarget> DeviceD3D12::CreateCubeRenderTarget(
+  std::shared_ptr<CubeRenderTarget> DeviceD3D12::CreateCubeRenderTarget(
     const CubeRenderTargetContext* const context
   )
   {
-    return boost::shared_ptr<CubeRenderTarget>(new CubeRenderTargetD3D12(*context));
+    return std::shared_ptr<CubeRenderTarget>(new CubeRenderTargetD3D12(*context));
   }
 
-  boost::shared_ptr<DepthStencilTarget> DeviceD3D12::CreateDepthStencilTarget(
+  std::shared_ptr<DepthStencilTarget> DeviceD3D12::CreateDepthStencilTarget(
     const DepthStencilTargetContext* const context
   )
   {
@@ -2424,40 +2422,40 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
       shaderView = mSrvPool.Allocate();
       mDevice->CreateShaderResourceView(resource.resource.Get(), &view, shaderView);
     }
-    return boost::shared_ptr<DepthStencilTarget>(
+    return std::shared_ptr<DepthStencilTarget>(
       new DepthStencilTargetD3D12(*context, std::move(resource), depthView, shaderView, formats.depthView)
     );
   }
 
-  boost::shared_ptr<VertexFormat> DeviceD3D12::CreateVertexFormat(
+  std::shared_ptr<VertexFormat> DeviceD3D12::CreateVertexFormat(
     const std::uint32_t formatCode
   )
   {
     if (formatCode >= d3d11::kVertexFormatCount || d3d11::VertexLayoutElements(formatCode).empty()) {
       ThrowError("DeviceD3D12.cpp", __LINE__, "invalid vertex format specified");
     }
-    return boost::shared_ptr<VertexFormat>(new VertexFormatD3D12(formatCode));
+    return std::shared_ptr<VertexFormat>(new VertexFormatD3D12(formatCode));
   }
 
-  boost::shared_ptr<VertexBuffer> DeviceD3D12::CreateVertexBuffer(
+  std::shared_ptr<VertexBuffer> DeviceD3D12::CreateVertexBuffer(
     const VertexBufferContext* const context
   )
   {
     const std::lock_guard<std::recursive_mutex> lock(mMutex);
-    return boost::shared_ptr<VertexBuffer>(new VertexBufferD3D12(*context));
+    return std::shared_ptr<VertexBuffer>(new VertexBufferD3D12(*context));
   }
 
-  boost::shared_ptr<IndexBuffer> DeviceD3D12::CreateIndexBuffer(
+  std::shared_ptr<IndexBuffer> DeviceD3D12::CreateIndexBuffer(
     const IndexBufferContext* const context
   )
   {
     const std::lock_guard<std::recursive_mutex> lock(mMutex);
-    return boost::shared_ptr<IndexBuffer>(new IndexBufferD3D12(*context));
+    return std::shared_ptr<IndexBuffer>(new IndexBufferD3D12(*context));
   }
 
   void DeviceD3D12::GetRenderTargetData(
-    const boost::shared_ptr<RenderTarget>& source,
-    const boost::shared_ptr<Texture>& destination
+    const std::shared_ptr<RenderTarget>& source,
+    const std::shared_ptr<Texture>& destination
   )
   {
     if (source == nullptr) {
@@ -2477,8 +2475,8 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
   }
 
   void DeviceD3D12::StretchRect(
-    const boost::shared_ptr<RenderTarget>& source,
-    const boost::shared_ptr<RenderTarget>& destination,
+    const std::shared_ptr<RenderTarget>& source,
+    const std::shared_ptr<RenderTarget>& destination,
     const RECT* const sourceRect,
     const RECT* const destinationRect
   )
@@ -2648,8 +2646,8 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
   }
 
   void DeviceD3D12::UpdateSurface(
-    const boost::shared_ptr<Texture>& source,
-    const boost::shared_ptr<Texture>& destination,
+    const std::shared_ptr<Texture>& source,
+    const std::shared_ptr<Texture>& destination,
     const RECT* const sourceRect,
     const RECT* const destinationRect
   )
@@ -2723,7 +2721,7 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
   }
 
   void DeviceD3D12::SaveCubeRenderTarget(
-    const boost::shared_ptr<CubeRenderTarget>& cubeTarget,
+    const std::shared_ptr<CubeRenderTarget>& cubeTarget,
     const fa::string& filePath
   )
   {
@@ -2732,7 +2730,7 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
   }
 
   void DeviceD3D12::SaveRenderTarget(
-    const boost::shared_ptr<RenderTarget>& renderTarget,
+    const std::shared_ptr<RenderTarget>& renderTarget,
     const fa::string& filePath,
     const int fileFormat
   )
@@ -2750,7 +2748,7 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
   }
 
   void DeviceD3D12::SaveTexture(
-    const boost::shared_ptr<Texture>& texture,
+    const std::shared_ptr<Texture>& texture,
     const fa::string& filePath,
     const int fileFormat,
     gpg::MemBuffer<char>* const outBuffer
@@ -2817,9 +2815,9 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     std::memcpy(outTextureData->GetPtr(0U, 0U), image.bytes.data() + top.offset, requiredBytes);
   }
 
-  boost::weak_ptr<void>* DeviceD3D12::Func7(
-    boost::weak_ptr<void>* const outWeakHandle,
-    boost::shared_ptr<void> temporarySharedHandle
+  std::weak_ptr<void>* DeviceD3D12::Func7(
+    std::weak_ptr<void>* const outWeakHandle,
+    std::shared_ptr<void> temporarySharedHandle
   )
   {
     static_cast<void>(temporarySharedHandle);
@@ -3280,7 +3278,7 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
   void DeviceD3D12::ClearTextures() {}
 
   void DeviceD3D12::SetVertexDeclaration(
-    const boost::shared_ptr<VertexFormat> vertexFormat
+    const std::shared_ptr<VertexFormat> vertexFormat
   )
   {
     RecordStateChange();
@@ -3289,7 +3287,7 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
 
   void DeviceD3D12::SetVertexBuffer(
     const std::uint32_t streamSlot,
-    const boost::shared_ptr<VertexBuffer> vertexBuffer,
+    const std::shared_ptr<VertexBuffer> vertexBuffer,
     const int streamFrequencyToken,
     const int startVertex
   )
@@ -3307,7 +3305,7 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
   }
 
   void DeviceD3D12::SetBufferIndices(
-    const boost::shared_ptr<IndexBuffer> indexBuffer
+    const std::shared_ptr<IndexBuffer> indexBuffer
   )
   {
     RecordStateChange();

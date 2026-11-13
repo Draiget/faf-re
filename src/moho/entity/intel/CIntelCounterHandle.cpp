@@ -104,7 +104,7 @@ namespace
       return;
     }
 
-    boost::shared_ptr<moho::CIntelGrid> grid{};
+    std::shared_ptr<moho::CIntelGrid> grid{};
     switch (handle.mType) {
     case moho::INTELCOUNTER_RadarStealthField:
       grid = reconDB->ReconGetRCIGrid();
@@ -184,7 +184,7 @@ namespace moho
     const EIntelCounter type,
     CAiReconDBImpl* const reconDB
   )
-    : CIntelPosHandle(radius, boost::shared_ptr<CIntelGrid>{})
+    : CIntelPosHandle(radius, std::shared_ptr<CIntelGrid>{})
     , mSim(sim)
     , mReconDB(reconDB)
     , mType(type)

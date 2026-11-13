@@ -49,21 +49,21 @@ namespace
 
   template <typename TType>
   [[nodiscard]] bool IsSharedHandleLessForBucket(
-    const boost::shared_ptr<TType>& lhs,
-    const boost::shared_ptr<TType>& rhs
+    const std::shared_ptr<TType>& lhs,
+    const std::shared_ptr<TType>& rhs
   ) noexcept
   {
     if (lhs.get() == rhs.get()) {
       return false;
     }
-    // `boost::shared_ptr`'s `operator<` is this Boost's owner order (control-block pointers).
-    return lhs < rhs;
+    // Retail's `boost::shared_ptr` `operator<` is the owner order (control-block pointers): `owner_before`.
+    return lhs.owner_before(rhs);
   }
 
   template <typename TType>
   [[nodiscard]] bool AreSharedHandlesEquivalentForBucket(
-    const boost::shared_ptr<TType>& lhs,
-    const boost::shared_ptr<TType>& rhs
+    const std::shared_ptr<TType>& lhs,
+    const std::shared_ptr<TType>& rhs
   ) noexcept
   {
     return lhs.get() == rhs.get();

@@ -9,7 +9,7 @@
 
 #include "ArchiveSerialization.h"
 #include "legacy/containers/Map.h"
-#include "boost/shared_ptr.h"
+#include <memory>
 
 namespace fa
 {
@@ -360,14 +360,14 @@ namespace gpg
    * What it does:
    * Creates one file-backed concrete `WriteArchive` for save/load serializers.
    */
-  WriteArchive* CreateBinaryWriteArchive(const boost::shared_ptr<std::FILE>& file);
+  WriteArchive* CreateBinaryWriteArchive(const std::shared_ptr<std::FILE>& file);
 
   /**
    * Engine addition: the same format as `CreateBinaryWriteArchive`, for a replay keyframe. Tracked pointers go
    * through a hash index, and writes through a memory buffer instead of one `fwrite` per value. The file is only
    * complete after `EndSection`, `Close` or the archive's destruction, so nothing else may write to it before that.
    */
-  WriteArchive* CreateFastBinaryWriteArchive(const boost::shared_ptr<std::FILE>& file);
+  WriteArchive* CreateFastBinaryWriteArchive(const std::shared_ptr<std::FILE>& file);
 
   /** Engine addition: where a fast archive's bytes go instead of a file. */
   class WriteArchiveSink
@@ -387,5 +387,5 @@ namespace gpg
    * What it does:
    * Creates one text-backed concrete `WriteArchive` bound to an output stream.
    */
-  WriteArchive* CreateTextWriteArchive(const boost::shared_ptr<std::ostream>& stream);
+  WriteArchive* CreateTextWriteArchive(const std::shared_ptr<std::ostream>& stream);
 } // namespace gpg

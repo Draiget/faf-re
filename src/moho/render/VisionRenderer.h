@@ -3,7 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 
-#include "boost/shared_ptr.h"
+#include <memory>
 #include "gpg/gal/VertexBuffer.hpp"
 #include "moho/render/CRenFrame.h"
 #include "moho/render/RenderGeometryBuffers.h"
@@ -69,7 +69,7 @@ namespace moho
      * with `D3DLOCK_NOOVERWRITE`, wrapping back to 0 with `D3DLOCK_DISCARD`.
      */
     std::uint32_t mInstanceRingCursor = 0;                    // +0x24
-    boost::shared_ptr<gpg::gal::VertexBuffer> mVertexBuffer2; // +0x28
+    std::shared_ptr<gpg::gal::VertexBuffer> mVertexBuffer2;   // +0x28
     CRenFrame mFrame;                                         // +0x30
   };
 
@@ -98,7 +98,7 @@ namespace moho
    * fog-of-war overlay (`RenderFogOfWar`, 0x0081C6A9), which live in two
    * different translation units - hence the external linkage.
    */
-  [[nodiscard]] boost::shared_ptr<gpg::gal::Effect> AcquireVisionBaseEffect();
+  [[nodiscard]] std::shared_ptr<gpg::gal::Effect> AcquireVisionBaseEffect();
 
   /**
    * Address: 0x0081C660 (FUN_0081C660, func_ren_FogOfWar)

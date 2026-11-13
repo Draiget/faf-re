@@ -3,7 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 
-#include "boost/weak_ptr.h"
+#include <memory>
 #include "gpg/core/time/Timer.h"
 #include "INetNATTraversalProvider.h"
 #include "legacy/containers/String.h"
@@ -393,7 +393,7 @@ namespace moho
    * Creates a non-blocking UDP connector bound to `port`, or returns null on
    * socket/ioctl/bind/allocation failure.
    */
-  INetConnector* NET_MakeUDPConnector(u_short port, boost::weak_ptr<INetNATTraversalProvider> prov);
+  INetConnector* NET_MakeUDPConnector(u_short port, std::weak_ptr<INetNATTraversalProvider> prov);
 
   /**
    * Address: 0x004849A0 (FUN_004849A0)

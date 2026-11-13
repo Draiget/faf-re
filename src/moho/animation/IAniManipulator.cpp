@@ -1234,7 +1234,7 @@ namespace moho
    */
   void CBoneEntityManipulator::InitPivotFromBoneBounds()
   {
-    const boost::shared_ptr<const CAniSkel> skeleton = mOwnerActor->GetSkeleton();
+    const std::shared_ptr<const CAniSkel> skeleton = mOwnerActor->GetSkeleton();
     const CAniSkel* const skel = skeleton.get();
     if (skel == nullptr) {
       return;

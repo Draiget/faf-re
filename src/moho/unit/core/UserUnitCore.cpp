@@ -533,8 +533,8 @@ namespace
   }
 
   [[nodiscard]] bool CanReuseSharedPoseForSkeleton(
-    const boost::shared_ptr<CAniPose>& sharedPose,
-    const boost::shared_ptr<const CAniSkel>& skeleton
+    const std::shared_ptr<CAniPose>& sharedPose,
+    const std::shared_ptr<const CAniSkel>& skeleton
   )
   {
     if (!sharedPose || !skeleton) {
@@ -1704,7 +1704,7 @@ void UserUnit::CreateMeshInstance(
     static_cast<const RMeshBlueprint*>(entityView->mVariableData.mMeshBlueprint),
     uniformMeshScale,
     true,
-    boost::shared_ptr<MeshMaterial>{}
+    std::shared_ptr<MeshMaterial>{}
   );
 
   if (entityView->mMeshInstance == nullptr) {
@@ -1729,13 +1729,13 @@ void UserUnit::CreateMeshInstance(
   }
   entityView->mMeshInstance->meshColor = (clampedColorIndex + 0.5f) / lookupCount;
 
-  const boost::shared_ptr<Mesh> mesh = entityView->mMeshInstance->GetMesh();
-  const boost::shared_ptr<RScmResource> resource = mesh ? mesh->GetResource(0) : boost::shared_ptr<RScmResource>{};
-  const boost::shared_ptr<const CAniSkel> skeleton =
-    resource ? resource->GetSkeleton() : boost::shared_ptr<const CAniSkel>{};
+  const std::shared_ptr<Mesh> mesh = entityView->mMeshInstance->GetMesh();
+  const std::shared_ptr<RScmResource> resource = mesh ? mesh->GetResource(0) : std::shared_ptr<RScmResource>{};
+  const std::shared_ptr<const CAniSkel> skeleton =
+    resource ? resource->GetSkeleton() : std::shared_ptr<const CAniSkel>{};
 
-  const boost::shared_ptr<CAniPose> priorSharedPose =
-    unitVarDat ? unitVarDat->mPriorSharedPose : boost::shared_ptr<CAniPose>{};
+  const std::shared_ptr<CAniPose> priorSharedPose =
+    unitVarDat ? unitVarDat->mPriorSharedPose : std::shared_ptr<CAniPose>{};
   if (CanReuseSharedPoseForSkeleton(priorSharedPose, skeleton)) {
     entityView->mPosePrimary = priorSharedPose;
   } else {
@@ -1745,7 +1745,7 @@ void UserUnit::CreateMeshInstance(
     }
   }
 
-  const boost::shared_ptr<CAniPose> sharedPose = unitVarDat ? unitVarDat->mSharedPose : boost::shared_ptr<CAniPose>{};
+  const std::shared_ptr<CAniPose> sharedPose = unitVarDat ? unitVarDat->mSharedPose : std::shared_ptr<CAniPose>{};
   if (CanReuseSharedPoseForSkeleton(sharedPose, skeleton)) {
     entityView->mPoseSecondary = sharedPose;
   } else {

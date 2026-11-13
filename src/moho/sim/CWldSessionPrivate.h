@@ -150,8 +150,8 @@
  */
 struct SFormationPreviewGhost
 {
-  boost::shared_ptr<moho::MeshInstance> mMesh;     // +0x00
-  boost::shared_ptr<moho::MeshMaterial> mMaterial; // +0x08
+  std::shared_ptr<moho::MeshInstance> mMesh;     // +0x00
+  std::shared_ptr<moho::MeshMaterial> mMaterial; // +0x08
 };
 static_assert(sizeof(SFormationPreviewGhost) == 0x10, "SFormationPreviewGhost size must be 0x10");
 extern fa::vector<SFormationPreviewGhost> gFormationPreviews;
@@ -164,7 +164,7 @@ namespace moho
 
   struct UICommandGraphNode
   {
-    boost::shared_ptr<ID3DTextureSheet> mOrderlineTexture{}; // +0x00
+    std::shared_ptr<ID3DTextureSheet> mOrderlineTexture{}; // +0x00
     float mOrderlineAspectRatio = 0.0f;            // +0x08
     float mOrderlineAnimRate = 0.0f;               // +0x0C
     std::uint32_t mOrderlineColor = 0;             // +0x10
@@ -180,8 +180,8 @@ namespace moho
     float mWaypointSelectedScale = 0.0f;           // +0x38
     float mWaypointHighlightScale = 0.0f;          // +0x3C
     float mArrowheadCapOffset = 0.0f;              // +0x40
-    boost::shared_ptr<CD3DBatchTexture> mWaypointTexture{};  // +0x44
-    boost::shared_ptr<CD3DBatchTexture> mArrowheadTexture{}; // +0x4C
+    std::shared_ptr<CD3DBatchTexture> mWaypointTexture{};  // +0x44
+    std::shared_ptr<CD3DBatchTexture> mArrowheadTexture{}; // +0x4C
 
     /**
      * Address: 0x008243F0 (FUN_008243F0, ??0UICommandGraphNode@Moho@@QAE@@Z)
@@ -315,7 +315,7 @@ namespace moho
        * Normal shared_ptr copy, assignment and destruction preserve that
        * ownership, including constructor failure while copying the edge lists.
        */
-      boost::shared_ptr<MeshInstance> mMeshInstance; // +0x20
+      std::shared_ptr<MeshInstance> mMeshInstance; // +0x20
       /**
        * Orderline tangent override: 0x008288D0 reads this as one `Vector3f`
        * (previously mis-split as `field_0x28`(uint32)/`field_0x2C`/
@@ -386,7 +386,7 @@ namespace moho
       /// call `SetTexture(boost::shared_ptr<ID3DTextureSheet>)` at 0x00829226
       /// and 0x00829396, and only the flat-white node pass at 0x0082952C takes
       /// the `CD3DBatchTexture` overload.
-      boost::shared_ptr<ID3DTextureSheet> mTexture;   // +0x00
+      std::shared_ptr<ID3DTextureSheet> mTexture;     // +0x00
       fa::vector<CommandGraphEdge*> mEdges;           // +0x08
     };
     static_assert(sizeof(CommandGraphTreeBucket) == 0x18, "CommandGraphTreeBucket size must be 0x18");
@@ -651,7 +651,7 @@ namespace moho
      */
     static CommandGraphTreeBucket* InitCommandGraphTreeBucketValue(
       CommandGraphTreeBucket* destination,
-      const boost::shared_ptr<ID3DTextureSheet>& texture
+      const std::shared_ptr<ID3DTextureSheet>& texture
     );
 
     /**
@@ -692,7 +692,7 @@ namespace moho
       CommandGraphTree& tree,
       bool addLeft,
       CommandGraphTreeNode* where,
-      const boost::shared_ptr<ID3DTextureSheet>& texture
+      const std::shared_ptr<ID3DTextureSheet>& texture
     );
 
     /**
@@ -707,7 +707,7 @@ namespace moho
      * for this map instantiation.
      */
     static CommandGraphTreeNode*
-    AttachCommandGraphNodeUnique(CommandGraphTree& tree, const boost::shared_ptr<ID3DTextureSheet>& texture);
+    AttachCommandGraphNodeUnique(CommandGraphTree& tree, const std::shared_ptr<ID3DTextureSheet>& texture);
 
     /**
      * Address: 0x0082CC80 (FUN_0082CC80, sub_82CC80)
@@ -725,7 +725,7 @@ namespace moho
     static CommandGraphTreeNode* AttachCommandGraphNodeHinted(
       CommandGraphTree& tree,
       CommandGraphTreeNode* hint,
-      const boost::shared_ptr<ID3DTextureSheet>& texture
+      const std::shared_ptr<ID3DTextureSheet>& texture
     );
 
     /**
@@ -742,7 +742,7 @@ namespace moho
      * `CommandGraphTreeBucket::mEdges.push_back` (0x0082BCB0).
      */
     static fa::vector<CommandGraphEdge*>&
-    FindOrInsertCommandGraphBucket(CommandGraphTree& tree, const boost::shared_ptr<ID3DTextureSheet>& texture);
+    FindOrInsertCommandGraphBucket(CommandGraphTree& tree, const std::shared_ptr<ID3DTextureSheet>& texture);
 
     /**
      * Address: 0x00824740 (FUN_00824740, func_OnCommandGraphShow)

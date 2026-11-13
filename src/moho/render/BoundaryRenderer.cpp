@@ -2,7 +2,7 @@
 
 #include <cstdint>
 
-#include "boost/shared_ptr.h"
+#include <memory>
 #include "gpg/gal/Device.hpp"
 #include "gpg/gal/DeviceContext.hpp"
 #include "gpg/gal/DrawIndexedContext.hpp"
@@ -87,13 +87,13 @@ namespace
     // overwritten by the effect lookup at 0x007D0914 before it is ever read.
     static_cast<void>(device->GetDeviceContext()->GetHead(headIndex));
 
-    const boost::shared_ptr<gpg::gal::Effect> effect = moho::AcquireVisionBaseEffect();
+    const std::shared_ptr<gpg::gal::Effect> effect = moho::AcquireVisionBaseEffect();
 
-    const boost::shared_ptr<gpg::gal::EffectTechnique> technique = effect->GetTechnique(techniqueName.c_str());
-    const boost::shared_ptr<gpg::gal::EffectVariable> viewMatrix = effect->GetVariable("viewMatrix");
-    const boost::shared_ptr<gpg::gal::EffectVariable> projMatrix = effect->GetVariable("projMatrix");
-    const boost::shared_ptr<gpg::gal::EffectVariable> boxCenter = effect->GetVariable("boxCenter");
-    const boost::shared_ptr<gpg::gal::EffectVariable> boxExtent = effect->GetVariable("boxExtent");
+    const std::shared_ptr<gpg::gal::EffectTechnique> technique = effect->GetTechnique(techniqueName.c_str());
+    const std::shared_ptr<gpg::gal::EffectVariable> viewMatrix = effect->GetVariable("viewMatrix");
+    const std::shared_ptr<gpg::gal::EffectVariable> projMatrix = effect->GetVariable("projMatrix");
+    const std::shared_ptr<gpg::gal::EffectVariable> boxCenter = effect->GetVariable("boxCenter");
+    const std::shared_ptr<gpg::gal::EffectVariable> boxExtent = effect->GetVariable("boxExtent");
 
     const float center[3] = {
       (volume.Min.x + volume.Max.x) * 0.5f, (volume.Min.y + volume.Max.y) * 0.5f, (volume.Min.z + volume.Max.z) * 0.5f

@@ -271,22 +271,22 @@ namespace moho
    * so `insert_unique`'s own find-or-insert semantics (RbTree.h) need no
    * extra conditional on this side.
    */
-  boost::shared_ptr<Mesh> MeshRenderer::FindOrCreateMesh(
+  std::shared_ptr<Mesh> MeshRenderer::FindOrCreateMesh(
     const RMeshBlueprint* const blueprint,
-    const boost::shared_ptr<MeshMaterial> materialArg
+    const std::shared_ptr<MeshMaterial> materialArg
   )
   {
     MeshKey key(blueprint, materialArg);
-    if (boost::weak_ptr<Mesh>* const found = meshCacheTree.try_get(key)) {
-      if (boost::shared_ptr<Mesh> locked = found->lock()) {
+    if (std::weak_ptr<Mesh>* const found = meshCacheTree.try_get(key)) {
+      if (std::shared_ptr<Mesh> locked = found->lock()) {
         return locked;
       }
     }
 
     const std::pair<MeshRendererMeshCacheTree::iterator, bool> result =
-      meshCacheTree.insert({key, boost::weak_ptr<Mesh>()});
+      meshCacheTree.insert({key, std::weak_ptr<Mesh>()});
 
-    boost::shared_ptr<Mesh> mesh;
+    std::shared_ptr<Mesh> mesh;
     ConstructSharedMeshWithCacheEvictingDeleter(mesh, new Mesh(blueprint, materialArg), meshCacheTree, key);
     result.first->second = mesh;
 
@@ -303,7 +303,7 @@ namespace moho
     const RMeshBlueprint* const blueprint,
     const Wm3::Vec3f& scale,
     const bool isStaticPose,
-    const boost::shared_ptr<MeshMaterial> materialArg
+    const std::shared_ptr<MeshMaterial> materialArg
   )
   {
     if (!blueprint) {
@@ -323,7 +323,7 @@ namespace moho
       return nullptr;
     }
 
-    boost::shared_ptr<Mesh> mesh = FindOrCreateMesh(blueprint, materialArg);
+    std::shared_ptr<Mesh> mesh = FindOrCreateMesh(blueprint, materialArg);
     return CreateMeshInstance(gameTick, color, scale, isStaticPose, mesh);
   }
 
@@ -336,7 +336,7 @@ namespace moho
     const std::int32_t color,
     const Wm3::Vec3f& scale,
     const bool isStaticPose,
-    const boost::shared_ptr<Mesh> meshArg
+    const std::shared_ptr<Mesh> meshArg
   )
   {
     if (!meshArg) {
@@ -368,14 +368,14 @@ namespace moho
   MeshInstance* MeshRenderer::CreateMeshInstance(
     const std::int32_t gameTick,
     const std::int32_t color,
-    const boost::shared_ptr<RScmResource> resource,
+    const std::shared_ptr<RScmResource> resource,
     const Wm3::Vec3f& scale,
     const bool isStaticPose,
-    const boost::shared_ptr<MeshMaterial> material,
+    const std::shared_ptr<MeshMaterial> material,
     const float lodCutoff
   )
   {
-    boost::shared_ptr<Mesh> mesh(new Mesh(resource, material));
+    std::shared_ptr<Mesh> mesh(new Mesh(resource, material));
     mesh->lods.front()->SetCutoff(lodCutoff);
     return CreateMeshInstance(gameTick, color, scale, isStaticPose, mesh);
   }
@@ -677,8 +677,8 @@ namespace moho
 
     // Global lookup textures + the three per-frame texture binds.
     LoadGlobalTextures();
-    BindTextureShaderVar(sv.anisotropicTexture, boost::static_pointer_cast<ID3DTextureSheet>(anisotropiclookupTex));
-    BindTextureShaderVar(sv.insectTexture, boost::static_pointer_cast<ID3DTextureSheet>(insectlookupTex));
+    BindTextureShaderVar(sv.anisotropicTexture, std::static_pointer_cast<ID3DTextureSheet>(anisotropiclookupTex));
+    BindTextureShaderVar(sv.insectTexture, std::static_pointer_cast<ID3DTextureSheet>(insectlookupTex));
 
     // Frame time: fold the frame counter into a float (with the unsigned int
     // fixup the binary applies to negative counters), add the accumulated delta
@@ -732,7 +732,7 @@ namespace moho
       sv.projMatrix.SetMatrix4x4(&camera.projection);
     }
 
-    BindTextureShaderVar(sv.dissolveTexture, boost::static_pointer_cast<ID3DTextureSheet>(dissolveTex));
+    BindTextureShaderVar(sv.dissolveTexture, std::static_pointer_cast<ID3DTextureSheet>(dissolveTex));
 
     if (terrainRes != nullptr) {
       const STIMap* const map = terrainRes->mMap;
@@ -818,7 +818,7 @@ namespace moho
       ID3DDeviceResources* const resources = device->GetResources();
       ID3DDeviceResources::TextureResourceHandle waterRampResource;
       resources->GetTexture(waterRampResource, "/textures/engine/waterramp.dds", 0, true);
-      BindTextureShaderVar(sv.waterRamp, boost::static_pointer_cast<ID3DTextureSheet>(waterRampResource));
+      BindTextureShaderVar(sv.waterRamp, std::static_pointer_cast<ID3DTextureSheet>(waterRampResource));
     }
 
     // Shadow-map lane: only when a shadow object with fidelity > 1 is supplied.
@@ -838,7 +838,7 @@ namespace moho
       // pulls the GAL surface off the target's own vtable. The retained copy is
       // released when it leaves scope, matching the binary's trailing
       // shared_ptr teardown.
-      boost::shared_ptr<CD3DRenderTarget> shadowMap{};
+      std::shared_ptr<CD3DRenderTarget> shadowMap{};
       shadow->GetShadowMap(shadowMap);
       sv.shadowTexture.SetRenderTargetTexture(shadowMap);
 
@@ -1094,7 +1094,7 @@ namespace moho
         // shared_ptr handle keeps the batch retained for the draw call; the
         // cartographic pass always draws un-mirrored (binary pushes 0,
         // 0x007E030C).
-        boost::shared_ptr<MeshBatch> batchHandle;
+        std::shared_ptr<MeshBatch> batchHandle;
         if (MeshBatchEntryIsSkinned(bucket)) {
           lod->GetSkinnedBatch(batchHandle);
         } else {
@@ -1166,7 +1166,7 @@ namespace moho
 
         tv.albedoTexture.GetTexture(lod->mat.mAlbedoSheet);
 
-        boost::shared_ptr<MeshBatch> batchHandle;
+        std::shared_ptr<MeshBatch> batchHandle;
         if (MeshBatchEntryIsSkinned(bucket)) {
           lod->GetSkinnedBatch(batchHandle);
         } else {
@@ -1356,7 +1356,7 @@ namespace moho
         // mesh batch (skinned for static-pose buckets, static otherwise). The
         // shared_ptr handle keeps the batch retained for the draw call; the
         // depth pass always draws un-mirrored (binary passes 0).
-        boost::shared_ptr<MeshBatch> batchHandle;
+        std::shared_ptr<MeshBatch> batchHandle;
         if (MeshBatchEntryIsSkinned(bucket)) {
           lod->GetSkinnedBatch(batchHandle);
         } else {
@@ -1481,7 +1481,7 @@ namespace moho
       // Draw the bucket's instances through the LOD's lazily-built hardware mesh
       // batch (skinned for static-pose buckets, static otherwise). The
       // shared_ptr handle keeps the batch retained for the draw call.
-      boost::shared_ptr<MeshBatch> batchHandle;
+      std::shared_ptr<MeshBatch> batchHandle;
       if (MeshBatchEntryIsSkinned(bucket)) {
         lod->GetSkinnedBatch(batchHandle);
       } else {
@@ -1587,7 +1587,7 @@ namespace moho
     // binary reads `*mesh->lods._Myfirst` (the first LOD) after taking a live
     // shared_ptr copy via GetMesh(); the handle keeps the mesh alive across the
     // draw. (FUN_007E11C0 @0x007E11EA..0x007E11FE.)
-    const boost::shared_ptr<Mesh> mesh = meshInstance->GetMesh();
+    const std::shared_ptr<Mesh> mesh = meshInstance->GetMesh();
     MeshLOD* const lod = mesh->lods.front();
 
     // Bind the caller's color + depth targets with a full clear (color
@@ -1620,7 +1620,7 @@ namespace moho
     // fed a one-element instance vector and drawn un-mirrored; the shared_ptr
     // handle retains the batch for the draw and the vector releases after.
     // (FUN_007E11C0 @0x007E1282..0x007E12DB.)
-    boost::shared_ptr<MeshBatch> batchHandle;
+    std::shared_ptr<MeshBatch> batchHandle;
     lod->GetStaticBatch(batchHandle);
     if (batchHandle) {
       fa::vector<MeshInstance*> singleInstance;
@@ -1865,7 +1865,7 @@ namespace moho
       }
 
       // Every LOD batch is a HardwareMeshBatch (BuildHardwareMeshBatchForLod).
-      boost::shared_ptr<MeshBatch> batchHandle;
+      std::shared_ptr<MeshBatch> batchHandle;
       MeshBatchEntryLod(bucket)->GetSkinnedBatch(batchHandle);
       if (batchHandle) {
         static_cast<HardwareMeshBatch*>(batchHandle.get())->PrepareBonePalettes(bucket.second);

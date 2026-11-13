@@ -4466,7 +4466,7 @@ namespace moho
     // keeping the shared_ptr alive across the walk below.
     const CAniSkel* skel;
     {
-      const boost::shared_ptr<const CAniSkel> skelHandle = pose->GetSkeleton();
+      const std::shared_ptr<const CAniSkel> skelHandle = pose->GetSkeleton();
       skel = skelHandle.get();
     }
 

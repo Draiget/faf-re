@@ -396,7 +396,7 @@ namespace moho
     // The sun's shadow texture, so contact shadows leave the points it shades alone.
     ID3DRenderTarget::SurfaceHandle shadowSurface{};
     if (constants.sun[3] > 0.0f && shadow != nullptr && shadow->mShadowCameraValid) {
-      if (const boost::shared_ptr<CD3DRenderTarget> shadowTexture = shadow->GetShadowTexture(); shadowTexture) {
+      if (const std::shared_ptr<CD3DRenderTarget> shadowTexture = shadow->GetShadowTexture(); shadowTexture) {
         (void)shadowTexture->GetSurface(shadowSurface);
       }
       if (shadowSurface) {

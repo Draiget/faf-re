@@ -170,11 +170,11 @@ namespace moho
       }
 
       // 0x0086B616: the shared `GetModel` lane, same as every other model consumer.
-      const boost::shared_ptr<RScmResource> modelResource = GetModel(LuaStringOrEmpty(meshNameObject), nullptr);
+      const std::shared_ptr<RScmResource> modelResource = GetModel(LuaStringOrEmpty(meshNameObject), nullptr);
       const fa::string textureName(LuaStringOrEmpty(textureNameObject));
       const fa::string shaderName(LuaStringOrEmpty(shaderNameObject));
       const fa::string emptyTextureName{};
-      const boost::shared_ptr<MeshMaterial> material = MeshMaterial::Create(
+      const std::shared_ptr<MeshMaterial> material = MeshMaterial::Create(
         shaderName, textureName, emptyTextureName, emptyTextureName, emptyTextureName, emptyTextureName, nullptr
       );
 
@@ -213,7 +213,7 @@ namespace moho
       const Wm3::Vec3f scale{blueprintUniformScale, blueprintUniformScale, blueprintUniformScale};
       mMeshInstance = meshRenderer != nullptr
         ? meshRenderer->CreateMeshInstance(
-            gameTick, color, meshBlueprint, scale, false, boost::shared_ptr<MeshMaterial>()
+            gameTick, color, meshBlueprint, scale, false, std::shared_ptr<MeshMaterial>()
           )
         : nullptr;
     }

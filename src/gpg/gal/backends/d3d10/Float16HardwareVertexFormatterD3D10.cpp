@@ -52,7 +52,7 @@ namespace gpg::gal
    * Creates vertex format 15 on the active device. Unlike the D3D9 float16
    * formatter it never picks 16: `layoutVariant` is ignored.
    */
-  boost::shared_ptr<VertexFormat> Float16HardwareVertexFormatterD3D10::CreateVertexFormat(
+  std::shared_ptr<VertexFormat> Float16HardwareVertexFormatterD3D10::CreateVertexFormat(
     const std::int32_t layoutVariant
   )
   {

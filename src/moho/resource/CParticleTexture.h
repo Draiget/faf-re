@@ -2,7 +2,7 @@
 
 #include <cstddef>
 
-#include "boost/shared_ptr.h"
+#include <memory>
 #include "legacy/containers/String.h"
 #include "moho/misc/CountedObject.h"
 
@@ -48,7 +48,7 @@ namespace moho
       gpg::SerSaveConstructArgsResult& result
     );
 
-    using TextureResourceHandle = boost::shared_ptr<RD3DTextureResource>;
+    using TextureResourceHandle = std::shared_ptr<RD3DTextureResource>;
 
     static gpg::RType* sType;
 

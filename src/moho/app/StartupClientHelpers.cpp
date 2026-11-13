@@ -640,7 +640,7 @@ int moho::cfunc_GetTextureDimensionsL(
     filename = "";
   }
 
-  boost::shared_ptr<CD3DBatchTexture> texture = CD3DBatchTexture::FromFile(filename, border);
+  std::shared_ptr<CD3DBatchTexture> texture = CD3DBatchTexture::FromFile(filename, border);
   if (texture) {
     lua_pushnumber(rawState, static_cast<float>(static_cast<int>(texture->mWidth)));
     (void)lua_gettop(rawState);

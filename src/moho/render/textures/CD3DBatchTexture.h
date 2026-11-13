@@ -4,7 +4,7 @@
 #include <cstdint>
 
 #include <mutex>
-#include "boost/shared_ptr.h"
+#include <memory>
 #include "gpg/core/containers/DList.h"
 #include "gpg/core/containers/String.h"
 #include "Wm3Vector2.h"
@@ -29,8 +29,8 @@ namespace moho
     friend class CD3DTextureBatcher;
 
   public:
-    using TextureSheetHandle = boost::shared_ptr<ID3DTextureSheet>;
-    using DynamicTextureSheetHandle = boost::shared_ptr<CD3DDynamicTextureSheet>;
+    using TextureSheetHandle = std::shared_ptr<ID3DTextureSheet>;
+    using DynamicTextureSheetHandle = std::shared_ptr<CD3DDynamicTextureSheet>;
 
     /**
      * Address: 0x00447170 (FUN_00447170, deleting-thunk lane)
@@ -77,7 +77,7 @@ namespace moho
      * What it does:
      * Returns one cached solid-color batch texture, creating it on first use.
      */
-    [[nodiscard]] static boost::shared_ptr<CD3DBatchTexture> FromSolidColor(std::uint32_t rgba);
+    [[nodiscard]] static std::shared_ptr<CD3DBatchTexture> FromSolidColor(std::uint32_t rgba);
 
     /**
      * Address: 0x004486F0 (FUN_004486F0, Moho::CD3DBatchTexture::FromFile)
@@ -88,7 +88,7 @@ namespace moho
      * Loads one file-backed batch texture by cache key `(filename,border)`,
      * reusing retained file-texture instances when available.
      */
-    [[nodiscard]] static boost::shared_ptr<CD3DBatchTexture> FromFile(gpg::StrArg filename, std::uint32_t border);
+    [[nodiscard]] static std::shared_ptr<CD3DBatchTexture> FromFile(gpg::StrArg filename, std::uint32_t border);
 
     /**
      * Address: 0x00448270 (FUN_00448270, Moho::CD3DBatchTexture::FromDXT5)
@@ -99,7 +99,7 @@ namespace moho
      * Wraps caller-provided DXT5 block bytes into one `CD3DRawBatchTexture`
      * instance with zero border.
      */
-    [[nodiscard]] static boost::shared_ptr<CD3DBatchTexture>
+    [[nodiscard]] static std::shared_ptr<CD3DBatchTexture>
     FromDXT5(std::uint32_t width, std::uint32_t height, const void* dxt5Blocks, std::uint32_t sourcePitchBytes);
 
     /**
@@ -168,7 +168,7 @@ namespace moho
    * initialisation; defined in moho/entity/REntityBlueprint.cpp. Without a client it
    * is null and the simulation holds no texture.
    */
-  using BatchTextureFromFileHook = boost::shared_ptr<CD3DBatchTexture> (*)(gpg::StrArg filename, std::uint32_t border);
+  using BatchTextureFromFileHook = std::shared_ptr<CD3DBatchTexture> (*)(gpg::StrArg filename, std::uint32_t border);
   extern BatchTextureFromFileHook sBatchTextureFromFile;
 
   static_assert(offsetof(CD3DBatchTexture, mWidth) == 0x0C, "CD3DBatchTexture::mWidth offset must be 0x0C");

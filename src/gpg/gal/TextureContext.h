@@ -3,7 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 
-#include "boost/shared_ptr.h"
+#include <memory>
 #include "gpg/core/streams/MemBufferStream.h"
 #include "legacy/containers/String.h"
 

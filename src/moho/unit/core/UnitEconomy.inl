@@ -164,8 +164,8 @@ namespace moho
 } // namespace moho
 
 void Unit::RefreshSyncBlock(
-  boost::shared_ptr<CAniPose>* const releasedPose,
-  boost::shared_ptr<CAniPose>* const releasedPriorPose
+  std::shared_ptr<CAniPose>* const releasedPose,
+  std::shared_ptr<CAniPose>* const releasedPriorPose
 )
 {
   if (NeedSyncGameData) {
@@ -243,8 +243,8 @@ void Unit::RefreshSyncBlock(
 
   if (!POSE_HoldClientHandles(*AniActor)) {
     if (VarDat().mSharedPose.get() != nullptr || VarDat().mPriorSharedPose.get() != nullptr) {
-      boost::shared_ptr<CAniPose> none;
-      boost::shared_ptr<CAniPose> nonePrior;
+      std::shared_ptr<CAniPose> none;
+      std::shared_ptr<CAniPose> nonePrior;
       if (releasedPose != nullptr) {
         releasedPose->swap(VarDat().mSharedPose);
       } else {

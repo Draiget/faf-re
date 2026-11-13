@@ -155,7 +155,7 @@ namespace moho
     const Wm3::Vec3f borderScaleVec{borderScale, borderScale, borderScale};
 
     MeshInstance* const instance =
-      meshRenderer->CreateMeshInstance(0, -1, meshBlueprint, borderScaleVec, false, boost::shared_ptr<MeshMaterial>{});
+      meshRenderer->CreateMeshInstance(0, -1, meshBlueprint, borderScaleVec, false, std::shared_ptr<MeshMaterial>{});
     if (instance == nullptr) {
       return;
     }

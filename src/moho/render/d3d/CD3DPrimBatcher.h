@@ -7,7 +7,7 @@
 #include "gpg/core/containers/Rect2.h"
 #include "gpg/core/containers/FastVector.h"
 #include "legacy/containers/Vector.h"
-#include "boost/shared_ptr.h"
+#include <memory>
 #include "moho/math/VMatrix4.h"
 #include "moho/math/Vector3f.h"
 #include "moho/render/d3d/CD3DFontTypes.h"
@@ -104,7 +104,7 @@ namespace moho
      * What it does:
      * Binds one retained batch texture for subsequent primitive draws.
      */
-    void SetTexture(const boost::shared_ptr<CD3DBatchTexture>& texture);
+    void SetTexture(const std::shared_ptr<CD3DBatchTexture>& texture);
 
     /**
      * Address: 0x00438870 (FUN_00438870,
@@ -117,13 +117,13 @@ namespace moho
      * base interface; the runtime invariant is that the concrete sheet is
      * always a CD3DDynamicTextureSheet (binary stores the derived pointer).
      */
-    void SetTexture(boost::shared_ptr<ID3DTextureSheet> sheet);
+    void SetTexture(std::shared_ptr<ID3DTextureSheet> sheet);
 
     /** FAF addition: what `SetTexture` bound, so a draw with its own texture can put it back. */
     struct TextureBinding
     {
-      boost::shared_ptr<CD3DDynamicTextureSheet> mSheet;
-      boost::shared_ptr<CD3DBatchTexture> mTexture;
+      std::shared_ptr<CD3DDynamicTextureSheet> mSheet;
+      std::shared_ptr<CD3DBatchTexture> mTexture;
       float mP1x;
       float mP1y;
       float mP2x;
@@ -267,8 +267,8 @@ namespace moho
     // Both handles are strong `boost::shared_ptr<T>` lanes: the rebind at
     // 0x004387A5 stores `px` then `lock xadd [pi+4], 1` (add_ref_copy) and
     // releases the old block through 0x004229B0 (sp_counted_base::release).
-    boost::shared_ptr<CD3DDynamicTextureSheet> mDynamicTexSheet{}; // +0x3C
-    boost::shared_ptr<CD3DBatchTexture> mTexture{};                // +0x44
+    std::shared_ptr<CD3DDynamicTextureSheet> mDynamicTexSheet{};   // +0x3C
+    std::shared_ptr<CD3DBatchTexture> mTexture{};                  // +0x44
     float mP2x = 0.0f;                                             // +0x4C
     float mP2y = 0.0f;                                             // +0x50
     float mP1x = 1.0f;                                             // +0x54
@@ -359,7 +359,7 @@ namespace moho
    * the detached block - disposing the pointee when `use_count_` reaches zero
    * and destroying the block when `weak_count_` follows it to zero.
    */
-  void ResetSharedBatchTextureHandle(boost::shared_ptr<CD3DBatchTexture>& handle) noexcept;
+  void ResetSharedBatchTextureHandle(std::shared_ptr<CD3DBatchTexture>& handle) noexcept;
 
   /**
    * Address: 0x0043A860 (FUN_0043A860)
@@ -379,7 +379,7 @@ namespace moho
    * from the detached block - disposing the sheet when `use_count_` reaches
    * zero and destroying the block when `weak_count_` follows it to zero.
    */
-  void ResetSharedDynamicTextureSheetHandle(boost::shared_ptr<CD3DDynamicTextureSheet>& handle) noexcept;
+  void ResetSharedDynamicTextureSheetHandle(std::shared_ptr<CD3DDynamicTextureSheet>& handle) noexcept;
 
   /** The two corner rings of a `DRAW_Rect` border, each top-left, top-right, bottom-right, bottom-left. */
   struct DrawRectRing

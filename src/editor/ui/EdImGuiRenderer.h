@@ -5,7 +5,7 @@
 #include "gpg/gal/RenderTarget.hpp"
 #include <vector>
 
-#include "boost/shared_ptr.h"
+#include <memory>
 
 struct ImDrawData;
 struct ImDrawVert;
@@ -63,9 +63,9 @@ namespace faf::editor
     void UpdateTexture(ImTextureData* texture);
     void EnsureCapacity(std::uint32_t vertexCount, std::uint32_t indexCount);
 
-    boost::shared_ptr<gpg::gal::GpuProgram> mProgram;
-    boost::shared_ptr<gpg::gal::GpuBuffer> mVertices;
-    boost::shared_ptr<gpg::gal::GpuBuffer> mIndices;
+    std::shared_ptr<gpg::gal::GpuProgram> mProgram;
+    std::shared_ptr<gpg::gal::GpuBuffer> mVertices;
+    std::shared_ptr<gpg::gal::GpuBuffer> mIndices;
     std::uint32_t mVertexCapacity = 0U;
     std::uint32_t mIndexCapacity = 0U;
     std::vector<std::uint8_t> mVertexStage;

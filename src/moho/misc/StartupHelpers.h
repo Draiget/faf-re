@@ -87,7 +87,7 @@ namespace moho
    * active viewport's range and vision renderers. This is what the sim
    * driver's bootstrap thread calls.
    */
-  [[nodiscard]] Sim* Sim_Create_exxt(const boost::shared_ptr<LaunchInfoBase>& launchInfo);
+  [[nodiscard]] Sim* Sim_Create_exxt(const std::shared_ptr<LaunchInfoBase>& launchInfo);
 
   /**
    * Engine addition (dedicated-server plan WPL.4): what Sim_Create_exxt runs

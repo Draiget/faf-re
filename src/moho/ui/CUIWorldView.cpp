@@ -529,7 +529,7 @@ namespace moho
   )
   {
     // Held for the whole pass and released on the way out (0x00853F0B).
-    const boost::shared_ptr<UICommandGraph> graph = buildDrag.mSession->GetCommandGraph(false);
+    const std::shared_ptr<UICommandGraph> graph = buildDrag.mSession->GetCommandGraph(false);
     const bool graphActive = static_cast<bool>(graph);
 
     if (buildDrag.mQueuedGhostsHidden != graphActive) {

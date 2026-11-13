@@ -10,7 +10,7 @@
 #include <unordered_map>
 #include <vector>
 
-#include "boost/shared_ptr.h"
+#include <memory>
 #include "moho/render/camera/VTransform.h"
 #include "remote/client/SyncRebuilder.h"
 #include "remote/client/ViewMerge.h"
@@ -96,8 +96,8 @@ namespace faf::headless
     /** What one runtime's session holds of a unit, as its user unit draws it. */
     struct SHeldUnit
     {
-      boost::shared_ptr<moho::CAniPose> prior; // `mPosePrimary`: the blend's start
-      boost::shared_ptr<moho::CAniPose> pose;  // `mPoseSecondary`: its end
+      std::shared_ptr<moho::CAniPose> prior;   // `mPosePrimary`: the blend's start
+      std::shared_ptr<moho::CAniPose> pose;    // `mPoseSecondary`: its end
       moho::VTransform last;                   // `mLastTransform`
       moho::VTransform cur;                    // `mCurTransform`
       bool hasTransforms = false;

@@ -3,17 +3,12 @@
 #include <cstddef>
 #include <cstdint>
 
-#include "boost/weak_ptr.h"
+#include <memory>
 #include "gpg/core/containers/FastVector.h"
 #include "moho/render/camera/VTransform.h"
 #include "moho/terrain/TerrainCommon.h"
 #include "moho/terrain/splat/CWldSplat.h"
 #include "moho/terrain/water/WaterSurface.h"
-
-namespace boost::detail
-{
-  class sp_counted_base;
-}
 
 namespace gpg::gal
 {
@@ -125,8 +120,8 @@ namespace moho
     void DrawWaterTerrain(
       std::int32_t tick,
       float tickLerp,
-      boost::shared_ptr<ID3DRenderTarget> refractionTexture,
-      boost::shared_ptr<ID3DRenderTarget> reflectionTexture
+      std::shared_ptr<ID3DRenderTarget> refractionTexture,
+      std::shared_ptr<ID3DRenderTarget> reflectionTexture
     ) override;
 
     void DrawTerrainSkirt() override;
@@ -178,8 +173,7 @@ namespace moho
      * Releases one retained shared-control lane passed by the render caller and
      * leaves terrain draw behavior as an empty hook for this fidelity path.
      */
-    void
-    DrawTerrain(boost::shared_ptr<CD3DDynamicTextureSheet> overlayTexture, const fa::string* techniqueName) override;
+    void DrawTerrain(std::shared_ptr<CD3DDynamicTextureSheet> overlayTexture, const fa::string* techniqueName) override;
 
     /**
      * Address: 0x00809D70 (FUN_00809D70, Moho::LowFidelityTerrain::DrawDirtyTerrain)
@@ -227,7 +221,7 @@ namespace moho
     bool DrawNormals(
       std::int32_t gameTick,
       float deltaSeconds,
-      const boost::shared_ptr<ID3DRenderTarget>& terrainNormalTexture,
+      const std::shared_ptr<ID3DRenderTarget>& terrainNormalTexture,
       Shadow* shadowContext
     ) override;
 

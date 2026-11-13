@@ -537,7 +537,7 @@ namespace gpg::gal
   bool DeviceVulkan::SetRayInstances(
     const RayInstance* const instances,
     const std::uint32_t count,
-    const boost::shared_ptr<Texture>* const textures,
+    const std::shared_ptr<Texture>* const textures,
     const std::uint32_t textureCount
   )
   {

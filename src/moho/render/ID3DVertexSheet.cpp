@@ -1,6 +1,6 @@
 #include "ID3DVertexSheet.h"
 
-#include "boost/shared_ptr.h"
+#include <memory>
 
 #include <new>
 

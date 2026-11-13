@@ -39,7 +39,7 @@
 #include <utility>
 #include <vector>
 
-#include "boost/shared_ptr.h"
+#include <memory>
 #include "gpg/core/containers/String.h"
 #include "gpg/core/diagnostics/BuildInfo.h"
 #include "gpg/core/utils/Logging.h"
@@ -1554,7 +1554,7 @@ namespace
     sessionInfo->mIsMultiplayer = false;
     sessionInfo->mSourceId = build.localSourceId;
     sessionInfo->mMapName = build.mapName;
-    sessionInfo->mLaunchInfo = boost::static_pointer_cast<moho::LaunchInfoBase>(build.launchInfo);
+    sessionInfo->mLaunchInfo = std::static_pointer_cast<moho::LaunchInfoBase>(build.launchInfo);
     sessionInfo->mClientManager = moho::CLIENT_CreateClientManager(
       static_cast<std::size_t>(build.clientCount), nullptr, launchSpeed.speed, launchSpeed.adjustable
     );
@@ -1871,7 +1871,7 @@ namespace
           }
           build = std::move(rebuilt);
           takePauseBudgets(build); // the options may set another `Timeouts`
-          sessionInfo->mLaunchInfo = boost::static_pointer_cast<moho::LaunchInfoBase>(build.launchInfo);
+          sessionInfo->mLaunchInfo = std::static_pointer_cast<moho::LaunchInfoBase>(build.launchInfo);
           for (const auto& [source, seat] : pauseSeats) {
             const auto budget = pauseBudgets.find(source);
             seat->SetPauseAllowed(budget == pauseBudgets.end() || budget->second != 0);

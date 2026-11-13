@@ -31,8 +31,8 @@ namespace
    * Appends one texture batch entry to the bitmap's legacy vector lane.
    */
   void AppendBitmapTextureBatch(
-    fa::vector<boost::shared_ptr<moho::CD3DBatchTexture>>& textureBatches,
-    const boost::shared_ptr<moho::CD3DBatchTexture>& texture
+    fa::vector<std::shared_ptr<moho::CD3DBatchTexture>>& textureBatches,
+    const std::shared_ptr<moho::CD3DBatchTexture>& texture
   )
   {
     textureBatches.push_back(texture);
@@ -116,7 +116,7 @@ int moho::cfunc_CMauiBitmapSetNewTextureL(
       texturePath = "";
     }
 
-    boost::shared_ptr<CD3DBatchTexture> texture = CD3DBatchTexture::FromFile(texturePath, borderLane);
+    std::shared_ptr<CD3DBatchTexture> texture = CD3DBatchTexture::FromFile(texturePath, borderLane);
     if (texture) {
       bitmap->SetTexture(texture);
     } else {
@@ -132,7 +132,7 @@ int moho::cfunc_CMauiBitmapSetNewTextureL(
       const char* texturePath = frameObject.GetString();
       const char* const pathText = texturePath != nullptr ? texturePath : "";
 
-      boost::shared_ptr<CD3DBatchTexture> texture = CD3DBatchTexture::FromFile(pathText, borderLane);
+      std::shared_ptr<CD3DBatchTexture> texture = CD3DBatchTexture::FromFile(pathText, borderLane);
       if (texture) {
         bitmap->SetTexture(texture);
       } else {
@@ -205,7 +205,7 @@ int moho::cfunc_CMauiBitmapInternalSetSolidColorL(
 
   LuaPlus::LuaObject colorObject(LuaPlus::LuaStackObject(state, 2));
   const std::uint32_t rgba = SCR_DecodeColor(state, colorObject);
-  const boost::shared_ptr<CD3DBatchTexture> solidTexture = CD3DBatchTexture::FromSolidColor(rgba);
+  const std::shared_ptr<CD3DBatchTexture> solidTexture = CD3DBatchTexture::FromSolidColor(rgba);
   bitmap->SetTexture(solidTexture);
   bitmap->SetForwardPattern();
 
@@ -1250,7 +1250,7 @@ namespace
     const moho::CMauiBitmap* const bitmap
   ) noexcept
   {
-    const boost::shared_ptr<moho::CD3DBatchTexture>* const textureStart = bitmap->mTextureBatches.begin();
+    const std::shared_ptr<moho::CD3DBatchTexture>* const textureStart = bitmap->mTextureBatches.begin();
     return textureStart != nullptr ? static_cast<std::int32_t>(bitmap->mTextureBatches.end() - textureStart) : 0;
   }
 
@@ -1422,9 +1422,9 @@ bool moho::CMauiBitmap::HitTest(
   }
 
   const std::int32_t* const frameStart = mFrames.begin();
-  const boost::shared_ptr<CD3DBatchTexture>* const textureStart = mTextureBatches.begin();
+  const std::shared_ptr<CD3DBatchTexture>* const textureStart = mTextureBatches.begin();
   const std::int32_t frameTextureIndex = frameStart[mCurrentFrame];
-  const boost::shared_ptr<CD3DBatchTexture>& texture = textureStart[frameTextureIndex];
+  const std::shared_ptr<CD3DBatchTexture>& texture = textureStart[frameTextureIndex];
   if (!texture) {
     return baseHit;
   }
@@ -1473,7 +1473,7 @@ void moho::CMauiBitmap::DoRender(
   destRect.x1 = right;
   destRect.z1 = bottom;
 
-  const boost::shared_ptr<CD3DBatchTexture> texture = mTextureBatches[frameIndex];
+  const std::shared_ptr<CD3DBatchTexture> texture = mTextureBatches[frameIndex];
   primBatcher->SetTexture(texture);
 
   const std::uint32_t vertexColor = mVertexAlpha;
@@ -1509,7 +1509,7 @@ void moho::CMauiBitmap::ShareTextures(
 
   mTextureBatches = sourceBitmap->mTextureBatches;
 
-  const boost::shared_ptr<CD3DBatchTexture>* const textureStart = mTextureBatches.begin();
+  const std::shared_ptr<CD3DBatchTexture>* const textureStart = mTextureBatches.begin();
   CScriptLazyVar_float::SetValue(&mBitmapWidthLV, static_cast<float>(textureStart->get()->mWidth));
   CScriptLazyVar_float::SetValue(&mBitmapHeightLV, static_cast<float>(textureStart->get()->mHeight));
 }
@@ -1522,19 +1522,19 @@ void moho::CMauiBitmap::ShareTextures(
  * and height lazy-vars for single-frame paths.
  */
 void moho::CMauiBitmap::SetTexture(
-  const boost::shared_ptr<CD3DBatchTexture>& texture
+  const std::shared_ptr<CD3DBatchTexture>& texture
 )
 {
   AppendBitmapTextureBatch(mTextureBatches, texture);
 
-  const boost::shared_ptr<CD3DBatchTexture>* const textureStart = mTextureBatches.begin();
+  const std::shared_ptr<CD3DBatchTexture>* const textureStart = mTextureBatches.begin();
   if (textureStart != nullptr && (mTextureBatches.end() - textureStart) == 1) {
     CScriptLazyVar_float::SetValue(&mBitmapWidthLV, static_cast<float>(texture->mWidth));
     CScriptLazyVar_float::SetValue(&mBitmapHeightLV, static_cast<float>(texture->mHeight));
     return;
   }
 
-  const boost::shared_ptr<CD3DBatchTexture>* const parentTexture = mTextureBatches.begin();
+  const std::shared_ptr<CD3DBatchTexture>* const parentTexture = mTextureBatches.begin();
   const CD3DBatchTexture* const addedTexture = texture.get();
   if (addedTexture->mWidth != (*parentTexture)->mWidth || addedTexture->mHeight != (*parentTexture)->mHeight) {
     gpg::Warnf(

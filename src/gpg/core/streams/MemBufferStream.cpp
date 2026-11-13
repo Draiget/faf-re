@@ -87,8 +87,8 @@ namespace
    * Constructs one `boost::shared_ptr<char>` from raw pointer + deleter,
    * preserving `sp_enable_shared_from_this` setup done by Boost internals.
    */
-  boost::shared_ptr<char>* ConstructSharedByteOwnerWithDeleter(
-    boost::shared_ptr<char>* const outOwner,
+  std::shared_ptr<char>* ConstructSharedByteOwnerWithDeleter(
+    std::shared_ptr<char>* const outOwner,
     char* const pointer,
     const SharedByteDeleter deleter
   )
@@ -97,7 +97,7 @@ namespace
       return nullptr;
     }
 
-    *outOwner = boost::shared_ptr<char>(pointer, deleter);
+    *outOwner = std::shared_ptr<char>(pointer, deleter);
     return outOwner;
   }
 } // namespace
@@ -262,7 +262,7 @@ MemBuffer<char> gpg::AllocMemBuffer(
     std::memset(buff, 0, size);
   }
 
-  boost::shared_ptr<char> ptr;
+  std::shared_ptr<char> ptr;
   (void)ConstructSharedByteOwnerWithDeleter(&ptr, buff, static_cast<SharedByteDeleter>(&std::free));
   char* const end = (buff == nullptr) ? nullptr : (buff + size);
   return MemBuffer<char>(ptr, buff, end);

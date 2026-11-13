@@ -134,11 +134,11 @@ namespace moho
    * Allocates a fresh `RScaResource` straight into the returned handle, parses
    * the SCA file via `LoadScaFile`, and empties the handle when parsing fails.
    */
-  boost::shared_ptr<RScaResource> CScaResourceFactory::LoadImpl(
+  std::shared_ptr<RScaResource> CScaResourceFactory::LoadImpl(
     const gpg::StrArg path
   )
   {
-    boost::shared_ptr<RScaResource> resource(new RScaResource());
+    std::shared_ptr<RScaResource> resource(new RScaResource());
     if (!resource->LoadScaFile(path)) {
       resource.reset();
     }
@@ -153,7 +153,7 @@ namespace moho
    * owning handle: `RES_GetResource`'s `shared_ptr<void>` is converted in place
    * (0x0053B2C0) and the temporary released.
    */
-  boost::shared_ptr<RScaResource> GetScaResource(
+  std::shared_ptr<RScaResource> GetScaResource(
     const gpg::StrArg path
   )
   {
@@ -163,8 +163,8 @@ namespace moho
       RScaResource::sType = resourceType;
     }
 
-    const boost::shared_ptr<RScaResource> resource =
-      boost::static_pointer_cast<RScaResource>(RES_GetResource(path, nullptr, resourceType));
+    const std::shared_ptr<RScaResource> resource =
+      std::static_pointer_cast<RScaResource>(RES_GetResource(path, nullptr, resourceType));
     return resource;
   }
 

@@ -3,7 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 
-#include "boost/shared_ptr.h"
+#include <memory>
 
 namespace moho
 {
@@ -77,7 +77,7 @@ namespace moho
      */
     void Render(const GeomCamera3& camera, std::int32_t renderTargetIndex);
 
-    boost::shared_ptr<ID3DVertexSheet> mQuadVertexSheet; // +0x04..+0x0B
+    std::shared_ptr<ID3DVertexSheet> mQuadVertexSheet; // +0x04..+0x0B
   };
 
   static_assert(offsetof(Silhouette, mQuadVertexSheet) == 0x04, "Silhouette::mQuadVertexSheet offset must be 0x04");

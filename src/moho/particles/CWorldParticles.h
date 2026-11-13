@@ -4,7 +4,7 @@
 #include <cstdint>
 
 #include "legacy/containers/Map.h"
-#include "boost/weak_ptr.h"
+#include <memory>
 #include "moho/particles/ParticleRenderBuckets.h"
 #include "moho/particles/SParticleBuffer.h"
 #include "moho/render/d3d/CD3DVertexSheet.h"
@@ -281,7 +281,7 @@ namespace moho
       GeomCamera3* camera,
       int tick,
       float frameDelta,
-      const boost::shared_ptr<ID3DRenderTarget>& backgroundTexture
+      const std::shared_ptr<ID3DRenderTarget>& backgroundTexture
     );
 
     /**

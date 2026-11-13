@@ -239,7 +239,7 @@ namespace moho
   }
 
   RayScene::MeshPieces* RayScene::PiecesFor(
-    const boost::shared_ptr<RScmResource>& resource,
+    const std::shared_ptr<RScmResource>& resource,
     const bool skinned,
     const bool alpha
   )
@@ -368,7 +368,7 @@ namespace moho
           texture = static_cast<std::uint32_t>(known - mAlphaTextures.begin()) + 1U;
         }
       }
-      boost::shared_ptr<MeshBatch> batch;
+      std::shared_ptr<MeshBatch> batch;
       if (bucket.first.mIsStaticPose != 0) {
         lod->GetSkinnedBatch(batch);
       } else {

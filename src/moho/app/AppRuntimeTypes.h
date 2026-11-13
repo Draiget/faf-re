@@ -10,7 +10,7 @@
 #include <vector>
 
 #include "legacy/thread/Mutex.h"
-#include "boost/shared_ptr.h"
+#include <memory>
 #include "gpg/core/utils/Logging.h"
 #include "legacy/containers/String.h"
 #include "legacy/containers/Vector.h"

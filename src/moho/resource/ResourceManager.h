@@ -7,7 +7,7 @@
 #include "legacy/thread/Condition.h"
 #include "legacy/thread/Thread.h"
 #include <memory>
-#include "boost/shared_ptr.h"
+#include <memory>
 #include "gpg/core/containers/String.h"
 #include "legacy/containers/Deque.h"
 #include "legacy/containers/Map.h"
@@ -81,9 +81,9 @@ namespace moho
     const gpg::RType* mType;                 // +0x1C
     bool mLoading;                           // +0x20
     bool mReloadPending;                     // +0x21 (the file changed while it was loading)
-    boost::weak_ptr<void> mResource;         // +0x24
+    std::weak_ptr<void> mResource;           // +0x24
     bool mLoadFailed;                        // +0x2C
-    boost::weak_ptr<PrefetchData> mPrefetch; // +0x30
+    std::weak_ptr<PrefetchData> mPrefetch;   // +0x30
     TDatList<ResourceWatch, void> mWatches;  // +0x38
   };
 
@@ -243,7 +243,7 @@ namespace moho
      * Resolves `path` (VFS paths through the mounted file system), finds or
      * makes its record, registers `watcher` for changes to it, and loads it.
      */
-    [[nodiscard]] boost::shared_ptr<void>
+    [[nodiscard]] std::shared_ptr<void>
     GetResource(gpg::StrArg path, CResourceWatcher* watcher, const gpg::RType* type);
 
   private:
@@ -270,7 +270,7 @@ namespace moho
      * and it has not failed before. The lock is dropped around the factory
      * call; a file change during the load makes it load again.
      */
-    [[nodiscard]] boost::shared_ptr<void> LoadRecord(ResourceRecord& record, fa::recursive_mutex::scoped_lock& lock);
+    [[nodiscard]] std::shared_ptr<void> LoadRecord(ResourceRecord& record, fa::recursive_mutex::scoped_lock& lock);
 
     mutable fa::recursive_mutex mLock;                           // +0x30
     fa::vector<ResourceFactoryBase*> mPendingFactories;          // +0x3C
@@ -279,7 +279,7 @@ namespace moho
     int mLoadsInProgress;                                        // +0x5C
     fa::xtime mLastLoadTime;                                     // +0x60
     ResourceRecordSet mRecords;                                  // +0x70
-    fa::deque<boost::weak_ptr<PrefetchData>> mPrefetchQueue;     // +0x7C
+    fa::deque<std::weak_ptr<PrefetchData>> mPrefetchQueue;       // +0x7C
     fa::condition mPrefetchQueued;                               // +0x90
     fa::condition mLoadFinished;                                 // +0xA8
     std::unique_ptr<fa::thread> mPrefetchThread;                 // +0xC0
@@ -315,7 +315,7 @@ namespace moho
    * `ResourceManager::GetResource` on the singleton; the result owns the
    * resource. Callers `static_pointer_cast` it to the type they asked for.
    */
-  [[nodiscard]] boost::shared_ptr<void>
+  [[nodiscard]] std::shared_ptr<void>
   RES_GetResource(gpg::StrArg path, CResourceWatcher* resourceWatcher, const gpg::RType* resourceType);
 
   /**

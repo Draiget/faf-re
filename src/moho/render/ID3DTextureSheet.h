@@ -2,7 +2,7 @@
 
 #include <cstdint>
 
-#include "boost/shared_ptr.h"
+#include <memory>
 #include "platform/Platform.h"
 #include "Wm3Vector2.h"
 #include "Wm3Vector3.h"
@@ -28,7 +28,7 @@ namespace moho
   class ID3DTextureSheet
   {
   public:
-    using TextureHandle = boost::shared_ptr<gpg::gal::Texture>;
+    using TextureHandle = std::shared_ptr<gpg::gal::Texture>;
     static gpg::RType* sType;
 
     /**

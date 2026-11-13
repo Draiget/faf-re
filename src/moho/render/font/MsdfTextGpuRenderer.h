@@ -18,7 +18,7 @@
 #include <cstdint>
 #include <vector>
 
-#include "boost/shared_ptr.h"
+#include <memory>
 #include "moho/math/VMatrix4.h"
 #include "moho/render/d3d/CD3DPrimBatcher.h"
 
@@ -65,7 +65,7 @@ namespace moho
      * Starts a string's glyphs from this atlas page, with this batcher's matrices and alpha multiplier.
      * False, having added nothing, when the page has no texture.
      */
-    [[nodiscard]] bool BeginString(CD3DPrimBatcher& batcher, const boost::shared_ptr<CD3DDynamicTextureSheet>& page);
+    [[nodiscard]] bool BeginString(CD3DPrimBatcher& batcher, const std::shared_ptr<CD3DDynamicTextureSheet>& page);
 
     void AddGlyph(const MsdfUiQuad& glyph);
 
@@ -89,17 +89,17 @@ namespace moho
     void PrepareFor(CD3DPrimBatcher& batcher);
     void Push(const MsdfUiQuad& quad);
 
-    boost::shared_ptr<gpg::gal::GpuProgram> mProgram;
-    boost::shared_ptr<gpg::gal::GpuBuffer> mBuffer;
+    std::shared_ptr<gpg::gal::GpuProgram> mProgram;
+    std::shared_ptr<gpg::gal::GpuBuffer> mBuffer;
     std::vector<MsdfUiQuad> mPending;
-    boost::shared_ptr<gpg::gal::Texture> mPage; // the MSDF atlas page
+    std::shared_ptr<gpg::gal::Texture> mPage;   // the MSDF atlas page
     CD3DPrimBatcher* mBatcher = nullptr;        // whose atlas and matrices the pending quads use
     VMatrix4 mComposite{};
     float mAlphaMultiplier = 1.0f;
     std::uint32_t mNextQuad = 0u; // where the next upload goes in the buffer
     // The last technique seen by QueueImageQuad and whether quads may join under it. Selecting a technique
     // makes a new object, so this compares by pointer once and by name only when that changes.
-    boost::shared_ptr<gpg::gal::EffectTechnique> mCheckedTechnique;
+    std::shared_ptr<gpg::gal::EffectTechnique> mCheckedTechnique;
     bool mCheckedTechniqueAllowsQuads = false;
     bool mInitialized = false;
     bool mSupported = false;

@@ -35,8 +35,8 @@
 #include "GpuDrivenD3D12.h"
 #include "PipelineCacheD3D12.h"
 #include "ResourcesD3D12.h"
-#include "boost/shared_ptr.h"
-#include "boost/weak_ptr.h"
+#include <memory>
+#include <memory>
 #include "gpg/core/streams/MemBufferStream.h"
 #include "gpg/gal/Device.hpp"
 #include "gpg/gal/DeviceContext.hpp"
@@ -81,40 +81,39 @@ namespace gpg::gal
     void GetModesForAdapter(fa::vector<HeadAdapterMode>& outModes, int adapterIndex) override;
     OutputContext* GetHeadOutputContext(unsigned int headIndex) override;
     const OutputContext* GetHeadOutputContext(unsigned int headIndex) const override;
-    boost::shared_ptr<PipelineState> GetPipelineState() override;
-    boost::shared_ptr<Effect> CreateEffect(const EffectContext& context) override;
-    boost::shared_ptr<Texture> CreateTexture(const TextureContext* context) override;
-    boost::shared_ptr<RenderTarget> CreateRenderTarget(const RenderTargetContext* context) override;
-    boost::shared_ptr<CubeRenderTarget> CreateCubeRenderTarget(const CubeRenderTargetContext* context) override;
-    boost::shared_ptr<DepthStencilTarget> CreateDepthStencilTarget(const DepthStencilTargetContext* context) override;
-    boost::shared_ptr<VertexFormat> CreateVertexFormat(std::uint32_t formatCode) override;
-    boost::shared_ptr<VertexBuffer> CreateVertexBuffer(const VertexBufferContext* context) override;
-    boost::shared_ptr<IndexBuffer> CreateIndexBuffer(const IndexBufferContext* context) override;
+    std::shared_ptr<PipelineState> GetPipelineState() override;
+    std::shared_ptr<Effect> CreateEffect(const EffectContext& context) override;
+    std::shared_ptr<Texture> CreateTexture(const TextureContext* context) override;
+    std::shared_ptr<RenderTarget> CreateRenderTarget(const RenderTargetContext* context) override;
+    std::shared_ptr<CubeRenderTarget> CreateCubeRenderTarget(const CubeRenderTargetContext* context) override;
+    std::shared_ptr<DepthStencilTarget> CreateDepthStencilTarget(const DepthStencilTargetContext* context) override;
+    std::shared_ptr<VertexFormat> CreateVertexFormat(std::uint32_t formatCode) override;
+    std::shared_ptr<VertexBuffer> CreateVertexBuffer(const VertexBufferContext* context) override;
+    std::shared_ptr<IndexBuffer> CreateIndexBuffer(const IndexBufferContext* context) override;
     void GetRenderTargetData(
-      const boost::shared_ptr<RenderTarget>& source,
-      const boost::shared_ptr<Texture>& destination
+      const std::shared_ptr<RenderTarget>& source,
+      const std::shared_ptr<Texture>& destination
     ) override;
     void StretchRect(
-      const boost::shared_ptr<RenderTarget>& source,
-      const boost::shared_ptr<RenderTarget>& destination,
+      const std::shared_ptr<RenderTarget>& source,
+      const std::shared_ptr<RenderTarget>& destination,
       const RECT* sourceRect,
       const RECT* destinationRect
     ) override;
     void UpdateSurface(
-      const boost::shared_ptr<Texture>& source,
-      const boost::shared_ptr<Texture>& destination,
+      const std::shared_ptr<Texture>& source,
+      const std::shared_ptr<Texture>& destination,
       const RECT* sourceRect,
       const RECT* destinationRect
     ) override;
-    void
-    SaveCubeRenderTarget(const boost::shared_ptr<CubeRenderTarget>& cubeTarget, const fa::string& filePath) override;
+    void SaveCubeRenderTarget(const std::shared_ptr<CubeRenderTarget>& cubeTarget, const fa::string& filePath) override;
     void SaveRenderTarget(
-      const boost::shared_ptr<RenderTarget>& renderTarget,
+      const std::shared_ptr<RenderTarget>& renderTarget,
       const fa::string& filePath,
       int fileFormat
     ) override;
     void SaveTexture(
-      const boost::shared_ptr<Texture>& texture,
+      const std::shared_ptr<Texture>& texture,
       const fa::string& filePath,
       int fileFormat,
       gpg::MemBuffer<char>* outBuffer
@@ -126,8 +125,8 @@ namespace gpg::gal
       std::uint32_t* outWidth,
       int* outHeight
     ) override;
-    boost::weak_ptr<void>*
-    Func7(boost::weak_ptr<void>* outWeakHandle, boost::shared_ptr<void> temporarySharedHandle) override;
+    std::weak_ptr<void>*
+    Func7(std::weak_ptr<void>* outWeakHandle, std::shared_ptr<void> temporarySharedHandle) override;
     void Reset(DeviceContext* context) override;
     void Reset() override;
     int TestCooperativeLevel() override;
@@ -149,14 +148,14 @@ namespace gpg::gal
       int stencil
     ) override;
     void ClearTextures() override;
-    void SetVertexDeclaration(boost::shared_ptr<VertexFormat> vertexFormat) override;
+    void SetVertexDeclaration(std::shared_ptr<VertexFormat> vertexFormat) override;
     void SetVertexBuffer(
       std::uint32_t streamSlot,
-      boost::shared_ptr<VertexBuffer> vertexBuffer,
+      std::shared_ptr<VertexBuffer> vertexBuffer,
       int streamFrequencyToken,
       int startVertex
     ) override;
-    void SetBufferIndices(boost::shared_ptr<IndexBuffer> indexBuffer) override;
+    void SetBufferIndices(std::shared_ptr<IndexBuffer> indexBuffer) override;
     void SetFogState(bool enable, const Matrix* projection, float fogStart, float fogEnd, int fogColor) override;
     void SetWireframeState(bool enabled) override;
     void SetColorWriteState(bool writeColor, bool writeAlpha) override;
@@ -171,9 +170,9 @@ namespace gpg::gal
     [[nodiscard]] std::uint32_t GetGpuDrivenVerified() const override;
     /** `kGpuPathMsdfCook` for an NVIDIA adapter, else 0 (issue #309). */
     [[nodiscard]] std::uint32_t MsdfCookVerified() const;
-    boost::shared_ptr<GpuBuffer> CreateGpuBuffer(const GpuBufferDesc& desc) override;
+    std::shared_ptr<GpuBuffer> CreateGpuBuffer(const GpuBufferDesc& desc) override;
     void UpdateGpuBuffer(GpuBuffer& buffer, std::uint32_t firstElement, std::uint32_t count, const void* data) override;
-    boost::shared_ptr<GpuProgram> CreateGpuProgram(const GpuProgramDesc& desc) override;
+    std::shared_ptr<GpuProgram> CreateGpuProgram(const GpuProgramDesc& desc) override;
     void DrawGpuProgram(const GpuDrawCall& call) override;
     void DispatchGpuProgram(const GpuDispatch& dispatch) override;
     void BeginProfileRegion(std::uint32_t region) override;
@@ -197,7 +196,7 @@ namespace gpg::gal
     bool SetRayInstances(
       const RayInstance* instances,
       std::uint32_t count,
-      const boost::shared_ptr<Texture>* textures,
+      const std::shared_ptr<Texture>* textures,
       std::uint32_t textureCount
     ) override;
 
@@ -441,7 +440,7 @@ namespace gpg::gal
     // ---- heads ---------------------------------------------------------------
     std::vector<std::unique_ptr<dxgi::SwapChain>> mSwapChains;
     std::vector<OutputContext> mHeadOutputContexts;
-    boost::shared_ptr<PipelineStateD3D12> mPipelineState;
+    std::shared_ptr<PipelineStateD3D12> mPipelineState;
     WindowsCursor mCursor;
 
     // ---- pipeline state ------------------------------------------------------
@@ -477,13 +476,13 @@ namespace gpg::gal
     std::uint32_t mBoundFormat = 0xFFFFFFFFU;
     struct StreamBinding
     {
-      boost::shared_ptr<VertexBuffer> buffer;
+      std::shared_ptr<VertexBuffer> buffer;
       std::uint32_t offset = 0;
       std::uint32_t stride = 0;
     };
     StreamBinding mStreams[16];
     std::int32_t mStreamFrequencies[16]{};
-    boost::shared_ptr<IndexBuffer> mIndexBuffer;
+    std::shared_ptr<IndexBuffer> mIndexBuffer;
     bool mFrameStateDirty = true;
     bool mPreparingDraw = false;
 
@@ -557,7 +556,7 @@ namespace gpg::gal
     std::uint64_t mRayAttributesBytes = 0U;
     std::uint64_t mRayAttributesUsed = 0U;
     std::vector<std::uint32_t> mRayRecords; // four per instance
-    std::vector<boost::shared_ptr<Texture>> mRayTextures;
+    std::vector<std::shared_ptr<Texture>> mRayTextures;
     d3d12::TrackedResource mRayRecordsBuffer; // default heap, rewritten by each SetRayInstances
     std::uint64_t mRayRecordsBytes = 0U;
     D3D12_GPU_VIRTUAL_ADDRESS mRayRecordsAddress = 0U;

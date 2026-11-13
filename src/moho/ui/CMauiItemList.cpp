@@ -967,7 +967,7 @@ void moho::CMauiItemList::DoRender(
 
   // Background quad spanning the full control rectangle.
   {
-    const boost::shared_ptr<CD3DBatchTexture> backgroundTexture = CD3DBatchTexture::FromSolidColor(mBackgroundColor);
+    const std::shared_ptr<CD3DBatchTexture> backgroundTexture = CD3DBatchTexture::FromSolidColor(mBackgroundColor);
     primBatcher->SetTexture(backgroundTexture);
 
     const CD3DPrimBatcher::Vertex topLeft = MakeBorderVertex(left, top, vertexColor, 0.0f, 0.0f);
@@ -988,7 +988,7 @@ void moho::CMauiItemList::DoRender(
       const float rowTop = rowHeight * static_cast<float>(static_cast<std::uint32_t>(visibleRow)) + top;
       const float rowBottom = font->mHeight + rowTop;
 
-      const boost::shared_ptr<CD3DBatchTexture> highlightTexture =
+      const std::shared_ptr<CD3DBatchTexture> highlightTexture =
         CD3DBatchTexture::FromSolidColor(mHighlightBackgroundColor);
       primBatcher->SetTexture(highlightTexture);
 
@@ -1009,7 +1009,7 @@ void moho::CMauiItemList::DoRender(
       const float rowTop = rowHeight * static_cast<float>(static_cast<std::uint32_t>(visibleRow)) + top;
       const float rowBottom = font->mHeight + rowTop;
 
-      const boost::shared_ptr<CD3DBatchTexture> selectedTexture =
+      const std::shared_ptr<CD3DBatchTexture> selectedTexture =
         CD3DBatchTexture::FromSolidColor(mSelectedBackgroundColor);
       primBatcher->SetTexture(selectedTexture);
 

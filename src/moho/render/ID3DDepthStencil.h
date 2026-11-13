@@ -1,6 +1,6 @@
 #pragma once
 
-#include "boost/shared_ptr.h"
+#include <memory>
 
 namespace gpg::gal
 {
@@ -12,7 +12,7 @@ namespace moho
   class ID3DDepthStencil
   {
   public:
-    using SurfaceHandle = boost::shared_ptr<gpg::gal::DepthStencilTarget>;
+    using SurfaceHandle = std::shared_ptr<gpg::gal::DepthStencilTarget>;
 
     /**
      * Address: 0x0043F090 (FUN_0043F090, sub_43F090)

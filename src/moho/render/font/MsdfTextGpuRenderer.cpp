@@ -215,7 +215,7 @@ float4 MsdfTextPS(QuadVertex input) : SV_Target
 
   bool MsdfTextGpuRenderer::BeginString(
     CD3DPrimBatcher& batcher,
-    const boost::shared_ptr<CD3DDynamicTextureSheet>& page
+    const std::shared_ptr<CD3DDynamicTextureSheet>& page
   )
   {
     ID3DTextureSheet::TextureHandle texture;
@@ -306,7 +306,7 @@ float4 MsdfTextPS(QuadVertex input) : SV_Target
     // The prim batcher's atlas, with what was added to it since its last upload.
     ID3DTextureSheet::TextureHandle imageAtlas;
     if (mBatcher != nullptr && mBatcher->mTextureBatcher != nullptr) {
-      const boost::shared_ptr<ID3DTextureSheet> sheet = mBatcher->mTextureBatcher->GetCompositeTexture();
+      const std::shared_ptr<ID3DTextureSheet> sheet = mBatcher->mTextureBatcher->GetCompositeTexture();
       if (sheet) {
         (void)sheet->GetTexture(imageAtlas);
       }

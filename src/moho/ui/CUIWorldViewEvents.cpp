@@ -379,7 +379,7 @@ void moho::CBuildDragPreview::ClearBuildPreviewCache()
   }
 }
 
-boost::shared_ptr<moho::MeshInstance> moho::CBuildDragPreview::CreateBuildPreviewMeshInstance(
+std::shared_ptr<moho::MeshInstance> moho::CBuildDragPreview::CreateBuildPreviewMeshInstance(
   moho::RUnitBlueprint* const blueprint
 )
 {
@@ -403,7 +403,7 @@ boost::shared_ptr<moho::MeshInstance> moho::CBuildDragPreview::CreateBuildPrevie
     false,
     mUnitPlaceMaterial
   );
-  return boost::shared_ptr<moho::MeshInstance>(meshInstance);
+  return std::shared_ptr<moho::MeshInstance>(meshInstance);
 }
 
 /**
@@ -420,7 +420,7 @@ void moho::CBuildDragPreview::AppendBuildPreviewMesh(
   moho::RUnitBlueprint* const blueprint
 )
 {
-  boost::shared_ptr<moho::MeshInstance> meshInstance = CreateBuildPreviewMeshInstance(blueprint);
+  std::shared_ptr<moho::MeshInstance> meshInstance = CreateBuildPreviewMeshInstance(blueprint);
   moho::PushBackMeshInstanceSharedPtrVector(mMeshes, meshInstance);
   mBlueprints.push_back(blueprint);
 }
@@ -437,7 +437,7 @@ void moho::CBuildDragPreview::ReplaceBuildPreviewMesh(
   moho::RUnitBlueprint* const blueprint
 )
 {
-  boost::shared_ptr<moho::MeshInstance> meshInstance = CreateBuildPreviewMeshInstance(blueprint);
+  std::shared_ptr<moho::MeshInstance> meshInstance = CreateBuildPreviewMeshInstance(blueprint);
   mMeshes[index] = meshInstance;
   mBlueprints[index] = blueprint;
 }
@@ -505,7 +505,7 @@ void moho::CBuildDragPreview::RefreshQueuedBuildGhosts()
 
   // Built from scratch every pass. Whatever stays behind in the map this one
   // displaces belongs to orders that are gone, and dies with it below.
-  fa::map<moho::CmdId, boost::shared_ptr<moho::MeshInstance>> refreshed;
+  fa::map<moho::CmdId, std::shared_ptr<moho::MeshInstance>> refreshed;
 
   for (const auto& [commandId, helper] : session->mCommandManager->mCommands) {
     static_cast<void>(commandId);
@@ -524,7 +524,7 @@ void moho::CBuildDragPreview::RefreshQueuedBuildGhosts()
 
     const moho::CmdId orderId = helper->mConstantData.cmd;
 
-    boost::shared_ptr<moho::MeshInstance> ghost;
+    std::shared_ptr<moho::MeshInstance> ghost;
     if (const auto cached = mPreviewPositions.find(orderId); cached != mPreviewPositions.end()) {
       ghost = cached->second;
       ghost->isHidden = 0;
@@ -550,7 +550,7 @@ void moho::CBuildDragPreview::RefreshQueuedBuildGhosts()
       const moho::RMeshBlueprintLOD& topLod = *meshBlueprint->mLods.begin();
       const fa::string shaderName("UnitPlace");
       const fa::string emptyTextureName;
-      boost::shared_ptr<moho::MeshMaterial> ghostMaterial = moho::MeshMaterial::Create(
+      std::shared_ptr<moho::MeshMaterial> ghostMaterial = moho::MeshMaterial::Create(
         shaderName,
         topLod.mAlbedoName,
         topLod.mNormalsName,
@@ -1000,7 +1000,7 @@ void moho::CBuildDragPreview::UpdateDragPreview()
       ReplaceBuildPreviewMesh(static_cast<std::size_t>(slot), blueprint);
     }
 
-    if (const boost::shared_ptr<moho::MeshInstance>& preview = mMeshes[static_cast<std::size_t>(slot)]; preview) {
+    if (const std::shared_ptr<moho::MeshInstance>& preview = mMeshes[static_cast<std::size_t>(slot)]; preview) {
       preview->color = static_cast<std::int32_t>(previewColor);
       preview->SetStance(stance, stance);
     }
@@ -1106,7 +1106,7 @@ void moho::CBuildDragPreview::UpdateDragPreview()
         mBlueprints[static_cast<std::size_t>(slot)] = const_cast<moho::RUnitBlueprint*>(buildBlueprint);
       }
 
-      if (const boost::shared_ptr<moho::MeshInstance>& preview = mMeshes[static_cast<std::size_t>(slot)]; preview) {
+      if (const std::shared_ptr<moho::MeshInstance>& preview = mMeshes[static_cast<std::size_t>(slot)]; preview) {
         preview->color = static_cast<std::int32_t>(previewColor);
         preview->SetStance(stance, stance);
       }
@@ -3711,7 +3711,7 @@ namespace
     return value != nullptr ? value : "";
   }
 
-  [[nodiscard]] boost::shared_ptr<moho::RScmResource> ResolveCommandFeedbackModelFromDescriptor(
+  [[nodiscard]] std::shared_ptr<moho::RScmResource> ResolveCommandFeedbackModelFromDescriptor(
     const LuaPlus::LuaObject& meshDescriptor,
     moho::CWldSession* const worldSession,
     float* const outUniformScale
@@ -3788,7 +3788,7 @@ int moho::cfunc_AddCommandFeedbackBlipL(
   const LuaPlus::LuaObject meshDescriptor(LuaPlus::LuaStackObject(state, 1));
 
   float uniformScale = 1.0f;
-  const boost::shared_ptr<RScmResource> modelResource =
+  const std::shared_ptr<RScmResource> modelResource =
     ResolveCommandFeedbackModelFromDescriptor(meshDescriptor, worldSession, &uniformScale);
   if (!modelResource) {
     return 0;
@@ -3800,7 +3800,7 @@ int moho::cfunc_AddCommandFeedbackBlipL(
   const fa::string shaderName(LuaStringOrEmpty(meshDescriptor.GetByName("ShaderName")));
   const fa::string emptyTextureName{};
 
-  const boost::shared_ptr<MeshMaterial> material = MeshMaterial::Create(
+  const std::shared_ptr<MeshMaterial> material = MeshMaterial::Create(
     shaderName, textureName, emptyTextureName, emptyTextureName, emptyTextureName, emptyTextureName, nullptr
   );
 

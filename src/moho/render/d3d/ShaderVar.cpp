@@ -246,7 +246,7 @@ namespace moho
       return false;
     }
 
-    boost::shared_ptr<gpg::gal::Effect> baseEffect = effect->GetBaseEffect();
+    std::shared_ptr<gpg::gal::Effect> baseEffect = effect->GetBaseEffect();
     try {
       mEffectVariable = baseEffect->GetVariable(mVariableName.c_str());
     } catch (const gpg::gal::Error&) {
@@ -263,7 +263,7 @@ namespace moho
    * into the bound effect-variable lane.
    */
   ShaderVar* ShaderVar::GetTexture(
-    const boost::shared_ptr<ID3DTextureSheet>& textureSheet
+    const std::shared_ptr<ID3DTextureSheet>& textureSheet
   )
   {
     if (Exists()) {
@@ -295,7 +295,7 @@ namespace moho
    * bind, they only differ in what.
    */
   ShaderVar* ShaderVar::SetRenderTargetTexture(
-    const boost::shared_ptr<ID3DRenderTarget>& renderTarget
+    const std::shared_ptr<ID3DRenderTarget>& renderTarget
   )
   {
     if (Exists()) {

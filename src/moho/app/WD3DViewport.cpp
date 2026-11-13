@@ -92,7 +92,7 @@ void moho::WD3DViewport::RenderPreviewImage(
 /**
  * Address: 0x0042BB30 (FUN_0042BB30)
  */
-boost::shared_ptr<moho::ID3DTextureSheet> moho::WD3DViewport::GetPreviewImage()
+std::shared_ptr<moho::ID3DTextureSheet> moho::WD3DViewport::GetPreviewImage()
 {
   return {};
 }

@@ -1512,7 +1512,7 @@ namespace moho
      * `Load` (saved game); throws `std::runtime_error` for an unknown launch-info
      * subclass.
      */
-    [[nodiscard]] static Sim* Create(const boost::shared_ptr<LaunchInfoBase>& launchInfo);
+    [[nodiscard]] static Sim* Create(const std::shared_ptr<LaunchInfoBase>& launchInfo);
 
     /**
      * Address: 0x0074B120 (FUN_0074B120, ?FlattenMapRect@Sim@Moho@@QAEXABV?$Rect2@H@gpg@@M@Z)
@@ -1544,7 +1544,7 @@ namespace moho
     RRuleGameRules* mRules;             // 0x08C8
     STIMap* mMapData;                   // 0x08CC
 
-    boost::shared_ptr<CSimResources> mSimResources; // 0x08D0..0x08D7 (px, pi)
+    std::shared_ptr<CSimResources> mSimResources; // 0x08D0..0x08D7 (px, pi)
     LuaPlus::LuaState* mLuaState;
     bool mGameEnded;
     bool mGameOver;
@@ -1570,16 +1570,16 @@ namespace moho
     /// The canvas sim script draws into. `GetDebugCanvas` (FUN_00746720) is
     /// `add edi, 96Ch` plus a lazy `new CDebugCanvas`, which pins this offset
     /// exactly; `AdvanceBeat` then rolls it into the slot below and clears it.
-    boost::shared_ptr<CDebugCanvas> mDebugCanvas1; // 0x096C
+    std::shared_ptr<CDebugCanvas> mDebugCanvas1; // 0x096C
     /// The finished canvas from the previous beat roll.
-    boost::shared_ptr<CDebugCanvas> mDebugCanvas2; // 0x0974
+    std::shared_ptr<CDebugCanvas> mDebugCanvas2; // 0x0974
     PathTables* mPathTables;
     CAiFormationDBImpl* mFormationDB; // 0x0980
     EntityDB* mEntityDB;              // 0x0984
     CCommandDB* mCommandDB;           // 0x0988
     uint32_t mReserved98C;
     uint32_t mReserved990;
-    boost::shared_ptr<SParticleBuffer> mParticleBuffer;
+    std::shared_ptr<SParticleBuffer> mParticleBuffer;
     CDecalBuffer* mDecalBuffer;
     gpg::DList<RDebugOverlay> mDebugOverlays;
     fa::vector<CSimConVarInstanceBase*> mSimVars;

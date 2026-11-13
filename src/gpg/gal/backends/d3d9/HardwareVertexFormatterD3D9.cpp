@@ -37,7 +37,7 @@ namespace gpg::gal
    * What it does:
    * Creates vertex format 14 on the active device (slot 14, `[vtbl+0x38]`).
    */
-  boost::shared_ptr<VertexFormat> HardwareVertexFormatterD3D9::CreateVertexFormat(
+  std::shared_ptr<VertexFormat> HardwareVertexFormatterD3D9::CreateVertexFormat(
     const std::int32_t /*layoutVariant*/
   )
   {

@@ -3,7 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 
-#include "boost/shared_ptr.h"
+#include <memory>
 #include "moho/render/textures/CD3DBatchTexture.h"
 
 namespace moho
@@ -17,7 +17,7 @@ namespace moho
   class CD3DRawBatchTexture : public CD3DBatchTexture
   {
   public:
-    using DataHandle = boost::shared_ptr<SBatchTextureData>;
+    using DataHandle = std::shared_ptr<SBatchTextureData>;
 
     /**
      * Address: 0x00448120 (FUN_00448120, Moho::CD3DRawBatchTexture::CD3DRawBatchTexture)

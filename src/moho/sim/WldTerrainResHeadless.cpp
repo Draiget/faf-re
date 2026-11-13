@@ -294,7 +294,7 @@ namespace
     {
       return mSkycubeFile;
     }
-    boost::shared_ptr<moho::ID3DTextureSheet> GetSkycube() const override
+    std::shared_ptr<moho::ID3DTextureSheet> GetSkycube() const override
     {
       return {};
     }
@@ -308,7 +308,7 @@ namespace
     {
       return mBackgroundFile;
     }
-    boost::shared_ptr<moho::ID3DTextureSheet> GetBackground() const override
+    std::shared_ptr<moho::ID3DTextureSheet> GetBackground() const override
     {
       return {};
     }
@@ -321,7 +321,7 @@ namespace
       const fa::string&
     ) override
     {}
-    boost::shared_ptr<moho::ID3DTextureSheet> GetEnvLookup(
+    std::shared_ptr<moho::ID3DTextureSheet> GetEnvLookup(
       const fa::string&
     ) const override
     {
@@ -384,7 +384,7 @@ namespace
       std::int32_t
     ) override
     {}
-    boost::shared_ptr<moho::ID3DTextureSheet> GetWaterMap() const override
+    std::shared_ptr<moho::ID3DTextureSheet> GetWaterMap() const override
     {
       return {};
     }

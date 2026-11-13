@@ -16,7 +16,7 @@
 #include <mutex>
 #include <vector>
 
-#include "boost/shared_ptr.h"
+#include <memory>
 #include "gpg/core/containers/String.h"
 #include "gpg/core/time/Timer.h"
 #include "gpg/core/utils/BoostWrappers.h"
@@ -244,7 +244,7 @@ namespace moho
     const float right = left + width;
     const float bottom = top + height;
 
-    const boost::shared_ptr<CD3DBatchTexture> whiteTexture = CD3DBatchTexture::FromSolidColor(0xFFFFFFFFu);
+    const std::shared_ptr<CD3DBatchTexture> whiteTexture = CD3DBatchTexture::FromSolidColor(0xFFFFFFFFu);
     primBatcher->SetTexture(whiteTexture);
     DrawPanelRect(*primBatcher, left, top, right, bottom, 0xFFFFFFFFu);
 

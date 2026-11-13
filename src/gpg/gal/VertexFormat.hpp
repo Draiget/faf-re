@@ -4,7 +4,7 @@
 #include <cstdint>
 
 #include "gpg/core/utils/NonCopyable.h"
-#include "boost/shared_ptr.h"
+#include <memory>
 #include "legacy/containers/Vector.h"
 
 namespace gpg::gal
@@ -52,7 +52,7 @@ namespace gpg::gal
      * `[vtbl+0x38]`). `CD3DVertexFormat`'s constructor is its caller
      * (0x0043CFE6).
      */
-    static boost::shared_ptr<VertexFormat> Create(std::uint32_t formatCode);
+    static std::shared_ptr<VertexFormat> Create(std::uint32_t formatCode);
 
     std::uint32_t formatCode_;                // +0x04
     fa::vector<std::uint32_t> streamStrides_; // +0x08 byte stride per vertex stream

@@ -29,12 +29,12 @@ namespace
    * Copies NAT traversal provider weak pointer only when the provider still has
    * a live strong-reference count.
    */
-  boost::weak_ptr<INetNATTraversalProvider> CopyLiveNatTraversalProviderWeakPtr(
-    const boost::weak_ptr<INetNATTraversalProvider>& provider
+  std::weak_ptr<INetNATTraversalProvider> CopyLiveNatTraversalProviderWeakPtr(
+    const std::weak_ptr<INetNATTraversalProvider>& provider
   )
   {
     if (provider.expired()) {
-      return boost::weak_ptr<INetNATTraversalProvider>{};
+      return std::weak_ptr<INetNATTraversalProvider>{};
     }
     return provider;
   }
@@ -129,7 +129,7 @@ CNetUDPConnector::~CNetUDPConnector()
  */
 CNetUDPConnector::CNetUDPConnector(
   platform::net::Socket sock,
-  boost::weak_ptr<INetNATTraversalProvider>& prov
+  std::weak_ptr<INetNATTraversalProvider>& prov
 )
   : lock_{}
   , socket_{sock}
@@ -159,7 +159,7 @@ CNetUDPConnector::CNetUDPConnector(
 
   // Keep one aliasing shared_ptr alive in worker thread so provider weak_ptr
   // remains lockable during connector lifetime.
-  auto selfOwner = boost::shared_ptr<CNetUDPConnector>(this, [](CNetUDPConnector*) {});
+  auto selfOwner = std::shared_ptr<CNetUDPConnector>(this, [](CNetUDPConnector*) {});
   {
     fa::recursive_mutex::scoped_lock lock{lock_};
 
@@ -174,8 +174,7 @@ CNetUDPConnector::CNetUDPConnector(
 
   const auto natProviderWeak = CopyLiveNatTraversalProviderWeakPtr(mNatTraversalProvider);
   if (const auto natProvider = natProviderWeak.lock()) {
-    boost::shared_ptr<INetNATTraversalHandler> natHandler =
-      boost::static_pointer_cast<INetNATTraversalHandler>(selfOwner);
+    std::shared_ptr<INetNATTraversalHandler> natHandler = std::static_pointer_cast<INetNATTraversalHandler>(selfOwner);
     const int port = GetLocalPort();
     natProvider->SetTraversalHandler(port, &natHandler);
   }
@@ -193,7 +192,7 @@ void CNetUDPConnector::Destroy()
 {
   const auto natProviderWeak = CopyLiveNatTraversalProviderWeakPtr(mNatTraversalProvider);
   if (const auto natProvider = natProviderWeak.lock()) {
-    boost::shared_ptr<INetNATTraversalHandler> nullHandler{};
+    std::shared_ptr<INetNATTraversalHandler> nullHandler{};
     const int port = GetLocalPort();
     natProvider->SetTraversalHandler(port, &nullHandler);
   }

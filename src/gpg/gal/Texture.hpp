@@ -3,7 +3,7 @@
 #include <cstddef>
 
 #include "gpg/core/utils/NonCopyable.h"
-#include "boost/shared_ptr.h"
+#include <memory>
 #include "gpg/core/streams/MemBufferStream.h"
 #include "platform/Platform.h"
 
@@ -68,7 +68,7 @@ namespace gpg::gal
      * Creates one texture on the active device - slot 10 (`[vtbl+0x28]`)
      * of `Device::GetInstance()`.
      */
-    static boost::shared_ptr<Texture> Create(const TextureContext& context);
+    static std::shared_ptr<Texture> Create(const TextureContext& context);
 
     /**
      * Slot: 1

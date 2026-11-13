@@ -1,7 +1,7 @@
 #pragma once
 
 #include "gpg/core/utils/NonCopyable.h"
-#include "boost/shared_ptr.h"
+#include <memory>
 
 namespace gpg::gal
 {
@@ -46,7 +46,7 @@ namespace gpg::gal
      * Creates one depth/stencil target on the active device - slot 13
      * (`[vtbl+0x34]`) of `Device::GetInstance()`.
      */
-    static boost::shared_ptr<DepthStencilTarget> Create(const DepthStencilTargetContext& context);
+    static std::shared_ptr<DepthStencilTarget> Create(const DepthStencilTargetContext& context);
 
     /**
      * Slot: 1

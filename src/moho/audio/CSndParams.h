@@ -3,7 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 
-#include "boost/shared_ptr.h"
+#include <memory>
 #include "gpg/core/reflection/Reflection.h"
 #include "legacy/containers/String.h"
 #include "moho/audio/CSndVar.h"
@@ -134,7 +134,7 @@ namespace moho
       const fa::string& cueName,
       CSndVar* lodCutoffVar,
       CSndVar* rpcLoopVar,
-      const boost::weak_ptr<AudioEngine>& engine
+      const std::weak_ptr<AudioEngine>& engine
     );
 
     /**
@@ -162,7 +162,7 @@ namespace moho
      * What it does:
      * Copies/returns the retained playback engine handle for this cue set.
      */
-    boost::shared_ptr<AudioEngine>* GetEngine(boost::shared_ptr<AudioEngine>* outEngine) const;
+    std::shared_ptr<AudioEngine>* GetEngine(std::shared_ptr<AudioEngine>* outEngine) const;
 
   private:
     /**
@@ -172,7 +172,7 @@ namespace moho
      * Resolves bank/cue ids and returns a strong `AudioEngine` handle when the
      * current descriptor can be bound to one loaded engine.
      */
-    [[nodiscard]] boost::shared_ptr<AudioEngine> DoResolve() const;
+    [[nodiscard]] std::shared_ptr<AudioEngine> DoResolve() const;
 
   public:
     fa::string mBank;                             // +0x00
@@ -182,7 +182,7 @@ namespace moho
     mutable std::uint32_t mResolvePolicy;         // +0x40
     mutable std::uint16_t mBankId;                // +0x44
     mutable std::uint16_t mCueId;                 // +0x46
-    mutable boost::weak_ptr<AudioEngine> mEngine; // +0x48
+    mutable std::weak_ptr<AudioEngine> mEngine;   // +0x48
   };
 
   static_assert(offsetof(CSndParams, mBank) == 0x00, "CSndParams::mBank offset must be 0x00");

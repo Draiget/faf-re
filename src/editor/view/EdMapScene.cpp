@@ -1320,7 +1320,7 @@ namespace faf::editor
       }
       // A texture made from the bytes (copied), as the engine's own in-memory sheets are (CD3DDeviceResources
       // 0x00441810); the path stays the map's, so saving writes what the map names.
-      boost::shared_ptr<moho::RD3DTextureResource> sheet(
+      std::shared_ptr<moho::RD3DTextureResource> sheet(
         new moho::RD3DTextureResource("editor:material", const_cast<std::uint8_t*>(bytes.data()), bytes.size())
       );
       material.mTextureSheet = sheet;
@@ -2647,7 +2647,7 @@ namespace faf::editor
         }
         const float scale = blueprint->Display.UniformScale;
         moho::MeshInstance* const instance = renderer->CreateMeshInstance(
-          0, -1, mesh, Wm3::Vec3f{scale, scale, scale}, false, boost::shared_ptr<moho::MeshMaterial>()
+          0, -1, mesh, Wm3::Vec3f{scale, scale, scale}, false, std::shared_ptr<moho::MeshMaterial>()
         );
         if (instance == nullptr) {
           ++missing;
@@ -2700,7 +2700,7 @@ namespace faf::editor
     }
     const float scale = blueprint->Display.UniformScale;
     moho::MeshInstance* const instance = renderer->CreateMeshInstance(
-      0, -1, mesh, Wm3::Vec3f{scale, scale, scale}, false, boost::shared_ptr<moho::MeshMaterial>()
+      0, -1, mesh, Wm3::Vec3f{scale, scale, scale}, false, std::shared_ptr<moho::MeshMaterial>()
     );
     if (instance != nullptr) {
       instance->SetStance(entry.mTransform, entry.mTransform);
@@ -5436,7 +5436,7 @@ namespace faf::editor
       if (instance == nullptr) {
         const float scale = place.first->scale;
         instance = renderer->CreateMeshInstance(
-          0, -1, place.first->mesh, Wm3::Vec3f{scale, scale, scale}, false, boost::shared_ptr<moho::MeshMaterial>()
+          0, -1, place.first->mesh, Wm3::Vec3f{scale, scale, scale}, false, std::shared_ptr<moho::MeshMaterial>()
         );
         if (instance == nullptr) {
           mDeposits.erase(name);
@@ -6699,10 +6699,10 @@ namespace faf::editor
       const char* const shellTechnique = sways ? "EditorOutlineAlphaSway"
         : alphaTested                          ? "EditorOutlineAlpha"
                                                : "EditorOutline";
-      const boost::shared_ptr<moho::MeshMaterial> hull = moho::MeshMaterial::Create(
+      const std::shared_ptr<moho::MeshMaterial> hull = moho::MeshMaterial::Create(
         fa::string(shellTechnique), lod->mAlbedoName, fa::string(), fa::string(), fa::string(), fa::string(), nullptr
       );
-      const boost::shared_ptr<moho::MeshMaterial> over = moho::MeshMaterial::Create(
+      const std::shared_ptr<moho::MeshMaterial> over = moho::MeshMaterial::Create(
         fa::string(sways ? "EditorPropOverSway" : "EditorPropOver"),
         lod->mAlbedoName,
         lod->mNormalsName,

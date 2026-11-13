@@ -359,7 +359,7 @@ namespace faf::remote::client
   )
   {
     // The skeleton of the unit's mesh as this client resolved it, and its blueprint's scale (`Unit::SetMesh`).
-    boost::shared_ptr<const moho::CAniSkel> skeleton;
+    std::shared_ptr<const moho::CAniSkel> skeleton;
     if (moho::RScmResource* const mesh = held.data.mScmResource.get(); mesh != nullptr) {
       skeleton = mesh->GetSkeleton();
     }
@@ -390,13 +390,13 @@ namespace faf::remote::client
     // poses too, with or without bones: otherwise one pose stands at both ends, and the body jumps a beat's way at
     // each beat while the unit's transforms glide.
     const bool moved = !SameTransform(held.data.mCurTransform, held.data.mLastTransform);
-    boost::shared_ptr<moho::CAniPose> prior = held.pose;
+    std::shared_ptr<moho::CAniPose> prior = held.pose;
     if (bones == nullptr && moved) {
       held.pose.reset(new moho::CAniPose(*held.pose)); // the same bones, a beat on
       held.poseMoving = true;
     } else if (bones != nullptr) {
       // A new current pose, as `CAniActor` steps: a copy of the last one with the lane's bones over it.
-      boost::shared_ptr<moho::CAniPose> next(new moho::CAniPose(*held.pose));
+      std::shared_ptr<moho::CAniPose> next(new moho::CAniPose(*held.pose));
       moho::CAniPoseBone* const first = next->mBones.begin();
       const std::size_t count = next->mBones.size();
       if (bones->whole) {
@@ -621,7 +621,7 @@ namespace faf::remote::client
     return mSounds[id];
   }
 
-  boost::shared_ptr<moho::CD3DBatchTexture> CSyncRebuilder::ResolveUnderlay(
+  std::shared_ptr<moho::CD3DBatchTexture> CSyncRebuilder::ResolveUnderlay(
     const std::uint32_t id
   )
   {
@@ -643,7 +643,7 @@ namespace faf::remote::client
     // Through the client's texture hook (CD3DBatchTexture.h): a build without a client (the
     // sim-only headless) loads no texture, as its sim holds none.
     mUnderlays[id].texture = moho::sBatchTextureFromFile != nullptr ? moho::sBatchTextureFromFile(path->c_str(), 0u)
-                                                                    : boost::shared_ptr<moho::CD3DBatchTexture>{};
+                                                                    : std::shared_ptr<moho::CD3DBatchTexture>{};
     mUnderlays[id].resolved = true;
     return mUnderlays[id].texture;
   }
@@ -1172,9 +1172,9 @@ namespace faf::remote::client
       entry.mVariableData.mPriorSharedPose = held.pose;
       entry.mVariableData.mSharedPose = held.pose;
       if (const auto it = movedById.find(id); it != movedById.end()) {
-        boost::shared_ptr<moho::CAniPose> prior(new moho::CAniPose(*held.pose));
+        std::shared_ptr<moho::CAniPose> prior(new moho::CAniPose(*held.pose));
         prior->SetWorldTransform(it->second->mVariableData.mLastTransform);
-        boost::shared_ptr<moho::CAniPose> pose(new moho::CAniPose(*held.pose));
+        std::shared_ptr<moho::CAniPose> pose(new moho::CAniPose(*held.pose));
         pose->SetWorldTransform(it->second->mVariableData.mCurTransform);
         entry.mVariableData.mPriorSharedPose = std::move(prior);
         entry.mVariableData.mSharedPose = std::move(pose);

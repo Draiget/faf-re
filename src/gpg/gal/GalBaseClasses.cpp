@@ -108,7 +108,7 @@ namespace gpg::gal
    */
   CursorContext::CursorContext(
     const POINT& hotspot,
-    const boost::shared_ptr<Texture> texture
+    const std::shared_ptr<Texture> texture
   )
     : hotspotX_(hotspot.x)
     , hotspotY_(hotspot.y)

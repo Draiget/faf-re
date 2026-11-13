@@ -3,7 +3,7 @@
 #include <cmath>
 #include <cstdint>
 
-#include "boost/shared_ptr.h"
+#include <memory>
 #include "moho/entity/REntityBlueprint.h"
 #include "moho/entity/UserEntity.h"
 #include "moho/mesh/Mesh.h"
@@ -97,7 +97,7 @@ namespace moho
 
       // The icon is loaded but never bound: this is a residency check, and a
       // projectile whose icon will not load aborts the whole pass (0x0086035E).
-      const boost::shared_ptr<CD3DBatchTexture> icon =
+      const std::shared_ptr<CD3DBatchTexture> icon =
         CD3DBatchTexture::FromFile(blueprint->mStrategicIconName.c_str(), 0u);
       if (!icon) {
         break;
@@ -141,7 +141,7 @@ namespace moho
     primBatcher->Flush();
     (void)primBatcher->Setup("TAlphaBlendLinearSampleNoDepth");
 
-    const boost::shared_ptr<CD3DBatchTexture> trailTexture =
+    const std::shared_ptr<CD3DBatchTexture> trailTexture =
       CD3DBatchTexture::FromSolidColor(static_cast<std::uint32_t>(UI_RenProjectileTrailColor));
     primBatcher->SetTexture(trailTexture);
 

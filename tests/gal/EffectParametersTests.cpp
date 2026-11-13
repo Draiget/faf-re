@@ -12,7 +12,7 @@
 #include <vector>
 
 #include "GalTestSupport.h"
-#include "boost/shared_ptr.h"
+#include <memory>
 #include "gpg/gal/effects/EffectDescription.h"
 #include "gpg/gal/effects/EffectParameters.h"
 #include "gpg/gal/effects/ModernHlsl.h"
@@ -341,8 +341,8 @@ TEST_F(
   EXPECT_TRUE(mStore.Binding(texture).Empty());
   EXPECT_TRUE(mStore.Binding(99U).Empty());
 
-  const boost::shared_ptr<gpg::gal::Texture> image(new faf_gal_tests::FakeTexture());
-  const boost::shared_ptr<gpg::gal::RenderTarget> target(new faf_gal_tests::FakeRenderTarget());
+  const std::shared_ptr<gpg::gal::Texture> image(new faf_gal_tests::FakeTexture());
+  const std::shared_ptr<gpg::gal::RenderTarget> target(new faf_gal_tests::FakeRenderTarget());
   const std::uint64_t version = mStore.Version();
   mStore.SetTexture(texture, image);
   EXPECT_EQ(mStore.Binding(texture).texture.get(), image.get());

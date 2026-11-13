@@ -6,8 +6,8 @@
 
 #include <d3d9.h>
 
-#include "boost/shared_ptr.h"
-#include "boost/weak_ptr.h"
+#include <memory>
+#include <memory>
 #include "gpg/core/streams/MemBufferStream.h"
 #include "gpg/gal/Device.hpp"
 #include "gpg/gal/DeviceContext.hpp"
@@ -132,7 +132,7 @@ namespace gpg
        * What it does:
        * Runs the `Func1` pre-hook and returns the device's pipeline state.
        */
-      boost::shared_ptr<PipelineState> GetPipelineState() override;
+      std::shared_ptr<PipelineState> GetPipelineState() override;
       /**
        * Address: 0x008F13D0 (FUN_008F13D0)
        * Slot: 9
@@ -143,7 +143,7 @@ namespace gpg
        * cache (`CreateEffectFromCachedBinary`) when `context.mUseCache` is set
        * and from source (`CreateEffectFromSourceBuffer`) otherwise.
        */
-      boost::shared_ptr<Effect> CreateEffect(const EffectContext& context) override;
+      std::shared_ptr<Effect> CreateEffect(const EffectContext& context) override;
       /**
        * Address: 0x008EACC0 (FUN_008EACC0)
        * Slot: 10
@@ -152,7 +152,7 @@ namespace gpg
        * Creates one D3D9 texture (empty, or decoded from in-memory file data)
        * and wraps it in a `TextureD3D9`.
        */
-      boost::shared_ptr<Texture> CreateTexture(const TextureContext* context) override;
+      std::shared_ptr<Texture> CreateTexture(const TextureContext* context) override;
       /**
        * Address: 0x008EB610 (FUN_008EB610)
        * Slot: 11
@@ -161,7 +161,7 @@ namespace gpg
        * Creates one `D3DUSAGE_RENDERTARGET` texture of the context's size and
        * format in the default pool and wraps it in a `RenderTargetD3D9`.
        */
-      boost::shared_ptr<RenderTarget> CreateRenderTarget(const RenderTargetContext* context) override;
+      std::shared_ptr<RenderTarget> CreateRenderTarget(const RenderTargetContext* context) override;
       /**
        * Address: 0x008EB780 (FUN_008EB780)
        * Slot: 12
@@ -170,7 +170,7 @@ namespace gpg
        * Creates one render-target cube texture and wraps it in a
        * `CubeRenderTargetD3D9`.
        */
-      boost::shared_ptr<CubeRenderTarget> CreateCubeRenderTarget(const CubeRenderTargetContext* context) override;
+      std::shared_ptr<CubeRenderTarget> CreateCubeRenderTarget(const CubeRenderTargetContext* context) override;
       /**
        * Address: 0x008EB8E0 (FUN_008EB8E0)
        * Slot: 13
@@ -179,7 +179,7 @@ namespace gpg
        * Creates one depth/stencil surface and wraps it in a
        * `DepthStencilTargetD3D9`.
        */
-      boost::shared_ptr<DepthStencilTarget> CreateDepthStencilTarget(const DepthStencilTargetContext* context) override;
+      std::shared_ptr<DepthStencilTarget> CreateDepthStencilTarget(const DepthStencilTargetContext* context) override;
       /**
        * Address: 0x008EBA50 (FUN_008EBA50)
        * Slot: 14
@@ -188,7 +188,7 @@ namespace gpg
        * Creates the D3D9 vertex declaration for gal vertex format
        * `formatCode` and wraps it in a `VertexFormatD3D9`.
        */
-      boost::shared_ptr<VertexFormat> CreateVertexFormat(std::uint32_t formatCode) override;
+      std::shared_ptr<VertexFormat> CreateVertexFormat(std::uint32_t formatCode) override;
       /**
        * Address: 0x008EBBB0 (FUN_008EBBB0)
        * Slot: 15
@@ -196,7 +196,7 @@ namespace gpg
        * What it does:
        * Creates one D3D9 vertex buffer described by `context`.
        */
-      boost::shared_ptr<VertexBuffer> CreateVertexBuffer(const VertexBufferContext* context) override;
+      std::shared_ptr<VertexBuffer> CreateVertexBuffer(const VertexBufferContext* context) override;
       /**
        * Address: 0x008EBD30 (FUN_008EBD30)
        * Slot: 16
@@ -204,7 +204,7 @@ namespace gpg
        * What it does:
        * Creates one D3D9 index buffer described by `context`.
        */
-      boost::shared_ptr<IndexBuffer> CreateIndexBuffer(const IndexBufferContext* context) override;
+      std::shared_ptr<IndexBuffer> CreateIndexBuffer(const IndexBufferContext* context) override;
       /**
        * Address: 0x008EC440 (FUN_008EC440)
        * Slot: 17
@@ -215,8 +215,8 @@ namespace gpg
        * into level 0 of `destination`.
        */
       void GetRenderTargetData(
-        const boost::shared_ptr<RenderTarget>& source,
-        const boost::shared_ptr<Texture>& destination
+        const std::shared_ptr<RenderTarget>& source,
+        const std::shared_ptr<Texture>& destination
       ) override;
       /**
        * Address: 0x008EC250 (FUN_008EC250)
@@ -226,8 +226,8 @@ namespace gpg
        * Blits one colour target's surface into another with linear filtering.
        */
       void StretchRect(
-        const boost::shared_ptr<RenderTarget>& source,
-        const boost::shared_ptr<RenderTarget>& destination,
+        const std::shared_ptr<RenderTarget>& source,
+        const std::shared_ptr<RenderTarget>& destination,
         const RECT* sourceRect,
         const RECT* destinationRect
       ) override;
@@ -240,8 +240,8 @@ namespace gpg
        * `D3DXLoadSurfaceFromSurface`.
        */
       void UpdateSurface(
-        const boost::shared_ptr<Texture>& source,
-        const boost::shared_ptr<Texture>& destination,
+        const std::shared_ptr<Texture>& source,
+        const std::shared_ptr<Texture>& destination,
         const RECT* sourceRect,
         const RECT* destinationRect
       ) override;
@@ -253,7 +253,7 @@ namespace gpg
        * Writes one cube render target's texture to `filePath` as DDS.
        */
       void
-      SaveCubeRenderTarget(const boost::shared_ptr<CubeRenderTarget>& cubeTarget, const fa::string& filePath) override;
+      SaveCubeRenderTarget(const std::shared_ptr<CubeRenderTarget>& cubeTarget, const fa::string& filePath) override;
       /**
        * Address: 0x008EC970 (FUN_008EC970)
        * Slot: 21
@@ -263,7 +263,7 @@ namespace gpg
        * `fileFormat`.
        */
       void SaveRenderTarget(
-        const boost::shared_ptr<RenderTarget>& renderTarget,
+        const std::shared_ptr<RenderTarget>& renderTarget,
         const fa::string& filePath,
         int fileFormat
       ) override;
@@ -276,7 +276,7 @@ namespace gpg
        * it is non-null.
        */
       void SaveTexture(
-        const boost::shared_ptr<Texture>& texture,
+        const std::shared_ptr<Texture>& texture,
         const fa::string& filePath,
         int fileFormat,
         gpg::MemBuffer<char>* outBuffer
@@ -305,8 +305,8 @@ namespace gpg
        * Dispatches `Func1`, clears caller weak-handle output, and consumes one temporary
        * shared-handle argument by value.
        */
-      boost::weak_ptr<void>*
-      Func7(boost::weak_ptr<void>* outWeakHandle, boost::shared_ptr<void> temporarySharedHandle) override;
+      std::weak_ptr<void>*
+      Func7(std::weak_ptr<void>* outWeakHandle, std::shared_ptr<void> temporarySharedHandle) override;
       /**
        * Address: 0x008F3070 (FUN_008F3070)
        * Slot: 26
@@ -469,7 +469,7 @@ namespace gpg
        * What it does:
        * Binds `vertexFormat`'s D3D9 vertex declaration.
        */
-      void SetVertexDeclaration(boost::shared_ptr<VertexFormat> vertexFormat) override;
+      void SetVertexDeclaration(std::shared_ptr<VertexFormat> vertexFormat) override;
       /**
        * Address: 0x008EE0B0 (FUN_008EE0B0)
        * Slot: 41
@@ -479,7 +479,7 @@ namespace gpg
        */
       void SetVertexBuffer(
         std::uint32_t streamSlot,
-        boost::shared_ptr<VertexBuffer> vertexBuffer,
+        std::shared_ptr<VertexBuffer> vertexBuffer,
         int streamFrequencyToken,
         int startVertex
       ) override;
@@ -490,7 +490,7 @@ namespace gpg
        * What it does:
        * Binds `indexBuffer` as the device's index source.
        */
-      void SetBufferIndices(boost::shared_ptr<IndexBuffer> indexBuffer) override;
+      void SetBufferIndices(std::shared_ptr<IndexBuffer> indexBuffer) override;
       /**
        * Address: 0x008EE420 (FUN_008EE420)
        * Slot: 43
@@ -640,7 +640,7 @@ namespace gpg
        * bytes to the cache path when it can open it, and wraps the result in
        * an `EffectD3D9`.
        */
-      boost::shared_ptr<Effect> CreateEffectFromSourceBuffer(const EffectContext& context);
+      std::shared_ptr<Effect> CreateEffectFromSourceBuffer(const EffectContext& context);
 
       /**
        * Address: 0x008F0F90 (FUN_008F0F90)
@@ -650,7 +650,7 @@ namespace gpg
        * D3DX effect from them, points it at the pipeline state's state manager
        * and wraps the result in an `EffectD3D9`.
        */
-      boost::shared_ptr<Effect> CreateEffectFromCachedBinary(const EffectContext& context);
+      std::shared_ptr<Effect> CreateEffectFromCachedBinary(const EffectContext& context);
 
       /**
        * FAF addition, not in the shipped binary.
@@ -667,7 +667,7 @@ namespace gpg
       int mCurThreadId = 0;                                // +0x24 thread that ran Setup
       fa::vector<AdapterD3D9> mAdapters;                   // +0x28
       DeviceContext mDeviceContext{DeviceApi::Unset};      // +0x38 the context actually in force
-      boost::shared_ptr<PipelineStateD3D9> mPipelineState; // +0x6C
+      std::shared_ptr<PipelineStateD3D9> mPipelineState;   // +0x6C
       IDirect3D9* mDirect3D = nullptr;                     // +0x74
       IDirect3DDevice9* mDevice = nullptr;                 // +0x78
       OutputContext* mHeads = nullptr;                     // +0x7C one per head, new[]'d by CreateHeads

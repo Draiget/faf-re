@@ -3,7 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 
-#include "boost/shared_ptr.h"
+#include <memory>
 
 namespace gpg::gal
 {
@@ -106,16 +106,16 @@ namespace moho
      * Engine addition (`ren_ParticleBatch`): `Render`, but with the instance data
      * read from `instances` (the same layout) instead of this buffer's own.
      */
-    void RenderInstances(const boost::shared_ptr<gpg::gal::VertexBuffer>& instances, int count, int startIndex);
+    void RenderInstances(const std::shared_ptr<gpg::gal::VertexBuffer>& instances, int count, int startIndex);
 
   public:
     int mMaxParticles;                                               // +0x04
     bool mInitialized;                                               // +0x08
     std::uint8_t mPadding09[3];                                      // +0x09
-    boost::shared_ptr<gpg::gal::VertexFormat> mVertexFormat;         // +0x0C
-    boost::shared_ptr<gpg::gal::VertexBuffer> mQuadVertexBuffer;     // +0x14
-    boost::shared_ptr<gpg::gal::VertexBuffer> mInstanceVertexBuffer; // +0x1C
-    boost::shared_ptr<gpg::gal::IndexBuffer> mQuadIndexBuffer;       // +0x24
+    std::shared_ptr<gpg::gal::VertexFormat> mVertexFormat;           // +0x0C
+    std::shared_ptr<gpg::gal::VertexBuffer> mQuadVertexBuffer;       // +0x14
+    std::shared_ptr<gpg::gal::VertexBuffer> mInstanceVertexBuffer;   // +0x1C
+    std::shared_ptr<gpg::gal::IndexBuffer> mQuadIndexBuffer;         // +0x24
 
   private:
     /**

@@ -381,7 +381,7 @@ namespace moho
         if (mTexture) {
           BoneTextureShaderVars& vars = GetBoneTextureShaderVars();
           if (vars.texture.Exists()) {
-            vars.texture.mEffectVariable->SetTexture(boost::shared_ptr<gpg::gal::Texture>{});
+            vars.texture.mEffectVariable->SetTexture(std::shared_ptr<gpg::gal::Texture>{});
           }
         }
         mTexture.reset();
@@ -424,7 +424,7 @@ namespace moho
 
       std::vector<SkinPaletteEntry> mTexels;
       std::unordered_map<MeshInstance* const*, PreparedBucket> mPrepared; // keyed by the bucket's end()
-      boost::shared_ptr<gpg::gal::Texture> mTexture;
+      std::shared_ptr<gpg::gal::Texture> mTexture;
       std::uint32_t mRows = 0u;
       bool mDirty = true;
     };
@@ -497,7 +497,7 @@ namespace moho
         return first;
       }
 
-      [[nodiscard]] const boost::shared_ptr<gpg::gal::VertexBuffer>& Buffer() const noexcept
+      [[nodiscard]] const std::shared_ptr<gpg::gal::VertexBuffer>& Buffer() const noexcept
       {
         return mBuffer;
       }
@@ -512,7 +512,7 @@ namespace moho
       }
 
     private:
-      boost::shared_ptr<gpg::gal::VertexBuffer> mBuffer;
+      std::shared_ptr<gpg::gal::VertexBuffer> mBuffer;
       std::uint32_t mCapacity = 0u;
       std::uint32_t mStride = 0u;
       std::uint32_t mCursor = 0u;
@@ -712,8 +712,8 @@ namespace moho
   void HardwareMeshBatch::Initialize(
     const MeshLOD* const lod,
     const bool remapToReferenceResource,
-    const boost::shared_ptr<RScmResource> referenceResource,
-    const boost::shared_ptr<RScmResource> currentResource
+    const std::shared_ptr<RScmResource> referenceResource,
+    const std::shared_ptr<RScmResource> currentResource
   )
   {
     // Base initialization seeds mUseBoneRemap / mCurrentResource / counters
@@ -1429,8 +1429,8 @@ namespace moho
   HardwareMeshBatch::HardwareMeshBatch(
     const MeshLOD* const lod,
     const bool remapToReferenceResource,
-    boost::shared_ptr<RScmResource> referenceResource,
-    boost::shared_ptr<RScmResource> currentResource
+    std::shared_ptr<RScmResource> referenceResource,
+    std::shared_ptr<RScmResource> currentResource
   )
     : MeshBatch()
     , mStaticVertexBuffer()

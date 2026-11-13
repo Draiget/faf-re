@@ -1,7 +1,7 @@
 #pragma once
 
 #include "gpg/core/utils/NonCopyable.h"
-#include "boost/shared_ptr.h"
+#include <memory>
 #include "legacy/containers/Vector.h"
 
 namespace gpg::gal
@@ -35,7 +35,7 @@ namespace gpg::gal
      * What it does:
      * Has the active device build the effect `context` describes.
      */
-    static boost::shared_ptr<Effect> Create(const EffectContext& context);
+    static std::shared_ptr<Effect> Create(const EffectContext& context);
 
     /**
      * Address: 0x00941590 (FUN_00941590)
@@ -61,7 +61,7 @@ namespace gpg::gal
      * What it does:
      * Appends every technique the device can run to `outTechniques`.
      */
-    virtual void GetTechniques(fa::vector<boost::shared_ptr<EffectTechnique>>& outTechniques) = 0;
+    virtual void GetTechniques(fa::vector<std::shared_ptr<EffectTechnique>>& outTechniques) = 0;
 
     /**
      * Slot: 3
@@ -70,7 +70,7 @@ namespace gpg::gal
      * The variable (effect parameter) called `name`; throws when there is
      * none.
      */
-    virtual boost::shared_ptr<EffectVariable> GetVariable(const char* name) = 0;
+    virtual std::shared_ptr<EffectVariable> GetVariable(const char* name) = 0;
 
     /**
      * Slot: 4
@@ -78,7 +78,7 @@ namespace gpg::gal
      * What it does:
      * The technique called `name`; throws when there is none.
      */
-    virtual boost::shared_ptr<EffectTechnique> GetTechnique(const char* name) = 0;
+    virtual std::shared_ptr<EffectTechnique> GetTechnique(const char* name) = 0;
 
     /**
      * Slot: 5

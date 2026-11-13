@@ -45,7 +45,7 @@ namespace
 
   void DrawScrollbarQuad(
     moho::CD3DPrimBatcher* const primBatcher,
-    const boost::shared_ptr<moho::CD3DBatchTexture>& texture,
+    const std::shared_ptr<moho::CD3DBatchTexture>& texture,
     const float left,
     const float top,
     const float right,
@@ -218,10 +218,10 @@ moho::CMauiScrollbar::~CMauiScrollbar()
  * thumb-top, thumb-bottom).
  */
 void moho::CMauiScrollbar::SetTextures(
-  const boost::shared_ptr<CD3DBatchTexture>& background,
-  const boost::shared_ptr<CD3DBatchTexture>& thumbMiddle,
-  const boost::shared_ptr<CD3DBatchTexture>& thumbTop,
-  const boost::shared_ptr<CD3DBatchTexture>& thumbBottom
+  const std::shared_ptr<CD3DBatchTexture>& background,
+  const std::shared_ptr<CD3DBatchTexture>& thumbMiddle,
+  const std::shared_ptr<CD3DBatchTexture>& thumbTop,
+  const std::shared_ptr<CD3DBatchTexture>& thumbBottom
 )
 {
 
@@ -580,7 +580,7 @@ int moho::cfunc_CMauiScrollbarSetNewTexturesL(
   auto scrollbarObject = LuaPlus::LuaObject(LuaPlus::LuaStackObject(state, 1));
   CMauiScrollbar* const scrollbar = SCR_FromLua_CMauiScrollbar(scrollbarObject, state);
 
-  boost::shared_ptr<CD3DBatchTexture> backgroundTexture{};
+  std::shared_ptr<CD3DBatchTexture> backgroundTexture{};
   if (lua_type(state->m_state, 2) != LUA_TNIL) {
     LuaPlus::LuaStackObject textureArg(state, 2);
     const char* texturePath = lua_tostring(state->m_state, 2);
@@ -596,7 +596,7 @@ int moho::cfunc_CMauiScrollbarSetNewTexturesL(
     }
   }
 
-  boost::shared_ptr<CD3DBatchTexture> thumbMiddleTexture{};
+  std::shared_ptr<CD3DBatchTexture> thumbMiddleTexture{};
   if (lua_type(state->m_state, 3) != LUA_TNIL) {
     LuaPlus::LuaStackObject textureArg(state, 3);
     const char* texturePath = lua_tostring(state->m_state, 3);
@@ -612,7 +612,7 @@ int moho::cfunc_CMauiScrollbarSetNewTexturesL(
     }
   }
 
-  boost::shared_ptr<CD3DBatchTexture> thumbTopTexture{};
+  std::shared_ptr<CD3DBatchTexture> thumbTopTexture{};
   if (lua_type(state->m_state, 4) != LUA_TNIL) {
     LuaPlus::LuaStackObject textureArg(state, 4);
     const char* texturePath = lua_tostring(state->m_state, 4);
@@ -628,7 +628,7 @@ int moho::cfunc_CMauiScrollbarSetNewTexturesL(
     }
   }
 
-  boost::shared_ptr<CD3DBatchTexture> thumbBottomTexture{};
+  std::shared_ptr<CD3DBatchTexture> thumbBottomTexture{};
   if (lua_type(state->m_state, 5) != LUA_TNIL) {
     LuaPlus::LuaStackObject textureArg(state, 5);
     const char* texturePath = lua_tostring(state->m_state, 5);

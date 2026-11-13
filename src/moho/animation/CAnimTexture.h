@@ -15,7 +15,7 @@ namespace moho
   class CAnimTexture final : public CountedObject
   {
   public:
-    using FrameRef = boost::shared_ptr<ID3DTextureSheet>;
+    using FrameRef = std::shared_ptr<ID3DTextureSheet>;
 
     /**
      * Address: 0x00422D20 (FUN_00422D20)

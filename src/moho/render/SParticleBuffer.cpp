@@ -213,7 +213,7 @@ namespace moho
   }
 
   void ParticleBuffer::RenderInstances(
-    const boost::shared_ptr<gpg::gal::VertexBuffer>& instances,
+    const std::shared_ptr<gpg::gal::VertexBuffer>& instances,
     const int count,
     const int startIndex
   )
@@ -266,7 +266,7 @@ namespace moho
 
     auto* const device = deviceBase;
 
-    boost::shared_ptr<gpg::gal::VertexFormat> vertexFormat;
+    std::shared_ptr<gpg::gal::VertexFormat> vertexFormat;
     vertexFormat = device->CreateVertexFormat(19U);
     mVertexFormat = vertexFormat;
 
@@ -276,7 +276,7 @@ namespace moho
     quadVertexContext.vertexCount_ = 4U;
     quadVertexContext.stride_ = 8U;
 
-    boost::shared_ptr<gpg::gal::VertexBuffer> quadVertexBuffer;
+    std::shared_ptr<gpg::gal::VertexBuffer> quadVertexBuffer;
     quadVertexBuffer = device->CreateVertexBuffer(&quadVertexContext);
     mQuadVertexBuffer = quadVertexBuffer;
 
@@ -295,7 +295,7 @@ namespace moho
     instanceVertexContext.vertexCount_ = static_cast<unsigned int>(mMaxParticles);
     instanceVertexContext.stride_ = sizeof(Instanced);
 
-    boost::shared_ptr<gpg::gal::VertexBuffer> instanceVertexBuffer;
+    std::shared_ptr<gpg::gal::VertexBuffer> instanceVertexBuffer;
     instanceVertexBuffer = device->CreateVertexBuffer(&instanceVertexContext);
     mInstanceVertexBuffer = instanceVertexBuffer;
     // Engine change (ren_CopyWrittenOnly): each particle is written once at its birth, after the last
@@ -309,7 +309,7 @@ namespace moho
     indexContext.format_ = 1U;
     indexContext.size_ = 6U;
 
-    boost::shared_ptr<gpg::gal::IndexBuffer> indexBuffer;
+    std::shared_ptr<gpg::gal::IndexBuffer> indexBuffer;
     indexBuffer = device->CreateIndexBuffer(&indexContext);
     mQuadIndexBuffer = indexBuffer;
 

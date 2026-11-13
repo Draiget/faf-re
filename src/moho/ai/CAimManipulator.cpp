@@ -668,7 +668,7 @@ moho::CAimManipulator::CAimManipulator(
   }
 
   // Read the owner actor skeleton (RAII shared_ptr; released at scope end).
-  const boost::shared_ptr<const CAniSkel> skeleton = ownerUnit->AniActor->GetSkeleton();
+  const std::shared_ptr<const CAniSkel> skeleton = ownerUnit->AniActor->GetSkeleton();
   const CAniSkel* const skel = skeleton.get();
 
   // Register the two watched aim bones, then pick the muzzle bone (muzzle, then

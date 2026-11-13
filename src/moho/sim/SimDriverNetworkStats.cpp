@@ -277,7 +277,7 @@ void CSimDriver::DrawNetworkStatsPanel(
 
   // ---- Backdrop quad (semi-transparent black over a white texture). 0x0073EC14..0x0073ED81.
   {
-    const boost::shared_ptr<CD3DBatchTexture> whiteTex = CD3DBatchTexture::FromSolidColor(0xFFFFFFFFu); // 0x0073EC14
+    const std::shared_ptr<CD3DBatchTexture> whiteTex = CD3DBatchTexture::FromSolidColor(0xFFFFFFFFu);   // 0x0073EC14
     batcher->SetTexture(whiteTex);                                                                      // 0x0073EC29
 
     constexpr std::uint32_t kBackdropColor = 0x80000000u; // 0x0073EC85
@@ -359,7 +359,7 @@ void CSimDriver::DrawNetworkStatsPanel(
 
   // ---- Border rectangle: 4 white edges over a white texture. 0x0073F0B2..0x0073F365.
   {
-    const boost::shared_ptr<CD3DBatchTexture> whiteTex = CD3DBatchTexture::FromSolidColor(0xFFFFFFFFu); // 0x0073F0BE
+    const std::shared_ptr<CD3DBatchTexture> whiteTex = CD3DBatchTexture::FromSolidColor(0xFFFFFFFFu);   // 0x0073F0BE
     batcher->SetTexture(whiteTex);                                                                      // 0x0073F0D3
 
     constexpr std::uint32_t kBorderColor = 0xFFFFFFFFu; // esi == 0xFFFFFFFF (0x0073F0B2)

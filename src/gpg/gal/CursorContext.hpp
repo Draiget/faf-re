@@ -3,7 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 
-#include "boost/shared_ptr.h"
+#include <memory>
 #include "gpg/gal/Texture.hpp"
 #include "platform/Platform.h"
 
@@ -38,7 +38,7 @@ namespace gpg::gal
      * binary keeps the body but nothing calls it; the hotspot's declared
      * type is not observable, `POINT` has its layout.
      */
-    CursorContext(const POINT& hotspot, boost::shared_ptr<Texture> texture);
+    CursorContext(const POINT& hotspot, std::shared_ptr<Texture> texture);
 
     /**
      * Address: 0x0093EE60 (FUN_0093EE60, __imp_??1CursorContext@gal@gpg@@UAE@XZ)
@@ -52,7 +52,7 @@ namespace gpg::gal
   public:
     std::int32_t hotspotX_ = 0;          // +0x04
     std::int32_t hotspotY_ = 0;          // +0x08
-    boost::shared_ptr<Texture> texture_; // +0x0C
+    std::shared_ptr<Texture> texture_;   // +0x0C
   };
 
   static_assert(offsetof(CursorContext, hotspotX_) == 0x04, "CursorContext::hotspotX_ offset must be 0x04");

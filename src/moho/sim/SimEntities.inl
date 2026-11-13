@@ -213,7 +213,7 @@ Unit* Sim::TransferUnit(
       if (newUnit->AiTransport) {
         // Resolve the attach bone's name and fire the child's OnTransportAttach
         // script, matching the transport attach path.
-        const boost::shared_ptr<const CAniSkel> skeleton = newUnit->AniActor->GetSkeleton();
+        const std::shared_ptr<const CAniSkel> skeleton = newUnit->AniActor->GetSkeleton();
         const CAniSkel* const skel = skeleton.get();
         const char* boneName = nullptr;
         if (skel) {

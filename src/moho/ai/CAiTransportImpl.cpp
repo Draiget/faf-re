@@ -311,7 +311,7 @@ namespace
 
   [[nodiscard]] const CAniSkel* ResolveUnitSkeleton(
     const Unit* const unit,
-    boost::shared_ptr<const CAniSkel>& holdSkel
+    std::shared_ptr<const CAniSkel>& holdSkel
   )
   {
     holdSkel = {};
@@ -328,7 +328,7 @@ namespace
     const unsigned int boneIndex
   )
   {
-    boost::shared_ptr<const CAniSkel> holdSkel{};
+    std::shared_ptr<const CAniSkel> holdSkel{};
     const CAniSkel* const skeleton = ResolveUnitSkeleton(unit, holdSkel);
     if (!skeleton) {
       return nullptr;
@@ -983,7 +983,7 @@ void CAiTransportImpl::SetUpAttachPoints()
     return;
   }
 
-  const boost::shared_ptr<const CAniSkel> skeletonHandle = mUnit->AniActor->GetSkeleton();
+  const std::shared_ptr<const CAniSkel> skeletonHandle = mUnit->AniActor->GetSkeleton();
   const CAniSkel* const skeleton = skeletonHandle.get();
   if (!skeleton) {
     return;
@@ -1078,7 +1078,7 @@ int CAiTransportImpl::GetBestAttachPoint(
   // the one the carried unit hangs by (`SEntAttachInfo::mChildBoneIndex`), so
   // it has to come out of the carried unit's own skeleton; reading the
   // transport's returned a bone index that means nothing on the passenger.
-  boost::shared_ptr<const CAniSkel> holdSkel{};
+  std::shared_ptr<const CAniSkel> holdSkel{};
   const CAniSkel* const skeleton = ResolveUnitSkeleton(unit, holdSkel);
   const int attachPointIndex = skeleton ? skeleton->FindBoneIndex("AttachPoint") : -1;
 

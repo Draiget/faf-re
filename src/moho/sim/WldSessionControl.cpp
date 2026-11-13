@@ -301,7 +301,7 @@ namespace moho
     struct SEarlySimStart
     {
       ISTIDriver* driver = nullptr;
-      boost::shared_ptr<LaunchInfoBase> launchClone;
+      std::shared_ptr<LaunchInfoBase> launchClone;
       std::string language; // the launch info's, checked against the session's once that exists
     };
     SEarlySimStart sEarlySim;
@@ -370,9 +370,9 @@ namespace moho
       launchInfo->mLanguage.assign_owned(language);
 
       if (!sessionInfo->mIsMultiplayer && !sessionInfo->mIsReplay) {
-        boost::shared_ptr<void> createdLaunchInfo;
+        std::shared_ptr<void> createdLaunchInfo;
         launchInfo->Create(createdLaunchInfo);
-        sEarlySim.launchClone = boost::static_pointer_cast<LaunchInfoBase>(createdLaunchInfo);
+        sEarlySim.launchClone = std::static_pointer_cast<LaunchInfoBase>(createdLaunchInfo);
         createdLaunchInfo.reset();
       }
 
@@ -565,10 +565,10 @@ namespace moho
         if (!wldSession->IsMultiplayer && !wldSession->IsReplay) {
           // Single player: the session takes a shared owner on a fresh clone of
           // the launch info, which is what a mid-game save serializes.
-          boost::shared_ptr<void> createdLaunchInfo;
+          std::shared_ptr<void> createdLaunchInfo;
           launchInfo->Create(createdLaunchInfo);
 
-          wldSession->mLaunchInfo = boost::static_pointer_cast<LaunchInfoBase>(createdLaunchInfo);
+          wldSession->mLaunchInfo = std::static_pointer_cast<LaunchInfoBase>(createdLaunchInfo);
           createdLaunchInfo.reset();
         }
 

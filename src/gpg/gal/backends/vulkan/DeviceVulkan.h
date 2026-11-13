@@ -33,8 +33,8 @@
 #include "ResourcesVulkan.h"
 #include "VulkanCore.h"
 #include "GpuDrivenVulkan.h"
-#include "boost/shared_ptr.h"
-#include "boost/weak_ptr.h"
+#include <memory>
+#include <memory>
 #include "gpg/core/streams/MemBufferStream.h"
 #include "gpg/gal/Device.hpp"
 #include "gpg/gal/DeviceContext.hpp"
@@ -70,40 +70,39 @@ namespace gpg::gal
     void GetModesForAdapter(fa::vector<HeadAdapterMode>& outModes, int adapterIndex) override;
     OutputContext* GetHeadOutputContext(unsigned int headIndex) override;
     const OutputContext* GetHeadOutputContext(unsigned int headIndex) const override;
-    boost::shared_ptr<PipelineState> GetPipelineState() override;
-    boost::shared_ptr<Effect> CreateEffect(const EffectContext& context) override;
-    boost::shared_ptr<Texture> CreateTexture(const TextureContext* context) override;
-    boost::shared_ptr<RenderTarget> CreateRenderTarget(const RenderTargetContext* context) override;
-    boost::shared_ptr<CubeRenderTarget> CreateCubeRenderTarget(const CubeRenderTargetContext* context) override;
-    boost::shared_ptr<DepthStencilTarget> CreateDepthStencilTarget(const DepthStencilTargetContext* context) override;
-    boost::shared_ptr<VertexFormat> CreateVertexFormat(std::uint32_t formatCode) override;
-    boost::shared_ptr<VertexBuffer> CreateVertexBuffer(const VertexBufferContext* context) override;
-    boost::shared_ptr<IndexBuffer> CreateIndexBuffer(const IndexBufferContext* context) override;
+    std::shared_ptr<PipelineState> GetPipelineState() override;
+    std::shared_ptr<Effect> CreateEffect(const EffectContext& context) override;
+    std::shared_ptr<Texture> CreateTexture(const TextureContext* context) override;
+    std::shared_ptr<RenderTarget> CreateRenderTarget(const RenderTargetContext* context) override;
+    std::shared_ptr<CubeRenderTarget> CreateCubeRenderTarget(const CubeRenderTargetContext* context) override;
+    std::shared_ptr<DepthStencilTarget> CreateDepthStencilTarget(const DepthStencilTargetContext* context) override;
+    std::shared_ptr<VertexFormat> CreateVertexFormat(std::uint32_t formatCode) override;
+    std::shared_ptr<VertexBuffer> CreateVertexBuffer(const VertexBufferContext* context) override;
+    std::shared_ptr<IndexBuffer> CreateIndexBuffer(const IndexBufferContext* context) override;
     void GetRenderTargetData(
-      const boost::shared_ptr<RenderTarget>& source,
-      const boost::shared_ptr<Texture>& destination
+      const std::shared_ptr<RenderTarget>& source,
+      const std::shared_ptr<Texture>& destination
     ) override;
     void StretchRect(
-      const boost::shared_ptr<RenderTarget>& source,
-      const boost::shared_ptr<RenderTarget>& destination,
+      const std::shared_ptr<RenderTarget>& source,
+      const std::shared_ptr<RenderTarget>& destination,
       const RECT* sourceRect,
       const RECT* destinationRect
     ) override;
     void UpdateSurface(
-      const boost::shared_ptr<Texture>& source,
-      const boost::shared_ptr<Texture>& destination,
+      const std::shared_ptr<Texture>& source,
+      const std::shared_ptr<Texture>& destination,
       const RECT* sourceRect,
       const RECT* destinationRect
     ) override;
-    void
-    SaveCubeRenderTarget(const boost::shared_ptr<CubeRenderTarget>& cubeTarget, const fa::string& filePath) override;
+    void SaveCubeRenderTarget(const std::shared_ptr<CubeRenderTarget>& cubeTarget, const fa::string& filePath) override;
     void SaveRenderTarget(
-      const boost::shared_ptr<RenderTarget>& renderTarget,
+      const std::shared_ptr<RenderTarget>& renderTarget,
       const fa::string& filePath,
       int fileFormat
     ) override;
     void SaveTexture(
-      const boost::shared_ptr<Texture>& texture,
+      const std::shared_ptr<Texture>& texture,
       const fa::string& filePath,
       int fileFormat,
       gpg::MemBuffer<char>* outBuffer
@@ -115,8 +114,8 @@ namespace gpg::gal
       std::uint32_t* outWidth,
       int* outHeight
     ) override;
-    boost::weak_ptr<void>*
-    Func7(boost::weak_ptr<void>* outWeakHandle, boost::shared_ptr<void> temporarySharedHandle) override;
+    std::weak_ptr<void>*
+    Func7(std::weak_ptr<void>* outWeakHandle, std::shared_ptr<void> temporarySharedHandle) override;
     void Reset(DeviceContext* context) override;
     void Reset() override;
     int TestCooperativeLevel() override;
@@ -138,14 +137,14 @@ namespace gpg::gal
       int stencil
     ) override;
     void ClearTextures() override;
-    void SetVertexDeclaration(boost::shared_ptr<VertexFormat> vertexFormat) override;
+    void SetVertexDeclaration(std::shared_ptr<VertexFormat> vertexFormat) override;
     void SetVertexBuffer(
       std::uint32_t streamSlot,
-      boost::shared_ptr<VertexBuffer> vertexBuffer,
+      std::shared_ptr<VertexBuffer> vertexBuffer,
       int streamFrequencyToken,
       int startVertex
     ) override;
-    void SetBufferIndices(boost::shared_ptr<IndexBuffer> indexBuffer) override;
+    void SetBufferIndices(std::shared_ptr<IndexBuffer> indexBuffer) override;
     void SetFogState(bool enable, const Matrix* projection, float fogStart, float fogEnd, int fogColor) override;
     void SetWireframeState(bool enabled) override;
     void SetColorWriteState(bool writeColor, bool writeAlpha) override;
@@ -158,9 +157,9 @@ namespace gpg::gal
     // GPU-driven additions (GpuDrivenVulkan.cpp)
     [[nodiscard]] std::uint32_t GetGpuDrivenFeatures() const override;
     [[nodiscard]] std::uint32_t GetGpuDrivenVerified() const override;
-    boost::shared_ptr<GpuBuffer> CreateGpuBuffer(const GpuBufferDesc& desc) override;
+    std::shared_ptr<GpuBuffer> CreateGpuBuffer(const GpuBufferDesc& desc) override;
     void UpdateGpuBuffer(GpuBuffer& buffer, std::uint32_t firstElement, std::uint32_t count, const void* data) override;
-    boost::shared_ptr<GpuProgram> CreateGpuProgram(const GpuProgramDesc& desc) override;
+    std::shared_ptr<GpuProgram> CreateGpuProgram(const GpuProgramDesc& desc) override;
     void DrawGpuProgram(const GpuDrawCall& call) override;
     void DispatchGpuProgram(const GpuDispatch& dispatch) override;
     void BeginProfileRegion(std::uint32_t region) override;
@@ -186,7 +185,7 @@ namespace gpg::gal
     bool SetRayInstances(
       const RayInstance* instances,
       std::uint32_t count,
-      const boost::shared_ptr<Texture>* textures,
+      const std::shared_ptr<Texture>* textures,
       std::uint32_t textureCount
     ) override;
 
@@ -477,7 +476,7 @@ namespace gpg::gal
     // ---- heads ---------------------------------------------------------------
     std::vector<SwapChain> mSwapChains;
     std::vector<OutputContext> mHeadOutputContexts;
-    boost::shared_ptr<PipelineStateVulkan> mPipelineState;
+    std::shared_ptr<PipelineStateVulkan> mPipelineState;
     WindowsCursor mCursor;
 
     // ---- state ---------------------------------------------------------------
@@ -489,14 +488,14 @@ namespace gpg::gal
     std::uint32_t mBoundFormat = 0xFFFFFFFFU;
     struct StreamBinding
     {
-      boost::shared_ptr<VertexBuffer> buffer;
+      std::shared_ptr<VertexBuffer> buffer;
       std::uint32_t offset = 0;
       std::uint32_t stride = 0;
     };
     StreamBinding mStreams[16];
     std::int32_t mStreamFrequencies[16]{};
     std::uint32_t mDrawInstanceLimit = ~0U; ///< set by PrepareDraw: the instances the bound instance streams hold
-    boost::shared_ptr<IndexBuffer> mIndexBuffer;
+    std::shared_ptr<IndexBuffer> mIndexBuffer;
     bool mPreparingDraw = false;
 
     // Dynamic rendering: what the open rendering scope draws into.
@@ -553,7 +552,7 @@ namespace gpg::gal
       RayBuffer buffer;
       RayRange range;
       VkDescriptorSet set = VK_NULL_HANDLE;
-      std::vector<boost::shared_ptr<Texture>> textures; // a retired set's alpha textures
+      std::vector<std::shared_ptr<Texture>> textures; // a retired set's alpha textures
     };
     [[nodiscard]] bool CreateRayBuffer(VkDeviceSize bytes, VkBufferUsageFlags usage, bool host, RayBuffer& out);
     void DestroyRayBuffer(RayBuffer& buffer) noexcept;
@@ -585,8 +584,8 @@ namespace gpg::gal
     std::vector<RayBuffer> mRayAttributesOld; // grown out of; retired once set 2 no longer points at them
     VkDeviceSize mRayAttributesUsed = 0U;
     std::vector<std::uint32_t> mRayRecords;
-    std::vector<boost::shared_ptr<Texture>> mRayTextures;
-    std::vector<boost::shared_ptr<Texture>> mRaySetTextures;
+    std::vector<std::shared_ptr<Texture>> mRayTextures;
+    std::vector<std::shared_ptr<Texture>> mRaySetTextures;
     VkSampler mRaySampler = VK_NULL_HANDLE;
     RayInputChunk* mRayRecordsChunk = nullptr;
     bool AppendRayAttributes(const void* data, VkDeviceSize bytes, VkDeviceSize& offset);

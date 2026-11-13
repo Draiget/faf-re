@@ -87,7 +87,7 @@ namespace moho
     const Wm3::Quatf& orientationArg,
     const std::uint32_t colorArg,
     const gpg::Rect2f& outputRectArg,
-    const boost::shared_ptr<ID3DTextureSheet>& outputSheetArg
+    const std::shared_ptr<ID3DTextureSheet>& outputSheetArg
   )
     : requestId(requestIdArg)
     , camera(cameraArg)

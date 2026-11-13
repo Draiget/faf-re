@@ -392,7 +392,7 @@ namespace
     const moho::CSndParams& params
   )
   {
-    boost::shared_ptr<moho::AudioEngine> resolvedEngine;
+    std::shared_ptr<moho::AudioEngine> resolvedEngine;
     return params.GetEngine(&resolvedEngine)->get() != nullptr;
   }
 

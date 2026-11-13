@@ -19,7 +19,7 @@
 #include <string>
 #include <vector>
 
-#include "boost/shared_ptr.h"
+#include <memory>
 
 namespace gpg::gal
 {
@@ -90,9 +90,9 @@ namespace moho
 
     gpg::gal::Device* mDevice = nullptr;
     bool mSupported = false;
-    boost::shared_ptr<gpg::gal::GpuProgram> mCompute;
-    boost::shared_ptr<gpg::gal::GpuProgram> mComposite;
-    boost::shared_ptr<gpg::gal::GpuBuffer> mTerms;
+    std::shared_ptr<gpg::gal::GpuProgram> mCompute;
+    std::shared_ptr<gpg::gal::GpuProgram> mComposite;
+    std::shared_ptr<gpg::gal::GpuBuffer> mTerms;
     std::uint32_t mTermCapacity = 0U;
     std::vector<Light> mLights;
     int mLastTick = -1;

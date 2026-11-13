@@ -1,7 +1,7 @@
 ﻿#pragma once
 #include <cstddef>
 
-#include "boost/weak_ptr.h"
+#include <memory>
 #include "gpg/core/algorithms/MD5.h"
 #include "gpg/core/containers/DList.h"
 #include "gpg/core/streams/PipeStream.h"

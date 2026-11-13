@@ -7,7 +7,7 @@
 #include <cstddef>
 #include <cstdint>
 
-#include "boost/shared_ptr.h"
+#include <memory>
 #include "gpg/core/containers/BitArray2D.h"
 #include "gpg/core/containers/Rect2.h"
 
@@ -308,7 +308,7 @@ namespace gpg::HaStar
 
   struct ClusterCache
   {
-    boost::shared_ptr<ClusterCacheImpl> mImpl;
+    std::shared_ptr<ClusterCacheImpl> mImpl;
 
     /**
      * Address: 0x00931FB0 (FUN_00931FB0, ??1WeakPtr_ClusterCache@Moho@@QAE@@Z)

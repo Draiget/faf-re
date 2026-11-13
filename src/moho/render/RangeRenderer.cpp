@@ -78,7 +78,7 @@ namespace
    * Resolves one `"range"` D3D effect from device resources and returns
    * its base GAL effect handle.
    */
-  [[nodiscard, maybe_unused]] boost::shared_ptr<gpg::gal::Effect> AcquireRangeRingBaseEffect()
+  [[nodiscard, maybe_unused]] std::shared_ptr<gpg::gal::Effect> AcquireRangeRingBaseEffect()
   {
     moho::ID3DDeviceResources* const resources = moho::D3D_GetDevice()->GetResources();
     moho::CD3DEffect* const effect = resources->FindEffect("range");
@@ -291,10 +291,10 @@ namespace
   {
     auto* const device = gpg::gal::Device::GetInstance();
 
-    boost::shared_ptr<gpg::gal::Effect> effect = AcquireRangeRingBaseEffect();
-    boost::shared_ptr<gpg::gal::EffectTechnique> castTechnique = effect->GetTechnique("Cast");
-    boost::shared_ptr<gpg::gal::EffectVariable> viewMatrixVar = effect->GetVariable("viewMatrix");
-    boost::shared_ptr<gpg::gal::EffectVariable> projMatrixVar = effect->GetVariable("projMatrix");
+    std::shared_ptr<gpg::gal::Effect> effect = AcquireRangeRingBaseEffect();
+    std::shared_ptr<gpg::gal::EffectTechnique> castTechnique = effect->GetTechnique("Cast");
+    std::shared_ptr<gpg::gal::EffectVariable> viewMatrixVar = effect->GetVariable("viewMatrix");
+    std::shared_ptr<gpg::gal::EffectVariable> projMatrixVar = effect->GetVariable("projMatrix");
 
     // `range.fx` declares both `viewMatrix` and `projMatrix` as its own globals,
     // so both have to be pushed - the device's matrices are a different effect's

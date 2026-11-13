@@ -4,7 +4,7 @@
 #include <cstddef>
 #include <cstdint>
 
-#include "boost/shared_ptr.h"
+#include <memory>
 #include "gpg/core/reflection/Reflection.h"
 #include "moho/render/camera/VTransform.h"
 #include "moho/sim/SimBlockLane.h"
@@ -365,7 +365,7 @@ namespace moho
      * What it does:
      * Initializes animation-pose state from skeleton + scalar pose factor.
      */
-    CAniPose(boost::shared_ptr<const CAniSkel> skeleton, float scale);
+    CAniPose(std::shared_ptr<const CAniSkel> skeleton, float scale);
 
     /**
      * Address: 0x0054B290 (FUN_0054B290, ??0CAniPose@Moho@@QAE@ABV01@@Z)
@@ -442,7 +442,7 @@ namespace moho
      * Returns a retained copy of this pose's skeleton shared handle.
      */
     [[nodiscard]]
-    boost::shared_ptr<const CAniSkel> GetSkeleton() const;
+    std::shared_ptr<const CAniSkel> GetSkeleton() const;
 
     /**
      * Address: 0x0054F380 (FUN_0054F380, Moho::CAniPose::MemberDeserialize)
@@ -477,7 +477,7 @@ namespace moho
     void MarkBoneDirty(int idx);
 
   public:
-    boost::shared_ptr<const CAniSkel> mSkeleton; // +0x00
+    std::shared_ptr<const CAniSkel> mSkeleton;   // +0x00
     float mScale;                                // +0x08
     VTransform mLocalTransform;                  // +0x0C
     CAniPoseBoneArray mBones;                    // +0x28

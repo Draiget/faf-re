@@ -23,7 +23,7 @@
 #include <d3d9.h>
 #endif
 
-#include "boost/shared_ptr.h"
+#include <memory>
 #include "gpg/core/containers/String.h"
 #include "gpg/core/diagnostics/BuildInfo.h"
 #include "gpg/gal/Device.hpp"

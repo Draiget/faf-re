@@ -75,7 +75,7 @@ namespace gpg::gal
    * Creates vertex format 15 on the active device, or 16 (the one with the
    * second per-vertex position stream) when `layoutVariant` is set.
    */
-  boost::shared_ptr<VertexFormat> Float16HardwareVertexFormatterD3D9::CreateVertexFormat(
+  std::shared_ptr<VertexFormat> Float16HardwareVertexFormatterD3D9::CreateVertexFormat(
     const std::int32_t layoutVariant
   )
   {

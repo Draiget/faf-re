@@ -2,7 +2,7 @@
 #include <cstddef>
 #include <cstdint>
 
-#include "boost/weak_ptr.h"
+#include <memory>
 #include "Broadcaster.h"
 #include "gpg/core/containers/FastVector.h"
 #include "legacy/containers/Vector.h"

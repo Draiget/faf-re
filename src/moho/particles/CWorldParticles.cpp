@@ -1333,7 +1333,7 @@ namespace moho
     GeomCamera3* const camera,
     const int tick,
     const float frameDelta,
-    const boost::shared_ptr<ID3DRenderTarget>& backgroundTexture
+    const std::shared_ptr<ID3DRenderTarget>& backgroundTexture
   )
   {
     Init();

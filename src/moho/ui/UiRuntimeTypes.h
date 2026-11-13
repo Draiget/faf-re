@@ -6,7 +6,7 @@
 #include <string>
 
 #include <memory>
-#include "boost/shared_ptr.h"
+#include <memory>
 #include "gpg/core/containers/FastVector.h"
 #include "gpg/core/containers/String.h"
 #include "gpg/core/utils/BoostWrappers.h"
@@ -308,7 +308,7 @@ namespace moho
     /// and never writes the allocator word at +0x38, and the `push_back` it
     /// grows through (0x004A5C60, `lea edi,[ebx+38h]` at 0x0086A7AF) finds
     /// first/last/end at +4/+8/+0xC of the object.
-    fa::vector<boost::shared_ptr<PrefetchData>> mPrefetchData; // +0x38
+    fa::vector<std::shared_ptr<PrefetchData>> mPrefetchData; // +0x38
   };
   static_assert(
     offsetof(CLuaWldUIProvider, mPrefetchData) == 0x38,
@@ -852,7 +852,7 @@ namespace moho
      */
     void ClearBuildPreviewCache();
 
-    [[nodiscard]] boost::shared_ptr<MeshInstance> CreateBuildPreviewMeshInstance(RUnitBlueprint* blueprint);
+    [[nodiscard]] std::shared_ptr<MeshInstance> CreateBuildPreviewMeshInstance(RUnitBlueprint* blueprint);
 
     /**
      * Address: 0x00854130 (FUN_00854130, sub_854130)
@@ -913,14 +913,14 @@ namespace moho
     // 0x00852C75 and then divides `[+0x64,+0x68)` by 204 (0x00852CD4,
     // sizeof(RMeshBlueprintLOD)) to test whether the LOD chain is empty.
     RMeshBlueprint* mActiveBuildMesh = nullptr;          // +0x04
-    fa::vector<boost::shared_ptr<MeshInstance>> mMeshes; // +0x08
+    fa::vector<std::shared_ptr<MeshInstance>> mMeshes;   // +0x08
     fa::vector<RUnitBlueprint*> mBlueprints;             // +0x18
     // The binary's "preview positions" lane is an ordinary MSVC8 std::map
     // keyed by the order's command id: node {left,parent,right} at 0x00..0x0B,
     // pair<const CmdId, shared_ptr<MeshInstance>> at 0x0C, _Color at 0x18 and
     // _Isnil at 0x19 - exactly fa::map's node shape.
-    fa::map<CmdId, boost::shared_ptr<MeshInstance>> mPreviewPositions; // +0x28
-    boost::shared_ptr<MeshMaterial> mUnitPlaceMaterial;                // +0x34
+    fa::map<CmdId, std::shared_ptr<MeshInstance>> mPreviewPositions;   // +0x28
+    std::shared_ptr<MeshMaterial> mUnitPlaceMaterial;                  // +0x34
     CWldTerrainDecal* mDecal = nullptr;                                // +0x3C
     // Command *mode*, not caps: FUN_00852C10 copies `CommandModeData::mMode`
     // (its +0x00 lane) here at 0x00852C9C and gates the whole preview on it
@@ -1224,7 +1224,7 @@ namespace moho
     /// The strong reference this drag holds on the session's command graph.
     /// The constructor (0x00823FE0) builds it in place: `GetCommandGraph`'s
     /// hidden return buffer is `lea ecx,[esi+14h]`.
-    boost::shared_ptr<UICommandGraph> mGraph; // +0x14
+    std::shared_ptr<UICommandGraph> mGraph; // +0x14
   };
 
   static_assert(offsetof(UICommandDragger, mCam) == 0xC, "UICommandDragger::mCam offset must be 0xC");
@@ -1725,9 +1725,9 @@ namespace moho
     // runs ~CScriptObject, which is plain reverse-declaration destruction.
 
     /// The texture the cursor shows now.
-    boost::shared_ptr<RD3DTextureResource> mTexture; // +0x34
+    std::shared_ptr<RD3DTextureResource> mTexture; // +0x34
     /// The texture `ResetToDefault` goes back to.
-    boost::shared_ptr<RD3DTextureResource> mDefaultTexture; // +0x3C
+    std::shared_ptr<RD3DTextureResource> mDefaultTexture; // +0x3C
     /// The texture, hotspot or visibility changed since `MAUI_UpdateCursor`
     /// last pushed them to the device; it clears this when it does.
     bool mNeedsUpdate;             // +0x44
@@ -2623,7 +2623,7 @@ namespace moho
      * Imports `/lua/maui/frame.lua`, calls `Frame()`, converts the Lua return
      * payload to a `CMauiFrame*`, and returns it as shared ownership.
      */
-    [[nodiscard]] static boost::shared_ptr<CMauiFrame> Create(LuaPlus::LuaState* state);
+    [[nodiscard]] static std::shared_ptr<CMauiFrame> Create(LuaPlus::LuaState* state);
 
     /**
      * Address: 0x00796680 (FUN_00796680, Moho::CMauiFrame::GetTopmostDepth)
@@ -2714,7 +2714,7 @@ namespace moho
     // 0x11C and every access through the old `CMauiFrame` overlay -- which described
     // exactly this run -- wrote past the end of the heap block.
     // ---------------------------------------------------------------------
-    boost::weak_ptr<CMauiFrame> mSelfWeak;              // +0x11C
+    std::weak_ptr<CMauiFrame> mSelfWeak;                // +0x11C
     TDatList<CMauiControl, void> mDeletedControlList{}; // +0x124
     CMauiEventMapper* mEventHandler = nullptr;          // +0x12C
     std::int32_t mTargetHead = -1;                      // +0x130
@@ -2820,7 +2820,7 @@ namespace moho
      * What it does:
      * Appends one texture lane to this bitmap texture-batch list.
      */
-    void SetTexture(const boost::shared_ptr<CD3DBatchTexture>& texture);
+    void SetTexture(const std::shared_ptr<CD3DBatchTexture>& texture);
 
     /**
      * Address: 0x00780110 (FUN_00780110, Moho::CMauiBitmap::SetFrame)
@@ -2915,7 +2915,7 @@ namespace moho
     // "HEAP CORRUPTION DETECTED: after Normal block" inside
     // `CMauiBitmap::~CMauiBitmap` via `CMauiFrame::PurgeDeleted`.
     // ---------------------------------------------------------------------
-    fa::vector<boost::shared_ptr<CD3DBatchTexture>> mTextureBatches; // +0x11C
+    fa::vector<std::shared_ptr<CD3DBatchTexture>> mTextureBatches;   // +0x11C
     CScriptLazyVar_float mBitmapWidthLV{};                           // +0x12C
     CScriptLazyVar_float mBitmapHeightLV{};                          // +0x140
     float mU0 = 0.0f;                                                // +0x154
@@ -3443,7 +3443,7 @@ namespace moho
 
     /// Dynamic sheet the thumbnail renderer draws the mesh into and `DoRender`
     /// shows; created by `ID3DDeviceResources::NewDynamicTextureSheet`.
-    boost::shared_ptr<ID3DTextureSheet> mThumbnailSheet; // +0x11C
+    std::shared_ptr<ID3DTextureSheet> mThumbnailSheet; // +0x11C
     /// Set by `SetMesh`, `SetOrientation` and a sheet resize; `Frame` renders
     /// and clears it.
     bool mThumbnailDirty = false;             // +0x124
@@ -3667,10 +3667,10 @@ namespace moho
      * thumb-top, thumb-bottom).
      */
     void SetTextures(
-      const boost::shared_ptr<CD3DBatchTexture>& background,
-      const boost::shared_ptr<CD3DBatchTexture>& thumbMiddle,
-      const boost::shared_ptr<CD3DBatchTexture>& thumbTop,
-      const boost::shared_ptr<CD3DBatchTexture>& thumbBottom
+      const std::shared_ptr<CD3DBatchTexture>& background,
+      const std::shared_ptr<CD3DBatchTexture>& thumbMiddle,
+      const std::shared_ptr<CD3DBatchTexture>& thumbTop,
+      const std::shared_ptr<CD3DBatchTexture>& thumbBottom
     );
 
     /**
@@ -3743,10 +3743,10 @@ namespace moho
     // ---------------------------------------------------------------------
     /// The control this scrollbar scrolls (`SetScrollable`).
     WeakPtr<CMauiControl> mScrollable;                  // +0x124
-    boost::shared_ptr<CD3DBatchTexture> mThumbTop{};    // +0x12C
-    boost::shared_ptr<CD3DBatchTexture> mThumbBottom{}; // +0x134
-    boost::shared_ptr<CD3DBatchTexture> mThumbMiddle{}; // +0x13C
-    boost::shared_ptr<CD3DBatchTexture> mBackground{};  // +0x144
+    std::shared_ptr<CD3DBatchTexture> mThumbTop{};      // +0x12C
+    std::shared_ptr<CD3DBatchTexture> mThumbBottom{};   // +0x134
+    std::shared_ptr<CD3DBatchTexture> mThumbMiddle{};   // +0x13C
+    std::shared_ptr<CD3DBatchTexture> mBackground{};    // +0x144
     float mDragStart = 0.0f;                            // +0x14C
     float mTopAtDragStart = 0.0f;                       // +0x150
     EMauiScrollAxis mAxis{};                            // +0x154
@@ -3939,12 +3939,12 @@ namespace moho
      * lazy-vars from the vertical and horizontal texture dimensions.
      */
     void SetTextures(
-      const boost::shared_ptr<CD3DBatchTexture>& vert,
-      const boost::shared_ptr<CD3DBatchTexture>& horz,
-      const boost::shared_ptr<CD3DBatchTexture>& ul,
-      const boost::shared_ptr<CD3DBatchTexture>& ur,
-      const boost::shared_ptr<CD3DBatchTexture>& ll,
-      const boost::shared_ptr<CD3DBatchTexture>& lr
+      const std::shared_ptr<CD3DBatchTexture>& vert,
+      const std::shared_ptr<CD3DBatchTexture>& horz,
+      const std::shared_ptr<CD3DBatchTexture>& ul,
+      const std::shared_ptr<CD3DBatchTexture>& ur,
+      const std::shared_ptr<CD3DBatchTexture>& ll,
+      const std::shared_ptr<CD3DBatchTexture>& lr
     );
 
     /**
@@ -3972,12 +3972,12 @@ namespace moho
     // 0x11C and every access through the old `CMauiBorder` overlay -- which described
     // exactly this run -- wrote past the end of the heap block.
     // ---------------------------------------------------------------------
-    boost::shared_ptr<CD3DBatchTexture> mTex1;    // +0x11C
-    boost::shared_ptr<CD3DBatchTexture> mTexHorz; // +0x124
-    boost::shared_ptr<CD3DBatchTexture> mTexUL;   // +0x12C
-    boost::shared_ptr<CD3DBatchTexture> mTexUR;   // +0x134
-    boost::shared_ptr<CD3DBatchTexture> mTexLL;   // +0x13C
-    boost::shared_ptr<CD3DBatchTexture> mTexLR;   // +0x144
+    std::shared_ptr<CD3DBatchTexture> mTex1;      // +0x11C
+    std::shared_ptr<CD3DBatchTexture> mTexHorz;   // +0x124
+    std::shared_ptr<CD3DBatchTexture> mTexUL;     // +0x12C
+    std::shared_ptr<CD3DBatchTexture> mTexUR;     // +0x134
+    std::shared_ptr<CD3DBatchTexture> mTexLL;     // +0x13C
+    std::shared_ptr<CD3DBatchTexture> mTexLR;     // +0x144
     CScriptLazyVar_float mBorderWidthLV;          // +0x14C
     CScriptLazyVar_float mBorderHeightLV;         // +0x160
   };
@@ -4089,7 +4089,7 @@ namespace moho
     // old `CUIMapPreview` overlay wrote past the end of the block. This one
     // draws on the loading screen, which is where it showed up.
     // ---------------------------------------------------------------------
-    boost::shared_ptr<ID3DTextureSheet> mTexture; // +0x11C
+    std::shared_ptr<ID3DTextureSheet> mTexture; // +0x11C
   };
 
   static_assert(sizeof(CUIMapPreview) == 0x124, "moho::CUIMapPreview size must be 0x124");
@@ -4450,7 +4450,7 @@ namespace moho
     /// `RenderCommandGraph` takes it (0x0086ED3F) and lets go when Shift comes
     /// up (0x0086ED9E). The session keeps only a weak reference, so this is
     /// what keeps the graph, and the ghost meshes hanging off it, alive.
-    boost::shared_ptr<UICommandGraph> mComGraph; // +0x20C
+    std::shared_ptr<UICommandGraph> mComGraph;   // +0x20C
     CBuildDragPreview mBuildDrag;                // +0x214
     bool mConvertToPatrolCursor = false;         // +0x274
     /// Set on MET_MouseEnter and cleared on MET_MouseExit by `HandleEvent`
@@ -4549,7 +4549,7 @@ namespace moho
    */
   [[nodiscard]] bool MAUI_KeyIsDown(EMauiKeyCode keyCode);
 
-  FAF_RUNTIME_LAYOUT_ASSERT(sizeof(boost::weak_ptr<CMauiFrame>) == 0x8, "boost::weak_ptr<CMauiFrame> size must be 0x8");
+  FAF_RUNTIME_LAYOUT_ASSERT(sizeof(std::weak_ptr<CMauiFrame>) == 0x8, "boost::weak_ptr<CMauiFrame> size must be 0x8");
 
   FAF_RUNTIME_LAYOUT_ASSERT(sizeof(fa::vector<fa::string>) == 0x10, "fa::vector<fa::string> size must be 0x10");
 
@@ -9835,7 +9835,7 @@ namespace moho
    * the MSVC8 per-T template emission symbol shape.
    */
   void PushBackMeshInstanceSharedPtrVector(
-    fa::vector<boost::shared_ptr<MeshInstance>>& destination,
-    const boost::shared_ptr<MeshInstance>& value
+    fa::vector<std::shared_ptr<MeshInstance>>& destination,
+    const std::shared_ptr<MeshInstance>& value
   );
 } // namespace moho

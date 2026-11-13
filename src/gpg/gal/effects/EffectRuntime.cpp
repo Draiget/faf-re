@@ -619,18 +619,18 @@ namespace gpg::gal
   }
 
   void ProgramEffect::GetTechniques(
-    fa::vector<boost::shared_ptr<EffectTechnique>>& outTechniques
+    fa::vector<std::shared_ptr<EffectTechnique>>& outTechniques
   )
   {
     const auto count = static_cast<std::uint32_t>(mProgram->Description().techniques.size());
     for (std::uint32_t technique = 0U; technique < count; ++technique) {
       outTechniques.push_back(
-        boost::shared_ptr<EffectTechnique>(new ProgramEffectTechnique(mProgram, technique, mBinder))
+        std::shared_ptr<EffectTechnique>(new ProgramEffectTechnique(mProgram, technique, mBinder))
       );
     }
   }
 
-  boost::shared_ptr<EffectVariable> ProgramEffect::GetVariable(
+  std::shared_ptr<EffectVariable> ProgramEffect::GetVariable(
     const char* const name
   )
   {
@@ -645,17 +645,17 @@ namespace gpg::gal
         Throw(__LINE__, "invalid effect variable requested: " + std::string(wanted));
       }
     }
-    return boost::shared_ptr<EffectVariable>(new ProgramEffectVariable(mProgram, parameter, name));
+    return std::shared_ptr<EffectVariable>(new ProgramEffectVariable(mProgram, parameter, name));
   }
 
-  boost::shared_ptr<EffectTechnique> ProgramEffect::GetTechnique(
+  std::shared_ptr<EffectTechnique> ProgramEffect::GetTechnique(
     const char* const name
   )
   {
     const auto& techniques = mProgram->Description().techniques;
     for (std::size_t technique = 0U; technique < techniques.size(); ++technique) {
       if (name != nullptr && techniques[technique].name == name) {
-        return boost::shared_ptr<EffectTechnique>(
+        return std::shared_ptr<EffectTechnique>(
           new ProgramEffectTechnique(mProgram, static_cast<std::uint32_t>(technique), mBinder)
         );
       }
@@ -846,14 +846,14 @@ namespace gpg::gal
   }
 
   void ProgramEffectVariable::SetCubeRenderTarget(
-    const boost::shared_ptr<CubeRenderTarget> cubeTarget
+    const std::shared_ptr<CubeRenderTarget> cubeTarget
   )
   {
     static_cast<void>(cubeTarget);
   }
 
   void ProgramEffectVariable::SetRenderTarget(
-    const boost::shared_ptr<RenderTarget> renderTarget
+    const std::shared_ptr<RenderTarget> renderTarget
   )
   {
     RecordStateChange();
@@ -863,7 +863,7 @@ namespace gpg::gal
   }
 
   void ProgramEffectVariable::SetTexture(
-    const boost::shared_ptr<Texture> texture
+    const std::shared_ptr<Texture> texture
   )
   {
     RecordStateChange();

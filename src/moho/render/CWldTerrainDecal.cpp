@@ -579,7 +579,7 @@ namespace moho
    * Samples one animated decal texture for `slot` using binary-equivalent frame
    * phase math and returns one retained texture-sheet handle.
    */
-  boost::shared_ptr<ID3DTextureSheet> CWldTerrainDecal::GetTexture(
+  std::shared_ptr<ID3DTextureSheet> CWldTerrainDecal::GetTexture(
     const int slot,
     const float phaseOffset,
     const int frameSeed

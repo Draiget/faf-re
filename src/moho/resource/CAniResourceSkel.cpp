@@ -27,7 +27,7 @@ namespace moho
    */
   CAniResourceSkel::CAniResourceSkel(
     const fa::string& name,
-    const boost::shared_ptr<const SScmFile>& file
+    const std::shared_ptr<const SScmFile>& file
   )
     : CAniSkel(file)
   {
@@ -54,8 +54,8 @@ namespace moho
   {
     fa::string path;
     archive.ReadString(&path);
-    boost::shared_ptr<const CAniSkel> skeleton;
-    if (const boost::shared_ptr<RScmResource> model = GetModel(path.c_str(), nullptr)) {
+    std::shared_ptr<const CAniSkel> skeleton;
+    if (const std::shared_ptr<RScmResource> model = GetModel(path.c_str(), nullptr)) {
       skeleton = model->GetSkeleton();
     }
     result.SetShared(skeleton, 1u);

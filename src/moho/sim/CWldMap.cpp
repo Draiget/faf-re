@@ -586,7 +586,7 @@ namespace moho
    * display name into this chunk.
    */
   RWldMapPreviewChunk::RWldMapPreviewChunk(
-    boost::shared_ptr<ID3DTextureSheet> textureSheet,
+    std::shared_ptr<ID3DTextureSheet> textureSheet,
     const Wm3::Vector2f& previewSize,
     const char* const previewName
   )
@@ -616,7 +616,7 @@ namespace moho
    * What it does:
    * Returns one retained shared texture-sheet handle for this preview chunk.
    */
-  boost::shared_ptr<ID3DTextureSheet> RWldMapPreviewChunk::GetTextureSheet()
+  std::shared_ptr<ID3DTextureSheet> RWldMapPreviewChunk::GetTextureSheet()
   {
     return mPreviewTexture;
   }
@@ -804,7 +804,7 @@ namespace moho
    */
   TerrainEnvironmentLookupEntry::TerrainEnvironmentLookupEntry(
     const fa::string& environmentName,
-    boost::shared_ptr<RD3DTextureResource> texture
+    std::shared_ptr<RD3DTextureResource> texture
   )
   {
     mEnvironmentName.assign(environmentName, 0u, 0xFFFFFFFFu);

@@ -165,8 +165,8 @@ namespace
     return transform;
   }
 
-  [[nodiscard]] boost::shared_ptr<const moho::CAniSkel> ResolveInitialPoseSkeleton(
-    const boost::shared_ptr<moho::Mesh>& mesh,
+  [[nodiscard]] std::shared_ptr<const moho::CAniSkel> ResolveInitialPoseSkeleton(
+    const std::shared_ptr<moho::Mesh>& mesh,
     const bool isStaticPose
   )
   {
@@ -174,12 +174,12 @@ namespace
       return moho::CAniSkel::GetDefaultSkeleton();
     }
 
-    const boost::shared_ptr<moho::RScmResource> resource = mesh->GetResource(0);
+    const std::shared_ptr<moho::RScmResource> resource = mesh->GetResource(0);
     if (!resource) {
       return moho::CAniSkel::GetDefaultSkeleton();
     }
 
-    const boost::shared_ptr<const moho::CAniSkel> skeleton = resource->GetSkeleton();
+    const std::shared_ptr<const moho::CAniSkel> skeleton = resource->GetSkeleton();
     if (skeleton) {
       return skeleton;
     }
@@ -188,7 +188,7 @@ namespace
   }
 
   [[nodiscard]] float ComputeSpatialDissolveCutoff(
-    const boost::shared_ptr<moho::Mesh>& mesh
+    const std::shared_ptr<moho::Mesh>& mesh
   )
   {
     if (!mesh) {
@@ -239,7 +239,7 @@ namespace moho
     const std::int32_t gameTickArg,
     const std::int32_t colorArg,
     const bool isStaticPoseArg,
-    const boost::shared_ptr<Mesh> meshArg
+    const std::shared_ptr<Mesh> meshArg
   )
     : TDatListItem<MeshInstance, void>()
     , db()
@@ -295,7 +295,7 @@ namespace moho
   {
     sphere.Center = {NanValue(), NanValue(), NanValue()};
     sphere.Radius = NanValue();
-    const boost::shared_ptr<const CAniSkel> skeleton = ResolveInitialPoseSkeleton(meshArg, isStaticPoseArg);
+    const std::shared_ptr<const CAniSkel> skeleton = ResolveInitialPoseSkeleton(meshArg, isStaticPoseArg);
     curPose.reset(new CAniPose(skeleton, 1.0f));
 
     db.Register(spatialDbStorage, this, kMeshSpatialDbRoutingMask);
@@ -320,7 +320,7 @@ namespace moho
   /**
    * Address: 0x007DADD0 (FUN_007DADD0, ?GetMesh@MeshInstance@Moho@@QBE?AV?$shared_ptr@VMesh@Moho@@@boost@@XZ)
    */
-  boost::shared_ptr<Mesh> MeshInstance::GetMesh() const
+  std::shared_ptr<Mesh> MeshInstance::GetMesh() const
   {
     return mesh;
   }
@@ -488,8 +488,8 @@ namespace moho
     const VTransform& startTransformArg,
     const VTransform& endTransformArg,
     const bool forceRefresh,
-    boost::shared_ptr<CAniPose> startPoseArg,
-    boost::shared_ptr<CAniPose> endPoseArg
+    std::shared_ptr<CAniPose> startPoseArg,
+    std::shared_ptr<CAniPose> endPoseArg
   )
   {
     // Republish the swept bounds into this instance's spatial-db entry
@@ -507,8 +507,8 @@ namespace moho
     const VTransform& startTransformArg,
     const VTransform& endTransformArg,
     const bool forceRefresh,
-    const boost::shared_ptr<CAniPose>& startPoseArg,
-    const boost::shared_ptr<CAniPose>& endPoseArg
+    const std::shared_ptr<CAniPose>& startPoseArg,
+    const std::shared_ptr<CAniPose>& endPoseArg
   )
   {
     if (isStaticPose == 0) {
@@ -630,7 +630,7 @@ namespace moho
     // and never cleared, so this should never actually be empty on a live
     // instance. Guarded anyway, matching GetSweptAlignedBox's own established
     // pattern in this class.
-    const boost::shared_ptr<RScmResource> resource = mesh ? mesh->GetResource(0) : boost::shared_ptr<RScmResource>{};
+    const std::shared_ptr<RScmResource> resource = mesh ? mesh->GetResource(0) : std::shared_ptr<RScmResource>{};
     if (!resource) {
       return;
     }
@@ -741,13 +741,13 @@ namespace moho
    * inlines the control-block `use_count` bump; the typed return here
    * preserves the same semantics.
    */
-  boost::shared_ptr<CAniPose> MeshInstance::ComputeDebugPose()
+  std::shared_ptr<CAniPose> MeshInstance::ComputeDebugPose()
   {
     if (isStaticPose == 0u || isLocked != 0u) {
-      return boost::shared_ptr<CAniPose>{};
+      return std::shared_ptr<CAniPose>{};
     }
 
-    const boost::shared_ptr<RScmResource> resource = mesh->GetResource(0);
+    const std::shared_ptr<RScmResource> resource = mesh->GetResource(0);
     const std::int32_t boneCount = static_cast<std::int32_t>(resource->mFile->mBoneTotalCount);
 
     curPose->InterpolatePose(currInterpolant, startPose.get(), endPose.get(), boneCount);
@@ -766,8 +766,8 @@ namespace moho
   {
     MeshInstance& self = *const_cast<MeshInstance*>(this);
     if (self.boundsValid != 0u) {
-      const boost::shared_ptr<RScmResource> resource =
-        self.mesh ? self.mesh->GetResource(0) : boost::shared_ptr<RScmResource>{};
+      const std::shared_ptr<RScmResource> resource =
+        self.mesh ? self.mesh->GetResource(0) : std::shared_ptr<RScmResource>{};
       if (resource) {
         const Wm3::AxisAlignedBox3f scaledLocalBounds = ScaleLocalMeshBounds(self.scale, resource->mBounds);
 

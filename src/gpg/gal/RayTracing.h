@@ -15,7 +15,7 @@
 #include <atomic>
 #include <cstdint>
 
-#include "boost/shared_ptr.h"
+#include <memory>
 
 namespace gpg::gal
 {

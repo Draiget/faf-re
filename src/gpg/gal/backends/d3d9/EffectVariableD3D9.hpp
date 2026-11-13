@@ -5,8 +5,8 @@
 
 #include <d3dx9effect.h>
 
-#include "boost/shared_ptr.h"
-#include "boost/weak_ptr.h"
+#include <memory>
+#include <memory>
 #include "gpg/gal/EffectVariable.hpp"
 #include "legacy/containers/String.h"
 
@@ -34,7 +34,7 @@ namespace gpg::gal
      * throws "invalid effect specified" (line 37) when the effect is
      * already gone.
      */
-    EffectVariableD3D9(const char* name, boost::shared_ptr<EffectD3D9> effect, D3DXHANDLE handle);
+    EffectVariableD3D9(const char* name, std::shared_ptr<EffectD3D9> effect, D3DXHANDLE handle);
 
     /**
      * Address: 0x00942FC0 (FUN_00942FC0)
@@ -64,7 +64,7 @@ namespace gpg::gal
      * Binds a cube render target's texture to this parameter (a null
      * target unbinds it).
      */
-    void SetCubeRenderTarget(boost::shared_ptr<CubeRenderTarget> cubeTarget) override;
+    void SetCubeRenderTarget(std::shared_ptr<CubeRenderTarget> cubeTarget) override;
 
     /**
      * Address: 0x00944420 (FUN_00944420)
@@ -74,7 +74,7 @@ namespace gpg::gal
      * Binds a colour render target's texture to this parameter (a null
      * target unbinds it).
      */
-    void SetRenderTarget(boost::shared_ptr<RenderTarget> renderTarget) override;
+    void SetRenderTarget(std::shared_ptr<RenderTarget> renderTarget) override;
 
     /**
      * Address: 0x009441A0 (FUN_009441A0)
@@ -83,7 +83,7 @@ namespace gpg::gal
      * What it does:
      * Binds a texture (2D, volume or cube) to this parameter.
      */
-    void SetTexture(boost::shared_ptr<Texture> texture) override;
+    void SetTexture(std::shared_ptr<Texture> texture) override;
 
     /**
      * Address: 0x00943E10 (FUN_00943E10)
@@ -205,7 +205,7 @@ namespace gpg::gal
 
   public:
     fa::string name_;                    // +0x04
-    boost::weak_ptr<EffectD3D9> effect_; // +0x20
+    std::weak_ptr<EffectD3D9> effect_;   // +0x20
     D3DXHANDLE handle_ = nullptr;        // +0x28
   };
 

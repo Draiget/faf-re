@@ -12,7 +12,7 @@
 #include <cstdint>
 #include <vector>
 
-#include "boost/shared_ptr.h"
+#include <memory>
 
 namespace gpg::gal
 {
@@ -45,7 +45,7 @@ namespace moho
     const char* mName;
     std::uint32_t mStride;
     std::uint32_t mBlockBytes;
-    boost::shared_ptr<gpg::gal::GpuBuffer> mBuffer;
+    std::shared_ptr<gpg::gal::GpuBuffer> mBuffer;
     std::vector<std::uint8_t> mUploaded; // what mBuffer holds
   };
 } // namespace moho

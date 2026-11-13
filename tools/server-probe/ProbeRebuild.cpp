@@ -170,7 +170,7 @@ namespace faf::probe
     moho::SWldSessionInfo sessionInfo{}; // value-initialised: `LoadSessionScenario` beats a non-null client manager
     sessionInfo.mClientManager = nullptr;
     sessionInfo.mMapName = build.mapName;
-    sessionInfo.mLaunchInfo = boost::static_pointer_cast<moho::LaunchInfoBase>(build.launchInfo);
+    sessionInfo.mLaunchInfo = std::static_pointer_cast<moho::LaunchInfoBase>(build.launchInfo);
     moho::SWldGameData gameData{};
     if (!faf::headless::LoadSessionScenario(sessionInfo, gameData, error)) {
       return false;

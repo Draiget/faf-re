@@ -15,7 +15,7 @@
 #include <string>
 #include <typeinfo>
 
-#include "boost/shared_ptr.h"
+#include <memory>
 #include "gpg/core/containers/ArchiveSerialization.h"
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/String.h"
@@ -351,7 +351,7 @@ namespace moho
     const LuaPlus::LuaObject& launchData
   )
   {
-    boost::shared_ptr<LaunchInfoNew> launchInfo(new LaunchInfoNew());
+    std::shared_ptr<LaunchInfoNew> launchInfo(new LaunchInfoNew());
     launchInfo->mCommandSources.mOriginalSource = 0;
     launchInfo->mCheatsEnabled = gSessionCheats || USER_DebugFacilitiesEnabled();
 
@@ -381,7 +381,7 @@ namespace moho
     fa::auto_ptr<SWldSessionInfo> sessionInfo(new SWldSessionInfo());
     const char* const mapName = scenarioInfo["map"].GetString();
     sessionInfo->mMapName = mapName != nullptr ? mapName : "";
-    sessionInfo->mLaunchInfo = boost::static_pointer_cast<LaunchInfoBase>(launchInfo);
+    sessionInfo->mLaunchInfo = std::static_pointer_cast<LaunchInfoBase>(launchInfo);
     sessionInfo->mIsBeingRecorded = launchData["createReplay"].GetBoolean();
     sessionInfo->mIsReplay = false;
     sessionInfo->mIsMultiplayer = false;
@@ -1084,8 +1084,8 @@ namespace moho
     auto* const request = new CSaveGameRequestImpl(savePath, sessionName, completionCallback);
 
     CWldSession* const session = WLD_GetActiveSession();
-    const boost::shared_ptr<SSessionSaveData> saveData =
-      session != nullptr ? session->GetSaveData() : boost::shared_ptr<SSessionSaveData>{};
+    const std::shared_ptr<SSessionSaveData> saveData =
+      session != nullptr ? session->GetSaveData() : std::shared_ptr<SSessionSaveData>{};
 
     gpg::WriteArchive* const archive = request->GetArchive();
     gpg::WriteRawPointer(
@@ -1115,7 +1115,7 @@ namespace moho
     if (_wfopen_s(&rawFile, widePath.c_str(), L"rb") != 0) {
       rawFile = nullptr;
     }
-    boost::shared_ptr<std::FILE> file(rawFile, moho::SFileStarCloser{});
+    std::shared_ptr<std::FILE> file(rawFile, moho::SFileStarCloser{});
     if (!file.get()) {
       throw SaveLoadError("CantOpen");
     }
@@ -1159,7 +1159,7 @@ namespace moho
   {
     // Address: 0x00883F60 (FUN_00883F60 -- `boost::shared_ptr<LaunchInfoLoad>(LaunchInfoLoad*)`, emitted out of line by
     // MSVC8; formerly `boost::ConstructSharedLaunchInfoLoadFromRaw` in BoostWrappers.)
-    boost::shared_ptr<LaunchInfoLoad> launchInfo(new LaunchInfoLoad());
+    std::shared_ptr<LaunchInfoLoad> launchInfo(new LaunchInfoLoad());
     mReader->ReadPointerShared(&launchInfo->mLoadSessionData, &NullOwnerRef());
     mReader->EndSection(false);
 
@@ -1210,7 +1210,7 @@ namespace moho
 
     fa::auto_ptr<SWldSessionInfo> sessionInfo(new SWldSessionInfo());
     sessionInfo->mMapName = mHeader.mMapName;
-    sessionInfo->mLaunchInfo = boost::static_pointer_cast<LaunchInfoBase>(launchInfo);
+    sessionInfo->mLaunchInfo = std::static_pointer_cast<LaunchInfoBase>(launchInfo);
     sessionInfo->mIsBeingRecorded = false;
     sessionInfo->mIsReplay = false;
     sessionInfo->mIsMultiplayer = false;

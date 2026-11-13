@@ -4,7 +4,7 @@
 #include <cstddef>
 #include <cstdint>
 
-#include "boost/shared_ptr.h"
+#include <memory>
 
 #include "gpg/core/utils/BoostWrappers.h"
 #include "moho/math/Vector3f.h"
@@ -531,7 +531,7 @@ namespace moho
      * TextureResourceHandle`). Both models are 8 bytes, so the layout is
      * unchanged.
      */
-    boost::shared_ptr<RD3DTextureResource> mHighlightTexture; // +0x44
+    std::shared_ptr<RD3DTextureResource> mHighlightTexture; // +0x44
 
     /**
      * Cached decal manager for this dragger's owning terrain resource

@@ -404,9 +404,9 @@ void Sim::SerializeLoadBody(
   delete std::exchange(mFormationDB, static_cast<CAiFormationDBImpl*>(formation));
 
   {
-    boost::shared_ptr<ISimResources> resources;
+    std::shared_ptr<ISimResources> resources;
     archive->ReadPointerShared(&resources, &ownerRef);
-    mSimResources = boost::static_pointer_cast<CSimResources>(resources);
+    mSimResources = std::static_pointer_cast<CSimResources>(resources);
   }
   SerArmies(archive);
 

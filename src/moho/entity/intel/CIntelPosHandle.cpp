@@ -145,7 +145,7 @@ namespace moho
    */
   CIntelPosHandle::CIntelPosHandle(
     const std::uint32_t radius,
-    const boost::shared_ptr<CIntelGrid>& intelGrid
+    const std::shared_ptr<CIntelGrid>& intelGrid
   )
     : mGrid{}
   {
@@ -360,7 +360,7 @@ namespace moho
     gpg::SerConstructResult& result
   )
   {
-    result.SetUnowned(gpg::MakeRRef(new CIntelPosHandle(0u, boost::shared_ptr<CIntelGrid>{})), 0u);
+    result.SetUnowned(gpg::MakeRRef(new CIntelPosHandle(0u, std::shared_ptr<CIntelGrid>{})), 0u);
   }
 
   /**

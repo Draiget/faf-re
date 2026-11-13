@@ -13,7 +13,7 @@
 #include <thread>
 #include <vector>
 
-#include "boost/weak_ptr.h"
+#include <memory>
 #include "gpg/core/utils/BoostWrappers.h"
 #include "gpg/core/utils/Logging.h"
 #include "moho/app/NetworkTray.h"
@@ -120,7 +120,7 @@ namespace moho
       }
 
       void SetGpgNet(
-        const boost::weak_ptr<CGpgNetInterface>& gpgnet
+        const std::weak_ptr<CGpgNetInterface>& gpgnet
       )
       {
         std::lock_guard lock(mMutex);
@@ -163,7 +163,7 @@ namespace moho
       // Issue #274: native mode, the launcher talks to the game directly. Link
       // options come from the command line and the launcher's messages.
       void StartNative(
-        const boost::weak_ptr<CGpgNetInterface>& gpgnet,
+        const std::weak_ptr<CGpgNetInterface>& gpgnet,
         const std::string& bindAddress,
         const bool forceRelay,
         const bool webrtc,
@@ -504,7 +504,7 @@ namespace moho
         SNetCommandArg remote(static_cast<std::int32_t>(id));
         SNetCommandArg state(fa::string(nl::LinkStateName(link->GetState())));
         SNetCommandArg connected(link->IsConnected() ? 1 : 0);
-        boost::shared_ptr<CGpgNetInterface> gpgnet = GpgNet();
+        std::shared_ptr<CGpgNetInterface> gpgnet = GpgNet();
         if (gpgnet) {
           try {
             gpgnet->WriteCommandWith3Args(nl::kCmdState, &remote, &state, &connected);
@@ -520,7 +520,7 @@ namespace moho
         const SNetCommandArg* b
       )
       {
-        boost::shared_ptr<CGpgNetInterface> gpgnet = GpgNet();
+        std::shared_ptr<CGpgNetInterface> gpgnet = GpgNet();
         if (!gpgnet) {
           return;
         }
@@ -534,7 +534,7 @@ namespace moho
         }
       }
 
-      boost::shared_ptr<CGpgNetInterface> GpgNet()
+      std::shared_ptr<CGpgNetInterface> GpgNet()
       {
         std::lock_guard lock(mMutex);
         return mGpgNet.lock();
@@ -575,7 +575,7 @@ namespace moho
       std::condition_variable mWake;
       std::thread mTicker;
       bool mStop = false;
-      boost::weak_ptr<CGpgNetInterface> mGpgNet;
+      std::weak_ptr<CGpgNetInterface> mGpgNet;
       std::int64_t mLocalId = 0;
       std::vector<nl::IceServer> mIceServers;
       bool mForceRelay = false;
@@ -645,7 +645,7 @@ namespace moho
     if (net_InEngineLinks == 0) {
       return;
     }
-    boost::weak_ptr<CGpgNetInterface> weak;
+    std::weak_ptr<CGpgNetInterface> weak;
     boost::AssignWeakFromShared(weak, GPGNET_GetPtr());
     Links().SetGpgNet(weak);
     gpg::Logf("NETLINK: asking the adapter for in-engine links");
@@ -738,7 +738,7 @@ namespace moho
     }
     // The client's "force relay" setting: only TURN-relayed candidates.
     const bool forceRelay = CFG_GetArgOption("/nativenetrelay", 0u, nullptr);
-    boost::weak_ptr<CGpgNetInterface> weak;
+    std::weak_ptr<CGpgNetInterface> weak;
     boost::AssignWeakFromShared(weak, GPGNET_GetPtr());
     NETLINK_KeepLogLines(); // issue #322: the panel's log lines
     const bool encrypt = net_NativeNetEncrypt != 0;

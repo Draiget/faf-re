@@ -6,7 +6,7 @@
 #include <sstream>
 #include <system_error>
 
-#include "boost/shared_ptr.h"
+#include <memory>
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/utils/Global.h"
@@ -55,14 +55,14 @@ namespace faf_reflection_tests
       }
     }
 
-    boost::shared_ptr<std::FILE> OpenFile(
+    std::shared_ptr<std::FILE> OpenFile(
       const std::string& path,
       const char* const mode
     )
     {
       std::FILE* file = nullptr;
       EXPECT_EQ(fopen_s(&file, path.c_str(), mode), 0) << path;
-      return boost::shared_ptr<std::FILE>(file, &CloseFile);
+      return std::shared_ptr<std::FILE>(file, &CloseFile);
     }
 
     std::string ReadWholeFile(
@@ -174,7 +174,7 @@ namespace faf_reflection_tests
 
     const std::string path = NextFile("written");
     {
-      boost::shared_ptr<std::FILE> file = OpenFile(path, "wb");
+      std::shared_ptr<std::FILE> file = OpenFile(path, "wb");
       std::unique_ptr<gpg::WriteArchive> archive(gpg::CreateBinaryWriteArchive(file));
       body(*archive);
       archive->Close();
@@ -189,7 +189,7 @@ namespace faf_reflection_tests
   {
     const std::string path = NextFile("read");
     WriteWholeFile(path, bytes);
-    boost::shared_ptr<std::FILE> file = OpenFile(path, "rb");
+    std::shared_ptr<std::FILE> file = OpenFile(path, "rb");
     std::unique_ptr<gpg::ReadArchive> archive(gpg::CreateBinaryReadArchive(file));
     body(*archive);
   }
@@ -199,7 +199,7 @@ namespace faf_reflection_tests
   )
   {
     auto* const text = new std::ostringstream;
-    const boost::shared_ptr<std::ostream> stream(text);
+    const std::shared_ptr<std::ostream> stream(text);
     {
       std::unique_ptr<gpg::WriteArchive> archive(gpg::CreateTextWriteArchive(stream));
       body(*archive);
@@ -213,7 +213,7 @@ namespace faf_reflection_tests
     const std::function<void(gpg::ReadArchive&)>& body
   )
   {
-    const boost::shared_ptr<std::istream> stream(new std::istringstream(text));
+    const std::shared_ptr<std::istream> stream(new std::istringstream(text));
     std::unique_ptr<gpg::ReadArchive> archive(gpg::CreateTextReadArchive(stream));
     body(*archive);
   }

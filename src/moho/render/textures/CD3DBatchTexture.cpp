@@ -145,16 +145,16 @@ namespace moho
    * Address: 0x0044EAF0 (FUN_0044EAF0, shared_count<SBatchTextureData> ctor lane)
    * Address: 0x0044EB70 (FUN_0044EB70, shared_count<CD3DRawBatchTexture> ctor lane)
    */
-  boost::shared_ptr<CD3DBatchTexture> CD3DBatchTexture::FromDXT5(
+  std::shared_ptr<CD3DBatchTexture> CD3DBatchTexture::FromDXT5(
     const std::uint32_t width,
     const std::uint32_t height,
     const void* const dxt5Blocks,
     const std::uint32_t sourcePitchBytes
   )
   {
-    boost::shared_ptr<CD3DBatchTexture> outTexture;
+    std::shared_ptr<CD3DBatchTexture> outTexture;
 
-    boost::shared_ptr<SBatchTextureData> data(new (std::nothrow) SBatchTextureData());
+    std::shared_ptr<SBatchTextureData> data(new (std::nothrow) SBatchTextureData());
     if (!data) {
       return outTexture;
     }
@@ -163,7 +163,7 @@ namespace moho
       return outTexture;
     }
 
-    boost::shared_ptr<CD3DRawBatchTexture> rawTexture(new (std::nothrow) CD3DRawBatchTexture(data, 0u));
+    std::shared_ptr<CD3DRawBatchTexture> rawTexture(new (std::nothrow) CD3DRawBatchTexture(data, 0u));
     outTexture = rawTexture;
     return outTexture;
   }

@@ -86,7 +86,7 @@ namespace moho
    * Unwraps Lua boxed userdata payload and returns the typed
    * `boost::weak_ptr<INetNATTraversalProvider>` slot.
    */
-  [[nodiscard]] boost::weak_ptr<INetNATTraversalProvider>*
+  [[nodiscard]] std::weak_ptr<INetNATTraversalProvider>*
   func_GetCObj_NatTraversalProvider(LuaPlus::LuaObject valueObject);
   int cfunc_InternalCreateLobbyL(LuaPlus::LuaState* state);
   int cfunc_CLobbyHostGameL(LuaPlus::LuaState* state);
@@ -1507,7 +1507,7 @@ int moho::cfunc_InternalCreateLobby(
  * Unwraps Lua boxed userdata payload and returns the typed
  * `boost::weak_ptr<INetNATTraversalProvider>` slot.
  */
-boost::weak_ptr<moho::INetNATTraversalProvider>* moho::func_GetCObj_NatTraversalProvider(
+std::weak_ptr<moho::INetNATTraversalProvider>* moho::func_GetCObj_NatTraversalProvider(
   LuaPlus::LuaObject valueObject
 )
 {
@@ -1517,7 +1517,7 @@ boost::weak_ptr<moho::INetNATTraversalProvider>* moho::func_GetCObj_NatTraversal
 
   const gpg::RRef userDataRef = moho::SCR_UserDataRef(valueObject);
   const gpg::RRef upcastRef = gpg::REF_UpcastPtr(userDataRef, gpg::ResolveWeakPtrINetNATTraversalProviderType());
-  auto* const providerSlot = static_cast<boost::weak_ptr<INetNATTraversalProvider>*>(upcastRef.mObj);
+  auto* const providerSlot = static_cast<std::weak_ptr<INetNATTraversalProvider>*>(upcastRef.mObj);
   if (providerSlot == nullptr) {
     throw std::bad_cast{};
   }
@@ -1574,13 +1574,13 @@ int moho::cfunc_InternalCreateLobbyL(
     uid = std::atoi(uidText ? uidText : "");
   }
 
-  boost::weak_ptr<INetNATTraversalProvider> natTraversalProvider{};
+  std::weak_ptr<INetNATTraversalProvider> natTraversalProvider{};
   if (lua_type(state->m_state, 7) != LUA_TNIL) {
     const LuaPlus::LuaObject natTraversalProviderObject(LuaPlus::LuaStackObject(state, 7));
     natTraversalProvider = *func_GetCObj_NatTraversalProvider(natTraversalProviderObject);
   }
 
-  boost::weak_ptr<INetNATTraversalProvider> liveNatTraversalProvider{};
+  std::weak_ptr<INetNATTraversalProvider> liveNatTraversalProvider{};
   if (!natTraversalProvider.expired()) {
     liveNatTraversalProvider = natTraversalProvider;
   }
@@ -3368,7 +3368,7 @@ void CLobby::LaunchGame(
   sessionInfo->mIsReplay = false;
   sessionInfo->mIsMultiplayer = isMultiplayer;
   sessionInfo->mSourceId = build.localSourceId;
-  const boost::shared_ptr<LaunchInfoNew>& launchInfo = build.launchInfo;
+  const std::shared_ptr<LaunchInfoNew>& launchInfo = build.launchInfo;
   const int32_t clientIndex = build.clientCount;
   const int32_t localClientIndex = build.localClientIndex;
 
@@ -3419,7 +3419,7 @@ void CLobby::LaunchGame(
   }
 
   sessionInfo->mMapName = build.mapName;
-  sessionInfo->mLaunchInfo = boost::static_pointer_cast<LaunchInfoBase>(launchInfo);
+  sessionInfo->mLaunchInfo = std::static_pointer_cast<LaunchInfoBase>(launchInfo);
 
   RunScript("GameLaunched");
   WLD_BeginSession(sessionInfo);

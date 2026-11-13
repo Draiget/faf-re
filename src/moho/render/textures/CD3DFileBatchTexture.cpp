@@ -5,7 +5,7 @@
 #include <map>
 #include <utility>
 
-#include "boost/weak_ptr.h"
+#include <memory>
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/utils/Logging.h"
 #include "moho/resource/ResourceManager.h"
@@ -132,8 +132,8 @@ namespace moho
       }
     };
 
-    using FileTextureHandle = boost::shared_ptr<CD3DFileBatchTexture>;
-    using FileTextureWeakHandle = boost::weak_ptr<CD3DFileBatchTexture>;
+    using FileTextureHandle = std::shared_ptr<CD3DFileBatchTexture>;
+    using FileTextureWeakHandle = std::weak_ptr<CD3DFileBatchTexture>;
     using TextureLookupMap = std::map<TextureLookup, FileTextureWeakHandle, TextureLookupLess>;
     using FileTextureRetainQueue = fa::vector<FileTextureHandle>;
     constexpr std::size_t kRetainQueueLimit = 30u;
@@ -230,7 +230,7 @@ namespace moho
      * What it does:
      * Loads one decoded `SBatchTextureData` payload through the texture-data factory.
      */
-    [[nodiscard]] boost::shared_ptr<SBatchTextureData> GetD3DTextureData(
+    [[nodiscard]] std::shared_ptr<SBatchTextureData> GetD3DTextureData(
       const char* const filename
     )
     {
@@ -252,7 +252,7 @@ namespace moho
         SBatchTextureData::sType = resourceType;
       }
 
-      return boost::static_pointer_cast<SBatchTextureData>(
+      return std::static_pointer_cast<SBatchTextureData>(
         RES_GetResource(filename != nullptr ? filename : "", nullptr, resourceType)
       );
     }
@@ -382,12 +382,12 @@ namespace moho
    * Address: 0x0044E050 (FUN_0044E050, shared_ptr raw-assign helper lane)
    * Address: 0x0044EC00 (FUN_0044EC00, shared_count with OnClose deleter lane)
    */
-  boost::shared_ptr<CD3DBatchTexture> CD3DBatchTexture::FromFile(
+  std::shared_ptr<CD3DBatchTexture> CD3DBatchTexture::FromFile(
     const gpg::StrArg filename,
     const std::uint32_t border
   )
   {
-    boost::shared_ptr<CD3DBatchTexture> outTexture;
+    std::shared_ptr<CD3DBatchTexture> outTexture;
     const char* const normalizedPath = filename != nullptr ? filename : "";
 
     std::lock_guard<std::recursive_mutex> scopedLock(sResourceLock);
@@ -407,7 +407,7 @@ namespace moho
       }
     }
 
-    boost::shared_ptr<SBatchTextureData> textureData = GetD3DTextureData(normalizedPath);
+    std::shared_ptr<SBatchTextureData> textureData = GetD3DTextureData(normalizedPath);
     if (!textureData) {
       gpg::Logf("Unable to load texture from file: %s", normalizedPath);
       return outTexture;

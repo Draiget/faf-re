@@ -3,7 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 
-#include "boost/shared_ptr.h"
+#include <memory>
 #include "gpg/core/containers/Rect2.h"
 #include "legacy/containers/Set.h"
 #include "legacy/containers/Vector.h"
@@ -33,7 +33,7 @@ namespace moho
   public:
     struct TextureAtlasEntry
     {
-      boost::shared_ptr<CD3DBatchTexture> mTexture; // +0x00
+      std::shared_ptr<CD3DBatchTexture> mTexture;   // +0x00
       gpg::Rect2f mUvRect;                          // +0x08
     };
 
@@ -49,7 +49,7 @@ namespace moho
     };
 
     using AvailableRectVector = fa::vector<gpg::Rect2i>;
-    using DynamicTextureSheetHandle = boost::shared_ptr<CD3DDynamicTextureSheet>;
+    using DynamicTextureSheetHandle = std::shared_ptr<CD3DDynamicTextureSheet>;
     using TextureAtlasSet = fa::set<TextureAtlasEntry, TextureAtlasEntryLess>;
     using PixelByteVector = fa::vector<std::uint8_t>;
 
@@ -83,7 +83,7 @@ namespace moho
      * Returns cached UVs for one batch texture or allocates new atlas space,
      * uploads the texture payload, and stores one new UV mapping.
      */
-    [[nodiscard]] const gpg::Rect2f* AddTexture(const boost::shared_ptr<CD3DBatchTexture>& texture);
+    [[nodiscard]] const gpg::Rect2f* AddTexture(const std::shared_ptr<CD3DBatchTexture>& texture);
 
     /**
      * Address: 0x00448E50 (FUN_00448E50)
@@ -101,7 +101,7 @@ namespace moho
      * Uploads dirty atlas bytes to the dynamic texture and returns the retained
      * sheet handle as `ID3DTextureSheet`.
      */
-    [[nodiscard]] boost::shared_ptr<ID3DTextureSheet> GetCompositeTexture();
+    [[nodiscard]] std::shared_ptr<ID3DTextureSheet> GetCompositeTexture();
 
   private:
     /**

@@ -10,7 +10,7 @@
 #include <zlib.h>
 #include <zstd.h>
 
-#include "boost/shared_ptr.h"
+#include <memory>
 #include "gpg/core/algorithms/MD5.h"
 #include "gpg/core/containers/WriteArchive.h"
 #include "moho/console/CConCommand.h"
@@ -132,7 +132,7 @@ namespace faf::headless
           // `Sim::SaveState` writes through the archive it is given; the driver catches the throw.
           throw std::runtime_error("cannot write " + mPath);
         }
-        mFile = boost::shared_ptr<std::FILE>(file, moho::SFileStarCloser{});
+        mFile = std::shared_ptr<std::FILE>(file, moho::SFileStarCloser{});
         const bool compress = mOwner.IsPreparing() && moho::CFG_GetArgOption("--keyframe-quiet", 0, nullptr);
         if (compress) {
           mSink = std::make_unique<CKeyframeZstdSink>(file);
@@ -217,7 +217,7 @@ namespace faf::headless
       const moho::Sim* mSim;
       std::uint32_t mBeat = 0;
       Clock::time_point mStart{};
-      boost::shared_ptr<std::FILE> mFile;
+      std::shared_ptr<std::FILE> mFile;
       std::unique_ptr<CKeyframeZstdSink> mSink;
       std::uint32_t mTick = 0;
       gpg::WriteArchive* mArchive = nullptr;

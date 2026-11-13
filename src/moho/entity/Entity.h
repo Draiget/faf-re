@@ -6,7 +6,7 @@
 #include <iterator>
 #include <utility>
 
-#include "boost/shared_ptr.h"
+#include <memory>
 #include "gpg/core/utils/BoostWrappers.h"
 #include "../script/CScriptObject.h"
 #include "../task/CTask.h"
@@ -901,7 +901,7 @@ namespace moho
      * Copies this entity's mesh shared-handle lanes and retains one shared
      * owner on the control block when present.
      */
-    [[nodiscard]] boost::shared_ptr<RScmResource> GetMesh() const;
+    [[nodiscard]] std::shared_ptr<RScmResource> GetMesh() const;
 
     /**
      * Address: 0x005BDB60 (FUN_005BDB60)
@@ -1347,7 +1347,7 @@ namespace moho
      * Replaces strategic-underlay texture lanes from one by-value shared
      * texture handle only when the incoming raw texture pointer differs.
      */
-    void SetStrategicUnderlay(boost::shared_ptr<CD3DBatchTexture> underlayTexture);
+    void SetStrategicUnderlay(std::shared_ptr<CD3DBatchTexture> underlayTexture);
 
     /**
      * Address: 0x005BDD20 (FUN_005BDD20,
@@ -1357,7 +1357,7 @@ namespace moho
      * What it does:
      * Returns one retained shared strategic-underlay texture handle.
      */
-    [[nodiscard]] boost::shared_ptr<CD3DBatchTexture> GetStrategicUnderlay() const;
+    [[nodiscard]] std::shared_ptr<CD3DBatchTexture> GetStrategicUnderlay() const;
 
     [[nodiscard]] Wm3::Vec3f const& GetPositionWm3() const noexcept;
 

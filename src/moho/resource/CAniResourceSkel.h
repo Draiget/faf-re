@@ -2,7 +2,7 @@
 
 #include <cstddef>
 
-#include "boost/shared_ptr.h"
+#include <memory>
 #include "legacy/containers/String.h"
 #include "moho/animation/CAniSkel.h"
 
@@ -63,7 +63,7 @@ namespace moho
      * installs the `CAniResourceSkel` vtable, and copies the resource name into
      * `mName`.
      */
-    CAniResourceSkel(const fa::string& name, const boost::shared_ptr<const SScmFile>& file);
+    CAniResourceSkel(const fa::string& name, const std::shared_ptr<const SScmFile>& file);
 
     /**
      * Address: 0x00538500 (FUN_00538500, Moho::CAniResourceSkel::dtr thunk/body)

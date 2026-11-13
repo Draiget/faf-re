@@ -6,7 +6,7 @@
 #include <cstddef>
 #include <cstdint>
 
-#include "boost/shared_ptr.h"
+#include <memory>
 #include "legacy/containers/Vector.h"
 
 namespace gpg::gal
@@ -59,8 +59,8 @@ namespace moho
     virtual void Initialize(
       const MeshLOD* lod,
       bool remapToReferenceResource,
-      boost::shared_ptr<RScmResource> referenceResource,
-      boost::shared_ptr<RScmResource> currentResource
+      std::shared_ptr<RScmResource> referenceResource,
+      std::shared_ptr<RScmResource> currentResource
     );
 
     /**
@@ -96,7 +96,7 @@ namespace moho
   public:
     std::uint8_t mUseBoneRemap; // +0x04
     std::uint8_t pad_05_07[0x03]{};
-    boost::shared_ptr<RScmResource> mCurrentResource; // +0x08
+    std::shared_ptr<RScmResource> mCurrentResource;   // +0x08
     std::int32_t mVertexCount;                        // +0x10
     std::int32_t mIndexCount;                         // +0x14
     std::int32_t mTriangleCount;                      // +0x18
@@ -108,8 +108,8 @@ namespace moho
     std::uint8_t mUseSecondaryData;                   // +0x3C
     std::uint8_t pad_3D_3F[0x03]{};
     std::int32_t mParameterAnnotation;                       // +0x40
-    boost::shared_ptr<gpg::gal::VertexFormat> mVertexFormat; // +0x44 the batch's vertex declaration
-    boost::shared_ptr<gpg::gal::IndexBuffer> mIndexBuffer;   // +0x4C the batch's static index buffer
+    std::shared_ptr<gpg::gal::VertexFormat> mVertexFormat;   // +0x44 the batch's vertex declaration
+    std::shared_ptr<gpg::gal::IndexBuffer> mIndexBuffer;     // +0x4C the batch's static index buffer
   };
 
   static_assert(offsetof(MeshBatch, mUseBoneRemap) == 0x04, "MeshBatch::mUseBoneRemap offset must be 0x04");
@@ -168,8 +168,8 @@ namespace moho
     HardwareMeshBatch(
       const MeshLOD* lod,
       bool remapToReferenceResource,
-      boost::shared_ptr<RScmResource> referenceResource,
-      boost::shared_ptr<RScmResource> currentResource
+      std::shared_ptr<RScmResource> referenceResource,
+      std::shared_ptr<RScmResource> currentResource
     );
 
     /**
@@ -206,8 +206,8 @@ namespace moho
     void Initialize(
       const MeshLOD* lod,
       bool remapToReferenceResource,
-      boost::shared_ptr<RScmResource> referenceResource,
-      boost::shared_ptr<RScmResource> currentResource
+      std::shared_ptr<RScmResource> referenceResource,
+      std::shared_ptr<RScmResource> currentResource
     ) override;
 
     // --- Concrete backend slot overrides (bodies out of this pass's scope) ---
@@ -286,10 +286,10 @@ namespace moho
 
   public:
     // +0x54 static (all-instances) GPU vertex buffer built in Initialize.
-    boost::shared_ptr<gpg::gal::VertexBuffer> mStaticVertexBuffer;
+    std::shared_ptr<gpg::gal::VertexBuffer> mStaticVertexBuffer;
     // +0x5C dynamic (per-instance) GPU vertex buffer grown by PrepareBatch.
     // FAF: stays empty; the records go to the shared instance ring buffer.
-    boost::shared_ptr<gpg::gal::VertexBuffer> mDynamicVertexBuffer;
+    std::shared_ptr<gpg::gal::VertexBuffer> mDynamicVertexBuffer;
     // +0x64 CPU scratch buffer for per-instance vertex staging.
     void* mScratchVertexData = nullptr;
   };

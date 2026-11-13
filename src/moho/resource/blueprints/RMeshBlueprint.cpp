@@ -8,7 +8,7 @@
 #include <string_view>
 #include <typeinfo>
 
-#include "boost/weak_ptr.h"
+#include <memory>
 #include "moho/misc/FileWaitHandleSet.h"
 #include "moho/resource/RResId.h"
 #include "moho/resource/RScmResource.h"
@@ -339,7 +339,7 @@ namespace moho
    * empty, every entry has an empty mesh name, or every lookup resolves to
    * a dead weak handle.
    */
-  boost::shared_ptr<RScmResource> RMeshBlueprint::GetMesh() const
+  std::shared_ptr<RScmResource> RMeshBlueprint::GetMesh() const
   {
     for (const RMeshBlueprintLOD& lod : mLods) {
       if (lod.mMeshName.empty()) {
@@ -348,12 +348,12 @@ namespace moho
 
       // 0x0067A650: each candidate path goes through the shared `GetModel`
       // resource lane, which owns the cached-RType resolution.
-      if (boost::shared_ptr<RScmResource> resource = GetModel(lod.mMeshName.c_str(), nullptr); resource) {
+      if (std::shared_ptr<RScmResource> resource = GetModel(lod.mMeshName.c_str(), nullptr); resource) {
         return resource;
       }
     }
 
-    return boost::shared_ptr<RScmResource>{};
+    return std::shared_ptr<RScmResource>{};
   }
 } // namespace moho
 

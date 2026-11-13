@@ -2,7 +2,7 @@
 
 #include <cstdint>
 
-#include "boost/shared_ptr.h"
+#include <memory>
 
 namespace gpg::gal
 {
@@ -16,7 +16,7 @@ namespace moho
   class ID3DIndexSheet
   {
   public:
-    using BufferHandle = boost::shared_ptr<gpg::gal::IndexBuffer>;
+    using BufferHandle = std::shared_ptr<gpg::gal::IndexBuffer>;
 
     /**
      * Address: 0x0043F5D0 (FUN_0043F5D0, sub_43F5D0)

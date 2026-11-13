@@ -10,7 +10,7 @@
 #include <string>
 #include <string_view>
 
-#include "boost/shared_ptr.h"
+#include <memory>
 #include "gpg/core/containers/DList.h"
 #include "gpg/core/containers/FastVector.h"
 #include "gpg/core/containers/Rect2.h"
@@ -323,7 +323,7 @@ namespace moho
 
     std::uint8_t mBuildStateTag;                   // +0x00
     std::uint8_t pad_01[3];                        // +0x01
-    boost::shared_ptr<Stats<StatItem>> mStatsRoot; // +0x04
+    std::shared_ptr<Stats<StatItem>> mStatsRoot;   // +0x04
     std::uint8_t mFake;                            // +0x0C
     std::uint8_t pad_0D[3];                        // +0x0D
   };
@@ -563,8 +563,8 @@ namespace moho
     EntId mFocusUnit;                             // +0x078
     EntId mGuardedUnit;                           // +0x07C
     EntId mTargetBlip;                            // +0x080
-    boost::shared_ptr<CAniPose> mPriorSharedPose; // +0x084
-    boost::shared_ptr<CAniPose> mSharedPose;      // +0x08C
+    std::shared_ptr<CAniPose> mPriorSharedPose;   // +0x084
+    std::shared_ptr<CAniPose> mSharedPose;        // +0x08C
     std::uint8_t mPad094_097[0x04];               // +0x094
     // Per-sim CmdId snapshot lanes (NOT weak-command handles): the binary
     // treats these as 4-byte `CmdId` elements — `Unit::SyncInterface`
@@ -1143,8 +1143,8 @@ namespace moho
      * instead of released, so a worker never drops what may be a pose's last owner.
      */
     void RefreshSyncBlock(
-      boost::shared_ptr<CAniPose>* releasedPose = nullptr,
-      boost::shared_ptr<CAniPose>* releasedPriorPose = nullptr
+      std::shared_ptr<CAniPose>* releasedPose = nullptr,
+      std::shared_ptr<CAniPose>* releasedPriorPose = nullptr
     );
 
     /**
@@ -1527,7 +1527,7 @@ namespace moho
      * Copies prior/current shared animation poses into variable-data lanes and
      * mirrors them into `AniActor::{mPose,mPriorPose}`.
      */
-    void SetPoses(const boost::shared_ptr<CAniPose>& priorSharedPose, const boost::shared_ptr<CAniPose>& sharedPose);
+    void SetPoses(const std::shared_ptr<CAniPose>& priorSharedPose, const std::shared_ptr<CAniPose>& sharedPose);
 
     /**
      * Address: 0x006A9E50 (FUN_006A9E50, ?CanBuild@Unit@Moho@@QBE_NPBVRUnitBlueprint@2@@Z)

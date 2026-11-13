@@ -17,7 +17,7 @@
 #include <vector>
 
 #include "GalTestSupport.h"
-#include "boost/shared_ptr.h"
+#include <memory>
 #include "gpg/gal/DrawStatistics.h"
 #include "gpg/gal/EffectContext.hpp"
 #include "gpg/gal/Error.hpp"
@@ -194,12 +194,12 @@ TEST(
   effect.OnLost();
   effect.OnReset();
 
-  fa::vector<boost::shared_ptr<EffectTechnique>> techniques;
+  fa::vector<std::shared_ptr<EffectTechnique>> techniques;
   effect.GetTechniques(techniques);
   ASSERT_EQ(techniques.size(), 1U);
   EXPECT_STREQ(techniques[0]->GetName()->c_str(), "Draw");
 
-  const boost::shared_ptr<EffectTechnique> draw = effect.GetTechnique("Draw");
+  const std::shared_ptr<EffectTechnique> draw = effect.GetTechnique("Draw");
   ASSERT_NE(draw.get(), nullptr);
   EXPECT_STREQ(draw->GetName()->c_str(), "Draw");
   EXPECT_EQ(
@@ -215,11 +215,11 @@ TEST(
     "invalid effect technique requested: "
   );
 
-  const boost::shared_ptr<EffectVariable> tint = effect.GetVariable("Tint");
+  const std::shared_ptr<EffectVariable> tint = effect.GetVariable("Tint");
   ASSERT_NE(tint.get(), nullptr);
   EXPECT_STREQ(tint->GetName()->c_str(), "Tint");
   // A sampler is a known name without a parameter: its setters do nothing.
-  const boost::shared_ptr<EffectVariable> sampler = effect.GetVariable("BaseSampler");
+  const std::shared_ptr<EffectVariable> sampler = effect.GetVariable("BaseSampler");
   ASSERT_NE(sampler.get(), nullptr);
   sampler->SetFloat(1.0f);
   bool flag = false;
@@ -239,7 +239,7 @@ TEST(
 {
   RecordingBinder binder;
   ProgramEffect effect(EffectContext{}, MakeProgram(), binder);
-  const boost::shared_ptr<EffectTechnique> draw = effect.GetTechnique("Draw");
+  const std::shared_ptr<EffectTechnique> draw = effect.GetTechnique("Draw");
 
   fa::string text;
   EXPECT_TRUE(draw->GetAnnotationString(&text, fa::string("Category")));
@@ -273,7 +273,7 @@ TEST(
 {
   RecordingBinder binder;
   ProgramEffect effect(EffectContext{}, MakeProgram(), binder);
-  const boost::shared_ptr<EffectTechnique> draw = effect.GetTechnique("Draw");
+  const std::shared_ptr<EffectTechnique> draw = effect.GetTechnique("Draw");
   EXPECT_EQ(
     ErrorMessage([&] {
     draw->BeginPass(0);
@@ -318,7 +318,7 @@ texture Base;
     return program->Parameters().Constants();
   };
 
-  const boost::shared_ptr<EffectVariable> scale = effect.GetVariable("Scale");
+  const std::shared_ptr<EffectVariable> scale = effect.GetVariable("Scale");
   scale->SetFloat(3.5f);
   EXPECT_FLOAT_EQ(FloatAt(image(), OffsetOf(*program, "Scale")), 3.5f);
   float minimum = 0.0f;
@@ -372,19 +372,19 @@ texture Base;
 
   // Texture bindings count as pipeline state changes.
   static_cast<void>(TakeDrawStatistics());
-  const boost::shared_ptr<EffectVariable> base = effect.GetVariable("Base");
-  const boost::shared_ptr<Texture> texture(new faf_gal_tests::FakeTexture());
+  const std::shared_ptr<EffectVariable> base = effect.GetVariable("Base");
+  const std::shared_ptr<Texture> texture(new faf_gal_tests::FakeTexture());
   base->SetTexture(texture);
   EXPECT_EQ(
     program->Parameters().Binding(static_cast<std::uint32_t>(program->FindParameter("Base"))).texture.get(),
     texture.get()
   );
-  const boost::shared_ptr<RenderTarget> target(new faf_gal_tests::FakeRenderTarget());
+  const std::shared_ptr<RenderTarget> target(new faf_gal_tests::FakeRenderTarget());
   base->SetRenderTarget(target);
   EXPECT_EQ(
     program->Parameters().Binding(static_cast<std::uint32_t>(program->FindParameter("Base"))).renderTarget.get(),
     target.get()
   );
-  base->SetCubeRenderTarget(boost::shared_ptr<CubeRenderTarget>());
+  base->SetCubeRenderTarget(std::shared_ptr<CubeRenderTarget>());
   EXPECT_EQ(TakeDrawStatistics().stateChanges, 2U);
 }

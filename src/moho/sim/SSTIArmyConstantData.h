@@ -3,7 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 
-#include "../../boost/shared_ptr.h"
+#include <memory>
 #include "../../legacy/containers/String.h"
 #include "gpg/core/reflection/Reflection.h"
 
@@ -82,14 +82,14 @@ namespace moho
     fa::string mPlayerName;                         // +0x20
     std::uint8_t mIsCivilian;                       // +0x3C
     std::uint8_t mPad3D[3];                         // +0x3D
-    boost::shared_ptr<CIntelGrid> mVisionReconGrid; // +0x40
-    boost::shared_ptr<CIntelGrid> mWaterReconGrid;  // +0x48
-    boost::shared_ptr<CIntelGrid> mRadarReconGrid;  // +0x50
-    boost::shared_ptr<CIntelGrid> mSonarReconGrid;  // +0x58
-    boost::shared_ptr<CIntelGrid> mOmniReconGrid;   // +0x60
-    boost::shared_ptr<CIntelGrid> mRciReconGrid;    // +0x68
-    boost::shared_ptr<CIntelGrid> mSciReconGrid;    // +0x70
-    boost::shared_ptr<CIntelGrid> mVciReconGrid;    // +0x78
+    std::shared_ptr<CIntelGrid> mVisionReconGrid;   // +0x40
+    std::shared_ptr<CIntelGrid> mWaterReconGrid;    // +0x48
+    std::shared_ptr<CIntelGrid> mRadarReconGrid;    // +0x50
+    std::shared_ptr<CIntelGrid> mSonarReconGrid;    // +0x58
+    std::shared_ptr<CIntelGrid> mOmniReconGrid;     // +0x60
+    std::shared_ptr<CIntelGrid> mRciReconGrid;      // +0x68
+    std::shared_ptr<CIntelGrid> mSciReconGrid;      // +0x70
+    std::shared_ptr<CIntelGrid> mVciReconGrid;      // +0x78
   };
 
   /**
@@ -103,7 +103,7 @@ namespace moho
    */
   SSTIArmyConstantData* AssignArmyConstantData(const SSTIArmyConstantData& source, SSTIArmyConstantData* destination);
 
-  static_assert(sizeof(boost::shared_ptr<CIntelGrid>) == 0x08, "shared_ptr<CIntelGrid> size must be 0x08");
+  static_assert(sizeof(std::shared_ptr<CIntelGrid>) == 0x08, "shared_ptr<CIntelGrid> size must be 0x08");
   static_assert(
     offsetof(SSTIArmyConstantData, mArmyName) == 0x04,
     "SSTIArmyConstantData::mArmyName offset must be 0x04"

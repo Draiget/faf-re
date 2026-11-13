@@ -46,9 +46,9 @@ namespace
    * What it does:
    * Assigns one retained frame owner into one weak self-owner lane.
    */
-  [[maybe_unused]] boost::weak_ptr<moho::CMauiFrame>* AssignFrameWeakSelfFromSharedOwner(
-    const boost::shared_ptr<moho::CMauiFrame>& owner,
-    boost::weak_ptr<moho::CMauiFrame>* const destination
+  [[maybe_unused]] std::weak_ptr<moho::CMauiFrame>* AssignFrameWeakSelfFromSharedOwner(
+    const std::shared_ptr<moho::CMauiFrame>& owner,
+    std::weak_ptr<moho::CMauiFrame>* const destination
   )
   {
     if (destination == nullptr) {
@@ -349,7 +349,7 @@ moho::CMauiFrame::CMauiFrame(
   // to hold and write through it. The binary zeroes the two words outright
   // (`this->mPtr.px = 0; this->mPtr.pn.pi_ = 0` at 0x00796360), which is the
   // same thing a placement-construct emits.
-  new (&mSelfWeak) boost::weak_ptr<CMauiFrame>{};
+  new (&mSelfWeak) std::weak_ptr<CMauiFrame>{};
 
   auto* const deletedListHead = static_cast<CMauiControlListNode*>(&mDeletedControlList);
   mDeletedControlList.mNext = deletedListHead;
@@ -380,7 +380,7 @@ moho::CMauiFrame::~CMauiFrame()
     mEventHandler = nullptr;
   }
 
-  mSelfWeak = boost::weak_ptr<CMauiFrame>{};
+  mSelfWeak = std::weak_ptr<CMauiFrame>{};
 }
 
 /**
@@ -481,7 +481,7 @@ void moho::CMauiFrame::Frame(
 
   // Pin this frame's shared owner for the duration of the tick so descendants
   // cannot tear down the root while they're still iterating.
-  boost::shared_ptr<CMauiFrame> selfLock(mSelfWeak);
+  std::shared_ptr<CMauiFrame> selfLock(mSelfWeak);
 
   static int sProbeCalls = 0;
   static int sProbeBudget = 0;
@@ -568,11 +568,11 @@ void moho::CMauiFrame::Frame(
  * Imports `/lua/maui/frame.lua`, calls `Frame()`, converts the return payload
  * to `CMauiFrame*`, and initializes the frame's weak self-owner lane.
  */
-boost::shared_ptr<moho::CMauiFrame> moho::CMauiFrame::Create(
+std::shared_ptr<moho::CMauiFrame> moho::CMauiFrame::Create(
   LuaPlus::LuaState* const state
 )
 {
-  boost::shared_ptr<CMauiFrame> outFrame{};
+  std::shared_ptr<CMauiFrame> outFrame{};
   if (state == nullptr || state->m_state == nullptr) {
     return outFrame;
   }
@@ -600,7 +600,7 @@ boost::shared_ptr<moho::CMauiFrame> moho::CMauiFrame::Create(
   LuaPlus::LuaObject frameLuaObject(state, -1);
   CMauiFrame* const frame = ResolveFrameFromLuaObjectOrError(frameLuaObject, state);
   if (frame != nullptr) {
-    outFrame = boost::shared_ptr<CMauiFrame>(frame);
+    outFrame = std::shared_ptr<CMauiFrame>(frame);
     (void)AssignFrameWeakSelfFromSharedOwner(outFrame, &frame->mSelfWeak);
   }
 

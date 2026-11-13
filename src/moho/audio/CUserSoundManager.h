@@ -5,7 +5,7 @@
 #include <cstdint>
 #include <type_traits>
 
-#include "boost/shared_ptr.h"
+#include <memory>
 #include "gpg/core/containers/FastVector.h"
 #include "gpg/core/containers/String.h"
 #include "legacy/containers/Set.h"
@@ -413,9 +413,9 @@ namespace moho
     WeakPtr<UserArmy> mListenerArmy;        // +0x295C (the army whose recon filters positional sounds)
     TDatList<HSound, void> mActiveLoops;    // +0x2964
 
-    boost::shared_ptr<AudioEngine> mAmbientEngine;  // +0x296C
-    boost::shared_ptr<AudioEngine> mTutorialEngine; // +0x2974
-    boost::shared_ptr<AudioEngine> mVoiceEngine;    // +0x297C
+    std::shared_ptr<AudioEngine> mAmbientEngine;  // +0x296C
+    std::shared_ptr<AudioEngine> mTutorialEngine; // +0x2974
+    std::shared_ptr<AudioEngine> mVoiceEngine;    // +0x297C
 
     CSndVar mCameraDistanceVar;         // +0x2984
     CSndVar mZoomPercentVar;            // +0x29A4

@@ -17,7 +17,7 @@
 #include <string>
 #include <typeinfo>
 
-#include "boost/shared_ptr.h"
+#include <memory>
 #include "gpg/core/containers/String.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/streams/BinaryReader.h"
@@ -159,16 +159,16 @@ namespace
    * `shared_ptr<LaunchInfoBase>` output slot through swap-based temporary
    * ownership transfer.
    */
-  boost::shared_ptr<moho::LaunchInfoBase>* CopyLaunchInfoBasePtr(
-    boost::shared_ptr<moho::LaunchInfoBase>* const outBase,
-    const boost::shared_ptr<moho::LaunchInfoNew>& source
+  std::shared_ptr<moho::LaunchInfoBase>* CopyLaunchInfoBasePtr(
+    std::shared_ptr<moho::LaunchInfoBase>* const outBase,
+    const std::shared_ptr<moho::LaunchInfoNew>& source
   )
   {
     if (outBase == nullptr) {
       return nullptr;
     }
 
-    boost::shared_ptr<moho::LaunchInfoBase> temp(source);
+    std::shared_ptr<moho::LaunchInfoBase> temp(source);
     temp.swap(*outBase);
     return outBase;
   }
@@ -402,7 +402,7 @@ namespace moho
     // A replay is a file anyone can hand out, and the binary let a short or
     // damaged header (PrematureEOF, InvalidFormat) end the process; such a
     // replay is now refused like one of the wrong version.
-    boost::shared_ptr<LaunchInfoNew> launchInfo;
+    std::shared_ptr<LaunchInfoNew> launchInfo;
     BVIntSet replayCommandSources{};
     fa::string replayMapName{};
     try {

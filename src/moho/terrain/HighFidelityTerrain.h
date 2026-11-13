@@ -3,7 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 
-#include "boost/weak_ptr.h"
+#include <memory>
 #include "gpg/core/containers/FastVector.h"
 #include "legacy/containers/String.h"
 #include "moho/render/camera/VTransform.h"
@@ -108,7 +108,7 @@ namespace moho
      * normalization constants, and forwards the optional terrain-normal texture
      * weak handle into the active terrain effect.
      */
-    void LoadShaderVars(const boost::shared_ptr<ID3DRenderTarget>& terrainNormalTexture);
+    void LoadShaderVars(const std::shared_ptr<ID3DRenderTarget>& terrainNormalTexture);
 
     /**
      * Address: 0x008033E0 (FUN_008033E0, Moho::HighFidelityTerrain::DrawWaterline)
@@ -224,8 +224,8 @@ namespace moho
     void DrawWaterTerrain(
       std::int32_t tick,
       float tickLerp,
-      boost::shared_ptr<ID3DRenderTarget> refractionTexture,
-      boost::shared_ptr<ID3DRenderTarget> reflectionTexture
+      std::shared_ptr<ID3DRenderTarget> refractionTexture,
+      std::shared_ptr<ID3DRenderTarget> reflectionTexture
     ) override;
 
     /**
@@ -238,7 +238,7 @@ namespace moho
     bool DrawNormals(
       std::int32_t gameTick,
       float deltaSeconds,
-      const boost::shared_ptr<ID3DRenderTarget>& terrainNormalTexture,
+      const std::shared_ptr<ID3DRenderTarget>& terrainNormalTexture,
       Shadow* shadowContext
     ) override;
 
@@ -323,8 +323,7 @@ namespace moho
      * terrain triangle list. The retained overlay handle is released as the
      * by-value `shared_ptr` parameter goes out of scope.
      */
-    void
-    DrawTerrain(boost::shared_ptr<CD3DDynamicTextureSheet> overlayTexture, const fa::string* techniqueName) override;
+    void DrawTerrain(std::shared_ptr<CD3DDynamicTextureSheet> overlayTexture, const fa::string* techniqueName) override;
 
     /**
      * Address: 0x00801EE0 (FUN_00801EE0, Moho::HighFidelityTerrain::DrawDirtyTerrain)

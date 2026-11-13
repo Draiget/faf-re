@@ -105,7 +105,7 @@ float4 ImGuiPS(ImGuiPixel input) : SV_Target
     /** One texture ImGui asked for, kept in `ImTextureData::BackendUserData`. */
     struct TextureEntry
     {
-      boost::shared_ptr<gpg::gal::Texture> texture;
+      std::shared_ptr<gpg::gal::Texture> texture;
     };
 
     /** Copies ImGui's RGBA pixels into the BGRA texture, the whole level. */
@@ -129,9 +129,9 @@ float4 ImGuiPS(ImGuiPixel input) : SV_Target
       (void)texture.Unlock(0);
     }
     /** The editor's own images (CreateImage), by their ImTextureID. */
-    std::unordered_map<std::uint64_t, boost::shared_ptr<gpg::gal::Texture>>& OwnImages()
+    std::unordered_map<std::uint64_t, std::shared_ptr<gpg::gal::Texture>>& OwnImages()
     {
-      static std::unordered_map<std::uint64_t, boost::shared_ptr<gpg::gal::Texture>> images;
+      static std::unordered_map<std::uint64_t, std::shared_ptr<gpg::gal::Texture>> images;
       return images;
     }
   } // namespace
@@ -154,7 +154,7 @@ float4 ImGuiPS(ImGuiPixel input) : SV_Target
     context.mipmapLevels_ = 1U;
     context.width_ = static_cast<std::uint32_t>(width);
     context.height_ = static_cast<std::uint32_t>(height);
-    boost::shared_ptr<gpg::gal::Texture> texture = device->CreateTexture(&context);
+    std::shared_ptr<gpg::gal::Texture> texture = device->CreateTexture(&context);
     if (texture.get() == nullptr) {
       return 0U;
     }

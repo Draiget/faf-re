@@ -947,8 +947,8 @@ namespace
 
   // The getter's copy holds one reference; the field takes its own and `source` lets go at return.
   void AssignRetainedReconGrid(
-    boost::shared_ptr<moho::CIntelGrid>& destination,
-    const boost::shared_ptr<moho::CIntelGrid>& source
+    std::shared_ptr<moho::CIntelGrid>& destination,
+    const std::shared_ptr<moho::CIntelGrid>& source
   ) noexcept
   {
     destination = source;
@@ -2176,8 +2176,8 @@ namespace moho
   /**
    * Address: 0x006FDDF0 (FUN_006FDDF0, Moho::CArmyImpl::SetUnknownSharedRef)
    */
-  boost::shared_ptr<void>* CArmyImpl::SetUnknownSharedRef(
-    boost::shared_ptr<void>* value
+  std::shared_ptr<void>* CArmyImpl::SetUnknownSharedRef(
+    std::shared_ptr<void>* value
   )
   {
     if (value == nullptr) {
@@ -2192,8 +2192,8 @@ namespace moho
   /**
    * Address: 0x006FDE40 (FUN_006FDE40, Moho::CArmyImpl::GetUnknownSharedRef)
    */
-  boost::shared_ptr<void>* CArmyImpl::GetUnknownSharedRef(
-    boost::shared_ptr<void>* outValue
+  std::shared_ptr<void>* CArmyImpl::GetUnknownSharedRef(
+    std::shared_ptr<void>* outValue
   )
   {
     if (outValue == nullptr) {

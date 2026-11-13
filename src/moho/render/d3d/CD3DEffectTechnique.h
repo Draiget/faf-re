@@ -5,7 +5,7 @@
 #include "legacy/containers/Map.h"
 #include <cstdint>
 
-#include "boost/shared_ptr.h"
+#include <memory>
 #include "legacy/containers/String.h"
 #include "legacy/containers/Vector.h"
 
@@ -341,7 +341,7 @@ namespace moho
      * What it does:
      * Returns a new reference to the gal effect.
      */
-    [[nodiscard]] boost::shared_ptr<gpg::gal::Effect> GetBaseEffect();
+    [[nodiscard]] std::shared_ptr<gpg::gal::Effect> GetBaseEffect();
 
     /**
      * Address: 0x0042DA30 (FUN_0042DA30,
@@ -351,15 +351,15 @@ namespace moho
      * Resolves one effect variable by name and binds one texture handle (or
      * clears the slot when texture is null).
      */
-    void SetTexture(const char* variableName, boost::shared_ptr<ID3DTextureSheet> texture);
+    void SetTexture(const char* variableName, std::shared_ptr<ID3DTextureSheet> texture);
 
   public:
     AttachedLink* mAttachedLinks;                                   // +0x00
     TechniqueSet mTechniques;                                       // +0x04
     fa::string mName;                                               // +0x10
     fa::string mFile;                                               // +0x2C
-    boost::shared_ptr<gpg::gal::Effect> mEffect;                    // +0x48
-    boost::shared_ptr<gpg::gal::EffectTechnique> mCurrentTechnique; // +0x50
+    std::shared_ptr<gpg::gal::Effect> mEffect;                      // +0x48
+    std::shared_ptr<gpg::gal::EffectTechnique> mCurrentTechnique;   // +0x50
   };
 
   static_assert(

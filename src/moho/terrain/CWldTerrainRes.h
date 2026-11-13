@@ -110,7 +110,7 @@ namespace moho
      * What it does:
      * Returns one retained shared texture handle for terrain skycube.
      */
-    [[nodiscard]] boost::shared_ptr<ID3DTextureSheet> GetSkycube() const override;
+    [[nodiscard]] std::shared_ptr<ID3DTextureSheet> GetSkycube() const override;
 
     /**
      * Address: 0x008A1080 (FUN_008A1080,
@@ -140,7 +140,7 @@ namespace moho
      * What it does:
      * Returns one retained shared texture handle for terrain background.
      */
-    [[nodiscard]] boost::shared_ptr<ID3DTextureSheet> GetBackground() const override;
+    [[nodiscard]] std::shared_ptr<ID3DTextureSheet> GetBackground() const override;
 
     /**
      * Address: 0x008A1300 (FUN_008A1300)
@@ -171,7 +171,7 @@ namespace moho
      * What it does:
      * Returns one environment texture handle by key, with `<default>` fallback.
      */
-    [[nodiscard]] boost::shared_ptr<ID3DTextureSheet> GetEnvLookup(const fa::string& environmentKey) const override;
+    [[nodiscard]] std::shared_ptr<ID3DTextureSheet> GetEnvLookup(const fa::string& environmentKey) const override;
 
     /**
      * Address: 0x008A1500 (FUN_008A1500)
@@ -313,7 +313,7 @@ namespace moho
      * What it does:
      * Returns one retained shared texture handle for the terrain water map.
      */
-    [[nodiscard]] boost::shared_ptr<ID3DTextureSheet> GetWaterMap() const override;
+    [[nodiscard]] std::shared_ptr<ID3DTextureSheet> GetWaterMap() const override;
 
     /**
      * Address: 0x008A50F0 (FUN_008A50F0, ?UpdateWaterMap@CWldTerrainRes@Moho@@UAEXABV?$Rect2@H@gpg@@@Z)
@@ -806,7 +806,7 @@ namespace moho
      * Copies a packed RGBA texel buffer row-by-row into one dynamic texture
      * sheet lock.
      */
-    void UpdateTexture(boost::shared_ptr<CD3DDynamicTextureSheet> textureSheet, const std::uint32_t* sourcePixels);
+    void UpdateTexture(std::shared_ptr<CD3DDynamicTextureSheet> textureSheet, const std::uint32_t* sourcePixels);
 
     /**
      * Address: 0x008A4DA0 (FUN_008A4DA0,
@@ -815,7 +815,7 @@ namespace moho
      * What it does:
      * Clears one lockable terrain texture sheet to zero over all rows.
      */
-    void ClearTexture(boost::shared_ptr<CD3DDynamicTextureSheet> textureSheet);
+    void ClearTexture(std::shared_ptr<CD3DDynamicTextureSheet> textureSheet);
 
     /**
      * Address: 0x008A4B90 (FUN_008A4B90,
@@ -828,7 +828,7 @@ namespace moho
     void UpdateTextureChannel(
       std::int32_t rowStart,
       std::int32_t columnEnd,
-      boost::shared_ptr<CD3DDynamicTextureSheet> textureSheet,
+      std::shared_ptr<CD3DDynamicTextureSheet> textureSheet,
       std::int32_t columnStart,
       std::int32_t rowEnd,
       std::uint32_t channelMask,
@@ -845,7 +845,7 @@ namespace moho
      * writes unpacked bytes to caller-provided destination rows.
      */
     void GetTextureChannel(
-      boost::shared_ptr<CD3DDynamicTextureSheet> textureSheet,
+      std::shared_ptr<CD3DDynamicTextureSheet> textureSheet,
       std::uint32_t channelMask,
       std::uint32_t channelShift,
       std::uint8_t* outChannelData

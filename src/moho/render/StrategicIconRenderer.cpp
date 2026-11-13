@@ -153,7 +153,7 @@ namespace moho
   }
 
   std::uint16_t StrategicIconRenderer::AddSlot(
-    const boost::shared_ptr<CD3DBatchTexture>& texture
+    const std::shared_ptr<CD3DBatchTexture>& texture
   )
   {
     if (!texture) {
@@ -274,7 +274,7 @@ namespace moho
     }
     // Anything the batcher still holds was submitted before the icons.
     batcher.Flush();
-    const boost::shared_ptr<ID3DTextureSheet> sheet = batcher.mTextureBatcher->GetCompositeTexture();
+    const std::shared_ptr<ID3DTextureSheet> sheet = batcher.mTextureBatcher->GetCompositeTexture();
     if (sheet.get() == nullptr) {
       return nullptr;
     }

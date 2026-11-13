@@ -4,7 +4,7 @@
 #include <cstdint>
 #include <type_traits>
 
-#include "boost/shared_ptr.h"
+#include <memory>
 #include "gpg/gal/MeshVertex.h"
 
 namespace gpg::gal
@@ -51,7 +51,7 @@ namespace gpg::gal
      * records are laid out in (Device slot 14). `layoutVariant` selects
      * format 16 over 15 on the D3D9 float16 formatter; the others ignore it.
      */
-    [[nodiscard]] virtual boost::shared_ptr<VertexFormat> CreateVertexFormat(std::int32_t layoutVariant) = 0;
+    [[nodiscard]] virtual std::shared_ptr<VertexFormat> CreateVertexFormat(std::int32_t layoutVariant) = 0;
 
     /**
      * Address: 0x00A82547 (_purecall in MeshFormatter slot 3)

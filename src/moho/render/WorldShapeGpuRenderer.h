@@ -16,7 +16,7 @@
 #include <span>
 #include <vector>
 
-#include "boost/shared_ptr.h"
+#include <memory>
 #include "moho/render/GpuArrayStream.h"
 #include "moho/render/WorldShapeShader.h"
 
@@ -68,7 +68,7 @@ namespace moho
     bool mInitialized = false;
     bool mSupported = false;
     std::uint64_t mDraws = 0U;
-    boost::shared_ptr<gpg::gal::GpuProgram> mProgram;
+    std::shared_ptr<gpg::gal::GpuProgram> mProgram;
     std::vector<ViewStream> mStreams;
   };
 } // namespace moho

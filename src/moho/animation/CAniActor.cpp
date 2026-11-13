@@ -136,7 +136,7 @@ namespace
         continue;
       }
 
-      const boost::shared_ptr<const moho::CAniSkel> skeleton = ownerActor->GetSkeleton();
+      const std::shared_ptr<const moho::CAniSkel> skeleton = ownerActor->GetSkeleton();
       if (!skeleton) {
         continue;
       }
@@ -336,8 +336,8 @@ namespace moho
    * Address: 0x0063A8F0 (FUN_0063A8F0, ??0CAniActor@Moho@@QAE@ABV?$shared_ptr@VCAniPose@Moho@@@boost@@0@Z)
    */
   CAniActor::CAniActor(
-    const boost::shared_ptr<CAniPose>& pose,
-    const boost::shared_ptr<CAniPose>& priorPose
+    const std::shared_ptr<CAniPose>& pose,
+    const std::shared_ptr<CAniPose>& priorPose
   )
     : mPose(pose)
     , mPriorPose(priorPose)
@@ -406,8 +406,8 @@ namespace moho
       return;
     }
 
-    archive->PreCreatedPtr(gpg::MakeRRef(const_cast<boost::shared_ptr<CAniPose>*>(&mPose)));
-    archive->PreCreatedPtr(gpg::MakeRRef(const_cast<boost::shared_ptr<CAniPose>*>(&mPriorPose)));
+    archive->PreCreatedPtr(gpg::MakeRRef(const_cast<std::shared_ptr<CAniPose>*>(&mPose)));
+    archive->PreCreatedPtr(gpg::MakeRRef(const_cast<std::shared_ptr<CAniPose>*>(&mPriorPose)));
 
     archive->WritePointer(mPose.get(), gpg::TrackedPointerState::Shared, gpg::RRef{});
     archive->WritePointer(mPriorPose.get(), gpg::TrackedPointerState::Shared, gpg::RRef{});
@@ -417,7 +417,7 @@ namespace moho
   /**
    * Address: 0x005E3CF0 (FUN_005E3CF0, ?GetSkeleton@CAniActor@Moho@@QBE?AV?$shared_ptr@$$CBVCAniSkel@Moho@@@boost@@XZ)
    */
-  boost::shared_ptr<const CAniSkel> CAniActor::GetSkeleton() const
+  std::shared_ptr<const CAniSkel> CAniActor::GetSkeleton() const
   {
     POSE_WaitFor(this); // engine addition (sim_ParallelPose)
     return mPose->GetSkeleton();
@@ -429,7 +429,7 @@ namespace moho
    * What it does:
    * Returns one retained shared-ptr handle to this actor's current pose.
    */
-  boost::shared_ptr<CAniPose> CAniActor::GetPoseShared() const
+  std::shared_ptr<CAniPose> CAniActor::GetPoseShared() const
   {
     POSE_WaitFor(this); // engine addition (sim_ParallelPose)
     return mPose;
@@ -442,7 +442,7 @@ namespace moho
    * What it does:
    * Returns one retained shared-ptr handle to this actor's prior pose.
    */
-  boost::shared_ptr<CAniPose> CAniActor::GetPriorPoseShared() const
+  std::shared_ptr<CAniPose> CAniActor::GetPriorPoseShared() const
   {
     POSE_WaitFor(this); // engine addition (sim_ParallelPose)
     return mPriorPose;
@@ -459,8 +459,8 @@ namespace moho
    * (0x006ABB90) calls it.
    */
   void CAniActor::AssignPoses(
-    const boost::shared_ptr<CAniPose>& pose,
-    const boost::shared_ptr<CAniPose>& priorPose
+    const std::shared_ptr<CAniPose>& pose,
+    const std::shared_ptr<CAniPose>& priorPose
   ) noexcept
   {
     mPose = pose;
@@ -494,7 +494,7 @@ namespace moho
     // Engine addition (sim_RecyclePose): when unique, overwrite in-place without heap reallocation.
     // Not an 11-bone pose: the block order of the binary's allocator class depends on these (see SimBlockLane).
     if (
-      sim_RecyclePose && mPose != nullptr && mPose.unique() &&
+      sim_RecyclePose && mPose != nullptr && mPose.use_count() == 1 &&
       mPose->mBones.size() != CAniPoseBoneArray::kBinaryLaneBones
     ) {
       mPose->OverwritePose(*mPriorPose);
@@ -621,7 +621,7 @@ namespace moho
       const int boneIndex = static_cast<int>(lua_tonumber(rawState, stackIndex));
       bool isInvalid = true;
       if (boneIndex >= -2) {
-        const boost::shared_ptr<const CAniSkel> skeleton = GetSkeleton();
+        const std::shared_ptr<const CAniSkel> skeleton = GetSkeleton();
         const int boneCount = skeleton ? static_cast<int>(skeleton->mBones.size()) : 0;
         isInvalid = boneIndex >= boneCount;
       }
@@ -639,7 +639,7 @@ namespace moho
         boneName = "";
       }
 
-      const boost::shared_ptr<const CAniSkel> skeleton = GetSkeleton();
+      const std::shared_ptr<const CAniSkel> skeleton = GetSkeleton();
       const int boneIndex = skeleton ? skeleton->FindBoneIndex(boneName) : -1;
       if (boneIndex < 0) {
         const LuaPlus::LuaObject boneIdentifier(boneArg);

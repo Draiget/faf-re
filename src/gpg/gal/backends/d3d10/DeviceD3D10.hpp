@@ -13,8 +13,8 @@
 
 #include "AdapterD3D10.hpp"
 #include "CursorD3D10.hpp"
-#include "boost/shared_ptr.h"
-#include "boost/weak_ptr.h"
+#include <memory>
+#include <memory>
 #include "gpg/core/streams/MemBufferStream.h"
 #include "gpg/gal/Device.hpp"
 #include "gpg/gal/DeviceContext.hpp"
@@ -144,7 +144,7 @@ namespace gpg
        * What it does:
        * Returns the device's pipeline state.
        */
-      boost::shared_ptr<PipelineState> GetPipelineState() override;
+      std::shared_ptr<PipelineState> GetPipelineState() override;
       /**
        * Address: 0x008FEA00 (FUN_008FEA00)
        * Slot: 9
@@ -155,7 +155,7 @@ namespace gpg
        * wraps the result in an `EffectD3D10`, constructed straight into the
        * caller's return slot.
        */
-      boost::shared_ptr<Effect> CreateEffect(const EffectContext& context) override;
+      std::shared_ptr<Effect> CreateEffect(const EffectContext& context) override;
       /**
        * Address: 0x008FAD20 (FUN_008FAD20)
        * Slot: 10
@@ -164,7 +164,7 @@ namespace gpg
        * Creates one texture with its shader-resource view and wraps both in a
        * `TextureD3D10`.
        */
-      boost::shared_ptr<Texture> CreateTexture(const TextureContext* context) override;
+      std::shared_ptr<Texture> CreateTexture(const TextureContext* context) override;
       /**
        * Address: 0x008FB1D0 (FUN_008FB1D0)
        * Slot: 11
@@ -173,7 +173,7 @@ namespace gpg
        * Creates one render-target texture with its RTV/SRV pair and wraps them
        * in a `RenderTargetD3D10`.
        */
-      boost::shared_ptr<RenderTarget> CreateRenderTarget(const RenderTargetContext* context) override;
+      std::shared_ptr<RenderTarget> CreateRenderTarget(const RenderTargetContext* context) override;
       /**
        * Address: 0x008FA6B0 (FUN_008FA6B0)
        * Slot: 12
@@ -181,7 +181,7 @@ namespace gpg
        * What it does:
        * Returns an empty `CubeRenderTargetD3D10`; D3D10 has no cube targets.
        */
-      boost::shared_ptr<CubeRenderTarget> CreateCubeRenderTarget(const CubeRenderTargetContext* context) override;
+      std::shared_ptr<CubeRenderTarget> CreateCubeRenderTarget(const CubeRenderTargetContext* context) override;
       /**
        * Address: 0x008FB570 (FUN_008FB570)
        * Slot: 13
@@ -190,7 +190,7 @@ namespace gpg
        * Creates one depth texture with its DSV (and SRV when sampleable) and
        * wraps them in a `DepthStencilTargetD3D10`.
        */
-      boost::shared_ptr<DepthStencilTarget> CreateDepthStencilTarget(const DepthStencilTargetContext* context) override;
+      std::shared_ptr<DepthStencilTarget> CreateDepthStencilTarget(const DepthStencilTargetContext* context) override;
       /**
        * Address: 0x008FE220 (FUN_008FE220)
        * Slot: 14
@@ -198,7 +198,7 @@ namespace gpg
        * What it does:
        * Builds the input layout for gal vertex format `formatToken`.
        */
-      boost::shared_ptr<VertexFormat> CreateVertexFormat(std::uint32_t formatToken) override;
+      std::shared_ptr<VertexFormat> CreateVertexFormat(std::uint32_t formatToken) override;
       /**
        * Address: 0x008FB8D0 (FUN_008FB8D0)
        * Slot: 15
@@ -206,7 +206,7 @@ namespace gpg
        * What it does:
        * Creates one GPU vertex buffer and its staging buffer.
        */
-      boost::shared_ptr<VertexBuffer> CreateVertexBuffer(const VertexBufferContext* context) override;
+      std::shared_ptr<VertexBuffer> CreateVertexBuffer(const VertexBufferContext* context) override;
       /**
        * Address: 0x008FBB60 (FUN_008FBB60)
        * Slot: 16
@@ -214,7 +214,7 @@ namespace gpg
        * What it does:
        * Creates one GPU index buffer and its staging buffer.
        */
-      boost::shared_ptr<IndexBuffer> CreateIndexBuffer(const IndexBufferContext* context) override;
+      std::shared_ptr<IndexBuffer> CreateIndexBuffer(const IndexBufferContext* context) override;
       /**
        * Address: 0x008FC540
        * Slot: 17
@@ -224,8 +224,8 @@ namespace gpg
        * `CopyResource`.
        */
       void GetRenderTargetData(
-        const boost::shared_ptr<RenderTarget>& source,
-        const boost::shared_ptr<Texture>& destination
+        const std::shared_ptr<RenderTarget>& source,
+        const std::shared_ptr<Texture>& destination
       ) override;
       /**
        * Address: 0x008FC290
@@ -236,8 +236,8 @@ namespace gpg
        * otherwise draws the source into the destination through the RTT effect.
        */
       void StretchRect(
-        const boost::shared_ptr<RenderTarget>& source,
-        const boost::shared_ptr<RenderTarget>& destination,
+        const std::shared_ptr<RenderTarget>& source,
+        const std::shared_ptr<RenderTarget>& destination,
         const RECT* sourceRect,
         const RECT* destinationRect
       ) override;
@@ -251,8 +251,8 @@ namespace gpg
        * destination rectangle's top-left corner is used.
        */
       void UpdateSurface(
-        const boost::shared_ptr<Texture>& source,
-        const boost::shared_ptr<Texture>& destination,
+        const std::shared_ptr<Texture>& source,
+        const std::shared_ptr<Texture>& destination,
         const RECT* sourceRect,
         const RECT* destinationRect
       ) override;
@@ -264,7 +264,7 @@ namespace gpg
        * D3D10 cannot save a cube target (`ret 8`).
        */
       void
-      SaveCubeRenderTarget(const boost::shared_ptr<CubeRenderTarget>& cubeTarget, const fa::string& filePath) override;
+      SaveCubeRenderTarget(const std::shared_ptr<CubeRenderTarget>& cubeTarget, const fa::string& filePath) override;
       /**
        * Address: 0x008FC9B0
        * Slot: 21
@@ -274,7 +274,7 @@ namespace gpg
        * `fileFormat`.
        */
       void SaveRenderTarget(
-        const boost::shared_ptr<RenderTarget>& renderTarget,
+        const std::shared_ptr<RenderTarget>& renderTarget,
         const fa::string& filePath,
         int fileFormat
       ) override;
@@ -287,7 +287,7 @@ namespace gpg
        * non-null.
        */
       void SaveTexture(
-        const boost::shared_ptr<Texture>& texture,
+        const std::shared_ptr<Texture>& texture,
         const fa::string& filePath,
         int fileFormat,
         gpg::MemBuffer<char>* outBuffer
@@ -317,8 +317,8 @@ namespace gpg
        * Resets caller weak-handle output lane and consumes one temporary shared-handle
        * argument by value.
        */
-      boost::weak_ptr<void>*
-      Func7(boost::weak_ptr<void>* outWeakHandle, boost::shared_ptr<void> temporarySharedHandle) override;
+      std::weak_ptr<void>*
+      Func7(std::weak_ptr<void>* outWeakHandle, std::shared_ptr<void> temporarySharedHandle) override;
       /**
        * Address: 0x008F8710
        * Slot: 26
@@ -459,7 +459,7 @@ namespace gpg
        * What it does:
        * Binds `vertexFormat`'s input layout.
        */
-      void SetVertexDeclaration(boost::shared_ptr<VertexFormat> vertexFormat) override;
+      void SetVertexDeclaration(std::shared_ptr<VertexFormat> vertexFormat) override;
       /**
        * Address: 0x008F9690
        * Slot: 41
@@ -469,7 +469,7 @@ namespace gpg
        */
       void SetVertexBuffer(
         std::uint32_t streamSlot,
-        boost::shared_ptr<VertexBuffer> vertexBuffer,
+        std::shared_ptr<VertexBuffer> vertexBuffer,
         int streamFrequencyToken,
         int startVertex
       ) override;
@@ -480,7 +480,7 @@ namespace gpg
        * What it does:
        * Binds `indexBuffer` as the index source.
        */
-      void SetBufferIndices(boost::shared_ptr<IndexBuffer> indexBuffer) override;
+      void SetBufferIndices(std::shared_ptr<IndexBuffer> indexBuffer) override;
       /**
        * Address: 0x008FE6D0
        * Slot: 43
@@ -720,7 +720,7 @@ namespace gpg
       DeviceContext mDeviceContext{DeviceApi::Unset};                           // +0x60
       fa::vector<AdapterD3D10> mAdapters{};                                     // +0x94
       fa::vector<IDXGISwapChain*> mSwapChains{};                                // +0xA4
-      boost::shared_ptr<PipelineStateD3D10> mPipelineState{};                   // +0xB4
+      std::shared_ptr<PipelineStateD3D10> mPipelineState{};                     // +0xB4
       IDXGIFactory* mDXGIFactory = nullptr;                                     // +0xBC
       ID3D10Device* mDevice = nullptr;                                          // +0xC0
       ID3D10Effect* mSignatureEffect = nullptr;       // +0xC4  from kSignaturePreambleEffectSource

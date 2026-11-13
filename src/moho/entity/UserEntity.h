@@ -3,7 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 
-#include "boost/shared_ptr.h"
+#include <memory>
 #include "legacy/containers/String.h"
 #include "moho/audio/CSndParams.h"
 #include "moho/containers/TDatList.h"
@@ -239,7 +239,7 @@ namespace moho
      * Selects UI selection-bracket texture lane from alliance relation and unit
      * intel-state flags.
      */
-    [[nodiscard]] boost::shared_ptr<CD3DBatchTexture> GetSelectionBracketTexture(const UserArmy* viewingArmy) const;
+    [[nodiscard]] std::shared_ptr<CD3DBatchTexture> GetSelectionBracketTexture(const UserArmy* viewingArmy) const;
 
     /**
      * Address: 0x008B97C0 (FUN_008B97C0,
@@ -275,7 +275,7 @@ namespace moho
      * Applies one shared animation pose to both runtime pose lanes, ensures
      * static-pose mesh stance mode, and refreshes spatial-db bounds.
      */
-    void SetPose(const boost::shared_ptr<CAniPose>& pose);
+    void SetPose(const std::shared_ptr<CAniPose>& pose);
 
     /**
      * Address: 0x00838030 (FUN_00838030, ?GetAttachmentParent@UserEntity@Moho@@QAEPAV12@XZ)
@@ -296,8 +296,8 @@ namespace moho
     /// as an ordinary member destructor at 0x008B888D.
     SpatialDBEntry<UserEntity> mSpatialDbEntry; // 0x10
     VisionDB::Handle* mVisionHandle;            // 0x18
-    boost::shared_ptr<CAniPose> mPosePrimary;   // 0x1C
-    boost::shared_ptr<CAniPose> mPoseSecondary; // 0x24
+    std::shared_ptr<CAniPose> mPosePrimary;     // 0x1C
+    std::shared_ptr<CAniPose> mPoseSecondary;   // 0x24
     MeshInstance* mMeshInstance;                // 0x2C
     /**
      * The entity's own ambient sound loop, stored inline rather than behind a

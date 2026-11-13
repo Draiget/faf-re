@@ -255,7 +255,7 @@ void moho::CMauiMovie::DoRender(
   // Slot 14 hands back a retained (px, pi) pair, which the binary pushes as
   // two words into the sheet overload of SetTexture (0x00438870) - not the
   // CD3DBatchTexture overload.
-  boost::shared_ptr<ID3DTextureSheet> movieSheet{};
+  std::shared_ptr<ID3DTextureSheet> movieSheet{};
   moviePlayback->GetTextureSheetHandle(&movieSheet);
   primBatcher->SetTexture(movieSheet);
 

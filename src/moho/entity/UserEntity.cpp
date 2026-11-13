@@ -77,7 +77,7 @@ namespace
    */
   void CreateCAniPoseSharedPtr(
     moho::CAniPose* const pose,
-    boost::shared_ptr<moho::CAniPose>& out
+    std::shared_ptr<moho::CAniPose>& out
   )
   {
     out.reset(pose);
@@ -119,16 +119,16 @@ namespace
   }
 
   [[nodiscard]] bool TryRestorePose(
-    const boost::shared_ptr<moho::CAniPose>& destination,
-    const boost::shared_ptr<moho::CAniPose>& source
+    const std::shared_ptr<moho::CAniPose>& destination,
+    const std::shared_ptr<moho::CAniPose>& source
   )
   {
     if (!destination || !source) {
       return false;
     }
 
-    const boost::shared_ptr<const moho::CAniSkel> dstSkeleton = destination->GetSkeleton();
-    const boost::shared_ptr<const moho::CAniSkel> srcSkeleton = source->GetSkeleton();
+    const std::shared_ptr<const moho::CAniSkel> dstSkeleton = destination->GetSkeleton();
+    const std::shared_ptr<const moho::CAniSkel> srcSkeleton = source->GetSkeleton();
     if (!dstSkeleton || !srcSkeleton || dstSkeleton.get() != srcSkeleton.get()) {
       return false;
     }
@@ -438,8 +438,8 @@ namespace moho
     bool restoredPrimaryPose = false;
     if (update.mRequiresMeshRebuild) {
       if (mMeshInstance != nullptr && variableData.mMeshBlueprint != nullptr) {
-        const boost::shared_ptr<CAniPose> oldPrimaryPose = mPosePrimary;
-        const boost::shared_ptr<CAniPose> oldSecondaryPose = mPoseSecondary;
+        const std::shared_ptr<CAniPose> oldPrimaryPose = mPosePrimary;
+        const std::shared_ptr<CAniPose> oldSecondaryPose = mPoseSecondary;
         DestroyMeshInstance();
 
         if (variableData.mScmResource.get() != nullptr) {
@@ -657,7 +657,7 @@ namespace moho
       static_cast<const RMeshBlueprint*>(mVariableData.mMeshBlueprint),
       mVariableData.mScale,
       forUnitPose,
-      boost::shared_ptr<MeshMaterial>{}
+      std::shared_ptr<MeshMaterial>{}
     );
 
     if (mMeshInstance) {
@@ -668,9 +668,9 @@ namespace moho
       return;
     }
 
-    const boost::shared_ptr<Mesh> mesh = mMeshInstance->GetMesh();
-    const boost::shared_ptr<RScmResource> resource = mesh->GetResource(0);
-    const boost::shared_ptr<const CAniSkel> skeleton = resource->GetSkeleton();
+    const std::shared_ptr<Mesh> mesh = mMeshInstance->GetMesh();
+    const std::shared_ptr<RScmResource> resource = mesh->GetResource(0);
+    const std::shared_ptr<const CAniSkel> skeleton = resource->GetSkeleton();
 
     auto* const primaryPose = new CAniPose(skeleton, mVariableData.mCurImpactValue);
     CreateCAniPoseSharedPtr(primaryPose, mPosePrimary);
@@ -711,7 +711,7 @@ namespace moho
    * and spatial-db swept bounds.
    */
   void UserEntity::SetPose(
-    const boost::shared_ptr<CAniPose>& pose
+    const std::shared_ptr<CAniPose>& pose
   )
   {
     if (mMeshInstance == nullptr) {
@@ -772,7 +772,7 @@ namespace moho
    * Selects one selection-bracket texture from alliance relation, and suppresses
    * enemy brackets when the user-unit intel-state visibility bit is clear.
    */
-  boost::shared_ptr<CD3DBatchTexture> UserEntity::GetSelectionBracketTexture(
+  std::shared_ptr<CD3DBatchTexture> UserEntity::GetSelectionBracketTexture(
     const UserArmy* const viewingArmy
   ) const
   {

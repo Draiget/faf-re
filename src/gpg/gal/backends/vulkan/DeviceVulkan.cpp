@@ -2148,12 +2148,12 @@ namespace gpg::gal
     return &mHeadOutputContexts[headIndex];
   }
 
-  boost::shared_ptr<PipelineState> DeviceVulkan::GetPipelineState()
+  std::shared_ptr<PipelineState> DeviceVulkan::GetPipelineState()
   {
     return mPipelineState;
   }
 
-  boost::shared_ptr<Effect> DeviceVulkan::CreateEffect(
+  std::shared_ptr<Effect> DeviceVulkan::CreateEffect(
     const EffectContext& context
   )
   {
@@ -2242,10 +2242,10 @@ namespace gpg::gal
       static_cast<unsigned>(program->Parameters().Constants().size()),
       ::GetTickCount() - started
     );
-    return boost::shared_ptr<Effect>(new ProgramEffect(context, program, *this));
+    return std::shared_ptr<Effect>(new ProgramEffect(context, program, *this));
   }
 
-  boost::shared_ptr<Texture> DeviceVulkan::CreateTexture(
+  std::shared_ptr<Texture> DeviceVulkan::CreateTexture(
     const TextureContext* const context
   )
   {
@@ -2359,12 +2359,12 @@ namespace gpg::gal
     view.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0U, levels, 0U, layers};
     VkImageView imageView = VK_NULL_HANDLE;
     CheckVk("DeviceVulkan.cpp", __LINE__, Vk().vkCreateImageView(mDevice, &view, nullptr, &imageView));
-    return boost::shared_ptr<Texture>(
+    return std::shared_ptr<Texture>(
       new TextureVulkan(*context, tracked, imageView, dxgiFormat, cube, contentsFromEngine)
     );
   }
 
-  boost::shared_ptr<RenderTarget> DeviceVulkan::CreateRenderTarget(
+  std::shared_ptr<RenderTarget> DeviceVulkan::CreateRenderTarget(
     const RenderTargetContext* const context
   )
   {
@@ -2383,17 +2383,17 @@ namespace gpg::gal
     SetViewport(&viewport);
 
     std::vector<RenderTargetVulkan::Buffer> buffers{buffer};
-    return boost::shared_ptr<RenderTarget>(new RenderTargetVulkan(std::move(buffers), dxgiFormat, -1));
+    return std::shared_ptr<RenderTarget>(new RenderTargetVulkan(std::move(buffers), dxgiFormat, -1));
   }
 
-  boost::shared_ptr<CubeRenderTarget> DeviceVulkan::CreateCubeRenderTarget(
+  std::shared_ptr<CubeRenderTarget> DeviceVulkan::CreateCubeRenderTarget(
     const CubeRenderTargetContext* const context
   )
   {
-    return boost::shared_ptr<CubeRenderTarget>(new CubeRenderTargetVulkan(*context));
+    return std::shared_ptr<CubeRenderTarget>(new CubeRenderTargetVulkan(*context));
   }
 
-  boost::shared_ptr<DepthStencilTarget> DeviceVulkan::CreateDepthStencilTarget(
+  std::shared_ptr<DepthStencilTarget> DeviceVulkan::CreateDepthStencilTarget(
     const DepthStencilTargetContext* const context
   )
   {
@@ -2449,33 +2449,33 @@ namespace gpg::gal
       view.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
       CheckVk("DeviceVulkan.cpp", __LINE__, Vk().vkCreateImageView(mDevice, &view, nullptr, &sampledView));
     }
-    return boost::shared_ptr<DepthStencilTarget>(new DepthStencilTargetVulkan(*context, image, imageView, sampledView));
+    return std::shared_ptr<DepthStencilTarget>(new DepthStencilTargetVulkan(*context, image, imageView, sampledView));
   }
 
-  boost::shared_ptr<VertexFormat> DeviceVulkan::CreateVertexFormat(
+  std::shared_ptr<VertexFormat> DeviceVulkan::CreateVertexFormat(
     const std::uint32_t formatCode
   )
   {
     if (formatCode >= d3d11::kVertexFormatCount || d3d11::VertexLayoutElements(formatCode).empty()) {
       ThrowError("DeviceVulkan.cpp", __LINE__, "invalid vertex format specified");
     }
-    return boost::shared_ptr<VertexFormat>(new VertexFormatVulkan(formatCode));
+    return std::shared_ptr<VertexFormat>(new VertexFormatVulkan(formatCode));
   }
 
-  boost::shared_ptr<VertexBuffer> DeviceVulkan::CreateVertexBuffer(
+  std::shared_ptr<VertexBuffer> DeviceVulkan::CreateVertexBuffer(
     const VertexBufferContext* const context
   )
   {
     const std::lock_guard<std::recursive_mutex> lock(mMutex);
-    return boost::shared_ptr<VertexBuffer>(new VertexBufferVulkan(*context));
+    return std::shared_ptr<VertexBuffer>(new VertexBufferVulkan(*context));
   }
 
-  boost::shared_ptr<IndexBuffer> DeviceVulkan::CreateIndexBuffer(
+  std::shared_ptr<IndexBuffer> DeviceVulkan::CreateIndexBuffer(
     const IndexBufferContext* const context
   )
   {
     const std::lock_guard<std::recursive_mutex> lock(mMutex);
-    return boost::shared_ptr<IndexBuffer>(new IndexBufferVulkan(*context));
+    return std::shared_ptr<IndexBuffer>(new IndexBufferVulkan(*context));
   }
 
   void DeviceVulkan::CopyImage(
@@ -2545,8 +2545,8 @@ namespace gpg::gal
   }
 
   void DeviceVulkan::GetRenderTargetData(
-    const boost::shared_ptr<RenderTarget>& source,
-    const boost::shared_ptr<Texture>& destination
+    const std::shared_ptr<RenderTarget>& source,
+    const std::shared_ptr<Texture>& destination
   )
   {
     if (source == nullptr) {
@@ -2564,8 +2564,8 @@ namespace gpg::gal
   }
 
   void DeviceVulkan::StretchRect(
-    const boost::shared_ptr<RenderTarget>& source,
-    const boost::shared_ptr<RenderTarget>& destination,
+    const std::shared_ptr<RenderTarget>& source,
+    const std::shared_ptr<RenderTarget>& destination,
     const RECT* const sourceRect,
     const RECT* const destinationRect
   )
@@ -2599,8 +2599,8 @@ namespace gpg::gal
   }
 
   void DeviceVulkan::UpdateSurface(
-    const boost::shared_ptr<Texture>& source,
-    const boost::shared_ptr<Texture>& destination,
+    const std::shared_ptr<Texture>& source,
+    const std::shared_ptr<Texture>& destination,
     const RECT* const sourceRect,
     const RECT* const destinationRect
   )
@@ -2644,7 +2644,7 @@ namespace gpg::gal
   }
 
   void DeviceVulkan::SaveCubeRenderTarget(
-    const boost::shared_ptr<CubeRenderTarget>& cubeTarget,
+    const std::shared_ptr<CubeRenderTarget>& cubeTarget,
     const fa::string& filePath
   )
   {
@@ -2653,7 +2653,7 @@ namespace gpg::gal
   }
 
   void DeviceVulkan::SaveRenderTarget(
-    const boost::shared_ptr<RenderTarget>& renderTarget,
+    const std::shared_ptr<RenderTarget>& renderTarget,
     const fa::string& filePath,
     const int fileFormat
   )
@@ -2672,7 +2672,7 @@ namespace gpg::gal
   }
 
   void DeviceVulkan::SaveTexture(
-    const boost::shared_ptr<Texture>& texture,
+    const std::shared_ptr<Texture>& texture,
     const fa::string& filePath,
     const int fileFormat,
     gpg::MemBuffer<char>* const outBuffer
@@ -2737,9 +2737,9 @@ namespace gpg::gal
     std::memcpy(outTextureData->GetPtr(0U, 0U), image.bytes.data() + top.offset, top.slicePitch);
   }
 
-  boost::weak_ptr<void>* DeviceVulkan::Func7(
-    boost::weak_ptr<void>* const outWeakHandle,
-    boost::shared_ptr<void> temporarySharedHandle
+  std::weak_ptr<void>* DeviceVulkan::Func7(
+    std::weak_ptr<void>* const outWeakHandle,
+    std::shared_ptr<void> temporarySharedHandle
   )
   {
     static_cast<void>(temporarySharedHandle);
@@ -3080,7 +3080,7 @@ namespace gpg::gal
   void DeviceVulkan::ClearTextures() {}
 
   void DeviceVulkan::SetVertexDeclaration(
-    const boost::shared_ptr<VertexFormat> vertexFormat
+    const std::shared_ptr<VertexFormat> vertexFormat
   )
   {
     RecordStateChange();
@@ -3089,7 +3089,7 @@ namespace gpg::gal
 
   void DeviceVulkan::SetVertexBuffer(
     const std::uint32_t streamSlot,
-    const boost::shared_ptr<VertexBuffer> vertexBuffer,
+    const std::shared_ptr<VertexBuffer> vertexBuffer,
     const int streamFrequencyToken,
     const int startVertex
   )
@@ -3106,7 +3106,7 @@ namespace gpg::gal
   }
 
   void DeviceVulkan::SetBufferIndices(
-    const boost::shared_ptr<IndexBuffer> indexBuffer
+    const std::shared_ptr<IndexBuffer> indexBuffer
   )
   {
     RecordStateChange();

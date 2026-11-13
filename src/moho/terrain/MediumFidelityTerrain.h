@@ -3,8 +3,8 @@
 #include <cstddef>
 #include <cstdint>
 
-#include "boost/shared_ptr.h"
-#include "boost/weak_ptr.h"
+#include <memory>
+#include <memory>
 #include "gpg/core/containers/FastVector.h"
 #include "gpg/gal/Matrix.h"
 #include "legacy/containers/String.h"
@@ -150,7 +150,7 @@ namespace moho
      * normalization constants, and forwards the optional terrain-normal texture
      * weak handle into the active terrain effect.
      */
-    void LoadShaderVars(const boost::shared_ptr<ID3DRenderTarget>& terrainNormalTexture);
+    void LoadShaderVars(const std::shared_ptr<ID3DRenderTarget>& terrainNormalTexture);
 
     /**
      * Address: 0x00805600 (FUN_00805600, sub_805600)
@@ -219,8 +219,7 @@ namespace moho
      * texture, loads the base terrain shader vars, and submits the terrain
      * triangle list. Releases the retained overlay-texture handle on return.
      */
-    void
-    DrawTerrain(boost::shared_ptr<CD3DDynamicTextureSheet> overlayTexture, const fa::string* techniqueName) override;
+    void DrawTerrain(std::shared_ptr<CD3DDynamicTextureSheet> overlayTexture, const fa::string* techniqueName) override;
 
     /**
      * Address: 0x00807410 (FUN_00807410, Moho::MediumFidelityTerrain::DrawWaterLine)
@@ -256,7 +255,7 @@ namespace moho
     bool DrawNormals(
       std::int32_t gameTick,
       float deltaSeconds,
-      const boost::shared_ptr<ID3DRenderTarget>& terrainNormalTexture,
+      const std::shared_ptr<ID3DRenderTarget>& terrainNormalTexture,
       Shadow* shadowContext
     ) override;
 
@@ -312,8 +311,8 @@ namespace moho
     void DrawWaterTerrain(
       std::int32_t tick,
       float tickLerp,
-      boost::shared_ptr<ID3DRenderTarget> refractionTexture,
-      boost::shared_ptr<ID3DRenderTarget> reflectionTexture
+      std::shared_ptr<ID3DRenderTarget> refractionTexture,
+      std::shared_ptr<ID3DRenderTarget> reflectionTexture
     ) override;
 
     /**

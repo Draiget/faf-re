@@ -1163,12 +1163,12 @@ namespace moho
   /**
    * Address: 0x0070BAB0 (FUN_0070BAB0, Moho::CArmyStats::GetTrigger)
    */
-  boost::shared_ptr<STrigger>* CArmyStats::GetTrigger(
-    boost::shared_ptr<STrigger>* outTrigger,
+  std::shared_ptr<STrigger>* CArmyStats::GetTrigger(
+    std::shared_ptr<STrigger>* outTrigger,
     const char* triggerName
   )
   {
-    for (const boost::shared_ptr<STrigger>& trigger : mTriggers) {
+    for (const std::shared_ptr<STrigger>& trigger : mTriggers) {
       if (_stricmp(trigger->mName.c_str(), triggerName) == 0) {
         *outTrigger = trigger;
         return outTrigger;
@@ -1191,7 +1191,7 @@ namespace moho
     const float triggerValue
   )
   {
-    boost::shared_ptr<STrigger> trigger;
+    std::shared_ptr<STrigger> trigger;
     armyStats->GetTrigger(&trigger, triggerName);
     if (!trigger) {
       gpg::Warnf("Trigger %s does not exist.", triggerName);
@@ -1222,7 +1222,7 @@ namespace moho
     const char* const triggerName
   )
   {
-    boost::shared_ptr<STrigger> trigger;
+    std::shared_ptr<STrigger> trigger;
     GetTrigger(&trigger, triggerName);
     if (trigger) {
       return;
@@ -1231,7 +1231,7 @@ namespace moho
     // Route the per-T raw-pointer ctor through the canonical helper
     // (FUN_007134C0) so the MSVC8 `shared_ptr<STrigger>(STrigger*)`
     // template emission symbol is preserved.
-    boost::shared_ptr<STrigger> created;
+    std::shared_ptr<STrigger> created;
     ConstructSharedSTriggerFromRaw(created, new STrigger());
     created->mName = triggerName ? triggerName : "";
 
@@ -1266,7 +1266,7 @@ namespace moho
   {
     ArmyTriggerList fired;
     for (ArmyTriggerList::iterator it = mTriggers.begin(); it != mTriggers.end();) {
-      const boost::shared_ptr<STrigger> trigger = *it;
+      const std::shared_ptr<STrigger> trigger = *it;
       const auto& conditions = trigger->mConditions;
       if (conditions.Empty()) {
         ++it;
@@ -1289,7 +1289,7 @@ namespace moho
       }
     }
 
-    for (const boost::shared_ptr<STrigger>& trigger : fired) {
+    for (const std::shared_ptr<STrigger>& trigger : fired) {
       (void)mOwnerArmy->RunScript(kOnStatsTriggerScriptName, trigger->mName.c_str());
     }
   }
@@ -1350,7 +1350,7 @@ namespace moho
    * per-T template emission symbol for `T = STrigger`.
    */
   void ConstructSharedSTriggerFromRaw(
-    boost::shared_ptr<STrigger>& out,
+    std::shared_ptr<STrigger>& out,
     STrigger* const raw
   )
   {

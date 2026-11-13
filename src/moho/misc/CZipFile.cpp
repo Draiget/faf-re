@@ -168,7 +168,7 @@ namespace
 
   [[nodiscard]]
   gpg::MemBuffer<const char> MakeConstMemBuffer(
-    const boost::shared_ptr<const char>& sharedData,
+    const std::shared_ptr<const char>& sharedData,
     const std::size_t byteCount
   )
   {
@@ -356,7 +356,7 @@ namespace moho
         break;
       }
 
-      boost::shared_ptr<CZipFileEntry> parsedEntry(new CZipFileEntry(), ZipFileEntrySharedDeleter{});
+      std::shared_ptr<CZipFileEntry> parsedEntry(new CZipFileEntry(), ZipFileEntrySharedDeleter{});
       parsedEntry->mGeneralPurposeFlags = directoryHeader.mGeneralPurposeFlags;
       parsedEntry->mCompressionMethod = directoryHeader.mCompressionMethod;
       parsedEntry->mDosDate = directoryHeader.mDosDate;

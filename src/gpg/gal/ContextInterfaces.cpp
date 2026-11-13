@@ -258,7 +258,7 @@ namespace gpg::gal
    * (`[vtbl+0x28]`). Callers: `RD3DTextureResource` (0x0043DAA0) and
    * `CD3DDynamicTextureSheet` (0x0043E8E0, 0x00442940).
    */
-  boost::shared_ptr<Texture> Texture::Create(
+  std::shared_ptr<Texture> Texture::Create(
     const TextureContext& context
   )
   {
@@ -554,7 +554,7 @@ namespace gpg::gal
    * Creates one depth/stencil target on the active device through its
    * slot 13 (`[vtbl+0x34]`).
    */
-  boost::shared_ptr<DepthStencilTarget> DepthStencilTarget::Create(
+  std::shared_ptr<DepthStencilTarget> DepthStencilTarget::Create(
     const DepthStencilTargetContext& context
   )
   {
@@ -877,7 +877,7 @@ namespace gpg::gal
    * Creates one index buffer on the active device through its slot 16
    * (`[vtbl+0x40]`). Caller: `CD3DIndexSheet::CreateBuffer` (0x0043F737).
    */
-  boost::shared_ptr<IndexBuffer> IndexBuffer::Create(
+  std::shared_ptr<IndexBuffer> IndexBuffer::Create(
     const IndexBufferContext& context
   )
   {
@@ -906,8 +906,8 @@ namespace gpg::gal
    * cube handle at +0x04 empty.
    */
   OutputContext::OutputContext(
-    const boost::shared_ptr<RenderTarget> surface,
-    const boost::shared_ptr<DepthStencilTarget> depthStencil
+    const std::shared_ptr<RenderTarget> surface,
+    const std::shared_ptr<DepthStencilTarget> depthStencil
   )
     : cubeTarget()
     , surface(surface)
@@ -922,9 +922,9 @@ namespace gpg::gal
    * leaving the 2D surface handle empty.
    */
   OutputContext::OutputContext(
-    const boost::shared_ptr<CubeRenderTarget> cubeTarget,
+    const std::shared_ptr<CubeRenderTarget> cubeTarget,
     const std::int32_t face,
-    const boost::shared_ptr<DepthStencilTarget> depthStencil
+    const std::shared_ptr<DepthStencilTarget> depthStencil
   )
     : cubeTarget(cubeTarget)
     , face(face)
@@ -1004,7 +1004,7 @@ namespace gpg::gal
    * Creates one render target on the active device through its slot 11
    * (`[vtbl+0x2C]`).
    */
-  boost::shared_ptr<RenderTarget> RenderTarget::Create(
+  std::shared_ptr<RenderTarget> RenderTarget::Create(
     const RenderTargetContext& context
   )
   {
@@ -1056,7 +1056,7 @@ namespace gpg::gal
    * Creates one vertex buffer on the active device through its slot 15
    * (`[vtbl+0x3C]`). Caller: `CD3DVertexStream::CreateBuffer` (0x0043FC20).
    */
-  boost::shared_ptr<VertexBuffer> VertexBuffer::Create(
+  std::shared_ptr<VertexBuffer> VertexBuffer::Create(
     const VertexBufferContext& context
   )
   {
@@ -1071,7 +1071,7 @@ namespace gpg::gal
    * slot 14 (`[vtbl+0x38]`). Caller: `CD3DVertexFormat`'s constructor
    * (0x0043CFE6).
    */
-  boost::shared_ptr<VertexFormat> VertexFormat::Create(
+  std::shared_ptr<VertexFormat> VertexFormat::Create(
     const std::uint32_t formatCode
   )
   {

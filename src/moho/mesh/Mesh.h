@@ -5,7 +5,7 @@
 #include <map>
 #include <vector>
 
-#include "boost/shared_ptr.h"
+#include <memory>
 #include "gpg/core/containers/FastVector.h"
 #include "gpg/core/containers/String.h"
 #include "legacy/containers/Map.h"
@@ -110,7 +110,7 @@ namespace moho
      * What it does:
      * Builds one material from one mesh LOD blueprint descriptor.
      */
-    static boost::shared_ptr<MeshMaterial>
+    static std::shared_ptr<MeshMaterial>
     Create(const RMeshBlueprintLOD& blueprintLod, CResourceWatcher* resourceWatcher);
 
     /**
@@ -120,7 +120,7 @@ namespace moho
      * What it does:
      * Creates one mesh material and resolves per-texture sheet handles from paths.
      */
-    static boost::shared_ptr<MeshMaterial> Create(
+    static std::shared_ptr<MeshMaterial> Create(
       const fa::string& shaderName,
       const fa::string& albedoName,
       const fa::string& normalsName,
@@ -141,12 +141,12 @@ namespace moho
     // is their shared `ID3DTextureSheet` base, which sits at offset 0 in each,
     // so the raw pointer stored is the same word the binary stores.
     fa::string mShaderAnnotation;                          // +0x04
-    boost::shared_ptr<ID3DTextureSheet> mAlbedoSheet;      // +0x20
-    boost::shared_ptr<ID3DTextureSheet> mNormalsSheet;     // +0x28
-    boost::shared_ptr<ID3DTextureSheet> mSpecularSheet;    // +0x30
-    boost::shared_ptr<ID3DTextureSheet> mLookupSheet;      // +0x38
-    boost::shared_ptr<ID3DTextureSheet> mSecondarySheet;   // +0x40
-    boost::shared_ptr<ID3DTextureSheet> mEnvironmentSheet; // +0x48
+    std::shared_ptr<ID3DTextureSheet> mAlbedoSheet;        // +0x20
+    std::shared_ptr<ID3DTextureSheet> mNormalsSheet;       // +0x28
+    std::shared_ptr<ID3DTextureSheet> mSpecularSheet;      // +0x30
+    std::shared_ptr<ID3DTextureSheet> mLookupSheet;        // +0x38
+    std::shared_ptr<ID3DTextureSheet> mSecondarySheet;     // +0x40
+    std::shared_ptr<ID3DTextureSheet> mEnvironmentSheet;   // +0x48
     std::int32_t mShaderIndex;                             // +0x50
     // The two technique names the cartographic and depth passes resolve from
     // `mShaderAnnotation` the first time they reach this material
@@ -182,8 +182,8 @@ namespace moho
      */
     MeshLOD(
       const RMeshBlueprintLOD& blueprintLod,
-      boost::shared_ptr<RScmResource> previousResource,
-      boost::shared_ptr<MeshMaterial> material,
+      std::shared_ptr<RScmResource> previousResource,
+      std::shared_ptr<MeshMaterial> material,
       CResourceWatcher* ownerWatcher
     );
 
@@ -195,7 +195,7 @@ namespace moho
      * Initializes one runtime LOD from pre-resolved resource/material shared
      * pointers without blueprint-load side effects.
      */
-    MeshLOD(boost::shared_ptr<RScmResource> resource, boost::shared_ptr<MeshMaterial> material);
+    MeshLOD(std::shared_ptr<RScmResource> resource, std::shared_ptr<MeshMaterial> material);
 
     /**
      * Address: 0x007DCD60 (FUN_007DCD60, ??1MeshLOD@Moho@@UAE@XZ)
@@ -210,8 +210,8 @@ namespace moho
      */
     void Load(
       const RMeshBlueprintLOD& blueprintLod,
-      boost::shared_ptr<RScmResource> previousResource,
-      boost::shared_ptr<MeshMaterial> material,
+      std::shared_ptr<RScmResource> previousResource,
+      std::shared_ptr<MeshMaterial> material,
       CResourceWatcher* ownerWatcher
     );
 
@@ -245,7 +245,7 @@ namespace moho
      * runtime instancing is enabled — then returns a retained copy of the cached
      * handle. When instancing is unavailable the cached handle is left null.
      */
-    boost::shared_ptr<MeshBatch>& GetStaticBatch(boost::shared_ptr<MeshBatch>& outBatch);
+    std::shared_ptr<MeshBatch>& GetStaticBatch(std::shared_ptr<MeshBatch>& outBatch);
 
     /**
      * Address: 0x007DD420 (FUN_007DD420,
@@ -260,7 +260,7 @@ namespace moho
      * first use, then returns a retained copy of the cached handle. Identical to
      * GetStaticBatch except it enables the reference-resource bone remap.
      */
-    boost::shared_ptr<MeshBatch>& GetSkinnedBatch(boost::shared_ptr<MeshBatch>& outBatch);
+    std::shared_ptr<MeshBatch>& GetSkinnedBatch(std::shared_ptr<MeshBatch>& outBatch);
 
     /**
      * Address: 0x007DD5D0 (FUN_007DD5D0, ?SetCutoff@MeshLOD@Moho@@QAEXM@Z)
@@ -275,15 +275,15 @@ namespace moho
     std::uint8_t pad_05_07[0x03]{};
     float cutoff;                                     // +0x08
     MeshMaterial mat;                                 // +0x0C
-    boost::shared_ptr<RScmResource> previousResource; // +0x9C
-    boost::shared_ptr<RScmResource> res;              // +0xA4
+    std::shared_ptr<RScmResource> previousResource;   // +0x9C
+    std::shared_ptr<RScmResource> res;                // +0xA4
     std::uint8_t scrolling;                           // +0xAC
     std::uint8_t occlude;                             // +0xAD
     std::uint8_t silhouette;                          // +0xAE
     std::uint8_t pad_AF{};
-    boost::shared_ptr<RMeshBlueprintLOD> lodBlueprintCopy; // +0xB0
-    boost::shared_ptr<MeshBatch> staticBatch;              // +0xB8
-    boost::shared_ptr<MeshBatch> dynamicBatch;             // +0xC0
+    std::shared_ptr<RMeshBlueprintLOD> lodBlueprintCopy; // +0xB0
+    std::shared_ptr<MeshBatch> staticBatch;              // +0xB8
+    std::shared_ptr<MeshBatch> dynamicBatch;             // +0xC0
   };
 
   class Mesh : public CResourceWatcher
@@ -302,7 +302,7 @@ namespace moho
      * Address: 0x007DD680 (FUN_007DD680,
      * ??0Mesh@Moho@@QAE@PBVRMeshBlueprint@1@V?$shared_ptr@VMeshMaterial@Moho@@@boost@@@Z)
      */
-    Mesh(const RMeshBlueprint* blueprint, boost::shared_ptr<MeshMaterial> material);
+    Mesh(const RMeshBlueprint* blueprint, std::shared_ptr<MeshMaterial> material);
 
     /**
      * Address: 0x007DD750 (FUN_007DD750,
@@ -311,7 +311,7 @@ namespace moho
      * What it does:
      * Initializes a mesh with one pre-resolved resource/material LOD lane.
      */
-    Mesh(boost::shared_ptr<RScmResource> resource, boost::shared_ptr<MeshMaterial> material);
+    Mesh(std::shared_ptr<RScmResource> resource, std::shared_ptr<MeshMaterial> material);
 
     /**
      * Address: 0x007DD880 (FUN_007DD880, ??1Mesh@Moho@@UAE@XZ)
@@ -327,7 +327,7 @@ namespace moho
      * Address: 0x007DDB50 (FUN_007DDB50,
      * ?Load@Mesh@Moho@@AAEXPBVRMeshBlueprint@2@V?$shared_ptr@VMeshMaterial@Moho@@@boost@@@Z)
      */
-    void Load(const RMeshBlueprint* blueprint, boost::shared_ptr<MeshMaterial> material);
+    void Load(const RMeshBlueprint* blueprint, std::shared_ptr<MeshMaterial> material);
 
     /**
      * Address: 0x007DDAC0 (FUN_007DDAC0)
@@ -374,7 +374,7 @@ namespace moho
      * Address: 0x007DDC50 (FUN_007DDC50,
      * ?CreateLOD@Mesh@Moho@@AAEPAVMeshLOD@2@ABVRMeshBlueprintLOD@2@V?$shared_ptr@VMeshMaterial@Moho@@@boost@@@Z)
      */
-    MeshLOD* CreateLOD(const RMeshBlueprintLOD& blueprintLod, boost::shared_ptr<MeshMaterial> material);
+    MeshLOD* CreateLOD(const RMeshBlueprintLOD& blueprintLod, std::shared_ptr<MeshMaterial> material);
 
     /**
      * Address: 0x007DDE50 (FUN_007DDE50,
@@ -383,16 +383,16 @@ namespace moho
      * What it does:
      * Adds one direct resource/material-backed mesh LOD entry.
      */
-    MeshLOD* CreateLOD(boost::shared_ptr<RScmResource> resource, boost::shared_ptr<MeshMaterial> material);
+    MeshLOD* CreateLOD(std::shared_ptr<RScmResource> resource, std::shared_ptr<MeshMaterial> material);
 
     /**
      * Address: 0x007DD950 (FUN_007DD950, ?GetResource@Mesh@Moho@@QBE?AV?$shared_ptr@VRScmResource@Moho@@@boost@@H@Z)
      */
-    [[nodiscard]] boost::shared_ptr<RScmResource> GetResource(std::int32_t lodIndex) const;
+    [[nodiscard]] std::shared_ptr<RScmResource> GetResource(std::int32_t lodIndex) const;
 
   public:
     const RMeshBlueprint* bp;                 // +0x20
-    boost::shared_ptr<MeshMaterial> material; // +0x24
+    std::shared_ptr<MeshMaterial> material;   // +0x24
     std::uint32_t unk2C;                      // +0x2C
     fa::vector<MeshLOD*> lods;                // +0x30
     std::uint32_t unk3C;                      // +0x3C
@@ -405,7 +405,7 @@ namespace moho
      * Address: 0x007DAF00 (FUN_007DAF00,
      * ??0MeshKey@Moho@@QAE@PBVRMeshBlueprint@1@V?$shared_ptr@VMeshMaterial@Moho@@@boost@@@Z)
      */
-    MeshKey(const RMeshBlueprint* blueprint, boost::shared_ptr<MeshMaterial> meshMaterial);
+    MeshKey(const RMeshBlueprint* blueprint, std::shared_ptr<MeshMaterial> meshMaterial);
 
     /**
      * Address: 0x007DF6E0 (FUN_007DF6E0, copy ctor)
@@ -437,7 +437,7 @@ namespace moho
 
   public:
     const RMeshBlueprint* blueprint;              // +0x04
-    boost::shared_ptr<MeshMaterial> meshMaterial; // +0x08
+    std::shared_ptr<MeshMaterial> meshMaterial;   // +0x08
   };
 
   /**
@@ -477,7 +477,7 @@ namespace moho
       std::int32_t gameTick,
       std::int32_t color,
       bool isStaticPose,
-      boost::shared_ptr<Mesh> mesh
+      std::shared_ptr<Mesh> mesh
     );
 
     /**
@@ -494,7 +494,7 @@ namespace moho
     /**
      * Address: 0x007DADD0 (FUN_007DADD0, ?GetMesh@MeshInstance@Moho@@QBE?AV?$shared_ptr@VMesh@Moho@@@boost@@XZ)
      */
-    [[nodiscard]] boost::shared_ptr<Mesh> GetMesh() const;
+    [[nodiscard]] std::shared_ptr<Mesh> GetMesh() const;
 
     /**
      * Address: 0x007DE6A0 (FUN_007DE6A0, ?SetCurrentInterpolant@MeshInstance@Moho@@SAXM@Z)
@@ -576,8 +576,8 @@ namespace moho
       const VTransform& startTransform,
       const VTransform& endTransform,
       bool forceRefresh,
-      boost::shared_ptr<CAniPose> startPoseArg,
-      boost::shared_ptr<CAniPose> endPoseArg
+      std::shared_ptr<CAniPose> startPoseArg,
+      std::shared_ptr<CAniPose> endPoseArg
     );
 
     /**
@@ -591,8 +591,8 @@ namespace moho
       const VTransform& startTransform,
       const VTransform& endTransform,
       bool forceRefresh,
-      const boost::shared_ptr<CAniPose>& startPoseArg,
-      const boost::shared_ptr<CAniPose>& endPoseArg
+      const std::shared_ptr<CAniPose>& startPoseArg,
+      const std::shared_ptr<CAniPose>& endPoseArg
     );
 
     /// Engine addition: `SetStance`'s last step - republish the swept stance bounds into `db`.
@@ -641,7 +641,7 @@ namespace moho
      * reference. Otherwise (non-static or locked) returns an empty
      * shared handle.
      */
-    [[nodiscard]] boost::shared_ptr<CAniPose> ComputeDebugPose();
+    [[nodiscard]] std::shared_ptr<CAniPose> ComputeDebugPose();
 
     /**
      * Address: 0x007DEFC0 (FUN_007DEFC0,
@@ -656,7 +656,7 @@ namespace moho
   public:
     // +0x04..+0x0B: the TDatListItem<MeshInstance, void> base.
     SpatialDBEntry<MeshInstance> db;     // +0x0C
-    boost::shared_ptr<Mesh> mesh;        // +0x14
+    std::shared_ptr<Mesh> mesh;          // +0x14
     std::int32_t color;                  // +0x1C
     float meshColor;                     // +0x20
     const GeomCamera3* visibilityCamera; // +0x24, null or the camera that owns this clutter
@@ -678,9 +678,9 @@ namespace moho
     // Engine addition in the padding (ren_MeshPoseStill): curPose already holds startPose and endPose,
     // which match, so blending them again would give the same pose.
     std::uint8_t poseStill{};              // +0xA7
-    boost::shared_ptr<CAniPose> startPose; // +0xA8
-    boost::shared_ptr<CAniPose> endPose;   // +0xB0
-    boost::shared_ptr<CAniPose> curPose;   // +0xB8
+    std::shared_ptr<CAniPose> startPose;   // +0xA8
+    std::shared_ptr<CAniPose> endPose;     // +0xB0
+    std::shared_ptr<CAniPose> curPose;     // +0xB8
     float dissolve;                        // +0xC0
     float parameters;                      // +0xC4
     float fractionCompleteParameter;       // +0xC8
@@ -747,7 +747,7 @@ namespace moho
    * this codebase already uses, matching `MeshBatchBucketTree`
    * (`MeshBatchKey.h`), this file's own sibling batch-bucket tree.
    */
-  using MeshRendererMeshCacheTree = fa::map<MeshKey, boost::weak_ptr<Mesh>, MeshKeyLess>;
+  using MeshRendererMeshCacheTree = fa::map<MeshKey, std::weak_ptr<Mesh>, MeshKeyLess>;
 
   /**
    * Process-wide mesh-render shader-constant lane. The binary holds each of
@@ -1049,7 +1049,7 @@ namespace moho
       const RMeshBlueprint* blueprint,
       const Wm3::Vec3f& scale,
       bool isStaticPose,
-      boost::shared_ptr<MeshMaterial> material
+      std::shared_ptr<MeshMaterial> material
     );
 
     /**
@@ -1061,7 +1061,7 @@ namespace moho
       std::int32_t color,
       const Wm3::Vec3f& scale,
       bool isStaticPose,
-      boost::shared_ptr<Mesh> mesh
+      std::shared_ptr<Mesh> mesh
     );
 
     /**
@@ -1076,10 +1076,10 @@ namespace moho
     MeshInstance* CreateMeshInstance(
       std::int32_t gameTick,
       std::int32_t color,
-      boost::shared_ptr<RScmResource> resource,
+      std::shared_ptr<RScmResource> resource,
       const Wm3::Vec3f& scale,
       bool isStaticPose,
-      boost::shared_ptr<MeshMaterial> material,
+      std::shared_ptr<MeshMaterial> material,
       float lodCutoff
     );
 
@@ -1285,8 +1285,8 @@ namespace moho
      * Address: 0x007E5280 (FUN_007E5280,
      * ?FindOrCreateMesh@MeshRenderer@Moho@@QAE?AV?$shared_ptr@VMesh@Moho@@@boost@@PBVRMeshBlueprint@2@V?$shared_ptr@VMeshMaterial@Moho@@@3@@Z)
      */
-    [[nodiscard]] boost::shared_ptr<Mesh>
-    FindOrCreateMesh(const RMeshBlueprint* blueprint, boost::shared_ptr<MeshMaterial> material);
+    [[nodiscard]] std::shared_ptr<Mesh>
+    FindOrCreateMesh(const RMeshBlueprint* blueprint, std::shared_ptr<MeshMaterial> material);
 
     MeshEnvironment meshEnvironment;         // +0x04
     MeshRendererMeshCacheTree meshCacheTree; // +0x60
@@ -1297,10 +1297,10 @@ namespace moho
     // extracted at bind time when ConfigureShader passes these resources to the
     // mesh texture shader-vars. They are the owning resource handles, not the
     // extracted `TextureD3D9`, so the lane type is `RD3DTextureResource`.
-    boost::shared_ptr<RD3DTextureResource> dissolveTex;          // +0x6C
-    boost::shared_ptr<RD3DTextureResource> meshEnvironmentTex;   // +0x74
-    boost::shared_ptr<RD3DTextureResource> anisotropiclookupTex; // +0x7C
-    boost::shared_ptr<RD3DTextureResource> insectlookupTex;      // +0x84
+    std::shared_ptr<RD3DTextureResource> dissolveTex;            // +0x6C
+    std::shared_ptr<RD3DTextureResource> meshEnvironmentTex;     // +0x74
+    std::shared_ptr<RD3DTextureResource> anisotropiclookupTex;   // +0x7C
+    std::shared_ptr<RD3DTextureResource> insectlookupTex;        // +0x84
     TDatList<MeshInstance, void> instances;                      // +0x8C
     std::int32_t instanceListSize;                               // +0x94
     float deltaFrame;                                            // +0x98
@@ -1454,7 +1454,7 @@ namespace moho
    * copy of boost's own internals.
    */
   void ConstructSharedMeshWithCacheEvictingDeleter(
-    boost::shared_ptr<Mesh>& out,
+    std::shared_ptr<Mesh>& out,
     Mesh* raw,
     MeshRendererMeshCacheTree& tree,
     const MeshKey& key

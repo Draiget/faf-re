@@ -3,7 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 
-#include "boost/shared_ptr.h"
+#include <memory>
 
 namespace moho
 {
@@ -33,8 +33,8 @@ namespace moho
    */
   struct SUnitUpdateOverrides
   {
-    const boost::shared_ptr<CAniPose>* mPriorPose = nullptr; // with mPose: replace both handles
-    const boost::shared_ptr<CAniPose>* mPose = nullptr;
+    const std::shared_ptr<CAniPose>* mPriorPose = nullptr; // with mPose: replace both handles
+    const std::shared_ptr<CAniPose>* mPose = nullptr;
     bool mHasStunTicks = false;
     std::int32_t mStunTicks = 0;
   };

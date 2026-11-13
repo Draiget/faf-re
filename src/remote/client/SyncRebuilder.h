@@ -161,12 +161,12 @@ namespace faf::remote::client
     {
       bool live = false; // in the session's id map (not orphaned)
       moho::SSTIEntityVariableData data{};
-      boost::shared_ptr<moho::Stats<moho::StatItem>> stats; // a unit's stats tree (the client's own)
+      std::shared_ptr<moho::Stats<moho::StatItem>> stats;   // a unit's stats tree (the client's own)
       std::unique_ptr<moho::SSTIUnitVariableData> unit;     // a unit's data as last given to the session
       // With `SetNoSim`, plan WP8.3: the unit's current pose, the client's own (each beat with bones a new copy, the
       // old one becoming the prior pose, as `CAniActor` steps), the skeleton it was made with, and whether last
       // beat moved it (the next beat without bones gives the session prior == current).
-      boost::shared_ptr<moho::CAniPose> pose;
+      std::shared_ptr<moho::CAniPose> pose;
       std::vector<wire::SPoseBone> poseBones; // the lane's values as this client holds them (differences add to them)
       const void* poseSkeleton = nullptr;
       bool poseMoving = false;
@@ -192,7 +192,7 @@ namespace faf::remote::client
     struct SMeshResource
     {
       bool resolved = false;
-      boost::shared_ptr<moho::RScmResource> resource;
+      std::shared_ptr<moho::RScmResource> resource;
     };
 
     /** The session tables the frames' sound and name ids refer to (WP7.2). */
@@ -240,7 +240,7 @@ namespace faf::remote::client
     {
       const moho::SSTIEntityVariableData* data = nullptr;
       const moho::REntityBlueprint* blueprint = nullptr;
-      boost::shared_ptr<moho::CAniPose> pose; // a unit's, with `SetNoSim`
+      std::shared_ptr<moho::CAniPose> pose; // a unit's, with `SetNoSim`
       bool isUnit = false;
       bool removed = false; // the last frame removed it (`orRemoved`)
     };
@@ -286,7 +286,7 @@ namespace faf::remote::client
     struct SUnderlay
     {
       bool resolved = false;
-      boost::shared_ptr<moho::CD3DBatchTexture> texture;
+      std::shared_ptr<moho::CD3DBatchTexture> texture;
     };
 
     [[nodiscard]] moho::CSndParams* ResolveSound(std::uint32_t id);
@@ -294,7 +294,7 @@ namespace faf::remote::client
     void ApplyDeposits(moho::SSyncData& packet);
     /** The client's own height field and changed-terrain rectangles from the terrain edits. */
     void ApplyTerrain(moho::SSyncData& packet);
-    [[nodiscard]] boost::shared_ptr<moho::CD3DBatchTexture> ResolveUnderlay(std::uint32_t id);
+    [[nodiscard]] std::shared_ptr<moho::CD3DBatchTexture> ResolveUnderlay(std::uint32_t id);
 
     /** Mesh blueprint and resource for a meshes-table ordinal, as `Entity::SetMesh` sets them. */
     void ResolveMesh(std::uint32_t ordinal, moho::SSTIEntityVariableData& data);
@@ -311,9 +311,9 @@ namespace faf::remote::client
     moho::RRuleGameRules* mRules = nullptr;
     std::vector<moho::CSndParams*> mSounds;              // by sound id, resolved on first use
     std::vector<SUnderlay> mUnderlays;                   // by name id
-    boost::shared_ptr<moho::CSimResources> mResources;   // the client's deposits (WP11.2)
-    boost::shared_ptr<moho::CHeightField> mTerrain;      // the client's copy of the sim's heights (WP11.2)
-    boost::shared_ptr<moho::CHeightField> mSimTerrain;   // the sim's, for the check (a counted reference)
+    std::shared_ptr<moho::CSimResources> mResources;     // the client's deposits (WP11.2)
+    std::shared_ptr<moho::CHeightField> mTerrain;        // the client's copy of the sim's heights (WP11.2)
+    std::shared_ptr<moho::CHeightField> mSimTerrain;     // the sim's, for the check (a counted reference)
     std::size_t mDepositsApplied = 0;
     wire::SViewFrame mShown;
     bool mHasShown = false;

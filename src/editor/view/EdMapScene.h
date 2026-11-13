@@ -761,8 +761,8 @@ namespace faf::editor
      * 2 x 2, `hydrocarbon_marker.dds` 6 x 6, heading 0.
      */
     void DrawResourceSplats(moho::CD3DPrimBatcher& batcher, const moho::CHeightField& field);
-    boost::shared_ptr<moho::CD3DBatchTexture> mMassSplat;
-    boost::shared_ptr<moho::CD3DBatchTexture> mHydroSplat;
+    std::shared_ptr<moho::CD3DBatchTexture> mMassSplat;
+    std::shared_ptr<moho::CD3DBatchTexture> mHydroSplat;
     bool mSplatsLoaded = false;
     EdDocument::SaveSnapshot mBorderBefore;
     /** A size drag on one slot keeps adding to its undo step until something else happens. */

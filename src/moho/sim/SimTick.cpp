@@ -188,8 +188,8 @@ namespace
     // The pose handles each refresh replaces, dropped below on this thread in unit order.
     struct SReleasedPoses
     {
-      boost::shared_ptr<CAniPose> mPose;
-      boost::shared_ptr<CAniPose> mPriorPose;
+      std::shared_ptr<CAniPose> mPose;
+      std::shared_ptr<CAniPose> mPriorPose;
     };
     static std::vector<SReleasedPoses> sReleased;
     if (sReleased.size() < units.size()) {

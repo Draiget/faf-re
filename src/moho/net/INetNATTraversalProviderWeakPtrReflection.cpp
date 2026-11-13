@@ -9,7 +9,7 @@
 
 namespace
 {
-  using WeakProviderPtr = boost::weak_ptr<moho::INetNATTraversalProvider>;
+  using WeakProviderPtr = std::weak_ptr<moho::INetNATTraversalProvider>;
 
   [[nodiscard]] gpg::RType* CachedProviderType()
   {
@@ -191,7 +191,7 @@ gpg::RType* gpg::ResolveWeakPtrINetNATTraversalProviderType()
  */
 gpg::RRef* gpg::RRef_weak_ptr_INetNATTraversalProvider(
   gpg::RRef* const out,
-  boost::weak_ptr<moho::INetNATTraversalProvider>* const provider
+  std::weak_ptr<moho::INetNATTraversalProvider>* const provider
 )
 {
   if (!out) {
@@ -228,7 +228,7 @@ fa::string gpg::RWeakPointerType<moho::INetNATTraversalProvider>::GetLexical(
     return fa::string("NULL");
   }
 
-  const boost::shared_ptr<moho::INetNATTraversalProvider> locked = weakProvider->lock();
+  const std::shared_ptr<moho::INetNATTraversalProvider> locked = weakProvider->lock();
   if (!locked) {
     return fa::string("NULL");
   }
@@ -248,10 +248,10 @@ fa::string gpg::RWeakPointerType<moho::INetNATTraversalProvider>::GetLexical(
 void gpg::RWeakPointerType<moho::INetNATTraversalProvider>::Init()
 {
   static_assert(
-    sizeof(boost::weak_ptr<moho::INetNATTraversalProvider>) == 0x08,
+    sizeof(std::weak_ptr<moho::INetNATTraversalProvider>) == 0x08,
     "boost::weak_ptr<moho::INetNATTraversalProvider> is 0x08 bytes on x86"
   );
-  size_ = sizeof(boost::weak_ptr<moho::INetNATTraversalProvider>);
+  size_ = sizeof(std::weak_ptr<moho::INetNATTraversalProvider>);
   newRefFunc_ = &NewWeakProviderRef;
   cpyRefFunc_ = &CopyWeakProviderRef;
   deleteFunc_ = &DeleteWeakProvider;

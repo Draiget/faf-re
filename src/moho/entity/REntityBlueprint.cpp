@@ -152,7 +152,7 @@ namespace moho
      * back by value here, which is the same net result now that
      * `CD3DBatchTexture::FromFile` returns one directly.
      */
-    [[nodiscard]] boost::shared_ptr<moho::CD3DBatchTexture> LoadStrategicIconTexture(
+    [[nodiscard]] std::shared_ptr<moho::CD3DBatchTexture> LoadStrategicIconTexture(
       const fa::string& iconPath,
       const fa::string& variantLabel
     )
@@ -162,7 +162,7 @@ namespace moho
       if (moho::sBatchTextureFromFile == nullptr) {
         return {};
       }
-      boost::shared_ptr<moho::CD3DBatchTexture> icon = moho::sBatchTextureFromFile(iconPath.c_str(), 0u);
+      std::shared_ptr<moho::CD3DBatchTexture> icon = moho::sBatchTextureFromFile(iconPath.c_str(), 0u);
       if (!icon) {
         gpg::Logf("Failed to load %s icon %s", variantLabel.c_str(), iconPath.c_str());
       }

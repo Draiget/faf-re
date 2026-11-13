@@ -4,7 +4,7 @@
 #include <cstdint>
 #include <exception>
 
-#include "boost/shared_ptr.h"
+#include <memory>
 #include "gpg/core/utils/Sync.h"
 #include "legacy/containers/String.h"
 #include "moho/containers/TDatList.h"
@@ -39,7 +39,7 @@ namespace moho
   struct SWldSessionInfo
   {
     fa::string mMapName;                           // 0x00
-    boost::shared_ptr<LaunchInfoBase> mLaunchInfo; // 0x1C
+    std::shared_ptr<LaunchInfoBase> mLaunchInfo;   // 0x1C
     bool mIsBeingRecorded;                         // 0x24
     bool mIsReplay;                                // 0x25
     bool mIsMultiplayer;                           // 0x26

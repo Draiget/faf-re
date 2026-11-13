@@ -1787,7 +1787,7 @@ gpg::MemBuffer<const char> moho::FWaitHandleSet::MemoryMapFile(
 
   const char* const begin = static_cast<const char*>(mappedView);
   const char* const end = begin + fileSize;
-  boost::shared_ptr<const char> mappedOwner(begin, &UnmapFileView);
+  std::shared_ptr<const char> mappedOwner(begin, &UnmapFileView);
   DISK_TraceAccess("map", canonicalPath.c_str());
   return gpg::MemBuffer<const char>(mappedOwner, begin, end);
 }

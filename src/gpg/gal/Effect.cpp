@@ -52,7 +52,7 @@ namespace gpg::gal
    * Has the active device build the effect: device slot 9, with this
    * call's own return slot forwarded as the callee's.
    */
-  boost::shared_ptr<Effect> Effect::Create(
+  std::shared_ptr<Effect> Effect::Create(
     const EffectContext& context
   )
   {

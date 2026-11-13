@@ -421,7 +421,7 @@ namespace moho
         std::int32_t mY = 0;
       };
 
-      boost::shared_ptr<CD3DDynamicTextureSheet> mSheet;
+      std::shared_ptr<CD3DDynamicTextureSheet> mSheet;
       const void* mUploadedTexture = nullptr;
       std::vector<PlacedFont> mFonts;
       std::int32_t mShelfX = 0;
@@ -691,7 +691,7 @@ namespace moho
       if (usesFallback && !AcquireMsdfPlacement(page, *fallback, fallbackPageX, fallbackPageY, pageFull)) {
         return false;
       }
-      const boost::shared_ptr<CD3DDynamicTextureSheet>& sheet = page.mSheet;
+      const std::shared_ptr<CD3DDynamicTextureSheet>& sheet = page.mSheet;
 
       const float size = static_cast<float>(binding.mPointSize) * textScale;
       const float pixelRange = atlas.mDistanceRange * size / atlas.mEmPixels;
@@ -700,7 +700,7 @@ namespace moho
       MsdfTextGpuRenderer& instancedText = MsdfTextGpuRenderer::Get();
       const bool instanced = instancedText.IsActive() && instancedText.BeginString(primBatcher, sheet);
       CD3DPrimBatcher::TextureBinding previousTexture{};
-      boost::shared_ptr<gpg::gal::EffectTechnique> previousTechnique;
+      std::shared_ptr<gpg::gal::EffectTechnique> previousTechnique;
       if (!instanced) {
         if (!shaderVarPrimBatcherMsdfPixelRange.Exists()) {
           return false;
@@ -710,7 +710,7 @@ namespace moho
         previousTechnique = effect->mCurrentTechnique;
         effect->SetTechnique(kMsdfTechnique);
         shaderVarPrimBatcherMsdfPixelRange.mEffectVariable->SetFloat(pixelRange);
-        primBatcher.SetTexture(boost::static_pointer_cast<ID3DTextureSheet>(sheet));
+        primBatcher.SetTexture(std::static_pointer_cast<ID3DTextureSheet>(sheet));
       }
 
       const float inverseWidth = 1.0f / static_cast<float>(kMsdfPageWidth);

@@ -573,7 +573,7 @@ namespace
 
     moho::CSndVar* const lodCutoffVar = moho::SND_FindOrCreateVariable(key.mLodCutoffVariableName);
     moho::CSndVar* const rpcLoopVar = moho::SND_FindOrCreateVariable(key.mRpcLoopVariableName);
-    const boost::weak_ptr<moho::AudioEngine> weakEngine{};
+    const std::weak_ptr<moho::AudioEngine> weakEngine{};
     moho::CSndParams* const created =
       new moho::CSndParams(key.mBankName, key.mCueName, lodCutoffVar, rpcLoopVar, weakEngine);
     InsertSndParamsCacheEntryLocked(hash, created);
@@ -822,7 +822,7 @@ namespace moho
     const fa::string& cueName,
     CSndVar* const lodCutoffVar,
     CSndVar* const rpcLoopVar,
-    const boost::weak_ptr<AudioEngine>& engine
+    const std::weak_ptr<AudioEngine>& engine
   )
     : mBank(bankName)
     , mCue(cueName)

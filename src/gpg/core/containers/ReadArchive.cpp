@@ -13,7 +13,7 @@
 
 #include "gpg/core/containers/String.h"
 
-#include "boost/shared_ptr.h"
+#include <memory>
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/utils/BoostWrappers.h"
 #include "gpg/core/reflection/SerializationError.h"
@@ -173,7 +173,7 @@ namespace
   {
   public:
     explicit BinaryReadArchive(
-      const boost::shared_ptr<std::FILE>& file
+      const std::shared_ptr<std::FILE>& file
     )
       : mFile(file)
       , mCachedFile(file.get())
@@ -636,7 +636,7 @@ namespace
     // pointer -- `BinaryReadArchive::ReadBytes` (0x00904960) is
     // `fread(..., this->str)`, and its `feof`/`ferror` retries use it too.
     // Keeping it is what makes this class 0x44 rather than 0x40.
-    boost::shared_ptr<std::FILE> mFile; // +0x38
+    std::shared_ptr<std::FILE> mFile;   // +0x38
     std::FILE* mCachedFile = nullptr;   // +0x40
   };
 
@@ -682,7 +682,7 @@ namespace
      * `std::ios_base::clear`.
      */
     explicit TextReadArchive(
-      const boost::shared_ptr<std::istream>& stream
+      const std::shared_ptr<std::istream>& stream
     )
       : mStream(stream)
       , mCachedStream(stream.get())
@@ -1009,7 +1009,7 @@ namespace
     // pointer -- exactly as the sibling `BinaryReadArchive` caches its
     // `std::FILE*`. Keeping it is what makes this class 0x44 rather than
     // 0x40, which is the size `CreateTextReadArchive` allocates.
-    boost::shared_ptr<std::istream> mStream; // +0x38
+    std::shared_ptr<std::istream> mStream;   // +0x38
     std::istream* mCachedStream = nullptr;   // +0x40
   };
 
@@ -1066,7 +1066,7 @@ namespace
  * factory interface. Returns `nullptr` if allocation fails.
  */
 ReadArchive* gpg::CreateTextReadArchive(
-  const boost::shared_ptr<std::istream>& stream
+  const std::shared_ptr<std::istream>& stream
 )
 {
   // `push 44h` at 0x00939816 is sizeof(TextReadArchive) now that the class
@@ -1452,7 +1452,7 @@ void ReadArchive::EndSection(
  * write-side CreateBinaryWriteArchive.
  */
 ReadArchive* gpg::CreateBinaryReadArchive(
-  const boost::shared_ptr<std::FILE>& file
+  const std::shared_ptr<std::FILE>& file
 )
 {
   return new (std::nothrow) BinaryReadArchive(file);

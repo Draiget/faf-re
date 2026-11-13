@@ -3,7 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 
-#include "boost/shared_ptr.h"
+#include <memory>
 #include "legacy/containers/String.h"
 
 namespace moho
@@ -233,7 +233,7 @@ namespace moho
     virtual bool DrawNormals(
       std::int32_t gameTick,
       float deltaSeconds,
-      const boost::shared_ptr<ID3DRenderTarget>& terrainNormalTexture,
+      const std::shared_ptr<ID3DRenderTarget>& terrainNormalTexture,
       Shadow* shadowContext
     ) = 0;
 
@@ -278,8 +278,8 @@ namespace moho
     virtual void DrawWaterTerrain(
       std::int32_t tick,
       float tickLerp,
-      boost::shared_ptr<ID3DRenderTarget> refractionTexture,
-      boost::shared_ptr<ID3DRenderTarget> reflectionTexture
+      std::shared_ptr<ID3DRenderTarget> refractionTexture,
+      std::shared_ptr<ID3DRenderTarget> reflectionTexture
     ) = 0;
 
     /**
@@ -316,7 +316,7 @@ namespace moho
      * in all three classes.
      */
     virtual void
-    DrawTerrain(boost::shared_ptr<CD3DDynamicTextureSheet> overlayTexture, const fa::string* techniqueName) = 0;
+    DrawTerrain(std::shared_ptr<CD3DDynamicTextureSheet> overlayTexture, const fa::string* techniqueName) = 0;
 
     /**
      * Primary vtable slot 14.
@@ -338,7 +338,7 @@ namespace moho
      */
     virtual void DrawDirtyTerrain(CD3DPrimBatcher* batcher) = 0;
 
-    boost::shared_ptr<RD3DTextureResource> mDecalMask{}; // +0x04
+    std::shared_ptr<RD3DTextureResource> mDecalMask{}; // +0x04
   };
 
   static_assert(offsetof(TerrainCommon, mDecalMask) == 0x04, "TerrainCommon::mDecalMask offset must be 0x04");

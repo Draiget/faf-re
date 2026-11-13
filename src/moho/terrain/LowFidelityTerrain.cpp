@@ -107,8 +107,8 @@ namespace
     const std::int32_t gameTick
   )
   {
-    const boost::shared_ptr<moho::ID3DTextureSheet> texture = decal.GetTexture(slot, lod, gameTick);
-    target.GetTexture(boost::static_pointer_cast<moho::CD3DDynamicTextureSheet>(texture));
+    const std::shared_ptr<moho::ID3DTextureSheet> texture = decal.GetTexture(slot, lod, gameTick);
+    target.GetTexture(std::static_pointer_cast<moho::CD3DDynamicTextureSheet>(texture));
   }
 } // namespace
 
@@ -126,7 +126,7 @@ namespace moho
   extern bool ren_Splats;
   extern float ren_DecalFadeFraction;
 
-  boost::shared_ptr<RD3DTextureResource> sTerrainGridTexture;
+  std::shared_ptr<RD3DTextureResource> sTerrainGridTexture;
   WaterSurface* sTerrainWaterSurface = nullptr;
   CD3DTextureBatcher* texture_batcher = nullptr;
 
@@ -516,8 +516,8 @@ namespace moho
   void LowFidelityTerrain::DrawWaterTerrain(
     const std::int32_t tick,
     const float tickLerp,
-    const boost::shared_ptr<ID3DRenderTarget> refractionTexture,
-    const boost::shared_ptr<ID3DRenderTarget> reflectionTexture
+    const std::shared_ptr<ID3DRenderTarget> refractionTexture,
+    const std::shared_ptr<ID3DRenderTarget> reflectionTexture
   )
   {
     auto* const terrainRes = mTerrainResource;
@@ -591,7 +591,7 @@ namespace moho
    * high overrides exactly, so the parameter list is theirs.
    */
   void LowFidelityTerrain::DrawTerrain(
-    boost::shared_ptr<CD3DDynamicTextureSheet> /*overlayTexture*/,
+    std::shared_ptr<CD3DDynamicTextureSheet> /*overlayTexture*/,
     const fa::string* /*techniqueName*/
   )
   {}
@@ -675,7 +675,7 @@ namespace moho
     SetShaderVarMem(shaderVars.upperAlbedoTile, 4U, &strata.mUpperAlbedoTexture.mScaleX);
 
     shaderVars.decalMaskTexture.GetTexture(
-      boost::static_pointer_cast<CD3DDynamicTextureSheet>(boost::static_pointer_cast<ID3DTextureSheet>(mDecalMask))
+      std::static_pointer_cast<CD3DDynamicTextureSheet>(std::static_pointer_cast<ID3DTextureSheet>(mDecalMask))
     );
   }
 
@@ -721,7 +721,7 @@ namespace moho
         shaderVars.shadowMatrix.SetMatrix4x4(&shadowContext->mCamera.viewProjection);
       }
 
-      const boost::shared_ptr<CD3DRenderTarget> shadowTexture = shadowContext->GetShadowTexture();
+      const std::shared_ptr<CD3DRenderTarget> shadowTexture = shadowContext->GetShadowTexture();
       shaderVars.shadowTexture.SetRenderTargetTexture(shadowTexture);
     } else {
       const std::uint32_t shadowsDisabledBlob = 0U;
@@ -843,7 +843,7 @@ namespace moho
     if (splatVertexCount > 1000U) {
       D3D_GetDevice()->SelectTechnique("LowFidelitySplat");
       GetTerrainShaderVars().decalAlbedoTexture.GetTexture(
-        boost::static_pointer_cast<CD3DDynamicTextureSheet>(texture_batcher->GetCompositeTexture())
+        std::static_pointer_cast<CD3DDynamicTextureSheet>(texture_batcher->GetCompositeTexture())
       );
       DrawSplatChunksPassMajor(
         D3D_GetDevice(), mDynamicVertexSheet, mDynamicIndexSheet, mSplatVertices.data(), splatVertexCount, 250
@@ -861,7 +861,7 @@ namespace moho
 
     auto& shaderVars = GetTerrainShaderVars();
     shaderVars.decalAlbedoTexture.GetTexture(
-      boost::static_pointer_cast<CD3DDynamicTextureSheet>(texture_batcher->GetCompositeTexture())
+      std::static_pointer_cast<CD3DDynamicTextureSheet>(texture_batcher->GetCompositeTexture())
     );
 
     std::int32_t primitiveType = kTriangleListPrimitiveType;
@@ -889,7 +889,7 @@ namespace moho
   bool LowFidelityTerrain::DrawNormals(
     const std::int32_t gameTick,
     const float deltaSeconds,
-    const boost::shared_ptr<ID3DRenderTarget>& /*terrainNormalTexture*/,
+    const std::shared_ptr<ID3DRenderTarget>& /*terrainNormalTexture*/,
     Shadow* const shadowContext
   )
   {

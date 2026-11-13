@@ -12,7 +12,7 @@
 #include <thread>
 #include <vector>
 
-#include "boost/shared_ptr.h"
+#include <memory>
 #include "moho/animation/CAniSkel.h"
 #include "moho/resource/RScmResource.h"
 #include "moho/resource/SScmFile.h"
@@ -46,7 +46,7 @@ namespace
     std::memcpy(bytes.data() + at, &value, sizeof(value));
   }
 
-  boost::shared_ptr<const moho::SScmFile> MakeOneBoneScm()
+  std::shared_ptr<const moho::SScmFile> MakeOneBoneScm()
   {
     auto* const image = new std::vector<std::uint8_t>(kFileBytes, 0u);
     std::vector<std::uint8_t>& bytes = *image;
@@ -72,14 +72,14 @@ namespace
     PutF32(bytes, kVertexOffset + 0x08, 3.0f);
 
     const auto* const file = reinterpret_cast<const moho::SScmFile*>(bytes.data());
-    return boost::shared_ptr<const moho::SScmFile>(file, [image](const moho::SScmFile*) {
+    return std::shared_ptr<const moho::SScmFile>(file, [image](const moho::SScmFile*) {
       delete image;
     });
   }
 
-  boost::shared_ptr<moho::RScmResource> MakeResource()
+  std::shared_ptr<moho::RScmResource> MakeResource()
   {
-    return boost::shared_ptr<moho::RScmResource>(new moho::RScmResource("test/one_bone.scm", MakeOneBoneScm()));
+    return std::shared_ptr<moho::RScmResource>(new moho::RScmResource("test/one_bone.scm", MakeOneBoneScm()));
   }
 } // namespace
 
@@ -88,8 +88,8 @@ TEST(
   OneThreadBuildsTheFileBones
 )
 {
-  const boost::shared_ptr<moho::RScmResource> resource = MakeResource();
-  const boost::shared_ptr<const moho::CAniSkel> skeleton = resource->GetSkeleton();
+  const std::shared_ptr<moho::RScmResource> resource = MakeResource();
+  const std::shared_ptr<const moho::CAniSkel> skeleton = resource->GetSkeleton();
   ASSERT_NE(skeleton.get(), nullptr);
   ASSERT_EQ(skeleton->mBones.size(), 1u);
   EXPECT_STREQ(skeleton->mBones.begin()[0].mBoneName, "root");
@@ -106,7 +106,7 @@ TEST(
   constexpr int kRounds = 500;
 
   for (int round = 0; round < kRounds; ++round) {
-    const boost::shared_ptr<moho::RScmResource> resource = MakeResource();
+    const std::shared_ptr<moho::RScmResource> resource = MakeResource();
     std::atomic<int> ready{0};
     std::atomic<bool> go{false};
     std::vector<const moho::CAniSkel*> seen(kThreads, nullptr);
@@ -118,7 +118,7 @@ TEST(
       threads.emplace_back([&, t] {
         ready.fetch_add(1);
         while (!go.load(std::memory_order_acquire)) {}
-        const boost::shared_ptr<const moho::CAniSkel> skeleton = resource->GetSkeleton();
+        const std::shared_ptr<const moho::CAniSkel> skeleton = resource->GetSkeleton();
         seen[t] = skeleton.get();
         boneCounts[t] = skeleton ? skeleton->mBones.size() : 0u;
       });

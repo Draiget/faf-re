@@ -59,49 +59,49 @@ namespace moho
   /**
    * Address: 0x0043DED0 (FUN_0043DED0)
    */
-  boost::shared_ptr<RD3DTextureResource> CD3DTextureResourceFactory::LoadImpl(
+  std::shared_ptr<RD3DTextureResource> CD3DTextureResourceFactory::LoadImpl(
     const gpg::StrArg path
   )
   {
     if (path != nullptr && path[0] != '\0') {
       const gpg::MemBuffer<const char> data = MapTextureFile(path);
       if (data.mBegin != nullptr) {
-        boost::shared_ptr<RD3DTextureResource> resource(new RD3DTextureResource(path));
+        std::shared_ptr<RD3DTextureResource> resource(new RD3DTextureResource(path));
         if (resource->Init(data)) {
           return resource;
         }
       }
     }
-    return boost::shared_ptr<RD3DTextureResource>();
+    return std::shared_ptr<RD3DTextureResource>();
   }
 
   /**
    * Address: 0x0043E0C0 (FUN_0043E0C0)
    */
-  boost::shared_ptr<gpg::MemBuffer<const char>> CD3DTextureResourceFactory::PreloadImpl(
+  std::shared_ptr<gpg::MemBuffer<const char>> CD3DTextureResourceFactory::PreloadImpl(
     const gpg::StrArg path
   )
   {
     if (path != nullptr && path[0] != '\0') {
       const gpg::MemBuffer<const char> data = MapTextureFile(path);
       if (data.mBegin != nullptr) {
-        return boost::shared_ptr<gpg::MemBuffer<const char>>(new gpg::MemBuffer<const char>(data));
+        return std::shared_ptr<gpg::MemBuffer<const char>>(new gpg::MemBuffer<const char>(data));
       }
     }
-    return boost::shared_ptr<gpg::MemBuffer<const char>>();
+    return std::shared_ptr<gpg::MemBuffer<const char>>();
   }
 
   /**
    * Address: 0x0043E200 (FUN_0043E200)
    */
-  boost::shared_ptr<RD3DTextureResource> CD3DTextureResourceFactory::LoadFromImpl(
+  std::shared_ptr<RD3DTextureResource> CD3DTextureResourceFactory::LoadFromImpl(
     const gpg::StrArg path,
-    const boost::shared_ptr<gpg::MemBuffer<const char>> prefetchData
+    const std::shared_ptr<gpg::MemBuffer<const char>> prefetchData
   )
   {
-    boost::shared_ptr<RD3DTextureResource> resource(new RD3DTextureResource(path));
+    std::shared_ptr<RD3DTextureResource> resource(new RD3DTextureResource(path));
     if (!resource->Init(*prefetchData)) {
-      return boost::shared_ptr<RD3DTextureResource>();
+      return std::shared_ptr<RD3DTextureResource>();
     }
     return resource;
   }

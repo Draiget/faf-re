@@ -54,7 +54,7 @@ namespace moho
    */
   RScmResource::RScmResource(
     const gpg::StrArg resourcePath,
-    const boost::shared_ptr<const SScmFile>& scmFile
+    const std::shared_ptr<const SScmFile>& scmFile
   )
     : mName(resourcePath)
     , mFile(scmFile)
@@ -144,7 +144,7 @@ namespace moho
     auto* const trimmed = reinterpret_cast<SScmFile*>(bytes);
     trimmed->mVertexCount = 0u;
     trimmed->mIndexCount = 0u;
-    const boost::shared_ptr<const SScmFile> trimmedFile(trimmed, &DeleteTrimmedScmFile);
+    const std::shared_ptr<const SScmFile> trimmedFile(trimmed, &DeleteTrimmedScmFile);
     mSkeleton.load(std::memory_order_acquire)->RebindFile(trimmedFile);
     mFile = trimmedFile;
   }
@@ -187,7 +187,7 @@ namespace moho
    * one, and it publishes with release so a reader never sees a half-built one.
    * Without it the plain `if (mSkeleton == nullptr)` had both races.
    */
-  boost::shared_ptr<const CAniSkel> RScmResource::GetSkeleton()
+  std::shared_ptr<const CAniSkel> RScmResource::GetSkeleton()
   {
     CAniSkel* skeleton = nullptr;
     for (;;) {
@@ -231,7 +231,7 @@ namespace moho
 
     struct KeepOwnerAlive
     {
-      boost::shared_ptr<RScmResource> owner;
+      std::shared_ptr<RScmResource> owner;
       void operator()(
         const CAniSkel*
       ) const
@@ -239,7 +239,7 @@ namespace moho
     };
 
     KeepOwnerAlive keepOwner{shared_from_this()};
-    return boost::shared_ptr<const CAniSkel>(skeleton, keepOwner);
+    return std::shared_ptr<const CAniSkel>(skeleton, keepOwner);
   }
 
   /**
@@ -259,12 +259,12 @@ namespace moho
    * `outResource` is guaranteed null at this call site (explicitly reset at
    * function entry), matching the binary's fresh-construction shape.
    */
-  boost::shared_ptr<RScmResource>* ConstructSharedRScmResourceFromRaw(
-    boost::shared_ptr<RScmResource>* const outResource,
+  std::shared_ptr<RScmResource>* ConstructSharedRScmResourceFromRaw(
+    std::shared_ptr<RScmResource>* const outResource,
     RScmResource* const resource
   )
   {
-    return ::new (outResource) boost::shared_ptr<RScmResource>(resource);
+    return ::new (outResource) std::shared_ptr<RScmResource>(resource);
   }
 
   /**
@@ -366,7 +366,7 @@ namespace moho
    * empty-path case lands there too, via the manager's own
    * `GetResource: Invalid name` rejection.
    */
-  boost::shared_ptr<RScmResource> GetModel(
+  std::shared_ptr<RScmResource> GetModel(
     const gpg::StrArg path,
     CResourceWatcher* const resourceWatcher
   )
@@ -377,6 +377,6 @@ namespace moho
       RScmResource::sType = resourceType;
     }
 
-    return boost::static_pointer_cast<RScmResource>(RES_GetResource(path, resourceWatcher, resourceType));
+    return std::static_pointer_cast<RScmResource>(RES_GetResource(path, resourceWatcher, resourceType));
   }
 } // namespace moho

@@ -3,7 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 
-#include "boost/shared_ptr.h"
+#include <memory>
 #include "gpg/core/containers/FastVector.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "moho/entity/EntityAttributes.h"
@@ -162,7 +162,7 @@ namespace moho
 
     [[nodiscard]] bool UsesUnderwaterReconGrid() const noexcept;
 
-    boost::shared_ptr<RScmResource> mScmResource; // 0x00
+    std::shared_ptr<RScmResource> mScmResource;   // 0x00
     const RMeshBlueprint* mMeshBlueprint;         // 0x08
     Wm3::Vec3f mScale;                            // 0x0C
     float mHealth;                                // 0x18
@@ -197,7 +197,7 @@ namespace moho
     std::uint8_t mUsingAltFootprint;           // 0xA4
     std::uint8_t mUsingAltFootprintSecondary;  // 0xA5
     std::uint8_t pad_00A6_00A7[0x02];
-    boost::shared_ptr<CD3DBatchTexture> mUnderlayTexture; // 0xA8
+    std::shared_ptr<CD3DBatchTexture> mUnderlayTexture;   // 0xA8
     EntityAttributes mIntelAttributes;                    // 0xB0
   };
 

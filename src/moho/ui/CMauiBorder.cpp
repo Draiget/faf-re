@@ -81,18 +81,18 @@ int moho::cfunc_CMauiBorderSetNewTexturesL(
   const char* const llPath = readOptionalTexturePath(6);
   const char* const lrPath = readOptionalTexturePath(7);
 
-  const boost::shared_ptr<CD3DBatchTexture> vertTexture =
-    vertPath != nullptr ? CD3DBatchTexture::FromFile(vertPath, 1u) : boost::shared_ptr<CD3DBatchTexture>{};
-  const boost::shared_ptr<CD3DBatchTexture> horzTexture =
-    horzPath != nullptr ? CD3DBatchTexture::FromFile(horzPath, 1u) : boost::shared_ptr<CD3DBatchTexture>{};
-  const boost::shared_ptr<CD3DBatchTexture> ulTexture =
-    ulPath != nullptr ? CD3DBatchTexture::FromFile(ulPath, 1u) : boost::shared_ptr<CD3DBatchTexture>{};
-  const boost::shared_ptr<CD3DBatchTexture> urTexture =
-    urPath != nullptr ? CD3DBatchTexture::FromFile(urPath, 1u) : boost::shared_ptr<CD3DBatchTexture>{};
-  const boost::shared_ptr<CD3DBatchTexture> llTexture =
-    llPath != nullptr ? CD3DBatchTexture::FromFile(llPath, 1u) : boost::shared_ptr<CD3DBatchTexture>{};
-  const boost::shared_ptr<CD3DBatchTexture> lrTexture =
-    lrPath != nullptr ? CD3DBatchTexture::FromFile(lrPath, 1u) : boost::shared_ptr<CD3DBatchTexture>{};
+  const std::shared_ptr<CD3DBatchTexture> vertTexture =
+    vertPath != nullptr ? CD3DBatchTexture::FromFile(vertPath, 1u) : std::shared_ptr<CD3DBatchTexture>{};
+  const std::shared_ptr<CD3DBatchTexture> horzTexture =
+    horzPath != nullptr ? CD3DBatchTexture::FromFile(horzPath, 1u) : std::shared_ptr<CD3DBatchTexture>{};
+  const std::shared_ptr<CD3DBatchTexture> ulTexture =
+    ulPath != nullptr ? CD3DBatchTexture::FromFile(ulPath, 1u) : std::shared_ptr<CD3DBatchTexture>{};
+  const std::shared_ptr<CD3DBatchTexture> urTexture =
+    urPath != nullptr ? CD3DBatchTexture::FromFile(urPath, 1u) : std::shared_ptr<CD3DBatchTexture>{};
+  const std::shared_ptr<CD3DBatchTexture> llTexture =
+    llPath != nullptr ? CD3DBatchTexture::FromFile(llPath, 1u) : std::shared_ptr<CD3DBatchTexture>{};
+  const std::shared_ptr<CD3DBatchTexture> lrTexture =
+    lrPath != nullptr ? CD3DBatchTexture::FromFile(lrPath, 1u) : std::shared_ptr<CD3DBatchTexture>{};
 
   border->SetTextures(vertTexture, horzTexture, ulTexture, urTexture, llTexture, lrTexture);
   lua_settop(state->m_state, 1);
@@ -150,7 +150,7 @@ int moho::cfunc_CMauiBorderSetSolidColorL(
 
   LuaPlus::LuaObject colorObject(LuaPlus::LuaStackObject(state, 2));
   const std::uint32_t rgba = SCR_DecodeColor(state, colorObject);
-  const boost::shared_ptr<CD3DBatchTexture> solidTexture = CD3DBatchTexture::FromSolidColor(rgba);
+  const std::shared_ptr<CD3DBatchTexture> solidTexture = CD3DBatchTexture::FromSolidColor(rgba);
   border->SetTextures(solidTexture, solidTexture, solidTexture, solidTexture, solidTexture, solidTexture);
 
   lua_settop(state->m_state, 1);
@@ -279,12 +279,12 @@ gpg::RRef moho::CMauiBorder::GetDerivedObjectRef()
  * lazy-vars from the vertical and horizontal texture dimensions.
  */
 void moho::CMauiBorder::SetTextures(
-  const boost::shared_ptr<CD3DBatchTexture>& vert,
-  const boost::shared_ptr<CD3DBatchTexture>& horz,
-  const boost::shared_ptr<CD3DBatchTexture>& ul,
-  const boost::shared_ptr<CD3DBatchTexture>& ur,
-  const boost::shared_ptr<CD3DBatchTexture>& ll,
-  const boost::shared_ptr<CD3DBatchTexture>& lr
+  const std::shared_ptr<CD3DBatchTexture>& vert,
+  const std::shared_ptr<CD3DBatchTexture>& horz,
+  const std::shared_ptr<CD3DBatchTexture>& ul,
+  const std::shared_ptr<CD3DBatchTexture>& ur,
+  const std::shared_ptr<CD3DBatchTexture>& ll,
+  const std::shared_ptr<CD3DBatchTexture>& lr
 )
 {
   if (vert) {

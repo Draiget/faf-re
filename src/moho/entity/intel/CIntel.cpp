@@ -297,31 +297,31 @@ namespace moho
   {
     switch (intelType) {
     case 1: {
-      boost::shared_ptr<CIntelGrid> grid = reconDB ? reconDB->ReconGetVisionGrid() : boost::shared_ptr<CIntelGrid>{};
+      std::shared_ptr<CIntelGrid> grid = reconDB ? reconDB->ReconGetVisionGrid() : std::shared_ptr<CIntelGrid>{};
       mIntelHandles[INTEL_Vision].reset(new (std::nothrow) CIntelPosHandle(radius, grid));
       grid.reset();
       return;
     }
     case 2: {
-      boost::shared_ptr<CIntelGrid> grid = reconDB ? reconDB->ReconGetWaterGrid() : boost::shared_ptr<CIntelGrid>{};
+      std::shared_ptr<CIntelGrid> grid = reconDB ? reconDB->ReconGetWaterGrid() : std::shared_ptr<CIntelGrid>{};
       mIntelHandles[INTEL_WaterVision].reset(new (std::nothrow) CIntelPosHandle(radius, grid));
       grid.reset();
       return;
     }
     case 3: {
-      boost::shared_ptr<CIntelGrid> grid = reconDB ? reconDB->ReconGetRadarGrid() : boost::shared_ptr<CIntelGrid>{};
+      std::shared_ptr<CIntelGrid> grid = reconDB ? reconDB->ReconGetRadarGrid() : std::shared_ptr<CIntelGrid>{};
       mIntelHandles[INTEL_Radar].reset(new (std::nothrow) CIntelPosHandle(radius, grid));
       grid.reset();
       return;
     }
     case 4: {
-      boost::shared_ptr<CIntelGrid> grid = reconDB ? reconDB->ReconGetSonarGrid() : boost::shared_ptr<CIntelGrid>{};
+      std::shared_ptr<CIntelGrid> grid = reconDB ? reconDB->ReconGetSonarGrid() : std::shared_ptr<CIntelGrid>{};
       mIntelHandles[INTEL_Sonar].reset(new (std::nothrow) CIntelPosHandle(radius, grid));
       grid.reset();
       return;
     }
     case 5: {
-      boost::shared_ptr<CIntelGrid> grid = reconDB ? reconDB->ReconGetOmniGrid() : boost::shared_ptr<CIntelGrid>{};
+      std::shared_ptr<CIntelGrid> grid = reconDB ? reconDB->ReconGetOmniGrid() : std::shared_ptr<CIntelGrid>{};
       mIntelHandles[INTEL_Omni].reset(new (std::nothrow) CIntelPosHandle(radius, grid));
       grid.reset();
       return;

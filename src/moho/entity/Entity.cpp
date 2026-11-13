@@ -1833,7 +1833,7 @@ namespace moho
       return 0;
     }
 
-    const boost::shared_ptr<const CAniSkel> skeleton = scmResource->GetSkeleton();
+    const std::shared_ptr<const CAniSkel> skeleton = scmResource->GetSkeleton();
     const CAniSkel* const skel = skeleton.get();
     if (skel == nullptr) {
       return 0;
@@ -1858,7 +1858,7 @@ namespace moho
       return nullptr;
     }
 
-    const boost::shared_ptr<const CAniSkel> skeleton = scmResource->GetSkeleton();
+    const std::shared_ptr<const CAniSkel> skeleton = scmResource->GetSkeleton();
     const CAniSkel* const skel = skeleton.get();
     if (skel == nullptr) {
       return nullptr;
@@ -1874,7 +1874,7 @@ namespace moho
    * What it does:
    * Returns this entity's mesh resource.
    */
-  boost::shared_ptr<RScmResource> Entity::GetMesh() const
+  std::shared_ptr<RScmResource> Entity::GetMesh() const
   {
     return mVarDat.mScmResource;
   }
@@ -1921,7 +1921,7 @@ namespace moho
       return -1;
     }
 
-    const boost::shared_ptr<const CAniSkel> skeleton = scmResource->GetSkeleton();
+    const std::shared_ptr<const CAniSkel> skeleton = scmResource->GetSkeleton();
     const CAniSkel* const skel = skeleton.get();
     if (skel == nullptr) {
       return -1;
@@ -3407,7 +3407,7 @@ namespace moho
     // Engine addition (plan WPL.4): the texture is the client's
     // (CD3DBatchTexture.h sBatchTextureFromFile); without a client there is none.
     mVarDat.mUnderlayTexture = sBatchTextureFromFile != nullptr ? sBatchTextureFromFile(underlayPath.c_str(), 0u)
-                                                                : boost::shared_ptr<CD3DBatchTexture>{};
+                                                                : std::shared_ptr<CD3DBatchTexture>{};
 #if FAF_SERVER_MODE
     // Engine addition, server mode: the path, for the frames (remote/UnderlayPaths.h).
     faf::remote::SetUnderlayPath(static_cast<std::uint32_t>(id_), underlayPath);
@@ -3426,7 +3426,7 @@ namespace moho
    * shared handle when the incoming raw texture pointer differs.
    */
   void Entity::SetStrategicUnderlay(
-    boost::shared_ptr<CD3DBatchTexture> underlayTexture
+    std::shared_ptr<CD3DBatchTexture> underlayTexture
   )
   {
     if (mVarDat.mUnderlayTexture.get() == underlayTexture.get()) {
@@ -3444,7 +3444,7 @@ namespace moho
    * What it does:
    * Returns one retained shared strategic-underlay texture handle.
    */
-  boost::shared_ptr<CD3DBatchTexture> Entity::GetStrategicUnderlay() const
+  std::shared_ptr<CD3DBatchTexture> Entity::GetStrategicUnderlay() const
   {
     return mVarDat.mUnderlayTexture;
   }

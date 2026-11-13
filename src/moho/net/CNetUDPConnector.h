@@ -3,7 +3,7 @@
 #include <cstdint>
 
 #include "legacy/thread/Mutex.h"
-#include "boost/weak_ptr.h"
+#include <memory>
 #include "CNetUDPConnection.h"
 #include "Common.h"
 #include "gpg/core/time/Timer.h"
@@ -93,7 +93,7 @@ namespace moho
      * Initializes connector runtime state, starts worker `Entry` thread, and
      * registers NAT traversal callback with provider.
      */
-    CNetUDPConnector(platform::net::Socket sock, boost::weak_ptr<INetNATTraversalProvider>& prov);
+    CNetUDPConnector(platform::net::Socket sock, std::weak_ptr<INetNATTraversalProvider>& prov);
 
     /**
      * In binary this does:
@@ -343,7 +343,7 @@ namespace moho
     fa::recursive_mutex lock_;
     platform::net::Socket socket_{platform::net::kInvalidSocket};
     HANDLE event_{nullptr};
-    boost::weak_ptr<INetNATTraversalProvider> mNatTraversalProvider;
+    std::weak_ptr<INetNATTraversalProvider> mNatTraversalProvider;
     gpg::DList<CNetUDPConnection> mConnections;
     TDatList<SNetPacket, void> mPacketList;
     uint32_t mPacketPoolSize{0};

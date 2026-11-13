@@ -299,7 +299,7 @@ void Unit::SetMesh(
     return;
   }
 
-  boost::shared_ptr<const CAniSkel> skeleton;
+  std::shared_ptr<const CAniSkel> skeleton;
   if (RScmResource* const scmResource = mVarDat.mScmResource.get(); scmResource != nullptr) {
     skeleton = scmResource->GetSkeleton();
   }
@@ -333,8 +333,8 @@ void Unit::SetMesh(
  * mirrors them into `AniActor::{mPose,mPriorPose}`.
  */
 void Unit::SetPoses(
-  const boost::shared_ptr<CAniPose>& priorSharedPose,
-  const boost::shared_ptr<CAniPose>& sharedPose
+  const std::shared_ptr<CAniPose>& priorSharedPose,
+  const std::shared_ptr<CAniPose>& sharedPose
 )
 {
   SSTIUnitVariableData& varDat = VarDat();

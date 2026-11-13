@@ -3,7 +3,7 @@
 #include <cstdint>
 
 #include "gpg/core/utils/NonCopyable.h"
-#include "boost/shared_ptr.h"
+#include <memory>
 #include "gpg/gal/Matrix.h"
 #include "legacy/containers/String.h"
 
@@ -55,7 +55,7 @@ namespace gpg::gal
      * What it does:
      * Binds a cube render target's texture; a null target unbinds.
      */
-    virtual void SetCubeRenderTarget(boost::shared_ptr<CubeRenderTarget> cubeTarget) = 0;
+    virtual void SetCubeRenderTarget(std::shared_ptr<CubeRenderTarget> cubeTarget) = 0;
 
     /**
      * Slot: 3
@@ -63,7 +63,7 @@ namespace gpg::gal
      * What it does:
      * Binds a colour render target's texture; a null target unbinds.
      */
-    virtual void SetRenderTarget(boost::shared_ptr<RenderTarget> renderTarget) = 0;
+    virtual void SetRenderTarget(std::shared_ptr<RenderTarget> renderTarget) = 0;
 
     /**
      * Slot: 4
@@ -71,7 +71,7 @@ namespace gpg::gal
      * What it does:
      * Binds a texture; a null texture unbinds.
      */
-    virtual void SetTexture(boost::shared_ptr<Texture> texture) = 0;
+    virtual void SetTexture(std::shared_ptr<Texture> texture) = 0;
 
     /**
      * Slot: 5

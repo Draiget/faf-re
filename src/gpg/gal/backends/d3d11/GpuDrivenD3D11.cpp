@@ -316,14 +316,14 @@ namespace gpg::gal
 
   GpuDrivenD3D11::~GpuDrivenD3D11() = default;
 
-  boost::shared_ptr<GpuBuffer> GpuDrivenD3D11::CreateBuffer(
+  std::shared_ptr<GpuBuffer> GpuDrivenD3D11::CreateBuffer(
     const GpuBufferDesc& desc
   )
   {
     if ((mFeatures & kGpuFeatureVertexPulling) == 0U) {
       return {};
     }
-    return boost::shared_ptr<GpuBuffer>(new GpuBufferD3D11(mDevice.Get(), desc));
+    return std::shared_ptr<GpuBuffer>(new GpuBufferD3D11(mDevice.Get(), desc));
   }
 
   void GpuDrivenD3D11::UpdateBuffer(
@@ -386,7 +386,7 @@ namespace gpg::gal
     return true;
   }
 
-  boost::shared_ptr<GpuProgram> GpuDrivenD3D11::CreateProgram(
+  std::shared_ptr<GpuProgram> GpuDrivenD3D11::CreateProgram(
     const GpuProgramDesc& desc
   )
   {
@@ -394,7 +394,7 @@ namespace gpg::gal
       return {};
     }
 
-    boost::shared_ptr<GpuProgramD3D11> program(new GpuProgramD3D11());
+    std::shared_ptr<GpuProgramD3D11> program(new GpuProgramD3D11());
     if (desc.computeEntry != nullptr) {
       const ComPtr<ID3DBlob> code = CompileStage(desc, desc.computeEntry, "cs_5_0");
       if (

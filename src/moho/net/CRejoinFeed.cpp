@@ -1089,7 +1089,7 @@ namespace
   }
 
   /// A file that goes away when it is closed: a save is far too large to be sure of memory for it twice.
-  [[nodiscard]] boost::shared_ptr<std::FILE> OpenScratchFile()
+  [[nodiscard]] std::shared_ptr<std::FILE> OpenScratchFile()
   {
     static std::atomic<int> sCount{0};
     std::error_code ignored;
@@ -1112,7 +1112,7 @@ namespace
     if (file == nullptr) {
       throw std::runtime_error("cannot write " + path.string());
     }
-    return boost::shared_ptr<std::FILE>(file, SFileStarCloser{});
+    return std::shared_ptr<std::FILE>(file, SFileStarCloser{});
   }
 
   // A peer's save of the running game, on its way to a client that restarted. Under
@@ -1270,7 +1270,7 @@ namespace
     const Sim& mSim;
     std::uint32_t mBeat = 0;
     std::chrono::steady_clock::time_point mStart{};
-    boost::shared_ptr<std::FILE> mFile;
+    std::shared_ptr<std::FILE> mFile;
     gpg::WriteArchive* mArchive = nullptr;
   };
 
@@ -1278,7 +1278,7 @@ namespace
   std::chrono::steady_clock::time_point sRejoinStart{};
 
   // A client coming back: the save it was sent, until the session's driver is created.
-  boost::shared_ptr<std::FILE> sRestoreFile;
+  std::shared_ptr<std::FILE> sRestoreFile;
   SSimKeyframeHeader sRestoreHeader{};
 } // namespace
 
@@ -1313,7 +1313,7 @@ void moho::REJOIN_PrepareRestore(
   }
 
   LaunchInfoBase* const launchInfo = sessionInfo.mLaunchInfo.get();
-  boost::shared_ptr<LaunchInfoLoad> loadInfo(new LaunchInfoLoad());
+  std::shared_ptr<LaunchInfoLoad> loadInfo(new LaunchInfoLoad());
   loadInfo->mGameRules = launchInfo->mGameRules;
   loadInfo->mMap = launchInfo->mMap;
   launchInfo->mMap = nullptr;
@@ -1329,7 +1329,7 @@ void moho::REJOIN_PrepareRestore(
   SIM_BeginKeyframeRestore(sRestoreHeader);
   // Unlike a replay's, this session's clients already count in the game's own beats.
   gSimBeatOrigin.store(0);
-  sessionInfo.mLaunchInfo = boost::static_pointer_cast<LaunchInfoBase>(loadInfo);
+  sessionInfo.mLaunchInfo = std::static_pointer_cast<LaunchInfoBase>(loadInfo);
   gpg::Logf(
     "REJOIN: loading the save of beat %u, %.1f s after starting",
     sRestoreHeader.beat,
@@ -1934,7 +1934,7 @@ bool moho::REJOIN_BeginSetup(
     return refuse("No peer was given.");
   }
 
-  setup->connector = NET_MakeUDPConnector(localPort, boost::weak_ptr<INetNATTraversalProvider>{});
+  setup->connector = NET_MakeUDPConnector(localPort, std::weak_ptr<INetNATTraversalProvider>{});
   if (setup->connector == nullptr) {
     return refuse("The game port could not be opened.");
   }
@@ -2077,7 +2077,7 @@ fa::auto_ptr<SWldSessionInfo> moho::REJOIN_PollSetup(
   if (packed.size() > kPackedHeaderBytes) {
     std::memcpy(&rawSize, packed.data() + 1, sizeof(rawSize));
     std::vector<unsigned char> raw(static_cast<std::size_t>(rawSize));
-    boost::shared_ptr<std::FILE> file = OpenScratchFile();
+    std::shared_ptr<std::FILE> file = OpenScratchFile();
     const char* const body = packed.data() + kPackedHeaderBytes;
     const std::size_t bodySize = packed.size() - kPackedHeaderBytes;
     bool unpacked = false;

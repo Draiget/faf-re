@@ -3,7 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 
-#include "boost/shared_ptr.h"
+#include <memory>
 #include "gpg/gal/Effect.hpp"
 #include "legacy/containers/String.h"
 
@@ -219,11 +219,11 @@ namespace moho
   public:
     fa::string mTechniqueName;                                       // +0x04
     fa::string mTexturePath;                                         // +0x20
-    boost::shared_ptr<gpg::gal::Texture> mDecalTexture;              // +0x3C
-    boost::shared_ptr<gpg::gal::VertexFormat> mVertexFormat;         // +0x44
-    boost::shared_ptr<gpg::gal::VertexBuffer> mQuadVertexBuffer;     // +0x4C
-    boost::shared_ptr<gpg::gal::VertexBuffer> mInstanceVertexBuffer; // +0x54
-    boost::shared_ptr<gpg::gal::IndexBuffer> mIndexBuffer;           // +0x5C
+    std::shared_ptr<gpg::gal::Texture> mDecalTexture;                // +0x3C
+    std::shared_ptr<gpg::gal::VertexFormat> mVertexFormat;           // +0x44
+    std::shared_ptr<gpg::gal::VertexBuffer> mQuadVertexBuffer;       // +0x4C
+    std::shared_ptr<gpg::gal::VertexBuffer> mInstanceVertexBuffer;   // +0x54
+    std::shared_ptr<gpg::gal::IndexBuffer> mIndexBuffer;             // +0x5C
     bool mNeedsVertexUpload;                                         // +0x64
     std::uint8_t mPadding65_67[0x03];                                // +0x65
     CartographicDecalList mDecals;                                   // +0x68
@@ -351,7 +351,7 @@ namespace moho
      * Resolves the cartographic shader from the active D3D device resources
      * and returns the backing GAL effect handle.
      */
-    [[nodiscard]] boost::shared_ptr<gpg::gal::Effect> GetEffect();
+    [[nodiscard]] std::shared_ptr<gpg::gal::Effect> GetEffect();
 
     /**
      * Address: 0x007D13E0 (FUN_007D13E0)
@@ -443,9 +443,9 @@ namespace moho
       RangeRenderer* rangeRenderer,
       VisionRenderer* visionRenderer,
       BoundaryRenderer* boundaryRenderer,
-      boost::shared_ptr<gpg::gal::RenderTarget> colorTarget,
-      boost::shared_ptr<gpg::gal::DepthStencilTarget> depthStencilTarget,
-      boost::shared_ptr<CD3DPrimBatcher> primBatcher
+      std::shared_ptr<gpg::gal::RenderTarget> colorTarget,
+      std::shared_ptr<gpg::gal::DepthStencilTarget> depthStencilTarget,
+      std::shared_ptr<CD3DPrimBatcher> primBatcher
     );
 
   private:
@@ -562,7 +562,7 @@ namespace moho
      * The shipped body is `retn 10h` (0x007D3AB7): link-time code generation
      * moved `this` onto the stack ahead of the two declared arguments.
      */
-    void RenderTerrainStage1(std::int32_t headIndex, boost::shared_ptr<gpg::gal::RenderTarget> colorTarget);
+    void RenderTerrainStage1(std::int32_t headIndex, std::shared_ptr<gpg::gal::RenderTarget> colorTarget);
 
     /**
      * Address: 0x007D2CB0 (FUN_007D2CB0)
@@ -635,14 +635,14 @@ namespace moho
 
     // GPU resource handles, all lazily created by InitializeTerrain /
     // InitializeTerrainTextures and released by Shutdown / the dtor.
-    boost::shared_ptr<gpg::gal::Texture> mTopographicTexture;       // +0x64
-    boost::shared_ptr<gpg::gal::Texture> mHypsometricTexture;       // +0x6C
-    boost::shared_ptr<gpg::gal::Texture> mElevTexture;              // +0x74
-    boost::shared_ptr<gpg::gal::VertexFormat> mTerrainVertexFormat; // +0x7C
-    boost::shared_ptr<gpg::gal::VertexBuffer> mTerrainVertexBuffer; // +0x84
-    boost::shared_ptr<gpg::gal::VertexFormat> mFrameVertexFormat;   // +0x8C
-    boost::shared_ptr<gpg::gal::VertexBuffer> mFrameVertexBuffer;   // +0x94
-    boost::shared_ptr<gpg::gal::IndexBuffer> mQuadIndexBuffer;      // +0x9C
+    std::shared_ptr<gpg::gal::Texture> mTopographicTexture;       // +0x64
+    std::shared_ptr<gpg::gal::Texture> mHypsometricTexture;       // +0x6C
+    std::shared_ptr<gpg::gal::Texture> mElevTexture;              // +0x74
+    std::shared_ptr<gpg::gal::VertexFormat> mTerrainVertexFormat; // +0x7C
+    std::shared_ptr<gpg::gal::VertexBuffer> mTerrainVertexBuffer; // +0x84
+    std::shared_ptr<gpg::gal::VertexFormat> mFrameVertexFormat;   // +0x8C
+    std::shared_ptr<gpg::gal::VertexBuffer> mFrameVertexBuffer;   // +0x94
+    std::shared_ptr<gpg::gal::IndexBuffer> mQuadIndexBuffer;      // +0x9C
   };
 
   static_assert(offsetof(Cartographic, mInitialized) == 0x04, "Cartographic::mInitialized offset must be 0x04");

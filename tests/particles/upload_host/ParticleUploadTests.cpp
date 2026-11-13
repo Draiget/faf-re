@@ -107,7 +107,7 @@ namespace gpg::gal
     {
       return kGpuPathParticleBatch;
     }
-    boost::shared_ptr<VertexBuffer> CreateVertexBuffer(
+    std::shared_ptr<VertexBuffer> CreateVertexBuffer(
       const VertexBufferContext* context
     )
     {
@@ -134,7 +134,7 @@ namespace gpg::gal
       return call.success;
     }
     void RecordDraw(
-      const boost::shared_ptr<VertexBuffer>& source,
+      const std::shared_ptr<VertexBuffer>& source,
       int count,
       int first,
       bool original
@@ -199,7 +199,7 @@ namespace moho
       return false;
     }
     void SetRenderTargetTexture(
-      const boost::shared_ptr<ID3DRenderTarget>&
+      const std::shared_ptr<ID3DRenderTarget>&
     )
     {}
   };
@@ -252,7 +252,7 @@ namespace moho
       std::uint8_t data[0x5C];
     };
     int mMaxParticles = kParticleBufferCapacity;
-    boost::shared_ptr<gpg::gal::VertexBuffer> mInstanceVertexBuffer;
+    std::shared_ptr<gpg::gal::VertexBuffer> mInstanceVertexBuffer;
     ParticleBuffer()
     {
       gpg::gal::VertexBufferContext context{};
@@ -292,7 +292,7 @@ namespace moho
       gpg::gal::Device::GetInstance()->RecordDraw(mInstanceVertexBuffer, count, first, true);
     }
     void RenderInstances(
-      const boost::shared_ptr<gpg::gal::VertexBuffer>& source,
+      const std::shared_ptr<gpg::gal::VertexBuffer>& source,
       int count,
       int first
     )
@@ -374,7 +374,7 @@ namespace moho
     ParticleBuffer* AcquireParticleBuffer();
     void ReleaseParticleBuffer(ParticleBuffer*);
     char RenderEffects(GeomCamera3*, char, char, int, float);
-    void RenderRefractingEffects(GeomCamera3*, int, float, const boost::shared_ptr<ID3DRenderTarget>&);
+    void RenderRefractingEffects(GeomCamera3*, int, float, const std::shared_ptr<ID3DRenderTarget>&);
     SParticleRenderBucket& P(
       int key,
       float scalar = 0,

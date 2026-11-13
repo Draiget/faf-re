@@ -24,7 +24,7 @@ namespace
   constexpr int kTransientLookupAssertLine = 1238;
   constexpr const char* kUnreachableAssertSourcePath = "c:\\work\\rts\\main\\code\\src\\user\\RenTerrain.cpp";
 
-  using DynamicSheetHandle = boost::shared_ptr<moho::CD3DDynamicTextureSheet>;
+  using DynamicSheetHandle = std::shared_ptr<moho::CD3DDynamicTextureSheet>;
 
   enum class LookupTextureCreationLane : std::uint8_t
   {
@@ -126,7 +126,7 @@ namespace moho
    * cubic-blend lookup table into 128 RGBA texels, unlocks the sheet, and
    * returns retained ownership.
    */
-  boost::shared_ptr<CD3DDynamicTextureSheet> CreateTerrainCubicBlendLookupTexture()
+  std::shared_ptr<CD3DDynamicTextureSheet> CreateTerrainCubicBlendLookupTexture()
   {
     return CreateTerrainCubicBlendLookupTextureImpl(LookupTextureCreationLane::Tracked, kTrackedLookupAssertLine);
   }
@@ -139,7 +139,7 @@ namespace moho
    * non-tracked resource lane, writes the cubic-blend lookup table into 128
    * RGBA texels, unlocks the sheet, and returns retained ownership.
    */
-  boost::shared_ptr<CD3DDynamicTextureSheet> CreateTerrainCubicBlendLookupTextureTransient()
+  std::shared_ptr<CD3DDynamicTextureSheet> CreateTerrainCubicBlendLookupTextureTransient()
   {
     return CreateTerrainCubicBlendLookupTextureImpl(LookupTextureCreationLane::Transient, kTransientLookupAssertLine);
   }

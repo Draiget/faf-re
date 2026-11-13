@@ -17,7 +17,7 @@
 #include "moho/unit/core/CWeaponAttributes.h"
 #include "Wm3Vector3.h"
 #include "Wm3Quaternion.h"
-#include "boost/shared_ptr.h"
+#include <memory>
 
 struct lua_State;
 namespace LuaPlus
@@ -372,7 +372,7 @@ namespace moho
       std::int32_t bone,
       float thickness,
       float lifetime,
-      boost::shared_ptr<RD3DTextureResource> textureSheet
+      std::shared_ptr<RD3DTextureResource> textureSheet
     );
 
     /**

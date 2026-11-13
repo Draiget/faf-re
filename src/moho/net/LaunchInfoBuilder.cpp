@@ -192,7 +192,7 @@ namespace moho
     }
     scenarioInfo.SetObject("Options", gameOptions);
 
-    boost::shared_ptr<LaunchInfoNew> launchInfo(new LaunchInfoNew());
+    std::shared_ptr<LaunchInfoNew> launchInfo(new LaunchInfoNew());
     launchInfo->mGameMods = SCR_ToString(dat["GameMods"]);
     launchInfo->mScenarioInfo = SCR_ToString(scenarioInfo);
     launchInfo->mInitSeed = seed;

@@ -2,7 +2,7 @@
 #include <cstddef>
 #include <cstdint>
 
-#include "boost/shared_ptr.h"
+#include <memory>
 #include "gpg/core/containers/FastVector.h"
 #include "CArmyImpl.h"
 #include "gpg/core/containers/IntrusiveLink.h"
@@ -366,7 +366,7 @@ namespace moho
      * `WRenViewport::Render` (0x007F90D0) calls this once per frame to decide
      * whether there is a tick debug canvas to draw.
      */
-    [[nodiscard]] boost::shared_ptr<CDebugCanvas> GetTickDebugCanvas() const;
+    [[nodiscard]] std::shared_ptr<CDebugCanvas> GetTickDebugCanvas() const;
 
     /**
      * Address: 0x007F63C0 (FUN_007F63C0, Moho::CWldSession::GetBeatDebugCanvas)
@@ -375,7 +375,7 @@ namespace moho
      * Returns a retained shared reference to the beat-scoped debug canvas
      * (`mBeatDebugCanvas`, +0x041C).
      */
-    [[nodiscard]] boost::shared_ptr<CDebugCanvas> GetBeatDebugCanvas() const;
+    [[nodiscard]] std::shared_ptr<CDebugCanvas> GetBeatDebugCanvas() const;
 
     /**
      * Address: 0x007A6360 (FUN_007A6360, ?GetFocusArmy@CWldSession@Moho@@QBEPAVUserArmy@2@XZ)
@@ -759,7 +759,7 @@ namespace moho
      * What it does:
      * Builds a save-data snapshot for current world-session entities.
      */
-    [[nodiscard]] boost::shared_ptr<SSessionSaveData> GetSaveData() const;
+    [[nodiscard]] std::shared_ptr<SSessionSaveData> GetSaveData() const;
 
     /**
      * Address: 0x0087FC90 (FUN_0087FC90,
@@ -989,7 +989,7 @@ namespace moho
      * `CUIWorldView::RenderCommandGraph` (0x0086ECD0) and
      * `UICommandDragger`'s constructor (0x00823FE0).
      */
-    [[nodiscard]] boost::shared_ptr<UICommandGraph> GetCommandGraph(bool allowCreate);
+    [[nodiscard]] std::shared_ptr<UICommandGraph> GetCommandGraph(bool allowCreate);
 
     /**
      * Address: 0x0085AF40 (FUN_0085AF40, sub_85AF40)
@@ -1047,7 +1047,7 @@ namespace moho
     CTaskStage* mCurThread;                        // 0x0014
     RRuleGameRulesImpl* mRules;                    // 0x0018
     CWldMap* mWldMap;                              // 0x001C
-    boost::shared_ptr<LaunchInfoBase> mLaunchInfo; // 0x0020
+    std::shared_ptr<LaunchInfoBase> mLaunchInfo;   // 0x0020
     fa::string mMapName;                           // 0x0028
     /**
      * Every live `UserEntity` in the session, by entity id. `AddEntity` /
@@ -1115,12 +1115,12 @@ namespace moho
     /// and command drags hold it while they draw or edit it, and it dies when
     /// the last of them lets go. `GetCommandGraph` locks it (0x00898F70) and
     /// re-points it at a graph it creates (0x0089AE50, `weak_count` at +0x08).
-    boost::weak_ptr<UICommandGraph> mCommandGraph;  // 0x0404
-    boost::shared_ptr<void> mUnknownShared40C;      // 0x040C
-    boost::shared_ptr<CDebugCanvas> mDebugCanvas;   // 0x0414
+    std::weak_ptr<UICommandGraph> mCommandGraph; // 0x0404
+    std::shared_ptr<void> mUnknownShared40C;     // 0x040C
+    std::shared_ptr<CDebugCanvas> mDebugCanvas;  // 0x0414
     /// The beat-scoped debug canvas; `DoBeat` re-seats it from the packet.
-    boost::shared_ptr<CDebugCanvas> mBeatDebugCanvas; // 0x041C
-    boost::shared_ptr<CSimResources> mSimResources;   // 0x0424
+    std::shared_ptr<CDebugCanvas> mBeatDebugCanvas; // 0x041C
+    std::shared_ptr<CSimResources> mSimResources;   // 0x0424
     /// Entities the sim has destroyed that are still playing out their death
     /// on the user side. `OrphanEntity` (0x008941FA) and `DoBeat`'s entity
     /// removal (0x00894C70) both `WeakSet<UserEntity>::Add` (0x007AE1B0) into
@@ -1210,7 +1210,7 @@ namespace moho
     bool mTeamColorMode;                                  // 0x04E9
     char pad_04EA[2];                                     // 0x04EA
     gpg::MemBuffer<char> mEdgeFog;                        // 0x04EC
-    boost::shared_ptr<SSessionSaveData> mPendingSaveData; // 0x04FC
+    std::shared_ptr<SSessionSaveData> mPendingSaveData;   // 0x04FC
     char pad_0504[4];                                     // 0x0504
   };
 

@@ -2,7 +2,7 @@
 
 #include <cstdint>
 
-#include "boost/shared_ptr.h"
+#include <memory>
 
 namespace gpg::gal
 {
@@ -14,7 +14,7 @@ namespace moho
   class ID3DVertexFormat
   {
   public:
-    using FormatHandle = boost::shared_ptr<gpg::gal::VertexFormat>;
+    using FormatHandle = std::shared_ptr<gpg::gal::VertexFormat>;
 
     /**
      * Address: 0x0043F420 (FUN_0043F420, sub_43F420)

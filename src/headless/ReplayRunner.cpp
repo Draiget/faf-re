@@ -316,7 +316,7 @@ namespace faf::headless
     const char* const label = options.label.c_str();
 
     // `--resume-from`: the keyframe's header says how far into the stream the session starts.
-    boost::shared_ptr<std::FILE> keyframeFile;
+    std::shared_ptr<std::FILE> keyframeFile;
     moho::SSimKeyframeHeader keyframeHeader{};
     if (!options.resumeFrom.empty()) {
       std::FILE* rawFile = nullptr;
@@ -324,7 +324,7 @@ namespace faf::headless
         result.error = "cannot read " + options.resumeFrom;
         return result;
       }
-      keyframeFile = boost::shared_ptr<std::FILE>(rawFile, moho::SFileStarCloser{});
+      keyframeFile = std::shared_ptr<std::FILE>(rawFile, moho::SFileStarCloser{});
       if (!moho::SIM_ReadKeyframeHeader(rawFile, keyframeHeader)) {
         result.error = options.resumeFrom + " is not a keyframe";
         return result;
@@ -516,7 +516,7 @@ namespace faf::headless
     // `--resume-from`: the same launch info, as `CSavedGame::CreateSinglePlayerSessionInfo` builds
     // a saved game's; the sim comes from the archive behind the header.
     if (keyframeFile.get() != nullptr) {
-      boost::shared_ptr<moho::LaunchInfoLoad> loadInfo(new moho::LaunchInfoLoad());
+      std::shared_ptr<moho::LaunchInfoLoad> loadInfo(new moho::LaunchInfoLoad());
       loadInfo->mGameRules = launchInfo->mGameRules;
       loadInfo->mMap = launchInfo->mMap;
       launchInfo->mMap = nullptr;
@@ -534,7 +534,7 @@ namespace faf::headless
         // As REJOIN_PrepareRestore: this session's clients count in the game's own beats.
         moho::gSimBeatOrigin.store(0);
       }
-      sessionInfo->mLaunchInfo = boost::static_pointer_cast<moho::LaunchInfoBase>(loadInfo);
+      sessionInfo->mLaunchInfo = std::static_pointer_cast<moho::LaunchInfoBase>(loadInfo);
     }
 
     if (options.checksumPeriod > 0) {

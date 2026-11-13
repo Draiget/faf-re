@@ -1,6 +1,6 @@
 #pragma once
 
-#include "boost/shared_ptr.h"
+#include <memory>
 
 namespace gpg::gal
 {
@@ -39,6 +39,6 @@ namespace moho
   private:
     gpg::gal::Device* mDevice = nullptr;
     bool mSupported = false;
-    boost::shared_ptr<gpg::gal::GpuProgram> mProgram;
+    std::shared_ptr<gpg::gal::GpuProgram> mProgram;
   };
 } // namespace moho

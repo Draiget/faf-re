@@ -66,10 +66,10 @@ namespace moho
 
     void BindTextureShaderVar(
       ShaderVar& shaderVar,
-      const boost::shared_ptr<ID3DTextureSheet>& texture
+      const std::shared_ptr<ID3DTextureSheet>& texture
     )
     {
-      shaderVar.GetTexture(boost::static_pointer_cast<CD3DDynamicTextureSheet>(texture));
+      shaderVar.GetTexture(std::static_pointer_cast<CD3DDynamicTextureSheet>(texture));
     }
   } // namespace
 
@@ -206,8 +206,8 @@ namespace moho
     const float tickLerp,
     const GeomCamera3* const camera,
     const CWaterShaderProperties* const shaderProperties,
-    const boost::shared_ptr<ID3DRenderTarget>& refractionTexture,
-    const boost::shared_ptr<ID3DRenderTarget>& reflectionTexture
+    const std::shared_ptr<ID3DRenderTarget>& refractionTexture,
+    const std::shared_ptr<ID3DRenderTarget>& reflectionTexture
   )
   {
     (void)refractionTexture;

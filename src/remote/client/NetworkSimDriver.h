@@ -13,7 +13,7 @@
 #include <string>
 #include <vector>
 
-#include "boost/shared_ptr.h"
+#include <memory>
 #include "moho/net/CClientManagerImpl.h"
 #include "moho/sim/ISTIDriver.h"
 #include "remote/SpeedLimit.h"
@@ -194,7 +194,7 @@ namespace faf::remote::client
     bool mArmiesGiven = false;
     // The session's resource deposits (it takes them from every packet, and its map draws them): an empty set for a
     // packet the view client gave none (the session tables' deposits are the packets' from the first view on).
-    boost::shared_ptr<moho::CSimResources> mResources;
+    std::shared_ptr<moho::CSimResources> mResources;
     const moho::CHeightField* mSeedHeights = nullptr; // copied into the view client when it is made
     std::uint64_t mTablesBad = 0;
     std::uint64_t mRosters = 0;

@@ -179,8 +179,8 @@ namespace faf::remote::client
     std::int32_t focusArmy = -1;
     bool fogOfWar = false;
     std::int32_t pausedBy = -1;
-    boost::shared_ptr<moho::CHeightField> terrain;
-    boost::shared_ptr<moho::CSimResources> resources;
+    std::shared_ptr<moho::CHeightField> terrain;
+    std::shared_ptr<moho::CSimResources> resources;
 
     SCarried() = default;
     SCarried(const SCarried&) = delete;

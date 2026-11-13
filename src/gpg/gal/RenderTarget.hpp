@@ -1,7 +1,7 @@
 #pragma once
 
 #include "gpg/core/utils/NonCopyable.h"
-#include "boost/shared_ptr.h"
+#include <memory>
 #include "platform/Platform.h"
 
 namespace gpg::gal
@@ -49,7 +49,7 @@ namespace gpg::gal
      * `Effect::Create` (0x0093F5B0), whose export spells it
      * `?Create@Effect@gal@gpg@@SA?AV?$shared_ptr@VEffect@gal@gpg@@@boost@@ABVEffectContext@23@@Z`.
      */
-    static boost::shared_ptr<RenderTarget> Create(const RenderTargetContext& context);
+    static std::shared_ptr<RenderTarget> Create(const RenderTargetContext& context);
 
     /**
      * Slot: 1

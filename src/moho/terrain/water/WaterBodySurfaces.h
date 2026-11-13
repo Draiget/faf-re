@@ -7,7 +7,7 @@
 #include <cstdint>
 #include <vector>
 
-#include "boost/shared_ptr.h"
+#include <memory>
 
 namespace moho
 {
@@ -76,14 +76,14 @@ namespace moho
      * level `SetBodyReflection` was given, otherwise a cleared target, so a lake reflects the
      * sky and not units mirrored at the sea.
      */
-    [[nodiscard]] static boost::shared_ptr<ID3DRenderTarget> ReflectionFor(float level);
+    [[nodiscard]] static std::shared_ptr<ID3DRenderTarget> ReflectionFor(float level);
 
     /// Set by the reflection pass each frame: the body level it mirrored at (or none) and the targets.
     static void SetBodyReflection(
       bool mirrored,
       float level,
-      const boost::shared_ptr<ID3DRenderTarget>& bodyTarget,
-      const boost::shared_ptr<ID3DRenderTarget>& emptyTarget
+      const std::shared_ptr<ID3DRenderTarget>& bodyTarget,
+      const std::shared_ptr<ID3DRenderTarget>& emptyTarget
     );
   };
 } // namespace moho

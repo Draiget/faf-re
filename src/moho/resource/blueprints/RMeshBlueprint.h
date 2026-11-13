@@ -3,7 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 
-#include "boost/shared_ptr.h"
+#include <memory>
 #include "gpg/core/reflection/Reflection.h"
 #include "legacy/containers/Vector.h"
 #include "moho/resource/blueprints/RBlueprint.h"
@@ -215,7 +215,7 @@ namespace moho
      * shared lock. Returns an empty `boost::shared_ptr<RScmResource>` when
      * no LOD has a mesh name or none resolves to a live resource.
      */
-    [[nodiscard]] boost::shared_ptr<RScmResource> GetMesh() const;
+    [[nodiscard]] std::shared_ptr<RScmResource> GetMesh() const;
   };
 
   static_assert(sizeof(RMeshBlueprintLOD) == 0xCC, "RMeshBlueprintLOD size must be 0xCC");

@@ -371,7 +371,7 @@ namespace gpg::gal::effects
 
   void ParameterStore::SetTexture(
     const std::uint32_t parameter,
-    const boost::shared_ptr<Texture>& texture
+    const std::shared_ptr<Texture>& texture
   )
   {
     if (parameter >= mBindings.size()) {
@@ -385,7 +385,7 @@ namespace gpg::gal::effects
 
   void ParameterStore::SetRenderTarget(
     const std::uint32_t parameter,
-    const boost::shared_ptr<RenderTarget>& renderTarget
+    const std::shared_ptr<RenderTarget>& renderTarget
   )
   {
     if (parameter >= mBindings.size()) {

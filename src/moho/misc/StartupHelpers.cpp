@@ -1665,7 +1665,7 @@ std::int32_t moho::graphics_Fidelity = 2;
  * `Sim::Create`.
  */
 moho::Sim* moho::Sim_Create_exxt(
-  const boost::shared_ptr<moho::LaunchInfoBase>& launchInfo
+  const std::shared_ptr<moho::LaunchInfoBase>& launchInfo
 )
 {
   moho::Sim* const sim = moho::Sim::Create(launchInfo);

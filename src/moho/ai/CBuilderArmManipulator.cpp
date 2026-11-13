@@ -257,7 +257,7 @@ namespace moho
 
     // Read the goal unit's actor skeleton (RAII shared_ptr; released at scope end).
     Unit* const goalUnit = mGoalUnit.GetObjectPtr();
-    const boost::shared_ptr<const CAniSkel> skeleton = goalUnit->AniActor->GetSkeleton();
+    const std::shared_ptr<const CAniSkel> skeleton = goalUnit->AniActor->GetSkeleton();
     const CAniSkel* const skel = skeleton.get();
 
     // Register the two watched bones, then record the reference (muzzle) bone:

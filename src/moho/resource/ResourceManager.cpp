@@ -229,7 +229,7 @@ namespace moho
       record.mResource.reset();
       record.mLoadFailed = false;
 
-      const boost::shared_ptr<PrefetchData> prefetch = boost::LockWeak(record.mPrefetch);
+      const std::shared_ptr<PrefetchData> prefetch = boost::LockWeak(record.mPrefetch);
       if (prefetch) {
         prefetch->mPrefetchData.reset();
         prefetch->mResource.reset();
@@ -394,7 +394,7 @@ namespace moho
         continue;
       }
 
-      const boost::shared_ptr<PrefetchData> prefetch = boost::LockWeak(mPrefetchQueue.front());
+      const std::shared_ptr<PrefetchData> prefetch = boost::LockWeak(mPrefetchQueue.front());
       mPrefetchQueue.pop_front();
       if (!prefetch) {
         continue;
@@ -454,13 +454,13 @@ namespace moho
 
     ResourceRecord& record = Record(mRecords.insert(ResourceRecord(name.c_str(), type)).first);
 
-    boost::shared_ptr<PrefetchData> prefetch = boost::LockWeak(record.mPrefetch);
+    std::shared_ptr<PrefetchData> prefetch = boost::LockWeak(record.mPrefetch);
     if (!prefetch) {
-      prefetch = boost::shared_ptr<PrefetchData>(new PrefetchData(&record));
+      prefetch = std::shared_ptr<PrefetchData>(new PrefetchData(&record));
       record.mPrefetch = prefetch;
     }
 
-    if (const boost::shared_ptr<void> resource = boost::LockWeak(record.mResource); !resource) {
+    if (const std::shared_ptr<void> resource = boost::LockWeak(record.mResource); !resource) {
       mPrefetchQueue.push_back(prefetch);
       if (mPrefetchThread) {
         mPrefetchQueued.notify_all();
@@ -484,7 +484,7 @@ namespace moho
    * for loads as nothing. A watcher is registered once per record, under the
    * path the caller gave.
    */
-  boost::shared_ptr<void> ResourceManager::GetResource(
+  std::shared_ptr<void> ResourceManager::GetResource(
     const gpg::StrArg path,
     CResourceWatcher* const watcher,
     const gpg::RType* const type
@@ -498,11 +498,11 @@ namespace moho
     } else if (path != nullptr && path[0] == '/' && path[1] != ':' && path[1] != '/') {
       name = FindMountedFile(path);
       if (name.empty()) {
-        return boost::shared_ptr<void>();
+        return std::shared_ptr<void>();
       }
     } else {
       gpg::Warnf("GetResource: Invalid name \"%s\"", path);
-      return boost::shared_ptr<void>();
+      return std::shared_ptr<void>();
     }
 
     ResourceRecord& record = Record(mRecords.insert(ResourceRecord(name.c_str(), type)).first);
@@ -528,17 +528,17 @@ namespace moho
   /**
    * Address: 0x004AA690 (FUN_004AA690)
    */
-  boost::shared_ptr<void> ResourceManager::LoadRecord(
+  std::shared_ptr<void> ResourceManager::LoadRecord(
     ResourceRecord& record,
     fa::recursive_mutex::scoped_lock& lock
   )
   {
-    const boost::shared_ptr<PrefetchData> prefetch = boost::LockWeak(record.mPrefetch);
+    const std::shared_ptr<PrefetchData> prefetch = boost::LockWeak(record.mPrefetch);
     while (record.mLoading) {
       mLoadFinished.wait(lock);
     }
 
-    boost::shared_ptr<void> resource = boost::LockWeak(record.mResource);
+    std::shared_ptr<void> resource = boost::LockWeak(record.mResource);
     if (resource || record.mLoadFailed) {
       return resource;
     }
@@ -605,7 +605,7 @@ namespace moho
    * Address: 0x004ABEE0 (FUN_004ABEE0,
    * ?RES_GetResource@Moho@@YA?AV?$shared_ptr@X@boost@@VStrArg@gpg@@PAVCResourceWatcher@1@PBVRType@5@@Z)
    */
-  boost::shared_ptr<void> RES_GetResource(
+  std::shared_ptr<void> RES_GetResource(
     const gpg::StrArg path,
     CResourceWatcher* const resourceWatcher,
     const gpg::RType* const resourceType

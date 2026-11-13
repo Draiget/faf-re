@@ -912,12 +912,12 @@ namespace gpg::gal
     return &mHeadOutputContexts[headIndex];
   }
 
-  boost::shared_ptr<PipelineState> DeviceD3D11::GetPipelineState()
+  std::shared_ptr<PipelineState> DeviceD3D11::GetPipelineState()
   {
     return mPipelineState;
   }
 
-  boost::shared_ptr<Effect> DeviceD3D11::CreateEffect(
+  std::shared_ptr<Effect> DeviceD3D11::CreateEffect(
     const EffectContext& context
   )
   {
@@ -941,10 +941,10 @@ namespace gpg::gal
     const std::size_t sourceBytes = static_cast<std::size_t>(context.mSourceBuffer.mEnd - context.mSourceBuffer.mBegin);
     ComPtr<ID3DX11Effect> effect =
       CompileEffect(sourceData, sourceBytes, context.mSourcePath.c_str(), defines.data(), context.mCachePath.c_str());
-    return boost::shared_ptr<Effect>(new EffectD3D11(context, effect.Get()));
+    return std::shared_ptr<Effect>(new EffectD3D11(context, effect.Get()));
   }
 
-  boost::shared_ptr<Texture> DeviceD3D11::CreateTexture(
+  std::shared_ptr<Texture> DeviceD3D11::CreateTexture(
     const TextureContext* const context
   )
   {
@@ -1067,12 +1067,12 @@ namespace gpg::gal
       CheckHresult("DeviceD3D11.cpp", __LINE__, mDevice->CreateShaderResourceView(resource.Get(), nullptr, &view));
     }
 
-    return boost::shared_ptr<Texture>(
+    return std::shared_ptr<Texture>(
       new TextureD3D11(*context, mDevice.Get(), mImmediate.Get(), resource.Get(), view.Get(), contentsFromEngine)
     );
   }
 
-  boost::shared_ptr<RenderTarget> DeviceD3D11::CreateRenderTarget(
+  std::shared_ptr<RenderTarget> DeviceD3D11::CreateRenderTarget(
     const RenderTargetContext* const context
   )
   {
@@ -1108,19 +1108,19 @@ namespace gpg::gal
     viewport.MaxZ = 1.0f;
     SetViewport(&viewport);
 
-    return boost::shared_ptr<RenderTarget>(
+    return std::shared_ptr<RenderTarget>(
       new RenderTargetD3D11(texture.Get(), renderTargetView.Get(), shaderResourceView.Get())
     );
   }
 
-  boost::shared_ptr<CubeRenderTarget> DeviceD3D11::CreateCubeRenderTarget(
+  std::shared_ptr<CubeRenderTarget> DeviceD3D11::CreateCubeRenderTarget(
     const CubeRenderTargetContext* const context
   )
   {
-    return boost::shared_ptr<CubeRenderTarget>(new CubeRenderTargetD3D11(*context));
+    return std::shared_ptr<CubeRenderTarget>(new CubeRenderTargetD3D11(*context));
   }
 
-  boost::shared_ptr<DepthStencilTarget> DeviceD3D11::CreateDepthStencilTarget(
+  std::shared_ptr<DepthStencilTarget> DeviceD3D11::CreateDepthStencilTarget(
     const DepthStencilTargetContext* const context
   )
   {
@@ -1157,7 +1157,7 @@ namespace gpg::gal
       );
     }
 
-    return boost::shared_ptr<DepthStencilTarget>(
+    return std::shared_ptr<DepthStencilTarget>(
       new DepthStencilTargetD3D11(*context, texture.Get(), depthView.Get(), shaderView.Get())
     );
   }
@@ -1285,33 +1285,33 @@ namespace gpg::gal
     }
   }
 
-  boost::shared_ptr<VertexFormat> DeviceD3D11::CreateVertexFormat(
+  std::shared_ptr<VertexFormat> DeviceD3D11::CreateVertexFormat(
     const std::uint32_t formatCode
   )
   {
     if (formatCode >= d3d11::kVertexFormatCount || mInputLayouts[formatCode] == nullptr) {
       ThrowError("DeviceD3D11.cpp", __LINE__, "invalid vertex format specified");
     }
-    return boost::shared_ptr<VertexFormat>(new VertexFormatD3D11(formatCode, mInputLayouts[formatCode].Get()));
+    return std::shared_ptr<VertexFormat>(new VertexFormatD3D11(formatCode, mInputLayouts[formatCode].Get()));
   }
 
-  boost::shared_ptr<VertexBuffer> DeviceD3D11::CreateVertexBuffer(
+  std::shared_ptr<VertexBuffer> DeviceD3D11::CreateVertexBuffer(
     const VertexBufferContext* const context
   )
   {
-    return boost::shared_ptr<VertexBuffer>(new VertexBufferD3D11(*context, mDevice.Get(), mImmediate.Get()));
+    return std::shared_ptr<VertexBuffer>(new VertexBufferD3D11(*context, mDevice.Get(), mImmediate.Get()));
   }
 
-  boost::shared_ptr<IndexBuffer> DeviceD3D11::CreateIndexBuffer(
+  std::shared_ptr<IndexBuffer> DeviceD3D11::CreateIndexBuffer(
     const IndexBufferContext* const context
   )
   {
-    return boost::shared_ptr<IndexBuffer>(new IndexBufferD3D11(*context, mDevice.Get(), mImmediate.Get()));
+    return std::shared_ptr<IndexBuffer>(new IndexBufferD3D11(*context, mDevice.Get(), mImmediate.Get()));
   }
 
   void DeviceD3D11::GetRenderTargetData(
-    const boost::shared_ptr<RenderTarget>& source,
-    const boost::shared_ptr<Texture>& destination
+    const std::shared_ptr<RenderTarget>& source,
+    const std::shared_ptr<Texture>& destination
   )
   {
     if (source == nullptr) {
@@ -1329,8 +1329,8 @@ namespace gpg::gal
   }
 
   void DeviceD3D11::StretchRect(
-    const boost::shared_ptr<RenderTarget>& source,
-    const boost::shared_ptr<RenderTarget>& destination,
+    const std::shared_ptr<RenderTarget>& source,
+    const std::shared_ptr<RenderTarget>& destination,
     const RECT* const sourceRect,
     const RECT* const destinationRect
   )
@@ -1486,8 +1486,8 @@ namespace gpg::gal
   }
 
   void DeviceD3D11::UpdateSurface(
-    const boost::shared_ptr<Texture>& source,
-    const boost::shared_ptr<Texture>& destination,
+    const std::shared_ptr<Texture>& source,
+    const std::shared_ptr<Texture>& destination,
     const RECT* const sourceRect,
     const RECT* const destinationRect
   )
@@ -1597,7 +1597,7 @@ namespace gpg::gal
   }
 
   void DeviceD3D11::SaveCubeRenderTarget(
-    const boost::shared_ptr<CubeRenderTarget>& cubeTarget,
+    const std::shared_ptr<CubeRenderTarget>& cubeTarget,
     const fa::string& filePath
   )
   {
@@ -1606,7 +1606,7 @@ namespace gpg::gal
   }
 
   void DeviceD3D11::SaveRenderTarget(
-    const boost::shared_ptr<RenderTarget>& renderTarget,
+    const std::shared_ptr<RenderTarget>& renderTarget,
     const fa::string& filePath,
     const int fileFormat
   )
@@ -1620,7 +1620,7 @@ namespace gpg::gal
   }
 
   void DeviceD3D11::SaveTexture(
-    const boost::shared_ptr<Texture>& texture,
+    const std::shared_ptr<Texture>& texture,
     const fa::string& filePath,
     const int fileFormat,
     gpg::MemBuffer<char>* const outBuffer
@@ -1753,9 +1753,9 @@ namespace gpg::gal
     mDecodeContext->Unmap(staging.Get(), 0U);
   }
 
-  boost::weak_ptr<void>* DeviceD3D11::Func7(
-    boost::weak_ptr<void>* const outWeakHandle,
-    boost::shared_ptr<void> temporarySharedHandle
+  std::weak_ptr<void>* DeviceD3D11::Func7(
+    std::weak_ptr<void>* const outWeakHandle,
+    std::shared_ptr<void> temporarySharedHandle
   )
   {
     static_cast<void>(temporarySharedHandle);
@@ -2391,7 +2391,7 @@ namespace gpg::gal
   }
 
   void DeviceD3D11::SetVertexDeclaration(
-    const boost::shared_ptr<VertexFormat> vertexFormat
+    const std::shared_ptr<VertexFormat> vertexFormat
   )
   {
     auto* const format = static_cast<VertexFormatD3D11*>(vertexFormat.get());
@@ -2503,7 +2503,7 @@ namespace gpg::gal
 
   void DeviceD3D11::SetVertexBuffer(
     const std::uint32_t streamSlot,
-    const boost::shared_ptr<VertexBuffer> vertexBuffer,
+    const std::shared_ptr<VertexBuffer> vertexBuffer,
     const int streamFrequencyToken,
     const int startVertex
   )
@@ -2531,7 +2531,7 @@ namespace gpg::gal
   }
 
   void DeviceD3D11::SetBufferIndices(
-    const boost::shared_ptr<IndexBuffer> indexBuffer
+    const std::shared_ptr<IndexBuffer> indexBuffer
   )
   {
     auto* const buffer = static_cast<IndexBufferD3D11*>(indexBuffer.get());
@@ -2680,11 +2680,11 @@ namespace gpg::gal
     return nvidia ? kGpuPathMsdfCook : 0U;
   }
 
-  boost::shared_ptr<GpuBuffer> DeviceD3D11::CreateGpuBuffer(
+  std::shared_ptr<GpuBuffer> DeviceD3D11::CreateGpuBuffer(
     const GpuBufferDesc& desc
   )
   {
-    return mGpuDriven != nullptr ? mGpuDriven->CreateBuffer(desc) : boost::shared_ptr<GpuBuffer>();
+    return mGpuDriven != nullptr ? mGpuDriven->CreateBuffer(desc) : std::shared_ptr<GpuBuffer>();
   }
 
   void DeviceD3D11::UpdateGpuBuffer(
@@ -2699,11 +2699,11 @@ namespace gpg::gal
     }
   }
 
-  boost::shared_ptr<GpuProgram> DeviceD3D11::CreateGpuProgram(
+  std::shared_ptr<GpuProgram> DeviceD3D11::CreateGpuProgram(
     const GpuProgramDesc& desc
   )
   {
-    return mGpuDriven != nullptr ? mGpuDriven->CreateProgram(desc) : boost::shared_ptr<GpuProgram>();
+    return mGpuDriven != nullptr ? mGpuDriven->CreateProgram(desc) : std::shared_ptr<GpuProgram>();
   }
 
   void DeviceD3D11::DrawGpuProgram(

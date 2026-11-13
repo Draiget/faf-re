@@ -643,7 +643,7 @@ namespace gpg::gal
    * Runs the `Func1` pre-hook and returns a new reference to the device's
    * pipeline state.
    */
-  boost::shared_ptr<PipelineState> DeviceD3D9::GetPipelineState()
+  std::shared_ptr<PipelineState> DeviceD3D9::GetPipelineState()
   {
     Func1();
     return mPipelineState;
@@ -657,7 +657,7 @@ namespace gpg::gal
    * effect object, installs the active pipeline state-manager, and emits
    * the compiled bytecode to cache-path when the file can be opened.
    */
-  boost::shared_ptr<Effect> DeviceD3D9::CreateEffectFromSourceBuffer(
+  std::shared_ptr<Effect> DeviceD3D9::CreateEffectFromSourceBuffer(
     const EffectContext& context
   )
   {
@@ -749,7 +749,7 @@ namespace gpg::gal
       throw;
     }
 
-    return boost::shared_ptr<Effect>(new EffectD3D9(context, effect));
+    return std::shared_ptr<Effect>(new EffectD3D9(context, effect));
   }
 
   /**
@@ -759,7 +759,7 @@ namespace gpg::gal
    * Loads one cached compiled-effect payload from `cachePath`, creates the
    * native D3D9 effect, and installs the active pipeline state-manager.
    */
-  boost::shared_ptr<Effect> DeviceD3D9::CreateEffectFromCachedBinary(
+  std::shared_ptr<Effect> DeviceD3D9::CreateEffectFromCachedBinary(
     const EffectContext& context
   )
   {
@@ -814,7 +814,7 @@ namespace gpg::gal
       throw;
     }
 
-    return boost::shared_ptr<Effect>(new EffectD3D9(context, effect));
+    return std::shared_ptr<Effect>(new EffectD3D9(context, effect));
   }
 
   /**
@@ -826,7 +826,7 @@ namespace gpg::gal
    * cache when the context asks for it and from source otherwise. Both
    * builders construct straight into this call's return slot.
    */
-  boost::shared_ptr<Effect> DeviceD3D9::CreateEffect(
+  std::shared_ptr<Effect> DeviceD3D9::CreateEffect(
     const EffectContext& context
   )
   {
@@ -987,9 +987,9 @@ namespace gpg::gal
    * Dispatches `Func1`, clears caller weak-handle output, and consumes one
    * temporary shared-handle argument by value.
    */
-  boost::weak_ptr<void>* DeviceD3D9::Func7(
-    boost::weak_ptr<void>* const outWeakHandle,
-    boost::shared_ptr<void> temporarySharedHandle
+  std::weak_ptr<void>* DeviceD3D9::Func7(
+    std::weak_ptr<void>* const outWeakHandle,
+    std::shared_ptr<void> temporarySharedHandle
   )
   {
     Func1();
@@ -1539,7 +1539,7 @@ namespace gpg::gal
    * decoded from in-memory file data as a 2D, cube or volume texture - and
    * wraps it in a `TextureD3D9` whose context records what was built.
    */
-  boost::shared_ptr<Texture> DeviceD3D9::CreateTexture(
+  std::shared_ptr<Texture> DeviceD3D9::CreateTexture(
     const TextureContext* const context
   )
   {
@@ -1725,7 +1725,7 @@ namespace gpg::gal
       ThrowGalError("DeviceD3D9.cpp", 493, "invalid source specified for texture data");
     }
 
-    return boost::shared_ptr<Texture>(new TextureD3D9(&textureContext, nativeTexture));
+    return std::shared_ptr<Texture>(new TextureD3D9(&textureContext, nativeTexture));
   }
 
   /**
@@ -1736,7 +1736,7 @@ namespace gpg::gal
    * context's size and format in the default pool and hands it to a new
    * `RenderTargetD3D9`, which takes its level-0 surface.
    */
-  boost::shared_ptr<RenderTarget> DeviceD3D9::CreateRenderTarget(
+  std::shared_ptr<RenderTarget> DeviceD3D9::CreateRenderTarget(
     const RenderTargetContext* const context
   )
   {
@@ -1757,7 +1757,7 @@ namespace gpg::gal
       ThrowGalErrorFromHresult("DeviceD3D9.cpp", 508, createResult);
     }
 
-    return boost::shared_ptr<RenderTarget>(new RenderTargetD3D9(context, renderTexture));
+    return std::shared_ptr<RenderTarget>(new RenderTargetD3D9(context, renderTexture));
   }
 
   /**
@@ -1767,7 +1767,7 @@ namespace gpg::gal
    * Creates one single-level render-target cube texture and hands it to a
    * new `CubeRenderTargetD3D9`, which takes the six face surfaces.
    */
-  boost::shared_ptr<CubeRenderTarget> DeviceD3D9::CreateCubeRenderTarget(
+  std::shared_ptr<CubeRenderTarget> DeviceD3D9::CreateCubeRenderTarget(
     const CubeRenderTargetContext* const context
   )
   {
@@ -1787,7 +1787,7 @@ namespace gpg::gal
       ThrowGalErrorFromHresult("DeviceD3D9.cpp", 521, createResult);
     }
 
-    return boost::shared_ptr<CubeRenderTarget>(new CubeRenderTargetD3D9(context, cubeTexture));
+    return std::shared_ptr<CubeRenderTarget>(new CubeRenderTargetD3D9(context, cubeTexture));
   }
 
   /**
@@ -1797,7 +1797,7 @@ namespace gpg::gal
    * Creates one non-multisampled depth/stencil surface of the context's size
    * and format and wraps it in a `DepthStencilTargetD3D9`.
    */
-  boost::shared_ptr<DepthStencilTarget> DeviceD3D9::CreateDepthStencilTarget(
+  std::shared_ptr<DepthStencilTarget> DeviceD3D9::CreateDepthStencilTarget(
     const DepthStencilTargetContext* const context
   )
   {
@@ -1818,7 +1818,7 @@ namespace gpg::gal
       ThrowGalErrorFromHresult("DeviceD3D9.cpp", 534, createResult);
     }
 
-    return boost::shared_ptr<DepthStencilTarget>(new DepthStencilTargetD3D9(context, depthStencilSurface));
+    return std::shared_ptr<DepthStencilTarget>(new DepthStencilTargetD3D9(context, depthStencilSurface));
   }
 
   /**
@@ -1829,7 +1829,7 @@ namespace gpg::gal
    * and wraps it in a `VertexFormatD3D9`. An unknown code throws from the
    * element-table lookup.
    */
-  boost::shared_ptr<VertexFormat> DeviceD3D9::CreateVertexFormat(
+  std::shared_ptr<VertexFormat> DeviceD3D9::CreateVertexFormat(
     const std::uint32_t formatCode
   )
   {
@@ -1842,7 +1842,7 @@ namespace gpg::gal
       ThrowGalErrorFromHresult("DeviceD3D9.cpp", 546, createResult);
     }
 
-    return boost::shared_ptr<VertexFormat>(new VertexFormatD3D9(formatCode, vertexDeclaration));
+    return std::shared_ptr<VertexFormat>(new VertexFormatD3D9(formatCode, vertexDeclaration));
   }
 
   /**
@@ -1853,7 +1853,7 @@ namespace gpg::gal
    * buffers in the default pool, the rest managed) and wraps it in a
    * `VertexBufferD3D9`.
    */
-  boost::shared_ptr<VertexBuffer> DeviceD3D9::CreateVertexBuffer(
+  std::shared_ptr<VertexBuffer> DeviceD3D9::CreateVertexBuffer(
     const VertexBufferContext* const context
   )
   {
@@ -1870,7 +1870,7 @@ namespace gpg::gal
       ThrowGalErrorFromHresult("DeviceD3D9.cpp", 560, createResult);
     }
 
-    return boost::shared_ptr<VertexBuffer>(new VertexBufferD3D9(context, nativeVertexBuffer));
+    return std::shared_ptr<VertexBuffer>(new VertexBufferD3D9(context, nativeVertexBuffer));
   }
 
   /**
@@ -1880,7 +1880,7 @@ namespace gpg::gal
    * Creates one D3D9 index buffer of 16- or 32-bit indices (format 0 throws
    * "undefined index buffer format") and wraps it in an `IndexBufferD3D9`.
    */
-  boost::shared_ptr<IndexBuffer> DeviceD3D9::CreateIndexBuffer(
+  std::shared_ptr<IndexBuffer> DeviceD3D9::CreateIndexBuffer(
     const IndexBufferContext* const context
   )
   {
@@ -1903,7 +1903,7 @@ namespace gpg::gal
       ThrowGalErrorFromHresult("DeviceD3D9.cpp", 581, createResult);
     }
 
-    return boost::shared_ptr<IndexBuffer>(new IndexBufferD3D9(context, nativeIndexBuffer));
+    return std::shared_ptr<IndexBuffer>(new IndexBufferD3D9(context, nativeIndexBuffer));
   }
 
   /**
@@ -1915,8 +1915,8 @@ namespace gpg::gal
    * `GetRenderTargetData` from the target's surface into it.
    */
   void DeviceD3D9::GetRenderTargetData(
-    const boost::shared_ptr<RenderTarget>& source,
-    const boost::shared_ptr<Texture>& destination
+    const std::shared_ptr<RenderTarget>& source,
+    const std::shared_ptr<Texture>& destination
   )
   {
     Func1();
@@ -1953,8 +1953,8 @@ namespace gpg::gal
    * native `IDirect3DDevice9::StretchRect` with linear filtering.
    */
   void DeviceD3D9::StretchRect(
-    const boost::shared_ptr<RenderTarget>& source,
-    const boost::shared_ptr<RenderTarget>& destination,
+    const std::shared_ptr<RenderTarget>& source,
+    const std::shared_ptr<RenderTarget>& destination,
     const RECT* const sourceRect,
     const RECT* const destinationRect
   )
@@ -1990,8 +1990,8 @@ namespace gpg::gal
    * rects mean the whole surface.
    */
   void DeviceD3D9::UpdateSurface(
-    const boost::shared_ptr<Texture>& source,
-    const boost::shared_ptr<Texture>& destination,
+    const std::shared_ptr<Texture>& source,
+    const std::shared_ptr<Texture>& destination,
     const RECT* const sourceRect,
     const RECT* const destinationRect
   )
@@ -2043,7 +2043,7 @@ namespace gpg::gal
    * handed string bytes as its texture.
    */
   void DeviceD3D9::SaveCubeRenderTarget(
-    const boost::shared_ptr<CubeRenderTarget>& cubeTarget,
+    const std::shared_ptr<CubeRenderTarget>& cubeTarget,
     const fa::string& filePath
   )
   {
@@ -2075,7 +2075,7 @@ namespace gpg::gal
    * `fileFormat`.
    */
   void DeviceD3D9::SaveRenderTarget(
-    const boost::shared_ptr<RenderTarget>& renderTarget,
+    const std::shared_ptr<RenderTarget>& renderTarget,
     const fa::string& filePath,
     const int fileFormat
   )
@@ -2111,7 +2111,7 @@ namespace gpg::gal
    * to `filePath`.
    */
   void DeviceD3D9::SaveTexture(
-    const boost::shared_ptr<Texture>& texture,
+    const std::shared_ptr<Texture>& texture,
     const fa::string& filePath,
     const int fileFormat,
     gpg::MemBuffer<char>* const outBuffer
@@ -2575,7 +2575,7 @@ namespace gpg::gal
    * "invalid vertex format" when it is unset.
    */
   void DeviceD3D9::SetVertexDeclaration(
-    const boost::shared_ptr<VertexFormat> vertexFormat
+    const std::shared_ptr<VertexFormat> vertexFormat
   )
   {
     Func1();
@@ -2601,7 +2601,7 @@ namespace gpg::gal
    */
   void DeviceD3D9::SetVertexBuffer(
     const std::uint32_t streamSlot,
-    const boost::shared_ptr<VertexBuffer> vertexBuffer,
+    const std::shared_ptr<VertexBuffer> vertexBuffer,
     const int streamFrequencyToken,
     const int startVertex
   )
@@ -2641,7 +2641,7 @@ namespace gpg::gal
    * "invalid index buffer" when it is unset.
    */
   void DeviceD3D9::SetBufferIndices(
-    const boost::shared_ptr<IndexBuffer> indexBuffer
+    const std::shared_ptr<IndexBuffer> indexBuffer
   )
   {
     Func1();

@@ -690,7 +690,7 @@ technique EditorPropOverSway_LowFidelity
       static constexpr std::size_t kTechniques = 24U;
       const gpg::gal::Effect* galEffect = nullptr;
       std::int32_t fidelity = 0;
-      std::vector<std::pair<std::string, boost::shared_ptr<gpg::gal::EffectTechnique>>> techniques;
+      std::vector<std::pair<std::string, std::shared_ptr<gpg::gal::EffectTechnique>>> techniques;
     };
 
     struct TechniqueMemoTable
@@ -1285,10 +1285,10 @@ technique EditorPropOverSway_LowFidelity
     fa::vector<fa::string>& outTechniqueNames
   )
   {
-    fa::vector<boost::shared_ptr<gpg::gal::EffectTechnique>> techniques{};
+    fa::vector<std::shared_ptr<gpg::gal::EffectTechnique>> techniques{};
     mEffect->GetTechniques(techniques);
 
-    for (const boost::shared_ptr<gpg::gal::EffectTechnique>& technique : techniques) {
+    for (const std::shared_ptr<gpg::gal::EffectTechnique>& technique : techniques) {
       outTechniqueNames.push_back(*technique->GetName());
     }
   }
@@ -1390,7 +1390,7 @@ technique EditorPropOverSway_LowFidelity
     const fa::string& annotationName
   )
   {
-    const boost::shared_ptr<gpg::gal::EffectTechnique> technique = mEffect->GetTechnique(implementationName.c_str());
+    const std::shared_ptr<gpg::gal::EffectTechnique> technique = mEffect->GetTechnique(implementationName.c_str());
     if (!technique) {
       return false;
     }
@@ -1451,7 +1451,7 @@ technique EditorPropOverSway_LowFidelity
     const fa::string& annotationName
   )
   {
-    const boost::shared_ptr<gpg::gal::EffectTechnique> technique = mEffect->GetTechnique(implementationName.c_str());
+    const std::shared_ptr<gpg::gal::EffectTechnique> technique = mEffect->GetTechnique(implementationName.c_str());
     if (!technique) {
       return false;
     }
@@ -1504,7 +1504,7 @@ technique EditorPropOverSway_LowFidelity
    * What it does:
    * Returns a new reference to the gal effect.
    */
-  boost::shared_ptr<gpg::gal::Effect> CD3DEffect::GetBaseEffect()
+  std::shared_ptr<gpg::gal::Effect> CD3DEffect::GetBaseEffect()
   {
     return mEffect;
   }
@@ -1519,10 +1519,10 @@ technique EditorPropOverSway_LowFidelity
    */
   void CD3DEffect::SetTexture(
     const char* const variableName,
-    boost::shared_ptr<ID3DTextureSheet> texture
+    std::shared_ptr<ID3DTextureSheet> texture
   )
   {
-    const boost::shared_ptr<gpg::gal::EffectVariable> variable = mEffect->GetVariable(variableName);
+    const std::shared_ptr<gpg::gal::EffectVariable> variable = mEffect->GetVariable(variableName);
 
     if (texture) {
       ID3DTextureSheet::TextureHandle textureHandle{};

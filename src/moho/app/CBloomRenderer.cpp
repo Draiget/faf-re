@@ -104,7 +104,7 @@ int moho::CBloomRenderer::Init(
  */
 void moho::CBloomRenderer::RenderToBlur(
   const char* const technique,
-  boost::shared_ptr<ID3DRenderTarget> texture
+  std::shared_ptr<ID3DRenderTarget> texture
 )
 {
   CRenFrame& frame = mCompositeFrame;
@@ -122,7 +122,7 @@ void moho::CBloomRenderer::RenderToBlur(
  * Mangled: ?RenderToBackBuffer@CBloomRenderer@Moho@@AAEXPBDV?$shared_ptr@VID3DRenderTarget@Moho@@@boost@@@Z
  */
 void moho::CBloomRenderer::RenderToBackBuffer(
-  boost::shared_ptr<ID3DRenderTarget> texture
+  std::shared_ptr<ID3DRenderTarget> texture
 )
 {
   CRenFrame& frame = mExtractFrame;
@@ -161,14 +161,14 @@ void moho::CBloomRenderer::DoBloom(
 
   // The binary keeps only the .px of the returned depth stencil in `edi` for
   // the whole routine.
-  boost::shared_ptr<CD3DDepthStencil> activeDepthStencil;
+  std::shared_ptr<CD3DDepthStencil> activeDepthStencil;
   ID3DDepthStencil* const depthStencil = D3D_GetDevice()->GetDepthStencil(activeDepthStencil).get();
 
   D3DVIEWPORT9 savedViewport{};
 
   // Acquire this head's writer-lock render target, then StretchRect it into
   // the blur target. This seeds the blur target with the current back buffer.
-  boost::shared_ptr<ID3DRenderTarget> writerLock;
+  std::shared_ptr<ID3DRenderTarget> writerLock;
   D3D_GetDevice()->GetWriterLock1(writerLock, static_cast<int>(mHead));
   D3D_GetDevice()->SetViewRect(writerLock.get(), mRenderTargets[1].get(), nullptr, nullptr);
 

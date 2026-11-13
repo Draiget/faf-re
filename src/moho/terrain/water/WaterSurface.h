@@ -3,7 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 
-#include "boost/weak_ptr.h"
+#include <memory>
 
 namespace gpg::gal
 {
@@ -93,8 +93,8 @@ namespace moho
       float tickLerp,
       const GeomCamera3* camera,
       const CWaterShaderProperties* shaderProperties,
-      const boost::shared_ptr<ID3DRenderTarget>& refractionTexture,
-      const boost::shared_ptr<ID3DRenderTarget>& reflectionTexture
+      const std::shared_ptr<ID3DRenderTarget>& refractionTexture,
+      const std::shared_ptr<ID3DRenderTarget>& reflectionTexture
     ) = 0;
   };
 } // namespace moho

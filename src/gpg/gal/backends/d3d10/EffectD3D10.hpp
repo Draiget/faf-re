@@ -5,7 +5,7 @@
 
 #include <d3d10.h>
 
-#include "boost/shared_ptr.h"
+#include <memory>
 #include "gpg/gal/Effect.hpp"
 #include "gpg/gal/EffectContext.hpp"
 #include "legacy/containers/Vector.h"
@@ -70,7 +70,7 @@ namespace gpg::gal
      * Walks the effect's techniques by index and appends a wrapper for every
      * valid one.
      */
-    void GetTechniques(fa::vector<boost::shared_ptr<EffectTechnique>>& outTechniques) override;
+    void GetTechniques(fa::vector<std::shared_ptr<EffectTechnique>>& outTechniques) override;
 
     /**
      * Address: 0x0094B8A0 (FUN_0094B8A0)
@@ -79,7 +79,7 @@ namespace gpg::gal
      * What it does:
      * Wraps the effect variable called `name`; throws when there is none.
      */
-    boost::shared_ptr<EffectVariable> GetVariable(const char* name) override;
+    std::shared_ptr<EffectVariable> GetVariable(const char* name) override;
 
     /**
      * Address: 0x0094BA80 (FUN_0094BA80)
@@ -88,7 +88,7 @@ namespace gpg::gal
      * What it does:
      * Wraps the technique called `name`; throws when there is none.
      */
-    boost::shared_ptr<EffectTechnique> GetTechnique(const char* name) override;
+    std::shared_ptr<EffectTechnique> GetTechnique(const char* name) override;
 
     /**
      * Address: 0x0094B5E0 (FUN_0094B5E0)

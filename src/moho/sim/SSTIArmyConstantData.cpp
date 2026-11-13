@@ -114,7 +114,7 @@ namespace moho
     archive->WriteString(const_cast<fa::string*>(&mPlayerName));
     archive->WriteBool(mIsCivilian != 0u);
 
-    const auto writeSharedGridPointer = [archive, &ownerRef](const boost::shared_ptr<CIntelGrid>& gridPointer) {
+    const auto writeSharedGridPointer = [archive, &ownerRef](const std::shared_ptr<CIntelGrid>& gridPointer) {
       gpg::RRef gridRef{};
       (void)gpg::RRef_CIntelGrid(&gridRef, const_cast<CIntelGrid*>(gridPointer.get()));
       gpg::WriteRawPointer(archive, gridRef, gpg::TrackedPointerState::Shared, ownerRef);

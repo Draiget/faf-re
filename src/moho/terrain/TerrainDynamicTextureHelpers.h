@@ -1,6 +1,6 @@
 #pragma once
 
-#include "boost/shared_ptr.h"
+#include <memory>
 
 namespace moho
 {
@@ -14,7 +14,7 @@ namespace moho
    * cubic-blend lookup table into 128 RGBA texels, unlocks the sheet, and
    * returns retained ownership.
    */
-  boost::shared_ptr<CD3DDynamicTextureSheet> CreateTerrainCubicBlendLookupTexture();
+  std::shared_ptr<CD3DDynamicTextureSheet> CreateTerrainCubicBlendLookupTexture();
 
   /**
    * Address: 0x00803720 (FUN_00803720, func_NewDynamicTextureSheet)
@@ -24,5 +24,5 @@ namespace moho
    * non-tracked resource lane, writes the cubic-blend lookup table into 128
    * RGBA texels, unlocks the sheet, and returns retained ownership.
    */
-  boost::shared_ptr<CD3DDynamicTextureSheet> CreateTerrainCubicBlendLookupTextureTransient();
+  std::shared_ptr<CD3DDynamicTextureSheet> CreateTerrainCubicBlendLookupTextureTransient();
 } // namespace moho

@@ -263,14 +263,14 @@ namespace
     }
   }
 
-  boost::shared_ptr<std::FILE> OpenFile(
+  std::shared_ptr<std::FILE> OpenFile(
     const std::string& path,
     const char* const mode
   )
   {
     std::FILE* file = nullptr;
     EXPECT_EQ(fopen_s(&file, path.c_str(), mode), 0) << path;
-    return boost::shared_ptr<std::FILE>(file, &CloseFile);
+    return std::shared_ptr<std::FILE>(file, &CloseFile);
   }
 
   class StringSink final : public gpg::WriteArchiveSink
@@ -312,7 +312,7 @@ namespace
       const std::string path = mFolder.File(("written" + std::to_string(mCount++) + ".bin").c_str());
       StringSink sink;
       {
-        boost::shared_ptr<std::FILE> file = OpenFile(path, "wb");
+        std::shared_ptr<std::FILE> file = OpenFile(path, "wb");
         std::unique_ptr<gpg::WriteArchive> archive(
           kind == WriterKind::Binary       ? gpg::CreateBinaryWriteArchive(file)
             : kind == WriterKind::FastFile ? gpg::CreateFastBinaryWriteArchive(file)
@@ -332,7 +332,7 @@ namespace
     {
       const std::string path = mFolder.File(("read" + std::to_string(mCount++) + ".bin").c_str());
       faf_core_tests::WriteWholeFile(path, bytes);
-      boost::shared_ptr<std::FILE> file = OpenFile(path, "rb");
+      std::shared_ptr<std::FILE> file = OpenFile(path, "rb");
       std::unique_ptr<gpg::ReadArchive> archive(gpg::CreateBinaryReadArchive(file));
       body(*archive);
     }
@@ -865,7 +865,7 @@ namespace
   )
   {
     auto* const text = new std::ostringstream;
-    const boost::shared_ptr<std::ostream> stream(text);
+    const std::shared_ptr<std::ostream> stream(text);
     {
       std::unique_ptr<gpg::WriteArchive> archive(gpg::CreateTextWriteArchive(stream));
       body(*archive);
@@ -879,7 +879,7 @@ namespace
     const std::function<void(gpg::ReadArchive&)>& body
   )
   {
-    const boost::shared_ptr<std::istream> stream(new std::istringstream(text));
+    const std::shared_ptr<std::istream> stream(new std::istringstream(text));
     std::unique_ptr<gpg::ReadArchive> archive(gpg::CreateTextReadArchive(stream));
     body(*archive);
   }
@@ -1094,7 +1094,7 @@ namespace
     EXPECT_FALSE(unowned.mLoadMembers);
 
     gpg::SerConstructResult shared{};
-    const boost::shared_ptr<void> holder(new int(5));
+    const std::shared_ptr<void> holder(new int(5));
     shared.SetShared(holder, ref.mType, 1u);
     EXPECT_EQ(shared.mInfo.state, gpg::TrackedPointerState::Shared);
     EXPECT_EQ(shared.mInfo.object, holder.get());

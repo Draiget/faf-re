@@ -99,7 +99,7 @@ namespace gpg::gal
    * around `shared_count(EffectTechniqueD3D9*)` 0x009417B0.
    */
   void EffectD3D9::GetTechniques(
-    fa::vector<boost::shared_ptr<EffectTechnique>>& outTechniques
+    fa::vector<std::shared_ptr<EffectTechnique>>& outTechniques
   )
   {
     if (dxEffect_ == nullptr) {
@@ -116,7 +116,7 @@ namespace gpg::gal
       }
 
       outTechniques.push_back(
-        boost::shared_ptr<EffectTechnique>(
+        std::shared_ptr<EffectTechnique>(
           new EffectTechniqueD3D9(description.Name, boost::SharedFromThis(*this), technique)
         )
       );
@@ -132,7 +132,7 @@ namespace gpg::gal
    * `shared_from_this()` (0x00941B90) as its effect; throws when the effect
    * or the parameter is missing.
    */
-  boost::shared_ptr<EffectVariable> EffectD3D9::GetVariable(
+  std::shared_ptr<EffectVariable> EffectD3D9::GetVariable(
     const char* const variableName
   )
   {
@@ -149,7 +149,7 @@ namespace gpg::gal
       ThrowGalError("EffectD3D9.cpp", 79, message);
     }
 
-    return boost::shared_ptr<EffectVariable>(
+    return std::shared_ptr<EffectVariable>(
       new EffectVariableD3D9(variableName, boost::SharedFromThis(*this), parameterHandle)
     );
   }
@@ -162,7 +162,7 @@ namespace gpg::gal
    * `shared_from_this()` as its effect; throws when the effect or the
    * technique is missing.
    */
-  boost::shared_ptr<EffectTechnique> EffectD3D9::GetTechnique(
+  std::shared_ptr<EffectTechnique> EffectD3D9::GetTechnique(
     const char* const techniqueName
   )
   {
@@ -182,7 +182,7 @@ namespace gpg::gal
       ThrowGalError("EffectD3D9.cpp", 89, message);
     }
 
-    return boost::shared_ptr<EffectTechnique>(
+    return std::shared_ptr<EffectTechnique>(
       new EffectTechniqueD3D9(techniqueName, boost::SharedFromThis(*this), techniqueHandle)
     );
   }
@@ -199,7 +199,7 @@ namespace gpg::gal
       ThrowGalError("EffectD3D9.cpp", 96, "invalid effect");
     }
 
-    const boost::shared_ptr<PipelineState> pipelineState = Device::GetInstance()->GetPipelineState();
+    const std::shared_ptr<PipelineState> pipelineState = Device::GetInstance()->GetPipelineState();
 
     StateManagerD3D9* const stateManager = static_cast<PipelineStateD3D9*>(pipelineState.get())->GetStateManager();
     static_cast<void>(dxEffect_->SetStateManager(stateManager));

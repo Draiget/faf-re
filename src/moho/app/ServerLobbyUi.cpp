@@ -74,7 +74,7 @@ namespace
     if (sForLauncher.empty()) {
       return;
     }
-    const boost::shared_ptr<moho::CGpgNetInterface> gpgnet = moho::GPGNET_GetPtr();
+    const std::shared_ptr<moho::CGpgNetInterface> gpgnet = moho::GPGNET_GetPtr();
     if (!gpgnet) {
       sForLauncher.clear(); // the launcher has gone
       return;
@@ -299,7 +299,7 @@ namespace
     sessionInfo->mIsMultiplayer = true;
     sessionInfo->mSourceId = build.localSourceId;
     sessionInfo->mMapName = build.mapName;
-    sessionInfo->mLaunchInfo = boost::static_pointer_cast<moho::LaunchInfoBase>(build.launchInfo);
+    sessionInfo->mLaunchInfo = std::static_pointer_cast<moho::LaunchInfoBase>(build.launchInfo);
     sessionInfo->mClientManager = nullptr; // the network driver makes its own (remote/client/NetworkSimDriver.h)
     if (mLobby == nullptr) {
       // Plan WP12.2: a match with no lobby: the launcher hears the launch as from a lobby (lobby.lua's GameLaunched

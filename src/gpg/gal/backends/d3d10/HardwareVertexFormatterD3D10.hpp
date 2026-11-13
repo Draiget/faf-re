@@ -41,7 +41,7 @@ namespace gpg::gal
      * Address: 0x0094D960 (FUN_0094D960)
      * Slot: 2
      */
-    [[nodiscard]] boost::shared_ptr<VertexFormat> CreateVertexFormat(std::int32_t layoutVariant) override;
+    [[nodiscard]] std::shared_ptr<VertexFormat> CreateVertexFormat(std::int32_t layoutVariant) override;
 
     /**
      * Address: 0x0094D530 (FUN_0094D530)

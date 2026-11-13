@@ -26,7 +26,7 @@ namespace gpg::gal
     HICON BuildCursorIcon(
       const int hotspotX,
       const int hotspotY,
-      const boost::shared_ptr<Texture> texture
+      const std::shared_ptr<Texture> texture
     )
     {
       BITMAPV5HEADER bitmapInfo{};

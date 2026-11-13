@@ -10,7 +10,7 @@
 
 #include <gtest/gtest.h>
 
-#include "boost/shared_ptr.h"
+#include <memory>
 #include "moho/effects/rendering/CEffectImpl.h"
 #include "moho/effects/rendering/CEfxBeam.h"
 #include "moho/effects/rendering/CHostedEffectManager.h"
@@ -76,7 +76,7 @@ namespace
       return 0.0f;
     }
 
-    boost::shared_ptr<moho::SParticleBuffer> buffer;
+    std::shared_ptr<moho::SParticleBuffer> buffer;
     fa::vector<moho::GeomCamera3> cameras;
     std::uint32_t tick = 1;
   };

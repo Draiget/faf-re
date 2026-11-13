@@ -17,7 +17,7 @@
 #include <gtest/gtest-spi.h>
 
 #include "ReflectionTestSupport.h"
-#include "boost/shared_ptr.h"
+#include <memory>
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/Rect2.h"
 #include "gpg/core/containers/WriteArchive.h"
@@ -559,19 +559,19 @@ namespace
     SharedPointerTypeViewsItsPointee
   )
   {
-    gpg::RType* const type = gpg::RTypeOf<boost::shared_ptr<ReflPair>>();
+    gpg::RType* const type = gpg::RTypeOf<std::shared_ptr<ReflPair>>();
     ASSERT_EQ(type, &gPairSharedType);
     EXPECT_EQ(std::string(type->GetName()), std::string("boost::shared_ptr<") + kPairName + ">");
-    EXPECT_EQ(type->size_, static_cast<int>(sizeof(boost::shared_ptr<ReflPair>)));
+    EXPECT_EQ(type->size_, static_cast<int>(sizeof(std::shared_ptr<ReflPair>)));
     ASSERT_NE(type->IsPointer(), nullptr);
     EXPECT_EQ(type->IsPointer(), type->IsIndexed());
 
-    boost::shared_ptr<ReflPair> empty;
+    std::shared_ptr<ReflPair> empty;
     const gpg::RRef emptyRef{&empty, type};
     EXPECT_EQ(emptyRef.GetLexical().view(), "NULL"sv);
     EXPECT_EQ(emptyRef.GetCount(), 0u);
 
-    boost::shared_ptr<ReflPair> held(new ReflPair{1, 2});
+    std::shared_ptr<ReflPair> held(new ReflPair{1, 2});
     const gpg::RRef heldRef{&held, type};
     EXPECT_EQ(heldRef.GetCount(), 1u);
     const gpg::RRef pointee = heldRef[0];
@@ -588,7 +588,7 @@ namespace
     SharedPointersReadBackSharingOneObject
   )
   {
-    boost::shared_ptr<ReflPair> pair(new ReflPair{11, 12});
+    std::shared_ptr<ReflPair> pair(new ReflPair{11, 12});
     const std::string bytes = Write([&](gpg::WriteArchive& archive) {
       archive.WritePointer(pair.get(), gpg::TrackedPointerState::Shared, gpg::RRef{});
       archive.WritePointer(pair.get(), gpg::TrackedPointerState::Shared, gpg::RRef{});
@@ -598,8 +598,8 @@ namespace
       ToHex(Bytes().Token('N').I32(-1).Str(kPairName).I32(2).I32(11).I32(12).End().Token('*').I32(0).str())
     );
 
-    boost::shared_ptr<ReflPair> first;
-    boost::shared_ptr<ReflPair> second;
+    std::shared_ptr<ReflPair> first;
+    std::shared_ptr<ReflPair> second;
     Read(bytes, [&](gpg::ReadArchive& archive) {
       const gpg::RRef owner{};
       archive.ReadPointerShared(&first, &owner);
@@ -630,7 +630,7 @@ namespace
       const gpg::RRef owner{};
       ReflPair* owned = nullptr;
       archive.ReadPointerOwned(&owned, &owner);
-      boost::shared_ptr<ReflPair> shared;
+      std::shared_ptr<ReflPair> shared;
       try {
         archive.ReadPointerShared(&shared, &owner);
         ADD_FAILURE() << "no throw";

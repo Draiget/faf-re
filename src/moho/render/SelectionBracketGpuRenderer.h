@@ -16,7 +16,7 @@
 #include <span>
 #include <vector>
 
-#include "boost/shared_ptr.h"
+#include <memory>
 #include "moho/render/GpuArrayStream.h"
 #include "moho/render/SelectionBracketShader.h"
 
@@ -50,7 +50,7 @@ namespace moho
     [[nodiscard]] bool Draw(
       CD3DPrimBatcher& batcher,
       const void* viewKey,
-      const boost::shared_ptr<CD3DBatchTexture>& texture,
+      const std::shared_ptr<CD3DBatchTexture>& texture,
       std::uint32_t color,
       std::span<const SelectionBracketInstance> instances
     );
@@ -68,7 +68,7 @@ namespace moho
     bool mInitialized = false;
     bool mSupported = false;
     std::uint64_t mDraws = 0U;
-    boost::shared_ptr<gpg::gal::GpuProgram> mProgram;
+    std::shared_ptr<gpg::gal::GpuProgram> mProgram;
     std::vector<ViewStream> mStreams;
   };
 } // namespace moho

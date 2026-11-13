@@ -2,7 +2,7 @@
 
 #include <cstddef>
 
-#include "boost/shared_ptr.h"
+#include <memory>
 #include "gpg/core/containers/String.h"
 #include "gpg/core/reflection/Reflection.h"
 
@@ -39,8 +39,8 @@ namespace moho
     {}
 
     ResourceRecord* mRecord;               // +0x00
-    boost::shared_ptr<void> mPrefetchData; // +0x04 (`ResourceFactoryBase::Preload`'s result)
-    boost::shared_ptr<void> mResource;     // +0x0C
+    std::shared_ptr<void> mPrefetchData;   // +0x04 (`ResourceFactoryBase::Preload`'s result)
+    std::shared_ptr<void> mResource;       // +0x0C
   };
   static_assert(offsetof(PrefetchData, mRecord) == 0x00, "PrefetchData::mRecord offset must be 0x00");
   static_assert(offsetof(PrefetchData, mPrefetchData) == 0x04, "PrefetchData::mPrefetchData offset must be 0x04");
@@ -106,7 +106,7 @@ namespace moho
      * through it.
      */
     explicit PrefetchHandleBase(
-      const boost::shared_ptr<PrefetchData> data
+      const std::shared_ptr<PrefetchData> data
     )
       : mPtr(data)
     {}
@@ -137,7 +137,7 @@ namespace moho
     [[nodiscard]] const fa::string& GetName() const;
 
   public:
-    boost::shared_ptr<PrefetchData> mPtr; // +0x00
+    std::shared_ptr<PrefetchData> mPtr; // +0x00
   };
 
   static_assert(offsetof(PrefetchHandleBase, mPtr) == 0x00, "PrefetchHandleBase::mPtr offset must be 0x00");

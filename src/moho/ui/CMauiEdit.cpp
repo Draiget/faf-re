@@ -560,7 +560,7 @@ namespace
     const std::uint32_t vertexColor
   )
   {
-    const boost::shared_ptr<moho::CD3DBatchTexture> texture = moho::CD3DBatchTexture::FromSolidColor(textureColor);
+    const std::shared_ptr<moho::CD3DBatchTexture> texture = moho::CD3DBatchTexture::FromSolidColor(textureColor);
     primBatcher->SetTexture(texture);
 
     const moho::CD3DPrimBatcher::Vertex topLeft = MakeBorderVertex(left, top, vertexColor, 0.0f, 0.0f);

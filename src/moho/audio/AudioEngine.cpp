@@ -693,7 +693,7 @@ namespace
    */
   void RegisterEngineRef(
     moho::SoundConfiguration& configuration,
-    const boost::shared_ptr<moho::AudioEngine>& engineRef
+    const std::shared_ptr<moho::AudioEngine>& engineRef
   )
   {
     if (engineRef.get() == nullptr) {
@@ -1595,7 +1595,7 @@ namespace moho
    */
   SoundConfiguration::~SoundConfiguration()
   {
-    for (const boost::shared_ptr<AudioEngine>& entry : mEngines) {
+    for (const std::shared_ptr<AudioEngine>& entry : mEngines) {
       AudioEngine* const engine = entry.get();
       if (engine == nullptr) {
         continue;
@@ -1994,7 +1994,7 @@ namespace moho
    * Finds one loaded `AudioEngine` that owns a bank matching the supplied
    * bank name.
    */
-  boost::shared_ptr<AudioEngine> SND_FindEngine(
+  std::shared_ptr<AudioEngine> SND_FindEngine(
     const gpg::StrArg bankName
   )
   {
@@ -2005,7 +2005,7 @@ namespace moho
 
     const std::size_t engineCount = configuration->mEngines.size();
     for (std::size_t engineIndex = 0; engineIndex < engineCount; ++engineIndex) {
-      const boost::shared_ptr<AudioEngine>& engineRef = configuration->mEngines[engineIndex];
+      const std::shared_ptr<AudioEngine>& engineRef = configuration->mEngines[engineIndex];
       AudioEngine* const engine = engineRef.get();
       if (engine == nullptr || engine->mImpl == nullptr || engine->mImpl->mBanks.empty()) {
         continue;
@@ -2130,7 +2130,7 @@ namespace moho
    * object through the recovered constructor lane, and registers it into the
    * process-global engine lane used by `SND_Frame`/`SND_Mute`.
    */
-  boost::shared_ptr<AudioEngine> AudioEngine::Create(
+  std::shared_ptr<AudioEngine> AudioEngine::Create(
     const gpg::StrArg voicePath
   )
   {
@@ -2155,7 +2155,7 @@ namespace moho
     // Address: 0x004DE750 (FUN_004DE750 -- this shared_ptr's `sp_counted_impl_p<AudioEngine>::dispose`: deletes the
     // engine, whose destructor deletes its `AudioEngineImpl`; formerly `DestroyAudioEngineImplOwnedByCountedBlock`
     // over a hand-made control-block layout in this file.)
-    boost::shared_ptr<AudioEngine> result(createdEngine);
+    std::shared_ptr<AudioEngine> result(createdEngine);
     if (sSoundConfiguration && createdEngine != nullptr) {
       RegisterEngineRef(*sSoundConfiguration, result);
     }

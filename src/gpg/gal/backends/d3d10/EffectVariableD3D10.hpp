@@ -5,7 +5,7 @@
 
 #include <d3d10.h>
 
-#include "boost/shared_ptr.h"
+#include <memory>
 #include "gpg/gal/EffectVariable.hpp"
 #include "legacy/containers/String.h"
 
@@ -58,7 +58,7 @@ namespace gpg::gal
      * Nothing: D3D10 has no cube render targets to bind. The by-value
      * `shared_ptr` is released on return.
      */
-    void SetCubeRenderTarget(boost::shared_ptr<CubeRenderTarget> cubeTarget) override;
+    void SetCubeRenderTarget(std::shared_ptr<CubeRenderTarget> cubeTarget) override;
 
     /**
      * Address: 0x0094CD00 (FUN_0094CD00)
@@ -67,7 +67,7 @@ namespace gpg::gal
      * What it does:
      * Binds a render target's shader-resource view to this variable.
      */
-    void SetRenderTarget(boost::shared_ptr<RenderTarget> renderTarget) override;
+    void SetRenderTarget(std::shared_ptr<RenderTarget> renderTarget) override;
 
     /**
      * Address: 0x0094CBB0 (FUN_0094CBB0)
@@ -76,7 +76,7 @@ namespace gpg::gal
      * What it does:
      * Binds a texture's shader-resource view to this variable.
      */
-    void SetTexture(boost::shared_ptr<Texture> texture) override;
+    void SetTexture(std::shared_ptr<Texture> texture) override;
 
     /**
      * Address: 0x0094C9B0 (FUN_0094C9B0)

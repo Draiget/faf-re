@@ -233,8 +233,8 @@ namespace moho
     struct CascadeAtlas
     {
       const Shadow* shadow = nullptr;
-      boost::shared_ptr<ID3DVertexSheet> firstTileQuad;
-      boost::shared_ptr<ID3DVertexSheet> topRowQuad;
+      std::shared_ptr<ID3DVertexSheet> firstTileQuad;
+      std::shared_ptr<ID3DVertexSheet> topRowQuad;
     };
     std::vector<CascadeAtlas> sAtlasShadows;
 
@@ -457,7 +457,7 @@ namespace moho
     mBlurTargetB.reset();
     mDepthStencil.reset();
     mQuadVertexSheet.reset();
-    for (boost::shared_ptr<void>& resource : mUnreferencedResources) {
+    for (std::shared_ptr<void>& resource : mUnreferencedResources) {
       resource.reset();
     }
 
@@ -494,7 +494,7 @@ namespace moho
    * Selects `mBlurTargetB` (+0x2F0) when `mShadowBlurEnabled` (+0x0C) is set,
    * otherwise `mShadowMap` (+0x2E0), and returns a retained copy.
    */
-  boost::shared_ptr<CD3DRenderTarget> Shadow::GetShadowTexture() const
+  std::shared_ptr<CD3DRenderTarget> Shadow::GetShadowTexture() const
   {
     return mShadowBlurEnabled ? mBlurTargetB : mShadowMap;
   }
@@ -505,8 +505,8 @@ namespace moho
    * What it does:
    * Returns a retained copy of the shadow-map render target for shader binding.
    */
-  boost::shared_ptr<CD3DRenderTarget>& Shadow::GetShadowMap(
-    boost::shared_ptr<CD3DRenderTarget>& outShadowMap
+  std::shared_ptr<CD3DRenderTarget>& Shadow::GetShadowMap(
+    std::shared_ptr<CD3DRenderTarget>& outShadowMap
   ) const
   {
     outShadowMap = mShadowMap;
@@ -1047,7 +1047,7 @@ namespace moho
     float savedMaxDepth = 1.0f;
 
     // Binds one target and gives it a viewport inset by a one-pixel border.
-    const auto bindTargetWithBorder = [&](const boost::shared_ptr<CD3DRenderTarget>& target) {
+    const auto bindTargetWithBorder = [&](const std::shared_ptr<CD3DRenderTarget>& target) {
       device->GetView(&savedPos, &savedSize, &savedMinDepth, &savedMaxDepth);
 
       // The target's real extent, via its surface's context.
@@ -1170,7 +1170,7 @@ namespace moho
         return;
       }
       sDumped = true;
-      const auto dump = [&](const boost::shared_ptr<CD3DRenderTarget>& target, const char* const name) {
+      const auto dump = [&](const std::shared_ptr<CD3DRenderTarget>& target, const char* const name) {
         if (!target) {
           return;
         }
@@ -1226,8 +1226,8 @@ namespace moho
 
     // Separable variance blur: shadow map -> A (horizontal) -> B (vertical).
     const auto blurPass = [&](
-                            const boost::shared_ptr<CD3DRenderTarget>& target,
-                            const boost::shared_ptr<CD3DRenderTarget>& source,
+                            const std::shared_ptr<CD3DRenderTarget>& target,
+                            const std::shared_ptr<CD3DRenderTarget>& source,
                             const char* const technique
                           ) {
       device->SetRenderTarget1(target.get(), mDepthStencil.get(), true, -1, 1.0f, 0);

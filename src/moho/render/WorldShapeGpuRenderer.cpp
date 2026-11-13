@@ -173,7 +173,7 @@ namespace moho
 
     // The solid white texture the pass bound with `SetTexture`; its atlas
     // rectangle gives the same uv transform the batcher applies.
-    const boost::shared_ptr<CD3DBatchTexture> texture = CD3DBatchTexture::FromSolidColor(0xFFFFFFFFU);
+    const std::shared_ptr<CD3DBatchTexture> texture = CD3DBatchTexture::FromSolidColor(0xFFFFFFFFU);
     CD3DTextureBatcher& atlas = *batcher.mTextureBatcher;
     if (
       !texture || texture->mWidth >= (static_cast<std::uint32_t>(atlas.mWidth) >> 1U) ||
@@ -194,7 +194,7 @@ namespace moho
 
     // Anything the batcher still holds was submitted before the shapes.
     batcher.Flush();
-    const boost::shared_ptr<ID3DTextureSheet> sheet = atlas.GetCompositeTexture();
+    const std::shared_ptr<ID3DTextureSheet> sheet = atlas.GetCompositeTexture();
     if (sheet.get() == nullptr) {
       return false;
     }

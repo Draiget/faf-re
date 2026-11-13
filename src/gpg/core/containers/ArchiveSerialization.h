@@ -2,7 +2,7 @@
 
 #include <cstddef>
 
-#include "boost/shared_ptr.h"
+#include <memory>
 
 namespace moho
 {
@@ -119,7 +119,7 @@ namespace gpg
   {
     void* object = nullptr;                                    // +0x00
     RType* type = nullptr;                                     // +0x04
-    boost::shared_ptr<void> sharedPtr;                         // +0x08
+    std::shared_ptr<void> sharedPtr;                           // +0x08
     TrackedPointerState state = TrackedPointerState::Reserved; // +0x10
   };
   static_assert(offsetof(TrackedPointerInfo, sharedPtr) == 0x08, "TrackedPointerInfo::sharedPtr offset must be 0x08");
@@ -174,7 +174,7 @@ namespace gpg
      * Marks load-construct result ownership as `SHARED`, retains the shared
      * control block, and stores the reflected reference.
      */
-    void SetShared(const boost::shared_ptr<void>& object, RType* type, unsigned int flags);
+    void SetShared(const std::shared_ptr<void>& object, RType* type, unsigned int flags);
 
     /**
      * What it does:
@@ -182,7 +182,7 @@ namespace gpg
      * reflected type. Defined in Reflection.h, after `RTypeOf`.
      */
     template <class T>
-    void SetShared(const boost::shared_ptr<T>& object, unsigned int flags);
+    void SetShared(const std::shared_ptr<T>& object, unsigned int flags);
 
     TrackedPointerInfo mInfo{}; // +0x00
     bool mLoadMembers = true;   // +0x14

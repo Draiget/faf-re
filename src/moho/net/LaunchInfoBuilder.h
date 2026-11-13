@@ -3,7 +3,7 @@
 #include <cstdint>
 #include <vector>
 
-#include "boost/shared_ptr.h"
+#include <memory>
 #include "legacy/containers/String.h"
 #include "legacy/containers/Vector.h"
 
@@ -61,7 +61,7 @@ namespace moho
   {
     /** Non-null: the launch failed before anything was assigned; the `LaunchFailed` reason. */
     const char* failure = nullptr;
-    boost::shared_ptr<LaunchInfoNew> launchInfo;
+    std::shared_ptr<LaunchInfoNew> launchInfo;
     fa::string mapName;
     std::int32_t clientCount = 0; // client indices handed out
     std::int32_t localClientIndex = -1;
