@@ -319,6 +319,16 @@ namespace faf::editor
       mWaveSpacing = spacing;
       mWaveAsk = WaveAsk::AddAlongShore;
     }
+    /** The water's sun turns with the Lighting panel's sun (on by default). */
+    [[nodiscard]] bool WaterSunFollows() const noexcept
+    {
+      return mWaterSunFollows;
+    }
+    /** "Take it now": the water's sun set from the lighting sun once, as its own undo step. */
+    [[nodiscard]] bool TakeWaterTakeLightingSun() noexcept
+    {
+      return std::exchange(mWaterTakeLightingSun, false);
+    }
     [[nodiscard]] bool TakeWaterChange(
       WaterState& water,
       bool& final
@@ -2619,6 +2629,8 @@ namespace faf::editor
     WaveAsk mWaveAsk = WaveAsk::None;
     bool mWaterChanged = false;
     bool mWaterFinal = false;
+    bool mWaterSunFollows = true;
+    bool mWaterTakeLightingSun = false;
     bool mWaterImport = false;
     bool mWaterExport = false;
     void DrawWaterBodies();

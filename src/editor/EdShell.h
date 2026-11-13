@@ -605,6 +605,17 @@ namespace faf::editor
     LightingState mLighting;
     LightingState mLightingBefore;
     bool mLightingEditing = false;
+    WaterState mLightingWaterBefore; // the water, when the lighting sun turns its sun too
+    bool mLightingMovedWater = false;
+    // The Sky and Reflection cubes sections: the panel's copies while a control is held, and their befores.
+    SkyboxState mSky;
+    SkyboxState mSkyBefore;
+    bool mSkyEditing = false;
+    std::vector<std::pair<std::string, std::string>> mCubes;
+    char mCubeName[64]{};
+    char mCubePath[256]{};
+    void DrawSkyEditor();
+    void DrawCubes();
     bool mLightingImport = false;
     bool mLightingExport = false;
     bool mSkyboxImport = false;

@@ -1447,6 +1447,35 @@ namespace faf::editor
     mModified = true;
   }
 
+  std::vector<std::pair<std::string, std::string>> EdDocument::CubesNow() const
+  {
+    std::vector<std::pair<std::string, std::string>> cubes;
+    if (mMap == nullptr || mMap->mTerrainRes == nullptr) {
+      return cubes;
+    }
+    moho::TerrainEnvironmentLookupPairs pairs;
+    static_cast<const moho::IWldTerrainRes&>(*mMap->mTerrainRes).EnumerateEnvLookup(pairs);
+    for (const auto& [name, cube] : pairs) {
+      cubes.emplace_back(name.c_str(), cube.c_str());
+    }
+    return cubes;
+  }
+
+  void EdDocument::ApplyCubes(
+    const std::vector<std::pair<std::string, std::string>>& cubes
+  )
+  {
+    if (mMap == nullptr || mMap->mTerrainRes == nullptr) {
+      return;
+    }
+    moho::IWldTerrainRes& terrain = *mMap->mTerrainRes;
+    terrain.ClearEnvLookup();
+    for (const auto& [name, cube] : cubes) {
+      terrain.AddEnvLookup(fa::string(name.c_str()), fa::string(cube.c_str()));
+    }
+    mModified = true;
+  }
+
   void EdDocument::LookApplied(
     LookEnvironment before
   )

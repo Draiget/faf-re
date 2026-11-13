@@ -1,4 +1,5 @@
 #include "editor/EdTools.h"
+#include "editor/doc/EdLighting.h"
 #include "moho/misc/StartupHelpers.h"
 #include "editor/ui/EdControls.h"
 #include "editor/ui/EdFonts.h"
@@ -2777,8 +2778,37 @@ namespace faf::editor
       ImGui::BeginDisabled(!mWater.enabled);
       ImGui::SetNextItemWidth(-1.0f);
       changed(ImGui::ColorEdit3("##suncolor", s.mSunColor, ImGuiColorEditFlags_Float));
+      // The water keeps the way the light travels (retail maps: 0.1, -0.963, 0.252, straight down nearly); shown as
+      // where the sun is, as the Lighting panel shows its sun.
+      float towards[3] = {-s.mSunDirection[0], -s.mSunDirection[1], -s.mSunDirection[2]};
+      float azimuth = 0.0f, elevation = 0.0f;
+      SunAnglesOf(towards, azimuth, elevation);
       ImGui::SetNextItemWidth(-1.0f);
-      changed(ImGui::DragFloat3("##sundirection", s.mSunDirection, 0.01f, -1.0f, 1.0f, "%.2f"));
+      const bool turned = FillSliderFloat("##waterazimuth", &azimuth, -180.0f, 180.0f, "Azimuth %.0f\xC2\xB0");
+      changed(turned);
+      ImGui::SetNextItemWidth(-1.0f);
+      const bool raised = FillSliderFloat("##waterelevation", &elevation, 0.0f, 90.0f, "Elevation %.0f\xC2\xB0");
+      changed(raised);
+      if (turned || raised) {
+        SunDirectionOf(azimuth, elevation, towards);
+        for (int i = 0; i < 3; ++i) {
+          s.mSunDirection[i] = -towards[i];
+        }
+      }
+      ImGui::Checkbox("Follow the lighting sun", &mWaterSunFollows);
+      EdSetItemTooltip(
+        "Follow the lighting sun\nTurning the sun in the Lighting panel turns the water's sun with it, in the same "
+        "undo "
+        "step. Opening a map never changes it."
+      );
+      if (!mWaterSunFollows) {
+        ImGui::SameLine();
+        if (ImGui::SmallButton("Take it now")) {
+          mWaterTakeLightingSun = true;
+        }
+      }
+      ImGui::SetNextItemWidth(-1.0f);
+      changed(FillDragFloat("##sunstrength", &s.mSunStrength, 0.05f, 0.0f, 20.0f, "Strength %.2f"));
       ImGui::SetNextItemWidth(-1.0f);
       changed(FillDragFloat("##sunshininess", &s.mSunShininess, 0.5f, 0.0f, 500.0f, "Shininess %.1f"));
       ImGui::SetNextItemWidth(-1.0f);

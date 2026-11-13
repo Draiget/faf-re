@@ -1387,6 +1387,190 @@ namespace faf::editor
     }
     ImGui::End();
   }
+  void EdShell::DrawSkyEditor()
+  {
+    if (!Section("Sky")) {
+      return;
+    }
+    // As the lighting: the panel's copy follows the map until a control is held; one undo step when it is let go.
+    if (!mSkyEditing) {
+      mSky = mDocument.SkyboxNow();
+    }
+    bool active = false;
+    bool changed = false;
+    bool finished = false;
+    const auto watch = [&](const bool edited) {
+      active = active || ImGui::IsItemActive();
+      changed = changed || edited;
+      finished = finished || ImGui::IsItemDeactivatedAfterEdit();
+    };
+    RowLabel("Horizon");
+    watch(ColourField("##skyhorizon", mSky.horizonColor, false));
+    RowLabel("Zenith");
+    watch(ColourField("##skyzenith", mSky.zenithColor, false));
+    ImGui::SetNextItemWidth(-1.0f);
+    watch(FillDragFloat("##skyscale", &mSky.scale, 5.0f, 10.0f, 20000.0f, "Dome size %.0f"));
+    ImGui::SetNextItemWidth(-1.0f);
+    watch(FillDragFloat("##skyhorizonheight", &mSky.horizonHeight, 0.5f, -2000.0f, 2000.0f, "Horizon height %.1f"));
+    ImGui::SetNextItemWidth(-1.0f);
+    watch(FillDragFloat("##skyzenithheight", &mSky.zenithHeight, 0.5f, 0.0f, 5000.0f, "Zenith height %.1f"));
+    ImGui::SetNextItemWidth(-1.0f);
+    watch(FillDragFloat("##skysubtract", &mSky.subtractHeight, 0.005f, 0.0f, 10.0f, "Lowered by %.3f"));
+    ImGui::SetNextItemWidth(-1.0f);
+    watch(ImGui::DragInt("##skyaround", &mSky.subdivisionsAxis, 0.1f, 3, 64, "%d segments round"));
+    ImGui::SetNextItemWidth(-1.0f);
+    watch(ImGui::DragInt("##skyup", &mSky.subdivisionsHeight, 0.1f, 1, 32, "%d segments up"));
+    ImGui::SetNextItemWidth(-1.0f);
+    watch(FillDragFloat("##skyglow", &mSky.decalGlow, 0.005f, 0.0f, 4.0f, "Planet glow %.3f"));
+    ImGui::SeparatorText("Cirrus");
+    RowLabel("Colour");
+    watch(ColourField("##cirruscolour", mSky.cirrusColor, true));
+    ImGui::SetNextItemWidth(-1.0f);
+    watch(FillDragFloat("##cirrusmultiplier", &mSky.cirrusMultiplier, 0.01f, 0.0f, 10.0f, "Strength %.2f"));
+    char texture[256];
+    (void)std::snprintf(texture, sizeof(texture), "%s", mSky.cirrusTexture.c_str());
+    ImGui::SetNextItemWidth(-1.0f);
+    if (ImGui::InputTextWithHint("##cirrustexture", "cirrus texture", texture, sizeof(texture))) {
+      mSky.cirrusTexture = texture;
+    }
+    watch(ImGui::IsItemDeactivatedAfterEdit());
+    for (int i = 0; i < 4; ++i) {
+      ImGui::PushID(i);
+      SkyboxCirrusLayer& layer = mSky.cirrus[i];
+      ImGui::AlignTextToFramePadding();
+      ImGui::TextDisabled("Layer %d", i + 1);
+      ImGui::SetNextItemWidth(-1.0f);
+      watch(ImGui::DragFloat2("##frequency", layer.frequency, 0.001f, 0.0f, 10.0f, "frequency %.3f"));
+      ImGui::SetNextItemWidth(-1.0f);
+      watch(FillDragFloat("##speed", &layer.speed, 0.001f, -10.0f, 10.0f, "Speed %.3f"));
+      ImGui::SetNextItemWidth(-1.0f);
+      watch(ImGui::DragFloat2("##direction", layer.direction, 0.01f, -1.0f, 1.0f, "direction %.2f"));
+      ImGui::PopID();
+    }
+    ImGui::SeparatorText("Planets");
+    int remove = -1;
+    for (std::size_t i = 0; i < mSky.planets.size(); ++i) {
+      ImGui::PushID(static_cast<int>(i));
+      SkyboxPlanet& planet = mSky.planets[i];
+      ImGui::AlignTextToFramePadding();
+      ImGui::TextDisabled("Planet %zu", i + 1);
+      ImGui::SameLine();
+      if (ImGui::SmallButton("Remove")) {
+        remove = static_cast<int>(i);
+      }
+      ImGui::SetNextItemWidth(-1.0f);
+      watch(ImGui::DragFloat3("##position", planet.position, 0.5f, -5000.0f, 5000.0f, "%.1f"));
+      ImGui::SetNextItemWidth(-1.0f);
+      watch(FillDragFloat("##rotation", &planet.rotation, 0.01f, -10.0f, 10.0f, "Turn %.2f"));
+      ImGui::SetNextItemWidth(-1.0f);
+      watch(ImGui::DragFloat2("##scale", planet.scale, 0.1f, 0.0f, 2000.0f, "size %.1f"));
+      ImGui::PopID();
+    }
+    if (remove >= 0) {
+      mSky.planets.erase(mSky.planets.begin() + remove);
+      changed = true;
+      finished = true;
+    }
+    if (mSky.planets.empty()) {
+      ImGui::TextDisabled("No planets.");
+    }
+    active = active || ImGui::IsAnyItemActive();
+    if (changed) {
+      if (!mSkyEditing) {
+        mSkyBefore = mDocument.SkyboxNow();
+      }
+      mSkyEditing = true;
+      mDocument.ApplySkybox(mSky);
+    }
+    if (finished || (mSkyEditing && !active)) {
+      mSkyEditing = false;
+      if (!(mSkyBefore == mDocument.SkyboxNow())) {
+        mDocument.SkyboxEdited(mSkyBefore);
+        gpg::Logf(
+          "editor: sky: dome %.0f, horizon %.2f %.2f %.2f, %zu planets",
+          static_cast<double>(mSky.scale),
+          static_cast<double>(mSky.horizonColor[0]),
+          static_cast<double>(mSky.horizonColor[1]),
+          static_cast<double>(mSky.horizonColor[2]),
+          mSky.planets.size()
+        );
+      }
+    }
+  }
+
+  void EdShell::DrawCubes()
+  {
+    if (!Section("Reflection cubes", false)) {
+      return;
+    }
+    // The cube maps the water and units reflect (CWldTerrainRes's environment lookups), each change one undo step.
+    const std::vector<std::pair<std::string, std::string>> cubes = mDocument.CubesNow();
+    std::optional<std::vector<std::pair<std::string, std::string>>> after;
+    bool hasDefault = false;
+    for (std::size_t i = 0; i < cubes.size(); ++i) {
+      ImGui::PushID(static_cast<int>(i));
+      hasDefault = hasDefault || cubes[i].first == "<default>";
+      ImGui::AlignTextToFramePadding();
+      ImGui::TextUnformatted(cubes[i].first.c_str());
+      char path[256];
+      (void)std::snprintf(path, sizeof(path), "%s", cubes[i].second.c_str());
+      const bool removable = cubes[i].first != "<default>";
+      ImGui::SetNextItemWidth(-(removable ? ImGui::GetFrameHeight() + ImGui::GetStyle().ItemSpacing.x : 0.0f));
+      (void)ImGui::InputText("##cubepath", path, sizeof(path));
+      if (ImGui::IsItemDeactivatedAfterEdit()) {
+        after = cubes;
+        (*after)[i].second = path;
+      }
+      if (removable) {
+        ImGui::SameLine();
+        if (ImGui::Button("x", ImVec2(ImGui::GetFrameHeight(), 0.0f))) {
+          after = cubes;
+          after->erase(after->begin() + static_cast<std::ptrdiff_t>(i));
+        }
+        EdSetItemTooltip("Remove this lookup");
+      }
+      ImGui::PopID();
+    }
+    if (!hasDefault) {
+      ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.95f, 0.75f, 0.30f, 1.0f));
+      ImGui::TextWrapped("No <default> cube: the game has nothing to reflect for units without their own.");
+      ImGui::PopStyleColor();
+      if (ImGui::Button("Add <default>")) {
+        after = cubes;
+        after->emplace_back("<default>", "/textures/environment/defaultenvcube.dds");
+      }
+    }
+    ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x * 0.3f);
+    ImGui::InputTextWithHint("##cubename", "<aeon>", mCubeName, sizeof(mCubeName));
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - Em(60.0f));
+    ImGui::InputTextWithHint("##cubenewpath", "/textures/environment/...dds", mCubePath, sizeof(mCubePath));
+    ImGui::SameLine();
+    ImGui::BeginDisabled(mCubeName[0] == '\0' || mCubePath[0] == '\0');
+    if (ImGui::Button("Add", ImVec2(-1.0f, 0.0f))) {
+      after = cubes;
+      // The map's names are in angle brackets (<default>, <aeon>): a bare name gets them.
+      std::string name = mCubeName;
+      if (name.front() != '<') {
+        name = "<" + name + ">";
+      }
+      after->emplace_back(std::move(name), mCubePath);
+      mCubeName[0] = '\0';
+      mCubePath[0] = '\0';
+    }
+    ImGui::EndDisabled();
+    HelpNote(
+      "The cube maps the water and units reflect, by name: <default> for every unit, others by the environment a "
+      "unit's blueprint names. Looks carry them with the sky."
+    );
+    if (after.has_value()) {
+      const EdDocument::LookEnvironment before = mDocument.LookEnvironmentNow();
+      mDocument.ApplyCubes(*after);
+      mDocument.LookApplied(before);
+      gpg::Logf("editor: reflection cubes: %zu now", after->size());
+    }
+  }
+
   void EdShell::DrawLooks()
   {
     if (!Section("Looks")) {
@@ -1597,6 +1781,18 @@ namespace faf::editor
       watch(raised);
       if (turned || raised) {
         SunDirectionOf(azimuth, elevation, mLighting.sunDirection);
+        if (mTools.WaterSunFollows()) {
+          // The water keeps the way the light travels: the opposite of the lighting's "towards the sun".
+          if (!mLightingEditing && !mLightingMovedWater) {
+            mLightingWaterBefore = mDocument.WaterNow();
+          }
+          WaterState water = mDocument.WaterNow();
+          for (int i = 0; i < 3; ++i) {
+            water.shader.mSunDirection[i] = -mLighting.sunDirection[i];
+          }
+          mDocument.ApplyWater(water);
+          mLightingMovedWater = true;
+        }
       }
       ImGui::SetNextItemWidth(-1.0f);
       watch(FillDragFloat("##multiplier", &mLighting.multiplier, 0.01f, 0.0f, 4.0f, "Multiplier %.2f"));
@@ -1643,7 +1839,26 @@ namespace faf::editor
     }
     if (finished || (mLightingEditing && !active)) {
       mLightingEditing = false;
-      if (!(mLightingBefore == mDocument.LightingNow())) {
+      if (mLightingMovedWater) {
+        // The sun turned the water's sun too: one step for both.
+        mLightingMovedWater = false;
+        EdDocument::LookEnvironment before = mDocument.LookEnvironmentNow();
+        before.lighting = mLightingBefore;
+        before.water = mLightingWaterBefore;
+        mDocument.LookApplied(before);
+        const LightingState lit = mDocument.LightingNow();
+        const WaterState wet = mDocument.WaterNow();
+        gpg::Logf(
+          "editor: lighting sun turned with the water's sun: sun %.3f %.3f %.3f, water's %.3f %.3f %.3f (one step: %s)",
+          static_cast<double>(lit.sunDirection[0]),
+          static_cast<double>(lit.sunDirection[1]),
+          static_cast<double>(lit.sunDirection[2]),
+          static_cast<double>(wet.shader.mSunDirection[0]),
+          static_cast<double>(wet.shader.mSunDirection[1]),
+          static_cast<double>(wet.shader.mSunDirection[2]),
+          mDocument.UndoStepName() != nullptr ? mDocument.UndoStepName() : "-"
+        );
+      } else if (!(mLightingBefore == mDocument.LightingNow())) {
         mDocument.LightingEdited(mLightingBefore);
         gpg::Logf(
           "editor: lighting: multiplier %.2f, bloom %.3f, fog %.0f to %.0f",
@@ -1664,36 +1879,7 @@ namespace faf::editor
       }
       HelpNote("FAForeverMapEditor's lighting settings file: the sun, ambience, shadow, specular, bloom and fog.");
     }
-    if (Section("Sky")) {
-      const SkyboxState sky = mDocument.SkyboxNow();
-      ImGui::Text(
-        "Dome %.0f across, %d x %d segments",
-        static_cast<double>(sky.scale),
-        sky.subdivisionsAxis,
-        sky.subdivisionsHeight
-      );
-      ImGui::ColorButton(
-        "##horizon",
-        ImVec4(sky.horizonColor[0], sky.horizonColor[1], sky.horizonColor[2], 1.0f),
-        ImGuiColorEditFlags_NoTooltip
-      );
-      ImGui::SameLine();
-      ImGui::TextUnformatted("horizon");
-      ImGui::SameLine();
-      ImGui::ColorButton(
-        "##zenith",
-        ImVec4(sky.zenithColor[0], sky.zenithColor[1], sky.zenithColor[2], 1.0f),
-        ImGuiColorEditFlags_NoTooltip
-      );
-      ImGui::SameLine();
-      ImGui::TextUnformatted("zenith");
-      ImGui::Text(
-        "%zu planet%s, cirrus %s",
-        sky.planets.size(),
-        sky.planets.size() == 1 ? "" : "s",
-        sky.cirrusTexture.empty() ? "(none)" : sky.cirrusTexture.substr(sky.cirrusTexture.find_last_of('/') + 1).c_str()
-      );
-    }
+    DrawSkyEditor();
     if (ImGui::Button("Import .scmskybox...")) {
       mSkyboxImport = true;
     }
@@ -1705,6 +1891,7 @@ namespace faf::editor
       "FAForeverMapEditor's sky file: the dome, horizon and zenith colours, planets and cirrus. An import is one "
       "undo step and is saved with the map."
     );
+    DrawCubes();
     ImGui::End();
   }
 } // namespace faf::editor

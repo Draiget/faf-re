@@ -283,10 +283,15 @@ namespace faf::editor
       LightingState lighting;
       WaterState water;
       SkyboxState sky;
+      /** The environment cube lookups (CWldTerrainRes::EnumerateEnvLookup): a name, its cube texture. */
+      std::vector<std::pair<std::string, std::string>> cubes;
     };
+    [[nodiscard]] std::vector<std::pair<std::string, std::string>> CubesNow() const;
+    /** The lookups replaced by these (ClearEnvLookup, then AddEnvLookup each); no undo step. */
+    void ApplyCubes(const std::vector<std::pair<std::string, std::string>>& cubes);
     [[nodiscard]] LookEnvironment LookEnvironmentNow() const
     {
-      return {LightingNow(), WaterNow(), SkyboxNow()};
+      return {LightingNow(), WaterNow(), SkyboxNow(), CubesNow()};
     }
     /** Puts a look's lighting, water and sky on the map (no undo step; LookApplied records one). */
     void ApplyLookEnvironment(
@@ -296,6 +301,9 @@ namespace faf::editor
       ApplyLighting(look.lighting);
       ApplyWater(look.water);
       ApplySkybox(look.sky);
+      if (!look.cubes.empty()) {
+        ApplyCubes(look.cubes);
+      }
     }
     void LookApplied(LookEnvironment before);
     [[nodiscard]] std::vector<std::pair<LookEnvironment, LookEnvironment>>& LookUndo() noexcept
@@ -680,7 +688,7 @@ namespace faf::editor
       case EditKind::LayerConversion:
         return "layer conversion";
       case EditKind::Look:
-        return "look";
+        return "environment";
       }
       return "edit";
     }

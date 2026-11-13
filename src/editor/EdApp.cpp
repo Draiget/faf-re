@@ -140,19 +140,26 @@ namespace faf::editor
     [[nodiscard]] bool IsTestRunCommandLine()
     {
       static const char* const kOptions[] = {
-        "/command",        "/palette",        "/theme",          "/keysfile",        "/focuspanel",  "/uiclicks",
-        "/hidegameunits",  "/movelayer",      "/pickfilter",     "/mapwide",         "/tool",        "/proptool",
-        "/play",           "/debugarm",       "/breakpoint",     "/check",           "/decaltool",   "/markertool",
-        "/unittool",       "/hoverprop",      "/selectprops",    "/selectunit",      "/propswap",    "/saveas",
-        "/settingsfile",   "/autosavefolder", "/askunsaved",     "/particlebrowser", "/particlenew", "/particleopen",
-        "/materialeditor", "/uiscale",        "/testrun",        "/openall",         "/roundtrip",   "/vault",
-        "/vaultsearch",    "/vaultmap",       "/newmap",         "/stamp",           "/brush",       "/layer",
-        "/waterbody",      "/ruler",          "/adaptivewindow", "/maskrule",        "/maskgen",     "/symhover",
-        "/stbfont",        "/recipe",         "/texset",         "/layerop",         "/slopeview",   "/typesfromlayers",
-        "/uncapped",       "/nominimap",      "/followtest",     "/arrangetest",     "/findtest",    "/findopen",
-        "/filltest",       "/modaltest",      "/looktest",       "/looksfolder",     "/symmenu",     "/panelbottom",
-        "/shader",         "/brushtest",      "/brushshape",     "/stampsource",     "/stampstroke", "/symoptions",
-        "/maskoptions",    "/masktest",       "/shaderbrowser",  "/convertlayers",
+        "/command",        "/palette",         "/theme",          "/keysfile",
+        "/focuspanel",     "/uiclicks",        "/hidegameunits",  "/movelayer",
+        "/pickfilter",     "/mapwide",         "/tool",           "/proptool",
+        "/play",           "/debugarm",        "/breakpoint",     "/check",
+        "/decaltool",      "/markertool",      "/unittool",       "/hoverprop",
+        "/selectprops",    "/selectunit",      "/propswap",       "/saveas",
+        "/settingsfile",   "/autosavefolder",  "/askunsaved",     "/particlebrowser",
+        "/particlenew",    "/particleopen",    "/materialeditor", "/uiscale",
+        "/testrun",        "/openall",         "/roundtrip",      "/vault",
+        "/vaultsearch",    "/vaultmap",        "/newmap",         "/stamp",
+        "/brush",          "/layer",           "/waterbody",      "/ruler",
+        "/adaptivewindow", "/maskrule",        "/maskgen",        "/symhover",
+        "/stbfont",        "/recipe",          "/texset",         "/layerop",
+        "/slopeview",      "/typesfromlayers", "/uncapped",       "/nominimap",
+        "/followtest",     "/arrangetest",     "/findtest",       "/findopen",
+        "/filltest",       "/modaltest",       "/looktest",       "/looksfolder",
+        "/envtest",        "/symmenu",         "/panelbottom",    "/shader",
+        "/brushtest",      "/brushshape",      "/stampsource",    "/stampstroke",
+        "/symoptions",     "/maskoptions",     "/masktest",       "/shaderbrowser",
+        "/convertlayers",
       };
       for (const char* const option : kOptions) {
         if (moho::CFG_GetArgOption(option, 0, nullptr)) {
@@ -1920,6 +1927,7 @@ namespace faf::editor
         look.water = environment.water;
         look.sky = environment.sky;
         look.hasSky = true;
+        look.cubes = environment.cubes;
         return look;
       }
 
@@ -2037,7 +2045,7 @@ namespace faf::editor
             mLookOriginal = mDocument.LookEnvironmentNow();
           }
           const Look mixed = BlendLook(LookOfEnvironment(*mLookOriginal), look, ask.blend, ask.sections);
-          mDocument.ApplyLookEnvironment({mixed.lighting, mixed.water, mixed.sky});
+          mDocument.ApplyLookEnvironment({mixed.lighting, mixed.water, mixed.sky, mixed.cubes});
           mLookTriedId = ask.id;
           mLookTriedName = look.name;
           mShell->SetLookState(
@@ -2112,6 +2120,57 @@ namespace faf::editor
         case What::None:
           break;
         }
+      }
+
+      /**
+       * `/envtest cubes|sky` (test runs): a reflection cube added, or the sky's horizon reddened and a planet taken, as
+       * the Lighting panel does them (one undo step), then undone; each state logged.
+       */
+      void TestEnvironment()
+      {
+        if (mEnvTestArg.empty() || mScene.ModelsPending() || ++mEnvTestFrames < 150) {
+          return;
+        }
+        const std::string what = std::exchange(mEnvTestArg, {});
+        const auto log = [this](const char* const when) {
+          const EdDocument::LookEnvironment now = mDocument.LookEnvironmentNow();
+          std::string cubes;
+          for (const auto& [name, cube] : now.cubes) {
+            cubes += (cubes.empty() ? "" : ", ") + name + " " + cube;
+          }
+          gpg::Logf(
+            "editor: env test %s: cubes [%s]; sky horizon %.2f %.2f %.2f, %zu planets; undo: %s",
+            when,
+            cubes.c_str(),
+            static_cast<double>(now.sky.horizonColor[0]),
+            static_cast<double>(now.sky.horizonColor[1]),
+            static_cast<double>(now.sky.horizonColor[2]),
+            now.sky.planets.size(),
+            mDocument.UndoStepName() != nullptr ? mDocument.UndoStepName() : "-"
+          );
+        };
+        log("before");
+        if (what == "cubes") {
+          const EdDocument::LookEnvironment before = mDocument.LookEnvironmentNow();
+          std::vector<std::pair<std::string, std::string>> cubes = before.cubes;
+          cubes.emplace_back("aeon", "/textures/environment/envcube_aeon_desert.dds");
+          mDocument.ApplyCubes(cubes);
+          mDocument.LookApplied(before);
+        } else {
+          const SkyboxState before = mDocument.SkyboxNow();
+          SkyboxState sky = before;
+          sky.horizonColor[0] = 1.0f;
+          sky.horizonColor[1] = 0.2f;
+          sky.horizonColor[2] = 0.1f;
+          if (!sky.planets.empty()) {
+            sky.planets.pop_back();
+          }
+          mDocument.ApplySkybox(sky);
+          mDocument.SkyboxEdited(before);
+        }
+        log("edited");
+        (void)mScene.Undo();
+        log("after undo");
       }
 
       /** `/looktest <map folder>,<sections>,<blend>,apply|revert|keep` (test runs): that map's look tried, then ended.
@@ -2459,6 +2518,8 @@ namespace faf::editor
       std::map<std::string, Look> mLookCache;
       bool mLooksListed = false;
       std::string mLookTestArg; // `/looktest <map>,<sections>,<blend>,apply|revert|keep` (test runs)
+      std::string mEnvTestArg;  // `/envtest cubes|sky` (test runs)
+      int mEnvTestFrames = 0;
       int mLookTestFrames = 0;
       // Find and replace objects: asked (Ctrl+F), the objects and types when it opened, the choices.
       bool mFindAsk = false;
@@ -3396,6 +3457,12 @@ namespace faf::editor
       for (std::size_t i = 0; i < Workspaces().size(); ++i) {
         workspaces.items.push_back(cmd(("workspace." + std::to_string(i)).c_str()));
       }
+      // View > World: every environment panel in one place (the design's Window > World).
+      EdMenuItem world;
+      world.label = "&World";
+      world.provider = [cmd] {
+        return std::vector<EdMenuItem>{cmd("view.lighting"), cmd("tool.3")};
+      };
       EdMenuItem arrange;
       arrange.label = "&Arrange";
       arrange.provider = [] {
@@ -3494,6 +3561,7 @@ namespace faf::editor
            cmd("view.particle"),
            cmd("view.particlebrowser"),
            cmd("view.adaptive"),
+           world,
            sep(),
            cmd("view.palette"),
            cmd("settings.keys"),
@@ -4579,6 +4647,9 @@ namespace faf::editor
       }
       if (fa::vector<fa::string> modal; moho::CFG_GetArgOption("/modaltest", 1, &modal) && !modal.empty()) {
         mModalTestArg = modal[0].c_str();
+      }
+      if (fa::vector<fa::string> env; moho::CFG_GetArgOption("/envtest", 1, &env) && !env.empty()) {
+        mEnvTestArg = env[0].c_str();
       }
       if (fa::vector<fa::string> look; moho::CFG_GetArgOption("/looktest", 1, &look) && !look.empty()) {
         mLookTestArg = look[0].c_str();
@@ -5941,6 +6012,22 @@ namespace faf::editor
         tools.SetWater(mDocument.WaterNow());
         if (WaterState water; true) {
           bool final = false;
+          if (tools.TakeWaterTakeLightingSun()) {
+            const WaterState before = mDocument.WaterNow();
+            WaterState taken = before;
+            const LightingState lighting = mDocument.LightingNow();
+            for (int i = 0; i < 3; ++i) {
+              taken.shader.mSunDirection[i] = -lighting.sunDirection[i];
+            }
+            mDocument.ApplyWater(taken);
+            mDocument.WaterEdited(before);
+            gpg::Logf(
+              "editor: the water's sun takes the lighting sun: %.3f %.3f %.3f",
+              static_cast<double>(taken.shader.mSunDirection[0]),
+              static_cast<double>(taken.shader.mSunDirection[1]),
+              static_cast<double>(taken.shader.mSunDirection[2])
+            );
+          }
           if (tools.TakeWaterChange(water, final)) {
             if (!mWaterDragging) {
               mWaterBefore = mDocument.WaterNow();
@@ -6660,6 +6747,7 @@ namespace faf::editor
       }
       UpdateLooks();
       TestLooks();
+      TestEnvironment();
       // The Lighting panel's "from another map", or `/lightingfrom <map folder>` for test runs: that map's lighting,
       // read from its .scmap.
       {
