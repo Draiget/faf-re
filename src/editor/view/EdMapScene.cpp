@@ -2205,6 +2205,29 @@ namespace faf::editor
     return true;
   }
 
+  bool EdMapScene::FillMaskLayer(
+    const int layer,
+    std::string& message
+  )
+  {
+    LoadMasks();
+    EdDocument::MaskGrid& masks = mDocument.Masks();
+    if (masks.texels.empty() || mPaintingMask) {
+      message = "No map's masks to change.";
+      return false;
+    }
+    const SampleRect whole{0, 0, masks.width - 1, masks.height - 1};
+    mDocument.MaskUndo().BeginStroke();
+    mDocument.MaskUndo().BeforeWrite(masks.texels.data(), whole);
+    // 255 shows full in either range (saturate(2 * 1 - 1) = 1).
+    for (std::uint64_t& texel : masks.texels) {
+      texel = WithMaskByte(texel, layer, 255);
+    }
+    WholeMaskChanged(whole);
+    message = "Filled the paint of layer " + std::to_string(layer + 1);
+    return true;
+  }
+
   bool EdMapScene::ImportMaskLayer(
     const int layer,
     const std::filesystem::path& file,

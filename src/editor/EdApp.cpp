@@ -49,6 +49,9 @@
 #include "editor/doc/EdLighting.h"
 #include "editor/tools/EdShaderSlots.h"
 #include "editor/tools/EdMapTextures.h"
+#include "editor/doc/EdLayerPreset.h"
+#include "editor/tools/EdTexScale.h"
+#include "editor/tools/EdTextureSets.h"
 #include "editor/tools/EdRecipes.h"
 #include "editor/tools/EdMaskBrush.h"
 #include "editor/tools/EdMaskGen.h"
@@ -144,9 +147,9 @@ namespace faf::editor
         "/materialeditor", "/uiscale",        "/testrun",        "/openall",         "/roundtrip",   "/vault",
         "/vaultsearch",    "/vaultmap",       "/newmap",         "/stamp",           "/brush",       "/layer",
         "/waterbody",      "/ruler",          "/adaptivewindow", "/maskrule",        "/maskgen",     "/symhover",
-        "/stbfont",        "/recipe",         "/symmenu",        "/panelbottom",     "/shader",      "/brushtest",
-        "/brushshape",     "/stampsource",    "/stampstroke",    "/symoptions",      "/maskoptions", "/masktest",
-        "/shaderbrowser",  "/convertlayers",
+        "/stbfont",        "/recipe",         "/texset",         "/layerop",         "/symmenu",     "/panelbottom",
+        "/shader",         "/brushtest",      "/brushshape",     "/stampsource",     "/stampstroke", "/symoptions",
+        "/maskoptions",    "/masktest",       "/shaderbrowser",  "/convertlayers",
       };
       for (const char* const option : kOptions) {
         if (moho::CFG_GetArgOption(option, 0, nullptr)) {
@@ -2234,6 +2237,22 @@ namespace faf::editor
       int mRecipeFrame = 0;
       int mRecipeArg = -1; // `/recipe <style>` (test runs)
       int mRecipeArgFrames = 0;
+      /** The Layers panel's optimal tiles (once a second) and Texture sets (try, keep, back, apply). */
+      void TexturesUpdate();
+      [[nodiscard]] int TexturePixels(const std::string& path);
+      [[nodiscard]] bool GameFileExists(const std::string& path);
+      std::map<std::string, int> mTexturePixels;               // lower case path -> width, 0 unreadable
+      std::map<std::string, bool> mGameFiles;                  // lower case path -> exists
+      std::vector<std::pair<int, LayerSettings>> mThemeBefore; // the layers before a Try
+      bool mThemeTrying = false;
+      int mTexturesFrame = 0;
+      int mThemePreviewFor = -1;
+      std::string mThemeShaderFor;
+      std::vector<std::string> mThemePreviewLines;
+      std::string mThemeArg;   // `/texset <index>[,try|,back]` (test runs)
+      std::string mLayerOpArg; // `/layerop <slot>,fill|remove|optimal` (test runs)
+      int mLayerOpFrames = 0;
+      int mThemeArgFrames = 0;
       /** Export (true) the slot's texture to a .dds, or import one into the map's folder and the slot. */
       void TransferMapTexture(MapTextureKind kind, bool exporting, const std::string& testFile);
       bool mMapTexturesStale[4]{};
@@ -4009,6 +4028,12 @@ namespace faf::editor
       if (fa::vector<fa::string> test; moho::CFG_GetArgOption("/brushtest", 1, &test) && !test.empty()) {
         mBrushTestArg = test[0].c_str();
       }
+      if (fa::vector<fa::string> op; moho::CFG_GetArgOption("/layerop", 1, &op) && !op.empty()) {
+        mLayerOpArg = op[0].c_str();
+      }
+      if (fa::vector<fa::string> theme; moho::CFG_GetArgOption("/texset", 1, &theme) && !theme.empty()) {
+        mThemeArg = theme[0].c_str();
+      }
       if (fa::vector<fa::string> recipe; moho::CFG_GetArgOption("/recipe", 1, &recipe) && !recipe.empty()) {
         mRecipeArg = std::max(0, std::atoi(recipe[0].c_str()));
       }
@@ -4524,6 +4549,188 @@ namespace faf::editor
       );
     }
 
+    int EditorApp::TexturePixels(
+      const std::string& path
+    )
+    {
+      const std::string key = LowerPath(path);
+      if (const auto found = mTexturePixels.find(key); found != mTexturePixels.end()) {
+        return found->second;
+      }
+      std::string bytes;
+      const int width = !path.empty() && ReadGameFile(path, bytes) ? DdsWidth(bytes.data(), bytes.size()) : 0;
+      mTexturePixels[key] = width;
+      if (width > 0) {
+        mGameFiles[key] = true;
+      }
+      return width;
+    }
+
+    bool EditorApp::GameFileExists(
+      const std::string& path
+    )
+    {
+      const std::string key = LowerPath(path);
+      if (const auto found = mGameFiles.find(key); found != mGameFiles.end()) {
+        return found->second;
+      }
+      std::string bytes;
+      const bool exists = ReadGameFile(path, bytes);
+      mGameFiles[key] = exists;
+      if (exists) {
+        mTexturePixels[key] = DdsWidth(bytes.data(), bytes.size());
+      }
+      return exists;
+    }
+
+    void EditorApp::TexturesUpdate()
+    {
+      EdTools& tools = mShell->Tools();
+      if (mScene.TerrainHeights() == nullptr) {
+        return;
+      }
+      // `/texset <index>[,try|,back]` (test runs): that set applied (or tried, or tried and taken back).
+      if (!mThemeArg.empty() && ++mThemeArgFrames == 150) {
+        tools.SetThemeIndex(std::clamp(std::atoi(mThemeArg.c_str()), 0, static_cast<int>(TextureThemes().size()) - 1));
+        tools.AskTheme(
+          mThemeArg.find(",try") != std::string::npos || mThemeArg.find(",back") != std::string::npos
+            ? EdTools::ThemeOp::Try
+            : EdTools::ThemeOp::Apply
+        );
+      }
+      if (!mThemeArg.empty() && mThemeArgFrames == 240 && mThemeArg.find(",back") != std::string::npos) {
+        tools.AskTheme(EdTools::ThemeOp::Back);
+        mThemeArg.clear();
+      }
+      // `/layerop <slot>,<item>` (test runs): after the optimal tiles are known (a second in).
+      if (!mLayerOpArg.empty() && ++mLayerOpFrames == 120) {
+        const std::size_t comma = mLayerOpArg.find(',');
+        const int slot = std::atoi(mLayerOpArg.c_str());
+        const std::string item = comma == std::string::npos ? std::string() : mLayerOpArg.substr(comma + 1);
+        float before[8] = {};
+        (void)mScene.MaskCoverage(before);
+        gpg::Logf(
+          "editor: /layerop %s: %s (layer %d covered %.1f %%)",
+          mLayerOpArg.c_str(),
+          tools.RunLayerMenuItem(slot, item) ? "asked" : "refused",
+          slot,
+          slot >= 1 && slot <= 8 ? static_cast<double>(before[slot - 1] * 100.0f) : 0.0
+        );
+        mLayerOpArg.clear();
+      }
+      const std::vector<EdTools::LayerSlot> slots = mScene.LayerSlots();
+      const ShaderProfile profile = ShaderProfileOf(mScene.TerrainShader());
+      const bool biplanar = profile.summary.find("biplanar") != std::string::npos;
+      // The Upper layer takes a macrotexture only where the shader lays it over the ground.
+      const bool upperOverlay = MapTextureTargetOf(mScene.TerrainShader(), MapTextureKind::Macro).Valid();
+      const TextureTheme& theme = TextureThemes()[static_cast<std::size_t>(
+        std::clamp(tools.ThemeIndex(), 0, static_cast<int>(TextureThemes().size()) - 1)
+      )];
+      const auto themeSlots = [&] {
+        return ThemeSlots(theme, profile.painted, biplanar, upperOverlay, [this](const std::string& path) {
+          return GameFileExists(path);
+        }, [this](const std::string& path) {
+          return TexturePixels(path);
+        });
+      };
+      const EdTools::ThemeOp op = tools.TakeThemeOp();
+      switch (op) {
+      case EdTools::ThemeOp::Try:
+      case EdTools::ThemeOp::Apply: {
+        const bool trying = op == EdTools::ThemeOp::Try;
+        std::vector<std::pair<int, LayerSettings>> layers;
+        std::vector<std::pair<int, LayerSettings>> before;
+        EdTextureLibrary& library = tools.Library();
+        for (const ThemeSlot& s : themeSlots()) {
+          // The normal map that pairs with the texture in the library.
+          std::string normals;
+          for (const LayerTexture& t : library.Textures()) {
+            if (LowerPath(t.path) == LowerPath(s.albedo)) {
+              normals = t.normals;
+              break;
+            }
+          }
+          layers.push_back({s.slot, LayerSettings{s.albedo, normals, s.size, s.size}});
+          if (static_cast<std::size_t>(s.slot) < slots.size()) {
+            const EdTools::LayerSlot& now = slots[static_cast<std::size_t>(s.slot)];
+            before.push_back({s.slot, LayerSettings{now.albedo, now.normals, now.albedoSize, now.normalsSize}});
+          }
+        }
+        const int changed = mScene.ApplyLayerSettings({}, layers);
+        if (trying) {
+          mThemeBefore = std::move(before);
+        }
+        // Apply keeps at once; Try keeps the layers before until Keep or Back.
+        mThemeTrying = trying && changed > 0;
+        gpg::Logf("editor: texture set %s: %d layers changed (%zu given)", theme.id, changed, layers.size());
+        PostStatusMessage(std::string("Texture set ") + theme.label + ": " + std::to_string(changed) + " layers");
+        mThemePreviewFor = -1;
+        break;
+      }
+      case EdTools::ThemeOp::Keep:
+        mThemeTrying = false;
+        mThemeBefore.clear();
+        gpg::Logf("editor: texture set kept");
+        break;
+      case EdTools::ThemeOp::Back: {
+        const int changed = mScene.ApplyLayerSettings({}, mThemeBefore);
+        mThemeTrying = false;
+        mThemeBefore.clear();
+        gpg::Logf("editor: texture set taken back: %d layers as before", changed);
+        PostStatusMessage("Back to the textures before");
+        break;
+      }
+      case EdTools::ThemeOp::None:
+        break;
+      }
+      // Once a second while the Layers panel is shown: each slot's optimal tile, and what the picked set gives.
+      if (!tools.LayersPanelShown() || mTexturesFrame++ % 60 != 0) {
+        return;
+      }
+      const auto measured = std::chrono::steady_clock::now();
+      std::array<float, 10> tiles{};
+      for (std::size_t slot = 0; slot < slots.size() && slot < tiles.size(); ++slot) {
+        const std::string& albedo = slots[slot].albedo;
+        if (!albedo.empty()) {
+          tiles[slot] = TileForPixels(TexturePixels(albedo));
+        }
+      }
+      tools.SetOptimalTiles(tiles);
+      if (mThemePreviewFor != tools.ThemeIndex() || mThemeShaderFor != mScene.TerrainShader()) {
+        mThemePreviewFor = tools.ThemeIndex();
+        mThemeShaderFor = mScene.TerrainShader();
+        std::vector<std::string> preview;
+        for (const ThemeSlot& s : themeSlots()) {
+          char line[160];
+          std::snprintf(
+            line,
+            sizeof(line),
+            "%s\t%s\t%s\t%.1f",
+            s.slot == 0     ? "Base"
+              : s.slot == 9 ? "Upper"
+                            : std::to_string(s.slot).c_str(),
+            s.slot == 0     ? "base"
+              : s.slot == 9 ? "macro"
+                            : GroundKindName(s.kind),
+            LayerTextureName(s.albedo).c_str(),
+            static_cast<double>(s.size)
+          );
+          preview.emplace_back(line);
+        }
+        mThemePreviewLines = std::move(preview);
+      }
+      tools.SetThemeState(mThemeTrying, mThemePreviewLines);
+      // The widths are read once per texture (whole files from the game's archives); say so when that takes long.
+      if (
+        const double took = std::chrono::duration<double>(std::chrono::steady_clock::now() - measured).count();
+        took > 0.2
+      ) {
+        gpg::Logf(
+          "editor: texture widths and the set's preview took %.2f s (%zu textures known)", took, mTexturePixels.size()
+        );
+      }
+    }
+
     void EditorApp::RecipesUpdate()
     {
       EdTools& tools = mShell->Tools();
@@ -4949,6 +5156,7 @@ namespace faf::editor
         MapTexturesUpdate();
         MaskGenUpdate();
         RecipesUpdate();
+        TexturesUpdate();
         DriveMaterialEditor();
         tools.SetMapSizeUnits(static_cast<float>(std::max(mDocument.Facts().sizeX, mDocument.Facts().sizeZ)));
         {
@@ -5526,6 +5734,11 @@ namespace faf::editor
         case EdTools::MaskOp::Clear: {
           std::string message;
           report(mScene.ClearMaskLayer(tools.MaskLayer(), message), message);
+          break;
+        }
+        case EdTools::MaskOp::Fill: {
+          std::string message;
+          report(mScene.FillMaskLayer(tools.MaskLayer(), message), message);
           break;
         }
         case EdTools::MaskOp::Import:

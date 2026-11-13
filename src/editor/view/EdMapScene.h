@@ -148,6 +148,8 @@ namespace faf::editor
     [[nodiscard]] std::vector<EdTools::LayerSlot> LayerSlots() const;
     /** The paint layer's mask cleared, or read from / written to a grey image (PNG, RAW: 0-255 as 0-65535). */
     bool ClearMaskLayer(int layer, std::string& message);
+    /** Stratum `layer`'s (0-7) mask full over the whole map, as one undo step. */
+    bool FillMaskLayer(int layer, std::string& message);
     bool ImportMaskLayer(int layer, const std::filesystem::path& file, std::string& message);
     bool ExportMaskLayer(int layer, const std::filesystem::path& file, std::string& message);
     /** Each stratum's share of the map, once the masks are read. */

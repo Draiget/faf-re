@@ -1488,6 +1488,10 @@ namespace faf::editor
               mMaskLayer = slot - 1;
               mMaskOp = MaskOp::Clear;
             }
+            if (ImGui::MenuItem("Fill its paint (the whole map)")) {
+              mMaskLayer = slot - 1;
+              mMaskOp = MaskOp::Fill;
+            }
             if (ImGui::MenuItem("Import its mask...")) {
               mMaskLayer = slot - 1;
               mMaskOp = MaskOp::Import;
@@ -1495,6 +1499,21 @@ namespace faf::editor
             if (ImGui::MenuItem("Export its mask...")) {
               mMaskLayer = slot - 1;
               mMaskOp = MaskOp::Export;
+            }
+          }
+          if (
+            slot >= 1 && !layer.albedo.empty() &&
+            ImGui::MenuItem(stratum ? "Remove its texture and paint" : "Remove its texture")
+          ) {
+            mChangedSlot = slot;
+            mChangedValue = layer;
+            mChangedValue.albedo.clear();
+            mChangedValue.normals.clear();
+            mChangedValue.albedoSize = 4.0f;
+            mChangedValue.normalsSize = 4.0f;
+            if (stratum) {
+              mMaskLayer = slot - 1;
+              mMaskOp = MaskOp::Clear;
             }
           }
           ImGui::Separator();
@@ -1507,6 +1526,39 @@ namespace faf::editor
             mChangedValue = layer;
             mChangedValue.albedoSize = size;
             mChangedValue.normalsSize = size * ratio;
+          }
+          ImGui::SetItemTooltip("The tile: world units one repeat of the texture covers (its normal map follows)");
+          if (!layer.normals.empty()) {
+            ImGui::SetNextItemWidth(Em(180.0f));
+            float normals = layer.normalsSize;
+            if (FillDragFloat("##nsize", &normals, 0.05f, 0.1f, 1024.0f, "Normal map %.2f") && normals > 0.0f) {
+              mChangedSlot = slot;
+              mChangedValue = layer;
+              mChangedValue.normalsSize = normals;
+            }
+            ImGui::SetItemTooltip(
+              "The normal map's own tile (usually the texture's: the bumps then sit on their colours)"
+            );
+          }
+          if (const float optimal = mOptimalTiles[static_cast<std::size_t>(slot)]; optimal > 0.0f && slot < 9) {
+            char label[64];
+            std::snprintf(label, sizeof(label), "Optimal tile size (%.1f)", static_cast<double>(optimal));
+            if (
+              ImGui::MenuItem(
+                label,
+                nullptr,
+                false,
+                std::fabs(layer.albedoSize - optimal) > 0.01f || std::fabs(layer.normalsSize - optimal) > 0.01f
+              )
+            ) {
+              mChangedSlot = slot;
+              mChangedValue = layer;
+              mChangedValue.albedoSize = optimal;
+              mChangedValue.normalsSize = optimal;
+            }
+            ImGui::SetItemTooltip(
+              "The largest tile that stays sharp at the closest zoom, from the texture's width; the normal map too"
+            );
           }
           ImGui::EndPopup();
         }
@@ -1650,6 +1702,8 @@ namespace faf::editor
       }
       DrawTextureBrowser();
     }
+
+    DrawThemes();
 
     if (Section("Map-wide textures")) {
       const MapTextureRow& normals = mMapTextureRows[0];
@@ -2205,6 +2259,97 @@ namespace faf::editor
     }
     DrawMaskGenerator();
     DrawRecipes();
+  }
+
+  bool EdTools::RunLayerMenuItem(
+    const int slot,
+    const std::string& item
+  )
+  {
+    if (slot < 0 || slot >= static_cast<int>(mSlots.size())) {
+      return false;
+    }
+    const LayerSlot& layer = mSlots[static_cast<std::size_t>(slot)];
+    const bool stratum = slot >= 1 && slot <= 8;
+    if (item == "fill" && stratum) {
+      mMaskLayer = slot - 1;
+      mMaskOp = MaskOp::Fill;
+      return true;
+    }
+    if (item == "remove" && slot >= 1 && !layer.albedo.empty()) {
+      mChangedSlot = slot;
+      mChangedValue = layer;
+      mChangedValue.albedo.clear();
+      mChangedValue.normals.clear();
+      mChangedValue.albedoSize = 4.0f;
+      mChangedValue.normalsSize = 4.0f;
+      if (stratum) {
+        mMaskLayer = slot - 1;
+        mMaskOp = MaskOp::Clear;
+      }
+      return true;
+    }
+    if (item == "optimal" && slot < 9 && mOptimalTiles[static_cast<std::size_t>(slot)] > 0.0f) {
+      mChangedSlot = slot;
+      mChangedValue = layer;
+      mChangedValue.albedoSize = mOptimalTiles[static_cast<std::size_t>(slot)];
+      mChangedValue.normalsSize = mOptimalTiles[static_cast<std::size_t>(slot)];
+      return true;
+    }
+    return false;
+  }
+
+  void EdTools::DrawThemes()
+  {
+    mLayersShown = true;
+    if (!Section("Texture sets")) {
+      return;
+    }
+    Note(
+      "A set of textures for every kind of ground: the base layer, each kind's layer for this shader and the Upper "
+      "layer, at their optimal tile sizes. The paint stays. Try it, then keep it or go back; Apply keeps it at once."
+    );
+    std::vector<const char*> names;
+    for (const TextureTheme& theme : TextureThemes()) {
+      names.push_back(theme.label);
+    }
+    ImGui::BeginDisabled(mThemeTrying);
+    ImGui::SetNextItemWidth(-1.0f);
+    (void)EdCombo("##theme", &mThemeIndex, names.data(), static_cast<int>(names.size()));
+    ImGui::EndDisabled();
+    // What it would give each layer, in columns: the layer, its kind, the texture, its tile.
+    for (const std::string& line : mThemePreview) {
+      static const float kColumns[] = {0.0f, 44.0f, 124.0f, 290.0f};
+      const float left = ImGui::GetCursorPosX();
+      std::size_t at = 0;
+      for (int column = 0; column < 4 && at <= line.size(); ++column) {
+        const std::size_t tab = std::min(line.find('\t', at), line.size());
+        if (column > 0) {
+          ImGui::SameLine(left + Em(kColumns[column]));
+        }
+        ImGui::TextDisabled("%s", line.substr(at, tab - at).c_str());
+        at = tab + 1;
+      }
+    }
+    if (mThemeTrying) {
+      if (PrimaryButton("Keep it")) {
+        mThemeOp = ThemeOp::Keep;
+      }
+      ImGui::SameLine();
+      if (ImGui::Button("Back to before")) {
+        mThemeOp = ThemeOp::Back;
+      }
+    } else {
+      if (ImGui::Button("Try")) {
+        mThemeOp = ThemeOp::Try;
+      }
+      EdSetItemTooltip("Put the set on the layers to look at it\nKeep it or go back to the textures before.");
+      ImGui::SameLine();
+      if (ImGui::Button("Apply")) {
+        mThemeOp = ThemeOp::Apply;
+      }
+      EdSetItemTooltip("Put the set on the layers\nOne undo step.");
+    }
   }
 
   void EdTools::DrawRecipes()

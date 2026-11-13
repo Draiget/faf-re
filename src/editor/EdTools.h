@@ -11,6 +11,7 @@
 #include "editor/tools/EdMaskBrush.h"
 #include "editor/tools/EdMaskGen.h"
 #include "editor/tools/EdRecipes.h"
+#include "editor/tools/EdTextureSets.h"
 #include "editor/doc/EdPropPaint.h"
 #include "editor/doc/EdUnits.h"
 #include "editor/tools/EdWaves.h"
@@ -1595,6 +1596,7 @@ namespace faf::editor
     {
       None,
       Clear,
+      Fill,
       Import,
       Export,
     };
@@ -1831,6 +1833,60 @@ namespace faf::editor
     [[nodiscard]] bool RecipesOpen() const noexcept
     {
       return mRecipesOpen;
+    }
+
+    /** Each slot's optimal tile size (EdTexScale, from its texture's width; 0: unknown), for the row menus. */
+    void SetOptimalTiles(
+      const std::array<float, 10>& tiles
+    ) noexcept
+    {
+      mOptimalTiles = tiles;
+    }
+    /** The Texture sets section: the theme picked, what it would give, and what the panel asks. */
+    enum class ThemeOp : std::uint8_t
+    {
+      None,
+      Try,   // applied, the layers before kept to go back to
+      Keep,  // the tried theme stays
+      Back,  // the layers as they were before Try
+      Apply, // applied and kept at once
+    };
+    [[nodiscard]] int ThemeIndex() const noexcept
+    {
+      return mThemeIndex;
+    }
+    void SetThemeIndex(
+      const int index
+    ) noexcept
+    {
+      mThemeIndex = index;
+    }
+    void AskTheme(
+      const ThemeOp op
+    ) noexcept
+    {
+      mThemeOp = op;
+    }
+    [[nodiscard]] ThemeOp TakeThemeOp() noexcept
+    {
+      return std::exchange(mThemeOp, ThemeOp::None);
+    }
+    /** The app: whether a theme is being tried, and what the picked one would give each layer ("2  Rock  EvRock006c").
+     */
+    void SetThemeState(
+      const bool trying,
+      std::vector<std::string> preview
+    )
+    {
+      mThemeTrying = trying;
+      mThemePreview = std::move(preview);
+    }
+    /** Test runs (`/layerop`): a row menu item of the Layers panel on `slot` (fill, remove, optimal). False when it
+     * can't. */
+    bool RunLayerMenuItem(int slot, const std::string& item);
+    [[nodiscard]] bool LayersPanelShown() const noexcept
+    {
+      return mLayersShown;
     }
 
     /** Test runs (`/browse`): the texture browser opened for a slot. */
@@ -2359,6 +2415,13 @@ namespace faf::editor
     bool mRecipeApply = false;
     bool mRecipesOpen = false;
     std::string mRecipeResult;
+    std::array<float, 10> mOptimalTiles{};
+    int mThemeIndex = 1;
+    ThemeOp mThemeOp = ThemeOp::None;
+    bool mThemeTrying = false;
+    std::vector<std::string> mThemePreview;
+    bool mLayersShown = false;
+    void DrawThemes();
     bool mRulesRequested = false;
 
     bool mCheckedMasks = false;
