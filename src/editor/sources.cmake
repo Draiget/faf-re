@@ -61,6 +61,8 @@ set(FAF_EDITOR_SOURCES
   EdLuaDebugger.cpp
   EdDebugRules.cpp
   ui/EdDebuggerPanel.cpp
+  ui/EdUnitCatalog.cpp
+  ui/EdUnitBrowser.cpp
   ui/EdWindowChrome.cpp
   ui/EdTitleBar.cpp
   ui/EdPalette.cpp

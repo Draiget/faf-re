@@ -2000,6 +2000,9 @@ namespace faf::editor
     }
     if (mUnitTypes.empty()) {
       Note("The unit list comes once the game's rules are built after startup.");
+    } else if (!mUnitInfos.empty()) {
+      // The browser: by faction and kind, in tech rows of build icons (or a list).
+      DrawUnitBrowser();
     } else if (
       ImGui::BeginChild("##unittypes", ImVec2(0.0f, ImGui::GetFrameHeight() * 1.6f * 9.0f), ImGuiChildFlags_Borders)
     ) {
@@ -2045,7 +2048,7 @@ namespace faf::editor
         ImGui::PopID();
       }
     }
-    if (!mUnitTypes.empty()) {
+    if (!mUnitTypes.empty() && mUnitInfos.empty()) {
       ImGui::EndChild();
     }
     ImGui::Checkbox("Random turn", &mUnitRandomTurn);

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "editor/ui/EdUnitCatalog.h"
 #include "editor/ui/EdProperties.h"
 #include "editor/tools/EdHeightBrush.h"
 #include "editor/tools/EdMaskBrush.h"
@@ -483,6 +484,13 @@ namespace faf::editor
     [[nodiscard]] bool HasUnitTypes() const noexcept
     {
       return !mUnitTypes.empty();
+    }
+    /** Each unit's faction, kind and tech (its blueprint's categories), for the unit browser. */
+    void SetUnitInfos(
+      std::vector<EdUnitInfo> infos
+    )
+    {
+      mUnitInfos = std::move(infos);
     }
     /** A unit blueprint's name ("Mass Extractor"), or "" when the rules don't have it. */
     [[nodiscard]] std::string UnitTypeName(
@@ -1672,6 +1680,11 @@ namespace faf::editor
 
     int mTool = 1;
     std::vector<std::string> mToolKeys;
+    /** The Units tool's browser (ui/EdUnitBrowser.cpp): the units by group, its chips' picks, tiles or a list. */
+    void DrawUnitBrowser();
+    std::vector<EdUnitInfo> mUnitInfos;
+    EdUnitFilter mUnitBrowse;
+    bool mUnitGrid = true;
     bool mReadOnly = false;
 
     int mBrushMode = 0;

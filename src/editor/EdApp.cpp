@@ -4129,6 +4129,7 @@ namespace faf::editor
       if (!tools.HasUnitTypes()) {
         if (moho::RRuleGameRules* const rules = moho::RULE_PeekKept(); rules != nullptr) {
           std::vector<std::pair<std::string, std::string>> types;
+          std::vector<EdUnitInfo> infos;
           for (const auto& [id, entry] : rules->GetUnitBlueprints()) {
             moho::RResId resId{};
             resId.name.assign(id.c_str());
@@ -4139,9 +4140,18 @@ namespace faf::editor
               name = close == std::string::npos ? std::string() : name.substr(close + 1);
             }
             types.emplace_back(id.c_str(), name);
+            // Its faction, kind and tech for the unit browser, from its categories.
+            std::vector<std::string> categories;
+            if (blueprint != nullptr) {
+              for (const fa::string& category : blueprint->mCategories) {
+                categories.emplace_back(category.c_str());
+              }
+            }
+            infos.push_back(UnitInfoFrom(id.c_str(), name, categories));
           }
           std::sort(types.begin(), types.end());
           tools.SetUnitTypes(std::move(types));
+          tools.SetUnitInfos(std::move(infos));
         }
       }
       // The prop palette, once the kept rules are built.
