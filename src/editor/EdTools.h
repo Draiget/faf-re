@@ -1208,6 +1208,53 @@ namespace faf::editor
       mSymmetry = mode;
     }
     [[nodiscard]] static const char* SymmetryName(int mode) noexcept;
+    /**
+     * The view's camera for its overlays, the scene's each frame: the directions on the ground of the view's up and
+     * right (unit vectors in x, z), the ground under the view's corners (top-left, top-right, bottom-right,
+     * bottom-left; fewer when a corner shows sky), and the map's rectangle.
+     */
+    struct ViewFrame
+    {
+      bool valid = false;
+      float upX = 0.0f;
+      float upZ = -1.0f;
+      float rightX = 1.0f;
+      float rightZ = 0.0f;
+      int corners = 0;
+      float cornerX[4]{};
+      float cornerZ[4]{};
+      float minX = 0.0f;
+      float minZ = 0.0f;
+      float maxX = 0.0f;
+      float maxZ = 0.0f;
+    };
+    [[nodiscard]] ViewFrame& View() noexcept
+    {
+      return mViewFrame;
+    }
+    [[nodiscard]] const ViewFrame& View() const noexcept
+    {
+      return mViewFrame;
+    }
+    /** The minimap's click: the camera looks at (x, z) next frame (the scene takes it). */
+    void AskCameraAt(
+      const float x,
+      const float z
+    ) noexcept
+    {
+      mCameraAsk = true;
+      mCameraAskX = x;
+      mCameraAskZ = z;
+    }
+    [[nodiscard]] bool TakeCameraAsk(
+      float& x,
+      float& z
+    ) noexcept
+    {
+      x = mCameraAskX;
+      z = mCameraAskZ;
+      return std::exchange(mCameraAsk, false);
+    }
     /** The view's HUD: the terrain brush's mode by name ("Raise"), or null for the other tools. */
     [[nodiscard]] const char* HudMode() const noexcept;
     /** The view's HUD: how many copies an edit makes (the symmetry's), 1 for tools that don't mirror. */
@@ -1912,6 +1959,10 @@ namespace faf::editor
     float mFalloff = 0.6f;
     int mSymmetry = 6; // both axes
     int mNWay = 3;
+    ViewFrame mViewFrame;
+    bool mCameraAsk = false;
+    float mCameraAskX = 0.0f;
+    float mCameraAskZ = 0.0f;
     bool mLimitHeight = false;
     float mLimitLow = 0.0f;
     float mLimitHigh = 100.0f;

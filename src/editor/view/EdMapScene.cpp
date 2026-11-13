@@ -2984,6 +2984,66 @@ namespace faf::editor
         mTools->SetCursorText({});
       }
     }
+    // The view's frame for its overlays (the compass, the minimap), and the minimap's ask to look somewhere.
+    if (mTools != nullptr) {
+      EdTools::ViewFrame& frame = mTools->View();
+      frame = {};
+      if (mMap != nullptr && mCamera != nullptr && mWidth > 0 && mHeight > 0) {
+        float lookX = 0.0f;
+        float lookZ = 0.0f;
+        if (mTools->TakeCameraAsk(lookX, lookZ)) {
+          mTargetX = lookX;
+          mTargetZ = lookZ;
+          ApplyCamera();
+        }
+        const Wm3::AxisAlignedBox3f bounds = mMap->mTerrainRes->mMap->GetBounds3D();
+        frame.minX = bounds.Min.x;
+        frame.minZ = bounds.Min.z;
+        frame.maxX = bounds.Max.x;
+        frame.maxZ = bounds.Max.z;
+        // Up and right on the ground: the heading's, or the camera's own around the view's middle.
+        frame.upX = -std::sin(mHeading);
+        frame.upZ = -std::cos(mHeading);
+        frame.rightX = -frame.upZ;
+        frame.rightZ = frame.upX;
+        const float cx = static_cast<float>(mWidth) * 0.5f;
+        const float cy = static_cast<float>(mHeight) * 0.5f;
+        float centerX = 0.0f, centerZ = 0.0f, upX = 0.0f, upZ = 0.0f, rightX = 0.0f, rightZ = 0.0f;
+        if (
+          GroundAt(cx, cy, centerX, centerZ) && GroundAt(cx, cy - 40.0f, upX, upZ) &&
+          GroundAt(cx + 40.0f, cy, rightX, rightZ)
+        ) {
+          const float upLength = std::hypot(upX - centerX, upZ - centerZ);
+          const float rightLength = std::hypot(rightX - centerX, rightZ - centerZ);
+          if (upLength > 1e-4f && rightLength > 1e-4f) {
+            frame.upX = (upX - centerX) / upLength;
+            frame.upZ = (upZ - centerZ) / upLength;
+            frame.rightX = (rightX - centerX) / rightLength;
+            frame.rightZ = (rightZ - centerZ) / rightLength;
+          }
+        }
+        // The ground under the corners; a top corner showing sky takes the first ground below it.
+        const float w = static_cast<float>(mWidth);
+        const float h = static_cast<float>(mHeight);
+        const float corners[4][2] = {{0.0f, 0.0f}, {w, 0.0f}, {w, h}, {0.0f, h}};
+        for (const auto& corner : corners) {
+          float y = corner[1];
+          float gx = 0.0f;
+          float gz = 0.0f;
+          bool hit = GroundAt(corner[0], y, gx, gz);
+          while (!hit && corner[1] == 0.0f && y < h * 0.6f) {
+            y += h * 0.05f;
+            hit = GroundAt(corner[0], y, gx, gz);
+          }
+          if (hit) {
+            frame.cornerX[frame.corners] = gx;
+            frame.cornerZ[frame.corners] = gz;
+            ++frame.corners;
+          }
+        }
+        frame.valid = true;
+      }
+    }
     // The type under the cursor, for the panel.
     if (mTools != nullptr && mTools->PaintingTerrainTypes()) {
       float groundX = 0.0f;

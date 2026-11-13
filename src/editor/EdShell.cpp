@@ -1301,6 +1301,120 @@ namespace faf::editor
       ImGui::Dummy(ImVec2(0.0f, pillHeight));
     }
     end();
+
+    // The view's right side (.vp-gizmo, .vp-mini): the compass, and the minimap with what the camera sees.
+    const EdTools::ViewFrame& frame = mTools.View();
+    if (frame.valid && frame.maxX > frame.minX && frame.maxZ > frame.minZ) {
+      // The compass: where the map's north (-z) and east (+x) are on the screen.
+      const float radius = std::round(Em(30.0f));
+      ImGui::SetNextWindowPos(
+        ImVec2(view.x + viewSize.x - margin, view.y + margin), ImGuiCond_Always, ImVec2(1.0f, 0.0f)
+      );
+      ImGui::SetNextWindowSize(ImVec2(radius * 2.0f, radius * 2.0f));
+      ImGui::SetNextWindowViewport(viewport->ID);
+      ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
+      ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+      ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
+      if (ImGui::Begin("##viewcompass", nullptr, kFlags & ~ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImDrawList* const dl = ImGui::GetWindowDrawList();
+        const ImVec2 centre(ImGui::GetWindowPos().x + radius, ImGui::GetWindowPos().y + radius);
+        dl->AddCircleFilled(centre, radius, ground, 40);
+        dl->AddCircle(centre, radius, edge, 40);
+        // A world direction (x, z) as a screen direction: its parts along the view's right and up.
+        const auto onScreen = [&](const float x, const float z) {
+          ImVec2 d(x * frame.rightX + z * frame.rightZ, -(x * frame.upX + z * frame.upZ));
+          const float length = std::max(1e-4f, std::hypot(d.x, d.y));
+          return ImVec2(d.x / length, d.y / length);
+        };
+        const auto axis = [&](const ImVec2 dir, const ImU32 colour, const char* const letter) {
+          const ImVec2 tip(centre.x + dir.x * radius * 0.62f, centre.y + dir.y * radius * 0.62f);
+          dl->AddLine(centre, tip, colour, Em(2.0f));
+          const float dot = Em(8.0f);
+          dl->AddCircleFilled(tip, dot, colour, 20);
+          const float size = std::round(fontSize * 0.7f);
+          const ImVec2 text = ImGui::GetFont()->CalcTextSizeA(size, FLT_MAX, 0.0f, letter);
+          dl->AddText(
+            gBoldFont != nullptr ? gBoldFont : ImGui::GetFont(),
+            size,
+            ImVec2(std::round(tip.x - text.x * 0.5f), std::round(tip.y - text.y * 0.5f)),
+            IM_COL32(0x10, 0x12, 0x16, 0xFF),
+            letter
+          );
+        };
+        axis(onScreen(1.0f, 0.0f), IM_COL32(0x4F, 0xD1, 0x8B, 0xFF), "E");
+        axis(onScreen(0.0f, -1.0f), IM_COL32(0xFF, 0x5D, 0x5D, 0xFF), "N");
+        dl->AddCircleFilled(centre, Em(5.0f), IM_COL32(0xE9, 0xED, 0xF2, 0xFF), 16);
+        if (ImGui::IsWindowHovered()) {
+          ImGui::SetTooltip("Where the map's north and east are");
+        }
+      }
+      ImGui::End();
+      ImGui::PopStyleColor();
+      ImGui::PopStyleVar(2);
+
+      // The minimap: the map's picture, the camera's ground as a frame; a click or a drag moves the camera there.
+      const float mapW = frame.maxX - frame.minX;
+      const float mapH = frame.maxZ - frame.minZ;
+      const float longest = std::round(Em(160.0f));
+      const ImVec2 size = mapW >= mapH ? ImVec2(longest, std::round(longest * mapH / mapW))
+                                       : ImVec2(std::round(longest * mapW / mapH), longest);
+      ImGui::SetNextWindowPos(
+        ImVec2(view.x + viewSize.x - margin, view.y + viewSize.y - margin), ImGuiCond_Always, ImVec2(1.0f, 1.0f)
+      );
+      ImGui::SetNextWindowSize(size);
+      ImGui::SetNextWindowViewport(viewport->ID);
+      ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
+      ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, Em(8.0f));
+      ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 1.0f);
+      ImGui::PushStyleColor(ImGuiCol_WindowBg, ImGui::ColorConvertU32ToFloat4(ground));
+      ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(1.0f, 1.0f, 1.0f, 0.14f));
+      if (ImGui::Begin("##viewminimap", nullptr, kFlags & ~ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImDrawList* const dl = ImGui::GetWindowDrawList();
+        const ImVec2 at = ImGui::GetWindowPos();
+        std::string title;
+        std::string mapSize;
+        int players = 0;
+        std::uint64_t picture = 0;
+        (void)mBrowser.MapCard(mDocument.Path(), title, mapSize, players, picture);
+        if (picture != 0) {
+          dl->AddImageRounded(
+            static_cast<ImTextureID>(picture),
+            at,
+            ImVec2(at.x + size.x, at.y + size.y),
+            ImVec2(0.0f, 0.0f),
+            ImVec2(1.0f, 1.0f),
+            IM_COL32_WHITE,
+            Em(8.0f)
+          );
+        }
+        const auto toMini = [&](const float x, const float z) {
+          return ImVec2(at.x + (x - frame.minX) / mapW * size.x, at.y + (z - frame.minZ) / mapH * size.y);
+        };
+        if (frame.corners >= 3) {
+          ImVec2 points[4];
+          for (int i = 0; i < frame.corners; ++i) {
+            points[i] = toMini(frame.cornerX[i], frame.cornerZ[i]);
+          }
+          dl->PushClipRect(at, ImVec2(at.x + size.x, at.y + size.y), true);
+          dl->AddPolyline(points, frame.corners, IM_COL32_WHITE, ImDrawFlags_Closed, Em(1.5f));
+          dl->PopClipRect();
+        }
+        ImGui::SetCursorScreenPos(at);
+        (void)ImGui::InvisibleButton("##minimapjump", size);
+        if (ImGui::IsItemActive()) {
+          const ImVec2 mouse = ImGui::GetIO().MousePos;
+          const float u = std::clamp((mouse.x - at.x) / size.x, 0.0f, 1.0f);
+          const float v = std::clamp((mouse.y - at.y) / size.y, 0.0f, 1.0f);
+          mTools.AskCameraAt(frame.minX + u * mapW, frame.minZ + v * mapH);
+        }
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) {
+          ImGui::SetTooltip("The map: click or drag to look there");
+        }
+      }
+      ImGui::End();
+      ImGui::PopStyleColor(2);
+      ImGui::PopStyleVar(3);
+    }
   }
 
   void EdShell::CarryPanelPlaces()
