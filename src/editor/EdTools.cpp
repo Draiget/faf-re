@@ -443,6 +443,38 @@ namespace faf::editor
     return true;
   }
 
+  void EdTools::DrawShapePicker()
+  {
+    const float half = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) * 0.5f;
+    ImGui::SetNextItemWidth(half);
+    const bool image = mBrushShape == static_cast<int>(BrushShape::Image);
+    if (
+      ImGui::BeginCombo(
+        "##brushshape", image ? mShapeImageName.c_str() : BrushShapeName(static_cast<BrushShape>(mBrushShape))
+      )
+    ) {
+      for (int k = 0; k < kBrushShapeCount; ++k) {
+        if (ImGui::Selectable(BrushShapeName(static_cast<BrushShape>(k)), k == mBrushShape)) {
+          mBrushShape = k;
+        }
+      }
+      if (!mBrushImages.empty()) {
+        ImGui::Separator();
+      }
+      for (std::size_t i = 0; i < mBrushImages.size(); ++i) {
+        if (ImGui::Selectable(mBrushImages[i].name.c_str(), image && mShapeImageName == mBrushImages[i].name)) {
+          (void)ChooseShapeImage(static_cast<int>(i));
+        }
+      }
+      ImGui::EndCombo();
+    }
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(-1.0f);
+    ImGui::BeginDisabled(mBrushShape == 0);
+    ImGui::SliderFloat("##shapeangle", &mShapeAngle, -180.0f, 180.0f, "Turn %.0f deg");
+    ImGui::EndDisabled();
+  }
+
   void EdTools::DrawBrush(
     const bool withModes
   )
@@ -626,34 +658,7 @@ namespace faf::editor
       // The brush's shape: every mode that paints sample by sample (the droplet brushes keep a round brush).
       const auto mode = static_cast<HeightBrushMode>(mBrushMode);
       if (mode != HeightBrushMode::WaterErode && !IsErosionMode(mode)) {
-        const float half = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) * 0.5f;
-        ImGui::SetNextItemWidth(half);
-        const bool image = mBrushShape == static_cast<int>(BrushShape::Image);
-        if (
-          ImGui::BeginCombo(
-            "##brushshape", image ? mShapeImageName.c_str() : BrushShapeName(static_cast<BrushShape>(mBrushShape))
-          )
-        ) {
-          for (int k = 0; k < kBrushShapeCount; ++k) {
-            if (ImGui::Selectable(BrushShapeName(static_cast<BrushShape>(k)), k == mBrushShape)) {
-              mBrushShape = k;
-            }
-          }
-          if (!mBrushImages.empty()) {
-            ImGui::Separator();
-          }
-          for (std::size_t i = 0; i < mBrushImages.size(); ++i) {
-            if (ImGui::Selectable(mBrushImages[i].name.c_str(), image && mShapeImageName == mBrushImages[i].name)) {
-              (void)ChooseShapeImage(static_cast<int>(i));
-            }
-          }
-          ImGui::EndCombo();
-        }
-        ImGui::SameLine();
-        ImGui::SetNextItemWidth(-1.0f);
-        ImGui::BeginDisabled(mBrushShape == 0);
-        ImGui::SliderFloat("##shapeangle", &mShapeAngle, -180.0f, 180.0f, "Turn %.0f deg");
-        ImGui::EndDisabled();
+        DrawShapePicker();
       }
     }
     ImGui::SetNextItemWidth(-1.0f);
@@ -1347,6 +1352,37 @@ namespace faf::editor
     Segmented(kMaskModes, 3, mMaskMode);
     ImGui::Checkbox("Lower the layers above", &mLowerAbove);
     ImGui::Checkbox("Show the layer's weight", &mShowWeight);
+    {
+      const float half = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) * 0.5f;
+      float target = mMaskTarget * 100.0f;
+      ImGui::SetNextItemWidth(half);
+      if (ImGui::SliderFloat("##masktarget", &target, 5.0f, 100.0f, "Up to %.0f%%")) {
+        mMaskTarget = target / 100.0f;
+      }
+      ImGui::SameLine();
+      float scatter = mMaskScatter * 100.0f;
+      ImGui::SetNextItemWidth(-1.0f);
+      if (
+        ImGui::SliderFloat("##maskscatter", &scatter, 0.0f, 100.0f, scatter <= 0.0f ? "No scatter" : "Scatter %.0f%%")
+      ) {
+        mMaskScatter = scatter / 100.0f;
+      }
+      ImGui::SetNextItemWidth(half);
+      ImGui::SliderFloat(
+        "##maskminslope",
+        &mMaskMinSlopeDegrees,
+        0.0f,
+        60.0f,
+        mMaskMinSlopeDegrees <= 0.0f ? "Any slope" : "Steeper than %.0f deg"
+      );
+      ImGui::SameLine();
+      ImGui::Checkbox("Build up", &mMaskBuildUp);
+      Note(
+        "Paint stops at its Up to share. Without Build up, a stroke gives each texel the strongest weight any of its "
+        "dabs gave it, so going over a spot again doesn't add more. Scatter speckles the edge, the same at every copy."
+      );
+    }
+    DrawShapePicker();
     DrawBrush(false);
     DrawSymmetry(true);
     DrawLimits();

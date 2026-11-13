@@ -2083,6 +2083,11 @@ namespace faf::editor
     }
     MaskBrush brush = mTools->CurrentMaskBrush();
     brush.step = ++mMaskSteps;
+    // A new stroke: a new scatter pattern (the stroke model starts from the texels as they are, ApplyMaskBrush).
+    if (mMaskStroke.before.empty()) {
+      ++mMaskStrokes;
+    }
+    brush.scatterSeed = mMaskStrokes;
     // Stored for the map's shader (most read saturate(2m-1)): the brush works in the weight that shows.
     brush.remapped = RemappedStrata(TerrainShader());
     // A right-button stroke does the opposite: Paint erases, Erase paints.
@@ -2096,7 +2101,15 @@ namespace faf::editor
       mDocument.MaskUndo().BeforeWrite(masks.texels.data(), rect);
     }
     const std::vector<SampleRect> rects = ApplyMaskBrush(
-      masks.texels.data(), masks.width, masks.height, terrain, groundX, groundZ, brush, std::min(frameSeconds, 0.1f)
+      masks.texels.data(),
+      masks.width,
+      masks.height,
+      terrain,
+      groundX,
+      groundZ,
+      brush,
+      std::min(frameSeconds, 0.1f),
+      &mMaskStroke
     );
     if (!rects.empty()) {
       mDocument.SetModified(true);
@@ -2110,8 +2123,74 @@ namespace faf::editor
     }
   }
 
+  void EdMapScene::TestMaskStroke(
+    const int layer,
+    const float x,
+    const float z,
+    const float seconds
+  )
+  {
+    LoadMasks();
+    EdDocument::MaskGrid& masks = mDocument.Masks();
+    const moho::CHeightField* const field = mMap != nullptr ? mMap->mTerrainRes->GetHeightField() : nullptr;
+    if (mTools == nullptr || field == nullptr || masks.texels.empty()) {
+      return;
+    }
+    const std::vector<std::uint64_t> start = masks.texels;
+    MaskBrush brush = mTools->CurrentMaskBrush();
+    brush.layer = std::clamp(layer, 0, 7);
+    brush.remapped = RemappedStrata(TerrainShader());
+    brush.scatterSeed = ++mMaskStrokes;
+    const MaskTerrain terrain{field->data, field->width, field->height};
+    mDocument.MaskUndo().BeginStroke();
+    std::vector<SampleRect> all;
+    for (float done = 0.0f; done < seconds; done += 1.0f / 60.0f) {
+      brush.step = ++mMaskSteps;
+      for (const SampleRect& rect : MaskBrushRects(masks.width, masks.height, terrain, x, z, brush)) {
+        mDocument.MaskUndo().BeforeWrite(masks.texels.data(), rect);
+      }
+      const std::vector<SampleRect> rects = ApplyMaskBrush(
+        masks.texels.data(), masks.width, masks.height, terrain, x, z, brush, 1.0f / 60.0f, &mMaskStroke
+      );
+      all.insert(all.end(), rects.begin(), rects.end());
+    }
+    std::size_t changed = 0;
+    int strongest = 0;
+    for (std::size_t i = 0; i < start.size(); ++i) {
+      if (MaskByte(masks.texels[i], brush.layer) != MaskByte(start[i], brush.layer)) {
+        ++changed;
+        strongest = std::max(
+          strongest,
+          static_cast<int>(
+            MaskWeight(MaskByte(masks.texels[i], brush.layer), (brush.remapped & (1U << brush.layer)) != 0)
+          )
+        );
+      }
+    }
+    if (!all.empty()) {
+      mDocument.SetModified(true);
+      mWeightStale = true;
+      UploadMasks(all, 0xFFu);
+    }
+    EndMaskStroke();
+    gpg::Logf(
+      "editor: mask test: layer %d at %.0f,%.0f for %.1f s (target %.2f, scatter %.2f, %s): %zu texels changed, the "
+      "strongest weight %d of 255",
+      brush.layer + 1,
+      static_cast<double>(x),
+      static_cast<double>(z),
+      static_cast<double>(seconds),
+      static_cast<double>(brush.target),
+      static_cast<double>(brush.scatter),
+      brush.buildUp ? "build up" : "stroke model",
+      changed,
+      strongest
+    );
+  }
+
   void EdMapScene::EndMaskStroke()
   {
+    mMaskStroke = MaskStroke{};
     EdDocument::MaskGrid& masks = mDocument.Masks();
     if (mDocument.MaskUndo().Stroking() && !masks.texels.empty()) {
       const std::size_t before = mDocument.MaskUndo().UndoCount();

@@ -967,6 +967,15 @@ namespace faf::editor
     }
   } // namespace
 
+  float BrushWeightAt(
+    const HeightBrush& brush,
+    const float dx,
+    const float dz
+  )
+  {
+    return ShapeWeight(brush, dx, dz);
+  }
+
   const char* BrushShapeName(
     const BrushShape shape
   )

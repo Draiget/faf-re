@@ -1308,6 +1308,10 @@ namespace faf::editor
       brush.mode = static_cast<MaskBrushMode>(mMaskMode);
       brush.layer = mMaskLayer;
       brush.lowerAbove = mLowerAbove;
+      brush.target = mMaskTarget;
+      brush.scatter = mMaskScatter;
+      brush.limitMinSlope = std::tan(mMaskMinSlopeDegrees * 0.0174532925f);
+      brush.buildUp = mMaskBuildUp;
       return brush;
     }
     /** The open map's layer texture paths (lower, strata 1-8, upper), for the layer list. */
@@ -1625,6 +1629,20 @@ namespace faf::editor
       mTool = 1;
       mBrushMode = mode;
     }
+    /** Test runs (`/maskoptions <target>,<scatter>,<min slope degrees>,<build up>`). */
+    void SetMaskOptions(
+      const float target,
+      const float scatter,
+      const float minSlopeDegrees,
+      const bool buildUp
+    ) noexcept
+    {
+      mMaskTarget = std::clamp(target, 0.05f, 1.0f);
+      mMaskScatter = std::clamp(scatter, 0.0f, 1.0f);
+      mMaskMinSlopeDegrees = std::clamp(minSlopeDegrees, 0.0f, 60.0f);
+      mMaskBuildUp = buildUp;
+    }
+    void DrawShapePicker();
     /** Test runs (`/brushshape`): the height brush's shape (a BrushShape) and turn in degrees. */
     void SetBrushShape(
       const int shape,
@@ -1896,6 +1914,10 @@ namespace faf::editor
     int mMaskLayer = 0;
     int mMaskMode = 0;
     bool mLowerAbove = true;
+    float mMaskTarget = 1.0f;
+    float mMaskScatter = 0.0f;
+    float mMaskMinSlopeDegrees = 0.0f;
+    bool mMaskBuildUp = false; // FAF Studio's stroke model by default
     std::vector<std::string> mLayerNames;
     std::vector<LayerSlot> mSlots;
     int mChangedSlot = -1;

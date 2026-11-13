@@ -131,6 +131,7 @@ namespace faf::editor
         "/roundtrip",   "/vault",        "/vaultsearch",    "/vaultmap",       "/newmap",         "/stamp",
         "/brush",       "/layer",        "/waterbody",      "/ruler",          "/adaptivewindow", "/maskrule",
         "/shader",      "/brushtest",    "/brushshape",     "/stampsource",    "/stampstroke",    "/symoptions",
+        "/maskoptions", "/masktest",
       };
       for (const char* const option : kOptions) {
         if (moho::CFG_GetArgOption(option, 0, nullptr)) {
@@ -2023,6 +2024,9 @@ namespace faf::editor
       int mBrushModeArg = -1;
       bool mStampSourceDone = false;
       bool mSymOptionsDone = false;
+      bool mMaskOptionsDone = false;
+      std::string mMaskTestArg;
+      int mMaskTestFrames = 0;
       // `/masklayer <1-8>` and `/maskrule <layer>,<low>,<high>` (test runs): the Texture tool on that layer;
       // a height rule applied to the whole map once the map has been shown for 120 frames.
       int mMaskLayerArg = -1;
@@ -3902,6 +3906,9 @@ namespace faf::editor
       if (fa::vector<fa::string> layer; moho::CFG_GetArgOption("/layer", 1, &layer) && !layer.empty()) {
         mLayerArg = layer[0].c_str();
       }
+      if (fa::vector<fa::string> mask; moho::CFG_GetArgOption("/masktest", 1, &mask) && !mask.empty()) {
+        mMaskTestArg = mask[0].c_str();
+      }
       if (fa::vector<fa::string> test; moho::CFG_GetArgOption("/brushtest", 1, &test) && !test.empty()) {
         mBrushTestArg = test[0].c_str();
       }
@@ -4801,6 +4808,28 @@ namespace faf::editor
         tools.AddRule(rule);
         tools.RequestRules();
         mMaskRuleArg.clear();
+      }
+      // `/masktest <layer>,<x>,<z>[,<seconds>]` (test runs): a scripted mask stroke, once the map is shown.
+      if (!mMaskTestArg.empty() && mScene.Attached() && ++mMaskTestFrames == 130) {
+        int layer = 0;
+        float x = 0.0f;
+        float z = 0.0f;
+        float seconds = 1.0f;
+        (void)std::sscanf(mMaskTestArg.c_str(), "%d,%f,%f,%f", &layer, &x, &z, &seconds);
+        mScene.TestMaskStroke(layer - 1, x, z, seconds);
+        mMaskTestArg.clear();
+      }
+      // `/maskoptions <target>,<scatter>,<min slope degrees>,<build up>` (test runs): the mask brush's options.
+      if (!mMaskOptionsDone) {
+        mMaskOptionsDone = true;
+        if (fa::vector<fa::string> mask; moho::CFG_GetArgOption("/maskoptions", 1, &mask) && !mask.empty()) {
+          float target = 1.0f;
+          float scatter = 0.0f;
+          float slope = 0.0f;
+          int buildUp = 0;
+          (void)std::sscanf(mask[0].c_str(), "%f,%f,%f,%d", &target, &scatter, &slope, &buildUp);
+          tools.SetMaskOptions(target, scatter, slope, buildUp != 0);
+        }
       }
       // `/symoptions <part>,<combine>,<seam>,<masks>,<types>` (test runs): Make symmetric's options.
       if (!mSymOptionsDone) {

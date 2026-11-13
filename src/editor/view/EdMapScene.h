@@ -97,6 +97,8 @@ namespace faf::editor
      * changed, the ground added or taken, and the farthest change from x,z. False if nothing changed.
      */
     bool TestBrush(HeightBrushMode mode, float x, float z, float seconds, bool panelBrush = true);
+    /** Test runs (`/masktest`): the panel's mask brush on stratum `layer` (0-7) at world x,z for `seconds`, logged. */
+    void TestMaskStroke(int layer, float x, float z, float seconds);
     /**
      * Test runs: stratum 4 painted full in a square of 24 mask texels around world x,z, as the mask brush uploads it,
      * then the editor's and (in front of a play) the play's mask read back at its middle, logged.
@@ -690,6 +692,9 @@ namespace faf::editor
     std::uint32_t mWaterErodeSeed = 0;
     /** Noise: the pattern of the stroke in progress (the next stroke takes the next one). */
     std::uint32_t mNoiseSeed = 0;
+    /** The mask stroke in progress (FAF Studio's stroke model: the texels before it, their coverage). */
+    MaskStroke mMaskStroke;
+    std::uint32_t mMaskStrokes = 0;
     /** Rain and Deposit: the erosion session of the stroke in progress (made at its first step). */
     ErosionStrokePtr mErosionStroke;
     /** The camera left by the last Detach, and the map it was on (kept for that map's next Attach). */

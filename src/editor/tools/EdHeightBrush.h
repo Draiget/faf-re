@@ -120,6 +120,13 @@ namespace faf::editor
     Replace,
   };
 
+  /**
+   * The brush's weight (0..1) at offset (dx, dz) from its centre, in its own frame: the falloff for Round, else its
+   * shape turned by its angle, cut at the radius (the mask brush reads its shape through this too).
+   */
+  struct HeightBrush;
+  [[nodiscard]] float BrushWeightAt(const HeightBrush& brush, float dx, float dz);
+
   /** A shape's name for the panel. */
   [[nodiscard]] const char* BrushShapeName(BrushShape shape);
 

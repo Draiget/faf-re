@@ -37,6 +37,28 @@ namespace faf::editor
     /** The strata the map's shader reads through saturate(2m-1) (RemappedStrata): the brush works in the weight that
      * shows and stores the byte for it. */
     std::uint8_t remapped = 0;
+    /** Paint stops at this share of full weight (FAF Studio's target %); ground already above it stays. */
+    float target = 1.0f;
+    /** 0..1: the share of a texel's weight a hash takes away, for a speckled edge (the same at every copy). */
+    float scatter = 0.0f;
+    /** The scatter's pattern (one per stroke). */
+    std::uint32_t scatterSeed = 0;
+    /** Paints only where the ground is at least this steep (rise over run; 0: anywhere). */
+    float limitMinSlope = 0.0f;
+    /**
+     * Build up (the default): a still brush keeps adding. Off, with a MaskStroke: each texel's coverage is the
+     * strongest weight times strength any step of the stroke gave it, and the texel is what it was before the stroke
+     * blended towards the target (Paint) or nothing (Erase) by that coverage, so dabs don't pile up and the edge keeps
+     * the brush's profile (FAF Studio's stroke model).
+     */
+    bool buildUp = true;
+  };
+
+  /** One stroke's texels as they were before it and their coverage so far (MaskBrush::buildUp off). */
+  struct MaskStroke
+  {
+    std::vector<std::uint64_t> before;
+    std::vector<float> coverage;
   };
 
   /**
@@ -148,7 +170,8 @@ namespace faf::editor
     float x,
     float z,
     const MaskBrush& brush,
-    float seconds
+    float seconds,
+    MaskStroke* stroke = nullptr
   );
 
   /** A rule for the whole map: the layer's weight full where the ground is in the height and slope range, else

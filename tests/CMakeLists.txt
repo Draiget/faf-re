@@ -388,7 +388,7 @@ add_test(NAME editor_field COMMAND faf_editor_field_tests)
 # byte-exact undo, height images read back as written.
 add_executable(faf_editor_brush_tests EXCLUDE_FROM_ALL editor/HeightBrushTests.cpp editor/HeightHistoryTests.cpp editor/SymmetryCheckTests.cpp editor/HeightFileTests.cpp
   editor/NewMapTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdNewMap.cpp
-  editor/MaskBrushTests.cpp editor/MaskEncodingTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdMaskBrush.cpp
+  editor/MaskBrushTests.cpp editor/MaskEncodingTests.cpp editor/MaskBrushOptionsTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdMaskBrush.cpp
   editor/BrushLibraryTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdBrushLibrary.cpp
   editor/SymmetrizeTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdSymmetrize.cpp ${CMAKE_SOURCE_DIR}/src/editor/terrain/EdFieldSc.cpp
   editor/SaveFileTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdSaveFile.cpp
