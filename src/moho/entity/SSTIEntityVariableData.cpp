@@ -20,6 +20,7 @@
 #include "moho/command/SSTITarget.h"
 #include "moho/entity/Entity.h"
 #include "moho/entity/EntityId.h"
+#include "moho/sim/FafGameVersion.h"
 #include "moho/resource/blueprints/RMeshBlueprint.h"
 #include "moho/resource/RScmResource.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
@@ -545,6 +546,23 @@ namespace moho
     return destination;
   }
 
+  namespace
+  {
+    /// The first FAF game version whose exe carries FA-Binary-Patches #134 (the alt-footprint flags as an int).
+    constexpr int kFafGameVersionFootprintWord = 3840;
+
+    /**
+     * Whether the alt-footprint flags go into the archive as an int (FA-Binary-Patches #134) rather than the one bool
+     * byte the 3835 exe reads and writes (0x00559DAE / 0x0055A11D, vtable slot 0x38): sessions of game version 3840
+     * and later, and keyframes, which only this build reads back.
+     */
+    [[nodiscard]] bool UsesFootprintWord()
+    {
+      return gSimExactArchive.load(std::memory_order_relaxed) ||
+        FAF_GetSessionGameVersion() >= kFafGameVersionFootprintWord;
+    }
+  } // namespace
+
   /**
    * Address: 0x00559B00 (FUN_00559B00, Moho::SSTIEntityVariableData::MemberDeserialize)
    *
@@ -611,17 +629,24 @@ namespace moho
     GPG_ASSERT(layerType != nullptr);
     archive->Read(layerType, &mLayerMask, ownerRef);
 
-    // FAF FA-Binary-Patches #134 (Serialize add patched entity var dat fields):
-    // the footprint flags are one `int` (0x00559DAE `ReadBool` -> `ReadInt`),
-    // read over the whole 0xA4..0xA7 word -- the alt-footprint byte, FAF's
-    // forced-alt-footprint byte and the two pad bytes, low byte first.
-    int footprintFlags = 0;
-    archive->ReadInt(&footprintFlags);
-    const auto footprintWord = static_cast<std::uint32_t>(footprintFlags);
-    mUsingAltFootprint = static_cast<std::uint8_t>(footprintWord);
-    mUsingAltFootprintSecondary = static_cast<std::uint8_t>(footprintWord >> 8);
-    pad_00A6_00A7[0] = static_cast<std::uint8_t>(footprintWord >> 16);
-    pad_00A6_00A7[1] = static_cast<std::uint8_t>(footprintWord >> 24);
+    if (UsesFootprintWord()) {
+      // FAF FA-Binary-Patches #134 (Serialize add patched entity var dat fields, game version 3840):
+      // the footprint flags are one `int` (0x00559DAE `ReadBool` -> `ReadInt`),
+      // read over the whole 0xA4..0xA7 word -- the alt-footprint byte, FAF's
+      // forced-alt-footprint byte and the two pad bytes, low byte first.
+      int footprintFlags = 0;
+      archive->ReadInt(&footprintFlags);
+      const auto footprintWord = static_cast<std::uint32_t>(footprintFlags);
+      mUsingAltFootprint = static_cast<std::uint8_t>(footprintWord);
+      mUsingAltFootprintSecondary = static_cast<std::uint8_t>(footprintWord >> 8);
+      pad_00A6_00A7[0] = static_cast<std::uint8_t>(footprintWord >> 16);
+      pad_00A6_00A7[1] = static_cast<std::uint8_t>(footprintWord >> 24);
+    } else {
+      // Game version 3835: the alt-footprint byte alone, as a bool (0x00559DAE).
+      bool usingAltFootprint = false;
+      archive->ReadBool(&usingAltFootprint);
+      mUsingAltFootprint = usingAltFootprint ? 1u : 0u;
+    }
 
     gpg::RType* const attributesType = ResolveEntityAttributesType();
     GPG_ASSERT(attributesType != nullptr);
@@ -701,15 +726,18 @@ namespace moho
     GPG_ASSERT(layerType != nullptr);
     archive->Write(layerType, &mLayerMask, ownerRef);
 
-    // FAF FA-Binary-Patches #134 (Serialize add patched entity var dat fields):
+    // FAF FA-Binary-Patches #134 (Serialize add patched entity var dat fields, game version 3840):
     // written with `WriteInt` (0x0055A11D) instead of `WriteBool`. The patch
     // only swapped the call, so the value is still the zero-extended
     // alt-footprint byte (`movzx ecx, byte ptr [edi+0A4h]`).
     if (gSimExactArchive.load(std::memory_order_relaxed)) {
       // Engine addition (replay keyframes): the second byte too; the patched save above loses it.
       archive->WriteInt(static_cast<int>(mUsingAltFootprint) | (static_cast<int>(mUsingAltFootprintSecondary) << 8));
-    } else {
+    } else if (UsesFootprintWord()) {
       archive->WriteInt(static_cast<int>(mUsingAltFootprint));
+    } else {
+      // Game version 3835: one bool byte, as that exe writes it (0x0055A11D, `WriteBool`).
+      archive->WriteBool(mUsingAltFootprint != 0u);
     }
 
     gpg::RType* const attributesType = ResolveEntityAttributesType();
