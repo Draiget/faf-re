@@ -1455,9 +1455,20 @@ float4 SimCopyPS(float4 position : SV_Position) : SV_Target
             body = water.body;
           }
           );
-          dist = ComputeShoreDistanceDomains(rawAt, [&table](const std::uint32_t x, const std::uint32_t z) {
+          // a river's level is not one number (its surface slopes): its domain is compared with the level of each
+          // sample's own block, the table's (docs/projects/RIVERS.md); a flat water is computed as ever
+          std::vector<std::uint8_t> sloped;
+          if (map->mWaterBodies->HasRivers()) {
+            sloped.assign(256U, 0U);
+            for (std::size_t body = 1; body <= map->mWaterBodies->BodyCount() && body < sloped.size(); ++body) {
+              sloped[body] = map->mWaterBodies->IsRiver(static_cast<std::uint8_t>(body)) ? 1U : 0U;
+            }
+          }
+          dist = ComputeShoreDistanceDomainsSloped(rawAt, [&table](const std::uint32_t x, const std::uint32_t z) {
             return static_cast<std::uint32_t>(table.domain[BlockOfSample(table, x, z)]);
-          }, DomainLevels(table), hw, hh, windAngle);
+          }, DomainLevels(table), sloped, [&table](const std::uint32_t x, const std::uint32_t z) {
+            return table.levelRaw[BlockOfSample(table, x, z)];
+          }, hw, hh, windAngle);
           dist.insert(dist.end(), table.levelRaw.begin(), table.levelRaw.end());
           dist.insert(dist.end(), table.domain.begin(), table.domain.end());
           blocksX = table.blocksX;
@@ -2067,6 +2078,22 @@ float4 SimCopyPS(float4 position : SV_Position) : SV_Target
     s.vars.gridWindow.mEffectVariable->SetVector(window);
     s.vars.owner.GetTexture(owner);
     return true;
+  }
+
+  void BindWaterGridLevelOff()
+  {
+    State& s = GetState();
+    const float off[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+    const float full[4] = {0.0f, 0.0f, 1.0f, 1.0f};
+    if (s.vars.gridParams.Exists()) {
+      s.vars.gridParams.mEffectVariable->SetVector(off);
+    }
+    if (s.vars.levelParams.Exists()) {
+      s.vars.levelParams.mEffectVariable->SetVector(off);
+    }
+    if (s.vars.gridWindow.Exists()) {
+      s.vars.gridWindow.mEffectVariable->SetVector(full);
+    }
   }
 
   void EndWaterGridLevels()

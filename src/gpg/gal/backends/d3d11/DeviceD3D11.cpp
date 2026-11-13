@@ -1993,11 +1993,21 @@ namespace gpg::gal
     if (directory == nullptr || directory[0] == 0 || mHeadOutputContexts.empty()) {
       return;
     }
+    // FAF_GAL_DUMP_MS (diagnostics): an interval in milliseconds, which also numbers the files 0, 1, 2, ... instead of
+    // by the second.
+    static const long intervalMs = [] {
+      const char* const milliseconds = std::getenv("FAF_GAL_DUMP_MS");
+      return (milliseconds != nullptr) ? std::strtol(milliseconds, nullptr, 10) : 0L;
+    }();
     static const DWORD interval = [] {
+      if (intervalMs > 0L) {
+        return static_cast<DWORD>(intervalMs);
+      }
       const char* const seconds = std::getenv("FAF_GAL_DUMP_SECONDS");
       const long value = (seconds != nullptr) ? std::strtol(seconds, nullptr, 10) : 10L;
       return static_cast<DWORD>((value > 0L) ? value * 1000L : 10000L);
     }();
+    static unsigned long dumpIndex = 0UL;
     const DWORD now = ::GetTickCount();
     if (mLastDumpTick != 0U && now - mLastDumpTick < interval) {
       return;
@@ -2009,7 +2019,11 @@ namespace gpg::gal
 
     char path[MAX_PATH]{};
     std::snprintf(
-      path, sizeof(path), "%s/d3d11_%06lu.bmp", directory, static_cast<unsigned long>((now - mFirstDumpTick) / 1000U)
+      path,
+      sizeof(path),
+      "%s/d3d11_%06lu.bmp",
+      directory,
+      (intervalMs > 0L) ? dumpIndex++ : static_cast<unsigned long>((now - mFirstDumpTick) / 1000U)
     );
     auto* const target = static_cast<RenderTargetD3D11*>(mHeadOutputContexts.front().surface.get());
     DumpTexture(target->GetTexture(), path);

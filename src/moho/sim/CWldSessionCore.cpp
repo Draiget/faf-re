@@ -9,6 +9,7 @@
 #include "moho/render/DynamicLights.h"
 #include "moho/render/lights/LightFeeds.h"
 #include "moho/render/WRenViewport.h"
+#include "moho/terrain/water/Waterfall.h"
 
 namespace moho
 {
@@ -1759,6 +1760,9 @@ namespace moho
 
     if (worldCamera != nullptr) {
       terrainRes->UpdateWaveSystem(worldCamera->CameraGetView(), worldCamera->CameraGetTargetZoom(), mGameTick);
+      // Engine addition (docs/projects/RIVERS.md): the curtains of the waterfalls in view, added after the renderer
+      // cleared its beams for this beat; a beat in which the game did not advance (a pause) keeps the last ones.
+      water::falls::OnBeat(worldCamera->CameraGetView(), beat.mAdvanced);
     }
 
     // Engine addition: all of the beat's map changes in one call, the same as `NotifyMapChange` for

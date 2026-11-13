@@ -19,6 +19,7 @@
 #include "moho/render/d3d/CD3DVertexSheet.h"
 #include "moho/sim/CWldMap.h"
 #include "moho/sim/STIMap.h"
+#include "moho/terrain/water/RiverFlow.h"
 #include "moho/terrain/water/ShoreCell.h"
 #include "moho/terrain/water/WaterBodySurfaces.h"
 #include "moho/terrain/water/WaterSurface.h"
@@ -636,7 +637,8 @@ namespace
     const float height00,
     const float height10,
     const float height01,
-    const float height11
+    const float height11,
+    const float drawElevation
   )
   {
     const ShoreCorner3 corner00{baseX, height00, baseZ};
@@ -657,7 +659,8 @@ namespace
     }
 
     (void)terrainResource;
-    InitializeShoreCellSpatialEntry(*cell, shoreline.mSpatialDb, waterElevation);
+    // (the level the cell is drawn at, which is the level it is cut at except for a river's: see `Generate`)
+    InitializeShoreCellSpatialEntry(*cell, shoreline.mSpatialDb, drawElevation);
     AppendShoreCellRef(shoreline.mCells, cell);
   }
 
@@ -827,10 +830,18 @@ namespace moho
       for (std::int32_t x = 0; x < width; x += 2) {
         for (std::int32_t z = 0; z < height; z += 2) {
           // Engine addition (water bodies): each block's shore is cut at its own water's level.
-          const float waterElevation = map->HasWaterBodies() ? WaterOfBlock(*map, x, z).level : seaElevation;
+          const SWaterOfBlock block = map->HasWaterBodies() ? WaterOfBlock(*map, x, z) : SWaterOfBlock{};
+          const float waterElevation = map->HasWaterBodies() ? block.level : seaElevation;
           if (waterElevation == kNoWaterElevation) {
             continue;
           }
+          // A river's surface slopes, and the cells are drawn grouped by level, one draw each: a river block's cut is
+          // drawn at its level rounded to an eighth of a unit (the cut itself is made at the exact level), a few
+          // dozen draws along a river instead of one per block.
+          const float drawElevation =
+            map->HasWaterBodies() && block.body != 0u && map->mWaterBodies->IsRiver(block.body)
+            ? water::RiverShoreLevel(waterElevation)
+            : waterElevation;
           const float height00 = ReadHeightSampleMeters(heightField, x, z);
           const float height10 = ReadHeightSampleMeters(heightField, x + 2, z);
           const float height01 = ReadHeightSampleMeters(heightField, x, z + 2);
@@ -874,7 +885,8 @@ namespace moho
               height00,
               height10,
               height01,
-              height11
+              height11,
+              drawElevation
             );
           }
         }

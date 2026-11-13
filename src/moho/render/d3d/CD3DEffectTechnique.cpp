@@ -38,6 +38,10 @@
 #include "moho/particles/ParticleLowRes.h"
 #include "moho/render/d3d/CD3DDevice.h"
 #include "moho/render/ID3DTextureSheet.h"
+#include "moho/terrain/water/RiverFlow.h"
+#include "moho/terrain/water/RiverFlowBind.h"
+#include "moho/terrain/water/WaterBanks.h"
+#include "moho/terrain/water/WaterBanksBind.h"
 #include "moho/terrain/water/TerrainWaterLevelPatch.h"
 #include "moho/terrain/water/TerrainWaterLevels.h"
 #include "moho/terrain/water/WaterEffectPatch.h"
@@ -1840,7 +1844,13 @@ technique EditorMeshFill
         const bool wantsLit =
           CFG_GetArgOption("/dynlights", 0U, nullptr) || lights::LightsWanted(deviceContext->mDeviceType);
         const bool wantsReflect = water::ReflectionPatchWanted(deviceContext->mDeviceType);
-        if (wantsSim || wantsFilter || wantsLit || wantsReflect) {
+        // Rivers (docs/projects/RIVERS.md): the vertex shaders keep a river mesh's heights, the pixel shader scrolls
+        // the normals along the flow of a river. A no-op while no river is on the map (a branch on a constant).
+        const bool wantsRivers = water::RiverPatchWanted();
+        // Banks (docs/WATER_SIMULATION.md): the cut-out mask of a lake or a river is the depth test alone. A no-op at
+        // run time while no body's mask is drawn (a branch on a constant).
+        const bool wantsBanks = water::BankPatchWanted();
+        if (wantsSim || wantsFilter || wantsLit || wantsReflect || wantsRivers || wantsBanks) {
           const gpg::MemBuffer<char> unpatchedBuffer = mergedBuffer;
           std::string text(effectSourceBuffer.GetPtr(0U, 0U), effectByteCount);
           std::string tags;
@@ -1866,6 +1876,28 @@ technique EditorMeshFill
               gpg::Warnf(
                 "Water: %s not patched with the wave simulation: %s", effectBaseName.c_str(), patch.error.c_str()
               );
+            }
+          }
+          if (wantsRivers) {
+            std::string rivered = text;
+            const water::RiverPatchResult patch = water::PatchWaterRivers(rivered);
+            if (patch.patched) {
+              text = std::move(rivered);
+              tags += ".waterriv1";
+              gpg::Logf("Water: %s patched, the rivers slope and flow", effectBaseName.c_str());
+            } else {
+              gpg::Warnf("Water: %s not patched for rivers: %s", effectBaseName.c_str(), patch.error.c_str());
+            }
+          }
+          if (wantsBanks) {
+            std::string banked = text;
+            const water::BankPatchResult patch = water::PatchWaterBanks(banked);
+            if (patch.patched) {
+              text = std::move(banked);
+              tags += ".waterbank1";
+              gpg::Logf("Water: %s patched, the banks of lakes and rivers are cut per pixel", effectBaseName.c_str());
+            } else {
+              gpg::Warnf("Water: %s not patched for the banks: %s", effectBaseName.c_str(), patch.error.c_str());
             }
           }
           if (wantsFilter) {

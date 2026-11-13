@@ -118,6 +118,10 @@ namespace moho::water
   BindWaterGridLevel(const GeomCamera3& camera, const GridLevel& level, const std::shared_ptr<ID3DTextureSheet>& owner);
   void EndWaterGridLevels();
 
+  // Switches the projected grid off for the draw that follows (a river's mesh, which keeps its own heights): the grid
+  // of the water drawn before it leaves its variables on.
+  void BindWaterGridLevelOff();
+
   // Source patch of water2.fx: declares the variables and lets the ripples bend the normal and raise the wave crest.
   // Text in, text out.
   struct SimPatchResult
