@@ -327,10 +327,10 @@ namespace moho
    * Empties one `shared_ptr<CD3DDynamicTextureSheet>` lane in place and drops
    * one strong owner reference from the detached control block.
    *
-   * Byte-identical to `ResetSharedBatchTextureHandle` above (both hash to
-   * 597fd943...); the two remain distinct functions because they are distinct
-   * template instantiations, and the caller picks them per lane - +0x44 for
-   * the batch texture, +0x3C for the sheet.
+   * Byte-identical to the batch-texture reset above (both hash to
+   * 597fd943...); the binary keeps two functions because they are distinct
+   * template instantiations, one per lane - +0x44 for the batch texture,
+   * +0x3C for the sheet. Both are `handle.reset()` here.
    *
    * Callers call `handle.reset()`.
    */

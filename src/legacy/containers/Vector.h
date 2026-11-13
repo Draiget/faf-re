@@ -7071,8 +7071,8 @@ namespace fa
      * overload above -> this method with `count=1`) for
      * `moho::CBuildDragPreview::mMeshes`
      * (UiRuntimeTypes.h:890) -- confirmed directly from
-     * `PushBackMeshInstanceSharedPtrVector`'s (FUN_00855040,
-     * UiRuntimeTypes.cpp, already recovered) own raw decompile, which
+     * the `push_back` emission FUN_00855040 (written as a plain
+     * `mMeshes.push_back` in CUIWorldViewEvents.cpp), whose raw decompile
      * tail-calls `sub_855DF0((int)a2, a2[2], 1u, a1)` on its
      * capacity-full path.)
      *

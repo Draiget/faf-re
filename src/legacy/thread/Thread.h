@@ -40,9 +40,13 @@ namespace fa
     thread& operator=(const thread&) = delete;
 
     /**
-     * Waits for the thread to finish. Like boost's, it never throws: called on the thread itself, where
-     * `std::thread::join` would throw `resource_deadlock_would_occur`, it detaches instead, so the thread
-     * runs on as it does when its object is destroyed.
+     * Address: 0x00AC27B0 (FUN_00AC27B0, boost::thread::join)
+     *
+     * Waits for the thread to finish. boost's never throws: it waits on the handle with no timeout
+     * (0x00AC27B8), closes it (0x00AC27C1) and clears the joinable byte (0x00AC27C7). Called on the thread
+     * itself, that wait never returns; here, where `std::thread::join` would throw
+     * `resource_deadlock_would_occur`, it detaches instead, so the thread runs on as it does when its object
+     * is destroyed.
      */
     void join() noexcept
     {

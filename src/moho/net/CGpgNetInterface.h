@@ -510,9 +510,9 @@ namespace moho
 
   // FUN_007BB4E0 (boost::weak_ptr<INetNATTraversalHandler>(const shared_ptr&))
   // and FUN_007BC5C0 (the CGpgNetInterface->INetNATTraversalProvider aliasing
-  // form) are both instantiations of the generic `boost::AssignWeakFromShared`
-  // template -- see BoostWrappers.h for the shared per-T binding and both
-  // addresses' citations.
+  // form) are both instantiations of weak_ptr's converting constructor from
+  // shared_ptr, written here as a plain weak_ptr assignment; both addresses
+  // are cited in gpg/core/utils/SharedPtrUtils.h.
 
   /**
    * Address: 0x007BC5F0 (FUN_007BC5F0, Moho::NET_MakeNATTraversal)

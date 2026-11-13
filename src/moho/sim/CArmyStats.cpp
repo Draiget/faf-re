@@ -1228,9 +1228,7 @@ namespace moho
       return;
     }
 
-    // Route the per-T raw-pointer ctor through the canonical helper
-    // (FUN_007134C0) so the MSVC8 `shared_ptr<STrigger>(STrigger*)`
-    // template emission symbol is preserved.
+    // The binary's `shared_ptr<STrigger>(STrigger*)` emission (FUN_007134C0).
     std::shared_ptr<STrigger> created;
     created.reset(new STrigger());
     created->mName = triggerName ? triggerName : "";

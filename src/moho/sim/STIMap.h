@@ -164,7 +164,7 @@ namespace moho
      * second time, fused with a trailing `operator delete(this)`, as
      * `boost::detail::sp_counted_impl_p<Moho::CHeightField>::dispose`'s
      * callee at 0x00579250 (`FUN_00579250`). That control block is the real
-     * vendored one, constructed by `CreateBoostPtrCHeightField` (STIMap.cpp,
+     * vendored one, constructed by `func_CreateBoostPtrCHeightField` (0x005790E0,
      * `out = boost::shared_ptr<moho::CHeightField>(field)`) -- its
      * `dispose()` reaches this destructor via `delete countedImpl->px`.
      */

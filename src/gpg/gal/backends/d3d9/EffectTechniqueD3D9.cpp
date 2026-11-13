@@ -33,8 +33,8 @@ namespace gpg::gal
 
     /**
      * The lock-and-check every `EffectTechniqueD3D9` entry point opens
-     * with: the out-of-line `weak_ptr<EffectD3D9>::lock` emission (cited on
-     * `boost::LockWeak`), then "attempt to use invalid effect" from the
+     * with: the out-of-line `weak_ptr<EffectD3D9>::lock` emission (0x008F3950,
+     * cited in gpg/core/utils/SharedPtrUtils.h), then "attempt to use invalid effect" from the
      * caller's line when the effect is gone.
      */
     std::shared_ptr<EffectD3D9> LockEffectOrThrow(

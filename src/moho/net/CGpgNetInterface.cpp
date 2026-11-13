@@ -894,10 +894,9 @@ bool CGpgNetInterface::Shutdown()
  *
  * What it does:
  * Updates weak NAT handler pointer used by SendNatPacket command path.
- * The weak/shared interconversion is routed through the generic per-T
- * template `boost::AssignWeakFromShared` (BoostWrappers.h, cited there
- * for this instantiation as FUN_007BB4E0) so the MSVC8 per-T template
- * emission symbol shape is preserved across the assignment.
+ * The binary's `weak_ptr<INetNATTraversalHandler>` from `shared_ptr`
+ * construction (FUN_007BB4E0, cited in gpg/core/utils/SharedPtrUtils.h)
+ * is the plain weak_ptr assignment here.
  */
 void CGpgNetInterface::SetTraversalHandler(
   const int port,

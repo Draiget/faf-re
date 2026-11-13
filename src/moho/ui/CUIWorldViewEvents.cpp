@@ -411,10 +411,9 @@ std::shared_ptr<moho::MeshInstance> moho::CBuildDragPreview::CreateBuildPreviewM
  *
  * What it does:
  * Creates one `UnitPlace` build-preview mesh instance for a unit blueprint and
- * appends it to the preview mesh/blueprint caches. The shared-ptr mesh
- * push is routed through the per-T named helper
- * `PushBackMeshInstanceSharedPtrVector` (FUN_00855040) to preserve the
- * MSVC8 `vector<shared_ptr<MeshInstance>>::push_back` symbol shape.
+ * appends it to the preview mesh/blueprint caches. The mesh push is the
+ * binary's `vector<shared_ptr<MeshInstance>>::push_back` emission
+ * (FUN_00855040), a plain `push_back` here.
  */
 void moho::CBuildDragPreview::AppendBuildPreviewMesh(
   moho::RUnitBlueprint* const blueprint

@@ -1644,7 +1644,7 @@ void moho::WRenViewport::D3DWindowOnDeviceRender()
  *   `_InterlockedExchangeAdd` refcount bookkeeping and a `dtr_sp_counted_base`
  *   virtual call on the camera pointer. Both are decompiler artifacts: the
  *   shared_count calls are boost's own `shared_ptr<TerrainCommon>` machinery
- *   (mirrored below through `AssignSharedTerrainFromRaw`, exactly as
+ *   (written below as `mTerrain.reset(...)`, exactly as
  *   `WRenViewport::AddWorldView` already uses it for the identical
  *   `IRenTerrain::Create()` + `Create(terrainRes)` pair), and
  *   `dtr_sp_counted_base(camera, 1)` is CameraImpl's own scalar-deleting
