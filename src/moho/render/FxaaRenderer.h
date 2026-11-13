@@ -14,10 +14,9 @@ namespace moho
   extern int ren_Fxaa;
 
   /**
-   * Engine addition (`ren_Fxaa`): FXAA over the finished world views on Direct3D 12 and Vulkan,
-   * which have no multisampled back buffer and so ignored the Anti-Aliasing option until now. On by
-   * default (1), off at 0; Options > Video > Anti-aliasing (FXAA) sets it. Direct3D 9 and 11 keep
-   * their own anti-aliasing and the original look.
+   * Engine addition (`ren_Fxaa`): anti-aliasing of the finished world views on Direct3D 11, 12 and Vulkan, which have
+   * no multisampled back buffer and so ignored the Anti-Aliasing option until now. 0 off, 1 FXAA (this class, on by
+   * default), 2 SMAA 1x (SmaaRenderer); Options > Video > Anti-aliasing sets it.
    */
   class FxaaRenderer
   {

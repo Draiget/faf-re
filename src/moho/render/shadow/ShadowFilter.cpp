@@ -103,6 +103,7 @@ namespace moho::shadowfilter
       using render::Api;
       render::Feature feature;
       feature.key = "shadow_filter";
+      feature.after = "dynlights_quality"; // Options > Video lists the render features in this order
       feature.title = "Shadow Filtering";
       feature.tip = "Soft, filtered shadows: a larger shadow map, a rotated-disk filter instead of the 5-tap lookup, "
                     "and from High on shadows that soften "

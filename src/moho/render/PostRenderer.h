@@ -18,9 +18,8 @@ namespace moho
 
   /**
    * Engine addition (`ren_Sharpen`, `ren_Grade`): contrast-adaptive sharpening and a mild colour
-   * grade over the finished world views on Direct3D 12 and Vulkan, after FXAA and before the
-   * interface, in one pass. On by default; Options > Video > Sharpening and Colour grading set them.
-   * Direct3D 9 and 11 keep the original look.
+   * grade over the finished world views on Direct3D 11, 12 and Vulkan, after the anti-aliasing and before
+   * the interface, in one pass. On by default; Options > Video > Sharpening and Colour grading set them.
    */
   class PostRenderer
   {
