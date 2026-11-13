@@ -221,6 +221,7 @@ namespace gpg::gal
           : nullptr;
       }
       for (std::uint32_t index = 0U; index < kGpuMaxTextures; ++index) {
+        // A texture wins; a colour target (not bound for drawing) fills the slot a texture leaves empty.
         ID3D11ShaderResourceView* view = nullptr;
         if (bindings.textures[index] != nullptr) {
           view = static_cast<TextureD3D11*>(bindings.textures[index])->GetShaderResourceView();

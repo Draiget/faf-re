@@ -25,6 +25,7 @@
 #include "D3D11VertexLayouts.h"
 #include "EffectD3D11.h"
 #include "EffectSourceD3D11.h"
+#include "gpg/gal/effects/EffectDescription.h"
 #include "RenderTargetD3D11.h"
 #include "TextureD3D11.h"
 
@@ -979,7 +980,48 @@ namespace gpg::gal
     const std::size_t sourceBytes = static_cast<std::size_t>(context.mSourceBuffer.mEnd - context.mSourceBuffer.mBegin);
     ComPtr<ID3DX11Effect> effect =
       CompileEffect(sourceData, sourceBytes, context.mSourcePath.c_str(), defines.data(), context.mCachePath.c_str());
-    return std::shared_ptr<Effect>(new EffectD3D11(context, effect.Get()));
+    return std::shared_ptr<Effect>(new EffectD3D11(
+      context, effect.Get(), SamplerTextures(sourceData, sourceBytes, context.mSourcePath.c_str(), defines.data())
+    ));
+  }
+
+  // Which texture parameter each sampler of the effect reads, from the effect source preprocessed, translated and
+  // parsed the way the Direct3D 12 and Vulkan runtimes do (anisotropic filtering leaves lookup tables alone, which only
+  // the texture's name says). Empty when any step fails.
+  std::vector<std::pair<std::string, std::string>> DeviceD3D11::SamplerTextures(
+    const char* const source,
+    const std::size_t sourceBytes,
+    const char* const sourceName,
+    const D3D_SHADER_MACRO* const defines
+  )
+  {
+    std::vector<std::pair<std::string, std::string>> links;
+    if (sourceName == nullptr || sourceName[0] == '\0') {
+      return links;
+    }
+    try {
+      ComPtr<ID3DBlob> preprocessed;
+      ComPtr<ID3DBlob> errors;
+      if (FAILED(::D3DPreprocess(source, sourceBytes, sourceName, defines, nullptr, &preprocessed, &errors))) {
+        return links;
+      }
+      const d3d11::TranslatedEffectSource translated = d3d11::TranslateEffectSource(
+        std::string_view(
+          static_cast<const char*>(preprocessed->GetBufferPointer()), preprocessed->GetBufferSize() - 1U
+        ),
+        mFeatureLevel >= D3D_FEATURE_LEVEL_10_1,
+        std::string_view(source, sourceBytes)
+      );
+      const effects::EffectDescription description = effects::ParseEffect(translated.source);
+      for (const effects::SamplerDesc& sampler : description.samplers) {
+        if (!sampler.name.empty() && !sampler.texture.empty()) {
+          links.emplace_back(sampler.name, sampler.texture);
+        }
+      }
+    } catch (...) {
+      links.clear();
+    }
+    return links;
   }
 
   std::shared_ptr<Texture> DeviceD3D11::CreateTexture(

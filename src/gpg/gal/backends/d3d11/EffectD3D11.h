@@ -5,6 +5,10 @@
 // Effects 11 (FX11) runtime.
 
 #include <cstdint>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
 
 #include <d3d11.h>
 #include <d3dx11effect.h>
@@ -20,10 +24,40 @@
 
 namespace gpg::gal
 {
+  /**
+   * The sampler variables of one effect that take anisotropic filtering (`ren_TextureAnisotropy`,
+   * effects/TextureFiltering.h). Effects 11 lets a sampler variable take a state object of the caller's (`SetSampler`)
+   * and give it back
+   * (`UndoSetSampler`), so the effect's own sampler states are swapped for anisotropic copies and back without touching
+   * the source. Which samplers qualify is decided on their authored state and the texture they read, by the same rule
+   * the Direct3D 12 and Vulkan backends use.
+   */
+  struct EffectSamplersD3D11
+  {
+    struct Entry
+    {
+      std::string name;
+      ID3DX11EffectSamplerVariable* variable = nullptr; // owned by the effect
+      std::vector<D3D11_SAMPLER_DESC> authored;         // the effect's own state per array element
+    };
+    std::vector<Entry> samplers;
+    Microsoft::WRL::ComPtr<ID3D11Device> device;
+    int applied = 1; // effects::gTextureAnisotropy the samplers were last set for (1: as authored)
+
+    /** `samplerTextures`: (sampler name, texture parameter name) pairs from the effect source. */
+    void Collect(ID3DX11Effect* effect, const std::vector<std::pair<std::string, std::string>>& samplerTextures);
+    /** Re-applies every collected sampler when the switch changed since the last call. Cheap otherwise. */
+    void Sync();
+  };
+
   class EffectD3D11 final : public Effect
   {
   public:
-    EffectD3D11(const EffectContext& context, ID3DX11Effect* effect);
+    EffectD3D11(
+      const EffectContext& context,
+      ID3DX11Effect* effect,
+      const std::vector<std::pair<std::string, std::string>>& samplerTextures = {}
+    );
     ~EffectD3D11() override;
 
     EffectContext* GetContext() override;
@@ -37,12 +71,18 @@ namespace gpg::gal
   private:
     EffectContext mContext;
     Microsoft::WRL::ComPtr<ID3DX11Effect> mEffect;
+    std::shared_ptr<EffectSamplersD3D11> mSamplers;
   };
 
   class EffectTechniqueD3D11 final : public EffectTechnique
   {
   public:
-    EffectTechniqueD3D11(const char* name, ID3DX11Effect* effect, ID3DX11EffectTechnique* technique);
+    EffectTechniqueD3D11(
+      const char* name,
+      ID3DX11Effect* effect,
+      ID3DX11EffectTechnique* technique,
+      std::shared_ptr<EffectSamplersD3D11> samplers = nullptr
+    );
     ~EffectTechniqueD3D11() override;
 
     fa::string* GetName() override;
@@ -60,6 +100,7 @@ namespace gpg::gal
     Microsoft::WRL::ComPtr<ID3DX11Effect> mEffect;        // keeps the technique alive
     ID3DX11EffectTechnique* mTechnique = nullptr;         // owned by the effect
     ID3DX11EffectVectorVariable* mViewportSize = nullptr; // faf_ViewportSize, when the effect has it
+    std::shared_ptr<EffectSamplersD3D11> mSamplers;
     bool mBegun = false;
   };
 
