@@ -2580,7 +2580,8 @@ namespace faf::editor
       void SetUpWindowChrome(HWND frame);
       void UpdateTitle();
       void RenderPanels();
-      void FitGameView();
+      /** True when it re-made the device's heads (the view changed size): the frame's panels aren't drawn then. */
+      bool FitGameView();
       void ReadOpenCommandLine();
       void DriveOpens();
 
@@ -4595,8 +4596,11 @@ namespace faf::editor
         {
           const gpg::gal::RenderProfileScope profilePanels("EdPanelsRender");
           ImGui::Render();
-          FitGameView();
-          RenderPanels();
+          // A frame whose heads were re-made isn't drawn: its draw lists hold the view's and the minimap's copies,
+          // which the re-made context freed.
+          if (!FitGameView()) {
+            RenderPanels();
+          }
         }
       }
 
@@ -8004,13 +8008,13 @@ namespace faf::editor
       mScene.SetMiniMapCached(tools.MinimapImage() != 0);
     }
 
-    void EditorApp::FitGameView()
+    bool EditorApp::FitGameView()
     {
       const HWND frame = HandleOf(mGame.supcomFrame);
       const HWND view = HandleOf(moho::ren_Viewport);
       moho::CD3DDevice* const d3d = moho::D3D_GetDevice();
       if (frame == nullptr || view == nullptr || d3d == nullptr || ::IsIconic(frame) != FALSE) {
-        return;
+        return false;
       }
       RECT client{};
       ::GetClientRect(frame, &client);
@@ -8135,7 +8139,7 @@ namespace faf::editor
       // handler sets head 0 to the whole client area when the window is resized; this puts it back.
       const gpg::gal::DeviceContext* const active = gpg::gal::Device::GetInstance()->GetDeviceContext();
       if (active->GetHeadCount() <= static_cast<int>(kPanelHead)) {
-        return;
+        return false;
       }
       const gpg::gal::Head& gameHead = active->GetHead(0);
       const gpg::gal::Head& panelHead = active->GetHead(kPanelHead);
@@ -8150,9 +8154,24 @@ namespace faf::editor
         context.GetHead(0).mHeight = static_cast<std::uint32_t>(height);
         context.GetHead(kPanelHead).mWidth = static_cast<std::uint32_t>(clientWidth);
         context.GetHead(kPanelHead).mHeight = static_cast<std::uint32_t>(clientHeight);
+        // The copies of the view and the minimap are targets of the context about to be re-made: nothing may point
+        // at them afterwards (a workspace whose panels resize the view crashed drawing the stale copy).
+        gViewSurface = nullptr;
+        mViewSurface.reset();
+        mViewImage = 0;
+        mViewCopy.reset();
+        mViewCopyWidth = 0;
+        mViewCopyHeight = 0;
+        mMiniSurface.reset();
+        mMiniCopy.reset();
+        mMiniCopyWidth = 0;
+        mMiniCopyHeight = 0;
+        mShell->Tools().SetMinimapImage(0);
         d3d->Clear();
         (void)d3d->InitContext(&context);
+        return true;
       }
+      return false;
     }
 
     void EditorApp::Destroy()
