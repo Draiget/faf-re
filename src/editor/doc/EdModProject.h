@@ -33,6 +33,12 @@ namespace faf::editor
     std::string description;
     /** It has an icon of its own in the project (`icons/units/<id>_icon.dds`): the hook names it (Display.IconName). */
     bool icon = false;
+    /**
+     * It has a script of its own (`units/<id>/<id>_script.lua`, a class built on the base unit's): the hook sets the
+     * blueprint's ScriptModule to it (the engine otherwise runs the script beside the base's blueprint). The file is
+     * written once and then the modder's.
+     */
+    bool script = false;
     bool operator==(const ModDerived&) const = default;
   };
 
@@ -144,6 +150,9 @@ namespace faf::editor
    * `<mod>/icons/units/<IconName>_icon.dds` (UIUtil.UIFile with checkMods, the "Unit Icons" case).
    */
   [[nodiscard]] std::string ModUnitIconFile(const std::string& id);
+  /** A derived unit's own script: its file in the project and its first text (a class on the base unit's). */
+  [[nodiscard]] std::string ModUnitScriptFile(const std::string& id);
+  [[nodiscard]] std::string ModUnitScriptText(const std::string& id, const std::string& base);
   /** Where the hook goes in the project's folder. */
   extern const char* const kModHookFile;
 

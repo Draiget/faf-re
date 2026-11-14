@@ -2679,6 +2679,12 @@ namespace faf::editor
           std::string deriveError;
           if (lab.Derive("xel0201", "Lab Tank", "A heavier Medium Tank", deriveError)) {
             (void)lab.SetField(*mass, mass->base * 2.0 + 44.0, false);
+            // With a script of its own (the play logs the module the sim has for it).
+            if (ModProject* const scripted = panel.Project(); scripted != nullptr) {
+              if (const auto made = scripted->derived.find("xel0201"); made != scripted->derived.end()) {
+                made->second.script = true;
+              }
+            }
             gpg::Logf(
               "editor: unit lab test: derived xel0201 from %s, mass %g; %zu history steps",
               unit.c_str(),
@@ -2724,10 +2730,19 @@ namespace faf::editor
             sizeof(command),
             "SimLua local d = __blueprints['xel0201'] if d then LOG('editor: unit lab test: the sim has xel0201: mass "
             "', "
-            "d.Economy.BuildCostMass, ', name ', d.General.UnitName, ', weapon 1 damage ', d.Weapon[1].Damage) "
+            "d.Economy.BuildCostMass, ', name ', d.General.UnitName, ', weapon 1 damage ', d.Weapon[1].Damage, "
+            "', script ', tostring(d.ScriptModule)) "
             "else LOG('editor: unit lab test: the sim has no xel0201') end"
           );
           moho::CON_Execute(command);
+          if (mLabTestStage == 4) {
+            // One made, so the sim imports its own script (a failed import logs "Error importing").
+            moho::CON_Execute(
+              "SimLua local u = CreateUnitHPR('xel0201', 'ARMY_1', 300, 25, 300, 0, 0, 0) "
+              "LOG('editor: unit lab test: made xel0201: ', tostring(u ~= nil), ', its class from its script: ', "
+              "tostring(u ~= nil and u.OnStopBeingBuilt ~= nil))"
+            );
+          }
           break;
         }
         case 8:

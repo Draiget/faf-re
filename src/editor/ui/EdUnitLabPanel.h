@@ -57,6 +57,7 @@ namespace faf::editor
     char mDeriveId[16] = {};
     char mDeriveName[64] = {};
     char mDeriveDescription[128] = {};
+    bool mDeriveScript = false;
     std::string mDeriveError;
     bool mTestAsked = false;
   };

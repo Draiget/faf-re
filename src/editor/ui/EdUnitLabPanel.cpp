@@ -242,8 +242,15 @@ namespace faf::editor
       ImGui::InputText("Name", mDeriveName, sizeof(mDeriveName));
       ImGui::SetNextItemWidth(260.0f);
       ImGui::InputText("Description", mDeriveDescription, sizeof(mDeriveDescription));
+      ImGui::Checkbox("With a script of its own", &mDeriveScript);
+      EdSetItemTooltip("units/<id>/<id>_script.lua: a class built on the base unit's, written once for you to change");
       if (ImGui::Button("Derive")) {
         if (Derive(mDeriveId, mDeriveName, mDeriveDescription, mDeriveError)) {
+          if (mDeriveScript) {
+            if (const auto made = p->derived.find(mDeriveId); made != p->derived.end()) {
+              made->second.script = true;
+            }
+          }
           ImGui::CloseCurrentPopup();
         }
       }

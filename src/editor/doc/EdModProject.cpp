@@ -612,7 +612,12 @@ namespace faf::editor
     out += "    local oldModBlueprints = ModBlueprints\n\n";
     out += "    function ModBlueprints(all_bps)\n";
     out += "        oldModBlueprints(all_bps)\n\n";
-    out += "        local function Derive(id, base, name, description, icon, delta)\n";
+    // A unit with its own script: the module in this mod's folder (found by the mod's uid among the active mods).
+    out += "        local here\n";
+    out += "        for _, mod in __active_mods or {} do\n";
+    out += "            if mod.uid == " + LuaQuote(project.uid) + " then here = mod.location end\n";
+    out += "        end\n\n";
+    out += "        local function Derive(id, base, name, description, icon, script, delta)\n";
     out += "            local source = all_bps.Unit[base]\n";
     out +=
       "            if not source then WARN('derived unit ' .. id .. ': the game has no unit ' .. base) return end\n";
@@ -621,6 +626,8 @@ namespace faf::editor
     out += "            if name ~= '' then bp.General = bp.General or {} bp.General.UnitName = name end\n";
     out += "            if description ~= '' then bp.Description = description end\n";
     out += "            if icon then bp.Display = bp.Display or {} bp.Display.IconName = id end\n";
+    out += "            if script and here then bp.ScriptModule = here .. '/units/' .. id .. '/' .. id .. "
+           "'_script.lua' end\n";
     out += "            all_bps.Unit[id] = bp\n";
     out += "        end\n\n";
     for (const auto& [id, d] : project.derived) {
@@ -642,7 +649,7 @@ namespace faf::editor
         }
       }
       out += "        Derive(" + LuaQuote(id) + ", " + LuaQuote(d.base) + ", " + LuaQuote(d.name) + ", " +
-        LuaQuote(d.description) + ", " + (d.icon ? "true" : "false") + ", {\n";
+        LuaQuote(d.description) + ", " + (d.icon ? "true" : "false") + ", " + (d.script ? "true" : "false") + ", {\n";
       Dump(delta, "            ", out);
       out += "        })\n";
     }
@@ -681,7 +688,7 @@ namespace faf::editor
     for (const auto& [id, d] : p.derived) {
       out += std::string(first ? "\n" : ",\n") + "    {\"id\": " + JsonQuote(id) + ", \"base\": " + JsonQuote(d.base) +
         ", \"name\": " + JsonQuote(d.name) + ", \"description\": " + JsonQuote(d.description) + ", \"icon\": \"" +
-        (d.icon ? "true" : "false") + "\"}";
+        (d.icon ? "true" : "false") + "\", \"script\": \"" + (d.script ? "true" : "false") + "\"}";
       first = false;
     }
     out += first ? "]\n}\n" : "\n  ]\n}\n";
@@ -744,7 +751,11 @@ namespace faf::editor
           return false;
         }
         p.derived[d["id"].first] = {
-          d["base"].first, d["name"].first, d["description"].first, d["icon"].first == "true"
+          d["base"].first,
+          d["name"].first,
+          d["description"].first,
+          d["icon"].first == "true",
+          d["script"].first == "true"
         };
       }
     }
@@ -825,6 +836,21 @@ namespace faf::editor
       } else if (std::filesystem::exists(path, ec) && OursOrMissing(path)) {
         std::filesystem::remove(path, ec);
         report.written.push_back(std::string(kModHookFile) + " (removed: no derived units)");
+      }
+    }
+    // The derived units' own scripts: written when missing, then left to the modder.
+    for (const auto& [id, d] : project.derived) {
+      if (!d.script || !ModUnitIdOk(id) || !ModUnitIdOk(d.base)) {
+        continue;
+      }
+      const std::string relative = ModUnitScriptFile(id);
+      if (!std::filesystem::exists(folder / relative, ec)) {
+        std::filesystem::create_directories((folder / relative).parent_path(), ec);
+        if (WriteFile(folder / relative, ModUnitScriptText(id, d.base))) {
+          report.written.push_back(relative);
+        } else {
+          report.problems.push_back(relative + ": couldn't be written");
+        }
       }
     }
     // Merge blueprints the project made for units without changes any more.
@@ -955,6 +981,33 @@ namespace faf::editor
     }
     std::sort(r.files.begin(), r.files.end());
     return r;
+  }
+
+  std::string ModUnitScriptFile(
+    const std::string& id
+  )
+  {
+    return "units/" + id + "/" + id + "_script.lua";
+  }
+
+  std::string ModUnitScriptText(
+    const std::string& id,
+    const std::string& base
+  )
+  {
+    std::string upper = id;
+    for (char& c : upper) {
+      c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
+    }
+    std::string text;
+    text += "-- " + id + "'s own script, made by the FAF map editor's unit lab: a class built on " + base + "'s.\n";
+    text +=
+      "-- Change what it does here (OnStopBeingBuilt, OnKilled, ...), calling Base's where it should still run.\n";
+    text += "-- The editor wrote this file once; it is yours now.\n";
+    text += "local Base = import('/units/" + base + "/" + base + "_script.lua').TypeClass\n\n";
+    text += upper + " = Class(Base) {\n}\n\n";
+    text += "TypeClass = " + upper + "\n";
+    return text;
   }
 
   std::string ModUnitIconFile(
