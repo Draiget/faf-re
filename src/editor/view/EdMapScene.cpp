@@ -4150,7 +4150,7 @@ namespace faf::editor
     }
     if (
       mObjectStroke && mTools != nullptr && mTools->PropsToolActive() &&
-      mTools->CurrentPropMode() != EdTools::PropMode::Single
+      (mTools->CurrentPropMode() == EdTools::PropMode::Scatter || mTools->CurrentPropMode() == EdTools::PropMode::Erase)
     ) {
       float groundX = 0.0f;
       float groundZ = 0.0f;
@@ -12714,7 +12714,11 @@ namespace faf::editor
         ::SetCapture(window);
         ::SetFocus(window);
         mScatterDue = 0.0f;
-        if ((wParam & MK_SHIFT) != 0 || mTools->CurrentPropMode() == EdTools::PropMode::Erase) {
+        if (mTools->CurrentPropMode() == EdTools::PropMode::Line && (wParam & MK_SHIFT) == 0) {
+          mPropLine = true;
+          mPropLineFromX = groundX;
+          mPropLineFromZ = groundZ;
+        } else if ((wParam & MK_SHIFT) != 0 || mTools->CurrentPropMode() == EdTools::PropMode::Erase) {
           EraseProps(groundX, groundZ);
         } else if (mTools->CurrentPropMode() == EdTools::PropMode::Single) {
           PlaceProps(groundX, groundZ, mTools->RandomPropTurn() ? mNextPropYaw : 0.0f);
@@ -12984,6 +12988,26 @@ namespace faf::editor
         return true;
       }
       if (mObjectStroke) {
+        if (mPropLine) {
+          mPropLine = false;
+          float toX = 0.0f;
+          float toZ = 0.0f;
+          if (mTools != nullptr && CursorGround(toX, toZ)) {
+            const float dx = toX - mPropLineFromX;
+            const float dz = toZ - mPropLineFromZ;
+            const float length = std::hypot(dx, dz);
+            const float spacing = std::max(0.5f, mTools->PropLineSpacing());
+            const int count = static_cast<int>(length / spacing) + 1;
+            const float along = std::atan2(dz, dx);
+            for (int i = 0; i < count; ++i) {
+              const float t = length > 0.0f ? static_cast<float>(i) * spacing / length : 0.0f;
+              const float yaw = mTools->PropLineAlong() ? along : (mTools->RandomPropTurn() ? mNextPropYaw : 0.0f);
+              PlaceProps(mPropLineFromX + dx * t, mPropLineFromZ + dz * t, yaw);
+              RollPropYaw();
+            }
+            gpg::Logf("editor: %d props along a line of %.1f", count, static_cast<double>(length));
+          }
+        }
         EndObjectStroke();
         ::ReleaseCapture();
         return true;

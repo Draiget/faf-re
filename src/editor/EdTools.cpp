@@ -3914,8 +3914,17 @@ namespace faf::editor
       }
     }
     if (Section("Place")) {
-      static const char* const kModes[] = {"Single", "Scatter", "Erase"};
-      Segmented(kModes, 3, mPropMode);
+      static const char* const kModes[] = {"Single", "Scatter", "Erase", "Line"};
+      Segmented(kModes, 4, mPropMode);
+      if (mPropMode == 3) {
+        ImGui::SetNextItemWidth(-1.0f);
+        FillSliderFloat("##propspacing", &mPropLineSpacing, 0.5f, 64.0f, "%.1f apart");
+        ImGui::Checkbox("Turned along the line", &mPropLineAlong);
+        Note(
+          "Drag from where the line starts to where it ends: the props go down along it when you let go, with their "
+          "symmetric copies (one undo step)."
+        );
+      }
       if (mPropMode == 1) {
         ImGui::SetNextItemWidth(-1.0f);
         FillSliderFloat("##density", &mPropDensity, 0.5f, 60.0f, "%.1f props a second");

@@ -79,7 +79,19 @@ namespace faf::editor
       Single,
       Scatter,
       Erase,
+      /** A drag from a start to an end: props along it, the spacing apart (FAF Studio's line placement). */
+      Line,
     };
+    /** Line mode: the props' distance apart along the line, in game units. */
+    [[nodiscard]] float PropLineSpacing() const noexcept
+    {
+      return mPropLineSpacing;
+    }
+    /** Line mode: each prop turned along the line (else as Random turn says). */
+    [[nodiscard]] bool PropLineAlong() const noexcept
+    {
+      return mPropLineAlong;
+    }
     [[nodiscard]] const std::string& PropBlueprint() const noexcept
     {
       return mPropBlueprint;
@@ -3093,6 +3105,8 @@ namespace faf::editor
     std::function<std::uint64_t(const std::string&)> mPropPictures;
     std::string mPropBlueprint;
     int mPropMode = 0;
+    float mPropLineSpacing = 6.0f;
+    bool mPropLineAlong = true;
     float mPropDensity = 8.0f;
     bool mPropRandomTurn = true;
     std::vector<PropPaintEntry> mPaintList;

@@ -1062,6 +1062,10 @@ namespace faf::editor
     /** The scatter or erase brush at (x, z) during its drag. */
     void DecalBrushAt(float x, float z);
     bool mDecalBrushing = false;
+    // The Props tool's Line: where the drag began.
+    bool mPropLine = false;
+    float mPropLineFromX = 0.0f;
+    float mPropLineFromZ = 0.0f;
     /** The selected units to `army` (out of their own); how many moved. */
     int GiveSelectedUnits(const std::string& army);
     /** A unit blueprint's rings: weapons' greatest and least reach, vision, radar (0 for none); kept per id. */
