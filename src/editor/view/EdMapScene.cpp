@@ -8274,6 +8274,29 @@ namespace faf::editor
     if (linked > 0) {
       gpg::Logf("editor: %d path links made", linked);
     }
+    // Draw chain: the new marker joins the chain's end; each symmetric copy its own chain (<name>_m<copy>).
+    if (mTools->DrawingChain() && !mMarkerSelection.empty() && !mTools->ChainName().empty()) {
+      std::vector<MarkerChain>& chains = mDocument.SaveData().Chains();
+      for (std::size_t c = 0; c < mMarkerSelection.size(); ++c) {
+        const std::string chainName = c == 0 ? mTools->ChainName() : mTools->ChainName() + "_m" + std::to_string(c);
+        auto chain = std::find_if(chains.begin(), chains.end(), [&](const MarkerChain& each) {
+          return each.name == chainName;
+        });
+        if (chain == chains.end()) {
+          chains.push_back({chainName, {}});
+          chain = chains.end() - 1;
+        }
+        chain->markers.push_back(mMarkerSelection[c]);
+      }
+      gpg::Logf("editor: chain %s has %zu markers", mTools->ChainName().c_str(), [&] {
+        for (const MarkerChain& chain : chains) {
+          if (chain.name == mTools->ChainName()) {
+            return chain.markers.size();
+          }
+        }
+        return std::size_t{0};
+      }());
+    }
     if (!mMarkerSelection.empty()) {
       mDocument.SaveDataEdited(std::move(before));
       float fx = 0.0f, fy = 0.0f, fz = 0.0f;
@@ -12332,6 +12355,30 @@ namespace faf::editor
           return true;
         }
         if (hit < 0) {
+          // Draw chain: Ctrl starts the next chain (the first free Chain_NN, or the name's next number).
+          if (mTools->DrawingChain() && (wParam & MK_CONTROL) != 0 && !connect) {
+            const std::vector<MarkerChain>& chains = mDocument.SaveData().Chains();
+            const auto used = [&](const std::string& name) {
+              return std::any_of(chains.begin(), chains.end(), [&](const MarkerChain& chain) {
+                return chain.name == name;
+              });
+            };
+            std::string base = mTools->ChainName();
+            while (!base.empty() && (std::isdigit(static_cast<unsigned char>(base.back())) != 0)) {
+              base.pop_back();
+            }
+            if (base.empty()) {
+              base = "Chain_";
+            }
+            for (int n = 1; n < 1000; ++n) {
+              char name[96];
+              (void)std::snprintf(name, sizeof(name), "%s%02d", base.c_str(), n);
+              if (!used(name)) {
+                mTools->SetChainName(name);
+                break;
+              }
+            }
+          }
           PlaceMarkers(groundX, groundZ, connect);
           return true;
         }

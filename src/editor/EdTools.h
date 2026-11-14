@@ -1185,6 +1185,21 @@ namespace faf::editor
     }
 
     /** The Markers tool's connect mode: a click on a path node links it to the selection. */
+    /** Draw chain (FAF Studio's chains.lua): each marker placed joins the chain named in the panel. */
+    [[nodiscard]] bool DrawingChain() const noexcept
+    {
+      return MarkersToolActive() && mDrawChain;
+    }
+    [[nodiscard]] std::string ChainName() const
+    {
+      return mChainName;
+    }
+    void SetChainName(
+      const std::string& name
+    )
+    {
+      (void)std::snprintf(mChainName, sizeof(mChainName), "%s", name.c_str());
+    }
     [[nodiscard]] bool ConnectPathNodes() const noexcept
     {
       return mConnectNodes;
@@ -3156,6 +3171,8 @@ namespace faf::editor
     char mUnitFilter[64]{};
     int mUnitSelectionCount = 0;
     bool mShowRangeRings = true;
+    bool mDrawChain = false;
+    char mChainName[64] = "Chain_01";
     bool mGiveUnits = false;
     std::vector<DecalTexture> mDecalTextures;
     bool mDecalTexturesListed = false;

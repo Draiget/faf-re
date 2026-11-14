@@ -4604,6 +4604,15 @@ namespace faf::editor
 
   void EdTools::DrawMarkers()
   {
+    if (Section("Draw chain", false)) {
+      ImGui::Checkbox("Draw a chain", &mDrawChain);
+      ImGui::SetNextItemWidth(-1.0f);
+      ImGui::InputTextWithHint("##chainname", "chain name", mChainName, sizeof(mChainName));
+      Note(
+        "Each marker placed joins this chain at its end (a route for scripts and the AI); its symmetric copies join "
+        "<name>_m1, _m2... Ctrl+click on the ground starts the next chain. Chains are saved in the map's save file."
+      );
+    }
     if (Section("Place")) {
       const std::vector<MarkerType>& types = MarkerTypes();
       mMarkerType = std::clamp(mMarkerType, 0, static_cast<int>(types.size()) - 1);
