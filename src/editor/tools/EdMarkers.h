@@ -119,6 +119,24 @@ namespace faf::editor
    * neighbours, as FAForeverMapEditor's air presets lay them (16 x 16 over the map, a sixteenth apart, half a step in).
    * Named after `existing` (AirPN<nn> not yet taken); heights from `height`. Returned in rows, the links set.
    */
+  /**
+   * A grid of path nodes of `typeName` (Land Path Node, Water Path Node) over the rectangle, as AirNodeGrid lays them,
+   * but only where `stands(x, z)` holds, each linked to its 8 neighbours where `reaches(ax, az, bx, bz)` holds (the
+   * ground or water between them is passable for the kind of unit, in one connected area).
+   */
+  std::vector<SaveEntry> PathNodeGrid(
+    const std::vector<SaveEntry>& existing,
+    const char* typeName,
+    int count,
+    float x0,
+    float z0,
+    float x1,
+    float z1,
+    const std::function<float(float, float)>& height,
+    const std::function<bool(float, float)>& stands,
+    const std::function<bool(float, float, float, float)>& reaches
+  );
+
   std::vector<SaveEntry> AirNodeGrid(
     const std::vector<SaveEntry>& existing,
     int count,

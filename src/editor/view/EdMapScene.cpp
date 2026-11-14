@@ -5,6 +5,10 @@
 #include "editor/doc/EdLighting.h"
 #include "editor/tools/EdGroundKind.h"
 #include "editor/tools/EdRecipes.h"
+#include "editor/tools/EdMapStats.h"
+#include "editor/tools/EdPathing.h"
+#include "editor/tools/EdMarkers.h"
+#include "editor/tools/EdScatter.h"
 #include "editor/tools/EdSlopeRules.h"
 #include "editor/tools/EdSymmetryFollow.h"
 #include "editor/doc/EdUnitFate.h"
@@ -676,6 +680,57 @@ namespace faf::editor
       }
     }
 
+    // The Units tool's fit (FAF Studio's ghost): the picked unit's footprint at the cursor, green where it fits by
+    // the game's rules, red where it doesn't.
+    if (mTools->UnitsToolActive()) {
+      float gx = 0.0f;
+      float gz = 0.0f;
+      if (CursorGround(gx, gz)) {
+        int sizeX = 1;
+        int sizeZ = 1;
+        const std::string problem = UnitFitAt(mTools->UnitType(), gx, gz, sizeX, sizeZ);
+        const float x0 = (sizeX > 1 ? SnapFootprint(gx, sizeX) : gx) - sizeX * 0.5f;
+        const float z0 = (sizeZ > 1 ? SnapFootprint(gz, sizeZ) : gz) - sizeZ * 0.5f;
+        const std::uint32_t colour = problem.empty() ? 0xE040E060u : 0xE0FF4040u;
+        const float corners[5][2] = {{x0, z0}, {x0 + sizeX, z0}, {x0 + sizeX, z0 + sizeZ}, {x0, z0 + sizeZ}, {x0, z0}};
+        for (int e = 0; e < 4; ++e) {
+          batcher->DrawLine(
+            groundVertex(corners[e][0], corners[e][1], colour, 0.6f),
+            groundVertex(corners[e + 1][0], corners[e + 1][1], colour, 0.6f)
+          );
+        }
+        mTools->SetUnitFitNote(problem);
+      }
+    }
+    // The map's areas (the save's AREA_n), outlined in teal with their names' corner post.
+    if (mTools->MarkersToolActive()) {
+      for (const SaveEntry& area : mDocument.SaveData().Areas()) {
+        const std::vector<double> edges = ValueNumbers(area.Get("rectangle"));
+        if (edges.size() < 4) {
+          continue;
+        }
+        const float ax0 = static_cast<float>(edges[0]);
+        const float az0 = static_cast<float>(edges[1]);
+        const float ax1 = static_cast<float>(edges[2]);
+        const float az1 = static_cast<float>(edges[3]);
+        constexpr std::uint32_t kArea = 0xD040D0C0u;
+        const auto edge = [&](const float fx, const float fz, const float tx, const float tz) {
+          const int steps = std::max(2, static_cast<int>(std::hypot(tx - fx, tz - fz) / 4.0f));
+          for (int s = 0; s < steps; ++s) {
+            const float t0 = static_cast<float>(s) / steps;
+            const float t1 = static_cast<float>(s + 1) / steps;
+            batcher->DrawLine(
+              groundVertex(fx + (tx - fx) * t0, fz + (tz - fz) * t0, kArea, 0.9f),
+              groundVertex(fx + (tx - fx) * t1, fz + (tz - fz) * t1, kArea, 0.9f)
+            );
+          }
+        };
+        edge(ax0, az0, ax1, az0);
+        edge(ax1, az0, ax1, az1);
+        edge(ax1, az1, ax0, az1);
+        edge(ax0, az1, ax0, az0);
+      }
+    }
     // Resource splats under the markers, then the markers: all of them with the Markers tool, the start positions
     // and resources otherwise.
     DrawWaterBodyGuides(*batcher, *field);
@@ -4413,9 +4468,27 @@ namespace faf::editor
         if (mTools->CurrentPropMode() == EdTools::PropMode::Erase || (::GetKeyState(VK_SHIFT) & 0x8000) != 0) {
           EraseProps(groundX, groundZ);
         } else {
-          // Scatter: props a second at random points inside the brush.
-          mScatterDue += mTools->PropDensity() * std::min(frameSeconds, 0.1f);
+          // Scatter by area (FAF Studio's): the brush filled up to a density, never closer than the spacing.
           const float radius = mTools->CurrentHeightBrush().radius;
+          if (mTools->PropScatterByArea() && mMap->mProps != nullptr) {
+            std::vector<std::pair<float, float>> nearby;
+            for (const moho::CWldPropEntry& entry : mMap->mProps->mEntries) {
+              if (
+                std::hypot(entry.mTransform.pos_.x - groundX, entry.mTransform.pos_.z - groundZ) <
+                radius + mTools->PropSpacing()
+              ) {
+                nearby.emplace_back(entry.mTransform.pos_.x, entry.mTransform.pos_.z);
+              }
+            }
+            mScatterSeed = mScatterSeed * 1664525U + 1013904223U;
+            for (const auto& [px, pz] : AreaScatter(
+                   groundX, groundZ, radius, mTools->PropAreaDensity(), mTools->PropSpacing(), nearby, mScatterSeed, 6
+                 )) {
+              PlaceProps(px, pz);
+            }
+            mScatterDue = 0.0f;
+          }
+          mScatterDue += mTools->PropScatterByArea() ? 0.0f : mTools->PropDensity() * std::min(frameSeconds, 0.1f);
           while (mScatterDue >= 1.0f) {
             mScatterDue -= 1.0f;
             mScatterSeed = mScatterSeed * 1664525U + 1013904223U;
@@ -8718,6 +8791,157 @@ namespace faf::editor
     mDocument.SaveDataEdited(std::move(before));
   }
 
+  void EdMapScene::FillPathGrid(
+    const int kind,
+    const int count,
+    const bool replace
+  )
+  {
+    const moho::CHeightField* const field = mMap != nullptr ? mMap->mTerrainRes->GetHeightField() : nullptr;
+    if (kind <= 0 || field == nullptr) {
+      FillAirGrid(count, replace);
+      return;
+    }
+    const char* const typeName = kind == 1 ? "Land Path Node" : "Water Path Node";
+    // The kind's passability, as the map check measures it (a T1 tank's or a frigate's footprint).
+    const MapFacts& facts = mDocument.Facts();
+    const PathFootprint footprint =
+      kind == 1 ? PathFootprint{0x1, 0.75f, 0.0f, 0.0f} : PathFootprint{0x8, 0.0f, 1.5f, 0.0f};
+    const std::vector<std::uint8_t> cells =
+      PassableCells(field->data, field->width, field->height, facts.water, facts.waterElevation, footprint);
+    const int cellsX = field->width - 1;
+    const int cellsZ = field->height - 1;
+    std::vector<int> areas;
+    (void)ConnectAreas(cells, cellsX, cellsZ, areas);
+    const auto areaAt = [&](const float x, const float z) {
+      const int cx = std::clamp(static_cast<int>(x), 0, cellsX - 1);
+      const int cz = std::clamp(static_cast<int>(z), 0, cellsZ - 1);
+      return areas[static_cast<std::size_t>(cz) * static_cast<std::size_t>(cellsX) + static_cast<std::size_t>(cx)];
+    };
+    float x0 = 0.0f;
+    float z0 = 0.0f;
+    float x1 = static_cast<float>(cellsX);
+    float z1 = static_cast<float>(cellsZ);
+    if (const std::optional<EdDocument::PlayableRect> area = mDocument.PlayableArea()) {
+      x0 = static_cast<float>(area->x0);
+      z0 = static_cast<float>(area->z0);
+      x1 = static_cast<float>(area->x1);
+      z1 = static_cast<float>(area->z1);
+    }
+    EdDocument::SaveSnapshot before = mDocument.SaveDataNow();
+    std::vector<SaveEntry>& markers = mDocument.SaveData().Markers();
+    std::size_t removed = 0;
+    if (replace) {
+      const std::size_t count0 = markers.size();
+      markers.erase(
+        std::remove_if(
+          markers.begin(),
+          markers.end(),
+          [typeName](const SaveEntry& marker) {
+        return MarkerTypeOf(marker) == typeName;
+      }
+        ),
+        markers.end()
+      );
+      removed = count0 - markers.size();
+    }
+    std::vector<SaveEntry> grid =
+      PathNodeGrid(markers, typeName, count, x0, z0, x1, z1, [&](const float x, const float z) {
+      return mMap->mTerrainRes->GetHeightAt(static_cast<std::int32_t>(x), static_cast<std::int32_t>(z));
+    }, [&](const float x, const float z) {
+      return areaAt(x, z) != 0;
+    }, [&](const float ax, const float az, const float bx, const float bz) {
+      const int area = areaAt(ax, az);
+      const int steps = std::max(2, static_cast<int>(std::hypot(bx - ax, bz - az)));
+      for (int s = 0; s <= steps; ++s) {
+        const float t = static_cast<float>(s) / static_cast<float>(steps);
+        if (areaAt(ax + (bx - ax) * t, az + (bz - az) * t) != area) {
+          return false;
+        }
+      }
+      return true;
+    });
+    mMarkerSelection.clear();
+    for (SaveEntry& node : grid) {
+      mMarkerSelection.push_back(node.name);
+      markers.push_back(std::move(node));
+    }
+    mDocument.SaveDataEdited(std::move(before));
+    gpg::Logf(
+      "editor: %s graph: %zu nodes of a %d x %d grid stand on its ground (%zu removed first), %zu markers now",
+      typeName,
+      mMarkerSelection.size(),
+      count,
+      count,
+      removed,
+      markers.size()
+    );
+  }
+
+  std::string EdMapScene::UnitFitAt(
+    const std::string& type,
+    const float x,
+    const float z,
+    int& sizeX,
+    int& sizeZ
+  ) const
+  {
+    sizeX = 1;
+    sizeZ = 1;
+    const moho::CHeightField* const field = mMap != nullptr ? mMap->mTerrainRes->GetHeightField() : nullptr;
+    moho::RRuleGameRules* const rules = moho::RULE_PeekKept();
+    if (field == nullptr || rules == nullptr || type.empty()) {
+      return {};
+    }
+    std::string lower = type;
+    for (char& c : lower) {
+      c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    }
+    moho::RResId id{};
+    id.name.assign(lower.c_str());
+    const moho::RUnitBlueprint* const blueprint = rules->GetUnitBlueprint(id);
+    if (blueprint == nullptr) {
+      return {};
+    }
+    const moho::SFootprint& footprint = blueprint->mFootprint;
+    sizeX = std::max<int>(1, footprint.mSizeX);
+    sizeZ = std::max<int>(1, footprint.mSizeZ);
+    FitFacts facts;
+    facts.structure = blueprint->Physics.MotionType == moho::RULEUMT_None;
+    facts.maxVariation = blueprint->Physics.MaxGroundVariation;
+    const auto word = [field](const int wx, const int wz) {
+      const int cx = std::clamp(wx, 0, field->width - 1);
+      const int cz = std::clamp(wz, 0, field->height - 1);
+      return static_cast<int>(field->data[static_cast<std::size_t>(cz) * field->width + cx]);
+    };
+    if (facts.structure && facts.maxVariation > 0.0f) {
+      const int n = std::max(sizeX, sizeZ);
+      const int cx = static_cast<int>(std::floor(x - sizeX * 0.5f));
+      const int cz = static_cast<int>(std::floor(z - sizeZ * 0.5f));
+      const int kind = blueprint->Physics.FlattenSkirt != 0U ? sloperules::kKindRing : sloperules::kKindBuild;
+      facts.groundVaries = static_cast<float>(sloperules::CellRating(kind, n, cx, cz, word)) / 128.0f;
+    }
+    const MapFacts& map = mDocument.Facts();
+    const float ground = static_cast<float>(word(static_cast<int>(x), static_cast<int>(z))) / 128.0f;
+    facts.waterDepth = map.water ? std::max(0.0f, map.waterElevation - ground) : 0.0f;
+    const auto caps = static_cast<unsigned>(footprint.mOccupancyCaps);
+    facts.landOnly = (caps & 0x0Eu) == 0U; // no seabed, sub or water bits
+    if (const std::optional<EdDocument::PlayableRect> area = mDocument.PlayableArea()) {
+      facts.outsidePlayable = x - sizeX * 0.5f < static_cast<float>(area->x0) ||
+        z - sizeZ * 0.5f < static_cast<float>(area->z0) || x + sizeX * 0.5f > static_cast<float>(area->x1) ||
+        z + sizeZ * 0.5f > static_cast<float>(area->z1);
+    }
+    for (const UnitRef& unit : mUnitRefs) {
+      if (
+        std::fabs(unit.position.x - x) < sizeX * 0.5f + 0.5f && std::fabs(unit.position.z - z) < sizeZ * 0.5f + 0.5f
+      ) {
+        facts.overlaps = facts.structure;
+        break;
+      }
+    }
+    return FitProblem(facts);
+  }
+
   void EdMapScene::FillAirGrid(
     const int count,
     const bool replace
@@ -11771,6 +11995,10 @@ namespace faf::editor
       if (!inside) {
         continue;
       }
+      // "Only the picked prop": the others stay.
+      if (mTools->EraseOnlyThisProp() && mTools->PropBlueprint() != entries[i].mBlueprintPath.c_str()) {
+        continue;
+      }
       if (i < mProps.size()) {
         delete mProps[i];
         mProps.erase(mProps.begin() + static_cast<std::ptrdiff_t>(i));
@@ -12105,6 +12333,17 @@ namespace faf::editor
       unit.type = type;
       unit.position[0] = SnapToGrid(centreX[c]);
       unit.position[2] = SnapToGrid(centreZ[c]);
+      // A structure snaps by its footprint (FAF Studio's unitfit): odd sizes on a cell's middle, even on a corner.
+      int fitX = 1;
+      int fitZ = 1;
+      const std::string fit = UnitFitAt(type, unit.position[0], unit.position[2], fitX, fitZ);
+      if (mTools->SnapToGrid() && (fitX > 1 || fitZ > 1)) {
+        unit.position[0] = SnapFootprint(centreX[c], fitX);
+        unit.position[2] = SnapFootprint(centreZ[c], fitZ);
+      }
+      if (!fit.empty()) {
+        gpg::Warnf("editor: %s placed where it doesn't fit: %s", type.c_str(), fit.c_str());
+      }
       unit.position[1] = UnitRestHeight(unit.position[0], unit.position[2]);
       // The saves keep a unit's turn in Orientation's second value.
       unit.orientation[1] = std::atan2(aheadX[c] - centreX[c], aheadZ[c] - centreZ[c]);

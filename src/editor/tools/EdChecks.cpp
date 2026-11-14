@@ -329,6 +329,26 @@ namespace faf::editor
             0.0f
           );
         }
+        // FAF Studio's chain checks: too short to be a route, and a marker named twice.
+        if (chain.markers.size() < 2) {
+          add(
+            CheckIssue::Level::Warning,
+            chain.name,
+            "chain has " + std::to_string(chain.markers.size()) + " marker(s): a route needs two at least",
+            0.0f,
+            0.0f
+          );
+        }
+        for (std::size_t i = 0; i < chain.markers.size(); ++i) {
+          if (
+            std::find(
+              chain.markers.begin(), chain.markers.begin() + static_cast<std::ptrdiff_t>(i), chain.markers[i]
+            ) != chain.markers.begin() + static_cast<std::ptrdiff_t>(i)
+          ) {
+            add(CheckIssue::Level::Note, chain.name, "chain names " + chain.markers[i] + " more than once", 0.0f, 0.0f);
+            break;
+          }
+        }
       }
     }
     for (const auto& [blueprint, at] : in.missingProps) {

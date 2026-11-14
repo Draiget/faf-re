@@ -31,4 +31,20 @@ namespace faf::editor
 
   /** The ground's slope in degrees from the heights a unit either side (dx = right - left, dz = below - above). */
   [[nodiscard]] float SlopeDegrees(float left, float right, float above, float below);
+
+  /**
+   * The scatter brush by area (FAF Studio's props.lua): new points in the circle until it holds `densityPer100` per
+   * 100 square units (the `existing` points inside count), none closer than `spacing` to another, at most `maxNew`;
+   * the same seed gives the same points.
+   */
+  [[nodiscard]] std::vector<std::pair<float, float>> AreaScatter(
+    float x,
+    float z,
+    float radius,
+    float densityPer100,
+    float spacing,
+    const std::vector<std::pair<float, float>>& existing,
+    std::uint32_t seed,
+    int maxNew
+  );
 } // namespace faf::editor

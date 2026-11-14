@@ -5960,6 +5960,17 @@ namespace faf::editor
       }, [this]() -> std::string {
         return mPlay.Active() && moho::WLD_GetActiveSession() != nullptr ? std::string() : "no play running";
       });
+      // Alt+Shift+A (FAF Studio's Alt+A; plain Alt+A stays Select > None as in Blender): a new area at the cursor.
+      add("tool.area", "Add an area here", "Tool", "Alt+Shift+A", [this] {
+        float x = 0.0f;
+        float z = 0.0f;
+        if (!mScene.CursorGroundNow(x, z)) {
+          PostStatusMessage("Point at the map to add an area there");
+          return;
+        }
+        (void)mCommands.Run("tool.markers");
+        mShell->Tools().AskAddAreaAt(x, z);
+      }, mapOpen, {}, "A new 64 x 64 area (the save file's AREA_n) round the cursor, in the Markers tool's Areas");
       // Alt+C (FAF Studio): the Markers tool drawing a chain, each marker placed joining it.
       add("tool.chain", "Draw a chain", "Tool", "Alt+C", [this] {
         (void)mCommands.Run("tool.markers");
@@ -6043,6 +6054,7 @@ namespace faf::editor
       windowPanel("window.editormods", "Editor mods", "EditorMods");
       windowPanel("window.assets", "Asset browser", "AssetBrowser");
       windowPanel("window.fields", "Fields (op by op)", "Fields");
+      windowPanel("window.statistics", "Statistics", "Statistics");
       if (EdCommand* const assets = const_cast<EdCommand*>(c.Find("window.assets")); assets != nullptr) {
         (void)c.SetKeys("window.assets", "Ctrl+Alt+A");
       }
@@ -6308,6 +6320,7 @@ namespace faf::editor
            cmd("view.armies"),
            cmd("view.markers"),
            cmd("view.check"),
+           cmd("window.statistics"),
            sep(),
            cmd("view.script"),
            cmd("view.adaptive"),
@@ -9337,7 +9350,7 @@ namespace faf::editor
         if (int count = 0; true) {
           bool replace = true;
           if (tools.TakeAirGrid(count, replace)) {
-            mScene.FillAirGrid(count, replace);
+            mScene.FillPathGrid(tools.PathGridKind(), count, replace);
           }
         }
         // `/adaptive <marker>,<army>` (test runs): ties a mass or hydrocarbon marker to an army in the adaptive tables,

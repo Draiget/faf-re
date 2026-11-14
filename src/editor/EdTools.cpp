@@ -1,3 +1,6 @@
+#include "editor/tools/EdMarkers.h"
+#include "editor/doc/EdSaveFile.h"
+#include "editor/doc/EdDocument.h"
 #include "editor/EdTools.h"
 #include "editor/doc/EdLighting.h"
 #include "editor/doc/EdWaterPreset.h"
@@ -3981,8 +3984,20 @@ namespace faf::editor
         );
       }
       if (mPropMode == 1) {
+        ImGui::Checkbox("By area (density and spacing)", &mPropByArea);
+        EdSetItemTooltip("FAF Studio's scatter: fills the brush up to a density, never closer than the spacing");
         ImGui::SetNextItemWidth(-1.0f);
-        FillSliderFloat("##density", &mPropDensity, 0.5f, 60.0f, "%.1f props a second");
+        if (mPropByArea) {
+          FillSliderFloat("##areadensity", &mPropAreaDensity, 0.1f, 20.0f, "%.1f per 100 square units");
+          ImGui::SetNextItemWidth(-1.0f);
+          FillSliderFloat("##propspacingmin", &mPropSpacing, 0.5f, 32.0f, "At least %.1f apart");
+        } else {
+          FillSliderFloat("##density", &mPropDensity, 0.5f, 60.0f, "%.1f props a second");
+        }
+      }
+      if (mPropMode == 2) {
+        ImGui::Checkbox("Only the picked prop", &mEraseOnlyThis);
+        EdSetItemTooltip("Erase removes only props of the blueprint picked above, the others stay");
       }
       if (mPropMode != 1 || mPaintList.empty()) {
         ImGui::Checkbox("Random turn", &mPropRandomTurn);
@@ -4903,13 +4918,20 @@ namespace faf::editor
         }
       }
     }
-    if (Section("Air path nodes")) {
+    if (Section("Path node graphs")) {
+      static const char* const kKinds[] = {"Air (everywhere)", "Land (where a tank goes)", "Water (where a ship goes)"};
       ImGui::SetNextItemWidth(-1.0f);
-      FillSliderInt("##airgrid", &mAirGridCount, 4, 32, "%d nodes a side");
-      ImGui::Checkbox("Replace the map's air nodes", &mAirGridReplace);
-      if (ImGui::Button("Fill the map with an air node grid", ImVec2(-1.0f, 0.0f))) {
+      (void)EdCombo("##pathgridkind", &mPathGridKind, kKinds, 3);
+      ImGui::SetNextItemWidth(-1.0f);
+      FillSliderInt("##airgrid", &mAirGridCount, 4, 48, "%d nodes a side");
+      ImGui::Checkbox("Replace the map's nodes of that kind", &mAirGridReplace);
+      if (ImGui::Button("Fill the map with a path node graph", ImVec2(-1.0f, 0.0f))) {
         mAirGridAsked = true;
       }
+      Note(
+        "Land and water graphs keep only the nodes a T1 tank (a frigate) can stand on, linked where it can drive "
+        "from one to the next on the same ground (the map check's pathing)."
+      );
       Note(
         "A grid of air path nodes over the playable area (the whole map without one), each linked to its 8 neighbours, "
         "as "
@@ -4960,4 +4982,84 @@ namespace faf::editor
     }
   }
 
+  void EdTools::DrawAreas(
+    EdDocument& document
+  )
+  {
+    if (!Section("Areas")) {
+      return;
+    }
+    std::vector<SaveEntry>& areas = document.SaveData().Areas();
+    const auto edited = [&document](EdDocument::SaveSnapshot before, const std::string& what) {
+      document.SaveDataEdited(std::move(before));
+      gpg::Logf("editor: areas: %s", what.c_str());
+    };
+    // Alt+Shift+A from the view: a new area round the cursor.
+    if (mAreaAddAsked) {
+      mAreaAddAsked = false;
+      EdDocument::SaveSnapshot before = document.SaveDataNow();
+      int n = 1;
+      const auto taken = [&areas](const std::string& name) {
+        return std::any_of(areas.begin(), areas.end(), [&name](const SaveEntry& a) {
+          return a.name == name;
+        });
+      };
+      while (taken("AREA_" + std::to_string(n))) {
+        ++n;
+      }
+      SaveEntry area{"AREA_" + std::to_string(n), {}};
+      const float x = std::floor(mAreaAddAt[0] / 4.0f) * 4.0f;
+      const float z = std::floor(mAreaAddAt[1] / 4.0f) * 4.0f;
+      area.Set("rectangle", RectangleValue(x - 32.0, z - 32.0, x + 32.0, z + 32.0));
+      areas.push_back(std::move(area));
+      mAreaChosen = static_cast<int>(areas.size()) - 1;
+      edited(std::move(before), "added " + areas.back().name);
+    }
+    for (std::size_t i = 0; i < areas.size(); ++i) {
+      ImGui::PushID(static_cast<int>(i));
+      if (ImGui::Selectable(areas[i].name.c_str(), mAreaChosen == static_cast<int>(i))) {
+        mAreaChosen = static_cast<int>(i);
+        (void)std::snprintf(mAreaName, sizeof(mAreaName), "%s", areas[i].name.c_str());
+      }
+      ImGui::PopID();
+    }
+    if (areas.empty()) {
+      ImGui::TextDisabled("No areas. Alt+Shift+A over the map adds one there.");
+    }
+    if (mAreaChosen >= 0 && mAreaChosen < static_cast<int>(areas.size())) {
+      SaveEntry& area = areas[static_cast<std::size_t>(mAreaChosen)];
+      std::vector<double> edges = ValueNumbers(area.Get("rectangle"));
+      edges.resize(4, 0.0);
+      int box[4] = {
+        static_cast<int>(edges[0]), static_cast<int>(edges[1]), static_cast<int>(edges[2]), static_cast<int>(edges[3])
+      };
+      ImGui::SetNextItemWidth(-1.0f);
+      ImGui::DragInt4("##areaedges", box, 1.0f, 0, 8192);
+      EdSetItemTooltip("Left, top, right, bottom in game units");
+      if (ImGui::IsItemDeactivatedAfterEdit()) {
+        EdDocument::SaveSnapshot before = document.SaveDataNow();
+        area.Set(
+          "rectangle", RectangleValue(box[0], box[1], std::max(box[0] + 1, box[2]), std::max(box[1] + 1, box[3]))
+        );
+        edited(std::move(before), area.name + " edges set");
+      }
+      ImGui::SetNextItemWidth(-Em(80.0f));
+      ImGui::InputText("##areaname", mAreaName, sizeof(mAreaName));
+      ImGui::SameLine();
+      if (ImGui::Button("Rename") && mAreaName[0] != '\0' && area.name != mAreaName) {
+        EdDocument::SaveSnapshot before = document.SaveDataNow();
+        const std::string old = area.name;
+        area.name = mAreaName;
+        edited(std::move(before), old + " renamed " + area.name);
+      }
+      if (ImGui::Button("Delete this area")) {
+        EdDocument::SaveSnapshot before = document.SaveDataNow();
+        const std::string gone = area.name;
+        areas.erase(areas.begin() + mAreaChosen);
+        mAreaChosen = -1;
+        edited(std::move(before), "deleted " + gone);
+      }
+    }
+    Note("The map's areas (the save file's AREA_n rectangles): mission scripts and the playable area use them.");
+  }
 } // namespace faf::editor

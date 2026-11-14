@@ -816,4 +816,67 @@ namespace faf::editor
     }
     return out;
   }
+
+  std::vector<SaveEntry> PathNodeGrid(
+    const std::vector<SaveEntry>& existing,
+    const char* const typeName,
+    const int count,
+    const float x0,
+    const float z0,
+    const float x1,
+    const float z1,
+    const std::function<float(float, float)>& height,
+    const std::function<bool(float, float)>& stands,
+    const std::function<bool(float, float, float, float)>& reaches
+  )
+  {
+    std::vector<SaveEntry> grid;
+    const MarkerType* const type = FindMarkerType(typeName);
+    if (type == nullptr || count < 2 || x1 <= x0 || z1 <= z0) {
+      return grid;
+    }
+    std::vector<SaveEntry> taken = existing;
+    const float stepX = (x1 - x0) / static_cast<float>(count);
+    const float stepZ = (z1 - z0) / static_cast<float>(count);
+    // -1 where no node stands; else its index in `grid`.
+    std::vector<int> at(static_cast<std::size_t>(count) * static_cast<std::size_t>(count), -1);
+    std::vector<std::pair<float, float>> place(at.size());
+    for (int row = 0; row < count; ++row) {
+      for (int column = 0; column < count; ++column) {
+        const float x = std::floor(x0 + stepX * (static_cast<float>(column) + 0.5f)) + 0.5f;
+        const float z = std::floor(z0 + stepZ * (static_cast<float>(row) + 0.5f)) + 0.5f;
+        if (!stands(x, z)) {
+          continue;
+        }
+        SaveEntry node = NewMarker(*type, NextMarkerName(taken, *type), x, height(x, z), z);
+        taken.push_back({node.name, {}});
+        const std::size_t cell = static_cast<std::size_t>(row * count + column);
+        at[cell] = static_cast<int>(grid.size());
+        place[cell] = {x, z};
+        grid.push_back(std::move(node));
+      }
+    }
+    for (int row = 0; row < count; ++row) {
+      for (int column = 0; column < count; ++column) {
+        const std::size_t from = static_cast<std::size_t>(row * count + column);
+        if (at[from] < 0) {
+          continue;
+        }
+        for (const auto& [dr, dc] : {std::pair{0, 1}, std::pair{1, -1}, std::pair{1, 0}, std::pair{1, 1}}) {
+          const int r = row + dr;
+          const int c = column + dc;
+          if (r >= count || c < 0 || c >= count) {
+            continue;
+          }
+          const std::size_t to = static_cast<std::size_t>(r * count + c);
+          if (at[to] < 0 || !reaches(place[from].first, place[from].second, place[to].first, place[to].second)) {
+            continue;
+          }
+          const std::string other = grid[static_cast<std::size_t>(at[to])].name;
+          (void)SetMarkerLink(grid, grid[static_cast<std::size_t>(at[from])].name, other, true);
+        }
+      }
+    }
+    return grid;
+  }
 } // namespace faf::editor

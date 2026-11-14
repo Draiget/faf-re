@@ -97,4 +97,46 @@ namespace faf::editor
     const float dz = (below - above) * 0.5f;
     return std::atan(std::hypot(dx, dz)) * (180.0f / 3.14159265f);
   }
+
+  std::vector<std::pair<float, float>> AreaScatter(
+    const float x,
+    const float z,
+    const float radius,
+    const float densityPer100,
+    const float spacing,
+    const std::vector<std::pair<float, float>>& existing,
+    std::uint32_t seed,
+    const int maxNew
+  )
+  {
+    std::vector<std::pair<float, float>> out;
+    if (radius <= 0.0f || densityPer100 <= 0.0f) {
+      return out;
+    }
+    const float area = 3.14159265f * radius * radius;
+    int inside = 0;
+    for (const auto& [px, pz] : existing) {
+      inside += std::hypot(px - x, pz - z) <= radius ? 1 : 0;
+    }
+    const int wanted = static_cast<int>(std::floor(area * densityPer100 / 100.0f)) - inside;
+    const int target = std::min(maxNew, wanted);
+    const auto next = [&seed]() {
+      seed = seed * 1664525U + 1013904223U;
+      return static_cast<float>(seed >> 8) / 16777216.0f;
+    };
+    for (int attempt = 0; attempt < target * 12 && static_cast<int>(out.size()) < target; ++attempt) {
+      const float angle = next() * 6.2831853f;
+      const float distance = std::sqrt(next()) * radius;
+      const float px = x + std::cos(angle) * distance;
+      const float pz = z + std::sin(angle) * distance;
+      const auto close = [&](const std::pair<float, float>& p) {
+        return std::hypot(p.first - px, p.second - pz) < spacing;
+      };
+      if (std::any_of(existing.begin(), existing.end(), close) || std::any_of(out.begin(), out.end(), close)) {
+        continue;
+      }
+      out.emplace_back(px, pz);
+    }
+    return out;
+  }
 } // namespace faf::editor

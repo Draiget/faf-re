@@ -47,6 +47,7 @@
 
 namespace faf::editor
 {
+  class EdDocument;
   /**
    * The tool box, as the mockup lays it out: a strip of tool icons at the window's left edge (DrawStrip, drawn by
    * the shell) and the chosen tool's settings in the Tools panel (brush modes, size, strength, falloff, the symmetry
@@ -908,6 +909,56 @@ namespace faf::editor
       count = mAirGridCount;
       replace = mAirGridReplace;
       return std::exchange(mAirGridAsked, false);
+    }
+    /** The path graph's kind: 0 air, 1 land (a T1 tank's ground), 2 water (a frigate's). */
+    [[nodiscard]] int PathGridKind() const noexcept
+    {
+      return mPathGridKind;
+    }
+    void SetPathGridKind(
+      const int kind
+    ) noexcept
+    {
+      mPathGridKind = kind;
+    }
+    /** Props > Scatter by area (FAF Studio's): props per 100 square units in the brush, at least `spacing` apart. */
+    [[nodiscard]] bool PropScatterByArea() const noexcept
+    {
+      return mPropByArea;
+    }
+    [[nodiscard]] float PropAreaDensity() const noexcept
+    {
+      return mPropAreaDensity;
+    }
+    [[nodiscard]] float PropSpacing() const noexcept
+    {
+      return mPropSpacing;
+    }
+    /** What the view measured for the picked unit at the cursor ("" when it fits). */
+    void SetUnitFitNote(
+      std::string note
+    )
+    {
+      mUnitFitNote = std::move(note);
+    }
+    [[nodiscard]] const std::string& UnitFitNote() const noexcept
+    {
+      return mUnitFitNote;
+    }
+    /** Props > Erase: only props of the picked blueprint. */
+    [[nodiscard]] bool EraseOnlyThisProp() const noexcept
+    {
+      return mEraseOnlyThis;
+    }
+    /** The map's areas (Markers tool > Areas): the one being edited, and an add asked from the view (Alt+Shift+A). */
+    void AskAddAreaAt(
+      const float x,
+      const float z
+    ) noexcept
+    {
+      mAreaAddAt[0] = x;
+      mAreaAddAt[1] = z;
+      mAreaAddAsked = true;
     }
     /** The Markers tool's type to place (an entry of MarkerTypes()). */
     [[nodiscard]] const MarkerType& PlaceMarkerType() const noexcept
@@ -3197,6 +3248,22 @@ namespace faf::editor
     std::vector<std::string> mReclaimRows;
     char mPropFilter[64]{};
     int mAirGridCount = 16;
+    int mPathGridKind = 0;
+    bool mPropByArea = false;
+    float mPropAreaDensity = 2.0f;
+    float mPropSpacing = 3.0f;
+    bool mEraseOnlyThis = false;
+    std::string mUnitFitNote;
+    bool mAreaAddAsked = false;
+    float mAreaAddAt[2] = {0.0f, 0.0f};
+    int mAreaChosen = -1;
+    char mAreaName[64] = {};
+
+  public:
+    /** The Areas section's edits on the map's `_save.lua` areas (the playable one too), one undo step each. */
+    void DrawAreas(EdDocument& document);
+
+  private:
     bool mAirGridReplace = true;
     bool mAirGridAsked = false;
     bool mEditBorder = false;

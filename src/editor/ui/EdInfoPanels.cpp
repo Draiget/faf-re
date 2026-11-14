@@ -556,6 +556,7 @@ namespace faf::editor
     ImGui::InputTextWithHint("##markerfilter", "Filter by name or type", mMarkerFilter, sizeof(mMarkerFilter));
 
     DrawChains();
+    DrawAreasSection();
 
     // Group, then type, then the markers in the save's order.
     std::array<std::map<std::string, std::vector<std::size_t>>, kMarkerGroupCount> tree;
@@ -735,6 +736,13 @@ namespace faf::editor
     ImGui::EndChild();
     ImGui::End();
   }
+  void EdShell::DrawAreasSection()
+  {
+    if (mDocument.Map() != nullptr) {
+      mTools.DrawAreas(mDocument);
+    }
+  }
+
   void EdShell::DrawChains()
   {
     std::vector<MarkerChain>& chains = mDocument.SaveData().Chains();

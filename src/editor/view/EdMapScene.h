@@ -348,6 +348,10 @@ namespace faf::editor
     /** An air path node grid `count` a side over the playable area (or the map), as one undo step; `replace` removes
      * the air nodes there were. */
     void FillAirGrid(int count, bool replace);
+    /** The path node graph of a kind (0 air, 1 land, 2 water) over the playable area; one undo step. */
+    void FillPathGrid(int kind, int count, bool replace);
+    /** Whether `type` fits at (x, z) by the game's rules (empty: it fits; else why not), and its footprint. */
+    [[nodiscard]] std::string UnitFitAt(const std::string& type, float x, float z, int& sizeX, int& sizeZ) const;
     /**
      * The move gizmo's parts: an arrow per axis; the corner between two arms for a move in their plane (Free: X and Z,
      * over the ground, also the square in the middle; XY and ZY: upright planes, so up and down too).
@@ -1265,6 +1269,17 @@ namespace faf::editor
     /** The ground under the cursor, only while it is over the view. */
     [[nodiscard]] bool CursorGround(float& x, float& z) const;
 
+  public:
+    /** Where the cursor points on the ground now (commands that act there, Alt+Shift+A). */
+    [[nodiscard]] bool CursorGroundNow(
+      float& x,
+      float& z
+    ) const
+    {
+      return CursorGround(x, z);
+    }
+
+  private:
     // Held movement keys (WASD and the arrows), and Shift for speed.
     bool mForward = false;
     bool mBack = false;

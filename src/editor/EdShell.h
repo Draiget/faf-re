@@ -602,6 +602,7 @@ namespace faf::editor
     bool mShowEditorMods = false;
     bool mShowUnitViewer = false;
     bool mShowFields = false;
+    bool mShowStatistics = false;
     EdFieldsPanel mFieldsPanel;
     bool mViewMenuAsk = false;
     char mSaveAsParent[512] = {};
@@ -674,6 +675,10 @@ namespace faf::editor
     /** The Markers panel's chains: made, renamed, deleted, their markers added, ordered, taken out
      * (ui/EdInfoPanels.cpp). */
     void DrawChains();
+    /** The Markers panel's Areas section (the save's AREA_n rectangles). */
+    void DrawAreasSection();
+    /** View > Statistics: the map's counts and each start's resources and reclaim (ui/EdStatsPanel.cpp). */
+    void DrawStatisticsPanel();
     /** The player slots and extra armies as cards, and the chosen army's settings (ui/EdArmiesPanel.cpp). */
     void DrawArmiesPanel();
     void DrawPropertiesPanel();
