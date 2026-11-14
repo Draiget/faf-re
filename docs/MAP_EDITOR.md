@@ -96,6 +96,7 @@ In VS Code, the Run view has "Editor (x64, Debug)" and "Editor (x64, Release)": 
 - The radius goes from 1 to 128; a strength below zero does the mode's opposite. With Airbrush off the brush lays dabs a third of its radius apart along the stroke. Every height stroke reports the ground it took away and put down (the panel and the log).
 - Heightmap import can fit its image into a rectangle of the map and fade it in over a feather.
 - A Generate graph built on a map is saved beside it (`<map>_terrain.editor`, which packages leave out) and opens in Generate with the map.
+- Unit-tested (paths, the inversions, the import region); not run in the editor yet: the Ramp drag, Airbrush off, the region import, the graph saved with a map.
 
 **Texturing and environment**:
 - The layer texture browser picks a normal map alone (or none), normal maps shown as lit relief. Painting a layer the map's shader doesn't blend is refused with the reason. Map-wide textures import from PNG, TGA, JPEG, BMP or TIFF (converted to a 1024 px DDS) and export as PNG; the eight masks export to and import from one set of files (name_1 .. name_8).
@@ -103,11 +104,13 @@ In VS Code, the Run view has "Editor (x64, Debug)" and "Editor (x64, Release)": 
 - `SFogInfo`'s fields are named for what WRenViewport::FogOn (0x007F8A30) reads: the colour's red, green, blue, then start and end.
 - Decals: Scatter and Erase drag modes and a size variation, all symmetric. Assets: a unit, prop, decal or marker tile dragged onto the map is placed there; effect tiles show the texture the effect draws with.
 - Not here: the strategic view's colours (the `.scmap` keeps only its cartographic decals, Cartographic::ReadDecals 0x007D1D30).
+- Unit-tested where the code is plain (relief, mask file names, water presets, the sky's fit, decal scatter points, effect textures); none of these was run in the editor yet.
 
 **Objects**:
 - With the Select tool, copy takes every kind selected at once. Selected units show range rings from their blueprints (weapons' reach and least reach, vision, radar); the Units panel gives them to another army. Edit › Mirror the selection copies selected markers, props, units and decals through the symmetry (`/symcheck 1` and `/command tool.0,select.all,edit.mirror` on the resized map: 749 props, 749 copies).
 - Draw a chain (Markers): each marker placed joins the named chain, its symmetric copies chains of their own; Ctrl+click starts the next. Props: Line places along a drag at a spacing.
 - The marker palette adds the types of FAF's `/lua/MarkerTemplates.lua` it lacks (3 on the current FAF files), and a selected marker's type can be changed in place.
+- Not run in the editor yet: the mixed clipboard, range rings, Give, Draw a chain, the prop line, a type change (the template reader and the type change are unit-tested).
 
 **Check, console and mission run**:
 - The Check runs every call of the game's script modules in `_script.lua` against the API table (a function a module hasn't got, too many arguments) and offers fixes: Pull inside for a start or resource off the map or playable area, Snap to grid for a resource off its cell's middle; a row's fix button and Fix all. On a test map with both planted: "ScenarioFramework has no function NoSuchFunction" at line 11, Mass 08 off its grid; a simulated click on Snap to grid moved it to 112.5, 305.5 (the button didn't get the click before: fixed).
