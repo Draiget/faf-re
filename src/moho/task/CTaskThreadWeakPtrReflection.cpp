@@ -42,8 +42,7 @@ namespace
       return out;
     }
 
-    out.mObj =
-      reinterpret_cast<void*>(reinterpret_cast<std::uintptr_t>(thread) - static_cast<std::uintptr_t>(baseOffset));
+    out.mObj = gpg::CompleteObject(thread, baseOffset);
     out.mType = dynamicType;
     return out;
   }
@@ -226,12 +225,12 @@ gpg::RRef moho::RWeakPtrType<moho::CTaskThread>::SubscriptIndex(
  */
 void moho::WeakPtr_CTaskThread::Deserialize(
   gpg::ReadArchive* const archive,
-  const std::intptr_t objectPtr,
+  void* const objectPtr,
   int /*version*/,
   gpg::RRef* ownerRef
 )
 {
-  auto* const weak = reinterpret_cast<moho::WeakPtr<moho::CTaskThread>*>(objectPtr);
+  auto* const weak = static_cast<moho::WeakPtr<moho::CTaskThread>*>(objectPtr);
   GPG_ASSERT(weak != nullptr);
 
   const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
@@ -243,12 +242,12 @@ void moho::WeakPtr_CTaskThread::Deserialize(
  */
 void moho::WeakPtr_CTaskThread::Serialize(
   gpg::WriteArchive* const archive,
-  const std::intptr_t objectPtr,
+  void* const objectPtr,
   int /*version*/,
   gpg::RRef* ownerRef
 )
 {
-  auto* const weak = reinterpret_cast<moho::WeakPtr<moho::CTaskThread>*>(objectPtr);
+  auto* const weak = static_cast<moho::WeakPtr<moho::CTaskThread>*>(objectPtr);
   GPG_ASSERT(weak != nullptr);
 
   const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};

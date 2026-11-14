@@ -233,7 +233,7 @@ namespace moho
    *  - Deserialize(): 0x0060AA10 (confirmed via raw asm: `objectPtr` in EAX,
    *    `archive` in EDI, tail-calls `CUnitTeleportTask::MemberDeserialize`'s
    *    custom-ABI body at 0x0060D270 -- matches the template's
-   *    `reinterpret_cast<T*>(objectPtr)->MemberDeserialize(archive)` exactly)
+   *    `static_cast<T*>(objectPtr)->MemberDeserialize(archive)` exactly)
    *  - Serialize(): 0x0060AA20 (same shape, tail-calls
    *    `CUnitTeleportTask::MemberSerialize` at 0x0060D350)
    *

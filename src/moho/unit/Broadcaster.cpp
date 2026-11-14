@@ -18,7 +18,12 @@
 
 namespace gpg
 {
-  void SaveBroadcasterListenerChainEUnitCommandQueueStatus(WriteArchive* archive, std::intptr_t objectPtr);
+  void SaveBroadcasterListenerChainEUnitCommandQueueStatus(
+    WriteArchive* archive,
+    void* objectPtr,
+    int version,
+    RRef* ownerRef
+  );
 } // namespace gpg
 
 namespace
@@ -48,7 +53,7 @@ namespace
      * listener pointers until a null sentinel and relinking each listener node
      * into the broadcaster ring.
      */
-    static void SerLoad(gpg::ReadArchive* archive, std::intptr_t objectPtr, int version, gpg::RRef* ownerRef);
+    static void SerLoad(gpg::ReadArchive* archive, void* objectPtr, int version, gpg::RRef* ownerRef);
 
     /**
      * Address: 0x006EA810 (FUN_006EA810, Moho::RBroadcasterRType_ECommandEvent::SerSave)
@@ -58,7 +63,7 @@ namespace
      * each linked listener pointer as `UNOWNED` and terminating with one null
      * pointer record.
      */
-    static void SerSave(gpg::WriteArchive* archive, std::intptr_t objectPtr, int version, gpg::RRef* ownerRef);
+    static void SerSave(gpg::WriteArchive* archive, void* objectPtr, int version, gpg::RRef* ownerRef);
 
     /**
      * Address: 0x006E97D0 (FUN_006E97D0, Moho::RBroadcasterRType_ECommandEvent::GetName)
@@ -96,7 +101,7 @@ namespace
      * reading listener pointers until a null sentinel and relinking each
      * listener node into the broadcaster ring.
      */
-    static void SerLoad(gpg::ReadArchive* archive, std::intptr_t objectPtr, int version, gpg::RRef* ownerRef);
+    static void SerLoad(gpg::ReadArchive* archive, void* objectPtr, int version, gpg::RRef* ownerRef);
 
     /**
      * Address: 0x006F92F0 (FUN_006F92F0, Moho::RBroadcasterRType_EUnitCommandQueueStatus::dtr)
@@ -134,9 +139,7 @@ namespace
       size_ = sizeof(moho::Broadcaster<moho::EUnitCommandQueueStatus>);
       version_ = 1;
       serLoadFunc_ = &RBroadcasterRType_EUnitCommandQueueStatus::SerLoad;
-      serSaveFunc_ = reinterpret_cast<gpg::RType::save_func_t>(
-        reinterpret_cast<void (*)()>(&gpg::SaveBroadcasterListenerChainEUnitCommandQueueStatus)
-      );
+      serSaveFunc_ = &gpg::SaveBroadcasterListenerChainEUnitCommandQueueStatus;
     }
   };
 
@@ -277,12 +280,12 @@ namespace
    */
   void RBroadcasterRType_ECommandEvent::SerLoad(
     gpg::ReadArchive* const archive,
-    const std::intptr_t objectPtr,
+    void* const objectPtr,
     const int,
     gpg::RRef* const ownerRef
   )
   {
-    auto* const broadcaster = reinterpret_cast<moho::Broadcaster<moho::ECommandEvent>*>(objectPtr);
+    auto* const broadcaster = static_cast<moho::Broadcaster<moho::ECommandEvent>*>(objectPtr);
     GPG_ASSERT(archive != nullptr);
     GPG_ASSERT(broadcaster != nullptr);
     if (!archive || !broadcaster) {
@@ -306,12 +309,12 @@ namespace
    */
   void RBroadcasterRType_ECommandEvent::SerSave(
     gpg::WriteArchive* const archive,
-    const std::intptr_t objectPtr,
+    void* const objectPtr,
     const int,
     gpg::RRef* const
   )
   {
-    auto* const broadcaster = reinterpret_cast<moho::Broadcaster<moho::ECommandEvent>*>(objectPtr);
+    auto* const broadcaster = static_cast<moho::Broadcaster<moho::ECommandEvent>*>(objectPtr);
     GPG_ASSERT(archive != nullptr);
     GPG_ASSERT(broadcaster != nullptr);
     if (!archive || !broadcaster) {
@@ -339,12 +342,12 @@ namespace
    */
   void RBroadcasterRType_EUnitCommandQueueStatus::SerLoad(
     gpg::ReadArchive* const archive,
-    const std::intptr_t objectPtr,
+    void* const objectPtr,
     const int,
     gpg::RRef* const ownerRef
   )
   {
-    auto* const broadcaster = reinterpret_cast<moho::Broadcaster<moho::EUnitCommandQueueStatus>*>(objectPtr);
+    auto* const broadcaster = static_cast<moho::Broadcaster<moho::EUnitCommandQueueStatus>*>(objectPtr);
     GPG_ASSERT(archive != nullptr);
     GPG_ASSERT(broadcaster != nullptr);
     if (!archive || !broadcaster) {
@@ -464,10 +467,12 @@ namespace gpg
    */
   void SaveBroadcasterListenerChainEUnitCommandQueueStatus(
     WriteArchive* const archive,
-    const std::intptr_t objectPtr
+    void* objectPtr,
+    int,
+    RRef*
   )
   {
-    auto* const broadcaster = reinterpret_cast<moho::Broadcaster<moho::EUnitCommandQueueStatus>*>(objectPtr);
+    auto* const broadcaster = static_cast<moho::Broadcaster<moho::EUnitCommandQueueStatus>*>(objectPtr);
     GPG_ASSERT(archive != nullptr);
     GPG_ASSERT(broadcaster != nullptr);
     if (!archive || !broadcaster) {

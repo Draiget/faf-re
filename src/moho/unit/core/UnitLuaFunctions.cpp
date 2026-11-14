@@ -1648,7 +1648,7 @@ namespace moho
         CUnitCommand* const command = weakCommand.GetObjectPtr();
         const bool isUpgradeToDest = command != nullptr &&
           command->mVarDat.mCmdType == EUnitCommandType::UNITCOMMAND_Upgrade &&
-          command->mConstDat.blueprint == reinterpret_cast<const REntityBlueprint*>(destBlueprint);
+          command->mConstDat.blueprint == destBlueprint;
         if (!isUpgradeToDest) {
           dest->CommandQueue->AddCommandToQueue(command);
         }

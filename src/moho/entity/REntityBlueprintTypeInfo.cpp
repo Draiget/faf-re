@@ -134,7 +134,7 @@ namespace
      * Reads one serialized string-vector lane (count + string elements) and
      * replaces destination storage.
      */
-    static void SerLoad(gpg::ReadArchive* archive, std::intptr_t objectPtr, int version, gpg::RRef* ownerRef);
+    static void SerLoad(gpg::ReadArchive* archive, void* objectPtr, int version, gpg::RRef* ownerRef);
 
     /**
      * Address: 0x00512F60 (FUN_00512F60, gpg::RVectorType_string::SerSave)
@@ -142,7 +142,7 @@ namespace
      * What it does:
      * Writes one reflected string-vector lane as count + element payloads.
      */
-    static void SerSave(gpg::WriteArchive* archive, std::intptr_t objectPtr, int version, gpg::RRef* ownerRef);
+    static void SerSave(gpg::WriteArchive* archive, void* objectPtr, int version, gpg::RRef* ownerRef);
 
     [[nodiscard]] gpg::RRef SubscriptIndex(void* obj, int ind) const override;
     [[nodiscard]] size_t GetCount(void* obj) const override;
@@ -237,7 +237,7 @@ namespace
    */
   void RStringVectorTypeInfo::SerLoad(
     gpg::ReadArchive* const archive,
-    const std::intptr_t objectPtr,
+    void* const objectPtr,
     const int,
     gpg::RRef* const
   )
@@ -246,7 +246,7 @@ namespace
       return;
     }
 
-    auto* const storage = reinterpret_cast<StringVector*>(objectPtr);
+    auto* const storage = static_cast<StringVector*>(objectPtr);
     unsigned int count = 0u;
     archive->ReadUInt(&count);
 
@@ -264,7 +264,7 @@ namespace
 
   void RStringVectorTypeInfo::SerSave(
     gpg::WriteArchive* const archive,
-    const std::intptr_t objectPtr,
+    void* const objectPtr,
     const int,
     gpg::RRef* const
   )
@@ -273,7 +273,7 @@ namespace
       return;
     }
 
-    auto* const storage = reinterpret_cast<StringVector*>(objectPtr);
+    auto* const storage = static_cast<StringVector*>(objectPtr);
     const unsigned int count = storage != nullptr ? static_cast<unsigned int>(storage->size()) : 0u;
     archive->WriteUInt(count);
 
@@ -449,7 +449,7 @@ namespace
       return outRef;
     }
 
-    outRef->mObj = reinterpret_cast<char*>(value) - static_cast<std::ptrdiff_t>(baseOffset);
+    outRef->mObj = gpg::CompleteObject(value, baseOffset);
     outRef->mType = runtimeType;
     return outRef;
   }

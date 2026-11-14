@@ -3977,11 +3977,11 @@ namespace fa
      * resize(n, val)` for `ClusterInternalCache<gpg::HaStar::
      * OccupationData>::mVec` (`OccupationCacheMap`,
      * `gpg/core/algorithms/Cluster.cpp`) -- same 4-byte `list<pair<const
-     * OccupationCacheKey, Cluster::Data*>>::iterator` element as
+     * OccupationData, Cluster::Data*>>::iterator` element as
      * `insert`'s `FUN_0092F9E0` above. Grows via that
      * `insert(last_, newSize-cur, val)` call; shrinks via the erase
      * body `FUN_0092EA10` (not part of this pass). Reached from
-     * `hash_map<OccupationCacheKey,...>::insert(value)`'s inlined
+     * `hash_map<OccupationData,...>::insert(value)`'s inlined
      * `_Grow()` (`FUN_00930890`, IDA-named
      * `std::hash_map_unk_unk::insert`, sole caller per
      * `_callgraph_index.sqlite`) -- `mVec.resize(2 * windowCount - 1,
@@ -4407,12 +4407,12 @@ namespace fa
      * 0x00930790 runs for `mVec(min_buckets + 1, end())`; callers 0x009300D0; formerly
      * `ReleaseLegacyBufferTripleRuntimeD` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.) Address:
      * 0x00933120 (FUN_00933120 -- `tidy()` for the bucket vector `hash_table::mVec` of `OccupationCacheMap`
-     * (`ClusterInternalCache<OccupationData>`'s `fa::hash_map<OccupationCacheKey, Cluster::Data*>`, 0x20-byte node,
+     * (`ClusterInternalCache<OccupationData>`'s `fa::hash_map<OccupationData, Cluster::Data*>`, 0x20-byte node,
      * head bought by 0x009327A0): the `catch (...) { tidy(); throw; }` arm (0x00934235) of `vector(count, value)`
      * 0x009341A0, run by `hash_table()` 0x00934820; callers 0x009341A0; formerly `ReleaseLegacyBufferTripleRuntimeE` in
      * moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.) Address: 0x00933150 (FUN_00933150 -- `tidy()`
      * for the bucket vector `hash_table::mVec` of `SubclusterCacheMap` (`ClusterInternalCache<SubclusterData>`'s
-     * `fa::hash_map<SubclusterCacheKey, Cluster::Data*>`, 0x50-byte node, head bought by 0x009327E0): the `catch (...)
+     * `fa::hash_map<SubclusterData, Cluster::Data*>`, 0x50-byte node, head bought by 0x009327E0): the `catch (...)
      * { tidy(); throw; }` arm (0x009342E5) of `vector(count, value)` 0x00934250, run by `hash_table()` 0x00934B60;
      * callers 0x00934250; formerly `ReleaseLegacyBufferTripleRuntimeF` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE),
      * removed 2026-09-30.) Address: 0x006E2180 (FUN_006E2180 -- `tidy()` for `fa::vector<moho::CmdId>`
@@ -5271,7 +5271,7 @@ namespace fa
      * for this trivially-destructible element) with a redundant-store
      * guard the compiler added around the unconditional pointer write,
      * not a divergence from this member's unconditional `clear()` call.
-     * Reached from `hash_map<OccupationCacheKey,...>`'s default
+     * Reached from `hash_map<OccupationData,...>`'s default
      * constructor (`FUN_00930810`, a 1-statement thiscall thunk into
      * this token, cited as `skip`) and from `clear()` (`FUN_00930B40`,
      * IDA-named `std::hash_map_unk_unk::clear`) -- both call sites are
@@ -7528,12 +7528,12 @@ namespace fa
      *
      * Address: 0x0092F9E0 (FUN_0092F9E0, sub_92F9E0) -- `fa::
      * vector<iterator>::insert(pos, count, value)` for `fa::hash_map<
-     * OccupationCacheKey, gpg::HaStar::Cluster::Data*, hash_compare<
-     * OccupationCacheKey, OccupationKeyOrder>>::mVec`
+     * OccupationData, gpg::HaStar::Cluster::Data*, hash_compare<
+     * OccupationData>>::mVec`
      * (`OccupationCacheMap`, `ClusterInternalCache<gpg::HaStar::
      * OccupationData>::mVec`, `gpg/core/algorithms/Cluster.cpp`) -- the
      * bucket-index vector whose element is `fa::list<std::pair<const
-     * OccupationCacheKey, Cluster::Data*>>::iterator`, a single 4-byte
+     * OccupationData, Cluster::Data*>>::iterator`, a single 4-byte
      * `_Nodeptr` wrapper (this file's own `list<T>::iterator`), matching
      * the `0x3FFFFFFF` (`0xFFFFFFFF/4`) `max_size` fold this body
      * carries. Carries this method's full two-branch shape: `sub_92F0D0`
@@ -7561,7 +7561,7 @@ namespace fa
      *
      * Reached from `resize(n, val)`'s grow branch (`FUN_0092FC60`,
      * IDA-named `std::vector_MapNode::resize`, cited below on
-     * `resize`), itself called from `hash_map<OccupationCacheKey,...>::
+     * `resize`), itself called from `hash_map<OccupationData,...>::
      * insert(value)` (`FUN_00930890`, IDA-named
      * `std::hash_map_unk_unk::insert`, `_Grow()` inlined) when the load
      * factor is exceeded -- the source-level trigger is
@@ -15532,7 +15532,7 @@ namespace fa
      * Address: 0x00932FD0 (FUN_00932FD0, sub_932FD0, `_Buynode` below)
      * / 0x009333D0 (FUN_009333D0, `_Incsize` below) -- the 0x50-byte-
      * node (0x48-byte `value_type`) instantiation for `fa::list<
-     * std::pair<const SubclusterCacheKey, gpg::HaStar::Cluster::Data*>>`
+     * std::pair<const SubclusterData, gpg::HaStar::Cluster::Data*>>`
      * (`gpg/core/algorithms/Cluster.cpp`'s subcluster-key table). This
      * instantiation is the one that shows `max_size()` really is
      * `0xFFFFFFFF / sizeof(value_type)` per element width rather than a
@@ -15552,7 +15552,7 @@ namespace fa
      * form expresses the same net state via placement-new (`_Buynode`) followed
      * by the explicit link reassignment below. FUN_004E3310 checks `_Mysize`
      * against what looked like a Dinkumware-generic `0x3FFFFFFF` cap before the
-     * SubclusterCacheKey instantiation above proved it is really `max_size()` --
+     * SubclusterData instantiation above proved it is really `max_size()` --
      * `0xFFFFFFFF / sizeof(value_type)`, which happens to fold to the same
      * `0x3FFFFFFF` immediate for every 4-byte-pointer/scalar `T` cited above --
      * and throws `std::length_error("list<T> too long")` before incrementing;
@@ -15596,7 +15596,7 @@ namespace fa
 
     /**
      * Address: 0x00933CF0 (FUN_00933CF0, sub_933CF0) -- `fa::list<
-     * std::pair<const SubclusterCacheKey, gpg::HaStar::Cluster::Data*>>::
+     * std::pair<const SubclusterData, gpg::HaStar::Cluster::Data*>>::
      * insert(const_iterator, InputIt, InputIt)` (`gpg/core/algorithms/
      * Cluster.cpp`'s subcluster-key table). Copies `[first, last)` node
      * by node ahead of `pos`, buying each node through the same body as
@@ -15618,7 +15618,7 @@ namespace fa
      * disassembling the raw PE bytes directly (capstone, against
      * `bin/external/ForgedAlliance.exe`) rather than trusting the
      * callgraph index, which has no token for that address. The stub
-     * sits in the same run of `hash_map<SubclusterCacheKey, ...>`
+     * sits in the same run of `hash_map<SubclusterData, ...>`
      * calling-convention thunks as the already-tokenized/`skip`-marked
      * `FUN_009344B0` (`jmp FUN_00934300`) two slots later, and
      * immediately follows the already-recovered bucket-vector resize
@@ -15678,7 +15678,7 @@ namespace fa
 
     /**
      * Address: 0x009334E0 (FUN_009334E0, sub_9334E0) -- `fa::list<
-     * std::pair<const SubclusterCacheKey, gpg::HaStar::Cluster::Data*>>::
+     * std::pair<const SubclusterData, gpg::HaStar::Cluster::Data*>>::
      * erase(iterator)` (`gpg/core/algorithms/Cluster.cpp`'s
      * subcluster-key table). Standalone out-of-line body: captures
      * `node->_Next` as the return value up front, then -- guarded by
@@ -15692,7 +15692,7 @@ namespace fa
      *
      * The `node != _Myhead` guard is real MSVC8 `<list>` shape, not a
      * defensive addition invented during recovery: `FUN_009346F0`
-     * (`hash_map<SubclusterCacheKey, ...>::erase(iterator)`,
+     * (`hash_map<SubclusterData, ...>::erase(iterator)`,
      * `legacy/containers/HashMap.h`) inlines this *exact* sequence --
      * same guard, same unlink order, same `eh vector destructor
      * iterator(ptr, 4, 16, Cluster::~Cluster)` call -- directly into
@@ -15834,7 +15834,7 @@ namespace fa
     /**
      * Address: 0x00932FD0 (FUN_00932FD0, sub_932FD0) -- the node-buy
      * body instantiated for `fa::list<std::pair<const
-     * SubclusterCacheKey, gpg::HaStar::Cluster::Data*>>`
+     * SubclusterData, gpg::HaStar::Cluster::Data*>>`
      * (`gpg/core/algorithms/Cluster.cpp`'s subcluster-key table).
      *
      * IDA signature:
@@ -15930,7 +15930,7 @@ namespace fa
     /**
      * Address: 0x009333D0 (FUN_009333D0, sub_9333D0) -- the checked
      * size increment instantiated for `fa::list<std::pair<const
-     * SubclusterCacheKey, gpg::HaStar::Cluster::Data*>>`
+     * SubclusterData, gpg::HaStar::Cluster::Data*>>`
      * (`gpg/core/algorithms/Cluster.cpp`'s subcluster-key table),
      * called from `insert(pos, first, last)`'s copy loop
      * (`FUN_00933CF0`, cited there) once per element bought.
@@ -15941,9 +15941,9 @@ namespace fa
      * What it does:
      * `if (max_size() - _Mysize < count) throw
      * length_error("list<T> too long"); _Mysize += count;`. This
-     * instantiation's `pair<const SubclusterCacheKey, gpg::HaStar::
+     * instantiation's `pair<const SubclusterData, gpg::HaStar::
      * Cluster::Data*>` `value_type` is 0x48 (72) bytes --
-     * `SubclusterCacheKey`'s sixteen embedded 4-byte `gpg::HaStar::
+     * `SubclusterData`'s sixteen embedded 4-byte `gpg::HaStar::
      * Cluster` handles plus the 4-byte `Data*` -- so `max_size()` folds
      * to `0xFFFFFFFF / 0x48 = 0x038E8FE3` (59652323 decimal), exactly
      * the constant this address compares `_Mysize` against. Confirms

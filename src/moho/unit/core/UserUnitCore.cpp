@@ -1,5 +1,7 @@
 #include "moho/unit/core/UserUnitPrivate.h"
 
+#include "moho/resource/CSimResources.h"
+
 namespace
 {
   void WarnFocusArmyUnitDamagedCallbackError(const std::exception& exception) noexcept;
@@ -72,48 +74,6 @@ namespace moho
 
 namespace
 {
-
-  /**
-   * Address: 0x008BEF80 (FUN_008BEF80, Moho::IUnit_UserUnit::CalcTransportLoadFactor)
-   *
-   * What it does:
-   * Returns the fixed transport-load factor used by the UserUnit IUnit bridge.
-   */
-  [[maybe_unused]] [[nodiscard]] float IUnitBridgeCalcTransportLoadFactor(
-    const IUnit* const bridge
-  ) noexcept
-  {
-    (void)bridge;
-    return 1.0f;
-  }
-
-  /**
-   * Address: 0x008BEFA0 (FUN_008BEFA0, Moho::IUnit_UserUnit::DestroyQueued)
-   *
-   * What it does:
-   * Returns false for the UserUnit IUnit bridge destroy-queued lane.
-   */
-  [[maybe_unused]] [[nodiscard]] bool IUnitBridgeDestroyQueued(
-    const IUnit* const bridge
-  ) noexcept
-  {
-    (void)bridge;
-    return false;
-  }
-
-  /**
-   * Address: 0x008BEFC0 (FUN_008BEFC0, Moho::IUnit_UserUnit::IsNavigatorIdle)
-   *
-   * What it does:
-   * Returns false for the UserUnit IUnit bridge navigator-idle lane.
-   */
-  [[maybe_unused]] [[nodiscard]] bool IUnitBridgeIsNavigatorIdle(
-    const IUnit* const bridge
-  ) noexcept
-  {
-    (void)bridge;
-    return false;
-  }
 
   /**
    * Address: 0x008BF020 (FUN_008BF020, Moho::IUnit_UserUnit::IsUnitState)
@@ -504,7 +464,7 @@ namespace
     const REntityBlueprint* const blueprint
   ) noexcept
   {
-    return blueprint != nullptr && categorySet.Bits().Contains(blueprint->mCategoryBitIndex);
+    return blueprint != nullptr && categorySet.Bits().Contains(blueprint->mBlueprintOrdinal);
   }
 
   [[nodiscard]] bool WeaponAllowsBlueprint(
@@ -554,32 +514,6 @@ namespace
     return std::sqrt((dx * dx) + (dz * dz));
   }
 
-  /**
-   * Address: 0x008528B0 (FUN_008528B0)
-   *
-   * What it does:
-   * Copies one contiguous `Vector3<float>` range `[sourceBegin, sourceEnd)`
-   * into destination storage and returns one-past the copied destination lane.
-   */
-  [[maybe_unused]] Wm3::Vector3<float>* CopyVector3RangeNullable(
-    Wm3::Vector3<float>* destination,
-    const Wm3::Vector3<float>* const sourceBegin,
-    const Wm3::Vector3<float>* const sourceEnd
-  ) noexcept
-  {
-    std::uintptr_t destinationAddress = reinterpret_cast<std::uintptr_t>(destination);
-    for (const Wm3::Vector3<float>* source = sourceBegin; source != sourceEnd; ++source) {
-      if (destinationAddress != 0u) {
-        auto* const out = reinterpret_cast<Wm3::Vector3<float>*>(destinationAddress);
-        out->x = source->x;
-        out->y = source->y;
-        out->z = source->z;
-      }
-      destinationAddress += sizeof(Wm3::Vector3<float>);
-    }
-
-    return reinterpret_cast<Wm3::Vector3<float>*>(destinationAddress);
-  }
 } // namespace
 
 namespace moho
@@ -615,11 +549,9 @@ namespace moho
    * Bridge exposing the file-local `GetLastQueuedUserCommandHelper` (FUN_008B7320)
    * to the recovered `cfunc_IssueDockCommandL` worker. Resolves the unit's
    * command-manager handle (`UserUnit::GetCommandQueue`, slot 6) and returns the
-   * most recent queued command-issue helper as an opaque cross-TU handle. The
-   * dock worker reinterprets this handle as the command-graph anchor history the
-   * binary walks to seed its centroid (identical binary object).
+   * most recent queued command-issue helper.
    */
-  const QueuedUserCommandRecord* GetLastQueuedUserCommandAnchor(
+  const UserCommandIssueHelper* GetLastQueuedUserCommandAnchor(
     const UserUnit* const unit
   ) noexcept
   {
@@ -632,7 +564,7 @@ namespace moho
       return nullptr;
     }
 
-    return reinterpret_cast<const QueuedUserCommandRecord*>(GetLastQueuedUserCommandHelper(manager));
+    return GetLastQueuedUserCommandHelper(manager);
   }
 
   /**
@@ -1939,11 +1871,11 @@ bool UserUnit::IsOverchargePaused() const
  * Address: 0x008BF010 (FUN_008BF010)
  *
  * What it does:
- * Returns the in-object custom-name storage anchor at +0x1DC.
+ * Returns the unit's custom-name string at +0x1DC.
  */
-char* UserUnit::GetCustomName()
+const fa::string& UserUnit::GetCustomName()
 {
-  return reinterpret_cast<char*>(&mUnitVarDat.mCustomName);
+  return mUnitVarDat.mCustomName;
 }
 
 /**
@@ -2183,7 +2115,7 @@ bool UserUnit::CanAttackTarget(
   }
 
   const float cursorDistance =
-    PlanarDistanceXZ(selfEntity->mVariableData.mCurTransform.pos_, activeSession->CursorWorldPos);
+    PlanarDistanceXZ(selfEntity->mVariableData.mCurTransform.pos_, activeSession->mCursorInfo.mMouseWorldPos);
   const UnitWeaponInfo* weaponInfo = GetWeaponInfoBegin(this);
   const UnitWeaponInfo* const weaponInfoEnd = GetWeaponInfoEnd(this);
   while (weaponInfo != weaponInfoEnd) {
@@ -2211,13 +2143,13 @@ bool moho::USERUNIT_CanBeBuiltAt(
   const SCoordsVec2& buildPosition,
   const bool allowCommandOverlap,
   SOccupationResult* const buildInfo,
-  const UserCommand* const ignoredCommand
+  const UserCommandIssueHelper* const ignoredCommand
 )
 {
   (void)allowCommandOverlap;
 
   auto* const map = session.mWldMap->mTerrainRes->mMap;
-  auto* const resources = reinterpret_cast<ISimResources*>(session.mSimResources.get());
+  ISimResources* const resources = session.mSimResources.get();
   if (!OCCUPY_Check(*map, *buildBlueprint, buildPosition, *resources, *buildInfo)) {
     return false;
   }
@@ -2279,7 +2211,7 @@ bool moho::USERUNIT_CanBeBuiltAt(
       continue;
     }
 
-    if (ignoredCommand != nullptr && reinterpret_cast<const UserCommand*>(helper) == ignoredCommand) {
+    if (ignoredCommand != nullptr && helper == ignoredCommand) {
       continue;
     }
 

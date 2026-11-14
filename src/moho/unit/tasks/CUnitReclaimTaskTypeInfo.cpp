@@ -20,18 +20,6 @@ namespace
     return &sInstance;
   }
 
-  /**
-   * Address: 0x0061ED40 (FUN_0061ED40, sub_61ED40)
-   *
-   * What it does:
-   * Constructs and preregisters static RTTI descriptor storage for
-   * `moho::CUnitReclaimTask`.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::RType* construct_CUnitReclaimTaskTypeInfo()
-  {
-    return AcquireCUnitReclaimTaskTypeInfo();
-  }
-
   [[nodiscard]] gpg::RRef MakeCUnitReclaimTaskRef(
     moho::CUnitReclaimTask* const object
   )
@@ -156,7 +144,7 @@ namespace moho
   {
     auto* const object = gpg::ConstructInStorage<moho::CUnitReclaimTask>(objectStorage);
 
-    return MakeCUnitReclaimTaskRef(reinterpret_cast<CUnitReclaimTask*>(object));
+    return MakeCUnitReclaimTaskRef(static_cast<CUnitReclaimTask*>(object));
   }
 
   /**

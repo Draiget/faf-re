@@ -61,18 +61,6 @@ namespace
   }
 
   /**
-   * Address: 0x00508E90 (FUN_00508E90, delayed-sub-viz typed read helper duplicate)
-   */
-  [[maybe_unused]] void ReadDelayedSubVizInfoViaRTypeVariant2(
-    gpg::ReadArchive* const archive,
-    void* const object,
-    const gpg::RRef* const ownerRef
-  )
-  {
-    (void)ReadDelayedSubVizInfoViaRTypeVariant1(archive, object, ownerRef);
-  }
-
-  /**
    * Address: 0x00508BA0 (FUN_00508BA0, delayed-sub-viz typed write helper)
    */
   gpg::WriteArchive* WriteDelayedSubVizInfoViaRTypeVariant1(
@@ -89,29 +77,6 @@ namespace
   }
 
   /**
-   * Address: 0x00508EC0 (FUN_00508EC0, delayed-sub-viz typed write helper duplicate)
-   */
-  [[maybe_unused]] void WriteDelayedSubVizInfoViaRTypeVariant2(
-    gpg::WriteArchive* const archive,
-    const void* const object,
-    const gpg::RRef* const ownerRef
-  )
-  {
-    (void)WriteDelayedSubVizInfoViaRTypeVariant1(archive, object, ownerRef);
-  }
-
-  /**
-   * Address: 0x00508AD0 (FUN_00508AD0, delayed-sub-viz RRef fill helper)
-   */
-  [[maybe_unused]] gpg::RRef* FillDelayedSubVizRef(
-    moho::SDelayedSubVizInfo* const value,
-    gpg::RRef* const outRef
-  )
-  {
-    return gpg::RRef_SDelayedSubVizInfo(outRef, value);
-  }
-
-  /**
    * Address: 0x005080C0 (FUN_005080C0, gpg::RVectorType_SDelayedSubVizInfo::SerLoad)
    *
    * What it does:
@@ -120,12 +85,12 @@ namespace
    */
   void LoadSDelayedSubVizInfoVector(
     gpg::ReadArchive* archive,
-    std::intptr_t objectPtr,
+    void* objectPtr,
     int,
     gpg::RRef* ownerRef
   )
   {
-    auto* const out = reinterpret_cast<DelayedSubVizVector*>(objectPtr);
+    auto* const out = static_cast<DelayedSubVizVector*>(objectPtr);
     GPG_ASSERT(archive != nullptr);
     GPG_ASSERT(out != nullptr);
     if (!archive || !out) {
@@ -161,12 +126,12 @@ namespace
    */
   void SaveSDelayedSubVizInfoVector(
     gpg::WriteArchive* archive,
-    std::intptr_t objectPtr,
+    void* objectPtr,
     int,
     gpg::RRef* ownerRef
   )
   {
-    auto* const source = reinterpret_cast<const DelayedSubVizVector*>(objectPtr);
+    auto* const source = static_cast<const DelayedSubVizVector*>(objectPtr);
     GPG_ASSERT(archive != nullptr);
     GPG_ASSERT(source != nullptr);
     if (!archive || !source) {

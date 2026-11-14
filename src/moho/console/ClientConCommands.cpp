@@ -193,9 +193,9 @@ namespace
       if (nearestToMouse) {
         // Keep only the single unit nearest the cursor world position.
         const Wm3::Vec3f& unitPos = iunit->GetPosition();
-        const float dx = unitPos.x - session->CursorWorldPos.x;
-        const float dy = unitPos.y - session->CursorWorldPos.y;
-        const float dz = unitPos.z - session->CursorWorldPos.z;
+        const float dx = unitPos.x - session->mCursorInfo.mMouseWorldPos.x;
+        const float dy = unitPos.y - session->mCursorInfo.mMouseWorldPos.y;
+        const float dz = unitPos.z - session->mCursorInfo.mMouseWorldPos.z;
         const float distance = std::sqrt(dx * dx + dy * dy + dz * dz);
         if (nearestDistance > distance) {
           nearestEntity = candidate;
@@ -406,17 +406,15 @@ namespace
     return {outputBegin, outputCursor};
   }
   /**
-   * `UserUnit::GetCustomName` (vtable slot +0x60) hands back the address of the
-   * unit's in-object custom-name storage; the recovered declaration types that
-   * anchor as `char*`, but the binary reads it as an `fa::string` (it tests
-   * `+0x14` for the size and picks the SSO buffer or heap pointer off `+0x04`).
-   * Recover the string the engine actually reads through.
+   * `UserUnit::GetCustomName` (vtable slot +0x60): the unit's custom-name
+   * `fa::string` (the binary tests `+0x14` for the size and picks the SSO
+   * buffer or heap pointer off `+0x04`).
    */
   [[nodiscard]] const fa::string& CustomNameStorage(
     UserUnit* const userUnit
   ) noexcept
   {
-    return *reinterpret_cast<const fa::string*>(userUnit->GetCustomName());
+    return userUnit->GetCustomName();
   }
   /**
    * The first live selected entity, or `nullptr` when none is left: `begin()`
@@ -1390,7 +1388,7 @@ void moho::CON_PopupCreateUnitMenu(
 
   LuaPlus::LuaObject createDialogObject = moduleObject["CreateDialog"];
   LuaPlus::LuaFunction<> createDialogFunction(createDialogObject);
-  createDialogFunction(session->CursorScreenPos.x, session->CursorScreenPos.y);
+  createDialogFunction(session->mCursorInfo.mMouseScreenPos.x, session->mCursorInfo.mMouseScreenPos.y);
 }
 
 /**
@@ -1422,7 +1420,7 @@ void moho::CON_CreateProp(
     character = static_cast<char>(std::tolower(static_cast<unsigned char>(character)));
   }
 
-  WLD_GetDriver()->CreateProp(normalizedBlueprintPath.c_str(), session->CursorWorldPos);
+  WLD_GetDriver()->CreateProp(normalizedBlueprintPath.c_str(), session->mCursorInfo.mMouseWorldPos);
 }
 
 /**
@@ -1456,7 +1454,7 @@ void moho::CON_CreateUnit(
     return;
   }
 
-  SCoordsVec2 spawnPos{session->CursorWorldPos.x, session->CursorWorldPos.z};
+  SCoordsVec2 spawnPos{session->mCursorInfo.mMouseWorldPos.x, session->mCursorInfo.mMouseWorldPos.z};
 
   // The binary gates the explicit-screen-point path on `tokenCount >= 4` while
   // reading tokens 3 *and* 4, so a four-token invocation reads one past the
@@ -2058,7 +2056,7 @@ void moho::CON_TeleportSelectedUnits(
 
     IUnit* const iunit = ResolveIUnitBridge(userUnit);
     VTransform destination = entityView->mVariableData.mCurTransform;
-    destination.pos_ = session->CursorWorldPos;
+    destination.pos_ = session->mCursorInfo.mMouseWorldPos;
     destination.pos_.y = IUnit::CalcSpawnElevation(
       terrainMap, static_cast<ELayer>(entityView->mVariableData.mLayerMask), destination, iunit->GetAttributes()
     );
@@ -2163,7 +2161,7 @@ void moho::WLD_GameSpeed(
  * esp-relative trace of the call site cross-checked against the callee's
  * own prologue (`Moho::CSimDriver::ExecuteDebugCommand`, FUN_0073D1B0,
  * SimDriver.cpp): `command` is `CON_UnparseCommand`'s result c_str(),
- * `worldPos` is `session->CursorWorldPos`, `focusArmy` is
+ * `worldPos` is `session->mCursorInfo.mMouseWorldPos`, `focusArmy` is
  * `session->FocusArmy`, and `entities` is a `BVSet<EntId, EntIdUniverse>`
  * built from the current selection's entity IDs. The raw call site also
  * passes a 5th, undocumented hidden out-pointer that the already-recovered
@@ -2204,7 +2202,7 @@ void moho::DoSimCommand(
       (void)entities.Bits().Add(entityView->mParams.mEntityId);
     }
 
-    worldPos = session->CursorWorldPos;
+    worldPos = session->mCursorInfo.mMouseWorldPos;
     focusArmy = static_cast<std::uint32_t>(session->FocusArmy);
   }
 
@@ -2322,7 +2320,7 @@ void moho::EFX_CreateEmitterWindow(
   // editor owns itself now (issue #414).
   CWldSession& session = *WLD_GetActiveSession();
 
-  const Wm3::Vector3f spawnPosition = session.CursorWorldPos;
+  const Wm3::Vector3f spawnPosition = session.mCursorInfo.mMouseWorldPos;
   UserEntity* const attachEntity = FirstLiveSelectedUserEntity(session.mSelection);
 
   WEmitterEditor* const editor = args.size() > 1u && attachEntity != nullptr
@@ -2427,7 +2425,7 @@ void moho::CON_AddSplat(
   // Dispatched straight off the interface, as the binary does: `NewSplatAt` is
   // slot 17 of ??_7IDecalManager@Moho@@6B@, reached at +0x44.
   if (IDecalManager* const decalManager = terrainRes->GetDecalManager(); decalManager != nullptr) {
-    (void)decalManager->NewSplatAt(session->CursorWorldPos, WldTerrainDecalType_Albedo, texturePath);
+    (void)decalManager->NewSplatAt(session->mCursorInfo.mMouseWorldPos, WldTerrainDecalType_Albedo, texturePath);
   }
 }
 

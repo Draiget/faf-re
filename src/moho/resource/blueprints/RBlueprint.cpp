@@ -67,7 +67,11 @@ namespace moho
     , mSource()
     , mBlueprintOrdinal(0)
   {
-    InitIdentity(owner, resId, mBlueprintId, mBlueprintOrdinal);
+    // Engine addition: the default constructors of `REntityBlueprint` and
+    // `RPropBlueprint` pass no rules; they get an empty id and ordinal 0.
+    if (owner != nullptr) {
+      InitIdentity(owner, resId, mBlueprintId, mBlueprintOrdinal);
+    }
   }
 
   void RBlueprint::InitIdentity(

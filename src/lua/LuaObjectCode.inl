@@ -1013,7 +1013,7 @@ namespace
       userdata = luaS_newudata(state, type);
     } else {
       userdata = static_cast<Udata*>(luaM_reallocblock(state, nullptr, {0u, 0u}, sizeudata(nullptr)));
-      userdata->len = 0u;
+      userdata->type = nullptr;
       userdata->tt = LUA_TUSERDATA;
       userdata->marked = 0u;
       faf_lua51_gc_color_userdata(state, userdata);
@@ -1060,14 +1060,14 @@ extern "C" Udata* luaS_newudata(
   Udata* const userdata = static_cast<Udata*>(luaM_reallocblock(state, nullptr, {0u, 0u}, userdataSize));
 
   try {
-    void* const payload = reinterpret_cast<std::uint8_t*>(userdata) + sizeof(Udata);
+    void* const payload = userdata->Payload();
     (void)type->ctorRefFunc_(payload);
   } catch (...) {
     (void)luaM_reallocblock(state, userdata, userdataSize, {0u, 0u});
     throw;
   }
 
-  userdata->len = reinterpret_cast<std::size_t>(type);
+  userdata->type = const_cast<gpg::RType*>(type);
   userdata->tt = LUA_TUSERDATA;
   userdata->marked = (type->dtrFunc_ != nullptr) ? 2u : 0u;
   faf_lua51_gc_color_userdata(state, userdata);
@@ -1105,14 +1105,14 @@ namespace
     Udata* const userdata = static_cast<Udata*>(luaM_reallocblock(state, nullptr, {0u, 0u}, userdataSize));
 
     try {
-      void* const payload = reinterpret_cast<std::uint8_t*>(userdata) + sizeof(Udata);
+      void* const payload = userdata->Payload();
       (void)sourceType->movRefFunc_(payload, sourceRef);
     } catch (...) {
       (void)luaM_reallocblock(state, userdata, userdataSize, {0u, 0u});
       throw;
     }
 
-    userdata->len = reinterpret_cast<std::size_t>(sourceType);
+    userdata->type = const_cast<gpg::RType*>(sourceType);
     userdata->tt = LUA_TUSERDATA;
     userdata->marked = (sourceType->dtrFunc_ != nullptr) ? 2u : 0u;
     faf_lua51_gc_color_userdata(state, userdata);

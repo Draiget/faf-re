@@ -282,20 +282,6 @@ namespace
     (void)LegacyBootstrapTimeBarUnaryFunctionSlotTypeInfo(nullptr, nullptr);
   }
 
-  /**
-   * Address: 0x004E8150 (FUN_004E8150)
-   *
-   * What it does:
-   * stdcall adapter lane that republishes the same TimeBar RTTI callback
-   * dispatch pair as `FUN_004E7ED0`.
-   */
-  [[maybe_unused]] void __stdcall InitializeLegacyTimeBarTypeInfoDispatchAdaptersStdcall(
-    int /*unused*/
-  )
-  {
-    InitializeLegacyTimeBarTypeInfoDispatchAdapters();
-  }
-
   // ---------------------------------------------------------------------------
   // Legacy boost::thread_specific_ptr<STimeBarThreadInfo> bootstrap lanes
   // ---------------------------------------------------------------------------
@@ -531,57 +517,6 @@ namespace
   }
 
   /**
-   * Address: 0x004E7430 (FUN_004E7430)
-   *
-   * IDA signature:
-   * void __cdecl sub_4E7430(_DWORD *a1);
-   *
-   * What it does:
-   * TSS-slot deleter callback for `boost::thread_specific_ptr<
-   * Moho::STimeBarThreadInfo>`. `FUN_004E7130` (the ctor -- modern
-   * equivalent is the `thread_local TimeBarThreadSlot gThreadSlot;`
-   * declaration in `moho/misc/TimeBar.cpp`) takes this function's address
-   * (`sub_4E7B40((int)sub_4E7430, v4)`) and threads it through the
-   * `LegacyConstructTimeBarFunction1Slot` chain below as the "F" in
-   * `boost::function1<void, STimeBarThreadInfo*>::function1(F&)`; at thread
-   * exit boost's TSS machinery invokes the published functor with the
-   * thread's `STimeBarThreadInfo*` payload, landing here.
-   *
-   * The body unlinks the payload from its intrusive ring before releasing
-   * it. Verified instruction-for-instruction against the binary
-   * (0x004E7430..0x004E7455): field `+0x00` is read/written as the
-   * prev-node pointer and `+0x04` as the next-node pointer -- the same
-   * store order and operand shape as `moho::TDatListItem<T,
-   * U>::ListUnlinkSelf()` (moho/containers/TDatList.h), which is exactly
-   * `STimeBarThreadInfo`'s declared base
-   * (`STimeBarThreadInfo : TDatListItem<STimeBarThreadInfo, void>`,
-   * TimeBar.h). Behaviorally identical to `ReleaseThreadInfo`/
-   * `UnlinkThreadInfoNoLock` in `moho/misc/TimeBar.cpp`, which perform the
-   * same unlink-then-delete on the modern `thread_local` path -- this is
-   * the binary's compiler-fused version of the same operation (no separate
-   * destructor call: `STimeBarThreadInfo` has no other resources, so MSVC
-   * folded the inherited unlink directly into the deleting-callback body).
-   *
-   * `[[maybe_unused]]`: like `LegacyConstructTimeBarFunction1Slot` below,
-   * this helper's only real caller (`FUN_004E7130`) was replaced at the
-   * source level by `thread_local`, so nothing in recovered source takes
-   * its address; the relationship is documented rather than re-wired
-   * through fabricated stack-frame plumbing.
-   */
-  [[maybe_unused]] void __cdecl LegacyDeleteTimeBarThreadInfoTssPayload(
-    void* const value
-  )
-  {
-    if (value == nullptr) {
-      return;
-    }
-
-    auto* const info = static_cast<moho::STimeBarThreadInfo*>(value);
-    info->ListUnlinkSelf();
-    ::operator delete(info);
-  }
-
-  /**
    * Address: 0x004E7B40 (FUN_004E7B40)
    *
    * IDA signature:
@@ -686,86 +621,6 @@ namespace
   // Forward decl for LegacyClearAndPublishTssAdapterPair (FUN_004E7BA0).
   LegacyUnaryDispatchAdapter*
   LegacyClearAndPublishTssAdapterPair(LegacyCallbackPayloadLane* const sourceCallback, const int a2, const char a3);
-
-  LegacyCallbackLifecycleAdapter LegacyOnceInitAndAssignTimeBarCallbackBuffer(
-    LegacyCallbackPayloadLane* const outBuffer,
-    LegacyCallbackPayloadLane* const sourceCallback,
-    [[maybe_unused]] const std::byte* const localStackBytes
-  )
-  {
-    static bool sFunction1AssignOncePublished = false;
-
-    if (!sFunction1AssignOncePublished) {
-      sFunction1AssignOncePublished = true;
-      // Once-init: publish the tss_adapter dispatch pair via FUN_004E7BA0
-      // (clear + publish chain).
-      (void)LegacyClearAndPublishTssAdapterPair(sourceCallback, 0, 0);
-    }
-
-    // FUN_004E7C50 manage path: heap-allocates the function buffer and
-    // publishes the per-this lane pair pointer when manage succeeded.
-    const bool slotPublished = LegacyManageTssAdapterFunctionSlot(outBuffer, sourceCallback, 0);
-    outBuffer->lifecycleAdapter = slotPublished
-      ? reinterpret_cast<LegacyCallbackLifecycleAdapter>(&gLegacyTssAdapterUnaryDispatchAdapter)
-      : nullptr;
-
-    LegacyCallbackLifecycleAdapter result = nullptr;
-    if (sourceCallback != nullptr) {
-      result = sourceCallback->lifecycleAdapter;
-    }
-    return result;
-  }
-
-  /**
-   * Address: 0x004E77F0 (FUN_004E77F0)
-   *
-   * IDA signature:
-   * _DWORD *__thiscall sub_4E77F0(_DWORD *this, void (__cdecl **a2)(...),
-   *                                int a3, char a4, ...);
-   *
-   * What it does:
-   * boost::function1<>::function1(F&) ctor wrapper. Zeroes `*this`, prepares
-   * a local function-buffer view, runs `kQueryCopy` on the source's
-   * lifecycle adapter to clone the functor bytes, then delegates the real
-   * assign through `LegacyOnceInitAndAssignTimeBarCallbackBuffer`. After
-   * assignment, runs `kQueryReset` on the source to drop the temporary
-   * functor copy.
-   */
-  [[maybe_unused]] LegacyCallbackPayloadLane* LegacyConstructTimeBarFunction1Slot(
-    LegacyCallbackPayloadLane* const outSlot,
-    LegacyCallbackPayloadLane* const sourceCallback,
-    [[maybe_unused]] const int /*a3*/,
-    const char a4
-  )
-  {
-    LegacyCallbackPayloadLane localBuffer{};
-    char localKey = a4;
-    char localCopyStorage = 0;
-
-    outSlot->lifecycleAdapter = nullptr;
-
-    if (sourceCallback != nullptr) {
-      localBuffer = *sourceCallback;
-      // Mirror `(*a2)(&a4, &v12, 0)`: kQueryCopy fills `localCopyStorage`
-      // with the cloned functor payload.
-      LegacyCallbackLifecycleAdapter const lifecycleAdapter = sourceCallback->lifecycleAdapter;
-      if (lifecycleAdapter != nullptr) {
-        lifecycleAdapter(&localKey, &localCopyStorage, 0);
-      }
-    }
-
-    (void)LegacyOnceInitAndAssignTimeBarCallbackBuffer(
-      outSlot, &localBuffer, reinterpret_cast<const std::byte*>(&localCopyStorage)
-    );
-
-    if (sourceCallback != nullptr) {
-      LegacyCallbackLifecycleAdapter const lifecycleAdapter = sourceCallback->lifecycleAdapter;
-      if (lifecycleAdapter != nullptr) {
-        lifecycleAdapter(&localKey, &localKey, 1);
-      }
-    }
-    return outSlot;
-  }
 
   /**
    * Address: 0x004E7BA0 (FUN_004E7BA0)
@@ -996,13 +851,6 @@ namespace
   static_assert(sizeof(LegacyWideStringObject) == 0x1C, "LegacyWideStringObject size must be 0x1C");
 #endif
 
-  [[maybe_unused]] wchar_t* GetLegacyWideStringInlineBufferSubobject(
-    LegacyWideStringObject* const value
-  ) noexcept
-  {
-    return reinterpret_cast<wchar_t*>(&(value->storage));
-  }
-
   /**
    * Address: 0x004A1820 (FUN_004A1820, sub_4A1820)
    *
@@ -1018,137 +866,11 @@ namespace
     return moho::AppendWideRangePreservingOverlap(destination, safeSource, std::wcslen(safeSource));
   }
 
-  /**
-   * Address: 0x004A18F0 (FUN_004A18F0, sub_4A18F0)
-   *
-   * What it does:
-   * Duplicate zero-terminated wide append helper.
-   */
-  [[maybe_unused]] std::wstring* AppendWideStringFromNullTerminatedInputB(
-    std::wstring* const destination,
-    const wchar_t* const source
-  )
-  {
-    return AppendWideStringFromNullTerminatedInputA(destination, source);
-  }
-
-  /**
-   * Address: 0x004A1850 (FUN_004A1850, sub_4A1850)
-   *
-   * What it does:
-   * Returns a pointer to one character index in a recovered legacy wide-string
-   * object view (SSO-aware).
-   */
-  [[maybe_unused]] wchar_t* GetLegacyWideStringCharacterPointer(
-    LegacyWideStringObject* const value,
-    const std::uint32_t index
-  ) noexcept
-  {
-    if (value == nullptr) {
-      return nullptr;
-    }
-    if (value->capacity < 8U) {
-      return GetLegacyWideStringInlineBufferSubobject(value) + index;
-    }
-    return value->storage.heap + index;
-  }
-
   struct LegacyWideStringVectorAccessor
   {
     std::uint32_t reserved = 0;
     LegacyWideStringObject* first = nullptr;
   };
-
-  /**
-   * Address: 0x004A18B0 (FUN_004A18B0, sub_4A18B0)
-   *
-   * What it does:
-   * Returns one legacy wide-string element pointer by index from a recovered
-   * vector-storage accessor view.
-   */
-  [[maybe_unused]] LegacyWideStringObject* GetLegacyWideStringElementPointerByIndex(
-    const std::uint32_t index,
-    const LegacyWideStringVectorAccessor* const accessor
-  ) noexcept
-  {
-    if (accessor == nullptr || accessor->first == nullptr) {
-      return nullptr;
-    }
-    return accessor->first + index;
-  }
-
-  /**
-   * Address: 0x004A18C0 (FUN_004A18C0, sub_4A18C0)
-   *
-   * What it does:
-   * Resets one legacy wide-string pointer-slot to null.
-   */
-  [[maybe_unused]] LegacyWideStringObject** ResetLegacyWideStringPointerSlotA(
-    LegacyWideStringObject** const pointerSlot
-  ) noexcept
-  {
-    if (pointerSlot != nullptr) {
-      *pointerSlot = nullptr;
-    }
-    return pointerSlot;
-  }
-
-  /**
-   * Address: 0x004A18D0 (FUN_004A18D0, sub_4A18D0)
-   *
-   * What it does:
-   * Loads one legacy wide-string pointer-slot value.
-   */
-  [[maybe_unused]] LegacyWideStringObject* LoadLegacyWideStringPointerSlotA(
-    LegacyWideStringObject* const* const pointerSlot
-  ) noexcept
-  {
-    return (pointerSlot != nullptr) ? *pointerSlot : nullptr;
-  }
-
-  /**
-   * Address: 0x004A18E0 (FUN_004A18E0, sub_4A18E0)
-   *
-   * What it does:
-   * Advances one legacy wide-string pointer-slot by one element stride.
-   */
-  [[maybe_unused]] LegacyWideStringObject** AdvanceLegacyWideStringPointerSlotByOneElement(
-    LegacyWideStringObject** const pointerSlot
-  ) noexcept
-  {
-    if (pointerSlot != nullptr && *pointerSlot != nullptr) {
-      *pointerSlot = reinterpret_cast<LegacyWideStringObject*>(
-        reinterpret_cast<std::byte*>(*pointerSlot) + sizeof(LegacyWideStringObject)
-      );
-    }
-    return pointerSlot;
-  }
-
-  /**
-   * Address: 0x004A19C0 (FUN_004A19C0, sub_4A19C0)
-   *
-   * What it does:
-   * Duplicate legacy wide-string pointer-slot load helper.
-   */
-  [[maybe_unused]] LegacyWideStringObject* LoadLegacyWideStringPointerSlotB(
-    LegacyWideStringObject* const* const pointerSlot
-  ) noexcept
-  {
-    return LoadLegacyWideStringPointerSlotA(pointerSlot);
-  }
-
-  /**
-   * Address: 0x004A19D0 (FUN_004A19D0, sub_4A19D0)
-   *
-   * What it does:
-   * Duplicate legacy wide-string pointer-slot reset helper.
-   */
-  [[maybe_unused]] LegacyWideStringObject** ResetLegacyWideStringPointerSlotB(
-    LegacyWideStringObject** const pointerSlot
-  ) noexcept
-  {
-    return ResetLegacyWideStringPointerSlotA(pointerSlot);
-  }
 
   /**
    * Address: 0x004A1BF0 (FUN_004A1BF0)
@@ -1201,32 +923,6 @@ namespace
     return std::strrchr(text, character);
   }
 
-  /**
-   * Address: 0x004A33D0 (FUN_004A33D0, sub_4A33D0)
-   *
-   * What it does:
-   * Returns input value unchanged.
-   */
-  [[maybe_unused]] int ReturnIdentityInt(
-    const int value
-  ) noexcept
-  {
-    return value;
-  }
-
-  /**
-   * Address: 0x004A3460 (FUN_004A3460, sub_4A3460)
-   *
-   * What it does:
-   * Returns high byte from low 16-bit lane of the input integer.
-   */
-  [[maybe_unused]] std::uint8_t ExtractHighByteFromLowWord(
-    const std::uint32_t value
-  ) noexcept
-  {
-    return static_cast<std::uint8_t>((value >> 8) & 0xFFu);
-  }
-
   struct LegacyUint32PairEmitter
   {
     std::uint32_t reserved0 = 0;
@@ -1244,34 +940,6 @@ namespace
   static_assert(sizeof(LegacyUint32PairEmitter) == 0x0C, "LegacyUint32PairEmitter size must be 0x0C");
   static_assert(sizeof(LegacyUint32Pair) == 0x08, "LegacyUint32Pair size must be 0x08");
 #endif
-
-  /**
-   * Address: 0x004A35B0 (FUN_004A35B0, sub_4A35B0)
-   *
-   * What it does:
-   * Writes one 32-bit pair where `first = firstBase + delta` and
-   * `second = secondValue`.
-   */
-  [[maybe_unused]] LegacyUint32Pair* WriteAdjustedUint32PairFromEmitter(
-    const LegacyUint32PairEmitter* const emitter,
-    LegacyUint32Pair* const outPair,
-    const std::uint32_t delta
-  ) noexcept
-  {
-    if (outPair == nullptr) {
-      return nullptr;
-    }
-
-    if (emitter == nullptr) {
-      outPair->first = delta;
-      outPair->second = 0;
-      return outPair;
-    }
-
-    outPair->first = emitter->firstBase + delta;
-    outPair->second = emitter->secondValue;
-    return outPair;
-  }
 
   // The registry, dxdiag, the Windows-key hook, the crash dialog and the structured-exception
   // filter are Windows' (the Linux client, issue #255).
@@ -1514,118 +1182,11 @@ namespace
   }
 
   [[maybe_unused]] constexpr WORD kCrashDialogTemplateId = 0x7A;
-  constexpr int kCrashTextControlId = 1065;
-  constexpr int kCrashCopyButtonId = 1066;
-  constexpr int kCrashDisableButtonId = 1067;
-  constexpr int kCrashCloseButtonId = 1068;
-
   struct CrashDialogInitData
   {
     gpg::StrArg caption;
     gpg::StrArg body;
   };
-
-  /**
-   * Address: 0x004F0EA0 (FUN_004F0EA0)
-   *
-   * What it does:
-   * Stores two 32-bit lanes into one output pair lane (`[0]=first`, `[1]=second`).
-   */
-  [[maybe_unused]] std::int32_t* InitializeDwordPairLane(
-    std::int32_t* const outPair,
-    const std::int32_t second,
-    const std::int32_t first
-  ) noexcept
-  {
-    outPair[0] = first;
-    outPair[1] = second;
-    return outPair;
-  }
-
-  /**
-   * Address: 0x004F0EB0 (FUN_004F0EB0, sub_4F0EB0)
-   *
-   * What it does:
-   * Converts lone `\n` bytes in one UTF-8 crash/body payload into CRLF
-   * sequences while preserving existing `\r\n` pairs.
-   */
-  [[nodiscard]] fa::string NormalizeDialogNewlines(
-    const gpg::StrArg text
-  )
-  {
-    const char* const source = text != nullptr ? text : "";
-    std::string normalized;
-    normalized.reserve(std::strlen(source) * 2);
-
-    char previous = '\0';
-    for (const char current : std::string(source)) {
-      if (current == '\n' && previous != '\r') {
-        normalized.push_back('\r');
-      }
-      normalized.push_back(current);
-      previous = current;
-    }
-
-    fa::string result;
-    result.assign_owned(normalized);
-    return result;
-  }
-
-  /**
-   * Address: 0x004F0F50 (FUN_004F0F50, DialogFunc)
-   *
-   * What it does:
-   * Handles crash dialog init/commands, normalizes/copies UTF-8 crash text,
-   * and routes copy/close/terminate control actions.
-   */
-  [[maybe_unused]] INT_PTR CALLBACK CrashDialogProc(
-    HWND hWnd,
-    const UINT message,
-    const WPARAM wParam,
-    const LPARAM lParam
-  )
-  {
-    if (message == WM_INITDIALOG) {
-      auto* const initData = reinterpret_cast<CrashDialogInitData*>(lParam);
-      (void)::SetWindowLongPtrW(hWnd, DWLP_USER, reinterpret_cast<LONG_PTR>(initData));
-
-      const std::wstring caption = gpg::STR_Utf8ToWide(initData != nullptr ? initData->caption : "");
-      (void)::SetWindowTextW(hWnd, caption.c_str());
-
-      const fa::string normalizedBody = NormalizeDialogNewlines(initData != nullptr ? initData->body : "");
-      const std::wstring bodyText = gpg::STR_Utf8ToWide(normalizedBody.c_str());
-      (void)::SetDlgItemTextW(hWnd, kCrashTextControlId, bodyText.c_str());
-
-      (void)::EnableWindow(::GetDlgItem(hWnd, kCrashDisableButtonId), FALSE);
-      return TRUE;
-    }
-
-    if (message != WM_COMMAND) {
-      return FALSE;
-    }
-
-    switch (LOWORD(wParam)) {
-    case kCrashDisableButtonId:
-      (void)::EnableWindow(reinterpret_cast<HWND>(lParam), FALSE);
-      return TRUE;
-    case IDCANCEL:
-      ::TerminateProcess(::GetCurrentProcess(), 1u);
-      return TRUE;
-    case kCrashCopyButtonId: {
-      const auto* const initData = reinterpret_cast<const CrashDialogInitData*>(::GetWindowLongPtrW(hWnd, DWLP_USER));
-      if (initData != nullptr) {
-        const std::wstring bodyText = gpg::STR_Utf8ToWide(initData->body != nullptr ? initData->body : "");
-        (void)moho::WIN_CopyToClipboard(bodyText.c_str());
-      }
-      return TRUE;
-    }
-    case kCrashCloseButtonId:
-      ::EndDialog(hWnd, 0);
-      return TRUE;
-    default:
-      return FALSE;
-    }
-  }
 
   /**
    * Suspends every thread of this process except the calling one, so a crash

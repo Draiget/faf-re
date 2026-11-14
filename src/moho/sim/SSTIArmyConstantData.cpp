@@ -146,7 +146,11 @@ namespace moho
       return;
     }
 
-    archive->ReadUInt(reinterpret_cast<std::uint32_t*>(&mArmyIndex));
+    {
+      std::uint32_t value{};
+      archive->ReadUInt(&value);
+      mArmyIndex = static_cast<decltype(mArmyIndex)>(value);
+    }
     archive->ReadString(&mArmyName);
     archive->ReadString(&mPlayerName);
     bool isCivilian = false;
@@ -216,12 +220,12 @@ namespace moho
    */
   void EntIdSerializer::Deserialize(
     gpg::ReadArchive* const archive,
-    const std::intptr_t objectPtr,
+    void* const objectPtr,
     const int,
     gpg::RRef*
   )
   {
-    auto* const object = reinterpret_cast<std::uint32_t*>(objectPtr);
+    auto* const object = static_cast<std::uint32_t*>(objectPtr);
     archive->ReadUInt(object);
   }
 
@@ -235,12 +239,12 @@ namespace moho
    */
   void EntIdSerializer::Serialize(
     gpg::WriteArchive* const archive,
-    const std::intptr_t objectPtr,
+    void* const objectPtr,
     const int,
     gpg::RRef*
   )
   {
-    const auto* const object = reinterpret_cast<const std::uint32_t*>(objectPtr);
+    const auto* const object = static_cast<const std::uint32_t*>(objectPtr);
     archive->WriteUInt(*object);
   }
 

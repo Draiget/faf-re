@@ -642,25 +642,6 @@ namespace
 
   static_assert(sizeof(BinaryReadArchive) == 0x44, "BinaryReadArchive size must be 0x44");
 
-  /**
-   * Address: 0x00904890 (FUN_00904890)
-   *
-   * What it does:
-   * Runs one deleting-destructor thunk for `BinaryReadArchive`, forwarding
-   * through non-deleting teardown and optional storage release.
-   */
-  [[maybe_unused]] [[nodiscard]] BinaryReadArchive* DestroyBinaryReadArchiveDeleting(
-    BinaryReadArchive* const archive,
-    const unsigned char deleteFlag
-  )
-  {
-    archive->~BinaryReadArchive();
-    if ((deleteFlag & 1u) != 0u) {
-      ::operator delete(static_cast<void*>(archive));
-    }
-    return archive;
-  }
-
   class TextReadArchive : public gpg::ReadArchive
   {
   public:
@@ -1016,25 +997,6 @@ namespace
   static_assert(sizeof(TextReadArchive) == 0x44, "TextReadArchive size must be 0x44");
 
   /**
-   * Address: 0x009397E0 (FUN_009397E0, TextReadArchive::dtr)
-   *
-   * What it does:
-   * Runs one deleting-destructor thunk for `TextReadArchive`, forwarding
-   * through non-deleting teardown and optional storage release.
-   */
-  [[maybe_unused]] [[nodiscard]] TextReadArchive* DestroyTextReadArchiveDeleting(
-    TextReadArchive* const archive,
-    const unsigned char deleteFlag
-  )
-  {
-    archive->~TextReadArchive();
-    if ((deleteFlag & 1u) != 0u) {
-      ::operator delete(static_cast<void*>(archive));
-    }
-    return archive;
-  }
-
-  /**
    * Address: 0x00952C90 (FUN_00952C90)
    *
    * What it does:
@@ -1197,7 +1159,7 @@ void ReadArchive::Read(
     ));
   }
 
-  type->serLoadFunc_(this, reinterpret_cast<std::intptr_t>(object), handle.version, const_cast<RRef*>(&ownerRef));
+  type->serLoadFunc_(this, object, handle.version, const_cast<RRef*>(&ownerRef));
 
   if (NextMarker() != static_cast<int>(ArchiveToken::ObjectTerminator)) {
     ThrowSerializationError(STR_Printf(

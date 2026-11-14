@@ -588,12 +588,12 @@ namespace
    */
   void DeserializeCBuildTaskHelperSerializerCallback(
     gpg::ReadArchive* const archive,
-    const std::intptr_t objectPtr,
+    void* const objectPtr,
     const int,
     gpg::RRef* const
   )
   {
-    auto* const helper = reinterpret_cast<moho::CBuildTaskHelper*>(objectPtr);
+    auto* const helper = static_cast<moho::CBuildTaskHelper*>(objectPtr);
     if (helper == nullptr) {
       return;
     }
@@ -611,12 +611,12 @@ namespace
    */
   void SerializeCBuildTaskHelperSerializerCallback(
     gpg::WriteArchive* const archive,
-    const std::intptr_t objectPtr,
+    void* const objectPtr,
     const int,
     gpg::RRef* const
   )
   {
-    auto* const helper = reinterpret_cast<const moho::CBuildTaskHelper*>(objectPtr);
+    auto* const helper = static_cast<const moho::CBuildTaskHelper*>(objectPtr);
     if (helper == nullptr) {
       return;
     }

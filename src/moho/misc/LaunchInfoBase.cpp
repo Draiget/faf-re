@@ -80,12 +80,12 @@ namespace
     /**
      * Address: 0x00543530 (FUN_00543530)
      */
-    static void SerLoad(gpg::ReadArchive* archive, std::intptr_t objectPtr, int version, gpg::RRef* ownerRef);
+    static void SerLoad(gpg::ReadArchive* archive, void* objectPtr, int version, gpg::RRef* ownerRef);
 
     /**
      * Address: 0x005436C0 (FUN_005436C0)
      */
-    static void SerSave(gpg::WriteArchive* archive, std::intptr_t objectPtr, int version, gpg::RRef* ownerRef);
+    static void SerSave(gpg::WriteArchive* archive, void* objectPtr, int version, gpg::RRef* ownerRef);
   };
 
   static_assert(sizeof(ArmyLaunchInfoVectorTypeInfo) == 0x68, "ArmyLaunchInfoVectorTypeInfo size must be 0x68");
@@ -316,184 +316,6 @@ namespace
   }
 
   /**
-   * Address: 0x00544530 (FUN_00544530)
-   *
-   * What it does:
-   * Lazily resolves `ArmyLaunchInfo` reflection type and dispatches one archive
-   * read for the provided object lane.
-   */
-  [[maybe_unused]] gpg::ReadArchive* ReadArmyLaunchInfoArchiveAdapter(
-    gpg::ReadArchive* const archive,
-    void* const object,
-    gpg::RRef* const ownerRef
-  )
-  {
-    GPG_ASSERT(ownerRef != nullptr);
-    if (!archive || !ownerRef) {
-      return archive;
-    }
-
-    ReadArmyLaunchInfoReflectedObject(archive, object, *ownerRef);
-    return archive;
-  }
-
-  /**
-   * Address: 0x005445A0 (FUN_005445A0)
-   *
-   * What it does:
-   * Lazily resolves `ArmyLaunchInfo` reflection type and dispatches one archive
-   * write for the provided object lane.
-   */
-  [[maybe_unused]] gpg::WriteArchive* WriteArmyLaunchInfoArchiveAdapter(
-    gpg::WriteArchive* const archive,
-    const void* const object,
-    const gpg::RRef* const ownerRef
-  )
-  {
-    GPG_ASSERT(ownerRef != nullptr);
-    if (!archive || !ownerRef) {
-      return archive;
-    }
-
-    WriteArmyLaunchInfoReflectedObject(archive, object, *ownerRef);
-    return archive;
-  }
-
-  /**
-   * Address: 0x005449F0 (FUN_005449F0)
-   *
-   * What it does:
-   * Lazily resolves `vector<ArmyLaunchInfo>` reflection type and dispatches one
-   * archive read for the provided object lane.
-   */
-  [[maybe_unused]] gpg::ReadArchive* ReadArmyLaunchInfoVectorArchiveAdapter(
-    gpg::ReadArchive* const archive,
-    void* const object,
-    gpg::RRef* const ownerRef
-  )
-  {
-    GPG_ASSERT(ownerRef != nullptr);
-    if (!archive || !ownerRef) {
-      return archive;
-    }
-
-    gpg::RType* const type = ResolveArmyLaunchInfoVectorType();
-    archive->Read(type, object, *ownerRef);
-    return archive;
-  }
-
-  /**
-   * Address: 0x00544A30 (FUN_00544A30)
-   *
-   * What it does:
-   * Lazily resolves `vector<ArmyLaunchInfo>` reflection type and dispatches one
-   * archive write for the provided object lane.
-   */
-  [[maybe_unused]] gpg::WriteArchive* WriteArmyLaunchInfoVectorArchiveAdapter(
-    gpg::WriteArchive* const archive,
-    const void* const object,
-    const gpg::RRef* const ownerRef
-  )
-  {
-    GPG_ASSERT(ownerRef != nullptr);
-    if (!archive || !ownerRef) {
-      return archive;
-    }
-
-    gpg::RType* const type = ResolveArmyLaunchInfoVectorType();
-    archive->Write(type, object, *ownerRef);
-    return archive;
-  }
-
-  /**
-   * Address: 0x00544B00 (FUN_00544B00)
-   *
-   * What it does:
-   * Lazily resolves `LaunchInfoBase` reflection type and dispatches one archive
-   * read for the provided object lane.
-   */
-  [[maybe_unused]] gpg::ReadArchive* ReadLaunchInfoBaseArchiveAdapter(
-    gpg::ReadArchive* const archive,
-    void* const object,
-    gpg::RRef* const ownerRef
-  )
-  {
-    GPG_ASSERT(ownerRef != nullptr);
-    if (!archive || !ownerRef) {
-      return archive;
-    }
-
-    ReadLaunchInfoBaseReflectedObject(archive, object, *ownerRef);
-    return archive;
-  }
-
-  /**
-   * Address: 0x00544B80 (FUN_00544B80)
-   *
-   * What it does:
-   * Lazily resolves `LaunchInfoBase` reflection type and dispatches one archive
-   * write for the provided object lane.
-   */
-  [[maybe_unused]] gpg::WriteArchive* WriteLaunchInfoBaseArchiveAdapter(
-    gpg::WriteArchive* const archive,
-    const void* const object,
-    const gpg::RRef* const ownerRef
-  )
-  {
-    GPG_ASSERT(ownerRef != nullptr);
-    if (!archive || !ownerRef) {
-      return archive;
-    }
-
-    WriteLaunchInfoBaseReflectedObject(archive, object, *ownerRef);
-    return archive;
-  }
-
-  /**
-   * Address: 0x00544B40 (FUN_00544B40)
-   *
-   * What it does:
-   * Lazily resolves `vector<string>` reflection type and dispatches one archive
-   * read for the provided object lane.
-   */
-  [[maybe_unused]] gpg::ReadArchive* ReadLaunchInfoStringVectorArchiveAdapter(
-    gpg::ReadArchive* const archive,
-    void* const object,
-    gpg::RRef* const ownerRef
-  )
-  {
-    GPG_ASSERT(ownerRef != nullptr);
-    if (!archive || !ownerRef) {
-      return archive;
-    }
-
-    ReadStringVectorReflectedObject(archive, object, *ownerRef);
-    return archive;
-  }
-
-  /**
-   * Address: 0x00544BC0 (FUN_00544BC0)
-   *
-   * What it does:
-   * Lazily resolves `vector<string>` reflection type and dispatches one archive
-   * write for the provided object lane.
-   */
-  [[maybe_unused]] gpg::WriteArchive* WriteLaunchInfoStringVectorArchiveAdapter(
-    gpg::WriteArchive* const archive,
-    const void* const object,
-    const gpg::RRef* const ownerRef
-  )
-  {
-    GPG_ASSERT(ownerRef != nullptr);
-    if (!archive || !ownerRef) {
-      return archive;
-    }
-
-    WriteStringVectorReflectedObject(archive, object, *ownerRef);
-    return archive;
-  }
-
-  /**
    * Address: 0x005448D0 (FUN_005448D0, scalar deleting destructor thunk)
    */
   ArmyLaunchInfoVectorTypeInfo::~ArmyLaunchInfoVectorTypeInfo() = default;
@@ -591,12 +413,12 @@ namespace
    */
   void ArmyLaunchInfoVectorTypeInfo::SerLoad(
     gpg::ReadArchive* const archive,
-    const std::intptr_t objectPtr,
+    void* const objectPtr,
     const int,
     gpg::RRef* const
   )
   {
-    auto* const vectorStorage = reinterpret_cast<ArmyLaunchInfoVector*>(objectPtr);
+    auto* const vectorStorage = static_cast<ArmyLaunchInfoVector*>(objectPtr);
     GPG_ASSERT(archive != nullptr);
     GPG_ASSERT(vectorStorage != nullptr);
     if (!archive || !vectorStorage) {
@@ -630,12 +452,12 @@ namespace
    */
   void ArmyLaunchInfoVectorTypeInfo::SerSave(
     gpg::WriteArchive* const archive,
-    const std::intptr_t objectPtr,
+    void* const objectPtr,
     const int,
     gpg::RRef* const ownerRef
   )
   {
-    const auto* const vectorStorage = reinterpret_cast<const ArmyLaunchInfoVector*>(objectPtr);
+    const auto* const vectorStorage = static_cast<const ArmyLaunchInfoVector*>(objectPtr);
     GPG_ASSERT(archive != nullptr);
     if (!archive) {
       return;
@@ -732,16 +554,6 @@ namespace
     gLaunchInfoBaseTypeRegistered = true;
     return &gLaunchInfoBaseTypeInfo;
   }
-
-  /**
-   * Address: 0x005421B0 (FUN_005421B0)
-   */
-  [[maybe_unused]] void ArmyLaunchInfoTypeInfoStartupNoop() {}
-
-  /**
-   * Address: 0x005423A0 (FUN_005423A0)
-   */
-  [[maybe_unused]] void LaunchInfoBaseTypeInfoStartupNoop() {}
 
   struct LaunchInfoNewTypeInfoBootstrap
   {
@@ -1198,8 +1010,7 @@ namespace gpg
       return outRef;
     }
 
-    outRef->mObj =
-      reinterpret_cast<void*>(reinterpret_cast<std::uintptr_t>(value) - static_cast<std::uintptr_t>(baseOffset));
+    outRef->mObj = gpg::CompleteObject(value, baseOffset);
     outRef->mType = dynamicType;
     return outRef;
   }

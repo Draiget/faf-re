@@ -21,34 +21,6 @@ namespace
   }
 
   /**
-   * Address: 0x00546B30 (FUN_00546B30)
-   *
-   * What it does:
-   * Executes one non-deleting `gpg::RType` base-teardown lane for
-   * `CSimResourcesTypeInfo`.
-   */
-  [[maybe_unused]] void cleanup_CSimResourcesTypeInfoRTypeBase(
-    moho::CSimResourcesTypeInfo* const typeInfo
-  ) noexcept
-  {
-    gpg::ClearTypeLists(typeInfo);
-  }
-
-  /**
-   * Address: 0x00546B70 (FUN_00546B70)
-   *
-   * What it does:
-   * Register-shape adapter that forwards one reflected type lane into
-   * `CSimResourcesTypeInfo` base-registration semantics.
-   */
-  [[maybe_unused]] void AddBaseISimResourcesRegistrationThunk(
-    gpg::RType* const typeInfo
-  )
-  {
-    moho::resource_reflection::AddBase(typeInfo, moho::resource_reflection::ResolveISimResourcesType());
-  }
-
-  /**
    * Address: 0x00547820 (FUN_00547820)
    *
    * What it does:
@@ -79,70 +51,6 @@ namespace
     out.mObj = object;
     out.mType = moho::resource_reflection::ResolveCSimResourcesType();
     return out;
-  }
-
-  /**
-   * Address: 0x00548840 (FUN_00548840)
-   *
-   * What it does:
-   * Lazily resolves reflected type for `vector<ResourceDeposit>` and
-   * deserializes `CSimResources::deposits_`.
-   */
-  void DeserializeCSimResourcesDepositsPrimary(
-    gpg::ReadArchive* const archive,
-    moho::CSimResources* const object
-  )
-  {
-    gpg::RType* const vectorType = gpg::RTypeOf<fa::vector<moho::ResourceDeposit>>();
-    gpg::RRef ownerRef{};
-    archive->Read(vectorType, &object->deposits_, ownerRef);
-  }
-
-  /**
-   * Address: 0x00548890 (FUN_00548890)
-   *
-   * What it does:
-   * Lazily resolves reflected type for `vector<ResourceDeposit>` and
-   * serializes `CSimResources::deposits_`.
-   */
-  void SerializeCSimResourcesDepositsPrimary(
-    gpg::WriteArchive* const archive,
-    moho::CSimResources* const object
-  )
-  {
-    gpg::RType* const vectorType = gpg::RTypeOf<fa::vector<moho::ResourceDeposit>>();
-    gpg::RRef ownerRef{};
-    archive->Write(vectorType, &object->deposits_, ownerRef);
-  }
-
-  /**
-   * Address: 0x00549120 (FUN_00549120)
-   *
-   * What it does:
-   * Secondary deserialize entrypoint for the same `CSimResources::deposits_`
-   * archive lane.
-   */
-  [[maybe_unused]] void DeserializeCSimResourcesDepositsSecondary(
-    gpg::ReadArchive* const archive,
-    moho::CSimResources* const object
-  )
-  {
-    DeserializeCSimResourcesDepositsPrimary(archive, object);
-  }
-
-  /**
-   * Address: 0x00549170 (FUN_00549170)
-   *
-   * What it does:
-   * Secondary serialize entrypoint for the same `CSimResources::deposits_`
-   * archive lane.
-   */
-  [[maybe_unused]] void SerializeCSimResourcesDepositsSecondary(
-    gpg::WriteArchive* const archive,
-    moho::CSimResources* const object
-  )
-  {
-    SerializeCSimResourcesDepositsPrimary(archive, object);
   }
 
   struct CSimResourcesTypeInfoStartup
@@ -224,7 +132,7 @@ namespace moho
     void* const objectPtr
   )
   {
-    auto* const object = reinterpret_cast<CSimResources*>(objectPtr);
+    auto* const object = static_cast<CSimResources*>(objectPtr);
     if (object != nullptr) {
       new (object) CSimResources();
     }
@@ -238,7 +146,7 @@ namespace moho
     void* const objectPtr
   )
   {
-    auto* const object = reinterpret_cast<CSimResources*>(objectPtr);
+    auto* const object = static_cast<CSimResources*>(objectPtr);
     if (object != nullptr) {
       delete object;
     }
@@ -251,7 +159,7 @@ namespace moho
     void* const objectPtr
   )
   {
-    auto* const object = reinterpret_cast<CSimResources*>(objectPtr);
+    auto* const object = static_cast<CSimResources*>(objectPtr);
     object->~CSimResources();
   }
 

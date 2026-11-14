@@ -44,18 +44,6 @@ namespace
 
   constexpr float kMaxTextScale = 64.0f;
 
-  /**
-   * Address: 0x0078EBF0 (FUN_0078EBF0)
-   *
-   * What it does:
-   * Returns one font descent metric lane.
-   */
-  [[maybe_unused]] float ReadFontDescentLane(
-    const CD3DFont* const font
-  ) noexcept
-  {
-    return font->mDescent;
-  }
 } // namespace
 
 gpg::RType* moho::CMauiText::sType = nullptr;
@@ -186,7 +174,7 @@ void moho::CMauiText::SetNewFont(
     const float advance = mFont->GetAdvance(mText.c_str(), 0);
     CScriptLazyVar_float::SetValue(&mTextAdvanceLV, advance);
     CScriptLazyVar_float::SetValue(&mFontAscentLV, mFont->mAscent);
-    CScriptLazyVar_float::SetValue(&mFontDescentLV, ReadFontDescentLane(mFont));
+    CScriptLazyVar_float::SetValue(&mFontDescentLV, mFont->mDescent);
     CScriptLazyVar_float::SetValue(&mFontExternalLeadingLV, mFont->mExternalLeading);
   } else {
     CScriptLazyVar_float::SetValue(&mTextAdvanceLV, 0.0f);

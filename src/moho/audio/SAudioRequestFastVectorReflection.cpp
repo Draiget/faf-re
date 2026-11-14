@@ -123,7 +123,7 @@ namespace
    */
   void LoadFastVectorSAudioRequest(
     gpg::ReadArchive* const archive,
-    const std::intptr_t objectPtr,
+    void* const objectPtr,
     const int,
     gpg::RRef* const ownerRef
   )
@@ -135,7 +135,7 @@ namespace
     unsigned int count = 0;
     archive->ReadUInt(&count);
 
-    auto& vec = *reinterpret_cast<gpg::core::FastVectorInline<moho::SAudioRequest>*>(objectPtr);
+    auto& vec = *static_cast<gpg::core::FastVectorInline<moho::SAudioRequest>*>(objectPtr);
     moho::SAudioRequest fill{};
     vec.resize(static_cast<std::size_t>(count), fill);
 
@@ -155,7 +155,7 @@ namespace
    */
   void SaveFastVectorSAudioRequest(
     gpg::WriteArchive* const archive,
-    const std::intptr_t objectPtr,
+    void* const objectPtr,
     const int,
     gpg::RRef* const ownerRef
   )
@@ -164,7 +164,7 @@ namespace
       return;
     }
 
-    auto& vec = *reinterpret_cast<gpg::core::FastVectorInline<moho::SAudioRequest>*>(objectPtr);
+    auto& vec = *static_cast<gpg::core::FastVectorInline<moho::SAudioRequest>*>(objectPtr);
     const unsigned int count = static_cast<unsigned int>(vec.size());
     archive->WriteUInt(count);
 

@@ -101,19 +101,6 @@ namespace
   };
   static_assert(sizeof(AllocatorLockToken) == 0x01, "AllocatorLockToken size must be 0x01");
 
-  /**
-   * Address: 0x00957CA0 (FUN_00957CA0)
-   *
-   * What it does:
-   * Returns the allocator lock-state byte from one lock token.
-   */
-  [[maybe_unused]] [[nodiscard]] std::uint8_t ReadAllocatorLockStateLane(
-    const AllocatorLockToken* const token
-  ) noexcept
-  {
-    return token->hasLock;
-  }
-
   struct SmallBlockRequestLane
   {
     SmallBlockNode* head;
@@ -1132,7 +1119,7 @@ namespace
     AllocatorLockToken* const token
   )
   {
-    if (ReadAllocatorLockStateLane(token) != 0) {
+    if (token->hasLock != 0) {
       ::LeaveCriticalSection(&gAllocatorSentinel);
       token->hasLock = 0;
     }

@@ -536,14 +536,14 @@ namespace
 
     /// CWldTerrainRes::SetPlayableMapRect (0x008A6DA0).
     bool SetPlayableMapRect(
-      const moho::VisibilityRect& rect
+      const gpg::Rect2i& rect
     ) override
     {
       moho::STIMap* const map = mMap;
       if (map == nullptr) {
         return false;
       }
-      if (!map->SetPlayableMapRect(rect.AsRect2i())) {
+      if (!map->SetPlayableMapRect(rect)) {
         gpg::Warnf("Attempting to set an invalid playable rect");
         return false;
       }
@@ -551,11 +551,11 @@ namespace
     }
 
     /// CWldTerrainRes::GetPlayableMapRect.
-    const moho::VisibilityRect* GetPlayableMapRect(
-      moho::VisibilityRect& outRect
+    const gpg::Rect2i* GetPlayableMapRect(
+      gpg::Rect2i& outRect
     ) const override
     {
-      outRect = moho::VisibilityRect::FromRect2i(mMap->mPlayableRect);
+      outRect = mMap->mPlayableRect;
       return &outRect;
     }
 

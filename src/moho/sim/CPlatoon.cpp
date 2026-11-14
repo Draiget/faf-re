@@ -11,47 +11,6 @@ namespace
   // CCommandLuaFunctionRegistrations.cpp; the engine uses -0x10000000).
   constexpr std::int32_t kGroundTargetEntitySentinel = -0x10000000;
 
-  /**
-   * Address: 0x00723AA0 (FUN_00723AA0)
-   *
-   * What it does:
-   * Resolves and caches the `CPlatoon` reflection type.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::RType* CachedCPlatoonType()
-  {
-    if (moho::CPlatoon::sType == nullptr) {
-      moho::CPlatoon::sType = gpg::LookupRType(typeid(moho::CPlatoon));
-    }
-    return moho::CPlatoon::sType;
-  }
-
-  /**
-   * Address: 0x0072ABD0 (FUN_0072ABD0)
-   *
-   * What it does:
-   * Registers `CScriptObject` as the reflected base of `CPlatoon`, at
-   * offset 0.
-   */
-  void AddBase_CSCcriptObject(
-    gpg::RType* const typeInfo
-  )
-  {
-    gpg::AddReflectedBase<moho::CScriptObject>(typeInfo);
-  }
-
-  /**
-   * Address: 0x00724B90 (FUN_00724B90)
-   *
-   * What it does:
-   * Forwards to `AddBase_CSCcriptObject`.
-   */
-  [[maybe_unused]] void AddBase_CSCcriptObjectThunk(
-    gpg::RType* const typeInfo
-  )
-  {
-    AddBase_CSCcriptObject(typeInfo);
-  }
-
   // 0x00736450 / 0x00736470 are `rb_max`/`rb_min` of `sSimConList`'s
   // `fa::map` (node 0x30, isNil@+0x2D), cited on those members in
   // legacy/containers/RbTree.h.
@@ -1727,7 +1686,7 @@ namespace moho
             if (heldUnit == nullptr) {
               continue;
             }
-            const std::uint32_t ordinal = heldUnit->GetBlueprint()->mCategoryBitIndex;
+            const std::uint32_t ordinal = heldUnit->GetBlueprint()->mBlueprintOrdinal;
             if (category->mBits.Contains(ordinal)) {
               (void)unitsToUnload.Add(heldUnit);
               carrierGaveUpAUnit = true;
@@ -2023,9 +1982,9 @@ namespace moho
             continue;
           }
           // The category bitset is keyed by the blueprint's category-bit index
-          // (REntityBlueprint::mCategoryBitIndex, +0x5C -- the decompiler's
+          // (REntityBlueprint::mBlueprintOrdinal, +0x5C -- the decompiler's
           // "mBlueprintOrdinal" on the RUnitBlueprint returned by GetBlueprint).
-          const std::uint32_t ordinal = unit->GetBlueprint()->mCategoryBitIndex;
+          const std::uint32_t ordinal = unit->GetBlueprint()->mBlueprintOrdinal;
           if (category->mBits.Contains(ordinal)) {
             (void)loadableUnits.Add(unit);
           }

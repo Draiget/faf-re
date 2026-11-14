@@ -49,43 +49,6 @@ namespace
     return CachedSTIMapTypeVariant1();
   }
 
-  /**
-   * Address: 0x005099E0 (FUN_005099E0, STIMap RRef fill helper)
-   */
-  [[maybe_unused]] gpg::RRef* FillSTIMapRef(
-    moho::STIMap* const value,
-    gpg::RRef* const outRef
-  )
-  {
-    return gpg::RRef_STIMap(outRef, value);
-  }
-
-  /**
-   * Alias of FUN_005096E0 (non-canonical helper lane).
-   */
-  [[maybe_unused]] gpg::ReadArchive* ReadPointerSTIMapVariant1(
-    moho::STIMap** const outValue,
-    gpg::ReadArchive* const archive,
-    const gpg::RRef& ownerRef
-  )
-  {
-    if (outValue) {
-      *outValue = gpg::ReadPointerSTIMap(archive, ownerRef);
-    }
-    return archive;
-  }
-
-  /**
-   * Alias of FUN_005097F0 (non-canonical helper lane).
-   */
-  [[maybe_unused]] gpg::WriteArchive* WriteUnownedPointerSTIMapVariant1(
-    moho::STIMap* const value,
-    gpg::WriteArchive* const archive,
-    const gpg::RRef& ownerRef
-  )
-  {
-    return gpg::WriteUnownedPointerSTIMap(value, archive, ownerRef);
-  }
 } // namespace
 
 namespace moho

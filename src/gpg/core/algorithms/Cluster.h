@@ -55,17 +55,20 @@ namespace gpg::HaStar
 
   /**
    * The 9x9 passability window one level-1 cluster is built from: nine
-   * 16-bit row masks (bit x set = cell passable), padded to 20 bytes. Both
-   * the writer (`OccupySourceBinding::GetOccupyData`, `mov [ecx+eax*2], dx`
-   * at 0x0076B897) and the contact extractor (`movzx esi, word ptr
-   * [esi+ecx*2]` at 0x00955129) address it as 16-bit rows.
+   * 16-bit row masks (bit x set = cell passable), 0x12 bytes. The writer
+   * (`OccupySourceBinding::GetOccupyData`, `mov [ecx+eax*2], dx` at
+   * 0x0076B897) stores exactly nine words, the contact extractor (`movzx
+   * esi, word ptr [esi+ecx*2]` at 0x00955129) reads them as 16-bit rows,
+   * and the cluster cache keys on the whole struct: its comparator
+   * (0x00931460) and hash (`push 12h` at 0x0093208A) cover 0x12 bytes, and
+   * `ClusterInternalCache<OccupationData>::Fetch` copies the key as four
+   * dwords plus the word at +0x10 (0x00935009).
    */
   struct OccupationData
   {
     std::uint16_t mRows[9];
-    std::uint16_t mPad;
   };
-  static_assert(sizeof(OccupationData) == 0x14, "OccupationData size must be 0x14");
+  static_assert(sizeof(OccupationData) == 0x12, "OccupationData size must be 0x12");
 
   class Cluster
   {
@@ -94,14 +97,39 @@ namespace gpg::HaStar
 
     /**
      * Cluster edge bucket: one quantized `QuantizeEdgeCost` bucket value
-     * packed into a single byte. Stored as a triangular matrix indexed via
-     * `lhs + (rhs*(rhs-1))/2` (`TriangularEdgePairIndex`).
+     * packed into a single byte. A cluster of `n` nodes stores
+     * `TriangularSize(n)` of them, the edge between nodes `a` and `b` at
+     * `EdgeIndex(a, b)`.
      */
     struct Edge
     {
       std::int8_t cost;
     };
     static_assert(sizeof(Edge) == 0x01, "Cluster::Edge size must be 0x01");
+
+    /**
+     * Number of edges between `n` nodes, `n(n-1)/2`. The name is the
+     * source's: `EraseUnconnectedNodes` asserts
+     * `ioEdges.size() == TriangularSize(nnodes_used)` (Cluster.cpp:169).
+     */
+    [[nodiscard]] static constexpr std::uint32_t TriangularSize(
+      const std::uint32_t n
+    ) noexcept
+    {
+      return n * (n - 1u) / 2u;
+    }
+
+    /**
+     * Position of the edge between nodes `a` and `b` in the triangular
+     * table: row `max(a, b)`, column `min(a, b)`.
+     */
+    [[nodiscard]] static constexpr std::uint32_t EdgeIndex(
+      const std::uint32_t a,
+      const std::uint32_t b
+    ) noexcept
+    {
+      return a < b ? a + TriangularSize(b) : b + TriangularSize(a);
+    }
 
     /**
      * Refcounted cluster payload. Header layout:
@@ -126,6 +154,16 @@ namespace gpg::HaStar
       const void* mReleaseArg; // +0x08
       std::uint8_t mNodeCount; // +0x0C
       Node mNodes[1];          // +0x0D flexible tail
+
+      /** The triangular edge table that follows `Node[mNodeCount]` in the same block. */
+      [[nodiscard]] Edge* Edges() noexcept
+      {
+        return reinterpret_cast<Edge*>(mNodes + mNodeCount);
+      }
+      [[nodiscard]] const Edge* Edges() const noexcept
+      {
+        return reinterpret_cast<const Edge*>(mNodes + mNodeCount);
+      }
     };
     static_assert(offsetof(Data, mNodeCount) == 0x0C, "Cluster::Data::mNodeCount offset must be 0x0C");
     static_assert(offsetof(Data, mNodes) == 0x0D, "Cluster::Data::mNodes offset must be 0x0D");
@@ -531,7 +569,6 @@ namespace gpg::HaStar
     gpg::Rect2i mArea;
   };
 
-  static_assert(sizeof(OccupationData) == 0x14, "OccupationData size must be 0x14");
   static_assert(sizeof(ICache) == 0x04, "ICache size must be 0x04");
   static_assert(sizeof(Cluster) == 0x04, "Cluster size must be 0x04");
   static_assert(sizeof(SubclusterData) == 0x44, "SubclusterData size must be 0x44");

@@ -111,12 +111,12 @@ namespace
    */
   void DeserializeSSTIEntityConstantDataSerializerCallback(
     gpg::ReadArchive* const archive,
-    const std::intptr_t objectPtr,
+    void* const objectPtr,
     const int,
     gpg::RRef* const
   )
   {
-    auto* const data = reinterpret_cast<moho::SSTIEntityConstantData*>(objectPtr);
+    auto* const data = static_cast<moho::SSTIEntityConstantData*>(objectPtr);
     if (data == nullptr) {
       return;
     }
@@ -135,12 +135,12 @@ namespace
    */
   void SerializeSSTIEntityConstantDataSerializerCallback(
     gpg::WriteArchive* const archive,
-    const std::intptr_t objectPtr,
+    void* const objectPtr,
     const int,
     gpg::RRef* const
   )
   {
-    const auto* const data = reinterpret_cast<const moho::SSTIEntityConstantData*>(objectPtr);
+    const auto* const data = static_cast<const moho::SSTIEntityConstantData*>(objectPtr);
     if (data == nullptr) {
       return;
     }

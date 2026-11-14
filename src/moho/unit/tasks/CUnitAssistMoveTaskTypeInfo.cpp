@@ -101,7 +101,7 @@ namespace moho
   gpg::RRef CUnitAssistMoveTaskTypeInfo::NewRef()
   {
     auto* const task = new (std::nothrow) CUnitAssistMoveTask();
-    return MakeAssistMoveTaskRef(reinterpret_cast<CUnitAssistMoveTask*>(task));
+    return MakeAssistMoveTaskRef(static_cast<CUnitAssistMoveTask*>(task));
   }
 
   /**
@@ -116,7 +116,7 @@ namespace moho
   )
   {
     auto* const task = gpg::ConstructInStorage<CUnitAssistMoveTask>(objectStorage);
-    return MakeAssistMoveTaskRef(reinterpret_cast<CUnitAssistMoveTask*>(task));
+    return MakeAssistMoveTaskRef(static_cast<CUnitAssistMoveTask*>(task));
   }
 
   /**

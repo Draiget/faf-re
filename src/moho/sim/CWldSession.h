@@ -22,7 +22,7 @@
 #include "moho/sim/ISessionListener.h"
 #include "moho/unit/Broadcaster.h"
 #include "moho/sim/SSTICommandSource.h"
-#include "moho/sim/VisibilityRect.h"
+#include "gpg/core/containers/Rect2.h"
 #include "moho/command/CommandManager.h"
 #include "moho/misc/WeakSet.h"
 #include "moho/sim/WldSessionInfo.h"
@@ -53,9 +53,7 @@ namespace moho
   struct UserTarget;
   // Opaque cross-TU handle to the runtime command-graph anchor-history object
   // (see UserUnit.h). Only used as an incomplete pointer by the dock worker bridge.
-  struct QueuedUserCommandRecord;
   enum EMauiEventModifier : std::uint32_t;
-  class EntityCategoryLookupResolver;
   class LaunchInfoBase;
   class RRuleGameRules;
   class RRuleGameRulesImpl;
@@ -352,7 +350,7 @@ namespace moho
      * What it does:
      * Reads terrain playable-bounds rectangle used by user-entity visibility checks.
      */
-    [[nodiscard]] bool TryGetPlayableMapRect(VisibilityRect& outRect) const;
+    [[nodiscard]] bool TryGetPlayableMapRect(gpg::Rect2i& outRect) const;
 
     /**
      * Address: 0x007F6390 (FUN_007F6390, Moho::CWldSession::GetTickDebugCanvas)
@@ -450,15 +448,6 @@ namespace moho
      * accepted changes to the active sim driver.
      */
     void RequestFocusArmy(int index);
-
-    /**
-     * Alias of FUN_008B97C0 (non-canonical helper lane).
-     *
-     * What it does:
-     * Returns typed category resolver interface for `rules`.
-     */
-    [[nodiscard]] EntityCategoryLookupResolver* GetCategoryLookupResolver();
-    [[nodiscard]] const EntityCategoryLookupResolver* GetCategoryLookupResolver() const;
 
     /**
      * Alias of FUN_008B85E0 (non-canonical helper lane).
@@ -1186,7 +1175,7 @@ namespace moho
     /// `GetLeftMouseButtonAction(out, const MouseInfo*, int)` at 0x00852C39,
     /// and the bytes line up exactly: `mHitValid`+pad, `mMouseWorldPos`,
     /// `{mUnitHover, mPrevious}`, `mIsDragger` (which is what
-    /// `HighlightCommandId` really is) and `mMouseScreenPos`, ending at
+    /// `mCursorInfo.mIsDragger` really is) and `mMouseScreenPos`, ending at
     /// 0x4B0 + sizeof(MouseInfo) == 0x4D4. Use `CursorInfo()` below rather
     /// than these lanes; folding them into a real member is a separate pass
     /// because 31 call sites still name them individually.
@@ -1197,11 +1186,7 @@ namespace moho
     /// x86 (a `char[8]` stood in for the weak link and was half its x64 size).
     /// The destructor unlinks the hovered-unit weak link as a member, as
     /// 0x00893C7D does (`lea ecx, [ebp+4C0h]`).
-    alignas(MouseInfo) std::uint8_t mCursorWorldState[4]; // 0x04B0
-    Wm3::Vector3f CursorWorldPos;                         // 0x04B4
-    WeakPtr<UserEntity> mCursorUnitHover;                 // 0x04C0
-    int32_t HighlightCommandId;                           // 0x04C8
-    Wm3::Vector2f CursorScreenPos;                        // 0x04CC
+    MouseInfo mCursorInfo; // 0x04B0 (hit flag, world pos, hovered unit, highlighted command, screen pos)
     bool IsCheatsEnabled;                                 // 0x04D4
     bool mShowInvalidBuildPlacementPreview;               // 0x04D5
     char pad_04D6[2];                                     // 0x04D6
@@ -1253,17 +1238,6 @@ namespace moho
   static_assert(offsetof(CWldSession, FocusArmy) == 0x488, "CWldSession::FocusArmy offset must be 0x488");
   static_assert(offsetof(CWldSession, mSelectionSize) == 0x4AC, "CWldSession::mSelectionSize offset must be 0x4AC");
   static_assert(offsetof(CWldSession, mSelection) == 0x4A0, "CWldSession::mSelection offset must be 0x4A0");
-  static_assert(
-    offsetof(CWldSession, mCursorWorldState) == 0x4B0,
-    "CWldSession::mCursorWorldState offset must be 0x4B0"
-  );
-  static_assert(offsetof(CWldSession, CursorWorldPos) == 0x4B4, "CWldSession::CursorWorldPos offset must be 0x4B4");
-  static_assert(offsetof(CWldSession, mCursorUnitHover) == 0x4C0, "CWldSession::mCursorUnitHover offset must be 0x4C0");
-  static_assert(
-    offsetof(CWldSession, HighlightCommandId) == 0x4C8,
-    "CWldSession::HighlightCommandId offset must be 0x4C8"
-  );
-  static_assert(offsetof(CWldSession, CursorScreenPos) == 0x4CC, "CWldSession::CursorScreenPos offset must be 0x4CC");
   static_assert(
     offsetof(CWldSession, mShowInvalidBuildPlacementPreview) == 0x4D5,
     "CWldSession::mShowInvalidBuildPlacementPreview offset must be 0x4D5"
@@ -1603,7 +1577,7 @@ namespace moho
    * Wraps the CWldSession.cpp-local `ResolveCommandIssueTargetPosition`
    * (FUN_0081CFD0).
    */
-  [[nodiscard]] Wm3::Vector3f ResolveLastQueuedCommandAnchorPosition(const QueuedUserCommandRecord* record);
+  [[nodiscard]] Wm3::Vector3f ResolveLastQueuedCommandAnchorPosition(const UserCommandIssueHelper* record);
 
   /**
    * Bridge for `Moho::DrawAllUnitSkirts` (FUN_0085AD80): resolves the world

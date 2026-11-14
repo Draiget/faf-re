@@ -372,38 +372,6 @@ namespace
     "Incorrect type of game object.  (Did you call with '.' instead of ':'?)";
 
   /**
-   * Address: 0x004C8F00 (FUN_004C8F00, CScriptObject-pointer reflected ref store helper)
-   *
-   * What it does:
-   * Writes one `gpg::RRef` lane for a `CScriptObject*` slot pointer into
-   * caller-provided output storage.
-   */
-  [[maybe_unused]] gpg::RRef* StoreCScriptObjectPointerRef(
-    gpg::RRef* const outRef,
-    CScriptObject** const scriptObjectSlot
-  )
-  {
-    *outRef = gpg::MakeRRef<moho::CScriptObject*>(scriptObjectSlot);
-    return outRef;
-  }
-
-  /**
-   * Address: 0x004CBB30 (FUN_004CBB30, CScriptEvent reflected ref store helper)
-   *
-   * What it does:
-   * Writes one `gpg::RRef` lane for a CScriptEvent pointer into
-   * caller-provided output storage.
-   */
-  [[maybe_unused]] gpg::RRef* StoreCScriptEventRef(
-    gpg::RRef* const outRef,
-    CScriptEvent* const event
-  )
-  {
-    *outRef = gpg::MakeRRef<moho::CScriptEvent>(event);
-    return outRef;
-  }
-
-  /**
    * Address: 0x004CB570 (FUN_004CB570, CScriptEventTypeInfo::newRefFunc_)
    */
   [[nodiscard]]
@@ -502,20 +470,6 @@ namespace
     return typeInfo;
   }
 
-  /**
-   * Address: 0x004CB150 (FUN_004CB150, null RRef initializer helper)
-   *
-   * What it does:
-   * Clears one reflected reference payload to `{nullptr, nullptr}`.
-   */
-  [[maybe_unused]] gpg::RRef* ClearRRef(
-    gpg::RRef* const outRef
-  )
-  {
-    outRef->mObj = nullptr;
-    outRef->mType = nullptr;
-    return outRef;
-  }
 } // namespace
 
 namespace moho
@@ -866,7 +820,7 @@ CBoneEntityManipulator* moho::SCR_FromLua_CBoneEntityManipulator(
     return nullptr;
   }
 
-  return reinterpret_cast<CBoneEntityManipulator*>(upcast.mObj);
+  return static_cast<CBoneEntityManipulator*>(upcast.mObj);
 }
 
 /**
@@ -1175,7 +1129,7 @@ CSlaveManipulator* moho::SCR_FromLua_CSlaveManipulator(
     return nullptr;
   }
 
-  return reinterpret_cast<CSlaveManipulator*>(upcast.mObj);
+  return static_cast<CSlaveManipulator*>(upcast.mObj);
 }
 
 /**
@@ -1210,7 +1164,7 @@ CThrustManipulator* moho::SCR_FromLua_CThrustManipulator(
     return nullptr;
   }
 
-  return reinterpret_cast<CThrustManipulator*>(upcast.mObj);
+  return static_cast<CThrustManipulator*>(upcast.mObj);
 }
 
 /**
@@ -1245,7 +1199,7 @@ CSlideManipulator* moho::SCR_FromLua_CSlideManipulator(
     return nullptr;
   }
 
-  return reinterpret_cast<CSlideManipulator*>(upcast.mObj);
+  return static_cast<CSlideManipulator*>(upcast.mObj);
 }
 
 /**
@@ -1280,7 +1234,7 @@ CollisionBeamEntity* moho::SCR_FromLua_CollisionBeamEntity(
     return nullptr;
   }
 
-  return reinterpret_cast<CollisionBeamEntity*>(upcast.mObj);
+  return static_cast<CollisionBeamEntity*>(upcast.mObj);
 }
 
 /**
@@ -1451,7 +1405,7 @@ CDamage* moho::SCR_FromLua_CDamage(
     return nullptr;
   }
 
-  return reinterpret_cast<CDamage*>(upcast.mObj);
+  return static_cast<CDamage*>(upcast.mObj);
 }
 
 /**
@@ -1792,7 +1746,7 @@ CMauiBorder* moho::SCR_FromLua_CMauiBorder(
     return nullptr;
   }
 
-  return reinterpret_cast<CMauiBorder*>(upcast.mObj);
+  return static_cast<CMauiBorder*>(upcast.mObj);
 }
 
 /**
@@ -1827,7 +1781,7 @@ CMauiMesh* moho::SCR_FromLua_CMauiMesh(
     return nullptr;
   }
 
-  return reinterpret_cast<CMauiMesh*>(upcast.mObj);
+  return static_cast<CMauiMesh*>(upcast.mObj);
 }
 
 /**
@@ -1862,7 +1816,7 @@ CDiscoveryService* moho::SCR_FromLua_CDiscoveryService(
     return nullptr;
   }
 
-  return reinterpret_cast<CDiscoveryService*>(upcast.mObj);
+  return static_cast<CDiscoveryService*>(upcast.mObj);
 }
 
 /**
@@ -2041,7 +1995,7 @@ CUIWorldView* moho::SCR_FromLua_CUIWorldView(
     return nullptr;
   }
 
-  return reinterpret_cast<CUIWorldView*>(upcast.mObj);
+  return static_cast<CUIWorldView*>(upcast.mObj);
 }
 
 /**
@@ -2076,7 +2030,7 @@ CUIWorldMesh* moho::SCR_FromLua_CUIWorldMesh(
     return nullptr;
   }
 
-  return reinterpret_cast<CUIWorldMesh*>(upcast.mObj);
+  return static_cast<CUIWorldMesh*>(upcast.mObj);
 }
 
 /**
@@ -2111,7 +2065,7 @@ CMauiHistogram* moho::SCR_FromLua_CMauiHistogram(
     return nullptr;
   }
 
-  return reinterpret_cast<CMauiHistogram*>(upcast.mObj);
+  return static_cast<CMauiHistogram*>(upcast.mObj);
 }
 
 /**
@@ -2146,7 +2100,7 @@ CUIMapPreview* moho::SCR_FromLua_CUIMapPreview(
     return nullptr;
   }
 
-  return reinterpret_cast<CUIMapPreview*>(upcast.mObj);
+  return static_cast<CUIMapPreview*>(upcast.mObj);
 }
 
 /**
@@ -2181,7 +2135,7 @@ CMauiCursor* moho::SCR_FromLua_CMauiCursor(
     return nullptr;
   }
 
-  return reinterpret_cast<CMauiCursor*>(upcast.mObj);
+  return static_cast<CMauiCursor*>(upcast.mObj);
 }
 
 /**
@@ -2215,7 +2169,7 @@ CMauiItemList* moho::SCR_FromLua_CMauiItemList(
     return nullptr;
   }
 
-  return reinterpret_cast<CMauiItemList*>(upcast.mObj);
+  return static_cast<CMauiItemList*>(upcast.mObj);
 }
 
 /**
@@ -2250,7 +2204,7 @@ CMauiMovie* moho::SCR_FromLua_CMauiMovie(
     return nullptr;
   }
 
-  return reinterpret_cast<CMauiMovie*>(upcast.mObj);
+  return static_cast<CMauiMovie*>(upcast.mObj);
 }
 
 /**
@@ -2285,7 +2239,7 @@ CMauiScrollbar* moho::SCR_FromLua_CMauiScrollbar(
     return nullptr;
   }
 
-  return reinterpret_cast<CMauiScrollbar*>(upcast.mObj);
+  return static_cast<CMauiScrollbar*>(upcast.mObj);
 }
 
 /**
@@ -2320,7 +2274,7 @@ CMauiText* moho::SCR_FromLua_CMauiText(
     return nullptr;
   }
 
-  return reinterpret_cast<CMauiText*>(upcast.mObj);
+  return static_cast<CMauiText*>(upcast.mObj);
 }
 
 /**
@@ -2355,7 +2309,7 @@ CMauiControl* moho::SCR_FromLua_CMauiControl(
     return nullptr;
   }
 
-  return reinterpret_cast<CMauiControl*>(upcast.mObj);
+  return static_cast<CMauiControl*>(upcast.mObj);
 }
 
 /**
@@ -2390,7 +2344,7 @@ CMauiEdit* moho::SCR_FromLua_CMauiEdit(
     return nullptr;
   }
 
-  return reinterpret_cast<CMauiEdit*>(upcast.mObj);
+  return static_cast<CMauiEdit*>(upcast.mObj);
 }
 
 /**
@@ -2425,7 +2379,7 @@ CMauiBitmap* moho::SCR_FromLua_CMauiBitmap(
     return nullptr;
   }
 
-  return reinterpret_cast<CMauiBitmap*>(upcast.mObj);
+  return static_cast<CMauiBitmap*>(upcast.mObj);
 }
 
 /**
@@ -2460,7 +2414,7 @@ CMauiFrame* moho::SCR_FromLua_CMauiFrame(
     return nullptr;
   }
 
-  return reinterpret_cast<CMauiFrame*>(upcast.mObj);
+  return static_cast<CMauiFrame*>(upcast.mObj);
 }
 
 /**
@@ -2495,7 +2449,7 @@ CMauiLuaDragger* moho::SCR_FromLua_CMauiLuaDragger(
     return nullptr;
   }
 
-  return reinterpret_cast<CMauiLuaDragger*>(upcast.mObj);
+  return static_cast<CMauiLuaDragger*>(upcast.mObj);
 }
 
 /**

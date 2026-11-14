@@ -49,24 +49,6 @@ namespace
   }
 
   /**
-   * Address: 0x006A4BF0 (FUN_006A4BF0)
-   *
-   * What it does:
-   * Copies this unit's reserved O-grid rectangle bounds into one `Rect2i`.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::Rect2i GetReservedOgridRect(
-    const Unit& unit
-  ) noexcept
-  {
-    return {
-      unit.ReservedOgridRectMinX,
-      unit.ReservedOgridRectMinZ,
-      unit.ReservedOgridRectMaxX,
-      unit.ReservedOgridRectMaxZ,
-    };
-  }
-
-  /**
    * Address: 0x00565980 (FUN_00565980)
    *
    * What it does:

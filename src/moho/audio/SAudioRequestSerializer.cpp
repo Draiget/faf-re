@@ -28,7 +28,11 @@ namespace moho
     GPG_ASSERT(archive != nullptr);
     const gpg::RRef ownerRef{};
     archive->Read(gpg::RTypeOf<Wm3::Vector3f>(), &position, ownerRef);
-    archive->ReadInt(reinterpret_cast<int*>(&layer));
+    {
+      int value{};
+      archive->ReadInt(&value);
+      layer = static_cast<decltype(layer)>(value);
+    }
     (void)archive->ReadPointer(&params, &ownerRef);
     (void)archive->ReadPointer(&sound, &ownerRef);
   }

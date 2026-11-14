@@ -46,9 +46,7 @@ namespace
       gpg::CachedLookup<moho::UnitWeapon>(moho::UnitWeapon::sType) != nullptr &&
       dynamicType->IsDerivedFrom(gpg::CachedLookup<moho::UnitWeapon>(moho::UnitWeapon::sType), &baseOffset);
 
-    out.mObj = isDerived
-      ? reinterpret_cast<void*>(reinterpret_cast<std::uintptr_t>(weapon) - static_cast<std::uintptr_t>(baseOffset))
-      : static_cast<void*>(weapon);
+    out.mObj = isDerived ? gpg::CompleteObject(weapon, baseOffset) : static_cast<void*>(weapon);
     out.mType = dynamicType ? dynamicType : gpg::CachedLookup<moho::UnitWeapon>(moho::UnitWeapon::sType);
     return out;
   }
@@ -103,12 +101,12 @@ namespace moho
    */
   void WeakPtr_UnitWeapon::Deserialize(
     gpg::ReadArchive* const archive,
-    const std::intptr_t objectPtr,
+    void* const objectPtr,
     int,
     gpg::RRef* ownerRef
   )
   {
-    auto* const weak = reinterpret_cast<WeakPtr<UnitWeapon>*>(objectPtr);
+    auto* const weak = static_cast<WeakPtr<UnitWeapon>*>(objectPtr);
     if (!archive || !weak) {
       return;
     }
@@ -122,12 +120,12 @@ namespace moho
    */
   void WeakPtr_UnitWeapon::Serialize(
     gpg::WriteArchive* const archive,
-    const std::intptr_t objectPtr,
+    void* const objectPtr,
     int,
     gpg::RRef* ownerRef
   )
   {
-    auto* const weak = reinterpret_cast<WeakPtr<UnitWeapon>*>(objectPtr);
+    auto* const weak = static_cast<WeakPtr<UnitWeapon>*>(objectPtr);
     if (!archive || !weak) {
       return;
     }

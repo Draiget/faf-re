@@ -4,14 +4,6 @@
 
 namespace
 {
-  /**
-   * Address: 0x004AFF20 (FUN_004AFF20, nullsub_745)
-   *
-   * What it does:
-   * No-op helper thunk retained for callsite parity.
-   */
-  [[maybe_unused]] void NoOpHelperThunk() noexcept {}
-
 } // namespace
 
 /**

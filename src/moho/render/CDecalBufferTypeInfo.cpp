@@ -80,19 +80,6 @@ namespace
     return typeInfo;
   }
 
-  /**
-   * Address: 0x0077A740 (FUN_0077A740)
-   *
-   * What it does:
-   * Secondary callback-slot binder for `CDecalBuffer` reflected type
-   * lifecycle lanes.
-   */
-  [[maybe_unused]] moho::CDecalBufferTypeInfo* BindDecalBufferTypeCallbackSlotsSecondary(
-    moho::CDecalBufferTypeInfo* const typeInfo
-  )
-  {
-    return BindDecalBufferTypeCallbackSlotsPrimary(typeInfo);
-  }
 } // namespace
 
 namespace moho

@@ -16,54 +16,6 @@ namespace
 {
   using ResourceDepositVector = fa::vector<moho::ResourceDeposit>;
 
-  /**
-   * Address: 0x00549850 (FUN_00549850)
-   *
-   * What it does:
-   * Lazily resolves `vector<ResourceDeposit>` reflection type and dispatches
-   * one archive read for `CSimResources::deposits_` (x86 `+0x0C`, the only
-   * `fa::vector<ResourceDeposit>` member at that offset; same body as the
-   * CSimResources serializer's load half).
-   */
-  [[maybe_unused]] void ReadResourceDepositVectorFieldArchiveAdapter(
-    void* const object,
-    gpg::ReadArchive* const archive
-  )
-  {
-    GPG_ASSERT(archive != nullptr);
-    GPG_ASSERT(object != nullptr);
-    if (!archive || !object) {
-      return;
-    }
-
-    auto* const resources = static_cast<moho::CSimResources*>(object);
-    gpg::RRef owner{};
-    archive->Read(gpg::RTypeOf<ResourceDepositVector>(), &resources->deposits_, owner);
-  }
-
-  /**
-   * Address: 0x005498A0 (FUN_005498A0)
-   *
-   * What it does:
-   * Lazily resolves `vector<ResourceDeposit>` reflection type and dispatches
-   * one archive write for `CSimResources::deposits_` (x86 `+0x0C`).
-   */
-  [[maybe_unused]] void WriteResourceDepositVectorFieldArchiveAdapter(
-    void* const object,
-    gpg::WriteArchive* const archive
-  )
-  {
-    GPG_ASSERT(archive != nullptr);
-    GPG_ASSERT(object != nullptr);
-    if (!archive || !object) {
-      return;
-    }
-
-    auto* const resources = static_cast<moho::CSimResources*>(object);
-    gpg::RRef owner{};
-    archive->Write(gpg::RTypeOf<ResourceDepositVector>(), &resources->deposits_, owner);
-  }
-
   [[nodiscard]] gpg::RVectorType_ResourceDeposit& AcquireResourceDepositVectorType()
   {
     static gpg::RVectorType_ResourceDeposit sInstance;
@@ -143,7 +95,7 @@ void gpg::RVectorType_ResourceDeposit::Init()
  */
 void gpg::RVectorType_ResourceDeposit::SerLoad(
   gpg::ReadArchive* const archive,
-  const std::intptr_t objectPtr,
+  void* const objectPtr,
   const int,
   gpg::RRef* const
 )
@@ -152,7 +104,7 @@ void gpg::RVectorType_ResourceDeposit::SerLoad(
     return;
   }
 
-  auto* const storage = reinterpret_cast<ResourceDepositVector*>(objectPtr);
+  auto* const storage = static_cast<ResourceDepositVector*>(objectPtr);
   unsigned int count = 0u;
   archive->ReadUInt(&count);
 
@@ -184,7 +136,7 @@ void gpg::RVectorType_ResourceDeposit::SerLoad(
  */
 void gpg::RVectorType_ResourceDeposit::SerSave(
   gpg::WriteArchive* const archive,
-  const std::intptr_t objectPtr,
+  void* const objectPtr,
   const int,
   gpg::RRef* const ownerRef
 )
@@ -193,7 +145,7 @@ void gpg::RVectorType_ResourceDeposit::SerSave(
     return;
   }
 
-  const auto* const storage = reinterpret_cast<const ResourceDepositVector*>(objectPtr);
+  const auto* const storage = static_cast<const ResourceDepositVector*>(objectPtr);
   const unsigned int count = storage ? static_cast<unsigned int>(storage->size()) : 0u;
   archive->WriteUInt(count);
 

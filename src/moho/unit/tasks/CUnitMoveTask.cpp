@@ -873,22 +873,22 @@ namespace
 
   void DeserializeCUnitMoveTaskSerializerCallback(
     gpg::ReadArchive* const archive,
-    const std::intptr_t objectPtr,
+    void* const objectPtr,
     const int,
     gpg::RRef*
   )
   {
-    reinterpret_cast<moho::CUnitMoveTask*>(objectPtr)->MemberDeserialize(archive);
+    static_cast<moho::CUnitMoveTask*>(objectPtr)->MemberDeserialize(archive);
   }
 
   void SerializeCUnitMoveTaskSerializerCallback(
     gpg::WriteArchive* const archive,
-    const std::intptr_t objectPtr,
+    void* const objectPtr,
     const int,
     gpg::RRef*
   )
   {
-    reinterpret_cast<const moho::CUnitMoveTask*>(objectPtr)->MemberSerialize(archive);
+    static_cast<const moho::CUnitMoveTask*>(objectPtr)->MemberSerialize(archive);
   }
 
   CUnitMoveTaskSerializerHelper::CUnitMoveTaskSerializerHelper()

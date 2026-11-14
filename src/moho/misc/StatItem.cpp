@@ -2,6 +2,7 @@
 #include "moho/lua/CScrLuaInitForm.h"
 #include "platform/Interlocked.h"
 
+#include <atomic>
 #include <algorithm>
 #include <bit>
 #include <cfloat>
@@ -201,12 +202,12 @@ namespace
    */
   void DeserializeStatsStatItem(
     gpg::ReadArchive* archive,
-    std::intptr_t objectPtr,
+    void* objectPtr,
     int,
     gpg::RRef* /*ownerRef*/
   )
   {
-    auto* const stats = reinterpret_cast<moho::Stats<moho::StatItem>*>(objectPtr);
+    auto* const stats = static_cast<moho::Stats<moho::StatItem>*>(objectPtr);
     GPG_ASSERT(stats != nullptr);
 
     fa::mutex::scoped_lock lock(stats->mLock);
@@ -222,12 +223,12 @@ namespace
    */
   void SerializeStatsStatItem(
     gpg::WriteArchive* archive,
-    std::intptr_t objectPtr,
+    void* objectPtr,
     int,
     gpg::RRef* ownerRef
   )
   {
-    auto* const stats = reinterpret_cast<moho::Stats<moho::StatItem>*>(objectPtr);
+    auto* const stats = static_cast<moho::Stats<moho::StatItem>*>(objectPtr);
     GPG_ASSERT(stats != nullptr);
 
     fa::mutex::scoped_lock lock(stats->mLock);
@@ -321,19 +322,6 @@ namespace
   }
 
   /**
-   * Address: 0x004193E0 (FUN_004193E0)
-   *
-   * What it does:
-   * Returns first dword lane from one runtime view pointer.
-   */
-  [[nodiscard]] std::uint32_t ReadFirstDwordLane(
-    const std::uint32_t* value
-  ) noexcept
-  {
-    return value ? value[0] : 0U;
-  }
-
-  /**
    * Address: 0x00419B30 (FUN_00419B30)
    *
    * What it does:
@@ -383,7 +371,6 @@ namespace
       return;
     }
 
-    GPG_ASSERT(ReadFirstDwordLane(reinterpret_cast<const std::uint32_t*>(type)) != 0U);
     AssignStatItemTypeCreateCallbacks(type);
     AssignStatItemTypeDestroyCallbacks(type);
   }
@@ -465,14 +452,6 @@ namespace
   )
   {
     return platform::AtomicLoad(value);
-  }
-
-  void AtomicStoreI32(
-    volatile std::int32_t* value,
-    const std::int32_t wanted
-  )
-  {
-    (void)platform::AtomicExchange(value, wanted);
   }
 
   [[nodiscard]] std::int32_t AtomicExchangeI32(
@@ -891,7 +870,7 @@ namespace moho
   ) const noexcept
   {
     const __time64_t* const selectedTime =
-      useFineTime ? reinterpret_cast<const __time64_t*>(&ftime) : reinterpret_cast<const __time64_t*>(&time);
+      useFineTime ? static_cast<const __time64_t*>(&ftime) : static_cast<const __time64_t*>(&time);
     /**
      * Address: 0x00A86D49 (FUN_00A86D49, `_localtime64`, already
      * external_dependency)
@@ -933,7 +912,7 @@ namespace moho
    */
   const char* CTimeStamp::GetString() const noexcept
   {
-    const char* const source = _ctime64(reinterpret_cast<const __time64_t*>(&time));
+    const char* const source = _ctime64(static_cast<const __time64_t*>(&time));
     if (source == nullptr) {
       return nullptr;
     }
@@ -2161,7 +2140,7 @@ namespace moho
    */
   void StatItem::Synchronize()
   {
-    AtomicStoreI32(reinterpret_cast<volatile std::int32_t*>(&mType), static_cast<std::int32_t>(EStatType::kInt));
+    std::atomic_ref<EStatType>(mType).store(EStatType::kInt);
   }
 
   /**
@@ -2169,7 +2148,7 @@ namespace moho
    */
   void StatItem::SynchronizeAsInt()
   {
-    AtomicStoreI32(reinterpret_cast<volatile std::int32_t*>(&mType), static_cast<std::int32_t>(EStatType::kInt));
+    std::atomic_ref<EStatType>(mType).store(EStatType::kInt);
   }
 
   /**
@@ -2177,7 +2156,7 @@ namespace moho
    */
   void StatItem::SynchronizeAsFloat()
   {
-    AtomicStoreI32(reinterpret_cast<volatile std::int32_t*>(&mType), static_cast<std::int32_t>(EStatType::kFloat));
+    std::atomic_ref<EStatType>(mType).store(EStatType::kFloat);
   }
 
   /**
@@ -2463,7 +2442,7 @@ namespace moho
     const int mode
   )
   {
-    auto* const stats = reinterpret_cast<Stats<StatItem>*>(statsRoot);
+    auto* const stats = static_cast<Stats<StatItem>*>(statsRoot);
     if (!stats) {
       return nullptr;
     }
@@ -2478,7 +2457,7 @@ namespace moho
     const gpg::StrArg name
   )
   {
-    auto* const stats = reinterpret_cast<Stats<StatItem>*>(statsRoot);
+    auto* const stats = static_cast<Stats<StatItem>*>(statsRoot);
     if (!stats) {
       return nullptr;
     }
@@ -2493,7 +2472,7 @@ namespace moho
     const gpg::StrArg name
   )
   {
-    auto* const stats = reinterpret_cast<Stats<StatItem>*>(statsRoot);
+    auto* const stats = static_cast<Stats<StatItem>*>(statsRoot);
     if (!stats) {
       return nullptr;
     }

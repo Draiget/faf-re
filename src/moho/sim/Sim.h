@@ -1462,8 +1462,8 @@ namespace moho
 
     // CArmyImpl binary methods read several Sim internals directly (same pattern as retail layout codepaths).
     friend class CArmyImpl;
-    friend void SimSerializerLoadThunk(gpg::ReadArchive* archive, std::intptr_t objectPtr, int, gpg::RRef*);
-    friend void SimSerializerSaveThunk(gpg::WriteArchive* archive, std::intptr_t objectPtr, int, gpg::RRef*);
+    friend void SimSerializerLoadThunk(gpg::ReadArchive* archive, void* objectPtr, int, gpg::RRef*);
+    friend void SimSerializerSaveThunk(gpg::WriteArchive* archive, void* objectPtr, int, gpg::RRef*);
 
   public:
     static gpg::RType* sType;
@@ -7315,7 +7315,7 @@ namespace moho
    * What it does:
    * Enables steering debug overlay rendering during `CAiSteeringImpl::Execute`.
    */
-  extern std::uint8_t ren_Steering;
+  extern bool ren_Steering;
 
   /**
    * Address: 0x010A63D6 (?sim_ShowDamage@Moho@@3_NA)

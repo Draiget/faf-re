@@ -339,31 +339,7 @@ namespace
   ) noexcept
   {
     GPG_ASSERT(blueprint != nullptr);
-    return blueprint != nullptr && categorySet.Bits().Contains(blueprint->mCategoryBitIndex);
-  }
-
-  /**
-   * Address: 0x005562C0 (FUN_005562C0, category end-iterator lane helper)
-   *
-   * What it does:
-   * Builds one legacy `EntityCategoryIterator` end lane from raw category-set
-   * storage (`firstWordIndex + wordCount`, then `* 32`) without extra guards.
-   */
-  [[maybe_unused]] [[nodiscard]] moho::EntityCategoryIterator* BuildCategoryEndIteratorLaneUnchecked(
-    moho::EntityCategoryIterator* const out,
-    moho::EntityCategorySet* const categorySet
-  ) noexcept
-  {
-    moho::BVIntSet* const bits = &categorySet->mBits;
-    const std::uintptr_t wordBegin = reinterpret_cast<std::uintptr_t>(bits->mWords.start_);
-    const std::uintptr_t wordEnd = reinterpret_cast<std::uintptr_t>(bits->mWords.end_);
-    const std::uint32_t wordCount = static_cast<std::uint32_t>((wordEnd - wordBegin) >> 2u);
-    const std::uint32_t endWordIndex = bits->mFirstWordIndex + wordCount;
-
-    out->mRules = categorySet->mUniverse.mRules;
-    out->mSet = bits;
-    out->mCurBit = static_cast<std::int32_t>(endWordIndex << 5u);
-    return out;
+    return blueprint != nullptr && categorySet.Bits().Contains(blueprint->mBlueprintOrdinal);
   }
 
   /**
@@ -539,8 +515,7 @@ namespace
       return out;
     }
 
-    out.mObj =
-      reinterpret_cast<void*>(reinterpret_cast<std::uintptr_t>(object) - static_cast<std::uintptr_t>(baseOffset));
+    out.mObj = gpg::CompleteObject(object, baseOffset);
     out.mType = runtimeType;
     return out;
   }
@@ -3812,8 +3787,8 @@ namespace moho
    * Scans collision candidates, applies script and ally filters, and returns
    * the nearest surviving collision lane.
    */
-  WeaponCollisionEntry* UnitWeapon::GetClosestCollision(
-    gpg::fastvector_n<WeaponCollisionEntry, 10>* const collisions,
+  EntityLineCollision* UnitWeapon::GetClosestCollision(
+    gpg::fastvector_n<EntityLineCollision, 10>* const collisions,
     UnitWeapon* const weapon,
     Unit* const ownerUnit,
     const bool ignoreAlly
@@ -3837,7 +3812,7 @@ namespace moho
     // rather than reading through a hoisted pointer.
     //
     // That is not incidental. The body runs the `OnCollisionCheck` script, and
-    // this container is a `fastvector_n<WeaponCollisionEntry, 10>` - a script that
+    // this container is a `fastvector_n<EntityLineCollision, 10>` - a script that
     // pushes an eleventh entry spills the run out of the inline window onto the
     // heap, and any pointer captured before that call is left aiming at storage
     // the container no longer uses. Caching begin/end/count across the call
@@ -3865,11 +3840,11 @@ namespace moho
         }
       }
 
-      WeaponCollisionEntry& candidate = collisions->begin()[index];
-      if (closestDistance > candidate.dist) {
+      EntityLineCollision& candidate = collisions->begin()[index];
+      if (closestDistance > candidate.distanceFromLineStart) {
         if (candidate.entity == nullptr || candidate.entity->IsUnit() != ownerUnit) {
           closestIndex = static_cast<std::int32_t>(index);
-          closestDistance = collisions->begin()[index].dist;
+          closestDistance = collisions->begin()[index].distanceFromLineStart;
         }
       }
     }
@@ -4155,19 +4130,17 @@ namespace moho
     outHelper->mLineScale = sweepLength * 0.5f;
 
     // Gather entity collisions along the segment and pick the nearest valid hit.
-    gpg::fastvector_n<WeaponCollisionEntry, 10> collisions;
-    mSim->mOGrid->GetEntityCollisionsInLine(
-      reinterpret_cast<gpg::core::FastVectorN<EntityLineCollision, 10>&>(collisions), beamStart, sweepEnd
-    );
+    gpg::fastvector_n<EntityLineCollision, 10> collisions;
+    mSim->mOGrid->GetEntityCollisionsInLine(collisions, beamStart, sweepEnd);
 
     if (collisions.begin() != collisions.end()) {
       const bool ignoreAlly = (mWeaponBlueprint->IgnoresAlly != 0u);
       if (
-        WeaponCollisionEntry* const closest = GetClosestCollision(&collisions, this, mUnit, ignoreAlly);
+        EntityLineCollision* const closest = GetClosestCollision(&collisions, this, mUnit, ignoreAlly);
         closest != nullptr
       ) {
         Entity* const hitEntity = closest->entity;
-        outHelper->mPos = closest->contactPoint;
+        outHelper->mPos = closest->position;
         outHelper->mEntity.Set(hitEntity);
 
         // Distance from the beam start to the contact point (using a per-entity
@@ -4175,7 +4148,7 @@ namespace moho
         Entity* const boundEntity = outHelper->mEntity.GetObjectPtr();
         Wm3::Vec3f referencePoint{};
         if (boundEntity != nullptr && (static_cast<std::uint32_t>(boundEntity->id_) & 0xF0000000u) == 0x40000000u) {
-          referencePoint = closest->contactPoint;
+          referencePoint = closest->position;
         } else if (boundEntity != nullptr && boundEntity->IsUnit() == nullptr) {
           referencePoint = boundEntity->mVarDat.mCurTransform.pos_;
         } else if (boundEntity != nullptr) {

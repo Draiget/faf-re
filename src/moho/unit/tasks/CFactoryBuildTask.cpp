@@ -553,12 +553,12 @@ namespace
    */
   void DeserializeCFactoryBuildTaskSerializerCallback(
     gpg::ReadArchive* const archive,
-    const std::intptr_t objectPtr,
+    void* const objectPtr,
     const int,
     gpg::RRef* const
   )
   {
-    auto* const task = reinterpret_cast<moho::CFactoryBuildTask*>(objectPtr);
+    auto* const task = static_cast<moho::CFactoryBuildTask*>(objectPtr);
     if (task == nullptr) {
       return;
     }
@@ -576,12 +576,12 @@ namespace
    */
   void SerializeCFactoryBuildTaskSerializerCallback(
     gpg::WriteArchive* const archive,
-    const std::intptr_t objectPtr,
+    void* const objectPtr,
     const int,
     gpg::RRef* const
   )
   {
-    auto* const task = reinterpret_cast<const moho::CFactoryBuildTask*>(objectPtr);
+    auto* const task = static_cast<const moho::CFactoryBuildTask*>(objectPtr);
     if (task == nullptr) {
       return;
     }

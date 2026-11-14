@@ -74,7 +74,7 @@ namespace moho
     // Address: 0x006FDCA0 (FUN_006FDCA0)
     virtual CAiReconDBImpl* GetReconDB() = 0;
     // Address: 0x006FDCB0 (FUN_006FDCB0)
-    virtual CSimArmyEconomyInfo* GetEconomy() = 0;
+    virtual CEconomy* GetEconomy() = 0;
     // Address: 0x006FFCB0 (FUN_006FFCB0)
     virtual void GenerateArmyStart() = 0;
     // Address: 0x006FDCC0 (FUN_006FDCC0)

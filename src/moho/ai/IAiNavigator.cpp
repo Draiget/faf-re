@@ -33,7 +33,7 @@ namespace moho
      * Deserializes listener pointer lanes and relinks them into the target
      * broadcaster ring.
      */
-    static void SerLoad(gpg::ReadArchive* archive, std::intptr_t objectPtr, int version, gpg::RRef* ownerRef);
+    static void SerLoad(gpg::ReadArchive* archive, void* objectPtr, int version, gpg::RRef* ownerRef);
 
     /**
      * Address: 0x005A7800 (FUN_005A7800)
@@ -42,7 +42,7 @@ namespace moho
      * Serializes broadcaster listener pointers as `UNOWNED` and appends a null
      * pointer sentinel.
      */
-    static void SerSave(gpg::WriteArchive* archive, std::intptr_t objectPtr, int version, gpg::RRef* ownerRef);
+    static void SerSave(gpg::WriteArchive* archive, void* objectPtr, int version, gpg::RRef* ownerRef);
 
     [[nodiscard]] const char* GetName() const override;
 
@@ -133,62 +133,6 @@ namespace
   static_assert(offsetof(NavigatorGlueLateWord, lateWord) == 0x118, "lateWord offset must be 0x118");
 
   /**
-   * Address: 0x005A2BF0 (FUN_005A2BF0)
-   *
-   * What it does:
-   * Returns the first trailing 32-bit payload lane from one opaque navigator
-   * glue view object.
-   */
-  [[maybe_unused]] [[nodiscard]] std::uint32_t ReadNavigatorGlueTailWord0(
-    const NavigatorGlueTailWord* const view
-  ) noexcept
-  {
-    return view->tailWord0;
-  }
-
-  /**
-   * Address: 0x005A2C00 (FUN_005A2C00)
-   *
-   * What it does:
-   * Returns the second trailing 32-bit payload lane from one opaque navigator
-   * glue view object.
-   */
-  [[maybe_unused]] [[nodiscard]] std::uint32_t ReadNavigatorGlueTailWord1(
-    const NavigatorGlueTailWord* const view
-  ) noexcept
-  {
-    return view->tailWord1;
-  }
-
-  /**
-   * Address: 0x005A2C10 (FUN_005A2C10)
-   *
-   * What it does:
-   * Returns the third trailing 32-bit payload lane from one opaque navigator
-   * glue view object.
-   */
-  [[maybe_unused]] [[nodiscard]] std::uint32_t ReadNavigatorGlueTailWord2(
-    const NavigatorGlueTailWord* const view
-  ) noexcept
-  {
-    return view->tailWord2;
-  }
-
-  /**
-   * Address: 0x005A2DF0 (FUN_005A2DF0)
-   *
-   * What it does:
-   * Returns one late 32-bit payload lane from one opaque navigator glue view
-   * object.
-   */
-  [[maybe_unused]] [[nodiscard]] std::uint32_t ReadNavigatorGlueLateWord(
-    const NavigatorGlueLateWord* const view
-  ) noexcept
-  {
-    return view->lateWord;
-  }
-
-  /**
    * Address: 0x005A8240 (FUN_005A8240)
    *
    * What it does:
@@ -260,54 +204,6 @@ namespace
   // `gpg::RType::~RType()`, which already frees `bases_`/`fields_` in typed
   // form.
 
-  /**
-   * Address: 0x005A8970 (FUN_005A8970)
-   *
-   * What it does:
-   * Upcasts one reflected source lane to `CAiNavigatorImpl` and returns the
-   * resulting object pointer lane.
-   */
-  [[maybe_unused]] [[nodiscard]] void* UpcastCAiNavigatorImplRefObject(
-    gpg::RRef* const source
-  )
-  {
-    if (!source) {
-      return nullptr;
-    }
-
-    return gpg::REF_UpcastPtr(*source, gpg::RTypeOf<moho::CAiNavigatorImpl>()).mObj;
-  }
-
-  /**
-   * Address: 0x005A8A00 (FUN_005A8A00)
-   *
-   * What it does:
-   * Upcasts one reflected source lane to `Listener<EAiNavigatorEvent>` and
-   * returns the resulting object pointer lane.
-   */
-  [[maybe_unused]] [[nodiscard]] void* UpcastListenerEAiNavigatorEventRefObject(
-    gpg::RRef* const source
-  )
-  {
-    if (!source) {
-      return nullptr;
-    }
-
-    return gpg::REF_UpcastPtr(*source, gpg::RTypeOf<moho::Listener<moho::EAiNavigatorEvent>>()).mObj;
-  }
-
-  /**
-   * Address: 0x005A89F0 (FUN_005A89F0)
-   *
-   * What it does:
-   * Returns the high byte from one 32-bit packed value lane.
-   */
-  [[maybe_unused]] [[nodiscard]] std::uint8_t ExtractPackedHighByte(
-    const std::uint32_t value
-  ) noexcept
-  {
-    return static_cast<std::uint8_t>((value >> 8u) & 0xFFu);
-  }
 } // namespace
 
 /**
@@ -333,12 +229,12 @@ const char* moho::RBroadcasterRType_EAiNavigatorEvent::GetName() const
  */
 void moho::RBroadcasterRType_EAiNavigatorEvent::SerLoad(
   gpg::ReadArchive* const archive,
-  const std::intptr_t objectPtr,
+  void* const objectPtr,
   const int,
   gpg::RRef* const ownerRef
 )
 {
-  auto* const broadcaster = reinterpret_cast<moho::Broadcaster<moho::EAiNavigatorEvent>*>(objectPtr);
+  auto* const broadcaster = static_cast<moho::Broadcaster<moho::EAiNavigatorEvent>*>(objectPtr);
   GPG_ASSERT(archive != nullptr);
   GPG_ASSERT(broadcaster != nullptr);
   if (!archive || !broadcaster) {
@@ -362,12 +258,12 @@ void moho::RBroadcasterRType_EAiNavigatorEvent::SerLoad(
  */
 void moho::RBroadcasterRType_EAiNavigatorEvent::SerSave(
   gpg::WriteArchive* const archive,
-  const std::intptr_t objectPtr,
+  void* const objectPtr,
   const int,
   gpg::RRef* const ownerRef
 )
 {
-  auto* const broadcaster = reinterpret_cast<moho::Broadcaster<moho::EAiNavigatorEvent>*>(objectPtr);
+  auto* const broadcaster = static_cast<moho::Broadcaster<moho::EAiNavigatorEvent>*>(objectPtr);
   GPG_ASSERT(archive != nullptr);
   GPG_ASSERT(broadcaster != nullptr);
   if (!archive || !broadcaster) {
@@ -397,25 +293,6 @@ const char* moho::RListenerRType_EAiNavigatorEvent::GetName() const
 namespace
 {
   constexpr std::uint32_t kMaxPathCellCount = 0x3FFFFFFFu;
-
-  /**
-   * Address: 0x005A7660 (FUN_005A7660)
-   *
-   * What it does:
-   * Releases one `SNavPath` storage pointer lane (`start`) and clears the
-   * pointer triplet while preserving the leading metadata word.
-   */
-  [[maybe_unused]] void ResetPathCellStorageTriplet(
-    SNavPath& path
-  ) noexcept
-  {
-    if (path.start) {
-      ::operator delete(path.start);
-    }
-    path.start = nullptr;
-    path.finish = nullptr;
-    path.capacity = nullptr;
-  }
 
   /**
    * Address: 0x005B0650 (FUN_005B0650)
@@ -492,121 +369,6 @@ namespace
     return destination;
   }
 
-  [[nodiscard]] SOCellPos* CopyCellsForwardRawAddress(
-    std::uintptr_t destinationAddress,
-    const SOCellPos* sourceBegin,
-    const SOCellPos* sourceEnd
-  ) noexcept
-  {
-    while (sourceBegin != sourceEnd) {
-      if (destinationAddress != 0u) {
-        *reinterpret_cast<SOCellPos*>(destinationAddress) = *sourceBegin;
-      }
-      ++sourceBegin;
-      destinationAddress += sizeof(SOCellPos);
-    }
-    return reinterpret_cast<SOCellPos*>(destinationAddress);
-  }
-
-  /**
-   * Address: 0x005B1630 (FUN_005B1630)
-   * Address: 0x00682980 (FUN_00682980)
-   *
-   * What it does:
-   * Copies one source cell range while preserving the legacy "null destination
-   * is allowed" advance semantics used by MSVC helper thunks.
-   */
-  [[nodiscard]] SOCellPos* CopyCellsForwardAllowNull(
-    SOCellPos* destination,
-    const SOCellPos* sourceBegin,
-    const SOCellPos* sourceEnd
-  ) noexcept
-  {
-    return CopyCellsForwardRawAddress(reinterpret_cast<std::uintptr_t>(destination), sourceBegin, sourceEnd);
-  }
-
-  /**
-   * Address: 0x005B1650 (FUN_005B1650)
-   * Address: 0x0067FA10 (FUN_0067FA10)
-   * Address: 0x00680C50 (FUN_00680C50)
-   * Address: 0x00681CE0 (FUN_00681CE0)
-   * Address: 0x00682380 (FUN_00682380)
-   *
-   * What it does:
-   * Register-shape adapter that forwards one SOCellPos span copy into the
-   * canonical null-tolerant forward-copy helper.
-   */
-  [[maybe_unused]] [[nodiscard]] SOCellPos* CopyCellsForwardAllowNullRegisterAdapter(
-    const SOCellPos* const sourceBegin,
-    const SOCellPos* const sourceEnd,
-    SOCellPos* const destination
-  ) noexcept
-  {
-    return CopyCellsForwardAllowNull(destination, sourceBegin, sourceEnd);
-  }
-
-  /**
-   * Address: 0x005B1A20 (FUN_005B1A20)
-   *
-   * What it does:
-   * Stack-call bridge variant of null-tolerant forward copy for SOCellPos
-   * spans.
-   */
-  [[nodiscard]] SOCellPos* CopyCellsForwardAllowNullStackBridge(
-    SOCellPos* destination,
-    const SOCellPos* sourceBegin,
-    const SOCellPos* sourceEnd
-  ) noexcept
-  {
-    return CopyCellsForwardRawAddress(reinterpret_cast<std::uintptr_t>(destination), sourceBegin, sourceEnd);
-  }
-
-  /**
-   * Address: 0x005B16B0 (FUN_005B16B0)
-   *
-   * What it does:
-   * Register-shape adapter for the stack-bridge variant of null-tolerant
-   * SOCellPos forward-copy.
-   */
-  [[maybe_unused]] [[nodiscard]] SOCellPos* CopyCellsForwardAllowNullStackBridgeRegisterAdapter(
-    const SOCellPos* const sourceBegin,
-    const SOCellPos* const sourceEnd,
-    SOCellPos* const destination
-  ) noexcept
-  {
-    return CopyCellsForwardAllowNullStackBridge(destination, sourceBegin, sourceEnd);
-  }
-
-  /**
-   * Address: 0x005B09D0 (FUN_005B09D0)
-   *
-   * What it does:
-   * Assignment-lane bridge that forwards to the null-tolerant cell copy helper.
-   */
-  [[nodiscard]] SOCellPos* CopyCellsForAssignBridge(
-    SOCellPos* destination,
-    const SOCellPos* sourceBegin,
-    const SOCellPos* sourceEnd
-  ) noexcept
-  {
-    return CopyCellsForwardAllowNull(destination, sourceBegin, sourceEnd);
-  }
-
-  /**
-   * Address: 0x005B0A20 (FUN_005B0A20)
-   *
-   * What it does:
-   * Insert-lane bridge that forwards to the null-tolerant cell copy helper.
-   */
-  [[nodiscard]] SOCellPos* CopyCellsForInsertBridge(
-    SOCellPos* destination,
-    const SOCellPos* sourceBegin,
-    const SOCellPos* sourceEnd
-  ) noexcept
-  {
-    return CopyCellsForwardAllowNull(destination, sourceBegin, sourceEnd);
-  }
-
   /**
    * Address: 0x005B0A70 (FUN_005B0A70)
    * Address: 0x008D6EF0 (FUN_008D6EF0)
@@ -663,22 +425,6 @@ namespace
     return CopyCellsForwardUnchecked(destination, sourceBegin, sourceEnd);
   }
 
-  /**
-   * Address: 0x005B0EB0 (FUN_005B0EB0)
-   *
-   * What it does:
-   * Stack-call bridge variant that forwards to the null-tolerant SOCellPos
-   * copy helper.
-   */
-  [[nodiscard]] SOCellPos* CopyCellsForwardStackBridge(
-    SOCellPos* destination,
-    const SOCellPos* sourceBegin,
-    const SOCellPos* sourceEnd
-  ) noexcept
-  {
-    return CopyCellsForwardAllowNullStackBridge(destination, sourceBegin, sourceEnd);
-  }
-
   [[nodiscard]] std::size_t ComputeGrowthCapacity(
     const std::size_t currentCapacity,
     const std::size_t requiredCount
@@ -718,177 +464,6 @@ namespace
   }
 
   /**
-   * Address: 0x005B0000 (FUN_005B0000)
-   *
-   * What it does:
-   * Stores one 32-bit value through the supplied output pointer and returns the
-   * destination pointer unchanged.
-   */
-  [[nodiscard]] std::uint32_t* StoreDwordValue(
-    std::uint32_t* const destination,
-    const std::uint32_t value
-  ) noexcept
-  {
-    if (destination) {
-      *destination = value;
-    }
-    return destination;
-  }
-
-  /**
-   * Address: 0x005B0300 (FUN_005B0300)
-   *
-   * What it does:
-   * Alias lane for storing one 32-bit value through an output pointer.
-   */
-  [[maybe_unused]] [[nodiscard]] std::uint32_t* StoreDwordValueAlias(
-    std::uint32_t* const destination,
-    const std::uint32_t value
-  ) noexcept
-  {
-    return StoreDwordValue(destination, value);
-  }
-
-  /**
-   * Address: 0x005B0340 (FUN_005B0340)
-   *
-   * What it does:
-   * Secondary alias lane for storing one 32-bit value through an output
-   * pointer.
-   */
-  [[maybe_unused]] [[nodiscard]] std::uint32_t* StoreDwordValueAlias2(
-    std::uint32_t* const destination,
-    const std::uint32_t value
-  ) noexcept
-  {
-    return StoreDwordValue(destination, value);
-  }
-
-  /**
-   * Address: 0x005B0010 (FUN_005B0010)
-   *
-   * What it does:
-   * Loads one 32-bit value from a source pointer.
-   */
-  [[nodiscard]] std::uint32_t LoadDwordValue(
-    const std::uint32_t* const source
-  ) noexcept
-  {
-    return source ? *source : 0u;
-  }
-
-  /**
-   * Address: 0x005B0310 (FUN_005B0310)
-   *
-   * What it does:
-   * Alias lane for loading one 32-bit value from a source pointer.
-   */
-  [[maybe_unused]] [[nodiscard]] std::uint32_t LoadDwordValueAlias(
-    const std::uint32_t* const source
-  ) noexcept
-  {
-    return LoadDwordValue(source);
-  }
-
-  /**
-   * Address: 0x005B0350 (FUN_005B0350)
-   *
-   * What it does:
-   * Secondary alias lane for loading one 32-bit value from a source pointer.
-   */
-  [[maybe_unused]] [[nodiscard]] std::uint32_t LoadDwordValueAlias2(
-    const std::uint32_t* const source
-  ) noexcept
-  {
-    return LoadDwordValue(source);
-  }
-
-  /**
-   * Address: 0x005B00C0 (FUN_005B00C0)
-   *
-   * What it does:
-   * Reads one stored 32-bit base value, advances it by `index * 4`, and writes
-   * the adjusted value to the destination pointer.
-   */
-  [[maybe_unused]] [[nodiscard]] std::uint32_t* AdvanceStoredDwordValue(
-    std::uint32_t* const destination,
-    const std::uint32_t* const source,
-    const std::uint32_t index
-  ) noexcept
-  {
-    if (destination && source) {
-      *destination = *source + (4u * index);
-    }
-    return destination;
-  }
-
-  /**
-   * Address: 0x005B01C0 (FUN_005B01C0)
-   *
-   * What it does:
-   * Loads the third 32-bit lane from a source array and stores it through the
-   * destination pointer.
-   */
-  [[maybe_unused]] [[nodiscard]] std::uint32_t* LoadThirdDword(
-    std::uint32_t* const destination,
-    const std::uint32_t* const source
-  ) noexcept
-  {
-    if (destination && source) {
-      *destination = source[2];
-    }
-    return destination;
-  }
-
-  /**
-   * Address: 0x005AFE30 (FUN_005AFE30)
-   *
-   * What it does:
-   * Stores one `SNavPath::start` pointer lane through an output pointer.
-   */
-  [[maybe_unused]] [[nodiscard]] SOCellPos** StorePathStartPointer(
-    SOCellPos** const destination,
-    const SNavPath* const path
-  ) noexcept
-  {
-    if (destination) {
-      *destination = path ? path->start : nullptr;
-    }
-    return destination;
-  }
-
-  /**
-   * Address: 0x005AFE40 (FUN_005AFE40)
-   *
-   * What it does:
-   * Alias lane for storing one `SNavPath::start` pointer.
-   */
-  [[maybe_unused]] [[nodiscard]] SOCellPos** StorePathStartPointerAlias(
-    SOCellPos** const destination,
-    const SNavPath* const path
-  ) noexcept
-  {
-    return StorePathStartPointer(destination, path);
-  }
-
-  /**
-   * Address: 0x005AFE50 (FUN_005AFE50)
-   *
-   * What it does:
-   * Stores one `SNavPath::finish` pointer lane through an output pointer.
-   */
-  [[maybe_unused]] [[nodiscard]] SOCellPos** StorePathFinishPointer(
-    SOCellPos** const destination,
-    const SNavPath* const path
-  ) noexcept
-  {
-    if (destination) {
-      *destination = path ? path->finish : nullptr;
-    }
-    return destination;
-  }
-
-  /**
    * Address: 0x005B0870 (FUN_005B0870)
    *
    * What it does:
@@ -904,48 +479,6 @@ namespace
     }
 
     return static_cast<std::int32_t>(end - begin);
-  }
-
-  /**
-   * Address: 0x005B0A00 (FUN_005B0A00)
-   *
-   * What it does:
-   * Zero-length fill bridge that preserves the legacy no-op call shape used by
-   * the caller thunk lane.
-   */
-  [[maybe_unused]] [[nodiscard]] std::uint32_t FillZeroCellsBridge(
-    SOCellPos* const destination
-  ) noexcept
-  {
-    const SOCellPos zeroCell{};
-    return FillCellsWithValue(0u, zeroCell, destination);
-  }
-
-  /**
-   * Address: 0x005B0DE0 (FUN_005B0DE0)
-   *
-   * What it does:
-   * Zero-length copy bridge that preserves the legacy null-tolerant forward
-   * copy call shape.
-   */
-  [[maybe_unused]] [[nodiscard]] SOCellPos* CopyZeroCellRangeBridge(
-    SOCellPos* const destination
-  ) noexcept
-  {
-    return CopyCellsForwardAllowNull(destination, nullptr, nullptr);
-  }
-
-  /**
-   * Address: 0x005B0E20 (FUN_005B0E20)
-   *
-   * What it does:
-   * Secondary zero-length copy bridge for the same null-tolerant lane.
-   */
-  [[maybe_unused]] [[nodiscard]] SOCellPos* CopyZeroCellRangeBridge2(
-    SOCellPos* const destination
-  ) noexcept
-  {
-    return CopyCellsForwardAllowNull(destination, nullptr, nullptr);
   }
 
   /**
@@ -994,14 +527,14 @@ namespace
       const std::size_t tailCount = static_cast<std::size_t>(oldFinish - position);
       if (tailCount >= insertCount) {
         SOCellPos* const tailSource = oldFinish - insertCount;
-        path.finish = CopyCellsForInsertBridge(oldFinish, tailSource, oldFinish);
+        path.finish = std::copy(tailSource, oldFinish, oldFinish);
         (void)MoveCellsBackward(oldFinish, position, tailSource);
         (void)FillCellsWithValue(insertCount, value, position);
       } else {
         const std::uint32_t spillCount = insertCount - static_cast<std::uint32_t>(tailCount);
         (void)FillCellsWithValue(spillCount, value, oldFinish);
         path.finish = oldFinish + spillCount;
-        path.finish = CopyCellsForwardStackBridge(path.finish, position, oldFinish);
+        path.finish = std::copy(position, oldFinish, path.finish);
         (void)FillCellsWithValue(static_cast<std::uint32_t>(tailCount), value, position);
       }
       return position;
@@ -1016,10 +549,10 @@ namespace
       ? AllocatePathCellStorageChecked(static_cast<std::uint32_t>(grownCapacity))
       : static_cast<SOCellPos*>(::operator new(0));
 
-    SOCellPos* write = CopyCellsForwardAllowNull(newStorage, path.start, position);
+    SOCellPos* write = std::copy(path.start, position, newStorage);
     (void)FillCellsWithValue(insertCount, value, write);
     write += insertCount;
-    write = CopyCellsForwardAllowNull(write, position, path.finish);
+    write = std::copy(position, path.finish, write);
 
     if (path.start) {
       ::operator delete(path.start);
@@ -1130,7 +663,7 @@ void SNavPath::AssignCopy(
     (void)InitializePathStorageExact(*this, static_cast<std::uint32_t>(count));
   }
 
-  finish = CopyCellsForAssignBridge(start, src.start, src.start + count);
+  finish = std::copy(src.start, src.start + count, start);
 }
 
 /**
@@ -1165,13 +698,13 @@ void SNavPath::PrependCells(
     SOCellPos* const oldFinish = finish;
     if (currentCount >= prependCount) {
       SOCellPos* const tailSource = oldFinish - prependCount;
-      finish = CopyCellsForInsertBridge(oldFinish, tailSource, oldFinish);
+      finish = std::copy(tailSource, oldFinish, oldFinish);
       (void)MoveCellsBackward(oldFinish, start, tailSource);
       (void)CopyCellsForwardUncheckedStackBridge(start, begin, end);
     } else {
       const std::uint32_t tailCount = static_cast<std::uint32_t>(currentCount);
-      finish = CopyCellsForwardStackBridge(oldFinish, begin + tailCount, end);
-      finish = CopyCellsForInsertBridge(finish, start, oldFinish);
+      finish = std::copy(begin + tailCount, end, oldFinish);
+      finish = std::copy(start, oldFinish, finish);
       (void)CopyCellsForwardUncheckedStackBridge(start, begin, begin + tailCount);
     }
     return;
@@ -1186,8 +719,8 @@ void SNavPath::PrependCells(
     ? AllocatePathCellStorageChecked(static_cast<std::uint32_t>(newCapacity))
     : static_cast<SOCellPos*>(::operator new(0));
 
-  SOCellPos* write = CopyCellsForwardStackBridge(newStorage, begin, end);
-  write = CopyCellsForInsertBridge(write, start, finish);
+  SOCellPos* write = std::copy(begin, end, newStorage);
+  write = std::copy(start, finish, write);
 
   if (start) {
     ::operator delete(start);

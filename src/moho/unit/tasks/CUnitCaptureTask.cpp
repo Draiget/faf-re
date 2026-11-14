@@ -19,7 +19,7 @@
 #include "moho/entity/Entity.h"
 #include "moho/script/CScriptObject.h"
 #include "moho/sim/CArmyImpl.h"
-#include "moho/sim/CSimArmyEconomyInfo.h"
+#include "moho/sim/CEconomy.h"
 #include "moho/sim/EAllianceTypeInfo.h"
 #include "moho/sim/ReconBlip.h"
 #include "moho/sim/SFootprint.h"
@@ -81,7 +81,7 @@ namespace
 
   [[nodiscard]] moho::CEconRequest* CreateEconomyRequest(
     const moho::SEconValue& requested,
-    moho::CSimArmyEconomyInfo* const economy
+    moho::CEconomy* const economy
   )
   {
     auto* const request = new moho::CEconRequest{};
@@ -90,7 +90,7 @@ namespace
     request->mGranted.mass = 0.0f;
 
     if (economy != nullptr) {
-      request->mNode.ListLinkBefore(&economy->registrationNode);
+      request->mNode.ListLinkBefore(&economy->mConsumptionData);
     }
     return request;
   }
@@ -406,7 +406,7 @@ namespace moho
       mCaptureRate.energy = energyCost / captureTimeAsFloat;
       mCaptureRate.mass = massCost / captureTimeAsFloat;
 
-      CSimArmyEconomyInfo* const economyInfo = mUnit->ArmyRef->GetEconomy();
+      CEconomy* const economyInfo = mUnit->ArmyRef->GetEconomy();
       ReplaceEconomyRequestPointer(mConsumptionData, CreateEconomyRequest(mCaptureRate, economyInfo));
 
       DoCallback(true);

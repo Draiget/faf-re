@@ -103,7 +103,7 @@ namespace
     if (!blueprint || !categorySet) {
       return false;
     }
-    return categorySet->Bits().Contains(blueprint->mCategoryBitIndex);
+    return categorySet->Bits().Contains(blueprint->mBlueprintOrdinal);
   }
 
   /**

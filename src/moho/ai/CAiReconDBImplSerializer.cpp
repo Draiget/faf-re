@@ -183,7 +183,11 @@ namespace moho
     archive->ReadPointerShared(&mRCIGrid, &ownerRef);
     archive->ReadPointerShared(&mSCIGrid, &ownerRef);
     archive->ReadPointerShared(&mVCIGrid, &ownerRef);
-    archive->ReadBool(reinterpret_cast<bool*>(&mFogOfWar));
+    {
+      bool value{};
+      archive->ReadBool(&value);
+      mFogOfWar = static_cast<decltype(mFogOfWar)>(value);
+    }
     archive->Read(gpg::RTypeOf<EntityCategorySet>(), &mVisibleToReconCategory, ownerRef);
   }
 

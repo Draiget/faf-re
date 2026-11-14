@@ -209,34 +209,6 @@ namespace
     return camera;
   }
 
-  /**
-   * Address: 0x007EB050 (FUN_007EB050, sub_7EB050)
-   *
-   * What it does:
-   * Creates one mesh-instance request with unit mesh scale, then forwards
-   * prepared camera/orientation/output metadata into renderer queue insertion.
-   */
-  [[maybe_unused]] [[nodiscard]] std::uint32_t EnqueueRequestWithPreparedCamera(
-    moho::MeshThumbnailRenderer& renderer,
-    const moho::RMeshBlueprint* const blueprint,
-    const Wm3::Quatf& orientation,
-    const std::uint32_t color,
-    const moho::GeomCamera3& camera,
-    const std::shared_ptr<moho::ID3DTextureSheet>& outputSheet,
-    const gpg::Rect2f& outputRect
-  )
-  {
-    moho::MeshInstance* meshInstance = nullptr;
-    moho::MeshRenderer* const meshRenderer = moho::MeshRenderer::GetInstance();
-    if (meshRenderer != nullptr && blueprint != nullptr) {
-      const Wm3::Vec3f unitScale{1.0f, 1.0f, 1.0f};
-      meshInstance = meshRenderer->CreateMeshInstance(
-        0, static_cast<std::int32_t>(color), blueprint, unitScale, false, std::shared_ptr<moho::MeshMaterial>()
-      );
-    }
-
-    return renderer.EnqueuePreparedRequest(meshInstance, camera, orientation, color, outputRect, outputSheet);
-  }
 } // namespace
 
 namespace moho

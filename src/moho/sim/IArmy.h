@@ -23,7 +23,7 @@ namespace moho
   class CInfluenceMap;
   class CAiBrain;
   class CAiReconDBImpl;
-  class CSimArmyEconomyInfo;
+  class CEconomy;
   class CArmyStats;
   class CPlatoon;
   class CArmyImpl;

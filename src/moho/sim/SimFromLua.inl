@@ -802,10 +802,7 @@ namespace moho
       }
 
       blocker->FreeOgridRect();
-      blocker->ReservedOgridRectMinX = placedRect.x0;
-      blocker->ReservedOgridRectMinZ = placedRect.z0;
-      blocker->ReservedOgridRectMaxX = placedRect.x1;
-      blocker->ReservedOgridRectMaxZ = placedRect.z1;
+      blocker->mReservedOgridRect = placedRect;
       blocker->SimulationRef->mOGrid->OccupyRect(placedRect);
 
       if (IAiNavigator* const navigator = blocker->AiNavigator) {

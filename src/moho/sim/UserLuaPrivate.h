@@ -154,7 +154,7 @@
 #include "moho/sim/SOCellPos.h"
 #include "moho/sim/EAllianceTypeInfo.h"
 #include "moho/sim/CEconStorage.h"
-#include "moho/sim/CSimArmyEconomyInfo.h"
+#include "moho/sim/CEconomy.h"
 #include "moho/sim/SPhysConstants.h"
 #include "moho/sim/PathPreviewFinder.h"
 #include "moho/sim/SpecialFileType.h"

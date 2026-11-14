@@ -364,29 +364,6 @@ namespace
   }
 
   /**
-   * Address: 0x00912F00 (FUN_00912F00, isinstack)
-   *
-   * What it does:
-   * Returns `1` when `stackValue` is within one call frame stack window
-   * `[base, top)`; returns `0` otherwise.
-   */
-  [[maybe_unused]] [[nodiscard]] std::int32_t isinstack(
-    CallInfo* const callInfo,
-    LuaPlus::TObject* const stackValue
-  )
-  {
-    LuaPlus::StkId cursor = callInfo->base;
-    const LuaPlus::StkId top = callInfo->top;
-    while (cursor < top) {
-      if (cursor == stackValue) {
-        return 1;
-      }
-      ++cursor;
-    }
-    return 0;
-  }
-
-  /**
    * Address: 0x009103C0 (FUN_009103C0, freereg)
    *
    * What it does:
@@ -3414,24 +3391,6 @@ namespace
 
     --ls->nestlevel;
     return binaryOperator;
-  }
-
-  /**
-   * Address: 0x0091CE70 (FUN_0091CE70)
-   *
-   * What it does:
-   * Parses one expression, emits it into the next free register, and returns
-   * the original expression-kind lane.
-   */
-  [[maybe_unused]] std::int32_t ParseExpressionToNextRegisterAndReturnKind(
-    LexState* const ls
-  )
-  {
-    expdesc expression{};
-    subexpr(ls, &expression, -1);
-    const std::int32_t kind = expression.k;
-    luaK_exp2nextreg(ls->fs, &expression);
-    return kind;
   }
 
   /**

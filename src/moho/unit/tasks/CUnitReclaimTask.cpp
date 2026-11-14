@@ -25,7 +25,7 @@
 #include "moho/script/CScriptEvent.h"
 #include "moho/sim/CArmyImpl.h"
 #include "moho/sim/CEconomy.h"
-#include "moho/sim/CSimArmyEconomyInfo.h"
+#include "moho/sim/CEconomy.h"
 #include "moho/sim/ReconBlip.h"
 #include "moho/sim/SFootprint.h"
 #include "moho/sim/SOCellPos.h"
@@ -55,11 +55,6 @@ namespace
 
   constexpr std::uint64_t kUnitStateNoReclaimMask = 0x0000000000008000ull;
   constexpr std::uint64_t kUnitStateReclaimingMask = 0x0000000010000000ull;
-
-  static_assert(
-    sizeof(moho::CEconomy) == sizeof(moho::CSimArmyEconomyInfo),
-    "CEconomy and CSimArmyEconomyInfo layout must stay equivalent"
-  );
 
   struct ReclaimCostInfo
   {
@@ -143,12 +138,7 @@ namespace
       return nullptr;
     }
 
-    moho::CSimArmyEconomyInfo* const economyInfo = unit->ArmyRef->GetEconomy();
-    if (economyInfo == nullptr) {
-      return nullptr;
-    }
-
-    return reinterpret_cast<moho::CEconomy*>(economyInfo);
+    return unit->ArmyRef->GetEconomy();
   }
 
   void AwardReclaimedResources(
@@ -244,8 +234,8 @@ namespace moho
       mConsumptionData->mGranted.mass = 0.0f;
 
       if (mUnit != nullptr && mUnit->ArmyRef != nullptr) {
-        if (CSimArmyEconomyInfo* const economyInfo = mUnit->ArmyRef->GetEconomy(); economyInfo != nullptr) {
-          mConsumptionData->mNode.ListLinkBefore(&economyInfo->registrationNode);
+        if (CEconomy* const economyInfo = mUnit->ArmyRef->GetEconomy(); economyInfo != nullptr) {
+          mConsumptionData->mNode.ListLinkBefore(&economyInfo->mConsumptionData);
         }
       }
     }

@@ -780,7 +780,7 @@ namespace moho
             if (isFlat) {
               std::uint32_t addedIndexCount = 0;
               (void)mTesselator->EmitCollisionQuad(
-                reinterpret_cast<const Wm3::Vector3f*>(&flatnessQuad.mCorner0),
+                static_cast<const Wm3::Vector3f*>(&flatnessQuad.mCorner0),
                 &command.startIndex,
                 &addedIndexCount,
                 &command.startVertex,

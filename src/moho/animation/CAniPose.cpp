@@ -41,89 +41,6 @@ namespace
   // class-level comment in Reflection.h.
   moho::CAniPoseSerializer gCAniPoseSerializer;
 
-  /**
-   * Address: 0x0054DEB0 (FUN_0054DEB0)
-   *
-   * What it does:
-   * Register-shape adapter that forwards archive load to
-   * `moho::CAniPose::MemberDeserialize`.
-   */
-  [[maybe_unused]] void DeserializeCAniPoseRegisterAdapter(
-    moho::CAniPose* const pose,
-    gpg::ReadArchive* const archive
-  )
-  {
-    if (!pose) {
-      return;
-    }
-    pose->MemberDeserialize(archive);
-  }
-
-  /**
-   * Address: 0x0054DF20 (FUN_0054DF20)
-   *
-   * What it does:
-   * Materializes one temporary `RRef_CAniPoseBone` and copies its object/type
-   * lanes into caller-owned output storage.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::RRef* PackCAniPoseBoneRef(
-    gpg::RRef* const out,
-    moho::CAniPoseBone* const value
-  )
-  {
-    if (!out) {
-      return nullptr;
-    }
-
-    gpg::RRef tmp{};
-    tmp = gpg::MakeRRef<moho::CAniPoseBone>(value);
-    out->mObj = tmp.mObj;
-    out->mType = tmp.mType;
-    return out;
-  }
-
-  /**
-   * Address: 0x0054DF80 (FUN_0054DF80)
-   *
-   * What it does:
-   * Reads one archive object lane using cached `CAniPoseBone` reflection type.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::ReadArchive* ReadCAniPoseBoneArchiveObjectLane(
-    gpg::ReadArchive* const archive,
-    void* const objectStorage,
-    gpg::RRef* const ownerRef
-  )
-  {
-    if (!archive) {
-      return nullptr;
-    }
-
-    const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-    archive->Read(gpg::CachedLookup<moho::CAniPoseBone>(moho::CAniPoseBone::sType), objectStorage, owner);
-    return archive;
-  }
-
-  /**
-   * Address: 0x0054DFC0 (FUN_0054DFC0)
-   *
-   * What it does:
-   * Writes one archive object lane using cached `CAniPoseBone` reflection type.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::WriteArchive* WriteCAniPoseBoneArchiveObjectLane(
-    gpg::WriteArchive* const archive,
-    void** const objectSlot,
-    const gpg::RRef* const ownerRef
-  )
-  {
-    if (!archive) {
-      return nullptr;
-    }
-
-    const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-    archive->Write(gpg::CachedLookup<moho::CAniPoseBone>(moho::CAniPoseBone::sType), objectSlot, owner);
-    return archive;
-  }
-
   // Address: 0x00BC99C0 (FUN_00BC99C0, register_CAniPoseBoneSerializer) --
   // same shape as gCAniPoseSerializer above, for
   // `gpg::SerSaveLoadHelper<CAniPoseBone>`; real mangled destructor
@@ -201,39 +118,6 @@ namespace
     float lane3C;
   };
   static_assert(sizeof(PoseDualTransformTailLane) == 0x40, "PoseDualTransformTailLane size must be 0x40");
-
-  /**
-   * Address: 0x0054C960 (FUN_0054C960)
-   *
-   * What it does:
-   * Initializes the recovered tail-float lanes used by one paired-transform
-   * pose payload: sets both scale-diagonal lanes to `1.0f` and clears the
-   * remaining tail lanes.
-   */
-  [[maybe_unused]] PoseDualTransformTailLane* InitializePoseDualTransformTailLanes(
-    PoseDualTransformTailLane* const laneView
-  ) noexcept
-  {
-    if (laneView == nullptr) {
-      return nullptr;
-    }
-
-    laneView->lane08 = 1.0f;
-    laneView->lane0C = 0.0f;
-    laneView->lane10 = 0.0f;
-    laneView->lane14 = 0.0f;
-    laneView->lane18 = 0.0f;
-    laneView->lane1C = 0.0f;
-    laneView->lane20 = 0.0f;
-    laneView->lane24 = 1.0f;
-    laneView->lane28 = 0.0f;
-    laneView->lane2C = 0.0f;
-    laneView->lane30 = 0.0f;
-    laneView->lane34 = 0.0f;
-    laneView->lane38 = 0.0f;
-    laneView->lane3C = 0.0f;
-    return laneView;
-  }
 
   /**
    * Address: 0x0054C210 (FUN_0054C210)
@@ -680,9 +564,7 @@ namespace moho
    * What it does:
    * Releases `mBones`' heap storage when it has grown past its single
    * inline bone slot (`mBegin != mOriginal`): frees the heap buffer,
-   * rebinds `begin`/`capacity` back to inline storage, and restores the
-   * pre-grow capacity value that was stashed in the inline slot's header
-   * word. `end` is then rebased to `begin` unconditionally. `mSkeleton`'s
+   * rebinds `begin`/`capacity` back to inline storage. `end` is then rebased to `begin` unconditionally. `mSkeleton`'s
    * shared skeleton handle is released immediately afterward -- that is
    * `boost::shared_ptr<const CAniSkel>`'s own destructor, which the
    * compiler runs automatically right after this body and folds into the
@@ -699,7 +581,7 @@ namespace moho
     if (mBones.mBegin != mBones.mOriginal) {
       mBones.FreeHeapBones();
       mBones.mBegin = mBones.mOriginal;
-      mBones.mCapacity = mBones.InlineCapacityFromHeader();
+      mBones.mCapacity = mBones.mOriginal + 1;
     }
     mBones.mEnd = mBones.mBegin;
   }

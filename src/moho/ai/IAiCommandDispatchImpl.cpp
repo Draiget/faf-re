@@ -148,8 +148,7 @@ namespace
       return out;
     }
 
-    out.mObj =
-      reinterpret_cast<void*>(reinterpret_cast<std::uintptr_t>(queue) - static_cast<std::uintptr_t>(baseOffset));
+    out.mObj = gpg::CompleteObject(queue, baseOffset);
     out.mType = dynamicType;
     return out;
   }
@@ -198,40 +197,6 @@ namespace
     }
 
     return targetEntity;
-  }
-
-  /**
-   * Address: 0x0060B900 (FUN_0060B900)
-   *
-   * What it does:
-   * Runs lower-bound lookup by unit entity id over one sorted `Entity*` lane
-   * and writes either exact slot or `end` cursor into `outSlot`.
-   */
-  [[maybe_unused]] Entity*** FindUnitSlotInSortedEntityRange(
-    Entity** const begin,
-    Entity** const end,
-    Entity*** const outSlot,
-    Unit* const unit
-  )
-  {
-    if (!outSlot) {
-      return outSlot;
-    }
-
-    if (!begin || !end || !unit) {
-      *outSlot = end;
-      return outSlot;
-    }
-
-    Entity* const unitEntity = static_cast<Entity*>(unit);
-    const std::uint32_t unitId = static_cast<std::uint32_t>(unitEntity->id_);
-    Entity** const found =
-      std::lower_bound(begin, end, unitId, [](const Entity* const candidate, const std::uint32_t key) {
-      const std::uint32_t candidateId = candidate ? static_cast<std::uint32_t>(candidate->id_) : 0u;
-      return candidateId < key;
-    });
-    *outSlot = (found != end && *found == unitEntity) ? found : end;
-    return outSlot;
   }
 
   /**

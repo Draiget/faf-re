@@ -231,19 +231,6 @@ namespace
   }
 
   /**
-   * Address: 0x008AE440 (FUN_008AE440)
-   *
-   * What it does:
-   * Clears the process-global user-sound-manager singleton storage and
-   * returns the address of that singleton slot.
-   */
-  [[maybe_unused]] [[nodiscard]] moho::CUserSoundManager** ResetUserSoundManagerSingletonStorageLane() noexcept
-  {
-    gUserSoundManager = nullptr;
-    return &gUserSoundManager;
-  }
-
-  /**
    * Address: 0x008AB400 (FUN_008AB400, IXACTCUE::GetState)
    *
    * What it does:
@@ -281,23 +268,6 @@ namespace
     std::uint32_t mLane08;        // +0x08
   };
   static_assert(sizeof(SelfLinkedDwordNode12) == 0x0C, "SelfLinkedDwordNode12 size must be 0x0C");
-
-  /**
-   * Address: 0x008AF3A0 (FUN_008AF3A0, sub_8AF3A0)
-   *
-   * What it does:
-   * Allocates one 12-byte intrusive-list sentinel lane and self-links the
-   * first two pointer lanes.
-   */
-  [[maybe_unused]] [[nodiscard]] SelfLinkedDwordNode12* CreateSelfLinkedDwordNode12()
-  {
-    auto* const node = static_cast<SelfLinkedDwordNode12*>(::operator new(sizeof(SelfLinkedDwordNode12)));
-    if (node != nullptr) {
-      node->mNext = node;
-      node->mPrev = node;
-    }
-    return node;
-  }
 
   /**
    * Address: 0x008AE5D0 (FUN_008AE5D0)

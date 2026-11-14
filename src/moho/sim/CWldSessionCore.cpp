@@ -102,38 +102,18 @@ namespace moho
       if (terrainRes == nullptr) {
         return false;
       }
-      return terrainRes->SetPlayableMapRect(VisibilityRect::FromRect2i(playableRect));
+      return terrainRes->SetPlayableMapRect(playableRect);
     }
   } // namespace
 
   MouseInfo& CWldSession::CursorInfo() noexcept
   {
-    static_assert(
-      offsetof(CWldSession, CursorWorldPos) - offsetof(CWldSession, mCursorWorldState) ==
-        offsetof(MouseInfo, mMouseWorldPos),
-      "CWldSession's flattened cursor snapshot must line up with MouseInfo"
-    );
-    static_assert(
-      offsetof(CWldSession, mCursorUnitHover) - offsetof(CWldSession, mCursorWorldState) ==
-        offsetof(MouseInfo, mUnitHover),
-      "CWldSession's flattened cursor snapshot must line up with MouseInfo"
-    );
-    static_assert(
-      offsetof(CWldSession, HighlightCommandId) - offsetof(CWldSession, mCursorWorldState) ==
-        offsetof(MouseInfo, mIsDragger),
-      "CWldSession's flattened cursor snapshot must line up with MouseInfo"
-    );
-    static_assert(
-      offsetof(CWldSession, CursorScreenPos) - offsetof(CWldSession, mCursorWorldState) ==
-        offsetof(MouseInfo, mMouseScreenPos),
-      "CWldSession's flattened cursor snapshot must line up with MouseInfo"
-    );
-    return *reinterpret_cast<MouseInfo*>(&mCursorWorldState[0]);
+    return mCursorInfo;
   }
 
   const MouseInfo& CWldSession::CursorInfo() const noexcept
   {
-    return *reinterpret_cast<const MouseInfo*>(&mCursorWorldState[0]);
+    return mCursorInfo;
   }
 
   /**
@@ -246,8 +226,8 @@ namespace moho
 
     // 0x0089349D..0x008934D9 is `MouseInfo`'s default constructor, inlined
     // over the cursor lane this class still spells out field by field
-    // (`mCursorWorldState` / `CursorWorldPos` / `mCursorUnitHover` /
-    // `HighlightCommandId` / `CursorScreenPos` - see `CursorInfo()`):
+    // (`mCursorWorldState` / `mCursorInfo.mMouseWorldPos` / `mCursorInfo.mUnitHover` /
+    // `mCursorInfo.mIsDragger` / `mCursorInfo.mMouseScreenPos` - see `CursorInfo()`):
     //
     //   0x0089349D  mov  [ebp+4B0h], bl    ; mHitValid   = 0
     //   0x008934A3  movss [ebp+4B4h], xmm0 ; mMouseWorldPos = (0,0,0)
@@ -265,27 +245,27 @@ namespace moho
     // walked a garbage owner chain and faulted in
     // `WeakPtr<UserEntity>::ResetFromOwnerLinkSlot`. Whether a given build
     // survived startup came down to heap layout. The two stores are now
-    // `mCursorUnitHover`'s own default constructor, run as a member.
-    mCursorWorldState[0] = 0u;
+    // `mCursorInfo.mUnitHover`'s own default constructor, run as a member.
+    mCursorInfo.mHitValid = 0u;
 
     // 0x00893160 line ~288-293: seeds the initial cursor world position from
     // the map's own bounds midpoint, not the origin - matters because
-    // nothing else writes CursorWorldPos until the first real mouse-move
+    // nothing else writes mCursorInfo.mMouseWorldPos until the first real mouse-move
     // event, so any UI/camera code reading it on the first frame otherwise
     // sees world-origin instead of a point actually on the map.
     if (const STIMap* const stiMap = GetSTIMap(); stiMap != nullptr) {
       const Wm3::AxisAlignedBox3f mapBounds = stiMap->GetBounds3D();
-      CursorWorldPos.x = (mapBounds.Min.x + mapBounds.Max.x) * 0.5f;
-      CursorWorldPos.y = (mapBounds.Min.y + mapBounds.Max.y) * 0.5f;
-      CursorWorldPos.z = (mapBounds.Min.z + mapBounds.Max.z) * 0.5f;
+      mCursorInfo.mMouseWorldPos.x = (mapBounds.Min.x + mapBounds.Max.x) * 0.5f;
+      mCursorInfo.mMouseWorldPos.y = (mapBounds.Min.y + mapBounds.Max.y) * 0.5f;
+      mCursorInfo.mMouseWorldPos.z = (mapBounds.Min.z + mapBounds.Max.z) * 0.5f;
     } else {
-      CursorWorldPos.x = 0.0f;
-      CursorWorldPos.y = 0.0f;
-      CursorWorldPos.z = 0.0f;
+      mCursorInfo.mMouseWorldPos.x = 0.0f;
+      mCursorInfo.mMouseWorldPos.y = 0.0f;
+      mCursorInfo.mMouseWorldPos.z = 0.0f;
     }
-    CursorScreenPos.x = 0.0f;
-    CursorScreenPos.y = 0.0f;
-    HighlightCommandId = -1;
+    mCursorInfo.mMouseScreenPos.x = 0.0f;
+    mCursorInfo.mMouseScreenPos.y = 0.0f;
+    mCursorInfo.mIsDragger = -1;
 
     // 0x008934F1: `mov byte ptr [ebp+4D5h], 1`. Shipping this false made
     // `SelectBuildPreviewColor` return the valid colour unconditionally, so a
@@ -516,7 +496,7 @@ namespace moho
    * Alias of FUN_008B9580 (non-canonical helper lane).
    */
   bool CWldSession::TryGetPlayableMapRect(
-    VisibilityRect& outRect
+    gpg::Rect2i& outRect
   ) const
   {
     if (!mWldMap) {
@@ -750,30 +730,6 @@ namespace moho
     }
 
     return true;
-  }
-
-  /**
-   * Alias of FUN_008B97C0 (non-canonical helper lane).
-   */
-  EntityCategoryLookupResolver* CWldSession::GetCategoryLookupResolver()
-  {
-    return const_cast<EntityCategoryLookupResolver*>(
-      static_cast<const CWldSession*>(this)->GetCategoryLookupResolver()
-    );
-  }
-
-  /**
-   * Alias of FUN_008B97C0 (non-canonical helper lane).
-   */
-  const EntityCategoryLookupResolver* CWldSession::GetCategoryLookupResolver() const
-  {
-    if (!mRules) {
-      return nullptr;
-    }
-
-    // RRuleGameRulesImpl exposes the category-lookup contract in the same primary
-    // vtable; this is a typed interface view, not a separate base subobject.
-    return reinterpret_cast<const EntityCategoryLookupResolver*>(mRules);
   }
 
   /**
@@ -2334,7 +2290,7 @@ namespace moho
     UserUnit* const unit
   ) const
   {
-    const UserEntity* const entity = reinterpret_cast<const UserEntity*>(unit);
+    const UserEntity* const entity = static_cast<const UserEntity*>(unit);
     const bool selectableByArmy = entity != nullptr && entity->IsSelectable() && entity->mArmy == GetFocusUserArmy();
     return selectableByArmy || (UI_SelectAnything && static_cast<const void*>(this) != nullptr && IsCheatsEnabled);
   }

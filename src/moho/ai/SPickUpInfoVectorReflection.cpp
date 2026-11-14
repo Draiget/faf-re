@@ -100,12 +100,12 @@ void gpg::RVectorType_SPickUpInfo::Init()
  */
 void gpg::RVectorType_SPickUpInfo::SerLoad(
   gpg::ReadArchive* const archive,
-  const std::intptr_t objectPtr,
+  void* const objectPtr,
   const int,
   gpg::RRef* const
 )
 {
-  auto& storage = *reinterpret_cast<fa::vector<moho::SPickUpInfo>*>(objectPtr);
+  auto& storage = *static_cast<fa::vector<moho::SPickUpInfo>*>(objectPtr);
 
   unsigned int count = 0u;
   archive->ReadUInt(&count);
@@ -131,12 +131,12 @@ void gpg::RVectorType_SPickUpInfo::SerLoad(
  */
 void gpg::RVectorType_SPickUpInfo::SerSave(
   gpg::WriteArchive* const archive,
-  const std::intptr_t objectPtr,
+  void* const objectPtr,
   const int,
   gpg::RRef* const ownerRef
 )
 {
-  const auto& storage = *reinterpret_cast<const fa::vector<moho::SPickUpInfo>*>(objectPtr);
+  const auto& storage = *static_cast<const fa::vector<moho::SPickUpInfo>*>(objectPtr);
   const unsigned int count = static_cast<unsigned int>(storage.size());
   archive->WriteUInt(count);
   for (unsigned int i = 0u; i < count; ++i) {

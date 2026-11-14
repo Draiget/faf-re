@@ -24,12 +24,12 @@ namespace
    */
   void LoadPrefetchHandleBaseVector(
     gpg::ReadArchive* archive,
-    std::intptr_t objectPtr,
+    void* objectPtr,
     int,
     gpg::RRef*
   )
   {
-    auto* const storage = reinterpret_cast<fa::vector<moho::PrefetchHandleBase>*>(objectPtr);
+    auto* const storage = static_cast<fa::vector<moho::PrefetchHandleBase>*>(objectPtr);
     GPG_ASSERT(archive != nullptr);
     GPG_ASSERT(storage != nullptr);
     if (!archive || !storage) {
@@ -60,12 +60,12 @@ namespace
    */
   void SavePrefetchHandleBaseVector(
     gpg::WriteArchive* archive,
-    std::intptr_t objectPtr,
+    void* objectPtr,
     int,
     gpg::RRef* ownerRef
   )
   {
-    auto* const storage = reinterpret_cast<fa::vector<moho::PrefetchHandleBase>*>(objectPtr);
+    auto* const storage = static_cast<fa::vector<moho::PrefetchHandleBase>*>(objectPtr);
     GPG_ASSERT(archive != nullptr);
     GPG_ASSERT(storage != nullptr);
     if (!archive || !storage) {

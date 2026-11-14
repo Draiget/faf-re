@@ -2569,7 +2569,7 @@ namespace faf::editor
             moho::RResId resId{};
             resId.name.assign(id.c_str());
             const moho::RUnitBlueprint* const blueprint = rules->GetUnitBlueprint(resId);
-            std::string name = blueprint != nullptr ? blueprint->mBlueprintLabel.c_str() : "";
+            std::string name = blueprint != nullptr ? blueprint->mDescription.c_str() : "";
             if (name.rfind("<LOC", 0) == 0) {
               const std::size_t close = name.find('>');
               name = close == std::string::npos ? std::string() : name.substr(close + 1);

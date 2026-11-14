@@ -210,7 +210,7 @@ moho::UIBuildDragger::UIBuildDragger(
   , mEnd(0.0f, 0.0f, 0.0f)
 {
   if (mWldSession != nullptr) {
-    mStart = mWldSession->CursorWorldPos;
+    mStart = mWldSession->mCursorInfo.mMouseWorldPos;
   }
 
   mEnd = mStart;

@@ -173,24 +173,6 @@ namespace
   }
 
   /**
-   * Address: 0x007B6500 (FUN_007B6500)
-   *
-   * What it does:
-   * Returns whether one `LuaStackObject` currently points at a Lua boolean
-   * stack slot (`lua_type == LUA_TBOOLEAN`).
-   */
-  [[maybe_unused]] bool IsLuaStackObjectBooleanType(
-    const LuaPlus::LuaStackObject& stackObject
-  ) noexcept
-  {
-    if (stackObject.m_state == nullptr || stackObject.m_state->GetCState() == nullptr) {
-      return false;
-    }
-
-    return lua_type(stackObject.m_state->GetCState(), stackObject.m_stackIndex) == LUA_TBOOLEAN;
-  }
-
-  /**
    * Address: 0x007BB0E0 (FUN_007BB0E0)
    *
    * What it does:
@@ -233,21 +215,6 @@ namespace
   }
 
   /**
-   * Address: 0x007BB3C0 (FUN_007BB3C0, queue-clear thunk)
-   * Address: 0x007BB4D0 (FUN_007BB4D0, queue-clear thunk)
-   *
-   * What it does:
-   * Tail-forwards one queued-command deque clear lane into
-   * `ClearCommandQueue`.
-   */
-  [[maybe_unused]] void ClearCommandQueueThunk(
-    fa::deque<SNetCommand>& commands
-  ) noexcept
-  {
-    ClearCommandQueue(commands);
-  }
-
-  /**
    * Address: 0x007BB440 (FUN_007BB440, deque push-back lane)
    *
    * What it does:
@@ -259,131 +226,6 @@ namespace
   )
   {
     commandQueue.push_back(command);
-  }
-
-  /**
-   * Address: 0x007BE750 (FUN_007BE750, deque push-front lane)
-   *
-   * What it does:
-   * Prepends one `SNetCommand` to the front of the legacy deque command queue
-   * and returns the stored front element address.
-   */
-  [[maybe_unused]] [[nodiscard]] SNetCommand* PushFrontQueuedCommand(
-    fa::deque<SNetCommand>& commandQueue,
-    const SNetCommand& command
-  )
-  {
-    commandQueue.push_front(command);
-    return commandQueue.empty() ? nullptr : &commandQueue.front();
-  }
-
-  /**
-   * Address: 0x007BD950 (FUN_007BD950)
-   *
-   * What it does:
-   * Fills one half-open command-arg range with a single prototype argument by
-   * copying scalar lanes and cloning the legacy string payload.
-   */
-  [[maybe_unused]] [[nodiscard]] SNetCommandArg* FillCommandArgRangeFromPrototype(
-    SNetCommandArg* destinationBegin,
-    SNetCommandArg* destinationEnd,
-    const SNetCommandArg& prototype
-  )
-  {
-    while (destinationBegin != destinationEnd) {
-      destinationBegin->mType = prototype.mType;
-      destinationBegin->mNum = prototype.mNum;
-      destinationBegin->mStr.assign(prototype.mStr, 0, fa::string::npos);
-      ++destinationBegin;
-    }
-    return destinationEnd;
-  }
-
-  /**
-   * Address: 0x007BD810 (FUN_007BD810)
-   * Address: 0x007BB880 (FUN_007BB880, calling-convention trampoline into
-   *   this body -- see caller for the real dispatch)
-   *
-   * What it does:
-   * Writes `count` copies of one command-argument prototype into contiguous
-   * destination lanes, and on exception destroys already-written lanes before
-   * rethrowing.
-   */
-  [[maybe_unused]] void CopyAssignCommandArgRangeWithRollback(
-    const SNetCommandArg& prototype,
-    std::uint32_t count,
-    SNetCommandArg* const destination
-  )
-  {
-    if (destination == nullptr || count == 0U) {
-      return;
-    }
-
-    SNetCommandArg* const begin = destination;
-    SNetCommandArg* cursor = destination;
-    try {
-      for (std::uint32_t i = 0; i < count; ++i, ++cursor) {
-        *cursor = prototype;
-      }
-    } catch (...) {
-      for (SNetCommandArg* rollback = begin; rollback != cursor; ++rollback) {
-        rollback->ResetPayload();
-      }
-      throw;
-    }
-  }
-
-  /**
-   * Address: 0x007BEE10 (FUN_007BEE10, command-arg range copy-assign)
-   *
-   * What it does:
-   * Copy-assigns one half-open contiguous `SNetCommandArg` range into
-   * destination lanes and returns one-past-last written pointer.
-   */
-  [[maybe_unused]] [[nodiscard]] SNetCommandArg* CopyAssignCommandArgRange(
-    SNetCommandArg* destination,
-    const SNetCommandArg* sourceBegin,
-    const SNetCommandArg* sourceEnd
-  )
-  {
-    while (sourceBegin != sourceEnd) {
-      destination->mType = sourceBegin->mType;
-      destination->mNum = sourceBegin->mNum;
-      destination->mStr.assign(sourceBegin->mStr, 0, fa::string::npos);
-      ++destination;
-      ++sourceBegin;
-    }
-    return destination;
-  }
-
-  /**
-   * Address: 0x007BDE40 (FUN_007BDE40)
-   *
-   * What it does:
-   * Copy-assigns one half-open command-argument source range into destination
-   * lanes and rolls back already-written destination entries on exception.
-   */
-  [[maybe_unused]] [[nodiscard]] SNetCommandArg* CopyAssignCommandArgRangeWithRollbackFromSourceLaneA(
-    const SNetCommandArg* sourceBegin,
-    const SNetCommandArg* sourceEnd,
-    SNetCommandArg* destination
-  )
-  {
-    SNetCommandArg* const writtenBegin = destination;
-    SNetCommandArg* cursor = destination;
-    try {
-      while (sourceBegin != sourceEnd) {
-        *cursor = *sourceBegin;
-        ++cursor;
-        ++sourceBegin;
-      }
-    } catch (...) {
-      for (SNetCommandArg* rollback = writtenBegin; rollback != cursor; ++rollback) {
-        rollback->ResetPayload();
-      }
-      throw;
-    }
-    return cursor;
   }
 
 } // namespace

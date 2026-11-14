@@ -66,13 +66,7 @@ namespace moho
      * Performs the base-blueprint construction every blueprint receives: copies
      * the resource id into the id string and claims the next blueprint ordinal
      * from the owning rules. The instance count is the `InstanceCounter<RBlueprint>`
-     * base's, which a derived blueprint that mirrors this layout inline must
-     * carry itself (`REntityBlueprint` does).
-     *
-     * Derived blueprints in this tree mirror the base layout inline instead of
-     * inheriting it, so they call this on their own fields. That is what the
-     * binary's derived constructors do when they invoke the base constructor on
-     * themselves - there is no temporary base object anywhere in this chain.
+     * base's.
      */
     static void
     InitIdentity(RRuleGameRules* owner, const RResId& resId, fa::string& outBlueprintId, std::int32_t& outOrdinal);

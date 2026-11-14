@@ -872,7 +872,7 @@ void Sim::UpdateChecksum()
     CArmyImpl* const army = *it;
     Logf("  \"%s\" [%s]\n", army->mConstDat.mPlayerName.raw_data_unsafe(), army->mConstDat.mArmyName.raw_data_unsafe());
 
-    const SEconTotals& economy = army->GetEconomy()->economy;
+    const SEconTotals& economy = army->GetEconomy()->mTotals;
     mContext.Update(&economy, sizeof(economy));
     if (stateTap != nullptr) {
       const std::int32_t armyIndex = army->mConstDat.mArmyIndex;

@@ -19,7 +19,6 @@
 #include "CSquad.h"
 #include "CEconomy.h"
 #include "CInfluenceMap.h"
-#include "CSimArmyEconomyInfo.h"
 #include "UserArmy.h"
 #include "gpg/core/containers/String.h"
 #include "gpg/core/reflection/Reflection.h"
@@ -62,20 +61,6 @@ namespace
     pool.platoons.ResetStorageToInline();
   }
 
-  using IntrusiveListNode = moho::IntrusiveNode;
-
-  void UnlinkIntrusiveNode(
-    IntrusiveListNode& node
-  )
-  {
-    if (node.mNext != nullptr && node.mPrev != nullptr) {
-      node.ListUnlink();
-      return;
-    }
-
-    node.ListResetLinks();
-  }
-
   /**
    * Address: 0x00701A80 (FUN_00701A80)
    *
@@ -89,34 +74,25 @@ namespace
    * transposed and the last two fields were mistaken for padding.
    */
   void ReplacePathFinderOwnedPointer(
-    void*& field,
+    moho::PathQueue*& field,
     moho::PathQueue* const value
   )
   {
-    moho::PathQueue::Move(reinterpret_cast<moho::PathQueue**>(&field), value);
+    moho::PathQueue::Move(&field, value);
   }
 
   void DestroyArmyEconomyInfo(
-    moho::CSimArmyEconomyInfo*& economyInfo
+    moho::CEconomy*& economyInfo
   )
   {
     if (economyInfo == nullptr) {
       return;
     }
 
-    // Address: 0x006FF9A0 (FUN_006FF9A0), +0x1F4 teardown branch.
-    UnlinkIntrusiveNode(economyInfo->registrationNode);
-
-    moho::CEconStorage* const storage = economyInfo->storageDelta;
-    if (storage != nullptr) {
-      if (storage->mEconomy != nullptr) {
-        (void)storage->Chng(-1);
-      }
-      operator delete(storage);
-      economyInfo->storageDelta = nullptr;
-    }
-
-    operator delete(economyInfo);
+    // Address: 0x006FF9A0 (FUN_006FF9A0), +0x1F4 teardown branch: the inlined
+    // `CEconomy` deleting destructor (0x007048F0) -- `mConsumptionData`
+    // unlinks, then `mExtraStorage` takes its storage back out (Chng(-1)).
+    delete economyInfo;
     economyInfo = nullptr;
   }
 
@@ -444,11 +420,11 @@ namespace
   }
 
   void ReplaceEconomyOwnedPointer(
-    moho::CSimArmyEconomyInfo*& field,
-    moho::CSimArmyEconomyInfo* const value
+    moho::CEconomy*& field,
+    moho::CEconomy* const value
   )
   {
-    moho::CSimArmyEconomyInfo* prior = field;
+    moho::CEconomy* prior = field;
     if (prior == value) {
       return;
     }
@@ -621,7 +597,7 @@ namespace
       return nullptr;
     }
 
-    const std::uint32_t categoryBitIndex = blueprint->mCategoryBitIndex;
+    const std::uint32_t categoryBitIndex = blueprint->mBlueprintOrdinal;
     if (categoryBitIndex < army->UnitCategoryBaseIndex || categoryBitIndex > army->UnitCategoryMaxIndex) {
       return nullptr;
     }
@@ -1020,8 +996,9 @@ namespace
     std::uint32_t maxCategoryBit = 0u;
     for (const auto& entry : unitBlueprints) {
       if (auto* const blueprint = static_cast<moho::RUnitBlueprint*>(entry.second); blueprint != nullptr) {
-        minCategoryBit = std::min(minCategoryBit, blueprint->mCategoryBitIndex);
-        maxCategoryBit = std::max(maxCategoryBit, blueprint->mCategoryBitIndex);
+        const auto categoryBit = static_cast<std::uint32_t>(blueprint->mBlueprintOrdinal);
+        minCategoryBit = std::min(minCategoryBit, categoryBit);
+        maxCategoryBit = std::max(maxCategoryBit, categoryBit);
       }
     }
     if (minCategoryBit == std::numeric_limits<std::uint32_t>::max() || maxCategoryBit < minCategoryBit) {
@@ -1199,7 +1176,7 @@ namespace moho
     : CArmyImpl()
   {
     Simulation = sim;
-    EconomyInfo = reinterpret_cast<CSimArmyEconomyInfo*>(new CEconomy(sim, armyIndex));
+    EconomyInfo = new CEconomy(sim, armyIndex);
 
     UnitCategoryBaseIndex = std::numeric_limits<std::uint32_t>::max();
     UnitCategoryMaxIndex = 0u;
@@ -1233,8 +1210,8 @@ namespace moho
     // economy's totals (one 0x38-byte `rep movsd`, so the u64 max-storage pair
     // is copied whole) and its sharing flag -- the same copy
     // `CopyArmyVariableData` (0x00700243) takes at every sync.
-    mVarDat.mEconomyTotals = EconomyInfo->economy;
-    mVarDat.mIsResourceSharingEnabled = EconomyInfo->isResourceSharingEnabled;
+    mVarDat.mEconomyTotals = EconomyInfo->mTotals;
+    mVarDat.mIsResourceSharingEnabled = EconomyInfo->mResourceSharing;
 
     mVarDat.mIsAlly = static_cast<std::uint8_t>(isFocusArmy ? 1u : 0u);
     (void)mVarDat.mAllies.Add(static_cast<std::uint32_t>(armyIndex));
@@ -1418,7 +1395,7 @@ namespace moho
   /**
    * Address: 0x006FDCB0 (FUN_006FDCB0, Moho::CArmyImpl::GetEconomy)
    */
-  CSimArmyEconomyInfo* CArmyImpl::GetEconomy()
+  CEconomy* CArmyImpl::GetEconomy()
   {
     return EconomyInfo;
   }
@@ -1483,9 +1460,7 @@ namespace moho
     ReplaceDeleteOwnedPointer(
       AiReconDb, ReadPointerTyped<CAiReconDBImpl>(archive, owner, ResolveCAiReconDBImplType(), true)
     );
-    ReplaceEconomyOwnedPointer(
-      EconomyInfo, ReadPointerTyped<CSimArmyEconomyInfo>(archive, owner, ResolveCEconomyType(), true)
-    );
+    ReplaceEconomyOwnedPointer(EconomyInfo, ReadPointerTyped<CEconomy>(archive, owner, ResolveCEconomyType(), true));
 
     archive->ReadString(&ArmyPlans);
 
@@ -1837,12 +1812,10 @@ namespace moho
     // unchecked and calls func_ArmyProcessEconomy. That is the tick's only
     // economy work: nothing between it and the `mCurTick > 10` test at
     // 0x006FFDC9 refreshes `mVarDat`, whose economy copy is taken only by the
-    // constructor and by `CopyArmyVariableData` at sync time. CSimArmyEconomyInfo
-    // is the same object viewed through its economy-facing field names, exactly
-    // as CArmyImpl's own ctor and Unit::HandleResourceManagement already treat it.
+    // constructor and by `CopyArmyVariableData` at sync time.
     {
       FAF_PROFILE_ZONE_NAMED("Army::Economy");
-      ProcessArmyEconomy(*reinterpret_cast<CEconomy*>(EconomyInfo));
+      ProcessArmyEconomy(*EconomyInfo);
     }
 
     if (Simulation != nullptr && Simulation->mCurTick > 10u && Stats != nullptr) {
@@ -2119,8 +2092,8 @@ namespace moho
     // their high halves. Then 0x0070025D..0x00700265 copies the sharing flag. There is no null test
     // on `EconomyInfo` or `outBuffer`; the army always owns an economy. (This used to copy field by
     // field and truncate max storage to 32 bits, as the constructor's copy also did.)
-    mVarDat.mEconomyTotals = EconomyInfo->economy;
-    mVarDat.mIsResourceSharingEnabled = EconomyInfo->isResourceSharingEnabled;
+    mVarDat.mEconomyTotals = EconomyInfo->mTotals;
+    mVarDat.mIsResourceSharingEnabled = EconomyInfo->mResourceSharing;
 
     // The binary tail-calls the shared variable-data assignment
     // (FUN_00700280) with the army's own payload.
@@ -2429,8 +2402,7 @@ namespace moho
         continue;
       }
 
-      const auto* const entityBlueprint = reinterpret_cast<const REntityBlueprint*>(blueprint);
-      const std::uint32_t categoryBitIndex = entityBlueprint->mCategoryBitIndex;
+      const auto categoryBitIndex = static_cast<std::uint32_t>(blueprint->mBlueprintOrdinal);
       if (categoryBitIndex < UnitCategoryBaseIndex || categoryBitIndex > UnitCategoryMaxIndex) {
         continue;
       }

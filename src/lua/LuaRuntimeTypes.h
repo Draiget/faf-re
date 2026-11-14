@@ -323,10 +323,16 @@ struct Udata
   lu_byte tt;
   lu_byte marked;
   Table* metatable;
-  /// Reused by this fork to carry the object's `gpg::RType*` rather than a
-  /// byte count - see LuaObject::GetUserData (0x00907BC0), which reads it
-  /// from +0x0C and takes the payload from +0x10.
-  size_t len;
+  /// The payload's reflected type. Stock Lua keeps a byte count here; this
+  /// fork keeps the type - see LuaObject::GetUserData (0x00907BC0), which reads
+  /// it from +0x0C and takes the payload from +0x10.
+  gpg::RType* type;
+
+  /** The payload object, which directly follows this header. */
+  [[nodiscard]] void* Payload() noexcept
+  {
+    return this + 1;
+  }
 
   /**
    * Address: 0x009207E0 (FUN_009207E0, Udata::MemberSerialize)
@@ -370,7 +376,7 @@ struct Udata
   static gpg::RType* sType;
 };
 static_assert(offsetof(Udata, metatable) == 0x08, "Udata::metatable offset must be 0x08");
-static_assert(offsetof(Udata, len) == 0x0C, "Udata::len offset must be 0x0C");
+static_assert(offsetof(Udata, type) == 0x0C, "Udata::type offset must be 0x0C");
 static_assert(sizeof(Udata) == 0x10, "Udata size must be 0x10");
 
 struct CClosure

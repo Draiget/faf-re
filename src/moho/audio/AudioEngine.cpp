@@ -1068,12 +1068,17 @@ namespace moho
    * Chooses XACT engine CLSID from debug/audition mode + optional
    * `HKLM\\Software\\Microsoft\\XACT\\DebugEngine`, creates the COM instance,
    * and retries with retail CLSID when debug creation fails.
+   *
+   * FAF addition: `outEngineClass` receives the class that was created (null
+   * on the Linux client), for `SND_InstallXactClock`.
    */
   int func_CreateXACTinstance(
     const std::uint32_t mode,
-    void** const outEngine
+    void** const outEngine,
+    const GUID** const outEngineClass
   )
   {
+    *outEngineClass = nullptr;
 #if !FAFRE_PLATFORM_WINDOWS
     // The Linux client (issue #258): XACT on FAudio's FACT; it has no debug or audition engine.
     (void)mode;
@@ -1110,9 +1115,10 @@ namespace moho
 
     int result = CoCreateInstance(*selectedClsid, nullptr, CLSCTX_INPROC_SERVER, kXactComInterfaceRiid, outEngine);
     if (result < 0 && debug != 0u && auditionMode == 0u) {
-      result =
-        CoCreateInstance(kXactComInterfaceClsid, nullptr, CLSCTX_INPROC_SERVER, kXactComInterfaceRiid, outEngine);
+      selectedClsid = &kXactComInterfaceClsid;
+      result = CoCreateInstance(*selectedClsid, nullptr, CLSCTX_INPROC_SERVER, kXactComInterfaceRiid, outEngine);
     }
+    *outEngineClass = selectedClsid;
     return result;
 #endif
   }
@@ -1225,7 +1231,8 @@ namespace moho
       mode = 1u;
     }
 
-    const int errorCode = func_CreateXACTinstance(mode, reinterpret_cast<void**>(&impl->mInstance));
+    const GUID* engineClass = nullptr;
+    const int errorCode = func_CreateXACTinstance(mode, reinterpret_cast<void**>(&impl->mInstance), &engineClass);
     if (errorCode < 0) {
       const char* const errorMessage = func_SoundErrorCodeToMsg(errorCode);
       const fa::string fullMessage = gpg::STR_Printf(
@@ -1237,7 +1244,7 @@ namespace moho
     // FAF addition, not in the shipped binary: XACT 2.9 stops working after
     // 24.86 days of Windows uptime; give it a clock that starts with the game.
     if (impl->mInstance != nullptr) {
-      SND_InstallXactClock(*impl->mInstance);
+      SND_InstallXactClock(engineClass);
     }
   }
 

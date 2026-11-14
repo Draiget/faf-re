@@ -11,16 +11,6 @@ namespace
 {
   std::uint32_t gSimConVarIndexCounter = 0u;
 
-  /**
-   * Address: 0x00743210 (FUN_00743210)
-   *
-   * What it does:
-   * Returns the current process-global sim-convar index counter lane.
-   */
-  [[maybe_unused]] [[nodiscard]] std::uint32_t GetSimConVarIndexCounterValue() noexcept
-  {
-    return gSimConVarIndexCounter;
-  }
 } // namespace
 
 /**

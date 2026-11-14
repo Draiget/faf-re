@@ -125,12 +125,12 @@ namespace
 
   void LoadCountedPtrCParticleTexture(
     gpg::ReadArchive* archive,
-    std::intptr_t objectPtr,
+    void* objectPtr,
     int,
     gpg::RRef* ownerRef
   )
   {
-    auto* const counted = reinterpret_cast<moho::CountedPtr_CParticleTexture*>(objectPtr);
+    auto* const counted = static_cast<moho::CountedPtr_CParticleTexture*>(objectPtr);
     if (!counted || !archive) {
       return;
     }
@@ -142,12 +142,12 @@ namespace
 
   void SaveCountedPtrCParticleTexture(
     gpg::WriteArchive* archive,
-    std::intptr_t objectPtr,
+    void* objectPtr,
     int,
     gpg::RRef* ownerRef
   )
   {
-    auto* const counted = reinterpret_cast<moho::CountedPtr_CParticleTexture*>(objectPtr);
+    auto* const counted = static_cast<moho::CountedPtr_CParticleTexture*>(objectPtr);
     if (!counted || !archive) {
       return;
     }
@@ -166,7 +166,7 @@ namespace
    */
   void LoadFastVectorCountedPtrCParticleTexture(
     gpg::ReadArchive* archive,
-    std::intptr_t objectPtr,
+    void* objectPtr,
     int,
     gpg::RRef* ownerRef
   )
@@ -175,7 +175,7 @@ namespace
       return;
     }
 
-    auto& vec = *reinterpret_cast<gpg::core::FastVectorInline<moho::CountedPtr_CParticleTexture>*>(objectPtr);
+    auto& vec = *static_cast<gpg::core::FastVectorInline<moho::CountedPtr_CParticleTexture>*>(objectPtr);
 
     unsigned int count = 0;
     archive->ReadUInt(&count);
@@ -202,7 +202,7 @@ namespace
    */
   void SaveFastVectorCountedPtrCParticleTexture(
     gpg::WriteArchive* archive,
-    std::intptr_t objectPtr,
+    void* objectPtr,
     int,
     gpg::RRef* ownerRef
   )
@@ -211,7 +211,7 @@ namespace
       return;
     }
 
-    auto& vec = *reinterpret_cast<gpg::core::FastVectorInline<moho::CountedPtr_CParticleTexture>*>(objectPtr);
+    auto& vec = *static_cast<gpg::core::FastVectorInline<moho::CountedPtr_CParticleTexture>*>(objectPtr);
     const unsigned int count = static_cast<unsigned int>(vec.size());
     archive->WriteUInt(count);
 
@@ -331,7 +331,7 @@ namespace moho
     const gpg::RRef& ref
   ) const
   {
-    auto* const counted = reinterpret_cast<const moho::CountedPtr_CParticleTexture*>(ref.mObj);
+    auto* const counted = static_cast<const moho::CountedPtr_CParticleTexture*>(ref.mObj);
     if (!counted || !counted->tex) {
       return fa::string("NULL");
     }
@@ -389,7 +389,7 @@ namespace moho
     const int
   ) const
   {
-    auto* const counted = reinterpret_cast<moho::CountedPtr_CParticleTexture*>(obj);
+    auto* const counted = static_cast<moho::CountedPtr_CParticleTexture*>(obj);
     return MakeCParticleTextureRef(counted ? counted->tex : nullptr);
   }
 
@@ -403,7 +403,7 @@ namespace moho
     void* obj
   ) const
   {
-    auto* const counted = reinterpret_cast<moho::CountedPtr_CParticleTexture*>(obj);
+    auto* const counted = static_cast<moho::CountedPtr_CParticleTexture*>(obj);
     return (counted && counted->tex) ? 1u : 0u;
   }
 
@@ -415,7 +415,7 @@ namespace moho
    */
   void RCountedPtrType<moho::CParticleTexture>::SerLoad(
     gpg::ReadArchive* archive,
-    std::intptr_t objectPtr,
+    void* objectPtr,
     int,
     gpg::RRef* ownerRef
   )
@@ -431,7 +431,7 @@ namespace moho
    */
   void RCountedPtrType<moho::CParticleTexture>::SerSave(
     gpg::WriteArchive* archive,
-    std::intptr_t objectPtr,
+    void* objectPtr,
     int,
     gpg::RRef* ownerRef
   )

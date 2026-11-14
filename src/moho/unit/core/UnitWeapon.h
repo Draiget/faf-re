@@ -46,23 +46,7 @@ namespace moho
   class Unit;
   class UnitWeapon;
 
-  /**
-   * Collision candidate lane used by beam-impact filtering.
-   *
-   * Address evidence:
-   * - `UnitWeapon::GetClosestCollision` (0x006D6A00) iterates 0x20-byte entries
-   *   with `entity` at +0x00 and hit distance at +0x1C.
-   */
-  struct WeaponCollisionEntry
-  {
-    Entity* entity;              // +0x00
-    Wm3::Vector3f collisionAxis; // +0x04
-    Wm3::Vector3f contactPoint;  // +0x10
-    float dist;                  // +0x1C
-  };
-  static_assert(sizeof(WeaponCollisionEntry) == 0x20, "WeaponCollisionEntry size must be 0x20");
-  static_assert(offsetof(WeaponCollisionEntry, entity) == 0x00, "WeaponCollisionEntry::entity offset must be 0x00");
-  static_assert(offsetof(WeaponCollisionEntry, dist) == 0x1C, "WeaponCollisionEntry::dist offset must be 0x1C");
+  struct EntityLineCollision; // moho/sim/COGrid.h
 
   enum class ESolutionStatus : std::int32_t
   {
@@ -510,8 +494,8 @@ namespace moho
      * Scans collision candidates, applies script and ally filters, and returns
      * the nearest surviving collision lane.
      */
-    [[nodiscard]] static WeaponCollisionEntry* GetClosestCollision(
-      gpg::fastvector_n<WeaponCollisionEntry, 10>* collisions,
+    [[nodiscard]] static EntityLineCollision* GetClosestCollision(
+      gpg::fastvector_n<EntityLineCollision, 10>* collisions,
       UnitWeapon* weapon,
       Unit* ownerUnit,
       bool ignoreAlly

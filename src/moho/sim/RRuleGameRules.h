@@ -105,7 +105,7 @@ namespace moho
   /**
    * The category-name -> category-word-range map embedded in
    * `RRuleGameRulesImpl::mEntityCategoryLookup` (+0xC4, see
-   * `EntityCategoryLookupResolver::GetEntityCategory`). Address evidence for
+   * `RRuleGameRulesImpl::GetEntityCategory`). Address evidence for
    * the tree operations this instantiation reaches is cited on
    * `fa::detail::rb_tree`'s `insert_unique`/`insert_at`/`buy_node`/
    * `rb_decrement`/`find_node` members (insert/lookup side, reached from
@@ -116,10 +116,8 @@ namespace moho
    * `EntityCategoryLookupTable` constructor and implicit
    * destructor) in `RbTree.h`.
    *
-   * `EntityCategoryLookupResolver.cpp` independently models the read-only
-   * half of this exact tree as a lighter `CategoryNameMapView`/`Tree.h` view
-   * (no owning insert/erase, since that file only ever looks values up);
-   * all three recoveries agree on the node layout (key@+0x10, value@+0x30,
+   * `GetEntityCategory` (EntityCategoryLookupResolver.cpp) reads the same
+   * tree through this type; the recoveries agree on the node layout (key@+0x10, value@+0x30,
    * colour@+0x58, isNil@+0x59) -- corroborating evidence from three
    * independently recovered call sites for the same binary object.
    */
@@ -733,17 +731,8 @@ namespace moho
 
   public:
     std::uint32_t mUnknown04; // +0x04
-    /// The blueprint file watcher the constructor builds in place with the
-    /// "*.bp" pattern and tears down by hand. It has no default state, so it
-    /// lives in raw storage exactly as the binary lays it out.
-    alignas(CDiskWatchListener) std::uint8_t mDiskWatchListenerStorage[sizeof(CDiskWatchListener)]; // +0x08
-
-    [[nodiscard]] CDiskWatchListener& DiskWatchListener() noexcept
-    {
-      return *reinterpret_cast<CDiskWatchListener*>(mDiskWatchListenerStorage);
-    }
-    // boost::mutex placed by hand; 8 bytes on x86, larger on x64.
-    alignas(fa::mutex) std::uint8_t mLockStorage[sizeof(fa::mutex)];       // +0x38
+    CDiskWatchListener mDiskWatchListener;                                 // +0x08, watches "*.bp"
+    fa::mutex mLock;                                                       // +0x38 (8 bytes on x86, larger on x64)
     LuaPlus::LuaState* mLuaState;                                          // +0x40
     /**
      * Vector of per-target-LuaState export bindings. Real field name per

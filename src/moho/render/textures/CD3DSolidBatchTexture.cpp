@@ -204,30 +204,6 @@ namespace moho
       return destination;
     }
 
-    [[maybe_unused]] [[nodiscard]] SolidTextureMap::iterator RightmostSolidTextureEntry()
-    {
-      return GetMapRightmost(GetSolidTextureMap());
-    }
-
-    [[maybe_unused]] [[nodiscard]] SolidTextureMap::iterator LeftmostSolidTextureEntry()
-    {
-      return GetMapLeftmost(GetSolidTextureMap());
-    }
-
-    [[maybe_unused]] void AdvanceSolidTextureIterator(
-      SolidTextureMap::iterator& iterator
-    )
-    {
-      AdvanceMapIterator(GetSolidTextureMap(), iterator);
-    }
-
-    [[maybe_unused]] void RetreatSolidTextureIterator(
-      SolidTextureMap::iterator& iterator
-    )
-    {
-      RetreatMapIterator(GetSolidTextureMap(), iterator);
-    }
-
     [[nodiscard]] SolidTextureMap::iterator FindSolidTextureEntry(
       const std::uint32_t color
     )
@@ -270,21 +246,6 @@ namespace moho
     )
     {
       return SolidTextureHandle(rawTexture);
-    }
-
-    /**
-     * Address: 0x0044B2E0 (FUN_0044B2E0)
-     *
-     * What it does:
-     * Address: 0x0044DA30 (FUN_0044DA30, recursive node release lane)
-     *
-     * Releases map-node storage and resets map size/sentinel lanes.
-     * Recovered through full cache clear of typed map storage.
-     */
-    [[maybe_unused]] [[nodiscard]] int ReleaseSolidTextureMapStorage()
-    {
-      GetSolidTextureMap().clear();
-      return 0;
     }
 
   } // namespace

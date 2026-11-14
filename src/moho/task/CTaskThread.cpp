@@ -681,11 +681,7 @@ void CTaskStage::SerializeThreads(
 ) const
 {
   const gpg::RRef nullOwner{};
-  auto* const mainEnd = reinterpret_cast<const CTaskThread*>(&mThreads);
-  auto* const stagedEnd = reinterpret_cast<const CTaskThread*>(&mStagedThreads);
-
-  for (auto* node = static_cast<const CTaskThread*>(mThreads.mNext); node != mainEnd;
-       node = static_cast<const CTaskThread*>(node->mNext)) {
+  for (const CTaskThread* const node : mThreads.owners()) {
     const gpg::RRef threadRef = SerializeTaskThreadPointer(node);
     gpg::WriteRawPointer(archive, threadRef, gpg::TrackedPointerState::Owned, nullOwner);
   }
@@ -693,8 +689,7 @@ void CTaskStage::SerializeThreads(
   const gpg::RRef nullThread = SerializeTaskThreadPointer(nullptr);
   gpg::WriteRawPointer(archive, nullThread, gpg::TrackedPointerState::Owned, nullOwner);
 
-  for (auto* node = static_cast<const CTaskThread*>(mStagedThreads.mNext); node != stagedEnd;
-       node = static_cast<const CTaskThread*>(node->mNext)) {
+  for (const CTaskThread* const node : mStagedThreads.owners()) {
     const gpg::RRef threadRef = SerializeTaskThreadPointer(node);
     gpg::WriteRawPointer(archive, threadRef, gpg::TrackedPointerState::Owned, nullOwner);
   }

@@ -62,7 +62,9 @@ void Unit::Kill(
 
       RunScriptUnit("OnNotAdjacentTo", adjacent);
       adjacent->RunScriptUnit("OnNotAdjacentTo", this);
-      adjacent->ReserveOgridRect(GetReservedOgridRect(*adjacent));
+      adjacent->ReserveOgridRect(
+        gpg::Rect2i{adjacent->mReservedOgridRect}
+      ); // a copy: ReserveOgridRect frees (zeroes) the field before reading its argument
     }
   }
 
@@ -164,7 +166,9 @@ void Unit::OnDestroy()
         Unit* const adjacent = static_cast<Unit*>(entry);
         RunScriptUnit("OnNotAdjacentTo", adjacent);
         adjacent->RunScriptUnit("OnNotAdjacentTo", this);
-        adjacent->ReserveOgridRect(GetReservedOgridRect(*adjacent));
+        adjacent->ReserveOgridRect(
+          gpg::Rect2i{adjacent->mReservedOgridRect}
+        ); // a copy: ReserveOgridRect frees (zeroes) the field before reading its argument
       }
     }
 

@@ -151,39 +151,6 @@ namespace moho
     StrategicIconAux* gStrategicIconAuxiliary = nullptr;
 
     /**
-     * Address: 0x0085EFE0 (FUN_0085EFE0)
-     *
-     * What it does:
-     * Returns the global strategic-icon auxiliary object lane.
-     */
-    [[maybe_unused]] [[nodiscard]] StrategicIconAux* GetStrategicIconAuxiliaryLaneA() noexcept
-    {
-      return gStrategicIconAuxiliary;
-    }
-
-    /**
-     * Address: 0x0085EFF0 (FUN_0085EFF0)
-     *
-     * What it does:
-     * Secondary entrypoint returning the strategic-icon auxiliary object lane.
-     */
-    [[maybe_unused]] [[nodiscard]] StrategicIconAux* GetStrategicIconAuxiliaryLaneB() noexcept
-    {
-      return gStrategicIconAuxiliary;
-    }
-
-    /**
-     * Address: 0x0085F000 (FUN_0085F000)
-     *
-     * What it does:
-     * Third entrypoint returning the strategic-icon auxiliary object lane.
-     */
-    [[maybe_unused]] [[nodiscard]] StrategicIconAux* GetStrategicIconAuxiliaryLaneC() noexcept
-    {
-      return gStrategicIconAuxiliary;
-    }
-
-    /**
      * One classified entity in the strategic-icon pass - `struct_UnitIconData`
      * in the IDB. `CWldSession::RenderStrategicIcons` fills one of these per
      * visible entity, files it into one of the five runs on
@@ -1169,7 +1136,7 @@ namespace moho
     // `CAiFormationInstance` declares - `mCurInstance` is typed as the bare
     // `IFormationInstance` interface. Same reinterpret_cast the rest of the
     // tree already uses to reach the concrete instance (Unit.cpp).
-    CAiFormationInstance* const instance = reinterpret_cast<CAiFormationInstance*>(formation->mCurInstance);
+    CAiFormationInstance* const instance = static_cast<CAiFormationInstance*>(formation->mCurInstance);
     WeakSet<UserUnit>& participants = formation->mParticipants;
 
     for (UserUnit* const unit : participants) {
@@ -1177,7 +1144,7 @@ namespace moho
         // The unit's `IUnit` bridge sub-object at +0x148 is what every
         // formation-side call below is handed.
         IUnit* const bridge = GetIUnitBridge(unit);
-        Unit* const formationUnit = reinterpret_cast<Unit*>(bridge);
+        Unit* const formationUnit = static_cast<Unit*>(bridge);
 
         if (!bridge->IsDead() && instance->Contains(formationUnit, false) && unit->GetAttachmentParent() == nullptr) {
           const RUnitBlueprint* const blueprint = bridge->GetBlueprint();
@@ -1633,10 +1600,9 @@ namespace moho
       UserUnit* const unit = icon.mUnit->IsUserUnit();
 
       // `UserUnit::GetCustomName` (vtable slot 24, `[vftable+0x60]`) hands back
-      // the address of the unit's `fa::string`, not a C string - the binary
-      // reads `_Mysize` at +0x14 and picks the inline buffer or heap pointer off
-      // `_Myres` at +0x18. Same reinterpret the console command family uses.
-      const auto& customName = *reinterpret_cast<const fa::string*>(unit->GetCustomName());
+      // the unit's `fa::string` - the binary reads `_Mysize` at +0x14 and picks
+      // the inline buffer or heap pointer off `_Myres` at +0x18.
+      const fa::string& customName = unit->GetCustomName();
       if (customName.empty()) {
         return InvalidScreenPoint();
       }
@@ -3393,10 +3359,10 @@ namespace moho
           // Same reinterpret_cast as `RenderMeshPreviews`: `Contains` (slot 16,
           // 0x0085C4D9) and `GetFormationPosition` (slot 6, 0x0085C5C8) are
           // declared on the concrete instance only.
-          CAiFormationInstance* const instance = reinterpret_cast<CAiFormationInstance*>(formation->mCurInstance);
+          CAiFormationInstance* const instance = static_cast<CAiFormationInstance*>(formation->mCurInstance);
           for (UserUnit* const unit : formation->mParticipants) {
             IUnit* const bridge = GetIUnitBridge(unit);
-            Unit* const formationUnit = reinterpret_cast<Unit*>(bridge);
+            Unit* const formationUnit = static_cast<Unit*>(bridge);
             // 0x0085C4E9..0x0085C51B is `GetAttachmentParent()` inlined.
             if (
               bridge->IsDead() || !instance->Contains(formationUnit, false) || unit->GetAttachmentParent() != nullptr
@@ -3725,11 +3691,11 @@ namespace moho
         return;
       }
 
-      const auto* const blueprint = reinterpret_cast<const RProjectileBlueprint*>(entity->mParams.mBlueprint);
+      const auto* const blueprint = static_cast<const RProjectileBlueprint*>(entity->mParams.mBlueprint);
       if (blueprint == nullptr) {
         return;
       }
-      if (projectileCategory == nullptr || !projectileCategory->mBits.Contains(blueprint->mCategoryBitIndex)) {
+      if (projectileCategory == nullptr || !projectileCategory->mBits.Contains(blueprint->mBlueprintOrdinal)) {
         return;
       }
 
@@ -4027,7 +3993,7 @@ namespace moho
 
     // `mWldMap->mTerrainRes` + 0x04 is the active `STIMap`; its playable rect
     // sits at +0x08 (0x00862B09..0x00862B4D reads all four bounds).
-    const VisibilityRect& playableRect = VisibilityRect::FromRect2i(mWldMap->mTerrainRes->mMap->mPlayableRect);
+    const gpg::Rect2i& playableRect = mWldMap->mTerrainRes->mMap->mPlayableRect;
 
     primBatcher->SetProjectionMatrix(MakeViewportPixelProjection(*camera));
     primBatcher->SetViewMatrix(VMatrix4::Identity());
@@ -4065,8 +4031,8 @@ namespace moho
       // A deposit that pokes out of the playable rect is dropped whole, not
       // clipped (four signed compares at 0x00862DB1..0x00862DF4).
       if (
-        footprint.x0 < playableRect.minX || playableRect.maxX < footprint.x1 || footprint.z0 < playableRect.minZ ||
-        playableRect.maxZ < footprint.z1
+        footprint.x0 < playableRect.x0 || playableRect.x1 < footprint.x1 || footprint.z0 < playableRect.z0 ||
+        playableRect.z1 < footprint.z1
       ) {
         continue;
       }

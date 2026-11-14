@@ -50,13 +50,13 @@ namespace
   // further down in this same anonymous namespace.
   void DeserializeSSTITargetSerializerCallback(
     gpg::ReadArchive* archive,
-    std::intptr_t objectPtr,
+    void* objectPtr,
     int unusedTag,
     gpg::RRef* ownerRef
   );
   void SerializeSSTITargetSerializerCallback(
     gpg::WriteArchive* archive,
-    std::intptr_t objectPtr,
+    void* objectPtr,
     int unusedTag,
     gpg::RRef* ownerRef
   );
@@ -72,12 +72,12 @@ namespace
    */
   [[maybe_unused]] void DeserializeSSTITargetSerializerCallback(
     gpg::ReadArchive* const archive,
-    const std::intptr_t objectPtr,
+    void* const objectPtr,
     const int,
     gpg::RRef* const
   )
   {
-    auto* const target = reinterpret_cast<moho::SSTITarget*>(objectPtr);
+    auto* const target = static_cast<moho::SSTITarget*>(objectPtr);
     if (target == nullptr) {
       return;
     }
@@ -95,12 +95,12 @@ namespace
    */
   [[maybe_unused]] void SerializeSSTITargetSerializerCallback(
     gpg::WriteArchive* const archive,
-    const std::intptr_t objectPtr,
+    void* const objectPtr,
     const int,
     gpg::RRef* const
   )
   {
-    const auto* const target = reinterpret_cast<const moho::SSTITarget*>(objectPtr);
+    const auto* const target = static_cast<const moho::SSTITarget*>(objectPtr);
     if (target == nullptr) {
       return;
     }

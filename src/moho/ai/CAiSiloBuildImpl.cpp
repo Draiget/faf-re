@@ -17,7 +17,7 @@
 #include "moho/resource/blueprints/RProjectileBlueprint.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/sim/CArmyImpl.h"
-#include "moho/sim/CSimArmyEconomyInfo.h"
+#include "moho/sim/CEconomy.h"
 #include "moho/unit/core/Unit.h"
 #include "moho/unit/core/UnitWeapon.h"
 #include "gpg/core/reflection/Reflection.h"
@@ -98,7 +98,7 @@ namespace
 
   [[nodiscard]] CEconRequest* CreateEconomyRequest(
     const SEconValue& requested,
-    CSimArmyEconomyInfo* const economy
+    CEconomy* const economy
   )
   {
     auto* const request = new CEconRequest{};
@@ -107,7 +107,7 @@ namespace
     request->mGranted.mass = 0.0f;
 
     if (economy) {
-      request->mNode.ListLinkBefore(&economy->registrationNode);
+      request->mNode.ListLinkBefore(&economy->mConsumptionData);
     }
     return request;
   }
@@ -607,7 +607,7 @@ void CAiSiloBuildImpl::SiloTick()
     mSegmentCost.energy = (projectileBlueprint->Economy.BuildCostEnergy * energyAdj) / mSegments;
     mSegmentCost.mass = (projectileBlueprint->Economy.BuildCostMass * massAdj) / mSegments;
 
-    CSimArmyEconomyInfo* economy = nullptr;
+    CEconomy* economy = nullptr;
     if (mUnit->ArmyRef) {
       economy = mUnit->ArmyRef->GetEconomy();
     }

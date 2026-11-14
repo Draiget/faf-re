@@ -17,34 +17,6 @@ namespace
     return sInstance;
   }
 
-  /**
-   * Address: 0x00546FE0 (FUN_00546FE0)
-   *
-   * What it does:
-   * Executes one non-deleting `gpg::RType` base-teardown lane for
-   * `ISimResourcesTypeInfo`.
-   */
-  [[maybe_unused]] void cleanup_ISimResourcesTypeInfoRTypeBase(
-    moho::ISimResourcesTypeInfo* const typeInfo
-  ) noexcept
-  {
-    gpg::ClearTypeLists(typeInfo);
-  }
-
-  /**
-   * Address: 0x00547020 (FUN_00547020)
-   *
-   * What it does:
-   * Register-shape adapter that forwards one reflected type lane into
-   * `ISimResourcesTypeInfo` base-registration semantics.
-   */
-  [[maybe_unused]] void AddBaseIResourcesRegistrationThunk(
-    gpg::RType* const typeInfo
-  )
-  {
-    moho::resource_reflection::AddBase(typeInfo, moho::resource_reflection::ResolveIResourcesType());
-  }
-
   struct ISimResourcesTypeInfoStartup
   {
     ISimResourcesTypeInfoStartup()

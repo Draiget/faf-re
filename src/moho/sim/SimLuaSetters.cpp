@@ -1084,7 +1084,7 @@ int moho::cfunc_SetArmyEconomyL(
 
   const LuaPlus::LuaObject armyObject(LuaPlus::LuaStackObject(state, 1));
   CArmyImpl* const army = ARMY_FromLuaState(state, armyObject);
-  CSimArmyEconomyInfo* const economyInfo = army ? army->GetEconomy() : nullptr;
+  CEconomy* const economyInfo = army ? army->GetEconomy() : nullptr;
   if (!economyInfo) {
     return 0;
   }
@@ -1104,10 +1104,10 @@ int moho::cfunc_SetArmyEconomyL(
   // 0x00708CAE `add edi, 8`: both deltas land in the production pool at
   // `GetEconomy() + 8` (mResources) as {0, mass} then {energy, 0} pairs, so the
   // economy tick banks them as income -- they never touch mStored directly.
-  economyInfo->mResources.ENERGY += 0.0f;
-  economyInfo->mResources.MASS += massDelta;
-  economyInfo->mResources.ENERGY += energyDelta;
-  economyInfo->mResources.MASS += 0.0f;
+  economyInfo->mResources.energy += 0.0f;
+  economyInfo->mResources.mass += massDelta;
+  economyInfo->mResources.energy += energyDelta;
+  economyInfo->mResources.mass += 0.0f;
   return 0;
 }
 

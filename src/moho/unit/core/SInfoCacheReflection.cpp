@@ -9,6 +9,7 @@
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/SerializationError.h"
 #include "gpg/core/utils/Global.h"
+#include "moho/ai/CAiFormationInstance.h"
 #include "moho/ai/IFormationInstance.h"
 #include "moho/math/Vector3f.h"
 #include "moho/misc/WeakPtr.h"
@@ -87,9 +88,7 @@ namespace
       return out;
     }
 
-    out.mObj = reinterpret_cast<void*>(
-      reinterpret_cast<std::uintptr_t>(const_cast<TObject*>(object)) - static_cast<std::uintptr_t>(baseOffset)
-    );
+    out.mObj = gpg::CompleteObject(object, baseOffset);
     out.mType = runtimeType;
     return out;
   }
@@ -223,7 +222,7 @@ namespace moho
       SIM_NoteKeyframeFormationPointer(reinterpret_cast<void**>(&mFormationLayer), saved);
     } else {
       mFormationLayer =
-        reinterpret_cast<moho::CFormationInstance*>(ReadTrackedPointer<moho::IFormationInstance>(archive, ownerRef));
+        static_cast<moho::CFormationInstance*>(ReadTrackedPointer<moho::IFormationInstance>(archive, ownerRef));
     }
 
     archive->Read(gpg::RTypeOf<moho::WeakPtr<moho::IUnit>>(), &mFormationLeadRef, ownerRef);
@@ -260,7 +259,7 @@ namespace moho
     } else {
       WriteTrackedPointer(
         archive,
-        reinterpret_cast<const moho::IFormationInstance*>(mFormationLayer),
+        static_cast<const moho::IFormationInstance*>(mFormationLayer),
         gpg::TrackedPointerState::Unowned,
         ownerRef
       );

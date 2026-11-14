@@ -85,7 +85,7 @@
 #include "moho/sim/CArmyStats.h"
 #include "moho/sim/CPlatoon.h"
 #include "moho/sim/CEconStorage.h"
-#include "moho/sim/CSimArmyEconomyInfo.h"
+#include "moho/sim/CEconomy.h"
 #include "moho/sim/CSimConVarInstanceBase.h"
 #include "moho/sim/COGrid.h"
 #include "moho/sim/CDebugCanvas.h"

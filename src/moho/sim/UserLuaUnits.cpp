@@ -529,7 +529,7 @@ int moho::cfunc_EntityCategoryContainsUserL(
   const RUnitBlueprint* const blueprint = ResolveEntityCategoryFilterBlueprint(valueObject, session, state);
 
   const bool contains =
-    categorySet != nullptr && blueprint != nullptr && categorySet->Bits().Contains(blueprint->mCategoryBitIndex);
+    categorySet != nullptr && blueprint != nullptr && categorySet->Bits().Contains(blueprint->mBlueprintOrdinal);
   lua_pushboolean(rawState, contains ? 1 : 0);
   return 1;
 }
@@ -613,7 +613,7 @@ int moho::cfunc_EntityCategoryFilterDownUserL(
       continue;
     }
 
-    if (categorySet->Bits().Contains(blueprint->mCategoryBitIndex)) {
+    if (categorySet->Bits().Contains(blueprint->mBlueprintOrdinal)) {
       resultObject.SetObject(resultIndex, valueObject); // 0x008BA177: plain table set
       ++resultIndex;
     }
@@ -698,7 +698,7 @@ int moho::cfunc_EntityCategoryFilterOutL(
       continue;
     }
 
-    if (!categorySet->Bits().Contains(blueprint->mCategoryBitIndex)) {
+    if (!categorySet->Bits().Contains(blueprint->mBlueprintOrdinal)) {
       resultObject.SetObject(resultIndex, valueObject); // 0x008BA4A9: plain table set
       ++resultIndex;
     }
@@ -1971,7 +1971,7 @@ int moho::cfunc_AddSelectUnitsL(
  * `GetHighlightCommand() - return table of command or nil`.
  *
  * What it does:
- * For the command the cursor highlights (`CWldSession::HighlightCommandId`,
+ * For the command the cursor highlights (`CWldSession::mCursorInfo.mIsDragger`,
  * -1 for none), looked up in the session command manager
  * (`FindCommandIssueHelperInManager`, 0x008B5BB0), returns
  * `{commandType, x, y, z, commandId, targetId?, blueprintId?}`: the command
@@ -1989,7 +1989,7 @@ int moho::cfunc_GetHighlightCommand(
   if (session == nullptr) {
     return 0;
   }
-  const CmdId commandId = session->HighlightCommandId;
+  const CmdId commandId = session->mCursorInfo.mIsDragger;
   if (commandId == -1) {
     return 0;
   }
@@ -2507,8 +2507,8 @@ int moho::cfunc_CreateUnitAtMouseL(
   const float offsetX = static_cast<float>(lua_tonumber(rawState, 3));
 
   SCoordsVec2 spawnPos{};
-  spawnPos.x = session->CursorWorldPos.x + offsetX;
-  spawnPos.z = session->CursorWorldPos.z + offsetZ;
+  spawnPos.x = session->mCursorInfo.mMouseWorldPos.x + offsetX;
+  spawnPos.z = session->mCursorInfo.mMouseWorldPos.z + offsetZ;
 
   LuaPlus::LuaStackObject rotationArg(state, 5);
   if (lua_type(rawState, 5) != LUA_TNUMBER) {

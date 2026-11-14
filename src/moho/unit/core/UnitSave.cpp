@@ -169,8 +169,16 @@ void SSTIUnitVariableData::MemberDeserialize(
   );
   archive->Read(gpg::RTypeOf<UnitAttributes>(), &mAttributes, ownerRef);
 
-  archive->ReadInt(reinterpret_cast<int*>(&mScriptbits));
-  archive->ReadInt64(reinterpret_cast<__int64*>(&mUnitStates));
+  {
+    int value{};
+    archive->ReadInt(&value);
+    mScriptbits = static_cast<decltype(mScriptbits)>(value);
+  }
+  {
+    __int64 value{};
+    archive->ReadInt64(&value);
+    mUnitStates = static_cast<decltype(mUnitStates)>(value);
+  }
   archive->ReadBool(&mDidRefresh);
   archive->ReadBool(&mOverchargePaused);
 }
@@ -595,18 +603,6 @@ namespace moho
       return sType;
     }
 
-    /**
-     * Typed view over the four contiguous `Unit` reserved-O-grid bound lanes
-     * (`ReservedOgridRect{Min,Max}{X,Z}` at +0x5A8), which together form the
-     * unit occupation rectangle serialized/read as a single `gpg::Rect2i`.
-     */
-    [[nodiscard]] gpg::Rect2i& UnitOccupationRect(
-      moho::Unit& unit
-    ) noexcept
-    {
-      static_assert(offsetof(moho::Unit, ReservedOgridRectMinX) == 0x05A8, "Unit occupation rect must begin at +0x5A8");
-      return reinterpret_cast<gpg::Rect2i&>(unit.ReservedOgridRectMinX);
-    }
   } // namespace
 
   /**
@@ -731,7 +727,7 @@ namespace moho
     archive->WriteBool(mDebugAIStates);
 
     archive->Write(ResolveUnitSerializerType<SInfoCache>(), &mInfoCache, ownerRef);
-    archive->Write(ResolveUnitSerializerType<gpg::Rect2i>(), &UnitOccupationRect(*this), ownerRef);
+    archive->Write(ResolveUnitSerializerType<gpg::Rect2i>(), &mReservedOgridRect, ownerRef);
     archive->Write(ResolveUnitSerializerType<gpg::fastvector<WeakPtr<Entity>>>(), &mBlipsInRange, ownerRef);
 
     archive->WriteUInt(static_cast<unsigned int>(mBlipLastUpdateTick));
@@ -945,10 +941,14 @@ namespace moho
     archive->ReadBool(&mDebugAIStates);
 
     archive->Read(ResolveUnitSerializerType<SInfoCache>(), &mInfoCache, ownerRef);
-    archive->Read(ResolveUnitSerializerType<gpg::Rect2i>(), &UnitOccupationRect(*this), ownerRef);
+    archive->Read(ResolveUnitSerializerType<gpg::Rect2i>(), &mReservedOgridRect, ownerRef);
     archive->Read(ResolveUnitSerializerType<gpg::fastvector<WeakPtr<Entity>>>(), &mBlipsInRange, ownerRef);
 
-    archive->ReadUInt(reinterpret_cast<unsigned int*>(&mBlipLastUpdateTick));
+    {
+      unsigned int value{};
+      archive->ReadUInt(&value);
+      mBlipLastUpdateTick = static_cast<decltype(mBlipLastUpdateTick)>(value);
+    }
     archive->ReadBool(&mIsNotPod);
     archive->ReadBool(&mIsEngineer);
     archive->ReadBool(&mIsNaval);
@@ -991,9 +991,9 @@ namespace moho
       ExecuteOccupyGround();
     }
 
-    if (!IsCollisionRectEquivalentToZero(GetReservedOgridRect(*this))) {
+    if (!IsCollisionRectEquivalentToZero(mReservedOgridRect)) {
       if (SimulationRef && SimulationRef->mOGrid) {
-        SimulationRef->mOGrid->OccupyRect(UnitOccupationRect(*this));
+        SimulationRef->mOGrid->OccupyRect(mReservedOgridRect);
       }
     }
 

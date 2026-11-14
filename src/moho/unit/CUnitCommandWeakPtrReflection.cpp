@@ -83,9 +83,7 @@ namespace
     const bool isDerived = dynamicType != nullptr && CachedCUnitCommandType() != nullptr &&
       dynamicType->IsDerivedFrom(CachedCUnitCommandType(), &baseOffset);
 
-    out.mObj = isDerived
-      ? reinterpret_cast<void*>(reinterpret_cast<std::uintptr_t>(command) - static_cast<std::uintptr_t>(baseOffset))
-      : static_cast<void*>(command);
+    out.mObj = isDerived ? gpg::CompleteObject(command, baseOffset) : static_cast<void*>(command);
     out.mType = dynamicType ? dynamicType : CachedCUnitCommandType();
     return out;
   }
@@ -138,12 +136,12 @@ namespace
    */
   void LoadWeakPtrCUnitCommandVector(
     gpg::ReadArchive* archive,
-    std::intptr_t objectPtr,
+    void* objectPtr,
     int,
     gpg::RRef* ownerRef
   )
   {
-    auto* const storage = reinterpret_cast<WeakPtrVector*>(objectPtr);
+    auto* const storage = static_cast<WeakPtrVector*>(objectPtr);
     if (!archive || !storage) {
       return;
     }
@@ -178,12 +176,12 @@ namespace
    */
   void SaveWeakPtrCUnitCommandVector(
     gpg::WriteArchive* archive,
-    std::intptr_t objectPtr,
+    void* objectPtr,
     int,
     gpg::RRef* ownerRef
   )
   {
-    auto* const storage = reinterpret_cast<const WeakPtrVector*>(objectPtr);
+    auto* const storage = static_cast<const WeakPtrVector*>(objectPtr);
     if (!archive || !storage) {
       return;
     }
@@ -289,12 +287,12 @@ namespace moho
    */
   void WeakPtr_CUnitCommand::Deserialize(
     gpg::ReadArchive* const archive,
-    const std::intptr_t objectPtr,
+    void* const objectPtr,
     int,
     gpg::RRef* ownerRef
   )
   {
-    auto* const weak = reinterpret_cast<WeakPtr<CUnitCommand>*>(objectPtr);
+    auto* const weak = static_cast<WeakPtr<CUnitCommand>*>(objectPtr);
     if (!archive || !weak) {
       return;
     }
@@ -308,12 +306,12 @@ namespace moho
    */
   void WeakPtr_CUnitCommand::Serialize(
     gpg::WriteArchive* const archive,
-    const std::intptr_t objectPtr,
+    void* const objectPtr,
     int,
     gpg::RRef* ownerRef
   )
   {
-    auto* const weak = reinterpret_cast<WeakPtr<CUnitCommand>*>(objectPtr);
+    auto* const weak = static_cast<WeakPtr<CUnitCommand>*>(objectPtr);
     if (!archive || !weak) {
       return;
     }

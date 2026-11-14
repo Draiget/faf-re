@@ -225,29 +225,6 @@ namespace
   }
 
   /**
-   * Address: 0x004DED40 (FUN_004DED40)
-   *
-   * What it does:
-   * Copies the four `SParamKey` string lanes (`Cue`, `Bank`, `LodCutoff`,
-   * `RpcLoopVar`) from `sourceKey` into `outKey`.
-   */
-  [[maybe_unused]] [[nodiscard]] moho::SParamKey* CopySParamKeyStringLanes(
-    const moho::SParamKey* const sourceKey,
-    moho::SParamKey* const outKey
-  )
-  {
-    if (sourceKey == nullptr || outKey == nullptr) {
-      return outKey;
-    }
-
-    outKey->mCueName = sourceKey->mCueName;
-    outKey->mBankName = sourceKey->mBankName;
-    outKey->mLodCutoffVariableName = sourceKey->mLodCutoffVariableName;
-    outKey->mRpcLoopVariableName = sourceKey->mRpcLoopVariableName;
-    return outKey;
-  }
-
-  /**
    * Address: 0x004DEDF0 (FUN_004DEDF0)
    *
    * What it does:
@@ -324,25 +301,6 @@ namespace
 
   static_assert(sizeof(TwoWordState) == 0x8, "TwoWordState size must be 0x8");
 
-  /**
-   * Address: 0x004E14B0 (FUN_004E14B0)
-   *
-   * What it does:
-   * Clears one two-word runtime state pair to zero.
-   */
-  [[maybe_unused]] [[nodiscard]] TwoWordState* ClearTwoWordState(
-    TwoWordState* const state
-  ) noexcept
-  {
-    if (state == nullptr) {
-      return state;
-    }
-
-    state->mFirst = 0u;
-    state->mSecond = 0u;
-    return state;
-  }
-
   struct IntrusiveLinkNode
   {
     IntrusiveLinkNode* mNext; // +0x00
@@ -350,22 +308,6 @@ namespace
   };
 
   static_assert(sizeof(IntrusiveLinkNode) == 0x8, "IntrusiveLinkNode size must be 0x8");
-
-  /**
-   * Address: 0x004E1BD0 (FUN_004E1BD0)
-   *
-   * What it does:
-   * Advances one intrusive cursor slot to its current node's `next` link.
-   */
-  [[maybe_unused]] [[nodiscard]] IntrusiveLinkNode** AdvanceIntrusiveCursor(
-    IntrusiveLinkNode** const cursorSlot
-  ) noexcept
-  {
-    if (cursorSlot != nullptr && *cursorSlot != nullptr) {
-      *cursorSlot = (*cursorSlot)->mNext;
-    }
-    return cursorSlot;
-  }
 
   struct PairHeadTail
   {
@@ -375,66 +317,6 @@ namespace
 
   static_assert(sizeof(PairHeadTail) == 0x8, "PairHeadTail size must be 0x8");
 
-  [[nodiscard]] PairHeadTail* CopyPairHeadTail(
-    PairHeadTail* const outPair,
-    const std::uint32_t* const headValueSlot,
-    const std::uint32_t* const tailValueSlot
-  ) noexcept
-  {
-    if (outPair == nullptr || headValueSlot == nullptr || tailValueSlot == nullptr) {
-      return outPair;
-    }
-
-    outPair->mHeadValue = *headValueSlot;
-    outPair->mTailValue = *tailValueSlot;
-    return outPair;
-  }
-
-  /**
-   * Address: 0x004E1BF0 (FUN_004E1BF0)
-   *
-   * What it does:
-   * Writes one `(head,tail)` pair from two source value slots.
-   */
-  [[maybe_unused]] [[nodiscard]] PairHeadTail* CopyPairHeadTail_A(
-    PairHeadTail* const outPair,
-    const std::uint32_t* const headValueSlot,
-    const std::uint32_t* const tailValueSlot
-  ) noexcept
-  {
-    return CopyPairHeadTail(outPair, headValueSlot, tailValueSlot);
-  }
-
-  /**
-   * Address: 0x004E1C30 (FUN_004E1C30)
-   *
-   * What it does:
-   * Writes one `(head,tail)` pair from two source value slots.
-   */
-  [[maybe_unused]] [[nodiscard]] PairHeadTail* CopyPairHeadTail_B(
-    PairHeadTail* const outPair,
-    const std::uint32_t* const headValueSlot,
-    const std::uint32_t* const tailValueSlot
-  ) noexcept
-  {
-    return CopyPairHeadTail(outPair, headValueSlot, tailValueSlot);
-  }
-
-  /**
-   * Address: 0x004E1C70 (FUN_004E1C70)
-   *
-   * What it does:
-   * Writes one `(head,tail)` pair from two source value slots.
-   */
-  [[maybe_unused]] [[nodiscard]] PairHeadTail* CopyPairHeadTail_C(
-    PairHeadTail* const outPair,
-    const std::uint32_t* const headValueSlot,
-    const std::uint32_t* const tailValueSlot
-  ) noexcept
-  {
-    return CopyPairHeadTail(outPair, headValueSlot, tailValueSlot);
-  }
-
   struct HeaderPointerOwner
   {
     std::uint32_t mReserved00;  // +0x00
@@ -442,116 +324,6 @@ namespace
   };
 
   static_assert(sizeof(HeaderPointerOwner) == 0x8, "HeaderPointerOwner size must be 0x8");
-
-  [[nodiscard]] std::uint32_t* ReadHeaderRootWord(
-    std::uint32_t* const outWord,
-    const HeaderPointerOwner* const owner
-  ) noexcept
-  {
-    if (outWord == nullptr || owner == nullptr || owner->mHeaderSlot == nullptr) {
-      return outWord;
-    }
-
-    *outWord = *owner->mHeaderSlot;
-    return outWord;
-  }
-
-  [[nodiscard]] std::uint32_t* ReadHeaderPointerWord(
-    std::uint32_t* const outWord,
-    const HeaderPointerOwner* const owner
-  ) noexcept
-  {
-    if (outWord == nullptr || owner == nullptr) {
-      return outWord;
-    }
-
-    *outWord = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(owner->mHeaderSlot));
-    return outWord;
-  }
-
-  /**
-   * Address: 0x004E19F0 (FUN_004E19F0)
-   *
-   * What it does:
-   * Reads the root-word lane from one owner header slot (`owner->mHeaderSlot[0]`).
-   */
-  [[maybe_unused]] [[nodiscard]] std::uint32_t* ReadHeaderRootWord_A(
-    std::uint32_t* const outWord,
-    const HeaderPointerOwner* const owner
-  ) noexcept
-  {
-    return ReadHeaderRootWord(outWord, owner);
-  }
-
-  /**
-   * Address: 0x004E1A00 (FUN_004E1A00)
-   *
-   * What it does:
-   * Reads the header-pointer lane (`owner->mHeaderSlot`) as one 32-bit word.
-   */
-  [[maybe_unused]] [[nodiscard]] std::uint32_t* ReadHeaderPointerWord_A(
-    std::uint32_t* const outWord,
-    const HeaderPointerOwner* const owner
-  ) noexcept
-  {
-    return ReadHeaderPointerWord(outWord, owner);
-  }
-
-  /**
-   * Address: 0x004E1B00 (FUN_004E1B00)
-   *
-   * What it does:
-   * Reads the root-word lane from one owner header slot (`owner->mHeaderSlot[0]`).
-   */
-  [[maybe_unused]] [[nodiscard]] std::uint32_t* ReadHeaderRootWord_B(
-    std::uint32_t* const outWord,
-    const HeaderPointerOwner* const owner
-  ) noexcept
-  {
-    return ReadHeaderRootWord(outWord, owner);
-  }
-
-  /**
-   * Address: 0x004E1B10 (FUN_004E1B10)
-   *
-   * What it does:
-   * Reads the header-pointer lane (`owner->mHeaderSlot`) as one 32-bit word.
-   */
-  [[maybe_unused]] [[nodiscard]] std::uint32_t* ReadHeaderPointerWord_B(
-    std::uint32_t* const outWord,
-    const HeaderPointerOwner* const owner
-  ) noexcept
-  {
-    return ReadHeaderPointerWord(outWord, owner);
-  }
-
-  /**
-   * Address: 0x004E2590 (FUN_004E2590)
-   *
-   * What it does:
-   * Reads the root-word lane from one owner header slot (`owner->mHeaderSlot[0]`).
-   */
-  [[maybe_unused]] [[nodiscard]] std::uint32_t* ReadHeaderRootWord_C(
-    std::uint32_t* const outWord,
-    const HeaderPointerOwner* const owner
-  ) noexcept
-  {
-    return ReadHeaderRootWord(outWord, owner);
-  }
-
-  /**
-   * Address: 0x004E25A0 (FUN_004E25A0)
-   *
-   * What it does:
-   * Reads the header-pointer lane (`owner->mHeaderSlot`) as one 32-bit word.
-   */
-  [[maybe_unused]] [[nodiscard]] std::uint32_t* ReadHeaderPointerWord_C(
-    std::uint32_t* const outWord,
-    const HeaderPointerOwner* const owner
-  ) noexcept
-  {
-    return ReadHeaderPointerWord(outWord, owner);
-  }
 
   /**
    * Address: 0x004DF790 (FUN_004DF790, func_GetCSndParams)
@@ -723,20 +495,6 @@ namespace
     {}
   };
   static_assert(sizeof(CSndParamsPointerMetatableFactory) == 0x8, "CSndParamsPointerMetatableFactory size must be 0x8");
-
-  /**
-   * Address: 0x004E5A30 (FUN_004E5A30)
-   *
-   * What it does:
-   * Rebinds the startup metatable-factory index lane for
-   * `CScrLuaMetatableFactory<CSndParams*>` and returns that singleton.
-   */
-  [[maybe_unused]] CSndParamsPointerMetatableFactory* startup_CScrLuaMetatableFactory_CSndParamsPointer_Index()
-  {
-    auto& instance = CSndParamsPointerMetatableFactory::Instance();
-    instance.SetFactoryObjectIndexForRecovery(moho::CScrLuaObjectFactory::AllocateFactoryObjectIndex());
-    return &instance;
-  }
 
   /**
    * Address: 0x004E5510 (FUN_004E5510, gpg::RRef::TryUpcast_CSndParams_P)

@@ -21,6 +21,7 @@
 
 #include "gpg/core/algorithms/AStarSearch.h"
 #include "gpg/core/algorithms/MD5.h"
+#include "gpg/core/containers/DList.h"
 #include "gpg/core/containers/FastVector.h"
 #include "legacy/algorithms/Sort.h"
 #include "gpg/core/utils/SharedPtrUtils.h"
@@ -42,32 +43,74 @@ namespace
   constexpr std::array<std::uint8_t, 4> kOccupationEdgeBitStep = {1u, 1u, 0u, 0u};
   constexpr std::array<std::uint8_t, 4> kOccupationEdgeLayerStep = {0u, 0u, 1u, 1u};
 
-  void AppendPackedEdgeWord(
-    gpg::fastvector_n<std::int16_t, 16>& outEdges,
-    const std::uint8_t lowByte,
-    const std::uint8_t highByte
+  /**
+   * One cell of the 9x9 octile search `BuildClusterEdgeCosts` runs from each
+   * source node: a `gpg::DListItem` ring link (the search's FIFO open list)
+   * followed by the cell's search state. 0x00954940 is the constructor the
+   * binary runs over the grid with `eh vector constructor iterator`: links
+   * self-linked, cost, flags and cell zeroed.
+   */
+  struct PathSearchFrontierNode : gpg::DListItem<PathSearchFrontierNode>
+  {
+    float pathCost = 0.0f;       // +0x08
+    std::uint8_t visitFlags = 0; // +0x0C
+    std::uint8_t packedCell = 0; // +0x0D
+  };
+  static_assert(sizeof(PathSearchFrontierNode) == 0x10, "PathSearchFrontierNode size must be 0x10");
+  static_assert(
+    offsetof(PathSearchFrontierNode, pathCost) == 0x08,
+    "PathSearchFrontierNode::pathCost offset must be 0x08"
+  );
+  static_assert(
+    offsetof(PathSearchFrontierNode, visitFlags) == 0x0C,
+    "PathSearchFrontierNode::visitFlags offset must be 0x0C"
+  );
+  static_assert(
+    offsetof(PathSearchFrontierNode, packedCell) == 0x0D,
+    "PathSearchFrontierNode::packedCell offset must be 0x0D"
+  );
+
+  /**
+   * The binary sorts and deduplicates both builds' boundary node sets through
+   * one shared sort instantiation (0x0092F4E0, called from 0x0092FE30 and
+   * 0x009550E0) on the packed `x | (z << 8)` word, compared as a signed 16-bit
+   * value.
+   */
+  [[nodiscard]] std::int16_t PackedNodeKey(
+    const gpg::HaStar::Cluster::Node& node
+  ) noexcept
+  {
+    return static_cast<std::int16_t>(node.x | (static_cast<std::uint16_t>(node.z) << 8u));
+  }
+
+  void SortUniqueNodes(
+    gpg::fastvector<gpg::HaStar::Cluster::Node>& nodes
   )
   {
-    const std::uint16_t packed =
-      static_cast<std::uint16_t>(lowByte) | static_cast<std::uint16_t>(static_cast<std::uint16_t>(highByte) << 8u);
-
-    // `fastvector<Node>::push_back`; its grow arm is the `insert_range` at
-    // 0x0092D9B0 (cited on FastVector.h's `InsertAt`).
-    outEdges.push_back(static_cast<std::int16_t>(packed));
+    using Node = gpg::HaStar::Cluster::Node;
+    fa::sort(nodes.begin(), nodes.end(), [](const Node& lhs, const Node& rhs) {
+      return PackedNodeKey(lhs) < PackedNodeKey(rhs);
+    });
+    const auto uniqueEnd = std::unique(nodes.begin(), nodes.end(), [](const Node& lhs, const Node& rhs) {
+      return PackedNodeKey(lhs) == PackedNodeKey(rhs);
+    });
+    nodes.erase(uniqueEnd, nodes.end());
   }
 
   /**
-   * Address: 0x009550E0 (FUN_009550E0, gpg::HaStar::ClusterBuild occupation edge extraction lane)
+   * Address: 0x009550E0 (FUN_009550E0)
    *
    * What it does:
-   * Scans four occupancy edge lanes, emits packed edge-contact markers into
-   * `outEdges`, sorts them, and removes duplicates in-place. Each packed word
-   * is one cluster boundary `Node` (`x | (z << 8)`); `gpg::HaStar::ClusterBuild`
-   * consumes the result as the cluster's node set.
+   * Finds the level-1 cluster's boundary nodes: walks the four edges of the
+   * 9x9 occupation window, and for every run of passable cells along an edge
+   * appends one node at the run's midpoint (snapped to the edge centre or a
+   * corner when the run covers it), then sorts and deduplicates the set.
+   * Each append is `fastvector<Node>::push_back`, whose grow arm is
+   * `insert_range` 0x0092D9B0.
    */
-  std::int16_t* BuildOccupationEdgeContacts(
+  void BuildOccupationEdgeContacts(
     const gpg::HaStar::OccupationData& occupationData,
-    gpg::fastvector_n<std::int16_t, 16>& outEdges
+    gpg::fastvector<gpg::HaStar::Cluster::Node>& outNodes
   )
   {
     for (std::uint32_t edgeIndex = 0; edgeIndex < 4u; ++edgeIndex) {
@@ -100,11 +143,15 @@ namespace
             );
           }
 
+          gpg::HaStar::Cluster::Node node{};
           if (kOccupationEdgeBitStep[edgeIndex] != 0u) {
-            AppendPackedEdgeWord(outEdges, midpoint, currentLayer);
+            node.x = midpoint;
+            node.z = currentLayer;
           } else {
-            AppendPackedEdgeWord(outEdges, currentBit, midpoint);
+            node.x = currentBit;
+            node.z = midpoint;
           }
+          outNodes.push_back(node);
 
           runStart = 0xFFu;
           runEnd = 0xFFu;
@@ -115,648 +162,69 @@ namespace
       }
     }
 
-    std::sort(outEdges.begin(), outEdges.end());
-    outEdges.erase(std::unique(outEdges.begin(), outEdges.end()), outEdges.end());
-    return outEdges.end();
+    SortUniqueNodes(outNodes);
   }
+} // namespace
 
-  struct InlineByteCursorBuffer200
-  {
-    std::uint8_t* lane00;
-    std::uint8_t* lane04;
-    std::uint8_t* lane08;
-    std::uint8_t* lane0C;
-    std::uint8_t inlineStorage[200];
-  };
-  static_assert(sizeof(InlineByteCursorBuffer200) == 0xD8, "InlineByteCursorBuffer200 size must be 0xD8");
-  static_assert(
-    offsetof(InlineByteCursorBuffer200, inlineStorage) == 0x10,
-    "InlineByteCursorBuffer200::inlineStorage offset must be 0x10"
-  );
-
-  struct InlineByteCursorBuffer
-  {
-    std::uint8_t* begin;        // +0x00
-    std::uint8_t* current;      // +0x04
-    std::uint8_t* end;          // +0x08
-    std::uint8_t* inlineOrigin; // +0x0C
-  };
-  static_assert(sizeof(InlineByteCursorBuffer) == 0x10, "InlineByteCursorBuffer size must be 0x10");
-  static_assert(
-    offsetof(InlineByteCursorBuffer, inlineOrigin) == 0x0C,
-    "InlineByteCursorBuffer::inlineOrigin offset must be 0x0C"
-  );
-
-  struct InlineByteCursorBuffer64
-  {
-    InlineByteCursorBuffer state;
-    std::uint8_t inlineStorage[64];
-  };
-  static_assert(sizeof(InlineByteCursorBuffer64) == 0x50, "InlineByteCursorBuffer64 size must be 0x50");
-  static_assert(
-    offsetof(InlineByteCursorBuffer64, inlineStorage) == 0x10,
-    "InlineByteCursorBuffer64::inlineStorage offset must be 0x10"
-  );
-
-  struct InlineByteCursorBuffer32
-  {
-    InlineByteCursorBuffer state;
-    std::uint8_t inlineStorage[32];
-  };
-  static_assert(sizeof(InlineByteCursorBuffer32) == 0x30, "InlineByteCursorBuffer32 size must be 0x30");
-  static_assert(
-    offsetof(InlineByteCursorBuffer32, inlineStorage) == 0x10,
-    "InlineByteCursorBuffer32::inlineStorage offset must be 0x10"
-  );
-
-  struct InlineByteCursorBuffer120
-  {
-    InlineByteCursorBuffer state;
-    std::uint8_t inlineStorage[120];
-  };
-  static_assert(sizeof(InlineByteCursorBuffer120) == 0x88, "InlineByteCursorBuffer120 size must be 0x88");
-  static_assert(
-    offsetof(InlineByteCursorBuffer120, inlineStorage) == 0x10,
-    "InlineByteCursorBuffer120::inlineStorage offset must be 0x10"
-  );
-
-  struct IntrusiveRingNode
-  {
-    IntrusiveRingNode* prev;
-    IntrusiveRingNode* next;
-  };
-  static_assert(sizeof(IntrusiveRingNode) == 0x08, "IntrusiveRingNode size must be 0x08");
-
-  struct PathSearchFrontierNode
-  {
-    PathSearchFrontierNode* prev; // +0x00
-    PathSearchFrontierNode* next; // +0x04
-    float pathCost;               // +0x08
-    std::uint8_t visitFlags;      // +0x0C
-    std::uint8_t packedCell;      // +0x0D
-    std::uint8_t pad0E[2];        // +0x0E
-  };
-  static_assert(sizeof(PathSearchFrontierNode) == 0x10, "PathSearchFrontierNode size must be 0x10");
-  static_assert(
-    offsetof(PathSearchFrontierNode, pathCost) == 0x08,
-    "PathSearchFrontierNode::pathCost offset must be 0x08"
-  );
-  static_assert(
-    offsetof(PathSearchFrontierNode, visitFlags) == 0x0C,
-    "PathSearchFrontierNode::visitFlags offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(PathSearchFrontierNode, packedCell) == 0x0D,
-    "PathSearchFrontierNode::packedCell offset must be 0x0D"
-  );
-
-  struct WordTable
-  {
-    std::uint16_t* words;
-  };
-  static_assert(sizeof(WordTable) == 0x04, "WordTable size must be 0x04");
-
-  struct FourDwordWord
-  {
-    std::uint32_t lane00;
-    std::uint32_t lane04;
-    std::uint32_t lane08;
-    std::uint32_t lane0C;
-    std::uint16_t lane10;
-    std::uint16_t pad12;
-  };
-  static_assert(sizeof(FourDwordWord) == 0x14, "FourDwordWord size must be 0x14");
-
-  struct FourDwordWordAndTail
-  {
-    std::uint32_t lane00;
-    std::uint32_t lane04;
-    std::uint32_t lane08;
-    std::uint32_t lane0C;
-    std::uint16_t lane10;
-    std::uint16_t pad12;
-    std::uint32_t lane14;
-  };
-  static_assert(sizeof(FourDwordWordAndTail) == 0x18, "FourDwordWordAndTail size must be 0x18");
-
-  struct DwordAndByteLanes
-  {
-    std::uint32_t lane00;
-    std::uint8_t lane04;
-  };
-
-  struct ForwardLinkNode
-  {
-    ForwardLinkNode* lane00;
-    ForwardLinkNode* next;
-  };
-  static_assert(sizeof(ForwardLinkNode) == 0x08, "ForwardLinkNode size must be 0x08");
-
+namespace gpg::HaStar
+{
   /**
-   * Address: 0x0092E3C0 (FUN_0092E3C0)
+   * Address: 0x00931460 (FUN_00931460)
    *
    * What it does:
-   * Initializes one inline byte-buffer cursor block and returns `state`.
+   * Orders two occupation windows by their 0x12 bytes (an inlined
+   * `memcmp(lhs, rhs, sizeof(OccupationData)) < 0`). The occupation cache's
+   * `hash_compare` uses it to keep each bucket window sorted.
    */
-  [[maybe_unused]] InlineByteCursorBuffer200* InitializeInlineByteCursorBuffer200(
-    InlineByteCursorBuffer200* const state
-  ) noexcept
-  {
-    std::uint8_t* const inlineOrigin = state->inlineStorage;
-    state->lane00 = inlineOrigin;
-    state->lane04 = inlineOrigin;
-    state->lane08 = inlineOrigin + 200;
-    state->lane0C = inlineOrigin;
-    return state;
-  }
-
-  /**
-   * Address: 0x009541F0 (FUN_009541F0)
-   *
-   * What it does:
-   * Returns the current cursor lane from one inline byte-buffer state.
-   */
-  [[maybe_unused]] [[nodiscard]] std::uint8_t* InlineByteCursorCurrent(
-    const InlineByteCursorBuffer* const state
-  ) noexcept
-  {
-    return state->current;
-  }
-
-  /**
-   * Address: 0x00954200 (FUN_00954200)
-   *
-   * What it does:
-   * Returns used-byte count (`current - begin`) for one inline byte-buffer.
-   */
-  [[maybe_unused]] [[nodiscard]] std::ptrdiff_t InlineByteCursorUsedBytes(
-    const InlineByteCursorBuffer* const state
-  ) noexcept
-  {
-    return state->current - state->begin;
-  }
-
-  /**
-   * Address: 0x00954230 (FUN_00954230)
-   *
-   * What it does:
-   * Returns total capacity in bytes (`end - begin`) for one inline buffer.
-   */
-  [[maybe_unused]] [[nodiscard]] std::ptrdiff_t InlineByteCursorCapacityBytes(
-    const InlineByteCursorBuffer* const state
-  ) noexcept
-  {
-    return state->end - state->begin;
-  }
-
-  /**
-   * Address: 0x009543B0 (FUN_009543B0)
-   *
-   * What it does:
-   * Returns `begin + byteOffset` for one inline byte-buffer.
-   */
-  [[maybe_unused]] [[nodiscard]] std::uint8_t* InlineByteCursorAtOffset(
-    const InlineByteCursorBuffer* const state,
-    const std::ptrdiff_t byteOffset
-  ) noexcept
-  {
-    return state->begin + byteOffset;
-  }
-
-  /**
-   * Address: 0x00954840 (FUN_00954840)
-   *
-   * What it does:
-   * Initializes one intrusive ring node as a self-linked singleton.
-   */
-  IntrusiveRingNode* InitializeIntrusiveRingNode_A(
-    IntrusiveRingNode* const node
-  ) noexcept
-  {
-    node->prev = node;
-    node->next = node;
-    return node;
-  }
-
-  /**
-   * Address: 0x00954850 (FUN_00954850)
-   *
-   * What it does:
-   * Unlinks one intrusive ring node from neighbors and re-self-links it.
-   */
-  IntrusiveRingNode* UnlinkIntrusiveRingNode_A(
-    IntrusiveRingNode* const node
-  ) noexcept
-  {
-    node->prev->next = node->next;
-    IntrusiveRingNode* const previous = node->next;
-    previous->prev = node->prev;
-    node->next = node;
-    node->prev = node;
-    return previous;
-  }
-
-  /**
-   * Address: 0x00954870 (FUN_00954870)
-   *
-   * What it does:
-   * Returns the address of one 16-bit lane at `wordIndex`.
-   *
-   * Orphan: zero xrefs of any kind at this address per the IDA export
-   * (xrefs_total: 0), zero callers in the callgraph index, and `words`
-   * (the sole field of `WordTable`) is not referenced anywhere else
-   * in this file. Sits among this file's intrusive-ring-node/byte-cursor
-   * helper cluster (0x00954840-0x009548C0) but no caller for this specific
-   * lane has been found.
-   */
-  [[maybe_unused]] [[nodiscard]] std::uint16_t* ResolveWordTableEntryAddress(
-    const WordTable* const table,
-    const std::int32_t wordIndex
-  ) noexcept
-  {
-    return table->words + wordIndex;
-  }
-
-  /**
-   * Address: 0x00954880 (FUN_00954880)
-   *
-   * What it does:
-   * Unlinks `node` and inserts it immediately before `anchor`.
-   */
-  [[maybe_unused]] IntrusiveRingNode* RelinkIntrusiveRingNodeBeforeAnchor(
-    IntrusiveRingNode* const node,
-    IntrusiveRingNode* const anchor
-  ) noexcept
-  {
-    node->prev->next = node->next;
-    node->next->prev = node->prev;
-    node->prev = anchor->prev;
-    node->next = anchor;
-    anchor->prev = node;
-    node->prev->next = node;
-    return node->prev;
-  }
-
-  /**
-   * Address: 0x009548C0 (FUN_009548C0)
-   *
-   * What it does:
-   * Alias lane that unlinks one intrusive ring node and re-self-links it.
-   */
-  [[maybe_unused]] IntrusiveRingNode* UnlinkIntrusiveRingNode_B(
-    IntrusiveRingNode* const node
-  ) noexcept
-  {
-    return UnlinkIntrusiveRingNode_A(node);
-  }
-
-  /**
-   * Address: 0x009548E0 (FUN_009548E0)
-   *
-   * What it does:
-   * Alias lane that initializes one intrusive ring node as self-linked.
-   */
-  [[maybe_unused]] IntrusiveRingNode* InitializeIntrusiveRingNode_B(
-    IntrusiveRingNode* const node
-  ) noexcept
-  {
-    return InitializeIntrusiveRingNode_A(node);
-  }
-
-  /**
-   * Address: 0x00954930 (FUN_00954930)
-   *
-   * What it does:
-   * Returns one intrusive node `next` link lane.
-   */
-  [[maybe_unused]] [[nodiscard]] IntrusiveRingNode* GetIntrusiveRingNodeNext(
-    const IntrusiveRingNode* const node
-  ) noexcept
-  {
-    return node->next;
-  }
-
-  /**
-   * Address: 0x00954940 (FUN_00954940)
-   *
-   * What it does:
-   * Initializes one path-frontier node as self-linked with zero cost/state
-   * lanes.
-   */
-  PathSearchFrontierNode* InitializePathSearchFrontierNode(
-    PathSearchFrontierNode* const node
-  ) noexcept
-  {
-    node->next = node;
-    node->prev = node;
-    node->pathCost = 0.0f;
-    node->visitFlags = 0;
-    node->packedCell = 0;
-    return node;
-  }
-
-  /**
-   * Address: 0x00954980 (FUN_00954980)
-   *
-   * What it does:
-   * Alias lane that unlinks one intrusive ring node and re-self-links it.
-   */
-  [[maybe_unused]] IntrusiveRingNode* UnlinkIntrusiveRingNode_C(
-    IntrusiveRingNode* const node
-  ) noexcept
-  {
-    return UnlinkIntrusiveRingNode_A(node);
-  }
-
-  /**
-   * Address: 0x00931640 (FUN_00931640)
-   *
-   * What it does:
-   * Copies one `(4 dword + 1 word)` lane bundle and binds one external tail lane.
-   */
-  [[maybe_unused]] FourDwordWordAndTail* CopyFourDwordWordBundleWithTailLane(
-    FourDwordWordAndTail* const destination,
-    const FourDwordWord* const sourceBundle,
-    const std::uint32_t* const tailLaneSource
-  ) noexcept
-  {
-    destination->lane00 = sourceBundle->lane00;
-    destination->lane04 = sourceBundle->lane04;
-    destination->lane08 = sourceBundle->lane08;
-    destination->lane0C = sourceBundle->lane0C;
-    destination->lane10 = sourceBundle->lane10;
-    destination->lane14 = *tailLaneSource;
-    return destination;
-  }
-
-  /**
-   * Address: 0x00931670 (FUN_00931670)
-   *
-   * What it does:
-   * Copies one 32-bit lane into destination storage.
-   */
-  [[maybe_unused]] std::uint32_t* CopyDwordLane_A(
-    std::uint32_t* const destination,
-    const std::uint32_t* const source
-  ) noexcept
-  {
-    *destination = *source;
-    return destination;
-  }
-
-  /**
-   * Address: 0x00931680 (FUN_00931680)
-   *
-   * What it does:
-   * Copies one 8-bit lane into destination storage.
-   */
-  [[maybe_unused]] std::uint8_t* CopyByteLane_A(
-    std::uint8_t* const destination,
-    const std::uint8_t* const source
-  ) noexcept
-  {
-    *destination = *source;
-    return destination;
-  }
-
-  /**
-   * Address: 0x00931710 (FUN_00931710)
-   *
-   * What it does:
-   * Alias lane that copies one 32-bit value.
-   */
-  [[maybe_unused]] std::uint32_t* CopyDwordLane_B(
-    std::uint32_t* const destination,
-    const std::uint32_t* const source
-  ) noexcept
-  {
-    *destination = *source;
-    return destination;
-  }
-
-  /**
-   * Address: 0x00931720 (FUN_00931720)
-   *
-   * What it does:
-   * Alias lane that copies one 8-bit value.
-   */
-  [[maybe_unused]] std::uint8_t* CopyByteLane_B(
-    std::uint8_t* const destination,
-    const std::uint8_t* const source
-  ) noexcept
-  {
-    *destination = *source;
-    return destination;
-  }
-
-  /**
-   * Address: 0x009317D0 (FUN_009317D0)
-   *
-   * What it does:
-   * Writes one `(dword, byte)` lane pair into destination storage.
-   */
-  [[maybe_unused]] DwordAndByteLanes* WriteDwordAndByteLanes_A(
-    DwordAndByteLanes* const destination,
-    const std::uint32_t* const dwordLaneSource,
-    const std::uint8_t* const byteLaneSource
-  ) noexcept
-  {
-    destination->lane00 = *dwordLaneSource;
-    destination->lane04 = *byteLaneSource;
-    return destination;
-  }
-
-  /**
-   * Address: 0x00931810 (FUN_00931810)
-   *
-   * What it does:
-   * Alias lane that writes one `(dword, byte)` pair.
-   */
-  [[maybe_unused]] DwordAndByteLanes* WriteDwordAndByteLanes_B(
-    DwordAndByteLanes* const destination,
-    const std::uint32_t* const dwordLaneSource,
-    const std::uint8_t* const byteLaneSource
-  ) noexcept
-  {
-    destination->lane00 = *dwordLaneSource;
-    destination->lane04 = *byteLaneSource;
-    return destination;
-  }
-
-  struct SingleDwordLane
-  {
-    std::uint32_t value = 0;
-  };
-  static_assert(sizeof(SingleDwordLane) == 0x04, "SingleDwordLane size must be 0x04");
-
-  /**
-   * Address: 0x00932210 (FUN_00932210)
-   *
-   * What it does:
-   * Stores one 32-bit input lane into one dword lane object.
-   */
-  [[maybe_unused]] SingleDwordLane* StoreSingleDwordLane_A(
-    SingleDwordLane* const lane,
-    const std::uint32_t value
-  ) noexcept
-  {
-    lane->value = value;
-    return lane;
-  }
-
-  /**
-   * Address: 0x00932230 (FUN_00932230)
-   *
-   * What it does:
-   * Alias lane that stores one 32-bit input lane into one dword lane object.
-   */
-  [[maybe_unused]] SingleDwordLane* StoreSingleDwordLane_B(
-    SingleDwordLane* const lane,
-    const std::uint32_t value
-  ) noexcept
-  {
-    lane->value = value;
-    return lane;
-  }
-
-  /**
-   * Address: 0x00932360 (FUN_00932360)
-   *
-   * What it does:
-   * Alias lane that stores one 32-bit input lane into one dword lane object.
-   */
-  [[maybe_unused]] SingleDwordLane* StoreSingleDwordLane_C(
-    SingleDwordLane* const lane,
-    const std::uint32_t value
-  ) noexcept
-  {
-    lane->value = value;
-    return lane;
-  }
-
-  /**
-   * Address: 0x009323B0 (FUN_009323B0)
-   *
-   * What it does:
-   * Alias lane that stores one 32-bit input lane into one dword lane object.
-   */
-  [[maybe_unused]] SingleDwordLane* StoreSingleDwordLane_D(
-    SingleDwordLane* const lane,
-    const std::uint32_t value
-  ) noexcept
-  {
-    lane->value = value;
-    return lane;
-  }
-
-  struct VtableProbe
-  {
-    const std::uint32_t* vtable = nullptr;
-  };
-  static_assert(sizeof(VtableProbe) == 0x04, "VtableProbe size must be 0x04");
-
-  /**
-   * Address: 0x00932670 (FUN_00932670)
-   *
-   * What it does:
-   * Loads the dword lane at vtable slot index 4.
-   */
-  [[maybe_unused]] int LoadVtableDwordSlot04(
-    const VtableProbe* const object
-  ) noexcept
-  {
-    return static_cast<int>(object->vtable[4]);
-  }
-
-  /**
-   * Address: 0x00932680 (FUN_00932680)
-   *
-   * What it does:
-   * Loads the dword lane at vtable slot index 15.
-   */
-  [[maybe_unused]] int LoadVtableDwordSlot15(
-    const VtableProbe* const object
-  ) noexcept
-  {
-    return static_cast<int>(object->vtable[15]);
-  }
-
-  struct TwoDwordLane
-  {
-    std::uint32_t lane00 = 0;
-    std::uint32_t lane04 = 0;
-  };
-  static_assert(sizeof(TwoDwordLane) == 0x08, "TwoDwordLane size must be 0x08");
-  static_assert(offsetof(TwoDwordLane, lane04) == 0x04, "TwoDwordLane::lane04 offset must be 0x04");
-
-  struct OccupationCacheKey
-  {
-    std::array<std::uint8_t, 0x12> mBytes{};
-  };
-
-  /**
-   * Value type stored in `ClusterInternalCache<SubclusterData>::mVec`'s
-   * hash_map keys. This is deliberately the *same fields* as
-   * `gpg::HaStar::SubclusterData` (16 `Cluster` handles + `mLevel`), typed
-   * instead of a raw byte blob: the binary's insert lane copy-constructs
-   * this key through an `eh vector copy constructor iterator` over the 16
-   * `Cluster` handles (0x009329A0, see `MakeSubclusterCacheKey`), which
-   * retains each handle's refcount exactly like any other `Cluster` copy.
-   * A `std::array<uint8_t,...>` raw-byte model would have to `memcpy` the
-   * handles in (no retain) and would never run their destructors on
-   * teardown (no release) - `ClusterInternalCache<SubclusterData>`'s real
-   * destructor (`FUN_00934500`) needs those sixteen `~Cluster()` calls to
-   * happen, and typing the key this way is what makes `fa::list`'s
-   * generic node destructor perform them for free.
-   */
-  struct SubclusterCacheKey
-  {
-    gpg::HaStar::Cluster mClusters[16];
-    std::int32_t mLevel{};
-  };
-
-  /**
-   * Address: 0x00931460 (FUN_00931460, sub_931460)
-   *
-   * What it does:
-   * Strict-weak ordering comparator used for occupation cache keys.
-   */
-  [[nodiscard]] bool OccupationKeyLess(
-    const OccupationCacheKey& lhs,
-    const OccupationCacheKey& rhs
+  [[nodiscard]] bool operator<(
+    const OccupationData& lhs,
+    const OccupationData& rhs
   )
   {
-    return std::memcmp(lhs.mBytes.data(), rhs.mBytes.data(), lhs.mBytes.size()) < 0;
+    return std::memcmp(&lhs, &rhs, sizeof(OccupationData)) < 0;
   }
 
   /**
-   * Address: 0x00931500 (FUN_00931500, ?Hash@SubclusterData@HaStar@gpg@@...)
-   *
-   * IDA signature:
-   * unsigned int __cdecl gpg::HaStar::SubclusterData::Hash(const SubclusterData* data);
+   * Address: 0x00932080 (FUN_00932080) - the inlined key-hash half; the
+   *   enclosing bucket fold is `fa::hash_map::_Buckno`
    *
    * What it does:
-   * Combines a Murmur-style mix of `mLevel` with `hash_value` of each of
-   * the 16 cluster handles in turn, so structurally identical subclusters
-   * hash equal regardless of which heap allocation backs each `Cluster`.
+   * MSVC8's `stdext::hash_value` for an occupation window: `gpg::HashBytes`
+   * over its 0x12 bytes with salt 0x7BEF2693 (`push 12h` / `push 7BEF2693h`
+   * at 0x0093208A / 0x00932085), then the Park-Miller pseudorandomizing step
+   * `stdext::hash_compare::operator()(const Key&)` applies to every key
+   * (`fa::hash_value`). `fa::hash_compare` finds it by argument-dependent
+   * lookup.
    *
-   * This previously called `HashBytesSalted` over the raw `SubclusterData`
-   * bytes - but `Cluster::mData` is a 4-byte heap pointer, so that hashed
-   * 16 pointer values verbatim. Two structurally identical subclusters
-   * built from different allocations hashed to different buckets, so the
-   * dedup cache this feeds could essentially never hit.
-   * `kSubclusterKeySalt` was a placeholder that went with it; `0x7BEF2693`
-   * (kept below, matching the binary's actual `xor eax, 7BEF2693h`) is the
-   * real per-instance constant this function uses to seed the level mix -
-   * the same bit pattern `kOccupationKeySalt` carries, now confirmed
-   * against 0x00932080's literal `push 7BEF2693h` feeding `gpg::HashBytes`.
-   *
-   * This is the raw key hash only. The container applies MSVC8's
-   * `stdext::hash_compare` pseudorandomizing step on top; see
-   * `hash_value(const SubclusterCacheKey&)` below.
+   * 0x00932080 is the out-of-line `_Buckno` of
+   * `fa::hash_map<OccupationData, Cluster::Data*>`, shared by `find`
+   * (0x00932B70), `equal_range` (0x00933EF0) and `erase` (0x00933F80): `mov
+   * ecx,[esi+20h]` is `mMask`, `cmp [esi+24h],eax` is `mMaxidx`. The fold
+   * itself lives once in `legacy/containers/HashMap.h`.
    */
-  [[nodiscard]] std::uint32_t HashSubclusterKey(
-    const SubclusterCacheKey& key
+  [[nodiscard]] std::size_t hash_value(
+    const OccupationData& key
+  )
+  {
+    const std::uint32_t keyHash = gpg::HashBytes(&key, sizeof(OccupationData), kOccupationKeySalt);
+    return fa::hash_value(static_cast<long>(static_cast<std::int32_t>(keyHash)));
+  }
+
+  /**
+   * Address: 0x00931500 (FUN_00931500)
+   *
+   * What it does:
+   * Hashes a subcluster for the subcluster cache: a Murmur-style mix of
+   * `mLevel` seeded with 0x7BEF2693 (`xor eax, 7BEF2693h`), then of
+   * `hash_value` of each of the 16 cluster handles, so structurally equal
+   * subclusters hash equal whichever allocations back their clusters.
+   *
+   * The binary inlines MSVC8's `stdext::hash_compare` Park-Miller step right
+   * after the call (0x00934C89 and 0x00934D84, inside `insert` 0x00934BE0);
+   * `fa::hash_value` below is that step.
+   */
+  [[nodiscard]] std::size_t hash_value(
+    const SubclusterData& key
   )
   {
     constexpr std::uint32_t kMul = 0x106D643Du;
@@ -764,26 +232,28 @@ namespace
 
     std::uint32_t mixed = kMul * (static_cast<std::uint32_t>(key.mLevel) ^ kLevelXor);
     std::uint32_t hash = mixed ^ (mixed >> 13);
-    for (const gpg::HaStar::Cluster& cluster : key.mClusters) {
-      mixed = kMul * (hash ^ gpg::HaStar::hash_value(cluster));
+    for (const Cluster& cluster : key.mClusters) {
+      mixed = kMul * (hash ^ hash_value(cluster));
       hash = mixed ^ (mixed >> 13);
     }
-    return hash;
+    return fa::hash_value(static_cast<long>(static_cast<std::int32_t>(hash)));
   }
 
   /**
-   * Address: 0x00931560 (FUN_00931560, sub_931560)
+   * Address: 0x00931560 (FUN_00931560)
    *
    * What it does:
-   * Strict-weak ordering comparator used for subcluster cache keys.
+   * Orders two subclusters by level first, then each of the 16 cluster
+   * handles by payload (`Cluster::cmp`). The subcluster cache's
+   * `hash_compare` keeps each bucket window sorted by it, which is what lets
+   * `insert` (0x00934BE0) scan a window backwards and stop at the first key
+   * that does not compare greater.
    */
-  [[nodiscard]] bool SubclusterKeyLess(
-    const SubclusterCacheKey& lhs,
-    const SubclusterCacheKey& rhs
+  [[nodiscard]] bool operator<(
+    const SubclusterData& lhs,
+    const SubclusterData& rhs
   )
   {
-    // Orders exactly as the binary does: by level first, then each of the
-    // 16 cluster handles by payload (Cluster::cmp).
     if (lhs.mLevel != rhs.mLevel) {
       return lhs.mLevel < rhs.mLevel;
     }
@@ -795,189 +265,10 @@ namespace
     }
     return false;
   }
+} // namespace gpg::HaStar
 
-  /**
-   * Address: 0x00932080 (FUN_00932080, sub_932080) - the inlined key-hash
-   *   half; the enclosing bucket fold is `fa::hash_map::_Buckno`
-   *
-   * IDA signature:
-   * unsigned int __thiscall sub_932080(vector_OccupationData *this, unsigned __int8 *key);
-   *
-   * What it does:
-   * MSVC8's `stdext::hash_value` for the 18-byte occupation cache key:
-   * `gpg::HashBytes` over the raw key bytes, then the Park-Miller
-   * pseudorandomizing step `stdext::hash_compare::operator()(const Key&)`
-   * applies to every key (`fa::hash_value`). Found by argument-dependent
-   * lookup, which is how `fa::hash_compare` picks this up in place of the
-   * integral default - the same wiring `moho::hash_value(const SOCellPos&)`
-   * uses for the pathfinder node table.
-   *
-   * 0x00932080 is **not** a free hash function. It is the out-of-line
-   * emission of `fa::hash_map<OccupationCacheKey, Cluster::Data*>::_Buckno`
-   * for this key type, shared by its three call sites (`find` 0x00932B70,
-   * `equal_range` 0x00933EF0, `erase` 0x00933F80). The `this` displacements
-   * pin the container: `mov ecx,[esi+20h]` is `mMask` and `cmp [esi+24h],eax`
-   * is `mMaxidx`, matching `fa::hash_map`'s +0x20 / +0x24 exactly, and the
-   * tail `or edx,-1; sub edx,ecx; add eax,edx` is `bucket - (mMask >> 1) - 1`.
-   * Everything reproduced below is what that body inlines *before* the fold;
-   * the fold itself already exists once, in
-   * `legacy/containers/HashMap.h`, and must not be duplicated here.
-   *
-   * `0x12` matches `OccupationCacheKey::mBytes`'s size and `0x7BEF2693` is
-   * `kOccupationKeySalt`, both read straight off `push 12h` /
-   * `push 7BEF2693h` at 0x0093208A / 0x00932085.
-   */
-  [[nodiscard]] std::size_t hash_value(
-    const OccupationCacheKey& key
-  )
-  {
-    const std::uint32_t keyHash = gpg::HashBytes(key.mBytes.data(), key.mBytes.size(), kOccupationKeySalt);
-    return fa::hash_value(static_cast<long>(static_cast<std::int32_t>(keyHash)));
-  }
-
-  /**
-   * Address: inlined at 0x00934C89 and 0x00934D84 (inside FUN_00934BE0);
-   *   no standalone emission exists for this key type
-   *
-   * What it does:
-   * MSVC8's `stdext::hash_value` for the subcluster cache key: the engine's
-   * `SubclusterData::Hash` followed by the same Park-Miller step. The
-   * binary shows the pair back to back - `call SubclusterData::Hash` then
-   * `call ldiv` with 127773, `imul edx,41A7h`, `imul eax,0B14h`, and the
-   * `add edx,7FFFFFFFh` sign fixup - once in the grow lane and once on the
-   * insert lane, because `_Buckno` is inlined into `insert` for this key
-   * type instead of being emitted out of line.
-   */
-  [[nodiscard]] std::size_t hash_value(
-    const SubclusterCacheKey& key
-  )
-  {
-    return fa::hash_value(static_cast<long>(static_cast<std::int32_t>(HashSubclusterKey(key))));
-  }
-
-  /**
-   * Strict weak ordering half of the occupation cache's
-   * `stdext::hash_compare` traits. `OccupationKeyLess` (0x00931460) is the
-   * predicate the binary passes to every window scan in this instantiation:
-   * `find` (0x00932B9B) and both halves of `equal_range` (0x00933F16 for the
-   * lower bound, 0x00933F48 with the arguments swapped for the upper one).
-   */
-  struct OccupationKeyOrder
-  {
-    [[nodiscard]] bool operator()(
-      const OccupationCacheKey& lhs,
-      const OccupationCacheKey& rhs
-    ) const
-    {
-      return OccupationKeyLess(lhs, rhs);
-    }
-  };
-
-  /**
-   * Strict weak ordering half of the subcluster cache's
-   * `stdext::hash_compare` traits: `fa::hash_map` keeps each bucket
-   * window sorted by this predicate, which is what lets `insert`
-   * (0x00934BE0) scan the window backwards and stop on the first key that
-   * does not compare greater.
-   */
-  struct SubclusterKeyOrder
-  {
-    [[nodiscard]] bool operator()(
-      const SubclusterCacheKey& lhs,
-      const SubclusterCacheKey& rhs
-    ) const
-    {
-      return SubclusterKeyLess(lhs, rhs);
-    }
-  };
-
-  [[nodiscard]] std::uint32_t TriangularEdgePairIndex(
-    const std::uint32_t lhs,
-    const std::uint32_t rhs
-  ) noexcept
-  {
-    if (lhs >= rhs) {
-      return rhs + ((lhs * (lhs - 1u)) >> 1u);
-    }
-    return lhs + ((rhs * (rhs - 1u)) >> 1u);
-  }
-
-  // `{start, end, capacity, inline}` at 0x10 is `gpg::core::FastVectorInline`:
-  // the reset reads the saved capacity back out of the first word of the
-  // inline block, and the append grows by `max(size + 1, capacity * 2)` and
-  // stashes the old capacity there on the first spill -- both are that
-  // template's own behaviour.
-  using PackedNodeVector = gpg::core::FastVectorInline<std::uint16_t>;
-
-  static_assert(sizeof(PackedNodeVector) == 0x10, "PackedNodeVector size must be 0x10");
-
-  /**
-   * Address: 0x0092FE30 (FUN_0092FE30)
-   *
-   * What it does:
-   * Gathers boundary nodes from 4x4 child clusters into one packed `uint16`
-   * node list, then sorts and de-duplicates that packed node lane in-place.
-   */
-  [[maybe_unused]] [[nodiscard]] std::uint16_t* BuildSubclusterPackedNodeList(
-    const gpg::HaStar::SubclusterData& subcluster,
-    PackedNodeVector& outNodes
-  )
-  {
-    const std::int32_t level = subcluster.mLevel;
-    const std::uint8_t levelShift = kClusterSizeLog2ByLevel[level];
-    const std::uint32_t clusterMask = static_cast<std::uint32_t>(kClusterSizeByLevel[level + 1] - 1);
-
-    outNodes.ResetStorageToInline();
-
-    std::uint32_t clusterIndex = 0u;
-    for (std::uint32_t tileZ = 0u; tileZ < 4u; ++tileZ) {
-      const std::uint32_t tileBaseZ = tileZ << levelShift;
-      for (std::uint32_t tileX = 0u; tileX < 4u; ++tileX, ++clusterIndex) {
-        const std::uint32_t tileBaseX = tileX << levelShift;
-        const gpg::HaStar::Cluster::Data* const data = subcluster.mClusters[clusterIndex].mData;
-        if (data == nullptr || data->mNodeCount == 0u) {
-          continue;
-        }
-
-        for (std::uint32_t nodeIndex = 0u; nodeIndex < data->mNodeCount; ++nodeIndex) {
-          const std::uint8_t nodeXLocal = data->mNodes[nodeIndex].x;
-          const std::uint8_t nodeZLocal = data->mNodes[nodeIndex].z;
-          const std::uint32_t nodeX = tileBaseX + nodeXLocal;
-          const std::uint32_t nodeZ = tileBaseZ + nodeZLocal;
-          if ((nodeX & clusterMask) == 0u || (nodeZ & clusterMask) == 0u) {
-            outNodes.PushBack(static_cast<std::uint16_t>((nodeX & 0xFFu) | ((nodeZ & 0xFFu) << 8u)));
-          }
-        }
-      }
-    }
-
-    fa::sort(outNodes.start_, outNodes.end_, std::less<std::uint16_t>{});
-
-    std::uint16_t* const end = outNodes.end_;
-    std::uint16_t* result = outNodes.start_;
-    std::uint16_t* dedupEnd = end;
-    std::uint16_t* write = outNodes.start_;
-
-    if (outNodes.start_ != end) {
-      while (++result != end) {
-        if (*write == *result) {
-          for (++result; result != end; ++result) {
-            if (*write != *result) {
-              *++write = *result;
-            }
-          }
-          dedupEnd = write + 1;
-          break;
-        }
-        write = result;
-      }
-    }
-
-    if (dedupEnd != end) {
-      outNodes.end_ = dedupEnd;
-    }
-    return result;
-  }
+namespace
+{
 
   /**
    * The occupation half of `ClusterCache`, built from the same MSVC8
@@ -1000,8 +291,7 @@ namespace
    * `ClusterInternalCache<OccupationData>::Fetch` publishes `node + 8` as the
    * eviction key at 0x0093506A.
    */
-  using OccupationCacheMap = fa::
-    hash_map<OccupationCacheKey, gpg::HaStar::Cluster::Data*, fa::hash_compare<OccupationCacheKey, OccupationKeyOrder>>;
+  using OccupationCacheMap = fa::hash_map<gpg::HaStar::OccupationData, gpg::HaStar::Cluster::Data*>;
 
   /**
    * The subcluster half of `ClusterCache` as the binary actually builds it:
@@ -1021,8 +311,7 @@ namespace
    * `clear()` (`push 9` at 0x00934EDB) are the same `min_buckets + 1` this
    * container seeds `mVec` with.
    */
-  using SubclusterCacheMap = fa::
-    hash_map<SubclusterCacheKey, gpg::HaStar::Cluster::Data*, fa::hash_compare<SubclusterCacheKey, SubclusterKeyOrder>>;
+  using SubclusterCacheMap = fa::hash_map<gpg::HaStar::SubclusterData, gpg::HaStar::Cluster::Data*>;
 
   void RetainClusterData(
     gpg::HaStar::Cluster::Data* data
@@ -1055,45 +344,6 @@ namespace
     operator delete[](data);
   }
 
-  /**
-   * Address: 0x0076C0B0 (FUN_0076C0B0)
-   *
-   * What it does:
-   * Implements the compiler-generated deleting-destructor lane for
-   * `gpg::HaStar::Cluster`, handling both vector-destruct (`flags&2`) and
-   * optional storage release (`flags&1`).
-   */
-  [[maybe_unused]] void* DestroyClusterWithDeleteFlags(
-    gpg::HaStar::Cluster* start,
-    const std::uint8_t flags
-  )
-  {
-    if ((flags & 0x02u) != 0u) {
-#if INTPTR_MAX == INT32_MAX
-      static_assert(sizeof(gpg::HaStar::Cluster) == 0x04, "Cluster size must match 4-byte vector-dtor evidence");
-#endif
-      auto* const cookie = reinterpret_cast<std::uint32_t*>(start) - 1;
-      const std::uint32_t count = *cookie;
-      for (std::uint32_t index = 0u; index < count; ++index) {
-        start[index].~Cluster();
-      }
-
-      if ((flags & 0x01u) != 0u) {
-        ::operator delete[](cookie);
-      }
-      return cookie;
-    }
-
-    if (start != nullptr) {
-      start->~Cluster();
-    }
-
-    if ((flags & 0x01u) != 0u) {
-      ::operator delete(start);
-    }
-    return start;
-  }
-
   void AssignClusterData(
     gpg::HaStar::Cluster& dst,
     const gpg::HaStar::Cluster& src
@@ -1122,320 +372,134 @@ namespace
     dst.mData = data;
   }
 
-  [[nodiscard]] OccupationCacheKey MakeOccupationCacheKey(
-    const gpg::HaStar::OccupationData& occupationData
-  )
-  {
-    OccupationCacheKey key{};
-    // Hash-key blob flatten: the cache key is the raw byte image of the occupation payload.
-    std::memcpy(key.mBytes.data(), &occupationData, key.mBytes.size());
-    return key;
-  }
-
   /**
-   * Address: 0x00933EB0 (FUN_00933EB0)
+   * `gpg::HaStar::ClusterInternalCache<T>`: one `ICache` plus one
+   * `fa::hash_map<T, Cluster::Data*>`, keyed directly on the build input
+   * (`OccupationData` or `SubclusterData`). `ClusterCache::ClusterCache()`
+   * (0x00935580) constructs both instantiations in place, `mOccupationData`
+   * at `this+0x00` and `mSubclusterData` at `this+0x2C`, each `sizeof ==
+   * 0x2C` (vtable + the 0x28-byte map: `mMask`/`mMaxidx` at `this+0x20`/
+   * `+0x24`, list head/size at `this+0x0C`/`+0x10` in FUN_00934820 and
+   * FUN_00934B60).
    *
-   * What it does:
-   * Stores two source dword lanes into one two-dword destination record.
+   * `fa::hash_map`'s default constructor reproduces FUN_00934820 /
+   * FUN_00934B60: `_Init()` seeds the same nine bucket copies of
+   * `mList.end()`. The one binary write not reproduced is
+   * `this->mBool = *cacheEnabledFlag` at the map's `+0x00` traits slot: both
+   * construct sites (0x0093559B / 0x009355A0) pass the same uninitialised
+   * stack byte and no member ever reads it back.
+   *
+   * Per instantiation:
+   *   OccupationData: dtor 0x00933DE0, Fetch 0x00934F80, Evict 0x009355F0
+   *     (vtable 0x00D47884 slot 0, tail-jumps into `hash_map::erase`
+   *     0x00935480), 0x20-byte map nodes.
+   *   SubclusterData: dtor 0x00934500, Fetch 0x009350F0, Evict 0x00935600
+   *     (tail-jumps into `hash_map::erase` 0x009354D0), 0x50-byte map nodes
+   *     whose 16 `Cluster` keys are copy-constructed (0x009329A0) and
+   *     destroyed with the node.
    */
-  [[maybe_unused]] TwoDwordLane* StoreTwoDwordLanesFromSources_A(
-    TwoDwordLane* const destination,
-    const std::uint32_t* const sourceLane00,
-    const std::uint32_t* const sourceLane04
-  ) noexcept
-  {
-    destination->lane00 = *sourceLane00;
-    destination->lane04 = *sourceLane04;
-    return destination;
-  }
-
-  /**
-   * Address: 0x009345B0 (FUN_009345B0)
-   *
-   * What it does:
-   * Alias lane that stores two source dword lanes into one destination
-   * two-dword record.
-   */
-  [[maybe_unused]] TwoDwordLane* StoreTwoDwordLanesFromSources_B(
-    TwoDwordLane* const destination,
-    const std::uint32_t* const sourceLane00,
-    const std::uint32_t* const sourceLane04
-  ) noexcept
-  {
-    destination->lane00 = *sourceLane00;
-    destination->lane04 = *sourceLane04;
-    return destination;
-  }
-
-  [[nodiscard]] SubclusterCacheKey MakeSubclusterCacheKey(
-    const gpg::HaStar::SubclusterData& subclusterData
-  )
-  {
-    // Binary evidence (0x009329A0, "eh vector copy constructor iterator"
-    // over the 16 `Cluster` handles): the key is copy-constructed from
-    // the source `SubclusterData`, retaining each handle's refcount -
-    // not `memcpy`'d, which is why `SubclusterCacheKey` now holds real
-    // `Cluster` fields instead of a raw byte blob (see its declaration).
-    SubclusterCacheKey key{};
-    for (int i = 0; i < 16; ++i) {
-      key.mClusters[i] = subclusterData.mClusters[i];
-    }
-    key.mLevel = subclusterData.mLevel;
-    return key;
-  }
-
-  /**
-   * The real `ClusterInternalCache<T>` this subsystem builds, keyed
-   * directly on `T` (`OccupationData` / `SubclusterData`) rather than a
-   * side table. `ClusterCache::ClusterCache()` (0x00935580) constructs two
-   * of these in place - `mOccupationData` at `this+0x00`, `mSubclusterData`
-   * at `this+0x2C` - each `sizeof == 0x2C` (vtable + one
-   * `fa::hash_map<Key, Cluster::Data*, hash_compare<Key, Order>>`,
-   * itself `sizeof == 0x28`, matching FUN_00934820/FUN_00934B60's `mMask`/
-   * `mMaxidx` writes at `this+0x20`/`this+0x24` and the head/size writes at
-   * `this+0x0C`/`this+0x10`).
-   *
-   * `fa::hash_map`'s own default constructor already reproduces
-   * FUN_00934820/FUN_00934B60 exactly: `_Init()` seeds the same 9 bucket
-   * copies of `mList.end()` those functions build by hand via
-   * `sub_9327A0`/`sub_9327E0` + `sub_9341A0`/`sub_934250`. Only one binary
-   * write is not reproduced - `this->mBool = *cacheEnabledFlag` writes a
-   * caller-supplied byte at the container's `+0x00` (the `hash_compare`
-   * traits slot fa::hash_map's own layout already reserves there) -
-   * because both call sites that construct one of these
-   * (`ClusterCache::ClusterCache`, 0x0093559B/0x009355A0) pass the address
-   * of the *same uninitialized stack byte* to every field that would read
-   * it downstream, and no `ClusterInternalCache<T>` method (dtor, `Fetch`,
-   * `Evict`) ever reads it back out. It is a dead field at the binary
-   * level; the recovered constructor does not fabricate a reader for it.
-   */
-  template <typename T>
-  class ClusterInternalCache; // no generic body - only the two explicit specializations below exist.
-
-  /**
-   * Address: 0x00933DE0 (FUN_00933DE0)
-   * Mangled: ??1?$ClusterInternalCache@UOccupationData@HaStar@gpg@@@HaStar@gpg@@UAE@XZ
-   *
-   * IDA signature:
-   * void __thiscall sub_933DE0(gpg::HaStar::ClusterInternalCache_OccupationData *this);
-   *
-   * What it does:
-   * `ClusterInternalCache<OccupationData>::~ClusterInternalCache`. Walks
-   * every live entry severing its `Cluster::Data` backpointer (asserting
-   * `data->mCache == this` - `ClusterCache.cpp:70` - then zeroing
-   * `mReleaseObject`/`mReleaseArg`) so a handle that outlives this cache
-   * never calls back into a destroyed `ICache::Evict`. `mVec`'s own
-   * destructor (implicit, after this body runs) then tears down the
-   * bucket-index vector, walks the node list freeing each 0x20-byte node
-   * (`{Next, Prev, OccupationCacheKey, Cluster::Data*}` - a trivial key,
-   * no per-node destructor work needed), and frees the head sentinel -
-   * exactly the binary's `[esi+18h]` vector-storage free, `[esi+0Ch]`
-   * node walk, then final head `operator delete`.
-   */
-  template <>
-  class ClusterInternalCache<gpg::HaStar::OccupationData> final : public gpg::HaStar::ICache
+  template <class T>
+  class ClusterInternalCache final : public gpg::HaStar::ICache
   {
   public:
     ClusterInternalCache() = default;
 
-    // Not `override`: `ICache`'s vtable has a single documented slot
-    // (`Evict`, slot 0, `_purecall`) - no virtual destructor evidence.
-    // The vtable-repoint at this destructor's start (standard codegen
-    // for any class with at least one virtual member) is reproduced
-    // automatically since this class still derives from `ICache`.
-    ~ClusterInternalCache();
-
     /**
-     * Address: 0x00934F80 (FUN_00934F80, sub_934F80)
+     * Address: 0x00933DE0 (FUN_00933DE0, OccupationData)
+     * Address: 0x00934500 (FUN_00934500, SubclusterData)
+     * Mangled: ??1?$ClusterInternalCache@UOccupationData@HaStar@gpg@@@HaStar@gpg@@UAE@XZ
      *
      * What it does:
-     * Returns the cached cluster for `occupationData`, building and
-     * caching one on a miss. A successful insert arms this cache's
-     * `ICache::Evict` slot on the freshly-cached `Cluster::Data` (the
-     * `mov [ecx+4], edi` / `add edx, 8; mov [eax+8], edx` pair at
-     * 0x00935063/0x0093506A) so `ReleaseClusterData` can drop the entry
-     * once every outstanding `Cluster` handle to it releases.
+     * Severs every live entry's backpointer (asserting `data->mCache ==
+     * this`, `ClusterCache.cpp:70`, then clearing
+     * `mReleaseObject`/`mReleaseArg`) so a handle that outlives this cache
+     * never calls back into a destroyed `ICache::Evict`. `mVec`'s own
+     * destructor then frees the bucket vector and the nodes.
+     *
+     * Not `override`: `ICache`'s vtable has one slot (`Evict`), no virtual
+     * destructor.
      */
-    [[nodiscard]] gpg::HaStar::Cluster Fetch(const gpg::HaStar::OccupationData& occupationData);
+    ~ClusterInternalCache()
+    {
+      for (auto& entry : mVec) {
+        gpg::HaStar::Cluster::Data* const data = entry.second;
+        if (data->mReleaseObject != this) {
+          gpg::HandleAssertFailure(
+            "data->mCache == this", 70, "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore\\hastar\\ClusterCache.cpp"
+          );
+        }
+        data->mReleaseObject = nullptr;
+        data->mReleaseArg = nullptr;
+      }
+    }
+
+    /**
+     * Address: 0x00934F80 (FUN_00934F80, OccupationData)
+     * Address: 0x009350F0 (FUN_009350F0, SubclusterData)
+     *
+     * What it does:
+     * Returns the cached cluster for `key`, building and caching one on a
+     * miss. A successful insert arms this cache's `ICache::Evict` on the
+     * new `Cluster::Data` (`mov [ecx+4], edi` / `add edx, 8; mov [eax+8],
+     * edx` at 0x00935063 / 0x0093506A) so `ReleaseClusterData` drops the
+     * entry once the last `Cluster` handle to it goes.
+     */
+    [[nodiscard]] gpg::HaStar::Cluster Fetch(
+      const T& key
+    )
+    {
+      gpg::HaStar::Cluster result{};
+
+      const auto found = mVec.find(key);
+      if (found != mVec.end()) {
+        SetClusterData(result, found->second);
+        return result;
+      }
+
+      gpg::HaStar::Cluster built = gpg::HaStar::ClusterBuild(key);
+      const auto inserted = mVec.insert(typename Map::value_type(key, built.mData));
+      if (!inserted.second) {
+        gpg::HandleAssertFailure(
+          "ins.second", 87, "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore\\hastar\\ClusterCache.cpp"
+        );
+      } else {
+        RetainClusterData(inserted.first->second);
+        inserted.first->second->mReleaseObject = this;
+        inserted.first->second->mReleaseArg = &inserted.first->first;
+      }
+
+      SetClusterData(result, inserted.first->second);
+      return result;
+    }
 
   private:
+    using Map = fa::hash_map<T, gpg::HaStar::Cluster::Data*>;
+
     /**
-     * Address: 0x009355F0 (gpg::HaStar::ClusterInternalCache_OccupationData::Func)
-     * Mangled: ??_7?$ClusterInternalCache@UOccupationData@HaStar@gpg@@@HaStar@gpg@@6B@, slot 0
+     * Address: 0x009355F0 (OccupationData), 0x00935600 (SubclusterData)
      *
      * What it does:
-     * Slot 0 of this class's vtable (0x00D47884): `add ecx, 4` to step
-     * from the `ICache` sub-object onto `mVec`, then a tail `jmp` into
-     * `hash_map::erase(const key_type&)` (0x00935480, already the
-     * `OccupationCacheKey` instantiation of `fa::hash_map::erase`
-     * cited in `legacy/containers/HashMap.h`).
+     * Vtable slot 0: `add ecx, 4` onto `mVec`, then a tail `jmp` into
+     * `hash_map::erase(const key_type&)`. `key` is the map node's key that
+     * `Fetch` published as `mReleaseArg`.
      */
-    void Evict(const void* key) override;
+    void Evict(
+      const void* const key
+    ) override
+    {
+      mVec.erase(*static_cast<const T*>(key));
+    }
 
-    OccupationCacheMap mVec;
+    Map mVec;
   };
   static_assert(
     sizeof(ClusterInternalCache<gpg::HaStar::OccupationData>) == 0x2C,
     "ClusterInternalCache<OccupationData> size must be 0x2C"
   );
-
-  ClusterInternalCache<gpg::HaStar::OccupationData>::~ClusterInternalCache()
-  {
-    for (auto& entry : mVec) {
-      gpg::HaStar::Cluster::Data* const data = entry.second;
-      if (data->mReleaseObject != this) {
-        gpg::HandleAssertFailure(
-          "data->mCache == this", 70, "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore\\hastar\\ClusterCache.cpp"
-        );
-      }
-      data->mReleaseObject = nullptr;
-      data->mReleaseArg = nullptr;
-    }
-  }
-
-  void ClusterInternalCache<gpg::HaStar::OccupationData>::Evict(
-    const void* const key
-  )
-  {
-    mVec.erase(*static_cast<const OccupationCacheKey*>(key));
-  }
-
-  gpg::HaStar::Cluster ClusterInternalCache<gpg::HaStar::OccupationData>::Fetch(
-    const gpg::HaStar::OccupationData& occupationData
-  )
-  {
-    const OccupationCacheKey key = MakeOccupationCacheKey(occupationData);
-    gpg::HaStar::Cluster result{};
-
-    const auto found = mVec.find(key);
-    if (found != mVec.end()) {
-      SetClusterData(result, found->second);
-      return result;
-    }
-
-    gpg::HaStar::Cluster built = gpg::HaStar::ClusterBuild(occupationData);
-    const auto inserted = mVec.insert(OccupationCacheMap::value_type(key, built.mData));
-    if (!inserted.second) {
-      gpg::HandleAssertFailure(
-        "ins.second", 87, "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore\\hastar\\ClusterCache.cpp"
-      );
-    } else {
-      RetainClusterData(inserted.first->second);
-      inserted.first->second->mReleaseObject = this;
-      inserted.first->second->mReleaseArg = &inserted.first->first;
-    }
-
-    SetClusterData(result, inserted.first->second);
-    return result;
-  }
-
-  /**
-   * Address: 0x00934500 (FUN_00934500)
-   * Mangled: ??1?$ClusterInternalCache@USubclusterData@HaStar@gpg@@@HaStar@gpg@@UAE@XZ
-   *
-   * What it does:
-   * `ClusterInternalCache<SubclusterData>::~ClusterInternalCache` - same
-   * backpointer-severing prepass as the `OccupationData` sibling above,
-   * over a 0x50-byte-node hash_map instead of a 0x20-byte one. `mVec`'s
-   * implicit destructor then does the rest, and here that "rest" also
-   * covers what a hand-written `ClearSubclusterCacheRingList` used to do
-   * by hand: `SubclusterCacheKey` embeds 16 real `Cluster` handles, so the
-   * node's implicit `~pair<const SubclusterCacheKey, Cluster::Data*>()`
-   * already runs `~Cluster()` on each of them before the node is freed -
-   * exactly the binary's `eh vector destructor iterator` sweep.
-   */
-  template <>
-  class ClusterInternalCache<gpg::HaStar::SubclusterData> final : public gpg::HaStar::ICache
-  {
-  public:
-    ClusterInternalCache() = default;
-
-    // Not `override`: `ICache`'s vtable has a single documented slot
-    // (`Evict`, slot 0, `_purecall`) - no virtual destructor evidence.
-    // The vtable-repoint at this destructor's start (standard codegen
-    // for any class with at least one virtual member) is reproduced
-    // automatically since this class still derives from `ICache`.
-    ~ClusterInternalCache();
-
-    /**
-     * Address: 0x009350F0 (FUN_009350F0, sub_9350F0)
-     *
-     * What it does:
-     * Returns the cached cluster for `subclusterData`, building and
-     * caching one on a miss, and arming `ICache::Evict` on success -
-     * mirrors `ClusterInternalCache<OccupationData>::Fetch` one for one.
-     */
-    [[nodiscard]] gpg::HaStar::Cluster Fetch(const gpg::HaStar::SubclusterData& subclusterData);
-
-  private:
-    /**
-     * Address: 0x00935600 (gpg::HaStar::ClusterInternalCache_SubclusterData::Func)
-     * Mangled: ??_7?$ClusterInternalCache@USubclusterData@HaStar@gpg@@@HaStar@gpg@@6B@, slot 0
-     *
-     * What it does:
-     * The `SubclusterData` instantiation of the same vtable-slot-0
-     * pattern as `ClusterInternalCache<OccupationData>::Evict`: steps
-     * onto `mVec` and tails into `hash_map::erase(const key_type&)`
-     * (0x009354D0, the `SubclusterCacheKey` instantiation).
-     */
-    void Evict(const void* key) override;
-
-    SubclusterCacheMap mVec;
-  };
   static_assert(
     sizeof(ClusterInternalCache<gpg::HaStar::SubclusterData>) == 0x2C,
     "ClusterInternalCache<SubclusterData> size must be 0x2C"
   );
-
-  ClusterInternalCache<gpg::HaStar::SubclusterData>::~ClusterInternalCache()
-  {
-    for (auto& entry : mVec) {
-      gpg::HaStar::Cluster::Data* const data = entry.second;
-      if (data->mReleaseObject != this) {
-        gpg::HandleAssertFailure(
-          "data->mCache == this", 70, "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore\\hastar\\ClusterCache.cpp"
-        );
-      }
-      data->mReleaseObject = nullptr;
-      data->mReleaseArg = nullptr;
-    }
-  }
-
-  void ClusterInternalCache<gpg::HaStar::SubclusterData>::Evict(
-    const void* const key
-  )
-  {
-    mVec.erase(*static_cast<const SubclusterCacheKey*>(key));
-  }
-
-  gpg::HaStar::Cluster ClusterInternalCache<gpg::HaStar::SubclusterData>::Fetch(
-    const gpg::HaStar::SubclusterData& subclusterData
-  )
-  {
-    const SubclusterCacheKey key = MakeSubclusterCacheKey(subclusterData);
-    gpg::HaStar::Cluster result{};
-
-    const auto found = mVec.find(key);
-    if (found != mVec.end()) {
-      SetClusterData(result, found->second);
-      return result;
-    }
-
-    gpg::HaStar::Cluster built = gpg::HaStar::ClusterBuild(subclusterData);
-    const auto inserted = mVec.insert(SubclusterCacheMap::value_type(key, built.mData));
-    if (!inserted.second) {
-      gpg::HandleAssertFailure(
-        "ins.second", 87, "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore\\hastar\\ClusterCache.cpp"
-      );
-    } else {
-      RetainClusterData(inserted.first->second);
-      inserted.first->second->mReleaseObject = this;
-      inserted.first->second->mReleaseArg = &inserted.first->first;
-    }
-
-    SetClusterData(result, inserted.first->second);
-    return result;
-  }
 
 } // namespace
 
@@ -1451,12 +515,8 @@ namespace gpg::HaStar
    * FUN_00935580 does by explicit vtable-write-then-construct
    * (`mOccupationData` at `this+0`, `mSubclusterData` at `this+0x2C`).
    *
-   * `ClusterInternalCache<T>`'s two specializations live in this TU's
-   * anonymous namespace (they hold `fa::hash_map` instantiations keyed
-   * on equally TU-local `OccupationCacheKey`/`SubclusterCacheKey` types);
-   * ordinary unqualified lookup from this namespace still finds them
-   * because an anonymous namespace's members are implicitly visible from
-   * every enclosing scope in the same translation unit.
+   * `ClusterInternalCache<T>` lives in this TU's anonymous namespace;
+   * unqualified lookup from here finds it.
    */
   class ClusterCacheImpl
   {
@@ -1527,19 +587,7 @@ namespace
     gpg::HaStar::Subcluster& subcluster
   )
   {
-    if (!subcluster.mArray) {
-      subcluster.mWidth = 0;
-      subcluster.mHeight = 0;
-      return;
-    }
-
-    auto* const header = reinterpret_cast<std::uint32_t*>(subcluster.mArray) - 1;
-    const std::uint32_t clusterCount = *header;
-    for (std::uint32_t i = 0; i < clusterCount; ++i) {
-      subcluster.mArray[i].~Cluster();
-    }
-
-    operator delete[](header);
+    delete[] subcluster.mArray;
     subcluster.mArray = nullptr;
     subcluster.mWidth = 0;
     subcluster.mHeight = 0;
@@ -1555,49 +603,7 @@ namespace
     subcluster.mHeight = height;
 
     const int clusterCount = width * height;
-    if (clusterCount <= 0) {
-      subcluster.mArray = nullptr;
-      return;
-    }
-
-    const std::size_t bytes =
-      sizeof(std::uint32_t) + static_cast<std::size_t>(clusterCount) * sizeof(gpg::HaStar::Cluster);
-    auto* const raw = static_cast<std::uint8_t*>(operator new[](bytes));
-
-    *reinterpret_cast<std::uint32_t*>(raw) = static_cast<std::uint32_t>(clusterCount);
-    subcluster.mArray = reinterpret_cast<gpg::HaStar::Cluster*>(raw + sizeof(std::uint32_t));
-
-    for (int i = 0; i < clusterCount; ++i) {
-      new (&subcluster.mArray[i]) gpg::HaStar::Cluster();
-    }
-  }
-
-  struct ClusterNodeCoordinate
-  {
-    std::uint8_t x;
-    std::uint8_t z;
-  };
-  static_assert(sizeof(ClusterNodeCoordinate) == 0x02, "ClusterNodeCoordinate size must be 0x02");
-
-  /**
-   * Address: 0x0092E2E0 (FUN_0092E2E0, gpg::HaStar::Cluster::Node::CostTo)
-   *
-   * What it does:
-   * Computes geometric node-to-node distance, quantizes traversal cost, and
-   * writes one edge-cost byte into `out`.
-   */
-  [[maybe_unused]] std::uint8_t* QuantizeClusterNodeEdgeCost(
-    std::uint8_t* const out,
-    const ClusterNodeCoordinate& from,
-    const ClusterNodeCoordinate& to,
-    const float traversalCost
-  )
-  {
-    const float dx = std::fabs(static_cast<float>(static_cast<int>(from.x) - static_cast<int>(to.x)));
-    const float dz = std::fabs(static_cast<float>(static_cast<int>(from.z) - static_cast<int>(to.z)));
-    const float distance = (dz <= dx) ? (dz * 0.41421354f + dx) : (dx * 0.41421354f + dz);
-    *out = static_cast<std::uint8_t>(static_cast<int>(gpg::HaStar::Cluster::QuantizeEdgeCost(traversalCost, distance)));
-    return out;
+    subcluster.mArray = clusterCount > 0 ? new gpg::HaStar::Cluster[clusterCount] : nullptr;
   }
 
   // ------------------------------------------------------------------
@@ -1621,70 +627,38 @@ namespace
   // neighbours have already been settled this expansion; orthogonals (k<4)
   // have no prerequisite.
   constexpr std::array<std::uint8_t, 8> kNeighborPrereqMask = {0u, 0u, 0u, 0u, 3u, 6u, 12u, 9u};
-  constexpr float kOctileDiagonalFactor = 0.41421354f;
 
   // 9x9 expansion grid: cell (row z, column x) lives at grid[9*z + x].
   constexpr std::int32_t kEdgeSearchGridSpan = 9;
   constexpr std::int32_t kEdgeSearchGridCells = kEdgeSearchGridSpan * kEdgeSearchGridSpan; // 81
 
   /**
-   * What it does:
-   * Unlinks one frontier node from its current ring position
-   * (`prev->next = next; next->prev = prev`). Mirrors the inlined unlink the
-   * binary performs both when popping the open-list head and when re-queuing a
-   * relaxed neighbour.
-   */
-  void UnlinkFrontierNode(
-    PathSearchFrontierNode* const node
-  ) noexcept
-  {
-    node->prev->next = node->next;
-    node->next->prev = node->prev;
-  }
-
-  /**
-   * What it does:
-   * Appends one frontier node immediately before `head` (i.e. at the tail of
-   * the FIFO open-list ring), matching the binary's insert-before-sentinel
-   * sequence.
-   */
-  void AppendFrontierNodeToTail(
-    PathSearchFrontierNode* const head,
-    PathSearchFrontierNode* const node
-  ) noexcept
-  {
-    node->prev = head->prev;
-    node->next = head;
-    head->prev->next = node;
-    head->prev = node;
-  }
-
-  /**
-   * Address: 0x00954A40 (FUN_00954A40, sub_954A40)
-   * Mangled: (file-local; emitted as sub_954A40)
+   * Address: 0x00954A40 (FUN_00954A40)
    *
    * IDA signature:
    * void __cdecl sub_954A40(
    *   gpg::HaStar::OccupationData *a1,
-   *   int *a2 [fastvector<Node>],
+   *   gpg::fastvector<gpg::HaStar::Cluster::Node> *a2,
    *   gpg::fastvector<gpg::HaStar::Cluster::Edge> *a3);
    *
    * What it does:
    * Builds the cluster's triangular edge-cost matrix. For each ordered node
    * pair (s < t) it runs a label-correcting octile-grid search (FIFO ring
    * open-list over a 9x9 cell grid, seeded from node s) and, once the grid is
-   * settled, quantizes the path cost of node t's cell against the straight
-   * octile distance into a 0..31 bucket via
-   * `gpg::HaStar::Cluster::QuantizeEdgeCost`. Unreachable pairs store -1.
-   * Edge (s, t) is written at triangular index `s + t*(t-1)/2`. When fewer
-   * than two nodes exist the edge vector is emptied.
+   * settled, stores `Cluster::Node::CostTo(s, t, pathCost)` (inlined here) at
+   * triangular index `s + t*(t-1)/2`. Unreachable pairs store -1. When fewer
+   * than two nodes exist the edge vector is emptied. The fill is
+   * `fastvector<Edge>::resize` (0x0092E410), the same emission the subcluster
+   * build uses.
    */
   void BuildClusterEdgeCosts(
     const gpg::HaStar::OccupationData& occupation,
-    const gpg::fastvector_n<std::int16_t, 16>& nodes,
-    gpg::core::FastVectorInline<std::uint8_t>& outEdges
+    const gpg::fastvector<gpg::HaStar::Cluster::Node>& nodes,
+    gpg::core::FastVectorInline<gpg::HaStar::Cluster::Edge>& outEdges
   )
   {
+    using gpg::HaStar::Cluster;
+
     const std::uint32_t nodeCount = static_cast<std::uint32_t>(nodes.Size());
 
     if (nodeCount < 2u) {
@@ -1694,31 +668,21 @@ namespace
     }
 
     // Prefill the whole triangular matrix with -1 (unreachable).
-    const std::uint32_t triangularSize = TriangularEdgePairIndex(0u, nodeCount);
-    const std::uint8_t fillUnreachable = 0xFFu;
-    outEdges.resize(triangularSize, fillUnreachable);
+    Cluster::Edge noEdge{};
+    noEdge.cost = -1;
+    outEdges.resize(Cluster::TriangularSize(nodeCount), noEdge);
 
-    // 9x9 search grid + FIFO open-list sentinel. The binary constructs all 81
-    // cells once (each self-linked with zero cost/flags/packedCell) via the
-    // eh-vector-ctor over InitializePathSearchFrontierNode, then re-inits the
-    // cost/flag/packedCell lanes once per source expansion while leaving the
-    // ring links self-linked between sources.
-    std::array<PathSearchFrontierNode, kEdgeSearchGridCells> grid;
-    for (auto& cell : grid) {
-      (void)InitializePathSearchFrontierNode(&cell);
-    }
-    const auto* const nodeBytes = reinterpret_cast<const std::uint8_t*>(nodes.begin());
-    // Occupation rows are a uint16 bitmask grid: row r's passability mask is
-    // the 16-bit word at byte offset r*2 (the binary reads word ptr[a1 + r*2]).
+    // 9x9 search grid. The binary constructs all 81 cells once (0x00954940
+    // over an `eh vector constructor iterator`), then re-inits cost, flags and
+    // cell once per source expansion; the ring links are self-linked again
+    // by the time each expansion ends.
+    std::array<PathSearchFrontierNode, kEdgeSearchGridCells> grid{};
     const std::uint16_t* const layerRows = occupation.mRows;
 
     for (std::uint32_t source = 0u; source + 1u < nodeCount; ++source) {
-      PathSearchFrontierNode openListHead{};
-      openListHead.next = &openListHead;
-      openListHead.prev = &openListHead;
+      gpg::DListItem<PathSearchFrontierNode> openList;
 
-      // Re-initialise every grid cell for this source expansion. Cell
-      // (row z, col x) encodes packedCell = (z << 4) | x.
+      // Cell (row z, col x) encodes packedCell = (z << 4) | x.
       for (std::int32_t row = 0; row < kEdgeSearchGridSpan; ++row) {
         for (std::int32_t col = 0; col < kEdgeSearchGridSpan; ++col) {
           PathSearchFrontierNode& cell = grid[row * kEdgeSearchGridSpan + col];
@@ -1728,20 +692,16 @@ namespace
         }
       }
 
-      // Seed the source node's cell (grid[z_s][x_s]) into the open list.
-      const std::uint8_t sourceX = nodeBytes[2u * source];
-      const std::uint8_t sourceZ = nodeBytes[2u * source + 1u];
-      PathSearchFrontierNode& seed = grid[sourceZ * kEdgeSearchGridSpan + sourceX];
-      UnlinkFrontierNode(&seed);
+      // Seed the source node's cell into the open list.
+      const Cluster::Node& sourceNode = nodes[source];
+      PathSearchFrontierNode& seed = grid[sourceNode.z * kEdgeSearchGridSpan + sourceNode.x];
       seed.visitFlags = 1u;
-      AppendFrontierNodeToTail(&openListHead, &seed);
+      seed.ListLinkBefore(&openList);
 
       // Label-correcting drain of the FIFO ring.
-      while (openListHead.next != &openListHead) {
-        PathSearchFrontierNode* const current = openListHead.next;
-        UnlinkFrontierNode(current);
-        current->next = current;
-        current->prev = current;
+      while (!openList.ListIsUnlinked()) {
+        PathSearchFrontierNode* const current = openList.mNext->Get();
+        current->ListUnlink();
 
         std::uint8_t settledMask = 0u;
         const std::int32_t currentRow = current->packedCell >> 4;
@@ -1769,127 +729,19 @@ namespace
             continue;
           }
 
-          UnlinkFrontierNode(&neighbor);
           neighbor.visitFlags = 1u;
           neighbor.pathCost = candidateCost;
-          AppendFrontierNodeToTail(&openListHead, &neighbor);
+          neighbor.ListLinkBefore(&openList);
         }
       }
 
       // Emit the quantized edge cost for every later node t (source < t).
       for (std::uint32_t target = source + 1u; target < nodeCount; ++target) {
-        const std::uint32_t edgeIndex = TriangularEdgePairIndex(source, target);
-        const std::uint8_t targetX = nodeBytes[2u * target];
-        const std::uint8_t targetZ = nodeBytes[2u * target + 1u];
-        const PathSearchFrontierNode& targetCell = grid[targetZ * kEdgeSearchGridSpan + targetX];
-
-        if (targetCell.visitFlags == 0u) {
-          outEdges.start_[edgeIndex] = fillUnreachable;
-          continue;
-        }
-
-        const float deltaX = std::fabs(static_cast<float>(static_cast<int>(sourceX) - static_cast<int>(targetX)));
-        const float deltaZ = std::fabs(static_cast<float>(static_cast<int>(sourceZ) - static_cast<int>(targetZ)));
-        const float octileDistance =
-          (deltaZ <= deltaX) ? (deltaZ * kOctileDiagonalFactor + deltaX) : (deltaX * kOctileDiagonalFactor + deltaZ);
-
-        const int bucket =
-          static_cast<int>(gpg::HaStar::Cluster::QuantizeEdgeCost(targetCell.pathCost, octileDistance));
-        outEdges.start_[edgeIndex] = static_cast<std::uint8_t>(static_cast<std::int8_t>(bucket));
-      }
-    }
-  }
-
-  /**
-   * Address: 0x00954650 (FUN_00954650,
-   * ?EraseUnconnectedNodes@HaStar@gpg@@YAXAAV?$fastvector@UNode@Cluster@HaStar@gpg@@@2@AAV?$fastvector@UEdge@Cluster@HaStar@gpg@@@2@@Z)
-   * Mangled: ?EraseUnconnectedNodes@HaStar@gpg@@YAX...@Z
-   *
-   * IDA signature:
-   * void __cdecl gpg::HaStar::EraseUnconnectedNodes(
-   *   gpg::fastvector<Node> *ioNodes, gpg::fastvector<Edge> *ioEdges);
-   *
-   * What it does:
-   * Drops every cluster node that has no non-negative edge to any other node,
-   * compacting both the node array and the triangular edge matrix in place so
-   * that only reachable nodes and their pairwise edges survive. A node counts
-   * as reached if it is an endpoint of at least one edge whose quantized cost
-   * is >= 0. Asserts the post-compaction sizes:
-   * `nnodes_used == ioNodes.size()` and
-   * `ioEdges.size() == TriangularSize(nnodes_used)`.
-   */
-  void DropUnreachedClusterNodes(
-    gpg::fastvector_n<std::int16_t, 16>& ioNodes,
-    gpg::core::FastVectorInline<std::uint8_t>& ioEdges
-  )
-  {
-    // Reachability scratch: one byte per node, backed by a fastvector_n<char,12>.
-    // A 12-element inline buffer, exactly the shape the binary builds on the
-    // stack before the reachability pass.
-    gpg::fastvector_n<char, 12> reachable;
-
-    const std::uint32_t nodeCount = static_cast<std::uint32_t>(ioNodes.Size());
-    reachable.resize(nodeCount, char{0});
-
-    auto* const edgeBytes = ioEdges.start_;
-    std::int32_t reachedCount = 0;
-
-    // Mark endpoints of every non-negative edge as reached.
-    for (std::uint32_t high = 0u; high < nodeCount; ++high) {
-      if (high == 0u) {
-        continue;
-      }
-      std::uint32_t edgeIndex = TriangularEdgePairIndex(0u, high);
-      for (std::uint32_t low = 0u; low < high; ++low, ++edgeIndex) {
-        if (static_cast<std::int8_t>(edgeBytes[edgeIndex]) >= 0) {
-          reachedCount += (reachable.start_[low] == 0) ? 1 : 0;
-          reachedCount += (reachable.start_[high] == 0) ? 1 : 0;
-          reachable.start_[low] = 1;
-          reachable.start_[high] = 1;
-        }
-      }
-    }
-
-    if (reachedCount != static_cast<std::int32_t>(nodeCount)) {
-      // Compact both arrays, keeping only reached nodes and their pairwise
-      // edges (writing the surviving triangular matrix row by row).
-      auto* edgeWrite = edgeBytes;
-      auto* nodeWrite = ioNodes.begin();
-
-      for (std::uint32_t high = 0u; high < nodeCount; ++high) {
-        if (reachable.start_[high] == 0) {
-          continue;
-        }
-        if (high != 0u) {
-          const std::uint32_t rowBase = TriangularEdgePairIndex(0u, high);
-          for (std::uint32_t low = 0u; low < high; ++low) {
-            if (reachable.start_[low] != 0) {
-              *edgeWrite = edgeBytes[rowBase + low];
-              ++edgeWrite;
-            }
-          }
-        }
-        *nodeWrite = ioNodes[high];
-        ++nodeWrite;
-      }
-
-      ioNodes.erase(nodeWrite, ioNodes.end());
-      if (edgeWrite != ioEdges.end_) {
-        ioEdges.end_ = edgeWrite;
-      }
-
-      if (reachedCount != static_cast<std::int32_t>(ioNodes.Size())) {
-        gpg::HandleAssertFailure(
-          "nnodes_used == ioNodes.size()", 168, "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore\\hastar\\Cluster.cpp"
-        );
-      }
-      const std::uint32_t survivingTriangular = TriangularEdgePairIndex(0u, static_cast<std::uint32_t>(reachedCount));
-      if (static_cast<std::uint32_t>(ioEdges.end_ - ioEdges.start_) != survivingTriangular) {
-        gpg::HandleAssertFailure(
-          "ioEdges.size() == TriangularSize(nnodes_used)",
-          169,
-          "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore\\hastar\\Cluster.cpp"
-        );
+        const Cluster::Node& targetNode = nodes[target];
+        const PathSearchFrontierNode& targetCell = grid[targetNode.z * kEdgeSearchGridSpan + targetNode.x];
+        Cluster::Edge& edge = outEdges[Cluster::EdgeIndex(source, target)];
+        edge.cost = targetCell.visitFlags == 0u ? std::int8_t{-1}
+                                                : Cluster::Node::CostTo(sourceNode, targetNode, targetCell.pathCost);
       }
     }
   }
@@ -1897,6 +749,82 @@ namespace
 
 namespace gpg::HaStar
 {
+  /**
+   * Address: 0x00954650 (FUN_00954650,
+   * ?EraseUnconnectedNodes@HaStar@gpg@@YAXAAV?$fastvector@UNode@Cluster@HaStar@gpg@@@2@AAV?$fastvector@UEdge@Cluster@HaStar@gpg@@@2@@Z)
+   *
+   * What it does:
+   * Drops every cluster node that has no non-negative edge to any other node,
+   * compacting both the node array and the triangular edge matrix in place so
+   * that only reachable nodes and their pairwise edges survive. A node counts
+   * as reached if it is an endpoint of at least one edge whose quantized cost
+   * is >= 0. Asserts `nnodes_used == ioNodes.size()` and
+   * `ioEdges.size() == TriangularSize(nnodes_used)`. Both `ClusterBuild`
+   * overloads call it (0x00955369, 0x009312E7).
+   */
+  void EraseUnconnectedNodes(
+    gpg::fastvector<Cluster::Node>& ioNodes,
+    gpg::fastvector<Cluster::Edge>& ioEdges
+  )
+  {
+    // One byte per node, in the binary's 12-element inline stack buffer.
+    gpg::fastvector_n<char, 12> reachable;
+
+    const std::uint32_t nodeCount = static_cast<std::uint32_t>(ioNodes.Size());
+    reachable.resize(nodeCount, char{0});
+
+    // Mark endpoints of every non-negative edge as reached.
+    std::int32_t reachedCount = 0;
+    for (std::uint32_t high = 1u; high < nodeCount; ++high) {
+      std::uint32_t edgeIndex = Cluster::TriangularSize(high);
+      for (std::uint32_t low = 0u; low < high; ++low, ++edgeIndex) {
+        if (ioEdges[edgeIndex].cost >= 0) {
+          reachedCount += (reachable[low] == 0) ? 1 : 0;
+          reachedCount += (reachable[high] == 0) ? 1 : 0;
+          reachable[low] = 1;
+          reachable[high] = 1;
+        }
+      }
+    }
+
+    if (reachedCount == static_cast<std::int32_t>(nodeCount)) {
+      return;
+    }
+
+    // Compact both arrays row by row, keeping only reached nodes and the
+    // edges between them.
+    std::size_t edgeWrite = 0u;
+    std::size_t nodeWrite = 0u;
+    for (std::uint32_t high = 0u; high < nodeCount; ++high) {
+      if (reachable[high] == 0) {
+        continue;
+      }
+      const std::uint32_t rowBase = Cluster::TriangularSize(high);
+      for (std::uint32_t low = 0u; low < high; ++low) {
+        if (reachable[low] != 0) {
+          ioEdges[edgeWrite++] = ioEdges[rowBase + low];
+        }
+      }
+      ioNodes[nodeWrite++] = ioNodes[high];
+    }
+
+    ioNodes.erase(ioNodes.begin() + nodeWrite, ioNodes.end());
+    ioEdges.erase(ioEdges.begin() + edgeWrite, ioEdges.end());
+
+    if (reachedCount != static_cast<std::int32_t>(ioNodes.Size())) {
+      gpg::HandleAssertFailure(
+        "nnodes_used == ioNodes.size()", 168, "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore\\hastar\\Cluster.cpp"
+      );
+    }
+    if (ioEdges.Size() != Cluster::TriangularSize(static_cast<std::uint32_t>(reachedCount))) {
+      gpg::HandleAssertFailure(
+        "ioEdges.size() == TriangularSize(nnodes_used)",
+        169,
+        "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore\\hastar\\Cluster.cpp"
+      );
+    }
+  }
+
   /**
    * Address: 0x009315C0 (FUN_009315C0)
    *
@@ -2025,7 +953,7 @@ namespace gpg::HaStar
 
     constexpr std::size_t kHeaderBytes = offsetof(Data, mNodes); // 0x0D on x86
     const std::size_t nodeBytes = static_cast<std::size_t>(nodeCount) * sizeof(Node);
-    const std::size_t edgeBytes = static_cast<std::size_t>(nodeCount) * (nodeCount - 1u) / 2u;
+    const std::size_t edgeBytes = TriangularSize(nodeCount) * sizeof(Edge);
 
     Cluster::Data* payload = mData;
     const bool reuseInPlace =
@@ -2058,16 +986,11 @@ namespace gpg::HaStar
       payload = replacement;
     }
 
-    // Node array begins at `mNodes` (0x0D on x86); edges follow it.
-    auto* const nodeBase = reinterpret_cast<std::byte*>(&payload->mNodes[0]);
-    // Flat node/edge blob assembly: payload is a byte-packed node array followed by edges.
-    if (nodes != nullptr && nodeBytes != 0u) {
-      // Raw byte lane (see comment above): packed-word load / flat node-edge blob assembly.
-      std::memcpy(nodeBase, nodes, nodeBytes);
+    if (nodes != nullptr) {
+      std::copy_n(nodes, nodeCount, payload->mNodes);
     }
-    if (edges != nullptr && edgeBytes != 0u) {
-      // Raw byte lane (see comment above): packed-word load / flat node-edge blob assembly.
-      std::memcpy(nodeBase + nodeBytes, edges, edgeBytes);
+    if (edges != nullptr) {
+      std::copy_n(edges, TriangularSize(nodeCount), payload->Edges());
     }
   }
 
@@ -2100,7 +1023,7 @@ namespace gpg::HaStar
       return (nodeCount < rhs->mNodeCount) ? -1 : 1;
     }
 
-    const std::size_t payloadBytes = (nodeCount * (nodeCount - 1u)) / 2u + 2u * nodeCount + 1u;
+    const std::size_t payloadBytes = 1u + nodeCount * sizeof(Cluster::Node) + Cluster::TriangularSize(nodeCount);
     const int diff = std::memcmp(&self->mNodeCount, &rhs->mNodeCount, payloadBytes);
     return (diff < 0) ? -1 : (diff > 0 ? 1 : 0);
   }
@@ -2127,7 +1050,7 @@ namespace gpg::HaStar
   {
     const Cluster::Data* const data = cluster.mData;
     const unsigned int nodeCount = data->mNodeCount;
-    const std::size_t payloadBytes = (nodeCount * (nodeCount - 1u)) / 2u + 2u * nodeCount + 1u;
+    const std::size_t payloadBytes = 1u + nodeCount * sizeof(Cluster::Node) + Cluster::TriangularSize(nodeCount);
     return gpg::HashBytes(&data->mNodeCount, payloadBytes, 2079270547u);
   }
 
@@ -2152,25 +1075,18 @@ namespace gpg::HaStar
     const OccupationData& occupationData
   )
   {
-    // Node scratch: fastvector<Node> with a 32-byte (16-node) inline buffer,
-    // one packed `x | (z << 8)` word per boundary node.
-    gpg::fastvector_n<std::int16_t, 16> nodeView;
+    // Scratch with the binary's inline sizes: 16 nodes, 120 edges.
+    gpg::fastvector_n<Cluster::Node, 16> nodes;
+    gpg::fastvector_n<Cluster::Edge, 120> edges;
 
-    // Edge scratch: fastvector<Edge> with a 120-byte inline buffer.
-    gpg::fastvector_n<std::uint8_t, 120> edgeView;
-
-    (void)BuildOccupationEdgeContacts(occupationData, nodeView);
-    BuildClusterEdgeCosts(occupationData, nodeView, edgeView);
-    DropUnreachedClusterNodes(nodeView, edgeView);
+    BuildOccupationEdgeContacts(occupationData, nodes);
+    BuildClusterEdgeCosts(occupationData, nodes, edges);
+    EraseUnconnectedNodes(nodes, edges);
 
     Cluster cluster{};
     cluster.mData = &Cluster::sDefaultConstructData;
     ++Cluster::sDefaultConstructData.mRefs;
-    cluster.SetData(
-      reinterpret_cast<const Cluster::Node*>(nodeView.begin()),
-      reinterpret_cast<const Cluster::Edge*>(edgeView.start_),
-      static_cast<unsigned int>(nodeView.Size())
-    );
+    cluster.SetData(nodes.begin(), edges.begin(), static_cast<unsigned int>(nodes.Size()));
 
     return cluster;
   }
@@ -2321,7 +1237,7 @@ namespace gpg::HaStar
           }
 
           const Cluster::Node* const nodes = child->mNodes;
-          const auto* const edges = reinterpret_cast<const std::int8_t*>(nodes + nodeCount);
+          const Cluster::Edge* const edges = child->Edges();
 
           std::uint32_t fromIndex = 0u;
           for (; fromIndex < nodeCount; ++fromIndex) {
@@ -2341,7 +1257,7 @@ namespace gpg::HaStar
               continue;
             }
 
-            const std::int8_t bucket = edges[TriangularEdgePairIndex(fromIndex, toIndex)];
+            const std::int8_t bucket = edges[Cluster::EdgeIndex(fromIndex, toIndex)].cost;
             if (bucket < 0) {
               continue;
             }
@@ -2458,69 +1374,7 @@ namespace gpg::HaStar
         }
       }
 
-      // The binary sorts the packed words as signed 16-bit values.
-      std::sort(outNodes.begin(), outNodes.end(), [](const Cluster::Node& lhs, const Cluster::Node& rhs) {
-        return static_cast<std::int16_t>(PackedSubclusterNodeKey(lhs)) <
-          static_cast<std::int16_t>(PackedSubclusterNodeKey(rhs));
-      });
-      const auto uniqueEnd =
-        std::unique(outNodes.begin(), outNodes.end(), [](const Cluster::Node& lhs, const Cluster::Node& rhs) {
-        return PackedSubclusterNodeKey(lhs) == PackedSubclusterNodeKey(rhs);
-      });
-      outNodes.resize(static_cast<std::size_t>(uniqueEnd - outNodes.begin()));
-    }
-
-    /**
-     * Drops nodes with no non-negative edge and compacts the triangular edge
-     * table to the survivors -- the same pass `EraseUnconnectedNodes` runs on
-     * the level-1 build's scratch views, written against the container API.
-     */
-    template <std::size_t NodeInline, std::size_t EdgeInline>
-    void EraseUnconnectedNodes(
-      gpg::fastvector_n<Cluster::Node, NodeInline>& ioNodes,
-      gpg::fastvector_n<Cluster::Edge, EdgeInline>& ioEdges
-    )
-    {
-      const std::uint32_t nodeCount = static_cast<std::uint32_t>(ioNodes.Size());
-      gpg::fastvector_n<char, 12> reachable;
-      reachable.resize(nodeCount, 0);
-
-      std::int32_t reachedCount = 0;
-      for (std::uint32_t high = 1u; high < nodeCount; ++high) {
-        std::uint32_t edgeIndex = TriangularEdgePairIndex(0u, high);
-        for (std::uint32_t low = 0u; low < high; ++low, ++edgeIndex) {
-          if (ioEdges[edgeIndex].cost >= 0) {
-            reachedCount += (reachable[low] == 0) ? 1 : 0;
-            reachedCount += (reachable[high] == 0) ? 1 : 0;
-            reachable[low] = 1;
-            reachable[high] = 1;
-          }
-        }
-      }
-
-      if (reachedCount == static_cast<std::int32_t>(nodeCount)) {
-        return;
-      }
-
-      std::size_t edgeWrite = 0u;
-      std::size_t nodeWrite = 0u;
-      for (std::uint32_t high = 0u; high < nodeCount; ++high) {
-        if (reachable[high] == 0) {
-          continue;
-        }
-        if (high != 0u) {
-          const std::uint32_t rowBase = TriangularEdgePairIndex(0u, high);
-          for (std::uint32_t low = 0u; low < high; ++low) {
-            if (reachable[low] != 0) {
-              ioEdges[edgeWrite++] = ioEdges[rowBase + low];
-            }
-          }
-        }
-        ioNodes[nodeWrite++] = ioNodes[high];
-      }
-
-      ioNodes.resize(nodeWrite);
-      ioEdges.resize(edgeWrite);
+      SortUniqueNodes(outNodes);
     }
   } // namespace
 
@@ -2556,7 +1410,7 @@ namespace gpg::HaStar
     const std::uint32_t nodeCount = static_cast<std::uint32_t>(nodes.Size());
     Cluster::Edge noEdge{};
     noEdge.cost = -1;
-    edges.resize(static_cast<std::size_t>((nodeCount * (nodeCount - 1u)) >> 1u), noEdge);
+    edges.resize(Cluster::TriangularSize(nodeCount), noEdge);
 
     SubclusterSearch search;
     for (std::uint32_t high = 1u; high < nodeCount; ++high) {
@@ -2575,7 +1429,7 @@ namespace gpg::HaStar
         if (found == nullptr) {
           continue;
         }
-        edges[low + ((high * (high - 1u)) >> 1u)].cost =
+        edges[Cluster::EdgeIndex(low, high)].cost =
           Cluster::Node::CostTo(nodes[low], nodes[high], found->mCell.mDistance);
       }
     }
@@ -3071,7 +1925,8 @@ namespace gpg::HaStar
 
         const std::size_t nodes = data->mNodeCount;
         archive->WriteUShort(static_cast<unsigned short>(nodes));
-        const std::size_t bytes = nodes * sizeof(Cluster::Node) + nodes * (nodes - 1u) / 2u;
+        const std::size_t bytes =
+          nodes * sizeof(Cluster::Node) + Cluster::TriangularSize(static_cast<std::uint32_t>(nodes));
         if (bytes != 0u) {
           archive->WriteBytes(const_cast<char*>(reinterpret_cast<const char*>(&data->mNodes[0])), bytes);
         }
@@ -3105,8 +1960,7 @@ namespace gpg::HaStar
         }
 
         const std::size_t nodeBytes = static_cast<std::size_t>(nodes) * sizeof(Cluster::Node);
-        const std::size_t bytes =
-          nodeBytes + static_cast<std::size_t>(nodes) * (static_cast<std::size_t>(nodes) - 1u) / 2u;
+        const std::size_t bytes = nodeBytes + Cluster::TriangularSize(nodes);
         payload.assign(bytes + 1u, '\0');
         payload[0] = static_cast<char>(nodes);
         if (bytes != 0u) {
@@ -3115,12 +1969,12 @@ namespace gpg::HaStar
 
         auto found = shared.find(payload);
         if (found == shared.end()) {
+          std::vector<Cluster::Node> nodeList(nodes);
+          std::vector<Cluster::Edge> edgeList((bytes - nodeBytes) / sizeof(Cluster::Edge));
+          std::memcpy(nodeList.data(), payload.data() + 1, nodeBytes);
+          std::memcpy(edgeList.data(), payload.data() + 1 + nodeBytes, bytes - nodeBytes);
           Cluster built{};
-          built.SetData(
-            reinterpret_cast<const Cluster::Node*>(payload.data() + 1),
-            reinterpret_cast<const Cluster::Edge*>(payload.data() + 1 + nodeBytes),
-            nodes
-          );
+          built.SetData(nodeList.data(), edgeList.data(), nodes);
           found = shared.emplace(payload, built).first;
         }
         clusters.mArray[index] = found->second;

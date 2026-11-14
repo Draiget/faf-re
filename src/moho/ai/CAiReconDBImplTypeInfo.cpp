@@ -21,22 +21,22 @@ namespace
   /**
    * Address: 0x005C58E0 (FUN_005C58E0)
    */
-  void DeserializeReconBlipPointerVector(gpg::ReadArchive* archive, std::intptr_t objectPtr, int, gpg::RRef* ownerRef);
+  void DeserializeReconBlipPointerVector(gpg::ReadArchive* archive, void* objectPtr, int, gpg::RRef* ownerRef);
 
   /**
    * Address: 0x005C59F0 (FUN_005C59F0)
    */
-  void SerializeReconBlipPointerVector(gpg::WriteArchive* archive, std::intptr_t objectPtr, int, gpg::RRef* ownerRef);
+  void SerializeReconBlipPointerVector(gpg::WriteArchive* archive, void* objectPtr, int, gpg::RRef* ownerRef);
 
   /**
    * Address: 0x005C6210 (FUN_005C6210)
    */
-  void DeserializeReconBlipMapStorage(gpg::ReadArchive* archive, std::intptr_t objectPtr, int, gpg::RRef* ownerRef);
+  void DeserializeReconBlipMapStorage(gpg::ReadArchive* archive, void* objectPtr, int, gpg::RRef* ownerRef);
 
   /**
    * Address: 0x005C6390 (FUN_005C6390)
    */
-  void SerializeReconBlipMapStorage(gpg::WriteArchive* archive, std::intptr_t objectPtr, int, gpg::RRef* ownerRef);
+  void SerializeReconBlipMapStorage(gpg::WriteArchive* archive, void* objectPtr, int, gpg::RRef* ownerRef);
 
   class ReconBlipPointerVectorType final : public gpg::RType, public gpg::RIndexed
   {
@@ -188,9 +188,7 @@ namespace
     std::int32_t baseOffset = 0;
     const bool derived =
       dynamicType != nullptr && out.mType != nullptr && dynamicType->IsDerivedFrom(out.mType, &baseOffset);
-    out.mObj = derived
-      ? reinterpret_cast<void*>(reinterpret_cast<std::uintptr_t>(object) - static_cast<std::uintptr_t>(baseOffset))
-      : static_cast<void*>(object);
+    out.mObj = derived ? gpg::CompleteObject(object, baseOffset) : static_cast<void*>(object);
     out.mType = dynamicType ? dynamicType : out.mType;
     return out;
   }
@@ -283,13 +281,6 @@ namespace
     return gpg::MakeTypedRef(new CAiReconDBImpl(nullptr, false), gpg::RTypeOf<CAiReconDBImpl>());
   }
 
-  [[maybe_unused]] void DeleteAiReconDbOwned(
-    void* object
-  )
-  {
-    delete static_cast<CAiReconDBImpl*>(object);
-  }
-
   /**
    * Address: 0x005C7F00 (FUN_005C7F00)
    *
@@ -310,16 +301,6 @@ namespace
     gpg::RRef out{};
     out = gpg::MakeRRef<moho::CAiReconDBImpl>(constructed);
     return out;
-  }
-
-  [[maybe_unused]] void DestroyAiReconDbInPlace(
-    void* object
-  )
-  {
-    auto* const recon = static_cast<CAiReconDBImpl*>(object);
-    if (recon) {
-      recon->~CAiReconDBImpl();
-    }
   }
 
   /**
@@ -440,7 +421,7 @@ namespace
    */
   void DeserializeReconBlipPointerVector(
     gpg::ReadArchive* const archive,
-    const std::intptr_t objectPtr,
+    void* const objectPtr,
     const int,
     gpg::RRef* const ownerRef
   )
@@ -449,7 +430,7 @@ namespace
       return;
     }
 
-    auto* const storage = reinterpret_cast<fa::vector<ReconBlip*>*>(objectPtr);
+    auto* const storage = static_cast<fa::vector<ReconBlip*>*>(objectPtr);
 
     unsigned int count = 0;
     archive->ReadUInt(&count);
@@ -471,7 +452,7 @@ namespace
    */
   void SerializeReconBlipPointerVector(
     gpg::WriteArchive* const archive,
-    const std::intptr_t objectPtr,
+    void* const objectPtr,
     const int,
     gpg::RRef* const ownerRef
   )
@@ -480,7 +461,7 @@ namespace
       return;
     }
 
-    const auto* const storage = reinterpret_cast<const fa::vector<ReconBlip*>*>(objectPtr);
+    const auto* const storage = static_cast<const fa::vector<ReconBlip*>*>(objectPtr);
 
     const unsigned int count = static_cast<unsigned int>(storage->size());
     archive->WriteUInt(count);
@@ -497,7 +478,7 @@ namespace
    */
   void DeserializeReconBlipMapStorage(
     gpg::ReadArchive* const archive,
-    const std::intptr_t objectPtr,
+    void* const objectPtr,
     const int,
     gpg::RRef* const ownerRef
   )
@@ -506,7 +487,7 @@ namespace
       return;
     }
 
-    auto* const storage = reinterpret_cast<ReconBlipMap*>(objectPtr);
+    auto* const storage = static_cast<ReconBlipMap*>(objectPtr);
 
     unsigned int count = 0;
     archive->ReadUInt(&count);
@@ -535,7 +516,7 @@ namespace
    */
   void SerializeReconBlipMapStorage(
     gpg::WriteArchive* const archive,
-    const std::intptr_t objectPtr,
+    void* const objectPtr,
     const int,
     gpg::RRef* const ownerRef
   )
@@ -544,7 +525,7 @@ namespace
       return;
     }
 
-    const auto* const storage = reinterpret_cast<const ReconBlipMap*>(objectPtr);
+    const auto* const storage = static_cast<const ReconBlipMap*>(objectPtr);
 
     const unsigned int count = storage ? static_cast<unsigned int>(storage->size()) : 0u;
     archive->WriteUInt(count);

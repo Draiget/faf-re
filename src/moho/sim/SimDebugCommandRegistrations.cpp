@@ -11,7 +11,7 @@ namespace
    * Address: 0x00BCE420 (FUN_00BCE420, dynamic initializer for `gTConVar_ren_Steering`)
    * Address: 0x00BF80A0 (FUN_00BF80A0, dynamic atexit destructor for `gTConVar_ren_Steering`)
    */
-  moho::TConVar<bool> gTConVar_ren_Steering("ren_Steering", "", reinterpret_cast<bool*>(&moho::ren_Steering));
+  moho::TConVar<bool> gTConVar_ren_Steering("ren_Steering", "", &moho::ren_Steering);
 } // namespace
 
 namespace moho

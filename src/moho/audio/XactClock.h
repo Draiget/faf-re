@@ -2,15 +2,17 @@
 
 #pragma once
 
+struct _GUID;
+
 namespace moho
 {
-  class IXACTEngine;
 
   /**
    * FAF addition, not in the shipped binary.
    *
    * What it does:
-   * Gives the DLL that implements `engine` (xactengine2_9.dll) a millisecond
+   * Gives the DLL registered for the XACT engine class `engineClass`
+   * (xactengine2_9.dll) a millisecond
    * clock that counts from process start instead of from Windows boot, by
    * pointing that module's QueryPerformanceCounter and GetTickCount imports at
    * engine functions. Call it right after the engine object is created and
@@ -33,5 +35,5 @@ namespace moho
    * `FAF_TEST_TICK_OFFSET_DAYS` (test only) adds that many days to the clock
    * XACT would otherwise see, to reproduce the bug on a freshly booted machine.
    */
-  void SND_InstallXactClock(const IXACTEngine& engine);
+  void SND_InstallXactClock(const _GUID* engineClass);
 } // namespace moho

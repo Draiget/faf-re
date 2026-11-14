@@ -2671,7 +2671,7 @@ static size_t luaC_separateudata(
     }
 
     // The payload's x86 size: deadmem is charged against nblocks (x64 port, LuaMemAccounting.h).
-    deadmem += static_cast<size_t>(LuaX86PayloadSize(reinterpret_cast<gpg::RType*>(current->u.len)));
+    deadmem += static_cast<size_t>(LuaX86PayloadSize(current->u.type));
     *survivor = current->gch.next;
     current->gch.next = nullptr;
     *lastCollected = current;
@@ -2726,7 +2726,7 @@ static void luaC_callGCTM(
 
     udata->gch.marked &= kClearFinaliserBits;
 
-    auto* const type = reinterpret_cast<gpg::RType*>(udata->u.len);
+    auto* const type = udata->u.type;
     type->dtrFunc_(static_cast<void*>(&udata->u + 1));
   }
 

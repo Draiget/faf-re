@@ -34,25 +34,6 @@ namespace
     trigger->mName.tidy(true, 0U);
   }
 
-  /**
-   * Address: 0x00714850 (FUN_00714850)
-   *
-   * What it does:
-   * Deleting-dtor thunk lane for `STrigger`: runs the canonical destructor
-   * body and frees object storage when the pointer is non-null.
-   */
-  [[maybe_unused]] void DestroySTriggerAndFreeThunk(
-    moho::STrigger* const trigger
-  )
-  {
-    if (trigger == nullptr) {
-      return;
-    }
-
-    trigger->~STrigger();
-    ::operator delete(trigger);
-  }
-
   // The `_Copy_backward` emissions for `SCondition` (0x00714850, 0x00713950)
   // and the jump thunks 0x00712840/0x00712870 are the tail-shift step of
   // `fastvector_n<SCondition, 2>::InsertAt` (0x0070FAD0); they are cited on

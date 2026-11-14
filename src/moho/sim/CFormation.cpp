@@ -221,7 +221,7 @@ namespace moho
       Wm3::Vector3f unitPosition(0.0f, 0.0f, 0.0f);
       bool haveQueuedPosition = false;
       if (useLastQueuedDestination && unit != nullptr) {
-        if (const QueuedUserCommandRecord* const anchor = GetLastQueuedUserCommandAnchor(unit); anchor != nullptr) {
+        if (const UserCommandIssueHelper* const anchor = GetLastQueuedUserCommandAnchor(unit); anchor != nullptr) {
           const Wm3::Vector3f queuedPosition = ResolveLastQueuedCommandAnchorPosition(anchor);
           if (IsValidVector3f(queuedPosition)) {
             unitPosition = queuedPosition;

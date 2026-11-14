@@ -136,19 +136,6 @@ __declspec(naked) void __stdcall LuaStateSlotLoadBufferBridge(
 #endif // _M_IX86
 
 /**
- * Address: 0x004CCAB0 (FUN_004CCAB0)
- *
- * What it does:
- * Pops one value from a Lua stack slot by rebasing top to `-2`.
- */
-[[maybe_unused]] static void LuaStateSlotPopOne(
-  lua_State** const stateSlot
-)
-{
-  lua_settop(*stateSlot, -2);
-}
-
-/**
  * Address: 0x004CCA10 (FUN_004CCA10, LuaPlus::LuaState::PushNil)
  *
  * What it does:
@@ -800,8 +787,8 @@ gpg::RRef LuaObject::GetUserData() const
   auto* const userdata = static_cast<Udata*>(m_object.value.p);
 
   gpg::RRef out{};
-  out.mObj = reinterpret_cast<std::uint8_t*>(userdata) + sizeof(Udata);
-  out.mType = reinterpret_cast<gpg::RType*>(userdata->len);
+  out.mObj = userdata->Payload();
+  out.mType = userdata->type;
   return out;
 }
 
@@ -1759,25 +1746,6 @@ namespace
     std::uint32_t value;
   };
   static_assert(sizeof(OwnerWordWritePair) == 0x08, "OwnerWordWritePair size must be 0x08");
-
-  /**
-   * Address: 0x00929BE0 (FUN_00929BE0)
-   *
-   * What it does:
-   * Stores one 32-bit value into owner field `+0x44` (`+0x68` bytes) and
-   * returns the owner pointer lane.
-   */
-  [[maybe_unused]] OwnerWordLaneAt68* StoreOwnerWordLaneAt68(
-    OwnerWordWritePair* const writePair
-  )
-  {
-    if (writePair == nullptr || writePair->owner == nullptr) {
-      return nullptr;
-    }
-
-    writePair->owner->lane44 = writePair->value;
-    return writePair->owner;
-  }
 
   /**
    * Address: 0x009284D0 (FUN_009284D0)

@@ -89,55 +89,6 @@ namespace
     return gpg::CachedLookup<moho::CCollisionManipulator>(moho::CCollisionManipulator::sType);
   }
 
-  /**
-   * Address: 0x006377B0 (FUN_006377B0)
-   *
-   * What it does:
-   * Translates one world-space point into a local origin lane and rotates it
-   * by the inverse of one quaternion lane set.
-   */
-  [[maybe_unused]] Wm3::Vector3f* TransformWorldPointByInverseQuaternionLanes(
-    const float* const transformLanes,
-    Wm3::Vector3f* const outVector,
-    const float* const worldPointLanes
-  )
-  {
-    Wm3::Vector3f localPoint{};
-    localPoint.x = worldPointLanes[0] - transformLanes[4];
-    localPoint.y = worldPointLanes[1] - transformLanes[5];
-    localPoint.z = worldPointLanes[2] - transformLanes[6];
-
-    // 0x006377E2 copies `[eax+0]` verbatim into the conjugate's lane 0, and
-    // 0x006377F7 / 0x00637806 / 0x0063780B subtract `[eax+4]`, `[eax+8]` and
-    // `[eax+0Ch]` from the zero constant `dword_E4F748`.
-    Wm3::Quaternionf inverseRotation{};
-    inverseRotation.w = transformLanes[0];
-    inverseRotation.x = -transformLanes[1];
-    inverseRotation.y = -transformLanes[2];
-    inverseRotation.z = -transformLanes[3];
-
-    moho::MultQuadVec(outVector, &localPoint, &inverseRotation);
-    return outVector;
-  }
-
-  /**
-   * Address: 0x00638D10 (FUN_00638D10)
-   *
-   * What it does:
-   * Upcasts one reflected reference lane to `moho::CCollisionManipulator*`.
-   */
-  [[maybe_unused]] [[nodiscard]] void* TryUpcastCCollisionManipulatorRefObject(
-    gpg::RRef* const sourceRef
-  )
-  {
-    if (!sourceRef) {
-      return nullptr;
-    }
-
-    const gpg::RRef upcast = gpg::REF_UpcastPtr(*sourceRef, CachedCCollisionManipulatorType());
-    return upcast.mObj;
-  }
-
   void AddIAniManipulatorBase(
     gpg::RType* const typeInfo
   )
@@ -173,8 +124,7 @@ namespace
       return out;
     }
 
-    out.mObj =
-      reinterpret_cast<void*>(reinterpret_cast<std::uintptr_t>(iunit) - static_cast<std::uintptr_t>(baseOffset));
+    out.mObj = gpg::CompleteObject(iunit, baseOffset);
     out.mType = dynamicType;
     return out;
   }
@@ -278,20 +228,6 @@ namespace
       new (object) moho::CCollisionManipulator();
     }
     return gpg::MakeTypedRef(object, CachedCCollisionManipulatorType());
-  }
-
-  /**
-   * Address: 0x00637B10 (FUN_00637B10)
-   *
-   * What it does:
-   * In-place constructor lane that initializes one `CCollisionManipulator`
-   * object and returns that same storage pointer.
-   */
-  [[maybe_unused]] [[nodiscard]] moho::CCollisionManipulator* ConstructCollisionManipulatorInPlaceAlias(
-    moho::CCollisionManipulator* const objectStorage
-  )
-  {
-    return new (objectStorage) moho::CCollisionManipulator();
   }
 
   /**

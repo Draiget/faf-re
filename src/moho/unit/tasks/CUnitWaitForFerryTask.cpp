@@ -298,7 +298,11 @@ namespace moho
     static_assert(
       offsetof(CUnitWaitForFerryTask, mDispatch) == 0x30, "CUnitWaitForFerryTask::mDispatch offset must be 0x30"
     );
-    archive->ReadPointer(reinterpret_cast<CCommandTask**>(&mDispatch), &ownerRef);
+    {
+      CCommandTask* value = nullptr;
+      archive->ReadPointer(&value, &ownerRef);
+      mDispatch = static_cast<decltype(mDispatch)>(value);
+    }
 
     archive->Read(gpg::RTypeOf<moho::WeakPtr<moho::Unit>>(), &mFerryUnit, ownerRef);
     archive->Read(gpg::RTypeOf<moho::SNavGoal>(), &mMoveGoal, ownerRef);
@@ -307,58 +311,6 @@ namespace moho
 
 namespace
 {
-
-  /**
-   * Address: 0x0060F990 (FUN_0060F990, Moho::CUnitWaitForFerryTaskSerializer::Deserialize)
-   * Address: 0x00610590 (FUN_00610590, COMDAT/jmp alias)
-   * Address: 0x00610630 (FUN_00610630, COMDAT/jmp alias)
-   *
-   * What it does:
-   * Serializer-load callback registered with the reflected
-   * `Moho::CUnitWaitForFerryTask` type. Forwards the reflected object
-   * pointer into `CUnitWaitForFerryTask::MemberDeserialize` (FUN_00610C60
-   * body); `version` and the owner-ref lane are unused by the member
-   * (mirrors the binary tail-jump).
-   */
-  [[maybe_unused]] void DeserializeCUnitWaitForFerryTaskSerializerCallback(
-    gpg::ReadArchive* const archive,
-    const std::intptr_t objectPtr,
-    const int,
-    gpg::RRef* const
-  )
-  {
-    auto* const task = reinterpret_cast<moho::CUnitWaitForFerryTask*>(objectPtr);
-    if (task == nullptr) {
-      return;
-    }
-    task->MemberDeserialize(archive);
-  }
-
-  /**
-   * Address: 0x0060F9A0 (FUN_0060F9A0, Moho::CUnitWaitForFerryTaskSerializer::Serialize)
-   * Address: 0x006105A0 (FUN_006105A0, COMDAT/jmp alias)
-   * Address: 0x00610640 (FUN_00610640, COMDAT/jmp alias)
-   *
-   * What it does:
-   * Serializer-save callback registered with the reflected
-   * `Moho::CUnitWaitForFerryTask` type. Forwards the reflected object
-   * pointer into `CUnitWaitForFerryTask::MemberSerialize` (FUN_00610D30
-   * body); `version` and the owner-ref lane are unused by the member
-   * (mirrors the binary tail-jump).
-   */
-  [[maybe_unused]] void SerializeCUnitWaitForFerryTaskSerializerCallback(
-    gpg::WriteArchive* const archive,
-    const std::intptr_t objectPtr,
-    const int,
-    gpg::RRef* const
-  )
-  {
-    auto* const task = reinterpret_cast<moho::CUnitWaitForFerryTask*>(objectPtr);
-    if (task == nullptr) {
-      return;
-    }
-    task->MemberSerialize(archive);
-  }
 
 } // namespace
 

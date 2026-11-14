@@ -15,7 +15,7 @@
 #include "moho/script/CScriptEvent.h"
 #include "moho/script/CScriptObject.h"
 #include "moho/sim/CArmyImpl.h"
-#include "moho/sim/CSimArmyEconomyInfo.h"
+#include "moho/sim/CEconomy.h"
 #include "moho/sim/Sim.h"
 #include "moho/task/CTaskEvent.h"
 #include "moho/unit/core/Unit.h"
@@ -365,11 +365,11 @@ namespace moho
         }
       }
     } else if (CArmyImpl* const army = mUnit->ArmyRef; army != nullptr) {
-      if (CSimArmyEconomyInfo* const economyInfo = army->GetEconomy(); economyInfo != nullptr) {
-        const double maxStorage = economyInfo->economy.MaxStorageOf(mResourceType);
+      if (CEconomy* const economyInfo = army->GetEconomy(); economyInfo != nullptr) {
+        const double maxStorage = economyInfo->mTotals.MaxStorageOf(mResourceType);
         if (maxStorage > 0.0) {
           const float storedValue =
-            (mResourceType == ECON_MASS) ? economyInfo->economy.mStored.MASS : economyInfo->economy.mStored.ENERGY;
+            (mResourceType == ECON_MASS) ? economyInfo->mTotals.mStored.MASS : economyInfo->mTotals.mStored.ENERGY;
           storageRatio = storedValue / static_cast<float>(maxStorage);
         }
       }

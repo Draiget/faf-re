@@ -228,13 +228,13 @@ namespace
    */
   void DeserializeSSTIEntityAttachInfoSerializerCallback(
     gpg::ReadArchive* const archive,
-    const std::intptr_t objectPtr,
+    void* const objectPtr,
     const int,
     gpg::RRef*
   )
   {
     const gpg::RRef entIdRef{};
-    archive->Read(CachedEntIdType(), reinterpret_cast<void*>(objectPtr), entIdRef);
+    archive->Read(CachedEntIdType(), objectPtr, entIdRef);
   }
 
   /**
@@ -246,13 +246,13 @@ namespace
    */
   void SerializeSSTIEntityAttachInfoSerializerCallback(
     gpg::WriteArchive* const archive,
-    const std::intptr_t objectPtr,
+    void* const objectPtr,
     const int,
     gpg::RRef*
   )
   {
     const gpg::RRef entIdRef{};
-    archive->Write(CachedEntIdType(), reinterpret_cast<const void*>(objectPtr), entIdRef);
+    archive->Write(CachedEntIdType(), static_cast<const void*>(objectPtr), entIdRef);
   }
 
   /**
@@ -271,22 +271,22 @@ namespace
 
   void DeserializeEntityAttributesSerializerCallback(
     gpg::ReadArchive* const archive,
-    const std::intptr_t objectPtr,
+    void* const objectPtr,
     const int,
     gpg::RRef*
   )
   {
-    reinterpret_cast<moho::EntityAttributes*>(objectPtr)->MemberDeserialize(archive);
+    static_cast<moho::EntityAttributes*>(objectPtr)->MemberDeserialize(archive);
   }
 
   void SerializeEntityAttributesSerializerCallback(
     gpg::WriteArchive* const archive,
-    const std::intptr_t objectPtr,
+    void* const objectPtr,
     const int,
     gpg::RRef*
   )
   {
-    reinterpret_cast<const moho::EntityAttributes*>(objectPtr)->MemberSerialize(archive);
+    static_cast<const moho::EntityAttributes*>(objectPtr)->MemberSerialize(archive);
   }
 
   /**

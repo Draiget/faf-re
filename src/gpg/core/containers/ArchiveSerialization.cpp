@@ -435,7 +435,7 @@ namespace
      * `ownerRef` are unused -- the real body passes a fresh empty `RRef`
      * to the nested archive call rather than forwarding either.
      */
-    static void Deserialize(gpg::ReadArchive* archive, std::intptr_t objectPtr, int version, gpg::RRef* ownerRef);
+    static void Deserialize(gpg::ReadArchive* archive, void* objectPtr, int version, gpg::RRef* ownerRef);
 
     /**
      * Address: 0x007631D0 (FUN_007631D0, Moho::NavPathSerializer::Serialize)
@@ -444,7 +444,7 @@ namespace
      * Writes one `std::vector<HPathCell>` payload directly at `objectPtr`
      * through the reflected vector type, mirroring `Deserialize`.
      */
-    static void Serialize(gpg::WriteArchive* archive, std::intptr_t objectPtr, int version, gpg::RRef* ownerRef);
+    static void Serialize(gpg::WriteArchive* archive, void* objectPtr, int version, gpg::RRef* ownerRef);
 
     /**
      * Address: 0x00763370 (FUN_00763370, gpg::SerSaveLoadHelper_NavPath::Init)
@@ -480,26 +480,26 @@ namespace
 
   void NavPathSerializer::Deserialize(
     gpg::ReadArchive* const archive,
-    const std::intptr_t objectPtr,
+    void* const objectPtr,
     const int,
     gpg::RRef* const
   )
   {
     gpg::RType* const type = CachedCompatRType<fa::vector<moho::HPathCell>>();
     const gpg::RRef emptyOwner{};
-    archive->Read(type, reinterpret_cast<void*>(objectPtr), emptyOwner);
+    archive->Read(type, objectPtr, emptyOwner);
   }
 
   void NavPathSerializer::Serialize(
     gpg::WriteArchive* const archive,
-    const std::intptr_t objectPtr,
+    void* const objectPtr,
     const int,
     gpg::RRef* const
   )
   {
     gpg::RType* const type = CachedCompatRType<fa::vector<moho::HPathCell>>();
     const gpg::RRef emptyOwner{};
-    archive->Write(type, reinterpret_cast<void*>(objectPtr), emptyOwner);
+    archive->Write(type, objectPtr, emptyOwner);
   }
 
   void NavPathSerializer::Init()
@@ -561,7 +561,7 @@ namespace gpg
    */
   void SaveFastVectorUnitWeaponInfo(
     gpg::WriteArchive* const archive,
-    std::intptr_t objectPtr,
+    void* objectPtr,
     int /*version*/,
     gpg::RRef* const ownerRef
   )
@@ -570,7 +570,7 @@ namespace gpg
       return;
     }
 
-    const auto& weapons = *reinterpret_cast<const gpg::core::FastVector<moho::UnitWeaponInfo>*>(objectPtr);
+    const auto& weapons = *static_cast<const gpg::core::FastVector<moho::UnitWeaponInfo>*>(objectPtr);
     SaveContiguousArchiveVectorPayload(
       archive,
       weapons.Data(),
@@ -610,7 +610,7 @@ namespace gpg
    */
   void SaveVectorSPerArmyReconInfo(
     gpg::WriteArchive* const archive,
-    std::intptr_t objectPtr,
+    void* objectPtr,
     int /*version*/,
     gpg::RRef* const ownerRef
   )
@@ -619,7 +619,7 @@ namespace gpg
       return;
     }
 
-    const auto* const storage = reinterpret_cast<const fa::vector<moho::SPerArmyReconInfo>*>(objectPtr);
+    const auto* const storage = static_cast<const fa::vector<moho::SPerArmyReconInfo>*>(objectPtr);
     SaveContiguousArchiveVectorPayload(
       archive,
       storage->data(),
@@ -653,12 +653,12 @@ namespace gpg
    */
   void LoadVectorSPerArmyReconInfo(
     gpg::ReadArchive* const archive,
-    std::intptr_t objectPtr,
+    void* objectPtr,
     int /*version*/,
     gpg::RRef* /*ownerRef*/
   )
   {
-    auto* const outVector = reinterpret_cast<fa::vector<moho::SPerArmyReconInfo>*>(objectPtr);
+    auto* const outVector = static_cast<fa::vector<moho::SPerArmyReconInfo>*>(objectPtr);
 
     unsigned int count = 0;
     archive->ReadUInt(&count);
@@ -971,9 +971,7 @@ void gpg::WriteRawPointer(
         ));
       }
 
-      objectType->serSaveFunc_(
-        archive, reinterpret_cast<std::intptr_t>(objectRef.mObj), objectType->version_, const_cast<RRef*>(&ownerRef)
-      );
+      objectType->serSaveFunc_(archive, objectRef.mObj, objectType->version_, const_cast<RRef*>(&ownerRef));
     }
 
     archive->WriteMarker(static_cast<int>(ArchiveToken::ObjectTerminator));
@@ -1102,12 +1100,7 @@ TrackedPointerInfo& gpg::ReadRawPointer(
       ));
     }
 
-    handle.type->serLoadFunc_(
-      archive,
-      reinterpret_cast<std::intptr_t>(constructResult.mInfo.object),
-      handle.version,
-      const_cast<RRef*>(&ownerRef)
-    );
+    handle.type->serLoadFunc_(archive, constructResult.mInfo.object, handle.version, const_cast<RRef*>(&ownerRef));
   }
 
   if (archive->NextMarker() != static_cast<int>(ArchiveToken::ObjectTerminator)) {
@@ -1121,333 +1114,9 @@ TrackedPointerInfo& gpg::ReadRawPointer(
 
 namespace
 {
-  /**
-   * What it does:
-   * Writes `value` as a tracked pointer in `trackedState`, owned by nothing:
-   * `WriteRawPointer` of `MakeRRef<TObject>(value)`.
-   */
-  [[nodiscard]] gpg::RType* ResolveCThrustManipulatorArchiveAdapterType()
-  {
-    static gpg::RType* sType = nullptr;
-    if (sType == nullptr) {
-      sType = gpg::REF_FindTypeNamed("Moho::CThrustManipulator");
-      if (sType == nullptr) {
-        sType = gpg::REF_FindTypeNamed("CThrustManipulator");
-      }
-    }
-    return sType;
-  }
-
-  /**
-   * Address: 0x0050AD20 (FUN_0050AD20)
-   *
-   * What it does:
-   * Forwards one integer lane to `WriteArchive::WriteUByte`.
-   */
-  [[maybe_unused]] gpg::WriteArchive* WriteUByteArchiveLaneValueFromInt(
-    gpg::WriteArchive* const archive,
-    const int value
-  )
-  {
-    archive->WriteUByte(static_cast<unsigned __int8>(value));
-    return archive;
-  }
-
-  /**
-   * Address: 0x0050AD40 (FUN_0050AD40)
-   *
-   * What it does:
-   * Dereferences one byte lane and forwards it to `WriteArchive::WriteUByte`.
-   */
-  [[maybe_unused]] gpg::WriteArchive* WriteUByteArchiveLaneValueFromPointer(
-    gpg::WriteArchive* const archive,
-    const unsigned __int8* const value
-  )
-  {
-    archive->WriteUByte(*value);
-    return archive;
-  }
-
-  /**
-   * Address: 0x0050AD60 (FUN_0050AD60)
-   *
-   * What it does:
-   * Forwards one integer lane to `WriteArchive::WriteShort`.
-   */
-  [[maybe_unused]] gpg::WriteArchive* WriteShortArchiveLaneValueFromInt(
-    gpg::WriteArchive* const archive,
-    const int value
-  )
-  {
-    archive->WriteShort(static_cast<short>(value));
-    return archive;
-  }
-
-  /**
-   * Address: 0x0050AD70 (FUN_0050AD70)
-   *
-   * What it does:
-   * Dereferences one 16-bit lane and forwards it to `WriteArchive::WriteShort`.
-   */
-  [[maybe_unused]] gpg::WriteArchive* WriteShortArchiveLaneValueFromPointer(
-    gpg::WriteArchive* const archive,
-    const unsigned short* const value
-  )
-  {
-    archive->WriteShort(static_cast<short>(*value));
-    return archive;
-  }
-
-  /**
-   * Address: 0x0050CD30 (FUN_0050CD30)
-   *
-   * What it does:
-   * Writes two consecutive 32-bit lanes through `WriteArchive::WriteInt`.
-   */
-  [[maybe_unused]] gpg::WriteArchive* WriteInt32PairArchiveLanes(
-    const std::int32_t* const pairValue,
-    gpg::WriteArchive* const archive
-  )
-  {
-    archive->WriteInt(pairValue[0]);
-    archive->WriteInt(pairValue[1]);
-    return archive;
-  }
-
-  /**
-   * Address: 0x0050CD50 (FUN_0050CD50)
-   *
-   * What it does:
-   * Writes two consecutive float lanes through `WriteArchive::WriteFloat`.
-   */
-  [[maybe_unused]] gpg::WriteArchive* WriteFloatPairArchiveLanes(
-    const float* const pairValue,
-    gpg::WriteArchive* const archive
-  )
-  {
-    archive->WriteFloat(pairValue[0]);
-    archive->WriteFloat(pairValue[1]);
-    return archive;
-  }
-
-  /**
-   * Address: 0x0050CD70 (FUN_0050CD70)
-   *
-   * What it does:
-   * Writes two consecutive 16-bit signed lanes through `WriteArchive::WriteShort`.
-   */
-  [[maybe_unused]] gpg::WriteArchive* WriteShortPairArchiveLanesFromSignedPointer(
-    const std::int16_t* const pairValue,
-    gpg::WriteArchive* const archive
-  )
-  {
-    archive->WriteShort(pairValue[0]);
-    archive->WriteShort(pairValue[1]);
-    return archive;
-  }
-
-  /**
-   * Address: 0x0050CD90 (FUN_0050CD90)
-   *
-   * What it does:
-   * Writes two consecutive 16-bit unsigned lanes through `WriteArchive::WriteShort`.
-   */
-  [[maybe_unused]] gpg::WriteArchive* WriteShortPairArchiveLanesFromUnsignedPointer(
-    const unsigned short* const pairValue,
-    gpg::WriteArchive* const archive
-  )
-  {
-    archive->WriteShort(static_cast<short>(pairValue[0]));
-    archive->WriteShort(static_cast<short>(pairValue[1]));
-    return archive;
-  }
-
-  /**
-   * Address: 0x0050D170 (FUN_0050D170)
-   *
-   * What it does:
-   * Writes one signed 16-bit lane and returns the archive lane.
-   */
-  [[maybe_unused]] gpg::WriteArchive* WriteShortArchiveLaneAndReturnArchive(
-    const std::int16_t value,
-    gpg::WriteArchive* const archive
-  )
-  {
-    archive->WriteShort(value);
-    return archive;
-  }
-
-  /**
-   * Address: 0x0050D180 (FUN_0050D180)
-   *
-   * What it does:
-   * Writes one referenced 16-bit lane and returns the archive lane.
-   */
-  [[maybe_unused]] gpg::WriteArchive* WriteShortArchiveLaneFromPointerAndReturnArchive(
-    const unsigned short* const value,
-    gpg::WriteArchive* const archive
-  )
-  {
-    archive->WriteShort(static_cast<short>(*value));
-    return archive;
-  }
-
-  /**
-   * Address: 0x0050D290 (FUN_0050D290)
-   *
-   * What it does:
-   * Writes one byte lane through `WriteArchive::WriteUByte` and returns the
-   * archive object for chained callsites.
-   */
-  [[maybe_unused]] gpg::WriteArchive* WriteUByteArchiveLaneAndReturnArchive(
-    gpg::WriteArchive* const archive,
-    const unsigned __int8 value,
-    const int /*unusedStackLane*/
-  )
-  {
-    archive->WriteUByte(value);
-    return archive;
-  }
-
-  /**
-   * Address: 0x0050D2B0 (FUN_0050D2B0)
-   *
-   * What it does:
-   * Writes one referenced byte lane and returns the archive object for
-   * chained callsites.
-   */
-  [[maybe_unused]] gpg::WriteArchive* WriteUByteArchiveLaneFromPointerAndReturnArchive(
-    gpg::WriteArchive* const archive,
-    const unsigned __int8* const value,
-    const int /*unusedStackLane*/
-  )
-  {
-    archive->WriteUByte(*value);
-    return archive;
-  }
 } // namespace
 namespace
 {
-  /**
-   * Address: 0x0064B4F0 (FUN_0064B4F0)
-   *
-   * What it does:
-   * Upcasts one reflected reference to `CThrustManipulator` and returns the
-   * typed object pointer when the source is compatible.
-   */
-  [[maybe_unused]] [[nodiscard]] moho::CThrustManipulator* func_CastCThrustManipulator(
-    const gpg::RRef& source
-  )
-  {
-    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, ResolveCThrustManipulatorArchiveAdapterType());
-    return static_cast<moho::CThrustManipulator*>(upcast.mObj);
-  }
-
-  /**
-   * Address: 0x00652940 (FUN_00652940)
-   *
-   * What it does:
-   * Upcasts one reflected reference to `RDebugOverlay` and returns the typed
-   * object pointer when the source is compatible.
-   */
-  [[maybe_unused]] [[nodiscard]] moho::RDebugOverlay* func_CastRDebugOverlay(
-    const gpg::RRef& source
-  )
-  {
-    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, gpg::RTypeOf<moho::RDebugOverlay>());
-    return static_cast<moho::RDebugOverlay*>(upcast.mObj);
-  }
-
-  /**
-   * Address: 0x006608F0 (FUN_006608F0)
-   *
-   * What it does:
-   * Upcasts one reflected reference to `REmitterBlueprint` and returns the
-   * typed object pointer when the source is compatible.
-   */
-  [[maybe_unused]] [[nodiscard]] moho::REmitterBlueprint* func_CastREmitterBlueprint(
-    const gpg::RRef& source
-  )
-  {
-    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, gpg::RTypeOf<moho::REmitterBlueprint>());
-    return static_cast<moho::REmitterBlueprint*>(upcast.mObj);
-  }
-
-  /**
-   * Address: 0x00672B00 (FUN_00672B00)
-   *
-   * What it does:
-   * Upcasts one reflected reference to `RTrailBlueprint` and returns the typed
-   * object pointer when the source is compatible.
-   */
-  [[maybe_unused]] [[nodiscard]] moho::RTrailBlueprint* func_CastRTrailBlueprint(
-    const gpg::RRef& source
-  )
-  {
-    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, gpg::RTypeOf<moho::RTrailBlueprint>());
-    return static_cast<moho::RTrailBlueprint*>(upcast.mObj);
-  }
-
-  /**
-   * Address: 0x00675F80 (FUN_00675F80)
-   *
-   * What it does:
-   * Upcasts one reflected reference to `CollisionBeamEntity` and returns the
-   * typed object pointer when the source is compatible.
-   */
-  [[maybe_unused]] [[nodiscard]] moho::CollisionBeamEntity* func_CastCollisionBeamEntity(
-    const gpg::RRef& source
-  )
-  {
-    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, gpg::RTypeOf<moho::CollisionBeamEntity>());
-    return static_cast<moho::CollisionBeamEntity*>(upcast.mObj);
-  }
-
-  /**
-   * Address: 0x00675FC0 (FUN_00675FC0)
-   *
-   * What it does:
-   * Upcasts one reflected reference to `ManyToOneListener_ECollisionBeamEvent`
-   * and returns the typed object pointer when the source is compatible.
-   */
-  [[maybe_unused]] [[nodiscard]] moho::ManyToOneListener_ECollisionBeamEvent*
-  func_CastManyToOneListener_ECollisionBeamEvent(
-    const gpg::RRef& source
-  )
-  {
-    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, gpg::RTypeOf<moho::ManyToOneListener_ECollisionBeamEvent>());
-    return static_cast<moho::ManyToOneListener_ECollisionBeamEvent*>(upcast.mObj);
-  }
-
-  /**
-   * Address: 0x0067F0A0 (FUN_0067F0A0)
-   *
-   * What it does:
-   * Upcasts one reflected reference to `RProjectileBlueprint` and returns the
-   * typed object pointer when the source is compatible.
-   */
-  [[maybe_unused]] [[nodiscard]] moho::RProjectileBlueprint* func_CastRProjectileBlueprint(
-    const gpg::RRef& source
-  )
-  {
-    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, gpg::RTypeOf<moho::RProjectileBlueprint>());
-    return static_cast<moho::RProjectileBlueprint*>(upcast.mObj);
-  }
-
-  /**
-   * Address: 0x006898E0 (FUN_006898E0)
-   *
-   * What it does:
-   * Upcasts one reflected reference to `EntitySetBase` and returns the typed
-   * object pointer when the source is compatible.
-   */
-  [[maybe_unused]] [[nodiscard]] moho::EntitySetBase* func_CastEntitySetBase(
-    const gpg::RRef& source
-  )
-  {
-    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, gpg::RTypeOf<moho::EntitySetBase>());
-    return static_cast<moho::EntitySetBase*>(upcast.mObj);
-  }
 } // namespace
 namespace
 {
@@ -1509,108 +1178,6 @@ namespace
 namespace
 {
 
-  [[nodiscard]] gpg::RType* ResolveShieldArchiveAdapterType()
-  {
-    static gpg::RType* sType = nullptr;
-    if (sType == nullptr) {
-      sType = gpg::REF_FindTypeNamed("Moho::Shield");
-      if (sType == nullptr) {
-        sType = gpg::LookupRType(typeid(moho::Shield));
-      }
-    }
-    return sType;
-  }
-
-  [[nodiscard]] gpg::RType* ResolveListenerNavPathArchiveAdapterType()
-  {
-    static gpg::RType* sType = nullptr;
-    if (sType == nullptr) {
-      sType = gpg::REF_FindTypeNamed("Moho::Listener<Moho::NavPath const &>");
-      if (sType == nullptr) {
-        sType = gpg::REF_FindTypeNamed("Listener<Moho::NavPath const &>");
-      }
-      if (sType == nullptr) {
-        sType = gpg::REF_FindTypeNamed("Moho::Listener_NavPath");
-      }
-      if (sType == nullptr) {
-        sType = gpg::LookupRType(typeid(moho::Listener<const moho::SNavPath&>));
-      }
-    }
-    return sType;
-  }
-
-  [[nodiscard]] gpg::RType* ResolveIPathTravelerArchiveAdapterType()
-  {
-    static gpg::RType* sType = nullptr;
-    if (sType == nullptr) {
-      sType = gpg::REF_FindTypeNamed("Moho::IPathTraveler");
-      if (sType == nullptr) {
-        sType = gpg::REF_FindTypeNamed("IPathTraveler");
-      }
-      if (sType == nullptr) {
-        sType = gpg::LookupRType(typeid(moho::IPathTraveler));
-      }
-    }
-    return sType;
-  }
-
-  /**
-   * Address: 0x0073AD60 (FUN_0073AD60)
-   *
-   * What it does:
-   * Upcasts one reflected reference to `CDamage` and returns the typed object pointer when the source is compatible.
-   */
-  [[maybe_unused]] [[nodiscard]] moho::CDamage* func_CastCDamage(
-    const gpg::RRef& source
-  )
-  {
-    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, gpg::RTypeOf<moho::CDamage>());
-    return static_cast<moho::CDamage*>(upcast.mObj);
-  }
-
-  /**
-   * Address: 0x00755AC0 (FUN_00755AC0)
-   *
-   * What it does:
-   * Upcasts one reflected reference to `Shield` and returns the typed object pointer when the source is compatible.
-   */
-  [[maybe_unused]] [[nodiscard]] moho::Shield* func_CastShield(
-    const gpg::RRef& source
-  )
-  {
-    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, ResolveShieldArchiveAdapterType());
-    return static_cast<moho::Shield*>(upcast.mObj);
-  }
-
-  /**
-   * Address: 0x00764420 (FUN_00764420)
-   *
-   * What it does:
-   * Upcasts one reflected reference to `Listener<NavPath const&>` and returns the typed object pointer when the source
-   * is compatible.
-   */
-  [[maybe_unused]] [[nodiscard]] moho::Listener<const moho::SNavPath&>* func_CastListener_NavPath(
-    const gpg::RRef& source
-  )
-  {
-    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, ResolveListenerNavPathArchiveAdapterType());
-    return static_cast<moho::Listener<const moho::SNavPath&>*>(upcast.mObj);
-  }
-
-  /**
-   * Address: 0x0076AE30 (FUN_0076AE30)
-   *
-   * What it does:
-   * Upcasts one reflected reference to `IPathTraveler` and returns the typed object pointer when the source is
-   * compatible.
-   */
-  [[maybe_unused]] [[nodiscard]] moho::IPathTraveler* func_CastIPathTraveler(
-    const gpg::RRef& source
-  )
-  {
-    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, ResolveIPathTravelerArchiveAdapterType());
-    return static_cast<moho::IPathTraveler*>(upcast.mObj);
-  }
 } // namespace
 
 namespace gpg
@@ -1636,12 +1203,17 @@ namespace gpg
    */
   void SaveUnownedRawPointerFromManyToOneListener_EProjectileImpactEventIntrusiveHeadLane1(
     gpg::WriteArchive* archive,
-    std::uint32_t* intrusiveListHeadSlot
+    void* objectPtr,
+    int,
+    gpg::RRef*
   )
   {
-    ::SaveUnownedRawPointerFromManyToOneListener_EProjectileImpactEventIntrusiveHeadLane1_Impl(
-      archive, reinterpret_cast<const moho::ManyToOneBroadcaster<moho::EProjectileImpactEvent>*>(intrusiveListHeadSlot)
-    );
+    const auto* const broadcaster =
+      static_cast<const moho::ManyToOneBroadcaster<moho::EProjectileImpactEvent>*>(objectPtr);
+    // The object this `serSaveFunc_` receives is the reflected
+    // `ManyToOneBroadcaster<EProjectileImpactEvent>` itself (its RType's `size_` is the 8-byte
+    // broadcaster), not a raw list-head word.
+    ::SaveUnownedRawPointerFromManyToOneListener_EProjectileImpactEventIntrusiveHeadLane1_Impl(archive, broadcaster);
   }
 
   /**
@@ -1662,12 +1234,17 @@ namespace gpg
    */
   void SaveUnownedRawPointerFromManyToOneListener_ECollisionBeamEventIntrusiveHeadLane1(
     gpg::WriteArchive* archive,
-    std::uint32_t* intrusiveListHeadSlot
+    void* objectPtr,
+    int,
+    gpg::RRef*
   )
   {
-    ::SaveUnownedRawPointerFromManyToOneListener_ECollisionBeamEventIntrusiveHeadLane1_Impl(
-      archive, reinterpret_cast<const moho::ManyToOneBroadcaster<moho::ECollisionBeamEvent>*>(intrusiveListHeadSlot)
-    );
+    const auto* const broadcaster =
+      static_cast<const moho::ManyToOneBroadcaster<moho::ECollisionBeamEvent>*>(objectPtr);
+    // The object this `serSaveFunc_` receives is the reflected
+    // `ManyToOneBroadcaster<ECollisionBeamEvent>` itself (its RType's `size_` is the 8-byte
+    // broadcaster), not a raw list-head word.
+    ::SaveUnownedRawPointerFromManyToOneListener_ECollisionBeamEventIntrusiveHeadLane1_Impl(archive, broadcaster);
   }
 } // namespace gpg
 

@@ -142,30 +142,28 @@ namespace moho
   }
 
   /**
-   * Address: 0x0052B1E0 (FUN_0052B1E0)
+   * Address: 0x0052B1E0 (FUN_0052B1E0, Moho::RRuleGameRulesImpl::GetEntityCategory)
+   * VTable slot: 22 (offset +0x58)
    *
    * IDA signature:
    * char* __thiscall sub_52B1E0(_DWORD* this, char* source);
    *
    * What it does:
-   * Looks up category text in RRuleGameRulesImpl category map and returns
-   * either mapped range or fallback range stored in lookup table.
+   * Looks up category text in this rules object's category map
+   * (`mEntityCategoryLookup`, +0xC4) and returns either the mapped range or
+   * the fallback range stored in the lookup table. Defined here, beside the
+   * per-thread lookup cache it uses.
    */
-  const EntityCategorySet* EntityCategoryLookupResolver::GetEntityCategory(
+  const EntityCategorySet* RRuleGameRulesImpl::GetEntityCategory(
     const char* categoryName
   ) const
   {
-    // `RRuleGameRulesImpl` is the only class the binary dispatches slot 22 on,
-    // and it does not derive from this synthetic interface, so reaching its
-    // `mEntityCategoryLookup` (+0xC4, asserted in RRuleGameRules.h) still needs
-    // the cast -- but to the real class, not to a padded stand-in for it.
-    const auto* const rules = reinterpret_cast<const RRuleGameRulesImpl*>(this);
-    if (!rules->mEntityCategoryLookup) {
+    if (!mEntityCategoryLookup) {
       static const EntityCategorySet kEmpty{};
       return &kEmpty;
     }
 
-    const EntityCategoryLookupTable& lookup = *rules->mEntityCategoryLookup;
+    const EntityCategoryLookupTable& lookup = *mEntityCategoryLookup;
     if (!categoryName) {
       return &lookup.mCategoryFallback;
     }

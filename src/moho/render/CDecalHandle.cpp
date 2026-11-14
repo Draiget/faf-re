@@ -15,49 +15,6 @@ namespace moho
 {
   namespace
   {
-    /**
-     * Address: 0x00778890 (FUN_00778890)
-     *
-     * What it does:
-     * Returns the lazily cached reflection descriptor for `CDecalHandle`.
-     */
-    [[maybe_unused]] [[nodiscard]] gpg::RType* CachedCDecalHandleTypeBridge()
-    {
-      gpg::RType* type = CDecalHandle::sType;
-      if (type == nullptr) {
-        type = gpg::LookupRType(typeid(CDecalHandle));
-        CDecalHandle::sType = type;
-      }
-      return type;
-    }
-
-    /**
-     * Address: 0x0077D910 (FUN_0077D910)
-     *
-     * What it does:
-     * Thunk lane that forwards directly to `CDecalHandle::MemberDeserialize`.
-     */
-    [[maybe_unused]] void DeserializeCDecalHandleMemberLaneA(
-      CDecalHandle* const handle,
-      gpg::ReadArchive* const archive
-    )
-    {
-      handle->MemberDeserialize(archive);
-    }
-
-    /**
-     * Address: 0x0077E6C0 (FUN_0077E6C0)
-     *
-     * What it does:
-     * Secondary thunk lane for `CDecalHandle::MemberDeserialize`.
-     */
-    [[maybe_unused]] void DeserializeCDecalHandleMemberLaneB(
-      CDecalHandle* const handle,
-      gpg::ReadArchive* const archive
-    )
-    {
-      handle->MemberDeserialize(archive);
-    }
   } // namespace
 
   gpg::RType* CDecalHandle::sType = nullptr;

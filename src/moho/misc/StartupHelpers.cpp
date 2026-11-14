@@ -1870,24 +1870,6 @@ moho::Resolution::Resolution(
 
 namespace
 {
-  /**
-   * Address: 0x008CD840 (FUN_008CD840)
-   *
-   * What it does:
-   * Performs strict weak ordering on `Resolution` tuple lanes
-   * `(width, height, framesPerSecond)`, comparing `candidate` against
-   * `reference`.
-   */
-  [[maybe_unused]] [[nodiscard]] bool IsResolutionTupleLessThan(
-    const moho::Resolution* const reference,
-    const moho::Resolution* const candidate
-  ) noexcept
-  {
-    return candidate->width < reference->width ||
-      (candidate->width == reference->width && candidate->height < reference->height) ||
-      (candidate->width == reference->width && candidate->height == reference->height &&
-       candidate->framesPerSecond < reference->framesPerSecond);
-  }
 } // namespace
 
 /**
@@ -2387,82 +2369,6 @@ namespace
   }
 
   /**
-   * Address: 0x008CD100 (FUN_008CD100)
-   *
-   * What it does:
-   * Rewrites every byte in `[begin, end)` that matches `*sourceByte` to
-   * `*replacementByte`, then returns the terminal cursor.
-   */
-  [[maybe_unused]] std::uint8_t* ReplaceByteValueAcrossRange(
-    const std::uint8_t* const sourceByte,
-    const std::uint8_t* const replacementByte,
-    std::uint8_t* const begin,
-    std::uint8_t* const end
-  )
-  {
-    for (std::uint8_t* cursor = begin; cursor != end; ++cursor) {
-      if (*cursor == *sourceByte) {
-        *cursor = *replacementByte;
-      }
-    }
-
-    return end;
-  }
-
-  /**
-   * Address: 0x008CD160 (FUN_008CD160, func_StringCopyInitFilename)
-   *
-   * What it does:
-   * Initializes one raw `fa::string` lane to empty SSO state, then appends
-   * one filename segment using startup filename normalization rules.
-   */
-  [[maybe_unused]] fa::string* InitializeFilenameBufferWithSegment(
-    fa::string* const outPath,
-    const char* const filenameSegment
-  )
-  {
-    if (outPath == nullptr) {
-      return nullptr;
-    }
-
-    outPath->myRes = 15;
-    outPath->mySize = 0;
-    outPath->bx.buf[0] = '\0';
-    return func_StringAppendFilename(filenameSegment, outPath);
-  }
-
-  /**
-   * Address: 0x008CD020 (FUN_008CD020, func_StringComposeFilename)
-   *
-   * What it does:
-   * Builds one joined path by copying `directoryPath`, appending one filename
-   * segment with startup normalization rules, and assigning into `outPath`.
-   */
-  [[maybe_unused]] fa::string* ComposeDirectoryAndFilenameSegment(
-    fa::string* const outPath,
-    const fa::string& directoryPath,
-    const char* const filenameSegment
-  )
-  {
-    if (outPath == nullptr) {
-      return nullptr;
-    }
-
-    fa::string normalizedFilename{};
-    (void)InitializeFilenameBufferWithSegment(&normalizedFilename, filenameSegment);
-
-    fa::string joinedPath{};
-    joinedPath.assign_owned(directoryPath.view());
-    (void)func_StringAppendFilename(normalizedFilename.c_str(), &joinedPath);
-
-    outPath->myRes = 15;
-    outPath->mySize = 0;
-    outPath->bx.buf[0] = '\0';
-    outPath->assign_owned(joinedPath.view());
-    return outPath;
-  }
-
-  /**
    * Address: 0x0045FC20 (FUN_0045FC20, PathRootBoundaryIndex)
    *
    * What it does:
@@ -2611,37 +2517,6 @@ namespace
   }
 
   /**
-   * Address: 0x00460760 (FUN_00460760, PathRootBoundaryToken)
-   *
-   * What it does:
-   * Returns one-character root token at current root boundary, or empty
-   * token when boundary is absent.
-   */
-  [[nodiscard]] fa::string PathRootBoundaryToken(
-    const fa::string& path
-  )
-  {
-    const std::uint32_t rootBoundary = PathRootBoundaryIndex(path, static_cast<std::uint32_t>(path.size()));
-    if (rootBoundary == kInvalidPathBoundary || rootBoundary >= path.size()) {
-      return fa::string{};
-    }
-    return path.substr(rootBoundary, 1u);
-  }
-
-  /**
-   * Address: 0x0045FA90 (FUN_0045FA90, PathHasRootBoundaryToken)
-   *
-   * What it does:
-   * Returns true when a path has one root-boundary token.
-   */
-  [[nodiscard]] bool PathHasRootBoundaryToken(
-    const fa::string& path
-  )
-  {
-    return !PathRootBoundaryToken(path).empty();
-  }
-
-  /**
    * Address: 0x004608D0 (FUN_004608D0, ParsePathRootTokenSpan)
    *
    * What it does:
@@ -2746,79 +2621,6 @@ namespace
   }
 
   /**
-   * Address: 0x0045FA50 (FUN_0045FA50, PathHasLeadingPrefixToken)
-   *
-   * What it does:
-   * Returns true when path has one non-empty leading root/prefix token.
-   */
-  [[nodiscard]] bool PathHasLeadingPrefixToken(
-    const fa::string& path
-  )
-  {
-    return !InitPathPrefixCursor(path).mToken.empty();
-  }
-
-  /**
-   * Address: 0x0045F7A0 (FUN_0045F7A0, GetDriveOrUncPathPrefixToken)
-   *
-   * What it does:
-   * Returns one leading root token only when token is UNC-like (`//...`) or
-   * drive-like (`...:`); otherwise returns empty token.
-   */
-  [[nodiscard]] fa::string GetDriveOrUncPathPrefixToken(
-    const fa::string& path
-  )
-  {
-    const PathComponentCursor prefixCursor = InitPathPrefixCursor(path);
-    if (prefixCursor.mOffset == path.size()) {
-      return fa::string{};
-    }
-
-    const fa::string& token = prefixCursor.mToken;
-    if (token.size() > 1u && token[0] == '/' && token[1] == '/') {
-      return token;
-    }
-    if (!token.empty() && token[token.size() - 1u] == ':') {
-      return token;
-    }
-    return fa::string{};
-  }
-
-  /**
-   * Address: 0x0045F9E0 (FUN_0045F9E0, PathHasDriveOrUncRootAndBoundary)
-   *
-   * What it does:
-   * Returns true when path has both a root/prefix token and root-boundary
-   * marker token.
-   */
-  [[nodiscard]] bool PathHasDriveOrUncRootAndBoundary(
-    const fa::string& path
-  )
-  {
-    return !GetDriveOrUncPathPrefixToken(path).empty() && !PathRootBoundaryToken(path).empty();
-  }
-
-  /**
-   * Address: 0x0045F780 (FUN_0045F780, TrimPathToDirectory)
-   *
-   * What it does:
-   * Truncates one path string to directory portion.
-   */
-  fa::string* TrimPathToDirectory(
-    fa::string* const path
-  )
-  {
-    if (path == nullptr) {
-      return nullptr;
-    }
-
-    const std::uint32_t splitPos = func_PathFilenamePos(*path, static_cast<std::uint32_t>(path->size()));
-    const fa::string trimmed = path->substr(0u, splitPos);
-    path->assign_owned(trimmed.view());
-    return path;
-  }
-
-  /**
    * Address: 0x00460840 (FUN_00460840, IsCollapsiblePathSlashBoundary)
    *
    * What it does:
@@ -2857,29 +2659,6 @@ namespace
   }
 
   /**
-   * Address: 0x0045F8C0 (FUN_0045F8C0, GetPathBasenameOrDot)
-   *
-   * What it does:
-   * Returns basename token for one path; emits `.` for root-edge paths.
-   */
-  [[nodiscard]] fa::string GetPathBasenameOrDot(
-    const fa::string& path
-  )
-  {
-    const std::uint32_t size = static_cast<std::uint32_t>(path.size());
-    std::uint32_t split = func_PathFilenamePos(path, size);
-
-    if (
-      size != 0u && split != 0u && split < path.size() && path[split] == '/' &&
-      IsCollapsiblePathSlashBoundary(path, split)
-    ) {
-      return fa::string(".");
-    }
-
-    return path.substr(split);
-  }
-
-  /**
    * Address: 0x0045FB80 (FUN_0045FB80, InitReversePathComponentCursor)
    *
    * What it does:
@@ -2892,23 +2671,6 @@ namespace
     PathComponentCursor cursor{};
     cursor.mPath = &path;
     cursor.mOffset = static_cast<std::uint32_t>(path.size());
-    return cursor;
-  }
-
-  /**
-   * Address: 0x0045F420 (FUN_0045F420, CopyPathComponentCursor)
-   *
-   * What it does:
-   * Copies one path-component cursor state.
-   */
-  [[nodiscard]] PathComponentCursor CopyPathComponentCursor(
-    const PathComponentCursor& other
-  )
-  {
-    PathComponentCursor cursor{};
-    cursor.mToken = other.mToken;
-    cursor.mPath = other.mPath;
-    cursor.mOffset = other.mOffset;
     return cursor;
   }
 
@@ -2930,60 +2692,6 @@ namespace
     outToken->clear();
     (void)outToken->append(1u, marker);
     return outToken;
-  }
-
-  /**
-   * Address: 0x00460F00 (FUN_00460F00, AdvancePathComponentCursor)
-   *
-   * What it does:
-   * Advances one forward path-component cursor from its current token to the
-   * next token/separator marker in the same source path.
-   */
-  [[nodiscard]] PathComponentCursor& AdvancePathComponentCursor(
-    PathComponentCursor& cursor
-  )
-  {
-    if (cursor.mPath == nullptr) {
-      cursor.mToken.clear();
-      cursor.mOffset = 0u;
-      return cursor;
-    }
-
-    const fa::string& path = *cursor.mPath;
-    const std::uint32_t tokenSize = static_cast<std::uint32_t>(cursor.mToken.size());
-    const bool keepDoubleSlashMarker =
-      tokenSize > 2u && cursor.mToken[0] == '/' && cursor.mToken[1] == '/' && cursor.mToken[2] != '/';
-
-    cursor.mOffset = ClampPathIndex(path, cursor.mOffset + tokenSize);
-    const std::uint32_t pathSize = static_cast<std::uint32_t>(path.size());
-    if (cursor.mOffset == pathSize) {
-      cursor.mToken.clear();
-      return cursor;
-    }
-
-    if (path[cursor.mOffset] == '/') {
-      if (keepDoubleSlashMarker || (!cursor.mToken.empty() && cursor.mToken[cursor.mToken.size() - 1u] == ':')) {
-        (void)SetPathTokenMarker(&cursor.mToken, '/');
-        return cursor;
-      }
-
-      while (cursor.mOffset != pathSize && path[cursor.mOffset] == '/') {
-        ++cursor.mOffset;
-      }
-
-      if (cursor.mOffset == pathSize && IsCollapsiblePathSlashBoundary(path, cursor.mOffset)) {
-        --cursor.mOffset;
-        (void)SetPathTokenMarker(&cursor.mToken, '.');
-        return cursor;
-      }
-    }
-
-    const std::size_t split = path.find('/', cursor.mOffset);
-    const std::uint32_t tokenStart = cursor.mOffset;
-    const std::uint32_t tokenLength =
-      split == fa::string::npos ? (pathSize - tokenStart) : static_cast<std::uint32_t>(split - tokenStart);
-    cursor.mToken = path.substr(tokenStart, tokenLength);
-    return cursor;
   }
 
   /**
@@ -3047,21 +2755,6 @@ namespace
   // ComponentCursor and the two calls further below).
 
   /**
-   * Address: 0x0045F670 (FUN_0045F670, PostIncrementReversePathComponentCursor)
-   *
-   * What it does:
-   * Copies one path-component cursor and advances source cursor backwards.
-   */
-  [[nodiscard]] PathComponentCursor PostIncrementReversePathComponentCursor(
-    PathComponentCursor& source
-  )
-  {
-    PathComponentCursor copied = CopyPathComponentCursor(source);
-    (void)AdvanceReversePathComponentCursor(source);
-    return copied;
-  }
-
-  /**
    * Address: 0x0045F590 (FUN_0045F590, BuildNormalizedCursorPathToken)
    *
    * What it does:
@@ -3102,254 +2795,6 @@ namespace
   )
   {
     return lhs.mPath == rhs.mPath && lhs.mOffset == rhs.mOffset;
-  }
-
-  /**
-   * Address: 0x0045FE20 (FUN_0045FE20, AppendRelativePathToken)
-   *
-   * What it does:
-   * Appends one relative token onto a base path using filename-append
-   * normalization rules.
-   */
-  [[nodiscard]] fa::string AppendRelativePathToken(
-    const fa::string& basePath,
-    const fa::string& relativePath
-  )
-  {
-    fa::string appended = basePath;
-    (void)func_StringAppendFilename(relativePath.c_str(), &appended);
-    return appended;
-  }
-
-  /**
-   * Address: 0x0045E550 (FUN_0045E550, path slash-normalize helper)
-   *
-   * What it does:
-   * Copies one path into Windows-style slash form (`/` -> `\\`) while keeping
-   * root-boundary collapse semantics for leading-prefix lanes.
-   */
-  [[maybe_unused]] fa::string* NormalizePathToWindowsSlashes(
-    const fa::string& source,
-    fa::string* const out
-  )
-  {
-    if (out == nullptr) {
-      return nullptr;
-    }
-
-    out->clear();
-    const std::uint32_t size = static_cast<std::uint32_t>(source.size());
-    const std::uint32_t rootBoundary = PathRootBoundaryIndex(source, size);
-    bool allowRootCollapse = (rootBoundary != kInvalidPathBoundary);
-
-    for (std::uint32_t index = 0u; index < size; ++index) {
-      if (
-        index == 0u && size > 1u && source[0] == '/' && source[1] == '/' &&
-        (size == 2u || (source[2] != '/' && source[2] != '\\'))
-      ) {
-        (void)out->append(1u, '\\');
-        (void)out->append(1u, '\\');
-        index = 1u;
-        continue;
-      }
-
-      const char token = source[index];
-      const bool skipCollapsedSlash =
-        allowRootCollapse && !out->empty() && (*out)[out->size() - 1u] == '\\' && token == '/';
-      if (!skipCollapsedSlash) {
-        (void)out->append(1u, token == '/' ? '\\' : token);
-        if (index > rootBoundary && token == '/') {
-          allowRootCollapse = false;
-        }
-      }
-    }
-
-    return out;
-  }
-
-  /**
-   * Address: 0x0045E6C0 (FUN_0045E6C0, path directory-prefix helper)
-   *
-   * What it does:
-   * Builds normalized directory prefix text for one input path using filename
-   * split/root-boundary rules from the startup path helper lane.
-   */
-  [[maybe_unused]] fa::string* BuildNormalizedDirectoryPrefix(
-    const fa::string& path,
-    fa::string* const out
-  )
-  {
-    if (out == nullptr) {
-      return nullptr;
-    }
-
-    const std::uint32_t size = static_cast<std::uint32_t>(path.size());
-    std::uint32_t split = func_PathFilenamePos(path, size);
-
-    bool splitOnSlash = false;
-    if (size != 0u && split < path.size()) {
-      splitOnSlash = path[split] == '/';
-    }
-
-    const std::uint32_t rootBoundary = PathRootBoundaryIndex(path, split);
-    while (split > 0u) {
-      const std::uint32_t previous = split - 1u;
-      if (previous == rootBoundary) {
-        break;
-      }
-      if (path[previous] != '/') {
-        break;
-      }
-      --split;
-    }
-
-    fa::string prefix;
-    if (split == 1u && rootBoundary == 0u && splitOnSlash) {
-      prefix.clear();
-    } else {
-      const fa::string slice = path.substr(0u, split);
-      (void)func_StringAppendFilename(slice.c_str(), &prefix);
-    }
-
-    out->assign_owned(prefix.view());
-    return out;
-  }
-
-  /**
-   * Address: 0x0045E870 (FUN_0045E870, CollapsePathComponentsInPlace)
-   *
-   * What it does:
-   * Collapses one path in place by resolving `.`/`..` component lanes while
-   * preserving root/prefix boundary behavior from the startup filename lane.
-   */
-  [[maybe_unused]] fa::string* CollapsePathComponentsInPlace(
-    fa::string* const path
-  )
-  {
-    if (path == nullptr || path->empty()) {
-      return path;
-    }
-
-    fa::string collapsedPath{};
-    const PathComponentCursor prefixCursor = InitPathPrefixCursor(*path);
-    PathComponentCursor reverseCursor = InitReversePathComponentCursor(*path);
-    const PathComponentCursor endCursor = PostIncrementReversePathComponentCursor(reverseCursor);
-
-    PathComponentCursor current = CopyPathComponentCursor(prefixCursor);
-    while (PathComponentCursorNotEqual(current, endCursor)) {
-      const bool isDotToken = current.mToken == ".";
-      if (
-        !isDotToken || PathComponentCursorEqual(current, prefixCursor) ||
-        PathComponentCursorEqual(current, reverseCursor)
-      ) {
-        bool collapsedParent = false;
-        const bool isParentToken = current.mToken == "..";
-        if (!collapsedPath.empty() && isParentToken) {
-          const fa::string baseToken = GetPathBasenameOrDot(collapsedPath);
-          bool canCollapse = false;
-          if (!baseToken.empty()) {
-            if (baseToken.size() == 1u) {
-              const char token0 = baseToken[0];
-              canCollapse = token0 != '.' && token0 != '/';
-            } else if (baseToken.size() != 2u) {
-              canCollapse = true;
-            } else if (baseToken[0] != '.') {
-              const char token1 = baseToken[1];
-              canCollapse = token1 != '.' && token1 != ':';
-            }
-          }
-
-          if (canCollapse) {
-            (void)TrimPathToDirectory(&collapsedPath);
-            const std::uint32_t collapsedSize = static_cast<std::uint32_t>(collapsedPath.size());
-            if (collapsedSize != 0u && collapsedPath[collapsedSize - 1u] == '/') {
-              const std::uint32_t rootBoundary = PathRootBoundaryIndex(collapsedPath, collapsedSize);
-              if (rootBoundary == kInvalidPathBoundary || rootBoundary != collapsedSize - 1u) {
-                collapsedPath.erase(collapsedPath.size() - 1u, 1u);
-              }
-            }
-
-            if (collapsedPath.empty()) {
-              PathComponentCursor lookahead = CopyPathComponentCursor(current);
-              (void)AdvancePathComponentCursor(lookahead);
-              if (
-                PathComponentCursorNotEqual(lookahead, endCursor) &&
-                PathComponentCursorEqual(lookahead, reverseCursor) && reverseCursor.mToken == "."
-              ) {
-                (void)func_StringAppendFilename(".", &collapsedPath);
-              }
-            }
-
-            collapsedParent = true;
-          }
-        }
-
-        if (!collapsedParent) {
-          (void)func_StringAppendFilename(current.mToken.c_str(), &collapsedPath);
-        }
-      }
-
-      (void)AdvancePathComponentCursor(current);
-    }
-
-    if (collapsedPath.empty()) {
-      (void)func_StringAppendFilename(".", &collapsedPath);
-    }
-    path->assign_owned(collapsedPath.view());
-    return path;
-  }
-
-  /**
-   * Address: 0x0045EC70 (FUN_0045EC70, path resolve helper)
-   *
-   * What it does:
-   * Resolves one path token against a base path, preserving drive/UNC/absolute
-   * rules from the startup filename helper chain.
-   */
-  [[maybe_unused]] fa::string* ResolvePathAgainstBase(
-    const fa::string& basePath,
-    const fa::string& path,
-    fa::string* const out
-  )
-  {
-    if (out == nullptr) {
-      return nullptr;
-    }
-
-    if (path.empty() || PathHasDriveOrUncRootAndBoundary(path)) {
-      out->assign_owned(path.view());
-      return out;
-    }
-
-    if (PathHasLeadingPrefixToken(path)) {
-      out->assign_owned(AppendRelativePathToken(basePath, path).view());
-      return out;
-    }
-
-    if (PathHasRootBoundaryToken(path)) {
-      const fa::string basePrefix = GetDriveOrUncPathPrefixToken(basePath);
-      fa::string normalizedPrefix;
-      (void)func_StringAppendFilename(basePrefix.c_str(), &normalizedPrefix);
-      out->assign_owned(AppendRelativePathToken(normalizedPrefix, path).view());
-      return out;
-    }
-
-    out->assign_owned(AppendRelativePathToken(basePath, path).view());
-    return out;
-  }
-
-  /**
-   * Address: 0x0045F600 (FUN_0045F600, SetPathPointerLane)
-   *
-   * What it does:
-   * Stores one path pointer lane in a single-word helper wrapper.
-   */
-  [[maybe_unused]] void SetPathPointerLane(
-    const fa::string*& outPath,
-    const fa::string* const path
-  ) noexcept
-  {
-    outPath = path;
   }
 
   /**
@@ -4179,52 +3624,6 @@ fa::string moho::FindMapScenario(
 
 namespace
 {
-  /**
-   * Address: 0x004583D0 (FUN_004583D0, func_FWaitSetError)
-   *
-   * What it does:
-   * Maps one `errno` value to disk-error text and publishes it to the
-   * thread-local file wait-handle error slot.
-   */
-  [[maybe_unused]] void func_FWaitSetError(
-    const int err
-  )
-  {
-    const fa::string errorDescription = moho::FILE_GetErrorFromErrno(err);
-    if (fa::string* const errorSlot = moho::FWaitHandleSet::GetErrorString(); errorSlot != nullptr) {
-      errorSlot->assign_owned(errorDescription.view());
-    }
-  }
-
-  /**
-   * Address: 0x0045A930 (FUN_0045A930, func_StringSetFilename2)
-   *
-   * What it does:
-   * Initializes destination string storage and canonicalizes one filesystem
-   * path token.
-   */
-  fa::string* func_StringSetFilename2(
-    fa::string* const out,
-    const gpg::StrArg sourcePath
-  )
-  {
-    return gpg::STR_InitFilename(out, sourcePath != nullptr ? sourcePath : "");
-  }
-
-  /**
-   * Address: 0x0045A8D0 (FUN_0045A8D0, SetCanonicalFilenameFromString)
-   *
-   * What it does:
-   * Initializes destination string storage from one source string and
-   * canonicalizes it as a filesystem token.
-   */
-  [[maybe_unused]] fa::string* SetCanonicalFilenameFromString(
-    fa::string* const out,
-    const fa::string& sourcePath
-  )
-  {
-    return func_StringSetFilename2(out, sourcePath.c_str());
-  }
 } // namespace
 
 /**

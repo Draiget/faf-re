@@ -19,52 +19,6 @@ moho::CUIManager* moho::g_UIManager = nullptr;
 
 namespace
 {
-  /**
-   * Address: 0x0084C790 (FUN_0084C790, sub_84C790)
-   *
-   * What it does:
-   * Converts one normalized UI point (`[0..1]` per lane) into head-pixel
-   * coordinates using active D3D head dimensions.
-   */
-  [[maybe_unused]] float* ScaleNormalizedUiPointToHeadPixels(
-    const float* const normalizedPoint,
-    float* const outPixelPoint,
-    const int headIndex
-  )
-  {
-    moho::CD3DDevice* const widthDevice = moho::D3D_GetDevice();
-    moho::CD3DDevice* const heightDevice = moho::D3D_GetDevice();
-    const float headWidth = static_cast<float>(static_cast<unsigned int>(widthDevice->GetHeadWidth(headIndex)));
-    const float headHeight = static_cast<float>(static_cast<unsigned int>(heightDevice->GetHeadHeight(headIndex)));
-
-    outPixelPoint[0] = normalizedPoint[0] * headWidth;
-    outPixelPoint[1] = normalizedPoint[1] * headHeight;
-    return outPixelPoint;
-  }
-
-  /**
-   * Address: 0x0084C800 (FUN_0084C800, sub_84C800)
-   *
-   * What it does:
-   * Converts one head-pixel UI point into normalized (`[0..1]`) coordinates
-   * using active D3D head dimensions.
-   */
-  [[maybe_unused]] float* ScaleHeadPixelsToNormalizedUiPoint(
-    const float* const pixelPoint,
-    float* const outNormalizedPoint,
-    const int headIndex
-  )
-  {
-    moho::CD3DDevice* const widthDevice = moho::D3D_GetDevice();
-    moho::CD3DDevice* const heightDevice = moho::D3D_GetDevice();
-    const float headWidth = static_cast<float>(static_cast<unsigned int>(widthDevice->GetHeadWidth(headIndex)));
-    const float headHeight = static_cast<float>(static_cast<unsigned int>(heightDevice->GetHeadHeight(headIndex)));
-
-    outNormalizedPoint[0] = pixelPoint[0] / headWidth;
-    outNormalizedPoint[1] = pixelPoint[1] / headHeight;
-    return outNormalizedPoint;
-  }
-
   template <typename TCall>
   bool StartUIMainEntryWithState(
     LuaPlus::LuaState* const state,

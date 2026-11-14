@@ -20,6 +20,7 @@
 #include "moho/render/textures/CD3DBatchTexture.h"
 #include "moho/resource/RScmResource.h"
 #include "moho/sim/CWldSession.h"
+#include "moho/sim/RRuleGameRules.h"
 #include "moho/sim/EAllianceTypeInfo.h"
 #include "moho/sim/UserArmy.h"
 #include "moho/unit/core/UserUnit.h"
@@ -55,12 +56,12 @@ namespace
 
   // 0x00416F60
   [[nodiscard]] bool ContainsCell(
-    const moho::VisibilityRect& rect,
+    const gpg::Rect2i& rect,
     const std::int32_t x,
     const std::int32_t z
   )
   {
-    return x >= rect.minX && x < rect.maxX && z >= rect.minZ && z < rect.maxZ;
+    return x >= rect.x0 && x < rect.x1 && z >= rect.z0 && z < rect.z1;
   }
 
   /*
@@ -807,7 +808,7 @@ namespace moho
     case EUserEntityVisibilityMode::MapPlayableRect: {
       const auto cellX = static_cast<std::int32_t>(mVariableData.mCurTransform.pos_.x);
       const auto cellZ = static_cast<std::int32_t>(mVariableData.mCurTransform.pos_.z);
-      VisibilityRect visibleRect{};
+      gpg::Rect2i visibleRect{};
       (void)mSession->TryGetPlayableMapRect(visibleRect);
       meshInstance->isHidden = ContainsCell(visibleRect, cellX, cellZ) ? 0 : 1;
       return;
@@ -871,18 +872,20 @@ namespace moho
       return false;
     }
 
-    const EntityCategoryLookupResolver* const resolver = mSession->GetCategoryLookupResolver();
-    if (!resolver) {
+    // 0x008B97C3-0x008B97E7: `mSession->mRules` (+0x0C, +0x18), then its
+    // vtable slot 22 (`[edx+58h]`, `RRuleGameRules::GetEntityCategory`).
+    const RRuleGameRules* const rules = mSession->mRules;
+    if (!rules) {
       return false;
     }
 
     const char* const categoryName = category.raw_data_unsafe();
-    const EntityCategorySet* const range = resolver->GetEntityCategory(categoryName);
+    const EntityCategorySet* const range = rules->GetEntityCategory(categoryName);
     if (!range) {
       return false;
     }
 
-    const std::uint32_t categoryBitIndex = mParams.mBlueprint->mCategoryBitIndex;
+    const std::uint32_t categoryBitIndex = mParams.mBlueprint->mBlueprintOrdinal;
     const auto wordIt = range->FindWord(categoryBitIndex >> 5u);
     if (wordIt == range->WordEnd()) {
       return false;

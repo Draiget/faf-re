@@ -1096,11 +1096,11 @@ namespace moho
    * Copies playable map bounds from terrain-res internal storage into `outRect`
    * and returns `&outRect`.
    */
-  const VisibilityRect* CWldTerrainRes::GetPlayableMapRect(
-    VisibilityRect& outRect
+  const gpg::Rect2i* CWldTerrainRes::GetPlayableMapRect(
+    gpg::Rect2i& outRect
   ) const
   {
-    outRect = VisibilityRect::FromRect2i(mMap->mPlayableRect);
+    outRect = mMap->mPlayableRect;
     return &outRect;
   }
 
@@ -1112,7 +1112,7 @@ namespace moho
    * warning text when bounds are invalid.
    */
   bool CWldTerrainRes::SetPlayableMapRect(
-    const VisibilityRect& rect
+    const gpg::Rect2i& rect
   )
   {
     STIMap* const map = mMap;
@@ -1120,7 +1120,7 @@ namespace moho
       return false;
     }
 
-    const bool setOk = map->SetPlayableMapRect(rect.AsRect2i());
+    const bool setOk = map->SetPlayableMapRect(rect);
     if (!setOk) {
       gpg::Warnf("Attempting to set an invalid playable rect");
       return false;

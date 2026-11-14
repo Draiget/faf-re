@@ -1074,7 +1074,11 @@ void CAiSteeringImpl::MemberDeserialize(
   }
 
   archive->ReadPointer(&mOwnerUnit, &ownerRef);
-  archive->ReadUInt(reinterpret_cast<unsigned int*>(&mWaypointCount));
+  {
+    unsigned int value{};
+    archive->ReadUInt(&value);
+    mWaypointCount = static_cast<decltype(mWaypointCount)>(value);
+  }
 
   gpg::RType* const vector3Type = gpg::RTypeOf<Wm3::Vector3f>();
   GPG_ASSERT(vector3Type != nullptr);
@@ -1090,7 +1094,11 @@ void CAiSteeringImpl::MemberDeserialize(
     archive->Read(vector3Type, waypointTarget, ownerRef);
   }
 
-  archive->ReadUInt(reinterpret_cast<unsigned int*>(&mCurrentWaypointIndex));
+  {
+    unsigned int value{};
+    archive->ReadUInt(&value);
+    mCurrentWaypointIndex = static_cast<decltype(mCurrentWaypointIndex)>(value);
+  }
 
   gpg::RType* const layerType = gpg::RTypeOf<ELayer>();
   GPG_ASSERT(layerType != nullptr);
@@ -1713,7 +1721,7 @@ int CAiSteeringImpl::Execute()
     mNeedsWaypointRefresh = 1;
   }
 
-  if (ren_Steering != 0 && sim) {
+  if (ren_Steering && sim) {
     CDebugCanvas* const debugCanvas = sim->GetDebugCanvas();
     if (debugCanvas) {
       if (mOwnerUnit) {

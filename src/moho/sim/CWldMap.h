@@ -12,7 +12,7 @@
 #include "legacy/containers/Map.h"
 #include "moho/misc/ID3DDeviceResources.h"
 #include "moho/render/camera/VTransform.h"
-#include "moho/sim/VisibilityRect.h"
+#include "gpg/core/containers/Rect2.h"
 #include "Wm3AxisAlignedBox3.h"
 #include "Wm3Vector2.h"
 #include "Wm3Vector3.h"
@@ -491,8 +491,8 @@ namespace moho
     virtual void SetWaterElevation(float elevation) = 0;
     virtual void SetWaterElevationDeep(float elevation) = 0;
     virtual void SetWaterElevationAbyss(float elevation) = 0;
-    [[nodiscard]] virtual bool SetPlayableMapRect(const VisibilityRect& rect) = 0;
-    [[nodiscard]] virtual const VisibilityRect* GetPlayableMapRect(VisibilityRect& outRect) const = 0;
+    [[nodiscard]] virtual bool SetPlayableMapRect(const gpg::Rect2i& rect) = 0;
+    [[nodiscard]] virtual const gpg::Rect2i* GetPlayableMapRect(gpg::Rect2i& outRect) const = 0;
     [[nodiscard]] virtual bool IsInPlayableRect(const Wm3::Vec3f& worldPos) = 0;
     virtual void SetWaterShaderProperties(const CWaterShaderProperties& properties) = 0;
     [[nodiscard]] virtual CWaterShaderProperties* GetWaterShaderProperties() = 0;

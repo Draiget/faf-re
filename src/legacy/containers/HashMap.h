@@ -390,14 +390,14 @@ namespace fa
        * _DWORD *__thiscall sub_9345F0(_DWORD *self, _DWORD *ret, gpg::HaStar::SubclusterData *key);
        *
        * What it does:
-       * Same lower/upper forward-scan shape as the `OccupationCacheKey`
-       * emission above, instantiated for `SubclusterCacheKey`
+       * Same lower/upper forward-scan shape as the `OccupationData`
+       * emission above, instantiated for `SubclusterData`
        * (`gpg/core/algorithms/Cluster.cpp`): the hash/bucket lookup opens
        * with `SubclusterData::Hash` + the Park-Miller step inlined (matching
        * `_Buckno` below) rather than a named callee, and both scan
        * directions call `sub_931560` (the `SubclusterData` three-way
        * comparator, `Cluster.cpp`) as the `Traits(a,b)` ordering predicate
-       * in place of the `OccupationCacheKey` emission's own comparator. Both
+       * in place of the `OccupationData` emission's own comparator. Both
        * branches funnel into the same `{mList._Myhead, mList._Myhead}` miss
        * pair the template returns on an empty/degenerate window.
        */
@@ -456,8 +456,8 @@ namespace fa
        * _DWORD *__thiscall sub_9346F0(_DWORD *self, _DWORD *ret, char *where);
        *
        * What it does:
-       * Same bucket-retarget-then-unlink shape as the `OccupationCacheKey`
-       * emission above, instantiated for `SubclusterCacheKey`
+       * Same bucket-retarget-then-unlink shape as the `OccupationData`
+       * emission above, instantiated for `SubclusterData`
        * (`gpg/core/algorithms/Cluster.cpp`): the bucket index is recomputed
        * from `SubclusterData::Hash(where->first)` + the inlined Park-Miller
        * step (this instantiation's key does not carry a separately-stored
@@ -506,11 +506,11 @@ namespace fa
        *
        * What it does:
        * Same whole-table-clear special case plus one-at-a-time fallback as
-       * the `OccupationCacheKey` emission above, instantiated for
-       * `SubclusterCacheKey`. The clear branch matches `clear()`'s own
+       * the `OccupationData` emission above, instantiated for
+       * `SubclusterData`. The clear branch matches `clear()`'s own
        * re-arm sequence exactly: `sub_933380` drops every live entry's
        * cache backpointer (this instantiation's node value owns 16
-       * `Cluster` handles, so unlike the `OccupationCacheKey` table this
+       * `Cluster` handles, so unlike the `OccupationData` table this
        * walk has real per-entry work to do before the nodes are freed),
        * `sub_9347C0(9, &bucketArray)` reseeds the bucket-index vector with
        * `min_buckets + 1` fresh `end()` copies (`vector<iterator>::assign`,

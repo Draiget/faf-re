@@ -108,8 +108,16 @@ namespace moho
     archive->ReadUByte(&mSizeZ);
     archive->ReadFloat(&mMaxSlope);
     archive->ReadFloat(&mMinWaterDepth);
-    archive->ReadUByte(reinterpret_cast<unsigned char*>(&mOccupancyCaps));
-    archive->ReadUByte(reinterpret_cast<unsigned char*>(&mFlags));
+    {
+      unsigned char value{};
+      archive->ReadUByte(&value);
+      mOccupancyCaps = static_cast<decltype(mOccupancyCaps)>(value);
+    }
+    {
+      unsigned char value{};
+      archive->ReadUByte(&value);
+      mFlags = static_cast<decltype(mFlags)>(value);
+    }
   }
 
   /**

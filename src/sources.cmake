@@ -142,7 +142,6 @@ set(FAF_ENGINE_SOURCES
   gpg/core/containers/ReadArchive.cpp
   gpg/core/containers/String.cpp
   gpg/core/containers/WriteArchive.cpp
-  gpg/core/random/Random.cpp
   gpg/core/reflection/BadRefCast.cpp
   gpg/core/time/Timer.cpp
   gpg/core/utils/SharedPtrUtils.cpp

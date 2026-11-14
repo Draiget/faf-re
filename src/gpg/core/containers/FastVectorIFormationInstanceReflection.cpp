@@ -26,7 +26,7 @@ namespace
    */
   void LoadFastVectorIFormationInstance(
     gpg::ReadArchive* archive,
-    std::intptr_t objectPtr,
+    void* objectPtr,
     int,
     gpg::RRef* ownerRef
   )
@@ -37,7 +37,7 @@ namespace
       return;
     }
 
-    auto& vec = *reinterpret_cast<gpg::core::FastVectorInline<moho::IFormationInstance*>*>(objectPtr);
+    auto& vec = *static_cast<gpg::core::FastVectorInline<moho::IFormationInstance*>*>(objectPtr);
 
     unsigned int count = 0;
     archive->ReadUInt(&count);
@@ -60,7 +60,7 @@ namespace
    */
   void SaveFastVectorIFormationInstance(
     gpg::WriteArchive* archive,
-    std::intptr_t objectPtr,
+    void* objectPtr,
     int,
     gpg::RRef*
   )
@@ -71,7 +71,7 @@ namespace
       return;
     }
 
-    const auto& vec = *reinterpret_cast<const gpg::fastvector<moho::IFormationInstance*>*>(objectPtr);
+    const auto& vec = *static_cast<const gpg::fastvector<moho::IFormationInstance*>*>(objectPtr);
 
     const unsigned int count = static_cast<unsigned int>(vec.size());
     archive->WriteUInt(count);

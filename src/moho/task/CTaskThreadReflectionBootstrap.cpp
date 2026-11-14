@@ -13,22 +13,6 @@ namespace
   bool gCTaskThreadTypeInfoPreregistered = false;
 
   /**
-   * Address: 0x00409420 (FUN_00409420, sub_409420)
-   *
-   * What it does:
-   * Unlinks thread from current intrusive list, relinks it into owning stage
-   * main-thread list, and clears staged flag.
-   */
-  [[maybe_unused]] moho::CTaskThread* RelinkThreadToPrimaryStageList(
-    moho::CTaskThread* const thread
-  )
-  {
-    thread->ListLinkBefore(&thread->mStage->mThreads);
-    thread->mStaged = false;
-    return thread;
-  }
-
-  /**
    * Address: 0x00BEE340 (FUN_00BEE340, atexit destructor of the CTaskThreadTypeInfo object)
    */
   [[nodiscard]] gpg::RType* InitializeCTaskThreadTypeInfoStorage()

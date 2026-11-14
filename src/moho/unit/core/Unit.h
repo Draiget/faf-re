@@ -1934,10 +1934,7 @@ namespace moho
     bool mDebugAIStates;                             // 0x057D
     char pad_057E[2];                                // 0x057E
     SInfoCache mInfoCache;                           // 0x0580
-    std::int32_t ReservedOgridRectMinX;              // 0x05A8
-    std::int32_t ReservedOgridRectMinZ;              // 0x05AC
-    std::int32_t ReservedOgridRectMaxX;              // 0x05B0
-    std::int32_t ReservedOgridRectMaxZ;              // 0x05B4
+    gpg::Rect2i mReservedOgridRect;                  // 0x05A8, serialized as one Rect2i
     /**
      * Address: 0x006ADE50 (FUN_006ADE50, gpg::fastvector_n2_WeakPtr_Entity::fastvector_n2_WeakPtr_Entity)
      *
@@ -1970,10 +1967,7 @@ namespace moho
   static_assert(offsetof(Unit, PriorityBoost) == 0x0530, "Unit::PriorityBoost offset must be 0x0530");
   static_assert(offsetof(Unit, mConsumptionData) == 0x0534, "Unit::mConsumptionData offset must be 0x0534");
   static_assert(offsetof(Unit, mDebugAIStates) == 0x057D, "Unit::mDebugAIStates offset must be 0x057D");
-  static_assert(offsetof(Unit, ReservedOgridRectMinX) == 0x05A8, "Unit::ReservedOgridRectMinX offset must be 0x05A8");
-  static_assert(offsetof(Unit, ReservedOgridRectMinZ) == 0x05AC, "Unit::ReservedOgridRectMinZ offset must be 0x05AC");
-  static_assert(offsetof(Unit, ReservedOgridRectMaxX) == 0x05B0, "Unit::ReservedOgridRectMaxX offset must be 0x05B0");
-  static_assert(offsetof(Unit, ReservedOgridRectMaxZ) == 0x05B4, "Unit::ReservedOgridRectMaxZ offset must be 0x05B4");
+  static_assert(offsetof(Unit, mReservedOgridRect) == 0x05A8, "Unit::mReservedOgridRect offset must be 0x05A8");
   static_assert(offsetof(Unit, ArmorMultipliers) == 0x0568, "Unit::ArmorMultipliers offset must be 0x0568");
   static_assert(sizeof(fa::map<fa::string, float>) == 0x0C, "Unit::ArmorMultipliers (fa::map) size must be 0x0C");
   static_assert(offsetof(Unit, TransportLoadFactor) == 0x0564, "Unit::TransportLoadFactor offset must be 0x0564");

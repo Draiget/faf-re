@@ -27,44 +27,6 @@ namespace
 
   [[maybe_unused]] UnitTypeInfoPreRegisterBootstrap gUnitTypeInfoPreRegisterBootstrap;
 
-  /**
-   * Address: 0x0055D980 (FUN_0055D980, copy_UnitWeaponInfo_range_with_rollback)
-   *
-   * What it does:
-   * Copy-constructs one half-open `UnitWeaponInfo` range into destination
-   * storage using the engine `UnitWeaponInfo(const UnitWeaponInfo&)` copy
-   * constructor (`FUN_0055D6F0`), destroying already-constructed entries
-   * before rethrowing if a copy step throws.
-   */
-  [[maybe_unused]] UnitWeaponInfo* CopyUnitWeaponInfoRangeWithRollback(
-    const UnitWeaponInfo* const sourceBegin,
-    const UnitWeaponInfo* const sourceEnd,
-    UnitWeaponInfo* const destinationBegin
-  )
-  {
-    if (sourceBegin == sourceEnd) {
-      return destinationBegin;
-    }
-
-    if (sourceBegin == nullptr || sourceEnd == nullptr || destinationBegin == nullptr) {
-      return destinationBegin;
-    }
-
-    UnitWeaponInfo* destinationCursor = destinationBegin;
-    try {
-      for (const UnitWeaponInfo* sourceCursor = sourceBegin; sourceCursor != sourceEnd;
-           ++sourceCursor, ++destinationCursor) {
-        ::new (destinationCursor) UnitWeaponInfo(*sourceCursor);
-      }
-      return destinationCursor;
-    } catch (...) {
-      while (destinationCursor != destinationBegin) {
-        --destinationCursor;
-        destinationCursor->~UnitWeaponInfo();
-      }
-      throw;
-    }
-  }
 } // namespace
 
 /**

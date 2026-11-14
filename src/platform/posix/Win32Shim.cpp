@@ -3076,18 +3076,4 @@ namespace
   }
 } // namespace
 
-// MSVC's polymorphic typeid entry point (gpg/core/reflection/Reflection.cpp calls it on objects
-// of unknown dynamic type). In the Itanium ABI every vtable of an object, primary or secondary,
-// holds the complete object's type_info in the slot before its address point.
-extern "C" void* __RTtypeid(
-  void* const object
-)
-{
-  if (object == nullptr) {
-    throw std::bad_typeid();
-  }
-  void* const* const vtable = *static_cast<void* const* const*>(object);
-  return vtable[-1];
-}
-
 #endif // !FAFRE_PLATFORM_WINDOWS

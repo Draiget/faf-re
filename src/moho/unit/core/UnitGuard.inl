@@ -156,8 +156,7 @@ void Unit::HandleResourceManagement()
     if (mExtraStorage != nullptr) {
       mExtraStorage->ChangeAmt(storageAmount);
     } else {
-      CSimArmyEconomyInfo* const economyInfo = ArmyRef->GetEconomy();
-      SetExtraStorage(new (std::nothrow) CEconStorage(storageAmount, reinterpret_cast<CEconomy*>(economyInfo)));
+      SetExtraStorage(new (std::nothrow) CEconStorage(storageAmount, ArmyRef->GetEconomy()));
     }
   }
 
@@ -168,11 +167,11 @@ void Unit::HandleResourceManagement()
   producedThisTick.energy *= 0.1f;
   producedThisTick.mass *= 0.1f;
 
-  CSimArmyEconomyInfo* const economyInfo = ArmyRef->GetEconomy();
-  economyInfo->mResources.ENERGY += producedThisTick.energy;
-  economyInfo->mResources.MASS += producedThisTick.mass;
-  economyInfo->mPendingResources.ENERGY += producedThisTick.energy;
-  economyInfo->mPendingResources.MASS += producedThisTick.mass;
+  CEconomy* const economyInfo = ArmyRef->GetEconomy();
+  economyInfo->mResources.energy += producedThisTick.energy;
+  economyInfo->mResources.mass += producedThisTick.mass;
+  economyInfo->mPendingResources.energy += producedThisTick.energy;
+  economyInfo->mPendingResources.mass += producedThisTick.mass;
   mUnitVarDat.mProduced.ENERGY += producedThisTick.energy;
   mUnitVarDat.mProduced.MASS += producedThisTick.mass;
 }
@@ -301,10 +300,10 @@ Unit::Unit(
   mInfoCache.mFormationHeadingHint.y = 0.0f;
   mInfoCache.mFormationHeadingHint.z = 0.0f;
 
-  ReservedOgridRectMinX = 0;
-  ReservedOgridRectMinZ = 0;
-  ReservedOgridRectMaxX = 0;
-  ReservedOgridRectMaxZ = 0;
+  mReservedOgridRect.x0 = 0;
+  mReservedOgridRect.z0 = 0;
+  mReservedOgridRect.x1 = 0;
+  mReservedOgridRect.z1 = 0;
 
   // mBlipsInRange (FastVectorN<WeakPtr<Entity>,20>) and mReconBlips
   // (FastVectorN<ReconBlip*,2>) bind to their inline buffers as members.
@@ -434,10 +433,10 @@ Unit::Unit(
   mInfoCache.mFormationHeadingHint.y = 0.0f;
   mInfoCache.mFormationHeadingHint.z = 0.0f;
 
-  ReservedOgridRectMinX = 0;
-  ReservedOgridRectMinZ = 0;
-  ReservedOgridRectMaxX = 0;
-  ReservedOgridRectMaxZ = 0;
+  mReservedOgridRect.x0 = 0;
+  mReservedOgridRect.z0 = 0;
+  mReservedOgridRect.x1 = 0;
+  mReservedOgridRect.z1 = 0;
 
   mBlipLastUpdateTick = 0;
 

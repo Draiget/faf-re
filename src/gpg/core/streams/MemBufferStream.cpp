@@ -203,44 +203,6 @@ namespace
 } // namespace
 
 /**
- * Address: 0x0094E8A0 (FUN_0094E8A0, MemBufferCharTypeInfo deleting-dtor thunk)
- *
- * What it does:
- * Tears down one `MemBufferCharTypeInfo` descriptor via `gpg::RType` base
- * teardown and conditionally frees storage when `deleteFlag & 1`.
- */
-[[maybe_unused]] gpg::RType* DestroyMemBufferCharTypeInfoDeleting(
-  MemBufferCharTypeInfo* const typeInfo,
-  const unsigned char deleteFlag
-)
-{
-  typeInfo->gpg::RType::~RType();
-  if ((deleteFlag & 1u) != 0u) {
-    ::operator delete(static_cast<void*>(typeInfo));
-  }
-  return typeInfo;
-}
-
-/**
- * Address: 0x0094E900 (FUN_0094E900, MemBufferCharConstTypeInfo deleting-dtor thunk)
- *
- * What it does:
- * Tears down one `MemBufferCharConstTypeInfo` descriptor via `gpg::RType` base
- * teardown and conditionally frees storage when `deleteFlag & 1`.
- */
-[[maybe_unused]] gpg::RType* DestroyMemBufferCharConstTypeInfoDeleting(
-  MemBufferCharConstTypeInfo* const typeInfo,
-  const unsigned char deleteFlag
-)
-{
-  typeInfo->gpg::RType::~RType();
-  if ((deleteFlag & 1u) != 0u) {
-    ::operator delete(static_cast<void*>(typeInfo));
-  }
-  return typeInfo;
-}
-
-/**
  * Address: 0x0094E320 (FUN_0094E320)
  *
  * What it does:

@@ -58,19 +58,6 @@ namespace moho
       (void)resource_reflection::ResolveRD3DTextureResourceType();
     }
 
-    /**
-     * Address: 0x00443800 (FUN_00443800)
-     *
-     * What it does:
-     * Resolves RD3D texture RTTI on demand and registers the prefetch type key
-     * used by the D3D texture resource pipeline.
-     */
-    [[maybe_unused]] void RegisterTexturePrefetchType()
-    {
-      gpg::RType* const textureType = resource_reflection::ResolveRD3DTextureResourceType();
-      RES_RegisterPrefetchType("d3d_textures", textureType);
-    }
-
     CD3DTextureResourceFactory* GetTextureFactory()
     {
       return &gTextureResourceFactory;

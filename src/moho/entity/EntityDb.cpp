@@ -154,14 +154,7 @@ namespace
     moho::EEntityIdBitMask::Family | moho::EEntityIdBitMask::Source;
   constexpr std::uint32_t kEntityIdFamilySourceMaskRaw = moho::ToMask(kEntityIdFamilySourceMask);
   constexpr std::uint32_t kEntityIdSerialMask = moho::ToMask(moho::EEntityIdBitMask::Serial);
-  constexpr std::uint32_t kEntityIdSourceShift = moho::kEntityIdSourceShift;
   constexpr std::uint32_t kAllUnitsUnitTypeBoundaryKey = moho::ToRaw(moho::EEntityIdSentinel::FirstNonUnitFamily);
-  constexpr std::uint32_t kAllUnitsHighFamilyBoundaryKey = 0x20000000u;
-  constexpr std::uint32_t kAllUnitsMidFamilyBoundaryKey = 0x30000000u;
-  constexpr std::uint32_t kAllUnitsShieldFamilyBoundaryKey = 0x40000000u;
-  constexpr std::uint32_t kAllUnitsOtherFamilyBoundaryKey = 0x50000000u;
-  constexpr std::uint32_t kAllUnitsLateFamilyBoundaryKey = 0x60000000u;
-
   gpg::RType* gLegacyEntityDbIdPoolMapType = nullptr;
   gpg::RType* gLegacyEntityDbEntityListType = nullptr;
 
@@ -339,60 +332,6 @@ namespace
     );
   }
 
-  /**
-   * Address: 0x00683CC0 (FUN_00683CC0)
-   *
-   * What it does:
-   * Stores the first all-units node at/after one source upper-bound key
-   * `((sourceIndex + 1) << 20)` into `outNode`.
-   */
-  [[maybe_unused]] moho::CEntityDbAllUnitsNode** StoreAllUnitsSourceUpperBoundNode(
-    moho::CEntityDbAllUnitsNode** const outNode,
-    const std::uint32_t sourceIndex,
-    const moho::EntityDB* const entityDb
-  ) noexcept
-  {
-    if (outNode == nullptr) {
-      return nullptr;
-    }
-
-    const std::uint32_t lowerBoundKey = (sourceIndex + 1u) << kEntityIdSourceShift;
-    *outNode = (entityDb != nullptr) ? TreeLowerBound(entityDb->AllUnitsHead(), lowerBoundKey) : nullptr;
-    return outNode;
-  }
-
-  /**
-   * Address: 0x00683CF0 (FUN_00683CF0)
-   *
-   * What it does:
-   * Stores the left-most all-units tree node (minimum key) into `outNode`.
-   */
-  [[maybe_unused]] moho::CEntityDbAllUnitsNode** StoreAllUnitsLeftmostNode(
-    moho::CEntityDbAllUnitsNode** const outNode,
-    const moho::EntityDB* const entityDb
-  ) noexcept
-  {
-    if (outNode == nullptr) {
-      return nullptr;
-    }
-
-    moho::CEntityDbAllUnitsNode* head = (entityDb != nullptr) ? entityDb->AllUnitsHead() : nullptr;
-    if (head == nullptr) {
-      *outNode = nullptr;
-      return outNode;
-    }
-
-    moho::CEntityDbAllUnitsNode* node = head;
-    moho::CEntityDbAllUnitsNode* cursor = head->parent;
-    while (cursor != nullptr && cursor->isNil == 0u) {
-      node = cursor;
-      cursor = cursor->left;
-    }
-
-    *outNode = node;
-    return outNode;
-  }
-
   [[nodiscard]] moho::CEntityDbAllUnitsNode* FindExactEntityNodeOrHead(
     moho::CEntityDbAllUnitsNode* const head,
     const std::uint32_t entityId
@@ -407,329 +346,6 @@ namespace
       return head;
     }
     return node;
-  }
-
-  /**
-   * Address: 0x00684530 (FUN_00684530)
-   *
-   * What it does:
-   * Returns the exact all-units payload pointer for one `entityId`, or `nullptr`
-   * when lookup resolves to the map head/sentinel lane.
-   */
-  [[maybe_unused]] moho::Entity* FindEntityPayloadByIdNode(
-    moho::EntityDB* const entityDb,
-    const std::uint32_t entityId
-  ) noexcept
-  {
-    if (entityDb == nullptr) {
-      return nullptr;
-    }
-
-    moho::CEntityDbAllUnitsNode* const head = entityDb->AllUnitsHead();
-    moho::CEntityDbAllUnitsNode* const node = FindExactEntityNodeOrHead(head, entityId);
-    if (node == nullptr || node == head) {
-      return nullptr;
-    }
-    return static_cast<moho::Entity*>(node->unitListNode);
-  }
-
-  /**
-   * Address: 0x00683D90 (FUN_00683D90)
-   *
-   * What it does:
-   * Stores the first all-units node at/after the high-family boundary key
-   * (`0x20000000`) into `outNode`.
-   */
-  [[maybe_unused]] moho::CEntityDbAllUnitsNode** StoreHighFamilyBoundaryLowerBoundNode(
-    moho::CEntityDbAllUnitsNode** const outNode,
-    const moho::EntityDB* const entityDb
-  ) noexcept
-  {
-    if (outNode == nullptr) {
-      return nullptr;
-    }
-
-    *outNode =
-      (entityDb != nullptr) ? TreeLowerBound(entityDb->AllUnitsHead(), kAllUnitsHighFamilyBoundaryKey) : nullptr;
-    return outNode;
-  }
-
-  /**
-   * Address: 0x00683DC0 (FUN_00683DC0)
-   *
-   * What it does:
-   * Stores the first all-units node at/after the mid-family boundary key
-   * (`0x30000000`) into `outNode`.
-   */
-  [[maybe_unused]] moho::CEntityDbAllUnitsNode** StoreMidFamilyBoundaryLowerBoundNode(
-    moho::CEntityDbAllUnitsNode** const outNode,
-    const moho::EntityDB* const entityDb
-  ) noexcept
-  {
-    if (outNode == nullptr) {
-      return nullptr;
-    }
-
-    *outNode =
-      (entityDb != nullptr) ? TreeLowerBound(entityDb->AllUnitsHead(), kAllUnitsMidFamilyBoundaryKey) : nullptr;
-    return outNode;
-  }
-
-  /**
-   * Address: 0x00683EF0 (FUN_00683EF0)
-   *
-   * What it does:
-   * Stores the first all-units node at/after the shield-family boundary key
-   * (`0x40000000`) into `outNode`.
-   */
-  [[maybe_unused]] moho::CEntityDbAllUnitsNode** StoreShieldFamilyBoundaryLowerBoundNode(
-    moho::CEntityDbAllUnitsNode** const outNode,
-    const moho::EntityDB* const entityDb
-  ) noexcept
-  {
-    if (outNode == nullptr) {
-      return nullptr;
-    }
-
-    *outNode =
-      (entityDb != nullptr) ? TreeLowerBound(entityDb->AllUnitsHead(), kAllUnitsShieldFamilyBoundaryKey) : nullptr;
-    return outNode;
-  }
-
-  /**
-   * Address: 0x00683F20 (FUN_00683F20)
-   * Address: 0x00683FA0 (FUN_00683FA0)
-   *
-   * What it does:
-   * Stores the first all-units node at/after the other-family boundary key
-   * (`0x50000000`) into `outNode`.
-   */
-  [[maybe_unused]] moho::CEntityDbAllUnitsNode** StoreOtherFamilyBoundaryLowerBoundNode(
-    moho::CEntityDbAllUnitsNode** const outNode,
-    const moho::EntityDB* const entityDb
-  ) noexcept
-  {
-    if (outNode == nullptr) {
-      return nullptr;
-    }
-
-    *outNode =
-      (entityDb != nullptr) ? TreeLowerBound(entityDb->AllUnitsHead(), kAllUnitsOtherFamilyBoundaryKey) : nullptr;
-    return outNode;
-  }
-
-  /**
-   * Address: 0x00683FD0 (FUN_00683FD0)
-   *
-   * What it does:
-   * Stores the first all-units node at/after the late-family boundary key
-   * (`0x60000000`) into `outNode`.
-   */
-  [[maybe_unused]] moho::CEntityDbAllUnitsNode** StoreLateFamilyBoundaryLowerBoundNode(
-    moho::CEntityDbAllUnitsNode** const outNode,
-    const moho::EntityDB* const entityDb
-  ) noexcept
-  {
-    if (outNode == nullptr) {
-      return nullptr;
-    }
-
-    *outNode =
-      (entityDb != nullptr) ? TreeLowerBound(entityDb->AllUnitsHead(), kAllUnitsLateFamilyBoundaryKey) : nullptr;
-    return outNode;
-  }
-
-  /**
-   * Address: 0x00683D40 (FUN_00683D40)
-   *
-   * What it does:
-   * Stores the first all-units node at/after one prop-family purge key
-   * `((armyIndex | 0x200) << 20)` into `outNode`.
-   */
-  moho::CEntityDbAllUnitsNode** StorePurgePropFamilyLowerBoundNode(
-    moho::CEntityDbAllUnitsNode** const outNode,
-    const std::uint32_t armyIndex,
-    const moho::EntityDB* const entityDb
-  ) noexcept
-  {
-    if (outNode == nullptr) {
-      return nullptr;
-    }
-
-    const std::uint32_t lowerBoundKey = (armyIndex | 0x200U) << moho::kEntityIdSourceShift;
-    *outNode = (entityDb != nullptr) ? TreeLowerBound(entityDb->AllUnitsHead(), lowerBoundKey) : nullptr;
-    return outNode;
-  }
-
-  /**
-   * Address: 0x00683D80 (FUN_00683D80)
-   *
-   * What it does:
-   * Register-shape adapter that forwards one `(armyIndex + 1)` prop-family
-   * purge lower-bound query.
-   */
-  [[maybe_unused]] moho::CEntityDbAllUnitsNode** StorePurgePropFamilyUpperBoundNode(
-    moho::CEntityDbAllUnitsNode** const outNode,
-    const std::uint32_t armyIndex,
-    const moho::EntityDB* const entityDb
-  ) noexcept
-  {
-    return StorePurgePropFamilyLowerBoundNode(outNode, armyIndex + 1u, entityDb);
-  }
-
-  /**
-   * Address: 0x00683DF0 (FUN_00683DF0)
-   *
-   * What it does:
-   * Stores the first all-units node at/after one projectile-family purge key
-   * `((armyIndex | 0x100) << 20)` into `outNode`.
-   */
-  moho::CEntityDbAllUnitsNode** StorePurgeProjectileFamilyLowerBoundNode(
-    moho::CEntityDbAllUnitsNode** const outNode,
-    const std::uint32_t armyIndex,
-    const moho::EntityDB* const entityDb
-  ) noexcept
-  {
-    if (outNode == nullptr) {
-      return nullptr;
-    }
-
-    const std::uint32_t lowerBoundKey = (armyIndex | 0x100U) << moho::kEntityIdSourceShift;
-    *outNode = (entityDb != nullptr) ? TreeLowerBound(entityDb->AllUnitsHead(), lowerBoundKey) : nullptr;
-    return outNode;
-  }
-
-  /**
-   * Address: 0x00683E30 (FUN_00683E30)
-   *
-   * What it does:
-   * Register-shape adapter that forwards one `(armyIndex + 1)` projectile-family
-   * purge lower-bound query.
-   */
-  [[maybe_unused]] moho::CEntityDbAllUnitsNode** StorePurgeProjectileFamilyUpperBoundNode(
-    moho::CEntityDbAllUnitsNode** const outNode,
-    const std::uint32_t armyIndex,
-    const moho::EntityDB* const entityDb
-  ) noexcept
-  {
-    return StorePurgeProjectileFamilyLowerBoundNode(outNode, armyIndex + 1u, entityDb);
-  }
-
-  /**
-   * Address: 0x00683EA0 (FUN_00683EA0)
-   *
-   * What it does:
-   * Stores the first all-units node at/after one shield-family purge key
-   * `((armyIndex | 0x400) << 20)` into `outNode`.
-   */
-  moho::CEntityDbAllUnitsNode** StorePurgeShieldFamilyLowerBoundNode(
-    moho::CEntityDbAllUnitsNode** const outNode,
-    const std::uint32_t armyIndex,
-    const moho::EntityDB* const entityDb
-  ) noexcept
-  {
-    if (outNode == nullptr) {
-      return nullptr;
-    }
-
-    const std::uint32_t lowerBoundKey = (armyIndex | 0x400U) << moho::kEntityIdSourceShift;
-    *outNode = (entityDb != nullptr) ? TreeLowerBound(entityDb->AllUnitsHead(), lowerBoundKey) : nullptr;
-    return outNode;
-  }
-
-  /**
-   * Address: 0x00683EE0 (FUN_00683EE0)
-   *
-   * What it does:
-   * Register-shape adapter that forwards one `(armyIndex + 1)` shield-family
-   * purge lower-bound query.
-   */
-  [[maybe_unused]] moho::CEntityDbAllUnitsNode** StorePurgeShieldFamilyUpperBoundNode(
-    moho::CEntityDbAllUnitsNode** const outNode,
-    const std::uint32_t armyIndex,
-    const moho::EntityDB* const entityDb
-  ) noexcept
-  {
-    return StorePurgeShieldFamilyLowerBoundNode(outNode, armyIndex + 1u, entityDb);
-  }
-
-  /**
-   * Address: 0x00683F50 (FUN_00683F50)
-   *
-   * What it does:
-   * Stores the first all-units node at/after one other-family purge key
-   * `((armyIndex | 0x500) << 20)` into `outNode`.
-   */
-  moho::CEntityDbAllUnitsNode** StorePurgeOtherFamilyLowerBoundNode(
-    moho::CEntityDbAllUnitsNode** const outNode,
-    const std::uint32_t armyIndex,
-    const moho::EntityDB* const entityDb
-  ) noexcept
-  {
-    if (outNode == nullptr) {
-      return nullptr;
-    }
-
-    const std::uint32_t lowerBoundKey = (armyIndex | 0x500U) << moho::kEntityIdSourceShift;
-    *outNode = (entityDb != nullptr) ? TreeLowerBound(entityDb->AllUnitsHead(), lowerBoundKey) : nullptr;
-    return outNode;
-  }
-
-  /**
-   * Address: 0x00683F90 (FUN_00683F90)
-   *
-   * What it does:
-   * Register-shape adapter that forwards one `(armyIndex + 1)` other-family
-   * purge lower-bound query.
-   */
-  [[maybe_unused]] moho::CEntityDbAllUnitsNode** StorePurgeOtherFamilyUpperBoundNode(
-    moho::CEntityDbAllUnitsNode** const outNode,
-    const std::uint32_t armyIndex,
-    const moho::EntityDB* const entityDb
-  ) noexcept
-  {
-    return StorePurgeOtherFamilyLowerBoundNode(outNode, armyIndex + 1u, entityDb);
-  }
-
-  /**
-   * Address: 0x00683E40 (FUN_00683E40)
-   *
-   * What it does:
-   * Stores the first all-units node at/after the non-unit family boundary
-   * (`0x10000000`) into `outNode`.
-   */
-  [[maybe_unused]] moho::CEntityDbAllUnitsNode** StoreFirstNonUnitFamilyLowerBoundNode(
-    moho::CEntityDbAllUnitsNode** const outNode,
-    const moho::EntityDB* const entityDb
-  ) noexcept
-  {
-    if (outNode == nullptr) {
-      return nullptr;
-    }
-
-    *outNode = (entityDb != nullptr) ? TreeLowerBound(entityDb->AllUnitsHead(), kAllUnitsUnitTypeBoundaryKey) : nullptr;
-    return outNode;
-  }
-
-  /**
-   * Address: 0x00683E70 (FUN_00683E70)
-   *
-   * What it does:
-   * Stores the first all-units node at/after the high-family boundary
-   * (`0x20000000`) into `outNode`.
-   */
-  [[maybe_unused]] moho::CEntityDbAllUnitsNode** StoreFirstHighFamilyLowerBoundNode(
-    moho::CEntityDbAllUnitsNode** const outNode,
-    const moho::EntityDB* const entityDb
-  ) noexcept
-  {
-    if (outNode == nullptr) {
-      return nullptr;
-    }
-
-    *outNode =
-      (entityDb != nullptr) ? TreeLowerBound(entityDb->AllUnitsHead(), kAllUnitsHighFamilyBoundaryKey) : nullptr;
-    return outNode;
   }
 
   [[nodiscard]] moho::CEntityDbAllUnitsNode* NextNodeInAllUnitsTree(
@@ -778,43 +394,6 @@ namespace
     std::uint32_t size;
   };
   static_assert(sizeof(BackRefListOwner) == 0x0C, "BackRefListOwner size must be 0x0C");
-
-  /**
-   * Address: 0x00685BA0 (FUN_00685BA0)
-   * Address: 0x00685BE0 (FUN_00685BE0)
-   * Address: 0x00685C20 (FUN_00685C20)
-   * Address: 0x00685C60 (FUN_00685C60)
-   *
-   * What it does:
-   * Register-shape adapter that advances one all-armies iterator object and
-   * returns the same iterator pointer.
-   */
-  [[maybe_unused]] moho::CUnitIterAllArmies* AdvanceAllArmiesIteratorLane(
-    moho::CUnitIterAllArmies* const iterator
-  ) noexcept
-  {
-    if (iterator != nullptr) {
-      iterator->Next();
-    }
-    return iterator;
-  }
-
-  /**
-   * Address: 0x00687C30 (FUN_00687C30)
-   *
-   * What it does:
-   * Stores the current all-armies iterator node lane into `outIterator`, then
-   * advances the iterator with `Next()` and returns `outIterator`.
-   */
-  [[maybe_unused]] moho::CEntityDbAllUnitsNode** StoreAndAdvanceAllArmiesIteratorPostIncrement(
-    moho::CUnitIterAllArmies* const iterator,
-    moho::CEntityDbAllUnitsNode** const outIterator
-  ) noexcept
-  {
-    *outIterator = iterator->mItr;
-    iterator->Next();
-    return outIterator;
-  }
 
   void PurgeRegisteredEntitySets(
     moho::EntityDB& entityDb
@@ -1066,7 +645,7 @@ namespace
      * on their RbTree.h members) exactly as every other `fa::map`
      * instantiation in this codebase does -- no per-map reimplementation.
      */
-    static void SerLoad(gpg::ReadArchive* archive, std::intptr_t objectPtr, int version, gpg::RRef* ownerRef);
+    static void SerLoad(gpg::ReadArchive* archive, void* objectPtr, int version, gpg::RRef* ownerRef);
 
     /**
      * Address: 0x00686B10 (FUN_00686B10, std::map_IdPool::Serialize)
@@ -1078,7 +657,7 @@ namespace
      * `FUN_00685FA0`/`FUN_00686CE0`, cited on `rb_increment` in RbTree.h) --
      * no separate iteration mechanic is introduced here.
      */
-    static void SerSave(gpg::WriteArchive* archive, std::intptr_t objectPtr, int version, gpg::RRef* ownerRef);
+    static void SerSave(gpg::WriteArchive* archive, void* objectPtr, int version, gpg::RRef* ownerRef);
   };
   static_assert(sizeof(EntityDbIdPoolMapTypeInfo) == 0x64, "EntityDbIdPoolMapTypeInfo size must be 0x64");
 
@@ -1110,12 +689,12 @@ namespace
    */
   void EntityDbIdPoolMapTypeInfo::SerLoad(
     gpg::ReadArchive* const archive,
-    const std::intptr_t objectPtr,
+    void* const objectPtr,
     const int,
     gpg::RRef* const ownerRef
   )
   {
-    auto* const map = reinterpret_cast<fa::map<std::uint32_t, moho::IdPool>*>(objectPtr);
+    auto* const map = static_cast<fa::map<std::uint32_t, moho::IdPool>*>(objectPtr);
     if (archive == nullptr || map == nullptr) {
       return;
     }
@@ -1147,12 +726,12 @@ namespace
    */
   void EntityDbIdPoolMapTypeInfo::SerSave(
     gpg::WriteArchive* const archive,
-    const std::intptr_t objectPtr,
+    void* const objectPtr,
     const int,
     gpg::RRef* const ownerRef
   )
   {
-    const auto* const map = reinterpret_cast<const fa::map<std::uint32_t, moho::IdPool>*>(objectPtr);
+    const auto* const map = static_cast<const fa::map<std::uint32_t, moho::IdPool>*>(objectPtr);
     if (archive == nullptr || map == nullptr) {
       return;
     }
@@ -1410,7 +989,7 @@ namespace moho
       return nullptr;
     }
 
-    auto* const entitySubobject = reinterpret_cast<Entity*>(node->unitListNode);
+    auto* const entitySubobject = static_cast<Entity*>(node->unitListNode);
     return static_cast<Unit*>(entitySubobject);
   }
 

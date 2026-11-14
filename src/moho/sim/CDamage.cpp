@@ -81,35 +81,6 @@ namespace
     return false;
   }
 
-  /**
-   * Address: 0x00739BB0 (FUN_00739BB0)
-   *
-   * What it does:
-   * Removes one shield entry from the active damage-iteration list and returns
-   * the next iterator lane.
-   */
-  [[maybe_unused]] fa::list<moho::Shield*>::iterator RemoveDamageShieldEntry(
-    fa::list<moho::Shield*>& shields,
-    const fa::list<moho::Shield*>::iterator current
-  )
-  {
-    return shields.erase(current);
-  }
-
-  /**
-   * Address: 0x00739DD0 (FUN_00739DD0)
-   *
-   * What it does:
-   * Clears the temporary shield-iteration list used by the damage path and
-   * releases its owned entries.
-   */
-  [[maybe_unused]] void ResetDamageShieldIterationList(
-    fa::list<moho::Shield*>& shields
-  )
-  {
-    shields.clear();
-  }
-
   struct DamageShieldListSentinelNode
   {
     DamageShieldListSentinelNode* next;
@@ -117,21 +88,6 @@ namespace
     std::uint32_t valueLane;
   };
   static_assert(sizeof(DamageShieldListSentinelNode) == 0x0C, "DamageShieldListSentinelNode size must be 0x0C");
-
-  /**
-   * Address: 0x00739DB0 (FUN_00739DB0, SIM shield-list sentinel allocator)
-   *
-   * What it does:
-   * Allocates one 12-byte shield-list sentinel lane and self-links its
-   * `{next,prev}` pointers.
-   */
-  [[maybe_unused]] [[nodiscard]] DamageShieldListSentinelNode* AllocateSelfLinkedDamageShieldSentinel()
-  {
-    auto* const node = fa::detail::allocate_checked<DamageShieldListSentinelNode>(1u);
-    node->next = node;
-    node->prev = node;
-    return node;
-  }
 
   struct DamagePairSeed
   {
@@ -149,26 +105,6 @@ namespace
   };
   static_assert(sizeof(DamageLinkedPairNode) == 0x10, "DamageLinkedPairNode size must be 0x10");
 
-  /**
-   * Address: 0x0073A120 (FUN_0073A120, SIM damage linked-pair node allocator)
-   *
-   * What it does:
-   * Allocates one 16-byte linked node, seeds `{next,prev}` from caller lanes,
-   * and copies one 8-byte payload pair into the node tail.
-   */
-  [[maybe_unused]] [[nodiscard]] DamageLinkedPairNode* AllocateLinkedDamagePairNode(
-    const DamagePairSeed& seed,
-    DamageLinkedPairNode* const next,
-    DamageLinkedPairNode* const prev
-  )
-  {
-    auto* const node = fa::detail::allocate_checked<DamageLinkedPairNode>(1u);
-    node->next = next;
-    node->prev = prev;
-    node->payload0 = seed.first;
-    node->payload1 = seed.second;
-    return node;
-  }
 } // namespace
 
 namespace moho
@@ -967,7 +903,7 @@ namespace moho
         continue;
       }
 
-      const std::uint32_t ordinal = unit->GetBlueprint()->mCategoryBitIndex;
+      const std::uint32_t ordinal = unit->GetBlueprint()->mBlueprintOrdinal;
       if (category == nullptr || !category->mBits.Contains(ordinal)) {
         continue;
       }

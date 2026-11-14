@@ -135,25 +135,6 @@ namespace
   static_assert(sizeof(SAniManipBindingInline) == 0x10, "SAniManipBindingInline size must be 0x10");
 
   /**
-   * Address: 0x0063C780 (FUN_0063C780)
-   *
-   * What it does:
-   * Initializes one inline fastvector-style runtime view where `begin=end` at
-   * the inline storage base and capacity spans two `SAniManipBinding` lanes.
-   */
-  [[maybe_unused]] SAniManipBindingInline* InitializeSAniManipBindingInlineView(
-    SAniManipBindingInline* const outView,
-    moho::SAniManipBinding* const inlineStorageBase
-  ) noexcept
-  {
-    outView->begin = inlineStorageBase;
-    outView->end = inlineStorageBase;
-    outView->capacityEnd = inlineStorageBase + 2;
-    outView->inlineStorage = inlineStorageBase;
-    return outView;
-  }
-
-  /**
    * Address: 0x0063C7A0 (FUN_0063C7A0, gpg::RFastVectorType_SAniManipBinding::SerLoad)
    *
    * What it does:
@@ -161,7 +142,7 @@ namespace
    */
   void LoadFastVectorSAniManipBinding(
     gpg::ReadArchive* const archive,
-    const std::intptr_t objectPtr,
+    void* const objectPtr,
     const int,
     gpg::RRef* const ownerRef
   )
@@ -173,7 +154,7 @@ namespace
     unsigned int count = 0;
     archive->ReadUInt(&count);
 
-    auto& vec = *reinterpret_cast<gpg::core::FastVectorInline<moho::SAniManipBinding>*>(objectPtr);
+    auto& vec = *static_cast<gpg::core::FastVectorInline<moho::SAniManipBinding>*>(objectPtr);
     moho::SAniManipBinding fill{};
     vec.resize(static_cast<std::size_t>(count), fill);
 
@@ -192,7 +173,7 @@ namespace
    */
   void SaveFastVectorSAniManipBinding(
     gpg::WriteArchive* const archive,
-    const std::intptr_t objectPtr,
+    void* const objectPtr,
     const int,
     gpg::RRef* const ownerRef
   )
@@ -201,7 +182,7 @@ namespace
       return;
     }
 
-    auto& vec = *reinterpret_cast<gpg::core::FastVectorInline<moho::SAniManipBinding>*>(objectPtr);
+    auto& vec = *static_cast<gpg::core::FastVectorInline<moho::SAniManipBinding>*>(objectPtr);
     const unsigned int count = static_cast<unsigned int>(vec.size());
     archive->WriteUInt(count);
 

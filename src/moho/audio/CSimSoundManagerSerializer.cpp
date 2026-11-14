@@ -15,12 +15,7 @@ namespace
 {
   using LoopNode = moho::TDatListItem<moho::HSound, void>;
 
-  void SerializeAudioRequestFastVector(
-    gpg::WriteArchive* archive,
-    std::intptr_t objectPtr,
-    int version,
-    gpg::RRef* ownerRef
-  );
+  void SerializeAudioRequestFastVector(gpg::WriteArchive* archive, void* objectPtr, int version, gpg::RRef* ownerRef);
 
   [[nodiscard]] gpg::RType* CachedAudioRequestVectorType()
   {
@@ -28,7 +23,7 @@ namespace
     if (!type) {
       type = gpg::LookupRType(typeid(gpg::fastvector<moho::SAudioRequest>));
       if (type != nullptr && type->serSaveFunc_ == nullptr) {
-        type->serSaveFunc_ = reinterpret_cast<gpg::RType::save_func_t>(&SerializeAudioRequestFastVector);
+        type->serSaveFunc_ = &SerializeAudioRequestFastVector;
       }
     }
     return type;
@@ -43,7 +38,7 @@ namespace
    */
   void SerializeAudioRequestFastVector(
     gpg::WriteArchive* const archive,
-    const std::intptr_t objectPtr,
+    void* const objectPtr,
     const int,
     gpg::RRef* const ownerRef
   )
@@ -52,7 +47,7 @@ namespace
       return;
     }
 
-    const auto* const requests = reinterpret_cast<const gpg::fastvector<moho::SAudioRequest>*>(objectPtr);
+    const auto* const requests = static_cast<const gpg::fastvector<moho::SAudioRequest>*>(objectPtr);
 
     const unsigned int count = requests != nullptr ? static_cast<unsigned int>(requests->end_ - requests->start_) : 0u;
     archive->WriteUInt(count);

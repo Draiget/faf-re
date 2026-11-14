@@ -65,104 +65,6 @@ namespace
   constexpr const char* kFlushEventsHelpText = "FlushEvents() -- flush mouse/keyboard events";
   constexpr const char* kClearCurrentFactoryForQueueDisplayHelpText = "ClearCurrentFactoryForQueueDisplay()";
 
-  /**
-   * Address: 0x0078C730 (FUN_0078C730)
-   *
-   * What it does:
-   * Backward-copies one dword range `[sourceBegin, sourceEnd)` into destination
-   * ending at `destinationEnd` and stores resulting begin pointer to output.
-   */
-  [[maybe_unused]] std::uint32_t** CopyDwordRangeBackwardToEnd(
-    std::uint32_t** const outBeginSlot,
-    const std::uint32_t* sourceEnd,
-    const std::uint32_t* const sourceBegin,
-    std::uint32_t* destinationEnd
-  ) noexcept
-  {
-    if (sourceEnd != sourceBegin) {
-      do {
-        --sourceEnd;
-        --destinationEnd;
-        *destinationEnd = *sourceEnd;
-      } while (sourceEnd != sourceBegin);
-    }
-
-    *outBeginSlot = destinationEnd;
-    return outBeginSlot;
-  }
-
-  /**
-   * Address: 0x0078C760 (FUN_0078C760)
-   *
-   * What it does:
-   * Secondary entrypoint for backward dword-range copy into destination tail.
-   */
-  [[maybe_unused]] std::uint32_t** CopyDwordRangeBackwardToEndAlias(
-    std::uint32_t** const outBeginSlot,
-    const std::uint32_t* const sourceBegin,
-    const std::uint32_t* sourceEnd,
-    std::uint32_t* destinationEnd
-  ) noexcept
-  {
-    return CopyDwordRangeBackwardToEnd(outBeginSlot, sourceEnd, sourceBegin, destinationEnd);
-  }
-
-  /**
-   * Address: 0x0078C790 (FUN_0078C790)
-   *
-   * What it does:
-   * Forward-copies one dword range `[sourceBegin, sourceEnd)` and stores
-   * one-past-end destination pointer in output.
-   */
-  [[maybe_unused]] std::uint32_t** CopyDwordRangeForwardToEnd(
-    std::uint32_t** const outEndSlot,
-    const std::uint32_t* sourceBegin,
-    const std::uint32_t* const sourceEnd,
-    std::uint32_t* destinationBegin
-  ) noexcept
-  {
-    while (sourceBegin != sourceEnd) {
-      *destinationBegin = *sourceBegin;
-      ++sourceBegin;
-      ++destinationBegin;
-    }
-
-    *outEndSlot = destinationBegin;
-    return outEndSlot;
-  }
-
-  /**
-   * Address: 0x0078C7C0 (FUN_0078C7C0)
-   *
-   * What it does:
-   * Conditionally stores one source dword into destination when destination
-   * storage is present.
-   */
-  [[maybe_unused]] std::uint32_t* CopyDwordIfDestinationPresent(
-    std::uint32_t* const destination,
-    const std::uint32_t* const source
-  ) noexcept
-  {
-    if (destination != nullptr) {
-      *destination = *source;
-    }
-    return destination;
-  }
-
-  /**
-   * Address: 0x0078C8F0 (FUN_0078C8F0)
-   *
-   * What it does:
-   * Advances one packed byte-address lane by `4 * dwordCount`.
-   */
-  [[maybe_unused]] std::uint32_t* AdvancePackedAddressByDwordCount(
-    std::uint32_t* const packedAddressLane,
-    const std::int32_t dwordCount
-  ) noexcept
-  {
-    *packedAddressLane += static_cast<std::uint32_t>(4 * dwordCount);
-    return packedAddressLane;
-  }
 } // namespace
 
 /// The dragger that owns the mouse until it is released or replaced. A
@@ -195,72 +97,6 @@ fa::vector<moho::WeakPtr<moho::CMauiControl>> sInputCapture;
 namespace
 {
 
-  /**
-   * Address: 0x007A59E0 (FUN_007A59E0)
-   *
-   * What it does:
-   * Returns the process-global input-capture vector storage, ignoring one
-   * stdcall argument lane.
-   */
-  [[nodiscard]] fa::vector<moho::WeakPtr<moho::CMauiControl>>* ResolveInputCaptureStorageWithArg(
-    const std::int32_t /*ignoredArg*/
-  ) noexcept
-  {
-    return &sInputCapture;
-  }
-
-  /**
-   * Address: 0x007A5DA0 (FUN_007A5DA0)
-   *
-   * What it does:
-   * Returns the process-global input-capture vector storage.
-   */
-  [[maybe_unused]] [[nodiscard]] fa::vector<moho::WeakPtr<moho::CMauiControl>>* ResolveInputCaptureStorage() noexcept
-  {
-    return ResolveInputCaptureStorageWithArg(0);
-  }
-
-  /**
-   * Address: 0x007A5680 (FUN_007A5680)
-   *
-   * What it does:
-   * Stores the current global input-capture begin lane into `outBegin`.
-   */
-  [[maybe_unused]] [[nodiscard]] moho::WeakPtr<moho::CMauiControl>** StoreInputCaptureBeginLane(
-    moho::WeakPtr<moho::CMauiControl>** const outBegin
-  ) noexcept
-  {
-    *outBegin = sInputCapture.begin();
-    return outBegin;
-  }
-
-  /**
-   * Address: 0x007A5690 (FUN_007A5690)
-   *
-   * What it does:
-   * Stores the current global input-capture end lane into `outEnd`.
-   */
-  [[maybe_unused]] [[nodiscard]] moho::WeakPtr<moho::CMauiControl>** StoreInputCaptureEndLane(
-    moho::WeakPtr<moho::CMauiControl>** const outEnd
-  ) noexcept
-  {
-    *outEnd = sInputCapture.end();
-    return outEnd;
-  }
-
-  /**
-   * Address: 0x007A56F0 (FUN_007A56F0)
-   *
-   * What it does:
-   * Returns one indexed weak-control lane from the global input-capture
-   * vector storage.
-   */
-  [[maybe_unused]] [[nodiscard]] moho::WeakPtr<moho::CMauiControl>* ResolveInputCaptureLaneAt(
-    const std::size_t index
-  ) noexcept
-  {
-    return sInputCapture.begin() + static_cast<std::ptrdiff_t>(index);
-  }
   /**
    * Address: 0x00794DB0 (FUN_00794DB0)
    *
@@ -416,21 +252,6 @@ moho::CScrLuaMetatableFactory<moho::CMauiControl>& moho::CScrLuaMetatableFactory
 }
 
 /**
- * Address: 0x00783EA0 (FUN_00783EA0)
- *
- * What it does:
- * Rebinds the startup metatable-factory index lane for
- * `CScrLuaMetatableFactory<CMauiControl>` and returns that singleton.
- */
-[[maybe_unused]] static moho::CScrLuaMetatableFactory<moho::CMauiControl>*
-startup_CScrLuaMetatableFactory_CMauiControl_Index()
-{
-  auto& instance = moho::CScrLuaMetatableFactory<moho::CMauiControl>::Instance();
-  instance.SetFactoryObjectIndexForRecovery(moho::CScrLuaObjectFactory::AllocateFactoryObjectIndex());
-  return &instance;
-}
-
-/**
  * Address: 0x00783070 (FUN_00783070, Moho::CScrLuaMetatableFactory<Moho::CMauiControl>::Create)
  *
  * What it does:
@@ -450,21 +271,6 @@ moho::CScrLuaMetatableFactory<moho::CMauiBorder>::CScrLuaMetatableFactory()
 moho::CScrLuaMetatableFactory<moho::CMauiBorder>& moho::CScrLuaMetatableFactory<moho::CMauiBorder>::Instance()
 {
   return sInstance;
-}
-
-/**
- * Address: 0x007862E0 (FUN_007862E0)
- *
- * What it does:
- * Rebinds the startup metatable-factory index lane for
- * `CScrLuaMetatableFactory<CMauiBorder>` and returns that singleton.
- */
-[[maybe_unused]] static moho::CScrLuaMetatableFactory<moho::CMauiBorder>*
-startup_CScrLuaMetatableFactory_CMauiBorder_Index()
-{
-  auto& instance = moho::CScrLuaMetatableFactory<moho::CMauiBorder>::Instance();
-  instance.SetFactoryObjectIndexForRecovery(moho::CScrLuaObjectFactory::AllocateFactoryObjectIndex());
-  return &instance;
 }
 
 /**
@@ -490,21 +296,6 @@ moho::CScrLuaMetatableFactory<moho::CMauiBitmap>& moho::CScrLuaMetatableFactory<
 }
 
 /**
- * Address: 0x00783E70 (FUN_00783E70)
- *
- * What it does:
- * Rebinds the startup metatable-factory index lane for
- * `CScrLuaMetatableFactory<CMauiBitmap>` and returns that singleton.
- */
-[[maybe_unused]] static moho::CScrLuaMetatableFactory<moho::CMauiBitmap>*
-startup_CScrLuaMetatableFactory_CMauiBitmap_Index()
-{
-  auto& instance = moho::CScrLuaMetatableFactory<moho::CMauiBitmap>::Instance();
-  instance.SetFactoryObjectIndexForRecovery(moho::CScrLuaObjectFactory::AllocateFactoryObjectIndex());
-  return &instance;
-}
-
-/**
  * Address: 0x00783040 (FUN_00783040, Moho::CScrLuaMetatableFactory<Moho::CMauiBitmap>::Create)
  *
  * What it does:
@@ -524,21 +315,6 @@ moho::CScrLuaMetatableFactory<moho::CMauiCursor>::CScrLuaMetatableFactory()
 moho::CScrLuaMetatableFactory<moho::CMauiCursor>& moho::CScrLuaMetatableFactory<moho::CMauiCursor>::Instance()
 {
   return sInstance;
-}
-
-/**
- * Address: 0x0078DAA0 (FUN_0078DAA0)
- *
- * What it does:
- * Rebinds the startup metatable-factory index lane for
- * `CScrLuaMetatableFactory<CMauiCursor>` and returns that singleton.
- */
-[[maybe_unused]] static moho::CScrLuaMetatableFactory<moho::CMauiCursor>*
-startup_CScrLuaMetatableFactory_CMauiCursor_Index()
-{
-  auto& instance = moho::CScrLuaMetatableFactory<moho::CMauiCursor>::Instance();
-  instance.SetFactoryObjectIndexForRecovery(moho::CScrLuaObjectFactory::AllocateFactoryObjectIndex());
-  return &instance;
 }
 
 /**
@@ -564,21 +340,6 @@ moho::CScrLuaMetatableFactory<moho::CMauiLuaDragger>& moho::CScrLuaMetatableFact
 }
 
 /**
- * Address: 0x0078EAF0 (FUN_0078EAF0)
- *
- * What it does:
- * Rebinds the startup metatable-factory index lane for
- * `CScrLuaMetatableFactory<CMauiLuaDragger>` and returns that singleton.
- */
-[[maybe_unused]] static moho::CScrLuaMetatableFactory<moho::CMauiLuaDragger>*
-startup_CScrLuaMetatableFactory_CMauiLuaDragger_Index()
-{
-  auto& instance = moho::CScrLuaMetatableFactory<moho::CMauiLuaDragger>::Instance();
-  instance.SetFactoryObjectIndexForRecovery(moho::CScrLuaObjectFactory::AllocateFactoryObjectIndex());
-  return &instance;
-}
-
-/**
  * Address: 0x0078E660 (FUN_0078E660, Moho::CScrLuaMetatableFactory<Moho::CMauiLuaDragger>::Create)
  *
  * What it does:
@@ -598,21 +359,6 @@ moho::CScrLuaMetatableFactory<moho::CMauiEdit>::CScrLuaMetatableFactory()
 moho::CScrLuaMetatableFactory<moho::CMauiEdit>& moho::CScrLuaMetatableFactory<moho::CMauiEdit>::Instance()
 {
   return sInstance;
-}
-
-/**
- * Address: 0x00795610 (FUN_00795610)
- *
- * What it does:
- * Rebinds the startup metatable-factory index lane for
- * `CScrLuaMetatableFactory<CMauiEdit>` and returns that singleton.
- */
-[[maybe_unused]] static moho::CScrLuaMetatableFactory<moho::CMauiEdit>*
-startup_CScrLuaMetatableFactory_CMauiEdit_Index()
-{
-  auto& instance = moho::CScrLuaMetatableFactory<moho::CMauiEdit>::Instance();
-  instance.SetFactoryObjectIndexForRecovery(moho::CScrLuaObjectFactory::AllocateFactoryObjectIndex());
-  return &instance;
 }
 
 /**
@@ -826,57 +572,6 @@ int moho::cfunc_CMauiBitMapGetNumFramesL(
  *
  * The caller calls `mMeshes.push_back(meshInstance)`.
  */
-
-/**
- * Address: 0x0086DDF0 (FUN_0086DDF0, sub_86DDF0)
- *
- * What it does:
- * Clears the global mouse-scrub active flag and returns its storage address.
- */
-[[maybe_unused]] static std::uint8_t* func_ResetMouseScrubStateFlag()
-{
-  sMouseIsScrubbing = 0;
-  return &sMouseIsScrubbing;
-}
-
-/**
- * Address: 0x0086DE00 (FUN_0086DE00, sub_86DE00)
- *
- * What it does:
- * Converts integer mouse-scrub delta lanes to float XY output.
- */
-[[maybe_unused]] static float* func_GetMouseScrubDelta(
-  float* const outDelta
-)
-{
-  outDelta[0] = static_cast<float>(sMouseScrubDelta.x);
-  outDelta[1] = static_cast<float>(sMouseScrubDelta.y);
-  return outDelta;
-}
-
-/**
- * Address: 0x0086DE20 (FUN_0086DE20, sub_86DE20)
- *
- * What it does:
- * Returns whether mouse-scrub mode is currently active.
- */
-[[maybe_unused]] static std::uint8_t func_IsMouseScrubbingActive()
-{
-  return sMouseIsScrubbing;
-}
-
-/**
- * Address: 0x0086DFE0 (FUN_0086DFE0, sub_86DFE0)
- *
- * What it does:
- * Clears accumulated integer mouse-scrub deltas and returns zero.
- */
-[[maybe_unused]] static int func_ResetMouseScrubDelta()
-{
-  sMouseScrubDelta.x = 0;
-  sMouseScrubDelta.y = 0;
-  return 0;
-}
 
 void moho::UI_SetInvertMidMouseScrub(
   const bool invert
@@ -1760,26 +1455,6 @@ moho::WeakPtr<moho::UserUnit> moho::sCurrentBuildFactory{};
 namespace
 {
 
-  /**
-   * Address: 0x00836E60 (FUN_00836E60, sub_836E60)
-   *
-   * IDA signature:
-   * int __thiscall sub_836E60(gpg::fastvector_BuildQueueItem *this);
-   *
-   * What it does:
-   * Element count of one 0x30-stride queue lane, short-circuiting to zero when
-   * `_Myfirst` is null instead of dividing a null-based difference.
-   */
-  [[maybe_unused]] [[nodiscard]] std::uint32_t FactoryQueueItemCount(
-    const FactoryQueueItem* const begin,
-    const FactoryQueueItem* const end
-  ) noexcept
-  {
-    if (begin == nullptr) {
-      return 0u;
-    }
-    return static_cast<std::uint32_t>(end - begin);
-  }
 } // namespace
 
 void moho::CurrentBuildQueueItemCommands(
@@ -2056,55 +1731,6 @@ const moho::VMatrix4& moho::UI_IdentityMatrix()
 }
 namespace
 {
-  /**
-   * Address: 0x00858440 (FUN_00858440)
-   *
-   * What it does:
-   * Returns the global command-feedback blip-list lane.
-   */
-  [[maybe_unused]] [[nodiscard]] fa::list<SCommandFeedbackBlip>* GetCommandFeedbackBlipsLaneA(
-    const int /*unused*/
-  ) noexcept
-  {
-    return &sCommandFeedbackBlips;
-  }
-
-  /**
-   * Address: 0x008585C0 (FUN_008585C0)
-   *
-   * What it does:
-   * Secondary entrypoint returning the command-feedback blip-list lane.
-   */
-  [[maybe_unused]] [[nodiscard]] fa::list<SCommandFeedbackBlip>* GetCommandFeedbackBlipsLaneB(
-    const int /*unused*/
-  ) noexcept
-  {
-    return &sCommandFeedbackBlips;
-  }
-
-  /**
-   * Address: 0x00858670 (FUN_00858670)
-   *
-   * What it does:
-   * Third entrypoint returning the command-feedback blip-list lane.
-   */
-  [[maybe_unused]] [[nodiscard]] fa::list<SCommandFeedbackBlip>* GetCommandFeedbackBlipsLaneC(
-    const int /*unused*/
-  ) noexcept
-  {
-    return &sCommandFeedbackBlips;
-  }
-
-  /**
-   * Address: 0x008587A0 (FUN_008587A0)
-   *
-   * What it does:
-   * Fourth entrypoint returning the command-feedback blip-list lane.
-   */
-  [[maybe_unused]] [[nodiscard]] fa::list<SCommandFeedbackBlip>* GetCommandFeedbackBlipsLaneD() noexcept
-  {
-    return &sCommandFeedbackBlips;
-  }
   /**
    * Drives this file's Lua binder registrations.
    *

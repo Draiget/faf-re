@@ -1551,7 +1551,7 @@ namespace
           GCObject* const object = separated[at].object;
           GCObject** const link = separated[at].lastLive != nullptr ? &separated[at].lastLive->gch.next : carry;
           // The payload's x86 size: deadmem is charged against nblocks (x64 port, LuaMemAccounting.h).
-          deadmem += static_cast<size_t>(LuaX86PayloadSize(reinterpret_cast<gpg::RType*>(object->u.len)));
+          deadmem += static_cast<size_t>(LuaX86PayloadSize(object->u.type));
           *link = object->gch.next;
           object->gch.next = nullptr;
           *lastCollected = object;

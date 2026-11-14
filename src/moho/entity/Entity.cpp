@@ -57,40 +57,6 @@ namespace
     return &syncData->mNewEntities.back();
   }
 
-  /**
-   * Address: 0x005BD420 (FUN_005BD420)
-   *
-   * What it does:
-   * Pushes one byte-backed boolean lane to Lua stack storage.
-   */
-  [[maybe_unused]] void PushLuaBooleanByte(
-    lua_State* const rawState,
-    const std::uint8_t value
-  ) noexcept
-  {
-    lua_pushboolean(rawState, value != 0u ? 1 : 0);
-  }
-
-  /**
-   * Address: 0x005BD430 (FUN_005BD430)
-   *
-   * What it does:
-   * Pushes one unsigned 32-bit lane to Lua number stack storage while
-   * preserving unsigned conversion semantics for values above `INT32_MAX`.
-   */
-  [[maybe_unused]] void PushLuaUnsignedInt(
-    lua_State* const rawState,
-    const std::uint32_t value
-  ) noexcept
-  {
-    const std::int32_t signedBits = static_cast<std::int32_t>(value);
-    float lane = static_cast<float>(signedBits);
-    if (signedBits < 0) {
-      lane += 4294967296.0f;
-    }
-    lua_pushnumber(rawState, lane);
-  }
-
   void ApplyWorldImpulseToBody(
     moho::SPhysBody& body,
     const Wm3::Vector3f& impulse,
@@ -624,7 +590,7 @@ namespace
     const moho::REntityBlueprint* blueprint
   ) noexcept
   {
-    return blueprint ? blueprint->mCategoryBitIndex : 0u;
+    return blueprint ? blueprint->mBlueprintOrdinal : 0u;
   }
 
   /**
@@ -1680,8 +1646,8 @@ namespace moho
     if (BluePrint != nullptr) {
       const char* const blueprintId = BluePrint->mBlueprintId.c_str();
       mUniqueName.assign(blueprintId, std::strlen(blueprintId));
-      if (!BluePrint->mBlueprintLabel.empty()) {
-        mUniqueName += gpg::STR_Printf("(%s)", BluePrint->mBlueprintLabel.c_str());
+      if (!BluePrint->mDescription.empty()) {
+        mUniqueName += gpg::STR_Printf("(%s)", BluePrint->mDescription.c_str());
       }
       mUniqueName +=
         gpg::STR_Printf("-%d", static_cast<int>(static_cast<std::uint16_t>(static_cast<std::uint32_t>(entityId))));

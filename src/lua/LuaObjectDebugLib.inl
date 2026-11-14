@@ -744,7 +744,7 @@ std::size_t LuaDebugGetTObjectSize(
 
     // This fork keeps the payload's RType in `len` rather than a byte
     // count, so the size comes from the descriptor.
-    const auto* const payloadType = reinterpret_cast<const gpg::RType*>(userData->len);
+    const auto* const payloadType = userData->type;
     if (payloadType == nullptr) {
       return 0;
     }

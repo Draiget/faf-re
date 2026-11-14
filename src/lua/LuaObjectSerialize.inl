@@ -804,8 +804,8 @@ void Udata::MemberSerialize(
 
   archive->WritePointer<Table>(metatable, gpg::TrackedPointerState::Unowned, ownerRef);
 
-  gpg::RType* const payloadType = reinterpret_cast<gpg::RType*>(len);
-  const void* const payload = reinterpret_cast<const std::uint8_t*>(this) + sizeof(Udata);
+  gpg::RType* const payloadType = type;
+  const void* const payload = Payload();
   archive->Write(payloadType, payload, ownerRef);
 }
 
@@ -845,8 +845,8 @@ void Udata::MemberDeserialize(
   } lockGuard(ownerState->l_G);
 
   (void)archive->ReadPointer(&metatable, &ownerRef);
-  gpg::RType* const payloadType = reinterpret_cast<gpg::RType*>(len);
-  void* const payload = reinterpret_cast<std::uint8_t*>(this) + sizeof(Udata);
+  gpg::RType* const payloadType = type;
+  void* const payload = Payload();
   archive->Read(payloadType, payload, ownerRef);
 }
 

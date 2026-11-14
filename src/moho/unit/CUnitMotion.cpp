@@ -29,7 +29,7 @@
 #include "moho/entity/Entity.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/sim/CArmyImpl.h"
-#include "moho/sim/CSimArmyEconomyInfo.h"
+#include "moho/sim/CEconomy.h"
 #include "moho/sim/COGrid.h"
 #include "moho/sim/SPhysBody.h"
 #include "moho/sim/SimConVarAccess.h"
@@ -189,52 +189,6 @@ namespace moho
       // extent array, matching the `Box3(center, const Vector3* axis, const Real* extent)` ctor.
       *outBox = Wm3::Box3f(transform.pos_, &axes.vX, &halfExtents.x);
       return outBox;
-    }
-
-    /**
-     * Address: 0x00699600 (FUN_00699600, sub_699600)
-     *
-     * What it does:
-     * Builds one vector opposite to `direction`, scales that length by
-     * normalized distance and forward-projection attenuation, and applies the
-     * result in-place to `outVector`.
-     */
-    [[maybe_unused]] Wm3::Vector3f* ComputeScaledOpposingVectorWithDirectionalAttenuation(
-      Wm3::Vector3f* const outVector,
-      Wm3::Vector3f direction,
-      const float projectionAxisX,
-      const float projectionAxisY,
-      const float projectionAxisZ,
-      const float referenceLength,
-      const float outputLengthScale
-    ) noexcept
-    {
-      outVector->x = -direction.x;
-      outVector->y = -direction.y;
-      outVector->z = -direction.z;
-
-      // 0x0069963D..0x00699657 sums the squared lanes as (z + y) + x.
-      const float directionLength =
-        std::sqrt(((direction.z * direction.z) + (direction.y * direction.y)) + (direction.x * direction.x));
-      // 0x00699665..0x006996A1: `fcomip; jbe` caps an (ordered) ratio above 8,
-      // then `comiss; jbe` keeps it only when (ordered) above 1, so NaN ends
-      // up at 1.
-      float normalizedScale = directionLength / referenceLength;
-      if (normalizedScale > 8.0f) {
-        normalizedScale = 8.0f;
-      }
-      normalizedScale = (normalizedScale > 1.0f) ? normalizedScale : 1.0f;
-
-      (void)Wm3::Vector3f::Normalize(&direction);
-      // 0x006996B2..0x006996DA sums the projection as (z + y) + x and keeps it
-      // only when (ordered) positive.
-      const float rawProjection =
-        ((projectionAxisZ * direction.z) + (projectionAxisY * direction.y)) + (projectionAxisX * direction.x);
-      const float directionalProjection = (rawProjection > 0.0f) ? rawProjection : 0.0f;
-
-      const float scaledLength = ((1.0f - directionalProjection) * normalizedScale) * outputLengthScale;
-      (void)VecSetLength(outVector, scaledLength);
-      return outVector;
     }
 
     /**
@@ -521,26 +475,6 @@ namespace moho
       return sampledElevation;
     }
 
-    /**
-     * Address: 0x0062B1C0 (FUN_0062B1C0)
-     *
-     * What it does:
-     * Samples terrain elevation from one height-field lane and adds occupied
-     * rectangle distance when an owning unit is provided.
-     */
-    [[maybe_unused]] [[nodiscard]] float SampleElevationWithOccupiedRectOffset(
-      const CHeightField* const heightField,
-      Unit* const unit,
-      const Wm3::Vector3f& samplePoint
-    ) noexcept
-    {
-      const float elevation = heightField ? heightField->GetElevation(samplePoint.x, samplePoint.z) : samplePoint.y;
-      if (unit != nullptr) {
-        return elevation + unit->DistanceToOccupiedRect(&samplePoint);
-      }
-      return elevation;
-    }
-
     template <class TObject>
     [[nodiscard]] gpg::RType* ResolveCachedType()
     {
@@ -646,8 +580,7 @@ namespace moho
 
       std::int32_t baseOffset = 0;
       if (dynamicType && staticType && dynamicType->IsDerivedFrom(staticType, &baseOffset)) {
-        out.mObj =
-          reinterpret_cast<void*>(reinterpret_cast<std::uintptr_t>(object) - static_cast<std::uintptr_t>(baseOffset));
+        out.mObj = gpg::CompleteObject(object, baseOffset);
         out.mType = dynamicType;
         return out;
       }
@@ -695,7 +628,7 @@ namespace moho
 
     [[nodiscard]] CEconRequest* CreateEconomyRequest(
       const SEconValue& requested,
-      CSimArmyEconomyInfo* const economy
+      CEconomy* const economy
     )
     {
       auto* const request = new CEconRequest{};
@@ -704,7 +637,7 @@ namespace moho
       request->mGranted.mass = 0.0f;
 
       if (economy != nullptr) {
-        request->mNode.ListLinkBefore(&economy->registrationNode);
+        request->mNode.ListLinkBefore(&economy->mConsumptionData);
       }
       return request;
     }
@@ -1279,8 +1212,8 @@ namespace moho
     }
 
     if (
-      unit->ReservedOgridRectMinX == mReservationMinX && unit->ReservedOgridRectMinZ == mReservationMinZ &&
-      unit->ReservedOgridRectMaxX == mReservationMaxX && unit->ReservedOgridRectMaxZ == mReservationMaxZ
+      unit->mReservedOgridRect.x0 == mReservationMinX && unit->mReservedOgridRect.z0 == mReservationMinZ &&
+      unit->mReservedOgridRect.x1 == mReservationMaxX && unit->mReservedOgridRect.z1 == mReservationMaxZ
     ) {
       unit->FreeOgridRect();
     }
@@ -4758,7 +4691,7 @@ namespace moho
             mRepairConsumption.energy = stagingBlueprint->AI.RepairConsumeEnergy;
             mRepairConsumption.mass = stagingBlueprint->AI.RepairConsumeMass;
 
-            CSimArmyEconomyInfo* const economy = unit->ArmyRef ? unit->ArmyRef->GetEconomy() : nullptr;
+            CEconomy* const economy = unit->ArmyRef ? unit->ArmyRef->GetEconomy() : nullptr;
             ReplaceEconomyRequestPointer(mEconomyRequest, CreateEconomyRequest(mRepairConsumption, economy));
 
             unit->mUnitVarDat.mMaintainenceCost.ENERGY = mRepairConsumption.energy;

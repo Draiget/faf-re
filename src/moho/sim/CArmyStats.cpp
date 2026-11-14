@@ -161,7 +161,7 @@ namespace
    * Engine addition: the map is keyed on blueprint pointers, so it walks in
    * heap-address order, which is not the same on Linux and Windows (or between allocators). What adds
    * up the floats or hands them to Lua walks them in blueprint-ordinal order instead
-   * (`mCategoryBitIndex`, RBlueprint::mBlueprintOrdinal: load order, unique per blueprint), the same on
+   * (`mBlueprintOrdinal`, RBlueprint::mBlueprintOrdinal: load order, unique per blueprint), the same on
    * every platform. Null keys are left out, as the walks did.
    */
   [[nodiscard]] fa::vector<std::pair<const moho::RUnitBlueprint*, float>> BlueprintStatsInOrdinalOrder(
@@ -176,7 +176,7 @@ namespace
       }
     }
     fa::sort(entries.data(), entries.data() + entries.size(), [](const auto& lhs, const auto& rhs) {
-      return lhs.first->mCategoryBitIndex < rhs.first->mCategoryBitIndex;
+      return lhs.first->mBlueprintOrdinal < rhs.first->mBlueprintOrdinal;
     });
     return entries;
   }
@@ -293,8 +293,8 @@ namespace
     for (const auto& entry : tree) {
       const moho::RUnitBlueprint* const blueprint = entry.first;
       const int value = static_cast<int>(entry.second);
-      gpg::Logf(logFormat, blueprint->mBlueprintId.c_str(), blueprint->mBlueprintLabel.c_str(), value);
-      writer.Printf("%s(%s), %d\n", blueprint->mBlueprintId.c_str(), blueprint->mBlueprintLabel.c_str(), value);
+      gpg::Logf(logFormat, blueprint->mBlueprintId.c_str(), blueprint->mDescription.c_str(), value);
+      writer.Printf("%s(%s), %d\n", blueprint->mBlueprintId.c_str(), blueprint->mDescription.c_str(), value);
     }
   }
 
@@ -469,7 +469,7 @@ namespace moho
     float total = 0.0f;
     for (const auto& entry : BlueprintStatsInOrdinalOrder(mBlueprintStats)) {
       const RUnitBlueprint* const blueprint = entry.first;
-      if (categorySet->mBits.Contains(static_cast<unsigned int>(blueprint->mCategoryBitIndex))) {
+      if (categorySet->mBits.Contains(static_cast<unsigned int>(blueprint->mBlueprintOrdinal))) {
         total += entry.second;
       }
     }
@@ -851,7 +851,7 @@ namespace moho
           "damagereceived=\"%.2f\" masscost=\"%.2f\" energycost=\"%.2f\" buildtime=\"%.2f\"/>\n",
           indentText,
           blueprint->mBlueprintId.c_str(),
-          blueprint->mBlueprintLabel.c_str(),
+          blueprint->mDescription.c_str(),
           SumStatCategoryInt(unitsActive, unitCategory),
           SumStatCategoryInt(unitsLost, unitCategory),
           SumStatCategoryInt(enemiesKilled, unitCategory),

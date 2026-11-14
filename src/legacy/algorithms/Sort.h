@@ -209,7 +209,7 @@ namespace fa
     /**
      * Address: 0x0092E050 (FUN_0092E050 -- `_Median` -- median-of-three under 40 elements, the ninther sample ordering
      * above it -- for the `unsigned short` instantiation of `fa::sort` over the packed subcluster node keys
-     * (`BuildSubclusterPackedNodeList`, 0x0092FE30); callers 0x0092E6E0; formerly `OrderU16PivotSamples` in
+     * (`CollectSubclusterBoundaryNodes`, 0x0092FE30); callers 0x0092E6E0; formerly `OrderU16PivotSamples` in
      * gpg/core/algorithms/Cluster.cpp (RULE ONE), removed 2026-09-10.) Address: 0x0071F870 (FUN_0071F870 -- `_Median`
      * -- median-of-three under 40 elements, the ninther sample ordering above it -- for the 0x10-byte
      * `moho::SPositionThreat` ordered by descending `threat` -- `CInfluenceMap::GetThreatsAroundPosition`'s `fa::sort`
@@ -532,7 +532,7 @@ namespace fa
      * 0x007CEDB0 (FUN_007CEDB0 -- `_Push_heap` (settle-upward) for the 24-byte `(priority, LuaObject)` element; callers
      * 0x007CE9D0; formerly `InsertLuaHeapPairRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed
      * 2026-09-10.) Address: 0x0092D760 (FUN_0092D760 -- `_Adjust_heap` for the `unsigned short` instantiation of
-     * `fa::sort` over the packed subcluster node keys (`BuildSubclusterPackedNodeList`, 0x0092FE30); callers
+     * `fa::sort` over the packed subcluster node keys (`CollectSubclusterBoundaryNodes`, 0x0092FE30); callers
      * 0x0092D89F, 0x0092E1C0, 0x0092E2A0; formerly `SiftDownAndInsertU16HeapTail` in gpg/core/algorithms/Cluster.cpp
      * (RULE ONE), removed 2026-09-10.) Address: 0x005F05E0 (FUN_005F05E0 -- `push_heap`'s sift-up half of `adjust_heap`
      * for `fa::vector<moho::SAttachPoint>` (the transport's attach-point vector, sorted by squared distance); callers
@@ -542,7 +542,7 @@ namespace fa
      * 0x005EFAD0, 0x005F0810; formerly `SiftDownAttachPointHeapAndInsert` in moho/ai/CAiTransportImpl.cpp (RULE ONE),
      * removed 2026-09-10.) Address: 0x0092CB10 (FUN_0092CB10 -- `_Push_heap` (settle-upward: `(hole - 1) / 2` parents
      * while `top < hole && first[parent] < value`, unsigned 16-bit compare `cmp dx, di; jae`) for the `unsigned short`
-     * instantiation of `fa::sort` over the packed subcluster node keys (`BuildSubclusterPackedNodeList`, 0x0092FE30);
+     * instantiation of `fa::sort` over the packed subcluster node keys (`CollectSubclusterBoundaryNodes`, 0x0092FE30);
      * callers 0x0092D760 (`_Adjust_heap`); formerly `PushUInt16HeapEntryUpRuntime` in moho/sim/SimRecoveryRuntime.cpp
      * (RULE ONE), removed 2026-09-30.)
      */
@@ -604,10 +604,10 @@ namespace fa
     template <class T, class Compare>
     /**
      * Address: 0x0092E1C0 (FUN_0092E1C0 -- `_Make_heap` for the `unsigned short` instantiation of `fa::sort` over the
-     * packed subcluster node keys (`BuildSubclusterPackedNodeList`, 0x0092FE30); callers 0x0092E850, 0x0092F4E0;
+     * packed subcluster node keys (`CollectSubclusterBoundaryNodes`, 0x0092FE30); callers 0x0092E850, 0x0092F4E0;
      * formerly `BuildU16MaxHeapFromRange` in gpg/core/algorithms/Cluster.cpp (RULE ONE), removed 2026-09-10.) Address:
      * 0x0092E850 (FUN_0092E850 -- `_Make_heap`'s two-element guard for the `unsigned short` instantiation of `fa::sort`
-     * over the packed subcluster node keys (`BuildSubclusterPackedNodeList`, 0x0092FE30); zero callers, unreachable;
+     * over the packed subcluster node keys (`CollectSubclusterBoundaryNodes`, 0x0092FE30); zero callers, unreachable;
      * formerly `BuildU16HeapIfWideEnough` in gpg/core/algorithms/Cluster.cpp (RULE ONE), removed 2026-09-10.) Address:
      * 0x0071F990 (FUN_0071F990 -- `_Make_heap` for the 0x10-byte `moho::SPositionThreat` ordered by descending `threat`
      * -- `CInfluenceMap::GetThreatsAroundPosition`'s `fa::sort` over the collected samples; callers 0x0071E200,
@@ -715,16 +715,16 @@ namespace fa
      * element; zero callers, unreachable; formerly `PopElement8TailIntoRootAndSiftRuntime` in
      * moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.) Address: 0x0092EC40 (FUN_0092EC40 --
      * `_Sort_heap` for the `unsigned short` instantiation of `fa::sort` over the packed subcluster node keys
-     * (`BuildSubclusterPackedNodeList`, 0x0092FE30); callers 0x0092EEE0, 0x0092F4E0; formerly `HeapSortU16Range` in
+     * (`CollectSubclusterBoundaryNodes`, 0x0092FE30); callers 0x0092EEE0, 0x0092F4E0; formerly `HeapSortU16Range` in
      * gpg/core/algorithms/Cluster.cpp (RULE ONE), removed 2026-09-10.) Address: 0x0092EEE0 (FUN_0092EEE0 -- the `jmp`
      * thunk into `_Sort_heap` for the `unsigned short` instantiation of `fa::sort` over the packed subcluster node keys
-     * (`BuildSubclusterPackedNodeList`, 0x0092FE30); zero callers, unreachable; formerly `HeapSortU16RangeThunk` in
+     * (`CollectSubclusterBoundaryNodes`, 0x0092FE30); zero callers, unreachable; formerly `HeapSortU16RangeThunk` in
      * gpg/core/algorithms/Cluster.cpp (RULE ONE), removed 2026-09-10.) Address: 0x0092E2A0 (FUN_0092E2A0 -- `_Pop_heap`
      * for the `unsigned short` instantiation of `fa::sort` over the packed subcluster node keys
-     * (`BuildSubclusterPackedNodeList`, 0x0092FE30); zero callers, unreachable; formerly
+     * (`CollectSubclusterBoundaryNodes`, 0x0092FE30); zero callers, unreachable; formerly
      * `ReplaceU16HeapRootWithTailAndSift` in gpg/core/algorithms/Cluster.cpp (RULE ONE), removed 2026-09-10.) Address:
      * 0x0092E8E0 (FUN_0092E8E0 -- `_Pop_heap`'s two-element guard for the `unsigned short` instantiation of `fa::sort`
-     * over the packed subcluster node keys (`BuildSubclusterPackedNodeList`, 0x0092FE30); zero callers, unreachable;
+     * over the packed subcluster node keys (`CollectSubclusterBoundaryNodes`, 0x0092FE30); zero callers, unreachable;
      * formerly `ReplaceU16HeapRootIfWideEnough` in gpg/core/algorithms/Cluster.cpp (RULE ONE), removed 2026-09-10.)
      * Address: 0x007200D0 (FUN_007200D0 -- `_Pop_heap`'s two-element guard for the 0x10-byte `moho::SPositionThreat`
      * ordered by descending `threat` -- `CInfluenceMap::GetThreatsAroundPosition`'s `fa::sort` over the collected
@@ -832,7 +832,7 @@ namespace fa
     /**
      * Address: 0x0092E6E0 (FUN_0092E6E0 -- `_Unguarded_partition` (the three-way split returning both equal-band
      * boundaries) for the `unsigned short` instantiation of `fa::sort` over the packed subcluster node keys
-     * (`BuildSubclusterPackedNodeList`, 0x0092FE30); callers 0x0092F4E0; formerly `PartitionU16RangeWithEqualBands` in
+     * (`CollectSubclusterBoundaryNodes`, 0x0092FE30); callers 0x0092F4E0; formerly `PartitionU16RangeWithEqualBands` in
      * gpg/core/algorithms/Cluster.cpp (RULE ONE), removed 2026-09-10.) Address: 0x0071EFA0 (FUN_0071EFA0 --
      * `_Unguarded_partition` (the three-way split returning both equal-band boundaries) for the 0x10-byte
      * `moho::SPositionThreat` ordered by descending `threat` -- `CInfluenceMap::GetThreatsAroundPosition`'s `fa::sort`
@@ -981,7 +981,7 @@ namespace fa
     /**
      * Address: 0x0092F4E0 (FUN_0092F4E0 -- `_Sort` -- the introsort driver: partition while the budget lasts,
      * `_Insertion_sort` under 32 elements, `_Make_heap` + `_Sort_heap` when the budget runs out -- for the `unsigned
-     * short` instantiation of `fa::sort` over the packed subcluster node keys (`BuildSubclusterPackedNodeList`,
+     * short` instantiation of `fa::sort` over the packed subcluster node keys (`CollectSubclusterBoundaryNodes`,
      * 0x0092FE30); callers 0x0092FC41, 0x0092FE30, 0x009550E0; formerly `IntroSortU16RangeWithBudget` in
      * gpg/core/algorithms/Cluster.cpp (RULE ONE), removed 2026-09-10.) Address: 0x0071E200 (FUN_0071E200 -- `_Sort` --
      * the introsort driver for the 0x10-byte `moho::SPositionThreat` ordered by descending `threat` --

@@ -203,7 +203,7 @@ namespace gpg
     GPG_ASSERT(isDerived);
 
     outRef->mType = dynamicType;
-    outRef->mObj = reinterpret_cast<void*>(reinterpret_cast<char*>(value) - baseOffset);
+    outRef->mObj = gpg::CompleteObject(value, baseOffset);
     return outRef;
   }
 

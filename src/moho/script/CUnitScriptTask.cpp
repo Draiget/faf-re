@@ -64,24 +64,6 @@ namespace
     return CUnitScriptTask::sType;
   }
 
-  /**
-   * Address: 0x00624260 (FUN_00624260)
-   *
-   * What it does:
-   * Upcasts one reflected reference lane to `moho::CUnitScriptTask*`.
-   */
-  [[maybe_unused]] [[nodiscard]] void* TryUpcastCUnitScriptTaskRefObject(
-    gpg::RRef* const sourceRef
-  )
-  {
-    if (!sourceRef) {
-      return nullptr;
-    }
-
-    const gpg::RRef upcast = gpg::REF_UpcastPtr(*sourceRef, CachedCUnitScriptTaskType());
-    return upcast.mObj;
-  }
-
   [[nodiscard]] gpg::RType* CachedCScriptObjectType()
   {
     return CScriptObject::StaticGetClass();
@@ -165,8 +147,7 @@ namespace
       return ref;
     }
 
-    ref.mObj =
-      reinterpret_cast<void*>(reinterpret_cast<std::uintptr_t>(command) - static_cast<std::uintptr_t>(baseOffset));
+    ref.mObj = gpg::CompleteObject(command, baseOffset);
     ref.mType = dynamicType;
     return ref;
   }

@@ -55,20 +55,6 @@ namespace
     bounds.Max.z = std::max(bounds.Max.z, pointZ);
   }
 
-  /**
-   * Address: 0x00545CC0 (FUN_00545CC0)
-   *
-   * What it does:
-   * Executes one non-deleting `gpg::RType` base-teardown lane for
-   * `ResourceDepositTypeInfo`.
-   */
-  [[maybe_unused]] void cleanup_ResourceDepositTypeInfoRTypeBase(
-    moho::ResourceDepositTypeInfo* const typeInfo
-  ) noexcept
-  {
-    gpg::ClearTypeLists(typeInfo);
-  }
-
   [[nodiscard]] moho::ResourceDepositTypeInfo& AcquireResourceDepositTypeInfo()
   {
     static moho::ResourceDepositTypeInfo sInstance;

@@ -231,206 +231,6 @@ namespace
     return sType;
   }
 
-  /**
-   * Address: 0x006ED340 (FUN_006ED340)
-   *
-   * What it does:
-   * Loads one reflected `Broadcaster<ECommandEvent>` payload through cached
-   * RTTI lookup and returns the archive pointer for chaining.
-   */
-  gpg::ReadArchive* ReadBroadcasterCommandEventArchiveAndReturnArchive(
-    gpg::ReadArchive* const archive,
-    void* const objectPtr,
-    gpg::RRef* const ownerRef
-  )
-  {
-    if (archive != nullptr) {
-      const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-      if (gpg::RType* const type = ResolveBroadcasterCommandEventType()) {
-        archive->Read(type, objectPtr, owner);
-      }
-    }
-
-    return archive;
-  }
-
-  /**
-   * Address: 0x006ED380 (FUN_006ED380)
-   *
-   * What it does:
-   * Loads one reflected `SSTICommandConstantData` payload through cached RTTI
-   * lookup and returns the archive pointer for chaining.
-   */
-  [[maybe_unused]] gpg::ReadArchive* ReadSSTICommandConstantDataArchiveAndReturnArchive(
-    gpg::ReadArchive* const archive,
-    void* const objectPtr,
-    gpg::RRef* const ownerRef
-  )
-  {
-    if (archive != nullptr) {
-      const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-      if (gpg::RType* const type = gpg::RTypeOf<SSTICommandConstantData>()) {
-        archive->Read(type, objectPtr, owner);
-      }
-    }
-
-    return archive;
-  }
-
-  /**
-   * Address: 0x006ED3C0 (FUN_006ED3C0)
-   *
-   * What it does:
-   * Loads one reflected `SSTICommandVariableData` payload through cached RTTI
-   * lookup and returns the archive pointer for chaining.
-   */
-  [[maybe_unused]] gpg::ReadArchive* ReadSSTICommandVariableDataArchiveAndReturnArchive(
-    gpg::ReadArchive* const archive,
-    void* const objectPtr,
-    gpg::RRef* const ownerRef
-  )
-  {
-    if (archive != nullptr) {
-      const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-      if (gpg::RType* const type = gpg::RTypeOf<SSTICommandVariableData>()) {
-        archive->Read(type, objectPtr, owner);
-      }
-    }
-
-    return archive;
-  }
-
-  /**
-   * Address: 0x006ED400 (FUN_006ED400)
-   *
-   * What it does:
-   * Loads one reflected `CountedPtr<IFormationInstance>` payload through
-   * cached RTTI lookup and returns the archive pointer for chaining.
-   */
-  [[maybe_unused]] gpg::ReadArchive* ReadCountedPtrIFormationInstanceArchiveAndReturnArchive(
-    gpg::ReadArchive* const archive,
-    void* const objectPtr,
-    gpg::RRef* const ownerRef
-  )
-  {
-    if (archive != nullptr) {
-      const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-      if (gpg::RType* const type = ResolveCountedPtrIFormationInstanceType()) {
-        archive->Read(type, objectPtr, owner);
-      }
-    }
-
-    return archive;
-  }
-
-  /**
-   * Address: 0x006ED440 (FUN_006ED440)
-   *
-   * What it does:
-   * Saves one reflected `Broadcaster<ECommandEvent>` payload through cached
-   * RTTI lookup and returns the archive pointer for chaining.
-   */
-  [[maybe_unused]] gpg::WriteArchive* WriteBroadcasterCommandEventArchiveAndReturnArchive(
-    gpg::WriteArchive* const archive,
-    void* const objectPtr,
-    const gpg::RRef* const ownerRef
-  )
-  {
-    if (archive != nullptr) {
-      const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-      if (gpg::RType* const type = ResolveBroadcasterCommandEventType()) {
-        archive->Write(type, objectPtr, owner);
-      }
-    }
-
-    return archive;
-  }
-
-  /**
-   * Address: 0x006ED480 (FUN_006ED480)
-   *
-   * What it does:
-   * Saves one reflected `SSTICommandConstantData` payload through cached RTTI
-   * lookup and returns the archive pointer for chaining.
-   */
-  [[maybe_unused]] gpg::WriteArchive* WriteSSTICommandConstantDataArchiveAndReturnArchive(
-    gpg::WriteArchive* const archive,
-    void* const objectPtr,
-    const gpg::RRef* const ownerRef
-  )
-  {
-    if (archive != nullptr) {
-      const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-      if (gpg::RType* const type = gpg::RTypeOf<SSTICommandConstantData>()) {
-        archive->Write(type, objectPtr, owner);
-      }
-    }
-
-    return archive;
-  }
-
-  /**
-   * Address: 0x006ED4C0 (FUN_006ED4C0)
-   *
-   * What it does:
-   * Saves one reflected `SSTICommandVariableData` payload through cached RTTI
-   * lookup and returns the archive pointer for chaining.
-   */
-  [[maybe_unused]] gpg::WriteArchive* WriteSSTICommandVariableDataArchiveAndReturnArchive(
-    gpg::WriteArchive* const archive,
-    void* const objectPtr,
-    const gpg::RRef* const ownerRef
-  )
-  {
-    if (archive != nullptr) {
-      const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-      if (gpg::RType* const type = gpg::RTypeOf<SSTICommandVariableData>()) {
-        archive->Write(type, objectPtr, owner);
-      }
-    }
-
-    return archive;
-  }
-
-  /**
-   * Address: 0x006ED500 (FUN_006ED500)
-   *
-   * What it does:
-   * Saves one reflected `CountedPtr<IFormationInstance>` payload through
-   * cached RTTI lookup and returns the archive pointer for chaining.
-   */
-  [[maybe_unused]] gpg::WriteArchive* WriteCountedPtrIFormationInstanceArchiveAndReturnArchive(
-    gpg::WriteArchive* const archive,
-    void* const objectPtr,
-    const gpg::RRef* const ownerRef
-  )
-  {
-    if (archive != nullptr) {
-      const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-      if (gpg::RType* const type = ResolveCountedPtrIFormationInstanceType()) {
-        archive->Write(type, objectPtr, owner);
-      }
-    }
-
-    return archive;
-  }
-
-  /**
-   * Address: 0x006ED5B0 (FUN_006ED5B0)
-   *
-   * What it does:
-   * Read-callback bridge that loads one reflected `Broadcaster<ECommandEvent>`
-   * payload through cached RTTI lookup.
-   */
-  [[maybe_unused]] void ReadBroadcasterCommandEventArchiveCallback(
-    gpg::ReadArchive* const archive,
-    void* const objectPtr,
-    gpg::RRef* const ownerRef
-  )
-  {
-    (void)ReadBroadcasterCommandEventArchiveAndReturnArchive(archive, objectPtr, ownerRef);
-  }
-
   // The serializer works on the `Broadcaster` secondary base. That slice sits at
   // +0x34 in the binary layout, which is exactly where the compiler puts it:
   // `CUnitCommand : public CScriptObject, public Broadcaster<ECommandEvent>` and
@@ -514,38 +314,6 @@ namespace
     destination.unk1 = source.unk1;
     destination.blueprint = source.blueprint;
     destination.unk2 = source.unk2;
-  }
-
-  /**
-   * Address: 0x006E7BC0 (FUN_006E7BC0)
-   *
-   * What it does:
-   * Adapter that copies one published-command descriptor lane and returns the
-   * destination pointer.
-   */
-  [[maybe_unused]] SSTICommandConstantData* CopyPublishedCommandDescriptorAdapterPrimary(
-    SSTICommandConstantData* const destination,
-    const SSTICommandConstantData* const source
-  )
-  {
-    CopyPublishedCommandDescriptor(*destination, *source);
-    return destination;
-  }
-
-  /**
-   * Address: 0x006EB470 (FUN_006EB470)
-   *
-   * What it does:
-   * Secondary adapter that copies one published-command descriptor lane and
-   * returns the destination pointer.
-   */
-  [[maybe_unused]] SSTICommandConstantData* CopyPublishedCommandDescriptorAdapterSecondary(
-    SSTICommandConstantData* const destination,
-    const SSTICommandConstantData* const source
-  )
-  {
-    CopyPublishedCommandDescriptor(*destination, *source);
-    return destination;
   }
 
   /**
@@ -644,14 +412,14 @@ namespace
     }
 
     if (slot != nullptr) {
-      auto* const previous = reinterpret_cast<CountedObject*>(slot);
+      auto* const previous = static_cast<CountedObject*>(slot);
       (void)previous->ReleaseReference();
     }
 
     slot = value;
 
     if (slot != nullptr) {
-      auto* const current = reinterpret_cast<CountedObject*>(slot);
+      auto* const current = static_cast<CountedObject*>(slot);
       current->AddReference();
     }
   }
@@ -1105,7 +873,7 @@ void CUnitCommand::RemoveUnit(
   if (mFormationInstance) {
     mFormationInstance->RemoveUnit(unit);
     if (mFormationInstance && mFormationInstance->UnitCount() == 0) {
-      CountedObject* formationObject = reinterpret_cast<CountedObject*>(mFormationInstance);
+      CountedObject* formationObject = static_cast<CountedObject*>(mFormationInstance);
       ReleaseIntrusiveRefcountedObject(formationObject);
       mFormationInstance = nullptr;
     }
@@ -1133,7 +901,7 @@ void CUnitCommand::RemoveUnit(
   if (mFormationInstance) {
     mFormationInstance->RemoveUnit(unit);
     if (mFormationInstance && mFormationInstance->UnitCount() == 0) {
-      CountedObject* formationObject = reinterpret_cast<CountedObject*>(mFormationInstance);
+      CountedObject* formationObject = static_cast<CountedObject*>(mFormationInstance);
       ReleaseIntrusiveRefcountedObject(formationObject);
       mFormationInstance = nullptr;
     }
@@ -1166,7 +934,7 @@ void CUnitCommand::FormRemoveUnit(
     return;
   }
 
-  CountedObject* formationObject = reinterpret_cast<CountedObject*>(formationInstance);
+  CountedObject* formationObject = static_cast<CountedObject*>(formationInstance);
   ReleaseIntrusiveRefcountedObject(formationObject);
   command->mFormationInstance = nullptr;
 }

@@ -5,8 +5,8 @@
 )
 {
   gpg::RRef out{};
-  out.mObj = reinterpret_cast<std::uint8_t*>(userdata) + sizeof(Udata);
-  out.mType = reinterpret_cast<gpg::RType*>(userdata->len);
+  out.mObj = userdata->Payload();
+  out.mType = userdata->type;
   return out;
 }
 
@@ -1230,8 +1230,8 @@ void GetRRefFromUserdata(
   }
 
   auto* const userdata = static_cast<Udata*>(object->value.p);
-  out->mType = reinterpret_cast<gpg::RType*>(userdata->len);
-  out->mObj = reinterpret_cast<std::uint8_t*>(userdata) + sizeof(Udata);
+  out->mType = userdata->type;
+  out->mObj = userdata->Payload();
 }
 
 bool IsWrapFileTypeName(

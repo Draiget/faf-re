@@ -5,9 +5,13 @@
 #include <array>
 #include <cstdlib>
 #include <cstring>
+#include <cwchar>
 #include <mutex>
 #include <span>
 #include <windows.h>
+#if FAFRE_PLATFORM_WINDOWS
+#include <objbase.h>
+#endif
 
 #include "gpg/core/utils/Logging.h"
 #include "moho/audio/AudioEngine.h"
@@ -175,22 +179,40 @@ namespace
 namespace moho
 {
   void SND_InstallXactClock(
-    const IXACTEngine& engine
+    const _GUID* const engineClass
   )
   {
 #if !FAFRE_PLATFORM_WINDOWS
-    (void)engine;
+    (void)engineClass;
     gpg::Logf("SND: FAudio keeps its own clock; nothing to patch");
 #else
-    // A COM object's first word is its interface table, which sits in the
-    // image of the DLL that implements it.
-    const void* const interfaceTable = *reinterpret_cast<const void* const*>(&engine);
+    // COM loaded the DLL registered for the engine's class; find it by the
+    // file name registered under CLSID\{class}\InprocServer32.
     HMODULE module = nullptr;
-    if (!::GetModuleHandleExW(
-          GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
-          static_cast<LPCWSTR>(interfaceTable),
-          &module
-        )) {
+    wchar_t classText[64]{};
+    wchar_t serverPath[MAX_PATH]{};
+    DWORD serverPathBytes = sizeof(serverPath);
+    if (
+      engineClass != nullptr && ::StringFromGUID2(*engineClass, classText, static_cast<int>(std::size(classText))) != 0
+    ) {
+      wchar_t serverKey[128]{};
+      ::swprintf_s(serverKey, L"CLSID\\%ls\\InprocServer32", classText);
+      if (
+        ::RegGetValueW(
+          HKEY_CLASSES_ROOT,
+          serverKey,
+          nullptr,
+          RRF_RT_REG_SZ | RRF_RT_REG_EXPAND_SZ,
+          nullptr,
+          serverPath,
+          &serverPathBytes
+        ) == ERROR_SUCCESS
+      ) {
+        const wchar_t* const separator = std::wcsrchr(serverPath, L'\\');
+        module = ::GetModuleHandleW(separator != nullptr ? separator + 1 : serverPath);
+      }
+    }
+    if (module == nullptr) {
       gpg::Warnf("SND: could not find the XACT engine module; its clock stays on system uptime");
       return;
     }

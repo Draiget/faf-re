@@ -80,11 +80,6 @@ namespace
     RegisterExtractor(registry, "CounterIntel", new moho::CounterIntelExtractor());
   }
 
-  [[nodiscard]] BlueprintExtractorRegistry* GetBlueprintExtractorRegistryPointer() noexcept
-  {
-    return &GetBlueprintExtractorRegistry();
-  }
-
   /**
    * Address: 0x007EC590 (FUN_007EC590)
    *
@@ -127,61 +122,6 @@ namespace
    * stand-ins these were written over are gone with them (RULE ONE):
    * a vptr fixup has no source line to model an object for.
    */
-  /**
-   * Address: 0x007F1CB0 (FUN_007F1CB0)
-   *
-   * What it does:
-   * Returns the process-global blueprint extractor registry pointer.
-   */
-  [[maybe_unused]] BlueprintExtractorRegistry* GetBlueprintExtractorRegistryPointerLaneA(
-    const int /*unused*/
-  ) noexcept
-  {
-    return GetBlueprintExtractorRegistryPointer();
-  }
-
-  /**
-   * Address: 0x007F2CA0 (FUN_007F2CA0)
-   *
-   * What it does:
-   * Secondary lane returning the process-global blueprint extractor registry
-   * pointer.
-   */
-  [[maybe_unused]] BlueprintExtractorRegistry* GetBlueprintExtractorRegistryPointerLaneB(
-    const int /*unused*/
-  ) noexcept
-  {
-    return GetBlueprintExtractorRegistryPointer();
-  }
-
-  /**
-   * Address: 0x007F3040 (FUN_007F3040)
-   *
-   * What it does:
-   * Third lane returning the process-global blueprint extractor registry
-   * pointer.
-   */
-  [[maybe_unused]] BlueprintExtractorRegistry* GetBlueprintExtractorRegistryPointerLaneC(
-    const int /*unused*/
-  ) noexcept
-  {
-    return GetBlueprintExtractorRegistryPointer();
-  }
-
-  /**
-   * Address: 0x007F32C0 (FUN_007F32C0)
-   *
-   * What it does:
-   * Fourth lane returning the process-global blueprint extractor registry
-   * pointer.
-   */
-  [[maybe_unused]] BlueprintExtractorRegistry* GetBlueprintExtractorRegistryPointerLaneD(
-    const int /*unused*/
-  ) noexcept
-  {
-    return GetBlueprintExtractorRegistryPointer();
-  }
-
 } // namespace
 
 namespace moho

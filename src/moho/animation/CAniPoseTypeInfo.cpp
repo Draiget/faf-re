@@ -52,42 +52,6 @@ namespace
     return result;
   }
 
-  /**
-   * Address: 0x0054C5A0 (FUN_0054C5A0)
-   *
-   * What it does:
-   * Installs new/construct/delete/destruct callback lanes for one `CAniPose`
-   * reflection type descriptor.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::RType* InstallPoseTypeInfoCreateDeleteRefCallbacks(
-    gpg::RType* const result
-  )
-  {
-    result->newRefFunc_ = &CAniPoseTypeInfo::NewRef;
-    result->ctorRefFunc_ = &CAniPoseTypeInfo::CtrRef;
-    result->deleteFunc_ = &CAniPoseTypeInfo::Delete;
-    result->dtrFunc_ = &CAniPoseTypeInfo::Destruct;
-    return result;
-  }
-
-  /**
-   * Address: 0x0054C5C0 (FUN_0054C5C0)
-   *
-   * What it does:
-   * Installs copy/move/delete/destruct callback lanes for one `CAniPose`
-   * reflection type descriptor.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::RType* InstallPoseTypeInfoCopyMoveDeleteRefCallbacks(
-    gpg::RType* const result
-  )
-  {
-    result->cpyRefFunc_ = &CAniPoseTypeInfo::CpyRef;
-    result->movRefFunc_ = &CAniPoseTypeInfo::MovRef;
-    result->deleteFunc_ = &CAniPoseTypeInfo::Delete;
-    result->dtrFunc_ = &CAniPoseTypeInfo::Destruct;
-    return result;
-  }
-
   void InitializeDefaultPoseStorage(
     CAniPose& pose
   )

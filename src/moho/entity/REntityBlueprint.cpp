@@ -34,11 +34,7 @@ namespace moho
     RRuleGameRules* const owner,
     const RResId& resId
   )
-    : mOwner(nullptr)
-    , mBlueprintId()
-    , mBlueprintLabel()
-    , mSource()
-    , mCategoryBitIndex(0)
+    : RBlueprint(owner, resId)
     , mCategories()
     , mScriptModule()
     , mScriptClass()
@@ -81,24 +77,7 @@ namespace moho
     , mStrategicIconSelected()
     , mStrategicIconOver()
     , mStrategicIconSelectedOver()
-  {
-    if (owner) {
-      // The binary runs RBlueprint's constructor on this very object, whose
-      // prefix is the base sub-object. Building a temporary base here and
-      // copying out of it counted an extra instance and, worse, ran the base
-      // destructor on an object whose vtable word was still null.
-      std::int32_t blueprintOrdinal = 0;
-      RBlueprint::InitIdentity(owner, resId, mBlueprintId, blueprintOrdinal);
-      mOwner = owner;
-      mCategoryBitIndex = static_cast<std::uint32_t>(blueprintOrdinal);
-    } else {
-      mOwner = nullptr;
-      mBlueprintId.clear();
-      mBlueprintLabel.clear();
-      mSource.clear();
-      mCategoryBitIndex = 0;
-    }
-  }
+  {}
 
   /**
    * Address: 0x00511E80 (FUN_00511E80)
@@ -114,12 +93,8 @@ namespace moho
    */
   REntityBlueprint::~REntityBlueprint()
   {
-    // 0x0051203A calls Moho::RBlueprint::~RBlueprint() -- the base-destructor
-    // call the compiler emits because REntityBlueprint derives from
-    // RBlueprint in the binary. This class repeats that header rather than
-    // inheriting it; the one thing that destructor does which the members do
-    // not do for themselves is give back the RBlueprint instance count, and
-    // the InstanceCounter<RBlueprint> base does that.
+    // 0x0051203A calls Moho::RBlueprint::~RBlueprint(): the base destructor,
+    // which the compiler emits after this body.
   }
 
   namespace
@@ -246,13 +221,5 @@ namespace moho
   const RUnitBlueprint* REntityBlueprint::IsUnitBlueprint() const
   {
     return nullptr;
-  }
-
-  LuaPlus::LuaObject REntityBlueprint::GetLuaBlueprint(
-    LuaPlus::LuaState* const state
-  ) const
-  {
-    const auto* const baseBlueprint = reinterpret_cast<const RBlueprint*>(this);
-    return baseBlueprint->GetLuaBlueprint(state);
   }
 } // namespace moho

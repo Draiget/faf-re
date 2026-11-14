@@ -1,4 +1,4 @@
-// The smaller gpg containers (src/gpg/core/containers): DList, IntrusiveLink, IntrusiveRbTree,
+// The smaller gpg containers (src/gpg/core/containers): DList, IntrusiveLink,
 // Array2D, BitArray2D, Rect2, ChunkedVector, FlatGenerationMap, TrackedPointerIndex, ByteSpan.
 
 #include <gtest/gtest.h>
@@ -20,7 +20,6 @@
 #include "gpg/core/containers/DList.h"
 #include "gpg/core/containers/FlatGenerationMap.h"
 #include "gpg/core/containers/IntrusiveLink.h"
-#include "gpg/core/containers/IntrusiveRbTree.h"
 #include "gpg/core/containers/Rect2.h"
 #include "gpg/core/containers/TrackedPointerIndex.h"
 
@@ -279,123 +278,6 @@ TEST(
   const gpg::core::IntrusiveLink<int*> link;
   EXPECT_EQ(link.prev, nullptr);
   EXPECT_EQ(link.next, nullptr);
-}
-
-// --- IntrusiveRbTree ---------------------------------------------------------------------------
-
-namespace
-{
-  struct TreeLinks
-  {
-    std::uint8_t* left;
-    std::uint8_t* parent;
-    std::uint8_t* right;
-  };
-
-  struct TreeOwner
-  {
-    int key;
-    TreeLinks links;
-  };
-
-  struct TreeContainer
-  {
-    std::uint64_t pad;
-    TreeLinks head;
-  };
-
-  using OwnerTree = gpg::core::IntrusiveRbTree<
-    TreeOwner,
-    offsetof(TreeOwner, links),
-    offsetof(TreeContainer, head),
-    offsetof(TreeLinks, left),
-    offsetof(TreeLinks, parent),
-    offsetof(TreeLinks, right)>;
-
-  [[nodiscard]] std::uint8_t* LinksOf(
-    TreeOwner& owner
-  )
-  {
-    return reinterpret_cast<std::uint8_t*>(&owner.links);
-  }
-
-  /** A search tree over `owners` hung from `container.head`; empty children are `nil`. */
-  void BuildOwnerTree(
-    TreeContainer& container,
-    std::vector<TreeOwner>& owners,
-    const bool nilIsHead
-  )
-  {
-    std::uint8_t* const head = reinterpret_cast<std::uint8_t*>(&container.head);
-    std::uint8_t* const nil = nilIsHead ? head : nullptr;
-    container.head = TreeLinks{nullptr, nullptr, nullptr};
-    TreeOwner* root = nullptr;
-    TreeOwner* minimum = nullptr;
-    TreeOwner* maximum = nullptr;
-    for (TreeOwner& owner : owners) {
-      owner.links = TreeLinks{nil, head, nil};
-      if (root == nullptr) {
-        root = &owner;
-        minimum = &owner;
-        maximum = &owner;
-        continue;
-      }
-      TreeOwner* cur = root;
-      for (;;) {
-        std::uint8_t*& child = owner.key < cur->key ? cur->links.left : cur->links.right;
-        if (child == nil) {
-          child = LinksOf(owner);
-          owner.links.parent = LinksOf(*cur);
-          break;
-        }
-        cur = reinterpret_cast<TreeOwner*>(child - offsetof(TreeOwner, links));
-      }
-      if (owner.key < minimum->key) {
-        minimum = &owner;
-      }
-      if (owner.key >= maximum->key) {
-        maximum = &owner;
-      }
-    }
-    if (root != nullptr) {
-      container.head = TreeLinks{LinksOf(*minimum), LinksOf(*root), LinksOf(*maximum)};
-    }
-  }
-} // namespace
-
-TEST(
-  GpgIntrusiveRbTree,
-  WalksEmbeddedNodesInOrder
-)
-{
-  std::mt19937 rng(2);
-  for (int round = 0; round < 400; ++round) {
-    const bool nilIsHead = (round & 1) != 0;
-    std::vector<TreeOwner> owners(Pick(rng, 30));
-    std::vector<int> keys;
-    for (TreeOwner& owner : owners) {
-      owner.key = static_cast<int>(rng() % 50u);
-      keys.push_back(owner.key);
-    }
-    TreeContainer container{};
-    BuildOwnerTree(container, owners, nilIsHead);
-    const OwnerTree tree(&container);
-    EXPECT_EQ(tree.head_node(), &container.head);
-    std::vector<int> walked;
-    for (auto it = tree.begin(); it != tree.end(); ++it) {
-      walked.push_back(it->key);
-    }
-    std::sort(keys.begin(), keys.end());
-    ASSERT_EQ(walked, keys) << "round " << round;
-    std::vector<int> postIncrement;
-    for (auto it = tree.begin(); it != tree.end();) {
-      postIncrement.push_back((*it++).key);
-    }
-    ASSERT_EQ(postIncrement, keys);
-    if (owners.empty()) {
-      ASSERT_EQ(tree.root_node(), nullptr);
-    }
-  }
 }
 
 // --- Array2D -----------------------------------------------------------------------------------

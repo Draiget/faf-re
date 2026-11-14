@@ -52,22 +52,6 @@ namespace
   }
 
   /**
-   * Address: 0x00540A70 (FUN_00540A70)
-   *
-   * What it does:
-   * Reads one 32-bit integer value from a `BinaryReader` lane and returns it
-   * by value.
-   */
-  [[maybe_unused]] int ReadClientMessageInt32Raw(
-    gpg::BinaryReader* const reader
-  )
-  {
-    int value = 0;
-    reader->Read(reinterpret_cast<char*>(&value), sizeof(value));
-    return value;
-  }
-
-  /**
    * Engine addition, not in the binary: the fewest payload bytes each message
    * `Process` (and `UpdateState`, for the two command-stream ops it reads)
    * parses with `ReadExact` needs. The binary read them unchecked, so a

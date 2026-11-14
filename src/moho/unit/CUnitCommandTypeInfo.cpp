@@ -22,24 +22,6 @@ namespace
     return sInstance;
   }
 
-  gpg::RType* gLegacyCUnitCommandSecondaryType = nullptr;
-
-  /**
-   * Address: 0x006E7CD0 (FUN_006E7CD0)
-   *
-   * What it does:
-   * Resolves and caches one secondary RTTI lane for `CUnitCommand`.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::RType* ResolveLegacyCUnitCommandSecondaryType()
-  {
-    gpg::RType* type = gLegacyCUnitCommandSecondaryType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::CUnitCommand));
-      gLegacyCUnitCommandSecondaryType = type;
-    }
-    return type;
-  }
-
 } // namespace
 
 namespace moho

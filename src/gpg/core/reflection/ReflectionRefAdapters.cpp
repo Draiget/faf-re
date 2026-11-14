@@ -1,197 +1,14 @@
 #include "gpg/core/reflection/ReflectionPrivate.h"
+#include "moho/animation/CStorageManipulator.h"
+#include "moho/animation/CThrustManipulator.h"
+#include "moho/effects/rendering/CEffectManagerImpl.h"
+#include "moho/effects/rendering/CEfxEmitter.h"
+
+#include <type_traits>
+#include <typeinfo>
 
 namespace
 {
-  /**
-   * Address: 0x00525DA0 (FUN_00525DA0)
-   *
-   * What it does:
-   * Builds one temporary reflected `RUnitBlueprint` reference and copies its
-   * `(mObj,mType)` pair into the caller-provided output lane.
-   */
-  [[maybe_unused]] gpg::RRef* BuildRUnitBlueprintRefIntoOutput(
-    moho::RUnitBlueprint* const blueprint,
-    gpg::RRef* const out
-  )
-  {
-    gpg::RRef ref{};
-    ref = gpg::MakeRRef<moho::RUnitBlueprint>(blueprint);
-    out->mObj = ref.mObj;
-    out->mType = ref.mType;
-    return out;
-  }
-
-  /**
-   * Address: 0x00525E30 (FUN_00525E30)
-   *
-   * What it does:
-   * Builds one temporary reflected `RUnitBlueprintWeapon` reference and copies
-   * its `(mObj,mType)` pair into the caller-provided output lane.
-   */
-  [[maybe_unused]] gpg::RRef* BuildRUnitBlueprintWeaponRefIntoOutput(
-    moho::RUnitBlueprintWeapon* const weaponBlueprint,
-    gpg::RRef* const out
-  )
-  {
-    gpg::RRef ref{};
-    ref = gpg::MakeRRef<moho::RUnitBlueprintWeapon>(weaponBlueprint);
-    out->mObj = ref.mObj;
-    out->mType = ref.mType;
-    return out;
-  }
-
-  /**
-   * Address: 0x00525E60 (FUN_00525E60)
-   *
-   * What it does:
-   * Builds one temporary reflected `float` reference and copies its
-   * `(mObj,mType)` pair into the caller-provided output lane.
-   */
-  [[maybe_unused]] gpg::RRef* BuildFloatRefIntoOutput(
-    float* const value,
-    gpg::RRef* const out
-  )
-  {
-    gpg::RRef ref{};
-    ref = gpg::MakeRRef<float>(value);
-    out->mObj = ref.mObj;
-    out->mType = ref.mType;
-    return out;
-  }
-
-  /**
-   * Address: 0x00599A00 (FUN_00599A00)
-   *
-   * What it does:
-   * Builds one temporary reflected `IAiCommandDispatchImpl` reference and
-   * copies its `(mObj,mType)` pair into the caller-provided output lane.
-   */
-  [[maybe_unused]] gpg::RRef* BuildIAiCommandDispatchImplRefIntoOutput(
-    moho::IAiCommandDispatchImpl* const value,
-    gpg::RRef* const out
-  )
-  {
-    gpg::RRef ref{};
-    ref = gpg::MakeRRef<moho::IAiCommandDispatchImpl>(value);
-    out->mObj = ref.mObj;
-    out->mType = ref.mType;
-    return out;
-  }
-
-  /**
-   * Address: 0x0059DC30 (FUN_0059DC30)
-   *
-   * What it does:
-   * Builds one temporary reflected `IFormationInstance*` pointer-slot
-   * reference and copies its `(mObj,mType)` pair into output.
-   */
-  [[maybe_unused]] gpg::RRef* BuildIFormationInstancePointerRefIntoOutput(
-    moho::IFormationInstance** const value,
-    gpg::RRef* const out
-  )
-  {
-    gpg::RRef ref{};
-    ref = gpg::MakeRRef<moho::IFormationInstance*>(value);
-    out->mObj = ref.mObj;
-    out->mType = ref.mType;
-    return out;
-  }
-
-  /**
-   * Address: 0x0059DD90 (FUN_0059DD90)
-   *
-   * What it does:
-   * Builds one temporary reflected `CAiFormationDBImpl` reference and copies
-   * its `(mObj,mType)` pair into output.
-   */
-  [[maybe_unused]] gpg::RRef* BuildCAiFormationDBImplRefIntoOutput(
-    moho::CAiFormationDBImpl* const value,
-    gpg::RRef* const out
-  )
-  {
-    gpg::RRef ref{};
-    ref = gpg::MakeRRef<moho::CAiFormationDBImpl>(value);
-    out->mObj = ref.mObj;
-    out->mType = ref.mType;
-    return out;
-  }
-
-  /**
-   * Address: 0x0059DDD0 (FUN_0059DDD0)
-   *
-   * What it does:
-   * Builds one temporary reflected `IFormationInstance` reference and copies
-   * its `(mObj,mType)` pair into output.
-   */
-  [[maybe_unused]] gpg::RRef* BuildIFormationInstanceRefIntoOutput(
-    moho::IFormationInstance* const value,
-    gpg::RRef* const out
-  )
-  {
-    gpg::RRef ref{};
-    (void)gpg::RRef_IFormationInstance(&ref, value);
-    out->mObj = ref.mObj;
-    out->mType = ref.mType;
-    return out;
-  }
-
-  /**
-   * Address: 0x005A1CB0 (FUN_005A1CB0)
-   *
-   * What it does:
-   * Builds one temporary reflected `CAiBuilderImpl` reference and copies its
-   * `(mObj,mType)` pair into output.
-   */
-  [[maybe_unused]] gpg::RRef* BuildCAiBuilderImplRefIntoOutput(
-    moho::CAiBuilderImpl* const value,
-    gpg::RRef* const out
-  )
-  {
-    gpg::RRef ref{};
-    ref = gpg::MakeRRef<moho::CAiBuilderImpl>(value);
-    out->mObj = ref.mObj;
-    out->mType = ref.mType;
-    return out;
-  }
-
-  /**
-   * Address: 0x005A1E60 (FUN_005A1E60)
-   *
-   * What it does:
-   * Builds one temporary reflected `RUnitBlueprint*` pointer-slot reference
-   * and copies its `(mObj,mType)` pair into output.
-   */
-  [[maybe_unused]] gpg::RRef* BuildRUnitBlueprintPointerRefIntoOutput(
-    moho::RUnitBlueprint** const value,
-    gpg::RRef* const out
-  )
-  {
-    gpg::RRef ref{};
-    ref = gpg::MakeRRef<moho::RUnitBlueprint*>(value);
-    out->mObj = ref.mObj;
-    out->mType = ref.mType;
-    return out;
-  }
-
-  /**
-   * Address: 0x005B5710 (FUN_005B5710)
-   *
-   * What it does:
-   * Builds one temporary reflected `CPathPoint` reference and copies its
-   * `(mObj,mType)` pair into output.
-   */
-  [[maybe_unused]] gpg::RRef* BuildCPathPointRefIntoOutput(
-    moho::CPathPoint* const value,
-    gpg::RRef* const out
-  )
-  {
-    gpg::RRef ref{};
-    ref = gpg::MakeRRef<moho::CPathPoint>(value);
-    out->mObj = ref.mObj;
-    out->mType = ref.mType;
-    return out;
-  }
-
   template <class TObject>
   [[nodiscard]] gpg::RRef* BuildNamedPolymorphicRefWithCache(
     gpg::RRef* const out,
@@ -221,16 +38,8 @@ namespace
       return out;
     }
 
-    const std::type_info* runtimeTypeInfo = nullptr;
-    try {
-      runtimeTypeInfo = static_cast<const std::type_info*>(__RTtypeid(static_cast<void*>(object)));
-    } catch (...) {
-      runtimeTypeInfo = nullptr;
-    }
-
-    if (!runtimeTypeInfo) {
-      return out;
-    }
+    static_assert(std::is_polymorphic_v<TObject>, "the runtime type comes from the object's vtable");
+    const std::type_info* const runtimeTypeInfo = &typeid(*object);
 
     if (!cache.initialized) {
       cache.initialized = true;
@@ -283,7 +92,7 @@ namespace
     }
 
     out->mType = runtimeRType;
-    out->mObj = static_cast<void*>(reinterpret_cast<char*>(object) - baseOffset);
+    out->mObj = static_cast<void*>(gpg::CompleteObject(object, baseOffset));
     return out;
   }
 
@@ -331,101 +140,6 @@ namespace
   gpg::RType* gCEfxTrailEmitterRRefType = nullptr;
   thread_local TypeInfoCache3 gCEfxTrailEmitterRRefCache{false, {}};
 
-  /**
-   * Address: 0x005B5850 (FUN_005B5850)
-   *
-   * What it does:
-   * Value-first adapter that forwards one `CAiPathSpline*` object pointer into
-   * the canonical `gpg::RRef_CAiPathSpline` builder.
-   */
-  [[maybe_unused]] gpg::RRef* BuildCAiPathSplineRefValueFirst(
-    moho::CAiPathSpline* const value,
-    gpg::RRef* const out
-  )
-  {
-    *out = gpg::MakeRRef<moho::CAiPathSpline>(value);
-    return out;
-  }
-
-  /**
-   * Address: 0x005B95B0 (FUN_005B95B0)
-   *
-   * What it does:
-   * Value-first adapter that forwards one `CAiPersonality*` object pointer into
-   * the canonical `gpg::RRef_CAiPersonality` builder.
-   */
-  [[maybe_unused]] gpg::RRef* BuildCAiPersonalityRefValueFirst(
-    moho::CAiPersonality* const value,
-    gpg::RRef* const out
-  )
-  {
-    *out = gpg::MakeRRef<moho::CAiPersonality>(value);
-    return out;
-  }
-
-  /**
-   * Address: 0x005C9290 (FUN_005C9290)
-   *
-   * What it does:
-   * Value-first adapter that forwards one `EReconFlags*` value pointer into the
-   * canonical `gpg::RRef_EReconFlags` builder.
-   */
-  [[maybe_unused]] gpg::RRef* BuildEReconFlagsRefValueFirst(
-    moho::EReconFlags* const value,
-    gpg::RRef* const out
-  )
-  {
-    *out = gpg::MakeRRef<moho::EReconFlags>(value);
-    return out;
-  }
-
-  /**
-   * Address: 0x005C9A10 (FUN_005C9A10)
-   *
-   * What it does:
-   * Value-first adapter that forwards one `SPerArmyReconInfo*` object pointer
-   * into the canonical `gpg::RRef_SPerArmyReconInfo` builder.
-   */
-  [[maybe_unused]] gpg::RRef* BuildSPerArmyReconInfoRefValueFirst(
-    moho::SPerArmyReconInfo* const value,
-    gpg::RRef* const out
-  )
-  {
-    *out = gpg::MakeRRef<moho::SPerArmyReconInfo>(value);
-    return out;
-  }
-
-  /**
-   * Address: 0x005C9A40 (FUN_005C9A40)
-   *
-   * What it does:
-   * Value-first adapter that forwards one `ReconBlip*` slot pointer into the
-   * canonical `gpg::RRef_ReconBlip_P` builder.
-   */
-  [[maybe_unused]] gpg::RRef* BuildReconBlipSlotRefValueFirst(
-    moho::ReconBlip** const value,
-    gpg::RRef* const out
-  )
-  {
-    *out = gpg::MakeRRef<moho::ReconBlip*>(value);
-    return out;
-  }
-
-  /**
-   * Address: 0x005CA170 (FUN_005CA170)
-   *
-   * What it does:
-   * Value-first adapter that forwards one `CAiReconDBImpl*` object pointer into
-   * the canonical `gpg::RRef_CAiReconDBImpl` builder.
-   */
-  [[maybe_unused]] gpg::RRef* BuildCAiReconDBImplRefValueFirst(
-    moho::CAiReconDBImpl* const value,
-    gpg::RRef* const out
-  )
-  {
-    *out = gpg::MakeRRef<moho::CAiReconDBImpl>(value);
-    return out;
-  }
 } // namespace
 
 namespace gpg

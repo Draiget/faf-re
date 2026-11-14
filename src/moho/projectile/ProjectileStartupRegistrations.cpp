@@ -35,14 +35,16 @@ namespace gpg
 {
   void LoadAndBroadcastManyToOneListenerEProjectileImpactEvent(
     gpg::ReadArchive* archive,
-    moho::ManyToOneBroadcaster<moho::EProjectileImpactEvent>* broadcaster,
+    void* objectPtr,
     int version,
     gpg::RRef* ownerRef
   );
 
   void SaveUnownedRawPointerFromManyToOneListener_EProjectileImpactEventIntrusiveHeadLane1(
     gpg::WriteArchive* archive,
-    std::uint32_t* intrusiveListHeadSlot
+    void* objectPtr,
+    int version,
+    gpg::RRef* ownerRef
   );
 } // namespace gpg
 
@@ -352,12 +354,8 @@ namespace
       );
       size_ = sizeof(moho::ManyToOneBroadcaster_EProjectileImpactEvent);
       version_ = 1;
-      serLoadFunc_ = reinterpret_cast<gpg::RType::load_func_t>(
-        reinterpret_cast<void (*)()>(&gpg::LoadAndBroadcastManyToOneListenerEProjectileImpactEvent)
-      );
-      serSaveFunc_ = reinterpret_cast<gpg::RType::save_func_t>(reinterpret_cast<void (*)()>(
-        &gpg::SaveUnownedRawPointerFromManyToOneListener_EProjectileImpactEventIntrusiveHeadLane1
-      ));
+      serLoadFunc_ = &gpg::LoadAndBroadcastManyToOneListenerEProjectileImpactEvent;
+      serSaveFunc_ = &gpg::SaveUnownedRawPointerFromManyToOneListener_EProjectileImpactEventIntrusiveHeadLane1;
     }
   };
 
@@ -3083,11 +3081,12 @@ namespace gpg
    */
   void LoadAndBroadcastManyToOneListenerEProjectileImpactEvent(
     ReadArchive* const archive,
-    moho::ManyToOneBroadcaster<moho::EProjectileImpactEvent>* const broadcaster,
+    void* objectPtr,
     const int version,
     RRef* const ownerRef
   )
   {
+    auto* const broadcaster = static_cast<moho::ManyToOneBroadcaster<moho::EProjectileImpactEvent>*>(objectPtr);
     (void)version;
 
     moho::ManyToOneListener<moho::EProjectileImpactEvent>* listener = nullptr;

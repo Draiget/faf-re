@@ -25,8 +25,8 @@ void Unit::SetConsumptionActive(
     request->mGranted.mass = 0.0f;
 
     if (ArmyRef != nullptr) {
-      if (CSimArmyEconomyInfo* const economyInfo = ArmyRef->GetEconomy(); economyInfo != nullptr) {
-        request->mNode.ListLinkBefore(&economyInfo->registrationNode);
+      if (CEconomy* const economyInfo = ArmyRef->GetEconomy(); economyInfo != nullptr) {
+        request->mNode.ListLinkBefore(&economyInfo->mConsumptionData);
       }
     }
 
@@ -42,9 +42,9 @@ void Unit::SetConsumptionActive(
     // production pool (`GetEconomy() + 8` = mResources), so it is banked as
     // income on the next economy tick -- not straight into mStored.
     if (mConsumptionData != nullptr && ArmyRef != nullptr) {
-      if (CSimArmyEconomyInfo* const economyInfo = ArmyRef->GetEconomy(); economyInfo != nullptr) {
-        economyInfo->mResources.ENERGY += mConsumptionData->mGranted.energy;
-        economyInfo->mResources.MASS += mConsumptionData->mGranted.mass;
+      if (CEconomy* const economyInfo = ArmyRef->GetEconomy(); economyInfo != nullptr) {
+        economyInfo->mResources.energy += mConsumptionData->mGranted.energy;
+        economyInfo->mResources.mass += mConsumptionData->mGranted.mass;
       }
     }
 

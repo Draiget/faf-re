@@ -48,17 +48,6 @@ namespace
     return moho::MotorSinkAway::sType;
   }
 
-  /**
-   * Address: 0x00696C10 (FUN_00696C10)
-   *
-   * What it does:
-   * Secondary duplicated RTTI-resolve lane for `MotorSinkAway`.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::RType* CachedMotorSinkAwayTypeVariantB()
-  {
-    return CachedMotorSinkAwayType();
-  }
-
   [[nodiscard]] gpg::RType* CachedMotorType()
   {
     if (!moho::Motor::sType) {
@@ -80,70 +69,6 @@ namespace
   }
 
   /**
-   * Address: 0x006962A0 (FUN_006962A0)
-   *
-   * What it does:
-   * Deserializes one `Motor` object lane through archive owner context and
-   * returns the archive instance.
-   */
-  [[maybe_unused]] gpg::ReadArchive* ReadMotorArchiveAdapter(
-    gpg::ReadArchive* const archive,
-    void* const object,
-    gpg::RRef* const ownerRef
-  )
-  {
-    archive->Read(CachedMotorType(), object, *ownerRef);
-    return archive;
-  }
-
-  /**
-   * Address: 0x006962E0 (FUN_006962E0)
-   *
-   * What it does:
-   * Serializes one `Motor` object lane through archive owner context and
-   * returns the archive instance.
-   */
-  [[maybe_unused]] gpg::WriteArchive* WriteMotorArchiveAdapter(
-    gpg::WriteArchive* const archive,
-    void** const objectSlot,
-    const gpg::RRef* const ownerRef
-  )
-  {
-    archive->Write(CachedMotorType(), objectSlot, *ownerRef);
-    return archive;
-  }
-
-  /**
-   * Address: 0x00696320 (FUN_00696320)
-   *
-   * What it does:
-   * Deserializes one `Motor` object lane through archive owner context.
-   */
-  [[maybe_unused]] void ReadMotorArchiveObjectLane1(
-    gpg::ReadArchive* const archive,
-    void* const object,
-    gpg::RRef* const ownerRef
-  )
-  {
-    archive->Read(CachedMotorType(), object, *ownerRef);
-  }
-
-  /**
-   * Address: 0x00696350 (FUN_00696350)
-   *
-   * What it does:
-   * Serializes one `Motor` object lane through archive owner context.
-   */
-  [[maybe_unused]] void WriteMotorArchiveObjectLane1(
-    gpg::WriteArchive* const archive,
-    void** const objectSlot,
-    const gpg::RRef* const ownerRef
-  )
-  {
-    archive->Write(CachedMotorType(), objectSlot, *ownerRef);
-  }
-
-  /**
    * Address: 0x00696E70 (FUN_00696E70, Lua factory lookup thunk)
    */
   [[nodiscard]] LuaPlus::LuaObject GetMotorSinkAwayLuaFactoryObject(
@@ -151,25 +76,6 @@ namespace
   )
   {
     return moho::CScrLuaMetatableFactory<moho::MotorSinkAway>::Instance().Get(state);
-  }
-
-  /**
-   * Address: 0x00696F80 (FUN_00696F80)
-   *
-   * What it does:
-   * Builds one temporary `RRef_MotorSinkAway` and copies its `(mObj,mType)`
-   * pair into caller-owned output storage.
-   */
-  [[maybe_unused]] gpg::RRef* PackRRef_MotorSinkAway(
-    gpg::RRef* const out,
-    moho::MotorSinkAway* const value
-  )
-  {
-    gpg::RRef ref{};
-    (void)gpg::RRef_MotorSinkAway(&ref, value);
-    out->mObj = ref.mObj;
-    out->mType = ref.mType;
-    return out;
   }
 
 } // namespace
@@ -306,7 +212,7 @@ namespace moho
   )
   {
     gpg::RType* const baseType = CachedCScriptObjectType();
-    gpg::AddReflectedBaseType(typeInfo, baseType, gpg::RType::BaseSubobjectOffset<MotorSinkAway, CScriptObject>());
+    gpg::AddReflectedBaseType(typeInfo, baseType, gpg::BaseSubobjectOffset<MotorSinkAway, CScriptObject>());
   }
 
   /**

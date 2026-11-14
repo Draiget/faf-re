@@ -40,31 +40,6 @@ namespace
    * Returns the (possibly relocated) `start_` pointer of `storage`.
    */
 
-  /**
-   * Address: 0x00527EE0 (FUN_00527EE0)
-   * Address: 0x00527CD0 (FUN_00527CD0)
-   *
-   * What it does:
-   * Copies one contiguous float range `[sourceBegin, sourceEnd)` into
-   * destination storage and returns one-past the last destination lane.
-   */
-  [[maybe_unused]] float* CopyFloatRangeNullable(
-    float* destination,
-    const float* const sourceBegin,
-    const float* const sourceEnd
-  ) noexcept
-  {
-    std::uintptr_t destinationAddress = reinterpret_cast<std::uintptr_t>(destination);
-    for (const float* source = sourceBegin; source != sourceEnd; ++source) {
-      if (destinationAddress != 0u) {
-        *reinterpret_cast<float*>(destinationAddress) = *source;
-      }
-      destinationAddress += sizeof(float);
-    }
-
-    return reinterpret_cast<float*>(destinationAddress);
-  }
-
   // Addresses 0x00525FA0 (StdcallThunkA), 0x00527190 (CdeclThunkA),
   // 0x005275C0 (StdcallThunkB), 0x005279C0 (CdeclThunkB), 0x00527B10
   // (CdeclThunkC), and 0x00527C20 (CdeclThunkD) -- six calling-convention
@@ -210,7 +185,7 @@ namespace
      */
     static void SerLoad(
       gpg::ReadArchive* archive,
-      std::intptr_t objectPtr,
+      void* objectPtr,
       int,
       gpg::RRef*
     )
@@ -219,7 +194,7 @@ namespace
         return;
       }
 
-      auto* const storage = reinterpret_cast<VectorFloatType*>(objectPtr);
+      auto* const storage = static_cast<VectorFloatType*>(objectPtr);
       unsigned int count = 0u;
       archive->ReadUInt(&count);
 
@@ -245,7 +220,7 @@ namespace
      */
     static void SerSave(
       gpg::WriteArchive* archive,
-      std::intptr_t objectPtr,
+      void* objectPtr,
       int,
       gpg::RRef*
     )
@@ -254,7 +229,7 @@ namespace
         return;
       }
 
-      const auto* const storage = reinterpret_cast<const VectorFloatType*>(objectPtr);
+      const auto* const storage = static_cast<const VectorFloatType*>(objectPtr);
       const unsigned int count = storage ? static_cast<unsigned int>(storage->size()) : 0u;
       archive->WriteUInt(count);
       if (!storage) {
@@ -308,24 +283,6 @@ namespace
   {
     const fa::string base = gpg::RType::GetLexical(ref);
     return gpg::STR_Printf("%s, size=%d", base.c_str(), static_cast<int>(GetCount(ref.mObj)));
-  }
-
-  /**
-   * Address: 0x005238B0 (FUN_005238B0)
-   *
-   * What it does:
-   * Tail-thunk alias that forwards reflected vector-float count updates into
-   * `VectorFloatReflectionType::SetCount`.
-   */
-  [[maybe_unused]] void SetVectorFloatReflectionCountThunk(
-    const VectorFloatReflectionType* const typeInfo,
-    void* const storage,
-    const int count
-  )
-  {
-    if (typeInfo != nullptr) {
-      typeInfo->SetCount(storage, count);
-    }
   }
 
   /**

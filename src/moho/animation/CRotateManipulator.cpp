@@ -169,24 +169,6 @@ namespace
     return moho::CRotateManipulator::sType;
   }
 
-  /**
-   * Address: 0x006456B0 (FUN_006456B0)
-   *
-   * What it does:
-   * Upcasts one reflected reference lane to `moho::CRotateManipulator*`.
-   */
-  [[maybe_unused]] [[nodiscard]] void* TryUpcastCRotateManipulatorRefObject(
-    gpg::RRef* const sourceRef
-  )
-  {
-    if (!sourceRef) {
-      return nullptr;
-    }
-
-    const gpg::RRef upcast = gpg::REF_UpcastPtr(*sourceRef, CachedCRotateManipulatorType());
-    return upcast.mObj;
-  }
-
   // Address: 0x00BD3010 (FUN_00BD3010, register_CRotateManipulatorSerializer)
   // -- MSVC's own compiler-generated dynamic initializer for this global runs
   // the real `gpg::SerSaveLoadHelper<CRotateManipulator>` ctor (self-links

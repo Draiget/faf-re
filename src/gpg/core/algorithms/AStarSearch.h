@@ -510,11 +510,11 @@ namespace gpg
     {
       if constexpr (kAllowFlat) {
         if (UseFlat()) {
-          ::new (static_cast<void*>(mStorage)) flat_type*(new flat_type());
+          mStorage.flat = new flat_type();
           return;
         }
       }
-      ::new (static_cast<void*>(mStorage)) legacy_type();
+      ::new (&mStorage.legacy) legacy_type();
     }
 
     ~AStarNodeTable()
@@ -596,14 +596,22 @@ namespace gpg
   private:
     [[nodiscard]] legacy_type& Legacy() noexcept
     {
-      return *std::launder(reinterpret_cast<legacy_type*>(mStorage));
+      return mStorage.legacy;
     }
     [[nodiscard]] flat_type* Flat() const noexcept
     {
-      return *std::launder(reinterpret_cast<flat_type* const*>(mStorage));
+      return mStorage.flat;
     }
 
-    alignas(legacy_type) unsigned char mStorage[sizeof(legacy_type)];
+    /// One of the two tables, chosen once in the constructor (`UseFlat`).
+    union Storage
+    {
+      Storage() noexcept {}
+      ~Storage() {}
+
+      legacy_type legacy;
+      flat_type* flat;
+    } mStorage;
   };
 
   template <class TCell, class TTraits, class TCellTraits = fa::hash_compare<TCell>, bool kAllowFlatTable = false>

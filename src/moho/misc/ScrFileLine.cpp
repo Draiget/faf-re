@@ -8,66 +8,6 @@
 
 namespace
 {
-  /**
-   * Address: 0x004C6AB0 (FUN_004C6AB0)
-   *
-   * IDA signature:
-   * int __usercall sub_4C6AB0@<eax>(int a1@<eax>, int a2@<esi>);
-   *
-   * What it does:
-   * Copy-assigns one source ScrFileLine row into one already-constructed
-   * destination row by duplicating the marker state and owning-copying
-   * both embedded string lanes.
-   */
-  [[maybe_unused]] moho::ScrFileLine& CopyAssignScrFileLine(
-    moho::ScrFileLine& destination,
-    const moho::ScrFileLine& source
-  )
-  {
-    destination.mMarkerState = source.mMarkerState;
-    destination.mLineNumberText.assign(source.mLineNumberText, 0U, fa::string::npos);
-    destination.mSourceText.assign(source.mSourceText, 0U, fa::string::npos);
-    return destination;
-  }
-
-  /**
-   * Address: 0x004C68A0 (FUN_004C68A0)
-   *
-   * IDA signature:
-   * void __fastcall __noreturn sub_4C68A0(int a1, int a2,
-   *                                       void (__thiscall ***a3)(_DWORD, _DWORD));
-   *
-   * What it does:
-   * Uninitialized-constructs `count` ScrFileLine rows starting at
-   * `destinationBegin` using the copy-constructor from `sourceRow`; on any
-   * thrown exception, invokes the non-deleting destructor for every already-
-   * constructed row and rethrows. Matches the legacy
-   * `std::_Uninitialized_copy_n<ScrFileLine*>` instantiation used by
-   * `fa::vector<ScrFileLine>` growth paths.
-   */
-  [[maybe_unused]] moho::ScrFileLine* UninitializedConstructScrFileLineRun(
-    moho::ScrFileLine* const destinationBegin,
-    const std::size_t count,
-    const moho::ScrFileLine& sourceRow
-  )
-  {
-    moho::ScrFileLine* cursor = destinationBegin;
-    std::size_t remaining = count;
-    try {
-      while (remaining != 0U) {
-        ::new (static_cast<void*>(cursor)) moho::ScrFileLine(sourceRow);
-        ++cursor;
-        --remaining;
-      }
-      return cursor;
-    } catch (...) {
-      for (moho::ScrFileLine* unwind = destinationBegin; unwind != cursor; ++unwind) {
-        unwind->~ScrFileLine();
-      }
-      throw;
-    }
-  }
-
   void ExpandTabsToVisualColumns(
     fa::string& text
   )

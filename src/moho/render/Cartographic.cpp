@@ -108,33 +108,6 @@ namespace
     return sentinel;
   }
 
-  [[nodiscard]] moho::CartographicDecalBatch* CopyConstructCartographicDecalBatchIfPresent(
-    moho::CartographicDecalBatch* const destination,
-    const moho::CartographicDecalBatch* const source
-  )
-  {
-    if (source == nullptr) {
-      return nullptr;
-    }
-
-    return ::new (destination) moho::CartographicDecalBatch(*source);
-  }
-
-  /**
-   * Address: 0x007D3F40 (FUN_007D3F40)
-   *
-   * What it does:
-   * Adapter lane for nullable `CartographicDecalBatch` copy-construction into
-   * caller-provided storage.
-   */
-  [[maybe_unused]] [[nodiscard]] moho::CartographicDecalBatch* CopyConstructCartographicDecalBatchIfPresentAdapter(
-    moho::CartographicDecalBatch* const destination,
-    const moho::CartographicDecalBatch* const source
-  )
-  {
-    return CopyConstructCartographicDecalBatchIfPresent(destination, source);
-  }
-
   constexpr std::array<float, 8> kCartographicQuadVertices{
     -1.0f,
     1.0f,

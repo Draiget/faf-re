@@ -87,7 +87,7 @@ namespace
       return out;
     }
 
-    out.mObj = static_cast<void*>(reinterpret_cast<char*>(sim) - baseOffset);
+    out.mObj = static_cast<void*>(gpg::CompleteObject(sim, baseOffset));
     out.mType = dynamicType;
     return out;
   }

@@ -177,21 +177,6 @@ namespace
    */
 
   /**
-   * Address: 0x005419F0 (FUN_005419F0)
-   *
-   * What it does:
-   * Reads one position lane `{x,*,z}` and samples elevation from one indirect
-   * `CHeightField*` owner lane.
-   */
-  [[maybe_unused]] float SampleHeightFieldElevationFromPositionXZ(
-    const Wm3::Vec3f* const position,
-    moho::CHeightField* const* const heightField
-  )
-  {
-    return (*heightField)->GetElevation(position->x, position->z);
-  }
-
-  /**
    * Address: 0x00478D00 (FUN_00478D00, sub_478D00)
    *
    * What it does:
@@ -289,21 +274,6 @@ namespace
   }
 
   /**
-   * Address: 0x00478350 (FUN_00478350)
-   *
-   * What it does:
-   * Returns pointer to one min/max entry at `(x,z)` without clamping.
-   */
-  [[maybe_unused]] [[nodiscard]] moho::SMinMax<std::uint16_t>* MinMaxGridCellPtr(
-    moho::CHeightFieldMinMaxGrid& grid,
-    const std::int32_t x,
-    const std::int32_t z
-  ) noexcept
-  {
-    return &grid.data[x + z * grid.width];
-  }
-
-  /**
    * Address: 0x00478370 (FUN_00478370)
    *
    * What it does:
@@ -386,32 +356,6 @@ namespace
     return field.data;
   }
 
-  /**
-   * Address: 0x004784C0 (FUN_004784C0)
-   *
-   * What it does:
-   * Duplicate lane returning raw 16-bit height-word data pointer.
-   */
-  [[maybe_unused]] [[nodiscard]] std::uint16_t* GetHeightWordDataVariant2(
-    moho::CHeightField& field
-  ) noexcept
-  {
-    return field.data;
-  }
-
-  /**
-   * Address: 0x004784D0 (FUN_004784D0)
-   *
-   * What it does:
-   * Returns backing height-word byte count (`2 * width * height`).
-   */
-  [[maybe_unused]] [[nodiscard]] std::int32_t GetHeightWordDataByteCount(
-    const moho::CHeightField& field
-  ) noexcept
-  {
-    return 2 * field.width * field.height;
-  }
-
   using HeightFieldTierVector = fa::vector<moho::CHeightFieldTier>;
 
   [[nodiscard]] std::size_t MinMaxGridSampleCount(
@@ -472,171 +416,6 @@ namespace
     for (std::size_t i = 0; i < count; ++i) {
       dst.data[i] = src.data[i];
     }
-  }
-
-  /**
-   * Address: 0x00478D80 (FUN_00478D80, func_CopyIGrid_data4)
-   *
-   * What it does:
-   * Allocates and copies one min/max tier grid from `src` into `dst`.
-   */
-  moho::CHeightFieldMinMaxGrid* CopyMinMaxGridAllocateAndCopy(
-    moho::CHeightFieldMinMaxGrid& dst,
-    const moho::CHeightFieldMinMaxGrid& src
-  )
-  {
-    CreateMinMaxGridData(dst, src.width, src.height);
-
-    const std::size_t sampleCount = MinMaxGridSampleCount(dst);
-    for (std::size_t i = 0; i < sampleCount; ++i) {
-      dst.data[i] = src.data[i];
-    }
-
-    return &dst;
-  }
-
-  /**
-   * Address: 0x00478DC0 (FUN_00478DC0, func_CopyIGrid_data2)
-   *
-   * What it does:
-   * Allocates and copies one error-word tier grid from `src` into `dst`.
-   */
-  moho::CHeightFieldI16Grid* CopyHeightWordGridAllocateAndCopy(
-    const moho::CHeightFieldI16Grid& src,
-    moho::CHeightFieldI16Grid& dst
-  )
-  {
-    dst.width = src.width;
-    dst.height = src.height;
-
-    const std::size_t sampleCount = HeightWordGridSampleCount(dst);
-    dst.data = new std::int16_t[sampleCount];
-    for (std::size_t i = 0; i < sampleCount; ++i) {
-      dst.data[i] = src.data[i];
-    }
-
-    return &dst;
-  }
-
-  /**
-   * Address: 0x00478D30 (FUN_00478D30, func_CopyIGrid)
-   *
-   * What it does:
-   * Deep-copies one tier aggregate (`data1` + `data2`) into `dst`.
-   */
-  moho::CHeightFieldTier* CopyHeightFieldTier(
-    const moho::CHeightFieldTier& src,
-    moho::CHeightFieldTier& dst
-  )
-  {
-    CopyMinMaxGridAllocateAndCopy(dst.data1, src.data1);
-    try {
-      CopyHeightWordGridAllocateAndCopy(src.data2, dst.data2);
-    } catch (...) {
-      delete[] dst.data1.data;
-      dst.data1.data = nullptr;
-      throw;
-    }
-
-    return &dst;
-  }
-
-  /**
-   * Address: 0x00479470 (FUN_00479470)
-   *
-   * What it does:
-   * Assigns one min/max tier grid, reallocating destination storage as needed.
-   */
-  [[maybe_unused]] moho::CHeightFieldMinMaxGrid* AssignMinMaxGrid(
-    moho::CHeightFieldMinMaxGrid& dst,
-    const moho::CHeightFieldMinMaxGrid& src
-  )
-  {
-    if (&dst == &src) {
-      return &dst;
-    }
-
-    delete[] dst.data;
-    dst.data = nullptr;
-    return CopyMinMaxGridAllocateAndCopy(dst, src);
-  }
-
-  /**
-   * Address: 0x004794C0 (FUN_004794C0)
-   *
-   * What it does:
-   * Assigns one error-word tier grid, reallocating destination storage as
-   * needed.
-   */
-  [[maybe_unused]] moho::CHeightFieldI16Grid* AssignHeightWordGrid(
-    moho::CHeightFieldI16Grid& dst,
-    const moho::CHeightFieldI16Grid& src
-  )
-  {
-    if (&dst == &src) {
-      return &dst;
-    }
-
-    delete[] dst.data;
-    dst.data = nullptr;
-    return CopyHeightWordGridAllocateAndCopy(src, dst);
-  }
-
-  /**
-   * Address: 0x00479250 (FUN_00479250)
-   *
-   * What it does:
-   * Returns high byte of an integer lane.
-   */
-  [[maybe_unused]] std::uint8_t HighByteVariant1(
-    const std::uint32_t value
-  ) noexcept
-  {
-    return static_cast<std::uint8_t>((value >> 8u) & 0xFFu);
-  }
-
-  /**
-   * Address: 0x00479340 (FUN_00479340)
-   *
-   * What it does:
-   * Duplicate lane returning high byte of an integer.
-   */
-  [[maybe_unused]] std::uint8_t HighByteVariant2(
-    const std::uint32_t value
-  ) noexcept
-  {
-    return static_cast<std::uint8_t>((value >> 8u) & 0xFFu);
-  }
-
-  /**
-   * Address: 0x00479530 (FUN_00479530)
-   *
-   * What it does:
-   * Copies one tier from `source` into `dst` when `source` is non-null.
-   */
-  moho::CHeightFieldTier* CopyHeightFieldTierFromPointerVariant1(
-    moho::CHeightFieldTier& dst,
-    const moho::CHeightFieldTier* source
-  )
-  {
-    if (source != nullptr) {
-      return CopyHeightFieldTier(*source, dst);
-    }
-    return nullptr;
-  }
-
-  /**
-   * Address: 0x00479610 (FUN_00479610)
-   *
-   * What it does:
-   * Duplicate lane copying one tier from pointer source.
-   */
-  [[maybe_unused]] moho::CHeightFieldTier* CopyHeightFieldTierFromPointerVariant2(
-    moho::CHeightFieldTier& dst,
-    const moho::CHeightFieldTier* source
-  )
-  {
-    return CopyHeightFieldTierFromPointerVariant1(dst, source);
   }
 
   /**
@@ -1025,22 +804,6 @@ namespace
         }
       }
     }
-  }
-
-  /**
-   * Address: 0x004762C0 (FUN_004762C0, orphan helper with no incoming xrefs)
-   *
-   * What it does:
-   * Routes one z-row update through the tier-error kernel without progress ticks.
-   */
-  [[maybe_unused]] void UpdateErrorSingleRowNoProgress(
-    moho::CHeightField& field,
-    const std::int32_t z,
-    const std::int32_t x0,
-    const std::int32_t x1
-  )
-  {
-    UpdateErrorKernel(field, nullptr, x0, z, x1, z);
   }
 
   using moho::AdvanceGridTraversalEdge;
@@ -3229,7 +2992,7 @@ namespace moho
       if (res) {
         res->hitKind = 3;
       }
-      return PlaneIntersection(line, plane, reinterpret_cast<CGeomHitResult*>(res));
+      return PlaneIntersection(line, plane, static_cast<CGeomHitResult*>(res));
     }
 
     if (line.closest > -std::numeric_limits<float>::max()) {
@@ -3253,7 +3016,7 @@ namespace moho
       if (res) {
         res->hitKind = 3;
       }
-      return PlaneIntersection(line, plane, reinterpret_cast<CGeomHitResult*>(res));
+      return PlaneIntersection(line, plane, static_cast<CGeomHitResult*>(res));
     }
 
     if (res) {
@@ -3346,7 +3109,7 @@ namespace moho
     if (res) {
       res->hitKind = 3;
     }
-    return PlaneIntersection(line, plane, reinterpret_cast<CGeomHitResult*>(res));
+    return PlaneIntersection(line, plane, static_cast<CGeomHitResult*>(res));
   }
 
   /**

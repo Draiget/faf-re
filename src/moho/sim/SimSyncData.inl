@@ -40,7 +40,7 @@ void SSyncData::ReserveSizes(
  */
 void moho::SimSerializerLoadThunk(
   gpg::ReadArchive* archive,
-  std::intptr_t objectPtr,
+  void* objectPtr,
   int,
   gpg::RRef*
 )
@@ -49,7 +49,7 @@ void moho::SimSerializerLoadThunk(
     return;
   }
 
-  reinterpret_cast<Sim*>(objectPtr)->SerializeLoadBody(archive);
+  static_cast<Sim*>(objectPtr)->SerializeLoadBody(archive);
 }
 
 /**
@@ -64,7 +64,7 @@ void moho::SimSerializerLoadThunk(
  */
 void moho::SimSerializerSaveThunk(
   gpg::WriteArchive* archive,
-  std::intptr_t objectPtr,
+  void* objectPtr,
   int,
   gpg::RRef*
 )
@@ -73,7 +73,7 @@ void moho::SimSerializerSaveThunk(
     return;
   }
 
-  reinterpret_cast<Sim*>(objectPtr)->SerializeSaveBody(archive);
+  static_cast<Sim*>(objectPtr)->SerializeSaveBody(archive);
 }
 
 /**
@@ -332,7 +332,7 @@ void moho::SIM_DescribeStateForDesync(
     if (army == nullptr) {
       continue;
     }
-    const SEconTotals& economy = army->GetEconomy()->economy;
+    const SEconTotals& economy = army->GetEconomy()->mTotals;
     line(
       "  %d \"%s\" [%s]\n",
       army->mConstDat.mArmyIndex,

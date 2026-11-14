@@ -42,12 +42,12 @@ namespace
    */
   void LoadFastVectorSOCellPos(
     gpg::ReadArchive* archive,
-    std::intptr_t objectPtr,
+    void* objectPtr,
     int,
     gpg::RRef* ownerRef
   )
   {
-    auto* const storage = reinterpret_cast<void*>(objectPtr);
+    auto* const storage = objectPtr;
     GPG_ASSERT(archive != nullptr);
     GPG_ASSERT(storage != nullptr);
     if (!archive || !storage) {
@@ -77,12 +77,12 @@ namespace
    */
   void SaveFastVectorSOCellPos(
     gpg::WriteArchive* archive,
-    std::intptr_t objectPtr,
+    void* objectPtr,
     int,
     gpg::RRef* ownerRef
   )
   {
-    auto* const storage = reinterpret_cast<void*>(objectPtr);
+    auto* const storage = objectPtr;
     GPG_ASSERT(archive != nullptr);
     GPG_ASSERT(storage != nullptr);
     if (!archive || !storage) {

@@ -67,7 +67,7 @@ namespace
    */
   void LoadFastVectorCAniPoseBone(
     gpg::ReadArchive* const archive,
-    const std::intptr_t objectPtr,
+    void* const objectPtr,
     const int,
     gpg::RRef* const ownerRef
   )
@@ -80,7 +80,7 @@ namespace
     archive->ReadUInt(&count);
 
     // The array's own resize: on x64 an array of 11 bones is a block of SimBlockLane's size, freed as one.
-    auto& vec = *reinterpret_cast<moho::CAniPoseBoneArray*>(objectPtr);
+    auto& vec = *static_cast<moho::CAniPoseBoneArray*>(objectPtr);
     const moho::CAniPoseBone fill = MakeDefaultCAniPoseBone();
     vec.resize(static_cast<std::size_t>(count), fill);
 
@@ -103,7 +103,7 @@ namespace
    */
   void SaveFastVectorCAniPoseBone(
     gpg::WriteArchive* const archive,
-    const std::intptr_t objectPtr,
+    void* const objectPtr,
     const int,
     gpg::RRef* const ownerRef
   )
@@ -112,7 +112,7 @@ namespace
       return;
     }
 
-    auto& vec = *reinterpret_cast<gpg::core::FastVectorInline<moho::CAniPoseBone>*>(objectPtr);
+    auto& vec = *static_cast<gpg::core::FastVectorInline<moho::CAniPoseBone>*>(objectPtr);
     const unsigned int count = static_cast<unsigned int>(vec.size());
     archive->WriteUInt(count);
 

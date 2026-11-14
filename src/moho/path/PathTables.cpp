@@ -651,12 +651,12 @@ namespace moho
      */
     void PathQueueSerializerDeserialize(
       gpg::ReadArchive* const archive,
-      const std::intptr_t objectPtr,
+      void* const objectPtr,
       const int,
       gpg::RRef* const
     )
     {
-      reinterpret_cast<PathQueue*>(objectPtr)->MemberDeserialize(archive);
+      static_cast<PathQueue*>(objectPtr)->MemberDeserialize(archive);
     }
 
     /**
@@ -667,12 +667,12 @@ namespace moho
      */
     void PathQueueSerializerSerialize(
       gpg::WriteArchive* const archive,
-      const std::intptr_t objectPtr,
+      void* const objectPtr,
       const int,
       gpg::RRef* const
     )
     {
-      reinterpret_cast<const PathQueue*>(objectPtr)->MemberSerialize(archive);
+      static_cast<const PathQueue*>(objectPtr)->MemberSerialize(archive);
     }
 
     /**
@@ -935,12 +935,12 @@ namespace moho
      */
     void PathQueueImplSerializerDeserialize(
       gpg::ReadArchive* const archive,
-      const std::intptr_t objectPtr,
+      void* const objectPtr,
       const int,
       gpg::RRef* const
     )
     {
-      reinterpret_cast<PathQueue::Impl*>(objectPtr)->MemberDeserialize(archive);
+      static_cast<PathQueue::Impl*>(objectPtr)->MemberDeserialize(archive);
     }
 
     /**
@@ -952,12 +952,12 @@ namespace moho
      */
     void PathQueueImplSerializerSerialize(
       gpg::WriteArchive* const archive,
-      const std::intptr_t objectPtr,
+      void* const objectPtr,
       const int,
       gpg::RRef* const
     )
     {
-      reinterpret_cast<const PathQueue::Impl*>(objectPtr)->MemberSerialize(archive);
+      static_cast<const PathQueue::Impl*>(objectPtr)->MemberSerialize(archive);
     }
 
     /**
@@ -1904,7 +1904,6 @@ namespace moho
     for (std::size_t i = 0; i < kOccupationResultColumnCount; ++i) {
       outData.mRows[i] = static_cast<std::uint16_t>(rowMasks[i]);
     }
-    outData.mPad = 0u;
   }
 
   /**

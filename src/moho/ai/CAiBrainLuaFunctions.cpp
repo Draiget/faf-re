@@ -899,7 +899,7 @@ int moho::cfunc_CAiBrainSetResourceSharingL(
   CAiBrain* const brain = SCR_FromLua_CAiBrain(brainObject, state);
 
   const bool enableSharing = LuaPlus::LuaStackObject(state, 2).GetBoolean();
-  brain->mArmy->GetEconomy()->isResourceSharingEnabled = enableSharing ? 1u : 0u;
+  brain->mArmy->GetEconomy()->mResourceSharing = enableSharing ? 1u : 0u;
   return 0;
 }
 
@@ -1271,10 +1271,10 @@ int moho::cfunc_CAiBrainGiveResourceL(
   SEconPair valueToAdd{0.0f, 0.0f};
   SelectResourceLane(valueToAdd, resource) = amount;
 
-  CSimArmyEconomyInfo* const economyInfo = brain->mArmy->GetEconomy();
-  SEconPair& banked = economyInfo->mResources;
-  banked.ENERGY += valueToAdd.ENERGY;
-  banked.MASS += valueToAdd.MASS;
+  CEconomy* const economyInfo = brain->mArmy->GetEconomy();
+  SEconValue& banked = economyInfo->mResources;
+  banked.energy += valueToAdd.ENERGY;
+  banked.mass += valueToAdd.MASS;
   return 0;
 }
 
@@ -1345,8 +1345,8 @@ int moho::cfunc_CAiBrainGiveStorageL(
   SEconPair newStorage{0.0f, 0.0f};
   SelectResourceLane(newStorage, resource) = amount;
 
-  CSimArmyEconomyInfo* const economyInfo = brain->mArmy->GetEconomy();
-  CEconStorage* const extraStorage = economyInfo->storageDelta;
+  CEconomy* const economyInfo = brain->mArmy->GetEconomy();
+  CEconStorage* const extraStorage = economyInfo->mExtraStorage.get();
   (void)extraStorage->Chng(-1);
   extraStorage->mAmt.energy = newStorage.ENERGY;
   extraStorage->mAmt.mass = newStorage.MASS;
@@ -1421,8 +1421,8 @@ int moho::cfunc_CAiBrainTakeResourceL(
   SEconPair request{0.0f, 0.0f};
   SelectResourceLane(request, resource) = amount;
 
-  CSimArmyEconomyInfo* const economyInfo = brain->mArmy->GetEconomy();
-  SEconPair& stored = economyInfo->economy.mStored;
+  CEconomy* const economyInfo = brain->mArmy->GetEconomy();
+  SEconPair& stored = economyInfo->mTotals.mStored;
 
   // Spelled as `request > stored ? stored : request`, not the equivalent-looking
   // `request <= stored ? request : stored`. The two differ on exactly one input:

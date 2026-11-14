@@ -77,8 +77,7 @@ namespace
       dynamicType && gpg::RTypeOf<moho::Entity>() &&
       dynamicType->IsDerivedFrom(gpg::RTypeOf<moho::Entity>(), &baseOffset)
     ) {
-      out.mObj =
-        reinterpret_cast<void*>(reinterpret_cast<std::uintptr_t>(entity) - static_cast<std::uintptr_t>(baseOffset));
+      out.mObj = gpg::CompleteObject(entity, baseOffset);
       out.mType = dynamicType;
       return out;
     }
@@ -136,12 +135,12 @@ namespace
    */
   void LoadWeakPtrEntity(
     gpg::ReadArchive* archive,
-    std::intptr_t objectPtr,
+    void* objectPtr,
     int,
     gpg::RRef* ownerRef
   )
   {
-    auto* const weak = reinterpret_cast<WeakPtrEntity*>(objectPtr);
+    auto* const weak = static_cast<WeakPtrEntity*>(objectPtr);
     if (!archive || !weak) {
       return;
     }
@@ -155,12 +154,12 @@ namespace
    */
   void SaveWeakPtrEntity(
     gpg::WriteArchive* archive,
-    std::intptr_t objectPtr,
+    void* objectPtr,
     int,
     gpg::RRef* ownerRef
   )
   {
-    auto* const weak = reinterpret_cast<WeakPtrEntity*>(objectPtr);
+    auto* const weak = static_cast<WeakPtrEntity*>(objectPtr);
     if (!archive || !weak) {
       return;
     }
@@ -174,12 +173,12 @@ namespace
    */
   void LoadEntityPointerVector(
     gpg::ReadArchive* archive,
-    std::intptr_t objectPtr,
+    void* objectPtr,
     int,
     gpg::RRef* ownerRef
   )
   {
-    auto* const storage = reinterpret_cast<EntityPtrVector*>(objectPtr);
+    auto* const storage = static_cast<EntityPtrVector*>(objectPtr);
     if (!archive || !storage) {
       return;
     }
@@ -212,12 +211,12 @@ namespace
    */
   void SaveEntityPointerVector(
     gpg::WriteArchive* archive,
-    std::intptr_t objectPtr,
+    void* objectPtr,
     int,
     gpg::RRef* ownerRef
   )
   {
-    auto* const storage = reinterpret_cast<const EntityPtrVector*>(objectPtr);
+    auto* const storage = static_cast<const EntityPtrVector*>(objectPtr);
     if (!archive || !storage) {
       return;
     }
@@ -241,7 +240,7 @@ namespace
    */
   void LoadFastVectorEntityPointer(
     gpg::ReadArchive* archive,
-    std::intptr_t objectPtr,
+    void* objectPtr,
     int,
     gpg::RRef* ownerRef
   )
@@ -250,7 +249,7 @@ namespace
       return;
     }
 
-    auto& vec = *reinterpret_cast<gpg::core::FastVectorInline<moho::Entity*>*>(objectPtr);
+    auto& vec = *static_cast<gpg::core::FastVectorInline<moho::Entity*>*>(objectPtr);
 
     unsigned int count = 0;
     archive->ReadUInt(&count);
@@ -289,68 +288,6 @@ namespace
   }
 
   /**
-   * Address: 0x00694020 (FUN_00694020)
-   *
-   * What it does:
-   * Reads one `fastvector<Entity*>` payload: deserializes count, resizes the
-   * runtime lane with null-fill, and loads each `Entity*` through
-   * `ReadArchive::ReadPointer_Entity`.
-   */
-  [[maybe_unused]] void LoadFastVectorEntityPointerLane1(
-    gpg::ReadArchive* const archive,
-    const std::intptr_t objectPtr,
-    const int,
-    gpg::RRef* const ownerRef
-  )
-  {
-    if (!archive || objectPtr == 0) {
-      return;
-    }
-
-    auto& vec = *reinterpret_cast<gpg::core::FastVectorInline<moho::Entity*>*>(objectPtr);
-
-    unsigned int count = 0;
-    archive->ReadUInt(&count);
-
-    moho::Entity* fill = nullptr;
-    vec.resize(count, fill);
-
-    const gpg::RRef emptyOwner{};
-    const gpg::RRef* const effectiveOwner = ownerRef ? ownerRef : &emptyOwner;
-    for (unsigned int i = 0; i < count; ++i) {
-      archive->ReadPointer(&vec[i], effectiveOwner);
-    }
-  }
-
-  /**
-   * Address: 0x00694080 (FUN_00694080)
-   *
-   * What it does:
-   * Writes one `fastvector<Entity*>` payload: emits count and serializes each
-   * lane as one unowned tracked pointer built by `RRef_Entity`.
-   */
-  [[maybe_unused]] void SaveFastVectorEntityPointerLane1(
-    gpg::WriteArchive* const archive,
-    const std::intptr_t objectPtr,
-    const int,
-    gpg::RRef* const ownerRef
-  )
-  {
-    (void)ownerRef;
-    if (!archive || objectPtr == 0) {
-      return;
-    }
-
-    const auto& vec = *reinterpret_cast<const gpg::fastvector<moho::Entity*>*>(objectPtr);
-    const unsigned int count = static_cast<unsigned int>(vec.size());
-    archive->WriteUInt(count);
-
-    for (unsigned int i = 0; i < count; ++i) {
-      archive->WritePointer<moho::Entity>(vec[i], gpg::TrackedPointerState::Unowned, gpg::RRef{});
-    }
-  }
-
-  /**
    * Alias of FUN_00694380 (non-canonical helper lane).
    *
    * What it does:
@@ -358,7 +295,7 @@ namespace
    */
   void SaveFastVectorEntityPointer(
     gpg::WriteArchive* archive,
-    std::intptr_t objectPtr,
+    void* objectPtr,
     int,
     gpg::RRef* ownerRef
   )
@@ -367,7 +304,7 @@ namespace
       return;
     }
 
-    const auto& vec = *reinterpret_cast<const gpg::fastvector<moho::Entity*>*>(objectPtr);
+    const auto& vec = *static_cast<const gpg::fastvector<moho::Entity*>*>(objectPtr);
 
     const unsigned int count = static_cast<unsigned int>(vec.size());
     archive->WriteUInt(count);
@@ -416,7 +353,7 @@ namespace moho
    */
   void WeakPtr_Entity::Deserialize(
     gpg::ReadArchive* const archive,
-    const std::intptr_t objectPtr,
+    void* const objectPtr,
     int,
     gpg::RRef* ownerRef
   )
@@ -429,7 +366,7 @@ namespace moho
    */
   void WeakPtr_Entity::Serialize(
     gpg::WriteArchive* const archive,
-    const std::intptr_t objectPtr,
+    void* const objectPtr,
     int,
     gpg::RRef* ownerRef
   )

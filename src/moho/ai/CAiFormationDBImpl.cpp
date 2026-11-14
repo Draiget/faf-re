@@ -48,7 +48,7 @@ namespace
       return out;
     }
 
-    out.mObj = reinterpret_cast<void*>(reinterpret_cast<std::uintptr_t>(sim) - static_cast<std::uintptr_t>(baseOffset));
+    out.mObj = gpg::CompleteObject(sim, baseOffset);
     out.mType = dynamicType;
     return out;
   }
@@ -126,40 +126,6 @@ namespace
     if (bucket < 0 || bucket >= kFormationBucketCount) {
       return 0;
     }
-    return bucket;
-  }
-
-  /**
-   * Orphan: no caller found anywhere in src, and this function has no
-   * `Address:` citation of its own (no evidence it corresponds to a distinct
-   * compiled function in the binary). The six real, address-cited
-   * `FORMATION_*` entry points below (`FORMATION_GetNumScripts`,
-   * `FORMATION_GetScriptName`, `FORMATION_GetScriptIndex`,
-   * `FORMATION_PickTravelFormation`, `FORMATION_PickBestFormation`,
-   * `FORMATION_RunScript`) each independently import `/lua/formations.lua`
-   * and resolve a bucket/table, but none matches this function's exact
-   * shape: they use `module.GetByName(...)`/`SCR_Import`, not
-   * `SCR_GetLuaTableField`, and each has its own distinct warning-message
-   * behavior on failure (`ResolveFormationBucket` fails silently). Redirecting
-   * any of them to call this instead would risk changing that
-   * binary-observed behavior without evidence, so none were touched.
-   */
-  [[maybe_unused]] [[nodiscard]] LuaPlus::LuaObject ResolveFormationBucket(
-    LuaPlus::LuaState* state,
-    const EFormationType formationType
-  )
-  {
-    LuaPlus::LuaObject module = SCR_ImportLuaModule(state, kFormationModulePath);
-    if (!module || !module.IsTable()) {
-      return {};
-    }
-
-    const char* const bucketName = kFormationBuckets[ToFormationBucketIndex(formationType)];
-    LuaPlus::LuaObject bucket = SCR_GetLuaTableField(state, module, bucketName);
-    if (!bucket.IsTable()) {
-      return {};
-    }
-
     return bucket;
   }
 

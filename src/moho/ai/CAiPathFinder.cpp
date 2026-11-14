@@ -89,46 +89,6 @@ namespace
   using PathCellVector = fa::vector<moho::HPathCell>;
 
   /**
-   * Address: 0x005A9890 (FUN_005A9890)
-   *
-   * What it does:
-   * Swaps two 32-bit payload lanes and returns the first lane pointer.
-   */
-  [[maybe_unused]] [[nodiscard]] std::uint32_t* SwapDwordPayloadLanes(
-    std::uint32_t* const lhs,
-    std::uint32_t* const rhs
-  ) noexcept
-  {
-    if (!lhs || !rhs) {
-      return lhs;
-    }
-
-    const std::uint32_t temp = *lhs;
-    *lhs = *rhs;
-    *rhs = temp;
-    return lhs;
-  }
-
-  /**
-   * Address: 0x005A9C90 (FUN_005A9C90)
-   *
-   * What it does:
-   * Clears one packed `HPathCell` lane to zero.
-   */
-  [[maybe_unused]] [[nodiscard]] moho::HPathCell* ClearPackedPathCell(
-    moho::HPathCell* const outCell
-  ) noexcept
-  {
-    if (!outCell) {
-      return nullptr;
-    }
-
-    outCell->x = 0u;
-    outCell->z = 0u;
-    return outCell;
-  }
-
-  /**
    * Address: 0x005A9CA0 (FUN_005A9CA0)
    *
    * What it does:
@@ -148,32 +108,6 @@ namespace
   }
 
   /**
-   * Address: 0x005A9CB0 (FUN_005A9CB0)
-   *
-   * What it does:
-   * Returns the first 16-bit lane from one packed path-cell payload.
-   */
-  [[maybe_unused]] [[nodiscard]] std::uint16_t ReadPackedPathCellLane0(
-    const moho::HPathCell* const cell
-  ) noexcept
-  {
-    return cell ? cell->x : 0u;
-  }
-
-  /**
-   * Address: 0x005A9CC0 (FUN_005A9CC0)
-   *
-   * What it does:
-   * Returns the second 16-bit lane from one packed path-cell payload.
-   */
-  [[maybe_unused]] [[nodiscard]] std::uint16_t ReadPackedPathCellLane1(
-    const moho::HPathCell* const cell
-  ) noexcept
-  {
-    return cell ? cell->z : 0u;
-  }
-
-  /**
    * Address: 0x005A9D20 (FUN_005A9D20)
    *
    * What it does:
@@ -184,27 +118,6 @@ namespace
   ) noexcept
   {
     return unit ? unit->mVarDat.mUsingAltFootprint : 0u;
-  }
-
-  /**
-   * Address: 0x005AA100 (FUN_005AA100)
-   *
-   * What it does:
-   * Writes one anchor-cell `(x, z)` word pair into a path-finder instance.
-   */
-  [[maybe_unused]] [[nodiscard]] moho::CAiPathFinder* SetPathFinderAnchorCellWords(
-    moho::CAiPathFinder* const pathFinder,
-    const std::uint16_t lane0,
-    const std::uint16_t lane1
-  ) noexcept
-  {
-    if (!pathFinder) {
-      return nullptr;
-    }
-
-    pathFinder->mAnchorCell.x = lane0;
-    pathFinder->mAnchorCell.z = lane1;
-    return pathFinder;
   }
 
   /**
@@ -256,19 +169,6 @@ namespace
 
     pathFinder->mUseGoalBoundaryProbe = enabled;
     return pathFinder;
-  }
-
-  /**
-   * Address: 0x005AD220 (FUN_005AD220)
-   *
-   * What it does:
-   * Returns the path-finder owner unit pointer lane.
-   */
-  [[maybe_unused]] [[nodiscard]] moho::Unit* ReadPathFinderOwnerUnit(
-    moho::CAiPathFinder* const pathFinder
-  ) noexcept
-  {
-    return pathFinder ? pathFinder->mUnit : nullptr;
   }
 
   gpg::RType* gBroadcasterNavPathType = nullptr;
@@ -386,8 +286,7 @@ namespace
       return out;
     }
 
-    out.mObj =
-      reinterpret_cast<void*>(reinterpret_cast<std::uintptr_t>(object) - static_cast<std::uintptr_t>(baseOffset));
+    out.mObj = gpg::CompleteObject(object, baseOffset);
     out.mType = dynamicType;
     return out;
   }

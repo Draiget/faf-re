@@ -136,32 +136,6 @@ namespace
     return ScaClipHeader(*ref);
   }
 
-  /**
-   * Address: 0x0063EFB0 (FUN_0063EFB0)
-   *
-   * What it does:
-   * Returns animation clip bone-track count from one resource payload lane.
-   */
-  [[maybe_unused]] [[nodiscard]] std::uint32_t ReadAnimationClipBoneTrackCount(
-    const moho::RScaResource* const resource
-  ) noexcept
-  {
-    return ScaClipHeader(*resource)->mBoneTrackCount;
-  }
-
-  /**
-   * Address: 0x0063EFC0 (FUN_0063EFC0)
-   *
-   * What it does:
-   * Returns animation clip frame count from one resource payload lane.
-   */
-  [[maybe_unused]] [[nodiscard]] std::uint32_t ReadAnimationClipFrameCount(
-    const moho::RScaResource* const resource
-  ) noexcept
-  {
-    return ScaClipHeader(*resource)->mFrameCount;
-  }
-
   [[noreturn]] void RaiseLuaErrorWithMessage(
     lua_State* const rawState,
     const char* const message
@@ -222,44 +196,6 @@ namespace
     }
 
     return boneIndex;
-  }
-
-  /**
-   * Address: 0x00642820 (FUN_00642820)
-   *
-   * What it does:
-   * Upcasts one reflected reference lane to `moho::CAnimationManipulator*`.
-   */
-  [[maybe_unused]] [[nodiscard]] void* TryUpcastCAnimationManipulatorRefObject(
-    gpg::RRef* const sourceRef
-  )
-  {
-    if (!sourceRef) {
-      return nullptr;
-    }
-
-    const gpg::RRef upcast = gpg::REF_UpcastPtr(
-      *sourceRef, gpg::CachedLookup<moho::CAnimationManipulator>(moho::CAnimationManipulator::sType)
-    );
-    return upcast.mObj;
-  }
-
-  /**
-   * Address: 0x006422B0 (FUN_006422B0)
-   *
-   * What it does:
-   * Copies one packed vector<bool>-cursor lane, advances it by `bitDelta`,
-   * then stores the advanced `{word,bit}` pair in caller output storage.
-   */
-  [[maybe_unused]] fa::detail::vector_bool_word_cursor* AdvanceVectorBoolCursorPackedLane(
-    const fa::detail::vector_bool_word_cursor* const sourceCursor,
-    fa::detail::vector_bool_word_cursor* const destinationCursor,
-    const int bitDelta
-  )
-  {
-    *destinationCursor = *sourceCursor;
-    (void)fa::detail::AdvanceCursorBits(destinationCursor, bitDelta);
-    return destinationCursor;
   }
 
   /**
@@ -1354,12 +1290,7 @@ namespace moho
           keyTransform.pos_.y = key0.position[1] + (key1.position[1] - key0.position[1]) * frac;
           keyTransform.pos_.z = key0.position[2] + (key1.position[2] - key0.position[2]) * frac;
           Wm3::Quatf blended{};
-          (void)QuatLERP(
-            reinterpret_cast<const Wm3::Quatf*>(key1.rotation),
-            reinterpret_cast<const Wm3::Quatf*>(key0.rotation),
-            &blended,
-            frac
-          );
+          (void)QuatLERP(&key1.rotation, &key0.rotation, &blended, frac);
           keyTransform.orient_ = blended;
         } else {
           // Raw SCA key floats (on-disk float arrays) loaded into the math types.

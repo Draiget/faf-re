@@ -671,12 +671,12 @@ namespace
    */
   void DeserializeCUnitRepairTaskSerializerCallback(
     gpg::ReadArchive* const archive,
-    const std::intptr_t objectPtr,
+    void* const objectPtr,
     const int,
     gpg::RRef* const
   )
   {
-    auto* const task = reinterpret_cast<moho::CUnitRepairTask*>(objectPtr);
+    auto* const task = static_cast<moho::CUnitRepairTask*>(objectPtr);
     if (task == nullptr) {
       return;
     }
@@ -694,12 +694,12 @@ namespace
    */
   void SerializeCUnitRepairTaskSerializerCallback(
     gpg::WriteArchive* const archive,
-    const std::intptr_t objectPtr,
+    void* const objectPtr,
     const int,
     gpg::RRef* const
   )
   {
-    auto* const task = reinterpret_cast<const moho::CUnitRepairTask*>(objectPtr);
+    auto* const task = static_cast<const moho::CUnitRepairTask*>(objectPtr);
     if (task == nullptr) {
       return;
     }

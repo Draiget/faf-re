@@ -17,7 +17,6 @@
 #include "moho/sim/CArmyStats.h"
 #include "moho/console/CConCommand.h"
 #include "moho/sim/CEconStorage.h"
-#include "moho/sim/CSimArmyEconomyInfo.h"
 #include "moho/sim/Sim.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
@@ -112,7 +111,8 @@ namespace
     moho::TDatListItem<void, void>* const node
   ) noexcept
   {
-    return reinterpret_cast<moho::CEconRequest*>(node);
+    // `CEconRequest::mNode` (+0x00) is the link `mConsumptionData` threads.
+    return moho::TDatListItem<void, void>::owner_from_member_node<moho::CEconRequest, &moho::CEconRequest::mNode>(node);
   }
 } // namespace
 
@@ -293,14 +293,13 @@ namespace moho
     }
 
     /// `SimArmy::GetEconomy()` (vtable slot 9, `call [eax+24h]` at 0x00772135
-    /// and 0x0077218F) hands the army's `CEconomy` out under the older
-    /// `CSimArmyEconomyInfo` description of the same 0x60-byte object, which
-    /// `CArmyImpl`'s constructor allocates as a `CEconomy`.
+    /// and 0x0077218F) hands out the `CEconomy` that `CArmyImpl`'s constructor
+    /// allocates.
     [[nodiscard]] CEconomy* EconomyOf(
       CArmyImpl& army
     )
     {
-      return reinterpret_cast<CEconomy*>(army.GetEconomy());
+      return army.GetEconomy();
     }
 
     /// True while either lane of `economy` stores less than its cap: the test

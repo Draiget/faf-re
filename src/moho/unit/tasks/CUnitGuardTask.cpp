@@ -112,22 +112,22 @@ namespace
 
   void DeserializeCUnitGuardTaskSerializerCallback(
     gpg::ReadArchive* const archive,
-    const std::intptr_t objectPtr,
+    void* const objectPtr,
     const int,
     gpg::RRef*
   )
   {
-    reinterpret_cast<moho::CUnitGuardTask*>(objectPtr)->MemberDeserialize(archive);
+    static_cast<moho::CUnitGuardTask*>(objectPtr)->MemberDeserialize(archive);
   }
 
   void SerializeCUnitGuardTaskSerializerCallback(
     gpg::WriteArchive* const archive,
-    const std::intptr_t objectPtr,
+    void* const objectPtr,
     const int,
     gpg::RRef*
   )
   {
-    reinterpret_cast<const moho::CUnitGuardTask*>(objectPtr)->MemberSerialize(archive);
+    static_cast<const moho::CUnitGuardTask*>(objectPtr)->MemberSerialize(archive);
   }
 
   CUnitGuardTaskSerializerHelper::CUnitGuardTaskSerializerHelper()
@@ -153,26 +153,6 @@ namespace
 namespace
 {
   constexpr std::uint64_t kUnitStateMoveAbortMask = 0x80000000ull;
-
-  /**
-   * Address: 0x00610E60 (FUN_00610E60)
-   *
-   * What it does:
-   * Stores one primary-command weak-owner link-slot lane from a guard task.
-   */
-  [[maybe_unused]] [[nodiscard]] std::uint32_t* StoreGuardTaskPrimaryCommandOwnerLinkSlot(
-    std::uint32_t* const outWord,
-    const moho::CUnitGuardTask* const guardTask
-  ) noexcept
-  {
-    if (outWord == nullptr || guardTask == nullptr) {
-      return outWord;
-    }
-
-    *outWord =
-      static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(guardTask->mPrimaryCommandRef.ownerLinkSlot));
-    return outWord;
-  }
 
   [[nodiscard]] const moho::RUnitBlueprint* ResolveUnitBlueprintFromCommand(
     const moho::CUnitCommand* const command

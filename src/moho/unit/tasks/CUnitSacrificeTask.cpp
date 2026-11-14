@@ -432,52 +432,6 @@ namespace moho
 namespace
 {
 
-  /**
-   * Address: 0x005FB0D0 (FUN_005FB0D0, Moho::CUnitSacrificeTaskSerializer::Deserialize)
-   *
-   * What it does:
-   * Reflection load-callback facade for `CUnitSacrificeTask`. Forwards the
-   * reflected object pointer to `CUnitSacrificeTask::MemberDeserialize`
-   * (FUN_005FF2C0 body); `version` and the owner-ref lane are unused by the
-   * member (mirrors the binary tail call).
-   */
-  [[maybe_unused]] void DeserializeCUnitSacrificeTaskSerializerCallback(
-    gpg::ReadArchive* const archive,
-    const std::intptr_t objectPtr,
-    const int,
-    gpg::RRef* const
-  )
-  {
-    auto* const task = reinterpret_cast<moho::CUnitSacrificeTask*>(objectPtr);
-    if (task == nullptr) {
-      return;
-    }
-    task->MemberDeserialize(archive);
-  }
-
-  /**
-   * Address: 0x005FB0E0 (FUN_005FB0E0, Moho::CUnitSacrificeTaskSerializer::Serialize)
-   *
-   * What it does:
-   * Reflection save-callback facade for `CUnitSacrificeTask`. Forwards the
-   * reflected object pointer to `CUnitSacrificeTask::MemberSerialize`
-   * (FUN_005FF360 body); `version` and the owner-ref lane are unused by the
-   * member (mirrors the binary tail call).
-   */
-  [[maybe_unused]] void SerializeCUnitSacrificeTaskSerializerCallback(
-    gpg::WriteArchive* const archive,
-    const std::intptr_t objectPtr,
-    const int,
-    gpg::RRef* const
-  )
-  {
-    auto* const task = reinterpret_cast<const moho::CUnitSacrificeTask*>(objectPtr);
-    if (task == nullptr) {
-      return;
-    }
-    task->MemberSerialize(archive);
-  }
-
 } // namespace
 
 namespace moho

@@ -69,61 +69,6 @@ namespace
   }
 
   /**
-   * Address: 0x00527680 (FUN_00527680, Moho::RUnitBlueprintWeapon::operator=)
-   *
-   * IDA signature:
-   * int __usercall sub_527680@<eax>(int a1@<eax>, int a2@<esi>);
-   *
-   * What it does:
-   * Per-field copy-assignment body for one 0x184-byte
-   * `Moho::RUnitBlueprintWeapon` element. Copies the owner pointer and weapon
-   * index, then string-assigns each of the five embedded `fa::string`
-   * lanes (`Label`, `DisplayName`, `DamageType`, `TargetRestrictOnlyAllow`,
-   * `TargetRestrictDisallow`, `UIMinRangeVisualId`, `UIMaxRangeVisualId`) and
-   * mirrors the scalar/flag/float gameplay-field block.
-   *
-   * Per-T named free helper: the canonical bind site for the engine-instantiated
-   * `RUnitBlueprintWeapon::operator=` body. Callers must invoke this helper by
-   * explicit name (not inline `*dst = *src` syntax) so the linker keeps the
-   * out-of-line symbol matching the binary address.
-   */
-  moho::RUnitBlueprintWeapon& CopyAssignRUnitBlueprintWeapon(
-    moho::RUnitBlueprintWeapon& destination,
-    const moho::RUnitBlueprintWeapon& source
-  )
-  {
-    destination = source;
-    return destination;
-  }
-
-  /**
-   * Address: 0x00526170 (FUN_00526170)
-   *
-   * What it does:
-   * Copy-assigns one contiguous `RUnitBlueprintWeapon` destination range from
-   * source lanes and returns the advanced source cursor. Routes each per-element
-   * copy through `CopyAssignRUnitBlueprintWeapon` (FUN_00527680) by name so the
-   * out-of-line copy-assignment symbol stays bound.
-   */
-  [[maybe_unused]] const moho::RUnitBlueprintWeapon* CopyAssignUnitBlueprintWeaponRange(
-    moho::RUnitBlueprintWeapon* destinationBegin,
-    moho::RUnitBlueprintWeapon* destinationEnd,
-    const moho::RUnitBlueprintWeapon* sourceBegin
-  )
-  {
-    moho::RUnitBlueprintWeapon* destinationCursor = destinationBegin;
-    const moho::RUnitBlueprintWeapon* sourceCursor = sourceBegin;
-
-    while (destinationCursor != destinationEnd) {
-      (void)CopyAssignRUnitBlueprintWeapon(*destinationCursor, *sourceCursor);
-      ++destinationCursor;
-      ++sourceCursor;
-    }
-
-    return sourceCursor;
-  }
-
-  /**
    * Address: 0x00524620 (FUN_00524620)
    *
    * What it does:
@@ -319,7 +264,7 @@ void gpg::RVectorType_RUnitBlueprintWeapon::Init()
  */
 void gpg::RVectorType_RUnitBlueprintWeapon::SerLoad(
   gpg::ReadArchive* const archive,
-  const std::intptr_t objectPtr,
+  void* const objectPtr,
   const int,
   gpg::RRef* const
 )
@@ -328,7 +273,7 @@ void gpg::RVectorType_RUnitBlueprintWeapon::SerLoad(
     return;
   }
 
-  auto* const storage = reinterpret_cast<WeaponVector*>(objectPtr);
+  auto* const storage = static_cast<WeaponVector*>(objectPtr);
   unsigned int count = 0u;
   archive->ReadUInt(&count);
 
@@ -363,7 +308,7 @@ void gpg::RVectorType_RUnitBlueprintWeapon::SerLoad(
  */
 void gpg::RVectorType_RUnitBlueprintWeapon::SerSave(
   gpg::WriteArchive* const archive,
-  const std::intptr_t objectPtr,
+  void* const objectPtr,
   const int,
   gpg::RRef* const ownerRef
 )
@@ -372,7 +317,7 @@ void gpg::RVectorType_RUnitBlueprintWeapon::SerSave(
     return;
   }
 
-  const auto* const storage = reinterpret_cast<const WeaponVector*>(objectPtr);
+  const auto* const storage = static_cast<const WeaponVector*>(objectPtr);
   const unsigned int count = storage ? static_cast<unsigned int>(storage->size()) : 0u;
   archive->WriteUInt(count);
 

@@ -549,7 +549,7 @@ namespace
       return;
     }
 
-    const gpg::Rect2i ogridRect = GetReservedOgridRect(unit);
+    const gpg::Rect2i ogridRect = unit.mReservedOgridRect;
     if (occupied) {
       unit.SimulationRef->mOGrid->OccupyRect(ogridRect);
     } else {
@@ -813,104 +813,6 @@ namespace
       Finish();
     }
   };
-
-  /**
-   * Address: 0x0055C160 (FUN_0055C160, Moho::UnitWeaponInfoSerializer::Deserialize)
-   *
-   * What it does:
-   * Reflection load-callback facade for `UnitWeaponInfo`. Forwards the
-   * reflected object pointer to `UnitWeaponInfo::MemberDeserialize`; `version`
-   * and the owner-ref lane are unused by the member (mirrors the binary tail
-   * call).
-   */
-  [[maybe_unused]] void DeserializeUnitWeaponInfoSerializerCallback(
-    gpg::ReadArchive* const archive,
-    const std::intptr_t objectPtr,
-    const int,
-    gpg::RRef* const
-  )
-  {
-    auto* const info = reinterpret_cast<moho::UnitWeaponInfo*>(objectPtr);
-    if (info == nullptr) {
-      return;
-    }
-    info->MemberDeserialize(archive);
-  }
-
-  /**
-   * Address: 0x0055C170 (FUN_0055C170, Moho::UnitWeaponInfoSerializer::Serialize)
-   *
-   * What it does:
-   * Reflection save-callback facade for `UnitWeaponInfo`. Forwards the
-   * reflected object pointer to `UnitWeaponInfo::MemberSerialize`; `version`
-   * and the owner-ref lane are unused by the member (mirrors the binary tail
-   * call).
-   */
-  [[maybe_unused]] void SerializeUnitWeaponInfoSerializerCallback(
-    gpg::WriteArchive* const archive,
-    const std::intptr_t objectPtr,
-    const int,
-    gpg::RRef* const
-  )
-  {
-    auto* const info = reinterpret_cast<moho::UnitWeaponInfo*>(objectPtr);
-    if (info == nullptr) {
-      return;
-    }
-    info->MemberSerialize(archive);
-  }
-
-  /**
-   * Address: 0x0055C760 (FUN_0055C760, Moho::SSTIUnitVariableDataSerializer::Deserialize)
-   *
-   * IDA signature:
-   * int sub_55C760(); // elided tail-jump: return sub_55E030();
-   *
-   * What it does:
-   * Reflection load-callback facade for `SSTIUnitVariableData`. Forwards the
-   * reflected object pointer to the class member load body; `version` and the
-   * owner-ref lane are unused by the member (mirrors the binary tail-jump into
-   * FUN_0055E030).
-   */
-  [[maybe_unused]] void SSTIUnitVariableDataSerializerDeserialize(
-    gpg::ReadArchive* const archive,
-    const std::intptr_t objectPtr,
-    const int,
-    gpg::RRef* const
-  )
-  {
-    auto* const data = reinterpret_cast<moho::SSTIUnitVariableData*>(objectPtr);
-    if (data == nullptr) {
-      return;
-    }
-    data->MemberDeserialize(archive);
-  }
-
-  /**
-   * Address: 0x0055C770 (FUN_0055C770, Moho::SSTIUnitVariableDataSerializer::Serialize)
-   *
-   * IDA signature:
-   * int sub_55C770(); // elided tail-jump: return sub_55E420();
-   *
-   * What it does:
-   * Reflection save-callback facade for `SSTIUnitVariableData`. Forwards the
-   * reflected object pointer to the class member save body; `version` and the
-   * owner-ref lane are unused by the member (mirrors the binary tail-jump into
-   * FUN_0055E420).
-   */
-  [[maybe_unused]] void SSTIUnitVariableDataSerializerSerialize(
-    gpg::WriteArchive* const archive,
-    const std::intptr_t objectPtr,
-    const int,
-    gpg::RRef* const
-  )
-  {
-    auto* const data = reinterpret_cast<moho::SSTIUnitVariableData*>(objectPtr);
-    if (data == nullptr) {
-      return;
-    }
-    data->MemberSerialize(archive);
-  }
 }
 
 namespace moho

@@ -43,8 +43,6 @@ namespace moho
   // Opaque cross-TU handle to the runtime user command-issue helper / command-graph
   // anchor-history object (same binary object surfaced under two names). Used only as
   // an incomplete pointer by the IssueDockCommand worker.
-  struct QueuedUserCommandRecord;
-  struct UserCommand;
   class UserUnitWeapon;
   class IUnit;
   class CWldSession;
@@ -426,9 +424,11 @@ namespace moho
      * Demangled: moho::UserUnit::GetCustomName
      *
      * What it does:
-     * Returns the in-object custom-name storage anchor at offset +0x1DC.
+     * Returns the unit's custom-name string (`lea eax, [ecx+1DCh]`): callers
+     * read it as an `fa::string` (size at +0x14, SSO buffer or heap pointer
+     * off +0x04 in 0x0085E0A0 and in `UI_ShowRenameDialog` 0x00835830).
      */
-    virtual char* GetCustomName();
+    virtual const fa::string& GetCustomName();
 
     /**
      * Address: 0x008BF060 (FUN_008BF060)
@@ -1111,7 +1111,7 @@ namespace moho
     const SCoordsVec2& buildPosition,
     bool allowCommandOverlap,
     SOccupationResult* buildInfo,
-    const UserCommand* ignoredCommand
+    const UserCommandIssueHelper* ignoredCommand
   );
 
   /**
@@ -1183,10 +1183,11 @@ namespace moho
   /**
    * Bridge for the recovered `cfunc_IssueDockCommandL` worker: resolves one
    * unit's most recent queued command-issue helper (via `GetCommandQueue` +
-   * FUN_008B7320) as an opaque cross-TU anchor-history handle, or `nullptr` when
-   * the unit has no queued command.
+   * FUN_008B7320), or `nullptr` when the unit has no queued command. The
+   * binary's name for the helper type is `Moho::UserCommand`
+   * (`?ISSUE_DecreaseCommandCount@Moho@@YAXPAVUserCommand@1@H@Z`, 0x008B0EB0).
    */
-  [[nodiscard]] const QueuedUserCommandRecord* GetLastQueuedUserCommandAnchor(const UserUnit* unit) noexcept;
+  [[nodiscard]] const UserCommandIssueHelper* GetLastQueuedUserCommandAnchor(const UserUnit* unit) noexcept;
 
   /**
    * Address: 0x008C2010 (FUN_008C2010, cfunc_UserUnitCanAttackTarget)

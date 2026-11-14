@@ -162,24 +162,6 @@ void fa::string::tidy(
   bx.buf[newSize] = '\0';
 }
 
-/**
- * Address: 0x006582E0 (FUN_006582E0)
- *
- * What it does:
- * Resets each legacy string in `[begin, end)` to empty SSO state and releases
- * heap-backed buffers when present.
- */
-[[maybe_unused]] static void ResetStringRange(
-  fa::string* begin,
-  fa::string* end
-) noexcept
-{
-  while (begin != end) {
-    begin->tidy(true, 0U);
-    ++begin;
-  }
-}
-
 void fa::string::assign_owned(
   const std::string_view value
 )

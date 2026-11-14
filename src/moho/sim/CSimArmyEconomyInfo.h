@@ -74,56 +74,14 @@ namespace moho
     [[nodiscard]] double MaxStorageOf(EEconResource resource) const noexcept;
   };
 
-  /**
-   * Per-army economy state.
-   *
-   * This models the same binary object as `moho::CEconomy` (`moho/sim/CEconomy.h`)
-   * - `CArmyImpl` allocates a `CEconomy` and hands it out through
-   * `GetEconomy()` as a `CSimArmyEconomyInfo*` (`CArmyImpl.cpp:1445`). The two
-   * declarations agree field for field; keep them in step until one can be made
-   * a thin alias of the other.
-   */
-  class CSimArmyEconomyInfo
-  {
-  public:
-    Sim* mSim;           // +0x00 (CEconomy::mSim)
-    std::int32_t mIndex; // +0x04 (CEconomy::mIndex)
-    /// Resources banked this tick. `Unit::HandleResourceManagement` adds each
-    /// producing unit's per-tick output here and to `mPendingResources`.
-    SEconPair mResources;                  // +0x08 (CEconomy::mResources)
-    SEconPair mPendingResources;           // +0x10 (CEconomy::mPendingResources)
-    SEconTotals economy;                   // +0x18
-    CEconStorage* storageDelta;            // +0x50
-    std::uint8_t isResourceSharingEnabled; // +0x54
-    std::uint8_t _pad_55[3];
-    IntrusiveNode registrationNode; // +0x58
-  };
+  // The per-army economy object itself is `moho::CEconomy` (moho/sim/CEconomy.h):
+  // `CArmyImpl` allocates one (ctor 0x00771880) and `GetEconomy()` (0x006FDCB0)
+  // returns it. This header used to carry a second, field-for-field copy of
+  // it named `CSimArmyEconomyInfo`; the binary has only the one type.
 
   static_assert(sizeof(IntrusiveNode) == 0x8, "IntrusiveNode size must be 0x8");
   static_assert(sizeof(SEconPair) == 0x8, "SEconPair size must be 0x8");
   static_assert(sizeof(SEconStoragePair) == 0x10, "SEconStoragePair size must be 0x10");
   static_assert(offsetof(SEconTotals, mMaxStorage) == 0x28, "SEconTotals::mMaxStorage offset must be 0x28");
   static_assert(sizeof(SEconTotals) == 0x38, "SEconTotals size must be 0x38");
-  static_assert(
-    offsetof(CSimArmyEconomyInfo, mResources) == 0x08,
-    "CSimArmyEconomyInfo::mResources offset must be 0x08"
-  );
-  static_assert(
-    offsetof(CSimArmyEconomyInfo, mPendingResources) == 0x10,
-    "CSimArmyEconomyInfo::mPendingResources offset must be 0x10"
-  );
-  static_assert(offsetof(CSimArmyEconomyInfo, economy) == 0x18, "CSimArmyEconomyInfo::economy offset must be 0x18");
-  static_assert(
-    offsetof(CSimArmyEconomyInfo, storageDelta) == 0x50,
-    "CSimArmyEconomyInfo::storageDelta offset must be 0x50"
-  );
-  static_assert(
-    offsetof(CSimArmyEconomyInfo, isResourceSharingEnabled) == 0x54,
-    "CSimArmyEconomyInfo::isResourceSharingEnabled offset must be 0x54"
-  );
-  static_assert(
-    offsetof(CSimArmyEconomyInfo, registrationNode) == 0x58,
-    "CSimArmyEconomyInfo::registrationNode offset must be 0x58"
-  );
-  static_assert(sizeof(CSimArmyEconomyInfo) == 0x60, "CSimArmyEconomyInfo size must be 0x60");
 } // namespace moho

@@ -788,7 +788,7 @@ extern "C" void freeobj(
     // single allocation from then on. Must mirror the allocation in
     // `luaS_newudata` exactly.
     const auto* const ud = reinterpret_cast<const Udata*>(object);
-    const auto* const type = reinterpret_cast<const gpg::RType*>(ud->len);
+    const auto* const type = ud->type;
     (void)luaM_reallocblock(state, object, sizeudata(type), {0u, 0u});
     break;
   }

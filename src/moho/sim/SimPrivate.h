@@ -142,7 +142,7 @@
 #include "moho/sim/SOCellPos.h"
 #include "moho/sim/EAllianceTypeInfo.h"
 #include "moho/sim/CEconStorage.h"
-#include "moho/sim/CSimArmyEconomyInfo.h"
+#include "moho/sim/CEconomy.h"
 #include "moho/sim/SPhysConstants.h"
 #include "moho/sim/PathPreviewFinder.h"
 #include "moho/sim/SpecialFileType.h"
@@ -275,17 +275,6 @@ namespace
   }
 
   static_assert(sizeof(CommandManager) == 0xCC0, "CommandManager size must be 0xCC0");
-
-  static_assert(
-    offsetof(SimSubRes3, mValue) == offsetof(BVIntSet, mFirstWordIndex),
-    "SimSubRes3/BVIntSet offset mismatch"
-  );
-  static_assert(
-    offsetof(SimSubRes3, mReserved04) == offsetof(BVIntSet, mReservedMetaWord),
-    "SimSubRes3/BVIntSet offset mismatch"
-  );
-  static_assert(offsetof(SimSubRes3, mValues) == offsetof(BVIntSet, mWords), "SimSubRes3/BVIntSet offset mismatch");
-  static_assert(sizeof(SimSubRes3) == sizeof(BVIntSet), "SimSubRes3/BVIntSet size mismatch");
 
   /**
    * Address: 0x006856C0 (FUN_006856C0, std::map_EntId_Entity::find)
@@ -463,7 +452,7 @@ namespace
 
     const EntityCategorySet* const categoryRange = sim->mRules->GetEntityCategory(categoryName);
     const EntityCategorySet* const categorySet =
-      categoryRange != nullptr ? reinterpret_cast<const EntityCategorySet*>(categoryRange) : nullptr;
+      categoryRange != nullptr ? static_cast<const EntityCategorySet*>(categoryRange) : nullptr;
     return categorySet != nullptr && EntityCategory::HasBlueprint(blueprint, categorySet);
   }
 
@@ -1126,7 +1115,7 @@ namespace
       return;
     }
 
-    const auto* const blueprint = reinterpret_cast<const RBlueprint*>(blueprintObject);
+    const auto* const blueprint = static_cast<const RBlueprint*>(blueprintObject);
     const auto ordinal = static_cast<std::uint32_t>(blueprint->mBlueprintOrdinal);
 
     for (RRuleGameRulesLuaExportBinding& binding : rules.mMaps) {
@@ -1193,7 +1182,7 @@ namespace
     RRuleGameRulesImpl* const rules
   )
   {
-    const RBlueprint* const blueprint = reinterpret_cast<const RBlueprint*>(blueprintObject);
+    const RBlueprint* const blueprint = static_cast<const RBlueprint*>(blueprintObject);
     if (!rules || !rules->mLuaState || !blueprint) {
       return;
     }

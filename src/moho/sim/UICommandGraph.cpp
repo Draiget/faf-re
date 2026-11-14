@@ -2100,12 +2100,8 @@ namespace moho
 
       Wm3::Vector3f endPos = subjectBridge->GetPosition();
       if (MAUI_KeyIsDown(MKEY_SHIFT)) {
-        // `GetLastQueuedUserCommandAnchor` and `ResolveCommandGraphAnchorWorldPosition`
-        // both ultimately view the same binary object (the unit's most
-        // recently queued command-issue helper) through different recovered
-        // type lanes - see the former's doc comment in UserUnit.cpp.
-        const auto* const anchorHelper =
-          reinterpret_cast<const UserCommandIssueHelper*>(GetLastQueuedUserCommandAnchor(subject));
+        // The unit's most recently queued command-issue helper.
+        const UserCommandIssueHelper* const anchorHelper = GetLastQueuedUserCommandAnchor(subject);
         if (anchorHelper != nullptr) {
           endPos = ResolveCommandGraphAnchorWorldPosition(const_cast<UserCommandIssueHelper&>(*anchorHelper));
         }
@@ -2582,7 +2578,7 @@ namespace moho
     for (UserUnit* const unit : *ResolveCommandIssueCursorEntities(*helper)) {
       const RUnitBlueprint* const blueprint = GetIUnitBridge(unit)->GetBlueprint();
 
-      if (assistingCategory.ContainsBit(blueprint->mCategoryBitIndex) && orderedBlueprint != nullptr) {
+      if (assistingCategory.ContainsBit(blueprint->mBlueprintOrdinal) && orderedBlueprint != nullptr) {
         // How much of the job is left is read off whatever this unit is
         // currently working on, and only while it is working on *this* order -
         // an engineer queued to help later must not shorten the estimate.
@@ -2867,7 +2863,7 @@ namespace moho
           break;
         }
       }
-      if (helper->mConstantData.cmd == graph.mSession->HighlightCommandId) {
+      if (helper->mConstantData.cmd == graph.mSession->mCursorInfo.mIsDragger) {
         anyHighlight = true;
         break;
       }
@@ -2939,7 +2935,7 @@ namespace moho
         }
       }
 
-      if (anyHighlight && helper->mConstantData.cmd == graph.mSession->HighlightCommandId) {
+      if (anyHighlight && helper->mConstantData.cmd == graph.mSession->mCursorInfo.mIsDragger) {
         anyHighlight = false;
       }
       LinkCommandGraphEdge(*currentNode, *previousNode, graph, anyHighlight);

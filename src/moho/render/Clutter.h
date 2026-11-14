@@ -8,9 +8,15 @@
 #include "Wm3AxisAlignedBox3.h"
 #include "legacy/containers/Vector.h"
 
+namespace fa
+{
+  struct string;
+}
+
 namespace moho
 {
   class CHeightField;
+  class MeshInstance;
   class MeshRenderer;
   struct GeomCamera3;
   struct RMeshBlueprint;
@@ -18,92 +24,38 @@ namespace moho
   struct ClutterRegion;
   class ClutterRegionKey;
 
-  struct ClutterPayloadVTable
-  {
-    void(__thiscall* destroy)(void* self, int deleteFlag);
-  };
-  static_assert(sizeof(ClutterPayloadVTable) == 0x4, "ClutterPayloadVTable size must be 0x4");
-
-  struct ClutterPayloadHeader
-  {
-    ClutterPayloadVTable* vtable; // +0x00
-  };
-  static_assert(sizeof(ClutterPayloadHeader) == 0x4, "ClutterPayloadHeader size must be 0x4");
-
-  struct ClutterSurfaceElementVTable
-  {
-    void(__thiscall* destroy)(void* self, int deleteFlag);
-  };
-  static_assert(sizeof(ClutterSurfaceElementVTable) == 0x4, "ClutterSurfaceElementVTable size must be 0x4");
-
+  /**
+   * `Moho::Clutter::Seed`: one weighted mesh choice of a terrain type's
+   * clutter. It is polymorphic: the binary destroys `Surface::mSeeds`
+   * elements through vtable slot 0 with flag 0 (0x007D7E00, 0x007D7EB0,
+   * 0x007D7920), the virtual-destructor call MSVC emits for `p->~Seed()`, and
+   * its copy-assign (0x007D94B0, in `fa::vector::erase`'s shift loop) copies
+   * the three fields and leaves the vptr, as any implicit copy-assign does.
+   *
+   * Address: 0x007D60C0 (FUN_007D60C0) - the destructor's vptr store, inlined
+   * where a local seed goes out of scope.
+   */
   struct ClutterSurfaceElement
   {
-    ClutterSurfaceElementVTable* vtable; // +0x00
-    float selectionWeight;               // +0x04
-    float uniformScale;                  // +0x08
-    RMeshBlueprint* meshBlueprint;       // +0x0C
+    ClutterSurfaceElement() = default;
 
     /**
-     * Address: 0x007D7E00 (FUN_007D7E00, inlined into the tail-destroy loop
-     * of `fa::vector<ClutterSurfaceElement>::erase(first,last)` --
-     * `legacy/containers/Vector.h`)
-     * Address: 0x007D7EB0 (FUN_007D7EB0, ??1Surface@Clutter@Moho@@QAE@@Z,
-     * inlined into `Surface::~Surface`'s own `mSeeds` teardown sweep, below)
-     * Address: 0x007D7920 (unnamed 22-byte register-convention fragment --
-     * see the `erase(first,last)` citation in `Vector.h` for detail)
+     * Address: 0x007D5FE0 (FUN_007D5FE0)
      *
      * What it does:
-     * Dispatches through the element's own "poisoned" vtable slot 0 with a
-     * delete-flag of 0 (`vtable->destroy(this, 0)`). No source line calls
-     * this by name at any of the addresses above -- each is the compiler
-     * inlining this one-statement method (and the destructor that forwards
-     * to it, below) at its own call site. Reduces to a runtime no-op: every
-     * live element's `vtable` is set exactly once, via
-     * `ResetClutterSeedVtable`, to `SeedVtableResetToken()`, and
-     * `SeedVtableResetTag`'s destructor is defaulted with the delete flag
-     * skipping `operator delete` -- but the call itself is real and is part
-     * of the type's actual destructor, so it must happen for binary-exact
-     * fidelity.
+     * Builds a seed from one `{weight, prop blueprint path}` entry of a
+     * terrain type's `Clutter.Seeds` table: looks the prop blueprint up in
+     * the active rules and takes its display scale and mesh blueprint.
      */
-    void DestroyInPlace();
+    ClutterSurfaceElement(float selectionWeight, const fa::string& meshBlueprintId);
 
-    /**
-     * The real destructor's body is exactly `DestroyInPlace()` above -- MSVC
-     * inlines a one-statement destructor at each call site rather than
-     * emitting a standalone symbol, so there is no separate address to cite
-     * here beyond the ones already on `DestroyInPlace()`. Declaring this as
-     * a real (non-trivial) destructor, instead of leaving the type
-     * implicitly trivial, is what makes `fa::vector<ClutterSurfaceElement>`'s
-     * existing, unmodified `destroy_range`/`erase`/`clear`/`tidy` machinery
-     * (`Vector.h`) emit the per-element call `FUN_007D7E00` and
-     * `FUN_007D7EB0` both show -- previously the struct was (wrongly)
-     * trivially destructible and that machinery's
-     * `if constexpr (!is_trivially_destructible_v<T>)` guard silently
-     * skipped the call.
-     */
-    ~ClutterSurfaceElement();
+    ClutterSurfaceElement(const ClutterSurfaceElement&) = default;
+    ClutterSurfaceElement& operator=(const ClutterSurfaceElement&) = default;
+    virtual ~ClutterSurfaceElement() = default;
 
-    /**
-     * Address: 0x007D94B0 (FUN_007D94B0, inlined into the tail-shift step of
-     * `fa::vector<ClutterSurfaceElement>::erase(first,last)` --
-     * `legacy/containers/Vector.h`)
-     *
-     * What it does:
-     * Copies the three payload fields (`selectionWeight`, `uniformScale`,
-     * `meshBlueprint`) from `rhs` and deliberately leaves `vtable`
-     * untouched. Every live element's `vtable` already holds the same
-     * `SeedVtableResetToken()` value (`ResetClutterSeedVtable` sets it once;
-     * it never changes for the life of the slot), so the original source
-     * skips re-copying it on every shift-assign during an erase. Declaring
-     * this explicitly (instead of leaving the implicit memberwise copy) is
-     * what makes `erase(first,last)`'s per-element
-     * `first[i] = std::move(last[i])` shift loop produce this exact 3-field
-     * copy instead of copying all four fields -- a user-declared destructor
-     * alone already routes `erase` into that loop (it makes the type
-     * non-trivially-copyable), but without this operator the loop would
-     * fall back to the implicit, all-4-field copy-assignment.
-     */
-    ClutterSurfaceElement& operator=(const ClutterSurfaceElement& rhs);
+    float selectionWeight = 0.0f;            // +0x04
+    float uniformScale = 1.0f;               // +0x08
+    RMeshBlueprint* meshBlueprint = nullptr; // +0x0C
   };
   static_assert(sizeof(ClutterSurfaceElement) == 0x10, "ClutterSurfaceElement size must be 0x10");
   static_assert(
@@ -140,22 +92,21 @@ namespace moho
      * Address: 0x007D5CF0 (FUN_007D5CF0, ??0Surface@Clutter@Moho@@QAE@@Z)
      *
      * What it does:
-     * Resets the vtable to the poison/reset token and zeroes `density`;
-     * `mSeeds` default-constructs itself (empty, no allocation).
+     * Zeroes `density`; `mSeeds` starts empty.
      */
-    ClutterSurfaceEntry();
+    ClutterSurfaceEntry() = default;
 
     /**
      * Address: 0x007D5D10 (FUN_007D5D10)
+     * Address: 0x007D7EB0 (FUN_007D7EB0, ??1Surface@Clutter@Moho@@QAE@@Z)
      *
      * What it does:
-     * Resets the vtable to the poison/reset token; `mSeeds` destroys its
-     * live elements and releases its buffer through its own destructor.
+     * `mSeeds` destroys its elements (each through its virtual destructor)
+     * and frees its buffer.
      */
-    ~ClutterSurfaceEntry();
+    virtual ~ClutterSurfaceEntry() = default;
 
-    void* vtable;                             // +0x00
-    std::int32_t density;                     // +0x04
+    std::int32_t density = 0;                 // +0x04
     fa::vector<ClutterSurfaceElement> mSeeds; // +0x08 (16 bytes: myProxy_/first_/last_/end_)
   };
   static_assert(sizeof(ClutterSurfaceEntry) == 0x18, "ClutterSurfaceEntry size must be 0x18");
@@ -167,7 +118,7 @@ namespace moho
   // 128-region pool blocks, `mList2` the recycle list, and each region's
   // `mMap` the payloads that region owns.
   using ClutterRegionList = fa::list<ClutterRegion*>;
-  using ClutterPayloadList = fa::list<void*>;
+  using ClutterPayloadList = fa::list<MeshInstance*>;
 
   /**
    * The region-key element of `Clutter::mKeys`. The vtable slot at +0x00 is a
@@ -229,27 +180,20 @@ namespace moho
   using ClutterRegionKeySet = fa::set<ClutterRegionKey, ClutterRegionKeyLess>;
   static_assert(sizeof(ClutterRegionKeySet) == 0x0C, "ClutterRegionKeySet size must be 0x0C");
 
-  struct ClutterRegionMapPayloadVTable
-  {
-    void(__thiscall* destroy)(void* self, int deleteFlag);
-  };
-  static_assert(sizeof(ClutterRegionMapPayloadVTable) == 0x4, "ClutterRegionMapPayloadVTable size must be 0x4");
-
-  struct ClutterRegionMapPayloadHeader
-  {
-    ClutterRegionMapPayloadVTable* vtable; // +0x00
-  };
-  static_assert(sizeof(ClutterRegionMapPayloadHeader) == 0x4, "ClutterRegionMapPayloadHeader size must be 0x4");
-
+  /**
+   * `Moho::Clutter::Region`. Polymorphic: its constructor and destructor
+   * store its vtable (0x00E3F04C) at +0x00, and `Clutter::Shutdown` frees the
+   * 128-region pool blocks with `delete[]` (vtable slot 0, flag 3, at
+   * 0x007D9400).
+   */
   struct ClutterRegion
   {
-    void* vtable;               // +0x00
     ClutterRegion* mNext;       // +0x04
     ClutterRegion* mPrev;       // +0x08
     std::int32_t mX;            // +0x0C
     std::int32_t mZ;            // +0x10
     Wm3::AxisAlignedBox3f mBox; // +0x14
-    ClutterPayloadList mMap;    // +0x2C
+    ClutterPayloadList mMap;    // +0x2C, the mesh instances this region owns
 
     /**
      * Address: 0x007D5EE0 (FUN_007D5EE0, ??0Region@Clutter@Moho@@QAE@@Z)
@@ -264,20 +208,18 @@ namespace moho
      * Address: 0x007D5F20 (FUN_007D5F20, ??1Region@Clutter@Moho@@QAE@@Z)
      *
      * What it does:
-     * Resets region runtime payload lanes, clears map-node list storage, then
-     * releases the map sentinel allocation.
+     * Resets the region (`ResetState`); `mMap` then frees its nodes.
      */
-    ~ClutterRegion();
+    virtual ~ClutterRegion();
 
     /**
      * Address: 0x007D5F80 (FUN_007D5F80)
      *
      * What it does:
-     * Unlinks one region from the active chain, clears X/Z tags, and releases
-     * map payload instances through the mesh-renderer destroy-instance lane.
-     * Returns the region's payload list.
+     * Unlinks the region from the active chain, clears its X/Z tags, deletes
+     * the mesh instances it owns and empties `mMap`.
      */
-    ClutterPayloadList* ResetState();
+    void ResetState();
   };
   static_assert(sizeof(ClutterRegion) == 0x38, "ClutterRegion size must be 0x38");
   static_assert(offsetof(ClutterRegion, mNext) == 0x04, "ClutterRegion::mNext offset must be 0x04");
@@ -312,10 +254,12 @@ namespace moho
      * Address: 0x007D61E0 (FUN_007D61E0, ??1Clutter@Moho@@UAE@XZ)
      *
      * What it does:
-     * Runs shutdown, releases key-tree head/surface lanes, and frees both list
-     * sentinel allocations.
+     * Runs `Shutdown`; the members then free themselves.
+     *
+     * Address: 0x007D6190 (FUN_007D6190) - the scalar deleting destructor in
+     * vtable slot 2.
      */
-    ~Clutter();
+    virtual ~Clutter();
 
     /**
      * Address: 0x007D62B0 (FUN_007D62B0, ?Initialize@Clutter@Moho@@QAEXXZ)
@@ -453,7 +397,6 @@ namespace moho
     );
 
   public:
-    std::uint8_t reserved00[0x04];      // +0x00 (vtable lane)
     ClutterRegionList mList1;           // +0x04
     ClutterRegionList mList2;           // +0x10
     std::uint8_t mBuffer[0x100];        // +0x1C
@@ -469,12 +412,4 @@ namespace moho
   static_assert(offsetof(Clutter, mKeys) == 0x191C, "Clutter::mKeys offset must be 0x191C");
   static_assert(offsetof(Clutter, mCurRegion) == 0x1928, "Clutter::mCurRegion offset must be 0x1928");
   static_assert(sizeof(Clutter) == 0x192C, "Clutter size must be 0x192C");
-
-  /**
-   * Address: 0x007D9400 (FUN_007D9400)
-   *
-   * What it does:
-   * Walks one intrusive list lane and releases node payload storage.
-   */
-  std::uint8_t ReleaseRegionListPayloads(ClutterRegionList& poolBlocks, std::uint8_t passthrough);
 } // namespace moho

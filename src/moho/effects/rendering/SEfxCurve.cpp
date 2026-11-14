@@ -69,12 +69,12 @@ namespace gpg
     /**
      * Address: 0x0065F450 (FUN_0065F450, gpg::RFastVectorType_SEfxCurve::SerLoad)
      */
-    static void SerLoad(gpg::ReadArchive* archive, std::intptr_t objectPtr, int version, gpg::RRef* ownerRef);
+    static void SerLoad(gpg::ReadArchive* archive, void* objectPtr, int version, gpg::RRef* ownerRef);
 
     /**
      * Address: 0x0065F540 (FUN_0065F540, gpg::RFastVectorType_SEfxCurve::SerSave)
      */
-    static void SerSave(gpg::WriteArchive* archive, std::intptr_t objectPtr, int version, gpg::RRef* ownerRef);
+    static void SerSave(gpg::WriteArchive* archive, void* objectPtr, int version, gpg::RRef* ownerRef);
   };
 
   static_assert(sizeof(RFastVectorType<moho::SEfxCurve>) == 0x68, "RFastVectorType<SEfxCurve> size must be 0x68");
@@ -110,12 +110,12 @@ namespace gpg
    */
   void RFastVectorType<moho::SEfxCurve>::SerLoad(
     gpg::ReadArchive* const archive,
-    const std::intptr_t objectPtr,
+    void* const objectPtr,
     const int /*version*/,
     gpg::RRef* const ownerRef
   )
   {
-    auto& vec = *reinterpret_cast<gpg::core::FastVectorInline<moho::SEfxCurve>*>(objectPtr);
+    auto& vec = *static_cast<gpg::core::FastVectorInline<moho::SEfxCurve>*>(objectPtr);
 
     unsigned int count = 0;
     archive->ReadUInt(&count);
@@ -137,12 +137,12 @@ namespace gpg
    */
   void RFastVectorType<moho::SEfxCurve>::SerSave(
     gpg::WriteArchive* const archive,
-    const std::intptr_t objectPtr,
+    void* const objectPtr,
     const int /*version*/,
     gpg::RRef* const ownerRef
   )
   {
-    auto& vec = *reinterpret_cast<gpg::core::FastVectorInline<moho::SEfxCurve>*>(objectPtr);
+    auto& vec = *static_cast<gpg::core::FastVectorInline<moho::SEfxCurve>*>(objectPtr);
     const unsigned int count = static_cast<unsigned int>(vec.size());
     archive->WriteUInt(count);
 
