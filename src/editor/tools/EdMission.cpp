@@ -2256,6 +2256,13 @@ namespace faf::editor
     };
     add("local ScenarioUtils = import('/lua/sim/ScenarioUtilities.lua')");
     add("local ScenarioFramework = import('/lua/ScenarioFramework.lua')");
+    if (o.test) {
+      add("-- test run of the map editor: the operation's end is recorded for the run panel, not played");
+      add("ScenarioFramework.EndOperation = function(success, allPrimary, allSecondary, allBonus)");
+      add("    ScenarioInfo.EditorEnded = success and 'won' or 'lost'");
+      add("    LOG('EDMISSION trace end.' .. ScenarioInfo.EditorEnded)");
+      add("end");
+    }
     add("local Objectives = ScenarioFramework.Objectives");
     if (UsesType(m, "cutscene")) {
       add("local Cinematics = import('/lua/cinematics.lua')");

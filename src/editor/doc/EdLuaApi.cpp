@@ -359,4 +359,136 @@ namespace faf::editor
     }
     return out;
   }
+
+  std::vector<EdLuaApiProblem> CheckLuaApiCalls(
+    const std::string_view text
+  )
+  {
+    std::vector<EdLuaApiProblem> problems;
+    // The owners the table has functions of (module aliases only: a `.` call).
+    const auto knownOwner = [](const std::string& owner) {
+      for (const EdLuaApiEntry& entry : LuaApi()) {
+        if (owner == entry.owner) {
+          return true;
+        }
+      }
+      return false;
+    };
+    const auto isName = [](const char c) {
+      return std::isalnum(static_cast<unsigned char>(c)) != 0 || c == '_';
+    };
+    int line = 1;
+    std::size_t i = 0;
+    const std::size_t n = text.size();
+    while (i < n) {
+      const char c = text[i];
+      if (c == '\n') {
+        ++line;
+        ++i;
+        continue;
+      }
+      // Comments and strings.
+      if (c == '-' && i + 1 < n && text[i + 1] == '-') {
+        if (i + 3 < n && text[i + 2] == '[' && text[i + 3] == '[') {
+          const std::size_t end = text.find("]]", i + 4);
+          for (std::size_t k = i; k < std::min(n, end); ++k) {
+            line += text[k] == '\n' ? 1 : 0;
+          }
+          i = end == std::string_view::npos ? n : end + 2;
+        } else {
+          while (i < n && text[i] != '\n') {
+            ++i;
+          }
+        }
+        continue;
+      }
+      if (c == '"' || c == '\'') {
+        ++i;
+        while (i < n && text[i] != c && text[i] != '\n') {
+          i += text[i] == '\\' ? 2 : 1;
+        }
+        ++i;
+        continue;
+      }
+      if (!isName(c) || (i > 0 && (isName(text[i - 1]) || text[i - 1] == '.' || text[i - 1] == ':'))) {
+        ++i;
+        continue;
+      }
+      // A name: `Owner.Name(` ?
+      std::size_t end = i;
+      while (end < n && isName(text[end])) {
+        ++end;
+      }
+      const std::string owner(text.substr(i, end - i));
+      if (end + 1 >= n || text[end] != '.' || !isName(text[end + 1])) {
+        i = end;
+        continue;
+      }
+      std::size_t nameEnd = end + 1;
+      while (nameEnd < n && isName(text[nameEnd])) {
+        ++nameEnd;
+      }
+      const std::string name(text.substr(end + 1, nameEnd - end - 1));
+      std::size_t open = nameEnd;
+      while (open < n && (text[open] == ' ' || text[open] == '\t')) {
+        ++open;
+      }
+      i = nameEnd;
+      if (open >= n || text[open] != '(' || !knownOwner(owner)) {
+        continue;
+      }
+      const EdLuaApiEntry* const entry = LuaApiFind(owner, name);
+      if (entry == nullptr) {
+        problems.push_back({line, owner + "." + name, owner + " has no function " + name});
+        continue;
+      }
+      // The arguments: top-level commas up to the matching parenthesis.
+      int depth = 0;
+      int args = 0;
+      bool any = false;
+      for (std::size_t k = open; k < n; ++k) {
+        const char ch = text[k];
+        if (ch == '"' || ch == '\'') {
+          ++k;
+          while (k < n && text[k] != ch) {
+            k += text[k] == '\\' ? 2 : 1;
+          }
+          any = true;
+          continue;
+        }
+        if (ch == '(' || ch == '{' || ch == '[') {
+          if (depth > 0) {
+            any = true;
+          }
+          ++depth;
+        } else if (ch == ')' || ch == '}' || ch == ']') {
+          if (--depth == 0) {
+            break;
+          }
+        } else if (depth == 1 && ch == ',') {
+          ++args;
+        } else if (depth >= 1 && std::isspace(static_cast<unsigned char>(ch)) == 0) {
+          any = true;
+        }
+      }
+      const int given = any ? args + 1 : 0;
+      const std::string params = entry->params;
+      if (params.find("...") != std::string::npos) {
+        continue;
+      }
+      int takes = 0;
+      if (params.find_first_not_of(" ") != std::string::npos) {
+        takes = 1 + static_cast<int>(std::count(params.begin(), params.end(), ','));
+      }
+      if (given > takes) {
+        problems.push_back(
+          {line,
+           owner + "." + name,
+           owner + "." + name + " takes " + std::to_string(takes) + " argument" + (takes == 1 ? "" : "s") + " (" +
+             params + "), given " + std::to_string(given)}
+        );
+      }
+    }
+    return problems;
+  }
 } // namespace faf::editor

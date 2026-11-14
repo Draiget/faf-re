@@ -1249,6 +1249,15 @@ namespace faf::editor
     for (CheckIssue& issue : mDocument.CheckScripts()) {
       mCheckIssues.insert(mCheckIssues.begin(), std::move(issue));
     }
+    // The script's calls of the game's modules against their functions (the mission's generated region among them).
+    for (const EdLuaApiProblem& problem : CheckLuaApiCalls(mDocument.Script())) {
+      CheckIssue issue;
+      issue.level = CheckIssue::Level::Error;
+      issue.text = problem.text;
+      issue.file = "_script.lua";
+      issue.line = problem.line;
+      mCheckIssues.insert(mCheckIssues.begin(), std::move(issue));
+    }
     std::vector<EdTools::CheckPin> pins;
     int counts[3] = {0, 0, 0};
     for (const CheckIssue& issue : mCheckIssues) {

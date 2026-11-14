@@ -7,6 +7,7 @@
 #include "editor/ui/EdIconFont.h"
 #include "editor/ui/EdUiScale.h"
 #include "editor/ui/EdWorkspaces.h"
+#include "moho/console/CConCommand.h"
 #include "imgui.h"
 
 #include <algorithm>
@@ -706,11 +707,61 @@ namespace faf::editor
         "the chosen stage"
       );
     }
+    // While it plays (the test run's hooks: ScenarioInfo.EditorSkip, EditorTimeScale, the stage functions).
+    if (playing) {
+      if (ImGui::Button("Skip waits")) {
+        moho::CON_Execute("SimLua ScenarioInfo.EditorSkip = (ScenarioInfo.EditorSkip or 0) + 1");
+      }
+      EdSetItemTooltip("Every wait and timer running now ends at once");
+      ImGui::SameLine();
+      static const char* const kScales[] = {"Timers x1", "Timers x2", "Timers x4", "Timers x10"};
+      static constexpr int kScaleOf[] = {1, 2, 4, 10};
+      ImGui::SetNextItemWidth(Em(110.0f));
+      if (EdCombo("##timerscale", &mTimerScale, kScales, 4)) {
+        char command[96];
+        (void)std::snprintf(
+          command, sizeof(command), "SimLua ScenarioInfo.EditorTimeScale = %d", kScaleOf[mTimerScale]
+        );
+        moho::CON_Execute(command);
+      }
+      EdSetItemTooltip("The mission's waits and timers run this much faster (the game itself as fast as before)");
+      ImGui::SameLine();
+      ImGui::BeginDisabled(stages == 0);
+      if (ImGui::Button(("Jump to stage " + std::to_string(start)).c_str())) {
+        char command[96];
+        (void)std::snprintf(command, sizeof(command), "SimLua ForkThread(ScenarioInfo.EditorMission.Stage[%d])", start);
+        moho::CON_Execute(command);
+      }
+      ImGui::EndDisabled();
+      EdSetItemTooltip("Starts the stage chosen above now, as its turn would (the one running goes on too)");
+      ImGui::SameLine();
+      if (ImGui::Button("State to the log")) {
+        // The run's state as the sim has it: the tick, each variable, the objectives, whether it ended.
+        moho::CON_Execute(
+          "SimLua local m = ScenarioInfo.EditorMission or {} local n = 0 "
+          "for k, v in m.V or {} do LOG('EDMISSION var ' .. tostring(k) .. ' = ' .. tostring(v)) n = n + 1 end "
+          "LOG('EDMISSION state: tick ' .. GetGameTick() .. ', ' .. n .. ' variables, ' .. "
+          "table.getsize(m.Objectives or {}) .. ' objectives, ' .. (m.TraceCount or 0) .. ' nodes reached, ended: ' .. "
+          "tostring(ScenarioInfo.EditorEnded or 'no'))"
+        );
+      }
+      EdSetItemTooltip("The game tick, the mission's variables and objectives, and its end, written to the Log panel");
+    }
     ImGui::Separator();
     // The trace, newest last; a click selects the node in Stages.
     ImGui::BeginChild("##trace", ImVec2(0.0f, 0.0f), false);
     for (std::size_t k = 0; k < mTrace.size(); ++k) {
       MissionTraceId id;
+      if (mTrace[k].rfind("end.", 0) == 0) {
+        // The operation's end (the test run records it instead of ending the game).
+        const bool won = mTrace[k] == "end.won";
+        ImGui::TextColored(
+          won ? ImVec4(0.5f, 0.85f, 0.5f, 1.0f) : ImVec4(0.95f, 0.45f, 0.4f, 1.0f),
+          "The operation ended: %s",
+          won ? "won" : "lost"
+        );
+        continue;
+      }
       if (!ParseMissionTrace(mTrace[k], id)) {
         continue;
       }

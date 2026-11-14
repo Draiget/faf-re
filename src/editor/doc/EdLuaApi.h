@@ -75,6 +75,19 @@ namespace faf::editor
   };
   [[nodiscard]] std::vector<EdLuaTypo> LuaTypos(std::string_view text);
 
+  /**
+   * The API dry run (FAF Studio's mission dry run): every `Module.Function(...)` call whose module the table knows
+   * (ScenarioFramework, ScenarioUtils, ...) checked against it: a function the module hasn't got, or more arguments
+   * than it takes (a `...` takes any). Comments and strings are skipped.
+   */
+  struct EdLuaApiProblem
+  {
+    int line = 0;     // 1-based
+    std::string call; // `ScenarioFramework.CreateTimerTrigger`
+    std::string text;
+  };
+  [[nodiscard]] std::vector<EdLuaApiProblem> CheckLuaApiCalls(std::string_view text);
+
   /** Letters to change, add or remove to turn one name into the other (case counts). */
   [[nodiscard]] int EditDistance(std::string_view a, std::string_view b);
 } // namespace faf::editor

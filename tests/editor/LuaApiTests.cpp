@@ -6,6 +6,8 @@
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
+
 using faf::editor::EditDistance;
 using faf::editor::EdLuaCall;
 using faf::editor::LuaApi;
@@ -125,5 +127,39 @@ namespace
     EXPECT_EQ(script.substr(typos[0].at, typos[0].written.size()), "CreatUnitHPR");
     EXPECT_EQ(EditDistance("kitten", "sitting"), 3);
     EXPECT_TRUE(LuaTypos("ForkThread(Main)\nLOG('x')\n").empty()) << "the game's thread and log functions";
+  }
+
+  TEST(
+    LuaApi,
+    DryRunFindsUnknownFunctionsAndTooManyArguments
+  )
+  {
+    // A module function the table has, with a fixed number of parameters.
+    const faf::editor::EdLuaApiEntry* chosen = nullptr;
+    for (const faf::editor::EdLuaApiEntry& e : faf::editor::LuaApi()) {
+      const std::string params = e.params;
+      if (std::string(e.owner) == "ScenarioUtils" && params.find("...") == std::string::npos && !params.empty()) {
+        chosen = &e;
+        break;
+      }
+    }
+    ASSERT_NE(chosen, nullptr) << "the table has ScenarioUtils' functions";
+    const std::string params = chosen->params;
+    const int takes = 1 + static_cast<int>(std::count(params.begin(), params.end(), ','));
+    std::string args;
+    for (int i = 0; i <= takes; ++i) {
+      args += (i > 0 ? ", " : "") + std::to_string(i);
+    }
+    const std::string call = std::string("ScenarioUtils.") + chosen->name;
+    const std::string script = "-- ScenarioUtils.Nope() in a comment\n"
+                               "local s = 'ScenarioUtils.Nope()'\n" +
+      call + "(" + args + ")\n" + "ScenarioUtils.NoSuchFunction(1)\n" + call + "({1, 2, 3})\n" +
+      "Unknown.Thing(1, 2, 3, 4, 5)\n";
+    const auto problems = faf::editor::CheckLuaApiCalls(script);
+    ASSERT_EQ(problems.size(), 2U);
+    EXPECT_EQ(problems[0].line, 3);
+    EXPECT_EQ(problems[0].call, call) << "one argument too many";
+    EXPECT_EQ(problems[1].line, 4);
+    EXPECT_NE(problems[1].text.find("no function NoSuchFunction"), std::string::npos);
   }
 } // namespace

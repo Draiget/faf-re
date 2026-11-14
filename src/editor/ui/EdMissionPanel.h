@@ -70,6 +70,7 @@ namespace faf::editor
     int mAttack = -1;
     bool mWasPlaying = false;
     bool mPlayAsked = false;
+    int mTimerScale = 0;
     bool mFocusStages = false;
   };
 } // namespace faf::editor
