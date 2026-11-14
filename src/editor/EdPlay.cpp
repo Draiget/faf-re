@@ -1581,7 +1581,9 @@ end
     if (mPlayRequested) {
       mPlayRequested = false;
       if (CanPlay() && mSelected >= 0 && mSelected < static_cast<int>(mMaps.size())) {
-        (void)StartSession(mMaps[static_cast<std::size_t>(mSelected)]);
+        const std::string& selected = mMaps[static_cast<std::size_t>(mSelected)];
+        const std::string scenario = mScenarioFor ? mScenarioFor(selected) : selected;
+        (void)StartSession(scenario.empty() ? selected : scenario);
       }
     }
   }

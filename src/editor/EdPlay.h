@@ -1,5 +1,6 @@
 #pragma once
 
+#include <functional>
 #include <chrono>
 #include <map>
 #include <string>
@@ -187,6 +188,16 @@ namespace faf::editor
     {
       mPlayRequested = true;
     }
+    /**
+     * What a play starts for the selected map's scenario: the open map's play copy when it has unsaved edits (the app
+     * writes it), else the map as saved. Empty: the selected map.
+     */
+    void SetScenarioFor(
+      std::function<std::string(const std::string& selected)> scenarioFor
+    )
+    {
+      mScenarioFor = std::move(scenarioFor);
+    }
     /** Ends the session on the next frame. */
     void Stop() noexcept
     {
@@ -274,6 +285,7 @@ namespace faf::editor
     bool mWholeMap = false;
     bool mFogHidden = false;
     int mSelected = 0;
+    std::function<std::string(const std::string&)> mScenarioFor;
     bool mPlayRequested = false;
     bool mStopRequested = false;
 

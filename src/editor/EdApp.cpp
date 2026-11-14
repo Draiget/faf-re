@@ -160,6 +160,7 @@ namespace faf::editor
         "/nowaterhires",   "/camat",          "/erosiontest",    "/sctest",          "/symmenu",     "/panelbottom",
         "/shader",         "/brushtest",      "/brushshape",     "/stampsource",     "/stampstroke", "/symoptions",
         "/maskoptions",    "/masktest",       "/shaderbrowser",  "/convertlayers",   "/interoptest", "/gentest",
+        "/layouttest",     "/playcopytest",
       };
       for (const char* const option : kOptions) {
         if (moho::CFG_GetArgOption(option, 0, nullptr)) {
@@ -2161,6 +2162,119 @@ namespace faf::editor
           : name == "rot4"      ? Symmetry::QuarterTurns
                                 : Symmetry::None;
       }
+
+      /**
+       * Play of unsaved edits: a play of the open map while it has unsaved edits starts from a copy of it with the
+       * edits (EdDocument::WritePlayCopy); the copy goes when the play has ended.
+       */
+      void DrivePlayCopy()
+      {
+        if (!mPlayCopyWired) {
+          mPlayCopyWired = true;
+          mPlay.SetScenarioFor([this](const std::string& selected) -> std::string {
+            if (
+              mDocument.GetState() != EdDocument::State::Open || !mDocument.Modified() ||
+              LowerPath(mDocument.Path()) != LowerPath(selected)
+            ) {
+              return selected;
+            }
+            std::string scenario;
+            std::string message;
+            if (!mDocument.WritePlayCopy(scenario, message)) {
+              gpg::Warnf(
+                "editor: play: the unsaved edits couldn't be copied (%s); playing the map as saved", message.c_str()
+              );
+              PostStatusMessage("Playing the map as saved: " + message);
+              return selected;
+            }
+            // A folder made while the editor runs is mounted at /maps/<folder> as the game's init mounts the vault's
+            // (once a session: the mount stays while the copy is written again for the next play).
+            if (mPlayCopyMounted.insert(mDocument.PlayCopy()).second) {
+              moho::RULE_FinishPreparingKept();
+              moho::SIM_FinishPreparingLuaState();
+              if (!moho::DISK_MountDirectoryNow(
+                    mDocument.PlayCopyFolder(), ("/maps/" + mDocument.PlayCopy()).c_str()
+                  )) {
+                mPlayCopyMounted.erase(mDocument.PlayCopy());
+                gpg::Warnf("editor: play: the copy couldn't be mounted; playing the map as saved");
+                return selected;
+              }
+            }
+            gpg::Logf("editor: play: %s; starting %s", message.c_str(), scenario.c_str());
+            PostStatusMessage("Playing the map with its unsaved edits (a copy beside it, removed after the play).");
+            return scenario;
+          });
+        }
+        const bool active = mPlay.Active();
+        if (mPlayCopyWasActive && !active && !mDocument.PlayCopy().empty()) {
+          mDocument.RemovePlayCopy();
+        }
+        mPlayCopyWasActive = active;
+      }
+      bool mPlayCopyWired = false;
+      bool mPlayCopyWasActive = false;
+      std::set<std::string> mPlayCopyMounted;
+
+      /**
+       * `/playcopytest` (test runs): a marker moved (an unsaved edit), Play (the copy with the edit starts), then Stop
+       * (the copy goes); the copy's folder and the play's state at each stage, two seconds apart.
+       */
+      void TestPlayCopy()
+      {
+        if (
+          mPlayCopyTestStage >= 6 || (mPlayCopyTestStage < 2 && (mScene.ModelsPending() || !mScene.Attached())) ||
+          !moho::CFG_GetArgOption("/playcopytest", 0, nullptr) || ++mPlayCopyTestFrames % 120 != 0
+        ) {
+          return;
+        }
+        const std::string copy = mDocument.PlayCopy();
+        gpg::Logf(
+          "editor: play copy test stage %d: modified %s, play %s, copy %s",
+          mPlayCopyTestStage,
+          mDocument.Modified() ? "yes" : "no",
+          mPlay.Active() ? "on" : "off",
+          copy.empty() ? "none" : copy.c_str()
+        );
+        switch (mPlayCopyTestStage) {
+        case 0: {
+          EdDocument::SaveSnapshot before = mDocument.SaveDataNow();
+          for (SaveEntry& marker : mDocument.SaveData().Markers()) {
+            float x = 0.0f, y = 0.0f, z = 0.0f;
+            if (MarkerPosition(marker, x, y, z)) {
+              marker.Set("position", Vector3Value(x + 8.0f, y, z));
+              gpg::Logf(
+                "editor: play copy test: %s moved to %.1f, %.1f", marker.name.c_str(), x + 8.0, static_cast<double>(z)
+              );
+              break;
+            }
+          }
+          mDocument.SaveDataEdited(std::move(before));
+          break;
+        }
+        case 1: {
+          const std::vector<std::string>& maps = mPlay.Maps();
+          const auto at = std::find_if(maps.begin(), maps.end(), [&](const std::string& m) {
+            return LowerPath(m) == LowerPath(mDocument.Path());
+          });
+          if (at == maps.end()) {
+            gpg::Warnf("editor: play copy test: %s isn't in the play list", mDocument.Path().c_str());
+            mPlayCopyTestStage = 6;
+            return;
+          }
+          mPlay.Select(static_cast<int>(at - maps.begin()));
+          mPlay.Play();
+          break;
+        }
+        case 3:
+          mPlay.Stop();
+          break;
+        default:
+          break;
+        }
+        ++mPlayCopyTestStage;
+      }
+      int mPlayCopyTestStage = 0;
+      int mPlayCopyTestFrames = 0;
 
       /**
        * The Layout workspace: strokes follow the editor's symmetry, a template's symmetry becomes the editor's, and
@@ -7869,6 +7983,8 @@ namespace faf::editor
       TestGenerate();
       DriveLayout();
       TestLayout();
+      DrivePlayCopy();
+      TestPlayCopy();
       // `/sctest` (test runs): the SC tools window's buttons in turn, a second apart, the heights' checksum each time.
       if (
         mScTestStage < 8 && moho::CFG_GetArgOption("/sctest", 0, nullptr) && !mScene.ModelsPending() &&

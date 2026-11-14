@@ -1,4 +1,5 @@
 #include "editor/doc/EdDocument.h"
+#include "moho/sim/CVFSImpl.h"
 #include "editor/doc/EdAutosave.h"
 #include "editor/doc/EdRecentMaps.h"
 #include "editor/doc/EdAdaptiveTables.h"
@@ -11,6 +12,7 @@
 #include <ctime>
 #include <cstring>
 #include <fstream>
+#include <cstring>
 #include <iterator>
 #include <cstdlib>
 #include <cstdio>
@@ -2083,34 +2085,15 @@ namespace faf::editor
     return base + suffix;
   }
 
-  bool EdDocument::SaveAsNewFolder(
+  bool EdDocument::WriteFolderCopy(
     const std::string& folder,
+    std::filesystem::path& newMapFile,
+    int& copied,
     std::string& message
   )
   {
-    if (mState != State::Open || mMap == nullptr) {
-      message = "No map is open.";
-      return false;
-    }
-    SyncEffectScript();
-    if (mMap->mTerrainRes == nullptr || !mMap->mTerrainRes->GetBool()) {
-      message = "The map isn't ready yet (its terrain is still being prepared); save again in a moment.";
-      return false;
-    }
-    if (folder.empty() || folder.find_first_of("\\/:*?\"<>|") != std::string::npos) {
-      message = "\"" + folder + "\" can't be a folder name.";
-      return false;
-    }
-    if (mVault.empty()) {
-      message = "There is no vault folder to save into.";
-      return false;
-    }
     const std::filesystem::path target = mVault / "maps" / folder;
     std::error_code error;
-    if (std::filesystem::exists(target, error)) {
-      message = target.string() + " already exists; pick another name.";
-      return false;
-    }
 
     const std::string oldFolder = FolderName();
     std::string oldBase = mFacts.scenarioPath.substr(mFacts.scenarioPath.find_last_of('/') + 1);
@@ -2176,8 +2159,7 @@ namespace faf::editor
       return false;
     }
 
-    std::filesystem::path newMapFile;
-    int copied = 0;
+    copied = 0;
     for (const fa::string& file : files) {
       const std::string source = file.c_str();
       if (Lower(source).rfind(Lower(oldPrefix), 0) != 0) {
@@ -2244,6 +2226,117 @@ namespace faf::editor
       message = "Saving " + newMapFile.string() + " failed: " + failure;
       return false;
     }
+    return true;
+  }
+
+  bool EdDocument::WritePlayCopy(
+    std::string& scenario,
+    std::string& message
+  )
+  {
+    if (mState != State::Open || mMap == nullptr) {
+      message = "No map is open.";
+      return false;
+    }
+    SyncEffectScript();
+    if (mMap->mTerrainRes == nullptr || !mMap->mTerrainRes->GetBool()) {
+      message = "The map isn't ready yet (its terrain is still being prepared).";
+      return false;
+    }
+    if (mVault.empty()) {
+      message = "There is no vault folder to write the play copy into.";
+      return false;
+    }
+    // One copy per map, written again for every play: the last one goes first.
+    const std::string folder = WithoutVersion(FolderName()) + kPlayCopySuffix;
+    RemovePlayCopy(folder);
+    std::filesystem::path newMapFile;
+    int copied = 0;
+    if (!WriteFolderCopy(folder, newMapFile, copied, message)) {
+      return false;
+    }
+    mPlayCopy = folder;
+    moho::DISK_InvalidateFileLookups();
+    scenario = "/maps/" + folder + "/" + folder + "_scenario.lua";
+    message = "the open map with its unsaved edits copied to " + (mVault / "maps" / folder).string() + " (" +
+      std::to_string(copied + 1) + " files)";
+    return true;
+  }
+
+  void EdDocument::RemovePlayCopy(
+    std::string folder
+  )
+  {
+    if (folder.empty()) {
+      folder = mPlayCopy;
+    }
+    // Only a folder this editor names: never anything of the mapper's.
+    if (
+      folder.empty() || mVault.empty() || folder.size() <= std::strlen(kPlayCopySuffix) ||
+      folder.compare(folder.size() - std::strlen(kPlayCopySuffix), std::string::npos, kPlayCopySuffix) != 0 ||
+      folder.find_first_of("\\/:") != std::string::npos
+    ) {
+      return;
+    }
+    const std::filesystem::path target = mVault / "maps" / folder;
+    std::error_code error;
+    if (!std::filesystem::exists(target, error)) {
+      if (folder == mPlayCopy) {
+        mPlayCopy.clear();
+      }
+      return;
+    }
+    std::filesystem::remove_all(target, error);
+    if (error) {
+      gpg::Warnf("editor: the play copy %s stays for now: %s", target.string().c_str(), error.message().c_str());
+      return;
+    }
+    moho::DISK_InvalidateFileLookups();
+    gpg::Logf("editor: the play copy %s removed", target.string().c_str());
+    if (folder == mPlayCopy) {
+      mPlayCopy.clear();
+    }
+  }
+
+  bool EdDocument::SaveAsNewFolder(
+    const std::string& folder,
+    std::string& message
+  )
+  {
+    if (mState != State::Open || mMap == nullptr) {
+      message = "No map is open.";
+      return false;
+    }
+    SyncEffectScript();
+    if (mMap->mTerrainRes == nullptr || !mMap->mTerrainRes->GetBool()) {
+      message = "The map isn't ready yet (its terrain is still being prepared); save again in a moment.";
+      return false;
+    }
+    if (folder.empty() || folder.find_first_of("\\/:*?\"<>|") != std::string::npos) {
+      message = "\"" + folder + "\" can't be a folder name.";
+      return false;
+    }
+    if (mVault.empty()) {
+      message = "There is no vault folder to save into.";
+      return false;
+    }
+    const std::filesystem::path target = mVault / "maps" / folder;
+    std::error_code error;
+    if (std::filesystem::exists(target, error)) {
+      message = target.string() + " already exists; pick another name.";
+      return false;
+    }
+    std::filesystem::path newMapFile;
+    int copied = 0;
+    if (!WriteFolderCopy(folder, newMapFile, copied, message)) {
+      return false;
+    }
+    const std::string oldFolder = FolderName();
+    std::string oldBase = mFacts.scenarioPath.substr(mFacts.scenarioPath.find_last_of('/') + 1);
+    oldBase = oldBase.substr(0, oldBase.size() - std::min(oldBase.size(), std::string("_scenario.lua").size()));
+    const std::string newBase = WithoutVersion(folder);
+    const std::string oldPrefix = "/maps/" + oldFolder + "/";
+    const std::string newPrefix = "/maps/" + folder + "/";
     mSaveTarget = newMapFile;
     mBackedUp = true; // a new folder has nothing to back up
     mModified = false;

@@ -215,6 +215,24 @@ namespace faf::editor
      * the new folder from its next start (its file system is mounted at startup).
      */
     bool SaveAsNewFolder(const std::string& folder, std::string& message);
+    /**
+     * Play of unsaved edits: the open map, edits included, copied to `<vault>/maps/<map>_editor_playtest` (the files
+     * and names as Save as new folder writes them; the document's own files, save target and saved state untouched).
+     * `scenario` gets the copy's scenario path for the session.
+     */
+    bool WritePlayCopy(std::string& scenario, std::string& message);
+    /** Removes the play copy (`folder` empty: the last one written); only a folder ending in the copy's suffix. */
+    void RemovePlayCopy(std::string folder = {});
+    [[nodiscard]] const std::string& PlayCopy() const noexcept
+    {
+      return mPlayCopy;
+    }
+    /** The play copy's folder on disk (empty when there is none). */
+    [[nodiscard]] std::filesystem::path PlayCopyFolder() const
+    {
+      return mPlayCopy.empty() || mVault.empty() ? std::filesystem::path{} : mVault / "maps" / mPlayCopy;
+    }
+    static constexpr const char* kPlayCopySuffix = "_editor_playtest";
 
     /** The map's folder name (`scmp_009`, `seton.v0003`) and the suggestion for a new version of it. */
     [[nodiscard]] std::string FolderName() const;
@@ -937,5 +955,9 @@ namespace faf::editor
     std::filesystem::path mVault;
     /** Set by SaveAsNewFolder: where Save writes from then on (else the map's own file). */
     std::filesystem::path mSaveTarget;
+    std::string mPlayCopy; // the play copy's folder while one is on disk
+    /** The map's files, edits included, copied to `<vault>/maps/<folder>` with their paths and names moved to it. */
+    bool
+    WriteFolderCopy(const std::string& folder, std::filesystem::path& newMapFile, int& copied, std::string& message);
   };
 } // namespace faf::editor
