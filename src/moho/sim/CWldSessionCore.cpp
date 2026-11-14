@@ -2106,6 +2106,13 @@ namespace moho
         DoBeat(fa::auto_ptr<SSyncData>(packet));
       }
 
+    // Microchip: measure only normal, demanded simulation beats, not replay/rejoin catch-up.
+    if (auto* localSimDriver = dynamic_cast<CSimDriver*>(simDriver)) {
+      const bool measuring = mGameTick > 0 && !mReplayIsPaused && fastForwardTarget < 0 && !rejoinCatchingUp;
+      localSimDriver->RecordNetworkWaitDemand(
+        measuring, measuring && mGameTick < targetTick && !simDriver->HasSyncData());
+    }
+
     if (sEngineStat_Sync_Count == nullptr) {
       sEngineStat_Sync_Count = GetEngineStats()->GetItem("Sync_Count", true);
       (void)sEngineStat_Sync_Count->Release(0);

@@ -1,0 +1,22 @@
+diff --git a/src/moho/net/NetConVars.cpp b/src/moho/net/NetConVars.cpp
+--- a/src/moho/net/NetConVars.cpp
++++ b/src/moho/net/NetConVars.cpp
+@@ -9,12 +9,16 @@
+   bool net_DebugCrash = false;                     // 0x010A6380
+   bool net_LogPackets = false;                     // 0x010A6381
+   int32_t net_DebugLevel = 0;                      // 0x010A6384
+-  // Initial values are the .data words at those addresses in the shipped PE.
++  // Unless noted, initial values are the shipped PE data words at these addresses.
+   int32_t net_AckDelay = 25;                       // 0x00F58DE0
+   int32_t net_SendDelay = 25;                      // 0x00F58DE4
+   int32_t net_MinResendDelay = 100;                // 0x00F58DE8
+   int32_t net_MaxResendDelay = 1000;               // 0x00F58DEC
+-  int32_t net_MaxSendRate = 2048;                  // 0x00F58DF0
++  // Rebuilt-engine default: order-stream checks add a 16-byte digest to
++  // each ACK. With 12 players, ACK traffic alone can exceed the retail
++  // 2048-byte/s per-peer budget and throttle normal-speed simulation.
++  // Keep the checks enabled and leave room for their traffic and commands.
++  int32_t net_MaxSendRate = 8192;                  // Retail: 2048 at 0x00F58DF0
+   int32_t net_MaxBacklog = 2048;                   // 0x00F58DF4
+   int32_t net_CompressionMethod = NETCOMP_Deflate; // 0x00F58DF8
+   float net_ResendPingMultiplier = 1.0f;           // 0x00F58DFC

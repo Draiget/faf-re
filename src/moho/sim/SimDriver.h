@@ -790,6 +790,8 @@ namespace moho
      */
     DWORD PerformNextEvent();
 
+    void RecordNetworkWaitDemand(bool active, bool waiting);
+
     // ---- diagnostics-only readouts (crash report section; no behaviour) ----
     [[nodiscard]] int32_t DiagDispatchBeat() const
     {

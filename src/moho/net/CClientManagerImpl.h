@@ -2,6 +2,7 @@
 // This header is a skeleton for reverse-engineering; adjust as needed.
 #pragma once
 #include <memory>
+#include "moho/net/NetworkWaitTracker.h"
 
 #include "legacy/thread/Mutex.h"
 #include "gpg/core/streams/PipeStream.h"
@@ -496,6 +497,10 @@ namespace moho
      * Demangled: Moho::CClientManagerImpl::Func4
      */
     virtual SClientBottleneckInfo GetBottleneckInfo();
+    // Nonvirtual diagnostics: no changes to the engine object layout or protocol.
+    void RecordNetworkWaitDemand(bool active, bool waiting, int targetBeat);
+    void RefreshNetworkWaitDiagnostics();
+    std::vector<NetworkWaitMetrics> GetNetworkWaitMetrics();
 
     /**
      * Address: 0x0053F920
