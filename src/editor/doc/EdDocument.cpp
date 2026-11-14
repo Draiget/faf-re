@@ -2819,6 +2819,12 @@ namespace faf::editor
     return map.parent_path() / (map.stem().string() + "_layout.editor");
   }
 
+  std::filesystem::path EdDocument::ModsFile() const
+  {
+    const std::filesystem::path map = MapDiskFile();
+    return map.empty() ? std::filesystem::path() : map.parent_path() / (map.stem().string() + "_mods.editor");
+  }
+
   std::filesystem::path EdDocument::TerrainGraphFile() const
   {
     const std::filesystem::path map = MapDiskFile();

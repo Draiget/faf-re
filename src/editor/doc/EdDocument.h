@@ -459,6 +459,8 @@ namespace faf::editor
      * `.editor` files out): saved with the map, opened in Generate when the map opens.
      */
     [[nodiscard]] std::filesystem::path TerrainGraphFile() const;
+    /** The map's own mods for plays, beside its file (`<map>_mods.editor`, a uid a line), empty without a disk file. */
+    [[nodiscard]] std::filesystem::path ModsFile() const;
     /**
      * The mission (the Mission workspace's stages and dialogues): kept beside the map in `<map>_mission.editor`, read
      * when the map opens; Save compiles it into the script's generated region, a play copy gets the test run's.

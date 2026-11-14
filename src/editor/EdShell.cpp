@@ -2301,6 +2301,34 @@ namespace faf::editor
           }
           ImGui::PopID();
         }
+        // The map's own list (FAF Studio keeps it with the map): a file beside the map, a uid a line.
+        const std::filesystem::path modsFile = mDocument.ModsFile();
+        ImGui::BeginDisabled(modsFile.empty());
+        if (ImGui::SmallButton("Keep these mods with the map")) {
+          std::ofstream out(modsFile, std::ios::binary | std::ios::trunc);
+          for (const std::string& uid : setup.mods) {
+            out << uid << '\n';
+          }
+          gpg::Logf("editor: play: %zu mods kept with the map in %s", setup.mods.size(), modsFile.string().c_str());
+        }
+        ImGui::SameLine();
+        if (ImGui::SmallButton("Use the map's mods")) {
+          std::ifstream in(modsFile, std::ios::binary);
+          std::vector<std::string> mods;
+          for (std::string line; std::getline(in, line);) {
+            while (!line.empty() && (line.back() == '\r' || line.back() == ' ')) {
+              line.pop_back();
+            }
+            if (!line.empty()) {
+              mods.push_back(line);
+            }
+          }
+          setup.mods = std::move(mods);
+          changed = true;
+          gpg::Logf("editor: play: the map's %zu mods", setup.mods.size());
+        }
+        ImGui::EndDisabled();
+        EdSetItemTooltip("The map's own mod list: a file beside the map (_mods.editor), so it goes along with the map");
         if (changed) {
           mPlay.PrepareRules();
         }

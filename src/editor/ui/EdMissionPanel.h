@@ -55,6 +55,8 @@ namespace faf::editor
     [[nodiscard]] std::vector<MissionNode>* ListOf(Mission& m, int section, const std::vector<int>& path);
     [[nodiscard]] MissionNode* NodeAt(Mission& m, int section, const std::vector<int>& path);
 
+    /** The Platoons panel's builders view: an army's PlatoonBuilders listed, edited, added, deleted. */
+    void DrawBuilders();
     EdDocument& mDocument;
     int mStage = 0;
     int mSection = 0;       // 0 enter, 1 ready

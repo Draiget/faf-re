@@ -11242,6 +11242,21 @@ namespace faf::editor
           mFieldsTest.clear();
         }
       }
+      // The coop shim mod in the vault's mods folder, once a run (played with coop maps, EdPlay::WriteCoopShim).
+      {
+        static bool shimWritten = false;
+        if (!shimWritten && !mDocument.VaultFolder().empty()) {
+          shimWritten = true;
+          std::string error;
+          if (EdPlay::WriteCoopShim(mDocument.VaultFolder() / "mods", error)) {
+            gpg::Logf(
+              "editor: coop shim written to %s", (mDocument.VaultFolder() / "mods" / "EditorCoopShim").string().c_str()
+            );
+          } else {
+            gpg::Warnf("editor: coop shim: %s", error.c_str());
+          }
+        }
+      }
       // The sample map open: its ground from the island graph (Generate's Build, one undo step).
       if (mSampleBuildDue && mDocument.GetState() == EdDocument::State::Open && mScene.Attached()) {
         mSampleBuildDue = false;

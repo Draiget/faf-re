@@ -1,5 +1,8 @@
 #include "editor/ui/EdMissionPanel.h"
 
+#include "editor/tools/EdBuilders.h"
+#include "gpg/core/utils/Logging.h"
+
 #include "editor/doc/EdDocument.h"
 #include "editor/doc/EdUnits.h"
 #include "editor/tools/EdMarkers.h"
@@ -1460,6 +1463,101 @@ namespace faf::editor
       ImGui::TextDisabled("Given in turn by a Spawn a group as a platoon or a Give a platoon an order queue node.");
       ImGui::PopID();
     }
+    DrawBuilders();
     ImGui::End();
+  }
+
+  void EdMissionPanel::DrawBuilders()
+  {
+    // ---- platoon builders (FAF Studio's builders view): an army's PlatoonBuilders, the game's PBM reads them
+    ImGui::SeparatorText("Platoon builders");
+    std::vector<SaveEntry>& armies = mDocument.SaveData().Armies();
+    if (armies.empty()) {
+      ImGui::TextDisabled("The map has no armies.");
+      return;
+    }
+    static int armyIndex = 0;
+    static int chosen = -1;
+    static char newName[64] = "Builder_1";
+    static char newTemplate[64] = "";
+    static char newLocation[64] = "MAIN";
+    armyIndex = std::clamp(armyIndex, 0, static_cast<int>(armies.size()) - 1);
+    ImGui::SetNextItemWidth(-1.0f);
+    if (EdBeginCombo("##builderarmy", armies[static_cast<std::size_t>(armyIndex)].name.c_str())) {
+      for (int i = 0; i < static_cast<int>(armies.size()); ++i) {
+        if (ImGui::Selectable(armies[static_cast<std::size_t>(i)].name.c_str(), i == armyIndex)) {
+          armyIndex = i;
+          chosen = -1;
+        }
+      }
+      ImGui::EndCombo();
+    }
+    SaveEntry& army = armies[static_cast<std::size_t>(armyIndex)];
+    std::vector<MissionBuilder> builders;
+    std::string error;
+    if (!ParseBuilders(army.Get("PlatoonBuilders"), builders, error)) {
+      ImGui::TextColored(ImVec4(0.95f, 0.5f, 0.4f, 1.0f), "Its builders can't be read: %s", error.c_str());
+      return;
+    }
+    const auto write = [&](const std::string& what) {
+      EdDocument::SaveSnapshot before = mDocument.SaveDataNow();
+      army.Set("PlatoonBuilders", FormatBuilders(builders));
+      mDocument.SaveDataEdited(std::move(before));
+      gpg::Logf("editor: platoon builders of %s: %s (%zu now)", army.name.c_str(), what.c_str(), builders.size());
+    };
+    for (int i = 0; i < static_cast<int>(builders.size()); ++i) {
+      ImGui::PushID(i);
+      const std::string label = builders[static_cast<std::size_t>(i)].name + "  " +
+        builders[static_cast<std::size_t>(i)].Get("PlatoonTemplate");
+      if (ImGui::Selectable(label.c_str(), chosen == i)) {
+        chosen = i;
+      }
+      ImGui::PopID();
+    }
+    if (builders.empty()) {
+      ImGui::TextDisabled("No builders in this army.");
+    }
+    if (chosen >= 0 && chosen < static_cast<int>(builders.size())) {
+      MissionBuilder& builder = builders[static_cast<std::size_t>(chosen)];
+      bool changed = false;
+      for (auto& [key, value] : builder.fields) {
+        ImGui::PushID(key.c_str());
+        RowLabel(key.c_str());
+        char buffer[512];
+        (void)std::snprintf(buffer, sizeof(buffer), "%s", value.c_str());
+        ImGui::SetNextItemWidth(-1.0f);
+        if (ImGui::InputText("##v", buffer, sizeof(buffer))) {
+          value = buffer;
+        }
+        changed = changed || ImGui::IsItemDeactivatedAfterEdit();
+        ImGui::PopID();
+      }
+      if (changed) {
+        write(builder.name + " edited");
+      }
+      if (ImGui::Button("Delete this builder")) {
+        const std::string gone = builder.name;
+        builders.erase(builders.begin() + chosen);
+        chosen = -1;
+        write("deleted " + gone);
+      }
+    }
+    ImGui::SetNextItemWidth(Em(120.0f));
+    ImGui::InputText("##newbuilder", newName, sizeof(newName));
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(Em(120.0f));
+    ImGui::InputTextWithHint("##newtemplate", "platoon template", newTemplate, sizeof(newTemplate));
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(Em(80.0f));
+    ImGui::InputTextWithHint("##newlocation", "base", newLocation, sizeof(newLocation));
+    ImGui::SameLine();
+    ImGui::BeginDisabled(newName[0] == '\0' || newTemplate[0] == '\0');
+    if (ImGui::Button("Add builder")) {
+      builders.push_back(NewBuilder(newName, newTemplate, newLocation));
+      chosen = static_cast<int>(builders.size()) - 1;
+      write(std::string("added ") + newName);
+    }
+    ImGui::EndDisabled();
+    ImGui::TextDisabled("Values are Lua (strings quoted); BuildConditions and other tables stay as written.");
   }
 } // namespace faf::editor
