@@ -93,9 +93,12 @@ namespace platform::window
   [[nodiscard]] bool IsInitialized();
 
   // A top-level window, hidden until Show. x, y: the frame's (outer) screen position, as the retail
-  // window library placed frames; -1: centred. width, height: the client size. Null when it can't
-  // be made.
-  [[nodiscard]] Handle CreateTopLevel(const char* utf8Title, int x, int y, int width, int height, bool resizable);
+  // window library placed frames; -1: centred. width, height: the client size. bordered: false for
+  // a window with no caption or border, as the full-screen frame is. Null when it can't be made.
+  [[nodiscard]] Handle
+  CreateTopLevel(const char* utf8Title, int x, int y, int width, int height, bool resizable, bool bordered);
+  // Gives a top-level window a caption and border or takes them away, and lets it be resized or not.
+  void SetFrameStyle(Handle window, bool bordered, bool resizable);
   // A window inside `parent`'s client area at x, y (relative to it), shown, with input of its own,
   // as the window library's child windows were on Windows (the game's viewport, the map editor's view of it). Null
   // where the system has none; the engine's child then shares its parent's window.

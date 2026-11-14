@@ -17,6 +17,7 @@
 #define SHELL_RESIZE_BORDER 0x00000040
 #define SHELL_CLOSE_BOX 0x1000
 #define SHELL_CLIP_CHILDREN 0x00400000
+#define SHELL_NO_BORDER 0x00200000 // no caption or border: the full-screen frame (0x200800)
 #define SHELL_DEFAULT_FRAME_STYLE                                                                                      \
   (SHELL_SYSTEM_MENU | SHELL_RESIZE_BORDER | SHELL_MINIMIZE_BOX | SHELL_MAXIMIZE_BOX | SHELL_CAPTION |                 \
    SHELL_CLIP_CHILDREN)
@@ -124,12 +125,8 @@ public:
   {
     SetSize(width, height);
   }
-  void SetWindowStyleFlag(
-    const long style
-  )
-  {
-    m_windowStyle = style;
-  }
+  // The window gets the style's border and resize border, as the window library restyled the frame.
+  void SetWindowStyleFlag(long style);
   long GetWindowStyleFlag() const
   {
     return m_windowStyle;
