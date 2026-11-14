@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FAF Rebuilt x64 — Windows setup guide</title>
+  <style>
+    :root{color-scheme:dark;--bg:#101821;--panel:#192633;--text:#eef4fa;--muted:#b6c6d5;--accent:#83dfbf;--line:#344859}
+    *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:17px/1.65 system-ui,sans-serif}main{max-width:940px;margin:auto;padding:60px 24px 80px}header{padding-bottom:32px;border-bottom:1px solid var(--line)}.eyebrow{color:var(--accent);text-transform:uppercase;letter-spacing:.15em;font-size:13px;font-weight:700}h1{font-size:clamp(32px,5vw,52px);line-height:1.15;margin:12px 0 20px}h2{font-size:25px;line-height:1.3;margin:0 0 18px}h3{font-size:19px;margin:24px 0 8px}p{margin:12px 0}a{color:var(--accent)}.lead,.muted{color:var(--muted)}nav{display:flex;flex-wrap:wrap;gap:8px 20px;margin:24px 0}section{scroll-margin-top:24px;margin-top:28px;padding:28px;background:var(--panel);border:1px solid var(--line);border-radius:14px}ul,ol{padding-left:24px}li{margin:7px 0}.note{border-left:3px solid var(--accent);padding:10px 16px;background:#122b2a;margin:20px 0}.command{position:relative;margin:16px 0}pre{overflow-x:auto;background:#0b1219;border:1px solid var(--line);border-radius:8px;padding:52px 18px 18px;margin:0;white-space:pre;font-size:14px;line-height:1.65}code{font-family:Consolas,monospace;overflow-wrap:anywhere}p code,li code,td code{font-size:.9em;color:#cfecff}button{border:1px solid #526e80;background:#233a49;color:white;padding:6px 12px;border-radius:6px;font:inherit;font-size:13px;cursor:pointer}.copy{position:absolute;right:10px;top:10px}button:hover{background:#36566a}button:focus-visible,a:focus-visible{outline:3px solid var(--accent);outline-offset:3px}.toolbar{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-top:25px}table{width:100%;border-collapse:collapse}td,th{text-align:left;padding:12px 0;border-bottom:1px solid var(--line);vertical-align:top}th{width:34%;padding-right:16px}footer{margin-top:36px;color:var(--muted);font-size:14px}#copy-status{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#d5f8e9;color:#102a20;border-radius:8px;padding:8px 16px}#copy-status:empty{display:none}.no-js .copy,.no-js .print{display:none}@media(max-width:600px){main{padding:32px 16px}section{padding:20px}th,td{display:block;width:100%;padding:8px 0}td{padding-bottom:16px}th{border:0}}@media print{:root{color-scheme:light;--bg:white;--panel:white;--text:#111;--muted:#444;--accent:#145842;--line:#bbb}main{max-width:none;padding:0}section{break-inside:avoid;border-radius:0;padding:18px;margin-top:16px}pre{background:#f3f5f7;color:#111;padding:14px;white-space:pre-wrap;overflow-wrap:anywhere;font-size:10px}.copy,.print,nav,#copy-status{display:none}.note{background:#f2f7f5}a{color:#145842}h1{font-size:32px}body{font-size:12px}}
+  </style>
+</head>
+<body class="no-js">
+<main>
+  <header>
+    <div class="eyebrow">Windows · x64 · FAF client</div>
+    <h1>Run the rebuilt engine<br>with Forged Alliance Forever</h1>
+    <p class="lead">Build faf-re, connect it to your existing FAF installation, and launch games through the FAF client. These steps are based on a successful Windows setup.</p>
+    <div class="toolbar"><a href="https://github.com/Draiget/faf-re#build">Maintainer’s build instructions ↗</a><button class="print" type="button" onclick="window.print()">Print / save PDF</button></div>
+  </header>
+  <nav aria-label="Guide sections"><a href="#requirements">1. Requirements</a><a href="#build">2. Build</a><a href="#stage">3. Prepare files</a><a href="#client">4. Configure FAF</a><a href="#verify">5. Verify</a><a href="#maintenance">Updates &amp; restore</a></nav>
+
+  <section id="requirements">
+    <h2>1. Install the prerequisites</h2>
+    <ul>
+      <li>Your own working copy of <strong>Supreme Commander: Forged Alliance</strong> and the <a href="https://www.faforever.com/">FAF client</a>. Launch a normal FAF game once so the client downloads its game files.</li>
+      <li><a href="https://visualstudio.microsoft.com/downloads/">Visual Studio 2022 Build Tools</a> with <strong>Desktop development with C++</strong>, a <strong>Windows SDK</strong>, <strong>C++ CMake tools for Windows</strong>, and <strong>C++ ATL for x86 and x64</strong>.</li>
+      <li><a href="https://github.com/llvm/llvm-project/releases">LLVM</a>, including clang-cl and lld-link, installed in <code>C:\Program Files\LLVM</code>. The maintainer’s current guide specifies any version requirements.</li>
+      <li><a href="https://git-scm.com/downloads/win">Git for Windows</a>.</li>
+    </ul>
+    <div class="note">This builds the engine only. You still need the original game’s assets and FAF’s downloaded game data.</div>
+  </section>
+
+  <section id="build">
+    <h2>2. Download and build the engine</h2>
+    <p>Open PowerShell in the folder where you want the source code, then run:</p>
+    <div class="command"><button type="button" class="copy">Copy</button><pre><code>git clone --recursive https://github.com/Draiget/faf-re.git
+cd faf-re</code></pre></div>
+    <p>Select Visual Studio’s bundled CMake and Ninja. This path assumes the standard Build Tools 2022 installation:</p>
+    <div class="command"><button type="button" class="copy">Copy</button><pre><code>$cmakeTools = "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\Common7\IDE\CommonExtensions\Microsoft\CMake"
+$env:PATH = "$cmakeTools\CMake\bin;$cmakeTools\Ninja;$env:PATH"</code></pre></div>
+    <p>If you use Visual Studio Community, Professional, or Enterprise, use its corresponding CMake installation path, or put CMake 3.25+ and Ninja on <code>PATH</code>.</p>
+    <p>Build x64 Release:</p>
+    <div class="command"><button type="button" class="copy">Copy</button><pre><code>.\build.ps1 -NoCopy -Jobs 8</code></pre></div>
+    <p>Dependencies download and patch automatically. Use a smaller job count on PCs with limited memory. A successful build produces:</p>
+    <div class="command"><button type="button" class="copy">Copy</button><pre><code>build\clang-x64-release\src\main_x64.exe</code></pre></div>
+  </section>
+
+  <section id="stage">
+    <h2>3. Prepare the FAF launch folder</h2>
+    <p>From the repository folder, run:</p>
+    <div class="command"><button type="button" class="copy">Copy</button><pre><code>.\build.ps1 -NoBuild
+Copy-Item "C:\ProgramData\FAForever\bin\*.lua" `
+          "C:\ProgramData\FAForever\bin_x64\" -Force</code></pre></div>
+    <p>The script stages the executable, debug symbols, engine hooks, and DXC DLLs. The second command copies FAF’s initialization scripts.</p>
+    <div class="note">These steps assume FAF’s default data folder: <code>C:\ProgramData\FAForever</code>. For another location, pass <code>-FafDir "D:\Your\FAForever"</code> to the build script and adjust all paths below. If staging reports access denied, run the staging commands in an administrator PowerShell.</div>
+  </section>
+
+  <section id="client">
+    <h2>4. Configure the FAF client</h2>
+    <p>Open <strong>☰ → Settings → Forged Alliance Forever</strong>. Scroll down to the executable settings.</p>
+    <h3>Command Line Format for Executable</h3>
+    <div class="command"><button type="button" class="copy">Copy</button><pre><code>"C:\ProgramData\FAForever\bin_x64\main_x64.exe" /con lua_AllowPrecompiledChunks=1;ren_GpuSelectBrackets=0</code></pre></div>
+    <h3>Execution directory</h3>
+    <div class="command"><button type="button" class="copy">Copy</button><pre><code>C:\ProgramData\FAForever\bin_x64</code></pre></div>
+    <table><tbody><tr><th scope="row">Game Location</th><td>Keep this pointing to the original Steam/game installation.</td></tr><tr><th scope="row">Relative Game Paths</th><td>Leave disabled.</td></tr><tr><th scope="row">Maps and Mods Location</th><td>Keep your existing FAF vault location.</td></tr></tbody></table>
+    <div class="note"><strong>Compiled-Lua mods:</strong> <code>lua_AllowPrecompiledChunks=1</code> enables mods such as EconomyMiddle and RFA. It also permits compiled Lua from other loaded maps and mods. If you do not need compiled-Lua compatibility, remove <code>lua_AllowPrecompiledChunks=1;</code> while keeping the selection-bracket setting.</div>
+    <h3>Restore the selected-unit rings / brackets</h3>
+    <p>If the selection indicator around a unit is missing on the battlefield, set <code>ren_GpuSelectBrackets=0</code> as shown in the command above. This disables GPU-instanced selection brackets and uses the engine’s fallback drawing path.</p>
+    <p>For an existing setup, replace <strong>Command Line Format for Executable</strong> with the full command above. Both settings belong in one <code>/con</code> argument, separated by a semicolon.</p>
+    <p>If you also use a standalone desktop shortcut, right-click it → <strong>Properties</strong> and set <strong>Target</strong> to:</p>
+    <div class="command"><button type="button" class="copy">Copy</button><pre><code>"C:\ProgramData\FAForever\bin_x64\main_x64.exe" /init init_faf.lua /nobugreport /con lua_AllowPrecompiledChunks=1;ren_GpuSelectBrackets=0</code></pre></div>
+    <p>Set the shortcut’s <strong>Start in</strong> field to <code>C:\ProgramData\FAForever\bin_x64</code>. Close and relaunch the game, then select a unit to check that its battlefield selection indicator is visible. This setting affects selection rings / brackets, not the unit portrait in the bottom panel.</p>
+    <p>Close Settings. Changes apply to the next game launched; an already running game keeps its existing engine. Exit the FAF client normally when finished so it can save its preferences.</p>
+  </section>
+
+  <section id="verify">
+    <h2>5. Verify the setup</h2>
+    <ol><li>Host or join a <strong>private, unranked test game through the FAF client</strong>.</li><li>Open Task Manager → Details. The game process should be <strong>main_x64.exe</strong>.</li><li>Check that the lobby connects, your mods load, and the game runs without desyncs.</li></ol>
+    <p>The client supplies the lobby, player, replay, and network arguments. A standalone desktop shortcut does not connect you to a FAF lobby.</p>
+    <p class="muted">The maintainer reports multiplayer compatibility with the original engine. This remains an independent engine build; successful launch alone does not verify multiplayer compatibility for every game or mod.</p>
+  </section>
+
+  <section id="maintenance">
+    <h2>Updates, troubleshooting &amp; restore</h2>
+    <h3>Refresh FAF’s launch scripts</h3>
+    <p>After FAF updates its initialization scripts, copy the current versions again:</p>
+    <div class="command"><button type="button" class="copy">Copy</button><pre><code>Copy-Item "C:\ProgramData\FAForever\bin\*.lua" `
+          "C:\ProgramData\FAForever\bin_x64\" -Force</code></pre></div>
+    <h3>Common problems</h3>
+    <ul><li><strong>Missing atlbase.h:</strong> install the Visual Studio C++ ATL component, then rebuild.</li><li><strong>CMake or Ninja not found:</strong> check the bundled-tools path in step 2 and the installed CMake tools component.</li><li><strong>Game fails to start:</strong> check the executable and working-folder paths, copied Lua scripts, and the newest game log in the FAF client’s log folder (available from its ☰ menu).</li><li><strong>Mods appear but fail:</strong> inspect the game log for compiled-Lua rejections or other mod errors.</li></ul>
+    <h3>Return to the normal FAF engine</h3>
+    <p>Clear <strong>Command Line Format for Executable</strong> and <strong>Execution directory</strong> in FAF Settings. The next launch uses the normal executable. No replacement of FAF’s original executable is needed.</p>
+  </section>
+  <footer>Prepared 8 November 2026 · Windows setup tested with the 26 October engine checkout. Upstream requirements and client settings may change; consult the <a href="https://github.com/Draiget/faf-re">project repository</a> for updates. This guide does not distribute game assets.</footer>
+</main>
+<div id="copy-status" role="status" aria-live="polite"></div>
+<script>
+  document.body.classList.remove('no-js');
+  document.querySelectorAll('.copy').forEach(button => button.addEventListener('click', async () => {
+    const code = button.parentElement.querySelector('code');
+    const status = document.getElementById('copy-status');
+    try {
+      if (!navigator.clipboard || !window.isSecureContext) throw new Error('Clipboard unavailable');
+      await navigator.clipboard.writeText(code.textContent);
+      status.textContent = 'Copied to clipboard';
+    } catch {
+      const range = document.createRange(); range.selectNodeContents(code);
+      const selection = window.getSelection(); selection.removeAllRanges(); selection.addRange(range);
+      status.textContent = 'Command selected — press Ctrl+C to copy';
+    }
+    clearTimeout(window.copyNoticeTimer);
+    window.copyNoticeTimer = setTimeout(() => { status.textContent = ''; }, 5000);
+  }));
+</script>
+</body>
+</html>
