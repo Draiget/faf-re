@@ -1,3 +1,5 @@
+#include "gpg/gal/backends/common/ImageCodec.h"
+#include "editor/tools/EdHeightFile.h"
 #include "editor/doc/EdScenarioInfo.h"
 #include "editor/doc/EdDocument.h"
 #include "moho/sim/CVFSImpl.h"
@@ -2443,6 +2445,59 @@ namespace faf::editor
     }
     message = "packaged " + std::to_string(entries.size()) + " files, " + std::to_string(zip.size()) + " bytes, as " +
       written.string();
+    return true;
+  }
+
+  bool EdDocument::ExportPreview(
+    const std::filesystem::path& file,
+    std::string& message
+  ) const
+  {
+    // The DDS inside the preview chunk the map was read with.
+    const std::vector<char>& chunk = mFileRecords.preview;
+    std::size_t at = std::string::npos;
+    for (std::size_t i = 0; i + 4 <= chunk.size(); ++i) {
+      if (chunk[i] == 'D' && chunk[i + 1] == 'D' && chunk[i + 2] == 'S' && chunk[i + 3] == ' ') {
+        at = i;
+        break;
+      }
+    }
+    if (at == std::string::npos || chunk.size() < at + 128) {
+      message = "The map has no preview picture in its file (a new map gets one when it is saved).";
+      return false;
+    }
+    std::uint32_t size[2] = {};
+    std::memcpy(size, chunk.data() + at + 12, sizeof(size)); // the DDS header's height, then width
+    gpg::gal::imaging::ImageCodec* const codec = gpg::gal::imaging::ImageCodec::Instance();
+    gpg::gal::imaging::DecodeOptions options;
+    options.format = DXGI_FORMAT_B8G8R8A8_UNORM;
+    options.width = size[1];
+    options.height = size[0];
+    options.mipLevels = 1;
+    gpg::gal::imaging::Image image;
+    if (
+      codec == nullptr || FAILED(codec->Decode(chunk.data() + at, chunk.size() - at, options, image)) ||
+      image.subresources.empty() || image.format != DXGI_FORMAT_B8G8R8A8_UNORM
+    ) {
+      message = "The preview picture couldn't be decoded.";
+      return false;
+    }
+    const auto& level = image.subresources.front();
+    std::vector<std::uint32_t> pixels(static_cast<std::size_t>(level.width) * level.height);
+    for (std::uint32_t y = 0; y < level.height; ++y) {
+      std::memcpy(
+        pixels.data() + static_cast<std::size_t>(y) * level.width,
+        image.bytes.data() + level.offset + static_cast<std::size_t>(y) * level.rowPitch,
+        static_cast<std::size_t>(level.width) * 4U
+      );
+    }
+    std::string error;
+    if (!WriteColourPng(file, static_cast<int>(level.width), static_cast<int>(level.height), pixels, error)) {
+      message = error;
+      return false;
+    }
+    message = "Exported the lobby preview (" + std::to_string(level.width) + " x " + std::to_string(level.height) +
+      ") to " + file.string();
     return true;
   }
 

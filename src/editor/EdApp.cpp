@@ -251,6 +251,7 @@ namespace faf::editor
         "/viewmenu",
         "/mapinfotest",
         "/dropdefaultcube",
+        "/exportpreview",
       };
       for (const char* const option : kOptions) {
         if (moho::CFG_GetArgOption(option, 0, nullptr)) {
@@ -4849,6 +4850,12 @@ namespace faf::editor
         if (++frame != 300) {
           return;
         }
+        // `/exportpreview <file>` (test runs): the lobby preview written there.
+        if (fa::vector<fa::string> file; moho::CFG_GetArgOption("/exportpreview", 1, &file) && !file.empty()) {
+          std::string message;
+          const bool ok = mDocument.ExportPreview(file[0].c_str(), message);
+          (ok ? gpg::Logf : gpg::Warnf)("editor: %s", message.c_str());
+        }
         // `/dropdefaultcube` (test runs): the map's <default> reflection cube taken away first (a save adds it back).
         if (moho::CFG_GetArgOption("/dropdefaultcube", 0, nullptr)) {
           std::vector<std::pair<std::string, std::string>> cubes = mDocument.CubesNow();
@@ -5338,6 +5345,24 @@ namespace faf::editor
       add("file.save", "Save", "File", "Ctrl+S", [this] {
         SaveDocument();
       }, mapOpen);
+      add("file.exportpreview", "Export the lobby preview (PNG)...", "File", "", [this] {
+        wchar_t path[MAX_PATH] = L"";
+        OPENFILENAMEW dialog{};
+        dialog.lStructSize = sizeof(dialog);
+        dialog.hwndOwner = HandleOf(mGame.supcomFrame);
+        dialog.lpstrFile = path;
+        dialog.nMaxFile = MAX_PATH;
+        dialog.lpstrFilter = L"PNG picture (*.png)\0*.png\0";
+        dialog.lpstrDefExt = L"png";
+        dialog.lpstrTitle = L"Export the lobby preview";
+        dialog.Flags = OFN_OVERWRITEPROMPT | OFN_PATHMUSTEXIST | OFN_NOCHANGEDIR;
+        if (::GetSaveFileNameW(&dialog) != FALSE) {
+          std::string message;
+          const bool ok = mDocument.ExportPreview(path, message);
+          (ok ? gpg::Logf : gpg::Warnf)("editor: %s", message.c_str());
+          PostStatusMessage(message);
+        }
+      }, mapOpen, {}, "The map's preview picture, as the lobby shows it, as a PNG");
       add("file.saveas", "Save as new map folder...", "File", "Ctrl+Shift+S", [this] {
         mShell->OpenSaveAs();
       }, mapOpen);
@@ -5867,6 +5892,7 @@ namespace faf::editor
            cmd("file.save"),
            cmd("file.saveas"),
            cmd("file.package"),
+           cmd("file.exportpreview"),
            sep(),
            cmd("file.recover"),
            cmd("settings.open"),

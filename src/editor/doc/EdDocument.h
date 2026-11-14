@@ -247,6 +247,11 @@ namespace faf::editor
      */
     bool WritePackage(const PackagePlan& plan, std::filesystem::path& written, std::string& message) const;
 
+    /**
+     * File › Export › Lobby preview: the map's preview picture (the DDS in the file's preview chunk, as the lobby shows
+     * it) written as a PNG at its own size; false with `message`.
+     */
+    bool ExportPreview(const std::filesystem::path& file, std::string& message) const;
     /** What the map file stored that a save writes back as it was (the preview, unchanged props). */
     [[nodiscard]] const MapFileRecords& FileRecords() const noexcept
     {

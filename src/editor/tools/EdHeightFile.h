@@ -28,6 +28,14 @@ namespace faf::editor
     std::string& error
   );
 
+  /** Writes a 32-bit BGRA picture (B in the low byte) as a PNG; false with `error`. */
+  bool WriteColourPng(
+    const std::filesystem::path& file,
+    int width,
+    int height,
+    const std::vector<std::uint32_t>& bgra,
+    std::string& error
+  );
   /** Writes a height image by its extension: `.raw` / `.r16` as 16-bit little-endian words, `.png` as 16-bit grey. */
   bool WriteHeightImage(const std::filesystem::path& file, const HeightImage& image, std::string& error);
 

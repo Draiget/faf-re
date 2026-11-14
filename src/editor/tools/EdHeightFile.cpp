@@ -244,6 +244,73 @@ namespace faf::editor
     }
   } // namespace
 
+  bool WriteColourPng(
+    const std::filesystem::path& file,
+    const int width,
+    const int height,
+    const std::vector<std::uint32_t>& bgra,
+    std::string& error
+  )
+  {
+    if (width <= 0 || height <= 0 || bgra.size() != static_cast<std::size_t>(width) * height) {
+      error = "no picture to write";
+      return false;
+    }
+    const ComScope com;
+    ComPtr<IWICImagingFactory> factory;
+    HRESULT hr = ::CoCreateInstance(CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&factory.p));
+    ComPtr<IWICStream> stream;
+    if (SUCCEEDED(hr)) {
+      hr = factory->CreateStream(&stream);
+    }
+    if (SUCCEEDED(hr)) {
+      hr = stream->InitializeFromFilename(file.wstring().c_str(), GENERIC_WRITE);
+    }
+    ComPtr<IWICBitmapEncoder> encoder;
+    if (SUCCEEDED(hr)) {
+      hr = factory->CreateEncoder(GUID_ContainerFormatPng, nullptr, &encoder);
+    }
+    if (SUCCEEDED(hr)) {
+      hr = encoder->Initialize(stream.p, WICBitmapEncoderNoCache);
+    }
+    ComPtr<IWICBitmapFrameEncode> frame;
+    if (SUCCEEDED(hr)) {
+      hr = encoder->CreateNewFrame(&frame, nullptr);
+    }
+    if (SUCCEEDED(hr)) {
+      hr = frame->Initialize(nullptr);
+    }
+    if (SUCCEEDED(hr)) {
+      hr = frame->SetSize(static_cast<UINT>(width), static_cast<UINT>(height));
+    }
+    WICPixelFormatGUID format = GUID_WICPixelFormat32bppBGRA;
+    if (SUCCEEDED(hr)) {
+      hr = frame->SetPixelFormat(&format);
+    }
+    if (SUCCEEDED(hr) && format != GUID_WICPixelFormat32bppBGRA) {
+      hr = E_FAIL;
+    }
+    if (SUCCEEDED(hr)) {
+      hr = frame->WritePixels(
+        static_cast<UINT>(height),
+        static_cast<UINT>(width) * 4,
+        static_cast<UINT>(bgra.size() * 4),
+        reinterpret_cast<BYTE*>(const_cast<std::uint32_t*>(bgra.data()))
+      );
+    }
+    if (SUCCEEDED(hr)) {
+      hr = frame->Commit();
+    }
+    if (SUCCEEDED(hr)) {
+      hr = encoder->Commit();
+    }
+    if (FAILED(hr)) {
+      error = "can't write " + file.string() + " (" + HResultText(hr) + ")";
+      return false;
+    }
+    return true;
+  }
+
   bool ReadHeightImage(
     const std::filesystem::path& file,
     const int expectWidth,
