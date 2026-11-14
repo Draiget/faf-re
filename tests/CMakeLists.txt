@@ -446,13 +446,16 @@ add_test(NAME slab_tests COMMAND faf_slab_tests)
 set_tests_properties(slab_tests PROPERTIES LABELS "Sim")
 
 # Swap-chain decisions (src/gpg/gal/backends/dxgi/DxgiSwapChainPolicy.h): header-only, no device.
-add_executable(faf_dxgi_tests EXCLUDE_FROM_ALL dxgi/SwapChainPolicyTests.cpp)
-target_include_directories(faf_dxgi_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
-target_compile_features(faf_dxgi_tests PRIVATE cxx_std_20)
-target_link_libraries(faf_dxgi_tests PRIVATE gtest_main)
-set_target_properties(faf_dxgi_tests PROPERTIES FOLDER "Tests/Existing")
-add_test(NAME dxgi_swap_chain_policy COMMAND faf_dxgi_tests)
-set_tests_properties(dxgi_swap_chain_policy PROPERTIES LABELS "Existing")
+# Windows only: the header uses DXGI's own headers, which the Linux builds of faf_tests don't have.
+if(WIN32)
+  add_executable(faf_dxgi_tests EXCLUDE_FROM_ALL dxgi/SwapChainPolicyTests.cpp)
+  target_include_directories(faf_dxgi_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
+  target_compile_features(faf_dxgi_tests PRIVATE cxx_std_20)
+  target_link_libraries(faf_dxgi_tests PRIVATE gtest_main)
+  set_target_properties(faf_dxgi_tests PROPERTIES FOLDER "Tests/Existing")
+  add_test(NAME dxgi_swap_chain_policy COMMAND faf_dxgi_tests)
+  set_tests_properties(dxgi_swap_chain_policy PROPERTIES LABELS "Existing")
+endif()
 
 # Every GoogleTest executable above and in the subdirectories. Keep this last: it sees only the
 # targets defined before it, so a test added below it is never built by faf_tests and ctest
