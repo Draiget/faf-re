@@ -1437,6 +1437,25 @@ namespace faf::editor
       }
       ImGui::SetNextItemWidth(-1.0f);
       FillSliderFloat("##interopstrength", &s.strength, 0.0f, 1.0f, "Strength %.2f");
+      ImGui::Checkbox("Only a region", &s.region);
+      EdSetItemTooltip("The image fitted onto a rectangle of the map (in samples, one a game unit); the rest stays.");
+      if (s.region) {
+        int from[2] = {s.regionX0, s.regionZ0};
+        int to[2] = {s.regionX1, s.regionZ1};
+        ImGui::SetNextItemWidth(-1.0f);
+        if (ImGui::DragInt2("##regionfrom", from, 1.0f, 0, 4096, "From %d")) {
+          s.regionX0 = from[0];
+          s.regionZ0 = from[1];
+        }
+        ImGui::SetNextItemWidth(-1.0f);
+        if (ImGui::DragInt2("##regionto", to, 1.0f, 0, 4096, "To %d")) {
+          s.regionX1 = to[0];
+          s.regionZ1 = to[1];
+        }
+      }
+      ImGui::SetNextItemWidth(-1.0f);
+      FillSliderFloat("##interopfeather", &s.feather, 0.0f, 256.0f, "Feather %.0f");
+      EdSetItemTooltip("Samples in from the edge over which the import fades in, so it meets the map without a step.");
       const bool haveFile = mInteropImportPath[0] != '\0';
       ImGui::BeginDisabled(!haveFile);
       if (PrimaryButton("Import")) {

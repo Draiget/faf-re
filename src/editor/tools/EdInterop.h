@@ -34,6 +34,17 @@ namespace faf::editor
       Min,
     } blend = Blend::Replace;
     float strength = 1.0f; // how far the map moves to the result, 0..1
+    /**
+     * Only part of the map takes the import (FAF Studio's import region): the image fitted onto this rectangle of
+     * samples, x0..x1 by z0..z1 inclusive; the rest stays. Off: the whole map.
+     */
+    bool region = false;
+    int regionX0 = 0;
+    int regionZ0 = 0;
+    int regionX1 = 256;
+    int regionZ1 = 256;
+    /** Samples in from the edge (of the region, or of the map) over which the import fades in; 0: a hard edge. */
+    float feather = 0.0f;
   };
 
   /** The image flipped and turned as the settings say. */

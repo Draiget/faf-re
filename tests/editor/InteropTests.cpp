@@ -115,6 +115,35 @@ namespace
 
   TEST(
     Interop,
+    ARegionTakesTheImportAndTheFeatherFadesItIn
+  )
+  {
+    HeightImage image;
+    image.width = 2;
+    image.height = 2;
+    image.words.assign(4, 2560); // 20 units
+    const std::vector<std::uint16_t> map(21 * 21, 0);
+    ImportSettings a;
+    a.mapping = ImportSettings::Mapping::Absolute;
+    a.region = true;
+    a.regionX0 = 5;
+    a.regionZ0 = 5;
+    a.regionX1 = 15;
+    a.regionZ1 = 15;
+    auto out = ImportedHeights(image, map, 21, 21, a);
+    EXPECT_EQ(out[4 * 21 + 10], 0) << "outside the region";
+    EXPECT_EQ(out[5 * 21 + 10], 2560) << "its edge";
+    EXPECT_EQ(out[10 * 21 + 10], 2560);
+    a.feather = 4.0f;
+    out = ImportedHeights(image, map, 21, 21, a);
+    EXPECT_EQ(out[5 * 21 + 10], 0) << "the edge: faded out";
+    EXPECT_GT(out[7 * 21 + 10], 0);
+    EXPECT_LT(out[7 * 21 + 10], 2560) << "part way in";
+    EXPECT_EQ(out[10 * 21 + 10], 2560) << "past the feather: all of it";
+  }
+
+  TEST(
+    Interop,
     SidecarSaysHowToReadTheWords
   )
   {

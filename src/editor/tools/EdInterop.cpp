@@ -77,35 +77,52 @@ namespace faf::editor
     ) {
       return out;
     }
-    const HeightImage fitted = ResampleHeights(OrientHeights(image, s.flipX, s.flipZ, s.turns), width, height);
+    // The part that takes the import: the region (clipped to the map), else all of it.
+    const int x0 = s.region ? std::clamp(std::min(s.regionX0, s.regionX1), 0, width - 1) : 0;
+    const int x1 = s.region ? std::clamp(std::max(s.regionX0, s.regionX1), 0, width - 1) : width - 1;
+    const int z0 = s.region ? std::clamp(std::min(s.regionZ0, s.regionZ1), 0, height - 1) : 0;
+    const int z1 = s.region ? std::clamp(std::max(s.regionZ0, s.regionZ1), 0, height - 1) : height - 1;
+    const int rw = x1 - x0 + 1;
+    const int rh = z1 - z0 + 1;
+    const HeightImage fitted = ResampleHeights(OrientHeights(image, s.flipX, s.flipZ, s.turns), rw, rh);
     std::uint16_t darkest = 0, brightest = 0;
     HeightImageRange(fitted, darkest, brightest);
     const float span = std::max(1.0f, static_cast<float>(brightest - darkest));
     const float strength = std::clamp(s.strength, 0.0f, 1.0f);
-    for (std::size_t k = 0; k < out.size(); ++k) {
-      const float word = static_cast<float>(fitted.words[k]);
-      // The image's value as a height in map units.
-      const float units = s.mapping == ImportSettings::Mapping::Normalised
-        ? s.low + (word - static_cast<float>(darkest)) / span * (s.high - s.low)
-        : word * s.scale / 128.0f;
-      const float now = static_cast<float>(current[k]) / 128.0f;
-      float result = units;
-      switch (s.blend) {
-      case ImportSettings::Blend::Add:
-        // On top of the map's: the import's lowest point adds nothing.
-        result = now + units - (s.mapping == ImportSettings::Mapping::Normalised ? s.low : 0.0f);
-        break;
-      case ImportSettings::Blend::Max:
-        result = std::max(now, units);
-        break;
-      case ImportSettings::Blend::Min:
-        result = std::min(now, units);
-        break;
-      default:
-        break;
+    for (int z = z0; z <= z1; ++z) {
+      for (int x = x0; x <= x1; ++x) {
+        const std::size_t k = static_cast<std::size_t>(z) * width + x;
+        const float word = static_cast<float>(fitted.words[static_cast<std::size_t>(z - z0) * rw + (x - x0)]);
+        // The image's value as a height in map units.
+        const float units = s.mapping == ImportSettings::Mapping::Normalised
+          ? s.low + (word - static_cast<float>(darkest)) / span * (s.high - s.low)
+          : word * s.scale / 128.0f;
+        const float now = static_cast<float>(current[k]) / 128.0f;
+        float result = units;
+        switch (s.blend) {
+        case ImportSettings::Blend::Add:
+          // On top of the map's: the import's lowest point adds nothing.
+          result = now + units - (s.mapping == ImportSettings::Mapping::Normalised ? s.low : 0.0f);
+          break;
+        case ImportSettings::Blend::Max:
+          result = std::max(now, units);
+          break;
+        case ImportSettings::Blend::Min:
+          result = std::min(now, units);
+          break;
+        default:
+          break;
+        }
+        // The feather: in from the edge, a smooth fade from nothing to all.
+        float weight = strength;
+        if (s.feather > 0.0f) {
+          const float in = static_cast<float>(std::min({x - x0, x1 - x, z - z0, z1 - z}));
+          const float t = std::clamp(in / s.feather, 0.0f, 1.0f);
+          weight *= t * t * (3.0f - 2.0f * t);
+        }
+        result = now + (result - now) * weight;
+        out[k] = static_cast<std::uint16_t>(std::clamp(std::lround(result * 128.0f), 0L, 65535L));
       }
-      result = now + (result - now) * strength;
-      out[k] = static_cast<std::uint16_t>(std::clamp(std::lround(result * 128.0f), 0L, 65535L));
     }
     return out;
   }
