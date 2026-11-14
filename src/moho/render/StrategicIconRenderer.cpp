@@ -24,6 +24,60 @@
 
 namespace moho
 {
+  namespace
+  {
+    struct IconScaleSetting
+    {
+      std::shared_ptr<CD3DBatchTexture> texture;
+      float scale;
+    };
+    std::unordered_map<const CD3DBatchTexture*, IconScaleSetting> sIconScales;
+    std::uint64_t sIconScaleRevision = 0;
+  }
+
+  bool SetStrategicIconScales(const std::vector<std::pair<std::string, float>>& scales)
+  {
+    decltype(sIconScales) replacement;
+    for (const auto& [base, percent] : scales) {
+      if (!std::isfinite(percent) || percent < 25.0f || percent > 400.0f ||
+          !base.starts_with("/mods/Microchip-Icon-Mod/custom-strategic-icons/icon_") ||
+          base.find("..") != std::string::npos) {
+        return false;
+      }
+      if (percent == 100.0f) {
+        continue;
+      }
+      // FAF mounts mod icons under this alias before loading unit blueprints. The
+      // thumbnail and the strategic renderer use distinct cache keys for the same file.
+      const std::string mounted = "/textures/ui/common/game/strategicicons/microchip-icon-mod/" +
+        base.substr(base.find_last_of('/') + 1);
+      for (const auto& prefix : {base, mounted}) {
+        for (const char* state : {"_rest.dds", "_over.dds", "_selected.dds", "_selectedover.dds"}) {
+          const std::string path = prefix + state;
+          auto texture = CD3DBatchTexture::FromFile(path.c_str(), 0);
+          if (!texture) {
+            return false;
+          }
+          replacement.emplace(texture.get(), IconScaleSetting{texture, percent / 100.0f});
+        }
+      }
+    }
+    sIconScales.swap(replacement);
+    ++sIconScaleRevision;
+    return true;
+  }
+
+  float GetStrategicIconTextureScale(const CD3DBatchTexture* texture)
+  {
+    const auto found = sIconScales.find(texture);
+    return found == sIconScales.end() ? 1.0f : found->second.scale;
+  }
+
+  std::uint64_t GetStrategicIconScaleRevision()
+  {
+    return sIconScaleRevision;
+  }
+
   extern float ui_StrategicIconScale; // FAF FA-Binary-Patches #147 (CWldSession.cpp)
 
   int ren_GpuIcons = -1;
@@ -231,8 +285,9 @@ namespace moho
       const Slot& slot = mSlots[index];
       std::memcpy(records[index].uv, slot.mUv, sizeof(slot.mUv));
       // FAF FA-Binary-Patches #147: the batcher path's radii times `ui_StrategicIconScale`.
-      records[index].halfSize[0] = slot.mHalfSize[0] * ui_StrategicIconScale;
-      records[index].halfSize[1] = slot.mHalfSize[1] * ui_StrategicIconScale;
+      const float scale = ui_StrategicIconScale * GetStrategicIconTextureScale(slot.mTexture.get());
+      records[index].halfSize[0] = slot.mHalfSize[0] * scale;
+      records[index].halfSize[1] = slot.mHalfSize[1] * scale;
       records[index].unused[0] = 0.0f;
       records[index].unused[1] = 0.0f;
     }
@@ -241,6 +296,7 @@ namespace moho
     }
     mSlotsDirty = false;
     mUploadedIconScale = ui_StrategicIconScale;
+    mUploadedIconScaleRevision = GetStrategicIconScaleRevision();
   }
 
   StrategicIconRenderer::ViewStream& StrategicIconRenderer::StreamFor(
@@ -269,7 +325,8 @@ namespace moho
     if (!RefreshAtlasSlots(batcher)) {
       return nullptr;
     }
-    if (mSlotsDirty || mUploadedIconScale != ui_StrategicIconScale) {
+    if (mSlotsDirty || mUploadedIconScale != ui_StrategicIconScale ||
+        mUploadedIconScaleRevision != GetStrategicIconScaleRevision()) {
       UploadSlots();
     }
     // Anything the batcher still holds was submitted before the icons.

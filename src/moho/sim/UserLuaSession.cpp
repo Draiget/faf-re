@@ -1,4 +1,5 @@
 #include "moho/lua/CScrLuaInitForm.h"
+#include "moho/render/StrategicIconRenderer.h"
 #include "moho/sim/UserLuaPrivate.h"
 #include "gpg/core/diagnostics/BuildInfo.h"
 
@@ -2418,6 +2419,7 @@ namespace
       (void)::moho::func_RenderOverlayIntel_LuaFuncDef();
       (void)::moho::func_RenderOverlayEconomy_LuaFuncDef();
       (void)::moho::func_TeamColorMode_LuaFuncDef();
+      (void)::moho::RegisterStrategicIconScalesLua();
       (void)::moho::func_GetUnitByIdUser_LuaFuncDef();
       (void)::moho::func_CreateUnitAtMouse_LuaFuncDef();
       (void)::moho::func_AudioSetLanguageUser_LuaFuncDef();

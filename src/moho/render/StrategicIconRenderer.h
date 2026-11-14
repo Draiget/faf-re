@@ -21,6 +21,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <span>
+#include <string>
 #include <unordered_map>
 #include <vector>
 
@@ -38,6 +39,13 @@ namespace moho
 {
   class CD3DBatchTexture;
   class CD3DPrimBatcher;
+  class CScrLuaInitForm;
+
+  // UI-only, main-thread settings. Percentages affect every display state of a texture set.
+  bool SetStrategicIconScales(const std::vector<std::pair<std::string, float>>& scales);
+  float GetStrategicIconTextureScale(const CD3DBatchTexture* texture);
+  std::uint64_t GetStrategicIconScaleRevision();
+  CScrLuaInitForm* RegisterStrategicIconScalesLua();
 
   /// `ren_GpuIcons`: draw strategic icons through StrategicIconRenderer when the backend can.
   extern int ren_GpuIcons;
@@ -162,6 +170,7 @@ namespace moho
     std::uint32_t mSlotCapacity = 0U;
     bool mSlotsDirty = false;
     float mUploadedIconScale = 1.0f; // `ui_StrategicIconScale` the slot buffer was built with
+    std::uint64_t mUploadedIconScaleRevision = 0;
     std::vector<Slot> mSlots;
     std::unordered_map<const CD3DBatchTexture*, std::uint16_t> mSlotByTexture;
     std::vector<ViewStream> mStreams;

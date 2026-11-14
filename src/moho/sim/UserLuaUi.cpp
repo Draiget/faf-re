@@ -1,4 +1,5 @@
 #include "moho/sim/UserLuaPrivate.h"
+#include "moho/render/StrategicIconRenderer.h"
 
 namespace
 {
@@ -1047,5 +1048,31 @@ moho::CScrLuaInitForm* moho::func_HasLocalizedVOUser_LuaFuncDef()
     "<global>",
     kHasLocalizedVOUserHelpText
   );
+  return &binder;
+}
+
+// Presentation-only settings: this binder is deliberately absent from simulation Lua.
+namespace {
+  int SetStrategicIconScalesFromLua(lua_State* state)
+  {
+    luaL_checktype(state, 1, LUA_TTABLE);
+    std::vector<std::pair<std::string, float>> scales;
+    lua_pushnil(state);
+    while (lua_next(state, 1) != 0) {
+      if (lua_type(state, -2) != LUA_TSTRING || lua_type(state, -1) != LUA_TNUMBER || scales.size() >= 512) {
+        lua_pushboolean(state, false);
+        return 1;
+      }
+      scales.emplace_back(lua_tostring(state, -2), static_cast<float>(lua_tonumber(state, -1)));
+      lua_pop(state, 1);
+    }
+    lua_pushboolean(state, moho::SetStrategicIconScales(scales));
+    return 1;
+  }
+}
+moho::CScrLuaInitForm* moho::RegisterStrategicIconScalesLua()
+{
+  static CScrLuaBinder binder(SCR_UserLuaInitSet(), "SetStrategicIconScales", &SetStrategicIconScalesFromLua,
+    nullptr, "<global>", "SetStrategicIconScales({[iconBasePath] = percent}) - UI-only live icon scales, 25..400 percent");
   return &binder;
 }
