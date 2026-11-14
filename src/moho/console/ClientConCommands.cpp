@@ -4589,4 +4589,36 @@ namespace moho
    */
   CConFunc gCConFunc_ShowStats("ShowStats", kConsoleStartupShowStatsDescription, &moho::ShowStats);
 
+  /**
+   * Engine addition: planned factory ghost selection and pre-orders switch.
+   * Default: false (0). Allows selecting planned factories under construction
+   * to queue production orders, set rally points, and toggle repeat build ahead of time.
+   */
+  bool ui_FactoryPreOrders = false;
+
+  bool IsFactoryPreOrdersEnabled()
+  {
+    return ui_FactoryPreOrders;
+  }
+
+  void SetFactoryPreOrdersEnabled(
+    const bool enabled
+  )
+  {
+    ui_FactoryPreOrders = enabled;
+  }
+
 } // namespace moho
+
+namespace
+{
+  constexpr const char* kConsoleStartupUIFactoryPreOrdersDescription =
+    "Allow selecting planned factories under construction to queue production orders and set rally points ahead of "
+    "time";
+
+  TConVar<bool> gTConVar_ui_FactoryPreOrders(
+    "ui_FactoryPreOrders",
+    kConsoleStartupUIFactoryPreOrdersDescription,
+    &moho::ui_FactoryPreOrders
+  );
+} // namespace

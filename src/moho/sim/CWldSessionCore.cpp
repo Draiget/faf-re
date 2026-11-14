@@ -8,6 +8,7 @@
 #include "moho/sim/STIMap.h"
 #include "moho/render/DynamicLights.h"
 #include "moho/render/WRenViewport.h"
+#include "moho/sim/PlannedFactoryProxy.h"
 
 namespace moho
 {
@@ -406,6 +407,10 @@ namespace moho
    */
   CWldSession::~CWldSession()
   {
+    if (moho::IsFactoryPreOrdersEnabled()) {
+      moho::PlannedFactoryManager::Get().ClearAll();
+    }
+
     // Partial lift of 0x00893A60: core owner releases + recovered shared/weak cleanup.
 
     // 0x00893A88..0x00893A99: viewport-owned border meshes borrow the
@@ -2257,6 +2262,16 @@ namespace moho
     // erase 0x007AF740, `_Copy` 0x00867B20), then the live count at +0x4AC.
     mSelection = selection;
     mSelectionSize = static_cast<std::uint32_t>(mSelection.Size());
+
+    if (moho::IsFactoryPreOrdersEnabled()) {
+      auto& pfm = moho::PlannedFactoryManager::Get();
+      for (const auto& proxy : pfm.GetAllProxies()) {
+        if (proxy) {
+          const bool isSelected = proxy->mUserUnit != nullptr && mSelection.Find(proxy->mUserUnit) != mSelection.end();
+          proxy->SetSelected(isSelected);
+        }
+      }
+    }
 
     if (selectionChanged) {
       if (ISTIDriver* const activeDriver = sSimDriver.get(); activeDriver != nullptr) {

@@ -613,7 +613,7 @@ namespace moho
     bool mQueueEmptyCached;             // 0x03DC
     bool mIsEngineer;                   // 0x03DD
     bool mIsFactory;                    // 0x03DE
-    std::uint8_t pad_03DF_03E0[0x03E0 - 0x03DF]{};
+    bool mPreOrdersDispatched{false};   // 0x03DF
     std::uint32_t mIntelStateFlags; // 0x03E0
     std::uint8_t pad_03E4_03E8[0x3E8 - 0x03E4]{};
   };
@@ -632,6 +632,10 @@ namespace moho
   static_assert(offsetof(UserUnit, mQueueEmptyCached) == 0x03DC, "UserUnit::mQueueEmptyCached offset must be 0x03DC");
   static_assert(offsetof(UserUnit, mIsEngineer) == 0x03DD, "UserUnit::mIsEngineer offset must be 0x03DD");
   static_assert(offsetof(UserUnit, mIsFactory) == 0x03DE, "UserUnit::mIsFactory offset must be 0x03DE");
+  static_assert(
+    offsetof(UserUnit, mPreOrdersDispatched) == 0x03DF,
+    "UserUnit::mPreOrdersDispatched offset must be 0x03DF"
+  );
   static_assert(offsetof(UserUnit, mIntelStateFlags) == 0x03E0, "UserUnit::mIntelStateFlags offset must be 0x03E0");
 
   /**
