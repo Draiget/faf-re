@@ -25,6 +25,10 @@ namespace faf::editor
 
     /** The unit's values from the game's rules (empty when the rules or the unit aren't there). */
     [[nodiscard]] static UnitLabSource ReadUnit(const std::string& id);
+    /** Whether the game's rules have the unit. */
+    [[nodiscard]] static bool GameHasUnit(const std::string& id);
+    /** Makes a derived unit of the selected one (an undo step) and selects it; false with `error`. */
+    bool Derive(const std::string& id, const std::string& name, const std::string& description, std::string& error);
     void SelectUnit(
       const std::string& id
     )
@@ -50,6 +54,10 @@ namespace faf::editor
     EdModPanel& mProject;
     std::string mUnit;
     char mFilter[64] = {};
+    char mDeriveId[16] = {};
+    char mDeriveName[64] = {};
+    char mDeriveDescription[128] = {};
+    std::string mDeriveError;
     bool mTestAsked = false;
   };
 } // namespace faf::editor

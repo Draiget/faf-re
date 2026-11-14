@@ -1,5 +1,7 @@
 #pragma once
 
+#include "editor/doc/EdModProject.h"
+
 #include <map>
 #include <string>
 #include <vector>
@@ -49,14 +51,22 @@ namespace faf::editor
   class ModEditHistory
   {
   public:
-    using Edits = std::map<std::string, std::map<std::string, double>>;
+    using Edits = ModChanges;
 
     /** Records a change already made; false when before and after are the same. */
-    bool
-    Record(const std::string& label, const Edits& before, const Edits& after, const std::string& mergeKey, double now);
-    /** Puts the project back a step; false when there's none. */
-    bool Undo(Edits& edits);
-    bool Redo(Edits& edits);
+    bool Record(
+      const std::string& label,
+      const ModChanges& before,
+      const ModChanges& after,
+      const std::string& mergeKey,
+      double now
+    );
+    /** Puts the changes back a step; false when there's none. */
+    bool Undo(ModChanges& changes);
+    bool Redo(ModChanges& changes);
+    /** The same on a project's changes and derived units. */
+    bool Undo(ModProject& project);
+    bool Redo(ModProject& project);
     [[nodiscard]] const std::string* UndoName() const;
     [[nodiscard]] const std::string* RedoName() const;
     void Clear();
@@ -69,8 +79,8 @@ namespace faf::editor
     struct Entry
     {
       std::string label;
-      Edits before;
-      Edits after;
+      ModChanges before;
+      ModChanges after;
       std::string mergeKey;
       double at = 0.0;
     };

@@ -2533,10 +2533,10 @@ namespace faf::editor
           (void)lab.SetField(*mass, mass->base + 25.0, false);
           (void)lab.SetField(*damage, damage->base * 3.0, false);
           ModProject& p = *panel.Project();
-          const ModEditHistory::Edits after = p.edits;
-          const bool undone = panel.History().Undo(p.edits);
+          const ModChanges after = ModChangesOf(p);
+          const bool undone = panel.History().Undo(p);
           const std::size_t afterUndo = p.edits.count(unit) != 0 ? p.edits[unit].size() : 0;
-          const bool redone = panel.History().Redo(p.edits);
+          const bool redone = panel.History().Redo(p);
           gpg::Logf(
             "editor: unit lab test: %s, %zu fields; mass %g -> %g, %s %g -> %g; undo %s (%zu changes left), redo %s, "
             "same as before: %s",
@@ -2550,9 +2550,24 @@ namespace faf::editor
             undone ? "took a step" : "had none",
             afterUndo,
             redone ? "took it again" : "had none",
-            p.edits == after ? "yes" : "no"
+            ModChangesOf(p) == after ? "yes" : "no"
           );
           mLabTestUnit = unit;
+          // A derived unit of it: its own mass cost, named.
+          p.derived.clear();
+          std::string deriveError;
+          if (lab.Derive("xel0201", "Lab Tank", "A heavier Medium Tank", deriveError)) {
+            (void)lab.SetField(*mass, mass->base * 2.0 + 44.0, false);
+            gpg::Logf(
+              "editor: unit lab test: derived xel0201 from %s, mass %g; %zu history steps",
+              unit.c_str(),
+              mass->base * 2.0 + 44.0,
+              panel.History().Size()
+            );
+          } else {
+            gpg::Warnf("editor: unit lab test: no derived unit: %s", deriveError.c_str());
+          }
+          lab.SelectUnit(unit);
           {
             std::string label;
             std::string field;
@@ -2581,6 +2596,15 @@ namespace faf::editor
             mLabTestUnit.c_str(),
             index,
             index
+          );
+          moho::CON_Execute(command);
+          (void)std::snprintf(
+            command,
+            sizeof(command),
+            "SimLua local d = __blueprints['xel0201'] if d then LOG('editor: unit lab test: the sim has xel0201: mass "
+            "', "
+            "d.Economy.BuildCostMass, ', name ', d.General.UnitName, ', weapon 1 damage ', d.Weapon[1].Damage) "
+            "else LOG('editor: unit lab test: the sim has no xel0201') end"
           );
           moho::CON_Execute(command);
           break;

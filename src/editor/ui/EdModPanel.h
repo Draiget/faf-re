@@ -55,6 +55,8 @@ namespace faf::editor
     }
     /** A unit's weapon place by label in the game's blueprint (1-based; 0 when none). */
     [[nodiscard]] static int WeaponIndex(const std::string& id, const std::string& label);
+    /** The same for a project's unit (a derived unit's weapons are its base unit's). */
+    [[nodiscard]] static int WeaponIndexIn(const ModProject& project, const std::string& id, const std::string& label);
 
   private:
     EdDocument& mDocument;

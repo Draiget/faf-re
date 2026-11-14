@@ -194,4 +194,55 @@ namespace faf::editor
     EXPECT_TRUE(fromBackup);
     EXPECT_EQ(back.edits.count("uel0201"), 1U) << "the .bak holds the project before the last write";
   }
+
+  TEST(
+    ModProject,
+    DerivedUnitsAreMadeByTheProjectsBlueprintHook
+  )
+  {
+    const auto gameHas = [](const std::string& id) {
+      return id == "uel0201" || id == "ura0203";
+    };
+    ModProject p;
+    std::string error;
+    EXPECT_FALSE(AddModDerived(p, "xel01", "uel0201", "", "", gameHas, error)) << "too short";
+    EXPECT_FALSE(AddModDerived(p, "ura0203", "uel0201", "", "", gameHas, error)) << "the game has it";
+    EXPECT_FALSE(AddModDerived(p, "xel0201", "nope0001", "", "", gameHas, error)) << "no base";
+    ASSERT_TRUE(AddModDerived(p, "xel0201", "uel0201", "Lab 'Tank'", "Heavier", gameHas, error)) << error;
+    EXPECT_FALSE(AddModDerived(p, "xel0201", "uel0201", "", "", gameHas, error)) << "derived already";
+    EXPECT_EQ(ModSourceUnit(p, "xel0201"), "uel0201");
+    EXPECT_EQ(ModSourceUnit(p, "uel0201"), "uel0201");
+    p.edits["xel0201"]["Economy.BuildCostMass"] = 156.0;
+    p.edits["xel0201"]["Weapon:MainGun.Damage"] = 40.0;
+    p.edits["uel0201"]["Economy.BuildCostMass"] = 81.0;
+    const std::string hook = ModDerivedHook(p, Weapons);
+    EXPECT_EQ(hook.rfind(kModProjectMark, 0), 0U);
+    EXPECT_TRUE(Has(hook, "    local oldModBlueprints = ModBlueprints\n"));
+    EXPECT_TRUE(Has(hook, "    function ModBlueprints(all_bps)\n        oldModBlueprints(all_bps)\n"));
+    EXPECT_TRUE(Has(hook, "local bp = table.merged(table.deepcopy(source), delta)"));
+    EXPECT_TRUE(Has(
+      hook,
+      "        Derive('xel0201', 'uel0201', 'Lab \\'Tank\\'', 'Heavier', {\n            Economy = {\n"
+      "                BuildCostMass = 156,\n            },\n            Weapon = {\n                [1] = {\n"
+      "                    Damage = 40,\n                },\n            },\n        })\n"
+    )) << hook;
+    EXPECT_FALSE(Has(hook, "BuildCostMass = 81")) << "the base unit's own change is its merge blueprint's";
+    // Saved and read back.
+    ModProject back;
+    ASSERT_TRUE(LoadModProject(SaveModProject(p), back, error)) << error;
+    EXPECT_EQ(back.derived, p.derived);
+    EXPECT_EQ(back.edits, p.edits);
+    // Written: the hook, a merge blueprint for uel0201 only; without derived units the hook goes.
+    const std::filesystem::path folder = Fresh("derived");
+    ModWriteReport report = WriteModProject(folder, p, Weapons, {});
+    EXPECT_TRUE(report.problems.empty());
+    EXPECT_TRUE(Has(Read(folder / kModHookFile), "Derive('xel0201'"));
+    EXPECT_TRUE(std::filesystem::exists(folder / "units" / "uel0201" / "uel0201_unit.bp"));
+    EXPECT_FALSE(std::filesystem::exists(folder / "units" / "xel0201"));
+    p.derived.clear();
+    p.edits.erase("xel0201");
+    EXPECT_TRUE(ModDerivedHook(p, Weapons).empty());
+    report = WriteModProject(folder, p, Weapons, {});
+    EXPECT_FALSE(std::filesystem::exists(folder / kModHookFile));
+  }
 } // namespace faf::editor

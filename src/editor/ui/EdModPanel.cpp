@@ -43,6 +43,15 @@ namespace faf::editor
     return mDocument.VaultFolder().empty() ? std::filesystem::path() : mDocument.VaultFolder() / "mods";
   }
 
+  int EdModPanel::WeaponIndexIn(
+    const ModProject& project,
+    const std::string& id,
+    const std::string& label
+  )
+  {
+    return WeaponIndex(ModSourceUnit(project, id), label);
+  }
+
   int EdModPanel::WeaponIndex(
     const std::string& id,
     const std::string& label
@@ -136,6 +145,14 @@ namespace faf::editor
     );
     mDirty = !report.problems.empty();
     mReport = report.problems;
+    if (!mProject->derived.empty()) {
+      gpg::Logf(
+        "editor: mod project %s: %zu derived units in %s",
+        mProject->name.c_str(),
+        mProject->derived.size(),
+        kModHookFile
+      );
+    }
     mMessage = "wrote " + std::to_string(report.written.size()) + " files" +
       (report.problems.empty() ? std::string() : ", " + std::to_string(report.problems.size()) + " problems");
     gpg::Logf(
@@ -233,8 +250,13 @@ namespace faf::editor
     }
     ImGui::TextDisabled("uid %s", p.uid.c_str());
     ImGui::SeparatorText("Changes");
-    if (p.edits.empty()) {
+    if (p.edits.empty() && p.derived.empty()) {
       ImGui::TextDisabled("No unit changed yet (the unit lab changes them).");
+    }
+    for (const auto& [id, d] : p.derived) {
+      ImGui::BulletText(
+        "%s: derived from %s%s%s", id.c_str(), d.base.c_str(), d.name.empty() ? "" : ", ", d.name.c_str()
+      );
     }
     std::string removeId;
     std::string removeKey;
@@ -271,24 +293,24 @@ namespace faf::editor
       ImGui::EndTable();
     }
     if (!removeId.empty()) {
-      const ModEditHistory::Edits before = p.edits;
+      const ModChanges before = ModChangesOf(p);
       p.edits[removeId].erase(removeKey);
       if (p.edits[removeId].empty()) {
         p.edits.erase(removeId);
       }
-      (void)mHistory.Record("revert " + removeId + " " + removeKey, before, p.edits, "", ImGui::GetTime());
+      (void)mHistory.Record("revert " + removeId + " " + removeKey, before, ModChangesOf(p), "", ImGui::GetTime());
       mDirty = true;
     }
     ImGui::BeginDisabled(mHistory.UndoName() == nullptr);
     if (ImGui::Button(ICON_UNDO " Undo")) {
-      (void)mHistory.Undo(p.edits);
+      (void)mHistory.Undo(p);
       mDirty = true;
     }
     ImGui::EndDisabled();
     ImGui::SameLine();
     ImGui::BeginDisabled(mHistory.RedoName() == nullptr);
     if (ImGui::Button(ICON_REDO " Redo")) {
-      (void)mHistory.Redo(p.edits);
+      (void)mHistory.Redo(p);
       mDirty = true;
     }
     ImGui::EndDisabled();

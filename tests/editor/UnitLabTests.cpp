@@ -70,34 +70,34 @@ namespace faf::editor
     ModEditHistory h;
     ModEditHistory::Edits e;
     ModEditHistory::Edits before = e;
-    e["uel0201"]["Economy.BuildCostMass"] = 55;
+    e.edits["uel0201"]["Economy.BuildCostMass"] = 55;
     EXPECT_TRUE(h.Record("mass", before, e, "drag", 0.0));
     before = e;
-    e["uel0201"]["Economy.BuildCostMass"] = 60;
+    e.edits["uel0201"]["Economy.BuildCostMass"] = 60;
     EXPECT_TRUE(h.Record("mass", before, e, "drag", 0.3));
     EXPECT_EQ(h.Size(), 1U) << "one drag, one step";
     before = e;
-    e["uel0201"]["Defense.MaxHealth"] = 400;
+    e.edits["uel0201"]["Defense.MaxHealth"] = 400;
     EXPECT_TRUE(h.Record("health", before, e, "drag2", 0.4));
     EXPECT_FALSE(h.Record("nothing", e, e, "", 0.5));
     EXPECT_EQ(*h.UndoName(), "health");
     ASSERT_TRUE(h.Undo(e));
-    EXPECT_EQ(e.at("uel0201").count("Defense.MaxHealth"), 0U);
+    EXPECT_EQ(e.edits.at("uel0201").count("Defense.MaxHealth"), 0U);
     ASSERT_TRUE(h.Undo(e));
-    EXPECT_TRUE(e.empty());
+    EXPECT_TRUE(e.edits.empty());
     EXPECT_FALSE(h.Undo(e));
     ASSERT_TRUE(h.Redo(e));
-    EXPECT_DOUBLE_EQ(e.at("uel0201").at("Economy.BuildCostMass"), 60);
+    EXPECT_DOUBLE_EQ(e.edits.at("uel0201").at("Economy.BuildCostMass"), 60);
     // A step after an undo drops the redo.
     before = e;
-    e["ura0203"]["Physics.MaxSpeed"] = 9;
+    e.edits["ura0203"]["Physics.MaxSpeed"] = 9;
     EXPECT_TRUE(h.Record("speed", before, e, "", 1.0));
     EXPECT_EQ(h.RedoName(), nullptr);
     // A redone step doesn't take a later drag of the same key in.
     ASSERT_TRUE(h.Undo(e));
     ASSERT_TRUE(h.Redo(e));
     before = e;
-    e["ura0203"]["Physics.MaxSpeed"] = 10;
+    e.edits["ura0203"]["Physics.MaxSpeed"] = 10;
     EXPECT_TRUE(h.Record("speed", before, e, "", 1.1));
     EXPECT_EQ(h.Size(), 3U);
   }

@@ -122,8 +122,8 @@ namespace faf::editor
 
   bool ModEditHistory::Record(
     const std::string& label,
-    const Edits& before,
-    const Edits& after,
+    const ModChanges& before,
+    const ModChanges& after,
     const std::string& mergeKey,
     const double now
   )
@@ -145,7 +145,7 @@ namespace faf::editor
   }
 
   bool ModEditHistory::Undo(
-    Edits& edits
+    ModChanges& edits
   )
   {
     if (mUndo.empty()) {
@@ -160,7 +160,7 @@ namespace faf::editor
   }
 
   bool ModEditHistory::Redo(
-    Edits& edits
+    ModChanges& edits
   )
   {
     if (mRedo.empty()) {
@@ -170,6 +170,30 @@ namespace faf::editor
     mRedo.pop_back();
     edits = entry.after;
     mUndo.push_back(std::move(entry));
+    return true;
+  }
+
+  bool ModEditHistory::Undo(
+    ModProject& project
+  )
+  {
+    ModChanges changes = ModChangesOf(project);
+    if (!Undo(changes)) {
+      return false;
+    }
+    ApplyModChanges(project, changes);
+    return true;
+  }
+
+  bool ModEditHistory::Redo(
+    ModProject& project
+  )
+  {
+    ModChanges changes = ModChangesOf(project);
+    if (!Redo(changes)) {
+      return false;
+    }
+    ApplyModChanges(project, changes);
     return true;
   }
 
