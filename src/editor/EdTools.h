@@ -275,7 +275,24 @@ namespace faf::editor
       float spacing = 4.0f;
       float centre = 0.0f;
       float range = 180.0f;
+      /** Each picked place copied through the map's symmetry (the brushes' setting). */
+      bool symmetric = false;
     };
+    /** Pick waves: a click picks a wave generator (Ctrl adds, Shift removes it), a drag moves the picked. */
+    [[nodiscard]] bool WavePicking() const noexcept
+    {
+      return mTool == 3 && mWavePick;
+    }
+    void SetWaveSelectionCount(
+      const int count
+    ) noexcept
+    {
+      mWaveSelectionCount = count;
+    }
+    [[nodiscard]] bool TakeWaveDelete() noexcept
+    {
+      return std::exchange(mWaveDelete, false);
+    }
     void SetWaveCount(
       const int count
     ) noexcept
@@ -296,7 +313,8 @@ namespace faf::editor
         mWaveDensity,
         mWaveSpacing,
         mWaveCentre,
-        mWaveRange
+        mWaveRange,
+        mWaveSymmetric
       };
       return std::exchange(mWaveAsk, WaveAsk::None);
     }
@@ -3092,6 +3110,10 @@ namespace faf::editor
     bool mWaterFinal = false;
     bool mWaterSunFollows = true;
     bool mWaterMaskPaint = false;
+    bool mWavePick = false;
+    bool mWaveSymmetric = false;
+    bool mWaveDelete = false;
+    int mWaveSelectionCount = 0;
     int mWaterMaskKind = 0;
     int mWaterMaskValue = 255;
     WaterMaskBrush mWaterMaskBrush;

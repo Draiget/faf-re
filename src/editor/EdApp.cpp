@@ -10421,7 +10421,46 @@ namespace faf::editor
             const std::vector<ShorePoint> found =
               FindShorePoints(heights, width, height, water.elevation, settings.depth, settings.centre, settings.range);
             std::uint32_t seed = static_cast<std::uint32_t>(::GetTickCount());
-            const std::vector<ShorePoint> picked = PickShorePoints(found, settings.density, settings.spacing, seed);
+            std::vector<ShorePoint> picked = PickShorePoints(found, settings.density, settings.spacing, seed);
+            if (settings.symmetric) {
+              const HeightBrush brush = tools.CurrentHeightBrush();
+              std::vector<ShorePoint> mirrored;
+              const float apart = std::max(1.0f, settings.spacing);
+              const auto crowded = [&](const float x, const float z) {
+                for (const ShorePoint& p : mirrored) {
+                  if (std::hypot(p.x - x, p.z - z) < apart) {
+                    return true;
+                  }
+                }
+                return false;
+              };
+              for (const ShorePoint& point : picked) {
+                float cx[kMaxSymmetryCopies], cz[kMaxSymmetryCopies], ax[kMaxSymmetryCopies], az[kMaxSymmetryCopies];
+                const int copies = HeightBrushCentres(
+                  field->width, field->height, point.x, point.z, brush.symmetry, brush.turns, cx, cz
+                );
+                (void)HeightBrushCentres(
+                  field->width,
+                  field->height,
+                  point.x + std::cos(point.heading),
+                  point.z + std::sin(point.heading),
+                  brush.symmetry,
+                  brush.turns,
+                  ax,
+                  az
+                );
+                if (crowded(point.x, point.z)) {
+                  continue; // (another place's copy is here already)
+                }
+                for (int c = 0; c < copies; ++c) {
+                  if (c > 0 && crowded(cx[c], cz[c])) {
+                    continue;
+                  }
+                  mirrored.push_back({cx[c], cz[c], std::atan2(az[c] - cz[c], ax[c] - cx[c])});
+                }
+              }
+              picked = std::move(mirrored);
+            }
             std::vector<WaveRecord> before = mDocument.WavesNow();
             std::vector<WaveRecord> after = before;
             for (const ShorePoint& point : picked) {

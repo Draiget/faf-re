@@ -1060,6 +1060,13 @@ namespace faf::editor
     /** The scatter or erase brush at (x, z) during its drag. */
     void DecalBrushAt(float x, float z);
     bool mDecalBrushing = false;
+    // The Water tool's picked wave generators (indexes into the document's) and a drag of them.
+    std::vector<int> mWaveSelection;
+    bool mWaveDrag = false;
+    float mWaveDragFromX = 0.0f;
+    float mWaveDragFromZ = 0.0f;
+    /** The generator nearest (x, z) within a few units, or -1. */
+    int PickWave(float x, float z) const;
     float mDecalBrushLastX = -1.0e9f;
     float mDecalBrushLastZ = -1.0e9f;
     std::vector<std::pair<float, float>> mDecalBrushPoints;

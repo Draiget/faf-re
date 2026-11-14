@@ -3516,6 +3516,10 @@ namespace faf::editor
         ImGui::SetNextItemWidth(-1.0f);
         ImGui::DragFloat2("##wavedirection", &mWaveCentre, 1.0f, 0.0f, 360.0f, "%.0f");
         ImGui::TextDisabled("Facing (degrees) and how far from it");
+        ImGui::Checkbox("Symmetric", &mWaveSymmetric);
+        EdSetItemTooltip(
+          "Each place copied through the map's symmetry (the brushes' setting), the copies facing alike"
+        );
         if (ImGui::Button("Add along the shore")) {
           mWaveAsk = WaveAsk::AddAlongShore;
         }
@@ -3535,6 +3539,19 @@ namespace faf::editor
         ImGui::SameLine();
         if (ImGui::Button("Export##waves")) {
           mWaveAsk = WaveAsk::Export;
+        }
+        ImGui::Checkbox("Pick waves in the view", &mWavePick);
+        if (mWavePick) {
+          mWaterMaskPaint = false;
+          ImGui::SameLine();
+          ImGui::BeginDisabled(mWaveSelectionCount == 0);
+          if (ImGui::Button("Delete picked")) {
+            mWaveDelete = true;
+          }
+          ImGui::EndDisabled();
+          ImGui::TextDisabled(
+            "%d picked: click picks (Ctrl adds), Shift+click removes, a drag moves", mWaveSelectionCount
+          );
         }
         Note(
           "Waves start where the ground is the depth below the sea and travel to the shore, as the retail maps' shore "

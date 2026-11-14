@@ -1085,6 +1085,32 @@ namespace faf::editor
         batcher->DrawLine(bottom, top);
       }
     }
+    // The Water tool's wave generators: a post each and an arrow the way its waves go (the picked ones yellow).
+    if (mTools->WaterToolActive()) {
+      const std::vector<WaveRecord> waves = mDocument.WavesNow();
+      mTools->SetWaveSelectionCount(static_cast<int>(mWaveSelection.size()));
+      for (std::size_t i = 0; i < waves.size(); ++i) {
+        const WaveRecord& wave = waves[i];
+        const bool picked =
+          std::find(mWaveSelection.begin(), mWaveSelection.end(), static_cast<int>(i)) != mWaveSelection.end();
+        const std::uint32_t colour = picked ? 0xF0FFE040u : 0xC040D0FFu;
+        moho::CD3DPrimBatcher::Vertex base{};
+        base.mX = wave.position[0];
+        base.mY = wave.position[1];
+        base.mZ = wave.position[2];
+        base.mColor = colour;
+        moho::CD3DPrimBatcher::Vertex top = base;
+        top.mY += 3.0f;
+        batcher->DrawLine(base, top);
+        const float speed = std::hypot(wave.velocity[0], wave.velocity[2]);
+        if (speed > 1e-4f) {
+          moho::CD3DPrimBatcher::Vertex tip = base;
+          tip.mX += wave.velocity[0] / speed * 6.0f;
+          tip.mZ += wave.velocity[2] / speed * 6.0f;
+          batcher->DrawLine(base, tip);
+        }
+      }
+    }
     // The Water tool's mask brush: the chosen mask where it isn't at its default, in bands (2 x 2 units a cell).
     if (mTools->WaterMaskPainting()) {
       int width = 0;
@@ -1765,6 +1791,24 @@ namespace faf::editor
       mDocument.SetModified(true);
       RefreshHeights(rects);
     }
+  }
+
+  int EdMapScene::PickWave(
+    const float x,
+    const float z
+  ) const
+  {
+    int best = -1;
+    float bestDistance = 6.0f;
+    const std::vector<WaveRecord> waves = mDocument.WavesNow();
+    for (std::size_t i = 0; i < waves.size(); ++i) {
+      const float d = std::hypot(waves[i].position[0] - x, waves[i].position[2] - z);
+      if (d < bestDistance) {
+        bestDistance = d;
+        best = static_cast<int>(i);
+      }
+    }
+    return best;
   }
 
   std::string EdMapScene::ApplyPathNow(
@@ -4104,6 +4148,20 @@ namespace faf::editor
           }
           mTools->SetErosionStatus(status, mErosionPreviewShown);
         }
+      }
+      if (mTools->TakeWaveDelete() && !mWaveSelection.empty()) {
+        std::vector<WaveRecord> before = mDocument.WavesNow();
+        std::vector<WaveRecord> after;
+        for (std::size_t i = 0; i < before.size(); ++i) {
+          if (std::find(mWaveSelection.begin(), mWaveSelection.end(), static_cast<int>(i)) == mWaveSelection.end()) {
+            after.push_back(before[i]);
+          }
+        }
+        const std::size_t removed = before.size() - after.size();
+        mDocument.ApplyWaves(after);
+        mDocument.WavesEdited(std::move(before));
+        mWaveSelection.clear();
+        gpg::Logf("editor: %zu wave generators deleted, %zu now", removed, after.size());
       }
       if (mTools->TakePathApply()) {
         mTools->SetStrokeStats(ApplyPathNow(mTools->PathPoints(), mTools->CurrentPathOptions()));
@@ -12012,6 +12070,44 @@ namespace faf::editor
           mTools->SetRulerText({});
         }
       }
+      // The Water tool's wave generators: pick (Ctrl adds), Shift removes, a drag moves the picked.
+      if (mTools != nullptr && mTools->WavePicking()) {
+        float groundX = 0.0f;
+        float groundZ = 0.0f;
+        if (!GroundAt(static_cast<float>(at.x), static_cast<float>(at.y), groundX, groundZ)) {
+          return true;
+        }
+        const int hit = PickWave(groundX, groundZ);
+        if ((wParam & MK_SHIFT) != 0) {
+          if (hit >= 0) {
+            std::vector<WaveRecord> before = mDocument.WavesNow();
+            std::vector<WaveRecord> after = before;
+            after.erase(after.begin() + hit);
+            mDocument.ApplyWaves(after);
+            mDocument.WavesEdited(std::move(before));
+            mWaveSelection.clear();
+            gpg::Logf("editor: wave generator %d removed, %zu now", hit, after.size());
+          }
+          return true;
+        }
+        if (hit < 0) {
+          if ((wParam & MK_CONTROL) == 0) {
+            mWaveSelection.clear();
+          }
+          return true;
+        }
+        if (std::find(mWaveSelection.begin(), mWaveSelection.end(), hit) == mWaveSelection.end()) {
+          if ((wParam & MK_CONTROL) == 0) {
+            mWaveSelection.clear();
+          }
+          mWaveSelection.push_back(hit);
+        }
+        mWaveDrag = true;
+        mWaveDragFromX = groundX;
+        mWaveDragFromZ = groundZ;
+        ::SetCapture(window);
+        return true;
+      }
       // The Water tool's mask brush: a drag paints the chosen mask (one undo step a stroke).
       if (mTools != nullptr && mTools->WaterMaskPainting()) {
         float groundX = 0.0f;
@@ -12521,6 +12617,26 @@ namespace faf::editor
     }
     case WM_LBUTTONUP:
       mGizmoDrag = GizmoPart::None;
+      if (mWaveDrag) {
+        mWaveDrag = false;
+        ::ReleaseCapture();
+        float toX = 0.0f;
+        float toZ = 0.0f;
+        if (CursorGround(toX, toZ) && std::hypot(toX - mWaveDragFromX, toZ - mWaveDragFromZ) >= 0.5f) {
+          std::vector<WaveRecord> before = mDocument.WavesNow();
+          std::vector<WaveRecord> after = before;
+          for (const int index : mWaveSelection) {
+            if (index >= 0 && index < static_cast<int>(after.size())) {
+              after[static_cast<std::size_t>(index)].position[0] += toX - mWaveDragFromX;
+              after[static_cast<std::size_t>(index)].position[2] += toZ - mWaveDragFromZ;
+            }
+          }
+          mDocument.ApplyWaves(after);
+          mDocument.WavesEdited(std::move(before));
+          gpg::Logf("editor: %zu wave generators moved", mWaveSelection.size());
+        }
+        return true;
+      }
       if (mDecalBrushing) {
         mDecalBrushing = false;
         ::ReleaseCapture();
