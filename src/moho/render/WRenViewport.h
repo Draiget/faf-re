@@ -467,8 +467,7 @@ namespace moho
     /**
      * Engine addition: one world view of `Render`'s per-view loop.
      */
-    void
-    RenderWorldView(const SWorldViewInfo* worldView, int head, const SWorldViewInfo* begin, bool regenerateShoreline);
+    void RenderWorldView(SWorldViewInfo* worldView, int head, const SWorldViewInfo* begin, bool regenerateShoreline);
 
     /**
      * Engine addition: FXAA, sharpening and grading (ren_Fxaa, ren_Sharpen, ren_Grade) over the world

@@ -985,7 +985,7 @@ namespace gpg::gal
   /**
    * Address: 0x008E9B40 (FUN_008E9B40)
    *
-   * std::weak_ptr<void> *,std::shared_ptr<void>
+   * boost::weak_ptr<void> *,boost::shared_ptr<void>
    *
    * What it does:
    * Dispatches `Func1`, clears caller weak-handle output, and consumes one
