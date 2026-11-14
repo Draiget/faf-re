@@ -4938,6 +4938,8 @@ namespace faf::editor
       // `/roundtripframes <n>` (test runs): /roundtrip and /saveas wait this many frames of the drawn map (180).
       int mRoundTripAfter = 180;
       void SaveDocument();
+      std::string mGraphMap;       // the map the Generate graph was built on (or came with): saved beside it
+      std::string mGraphOpenedFor; // the map whose own graph was looked for
       /**
        * Map > Resize, in two steps: StartResize takes what the map has (heights and masks as images, resized; props,
        * decals, markers, areas and units moved; the look, the layers and the scenario's fields) and makes the new
@@ -8255,6 +8257,17 @@ namespace faf::editor
       if (saved) {
         gpg::Logf("editor: %s", message.c_str());
         PostStatusMessage("Saved " + mDocument.FolderName());
+        if (!mGraphMap.empty() && mGraphMap == mDocument.Path()) {
+          if (const std::filesystem::path file = mDocument.TerrainGraphFile(); !file.empty()) {
+            std::ofstream out(file, std::ios::binary | std::ios::trunc);
+            out << mShell->Generate().GraphText();
+            (out ? gpg::Logf : gpg::Warnf)(
+              "editor: the terrain graph %s %s",
+              out ? "saved with the map as" : "couldn't be written to",
+              file.filename().string().c_str()
+            );
+          }
+        }
         // Saved: its autosave is behind it now.
         if (!mAutosaveRoot.empty()) {
           RemoveAutosave(mAutosaveRoot / mDocument.FolderName());
@@ -10484,6 +10497,22 @@ namespace faf::editor
       }
       if (EdShell::ResizeRequest ask; mShell->TakeResize(ask)) {
         StartResize(ask);
+      }
+      // A terrain graph built on the open map goes with it when it is saved.
+      if (mShell->Generate().TakeBuilt() && mDocument.GetState() == EdDocument::State::Open) {
+        mGraphMap = mDocument.Path();
+      }
+      // A map that has one: its graph opens in Generate.
+      if (finished && mDocument.GetState() == EdDocument::State::Open && mGraphOpenedFor != mDocument.Path()) {
+        mGraphOpenedFor = mDocument.Path();
+        std::error_code ec;
+        if (
+          const std::filesystem::path file = mDocument.TerrainGraphFile();
+          !file.empty() && std::filesystem::exists(file, ec) && mShell->Generate().OpenFile(file)
+        ) {
+          mGraphMap = mDocument.Path();
+          gpg::Logf("editor: the map's terrain graph opened in Generate (%s)", file.filename().string().c_str());
+        }
       }
       if (
         mResize.has_value() && !mResize->scenario.empty() && mScene.Attached() &&

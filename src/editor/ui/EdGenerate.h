@@ -82,6 +82,13 @@ namespace faf::editor
     {
       mBuildAsked = true;
     }
+    /** Whether a Build ran since the last ask (the app then saves the graph with the map). */
+    [[nodiscard]] bool TakeBuilt() noexcept
+    {
+      return std::exchange(mBuilt, false);
+    }
+    /** The graph as its file holds it (`.fafgraph.json`'s text). */
+    [[nodiscard]] std::string GraphText() const;
     void SetSeed(
       const int seed
     ) noexcept
@@ -160,6 +167,7 @@ namespace faf::editor
     bool mShowOnMap = false;
     bool mShownOnMap = false;
     bool mBuildAsked = false;
+    bool mBuilt = false;
     bool mRefreshAsked = true;
     std::string mEvaluatedKey;
     std::string mPendingKey;

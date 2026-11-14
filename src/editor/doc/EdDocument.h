@@ -454,6 +454,11 @@ namespace faf::editor
     /** The layout file of the map (empty for a map without a file of its own). */
     [[nodiscard]] std::filesystem::path LayoutFile() const;
     /**
+     * The terrain graph built on this map, kept beside it (`<map>_terrain.editor`, the graph's own JSON; packages leave
+     * `.editor` files out): saved with the map, opened in Generate when the map opens.
+     */
+    [[nodiscard]] std::filesystem::path TerrainGraphFile() const;
+    /**
      * The mission (the Mission workspace's stages and dialogues): kept beside the map in `<map>_mission.editor`, read
      * when the map opens; Save compiles it into the script's generated region, a play copy gets the test run's.
      */

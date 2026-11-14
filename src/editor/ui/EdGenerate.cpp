@@ -247,6 +247,11 @@ namespace faf::editor
                             : std::filesystem::path("terrain graphs");
   }
 
+  std::string EdGenerate::GraphText() const
+  {
+    return SaveTerrainGraph(*mGraph, mSeed, mName, mSymmetry);
+  }
+
   void EdGenerate::Save()
   {
     std::string file;
@@ -382,6 +387,7 @@ namespace faf::editor
     }
     if (mBuildAsked && !mAsked) {
       mBuildAsked = false;
+      mBuilt = true;
       TerrainGround ground;
       if (!mGround || !mGround(ground)) {
         mStatus = "Open a map: the graph runs on its ground.";

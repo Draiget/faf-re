@@ -2746,6 +2746,15 @@ namespace faf::editor
     return map.parent_path() / (map.stem().string() + "_layout.editor");
   }
 
+  std::filesystem::path EdDocument::TerrainGraphFile() const
+  {
+    const std::filesystem::path map = MapDiskFile();
+    if (map.empty()) {
+      return {};
+    }
+    return map.parent_path() / (map.stem().string() + "_terrain.editor");
+  }
+
   void EdDocument::LayoutArea(
     float& x0,
     float& z0,
