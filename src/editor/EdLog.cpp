@@ -147,7 +147,10 @@ namespace faf::editor
     }
     ImGui::Separator();
 
-    if (ImGui::BeginChild("##lines", ImVec2(0.0f, 0.0f), ImGuiChildFlags_None, ImGuiWindowFlags_HorizontalScrollbar)) {
+    const float footer = ImGui::GetFrameHeightWithSpacing();
+    if (
+      ImGui::BeginChild("##lines", ImVec2(0.0f, -footer), ImGuiChildFlags_None, ImGuiWindowFlags_HorizontalScrollbar)
+    ) {
       const std::lock_guard<std::mutex> lock(mMutex);
       for (const Line& line : mLines) {
         if (!Shown(line)) {
@@ -170,6 +173,54 @@ namespace faf::editor
       }
     }
     ImGui::EndChild();
+    // The console line: Enter runs it, Up and Down walk the history.
+    ImGui::SetNextItemWidth(-1.0f);
+    if (
+      ImGui::InputTextWithHint(
+        "##console",
+        "Lua (=expr prints it; sim <code> runs in the sim; con <command> the engine's console)",
+        mCommand,
+        sizeof(mCommand),
+        ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_CallbackHistory,
+        &EdLog::HistoryCallback,
+        this
+      )
+    ) {
+      std::string line = mCommand;
+      if (!line.empty()) {
+        mCommands.push_back(line);
+        if (mHistory.empty() || mHistory.back() != line) {
+          mHistory.push_back(line);
+          if (mHistory.size() > 50) {
+            mHistory.erase(mHistory.begin());
+          }
+        }
+      }
+      mCommand[0] = '\0';
+      mHistoryAt = -1;
+      ImGui::SetKeyboardFocusHere(-1); // stays in the line for the next one
+    }
+  }
+
+  int EdLog::HistoryCallback(
+    ImGuiInputTextCallbackData* const data
+  )
+  {
+    auto* const log = static_cast<EdLog*>(data->UserData);
+    if (log == nullptr || log->mHistory.empty()) {
+      return 0;
+    }
+    const int count = static_cast<int>(log->mHistory.size());
+    if (data->EventKey == ImGuiKey_UpArrow) {
+      log->mHistoryAt = log->mHistoryAt < 0 ? count - 1 : std::max(0, log->mHistoryAt - 1);
+    } else if (data->EventKey == ImGuiKey_DownArrow) {
+      log->mHistoryAt = log->mHistoryAt < 0 || log->mHistoryAt + 1 >= count ? -1 : log->mHistoryAt + 1;
+    }
+    data->DeleteChars(0, data->BufTextLen);
+    if (log->mHistoryAt >= 0) {
+      data->InsertChars(0, log->mHistory[static_cast<std::size_t>(log->mHistoryAt)].c_str());
+    }
+    return 0;
   }
   bool EdLog::Shown(
     const Line& line

@@ -47,6 +47,9 @@
 #include "moho/sim/CWldSession.h"
 #include "editor/tools/EdHeightFile.h"
 #include "editor/tools/EdResize.h"
+#include "lua/LuaObject.h"
+#include "lua/LuaPrimitives.h"
+#include "lua/luaplus/include/lauxlib.h"
 #include "editor/tools/EdTextureFiles.h"
 #include "editor/doc/EdPreview.h"
 #include "editor/tools/EdAlphaGen.h"
@@ -256,6 +259,7 @@ namespace faf::editor
         "/dropdefaultcube",
         "/exportpreview",
         "/resizetest",
+        "/console",
       };
       for (const char* const option : kOptions) {
         if (moho::CFG_GetArgOption(option, 0, nullptr)) {
@@ -4854,6 +4858,10 @@ namespace faf::editor
         if (++frame != 300) {
           return;
         }
+        // `/console <line>` (test runs): a console line, as if typed in the Log panel and Entered.
+        if (fa::vector<fa::string> line; moho::CFG_GetArgOption("/console", 1, &line) && !line.empty()) {
+          mLog.QueueCommand(line[0].c_str());
+        }
         // `/resizetest <width index>,<depth index>,<canvas|scale>,<anchor>,<folder>` (test runs): Map > Resize.
         if (fa::vector<fa::string> spec; moho::CFG_GetArgOption("/resizetest", 1, &spec) && !spec.empty()) {
           std::vector<std::string> parts;
@@ -4939,6 +4947,11 @@ namespace faf::editor
       // `/roundtripframes <n>` (test runs): /roundtrip and /saveas wait this many frames of the drawn map (180).
       int mRoundTripAfter = 180;
       void SaveDocument();
+      /**
+       * The Log panel's console line: `sim <code>` runs in the sim (the engine's SimLua, with a session), `con
+       * <command>` is the engine's console, anything else runs in the interface's Lua; `=expr` prints its value.
+       */
+      void RunConsoleLine(const std::string& line);
       bool mMarkerTemplatesRead = false;
       std::string mGraphMap;       // the map the Generate graph was built on (or came with): saved beside it
       std::string mGraphOpenedFor; // the map whose own graph was looked for
@@ -8600,6 +8613,49 @@ namespace faf::editor
       return true;
     }
 
+    void EditorApp::RunConsoleLine(
+      const std::string& line
+    )
+    {
+      gpg::Logf("> %s", line.c_str());
+      if (line.rfind("sim ", 0) == 0) {
+        if (!mPlay.Active()) {
+          gpg::Warnf("editor: sim: no game is running (Play first)");
+          return;
+        }
+        moho::CON_Execute(("SimLua " + line.substr(4)).c_str());
+        return;
+      }
+      if (line.rfind("con ", 0) == 0) {
+        moho::CON_Execute(line.substr(4).c_str());
+        return;
+      }
+      LuaPlus::LuaState* const state = moho::USER_GetLuaState();
+      lua_State* const L = state != nullptr ? state->GetCState() : nullptr;
+      if (L == nullptr) {
+        gpg::Warnf("editor: the interface's Lua isn't running yet");
+        return;
+      }
+      const bool print = !line.empty() && line.front() == '=';
+      const std::string chunk = print ? "return " + line.substr(1) : line;
+      const int top = lua_gettop(L);
+      if (luaL_loadbuffer(L, chunk.data(), chunk.size(), "=console") != 0) {
+        gpg::Warnf("%s", lua_tostring(L, -1) != nullptr ? lua_tostring(L, -1) : "can't read it");
+      } else if (LuaCallProtected(L, 0, print ? 1 : 0) != 0) {
+        gpg::Warnf("%s", lua_tostring(L, -1) != nullptr ? lua_tostring(L, -1) : "error");
+      } else if (print) {
+        const int type = lua_type(L, -1);
+        if (type == LUA_TSTRING || type == LUA_TNUMBER) {
+          gpg::Logf("= %s", lua_tostring(L, -1));
+        } else if (type == LUA_TBOOLEAN) {
+          gpg::Logf("= %s", lua_toboolean(L, -1) != 0 ? "true" : "false");
+        } else {
+          gpg::Logf("= (%s)", lua_typename(L, type));
+        }
+      }
+      lua_settop(L, top);
+    }
+
     void EditorApp::FinishResize()
     {
       PendingResize& r = *mResize;
@@ -10680,6 +10736,9 @@ namespace faf::editor
       }
       if (EdShell::ResizeRequest ask; mShell->TakeResize(ask)) {
         StartResize(ask);
+      }
+      for (std::string command; mLog.TakeCommand(command);) {
+        RunConsoleLine(command);
       }
       // The game's marker templates (FAF's /lua/MarkerTemplates.lua, mods' types too), once the files are there.
       if (!mMarkerTemplatesRead && mDocument.GetState() == EdDocument::State::Open) {

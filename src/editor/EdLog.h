@@ -9,6 +9,8 @@
 
 #include "gpg/core/utils/Logging.h"
 
+struct ImGuiInputTextCallbackData;
+
 namespace faf::editor
 {
   /**
@@ -49,6 +51,28 @@ namespace faf::editor
     [[nodiscard]] std::vector<std::string> EndCapture();
     /** The mission trace ids (`EDMISSION trace <id>` lines of a test play) that arrived since the last take. */
     [[nodiscard]] std::vector<std::string> TakeMissionTrace();
+    /**
+     * The console line under the lines (FAF Studio's console): what was typed and Entered, taken once a frame by the
+     * app, which runs it (UI Lua; `=expr` prints its value; `sim <code>` in the sim; `con <command>` the engine's).
+     */
+    [[nodiscard]] bool TakeCommand(
+      std::string& out
+    )
+    {
+      if (mCommands.empty()) {
+        return false;
+      }
+      out = std::move(mCommands.front());
+      mCommands.pop_front();
+      return true;
+    }
+    /** Test runs: a line as if typed and Entered. */
+    void QueueCommand(
+      std::string command
+    )
+    {
+      mCommands.push_back(std::move(command));
+    }
 
   private:
     struct Line
@@ -75,5 +99,10 @@ namespace faf::editor
     bool mShowWarnings = true;
     bool mShowDebug = true;
     char mFilter[128]{};
+    char mCommand[512]{};
+    std::deque<std::string> mCommands;
+    std::vector<std::string> mHistory; // the last 50 lines Entered, oldest first
+    int mHistoryAt = -1;               // Up / Down's place in it (-1: the line being typed)
+    static int HistoryCallback(::ImGuiInputTextCallbackData* data);
   };
 } // namespace faf::editor
