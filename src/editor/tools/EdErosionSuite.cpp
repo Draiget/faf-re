@@ -343,7 +343,7 @@ namespace faf::editor
   ErosionValues ErosionOpValues(
     const ErosionSolver& solver,
     const ErosionValues& values,
-    const int step
+    const double step
   )
   {
     ErosionValues p = values;
@@ -351,6 +351,24 @@ namespace faf::editor
       const auto found = p.find(key);
       return found != p.end() ? found->second : fallback;
     };
+    // Finer than the map's grid (an Oversample node's re-run, step 1 / factor): the same scaling the other way, the
+    // masks kept (they are why it runs again).
+    if (step > 0.0 && step < 1.0) {
+      const double s = step;
+      const std::string id = solver.id;
+      if (id == "hydraulic") {
+        p["iterations"] = std::floor(get("iterations", 60) / s + 0.5);
+        p["rain"] = get("rain", 0.004) * s;
+        p["erosion"] = get("erosion", 0.08) * s;
+        p["deposition"] = get("deposition", 0.05) * s;
+      } else if (id == "droplet") {
+        p["lifetime"] = std::floor(get("lifetime", 40) / s + 0.5);
+        p["radius"] = std::floor(get("radius", 3) / s + 0.5);
+        p["thermal_steps"] = std::floor(get("thermal_steps", 0) / s + 0.5);
+        p["creep"] = get("creep", 2) / s;
+      }
+      return p;
+    }
     if (step > 1) {
       const double s = static_cast<double>(step);
       const std::string id = solver.id;
@@ -367,7 +385,7 @@ namespace faf::editor
         p["creep"] = get("creep", 2) * 1.5 / s;
       }
       if (id != "stream") {
-        p["smooth_passes"] = step >= 4 ? 0.0 : std::max(0.0, get("smooth_passes", 1) - 1.0);
+        p["smooth_passes"] = step >= 4.0 ? 0.0 : std::max(0.0, get("smooth_passes", 1) - 1.0);
       }
       p["masks"] = 0; // a preview needs no wear, deposit or flow
     }

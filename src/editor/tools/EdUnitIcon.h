@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -41,4 +42,45 @@ namespace faf::editor
    */
   [[nodiscard]] std::vector<std::uint32_t>
   KeyedIcon(const std::uint32_t* onBlack, const std::uint32_t* onWhite, int side, float wantLight);
+
+  /**
+   * How a made icon compares with the one the game ships (FAF Studio's icongen.lua Compare), both RGBA 0..255 bytes of
+   * the same size: the silhouettes' overlap (intersection over union of the pixels with alpha >= 128), the mean colour
+   * difference where both are drawn, the mean alpha difference, the difference of the two drawn parts' mean colours
+   * (tint), and the mean difference of 8 x 8 blocks (coarse look).
+   */
+  struct IconMetrics
+  {
+    float iou = 0.0f;
+    int areaA = 0;
+    int areaB = 0;
+    float colour = 255.0f;
+    float alpha = 255.0f;
+    float tint = 255.0f;
+    float coarse = 255.0f;
+  };
+  [[nodiscard]] IconMetrics CompareIcons(const std::uint8_t* a, const std::uint8_t* b, int side);
+
+  /**
+   * Tone fit (Studio's ToneFit): per faction, what the shipped icons' colours are over the renders' where both are
+   * fully drawn and the shipped one isn't near white; gains (r, g, b) once a faction has 200 pixels.
+   */
+  struct IconToneFit
+  {
+    struct Sums
+    {
+      long long n = 0;
+      double x[3] = {0, 0, 0};
+      double y[3] = {0, 0, 0};
+    };
+    std::map<std::string, Sums> sums;
+    void Add(const std::string& faction, const std::uint8_t* render, const std::uint8_t* shipped, int side);
+    /** The faction's gains, or false when it has too few pixels (then `all` factions together, if enough). */
+    bool Gains(const std::string& faction, float (&gains)[3]) const;
+  };
+  /** The colours of RGBA bytes times the gains (alpha kept). */
+  void ApplyIconTone(std::vector<std::uint8_t>& rgba, const float (&gains)[3]);
+  /** A unit id's faction by its letters (uel / uea / ues / ueb: UEF, ua*: Aeon, ur*: Cybran, xs*: Seraphim); "" none.
+   */
+  [[nodiscard]] std::string IconFactionOf(const std::string& id);
 } // namespace faf::editor

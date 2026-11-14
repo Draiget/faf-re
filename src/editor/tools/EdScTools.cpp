@@ -250,7 +250,7 @@ namespace faf::editor
     float fx0 = 1e9f, fz0 = 1e9f, fx1 = -1e9f, fz1 = -1e9f;
     std::vector<double> flat;
     for (const Pad& p : pads) {
-      flat.insert(flat.end(), {p.x, p.z, p.half, p.skirt, 0.0, static_cast<double>(p.group)});
+      flat.insert(flat.end(), {p.x, p.z, p.half, p.skirt, static_cast<double>(p.y), static_cast<double>(p.group)});
       const float r = p.half + p.skirt + 2.0f;
       fx0 = std::min(fx0, p.x - r);
       fz0 = std::min(fz0, p.z - r);

@@ -282,6 +282,136 @@ namespace faf::editor
     }
 
     /** Editor.Tool(id, title, click) */
+    /**
+     * Editor.MissionNode(id, title, params, code): a mission node type (Studio's Mission.Register). `params` a list of
+     * { key, label, kind ('text', 'number', 'bool', 'army', 'chain', 'marker' ...), value }, `code(values)` returns the
+     * Lua the node compiles to (a string; lines split at line breaks). While editor/commands.lua loads.
+     */
+    int LuaMissionNode(
+      lua_State* L
+    )
+    {
+      Mod* const mod = ModOf(L);
+      const std::string id = ArgString(L, 1);
+      if (
+        mod == nullptr || gHost == nullptr || gHost->Loading() != mod || id.empty() || lua_type(L, 3) != LUA_TTABLE ||
+        lua_type(L, 4) != LUA_TFUNCTION
+      ) {
+        lua_pushstring(
+          L,
+          "Editor.MissionNode(id, title, params, code): an id, a title, a list of params and a function, while "
+          "editor/commands.lua loads"
+        );
+        lua_error(L);
+        return 0;
+      }
+      MissionNodeType type;
+      type.id = id;
+      type.title = ArgString(L, 2).empty() ? id : ArgString(L, 2);
+      type.family = "mod";
+      const auto field = [L](const char* key) {
+        lua_pushstring(L, key);
+        lua_gettable(L, -2);
+        std::string value = lua_isstring(L, -1) != 0 ? lua_tostring(L, -1) : "";
+        lua_pop(L, 1);
+        return value;
+      };
+      for (int i = 1;; ++i) {
+        lua_rawgeti(L, 3, i);
+        if (lua_type(L, -1) != LUA_TTABLE) {
+          lua_pop(L, 1);
+          break;
+        }
+        MissionParam p;
+        p.key = field("key");
+        p.label = field("label");
+        p.kind = field("kind");
+        p.value = field("value");
+        if (p.label.empty()) {
+          p.label = p.key;
+        }
+        if (p.kind.empty()) {
+          p.kind = "text";
+        }
+        lua_pop(L, 1);
+        if (!p.key.empty()) {
+          type.params.push_back(std::move(p));
+        }
+      }
+      lua_pushvalue(L, 4);
+      const int ref = luaL_ref(L, LUA_REGISTRYINDEX);
+      std::vector<std::string> keys;
+      for (const MissionParam& p : type.params) {
+        keys.push_back(p.key);
+      }
+      const std::string title = type.title;
+      Mod* const owner = mod;
+      type.emit = [owner, ref, keys, title](const MissionValues& values, const MissionEmit&) {
+        std::vector<std::string> lines;
+        if (!owner->running || owner->lua == nullptr) {
+          lines.push_back("-- " + title + ": its editor mod isn't running");
+          return lines;
+        }
+        lua_State* const S = owner->lua->GetCState();
+        lua_rawgeti(S, LUA_REGISTRYINDEX, ref);
+        lua_newtable(S);
+        for (const std::string& key : keys) {
+          lua_pushstring(S, key.c_str());
+          const std::string v = values.S(key);
+          lua_pushstring(S, v.c_str());
+          lua_settable(S, -3);
+        }
+        if (LuaCallProtected(S, 1, 1) != 0) {
+          const std::string message = lua_isstring(S, -1) != 0 ? lua_tostring(S, -1) : "an error";
+          lua_settop(S, 0);
+          lines.push_back("-- " + title + ": its code failed: " + message);
+          return lines;
+        }
+        const std::string code = lua_isstring(S, -1) != 0 ? lua_tostring(S, -1) : "";
+        lua_settop(S, 0);
+        std::size_t at = 0;
+        while (at <= code.size()) {
+          const std::size_t nl = std::min(code.find('\n', at), code.size());
+          if (nl > at) {
+            lines.push_back(code.substr(at, nl - at));
+          }
+          at = nl + 1;
+        }
+        return lines;
+      };
+      std::string error;
+      if (!RegisterMissionNodeType(std::move(type), error)) {
+        lua_pushstring(L, ("Editor.MissionNode: " + error).c_str());
+        lua_error(L);
+        return 0;
+      }
+      return 0;
+    }
+
+    /** Editor.On(event, fn): `fn(arg)` after `map` (a map opened: its path), `save` (saved) and `edit` (an undo step
+     * ended: what it was). The editor's hook points for mods (Studio's mods hook its Lua modules). */
+    int LuaOn(
+      lua_State* L
+    )
+    {
+      Mod* const mod = ModOf(L);
+      const std::string event = ArgString(L, 1);
+      if (
+        mod == nullptr || gHost == nullptr || gHost->Loading() != mod ||
+        (event != "map" && event != "save" && event != "edit") || lua_type(L, 2) != LUA_TFUNCTION
+      ) {
+        lua_pushstring(
+          L, "Editor.On(event, fn): event 'map', 'save' or 'edit' and a function, while editor/commands.lua loads"
+        );
+        lua_error(L);
+        return 0;
+      }
+      lua_pushvalue(L, 2);
+      const int ref = luaL_ref(L, LUA_REGISTRYINDEX);
+      gHost->AddListener(*mod, event, ref);
+      return 0;
+    }
+
     int LuaTool(
       lua_State* L
     )
@@ -385,7 +515,10 @@ namespace faf::editor
         {"map", 1},
         {"markers", 1},
         {"heights", 1},
-        {"layers", 1}
+        {"layers", 1},
+        {"mission_nodes", 1},
+        {"events", 1},
+        {"sim_hooks", 1}
       };
       return kPoints;
     }
@@ -557,11 +690,125 @@ namespace faf::editor
     }
   }
 
+  void EdModHost::AddListener(
+    Mod& mod,
+    const std::string& event,
+    const int ref
+  )
+  {
+    mListeners.push_back({&mod, event, ref});
+  }
+
+  void EdModHost::Notify(
+    const std::string& event,
+    const std::string& arg
+  )
+  {
+    for (const Listener& l : mListeners) {
+      if (l.event != event || l.mod == nullptr || !l.mod->running || l.mod->lua == nullptr) {
+        continue;
+      }
+      lua_State* const L = l.mod->lua->GetCState();
+      lua_rawgeti(L, LUA_REGISTRYINDEX, l.ref);
+      lua_pushstring(L, arg.c_str());
+      if (LuaCallProtected(L, 1, 0) != 0) {
+        const std::string message = lua_isstring(L, -1) != 0 ? lua_tostring(L, -1) : "an error";
+        lua_settop(L, 0);
+        Fail(*l.mod, "its " + event + " listener failed: " + message);
+      }
+    }
+  }
+
+  std::vector<std::string> EdModHost::SimHookMods() const
+  {
+    std::vector<std::string> out;
+    for (const std::unique_ptr<Mod>& mod : mMods) {
+      if (mod->info.simHooks && mEnabled.count(mod->info.uid) != 0 && !mod->info.uid.empty()) {
+        out.push_back(mod->info.uid);
+      }
+    }
+    return out;
+  }
+
+  void EdModHost::EndTrial()
+  {
+    if (!mTrialFile.empty() && mTrialOpen) {
+      std::error_code ec;
+      std::filesystem::remove(mTrialFile, ec);
+      mTrialOpen = false;
+      gpg::Logf("editor: editor mods: the editor came up with its mods (start-up trial passed)");
+    }
+  }
+
   void EdModHost::Scan(
     const std::filesystem::path& mods
   )
   {
     mFolder = mods;
+    // The start-up trial (Studio's mods.lua): the mods turned on are written down before they run and the note is taken
+    // away once the editor is up (EndTrial). A note still there means the editor didn't come up with them last time:
+    // they are turned off now and the panel says so.
+    std::error_code ec;
+    if (!mEnabledFile.empty()) {
+      mTrialFile = mEnabledFile;
+      mTrialFile += ".trial";
+      std::ifstream trial(mTrialFile, std::ios::binary);
+      if (trial) {
+        std::string uid;
+        while (std::getline(trial, uid)) {
+          if (!uid.empty() && uid.back() == '\r') {
+            uid.pop_back();
+          }
+          if (!uid.empty() && mEnabled.erase(uid) != 0) {
+            mTrialOff.insert(uid);
+          }
+        }
+        trial.close();
+        if (!mTrialOff.empty()) {
+          gpg::Warnf(
+            "editor: editor mods: the editor didn't come up last time with these turned on: %zu %s off now",
+            mTrialOff.size(),
+            mTrialOff.size() == 1 ? "mod is" : "mods are"
+          );
+          SaveEnabled();
+        }
+      }
+      // New mods start turned on (Studio's are always loaded); a mod the user turned off stays off.
+      std::filesystem::path knownFile = mEnabledFile;
+      knownFile += ".known";
+      std::set<std::string> known;
+      {
+        std::ifstream in(knownFile, std::ios::binary);
+        std::string uid;
+        while (std::getline(in, uid)) {
+          if (!uid.empty() && uid.back() == '\r') {
+            uid.pop_back();
+          }
+          known.insert(uid);
+        }
+      }
+      bool added = false;
+      for (const EditorModInfo& info : FindEditorMods(mods)) {
+        if (known.insert(info.uid).second) {
+          if (mNewModsOn && mTrialOff.count(info.uid) == 0) {
+            mEnabled.insert(info.uid);
+          }
+          added = true;
+        }
+      }
+      if (added) {
+        std::ofstream out(knownFile, std::ios::binary | std::ios::trunc);
+        for (const std::string& uid : known) {
+          out << uid << "\n";
+        }
+        SaveEnabled();
+      }
+      std::ofstream note(mTrialFile, std::ios::binary | std::ios::trunc);
+      for (const std::string& uid : mEnabled) {
+        note << uid << "\n";
+      }
+      mTrialOpen = static_cast<bool>(note);
+    }
     for (EditorModInfo& info : FindEditorMods(mods)) {
       const bool known = std::any_of(mMods.begin(), mMods.end(), [&](const std::unique_ptr<Mod>& m) {
         return m->info.uid == info.uid;
@@ -649,6 +896,8 @@ namespace faf::editor
     SetFunction(L, "Menu", &LuaMenu, &mod);
     SetFunction(L, "Has", &LuaHas, &mod);
     SetFunction(L, "Tool", &LuaTool, &mod);
+    SetFunction(L, "MissionNode", &LuaMissionNode, &mod);
+    SetFunction(L, "On", &LuaOn, &mod);
     SetFunction(L, "SetHeights", &LuaSetHeights, &mod);
     SetFunction(L, "LayerAt", &LuaLayerAt, &mod);
     lua_pushstring(L, "ApiVersion");
@@ -705,6 +954,16 @@ namespace faf::editor
     }
       ),
       mTools.end()
+    );
+    mListeners.erase(
+      std::remove_if(
+        mListeners.begin(),
+        mListeners.end(),
+        [&mod](const Listener& l) {
+      return l.mod == &mod;
+    }
+      ),
+      mListeners.end()
     );
     mod.running = true;
     mod.error.clear();
@@ -1033,11 +1292,26 @@ namespace faf::editor
       return;
     }
     ImGui::TextWrapped(
-      "Mods that add commands, panels and menu entries to the editor (mod_info.lua: editor_mod = true; "
-      "editor/commands.lua). They are off until turned on here, run apart from the game (no files, no engine "
-      "functions), "
-      "and a mod whose command fails is turned off until the editor starts again; a panel that fails stops drawing."
+      "Mods that add commands, panels, menu entries, view tools and mission node types to the editor (mod_info.lua: "
+      "editor_mod = true; editor/commands.lua). A new mod starts turned on; they run apart from the game (no files, no "
+      "engine functions); a mod whose command fails is turned off until the editor starts again, a panel that fails "
+      "stops drawing, and a mod the editor didn't come up with last time is turned off."
     );
+    if (!mTrialOff.empty()) {
+      std::string names;
+      for (const std::string& uid : mTrialOff) {
+        for (const std::unique_ptr<Mod>& mod : mMods) {
+          if (mod->info.uid == uid) {
+            names += (names.empty() ? "" : ", ") + mod->info.name;
+          }
+        }
+      }
+      ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(255, 190, 90, 255));
+      ImGui::TextWrapped(
+        "Turned off by the start-up trial (the editor didn't come up with them last time): %s", names.c_str()
+      );
+      ImGui::PopStyleColor();
+    }
     ImGui::TextDisabled("In %s", mFolder.string().c_str());
     if (mMods.empty()) {
       ImGui::TextDisabled("No editor mods there.");

@@ -107,7 +107,12 @@ namespace faf::editor
     if (device == nullptr || device->GetResources() == nullptr || moho::ren_Viewport == nullptr) {
       return;
     }
+    // Last frame's replaced targets: no draw list holds their image any more.
+    mRetired.reset();
+    mRetiredDepth.reset();
     if (!mTarget || !mDepth || mTargetWidth != mWidth || mTargetHeight != mHeight) {
+      mRetired = std::move(mTarget);
+      mRetiredDepth = std::move(mDepth);
       mTarget.reset();
       mDepth.reset();
       (void)device->GetResources()->CreateRenderTarget(mTarget, mWidth, mHeight, 2);

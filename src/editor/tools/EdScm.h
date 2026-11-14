@@ -20,6 +20,9 @@ namespace faf::editor
       int normal = -1;
     };
     std::vector<std::array<Corner, 3>> triangles;
+    /** The `o` / `g` names in file order, and each triangle's (an index into them; -1 before the first). */
+    std::vector<std::string> groups;
+    std::vector<int> triangleGroup;
   };
 
   /** Reads `v`, `vt`, `vn` and `f` lines (polygons fanned into triangles, negative indexes from the end). */
@@ -36,6 +39,31 @@ namespace faf::editor
   [[nodiscard]] std::vector<std::uint8_t> ScmFromObj(
     const ObjMesh& mesh,
     const std::string& boneName,
+    float scale,
+    const std::string& info,
+    std::string& error
+  );
+
+  /** A bone of a skinned model: its parent (-1 the root, parents before children), its place and turn in the parent
+   * (rotation w, x, y, z), and the inverse bind pose (3 rows of 3, then the translation row) when known. */
+  struct ScmBone
+  {
+    std::string name;
+    int parent = -1;
+    std::array<float, 12> rest{};
+    bool hasRest = false;
+    std::array<float, 3> pos{};
+    std::array<float, 4> rot{1.0f, 0.0f, 0.0f, 0.0f};
+  };
+  /** Fills the inverse bind pose of every bone that has none, from its position and rotation (parents first). */
+  void ScmBindPose(std::vector<ScmBone>& bones);
+  /** Where each bone is in the bind pose (model units). */
+  [[nodiscard]] std::vector<std::array<float, 3>> ScmBonePositions(const std::vector<ScmBone>& bones);
+  /** The same model with a skeleton: `positionBone[i]` is the bone of OBJ position i (missing: the root). */
+  [[nodiscard]] std::vector<std::uint8_t> ScmFromObjSkinned(
+    const ObjMesh& mesh,
+    const std::vector<ScmBone>& bones,
+    const std::vector<int>& positionBone,
     float scale,
     const std::string& info,
     std::string& error

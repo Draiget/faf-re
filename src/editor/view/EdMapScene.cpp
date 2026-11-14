@@ -1624,6 +1624,12 @@ namespace faf::editor
       }
     }
     DrawGizmo(*batcher);
+    // The kept paths (whatever the tool): their curves, reach and points while the Paths panel is up.
+    if (mPathEdit != nullptr) {
+      DrawKeptPaths(*batcher, *field);
+    }
+    DrawUnitPreview(*batcher);
+    DrawMeshTerrain(*batcher);
     if (!mTools->TerrainToolActive() && !mTools->TextureToolActive() && !mTools->PropsToolActive()) {
       batcher->Flush();
       return;
@@ -2420,6 +2426,7 @@ namespace faf::editor
       : kind == EdDocument::EditKind::Layout              ? mDocument.UndoLayout(false)
       : kind == EdDocument::EditKind::Mission             ? mDocument.UndoMission(false)
       : kind == EdDocument::EditKind::MapInfo             ? mDocument.UndoMapInfo(false)
+      : kind == EdDocument::EditKind::Paths               ? mDocument.UndoPaths(false)
                                                           : UndoHeights(false);
     if (done) {
       mDocument.PushRedo(kind);
@@ -2451,6 +2458,7 @@ namespace faf::editor
       : kind == EdDocument::EditKind::Layout              ? mDocument.UndoLayout(true)
       : kind == EdDocument::EditKind::Mission             ? mDocument.UndoMission(true)
       : kind == EdDocument::EditKind::MapInfo             ? mDocument.UndoMapInfo(true)
+      : kind == EdDocument::EditKind::Paths               ? mDocument.UndoPaths(true)
                                                           : UndoHeights(true);
     if (done) {
       mDocument.PushUndo(kind);
@@ -4257,6 +4265,7 @@ namespace faf::editor
                             static_cast<std::size_t>(std::clamp(static_cast<int>(x), 0, field->width - 1))]);
     brush.noiseSeed = mNoiseSeed++;
     const ErosionStrokePtr stroke = IsErosionMode(mode) ? MakeErosionStroke() : nullptr;
+    const std::size_t undoBefore = mDocument.Heights().UndoCount();
     mDocument.Heights().BeginStroke();
     for (const SampleRect& rect : HeightBrushRects(field->width, field->height, x, z, brush)) {
       mDocument.Heights().BeforeWrite(field->data, rect);
@@ -4290,6 +4299,10 @@ namespace faf::editor
       rects.insert(rects.end(), step.begin(), step.end());
     }
     mDocument.Heights().EndStroke(field->data);
+    // One step in the editor's undo order, as a stroke of the mouse makes it (EndStroke()).
+    if (mDocument.Heights().UndoCount() > undoBefore) {
+      mDocument.EditEnded(EdDocument::EditKind::Heights);
+    }
     if (!raise) {
       std::size_t changed = 0;
       std::int64_t words = 0;
@@ -4846,6 +4859,8 @@ namespace faf::editor
         mTools->SetScStatus(RunScTool(sc));
       }
       TickPads(frameSeconds);
+      TickPaths();
+      TickUnitPreview(frameSeconds);
       if (const EdTools::InteropAsk ask = mTools->TakeInteropAsk(); ask != EdTools::InteropAsk::None) {
         mTools->SetInteropStatus(RunInterop(ask));
       }
@@ -6621,8 +6636,11 @@ namespace faf::editor
     const std::uint16_t parts = from.back();
     from.pop_back();
     const int strokes = (parts >> 1) & 31;
-    // Undo in the reverse order of the build (water, props, types, masks, heights); redo in its order.
+    // Undo in the reverse order of the build (paths, water, props, types, masks, heights); redo in its order.
     if (!redo) {
+      if ((parts & 1024) != 0) {
+        (void)mDocument.UndoPaths(false);
+      }
       if ((parts & 512) != 0) {
         (void)UndoDecals(false);
       }
@@ -6659,6 +6677,9 @@ namespace faf::editor
       }
       if ((parts & 512) != 0) {
         (void)UndoDecals(true);
+      }
+      if ((parts & 1024) != 0) {
+        (void)mDocument.UndoPaths(true);
       }
     }
     to.push_back(parts);
@@ -11918,13 +11939,8 @@ namespace faf::editor
       centreZ[c] = SnapToGrid(centreZ[c]);
       moho::CWldPropEntry entry;
       entry.mBlueprintPath.assign(blueprint.c_str());
-      entry.mTransform.pos_ = Wm3::Vec3f{
-        centreX[c],
-        mMap->mTerrainRes->GetHeightAt(
-          static_cast<std::int32_t>(std::lround(centreX[c])), static_cast<std::int32_t>(std::lround(centreZ[c]))
-        ),
-        centreZ[c]
-      };
+      // On the ground the view shows (a mesh terrain map's mesh while it is shown).
+      entry.mTransform.pos_ = Wm3::Vec3f{centreX[c], PlacementHeight(centreX[c], centreZ[c]), centreZ[c]};
       entry.mTransform.orient_ = Wm3::Quatf(std::cos(heading * 0.5f), 0.0f, std::sin(heading * 0.5f), 0.0f);
       // The prop as the file will give it back (its record is what gets saved).
       PropRecord record = PropRecordFor(blueprint, entry.mTransform);
@@ -12009,8 +12025,9 @@ namespace faf::editor
         return false;
       }
       if (
-        SlopeDegrees(height(x - 1.0f, z), height(x + 1.0f, z), height(x, z - 1.0f), height(x, z + 1.0f)) >
-        scatter.slopeMax
+        const float slope =
+          SlopeDegrees(height(x - 1.0f, z), height(x + 1.0f, z), height(x, z - 1.0f), height(x, z + 1.0f));
+        slope > scatter.slopeMax || slope < scatter.slopeMin
       ) {
         return false;
       }
@@ -12109,8 +12126,9 @@ namespace faf::editor
         return false;
       }
       if (
-        SlopeDegrees(height(x - 1.0f, z), height(x + 1.0f, z), height(x, z - 1.0f), height(x, z + 1.0f)) >
-        scatter.slopeMax
+        const float slope =
+          SlopeDegrees(height(x - 1.0f, z), height(x + 1.0f, z), height(x, z - 1.0f), height(x, z + 1.0f));
+        slope > scatter.slopeMax || slope < scatter.slopeMin
       ) {
         return false;
       }
@@ -12169,8 +12187,13 @@ namespace faf::editor
           continue;
         }
         const float heading = std::atan2(aheadZ[c] - centreZ[c], aheadX[c] - centreX[c]);
-        const DecalFootprint footprint =
-          DecalAround(centreX[c], centreZ[c], mTools->DecalSizeX() * scale, mTools->DecalSizeZ() * scale, heading);
+        const DecalFootprint footprint = DecalAround(
+          centreX[c],
+          centreZ[c],
+          (scatter.decalSize > 0.0f ? scatter.decalSize : mTools->DecalSizeX()) * scale,
+          (scatter.decalSize > 0.0f ? scatter.decalSize : mTools->DecalSizeZ()) * scale,
+          heading
+        );
         DecalState state;
         state.type = DecalTypeForTexture(chosen->first);
         state.names[0] = chosen->first;
@@ -12533,6 +12556,7 @@ namespace faf::editor
     }
     mUnits.clear();
     mUnitRefs.clear();
+    DropUnitPreview();
   }
 
   void EdMapScene::ReloadUnits()
@@ -13266,6 +13290,17 @@ namespace faf::editor
         }
         return true;
       }
+      // Path editing (the Paths panel's "Edit on the map") takes the click next.
+      if (mPathEdit != nullptr && mPathEdit->editing) {
+        float groundX = 0.0f;
+        float groundZ = 0.0f;
+        if (
+          GroundAt(static_cast<float>(at.x), static_cast<float>(at.y), groundX, groundZ) &&
+          PathMouseDown(window, groundX, groundZ, (wParam & MK_SHIFT) != 0, (wParam & MK_CONTROL) != 0)
+        ) {
+          return true;
+        }
+      }
       // An editor mod's tool takes the click first.
       if (viewClickHook) {
         float groundX = 0.0f;
@@ -13859,6 +13894,10 @@ namespace faf::editor
     }
     case WM_LBUTTONUP:
       mGizmoDrag = GizmoPart::None;
+      if (mPathDragging) {
+        ::ReleaseCapture();
+        return PathMouseUp();
+      }
       if (mWaveDrag) {
         mWaveDrag = false;
         ::ReleaseCapture();
@@ -14173,6 +14212,14 @@ namespace faf::editor
       }
       return true;
     case WM_MOUSEMOVE: {
+      if (mPathDragging) {
+        float groundX = 0.0f;
+        float groundZ = 0.0f;
+        if (GroundAt(static_cast<float>(at.x), static_cast<float>(at.y), groundX, groundZ)) {
+          PathMouseMove(groundX, groundZ);
+        }
+        return true;
+      }
       if (mPaintingWaterMask) {
         float groundX = 0.0f;
         float groundZ = 0.0f;
@@ -14449,6 +14496,9 @@ namespace faf::editor
       // Undo, redo, copy, paste, duplicate and framing the map are commands with keys (EdApp.cpp runs them before
       // the scene sees the key); the keys here are the tools' own: paths, the camera, Delete and Q/E for a tool.
       mFast = (::GetKeyState(VK_SHIFT) & 0x8000) != 0;
+      if (down && mPathEdit != nullptr && mPathEdit->editing && PathKey(wParam)) {
+        return true;
+      }
       // G and R: the selection follows the cursor until a click or Enter (Escape puts it back); X or Z locks an axis,
       // digits type an exact distance or angle.
       if (mModal.on) {

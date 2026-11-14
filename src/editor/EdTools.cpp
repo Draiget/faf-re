@@ -803,6 +803,13 @@ namespace faf::editor
         if (mConvertPlan.toBiplanar) {
           ImGui::Checkbox("Move the cliff layers to layers 3 and 4", &mConvertOptions.arrange);
         }
+        ImGui::Checkbox("Also write the textures it needs", &mConvertOptions.textures);
+        EdSetItemTooltip(
+          "New copies of the layers' textures with the alpha the target reads (specularity, 1 - specularity or the "
+          "base "
+          "opacity), and for the 1xx / 2xx shaders the roughness / height atlas in the Upper layer. The textures stay "
+          "as they were; the copies go beside the map (env/layers) and are their own undo steps."
+        );
         if (PrimaryButton("Convert and switch")) {
           mConvertRequested = true;
         }

@@ -37,6 +37,8 @@ namespace faf::editor
         {EdSettings::kGfxAo, "auto", {"auto", "on", "off"}},
         {EdSettings::kGfxTextureDetail, "auto", {"auto", "high", "medium", "low"}},
         {EdSettings::kGfxAnisotropy, "auto", {"auto", "0", "4", "8", "16"}},
+        {EdSettings::kGpuCompute, "1", {}},
+        {EdSettings::kGpuMinCells, "65536", {"16384", "65536", "262144", "1048576"}},
       };
       return kDefinitions;
     }

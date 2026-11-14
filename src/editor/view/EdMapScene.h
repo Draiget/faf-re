@@ -33,6 +33,13 @@
 #include "editor/tools/EdModalTransform.h"
 #include "editor/tools/EdHeightBrush.h"
 #include "editor/tools/EdTerrainPath.h"
+#include "editor/tools/EdKeptPaths.h"
+#include "editor/tools/EdPathEdit.h"
+#include "editor/tools/EdSkeleton.h"
+#include "editor/tools/EdDetailPass.h"
+#include "editor/tools/EdScaAnim.h"
+#include "editor/tools/EdMeshData.h"
+#include "editor/tools/EdUnitPreview.h"
 #include "editor/tools/EdMaskGen.h"
 #include "editor/tools/EdRecipes.h"
 #include "editor/tools/EdLayerConvert.h"
@@ -41,6 +48,7 @@
 namespace moho
 {
   class CameraImpl;
+  class CAniPose;
   class CWldMap;
   class MeshInstance;
   class SimpleRenderWorldView;
@@ -134,6 +142,75 @@ namespace faf::editor
     {
       mTools = tools;
     }
+    /** The Paths panel's state: the view edits the current path with the mouse and carries out the panel's asks. */
+    void SetPathEdit(
+      PathEditState* state
+    ) noexcept
+    {
+      mPathEdit = state;
+    }
+    /**
+     * A kept path's result on the map (EdKeptPaths, Studio's paths.lua): Preview shows the heights without an undo step
+     * of their own (taken back by the next path action or when other edits come after it), Apply replaces the path's
+     * earlier result with the new heights, strata, props and decals as one undo step, Unapply takes the result off,
+     * Bake forgets it (the next Apply adds to the ground). What it did, in words.
+     */
+    std::string PreviewKeptPath(const std::vector<std::string>& ids);
+    bool RevertPathPreview();
+    /**
+     * `before` and `after` write heights inside the same stroke (they call BeforeWrite for what they change and add the
+     * rects they wrote), before the paths are built and after: the skeleton's pads and its lane smoothing.
+     */
+    std::string ApplyKeptPaths(
+      const std::vector<std::string>& ids,
+      const std::function<void(std::vector<SampleRect>&)>& before = {},
+      const std::function<void(std::vector<SampleRect>&)>& after = {},
+      std::shared_ptr<const PadResult>* skeletonPads = nullptr
+    );
+    /**
+     * The map skeleton (EdSkeleton, Studio's skeleton.lua): Generate replaces the skeleton paths (taking their results
+     * off first) with new ones for the start positions; Apply all puts its pads, its paths in order and the lane
+     * smoothing on the map as one undo step; Clear removes the skeleton paths. What it did, in words.
+     */
+    std::string GenerateSkeleton(const SkeletonSettings& settings);
+    std::string ApplySkeleton(const SkeletonSettings& settings);
+    std::string ClearSkeleton();
+    /** `/skeletontest style,topology` (test runs): generated, applied, logged, undone. */
+    void TestSkeleton(const std::string& spec);
+    /**
+     * The detail pass (EdDetailPass, Studio's detail.lua): every class scattered with its slope window, clustering and
+     * density, props and decals together as one undo step; Plan says how many each class would place; Measure counts
+     * the classes on this map (a reference). What it did, in words.
+     */
+    std::string RunDetailPass(const DetailRun& run);
+    [[nodiscard]] std::string PlanDetailPass(const DetailRun& run);
+    [[nodiscard]] std::string MeasureDetailPass();
+    /** The environment the map's layers suggest. */
+    [[nodiscard]] std::string DetailEnvironmentGuess() const;
+    /** Whether a file is in the game's data (decal textures); set by the app. */
+    std::function<bool(const std::string&)> gameFileExists;
+    /** A file of the game's data read whole (animations); set by the app. */
+    std::function<bool(const std::string&, std::string&)> readGameFile;
+    /**
+     * The unit viewer's animated unit (FAF Studio's unitview.lua): the unit drawn in the view by the game's mesh
+     * renderer at the camera's target, posed from its animation every frame, its bones, collision box, footprint,
+     * ranges and senses drawn over it.
+     */
+    void SetUnitPreview(
+      UnitPreviewState* state
+    ) noexcept
+    {
+      mUnitPreview = state;
+    }
+    std::string UnapplyKeptPath(const std::string& id);
+    std::string BakeKeptPath(const std::string& id);
+    /** The ground the paths start from at a point (game units). */
+    [[nodiscard]] float GroundHeightAt(float x, float z) const;
+    /** The map's symmetry as images a path is copied through (the Tools panel's symmetry). */
+    [[nodiscard]] std::vector<KeptPathImage> PathImages() const;
+    /** `/pathtest mode,x0,z0,x1,z1[,x2,z2...]` (test runs): a kept path made, applied, logged, unapplied, applied,
+     * undone. */
+    void TestKeptPath(const std::string& spec);
 
     /** Replaces the map's heights from a height image, resampled to the map's size, as one undo step. */
     bool ImportHeights(const std::filesystem::path& file, float scale, std::string& message);
@@ -732,6 +809,64 @@ namespace faf::editor
     /** Hands written samples back to the height field (its tiers and revision) and redraws their terrain. */
     void RefreshHeights(const std::vector<SampleRect>& rects);
     EdTools* mTools = nullptr;
+    PathEditState* mPathEdit = nullptr;
+    // The unit viewer's animated unit.
+    UnitPreviewState* mUnitPreview = nullptr;
+    moho::MeshInstance* mPreviewInstance = nullptr;
+    std::string mPreviewKey; // unit and army the instance was made for
+    std::string mPreviewAnimPath;
+    ScaAnimation mPreviewAnim;
+    std::shared_ptr<moho::CAniPose> mPreviewPose;
+    std::vector<int> mPreviewBoneMap; // animation bone -> skeleton bone (-1 none)
+    float mPreviewPos[3] = {0.0f, 0.0f, 0.0f};
+    void TickUnitPreview(float frameSeconds);
+    void DrawUnitPreview(moho::CD3DPrimBatcher& batcher);
+    void DropUnitPreview();
+    // A mesh terrain map's patches (EdMeshData), drawn shaded over the field, and what placing stands on.
+    edmesh::MeshMap mMeshMap;
+    int mMeshMode = 1;
+    std::vector<moho::CD3DPrimBatcher::Vertex> mMeshTris;
+    std::vector<moho::CD3DPrimBatcher::Vertex> mMeshEdges;
+    void DrawMeshTerrain(moho::CD3DPrimBatcher& batcher);
+
+  public:
+    /**
+     * A mesh terrain map (FAF Studio's: the scenario's TerrainSystem = 'mesh' names its manifest TerrainMesh): its
+     * patches read (again), what happened in words; an empty one when the map isn't one.
+     */
+    std::string LoadMeshTerrain();
+    /** What the view shows: 0 the height field, 1 the mesh, 2 both (the mesh and its edges). */
+    void SetMeshMode(
+      const int mode
+    ) noexcept
+    {
+      mMeshMode = mode;
+    }
+    /** The patches' checks (EdMeshScan), as lines. */
+    [[nodiscard]] std::vector<std::string> CheckMeshTerrain();
+    /** The ground things are placed on: the mesh surface while it is shown (the highest one up to 40 above the field).
+     */
+    [[nodiscard]] float PlacementHeight(float x, float z) const;
+
+  private:
+    // Kept paths: a point drag (its model before), the preview's place in the undo order.
+    bool mPathDragging = false;
+    bool mPathDragMoved = false;
+    float mPathDragX = 0.0f;
+    float mPathDragZ = 0.0f;
+    std::unique_ptr<EdDocument::PathsState> mPathDragBefore;
+    bool mPathPreviewShown = false;
+    std::size_t mPathPreviewDepth = 0;
+    int mPathPreviewRevision = -1;
+    bool PathMouseDown(HWND window, float x, float z, bool shift, bool ctrl);
+    void PathMouseMove(float x, float z);
+    bool PathMouseUp();
+    bool PathKey(WPARAM key);
+    void TickPaths();
+    void DrawKeptPaths(moho::CD3DPrimBatcher& batcher, const moho::CHeightField& field);
+    /** Takes `result`'s props and decals off the map, puts `next`'s on (no undo step: the caller's step holds them). */
+    void
+    SwapPathItems(const KeptPathResult* result, const KeptPathResult* next, bool& propsChanged, bool& decalsChanged);
 
     /** The symmetry check (EdSymmetryCheck.cpp) on the map's heights, its result to the Tools panel. */
     void RunSymmetryCheck();

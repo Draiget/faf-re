@@ -395,6 +395,9 @@ add_executable(faf_editor_field_tests EXCLUDE_FROM_ALL editor/FieldTests.cpp edi
   editor/UnitLabTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdUnitLab.cpp
   editor/EditorModsTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdEditorMods.cpp
   editor/UnitIconTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdUnitIcon.cpp
+  editor/RoundTwoFieldTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdKeptPaths.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdJsonTree.cpp
+  ${CMAKE_SOURCE_DIR}/src/editor/tools/EdSkeleton.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdDetailPass.cpp
+  ${CMAKE_SOURCE_DIR}/src/editor/tools/EdMissionImport.cpp
   editor/SelectModesTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdSelectModes.cpp
   editor/ViewMenuTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/ui/EdViewMenu.cpp
   editor/ScenarioInfoTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdScenarioInfo.cpp
@@ -475,6 +478,9 @@ add_executable(faf_editor_brush_tests EXCLUDE_FROM_ALL editor/HeightBrushTests.c
   editor/SettingsTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/ui/EdSettings.cpp
   editor/TerrainExtrasTests.cpp
   editor/MeshImportTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdMeshImport.cpp
+  editor/RoundTwoAssetTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdLuaTable.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdJsonTree.cpp
+  ${CMAKE_SOURCE_DIR}/src/editor/tools/EdUnitWizard.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdScaAnim.cpp
+  ${CMAKE_SOURCE_DIR}/src/editor/tools/EdMeshData.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdMeshScan.cpp
   editor/BuildersTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdBuilders.cpp
   editor/ObjectsExtrasTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdMapStats.cpp
   editor/EnvironmentExtrasTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdLookMoods.cpp
@@ -497,6 +503,7 @@ add_executable(faf_editor_brush_tests EXCLUDE_FROM_ALL editor/HeightBrushTests.c
   ${CMAKE_SOURCE_DIR}/src/editor/tools/EdHeightFile.cpp
   ${CMAKE_SOURCE_DIR}/src/editor/undo/EdHeightHistory.cpp)
 target_include_directories(faf_editor_brush_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_compile_definitions(faf_editor_brush_tests PRIVATE FAF_UNITWIZ_DATA="${CMAKE_SOURCE_DIR}/src/editor/tools/data/unitwizdata.lua")
 # The terrain library (Water erode, Rain and Deposit) turns running out of memory into an op error.
 target_compile_options(faf_editor_brush_tests PRIVATE /EHsc)
 # The zlib the engine links: 1.2.3 on both architectures (src/CMakeLists.txt).

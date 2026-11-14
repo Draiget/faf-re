@@ -66,4 +66,24 @@ namespace faf::editor
     EXPECT_EQ(ParseEnabledMods(SaveEnabledMods(enabled)), enabled);
     EXPECT_EQ(ParseEnabledMods("# comment\n  a  \r\n\nb\n"), enabled);
   }
+
+  TEST(
+    EditorMods,
+    SimHooksNeedUiOnlyFalseAndAHookFolder
+  )
+  {
+    // Studio's sim hooks: `ui_only = false` and a `hook` folder; either alone is no sim hook.
+    const std::filesystem::path root = std::filesystem::temp_directory_path() / "faf_editor_simhook_tests";
+    std::error_code ec;
+    std::filesystem::remove_all(root, ec);
+    std::filesystem::create_directories(root / "hooked" / "hook", ec);
+    std::filesystem::create_directories(root / "nohook", ec);
+    const std::string sim = "uid = 'x'\neditor_mod = true\nui_only = false\n";
+    const std::string ui = "uid = 'x'\neditor_mod = true\nui_only = true\n";
+    EXPECT_TRUE(ReadEditorModInfo(sim, root / "hooked").simHooks);
+    EXPECT_FALSE(ReadEditorModInfo(sim, root / "nohook").simHooks) << "no hook folder";
+    EXPECT_FALSE(ReadEditorModInfo(ui, root / "hooked").simHooks) << "ui_only";
+    EXPECT_FALSE(ReadEditorModInfo("uid = 'x'\neditor_mod = true\n", root / "hooked").simHooks) << "ui_only missing";
+    std::filesystem::remove_all(root, ec);
+  }
 } // namespace faf::editor

@@ -50,4 +50,15 @@ namespace faf::editor
 
   /** The manifest the import writes beside the tiles: `MeshTerrain = { tile = 256, tiles = { {x, z, file}, ... } }`. */
   [[nodiscard]] std::string MeshManifest(const std::map<std::pair<int, int>, std::string>& files, float tile);
+  /**
+   * The same tiles as a mesh terrain map's manifest (`terrain/terrain.lua`, FAF Studio's dialect: `size = ...`, one
+   * material, `{ mesh = '<file>', material = 1 }` a line), which the editor's mesh terrain and Studio's both read.
+   */
+  [[nodiscard]] std::string
+  MeshTerrainManifest(const std::map<std::pair<int, int>, std::string>& files, float size, float meshHigh);
+  /**
+   * How far above the highest vertex a mesh map's `mesh_high` sits (Studio's validator, check V15): the import writes
+   * the highest vertex plus this, and the mesh checks expect it.
+   */
+  inline constexpr float kMeshHighMargin = 32.0f;
 } // namespace faf::editor

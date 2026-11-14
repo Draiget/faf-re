@@ -604,7 +604,7 @@ namespace faf::editor
         "it. Scattered props aren't mirrored. \"Follow the map\" takes the editor's symmetry (the toolbar's)."
       );
     }
-    ImGui::SameLine();
+    SameLineIfFits(CheckboxWidth("Show on the map"));
     ImGui::Checkbox("Show on the map", &mShowOnMap);
     EdSetItemTooltip(
       "The preview on the terrain as one undo step, replaced by the next one; Revert or unticking takes it off."

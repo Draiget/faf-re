@@ -53,7 +53,8 @@ namespace faf::editor
     float z = 0.0f;
     float half = 0.0f;
     float skirt = 0.0f;
-    int group = 0; // 0: its own height; k >= 1: the height shared with the others of group k
+    int group = 0;  // 0: its own height; k >= 1: the height shared with the others of group k; -1: the height `y`
+    float y = 0.0f; // group -1: the pad's absolute height (a plateau, a plaza)
   };
 
   /**

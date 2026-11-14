@@ -113,4 +113,13 @@ namespace faf::editor
   void EdSetTooltip(const char* format, ...) IM_FMTARGS(1);
   /** When the last item is hovered as ImGui's SetItemTooltip waits for. */
   void EdSetItemTooltip(const char* format, ...) IM_FMTARGS(1);
+
+  /**
+   * A row that wraps: the next item goes beside the last one when `width` still fits inside the window's content
+   * area, else on a new line (the layout check found rows that ran past the panel's side at larger UI scales).
+   */
+  void SameLineIfFits(float width);
+  /** The widths ImGui gives a checkbox and a button with these labels (for SameLineIfFits). */
+  [[nodiscard]] float CheckboxWidth(const char* label);
+  [[nodiscard]] float ButtonWidth(const char* label);
 } // namespace faf::editor

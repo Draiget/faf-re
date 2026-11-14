@@ -1,6 +1,7 @@
 #pragma once
 
 #include "editor/tools/EdMission.h"
+#include "editor/tools/EdMissionImport.h"
 
 #include <optional>
 #include <string>
@@ -68,6 +69,19 @@ namespace faf::editor
 
     /** The Platoons panel's builders view: an army's PlatoonBuilders listed, edited, added, deleted. */
     void DrawBuilders();
+    /**
+     * Stages > Hand-written script (Studio's missionimport.lua): the map's own `_script.lua` read as text into an
+     * outline (stages, functions, objectives, triggers, AI, dialogues, options), shown read-only; the `_strings.lua`
+     * dialogues can be added to the Strings.
+     */
+    void DrawImported();
+    void ReadImported();
+    bool mImportedRead = false;
+    MissionOutline mImported;
+    std::vector<ImportedStageRows> mImportedRows;
+    std::vector<MissionDialogue> mImportedDialogues;
+    std::string mImportNote;
+    std::string mImportedFor; // the map it was read for
     EdDocument& mDocument;
     int mStage = 0;
     int mSection = 0;       // 0 enter, 1 ready

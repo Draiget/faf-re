@@ -138,6 +138,33 @@ set(FAF_EDITOR_SOURCES
   tools/EdCameraFrame.cpp
   tools/EdResize.cpp
   tools/EdTerrainPath.cpp
+  tools/EdKeptPaths.cpp
+  tools/EdSkeleton.cpp
+  doc/EdJsonTree.cpp
+  view/EdMapScenePaths.cpp
+  ui/EdPathsPanel.cpp
+  tools/EdDetailPass.cpp
+  view/EdMapSceneDetail.cpp
+  ui/EdDetailPanel.cpp
+  tools/EdMissionImport.cpp
+  terrain/gpu/EdGpu.cpp
+  terrain/gpu/EdGpuOps.cpp
+  terrain/gpu/EdGpuErosion.cpp
+  terrain/gpu/EdGpuFieldFilt.cpp
+  terrain/gpu/EdGpuFieldFlow.cpp
+  terrain/gpu/EdGpuFieldIter.cpp
+  terrain/gpu/EdGpuGen.cpp
+  terrain/gpu/EdGpuGenFilt.cpp
+  doc/EdLuaTable.cpp
+  tools/EdUnitWizard.cpp
+  ui/EdUnitWizardPanel.cpp
+  tools/EdScaAnim.cpp
+  view/EdMapSceneUnitPreview.cpp
+  tools/EdMeshData.cpp
+  tools/EdMeshScan.cpp
+  view/EdMapSceneMesh.cpp
+  ui/EdUiQa.cpp
+  ui/EdSelfTests.cpp
   tools/EdTextureFiles.cpp
   tools/EdScm.cpp
   doc/EdPreview.cpp

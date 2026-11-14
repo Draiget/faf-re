@@ -647,6 +647,13 @@ end
     if (mSetup.slots.empty() && mSetup.withAi) {
       addAiMod(mSetup.ai);
     }
+    // The turned-on editor mods with sim hooks (`ui_only = false`, Studio's sim_hooks): they play as the game's sim
+    // mods do (their hook/ files on the sim's), with nothing more than any FAF mod has.
+    for (const std::string& uid : extraSimMods) {
+      if (std::find(mods.begin(), mods.end(), uid) == mods.end()) {
+        mods.push_back(uid);
+      }
+    }
     for (const PlaySlot& slot : mSetup.slots) {
       if (slot.role == PlaySlot::Role::Ai) {
         addAiMod(slot.ai);

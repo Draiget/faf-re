@@ -2,6 +2,9 @@
 
 #include <cstring>
 #include "editor/ui/EdControls.h"
+#include "editor/ui/EdUiScale.h"
+
+#include <algorithm>
 
 #include <cstdio>
 
@@ -135,15 +138,19 @@ namespace faf::editor
 
   void EdLog::Draw()
   {
-    ImGui::SetNextItemWidth(-560.0f);
+    // The filter takes what the controls after it leave (at least 12 em); they wrap when the panel is narrower.
+    const float spacing = ImGui::GetStyle().ItemSpacing.x;
+    const float controls = CheckboxWidth("Info") + CheckboxWidth("Warnings") + CheckboxWidth("Debug") +
+      ButtonWidth("Copy") + CheckboxWidth("Times") + CheckboxWidth("Follow") + ButtonWidth("Clear") + spacing * 7.0f;
+    ImGui::SetNextItemWidth(std::max(Em(12.0f), ImGui::GetContentRegionAvail().x - controls));
     ImGui::InputTextWithHint("##filter", "Filter", mFilter, sizeof(mFilter));
-    ImGui::SameLine();
+    SameLineIfFits(CheckboxWidth("Info"));
     ImGui::Checkbox("Info", &mShowInfo);
-    ImGui::SameLine();
+    SameLineIfFits(CheckboxWidth("Warnings"));
     ImGui::Checkbox("Warnings", &mShowWarnings);
-    ImGui::SameLine();
+    SameLineIfFits(CheckboxWidth("Debug"));
     ImGui::Checkbox("Debug", &mShowDebug);
-    ImGui::SameLine();
+    SameLineIfFits(ButtonWidth("Copy"));
     if (ImGui::Button("Copy")) {
       // The lines shown (filter and levels), as text.
       const std::lock_guard<std::mutex> lock(mMutex);
@@ -158,14 +165,14 @@ namespace faf::editor
     if (ImGui::IsItemHovered()) {
       EdSetTooltip("The lines shown, to the clipboard");
     }
-    ImGui::SameLine();
+    SameLineIfFits(CheckboxWidth("Times"));
     ImGui::Checkbox("Times", &mShowTimes);
     if (ImGui::IsItemHovered()) {
       EdSetTooltip("Each line's time, in seconds since the editor started");
     }
-    ImGui::SameLine();
+    SameLineIfFits(CheckboxWidth("Follow"));
     ImGui::Checkbox("Follow", &mAutoScroll);
-    ImGui::SameLine();
+    SameLineIfFits(ButtonWidth("Clear"));
     if (ImGui::Button("Clear")) {
       const std::lock_guard<std::mutex> lock(mMutex);
       mLines.clear();

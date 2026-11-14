@@ -4,8 +4,9 @@
 // format to another's: the mask bytes re-encoded for the target's range, the painted layers the target can't draw
 // moved to a free layer, merged into one or dropped, layer 8 given its new role (the 1xx / 2xx shaders read it as a
 // roughness multiplier: neutral 128), and for the biplanar shaders the layers painted on steep ground moved to layers
-// 3 and 4 (which they draw from the side). The textures stay as they are (the report says what to look at). No engine
-// types: tested on its own (tests/editor/LayerConvertTests.cpp).
+// 3 and 4 (which they draw from the side). The textures themselves are never changed in place: with `textures` on, the
+// app writes new copies the target reads (texconv.lua's part). No engine types: tested on its own
+// (tests/editor/LayerConvertTests.cpp).
 
 #include "editor/tools/EdMaskBrush.h"
 
@@ -54,6 +55,12 @@ namespace faf::editor
     int mergeInto = 0;
     /** Biplanar targets: move the steep-ground layers to layers 3 and 4. */
     bool arrange = true;
+    /**
+     * Also write the textures the target reads (FAF Studio's texconv.lua): copies of the layers' albedo with the alpha
+     * the target wants, and the Upper roughness / height atlas for the 1xx / 2xx shaders. Done by the app after the
+     * masks (EdApp: MakeTextureAlpha, MakeAtlasTexture), each its own undo step.
+     */
+    bool textures = true;
   };
 
   /** A layer painted on ground at least this steep on average counts as a cliff layer (FAF Studio's CLIFF_SLOPE). */

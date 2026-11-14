@@ -20,6 +20,7 @@ namespace faf::editor
     std::istringstream lines(text);
     std::string line;
     int number = 0;
+    int group = -1; // -1: before any `o` / `g` line
     const auto index = [](const std::string& part, const std::size_t count) {
       if (part.empty()) {
         return -1;
@@ -47,6 +48,17 @@ namespace faf::editor
         std::array<float, 3> n{};
         words >> n[0] >> n[1] >> n[2];
         out.normals.push_back(n);
+      } else if (kind == "o" || kind == "g") {
+        std::string name;
+        std::getline(words >> std::ws, name);
+        if (name.empty()) {
+          name = "default";
+        }
+        const auto found = std::find(out.groups.begin(), out.groups.end(), name);
+        group = static_cast<int>(found - out.groups.begin());
+        if (found == out.groups.end()) {
+          out.groups.push_back(name);
+        }
       } else if (kind == "f") {
         std::vector<ObjMesh::Corner> polygon;
         std::string word;
@@ -70,6 +82,7 @@ namespace faf::editor
         }
         for (std::size_t k = 2; k < polygon.size(); ++k) {
           out.triangles.push_back({polygon[0], polygon[k - 1], polygon[k]});
+          out.triangleGroup.push_back(group);
         }
       }
     }
@@ -139,6 +152,84 @@ namespace faf::editor
     }
   } // namespace
 
+  void ScmBindPose(
+    std::vector<ScmBone>& bones
+  )
+  {
+    // Row-vector matrices (Direct3D): a bone's local transform is its rotation (the quaternion's matrix transposed) and
+    // its position; the absolute one is local * parent's absolute; the file keeps the inverse of the absolute.
+    struct Abs
+    {
+      float R[3][3];
+      float t[3];
+    };
+    std::vector<Abs> abs(bones.size());
+    for (std::size_t i = 0; i < bones.size(); ++i) {
+      const ScmBone& b = bones[i];
+      const float w = b.rot[0], x = b.rot[1], y = b.rot[2], z = b.rot[3];
+      // The usual column matrix of the quaternion, transposed (row vectors).
+      const float m[3][3] = {
+        {1 - 2 * (y * y + z * z), 2 * (x * y + w * z), 2 * (x * z - w * y)},
+        {2 * (x * y - w * z), 1 - 2 * (x * x + z * z), 2 * (y * z + w * x)},
+        {2 * (x * z + w * y), 2 * (y * z - w * x), 1 - 2 * (x * x + y * y)},
+      };
+      Abs a{};
+      if (b.parent >= 0 && static_cast<std::size_t>(b.parent) < i) {
+        const Abs& p = abs[static_cast<std::size_t>(b.parent)];
+        for (int r = 0; r < 3; ++r) {
+          for (int c = 0; c < 3; ++c) {
+            a.R[r][c] = m[r][0] * p.R[0][c] + m[r][1] * p.R[1][c] + m[r][2] * p.R[2][c];
+          }
+          a.t[r] = 0.0f;
+        }
+        for (int c = 0; c < 3; ++c) {
+          a.t[c] = b.pos[0] * p.R[0][c] + b.pos[1] * p.R[1][c] + b.pos[2] * p.R[2][c] + p.t[c];
+        }
+      } else {
+        for (int r = 0; r < 3; ++r) {
+          for (int c = 0; c < 3; ++c) {
+            a.R[r][c] = m[r][c];
+          }
+          a.t[r] = b.pos[static_cast<std::size_t>(r)];
+        }
+      }
+      abs[i] = a;
+      if (!b.hasRest) {
+        ScmBone& out = bones[i];
+        for (int r = 0; r < 3; ++r) {
+          for (int c = 0; c < 3; ++c) {
+            out.rest[static_cast<std::size_t>(r * 3 + c)] = a.R[c][r];
+          }
+        }
+        for (int c = 0; c < 3; ++c) {
+          out.rest[static_cast<std::size_t>(9 + c)] = -(a.t[0] * a.R[c][0] + a.t[1] * a.R[c][1] + a.t[2] * a.R[c][2]);
+        }
+        out.hasRest = true;
+      }
+    }
+  }
+
+  std::vector<std::array<float, 3>> ScmBonePositions(
+    const std::vector<ScmBone>& bones
+  )
+  {
+    // The rest pose's translation row inverted: the bone's place in the model.
+    std::vector<ScmBone> copy = bones;
+    ScmBindPose(copy);
+    std::vector<std::array<float, 3>> out;
+    for (const ScmBone& b : copy) {
+      const auto& r = b.rest;
+      // rest = [R^T | -t R^T]: t = -(row translation) * R
+      const float tx = r[9], ty = r[10], tz = r[11];
+      out.push_back({
+        -(tx * r[0] + ty * r[1] + tz * r[2]),
+        -(tx * r[3] + ty * r[4] + tz * r[5]),
+        -(tx * r[6] + ty * r[7] + tz * r[8]),
+      });
+    }
+    return out;
+  }
+
   std::vector<std::uint8_t> ScmFromObj(
     const ObjMesh& mesh,
     const std::string& boneName,
@@ -147,6 +238,28 @@ namespace faf::editor
     std::string& error
   )
   {
+    ScmBone root;
+    root.name = boneName;
+    root.rest = {1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0};
+    root.hasRest = true;
+    return ScmFromObjSkinned(mesh, {root}, {}, scale, info, error);
+  }
+
+  std::vector<std::uint8_t> ScmFromObjSkinned(
+    const ObjMesh& mesh,
+    const std::vector<ScmBone>& bonesIn,
+    const std::vector<int>& positionBone,
+    const float scale,
+    const std::string& info,
+    std::string& error
+  )
+  {
+    if (bonesIn.empty()) {
+      error = "a model needs a bone";
+      return {};
+    }
+    std::vector<ScmBone> bones = bonesIn;
+    ScmBindPose(bones);
     struct Vertex
     {
       std::array<float, 3> position{};
@@ -154,6 +267,7 @@ namespace faf::editor
       std::array<float, 3> tangent{};
       std::array<float, 3> binormal{};
       std::array<float, 2> uv{};
+      int bone = 0;
     };
     // One vertex per distinct corner (position, uv, normal).
     std::map<std::tuple<int, int, int>, std::uint32_t> made;
@@ -182,6 +296,11 @@ namespace faf::editor
           v.normal = corner.normal >= 0 && corner.normal < static_cast<int>(mesh.normals.size())
             ? Normalized(mesh.normals[static_cast<std::size_t>(corner.normal)])
             : face;
+          if (corner.position >= 0 && static_cast<std::size_t>(corner.position) < positionBone.size()) {
+            v.bone = std::clamp(
+              positionBone[static_cast<std::size_t>(corner.position)], 0, static_cast<int>(bones.size()) - 1
+            );
+          }
           found = made.emplace(key, static_cast<std::uint32_t>(vertices.size())).first;
           vertices.push_back(v);
         }
@@ -252,32 +371,38 @@ namespace faf::editor
       Put32(out, 0);
     }
     Section(out, "NAME"); // the names from 0x40, one after another
-    out.insert(out.end(), boneName.begin(), boneName.end());
-    out.push_back(0);
+    const std::size_t namesAt = out.size();
+    std::vector<std::uint32_t> nameOffsets;
+    for (const ScmBone& b : bones) {
+      nameOffsets.push_back(static_cast<std::uint32_t>(out.size() - namesAt));
+      out.insert(out.end(), b.name.begin(), b.name.end());
+      out.push_back(0);
+    }
+    int used = 0;
+    for (const Vertex& v : vertices) {
+      used = std::max(used, v.bone);
+    }
     Section(out, "SKEL");
-    Set32(out, 0x08, static_cast<std::uint32_t>(out.size())); // bone table
-    Set32(out, 0x0C, 1);                                      // skinned bones
-    Set32(out, 0x2C, 1);                                      // every bone
-    {
-      // The root at rest: an identity basis, at the origin, parent -1.
-      const float basis[3][4] = {{1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 1, 0}};
-      for (const auto& row : basis) {
-        for (const float value : row) {
-          PutFloat(out, value);
-        }
+    Set32(out, 0x08, static_cast<std::uint32_t>(out.size()));   // bone table
+    Set32(out, 0x0C, static_cast<std::uint32_t>(used + 1));     // skinned bones
+    Set32(out, 0x2C, static_cast<std::uint32_t>(bones.size())); // every bone
+    for (std::size_t i = 0; i < bones.size(); ++i) {
+      // The inverse bind pose as a 4x4 (rotation rows, then the translation row and 1), the position in the parent,
+      // the rotation (w, x, y, z), the name's place in the names, the parent (-1: none), two words unused.
+      const ScmBone& b = bones[i];
+      const auto& r = b.rest;
+      const float rows[16] = {r[0], r[1], r[2], 0, r[3], r[4], r[5], 0, r[6], r[7], r[8], 0, r[9], r[10], r[11], 1};
+      for (const float value : rows) {
+        PutFloat(out, value);
       }
-      for (int i = 0; i < 4; ++i) {
-        PutFloat(out, 0.0f); // rest position, pad
+      for (const float value : b.pos) {
+        PutFloat(out, value);
       }
-      for (int i = 0; i < 3; ++i) {
-        PutFloat(out, 0.0f); // position in the parent
+      for (const float value : b.rot) {
+        PutFloat(out, value);
       }
-      PutFloat(out, 1.0f); // rotation w, x, y, z
-      PutFloat(out, 0.0f);
-      PutFloat(out, 0.0f);
-      PutFloat(out, 0.0f);
-      Put32(out, 0);           // its name's place in the names
-      Put32(out, 0xFFFFFFFFu); // parent -1
+      Put32(out, nameOffsets[i]);
+      Put32(out, b.parent < 0 ? 0xFFFFFFFFu : static_cast<std::uint32_t>(b.parent));
       Put32(out, 0);
       Put32(out, 0);
     }
@@ -301,7 +426,7 @@ namespace faf::editor
       PutFloat(out, v.uv[1]);
       PutFloat(out, v.uv[0]); // the second set: the same
       PutFloat(out, v.uv[1]);
-      Put32(out, 0); // bone 0
+      Put32(out, static_cast<std::uint32_t>(v.bone)); // its bone (the first of four bytes)
     }
     Section(out, "TRIS");
     Set32(out, 0x1C, static_cast<std::uint32_t>(out.size()));

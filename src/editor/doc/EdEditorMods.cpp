@@ -75,6 +75,7 @@ namespace faf::editor
     info.uid = get("uid");
     info.description = get("description");
     info.editorMod = get("editor_mod") == "true";
+    info.simHooks = get("ui_only") == "false" && std::filesystem::is_directory(folder / "hook");
     if (const std::string api = get("editor_api"); !api.empty()) {
       info.api = std::atoi(api.c_str());
     }

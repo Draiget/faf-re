@@ -57,7 +57,7 @@ namespace faf::editor
    * further per iteration, so iterations, rain, rates, lifetime, radius and density are scaled to give much the same
    * result at a fraction of the cost (Studio's OpParams).
    */
-  [[nodiscard]] ErosionValues ErosionOpValues(const ErosionSolver& solver, const ErosionValues& values, int step);
+  [[nodiscard]] ErosionValues ErosionOpValues(const ErosionSolver& solver, const ErosionValues& values, double step);
 
   /** The preview's step: the smallest that keeps the coarse grid within `most` samples a side, one dividing the map's
    * cells when one of the next three does. */

@@ -6,6 +6,11 @@
 
 #include <memory>
 
+#include "editor/tools/EdUnitIcon.h"
+#include "editor/tools/EdUnitPreview.h"
+
+#include <functional>
+
 namespace moho
 {
   class CD3DDynamicTextureSheet;
@@ -61,7 +66,33 @@ namespace faf::editor
       mPitch = pitch;
     }
 
+    /** The animated unit in the view (the scene reads and fills it). */
+    [[nodiscard]] UnitPreviewState& Preview() noexcept
+    {
+      return mPreview;
+    }
+
+    /** The game's icon of a unit, decoded to `side` x `side` RGBA bytes (set by the app). */
+    std::function<bool(const std::string&, int, std::vector<std::uint8_t>&)> loadGameIcon;
+    /** Icons for every unit the project edits or derives, one after another. */
+    void AskBatch();
+    bool AskIconFor(const std::string& unit, std::string& error);
+    /** After Make icon: how the made icon compares with the game's (empty before). */
+    [[nodiscard]] const std::string& Comparison() const noexcept
+    {
+      return mCompare;
+    }
+
   private:
+    void DrawInView(const std::string& source);
+    std::vector<std::string> mBatch;
+    int mBatchTotal = 0;
+    IconToneFit mTone;
+    bool mToneOn = false;
+    std::string mCompare;
+    std::vector<std::uint8_t> mShipped;
+    std::vector<std::uint8_t> mMade;
+    UnitPreviewState mPreview;
     bool Request(
       std::shared_ptr<moho::CD3DDynamicTextureSheet>& sheet,
       int side,

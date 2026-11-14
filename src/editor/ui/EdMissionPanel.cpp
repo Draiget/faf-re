@@ -17,6 +17,9 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <filesystem>
+#include <fstream>
+#include <iterator>
 
 namespace faf::editor
 {
@@ -389,6 +392,7 @@ namespace faf::editor
         Edited(std::move(before));
       }
     }
+    DrawImported();
     // The stages.
     if (Section("Stages")) {
       for (std::size_t s = 0; s < m.stages.size(); ++s) {
@@ -472,9 +476,17 @@ namespace faf::editor
     // Add: inside the selected container, after the selected node, or at the end of "Then".
     if (EdBeginCombo("##addnode", ICON_PLUS " Add a node")) {
       std::string family;
+      std::vector<const MissionNodeType*> types;
       for (const MissionNodeType& t : MissionNodeTypes()) {
-        if (t.family != family) {
-          family = t.family;
+        types.push_back(&t);
+      }
+      const std::vector<const MissionNodeType*> modTypes = MissionModNodeTypes();
+      types.insert(types.end(), modTypes.begin(), modTypes.end());
+      for (std::size_t ti = 0; ti < types.size(); ++ti) {
+        const MissionNodeType& t = *types[ti];
+        const std::string heading = ti >= types.size() - modTypes.size() ? "from editor mods" : t.family;
+        if (heading != family) {
+          family = heading;
           ImGui::SeparatorText(family.c_str());
         }
         if (ImGui::Selectable(t.title.c_str())) {
@@ -1589,7 +1601,7 @@ namespace faf::editor
     ImGui::SameLine();
     ImGui::SetNextItemWidth(Em(80.0f));
     ImGui::InputTextWithHint("##newlocation", "base", newLocation, sizeof(newLocation));
-    ImGui::SameLine();
+    SameLineIfFits(ButtonWidth("Add builder"));
     ImGui::BeginDisabled(newName[0] == '\0' || newTemplate[0] == '\0');
     if (ImGui::Button("Add builder")) {
       builders.push_back(NewBuilder(newName, newTemplate, newLocation));
@@ -1598,5 +1610,131 @@ namespace faf::editor
     }
     ImGui::EndDisabled();
     ImGui::TextDisabled("Values are Lua (strings quoted); BuildConditions and other tables stay as written.");
+  }
+
+  void EdMissionPanel::ReadImported()
+  {
+    mImportedRead = true;
+    mImportedFor = mDocument.Path();
+    mImported = ParseMissionScript(mDocument.Script());
+    mImportedRows = ImportedStages(mImported);
+    mImportedDialogues.clear();
+    // The strings file beside the map (`<map>_strings.lua`), read from disk; maps in the game's archives have none
+    // here.
+    const std::filesystem::path map = mDocument.MapDiskFile();
+    std::string strings;
+    if (!map.empty()) {
+      std::vector<std::filesystem::path> candidates = {map.parent_path() / (map.stem().string() + "_strings.lua")};
+      // The script's own base name (`SCCA_Coop_A01_script.lua` -> `SCCA_Coop_A01_strings.lua`).
+      const std::string script = std::filesystem::path(mDocument.Facts().scriptPath).filename().string();
+      if (const std::size_t at = script.rfind("_script.lua"); at != std::string::npos) {
+        candidates.push_back(map.parent_path() / (script.substr(0, at) + "_strings.lua"));
+      }
+      for (const std::filesystem::path& file : candidates) {
+        std::error_code ignored;
+        if (!file.empty() && std::filesystem::exists(file, ignored)) {
+          std::ifstream in(file, std::ios::binary);
+          strings.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+          break;
+        }
+      }
+    }
+    if (!strings.empty()) {
+      mImportedDialogues = ParseMissionStrings(strings);
+    }
+    char note[240];
+    (void)std::snprintf(
+      note,
+      sizeof(note),
+      "%d lines: %zu stages, %zu functions, %zu objectives, %zu triggers, %zu AI helpers, %zu dialogues used; %s",
+      mImported.lineCount,
+      mImported.stages.size(),
+      mImported.functions.size(),
+      mImported.objectives.size(),
+      mImported.triggers.size(),
+      mImported.helpers.size(),
+      mImported.dialogueRefs.size(),
+      strings.empty() ? "no _strings.lua beside the map"
+                      : (std::to_string(mImportedDialogues.size()) + " dialogues in its _strings.lua").c_str()
+    );
+    mImportNote = note;
+    gpg::Logf("editor: mission import: %s", mImportNote.c_str());
+  }
+
+  void EdMissionPanel::DrawImported()
+  {
+    if (mImportedRead && mImportedFor != mDocument.Path()) {
+      mImportedRead = false;
+      mImportedRows.clear();
+      mImportedDialogues.clear();
+      mImportNote.clear();
+    }
+    if (!Section("Hand-written script", false)) {
+      return;
+    }
+    ImGui::TextWrapped(
+      "A campaign map's own script, read as text into an outline. It is shown here read-only: the editor never runs, "
+      "rewrites or compiles it; edit the file in a text editor."
+    );
+    if (ImGui::Button(mImportedRead ? "Read it again" : "Read the map's script")) {
+      ReadImported();
+    }
+    if (!mImportedRead) {
+      return;
+    }
+    ImGui::TextDisabled("%s", mImportNote.c_str());
+    for (const ImportedStageRows& stage : mImportedRows) {
+      char title[160];
+      (void)std::snprintf(
+        title, sizeof(title), "%s  (%zu rows)###imported%d", stage.name.c_str(), stage.rows.size(), stage.number
+      );
+      if (ImGui::TreeNode(title)) {
+        for (const ImportedRow& row : stage.rows) {
+          const ImU32 colour = row.kind == "objective" ? IM_COL32(120, 210, 255, 255)
+            : row.kind == "trigger"                    ? IM_COL32(255, 200, 110, 255)
+            : row.kind == "ai"                         ? IM_COL32(200, 160, 255, 255)
+            : row.kind == "note"                       ? IM_COL32(160, 160, 160, 255)
+                                                       : ImGui::GetColorU32(ImGuiCol_Text);
+          ImGui::PushStyleColor(ImGuiCol_Text, colour);
+          ImGui::TextUnformatted(row.text.c_str());
+          ImGui::PopStyleColor();
+          if (!row.extra.empty()) {
+            ImGui::SameLine();
+            ImGui::TextDisabled("%s", row.extra.c_str());
+          }
+        }
+        ImGui::TreePop();
+      }
+    }
+    if (!mImportedDialogues.empty()) {
+      Mission& m = mDocument.EditMission();
+      std::size_t fresh = 0;
+      for (const MissionDialogue& d : mImportedDialogues) {
+        fresh += std::none_of(
+                   m.dialogues.begin(),
+                   m.dialogues.end(),
+                   [&d](const MissionDialogue& own) {
+          return own.name == d.name;
+        }
+                 )
+          ? 1u
+          : 0u;
+      }
+      ImGui::BeginDisabled(fresh == 0);
+      char label[120];
+      (void)std::snprintf(label, sizeof(label), "Add its %zu dialogues to the Strings", fresh);
+      if (ImGui::Button(label)) {
+        Mission before = m;
+        for (const MissionDialogue& d : mImportedDialogues) {
+          if (std::none_of(m.dialogues.begin(), m.dialogues.end(), [&d](const MissionDialogue& own) {
+            return own.name == d.name;
+          })) {
+            m.dialogues.push_back(d);
+          }
+        }
+        Edited(std::move(before));
+      }
+      ImGui::EndDisabled();
+    }
   }
 } // namespace faf::editor

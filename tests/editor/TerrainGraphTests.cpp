@@ -687,6 +687,60 @@ namespace
 
   TEST(
     TerrainGraph,
+    OversampleRunsTheErosionAgainOnTheFineGrid
+  )
+  {
+    // Map heights -> hydraulic erosion -> oversample x2 with "Run the erosion again": the erosion's wear comes out on
+    // the fine grid (65 samples a side at step 4), used as the blend's mask.
+    const TerrainGround ground = Ground();
+    NodeGraph graph(TerrainNodeTypes());
+    const int base = graph.AddNode("terrain", 0, 0);
+    const int erode = graph.AddNode("erode_hydraulic", 200, 0);
+    const int over = graph.AddNode("oversample", 400, 0);
+    const int noise = graph.AddNode("perlin", 400, 200);
+    const int blend = graph.AddNode("blend", 600, 0);
+    ASSERT_EQ(graph.Link(base, 0, erode, 0), LinkResult::Ok);
+    ASSERT_EQ(graph.Link(erode, 0, over, 0), LinkResult::Ok);
+    ParamValue two;
+    two.value[0] = 2.0f;
+    graph.SetParam(over, ParamOf(*graph.Find(over)->type, "factor"), two);
+    const faf::editor::GraphNode& overNode = *graph.Find(over);
+    const faf::editor::GraphNode& blendNode = *graph.Find(blend);
+    ASSERT_EQ(graph.Link(over, 0, blend, PinOf(blendNode.type->inputs, "a")), LinkResult::Ok);
+    ASSERT_EQ(graph.Link(noise, 0, blend, PinOf(blendNode.type->inputs, "b")), LinkResult::Ok);
+    ASSERT_EQ(
+      graph.Link(over, PinOf(overNode.type->outputs, "wear"), blend, PinOf(blendNode.type->inputs, "mask")),
+      LinkResult::Ok
+    );
+    TerrainRun run(4);
+    const auto report = run.Evaluate(graph, 1, ground);
+    ASSERT_TRUE(report.errors.empty()) << report.errors.begin()->second;
+    const faf::editor::TerrainValue* const wear = run.Value(over, "wear");
+    ASSERT_NE(wear, nullptr);
+    ASSERT_NE(wear->grid, nullptr);
+    EXPECT_EQ(wear->grid->w, 65) << "(33 - 1) x 2 + 1: the erosion ran on the fine grid";
+    EXPECT_EQ(run.Value(over, "out")->grid->w, 65);
+    // Without the erosion node before it, the masks are refused with the reason.
+    NodeGraph plain(TerrainNodeTypes());
+    const int base2 = plain.AddNode("terrain", 0, 0);
+    const int over2 = plain.AddNode("oversample", 200, 0);
+    const int blend2 = plain.AddNode("blend", 400, 0);
+    ASSERT_EQ(plain.Link(base2, 0, over2, 0), LinkResult::Ok);
+    plain.SetParam(over2, ParamOf(*plain.Find(over2)->type, "factor"), two);
+    const faf::editor::GraphNode& over2Node = *plain.Find(over2);
+    const faf::editor::GraphNode& blend2Node = *plain.Find(blend2);
+    ASSERT_EQ(plain.Link(over2, 0, blend2, PinOf(blend2Node.type->inputs, "a")), LinkResult::Ok);
+    ASSERT_EQ(
+      plain.Link(over2, PinOf(over2Node.type->outputs, "wear"), blend2, PinOf(blend2Node.type->inputs, "mask")),
+      LinkResult::Ok
+    );
+    TerrainRun run2(4);
+    (void)run2.Evaluate(plain, 1, ground);
+    EXPECT_NE(run2.Error(over2).find("erosion node"), std::string::npos) << run2.Error(over2);
+  }
+
+  TEST(
+    TerrainGraph,
     TextureLayerAndImageSourcesReadTheMap
   )
   {

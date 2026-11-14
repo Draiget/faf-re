@@ -204,4 +204,27 @@ namespace faf::editor
     out += "    },\n}\n";
     return out;
   }
+
+  std::string MeshTerrainManifest(
+    const std::map<std::pair<int, int>, std::string>& files,
+    const float size,
+    const float meshHigh
+  )
+  {
+    // The line oriented dialect the mesh terrain reads (FAF Studio's EdMeshData ParseManifest): one entry a line.
+    char line[160];
+    std::string out = "-- mesh terrain manifest (FAF map editor): one entry a line\n";
+    (void)std::snprintf(line, sizeof(line), "size = %g,\n", static_cast<double>(size));
+    out += line;
+    if (meshHigh > -9999.0f) {
+      // The highest vertex plus the margin the mesh checks expect (V15).
+      (void)std::snprintf(line, sizeof(line), "mesh_high = %g,\n", static_cast<double>(meshHigh + kMeshHighMargin));
+      out += line;
+    }
+    out += "{ name = 'ground', diffuse_a = '' },\n";
+    for (const auto& [key, file] : files) {
+      out += "{ mesh = '" + file + "', material = 1 },\n";
+    }
+    return out;
+  }
 } // namespace faf::editor

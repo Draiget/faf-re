@@ -152,8 +152,35 @@ namespace faf::editor
     std::string& error
   )
   {
+    return AskIconFor(mLab.Unit(), error);
+  }
+
+  void EdUnitViewer::AskBatch()
+  {
     ModProject* const project = mProject.Project();
-    const std::string unit = mLab.Unit();
+    if (project == nullptr) {
+      mStatus = "open a mod project first";
+      return;
+    }
+    mBatch.clear();
+    for (const auto& [id, keys] : project->edits) {
+      mBatch.push_back(id);
+    }
+    for (const auto& [id, d] : project->derived) {
+      if (std::find(mBatch.begin(), mBatch.end(), id) == mBatch.end()) {
+        mBatch.push_back(id);
+      }
+    }
+    mBatchTotal = static_cast<int>(mBatch.size());
+    mStatus = "making " + std::to_string(mBatchTotal) + " icons...";
+  }
+
+  bool EdUnitViewer::AskIconFor(
+    const std::string& unit,
+    std::string& error
+  )
+  {
+    ModProject* const project = mProject.Project();
     if (project == nullptr || unit.empty()) {
       error = "open a mod project and pick a unit in the unit lab";
       return false;
@@ -180,6 +207,16 @@ namespace faf::editor
           mDrawnPixels += (pixel & 0x00FFFFFFu) != 0U ? 1 : 0; // (lit pixels: the background is opaque black)
         }
       }
+    }
+    // A batch: the next unit once the last icon is done.
+    if (mIconFrames < 0 && !mBatch.empty()) {
+      const std::string next = mBatch.front();
+      mBatch.erase(mBatch.begin());
+      std::string error;
+      if (!AskIconFor(next, error)) {
+        gpg::Warnf("editor: unit viewer: batch: %s: %s", next.c_str(), error.c_str());
+      }
+      return;
     }
     if (mIconFrames < 0 || ++mIconFrames < 4 || !mIconSheet) {
       return;
@@ -220,8 +257,55 @@ namespace faf::editor
       gpg::Warnf("editor: unit viewer: %s", mStatus.c_str());
       return;
     }
-    const std::vector<float> icon = IconPixels(pixels.data(), kIconRender, kIconSide, 0.9f);
+    std::vector<float> icon = IconPixels(pixels.data(), kIconRender, kIconSide, 0.9f);
     mIconFrames = -1;
+    // Beside the icon the game ships (Studio's Icons panel): the silhouettes' overlap and the colours, and what the
+    // faction's tone fit learns from it; the fit applied when asked.
+    {
+      std::vector<std::uint8_t> made(icon.size());
+      for (std::size_t i = 0; i < icon.size(); ++i) {
+        made[i] = static_cast<std::uint8_t>(std::clamp(icon[i] * 255.0f + 0.5f, 0.0f, 255.0f));
+      }
+      ModProject* const p = mProject.Project();
+      const std::string source = p != nullptr ? ModSourceUnit(*p, mIconUnit) : mIconUnit;
+      const std::string faction = IconFactionOf(source);
+      std::vector<std::uint8_t> shipped;
+      if (
+        loadGameIcon && loadGameIcon("/textures/ui/common/icons/units/" + source + "_icon.dds", kIconSide, shipped) &&
+        shipped.size() == made.size()
+      ) {
+        const IconMetrics m = CompareIcons(made.data(), shipped.data(), kIconSide);
+        mTone.Add(faction, made.data(), shipped.data(), kIconSide);
+        char text[220];
+        (void)std::snprintf(
+          text,
+          sizeof(text),
+          "Beside the game's icon of %s: silhouettes overlap %.0f%% (%d / %d pixels), colour off by %.0f, tint by "
+          "%.0f, "
+          "blocks by %.0f",
+          source.c_str(),
+          static_cast<double>(m.iou * 100.0f),
+          m.areaA,
+          m.areaB,
+          static_cast<double>(m.colour),
+          static_cast<double>(m.tint),
+          static_cast<double>(m.coarse)
+        );
+        mCompare = text;
+        mShipped = shipped;
+        mMade = made;
+        gpg::Logf("editor: unit viewer: %s", text);
+      } else {
+        mCompare = "The game ships no icon for " + source + " to compare with.";
+      }
+      float gains[3] = {1.0f, 1.0f, 1.0f};
+      if (mToneOn && mTone.Gains(faction, gains)) {
+        ApplyIconTone(made, gains);
+        for (std::size_t i = 0; i < icon.size(); ++i) {
+          icon[i] = static_cast<float>(made[i]) / 255.0f;
+        }
+      }
+    }
     TexImage image;
     image.Reset(kIconSide, 4);
     std::memcpy(image.data.data(), icon.data(), icon.size() * sizeof(float));
@@ -360,9 +444,101 @@ namespace faf::editor
         "shows it; a derived unit names it"
       );
     }
+    ImGui::SameLine();
+    ImGui::BeginDisabled(project == nullptr || mIconFrames >= 0 || !mBatch.empty());
+    if (ImGui::Button("Icons of every project unit")) {
+      AskBatch();
+    }
+    ImGui::EndDisabled();
+    ImGui::Checkbox("Fit the tone per faction (learned from the comparisons)", &mToneOn);
+    EdSetItemTooltip(
+      "Each faction's colour gains from the made icons against the game's (Studio's tone fit), applied when an icon is "
+      "written"
+    );
+    if (!mBatch.empty()) {
+      ImGui::TextDisabled("Batch: %d of %d left", static_cast<int>(mBatch.size()), mBatchTotal);
+    }
+    if (!mCompare.empty()) {
+      ImGui::TextWrapped("%s", mCompare.c_str());
+    }
     if (!mStatus.empty()) {
       ImGui::TextWrapped("%s", mStatus.c_str());
     }
+    DrawInView(source);
     ImGui::End();
+  }
+
+  void EdUnitViewer::DrawInView(
+    const std::string& source
+  )
+  {
+    UnitPreviewState& p = mPreview;
+    if (!Section("In the view, animated", false)) {
+      return;
+    }
+    if (ImGui::Checkbox("Show the unit in the view", &p.active)) {
+      p.time = 0.0f;
+    }
+    EdSetItemTooltip("The unit stands at the camera's target, drawn by the game's renderer with its animations");
+    if (p.unit != source) {
+      p.unit = source;
+      p.animation.clear();
+      p.animations.clear();
+    }
+    if (!p.active) {
+      return;
+    }
+    ImGui::SetNextItemWidth(-1.0f);
+    if (EdBeginCombo("##anim", p.animation.empty() ? "Rest pose" : p.animation.c_str())) {
+      if (ImGui::Selectable("Rest pose", p.animation.empty())) {
+        p.animation.clear();
+      }
+      for (const std::string& a : p.animations) {
+        if (ImGui::Selectable(a.c_str(), a == p.animation)) {
+          p.animation = a;
+          p.playing = true;
+        }
+      }
+      ImGui::EndCombo();
+    }
+    char path[256];
+    (void)std::snprintf(path, sizeof(path), "%s", p.animation.c_str());
+    ImGui::SetNextItemWidth(-1.0f);
+    if (
+      ImGui::InputTextWithHint(
+        "##animpath", "or any .sca of the game", path, sizeof(path), ImGuiInputTextFlags_EnterReturnsTrue
+      )
+    ) {
+      p.animation = path;
+    }
+    if (ImGui::Button(p.playing ? "Pause" : "Play")) {
+      p.playing = !p.playing;
+      if (p.playing && !p.loop && p.time >= p.duration) {
+        p.time = 0.0f;
+      }
+    }
+    ImGui::SameLine();
+    ImGui::Checkbox("Loop", &p.loop);
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(-1.0f);
+    (void)FillSliderFloat("##rate", &p.rate, 0.05f, 4.0f, "Rate %.2f");
+    ImGui::SetNextItemWidth(-1.0f);
+    if (FillSliderFloat("##time", &p.time, 0.0f, std::max(0.01f, p.duration), "Time %.2f s")) {
+      p.scrubbed = true;
+      p.playing = false;
+    }
+    ImGui::Checkbox("Bones", &p.bones);
+    ImGui::SameLine();
+    ImGui::Checkbox("Collision box", &p.hitbox);
+    ImGui::SameLine();
+    ImGui::Checkbox("Footprint", &p.footprint);
+    ImGui::Checkbox("Weapon ranges", &p.ranges);
+    ImGui::SameLine();
+    ImGui::Checkbox("Senses", &p.senses);
+    ImGui::SetNextItemWidth(-1.0f);
+    (void)FillSliderInt("##army", &p.army, 0, 7, "Army colour %d");
+    if (!p.status.empty()) {
+      ImGui::TextDisabled("%s", p.status.c_str());
+    }
   }
 } // namespace faf::editor

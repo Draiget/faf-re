@@ -793,4 +793,30 @@ namespace faf::editor
     TooltipV(format, args);
     va_end(args);
   }
+
+  void SameLineIfFits(
+    const float width
+  )
+  {
+    const ImGuiStyle& style = ImGui::GetStyle();
+    const float right = ImGui::GetCurrentWindowRead()->WorkRect.Max.x;
+    if (ImGui::GetItemRectMax().x + style.ItemSpacing.x + width <= right) {
+      ImGui::SameLine();
+    }
+  }
+
+  float CheckboxWidth(
+    const char* const label
+  )
+  {
+    const ImGuiStyle& style = ImGui::GetStyle();
+    return ImGui::GetFrameHeight() + style.ItemInnerSpacing.x + ImGui::CalcTextSize(label, nullptr, true).x;
+  }
+
+  float ButtonWidth(
+    const char* const label
+  )
+  {
+    return ImGui::CalcTextSize(label, nullptr, true).x + ImGui::GetStyle().FramePadding.x * 2.0f;
+  }
 } // namespace faf::editor

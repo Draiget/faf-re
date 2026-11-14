@@ -285,9 +285,10 @@ namespace faf::editor
     // What the masks can't fix: the textures.
     if (plan.toRoughLayer8) {
       plan.warnings.push_back(
-        to +
-        " takes every layer's roughness from the Upper layer (a roughness atlas) and ignores the albedo alpha: "
-        "the textures are not converted here."
+        to + " takes every layer's roughness from the Upper layer (a roughness atlas) and ignores the albedo alpha: " +
+        (options.textures
+           ? std::string("the atlas is made from the layers' textures after the masks (its own undo step).")
+           : std::string("tick \"Also write the textures it needs\" to make the atlas too."))
       );
     }
     if (target.family == ShaderFamily::Splat) {

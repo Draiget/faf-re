@@ -1921,6 +1921,11 @@ namespace faf::editor
     mLayoutRedo.clear();
     mMissionRedo.clear();
     mMapInfoRedo.clear();
+    mPathsRedo.clear();
+    if (onEditEnded) {
+      const char* const step = UndoStepName();
+      onEditEnded(step != nullptr ? step : "");
+    }
   }
 
   bool EdDocument::PopUndo(
@@ -2032,6 +2037,7 @@ namespace faf::editor
       }
       LoadLayout();
       LoadMissionFile();
+      LoadPathsFile();
       gpg::Logf(
         "editor: opened %s in %.2f s: %d x %d, %zu layers named, %d props, %d decals, %d markers, %zu armies%s%s",
         mPath.c_str(),
@@ -2686,6 +2692,20 @@ namespace faf::editor
       }
       mMissionRead = mission;
     }
+    // The kept paths beside the map (only when they changed; no paths and no file: none written).
+    if (
+      const std::string paths =
+        mPaths.set.paths.empty() && mPathsRead.empty() ? std::string() : KeptPathsText(mPaths.set);
+      paths != mPathsRead && !PathsFile().empty()
+    ) {
+      std::ofstream out(PathsFile(), std::ios::binary | std::ios::trunc);
+      out.write(paths.data(), static_cast<std::streamsize>(paths.size()));
+      if (!out) {
+        message = "Saved " + file.string() + ", but the paths file " + PathsFile().string() + " couldn't be written";
+        return false;
+      }
+      mPathsRead = paths;
+    }
     // The layout's drawing beside the map (only when it changed; an emptied drawing empties the file).
     if (const std::string layout = mLayout.Save(); layout != mLayoutRead && !LayoutFile().empty()) {
       std::ofstream out(LayoutFile(), std::ios::binary | std::ios::trunc);
@@ -3008,6 +3028,75 @@ namespace faf::editor
     to.push_back(std::move(step));
     mModified = true;
     return true;
+  }
+
+  void EdDocument::PathsEdited(
+    PathsState before,
+    const bool ownStep
+  )
+  {
+    mPathsUndo.emplace_back(std::move(before), mPaths);
+    if (mPathsUndo.size() > 200) {
+      mPathsUndo.erase(mPathsUndo.begin());
+    }
+    ++mPathsRevision;
+    if (ownStep) {
+      EditEnded(EditKind::Paths);
+    } else {
+      mPathsRedo.clear();
+    }
+    mModified = true;
+  }
+
+  bool EdDocument::UndoPaths(
+    const bool redo
+  )
+  {
+    auto& from = redo ? mPathsRedo : mPathsUndo;
+    auto& to = redo ? mPathsUndo : mPathsRedo;
+    if (from.empty()) {
+      return false;
+    }
+    auto step = std::move(from.back());
+    from.pop_back();
+    mPaths = redo ? step.second : step.first;
+    to.push_back(std::move(step));
+    ++mPathsRevision;
+    mModified = true;
+    return true;
+  }
+
+  std::filesystem::path EdDocument::PathsFile() const
+  {
+    const std::filesystem::path map = MapDiskFile();
+    if (map.empty()) {
+      return {};
+    }
+    return map.parent_path() / (map.stem().string() + "_paths.editor");
+  }
+
+  void EdDocument::LoadPathsFile()
+  {
+    mPaths = PathsState{};
+    mPathsRead.clear();
+    mPathsUndo.clear();
+    mPathsRedo.clear();
+    ++mPathsRevision;
+    const std::filesystem::path file = PathsFile();
+    std::error_code ignored;
+    if (file.empty() || !std::filesystem::exists(file, ignored)) {
+      return;
+    }
+    std::ifstream in(file, std::ios::binary);
+    const std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+    std::string error;
+    if (!text.empty() && !ReadKeptPaths(text, mPaths.set, error)) {
+      gpg::Warnf("editor: %s: the paths couldn't be read (%s)", file.string().c_str(), error.c_str());
+      mPaths = PathsState{};
+      return;
+    }
+    mPathsRead = text;
+    gpg::Logf("editor: paths read from %s: %zu paths", file.string().c_str(), mPaths.set.paths.size());
   }
 
   std::filesystem::path EdDocument::MissionFile() const

@@ -289,6 +289,9 @@ namespace faf::editor
       float minDist = 6.0f;
       float fill = 1.0f;
       float slopeMax = 35.0f; // degrees
+      float slopeMin = 0.0f;  // degrees: flatter ground is left (the detail pass's cliff classes)
+      /** Decals: their size in units at scale 1 (0: the Decals tool's size). */
+      float decalSize = 0.0f;
       float scaleMin = 0.8f;
       float scaleMax = 1.2f;
       float margin = 4.0f;

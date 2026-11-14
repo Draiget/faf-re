@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <deque>
 #include <cstdio>
 #include <cstdlib>
 #include <set>
@@ -2127,11 +2128,62 @@ namespace faf::editor
     return kTypes;
   }
 
+  namespace
+  {
+    std::deque<MissionNodeType>& ModTypes()
+    {
+      static std::deque<MissionNodeType> types; // a deque: the found pointers stay valid as types are added
+      return types;
+    }
+  } // namespace
+
+  bool RegisterMissionNodeType(
+    MissionNodeType type,
+    std::string& error
+  )
+  {
+    if (type.id.empty() || type.title.empty() || !type.emit) {
+      error = "a node type needs an id, a title and code";
+      return false;
+    }
+    for (const MissionNodeType& t : MissionNodeTypes()) {
+      if (t.id == type.id) {
+        error = "the editor has a node type " + type.id;
+        return false;
+      }
+    }
+    for (MissionNodeType& t : ModTypes()) {
+      if (t.id == type.id) {
+        t = std::move(type); // a mod run again replaces its own
+        return true;
+      }
+    }
+    if (type.family.empty()) {
+      type.family = "action";
+    }
+    ModTypes().push_back(std::move(type));
+    return true;
+  }
+
+  std::vector<const MissionNodeType*> MissionModNodeTypes()
+  {
+    std::vector<const MissionNodeType*> out;
+    for (const MissionNodeType& t : ModTypes()) {
+      out.push_back(&t);
+    }
+    return out;
+  }
+
   const MissionNodeType* FindMissionNodeType(
     const std::string& id
   )
   {
     for (const MissionNodeType& t : MissionNodeTypes()) {
+      if (t.id == id) {
+        return &t;
+      }
+    }
+    for (const MissionNodeType& t : ModTypes()) {
       if (t.id == id) {
         return &t;
       }

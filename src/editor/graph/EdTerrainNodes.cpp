@@ -1186,7 +1186,7 @@ namespace faf::editor::terrain
         for (const ErosionParam& p : s->params) {
           values[p.key] = v.N(p.key);
         }
-        values = ErosionOpValues(*s, values, E.step);
+        values = ErosionOpValues(*s, values, E.fineStep > 0.0 ? E.fineStep : static_cast<double>(E.step));
         values["seed"] = E.Seed(v.N("seed"));
         const bool masks =
           E.wanted.count("wear") + E.wanted.count("deposit") + E.wanted.count("flow") + E.wanted.count("accum") > 0;
@@ -3816,17 +3816,29 @@ namespace faf::editor::terrain
         "Oversample",
         "erosion",
         "Puts the height on a grid `factor` times finer than the map's (smooth, not blocky), so what comes after it "
-        "(erosion, normals, masks) works at a multiple of the map's resolution. The outputs that write into the map "
-        "average it back down. Costs memory and time with the square of the factor: 2 is 4 times the samples, 4 is "
-        "16 times.",
+        "(erosion, normals, masks) works at a multiple of the map's resolution. Wired straight after an erosion node "
+        "with \"Run the erosion again\" on, it runs that erosion again on the fine grid from its own inputs (settings "
+        "scaled to the finer cell): the wear, deposit, flow and drainage outputs then carry the fine detail. The "
+        "outputs that write into the map average it back down. Costs memory and time with the square of the factor: "
+        "2 is 4 times the samples, 4 is 16 times.",
         {Pin("a")},
-        kHeightOut,
+        {Pin("out"),
+         Pin("wear", PinType::Mask),
+         Pin("deposit", PinType::Mask),
+         Pin("flow", PinType::Mask),
+         Pin("accum", PinType::Mask)},
         {N("factor", "Factor (times the map's resolution)", 1, 8, 1, "%.0f", 2),
-         C("method", "Resampling", {"cubic", "linear"}, {"Smooth (cubic)", "Linear"}, "cubic")},
+         C("method", "Resampling", {"cubic", "linear"}, {"Smooth (cubic)", "Linear"}, "cubic"),
+         B("rerun", "Run the erosion again at the higher resolution (when wired after an erosion node)", true)},
         [](const Env& E, const Values& v, const Inputs& ins) {
         const field::GridPtr a = In(ins, "a");
         const int k = std::clamp(static_cast<int>(std::lround(v.N("factor"))), 1, 8);
+        const bool wantMasks =
+          E.wanted.count("wear") + E.wanted.count("deposit") + E.wanted.count("flow") + E.wanted.count("accum") > 0;
         if (k == 1) {
+          if (wantMasks) {
+            Fail("the erosion masks need a factor above 1 and \"Run the erosion again\"");
+          }
           return One(a);
         }
         const long long w = static_cast<long long>(a->w - 1) * k + 1;
@@ -3838,9 +3850,24 @@ namespace faf::editor::terrain
             "smaller factor"
           );
         }
-        return One(E.Op(
+        const field::GridPtr up = E.Op(
           "upsample", {{"a", a}, {"factor", static_cast<double>(k)}, {"linear", v.S("method") == "linear" ? 1.0 : 0.0}}
-        ));
+        );
+        if (!v.B("rerun") || !E.rerunUpstream) {
+          if (wantMasks) {
+            Fail("turn on \"Run the erosion again\" for the erosion masks");
+          }
+          return One(up);
+        }
+        Outputs out;
+        std::string why;
+        if (!E.rerunUpstream("a", k, up, out, why)) {
+          if (wantMasks) {
+            Fail(why);
+          }
+          return One(up); // not after an erosion node: the height on the fine grid alone
+        }
+        return out;
       }
       );
     }

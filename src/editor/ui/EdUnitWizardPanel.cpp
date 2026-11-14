@@ -1,0 +1,485 @@
+#include "editor/ui/EdUnitWizardPanel.h"
+
+#include "editor/doc/EdModProject.h"
+#include "editor/ui/EdControls.h"
+#include "editor/ui/EdHelp.h"
+#include "editor/ui/EdModPanel.h"
+#include "editor/ui/EdUiScale.h"
+#include "editor/ui/EdWorkspaces.h"
+#include "gpg/core/utils/Logging.h"
+#include "imgui.h"
+
+#include <algorithm>
+#include <cstdio>
+#include <filesystem>
+#include <fstream>
+#include <iterator>
+
+namespace faf::editor
+{
+  const std::string& EmbeddedEditorData(const std::string& name);
+
+  EdUnitWizardPanel::EdUnitWizardPanel(
+    EdModPanel& project
+  )
+    : mProject(project)
+  {}
+
+  bool EdUnitWizardPanel::Data()
+  {
+    if (!mDataTried) {
+      mDataTried = true;
+      const std::string& text = EmbeddedEditorData("unitwizdata.lua");
+      if (text.empty()) {
+        mDataError = "the wizard's template data isn't in this build";
+      } else if (!LoadUnitWizardData(text, mData, mDataError)) {
+        mDataError = "the wizard's template data can't be read: " + mDataError;
+      }
+      if (!mDataError.empty()) {
+        gpg::Warnf("editor: unit wizard: %s", mDataError.c_str());
+      }
+    }
+    return mDataError.empty();
+  }
+
+  void EdUnitWizardPanel::LoadSpecs()
+  {
+    mSpecs.clear();
+    mCurrent = -1;
+    mReport.clear();
+    mChecks.clear();
+    mFolder = mProject.Folder().string();
+    std::ifstream in(mProject.Folder() / "editor_newunits.json", std::ios::binary);
+    if (!in) {
+      return;
+    }
+    const std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+    std::string error;
+    if (!ReadUnitSpecs(text, mSpecs, error)) {
+      gpg::Warnf("editor: unit wizard: editor_newunits.json: %s", error.c_str());
+    }
+    mCurrent = mSpecs.empty() ? -1 : 0;
+  }
+
+  void EdUnitWizardPanel::SaveSpecs()
+  {
+    if (mFolder.empty()) {
+      return;
+    }
+    const std::string text = UnitSpecsText(mSpecs);
+    std::ofstream out(std::filesystem::path(mFolder) / "editor_newunits.json", std::ios::binary | std::ios::trunc);
+    out.write(text.data(), static_cast<std::streamsize>(text.size()));
+    mDirty = false;
+  }
+
+  bool EdUnitWizardPanel::Taken(
+    const std::string& id
+  ) const
+  {
+    if (gameHasUnit && gameHasUnit(id)) {
+      return true;
+    }
+    if (const ModProject* p = const_cast<EdModPanel&>(mProject).Project(); p != nullptr && p->derived.count(id) != 0) {
+      return true;
+    }
+    return std::any_of(mSpecs.begin(), mSpecs.end(), [&id](const UnitWizardSpec& s) {
+      return s.id == id;
+    });
+  }
+
+  std::string EdUnitWizardPanel::Test(
+    const std::string& templateId,
+    const std::string& faction
+  )
+  {
+    if (mProject.Project() == nullptr) {
+      return "no mod project open";
+    }
+    if (!Data()) {
+      return mDataError;
+    }
+    if (mFolder != mProject.Folder().string()) {
+      LoadSpecs();
+    }
+    UnitWizardSpec spec;
+    std::string error;
+    const std::string id = SuggestUnitId(templateId, faction, [this](const std::string& i) {
+      return Taken(i);
+    });
+    if (!NewUnitSpec(mData, templateId, faction, id, spec, error)) {
+      return error;
+    }
+    mSpecs.push_back(spec);
+    SaveSpecs();
+    std::vector<std::string> report;
+    const ModProject* p = mProject.Project();
+    const auto edits = p->edits.find(id);
+    (void)WriteWizardUnit(
+      mData, spec, edits != p->edits.end() ? edits->second : std::map<std::string, double>{}, mFolder, report
+    );
+    UnitCheckGame game;
+    game.unitExists = gameHasUnit;
+    game.projectileExists = gameFileExists;
+    game.fileExists = gameFileExists;
+    std::string text = "made " + id + ":";
+    for (const std::string& line : report) {
+      text += " " + line + ";";
+    }
+    for (const UnitCheck& c : CheckWizardUnit(mData, spec, mFolder, game)) {
+      text += std::string(" [") + c.severity + "] " + c.text + ";";
+    }
+    return text;
+  }
+
+  void EdUnitWizardPanel::Draw(
+    bool& open
+  )
+  {
+    ImGui::SetNextWindowSize(ImVec2(Em(420.0f), Em(640.0f)), ImGuiCond_FirstUseEver);
+    if (!ImGui::Begin(Panel("New unit###UnitWizard"), &open)) {
+      ImGui::End();
+      return;
+    }
+    if (mProject.Project() == nullptr) {
+      ImGui::TextWrapped("Open or make a mod project first (Mod project panel): the new units go into it.");
+      ImGui::End();
+      return;
+    }
+    if (!Data()) {
+      ImGui::TextWrapped("%s", mDataError.c_str());
+      ImGui::End();
+      return;
+    }
+    if (mFolder != mProject.Folder().string()) {
+      LoadSpecs();
+    }
+    HelpNote(
+      "A unit with its own id, made from a template (bot, tank, ship, aircraft, structure ...) and never from a copy "
+      "of "
+      "a blueprint: its blueprint, script, strings, mesh (your OBJ, or a placeholder in the template's skeleton), "
+      "textures and a quick icon are written into the project. The unit lab's changes go into its blueprint."
+    );
+    if (Section("New")) {
+      std::vector<const char*> templates;
+      for (const UnitTemplate& t : UnitTemplates()) {
+        templates.push_back(t.label);
+      }
+      RowLabel("Template");
+      ImGui::SetNextItemWidth(-1.0f);
+      (void)EdCombo("##template", &mNewTemplate, templates.data(), static_cast<int>(templates.size()));
+      RowLabel("Faction");
+      ImGui::SetNextItemWidth(-1.0f);
+      (void)EdCombo("##faction", &mNewFaction, UnitFactions().data(), static_cast<int>(UnitFactions().size()));
+      if (PrimaryButton("Make the unit")) {
+        const UnitTemplate& t = UnitTemplates()[static_cast<std::size_t>(mNewTemplate)];
+        const std::string faction = UnitFactions()[static_cast<std::size_t>(mNewFaction)];
+        const std::string id = SuggestUnitId(t.id, faction, [this](const std::string& i) {
+          return Taken(i);
+        });
+        UnitWizardSpec spec;
+        std::string error;
+        if (NewUnitSpec(mData, t.id, faction, id, spec, error)) {
+          mSpecs.push_back(std::move(spec));
+          mCurrent = static_cast<int>(mSpecs.size()) - 1;
+          SaveSpecs();
+          mReport = {"made " + id + " (" + t.label + ", " + faction + "): set it up, then Write"};
+        } else {
+          mReport = {error};
+        }
+      }
+    }
+    if (!mSpecs.empty() && Section("Units")) {
+      for (std::size_t i = 0; i < mSpecs.size(); ++i) {
+        char label[200];
+        (void)std::snprintf(
+          label,
+          sizeof(label),
+          "%s  %s (%s %s)###unit%zu",
+          mSpecs[i].id.c_str(),
+          mSpecs[i].name.c_str(),
+          mSpecs[i].faction.c_str(),
+          mSpecs[i].templateId.c_str(),
+          i
+        );
+        if (ImGui::Selectable(label, mCurrent == static_cast<int>(i))) {
+          mCurrent = static_cast<int>(i);
+          mChecks.clear();
+        }
+      }
+    }
+    if (mCurrent >= 0 && mCurrent < static_cast<int>(mSpecs.size())) {
+      UnitWizardSpec& spec = mSpecs[static_cast<std::size_t>(mCurrent)];
+      ImGui::PushID(mCurrent);
+      DrawSpec(spec);
+      ImGui::Separator();
+      if (PrimaryButton("Write the unit")) {
+        SaveSpecs();
+        mReport.clear();
+        const ModProject* p = mProject.Project();
+        const auto edits = p->edits.find(spec.id);
+        (void)WriteWizardUnit(
+          mData, spec, edits != p->edits.end() ? edits->second : std::map<std::string, double>{}, mFolder, mReport
+        );
+        gpg::Logf("editor: unit wizard: %s written (%zu lines)", spec.id.c_str(), mReport.size());
+      }
+      ImGui::SameLine();
+      if (ImGui::Button("Check")) {
+        UnitCheckGame game;
+        game.unitExists = gameHasUnit;
+        game.projectileExists = gameFileExists;
+        game.fileExists = gameFileExists;
+        mChecks = CheckWizardUnit(mData, spec, mFolder, game);
+      }
+      ImGui::SameLine();
+      if (ImGui::Button("Remove from the list")) {
+        mSpecs.erase(mSpecs.begin() + mCurrent);
+        mCurrent = mSpecs.empty() ? -1 : 0;
+        SaveSpecs();
+        mReport = {"removed from the wizard's list; its files stay in the project"};
+        ImGui::PopID();
+        ImGui::End();
+        return;
+      }
+      ImGui::PopID();
+    }
+    for (const UnitCheck& c : mChecks) {
+      const ImU32 colour = c.severity == 'E' ? IM_COL32(255, 110, 100, 255)
+        : c.severity == 'W'                  ? IM_COL32(255, 200, 100, 255)
+                                             : IM_COL32(170, 170, 170, 255);
+      ImGui::PushStyleColor(ImGuiCol_Text, colour);
+      ImGui::TextWrapped("%c  %s", c.severity, c.text.c_str());
+      ImGui::PopStyleColor();
+    }
+    for (const std::string& line : mReport) {
+      ImGui::TextWrapped("%s", line.c_str());
+    }
+    if (mDirty) {
+      SaveSpecs();
+    }
+    ImGui::End();
+  }
+
+  void EdUnitWizardPanel::DrawSpec(
+    UnitWizardSpec& spec
+  )
+  {
+    const auto text = [this](const char* label, const char* hint, std::string& value) {
+      char buffer[512];
+      (void)std::snprintf(buffer, sizeof(buffer), "%s", value.c_str());
+      ImGui::SetNextItemWidth(-1.0f);
+      if (ImGui::InputTextWithHint(label, hint, buffer, sizeof(buffer))) {
+        value = buffer;
+        mDirty = true;
+      }
+    };
+    const auto number = [this](
+                          const char* id,
+                          std::map<std::string, double>& map,
+                          const char* key,
+                          const float lo,
+                          const float hi,
+                          const char* format
+                        ) {
+      float v = static_cast<float>(map.count(key) != 0 ? map[key] : 0.0);
+      ImGui::SetNextItemWidth(-1.0f);
+      if (FillDragFloat(id, &v, (hi - lo) / 400.0f, lo, hi, format)) {
+        map[key] = v;
+        mDirty = true;
+      }
+    };
+    if (Section("Unit")) {
+      std::string id = spec.id;
+      text("##id", "unit id (zel0001)", id);
+      if (id != spec.id) {
+        std::string why;
+        if (CheckUnitId(id, [this, &spec](const std::string& i) {
+          return i != spec.id && Taken(i);
+        }, why)) {
+          spec.id = id;
+        } else {
+          ImGui::TextDisabled("%s", why.c_str());
+        }
+      }
+      text("##name", "name", spec.name);
+      text("##desc", "description", spec.description);
+      RowLabel("Tech");
+      ImGui::SetNextItemWidth(-1.0f);
+      static const char* const kTech[4] = {"Tech 1", "Tech 2", "Tech 3", "Experimental"};
+      int tech = std::clamp(spec.tech, 1, 4) - 1;
+      if (EdCombo("##tech", &tech, kTech, 4)) {
+        spec.tech = tech + 1;
+        if (const UnitTemplate* t = UnitTemplateOf(spec.templateId); t != nullptr) {
+          spec.buildBy = DefaultBuildBy(*t, spec.tech);
+        }
+        mDirty = true;
+      }
+      ImGui::TextDisabled("Template %s, faction %s", spec.templateId.c_str(), spec.faction.c_str());
+    }
+    if (Section("Who builds it", false)) {
+      for (const UnitBuildKey& key : UnitBuildKeys()) {
+        bool on = std::find(spec.buildBy.begin(), spec.buildBy.end(), key.key) != spec.buildBy.end();
+        if (ImGui::Checkbox(key.label, &on)) {
+          if (on) {
+            spec.buildBy.push_back(key.key);
+          } else {
+            spec.buildBy.erase(std::remove(spec.buildBy.begin(), spec.buildBy.end(), key.key), spec.buildBy.end());
+          }
+          mDirty = true;
+        }
+      }
+      std::string add;
+      for (const std::string& c : spec.catAdd) {
+        add += (add.empty() ? "" : " ") + c;
+      }
+      std::string del;
+      for (const std::string& c : spec.catDel) {
+        del += (del.empty() ? "" : " ") + c;
+      }
+      const std::string addWas = add;
+      const std::string delWas = del;
+      text("##catadd", "categories to add (space between)", add);
+      text("##catdel", "categories to take away", del);
+      const auto split = [](const std::string& s) {
+        std::vector<std::string> out;
+        std::string word;
+        for (const char c : s + " ") {
+          if (c == ' ' || c == ',') {
+            if (!word.empty()) {
+              out.push_back(word);
+            }
+            word.clear();
+          } else {
+            word += c;
+          }
+        }
+        return out;
+      };
+      if (add != addWas) {
+        spec.catAdd = split(add);
+      }
+      if (del != delWas) {
+        spec.catDel = split(del);
+      }
+      std::string cats;
+      for (const std::string& c : UnitCategories(mData, spec)) {
+        cats += (cats.empty() ? "" : " ") + c;
+      }
+      ImGui::TextWrapped("Categories: %s", cats.c_str());
+    }
+    if (Section("Numbers", false)) {
+      number("##mass", spec.economy, "BuildCostMass", 0.0f, 100000.0f, "Mass %.0f");
+      number("##energy", spec.economy, "BuildCostEnergy", 0.0f, 1000000.0f, "Energy %.0f");
+      number("##time", spec.economy, "BuildTime", 1.0f, 100000.0f, "Build time %.0f");
+      number("##health", spec.defense, "MaxHealth", 1.0f, 200000.0f, "Health %.0f");
+      number("##regen", spec.defense, "RegenRate", 0.0f, 500.0f, "Regeneration %.1f");
+      if (const UnitTemplate* t = UnitTemplateOf(spec.templateId); t != nullptr && t->mobile) {
+        number("##speed", spec.physics, "MaxSpeed", 0.0f, 60.0f, "Speed %.2f");
+        number("##turn", spec.physics, "TurnRate", 0.0f, 360.0f, "Turn rate %.0f");
+      } else {
+        ImGui::SetNextItemWidth(Em(140.0f));
+        if (FillSliderInt("##fx", &spec.footprintX, 1, 20, "Footprint %d")) {
+          mDirty = true;
+        }
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(-1.0f);
+        if (FillSliderInt("##fz", &spec.footprintZ, 1, 20, "by %d")) {
+          mDirty = true;
+        }
+      }
+      number("##vision", spec.intel, "VisionRadius", 0.0f, 300.0f, "Vision %.0f");
+    }
+    if (Section("Weapons", false)) {
+      int remove = -1;
+      for (std::size_t i = 0; i < spec.weapons.size(); ++i) {
+        UnitWizardWeapon& w = spec.weapons[i];
+        ImGui::PushID(static_cast<int>(i));
+        ImGui::TextDisabled("%s", UnitWeaponKindName(w.kind));
+        text("##label", "label (the script's weapon name)", w.label);
+        const auto weaponNumber =
+          [this](const char* id, double& value, const float lo, const float hi, const char* format) {
+          float v = static_cast<float>(value);
+          ImGui::SetNextItemWidth(-1.0f);
+          if (FillDragFloat(id, &v, (hi - lo) / 400.0f, lo, hi, format)) {
+            value = v;
+            mDirty = true;
+          }
+        };
+        weaponNumber("##damage", w.damage, 0.0f, 100000.0f, "Damage %.1f");
+        weaponNumber("##range", w.range, 0.0f, 1000.0f, "Range %.1f");
+        weaponNumber("##rof", w.rof, 0.01f, 20.0f, "Rate of fire %.2f");
+        weaponNumber("##radius", w.damageRadius, 0.0f, 50.0f, "Damage radius %.1f");
+        text("##proj", "projectile blueprint", w.projectile);
+        if (ImGui::SmallButton("Remove weapon")) {
+          remove = static_cast<int>(i);
+        }
+        ImGui::Separator();
+        ImGui::PopID();
+      }
+      if (remove >= 0) {
+        spec.weapons.erase(spec.weapons.begin() + remove);
+        mDirty = true;
+      }
+      if (const UnitTemplate* t = UnitTemplateOf(spec.templateId); t != nullptr && !t->kinds.empty()) {
+        std::vector<const char*> names;
+        for (const char* k : t->kinds) {
+          names.push_back(UnitWeaponKindName(k));
+        }
+        mNewWeaponKind = std::clamp(mNewWeaponKind, 0, static_cast<int>(names.size()) - 1);
+        ImGui::SetNextItemWidth(Em(160.0f));
+        (void)EdCombo("##newweapon", &mNewWeaponKind, names.data(), static_cast<int>(names.size()));
+        ImGui::SameLine();
+        if (ImGui::Button("Add weapon")) {
+          const std::string label =
+            spec.weapons.empty() ? "MainGun" : "Weapon" + std::to_string(spec.weapons.size() + 1);
+          spec.weapons.push_back(NewUnitWeapon(mData, spec, t->kinds[static_cast<std::size_t>(mNewWeaponKind)], label));
+          mDirty = true;
+        }
+      }
+    }
+    if (Section("Mesh and textures", false)) {
+      text("##obj", "OBJ file (empty: a placeholder)", spec.mesh.source);
+      static const char* const kAxis[2] = {"Y up", "Z up"};
+      int axis = spec.mesh.axis == "z_up" ? 1 : 0;
+      RowLabel("Up axis");
+      ImGui::SetNextItemWidth(-1.0f);
+      if (EdCombo("##axis", &axis, kAxis, 2)) {
+        spec.mesh.axis = axis == 1 ? "z_up" : "y_up";
+        mDirty = true;
+      }
+      static const char* const kSkeleton[2] = {"The template's skeleton", "One bone per OBJ group"};
+      int skeleton = spec.mesh.skeleton == "groups" ? 1 : 0;
+      RowLabel("Bones");
+      ImGui::SetNextItemWidth(-1.0f);
+      if (EdCombo("##skeleton", &skeleton, kSkeleton, 2)) {
+        spec.mesh.skeleton = skeleton == 1 ? "groups" : "template";
+        mDirty = true;
+      }
+      EdSetItemTooltip("Template: OBJ groups named like the template's bones move with them, the rest with the root");
+      ImGui::SetNextItemWidth(-1.0f);
+      if (FillDragFloat("##length", &spec.mesh.length, 0.01f, 0.1f, 100.0f, "Length %.2f units")) {
+        mDirty = true;
+      }
+      ImGui::SetNextItemWidth(-1.0f);
+      if (FillSliderFloat("##yaw", &spec.mesh.yaw, -180.0f, 180.0f, "Turn %.0f deg")) {
+        mDirty = true;
+      }
+      mDirty |= ImGui::Checkbox("Mirror X", &spec.mesh.mirrorX);
+      ImGui::SameLine();
+      mDirty |= ImGui::Checkbox("Flip faces", &spec.mesh.flipWinding);
+      ImGui::SameLine();
+      mDirty |= ImGui::Checkbox("Flip V", &spec.mesh.flipV);
+      text("##albedo", "albedo DDS (empty: placeholder)", spec.albedo);
+      text("##normal", "normal map DDS", spec.normal);
+      text("##spec", "specular + team colour DDS", spec.specular);
+      mDirty |= ImGui::Checkbox("Quick icon", &spec.icon);
+      static const char* const kAnim[2] = {"The template's animations", "None"};
+      int anim = spec.anim == "none" ? 1 : 0;
+      RowLabel("Animations");
+      ImGui::SetNextItemWidth(-1.0f);
+      if (EdCombo("##anim", &anim, kAnim, 2)) {
+        spec.anim = anim == 1 ? "none" : "template";
+        mDirty = true;
+      }
+    }
+  }
+} // namespace faf::editor

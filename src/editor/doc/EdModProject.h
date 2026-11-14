@@ -67,6 +67,12 @@ namespace faf::editor
     }
   };
 
+  /** The first line of the files the new unit wizard writes (EdUnitWizard): Studio's mark, so its projects read alike.
+   */
+  extern const char* const kUnitWizardMark;
+  /** Whether `units/<id>/<id>_unit.bp` of the project folder is a unit of the new unit wizard (its own blueprint). */
+  [[nodiscard]] bool ModWizardUnit(const std::filesystem::path& folder, const std::string& id);
+
   /** What a project's undo step holds: its changes and its derived units. */
   struct ModChanges
   {

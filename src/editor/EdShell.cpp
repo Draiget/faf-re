@@ -17,6 +17,7 @@
 #include <algorithm>
 #include <cstdio>
 #include <cstdlib>
+#include <utility>
 
 #include "editor/EdLog.h"
 #include "editor/EdPlay.h"
@@ -593,6 +594,18 @@ namespace faf::editor
       if (mShowMesh) {
         DrawMeshPanel();
       }
+      if (mShowDetail) {
+        DrawDetailPanel();
+      }
+      if (mShowUnitWizard) {
+        mUnitWizard.Draw(mShowUnitWizard);
+      }
+      if (mShowPaths) {
+        mPathsPanel.Draw(mShowPaths, mDocument.Map() != nullptr);
+      } else {
+        // The view edits paths only while the panel is up.
+        mPathsPanel.State().editing = false;
+      }
       mUnitViewer.Frame();
       DrawViewMenu();
       if (std::string effect; mAssets.TakeEffectAsk(effect)) {
@@ -833,6 +846,9 @@ namespace faf::editor
       {"Statistics###Statistics", &EdShell::mShowStatistics},
       {"Images###Images", &EdShell::mShowImages},
       {"Mesh terrain###MeshTerrain", &EdShell::mShowMesh},
+      {"Paths###Paths", &EdShell::mShowPaths},
+      {"Detail pass###DetailPass", &EdShell::mShowDetail},
+      {"New unit###UnitWizard", &EdShell::mShowUnitWizard},
     };
     return kFlags;
   }
@@ -876,6 +892,29 @@ namespace faf::editor
       }
     }
     return nullptr;
+  }
+
+  std::vector<std::string> EdShell::PanelWindows() const
+  {
+    // The names the panels' Begin uses now (icon in front, the workspace after the id), as ImGui knows the windows.
+    std::vector<std::string> out;
+    for (const PanelFlag& flag : PanelFlags()) {
+      out.push_back(PanelWindowName(flag.window, ActiveWorkspace()));
+    }
+    return out;
+  }
+
+  bool EdShell::ShowPanelWindow(
+    const std::string& window,
+    const bool on
+  )
+  {
+    for (const PanelFlag& flag : PanelFlags()) {
+      if (window == PanelWindowName(flag.window, ActiveWorkspace())) {
+        return std::exchange(this->*flag.shown, on);
+      }
+    }
+    return false;
   }
 
   std::vector<std::string> EdShell::ShownPanelIds() const

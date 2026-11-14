@@ -151,6 +151,8 @@ namespace faf::editor
     }
     /** The mods the setup plays with: its own and the chosen AI's; a uid set as Lua text (`{ ['uid'] = true }`). */
     [[nodiscard]] std::vector<std::string> PlayedMods() const;
+    /** Sim mods every play adds (the turned-on editor mods with sim hooks; set by the app). */
+    std::vector<std::string> extraSimMods;
     /** After the setup's mods change: the game's rules for them built ahead on a thread, so the next Play is quick. */
     void PrepareRules();
     /** After a mod folder is mounted (a mod project's Test): the sim mods, and the AI types, found again. */

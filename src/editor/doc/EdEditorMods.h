@@ -25,6 +25,8 @@ namespace faf::editor
     std::string description;
     int api = 1; // `editor_api`; missing means 1
     bool editorMod = false;
+    /** `ui_only = false`: it also hooks the sim (its hook/ files), and plays take it as a sim mod. */
+    bool simHooks = false;
   };
 
   /** The top-level `key = value` lines of a mod_info.lua: strings without their quotes, other values as written. */

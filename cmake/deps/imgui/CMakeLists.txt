@@ -20,8 +20,12 @@ add_library(faf_imgui_core STATIC
   "${_imgui}/imgui_demo.cpp"
   "${_imgui}/imgui_draw.cpp"
   "${_imgui}/imgui_tables.cpp"
-  "${_imgui}/imgui_widgets.cpp")
-target_include_directories(faf_imgui_core SYSTEM PUBLIC "${_imgui}" "${_imgui}/backends")
+  "${_imgui}/imgui_widgets.cpp"
+  "${CMAKE_CURRENT_SOURCE_DIR}/faf_imgui_hooks.cpp")
+target_include_directories(faf_imgui_core SYSTEM PUBLIC "${_imgui}" "${_imgui}/backends" "${CMAKE_CURRENT_SOURCE_DIR}")
+# The test-engine item hooks (faf_imgui_hooks.cpp): every item's box and a widget's label, for the map editor's click
+# sweep and layout check. ImGui calls them only while a context's TestEngineHookItems is set.
+target_compile_definitions(faf_imgui_core PRIVATE IMGUI_ENABLE_TEST_ENGINE)
 # 32-bit indices: the editor's renderer reads them from a structured buffer of uint; SDL's renderer
 # takes either size.
 target_compile_definitions(faf_imgui_core PUBLIC "ImDrawIdx=unsigned int" IMGUI_DISABLE_OBSOLETE_FUNCTIONS)

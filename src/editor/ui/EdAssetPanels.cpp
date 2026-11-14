@@ -74,9 +74,28 @@ namespace faf::editor
       return;
     }
     HelpNote(
-      "An OBJ made in another tool, cut into tiles of .scm meshes in the map's mesh folder with a manifest (FAF "
-      "Studio's mesh import). The game draws height fields only, so the mesh is shown over the map as wires here."
+      "A mesh terrain map (FAF Studio's: its scenario says TerrainSystem = 'mesh' and names terrain/terrain.lua) has "
+      "its ground in .scm patches. Import cuts an OBJ into such patches; the view draws them over or in place of the "
+      "height field, things placed stand on the mesh, and Check looks at the patches' normals, tangent frames, "
+      "degenerate triangles, light mask coordinates and coverage."
     );
+    {
+      static const char* const kModes[3] = {"Height field", "Mesh", "Both (mesh over the field's wires)"};
+      RowLabel("The view shows");
+      ImGui::SetNextItemWidth(-1.0f);
+      (void)EdCombo("##meshmode", &mMeshMode, kModes, 3);
+      if (ImGui::Button("Load the map's mesh again")) {
+        mMeshAskMore = 1;
+      }
+      ImGui::SameLine();
+      if (ImGui::Button("Check the patches")) {
+        mMeshAskMore = 2;
+      }
+      for (const std::string& f : mMeshFindings) {
+        ImGui::TextWrapped("%s", f.c_str());
+      }
+      ImGui::Separator();
+    }
     ImGui::SetNextItemWidth(-1.0f);
     ImGui::InputTextWithHint("##meshfile", "OBJ file", mMeshFile, sizeof(mMeshFile));
     ImGui::SetNextItemWidth(-1.0f);
@@ -88,9 +107,12 @@ namespace faf::editor
     FillDragFloat("##meshtile", &mMeshOptions.tile, 1.0f, 16.0f, 4096.0f, "Tiles of %.0f units");
     ImGui::BeginDisabled(mMeshFile[0] == '\0' || mDocument.Map() == nullptr);
     if (ImGui::Button("Import")) {
-      mMeshAsk = MeshAsk{true, mMeshFile, mMeshOptions};
+      mMeshAsk = MeshAsk{true, mMeshFile, mMeshOptions, mMeshMakeMap};
     }
     ImGui::EndDisabled();
+    ImGui::SameLine();
+    ImGui::Checkbox("Make it a mesh terrain map", &mMeshMakeMap);
+    EdSetItemTooltip("The scenario names the patches (TerrainSystem = 'mesh', TerrainMesh), one undo step");
     ImGui::SameLine();
     ImGui::Checkbox("Show over the map", &mMeshShown);
     if (!mMeshStatus.empty()) {

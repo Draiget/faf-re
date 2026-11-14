@@ -20,6 +20,8 @@
 #include "editor/doc/EdWaterBodies.h"
 #include "editor/tools/EdMapLayout.h"
 #include "editor/tools/EdMission.h"
+#include "editor/tools/EdKeptPaths.h"
+#include "editor/tools/EdScTools.h"
 #include "editor/tools/EdChecks.h"
 #include "editor/tools/EdDecals.h"
 #include "editor/tools/EdSymmetryCheck.h"
@@ -330,6 +332,8 @@ namespace faf::editor
       Mission,
       /** The map's own fields in its scenario (Map info: name, description, type, version, no-rush radius). */
       MapInfo,
+      /** The kept paths (their points and settings; an Apply's results join a GraphBuild step). */
+      Paths,
     };
     /** The water's three masks, a byte for every 2 x 2 units (the map's size halved). */
     struct WaterMaskSnapshot
@@ -348,6 +352,8 @@ namespace faf::editor
     [[nodiscard]] std::uint8_t* WaterMaskCells(WaterMask mask, int& width, int& height) const;
     /** After cells changed in [x0, x1) x [z0, z1) (mask cells): the water map there rebuilt, the overlay told. */
     void WaterMasksChanged(int x0, int z0, int x1, int z1);
+    /** After each new undo step (its name): the app queues it for the editor mods' "edit" event. */
+    std::function<void(const std::string& step)> onEditEnded;
     /** Goes up with every edit, undo and redo (the check runs again when it changed). */
     [[nodiscard]] std::uint64_t EditCount() const noexcept
     {
@@ -475,6 +481,39 @@ namespace faf::editor
     }
     /** A change to the mission as one undo step: `before` is how it was. */
     void MissionEdited(faf::editor::Mission before);
+    /**
+     * The kept paths (Studio's spline paths), kept beside the map in `<map>_paths.editor` (the paths only; what an
+     * Apply did stays while the map is open), and the result each applied path has on the map now.
+     */
+    struct PathsState
+    {
+      KeptPathSet set;
+      std::map<std::string, std::shared_ptr<const KeptPathResult>> results;
+      /** The skeleton's pads as its last Apply all put them down (the next one replaces them). */
+      std::shared_ptr<const PadResult> skeletonPads;
+    };
+    [[nodiscard]] const PathsState& PathsNow() const noexcept
+    {
+      return mPaths;
+    }
+    [[nodiscard]] PathsState& EditPaths() noexcept
+    {
+      return mPaths;
+    }
+    /** A change to the paths as an undo step (`ownStep` false: it joins a GraphBuild step its caller ends, bit 1024).
+     */
+    void PathsEdited(PathsState before, bool ownStep = true);
+    bool UndoPaths(bool redo);
+    [[nodiscard]] std::filesystem::path PathsFile() const;
+    /** Counts every change of the paths (the view redraws their lines). */
+    [[nodiscard]] int PathsRevision() const noexcept
+    {
+      return mPathsRevision;
+    }
+    void PathsTouched() noexcept
+    {
+      ++mPathsRevision;
+    }
     bool UndoMission(bool redo);
     /**
      * Sets one of the scenario's own fields (ScenarioFields) as one undo step ("map info"); false when it is the same
@@ -899,6 +938,8 @@ namespace faf::editor
         return "mission";
       case EditKind::MapInfo:
         return "map info";
+      case EditKind::Paths:
+        return "paths";
       }
       return "edit";
     }
@@ -1031,6 +1072,12 @@ namespace faf::editor
     bool mCopyTestMission = false; // WriteFolderCopy writes the test run's mission (a play copy)
     int mPlayStartStage = 1;
     void LoadMissionFile();
+    PathsState mPaths;
+    std::string mPathsRead;
+    std::vector<std::pair<PathsState, PathsState>> mPathsUndo;
+    std::vector<std::pair<PathsState, PathsState>> mPathsRedo;
+    int mPathsRevision = 0;
+    void LoadPathsFile();
     std::vector<LayoutEdit> mLayoutUndo;
     std::vector<LayoutEdit> mLayoutRedo;
     void LoadLayout();

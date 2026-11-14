@@ -68,6 +68,9 @@ namespace faf::editor
     static constexpr const char* kGfxAo = "GfxAo";
     static constexpr const char* kGfxTextureDetail = "GfxTextureDetail";
     static constexpr const char* kGfxAnisotropy = "GfxAnisotropy";
+    /** The terrain tools' GPU compute backend (FAF Studio's ed_gpu_compute) and the smallest field it takes. */
+    static constexpr const char* kGpuCompute = "GpuCompute";
+    static constexpr const char* kGpuMinCells = "GpuMinCells";
     /** The console lines the graphics settings stand for (none for "auto"), in a fixed order. */
     [[nodiscard]] std::vector<std::string> GraphicsCommands() const;
     /** settings.ini's format now: a file of a newer one is read but never written over. */

@@ -203,6 +203,12 @@ namespace faf::editor
   /** The catalogue, in the palette's order. */
   [[nodiscard]] const std::vector<MissionNodeType>& MissionNodeTypes();
   [[nodiscard]] const MissionNodeType* FindMissionNodeType(const std::string& id);
+  /**
+   * A node type from an editor mod (Studio's Mission.Register): its id may not be one of the editor's; a mod that runs
+   * again replaces its own. False with `error`. The palette lists them after the editor's own.
+   */
+  bool RegisterMissionNodeType(MissionNodeType type, std::string& error);
+  [[nodiscard]] std::vector<const MissionNodeType*> MissionModNodeTypes();
   /** A new node of a type with its parameters at their defaults. */
   [[nodiscard]] MissionNode NewMissionNode(const std::string& type);
 

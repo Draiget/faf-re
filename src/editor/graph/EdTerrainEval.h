@@ -132,6 +132,15 @@ namespace faf::editor::terrain
     std::set<std::string> wanted; // output pins something is linked to
     const TerrainGround* ground = nullptr;
     std::function<field::GridPtr()> base; // the map's heights on this grid (a node of its own owns the copy)
+    /** Finer than the map's grid (an Oversample re-run): the erosion settings' step (1 / factor); 0 otherwise. */
+    double fineStep = 0.0;
+    /**
+     * The Oversample node's re-run (FAF Studio's): the erosion node wired into input `pin` of this node evaluated again
+     * on `fine` from its own inputs (brought onto the fine grid) with its own settings; false with `why` when the input
+     * isn't an erosion node's height. Set by the runner.
+     */
+    std::function<bool(const std::string& pin, int factor, const field::GridPtr& fine, Outputs& out, std::string& why)>
+      rerunUpstream;
 
     [[nodiscard]] int Seed(
       const double n

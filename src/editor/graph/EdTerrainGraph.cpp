@@ -483,6 +483,101 @@ namespace faf::editor
       env.base = [this, &ground] {
         return BaseHere(ground);
       };
+      env.rerunUpstream =
+        [this, &graph, &ground, &behaviours, node, id, seed](
+          const std::string& pin, const int factor, const field::GridPtr& fine, terrain::Outputs& out, std::string& why
+        ) {
+        // The erosion node wired into `pin`, by its height.
+        int pinIndex = -1;
+        for (std::size_t p = 0; p < node->type->inputs.size(); ++p) {
+          if (node->type->inputs[p].name == pin) {
+            pinIndex = static_cast<int>(p);
+          }
+        }
+        const GraphLink* link = pinIndex >= 0 ? graph.InputLink(id, pinIndex) : nullptr;
+        const GraphNode* src = link != nullptr ? graph.Find(link->fromNode) : nullptr;
+        if (
+          src == nullptr || src->type->name.rfind("erode_", 0) != 0 ||
+          src->type->outputs[static_cast<std::size_t>(link->fromPin)].name != "out"
+        ) {
+          why = "the masks come from an erosion node: wire the height of Hydraulic, Droplet or Stream power erosion "
+                "into this node";
+          return false;
+        }
+        const auto srcBehaviour = behaviours.find(src->type->name);
+        if (srcBehaviour == behaviours.end()) {
+          why = "the erosion node is of an unknown type";
+          return false;
+        }
+        // Its inputs, brought onto the fine grid (masks straight, heights smooth).
+        terrain::Inputs srcIns;
+        std::vector<std::unique_ptr<TerrainValue>> kept;
+        for (std::size_t p = 0; p < src->type->inputs.size(); ++p) {
+          const GraphLink* in = graph.InputLink(src->id, static_cast<int>(p));
+          if (in == nullptr) {
+            continue;
+          }
+          const GraphNode* from = graph.Find(in->fromNode);
+          const TerrainValue* value = from != nullptr
+            ? Value(in->fromNode, from->type->outputs[static_cast<std::size_t>(in->fromPin)].name)
+            : nullptr;
+          if (value == nullptr) {
+            continue;
+          }
+          auto copy = std::make_unique<TerrainValue>(*value);
+          if (copy->grid != nullptr && !copy->grid->SameShape(*fine)) {
+            field::OpArgs args;
+            args.in["a"] = copy->grid;
+            args.in["like"] = fine;
+            args.p.num["linear"] = src->type->inputs[p].type == PinType::Mask ? 1.0 : 0.0;
+            auto grid = std::make_shared<field::Grid>();
+            std::string error;
+            if (!field::RunOp("upsample", args, *grid, error)) {
+              why = "the erosion's input " + src->type->inputs[p].name +
+                " couldn't be brought onto the fine grid: " + error;
+              return false;
+            }
+            copy->grid = std::move(grid);
+          }
+          srcIns[src->type->inputs[p].name] = copy.get();
+          kept.push_back(std::move(copy));
+        }
+        if (srcIns.count("a") == 0) {
+          why = "the erosion node before this one has no input value";
+          return false;
+        }
+        // Its own settings (wired numbers applied), its own seed, every mask wanted.
+        terrain::Values srcValues;
+        for (std::size_t p = 0; p < src->type->params.size() && p < src->params.size(); ++p) {
+          const ParamDef& def = src->type->params[p];
+          ReadParam(def, src->params[p], srcValues);
+          if (def.wire) {
+            const auto wired = srcIns.find(def.name);
+            if (wired != srcIns.end() && wired->second->isNumber) {
+              srcValues.num[def.name] = wired->second->number;
+            }
+          }
+        }
+        terrain::Env fineEnv;
+        fineEnv.like = fine;
+        fineEnv.cell = fine->cell;
+        fineEnv.step = 1;
+        fineEnv.fineStep = factor > 1 ? static_cast<double>(mStep) / static_cast<double>(factor) : 0.0;
+        fineEnv.W = static_cast<float>(ground.width - 1);
+        fineEnv.H = static_cast<float>(ground.height - 1);
+        fineEnv.water = ground.water;
+        fineEnv.graphSeed = seed;
+        fineEnv.nodeId = src->id;
+        fineEnv.wanted = {"out", "wear", "deposit", "flow", "accum"};
+        fineEnv.ground = &ground;
+        try {
+          out = srcBehaviour->second.eval(fineEnv, srcValues, srcIns);
+        } catch (const std::exception& e) {
+          why = std::string("the erosion again on the fine grid: ") + e.what();
+          return false;
+        }
+        return true;
+      };
       const auto t0 = Clock::now();
       try {
         terrain::Outputs outs = behaviour->second.eval(env, values, ins);

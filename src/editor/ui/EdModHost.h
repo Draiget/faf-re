@@ -28,14 +28,16 @@ namespace faf::editor
    * each frame by `draw(ui)`, `ui` holding Text, Note, Button, Checkbox, Slider, Input, Separator, SameLine, Tooltip),
    * `Menu(commandId [, label])` (an entry under Window > From editor mods), `Tool(id, title, click)` (a tool its
    * command turns on: a left click on the view calls `click(x, z, shift, ctrl)`), `SetHeights(x0, z0, w, h, list)`
-   * (one undo step), `LayerAt(layer, x, z)`, `Has(point [, version])`, `Capabilities` and `ApiVersion` (FAF Studio's
-   * extension points, on this editor). A command that raises an error is reported with
-   * its mod's name and turns that mod off until the editor starts again; a panel that raises stops drawing and says
-   * why.
+   * (one undo step), `LayerAt(layer, x, z)`, `MissionNode(id, title, params, code)` (a node type for the mission
+   * graph), `On(event, fn)` (fn(arg) on "map", "save" or "edit"), `Has(point [, version])`, `Capabilities` and
+   * `ApiVersion` (FAF Studio's extension points, on this editor). A command that raises an error is reported with its
+   * mod's name and turns that mod off until the editor starts again; a panel that raises stops drawing and says why.
    */
   class EdModHost
   {
   public:
+    struct Mod;
+
     EdModHost(EdDocument& document);
     ~EdModHost();
 
@@ -47,8 +49,23 @@ namespace faf::editor
     }
     /** Where the turned-on mods are kept (empty: not kept, as in test runs); read when set. */
     void SetEnabledFile(const std::filesystem::path& file);
-    /** Looks for editor mods in a mods folder and runs the turned-on ones. */
+    /**
+     * Looks for editor mods in a mods folder and runs the turned-on ones. With an enabled file, under a start-up trial
+     * (Studio's): the mods about to run are noted, EndTrial takes the note away once the editor is up; a note left from
+     * the last start turns its mods off (TrialOff). A mod seen for the first time starts turned on.
+     */
     void Scan(const std::filesystem::path& mods);
+    void EndTrial();
+    /** A mod's Editor.On listener; Notify calls the running mods' listeners of an event ("map", "save", "edit"). */
+    void AddListener(Mod& mod, const std::string& event, int ref);
+    void Notify(const std::string& event, const std::string& arg);
+    /** The turned-on mods with sim hooks (`ui_only = false` and a hook folder): plays add them as sim mods. */
+    [[nodiscard]] std::vector<std::string> SimHookMods() const;
+    /** The mods the start-up trial turned off (the editor didn't come up with them last time). */
+    [[nodiscard]] const std::set<std::string>& TrialOff() const noexcept
+    {
+      return mTrialOff;
+    }
     /** Turns a mod on (runs it) or off (its commands say so); kept in the enabled file. */
     bool SetEnabled(const std::string& uid, bool on);
     void Draw(bool& open);
@@ -145,6 +162,17 @@ namespace faf::editor
     std::string mActiveTool; // "<uid>/<id>" of the tool that is on
     std::set<std::string> mEnabled;
     std::filesystem::path mEnabledFile;
+    struct Listener
+    {
+      Mod* mod = nullptr;
+      std::string event;
+      int ref = 0;
+    };
+    std::vector<Listener> mListeners;
+    std::filesystem::path mTrialFile;
+    bool mTrialOpen = false;
+    std::set<std::string> mTrialOff;
+    bool mNewModsOn = true;
     std::filesystem::path mFolder;
     int mRunDepth = 0;
     /** Lua states of mods that stopped while their own code was running, freed once it has returned. */

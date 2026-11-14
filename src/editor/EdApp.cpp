@@ -1,5 +1,6 @@
 #include "editor/doc/EdScenarioInfo.h"
 #include "editor/EdApp.h"
+#include "editor/terrain/gpu/EdGpuOps.h"
 #include "editor/ui/EdControls.h"
 #include "editor/EdPath.h"
 #include "editor/view/EdPropThumbnails.h"
@@ -98,6 +99,10 @@
 #include "lua/LuaTableIterator.h"
 #include "editor/ui/EdPopouts.h"
 #include "editor/ui/EdTipCheck.h"
+#include "editor/ui/EdUiQa.h"
+#include "editor/ui/EdSelfTests.h"
+#include "editor/tools/EdMissionImport.h"
+#include "editor/tools/EdUnitWizard.h"
 #include "editor/tools/EdMarkers.h"
 #include "editor/ui/EdFramePacing.h"
 #include "editor/doc/EdUserFiles.h"
@@ -221,6 +226,10 @@ namespace faf::editor
         "/mapinfotest",     "/dropdefaultcube",
         "/exportpreview",   "/resizetest",
         "/console",         "/pathtest",
+        "/keptpathtest",    "/skeletontest",
+        "/gputest",         "/clicksweep",
+        "/layoutcheck",     "/selftests",
+        "/meshtest",
       };
       for (const char* const option : kOptions) {
         if (moho::CFG_GetArgOption(option, 0, nullptr)) {
@@ -234,6 +243,9 @@ namespace faf::editor
     // there at the first frame (-1 until then), the one in use written back.
     float gUiScaleRead = -1.0f;
     float gUiScaleNow = 1.0f;
+    // While the QA runs press buttons: Windows' file dialogs are modal and stop the frame loop, so they don't open
+    // (they answer as if cancelled).
+    bool gNoFileDialogs = false;
 
     void* UiSettingsOpen(
       ImGuiContext*,
@@ -1524,7 +1536,8 @@ namespace faf::editor
         pacing.secondsSinceInput = static_cast<double>(::GetTickCount() - input.dwTime) / 1000.0;
         pacing.backgroundFps = mSettings.GetInt(EdSettings::kBackgroundFps);
         pacing.idleFps = mSettings.GetInt(EdSettings::kIdleFps);
-        const int cap = uncapped ? 0 : PacedFps(pacing);
+        // The self tests' frame budget measures the editor's own frames, never the pacing's wait.
+        const int cap = uncapped || mSelfTests.Running() ? 0 : PacedFps(pacing);
         if (cap > 0) {
           const auto wanted = std::chrono::microseconds(1000000 / cap);
           const auto spent = now - mLastBackgroundFrame;
@@ -3125,10 +3138,11 @@ namespace faf::editor
        * it (the pixels the renderer drew counted), Make icon writes its icon, the derived unit then names it in the
        * hook.
        */
+      float mPreviewTimeSeen = 0.0f;
       void TestUnitViewer()
       {
         if (
-          mViewTestStage >= 7 || !mScene.Attached() || moho::RULE_PeekKept() == nullptr ||
+          mViewTestStage >= 13 || !mScene.Attached() || moho::RULE_PeekKept() == nullptr ||
           !moho::CFG_GetArgOption("/unitviewtest", 0, nullptr) || ++mViewTestFrames % 90 != 0
         ) {
           return;
@@ -3144,7 +3158,7 @@ namespace faf::editor
           std::string error;
           if (!panel.Open("EditorViewTest", error) && !panel.Create("EditorViewTest", error)) {
             gpg::Warnf("editor: unit view test: no project: %s", error.c_str());
-            mViewTestStage = 7;
+            mViewTestStage = 13;
             return;
           }
           panel.Project()->derived.clear();
@@ -3223,7 +3237,54 @@ namespace faf::editor
             "editor: unit view test: dalk003's projectile drew %d of %d pixels", viewer.DrawnPixels(), 384 * 384
           );
           viewer.ShowWeapon(-1);
+          gpg::Logf(
+            "editor: unit view test: icon compared: %s",
+            viewer.Comparison().empty() ? "(nothing)" : viewer.Comparison().c_str()
+          );
           break;
+        case 7:
+          // The new-unit wizard: a UEF tank from its template into the project, then its checks.
+          gpg::Logf("editor: unit view test: wizard: %s", mShell->UnitWizard().Test("tank", "UEF").c_str());
+          break;
+        case 8: {
+          // The unit in the view, animated (Unit viewer > In the view): uel0106 at the map's middle.
+          UnitPreviewState& preview = viewer.Preview();
+          preview.active = true;
+          preview.unit = "uel0106"; // the Mech Marine: it names a walk animation
+          preview.animation.clear();
+          break;
+        }
+        case 9: {
+          UnitPreviewState& preview = viewer.Preview();
+          gpg::Logf(
+            "editor: unit view test: preview of %s: %zu animations named; %s",
+            preview.unit.c_str(),
+            preview.animations.size(),
+            preview.status.c_str()
+          );
+          if (!preview.animations.empty()) {
+            preview.animation = preview.animations.front();
+            preview.playing = true;
+            preview.loop = true;
+          }
+          break;
+        }
+        case 10:
+          mPreviewTimeSeen = viewer.Preview().time;
+          break;
+        case 11: {
+          const UnitPreviewState& preview = viewer.Preview();
+          gpg::Logf(
+            "editor: unit view test: animation %s: %s; duration %.2f s, the clock went %.2f -> %.2f",
+            preview.animation.empty() ? "(none)" : preview.animation.c_str(),
+            preview.status.c_str(),
+            static_cast<double>(preview.duration),
+            static_cast<double>(mPreviewTimeSeen),
+            static_cast<double>(preview.time)
+          );
+          viewer.Preview().active = false;
+          break;
+        }
         default:
           break;
         }
@@ -3293,6 +3354,7 @@ namespace faf::editor
 
       int mViewTestStage = 0;
       int mViewTestFrames = 0;
+      int mMeshTestFrames = 0; // `/meshtest`: frames since the import was asked (0: none)
 
       bool mEditorModTestDone = false;
       int mEditorModTestFrames = 0;
@@ -4159,6 +4221,44 @@ namespace faf::editor
       }
       std::map<std::string, std::string> mAlphaOrigins; // a texture alpha copy (lower case game path) -> its original
 
+      /**
+       * Convert layers' textures (FAF Studio's texconv.lua): after the masks moved to `shader`, the textures it reads
+       * made as new files beside the map: the layers' albedo copies with the alpha it wants (specularity, 1 -
+       * specularity, the base opacity), and for the 1xx / 2xx shaders the roughness / height atlas in the Upper layer.
+       * Lines go to `report`.
+       */
+      void ConvertTextures(
+        const std::string& shader,
+        std::vector<std::string>& report
+      )
+      {
+        std::string lower = shader;
+        std::transform(lower.begin(), lower.end(), lower.begin(), [](const unsigned char c) {
+          return static_cast<char>(std::tolower(c));
+        });
+        const bool atlas = lower.size() >= 10 && lower.compare(0, 7, "terrain") == 0 &&
+          (lower[7] == '1' || lower[7] == '2') && std::isdigit(static_cast<unsigned char>(lower[8])) != 0;
+        const ShaderAlphaUse use = ShaderAlphaOf(shader);
+        TerrainBuildWrites writes;
+        if (use.layers == LayerAlphaUse::Specularity || use.layers == LayerAlphaUse::Matte || use.baseOpacity) {
+          writes.texAlpha = true;
+          writes.texAlphaMode = TextureAlphaMode::Generate;
+          writes.baseOpacity = 1.0f;
+          report.push_back("Textures: " + MakeTextureAlpha(writes));
+        }
+        if (atlas) {
+          writes.atlas = true;
+          writes.atlasSize = 1024;
+          report.push_back("Textures: " + MakeAtlasTexture(writes));
+        }
+        if (!writes.texAlpha && !atlas) {
+          report.push_back(
+            "Textures: " + shader + " reads nothing from the textures' alpha or an atlas; none were made."
+          );
+        }
+        gpg::Logf("editor: convert layers: textures for %s written", shader.c_str());
+      }
+
       void DriveGenerate()
       {
         EdGenerate& generate = mShell->Generate();
@@ -4572,6 +4672,137 @@ namespace faf::editor
           }
           EdSetItemTooltip("%s", row.about);
         }
+        DrawGpuSettings();
+      }
+
+      /**
+       * Settings > GPU compute (FAF Studio's ed_gpu_compute, gpu_ab.lua): the terrain tools' field ops (blur, filters,
+       * generators, droplet / hydraulic / thermal erosion) on a compute-only Direct3D 11 device of their own, the CPU
+       * op on any problem; the smallest field it takes, the self test, and which ops ran where.
+       */
+      void DrawGpuSettings()
+      {
+        SettingLabel(
+          "GPU compute",
+          "The terrain tools' heavy work (erosion, generators, filters) on the graphics card, on a compute device of "
+          "its "
+          "own beside the renderer; any problem and the CPU does it, with the same result."
+        );
+        bool on = mSettings.GetBool(EdSettings::kGpuCompute);
+        if (ImGui::Checkbox("Use the GPU for the terrain tools", &on)) {
+          (void)mSettings.SetBool(EdSettings::kGpuCompute, on);
+          SaveSettings();
+          ApplyGpuSettings();
+        }
+        const std::string cells = mSettings.Get(EdSettings::kGpuMinCells);
+        ImGui::AlignTextToFramePadding();
+        ImGui::TextUnformatted("Smallest field");
+        ImGui::SameLine(Em(180.0f));
+        ImGui::SetNextItemWidth(Em(140.0f));
+        if (EdBeginCombo("##gpucells", cells.c_str())) {
+          for (const std::string& choice : EdSettings::Allowed(EdSettings::kGpuMinCells)) {
+            if (ImGui::Selectable(choice.c_str(), choice == cells) && choice != cells) {
+              (void)mSettings.Set(EdSettings::kGpuMinCells, choice);
+              SaveSettings();
+              ApplyGpuSettings();
+            }
+          }
+          ImGui::EndCombo();
+        }
+        EdSetItemTooltip(
+          "Fields with fewer samples stay on the CPU: sending them to the card costs more than it saves"
+        );
+        if (ImGui::Button("Run the GPU self test")) {
+          mGpuTestText = GpuSelfTestText();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Op statistics")) {
+          mGpuTestText = GpuStatsText(false);
+        }
+        if (!mGpuTestText.empty()) {
+          ImGui::TextWrapped("%s", mGpuTestText.c_str());
+        }
+      }
+      std::string mGpuTestText;
+      std::string mMeshLoadedFor; // the map whose mesh terrain was read
+      int mFramesUp = 0;
+      std::string mModMapSeen;
+      std::vector<std::string> mModEdits; // undo steps since the last frame, for the mods' "edit" event
+
+      void ApplyGpuSettings()
+      {
+        gpu::Policy& policy = gpu::GetPolicy();
+        policy.enabled = mSettings.GetBool(EdSettings::kGpuCompute);
+        policy.minCells =
+          static_cast<float>(std::max(1024, std::atoi(mSettings.Get(EdSettings::kGpuMinCells).c_str())));
+        policy.selfTestFirst = true;
+        static bool installed = false;
+        if (!installed) {
+          installed = true;
+          gpu::Install();
+        }
+        gpg::Logf(
+          "editor: GPU compute %s (fields from %.0f samples, %zu GPU ops)",
+          policy.enabled ? "on" : "off",
+          static_cast<double>(policy.minCells),
+          gpu::GpuOpNames().size()
+        );
+      }
+
+      static std::string GpuSelfTestText()
+      {
+        const gpu::SelfTestReport report = gpu::RunSelfTest();
+        std::string text;
+        if (!report.error.empty()) {
+          text = "No GPU compute: " + report.error;
+        } else {
+          char head[160];
+          (void)std::snprintf(
+            head,
+            sizeof(head),
+            "Self test %s in %.0f ms%s:",
+            report.ok ? "passed" : "FAILED",
+            report.ms,
+            report.texturesOk ? "" : " (textures not usable: buffer kernels only)"
+          );
+          text = head;
+          for (const gpu::SelfTestPart& part : report.parts) {
+            text += "\n  " + part.name + ": " + (part.ok ? "ok" : "failed") +
+              (part.detail.empty() ? "" : " (" + part.detail + ")");
+          }
+        }
+        gpg::Logf("editor: GPU self test: %s", text.c_str());
+        return text;
+      }
+
+      static std::string GpuStatsText(
+        const bool reset
+      )
+      {
+        const std::map<std::string, field::OpStat> stats = field::OpStats(reset);
+        std::string text;
+        std::uint64_t gpuCalls = 0;
+        std::uint64_t cpuCalls = 0;
+        for (const auto& [name, s] : stats) {
+          gpuCalls += s.gpuCalls;
+          cpuCalls += s.cpuCalls;
+          char line[200];
+          (void)std::snprintf(
+            line,
+            sizeof(line),
+            "\n  %s: GPU %llu (%.0f ms), CPU %llu (%.0f ms)%s",
+            name.c_str(),
+            static_cast<unsigned long long>(s.gpuCalls),
+            s.gpuMs,
+            static_cast<unsigned long long>(s.cpuCalls),
+            s.cpuMs,
+            s.fallbacks > 0 ? (", " + std::to_string(s.fallbacks) + " fell back").c_str() : ""
+          );
+          text += line;
+        }
+        const std::string error = gpu::LastOpError();
+        return "Ops this session: " + std::to_string(gpuCalls) + " on the GPU, " + std::to_string(cpuCalls) +
+          " on the CPU." + text + (error.empty() ? "" : "\nLast GPU problem: " + error);
       }
 
       /** The graphics settings that aren't "auto" put into the engine's switches (start, and each change). */
@@ -5116,6 +5347,9 @@ namespace faf::editor
       );
       moho::ID3DDeviceResources::RenderTargetHandle mMiniCopy;
       moho::ID3DRenderTarget::SurfaceHandle mMiniSurface;
+      // The copy a resize replaced: this frame's panels were built with its image, so it lives one frame more.
+      moho::ID3DDeviceResources::RenderTargetHandle mMiniRetired;
+      moho::ID3DRenderTarget::SurfaceHandle mMiniSurfaceRetired;
       int mMiniCopyWidth = 0;
       int mMiniCopyHeight = 0;
       moho::ID3DDeviceResources::RenderTargetHandle mViewCopy;
@@ -5212,6 +5446,195 @@ namespace faf::editor
       /** `/tipcheck`: the tooltip coverage check, then the editor closes. */
       EdTipCheck mTipCheck;
       bool mTipCheckAsked = false;
+      // The QA runs (EdUiQa) and the self tests (EdSelfTests), from Help or `/clicksweep`, `/layoutcheck`,
+      // `/selftests`.
+      EdUiQa mUiQa;
+      EdSelfTests mSelfTests;
+      bool mClickSweepAsked = false;
+      bool mLayoutCheckAsked = false;
+      bool mSelfTestsAsked = false;
+      bool mQaExitAfter = false;
+      bool mShowSelfTests = false;
+      bool mStressOn = false;
+      std::vector<std::string> mQaReport;
+      void WireUiQa()
+      {
+        mUiQa.getScale = [this] {
+          return mShell->UiScale();
+        };
+        mUiQa.setScale = [this](const float scale) {
+          mShell->UiScale() = scale;
+        };
+        mUiQa.panels = [this] {
+          return mShell->PanelWindows();
+        };
+        mUiQa.showPanel = [this](const std::string& window, const bool on) {
+          return mShell->ShowPanelWindow(window, on);
+        };
+      }
+      /** The self tests (Help > Self tests): each goes through the editor's own operations and undo on the open map. */
+      void RegisterSelfTests()
+      {
+        // The budget's stress (Studio's perfstress.lua): 4000 markers over the map as one undo step, taken back after.
+        mSelfTests.stressOn = [this] {
+          const MarkerType* const type = FindMarkerType("Blank Marker");
+          if (type == nullptr || mDocument.Map() == nullptr) {
+            return;
+          }
+          EdDocument::SaveSnapshot snapshot = mDocument.SaveDataNow();
+          std::vector<SaveEntry>& markers = mDocument.SaveData().Markers();
+          const float w = static_cast<float>(std::max(2, mDocument.Facts().fieldWidth) - 1);
+          for (int i = 0; i < 4000; ++i) {
+            const float x = std::fmod(static_cast<float>(i) * 37.13f, w);
+            const float z = std::fmod(static_cast<float>(i) * 91.71f, w);
+            markers.push_back(NewMarker(*type, NextMarkerName(markers, *type), x, mScene.GroundHeightAt(x, z), z));
+          }
+          mDocument.SaveDataEdited(std::move(snapshot));
+          mStressOn = true;
+          gpg::Logf("editor: self tests: the budget runs with 4000 more markers");
+        };
+        mSelfTests.stressOff = [this] {
+          if (std::exchange(mStressOn, false)) {
+            (void)mScene.Undo();
+          }
+        };
+        const auto heightsBack = [this](const std::uint64_t before, const char* what) -> std::string {
+          return mScene.HeightsHash() == before ? std::string()
+                                                : std::string(what) + ": undo didn't bring the heights back";
+        };
+        mSelfTests.Add("height stroke and its undo", [this, heightsBack] {
+          const std::uint64_t before = mScene.HeightsHash();
+          float low = 0.0f, high = 0.0f, mean = 0.0f;
+          (void)mScene.HeightRange(low, high, mean);
+          const float mid = static_cast<float>(mDocument.Facts().fieldWidth) * 0.5f;
+          if (!mScene.TestRaise(mid, mid, 0.5f)) {
+            return std::string("the stroke changed nothing");
+          }
+          (void)mScene.Undo();
+          return heightsBack(before, "stroke");
+        });
+        mSelfTests.Add("flatten the map and its undo", [this, heightsBack] {
+          const std::uint64_t before = mScene.HeightsHash();
+          std::string message;
+          float low = 0.0f, high = 0.0f, mean = 0.0f;
+          (void)mScene.HeightRange(low, high, mean);
+          if (!mScene.FlattenWhole(mean + 3.0f, message)) {
+            return "flatten refused: " + message;
+          }
+          (void)mScene.Undo();
+          return heightsBack(before, "flatten");
+        });
+        mSelfTests.Add("kept path: apply, apply again, take off, undo", [this, heightsBack] {
+          const std::uint64_t before = mScene.HeightsHash();
+          EdDocument::PathsState pathsBefore = mDocument.PathsNow();
+          KeptPath path = NewKeptPath(KeptPathMode::Carve, false, mDocument.EditPaths().set.TakeId());
+          const float w = static_cast<float>(mDocument.Facts().fieldWidth);
+          const auto ground = [this](const float x, const float z) {
+            return mScene.GroundHeightAt(x, z);
+          };
+          AddKeptPathPoint(path, w * 0.3f, w * 0.3f, ground);
+          AddKeptPathPoint(path, w * 0.6f, w * 0.5f, ground);
+          const std::string id = path.id;
+          mDocument.EditPaths().set.paths.push_back(std::move(path));
+          mDocument.PathsEdited(std::move(pathsBefore));
+          (void)mScene.ApplyKeptPaths({id});
+          const std::uint64_t applied = mScene.HeightsHash();
+          (void)mScene.ApplyKeptPaths({id});
+          std::string result;
+          if (applied == before) {
+            result = "the path changed nothing";
+          } else if (mScene.HeightsHash() != applied) {
+            result = "applying again didn't give the same heights";
+          }
+          (void)mScene.UnapplyKeptPath(id);
+          if (result.empty() && mScene.HeightsHash() != before) {
+            result = "taking it off didn't bring the heights back";
+          }
+          for (int i = 0; i < 4; ++i) {
+            (void)mScene.Undo();
+          }
+          return result.empty() ? heightsBack(before, "path") : result;
+        });
+        mSelfTests.Add("map skeleton: generate, apply all, undo", [this, heightsBack] {
+          const std::uint64_t before = mScene.HeightsHash();
+          SkeletonSettings settings;
+          // Ridges: raised ground on any map (open lanes on flat ground rightly change nothing).
+          settings.style = SkeletonStyle::Ridge;
+          const std::string generated = mScene.GenerateSkeleton(settings);
+          if (generated.find("needs at least two") != std::string::npos) {
+            return "skip: " + generated;
+          }
+          (void)mScene.ApplySkeleton(settings);
+          const bool changed = mScene.HeightsHash() != before;
+          (void)mScene.Undo();
+          const std::string back = heightsBack(before, "skeleton");
+          (void)mScene.Undo();
+          return !changed ? std::string("the skeleton changed nothing") : back;
+        });
+        mSelfTests.Add("detail pass and its undo", [this] {
+          const std::size_t before = mDocument.PropsNow().entries.size();
+          DetailRun run;
+          run.environment = mScene.DetailEnvironmentGuess();
+          run.density = 0.2f;
+          const std::string text = mScene.RunDetailPass(run);
+          const std::size_t after = mDocument.PropsNow().entries.size();
+          if (after == before) {
+            return "skip: " + text;
+          }
+          (void)mScene.Undo();
+          return mDocument.PropsNow().entries.size() == before ? std::string() : std::string("undo left props behind");
+        });
+        mSelfTests.Add("GPU and CPU blur agree", [] {
+          auto grid = std::make_shared<field::Grid>(512, 512, 1.0f, 0.0f, 0.0f);
+          for (int z = 0; z < 512; ++z) {
+            for (int x = 0; x < 512; ++x) {
+              grid->At(x, z) = static_cast<float>((x * 13 + z * 7) % 31);
+            }
+          }
+          field::OpArgs args;
+          args.in["a"] = grid;
+          args.p.num["radius"] = 4.0;
+          field::Grid a;
+          field::Grid b;
+          std::string error;
+          if (!field::RunOp("blur", args, a, error) || !field::RunOpCpu("blur", args, b, error)) {
+            return "the blur failed: " + error;
+          }
+          for (std::size_t k = 0; k < a.v.size(); ++k) {
+            if (std::abs(a.v[k] - b.v[k]) > 1e-3f) {
+              return std::string("the GPU blur differs from the CPU's");
+            }
+          }
+          return std::string();
+        });
+        mSelfTests.Add("the map's script reads as a mission outline", [this] {
+          const MissionOutline o = ParseMissionScript(mDocument.Script());
+          return o.lineCount > 0 ? std::string() : std::string("skip: the map has no script text");
+        });
+        mSelfTests.Add("the unit wizard's template data loads", [] {
+          UnitWizardData data;
+          std::string error;
+          return LoadUnitWizardData(EmbeddedEditorData("unitwizdata.lua"), data, error) ? std::string() : error;
+        });
+        mSelfTests.Add("undo and redo of a marker", [this] {
+          const std::size_t before = mDocument.SaveData().Markers().size();
+          const MarkerType* const type = FindMarkerType("Blank Marker");
+          if (type == nullptr) {
+            return std::string("skip: no Blank Marker type");
+          }
+          EdDocument::SaveSnapshot snapshot = mDocument.SaveDataNow();
+          std::vector<SaveEntry>& markers = mDocument.SaveData().Markers();
+          markers.push_back(
+            NewMarker(*type, NextMarkerName(markers, *type), 10.0f, mScene.GroundHeightAt(10.0f, 10.0f), 10.0f)
+          );
+          mDocument.SaveDataEdited(std::move(snapshot));
+          const bool added = mDocument.SaveData().Markers().size() == before + 1;
+          (void)mScene.Undo();
+          return added && mDocument.SaveData().Markers().size() == before
+            ? std::string()
+            : std::string("the marker didn't come and go");
+        });
+      }
       void FeedUiClicks();
       /**
        * Test runs: `/command <id>[,<id>...]` runs those commands once the map is open (each logs what it did, or why
@@ -5226,6 +5649,20 @@ namespace faf::editor
         // `/pathtest <mode>,x0,z0,x1,z1[,...]` (test runs): a terrain path applied (EdMapScene::TestPath).
         if (fa::vector<fa::string> path; moho::CFG_GetArgOption("/pathtest", 1, &path) && !path.empty()) {
           gpg::Logf("editor: /pathtest: %s", mScene.TestPath(path[0].c_str()).c_str());
+        }
+        // `/keptpathtest <mode>,x0,z0,x1,z1[,...]` (test runs): a kept path applied, re-applied, unapplied, undone.
+        if (fa::vector<fa::string> path; moho::CFG_GetArgOption("/keptpathtest", 1, &path) && !path.empty()) {
+          mScene.TestKeptPath(path[0].c_str());
+        }
+        // `/meshtest <obj file>` (test runs): the OBJ imported as the open map's mesh terrain (the scenario made a mesh
+        // map), then the mesh checks and the placement heights logged (DriveImagesAndMesh).
+        if (fa::vector<fa::string> obj; moho::CFG_GetArgOption("/meshtest", 1, &obj) && !obj.empty()) {
+          mShell->AskMeshImport(obj[0].c_str(), true);
+          mMeshTestFrames = 1;
+        }
+        // `/skeletontest <style>,<topology>` (test runs): the map skeleton generated, applied and undone.
+        if (fa::vector<fa::string> spec; moho::CFG_GetArgOption("/skeletontest", 1, &spec) && !spec.empty()) {
+          mScene.TestSkeleton(spec[0].c_str());
         }
         // `/console <line>` (test runs): a console line, as if typed in the Log panel and Entered.
         if (fa::vector<fa::string> line; moho::CFG_GetArgOption("/console", 1, &line) && !line.empty()) {
@@ -5597,6 +6034,81 @@ namespace faf::editor
         mScene.Detach();
       });
       mScene.SetTools(&mShell->Tools());
+      mScene.SetPathEdit(&mShell->PathsPanel().State());
+      mDocument.onEditEnded = [this](const std::string& step) {
+        if (mModEdits.size() < 256) {
+          mModEdits.push_back(step);
+        }
+      };
+      mScene.gameFileExists = [this](const std::string& path) {
+        return GameFileExists(path);
+      };
+      mScene.SetUnitPreview(&mShell->UnitViewer().Preview());
+      mShell->UnitViewer().loadGameIcon = [](const std::string& path, const int side, std::vector<std::uint8_t>& rgba) {
+        std::string bytes;
+        gpg::gal::imaging::ImageCodec* const codec = gpg::gal::imaging::ImageCodec::Instance();
+        if (codec == nullptr || !ReadGameFile(path, bytes)) {
+          return false;
+        }
+        gpg::gal::imaging::DecodeOptions options;
+        options.format = DXGI_FORMAT_B8G8R8A8_UNORM;
+        options.width = static_cast<std::uint32_t>(side);
+        options.height = static_cast<std::uint32_t>(side);
+        options.mipLevels = 1;
+        gpg::gal::imaging::Image image;
+        if (
+          FAILED(codec->Decode(bytes.data(), bytes.size(), options, image)) || image.subresources.empty() ||
+          image.format != DXGI_FORMAT_B8G8R8A8_UNORM
+        ) {
+          return false;
+        }
+        const auto& level = image.subresources.front();
+        if (level.width != static_cast<std::uint32_t>(side) || level.height != static_cast<std::uint32_t>(side)) {
+          return false;
+        }
+        rgba.resize(static_cast<std::size_t>(side) * side * 4);
+        for (int y = 0; y < side; ++y) {
+          const std::uint8_t* row = reinterpret_cast<const std::uint8_t*>(image.bytes.data()) + level.offset +
+            static_cast<std::size_t>(y) * level.rowPitch;
+          for (int x = 0; x < side; ++x) {
+            std::uint8_t* p = rgba.data() + (static_cast<std::size_t>(y) * side + x) * 4;
+            p[0] = row[x * 4 + 2];
+            p[1] = row[x * 4 + 1];
+            p[2] = row[x * 4 + 0];
+            p[3] = row[x * 4 + 3];
+          }
+        }
+        return true;
+      };
+      // The mesh terrain's files: the open map's own folder on disk first (new patches aren't in the mounted
+      // file system yet), else the game's files.
+      edmesh::SetMeshFileReader([this](const std::string& path) {
+        std::vector<std::uint8_t> bytes;
+        const std::string prefix = "/maps/" + mDocument.FolderName() + "/";
+        const std::filesystem::path map = mDocument.MapDiskFile();
+        if (!map.empty() && LowerPath(path).rfind(LowerPath(prefix), 0) == 0) {
+          std::ifstream in(map.parent_path() / path.substr(prefix.size()), std::ios::binary);
+          if (in) {
+            bytes.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+            return bytes;
+          }
+        }
+        std::string text;
+        if (ReadGameFile(path, text)) {
+          bytes.assign(text.begin(), text.end());
+        }
+        return bytes;
+      });
+      mScene.readGameFile = [](const std::string& path, std::string& bytes) {
+        return ReadGameFile(path, bytes);
+      };
+      mShell->UnitWizard().gameHasUnit = &EdUnitLabPanel::GameHasUnit;
+      mShell->UnitWizard().gameFileExists = [this](const std::string& path) {
+        return GameFileExists(path);
+      };
+      mShell->PathsPanel().ground = [this](const float x, const float z) {
+        return mScene.GroundHeightAt(x, z);
+      };
       mShell->Tools().SetPropPictures([this](const std::string& blueprint) {
         return mPropThumbnails.Get(blueprint);
       });
@@ -5669,6 +6181,49 @@ namespace faf::editor
       }
       SetUpWindowChrome(frame);
       ApplyGraphicsSettings();
+      ApplyGpuSettings();
+      // `/gputest` (test runs): the GPU self test, then a blur and a thermal erosion through the field ops, logged with
+      // which backend ran them.
+      if (moho::CFG_GetArgOption("/gputest", 0, nullptr)) {
+        gpg::Logf("editor: /gputest: %s", GpuSelfTestText().c_str());
+        auto grid = std::make_shared<field::Grid>(1025, 1025, 1.0f, 0.0f, 0.0f);
+        for (int z = 0; z < grid->h; ++z) {
+          for (int x = 0; x < grid->w; ++x) {
+            grid->At(x, z) =
+              20.0f + 8.0f * std::sin(x * 0.05f) * std::cos(z * 0.031f) + (((x * 7 + z * 13) % 17) * 0.1f);
+          }
+        }
+        for (const char* op : {"blur", "thermal"}) {
+          field::OpArgs args;
+          args.in["a"] = grid;
+          args.p.num["radius"] = 6.0;
+          args.p.num["iterations"] = 20.0;
+          field::Grid gpuOut;
+          field::Grid cpuOut;
+          std::string error;
+          const auto t0 = std::chrono::steady_clock::now();
+          const bool ran = field::RunOp(op, args, gpuOut, error);
+          const double runMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+          const auto t1 = std::chrono::steady_clock::now();
+          const bool cpu = field::RunOpCpu(op, args, cpuOut, error);
+          const double cpuMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t1).count();
+          double worst = 0.0;
+          if (ran && cpu && gpuOut.v.size() == cpuOut.v.size()) {
+            for (std::size_t k = 0; k < cpuOut.v.size(); ++k) {
+              worst = std::max(worst, static_cast<double>(std::abs(gpuOut.v[k] - cpuOut.v[k])));
+            }
+          }
+          gpg::Logf(
+            "editor: /gputest: %s: RunOp %.1f ms, CPU op %.1f ms, largest difference %.6f%s",
+            op,
+            runMs,
+            cpuMs,
+            worst,
+            ran ? "" : (" (RunOp failed: " + error + ")").c_str()
+          );
+        }
+        gpg::Logf("editor: /gputest: %s", GpuStatsText(true).c_str());
+      }
       // The game view's ambient occlusion makes its GPU programs on first use, which the editor's own view never
       // is: made now, so the first Play's first frame doesn't wait for them (WPE.15).
       const auto warmStart = std::chrono::steady_clock::now();
@@ -5856,7 +6411,7 @@ namespace faf::editor
         dialog.lpstrDefExt = L"png";
         dialog.lpstrTitle = L"Export the lobby preview";
         dialog.Flags = OFN_OVERWRITEPROMPT | OFN_PATHMUSTEXIST | OFN_NOCHANGEDIR;
-        if (::GetSaveFileNameW(&dialog) != FALSE) {
+        if (!gNoFileDialogs && ::GetSaveFileNameW(&dialog) != FALSE) {
           std::string message;
           const bool ok = mDocument.ExportPreview(path, message);
           (ok ? gpg::Logf : gpg::Warnf)("editor: %s", message.c_str());
@@ -5995,6 +6550,12 @@ namespace faf::editor
       add("terrain.flatten", "Flatten map...", "Terrain", "", [this] {
         mFlattenAsk = true;
       }, canEdit, {}, "The whole map to one height, as one undo step");
+      add("terrain.paths", "Paths and skeleton...", "Terrain", "", [this] {
+        mShell->ShowPaths();
+      }, mapOpen, {}, "Kept spline paths (roads, ramps, valleys, ridges, rivers) and the map skeleton generator");
+      add("objects.detail", "Detail pass...", "Terrain", "", [this] {
+        mShell->ShowDetail();
+      }, mapOpen, {}, "Small rocks, stones and decals in classes by slope and clustering, as one undo step");
       add("terrain.erosion", "Erosion...", "Terrain", "", [this] {
         mShell->Tools().OpenErosion();
       }, mapOpen, {}, "A solver run over the whole map: presets, a preview on the map, Apply as one undo step");
@@ -6327,6 +6888,12 @@ namespace faf::editor
       windowPanel("window.platoons", "Platoons", "MissionPlatoons");
       windowPanel("window.run", "Run", "MissionRun");
       windowPanel("window.unitlab", "Unit lab", "UnitLab");
+      windowPanel("window.unitwizard", "New unit (wizard)", "UnitWizard");
+      windowPanel("window.paths", "Paths", "Paths");
+      windowPanel("window.detail", "Detail pass", "DetailPass");
+      add("help.selftests", "Self tests and panel checks...", "Help", "", [this] {
+        mShowSelfTests = true;
+      }, {}, {}, "Checks inside the editor on the open map, the frame budget, the click sweep and the layout check");
       windowPanel("window.unitviewer", "Unit viewer", "UnitViewer");
       windowPanel("window.modproject", "Mod project", "ModProject");
       windowPanel("window.editormods", "Editor mods", "EditorMods");
@@ -6580,6 +7147,8 @@ namespace faf::editor
            cmd("terrain.interop"),
            cmd("terrain.erosion"),
            cmd("terrain.flatten"),
+           cmd("terrain.paths"),
+           cmd("objects.detail"),
            cmd("terrain.sctools"),
            cmd("window.fields"),
            cmd("window.mesh")}
@@ -6669,6 +7238,7 @@ namespace faf::editor
               cmd("view.particlebrowser"),
               cmd("view.material"),
               cmd("window.unitlab"),
+              cmd("window.unitwizard"),
               cmd("window.unitviewer"),
               cmd("window.modproject"),
               cmd("window.editormods")}
@@ -6687,6 +7257,7 @@ namespace faf::editor
            cmd("settings.keys"),
            sep(),
            cmd("help.diagnostics"),
+           cmd("help.selftests"),
            cmd("help.settingsfolder"),
            cmd("help.resetsettings")}
         },
@@ -7365,7 +7936,27 @@ namespace faf::editor
           mTipCheck.Start(180);
         }
         mTipCheck.BeforeNewFrame();
+        // `/clicksweep`, `/layoutcheck`, `/selftests` (test runs), once the map is open and its models are in.
+        if (
+          (mClickSweepAsked || mLayoutCheckAsked || mSelfTestsAsked) &&
+          mDocument.GetState() == EdDocument::State::Open && mScene.Attached() && !mScene.ModelsPending() &&
+          !mUiQa.Running() && !mSelfTests.Running()
+        ) {
+          if (mSelfTestsAsked) {
+            mSelfTestsAsked = false;
+            mSelfTests.RunAll();
+          } else if (mClickSweepAsked) {
+            mClickSweepAsked = false;
+            mUiQa.Start(EdUiQa::Kind::ClickSweep, 120);
+          } else {
+            mLayoutCheckAsked = false;
+            mUiQa.Start(EdUiQa::Kind::LayoutCheck, 120);
+          }
+        }
+        gNoFileDialogs = mUiQa.Running();
+        mUiQa.BeforeNewFrame();
         ImGui::NewFrame();
+        mUiQa.DuringFrame();
         popouts::AfterNewFrame();
         FeedTestCommands();
         // `/browser`, `/vaultmap <name>` (test runs), with or without a map open.
@@ -7492,6 +8083,9 @@ namespace faf::editor
         }
         SyncSettings();
         DrawSettings();
+        if (mShowSelfTests) {
+          mSelfTests.Draw(mShowSelfTests);
+        }
         DrawOverwriteAsk();
         DrawRecover();
         DrawUnsavedQuestion();
@@ -7610,6 +8204,30 @@ namespace faf::editor
             mTipCheck = EdTipCheck();
             mShell->RequestExit();
           }
+          mUiQa.AfterRender();
+          if (mUiQa.Done()) {
+            mQaReport = mUiQa.Report();
+            mUiQa = EdUiQa();
+            WireUiQa();
+            // Test runs close once every asked check has run (`/clicksweep /layoutcheck` run one after the other).
+            if (mQaExitAfter && !mClickSweepAsked && !mLayoutCheckAsked && !mSelfTestsAsked && !mSelfTests.Running()) {
+              mShell->RequestExit();
+            }
+          }
+          mSelfTests.Frame(ImGui::GetIO().DeltaTime);
+          if (!mQaReport.empty()) {
+            mSelfTests.qaReport = std::move(mQaReport);
+            mQaReport.clear();
+          }
+          if (std::exchange(mSelfTests.askClickSweep, false) && !mUiQa.Running()) {
+            mUiQa.Start(EdUiQa::Kind::ClickSweep, 10);
+          }
+          if (std::exchange(mSelfTests.askLayoutCheck, false) && !mUiQa.Running()) {
+            mUiQa.Start(EdUiQa::Kind::LayoutCheck, 10);
+          }
+          if (mSelfTests.Finished() && mQaExitAfter && !mSelfTestsAsked && !mClickSweepAsked && !mLayoutCheckAsked) {
+            mShell->RequestExit();
+          }
           // A frame whose heads were re-made isn't drawn: its draw lists hold the view's and the minimap's copies,
           // which the re-made context freed.
           const bool remade = FitGameView();
@@ -7667,6 +8285,12 @@ namespace faf::editor
         mToolArg = std::atoi(tool[0].c_str());
       }
       mTipCheckAsked = moho::CFG_GetArgOption("/tipcheck", 0, nullptr);
+      mClickSweepAsked = moho::CFG_GetArgOption("/clicksweep", 0, nullptr);
+      mLayoutCheckAsked = moho::CFG_GetArgOption("/layoutcheck", 0, nullptr);
+      mSelfTestsAsked = moho::CFG_GetArgOption("/selftests", 0, nullptr);
+      mQaExitAfter = mClickSweepAsked || mLayoutCheckAsked || mSelfTestsAsked;
+      WireUiQa();
+      RegisterSelfTests();
       if (
         fa::vector<fa::string> fieldsTest; moho::CFG_GetArgOption("/fieldstest", 1, &fieldsTest) && !fieldsTest.empty()
       ) {
@@ -9087,6 +9711,7 @@ namespace faf::editor
         mPreviewOnFirstSave = false;
         gpg::Logf("editor: %s", message.c_str());
         PostStatusMessage("Saved " + mDocument.FolderName());
+        mShell->ModHost().Notify("save", mDocument.Path());
         if (!mGraphMap.empty() && mGraphMap == mDocument.Path()) {
           if (const std::filesystem::path file = mDocument.TerrainGraphFile(); !file.empty()) {
             std::ofstream out(file, std::ios::binary | std::ios::trunc);
@@ -9149,6 +9774,35 @@ namespace faf::editor
         mRulesSeen = rules;
       }
       mScene.SetMeshWireShown(mShell->MeshShown());
+      // The editor mods' start-up trial ends once the editor has drawn for a while with them.
+      if (++mFramesUp == 120) {
+        mShell->ModHost().EndTrial();
+      }
+      // The turned-on editor mods with sim hooks play as sim mods.
+      mPlay.extraSimMods = mShell->ModHost().SimHookMods();
+      // The mods' Editor.On listeners: a map opened, an undo step ended.
+      if (mScene.Attached() && mDocument.Path() != mModMapSeen) {
+        mModMapSeen = mDocument.Path();
+        mShell->ModHost().Notify("map", mModMapSeen);
+      }
+      // Each undo step its own event, in order (a mod's own edits during a listener come next frame).
+      for (const std::string& step : std::exchange(mModEdits, {})) {
+        mShell->ModHost().Notify("edit", step);
+      }
+      // A mesh terrain map's patches: read when its map is up, again when asked; the view's mode; the checks.
+      mScene.SetMeshMode(mShell->MeshMode());
+      if (mScene.Attached() && mMeshLoadedFor != mDocument.Path()) {
+        mMeshLoadedFor = mDocument.Path();
+        mShell->SetMeshStatus(mScene.LoadMeshTerrain());
+        mShell->SetMeshFindings({});
+      } else if (!mScene.Attached()) {
+        mMeshLoadedFor.clear();
+      }
+      if (const int more = mShell->TakeMeshMore(); more == 1) {
+        mShell->SetMeshStatus(mScene.LoadMeshTerrain());
+      } else if (more == 2) {
+        mShell->SetMeshFindings(mScene.CheckMeshTerrain());
+      }
       const HWND owner = HandleOf(mGame.supcomFrame);
       for (EdShell::ImageAsk ask; mShell->TakeImageAsk(ask);) {
         if (!mScene.Attached()) {
@@ -9249,6 +9903,28 @@ namespace faf::editor
         mShell->SetImageStatus(ask.what + ": " + message);
         (ok ? gpg::Logf : gpg::Warnf)("editor: images: %s: %s", ask.what.c_str(), message.c_str());
       }
+      // The Detail pass panel: plan, run (one undo step) or measure; its environment defaults to the map's guess.
+      if (mDocument.Map() != nullptr && mScene.Attached()) {
+        mShell->SetDetailEnvironment(mScene.DetailEnvironmentGuess());
+        DetailRun run;
+        if (const int ask = mShell->TakeDetailAsk(run); ask != 0) {
+          const std::vector<std::string>& off = mShell->DetailClassesOff();
+          if (!off.empty()) {
+            for (const char* id : {"small", "stones", "big", "crack", "ground", "cliff"}) {
+              if (std::find(off.begin(), off.end(), id) == off.end()) {
+                run.only.emplace_back(id);
+              }
+            }
+          }
+          mShell->SetDetailText(
+            ask == 1     ? mScene.PlanDetailPass(run)
+              : ask == 2 ? mScene.RunDetailPass(run)
+                         : mScene.MeasureDetailPass()
+          );
+        }
+      } else {
+        mShell->ResetDetailEnvironment();
+      }
       for (EdShell::MeshAsk ask; mShell->TakeMeshAsk(ask);) {
         std::string text;
         {
@@ -9266,10 +9942,16 @@ namespace faf::editor
         std::size_t tiles = 0;
         std::size_t failed = 0;
         if (!map.empty()) {
-          const std::filesystem::path folder = map.parent_path() / "mesh";
+          // The mesh terrain map's own folder and manifest (FAF Studio's `terrain/terrain.lua`), which both editors
+          // read.
+          const std::filesystem::path folder = map.parent_path() / "terrain";
           std::error_code made;
           std::filesystem::create_directories(folder, made);
           std::map<std::pair<int, int>, std::string> files;
+          float meshHigh = -10000.0f;
+          for (const auto& p : placed.positions) {
+            meshHigh = std::max(meshHigh, p[1]);
+          }
           for (const auto& [key, part] : SplitByTile(placed, ask.options.tile)) {
             const std::string name = "tile_" + std::to_string(key.first) + "_" + std::to_string(key.second) + ".scm";
             std::string partError;
@@ -9284,8 +9966,19 @@ namespace faf::editor
             files[key] = name;
             ++tiles;
           }
-          std::ofstream manifest(folder / "mesh.lua", std::ios::binary | std::ios::trunc);
-          manifest << MeshManifest(files, ask.options.tile);
+          {
+            std::ofstream manifest(folder / "terrain.lua", std::ios::binary | std::ios::trunc);
+            manifest << MeshTerrainManifest(
+              files, static_cast<float>(std::max(mDocument.Facts().sizeX, mDocument.Facts().sizeZ)), meshHigh
+            );
+          }
+          // A mesh terrain map: its scenario names the manifest (TerrainSystem = 'mesh', TerrainMesh), one undo step.
+          if (ask.makeMeshMap) {
+            const std::string manifest = "/maps/" + mDocument.FolderName() + "/terrain/terrain.lua";
+            (void)mDocument.SetScenarioField("TerrainSystem", "mesh", true);
+            (void)mDocument.SetScenarioField("TerrainMesh", manifest, true);
+          }
+          mShell->SetMeshStatus(mScene.LoadMeshTerrain());
         }
         mScene.SetMeshWire(MeshWire(placed, 200000));
         const std::string status = std::to_string(placed.triangles.size()) + " triangles, " + std::to_string(tiles) +
@@ -9293,6 +9986,33 @@ namespace faf::editor
           (map.empty() ? " (no map folder: shown only)" : "");
         mShell->SetMeshStatus(status);
         gpg::Logf("editor: mesh terrain: %s", status.c_str());
+      }
+      // `/meshtest`: once the import is in, the checks and where props would stand.
+      if (mMeshTestFrames > 0 && ++mMeshTestFrames == 30) {
+        mMeshTestFrames = 0;
+        gpg::Logf(
+          "editor: /meshtest: the scenario %s TerrainSystem = 'mesh'",
+          mDocument.Scenario().find("TerrainSystem = 'mesh'") != std::string::npos ||
+              mDocument.Scenario().find("TerrainSystem = \"mesh\"") != std::string::npos
+            ? "says"
+            : "doesn't say"
+        );
+        gpg::Logf("editor: /meshtest: load: %s", mScene.LoadMeshTerrain().c_str());
+        const std::vector<std::string> findings = mScene.CheckMeshTerrain();
+        gpg::Logf("editor: /meshtest: %zu mesh check findings", findings.size());
+        for (std::size_t i = 0; i < findings.size() && i < 8; ++i) {
+          gpg::Logf("editor: /meshtest:   %s", findings[i].c_str());
+        }
+        const float w = static_cast<float>(std::max(mDocument.Facts().fieldWidth - 1, 1));
+        for (const float f : {0.25f, 0.5f, 0.75f}) {
+          gpg::Logf(
+            "editor: /meshtest: at %.0f, %.0f a prop stands at %.2f (the height field there: %.2f)",
+            static_cast<double>(w * f),
+            static_cast<double>(w * f),
+            static_cast<double>(mScene.PlacementHeight(w * f, w * f)),
+            static_cast<double>(mScene.GroundHeightAt(w * f, w * f))
+          );
+        }
       }
     }
 
@@ -9631,6 +10351,10 @@ namespace faf::editor
         const wchar_t* const title
       )
       {
+        if (gNoFileDialogs) {
+          gpg::Logf("editor: a file dialog wasn't opened (a QA run is pressing buttons)");
+          return {};
+        }
         wchar_t path[MAX_PATH] = L"";
         OPENFILENAMEW dialog{};
         dialog.lStructSize = sizeof(dialog);
@@ -9652,6 +10376,10 @@ namespace faf::editor
         const bool save
       )
       {
+        if (gNoFileDialogs) {
+          gpg::Logf("editor: a file dialog wasn't opened (a QA run is pressing buttons)");
+          return {};
+        }
         wchar_t path[MAX_PATH] = L"";
         OPENFILENAMEW dialog{};
         dialog.lStructSize = sizeof(dialog);
@@ -10342,7 +11070,9 @@ namespace faf::editor
           }
           if (tools.TakeConversionRequest(shader, options)) {
             std::vector<std::string> report;
-            (void)mScene.ConvertLayers(shader, options, report);
+            if (mScene.ConvertLayers(shader, options, report) && options.textures) {
+              ConvertTextures(shader, report);
+            }
             tools.SetConversionReport(std::move(report));
           }
         }
@@ -10366,8 +11096,15 @@ namespace faf::editor
           (void)mScene.PlanConversion(shader, options); // reads the masks
           const std::uint64_t before = hash();
           std::vector<std::string> report;
+          options.textures = arg.find(",textures") != std::string::npos;
           const bool converted = mScene.ConvertLayers(shader, options, report);
           const std::uint64_t after = hash();
+          if (converted && options.textures) {
+            ConvertTextures(shader, report);
+            for (const std::string& line : report) {
+              gpg::Logf("editor: convert test: %s", line.c_str());
+            }
+          }
           gpg::Logf(
             "editor: convert test: %s -> %s %s, masks %016llx -> %016llx",
             shaderBefore.c_str(),
@@ -10377,9 +11114,17 @@ namespace faf::editor
             static_cast<unsigned long long>(after)
           );
           if (converted && arg.find(",undo") != std::string::npos) {
-            const bool undone = mScene.Undo();
+            // With textures the atlas or the alpha copies are a step of their own after the conversion's.
+            const int steps = options.textures ? 2 : 1;
+            bool undone = true;
+            for (int i = 0; i < steps; ++i) {
+              undone = mScene.Undo() && undone;
+            }
             const bool backAgain = hash() == before && mScene.TerrainShader() == shaderBefore;
-            const bool redone = mScene.Redo();
+            bool redone = true;
+            for (int i = 0; i < steps; ++i) {
+              redone = mScene.Redo() && redone;
+            }
             const bool forwardAgain = hash() == after && mScene.TerrainShader() == shader;
             gpg::Logf(
               "editor: convert test: undo %s (masks and shader as before: %s), redo %s (as converted: %s)",
@@ -12096,7 +12841,11 @@ namespace faf::editor
         return;
       }
       if (mScene.MiniMapInLastFrame()) {
+        mMiniRetired.reset();
+        mMiniSurfaceRetired.reset();
         if (!mMiniCopy || mMiniCopyWidth != width || mMiniCopyHeight != height) {
+          mMiniRetired = std::move(mMiniCopy);
+          mMiniSurfaceRetired = std::move(mMiniSurface);
           mMiniCopy.reset();
           moho::ID3DDeviceResources::RenderTargetHandle target;
           (void)d3d.GetResources()->CreateRenderTarget(target, width, height, 2);
@@ -12288,9 +13037,13 @@ namespace faf::editor
         mViewCopyHeight = 0;
         mMiniSurface.reset();
         mMiniCopy.reset();
+        mMiniRetired.reset();
+        mMiniSurfaceRetired.reset();
         mMiniCopyWidth = 0;
         mMiniCopyHeight = 0;
         mShell->Tools().SetMinimapImage(0);
+        // The particle editor's own view too (its image was drawn after a resize: a freed target).
+        mShell->ParticleEditor().Viewport().DropTargets();
         d3d->Clear();
         (void)d3d->InitContext(&context);
         return true;
