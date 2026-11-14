@@ -539,6 +539,10 @@ namespace faf::editor
       if (mShowModProject) {
         mModPanel.Draw(mShowModProject);
       }
+      mParticleEditor.SetModProject(
+        mModPanel.Project() != nullptr ? mModPanel.Folder() : std::filesystem::path(),
+        mModPanel.Project() != nullptr ? mModPanel.Project()->name : std::string()
+      );
       if (mShowUnitLab) {
         mUnitLab.Draw(
           mShowUnitLab, mTools.UnitInfos(), mDocument.Map() != nullptr && mPlay.CanPlay() && !mPlay.Active()

@@ -41,6 +41,9 @@
 #include "editor/EdLuaDebugger.h"
 #include "editor/EdPlay.h"
 #include "editor/EdShell.h"
+#include "editor/doc/EdEffectMerge.h"
+#include "moho/resource/blueprints/REmitterBlueprint.h"
+#include "moho/sim/CWldSession.h"
 #include "editor/tools/EdHeightFile.h"
 #include "editor/tools/EdAlphaGen.h"
 #include "editor/tools/EdLayoutMarkers.h"
@@ -160,7 +163,7 @@ namespace faf::editor
         "/nowaterhires",   "/camat",          "/erosiontest",    "/sctest",          "/symmenu",     "/panelbottom",
         "/shader",         "/brushtest",      "/brushshape",     "/stampsource",     "/stampstroke", "/symoptions",
         "/maskoptions",    "/masktest",       "/shaderbrowser",  "/convertlayers",   "/interoptest", "/gentest",
-        "/layouttest",     "/playcopytest",   "/missiontest",    "/modtest",         "/unitlabtest",
+        "/layouttest",     "/playcopytest",   "/missiontest",    "/modtest",         "/unitlabtest", "/effectmodtest",
       };
       for (const char* const option : kOptions) {
         if (moho::CFG_GetArgOption(option, 0, nullptr)) {
@@ -2617,6 +2620,141 @@ namespace faf::editor
         }
         ++mLabTestStage;
       }
+      /**
+       * `/effectmodtest` (test runs): a game emitter opened in the particle editor, a copy with a longer lifetime
+       * and a changed size curve written into a project EditorEffectTest (a merge), a copy with a curve cut to one key
+       * (a replacement), the merge played: the sim's blueprint table asked for the emitter's lifetime.
+       */
+      void TestEffectMod()
+      {
+        static constexpr char kEmitter[] = "/effects/emitters/adisruptor_hit_01_emit.bp";
+        if (
+          mFxTestStage >= 7 || (mFxTestStage < 2 && (!mScene.Attached() || moho::RULE_PeekKept() == nullptr)) ||
+          !moho::CFG_GetArgOption("/effectmodtest", 0, nullptr) || ++mFxTestFrames % 150 != 0
+        ) {
+          return;
+        }
+        EdParticleEditor& fx = mShell->ParticleEditor();
+        switch (mFxTestStage) {
+        case 0: {
+          mShell->HideHome();
+          mShell->ShowModProject();
+          EdModPanel& panel = mShell->ModPanel();
+          std::string error;
+          if (!panel.Open("EditorEffectTest", error) && !panel.Create("EditorEffectTest", error)) {
+            gpg::Warnf("editor: effect mod test: no project: %s", error.c_str());
+            mFxTestStage = 7;
+            return;
+          }
+          fx.SetModProject(panel.Folder(), panel.Project()->name);
+          if (!fx.OpenGameEmitter(kEmitter) || fx.Emitters().empty()) {
+            gpg::Warnf("editor: effect mod test: couldn't open %s: %s", kEmitter, fx.Status().c_str());
+            mFxTestStage = 7;
+            return;
+          }
+          // A replacement first (a curve cut to one key), then the merge over it.
+          auto emitters = fx.Emitters();
+          EmitterBlueprint& e = emitters.front().second;
+          const float lifetime = e.lifetime;
+          std::size_t longest = 0;
+          for (std::size_t c = 1; c < e.curves.size(); ++c) {
+            if (e.curves[c].keys.size() > e.curves[longest].keys.size()) {
+              longest = c;
+            }
+          }
+          // A replacement: another game emitter with a curve of two keys or more, cut to one.
+          for (const char* other :
+               {"/effects/emitters/aeon_light_displacement_missile_hit_02_emit.bp",
+                "/effects/emitters/adisruptor_cannon_muzzle_01_emit.bp",
+                "/effects/emitters/adisruptor_cannon_munition_01_emit.bp",
+                "/effects/emitters/a3_end_nis_01_emit.bp",
+                "/effects/emitters/a3_end_nis_02_emit.bp"}) {
+            std::string text;
+            EmitterBlueprint cut;
+            std::string error;
+            if (!ReadGameFile(other, text) || !ParseEmitter(text, cut, error)) {
+              continue;
+            }
+            const auto many = std::find_if(cut.curves.begin(), cut.curves.end(), [](const EmitterCurve& c) {
+              return c.keys.size() >= 2;
+            });
+            if (many == cut.curves.end()) {
+              continue;
+            }
+            const std::size_t keys = many->keys.size();
+            many->keys.resize(1);
+            mFxCutLifetime = cut.lifetime;
+            cut.lifetime += 3.0f;
+            mFxCutPath = other;
+            std::string base = other;
+            base = base.substr(base.find_last_of('/') + 1);
+            base = base.substr(0, base.size() - 3);
+            (void)fx.SaveEmittersToMod({{base, cut}}, other);
+            gpg::Logf(
+              "editor: effect mod test: %s: %s cut from %zu keys to 1: %s",
+              other,
+              CurveInfo(static_cast<int>(many - cut.curves.begin())).name,
+              keys,
+              fx.Status().c_str()
+            );
+            std::ifstream replaced(panel.Folder() / EffectModFile(other), std::ios::binary);
+            std::string head;
+            for (int n = 0; n < 4 && std::getline(replaced, head); ++n) {
+              gpg::Logf("editor: effect mod test: replacement | %s", head.c_str());
+            }
+            break;
+          }
+          e.lifetime = lifetime + 7.0f;
+          if (!e.curves[longest].keys.empty()) {
+            e.curves[longest].keys.front().y += 1.0f;
+          }
+          (void)fx.SaveEmittersToMod(emitters, fx.OpenedPaths());
+          gpg::Logf("editor: effect mod test: lifetime %g -> %g: %s", lifetime, lifetime + 7.0f, fx.Status().c_str());
+          std::ifstream in(panel.Folder() / EffectModFile(kEmitter), std::ios::binary);
+          std::string line;
+          while (std::getline(in, line)) {
+            gpg::Logf("editor: effect mod test: bp | %s", line.c_str());
+          }
+          break;
+        }
+        case 1:
+          if (!PlayModProject()) {
+            gpg::Warnf("editor: effect mod test: no play");
+            mFxTestStage = 7;
+            return;
+          }
+          break;
+        case 4: {
+          // The play's own rules (the sim's Lua has no emitter blueprints): what the game made of the two files.
+          const moho::CWldSession* const session = moho::WLD_GetActiveSession();
+          moho::RRuleGameRules* const rules = session != nullptr ? session->mRules : nullptr;
+          for (const std::string& path : {std::string(kEmitter), mFxCutPath}) {
+            if (path.empty()) {
+              continue;
+            }
+            const moho::REmitterBlueprint* const bp =
+              rules != nullptr ? moho::RULE_FindEmitterBlueprintByName(rules, path.c_str()) : nullptr;
+            gpg::Logf(
+              "editor: effect mod test: the play's rules have %s: %s",
+              path.c_str(),
+              bp != nullptr ? ("lifetime " + std::to_string(bp->Lifetime)).c_str() : "no such emitter"
+            );
+          }
+          break;
+        }
+        case 6:
+          mPlay.Stop();
+          break;
+        default:
+          break;
+        }
+        ++mFxTestStage;
+      }
+      int mFxTestStage = 0;
+      int mFxTestFrames = 0;
+      std::string mFxCutPath;
+      float mFxCutLifetime = 0.0f;
+
       int mLabTestStage = 0;
       int mLabTestFrames = 0;
       std::string mLabTestUnit;
@@ -8408,6 +8546,7 @@ namespace faf::editor
         (void)PlayModProject();
       }
       TestUnitLab();
+      TestEffectMod();
       // `/sctest` (test runs): the SC tools window's buttons in turn, a second apart, the heights' checksum each time.
       if (
         mScTestStage < 8 && moho::CFG_GetArgOption("/sctest", 0, nullptr) && !mScene.ModelsPending() &&

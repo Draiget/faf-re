@@ -107,6 +107,36 @@ namespace faf::editor
     {
       mTexturePicker.AskOpen();
     }
+    /** The open mod project (the Units workspace's): Save to mod project writes there; empty when none is open. */
+    void SetModProject(
+      const std::filesystem::path& folder,
+      const std::string& name
+    )
+    {
+      mModFolder = folder;
+      mModName = name;
+    }
+    /**
+     * Save to mod project: each emitter of the effect that is a game file becomes a merge blueprint naming it (or a
+     * replacement when a merge can't say the change), a beam or trail the same; an emitter of the effect's own is
+     * written whole. The status line says what was written.
+     */
+    bool SaveToMod();
+    /** The same for given emitters (test runs edit a copy); `paths` the game files they came from (';' between). */
+    bool
+    SaveEmittersToMod(const std::vector<std::pair<std::string, EmitterBlueprint>>& emitters, const std::string& paths);
+    [[nodiscard]] const std::string& Status() const noexcept
+    {
+      return mStatus;
+    }
+    [[nodiscard]] const std::vector<std::pair<std::string, EmitterBlueprint>>& Emitters() const noexcept
+    {
+      return mFxEmitters;
+    }
+    [[nodiscard]] const std::string& OpenedPaths() const noexcept
+    {
+      return mOpenedPaths;
+    }
     /** Opens one of FAF's effect templates (its emitters played together) as a graph. */
     bool OpenTemplate(const EffectTemplate& effect);
     /** Test runs (`/particletemplate <name>`): opens that template. */
@@ -145,6 +175,10 @@ namespace faf::editor
     bool mPlaying = true;
     bool mLoop = true;
     std::filesystem::path mMapFolder;
+    std::filesystem::path mModFolder;
+    std::string mModName;
+    /** The game files the open effect was opened from (';' between), kept when it is saved elsewhere. */
+    std::string mOpenedPaths;
     std::string mMapFolderName;
     std::string mStatus;
     EdParticlePreview mPreview;

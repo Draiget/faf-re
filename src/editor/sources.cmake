@@ -21,6 +21,7 @@ set(FAF_EDITOR_SOURCES
   doc/EdWaterPreset.cpp
   doc/EdJson.cpp
   doc/EdModProject.cpp
+  doc/EdEffectMerge.cpp
   doc/EdLighting.cpp
   doc/EdMarkerPreset.cpp
   doc/EdUnitPreset.cpp

@@ -829,6 +829,29 @@ namespace faf::editor
     return report;
   }
 
+  bool ModWriteGenerated(
+    const std::filesystem::path& folder,
+    const std::string& relative,
+    const std::string& text,
+    std::string& error
+  )
+  {
+    if (relative.empty() || relative.find("..") != std::string::npos || relative.front() == '/') {
+      error = relative + ": not a path inside the project";
+      return false;
+    }
+    const std::filesystem::path path = folder / relative;
+    if (!OursOrMissing(path)) {
+      error = relative + ": not written (the file isn't one the project made)";
+      return false;
+    }
+    if (!WriteFile(path, text)) {
+      error = relative + ": couldn't be written";
+      return false;
+    }
+    return true;
+  }
+
   bool OpenModProject(
     const std::filesystem::path& folder,
     ModProject& project,

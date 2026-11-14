@@ -157,6 +157,16 @@ namespace faf::editor
     const ModWeaponIndex& weaponIndex,
     const ModLuaCheck& check
   );
+  /**
+   * Writes one generated file into a project folder (through a temporary file), unless a file is there the project
+   * didn't make (no mark on its first line); false with `error`.
+   */
+  bool ModWriteGenerated(
+    const std::filesystem::path& folder,
+    const std::string& relative,
+    const std::string& text,
+    std::string& error
+  );
   /** Reads a project folder: editor_project.json, else its .bak (`fromBackup`); the uid from mod_info.lua. */
   bool OpenModProject(
     const std::filesystem::path& folder,

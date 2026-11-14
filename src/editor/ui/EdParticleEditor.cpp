@@ -589,6 +589,18 @@ namespace faf::editor
         std::snprintf(mSaveName, sizeof(mSaveName), "%s", (mFlatMode ? mName : mEffectName).c_str());
         mOpenSave = true;
       }
+      if (ImGui::MenuItem("Save to mod project", nullptr, false, !mModFolder.empty())) {
+        (void)SaveToMod();
+      }
+      if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+        EdSetTooltip(
+          "%s",
+          mModFolder.empty()
+            ? "Open a mod project first (Units workspace, Mod project)"
+            : "The game's emitters you changed, as merge blueprints naming their files; the game's own "
+              "stay as they are"
+        );
+      }
       ImGui::EndMenu();
     }
     ImGui::Separator();

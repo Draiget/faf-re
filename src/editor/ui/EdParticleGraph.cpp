@@ -3,6 +3,10 @@
 // canvas, with Details for the selected node and a palette; every emitter plays in the particle view.
 
 #include "editor/ui/EdParticleEditor.h"
+
+#include "editor/doc/EdEffectMerge.h"
+#include "editor/doc/EdModProject.h"
+#include "gpg/core/utils/Logging.h"
 #include "editor/ui/EdControls.h"
 #include "editor/ui/EdUiScale.h"
 
@@ -159,6 +163,7 @@ namespace faf::editor
     mKeySelected = -1;
     mEffectName = effectName;
     mEffectPaths = gamePaths;
+    mOpenedPaths = gamePaths;
     mGraphClean = mGraph->Changes();
     mGraphBuilt = ~std::uint64_t{0};
     mGraphUndo = {mGraph->Save()};
@@ -284,6 +289,103 @@ namespace faf::editor
     (void)mGraph->Load(mGraphUndo[mGraphUndoAt], error);
     mGraphSnap = mGraph->Changes();
     mGraphClean = ~std::uint64_t{0};
+  }
+
+  bool EdParticleEditor::SaveToMod()
+  {
+    if (mFlatMode) {
+      if (mModFolder.empty()) {
+        mStatus = "Open a mod project first (Units workspace, Mod project)";
+        return false;
+      }
+      std::string text;
+      FlatBlueprint game;
+      std::string error;
+      if (mGamePath.empty() || !ReadGameFile(mGamePath, text) || !ParseFlatBlueprint(text, game, error)) {
+        mStatus = "Only a beam or trail of the game's goes into a mod project as a change";
+        return false;
+      }
+      const EffectModBlueprint bp = FlatModBlueprint(game, mFlat, mGamePath);
+      if (bp.text.empty()) {
+        mStatus = "Nothing changed from the game's " + mGamePath;
+        return false;
+      }
+      if (!ModWriteGenerated(mModFolder, EffectModFile(mGamePath), bp.text, error)) {
+        mStatus = "Can't: " + error;
+        return false;
+      }
+      mStatus = "Wrote " + EffectModFile(mGamePath) + " into the mod project " + mModName +
+        (bp.replaced ? " (replaces the game's: " + bp.why + ")" : " (" + std::to_string(bp.changed) + " changes)");
+      gpg::Logf("editor: particle editor: %s", mStatus.c_str());
+      return true;
+    }
+    SyncGraph();
+    return SaveEmittersToMod(mFxEmitters, mOpenedPaths);
+  }
+
+  bool EdParticleEditor::SaveEmittersToMod(
+    const std::vector<std::pair<std::string, EmitterBlueprint>>& emitters,
+    const std::string& paths
+  )
+  {
+    if (mModFolder.empty()) {
+      mStatus = "Open a mod project first (Units workspace, Mod project)";
+      return false;
+    }
+    std::vector<std::string> sources;
+    for (std::size_t start = 0; start < paths.size();) {
+      const std::size_t end = paths.find(';', start);
+      const std::string path = paths.substr(start, end == std::string::npos ? std::string::npos : end - start);
+      if (!path.empty() && path.rfind("/maps/", 0) != 0) {
+        sources.push_back(path);
+      }
+      if (end == std::string::npos) {
+        break;
+      }
+      start = end + 1;
+    }
+    int merges = 0;
+    int replaced = 0;
+    int own = 0;
+    int same = 0;
+    std::string why;
+    for (const auto& [name, emitter] : emitters) {
+      const auto source = std::find_if(sources.begin(), sources.end(), [&](const std::string& path) {
+        return FileBase(path) == name;
+      });
+      std::string text;
+      std::string relative;
+      EmitterBlueprint game;
+      std::string error;
+      std::string gameText;
+      if (source != sources.end() && ReadGameFile(*source, gameText) && ParseEmitter(gameText, game, error)) {
+        const EffectModBlueprint bp = EmitterModBlueprint(game, emitter, *source);
+        if (bp.text.empty()) {
+          ++same;
+          continue;
+        }
+        (bp.replaced ? replaced : merges) += 1;
+        if (bp.replaced && why.empty()) {
+          why = name + ": " + bp.why;
+        }
+        text = bp.text;
+        relative = EffectModFile(*source);
+      } else {
+        // An emitter of the effect's own: written whole; its id is its place in the mod.
+        text = std::string(kModProjectMark) + "\n" + WriteEmitter(emitter);
+        relative = "effects/emitters/" + name + ".bp";
+        ++own;
+      }
+      if (!ModWriteGenerated(mModFolder, relative, text, error)) {
+        mStatus = "Can't: " + error;
+        return false;
+      }
+    }
+    mStatus = "Mod project " + mModName + ": " + std::to_string(merges) + " merge(s), " + std::to_string(replaced) +
+      " replacement(s), " + std::to_string(own) + " emitter(s) of its own, " + std::to_string(same) + " unchanged" +
+      (why.empty() ? std::string() : "; replaced because " + why);
+    gpg::Logf("editor: particle editor: %s", mStatus.c_str());
+    return merges + replaced + own > 0;
   }
 
   bool EdParticleEditor::SaveGraph(
