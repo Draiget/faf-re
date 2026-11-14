@@ -3,10 +3,12 @@
 #include "moho/net/NetPeerTransport.h"
 #include "gpg/core/profiling/Profiler.h"
 
+#include <atomic>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
+#include <memory>
 #include <new>
 
 #include "legacy/thread/Mutex.h"
@@ -96,6 +98,12 @@ CNetUDPConnector::~CNetUDPConnector()
   if (socket_ != platform::net::kInvalidSocket)
     platform::net::CloseSocket(socket_);
 
+  // Engine addition: the binary closes the socket (0x00489C2D) and leaves the event it made with WSACreateEvent
+  // (0x00489744) open, one for each lobby and game.
+  if (event_ != nullptr) {
+    platform::net::CloseSocketEvent(event_);
+  }
+
   if (mPacketLogFile) {
     fclose(mPacketLogFile);
   }
@@ -151,9 +159,21 @@ CNetUDPConnector::CNetUDPConnector(
   ticks.HighPart = systemTime.dwHighDateTime;
   mTimeBaseUs = static_cast<int64_t>(ticks.QuadPart / 10ULL);
 
-  // Keep one aliasing shared_ptr alive in worker thread so provider weak_ptr
-  // remains lockable during connector lifetime.
-  auto selfOwner = std::shared_ptr<CNetUDPConnector>(this, [](CNetUDPConnector*) {});
+  // The worker thread holds the connector's last owner, as in the binary, whose shared_ptr (made at 0x00489818)
+  // deletes the connector through the deleting destructor (the count's dispose, 0x0048D140, calls vtable slot 0
+  // with 1), and whose Entry takes a copy by value and releases it on its way out. FAF hot-patch: Entry (0x00489F90)
+  // jumps to 0x0128C620 in .exxt, a copy of its body, which releases that copy at 0x0128C88C (retail 0x0048A1FA).
+  // So once Destroy has let the connections go and the thread has ended, the connector is deleted and its socket
+  // closed. The NAT provider keeps a weak copy (SetTraversalHandler).
+  // Engine addition: a thread that does not start throws out of this constructor. Its unwinding runs only the
+  // members' destructors and the new-expression frees the memory, so the owner deletes nothing until the thread has
+  // started. The socket and the event stay open on that path, as they did when the owner deleted nothing.
+  const auto threadStarted = std::make_shared<std::atomic<bool>>(false);
+  std::shared_ptr<CNetUDPConnector> selfOwner(this, [threadStarted](CNetUDPConnector* const connector) {
+    if (threadStarted->load()) {
+      delete connector;
+    }
+  });
   {
     fa::recursive_mutex::scoped_lock lock{lock_};
 
@@ -164,6 +184,7 @@ CNetUDPConnector::CNetUDPConnector(
     fa::thread([selfOwner]() {
       selfOwner->Entry();
     });
+    threadStarted->store(true);
   }
 
   const auto natProviderWeak = mNatTraversalProvider;
@@ -381,6 +402,11 @@ void CNetUDPConnector::Pull()
     conn->DispatchFromInput();
   }
 
+  // Engine addition: under the lock. The binary lets go of it before the dispatch (0x0048B78E), then clears the flag
+  // (0x0048B7BF) and reads the event for WSASetEvent (0x0048B7C5) without it, when Entry, which reads both flags
+  // under the lock, may already have ended and had the connector deleted: a lobby's Lua can destroy the lobby, and
+  // with it the connector, in the dispatch above.
+  fa::recursive_mutex::scoped_lock lock{lock_};
   mIsPulling = false;
   if (mClosed) {
     SignalSocketEvent();

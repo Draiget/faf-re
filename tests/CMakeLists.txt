@@ -37,6 +37,14 @@ set_target_properties(faf_fast_retransmit_tests PROPERTIES FOLDER "Tests/Existin
 add_test(NAME net_fast_retransmit COMMAND faf_fast_retransmit_tests)
 set_tests_properties(net_fast_retransmit PROPERTIES LABELS "Existing")
 
+# The end of a UDP connector: Destroy, its thread's goodbyes, then the connector deleted with its
+# socket and event; Linux runs the same file (cmake/FafLinux.cmake).
+add_executable(faf_udp_connector_lifetime_tests EXCLUDE_FROM_ALL net/UdpConnectorLifetimeTests.cpp)
+target_link_libraries(faf_udp_connector_lifetime_tests PRIVATE faf_engine gtest_main)
+set_target_properties(faf_udp_connector_lifetime_tests PROPERTIES FOLDER "Tests/Net")
+add_test(NAME net_udp_connector_lifetime COMMAND faf_udp_connector_lifetime_tests)
+set_tests_properties(net_udp_connector_lifetime PROPERTIES LABELS "Net")
+
 # libjuice gathering against a STUN/TURN server (issue #228), run by hand:
 #   faf_juice_gather <host> <port> [<turn user> <turn password>]
 add_executable(faf_juice_gather EXCLUDE_FROM_ALL netlink/JuiceGatherTest.cpp)
