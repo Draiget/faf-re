@@ -430,6 +430,15 @@ set_target_properties(faf_editor_bake_tests PROPERTIES FOLDER "Tests/Editor")
 add_test(NAME editor_texture_bake COMMAND faf_editor_bake_tests)
 set_tests_properties(editor_texture_bake PROPERTIES LABELS "Editor")
 
+# Engine addition: the cue AudioEngine::Play hands out, which outlives a rebuild of the XACT engine
+# on a new sound output (src/moho/audio/RecoverableCue.h). Fake XACT cues and banks; no audio device.
+add_executable(faf_audio_tests EXCLUDE_FROM_ALL audio/AudioCueRecoveryTests.cpp)
+target_include_directories(faf_audio_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_link_libraries(faf_audio_tests PRIVATE faf_engine gtest_main)
+set_target_properties(faf_audio_tests PROPERTIES FOLDER "Tests/Audio")
+add_test(NAME audio_cue_recovery COMMAND faf_audio_tests)
+set_tests_properties(audio_cue_recovery PROPERTIES LABELS "Audio")
+
 # The shell's mouse events from window-system events: wheel positions on the screen, as
 # WM_MOUSEWHEEL's (src/platform/shell/mouse.h). Shell.cpp is a client file, in faf_engine here;
 # the Linux client links it into the client alone.

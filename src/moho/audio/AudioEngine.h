@@ -749,6 +749,15 @@ namespace moho
   void SND_FrameExtraDoWorkTick();
 
   /**
+   * Engine addition, not in the shipped binary: when Windows' default sound output changed, or the
+   * output in use is gone, rebuilds every audio engine on the current default output and brings
+   * back the sounds that were playing. Retail XACT keeps playing on the device it opened at
+   * startup, and stays silent once that device is unplugged. Call it on the main thread, once a
+   * frame, before `SND_Frame`. Does nothing on other systems.
+   */
+  void SND_RecoverOutput();
+
+  /**
    * Address: 0x004D8FC0 (FUN_004D8FC0, ?SND_Mute@Moho@@YAX_N@Z)
    *
    * What it does:

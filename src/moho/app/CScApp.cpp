@@ -1520,6 +1520,8 @@ void CScApp::Main()
   // heard.
   const bool fastForwarding = moho::gReplayFastForward.load(std::memory_order_relaxed);
   if (!fastForwarding) {
+    // Engine addition: back on the new output when Windows' default sound output changed.
+    moho::SND_RecoverOutput();
     moho::SND_Frame();
   }
   moho::DISK_UpdateWatcher();

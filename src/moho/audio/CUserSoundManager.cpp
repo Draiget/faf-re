@@ -780,6 +780,11 @@ namespace moho
     gEarlySoundPending = false;
   }
 
+  bool USER_SoundBuildPending()
+  {
+    return gEarlySoundPending.load(std::memory_order_acquire);
+  }
+
   void USER_WithSound(
     std::function<void(IUserSoundManager*)> work
   )

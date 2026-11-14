@@ -343,6 +343,7 @@ set(FAF_ENGINE_SOURCES
   moho/lua/SCR_Math.cpp
   moho/lua/SCR_String.cpp
   moho/audio/AudioEngine.cpp
+  moho/audio/AudioOutputWatch.cpp
   moho/audio/AudioReflectionHelpers.cpp
   moho/audio/SParamKeyTypeInfo.cpp
   moho/audio/SParamKeySerializer.cpp

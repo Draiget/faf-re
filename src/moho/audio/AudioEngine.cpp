@@ -9,7 +9,10 @@
 #include <cstdlib>
 #include <cstring>
 #include <limits>
+#include <map>
+#include <mutex>
 #include <new>
+#include <set>
 #include <stdexcept>
 #include <string>
 #include <system_error>
@@ -32,6 +35,9 @@
 #include "legacy/containers/Map.h"
 #include "legacy/containers/Set.h"
 #include "legacy/containers/String.h"
+#include "moho/audio/AudioOutputWatch.h"
+#include "moho/audio/IUserSoundManager.h"
+#include "moho/audio/RecoverableCue.h"
 #include "moho/audio/XAudioError.h"
 #include "moho/audio/XactClock.h"
 #include "moho/audio/CSimSoundManager.h"
@@ -179,6 +185,12 @@ namespace
     4.71238899f,
     1.57079637f,
   };
+
+#if FAFRE_PLATFORM_WINDOWS
+  // Engine addition (output recovery, defined with its state below): keeps a copy of a sound bank's
+  // bytes as read from its file.
+  void KeepSoundBankFile(const moho::AudioEngineImpl* engine, const void* loader, const char* begin, const char* end);
+#endif
 
   struct AudioSoundBankLoader
   {
@@ -455,6 +467,10 @@ namespace
 
     mName = moho::FILE_Base(soundBankPath, true);
     gpg::Debugf("SND: Loaded SoundBank '%s'", mName.c_str());
+#if FAFRE_PLATFORM_WINDOWS
+    // Engine addition (output recovery): the bank's bytes as read, to make it again later.
+    KeepSoundBankFile(mEngine, this, mBuffer.mBegin, mBuffer.mEnd);
+#endif
     return true;
   }
 
@@ -1042,6 +1058,68 @@ namespace
     const std::uint16_t orientationVariable = cue->GetVariableIndex("OrientationAngle");
     return cue->SetVariable(orientationVariable, settings->mEmitterToListenerAngle * 57.295776f);
   }
+
+#if FAFRE_PLATFORM_WINDOWS
+  /**
+   * Engine addition (output recovery, see `SND_RecoverOutput`): what an engine needs, besides its
+   * recovered fields, to come back on a new sound output.
+   */
+  struct AudioOutputRecovery
+  {
+    std::set<moho::RecoverableCue*> mCues;           // the cues `AudioEngine::Play` handed out, live
+    std::map<std::uint16_t, float> mGlobalVariables; // what `SND_SetGlobalVariable` set
+    // Each sound bank's bytes as read from its file, by loader. XACT keeps a bank's run-time state
+    // in the buffer it was made from, so a bank that played can't be made again from that buffer
+    // (it fails with "Invalid data"); the rebuild copies these back first.
+    std::map<const void*, std::vector<char>> mSoundBankFiles;
+    bool mCuesPending = false; // cues to make again after a rebuild
+    ULONGLONG mCuesPendingSince = 0;
+  };
+
+  // Guards OutputRecovery(): sounds are played on the main thread, and on the sound build thread
+  // while it makes the engines (USER_StartSoundEarly).
+  // Never destroyed either: engines that `sSoundConfiguration`'s exit-time destructor deletes lock
+  // it, and that destructor runs after this file's later statics are gone.
+  std::mutex& sOutputRecoveryLock = *new std::mutex();
+
+  // One entry per engine with cues or global variables. Never destroyed, so engines that
+  // `sSoundConfiguration`'s exit-time destructor deletes still find it.
+  std::map<const moho::AudioEngineImpl*, AudioOutputRecovery>& OutputRecovery()
+  {
+    static auto* const recovery = new std::map<const moho::AudioEngineImpl*, AudioOutputRecovery>();
+    return *recovery;
+  }
+
+  void KeepSoundBankFile(
+    const moho::AudioEngineImpl* const engine,
+    const void* const loader,
+    const char* const begin,
+    const char* const end
+  )
+  {
+    if (engine == nullptr || begin == nullptr || end <= begin) {
+      return;
+    }
+    const std::lock_guard<std::mutex> guard(sOutputRecoveryLock);
+    OutputRecovery()[engine].mSoundBankFiles[loader].assign(begin, end);
+  }
+
+  // Held around `SND_Frame`'s DoWork calls, which loading threads make too
+  // (`SND_FrameExtraDoWorkTick`), and by the rebuild, so no DoWork reaches an engine being replaced.
+  std::mutex sAudioWorkLock;
+
+  // Set by `SND_Frame` when a DoWork result says the output is gone; read by `SND_RecoverOutput`.
+  std::atomic<bool> sOutputLost{false};
+
+  // XACT's "no audio device" (XACTENGINE_E_NOAUDIODEVICE) and WASAPI's AUDCLNT_E_DEVICE_INVALIDATED.
+  [[nodiscard]] bool IsOutputLostResult(
+    const int result
+  )
+  {
+    const auto code = static_cast<std::uint32_t>(result);
+    return code == 0x8AC70017u || code == 0x88890004u;
+  }
+#endif
 } // namespace
 
 namespace moho
@@ -1562,6 +1640,43 @@ namespace moho
         gpg::Warnf("SND: Error registering notification.\n%s", func_SoundErrorCodeToMsg(result));
       }
     }
+
+    /**
+     * The engine's set-up after its XACT instance is initialized, shared by the constructor and
+     * the output recovery: sizes the 3D settings for the output's channels and registers the
+     * engine-wide notifications.
+     *
+     * Deliberate change from retail: retail sized mSettings (mDelayTimes and
+     * mMatrixCoefficients) in AudioEngineImpl using ResolveDstChannelCount from
+     * DirectSound's speaker setting (which on modern Windows reports 9/8 for
+     * 5.1/7.1 Surround and defaults to stereo, 2 floats). X3DAudio is initialized
+     * from XACT's real output channel mask (GetFinalMixFormat). If the output has
+     * 5.1/7.1 channels (6 or 8 floats), X3DAudioCalculate writes past the 2-float
+     * buffer into adjacent heap memory (corrupting AudioEngine instances), and
+     * SetMatrixCoefficients fails with "XACT3DApply failed: Invalid arg".
+     * Size mSettings from the real output channel count from GetFinalMixFormat.
+     */
+    void ConfigureEngineForOutput(
+      AudioEngineImpl& impl
+    )
+    {
+      WAVEFORMATEXTENSIBLE finalMixFormat{};
+      if (impl.mInstance->GetFinalMixFormat(&finalMixFormat) >= 0) {
+        const std::uint32_t realDstChannels = finalMixFormat.Format.nChannels;
+        if (realDstChannels != 0u && realDstChannels != impl.mSettings.mDstChannelCount) {
+          delete[] impl.mSettings.mDelayTimes;
+          delete[] impl.mSettings.mMatrixCoefficients;
+          impl.mSettings.mDstChannelCount = realDstChannels;
+          impl.mSettings.mDelayTimes = new float[realDstChannels]();
+          impl.mSettings.mMatrixCoefficients = new float[realDstChannels * impl.mSettings.mSrcChannelCount]();
+        }
+      }
+
+      RegisterNotificationOrWarn(&impl, 10u);
+      RegisterNotificationOrWarn(&impl, 11u);
+      RegisterNotificationOrWarn(&impl, 17u);
+      RegisterNotificationOrWarn(&impl, 18u);
+    }
   } // namespace
 
   /**
@@ -1804,6 +1919,10 @@ namespace moho
       return;
     }
 
+#if FAFRE_PLATFORM_WINDOWS
+    // Engine addition (output recovery): no DoWork while SND_RecoverOutput replaces an engine.
+    const std::lock_guard<std::mutex> workGuard(sAudioWorkLock);
+#endif
     for (std::uint32_t index = 0;; ++index) {
       if (index >= configuration->EngineCount()) {
         break;
@@ -1812,7 +1931,14 @@ namespace moho
       if (
         AudioEngineImpl* const impl = configuration->EngineImplAt(index); impl != nullptr && impl->mInstance != nullptr
       ) {
-        impl->mInstance->DoWork();
+        const int workResult = impl->mInstance->DoWork();
+#if FAFRE_PLATFORM_WINDOWS
+        if (IsOutputLostResult(workResult)) {
+          sOutputLost.store(true, std::memory_order_release);
+        }
+#else
+        (void)workResult;
+#endif
         configuration = GetSoundConfigurationSingletonB();
       }
     }
@@ -1990,6 +2116,11 @@ namespace moho
     if (engine->mImpl->mInstance->SetGlobalVariable(varIndex, value) < 0) {
       gpg::Warnf("SND: Error setting global variable [index:%i]", varIndex);
     }
+#if FAFRE_PLATFORM_WINDOWS
+    // Engine addition (output recovery): a rebuilt engine starts from the defaults again.
+    const std::lock_guard<std::mutex> guard(sOutputRecoveryLock);
+    OutputRecovery()[engine->mImpl].mGlobalVariables[varIndex] = value;
+#endif
   }
 
   /**
@@ -2086,31 +2217,9 @@ namespace moho
       return;
     }
 
-    // Deliberate change from retail: retail sized mSettings (mDelayTimes and
-    // mMatrixCoefficients) in AudioEngineImpl using ResolveDstChannelCount from
-    // DirectSound's speaker setting (which on modern Windows reports 9/8 for
-    // 5.1/7.1 Surround and defaults to stereo, 2 floats). X3DAudio is initialized
-    // from XACT's real output channel mask (GetFinalMixFormat). If the output has
-    // 5.1/7.1 channels (6 or 8 floats), X3DAudioCalculate writes past the 2-float
-    // buffer into adjacent heap memory (corrupting AudioEngine instances), and
-    // SetMatrixCoefficients fails with "XACT3DApply failed: Invalid arg".
-    // Size mSettings from the real output channel count from GetFinalMixFormat.
-    WAVEFORMATEXTENSIBLE finalMixFormat{};
-    if (mImpl->mInstance->GetFinalMixFormat(&finalMixFormat) >= 0) {
-      const std::uint32_t realDstChannels = finalMixFormat.Format.nChannels;
-      if (realDstChannels != 0u && realDstChannels != mImpl->mSettings.mDstChannelCount) {
-        delete[] mImpl->mSettings.mDelayTimes;
-        delete[] mImpl->mSettings.mMatrixCoefficients;
-        mImpl->mSettings.mDstChannelCount = realDstChannels;
-        mImpl->mSettings.mDelayTimes = new float[realDstChannels]();
-        mImpl->mSettings.mMatrixCoefficients = new float[realDstChannels * mImpl->mSettings.mSrcChannelCount]();
-      }
-    }
-
-    RegisterNotificationOrWarn(mImpl, 10u);
-    RegisterNotificationOrWarn(mImpl, 11u);
-    RegisterNotificationOrWarn(mImpl, 17u);
-    RegisterNotificationOrWarn(mImpl, 18u);
+    // The 3D settings sized for the real output, and the notifications (the size is a deliberate
+    // change from retail, see ConfigureEngineForOutput).
+    ConfigureEngineForOutput(*mImpl);
 
     gpg::Logf("MEM: %i bytes SND", 0);
     func_LoadSoundPath(mImpl, voicePath);
@@ -2287,6 +2396,19 @@ namespace moho
    */
   AudioEngineImpl::~AudioEngineImpl()
   {
+#if FAFRE_PLATFORM_WINDOWS
+    // Engine addition (output recovery): the XACT cues behind this engine's recoverable cues go
+    // with it; the game may still hold those cues and destroy them later.
+    {
+      const std::lock_guard<std::mutex> guard(sOutputRecoveryLock);
+      if (const auto found = OutputRecovery().find(this); found != OutputRecovery().end()) {
+        for (RecoverableCue* const cue : found->second.mCues) {
+          cue->Detach(true);
+        }
+        OutputRecovery().erase(found);
+      }
+    }
+#endif
     // The banks and wave banks go first, while `mInstance` is still alive:
     // every loader's dtor calls `Destroy()` on an `IXACTSoundBank` /
     // `IXACTWaveBank` that the engine instance owns, so shutting the engine
@@ -2359,6 +2481,18 @@ namespace moho
     const int result =
       preloadOnly != 0 ? loader->mBank->Prepare(cueId, 0u, 0u, outCue) : loader->mBank->Play(cueId, 0u, 0u, outCue);
     if (result >= 0) {
+#if FAFRE_PLATFORM_WINDOWS
+      // Engine addition (output recovery): the caller keeps a cue that outlives a rebuild of this
+      // engine on another output (SND_RecoverOutput). A play with no cue back has nothing to keep.
+      if (outCue != nullptr && *outCue != nullptr) {
+        std::set<RecoverableCue*>* registry = nullptr;
+        {
+          const std::lock_guard<std::mutex> guard(sOutputRecoveryLock);
+          registry = &OutputRecovery()[engine->mImpl].mCues; // map nodes don't move
+        }
+        *outCue = new RecoverableCue(*registry, &sOutputRecoveryLock, *outCue, bankId, cueId, preloadOnly == 0);
+      }
+#endif
       return result;
     }
 
@@ -2697,4 +2831,311 @@ namespace moho
 
     return cueState == 0x20;
   }
+
+#if FAFRE_PLATFORM_WINDOWS
+  namespace
+  {
+    // A rebuild waits this long after the last change Windows reported: one change of the default
+    // arrives as several notifications (one per role), an unplugged device as two.
+    constexpr ULONGLONG kOutputSettleMs = 300u;
+    // A rebuild that failed (no output left, or the new one refused) is tried again this often.
+    constexpr ULONGLONG kOutputRetryMs = 2000u;
+    // Cues whose streaming wave bank is still being prepared are tried this long, then given up.
+    constexpr ULONGLONG kCueRestoreMs = 10000u;
+
+    AudioOutputWatch* sOutputWatch = nullptr;
+    bool sOutputWatchTried = false;
+    std::uint32_t sOutputChangesSeen = 0u;
+    bool sRebuildPending = false;
+    bool sRebuildAll = false; // false: a retry, only for engines a failed rebuild left without one
+    ULONGLONG sRebuildAt = 0u;
+
+    // Makes the XACT instance on a thread in the multithreaded apartment, as the startup does
+    // (USER_StartSoundEarly); the main thread's apartment is single-threaded (WinApp.cpp).
+    void CreateXactInstance(
+      AudioEngineImpl& impl
+    )
+    {
+      std::thread creator([&impl] {
+        (void)::CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+        try {
+          func_RetreiveXACTCOMInterface(&impl);
+        } catch (const XAudioError& error) {
+          gpg::Warnf("%s", error.what());
+          impl.mInstance = nullptr;
+        }
+      });
+      creator.join();
+    }
+
+    /**
+     * Brings one engine back on the current default output: destroys its cues' XACT cues, its
+     * banks and its XACT instance, makes a new instance, sets it up as the constructor does, and
+     * makes the wave banks and sound banks again from the files and buffers their loaders kept.
+     * Volumes, paused categories and global variables are set again. The cues come back over the
+     * next frames (RestoreCues). False when it failed: the engine then has no instance, which
+     * every caller checks, and plays nothing until a later try works.
+     */
+    bool RebuildEngineForOutput(
+      AudioEngineImpl& impl,
+      SoundConfiguration& configuration
+    )
+    {
+      {
+        const std::lock_guard<std::mutex> guard(sOutputRecoveryLock);
+        if (const auto found = OutputRecovery().find(&impl); found != OutputRecovery().end()) {
+          for (RecoverableCue* const cue : found->second.mCues) {
+            cue->Detach();
+          }
+        }
+      }
+      for (std::size_t index = 0; index < impl.mBanks.size(); ++index) {
+        auto* const loader = static_cast<AudioSoundBankLoader*>(impl.mBanks.begin()[index]);
+        if (loader != nullptr && loader->mBank != nullptr) {
+          loader->mBank->Destroy();
+          loader->mBank = nullptr;
+        }
+      }
+      for (std::size_t index = 0; index < impl.mHandles.size(); ++index) {
+        auto* const loader = static_cast<AudioWaveBankLoaderBase*>(impl.mHandles.begin()[index]);
+        if (loader != nullptr && loader->mWaveBank != nullptr) {
+          loader->mWaveBank->Destroy();
+          loader->mWaveBank = nullptr;
+        }
+      }
+      if (impl.mInstance != nullptr) {
+        impl.mInstance->ShutDown();
+        impl.mInstance->Release();
+        impl.mInstance = nullptr;
+      }
+
+      CreateXactInstance(impl);
+      if (impl.mInstance == nullptr) {
+        return false;
+      }
+      // XACT opens the default output (pRendererID is null), as at startup.
+      const int initializeResult = impl.mInstance->Initialize(&configuration.mRuntimeParams);
+      if (initializeResult < 0) {
+        gpg::Warnf(
+          "SND: Error initializing audio engine on the new output.\n%s (0x%08X)",
+          func_SoundErrorCodeToMsg(initializeResult),
+          static_cast<unsigned>(initializeResult)
+        );
+        impl.mInstance->Release();
+        impl.mInstance = nullptr;
+        return false;
+      }
+      const int audio3dResult = func_AudioInitialize(impl.mInstance, impl.mAudioHandle);
+      if (audio3dResult < 0) {
+        gpg::Warnf("SND: Error initializing 3D audio.\n%s", func_SoundErrorCodeToMsg(audio3dResult));
+      }
+      ConfigureEngineForOutput(impl);
+
+      // Wave banks first, then sound banks, the order func_LoadSoundPath loads them in.
+      for (std::size_t index = 0; index < impl.mHandles.size(); ++index) {
+        auto* const loader = static_cast<AudioWaveBankLoaderBase*>(impl.mHandles.begin()[index]);
+        if (loader == nullptr) {
+          continue;
+        }
+        int result = 0;
+        if (auto* const streaming = dynamic_cast<AudioStreamingWaveBankLoader*>(loader); streaming != nullptr) {
+          // The same parameters as AudioStreamingWaveBankLoader::Load, on the file it kept open.
+          AudioStreamingWaveBankCreateParams createParams{};
+          createParams.file = streaming->mFileHandle;
+          createParams.offset = 0u;
+          createParams.flags = 0u;
+          createParams.packetSize = 0x12u;
+          result = impl.mInstance->CreateStreamingWaveBank(&createParams, &loader->mWaveBank);
+          if (result >= 0) {
+            AudioNotificationDesc notification{};
+            notification.type = XACTNOTIFICATIONTYPE_WAVEBANKPREPARED;
+            notification.pWaveBank = reinterpret_cast<IXACT3WaveBank*>(loader->mWaveBank);
+            (void)impl.mInstance->RegisterNotification(&notification);
+          }
+        } else if (auto* const inMemory = dynamic_cast<AudioInMemoryWaveBankLoader*>(loader); inMemory != nullptr) {
+          result = impl.mInstance->CreateInMemoryWaveBank(
+            inMemory->mMappedBuffer.mBegin,
+            static_cast<std::int32_t>(inMemory->mMappedBuffer.mEnd - inMemory->mMappedBuffer.mBegin),
+            0u,
+            0u,
+            &loader->mWaveBank
+          );
+        }
+        if (result < 0) {
+          gpg::Warnf(
+            "SND: Error loading WaveBank '%s' on the new output: %s (0x%08X)",
+            loader->mName.c_str(),
+            func_SoundErrorCodeToMsg(result),
+            static_cast<unsigned>(result)
+          );
+          loader->mWaveBank = nullptr;
+        }
+      }
+      std::size_t changedBanks = 0;
+      for (std::size_t index = 0; index < impl.mBanks.size(); ++index) {
+        auto* const loader = static_cast<AudioSoundBankLoader*>(impl.mBanks.begin()[index]);
+        if (loader == nullptr) {
+          continue;
+        }
+        {
+          // The bank's bytes as read: XACT changed the buffer while the old bank played from it.
+          const std::lock_guard<std::mutex> guard(sOutputRecoveryLock);
+          const AudioOutputRecovery& recovery = OutputRecovery()[&impl];
+          const auto file = recovery.mSoundBankFiles.find(loader);
+          const std::size_t size = static_cast<std::size_t>(loader->mBuffer.mEnd - loader->mBuffer.mBegin);
+          if (file != recovery.mSoundBankFiles.end() && file->second.size() == size && size != 0) {
+            if (std::memcmp(loader->mBuffer.mBegin, file->second.data(), size) != 0) {
+              std::memcpy(loader->mBuffer.mBegin, file->second.data(), size);
+              ++changedBanks;
+            }
+          }
+        }
+        const int result = impl.mInstance->CreateSoundBank(
+          loader->mBuffer.mBegin,
+          static_cast<std::int32_t>(loader->mBuffer.mEnd - loader->mBuffer.mBegin),
+          0u,
+          0u,
+          &loader->mBank
+        );
+        if (result < 0) {
+          gpg::Warnf(
+            "SND: Error loading SoundBank '%s' on the new output: %s (0x%08X, %u bytes)",
+            loader->mName.c_str(),
+            func_SoundErrorCodeToMsg(result),
+            static_cast<unsigned>(result),
+            static_cast<unsigned>(loader->mBuffer.mEnd - loader->mBuffer.mBegin)
+          );
+          loader->mBank = nullptr;
+        }
+      }
+      if (changedBanks != 0) {
+        gpg::Debugf("SND: %u sound banks made again from their file's bytes", static_cast<unsigned>(changedBanks));
+      }
+
+      // What the game set on the old instance: category volumes (the mute too, SND_Mute sets the
+      // Global category's), paused categories, and global variables.
+      for (const auto& [category, volume] : impl.mCategoryVolumes) {
+        (void)impl.mInstance->SetVolume(category, volume);
+      }
+      for (const fa::string& category : impl.mPausedCategoryNames) {
+        const std::uint16_t categoryId = impl.mInstance->GetCategory(category.c_str());
+        if (categoryId != kInvalidCategoryId) {
+          (void)impl.mInstance->Pause(categoryId, 1);
+        }
+      }
+      const std::lock_guard<std::mutex> guard(sOutputRecoveryLock);
+      AudioOutputRecovery& recovery = OutputRecovery()[&impl];
+      for (const auto& [variable, value] : recovery.mGlobalVariables) {
+        (void)impl.mInstance->SetGlobalVariable(variable, value);
+      }
+      recovery.mCuesPending = !recovery.mCues.empty();
+      recovery.mCuesPendingSince = ::GetTickCount64();
+      return true;
+    }
+
+    /**
+     * Makes again, from the rebuilt sound banks, the cues the game still holds. A cue whose
+     * streaming wave bank is still being prepared fails and is tried on the next frame, up to
+     * kCueRestoreMs; then the game sees it stopped.
+     */
+    void RestoreCues(
+      AudioEngineImpl& impl
+    )
+    {
+      const std::lock_guard<std::mutex> guard(sOutputRecoveryLock);
+      const auto found = OutputRecovery().find(&impl);
+      if (found == OutputRecovery().end() || !found->second.mCuesPending || impl.mInstance == nullptr) {
+        return;
+      }
+      AudioOutputRecovery& recovery = found->second;
+      const bool giveUp = ::GetTickCount64() - recovery.mCuesPendingSince > kCueRestoreMs;
+      bool pending = false;
+      std::size_t abandoned = 0;
+      for (RecoverableCue* const cue : recovery.mCues) {
+        AudioSoundBankLoader* const loader = FindBankLoader(&impl, cue->BankId());
+        if (cue->Restore(loader != nullptr ? loader->mBank : nullptr)) {
+          continue;
+        }
+        if (giveUp) {
+          cue->Abandon();
+          ++abandoned;
+        } else {
+          pending = true;
+        }
+      }
+      recovery.mCuesPending = pending;
+      if (abandoned != 0) {
+        gpg::Warnf("SND: %u sounds didn't come back on the new output", static_cast<unsigned>(abandoned));
+      }
+    }
+  } // namespace
+
+  void SND_RecoverOutput()
+  {
+    SoundConfiguration* const configuration = sSoundConfiguration.get();
+    if (configuration == nullptr || configuration->mNoSound != 0u || USER_SoundBuildPending()) {
+      return;
+    }
+    if (!sOutputWatchTried) {
+      sOutputWatchTried = true;
+      sOutputWatch = AudioOutputWatch::Start();
+      if (sOutputWatch != nullptr) {
+        sOutputChangesSeen = sOutputWatch->Changes();
+      }
+    }
+
+    const ULONGLONG now = ::GetTickCount64();
+    if (sOutputWatch != nullptr && sOutputWatch->Changes() != sOutputChangesSeen) {
+      sOutputChangesSeen = sOutputWatch->Changes();
+      sRebuildPending = true;
+      sRebuildAll = true;
+      sRebuildAt = now + kOutputSettleMs;
+    }
+    if (sOutputLost.exchange(false, std::memory_order_acq_rel) && !sRebuildPending) {
+      sRebuildPending = true;
+      sRebuildAll = true;
+      sRebuildAt = now;
+    }
+
+    const std::lock_guard<std::mutex> workGuard(sAudioWorkLock);
+    if (sRebuildPending && now >= sRebuildAt) {
+      sRebuildPending = false;
+      std::size_t rebuilt = 0;
+      std::size_t failed = 0;
+      for (std::uint32_t index = 0; index < configuration->EngineCount(); ++index) {
+        AudioEngineImpl* const impl = configuration->EngineImplAt(index);
+        if (impl == nullptr || (!sRebuildAll && impl->mInstance != nullptr)) {
+          continue;
+        }
+        if (RebuildEngineForOutput(*impl, *configuration)) {
+          ++rebuilt;
+        } else {
+          ++failed;
+        }
+      }
+      const bool retrying = !sRebuildAll;
+      if (failed != 0) {
+        sRebuildPending = true;
+        sRebuildAll = false;
+        sRebuildAt = now + kOutputRetryMs;
+      }
+      // A retry that failed again isn't logged: with no output left it fails every 2 s.
+      if (!retrying || failed == 0) {
+        gpg::Logf(
+          "SND: the sound output changed; %u audio engines rebuilt on the default output, %u failed%s",
+          static_cast<unsigned>(rebuilt),
+          static_cast<unsigned>(failed),
+          failed != 0 ? " (trying again every 2 s)" : ""
+        );
+      }
+    }
+    for (std::uint32_t index = 0; index < configuration->EngineCount(); ++index) {
+      if (AudioEngineImpl* const impl = configuration->EngineImplAt(index); impl != nullptr) {
+        RestoreCues(*impl);
+      }
+    }
+  }
+#else
+  void SND_RecoverOutput() {}
+#endif
 } // namespace moho
