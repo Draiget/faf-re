@@ -342,6 +342,8 @@ namespace gpg::gal
     [[nodiscard]] VkExtent2D SurfaceExtent(const SwapChain& swapChain, std::uint32_t width, std::uint32_t height) const;
     /** A swap chain the engine's Reset must make again (TestCooperativeLevel answers 1 until it has). */
     void RequestSwapChainRecovery(const char* what, VkResult result);
+    /** True when every swap chain's window has no area (minimised): a Reset would rebuild nothing. */
+    [[nodiscard]] bool AllWindowsMinimised() const;
     void DestroySwapChain(SwapChain& swapChain, bool keepSurface) noexcept;
     /** Makes the head's surface, once its window has one (VulkanSurface.h's WaitForWindowSurface). */
     void TakeSurface(SwapChain& swapChain);

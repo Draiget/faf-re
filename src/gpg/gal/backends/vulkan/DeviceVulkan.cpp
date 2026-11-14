@@ -1005,6 +1005,7 @@ namespace gpg::gal
     std::uint32_t height
   )
   {
+    // A lost surface throws here; the callers let go of it, and TestCooperativeLevel takes the next one.
     VkSurfaceCapabilitiesKHR capabilities{};
     CheckVk(
       "DeviceVulkan.cpp",
@@ -1888,6 +1889,23 @@ namespace gpg::gal
     }
   }
 
+  bool DeviceVulkan::AllWindowsMinimised() const
+  {
+    if (mSwapChains.empty()) {
+      return false;
+    }
+    for (const SwapChain& swapChain : mSwapChains) {
+      VkSurfaceCapabilitiesKHR capabilities{};
+      if (
+        Vk().vkGetPhysicalDeviceSurfaceCapabilitiesKHR(mPhysical, swapChain.surface, &capabilities) != VK_SUCCESS ||
+        (capabilities.currentExtent.width != 0U && capabilities.currentExtent.height != 0U)
+      ) {
+        return false;
+      }
+    }
+    return true;
+  }
+
   void DeviceVulkan::RequestSwapChainRecovery(
     const char* const what,
     const VkResult result
@@ -1895,6 +1913,12 @@ namespace gpg::gal
   {
     // A few tries at most: a chain that is out of date again right after a Reset would loop forever.
     if (mRecoverRequested) {
+      return;
+    }
+    // Every window minimised: there is nothing to make the chain from until one has an area again, and a Reset would
+    // rebuild nothing. It is not a try (the limit of 3 would never be reached), and it is not worth a line per frame;
+    // the next out-of-date result once a window is back asks again.
+    if (AllWindowsMinimised()) {
       return;
     }
     if (++mConsecutiveRecoveries > 3U) {
@@ -3177,9 +3201,6 @@ namespace gpg::gal
     }
     if (!anyChange) {
       gpg::Logf("Vulkan: Reset requested, swap chains unchanged: nothing to rebuild");
-      if (force && mConsecutiveRecoveries != 0U) {
-        --mConsecutiveRecoveries; // a recovery that rebuilt nothing (minimised) is not a try
-      }
       // The swap chain stays (and with it the image acquired for this frame); the state a Reset hands back does not.
       ResetState();
       BindDefaultOutput();
