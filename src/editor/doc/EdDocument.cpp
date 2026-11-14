@@ -2101,7 +2101,7 @@ namespace faf::editor
     std::string& message
   )
   {
-    const std::filesystem::path target = mVault / "maps" / folder;
+    const std::filesystem::path target = (mCopyParent.empty() ? mVault / "maps" : mCopyParent) / folder;
     std::error_code error;
 
     const std::string oldFolder = FolderName();
@@ -2313,6 +2313,31 @@ namespace faf::editor
     }
   }
 
+  bool EdDocument::SaveAsNewFolderIn(
+    const std::filesystem::path& parent,
+    const std::string& folder,
+    std::string& message
+  )
+  {
+    std::error_code error;
+    if (!parent.empty() && !std::filesystem::is_directory(parent, error)) {
+      message = parent.string() + " isn't a folder.";
+      return false;
+    }
+    const std::filesystem::path vaultMaps = std::filesystem::weakly_canonical(mVault / "maps", error);
+    const bool outside = !parent.empty() && std::filesystem::weakly_canonical(parent, error) != vaultMaps;
+    mCopyParent = outside ? parent : std::filesystem::path();
+    const bool saved = SaveAsNewFolder(folder, message);
+    mCopyParent.clear();
+    if (saved) {
+      mSaveOutsideVault = outside;
+      if (outside) {
+        message += " (outside the vault: the game doesn't see it there)";
+      }
+    }
+    return saved;
+  }
+
   bool EdDocument::SaveAsNewFolder(
     const std::string& folder,
     std::string& message
@@ -2335,7 +2360,7 @@ namespace faf::editor
       message = "There is no vault folder to save into.";
       return false;
     }
-    const std::filesystem::path target = mVault / "maps" / folder;
+    const std::filesystem::path target = (mCopyParent.empty() ? mVault / "maps" : mCopyParent) / folder;
     std::error_code error;
     if (std::filesystem::exists(target, error)) {
       message = target.string() + " already exists; pick another name.";
@@ -2520,7 +2545,8 @@ namespace faf::editor
     const std::filesystem::path vaultMaps = std::filesystem::weakly_canonical(mVault / "maps", ignored);
     const std::filesystem::path relative =
       std::filesystem::relative(std::filesystem::weakly_canonical(file, ignored), vaultMaps, ignored);
-    if (mVault.empty() || relative.empty() || relative.native().rfind(L"..", 0) == 0) {
+    const bool picked = mSaveOutsideVault && file == mSaveTarget; // Save as put it in a folder picked for it
+    if (!picked && (mVault.empty() || relative.empty() || relative.native().rfind(L"..", 0) == 0)) {
       message = "This map isn't in your vault (" + (mVault / "maps").string() + "); save it as a new map folder there.";
       return false;
     }
@@ -2814,6 +2840,27 @@ namespace faf::editor
     return true;
   }
 
+  bool EdDocument::SetSlotFactions(
+    const SlotFactions& factions
+  )
+  {
+    const SlotFactions before = ReadSlotFactions(mScenario);
+    std::string changed = WithSlotFactions(mScenario, factions);
+    if (changed == mScenario) {
+      return false;
+    }
+    mScenario = std::move(changed);
+    MapInfoStep step;
+    step.key = "factions";
+    step.slotFactions = true;
+    step.factionsBefore = before;
+    step.factionsAfter = ReadSlotFactions(mScenario);
+    mMapInfoUndo.push_back(std::move(step));
+    EditEnded(EditKind::MapInfo);
+    mModified = true;
+    return true;
+  }
+
   bool EdDocument::UndoMapInfo(
     const bool redo
   )
@@ -2825,6 +2872,12 @@ namespace faf::editor
     }
     MapInfoStep step = std::move(from.back());
     from.pop_back();
+    if (step.slotFactions) {
+      mScenario = WithSlotFactions(mScenario, redo ? step.factionsAfter : step.factionsBefore);
+      to.push_back(std::move(step));
+      mModified = true;
+      return true;
+    }
     if (redo) {
       mScenario = WithScenarioField(mScenario, step.key, step.after, step.text);
     } else if (step.had) {

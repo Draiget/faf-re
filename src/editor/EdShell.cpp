@@ -2471,20 +2471,30 @@ namespace faf::editor
         return;
       }
       (void)std::snprintf(mSaveAsName, sizeof(mSaveAsName), "%s", mDocument.NextVersionFolder().c_str());
+      (void)std::snprintf(
+        mSaveAsParent, sizeof(mSaveAsParent), "%s", (mDocument.VaultFolder() / "maps").string().c_str()
+      );
       ImGui::OpenPopup(kTitle);
     }
     if (!ImGui::BeginPopupModal(kTitle, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
       return;
     }
-    ImGui::TextUnformatted("The new folder goes into your vault's maps folder:");
-    ImGui::TextDisabled("%s", (mDocument.VaultFolder() / "maps").string().c_str());
+    ImGui::TextUnformatted("The new folder goes into (your vault's maps folder, or another):");
+    ImGui::SetNextItemWidth(Em(420.0f));
+    ImGui::InputText("Into", mSaveAsParent, sizeof(mSaveAsParent));
+    if (ImGui::IsItemHovered()) {
+      EdSetTooltip(
+        "A map outside the vault's maps folder is saved there, but the game doesn't see it until it is in "
+        "the vault (Package for the FAF vault, or copy it there)"
+      );
+    }
     ImGui::SetNextItemWidth(Em(420.0f));
     const bool enter =
       ImGui::InputText("Folder", mSaveAsName, sizeof(mSaveAsName), ImGuiInputTextFlags_EnterReturnsTrue);
     ImGui::TextDisabled("FAF names map folders name.vNNNN; the files take the name without the version.");
     if (ImGui::Button("Save", ImVec2(Em(120.0f), 0.0f)) || enter) {
       std::string message;
-      if (mDocument.SaveAsNewFolder(mSaveAsName, message)) {
+      if (mDocument.SaveAsNewFolderIn(mSaveAsParent, mSaveAsName, message)) {
         gpg::Logf("editor: %s", message.c_str());
         ImGui::CloseCurrentPopup();
       } else {

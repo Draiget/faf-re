@@ -230,6 +230,49 @@ namespace faf::editor
       }
       ImGui::PopID();
     }
+    // The lobby slots' factions: what each start slot offers in FAF's lobby.
+    {
+      const std::size_t slots =
+        mDocument.Teams().empty() ? mDocument.Armies().size() : mDocument.Teams().front().armies.size();
+      SlotFactions factions = ReadSlotFactions(mDocument.Scenario());
+      ImGui::SeparatorText("Lobby slots' factions");
+      static const char* const kNames[] = {"UEF", "Aeon", "Cybran", "Seraphim"};
+      bool changed = false;
+      if (ImGui::BeginTable("##slotfactions", 5, ImGuiTableFlags_SizingStretchSame)) {
+        for (std::size_t slot = 0; slot < slots; ++slot) {
+          ImGui::PushID(static_cast<int>(slot));
+          ImGui::TableNextRow();
+          ImGui::TableNextColumn();
+          ImGui::Text("Slot %zu", slot + 1);
+          std::vector<std::string> offered =
+            slot < factions.size() && !factions[slot].empty() ? factions[slot] : FactionKeys();
+          for (std::size_t f = 0; f < FactionKeys().size(); ++f) {
+            ImGui::TableNextColumn();
+            bool on = std::find(offered.begin(), offered.end(), FactionKeys()[f]) != offered.end();
+            if (ImGui::Checkbox(kNames[f], &on)) {
+              if (factions.size() < slots) {
+                factions.resize(slots);
+              }
+              std::vector<std::string> next;
+              for (std::size_t k = 0; k < FactionKeys().size(); ++k) {
+                const bool keep =
+                  k == f ? on : std::find(offered.begin(), offered.end(), FactionKeys()[k]) != offered.end();
+                if (keep) {
+                  next.push_back(FactionKeys()[k]);
+                }
+              }
+              factions[slot] = next.empty() ? std::vector<std::string>{FactionKeys()[f]} : next; // at least one
+              changed = true;
+            }
+          }
+          ImGui::PopID();
+        }
+        ImGui::EndTable();
+      }
+      if (changed) {
+        (void)mDocument.SetSlotFactions(factions);
+      }
+    }
     ImGui::TextDisabled("Each change is an undo step (\"map info\"); Save writes it to the scenario.");
     ImGui::PopID();
     ImGui::TreePop();

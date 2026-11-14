@@ -51,4 +51,34 @@ namespace faf::editor
     EXPECT_EQ(ReadScenarioField(s, "version", v) && v == "3", true) << "the file's own version, a separate key";
     EXPECT_EQ(ScenarioFields().size(), 5U);
   }
+
+  TEST(
+    ScenarioInfo,
+    SlotFactionsReadWriteAndGoAwayWhenUnrestricted
+  )
+  {
+    const std::string none =
+      "ScenarioInfo = {\n  Configurations = {\n    ['standard'] = {\n      teams = { { name = 'FFA', "
+      "armies = {'ARMY_1','ARMY_2'} } },\n    },\n  },\n}\n";
+    EXPECT_TRUE(ReadSlotFactions(none).empty());
+    const std::string set = WithSlotFactions(none, {{"uef", "cybran"}, {}});
+    const SlotFactions back = ReadSlotFactions(set);
+    ASSERT_EQ(back.size(), 2U);
+    EXPECT_EQ(back[0], (std::vector<std::string>{"uef", "cybran"}));
+    EXPECT_EQ(back[1], FactionKeys()) << "an empty slot offers all four";
+    EXPECT_NE(set.find("{ name = 'FFA', armies = {'ARMY_1','ARMY_2'} }"), std::string::npos) << "teams kept";
+    // Replaced, then removed when nothing is restricted.
+    const std::string again = WithSlotFactions(set, {{"aeon"}});
+    EXPECT_EQ(ReadSlotFactions(again), (SlotFactions{{"aeon"}}));
+    const std::string removed = WithSlotFactions(again, {FactionKeys(), FactionKeys()});
+    EXPECT_TRUE(ReadSlotFactions(removed).empty());
+    EXPECT_EQ(removed.find("factions"), std::string::npos);
+    EXPECT_NE(removed.find("teams = {"), std::string::npos);
+    // A scenario's own table, double quotes and capitals, read.
+    const std::string own =
+      "ScenarioInfo = { Configurations = { [\"standard\"] = { teams = {}, factions = { {\"UEF\"}, "
+      "{'aeon', 'seraphim'} } } } }";
+    EXPECT_EQ(ReadSlotFactions(own), (SlotFactions{{"uef"}, {"aeon", "seraphim"}}));
+    EXPECT_EQ(WithSlotFactions("no configuration", {{"uef"}}), "no configuration");
+  }
 } // namespace faf::editor

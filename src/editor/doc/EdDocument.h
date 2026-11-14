@@ -9,6 +9,7 @@
 #include <thread>
 #include <vector>
 
+#include "editor/doc/EdScenarioInfo.h"
 #include "editor/doc/EdPackage.h"
 #include "editor/doc/EdLighting.h"
 #include "editor/tools/EdWaterMasks.h"
@@ -216,6 +217,11 @@ namespace faf::editor
      * the new folder from its next start (its file system is mounted at startup).
      */
     bool SaveAsNewFolder(const std::string& folder, std::string& message);
+    /**
+     * The same into another folder (`parent`, not the vault's maps): the game doesn't see a map there, but Save writes
+     * it from then on (the folder was picked for it). Empty `parent`: the vault's maps.
+     */
+    bool SaveAsNewFolderIn(const std::filesystem::path& parent, const std::string& folder, std::string& message);
     /**
      * Play of unsaved edits: the open map, edits included, copied to `<vault>/maps/<map>_editor_playtest` (the files
      * and names as Save as new folder writes them; the document's own files, save target and saved state untouched).
@@ -461,6 +467,8 @@ namespace faf::editor
      */
     bool SetScenarioField(const std::string& key, const std::string& value, bool text);
     bool UndoMapInfo(bool redo);
+    /** The lobby slots' factions (one undo step, "map info"); false when they are the same. */
+    bool SetSlotFactions(const SlotFactions& factions);
     /** The stage a play's test run starts at (1: the first). */
     void SetPlayStartStage(
       const int stage
@@ -984,6 +992,9 @@ namespace faf::editor
       std::string before;
       std::string after;
       std::string scenarioBefore; // the whole text, when the field was added
+      bool slotFactions = false;  // a step of the slots' factions (the two lists below)
+      SlotFactions factionsBefore;
+      SlotFactions factionsAfter;
     };
     std::vector<MapInfoStep> mMapInfoUndo;
     std::vector<MapInfoStep> mMapInfoRedo;
@@ -1030,6 +1041,10 @@ namespace faf::editor
     /** The guard, when there are changes to lose: true when it took over (the caller stops). */
     bool Guarded(std::function<void()> proceed);
     std::filesystem::path mVault;
+    /** Where WriteFolderCopy makes the folder (empty: the vault's maps). */
+    std::filesystem::path mCopyParent;
+    /** Save as put the map outside the vault: Save writes there (that folder was picked). */
+    bool mSaveOutsideVault = false;
     /** Set by SaveAsNewFolder: where Save writes from then on (else the map's own file). */
     std::filesystem::path mSaveTarget;
     std::string mPlayCopy; // the play copy's folder while one is on disk
