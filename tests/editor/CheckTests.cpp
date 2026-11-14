@@ -201,4 +201,50 @@ namespace
     EXPECT_EQ(Count(issues, "", "no mass points"), 1U) << "the broken one doesn't count";
     EXPECT_EQ(Count(issues, "Broken", "broken position"), 1U);
   }
+
+  TEST(
+    Check,
+    FixesPullInsideAndSnap
+  )
+  {
+    const std::vector<SaveEntry> markers = {
+      Marker("Mass", "Mass 00", 300.0f, 20.5f),      // off a 257-sample map
+      Marker("Blank Marker", "ARMY_1", 5.0f, 100.0f) // outside the playable area 10..246
+    };
+    faf::editor::MarkerCheckInput input;
+    input.markers = &markers;
+    input.width = 257;
+    input.height = 257;
+    input.playable = std::array<int, 4>{10, 10, 246, 246};
+    const std::vector<CheckIssue> issues = faf::editor::CheckMarkers(input);
+    bool pulledMass = false;
+    bool pulledStart = false;
+    for (const CheckIssue& issue : issues) {
+      if (issue.marker == "Mass 00" && issue.fix == CheckIssue::Fix::PullInside) {
+        pulledMass = true;
+        EXPECT_FLOAT_EQ(issue.fixX, 255.5f) << "inside (the map ends at 256), and in its cell's middle";
+        EXPECT_FLOAT_EQ(issue.fixZ, 20.5f);
+      }
+      if (issue.marker == "ARMY_1" && issue.fix == CheckIssue::Fix::PullInside) {
+        pulledStart = true;
+        EXPECT_FLOAT_EQ(issue.fixX, 11.0f);
+        EXPECT_FLOAT_EQ(issue.fixZ, 100.0f);
+      }
+    }
+    EXPECT_TRUE(pulledMass);
+    EXPECT_TRUE(pulledStart);
+    faf::editor::MapBasicsInput in;
+    std::vector<SaveEntry> grid = {Marker("Mass", "Mass 02", 41.0f, 60.2f)};
+    in.markers = &grid;
+    bool snapped = false;
+    for (const CheckIssue& issue : faf::editor::CheckMapBasics(in)) {
+      if (issue.fix == CheckIssue::Fix::SnapToGrid) {
+        snapped = true;
+        EXPECT_FLOAT_EQ(issue.fixX, 41.5f);
+        EXPECT_FLOAT_EQ(issue.fixZ, 60.5f);
+      }
+    }
+    EXPECT_TRUE(snapped);
+    EXPECT_STREQ(faf::editor::CheckFixName(CheckIssue::Fix::SnapToGrid), "Snap to grid");
+  }
 } // namespace

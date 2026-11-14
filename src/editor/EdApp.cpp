@@ -10740,6 +10740,21 @@ namespace faf::editor
       for (std::string command; mLog.TakeCommand(command);) {
         RunConsoleLine(command);
       }
+      // The Check panel's fixes: the marker moved (on the ground there), one undo step each.
+      for (std::string marker; mScene.Attached();) {
+        float x = 0.0f;
+        float z = 0.0f;
+        if (!mShell->TakeCheckFix(marker, x, z)) {
+          break;
+        }
+        const float y = mDocument.Map()->mTerrainRes->GetHeightAt(
+          static_cast<std::int32_t>(std::lround(x)), static_cast<std::int32_t>(std::lround(z))
+        );
+        mScene.EditMarker(marker, "position", Vector3Value(x, y, z));
+        gpg::Logf(
+          "editor: check fix: %s moved to %.1f, %.1f", marker.c_str(), static_cast<double>(x), static_cast<double>(z)
+        );
+      }
       // The game's marker templates (FAF's /lua/MarkerTemplates.lua, mods' types too), once the files are there.
       if (!mMarkerTemplatesRead && mDocument.GetState() == EdDocument::State::Open) {
         mMarkerTemplatesRead = true;

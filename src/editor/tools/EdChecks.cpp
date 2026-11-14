@@ -115,6 +115,17 @@ namespace faf::editor
          p.z > static_cast<float>(input.height - 1))
       ) {
         add(CheckIssue::Level::Error, p, what(p) + " is off the map");
+        // Pulled a unit in from the edge; a resource keeps the middle of its cell.
+        const bool resource = p.type != "Blank Marker";
+        float fx = std::clamp(p.x, 1.0f, static_cast<float>(input.width - 2));
+        float fz = std::clamp(p.z, 1.0f, static_cast<float>(input.height - 2));
+        if (resource) {
+          fx = std::floor(fx) + 0.5f;
+          fz = std::floor(fz) + 0.5f;
+        }
+        issues.back().fix = CheckIssue::Fix::PullInside;
+        issues.back().fixX = fx;
+        issues.back().fixZ = fz;
         continue;
       }
       if (input.playable) {
@@ -124,6 +135,16 @@ namespace faf::editor
           p.z > static_cast<float>(a[3])
         ) {
           add(CheckIssue::Level::Error, p, what(p) + " is outside the playable area");
+          const bool resource = p.type != "Blank Marker";
+          float fx = std::clamp(p.x, static_cast<float>(a[0]) + 1.0f, static_cast<float>(a[2]) - 1.0f);
+          float fz = std::clamp(p.z, static_cast<float>(a[1]) + 1.0f, static_cast<float>(a[3]) - 1.0f);
+          if (resource) {
+            fx = std::floor(fx) + 0.5f;
+            fz = std::floor(fz) + 0.5f;
+          }
+          issues.back().fix = CheckIssue::Fix::PullInside;
+          issues.back().fixX = fx;
+          issues.back().fixZ = fz;
         }
       }
       // Under the sea.
@@ -236,6 +257,9 @@ namespace faf::editor
               static_cast<double>(sz)
             );
             add(CheckIssue::Level::Warning, marker.name, text, x, z);
+            issues.back().fix = CheckIssue::Fix::SnapToGrid;
+            issues.back().fixX = sx;
+            issues.back().fixZ = sz;
           }
         }
       }
@@ -430,5 +454,19 @@ namespace faf::editor
     issues.push_back(std::move(summary));
     issues.insert(issues.end(), examples.begin(), examples.end());
     return issues;
+  }
+
+  const char* CheckFixName(
+    const CheckIssue::Fix fix
+  )
+  {
+    switch (fix) {
+    case CheckIssue::Fix::PullInside:
+      return "Pull inside";
+    case CheckIssue::Fix::SnapToGrid:
+      return "Snap to grid";
+    default:
+      return "";
+    }
   }
 } // namespace faf::editor

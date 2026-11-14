@@ -1366,7 +1366,34 @@ namespace faf::editor
       ++counts[static_cast<int>(issue.level)];
     }
     ImGui::Text("%d errors, %d warnings, %d notes", counts[0], counts[1], counts[2]);
+    {
+      const auto fixable = std::count_if(mCheckIssues.begin(), mCheckIssues.end(), [](const CheckIssue& issue) {
+        return issue.fix != CheckIssue::Fix::None;
+      });
+      if (fixable > 0) {
+        ImGui::SameLine();
+        if (ImGui::SmallButton(("Fix all (" + std::to_string(fixable) + ")").c_str())) {
+          for (const CheckIssue& issue : mCheckIssues) {
+            if (issue.fix != CheckIssue::Fix::None) {
+              mCheckFixes.push_back(issue);
+            }
+          }
+          mCheckIssues.erase(
+            std::remove_if(
+              mCheckIssues.begin(),
+              mCheckIssues.end(),
+              [](const CheckIssue& issue) {
+            return issue.fix != CheckIssue::Fix::None;
+          }
+            ),
+            mCheckIssues.end()
+          );
+        }
+        EdSetItemTooltip("Every marker with a fix moved: pulled inside, or snapped to its build grid");
+      }
+    }
     ImGui::BeginChild("##checkresults", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Borders);
+    int fixRow = -1;
     for (std::size_t i = 0; i < mCheckIssues.size(); ++i) {
       const CheckIssue& issue = mCheckIssues[i];
       ImGui::PushID(static_cast<int>(i));
@@ -1393,7 +1420,22 @@ namespace faf::editor
         ImVec2(row.x + line * 1.1f, row.y + line), ImGui::GetColorU32(ImGuiCol_TextDisabled), issue.text.c_str()
       );
       draw->PopClipRect();
+      if (issue.fix != CheckIssue::Fix::None) {
+        // The fix at the row's right end.
+        const ImVec2 after = ImGui::GetCursorScreenPos();
+        const char* const name = CheckFixName(issue.fix);
+        const float width = ImGui::CalcTextSize(name).x + ImGui::GetStyle().FramePadding.x * 2.0f;
+        ImGui::SetCursorScreenPos(ImVec2(ImGui::GetItemRectMax().x - width - 4.0f, row.y + 1.0f));
+        if (ImGui::SmallButton(name)) {
+          fixRow = static_cast<int>(i);
+        }
+        ImGui::SetCursorScreenPos(after);
+      }
       ImGui::PopID();
+    }
+    if (fixRow >= 0) {
+      mCheckFixes.push_back(mCheckIssues[static_cast<std::size_t>(fixRow)]);
+      mCheckIssues.erase(mCheckIssues.begin() + fixRow);
     }
     ImGui::EndChild();
     ImGui::End();

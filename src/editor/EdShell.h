@@ -405,6 +405,22 @@ namespace faf::editor
     }
     /** The ids of the panels shown now (PanelId), in the shell's order. */
     [[nodiscard]] std::vector<std::string> ShownPanelIds() const;
+    /** A Check fix asked for: the marker and where it goes (taken once each). */
+    [[nodiscard]] bool TakeCheckFix(
+      std::string& marker,
+      float& x,
+      float& z
+    )
+    {
+      if (mCheckFixes.empty()) {
+        return false;
+      }
+      marker = mCheckFixes.front().marker;
+      x = mCheckFixes.front().fixX;
+      z = mCheckFixes.front().fixZ;
+      mCheckFixes.erase(mCheckFixes.begin());
+      return true;
+    }
     /** File > Save as new map folder: the dialog asks for the folder's name. */
     void OpenSaveAs() noexcept
     {
@@ -807,6 +823,7 @@ namespace faf::editor
     double mTestRunStarted = 0.0;
     std::string mTestRunMap;
     std::vector<CheckIssue> mTestRunIssues;
+    std::vector<CheckIssue> mCheckFixes;
     bool mTestRunDone = false;
     std::string mTestRunSummary;
     std::string mCheckedPath;

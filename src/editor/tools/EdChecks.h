@@ -28,7 +28,22 @@ namespace faf::editor
     /** For a script finding: the file (`_script.lua`...) and the line (0 when none). */
     std::string file;
     int line = 0;
+    /**
+     * A fix the Check offers (FAF Studio's validate.lua): the marker moved to (fixX, fixZ): pulled inside the map or
+     * the playable area, or snapped to its build grid.
+     */
+    enum class Fix
+    {
+      None,
+      PullInside,
+      SnapToGrid,
+    };
+    Fix fix = Fix::None;
+    float fixX = 0.0f;
+    float fixZ = 0.0f;
   };
+  /** A fix's name for its button. */
+  const char* CheckFixName(CheckIssue::Fix fix);
 
   /**
    * Splits a Lua compile error (`[string "x_script.lua"]:12: '=' expected near 'end'`, or `x_script.lua:12: ...`) into
