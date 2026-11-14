@@ -60,6 +60,7 @@
 #include "moho/task/CTaskThread.h"
 #include "moho/ui/IUIManager.h"
 #include "moho/ui/UiWorldShapes.h"
+#include "platform/Window.h"
 #if FAF_SERVER_MODE
 #include "remote/client/OracleGolden.h"
 #include "remote/client/ServerConnect.h"
@@ -1846,40 +1847,43 @@ namespace
    */
   void SetUpHeads(
     gpg::gal::DeviceContext& context,
-    gpg::gal::Head& primaryHead,
     fa::vector<fa::string>& options,
     moho::IUserPrefs* const preferences,
     bool& windowedByCommandLine,
     bool& secondarySetupMode
   )
   {
+    // Head 0 through a pointer: adding the second monitor's head can move the head list, so it is fetched
+    // again after AddHead (the binary kept the primary size in locals, 0x008D08D9, and wrote it at 0x008D0A7A).
+    gpg::gal::Head* primaryHead = &context.GetHead(0);
     if (TryGetWindowOptionArgs(&options)) {
       context.AddHead(gpg::gal::Head{});
+      primaryHead = &context.GetHead(0); // AddHead may move the heads
       gpg::gal::Head& secondaryHead = context.GetHead(1);
 
-      primaryHead.mWindowed = true;
+      primaryHead->mWindowed = true;
       secondaryHead.mWindowed = true;
-      primaryHead.mWidth = ClampAtLeast(moho::wnd_DefaultCreateWidth, ParseIntegerArg(options[0]));
-      primaryHead.mHeight = ClampAtLeast(moho::wnd_DefaultCreateHeight, ParseIntegerArg(options[1]));
+      primaryHead->mWidth = ClampAtLeast(moho::wnd_DefaultCreateWidth, ParseIntegerArg(options[0]));
+      primaryHead->mHeight = ClampAtLeast(moho::wnd_DefaultCreateHeight, ParseIntegerArg(options[1]));
 
       if (options.size() == 4) {
         secondaryHead.mWidth = ClampAtLeast(moho::wnd_DefaultCreateWidth, ParseIntegerArg(options[2]));
         secondaryHead.mHeight = ClampAtLeast(moho::wnd_DefaultCreateHeight, ParseIntegerArg(options[3]));
       } else {
-        secondaryHead.mWidth = primaryHead.mWidth;
-        secondaryHead.mHeight = primaryHead.mHeight;
+        secondaryHead.mWidth = primaryHead->mWidth;
+        secondaryHead.mHeight = primaryHead->mHeight;
       }
 
       moho::sAdapterNotCLOverridden = 0;
     } else if (TryGetFullscreenOptionArgs(&options)) {
-      primaryHead.mWindowed = true;
-      primaryHead.mWidth = ClampAtLeast(moho::wnd_DefaultCreateWidth, ParseIntegerArg(options[0]));
-      primaryHead.mHeight = ClampAtLeast(moho::wnd_DefaultCreateHeight, ParseIntegerArg(options[1]));
+      primaryHead->mWindowed = true;
+      primaryHead->mWidth = ClampAtLeast(moho::wnd_DefaultCreateWidth, ParseIntegerArg(options[0]));
+      primaryHead->mHeight = ClampAtLeast(moho::wnd_DefaultCreateHeight, ParseIntegerArg(options[1]));
       moho::sAdapterNotCLOverridden = 0;
     } else if (TryGetWindowedOptionArgs(&options)) {
-      primaryHead.mWindowed = false;
-      primaryHead.mWidth = ClampAtLeast(moho::wnd_MinCmdLineWidth, ParseIntegerArg(options[0]));
-      primaryHead.mHeight = ClampAtLeast(moho::wnd_MinCmdLineHeight, ParseIntegerArg(options[1]));
+      primaryHead->mWindowed = false;
+      primaryHead->mWidth = ClampAtLeast(moho::wnd_MinCmdLineWidth, ParseIntegerArg(options[0]));
+      primaryHead->mHeight = ClampAtLeast(moho::wnd_MinCmdLineHeight, ParseIntegerArg(options[1]));
       moho::sAdapterNotCLOverridden = 0;
       windowedByCommandLine = true;
       secondarySetupMode = true;
@@ -1891,15 +1895,16 @@ namespace
 
       if (!IsDisabledAdapterToken(secondaryAdapter) && !IsWindowedAdapterToken(primaryAdapter)) {
         context.AddHead(gpg::gal::Head{});
+        primaryHead = &context.GetHead(0); // AddHead may move the heads
         gpg::gal::Head& secondaryHead = context.GetHead(1);
-        primaryHead.mWindowed = true;
+        primaryHead->mWindowed = true;
         secondaryHead.mWindowed = true;
 
         moho::ResolutionTriple primaryResolution{};
         if (moho::CFG_ParseResolutionTriple(primaryAdapter.c_str(), &primaryResolution)) {
-          primaryHead.mWidth = static_cast<std::uint32_t>(primaryResolution.width);
-          primaryHead.mHeight = static_cast<std::uint32_t>(primaryResolution.height);
-          primaryHead.framesPerSecond = static_cast<std::uint32_t>(primaryResolution.framesPerSecond);
+          primaryHead->mWidth = static_cast<std::uint32_t>(primaryResolution.width);
+          primaryHead->mHeight = static_cast<std::uint32_t>(primaryResolution.height);
+          primaryHead->framesPerSecond = static_cast<std::uint32_t>(primaryResolution.framesPerSecond);
         }
 
         moho::ResolutionTriple secondaryResolution{};
@@ -1911,20 +1916,20 @@ namespace
       } else if (!IsWindowedAdapterToken(primaryAdapter)) {
         moho::ResolutionTriple primaryResolution{};
         if (moho::CFG_ParseResolutionTriple(primaryAdapter.c_str(), &primaryResolution)) {
-          primaryHead.mWindowed = true;
-          primaryHead.mWidth = static_cast<std::uint32_t>(primaryResolution.width);
-          primaryHead.mHeight = static_cast<std::uint32_t>(primaryResolution.height);
-          primaryHead.framesPerSecond = static_cast<std::uint32_t>(primaryResolution.framesPerSecond);
+          primaryHead->mWindowed = true;
+          primaryHead->mWidth = static_cast<std::uint32_t>(primaryResolution.width);
+          primaryHead->mHeight = static_cast<std::uint32_t>(primaryResolution.height);
+          primaryHead->framesPerSecond = static_cast<std::uint32_t>(primaryResolution.framesPerSecond);
         }
       } else {
-        primaryHead.mWindowed = false;
+        primaryHead->mWindowed = false;
         const fa::string widthKey("Windows.Main.width");
         const fa::string heightKey("Windows.Main.height");
-        primaryHead.mWidth = static_cast<std::uint32_t>(
+        primaryHead->mWidth = static_cast<std::uint32_t>(
           preferences != nullptr ? preferences->GetInteger(widthKey, moho::wnd_DefaultCreateWidth)
                                  : moho::wnd_DefaultCreateWidth
         );
-        primaryHead.mHeight = static_cast<std::uint32_t>(
+        primaryHead->mHeight = static_cast<std::uint32_t>(
           preferences != nullptr ? preferences->GetInteger(heightKey, moho::wnd_DefaultCreateHeight)
                                  : moho::wnd_DefaultCreateHeight
         );
@@ -1969,11 +1974,13 @@ bool CScApp::CreateDevice()
   context.mVSync = moho::OPTIONS_GetInt("vsync") == 1;
   context.AddHead(gpg::gal::Head{});
 
-  gpg::gal::Head& primaryHead = context.GetHead(0);
-  primaryHead.mWindowed = true;
-  primaryHead.mWidth = static_cast<std::uint32_t>(moho::wnd_DefaultCreateWidth);
-  primaryHead.mHeight = static_cast<std::uint32_t>(moho::wnd_DefaultCreateHeight);
-  primaryHead.framesPerSecond = 60;
+  {
+    gpg::gal::Head& defaults = context.GetHead(0);
+    defaults.mWindowed = true;
+    defaults.mWidth = static_cast<std::uint32_t>(moho::wnd_DefaultCreateWidth);
+    defaults.mHeight = static_cast<std::uint32_t>(moho::wnd_DefaultCreateHeight);
+    defaults.framesPerSecond = 60;
+  }
 
   ShellPoint position = kShellDefaultPosition;
   bool windowedByCommandLine = false;
@@ -1982,12 +1989,15 @@ bool CScApp::CreateDevice()
   // Engine addition (moho::gAppWindowed): the map editor is always one window. `mWindowed` is the
   // full-screen flag (CreateAppFrame picks the frame style from it), so false makes a window.
   if (moho::gAppWindowed) {
-    primaryHead.mWindowed = false;
-    primaryHead.mWidth = static_cast<std::uint32_t>(std::max(moho::wnd_DefaultCreateWidth, 1600));
-    primaryHead.mHeight = static_cast<std::uint32_t>(std::max(moho::wnd_DefaultCreateHeight, 1000));
+    gpg::gal::Head& editorHead = context.GetHead(0);
+    editorHead.mWindowed = false;
+    editorHead.mWidth = static_cast<std::uint32_t>(std::max(moho::wnd_DefaultCreateWidth, 1600));
+    editorHead.mHeight = static_cast<std::uint32_t>(std::max(moho::wnd_DefaultCreateHeight, 1000));
   } else {
-    SetUpHeads(context, primaryHead, options, preferences, windowedByCommandLine, secondarySetupMode);
+    SetUpHeads(context, options, preferences, windowedByCommandLine, secondarySetupMode);
   }
+  // Fetched after SetUpHeads: the second monitor's head moves the head list.
+  gpg::gal::Head& primaryHead = context.GetHead(0);
 
   if (
     context.GetHeadCount() == 1 && moho::CFG_GetArgOptionAliases(moho::CFG_GetAdapterOptionAliases(), 1, &options) &&
@@ -2178,7 +2188,19 @@ bool CScApp::CreateAppFrame(
         static_cast<std::int32_t>(secondaryHead.mHeight),
       };
 
-      frame = new WSupComFrame(title.c_str(), position, secondarySize, frameStyle);
+      // Engine change: the second head's frame opens on the second display. The binary's Direct3D 9 put
+      // the second head on the adapter group's second adapter whatever its frame's place; a DXGI or Vulkan
+      // full-screen swap chain takes the display its window is on, so both heads claimed the first display
+      // and presenting failed (DXGI_ERROR_INVALID_CALL).
+      ShellPoint secondaryPosition = position;
+      int displayX = 0;
+      int displayY = 0;
+      int displayWidth = 0;
+      int displayHeight = 0;
+      if (platform::window::GetSecondaryDisplayBounds(&displayX, &displayY, &displayWidth, &displayHeight)) {
+        secondaryPosition = ShellPoint{displayX, displayY};
+      }
+      frame = new WSupComFrame(title.c_str(), secondaryPosition, secondarySize, frameStyle);
       frame->Show(!secondaryHead.mWindowed);
       secondaryHead.mHandle = primaryHead.mHandle;
       secondaryHead.mWindow = reinterpret_cast<void*>(static_cast<std::uintptr_t>(frame->GetHandle()));

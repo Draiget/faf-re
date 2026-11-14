@@ -1203,6 +1203,31 @@ namespace platform::window
     gFolderPickAnswer.path = utf8Path != nullptr ? utf8Path : "";
   }
 
+  bool GetSecondaryDisplayBounds(
+    int* const x,
+    int* const y,
+    int* const width,
+    int* const height
+  )
+  {
+    const SDL_DisplayID primary = SDL_GetPrimaryDisplay();
+    int count = 0;
+    SDL_DisplayID* const displays = SDL_GetDisplays(&count);
+    bool found = false;
+    for (int index = 0; displays != nullptr && index < count && !found; ++index) {
+      SDL_Rect bounds{};
+      if (displays[index] != primary && SDL_GetDisplayBounds(displays[index], &bounds)) {
+        *x = bounds.x;
+        *y = bounds.y;
+        *width = bounds.w;
+        *height = bounds.h;
+        found = true;
+      }
+    }
+    SDL_free(displays);
+    return found;
+  }
+
   bool ShowSplash(
     const char* const utf8PngPath,
     const int width,

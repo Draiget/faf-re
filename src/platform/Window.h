@@ -164,6 +164,10 @@ namespace platform::window
   // `utf8Path`; false when cancelled or without a window system, `utf8Path` unchanged.
   bool PickFolder(const char* utf8Title, std::string& utf8Path);
 
+  // The bounds, in screen pixels, of the first display that is not the primary one: where the game's second
+  // head goes (its full-screen swap chain takes the display its window is on). False with one display.
+  bool GetSecondaryDisplayBounds(int* x, int* y, int* width, int* height);
+
   // A borderless window centred on the primary display showing the PNG file scaled to
   // width x height, above other windows, until HideSplash. False when the file can't be read.
   bool ShowSplash(const char* utf8PngPath, int width, int height);
