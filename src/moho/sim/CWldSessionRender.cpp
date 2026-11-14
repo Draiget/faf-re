@@ -2475,13 +2475,14 @@ namespace moho
           return;
         }
 
-        // When the unit's own mesh is already close enough to be visible
-        // without help, skip the icon entirely for units that have full
-        // intel data (or belong to an immobile blueprint under a focus
-        // army) and aren't paused - everyone else still gets an icon.
+        // When the unit's own mesh is close enough to be visible without help, skip the icon
+        // for the units whose mesh is drawn: in sight now (0x08, `[esp+6Ch]`), or seen once
+        // and immobile (0x10, `[esp+88h]`, and `blueprint->IsMobile()` false), and neither
+        // paused nor stunned (0x0085C109..0x0085C13E). A radar contact out of sight has no
+        // mesh, so it keeps its icon at every zoom.
         const bool skipWhenMeshVisible =
-          (hasFullBlueprintIconData || (focusArmy != nullptr && !blueprint->IsMobile())) &&
-          !iconData.mShowPausedOverlay;
+          (selectedVariantEligible || (hasFullBlueprintIconData && !blueprint->IsMobile())) &&
+          !iconData.mShowPausedOverlay && !iconData.mShowStunnedOverlay;
 
         const RMeshBlueprint* const mesh = entity->mVariableData.mMeshBlueprint;
         if (mesh != nullptr && !ui_AlwaysRenderStrategicIcons) {
@@ -2611,8 +2612,10 @@ namespace moho
           set(asUnit->GetBlueprint()->Air.CanFly, StrategicIconSource::kAir);
         }
         set(entity->IsBeingBuilt(), StrategicIconSource::kBeingBuilt);
+        // `classify`'s skip test (0x0085C109..0x0085C13E).
+        const bool stunned = asUnit != nullptr && asUnit->mUnitVarDat.mStunTicks != 0;
         set(
-          (hasFullBlueprintIconData || (focusArmy != nullptr && !blueprint->IsMobile())) && !paused,
+          (selectedVariantEligible || (hasFullBlueprintIconData && !blueprint->IsMobile())) && !paused && !stunned,
           StrategicIconSource::kSkipWhenMeshVisible
         );
         set(blueprint->mStrategicIconSortPriority < static_cast<std::uint8_t>('A'), StrategicIconSource::kHighPriority);
