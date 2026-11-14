@@ -1318,6 +1318,9 @@ namespace faf::editor
     sky.cirrusTexture = dome.mCirrusTexPath.c_str();
     static_assert(sizeof(sky.cirrus) == sizeof(dome.mCirrusData), "four 20-byte cirrus layers");
     std::memcpy(sky.cirrus, dome.mCirrusData, sizeof(sky.cirrus));
+    const moho::IWldTerrainRes& terrain = *mMap->mTerrainRes;
+    sky.skycube = terrain.GetSkycubeFile().c_str();
+    sky.background = terrain.GetBackgroundFile().c_str();
     return sky;
   }
 
@@ -1353,6 +1356,18 @@ namespace faf::editor
     dome.mCirrusColor_B = sky.cirrusColor[2];
     dome.mCirrusTexPath.assign(sky.cirrusTexture.c_str());
     std::memcpy(dome.mCirrusData, sky.cirrus, sizeof(sky.cirrus));
+    // The cube and the background: only a name given changes them (a `.scmskybox` has neither).
+    moho::IWldTerrainRes& terrain = *mMap->mTerrainRes;
+    if (!sky.skycube.empty() && sky.skycube != terrain.GetSkycubeFile().c_str()) {
+      fa::string path;
+      path.assign(sky.skycube.c_str());
+      terrain.SetSkycube(path);
+    }
+    if (!sky.background.empty() && sky.background != terrain.GetBackgroundFile().c_str()) {
+      fa::string path;
+      path.assign(sky.background.c_str());
+      terrain.SetBackground(path);
+    }
     mModified = true;
   }
 

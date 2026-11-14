@@ -48,6 +48,12 @@ namespace faf::editor
     float cirrusColor[3] = {1.0f, 1.0f, 1.0f};
     std::string cirrusTexture;
     SkyboxCirrusLayer cirrus[4];
+    /**
+     * The reflections' cube map and the picture behind the dome (the `.scmap`'s header, CWldTerrainRes::SetSkycube /
+     * SetBackground); not in a `.scmskybox`. Empty when applied: the map's own stay.
+     */
+    std::string skycube;
+    std::string background;
 
     bool operator==(const SkyboxState& other) const;
   };
@@ -58,5 +64,11 @@ namespace faf::editor
    * written as zero and not read.
    */
   std::string SkyboxToScmskybox(const SkyboxState& sky);
+  /**
+   * A sky made for another map fitted to this one (FAF Studio's import): the dome centred on this map, its radius and
+   * the planets' distance from the centre and size scaled by the ratio of the maps' sizes (the other map's taken as
+   * twice its dome's centre), the dome's heights kept. Returns the ratio (1: nothing to do).
+   */
+  float RescaleSkybox(SkyboxState& sky, float mapWidth, float mapDepth);
   bool SkyboxFromScmskybox(const std::string& text, SkyboxState& sky, std::string& error);
 } // namespace faf::editor

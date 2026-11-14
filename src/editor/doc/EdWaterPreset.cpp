@@ -106,4 +106,49 @@ namespace faf::editor
     }
     return true;
   }
+
+  const char* WaterMotionPresetName(
+    const int preset
+  )
+  {
+    static constexpr const char* kNames[kWaterMotionPresetCount] = {
+      "Engine default", "Calm lake", "Choppy", "Ocean swell"
+    };
+    return kNames[preset < 0 || preset >= kWaterMotionPresetCount ? 0 : preset];
+  }
+
+  void ApplyWaterMotionPreset(
+    WaterNumbers& water,
+    const int preset
+  )
+  {
+    // The engine's own, as CWaterShaderProperties seeds them.
+    static constexpr float kRepeat[4] = {0.0009f, 0.009f, 0.05f, 0.5f};
+    static constexpr float kMovement[4][2] = {{0.5f, -0.95f}, {0.05f, -0.095f}, {0.01f, 0.03f}, {0.0005f, 0.0009f}};
+    float repeatScale = 1.0f;
+    float moveScale = 1.0f;
+    switch (preset) {
+    case 1: // calm lake
+      moveScale = 0.25f;
+      break;
+    case 2: // choppy: finer ripples, faster
+      repeatScale = 1.5f;
+      moveScale = 2.5f;
+      break;
+    case 3: // ocean swell: larger waves, a little faster
+      repeatScale = 0.6f;
+      moveScale = 1.5f;
+      break;
+    default:
+      break;
+    }
+    float* const movements[4] = {
+      water.mNormal1Movement, water.mNormal2Movement, water.mNormal3Movement, water.mNormal4Movement
+    };
+    for (int i = 0; i < 4; ++i) {
+      water.mNormalRepeatRate[i] = kRepeat[i] * repeatScale;
+      movements[i][0] = kMovement[i][0] * moveScale;
+      movements[i][1] = kMovement[i][1] * moveScale;
+    }
+  }
 } // namespace faf::editor

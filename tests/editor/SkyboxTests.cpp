@@ -144,4 +144,31 @@ namespace
     EXPECT_TRUE(again == sky);
     EXPECT_FALSE(faf::editor::SkyboxFromScmskybox("{ \"LightingMultiplier\": 1 }", again, error));
   }
+
+  TEST(
+    Skybox,
+    RescaledToAnotherMapsSize
+  )
+  {
+    faf::editor::SkyboxState sky;
+    sky.position[0] = 256.0f;
+    sky.position[2] = 256.0f;
+    sky.scale = 2000.0f;
+    sky.zenithHeight = 170.0f;
+    faf::editor::SkyboxPlanet planet;
+    planet.position[0] = 356.0f;
+    planet.position[1] = 50.0f;
+    planet.position[2] = 256.0f;
+    planet.scale[0] = 10.0f;
+    planet.scale[1] = 10.0f;
+    sky.planets.push_back(planet);
+    EXPECT_FLOAT_EQ(faf::editor::RescaleSkybox(sky, 1024.0f, 512.0f), 2.0f);
+    EXPECT_FLOAT_EQ(sky.position[0], 512.0f);
+    EXPECT_FLOAT_EQ(sky.position[2], 256.0f);
+    EXPECT_FLOAT_EQ(sky.scale, 4000.0f);
+    EXPECT_FLOAT_EQ(sky.zenithHeight, 170.0f) << "the dome's height kept";
+    EXPECT_FLOAT_EQ(sky.planets[0].position[0], 712.0f);
+    EXPECT_FLOAT_EQ(sky.planets[0].position[1], 50.0f);
+    EXPECT_FLOAT_EQ(sky.planets[0].scale[0], 20.0f);
+  }
 } // namespace

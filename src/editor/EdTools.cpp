@@ -1,5 +1,6 @@
 #include "editor/EdTools.h"
 #include "editor/doc/EdLighting.h"
+#include "editor/doc/EdWaterPreset.h"
 #include "moho/misc/StartupHelpers.h"
 #include "editor/ui/EdControls.h"
 #include "editor/ui/EdFonts.h"
@@ -3403,6 +3404,16 @@ namespace faf::editor
         ImGui::PopID();
       }
       Note("The four normal maps' repeat, then each one's movement (x, z per second).");
+      for (int p = 0; p < kWaterMotionPresetCount; ++p) {
+        if (p > 0) {
+          ImGui::SameLine();
+        }
+        if (ImGui::SmallButton(WaterMotionPresetName(p))) {
+          ApplyWaterMotionPreset(s, p);
+          mWaterChanged = true;
+          mWaterFinal = true; // one undo step
+        }
+      }
       ImGui::EndDisabled();
     }
     if (Section("Water masks", false)) {

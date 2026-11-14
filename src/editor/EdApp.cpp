@@ -10264,6 +10264,13 @@ namespace faf::editor
           if (!in || !SkyboxFromScmskybox(text, sky, error)) {
             gpg::Warnf("editor: %s: %s", importFile.string().c_str(), in ? error.c_str() : "can't read it");
           } else {
+            // Made for another map: fitted to this one's size.
+            const float ratio = RescaleSkybox(
+              sky, static_cast<float>(mDocument.Facts().sizeX), static_cast<float>(mDocument.Facts().sizeZ)
+            );
+            if (ratio != 1.0f) {
+              gpg::Logf("editor: the imported sky fitted to this map: %.2f times its size", static_cast<double>(ratio));
+            }
             const SkyboxState before = mDocument.SkyboxNow();
             mDocument.ApplySkybox(sky);
             mDocument.SkyboxEdited(before);

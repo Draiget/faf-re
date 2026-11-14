@@ -1649,6 +1649,25 @@ namespace faf::editor
     watch(ImGui::DragInt("##skyup", &mSky.subdivisionsHeight, 0.1f, 1, 32, "%d segments up"));
     ImGui::SetNextItemWidth(-1.0f);
     watch(FillDragFloat("##skyglow", &mSky.decalGlow, 0.005f, 0.0f, 4.0f, "Planet glow %.3f"));
+    ImGui::SeparatorText("Sky cube and background");
+    {
+      char path[256];
+      (void)std::snprintf(path, sizeof(path), "%s", mSky.skycube.c_str());
+      ImGui::SetNextItemWidth(-1.0f);
+      if (ImGui::InputTextWithHint("##skycube", "sky cube (/textures/environment/....dds)", path, sizeof(path))) {
+        mSky.skycube = path;
+      }
+      watch(ImGui::IsItemDeactivatedAfterEdit());
+      (void)std::snprintf(path, sizeof(path), "%s", mSky.background.c_str());
+      ImGui::SetNextItemWidth(-1.0f);
+      if (
+        ImGui::InputTextWithHint("##skybackground", "background (/textures/environment/....dds)", path, sizeof(path))
+      ) {
+        mSky.background = path;
+      }
+      watch(ImGui::IsItemDeactivatedAfterEdit());
+      ImGui::TextDisabled("The cube the ground and water reflect, and the picture behind the dome.");
+    }
     ImGui::SeparatorText("Cirrus");
     RowLabel("Colour");
     watch(ColourField("##cirruscolour", mSky.cirrusColor, true));
