@@ -4779,6 +4779,175 @@ namespace faf::editor
     );
   }
 
+  const char* EdMapScene::SelectableKind() const
+  {
+    if (mTools == nullptr || mMap == nullptr) {
+      return "";
+    }
+    if (mTools->MarkersToolActive()) {
+      return "markers";
+    }
+    if (mTools->UnitsToolActive()) {
+      return "units";
+    }
+    if (mTools->DecalsToolActive()) {
+      return "decals";
+    }
+    if (mTools->SelectToolActive() && mMap->mProps != nullptr && mTools->Pickable().props) {
+      return "props";
+    }
+    return "";
+  }
+
+  int EdMapScene::SelectWhole(
+    const SelectMode mode
+  )
+  {
+    const std::string kind = SelectableKind();
+    if (kind.empty()) {
+      return -1;
+    }
+    std::vector<std::string> keys;
+    std::vector<bool> selectable;
+    std::vector<std::size_t> selected;
+    if (kind == "markers") {
+      const auto& markers = mDocument.SaveData().Markers();
+      for (std::size_t i = 0; i < markers.size(); ++i) {
+        keys.push_back(MarkerTypeOf(markers[i]));
+        selectable.push_back(!MarkerHidden(markers[i]));
+        if (std::find(mMarkerSelection.begin(), mMarkerSelection.end(), markers[i].name) != mMarkerSelection.end()) {
+          selected.push_back(i);
+        }
+      }
+      mMarkerSelection.clear();
+      for (const std::size_t i : SelectByMode(keys, selectable, selected, mode)) {
+        mMarkerSelection.push_back(markers[i].name);
+      }
+      gpg::Logf("editor: select %s: %zu %s", SelectModeName(mode), mMarkerSelection.size(), kind.c_str());
+      return static_cast<int>(mMarkerSelection.size());
+    }
+    if (kind == "units") {
+      for (std::size_t i = 0; i < mUnitRefs.size(); ++i) {
+        keys.push_back(mUnitRefs[i].type);
+        const std::pair<std::string, std::string> key{mUnitRefs[i].army, mUnitRefs[i].name};
+        if (std::find(mUnitSelection.begin(), mUnitSelection.end(), key) != mUnitSelection.end()) {
+          selected.push_back(i);
+        }
+      }
+      mUnitSelection.clear();
+      for (const std::size_t i : SelectByMode(keys, selectable, selected, mode)) {
+        mUnitSelection.emplace_back(mUnitRefs[i].army, mUnitRefs[i].name);
+      }
+      gpg::Logf("editor: select %s: %zu %s", SelectModeName(mode), mUnitSelection.size(), kind.c_str());
+      return static_cast<int>(mUnitSelection.size());
+    }
+    if (kind == "decals") {
+      std::vector<int> indices;
+      if (moho::IDecalManager* const decals = mDocument.Decals(); decals != nullptr) {
+        for (std::int32_t i = 0; i < decals->GetDecalCount(); ++i) {
+          const moho::CWldTerrainDecal* const decal = decals->GetDecal(i);
+          if (decal == nullptr) {
+            continue;
+          }
+          if (std::find(mDecalSelection.begin(), mDecalSelection.end(), decal->mIndex) != mDecalSelection.end()) {
+            selected.push_back(indices.size());
+          }
+          keys.emplace_back(decal->mNames[0].c_str());
+          indices.push_back(decal->mIndex);
+        }
+      }
+      mDecalSelection.clear();
+      for (const std::size_t i : SelectByMode(keys, selectable, selected, mode)) {
+        mDecalSelection.push_back(indices[i]);
+      }
+      gpg::Logf("editor: select %s: %zu %s", SelectModeName(mode), mDecalSelection.size(), kind.c_str());
+      return static_cast<int>(mDecalSelection.size());
+    }
+    const auto& entries = mMap->mProps->mEntries;
+    for (std::size_t i = 0; i < entries.size(); ++i) {
+      keys.emplace_back(entries[i].mBlueprintPath.c_str());
+    }
+    for (const int i : mSelection) {
+      selected.push_back(static_cast<std::size_t>(i));
+    }
+    mSelection.clear();
+    for (const std::size_t i : SelectByMode(keys, selectable, selected, mode)) {
+      mSelection.push_back(static_cast<int>(i));
+    }
+    gpg::Logf("editor: select %s: %zu %s", SelectModeName(mode), mSelection.size(), kind.c_str());
+    return static_cast<int>(mSelection.size());
+  }
+
+  bool EdMapScene::FrameSelection()
+  {
+    if (mMap == nullptr) {
+      return false;
+    }
+    float x0 = 1e30f, z0 = 1e30f, x1 = -1e30f, z1 = -1e30f;
+    int count = 0;
+    const auto add = [&](const float x, const float z) {
+      x0 = std::min(x0, x);
+      z0 = std::min(z0, z);
+      x1 = std::max(x1, x);
+      z1 = std::max(z1, z);
+      ++count;
+    };
+    if (mMap->mProps != nullptr) {
+      const auto& entries = mMap->mProps->mEntries;
+      for (const int i : mSelection) {
+        if (i >= 0 && static_cast<std::size_t>(i) < entries.size()) {
+          add(
+            entries[static_cast<std::size_t>(i)].mTransform.pos_.x,
+            entries[static_cast<std::size_t>(i)].mTransform.pos_.z
+          );
+        }
+      }
+    }
+    for (const SaveEntry& marker : mDocument.SaveData().Markers()) {
+      float x = 0.0f, y = 0.0f, z = 0.0f;
+      if (
+        std::find(mMarkerSelection.begin(), mMarkerSelection.end(), marker.name) != mMarkerSelection.end() &&
+        ShownMarkerPosition(marker, x, y, z)
+      ) {
+        add(x, z);
+      }
+    }
+    for (const UnitRef& unit : mUnitRefs) {
+      if (
+        std::find(mUnitSelection.begin(), mUnitSelection.end(), std::make_pair(unit.army, unit.name)) !=
+        mUnitSelection.end()
+      ) {
+        add(unit.position.x, unit.position.z);
+      }
+    }
+    if (moho::IDecalManager* const decals = mDocument.Decals(); decals != nullptr) {
+      for (std::int32_t i = 0; i < decals->GetDecalCount(); ++i) {
+        const moho::CWldTerrainDecal* const decal = decals->GetDecal(i);
+        if (
+          decal != nullptr &&
+          std::find(mDecalSelection.begin(), mDecalSelection.end(), decal->mIndex) != mDecalSelection.end()
+        ) {
+          float cx = 0.0f, cz = 0.0f;
+          DecalCentre(FootprintOf(*decal), cx, cz);
+          add(cx, cz);
+        }
+      }
+    }
+    if (count == 0) {
+      return false;
+    }
+    const float extent = std::max(x1 - x0, z1 - z0);
+    FramePoint(0.5f * (x0 + x1), 0.5f * (z0 + z1), std::max(60.0f, extent * 1.4f));
+    gpg::Logf(
+      "editor: focus selection: %d objects around %.0f, %.0f (%.0f across)",
+      count,
+      static_cast<double>(0.5f * (x0 + x1)),
+      static_cast<double>(0.5f * (z0 + z1)),
+      static_cast<double>(extent)
+    );
+    return true;
+  }
+
   void EdMapScene::SetRuler(
     const float x0,
     const float z0,

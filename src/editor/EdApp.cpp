@@ -5361,6 +5361,66 @@ namespace faf::editor
       add("view.frame", "Frame the whole map", "View", "Home", [this] {
         mScene.FrameMap();
       }, mapOpen);
+      add("view.focus", "Focus selection", "View", "F", [this] {
+        if (!mScene.FrameSelection()) {
+          PostStatusMessage("Nothing selected to focus on");
+        }
+      }, mapOpen, {}, "The camera over the selection, far enough to see all of it");
+      // Select: over what the active tool selects (the Select tool's props, Markers, Units, Decals).
+      const auto selectWhy = [this, mapOpen]() -> std::string {
+        if (std::string why = mapOpen(); !why.empty()) {
+          return why;
+        }
+        return *mScene.SelectableKind() == '\0'
+          ? "the active tool selects nothing: use Select, Markers, Units or Decals"
+          : std::string();
+      };
+      const auto selectCommand =
+        [this, &add, selectWhy](
+          const char* id, const char* title, const char* keys, const SelectMode mode, const char* description
+        ) {
+        add(id, title, "Select", keys, [this, mode] {
+          const int count = mScene.SelectWhole(mode);
+          PostStatusMessage(
+            std::string(SelectModeName(mode)) + ": " + std::to_string(std::max(count, 0)) + " " +
+            mScene.SelectableKind()
+          );
+        }, selectWhy, {}, description);
+      };
+      selectCommand("select.all", "All", "Ctrl+A", SelectMode::All, "Selects every object the active tool selects");
+      selectCommand("select.none", "None", "Alt+A", SelectMode::None, "Selects nothing");
+      selectCommand("select.invert", "Invert", "Ctrl+I", SelectMode::Invert, "The unselected ones selected instead");
+      selectCommand(
+        "select.same",
+        "Same type",
+        "Shift+G",
+        SelectMode::Same,
+        "Every one with a selected one's blueprint, marker type or decal texture"
+      );
+      // Window: any panel by its id (the panels without a View entry of their own too).
+      const auto windowPanel = [this, &add](const char* id, const char* title, const char* panelId) {
+        add(id, title, "Window", "", [this, panelId] {
+          if (bool* const shown = mShell->PanelShown(panelId); shown != nullptr) {
+            *shown = !*shown;
+          }
+        }, {}, [this, panelId] {
+          const bool* const shown = mShell->PanelShown(panelId);
+          return shown != nullptr && *shown;
+        });
+      };
+      windowPanel("window.stages", "Stages", "MissionStages");
+      windowPanel("window.strings", "Strings", "MissionStrings");
+      windowPanel("window.bases", "Bases", "MissionBases");
+      windowPanel("window.platoons", "Platoons", "MissionPlatoons");
+      windowPanel("window.run", "Run", "MissionRun");
+      windowPanel("window.unitlab", "Unit lab", "UnitLab");
+      windowPanel("window.unitviewer", "Unit viewer", "UnitViewer");
+      windowPanel("window.modproject", "Mod project", "ModProject");
+      windowPanel("window.editormods", "Editor mods", "EditorMods");
+      windowPanel("window.assets", "Asset browser", "AssetBrowser");
+      if (EdCommand* const assets = const_cast<EdCommand*>(c.Find("window.assets")); assets != nullptr) {
+        (void)c.SetKeys("window.assets", "Ctrl+Alt+A");
+      }
       add("view.uiscale.up", "Larger panels and text", "View", "Ctrl+=", [this] {
         mShell->StepUiScale(1);
       });
@@ -5581,20 +5641,12 @@ namespace faf::editor
            cmd("terrain.sctools")}
         },
         EdMenu{
+          "&Select",
+          {cmd("select.all"), cmd("select.none"), cmd("select.invert"), cmd("select.same"), sep(), cmd("view.focus")}
+        },
+        EdMenu{
           "&View",
-          {cmd("view.tools"),
-           cmd("view.map"),
-           cmd("view.info"),
-           cmd("view.markers"),
-           cmd("view.check"),
-           cmd("view.script"),
-           cmd("view.lighting"),
-           cmd("view.armies"),
-           cmd("view.properties"),
-           cmd("view.material"),
-           cmd("view.particle"),
-           cmd("view.particlebrowser"),
-           cmd("view.adaptive"),
+          {EdMenuItem{"", "Camera", false, {cmd("view.frame"), cmd("view.focus")}},
            world,
            sep(),
            cmd("view.palette"),
@@ -5602,15 +5654,61 @@ namespace faf::editor
            themes,
            sep(),
            cmd("view.fullhelp"),
-           cmd("view.log"),
-           cmd("view.history"),
-           cmd("view.problems"),
-           cmd("view.debugger"),
            cmd("view.panelsplaying"),
            sep(),
            workspaces,
-           cmd("view.resetlayout"),
-           cmd("view.imguidemo")}
+           cmd("view.resetlayout")}
+        },
+        EdMenu{
+          "&Map",
+          {cmd("view.info"),
+           cmd("view.armies"),
+           cmd("view.markers"),
+           cmd("view.check"),
+           sep(),
+           cmd("view.script"),
+           cmd("view.adaptive"),
+           cmd("view.lighting")}
+        },
+        EdMenu{
+          "&Window",
+          {EdMenuItem{
+             "",
+             "General",
+             false,
+             {cmd("view.tools"),
+              cmd("view.properties"),
+              cmd("view.map"),
+              cmd("view.info"),
+              cmd("view.problems"),
+              cmd("view.log"),
+              cmd("view.history"),
+              cmd("view.debugger")}
+           },
+           EdMenuItem{
+             "",
+             "Mission",
+             false,
+             {cmd("window.stages"),
+              cmd("window.strings"),
+              cmd("window.bases"),
+              cmd("window.platoons"),
+              cmd("window.run")}
+           },
+           EdMenuItem{
+             "",
+             "Mod and effects",
+             false,
+             {cmd("view.particle"),
+              cmd("view.particlebrowser"),
+              cmd("view.material"),
+              cmd("window.unitlab"),
+              cmd("window.unitviewer"),
+              cmd("window.modproject"),
+              cmd("window.editormods")}
+           },
+           cmd("window.assets"),
+           cmd("view.script")}
         },
         EdMenu{"&Play", {cmd("play.toggle"), cmd("play.editorview"), playMaps}},
         EdMenu{"&Help", {cmd("help.open"), cmd("help.tour"), sep(), cmd("view.palette"), cmd("settings.keys")}},

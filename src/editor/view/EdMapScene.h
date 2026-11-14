@@ -12,6 +12,7 @@
 
 #include <Windows.h>
 
+#include "editor/tools/EdSelectModes.h"
 #include "editor/graph/EdTerrainGraph.h"
 #include "editor/graph/EdTextureGraph.h"
 #include "editor/view/EdLiveUnits.h"
@@ -439,6 +440,17 @@ namespace faf::editor
     void SelectMarkers(const std::vector<std::string>& names, bool add);
     /** Moves the camera over a marker, at most `distance` away. */
     void FrameMarker(const std::string& name, float distance = 140.0f);
+    /**
+     * Select › All, None, Invert, Same type over what the active tool selects (the Select tool's props, the Markers,
+     * Units or Decals tool's own kind; hidden markers never). -1 when the active tool selects nothing; else how many
+     * are selected after it.
+     */
+    int SelectWhole(SelectMode mode);
+    /** The kind SelectWhole works on now ("" when the active tool selects nothing). */
+    [[nodiscard]] const char* SelectableKind() const;
+    /** View › Focus selection: the camera over the selection's middle, far enough to see all of it; false without one.
+     */
+    bool FrameSelection();
     /** The view to the point (x, z) of the map, from no farther than `distance`. */
     void FramePoint(float x, float z, float distance = 80.0f);
     /** Test runs (`/selectunit <army>,<unit>`): that unit selected and the view on it. */

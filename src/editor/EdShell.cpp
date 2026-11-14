@@ -781,6 +781,18 @@ namespace faf::editor
     return kFlags;
   }
 
+  bool* EdShell::PanelShown(
+    const std::string_view id
+  )
+  {
+    for (const PanelFlag& flag : PanelFlags()) {
+      if (PanelId(flag.window) == id) {
+        return &(this->*flag.shown);
+      }
+    }
+    return nullptr;
+  }
+
   std::vector<std::string> EdShell::ShownPanelIds() const
   {
     std::vector<std::string> out;

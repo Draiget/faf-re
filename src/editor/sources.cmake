@@ -66,6 +66,7 @@ set(FAF_EDITOR_SOURCES
   tools/EdUnitLab.cpp
   tools/EdAssetCatalog.cpp
   tools/EdUnitIcon.cpp
+  tools/EdSelectModes.cpp
   tools/EdInterop.cpp
   graph/EdTerrainGraph.cpp
   graph/EdTerrainNodes.cpp

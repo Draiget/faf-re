@@ -498,6 +498,12 @@ namespace faf::editor
       bool EdShell::* shown;
     };
     static const std::vector<PanelFlag>& PanelFlags();
+
+  public:
+    /** A panel's shown flag by its id (`Properties`, `MissionStages`, `UnitLab`), or null. */
+    [[nodiscard]] bool* PanelShown(std::string_view id);
+
+  private:
     /** The workspaces whose dock space has been laid out this run. */
     std::vector<bool> mWorkspaceBuilt;
     bool mWorkspaceStarted = false;
