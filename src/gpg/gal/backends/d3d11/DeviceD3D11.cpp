@@ -43,6 +43,7 @@
 #include "gpg/gal/RenderTargetContext.hpp"
 #include "gpg/gal/TextureContext.h"
 #include "gpg/gal/VertexBufferContext.hpp"
+#include "gpg/gal/backends/common/CopyRegion.h"
 #include "gpg/gal/backends/common/TextureQuality.h"
 
 namespace gpg::gal
@@ -1416,19 +1417,26 @@ namespace gpg::gal
       fromRect.right - fromRect.left == toRect.right - toRect.left &&
       fromRect.bottom - fromRect.top == toRect.bottom - toRect.top && sourceDesc.Format == destinationDesc.Format
     ) {
-      // Same size: a direct copy.
+      // Same size: a direct copy. The box and the destination are cut to both surfaces first (Direct3D 11 leaves a
+      // box that reaches past one undefined; the engine's refraction copy can be a row too tall).
+      CopyRegion region{fromRect.left, fromRect.top, fromRect.right, fromRect.bottom, toRect.left, toRect.top};
+      if (!ClampCopyRegion(
+            region, sourceDesc.Width, sourceDesc.Height, destinationDesc.Width, destinationDesc.Height
+          )) {
+        return;
+      }
       D3D11_BOX box{};
-      box.left = static_cast<UINT>(fromRect.left);
-      box.top = static_cast<UINT>(fromRect.top);
-      box.right = static_cast<UINT>(fromRect.right);
-      box.bottom = static_cast<UINT>(fromRect.bottom);
+      box.left = static_cast<UINT>(region.left);
+      box.top = static_cast<UINT>(region.top);
+      box.right = static_cast<UINT>(region.right);
+      box.bottom = static_cast<UINT>(region.bottom);
       box.front = 0U;
       box.back = 1U;
       mImmediate->CopySubresourceRegion(
         destinationTarget->GetTexture(),
         0U,
-        static_cast<UINT>(toRect.left),
-        static_cast<UINT>(toRect.top),
+        static_cast<UINT>(region.x),
+        static_cast<UINT>(region.y),
         0U,
         sourceTarget->GetTexture(),
         0U,
@@ -1543,32 +1551,44 @@ namespace gpg::gal
       sourceContext->width_ == destinationContext->width_ && sourceContext->height_ == destinationContext->height_ &&
       sourceTexture->GetFormat() == destinationTexture->GetFormat()
     ) {
-      UINT destinationX = 0U;
-      UINT destinationY = 0U;
+      // The box is cut to both surfaces whether or not a source rectangle is given: the whole source copied to an
+      // offset of the destination reaches past it too, and Direct3D 11 leaves that undefined.
+      CopyRegion region{0, 0, sourceContext->width_, sourceContext->height_, 0, 0};
+      if (sourceRect != nullptr) {
+        region.left = sourceRect->left;
+        region.top = sourceRect->top;
+        region.right = sourceRect->right;
+        region.bottom = sourceRect->bottom;
+      }
       if (destinationRect != nullptr) {
-        destinationX = static_cast<UINT>(destinationRect->left);
-        destinationY = static_cast<UINT>(destinationRect->top);
+        region.x = destinationRect->left;
+        region.y = destinationRect->top;
+      }
+      if (!ClampCopyRegion(
+            region,
+            sourceContext->width_,
+            sourceContext->height_,
+            destinationContext->width_,
+            destinationContext->height_
+          )) {
+        return;
       }
       D3D11_BOX box{};
-      const D3D11_BOX* boxPointer = nullptr;
-      if (sourceRect != nullptr) {
-        box.left = static_cast<UINT>(sourceRect->left);
-        box.top = static_cast<UINT>(sourceRect->top);
-        box.right = static_cast<UINT>(sourceRect->right);
-        box.bottom = static_cast<UINT>(sourceRect->bottom);
-        box.front = 0U;
-        box.back = 1U;
-        boxPointer = &box;
-      }
+      box.left = static_cast<UINT>(region.left);
+      box.top = static_cast<UINT>(region.top);
+      box.right = static_cast<UINT>(region.right);
+      box.bottom = static_cast<UINT>(region.bottom);
+      box.front = 0U;
+      box.back = 1U;
       mImmediate->CopySubresourceRegion(
         destinationTexture->GetTexture2D(),
         0U,
-        destinationX,
-        destinationY,
+        static_cast<UINT>(region.x),
+        static_cast<UINT>(region.y),
         0U,
         sourceTexture->GetTexture2D(),
         0U,
-        boxPointer
+        &box
       );
       destinationTexture->DiscardCpuCopy();
       return;
