@@ -190,6 +190,49 @@ namespace faf::editor
        "Everything the editor does is a command with a name and keys: the menus, the toolbar and the keys run "
        "them. Ctrl+K (or the search box in the title row) finds any command by a few of its letters.",
        "view.palette"},
+      {"ModProject",
+       "Mod project",
+       "A FAF mod made in the editor: its folder (mod_info.lua, hooks, units, effects), its name, version and uid. "
+       "Units and effects it changes are kept as changes to the game's own, merged the way FAF merges a mod's "
+       "blueprints (table.merged, weapons by place), so the mod stays small and follows game updates.\n\n"
+       "The checks list what the game would refuse. Write project writes mod_info.lua, the project file and the merge "
+       "blueprints (a file that doesn't compile, or one the project didn't make, is left alone); Zip for the vault "
+       "writes, checks and zips the project's files under one folder. Every change is one undo step in the project's "
+       "own history (Undo, Redo).",
+       "window.modproject"},
+      {"UnitLab",
+       "Unit lab",
+       "A unit's numbers as the game's rules have them (economy, health, speed, intel, each weapon's) beside the "
+       "mod's changes; a change becomes the mod's, kept as a change to the game's unit. Derive makes a new unit id "
+       "copied from the chosen one (the project's blueprint hook makes it, no files are copied); Revert or Remove "
+       "takes a unit's changes back.\n\n"
+       "Test writes the project and plays the open map with the mod on.",
+       "window.unitlab,window.unitviewer"},
+      {"UnitViewer",
+       "Unit viewer",
+       "The unit's model, turned as you drag (Front faces it to you), with its mesh and level-of-detail files. Make "
+       "icon draws the build menu's picture from the model and writes it into the mod (icons/units/<id>_icon.dds); "
+       "a render too dark or with no outline is refused, so the base unit's icon stays.",
+       "window.unitviewer"},
+      {"AssetBrowser",
+       "Asset browser",
+       "Every unit, prop, decal, marker, terrain texture and effect the game has, as tiles with their pictures; a "
+       "tab per kind, a search and each kind's filters (faction, tech, biome, type). A click makes the asset the "
+       "tool's (the unit, prop, decal or marker to place); dragging a tile onto the map places it there. Right-click "
+       "stars a favourite; Recent shows what you used.",
+       ""},
+      {"EditorMods",
+       "Editor mods",
+       "Lua add-ons for the editor itself: each adds commands, panels or checks. Turn them on or off here; one that "
+       "fails is turned off and says why in the log.",
+       "window.editormods"},
+      {"MissionRun",
+       "Run (mission)",
+       "Plays the open map with its mission from a copy, from any stage, every node it reaches traced here; a click "
+       "on a line selects that node in Stages. While it plays: Skip waits ends the running waits and timers, Timers "
+       "x2 to x10 makes them faster, Jump to stage starts the chosen stage now, State to the log writes the mission's "
+       "variables and objectives. The operation's end (won or lost) is recorded here instead of ending the game.",
+       ""},
       {"workspaces",
        "Workspaces",
        "Ten sets of panels, each with its own layout, for one kind of work: the title row's tabs or Alt+1 to Alt+0 "
