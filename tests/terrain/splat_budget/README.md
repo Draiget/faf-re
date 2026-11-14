@@ -33,7 +33,7 @@ build-and-CTest steps run it. A passing Linux run is not Windows/x86 acceptance.
 Coverage:
 
 - The 10000-vertex storage used by high/medium fidelity and the 1000-vertex
-  storage used by low fidelity, all seven tiers and invalid integers.
+  storage used by low fidelity, all four tiers and invalid integers.
 - Original inline limits, bounded geometric growth preserving every live
   vertex, same-tier reuse, downshifts, and return to inline storage.
 - Atlas-restart storage contract at each growth boundary: clearing removes

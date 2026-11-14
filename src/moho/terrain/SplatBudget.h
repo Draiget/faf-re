@@ -28,12 +28,12 @@ namespace moho
     constexpr std::size_t inlineQuads = InlineVertices / 4;
     // Original code stops BEFORE appending the nominal 250th/2500th splat.
     // Invalid console/pref values must not increase the allocation budget.
-    if (tier < 1 || tier > 6) {
+    if (tier < 1 || tier > 3) {
       vertices.ResetStorageToInline();
       return {inlineQuads - 1, inlineQuads - 1};
     }
-    // Keep existing saved tiers unchanged. Higher tiers are opt-in stress budgets.
-    constexpr std::size_t multipliers[] = {0, 4, 10, 20, 40, 100, 200};
+    // Higher settings raise the existing per-view limits; growth remains bounded.
+    constexpr std::size_t multipliers[] = {0, 40, 200, 800};
     const std::size_t limit = inlineQuads * multipliers[tier];
     if (vertices.Capacity() / 4 > limit) {
       vertices.ResetStorageToInline();
