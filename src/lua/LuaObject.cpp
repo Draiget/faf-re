@@ -65,56 +65,6 @@ using namespace LuaPlus;
 
 extern "C" int luaG_checkcode(const Proto* f);
 
-/**
- * Legacy CRT `_iob[]` global array shim.
- *
- * The old MSVCRT exported `_iob` as `FILE _iob[_IOB_ENTRIES]` via
- * `__imp___iob`. UCRT removed the global in favor of `__acrt_iob_func()`,
- * but third-party .lib files compiled against the old CRT (e.g. LuaPlus's
- * `lauxlib.obj`, `lbaselib.obj`, `liolib.obj`) still reference
- * `__imp___iob`. Provide a private backing array so the link resolves; the
- * streams are not functional — callers that actually use them will route
- * through `__iob_func()` above which dispatches to UCRT at runtime.
- */
-#if defined(_DLL)
-// Linked statically (/MT), the CRT's own _file.obj defines `_iob`.
-extern "C" __declspec(selectany) std::FILE _iob[20]{};
-#endif
-
-/**
- * Address: 0x00A89E54 (legacy CRT compat thunk)
- *
- * What it does:
- * Returns the base of the legacy `_iob[]` array. On UCRT, dispatches to
- * `__acrt_iob_func(0)` from `ucrtbase.dll` (the modern replacement) and
- * falls back to a static placeholder array if the symbol is unavailable.
- * Provided here because UCRT does not export `__iob_func` directly.
- * Windows only: the POSIX C libraries have their own `stdin`/`stderr`, and
- * bionic's `FILE` is an incomplete type, so no placeholder array exists there.
- */
-#if FAFRE_PLATFORM_WINDOWS
-extern "C" std::FILE* __cdecl __iob_func(
-  void
-)
-{
-  using AcrtIobFunc = std::FILE*(__cdecl*)(unsigned int);
-  static AcrtIobFunc sAcrtIobFunc = []() noexcept -> AcrtIobFunc {
-    HMODULE const ucrtModule = ::GetModuleHandleA("ucrtbase.dll");
-    if (ucrtModule == nullptr) {
-      return nullptr;
-    }
-    return reinterpret_cast<AcrtIobFunc>(reinterpret_cast<void (*)()>(::GetProcAddress(ucrtModule, "__acrt_iob_func")));
-  }();
-
-  if (sAcrtIobFunc != nullptr) {
-    return sAcrtIobFunc(0u);
-  }
-
-  static std::FILE sLegacyIobFallback[20]{};
-  return sLegacyIobFallback;
-}
-#endif // FAFRE_PLATFORM_WINDOWS
-
 // FUN_00923F20 / FUN_00923F40 are recovered once, further down this file, as
 // the `extern "C"` pair that `luaHelper_Realloc` / `luaHelper_Free` point at.
 // A second copy used to live here with the same two addresses and the wrong
