@@ -1,3 +1,4 @@
+#include "editor/doc/EdScenarioInfo.h"
 #include "editor/doc/EdDocument.h"
 #include "moho/sim/CVFSImpl.h"
 #include "editor/doc/EdAutosave.h"
@@ -1847,6 +1848,7 @@ namespace faf::editor
     mBuildRedo.clear();
     mLayoutRedo.clear();
     mMissionRedo.clear();
+    mMapInfoRedo.clear();
   }
 
   bool EdDocument::PopUndo(
@@ -2704,6 +2706,82 @@ namespace faf::editor
     mModified = true;
   }
 
+  void EdDocument::RefreshInfoFacts()
+  {
+    std::string value;
+    mFacts.name = ReadScenarioField(mScenario, "name", value) ? WithoutLoc(value) : std::string();
+    mFacts.description = ReadScenarioField(mScenario, "description", value) ? WithoutLoc(value) : std::string();
+    mFacts.mapVersion = ReadScenarioField(mScenario, "map_version", value) ? std::atoi(value.c_str()) : 0;
+  }
+
+  bool EdDocument::SetScenarioField(
+    const std::string& key,
+    const std::string& value,
+    const bool text
+  )
+  {
+    MapInfoStep step;
+    step.key = key;
+    step.text = text;
+    step.after = value;
+    step.had = ReadScenarioField(mScenario, key, step.before);
+    if (step.had && step.before == value) {
+      return false;
+    }
+    std::string changed = WithScenarioField(mScenario, key, value, text);
+    if (changed == mScenario) {
+      return false;
+    }
+    if (!step.had) {
+      step.scenarioBefore = mScenario;
+    }
+    mScenario = std::move(changed);
+    RefreshInfoFacts();
+    mMapInfoUndo.push_back(std::move(step));
+    EditEnded(EditKind::MapInfo);
+    mModified = true;
+    return true;
+  }
+
+  bool EdDocument::UndoMapInfo(
+    const bool redo
+  )
+  {
+    auto& from = redo ? mMapInfoRedo : mMapInfoUndo;
+    auto& to = redo ? mMapInfoUndo : mMapInfoRedo;
+    if (from.empty()) {
+      return false;
+    }
+    MapInfoStep step = std::move(from.back());
+    from.pop_back();
+    if (redo) {
+      mScenario = WithScenarioField(mScenario, step.key, step.after, step.text);
+    } else if (step.had) {
+      mScenario = WithScenarioField(mScenario, step.key, step.before, step.text);
+    } else {
+      // Added: the line goes (the text it was added to; later scenario changes of other kinds are kept by them).
+      std::string value;
+      if (ReadScenarioField(mScenario, step.key, value) && value == step.after) {
+        const std::string line =
+          std::string("    ") + step.key + " = " + (step.text ? "\"" + step.after + "\"" : step.after) + ",";
+        const std::size_t at = mScenario.find(line);
+        if (at != std::string::npos) {
+          const std::size_t end = at + line.size();
+          std::size_t start = mScenario.rfind('\n', at);
+          start = start == std::string::npos ? at : start;
+          if (start > 0 && mScenario[start] == '\n' && mScenario[start - 1] == '\r') {
+            --start; // (the line's CR LF as WithScenarioField added it)
+          }
+          mScenario.erase(start, end - start);
+        }
+      }
+    }
+    RefreshInfoFacts();
+    to.push_back(std::move(step));
+    mModified = true;
+    return true;
+  }
+
   bool EdDocument::UndoMission(
     const bool redo
   )
@@ -2763,6 +2841,8 @@ namespace faf::editor
     mMissionRead.clear();
     mMissionUndo.clear();
     mMissionRedo.clear();
+    mMapInfoUndo.clear();
+    mMapInfoRedo.clear();
     const std::filesystem::path file = MissionFile();
     std::error_code ignored;
     if (file.empty() || !std::filesystem::exists(file, ignored)) {

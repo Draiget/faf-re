@@ -23,6 +23,7 @@ set(FAF_EDITOR_SOURCES
   doc/EdModProject.cpp
   doc/EdEffectMerge.cpp
   doc/EdEditorMods.cpp
+  doc/EdScenarioInfo.cpp
   doc/EdLighting.cpp
   doc/EdMarkerPreset.cpp
   doc/EdUnitPreset.cpp

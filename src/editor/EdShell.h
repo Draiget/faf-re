@@ -551,6 +551,9 @@ namespace faf::editor
     bool mShowEditorMods = false;
     bool mShowUnitViewer = false;
     bool mViewMenuAsk = false;
+    /** Map info's fields being typed in: key -> text (the scenario's value otherwise). */
+    std::map<std::string, std::string> mInfoEdits;
+    void DrawMapInfoFields();
     bool mViewMenuSelection = false;
     void DrawViewMenu();
     bool mDebugWasPaused = false;

@@ -1,5 +1,6 @@
 // The Info panel (what the open map is) and the Markers panel (its markers as a tree), EdShell's right-hand panels.
 
+#include "editor/doc/EdScenarioInfo.h"
 #include "editor/EdShell.h"
 #include "editor/ui/EdControls.h"
 #include "editor/doc/EdLighting.h"
@@ -173,6 +174,67 @@ namespace faf::editor
     }
   } // namespace
 
+  void EdShell::DrawMapInfoFields()
+  {
+    if (!ImGui::TreeNode("Edit map info")) {
+      return;
+    }
+    ImGui::PushID("mapinfo");
+    for (const ScenarioField& field : ScenarioFields()) {
+      ImGui::PushID(field.key);
+      std::string now;
+      const bool has = ReadScenarioField(mDocument.Scenario(), field.key, now);
+      if (std::string(field.key) == "name" || std::string(field.key) == "description") {
+        now = WithoutLoc(now); // (an edit drops the localisation tag: the text as written shows)
+      }
+      // The field shows the scenario's value, or what is being typed.
+      const auto typing = mInfoEdits.find(field.key);
+      std::string& text = typing != mInfoEdits.end() ? typing->second : mInfoEdits[field.key];
+      if (typing == mInfoEdits.end()) {
+        text = has ? now : std::string();
+      }
+      RowLabel(field.label);
+      ImGui::SetNextItemWidth(-1.0f);
+      char buffer[1024];
+      std::snprintf(buffer, sizeof(buffer), "%s", text.c_str());
+      bool edited = false;
+      if (std::string(field.key) == "type") {
+        static const char* const kTypes[] = {"skirmish", "campaign_coop", "campaign"};
+        if (EdBeginCombo("##v", text.empty() ? "(none)" : text.c_str())) {
+          for (const char* type : kTypes) {
+            if (ImGui::Selectable(type, text == type)) {
+              (void)mDocument.SetScenarioField(field.key, type, true);
+            }
+          }
+          ImGui::EndCombo();
+        }
+        mInfoEdits.erase(field.key);
+      } else if (std::string(field.key) == "description") {
+        edited =
+          ImGui::InputTextMultiline("##v", buffer, sizeof(buffer), ImVec2(-1.0f, ImGui::GetTextLineHeight() * 4.0f));
+      } else {
+        const ImGuiInputTextFlags flags = field.text ? 0 : ImGuiInputTextFlags_CharsDecimal;
+        edited = ImGui::InputText("##v", buffer, sizeof(buffer), flags);
+      }
+      if (edited) {
+        text = buffer;
+      }
+      // One undo step when the field is left after typing; until then the scenario keeps its value.
+      if (ImGui::IsItemDeactivatedAfterEdit()) {
+        if (!(text.empty() && !field.text)) {
+          (void)mDocument.SetScenarioField(field.key, text, field.text);
+        }
+        mInfoEdits.erase(field.key);
+      } else if (!ImGui::IsItemActive()) {
+        mInfoEdits.erase(field.key);
+      }
+      ImGui::PopID();
+    }
+    ImGui::TextDisabled("Each change is an undo step (\"map info\"); Save writes it to the scenario.");
+    ImGui::PopID();
+    ImGui::TreePop();
+  }
+
   void EdShell::DrawInfoPanel()
   {
     // A layout saved before this panel existed has no place for it: it goes beside the Map panel.
@@ -233,6 +295,7 @@ namespace faf::editor
     if (!mDocument.Error().empty()) {
       ImGui::TextColored(ImVec4(0.95f, 0.75f, 0.30f, 1.0f), "%s", mDocument.Error().c_str());
     }
+    DrawMapInfoFields();
 
     // What kind of map, as chips.
     ImGui::Spacing();

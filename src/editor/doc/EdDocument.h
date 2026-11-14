@@ -308,6 +308,8 @@ namespace faf::editor
       Layout,
       /** The mission (stages, nodes, dialogues). */
       Mission,
+      /** The map's own fields in its scenario (Map info: name, description, type, version, no-rush radius). */
+      MapInfo,
     };
     /** The water's three masks, a byte for every 2 x 2 units (the map's size halved). */
     struct WaterMaskSnapshot
@@ -447,6 +449,13 @@ namespace faf::editor
     /** A change to the mission as one undo step: `before` is how it was. */
     void MissionEdited(faf::editor::Mission before);
     bool UndoMission(bool redo);
+    /**
+     * Sets one of the scenario's own fields (ScenarioFields) as one undo step ("map info"); false when it is the same
+     * or can't be placed. Only that field goes back on undo (other scenario changes stay), a field the file didn't have
+     * goes away again.
+     */
+    bool SetScenarioField(const std::string& key, const std::string& value, bool text);
+    bool UndoMapInfo(bool redo);
     /** The stage a play's test run starts at (1: the first). */
     void SetPlayStartStage(
       const int stage
@@ -846,6 +855,8 @@ namespace faf::editor
         return "layout drawing";
       case EditKind::Mission:
         return "mission";
+      case EditKind::MapInfo:
+        return "map info";
       }
       return "edit";
     }
@@ -960,6 +971,18 @@ namespace faf::editor
     std::string mMissionRead; // the mission file's text as read or last saved
     std::vector<std::pair<faf::editor::Mission, faf::editor::Mission>> mMissionUndo;
     std::vector<std::pair<faf::editor::Mission, faf::editor::Mission>> mMissionRedo;
+    struct MapInfoStep
+    {
+      std::string key;
+      bool text = true;
+      bool had = true; // the file had the field before
+      std::string before;
+      std::string after;
+      std::string scenarioBefore; // the whole text, when the field was added
+    };
+    std::vector<MapInfoStep> mMapInfoUndo;
+    std::vector<MapInfoStep> mMapInfoRedo;
+    void RefreshInfoFacts();
     bool mCopyTestMission = false; // WriteFolderCopy writes the test run's mission (a play copy)
     int mPlayStartStage = 1;
     void LoadMissionFile();

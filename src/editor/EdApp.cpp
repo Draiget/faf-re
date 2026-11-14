@@ -1,3 +1,4 @@
+#include "editor/doc/EdScenarioInfo.h"
 #include "editor/EdApp.h"
 #include "editor/ui/EdControls.h"
 #include "editor/EdPath.h"
@@ -173,7 +174,7 @@ namespace faf::editor
         "/layouttest",     "/playcopytest",    "/missiontest",    "/modtest",
         "/unitlabtest",    "/effectmodtest",   "/assettest",      "/thumbcache",
         "/assetmarks",     "/editormods",      "/editormodtest",  "/unitviewtest",
-        "/runmarker",      "/pausetest",       "/viewmenu",
+        "/runmarker",      "/pausetest",       "/viewmenu",       "/mapinfotest",
       };
       for (const char* const option : kOptions) {
         if (moho::CFG_GetArgOption(option, 0, nullptr)) {
@@ -3036,6 +3037,7 @@ namespace faf::editor
         ++mPauseTestStage;
       }
       bool mViewMenuTested = false;
+      bool mMapInfoTested = false;
       int mViewMenuFrames = 0;
       int mPauseTestStage = 0;
       int mPauseTestFrames = 0;
@@ -5244,7 +5246,7 @@ namespace faf::editor
       add("file.save", "Save", "File", "Ctrl+S", [this] {
         SaveDocument();
       }, mapOpen);
-      add("file.saveas", "Save as new map folder...", "File", "", [this] {
+      add("file.saveas", "Save as new map folder...", "File", "Ctrl+Shift+S", [this] {
         mShell->OpenSaveAs();
       }, mapOpen);
       add("file.package", "Package for the FAF vault...", "File", "", [this] {
@@ -8208,6 +8210,38 @@ namespace faf::editor
           mScene.FramePoint(x, z);
         }
         tools.SetDecalSelectionCount(mScene.DecalSelectionCount());
+        // `/mapinfotest <name>` (test runs): the map's name set (an undo step), undone and redone, logged each time.
+        if (
+          fa::vector<fa::string> name;
+          !mMapInfoTested && mScene.Attached() && moho::CFG_GetArgOption("/mapinfotest", 1, &name) && !name.empty()
+        ) {
+          mMapInfoTested = true;
+          const std::string before = mDocument.Facts().name;
+          const bool set = mDocument.SetScenarioField("name", name[0].c_str(), true);
+          const bool added = mDocument.SetScenarioField("norushradius", "75", false);
+          gpg::Logf(
+            "editor: map info test: name %s -> %s (%s), no-rush added %s; undo step: %s",
+            before.c_str(),
+            mDocument.Facts().name.c_str(),
+            set ? "set" : "unchanged",
+            added ? "yes" : "no",
+            mDocument.UndoStepName() != nullptr ? mDocument.UndoStepName() : "-"
+          );
+          (void)mScene.Undo();
+          std::string radius;
+          gpg::Logf(
+            "editor: map info test: undo: no-rush %s",
+            ReadScenarioField(mDocument.Scenario(), "norushradius", radius) ? radius.c_str() : "gone"
+          );
+          (void)mScene.Undo();
+          gpg::Logf(
+            "editor: map info test: undo: name %s, modified %s",
+            mDocument.Facts().name.c_str(),
+            mDocument.Modified() ? "yes" : "no"
+          );
+          (void)mScene.Redo();
+          gpg::Logf("editor: map info test: redo: name %s", mDocument.Facts().name.c_str());
+        }
         if (bool selection = false; mScene.TakeContextMenuAsk(selection)) {
           mShell->OpenViewMenu(selection);
         }
