@@ -1408,6 +1408,8 @@ namespace faf::editor
       ImGui::PushID(static_cast<int>(i));
       const ImVec2 row = ImGui::GetCursorScreenPos();
       const float line = ImGui::GetTextLineHeight();
+      // The row's fix button sits on top of it and must get its own clicks.
+      ImGui::SetNextItemAllowOverlap();
       if (ImGui::Selectable("##issue", false, ImGuiSelectableFlags_SpanAvailWidth, ImVec2(0.0f, line * 2.0f + 2.0f))) {
         GoToIssue(issue);
       }
