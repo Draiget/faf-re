@@ -20,6 +20,7 @@
 
 #include "gpg/core/containers/String.h"
 #include "gpg/core/diagnostics/FrameSampler.h"
+#include "gpg/core/diagnostics/BuildInfo.h"
 #include "gpg/core/utils/Global.h"
 #include "gpg/gal/Device.hpp"
 #include "gpg/gal/DeviceContext.hpp"
@@ -1808,7 +1809,8 @@ namespace
   /**
    * Engine addition: appends the renderer actually created (when it isn't Direct3D 9) and the
    * `/title <label>` command-line label to the top-level window's title, e.g.
-   * "Forged Alliance [D3D11] replay-26935800", so side-by-side test windows can be told apart.
+   * "Forged Alliance [D3D11] Build a48d131 (Nov 10 2026) replay-26935800".
+   * The build metadata identifies the executable; the optional label distinguishes test windows.
    */
   void ApplyWindowTitleDetails(
     const fa::string& baseTitle,
@@ -1818,7 +1820,7 @@ namespace
     fa::vector<fa::string> labelArgs;
     const bool hasLabel = moho::CFG_GetArgOption("/title", 1, &labelArgs) && !labelArgs.empty();
     const char* const apiName = DeviceApiTitleName(context.mDeviceType);
-    if ((!hasLabel && apiName == nullptr) || moho::sMainWindow == nullptr) {
+    if (moho::sMainWindow == nullptr) {
       return;
     }
 
@@ -1828,6 +1830,11 @@ namespace
       title += apiName;
       title += "]";
     }
+    title += " Build ";
+    title += gpg::diag::BuildVersion();
+    title += " (";
+    title += gpg::diag::BuildDate();
+    title += ")";
     if (hasLabel) {
       title += " ";
       title += labelArgs[0].c_str();

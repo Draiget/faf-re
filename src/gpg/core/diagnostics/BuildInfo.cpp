@@ -31,6 +31,11 @@ namespace gpg::diag
     return FAF_BUILD_SHOWN;
   }
 
+  const char* BuildDate() noexcept
+  {
+    return __DATE__;
+  }
+
   const char* BuildCommit() noexcept
   {
     return FAF_BUILD_COMMIT;

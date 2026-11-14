@@ -35,6 +35,9 @@ namespace gpg::diag
   /// for local edits), or the short commit alone when it has no such tag.
   [[nodiscard]] const char* BuildVersion() noexcept;
 
+  /// Compilation date of the build metadata, e.g. "Nov 10 2026".
+  [[nodiscard]] const char* BuildDate() noexcept;
+
   /// One line for logs and reports: "a48d131-dirty x64 Release (master, v1.1.1-186-ga48d131-dirty)".
   [[nodiscard]] const char* BuildIdentity() noexcept;
 } // namespace gpg::diag
