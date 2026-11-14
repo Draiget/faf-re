@@ -3480,7 +3480,23 @@ namespace faf::editor
         }
         ImGui::PopID();
       }
-      Note("A game path (/textures/engine/waves.dds); Enter applies it as one undo step.");
+      for (int i = 0; i < 6; ++i) {
+        if (i > 0) {
+          ImGui::SameLine();
+        }
+        ImGui::PushID(100 + i);
+        if (ImGui::SmallButton(kTextureNames[i])) {
+          mWaterTexturePick = i;
+          mWaterTexturePickOpen = true;
+          mWaterTextureFilter[0] = '\0';
+        }
+        ImGui::PopID();
+      }
+      Note(
+        "A game path (/textures/engine/waves.dds); Enter applies it as one undo step. The buttons pick one from the "
+        "game's textures."
+      );
+      DrawWaterTexturePicker();
       mWaterEditing = active;
     }
     if (Section("Shore waves")) {
@@ -4017,6 +4033,88 @@ namespace faf::editor
         );
       }
     }
+  }
+
+  void EdTools::DrawWaterTexturePicker()
+  {
+    constexpr const char* kTitle = "Water texture";
+    if (mWaterTexturePickOpen) {
+      mWaterTexturePickOpen = false;
+      if (mGameTextures.empty()) {
+        mGameTextures = ListGameTextures("/textures");
+      }
+      ImGui::OpenPopup(kTitle);
+    }
+    ImGui::SetNextWindowSize(ImVec2(Em(640.0f), Em(520.0f)), ImGuiCond_Appearing);
+    if (!ImGui::BeginPopupModal(kTitle, nullptr)) {
+      return;
+    }
+    const int slot = std::clamp(mWaterTexturePick, 0, 5);
+    static const char* const kSlots[6] = {
+      "cube map", "colour ramp", "normals 1", "normals 2", "normals 3", "normals 4"
+    };
+    // What fits the slot by name: cube maps, ramps, wave normal maps (the search shows the rest).
+    static const char* const kHints[6] = {"cube", "ramp", "wave", "wave", "wave", "wave"};
+    ImGui::Text("The %s", kSlots[slot]);
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(Em(240.0f));
+    ImGui::InputTextWithHint("##waterfilter", "search all textures", mWaterTextureFilter, sizeof(mWaterTextureFilter));
+    ImGui::SameLine();
+    if (ImGui::Button("Cancel") || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+      ImGui::CloseCurrentPopup();
+    }
+    std::string filter = mWaterTextureFilter;
+    for (char& c : filter) {
+      c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    }
+    if (ImGui::BeginChild("##watertextures", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Borders)) {
+      const float cell = 96.0f;
+      const int columns = std::max(1, static_cast<int>(ImGui::GetContentRegionAvail().x / (cell + 12.0f)));
+      int shown = 0;
+      for (const std::string& path : mGameTextures) {
+        std::string lower = path;
+        for (char& c : lower) {
+          c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+        }
+        const std::size_t slash = lower.find_last_of('/');
+        const std::string leaf = slash == std::string::npos ? lower : lower.substr(slash + 1);
+        if (filter.empty() ? leaf.find(kHints[slot]) == std::string::npos : lower.find(filter) == std::string::npos) {
+          continue;
+        }
+        if (shown % columns != 0) {
+          ImGui::SameLine();
+        }
+        ++shown;
+        ImGui::PushID(path.c_str());
+        ImGui::BeginGroup();
+        const std::uint64_t image = mLibrary.Thumbnail(path);
+        const bool picked = image != 0U
+          ? ImGui::ImageButton("##pick", static_cast<ImTextureID>(image), ImVec2(cell, cell))
+          : ImGui::Button("...", ImVec2(cell + 6.0f, cell + 6.0f));
+        ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + cell);
+        ImGui::TextUnformatted(path.substr(path.find_last_of('/') + 1).c_str());
+        ImGui::PopTextWrapPos();
+        ImGui::EndGroup();
+        if (ImGui::IsItemHovered()) {
+          EdSetTooltip("%s", path.c_str());
+        }
+        if (picked) {
+          mWater.textures[slot] = path;
+          mWaterChanged = true;
+          mWaterFinal = true; // one undo step
+          ImGui::CloseCurrentPopup();
+        }
+        ImGui::PopID();
+      }
+      if (shown == 0) {
+        ImGui::TextDisabled(
+          "No texture's name has \"%s\"; search for another.", filter.empty() ? kHints[slot] : filter.c_str()
+        );
+      }
+    }
+    ImGui::EndChild();
+    mLibrary.Pump(6);
+    ImGui::EndPopup();
   }
 
   void EdTools::DrawDecals()

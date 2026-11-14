@@ -140,6 +140,31 @@ namespace faf::editor
     return 0U;
   }
 
+  std::vector<std::string> ListGameTextures(
+    const std::string& folder
+  )
+  {
+    std::vector<std::string> out;
+    moho::CVirtualFileSystem* const vfs = moho::DISK_GetVFS();
+    if (vfs == nullptr) {
+      return out;
+    }
+    fa::vector<fa::string> found;
+    vfs->EnumerateFiles(folder.c_str(), "*.dds", true, &found);
+    std::set<std::string> seen;
+    for (const fa::string& file : found) {
+      std::string lower = file.c_str();
+      for (char& c : lower) {
+        c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+      }
+      if (seen.insert(lower).second) {
+        out.emplace_back(file.c_str());
+      }
+    }
+    std::sort(out.begin(), out.end());
+    return out;
+  }
+
   bool EdTextureLibrary::AverageColour(
     const std::string& path,
     float (&rgb)[3]

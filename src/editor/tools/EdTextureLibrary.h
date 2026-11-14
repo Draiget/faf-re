@@ -71,6 +71,9 @@ namespace faf::editor
     std::unordered_map<std::string, std::array<float, 3>> mAverages; // r < 0: couldn't be read
   };
 
+  /** Every `.dds` the game's files have under `folder` (its sub-folders too), sorted, each once. */
+  [[nodiscard]] std::vector<std::string> ListGameTextures(const std::string& folder);
+
   /** "grass001" from ".../grass001_albedo.dds"; "(empty)" for none. */
   std::string LayerTextureName(const std::string& path);
 } // namespace faf::editor

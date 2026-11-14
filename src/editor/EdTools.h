@@ -3111,6 +3111,12 @@ namespace faf::editor
     bool mWaterSunFollows = true;
     bool mWaterMaskPaint = false;
     bool mWavePick = false;
+    // The water textures' picker: the slot it is for (-1 closed), the game's textures listed once, the search.
+    int mWaterTexturePick = -1;
+    bool mWaterTexturePickOpen = false;
+    std::vector<std::string> mGameTextures;
+    char mWaterTextureFilter[64]{};
+    void DrawWaterTexturePicker();
     bool mWaveSymmetric = false;
     bool mWaveDelete = false;
     int mWaveSelectionCount = 0;
