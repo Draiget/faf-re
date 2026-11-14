@@ -92,6 +92,7 @@ namespace faf::editor
     p.description = "Made with the FAF map editor";
     mProject = std::move(p);
     mFolder = folder;
+    mHistory.Clear();
     const ModWriteReport report = Write();
     if (!report.problems.empty()) {
       error = report.problems.front();
@@ -112,6 +113,7 @@ namespace faf::editor
     }
     mProject = std::move(p);
     mFolder = Root() / name;
+    mHistory.Clear();
     mDirty = fromBackup;
     mReport.clear();
     mMessage =
@@ -269,12 +271,28 @@ namespace faf::editor
       ImGui::EndTable();
     }
     if (!removeId.empty()) {
+      const ModEditHistory::Edits before = p.edits;
       p.edits[removeId].erase(removeKey);
       if (p.edits[removeId].empty()) {
         p.edits.erase(removeId);
       }
+      (void)mHistory.Record("revert " + removeId + " " + removeKey, before, p.edits, "", ImGui::GetTime());
       mDirty = true;
     }
+    ImGui::BeginDisabled(mHistory.UndoName() == nullptr);
+    if (ImGui::Button(ICON_UNDO " Undo")) {
+      (void)mHistory.Undo(p.edits);
+      mDirty = true;
+    }
+    ImGui::EndDisabled();
+    ImGui::SameLine();
+    ImGui::BeginDisabled(mHistory.RedoName() == nullptr);
+    if (ImGui::Button(ICON_REDO " Redo")) {
+      (void)mHistory.Redo(p.edits);
+      mDirty = true;
+    }
+    ImGui::EndDisabled();
+    ImGui::SameLine();
     if (ImGui::Button(ICON_SAVE " Write project")) {
       (void)Write();
     }

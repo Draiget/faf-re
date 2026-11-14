@@ -61,6 +61,7 @@ set(FAF_EDITOR_SOURCES
   tools/EdLayoutMarkers.cpp
   tools/EdAlphaGen.cpp
   tools/EdMission.cpp
+  tools/EdUnitLab.cpp
   tools/EdInterop.cpp
   graph/EdTerrainGraph.cpp
   graph/EdTerrainNodes.cpp
@@ -68,6 +69,7 @@ set(FAF_EDITOR_SOURCES
   ui/EdLayoutPanel.cpp
   ui/EdMissionPanel.cpp
   ui/EdModPanel.cpp
+  ui/EdUnitLabPanel.cpp
   ui/EdMapBrowser.cpp
   doc/EdWaterBodies.cpp
   view/EdWaterBodyView.cpp

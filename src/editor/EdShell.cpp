@@ -539,6 +539,11 @@ namespace faf::editor
       if (mShowModProject) {
         mModPanel.Draw(mShowModProject);
       }
+      if (mShowUnitLab) {
+        mUnitLab.Draw(
+          mShowUnitLab, mTools.UnitInfos(), mDocument.Map() != nullptr && mPlay.CanPlay() && !mPlay.Active()
+        );
+      }
       {
         // The test play's trace arrives in the log whether or not Run is shown.
         const std::vector<std::string> trace = mLog.TakeMissionTrace();
@@ -750,6 +755,7 @@ namespace faf::editor
       {"Bases###MissionBases", &EdShell::mShowMissionBases},
       {"Platoons###MissionPlatoons", &EdShell::mShowMissionPlatoons},
       {"Mod project###ModProject", &EdShell::mShowModProject},
+      {"Unit lab###UnitLab", &EdShell::mShowUnitLab},
     };
     return kFlags;
   }

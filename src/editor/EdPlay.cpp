@@ -89,6 +89,8 @@ function EditorStartPlay(mapPath, aiKey, faction, fog)
     if scenario.type == 'campaign' then
         info.scenarioMods = import('/lua/mods.lua').GetCampaignMods(scenario)
     else
+        -- A mod folder mounted since the last look (a mod project's Test) is found again.
+        import('/lua/mods.lua').ClearCache()
         info.scenarioMods = import('/lua/mods.lua').GetGameMods(extra.mods or {})
     end
 
@@ -404,6 +406,7 @@ end
     static constexpr char kListMods[] = R"lua(
 function EditorListMods()
     local out = {}
+    import('/lua/mods.lua').ClearCache()
     for uid, mod in import('/lua/mods.lua').AllSelectableMods() do
         if not mod.ui_only then
             local entry = { uid = uid, name = mod.name or uid, ai = {} }

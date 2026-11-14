@@ -19,6 +19,7 @@
 #include "editor/ui/EdLayoutPanel.h"
 #include "editor/ui/EdMissionPanel.h"
 #include "editor/ui/EdModPanel.h"
+#include "editor/ui/EdUnitLabPanel.h"
 #include "editor/ui/EdMaterialEditor.h"
 #include "editor/ui/EdParticleEditor.h"
 #include "imgui.h"
@@ -167,7 +168,11 @@ namespace faf::editor
     }
     void ShowModProject() noexcept
     {
-      mShowModProject = true;
+      mShowModProject = mShowUnitLab = true;
+    }
+    [[nodiscard]] EdUnitLabPanel& UnitLab() noexcept
+    {
+      return mUnitLab;
     }
     /** Shows the Mission workspace's Stages and Strings. */
     void ShowMission() noexcept
@@ -499,6 +504,7 @@ namespace faf::editor
     bool mShowMissionBases = false;
     bool mShowMissionPlatoons = false;
     bool mShowModProject = false;
+    bool mShowUnitLab = false;
     bool mDebugWasPaused = false;
     char mWatchInput[160] = {};
     std::vector<std::string> mWatches;
@@ -755,6 +761,7 @@ namespace faf::editor
     EdLayoutPanel mLayoutPanel{mDocument};
     EdMissionPanel mMissionPanel{mDocument};
     EdModPanel mModPanel{mDocument};
+    EdUnitLabPanel mUnitLab{mModPanel};
     ImVec4 mGameView{0.0f, 0.0f, 0.0f, 0.0f};
     /** The document path the Info tab was last brought to the front for. */
     std::string mInfoShownFor;

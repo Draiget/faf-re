@@ -153,6 +153,11 @@ namespace faf::editor
     [[nodiscard]] std::vector<std::string> PlayedMods() const;
     /** After the setup's mods change: the game's rules for them built ahead on a thread, so the next Play is quick. */
     void PrepareRules();
+    /** After a mod folder is mounted (a mod project's Test): the sim mods, and the AI types, found again. */
+    void FindModsAgain()
+    {
+      FindChoices();
+    }
     /** The profiles: the built-in ones, then the saved ones by name. */
     [[nodiscard]] std::vector<PlayProfile> Profiles() const;
     /** The setup becomes the profile's (`slots` is how many start positions the map has, for the built-in ones). */

@@ -160,7 +160,7 @@ namespace faf::editor
         "/nowaterhires",   "/camat",          "/erosiontest",    "/sctest",          "/symmenu",     "/panelbottom",
         "/shader",         "/brushtest",      "/brushshape",     "/stampsource",     "/stampstroke", "/symoptions",
         "/maskoptions",    "/masktest",       "/shaderbrowser",  "/convertlayers",   "/interoptest", "/gentest",
-        "/layouttest",     "/playcopytest",   "/missiontest",    "/modtest",
+        "/layouttest",     "/playcopytest",   "/missiontest",    "/modtest",         "/unitlabtest",
       };
       for (const char* const option : kOptions) {
         if (moho::CFG_GetArgOption(option, 0, nullptr)) {
@@ -2415,6 +2415,189 @@ namespace faf::editor
         }
         gpg::Warnf("editor: mod test: no unit with a labelled weapon");
       }
+      /**
+       * The unit lab's Test: the open mod project written, its folder mounted as /mods/<name> (once), its uid among
+       * the play's mods, and the open map played (FAF's mods.lua finds the mod again: its cache is cleared first).
+       */
+      bool PlayModProject()
+      {
+        EdModPanel& panel = mShell->ModPanel();
+        ModProject* const project = panel.Project();
+        if (project == nullptr || mPlay.Active() || !mPlay.CanPlay()) {
+          return false;
+        }
+        const ModWriteReport report = panel.Write();
+        if (!report.problems.empty()) {
+          gpg::Warnf(
+            "editor: unit lab: the project wrote with %zu problems; testing what was written", report.problems.size()
+          );
+        }
+        const std::string mount = "/mods/" + panel.Folder().filename().string();
+        if (mModMounted.insert(mount).second) {
+          moho::RULE_FinishPreparingKept();
+          moho::SIM_FinishPreparingLuaState();
+          if (!moho::DISK_MountDirectoryNow(panel.Folder(), mount.c_str())) {
+            mModMounted.erase(mount);
+            gpg::Warnf("editor: unit lab: couldn't mount %s as %s", panel.Folder().string().c_str(), mount.c_str());
+            return false;
+          }
+          mPlay.FindModsAgain();
+        }
+        if (std::none_of(mPlay.Mods().begin(), mPlay.Mods().end(), [&](const PlayMod& mod) {
+          return mod.uid == project->uid;
+        })) {
+          gpg::Warnf("editor: unit lab: the game doesn't list the project's mod (uid %s)", project->uid.c_str());
+          return false;
+        }
+        const std::vector<std::string>& maps = mPlay.Maps();
+        const auto at = std::find_if(maps.begin(), maps.end(), [&](const std::string& p) {
+          return LowerPath(p) == LowerPath(mDocument.Path());
+        });
+        if (at == maps.end()) {
+          gpg::Warnf("editor: unit lab: the open map isn't one the play lists");
+          return false;
+        }
+        // After Select: it puts the map's remembered setup in place.
+        mPlay.Select(static_cast<int>(at - maps.begin()));
+        std::vector<std::string>& mods = mPlay.Setup().mods;
+        if (std::find(mods.begin(), mods.end(), project->uid) == mods.end()) {
+          mods.push_back(project->uid);
+        }
+        mPlay.Play();
+        gpg::Logf(
+          "editor: unit lab: testing mod project %s (%s, %zu units changed) on %s",
+          project->name.c_str(),
+          project->uid.c_str(),
+          project->edits.size(),
+          mDocument.Path().c_str()
+        );
+        return true;
+      }
+      std::set<std::string> mModMounted;
+
+      /**
+       * `/unitlabtest` (test runs): the unit lab on a project EditorUnitLabTest: a unit with a weapon (uel0201 when
+       * the rules have it) gets mass +25 and its first weapon's damage x3 (two steps; undo and redo checked), Test
+       * plays it, and the sim's own blueprint table is asked for both values during the play; then Stop.
+       */
+      void TestUnitLab()
+      {
+        if (
+          mLabTestStage >= 9 || (mLabTestStage < 2 && (!mScene.Attached() || moho::RULE_PeekKept() == nullptr)) ||
+          !moho::CFG_GetArgOption("/unitlabtest", 0, nullptr) || ++mLabTestFrames % 150 != 0
+        ) {
+          return;
+        }
+        EdUnitLabPanel& lab = mShell->UnitLab();
+        switch (mLabTestStage) {
+        case 0: {
+          mShell->SwitchWorkspace(7);
+          mShell->HideHome();
+          mShell->ShowModProject();
+          EdModPanel& panel = mShell->ModPanel();
+          std::string error;
+          if (!panel.Open("EditorUnitLabTest", error) && !panel.Create("EditorUnitLabTest", error)) {
+            gpg::Warnf("editor: unit lab test: no project: %s", error.c_str());
+            mLabTestStage = 9;
+            return;
+          }
+          panel.Project()->edits.clear();
+          std::string unit = "uel0201";
+          if (EdUnitLabPanel::ReadUnit(unit).weapons.empty()) {
+            for (const EdUnitInfo& info : mShell->Tools().UnitInfos()) {
+              if (!EdUnitLabPanel::ReadUnit(info.id).weapons.empty()) {
+                unit = info.id;
+                break;
+              }
+            }
+          }
+          lab.SelectUnit(unit);
+          const std::vector<UnitLabField> fields = UnitLabFields(EdUnitLabPanel::ReadUnit(unit));
+          const UnitLabField* mass = nullptr;
+          const UnitLabField* damage = nullptr;
+          for (const UnitLabField& f : fields) {
+            if (f.key == "Economy.BuildCostMass") {
+              mass = &f;
+            } else if (
+              damage == nullptr && f.key.rfind("Weapon:", 0) == 0 && f.key.size() > 7 &&
+              f.key.compare(f.key.size() - 7, 7, ".Damage") == 0
+            ) {
+              damage = &f;
+            }
+          }
+          if (mass == nullptr || damage == nullptr) {
+            gpg::Warnf("editor: unit lab test: %s has no mass cost or weapon damage", unit.c_str());
+            mLabTestStage = 9;
+            return;
+          }
+          (void)lab.SetField(*mass, mass->base + 25.0, false);
+          (void)lab.SetField(*damage, damage->base * 3.0, false);
+          ModProject& p = *panel.Project();
+          const ModEditHistory::Edits after = p.edits;
+          const bool undone = panel.History().Undo(p.edits);
+          const std::size_t afterUndo = p.edits.count(unit) != 0 ? p.edits[unit].size() : 0;
+          const bool redone = panel.History().Redo(p.edits);
+          gpg::Logf(
+            "editor: unit lab test: %s, %zu fields; mass %g -> %g, %s %g -> %g; undo %s (%zu changes left), redo %s, "
+            "same as before: %s",
+            unit.c_str(),
+            fields.size(),
+            mass->base,
+            mass->base + 25.0,
+            damage->key.c_str(),
+            damage->base,
+            damage->base * 3.0,
+            undone ? "took a step" : "had none",
+            afterUndo,
+            redone ? "took it again" : "had none",
+            p.edits == after ? "yes" : "no"
+          );
+          mLabTestUnit = unit;
+          {
+            std::string label;
+            std::string field;
+            (void)ModWeaponKey(damage->key, label, field);
+            mLabTestWeapon = EdModPanel::WeaponIndex(unit, label); // (the kept rules are rebuilt for the play)
+          }
+          break;
+        }
+        case 1:
+          if (!PlayModProject()) {
+            gpg::Warnf("editor: unit lab test: Test didn't start a play");
+            mLabTestStage = 9;
+            return;
+          }
+          break;
+        case 4:
+        case 6: {
+          const int index = mLabTestWeapon;
+          char command[400];
+          (void)std::snprintf(
+            command,
+            sizeof(command),
+            "SimLua local b = __blueprints['%s'] LOG('editor: unit lab test: the sim has mass ', "
+            "b.Economy.BuildCostMass, "
+            "', weapon %d damage ', b.Weapon[%d].Damage)",
+            mLabTestUnit.c_str(),
+            index,
+            index
+          );
+          moho::CON_Execute(command);
+          break;
+        }
+        case 8:
+          mPlay.Stop();
+          break;
+        default:
+          break;
+        }
+        ++mLabTestStage;
+      }
+      int mLabTestStage = 0;
+      int mLabTestFrames = 0;
+      std::string mLabTestUnit;
+      int mLabTestWeapon = 1;
+
       bool mModTestDone = false;
       int mModTestFrames = 0;
 
@@ -8197,6 +8380,10 @@ namespace faf::editor
       TestPlayCopy();
       TestMission();
       TestModProject();
+      if (mShell->UnitLab().TakeTestAsk()) {
+        (void)PlayModProject();
+      }
+      TestUnitLab();
       // `/sctest` (test runs): the SC tools window's buttons in turn, a second apart, the heights' checksum each time.
       if (
         mScTestStage < 8 && moho::CFG_GetArgOption("/sctest", 0, nullptr) && !mScene.ModelsPending() &&

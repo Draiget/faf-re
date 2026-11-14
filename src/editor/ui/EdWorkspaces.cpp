@@ -118,8 +118,8 @@ namespace faf::editor
       {"units",
        "Units",
        "Alt+8",
-       "Units on the map and in mods: armies, groups, mod projects",
-       "Tools",
+       "Units on the map and in mods: armies, groups, mod projects, the unit lab",
+       "Unit lab###UnitLab,Tools",
        "Mod project###ModProject,Properties",
        "Armies,Info",
        "",
@@ -226,6 +226,7 @@ namespace faf::editor
       {"MissionBases", ICON_FLAG},
       {"MissionPlatoons", ICON_UNIT},
       {"ModProject", ICON_MOD},
+      {"UnitLab", ICON_UNIT},
     };
     for (const auto& [panel, icon] : kIcons) {
       if (panel == id) {
@@ -249,7 +250,8 @@ namespace faf::editor
     // 4: Mission's Bases beside Strings.
     // 5: Mission's Platoons beside Bases.
     // 2: Units' Mod project beside Properties.
-    return key == "mission" ? 5 : key == "layout" ? 3 : key == "terrain" || key == "generate" || key == "units" ? 2 : 1;
+    // 3: Units' Unit lab before Tools.
+    return key == "mission" ? 5 : key == "layout" || key == "units" ? 3 : key == "terrain" || key == "generate" ? 2 : 1;
   }
 
   std::map<std::string, int>& LayoutVersions()

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "editor/doc/EdModProject.h"
+#include "editor/tools/EdUnitLab.h"
 
 #include <filesystem>
 #include <optional>
@@ -47,6 +48,11 @@ namespace faf::editor
     {
       return mDirty;
     }
+    /** The open project's undo history (cleared when another project opens). */
+    [[nodiscard]] ModEditHistory& History() noexcept
+    {
+      return mHistory;
+    }
     /** A unit's weapon place by label in the game's blueprint (1-based; 0 when none). */
     [[nodiscard]] static int WeaponIndex(const std::string& id, const std::string& label);
 
@@ -58,5 +64,6 @@ namespace faf::editor
     char mNewName[65] = {};
     std::string mMessage;
     std::vector<std::string> mReport;
+    ModEditHistory mHistory;
   };
 } // namespace faf::editor

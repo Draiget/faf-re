@@ -549,6 +549,10 @@ namespace faf::editor
     {
       mUnitInfos = std::move(infos);
     }
+    [[nodiscard]] const std::vector<EdUnitInfo>& UnitInfos() const noexcept
+    {
+      return mUnitInfos;
+    }
     /** A unit blueprint's name ("Mass Extractor"), or "" when the rules don't have it. */
     [[nodiscard]] std::string UnitTypeName(
       const std::string& id
