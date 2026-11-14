@@ -32,7 +32,18 @@ namespace faf::editor
      * Run: a test play's progress (the stage it is in, the nodes it reached, a trigger dropped because its stage had
      * moved on), each entry a jump to its node in Stages; Play from a stage.
      */
-    void DrawRunPanel(bool& open, bool mapOpen, bool playing, const std::vector<std::string>& newTrace);
+    void DrawRunPanel(
+      bool& open,
+      bool mapOpen,
+      bool playing,
+      const std::vector<std::string>& newTrace,
+      const std::string* live = nullptr
+    );
+    /** The newest state the play reported (the Live section). */
+    [[nodiscard]] const MissionLive& Live() const noexcept
+    {
+      return mLive;
+    }
     /** Play from a stage was pressed (the shell starts the open map). */
     [[nodiscard]] bool TakePlayAsk() noexcept
     {
@@ -73,6 +84,9 @@ namespace faf::editor
     bool mWasPlaying = false;
     bool mPlayAsked = false;
     int mTimerScale = 0;
+    MissionLive mLive;
+    bool mHasLive = false;
+    double mLiveAskedAt = -10.0;
     bool mFocusStages = false;
   };
 } // namespace faf::editor

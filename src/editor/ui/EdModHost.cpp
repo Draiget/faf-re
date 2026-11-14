@@ -237,6 +237,84 @@ namespace faf::editor
       return 0;
     }
 
+    /** Editor.Tool(id, title, click) */
+    int LuaTool(
+      lua_State* L
+    )
+    {
+      Mod* const mod = ModOf(L);
+      const std::string id = ArgString(L, 1);
+      if (
+        mod == nullptr || gHost == nullptr || gHost->Loading() != mod || id.empty() || lua_type(L, 3) != LUA_TFUNCTION
+      ) {
+        lua_pushstring(
+          L, "Editor.Tool(id, title, click): an id, a title and a function, while editor/commands.lua loads"
+        );
+        lua_error(L);
+        return 0;
+      }
+      const std::string title = ArgString(L, 2);
+      lua_pushvalue(L, 3);
+      const int ref = luaL_ref(L, LUA_REGISTRYINDEX);
+      gHost->AddTool(*mod, id, title.empty() ? id : title, ref);
+      return 0;
+    }
+
+    /** Editor.SetHeights(x0, z0, w, h, list) -> true, or nil and why (one undo step) */
+    int LuaSetHeights(
+      lua_State* L
+    )
+    {
+      if (gHost == nullptr || !gHost->writeHeights || lua_type(L, 5) != LUA_TTABLE) {
+        lua_pushnil(L);
+        lua_pushstring(L, "Editor.SetHeights(x0, z0, w, h, list): no map, or no list of heights");
+        return 2;
+      }
+      const int x0 = static_cast<int>(lua_tonumber(L, 1));
+      const int z0 = static_cast<int>(lua_tonumber(L, 2));
+      const int w = static_cast<int>(lua_tonumber(L, 3));
+      const int h = static_cast<int>(lua_tonumber(L, 4));
+      // At most a 1025 x 1025 block in one call.
+      if (w <= 0 || h <= 0 || w > 1025 || h > 1025) {
+        lua_pushnil(L);
+        lua_pushstring(L, "w and h are 1 to 1025");
+        return 2;
+      }
+      std::vector<float> heights(static_cast<std::size_t>(w) * static_cast<std::size_t>(h), 0.0f);
+      for (std::size_t i = 0; i < heights.size(); ++i) {
+        lua_rawgeti(L, 5, static_cast<int>(i) + 1);
+        heights[i] = static_cast<float>(lua_tonumber(L, -1));
+        lua_pop(L, 1);
+      }
+      std::string why;
+      if (!gHost->writeHeights(x0, z0, w, h, heights, why)) {
+        lua_pushnil(L);
+        lua_pushstring(L, why.c_str());
+        return 2;
+      }
+      lua_pushboolean(L, 1);
+      return 1;
+    }
+
+    /** Editor.LayerAt(layer, x, z) -> 0..1, or nil (no map, no masks, off the map) */
+    int LuaLayerAt(
+      lua_State* L
+    )
+    {
+      const float weight = gHost != nullptr && gHost->layerAt ? gHost->layerAt(
+                                                                  static_cast<int>(lua_tonumber(L, 1)),
+                                                                  static_cast<float>(lua_tonumber(L, 2)),
+                                                                  static_cast<float>(lua_tonumber(L, 3))
+                                                                )
+                                                              : -1.0f;
+      if (weight < 0.0f) {
+        lua_pushnil(L);
+      } else {
+        lua_pushnumber(L, static_cast<lua_Number>(weight));
+      }
+      return 1;
+    }
+
     /** Editor.Menu(commandId [, label]) */
     int LuaMenu(
       lua_State* L
@@ -256,7 +334,14 @@ namespace faf::editor
     const std::vector<std::pair<const char*, int>>& Capabilities()
     {
       static const std::vector<std::pair<const char*, int>> kPoints = {
-        {"commands", 1}, {"panels", 1}, {"menus", 1}, {"map", 1}, {"markers", 1}
+        {"commands", 1},
+        {"panels", 1},
+        {"menus", 1},
+        {"tools", 1},
+        {"map", 1},
+        {"markers", 1},
+        {"heights", 1},
+        {"layers", 1}
       };
       return kPoints;
     }
@@ -518,6 +603,9 @@ namespace faf::editor
     SetFunction(L, "Panel", &LuaPanel, &mod);
     SetFunction(L, "Menu", &LuaMenu, &mod);
     SetFunction(L, "Has", &LuaHas, &mod);
+    SetFunction(L, "Tool", &LuaTool, &mod);
+    SetFunction(L, "SetHeights", &LuaSetHeights, &mod);
+    SetFunction(L, "LayerAt", &LuaLayerAt, &mod);
     lua_pushstring(L, "ApiVersion");
     lua_pushnumber(L, kEditorApiVersion);
     lua_settable(L, -3);
@@ -562,6 +650,16 @@ namespace faf::editor
     }
       ),
       mMenus.end()
+    );
+    mTools.erase(
+      std::remove_if(
+        mTools.begin(),
+        mTools.end(),
+        [&mod](const ModTool& tool) {
+      return tool.mod == &mod;
+    }
+      ),
+      mTools.end()
     );
     mod.running = true;
     mod.error.clear();
@@ -727,6 +825,83 @@ namespace faf::editor
     const std::string own = EditorModCommandId(mod.info.name, command);
     const bool ownCommand = mCommands != nullptr && mCommands->Find(own) != nullptr;
     mMenus.push_back(ModMenu{&mod, ownCommand ? own : command, label});
+  }
+
+  void EdModHost::AddTool(
+    Mod& mod,
+    const std::string& id,
+    const std::string& title,
+    const int ref
+  )
+  {
+    mTools.push_back(ModTool{&mod, id, title, ref});
+    if (mCommands == nullptr) {
+      return;
+    }
+    // Its command turns it on and off: `mod.<mod>.tool.<id>`.
+    const std::string full = EditorModCommandId(mod.info.name, "tool." + id);
+    const std::string key = mod.info.uid + "/" + id;
+    Mod* const owner = &mod;
+    EdCommand command;
+    command.id = full;
+    command.title = title + " (tool)";
+    command.category = "Mod: " + mod.info.name;
+    command.description = "Turns on or off the view tool of the editor mod " + mod.info.name +
+      ": while it is on, a left click on the map goes to the mod";
+    command.run = [this, key] {
+      mActiveTool = mActiveTool == key ? std::string() : key;
+    };
+    command.why = [owner] {
+      return owner->running ? std::string() : "the editor mod " + owner->info.name + " is " + owner->error;
+    };
+    command.checked = [this, key] {
+      return mActiveTool == key;
+    };
+    mCommands->Add(std::move(command));
+    mMenus.push_back(ModMenu{&mod, full, title});
+  }
+
+  const EdModHost::ModTool* EdModHost::ActiveTool() const
+  {
+    for (const ModTool& tool : mTools) {
+      if (tool.mod != nullptr && tool.mod->running && tool.mod->info.uid + "/" + tool.id == mActiveTool) {
+        return &tool;
+      }
+    }
+    return nullptr;
+  }
+
+  bool EdModHost::ClickTool(
+    const float x,
+    const float z,
+    const bool shift,
+    const bool ctrl
+  )
+  {
+    const ModTool* const tool = ActiveTool();
+    if (tool == nullptr) {
+      mActiveTool.clear();
+      return false;
+    }
+    Mod* const owner = tool->mod;
+    lua_State* const L = owner->lua->GetCState();
+    lua_rawgeti(L, LUA_REGISTRYINDEX, tool->ref);
+    lua_pushnumber(L, static_cast<lua_Number>(x));
+    lua_pushnumber(L, static_cast<lua_Number>(z));
+    lua_pushboolean(L, shift ? 1 : 0);
+    lua_pushboolean(L, ctrl ? 1 : 0);
+    const std::string where = EditorModCommandId(owner->info.name, "tool." + tool->id);
+    ++mRunDepth;
+    const int result = LuaCallProtected(L, 4, 0);
+    --mRunDepth;
+    if (result != 0) {
+      const std::string message = lua_isstring(L, -1) != 0 ? lua_tostring(L, -1) : "an error";
+      lua_settop(L, 0);
+      mActiveTool.clear();
+      Fail(*owner, where + ": " + message);
+    }
+    DropRetired();
+    return true;
   }
 
   std::vector<EdModHost::ModMenu> EdModHost::MenuEntries() const

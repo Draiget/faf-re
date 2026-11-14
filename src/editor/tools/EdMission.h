@@ -281,6 +281,29 @@ namespace faf::editor
   };
   bool ParseMissionTrace(const std::string& id, MissionTraceId& out);
 
+  /**
+   * A test play's state as the Run panel asks the sim for it once a second (FAF Studio's missionrun.lua State): the
+   * `EDMISSION live` line, its parts split by `|`: `tick N`, `stage N`, `var NAME=value` per variable and
+   * `obj TITLE=active|done|off` per objective.
+   */
+  struct MissionLive
+  {
+    int tick = 0;
+    int stage = 0;
+    std::vector<std::pair<std::string, std::string>> vars;
+    struct Objective
+    {
+      std::string title;
+      std::string state; // active, done, off
+    };
+    std::vector<Objective> objectives;
+  };
+  bool ParseMissionLive(const std::string& line, MissionLive& out);
+  /** The SimLua line that makes the sim log that state (`EDMISSION live ...`). */
+  [[nodiscard]] std::string MissionLiveQuery();
+  /** The SimLua line that sets a mission variable to true or false (false: the name isn't one a script can have). */
+  bool MissionSetVariable(const std::string& name, bool value, std::string& command);
+
   /** The region's hash (Studio's: Adler-like sums, two five-digit numbers). */
   [[nodiscard]] std::string MissionHash(const std::string& text);
 

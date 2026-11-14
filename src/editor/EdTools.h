@@ -2183,6 +2183,30 @@ namespace faf::editor
     }
 
     /** The texture brush as the panel sets it: the brush's shape, the layer, the mode. */
+    /**
+     * The texture brush's stamp stroke (FAF Studio's stamp_paint): the brush's shape pressed into the layer as
+     * separate dabs `spacing` of its width apart, each turned (at random or not), its size and place jittered.
+     */
+    struct MaskStamp
+    {
+      bool on = false;
+      float spacing = 0.6f;
+      bool randomTurn = true;
+      float jitter = 0.2f; // size and place, a share of the radius
+    };
+    [[nodiscard]] MaskStamp CurrentMaskStamp() const noexcept
+    {
+      return {mMaskStamp, mMaskStampSpacing, mMaskStampRandomTurn, mMaskStampJitter};
+    }
+    /** Test runs: the texture stamp stroke on or off, with its spacing. */
+    void SetMaskStamp(
+      const bool on,
+      const float spacing
+    ) noexcept
+    {
+      mMaskStamp = on;
+      mMaskStampSpacing = std::clamp(spacing, 0.1f, 4.0f);
+    }
     [[nodiscard]] MaskBrush CurrentMaskBrush() const noexcept
     {
       MaskBrush brush;
@@ -3138,6 +3162,10 @@ namespace faf::editor
     float mMaskScatter = 0.0f;
     float mMaskMinSlopeDegrees = 0.0f;
     bool mMaskBuildUp = false; // FAF Studio's stroke model by default
+    bool mMaskStamp = false;
+    float mMaskStampSpacing = 0.6f;
+    bool mMaskStampRandomTurn = true;
+    float mMaskStampJitter = 0.2f;
     std::vector<std::string> mLayerNames;
     std::vector<LayerSlot> mSlots;
     int mChangedSlot = -1;

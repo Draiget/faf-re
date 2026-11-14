@@ -645,12 +645,23 @@ namespace faf::editor
     bool& open,
     const bool mapOpen,
     const bool playing,
-    const std::vector<std::string>& newTrace
+    const std::vector<std::string>& newTrace,
+    const std::string* live
   )
   {
     // A new play starts a new trace.
     if (playing && !mWasPlaying) {
       mTrace.clear();
+      mHasLive = false;
+      mLiveAskedAt = -10.0;
+    }
+    if (live != nullptr && ParseMissionLive(*live, mLive)) {
+      mHasLive = true;
+    }
+    // While it plays: the sim is asked for its state once a second (the answer comes through the log).
+    if (playing && ImGui::GetTime() - mLiveAskedAt >= 1.0) {
+      mLiveAskedAt = ImGui::GetTime();
+      moho::CON_Execute(MissionLiveQuery().c_str());
     }
     mWasPlaying = playing;
     mTrace.insert(mTrace.end(), newTrace.begin(), newTrace.end());
@@ -749,6 +760,34 @@ namespace faf::editor
         );
       }
       EdSetItemTooltip("The game tick, the mission's variables and objectives, and its end, written to the Log panel");
+      // The state the play reported last (FAF Studio's live view): a true / false variable is a box to flip.
+      if (mHasLive && ImGui::CollapsingHeader("Live state", ImGuiTreeNodeFlags_DefaultOpen)) {
+        ImGui::Text("Tick %d, stage %d", mLive.tick, mLive.stage);
+        for (const MissionLive::Objective& objective : mLive.objectives) {
+          const ImVec4 colour = objective.state == "done" ? ImVec4(0.5f, 0.85f, 0.5f, 1.0f)
+            : objective.state == "active"                 ? ImVec4(1.0f, 0.85f, 0.4f, 1.0f)
+                                                          : ImVec4(0.6f, 0.6f, 0.6f, 1.0f);
+          ImGui::TextColored(colour, "Objective: %s (%s)", objective.title.c_str(), objective.state.c_str());
+        }
+        for (const auto& [name, value] : mLive.vars) {
+          if (value == "true" || value == "false") {
+            bool on = value == "true";
+            if (ImGui::Checkbox(name.c_str(), &on)) {
+              std::string command;
+              if (MissionSetVariable(name, on, command)) {
+                moho::CON_Execute(command.c_str());
+                mLiveAskedAt = -10.0; // asked again at once
+              }
+            }
+            EdSetItemTooltip("Sets the mission variable in the running play");
+          } else {
+            ImGui::TextDisabled("%s = %s", name.c_str(), value.c_str());
+          }
+        }
+        if (mLive.vars.empty() && mLive.objectives.empty()) {
+          ImGui::TextDisabled("No variables or objectives yet.");
+        }
+      }
     }
     ImGui::Separator();
     // The trace, newest last; a click selects the node in Stages.

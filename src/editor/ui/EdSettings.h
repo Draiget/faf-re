@@ -56,6 +56,20 @@ namespace faf::editor
     static constexpr const char* kPopouts = "Popouts";
     static constexpr const char* kIdleFps = "IdleFps";
     static constexpr const char* kFormat = "Format";
+    /**
+     * Graphics (FAF Studio's graphics settings, on this engine's switches): each "auto" (the engine's own default) or
+     * a value. Shadows, bloom, FXAA and ambient occlusion "on" / "off"; the shadow map's size 1024 / 2048 / 4096;
+     * texture detail "high" / "medium" / "low" (mip levels skipped 0 / 1 / 2); anisotropic filtering 0 / 4 / 8 / 16.
+     */
+    static constexpr const char* kGfxShadows = "GfxShadows";
+    static constexpr const char* kGfxShadowSize = "GfxShadowSize";
+    static constexpr const char* kGfxBloom = "GfxBloom";
+    static constexpr const char* kGfxFxaa = "GfxFxaa";
+    static constexpr const char* kGfxAo = "GfxAo";
+    static constexpr const char* kGfxTextureDetail = "GfxTextureDetail";
+    static constexpr const char* kGfxAnisotropy = "GfxAnisotropy";
+    /** The console lines the graphics settings stand for (none for "auto"), in a fixed order. */
+    [[nodiscard]] std::vector<std::string> GraphicsCommands() const;
     /** settings.ini's format now: a file of a newer one is read but never written over. */
     static constexpr int kFormatNow = 1;
     /** The Format line the file had (0: none, a file from before formats).*/

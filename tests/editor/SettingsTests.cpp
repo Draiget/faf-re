@@ -66,4 +66,25 @@ namespace
     EXPECT_TRUE(again.Read(text).empty());
     EXPECT_EQ(again.Write(), text);
   }
+  TEST(
+    Settings,
+    GraphicsSettingsBecomeTheEnginesSwitches
+  )
+  {
+    EdSettings settings;
+    EXPECT_TRUE(settings.GraphicsCommands().empty()) << "every one auto: the engine's own defaults";
+    EXPECT_TRUE(settings.Set(EdSettings::kGfxShadows, "off"));
+    EXPECT_TRUE(settings.Set(EdSettings::kGfxShadowSize, "4096"));
+    EXPECT_FALSE(settings.Set(EdSettings::kGfxShadowSize, "3000"));
+    EXPECT_TRUE(settings.Set(EdSettings::kGfxFxaa, "on"));
+    EXPECT_TRUE(settings.Set(EdSettings::kGfxTextureDetail, "medium"));
+    EXPECT_TRUE(settings.Set(EdSettings::kGfxAnisotropy, "16"));
+    EXPECT_EQ(
+      settings.GraphicsCommands(),
+      (std::vector<std::string>{
+        "ren_Shadows false", "ren_ShadowSize 4096", "ren_Fxaa 1", "ren_MipSkipLevels 1", "ren_TextureAnisotropy 16"
+      })
+    );
+  }
+
 } // namespace

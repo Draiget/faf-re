@@ -3,6 +3,7 @@
 #include "editor/doc/EdEditorMods.h"
 
 #include <filesystem>
+#include <functional>
 #include <memory>
 #include <set>
 #include <string>
@@ -25,8 +26,10 @@ namespace faf::editor
    * the editor's commands; false when it can't run), `Map()` (the open map: path, name, size, water, counts; or nil),
    * `HeightAt(x, z)`, `Markers()`, `AddMarker(type, x, z)` (one undo step), `Panel(id, title, draw)` (a panel drawn
    * each frame by `draw(ui)`, `ui` holding Text, Note, Button, Checkbox, Slider, Input, Separator, SameLine, Tooltip),
-   * `Menu(commandId [, label])` (an entry under Window > From editor mods), `Has(point [, version])`, `Capabilities`
-   * and `ApiVersion` (FAF Studio's extension points, on this editor). A command that raises an error is reported with
+   * `Menu(commandId [, label])` (an entry under Window > From editor mods), `Tool(id, title, click)` (a tool its
+   * command turns on: a left click on the view calls `click(x, z, shift, ctrl)`), `SetHeights(x0, z0, w, h, list)`
+   * (one undo step), `LayerAt(layer, x, z)`, `Has(point [, version])`, `Capabilities` and `ApiVersion` (FAF Studio's
+   * extension points, on this editor). A command that raises an error is reported with
    * its mod's name and turns that mod off until the editor starts again; a panel that raises stops drawing and says
    * why.
    */
@@ -70,6 +73,14 @@ namespace faf::editor
       bool shown = false;
       std::string error;
     };
+    /** A mod's tool: its click function; on while its command has it on. */
+    struct ModTool
+    {
+      Mod* mod = nullptr;
+      std::string id;
+      std::string title;
+      int ref = -1;
+    };
     /** A mod's menu entry: a command id and its label ("" for the command's title). */
     struct ModMenu
     {
@@ -86,6 +97,19 @@ namespace faf::editor
     void AddCommand(Mod& mod, const std::string& id, const std::string& title, const std::string& keys, int ref);
     void AddPanel(Mod& mod, const std::string& id, const std::string& title, int ref);
     void AddMenu(Mod& mod, const std::string& command, const std::string& label);
+    void AddTool(Mod& mod, const std::string& id, const std::string& title, int ref);
+    /** A left click on the view at a ground point: the active mod tool's, true when one took it. */
+    bool ClickTool(float x, float z, bool shift, bool ctrl);
+    /** The mod tool that is on (null: none). */
+    [[nodiscard]] const ModTool* ActiveTool() const;
+    void StopTool()
+    {
+      mActiveTool.clear();
+    }
+    /** What the mods' map writes and reads go through (the view's; set by the app). */
+    std::function<bool(int x0, int z0, int w, int h, const std::vector<float>& heights, std::string& message)>
+      writeHeights;
+    std::function<float(int layer, float x, float z)> layerAt;
     /** Each frame: the shown panels of the running mods. */
     void DrawPanels();
     /** The menu entries the running mods asked for, and their panels' show commands. */
@@ -117,6 +141,8 @@ namespace faf::editor
     std::vector<std::unique_ptr<Mod>> mMods;
     std::vector<ModPanel> mPanels;
     std::vector<ModMenu> mMenus;
+    std::vector<ModTool> mTools;
+    std::string mActiveTool; // "<uid>/<id>" of the tool that is on
     std::set<std::string> mEnabled;
     std::filesystem::path mEnabledFile;
     std::filesystem::path mFolder;

@@ -116,6 +116,8 @@ namespace faf::editor
     bool ConvertLayers(const std::string& shader, const LayerConvertOptions& options, std::vector<std::string>& report);
     /** Test runs (`/masktest`): the panel's mask brush on stratum `layer` (0-7) at world x,z for `seconds`, logged. */
     void TestMaskStroke(int layer, float x, float z, float seconds);
+    /** Test runs: a texture stamp stroke on `layer` from (x0, z0) to (x1, z1) in 32 steps; logs dabs and texels. */
+    void TestMaskStamp(int layer, float x0, float z0, float x1, float z1);
     /**
      * Test runs: stratum 4 painted full in a square of 24 mask texels around world x,z, as the mask brush uploads it,
      * then the editor's and (in front of a play) the play's mask read back at its middle, logged.
@@ -135,6 +137,22 @@ namespace faf::editor
 
     /** Replaces the map's heights from a height image, resampled to the map's size, as one undo step. */
     bool ImportHeights(const std::filesystem::path& file, float scale, std::string& message);
+    /** Sets the whole map to one height (Terrain > Flatten map), as one undo step. */
+    bool FlattenWhole(float height, std::string& message);
+    /**
+     * Writes `w` x `h` height samples from (x0, z0), row by row (an editor mod's Editor.SetHeights), as one undo step;
+     * the part off the map is left out. False with `message` when nothing could be written.
+     */
+    bool WriteHeightRect(int x0, int z0, int w, int h, const std::vector<float>& heights, std::string& message);
+    /** How much texture layer `layer` (1..8) shows at a world point, 0..1 (-1 without masks or off the map). */
+    [[nodiscard]] float LayerWeightAt(int layer, float x, float z);
+    /**
+     * A left click on the view (no Alt), first: given the ground point and Shift / Ctrl, true when it was taken (an
+     * editor mod's tool). Empty: the editor's tools have it.
+     */
+    std::function<bool(float x, float z, bool shift, bool ctrl)> viewClickHook;
+    /** The lowest, highest and mean ground height of the map (false without one). */
+    bool HeightRange(float& low, float& high, float& mean) const;
     /** Writes the map's heights as a height image, `width` samples wide (0: the map's own size). */
     bool ExportHeights(const std::filesystem::path& file, int width, float scale, std::string& message);
     /** The point the orbit camera looks at (on the ground): where the particle editor's preview emits. */
@@ -996,6 +1014,15 @@ namespace faf::editor
     std::uint32_t mNoiseSeed = 0;
     /** The mask stroke in progress (FAF Studio's stroke model: the texels before it, their coverage). */
     MaskStroke mMaskStroke;
+    // The texture stamp stroke: where the last dab fell, the way since, its random turns.
+    bool mMaskStamped = false;
+    float mMaskStampLastX = 0.0f;
+    float mMaskStampLastZ = 0.0f;
+    float mMaskStampTravelled = 0.0f;
+    int mMaskStampDabs = 0;
+    std::mt19937 mMaskStampRandom;
+    /** One texture stamp step to (x, z): the dabs it passes, written with `brush`; the texels written. */
+    std::vector<SampleRect> MaskStampTo(MaskBrush brush, float x, float z);
     std::uint32_t mMaskStrokes = 0;
     /** Rain and Deposit: the erosion session of the stroke in progress (made at its first step). */
     ErosionStrokePtr mErosionStroke;
@@ -1237,6 +1264,8 @@ namespace faf::editor
     [[nodiscard]] bool MarkerHidden(const SaveEntry& marker) const;
     void DeleteSelectedMarkers();
     void DrawMarkers(moho::CD3DPrimBatcher& batcher, bool all);
+    /** The view of a selected Camera Info marker: its frustum down to the ground (FAF Studio's camframe). */
+    void DrawCameraFrame(moho::CD3DPrimBatcher& batcher, const moho::CHeightField& field, const SaveEntry& marker);
     /**
      * Mass and hydrocarbon points as the game marks them: its splat textures draped on the ground, drawn from the
      * markers each frame (so they follow a drag). ScenarioUtilities.lua's CreateResources: `mass_marker.dds`

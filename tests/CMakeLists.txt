@@ -432,6 +432,7 @@ add_executable(faf_editor_brush_tests EXCLUDE_FROM_ALL editor/HeightBrushTests.c
   editor/SymmetrizeTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdSymmetrize.cpp ${CMAKE_SOURCE_DIR}/src/editor/terrain/EdFieldSc.cpp
   editor/SaveFileTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdSaveFile.cpp
   editor/MarkerTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdMarkers.cpp
+  editor/CameraFrameTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdCameraFrame.cpp
   editor/ResizeTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdResize.cpp
   editor/TerrainPathTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdTerrainPath.cpp
   editor/TextureFilesTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdTextureFiles.cpp

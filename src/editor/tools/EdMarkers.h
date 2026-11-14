@@ -61,6 +61,20 @@ namespace faf::editor
 
   /** A marker's position (from `position`); false when it has none. */
   bool MarkerPosition(const SaveEntry& marker, float& x, float& y, float& z);
+
+  /**
+   * Markers off the area (x0, z0, x1, z1) moved onto it (FAF Studio's "move stray markers onto the map"): each to the
+   * nearest point `inset` inside the edge, its height from `height` (or kept without one). Returns their names.
+   */
+  std::vector<std::string> PullMarkersInside(
+    std::vector<SaveEntry>& markers,
+    float x0,
+    float z0,
+    float x1,
+    float z1,
+    float inset,
+    const std::function<float(float, float)>& height
+  );
   /** A marker's colour as ARGB (from `color`, else grey). */
   std::uint32_t MarkerColor(const SaveEntry& marker);
 

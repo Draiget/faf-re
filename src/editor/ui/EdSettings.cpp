@@ -30,6 +30,13 @@ namespace faf::editor
         {EdSettings::kBackups, "10", {"0", "3", "10", "30"}},
         {EdSettings::kPopouts, "1", {}},
         {EdSettings::kIdleFps, "30", {"0", "10", "30", "60"}},
+        {EdSettings::kGfxShadows, "auto", {"auto", "on", "off"}},
+        {EdSettings::kGfxShadowSize, "auto", {"auto", "1024", "2048", "4096"}},
+        {EdSettings::kGfxBloom, "auto", {"auto", "on", "off"}},
+        {EdSettings::kGfxFxaa, "auto", {"auto", "on", "off"}},
+        {EdSettings::kGfxAo, "auto", {"auto", "on", "off"}},
+        {EdSettings::kGfxTextureDetail, "auto", {"auto", "high", "medium", "low"}},
+        {EdSettings::kGfxAnisotropy, "auto", {"auto", "0", "4", "8", "16"}},
       };
       return kDefinitions;
     }
@@ -177,4 +184,29 @@ namespace faf::editor
   {
     return Set(key, std::to_string(value));
   }
+  std::vector<std::string> EdSettings::GraphicsCommands() const
+  {
+    std::vector<std::string> out;
+    const auto onOff = [&](const char* key, const char* var, const char* on, const char* off) {
+      const std::string value = Get(key);
+      if (value == "on" || value == "off") {
+        out.push_back(std::string(var) + " " + (value == "on" ? on : off));
+      }
+    };
+    onOff(kGfxShadows, "ren_Shadows", "true", "false");
+    if (const std::string size = Get(kGfxShadowSize); size != "auto" && !size.empty()) {
+      out.push_back("ren_ShadowSize " + size);
+    }
+    onOff(kGfxBloom, "ren_Bloom", "true", "false");
+    onOff(kGfxFxaa, "ren_Fxaa", "1", "0");
+    onOff(kGfxAo, "ren_Ao", "1", "0");
+    if (const std::string detail = Get(kGfxTextureDetail); detail == "high" || detail == "medium" || detail == "low") {
+      out.push_back(std::string("ren_MipSkipLevels ") + (detail == "high" ? "0" : detail == "medium" ? "1" : "2"));
+    }
+    if (const std::string aniso = Get(kGfxAnisotropy); aniso != "auto" && !aniso.empty()) {
+      out.push_back("ren_TextureAnisotropy " + aniso);
+    }
+    return out;
+  }
+
 } // namespace faf::editor

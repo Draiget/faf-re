@@ -409,6 +409,15 @@ namespace faf::editor
         // The drawing (its revision) and the editor's symmetry: a stroke on the canvas runs the node again.
         key += "|layout" + ground.layoutKey;
       }
+      if (node->type->name == "stratum") {
+        key += "|paint" + ground.paintKey;
+      }
+      if (node->type->name == "image") {
+        const std::string file = values.S("path");
+        std::error_code stampError;
+        key += "|" + std::to_string(std::filesystem::file_size(file, stampError)) + ":" +
+          std::to_string(std::filesystem::last_write_time(file, stampError).time_since_epoch().count());
+      }
       if (node->type->name == "external_terrain") {
         // The window's file and mapping, or the node's own file's stamp: a new save of the other tool runs it again.
         key += "|ext" + ground.externalKey;
@@ -423,9 +432,46 @@ namespace faf::editor
         ++report.cached;
         continue;
       }
+      // A node after an Oversample node works on the finest grid among its inputs (FAF Studio's Run:Conform); its
+      // other field inputs are brought onto that grid (smooth), so every op sees fields of one shape.
+      field::GridPtr nodeLike = like;
+      for (const auto& [name, value] : ins) {
+        if (
+          value != nullptr && value->grid != nullptr && value->grid->w > nodeLike->w && value->grid->h > nodeLike->h
+        ) {
+          nodeLike = std::make_shared<field::Grid>(
+            value->grid->w, value->grid->h, value->grid->cell, value->grid->ox, value->grid->oz
+          );
+        }
+      }
+      std::vector<std::unique_ptr<TerrainValue>> conformed;
+      if (nodeLike != like) {
+        key += "|fine" + std::to_string(nodeLike->w);
+        for (auto& [name, value] : ins) {
+          if (value == nullptr || value->grid == nullptr || value->grid->SameShape(*nodeLike)) {
+            continue;
+          }
+          field::OpArgs args;
+          args.in["a"] = value->grid;
+          args.in["like"] = nodeLike;
+          auto grid = std::make_shared<field::Grid>();
+          std::string error;
+          if (!field::RunOp(value->grid->w < nodeLike->w ? "upsample" : "downsample", args, *grid, error)) {
+            continue;
+          }
+          auto copy = std::make_unique<TerrainValue>(*value);
+          copy->grid = std::move(grid);
+          value = copy.get();
+          conformed.push_back(std::move(copy));
+        }
+        if (entry.key == key && entry.error.empty()) {
+          ++report.cached;
+          continue;
+        }
+      }
       terrain::Env env;
-      env.like = like;
-      env.cell = like->cell;
+      env.like = nodeLike;
+      env.cell = nodeLike->cell;
       env.step = mStep;
       env.W = static_cast<float>(ground.width - 1);
       env.H = static_cast<float>(ground.height - 1);

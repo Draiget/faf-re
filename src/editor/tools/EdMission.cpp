@@ -2192,6 +2192,72 @@ namespace faf::editor
     return c;
   }
 
+  bool ParseMissionLive(
+    const std::string& line,
+    MissionLive& out
+  )
+  {
+    out = MissionLive{};
+    bool any = false;
+    std::size_t start = 0;
+    while (start <= line.size()) {
+      const std::size_t bar = line.find('|', start);
+      const std::string part = line.substr(start, bar == std::string::npos ? std::string::npos : bar - start);
+      start = bar == std::string::npos ? line.size() + 1 : bar + 1;
+      const std::size_t space = part.find(' ');
+      if (space == std::string::npos) {
+        continue;
+      }
+      const std::string key = part.substr(0, space);
+      const std::string rest = part.substr(space + 1);
+      const std::size_t eq = rest.rfind('=');
+      if (key == "tick") {
+        out.tick = std::atoi(rest.c_str());
+        any = true;
+      } else if (key == "stage") {
+        out.stage = std::atoi(rest.c_str());
+        any = true;
+      } else if (key == "var" && eq != std::string::npos && eq > 0) {
+        out.vars.emplace_back(rest.substr(0, rest.find('=')), rest.substr(rest.find('=') + 1));
+      } else if (key == "obj" && eq != std::string::npos) {
+        out.objectives.push_back({rest.substr(0, eq), rest.substr(eq + 1)});
+      }
+    }
+    return any;
+  }
+
+  std::string MissionLiveQuery()
+  {
+    // `|` and newlines in values would break the line apart: replaced.
+    return "SimLua local m = ScenarioInfo.EditorMission if m then "
+           "local function c(v) return (string.gsub(string.gsub(tostring(v), '|', '/'), '\\n', ' ')) end "
+           "local t = { 'tick ' .. GetGameTick(), 'stage ' .. (ScenarioInfo.MissionNumber or 0) } "
+           "for k, v in m.V or {} do table.insert(t, 'var ' .. c(k) .. '=' .. c(v)) end "
+           "for _, o in m.Objectives or {} do "
+           "table.insert(t, 'obj ' .. c(o.Title or o.Tag or '?') .. '=' .. "
+           "(o.Complete and 'done' or (o.Active and 'active' or 'off'))) end "
+           "LOG('EDMISSION live ' .. table.concat(t, '|')) end";
+  }
+
+  bool MissionSetVariable(
+    const std::string& name,
+    const bool value,
+    std::string& command
+  )
+  {
+    if (name.empty() || std::isdigit(static_cast<unsigned char>(name[0])) != 0) {
+      return false;
+    }
+    for (const char c : name) {
+      if (std::isalnum(static_cast<unsigned char>(c)) == 0 && c != '_') {
+        return false;
+      }
+    }
+    command = "SimLua local m = ScenarioInfo.EditorMission if m and m.V then m.V." + name + " = " +
+      (value ? "true" : "false") + " end";
+    return true;
+  }
+
   bool ParseMissionTrace(
     const std::string& id,
     MissionTraceId& out

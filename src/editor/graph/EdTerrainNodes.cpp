@@ -3807,6 +3807,95 @@ namespace faf::editor::terrain
       );
     }
 
+    // ---- Oversample (FAF Studio's graphnodes_oversample.lua): the height on a grid `factor` times finer; the nodes
+    // after it work on that grid by themselves (the runner brings their other inputs onto it), the map's outputs bring
+    // it back down.
+    {
+      c.Add(
+        "oversample",
+        "Oversample",
+        "erosion",
+        "Puts the height on a grid `factor` times finer than the map's (smooth, not blocky), so what comes after it "
+        "(erosion, normals, masks) works at a multiple of the map's resolution. The outputs that write into the map "
+        "average it back down. Costs memory and time with the square of the factor: 2 is 4 times the samples, 4 is "
+        "16 times.",
+        {Pin("a")},
+        kHeightOut,
+        {N("factor", "Factor (times the map's resolution)", 1, 8, 1, "%.0f", 2),
+         C("method", "Resampling", {"cubic", "linear"}, {"Smooth (cubic)", "Linear"}, "cubic")},
+        [](const Env& E, const Values& v, const Inputs& ins) {
+        const field::GridPtr a = In(ins, "a");
+        const int k = std::clamp(static_cast<int>(std::lround(v.N("factor"))), 1, 8);
+        if (k == 1) {
+          return One(a);
+        }
+        const long long w = static_cast<long long>(a->w - 1) * k + 1;
+        const long long h = static_cast<long long>(a->h - 1) * k + 1;
+        if (w > 8193 || h > 8193) {
+          Fail(
+            std::to_string(w) + " x " + std::to_string(h) +
+            " samples are too many (at most 8193 a side): use a "
+            "smaller factor"
+          );
+        }
+        return One(E.Op(
+          "upsample", {{"a", a}, {"factor", static_cast<double>(k)}, {"linear", v.S("method") == "linear" ? 1.0 : 0.0}}
+        ));
+      }
+      );
+    }
+
+    // ---- sources from the map's paint and from an image (FAF Studio's graphnodes.lua `stratum` and `image`)
+    {
+      c.Add(
+        "stratum",
+        "Texture layer",
+        "sources",
+        "What a texture layer (1..8) covers now, as a mask: the weight the map shows, at the graph's resolution.",
+        {},
+        kMaskOut,
+        {N("layer", "Layer", 1, 8, 1, "%.0f", 1)},
+        [](const Env& E, const Values& v, const Inputs&) {
+        if (E.ground == nullptr || !E.ground->layerMask) {
+          Fail("no map's paint to read");
+        }
+        auto mask = std::make_shared<field::Grid>();
+        std::string error;
+        if (!E.ground->layerMask(static_cast<int>(std::lround(v.N("layer"))), *mask, error)) {
+          Fail(error);
+        }
+        return One(E.Op("resample", {{"a", field::GridPtr(mask)}, {"like", E.like}}));
+      }
+      );
+      c.Add(
+        "image",
+        "Image (PNG16)",
+        "sources",
+        "A 16 bit grey image (.png, .tif, .r16, .raw) stretched over the map: black becomes the low value, white the "
+        "high one.",
+        {},
+        kHeightOut,
+        {T("path", "File (full path)", ""),
+         N("lo", "Value at black", -200, 600, 1, "%.0f", 0),
+         N("hi", "Value at white", -200, 600, 1, "%.0f", 100)},
+        [](const Env& E, const Values& v, const Inputs&) {
+        if (v.S("path").empty()) {
+          Fail("no file chosen");
+        }
+        if (E.ground == nullptr || !E.ground->loadImage) {
+          Fail("no map to stretch the image over");
+        }
+        auto image = std::make_shared<field::Grid>();
+        std::string error;
+        if (!E.ground->loadImage(v.S("path"), *image, error)) {
+          Fail(error);
+        }
+        const field::GridPtr r = E.Op("resample", {{"a", field::GridPtr(image)}, {"like", E.like}});
+        return One(E.Op("affine", {{"a", r}, {"mul", v.N("hi") - v.N("lo")}, {"add", v.N("lo")}}));
+      }
+      );
+    }
+
     // ---- terrain from other tools (FAF Studio's graphnodes_ext.lua) and the map layout (graphnodes_layout.lua)
     {
       c.Add(

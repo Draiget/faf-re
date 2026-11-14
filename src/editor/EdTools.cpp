@@ -2877,6 +2877,23 @@ namespace faf::editor
           "dabs gave it, so going over a spot again doesn't add more. Scatter speckles the edge, the same at every "
           "copy."
         );
+        // The stamp stroke (FAF Studio's texture stamp): the shape pressed in as separate dabs along the stroke.
+        ImGui::Checkbox("Stamp along the stroke", &mMaskStamp);
+        EdSetItemTooltip(
+          "The brush's shape (pick an image below) pressed into the layer as separate dabs along the stroke, each "
+          "turned and jittered, instead of a continuous brush"
+        );
+        if (mMaskStamp) {
+          ImGui::SetNextItemWidth(half);
+          FillSliderFloat("##maskstampspacing", &mMaskStampSpacing, 0.1f, 4.0f, "Spacing %.1f widths");
+          ImGui::SameLine();
+          ImGui::Checkbox("Random turn", &mMaskStampRandomTurn);
+          float jitter = mMaskStampJitter * 100.0f;
+          ImGui::SetNextItemWidth(half);
+          if (FillSliderFloat("##maskstampjitter", &jitter, 0.0f, 100.0f, "Jitter %.0f%%")) {
+            mMaskStampJitter = jitter / 100.0f;
+          }
+        }
       }
       DrawShapePicker();
       DrawBrush(false);

@@ -559,6 +559,25 @@ namespace faf::editor
         mModHost.Draw(mShowEditorMods);
       }
       mModHost.DrawPanels();
+      // An editor mod's tool that is on: a note at the top of the view, Esc turns it off.
+      if (const EdModHost::ModTool* const tool = mModHost.ActiveTool(); tool != nullptr) {
+        if (ImGui::IsKeyPressed(ImGuiKey_Escape) && !ImGui::GetIO().WantTextInput) {
+          mModHost.StopTool();
+        } else {
+          const ImGuiViewport* const main = ImGui::GetMainViewport();
+          const std::string note = tool->title + " (" + tool->mod->info.name + "): click the map. Esc turns it off.";
+          const ImVec2 size = ImGui::CalcTextSize(note.c_str());
+          const ImVec2 at(main->WorkPos.x + (main->WorkSize.x - size.x) * 0.5f, main->WorkPos.y + Em(64.0f));
+          ImDrawList* const draw = ImGui::GetForegroundDrawList(ImGui::GetMainViewport());
+          draw->AddRectFilled(
+            ImVec2(at.x - Em(10.0f), at.y - Em(5.0f)),
+            ImVec2(at.x + size.x + Em(10.0f), at.y + size.y + Em(5.0f)),
+            IM_COL32(20, 24, 30, 220),
+            Em(4.0f)
+          );
+          draw->AddText(at, IM_COL32(255, 224, 96, 255), note.c_str());
+        }
+      }
       if (mShowUnitViewer) {
         mUnitViewer.Draw(mShowUnitViewer);
       }
@@ -588,8 +607,12 @@ namespace faf::editor
       {
         // The test play's trace arrives in the log whether or not Run is shown.
         const std::vector<std::string> trace = mLog.TakeMissionTrace();
+        std::string live;
+        const bool hasLive = mLog.TakeMissionLive(live);
         if (mShowMissionRun) {
-          mMissionPanel.DrawRunPanel(mShowMissionRun, mDocument.Map() != nullptr, mPlay.Active(), trace);
+          mMissionPanel.DrawRunPanel(
+            mShowMissionRun, mDocument.Map() != nullptr, mPlay.Active(), trace, hasLive ? &live : nullptr
+          );
         }
       }
       if (mMissionPanel.TakePlayAsk() && !mPlay.Active() && mPlay.CanPlay()) {

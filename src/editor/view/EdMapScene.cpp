@@ -7,6 +7,7 @@
 #include "editor/tools/EdRecipes.h"
 #include "editor/tools/EdMapStats.h"
 #include "editor/tools/EdPathing.h"
+#include "editor/tools/EdCameraFrame.h"
 #include "editor/tools/EdMarkers.h"
 #include "editor/tools/EdScatter.h"
 #include "editor/tools/EdSlopeRules.h"
@@ -3481,20 +3482,25 @@ namespace faf::editor
                                                       : brush.mode;
     }
     const MaskTerrain terrain{field->data, field->width, field->height};
-    for (const SampleRect& rect : MaskBrushRects(masks.width, masks.height, terrain, groundX, groundZ, brush)) {
-      mDocument.MaskUndo().BeforeWrite(masks.texels.data(), rect);
+    std::vector<SampleRect> rects;
+    if (mTools->CurrentMaskStamp().on && (brush.mode == MaskBrushMode::Paint || brush.mode == MaskBrushMode::Erase)) {
+      rects = MaskStampTo(brush, groundX, groundZ);
+    } else {
+      for (const SampleRect& rect : MaskBrushRects(masks.width, masks.height, terrain, groundX, groundZ, brush)) {
+        mDocument.MaskUndo().BeforeWrite(masks.texels.data(), rect);
+      }
+      rects = ApplyMaskBrush(
+        masks.texels.data(),
+        masks.width,
+        masks.height,
+        terrain,
+        groundX,
+        groundZ,
+        brush,
+        std::min(frameSeconds, 0.1f),
+        &mMaskStroke
+      );
     }
-    const std::vector<SampleRect> rects = ApplyMaskBrush(
-      masks.texels.data(),
-      masks.width,
-      masks.height,
-      terrain,
-      groundX,
-      groundZ,
-      brush,
-      std::min(frameSeconds, 0.1f),
-      &mMaskStroke
-    );
     if (!rects.empty()) {
       mDocument.SetModified(true);
       mWeightStale = true;
@@ -3505,6 +3511,109 @@ namespace faf::editor
       }
       UploadMasks(rects, layers);
     }
+  }
+
+  std::vector<SampleRect> EdMapScene::MaskStampTo(
+    MaskBrush brush,
+    const float x,
+    const float z
+  )
+  {
+    EdDocument::MaskGrid& masks = mDocument.Masks();
+    const moho::CHeightField* const field = mMap->mTerrainRes->GetHeightField();
+    const EdTools::MaskStamp stamp = mTools->CurrentMaskStamp();
+    // A new stroke (the stroke model's snapshot is empty): the first point is a dab.
+    const float spacing = std::max(1.0f, 2.0f * brush.shape.radius * stamp.spacing);
+    if (!mMaskStamped || mMaskStroke.before.empty()) {
+      mMaskStamped = true;
+      mMaskStampTravelled = spacing;
+      mMaskStampLastX = x;
+      mMaskStampLastZ = z;
+      mMaskStampRandom.seed(mMaskStrokes * 7919u + 13u);
+    }
+    const std::vector<StampDab> dabs =
+      StampDabsAlong(mMaskStampLastX, mMaskStampLastZ, x, z, spacing, mMaskStampTravelled);
+    mMaskStampLastX = x;
+    mMaskStampLastZ = z;
+    // Each dab once, at full strength, in the stroke model: dabs that overlap don't pile up.
+    brush.buildUp = false;
+    std::uniform_real_distribution<float> unit(0.0f, 1.0f);
+    const MaskTerrain terrain{field->data, field->width, field->height};
+    std::vector<SampleRect> written;
+    for (const StampDab& at : dabs) {
+      MaskBrush dab = brush;
+      if (stamp.randomTurn) {
+        dab.shape.shapeAngle += unit(mMaskStampRandom) * 360.0f;
+      }
+      float dx = at.x;
+      float dz = at.z;
+      if (stamp.jitter > 0.0f) {
+        dab.shape.radius *= 1.0f + (unit(mMaskStampRandom) * 2.0f - 1.0f) * stamp.jitter;
+        const float angle = unit(mMaskStampRandom) * 6.2831853f;
+        const float reach = brush.shape.radius * stamp.jitter * std::sqrt(unit(mMaskStampRandom));
+        dx += std::cos(angle) * reach;
+        dz += std::sin(angle) * reach;
+      }
+      for (const SampleRect& rect : MaskBrushRects(masks.width, masks.height, terrain, dx, dz, dab)) {
+        mDocument.MaskUndo().BeforeWrite(masks.texels.data(), rect);
+      }
+      const std::vector<SampleRect> rects =
+        ApplyMaskBrush(masks.texels.data(), masks.width, masks.height, terrain, dx, dz, dab, 1.0f, &mMaskStroke);
+      written.insert(written.end(), rects.begin(), rects.end());
+      ++mMaskStampDabs;
+    }
+    return written;
+  }
+
+  void EdMapScene::TestMaskStamp(
+    const int layer,
+    const float x0,
+    const float z0,
+    const float x1,
+    const float z1
+  )
+  {
+    LoadMasks();
+    EdDocument::MaskGrid& masks = mDocument.Masks();
+    const moho::CHeightField* const field = mMap != nullptr ? mMap->mTerrainRes->GetHeightField() : nullptr;
+    if (mTools == nullptr || field == nullptr || masks.texels.empty()) {
+      return;
+    }
+    const std::vector<std::uint64_t> start = masks.texels;
+    MaskBrush brush = mTools->CurrentMaskBrush();
+    brush.layer = std::clamp(layer, 0, 7);
+    brush.remapped = RemappedStrata(TerrainShader());
+    brush.scatterSeed = ++mMaskStrokes;
+    mDocument.MaskUndo().BeginStroke();
+    mMaskStroke = MaskStroke{};
+    mMaskStamped = false;
+    mMaskStampDabs = 0;
+    std::vector<SampleRect> all;
+    for (int step = 0; step <= 32; ++step) {
+      const float t = static_cast<float>(step) / 32.0f;
+      brush.step = ++mMaskSteps;
+      const std::vector<SampleRect> rects = MaskStampTo(brush, x0 + (x1 - x0) * t, z0 + (z1 - z0) * t);
+      all.insert(all.end(), rects.begin(), rects.end());
+    }
+    std::size_t changed = 0;
+    for (std::size_t i = 0; i < start.size(); ++i) {
+      changed += MaskByte(masks.texels[i], brush.layer) != MaskByte(start[i], brush.layer) ? 1 : 0;
+    }
+    mDocument.MaskUndo().EndStroke(masks.texels.data());
+    mDocument.EditEnded(EdDocument::EditKind::Masks);
+    mMaskStroke = MaskStroke{};
+    mMaskStamped = false;
+    UploadMasks(all, 0xFFu);
+    gpg::Logf(
+      "editor: mask stamp test: layer %d, %d dabs from (%.0f, %.0f) to (%.0f, %.0f), %zu texels changed",
+      brush.layer + 1,
+      mMaskStampDabs,
+      x0,
+      z0,
+      x1,
+      z1,
+      changed
+    );
   }
 
   void EdMapScene::TestMaskStroke(
@@ -3919,6 +4028,129 @@ namespace faf::editor
     message = "Imported heights from " + file.string() + " (" + std::to_string(readWidth) + " x " +
       std::to_string(readHeight) + (readWidth != field->width || readHeight != field->height ? ", resampled" : "") +
       ")";
+    return true;
+  }
+
+  bool EdMapScene::FlattenWhole(
+    const float height,
+    std::string& message
+  )
+  {
+    moho::CHeightField* const field = mMap != nullptr ? mMap->mTerrainRes->GetHeightField() : nullptr;
+    if (field == nullptr || mPainting) {
+      message = "No map is open in the view.";
+      return false;
+    }
+    // Heights are stored in 1/128 units in 16 bits.
+    const auto word = static_cast<std::uint16_t>(std::clamp(std::lround(height * 128.0f), 0L, 65535L));
+    const SampleRect whole{0, 0, field->width - 1, field->height - 1};
+    mDocument.Heights().BeginStroke();
+    mDocument.Heights().BeforeWrite(field->data, whole);
+    std::fill(field->data, field->data + static_cast<std::size_t>(field->width) * field->height, word);
+    mDocument.Heights().EndStroke(field->data);
+    mDocument.EditEnded(EdDocument::EditKind::Heights);
+    RefreshHeights({whole});
+    mDocument.SetModified(true);
+    if (mCheckDone) {
+      RunSymmetryCheck();
+    }
+    char text[96];
+    (void)std::snprintf(text, sizeof(text), "Flattened the map to height %.2f", static_cast<float>(word) / 128.0f);
+    message = text;
+    gpg::Logf("editor: %s", text);
+    return true;
+  }
+
+  bool EdMapScene::WriteHeightRect(
+    const int x0,
+    const int z0,
+    const int w,
+    const int h,
+    const std::vector<float>& heights,
+    std::string& message
+  )
+  {
+    moho::CHeightField* const field = mMap != nullptr ? mMap->mTerrainRes->GetHeightField() : nullptr;
+    if (field == nullptr || mPainting) {
+      message = "no map is open in the view";
+      return false;
+    }
+    if (w <= 0 || h <= 0 || heights.size() < static_cast<std::size_t>(w) * static_cast<std::size_t>(h)) {
+      message = "the list has fewer than w x h heights";
+      return false;
+    }
+    const SampleRect rect{
+      std::max(0, x0), std::max(0, z0), std::min(field->width - 1, x0 + w - 1), std::min(field->height - 1, z0 + h - 1)
+    };
+    if (rect.x0 > rect.x1 || rect.z0 > rect.z1) {
+      message = "the rectangle is off the map";
+      return false;
+    }
+    mDocument.Heights().BeginStroke();
+    mDocument.Heights().BeforeWrite(field->data, rect);
+    for (int z = rect.z0; z <= rect.z1; ++z) {
+      for (int x = rect.x0; x <= rect.x1; ++x) {
+        const float value = heights[static_cast<std::size_t>(z - z0) * w + static_cast<std::size_t>(x - x0)];
+        field->data[static_cast<std::size_t>(z) * field->width + x] =
+          static_cast<std::uint16_t>(std::clamp(std::lround(value * 128.0f), 0L, 65535L));
+      }
+    }
+    mDocument.Heights().EndStroke(field->data);
+    mDocument.EditEnded(EdDocument::EditKind::Heights);
+    RefreshHeights({rect});
+    mDocument.SetModified(true);
+    return true;
+  }
+
+  float EdMapScene::LayerWeightAt(
+    const int layer,
+    const float x,
+    const float z
+  )
+  {
+    const moho::CHeightField* const field = mMap != nullptr ? mMap->mTerrainRes->GetHeightField() : nullptr;
+    if (field == nullptr || layer < 1 || layer > 8) {
+      return -1.0f;
+    }
+    LoadMasks();
+    const EdDocument::MaskGrid& masks = mDocument.Masks();
+    const float extent = static_cast<float>(field->width - 1);
+    if (masks.texels.empty() || x < 0.0f || z < 0.0f || x > extent || z > static_cast<float>(field->height - 1)) {
+      return -1.0f;
+    }
+    const int tx = std::clamp(static_cast<int>(x / extent * static_cast<float>(masks.width)), 0, masks.width - 1);
+    const int tz = std::clamp(
+      static_cast<int>(z / static_cast<float>(field->height - 1) * static_cast<float>(masks.height)),
+      0,
+      masks.height - 1
+    );
+    const bool remapped = (RemappedStrata(TerrainShader()) & (1U << (layer - 1))) != 0;
+    return MaskWeight(MaskByte(masks.texels[static_cast<std::size_t>(tz) * masks.width + tx], layer - 1), remapped) /
+      255.0f;
+  }
+
+  bool EdMapScene::HeightRange(
+    float& low,
+    float& high,
+    float& mean
+  ) const
+  {
+    const moho::CHeightField* const field = mMap != nullptr ? mMap->mTerrainRes->GetHeightField() : nullptr;
+    if (field == nullptr || field->width <= 0 || field->height <= 0) {
+      return false;
+    }
+    const std::size_t count = static_cast<std::size_t>(field->width) * field->height;
+    std::uint16_t lo = 65535;
+    std::uint16_t hi = 0;
+    double sum = 0.0;
+    for (std::size_t i = 0; i < count; ++i) {
+      lo = std::min(lo, field->data[i]);
+      hi = std::max(hi, field->data[i]);
+      sum += field->data[i];
+    }
+    low = static_cast<float>(lo) / 128.0f;
+    high = static_cast<float>(hi) / 128.0f;
+    mean = static_cast<float>(sum / static_cast<double>(count) / 128.0);
     return true;
   }
 
@@ -6146,6 +6378,42 @@ namespace faf::editor
         }
         return true;
       };
+      // A 16 bit image of any size, 0..1 (the Image node); resampled to the map's samples.
+      out.loadImage = [width, height](const std::string& file, field::Grid& grid, std::string& error) {
+        HeightImage image;
+        if (!ReadHeightImage(file, 0, 0, image, error)) {
+          error = file + ": " + error;
+          return false;
+        }
+        image = ResampleHeights(image, width, height);
+        grid = field::Grid(width, height, 1.0f, 0.0f, 0.0f);
+        for (std::size_t k = 0; k < image.words.size(); ++k) {
+          grid.v[k] = static_cast<float>(image.words[k]) / 65535.0f;
+        }
+        return true;
+      };
+      // A layer's paint as the map shows it (the Texture layer node), read when the node runs (on this thread).
+      out.paintKey = std::to_string(MasksHash());
+      out.layerMask = [this, width](const int layer, field::Grid& grid, std::string& error) {
+        if (layer < 1 || layer > 8) {
+          error = "layers are 1 to 8";
+          return false;
+        }
+        LoadMasks();
+        const EdDocument::MaskGrid& masks = mDocument.Masks();
+        if (masks.texels.empty() || masks.width < 2 || masks.height < 2) {
+          error = "the map has no paint masks";
+          return false;
+        }
+        const bool remapped = (RemappedStrata(TerrainShader()) & (1U << (layer - 1))) != 0;
+        // Each texel covers its share of the map: its sample in the middle of that square.
+        const float cell = static_cast<float>(width - 1) / static_cast<float>(masks.width);
+        grid = field::Grid(masks.width, masks.height, cell, cell * 0.5f, cell * 0.5f);
+        for (std::size_t i = 0; i < masks.texels.size(); ++i) {
+          grid.v[i] = MaskWeight(MaskByte(masks.texels[i], layer - 1), remapped) / 255.0f;
+        }
+        return true;
+      };
       // Named masks: files beside the window's heightmap, by name (FAF Studio's adopted files).
       out.loadExternalMask =
         [windowFile, width, height](const std::string& name, field::Grid& grid, std::string& error) {
@@ -6445,7 +6713,9 @@ namespace faf::editor
       up.in["a"] = source;
       up.in["like"] = fine;
       field::Grid upsampled;
-      if (!field::RunOpCpu("upsample", up, upsampled, error) || upsampled.v.size() != count) {
+      // A finer result (after an Oversample node) is averaged down; a coarser one put up smoothly.
+      const char* const op = result.w > width ? "downsample" : "upsample";
+      if (!field::RunOpCpu(op, up, upsampled, error) || upsampled.v.size() != count) {
         return "Preview: " + error;
       }
       target = std::move(upsampled.v);
@@ -9152,6 +9422,12 @@ namespace faf::editor
         batcher.DrawLine(vertex(x - s, base, z + s, color), vertex(x - s, base, z - s, color));
         batcher.DrawLine(vertex(x + grow, base, z, color), vertex(x + grow, base + (start ? 10.0f : 4.0f), z, color));
       }
+      if (
+        type == "Camera Info" &&
+        std::find(mMarkerSelection.begin(), mMarkerSelection.end(), marker.name) != mMarkerSelection.end()
+      ) {
+        DrawCameraFrame(batcher, *field, marker);
+      }
       if (std::find(mMarkerSelection.begin(), mMarkerSelection.end(), marker.name) != mMarkerSelection.end()) {
         constexpr std::uint32_t kSelected = 0xF0FFE040u;
         for (int s = 0; s < 20; ++s) {
@@ -9162,6 +9438,86 @@ namespace faf::editor
             vertex(x + std::cos(a1) * (r + 1.5f), base, z + std::sin(a1) * (r + 1.5f), kSelected)
           );
         }
+      }
+    }
+  }
+
+  void EdMapScene::DrawCameraFrame(
+    moho::CD3DPrimBatcher& batcher,
+    const moho::CHeightField& field,
+    const SaveEntry& marker
+  )
+  {
+    // FAF Studio's camframe.lua: from the eye to where the view's corners meet the ground, that outline laid on the
+    // ground, and a line to the focus. Heading and pitch from `orientation`, the view's width at the focus `zoom`.
+    float fx = 0.0f, fy = 0.0f, fz = 0.0f;
+    if (!MarkerPosition(marker, fx, fy, fz)) {
+      return;
+    }
+    const std::vector<double> turn = ValueNumbers(marker.Get("orientation"));
+    const std::vector<double> zoomValue = ValueNumbers(marker.Get("zoom"));
+    const float heading = turn.size() > 0 ? static_cast<float>(turn[0]) : mHeading;
+    const float pitch = turn.size() > 1 ? static_cast<float>(turn[1]) : mPitch;
+    const float zoom = !zoomValue.empty() && zoomValue[0] > 0.0 ? static_cast<float>(zoomValue[0]) : 100.0f;
+    const float maxZoom = mCamera != nullptr ? mCamera->GetMaxZoom() : mMapExtent * 2.0f;
+    const float aspect =
+      mWidth > 0 && mHeight > 0 ? static_cast<float>(mWidth) / static_cast<float>(mHeight) : 16.0f / 9.0f;
+    const CameraFrustum frustum =
+      CameraFrustumOf({fx, fy, fz}, heading, pitch, zoom, CameraFovFor(zoom, maxZoom), aspect);
+    // The ground between the samples, nothing off the terrain.
+    const auto ground = [&field](const float x, const float z) -> std::optional<float> {
+      if (x < 0.0f || z < 0.0f || x > static_cast<float>(field.width - 1) || z > static_cast<float>(field.height - 1)) {
+        return std::nullopt;
+      }
+      const int ix = std::min(static_cast<int>(x), field.width - 2);
+      const int iz = std::min(static_cast<int>(z), field.height - 2);
+      const float tx = x - static_cast<float>(ix);
+      const float tz = z - static_cast<float>(iz);
+      const auto at = [&field](const int sx, const int sz) {
+        return static_cast<float>(field.data[static_cast<std::size_t>(sz) * field.width + sx]) / 128.0f;
+      };
+      return (at(ix, iz) * (1.0f - tx) + at(ix + 1, iz) * tx) * (1.0f - tz) +
+        (at(ix, iz + 1) * (1.0f - tx) + at(ix + 1, iz + 1) * tx) * tz;
+    };
+    const float reach = std::max(mMapExtent * 3.0f, frustum.distance * 4.0f + 300.0f);
+    const std::array<CameraHit, 4> corners = CameraCorners(frustum, ground, reach, 600);
+    const auto vertex = [](const float x, const float y, const float z, const std::uint32_t color) {
+      moho::CD3DPrimBatcher::Vertex v{};
+      v.mX = x;
+      v.mY = y;
+      v.mZ = z;
+      v.mColor = color;
+      return v;
+    };
+    constexpr std::uint32_t kEdge = 0xB0FFE060u;
+    constexpr std::uint32_t kOutline = 0xFFFFE060u;
+    constexpr std::uint32_t kCentre = 0x60FFE060u;
+    constexpr float kLift = 0.15f;
+    const CameraVec& eye = frustum.eye;
+    for (const CameraHit& corner : corners) {
+      batcher.DrawLine(
+        vertex(eye[0], eye[1], eye[2], kEdge), vertex(corner.point[0], corner.point[1], corner.point[2], kEdge)
+      );
+    }
+    batcher.DrawLine(vertex(eye[0], eye[1], eye[2], kCentre), vertex(fx, fy, fz, kCentre));
+    // The outline on the ground, in short steps so it follows the hills (a far corner is laid down on it).
+    for (std::size_t i = 0; i < 4; ++i) {
+      const CameraVec& a = corners[i].point;
+      const CameraVec& b = corners[(i + 1) % 4].point;
+      const float length = std::hypot(b[0] - a[0], b[2] - a[2]);
+      const int steps = std::clamp(static_cast<int>(length / 4.0f), 1, 256);
+      float px = a[0], pz = a[2];
+      float py = ground(px, pz).value_or(a[1]) + kLift;
+      for (int s = 1; s <= steps; ++s) {
+        const float t = static_cast<float>(s) / static_cast<float>(steps);
+        const float x = a[0] + (b[0] - a[0]) * t;
+        const float z = a[2] + (b[2] - a[2]) * t;
+        const std::optional<float> g = ground(x, z);
+        const float y = (g ? *g : a[1] + (b[1] - a[1]) * t) + kLift;
+        batcher.DrawLine(vertex(px, py, pz, kOutline), vertex(x, y, z, kOutline));
+        px = x;
+        py = y;
+        pz = z;
       }
     }
   }
@@ -12906,6 +13262,17 @@ namespace faf::editor
           ::SetCapture(window);
         }
         return true;
+      }
+      // An editor mod's tool takes the click first.
+      if (viewClickHook) {
+        float groundX = 0.0f;
+        float groundZ = 0.0f;
+        if (
+          GroundAt(static_cast<float>(at.x), static_cast<float>(at.y), groundX, groundZ) &&
+          viewClickHook(groundX, groundZ, (wParam & MK_SHIFT) != 0, (wParam & MK_CONTROL) != 0)
+        ) {
+          return true;
+        }
       }
       if (mRulerShown && !mRuling) {
         // A click without Alt puts the ruler away.

@@ -6,6 +6,7 @@
 #include "editor/ui/EdModPanel.h"
 #include "editor/ui/EdWorkspaces.h"
 #include "imgui.h"
+#include "lua/LuaObject.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/sim/RRuleGameRules.h"
 
@@ -56,6 +57,27 @@ namespace faf::editor
       {"Intel.SonarRadius", static_cast<double>(bp->Intel.SonarRadius)},
       {"Intel.OmniRadius", static_cast<double>(bp->Intel.OmniRadius)},
     };
+    // What only the blueprint's Lua table holds (FAF's production, upkeep and shield numbers), from the rules' state.
+    if (LuaPlus::LuaState* const state = static_cast<moho::RRuleGameRulesImpl*>(rules)->mLuaState; state != nullptr) {
+      const LuaPlus::LuaObject table = bp->GetLuaBlueprint(state);
+      for (const char* const key :
+           {"Economy.ProductionPerSecondMass",
+            "Economy.ProductionPerSecondEnergy",
+            "Economy.MaintenanceConsumptionPerSecondEnergy",
+            "Defense.Shield.ShieldMaxHealth",
+            "Defense.Shield.ShieldRegenRate"}) {
+        LuaPlus::LuaObject at = table;
+        std::string rest = key;
+        while (at.IsTable() && !rest.empty()) {
+          const std::size_t dot = rest.find('.');
+          at = at.GetByName(rest.substr(0, dot).c_str());
+          rest = dot == std::string::npos ? std::string() : rest.substr(dot + 1);
+        }
+        if (rest.empty() && at.IsNumber()) {
+          s.values[key] = at.GetNumber();
+        }
+      }
+    }
     for (const moho::RUnitBlueprintWeapon& w : bp->Weapons.WeaponBlueprints) {
       UnitLabSource::Weapon weapon;
       weapon.label = w.Label.c_str();

@@ -106,6 +106,14 @@ namespace faf::editor
     std::function<bool(const std::string& name, field::Grid& out, std::string& error)> loadExternalMask;
     std::string externalKey;
     /**
+     * What texture layer `layer` (1..8) covers now, 0..1 at the masks' size (FAF Studio's Texture layer source), and a
+     * key that changes with the paint; false with `error` without a map.
+     */
+    std::function<bool(int layer, field::Grid& out, std::string& error)> layerMask;
+    std::string paintKey;
+    /** A 16 bit grey image over the whole map, 0..1 (FAF Studio's Image source); false with `error`. */
+    std::function<bool(const std::string& file, field::Grid& out, std::string& error)> loadImage;
+    /**
      * The Layout workspace's drawing (null: none) for the Map layout nodes, a key that changes with it and the editor's
      * symmetry, and that symmetry as the symmetrize op's mode ("" none) about the map's middle.
      */

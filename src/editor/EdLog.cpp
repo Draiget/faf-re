@@ -50,6 +50,25 @@ namespace faf::editor
     return out;
   }
 
+  std::vector<std::string> EdLog::Tail(
+    const std::size_t count
+  ) const
+  {
+    const std::lock_guard<std::mutex> lock(mMutex);
+    std::vector<std::string> out;
+    const std::size_t first = mLines.size() > count ? mLines.size() - count : 0;
+    for (std::size_t i = first; i < mLines.size(); ++i) {
+      const Line& line = mLines[i];
+      const char* const level = line.level == gpg::LogSeverity::Warn ? "warning"
+        : line.level == gpg::LogSeverity::Info                       ? "info"
+                                                                     : "debug";
+      char head[48];
+      (void)std::snprintf(head, sizeof(head), "%9.2f %s: ", line.seconds, level);
+      out.push_back(head + line.text);
+    }
+    return out;
+  }
+
   void EdLog::SetFilter(
     const std::string& text
   )
@@ -68,6 +87,12 @@ namespace faf::editor
     (void)previousDepth;
     const double seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - mStart).count();
     const std::lock_guard<std::mutex> lock(mMutex);
+    // The Run panel's state line, once a second during a test play: kept apart, not shown.
+    static constexpr char kLive[] = "EDMISSION live ";
+    if (std::strncmp(message.c_str(), kLive, sizeof(kLive) - 1) == 0) {
+      mMissionLive = message.c_str() + sizeof(kLive) - 1;
+      return;
+    }
     mLines.push_back(Line{level, std::string(message.c_str()), seconds});
     if (mTimesFile != nullptr) {
       std::fprintf(mTimesFile, "%9.3f %s\n", seconds, message.c_str());
@@ -237,6 +262,19 @@ namespace faf::editor
     default:
       return mShowInfo;
     }
+  }
+
+  bool EdLog::TakeMissionLive(
+    std::string& out
+  )
+  {
+    const std::lock_guard<std::mutex> lock(mMutex);
+    if (mMissionLive.empty()) {
+      return false;
+    }
+    out.swap(mMissionLive);
+    mMissionLive.clear();
+    return true;
   }
 
   std::vector<std::string> EdLog::TakeMissionTrace()

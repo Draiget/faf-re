@@ -15,8 +15,8 @@ namespace faf::editor
       int decimals;
     };
 
-    // Studio's UNIT_FIELDS without the ones only FAF's Lua tables hold (production, upkeep, shield health and regen),
-    // with the storage the native blueprint has.
+    // Studio's UNIT_FIELDS and the storage the native blueprint has. Production, upkeep and the shield's health and
+    // regeneration are only in the blueprint's Lua table (EdUnitLabPanel::ReadUnit reads them there).
     const FieldDef kUnitFields[] = {
       {"Economy.BuildCostMass", "Mass cost", "Economy", 0},
       {"Economy.BuildCostEnergy", "Energy cost", "Economy", 0},
@@ -24,9 +24,14 @@ namespace faf::editor
       {"Economy.BuildRate", "Build rate", "Economy", 1},
       {"Economy.StorageMass", "Mass storage", "Economy", 0},
       {"Economy.StorageEnergy", "Energy storage", "Economy", 0},
+      {"Economy.ProductionPerSecondMass", "Mass produced / s", "Economy", 1},
+      {"Economy.ProductionPerSecondEnergy", "Energy produced / s", "Economy", 0},
+      {"Economy.MaintenanceConsumptionPerSecondEnergy", "Energy upkeep / s", "Economy", 0},
       {"Defense.MaxHealth", "Health", "Defence", 0},
       {"Defense.RegenRate", "Regeneration / s", "Defence", 1},
       {"Defense.Shield.ShieldSize", "Shield diameter", "Defence", 1},
+      {"Defense.Shield.ShieldMaxHealth", "Shield health", "Defence", 0},
+      {"Defense.Shield.ShieldRegenRate", "Shield regeneration / s", "Defence", 0},
       {"Physics.MaxSpeed", "Top speed", "Movement", 2},
       {"Physics.MaxAcceleration", "Acceleration", "Movement", 2},
       {"Physics.MaxBrake", "Braking", "Movement", 2},

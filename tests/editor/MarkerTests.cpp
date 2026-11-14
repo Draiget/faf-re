@@ -253,4 +253,35 @@ namespace
     ASSERT_TRUE(faf::editor::MarkerPosition(changed, x, y, z));
     EXPECT_FLOAT_EQ(z, 30.0f);
   }
+  TEST(
+    Markers,
+    StrayMarkersArePulledOntoTheMap
+  )
+  {
+    const faf::editor::MarkerType* const mass = faf::editor::FindMarkerType("Mass");
+    ASSERT_NE(mass, nullptr);
+    std::vector<SaveEntry> markers = {
+      faf::editor::NewMarker(*mass, "Mass 00", 100.0f, 5.0f, 100.0f), // inside: stays
+      faf::editor::NewMarker(*mass, "Mass 01", -20.0f, 5.0f, 300.0f), // off the left edge
+      faf::editor::NewMarker(*mass, "Mass 02", 600.0f, 5.0f, 700.0f), // off a corner
+      faf::editor::NewMarker(*mass, "Mass 03", 256.0f, 5.0f, 512.0f), // on the edge: inside
+    };
+    const auto moved = faf::editor::PullMarkersInside(markers, 0.0f, 0.0f, 512.0f, 512.0f, 2.0f, [](float x, float z) {
+      return x * 0.01f + z * 0.001f;
+    });
+    ASSERT_EQ(moved.size(), 2u);
+    EXPECT_EQ(moved[0], "Mass 01");
+    EXPECT_EQ(moved[1], "Mass 02");
+    float x = 0.0f, y = 0.0f, z = 0.0f;
+    ASSERT_TRUE(faf::editor::MarkerPosition(markers[1], x, y, z));
+    EXPECT_FLOAT_EQ(x, 2.0f);
+    EXPECT_FLOAT_EQ(z, 300.0f);
+    EXPECT_NEAR(y, 0.02f + 0.3f, 1e-4f);
+    ASSERT_TRUE(faf::editor::MarkerPosition(markers[2], x, y, z));
+    EXPECT_FLOAT_EQ(x, 510.0f);
+    EXPECT_FLOAT_EQ(z, 510.0f);
+    ASSERT_TRUE(faf::editor::MarkerPosition(markers[0], x, y, z));
+    EXPECT_FLOAT_EQ(y, 5.0f);
+  }
+
 } // namespace

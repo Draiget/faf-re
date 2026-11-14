@@ -301,6 +301,38 @@ namespace faf::editor
     return true;
   }
 
+  std::vector<std::string> PullMarkersInside(
+    std::vector<SaveEntry>& markers,
+    const float x0,
+    const float z0,
+    const float x1,
+    const float z1,
+    const float inset,
+    const std::function<float(float, float)>& height
+  )
+  {
+    std::vector<std::string> moved;
+    // An area narrower than twice the inset keeps its middle.
+    const float lowX = std::min(x0 + inset, (x0 + x1) * 0.5f);
+    const float highX = std::max(x1 - inset, (x0 + x1) * 0.5f);
+    const float lowZ = std::min(z0 + inset, (z0 + z1) * 0.5f);
+    const float highZ = std::max(z1 - inset, (z0 + z1) * 0.5f);
+    for (SaveEntry& marker : markers) {
+      float x = 0.0f, y = 0.0f, z = 0.0f;
+      if (!MarkerPosition(marker, x, y, z) || (x >= x0 && x <= x1 && z >= z0 && z <= z1)) {
+        continue;
+      }
+      x = std::clamp(x, lowX, highX);
+      z = std::clamp(z, lowZ, highZ);
+      if (height) {
+        y = height(x, z);
+      }
+      marker.Set("position", Vector3Value(x, y, z));
+      moved.push_back(marker.name);
+    }
+    return moved;
+  }
+
   std::uint32_t MarkerColor(
     const SaveEntry& marker
   )

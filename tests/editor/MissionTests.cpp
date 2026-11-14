@@ -513,4 +513,35 @@ namespace faf::editor
     EXPECT_EQ(back.orderQueues[0].orders[0].chain, "Approach");
     EXPECT_EQ(CompileMission(back, MissionCompileOptions{}), CompileMission(m, MissionCompileOptions{}));
   }
+  TEST(
+    Mission,
+    LiveStateLineIsRead
+  )
+  {
+    faf::editor::MissionLive live;
+    ASSERT_TRUE(
+      faf::editor::ParseMissionLive(
+        "tick 312|stage 2|var BaseDown=true|var Count=4|obj Destroy the base=active|obj Survive=done", live
+      )
+    );
+    EXPECT_EQ(live.tick, 312);
+    EXPECT_EQ(live.stage, 2);
+    ASSERT_EQ(live.vars.size(), 2u);
+    EXPECT_EQ(live.vars[0].first, "BaseDown");
+    EXPECT_EQ(live.vars[0].second, "true");
+    EXPECT_EQ(live.vars[1].second, "4");
+    ASSERT_EQ(live.objectives.size(), 2u);
+    EXPECT_EQ(live.objectives[0].title, "Destroy the base");
+    EXPECT_EQ(live.objectives[0].state, "active");
+    EXPECT_EQ(live.objectives[1].state, "done");
+    EXPECT_FALSE(faf::editor::ParseMissionLive("nothing here", live));
+    std::string command;
+    ASSERT_TRUE(faf::editor::MissionSetVariable("BaseDown", false, command));
+    EXPECT_NE(command.find("m.V.BaseDown = false"), std::string::npos) << command;
+    EXPECT_FALSE(faf::editor::MissionSetVariable("a b", true, command));
+    EXPECT_FALSE(faf::editor::MissionSetVariable("9lives", true, command));
+    EXPECT_FALSE(faf::editor::MissionSetVariable("x'] = os", true, command));
+    EXPECT_NE(faf::editor::MissionLiveQuery().find("EDMISSION live "), std::string::npos);
+  }
+
 } // namespace faf::editor

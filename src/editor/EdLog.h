@@ -43,6 +43,8 @@ namespace faf::editor
     [[nodiscard]] int WarningCount() const;
     /** The warnings still kept (the log keeps its newest lines), oldest first: the Problems panel's log rows. */
     [[nodiscard]] std::vector<std::string> Warnings() const;
+    /** The newest `count` lines, oldest first, each with its seconds and level (the diagnostics file). */
+    [[nodiscard]] std::vector<std::string> Tail(std::size_t count) const;
     /** The filter box's text (the Problems panel shows a warning's lines). */
     void SetFilter(const std::string& text);
 
@@ -51,6 +53,8 @@ namespace faf::editor
     [[nodiscard]] std::vector<std::string> EndCapture();
     /** The mission trace ids (`EDMISSION trace <id>` lines of a test play) that arrived since the last take. */
     [[nodiscard]] std::vector<std::string> TakeMissionTrace();
+    /** The newest `EDMISSION live ...` state line since the last take (false: none); those lines aren't shown. */
+    bool TakeMissionLive(std::string& out);
     /**
      * The console line under the lines (FAF Studio's console): what was typed and Entered, taken once a frame by the
      * app, which runs it (UI Lua; `=expr` prints its value; `sim <code>` in the sim; `con <command>` the engine's).
@@ -91,6 +95,7 @@ namespace faf::editor
     bool mCapturing = false;
     std::vector<std::string> mCaptured;
     std::vector<std::string> mMissionTrace;
+    std::string mMissionLive;
     bool mAutoScroll = true;
     bool mShowTimes = false;
     /** Whether a line passes the filter and the level toggles. */

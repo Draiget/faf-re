@@ -265,6 +265,8 @@ namespace
       "frame",
       "path_drawn",
       "external_terrain",
+      "stratum",
+      "image",
       "layout_height",
       "layout_mask",
       "layout_bases"
@@ -637,6 +639,129 @@ namespace
     const int layout = graph.AddNode("layout_height", 0, 400);
     (void)run.Evaluate(graph, 1, ground);
     EXPECT_NE(run.Error(layout).find("no map layout"), std::string::npos) << run.Error(layout);
+  }
+
+  TEST(
+    TerrainGraph,
+    OversampleMakesTheNodesAfterItFiner
+  )
+  {
+    // Map heights (129 samples, run at step 4: 33) put on a 4 times finer grid, then blended with a coarse noise:
+    // the blend runs on the fine grid, its coarse input brought onto it.
+    const TerrainGround ground = Ground();
+    NodeGraph graph(TerrainNodeTypes());
+    const int base = graph.AddNode("terrain", 0, 0);
+    const int over = graph.AddNode("oversample", 200, 0);
+    const int noise = graph.AddNode("perlin", 0, 200);
+    const int blend = graph.AddNode("blend", 400, 0);
+    ASSERT_EQ(graph.Link(base, 0, over, 0), LinkResult::Ok);
+    ParamValue four;
+    four.value[0] = 4.0f;
+    graph.SetParam(over, ParamOf(*graph.Find(over)->type, "factor"), four);
+    ASSERT_EQ(graph.Link(over, 0, blend, PinOf(graph.Find(blend)->type->inputs, "a")), LinkResult::Ok);
+    ASSERT_EQ(graph.Link(noise, 0, blend, PinOf(graph.Find(blend)->type->inputs, "b")), LinkResult::Ok);
+    TerrainRun run(4);
+    const auto report = run.Evaluate(graph, 1, ground);
+    ASSERT_TRUE(report.errors.empty()) << report.errors.begin()->second;
+    const field::Grid& fine = *run.Value(over, "out")->grid;
+    EXPECT_EQ(fine.w, 129) << "(33 - 1) x 4 + 1";
+    EXPECT_FLOAT_EQ(fine.cell, 1.0f);
+    // The ramp 20 .. 30 kept at the ends and smooth between.
+    EXPECT_NEAR(fine.At(0, 0), 20.0f, 0.01f);
+    EXPECT_NEAR(fine.At(128, 0), 30.0f, 0.01f);
+    EXPECT_NEAR(fine.At(64, 64), 25.0f, 0.05f);
+    const field::Grid& mixed = *run.Value(blend, "out")->grid;
+    EXPECT_EQ(mixed.w, 129) << "the blend after it works on the fine grid";
+    // A factor that would pass 8193 a side is refused, not tried.
+    ParamValue eight;
+    eight.value[0] = 8.0f;
+    graph.SetParam(over, ParamOf(*graph.Find(over)->type, "factor"), eight);
+    TerrainRun full(1);
+    TerrainGround big = Ground();
+    big.width = 2049;
+    big.height = 2049;
+    big.heights = std::make_shared<std::vector<float>>(2049 * 2049, 10.0f);
+    (void)full.Evaluate(graph, 1, big);
+    EXPECT_NE(full.Error(over).find("too many"), std::string::npos) << full.Error(over);
+  }
+
+  TEST(
+    TerrainGraph,
+    TextureLayerAndImageSourcesReadTheMap
+  )
+  {
+    // Layer 2 paints the right half of a 64 x 64 mask over the 128-unit map; the image is a ramp 0..1 left to right.
+    TerrainGround ground = Ground();
+    int maskReads = 0;
+    ground.layerMask = [&](const int layer, field::Grid& out, std::string& error) {
+      ++maskReads;
+      if (layer != 2) {
+        error = "layer " + std::to_string(layer) + " is empty here";
+        return false;
+      }
+      const float cell = 128.0f / 64.0f;
+      out = field::Grid(64, 64, cell, cell * 0.5f, cell * 0.5f);
+      for (int z = 0; z < 64; ++z) {
+        for (int x = 0; x < 64; ++x) {
+          out.At(x, z) = x >= 32 ? 1.0f : 0.0f;
+        }
+      }
+      return true;
+    };
+    ground.paintKey = "1";
+    ground.loadImage = [](const std::string& file, field::Grid& out, std::string& error) {
+      if (file != "ramp.png") {
+        error = file + ": no such file";
+        return false;
+      }
+      out = field::Grid(129, 129, 1.0f, 0.0f, 0.0f);
+      for (int z = 0; z < 129; ++z) {
+        for (int x = 0; x < 129; ++x) {
+          out.At(x, z) = static_cast<float>(x) / 128.0f;
+        }
+      }
+      return true;
+    };
+    NodeGraph graph(TerrainNodeTypes());
+    const int layer = graph.AddNode("stratum", 0, 0);
+    const int image = graph.AddNode("image", 0, 200);
+    ParamValue two;
+    two.value[0] = 2.0f;
+    graph.SetParam(layer, ParamOf(*graph.Find(layer)->type, "layer"), two);
+    ParamValue path;
+    path.text = "ramp.png";
+    graph.SetParam(image, ParamOf(*graph.Find(image)->type, "path"), path);
+    ParamValue low;
+    low.value[0] = 20.0f;
+    graph.SetParam(image, ParamOf(*graph.Find(image)->type, "lo"), low);
+    ParamValue high;
+    high.value[0] = 60.0f;
+    graph.SetParam(image, ParamOf(*graph.Find(image)->type, "hi"), high);
+    TerrainRun run(4);
+    auto report = run.Evaluate(graph, 1, ground);
+    ASSERT_TRUE(report.errors.empty()) << report.errors.begin()->second;
+    const field::Grid& m = *run.Value(layer, "out")->grid;
+    EXPECT_EQ(m.w, 33) << "at the graph's resolution";
+    EXPECT_NEAR(m.At(4, 16), 0.0f, 0.01f) << "left: unpainted";
+    EXPECT_NEAR(m.At(28, 16), 1.0f, 0.01f) << "right: painted";
+    const field::Grid& h = *run.Value(image, "out")->grid;
+    EXPECT_NEAR(h.At(0, 0), 20.0f, 0.01f) << "black: the low value";
+    EXPECT_NEAR(h.At(32, 0), 60.0f, 0.01f) << "white: the high value";
+    EXPECT_NEAR(h.At(16, 7), 40.0f, 0.2f);
+    // The same paint: kept. New paint: read again.
+    (void)run.Evaluate(graph, 1, ground);
+    EXPECT_EQ(maskReads, 1);
+    ground.paintKey = "2";
+    (void)run.Evaluate(graph, 1, ground);
+    EXPECT_EQ(maskReads, 2);
+    // An empty layer and a missing file: the nodes say why.
+    two.value[0] = 5.0f;
+    graph.SetParam(layer, ParamOf(*graph.Find(layer)->type, "layer"), two);
+    path.text = "gone.png";
+    graph.SetParam(image, ParamOf(*graph.Find(image)->type, "path"), path);
+    (void)run.Evaluate(graph, 1, ground);
+    EXPECT_EQ(run.Error(layer), "layer 5 is empty here");
+    EXPECT_EQ(run.Error(image), "gone.png: no such file");
   }
 
   TEST(
