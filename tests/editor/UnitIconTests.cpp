@@ -70,4 +70,24 @@ namespace faf::editor
       IconRenderProblem(opaque.data(), kSide, 0.08f), "the render is opaque edge to edge (no outline to frame)"
     );
   }
+
+  TEST(
+    UnitIcon,
+    KeyedFromABlackAndAWhiteRender
+  )
+  {
+    // 2 x 2: the background (black, white), a solid grey pixel (same in both), a half-covering pixel.
+    const std::uint32_t black[4] = {0xFF000000u, 0xFF404040u, 0xFF202020u, 0xFF000000u};
+    const std::uint32_t white[4] = {0xFFFFFFFFu, 0xFF404040u, 0xFF9F9F9Fu, 0xFFFFFFFFu};
+    const std::vector<std::uint32_t> keyed = faf::editor::KeyedIcon(black, white, 2, 0.0f);
+    ASSERT_EQ(keyed.size(), 4U);
+    EXPECT_EQ(keyed[0] >> 24, 0U) << "the background: clear";
+    EXPECT_EQ(keyed[1], 0xFF404040u) << "solid: as drawn";
+    EXPECT_NEAR(static_cast<int>(keyed[2] >> 24), 128, 2) << "half covered";
+    EXPECT_NEAR(static_cast<int>(keyed[2] & 0xFFu), 0x40, 2) << "its colour over its alpha";
+    // A dark render lifted.
+    const std::vector<std::uint32_t> lifted = faf::editor::KeyedIcon(black, white, 2, 0.5f);
+    EXPECT_GT(lifted[1] & 0xFFu, 0x40u);
+    EXPECT_EQ(lifted[1] >> 24, 0xFFu);
+  }
 } // namespace faf::editor

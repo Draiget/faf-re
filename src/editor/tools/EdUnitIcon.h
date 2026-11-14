@@ -32,4 +32,13 @@ namespace faf::editor
    * a black square.
    */
   [[nodiscard]] std::string IconRenderProblem(const std::uint32_t* bgra, int side, float minLight);
+
+  /**
+   * One render on black and one on white made into one with its background keyed out (FAF Studio's icon maker): each
+   * pixel's alpha is 1 less how much brighter the white render is there, its colour the black render's over that
+   * alpha. Then, when the drawn pixels' mean brightness is under `wantLight`, their colour scaled up to it (the
+   * game's thumbnail pass draws unlit and dark). 32-bit BGRA in and out.
+   */
+  [[nodiscard]] std::vector<std::uint32_t>
+  KeyedIcon(const std::uint32_t* onBlack, const std::uint32_t* onWhite, int side, float wantLight);
 } // namespace faf::editor

@@ -69,6 +69,8 @@ namespace faf::editor
     boost::shared_ptr<moho::CD3DDynamicTextureSheet> mIconSheet;
     std::string mIconUnit;
     int mIconFrames = -1;
+    int mIconPass = 0;                       // 0 the black render, 1 the white one
+    std::vector<std::uint32_t> mIconOnBlack; // the first pass's pixels
     std::string mStatus;
     bool mFocus = false;
   };

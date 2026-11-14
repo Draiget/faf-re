@@ -3,6 +3,7 @@
 #include "editor/doc/EdModProject.h"
 #include "editor/graph/EdTextureBake.h"
 #include "editor/tools/EdUnitIcon.h"
+#include "moho/mesh/Mesh.h"
 #include "editor/ui/EdControls.h"
 #include "editor/ui/EdIconFont.h"
 #include "editor/ui/EdModPanel.h"
@@ -139,6 +140,8 @@ namespace faf::editor
     }
     mIconUnit = unit;
     mIconFrames = 0;
+    mIconPass = 0;
+    moho::ren_ThumbnailClearColor = 0xFF000000u;
     mStatus = "drawing the icon of " + unit + "...";
     return true;
   }
@@ -158,7 +161,29 @@ namespace faf::editor
       return;
     }
     std::vector<std::uint32_t> pixels;
-    const bool read = ReadSheet(*mIconSheet, kIconRender, pixels);
+    bool read = ReadSheet(*mIconSheet, kIconRender, pixels);
+    // Two passes (FAF Studio's): on black, then on white; the difference keys the background out.
+    if (read && mIconPass == 0 && !AlphaBox(pixels.data(), kIconRender).empty) {
+      ModProject* const project = mProject.Project();
+      mIconOnBlack = pixels;
+      moho::ren_ThumbnailClearColor = 0xFFFFFFFFu;
+      if (project != nullptr && Request(mIconSheet, kIconRender, ModSourceUnit(*project, mIconUnit))) {
+        mIconPass = 1;
+        mIconFrames = 0;
+        return;
+      }
+      moho::ren_ThumbnailClearColor = 0xFF000000u;
+    }
+    if (mIconPass == 1) {
+      if (read && AlphaBox(pixels.data(), kIconRender).empty && mIconFrames < 30) {
+        return; // the white render isn't drawn yet
+      }
+      moho::ren_ThumbnailClearColor = 0xFF000000u;
+      if (read && mIconOnBlack.size() == pixels.size()) {
+        pixels = KeyedIcon(mIconOnBlack.data(), pixels.data(), kIconRender, 0.45f);
+      }
+      mIconPass = 0;
+    }
     const std::string problem = read ? IconRenderProblem(pixels.data(), kIconRender, 0.08f) : "the sheet can't be read";
     if (!problem.empty()) {
       if (mIconFrames < 30 && problem == "the model drew nothing") {

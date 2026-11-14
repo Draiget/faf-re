@@ -118,4 +118,48 @@ namespace faf::editor
     }
     return result;
   }
+
+  std::vector<std::uint32_t> KeyedIcon(
+    const std::uint32_t* const onBlack,
+    const std::uint32_t* const onWhite,
+    const int side,
+    const float wantLight
+  )
+  {
+    const std::size_t count = static_cast<std::size_t>(std::max(side, 0)) * static_cast<std::size_t>(std::max(side, 0));
+    std::vector<float> rgba(count * 4, 0.0f);
+    double light = 0.0;
+    double weight = 0.0;
+    for (std::size_t i = 0; i < count; ++i) {
+      const auto channel = [](const std::uint32_t p, const int shift) {
+        return static_cast<float>((p >> shift) & 0xFFu) / 255.0f;
+      };
+      const float b[3] = {channel(onBlack[i], 16), channel(onBlack[i], 8), channel(onBlack[i], 0)};
+      const float w[3] = {channel(onWhite[i], 16), channel(onWhite[i], 8), channel(onWhite[i], 0)};
+      // How much of the background shows: the most any channel moved between the two.
+      const float through = std::clamp(std::max({w[0] - b[0], w[1] - b[1], w[2] - b[2]}), 0.0f, 1.0f);
+      const float alpha = 1.0f - through;
+      float* const out = &rgba[i * 4];
+      out[3] = alpha;
+      if (alpha > 1.0f / 255.0f) {
+        for (int c = 0; c < 3; ++c) {
+          out[c] = std::clamp(b[c] / alpha, 0.0f, 1.0f);
+        }
+        light += (out[0] * 0.2126f + out[1] * 0.7152f + out[2] * 0.0722f) * alpha;
+        weight += alpha;
+      }
+    }
+    // A dark render lifted to the wanted brightness (the thumbnail pass has no sun).
+    const float mean = weight > 0.0 ? static_cast<float>(light / weight) : 0.0f;
+    const float gain = mean > 1e-3f && mean < wantLight ? wantLight / mean : 1.0f;
+    std::vector<std::uint32_t> out(count, 0u);
+    for (std::size_t i = 0; i < count; ++i) {
+      const float* const p = &rgba[i * 4];
+      const auto byte = [](const float v) {
+        return static_cast<std::uint32_t>(std::lround(std::clamp(v, 0.0f, 1.0f) * 255.0f));
+      };
+      out[i] = (byte(p[3]) << 24) | (byte(p[0] * gain) << 16) | (byte(p[1] * gain) << 8) | byte(p[2] * gain);
+    }
+    return out;
+  }
 } // namespace faf::editor
