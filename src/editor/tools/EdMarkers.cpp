@@ -794,4 +794,26 @@ namespace faf::editor
     out.Set("prop", StringValue(Prop(type.prop)));
     return out;
   }
+
+  std::vector<ResourceSnap> ResourceSnaps(
+    const std::vector<SaveEntry>& markers
+  )
+  {
+    std::vector<ResourceSnap> out;
+    for (const SaveEntry& marker : markers) {
+      const std::string type = MarkerTypeOf(marker);
+      float x = 0.0f;
+      float y = 0.0f;
+      float z = 0.0f;
+      if ((type != "Mass" && type != "Hydrocarbon") || !MarkerPosition(marker, x, y, z)) {
+        continue;
+      }
+      const float sx = std::floor(x) + 0.5f;
+      const float sz = std::floor(z) + 0.5f;
+      if (std::fabs(sx - x) > 0.02f || std::fabs(sz - z) > 0.02f) {
+        out.push_back(ResourceSnap{marker.name, sx, sz});
+      }
+    }
+    return out;
+  }
 } // namespace faf::editor

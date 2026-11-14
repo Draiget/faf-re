@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <filesystem>
 #include <functional>
 #include <map>
@@ -778,6 +779,19 @@ namespace faf::editor
     /** A prop added at the end (with an empty record: it is saved from its transform) or removed at `index`. */
     void AddProp(const moho::CWldPropEntry& entry, const PropRecord& record);
     void SetPropRecord(std::size_t index, const PropRecord& record);
+    /**
+     * A prop's scale as its file record keeps it (the three floats after its rotation; FAF Studio edits them). The game
+     * draws props at their blueprint's size and ignores them, other tools read them; a save keeps what is set here.
+     */
+    [[nodiscard]] std::array<float, 3> PropScale(std::size_t index) const;
+    void SetPropScale(std::size_t index, const std::array<float, 3>& scale);
+    /**
+     * Save writes over a map outside the vault's maps folder (opened from another folder) only once asked
+     * (FAF Studio overwrote any folder; the editor confirms first). True while that question is due.
+     */
+    [[nodiscard]] bool SaveNeedsOverwriteConsent() const;
+    /** The answer: Save may write over the map's own file where it is. */
+    void AllowOverwrite();
     void DeletePropAt(std::size_t index);
     /** A texture slot's change (path or size), for undo: its values before and after, as the terrain has them. */
     struct LayerEdit
@@ -1058,6 +1072,8 @@ namespace faf::editor
     std::filesystem::path mCopyParent;
     /** Save as put the map outside the vault: Save writes there (that folder was picked). */
     bool mSaveOutsideVault = false;
+    /** The map file Save may write over outside the vault (AllowOverwrite). */
+    std::filesystem::path mOverwriteFile;
     /** Set by SaveAsNewFolder: where Save writes from then on (else the map's own file). */
     std::filesystem::path mSaveTarget;
     std::string mPlayCopy; // the play copy's folder while one is on disk

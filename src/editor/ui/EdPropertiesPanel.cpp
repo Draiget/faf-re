@@ -270,6 +270,27 @@ namespace faf::editor
         send(PropertyEdit::What::Heading, edit.heading, 0.0f, 0.0f);
       }
       active = active || ImGui::IsItemActive();
+      if (now.kind == SelectionProperties::Kind::Prop) {
+        // The prop's scale as the .scmap record keeps it (FAF Studio's prop scale); the game draws the blueprint's.
+        bool scaled = false;
+        for (int axis = 0; axis < 3; ++axis) {
+          static const char* const kRows[] = {"Scale X", "Scale Y", "Scale Z"};
+          static const char* const kIds[] = {"##scx", "##scy", "##scz"};
+          row(kRows[axis]);
+          FillDragFloat(kIds[axis], &edit.scale[axis], 0.01f, 0.01f, 100.0f, "%.2f");
+          if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) {
+            EdSetTooltip(
+              "The scale the map file keeps for this prop (other tools read it); FAF's game draws props at their "
+              "blueprint's size"
+            );
+          }
+          scaled = scaled || ImGui::IsItemDeactivatedAfterEdit();
+          active = active || ImGui::IsItemActive();
+        }
+        if (scaled) {
+          send(PropertyEdit::What::Scale, edit.scale[0], edit.scale[1], edit.scale[2]);
+        }
+      }
       if (now.kind == SelectionProperties::Kind::Decal) {
         bool sized = false;
         row("Size X");

@@ -53,8 +53,19 @@ namespace faf::editor
     static constexpr const char* kAutosaveMinutes = "AutosaveMinutes";
     /** Backups of a map's files a map keeps (made before the first save of a session): 0, 3, 10 or 30. */
     static constexpr const char* kBackups = "Backups";
+    static constexpr const char* kPopouts = "Popouts";
+    static constexpr const char* kIdleFps = "IdleFps";
+    static constexpr const char* kFormat = "Format";
+    /** settings.ini's format now: a file of a newer one is read but never written over. */
+    static constexpr int kFormatNow = 1;
+    /** The Format line the file had (0: none, a file from before formats).*/
+    [[nodiscard]] int FileFormat() const noexcept
+    {
+      return mFileFormat;
+    }
 
   private:
     std::map<std::string, std::string, std::less<>> mValues;
+    int mFileFormat = 0;
   };
 } // namespace faf::editor

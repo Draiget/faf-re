@@ -133,6 +133,13 @@ namespace faf::editor
   bool ParseVaultSearch(const std::string& json, std::vector<VaultMap>& maps, int& pages, std::string& error);
 
   /**
+   * The body FAF's API takes at `/maps/upload` (as the FAF client sends it, MapUploadTask): a multipart form with the
+   * map's zip as `file` and `metadata`, the JSON `{"isRanked": ...}`. `boundary` must not occur in the zip.
+   */
+  [[nodiscard]] std::string
+  MapUploadBody(const std::string& boundary, const std::string& zipName, const std::string& zipBytes, bool ranked);
+
+  /**
    * The editor's FAF session: logs in with the device flow (FAF's page in the browser, with the code already in it),
    * keeps the refresh token in `tokenFile` encrypted for this Windows user (DPAPI), and searches the vault. Every
    * request runs on its own thread; the panel reads the state each frame.
@@ -159,6 +166,19 @@ namespace faf::editor
     void CancelLogin();
     /** The FAF name logged in with (from the API's /me), empty until known. */
     [[nodiscard]] std::string UserName() const;
+    /**
+     * Uploads a packaged map (its zip) to the vault as the FAF client does, on a worker thread; UploadState says how
+     * it went. Only while logged in, one at a time.
+     */
+    void UploadMap(std::filesystem::path zip, bool ranked);
+    struct UploadState
+    {
+      bool running = false;
+      bool done = false;
+      bool ok = false;
+      std::string message;
+    };
+    [[nodiscard]] UploadState Upload() const;
     /** Seconds left before the login code runs out, while waiting for approval. */
     [[nodiscard]] int SecondsLeft() const;
     void Search(const VaultQuery& query, int page);
@@ -220,6 +240,7 @@ namespace faf::editor
       std::string error;
     };
     std::map<std::string, Named> mNamed;
+    UploadState mUpload;
 
     std::filesystem::path mTokenFile;
     std::atomic<State> mState{State::LoggedOut};

@@ -537,6 +537,9 @@ namespace faf::editor
 
   private:
     EdCommands* mCommands = nullptr;
+    /** A list row's Delete: edit.delete once its selection has been made (a couple of frames later). */
+    bool mDeleteAsked = false;
+    int mDeleteWait = 0;
     const std::vector<EdMenu>* mMenus = nullptr;
     /** The active workspace's first layout (its EdWorkspace's places) in its dock space. */
     void BuildDefaultLayout(unsigned int dockspaceId);

@@ -91,6 +91,16 @@ namespace faf::editor
   std::string MarkerColourOf(const float rgba[4]);
   /** A marker's `type` string. */
   std::string MarkerTypeOf(const SaveEntry& marker);
+
+  /** A resource marker off its extractor cell's middle and where it belongs (x.5, z.5). */
+  struct ResourceSnap
+  {
+    std::string name;
+    float x = 0.0f;
+    float z = 0.0f;
+  };
+  /** Map > Snap resource markers to grid (FAF Studio): every Mass and Hydrocarbon marker more than 0.02 off. */
+  [[nodiscard]] std::vector<ResourceSnap> ResourceSnaps(const std::vector<SaveEntry>& markers);
   /** A path node's neighbours (`adjacentTo`, names split on spaces). */
   std::vector<std::string> MarkerLinks(const SaveEntry& marker);
 

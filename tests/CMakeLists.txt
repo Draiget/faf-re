@@ -471,6 +471,7 @@ add_executable(faf_editor_brush_tests EXCLUDE_FROM_ALL editor/HeightBrushTests.c
   editor/WorkspacesTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/ui/EdWorkspaces.cpp
   editor/StatusTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/ui/EdStatus.cpp
   editor/SettingsTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/ui/EdSettings.cpp
+  editor/ShellExtrasTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdUserFiles.cpp ${CMAKE_SOURCE_DIR}/src/editor/ui/EdFramePacing.cpp ${CMAKE_SOURCE_DIR}/src/editor/ui/EdTipTally.cpp
   editor/HomeModelTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/ui/EdHomeModel.cpp
   editor/AutosaveTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdAutosave.cpp
   editor/HistoryTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/ui/EdHistory.cpp

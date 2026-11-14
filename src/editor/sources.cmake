@@ -171,5 +171,10 @@ set(FAF_EDITOR_SOURCES
   undo/EdHeightHistory.cpp
   view/EdMapScene.cpp
   ui/EdImGuiRenderer.cpp
+  ui/EdPopouts.cpp
+  ui/EdTipCheck.cpp
+  ui/EdTipTally.cpp
+  ui/EdFramePacing.cpp
+  doc/EdUserFiles.cpp
   ui/EdInfoPanels.cpp
 )

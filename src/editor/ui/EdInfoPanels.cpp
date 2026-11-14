@@ -232,6 +232,20 @@ namespace faf::editor
       }
       ImGui::PopID();
     }
+    // `starts` (FAF Studio's "armies start on starts"): each army begins at its ARMY_n marker; false lets the
+    // game's script place them (a few campaign-style maps).
+    {
+      std::string starts;
+      const bool has = ReadScenarioField(mDocument.Scenario(), "starts", starts);
+      bool on = !has || starts != "false";
+      RowLabel("Starts");
+      if (ImGui::Checkbox("Armies start on their start markers##starts", &on)) {
+        (void)mDocument.SetScenarioField("starts", on ? "true" : "false", false);
+      }
+      if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) {
+        EdSetTooltip("ScenarioInfo.starts: each army begins at its ARMY_n marker (on for skirmish maps)");
+      }
+    }
     // The lobby slots' factions: what each start slot offers in FAF's lobby.
     {
       const std::size_t slots =
@@ -655,7 +669,31 @@ namespace faf::editor
                 }
               }
               if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) {
-                EdSetTooltip("%s\nClick selects (Ctrl adds), double-click goes to it", marker.name.c_str());
+                EdSetTooltip(
+                  "%s\nClick selects (Ctrl adds), double-click goes to it, right-click for more", marker.name.c_str()
+                );
+              }
+              // The row's menu (FAF Studio's list context menus): select, go to, copy the name, delete.
+              if (ImGui::BeginPopupContextItem("##markermenu")) {
+                if (ImGui::MenuItem("Select")) {
+                  mTools.AskMarkerSelect({marker.name}, false);
+                }
+                if (ImGui::MenuItem("Add to the selection")) {
+                  mTools.AskMarkerSelect({marker.name}, true);
+                }
+                if (ImGui::MenuItem("Go to it")) {
+                  mTools.AskMarkerFrame(marker.name);
+                }
+                if (ImGui::MenuItem("Copy its name")) {
+                  ImGui::SetClipboardText(marker.name.c_str());
+                }
+                ImGui::Separator();
+                if (ImGui::MenuItem("Delete", nullptr, false, mCommands != nullptr)) {
+                  mTools.AskMarkerSelect({marker.name}, false);
+                  mDeleteAsked = true;
+                  mDeleteWait = 2;
+                }
+                ImGui::EndPopup();
               }
               ImDrawList* const draw = ImGui::GetWindowDrawList();
               const float line = ImGui::GetTextLineHeight();

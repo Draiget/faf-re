@@ -283,9 +283,11 @@ namespace faf::editor
           writer.Write(row->y);
           writer.Write(row->z);
         }
-        writer.Write(1.0f);
-        writer.Write(1.0f);
-        writer.Write(1.0f);
+        // A turned prop keeps the scale its record has (1 for a new one; Properties > Scale in the file sets it).
+        const bool scaled = i < props.size() && props[i].path == entry.mBlueprintPath.c_str();
+        writer.Write(scaled ? props[i].values[12] : 1.0f);
+        writer.Write(scaled ? props[i].values[13] : 1.0f);
+        writer.Write(scaled ? props[i].values[14] : 1.0f);
       }
       stream->VirtClose(gpg::Stream::ModeBoth);
       if (!preview || !terrain) {
@@ -350,6 +352,38 @@ namespace faf::editor
     std::error_code ignored;
     const std::filesystem::path path(Resolved(virtualPath));
     return std::filesystem::is_regular_file(path, ignored) ? path : std::filesystem::path{};
+  }
+
+  std::string PreviewPictureOf(
+    const std::vector<char>& record
+  )
+  {
+    // RWldMapPreviewChunk's layout: 0xBEEFFEED, version, width, height; the name in UTF-16 up to a 0; tag count and
+    // tags; payload size; payload.
+    if (record.size() < 16U) {
+      return {};
+    }
+    std::size_t at = 16;
+    while (at + 1 < record.size() && !(record[at] == 0 && record[at + 1] == 0)) {
+      at += 2;
+    }
+    at += 2;
+    if (at + 4 > record.size()) {
+      return {};
+    }
+    std::uint32_t tags = 0;
+    std::memcpy(&tags, record.data() + at, 4);
+    at += 4 + static_cast<std::size_t>(tags) * 8;
+    if (at + 4 > record.size()) {
+      return {};
+    }
+    std::uint32_t payload = 0;
+    std::memcpy(&payload, record.data() + at, 4);
+    at += 4;
+    if (at + payload > record.size()) {
+      return {};
+    }
+    return std::string(record.data() + at, payload);
   }
 
   PropRecord PropRecordFor(

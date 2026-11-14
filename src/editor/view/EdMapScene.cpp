@@ -7841,6 +7841,10 @@ namespace faf::editor
       out.position[2] = entry.mTransform.pos_.z;
       out.heading = 2.0f * std::atan2(entry.mTransform.orient_.y, entry.mTransform.orient_.w) * 180.0f / kPi;
       out.details = PropDetails(out.type);
+      const std::array<float, 3> scale = mDocument.PropScale(static_cast<std::size_t>(mSelection.front()));
+      out.scale[0] = scale[0];
+      out.scale[1] = scale[1];
+      out.scale[2] = scale[2];
       break;
     }
     case PickKind::Decal:
@@ -7918,6 +7922,21 @@ namespace faf::editor
       break;
     }
     case SelectionProperties::Kind::Prop: {
+      if (edit.what == PropertyEdit::What::Scale && mMap->mProps != nullptr) {
+        for (const int index : mSelection) {
+          if (index >= 0) {
+            mDocument.SetPropScale(static_cast<std::size_t>(index), {v[0], v[1], v[2]});
+          }
+        }
+        gpg::Logf(
+          "editor: %zu props: scale in the file %.2f %.2f %.2f",
+          mSelection.size(),
+          static_cast<double>(v[0]),
+          static_cast<double>(v[1]),
+          static_cast<double>(v[2])
+        );
+        break;
+      }
       if (edit.what == PropertyEdit::What::Blueprint && !edit.value.empty() && mMap->mProps != nullptr) {
         // Every selected prop becomes the chosen one where it stands (user ask 2026-11-11, WPE.55), as one undo step.
         BeginObjectStroke();

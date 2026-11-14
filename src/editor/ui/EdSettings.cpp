@@ -28,6 +28,8 @@ namespace faf::editor
         {EdSettings::kAutosave, "1", {}},
         {EdSettings::kAutosaveMinutes, "1", {"1", "2", "5", "10"}},
         {EdSettings::kBackups, "10", {"0", "3", "10", "30"}},
+        {EdSettings::kPopouts, "1", {}},
+        {EdSettings::kIdleFps, "30", {"0", "10", "30", "60"}},
       };
       return kDefinitions;
     }
@@ -91,6 +93,10 @@ namespace faf::editor
       const std::string_view key = Trim(line.substr(0, equals));
       const std::string_view value =
         equals == std::string_view::npos ? std::string_view{} : Trim(line.substr(equals + 1));
+      if (equals != std::string_view::npos && key == kFormat) {
+        mFileFormat = std::atoi(std::string(value).c_str());
+        continue;
+      }
       if (equals == std::string_view::npos || !Known(key)) {
         problems.push_back("line " + std::to_string(number) + ": no setting \"" + std::string(key) + "\"");
       } else if (!Set(key, value)) {
@@ -105,6 +111,7 @@ namespace faf::editor
   std::string EdSettings::Write() const
   {
     std::string out = "; The map editor's settings (Settings in the editor). <key>=<value>.\n[Settings]\n";
+    out += std::string(kFormat) + "=" + std::to_string(kFormatNow) + "\n";
     for (const Definition& d : Definitions()) {
       out += std::string(d.key) + "=" + Get(d.key) + "\n";
     }

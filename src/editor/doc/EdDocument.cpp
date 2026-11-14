@@ -1786,6 +1786,62 @@ namespace faf::editor
     mModified = true;
   }
 
+  std::array<float, 3> EdDocument::PropScale(
+    const std::size_t index
+  ) const
+  {
+    if (
+      mMap != nullptr && mMap->mProps != nullptr && index < mMap->mProps->mEntries.size() &&
+      index < mFileRecords.props.size() &&
+      mFileRecords.props[index].path == mMap->mProps->mEntries[index].mBlueprintPath.c_str()
+    ) {
+      const PropRecord& record = mFileRecords.props[index];
+      return {record.values[12], record.values[13], record.values[14]};
+    }
+    return {1.0f, 1.0f, 1.0f};
+  }
+
+  void EdDocument::SetPropScale(
+    const std::size_t index,
+    const std::array<float, 3>& scale
+  )
+  {
+    if (mMap == nullptr || mMap->mProps == nullptr || index >= mMap->mProps->mEntries.size()) {
+      return;
+    }
+    const moho::CWldPropEntry& entry = mMap->mProps->mEntries[index];
+    mFileRecords.props.resize(mMap->mProps->mEntries.size());
+    PropRecord& record = mFileRecords.props[index];
+    if (record.path != entry.mBlueprintPath.c_str()) {
+      record = PropRecordFor(entry.mBlueprintPath.c_str(), entry.mTransform);
+    }
+    record.values[12] = scale[0];
+    record.values[13] = scale[1];
+    record.values[14] = scale[2];
+    mModified = true;
+  }
+
+  bool EdDocument::SaveNeedsOverwriteConsent() const
+  {
+    if (mState != State::Open || mMap == nullptr) {
+      return false;
+    }
+    const std::filesystem::path file = MapDiskFile();
+    if (file.empty() || (mSaveOutsideVault && file == mSaveTarget) || file == mOverwriteFile || mVault.empty()) {
+      return false;
+    }
+    std::error_code ignored;
+    const std::filesystem::path vaultMaps = std::filesystem::weakly_canonical(mVault / "maps", ignored);
+    const std::filesystem::path relative =
+      std::filesystem::relative(std::filesystem::weakly_canonical(file, ignored), vaultMaps, ignored);
+    return relative.empty() || relative.native().rfind(L"..", 0) == 0;
+  }
+
+  void EdDocument::AllowOverwrite()
+  {
+    mOverwriteFile = MapDiskFile();
+  }
+
   void EdDocument::SetPropRecord(
     const std::size_t index,
     const PropRecord& record
@@ -2559,7 +2615,9 @@ namespace faf::editor
     const std::filesystem::path vaultMaps = std::filesystem::weakly_canonical(mVault / "maps", ignored);
     const std::filesystem::path relative =
       std::filesystem::relative(std::filesystem::weakly_canonical(file, ignored), vaultMaps, ignored);
-    const bool picked = mSaveOutsideVault && file == mSaveTarget; // Save as put it in a folder picked for it
+    // Save as put it in a folder picked for it, or the overwrite there was confirmed (SaveNeedsOverwriteConsent).
+    const bool picked =
+      (mSaveOutsideVault && file == mSaveTarget) || (!mOverwriteFile.empty() && file == mOverwriteFile);
     if (!picked && (mVault.empty() || relative.empty() || relative.native().rfind(L"..", 0) == 0)) {
       message = "This map isn't in your vault (" + (mVault / "maps").string() + "); save it as a new map folder there.";
       return false;

@@ -92,6 +92,11 @@
 #include "gpg/core/diagnostics/CrashHooks.h"
 #include "gpg/core/diagnostics/CrashReport.h"
 #include "gpg/core/utils/Global.h"
+#include "editor/ui/EdPopouts.h"
+#include "editor/ui/EdTipCheck.h"
+#include "editor/tools/EdMarkers.h"
+#include "editor/ui/EdFramePacing.h"
+#include "editor/doc/EdUserFiles.h"
 #include "gpg/core/utils/Logging.h"
 #include "gpg/gal/backends/common/ImageCodec.h"
 #include "gpg/gal/Device.hpp"
@@ -157,111 +162,59 @@ namespace faf::editor
     [[nodiscard]] bool IsTestRunCommandLine()
     {
       static const char* const kOptions[] = {
-        "/command",
-        "/palette",
-        "/theme",
-        "/keysfile",
-        "/focuspanel",
-        "/uiclicks",
-        "/hidegameunits",
-        "/movelayer",
-        "/pickfilter",
-        "/mapwide",
-        "/tool",
-        "/proptool",
-        "/play",
-        "/debugarm",
-        "/breakpoint",
-        "/check",
-        "/decaltool",
-        "/markertool",
-        "/unittool",
-        "/hoverprop",
-        "/selectprops",
-        "/selectunit",
-        "/propswap",
-        "/saveas",
-        "/settingsfile",
-        "/autosavefolder",
-        "/askunsaved",
-        "/particlebrowser",
-        "/particlenew",
-        "/particleopen",
-        "/materialeditor",
-        "/uiscale",
-        "/testrun",
-        "/openall",
-        "/roundtrip",
-        "/vault",
-        "/vaultsearch",
-        "/vaultmap",
-        "/newmap",
-        "/stamp",
-        "/brush",
-        "/layer",
-        "/waterbody",
-        "/ruler",
-        "/adaptivewindow",
-        "/maskrule",
-        "/maskgen",
-        "/symhover",
-        "/stbfont",
-        "/recipe",
-        "/texset",
-        "/layerop",
-        "/slopeview",
-        "/typesfromlayers",
-        "/uncapped",
-        "/nominimap",
-        "/followtest",
-        "/arrangetest",
-        "/findtest",
-        "/findopen",
-        "/filltest",
-        "/modaltest",
-        "/looktest",
-        "/looksfolder",
-        "/envtest",
-        "/watermasktest",
-        "/nowaterhires",
-        "/camat",
-        "/erosiontest",
-        "/sctest",
-        "/symmenu",
-        "/panelbottom",
-        "/shader",
-        "/brushtest",
-        "/brushshape",
-        "/stampsource",
-        "/stampstroke",
-        "/symoptions",
-        "/maskoptions",
-        "/masktest",
-        "/shaderbrowser",
-        "/convertlayers",
-        "/interoptest",
-        "/gentest",
-        "/layouttest",
-        "/playcopytest",
-        "/missiontest",
-        "/modtest",
-        "/unitlabtest",
-        "/effectmodtest",
-        "/assettest",
-        "/thumbcache",
-        "/assetmarks",
-        "/editormods",
-        "/editormodtest",
-        "/unitviewtest",
-        "/runmarker",
-        "/pausetest",
-        "/viewmenu",
-        "/mapinfotest",
-        "/dropdefaultcube",
-        "/exportpreview",
-        "/resizetest",
-        "/console",
-        "/pathtest",
+        "/command",         "/palette",
+        "/theme",           "/keysfile",
+        "/focuspanel",      "/uiclicks",
+        "/tipcheck",        "/hidegameunits",
+        "/movelayer",       "/pickfilter",
+        "/mapwide",         "/tool",
+        "/proptool",        "/play",
+        "/debugarm",        "/breakpoint",
+        "/check",           "/decaltool",
+        "/markertool",      "/unittool",
+        "/hoverprop",       "/selectprops",
+        "/selectunit",      "/propswap",
+        "/saveas",          "/settingsfile",
+        "/autosavefolder",  "/askunsaved",
+        "/particlebrowser", "/particlenew",
+        "/particleopen",    "/materialeditor",
+        "/uiscale",         "/testrun",
+        "/openall",         "/roundtrip",
+        "/vault",           "/vaultsearch",
+        "/vaultmap",        "/newmap",
+        "/stamp",           "/brush",
+        "/layer",           "/waterbody",
+        "/ruler",           "/adaptivewindow",
+        "/maskrule",        "/maskgen",
+        "/symhover",        "/stbfont",
+        "/recipe",          "/texset",
+        "/layerop",         "/slopeview",
+        "/typesfromlayers", "/uncapped",
+        "/nominimap",       "/followtest",
+        "/arrangetest",     "/findtest",
+        "/findopen",        "/filltest",
+        "/modaltest",       "/looktest",
+        "/looksfolder",     "/envtest",
+        "/watermasktest",   "/nowaterhires",
+        "/camat",           "/erosiontest",
+        "/sctest",          "/symmenu",
+        "/panelbottom",     "/shader",
+        "/brushtest",       "/brushshape",
+        "/stampsource",     "/stampstroke",
+        "/symoptions",      "/maskoptions",
+        "/masktest",        "/shaderbrowser",
+        "/convertlayers",   "/interoptest",
+        "/gentest",         "/layouttest",
+        "/playcopytest",    "/missiontest",
+        "/modtest",         "/unitlabtest",
+        "/effectmodtest",   "/assettest",
+        "/thumbcache",      "/assetmarks",
+        "/editormods",      "/editormodtest",
+        "/unitviewtest",    "/runmarker",
+        "/pausetest",       "/viewmenu",
+        "/mapinfotest",     "/dropdefaultcube",
+        "/exportpreview",   "/resizetest",
+        "/console",         "/pathtest",
       };
       for (const char* const option : kOptions) {
         if (moho::CFG_GetArgOption(option, 0, nullptr)) {
@@ -370,6 +323,8 @@ namespace faf::editor
     // keeps over the middle of the dock layout; ImGui draws head 1 here, around it.
     constexpr wchar_t kPanelWindowClass[] = L"FafMapEditorPanels";
     HWND gPanelWindow = nullptr;
+    /** Pop-out windows made with the device (settings.ini Popouts, `/nopopouts` none). */
+    int gPopoutHeads = 4;
     constexpr std::uint32_t kPanelHead = 1U;
 
     // The window's menu bar (File, View, Play): outside the game's picture, so the game's interface keeps its
@@ -704,6 +659,9 @@ namespace faf::editor
       head.mHandle = frame;
       head.mWindow = gPanelWindow;
       context.AddHead(head);
+      if (gPopoutHeads > 0) {
+        popouts::AddHeads(context, frame, gPopoutHeads, kPanelHead + 1U);
+      }
     }
 
     /**
@@ -1390,8 +1348,14 @@ namespace faf::editor
         }
         std::ostringstream text;
         text << in.rdbuf();
-        for (const std::string& problem : ReadKeymap(mCommands, text.str())) {
+        const std::vector<std::string> keyProblems = ReadKeymap(mCommands, text.str());
+        for (const std::string& problem : keyProblems) {
           gpg::Warnf("editor: %s: %s", mKeysFile.filename().string().c_str(), problem.c_str());
+        }
+        if (!keyProblems.empty()) {
+          if (const std::filesystem::path bad = KeepBadCopy(mKeysFile); !bad.empty()) {
+            gpg::Warnf("editor: keys: the file as it was is kept as %s", bad.string().c_str());
+          }
         }
         int changed = 0;
         for (const EdCommand& command : mCommands.All()) {
@@ -1446,7 +1410,21 @@ namespace faf::editor
           text << in.rdbuf();
           mSettingsProblems = mSettings.Read(text.str());
           mSettingsRead = true;
+          // A file from a newer editor is read but never written over; one with lines this editor can't read is
+          // kept as settings.ini.bad before it is written again (FAF Studio's userdata rules).
+          if (mSettings.FileFormat() > EdSettings::kFormatNow) {
+            mSettingsWritable = false;
+            mSettingsProblems.push_back(
+              "made by a newer editor (format " + std::to_string(mSettings.FileFormat()) + "): it is not written over"
+            );
+          } else if (!mSettingsProblems.empty()) {
+            if (const std::filesystem::path bad = KeepBadCopy(mSettingsFile); !bad.empty()) {
+              mSettingsProblems.push_back("the file as it was is kept as " + bad.string());
+            }
+          }
         }
+        gPopoutHeads =
+          moho::CFG_GetArgOption("/nopopouts", 0, nullptr) || !mSettings.GetBool(EdSettings::kPopouts) ? 0 : 4;
         mStartTitleBar = mSettings.Get(EdSettings::kTitleBar);
         mStartRenderer = mSettings.Get(EdSettings::kRenderer);
       }
@@ -1523,12 +1501,25 @@ namespace faf::editor
       {
         // `/uncapped` (test runs): no background limit, so a capture behind other windows measures the real frame rate.
         static const bool uncapped = moho::CFG_GetArgOption("/uncapped", 0, nullptr);
-        const int cap = uncapped ? 0 : mSettings.GetInt(EdSettings::kBackgroundFps);
         const auto now = std::chrono::steady_clock::now();
         const HWND front = ::GetForegroundWindow();
         const HWND frame = HandleOf(mGame.supcomFrame);
-        const bool behind = front != frame && (front == nullptr || ::GetAncestor(front, GA_ROOT) != frame);
-        if (cap > 0 && behind && !mPlay.Active()) {
+        // A pop-out window in front is the editor's too (owned by the frame).
+        const bool behind = front != frame && (front == nullptr || ::GetAncestor(front, GA_ROOT) != frame) &&
+          (front == nullptr || ::GetWindow(front, GW_OWNER) != frame);
+        // FAF Studio's pacing (ui/EdFramePacing): the background cap, the idle cap after a few seconds without input
+        // (the system's last input: the editor is in front), 60 while models load, none while playing.
+        LASTINPUTINFO input{sizeof(LASTINPUTINFO), 0};
+        (void)::GetLastInputInfo(&input);
+        PacingState pacing;
+        pacing.foreground = !behind;
+        pacing.playing = mPlay.Active();
+        pacing.loading = mShell->Tools().ModelsLoading();
+        pacing.secondsSinceInput = static_cast<double>(::GetTickCount() - input.dwTime) / 1000.0;
+        pacing.backgroundFps = mSettings.GetInt(EdSettings::kBackgroundFps);
+        pacing.idleFps = mSettings.GetInt(EdSettings::kIdleFps);
+        const int cap = uncapped ? 0 : PacedFps(pacing);
+        if (cap > 0) {
           const auto wanted = std::chrono::microseconds(1000000 / cap);
           const auto spent = now - mLastBackgroundFrame;
           if (spent < wanted) {
@@ -1682,6 +1673,9 @@ namespace faf::editor
               "settings.ini keeps these settings, layout.ini the panels, the theme and the scale, keys.ini your keys."
             );
             ImGui::PopTextWrapPos();
+            if (ImGui::Button("Reset user settings...")) {
+              (void)mCommands.Run("help.resetsettings");
+            }
             break;
           }
           case 1: {
@@ -1756,6 +1750,26 @@ namespace faf::editor
             (void)SettingChoice(
               EdSettings::kBackgroundFps, {{"10", "10 fps"}, {"30", "30 fps"}, {"60", "60 fps"}, {"0", "No limit"}}
             );
+            SettingLabel(
+              "Frame rate when idle",
+              "In front but untouched for 3 seconds (no play running), the editor draws at most this often; any "
+              "input brings the full rate back."
+            );
+            (void)SettingChoice(
+              EdSettings::kIdleFps, {{"10", "10 fps"}, {"30", "30 fps"}, {"60", "60 fps"}, {"0", "No limit"}}
+            );
+            SettingLabel(
+              "Pop-out windows",
+              "A panel dragged out of the editor's window gets a window of its own (up to four). Changes when the "
+              "editor starts again."
+            );
+            {
+              bool popouts = mSettings.GetBool(EdSettings::kPopouts);
+              if (ImGui::Checkbox("Panels can leave the window", &popouts)) {
+                (void)mSettings.SetBool(EdSettings::kPopouts, popouts);
+                SaveSettings();
+              }
+            }
             break;
           }
           default: {
@@ -4905,6 +4919,8 @@ namespace faf::editor
       };
       std::vector<UiClick> mUiClicks;
       int mUiClickFrame = 0;
+      /** `/tipcheck`: the tooltip coverage check, then the editor closes. */
+      EdTipCheck mTipCheck;
       void FeedUiClicks();
       /**
        * Test runs: `/command <id>[,<id>...]` runs those commands once the map is open (each logs what it did, or why
@@ -5009,6 +5025,17 @@ namespace faf::editor
       // `/roundtripframes <n>` (test runs): /roundtrip and /saveas wait this many frames of the drawn map (180).
       int mRoundTripAfter = 180;
       void SaveDocument();
+      /** Save's question for a map outside the vault: write over it there, Save as, or nothing. */
+      void DrawOverwriteAsk();
+      bool mAskOverwrite = false;
+      /** File > Update the lobby picture on save (FAF Studio renders it on every save; the editor keeps it by default).
+       */
+      bool mUpdatePreviewOnSave = false;
+      /** A new map's first save draws its lobby picture from the map (New made a plain one). */
+      bool mPreviewOnFirstSave = false;
+      /** File > New sample map: once the new map is open, the Generate workspace's island graph builds its ground. */
+      bool mSampleMapPending = false;
+      bool mSampleBuildDue = false;
       /**
        * The Log panel's console line: `sim <code>` runs in the sim (the engine's SimLua, with a session), `con
        * <command>` is the engine's console, anything else runs in the interface's Lua; `=expr` prints its value.
@@ -5414,6 +5441,7 @@ namespace faf::editor
         gMonoFont = io.Fonts->AddFontFromFileTTF(mono.string().c_str(), 16.0f);
       }
       ImGui_ImplWin32_Init(gPanelWindow);
+      popouts::Install();
     }
 
     void EditorApp::RegisterCommands()
@@ -5492,6 +5520,20 @@ namespace faf::editor
       add("file.save", "Save", "File", "Ctrl+S", [this] {
         SaveDocument();
       }, mapOpen);
+      // FAF Studio shipped a sample map (sample_island); the editor makes one: a 5 km two-player island from the
+      // Generate workspace's island graph.
+      add("file.samplemap", "New sample map (an island)", "File", "", [this] {
+        mNewMapSpec = "sample_island,1,2,25,20";
+        mSampleMapPending = true;
+        gpg::Logf("editor: sample map: making sample_island (5 km, 2 players, the island graph)");
+      }, [this]() -> std::string {
+        return mPlay.Active() ? "a play is running" : std::string();
+      }, {}, "A small map to try the tools on: a 5 km island for two, its ground built by the island graph");
+      add("file.updatepreview", "Update the lobby picture on save", "File", "", [this] {
+        mUpdatePreviewOnSave = !mUpdatePreviewOnSave;
+      }, {}, [this] {
+        return mUpdatePreviewOnSave;
+      }, "Each save draws the lobby picture anew from the map (else the one the map has is kept, byte for byte)");
       add("file.exportpreview", "Export the lobby preview (PNG)...", "File", "", [this] {
         wchar_t path[MAX_PATH] = L"";
         OPENFILENAMEW dialog{};
@@ -5738,6 +5780,33 @@ namespace faf::editor
       add("help.tour", "Tour", "Help", "", [this] {
         mShell->StartTour();
       }, {}, {}, "A few steps around the window");
+      add("help.settingsfolder", "Open the settings folder", "Help", "", [] {
+        const std::filesystem::path folder = EditorSettingsFolder();
+        (void)::ShellExecuteW(nullptr, L"open", folder.wstring().c_str(), nullptr, nullptr, SW_SHOWNORMAL);
+      }, {}, {}, "settings.ini, layout.ini, keys.ini and the play setups");
+      add(
+        "help.resetsettings",
+        "Reset user settings",
+        "Help",
+        "",
+        [this] {
+        // FAF Studio's Help > Reset user settings: the files are put aside (as <name>.reset) and nothing is written
+        // back this run, so the next start has the defaults.
+        const std::filesystem::path folder = EditorSettingsFolder();
+        ImGui::GetIO().IniFilename = nullptr;
+        mSettingsWritable = false;
+        mKeysFile.clear();
+        const int moved = PutUserSettingsAside(folder);
+        gpg::Logf("editor: user settings reset: %d files put aside in %s", moved, folder.string().c_str());
+        PostStatusMessage(
+          "Settings put aside (" + std::to_string(moved) + " files): start the editor again for the defaults"
+        );
+      },
+        {},
+        {},
+        "Settings, layout, keys and play setups back to the defaults at the next start (the old files are kept as "
+        ".reset)"
+      );
       add("view.palette", "Command palette", "View", "Ctrl+K, Ctrl+Shift+P", [] {
         OpenCommandPalette();
       }, {}, {}, "Find any command by a few of its letters");
@@ -5761,10 +5830,10 @@ namespace faf::editor
       add("view.turnright", "Turn the camera right", "View", "E", [this] {
         mScene.StepCamera(0.2617994f, 1.0f);
       }, mapOpen);
-      add("view.zoomin", "Closer", "View", "PageUp", [this] {
+      add("view.zoomin", "Closer", "View", "PageUp, Z", [this] {
         mScene.StepCamera(0.0f, 0.8f);
       }, mapOpen);
-      add("view.zoomout", "Farther", "View", "PageDown", [this] {
+      add("view.zoomout", "Farther", "View", "PageDown, X", [this] {
         mScene.StepCamera(0.0f, 1.25f);
       }, mapOpen);
       add("view.north", "Face north", "View", "N", [this] {
@@ -5820,6 +5889,24 @@ namespace faf::editor
       }, [this]() -> std::string {
         return mPlay.Active() && moho::WLD_GetActiveSession() != nullptr ? std::string() : "no play running";
       });
+      // Alt+C (FAF Studio): the Markers tool drawing a chain, each marker placed joining it.
+      add("tool.chain", "Draw a chain", "Tool", "Alt+C", [this] {
+        (void)mCommands.Run("tool.markers");
+        mShell->Tools().SetDrawChain(true);
+        PostStatusMessage("Draw chain: each marker placed joins " + mShell->Tools().ChainName());
+      }, mapOpen, {}, "The Markers tool with Draw chain on: each marker placed joins the chain named in the panel");
+      // Map > Snap resource markers to grid (FAF Studio): every mass and hydrocarbon in its cell's middle.
+      add("map.snapresources", "Snap resource markers to grid", "Map", "", [this] {
+        const std::vector<ResourceSnap> snaps = ResourceSnaps(mDocument.SaveData().Markers());
+        for (const ResourceSnap& snap : snaps) {
+          const float y = mDocument.Map()->mTerrainRes->GetHeightAt(
+            static_cast<std::int32_t>(std::lround(snap.x)), static_cast<std::int32_t>(std::lround(snap.z))
+          );
+          mScene.EditMarker(snap.name, "position", Vector3Value(snap.x, y, snap.z));
+        }
+        gpg::Logf("editor: snap resources: %zu markers moved to their cells' middles", snaps.size());
+        PostStatusMessage(std::to_string(snaps.size()) + " resource markers snapped to the grid");
+      }, mapOpen, {}, "Every mass and hydrocarbon marker moved to the middle of its extractor's cell (x.5)");
       add("view.focus", "Focus selection", "View", "F", [this] {
         if (!mScene.FrameSelection()) {
           PostStatusMessage("Nothing selected to focus on");
@@ -6063,6 +6150,7 @@ namespace faf::editor
           {cmd("file.home"),
            sep(),
            cmd("file.new"),
+           cmd("file.samplemap"),
            cmd("new.effect"),
            cmd("new.material"),
            cmd("file.open"),
@@ -6070,6 +6158,7 @@ namespace faf::editor
            sep(),
            cmd("file.save"),
            cmd("file.saveas"),
+           cmd("file.updatepreview"),
            cmd("file.package"),
            cmd("file.exportpreview"),
            sep(),
@@ -6145,6 +6234,7 @@ namespace faf::editor
            sep(),
            cmd("map.preview"),
            cmd("map.resize"),
+           cmd("map.snapresources"),
            sep(),
            cmd("texture.masks.export"),
            cmd("texture.masks.import")}
@@ -6190,7 +6280,17 @@ namespace faf::editor
            cmd("view.script")}
         },
         EdMenu{"&Play", {cmd("play.toggle"), cmd("play.pause"), cmd("play.editorview"), playMaps}},
-        EdMenu{"&Help", {cmd("help.open"), cmd("help.tour"), sep(), cmd("view.palette"), cmd("settings.keys")}},
+        EdMenu{
+          "&Help",
+          {cmd("help.open"),
+           cmd("help.tour"),
+           sep(),
+           cmd("view.palette"),
+           cmd("settings.keys"),
+           sep(),
+           cmd("help.settingsfolder"),
+           cmd("help.resetsettings")}
+        },
       };
       const auto clashes = c.Clashes();
       for (const auto& [a, b] : clashes) {
@@ -6253,7 +6353,9 @@ namespace faf::editor
         return;
       }
       ImGuiIO& io = ImGui::GetIO();
-      io.AddMousePosEvent(click.x, click.y);
+      // The points are the panels' window's pixels; ImGui's are the screen's once panels can pop out.
+      const ImVec2 origin = ImGui::GetMainViewport()->Pos;
+      io.AddMousePosEvent(origin.x + click.x, origin.y + click.y);
       if (click.hoverOnly) {
         if (step == 1) {
           gpg::Logf("editor: test pointer at %.0f,%.0f", click.x, click.y);
@@ -6853,8 +6955,11 @@ namespace faf::editor
       if (mImGuiReady) {
         ApplyUiScale();
         ImGui_ImplWin32_NewFrame();
+        popouts::BeforeNewFrame(gPanelWindow);
         FeedUiClicks();
+        mTipCheck.BeforeNewFrame();
         ImGui::NewFrame();
+        popouts::AfterNewFrame();
         FeedTestCommands();
         // `/browser`, `/vaultmap <name>` (test runs), with or without a map open.
         if (mBrowserArg) {
@@ -6980,6 +7085,7 @@ namespace faf::editor
         }
         SyncSettings();
         DrawSettings();
+        DrawOverwriteAsk();
         DrawRecover();
         DrawUnsavedQuestion();
         DrawFind();
@@ -7077,18 +7183,31 @@ namespace faf::editor
           }
         }
         if (gComposite && mViewImage != 0) {
-          const ImVec2 from(static_cast<float>(gViewRect.left), static_cast<float>(gViewRect.top));
-          const ImVec2 to(static_cast<float>(gViewRect.right), static_cast<float>(gViewRect.bottom));
+          // gViewRect is in the panels' window's pixels; ImGui's are the screen's once panels can pop out.
+          const ImVec2 origin = ImGui::GetMainViewport()->Pos;
+          const ImVec2 from(
+            origin.x + static_cast<float>(gViewRect.left), origin.y + static_cast<float>(gViewRect.top)
+          );
+          const ImVec2 to(
+            origin.x + static_cast<float>(gViewRect.right), origin.y + static_cast<float>(gViewRect.bottom)
+          );
           ImGui::GetBackgroundDrawList()->AddImage(static_cast<ImTextureID>(EdImGuiRenderer::kGameViewImage), from, to);
         }
         {
           const gpg::gal::RenderProfileScope profilePanels("EdPanelsRender");
           ImGui::Render();
+          mTipCheck.AfterRender();
+          if (mTipCheck.Done()) {
+            mTipCheck = EdTipCheck();
+            mShell->RequestExit();
+          }
           // A frame whose heads were re-made isn't drawn: its draw lists hold the view's and the minimap's copies,
           // which the re-made context freed.
-          if (!FitGameView()) {
+          const bool remade = FitGameView();
+          if (!remade) {
             RenderPanels();
           }
+          popouts::Render(mRenderer, !remade);
         }
       }
 
@@ -7137,6 +7256,9 @@ namespace faf::editor
       }
       if (fa::vector<fa::string> tool; moho::CFG_GetArgOption("/tool", 1, &tool) && !tool.empty()) {
         mToolArg = std::atoi(tool[0].c_str());
+      }
+      if (moho::CFG_GetArgOption("/tipcheck", 0, nullptr)) {
+        mTipCheck.Start(360);
       }
       if (fa::vector<fa::string> clicks; moho::CFG_GetArgOption("/uiclicks", 1, &clicks) && !clicks.empty()) {
         const std::string list = clicks[0].c_str();
@@ -8508,6 +8630,18 @@ namespace faf::editor
 
     void EditorApp::SaveDocument()
     {
+      if (mDocument.SaveNeedsOverwriteConsent()) {
+        mAskOverwrite = true;
+        return;
+      }
+      // The lobby picture drawn anew from the map: a new map's first save, or each save when asked to.
+      if (mUpdatePreviewOnSave || mPreviewOnFirstSave) {
+        std::string drawn;
+        const bool ok = RegeneratePreview(drawn);
+        (ok ? gpg::Logf : gpg::Warnf)(
+          "editor: lobby picture for the save%s: %s", mPreviewOnFirstSave ? " (the first)" : "", drawn.c_str()
+        );
+      }
       std::string message;
       // A look being tried isn't saved: the map's own is written, then the tried one put back on the map.
       std::optional<EdDocument::LookEnvironment> tried;
@@ -8521,6 +8655,7 @@ namespace faf::editor
         mDocument.ApplyLookEnvironment(*tried);
       }
       if (saved) {
+        mPreviewOnFirstSave = false;
         gpg::Logf("editor: %s", message.c_str());
         PostStatusMessage("Saved " + mDocument.FolderName());
         if (!mGraphMap.empty() && mGraphMap == mDocument.Path()) {
@@ -8542,6 +8677,41 @@ namespace faf::editor
       } else {
         gpg::Warnf("editor: %s", message.c_str());
       }
+    }
+
+    void EditorApp::DrawOverwriteAsk()
+    {
+      constexpr const char* kTitle = "Write over the map there?";
+      if (mAskOverwrite) {
+        mAskOverwrite = false;
+        ImGui::OpenPopup(kTitle);
+      }
+      const ImGuiViewport* const viewport = ImGui::GetMainViewport();
+      ImGui::SetNextWindowPos(viewport->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+      if (!ImGui::BeginPopupModal(kTitle, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+        return;
+      }
+      ImGui::TextUnformatted("This map isn't in your vault's maps folder:");
+      ImGui::TextDisabled("%s", mDocument.MapDiskFile().parent_path().string().c_str());
+      ImGui::TextUnformatted("Saving writes over its files there (they are backed up first).");
+      if (ImGui::Button("Write over it", ImVec2(Em(140.0f), 0.0f))) {
+        mDocument.AllowOverwrite();
+        gpg::Logf(
+          "editor: save: writing over %s (outside the vault) as asked", mDocument.MapDiskFile().string().c_str()
+        );
+        ImGui::CloseCurrentPopup();
+        SaveDocument();
+      }
+      ImGui::SameLine();
+      if (ImGui::Button("Save as...", ImVec2(Em(140.0f), 0.0f))) {
+        ImGui::CloseCurrentPopup();
+        (void)mCommands.Run("file.saveas");
+      }
+      ImGui::SameLine();
+      if (ImGui::Button("Cancel", ImVec2(Em(140.0f), 0.0f)) || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+        ImGui::CloseCurrentPopup();
+      }
+      ImGui::EndPopup();
     }
 
     void EditorApp::StartResize(
@@ -10850,6 +11020,11 @@ namespace faf::editor
       std::filesystem::path folder;
       std::string scenario;
       if (finished && mDocument.TakeCreated(folder, scenario)) {
+        mPreviewOnFirstSave = true;
+        if (mSampleMapPending) {
+          mSampleMapPending = false;
+          mSampleBuildDue = true;
+        }
         // The game's file system is always a CVFSImpl (VFS_Create, 0x00467F90).
         if (auto* const vfs = static_cast<moho::CVFSImpl*>(moho::DISK_GetVFS()); vfs != nullptr) {
           // The rules and the sim's Lua built ahead read the mounts on their threads, and the mounts
@@ -10885,6 +11060,16 @@ namespace faf::editor
           "editor: check fix: %s moved to %.1f, %.1f", marker.c_str(), static_cast<double>(x), static_cast<double>(z)
         );
       }
+      // The sample map open: its ground from the island graph (Generate's Build, one undo step).
+      if (mSampleBuildDue && mDocument.GetState() == EdDocument::State::Open && mScene.Attached()) {
+        mSampleBuildDue = false;
+        if (mShell->Generate().OpenShipped("island")) {
+          mShell->Generate().AskBuild();
+          gpg::Logf("editor: sample map: the island graph builds the ground");
+        } else {
+          gpg::Warnf("editor: sample map: the island graph isn't there");
+        }
+      }
       // The game's marker templates (FAF's /lua/MarkerTemplates.lua, mods' types too), once the files are there.
       if (!mMarkerTemplatesRead && mDocument.GetState() == EdDocument::State::Open) {
         mMarkerTemplatesRead = true;
@@ -10895,7 +11080,10 @@ namespace faf::editor
       // An asset dragged from the browser and let go over the map: it becomes the tool's, and the tool gets a click
       // there (sent to the view's window, as the panels pass the mouse on; the real cursor isn't touched).
       if (EdAssetBrowser::DropAsk drop; mShell->Assets().TakeDrop(drop) && gViewWindow != nullptr) {
-        const POINT at{static_cast<LONG>(std::lround(drop.x)), static_cast<LONG>(std::lround(drop.y))};
+        const ImVec2 origin = ImGui::GetMainViewport()->Pos;
+        const POINT at{
+          static_cast<LONG>(std::lround(drop.x - origin.x)), static_cast<LONG>(std::lround(drop.y - origin.y))
+        };
         bool over = ::PtInRect(&gViewRect, at) != FALSE;
         for (const RECT& covered : gOverView) {
           over = over && ::PtInRect(&covered, at) == FALSE;
@@ -11195,7 +11383,13 @@ namespace faf::editor
         (ImGui::GetTopMostPopupModal() != nullptr || (!gComposite && mShell != nullptr && mShell->Browser().Open()));
       std::vector<RECT> holes;
       if (mImGuiReady && !modal) {
+        const ImGuiViewport* const mainViewport = ImGui::GetMainViewport();
+        const ImVec2 origin = mainViewport->Pos;
         for (const ImGuiWindow* const window : ImGui::GetCurrentContext()->Windows) {
+          // A panel in a window of its own (popped out) is a window above the frame: no hole for it.
+          if (window->Viewport != nullptr && window->Viewport != mainViewport) {
+            continue;
+          }
           // A window not docked into the layout (the Maps window, the Material Editor, any panel pulled out) floats
           // over the view and takes the mouse there; the dock space's own host window (behind everything) doesn't.
           const bool undocked = (window->Flags & ImGuiWindowFlags_NoBringToFrontOnFocus) == 0 &&
@@ -11211,10 +11405,10 @@ namespace faf::editor
             continue;
           }
           RECT hole{
-            static_cast<LONG>(window->Pos.x) - x,
-            static_cast<LONG>(window->Pos.y) - y,
-            static_cast<LONG>(window->Pos.x + window->Size.x + 1.0f) - x,
-            static_cast<LONG>(window->Pos.y + window->Size.y + 1.0f) - y
+            static_cast<LONG>(window->Pos.x - origin.x) - x,
+            static_cast<LONG>(window->Pos.y - origin.y) - y,
+            static_cast<LONG>(window->Pos.x - origin.x + window->Size.x + 1.0f) - x,
+            static_cast<LONG>(window->Pos.y - origin.y + window->Size.y + 1.0f) - y
           };
           if (hole.right > 0 && hole.bottom > 0 && hole.left < width && hole.top < height) {
             holes.push_back(hole);
@@ -11293,13 +11487,15 @@ namespace faf::editor
       }
       const gpg::gal::Head& gameHead = active->GetHead(0);
       const gpg::gal::Head& panelHead = active->GetHead(kPanelHead);
+      // The pop-outs' heads follow their windows (a size taken once a drag ends).
+      gpg::gal::DeviceContext popoutSizes(*active);
       if (
-        gameHead.mWidth != static_cast<std::uint32_t>(width) ||
+        popouts::WantHeadSizes(popoutSizes) || gameHead.mWidth != static_cast<std::uint32_t>(width) ||
         gameHead.mHeight != static_cast<std::uint32_t>(height) ||
         panelHead.mWidth != static_cast<std::uint32_t>(clientWidth) ||
         panelHead.mHeight != static_cast<std::uint32_t>(clientHeight)
       ) {
-        gpg::gal::DeviceContext context(*active);
+        gpg::gal::DeviceContext context(popoutSizes);
         context.GetHead(0).mWidth = static_cast<std::uint32_t>(width);
         context.GetHead(0).mHeight = static_cast<std::uint32_t>(height);
         context.GetHead(kPanelHead).mWidth = static_cast<std::uint32_t>(clientWidth);
@@ -11423,6 +11619,51 @@ namespace faf::editor
     gpg::diag::InstallCrtDiagnosticHooks({});
     (void)gpg::SetDieHandler(&EditorDieHandler);
     const AccessibilityKeys accessibilityKeys;
+
+    // Started without arguments (a double click): FAF's game data is found as FAF Studio's start finds it, FAF's
+    // init_faf.lua next to the exe or in the FAF client's folders (doc/EdUserFiles), unless the exe's own
+    // SupComDataPath.lua (the game's default) is there.
+    static std::vector<std::string> startArgs;
+    static std::vector<char*> startArgv;
+    {
+      const std::vector<std::string> args(__argv, __argv + __argc);
+      wchar_t exePath[MAX_PATH] = {};
+      (void)::GetModuleFileNameW(nullptr, exePath, MAX_PATH);
+      const std::filesystem::path exeFolder = std::filesystem::path(exePath).parent_path();
+      std::error_code ignored;
+      if (!HasInitArgument(args) && !std::filesystem::exists(exeFolder / "SupComDataPath.lua", ignored)) {
+        const char* const programData = std::getenv("ProgramData");
+        const std::filesystem::path found = FindInitFile(
+          InitFileCandidates(
+            exeFolder, programData != nullptr ? std::filesystem::path(programData) : std::filesystem::path()
+          ),
+          [](const std::filesystem::path& file) {
+          std::error_code error;
+          return std::filesystem::is_regular_file(file, error);
+        }
+        );
+        if (found.empty()) {
+          (void)::MessageBoxW(
+            nullptr,
+            L"The map editor couldn't find Forged Alliance Forever's game data (init_faf.lua).\n\n"
+            L"Install the FAF client and run a game once, or start the editor with /init <init file>.",
+            L"FAF map editor",
+            MB_ICONERROR | MB_OK
+          );
+          return 1;
+        }
+        startArgs = args;
+        startArgs.emplace_back("/init");
+        startArgs.push_back(found.string());
+        for (std::string& argument : startArgs) {
+          startArgv.push_back(argument.data());
+        }
+        startArgv.push_back(nullptr);
+        __argc = static_cast<int>(startArgs.size());
+        __argv = startArgv.data();
+        (void)::SetCurrentDirectoryW(found.parent_path().wstring().c_str());
+      }
+    }
 
     int exitCode = 0;
     try {

@@ -1,3 +1,4 @@
+#include "editor/ui/EdPopouts.h"
 #include "editor/ui/EdViewMenu.h"
 #include "editor/EdShell.h"
 #include "editor/ui/EdControls.h"
@@ -286,6 +287,13 @@ namespace faf::editor
       mAdaptivePreviewDone.clear();
     }
     UpdateTestRun();
+    // A list row's Delete (its menu): the row was selected a frame or two ago, now the selection goes.
+    if (mDeleteAsked && --mDeleteWait <= 0) {
+      mDeleteAsked = false;
+      if (mCommands != nullptr) {
+        (void)mCommands->Run("edit.delete");
+      }
+    }
     mBrowser.Update();
     const bool playing = mPlay.Active();
     const bool panels = !playing || mPanelsWhilePlaying;
@@ -623,6 +631,11 @@ namespace faf::editor
         }
         ImGui::End();
       }
+    } else if (mShowMissionRun && popouts::IsOut(Panel("Run###MissionRun"))) {
+      // A play hides the panels, but the mission's Run panel stays when it is out in a window of its own (as FAF
+      // Studio's Run window during a test play).
+      const std::vector<std::string> trace = mLog.TakeMissionTrace();
+      mMissionPanel.DrawRunPanel(mShowMissionRun, mDocument.Map() != nullptr, mPlay.Active(), trace);
     }
     if (mShowDemo) {
       ImGui::ShowDemoWindow(&mShowDemo);
@@ -2808,7 +2821,45 @@ namespace faf::editor
     if (!mPackageMessage.empty()) {
       ImGui::TextWrapped("%s", mPackageMessage.c_str());
     }
-    ImGui::TextDisabled("Uploading to the vault is done in the FAF client (or its website) for now.");
+    // Upload to the FAF vault (as the FAF client's map upload): the package written above, ranked or not.
+    {
+      static bool ranked = true;
+      EdFafSession& faf = mBrowser.Faf();
+      const EdFafSession::UploadState upload = faf.Upload();
+      const std::filesystem::path zip = mDocument.VaultFolder() / "packages" / (mPackagePlan.folder + ".zip");
+      std::error_code missing;
+      const bool packaged = std::filesystem::exists(zip, missing);
+      const bool signedIn = faf.GetState() == EdFafSession::State::LoggedIn;
+      ImGui::Separator();
+      ImGui::Checkbox("Ranked", &ranked);
+      EdSetItemTooltip("Whether the map may be picked for ranked games (the vault's ranked flag)");
+      ImGui::SameLine();
+      ImGui::BeginDisabled(!packaged || !signedIn || upload.running || !mPackagePlan.errors.empty());
+      if (ImGui::Button("Upload to the FAF vault", ImVec2(Em(200.0f), 0.0f))) {
+        faf.UploadMap(zip, ranked);
+      }
+      ImGui::EndDisabled();
+      if (!signedIn) {
+        EdSetItemTooltip("Sign in to FAF on the start screen's FAF vault page first");
+      } else if (!packaged) {
+        EdSetItemTooltip("Package the map first: the upload sends its zip");
+      }
+      // The upload's end said once in the log.
+      static std::string told;
+      if (upload.done && told != upload.message) {
+        told = upload.message;
+        (upload.ok ? gpg::Logf : gpg::Warnf)("editor: vault upload: %s", upload.message.c_str());
+      }
+      if (upload.running || upload.done) {
+        ImGui::TextColored(
+          upload.running ? ImGui::GetStyleColorVec4(ImGuiCol_Text)
+            : upload.ok  ? ImVec4(0.45f, 0.85f, 0.45f, 1.0f)
+                         : ImVec4(0.95f, 0.45f, 0.40f, 1.0f),
+          "%s",
+          upload.message.c_str()
+        );
+      }
+    }
     ImGui::EndPopup();
   }
 

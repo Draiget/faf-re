@@ -102,34 +102,6 @@ namespace faf::editor
       return atom;
     }
 
-    /** The preview image (a DDS) inside a `.scmap`'s preview record, or empty. */
-    std::string PreviewImage(
-      const std::vector<char>& record
-    )
-    {
-      // 0xBEEFFEED, version, width, height; the name in UTF-16 up to a 0; tag count and tags; payload size; payload.
-      std::size_t at = 16;
-      while (at + 1 < record.size() && !(record[at] == 0 && record[at + 1] == 0)) {
-        at += 2;
-      }
-      at += 2;
-      if (at + 4 > record.size()) {
-        return {};
-      }
-      std::uint32_t tags = 0;
-      std::memcpy(&tags, record.data() + at, 4);
-      at += 4 + static_cast<std::size_t>(tags) * 8;
-      if (at + 4 > record.size()) {
-        return {};
-      }
-      std::uint32_t payload = 0;
-      std::memcpy(&payload, record.data() + at, 4);
-      at += 4;
-      if (at + payload > record.size()) {
-        return {};
-      }
-      return std::string(record.data() + at, payload);
-    }
   } // namespace
 
   namespace
@@ -406,7 +378,7 @@ namespace faf::editor
   {
     details.pictureAsked = true;
     gpg::gal::imaging::ImageCodec* const codec = gpg::gal::imaging::ImageCodec::Instance();
-    const std::string image = codec != nullptr ? PreviewImage(ReadPreviewRecord(details.scmap)) : std::string();
+    const std::string image = codec != nullptr ? PreviewPictureOf(ReadPreviewRecord(details.scmap)) : std::string();
     if (image.empty()) {
       return;
     }

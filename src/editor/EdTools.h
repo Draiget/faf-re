@@ -1202,6 +1202,13 @@ namespace faf::editor
     {
       return MarkersToolActive() && mDrawChain;
     }
+    /** Alt+C: the Markers tool's chain drawing on (the tool itself is picked by the command). */
+    void SetDrawChain(
+      const bool on
+    ) noexcept
+    {
+      mDrawChain = on;
+    }
     [[nodiscard]] std::string ChainName() const
     {
       return mChainName;
