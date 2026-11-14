@@ -19,7 +19,7 @@ namespace moho
    */
   inline constexpr int kFafGameVersionOldestSupported = 3835;
   /// The newest game version whose engine patches this engine carries.
-  inline constexpr int kFafGameVersionLatest = 3840;
+  inline constexpr int kFafGameVersionLatest = 3841;
 
   /**
    * Simulation behaviour that FA-Binary-Patches changed after game version 3835. Each entry is on
@@ -32,7 +32,7 @@ namespace moho
     ProjectileImpactBelowZero = 2,  ///< #154: a projectile below height 0 impacts (3840)
     RefuelUndockAboveMaxHealth = 3, ///< #169: aircraft undock when health >= max health (3840)
     ShieldRepair = 4,               ///< #175: shield repair scales with resources, and needs the shield on (3840)
-    ProjectileMapEdgeCollision = 5, ///< #180: terrain extends past the map edge; replaces #154 (not released yet)
+    ProjectileMapEdgeCollision = 5, ///< #180: terrain extends past the map edge; replaces #154 (3841)
     /// Engine feature, not an FA-Binary-Patches one: a map's `ScenarioInfo.WaterBodies` add water levels
     /// besides its sea (.plans/water-levels/PLAN.md). In no release yet: on only by `sim_FixWaterBodies`.
     WaterBodies = 6,
