@@ -881,10 +881,11 @@ namespace moho
   [[nodiscard]] RProjectileBlueprint* RULE_FindProjectileBlueprintByName(RRuleGameRules* rules, const char* name);
 
   /**
-   * Engine addition (`wld_StartSimEarly`): the session loader frees the rules' Lua copy of the
-   * blueprints itself (`RULE_ReleaseDeferredScriptBlueprints`), after the session's export, which
-   * comes after the sim's there; the sim, which may start before that export, then leaves it be in
-   * `OnSimHasBlueprints`. For the rules of one load at a time.
+   * Engine addition (`wld_StartSimEarly`): the rules' Lua copy of the blueprints is freed once both
+   * the session (`RULE_ReleaseDeferredScriptBlueprints`, after its export) and the sim
+   * (`OnSimHasBlueprints`) have their own, in whichever order they get there. The sim may start
+   * before the session's export, and may build its state only after it when the state wasn't
+   * prepared ahead. For the rules of one load at a time.
    */
   void RULE_DeferScriptBlueprintRelease(RRuleGameRules* rules) noexcept;
   void RULE_ReleaseDeferredScriptBlueprints(RRuleGameRules* rules);

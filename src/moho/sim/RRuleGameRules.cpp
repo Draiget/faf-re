@@ -90,6 +90,8 @@ namespace moho
 
   /// The rules whose Lua blueprints the session loader frees (RULE_DeferScriptBlueprintRelease).
   std::atomic<const RRuleGameRules*> gLoaderReleasesBlueprints{nullptr};
+  /// For those rules: how many of the session and the sim still have to copy the blueprints (2, 1, 0).
+  std::atomic<int> gDeferredCopiesPending{0};
 
   /**
    * One blueprint file waiting to be reloaded, linked into
@@ -1071,12 +1073,35 @@ namespace moho
     lua_setgcthreshold(mLuaState->m_state, 0);
   }
 
+  namespace
+  {
+    /**
+     * The session or the sim has its copy of deferred rules' blueprints; the second of the two frees
+     * the rules' own. The sim may copy before the session (a state prepared ahead) or after it (built
+     * in `Sim::Sim` when the prepare was skipped, as after a previous game in this process).
+     */
+    void DeferredCopyDone(
+      RRuleGameRulesImpl& rules
+    )
+    {
+      if (gDeferredCopiesPending.fetch_sub(1, std::memory_order_acq_rel) != 1) {
+        return;
+      }
+      const RRuleGameRules* expected = &rules;
+      if (
+        gLoaderReleasesBlueprints.compare_exchange_strong(expected, nullptr, std::memory_order_acq_rel) &&
+        rule_ReleaseScriptBlueprints && !KeepsScriptBlueprints()
+      ) {
+        rules.ReleaseScriptBlueprints();
+      }
+    }
+  } // namespace
+
   void RRuleGameRulesImpl::OnSimHasBlueprints()
   {
-    if (
-      rule_ReleaseScriptBlueprints && !KeepsScriptBlueprints() &&
-      gLoaderReleasesBlueprints.load(std::memory_order_acquire) != this
-    ) {
+    if (gLoaderReleasesBlueprints.load(std::memory_order_acquire) == this) {
+      DeferredCopyDone(*this);
+    } else if (rule_ReleaseScriptBlueprints && !KeepsScriptBlueprints()) {
       ReleaseScriptBlueprints();
     }
   }
@@ -1085,6 +1110,7 @@ namespace moho
     RRuleGameRules* const rules
   ) noexcept
   {
+    gDeferredCopiesPending.store(2, std::memory_order_relaxed);
     gLoaderReleasesBlueprints.store(rules, std::memory_order_release);
   }
 
@@ -1092,11 +1118,8 @@ namespace moho
     RRuleGameRules* const rules
   )
   {
-    if (
-      rule_ReleaseScriptBlueprints && !KeepsScriptBlueprints() && rules != nullptr &&
-      gLoaderReleasesBlueprints.load(std::memory_order_acquire) == rules
-    ) {
-      static_cast<RRuleGameRulesImpl*>(rules)->ReleaseScriptBlueprints();
+    if (rules != nullptr && gLoaderReleasesBlueprints.load(std::memory_order_acquire) == rules) {
+      DeferredCopyDone(*static_cast<RRuleGameRulesImpl*>(rules));
     }
   }
 
