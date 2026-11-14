@@ -1729,7 +1729,7 @@ namespace moho
    */
   fa::string Entity::GetErrorDescription()
   {
-    return gpg::STR_Printf("Entity %s at %08x", GetBlueprintId(), reinterpret_cast<std::uintptr_t>(this));
+    return gpg::STR_Printf("Entity %s at %p", GetBlueprintId(), static_cast<const void*>(this));
   }
 
   /**

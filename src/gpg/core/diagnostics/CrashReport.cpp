@@ -206,8 +206,10 @@ namespace gpg::diag
                   // file offset and does not map into memory).
                   const auto* const cv = base + debug[e].AddressOfRawData;
                   if (cv[0] == 'R' && cv[1] == 'S' && cv[2] == 'D' && cv[3] == 'S') {
-                    const GUID& sig = *reinterpret_cast<const GUID*>(cv + 4);
-                    const DWORD age = *reinterpret_cast<const DWORD*>(cv + 20);
+                    GUID sig{};
+                    DWORD age = 0;
+                    std::memcpy(&sig, cv + 4, sizeof(sig));
+                    std::memcpy(&age, cv + 20, sizeof(age));
                     const char* const pdbPath = reinterpret_cast<const char*>(cv + 24);
                     ReportLine(
                       sink,

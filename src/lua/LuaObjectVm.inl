@@ -804,9 +804,9 @@ void luaV_concat(
         luaV_concat_raise_typeerror(state, top - 2, top - 1);
       }
 
-      const ptrdiff_t resultOffset = reinterpret_cast<char*>(top - 2) - reinterpret_cast<char*>(state->stack);
+      const ptrdiff_t resultOffset = top - 2 - state->stack;
       (void)callTMres(handler, top - 2, top - 1, state);
-      *reinterpret_cast<StkId>(reinterpret_cast<char*>(state->stack) + resultOffset) = *state->top;
+      *(state->stack + resultOffset) = *state->top;
     } else if (static_cast<TString*>(top[-1].value.p)->len > 0u) {
       // Two strings at least. Reach back over as many more as are
       // convertible so the whole run costs one allocation.
@@ -2305,7 +2305,7 @@ static StkId tryFuncTM(
   constexpr int kTagMethodCall = 17;
 
   const TObject* const handler = luaT_gettmbyobj(state, func, kTagMethodCall);
-  const ptrdiff_t funcOffset = reinterpret_cast<char*>(func) - reinterpret_cast<char*>(state->stack);
+  const ptrdiff_t funcOffset = func - state->stack;
 
   if (!IsCallableTag(handler->tt)) {
     luaG_typeerror(state, func, "call");
@@ -2322,7 +2322,7 @@ static StkId tryFuncTM(
 
   ++state->top;
 
-  StkId const target = reinterpret_cast<StkId>(reinterpret_cast<char*>(state->stack) + funcOffset);
+  StkId const target = state->stack + funcOffset;
   target->tt = handler->tt;
   target->value.p = handler->value.p;
   return target;
@@ -2418,7 +2418,7 @@ StkId luaD_precall(
   // loaded through dofile faulted the moment it finished.
   constexpr int kFrameCFunction = 3;
 
-  const ptrdiff_t funcOffset = reinterpret_cast<char*>(func) - reinterpret_cast<char*>(state->stack);
+  const ptrdiff_t funcOffset = func - state->stack;
 
   if (!IsCallableTag(func->tt)) {
     func = tryFuncTM(func, state);
@@ -2442,7 +2442,7 @@ StkId luaD_precall(
     }
 
     CallInfo* const ci = ++state->ci;
-    ci->base = reinterpret_cast<StkId>(reinterpret_cast<char*>(state->stack) + funcOffset) + 1;
+    ci->base = state->stack + funcOffset + 1;
     state->base = ci->base;
     ci->top = state->base + proto->maxstacksize;
     ci->savedpc = proto->code;
@@ -2470,7 +2470,7 @@ StkId luaD_precall(
   }
 
   CallInfo* const ci = ++state->ci;
-  ci->base = reinterpret_cast<StkId>(reinterpret_cast<char*>(state->stack) + funcOffset) + 1;
+  ci->base = state->stack + funcOffset + 1;
   state->base = ci->base;
   ci->top = state->top + kMinCStackSlots;
   ci->state = kFrameCFunction;
@@ -2535,10 +2535,10 @@ int luaD_call(
   constexpr unsigned int kMaxCCalls = 200;
   constexpr unsigned int kMaxCCallsHandling = kMaxCCalls + (kMaxCCalls >> 3);
 
-  const ptrdiff_t frameOffset = reinterpret_cast<char*>(state->ci) - reinterpret_cast<char*>(state->base_ci);
+  const ptrdiff_t frameOffset = state->ci - state->base_ci;
   const std::uint16_t savedNestedCalls = state->nCcalls;
   const lu_byte savedAllowHook = state->l_G->allowhook;
-  const ptrdiff_t funcOffset = reinterpret_cast<char*>(func) - reinterpret_cast<char*>(state->stack);
+  const ptrdiff_t funcOffset = func - state->stack;
 
   ++state->nCcalls;
 
@@ -2546,11 +2546,11 @@ int luaD_call(
   // message where the caller expects it, then let the error continue
   // outward. Shared by the two handlers below.
   const auto unwindFrameForError = [&](const char* const message) {
-    StkId const errorSlot = reinterpret_cast<StkId>(reinterpret_cast<char*>(state->stack) + funcOffset);
+    StkId const errorSlot = state->stack + funcOffset;
     luaF_close(state, errorSlot);
     (void)PushLuaStringAtStackSlot(state, errorSlot, message);
 
-    state->ci = reinterpret_cast<CallInfo*>(reinterpret_cast<char*>(state->base_ci) + frameOffset);
+    state->ci = state->base_ci + frameOffset;
     state->base = state->ci->base;
     state->nCcalls = savedNestedCalls;
     state->l_G->allowhook = savedAllowHook;

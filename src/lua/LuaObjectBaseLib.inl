@@ -1323,8 +1323,7 @@ namespace LuaPlus
    */
   int luaU_endianness()
   {
-    const int probe = 1;
-    return *reinterpret_cast<const char*>(&probe);
+    return std::endian::native == std::endian::little ? 1 : 0;
   }
 
   /**

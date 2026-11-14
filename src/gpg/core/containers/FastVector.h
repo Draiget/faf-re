@@ -35,7 +35,7 @@ namespace gpg::core
     ) noexcept
     {
 #if defined(_M_IX86)
-      *reinterpret_cast<T**>(inlineOrigin) = capacityEnd;
+      std::memcpy(static_cast<void*>(inlineOrigin), &capacityEnd, sizeof(capacityEnd));
 #else
       const std::uint32_t inlineCount = static_cast<std::uint32_t>(capacityEnd - inlineOrigin);
       std::memcpy(static_cast<void*>(inlineOrigin), &inlineCount, sizeof(inlineCount));
@@ -48,7 +48,9 @@ namespace gpg::core
     ) noexcept
     {
 #if defined(_M_IX86)
-      return *reinterpret_cast<T* const*>(inlineOrigin);
+      T* capacityEnd = nullptr;
+      std::memcpy(&capacityEnd, static_cast<const void*>(inlineOrigin), sizeof(capacityEnd));
+      return capacityEnd;
 #else
       std::uint32_t inlineCount = 0;
       std::memcpy(&inlineCount, static_cast<const void*>(inlineOrigin), sizeof(inlineCount));
@@ -299,17 +301,14 @@ namespace gpg::core
       const T* p
     ) noexcept
     {
-      const auto b = reinterpret_cast<const std::byte*>(base);
-      const auto q = reinterpret_cast<const std::byte*>(p);
-      return static_cast<size_t>(q - b) / elem_;
+      return static_cast<size_t>(p - base);
     }
     static T* ptr_at(
       T* base,
       const size_t idx
     ) noexcept
     {
-      auto b = reinterpret_cast<std::byte*>(base);
-      return reinterpret_cast<T*>(b + idx * elem_);
+      return base + idx;
     }
 
     /**
@@ -376,9 +375,7 @@ namespace gpg::core
      */
     size_t Size() const noexcept
     {
-      const auto s = reinterpret_cast<const std::byte*>(start_);
-      const auto e = reinterpret_cast<const std::byte*>(end_);
-      return static_cast<size_t>(e - s) / elem_;
+      return static_cast<size_t>(end_ - start_);
     }
 
     /**
@@ -392,9 +389,7 @@ namespace gpg::core
      */
     size_t Capacity() const noexcept
     {
-      const auto s = reinterpret_cast<const std::byte*>(start_);
-      const auto c = reinterpret_cast<const std::byte*>(capacity_);
-      return static_cast<size_t>(c - s) / elem_;
+      return static_cast<size_t>(capacity_ - start_);
     }
 
     /**
@@ -1554,9 +1549,7 @@ namespace gpg::core
       const T* p
     ) noexcept
     {
-      auto b = reinterpret_cast<const std::byte*>(base);
-      auto q = reinterpret_cast<const std::byte*>(p);
-      return static_cast<size_t>(q - b) / ElemSize;
+      return static_cast<size_t>(p - base);
     }
 
     // Get pointer at element index from base
@@ -1565,8 +1558,7 @@ namespace gpg::core
       size_t idx
     ) noexcept
     {
-      auto b = reinterpret_cast<std::byte*>(base);
-      return reinterpret_cast<T*>(b + idx * ElemSize);
+      return base + idx;
     }
 
   public:
@@ -1580,15 +1572,36 @@ namespace gpg::core
      */
     // A spilled vector stores a native capacity pointer in the abandoned
     // inline window, even when its live inline payload is smaller than one.
-    alignas(8) alignas(T) std::byte inlineVec_[std::max(N * ElemSize, sizeof(T*))];
+    union InlineWindow
+    {
+      InlineWindow() noexcept {}
+      InlineWindow(
+        const InlineWindow& other
+      ) noexcept
+      {
+        std::memcpy(static_cast<void*>(mBytes), static_cast<const void*>(other.mBytes), sizeof(mBytes));
+      }
+      InlineWindow& operator=(
+        const InlineWindow& other
+      ) noexcept
+      {
+        std::memcpy(static_cast<void*>(mBytes), static_cast<const void*>(other.mBytes), sizeof(mBytes));
+        return *this;
+      }
+      ~InlineWindow() {}
+
+      T mSlots[N]; // only [start_, end_) holds live objects
+      std::byte mBytes[std::max(N * ElemSize, sizeof(T*))];
+    };
+    alignas(8) InlineWindow inlineVec_;
 
     [[nodiscard]] T* InlineStorage() noexcept
     {
-      return reinterpret_cast<T*>(inlineVec_);
+      return inlineVec_.mSlots;
     }
     [[nodiscard]] const T* InlineStorage() const noexcept
     {
-      return reinterpret_cast<const T*>(inlineVec_);
+      return inlineVec_.mSlots;
     }
 
     /**
@@ -2411,11 +2424,8 @@ namespace gpg::core
           return;
         }
 
-        const std::uintptr_t posAddress = reinterpret_cast<std::uintptr_t>(pos);
-        const std::uintptr_t insStartAddress = reinterpret_cast<std::uintptr_t>(insStart);
-        const std::uintptr_t insEndAddress = reinterpret_cast<std::uintptr_t>(insEnd);
-        T* const translatedInsertEnd = reinterpret_cast<T*>(insEndAddress + (posAddress - insStartAddress));
-        if (translatedInsertEnd <= end) {
+        // The inserted range ends at pos + insertCount; it fits when that is not past end.
+        if (insertCount <= static_cast<std::size_t>(end - pos)) {
           T* const tailStart = end - insertCount;
           this->end_ = CopyRangeForward(end, tailStart, end);
 
@@ -2424,7 +2434,7 @@ namespace gpg::core
             std::memmove(end - middleCount, pos, static_cast<std::size_t>(middleCount) * ElemSize);
           }
           if (insertCount > 0) {
-            std::memmove(translatedInsertEnd - insertCount, insStart, insertCount * ElemSize);
+            std::memmove(pos, insStart, insertCount * ElemSize);
           }
           return;
         }
@@ -2915,8 +2925,7 @@ namespace gpg::core
      * returns the advanced destination pointer. Mirrors the binary helper that
      * default-initializes each destination slot (`_Myres=15,_Mysize=0`) and then
      * `assign`s the source string; expressed here as placement-new copy so
-     * owned heap buffers are deep-copied, never aliased. Advances without
-     * writing when `dest == nullptr`, matching the binary's null-guarded lane.
+     * owned heap buffers are deep-copied, never aliased.
      * Address: 0x0056F1F0 (FUN_0056F1F0 -- `_Ucopy` for `gpg::fastvector_n<moho::SOffsetInfo, 2>`
      * (`CFormationInstance::mOffsetInfo`, element 0x4C), the copy-construct step of its
      * `GrowInsertDeepCopy`/`InsertAt`.) Address: 0x0056D390 (FUN_0056D390 -- `_Ucopy` for
@@ -2931,14 +2940,7 @@ namespace gpg::core
       const T* copyEnd
     )
     {
-      std::uintptr_t destinationAddress = reinterpret_cast<std::uintptr_t>(dest);
-      for (const T* cur = copyBegin; cur != copyEnd; ++cur) {
-        if (destinationAddress != 0u) {
-          ::new (reinterpret_cast<void*>(destinationAddress)) T(*cur);
-        }
-        destinationAddress += ElemSize;
-      }
-      return reinterpret_cast<T*>(destinationAddress);
+      return std::uninitialized_copy(copyBegin, copyEnd, dest);
     }
 
     /**
@@ -3501,7 +3503,7 @@ namespace gpg::core
      * sub-vector of `moho::SExtraUnitData` (`Unit.h`), the element of
      * `Sim::mSyncSerializeGroup2`. Byte-for-byte match: `if (start ==
      * originalVec_) { end_ = start_; return; } operator delete[](start_);
-     * start_ = originalVec_; capacity_ = *reinterpret_cast<T**>(start_);
+     * start_ = originalVec_; capacity_ = the pointer stored in the first inline slot;
      * end_ = start_;` -- exactly this free function's body. Called per
      * element, inlined into a range loop, by `fa::vector<
      * moho::SExtraUnitData>::destroy_range` (`FUN_00742170`,

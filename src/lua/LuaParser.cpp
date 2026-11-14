@@ -2826,9 +2826,9 @@ namespace
     parser.buff.buffer = nullptr;
     parser.buff.buffsize = 0;
 
-    const std::ptrdiff_t oldTopOffset = reinterpret_cast<char*>(L->top) - reinterpret_cast<char*>(L->stack);
+    const std::ptrdiff_t oldTopOffset = L->top - L->stack;
     const auto plantErrorAtOldTop = [L, oldTopOffset](const char* const message) {
-      const auto oldTop = reinterpret_cast<LuaPlus::StkId>(reinterpret_cast<char*>(L->stack) + oldTopOffset);
+      const auto oldTop = L->stack + oldTopOffset;
       (void)PushLuaStringAtStackSlot(L, oldTop, message);
     };
 

@@ -554,7 +554,7 @@ void CScriptObject::MemberSerialize(
  */
 fa::string CScriptObject::GetErrorDescription()
 {
-  return gpg::STR_Printf("CScriptObject at %08x", reinterpret_cast<std::uintptr_t>(this));
+  return gpg::STR_Printf("CScriptObject at %p", static_cast<const void*>(this));
 }
 
 /**

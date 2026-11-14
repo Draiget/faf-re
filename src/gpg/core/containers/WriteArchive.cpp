@@ -1113,9 +1113,9 @@ void WriteArchive::EndSection(
       const TrackedPointerIndex::Entry& entry = mFastObjRefs->At(index);
       if (entry.record.ownership == TrackedPointerState::Unowned) {
         ThrowSerializationError(STR_Printf(
-          "Error while creating archive: nobody claimed ownership of %s 0x%08llx",
+          "Error while creating archive: nobody claimed ownership of %s %p",
           SafeTypeName(entry.key.mType),
-          static_cast<unsigned long long>(reinterpret_cast<std::uintptr_t>(entry.key.mObj))
+          static_cast<const void*>(entry.key.mObj)
         ));
       }
     }
@@ -1126,9 +1126,9 @@ void WriteArchive::EndSection(
     for (TrackedPointerMap::const_iterator it = mObjRefs.begin(); it != mObjRefs.end(); ++it) {
       if (it->second.ownership == TrackedPointerState::Unowned) {
         ThrowSerializationError(STR_Printf(
-          "Error while creating archive: nobody claimed ownership of %s 0x%08llx",
+          "Error while creating archive: nobody claimed ownership of %s %p",
           SafeTypeName(it->first.mType),
-          static_cast<unsigned long long>(reinterpret_cast<std::uintptr_t>(it->first.mObj))
+          static_cast<const void*>(it->first.mObj)
         ));
       }
     }

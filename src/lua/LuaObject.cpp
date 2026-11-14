@@ -2,6 +2,7 @@
 #include "legacy/math/X87Math.h"
 #include <Windows.h>
 #include <array>
+#include <bit>
 #include <unordered_set>
 #include <vector>
 #include <thread>
