@@ -238,6 +238,87 @@ namespace faf::editor
        "Ten sets of panels, each with its own layout, for one kind of work: the title row's tabs or Alt+1 to Alt+0 "
        "switch them. Review only looks.",
        "workspace.0,workspace.1,workspace.9"},
+      // Task guides (after FAF Studio's docs/help): how a piece of work goes from start to end, in this editor.
+      {"guide.start",
+       "Guide: your first map",
+       "File > New makes a map of a size you pick (or File > New sample map, a finished two-player island to look "
+       "at); File > Open takes one the game lists or any folder. The middle of the window is the map: the wheel "
+       "zooms, the middle button turns, Home frames it all.\n\n"
+       "Work goes left to right through the workspaces (Alt+1 ... Alt+0): Terrain, Objects, Environment, Layout, "
+       "Generate, Mission, then the asset ones and Review. F5 plays the map inside the editor, F5 again stops. "
+       "Ctrl+S saves; Check (the toolbar) lists what the game would mind.",
+       "file.new,file.open,file.save,play.toggle,view.frame"},
+      {"guide.terrain",
+       "Guide: terrain from nothing",
+       "Start from a flat map. Terrain > Map layout draws where land, hills, plateaus, valleys and water go; the "
+       "Generate workspace turns a layout or a node graph into heights, paint and props as one undo step, and its "
+       "gallery tries seeds side by side.\n\n"
+       "Then shape by hand: the Terrain tool's brushes, Terrain > Paths and skeleton for lanes and roads between the "
+       "starts (kept as paths you can apply again), Terrain > Erosion for weathering, the SC tools for base pads and "
+       "ramps a tank can climb. Terrain > Detail pass scatters rocks and cracks to finish.",
+       "terrain.layout,terrain.generate,terrain.paths,terrain.erosion,terrain.sctools,objects.detail"},
+      {"guide.import",
+       "Guide: heights from Gaea or World Machine",
+       "Export a 16-bit PNG, RAW, R16 or R32 from the other tool at the map's size plus one (513 for a 512 map; "
+       "another size is resampled). Terrain > Import / Export reads it into the heights as one undo step.\n\n"
+       "Masks from the same tool (flow, deposition, snow) go in the same way into a texture layer, or into the "
+       "graph's External mask node. Exports write a sheet with the size and height range, so the other tool can "
+       "take the map back.",
+       "terrain.interop"},
+      {"guide.objects",
+       "Guide: props, decals, markers and units",
+       "The Objects workspace: Props paints or scatters trees and rocks from the prop list (or the asset browser), "
+       "Decals lays textures on the ground, Markers places starts, mass and hydrocarbon points, paths and areas, "
+       "Units places the units an army starts with. All follow the symmetry the toolbar picks.\n\n"
+       "Select picks any of them for the Properties panel; Delete, Ctrl+C / Ctrl+V and Ctrl+D work on the "
+       "selection. Map > Snap resource markers to grid and Move stray markers onto the map tidy the markers up.",
+       "tool.4,tool.5,tool.6,tool.7,map.snapresources,map.pullmarkers"},
+      {"guide.mission",
+       "Guide: a mission",
+       "The Mission workspace builds a mission as stages of nodes (objectives, triggers, dialogue, spawns); the "
+       "editor writes it into the map's script. Strings holds the dialogue lines, Bases and Platoons the AI's "
+       "bases and attack groups.\n\n"
+       "Run plays the map with its mission from any stage and traces each node it reaches. A hand-written script "
+       "can be read as an outline in Stages > Hand-written script, and its dialogues copied into Strings.",
+       "window.stages,window.strings,window.run"},
+      {"guide.mods",
+       "Guide: mods and units",
+       "A mod project (Window > Mod project) keeps unit changes as merge blueprints in the vault's mods folder. "
+       "The unit lab edits a unit's numbers or derives a new unit from one; Window > New unit makes a unit from a "
+       "template with its blueprint, script, strings, mesh and icon.\n\n"
+       "The unit viewer shows a unit, its projectiles and its animations in the view and makes its icon. Editor "
+       "mods (Window > Editor mods) add commands, panels and tools to the editor itself.",
+       "window.modproject,window.unitlab,window.unitwizard,window.unitviewer,window.editormods"},
+      {"guide.release",
+       "Guide: saving and releasing",
+       "Ctrl+S writes the map's files where they are (a map outside the vault's maps folder asks first); File > Save "
+       "as writes a new folder. Autosave keeps copies to recover from (File > Recover).\n\n"
+       "Before a release: Check until it shows no errors, play it (F5), update the lobby picture (File > Update the "
+       "lobby picture on save). File > Package for the FAF vault zips the map and, signed in, uploads it.",
+       "file.save,file.saveas,file.package,play.toggle"},
+      {"guide.layouts",
+       "Guide: layouts and settings",
+       "Each workspace keeps its panels where you leave them; View > Reset this workspace's layout brings its "
+       "first layout back, and View > Save or load a layout keeps the panels under a name to load again later.\n\n"
+       "File > Settings has the keys, the look, the graphics (with Studio's Low to Ultra presets), autosave and "
+       "the editor mods. The toolbar's - and + scale the panels and text.",
+       "view.resetlayout,view.layouts,view.uiscale.up,view.uiscale.down"},
+      {"guide.trouble",
+       "Guide: when something goes wrong",
+       "Ctrl+Z undoes any edit, the History panel jumps back further. If the editor stopped, its next start "
+       "says so and File > Recover offers the autosaved map.\n\n"
+       "Help > Save diagnostics for a bug report writes one file with the build, the renderer, the open map, the "
+       "settings and the end of the log: attach it to a report. Help > Self tests and panel checks runs the "
+       "editor's own checks on the open map.",
+       "edit.undo,file.recover,help.diagnostics,help.selftests"},
+      {"guide.layout",
+       "Guide: planning the map's layout",
+       "Start from the players: place the start markers (Objects > Markers, or the Layout workspace's Starts and "
+       "resources), pick the symmetry in the toolbar, and give each start its mass points. Paths and skeleton lays "
+       "lanes between the starts in a style (open, ridges, ramps, islands) with a pad under each base.\n\n"
+       "Check then tells whether the starts are fair: what each reaches by land and by sea, how far apart they are, "
+       "and whether every resource can be built on.",
+       "terrain.layout,terrain.paths,view.check"},
     };
     return kTopics;
   }

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdio>
+#include <functional>
 #include <map>
 #include <string>
 #include <utility>
@@ -985,6 +986,16 @@ namespace faf::editor
     std::string mScriptMessage;
     int mScriptErrorLine = 0;
     void RunCheck();
+
+  public:
+    /**
+     * The Check's resource part through the game's build rules (FAF Studio's validate.lua "blocked"): each mass and
+     * hydrocarbon marker tested with its building's footprint (slope, water, playable area, units, props). Set by the
+     * app (the view's unit fit).
+     */
+    std::function<std::vector<CheckIssue>()> resourceFit;
+
+  private:
     /** The pathing part of the Check: what each start reaches by land, and the overlay. */
     void CheckPathing(const MarkerCheckInput& input);
     bool mShowCheck = true;

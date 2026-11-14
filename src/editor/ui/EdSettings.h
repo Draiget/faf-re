@@ -68,6 +68,15 @@ namespace faf::editor
     static constexpr const char* kGfxAo = "GfxAo";
     static constexpr const char* kGfxTextureDetail = "GfxTextureDetail";
     static constexpr const char* kGfxAnisotropy = "GfxAnisotropy";
+    // FAF Studio's other graphics settings (graphics.lua): the game's fidelity, shadow distance, model detail, vsync.
+    static constexpr const char* kGfxFidelity = "GfxFidelity";
+    static constexpr const char* kGfxShadowDistance = "GfxShadowDistance";
+    static constexpr const char* kGfxModelDetail = "GfxModelDetail";
+    static constexpr const char* kGfxVsync = "GfxVsync";
+    /** Studio's quality presets: "low", "medium", "high", "ultra" set the graphics settings together. */
+    bool ApplyGraphicsPreset(const std::string& preset);
+    /** The preset the graphics settings match now, or "custom". */
+    [[nodiscard]] std::string GraphicsPreset() const;
     /** The terrain tools' GPU compute backend (FAF Studio's ed_gpu_compute) and the smallest field it takes. */
     static constexpr const char* kGpuCompute = "GpuCompute";
     static constexpr const char* kGpuMinCells = "GpuMinCells";

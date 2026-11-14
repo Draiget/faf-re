@@ -221,6 +221,42 @@ namespace faf::editor
      * the part off the map is left out. False with `message` when nothing could be written.
      */
     bool WriteHeightRect(int x0, int z0, int w, int h, const std::vector<float>& heights, std::string& message);
+    /** Editor mods: a texture layer's (1..8) weights 0..1 over [x0, x0+w) x [z0, z0+h) of the paint, one undo step. */
+    bool
+    WriteMaskRect(int layer, int x0, int z0, int w, int h, const std::vector<float>& weights, std::string& message);
+    /** The paint's size in texels (false without a map's paint). */
+    bool MaskSize(int& width, int& height);
+    /** Editor mods (view/EdMapSceneMods.cpp): the map's props, decals and units, and changes to them, one undo step
+     * each (an error text, empty when done). */
+    struct ModObject
+    {
+      std::string what; // blueprint path / texture / unit blueprint id
+      std::string name; // a unit's name
+      std::string army; // a unit's army
+      float x = 0.0f, y = 0.0f, z = 0.0f;
+      float size = 0.0f; // a decal's size
+    };
+    [[nodiscard]] std::vector<ModObject> ModProps() const;
+    std::string ModAddProp(const std::string& blueprint, float x, float z, float scale);
+    std::string ModRemoveProp(int index);
+    [[nodiscard]] std::vector<ModObject> ModDecals() const;
+    std::string ModAddDecal(const std::string& texture, float x, float z, float size, float heading);
+    [[nodiscard]] std::vector<ModObject> ModUnits() const;
+    /**
+     * The Check's resources by the build rules (view/EdMapSceneMods.cpp): each Mass marker with the mass extractor's
+     * footprint (`extractor`), each Hydrocarbon marker with the hydrocarbon plant's (`plant`), through UnitFitAt, and
+     * the props standing inside it. The marker's name, its place and what blocks it.
+     */
+    struct ResourceFit
+    {
+      std::string marker;
+      bool mass = true; // a Mass marker (else Hydrocarbon), by its type
+      float x = 0.0f, z = 0.0f;
+      std::string problem; // "" when it can be built
+      int props = 0;       // props inside the footprint (an engineer reclaims them first)
+    };
+    [[nodiscard]] std::vector<ResourceFit> ResourceFits(const std::string& extractor, const std::string& plant) const;
+    std::string ModAddUnit(const std::string& type, const std::string& army, float x, float z, std::string& name);
     /** How much texture layer `layer` (1..8) shows at a world point, 0..1 (-1 without masks or off the map). */
     [[nodiscard]] float LayerWeightAt(int layer, float x, float z);
     /**
@@ -814,6 +850,13 @@ namespace faf::editor
     UnitPreviewState* mUnitPreview = nullptr;
     moho::MeshInstance* mPreviewInstance = nullptr;
     std::string mPreviewKey; // unit and army the instance was made for
+    bool mPreviewStageOn = false; // the map's terrain, sky, water and border are off for the preview
+    int mPreviewLodShown = -1;    // the LOD the camera was last put at
+    std::string mPreviewLight = "Map";
+    bool mPreviewHasMapLight = false; // mPreviewMapLight holds the map's own light (before the first preset)
+    LightingState mPreviewMapLight;
+    void SetPreviewStage(bool on);
+    void SetPreviewLight(const std::string& name);
     std::string mPreviewAnimPath;
     ScaAnimation mPreviewAnim;
     std::shared_ptr<moho::CAniPose> mPreviewPose;

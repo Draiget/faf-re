@@ -5,8 +5,10 @@
 
 #include "editor/view/EdMapScene.h"
 
+#include "editor/doc/EdDocument.h"
 #include "gpg/core/utils/Logging.h"
 #include "lua/LuaObject.h"
+#include "moho/console/CConCommand.h"
 #include "lua/LuaTableIterator.h"
 #include "moho/animation/CAniPose.h"
 #include "moho/animation/CAniSkel.h"
@@ -83,6 +85,85 @@ namespace faf::editor
     }
   } // namespace
 
+  void EdMapScene::SetPreviewStage(
+    const bool on
+  )
+  {
+    if (on == mPreviewStageOn) {
+      return;
+    }
+    mPreviewStageOn = on;
+    // Studio's viewer stage (unitview.lua Flags): the engine's switches, process wide, put back when it is off.
+    for (const char* name : {"ren_Terrain", "ren_SkyDome", "ren_Water", "ren_WorldBorder"}) {
+      moho::CON_Executef("%s %s", name, on ? "false" : "true");
+    }
+    gpg::Logf("editor: unit view: the empty stage %s", on ? "on (terrain, sky, water and border not drawn)" : "off");
+  }
+
+  void EdMapScene::SetPreviewLight(
+    const std::string& name
+  )
+  {
+    // Studio's light presets (unitview.lua Lights): the map's sun, ambience and shadow fill, one undo step each; Map
+    // puts back the light the map had before the first preset.
+    struct Preset
+    {
+      const char* name;
+      float mult;
+      float sun[3];
+      float colour[3];
+      float ambient[3];
+      float fill[3];
+    };
+    static constexpr Preset kPresets[] = {
+      {"Noon", 1.5f, {0.2f, 0.95f, -0.2f}, {1.0f, 1.0f, 1.0f}, {0.3f, 0.3f, 0.3f}, {0.7f, 0.7f, 0.7f}},
+      {"Evening", 1.5f, {0.9f, 0.25f, -0.3f}, {1.0f, 0.7f, 0.45f}, {0.25f, 0.22f, 0.3f}, {0.5f, 0.45f, 0.55f}},
+      {"Overcast", 1.2f, {0.0f, 1.0f, 0.0f}, {0.6f, 0.6f, 0.62f}, {0.55f, 0.55f, 0.58f}, {0.8f, 0.8f, 0.82f}},
+      {"Night", 0.7f, {-0.3f, 0.6f, 0.4f}, {0.35f, 0.45f, 0.8f}, {0.15f, 0.18f, 0.3f}, {0.3f, 0.35f, 0.5f}},
+      {"Icon", 2.0f, {-0.5f, 0.7f, 0.5f}, {1.0f, 1.0f, 1.0f}, {0.35f, 0.35f, 0.4f}, {0.9f, 0.9f, 0.95f}},
+    };
+    mPreviewLight = name;
+    const LightingState before = mDocument.LightingNow();
+    LightingState next = before;
+    if (name == "Map") {
+      if (!mPreviewHasMapLight) {
+        return; // nothing was changed
+      }
+      next = mPreviewMapLight;
+      mPreviewHasMapLight = false;
+    } else {
+      const Preset* found = nullptr;
+      for (const Preset& p : kPresets) {
+        if (name == p.name) {
+          found = &p;
+        }
+      }
+      if (found == nullptr) {
+        return;
+      }
+      if (!mPreviewHasMapLight) {
+        mPreviewMapLight = before;
+        mPreviewHasMapLight = true;
+      }
+      const float len =
+        std::sqrt(found->sun[0] * found->sun[0] + found->sun[1] * found->sun[1] + found->sun[2] * found->sun[2]);
+      next.multiplier = found->mult;
+      for (int i = 0; i < 3; ++i) {
+        next.sunDirection[i] = len > 0.0f ? found->sun[i] / len : found->sun[i];
+        next.sunColor[i] = found->colour[i];
+        next.sunAmbience[i] = found->ambient[i];
+        next.shadowFill[i] = found->fill[i];
+      }
+    }
+    if (next == before) {
+      return;
+    }
+    mDocument.ApplyLighting(next);
+    mDocument.LightingEdited(before);
+    mDocument.SetModified(true);
+    gpg::Logf("editor: unit view: light %s (one undo step)", name.c_str());
+  }
+
   void EdMapScene::DropUnitPreview()
   {
     if (mPreviewInstance != nullptr && moho::MeshRenderer::GetInstance() != nullptr) {
@@ -99,6 +180,11 @@ namespace faf::editor
   )
   {
     UnitPreviewState* const s = mUnitPreview;
+    // The stage and the light follow the panel even while no unit is shown (the map comes back when it is off).
+    SetPreviewStage(s != nullptr && s->active && s->stage && mMap != nullptr);
+    if (s != nullptr && mMap != nullptr && s->light != mPreviewLight) {
+      SetPreviewLight(s->light);
+    }
     if (s == nullptr || !s->active || s->unit.empty() || mMap == nullptr) {
       if (mPreviewInstance != nullptr) {
         DropUnitPreview();
@@ -143,6 +229,12 @@ namespace faf::editor
       }
       mPreviewKey = key;
       mPreviewAnimPath.clear();
+      // The mesh's LODs, by their cutoff distances (the panel's LOD choice).
+      s->lodCutoffs.clear();
+      for (const auto& lod : mesh->mLods) {
+        s->lodCutoffs.push_back(lod.mLodCutoff);
+      }
+      mPreviewLodShown = -1;
       // The animations the blueprint names (Display.Animation*, and the death animations' Animation).
       s->animations.clear();
       if (LuaPlus::LuaState* const state = static_cast<moho::RRuleGameRulesImpl*>(rules)->mLuaState; state != nullptr) {
@@ -192,6 +284,28 @@ namespace faf::editor
           s->status = s->animation + ": " + std::to_string(mPreviewAnim.frames.size()) + " frames, " +
             std::to_string(mPreviewAnim.bones.size()) + " bones";
         }
+      }
+    }
+    // A chosen LOD: the camera at the middle of its distance range (Studio's ShowLOD; the engine picks the LOD by the
+    // camera's distance, so this is what the game shows at that distance).
+    if (s->lod != mPreviewLodShown) {
+      mPreviewLodShown = s->lod;
+      if (s->lod >= 0 && static_cast<std::size_t>(s->lod) < s->lodCutoffs.size()) {
+        const float from = s->lod == 0 ? 0.0f : s->lodCutoffs[static_cast<std::size_t>(s->lod) - 1];
+        const float cutoff = s->lodCutoffs[static_cast<std::size_t>(s->lod)];
+        float target = cutoff > from ? (from + cutoff) * 0.5f : from * 1.33f;
+        if (s->lod == 0) {
+          target = std::max(1.0f, cutoff * 0.5f);
+        }
+        mDistance = std::max(target, 2.0f);
+        gpg::Logf(
+          "editor: unit view: LOD %d of %s: the camera at %.0f (its range %.0f to %.0f)",
+          s->lod,
+          s->unit.c_str(),
+          static_cast<double>(mDistance),
+          static_cast<double>(from),
+          static_cast<double>(cutoff)
+        );
       }
     }
     // Where it stands: the camera's target (the camera follows it while locked).

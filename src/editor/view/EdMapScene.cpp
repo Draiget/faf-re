@@ -4110,6 +4110,66 @@ namespace faf::editor
     return true;
   }
 
+  bool EdMapScene::WriteMaskRect(
+    const int layer,
+    const int x0,
+    const int z0,
+    const int w,
+    const int h,
+    const std::vector<float>& weights,
+    std::string& message
+  )
+  {
+    LoadMasks();
+    EdDocument::MaskGrid& masks = mDocument.Masks();
+    if (masks.texels.empty() || mPaintingMask) {
+      message = "no map's paint to change";
+      return false;
+    }
+    if (layer < 1 || layer > 8) {
+      message = "layer is 1 to 8";
+      return false;
+    }
+    if (w <= 0 || h <= 0 || weights.size() < static_cast<std::size_t>(w) * static_cast<std::size_t>(h)) {
+      message = "the list has fewer than w x h weights";
+      return false;
+    }
+    const SampleRect rect{
+      std::max(0, x0), std::max(0, z0), std::min(masks.width - 1, x0 + w - 1), std::min(masks.height - 1, z0 + h - 1)
+    };
+    if (rect.x0 > rect.x1 || rect.z0 > rect.z1) {
+      message = "the rectangle is off the paint";
+      return false;
+    }
+    const int slot = layer - 1;
+    const bool remapped = (RemappedStrata(TerrainShader()) & (1U << slot)) != 0;
+    mDocument.MaskUndo().BeginStroke();
+    mDocument.MaskUndo().BeforeWrite(masks.texels.data(), rect);
+    for (int z = rect.z0; z <= rect.z1; ++z) {
+      for (int x = rect.x0; x <= rect.x1; ++x) {
+        const float weight = weights[static_cast<std::size_t>(z - z0) * w + static_cast<std::size_t>(x - x0)];
+        std::uint64_t& texel = masks.texels[static_cast<std::size_t>(z) * masks.width + x];
+        texel = WithMaskByte(
+          texel, slot, MaskStoredFor(std::clamp(weight, 0.0f, 1.0f) * 255.0f, remapped, MaskByte(texel, slot))
+        );
+      }
+    }
+    WholeMaskChanged(rect);
+    return true;
+  }
+
+  bool EdMapScene::MaskSize(
+    int& width,
+    int& height
+  )
+  {
+    LoadMasks();
+    const EdDocument::MaskGrid& masks = mDocument.Masks();
+    width = masks.width;
+    height = masks.height;
+    return !masks.texels.empty();
+  }
+
   float EdMapScene::LayerWeightAt(
     const int layer,
     const float x,

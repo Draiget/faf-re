@@ -1309,6 +1309,12 @@ namespace faf::editor
         mCheckIssues.push_back(std::move(issue));
       }
     }
+    // The resources by the build rules: can an extractor or a hydrocarbon plant be built there?
+    if (resourceFit) {
+      for (CheckIssue& issue : resourceFit()) {
+        mCheckIssues.push_back(std::move(issue));
+      }
+    }
     // The mission: missing names, variables read before they are set, a mission that never ends ...
     if (!mDocument.MissionNow().Empty()) {
       const LuaCompiles compiles = mDocument.MissionCompiler();

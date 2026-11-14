@@ -27,6 +27,17 @@ namespace faf::editor
     bool senses = false;
     int army = 0; // the army colour's index (0..7)
     bool lockCamera = true;
+    /**
+     * The mesh LOD to look at (Studio's ShowLOD): -1 leaves the camera alone; n puts the camera at the middle of LOD
+     * n's distance range (the engine picks a LOD by the camera's distance). Filled by the view: each LOD's cutoff.
+     */
+    int lod = -1;
+    std::vector<float> lodCutoffs;
+    /** Studio's viewer stage: the map's terrain, sky, water and border not drawn while the unit is shown. */
+    bool stage = false;
+    /** Studio's light presets for the map (one undo step each): Map (the map's own, back), Noon, Evening, Overcast,
+     * Night, Icon. */
+    std::string light = "Map";
     /** Filled by the view: the animations the blueprint names, the animation's length, what happened. */
     std::vector<std::string> animations;
     float duration = 0.0f;

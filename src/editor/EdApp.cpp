@@ -229,7 +229,9 @@ namespace faf::editor
         "/keptpathtest",    "/skeletontest",
         "/gputest",         "/clicksweep",
         "/layoutcheck",     "/selftests",
-        "/meshtest",
+        "/meshtest",        "/gfxpreset",
+        "/resourcecheck",   "/viewstage",
+        "/layoutsave",
       };
       for (const char* const option : kOptions) {
         if (moho::CFG_GetArgOption(option, 0, nullptr)) {
@@ -3096,6 +3098,15 @@ namespace faf::editor
           hello.c_str(),
           mCommands.Find(hello) != nullptr ? "yes" : "no"
         );
+        // The map API of round 3 (paint, props, decals, units, the map's store), before the steps below so their undo
+        // checks see what they did last.
+        if (
+          const std::string probe3 = EditorModCommandId("EditorModApiTest", "probe3"); mCommands.Find(probe3) != nullptr
+        ) {
+          gpg::Logf(
+            "editor: editor mod test: run probe3: %s", mCommands.Run(probe3) ? "ran" : mCommands.WhyNot(probe3).c_str()
+          );
+        }
         gpg::Logf("editor: editor mod test: markers before %zu", mDocument.SaveData().Markers().size());
         gpg::Logf(
           "editor: editor mod test: run hello: %s", mCommands.Run(hello) ? "ran" : mCommands.WhyNot(hello).c_str()
@@ -3139,10 +3150,11 @@ namespace faf::editor
        * hook.
        */
       float mPreviewTimeSeen = 0.0f;
+      float mPreviewLightBefore = 0.0f;
       void TestUnitViewer()
       {
         if (
-          mViewTestStage >= 13 || !mScene.Attached() || moho::RULE_PeekKept() == nullptr ||
+          mViewTestStage >= 14 || !mScene.Attached() || moho::RULE_PeekKept() == nullptr ||
           !moho::CFG_GetArgOption("/unitviewtest", 0, nullptr) || ++mViewTestFrames % 90 != 0
         ) {
           return;
@@ -3158,7 +3170,7 @@ namespace faf::editor
           std::string error;
           if (!panel.Open("EditorViewTest", error) && !panel.Create("EditorViewTest", error)) {
             gpg::Warnf("editor: unit view test: no project: %s", error.c_str());
-            mViewTestStage = 13;
+            mViewTestStage = 14;
             return;
           }
           panel.Project()->derived.clear();
@@ -3282,9 +3294,34 @@ namespace faf::editor
             static_cast<double>(mPreviewTimeSeen),
             static_cast<double>(preview.time)
           );
-          viewer.Preview().active = false;
+          // Studio's viewer extras: LOD 1 by the camera, the empty stage, the Evening light (one undo step).
+          UnitPreviewState& p = viewer.Preview();
+          p.lod = p.lodCutoffs.size() > 1 ? 1 : 0;
+          p.stage = true;
+          p.light = "Evening";
+          mPreviewLightBefore = mDocument.LightingNow().sunColor[1];
           break;
         }
+        case 12: {
+          UnitPreviewState& p = viewer.Preview();
+          gpg::Logf(
+            "editor: unit view test: %zu LODs; the sun's green %.2f -> %.2f (Evening's is 0.70)",
+            p.lodCutoffs.size(),
+            static_cast<double>(mPreviewLightBefore),
+            static_cast<double>(mDocument.LightingNow().sunColor[1])
+          );
+          p.light = "Map";
+          p.stage = false;
+          p.lod = -1;
+          p.active = false;
+          break;
+        }
+        case 13:
+          gpg::Logf(
+            "editor: unit view test: light back to the map's: the sun's green %.2f",
+            static_cast<double>(mDocument.LightingNow().sunColor[1])
+          );
+          break;
         default:
           break;
         }
@@ -3355,6 +3392,91 @@ namespace faf::editor
       int mViewTestStage = 0;
       int mViewTestFrames = 0;
       int mMeshTestFrames = 0; // `/meshtest`: frames since the import was asked (0: none)
+      // Named workspace layouts (FAF Studio's shell save / load layout): `layouts/<name>.ini` in the settings folder.
+      std::filesystem::path mLayoutToLoad;
+      bool mShowLayouts = false;
+      char mLayoutName[64] = "";
+      std::string mLayoutSaveFile; // `/layoutsave <file>`
+      int mLayoutSaveFrames = 0;
+      [[nodiscard]] static std::filesystem::path LayoutsFolder()
+      {
+        const std::filesystem::path settings = EditorSettingsFolder();
+        return settings.empty() ? std::filesystem::path{} : settings / "layouts";
+      }
+      bool SaveLayoutTo(
+        const std::filesystem::path& file
+      )
+      {
+        std::size_t size = 0;
+        const char* const text = ImGui::SaveIniSettingsToMemory(&size);
+        std::error_code ec;
+        std::filesystem::create_directories(file.parent_path(), ec);
+        std::ofstream out(file, std::ios::binary | std::ios::trunc);
+        out.write(text, static_cast<std::streamsize>(size));
+        gpg::Logf("editor: layout saved to %s (%zu bytes)", file.string().c_str(), size);
+        return static_cast<bool>(out);
+      }
+      /** Window > Layouts...: save the panels as they are under a name, or load a saved one. */
+      void DrawLayouts()
+      {
+        if (!mShowLayouts) {
+          return;
+        }
+        ImGui::SetNextWindowSize(ImVec2(Em(340.0f), Em(300.0f)), ImGuiCond_FirstUseEver);
+        if (!ImGui::Begin("Layouts###NamedLayouts", &mShowLayouts)) {
+          ImGui::End();
+          return;
+        }
+        const std::filesystem::path folder = LayoutsFolder();
+        if (folder.empty()) {
+          ImGui::TextDisabled("No settings folder: layouts can't be kept.");
+          ImGui::End();
+          return;
+        }
+        ImGui::SetNextItemWidth(Em(200.0f));
+        ImGui::InputTextWithHint("##layoutname", "name", mLayoutName, sizeof(mLayoutName));
+        ImGui::SameLine();
+        std::string name = mLayoutName;
+        name.erase(
+          std::remove_if(
+            name.begin(),
+            name.end(),
+            [](const char c) {
+          return c == '/' || c == '\\' || c == ':' || c == '*' || c == '?' || c == '"' || c == '<' || c == '>' ||
+            c == '|';
+        }
+          ),
+          name.end()
+        );
+        ImGui::BeginDisabled(name.empty());
+        if (ImGui::Button("Save the panels as this")) {
+          PostStatusMessage(
+            SaveLayoutTo(folder / (name + ".ini")) ? "Layout " + name + " saved"
+                                                   : "Layout " + name + " couldn't be saved"
+          );
+        }
+        ImGui::EndDisabled();
+        ImGui::Separator();
+        std::error_code ec;
+        bool any = false;
+        for (const auto& entry : std::filesystem::directory_iterator(folder, ec)) {
+          if (entry.path().extension() != ".ini") {
+            continue;
+          }
+          any = true;
+          ImGui::PushID(entry.path().string().c_str());
+          if (ImGui::Button("Load")) {
+            mLayoutToLoad = entry.path();
+          }
+          ImGui::SameLine();
+          ImGui::TextUnformatted(entry.path().stem().string().c_str());
+          ImGui::PopID();
+        }
+        if (!any) {
+          ImGui::TextDisabled("No layouts saved yet.");
+        }
+        ImGui::End();
+      }
 
       bool mEditorModTestDone = false;
       int mEditorModTestFrames = 0;
@@ -4652,7 +4774,32 @@ namespace faf::editor
           {EdSettings::kGfxAnisotropy,
            "Texture filtering",
            "Anisotropic filtering: ground seen at a slant stays sharp"},
+          {EdSettings::kGfxFidelity, "Fidelity", "Overall detail of the terrain shading, water and effects"},
+          {EdSettings::kGfxShadowDistance, "Shadow distance", "How far from the camera shadows are drawn"},
+          {EdSettings::kGfxModelDetail,
+           "Model detail",
+           "How long models keep their detailed meshes as the camera moves away"},
+          {EdSettings::kGfxVsync,
+           "Vertical sync",
+           "Wait for the monitor before showing a frame: no tearing, fewer frames"},
         };
+        // Studio's quality presets: the settings above set together.
+        ImGui::AlignTextToFramePadding();
+        ImGui::TextUnformatted("Quality preset");
+        ImGui::SameLine(Em(180.0f));
+        const std::string preset = mSettings.GraphicsPreset();
+        for (const char* name : {"low", "medium", "high", "ultra"}) {
+          const char* label = name[0] == 'l' ? "Low" : name[0] == 'm' ? "Medium" : name[0] == 'h' ? "High" : "Ultra";
+          if (ModeTile(label, preset == name, ImVec2(Em(64.0f), 0.0f)) && preset != name) {
+            (void)mSettings.ApplyGraphicsPreset(name);
+            SaveSettings();
+            ApplyGraphicsSettings();
+            gpg::Logf("editor: graphics preset %s", name);
+          }
+          ImGui::SameLine();
+        }
+        ImGui::TextDisabled("%s", preset == "custom" ? "(custom)" : "");
+        EdSetItemTooltip("FAF Studio's presets: fidelity, shadows, shadow size and distance, texture and model detail");
         for (const Row& row : kRows) {
           const std::vector<std::string> choices = EdSettings::Allowed(row.key);
           const std::string now = mSettings.Get(row.key);
@@ -5660,6 +5807,23 @@ namespace faf::editor
           mShell->AskMeshImport(obj[0].c_str(), true);
           mMeshTestFrames = 1;
         }
+        // `/resourcecheck` (test runs): the resources by the build rules, logged one line a marker.
+        if (moho::CFG_GetArgOption("/resourcecheck", 0, nullptr)) {
+          int blocked = 0;
+          const std::vector<EdMapScene::ResourceFit> fits = mScene.ResourceFits("ueb1103", "ueb1102");
+          for (const EdMapScene::ResourceFit& fit : fits) {
+            blocked += fit.problem.empty() ? 0 : 1;
+            gpg::Logf(
+              "editor: /resourcecheck: %s at %.1f, %.1f: %s; %d props in the footprint",
+              fit.marker.c_str(),
+              static_cast<double>(fit.x),
+              static_cast<double>(fit.z),
+              fit.problem.empty() ? "can be built" : fit.problem.c_str(),
+              fit.props
+            );
+          }
+          gpg::Logf("editor: /resourcecheck: %zu resources, %d can't be built", fits.size(), blocked);
+        }
         // `/skeletontest <style>,<topology>` (test runs): the map skeleton generated, applied and undone.
         if (fa::vector<fa::string> spec; moho::CFG_GetArgOption("/skeletontest", 1, &spec) && !spec.empty()) {
           mScene.TestSkeleton(spec[0].c_str());
@@ -6167,6 +6331,74 @@ namespace faf::editor
       mShell->ModHost().layerAt = [this](const int layer, const float x, const float z) {
         return mScene.LayerWeightAt(layer, x, z);
       };
+      // The Check's resources by the build rules: the UEF mass extractor's and hydrocarbon plant's footprints (every
+      // faction's are the same size).
+      mShell->resourceFit = [this] {
+        std::vector<CheckIssue> out;
+        for (const EdMapScene::ResourceFit& fit : mScene.ResourceFits("ueb1103", "ueb1102")) {
+          const char* const building = fit.mass ? "a mass extractor" : "a hydrocarbon plant";
+          if (!fit.problem.empty()) {
+            CheckIssue issue;
+            issue.level = CheckIssue::Level::Warning;
+            issue.marker = fit.marker;
+            issue.text = std::string(building) + " can't be built here by the game's rules: " + fit.problem;
+            issue.x = fit.x;
+            issue.z = fit.z;
+            out.push_back(std::move(issue));
+          }
+          if (fit.props > 0) {
+            CheckIssue issue;
+            issue.level = CheckIssue::Level::Note;
+            issue.marker = fit.marker;
+            issue.text = std::to_string(fit.props) + (fit.props == 1 ? " prop stands" : " props stand") + " where " +
+              building + " goes (an engineer reclaims them before it builds)";
+            issue.x = fit.x;
+            issue.z = fit.z;
+            out.push_back(std::move(issue));
+          }
+        }
+        return out;
+      };
+      EdModHost& host = mShell->ModHost();
+      host.writeLayer = [this](
+                          const int layer,
+                          const int x0,
+                          const int z0,
+                          const int w,
+                          const int h,
+                          const std::vector<float>& weights,
+                          std::string& why
+                        ) {
+        return mScene.WriteMaskRect(layer, x0, z0, w, h, weights, why);
+      };
+      host.paintSize = [this](int& w, int& h) {
+        return mScene.MaskSize(w, h);
+      };
+      host.listObjects = [this](const std::string& kind) {
+        const std::vector<EdMapScene::ModObject> found = kind == "props" ? mScene.ModProps()
+          : kind == "decals"                                             ? mScene.ModDecals()
+                                                                         : mScene.ModUnits();
+        std::vector<EdModHost::MapObject> out;
+        out.reserve(found.size());
+        for (const EdMapScene::ModObject& o : found) {
+          out.push_back({o.what, o.name, o.army, o.x, o.y, o.z, o.size});
+        }
+        return out;
+      };
+      host.addProp = [this](const std::string& blueprint, const float x, const float z, const float scale) {
+        return mScene.ModAddProp(blueprint, x, z, scale);
+      };
+      host.removeProp = [this](const int index) {
+        return mScene.ModRemoveProp(index);
+      };
+      host.addDecal =
+        [this](const std::string& texture, const float x, const float z, const float size, const float heading) {
+        return mScene.ModAddDecal(texture, x, z, size, heading);
+      };
+      host.addUnit =
+        [this](const std::string& type, const std::string& army, const float x, const float z, std::string& name) {
+        return mScene.ModAddUnit(type, army, x, z, name);
+      };
       mScene.viewClickHook = [this](const float x, const float z, const bool shift, const bool ctrl) {
         return mShell->ModHost().ClickTool(x, z, shift, ctrl);
       };
@@ -6180,6 +6412,17 @@ namespace faf::editor
         mShell->ModHost().Scan(mDocument.VaultFolder() / "mods");
       }
       SetUpWindowChrome(frame);
+      // `/gfxpreset <low|medium|high|ultra>` (test runs): Studio's quality preset over the settings, applied and
+      // logged.
+      if (fa::vector<fa::string> preset; moho::CFG_GetArgOption("/gfxpreset", 1, &preset) && !preset.empty()) {
+        const bool known = mSettings.ApplyGraphicsPreset(preset[0].c_str());
+        gpg::Logf(
+          "editor: /gfxpreset %s: %s (the settings now match: %s)",
+          preset[0].c_str(),
+          known ? "applied" : "no such preset",
+          mSettings.GraphicsPreset().c_str()
+        );
+      }
       ApplyGraphicsSettings();
       ApplyGpuSettings();
       // `/gputest` (test runs): the GPU self test, then a blur and a thermal erosion through the field ops, logged with
@@ -6648,6 +6891,9 @@ namespace faf::editor
       add("view.resetlayout", "Reset this workspace's layout", "View", "", [this] {
         mShell->ResetLayout();
       });
+      add("view.layouts", "Save or load a layout...", "View", "", [this] {
+        mShowLayouts = true;
+      }, {}, {}, "The panels as they are kept under a name, and loaded again (FAF Studio's save / load layout)");
       // Help: F1 the topic of the panel under the mouse (over the map view, the view's).
       add("help.open", "Help", "Help", "F1", [this] {
         mShell->OpenHelp(MouseOverView() ? std::string("view") : mShell->HelpTopicUnderMouse());
@@ -7182,7 +7428,8 @@ namespace faf::editor
            cmd("view.panelsplaying"),
            sep(),
            workspaces,
-           cmd("view.resetlayout")}
+           cmd("view.resetlayout"),
+           cmd("view.layouts")}
         },
         EdMenu{
           "&Map",
@@ -7954,6 +8201,19 @@ namespace faf::editor
           }
         }
         gNoFileDialogs = mUiQa.Running();
+        // A named layout asked for: ImGui reads settings (the docks too) only between frames.
+        if (!mLayoutToLoad.empty()) {
+          const std::filesystem::path file = std::exchange(mLayoutToLoad, {});
+          std::ifstream in(file, std::ios::binary);
+          const std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+          if (text.empty()) {
+            PostStatusMessage("No layout in " + file.filename().string());
+          } else {
+            ImGui::LoadIniSettingsFromMemory(text.c_str(), text.size());
+            gpg::Logf("editor: layout loaded from %s (%zu bytes)", file.string().c_str(), text.size());
+            PostStatusMessage("Layout " + file.stem().string() + " loaded");
+          }
+        }
         mUiQa.BeforeNewFrame();
         ImGui::NewFrame();
         mUiQa.DuringFrame();
@@ -8085,6 +8345,18 @@ namespace faf::editor
         DrawSettings();
         if (mShowSelfTests) {
           mSelfTests.Draw(mShowSelfTests);
+        }
+        DrawLayouts();
+        // `/layoutsave <file>` (test runs): the panels saved there once the map is up, then loaded back from it.
+        if (!mLayoutSaveFile.empty() && mScene.Attached() && ++mLayoutSaveFrames == 200) {
+          const bool saved = SaveLayoutTo(mLayoutSaveFile);
+          std::error_code ec;
+          gpg::Logf(
+            "editor: /layoutsave: saved %s (%llu bytes)",
+            saved ? "yes" : "no",
+            static_cast<unsigned long long>(std::filesystem::file_size(mLayoutSaveFile, ec))
+          );
+          mLayoutToLoad = mLayoutSaveFile;
         }
         DrawOverwriteAsk();
         DrawRecover();
@@ -8225,7 +8497,10 @@ namespace faf::editor
           if (std::exchange(mSelfTests.askLayoutCheck, false) && !mUiQa.Running()) {
             mUiQa.Start(EdUiQa::Kind::LayoutCheck, 10);
           }
-          if (mSelfTests.Finished() && mQaExitAfter && !mSelfTestsAsked && !mClickSweepAsked && !mLayoutCheckAsked) {
+          if (
+            mSelfTests.Finished() && mQaExitAfter && !mSelfTestsAsked && !mClickSweepAsked && !mLayoutCheckAsked &&
+            !mUiQa.Running()
+          ) {
             mShell->RequestExit();
           }
           // A frame whose heads were re-made isn't drawn: its draw lists hold the view's and the minimap's copies,
@@ -8288,6 +8563,9 @@ namespace faf::editor
       mClickSweepAsked = moho::CFG_GetArgOption("/clicksweep", 0, nullptr);
       mLayoutCheckAsked = moho::CFG_GetArgOption("/layoutcheck", 0, nullptr);
       mSelfTestsAsked = moho::CFG_GetArgOption("/selftests", 0, nullptr);
+      if (fa::vector<fa::string> file; moho::CFG_GetArgOption("/layoutsave", 1, &file) && !file.empty()) {
+        mLayoutSaveFile = file[0].c_str();
+      }
       mQaExitAfter = mClickSweepAsked || mLayoutCheckAsked || mSelfTestsAsked;
       WireUiQa();
       RegisterSelfTests();

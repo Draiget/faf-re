@@ -37,6 +37,10 @@ namespace faf::editor
         {EdSettings::kGfxAo, "auto", {"auto", "on", "off"}},
         {EdSettings::kGfxTextureDetail, "auto", {"auto", "high", "medium", "low"}},
         {EdSettings::kGfxAnisotropy, "auto", {"auto", "0", "4", "8", "16"}},
+        {EdSettings::kGfxFidelity, "auto", {"auto", "low", "medium", "high"}},
+        {EdSettings::kGfxShadowDistance, "auto", {"auto", "short", "normal", "long", "longest"}},
+        {EdSettings::kGfxModelDetail, "auto", {"auto", "low", "medium", "high"}},
+        {EdSettings::kGfxVsync, "auto", {"auto", "on", "off"}},
         {EdSettings::kGpuCompute, "1", {}},
         {EdSettings::kGpuMinCells, "65536", {"16384", "65536", "262144", "1048576"}},
       };
@@ -208,7 +212,81 @@ namespace faf::editor
     if (const std::string aniso = Get(kGfxAnisotropy); aniso != "auto" && !aniso.empty()) {
       out.push_back("ren_TextureAnisotropy " + aniso);
     }
+    // Studio's (graphics.lua): the game's fidelity, the shadow distance in units, the cameras' model detail, vsync.
+    const auto level = [](const std::string& v) {
+      return v == "low" ? "0" : v == "medium" ? "1" : v == "high" ? "2" : "";
+    };
+    if (const char* f = level(Get(kGfxFidelity)); *f != '\0') {
+      out.push_back(std::string("graphics_Fidelity ") + f);
+    }
+    if (const std::string d = Get(kGfxShadowDistance); d != "auto" && !d.empty()) {
+      out.push_back(
+        std::string("ren_ShadowLOD ") +
+        (d == "short"      ? "200"
+           : d == "normal" ? "260"
+           : d == "long"   ? "340"
+                           : "440")
+      );
+    }
+    if (const char* m = level(Get(kGfxModelDetail)); *m != '\0') {
+      out.push_back(std::string("SC_CameraScaleLOD ") + m);
+    }
+    onOff(kGfxVsync, "SC_VerticalSync", "1", "0");
     return out;
+  }
+
+  namespace
+  {
+    // Studio's presets (graphics.lua Presets), in this editor's settings: fidelity, shadows and their size and
+    // distance, texture detail, model detail.
+    struct GraphicsPresetRow
+    {
+      const char* name;
+      const char* fidelity;
+      const char* shadows;
+      const char* shadowSize;
+      const char* shadowDistance;
+      const char* texture;
+      const char* model;
+    };
+    constexpr GraphicsPresetRow kGraphicsPresets[] = {
+      {"low", "low", "off", "1024", "short", "low", "low"},
+      {"medium", "medium", "on", "1024", "normal", "medium", "medium"},
+      {"high", "high", "on", "2048", "long", "high", "high"},
+      {"ultra", "high", "on", "4096", "longest", "high", "high"},
+    };
+  } // namespace
+
+  bool EdSettings::ApplyGraphicsPreset(
+    const std::string& preset
+  )
+  {
+    for (const GraphicsPresetRow& p : kGraphicsPresets) {
+      if (preset == p.name) {
+        (void)Set(kGfxFidelity, p.fidelity);
+        (void)Set(kGfxShadows, p.shadows);
+        (void)Set(kGfxShadowSize, p.shadowSize);
+        (void)Set(kGfxShadowDistance, p.shadowDistance);
+        (void)Set(kGfxTextureDetail, p.texture);
+        (void)Set(kGfxModelDetail, p.model);
+        return true;
+      }
+    }
+    return false;
+  }
+
+  std::string EdSettings::GraphicsPreset() const
+  {
+    for (const GraphicsPresetRow& p : kGraphicsPresets) {
+      if (
+        Get(kGfxFidelity) == p.fidelity && Get(kGfxShadows) == p.shadows && Get(kGfxShadowSize) == p.shadowSize &&
+        Get(kGfxShadowDistance) == p.shadowDistance && Get(kGfxTextureDetail) == p.texture &&
+        Get(kGfxModelDetail) == p.model
+      ) {
+        return p.name;
+      }
+    }
+    return "custom";
   }
 
 } // namespace faf::editor

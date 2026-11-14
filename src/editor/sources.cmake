@@ -142,6 +142,7 @@ set(FAF_EDITOR_SOURCES
   tools/EdSkeleton.cpp
   doc/EdJsonTree.cpp
   view/EdMapScenePaths.cpp
+  view/EdMapSceneMods.cpp
   ui/EdPathsPanel.cpp
   tools/EdDetailPass.cpp
   view/EdMapSceneDetail.cpp

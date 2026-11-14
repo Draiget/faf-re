@@ -23,6 +23,7 @@
 #include "moho/sim/RRuleGameRules.h"
 
 #include <cmath>
+#include <cstdio>
 #include <cstring>
 #include <utility>
 
@@ -537,6 +538,38 @@ namespace faf::editor
     ImGui::Checkbox("Senses", &p.senses);
     ImGui::SetNextItemWidth(-1.0f);
     (void)FillSliderInt("##army", &p.army, 0, 7, "Army colour %d");
+    // Studio's viewer: the LOD to look at, the empty stage, the light.
+    {
+      const std::string shown = p.lod < 0 ? std::string("LOD: as the camera is") : "LOD " + std::to_string(p.lod);
+      ImGui::SetNextItemWidth(Em(170.0f));
+      if (EdBeginCombo("##lod", shown.c_str())) {
+        if (ImGui::Selectable("As the camera is", p.lod < 0)) {
+          p.lod = -1;
+        }
+        for (std::size_t l = 0; l < p.lodCutoffs.size(); ++l) {
+          char label[64];
+          (void)std::snprintf(label, sizeof(label), "LOD %zu (to %.0f)", l, static_cast<double>(p.lodCutoffs[l]));
+          if (ImGui::Selectable(label, p.lod == static_cast<int>(l))) {
+            p.lod = static_cast<int>(l);
+          }
+        }
+        ImGui::EndCombo();
+      }
+      EdSetItemTooltip("Puts the camera at the middle of that LOD's distance: the mesh the game shows there");
+      ImGui::SameLine();
+      ImGui::Checkbox("Empty stage", &p.stage);
+      EdSetItemTooltip("The map's terrain, sky, water and border aren't drawn while the unit is shown");
+      ImGui::SetNextItemWidth(Em(170.0f));
+      if (EdBeginCombo("##light", ("Light: " + p.light).c_str())) {
+        for (const char* name : {"Map", "Noon", "Evening", "Overcast", "Night", "Icon"}) {
+          if (ImGui::Selectable(name, p.light == name)) {
+            p.light = name;
+          }
+        }
+        ImGui::EndCombo();
+      }
+      EdSetItemTooltip("A light for the map (one undo step); Map puts back the map's own");
+    }
     if (!p.status.empty()) {
       ImGui::TextDisabled("%s", p.status.c_str());
     }
