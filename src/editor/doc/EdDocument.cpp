@@ -1393,11 +1393,11 @@ namespace faf::editor
     lighting.bloom = terrain.GetBloom();
     // The fog as WRenViewport::FogOn reads it: the colour from the first three floats, start and end from the next two.
     const moho::SFogInfo& fog = terrain.GetFogInfo();
-    lighting.fogColor[0] = fog.mStartDistance;
-    lighting.fogColor[1] = fog.mCutoffDistance;
-    lighting.fogColor[2] = fog.mMinClamp;
-    lighting.fogStart = fog.mMaxClamp;
-    lighting.fogEnd = fog.mCurveExponent;
+    lighting.fogColor[0] = fog.mColorR;
+    lighting.fogColor[1] = fog.mColorG;
+    lighting.fogColor[2] = fog.mColorB;
+    lighting.fogStart = fog.mStart;
+    lighting.fogEnd = fog.mEnd;
     return lighting;
   }
 
@@ -1437,11 +1437,11 @@ namespace faf::editor
     terrain.SetSpecularColor(specular);
     terrain.SetBloom(lighting.bloom);
     moho::SFogInfo fog = terrain.GetFogInfo();
-    fog.mStartDistance = lighting.fogColor[0];
-    fog.mCutoffDistance = lighting.fogColor[1];
-    fog.mMinClamp = lighting.fogColor[2];
-    fog.mMaxClamp = lighting.fogStart;
-    fog.mCurveExponent = lighting.fogEnd;
+    fog.mColorR = lighting.fogColor[0];
+    fog.mColorG = lighting.fogColor[1];
+    fog.mColorB = lighting.fogColor[2];
+    fog.mStart = lighting.fogStart;
+    fog.mEnd = lighting.fogEnd;
     terrain.SetFogInfo(fog);
   }
 

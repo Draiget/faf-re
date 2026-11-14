@@ -3122,9 +3122,9 @@ namespace
     const moho::SFogInfo& fogInfo
   ) noexcept
   {
-    const std::uint32_t red = ClampFogColorChannel(fogInfo.mStartDistance);
-    const std::uint32_t green = ClampFogColorChannel(fogInfo.mCutoffDistance);
-    const std::uint32_t blue = ClampFogColorChannel(fogInfo.mMinClamp);
+    const std::uint32_t red = ClampFogColorChannel(fogInfo.mColorR);
+    const std::uint32_t green = ClampFogColorChannel(fogInfo.mColorG);
+    const std::uint32_t blue = ClampFogColorChannel(fogInfo.mColorB);
     return 0xFF000000u | (red << 16u) | (green << 8u) | blue;
   }
 } // namespace
@@ -3151,8 +3151,8 @@ void moho::WRenViewport::FogOn(
     return;
   }
 
-  const float fogStart = fogInfo.mMaxClamp + fogOffset;
-  const float fogEnd = fogInfo.mCurveExponent + fogOffset;
+  const float fogStart = fogInfo.mStart + fogOffset;
+  const float fogEnd = fogInfo.mEnd + fogOffset;
   const std::uint32_t fogColor = PackFogColorArgb255(fogInfo);
   device->SetFogState(true, &mCam->projection, fogStart, fogEnd, static_cast<int>(fogColor));
 

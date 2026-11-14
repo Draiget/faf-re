@@ -2011,11 +2011,11 @@ namespace moho
     mSpecularColor.z = 0.0f;
     mSpecularColor.w = 0.0f;
     mBloom = 0.079999998f;
-    mFogInfo.mStartDistance = 1.0f;
-    mFogInfo.mCutoffDistance = 1.0f;
-    mFogInfo.mMinClamp = 1.0f;
-    mFogInfo.mMaxClamp = 0.0f;
-    mFogInfo.mCurveExponent = 1000.0f;
+    mFogInfo.mColorR = 1.0f;
+    mFogInfo.mColorG = 1.0f;
+    mFogInfo.mColorB = 1.0f;
+    mFogInfo.mStart = 0.0f;
+    mFogInfo.mEnd = 1000.0f;
 
     // 0x008A691A-0x008A693B
     SetWaterDefaults();
@@ -2219,11 +2219,11 @@ namespace moho
     const SFogInfo& fogInfo
   )
   {
-    mFogInfo.mStartDistance = fogInfo.mStartDistance;
-    mFogInfo.mCutoffDistance = fogInfo.mCutoffDistance;
-    mFogInfo.mMinClamp = fogInfo.mMinClamp;
-    mFogInfo.mMaxClamp = fogInfo.mMaxClamp;
-    mFogInfo.mCurveExponent = fogInfo.mCurveExponent;
+    mFogInfo.mColorR = fogInfo.mColorR;
+    mFogInfo.mColorG = fogInfo.mColorG;
+    mFogInfo.mColorB = fogInfo.mColorB;
+    mFogInfo.mStart = fogInfo.mStart;
+    mFogInfo.mEnd = fogInfo.mEnd;
   }
 
   /**
