@@ -1,7 +1,7 @@
 # Terrain splat budget tests
 
 `faf_splat_budget_tests` includes the production `SplatBudget.h`,
-`CWldSplat::SplatVertex` and `FastVectorN`. It links `faf_engine` and `gtest_main`,
+`CWldSplat::SplatVertex` and `FastVectorN`. It links `faf_engine` (Windows) or `faf_sim` (Linux), plus `gtest_main`,
 inherits the engine's headers, compiler configuration and existing forced
 `platform/LayoutAsserts.h`, and does not replace its allocator or bypass its
 container assertions. The target is excluded from the default build and registered with CTest's
@@ -17,13 +17,23 @@ ctest --test-dir build/clang-x64-release -R '^splat_budget$' --output-on-failure
 Repeat with `clang-x86-release` and its build directory. For a new build,
 configure the corresponding preset using the README toolchain requirements.
 No `build.ps1` copy/deploy step is needed. Normal engine runtime libraries must
-be available, but the tests do not need game data or a GPU. The Linux simulation
-build does not include the Windows engine test targets.
+be available, but the tests do not need game data or a GPU.
+
+The Linux build registers the same source as `splat_budget`, using the real
+engine/platform headers rather than host substitutes. From a configured checkout:
+
+```sh
+cmake --build --preset linux-clang-x64-release-plain --target faf_splat_budget_tests
+ctest --test-dir build/linux-clang-x64-release-plain -R '^splat_budget$' --output-on-failure
+```
+
+`faf_tests` also collects this GoogleTest target, so the Linux client CI's existing
+build-and-CTest steps run it. A passing Linux run is not Windows/x86 acceptance.
 
 Coverage:
 
 - The 10000-vertex storage used by high/medium fidelity and the 1000-vertex
-  storage used by low fidelity, all four tiers and invalid integers.
+  storage used by low fidelity, all seven tiers and invalid integers.
 - Original inline limits, bounded geometric growth preserving every live
   vertex, same-tier reuse, downshifts, and return to inline storage.
 - Atlas-restart storage contract at each growth boundary: clearing removes
@@ -46,7 +56,7 @@ chunk/pass sequencing, and actual allocation-failure handling need separate
 integration checks. Pointer/capacity observations do not instrument every
 process allocation.
 
-Build and run this target on Windows before claiming native acceptance.
+Build and run this target on each claimed platform before claiming its native acceptance.
 Host-compiling it with dependency substitutes checks only the test logic and
 budget/container behavior, not the real Windows includes, ABI, startup or link.
 No result here proves GPU output, visual quality or frame-time performance.

@@ -27,7 +27,9 @@ do
             title = 'Ground splat limit',
             description = 'Maximum ground splats drawn in each view, including tread marks. '
                 .. 'At Medium/High fidelity: Original 2,499; Enhanced 10,000; Very high 25,000; Extreme 50,000. '
-                .. 'At Low fidelity: 249; 1,000; 2,500; 5,000. '
+                .. 'Newer engines additionally offer experimental tiers: 100,000; 250,000; 500,000. '
+                .. 'At Low fidelity: 249; 1,000; 2,500; 5,000, plus 10,000; 25,000; 50,000 when supported. '
+                .. 'Experimental tiers may cause severe frame-time or memory pressure; lower the setting if needed. '
                 .. 'Applies after pressing Apply or OK, without restarting. '
                 .. 'Higher limits use more memory and rendering time. Marks can still disappear when the selected limit '
                 .. 'or available memory is exceeded. This does not change splat lifetime or every type of decal.',

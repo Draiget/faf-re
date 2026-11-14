@@ -124,18 +124,19 @@ end
 -- receive an unknown command when preferences are applied at startup.
 do
     local command = 'ren_SplatBudgetTier'
-    local function Supported()
+    local extendedCommand = 'ren_SplatBudgetTierExtended'
+    local function Supported(name)
         -- The engine's Lua reports C functions as 'cfunction'.
         local kind = type(ConTextMatches)
         if kind ~= 'function' and kind ~= 'cfunction' then
             return false
         end
-        local ok, matches = pcall(ConTextMatches, command)
+        local ok, matches = pcall(ConTextMatches, name)
         if not ok or type(matches) ~= 'table' then
             return false
         end
-        for _, name in ipairs(matches) do
-            if name == command then
+        for _, match in ipairs(matches) do
+            if match == name then
                 return true
             end
         end
@@ -143,7 +144,7 @@ do
     end
 
     local video = options and options.video
-    if video and video.items and Supported() then
+    if video and video.items and Supported(command) then
         local position = table.getn(video.items) + 1
         local present = false
         for index, item in ipairs(video.items) do
@@ -154,28 +155,42 @@ do
             end
         end
         if not present then
+            local states = {
+                { text = 'Original', key = 0 },
+                { text = 'Enhanced (about 4x)', key = 1 },
+                { text = 'Very high (about 10x)', key = 2 },
+                { text = 'Extreme (about 20x)', key = 3 },
+            }
+            if Supported(extendedCommand) then
+                table.insert(states, { text = 'Experimental (about 40x)', key = 4 })
+                table.insert(states, { text = 'Experimental (about 100x)', key = 5 })
+                table.insert(states, { text = 'Experimental (about 200x)', key = 6 })
+            end
             table.insert(video.items, position, {
                 title = 'Ground splat limit',
                 key = 'splat_budget_tier',
                 type = 'toggle',
                 default = 0,
                 set = function(key, value, startup)
-                    if not Supported() then
+                    if not Supported(command) then
                         return
                     end
                     -- Do not concatenate unvalidated preference text into a command.
-                    if value ~= 0 and value ~= 1 and value ~= 2 and value ~= 3 then
+                    if value ~= 0 and value ~= 1 and value ~= 2 and value ~= 3 and value ~= 4 and value ~= 5 and value ~= 6 then
                         value = 0
                     end
-                    ConExecute(command .. ' ' .. tostring(value))
+                    local destination = command
+                    if Supported(extendedCommand) then
+                        destination = extendedCommand
+                    elseif value >= 4 then
+                        -- A saved experimental tier on an older engine falls back
+                        -- to its supported maximum, never an invalid console value.
+                        value = 3
+                    end
+                    ConExecute(destination .. ' ' .. tostring(value))
                 end,
                 custom = {
-                    states = {
-                        { text = 'Original', key = 0 },
-                        { text = 'Enhanced (about 4x)', key = 1 },
-                        { text = 'Very high (about 10x)', key = 2 },
-                        { text = 'Extreme (about 20x)', key = 3 },
-                    },
+                    states = states,
                 },
             })
         end
