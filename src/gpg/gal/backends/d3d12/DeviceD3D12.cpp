@@ -2480,8 +2480,9 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
   namespace
   {
     // A D3D9 style rectangle copy takes a source rectangle that may reach past the surface (the engine's refraction
-    // copy passes the view rectangle, which can be a row taller than a 1280x720 window); D3D11 clips it, but D3D12's
-    // CopyTextureRegion makes the command list invalid (Close returns E_INVALIDARG and every later frame fails). Clip
+    // copy passes the view rectangle, which can be a row taller than a 1280x720 window). D3D11's backend passes it on
+    // unclipped too, where Microsoft leaves the result undefined; D3D12's CopyTextureRegion makes the command list
+    // invalid (Close returns E_INVALIDARG and every later frame fails). Clip
     // the box to the source and to what fits at (x, y) in the destination. False when nothing is left to copy.
     bool ClampCopyBox(
       D3D12_BOX& box,

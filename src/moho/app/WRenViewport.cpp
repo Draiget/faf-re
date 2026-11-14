@@ -1978,7 +1978,9 @@ void moho::WRenViewport::RenderWorldView(
   // another fidelity gets a new one. `[edi]` is the view's terrain, slot 1 is
   // IsFidelity, called with graphics_Fidelity (0x00F58E88); when it answers
   // false, IRenTerrain::Create (0x00809DA0) goes into mTerrain (0x007FB7C0)
-  // and slot 2 creates it over REN_GetTerrainRes (0x007FA170). This is what
+  // and slot 2 creates it over REN_GetTerrainRes (0x007FA170); 0x007F936A
+  // copies mTerrain back into the binary's local shared_ptr (0x007F7B00),
+  // which this function reads as worldView->mTerrain below. This is what
   // makes graphics_Fidelity, which the Options screen changes live, take
   // effect in a running game: starting on Low and choosing High left the Low
   // terrain and water in place without it.
