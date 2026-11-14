@@ -323,6 +323,11 @@ namespace faf::editor
     [[nodiscard]] std::uint8_t* WaterMaskCells(WaterMask mask, int& width, int& height) const;
     /** After cells changed in [x0, x1) x [z0, z1) (mask cells): the water map there rebuilt, the overlay told. */
     void WaterMasksChanged(int x0, int z0, int x1, int z1);
+    /** Goes up with every edit, undo and redo (the check runs again when it changed). */
+    [[nodiscard]] std::uint64_t EditCount() const noexcept
+    {
+      return mEditCount;
+    }
     [[nodiscard]] int WaterMaskRevision() const noexcept
     {
       return mWaterMaskRevision;
@@ -931,6 +936,7 @@ namespace faf::editor
     std::vector<std::pair<WaterMaskSnapshot, WaterMaskSnapshot>> mWaterMaskUndo;
     std::vector<std::pair<WaterMaskSnapshot, WaterMaskSnapshot>> mWaterMaskRedo;
     int mWaterMaskRevision = 0;
+    std::uint64_t mEditCount = 0;
     std::vector<std::pair<WaterState, WaterState>> mWaterUndo;
     std::vector<std::pair<WaterState, WaterState>> mWaterRedo;
     std::vector<std::pair<DecalSnapshot, DecalSnapshot>> mDecalUndo;

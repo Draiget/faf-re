@@ -153,4 +153,52 @@ namespace
     props.resize(4);
     EXPECT_TRUE(faf::editor::CheckPropSymmetry(props, faf::editor::Symmetry::LeftRight, 0, 257, 257).empty());
   }
+
+  TEST(
+    MapBasics,
+    StartsArmiesResourcesChainsAndNames
+  )
+  {
+    faf::editor::MapBasicsInput in;
+    std::vector<SaveEntry> markers = {
+      Marker("Blank Marker", "ARMY_1", 30.5f, 30.5f),
+      Marker("Blank Marker", "ARMY_2", 200.5f, 200.5f),
+      Marker("Mass", "Mass 01", 40.5f, 40.5f),
+      Marker("Mass", "Mass 02", 41.0f, 60.5f), // off the grid
+      Marker("Hydrocarbon", "Hydro 01", 50.5f, 50.5f),
+    };
+    in.markers = &markers;
+    in.armies = {"ARMY_1", "ARMY_3"};
+    std::vector<faf::editor::MarkerChain> chains = {{"Path", {"Mass 01", "Gone 7"}}};
+    in.chains = &chains;
+    in.name = "Test";
+    in.missingProps = {{"/env/x/props/nope_prop.bp", {5.0f, 6.0f}}};
+    std::vector<CheckIssue> issues = faf::editor::CheckMapBasics(in);
+    EXPECT_EQ(Count(issues, "ARMY_2", "army list hasn't got"), 1U) << "a start the list hasn't got";
+    EXPECT_EQ(Count(issues, "ARMY_3", "no start position marker"), 1U) << "an army without its start";
+    EXPECT_EQ(Count(issues, "", "2 mass points for 2 start positions"), 1U);
+    EXPECT_EQ(Count(issues, "Mass 02", "off the build grid"), 1U);
+    EXPECT_EQ(Count(issues, "Mass 01", "off the build grid"), 0U);
+    EXPECT_EQ(Count(issues, "Hydro 01", "off the build grid"), 0U);
+    EXPECT_EQ(Count(issues, "Path", "1 marker(s) the map hasn't got (first: Gone 7)"), 1U);
+    EXPECT_EQ(Count(issues, "", "nope_prop.bp"), 1U);
+    EXPECT_EQ(Count(issues, "", "no name"), 0U);
+    EXPECT_EQ(Count(issues, "", "no description"), 1U);
+    // No start at all; one start; no mass; a broken position.
+    std::vector<SaveEntry> none = {Marker("Mass", "Mass 01", 40.5f, 40.5f)};
+    in.markers = &none;
+    in.armies.clear();
+    in.chains = nullptr;
+    in.missingProps.clear();
+    issues = faf::editor::CheckMapBasics(in);
+    EXPECT_EQ(Count(issues, "", "no start positions"), 1U);
+    std::vector<SaveEntry> one = {Marker("Blank Marker", "ARMY_1", 30.5f, 30.5f)};
+    one.push_back(Marker("Mass", "Broken", 1.0f, 1.0f));
+    one.back().Set("position", "VECTOR3( nan, 0, 1 )");
+    in.markers = &one;
+    issues = faf::editor::CheckMapBasics(in);
+    EXPECT_EQ(Count(issues, "ARMY_1", "only start position"), 1U);
+    EXPECT_EQ(Count(issues, "", "no mass points"), 1U) << "the broken one doesn't count";
+    EXPECT_EQ(Count(issues, "Broken", "broken position"), 1U);
+  }
 } // namespace

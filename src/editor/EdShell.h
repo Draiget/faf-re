@@ -685,6 +685,11 @@ namespace faf::editor
     bool mShowCheck = true;
     std::vector<CheckIssue> mCheckIssues;
     bool mCheckRan = false;
+    /** The edits the last check saw; a change runs it again once the edits have rested a second. */
+    std::uint64_t mCheckedEdits = 0;
+    std::uint64_t mRecheckEdits = 0;
+    double mRecheckAt = -1.0;
+    void AutoRecheck();
     bool mRunCheck = false;
     void UpdateTestRun();
     /** 0 idle, 1 asked, 2 starting, 3 playing, 4 stopping. */

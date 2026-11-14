@@ -1828,6 +1828,7 @@ namespace faf::editor
         kind = !heights ? EditKind::Masks : !masks ? EditKind::Heights : kind;
       }
     }
+    ++mEditCount;
     mUndoOrder.push_back(kind);
     mRedoOrder.clear();
     mHeights.ClearRedo();
@@ -1851,6 +1852,7 @@ namespace faf::editor
     EditKind& kind
   )
   {
+    ++mEditCount;
     if (mUndoOrder.empty()) {
       return false;
     }
@@ -1863,6 +1865,7 @@ namespace faf::editor
     EditKind& kind
   )
   {
+    ++mEditCount;
     if (mRedoOrder.empty()) {
       return false;
     }

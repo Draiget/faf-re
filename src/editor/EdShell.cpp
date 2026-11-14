@@ -493,6 +493,7 @@ namespace faf::editor
       if (mShowMarkers) {
         DrawMarkersPanel();
       }
+      AutoRecheck();
       if (mShowCheck) {
         DrawCheckPanel();
       }

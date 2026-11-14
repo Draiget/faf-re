@@ -1,6 +1,7 @@
 #include "editor/tools/EdChecks.h"
 
 #include <algorithm>
+#include <set>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -189,6 +190,135 @@ namespace faf::editor
     }
     return issues;
   }
+  std::vector<CheckIssue> CheckMapBasics(
+    const MapBasicsInput& in
+  )
+  {
+    std::vector<CheckIssue> issues;
+    const auto add =
+      [&](
+        const CheckIssue::Level level, const std::string& marker, const std::string& text, const float x, const float z
+      ) {
+      issues.push_back({level, marker, text, x, z, std::string(), 0});
+    };
+    std::vector<std::pair<std::string, std::array<float, 2>>> starts;
+    std::set<std::string> names;
+    int masses = 0;
+    if (in.markers != nullptr) {
+      for (const SaveEntry& marker : *in.markers) {
+        names.insert(marker.name);
+        const std::string type = MarkerTypeOf(marker);
+        float x = 0.0f, y = 0.0f, z = 0.0f;
+        const bool placed = MarkerPosition(marker, x, y, z);
+        if (!placed || !std::isfinite(x) || !std::isfinite(z) || std::fabs(x) > 1.0e6f || std::fabs(z) > 1.0e6f) {
+          add(CheckIssue::Level::Error, marker.name, "has a broken position (none, not a number or huge)", 0.0f, 0.0f);
+          continue;
+        }
+        if (type == "Blank Marker" && marker.name.rfind("ARMY_", 0) == 0) {
+          starts.push_back({marker.name, {x, z}});
+        }
+        if (type == "Mass") {
+          ++masses;
+        }
+        // Resources sit in the middle of their extractor's cell (1 x 1 mass, 3 x 3 hydrocarbon: x.5).
+        if (type == "Mass" || type == "Hydrocarbon") {
+          const float sx = std::floor(x) + 0.5f;
+          const float sz = std::floor(z) + 0.5f;
+          if (std::fabs(sx - x) > 0.02f || std::fabs(sz - z) > 0.02f) {
+            char text[200];
+            (void)std::snprintf(
+              text,
+              sizeof(text),
+              "is off the build grid (%.2f, %.2f; the cell's middle is %.1f, %.1f)",
+              static_cast<double>(x),
+              static_cast<double>(z),
+              static_cast<double>(sx),
+              static_cast<double>(sz)
+            );
+            add(CheckIssue::Level::Warning, marker.name, text, x, z);
+          }
+        }
+      }
+    }
+    // The starts and the scenario's armies, both ways.
+    if (starts.empty()) {
+      add(
+        CheckIssue::Level::Error, "", "the map has no start positions (place them with the Markers tool)", 0.0f, 0.0f
+      );
+    } else if (starts.size() == 1) {
+      add(
+        CheckIssue::Level::Warning,
+        starts[0].first,
+        "is the map's only start position",
+        starts[0].second[0],
+        starts[0].second[1]
+      );
+    }
+    for (const auto& [name, at] : starts) {
+      if (!in.armies.empty() && std::find(in.armies.begin(), in.armies.end(), name) == in.armies.end()) {
+        add(
+          CheckIssue::Level::Warning,
+          name,
+          "is a start position the scenario's army list hasn't got (Armies panel)",
+          at[0],
+          at[1]
+        );
+      }
+    }
+    for (const std::string& army : in.armies) {
+      if (std::none_of(starts.begin(), starts.end(), [&](const auto& s) {
+        return s.first == army;
+      })) {
+        add(
+          CheckIssue::Level::Error, army, "is in the scenario's army list but has no start position marker", 0.0f, 0.0f
+        );
+      }
+    }
+    if (masses == 0) {
+      add(CheckIssue::Level::Warning, "", "the map has no mass points", 0.0f, 0.0f);
+    } else if (!starts.empty() && masses < 4 * static_cast<int>(starts.size())) {
+      add(
+        CheckIssue::Level::Note,
+        "",
+        std::to_string(masses) + " mass points for " + std::to_string(starts.size()) +
+          " start positions (usually at least 4 each)",
+        0.0f,
+        0.0f
+      );
+    }
+    // Chains naming markers the map hasn't got.
+    if (in.chains != nullptr) {
+      for (const MarkerChain& chain : *in.chains) {
+        std::vector<std::string> missing;
+        for (const std::string& name : chain.markers) {
+          if (names.count(name) == 0) {
+            missing.push_back(name);
+          }
+        }
+        if (!missing.empty()) {
+          add(
+            CheckIssue::Level::Warning,
+            chain.name,
+            "chain names " + std::to_string(missing.size()) +
+              " marker(s) the map hasn't got (first: " + missing.front() + ")",
+            0.0f,
+            0.0f
+          );
+        }
+      }
+    }
+    for (const auto& [blueprint, at] : in.missingProps) {
+      add(CheckIssue::Level::Warning, "", "prop blueprint the game hasn't got: " + blueprint, at[0], at[1]);
+    }
+    if (in.name.empty()) {
+      add(CheckIssue::Level::Warning, "", "the map has no name (Map panel)", 0.0f, 0.0f);
+    }
+    if (in.description.empty()) {
+      add(CheckIssue::Level::Note, "", "the map has no description (Map panel)", 0.0f, 0.0f);
+    }
+    return issues;
+  }
+
   std::vector<CheckIssue> CheckPropSymmetry(
     const std::vector<PropPoint>& props,
     const Symmetry symmetry,

@@ -11,6 +11,7 @@
 
 #include <algorithm>
 #include <array>
+#include <set>
 #include <chrono>
 #include <functional>
 #include <cctype>
@@ -1004,10 +1005,33 @@ namespace faf::editor
     );
   }
 
+  void EdShell::AutoRecheck()
+  {
+    if (
+      !mCheckRan || mPlay.Active() || mDocument.GetState() != EdDocument::State::Open ||
+      mCheckedPath != mDocument.Path() || mDocument.EditCount() == mCheckedEdits
+    ) {
+      mRecheckAt = -1.0;
+      return;
+    }
+    const double now = ImGui::GetTime();
+    if (mRecheckAt < 0.0 || mRecheckEdits != mDocument.EditCount()) {
+      // Wait until the edits have rested a second (a run of strokes checks once).
+      mRecheckEdits = mDocument.EditCount();
+      mRecheckAt = now + 1.0;
+      return;
+    }
+    if (now >= mRecheckAt) {
+      mRecheckAt = -1.0;
+      RunCheck();
+    }
+  }
+
   void EdShell::RunCheck()
   {
     mCheckIssues.clear();
     mCheckRan = true;
+    mCheckedEdits = mDocument.EditCount();
     mCheckedPath = mDocument.Path();
     moho::CWldMap* const map = mDocument.Map();
     if (map == nullptr || map->mTerrainRes == nullptr) {
@@ -1029,6 +1053,27 @@ namespace faf::editor
     input.width = facts.fieldWidth;
     input.height = facts.fieldHeight;
     mCheckIssues = CheckMarkers(input);
+    // The map-wide checks: starts and armies both ways, mass count, the build grid, chains, prop blueprints, names.
+    {
+      MapBasicsInput basics;
+      basics.markers = input.markers;
+      basics.armies = mDocument.Armies();
+      basics.chains = &mDocument.SaveData().Chains();
+      basics.name = facts.name;
+      basics.description = facts.description;
+      if (map->mProps != nullptr && mTools.HasPropBlueprints()) {
+        std::set<std::string> asked;
+        for (const moho::CWldPropEntry& entry : map->mProps->mEntries) {
+          const std::string blueprint = entry.mBlueprintPath.c_str();
+          if (asked.insert(blueprint).second && mTools.PropBlueprintNamed(blueprint).empty()) {
+            basics.missingProps.push_back({blueprint, {entry.mTransform.pos_.x, entry.mTransform.pos_.z}});
+          }
+        }
+      }
+      for (CheckIssue& issue : CheckMapBasics(basics)) {
+        mCheckIssues.push_back(std::move(issue));
+      }
+    }
     // The props under the same symmetry: each one's partner of its blueprint at its copies, and the reclaim that isn't.
     if (map->mProps != nullptr && input.symmetry != Symmetry::None) {
       std::map<std::string, float> massOf;
