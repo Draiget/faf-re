@@ -71,6 +71,12 @@ In VS Code, the Run view has "Editor (x64, Debug)" and "Editor (x64, Release)": 
 - View: Camera › Frame the whole map (Home), Focus selection (F: the camera over the selection's middle, far enough to see all of it); World, the palette, keys, themes, help, panels while playing, workspaces, reset.
 - Map: Info, Armies, Markers, Check, Script, Adaptive map, Lighting. Window: General (Tools, Properties, Map, Info, Problems, Log, History, Debugger), Mission (Stages, Strings, Bases, Platoons, Run), Mod and effects (Particle editor and browser, Material editor, Unit lab, Unit viewer, Mod project, Editor mods), Asset browser (Ctrl+Alt+A), Script. The ImGui demo is only in the palette.
 - On SCMP_009 with the Select tool: All 5182 props, None 0, Invert 5182, Same type 5182, Focus framed 512, 512 (1018 across); with the terrain tool Select All said "the active tool selects nothing".
+- Camera keys are commands (rebindable; View › Camera): Q / E turn the camera, unless the Select tool has props selected, when they turn the props (both are commands on the key; the first that can run takes it); PageUp / PageDown closer and farther; N faces north; T looks straight down. Ctrl+Shift+1..9 keeps the camera as a bookmark, Ctrl+1..9 goes back to it (per map, for the run; one not kept yet says so). WASD and the arrows still move the camera in the view.
+- The view's context menu: a right click that doesn't drag (the right button still pans) opens it at the cursor; with a selection: focus, duplicate, copy, delete, same type, invert, none, turn; without: paste, select all, frame the map, face north, look down, bookmark 1. Entries are commands, greyed with their reason.
+- Play › Pause (the Pause key) pauses and resumes the play's session (`/pausetest`: tick 43, paused: 50 three seconds later, resumed: 73).
+- The Log filters by level (Info, Warnings, Debug) besides its text filter, and Copy puts the lines shown on the clipboard.
+- A marker file (`editor_running.txt` in the settings folder) lives while the editor runs; found at the next start, the last run didn't end normally (a crash, or it was stopped) and the editor says so in the log and the status bar, pointing at the logs and File › Recover. A test run keeps none unless `/runmarker <file>`.
+- Anti-aliasing is left to the FXAA work replacing the game's (the old one freezes Nvidia under DX11 / DX12).
 
 ## Play
 
