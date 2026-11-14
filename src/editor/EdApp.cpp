@@ -2984,11 +2984,60 @@ namespace faf::editor
         ) {
           return;
         }
-        mEditorModTestDone = true;
+        EdModHost& host = mShell->ModHost();
+        const std::string uid = "11111111-2222-4333-a444-555555555555";
+        const auto hello = EditorModCommandId("EditorModApiTest", "hello");
+        const auto broken = EditorModCommandId("EditorModApiTest", "broken");
+        if (mEditorModTestFrames > 150) {
+          // The second stage, 60 frames on: what the panels did, the menu entries, then the failing command
+          // (`/editormodtest panels` stops before it, the panels left drawing for a capture).
+          fa::vector<fa::string> what;
+          const bool panelsOnly =
+            moho::CFG_GetArgOption("/editormodtest", 1, &what) && !what.empty() && what[0] == "panels";
+          if (mEditorModTestFrames < 210) {
+            return;
+          }
+          mEditorModTestDone = true;
+          mEditorModTestDone = true;
+          for (const EdModHost::ModPanel& panel : host.Panels()) {
+            gpg::Logf(
+              "editor: editor mod test: panel %s (%s): %s, %s",
+              panel.id.c_str(),
+              panel.title.c_str(),
+              panel.shown ? "shown" : "hidden",
+              panel.error.empty() ? "drawing" : ("stopped: " + panel.error).c_str()
+            );
+          }
+          for (const EdModHost::ModMenu& entry : host.MenuEntries()) {
+            gpg::Logf(
+              "editor: editor mod test: menu entry %s (%s), command %s",
+              entry.label.c_str(),
+              entry.command.c_str(),
+              mCommands.Find(entry.command) != nullptr ? "found" : "missing"
+            );
+          }
+          if (panelsOnly) {
+            return;
+          }
+          gpg::Logf(
+            "editor: editor mod test: run broken: %s", mCommands.Run(broken) ? "ran" : mCommands.WhyNot(broken).c_str()
+          );
+          gpg::Logf(
+            "editor: editor mod test: hello now: %s",
+            mCommands.WhyNot(hello).empty() ? "can run" : mCommands.WhyNot(hello).c_str()
+          );
+          const bool undone = mCommands.Run("edit.undo");
+          gpg::Logf(
+            "editor: editor mod test: undo the mod's marker: %s, markers %zu",
+            undone ? "ran" : mCommands.WhyNot("edit.undo").c_str(),
+            mDocument.SaveData().Markers().size()
+          );
+          (void)host.SetEnabled(uid, false);
+          return;
+        }
         mShell->SwitchWorkspace(7);
         mShell->HideHome();
         mShell->ShowEditorMods();
-        EdModHost& host = mShell->ModHost();
         for (const auto& mod : host.Mods()) {
           gpg::Logf(
             "editor: editor mod test: found %s (%s), api %d, %s",
@@ -2998,26 +3047,25 @@ namespace faf::editor
             mod->running ? "running" : ("not running: " + mod->error).c_str()
           );
         }
-        const std::string uid = "11111111-2222-4333-a444-555555555555";
         (void)host.SetEnabled(uid, true);
-        const auto hello = EditorModCommandId("EditorModApiTest", "hello");
-        const auto broken = EditorModCommandId("EditorModApiTest", "broken");
         gpg::Logf(
           "editor: editor mod test: %s in the registry: %s",
           hello.c_str(),
           mCommands.Find(hello) != nullptr ? "yes" : "no"
         );
+        gpg::Logf("editor: editor mod test: markers before %zu", mDocument.SaveData().Markers().size());
         gpg::Logf(
           "editor: editor mod test: run hello: %s", mCommands.Run(hello) ? "ran" : mCommands.WhyNot(hello).c_str()
         );
-        gpg::Logf(
-          "editor: editor mod test: run broken: %s", mCommands.Run(broken) ? "ran" : mCommands.WhyNot(broken).c_str()
-        );
-        gpg::Logf(
-          "editor: editor mod test: hello now: %s",
-          mCommands.WhyNot(hello).empty() ? "can run" : mCommands.WhyNot(hello).c_str()
-        );
-        (void)host.SetEnabled(uid, false);
+        // Both panels shown through their commands; they draw over the next 60 frames.
+        for (const char* const id : {"panel.probe", "panel.bad"}) {
+          const std::string full = EditorModCommandId("EditorModApiTest", id);
+          gpg::Logf(
+            "editor: editor mod test: show %s: %s",
+            full.c_str(),
+            mCommands.Run(full) ? "ran" : mCommands.WhyNot(full).c_str()
+          );
+        }
       }
       /**
        * `/unitviewtest` (test runs): a project EditorViewTest with xel0301 derived from uel0201; the unit viewer shows
@@ -6153,6 +6201,25 @@ namespace faf::editor
         }
         return items;
       };
+      // Window > From editor mods: the entries and panels the running editor mods added.
+      EdMenuItem modEntries;
+      modEntries.label = "From editor &mods";
+      modEntries.provider = [this] {
+        std::vector<EdMenuItem> items;
+        for (const EdModHost::ModMenu& entry : mShell->ModHost().MenuEntries()) {
+          EdMenuItem item;
+          item.command = entry.command;
+          item.label = entry.label;
+          items.push_back(std::move(item));
+        }
+        if (items.empty()) {
+          EdMenuItem none;
+          none.command = "window.editormods";
+          none.label = "No editor mod added one (Editor mods...)";
+          items.push_back(std::move(none));
+        }
+        return items;
+      };
       EdMenuItem playMaps;
       playMaps.label = "&Map";
       playMaps.provider = [this] {
@@ -6301,6 +6368,7 @@ namespace faf::editor
               cmd("window.modproject"),
               cmd("window.editormods")}
            },
+           modEntries,
            cmd("window.assets"),
            cmd("view.script")}
         },

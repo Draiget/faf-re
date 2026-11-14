@@ -558,6 +558,7 @@ namespace faf::editor
       if (mShowEditorMods) {
         mModHost.Draw(mShowEditorMods);
       }
+      mModHost.DrawPanels();
       if (mShowUnitViewer) {
         mUnitViewer.Draw(mShowUnitViewer);
       }

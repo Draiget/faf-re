@@ -22,9 +22,13 @@ namespace faf::editor
    * Runs the turned-on editor mods: each one's `editor/commands.lua` in a Lua state of its own (Lua's base library
    * without its file loading, and the `Editor` table), whose `Editor.Command(id, title, fn [, keys])` adds a command to
    * the editor (palette, keys; id `mod.<mod>.<id>`). The `Editor` table also has `Log(text)`, `Run(commandId)` (one of
-   * the editor's commands; false when it can't run) and `Map()` (the open map: `{ path = ... }`, or nil), and
-   * `ApiVersion`. A command that raises an error is reported with its mod's name and turns that mod's commands off
-   * until the editor starts again.
+   * the editor's commands; false when it can't run), `Map()` (the open map: path, name, size, water, counts; or nil),
+   * `HeightAt(x, z)`, `Markers()`, `AddMarker(type, x, z)` (one undo step), `Panel(id, title, draw)` (a panel drawn
+   * each frame by `draw(ui)`, `ui` holding Text, Note, Button, Checkbox, Slider, Input, Separator, SameLine, Tooltip),
+   * `Menu(commandId [, label])` (an entry under Window > From editor mods), `Has(point [, version])`, `Capabilities`
+   * and `ApiVersion` (FAF Studio's extension points, on this editor). A command that raises an error is reported with
+   * its mod's name and turns that mod off until the editor starts again; a panel that raises stops drawing and says
+   * why.
    */
   class EdModHost
   {
@@ -54,6 +58,24 @@ namespace faf::editor
       std::vector<int> refs;             // their functions in its registry
       std::string error;                 // why it isn't running ("" while it is)
       bool running = false;
+      int uiRef = -1; // the `ui` table its panels draw with, in its registry
+    };
+    /** A mod's panel: its draw function, shown or not (its command toggles it), why it stopped. */
+    struct ModPanel
+    {
+      Mod* mod = nullptr;
+      std::string id;
+      std::string title;
+      int ref = -1;
+      bool shown = false;
+      std::string error;
+    };
+    /** A mod's menu entry: a command id and its label ("" for the command's title). */
+    struct ModMenu
+    {
+      Mod* mod = nullptr;
+      std::string command;
+      std::string label;
     };
     [[nodiscard]] const std::vector<std::unique_ptr<Mod>>& Mods() const noexcept
     {
@@ -62,24 +84,45 @@ namespace faf::editor
 
     // The Lua side (static functions find their mod through an upvalue).
     void AddCommand(Mod& mod, const std::string& id, const std::string& title, const std::string& keys, int ref);
+    void AddPanel(Mod& mod, const std::string& id, const std::string& title, int ref);
+    void AddMenu(Mod& mod, const std::string& command, const std::string& label);
+    /** Each frame: the shown panels of the running mods. */
+    void DrawPanels();
+    /** The menu entries the running mods asked for, and their panels' show commands. */
+    [[nodiscard]] std::vector<ModMenu> MenuEntries() const;
+    [[nodiscard]] const std::vector<ModPanel>& Panels() const noexcept
+    {
+      return mPanels;
+    }
     bool RunCommand(const std::string& id);
     void Fail(Mod& mod, const std::string& what);
     [[nodiscard]] EdDocument& Document() noexcept
     {
       return mDocument;
     }
+    /** The mod whose commands.lua is running now (panels and menu entries are added only then). */
+    [[nodiscard]] const Mod* Loading() const noexcept
+    {
+      return mLoading;
+    }
 
   private:
     void Start(Mod& mod);
     void Stop(Mod& mod, const std::string& why);
     void SaveEnabled();
+    void DropRetired();
 
     EdDocument& mDocument;
     EdCommands* mCommands = nullptr;
     std::vector<std::unique_ptr<Mod>> mMods;
+    std::vector<ModPanel> mPanels;
+    std::vector<ModMenu> mMenus;
     std::set<std::string> mEnabled;
     std::filesystem::path mEnabledFile;
     std::filesystem::path mFolder;
     int mRunDepth = 0;
+    /** Lua states of mods that stopped while their own code was running, freed once it has returned. */
+    std::vector<std::unique_ptr<LuaPlus::LuaState>> mRetired;
+    Mod* mLoading = nullptr;
   };
 } // namespace faf::editor
