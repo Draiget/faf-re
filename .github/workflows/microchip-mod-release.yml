@@ -1,0 +1,68 @@
+name: Microchip mod releases
+on:
+  push:
+    branches: [codex/microchip-mods]
+    paths: ['.github/workflows/microchip-mod-release.yml', 'tools/mod-release/**', 'mods/**']
+    tags: ['chat-mention-v*', 'client-test-v*', 'eco-sharing-v*', 'logo-stamps-v*', 'connectivity-v*', 'icon-mod-v*', 'offline-chat-v*', 'team-colours-v*']
+permissions:
+  contents: read
+concurrency:
+  group: microchip-mod-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  package:
+    if: github.repository == 'comsci20-lab/faf-re'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Test release packaging
+        run: python -m unittest discover -s tools/mod-release -p 'test_*.py' -v
+      - name: Build and verify installation ZIPs
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+          REF_TYPE: ${{ github.ref_type }}
+        shell: bash
+        run: |
+          if [[ "$REF_TYPE" == "tag" ]]; then
+            python tools/mod-release/package.py --tag "$RELEASE_TAG" --output dist/mods
+          else
+            python tools/mod-release/package.py --all --output dist/mods
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: microchip-mod-packages
+          path: dist/mods/
+          if-no-files-found: error
+          retention-days: 7
+  publish:
+    if: github.ref_type == 'tag'
+    needs: package
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: microchip-mod-packages
+          path: dist/mods
+      - name: Publish this mod version
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        shell: bash
+        run: |
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release exists. Publish a new mod version instead of replacing its files."
+            exit 1
+          fi
+          TITLE=$(python -c 'import json; print(json.load(open("dist/mods/release.json"))["title"])')
+          gh release create "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --verify-tag \
+            --title "$TITLE" --notes-file dist/mods/release-notes.md --latest=false \
+            dist/mods/*.zip dist/mods/*.sha256
