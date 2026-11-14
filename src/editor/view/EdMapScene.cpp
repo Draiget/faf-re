@@ -1,4 +1,6 @@
 #include "editor/view/EdMapScene.h"
+
+#include "editor/tools/EdSymmetrize.h"
 #include "editor/tools/EdShaderProfiles.h"
 #include "editor/doc/EdLighting.h"
 #include "editor/tools/EdGroundKind.h"
@@ -5219,6 +5221,14 @@ namespace faf::editor
         mapping.turns
       );
       out.externalKey = key;
+      // The Layout workspace's drawing and the editor's symmetry, for the Map layout nodes.
+      const HeightBrush brush = mTools->CurrentHeightBrush();
+      const char* const mode = SymmetryOpModeName(brush.symmetry);
+      out.layout = &mDocument.Layout();
+      out.layoutSymmetry = mode != nullptr ? mode : "";
+      out.layoutTurns = brush.turns;
+      out.layoutKey =
+        std::to_string(mDocument.Layout().revision) + "|" + out.layoutSymmetry + "|" + std::to_string(brush.turns);
       const int width = field->width;
       const int height = field->height;
       out.loadExternal =

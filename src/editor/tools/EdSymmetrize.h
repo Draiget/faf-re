@@ -40,6 +40,9 @@ namespace faf::editor
     float centreZ = -1.0f;
   };
 
+  /** The `symmetrize` op's mode for a symmetry (mirror_x, rot2, rotn ...); null for none. */
+  [[nodiscard]] const char* SymmetryOpModeName(Symmetry symmetry);
+
   /** How many parts a symmetry splits a map into (1 for none). */
   [[nodiscard]] int SymmetryParts(Symmetry symmetry, int turns);
 

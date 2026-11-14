@@ -249,6 +249,7 @@ namespace faf::editor
     std::string symmetry;
     float cx = 0.0f;
     float cz = 0.0f;
+    int turns = 3; // rotn: the number of turns
   };
 
   /**

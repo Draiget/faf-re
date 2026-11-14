@@ -1434,6 +1434,7 @@ namespace faf::editor
       sym.p.num["seam"] = 12;
       sym.p.num["cx"] = options.cx;
       sym.p.num["cz"] = options.cz;
+      sym.p.num["n"] = std::clamp(options.turns, 2, 16);
       h = ops.Run("symmetrize", sym);
     }
     if (h == nullptr) {

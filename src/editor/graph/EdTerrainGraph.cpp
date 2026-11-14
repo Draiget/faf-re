@@ -405,6 +405,10 @@ namespace faf::editor
       if (node->type->name == "pad_flatten") {
         key += "|pads" + ground.padSignature;
       }
+      if (node->type->name.rfind("layout_", 0) == 0) {
+        // The drawing (its revision) and the editor's symmetry: a stroke on the canvas runs the node again.
+        key += "|layout" + ground.layoutKey;
+      }
       if (node->type->name == "external_terrain") {
         // The window's file and mapping, or the node's own file's stamp: a new save of the other tool runs it again.
         key += "|ext" + ground.externalKey;

@@ -221,4 +221,10 @@ namespace faf::editor
     }
     return true;
   }
+  const char* SymmetryOpModeName(
+    const Symmetry symmetry
+  )
+  {
+    return OpMode(symmetry);
+  }
 } // namespace faf::editor

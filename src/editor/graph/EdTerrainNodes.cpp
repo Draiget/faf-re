@@ -3843,40 +3843,87 @@ namespace faf::editor::terrain
         return One(E.Const(0.0));
       }
       );
-      const auto noLayout = [](const Env&, const Values&, const Inputs&) -> Outputs {
-        Fail("this editor has no map layout yet (the Layout canvas comes later)");
+      const auto layoutOf = [](const Env& E) -> const MapLayout& {
+        if (E.ground == nullptr || E.ground->layout == nullptr) {
+          Fail("no map layout: open a map and draw it in the Layout workspace");
+        }
+        return *E.ground->layout;
       };
       c.Add(
         "layout_height",
         "Map layout: heights",
         "sources",
-        "The height field the Layout workspace makes from the layers drawn on its canvas (not in this editor yet).",
+        "The height field the Layout workspace makes from the layers drawn on its canvas (hills, mountains, plateaus, "
+        "water, valleys, flat ground, bases), at the graph's resolution, with the layout's ground height and water "
+        "level. Carry on with it like any generator: erosion, texturing, props. With Apply the editor symmetry the "
+        "result is made symmetric as Generate terrain makes it. Weathering is kept for Studio's graphs but not applied "
+        "yet.",
         {},
         kHeightOut,
         {N("weather", "Weathering (gullies)", 0, 1, 0.05f, "%.2f", 0), B("sym", "Apply the editor symmetry", true)},
-        noLayout
+        [layoutOf](const Env& E, const Values& v, const Inputs&) {
+        const MapLayout& layout = layoutOf(E);
+        LayoutBuildOptions options;
+        if (v.B("sym")) {
+          options.symmetry = E.ground->layoutSymmetry;
+          options.turns = E.ground->layoutTurns;
+          options.cx = E.W * 0.5f;
+          options.cz = E.H * 0.5f;
+        }
+        auto out = std::make_shared<field::Grid>();
+        std::string error;
+        if (!BuildLayout(layout, *E.like, options, *out, nullptr, error)) {
+          Fail(error);
+        }
+        return One(out);
+      }
       );
       c.Add(
         "layout_mask",
         "Map layout: layer mask",
         "sources",
-        "The mask of one layer of the layout (not in this editor yet).",
+        "The mask of one layer of the layout: 1 where it is drawn, 0 where it isn't, as soft as the layer's own soft "
+        "edge (Layer counts the layers of the list from 1, bottom up). A region for erosion, texturing or scatter; a "
+        "Free mask layer is drawn for exactly that.",
         {},
         kMaskOut,
         {N("layer", "Layer (its number in the list)", 1, 16, 1, "%.0f", 1),
          B("soft", "Use the soft edge of the layer", true)},
-        noLayout
+        [layoutOf](const Env& E, const Values& v, const Inputs&) {
+        const MapLayout& layout = layoutOf(E);
+        const int index = static_cast<int>(std::lround(v.N("layer"))) - 1;
+        auto out = std::make_shared<field::Grid>();
+        std::string error;
+        if (!LayoutLayerMask(layout, *E.like, index, v.B("soft"), *out, error)) {
+          Fail(error);
+        }
+        return One(out);
+      }
       );
       c.Add(
         "layout_bases",
         "Map layout: bases",
         "sources",
-        "The bases drawn on Base layers as a mask and their number (not in this editor yet).",
+        "The bases drawn on layers of the kind Base: a mask with a disc around the centre of each blob, and the number "
+        "of bases (players) as a number.",
         {},
         {Pin("out", PinType::Mask), Pin("count", PinType::Number)},
         {N("radius", "Disc radius (units)", 2, 200, 1, "%.0f", 30),
          N("edge", "Soft edge (units)", 0, 100, 1, "%.0f", 12)},
-        noLayout
+        [layoutOf](const Env& E, const Values& v, const Inputs&) {
+        const std::vector<LayoutBase> bases = layoutOf(E).BaseCentres();
+        std::vector<double> pts;
+        for (const LayoutBase& base : bases) {
+          pts.insert(pts.end(), {base.x, base.z, v.N("radius"), 1.0});
+        }
+        Outputs out;
+        out["out"].grid = bases.empty()
+          ? E.Const(0.0)
+          : E.Op("points_mask", {{"like", E.like}, {"pts", pts}, {"feather", v.N("edge")}});
+        out["count"].number = static_cast<double>(bases.size());
+        out["count"].isNumber = true;
+        return out;
+      }
       );
     }
 

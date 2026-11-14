@@ -1,5 +1,6 @@
 #pragma once
 
+#include "editor/tools/EdMapLayout.h"
 #include "editor/graph/EdNodeGraph.h"
 #include "editor/terrain/EdFieldCore.h"
 #include "editor/tools/EdRecipes.h"
@@ -98,6 +99,14 @@ namespace faf::editor
      */
     std::function<bool(const std::string& file, field::Grid& out, std::string& error)> loadExternal;
     std::string externalKey;
+    /**
+     * The Layout workspace's drawing (null: none) for the Map layout nodes, a key that changes with it and the editor's
+     * symmetry, and that symmetry as the symmetrize op's mode ("" none) about the map's middle.
+     */
+    const MapLayout* layout = nullptr;
+    std::string layoutKey;
+    std::string layoutSymmetry;
+    int layoutTurns = 3;
   };
 
   /** The eight kinds of ground by the names graph files use, bottom to top, with their roughness (0 shiny .. 1 rough).

@@ -2522,6 +2522,44 @@ namespace faf::editor
         }(),
           mDocument.Armies().size()
         );
+        // `/layouttest graph`: the Duel drawn, then Studio's layout_terrain graph built from it in the Generate
+        // workspace (its Map layout nodes read the drawing), its node errors, undo.
+        if (std::string(arg[0].c_str()) == "graph") {
+          EdGenerate& generate = mShell->Generate();
+          for (const auto& [id, error] : generate.LastReport().errors) {
+            gpg::Logf("editor: layout test: node %d: %s", id, error.c_str());
+          }
+          switch (mLayoutTestStage) {
+          case 0:
+            mShell->SwitchWorkspace(3);
+            mShell->HideHome();
+            mShell->ShowLayout();
+            (void)mShell->LayoutPanel().ApplyTemplate("duel");
+            break;
+          case 1:
+            mShell->SwitchWorkspace(4);
+            mShell->ShowGenerate();
+            gpg::Logf(
+              "editor: layout test: graph layout_terrain %s",
+              generate.OpenShipped("layout_terrain") ? "opened" : "missing"
+            );
+            break;
+          case 2:
+            generate.AskBuild();
+            break;
+          case 3:
+            gpg::Logf(
+              "editor: layout test: %d nodes ran; undo %s",
+              generate.LastReport().evaluated,
+              mScene.Undo() ? "took a step back" : "had nothing"
+            );
+            break;
+          default:
+            break;
+          }
+          ++mLayoutTestStage;
+          return;
+        }
         // `/layouttest starts`: Preview, Place markers, undo, redo, Place markers again (the old ones replaced).
         if (std::string(arg[0].c_str()) == "starts") {
           EdLayoutPanel& panel = mShell->LayoutPanel();

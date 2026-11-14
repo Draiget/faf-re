@@ -25,6 +25,9 @@ namespace
   using faf::editor::TerrainGround;
   using faf::editor::TerrainNodeTypes;
   using faf::editor::TerrainRun;
+  using faf::editor::LayoutKind;
+  using faf::editor::MapLayout;
+  using faf::editor::TerrainReport;
   namespace field = faf::editor::field;
 
   std::string ReadFile(
@@ -622,6 +625,67 @@ namespace
     const int layout = graph.AddNode("layout_height", 0, 400);
     (void)run.Evaluate(graph, 1, ground);
     EXPECT_NE(run.Error(layout).find("no map layout"), std::string::npos) << run.Error(layout);
+  }
+
+  TEST(
+    TerrainGraph,
+    LayoutNodesFollowTheDrawing
+  )
+  {
+    // A drawing over the 128-unit map: a hill and a base on it, cells of 2 units.
+    MapLayout layout;
+    layout.New(64, 0.0f, 0.0f, 128.0f, 128.0f);
+    int hills = -1;
+    int base = -1;
+    for (std::size_t i = 0; i < layout.Layers().size(); ++i) {
+      hills = layout.Layers()[i].kind == LayoutKind::Hills && hills < 0 ? static_cast<int>(i) : hills;
+      base = layout.Layers()[i].kind == LayoutKind::Base ? static_cast<int>(i) : base;
+    }
+    ASSERT_GE(hills, 0);
+    ASSERT_GE(base, 0);
+    layout.FillEllipse(hills, 4.0f, 4.0f, 40.0f, 40.0f, 1.0f, false); // around (44, 44)
+    layout.Dab(base, 48.0f, 16.0f, 7.0f, 1.0f, 1.0f, false);          // a base at (96, 32)
+    TerrainGround ground = Ground();
+    ground.layout = &layout;
+    ground.layoutKey = "1";
+    NodeGraph graph(TerrainNodeTypes());
+    const int heights = graph.AddNode("layout_height", 0, 0);
+    const int mask = graph.AddNode("layout_mask", 0, 200);
+    const int bases = graph.AddNode("layout_bases", 0, 400);
+    ParamValue layer;
+    layer.value[0] = static_cast<float>(base + 1);
+    graph.SetParam(mask, ParamOf(*graph.Find(mask)->type, "layer"), layer);
+    ParamValue plain;
+    plain.value[0] = 0.0f;
+    graph.SetParam(mask, ParamOf(*graph.Find(mask)->type, "soft"), plain);
+    TerrainRun run(4);
+    TerrainReport report = run.Evaluate(graph, 1, ground);
+    ASSERT_TRUE(report.errors.empty()) << report.errors.begin()->second;
+    const field::Grid& h = *run.Value(heights, "out")->grid;
+    EXPECT_GT(field::SampleWorld(h, 44.0f, 44.0f), layout.base + 3.0f) << "the hill";
+    EXPECT_NEAR(field::SampleWorld(h, 96.0f, 32.0f), layout.base, 1.5f) << "the base levels the ground";
+    EXPECT_NEAR(field::SampleWorld(h, 110.0f, 110.0f), layout.base, 0.01f) << "nothing drawn: the ground height";
+    EXPECT_GT(field::SampleWorld(*run.Value(mask, "out")->grid, 96.0f, 32.0f), 0.99f);
+    EXPECT_LT(field::SampleWorld(*run.Value(mask, "out")->grid, 44.0f, 44.0f), 0.01f);
+    EXPECT_EQ(run.Value(bases, "count")->number, 1.0);
+    EXPECT_GT(field::SampleWorld(*run.Value(bases, "out")->grid, 96.0f, 32.0f), 0.99f);
+    // Unchanged: kept. A second base drawn (the drawing's key changes): run again.
+    report = run.Evaluate(graph, 1, ground);
+    EXPECT_EQ(report.evaluated, 0);
+    layout.Dab(base, 16.0f, 48.0f, 7.0f, 1.0f, 1.0f, false);
+    ground.layoutKey = "2";
+    report = run.Evaluate(graph, 1, ground);
+    EXPECT_EQ(report.evaluated, 3);
+    EXPECT_EQ(run.Value(bases, "count")->number, 2.0);
+    // A layer the list doesn't have; no drawing at all.
+    layer.value[0] = 12.0f;
+    graph.SetParam(mask, ParamOf(*graph.Find(mask)->type, "layer"), layer);
+    (void)run.Evaluate(graph, 1, ground);
+    EXPECT_NE(run.Error(mask).find("no layer 12"), std::string::npos) << run.Error(mask);
+    ground.layout = nullptr;
+    ground.layoutKey = "none";
+    (void)run.Evaluate(graph, 1, ground);
+    EXPECT_NE(run.Error(heights).find("no map layout"), std::string::npos) << run.Error(heights);
   }
 
   TEST(
