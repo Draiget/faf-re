@@ -1,4 +1,6 @@
 #include "editor/EdLog.h"
+
+#include <cstring>
 #include "editor/ui/EdControls.h"
 
 #include <cstdio>
@@ -74,6 +76,10 @@ namespace faf::editor
     if (mLines.size() > kMaxLines) {
       mLines.pop_front();
     }
+    static constexpr char kTrace[] = "EDMISSION trace ";
+    if (std::strncmp(message.c_str(), kTrace, sizeof(kTrace) - 1) == 0 && mMissionTrace.size() < 5000) {
+      mMissionTrace.emplace_back(message.c_str() + sizeof(kTrace) - 1);
+    }
     if (level == gpg::LogSeverity::Warn) {
       ++mWarnings;
       if (mCapturing && mCaptured.size() < 500) {
@@ -144,5 +150,12 @@ namespace faf::editor
       }
     }
     ImGui::EndChild();
+  }
+  std::vector<std::string> EdLog::TakeMissionTrace()
+  {
+    const std::lock_guard<std::mutex> lock(mMutex);
+    std::vector<std::string> out;
+    out.swap(mMissionTrace);
+    return out;
   }
 } // namespace faf::editor

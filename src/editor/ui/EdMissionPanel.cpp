@@ -270,6 +270,10 @@ namespace faf::editor
     const bool mapOpen
   )
   {
+    if (mFocusStages) {
+      mFocusStages = false;
+      ImGui::SetNextWindowFocus();
+    }
     if (!ImGui::Begin(Panel("Stages###MissionStages"), &open)) {
       ImGui::End();
       return;
@@ -543,6 +547,134 @@ namespace faf::editor
       dialogue.lines.push_back({"", "", 5.0});
       Edited(std::move(before));
     }
+    ImGui::End();
+  }
+  void EdMissionPanel::DrawRunPanel(
+    bool& open,
+    const bool mapOpen,
+    const bool playing,
+    const std::vector<std::string>& newTrace
+  )
+  {
+    // A new play starts a new trace.
+    if (playing && !mWasPlaying) {
+      mTrace.clear();
+    }
+    mWasPlaying = playing;
+    mTrace.insert(mTrace.end(), newTrace.begin(), newTrace.end());
+    if (mTrace.size() > 2000) {
+      mTrace.erase(mTrace.begin(), mTrace.begin() + static_cast<std::ptrdiff_t>(mTrace.size() - 2000));
+    }
+    if (!ImGui::Begin(Panel("Run###MissionRun"), &open)) {
+      ImGui::End();
+      return;
+    }
+    if (!mapOpen) {
+      ImGui::TextDisabled("Open a map to run its mission.");
+      ImGui::End();
+      return;
+    }
+    Mission& m = mDocument.EditMission();
+    // Where the play is: the last stage entered.
+    int current = 0;
+    for (auto it = mTrace.rbegin(); it != mTrace.rend(); ++it) {
+      MissionTraceId id;
+      if (ParseMissionTrace(*it, id) && id.section.empty()) {
+        current = id.stage;
+        break;
+      }
+    }
+    if (playing) {
+      ImGui::Text(
+        "Playing: %s", current > 0 ? ("stage " + std::to_string(current)).c_str() : "the mission hasn't started"
+      );
+    } else {
+      ImGui::TextDisabled(mTrace.empty() ? "No play yet." : "The last play's trace:");
+    }
+    // Play from a stage.
+    const int stages = static_cast<int>(m.stages.size());
+    int start = std::clamp(mDocument.PlayStartStage(), 1, std::max(1, stages));
+    ImGui::BeginDisabled(playing || stages == 0);
+    ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x * 0.45f);
+    if (EdBeginCombo("##startstage", ("Stage " + std::to_string(start)).c_str())) {
+      for (int i = 1; i <= stages; ++i) {
+        const std::string label = std::to_string(i) + "  " + m.stages[static_cast<std::size_t>(i - 1)].name;
+        if (ImGui::Selectable(label.c_str(), i == start)) {
+          start = i;
+          mDocument.SetPlayStartStage(i);
+        }
+      }
+      ImGui::EndCombo();
+    }
+    ImGui::SameLine();
+    if (ImGui::Button(ICON_PLAY " Play from this stage")) {
+      mDocument.SetPlayStartStage(start);
+      mPlayAsked = true;
+    }
+    ImGui::EndDisabled();
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+      ImGui::SetTooltip(
+        "Plays the open map with its mission from a copy (test run: every node traced here), starting at "
+        "the chosen stage"
+      );
+    }
+    ImGui::Separator();
+    // The trace, newest last; a click selects the node in Stages.
+    ImGui::BeginChild("##trace", ImVec2(0.0f, 0.0f), false);
+    for (std::size_t k = 0; k < mTrace.size(); ++k) {
+      MissionTraceId id;
+      if (!ParseMissionTrace(mTrace[k], id)) {
+        continue;
+      }
+      std::string text;
+      if (id.section.empty()) {
+        text = "stage " + std::to_string(id.stage) + " entered";
+      } else {
+        std::string title = "a node";
+        if (id.stage >= 1 && id.stage <= stages) {
+          const MissionStage& stage = m.stages[static_cast<std::size_t>(id.stage - 1)];
+          const std::vector<MissionNode>* list = id.section == "enter" ? &stage.enter : &stage.ready;
+          const MissionNode* node = nullptr;
+          for (const int i : id.path) {
+            if (list == nullptr || i < 1 || i > static_cast<int>(list->size())) {
+              node = nullptr;
+              break;
+            }
+            node = &(*list)[static_cast<std::size_t>(i - 1)];
+            list = &node->children;
+          }
+          if (node != nullptr) {
+            const MissionNodeType* t = FindMissionNodeType(node->type);
+            title = t != nullptr ? t->title : node->type;
+          }
+        }
+        text = "  " + std::to_string(id.stage) + " " + (id.section == "enter" ? "start" : "then") + ": " + title +
+          (id.mark == '!'     ? "  (its trigger fired)"
+             : id.mark == '~' ? "  (dropped: the stage had moved on)"
+                              : "");
+      }
+      ImGui::PushID(static_cast<int>(k));
+      if (id.mark == '~') {
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.75f, 0.35f, 1.0f));
+      }
+      if (ImGui::Selectable(text.c_str(), false) && id.stage >= 1 && id.stage <= stages) {
+        mStage = id.stage - 1;
+        mSection = id.section == "enter" ? 0 : 1;
+        mPath.clear();
+        for (const int i : id.path) {
+          mPath.push_back(i - 1);
+        }
+        mFocusStages = true;
+      }
+      if (id.mark == '~') {
+        ImGui::PopStyleColor();
+      }
+      ImGui::PopID();
+    }
+    if (playing && ImGui::GetScrollY() >= ImGui::GetScrollMaxY() - 4.0f) {
+      ImGui::SetScrollHereY(1.0f);
+    }
+    ImGui::EndChild();
     ImGui::End();
   }
 } // namespace faf::editor

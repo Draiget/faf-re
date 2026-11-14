@@ -227,4 +227,34 @@ namespace faf::editor
     EXPECT_EQ(SaveMission(Mission{}), "");
     EXPECT_FALSE(LoadMission("{}", back, error));
   }
+
+  TEST(
+    Mission,
+    ATestRunStartsAtAStageAndItsTraceReadsBack
+  )
+  {
+    MissionCompileOptions o;
+    o.test = true;
+    o.startStage = 2;
+    EXPECT_TRUE(Has(CompileMission(TwoStages(), o), "Stage[ScenarioInfo.EditorStartStage or 2]()"));
+    o.startStage = 9;
+    EXPECT_TRUE(Has(CompileMission(TwoStages(), o), "Stage[ScenarioInfo.EditorStartStage or 2]()"))
+      << "the last at most";
+    o.test = false;
+    EXPECT_TRUE(Has(CompileMission(TwoStages(), o), "    Stage[1]()")) << "a saved map starts at the first";
+    MissionTraceId id;
+    ASSERT_TRUE(ParseMissionTrace("stage.3", id));
+    EXPECT_EQ(id.stage, 3);
+    EXPECT_TRUE(id.section.empty());
+    ASSERT_TRUE(ParseMissionTrace("2.ready.4.1!", id));
+    EXPECT_EQ(id.stage, 2);
+    EXPECT_EQ(id.section, "ready");
+    EXPECT_EQ(id.path, (std::vector<int>{4, 1}));
+    EXPECT_EQ(id.mark, '!');
+    ASSERT_TRUE(ParseMissionTrace("1.enter.2~\r", id));
+    EXPECT_EQ(id.mark, '~');
+    EXPECT_FALSE(ParseMissionTrace("1.middle.2", id));
+    EXPECT_FALSE(ParseMissionTrace("nonsense", id));
+    EXPECT_FALSE(ParseMissionTrace("1.enter.0", id));
+  }
 } // namespace faf::editor

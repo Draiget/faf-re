@@ -152,6 +152,7 @@ namespace faf::editor
     bool withEntry = true; // OnPopulate / OnStart (a script that has its own gets EditorMissionStart only)
     bool test = false;     // a test run: traces (EdTrace), the run state, start at any stage
     bool hasArea1 = false; // OnPopulate sets the playable area AREA_1
+    int startStage = 1;    // a test run starts here (ScenarioInfo.EditorStartStage overrides it)
     LuaCompiles compiles;
   };
 
@@ -161,6 +162,19 @@ namespace faf::editor
     const MissionCompileOptions& options,
     std::vector<MissionProblem>* problems = nullptr
   );
+
+  /**
+   * A trace id of a test play: `stage.<n>` (a stage entered) or `<stage>.<section>.<path>` with `!` (a trigger's
+   * callback ran) or `~` (it was dropped: its stage had moved on) at the end. `path` is 1-based through the children.
+   */
+  struct MissionTraceId
+  {
+    int stage = 0;
+    std::string section; // empty: the stage itself
+    std::vector<int> path;
+    char mark = 0; // 0, '!' or '~'
+  };
+  bool ParseMissionTrace(const std::string& id, MissionTraceId& out);
 
   /** The region's hash (Studio's: Adler-like sums, two five-digit numbers). */
   [[nodiscard]] std::string MissionHash(const std::string& text);

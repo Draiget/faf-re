@@ -2749,6 +2749,7 @@ namespace faf::editor
   {
     MissionCompileOptions options;
     options.test = test;
+    options.startStage = test ? mPlayStartStage : 1;
     options.compiles = MissionCompiler();
     for (const SaveEntry& area : mSave.Areas()) {
       options.hasArea1 = options.hasArea1 || area.name == "AREA_1";

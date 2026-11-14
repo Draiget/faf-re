@@ -24,6 +24,22 @@ namespace faf::editor
     explicit EdMissionPanel(EdDocument& document);
     void DrawStagesPanel(bool& open, bool mapOpen);
     void DrawStringsPanel(bool& open, bool mapOpen);
+    /**
+     * Run: a test play's progress (the stage it is in, the nodes it reached, a trigger dropped because its stage had
+     * moved on), each entry a jump to its node in Stages; Play from a stage.
+     */
+    void DrawRunPanel(bool& open, bool mapOpen, bool playing, const std::vector<std::string>& newTrace);
+    /** Play from a stage was pressed (the shell starts the open map). */
+    [[nodiscard]] bool TakePlayAsk() noexcept
+    {
+      const bool asked = mPlayAsked;
+      mPlayAsked = false;
+      return asked;
+    }
+    [[nodiscard]] std::size_t TraceCount() const noexcept
+    {
+      return mTrace.size();
+    }
 
   private:
     /** An edit made now (a button): `before` is the mission as it was. */
@@ -41,5 +57,9 @@ namespace faf::editor
     std::vector<int> mPath; // the selected node (0-based through the children); empty: none
     int mDialogue = 0;
     std::optional<Mission> mFieldBefore; // a text field being typed in: the mission before it
+    std::vector<std::string> mTrace;
+    bool mWasPlaying = false;
+    bool mPlayAsked = false;
+    bool mFocusStages = false;
   };
 } // namespace faf::editor

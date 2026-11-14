@@ -447,6 +447,17 @@ namespace faf::editor
     /** A change to the mission as one undo step: `before` is how it was. */
     void MissionEdited(faf::editor::Mission before);
     bool UndoMission(bool redo);
+    /** The stage a play's test run starts at (1: the first). */
+    void SetPlayStartStage(
+      const int stage
+    ) noexcept
+    {
+      mPlayStartStage = std::max(1, stage);
+    }
+    [[nodiscard]] int PlayStartStage() const noexcept
+    {
+      return mPlayStartStage;
+    }
     [[nodiscard]] std::filesystem::path MissionFile() const;
     /** Whether Lua text compiles in the document's Lua (the mission compiler's checks). */
     [[nodiscard]] LuaCompiles MissionCompiler() const;
@@ -950,6 +961,7 @@ namespace faf::editor
     std::vector<std::pair<faf::editor::Mission, faf::editor::Mission>> mMissionUndo;
     std::vector<std::pair<faf::editor::Mission, faf::editor::Mission>> mMissionRedo;
     bool mCopyTestMission = false; // WriteFolderCopy writes the test run's mission (a play copy)
+    int mPlayStartStage = 1;
     void LoadMissionFile();
     std::vector<LayoutEdit> mLayoutUndo;
     std::vector<LayoutEdit> mLayoutRedo;

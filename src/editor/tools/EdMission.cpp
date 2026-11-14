@@ -1669,6 +1669,42 @@ namespace faf::editor
     return c;
   }
 
+  bool ParseMissionTrace(
+    const std::string& id,
+    MissionTraceId& out
+  )
+  {
+    out = MissionTraceId{};
+    std::string text = id;
+    while (!text.empty() && (text.back() == ' ' || text.back() == '\r' || text.back() == '\n')) {
+      text.pop_back();
+    }
+    if (!text.empty() && (text.back() == '!' || text.back() == '~')) {
+      out.mark = text.back();
+      text.pop_back();
+    }
+    if (text.rfind("stage.", 0) == 0) {
+      out.stage = std::atoi(text.c_str() + 6);
+      return out.stage > 0;
+    }
+    const std::size_t a = text.find('.');
+    const std::size_t b = a == std::string::npos ? a : text.find('.', a + 1);
+    if (b == std::string::npos) {
+      return false;
+    }
+    out.stage = std::atoi(text.substr(0, a).c_str());
+    out.section = text.substr(a + 1, b - a - 1);
+    for (std::size_t at = b + 1; at < text.size();) {
+      const std::size_t dot = text.find('.', at);
+      out.path.push_back(std::atoi(text.substr(at, dot == std::string::npos ? std::string::npos : dot - at).c_str()));
+      at = dot == std::string::npos ? text.size() : dot + 1;
+    }
+    return out.stage > 0 && (out.section == "enter" || out.section == "ready") && !out.path.empty() &&
+      std::all_of(out.path.begin(), out.path.end(), [](const int i) {
+      return i > 0;
+    });
+  }
+
   // ---- compile
   std::string MissionHash(
     const std::string& text
@@ -1830,7 +1866,8 @@ namespace faf::editor
       add("    if ScenarioInfo.Options.EditorMode then");
       add("        while not ScenarioInfo.EditorPlaying do WaitSeconds(0.2) end");
       add("    end");
-      add(o.test ? "    Stage[ScenarioInfo.EditorStartStage or 1]()" : "    Stage[1]()");
+      const int start = std::clamp(o.startStage, 1, static_cast<int>(m.stages.size()));
+      add(o.test ? "    Stage[ScenarioInfo.EditorStartStage or " + std::to_string(start) + "]()" : "    Stage[1]()");
       add("end");
       add("");
     }

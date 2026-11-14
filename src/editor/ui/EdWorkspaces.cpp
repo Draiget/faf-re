@@ -99,7 +99,7 @@ namespace faf::editor
        "Strings###MissionStrings",
        "Script Editor###ScriptEditor,Adaptive Map###AdaptiveMap",
        "Properties",
-       "Problems,Check,Log,Debugger",
+       "Run###MissionRun,Problems,Check,Log,Debugger",
        0.20f,
        0.42f,
        false},
@@ -222,6 +222,7 @@ namespace faf::editor
       {"LayoutStarts", ICON_FLAG},
       {"MissionStages", ICON_MISSION},
       {"MissionStrings", ICON_SCRIPT},
+      {"MissionRun", ICON_PLAY},
     };
     for (const auto& [panel, icon] : kIcons) {
       if (panel == id) {
@@ -241,7 +242,8 @@ namespace faf::editor
     // 2: Layout's drawing panels (Layout layers, Layout canvas).
     // 3: Layout's Starts and resources under its layers.
     // 2: Mission's Stages and Strings.
-    return key == "layout" ? 3 : key == "terrain" || key == "generate" || key == "mission" ? 2 : 1;
+    // 3: Mission's Run beside Problems.
+    return key == "layout" || key == "mission" ? 3 : key == "terrain" || key == "generate" ? 2 : 1;
   }
 
   std::map<std::string, int>& LayoutVersions()

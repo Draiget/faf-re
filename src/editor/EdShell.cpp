@@ -530,6 +530,21 @@ namespace faf::editor
       if (mShowMissionStrings) {
         mMissionPanel.DrawStringsPanel(mShowMissionStrings, mDocument.Map() != nullptr);
       }
+      {
+        // The test play's trace arrives in the log whether or not Run is shown.
+        const std::vector<std::string> trace = mLog.TakeMissionTrace();
+        if (mShowMissionRun) {
+          mMissionPanel.DrawRunPanel(mShowMissionRun, mDocument.Map() != nullptr, mPlay.Active(), trace);
+        }
+      }
+      if (mMissionPanel.TakePlayAsk() && !mPlay.Active() && mPlay.CanPlay()) {
+        const std::vector<std::string>& maps = mPlay.Maps();
+        const auto at = std::find(maps.begin(), maps.end(), mDocument.Path());
+        if (at != maps.end()) {
+          mPlay.Select(static_cast<int>(at - maps.begin()));
+          mPlay.Play();
+        }
+      }
       if (mShowParticleEditor) {
         mParticleEditor.Draw(mShowParticleEditor);
       }
@@ -722,6 +737,7 @@ namespace faf::editor
       {"Starts and resources###LayoutStarts", &EdShell::mShowLayoutStarts},
       {"Stages###MissionStages", &EdShell::mShowMissionStages},
       {"Strings###MissionStrings", &EdShell::mShowMissionStrings},
+      {"Run###MissionRun", &EdShell::mShowMissionRun},
     };
     return kFlags;
   }

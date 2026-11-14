@@ -156,10 +156,14 @@ namespace faf::editor
     {
       mShowLayoutLayers = mShowLayoutCanvas = mShowLayoutStarts = true;
     }
+    [[nodiscard]] EdMissionPanel& MissionPanel() noexcept
+    {
+      return mMissionPanel;
+    }
     /** Shows the Mission workspace's Stages and Strings. */
     void ShowMission() noexcept
     {
-      mShowMissionStages = mShowMissionStrings = true;
+      mShowMissionStages = mShowMissionStrings = mShowMissionRun = true;
     }
     [[nodiscard]] bool LayoutShown() const noexcept
     {
@@ -482,6 +486,7 @@ namespace faf::editor
     bool mShowLayoutStarts = false;
     bool mShowMissionStages = false;
     bool mShowMissionStrings = false;
+    bool mShowMissionRun = false;
     bool mDebugWasPaused = false;
     char mWatchInput[160] = {};
     std::vector<std::string> mWatches;

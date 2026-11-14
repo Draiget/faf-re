@@ -47,6 +47,8 @@ namespace faf::editor
     /** From now until EndCapture the warnings (where the game's Lua errors arrive) are also kept apart. */
     void BeginCapture();
     [[nodiscard]] std::vector<std::string> EndCapture();
+    /** The mission trace ids (`EDMISSION trace <id>` lines of a test play) that arrived since the last take. */
+    [[nodiscard]] std::vector<std::string> TakeMissionTrace();
 
   private:
     struct Line
@@ -64,6 +66,7 @@ namespace faf::editor
     int mWarnings = 0;
     bool mCapturing = false;
     std::vector<std::string> mCaptured;
+    std::vector<std::string> mMissionTrace;
     bool mAutoScroll = true;
     bool mShowTimes = false;
     char mFilter[128]{};

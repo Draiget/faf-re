@@ -2172,8 +2172,10 @@ namespace faf::editor
         if (!mPlayCopyWired) {
           mPlayCopyWired = true;
           mPlay.SetScenarioFor([this](const std::string& selected) -> std::string {
+            // A map with a mission plays from a copy too: its test run traces the nodes and can start at any stage.
             if (
-              mDocument.GetState() != EdDocument::State::Open || !mDocument.Modified() ||
+              mDocument.GetState() != EdDocument::State::Open ||
+              (!mDocument.Modified() && mDocument.MissionNow().Empty()) ||
               LowerPath(mDocument.Path()) != LowerPath(selected)
             ) {
               return selected;
@@ -2273,6 +2275,8 @@ namespace faf::editor
           break;
         }
         case 2: {
+          // From the second stage (the Run panel's Play from a stage).
+          mDocument.SetPlayStartStage(2);
           const std::vector<std::string>& maps = mPlay.Maps();
           const auto at = std::find_if(maps.begin(), maps.end(), [&](const std::string& p) {
             return LowerPath(p) == LowerPath(mDocument.Path());
@@ -2283,6 +2287,9 @@ namespace faf::editor
           }
           break;
         }
+        case 4:
+          gpg::Logf("editor: mission test: the Run panel holds %zu trace entries", mShell->MissionPanel().TraceCount());
+          break;
         case 5:
           mPlay.Stop();
           break;
