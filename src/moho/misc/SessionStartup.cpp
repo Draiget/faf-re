@@ -46,6 +46,7 @@
 #include "moho/sim/FafGameVersion.h"
 #include "moho/sim/SimDriver.h"
 #include "moho/sim/UserArmy.h"
+#include "moho/unit/core/UserUnit.h"
 #include "moho/sim/WldSessionInfo.h"
 #include "moho/ui/UiRuntimeTypes.h"
 #include "lua/LuaTableIterator.h"
@@ -855,6 +856,37 @@ namespace moho
     return &binder;
   }
 
+  // Read-only UI helper: current direct vision only, never sim-side hidden entities.
+  int cfunc_MicrochipVisibleEnemies(lua_State* const rawState)
+  {
+    auto* const state = moho::SCR_ResolveBindingState(rawState);
+    LuaPlus::LuaObject result;
+    result.AssignNewTable(state, 0, 0);
+    auto* const session = WLD_GetActiveSession();
+    auto* const focus = session && !session->IsReplay ? session->GetFocusArmy() : nullptr;
+    if (focus) {
+      fa::vector<UserUnit*> units;
+      GetSessionUserUnits(session, units);
+      int index = 1;
+      for (auto* unit : units) {
+        if (!unit || !unit->mArmy || !(unit->mIntelStateFlags & 0x08u)
+            || unit->mVariableData.mVisibilityMode == EUserEntityVisibilityMode::Hidden
+            || !focus->IsEnemy(static_cast<unsigned>(unit->mArmy->mArmyIndex))) continue;
+        auto* const bridge = GetIUnitBridge(unit);
+        if (bridge->IsDead()) continue;
+        result.SetObject(index++, bridge->GetLuaObject());
+      }
+    }
+    result.PushStack(state);
+    return 1;
+  }
+  CScrLuaInitForm* func_MicrochipVisibleEnemies()
+  {
+    static CScrLuaBinder binder(UserLuaInitSet(), "MicrochipGetVisibleEnemies", &cfunc_MicrochipVisibleEnemies,
+        nullptr, "<global>", "Returns live enemy UI units currently in direct vision; no radar-only or historical contacts.");
+    return &binder;
+  }
+
   /**
    * Address: 0x0088D4E0 (FUN_0088D4E0, func_GetSessionClients_LuaFuncDef)
    *
@@ -1271,6 +1303,7 @@ namespace
       (void)::moho::func_LoadSavedGame_LuaFuncDef();
       (void)::moho::func_PrefetchSession_LuaFuncDef();
       (void)::moho::func_GetSessionClients_LuaFuncDef();
+      (void)::moho::func_MicrochipVisibleEnemies();
       (void)::moho::func_InternalSaveGame_LuaFuncDef();
     }
   };
