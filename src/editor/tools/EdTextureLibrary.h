@@ -44,6 +44,14 @@ namespace faf::editor
      * default (a layer's alpha is its specular, not its shape); `withAlpha` keeps it (a decal's alpha is its shape).
      */
     std::uint64_t Thumbnail(const std::string& path, bool withAlpha = false);
+    /** A normal map's thumbnail as a lit relief (NormalRelief) instead of its raw colours. */
+    std::uint64_t Relief(
+      const std::string& normals
+    )
+    {
+      return normals.empty() ? 0U : Thumbnail(std::string(kReliefPrefix) + normals);
+    }
+    static constexpr const char* kReliefPrefix = "relief:";
 
     /** Decodes up to `count` asked-for thumbnails; called once a frame. */
     void Pump(int count);

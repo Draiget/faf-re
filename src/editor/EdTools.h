@@ -2466,6 +2466,13 @@ namespace faf::editor
       return mAirbrush;
     }
     /** What the last height stroke did (ground moved up and down), under the brush's sliders. */
+    /** Why the Texture tool won't paint the chosen layer (empty: it will). */
+    void SetPaintNote(
+      std::string text
+    )
+    {
+      mPaintNote = std::move(text);
+    }
     void SetStrokeStats(
       std::string text
     )
@@ -2830,6 +2837,9 @@ namespace faf::editor
     bool mPathApply = false;
     bool mAirbrush = true;
     std::string mStrokeStats;
+    std::string mPaintNote;
+    bool mBrowseNormals = false; // the browser picks the normal map alone
+    bool mBrowseRelief = true;   // normal maps shown as lit relief
     float mPlanePointH[3]{};
     float mPlanePointZ[3]{};
     int mPlanePoints = 0;

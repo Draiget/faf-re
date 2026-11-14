@@ -137,6 +137,7 @@ set(FAF_EDITOR_SOURCES
   tools/EdMarkers.cpp
   tools/EdResize.cpp
   tools/EdTerrainPath.cpp
+  tools/EdTextureFiles.cpp
   doc/EdPreview.cpp
   tools/EdDecalShape.cpp
   tools/EdDecals.cpp

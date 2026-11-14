@@ -47,6 +47,7 @@
 #include "moho/sim/CWldSession.h"
 #include "editor/tools/EdHeightFile.h"
 #include "editor/tools/EdResize.h"
+#include "editor/tools/EdTextureFiles.h"
 #include "editor/doc/EdPreview.h"
 #include "editor/tools/EdAlphaGen.h"
 #include "editor/tools/EdLayoutMarkers.h"
@@ -5021,6 +5022,8 @@ namespace faf::editor
       int mThemeArgFrames = 0;
       /** Export (true) the slot's texture to a .dds, or import one into the map's folder and the slot. */
       void TransferMapTexture(MapTextureKind kind, bool exporting, const std::string& testFile);
+      /** The eight strata masks to or from one set of files (`name_1` .. `name_8`); a file dialog asks for the name. */
+      void TransferAllMasks(bool exporting);
       bool mMapTexturesStale[4]{};
       /** The paint's textures: the heights, the masks and the layers' textures in one sum. */
       [[nodiscard]] std::uint64_t PaintChecksum(std::uint64_t heights);
@@ -5448,6 +5451,12 @@ namespace faf::editor
         "The preview picture the lobby shows, drawn anew from the heights, the sea, the start positions "
         "and the resources (saved with the map)"
       );
+      add("texture.masks.export", "Export all layer masks...", "Texture", "", [this] {
+        TransferAllMasks(true);
+      }, mapOpen, {}, "The eight layers' masks as name_1 .. name_8 (PNG or 16-bit RAW), grey for how much shows");
+      add("texture.masks.import", "Import all layer masks...", "Texture", "", [this] {
+        TransferAllMasks(false);
+      }, mapOpen, {}, "Pick any file of a set name_1 .. name_8: every one there goes into its layer");
       add("map.resize", "Resize map...", "Map", "", [this] {
         mShell->OpenResize();
       }, mapOpen, {}, "The map made another size in a new folder: cut or added around an anchor, or stretched");
@@ -6049,7 +6058,10 @@ namespace faf::editor
            cmd("view.lighting"),
            sep(),
            cmd("map.preview"),
-           cmd("map.resize")}
+           cmd("map.resize"),
+           sep(),
+           cmd("texture.masks.export"),
+           cmd("texture.masks.import")}
         },
         EdMenu{
           "&Window",
@@ -8069,6 +8081,40 @@ namespace faf::editor
       );
     }
 
+    void EditorApp::TransferAllMasks(
+      const bool exporting
+    )
+    {
+      const std::filesystem::path file = AskFile(
+        HandleOf(mGame.supcomFrame),
+        exporting,
+        exporting ? L"PNG picture (*.png)\0*.png\0Raw 16-bit (*.raw)\0*.raw\0"
+                  : L"Masks (*.png;*.raw;*.r16;*.bmp;*.tif)\0*.png;*.raw;*.r16;*.bmp;*.tif;*.tiff\0All files\0*.*\0",
+        L"png",
+        exporting ? L"Export the eight layer masks (name_1 .. name_8)" : L"Import layer masks: any file of the set"
+      );
+      if (file.empty()) {
+        return;
+      }
+      int done = 0;
+      std::string message;
+      for (int layer = 0; layer < 8; ++layer) {
+        const std::filesystem::path one = MaskSetFile(file, layer);
+        std::error_code ec;
+        if (
+          exporting ? mScene.ExportMaskLayer(layer, one, message)
+                    : std::filesystem::exists(one, ec) && mScene.ImportMaskLayer(layer, one, message)
+        ) {
+          ++done;
+        }
+      }
+      const std::string text = std::string(exporting ? "Exported " : "Imported ") + std::to_string(done) +
+        " of the 8 layer masks " + (exporting ? "to " : "from ") + MaskSetFile(file, 0).filename().string() + " .. " +
+        MaskSetFile(file, 7).filename().string();
+      gpg::Logf("editor: %s", text.c_str());
+      PostStatusMessage(text);
+    }
+
     void EditorApp::TransferMapTexture(
       const MapTextureKind kind,
       const bool exporting,
@@ -8084,7 +8130,10 @@ namespace faf::editor
       }
       EdTools::LayerSlot value = mScene.LayerSlots()[static_cast<std::size_t>(target.slot)];
       const std::string current = target.normalsPath ? value.normals : value.albedo;
-      const wchar_t* const filter = L"DirectDraw surface (*.dds)\0*.dds\0All files\0*.*\0";
+      const wchar_t* const filter = exporting
+        ? L"DirectDraw surface (*.dds)\0*.dds\0PNG picture (*.png)\0*.png\0All files\0*.*\0"
+        : L"Pictures (*.dds;*.png;*.tga;*.jpg;*.bmp;*.tif)\0*.dds;*.png;*.tga;*.jpg;*.jpeg;*.bmp;*.tif;*.tiff\0"
+          L"All files\0*.*\0";
       std::filesystem::path file = testFile.empty()
         ? AskFile(
             HandleOf(mGame.supcomFrame),
@@ -8104,6 +8153,48 @@ namespace faf::editor
           gpg::Warnf("editor: map-wide texture: slot %d has no texture to export", target.slot);
           return;
         }
+        // A PNG: the DDS decoded at its own size (its alpha kept: some shaders pack data there).
+        std::string ext = file.extension().string();
+        for (char& c : ext) {
+          c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+        }
+        if (ext == ".png") {
+          std::uint32_t size[2] = {};
+          if (bytes.size() >= 20) {
+            std::memcpy(size, bytes.data() + 12, sizeof(size)); // the header's height, then width
+          }
+          gpg::gal::imaging::ImageCodec* const codec = gpg::gal::imaging::ImageCodec::Instance();
+          gpg::gal::imaging::DecodeOptions options;
+          options.format = DXGI_FORMAT_B8G8R8A8_UNORM;
+          options.width = size[1];
+          options.height = size[0];
+          options.mipLevels = 1;
+          gpg::gal::imaging::Image image;
+          std::string error;
+          if (
+            codec == nullptr || size[0] == 0 || FAILED(codec->Decode(bytes.data(), bytes.size(), options, image)) ||
+            image.subresources.empty() || image.format != DXGI_FORMAT_B8G8R8A8_UNORM
+          ) {
+            PostStatusMessage("Can't decode " + current);
+            return;
+          }
+          const auto& level = image.subresources.front();
+          std::vector<std::uint32_t> pixels(static_cast<std::size_t>(level.width) * level.height);
+          for (std::uint32_t y = 0; y < level.height; ++y) {
+            std::memcpy(
+              pixels.data() + static_cast<std::size_t>(y) * level.width,
+              image.bytes.data() + level.offset + static_cast<std::size_t>(y) * level.rowPitch,
+              static_cast<std::size_t>(level.width) * 4U
+            );
+          }
+          const bool ok =
+            WriteColourPng(file, static_cast<int>(level.width), static_cast<int>(level.height), pixels, error);
+          gpg::Logf("editor: map-wide texture %s exported as PNG to %s", current.c_str(), file.string().c_str());
+          PostStatusMessage(
+            ok ? "Exported " + file.filename().string() : "Can't write " + file.string() + ": " + error
+          );
+          return;
+        }
         std::ofstream out(file, std::ios::binary | std::ios::trunc);
         out.write(bytes.data(), static_cast<std::streamsize>(bytes.size()));
         gpg::Logf(
@@ -8112,18 +8203,55 @@ namespace faf::editor
         PostStatusMessage(out ? "Exported " + file.filename().string() : "Can't write " + file.string());
         return;
       }
-      // Import: a DDS as it is (its packing is the shader's), copied into the map's folder.
+      // Import: a DDS as it is (its packing is the shader's), copied into the map's folder; another picture (PNG,
+      // TGA, JPEG, BMP, TIFF) decoded at 1024 x 1024 and written as a DDS (BC3, its alpha kept).
       std::ifstream in(file, std::ios::binary);
-      const std::string bytes((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+      std::string bytes((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+      std::string name = file.filename().string();
       if (bytes.size() < 128 || bytes.compare(0, 4, "DDS ") != 0) {
-        PostStatusMessage(file.filename().string() + " isn't a DDS file");
-        gpg::Warnf("editor: map-wide texture: %s isn't a DDS file (%zu bytes)", file.string().c_str(), bytes.size());
-        return;
+        constexpr int kSide = 1024;
+        gpg::gal::imaging::ImageCodec* const codec = gpg::gal::imaging::ImageCodec::Instance();
+        gpg::gal::imaging::DecodeOptions options;
+        options.format = DXGI_FORMAT_B8G8R8A8_UNORM;
+        options.width = kSide;
+        options.height = kSide;
+        options.mipLevels = 1;
+        gpg::gal::imaging::Image image;
+        if (
+          codec == nullptr || bytes.empty() || FAILED(codec->Decode(bytes.data(), bytes.size(), options, image)) ||
+          image.subresources.empty() || image.format != DXGI_FORMAT_B8G8R8A8_UNORM
+        ) {
+          PostStatusMessage("Can't read " + file.filename().string() + " as a picture");
+          gpg::Warnf("editor: map-wide texture: %s isn't a picture the editor reads", file.string().c_str());
+          return;
+        }
+        const auto& level = image.subresources.front();
+        TexImage picture;
+        picture.Reset(static_cast<int>(std::min(level.width, level.height)), 4);
+        for (int y = 0; y < picture.size; ++y) {
+          const std::uint8_t* const row =
+            image.bytes.data() + level.offset + static_cast<std::size_t>(y) * level.rowPitch;
+          for (int x = 0; x < picture.size; ++x) {
+            float* const p = picture.Pixel(x, y);
+            p[0] = static_cast<float>(row[x * 4 + 2]) / 255.0f;
+            p[1] = static_cast<float>(row[x * 4 + 1]) / 255.0f;
+            p[2] = static_cast<float>(row[x * 4 + 0]) / 255.0f;
+            p[3] = static_cast<float>(row[x * 4 + 3]) / 255.0f;
+          }
+        }
+        std::vector<std::uint8_t> dds;
+        std::string error;
+        if (!EncodeDds(picture, DdsKind::Bc3, dds, error)) {
+          PostStatusMessage("Can't make a DDS: " + error);
+          return;
+        }
+        bytes.assign(dds.begin(), dds.end());
+        name = file.stem().string() + ".dds";
+        gpg::Logf("editor: map-wide texture: %s converted to a %d px DDS", file.string().c_str(), picture.size);
       }
       const std::filesystem::path folder = scmap.parent_path() / "env" / "layers";
       std::error_code ec;
       std::filesystem::create_directories(folder, ec);
-      std::string name = file.filename().string();
       {
         std::ofstream out(folder / name, std::ios::binary | std::ios::trunc);
         out.write(bytes.data(), static_cast<std::streamsize>(bytes.size()));

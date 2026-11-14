@@ -433,6 +433,7 @@ add_executable(faf_editor_brush_tests EXCLUDE_FROM_ALL editor/HeightBrushTests.c
   editor/MarkerTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdMarkers.cpp
   editor/ResizeTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdResize.cpp
   editor/TerrainPathTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdTerrainPath.cpp
+  editor/TextureFilesTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdTextureFiles.cpp
   editor/DecalShapeTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdDecalShape.cpp
   editor/UnitTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdUnits.cpp
   editor/UnitFateTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdUnitFate.cpp

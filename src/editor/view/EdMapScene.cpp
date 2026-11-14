@@ -12355,6 +12355,25 @@ namespace faf::editor
       }
       if (mTools != nullptr && mTools->TextureToolActive()) {
         LoadMasks();
+        // A layer the map's shader doesn't blend: the paint wouldn't show (FAF Studio's WhyNotPaintable).
+        if (const ShaderProfile profile = ShaderProfileOf(TerrainShader()); mTools->MaskLayer() >= profile.painted) {
+          char why[240];
+          (void)std::snprintf(
+            why,
+            sizeof(why),
+            "%s blends layers 1 to %d only: paint on layer %d wouldn't show.%s",
+            TerrainShader().c_str(),
+            profile.painted,
+            mTools->MaskLayer() + 1,
+            profile.painted == 4     ? " A shader with eight layers (TTerrainXP) paints 5 to 8."
+              : profile.painted == 7 ? " Its layer 8 holds data (roughness), not paint."
+                                     : ""
+          );
+          mTools->SetPaintNote(why);
+          gpg::Warnf("editor: %s", why);
+          return true;
+        }
+        mTools->SetPaintNote({});
         if (!mDocument.Masks().texels.empty()) {
           mPaintInverted = false;
           mPaintingMask = true;

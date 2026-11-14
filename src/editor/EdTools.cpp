@@ -2662,6 +2662,33 @@ namespace faf::editor
       ImGui::CloseCurrentPopup();
     }
     ImGui::SameLine();
+    {
+      static const char* const kPick[] = {"Texture", "Normal map only"};
+      int pick = mBrowseNormals ? 1 : 0;
+      ImGui::SetNextItemWidth(Em(170.0f));
+      if (EdCombo("##browsepick", &pick, kPick, 2)) {
+        mBrowseNormals = pick == 1;
+      }
+      EdSetItemTooltip(
+        "Texture: the albedo with the normal map beside it. Normal map only: the layer keeps its albedo and takes "
+        "this normal map"
+      );
+    }
+    if (mBrowseNormals) {
+      ImGui::SameLine();
+      ImGui::Checkbox("Relief", &mBrowseRelief);
+      EdSetItemTooltip("Normal maps shown as lit relief (bumps as bumps), else as their raw colours");
+      if (mBrowseSlot >= 0 && mBrowseSlot < static_cast<int>(mSlots.size())) {
+        ImGui::SameLine();
+        if (ImGui::Button("No normal map")) {
+          mChangedSlot = mBrowseSlot;
+          mChangedValue = mSlots[static_cast<std::size_t>(mBrowseSlot)];
+          mChangedValue.normals.clear();
+          ImGui::CloseCurrentPopup();
+        }
+      }
+    }
+    ImGui::SameLine();
     if (ImGui::Button("Make one with nodes...")) {
       mMaterialAsk = mBrowseSlot;
       ImGui::CloseCurrentPopup();
@@ -2692,6 +2719,9 @@ namespace faf::editor
         if (!filter.empty() && key.find(filter) == std::string::npos) {
           continue;
         }
+        if (mBrowseNormals && texture.normals.empty()) {
+          continue; // (normal maps only)
+        }
         if (texture.biome != biome) {
           biome = texture.biome;
           shown = 0;
@@ -2703,7 +2733,9 @@ namespace faf::editor
         ++shown;
         ImGui::PushID(texture.path.c_str());
         ImGui::BeginGroup();
-        const std::uint64_t image = mLibrary.Thumbnail(texture.path);
+        const std::uint64_t image = !mBrowseNormals ? mLibrary.Thumbnail(texture.path)
+          : mBrowseRelief                           ? mLibrary.Relief(texture.normals)
+                                                    : mLibrary.Thumbnail(texture.normals);
         bool picked = false;
         if (image != 0U) {
           picked = ImGui::ImageButton("##pick", static_cast<ImTextureID>(image), ImVec2(cell, cell));
@@ -2724,9 +2756,13 @@ namespace faf::editor
         if (picked && mBrowseSlot >= 0 && mBrowseSlot < static_cast<int>(mSlots.size())) {
           mChangedSlot = mBrowseSlot;
           mChangedValue = mSlots[static_cast<std::size_t>(mBrowseSlot)];
-          mChangedValue.albedo = texture.path;
-          if (!texture.normals.empty()) {
+          if (mBrowseNormals) {
             mChangedValue.normals = texture.normals;
+          } else {
+            mChangedValue.albedo = texture.path;
+            if (!texture.normals.empty()) {
+              mChangedValue.normals = texture.normals;
+            }
           }
           ImGui::CloseCurrentPopup();
         }
@@ -2748,6 +2784,11 @@ namespace faf::editor
         DrawTerrainTypes();
         DrawTypesFromLayers();
         return;
+      }
+      if (!mPaintNote.empty()) {
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.75f, 0.3f, 1.0f));
+        ImGui::TextWrapped("%s", mPaintNote.c_str());
+        ImGui::PopStyleColor();
       }
     }
     {
