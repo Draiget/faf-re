@@ -46,10 +46,19 @@ namespace gpg::gal::d3d11
    * The shaderModel41 flag raises the compat preamble's vs_4_0/ps_4_0 to 4.1
    * (feature level 10.1 and up). `original` is the source before
    * preprocessing, read for the D3D9 pass states the D3D10 dialect
-   * preprocesses away (the alpha test).
+   * preprocesses away (the alpha test). With `functionMath` the text is for
+   * D3DCompile (fxc): sqrt, rsqrt and pow on |x| are helper functions behind
+   * macros that do not name themselves (fxc leaves a macro alone whose
+   * replacement contains its own name, so `#define sqrt(x) sqrt(abs(x))` is
+   * ignored there); the default keeps the self-referencing macros for the
+   * D3D12 and Vulkan layers, whose own compilers expand them.
    */
-  [[nodiscard]] TranslatedEffectSource
-  TranslateEffectSource(std::string_view preprocessed, bool shaderModel41, std::string_view original);
+  [[nodiscard]] TranslatedEffectSource TranslateEffectSource(
+    std::string_view preprocessed,
+    bool shaderModel41,
+    std::string_view original,
+    bool functionMath = false
+  );
 
   /**
    * Engine addition: `ren_EffectFastScan`. Scan effect text with EffectScan.h (true, the default) or

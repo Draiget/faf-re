@@ -325,7 +325,16 @@ namespace gpg::gal
     void CreateLayouts();
     void CreateNullImages();
     void CreateSwapChains(const DeviceContext& context);
-    void CreateSwapChain(SwapChain& swapChain, std::uint32_t width, std::uint32_t height);
+    /** False when the window has no area (minimised): the swap chain is left as it is. */
+    bool CreateSwapChain(SwapChain& swapChain, std::uint32_t width, std::uint32_t height);
+    /** The present modes to try for the swap chain, best first (vsync asks for FIFO only); FIFO is always last. */
+    [[nodiscard]] std::vector<VkPresentModeKHR> SelectPresentModes(const SwapChain& swapChain) const;
+    /** The extent a swap chain made now would get; 0 x 0 for a minimised window. */
+    [[nodiscard]] VkExtent2D SurfaceExtent(const SwapChain& swapChain, std::uint32_t width, std::uint32_t height) const;
+    /** A swap chain the engine's Reset must make again (TestCooperativeLevel answers 1 until it has). */
+    void RequestSwapChainRecovery(const char* what, VkResult result);
+    /** True when every swap chain's window has no area (minimised): a Reset would rebuild nothing. */
+    [[nodiscard]] bool AllWindowsMinimised() const;
     void DestroySwapChain(SwapChain& swapChain, bool keepSurface) noexcept;
     /** A stale scaled swap chain made again at the window's current size; false while the window has no area. */
     bool RecreateStaleSwapChain(SwapChain& swapChain);
@@ -334,6 +343,7 @@ namespace gpg::gal
     /** A device-local colour image with a view, usable as a target, a texture and a copy source or destination. */
     RenderTargetVulkan::Buffer CreateColorTargetImage(VkFormat format, std::uint32_t width, std::uint32_t height);
     void CreateRenderTargets();
+    void BindDefaultOutput();
     void ReleaseRenderTargets() noexcept;
     void CheckAvailableFormats(DeviceContext* context);
     void Shutdown() noexcept;
@@ -475,6 +485,8 @@ namespace gpg::gal
 
     // ---- heads ---------------------------------------------------------------
     std::vector<SwapChain> mSwapChains;
+    bool mRecoverRequested = false;
+    std::uint32_t mConsecutiveRecoveries = 0U; // recoveries since the last successful present
     std::vector<OutputContext> mHeadOutputContexts;
     std::shared_ptr<PipelineStateVulkan> mPipelineState;
     WindowsCursor mCursor;

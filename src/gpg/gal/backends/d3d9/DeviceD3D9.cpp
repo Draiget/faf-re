@@ -1,5 +1,9 @@
 #include "gpg/gal/backends/d3d9/D3D9Private.h"
 
+#include <memory>
+
+#include "gpg/core/utils/Logging.h"
+
 namespace gpg::gal
 {
   namespace
@@ -1472,13 +1476,22 @@ namespace gpg::gal
 
     SafeRelease(mFrameEventQuery);
 
-    // Allocated with new[] (0x008F3130) and, unlike Setup's, never freed.
-    D3DPRESENT_PARAMETERS* const parameters =
-      new D3DPRESENT_PARAMETERS[static_cast<std::size_t>(context->GetHeadCount())];
+    // Allocated with new[] (0x008F3130) and, unlike Setup's, never freed
+    // in the binary; FAF frees it, so that every vsync or resolution
+    // change does not leak the array.
+    const std::unique_ptr<D3DPRESENT_PARAMETERS[]> parameterStorage(
+      new D3DPRESENT_PARAMETERS[static_cast<std::size_t>(context->GetHeadCount())]
+    );
+    D3DPRESENT_PARAMETERS* const parameters = parameterStorage.get();
     GetDeviceParameters(parameters, context);
 
     const HRESULT resetResult = mDevice->Reset(parameters);
     if (resetResult < 0) {
+      // The device stays in its lost state (D3DERR_DEVICELOST when
+      // another application holds the display, D3DERR_INVALIDCALL when a
+      // default-pool resource is still alive); say which, then throw as
+      // the binary does (CD3DDevice::InitContext catches it).
+      gpg::Warnf("D3D9: IDirect3DDevice9::Reset failed (HRESULT 0x%08lX)", static_cast<unsigned long>(resetResult));
       ThrowGalErrorFromHresult("DeviceD3D9.cpp", 866, resetResult);
     }
 

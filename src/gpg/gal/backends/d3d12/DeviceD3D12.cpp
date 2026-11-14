@@ -21,6 +21,7 @@
 #include "gpg/core/utils/Global.h"
 #include "gpg/core/utils/Logging.h"
 #include "gpg/gal/backends/common/BackendErrors.h"
+#include "gpg/gal/backends/common/CopyRegion.h"
 #include "gpg/gal/backends/common/ImageCodec.h"
 #include "gpg/gal/backends/common/RuntimeInfo.h"
 #include "gpg/gal/backends/d3d11/D3D11VertexLayouts.h"
@@ -775,23 +776,8 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     mSwapChains.clear();
     for (int headIndex = 0; headIndex < context.GetHeadCount(); ++headIndex) {
       const Head& head = context.GetHead(static_cast<std::uint32_t>(headIndex));
-      dxgi::SwapChainDesc desc{};
-      desc.window = static_cast<HWND>(head.mWindow);
-      desc.width = head.mWidth;
-      desc.height = head.mHeight;
-      desc.format = DXGI_FORMAT_B8G8R8A8_UNORM;
-      // `Head::mWindowed` is a full-screen flag (see DeviceD3D11::CreateSwapChains).
-      desc.fullscreen = head.mWindowed;
-      desc.refreshHz = head.framesPerSecond;
-      desc.usage = DXGI_USAGE_RENDER_TARGET_OUTPUT | DXGI_USAGE_SHADER_INPUT;
-      desc.bufferCount = d3d12::kFramesInFlight;
-      desc.allowFlipModel = true; // Direct3D 12 has only the flip model
-      if (desc.width == 0U || desc.height == 0U) {
-        RECT client{};
-        ::GetClientRect(desc.window, &client);
-        desc.width = static_cast<std::uint32_t>(std::max<LONG>(client.right - client.left, 1));
-        desc.height = static_cast<std::uint32_t>(std::max<LONG>(client.bottom - client.top, 1));
-      }
+      // `Head::mWindowed` is a full-screen flag (see DescribeHeadChain); Direct3D 12 has only the flip model.
+      const dxgi::SwapChainDesc desc = dxgi::DescribeHeadChain(head, d3d12::kFramesInFlight, true);
       auto swapChain = std::make_unique<dxgi::SwapChain>();
       CheckHresult("DeviceD3D12.cpp", __LINE__, swapChain->Create(mFactory, mQueue.Get(), desc));
       if (!swapChain->IsFlipModel()) {
@@ -844,6 +830,12 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
         targetContext->height_
       );
     }
+    BindDefaultOutput();
+  }
+
+  void DeviceD3D12::BindDefaultOutput()
+  {
+    // What a Reset leaves bound, as D3D9's does: head 0 and a viewport over all of it.
     if (!mHeadOutputContexts.empty()) {
       ClearTarget(&mHeadOutputContexts.front());
       D3DVIEWPORT9 viewport{};
@@ -860,11 +852,23 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     outputContext_ = OutputContext();
     mHeadOutputContexts.clear();
     mTargetsDirty = true;
+    DrainGpu();
+  }
+
+  void DeviceD3D12::DrainGpu() noexcept
+  {
     try {
-      // Twice: the targets just released retire with the recording serial.
+      // Twice: the targets just released retire with the recording serial,
+      // and the second submission collects what the first one retired.
       Submit(true);
       Submit(true);
-    } catch (...) {}
+      WaitForSerial(mSubmittedSerial);
+      CollectCompleted();
+    } catch (const std::exception& error) {
+      gpg::Warnf("D3D12: draining the GPU failed: %s", error.what());
+    } catch (...) {
+      gpg::Warnf("D3D12: draining the GPU failed");
+    }
   }
 
   void DeviceD3D12::CheckAvailableFormats(
@@ -2522,17 +2526,27 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
       D3D12_TEXTURE_COPY_LOCATION origin{};
       origin.pResource = from.resource.resource.Get();
       origin.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+      // a box or a destination that reaches past a surface is cut to it (an invalid copy makes the command list
+      // unusable); D3D9's StretchRect would fail it, and the engine's refraction copy can be a row too tall
+      CopyRegion region{fromRect.left, fromRect.top, fromRect.right, fromRect.bottom, toRect.left, toRect.top};
+      if (!ClampCopyRegion(
+            region,
+            sourceContext->width_,
+            sourceContext->height_,
+            destinationContext->width_,
+            destinationContext->height_
+          )) {
+        return;
+      }
       D3D12_BOX box{};
-      box.left = static_cast<UINT>(fromRect.left);
-      box.top = static_cast<UINT>(fromRect.top);
-      box.right = static_cast<UINT>(fromRect.right);
-      box.bottom = static_cast<UINT>(fromRect.bottom);
+      box.left = static_cast<UINT>(region.left);
+      box.top = static_cast<UINT>(region.top);
+      box.right = static_cast<UINT>(region.right);
+      box.bottom = static_cast<UINT>(region.bottom);
       box.front = 0U;
       box.back = 1U;
       MarkDraw("StretchRect copy");
-      mList->CopyTextureRegion(
-        &target, static_cast<UINT>(toRect.left), static_cast<UINT>(toRect.top), 0U, &origin, &box
-      );
+      mList->CopyTextureRegion(&target, static_cast<UINT>(region.x), static_cast<UINT>(region.y), 0U, &origin, &box);
       FinishDraw();
       return;
     }
@@ -2677,21 +2691,37 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
       D3D12_TEXTURE_COPY_LOCATION origin{};
       origin.pResource = sourceTexture->Resource().resource.Get();
       origin.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
-      D3D12_BOX box{};
-      const D3D12_BOX* boxPointer = nullptr;
+      // The box is cut to both surfaces whether or not a source rectangle is given: the whole source copied to an
+      // offset of the destination reaches past it too.
+      CopyRegion region{0, 0, static_cast<std::int64_t>(sourceDesc.Width), sourceDesc.Height, 0, 0};
       if (sourceRect != nullptr) {
-        box.left = static_cast<UINT>(sourceRect->left);
-        box.top = static_cast<UINT>(sourceRect->top);
-        box.right = static_cast<UINT>(sourceRect->right);
-        box.bottom = static_cast<UINT>(sourceRect->bottom);
-        box.front = 0U;
-        box.back = 1U;
-        boxPointer = &box;
+        region.left = sourceRect->left;
+        region.top = sourceRect->top;
+        region.right = sourceRect->right;
+        region.bottom = sourceRect->bottom;
       }
-      const UINT x = (destinationRect != nullptr) ? static_cast<UINT>(destinationRect->left) : 0U;
-      const UINT y = (destinationRect != nullptr) ? static_cast<UINT>(destinationRect->top) : 0U;
+      if (destinationRect != nullptr) {
+        region.x = destinationRect->left;
+        region.y = destinationRect->top;
+      }
+      if (!ClampCopyRegion(
+            region,
+            static_cast<std::int64_t>(sourceDesc.Width),
+            sourceDesc.Height,
+            static_cast<std::int64_t>(destinationDesc.Width),
+            destinationDesc.Height
+          )) {
+        return;
+      }
+      D3D12_BOX box{};
+      box.left = static_cast<UINT>(region.left);
+      box.top = static_cast<UINT>(region.top);
+      box.right = static_cast<UINT>(region.right);
+      box.bottom = static_cast<UINT>(region.bottom);
+      box.front = 0U;
+      box.back = 1U;
       MarkDraw("UpdateSurface copy");
-      mList->CopyTextureRegion(&target, x, y, 0U, &origin, boxPointer);
+      mList->CopyTextureRegion(&target, static_cast<UINT>(region.x), static_cast<UINT>(region.y), 0U, &origin, &box);
       FinishDraw();
       destinationTexture->DiscardCpuCopy();
       return;
@@ -2833,8 +2863,12 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
       return;
     }
     const std::lock_guard<std::recursive_mutex> lock(mMutex);
-    gpg::Logf("D3D12: Reset requested");
+    const bool force = mRecoverRequested;
+    mRecoverRequested = false;
+
+    bool vsyncChanged = false;
     if (context != nullptr && context != &mDeviceContext) {
+      vsyncChanged = mDeviceContext.mVSync != context->mVSync;
       mDeviceContext.mVSync = context->mVSync;
       const int heads = std::min(context->GetHeadCount(), mDeviceContext.GetHeadCount());
       for (int headIndex = 0; headIndex < heads; ++headIndex) {
@@ -2842,27 +2876,65 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
         Head& head = mDeviceContext.GetHead(static_cast<std::uint32_t>(headIndex));
         head.mWidth = requested.mWidth;
         head.mHeight = requested.mHeight;
+        head.mWindowed = requested.mWindowed;
+        head.framesPerSecond = requested.framesPerSecond;
       }
     }
+
+    // What each chain has to do. Vsync is only the present interval: when no
+    // chain changes (a vsync or anti-aliasing option, a resolution set again)
+    // the back buffers stay as they are and nothing is released or flushed.
+    std::vector<dxgi::SwapChainDesc> wanted;
+    bool anyChange = force;
+    for (std::size_t headIndex = 0U; headIndex < mSwapChains.size(); ++headIndex) {
+      wanted.push_back(
+        dxgi::DescribeHeadChain(
+          mDeviceContext.GetHead(static_cast<std::uint32_t>(headIndex)), d3d12::kFramesInFlight, true
+        )
+      );
+      const dxgi::SwapChainDesc& desc = wanted.back();
+      const dxgi::ResetAction action = dxgi::PlanReset(
+        mSwapChains[headIndex]->State(),
+        dxgi::ChainState{desc.width, desc.height, desc.fullscreen, desc.fullscreen ? desc.refreshHz : 0U},
+        dxgi::IsWindowMinimized(desc.window),
+        false
+      );
+      anyChange = anyChange || action != dxgi::ResetAction::None;
+    }
+    if (!anyChange) {
+      gpg::Logf(
+        "D3D12: Reset requested, swap chains unchanged%s: nothing to rebuild", vsyncChanged ? " (vsync only)" : ""
+      );
+      // The back buffers stay; the state a Reset hands back does not.
+      ResetState();
+      BindDefaultOutput();
+      return;
+    }
+    gpg::Logf("D3D12: Reset requested%s", force ? " (swap chain recovery)" : "");
+
     ReleaseRenderTargets();
     for (std::size_t headIndex = 0U; headIndex < mSwapChains.size(); ++headIndex) {
-      Head& head = mDeviceContext.GetHead(static_cast<std::uint32_t>(headIndex));
-      std::uint32_t width = head.mWidth;
-      std::uint32_t height = head.mHeight;
-      if (width == 0U || height == 0U) {
-        RECT client{};
-        ::GetClientRect(static_cast<HWND>(head.mWindow), &client);
-        width = static_cast<std::uint32_t>(std::max<LONG>(client.right - client.left, 1));
-        height = static_cast<std::uint32_t>(std::max<LONG>(client.bottom - client.top, 1));
-      }
-      const HRESULT result = mSwapChains[headIndex]->Resize(width, height);
+      const dxgi::SwapChainDesc& desc = wanted[headIndex];
+      dxgi::ResetAction action = dxgi::ResetAction::None;
+      const HRESULT result = mSwapChains[headIndex]->Reconfigure(
+        mFactory, mQueue.Get(), desc, force, dxgi::IsWindowMinimized(desc.window), [this] {
+        DrainGpu();
+      }, &action
+      );
       if (FAILED(result)) {
-        gpg::Warnf(
-          "D3D12: resizing head %u to %ux%u failed (HRESULT 0x%08lX)",
+        // A removed device ends here with its reason; anything else means no
+        // swap chain could be made at all.
+        CheckDeviceHresult(__LINE__, result, "swap chain reset");
+      }
+      if (action != dxgi::ResetAction::None) {
+        const dxgi::ChainState state = mSwapChains[headIndex]->State();
+        gpg::Logf(
+          "D3D12: head %u swap chain %s to %ux%u %s",
           static_cast<unsigned>(headIndex),
-          width,
-          height,
-          static_cast<unsigned long>(result)
+          (action == dxgi::ResetAction::Recreate) ? "recreated" : "resized",
+          state.width,
+          state.height,
+          state.fullscreen ? "full screen" : "windowed"
         );
       }
     }
@@ -2877,7 +2949,9 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
 
   int DeviceD3D12::TestCooperativeLevel()
   {
-    return 0;
+    // 1 = "needs a Reset": CD3DDevice::Paint then rebinds the context, which
+    // builds the swap chains again (see PresentSwapChains).
+    return mRecoverRequested ? 1 : 0;
   }
 
   void DeviceD3D12::BeginScene() {}
@@ -3057,10 +3131,7 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     ID3D12CommandList* const lists[1] = {mList.Get()};
     mQueue->ExecuteCommandLists(1U, lists);
 
-    const bool vsync = mDeviceContext.mVSync;
-    for (const std::unique_ptr<dxgi::SwapChain>& swapChain : mSwapChains) {
-      CheckDeviceHresult(__LINE__, swapChain->Present(vsync), "present");
-    }
+    PresentSwapChains();
     const std::uint64_t serial = ++mSubmittedSerial;
     CheckDeviceHresult(__LINE__, mQueue->Signal(mFence.Get(), serial), "queue signal");
     mFrames[mFrameIndex].serial = serial;
@@ -3080,6 +3151,43 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
         gpg::Warnf("D3D12: %u draw(s) skipped in frame %u (pass without shaders)", mSkippedDraws, mFrameNumber);
       }
       mSkippedDraws = 0U;
+    }
+  }
+
+  void DeviceD3D12::PresentSwapChains()
+  {
+    const bool vsync = mDeviceContext.mVSync;
+    for (const std::unique_ptr<dxgi::SwapChain>& swapChain : mSwapChains) {
+      const dxgi::PresentResult present = swapChain->Present(vsync);
+      switch (present.status) {
+      case dxgi::PresentStatus::Presented:
+      case dxgi::PresentStatus::Occluded: // success: nothing is shown and Present did not wait
+        mConsecutiveRecoveries = 0U;
+        break;
+      case dxgi::PresentStatus::Skipped:
+        break; // the frame is dropped, the next one goes through
+      case dxgi::PresentStatus::InvalidCall:
+        // The chain refuses even a plain present: build it again through the
+        // engine's own Reset (TestCooperativeLevel), a few times at most.
+        if (++mConsecutiveRecoveries <= 3U) {
+          gpg::Warnf(
+            "D3D12: the swap chain refuses to present (0x%08lX); it is rebuilt",
+            static_cast<unsigned long>(present.result)
+          );
+          mRecoverRequested = true;
+        } else {
+          CheckDeviceHresult(__LINE__, present.result, "present");
+        }
+        break;
+      case dxgi::PresentStatus::DeviceLost:
+      case dxgi::PresentStatus::Failed:
+        CheckDeviceHresult(__LINE__, present.result, "present");
+        break;
+      }
+    }
+    // Frame-latency chains wait here, before the next frame is recorded.
+    for (const std::unique_ptr<dxgi::SwapChain>& swapChain : mSwapChains) {
+      static_cast<void>(swapChain->WaitForFrameLatency(100U));
     }
   }
 

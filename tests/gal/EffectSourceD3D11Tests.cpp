@@ -263,6 +263,25 @@ TEST(
   EXPECT_FALSE(HasNote(kept, "shader model 4.1 profiles"));
 }
 
+// fxc ignores a macro whose replacement names the macro itself, so `#define sqrt(x) sqrt(abs(x))` would do nothing on
+// Direct3D 11 (a NaN where Direct3D 9 gave a number: the black UEF shield). The domain intrinsics must be helper
+// functions defined before macros that do not name themselves.
+TEST(
+  GalEffectSourceD3D11,
+  DomainIntrinsicsAreFunctionsNotSelfReferencingMacros
+)
+{
+  const TranslatedEffectSource translated = TranslateEffectSource(kMixed, false, {}, true);
+  EXPECT_TRUE(Contains(translated.source, "faf_sqrt("));
+  EXPECT_TRUE(Contains(translated.source, "#define sqrt(x) faf_sqrt(x)"));
+  EXPECT_FALSE(Contains(translated.source, "#define sqrt(x) sqrt(abs(x))"));
+  EXPECT_LT(translated.source.find("faf_sqrt("), translated.source.find("#define sqrt(x) faf_sqrt(x)"));
+
+  // without the flag the translator is unchanged
+  const TranslatedEffectSource plain = TranslateEffectSource(kMixed, false, {});
+  EXPECT_FALSE(Contains(plain.source, "faf_sqrt("));
+}
+
 TEST(
   GalEffectSourceD3D11,
   AStructNamedLikeATechniqueIsRenamed

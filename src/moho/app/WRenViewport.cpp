@@ -1901,7 +1901,7 @@ void moho::WRenViewport::RenderWorldViewPostEffects()
 }
 
 void moho::WRenViewport::RenderWorldView(
-  const SWorldViewInfo* const worldView,
+  SWorldViewInfo* const worldView,
   const int head,
   const SWorldViewInfo* const begin,
   const bool regenerateShoreline
@@ -1972,6 +1972,23 @@ void moho::WRenViewport::RenderWorldView(
   if (moho::ren_Clutter && worldView == begin && !RenderAdditionsDisabled() && !sClutterDisabled) {
     mClutter.UpdateCurrent(mCam);
     mClutter.GenerateNew(mCam);
+  }
+
+  // Binary 0x007F9334..0x007F936F: a view whose terrain renderer was made for
+  // another fidelity gets a new one. `[edi]` is the view's terrain, slot 1 is
+  // IsFidelity, called with graphics_Fidelity (0x00F58E88); when it answers
+  // false, IRenTerrain::Create (0x00809DA0) goes into mTerrain (0x007FB7C0)
+  // and slot 2 creates it over REN_GetTerrainRes (0x007FA170); 0x007F936A
+  // copies mTerrain back into the binary's local shared_ptr (0x007F7B00),
+  // which this function reads as worldView->mTerrain below. This is what
+  // makes graphics_Fidelity, which the Options screen changes live, take
+  // effect in a running game: starting on Low and choosing High left the Low
+  // terrain and water in place without it.
+  if (worldView->mTerrain && !worldView->mTerrain->IsFidelity(moho::graphics_Fidelity)) {
+    worldView->mTerrain.reset(IRenTerrain::Create());
+    if (worldView->mTerrain) {
+      (void)worldView->mTerrain->Create(REN_GetTerrainRes());
+    }
   }
 
   // Refresh mScreenPos/mScreenSize/mFullScreen from THIS view's camera
@@ -2474,10 +2491,10 @@ void moho::WRenViewport::Render(
   // strand the scene BeginScene opened above, and the Present that
   // CD3DDevice::Paint issues at the head of the next frame would fail with
   // D3DERR_INVALIDCALL.
-  const SWorldViewInfo* const begin = worldViews.begin();
-  const SWorldViewInfo* const end = worldViews.end();
+  SWorldViewInfo* const begin = worldViews.begin();
+  SWorldViewInfo* const end = worldViews.end();
 
-  for (const SWorldViewInfo* worldView = begin; worldView != end; ++worldView) {
+  for (SWorldViewInfo* worldView = begin; worldView != end; ++worldView) {
     RenderWorldView(worldView, head, begin, regenerateShoreline);
   }
 
