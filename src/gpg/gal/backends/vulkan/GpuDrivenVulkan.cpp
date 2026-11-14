@@ -11,6 +11,7 @@
 
 #include "DeviceVulkan.h"
 #include "ResourcesVulkan.h"
+#include "VulkanLimits.h"
 
 #include "gpg/core/utils/Logging.h"
 #include "gpg/gal/backends/common/BackendErrors.h"
@@ -18,6 +19,7 @@
 #include "gpg/gal/DrawStatistics.h"
 #include "gpg/gal/effects/EffectRuntime.h"
 #include "gpg/gal/effects/ShaderCompiler.h"
+#include "gpg/gal/effects/SpirvReflect.h"
 #include "gpg/gal/RenderProfiler.h"
 
 namespace gpg::gal
@@ -123,6 +125,7 @@ namespace gpg::gal
 
     [[nodiscard]] VkShaderModule CompileModule(
       VkDevice device,
+      const VkPhysicalDeviceLimits& limits,
       const GpuProgramDesc& desc,
       const char* const entry,
       const wchar_t* const profile,
@@ -163,6 +166,24 @@ namespace gpg::gal
       if (!compiled.succeeded) {
         gpg::Warnf(
           "Vulkan: GPU program %s, %ls %s does not compile: %s", desc.name, profile, entry, compiled.messages.c_str()
+        );
+        return VK_NULL_HANDLE;
+      }
+      // A compute program's work group must fit the device: Vulkan promises 128 threads, CompactIconsCS has
+      // 1024, which desktop GPUs run and a phone's GPU need not. Without the program its path does without.
+      std::uint32_t group[3]{};
+      if (effects::ReflectSpirvComputeGroupSize(compiled.code, group) && !vulkan::WorkGroupFits(limits, group)) {
+        gpg::Warnf(
+          "Vulkan: GPU program %s, %s: a work group of %ux%ux%u, beyond the device's %ux%ux%u and %u threads",
+          desc.name,
+          entry,
+          group[0],
+          group[1],
+          group[2],
+          limits.maxComputeWorkGroupSize[0],
+          limits.maxComputeWorkGroupSize[1],
+          limits.maxComputeWorkGroupSize[2],
+          limits.maxComputeWorkGroupInvocations
         );
         return VK_NULL_HANDLE;
       }
@@ -220,6 +241,25 @@ namespace gpg::gal
 
   void DeviceVulkan::CreateGpuDrivenObjects()
   {
+    // CopyVertexBufferRegion is vkCmdCopyBuffer between transfer barriers.
+    mGpuFeatures = kGpuFeatureBufferCopy;
+    // Tessellated effect passes draw only with the device's tessellationShader feature (BindPass).
+    if (mTessellationSupported) {
+      mGpuFeatures |= kGpuFeatureTessellation;
+    }
+
+    // Timestamps, when the queue supports them in graphics and compute work.
+    if (mProperties.limits.timestampComputeAndGraphics == VK_TRUE && mProperties.limits.timestampPeriod > 0.0f) {
+      VkQueryPoolCreateInfo pool{};
+      pool.sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO;
+      pool.queryType = VK_QUERY_TYPE_TIMESTAMP;
+      pool.queryCount = kProfileFrames * 2U * (kMaxTimedRegionsPerFrame + 1U);
+      if (Vk().vkCreateQueryPool(mDevice, &pool, nullptr, &mTimestampPool) == VK_SUCCESS) {
+        mTimestampToMilliseconds = static_cast<double>(mProperties.limits.timestampPeriod) / 1.0e6;
+        mGpuFeatures |= kGpuFeatureTimestamps;
+      }
+    }
+
     VkDescriptorSetLayoutBinding bindings[kBindingCount]{};
     for (std::uint32_t binding = 0U; binding < kBindingCount; ++binding) {
       bindings[binding].binding = binding;
@@ -232,8 +272,24 @@ namespace gpg::gal
         : (binding == kSamplerBinding)                                      ? VK_DESCRIPTOR_TYPE_SAMPLER
                                                                             : VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
     }
+    // The programs' layout gives every stage this set's 6 storage buffers, and with ray queries the scene's 2 and
+    // its 64 textures, where Vulkan promises a stage only 4 storage buffers and 16 textures; desktop GPUs have far
+    // more. A device below what the layout holds must not make it (a driver need not refuse it): the engine's
+    // GPU-driven paths then draw as they do on a device without them (GpuPathEnabled).
+    const std::string beyond = vulkan::LayoutBeyondLimits(
+      mProperties.limits,
+      {{bindings, kBindingCount}, {mRaySceneBindings.data(), static_cast<std::uint32_t>(mRaySceneBindings.size())}}
+    );
+    if (!beyond.empty()) {
+      gpg::Warnf("Vulkan: the GPU programs' pipeline layout holds %s: GPU-driven drawing is off", beyond.c_str());
+      return;
+    }
+
     VkDescriptorSetLayoutCreateInfo layout{};
     layout.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    CheckVk(
+      "GpuDrivenVulkan.cpp", __LINE__, Vk().vkCreateDescriptorSetLayout(mDevice, &layout, nullptr, &mGpuEmptySetLayout)
+    );
     layout.bindingCount = kBindingCount;
     layout.pBindings = bindings;
     CheckVk(
@@ -242,8 +298,8 @@ namespace gpg::gal
     VkPipelineLayoutCreateInfo pipelineLayout{};
     pipelineLayout.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
     // Engine addition (ren_RayTracedShadows): the ray-traced scene as set 2, as for the effects; set 1 is unused
-    // and takes the program set's layout as a stand-in.
-    const VkDescriptorSetLayout sets[3] = {mGpuSetLayout, mGpuSetLayout, mRayLayout};
+    // and has an empty set layout, which holds nothing against the limits.
+    const VkDescriptorSetLayout sets[3] = {mGpuSetLayout, mGpuEmptySetLayout, mRayLayout};
     pipelineLayout.setLayoutCount = (mRayLayout != VK_NULL_HANDLE) ? 3U : 1U;
     pipelineLayout.pSetLayouts = sets;
     CheckVk(
@@ -271,24 +327,7 @@ namespace gpg::gal
 
     mGpuNullBuffer =
       CreateDeviceBuffer(kNullBufferBytes, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT);
-    // CopyVertexBufferRegion is vkCmdCopyBuffer between transfer barriers.
-    mGpuFeatures = kGpuFeatureVertexPulling | kGpuFeatureCompute | kGpuFeatureIndirectDraw | kGpuFeatureBufferCopy;
-    // Tessellated effect passes draw only with the device's tessellationShader feature (BindPass).
-    if (mTessellationSupported) {
-      mGpuFeatures |= kGpuFeatureTessellation;
-    }
-
-    // Timestamps, when the queue supports them in graphics and compute work.
-    if (mProperties.limits.timestampComputeAndGraphics == VK_TRUE && mProperties.limits.timestampPeriod > 0.0f) {
-      VkQueryPoolCreateInfo pool{};
-      pool.sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO;
-      pool.queryType = VK_QUERY_TYPE_TIMESTAMP;
-      pool.queryCount = kProfileFrames * 2U * (kMaxTimedRegionsPerFrame + 1U);
-      if (Vk().vkCreateQueryPool(mDevice, &pool, nullptr, &mTimestampPool) == VK_SUCCESS) {
-        mTimestampToMilliseconds = static_cast<double>(mProperties.limits.timestampPeriod) / 1.0e6;
-        mGpuFeatures |= kGpuFeatureTimestamps;
-      }
-    }
+    mGpuFeatures |= kGpuFeatureVertexPulling | kGpuFeatureCompute | kGpuFeatureIndirectDraw;
   }
 
   void DeviceVulkan::ReleaseGpuDrivenObjects() noexcept
@@ -326,6 +365,10 @@ namespace gpg::gal
     if (mGpuSetLayout != VK_NULL_HANDLE) {
       Vk().vkDestroyDescriptorSetLayout(mDevice, mGpuSetLayout, nullptr);
       mGpuSetLayout = VK_NULL_HANDLE;
+    }
+    if (mGpuEmptySetLayout != VK_NULL_HANDLE) {
+      Vk().vkDestroyDescriptorSetLayout(mDevice, mGpuEmptySetLayout, nullptr);
+      mGpuEmptySetLayout = VK_NULL_HANDLE;
     }
     for (ProfileFrame& frame : mProfileFrames) {
       frame = ProfileFrame{};
@@ -484,7 +527,7 @@ namespace gpg::gal
 
     if (desc.computeEntry != nullptr) {
       program->mComputeEntry = desc.computeEntry;
-      program->mCompute = CompileModule(mDevice, desc, desc.computeEntry, L"cs_6_0", false);
+      program->mCompute = CompileModule(mDevice, mProperties.limits, desc, desc.computeEntry, L"cs_6_0", false);
       if (program->mCompute == VK_NULL_HANDLE) {
         return {};
       }
@@ -510,8 +553,8 @@ namespace gpg::gal
     }
     program->mVertexEntry = desc.vertexEntry;
     program->mPixelEntry = desc.pixelEntry;
-    program->mVertex = CompileModule(mDevice, desc, desc.vertexEntry, L"vs_6_0", true);
-    program->mPixel = CompileModule(mDevice, desc, desc.pixelEntry, L"ps_6_0", false);
+    program->mVertex = CompileModule(mDevice, mProperties.limits, desc, desc.vertexEntry, L"vs_6_0", true);
+    program->mPixel = CompileModule(mDevice, mProperties.limits, desc, desc.pixelEntry, L"ps_6_0", false);
     if (program->mVertex == VK_NULL_HANDLE || program->mPixel == VK_NULL_HANDLE) {
       return {};
     }

@@ -1,10 +1,12 @@
-// gpg/gal/effects/SpirvReflect.h: the stage interface of a SPIR-V module, the input-location patch
+// gpg/gal/effects/SpirvReflect.h: the stage interface of a SPIR-V module, the input-location patch,
+// the link of a pixel shader's inputs to a vertex shader's outputs, a compute module's work group size
 // and the removal of the reflection decorations. The modules are assembled here word by word from
 // the SPIR-V 1.x specification: the header (magic 0x07230203, version, generator, bound, schema),
 // then instructions whose first word holds the word count in the high half and the opcode in the
 // low half; literal strings are UTF-8, nul-terminated and padded to whole words, first character
 // in the lowest byte. Opcodes and enumerants used (section 3 of the specification):
-// OpExtension 10, OpMemoryModel 14, OpCapability 17, OpTypeInt 21, OpTypeFloat 22, OpTypeVector 23,
+// OpExtension 10, OpMemoryModel 14, OpExecutionMode 16 (execution modes OriginUpperLeft 7,
+// LocalSize 17), OpCapability 17, OpTypeInt 21, OpTypeFloat 22, OpTypeVector 23,
 // OpTypeMatrix 24, OpTypeArray 28, OpTypePointer 32, OpConstant 43, OpVariable 59, OpDecorate 71,
 // OpDecorateString 5632, OpMemberDecorateString 5633; decorations BuiltIn 11, Location 30,
 // UserSemantic 5635, UserTypeGOOGLE 5636; storage classes Input 1, Uniform 2, Output 3, Private 6.
@@ -388,4 +390,170 @@ TEST(
   zero.Words().push_back(kOpCapability);
   const std::vector<std::uint8_t> zeroBytes = zero.Bytes();
   EXPECT_EQ(StripSpirvReflection(zeroBytes), zeroBytes);
+}
+
+namespace
+{
+  SpirvInterfaceVariable Variable(
+    const std::uint32_t id,
+    const std::uint32_t location,
+    const char* const semantic,
+    const std::uint32_t semanticIndex,
+    const std::uint32_t locations = 1U
+  )
+  {
+    SpirvInterfaceVariable variable;
+    variable.id = id;
+    variable.location = location;
+    variable.locations = locations;
+    variable.semantic = semantic;
+    variable.semanticIndex = semanticIndex;
+    variable.builtIn = variable.semantic.starts_with("SV_");
+    return variable;
+  }
+} // namespace
+
+TEST(
+  GalSpirvReflect,
+  PixelInputsTakeTheVertexOutputOfTheirSemantic
+)
+{
+  SpirvInterface vertex;
+  vertex.outputs = {
+    Variable(1U, 0U, "SV_POSITION", 0U),
+    Variable(2U, 0U, "TEXCOORD", 0U, 3U), // TEXCOORD0..2 at locations 0..2
+    Variable(3U, 3U, "COLOR", 0U),
+    Variable(4U, 4U, "TEXCOORD", 5U),
+  };
+  SpirvInterface pixel;
+  pixel.inputs = {
+    Variable(10U, 0U, "SV_POSITION", 0U),
+    Variable(11U, 0U, "TEXCOORD", 2U),
+    Variable(12U, 1U, "COLOR", 0U),
+    Variable(13U, 2U, "TEXCOORD", 5U),
+  };
+  const std::map<std::uint32_t, std::uint32_t> locations = LinkPixelInputLocations(vertex, pixel, 15U);
+  EXPECT_EQ(locations, (std::map<std::uint32_t, std::uint32_t>{{11U, 2U}, {12U, 3U}, {13U, 4U}}))
+    << "system values keep their built-ins; the rest move onto the outputs of their semantic";
+}
+
+TEST(
+  GalSpirvReflect,
+  PixelInputsNoVertexOutputWritesTakeTheDevicesLastLocations
+)
+{
+  SpirvInterface vertex;
+  vertex.outputs = {Variable(1U, 0U, "TEXCOORD", 0U)};
+  SpirvInterface pixel;
+  pixel.inputs = {
+    Variable(10U, 0U, "TEXCOORD", 0U),
+    Variable(11U, 1U, "TEXCOORD", 1U),
+    Variable(12U, 2U, "NORMAL", 0U),
+  };
+  // Vulkan promises 64 fragment input components, 16 locations: 15 is the last a device need have, and a
+  // location past the device's last is invalid.
+  EXPECT_EQ(
+    LinkPixelInputLocations(vertex, pixel, 15U),
+    (std::map<std::uint32_t, std::uint32_t>{{10U, 0U}, {11U, 15U}, {12U, 14U}})
+  );
+  EXPECT_EQ(
+    LinkPixelInputLocations(vertex, pixel, 31U),
+    (std::map<std::uint32_t, std::uint32_t>{{10U, 0U}, {11U, 31U}, {12U, 30U}})
+  ) << "a desktop GPU's 128 components";
+}
+
+TEST(
+  GalSpirvReflect,
+  PixelInputsNoVertexOutputWritesTakeFreeLocationsForAllTheyHold
+)
+{
+  SpirvInterface vertex;
+  vertex.outputs = {Variable(1U, 15U, "TEXCOORD", 0U)};
+  SpirvInterface pixel;
+  pixel.inputs = {
+    Variable(10U, 0U, "TEXCOORD", 0U),
+    Variable(11U, 1U, "NORMAL", 0U, 2U), // float4 NORMAL[2]: two locations
+    Variable(12U, 3U, "COLOR", 0U),
+    Variable(13U, 4U, "TANGENT", 0U, 4U), // float4x4: four columns
+  };
+  // The linked input holds 15; the array takes 13 and 14, past none of its own and below the linked one; the
+  // matrix four locations below the colour.
+  EXPECT_EQ(
+    LinkPixelInputLocations(vertex, pixel, 15U),
+    (std::map<std::uint32_t, std::uint32_t>{{10U, 15U}, {11U, 13U}, {12U, 12U}, {13U, 8U}})
+  );
+
+  // A gap of one between taken locations is left to an input that fits it.
+  vertex.outputs = {Variable(1U, 15U, "TEXCOORD", 0U), Variable(2U, 13U, "COLOR", 0U)};
+  pixel.inputs = {
+    Variable(10U, 0U, "TEXCOORD", 0U),
+    Variable(11U, 1U, "COLOR", 0U),
+    Variable(12U, 2U, "NORMAL", 0U, 2U),
+    Variable(13U, 4U, "BINORMAL", 0U),
+  };
+  EXPECT_EQ(
+    LinkPixelInputLocations(vertex, pixel, 15U),
+    (std::map<std::uint32_t, std::uint32_t>{{10U, 15U}, {11U, 13U}, {12U, 11U}, {13U, 14U}})
+  );
+}
+
+TEST(
+  GalSpirvReflect,
+  PixelInputsThatFindNoFreeLocationsKeepTheirOwn
+)
+{
+  SpirvInterface vertex;
+  SpirvInterface pixel;
+  pixel.inputs = {
+    Variable(10U, 0U, "TEXCOORD", 0U, 3U),
+    Variable(11U, 3U, "COLOR", 0U),
+  };
+  // A device with two locations: the array of three fits nowhere, the colour takes the last.
+  EXPECT_EQ(LinkPixelInputLocations(vertex, pixel, 1U), (std::map<std::uint32_t, std::uint32_t>{{11U, 1U}}));
+}
+
+TEST(
+  GalSpirvReflect,
+  ComputeModulesGiveTheirWorkGroupSize
+)
+{
+  constexpr std::uint16_t kOpExecutionMode = 16;
+  constexpr std::uint32_t kOriginUpperLeft = 7;
+  constexpr std::uint32_t kLocalSize = 17;
+  constexpr std::uint32_t kMain = 1;
+
+  Module compute;
+  compute.Op(kOpCapability, {1U});
+  compute.Op(kOpMemoryModel, {0U, 1U});
+  compute.Op(kOpExecutionMode, {kMain, kLocalSize, 1024U, 1U, 1U});
+  std::uint32_t size[3]{};
+  ASSERT_TRUE(ReflectSpirvComputeGroupSize(compute.Bytes(), size));
+  EXPECT_EQ(size[0], 1024U);
+  EXPECT_EQ(size[1], 1U);
+  EXPECT_EQ(size[2], 1U);
+
+  // Another execution mode before it is passed over.
+  Module tiled;
+  tiled.Op(kOpCapability, {1U});
+  tiled.Op(kOpExecutionMode, {kMain, kOriginUpperLeft});
+  tiled.Op(kOpExecutionMode, {kMain, kLocalSize, 8U, 8U, 2U});
+  ASSERT_TRUE(ReflectSpirvComputeGroupSize(tiled.Bytes(), size));
+  EXPECT_EQ(size[0], 8U);
+  EXPECT_EQ(size[1], 8U);
+  EXPECT_EQ(size[2], 2U);
+
+  // A pixel shader has no work group; malformed code has none either.
+  Module pixel;
+  pixel.Op(kOpCapability, {1U});
+  pixel.Op(kOpExecutionMode, {kMain, kOriginUpperLeft});
+  EXPECT_FALSE(ReflectSpirvComputeGroupSize(pixel.Bytes(), size));
+  EXPECT_FALSE(ReflectSpirvComputeGroupSize({}, size));
+  std::vector<std::uint8_t> wrongMagic = compute.Bytes();
+  wrongMagic[0] ^= 0xFFU;
+  EXPECT_FALSE(ReflectSpirvComputeGroupSize(wrongMagic, size));
+  Module truncated;
+  truncated.Words().push_back((6U << 16U) | kOpExecutionMode);
+  truncated.Words().push_back(kMain);
+  truncated.Words().push_back(kLocalSize);
+  EXPECT_FALSE(ReflectSpirvComputeGroupSize(truncated.Bytes(), size));
 }

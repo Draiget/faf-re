@@ -45,6 +45,7 @@
 #include "gpg/gal/TextureContext.h"
 #include "gpg/gal/VertexBufferContext.hpp"
 #include "VulkanAttachmentBarrier.h"
+#include "VulkanLimits.h"
 #include "VulkanSurface.h"
 
 namespace gpg::gal
@@ -682,6 +683,10 @@ namespace gpg::gal
     // A software rasterizer (llvmpipe, as in a virtual machine without 3D, issue #256) gets no ray
     // queries below: ray-traced shadows would trace on the CPU that already rasterizes every pixel.
     const bool softwareDevice = mProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_CPU;
+    // A rasterizer state's depth bias clamp needs the feature; without it a pipeline's clamp must be 0
+    // (CreatePipeline). Desktop GPUs have it, a phone's need not.
+    features.features.depthBiasClamp = available.features.depthBiasClamp;
+    mDepthBiasClamp = available.features.depthBiasClamp == VK_TRUE;
 
     const float priority = 1.0f;
     VkDeviceQueueCreateInfo queue{};
@@ -854,8 +859,24 @@ namespace gpg::gal
       layout.bindingCount = 5U;
       layout.pBindings = scene;
       CheckVk("DeviceVulkan.cpp", __LINE__, Vk().vkCreateDescriptorSetLayout(mDevice, &layout, nullptr, &mRayLayout));
+      mRaySceneBindings.assign(std::begin(scene), std::end(scene));
       layout.bindingCount = 1U;
       layout.pBindings = &constants;
+    } else {
+      mRaySceneBindings.clear();
+    }
+    // Set 0 gives every stage all of an effect's texture and sampler slots, and the ray-traced scene 64 textures
+    // more, where Vulkan promises a stage only 16 of each; desktop GPUs have hundreds. A layout beyond the device's
+    // limits is invalid, which a driver need not refuse, nor say why when it does: this names the limit. The layout
+    // is made all the same, as the effects draw with no other.
+    const std::string beyond = vulkan::LayoutBeyondLimits(
+      mProperties.limits,
+      {{bindings.data(), static_cast<std::uint32_t>(bindings.size())},
+       {&constants, 1U},
+       {mRaySceneBindings.data(), static_cast<std::uint32_t>(mRaySceneBindings.size())}}
+    );
+    if (!beyond.empty()) {
+      gpg::Warnf("Vulkan: the effects' pipeline layout holds %s", beyond.c_str());
     }
     const std::uint32_t setCount = mRayQuery ? 3U : 2U;
     const VkDescriptorSetLayout sets[3] = {mTextureLayout, mConstantLayout, mRayLayout};
@@ -3612,28 +3633,12 @@ namespace gpg::gal
     if (found != mLinkedModules.end()) {
       return found->second;
     }
-    const effects::SpirvInterface& vertexInterface = InterfaceOf(*vertex);
-    const effects::SpirvInterface& pixelInterface = InterfaceOf(entry);
-    std::map<std::uint32_t, std::uint32_t> locations;
-    std::uint32_t spare = 31U;
-    for (const effects::SpirvInterfaceVariable& input : pixelInterface.inputs) {
-      if (input.builtIn) {
-        continue;
-      }
-      std::uint32_t location = 0xFFFFFFFFU;
-      for (const effects::SpirvInterfaceVariable& output : vertexInterface.outputs) {
-        if (
-          !output.builtIn && output.semantic == input.semantic && input.semanticIndex >= output.semanticIndex &&
-          input.semanticIndex < output.semanticIndex + output.locations
-        ) {
-          location = output.location + (input.semanticIndex - output.semanticIndex);
-        }
-      }
-      if (location == 0xFFFFFFFFU) {
-        location = spare--; // not written by the vertex shader: undefined, as on D3D
-      }
-      locations[input.id] = location;
-    }
+    // An input the vertex shader doesn't write is invalid in Vulkan, where Direct3D reads an undefined value; it
+    // counts down from the device's last location, so that its location at least is one the device has: Vulkan
+    // promises 16 (64 components), and a phone's GPU may have no more.
+    const std::map<std::uint32_t, std::uint32_t> locations = effects::LinkPixelInputLocations(
+      InterfaceOf(*vertex), InterfaceOf(entry), vulkan::LastFragmentInputLocation(mProperties.limits)
+    );
     const VkShaderModule module = create(effects::PatchSpirvInputLocations(entry.code, locations));
     mLinkedModules.emplace(key, module);
     return module;
@@ -3877,7 +3882,7 @@ namespace gpg::gal
     raster.depthBiasEnable =
       (rasterizer.depthBias != 0 || rasterizer.slopeScaledDepthBias != 0.0f) ? VK_TRUE : VK_FALSE;
     raster.depthBiasConstantFactor = static_cast<float>(rasterizer.depthBias);
-    raster.depthBiasClamp = rasterizer.depthBiasClamp;
+    raster.depthBiasClamp = vulkan::PipelineDepthBiasClamp(mDepthBiasClamp, rasterizer.depthBiasClamp);
     raster.depthBiasSlopeFactor = rasterizer.slopeScaledDepthBias;
     raster.lineWidth = 1.0f;
     VkPipelineMultisampleStateCreateInfo multisample{};
