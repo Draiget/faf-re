@@ -35,7 +35,7 @@ get_filename_component(_faf_root "${CMAKE_CURRENT_LIST_DIR}/.." ABSOLUTE)
 if(NOT FAF_DEPENDENCIES_DIR)
   set(FAF_DEPENDENCIES_DIR "${_faf_root}/dependencies")
 endif()
-set(_faf_patches "${FAF_DEPENDENCIES_DIR}/patches")
+set(_faf_patches "${_faf_root}/dependencies/patches")
 set(_faf_downloads "${FAF_DEPENDENCIES_DIR}/.downloads")
 find_program(FAF_GIT git REQUIRED)
 
