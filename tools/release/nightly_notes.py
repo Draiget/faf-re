@@ -6,17 +6,22 @@ usage: TAG=... SHA=... PREVIOUS=... [PARITY_RUN=... PARITY_URL=... NOTE=...] nig
 
 --player-notes also writes the short notes for players that FAF Develop's changelog shows (issue #323):
 each `Player-Note:` trailer of the commits since the previous nightly or release, one line per note.
+`Player-Note: none` marks a change players won't notice and is left out (CONTRIBUTING.md, "Player notes").
 
 Reads git history, zips/SHA256SUMS.txt and, when the parity run's report was downloaded, report/report.json.
 """
 import argparse
 import json
 import os
+import re
 import subprocess
 
 REPO = "https://github.com/Draiget/faf-re"
 # GitHub refuses a release body over 125,000 characters.
 MAX_CHANGES = 100_000
+# `Player-Note:` values that say the change has no note
+NO_NOTE = {"none", "-", "no", "n/a"}
+PLAYER_NOTE_RE = re.compile(r"^\s*Player-Note:[ \t]*(.*)$", re.IGNORECASE)
 
 
 def changes(previous, sha):
@@ -27,11 +32,17 @@ def changes(previous, sha):
 
 
 def player_notes(previous, sha):
-    """The `Player-Note:` trailers of the commits in previous..sha, oldest first, as Markdown list lines."""
-    log = subprocess.run(["git", "log", "--no-merges", "--reverse", "--format=%(trailers:key=Player-Note,valueonly,separator=%x00)",
-                          "%s..%s" % (previous, sha)],
+    """The `Player-Note:` lines of the commits in previous..sha, oldest first, as Markdown list lines. Read anywhere in
+    the message, not only as trailers: a squash merge puts each commit's message one after another, so a note can end
+    up mid-message."""
+    log = subprocess.run(["git", "log", "--no-merges", "--reverse", "--format=%B%x00", "%s..%s" % (previous, sha)],
                          capture_output=True, text=True, encoding="utf-8", check=True).stdout
-    notes = [note.strip() for line in log.splitlines() for note in line.split("\0") if note.strip()]
+    notes = []
+    for message in log.split("\0"):
+        for line in message.splitlines():
+            m = PLAYER_NOTE_RE.match(line)
+            if m and m.group(1).strip() and m.group(1).strip().lower().rstrip(".") not in NO_NOTE:
+                notes.append(m.group(1).strip())
     return ["- " + note for note in notes]
 
 

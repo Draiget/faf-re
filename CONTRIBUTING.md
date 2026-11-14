@@ -141,6 +141,18 @@ To check every commit as you make it, call `node .github/scripts/commit-lint.js 
 
 Commits made before this rule use an older `Area: sentence` style; they stay as they are.
 
+### Player notes
+
+Each release carries short notes for players, which FAF Develop's lobby changelog shows. They come from `Player-Note:` lines in the commit messages since the previous release (`tools/release/nightly_notes.py`). A `feat`, `fix` or `perf` commit that changes `src/` or `data/` ends with one:
+
+```
+fix(render): shadows no longer flicker when zooming out
+
+Player-Note: Shadows no longer flicker when you zoom out.
+```
+
+Write one when players will notice the change in the game: what they see or hear, the UI or controls, how units and the game behave, multiplayer and connections, a crash or desync that no longer happens, or a speed-up they can feel. One plain sentence, without file, function or switch names. When players won't notice it (a refactor, logging, a change behind a switch that is off by default), write `Player-Note: none`, which the release leaves out. Other commit types need no line.
+
 ## Pull requests
 
 - Fill in the template ([.github/pull_request_template.md](.github/pull_request_template.md)), especially **Evidence**, **Sim impact** (tick exactly one box) and **Testing** (the replays you played on x64 and x86). The `PR sim impact` check fails without them ([What every pull request needs](#what-every-pull-request-needs)).
