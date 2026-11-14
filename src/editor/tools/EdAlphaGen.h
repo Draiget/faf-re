@@ -5,6 +5,7 @@
 #include <array>
 #include <cstdint>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace faf::editor
@@ -70,4 +71,50 @@ namespace faf::editor
     int size,
     std::vector<float>& rgba
   );
+
+  /**
+   * What a terrain shader reads from the layers' albedo alpha (Studio's shaders.lua profiles): TTerrainXP, its Ext and
+   * Terrain000 / 050 specularity; TTerrain 1 - specularity (matte); TTerrainGlow a glow mask; Terrain001 / 051 and the
+   * 1xx / 2xx nothing (unused). `baseOpacity`: the base layer's alpha is the opacity of its texture laid over the whole
+   * map (Terrain001 / 051, and the 1xx / 2xx whose last digit is 1 or 2).
+   */
+  enum class LayerAlphaUse : std::uint8_t
+  {
+    Unused,
+    Specularity,
+    Matte,
+    Glow,
+  };
+  struct ShaderAlphaUse
+  {
+    LayerAlphaUse layers = LayerAlphaUse::Specularity;
+    bool baseOpacity = false;
+  };
+  [[nodiscard]] ShaderAlphaUse ShaderAlphaOf(std::string_view shader);
+
+  /** A kind of ground's specularity (Studio's ROLE_SPEC: wet 0.85, snow 0.7 .. dirt 0.15); Unknown 0.3. */
+  [[nodiscard]] float KindSpecularity(GroundKind kind);
+
+  enum class TextureAlphaMode : std::uint8_t
+  {
+    Generate, // the kind's specularity moved by the texture's detail (bright spots shinier)
+    Adjust,   // the texture's own alpha pulled towards the kind's by `amount`
+    Off,      // the original textures back
+  };
+
+  /**
+   * A texture's alpha (BGRA bytes, in place; the colours stay) as the kind's specularity: Generate base + detail x
+   * (brightness - its mean), Adjust alpha x (1 - amount) + amount x base; matte (TTerrain) reads 1 - specularity, so
+   * its target is 1 - base and the detail counts the other way. Clamped to 0.02..0.98.
+   */
+  void SetSpecularityAlpha(
+    std::vector<std::uint8_t>& bgra,
+    GroundKind kind,
+    bool matte,
+    TextureAlphaMode mode,
+    float detail,
+    float amount
+  );
+  /** Every pixel's alpha to `value` (0..1), the colours as they are. */
+  void SetConstantAlpha(std::vector<std::uint8_t>& bgra, float value);
 } // namespace faf::editor

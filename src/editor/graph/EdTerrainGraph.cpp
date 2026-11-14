@@ -832,7 +832,14 @@ namespace faf::editor
         continue;
       }
       if (type == "out_texalpha") {
-        writes.notes.push_back(node->type->title + ": not written by this editor yet");
+        const std::string mode = TerrainParamText(*node, "mode");
+        writes.texAlpha = true;
+        writes.texAlphaMode = mode == "adjust" ? TextureAlphaMode::Adjust
+          : mode == "off"                      ? TextureAlphaMode::Off
+                                               : TextureAlphaMode::Generate;
+        writes.texAlphaDetail = static_cast<float>(TerrainParamNumber(*node, "detail", 0.35));
+        writes.texAlphaAmount = static_cast<float>(TerrainParamNumber(*node, "amount", 0.6));
+        writes.baseOpacity = static_cast<float>(TerrainParamNumber(*node, "baseOpacity", 0.0));
         continue;
       }
       if (type == "out_roughness") {

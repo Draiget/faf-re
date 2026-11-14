@@ -3554,7 +3554,12 @@ namespace faf::editor::terrain
         "out_texalpha",
         "Output: texture alpha",
         "outputs",
-        "The layer textures' alpha their shader reads as specularity (not written by this editor yet).",
+        "Build gives the layer textures the alpha their shader reads (copies of the textures beside the map, the "
+        "colours as they were; one undo step). TTerrain, TTerrainXP and the 0xx shaders read it as specularity "
+        "(TTerrain as 1 - specularity): Generate makes it from the kind of ground (wet ground and snow shiny, rock and "
+        "dirt dull) with the texture's detail, Adjust pulls the alpha the texture has towards the kind, Off puts the "
+        "original textures back. The shaders whose name ends in 1 or 2 (Terrain1x1, 2x2 ..., 001, 051) lay the base "
+        "texture over the map by its alpha: there the base layer gets the opacity below (0 = none).",
         {},
         {},
         {C("mode",

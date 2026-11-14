@@ -296,11 +296,18 @@ namespace faf::editor
     int atlasSize = 1024;
     float splatSoft = 0.0f;
     float splatContrast = 0.0f;
+    /** Output: texture alpha: the layers' albedo alpha as their shader reads it (copies of the textures). */
+    bool texAlpha = false;
+    TextureAlphaMode texAlphaMode = TextureAlphaMode::Generate;
+    float texAlphaDetail = 0.35f;
+    float texAlphaAmount = 0.6f;
+    float baseOpacity = 0.0f;
     /** Outputs left out, with why ("Output: ground kind (snow): no layer holds snow"). */
     std::vector<std::string> notes;
     [[nodiscard]] bool Empty() const noexcept
     {
-      return kinds.empty() && layers.empty() && types.empty() && scatters.empty() && mapTextures.empty() && !atlas;
+      return kinds.empty() && layers.empty() && types.empty() && scatters.empty() && mapTextures.empty() && !atlas &&
+        !texAlpha;
     }
   };
 

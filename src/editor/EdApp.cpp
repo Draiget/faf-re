@@ -2767,6 +2767,152 @@ namespace faf::editor
           " layers' textures and put in the Upper layer (its own undo step)." + splat;
       }
 
+      /**
+       * A terrain graph's Output: texture alpha: copies of the layers' textures (beside the map, the colours as they
+       * were) whose alpha is what the shader reads, put in the layers as one undo step; Off puts the originals back.
+       */
+      std::string MakeTextureAlpha(
+        const TerrainBuildWrites& writes
+      )
+      {
+        const std::filesystem::path scmap = mDocument.MapDiskFile();
+        const std::vector<EdTools::LayerSlot> slots = mScene.LayerSlots();
+        const std::string shader = mScene.TerrainShader();
+        const ShaderAlphaUse use = ShaderAlphaOf(shader);
+        const ShaderProfile profile = ShaderProfileOf(shader);
+        gpg::gal::imaging::ImageCodec* const codec = gpg::gal::imaging::ImageCodec::Instance();
+        const auto originOf = [&](const std::string& path) {
+          const auto found = mAlphaOrigins.find(LowerPath(path));
+          return found != mAlphaOrigins.end() ? found->second : path;
+        };
+        std::vector<std::pair<int, LayerSettings>> changes;
+        const auto change = [&](const int slot, const std::string& albedo) {
+          const EdTools::LayerSlot& s = slots[static_cast<std::size_t>(slot)];
+          changes.emplace_back(slot, LayerSettings{albedo, s.normals, s.albedoSize, s.normalsSize});
+        };
+        if (writes.texAlphaMode == TextureAlphaMode::Off) {
+          for (int slot = 0; slot < static_cast<int>(slots.size()); ++slot) {
+            const std::string origin = originOf(slots[static_cast<std::size_t>(slot)].albedo);
+            if (origin != slots[static_cast<std::size_t>(slot)].albedo) {
+              change(slot, origin);
+            }
+          }
+          const int changed = mScene.ApplyLayerSettings({}, changes);
+          return changed > 0
+            ? "Texture alpha: the original textures of " + std::to_string(changed) + " layers are back (one undo step)."
+            : "Texture alpha: the layers have their own textures already.";
+        }
+        const bool layers = use.layers == LayerAlphaUse::Specularity || use.layers == LayerAlphaUse::Matte;
+        if (!layers && !use.baseOpacity) {
+          return "Texture alpha: " + shader +
+            " reads no alpha from the layer textures (TTerrain, TTerrainXP and the "
+            "0xx shaders do; the 1xx / 2xx take roughness from the atlas).";
+        }
+        if (scmap.empty() || codec == nullptr) {
+          return "Texture alpha: the map has no folder of its own (save it as a new map first).";
+        }
+        const std::filesystem::path folder = scmap.parent_path() / "env" / "layers";
+        std::error_code ec;
+        std::filesystem::create_directories(folder, ec);
+        EdTextureLibrary& library = mShell->Tools().Library();
+        std::string kinds;
+        std::string skipped;
+        const auto made = [&](const int slot, const bool baseOnly) {
+          const std::string origin = originOf(slots[static_cast<std::size_t>(slot)].albedo);
+          std::string bytes;
+          if (origin.empty() || !ReadGameFile(origin, bytes)) {
+            return;
+          }
+          gpg::gal::imaging::DecodeOptions options;
+          options.format = DXGI_FORMAT_B8G8R8A8_UNORM;
+          options.mipLevels = 1;
+          gpg::gal::imaging::Image image;
+          if (
+            FAILED(codec->Decode(bytes.data(), bytes.size(), options, image)) || image.subresources.empty() ||
+            image.format != DXGI_FORMAT_B8G8R8A8_UNORM
+          ) {
+            skipped += (skipped.empty() ? "" : ", ") + std::to_string(slot) + " (unreadable)";
+            return;
+          }
+          const auto& level = image.subresources.front();
+          if (level.width != level.height || level.width < 4) {
+            skipped += (skipped.empty() ? "" : ", ") + std::to_string(slot) + " (not square)";
+            return;
+          }
+          const int size = static_cast<int>(level.width);
+          std::vector<std::uint8_t> bgra(static_cast<std::size_t>(size) * size * 4);
+          for (int y = 0; y < size; ++y) {
+            std::memcpy(
+              bgra.data() + static_cast<std::size_t>(y) * size * 4,
+              image.bytes.data() + level.offset + static_cast<std::size_t>(y) * level.rowPitch,
+              static_cast<std::size_t>(size) * 4
+            );
+          }
+          if (baseOnly) {
+            SetConstantAlpha(bgra, writes.baseOpacity);
+          } else {
+            float rgb[3] = {0.4f, 0.4f, 0.4f};
+            const bool read = library.AverageColour(origin, rgb);
+            const GroundKind kind = GroundKindOf(origin, read ? rgb : nullptr).kind;
+            kinds += (kinds.empty() ? "" : ", ") + std::to_string(slot) + " " + GroundKindName(kind);
+            SetSpecularityAlpha(
+              bgra,
+              kind,
+              use.layers == LayerAlphaUse::Matte,
+              writes.texAlphaMode,
+              writes.texAlphaDetail,
+              writes.texAlphaAmount
+            );
+          }
+          TexImage out;
+          out.Reset(size, 4, 0.0f);
+          for (std::size_t i = 0; i < bgra.size() / 4; ++i) {
+            out.data[i * 4 + 0] = bgra[i * 4 + 2] / 255.0f;
+            out.data[i * 4 + 1] = bgra[i * 4 + 1] / 255.0f;
+            out.data[i * 4 + 2] = bgra[i * 4 + 0] / 255.0f;
+            out.data[i * 4 + 3] = bgra[i * 4 + 3] / 255.0f;
+          }
+          std::vector<std::uint8_t> dds;
+          std::string error;
+          const std::string file = "layer" + std::to_string(slot) + (baseOnly ? "_opacity.dds" : "_alpha.dds");
+          if (!EncodeDds(out, DdsKind::Bgra, dds, error)) {
+            skipped += (skipped.empty() ? "" : ", ") + std::to_string(slot) + " (" + error + ")";
+            return;
+          }
+          std::ofstream stream(folder / file, std::ios::binary | std::ios::trunc);
+          stream.write(reinterpret_cast<const char*>(dds.data()), static_cast<std::streamsize>(dds.size()));
+          if (!stream) {
+            skipped += (skipped.empty() ? "" : ", ") + std::to_string(slot) + " (can't write)";
+            return;
+          }
+          const std::string game = "/maps/" + mDocument.FolderName() + "/env/layers/" + file;
+          mAlphaOrigins[LowerPath(game)] = origin;
+          change(slot, game);
+        };
+        const int last = std::min(8, profile.painted);
+        if (layers) {
+          for (int slot = 0; slot <= last && slot < static_cast<int>(slots.size()); ++slot) {
+            made(slot, false);
+          }
+        } else if (use.baseOpacity && !slots.empty()) {
+          made(0, true);
+        }
+        const int changed = mScene.ApplyLayerSettings({}, changes);
+        gpg::Logf(
+          "editor: texture alpha on %s: %d layers (%s)%s%s",
+          shader.c_str(),
+          changed,
+          layers ? kinds.c_str() : "the base layer's opacity",
+          skipped.empty() ? "" : "; skipped ",
+          skipped.c_str()
+        );
+        return "Texture alpha: " + std::to_string(changed) + " layers" +
+          (layers ? std::string(use.layers == LayerAlphaUse::Matte ? " (1 - specularity)" : " (specularity)")
+                  : std::string(" (the base texture's opacity)")) +
+          ", one undo step." + (skipped.empty() ? "" : " Skipped: " + skipped + ".");
+      }
+      std::map<std::string, std::string> mAlphaOrigins; // a texture alpha copy (lower case game path) -> its original
+
       void DriveGenerate()
       {
         EdGenerate& generate = mShell->Generate();
@@ -2801,6 +2947,9 @@ namespace faf::editor
             }
             if (ask.writes.atlas) {
               status += " " + MakeAtlasTexture(ask.writes);
+            }
+            if (ask.writes.texAlpha) {
+              status += " " + MakeTextureAlpha(ask.writes);
             }
             generate.SetStatus(status);
             break;

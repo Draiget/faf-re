@@ -3,6 +3,7 @@
 #include "editor/terrain/EdFieldCore.h"
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <memory>
 
@@ -209,6 +210,112 @@ namespace faf::editor
           }
         }
       }
+    }
+  }
+  ShaderAlphaUse ShaderAlphaOf(
+    const std::string_view shader
+  )
+  {
+    std::string low(shader);
+    for (char& c : low) {
+      c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    }
+    ShaderAlphaUse use;
+    if (low == "tterrain") {
+      use.layers = LayerAlphaUse::Matte;
+    } else if (low == "tterrainglow") {
+      use.layers = LayerAlphaUse::Glow;
+    } else if (low == "tterrainxp" || low == "tterrainxpext" || low == "terrain000" || low == "terrain050") {
+      use.layers = LayerAlphaUse::Specularity;
+    } else if (low == "terrain001" || low == "terrain051") {
+      use.layers = LayerAlphaUse::Unused;
+      use.baseOpacity = true;
+    } else if (
+      low.size() >= 10 && low.rfind("terrain", 0) == 0 && (low[7] == '1' || low[7] == '2') &&
+      std::isdigit(static_cast<unsigned char>(low[8])) != 0 && std::isdigit(static_cast<unsigned char>(low[9])) != 0
+    ) {
+      // Terrain1xx / 2xx (a B at the end: biplanar): roughness and height from the atlas; the last digit 1 or 2 lays
+      // the base texture over the map by its alpha.
+      use.layers = LayerAlphaUse::Unused;
+      use.baseOpacity = low[9] == '1' || low[9] == '2';
+    } else if (low == "terrain301") {
+      use.layers = LayerAlphaUse::Unused;
+    }
+    return use;
+  }
+
+  float KindSpecularity(
+    const GroundKind kind
+  )
+  {
+    switch (kind) {
+    case GroundKind::Grass:
+      return 0.18f;
+    case GroundKind::Dirt:
+      return 0.15f;
+    case GroundKind::Wet:
+      return 0.85f;
+    case GroundKind::Sand:
+      return 0.30f;
+    case GroundKind::Rock:
+      return 0.25f;
+    case GroundKind::DarkRock:
+      return 0.20f;
+    case GroundKind::HighRock:
+      return 0.30f;
+    case GroundKind::Snow:
+      return 0.70f;
+    default:
+      return 0.30f;
+    }
+  }
+
+  void SetSpecularityAlpha(
+    std::vector<std::uint8_t>& bgra,
+    const GroundKind kind,
+    const bool matte,
+    const TextureAlphaMode mode,
+    const float detail,
+    const float amount
+  )
+  {
+    const std::size_t n = bgra.size() / 4;
+    if (n == 0 || mode == TextureAlphaMode::Off) {
+      return;
+    }
+    const float base = KindSpecularity(kind);
+    const float target = matte ? 1.0f - base : base;
+    const auto store = [&](const std::size_t i, const float a) {
+      bgra[i * 4 + 3] = static_cast<std::uint8_t>(std::lround(std::clamp(a, 0.02f, 0.98f) * 255.0f));
+    };
+    if (mode == TextureAlphaMode::Adjust) {
+      const float w = std::clamp(amount, 0.0f, 1.0f);
+      for (std::size_t i = 0; i < n; ++i) {
+        store(i, bgra[i * 4 + 3] / 255.0f * (1.0f - w) + w * target);
+      }
+      return;
+    }
+    std::vector<float> lum(n);
+    double sum = 0.0;
+    for (std::size_t i = 0; i < n; ++i) {
+      lum[i] = (0.299f * bgra[i * 4 + 2] + 0.587f * bgra[i * 4 + 1] + 0.114f * bgra[i * 4]) / 255.0f;
+      sum += lum[i];
+    }
+    const float mean = static_cast<float>(sum / static_cast<double>(n));
+    const float scale = matte ? -detail : detail;
+    for (std::size_t i = 0; i < n; ++i) {
+      store(i, target + scale * (lum[i] - mean));
+    }
+  }
+
+  void SetConstantAlpha(
+    std::vector<std::uint8_t>& bgra,
+    const float value
+  )
+  {
+    const auto a = static_cast<std::uint8_t>(std::lround(std::clamp(value, 0.0f, 1.0f) * 255.0f));
+    for (std::size_t i = 3; i < bgra.size(); i += 4) {
+      bgra[i] = a;
     }
   }
 } // namespace faf::editor

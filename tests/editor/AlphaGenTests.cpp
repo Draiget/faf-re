@@ -157,4 +157,57 @@ namespace faf::editor
     ApplyAtlasStyle("custom", s, soft, contrast);
     EXPECT_FLOAT_EQ(s.spread, 1.3f) << "custom keeps the numbers";
   }
+
+  TEST(
+    TextureAlpha,
+    ShadersReadTheAlphaTheirOwnWay
+  )
+  {
+    EXPECT_EQ(ShaderAlphaOf("TTerrain").layers, LayerAlphaUse::Matte);
+    EXPECT_EQ(ShaderAlphaOf("TTerrainXP").layers, LayerAlphaUse::Specularity);
+    EXPECT_EQ(ShaderAlphaOf("Terrain050").layers, LayerAlphaUse::Specularity);
+    EXPECT_EQ(ShaderAlphaOf("TTerrainGlow").layers, LayerAlphaUse::Glow);
+    EXPECT_EQ(ShaderAlphaOf("Terrain051").layers, LayerAlphaUse::Unused);
+    EXPECT_TRUE(ShaderAlphaOf("Terrain051").baseOpacity);
+    EXPECT_EQ(ShaderAlphaOf("Terrain200").layers, LayerAlphaUse::Unused);
+    EXPECT_FALSE(ShaderAlphaOf("Terrain200").baseOpacity);
+    EXPECT_TRUE(ShaderAlphaOf("Terrain202B").baseOpacity) << "a last digit of 2, biplanar";
+    EXPECT_TRUE(ShaderAlphaOf("terrain101").baseOpacity) << "any case";
+    EXPECT_FALSE(ShaderAlphaOf("Terrain301").baseOpacity);
+  }
+
+  TEST(
+    TextureAlpha,
+    AlphaIsTheKindsSpecularityMovedByTheDetail
+  )
+  {
+    // Half the pixels bright, half dark; alpha 255 to start.
+    std::vector<std::uint8_t> picture = Grey([](int x, int) {
+      return x % 2 == 0 ? 200 : 100;
+    });
+    std::vector<std::uint8_t> spec = picture;
+    SetSpecularityAlpha(spec, GroundKind::Wet, false, TextureAlphaMode::Generate, 0.35f, 0.6f);
+    const float bright = spec[3] / 255.0f;
+    const float dark = spec[7] / 255.0f;
+    EXPECT_NEAR((bright + dark) / 2.0f, 0.85f, 0.01f) << "wet ground: 0.85 on average";
+    EXPECT_GT(bright, dark) << "bright spots shinier";
+    EXPECT_NEAR(bright - dark, 0.35f * (100.0f / 255.0f), 0.01f);
+    EXPECT_EQ(spec[0], picture[0]) << "the colours stay";
+    // TTerrain reads 1 - specularity: dull rock is a high alpha, and bright spots lower.
+    std::vector<std::uint8_t> matte = picture;
+    SetSpecularityAlpha(matte, GroundKind::Rock, true, TextureAlphaMode::Generate, 0.35f, 0.6f);
+    EXPECT_NEAR((matte[3] + matte[7]) / 510.0f, 0.75f, 0.01f);
+    EXPECT_LT(matte[3], matte[7]);
+    // Adjust pulls the texture's own alpha (1 here) towards the kind's by the amount.
+    std::vector<std::uint8_t> adjusted = picture;
+    SetSpecularityAlpha(adjusted, GroundKind::Dirt, false, TextureAlphaMode::Adjust, 0.35f, 0.6f);
+    EXPECT_NEAR(adjusted[3] / 255.0f, 0.4f + 0.6f * 0.15f, 0.01f);
+    // Off changes nothing; a constant alpha for the base layer's opacity.
+    std::vector<std::uint8_t> off = picture;
+    SetSpecularityAlpha(off, GroundKind::Dirt, false, TextureAlphaMode::Off, 0.35f, 0.6f);
+    EXPECT_EQ(off, picture);
+    SetConstantAlpha(off, 0.0f);
+    EXPECT_EQ(off[3], 0);
+    EXPECT_EQ(off[2], picture[2]);
+  }
 } // namespace faf::editor
