@@ -30,7 +30,11 @@ using namespace moho;
 
 namespace
 {
-  std::mutex gDiskWatchInitMutex;
+  // Never destroyed: a static initialiser elsewhere can create the watch, and register
+  // DISK_ResetWatch with atexit, before this file's initialiser registers the mutex's
+  // destructor, which then runs first at exit. bionic's FORTIFY aborts the process
+  // when DISK_ResetWatch then locks the destroyed mutex.
+  [[clang::no_destroy]] std::mutex gDiskWatchInitMutex;
   CDiskWatch* gDiskWatch = nullptr;
   constexpr std::size_t kDefaultReadBufferSize = 0x1000u;
 #if FAFRE_PLATFORM_WINDOWS
