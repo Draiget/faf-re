@@ -374,10 +374,16 @@ namespace gpg::gal::dxgi
       }
     }
 
+    // Release the old chain first, then drain: Direct3D 11 destroys a swap
+    // chain late, when the immediate context is flushed after its last
+    // reference went, and a flip-model chain still alive on the window makes
+    // the new one fail. Microsoft's order: release, ClearState + Flush (the
+    // D3D11 flushGpu), create. Direct3D 12's drain waits for the queue.
+    const SwapChainDesc previous = mDesc;
+    Release();
     if (flushGpu) {
       flushGpu();
     }
-    const SwapChainDesc previous = mDesc;
     HRESULT result = Create(factory, device, wanted);
     if (SUCCEEDED(result)) {
       return result;
