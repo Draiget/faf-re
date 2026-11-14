@@ -14,6 +14,7 @@
 #include "editor/doc/EdNewMap.h"
 #include "editor/doc/EdPackage.h"
 #include "editor/doc/EdSaveFile.h"
+#include "editor/tools/EdResize.h"
 #include "editor/ui/EdMapBrowser.h"
 #include "editor/ui/EdGenerate.h"
 #include "editor/ui/EdLayoutPanel.h"
@@ -409,6 +410,32 @@ namespace faf::editor
     {
       mOpenSaveAs = true;
     }
+    /** Map > Resize: the dialog asks for the new size, the way (canvas or scale) and the new folder. */
+    void OpenResize() noexcept
+    {
+      mOpenResize = true;
+    }
+    struct ResizeRequest
+    {
+      ResizeOptions options;
+      /** The new map's folder in the vault's maps (the new size is a copy; the map open now stays as it is). */
+      std::string folder;
+      /** kNewMapSizes' indexes of the new width and depth. */
+      int widthIndex = 2;
+      int depthIndex = 2;
+    };
+    /** The dialog's Resize, once. */
+    [[nodiscard]] bool TakeResize(
+      ResizeRequest& out
+    ) noexcept
+    {
+      if (!mResizeAsked) {
+        return false;
+      }
+      mResizeAsked = false;
+      out = mResizeRequest;
+      return true;
+    }
     /** File > New map: the dialog asks for the map's name, size, players, height and sea. */
     void OpenNewMap() noexcept
     {
@@ -789,6 +816,11 @@ namespace faf::editor
     void DrawSaveAsDialog();
     bool mOpenSaveAs = false;
     char mSaveAsName[128]{};
+    void DrawResizeDialog();
+    bool mOpenResize = false;
+    bool mResizeAsked = false;
+    ResizeRequest mResizeRequest;
+    char mResizeFolder[128]{};
     void DrawNewMapDialog();
     void DrawPackageDialog();
     bool mOpenPackage = false;

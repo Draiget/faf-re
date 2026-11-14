@@ -649,6 +649,7 @@ namespace faf::editor
       }
     }
     DrawSaveAsDialog();
+    DrawResizeDialog();
     DrawHome(top, statusHeight);
     DrawHelpWindow();
     DrawTour();
@@ -2501,6 +2502,117 @@ namespace faf::editor
         gpg::Warnf("editor: %s", message.c_str());
       }
     }
+    ImGui::SameLine();
+    if (ImGui::Button("Cancel", ImVec2(Em(120.0f), 0.0f)) || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+      ImGui::CloseCurrentPopup();
+    }
+    ImGui::EndPopup();
+  }
+
+  void EdShell::DrawResizeDialog()
+  {
+    constexpr const char* kTitle = "Resize map";
+    ResizeRequest& r = mResizeRequest;
+    if (mOpenResize) {
+      mOpenResize = false;
+      if (mDocument.GetState() != EdDocument::State::Open) {
+        gpg::Warnf("editor: open a map first");
+        return;
+      }
+      const MapFacts& facts = mDocument.Facts();
+      r = ResizeRequest{};
+      r.options.oldWidth = facts.sizeX > 0 ? facts.sizeX : facts.fieldWidth - 1;
+      r.options.oldDepth = facts.sizeZ > 0 ? facts.sizeZ : r.options.oldWidth;
+      for (int i = 0; i < kNewMapSizeCount; ++i) {
+        if (kNewMapSizes[i].units == r.options.oldWidth) {
+          r.widthIndex = i;
+        }
+        if (kNewMapSizes[i].units == r.options.oldDepth) {
+          r.depthIndex = i;
+        }
+      }
+      (void)std::snprintf(mResizeFolder, sizeof(mResizeFolder), "%s", mDocument.NextVersionFolder().c_str());
+      ImGui::OpenPopup(kTitle);
+    }
+    if (!ImGui::BeginPopupModal(kTitle, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+      return;
+    }
+    ImGui::Text("Now %d x %d game units.", r.options.oldWidth, r.options.oldDepth);
+    ImGui::TextDisabled("The resized map is a new folder in the vault; the map open now stays as it is.");
+    ImGui::Separator();
+    const auto sizeRow = [&](const char* label, int& index, const int id) {
+      ImGui::TextUnformatted(label);
+      ImGui::SameLine(Em(110.0f));
+      for (int i = 0; i < kNewMapSizeCount; ++i) {
+        if (i > 0) {
+          ImGui::SameLine();
+        }
+        ImGui::PushID(id + i);
+        if (ImGui::RadioButton(kNewMapSizes[i].name, index == i)) {
+          index = i;
+        }
+        ImGui::PopID();
+      }
+    };
+    sizeRow("Width", r.widthIndex, 0);
+    sizeRow("Depth", r.depthIndex, 100);
+    ImGui::TextUnformatted("Way");
+    ImGui::SameLine(Em(110.0f));
+    if (ImGui::RadioButton("Canvas (cut or add)", r.options.mode == ResizeMode::Canvas)) {
+      r.options.mode = ResizeMode::Canvas;
+    }
+    if (ImGui::IsItemHovered()) {
+      EdSetTooltip("The terrain as it is, cut or padded around the anchor; what falls outside is dropped");
+    }
+    ImGui::SameLine();
+    if (ImGui::RadioButton("Scale (stretch)", r.options.mode == ResizeMode::Scale)) {
+      r.options.mode = ResizeMode::Scale;
+    }
+    if (ImGui::IsItemHovered()) {
+      EdSetTooltip("The whole map stretched or shrunk to the new size; every position moves with it, nothing dropped");
+    }
+    if (r.options.mode == ResizeMode::Canvas) {
+      ImGui::TextUnformatted("Anchor");
+      ImGui::SameLine(Em(110.0f));
+      ImGui::BeginGroup();
+      for (int a = 0; a < 9; ++a) {
+        if (a % 3 != 0) {
+          ImGui::SameLine();
+        }
+        ImGui::PushID(200 + a);
+        if (
+          ImGui::Selectable(r.options.anchor == a ? "X" : ".", r.options.anchor == a, 0, ImVec2(Em(20.0f), Em(20.0f)))
+        ) {
+          r.options.anchor = a;
+        }
+        ImGui::PopID();
+      }
+      ImGui::EndGroup();
+      if (ImGui::IsItemHovered()) {
+        EdSetTooltip("Where the map now sits in the new one (a corner, an edge's middle or the centre)");
+      }
+      ImGui::Checkbox("Pad with the edge heights", &r.options.padEdge);
+      if (!r.options.padEdge) {
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(Em(120.0f));
+        ImGui::InputFloat("Pad level", &r.options.padLevel, 1.0f, 10.0f, "%.1f");
+        r.options.padLevel = std::clamp(r.options.padLevel, 0.0f, 511.0f);
+      }
+    }
+    ImGui::Separator();
+    ImGui::SetNextItemWidth(Em(420.0f));
+    ImGui::InputText("New folder", mResizeFolder, sizeof(mResizeFolder));
+    ImGui::TextDisabled("In %s", (mDocument.VaultFolder() / "maps").string().c_str());
+    r.options.newWidth = kNewMapSizes[std::clamp(r.widthIndex, 0, kNewMapSizeCount - 1)].units;
+    r.options.newDepth = kNewMapSizes[std::clamp(r.depthIndex, 0, kNewMapSizeCount - 1)].units;
+    const bool same = r.options.newWidth == r.options.oldWidth && r.options.newDepth == r.options.oldDepth;
+    ImGui::BeginDisabled(same || mResizeFolder[0] == '\0');
+    if (ImGui::Button("Resize", ImVec2(Em(120.0f), 0.0f))) {
+      r.folder = mResizeFolder;
+      mResizeAsked = true;
+      ImGui::CloseCurrentPopup();
+    }
+    ImGui::EndDisabled();
     ImGui::SameLine();
     if (ImGui::Button("Cancel", ImVec2(Em(120.0f), 0.0f)) || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
       ImGui::CloseCurrentPopup();

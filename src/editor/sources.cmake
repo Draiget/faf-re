@@ -135,6 +135,7 @@ set(FAF_EDITOR_SOURCES
   terrain/EdFieldPath.cpp
   terrain/EdFieldInterop.cpp
   tools/EdMarkers.cpp
+  tools/EdResize.cpp
   tools/EdDecalShape.cpp
   tools/EdDecals.cpp
   tools/EdChecks.cpp

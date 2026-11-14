@@ -46,6 +46,7 @@
 #include "moho/resource/blueprints/REmitterBlueprint.h"
 #include "moho/sim/CWldSession.h"
 #include "editor/tools/EdHeightFile.h"
+#include "editor/tools/EdResize.h"
 #include "editor/tools/EdAlphaGen.h"
 #include "editor/tools/EdLayoutMarkers.h"
 #include "editor/tools/EdMapLayout.h"
@@ -252,6 +253,7 @@ namespace faf::editor
         "/mapinfotest",
         "/dropdefaultcube",
         "/exportpreview",
+        "/resizetest",
       };
       for (const char* const option : kOptions) {
         if (moho::CFG_GetArgOption(option, 0, nullptr)) {
@@ -4850,6 +4852,32 @@ namespace faf::editor
         if (++frame != 300) {
           return;
         }
+        // `/resizetest <width index>,<depth index>,<canvas|scale>,<anchor>,<folder>` (test runs): Map > Resize.
+        if (fa::vector<fa::string> spec; moho::CFG_GetArgOption("/resizetest", 1, &spec) && !spec.empty()) {
+          std::vector<std::string> parts;
+          const std::string text = spec[0].c_str();
+          for (std::size_t at = 0; at <= text.size();) {
+            const std::size_t comma = std::min(text.find(',', at), text.size());
+            parts.push_back(text.substr(at, comma - at));
+            at = comma + 1;
+          }
+          if (parts.size() >= 5) {
+            const MapFacts& facts = mDocument.Facts();
+            EdShell::ResizeRequest ask;
+            ask.widthIndex = std::clamp(std::atoi(parts[0].c_str()), 0, kNewMapSizeCount - 1);
+            ask.depthIndex = std::clamp(std::atoi(parts[1].c_str()), 0, kNewMapSizeCount - 1);
+            ask.options.oldWidth = facts.sizeX;
+            ask.options.oldDepth = facts.sizeZ;
+            ask.options.newWidth = kNewMapSizes[ask.widthIndex].units;
+            ask.options.newDepth = kNewMapSizes[ask.depthIndex].units;
+            ask.options.mode = parts[2] == "scale" ? ResizeMode::Scale : ResizeMode::Canvas;
+            ask.options.anchor = std::atoi(parts[3].c_str());
+            ask.folder = parts[4];
+            StartResize(ask);
+          } else {
+            gpg::Warnf("editor: /resizetest wants <width index>,<depth index>,<canvas|scale>,<anchor>,<folder>");
+          }
+        }
         // `/exportpreview <file>` (test runs): the lobby preview written there.
         if (fa::vector<fa::string> file; moho::CFG_GetArgOption("/exportpreview", 1, &file) && !file.empty()) {
           std::string message;
@@ -4909,6 +4937,39 @@ namespace faf::editor
       // `/roundtripframes <n>` (test runs): /roundtrip and /saveas wait this many frames of the drawn map (180).
       int mRoundTripAfter = 180;
       void SaveDocument();
+      /**
+       * Map > Resize, in two steps: StartResize takes what the map has (heights and masks as images, resized; props,
+       * decals, markers, areas and units moved; the look, the layers and the scenario's fields) and makes the new
+       * folder; once the new map is open, FinishResize puts it all on it, saves it and opens it again.
+       */
+      void StartResize(const EdShell::ResizeRequest& request);
+      void FinishResize();
+      struct PendingResize
+      {
+        std::filesystem::path dir;
+        ResizeGeometry geometry;
+        ResizeReport report;
+        int maskWidth = 0;
+        int maskHeight = 0;
+        std::string shader;
+        std::vector<LayerSettings> layers;
+        EdDocument::LookEnvironment look;
+        EdDocument::PropSnapshot props;
+        EdDocument::DecalSnapshot decals;
+        std::string save;
+        std::string script;
+        std::vector<std::pair<std::string, std::string>> fields;
+        std::vector<ScenarioTeam> teams;
+        std::vector<std::string> extraArmies;
+        SlotFactions factions;
+        std::string folder;
+        std::string scenario; // the new map's, once it opens
+        int frames = 0;
+        bool reopened = false;
+      };
+      std::optional<PendingResize> mResize;
+      // `/resizetest <width index>,<depth index>,<canvas|scale>,<anchor>,<folder>` with `/open` (test runs).
+      std::string mResizeTestArg;
       /** The material editor's Live Update and Apply, with the open map's slots. */
       void DriveMaterialEditor();
       void ApplyMaterial(const EdMaterialEditor::Bake& bake);
@@ -5366,6 +5427,9 @@ namespace faf::editor
       add("file.saveas", "Save as new map folder...", "File", "Ctrl+Shift+S", [this] {
         mShell->OpenSaveAs();
       }, mapOpen);
+      add("map.resize", "Resize map...", "Map", "", [this] {
+        mShell->OpenResize();
+      }, mapOpen, {}, "The map made another size in a new folder: cut or added around an anchor, or stretched");
       add("file.package", "Package for the FAF vault...", "File", "", [this] {
         mShell->OpenPackage();
       }, mapOpen);
@@ -5961,7 +6025,9 @@ namespace faf::editor
            sep(),
            cmd("view.script"),
            cmd("view.adaptive"),
-           cmd("view.lighting")}
+           cmd("view.lighting"),
+           sep(),
+           cmd("map.resize")}
         },
         EdMenu{
           "&Window",
@@ -8179,6 +8245,198 @@ namespace faf::editor
       }
     }
 
+    void EditorApp::StartResize(
+      const EdShell::ResizeRequest& request
+    )
+    {
+      const auto fail = [this](const std::string& why) {
+        gpg::Warnf("editor: resize: %s", why.c_str());
+        PostStatusMessage("Resize: " + why);
+        mResize.reset();
+      };
+      if (mResize.has_value()) {
+        fail("a resize is still going");
+        return;
+      }
+      if (mDocument.GetState() != EdDocument::State::Open || !mScene.Attached()) {
+        fail("open a map first");
+        return;
+      }
+      PendingResize r;
+      const ResizeOptions& o = request.options;
+      r.geometry = MakeResizeGeometry(o);
+      std::error_code ec;
+      r.dir = std::filesystem::temp_directory_path(ec) / "FafEditor" / "resize";
+      std::filesystem::create_directories(r.dir, ec);
+      std::string message;
+      std::string error;
+      // The heights: written, read, resized, written again for the new map to read.
+      HeightImage image;
+      if (
+        !mScene.ExportHeights(r.dir / "heights_old.png", 0, 1.0f, message) ||
+        !ReadHeightImage(r.dir / "heights_old.png", 0, 0, image, error)
+      ) {
+        fail("the heights couldn't be read: " + message + error);
+        return;
+      }
+      const auto pad = static_cast<std::uint16_t>(std::clamp(std::lround(o.padLevel * 128.0f), 0L, 65535L));
+      const HeightImage heights = ResizeImage(image, r.geometry, o.newWidth + 1, o.newDepth + 1, o.padEdge, pad);
+      if (!WriteHeightImage(r.dir / "heights.png", heights, error)) {
+        fail("the heights couldn't be written: " + error);
+        return;
+      }
+      // The eight strata's masks alike (the mask grid at its own scale, padded with the edge or nothing).
+      for (int layer = 0; layer < 8; ++layer) {
+        const std::filesystem::path old = r.dir / ("mask" + std::to_string(layer) + "_old.png");
+        HeightImage mask;
+        if (!mScene.ExportMaskLayer(layer, old, message) || !ReadHeightImage(old, 0, 0, mask, error)) {
+          continue; // (a map without masks yet)
+        }
+        r.maskWidth =
+          std::max(2, static_cast<int>(std::lround(static_cast<double>(mask.width) * o.newWidth / o.oldWidth)));
+        r.maskHeight =
+          std::max(2, static_cast<int>(std::lround(static_cast<double>(mask.height) * o.newDepth / o.oldDepth)));
+        const HeightImage resized = ResizeImage(mask, r.geometry, r.maskWidth, r.maskHeight, o.padEdge, 0);
+        (void)WriteHeightImage(r.dir / ("mask" + std::to_string(layer) + ".png"), resized, error);
+      }
+      r.shader = mScene.TerrainShader();
+      r.layers = mScene.LayerSettingsNow();
+      r.look = mDocument.LookEnvironmentNow();
+      // Props moved (the file's record anew, its scale kept), those outside dropped.
+      const EdDocument::PropSnapshot props = mDocument.PropsNow();
+      for (std::size_t i = 0; i < props.entries.size(); ++i) {
+        moho::CWldPropEntry entry = props.entries[i];
+        float nx = 0.0f;
+        float nz = 0.0f;
+        if (!ResizePoint(r.geometry, entry.mTransform.pos_.x, entry.mTransform.pos_.z, nx, nz)) {
+          ++r.report.propsDropped;
+          continue;
+        }
+        entry.mTransform.pos_.x = nx;
+        entry.mTransform.pos_.z = nz;
+        PropRecord record = PropRecordFor(entry.mBlueprintPath.c_str(), entry.mTransform);
+        if (i < props.records.size()) {
+          for (int k = 12; k < 15; ++k) {
+            record.values[k] = props.records[i].values[k];
+          }
+        }
+        entry.mTransform = record.loaded;
+        r.props.entries.push_back(entry);
+        r.props.records.push_back(record);
+        ++r.report.propsKept;
+      }
+      // Decals moved (and stretched with a scale), those outside dropped.
+      for (DecalState decal : mDocument.DecalsNow()) {
+        float nx = 0.0f;
+        float nz = 0.0f;
+        if (!ResizePoint(r.geometry, decal.position[0], decal.position[2], nx, nz)) {
+          ++r.report.decalsDropped;
+          continue;
+        }
+        decal.position[0] = nx;
+        decal.position[2] = nz;
+        decal.scale[0] *= r.geometry.fx;
+        decal.scale[2] *= r.geometry.fz;
+        decal.index = -1;
+        r.decals.push_back(decal);
+        ++r.report.decalsKept;
+      }
+      r.save = ResizeSaveText(mDocument.SaveData().Text(), r.geometry, r.report, error);
+      if (r.save.empty()) {
+        fail("the save file couldn't be read: " + error);
+        return;
+      }
+      r.script = mDocument.Script();
+      for (const ScenarioField& field : ScenarioFields()) {
+        std::string value;
+        if (ReadScenarioField(mDocument.Scenario(), field.key, value)) {
+          r.fields.emplace_back(field.key, value);
+        }
+      }
+      r.teams = mDocument.Teams();
+      r.extraArmies = mDocument.ExtraArmies();
+      r.factions = ReadSlotFactions(mDocument.Scenario());
+      // The new folder: the engine's empty map of the new size, its start positions replaced in FinishResize.
+      NewMapSettings settings;
+      settings.folder = request.folder;
+      settings.title = request.folder;
+      settings.size = request.widthIndex;
+      settings.sizeZ = request.depthIndex == request.widthIndex ? -1 : request.depthIndex;
+      settings.players = std::clamp(static_cast<int>(mDocument.Armies().size()), 1, 16);
+      if (!mDocument.CreateNew(settings, message)) {
+        fail(message);
+        return;
+      }
+      gpg::Logf(
+        "editor: resize to %d x %d (%s) into %s: %s",
+        o.newWidth,
+        o.newDepth,
+        o.mode == ResizeMode::Scale ? "scale" : "canvas",
+        request.folder.c_str(),
+        r.report.Text().c_str()
+      );
+      r.folder = request.folder;
+      mResize = std::move(r);
+    }
+
+    void EditorApp::FinishResize()
+    {
+      PendingResize& r = *mResize;
+      std::string message;
+      if (!mScene.ImportHeights(r.dir / "heights.png", 1.0f, message)) {
+        gpg::Warnf("editor: resize: %s", message.c_str());
+      }
+      for (int layer = 0; layer < 8; ++layer) {
+        const std::filesystem::path mask = r.dir / ("mask" + std::to_string(layer) + ".png");
+        std::error_code ec;
+        if (std::filesystem::exists(mask, ec) && !mScene.ImportMaskLayer(layer, mask, message)) {
+          gpg::Warnf("editor: resize: %s", message.c_str());
+        }
+      }
+      std::vector<std::pair<int, LayerSettings>> layers;
+      for (std::size_t i = 0; i < r.layers.size(); ++i) {
+        layers.emplace_back(static_cast<int>(i), r.layers[i]);
+      }
+      (void)mScene.ApplyLayerSettings(r.shader, layers);
+      mDocument.ApplyLookEnvironment(r.look);
+      mDocument.RestoreProps(r.props); // (the scene shows them once the map opens again below)
+      mDocument.RestoreDecals(r.decals);
+      mDocument.Script() = r.script;
+      mDocument.SetTeams(r.teams);
+      mDocument.SetExtraArmies(r.extraArmies);
+      for (const auto& [key, value] : r.fields) {
+        bool text = true;
+        for (const ScenarioField& field : ScenarioFields()) {
+          if (key == field.key) {
+            text = field.text;
+          }
+        }
+        (void)mDocument.SetScenarioField(key, value, text);
+      }
+      if (!r.factions.empty()) {
+        (void)mDocument.SetSlotFactions(r.factions);
+      }
+      mDocument.SetModified(true);
+      SaveDocument();
+      // The moved markers, areas and units: the save file written over the new map's (its own start positions).
+      if (const std::string& savePath = mDocument.Facts().savePath; !savePath.empty()) {
+        const std::filesystem::path file =
+          mDocument.VaultFolder() / "maps" / r.folder / savePath.substr(savePath.find_last_of('/') + 1);
+        std::ofstream out(file, std::ios::binary);
+        out.write(r.save.data(), static_cast<std::streamsize>(r.save.size()));
+        if (!out) {
+          gpg::Warnf("editor: resize: can't write %s", file.string().c_str());
+        }
+      }
+      const std::string scenario = r.scenario;
+      const std::string report = r.report.Text();
+      mResize.reset();
+      // Opened again from its files: everything as the game will read it.
+      (void)mDocument.Open(scenario);
+      gpg::Logf("editor: resized: %s", report.c_str());
+      PostStatusMessage("Resized: " + report);
+    }
+
     namespace
     {
       /** A Windows file dialog for one kind of file; empty when cancelled. */
@@ -10146,6 +10404,19 @@ namespace faf::editor
         }
         mPlay.FindMaps();
         (void)mDocument.Open(scenario);
+        if (mResize.has_value() && mResize->scenario.empty()) {
+          mResize->scenario = scenario;
+        }
+      }
+      if (EdShell::ResizeRequest ask; mShell->TakeResize(ask)) {
+        StartResize(ask);
+      }
+      if (
+        mResize.has_value() && !mResize->scenario.empty() && mScene.Attached() &&
+        mDocument.GetState() == EdDocument::State::Open && mDocument.Path() == mResize->scenario &&
+        ++mResize->frames == 30
+      ) {
+        FinishResize();
       }
       DriveHeightFiles();
       if (mSymCheckMode >= 0 && mScene.Attached()) {
