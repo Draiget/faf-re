@@ -483,6 +483,14 @@ namespace faf::editor
     {
       mShowUnitViewer = true;
     }
+    /** The view's context menu, at the mouse, the next frame (ViewMenuCommands). */
+    void OpenViewMenu(
+      const bool selection
+    ) noexcept
+    {
+      mViewMenuAsk = true;
+      mViewMenuSelection = selection;
+    }
 
   private:
     EdCommands* mCommands = nullptr;
@@ -542,6 +550,9 @@ namespace faf::editor
     bool mShowAssets = false;
     bool mShowEditorMods = false;
     bool mShowUnitViewer = false;
+    bool mViewMenuAsk = false;
+    bool mViewMenuSelection = false;
+    void DrawViewMenu();
     bool mDebugWasPaused = false;
     char mWatchInput[160] = {};
     std::vector<std::string> mWatches;

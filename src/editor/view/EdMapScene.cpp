@@ -12467,7 +12467,11 @@ namespace faf::editor
         ::SetFocus(window);
         return true;
       }
-      // Middle drag orbits, Shift + middle drag pans; the right button pans.
+      // Middle drag orbits, Shift + middle drag pans; the right button pans (a click without a drag: the menu).
+      if (message == WM_RBUTTONDOWN) {
+        mRightDownAt = at;
+        mRightPending = true;
+      }
       mDrag = (message == WM_MBUTTONDOWN && (wParam & MK_SHIFT) == 0) ? Drag::Orbit : Drag::Pan;
       mDragFrom = at;
       ::SetCapture(window);
@@ -12496,6 +12500,12 @@ namespace faf::editor
       if (mDrag != Drag::None) {
         mDrag = Drag::None;
         ::ReleaseCapture();
+      }
+      if (
+        message == WM_RBUTTONUP && std::exchange(mRightPending, false) && std::abs(at.x - mRightDownAt.x) <= 4 &&
+        std::abs(at.y - mRightDownAt.y) <= 4
+      ) {
+        mContextAsk = true;
       }
       return true;
     case WM_MOUSEMOVE: {

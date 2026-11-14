@@ -173,7 +173,7 @@ namespace faf::editor
         "/layouttest",     "/playcopytest",    "/missiontest",    "/modtest",
         "/unitlabtest",    "/effectmodtest",   "/assettest",      "/thumbcache",
         "/assetmarks",     "/editormods",      "/editormodtest",  "/unitviewtest",
-        "/runmarker",      "/pausetest",
+        "/runmarker",      "/pausetest",       "/viewmenu",
       };
       for (const char* const option : kOptions) {
         if (moho::CFG_GetArgOption(option, 0, nullptr)) {
@@ -3035,6 +3035,8 @@ namespace faf::editor
         }
         ++mPauseTestStage;
       }
+      bool mViewMenuTested = false;
+      int mViewMenuFrames = 0;
       int mPauseTestStage = 0;
       int mPauseTestFrames = 0;
 
@@ -8206,6 +8208,17 @@ namespace faf::editor
           mScene.FramePoint(x, z);
         }
         tools.SetDecalSelectionCount(mScene.DecalSelectionCount());
+        if (bool selection = false; mScene.TakeContextMenuAsk(selection)) {
+          mShell->OpenViewMenu(selection);
+        }
+        // `/viewmenu` (test runs): the menu as a right click would open it, once the map is shown.
+        if (
+          !mViewMenuTested && mScene.Attached() && moho::CFG_GetArgOption("/viewmenu", 0, nullptr) &&
+          ++mViewMenuFrames > 120
+        ) {
+          mViewMenuTested = true;
+          mScene.AskContextMenu();
+        }
         mPropThumbnails.Pump(3);
         // `/rdcapture <frame>`: run under RenderDoc (renderdoccmd capture ...), that frame of the editor is captured,
         // through RenderDoc's in-app API (RENDERDOC_GetAPI, version 1.0.0; TriggerCapture is its table's 16th entry).

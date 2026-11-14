@@ -475,6 +475,24 @@ namespace faf::editor
     /** Q / E with props selected under the Select tool: they turn (false: nothing to turn). */
     [[nodiscard]] bool CanTurnSelectedProps() const;
     bool TurnSelectedProps(float radians);
+    /** A right click that didn't drag (the view's context menu); taken once, with whether something is selected. */
+    [[nodiscard]] bool TakeContextMenuAsk(
+      bool& selection
+    )
+    {
+      if (!mContextAsk) {
+        return false;
+      }
+      mContextAsk = false;
+      selection =
+        !mSelection.empty() || !mMarkerSelection.empty() || !mDecalSelection.empty() || !mUnitSelection.empty();
+      return true;
+    }
+    /** Test runs: as a right click would. */
+    void AskContextMenu() noexcept
+    {
+      mContextAsk = true;
+    }
     /** The view to the point (x, z) of the map, from no farther than `distance`. */
     void FramePoint(float x, float z, float distance = 80.0f);
     /** Test runs (`/selectunit <army>,<unit>`): that unit selected and the view on it. */
@@ -1013,6 +1031,9 @@ namespace faf::editor
     [[nodiscard]] float SnapToGrid(float value) const;
     /** The Decals tool: selected decals by their map index, a drag of them, its starts. */
     std::vector<int> mDecalSelection;
+    POINT mRightDownAt{};
+    bool mRightPending = false;
+    bool mContextAsk = false;
     bool mDragDecals = false;
     bool mDecalsMoved = false;
     float mDecalDragFromX = 0.0f;

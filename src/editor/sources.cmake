@@ -78,6 +78,7 @@ set(FAF_EDITOR_SOURCES
   ui/EdAssetBrowser.cpp
   ui/EdModHost.cpp
   ui/EdUnitViewer.cpp
+  ui/EdViewMenu.cpp
   ui/EdMapBrowser.cpp
   doc/EdWaterBodies.cpp
   view/EdWaterBodyView.cpp

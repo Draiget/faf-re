@@ -1,3 +1,4 @@
+#include "editor/ui/EdViewMenu.h"
 #include "editor/EdShell.h"
 #include "editor/ui/EdControls.h"
 #include "editor/ui/EdFonts.h"
@@ -553,6 +554,7 @@ namespace faf::editor
         mUnitViewer.Draw(mShowUnitViewer);
       }
       mUnitViewer.Frame();
+      DrawViewMenu();
       if (std::string effect; mAssets.TakeEffectAsk(effect)) {
         mShowParticleEditor = true;
         (void)mParticleEditor.OpenGameEmitter(effect);
@@ -779,6 +781,35 @@ namespace faf::editor
       {"Unit viewer###UnitViewer", &EdShell::mShowUnitViewer},
     };
     return kFlags;
+  }
+
+  void EdShell::DrawViewMenu()
+  {
+    if (std::exchange(mViewMenuAsk, false)) {
+      ImGui::OpenPopup("##viewmenu");
+      gpg::Logf("editor: the view's menu (%s)", mViewMenuSelection ? "with a selection" : "nothing selected");
+    }
+    if (mCommands == nullptr || !ImGui::BeginPopup("##viewmenu")) {
+      return;
+    }
+    for (const std::string& id : ViewMenuCommands(mViewMenuSelection)) {
+      if (id.empty()) {
+        ImGui::Separator();
+        continue;
+      }
+      const EdCommand* const command = mCommands->Find(id);
+      if (command == nullptr) {
+        continue;
+      }
+      const std::string why = mCommands->WhyNot(id);
+      if (ImGui::MenuItem(command->title.c_str(), command->keys.c_str(), false, why.empty())) {
+        (void)mCommands->Run(id);
+      }
+      if (!why.empty() && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+        EdSetTooltip("%s", why.c_str());
+      }
+    }
+    ImGui::EndPopup();
   }
 
   bool* EdShell::PanelShown(
