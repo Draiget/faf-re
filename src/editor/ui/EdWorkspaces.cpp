@@ -121,7 +121,7 @@ namespace faf::editor
        "Units on the map and in mods: armies, groups, mod projects, the unit lab",
        "Unit lab###UnitLab,Tools",
        "Mod project###ModProject,Properties,Assets###AssetBrowser",
-       "Armies,Info,Editor mods###EditorMods",
+       "Unit viewer###UnitViewer,Armies,Info,Editor mods###EditorMods",
        "",
        "Log",
        0.21f,
@@ -229,6 +229,7 @@ namespace faf::editor
       {"UnitLab", ICON_UNIT},
       {"AssetBrowser", ICON_IMAGE},
       {"EditorMods", ICON_MOD},
+      {"UnitViewer", ICON_UNIT},
     };
     for (const auto& [panel, icon] : kIcons) {
       if (panel == id) {
@@ -258,7 +259,7 @@ namespace faf::editor
       return 5;
     }
     if (key == "units") {
-      return 5; // 5: Editor mods beside Armies and Info
+      return 6; // 5: Editor mods beside Armies and Info; 6: Unit viewer before them
     }
     if (key == "layout") {
       return 3;

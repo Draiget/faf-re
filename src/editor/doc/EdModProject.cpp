@@ -612,7 +612,7 @@ namespace faf::editor
     out += "    local oldModBlueprints = ModBlueprints\n\n";
     out += "    function ModBlueprints(all_bps)\n";
     out += "        oldModBlueprints(all_bps)\n\n";
-    out += "        local function Derive(id, base, name, description, delta)\n";
+    out += "        local function Derive(id, base, name, description, icon, delta)\n";
     out += "            local source = all_bps.Unit[base]\n";
     out +=
       "            if not source then WARN('derived unit ' .. id .. ': the game has no unit ' .. base) return end\n";
@@ -620,6 +620,7 @@ namespace faf::editor
     out += "            bp.BlueprintId = id\n";
     out += "            if name ~= '' then bp.General = bp.General or {} bp.General.UnitName = name end\n";
     out += "            if description ~= '' then bp.Description = description end\n";
+    out += "            if icon then bp.Display = bp.Display or {} bp.Display.IconName = id end\n";
     out += "            all_bps.Unit[id] = bp\n";
     out += "        end\n\n";
     for (const auto& [id, d] : project.derived) {
@@ -641,7 +642,7 @@ namespace faf::editor
         }
       }
       out += "        Derive(" + LuaQuote(id) + ", " + LuaQuote(d.base) + ", " + LuaQuote(d.name) + ", " +
-        LuaQuote(d.description) + ", {\n";
+        LuaQuote(d.description) + ", " + (d.icon ? "true" : "false") + ", {\n";
       Dump(delta, "            ", out);
       out += "        })\n";
     }
@@ -668,11 +669,19 @@ namespace faf::editor
       }
     }
     out += first ? "]" : "\n  ]";
+    out += ",\n  \"files\": [";
+    first = true;
+    for (const std::string& file : p.files) {
+      out += std::string(first ? "" : ", ") + JsonQuote(file);
+      first = false;
+    }
+    out += "]";
     out += ",\n  \"derived\": [";
     first = true;
     for (const auto& [id, d] : p.derived) {
       out += std::string(first ? "\n" : ",\n") + "    {\"id\": " + JsonQuote(id) + ", \"base\": " + JsonQuote(d.base) +
-        ", \"name\": " + JsonQuote(d.name) + ", \"description\": " + JsonQuote(d.description) + "}";
+        ", \"name\": " + JsonQuote(d.name) + ", \"description\": " + JsonQuote(d.description) + ", \"icon\": \"" +
+        (d.icon ? "true" : "false") + "\"}";
       first = false;
     }
     out += first ? "]\n}\n" : "\n  ]\n}\n";
@@ -719,6 +728,14 @@ namespace faf::editor
         p.edits[e["id"].first][e["key"].first] = value;
       }
     }
+    if (const auto it = root.find("files"); it != root.end()) {
+      for (const std::string& file : ReadArray(it->second.first)) {
+        // (ReadArray gives a string without its quotes)
+        if (!file.empty() && file.find("..") == std::string::npos) {
+          p.files.insert(file);
+        }
+      }
+    }
     if (const auto it = root.find("derived"); it != root.end()) {
       for (const std::string& object : ReadArray(it->second.first)) {
         std::map<std::string, std::pair<std::string, bool>> d;
@@ -726,7 +743,9 @@ namespace faf::editor
           error = "a derived unit without its id or base";
           return false;
         }
-        p.derived[d["id"].first] = {d["base"].first, d["name"].first, d["description"].first};
+        p.derived[d["id"].first] = {
+          d["base"].first, d["name"].first, d["description"].first, d["icon"].first == "true"
+        };
       }
     }
     project = std::move(p);
@@ -859,12 +878,10 @@ namespace faf::editor
       if (d.name.empty()) {
         add('I', "derived unit " + id + " has no name: the game shows the base unit's");
       }
-      if (f.gameHasFile && !f.gameHasFile("/textures/ui/common/icons/units/" + id + "_icon.dds")) {
-        add(
-          'W',
-          "derived unit " + id + " has no icon (/textures/ui/common/icons/units/" + id +
-            "_icon.dds): the build menu shows none"
-        );
+      // A copy keeps its base unit's Display.IconName, so the build menu shows the base unit's icon
+      // (lua/ui/game/gamecommon.lua GetUnitIconFileNames).
+      if (!d.icon) {
+        add('I', "derived unit " + id + " shows " + d.base + "'s icon (Unit viewer: Make icon gives it its own)");
       }
     }
     for (const auto& [id, keys] : p.edits) {
@@ -940,6 +957,13 @@ namespace faf::editor
     return r;
   }
 
+  std::string ModUnitIconFile(
+    const std::string& id
+  )
+  {
+    return "icons/units/" + id + "_icon.dds";
+  }
+
   bool ModWriteGenerated(
     const std::filesystem::path& folder,
     const std::string& relative,
@@ -960,6 +984,31 @@ namespace faf::editor
       error = relative + ": couldn't be written";
       return false;
     }
+    return true;
+  }
+
+  bool ModWriteBinary(
+    ModProject& project,
+    const std::filesystem::path& folder,
+    const std::string& relative,
+    const std::string& bytes,
+    std::string& error
+  )
+  {
+    if (relative.empty() || relative.find("..") != std::string::npos || relative.front() == '/') {
+      error = relative + ": not a path inside the project";
+      return false;
+    }
+    std::error_code ec;
+    if (project.files.count(relative) == 0 && std::filesystem::exists(folder / relative, ec)) {
+      error = relative + ": not written (the file isn't one the project made)";
+      return false;
+    }
+    if (!WriteFile(folder / relative, bytes)) {
+      error = relative + ": couldn't be written";
+      return false;
+    }
+    project.files.insert(relative);
     return true;
   }
 

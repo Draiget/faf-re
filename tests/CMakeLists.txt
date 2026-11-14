@@ -393,6 +393,7 @@ add_executable(faf_editor_field_tests EXCLUDE_FROM_ALL editor/FieldTests.cpp edi
   editor/EffectMergeTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdEffectMerge.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdEmitter.cpp
   editor/UnitLabTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdUnitLab.cpp
   editor/EditorModsTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdEditorMods.cpp
+  editor/UnitIconTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdUnitIcon.cpp
   editor/AssetCatalogTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdAssetCatalog.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdEmitter.cpp
   editor/TerrainGraphTests.cpp ${_faf_terrain_graph_files} ${CMAKE_SOURCE_DIR}/src/editor/graph/EdTerrainGraph.cpp ${CMAKE_SOURCE_DIR}/src/editor/graph/EdTerrainNodes.cpp
   ${CMAKE_SOURCE_DIR}/src/editor/graph/EdNodeGraph.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdJson.cpp

@@ -65,6 +65,7 @@ set(FAF_EDITOR_SOURCES
   tools/EdMission.cpp
   tools/EdUnitLab.cpp
   tools/EdAssetCatalog.cpp
+  tools/EdUnitIcon.cpp
   tools/EdInterop.cpp
   graph/EdTerrainGraph.cpp
   graph/EdTerrainNodes.cpp
@@ -75,6 +76,7 @@ set(FAF_EDITOR_SOURCES
   ui/EdUnitLabPanel.cpp
   ui/EdAssetBrowser.cpp
   ui/EdModHost.cpp
+  ui/EdUnitViewer.cpp
   ui/EdMapBrowser.cpp
   doc/EdWaterBodies.cpp
   view/EdWaterBodyView.cpp

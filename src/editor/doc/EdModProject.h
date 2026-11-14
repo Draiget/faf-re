@@ -3,6 +3,7 @@
 #include <filesystem>
 #include <functional>
 #include <map>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -30,6 +31,8 @@ namespace faf::editor
     std::string base;
     std::string name;
     std::string description;
+    /** It has an icon of its own in the project (`icons/units/<id>_icon.dds`): the hook names it (Display.IconName). */
+    bool icon = false;
     bool operator==(const ModDerived&) const = default;
   };
 
@@ -44,6 +47,11 @@ namespace faf::editor
     std::map<std::string, std::map<std::string, double>> edits;
     /** derived unit id -> what it is made from */
     std::map<std::string, ModDerived> derived;
+    /**
+     * The binary files the project wrote (icons), relative to its folder: they can't carry the generated mark, so this
+     * list says they are the project's to write over.
+     */
+    std::set<std::string> files;
 
     [[nodiscard]] bool Empty() const noexcept
     {
@@ -131,6 +139,11 @@ namespace faf::editor
     const ModWeaponIndex& weaponIndex,
     std::vector<std::string>* dropped = nullptr
   );
+  /**
+   * Where a unit's own icon goes in the project: FAF's UI finds a unit's icon in an active mod's folder as
+   * `<mod>/icons/units/<IconName>_icon.dds` (UIUtil.UIFile with checkMods, the "Unit Icons" case).
+   */
+  [[nodiscard]] std::string ModUnitIconFile(const std::string& id);
   /** Where the hook goes in the project's folder. */
   extern const char* const kModHookFile;
 
@@ -165,6 +178,17 @@ namespace faf::editor
     const std::filesystem::path& folder,
     const std::string& relative,
     const std::string& text,
+    std::string& error
+  );
+  /**
+   * Writes a binary file into the project (an icon), over one there only when the project wrote it (its `files`
+   * list), and adds it to that list; false with `error`.
+   */
+  bool ModWriteBinary(
+    ModProject& project,
+    const std::filesystem::path& folder,
+    const std::string& relative,
+    const std::string& bytes,
     std::string& error
   );
   /** What the checks know about the game and the disk. */

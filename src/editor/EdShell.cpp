@@ -549,6 +549,10 @@ namespace faf::editor
       if (mShowEditorMods) {
         mModHost.Draw(mShowEditorMods);
       }
+      if (mShowUnitViewer) {
+        mUnitViewer.Draw(mShowUnitViewer);
+      }
+      mUnitViewer.Frame();
       if (std::string effect; mAssets.TakeEffectAsk(effect)) {
         mShowParticleEditor = true;
         (void)mParticleEditor.OpenGameEmitter(effect);
@@ -772,6 +776,7 @@ namespace faf::editor
       {"Unit lab###UnitLab", &EdShell::mShowUnitLab},
       {"Assets###AssetBrowser", &EdShell::mShowAssets},
       {"Editor mods###EditorMods", &EdShell::mShowEditorMods},
+      {"Unit viewer###UnitViewer", &EdShell::mShowUnitViewer},
     };
     return kFlags;
   }

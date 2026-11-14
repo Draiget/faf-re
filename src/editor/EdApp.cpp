@@ -172,7 +172,7 @@ namespace faf::editor
         "/shaderbrowser",  "/convertlayers",   "/interoptest",    "/gentest",
         "/layouttest",     "/playcopytest",    "/missiontest",    "/modtest",
         "/unitlabtest",    "/effectmodtest",   "/assettest",      "/thumbcache",
-        "/assetmarks",     "/editormods",      "/editormodtest",
+        "/assetmarks",     "/editormods",      "/editormodtest",  "/unitviewtest",
       };
       for (const char* const option : kOptions) {
         if (moho::CFG_GetArgOption(option, 0, nullptr)) {
@@ -2893,6 +2893,94 @@ namespace faf::editor
         );
         (void)host.SetEnabled(uid, false);
       }
+      /**
+       * `/unitviewtest` (test runs): a project EditorViewTest with xel0301 derived from uel0201; the unit viewer shows
+       * it (the pixels the renderer drew counted), Make icon writes its icon, the derived unit then names it in the
+       * hook.
+       */
+      void TestUnitViewer()
+      {
+        if (
+          mViewTestStage >= 5 || !mScene.Attached() || moho::RULE_PeekKept() == nullptr ||
+          !moho::CFG_GetArgOption("/unitviewtest", 0, nullptr) || ++mViewTestFrames % 90 != 0
+        ) {
+          return;
+        }
+        EdModPanel& panel = mShell->ModPanel();
+        EdUnitViewer& viewer = mShell->UnitViewer();
+        switch (mViewTestStage) {
+        case 0: {
+          mShell->SwitchWorkspace(7);
+          mShell->HideHome();
+          mShell->ShowModProject();
+          mShell->ShowUnitViewer();
+          std::string error;
+          if (!panel.Open("EditorViewTest", error) && !panel.Create("EditorViewTest", error)) {
+            gpg::Warnf("editor: unit view test: no project: %s", error.c_str());
+            mViewTestStage = 5;
+            return;
+          }
+          panel.Project()->derived.clear();
+          panel.Project()->edits.clear();
+          mShell->UnitLab().SelectUnit("uel0201");
+          std::string deriveError;
+          const bool derived = mShell->UnitLab().Derive("xel0301", "Viewer Tank", "", deriveError);
+          viewer.SetAngles(35.0f, 15.0f);
+          viewer.Focus();
+          gpg::Logf("editor: unit view test: derived xel0301: %s", derived ? "yes" : deriveError.c_str());
+          break;
+        }
+        case 1:
+          viewer.Focus(); // again, after the workspace's layout is in place
+          break;
+        case 2: {
+          gpg::Logf("editor: unit view test: the viewer drew %d of %d pixels", viewer.DrawnPixels(), 384 * 384);
+          std::string error;
+          gpg::Logf("editor: unit view test: make icon: %s", viewer.AskIcon(error) ? "asked" : error.c_str());
+          break;
+        }
+        case 4: {
+          gpg::Logf("editor: unit view test: %s", viewer.Status().c_str());
+          std::error_code ec;
+          const std::filesystem::path icon = panel.Folder() / ModUnitIconFile("xel0301");
+          gpg::Logf(
+            "editor: unit view test: icon file %s, %llu bytes (a 64 px DXT5 with mips is %llu)",
+            std::filesystem::exists(icon, ec) ? "there" : "missing",
+            static_cast<unsigned long long>(
+              std::filesystem::exists(icon, ec) ? std::filesystem::file_size(icon, ec) : 0
+            ),
+            static_cast<unsigned long long>(DdsFileSize(64, DdsKind::Bc3))
+          );
+          const ModWriteReport report = panel.Write();
+          std::ifstream hook(panel.Folder() / kModHookFile, std::ios::binary);
+          std::ostringstream text;
+          text << hook.rdbuf();
+          gpg::Logf(
+            "editor: unit view test: derived icon flag %s; the hook %s; icon note %s",
+            panel.Project()->derived.count("xel0301") != 0 && panel.Project()->derived.at("xel0301").icon ? "set"
+                                                                                                          : "not set",
+            text.str().find("'Viewer Tank', '', true,") != std::string::npos ? "names the icon" : "doesn't name it",
+            std::any_of(
+              panel.Check().begin(),
+              panel.Check().end(),
+              [](const ModIssue& i) {
+            return i.text.find("xel0301 shows") != std::string::npos;
+          }
+            )
+              ? "still there"
+              : "gone"
+          );
+          (void)report;
+          break;
+        }
+        default:
+          break;
+        }
+        ++mViewTestStage;
+      }
+      int mViewTestStage = 0;
+      int mViewTestFrames = 0;
+
       bool mEditorModTestDone = false;
       int mEditorModTestFrames = 0;
 
@@ -8719,6 +8807,7 @@ namespace faf::editor
       TestEffectMod();
       TestAssets();
       TestEditorMods();
+      TestUnitViewer();
       // `/sctest` (test runs): the SC tools window's buttons in turn, a second apart, the heights' checksum each time.
       if (
         mScTestStage < 8 && moho::CFG_GetArgOption("/sctest", 0, nullptr) && !mScene.ModelsPending() &&
