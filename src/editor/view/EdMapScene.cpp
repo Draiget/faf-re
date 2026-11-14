@@ -722,6 +722,30 @@ namespace faf::editor
             groundVertex(p.x + std::cos(a1) * 1.5f, p.z + std::sin(a1) * 1.5f, 0xF0FFE040u)
           );
         }
+        // Its range rings (FAF Studio's unitrings.lua): weapons, vision, radar.
+        if (mTools->ShowRangeRings()) {
+          const UnitRings& rings = RingsOf(mUnitRefs[static_cast<std::size_t>(index)].type);
+          const std::pair<float, std::uint32_t> circles[] = {
+            {rings.weaponMax, 0xD0FF4040u},
+            {rings.weaponMin, 0xC0FF9A30u},
+            {rings.vision, 0x9040FF60u},
+            {rings.radar, 0x904890FFu}
+          };
+          for (const auto& [radius, colour] : circles) {
+            if (radius <= 0.5f) {
+              continue;
+            }
+            const int segments = std::clamp(static_cast<int>(radius * 0.8f), 32, 160);
+            for (int s = 0; s < segments; ++s) {
+              const float a0 = 2.0f * kPi * static_cast<float>(s) / static_cast<float>(segments);
+              const float a1 = 2.0f * kPi * static_cast<float>(s + 1) / static_cast<float>(segments);
+              batcher->DrawLine(
+                groundVertex(p.x + std::cos(a0) * radius, p.z + std::sin(a0) * radius, colour),
+                groundVertex(p.x + std::cos(a1) * radius, p.z + std::sin(a1) * radius, colour)
+              );
+            }
+          }
+        }
       }
     }
     // The slope view: each cell rated by the sim's rule (EdSlopeRules: a unit footprint's steps, a structure's area or
@@ -1791,6 +1815,78 @@ namespace faf::editor
       mDocument.SetModified(true);
       RefreshHeights(rects);
     }
+  }
+
+  const EdMapScene::UnitRings& EdMapScene::RingsOf(
+    const std::string& type
+  )
+  {
+    if (const auto found = mUnitRings.find(type); found != mUnitRings.end()) {
+      return found->second;
+    }
+    UnitRings rings;
+    if (moho::RRuleGameRules* const rules = Rules(); rules != nullptr) {
+      moho::RResId id{};
+      id.name.assign(type.c_str());
+      if (const moho::RUnitBlueprint* const blueprint = rules->GetUnitBlueprint(id); blueprint != nullptr) {
+        rings.vision = static_cast<float>(blueprint->Intel.VisionRadius);
+        rings.radar = static_cast<float>(blueprint->Intel.RadarRadius);
+        rings.weaponMin = 1.0e9f;
+        for (const moho::RUnitBlueprintWeapon& weapon : blueprint->Weapons.WeaponBlueprints) {
+          if (weapon.DummyWeapon != 0U || weapon.MaxRadius <= 0.0f) {
+            continue;
+          }
+          rings.weaponMax = std::max(rings.weaponMax, weapon.MaxRadius);
+          if (weapon.MinRadius > 0.0f) {
+            rings.weaponMin = std::min(rings.weaponMin, weapon.MinRadius);
+          }
+        }
+        if (rings.weaponMin >= 1.0e9f) {
+          rings.weaponMin = 0.0f;
+        }
+      }
+    }
+    return mUnitRings.emplace(type, rings).first->second;
+  }
+
+  int EdMapScene::GiveSelectedUnits(
+    const std::string& army
+  )
+  {
+    if (army.empty() || mUnitSelection.empty()) {
+      return 0;
+    }
+    EdDocument::SaveSnapshot before = mDocument.SaveDataNow();
+    std::vector<std::pair<std::string, std::string>> given;
+    for (const auto& [from, name] : mUnitSelection) {
+      if (from == army) {
+        given.emplace_back(from, name);
+        continue;
+      }
+      SaveUnit unit;
+      bool found = false;
+      (void)EditArmyUnits(from, [&](UnitGroup& group) {
+        if (const SaveUnit* const u = FindUnit(group, name); u != nullptr) {
+          unit = *u;
+          found = RemoveUnit(group, name);
+        }
+      });
+      if (found && EditArmyUnits(army, [&](UnitGroup& group) {
+        AddUnit(group, unit);
+      })) {
+        given.emplace_back(army, name);
+      }
+    }
+    const int moved = static_cast<int>(std::count_if(given.begin(), given.end(), [&](const auto& g) {
+      return g.first == army;
+    }));
+    if (moved > 0) {
+      mDocument.SaveDataEdited(std::move(before));
+      ReloadUnits();
+      mUnitSelection = std::move(given);
+      gpg::Logf("editor: %d units given to %s", moved, army.c_str());
+    }
+    return moved;
   }
 
   int EdMapScene::PickWave(
@@ -4149,6 +4245,9 @@ namespace faf::editor
           mTools->SetErosionStatus(status, mErosionPreviewShown);
         }
       }
+      if (mTools->TakeGiveUnits()) {
+        (void)GiveSelectedUnits(mTools->UnitArmy());
+      }
       if (mTools->TakeWaveDelete() && !mWaveSelection.empty()) {
         std::vector<WaveRecord> before = mDocument.WavesNow();
         std::vector<WaveRecord> after;
@@ -4585,10 +4684,18 @@ namespace faf::editor
     if (mTools == nullptr || mMap == nullptr) {
       return 0;
     }
-    // The tool's own kind; the Select tool copies whichever kind is selected (it had only props, so a Shift+drag or a
-    // Ctrl+D of its markers, units or decals copied nothing).
-    const PickKind selected = mTools->SelectToolActive() ? SelectedKind() : PickKind::None;
-    if (mTools->MarkersToolActive() || selected == PickKind::Marker) {
+    // The tool's own kind; the Select tool copies every kind it has selected (markers, props, units and decals at
+    // once).
+    const bool all = mTools->SelectToolActive();
+    const PickKind selected = all ? SelectedKind() : PickKind::None;
+    const bool markers = all ? !mMarkerSelection.empty() : mTools->MarkersToolActive();
+    const bool props = all ? !mSelection.empty() : false;
+    const bool units = all ? !mUnitSelection.empty() : mTools->UnitsToolActive();
+    const bool decals = all ? !mDecalSelection.empty() : mTools->DecalsToolActive();
+    (void)selected;
+    int kinds = 0;
+    if (markers) {
+      ++kinds;
       copied.kind = Clipboard::Kind::Markers;
       for (const SaveEntry& marker : SelectedMarkers()) {
         float x = 0.0f, y = 0.0f, z = 0.0f;
@@ -4597,7 +4704,9 @@ namespace faf::editor
           add(x, z);
         }
       }
-    } else if (selected == PickKind::Prop && mMap->mProps != nullptr) {
+    }
+    if (props && mMap->mProps != nullptr) {
+      ++kinds;
       copied.kind = Clipboard::Kind::Props;
       const auto& records = mDocument.FileRecords().props;
       for (const int index : mSelection) {
@@ -4611,7 +4720,9 @@ namespace faf::editor
         copied.props.emplace_back(entry, record);
         add(entry.mTransform.pos_.x, entry.mTransform.pos_.z);
       }
-    } else if (mTools->UnitsToolActive() || selected == PickKind::Unit) {
+    }
+    if (units && (all || !markers)) {
+      ++kinds;
       copied.kind = Clipboard::Kind::Units;
       for (const SaveEntry& entry : mDocument.SaveData().Armies()) {
         UnitGroup group;
@@ -4631,7 +4742,9 @@ namespace faf::editor
           }
         }
       }
-    } else if ((mTools->DecalsToolActive() || selected == PickKind::Decal) && mDocument.Decals() != nullptr) {
+    }
+    if (decals && mDocument.Decals() != nullptr) {
+      ++kinds;
       copied.kind = Clipboard::Kind::Decals;
       for (const int index : mDecalSelection) {
         if (const moho::CWldTerrainDecal* const decal = FindDecal(*mDocument.Decals(), index); decal != nullptr) {
@@ -4640,6 +4753,9 @@ namespace faf::editor
           add(state.position[0], state.position[2]);
         }
       }
+    }
+    if (kinds > 1) {
+      copied.kind = Clipboard::Kind::Mixed;
     }
     const std::size_t count = copied.markers.size() + copied.props.size() + copied.units.size() + copied.decals.size();
     if (count == 0) {
@@ -4695,160 +4811,174 @@ namespace faf::editor
       );
     };
     std::size_t pasted = 0;
-    switch (mClipboard.kind) {
-    case Clipboard::Kind::Markers: {
-      // New names (a start position also clear of the armies, and added as one); path links kept between the copies.
-      EdDocument::SaveSnapshot before = mDocument.SaveDataNow();
-      std::vector<SaveEntry>& markers = mDocument.SaveData().Markers();
-      std::vector<std::pair<std::string, std::string>> renamed;
-      mMarkerSelection.clear();
-      for (SaveEntry marker : mClipboard.markers) {
-        float mx = 0.0f, my = 0.0f, mz = 0.0f;
-        (void)ShownMarkerPosition(marker, mx, my, mz);
-        const float px = mx + dx;
-        const float pz = mz + dz;
-        const MarkerType* const type = FindMarkerType(MarkerTypeOf(marker));
-        if (!onMap(px, pz) || type == nullptr) {
-          continue;
-        }
-        std::vector<SaveEntry> taken = markers;
-        const bool start = std::string(type->type) == "Blank Marker";
-        if (start) {
-          for (const std::string& army : mDocument.ArmyNamesInUse()) {
-            taken.push_back({army, {}});
+    // Each kind the clipboard holds (a mixed copy has several), one undo step each.
+    const Clipboard::Kind kinds[] = {
+      Clipboard::Kind::Markers, Clipboard::Kind::Props, Clipboard::Kind::Units, Clipboard::Kind::Decals
+    };
+    for (const Clipboard::Kind kind : kinds) {
+      const bool has = kind == Clipboard::Kind::Markers ? !mClipboard.markers.empty()
+        : kind == Clipboard::Kind::Props                ? !mClipboard.props.empty()
+        : kind == Clipboard::Kind::Units                ? !mClipboard.units.empty()
+                                                        : !mClipboard.decals.empty();
+      if (!has) {
+        continue;
+      }
+      const std::size_t pastedBefore = pasted;
+      switch (kind) {
+      case Clipboard::Kind::Markers: {
+        // New names (a start position also clear of the armies, and added as one); path links kept between the copies.
+        EdDocument::SaveSnapshot before = mDocument.SaveDataNow();
+        std::vector<SaveEntry>& markers = mDocument.SaveData().Markers();
+        std::vector<std::pair<std::string, std::string>> renamed;
+        mMarkerSelection.clear();
+        for (SaveEntry marker : mClipboard.markers) {
+          float mx = 0.0f, my = 0.0f, mz = 0.0f;
+          (void)ShownMarkerPosition(marker, mx, my, mz);
+          const float px = mx + dx;
+          const float pz = mz + dz;
+          const MarkerType* const type = FindMarkerType(MarkerTypeOf(marker));
+          if (!onMap(px, pz) || type == nullptr) {
+            continue;
           }
-        }
-        const std::string name = NextMarkerName(taken, *type);
-        renamed.emplace_back(marker.name, name);
-        marker.name = name;
-        marker.Set("position", Vector3Value(px, ground(px, pz), pz));
-        if (!marker.Get("adjacentTo").empty()) {
-          marker.Set("adjacentTo", StringValue(""));
-        }
-        if (start) {
-          mDocument.AddArmy(name);
-        }
-        markers.push_back(marker);
-        mMarkerSelection.push_back(name);
-        ++pasted;
-      }
-      for (const SaveEntry& original : mClipboard.markers) {
-        const auto from = std::find_if(renamed.begin(), renamed.end(), [&](const auto& pair) {
-          return pair.first == original.name;
-        });
-        if (from == renamed.end()) {
-          continue;
-        }
-        for (const std::string& link : MarkerLinks(original)) {
-          if (
-            const auto to = std::find_if(
-              renamed.begin(),
-              renamed.end(),
-              [&](const auto& pair) {
-            return pair.first == link;
+          std::vector<SaveEntry> taken = markers;
+          const bool start = std::string(type->type) == "Blank Marker";
+          if (start) {
+            for (const std::string& army : mDocument.ArmyNamesInUse()) {
+              taken.push_back({army, {}});
+            }
           }
-            );
-            to != renamed.end()
-          ) {
-            (void)SetMarkerLink(markers, from->second, to->second, true);
+          const std::string name = NextMarkerName(taken, *type);
+          renamed.emplace_back(marker.name, name);
+          marker.name = name;
+          marker.Set("position", Vector3Value(px, ground(px, pz), pz));
+          if (!marker.Get("adjacentTo").empty()) {
+            marker.Set("adjacentTo", StringValue(""));
           }
-        }
-      }
-      if (pasted > 0) {
-        mDocument.SaveDataEdited(std::move(before));
-        mOutsideStale = true;
-      }
-      break;
-    }
-    case Clipboard::Kind::Props: {
-      EdDocument::PropSnapshot before = mDocument.PropsNow();
-      mSelection.clear();
-      for (const auto& [source, record] : mClipboard.props) {
-        moho::CWldPropEntry entry = source;
-        entry.mTransform.pos_.x += dx;
-        entry.mTransform.pos_.z += dz;
-        if (!onMap(entry.mTransform.pos_.x, entry.mTransform.pos_.z)) {
-          continue;
-        }
-        entry.mTransform.pos_.y = ground(entry.mTransform.pos_.x, entry.mTransform.pos_.z);
-        // The copy's record: the new place, the source's rotation and scale floats.
-        PropRecord copy = PropRecordFor(entry.mBlueprintPath.c_str(), entry.mTransform);
-        for (int value = 3; value < 15; ++value) {
-          copy.values[value] = record.values[value];
-        }
-        entry.mTransform = copy.loaded;
-        mDocument.AddProp(entry, copy);
-        mProps.push_back(MakePropInstance(entry));
-        mSelection.push_back(static_cast<int>(mMap->mProps->mEntries.size()) - 1);
-        ++pasted;
-      }
-      if (pasted > 0) {
-        mDocument.PropsEdited(std::move(before));
-        mDocument.SetModified(true);
-      }
-      break;
-    }
-    case Clipboard::Kind::Units: {
-      int highest = 0;
-      for (const SaveEntry& entry : mDocument.SaveData().Armies()) {
-        UnitGroup group;
-        std::string error;
-        if (ParseUnitGroup(entry.Get("Units"), group, error)) {
-          highest = std::max(highest, HighestUnitNumber(group));
-        }
-      }
-      EdDocument::SaveSnapshot before = mDocument.SaveDataNow();
-      std::vector<std::pair<std::string, std::string>> placed;
-      for (const auto& [army, source] : mClipboard.units) {
-        SaveUnit unit = source;
-        unit.position[0] += dx;
-        unit.position[2] += dz;
-        if (!onMap(unit.position[0], unit.position[2])) {
-          continue;
-        }
-        unit.position[1] = UnitRestHeight(unit.position[0], unit.position[2]);
-        unit.name = "UNIT_" + std::to_string(++highest);
-        if (EditArmyUnits(army, [&](UnitGroup& group) {
-          AddUnit(group, unit);
-        })) {
-          placed.emplace_back(army, unit.name);
-        }
-      }
-      if (!placed.empty()) {
-        mDocument.SaveDataEdited(std::move(before));
-        ReloadUnits();
-        mUnitSelection = placed;
-        pasted = placed.size();
-      }
-      break;
-    }
-    case Clipboard::Kind::Decals: {
-      moho::IDecalManager* const decals = mDocument.Decals();
-      if (decals == nullptr) {
-        break;
-      }
-      EdDocument::DecalSnapshot before = mDocument.DecalsNow();
-      mDecalSelection.clear();
-      for (DecalState state : mClipboard.decals) {
-        state.index = -1;
-        state.position[0] += dx;
-        state.position[2] += dz;
-        if (!onMap(state.position[0], state.position[2])) {
-          continue;
-        }
-        state.position[1] = ground(state.position[0], state.position[2]);
-        if (const moho::CWldTerrainDecal* const decal = AddDecal(*decals, state); decal != nullptr) {
-          mDecalSelection.push_back(decal->mIndex);
+          if (start) {
+            mDocument.AddArmy(name);
+          }
+          markers.push_back(marker);
+          mMarkerSelection.push_back(name);
           ++pasted;
         }
+        for (const SaveEntry& original : mClipboard.markers) {
+          const auto from = std::find_if(renamed.begin(), renamed.end(), [&](const auto& pair) {
+            return pair.first == original.name;
+          });
+          if (from == renamed.end()) {
+            continue;
+          }
+          for (const std::string& link : MarkerLinks(original)) {
+            if (
+              const auto to = std::find_if(
+                renamed.begin(),
+                renamed.end(),
+                [&](const auto& pair) {
+              return pair.first == link;
+            }
+              );
+              to != renamed.end()
+            ) {
+              (void)SetMarkerLink(markers, from->second, to->second, true);
+            }
+          }
+        }
+        if (pasted > pastedBefore) {
+          mDocument.SaveDataEdited(std::move(before));
+          mOutsideStale = true;
+        }
+        break;
       }
-      if (pasted > 0) {
-        mDocument.DecalsEdited(std::move(before));
+      case Clipboard::Kind::Props: {
+        EdDocument::PropSnapshot before = mDocument.PropsNow();
+        mSelection.clear();
+        for (const auto& [source, record] : mClipboard.props) {
+          moho::CWldPropEntry entry = source;
+          entry.mTransform.pos_.x += dx;
+          entry.mTransform.pos_.z += dz;
+          if (!onMap(entry.mTransform.pos_.x, entry.mTransform.pos_.z)) {
+            continue;
+          }
+          entry.mTransform.pos_.y = ground(entry.mTransform.pos_.x, entry.mTransform.pos_.z);
+          // The copy's record: the new place, the source's rotation and scale floats.
+          PropRecord copy = PropRecordFor(entry.mBlueprintPath.c_str(), entry.mTransform);
+          for (int value = 3; value < 15; ++value) {
+            copy.values[value] = record.values[value];
+          }
+          entry.mTransform = copy.loaded;
+          mDocument.AddProp(entry, copy);
+          mProps.push_back(MakePropInstance(entry));
+          mSelection.push_back(static_cast<int>(mMap->mProps->mEntries.size()) - 1);
+          ++pasted;
+        }
+        if (pasted > pastedBefore) {
+          mDocument.PropsEdited(std::move(before));
+          mDocument.SetModified(true);
+        }
+        break;
       }
-      break;
-    }
-    case Clipboard::Kind::None:
-      break;
+      case Clipboard::Kind::Units: {
+        int highest = 0;
+        for (const SaveEntry& entry : mDocument.SaveData().Armies()) {
+          UnitGroup group;
+          std::string error;
+          if (ParseUnitGroup(entry.Get("Units"), group, error)) {
+            highest = std::max(highest, HighestUnitNumber(group));
+          }
+        }
+        EdDocument::SaveSnapshot before = mDocument.SaveDataNow();
+        std::vector<std::pair<std::string, std::string>> placed;
+        for (const auto& [army, source] : mClipboard.units) {
+          SaveUnit unit = source;
+          unit.position[0] += dx;
+          unit.position[2] += dz;
+          if (!onMap(unit.position[0], unit.position[2])) {
+            continue;
+          }
+          unit.position[1] = UnitRestHeight(unit.position[0], unit.position[2]);
+          unit.name = "UNIT_" + std::to_string(++highest);
+          if (EditArmyUnits(army, [&](UnitGroup& group) {
+            AddUnit(group, unit);
+          })) {
+            placed.emplace_back(army, unit.name);
+          }
+        }
+        if (!placed.empty()) {
+          mDocument.SaveDataEdited(std::move(before));
+          ReloadUnits();
+          mUnitSelection = placed;
+          pasted = placed.size();
+        }
+        break;
+      }
+      case Clipboard::Kind::Decals: {
+        moho::IDecalManager* const decals = mDocument.Decals();
+        if (decals == nullptr) {
+          break;
+        }
+        EdDocument::DecalSnapshot before = mDocument.DecalsNow();
+        mDecalSelection.clear();
+        for (DecalState state : mClipboard.decals) {
+          state.index = -1;
+          state.position[0] += dx;
+          state.position[2] += dz;
+          if (!onMap(state.position[0], state.position[2])) {
+            continue;
+          }
+          state.position[1] = ground(state.position[0], state.position[2]);
+          if (const moho::CWldTerrainDecal* const decal = AddDecal(*decals, state); decal != nullptr) {
+            mDecalSelection.push_back(decal->mIndex);
+            ++pasted;
+          }
+        }
+        if (pasted > pastedBefore) {
+          mDocument.DecalsEdited(std::move(before));
+        }
+        break;
+      }
+      default:
+        break;
+      }
     }
     gpg::Logf(
       "editor: %zu pasted at %.1f, %.1f (one undo step)", pasted, static_cast<double>(x), static_cast<double>(z)

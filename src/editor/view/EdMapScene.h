@@ -802,6 +802,8 @@ namespace faf::editor
         Props,
         Units,
         Decals,
+        /** The Select tool's selection of several kinds at once (FAF Studio's clipboard). */
+        Mixed,
       };
       Kind kind = Kind::None;
       std::vector<SaveEntry> markers;
@@ -1060,6 +1062,18 @@ namespace faf::editor
     /** The scatter or erase brush at (x, z) during its drag. */
     void DecalBrushAt(float x, float z);
     bool mDecalBrushing = false;
+    /** The selected units to `army` (out of their own); how many moved. */
+    int GiveSelectedUnits(const std::string& army);
+    /** A unit blueprint's rings: weapons' greatest and least reach, vision, radar (0 for none); kept per id. */
+    struct UnitRings
+    {
+      float weaponMax = 0.0f;
+      float weaponMin = 0.0f;
+      float vision = 0.0f;
+      float radar = 0.0f;
+    };
+    const UnitRings& RingsOf(const std::string& type);
+    std::map<std::string, UnitRings> mUnitRings;
     // The Water tool's picked wave generators (indexes into the document's) and a drag of them.
     std::vector<int> mWaveSelection;
     bool mWaveDrag = false;

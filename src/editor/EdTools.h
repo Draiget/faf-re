@@ -588,6 +588,16 @@ namespace faf::editor
       }
       return {};
     }
+    /** The selected units' rings: weapons' reach (and their least), vision and radar, from the blueprints. */
+    [[nodiscard]] bool ShowRangeRings() const noexcept
+    {
+      return mShowRangeRings;
+    }
+    /** The Units panel's Give: the selected units to its army (taken once). */
+    [[nodiscard]] bool TakeGiveUnits() noexcept
+    {
+      return std::exchange(mGiveUnits, false);
+    }
     void SetUnitSelectionCount(
       const int count
     ) noexcept
@@ -3145,6 +3155,8 @@ namespace faf::editor
     bool mUnitRandomTurn = false;
     char mUnitFilter[64]{};
     int mUnitSelectionCount = 0;
+    bool mShowRangeRings = true;
+    bool mGiveUnits = false;
     std::vector<DecalTexture> mDecalTextures;
     bool mDecalTexturesListed = false;
     std::string mDecalTexture;

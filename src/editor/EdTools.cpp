@@ -4336,6 +4336,17 @@ namespace faf::editor
           "Click a unit to select it (Ctrl adds), drag it or its arrows to move, Shift+click or Delete removes. Each "
           "edit is one undo step."
         );
+        ImGui::Checkbox("Range rings", &mShowRangeRings);
+        EdSetItemTooltip(
+          "Around the selected units: weapons' reach in red (their least in orange), vision in green, radar "
+          "in blue, from the blueprints"
+        );
+        ImGui::BeginDisabled(mUnitSelectionCount == 0 || mUnitArmy.empty());
+        if (ImGui::Button(("Give to " + (mUnitArmy.empty() ? std::string("the army") : mUnitArmy)).c_str())) {
+          mGiveUnits = true;
+        }
+        ImGui::EndDisabled();
+        EdSetItemTooltip("The selected units change army, to the one chosen below (one undo step)");
       }
 
       // The army new units join: the players' and the extra armies.
