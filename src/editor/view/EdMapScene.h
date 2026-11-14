@@ -1178,6 +1178,12 @@ namespace faf::editor
     /** The ruler between two points (test runs, `/ruler`). */
     void SetRuler(float x0, float z0, float x1, float z1);
     /** Ctrl+C, Ctrl+V or Ctrl+D (`key` 'C', 'V' or 'D'), as the keyboard gives them and test runs (`/uiclicks ^D`). */
+    /**
+     * Edit > Mirror the selection (FAF Studio's mirror.lua): each selected marker, prop, unit and decal copied to its
+     * places in the map's symmetry (the brushes' setting), turned as the symmetry turns it. Start positions are left
+     * out (each is an army). One undo step a kind; returns how many copies were made.
+     */
+    int MirrorSelection();
     void CtrlKey(char key);
     /** A Units-tool group ask on `army`'s tree: select a group's units, or change the tree as one undo step. */
     /** An army's settings in `_save.lua`, as one undo step. */

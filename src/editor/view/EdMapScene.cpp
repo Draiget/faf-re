@@ -1889,6 +1889,182 @@ namespace faf::editor
     return moved;
   }
 
+  int EdMapScene::MirrorSelection()
+  {
+    const moho::CHeightField* const field = mMap != nullptr ? mMap->mTerrainRes->GetHeightField() : nullptr;
+    if (field == nullptr || mTools == nullptr) {
+      return 0;
+    }
+    const HeightBrush brush = mTools->CurrentHeightBrush();
+    // A place's copies and each copy's heading (the copies of a point a unit ahead), copy 0 the original.
+    struct Copy
+    {
+      float x;
+      float z;
+      float heading;
+    };
+    const auto copiesOf = [&](const float x, const float z, const float heading) {
+      float cx[kMaxSymmetryCopies], cz[kMaxSymmetryCopies], ax[kMaxSymmetryCopies], az[kMaxSymmetryCopies];
+      const int n = HeightBrushCentres(field->width, field->height, x, z, brush.symmetry, brush.turns, cx, cz);
+      (void)HeightBrushCentres(
+        field->width, field->height, x + std::cos(heading), z + std::sin(heading), brush.symmetry, brush.turns, ax, az
+      );
+      std::vector<Copy> out;
+      for (int c = 1; c < n; ++c) {
+        if (
+          cx[c] >= 0.0f && cz[c] >= 0.0f && cx[c] <= static_cast<float>(field->width - 1) &&
+          cz[c] <= static_cast<float>(field->height - 1)
+        ) {
+          out.push_back({cx[c], cz[c], std::atan2(az[c] - cz[c], ax[c] - cx[c])});
+        }
+      }
+      return out;
+    };
+    const auto ground = [this](const float x, const float z) {
+      return mMap->mTerrainRes->GetHeightAt(
+        static_cast<std::int32_t>(std::lround(x)), static_cast<std::int32_t>(std::lround(z))
+      );
+    };
+    int made = 0;
+    // Markers and units: the save file.
+    if (!mMarkerSelection.empty() || !mUnitSelection.empty()) {
+      EdDocument::SaveSnapshot before = mDocument.SaveDataNow();
+      int changed = 0;
+      std::vector<SaveEntry>& markers = mDocument.SaveData().Markers();
+      const std::vector<std::string> selectedMarkers = mMarkerSelection;
+      for (const std::string& name : selectedMarkers) {
+        const auto found = std::find_if(markers.begin(), markers.end(), [&](const SaveEntry& m) {
+          return m.name == name;
+        });
+        float x = 0.0f, y = 0.0f, z = 0.0f;
+        if (found == markers.end() || !ShownMarkerPosition(*found, x, y, z)) {
+          continue;
+        }
+        const SaveEntry original = *found;
+        const MarkerType* const type = FindMarkerType(MarkerTypeOf(original));
+        if (type == nullptr || std::string(type->type) == "Blank Marker") {
+          continue; // (a start position is an army: placed on its own)
+        }
+        for (const Copy& copy : copiesOf(x, z, 0.0f)) {
+          SaveEntry marker = original;
+          marker.name = NextMarkerName(markers, *type);
+          marker.Set("position", Vector3Value(copy.x, ground(copy.x, copy.z), copy.z));
+          if (!marker.Get("adjacentTo").empty()) {
+            marker.Set("adjacentTo", StringValue(""));
+          }
+          markers.push_back(std::move(marker));
+          ++changed;
+        }
+      }
+      int highest = 0;
+      for (const SaveEntry& entry : mDocument.SaveData().Armies()) {
+        UnitGroup group;
+        std::string error;
+        if (ParseUnitGroup(entry.Get("Units"), group, error)) {
+          highest = std::max(highest, HighestUnitNumber(group));
+        }
+      }
+      for (const auto& [army, name] : std::vector<std::pair<std::string, std::string>>(mUnitSelection)) {
+        SaveUnit unit;
+        bool found = false;
+        (void)EditArmyUnits(army, [&](UnitGroup& group) {
+          if (const SaveUnit* const u = FindUnit(group, name); u != nullptr) {
+            unit = *u;
+            found = true;
+          }
+        });
+        if (!found) {
+          continue;
+        }
+        for (const Copy& copy : copiesOf(unit.position[0], unit.position[2], unit.orientation[1])) {
+          SaveUnit mirrored = unit;
+          mirrored.name = "UNIT_" + std::to_string(++highest);
+          mirrored.position[0] = copy.x;
+          mirrored.position[2] = copy.z;
+          mirrored.position[1] = UnitRestHeight(copy.x, copy.z);
+          mirrored.orientation[1] = copy.heading;
+          if (EditArmyUnits(army, [&](UnitGroup& group) {
+            AddUnit(group, mirrored);
+          })) {
+            ++changed;
+          }
+        }
+      }
+      if (changed > 0) {
+        mDocument.SaveDataEdited(std::move(before));
+        ReloadUnits();
+        mOutsideStale = true;
+        made += changed;
+      }
+    }
+    // Props.
+    if (!mSelection.empty() && mMap->mProps != nullptr) {
+      EdDocument::PropSnapshot before = mDocument.PropsNow();
+      const auto& records = mDocument.FileRecords().props;
+      const std::vector<int> selected = mSelection;
+      int changed = 0;
+      for (const int index : selected) {
+        if (index < 0 || static_cast<std::size_t>(index) >= mMap->mProps->mEntries.size()) {
+          continue;
+        }
+        const moho::CWldPropEntry source = mMap->mProps->mEntries[static_cast<std::size_t>(index)];
+        const PropRecord record = static_cast<std::size_t>(index) < records.size()
+          ? records[static_cast<std::size_t>(index)]
+          : PropRecordFor(source.mBlueprintPath.c_str(), source.mTransform);
+        const Wm3::Quatf& q = source.mTransform.orient_;
+        const float heading = 2.0f * std::atan2(q.y, q.w); // a prop turned about the up axis only
+        for (const Copy& copy : copiesOf(source.mTransform.pos_.x, source.mTransform.pos_.z, heading)) {
+          moho::CWldPropEntry entry = source;
+          entry.mTransform.pos_ = Wm3::Vec3f{copy.x, ground(copy.x, copy.z), copy.z};
+          entry.mTransform.orient_ =
+            Wm3::Quatf(std::cos(copy.heading * 0.5f), 0.0f, std::sin(copy.heading * 0.5f), 0.0f);
+          PropRecord mirrored = PropRecordFor(entry.mBlueprintPath.c_str(), entry.mTransform);
+          mirrored.values[12] = record.values[12];
+          mirrored.values[13] = record.values[13];
+          mirrored.values[14] = record.values[14];
+          entry.mTransform = mirrored.loaded;
+          mDocument.AddProp(entry, mirrored);
+          mProps.push_back(MakePropInstance(entry));
+          ++changed;
+        }
+      }
+      if (changed > 0) {
+        mDocument.PropsEdited(std::move(before));
+        mDocument.SetModified(true);
+        made += changed;
+      }
+    }
+    // Decals.
+    if (moho::IDecalManager* const decals = mDocument.Decals(); decals != nullptr && !mDecalSelection.empty()) {
+      EdDocument::DecalSnapshot before = mDocument.DecalsNow();
+      int changed = 0;
+      for (const int index : std::vector<int>(mDecalSelection)) {
+        const moho::CWldTerrainDecal* const decal = FindDecal(*decals, index);
+        if (decal == nullptr) {
+          continue;
+        }
+        const DecalState source = CaptureDecal(*decal);
+        for (const Copy& copy : copiesOf(source.position[0], source.position[2], source.orientation[1])) {
+          DecalState state = source;
+          state.index = -1;
+          state.position[0] = copy.x;
+          state.position[1] = ground(copy.x, copy.z);
+          state.position[2] = copy.z;
+          state.orientation[1] = copy.heading;
+          if (AddDecal(*decals, state) != nullptr) {
+            ++changed;
+          }
+        }
+      }
+      if (changed > 0) {
+        mDocument.DecalsEdited(std::move(before));
+        made += changed;
+      }
+    }
+    gpg::Logf("editor: the selection mirrored: %d copies", made);
+    return made;
+  }
+
   int EdMapScene::PickWave(
     const float x,
     const float z

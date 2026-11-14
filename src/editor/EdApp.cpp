@@ -5571,6 +5571,13 @@ namespace faf::editor
       add("edit.duplicate", "Duplicate beside", "Edit", "Ctrl+D", [this] {
         mScene.CtrlKey('D');
       }, canEdit, {}, "A copy of the selection 8 units beside it");
+      add("edit.mirror", "Mirror the selection", "Edit", "", [this] {
+        const int made = mScene.MirrorSelection();
+        PostStatusMessage(
+          made > 0 ? "Mirrored: " + std::to_string(made) + " copies"
+                   : "Nothing to mirror: select objects, and set a symmetry in the brushes"
+        );
+      }, canEdit, {}, "Each selected marker, prop, unit and decal copied to its places in the map's symmetry");
       for (int i = 0; i < static_cast<int>(ArrangeOp::Count); ++i) {
         const ArrangeOp op = static_cast<ArrangeOp>(i);
         add((std::string("arrange.") + ArrangeId(op)).c_str(), ArrangeTitle(op), "Edit", "", [this, op] {
@@ -6003,6 +6010,7 @@ namespace faf::editor
            cmd("edit.copy"),
            cmd("edit.paste"),
            cmd("edit.duplicate"),
+           cmd("edit.mirror"),
            cmd("edit.delete"),
            sep(),
            cmd("edit.find"),
