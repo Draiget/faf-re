@@ -418,6 +418,12 @@ add_executable(faf_platform_net_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/te
 target_link_libraries(faf_platform_net_tests PRIVATE faf_sim gtest_main)
 target_link_options(faf_platform_net_tests PRIVATE -Wl,--error-limit=0)
 add_test(NAME platform_net COMMAND faf_platform_net_tests)
+# What the lobby puts on the wire for another player (LOBMSG_NewPeer), as Windows runs it: the
+# Windows game's bytes, which an LP64 u_long does not have.
+add_executable(faf_lobby_wire_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/net/LobbyWireTests.cpp")
+target_link_libraries(faf_lobby_wire_tests PRIVATE faf_sim gtest_main)
+target_link_options(faf_lobby_wire_tests PRIVATE -Wl,--error-limit=0)
+add_test(NAME lobby_wire COMMAND faf_lobby_wire_tests)
 # The Win32 shim's handles when one thread closes what another still uses, and its shell folders
 # (Windows' behaviour).
 add_executable(faf_win32_shim_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/linux/Win32ShimHandleTests.cpp"

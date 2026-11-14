@@ -954,9 +954,10 @@ namespace
       return Bytes{}.Str("host").I32(kHostUid).I32(kLocalUid).Str("local").I32(0).data;
     }
 
+    // The address in 4 bytes, as SPeer::SendInfoTo writes it (tests/net/LobbyWireTests.cpp).
     std::string NewPeer(
       const char* name,
-      const u_long address,
+      const std::uint32_t address,
       const u_short port,
       const int32_t uid
     ) const
@@ -1048,6 +1049,7 @@ namespace
     FakeConnection* const bob = f->connector.Last();
     SPeer* const peer = f->Peer(20);
     EXPECT_TRUE(peer != nullptr && peer->state == ENetworkPlayerState::kPending);
+    EXPECT_TRUE(bob != f->host && bob->address == 0x0A000002u && bob->port == 7001);
     f->Deliver(bob, ELobbyMsg::LOBMSG_ConnMade, std::string{});
     EXPECT_TRUE(peer->state == ENetworkPlayerState::kWaitingJoin);
 
