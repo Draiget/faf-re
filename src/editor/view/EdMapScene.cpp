@@ -2065,6 +2065,41 @@ namespace faf::editor
     return made;
   }
 
+  std::string EdMapScene::TestPath(
+    const std::string& spec
+  )
+  {
+    if (mMap == nullptr || mTools == nullptr) {
+      return "no map";
+    }
+    std::vector<std::string> parts;
+    for (std::size_t at = 0; at <= spec.size();) {
+      const std::size_t comma = std::min(spec.find(',', at), spec.size());
+      parts.push_back(spec.substr(at, comma - at));
+      at = comma + 1;
+    }
+    PathOptions options = mTools->CurrentPathOptions();
+    static const char* const kModes[] = {"carve", "raise", "level", "ramp", "river"};
+    for (int m = 0; m < kPathModeCount; ++m) {
+      if (!parts.empty() && parts[0] == kModes[m]) {
+        options.mode = static_cast<PathMode>(m);
+      }
+    }
+    std::vector<TerrainPathPoint> points;
+    for (std::size_t i = 1; i + 1 < parts.size(); i += 2) {
+      const float x = static_cast<float>(std::atof(parts[i].c_str()));
+      const float z = static_cast<float>(std::atof(parts[i + 1].c_str()));
+      points.push_back(
+        {x,
+         z,
+         mMap->mTerrainRes->GetHeightAt(
+           static_cast<std::int32_t>(std::lround(x)), static_cast<std::int32_t>(std::lround(z))
+         )}
+      );
+    }
+    return ApplyPathNow(points, options);
+  }
+
   int EdMapScene::PickWave(
     const float x,
     const float z

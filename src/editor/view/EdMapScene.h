@@ -1184,6 +1184,11 @@ namespace faf::editor
      * out (each is an army). One undo step a kind; returns how many copies were made.
      */
     int MirrorSelection();
+    /**
+     * `/pathtest <carve|raise|level|ramp|river>,x0,z0,x1,z1[,...]` (test runs): a path through those points (their
+     * ground heights) applied as the Path brush's Apply does, as wide as the brush; what it did, for the log.
+     */
+    std::string TestPath(const std::string& spec);
     void CtrlKey(char key);
     /** A Units-tool group ask on `army`'s tree: select a group's units, or change the tree as one undo step. */
     /** An army's settings in `_save.lua`, as one undo step. */

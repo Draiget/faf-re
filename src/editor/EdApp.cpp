@@ -260,6 +260,7 @@ namespace faf::editor
         "/exportpreview",
         "/resizetest",
         "/console",
+        "/pathtest",
       };
       for (const char* const option : kOptions) {
         if (moho::CFG_GetArgOption(option, 0, nullptr)) {
@@ -4857,6 +4858,10 @@ namespace faf::editor
         static int frame = 0;
         if (++frame != 300) {
           return;
+        }
+        // `/pathtest <mode>,x0,z0,x1,z1[,...]` (test runs): a terrain path applied (EdMapScene::TestPath).
+        if (fa::vector<fa::string> path; moho::CFG_GetArgOption("/pathtest", 1, &path) && !path.empty()) {
+          gpg::Logf("editor: /pathtest: %s", mScene.TestPath(path[0].c_str()).c_str());
         }
         // `/console <line>` (test runs): a console line, as if typed in the Log panel and Entered.
         if (fa::vector<fa::string> line; moho::CFG_GetArgOption("/console", 1, &line) && !line.empty()) {
