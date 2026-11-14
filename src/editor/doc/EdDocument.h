@@ -258,6 +258,14 @@ namespace faf::editor
      * it) written as a PNG at its own size; false with `message`.
      */
     bool ExportPreview(const std::filesystem::path& file, std::string& message) const;
+    /** Map > Regenerate preview: the preview chunk a save writes from now on (EdPreview); the map counts as changed. */
+    void SetPreviewRecord(
+      std::vector<char> record
+    )
+    {
+      mFileRecords.preview = std::move(record);
+      mModified = true;
+    }
     /** What the map file stored that a save writes back as it was (the preview, unchanged props). */
     [[nodiscard]] const MapFileRecords& FileRecords() const noexcept
     {

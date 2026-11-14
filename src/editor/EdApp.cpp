@@ -47,6 +47,7 @@
 #include "moho/sim/CWldSession.h"
 #include "editor/tools/EdHeightFile.h"
 #include "editor/tools/EdResize.h"
+#include "editor/doc/EdPreview.h"
 #include "editor/tools/EdAlphaGen.h"
 #include "editor/tools/EdLayoutMarkers.h"
 #include "editor/tools/EdMapLayout.h"
@@ -4943,6 +4944,8 @@ namespace faf::editor
        * folder; once the new map is open, FinishResize puts it all on it, saves it and opens it again.
        */
       void StartResize(const EdShell::ResizeRequest& request);
+      /** Map > Regenerate preview: the lobby picture drawn anew from the heights, the sea and the markers. */
+      bool RegeneratePreview(std::string& message);
       void FinishResize();
       struct PendingResize
       {
@@ -5427,6 +5430,22 @@ namespace faf::editor
       add("file.saveas", "Save as new map folder...", "File", "Ctrl+Shift+S", [this] {
         mShell->OpenSaveAs();
       }, mapOpen);
+      add(
+        "map.preview",
+        "Regenerate the lobby preview",
+        "Map",
+        "",
+        [this] {
+        std::string message;
+        const bool ok = RegeneratePreview(message);
+        (ok ? gpg::Logf : gpg::Warnf)("editor: %s", message.c_str());
+        PostStatusMessage(message);
+      },
+        mapOpen,
+        {},
+        "The preview picture the lobby shows, drawn anew from the heights, the sea, the start positions "
+        "and the resources (saved with the map)"
+      );
       add("map.resize", "Resize map...", "Map", "", [this] {
         mShell->OpenResize();
       }, mapOpen, {}, "The map made another size in a new folder: cut or added around an anchor, or stretched");
@@ -6027,6 +6046,7 @@ namespace faf::editor
            cmd("view.adaptive"),
            cmd("view.lighting"),
            sep(),
+           cmd("map.preview"),
            cmd("map.resize")}
         },
         EdMenu{
@@ -8379,6 +8399,57 @@ namespace faf::editor
       mResize = std::move(r);
     }
 
+    bool EditorApp::RegeneratePreview(
+      std::string& message
+    )
+    {
+      if (mDocument.GetState() != EdDocument::State::Open || !mScene.Attached()) {
+        message = "Open a map first.";
+        return false;
+      }
+      std::error_code ec;
+      const std::filesystem::path dir = std::filesystem::temp_directory_path(ec) / "FafEditor";
+      std::filesystem::create_directories(dir, ec);
+      const std::filesystem::path file = dir / "preview_heights.png";
+      HeightImage heights;
+      std::string error;
+      if (!mScene.ExportHeights(file, 0, 1.0f, message) || !ReadHeightImage(file, 0, 0, heights, error)) {
+        message = "The preview needs the heights: " + message + error;
+        return false;
+      }
+      PreviewOptions options;
+      const EdDocument::LookEnvironment look = mDocument.LookEnvironmentNow();
+      options.water = look.water.enabled;
+      options.waterLevel = look.water.elevation;
+      // Resources first, start positions on top (as the lobby draws them).
+      for (int pass = 0; pass < 2; ++pass) {
+        for (const SaveEntry& marker : mDocument.SaveData().Markers()) {
+          float x = 0.0f;
+          float y = 0.0f;
+          float z = 0.0f;
+          if (!MarkerPosition(marker, x, y, z)) {
+            continue;
+          }
+          const std::string type = MarkerTypeOf(marker);
+          const bool start = marker.name.rfind("ARMY_", 0) == 0;
+          if (pass == 0 && type == "Mass") {
+            options.dots.push_back({x, z, 0xFF7CE03Cu, 1.5f});
+          } else if (pass == 0 && type == "Hydrocarbon") {
+            options.dots.push_back({x, z, 0xFFFFC832u, 2.5f});
+          } else if (pass == 1 && start) {
+            options.dots.push_back({x, z, 0xFFFFFFFFu, 3.0f});
+          }
+        }
+      }
+      const MapFacts& facts = mDocument.Facts();
+      const float width = static_cast<float>(facts.sizeX > 0 ? facts.sizeX : heights.width - 1);
+      const float depth = static_cast<float>(facts.sizeZ > 0 ? facts.sizeZ : heights.height - 1);
+      mDocument.SetPreviewRecord(PreviewRecord(width, depth, PreviewPixels(heights, width, depth, options)));
+      message = "Drew the lobby preview anew (" + std::to_string(options.dots.size()) +
+        " start positions and resources on it); saving the map writes it";
+      return true;
+    }
+
     void EditorApp::FinishResize()
     {
       PendingResize& r = *mResize;
@@ -8417,6 +8488,9 @@ namespace faf::editor
         (void)mDocument.SetSlotFactions(r.factions);
       }
       mDocument.SetModified(true);
+      if (std::string why; !RegeneratePreview(why)) {
+        gpg::Warnf("editor: resize: %s", why.c_str());
+      }
       SaveDocument();
       // The moved markers, areas and units: the save file written over the new map's (its own start positions).
       if (const std::string& savePath = mDocument.Facts().savePath; !savePath.empty()) {

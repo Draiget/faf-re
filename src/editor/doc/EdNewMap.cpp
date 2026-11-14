@@ -1,4 +1,5 @@
 #include "editor/doc/EdNewMap.h"
+#include "editor/doc/EdPreview.h"
 
 #include <algorithm>
 #include <cmath>
@@ -270,64 +271,35 @@ namespace faf::editor
     const NewMapSettings& settings
   )
   {
-    constexpr std::uint32_t kSide = 256;
     const float width = static_cast<float>(NewMapWidth(settings));
     const float depth = static_cast<float>(NewMapDepth(settings));
-    const float size = std::max(width, depth); // (the preview is square: the map at its longer side's scale)
-    std::vector<char> out;
-    AppendWord(out, 0xBEEFFEEDu);
-    AppendWord(out, 2u);
-    AppendFloat(out, width);
-    AppendFloat(out, depth);
-    out.push_back(0); // the name: empty, in UTF-16
-    out.push_back(0);
-    AppendWord(out, 0u); // no tag/value pairs
-
-    // The DDS: the classic 124-byte header (caps, height, width, pixel format), 32-bit BGRA, no mips.
-    std::vector<char> dds;
-    dds.insert(dds.end(), {'D', 'D', 'S', ' '});
-    AppendWord(dds, 124u);
-    AppendWord(dds, 0x1007u);
-    AppendWord(dds, kSide);
-    AppendWord(dds, kSide);
-    for (int i = 0; i < 2 + 1 + 11; ++i) {
-      AppendWord(dds, 0u); // pitch, depth, mip count, reserved
-    }
-    AppendWord(dds, 32u);
-    AppendWord(dds, 0x41u); // RGB with alpha
-    AppendWord(dds, 0u);
-    AppendWord(dds, 32u);
-    AppendWord(dds, 0x00FF0000u);
-    AppendWord(dds, 0x0000FF00u);
-    AppendWord(dds, 0x000000FFu);
-    AppendWord(dds, 0xFF000000u);
-    AppendWord(dds, 0x1000u); // a texture
-    for (int i = 0; i < 4; ++i) {
-      AppendWord(dds, 0u);
-    }
+    const PreviewFrame frame = PreviewFrameOf(width, depth);
     const bool underSea = settings.sea && settings.height < settings.seaLevel;
     const std::uint32_t ground = underSea ? 0xFF2E5A8Cu : 0xFF5E7F3Au;
-    std::vector<std::uint32_t> pixels(static_cast<std::size_t>(kSide) * kSide, ground);
+    // The map's square at its longer side's scale, centred; around it black.
+    std::vector<std::uint32_t> pixels(static_cast<std::size_t>(kPreviewSide) * kPreviewSide, 0xFF000000u);
+    for (int y = 0; y < kPreviewSide; ++y) {
+      for (int x = 0; x < kPreviewSide; ++x) {
+        const float wx = (static_cast<float>(x) + 0.5f - frame.offsetX) * frame.scale;
+        const float wz = (static_cast<float>(y) + 0.5f - frame.offsetZ) * frame.scale;
+        if (wx >= 0.0f && wz >= 0.0f && wx <= width && wz <= depth) {
+          pixels[static_cast<std::size_t>(y) * kPreviewSide + x] = ground;
+        }
+      }
+    }
     for (const NewMapSpawn& spawn : NewMapSpawns(settings)) {
-      const int cx = static_cast<int>(spawn.x / size * kSide);
-      const int cz = static_cast<int>(spawn.z / size * kSide);
+      const int cx = static_cast<int>(spawn.x / frame.scale + frame.offsetX);
+      const int cz = static_cast<int>(spawn.z / frame.scale + frame.offsetZ);
       for (int dz = -3; dz <= 3; ++dz) {
         for (int dx = -3; dx <= 3; ++dx) {
           const int x = cx + dx;
           const int z = cz + dz;
-          if (
-            dx * dx + dz * dz <= 9 && x >= 0 && z >= 0 && x < static_cast<int>(kSide) && z < static_cast<int>(kSide)
-          ) {
-            pixels[static_cast<std::size_t>(z) * kSide + static_cast<std::size_t>(x)] = 0xFFFFFFFFu;
+          if (dx * dx + dz * dz <= 9 && x >= 0 && z >= 0 && x < kPreviewSide && z < kPreviewSide) {
+            pixels[static_cast<std::size_t>(z) * kPreviewSide + x] = 0xFFFFFFFFu;
           }
         }
       }
     }
-    const auto* const bytes = reinterpret_cast<const char*>(pixels.data());
-    dds.insert(dds.end(), bytes, bytes + pixels.size() * 4);
-
-    AppendWord(out, static_cast<std::uint32_t>(dds.size()));
-    out.insert(out.end(), dds.begin(), dds.end());
-    return out;
+    return PreviewRecord(width, depth, pixels);
   }
 } // namespace faf::editor
