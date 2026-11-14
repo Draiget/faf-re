@@ -50,7 +50,8 @@ In VS Code, the Run view has "Editor (x64, Debug)" and "Editor (x64, Release)": 
 - Make icon: a render of the unit framed by its drawn part into a 64 x 64 DXT5 icon (`tools/EdUnitIcon.cpp`), written into the project as `icons/units/<id>_icon.dds`, where FAF's UI finds an active mod's unit icons (`UIUtil.UIFile` with checkMods); a derived unit then names it as its `Display.IconName` in the hook (a copy otherwise keeps its base unit's icon, a note in the checks). A render drawn edge to edge (no outline to frame) or too dark isn't written: with the thumbnail renderer that is every unit today, so Make icon says why and the base unit's icon stays. A lit render with a background that can be keyed out (FAF Studio renders on black and on white) is still to come.
 - Binary files the project writes (icons) are listed in `editor_project.json`: the project writes over its own and refuses anyone else's (a DDS can't carry the generated mark).
 - `/unitviewtest`: xel0301 derived from uel0201; the viewer lit 55,276 of 147,456 pixels; Make icon refused ("the render is opaque edge to edge"). Before the guard, a run wrote the icon (5,616 bytes, a 64 px DXT5 with mips), the flag and the hook's IconName, and decoding it showed it black (mean colour 0, 0, 8): hence the guard. A second run then found the first run's icon not the project's: hence the list of binary files.
-- The Units list of the design is the Assets panel's Units tab (faction, tech, type, search, favourites, icons). Not here yet: a usable icon render, the new unit wizard (phase E8).
+- The Units list of the design is the Assets panel's Units tab (faction, tech, type, search, favourites, icons). Not here yet: the new unit wizard's own script and strings files, a model from an OBJ (an SCM writer), a projectile preview.
+- Make icon draws the unit twice, on black and on white (the thumbnail pass's clear colour, `moho::ren_ThumbnailClearColor`, is retail's opaque black unless the editor sets another for one render): the difference is each pixel's alpha, so the icon's background is clear, and a render darker than the build menu needs is brightened (`KeyedIcon`, unit-tested). Not run in the editor yet.
 
 **Editor mods** (the Editor mods panel in Units; `doc/EdEditorMods.cpp`, `ui/EdModHost.cpp`; after FAF Studio's editor mod API, as commands since this editor's panels are native):
 - A mod in the vault's `mods` folder whose `mod_info.lua` says `editor_mod = true` (and `editor_api = 1`, or none) adds commands from its `editor/commands.lua`. Editor mods are off until turned on in the panel; the turned-on ones are kept in the settings folder (`editor_mods.txt`; a test run only with `/editormods <file>`) and run when the editor starts.
@@ -83,6 +84,38 @@ In VS Code, the Run view has "Editor (x64, Debug)" and "Editor (x64, Release)": 
 - Save adds the `<default>` reflection cube a map lacks (the game's `/textures/environment/defaultenvcube.dds`: units without a cube of their own reflect nothing otherwise), as one undo step, and the save's message says so (`/dropdefaultcube` then Save on paintspec: "added the <default> reflection cube it lacked"; opened again, the next Save had nothing to add).
 - The save round trip (`/roundtrip <folder>`: the map's `.scmap` written there, read back through the game's map reader, compared, saved a second time and compared byte for byte) passes on SCMP_009 and the test vault's paintspec: same data, stable, the same bytes as the original. It needs the game's map reader, so it is a test run's switch rather than a unit test.
 - Package for the FAF vault also runs the map's check when it opens and lists each check error among the package's errors, so Package stays off until they are fixed (SCMP_009 and paintspec had no check errors: only the packager's own were listed).
+
+
+**Resize and preview** (Map menu; `tools/EdResize.cpp`, `doc/EdPreview.cpp`):
+- Map › Resize makes the map another size in a new vault folder (the open map stays as it is): Canvas cuts or pads around one of nine anchors (the edge heights repeated, or a level), Scale stretches the whole map. Heights and the eight strata masks are resized as images; props, decals, markers, areas and every army's units move with them; what falls outside is dropped (out of its chains too) and counted. The look, layers, teams, the scenario's fields and the lobby slots' factions carry over; the new map is saved, gets a new preview and opens again from its files.
+- `/resizetest 2,2,canvas,4,resize_canvas.v0001` on SCMP_009 (1024 to 512, centred): 83 markers, 43 units, 749 props, 786 decals kept, the rest dropped; the reopened map had exactly those (513 x 513). `/resizetest 2,1,scale,0,...`: 512 x 256 with all 341 markers, 5182 props, 43 units; 18 decals that sat off the old map's edge dropped.
+- Map › Regenerate the lobby preview draws the picture from the map: the heights shaded and tinted by height, the sea blue by depth, starts and resources as dots. A map that isn't square sits centred in the square, as FAF's lobby assumes (`resmappreview.lua`); new maps' previews do too. The 512 x 256 map's exported preview showed it centred between black bands with its 8 starts.
+
+**Terrain** (`tools/EdTerrainPath.cpp`, `tools/EdInterop.cpp`):
+- Ramp: a drag lays a straight slope as wide as the brush between the ground's heights at its two ends. Path: clicked points make a Catmull-Rom curve that carves, raises, levels, ramps or digs a river, applied by the panel's Apply as one undo step. `/pathtest river,100,150,250,250,400,300` on the resized Seton's: 7709 samples lowered, 19194 cubic units taken away, one undo step.
+- The radius goes from 1 to 128; a strength below zero does the mode's opposite. With Airbrush off the brush lays dabs a third of its radius apart along the stroke. Every height stroke reports the ground it took away and put down (the panel and the log).
+- Heightmap import can fit its image into a rectangle of the map and fade it in over a feather.
+- A Generate graph built on a map is saved beside it (`<map>_terrain.editor`, which packages leave out) and opens in Generate with the map.
+
+**Texturing and environment**:
+- The layer texture browser picks a normal map alone (or none), normal maps shown as lit relief. Painting a layer the map's shader doesn't blend is refused with the reason. Map-wide textures import from PNG, TGA, JPEG, BMP or TIFF (converted to a 1024 px DDS) and export as PNG; the eight masks export to and import from one set of files (name_1 .. name_8).
+- Water: motion presets (engine default, calm lake, choppy, ocean swell), and pickers of the game's textures for the cube map, ramp and normal maps. Shore waves: every generator shown on the map, picked, moved and deleted with the Water tool; adding along the shore can copy each place through the symmetry. A sky imported from another map is fitted to this one's size; the Sky panel edits the cube map and the background.
+- `SFogInfo`'s fields are named for what WRenViewport::FogOn (0x007F8A30) reads: the colour's red, green, blue, then start and end.
+- Decals: Scatter and Erase drag modes and a size variation, all symmetric. Assets: a unit, prop, decal or marker tile dragged onto the map is placed there; effect tiles show the texture the effect draws with.
+- Not here: the strategic view's colours (the `.scmap` keeps only its cartographic decals, Cartographic::ReadDecals 0x007D1D30).
+
+**Objects**:
+- With the Select tool, copy takes every kind selected at once. Selected units show range rings from their blueprints (weapons' reach and least reach, vision, radar); the Units panel gives them to another army. Edit › Mirror the selection copies selected markers, props, units and decals through the symmetry (`/symcheck 1` and `/command tool.0,select.all,edit.mirror` on the resized map: 749 props, 749 copies).
+- Draw a chain (Markers): each marker placed joins the named chain, its symmetric copies chains of their own; Ctrl+click starts the next. Props: Line places along a drag at a spacing.
+- The marker palette adds the types of FAF's `/lua/MarkerTemplates.lua` it lacks (3 on the current FAF files), and a selected marker's type can be changed in place.
+
+**Check, console and mission run**:
+- The Check runs every call of the game's script modules in `_script.lua` against the API table (a function a module hasn't got, too many arguments) and offers fixes: Pull inside for a start or resource off the map or playable area, Snap to grid for a resource off its cell's middle; a row's fix button and Fix all. On a test map with both planted: "ScenarioFramework has no function NoSuchFunction" at line 11, Mass 08 off its grid; a simulated click on Snap to grid moved it to 112.5, 305.5 (the button didn't get the click before: fixed).
+- The Log panel has a Lua console line with a history: the interface's Lua, `=expr` prints (`=1+2` gave `= 3`), `sim <code>` runs in the sim of a play (without one it says so), `con <command>` the engine's console.
+- The Run panel, while a test play runs: Skip waits, Timers x2 / x4 / x10, Jump to stage, State to the log; the test run records the operation's end (won or lost) instead of ending the game. Not run in a play yet.
+- Not here: the sim build check (it needs the sim's own placement test).
+
+**Help**: F1 topics for the mod project, unit lab, unit viewer, assets, editor mods and the mission's Run panel.
 
 ## Play
 
