@@ -949,12 +949,40 @@ namespace gpg::gal
     std::uint32_t height
   )
   {
+    // The old swap chain goes first when the surface is made again: a surface can't be destroyed while a swap chain
+    // still uses it.
+    const auto dropSwapChain = [&] {
+      Vk().vkDeviceWaitIdle(mDevice);
+      for (VkSemaphore semaphore : swapChain.renderFinished) {
+        Vk().vkDestroySemaphore(mDevice, semaphore, nullptr);
+      }
+      swapChain.renderFinished.clear();
+      if (swapChain.swapchain != VK_NULL_HANDLE) {
+        Vk().vkDestroySwapchainKHR(mDevice, swapChain.swapchain, nullptr);
+        swapChain.swapchain = VK_NULL_HANDLE;
+      }
+      swapChain.images.clear();
+      swapChain.hasImage = false;
+    };
+    const auto remakeSurface = [&] {
+      dropSwapChain();
+      Vk().vkDestroySurfaceKHR(mInstance, swapChain.surface, nullptr);
+      swapChain.surface = VK_NULL_HANDLE;
+      VkResult surfaceResult = VK_SUCCESS;
+      swapChain.surface = vulkan::CreateWindowSurface(mInstance, swapChain.window, surfaceResult);
+      CheckVk("DeviceVulkan.cpp", __LINE__, surfaceResult);
+    };
+
     VkSurfaceCapabilitiesKHR capabilities{};
-    CheckVk(
-      "DeviceVulkan.cpp",
-      __LINE__,
-      Vk().vkGetPhysicalDeviceSurfaceCapabilitiesKHR(mPhysical, swapChain.surface, &capabilities)
-    );
+    VkResult capabilitiesResult =
+      Vk().vkGetPhysicalDeviceSurfaceCapabilitiesKHR(mPhysical, swapChain.surface, &capabilities);
+    if (capabilitiesResult == VK_ERROR_SURFACE_LOST_KHR) {
+      // The query is the first call that sees a lost surface: make it again before anything else uses it.
+      gpg::Warnf("Vulkan: the window surface was lost; it is made again");
+      remakeSurface();
+      capabilitiesResult = Vk().vkGetPhysicalDeviceSurfaceCapabilitiesKHR(mPhysical, swapChain.surface, &capabilities);
+    }
+    CheckVk("DeviceVulkan.cpp", __LINE__, capabilitiesResult);
     // A minimised window has an extent of 0 x 0, which no swap chain can have: keep what there is (if anything)
     // until the window is back.
     if (capabilities.currentExtent.width == 0U || capabilities.currentExtent.height == 0U) {
@@ -1030,23 +1058,9 @@ namespace gpg::gal
       gpg::Warnf(
         "Vulkan: creating the swap chain failed (%s); trying again without the old one", vulkan::ResultName(result)
       );
-      Vk().vkDeviceWaitIdle(mDevice);
-      for (VkSemaphore semaphore : swapChain.renderFinished) {
-        Vk().vkDestroySemaphore(mDevice, semaphore, nullptr);
-      }
-      swapChain.renderFinished.clear();
-      if (swapChain.swapchain != VK_NULL_HANDLE) {
-        Vk().vkDestroySwapchainKHR(mDevice, swapChain.swapchain, nullptr);
-        swapChain.swapchain = VK_NULL_HANDLE;
-      }
-      swapChain.images.clear();
-      swapChain.hasImage = false;
+      dropSwapChain();
       if (result == VK_ERROR_SURFACE_LOST_KHR) {
-        Vk().vkDestroySurfaceKHR(mInstance, swapChain.surface, nullptr);
-        swapChain.surface = VK_NULL_HANDLE;
-        VkResult surfaceResult = VK_SUCCESS;
-        swapChain.surface = vulkan::CreateWindowSurface(mInstance, swapChain.window, surfaceResult);
-        CheckVk("DeviceVulkan.cpp", __LINE__, surfaceResult);
+        remakeSurface();
         info.surface = swapChain.surface;
       }
       createWithModes();
@@ -1727,6 +1741,23 @@ namespace gpg::gal
     }
   }
 
+  bool DeviceVulkan::AllWindowsMinimised() const
+  {
+    if (mSwapChains.empty()) {
+      return false;
+    }
+    for (const SwapChain& swapChain : mSwapChains) {
+      VkSurfaceCapabilitiesKHR capabilities{};
+      if (
+        Vk().vkGetPhysicalDeviceSurfaceCapabilitiesKHR(mPhysical, swapChain.surface, &capabilities) != VK_SUCCESS ||
+        (capabilities.currentExtent.width != 0U && capabilities.currentExtent.height != 0U)
+      ) {
+        return false;
+      }
+    }
+    return true;
+  }
+
   void DeviceVulkan::RequestSwapChainRecovery(
     const char* const what,
     const VkResult result
@@ -1734,6 +1765,12 @@ namespace gpg::gal
   {
     // A few tries at most: a chain that is out of date again right after a Reset would loop forever.
     if (mRecoverRequested) {
+      return;
+    }
+    // Every window minimised: there is nothing to make the chain from until one has an area again, and a Reset would
+    // rebuild nothing. It is not a try (the limit of 3 would never be reached), and it is not worth a line per frame;
+    // the next out-of-date result once a window is back asks again.
+    if (AllWindowsMinimised()) {
       return;
     }
     if (++mConsecutiveRecoveries > 3U) {
@@ -2897,9 +2934,6 @@ namespace gpg::gal
     }
     if (!anyChange) {
       gpg::Logf("Vulkan: Reset requested, swap chains unchanged: nothing to rebuild");
-      if (force && mConsecutiveRecoveries != 0U) {
-        --mConsecutiveRecoveries; // a recovery that rebuilt nothing (minimised) is not a try
-      }
       // The swap chain stays (and with it the image acquired for this frame); the state a Reset hands back does not.
       ResetState();
       BindDefaultOutput();
