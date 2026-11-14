@@ -3004,7 +3004,7 @@ namespace faf::editor
       void TestUnitViewer()
       {
         if (
-          mViewTestStage >= 5 || !mScene.Attached() || moho::RULE_PeekKept() == nullptr ||
+          mViewTestStage >= 7 || !mScene.Attached() || moho::RULE_PeekKept() == nullptr ||
           !moho::CFG_GetArgOption("/unitviewtest", 0, nullptr) || ++mViewTestFrames % 90 != 0
         ) {
           return;
@@ -3020,7 +3020,7 @@ namespace faf::editor
           std::string error;
           if (!panel.Open("EditorViewTest", error) && !panel.Create("EditorViewTest", error)) {
             gpg::Warnf("editor: unit view test: no project: %s", error.c_str());
-            mViewTestStage = 5;
+            mViewTestStage = 7;
             return;
           }
           panel.Project()->derived.clear();
@@ -3074,8 +3074,32 @@ namespace faf::editor
               : "gone"
           );
           (void)report;
+          // Then the first weapon's projectile in the view: dalk003's (AASerpentine, one of the few with a model).
+          mShell->UnitLab().SelectUnit("dalk003");
+          if (moho::RRuleGameRules* const rules = moho::RULE_PeekKept(); rules != nullptr) {
+            moho::RResId id{};
+            id.name.assign("dalk003");
+            if (const moho::RUnitBlueprint* const aa = rules->GetUnitBlueprint(id); aa != nullptr) {
+              const auto& weapons = aa->Weapons.WeaponBlueprints;
+              for (std::size_t i = 0; i < weapons.size(); ++i) {
+                if (!weapons[i].ProjectileId.name.empty()) {
+                  viewer.ShowWeapon(static_cast<int>(i));
+                  gpg::Logf(
+                    "editor: unit view test: dalk003's weapon %zu fires %s", i, weapons[i].ProjectileId.name.c_str()
+                  );
+                  break;
+                }
+              }
+            }
+          }
           break;
         }
+        case 6:
+          gpg::Logf(
+            "editor: unit view test: dalk003's projectile drew %d of %d pixels", viewer.DrawnPixels(), 384 * 384
+          );
+          viewer.ShowWeapon(-1);
+          break;
         default:
           break;
         }

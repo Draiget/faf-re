@@ -36,6 +36,13 @@ namespace faf::editor
     {
       return mDrawnPixels;
     }
+    /** The view shows the projectile of this weapon (its place in the blueprint), or the unit (-1). */
+    void ShowWeapon(
+      const int weapon
+    ) noexcept
+    {
+      mShowWeapon = weapon;
+    }
     [[nodiscard]] const std::string& Status() const noexcept
     {
       return mStatus;
@@ -55,7 +62,15 @@ namespace faf::editor
     }
 
   private:
-    bool Request(boost::shared_ptr<moho::CD3DDynamicTextureSheet>& sheet, int side, const std::string& unit);
+    bool Request(
+      boost::shared_ptr<moho::CD3DDynamicTextureSheet>& sheet,
+      int side,
+      const std::string& unit,
+      int projectileOf = -1
+    );
+    /** -1: the unit; else the projectile of that weapon (its place in the blueprint's list) is shown. */
+    int mShowWeapon = -1;
+    std::string mFailed; // the last key whose picture couldn't be asked for (not asked again)
 
     EdUnitLabPanel& mLab;
     EdModPanel& mProject;

@@ -4,6 +4,7 @@
 #include "editor/graph/EdTextureBake.h"
 #include "editor/tools/EdUnitIcon.h"
 #include "moho/mesh/Mesh.h"
+#include "moho/resource/blueprints/RProjectileBlueprint.h"
 #include "editor/ui/EdControls.h"
 #include "editor/ui/EdIconFont.h"
 #include "editor/ui/EdModPanel.h"
@@ -91,11 +92,34 @@ namespace faf::editor
   bool EdUnitViewer::Request(
     boost::shared_ptr<moho::CD3DDynamicTextureSheet>& sheet,
     const int side,
-    const std::string& unit
+    const std::string& unit,
+    const int projectileOf
   )
   {
     moho::CD3DDevice* const device = moho::D3D_GetDevice();
-    const moho::RMeshBlueprint* const mesh = MeshOf(UnitBlueprint(unit));
+    const moho::RUnitBlueprint* const unitBlueprint = UnitBlueprint(unit);
+    const moho::RMeshBlueprint* mesh = MeshOf(unitBlueprint);
+    // A weapon's projectile instead: its blueprint's mesh (a projectile without one shows nothing).
+    if (projectileOf >= 0 && unitBlueprint != nullptr) {
+      const auto& weapons = unitBlueprint->Weapons.WeaponBlueprints;
+      moho::RRuleGameRules* const rules = moho::RULE_PeekKept();
+      mesh = nullptr;
+      if (rules != nullptr && static_cast<std::size_t>(projectileOf) < weapons.size()) {
+        const moho::RUnitBlueprintWeapon& weapon = weapons[static_cast<std::size_t>(projectileOf)];
+        const moho::RProjectileBlueprint* const projectile = rules->GetProjectileBlueprint(weapon.ProjectileId);
+        if (projectile != nullptr) {
+          mesh = rules->GetMeshBlueprint(projectile->Display.MeshBlueprint);
+        }
+        gpg::Logf(
+          "editor: unit viewer: %s weapon %d: projectile %s (%s), its mesh %s",
+          unit.c_str(),
+          projectileOf,
+          weapon.ProjectileId.name.c_str(),
+          projectile != nullptr ? "in the rules" : "not in the rules",
+          mesh != nullptr ? mesh->mBlueprintId.c_str() : "none"
+        );
+      }
+    }
     if (device == nullptr || device->GetResources() == nullptr || mesh == nullptr) {
       return false;
     }
@@ -248,10 +272,48 @@ namespace faf::editor
     }
     // Asked again when the unit or the angles change.
     char key[160];
-    std::snprintf(key, sizeof(key), "%s %.1f %.1f", source.c_str(), mHeading, mPitch);
-    if (mShown != key && Request(mSheet, kViewSide, source)) {
-      mShown = key;
-      mSinceAsked = 0;
+    // The unit, or one of its weapons' projectiles.
+    {
+      const auto& weapons = bp->Weapons.WeaponBlueprints;
+      if (mShowWeapon >= static_cast<int>(weapons.size())) {
+        mShowWeapon = -1;
+      }
+      const auto weaponName = [&](const int i) {
+        const moho::RUnitBlueprintWeapon& w = weapons[static_cast<std::size_t>(i)];
+        std::string name = w.Label.c_str();
+        name += std::string(" (") + (w.ProjectileId.name.empty() ? "no projectile" : w.ProjectileId.name.c_str()) + ")";
+        return name;
+      };
+      ImGui::SetNextItemWidth(-1.0f);
+      if (EdBeginCombo("##viewwhat", mShowWeapon < 0 ? "The unit" : weaponName(mShowWeapon).c_str())) {
+        if (ImGui::Selectable("The unit", mShowWeapon < 0)) {
+          mShowWeapon = -1;
+        }
+        for (int i = 0; i < static_cast<int>(weapons.size()); ++i) {
+          ImGui::PushID(i);
+          if (ImGui::Selectable(weaponName(i).c_str(), mShowWeapon == i)) {
+            mShowWeapon = i;
+          }
+          ImGui::PopID();
+        }
+        ImGui::EndCombo();
+      }
+      EdSetItemTooltip("The unit's model, or the projectile one of its weapons fires");
+    }
+    std::snprintf(key, sizeof(key), "%s %.1f %.1f %d", source.c_str(), mHeading, mPitch, mShowWeapon);
+    if (mShown != key && mFailed != key) {
+      if (Request(mSheet, kViewSide, source, mShowWeapon)) {
+        mShown = key;
+        mSinceAsked = 0;
+      } else {
+        mFailed = key; // (asked once: the log says why)
+      }
+    }
+    if (mFailed == key) {
+      ImGui::TextDisabled(
+        mShowWeapon >= 0 ? "This weapon's projectile has no model of its own (its effects draw it), or it fires none."
+                         : "The unit has no model the viewer can draw."
+      );
     }
     const float side = std::min(ImGui::GetContentRegionAvail().x, Em(300.0f));
     if (mSheet) {
