@@ -140,3 +140,23 @@ do
         AddChatText(text)
     end
 end
+
+do
+local originalReallyCreateLobby = ReallyCreateLobby
+function ReallyCreateLobby(...)
+    import('/fafengine/lua/ui/translation.lua').Reset()
+    return originalReallyCreateLobby(unpack(arg))
+end
+local originalAddChatText = AddChatText
+function AddChatText(text, playerID, scrollToBottom)
+    originalAddChatText(text, playerID, scrollToBottom)
+    if not playerID or not lobbyComm or tonumber(playerID) == tonumber(localPlayerID) then return end
+    local currentConnection = lobbyComm
+    import('/fafengine/lua/ui/translation.lua').Translate(text, function(english)
+        if currentConnection and lobbyComm == currentConnection then
+            originalAddChatText(english, playerID, false)
+        end
+    end)
+end
+
+end

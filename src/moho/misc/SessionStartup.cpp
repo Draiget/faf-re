@@ -1,6 +1,7 @@
 #include "moho/lua/CScrLuaInitForm.h"
 #include "moho/misc/FileWriteExact.h"
 #include "moho/misc/SessionStartup.h"
+#include "moho/misc/OfflineTranslation.h"
 
 #include <Windows.h>
 
@@ -1272,6 +1273,9 @@ namespace
       (void)::moho::func_PrefetchSession_LuaFuncDef();
       (void)::moho::func_GetSessionClients_LuaFuncDef();
       (void)::moho::func_InternalSaveGame_LuaFuncDef();
+#ifdef _WIN32
+      ::moho::RegisterOfflineTranslation();
+#endif
     }
   };
 
