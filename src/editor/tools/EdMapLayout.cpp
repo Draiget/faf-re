@@ -1,6 +1,7 @@
 #include "editor/tools/EdMapLayout.h"
 
 #include "editor/doc/EdJson.h"
+#include "editor/tools/EdErosionSuite.h"
 
 #include <algorithm>
 #include <cmath>
@@ -864,6 +865,90 @@ namespace faf::editor
     }
   }
 
+  int MapLayout::ImportPicture(
+    const int i,
+    const std::vector<float>& grey,
+    const int w,
+    const int h,
+    const LayoutPictureOptions& o
+  )
+  {
+    LayoutLayer* layer = Layer(i);
+    if (
+      layer == nullptr || w < 1 || h < 1 || grey.size() != static_cast<std::size_t>(w) * static_cast<std::size_t>(h)
+    ) {
+      return -1;
+    }
+    float lo = 0.0f;
+    float hi = 1.0f;
+    if (o.stretch) {
+      const auto [mn, mx] = std::minmax_element(grey.begin(), grey.end());
+      lo = *mn;
+      hi = *mx;
+    }
+    const float rw = static_cast<float>(mFrame.rw);
+    const float rh = static_cast<float>(mFrame.rh);
+    // The picture's rectangle on the drawing (cells): the whole of it, or fitted inside with its aspect.
+    float x0 = 0.0f, z0 = 0.0f, pw = rw, ph = rh;
+    if (o.contain) {
+      const float scale = std::min(rw / static_cast<float>(w), rh / static_cast<float>(h));
+      pw = static_cast<float>(w) * scale;
+      ph = static_cast<float>(h) * scale;
+      x0 = (rw - pw) / 2.0f;
+      z0 = (rh - ph) / 2.0f;
+    }
+    const auto at = [&](const int x, const int z) {
+      return grey
+        [static_cast<std::size_t>(std::clamp(z, 0, h - 1)) * static_cast<std::size_t>(w) +
+         static_cast<std::size_t>(std::clamp(x, 0, w - 1))];
+    };
+    int changed = 0;
+    for (int cz = 0; cz < mFrame.rh; ++cz) {
+      for (int cx = 0; cx < mFrame.rw; ++cx) {
+        float u = (static_cast<float>(cx) + 0.5f - x0) / pw;
+        float v = (static_cast<float>(cz) + 0.5f - z0) / ph;
+        float value = 0.0f;
+        if (u >= 0.0f && v >= 0.0f && u <= 1.0f && v <= 1.0f) {
+          u = o.flipX ? 1.0f - u : u;
+          v = o.flipZ ? 1.0f - v : v;
+          const float fx = u * static_cast<float>(w) - 0.5f;
+          const float fz = v * static_cast<float>(h) - 0.5f;
+          const int ix = static_cast<int>(std::floor(fx));
+          const int iz = static_cast<int>(std::floor(fz));
+          const float tx = fx - static_cast<float>(ix);
+          const float tz = fz - static_cast<float>(iz);
+          value = (at(ix, iz) * (1.0f - tx) + at(ix + 1, iz) * tx) * (1.0f - tz) +
+            (at(ix, iz + 1) * (1.0f - tx) + at(ix + 1, iz + 1) * tx) * tz;
+          if (o.stretch && hi > lo) {
+            value = (value - lo) / (hi - lo);
+          }
+          value = std::clamp(value, 0.0f, 1.0f);
+          if (o.invert) {
+            value = 1.0f - value;
+          }
+        } else if (o.invert) {
+          value = 0.0f; // outside the picture stays empty
+        }
+        if (o.hard) {
+          value = value > 0.5f ? 1.0f : 0.0f;
+        }
+        float& cell =
+          layer
+            ->data[static_cast<std::size_t>(cz) * static_cast<std::size_t>(mFrame.rw) + static_cast<std::size_t>(cx)];
+        if (o.add) {
+          value = std::max(value, cell);
+        }
+        value = std::round(value * 255.0f) / 255.0f;
+        if (cell != value) {
+          ++changed;
+          cell = value;
+        }
+      }
+    }
+    Touch();
+    return changed;
+  }
+
   bool MapLayout::Drawn() const
   {
     for (const LayoutLayer& layer : mLayers) {
@@ -1423,6 +1508,43 @@ namespace faf::editor
         break;
       case LayoutKind::Mask:
         break;
+      }
+    }
+    // Weathering: droplet erosion over the result (Studio's settings for it), on the run's grid.
+    if (h != nullptr && options.weather > 0.01f) {
+      if (const ErosionSolver* solver = FindErosionSolver("droplet"); solver != nullptr) {
+        ErosionValues values = ErosionDefaults(*solver);
+        const float w = std::min(1.0f, options.weather);
+        const std::map<std::string, double> mine = {
+          {"density", 0.3 + 2.5 * w},
+          {"lifetime", 70},
+          {"inertia", 0.25},
+          {"capacity", 6},
+          {"erode", 0.45},
+          {"deposit", 0.12},
+          {"gravity", 5},
+          {"thermal", 0.4},
+          {"thermal_steps", 3},
+          {"talus", 0.9},
+          {"drop_vary", 0.6},
+          {"radius", 2},
+          {"creep", 1.5},
+          {"seed", layout.seed + 101},
+        };
+        for (const auto& [key, value] : mine) {
+          if (values.count(key) != 0) {
+            values[key] = value;
+          }
+        }
+        field::OpArgs args;
+        const int step = std::max(1, static_cast<int>(std::lround(like.cell)));
+        for (const auto& [key, value] : ErosionOpValues(*solver, values, step)) {
+          args.p.num[key] = value;
+        }
+        args.in["a"] = h;
+        std::map<std::string, Grid> extra;
+        args.extra = &extra;
+        h = ops.Run(solver->op, args);
       }
     }
     if (h != nullptr && !options.symmetry.empty() && options.symmetry != "none") {

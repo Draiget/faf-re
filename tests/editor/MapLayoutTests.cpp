@@ -227,4 +227,79 @@ namespace faf::editor
     EXPECT_EQ(layout.Layers()[0].kind, LayoutKind::Water) << "the sea goes first";
     EXPECT_EQ(MapLayout::Templates().size(), 4U);
   }
+
+  TEST(
+    MapLayout,
+    APictureBecomesALayer
+  )
+  {
+    MapLayout layout;
+    layout.New(64, 0.0f, 0.0f, 256.0f, 256.0f);
+    // A 4 x 2 picture: its left half white, its right half black.
+    const std::vector<float> picture = {1, 1, 0, 0, 1, 1, 0, 0};
+    const int i = 0;
+    const int changed = layout.ImportPicture(i, picture, 4, 2, LayoutPictureOptions{});
+    EXPECT_GE(changed, 32 * 64) << "the white half, and a soft border into the black (bilinear)";
+    EXPECT_LE(changed, 40 * 64);
+    const auto& data = layout.Layers()[0].data;
+    EXPECT_FLOAT_EQ(data[10 * 64 + 5], 1.0f) << "stretched over the drawing: the left half drawn";
+    EXPECT_FLOAT_EQ(data[10 * 64 + 60], 0.0f);
+    LayoutPictureOptions flipped;
+    flipped.flipX = true;
+    (void)layout.ImportPicture(i, picture, 4, 2, flipped);
+    EXPECT_FLOAT_EQ(data[10 * 64 + 5], 0.0f);
+    EXPECT_FLOAT_EQ(data[10 * 64 + 60], 1.0f);
+    // Kept aspect: a 2 : 1 picture inside a square drawing leaves the top and bottom quarter empty.
+    LayoutPictureOptions contain;
+    contain.contain = true;
+    contain.invert = true;
+    (void)layout.ImportPicture(i, picture, 4, 2, contain);
+    EXPECT_FLOAT_EQ(data[2 * 64 + 60], 0.0f) << "outside the picture: empty, inverted or not";
+    EXPECT_FLOAT_EQ(data[32 * 64 + 60], 1.0f) << "inverted: the black half drawn";
+    // Add keeps what is drawn; a stretched grey picture spans 0..1; hard makes 0 or 1; no layer: -1.
+    LayoutPictureOptions add;
+    add.add = true;
+    (void)layout.ImportPicture(i, std::vector<float>(4, 0.0f), 2, 2, add);
+    EXPECT_FLOAT_EQ(data[32 * 64 + 60], 1.0f);
+    LayoutPictureOptions stretch;
+    stretch.stretch = true;
+    stretch.hard = true;
+    (void)layout.ImportPicture(i, {0.4f, 0.4f, 0.45f, 0.45f, 0.4f, 0.4f, 0.45f, 0.45f}, 4, 2, stretch);
+    EXPECT_FLOAT_EQ(data[10 * 64 + 5], 0.0f);
+    EXPECT_FLOAT_EQ(data[10 * 64 + 60], 1.0f);
+    EXPECT_EQ(layout.ImportPicture(40, picture, 4, 2, LayoutPictureOptions{}), -1);
+    EXPECT_EQ(layout.ImportPicture(i, {}, 0, 0, LayoutPictureOptions{}), -1);
+  }
+
+  TEST(
+    MapLayout,
+    WeatheringDigsGulliesIntoTheResult
+  )
+  {
+    MapLayout layout;
+    layout.New(32, 0.0f, 0.0f, 128.0f, 128.0f);
+    int mountains = -1;
+    for (std::size_t k = 0; k < layout.Layers().size(); ++k) {
+      mountains = layout.Layers()[k].kind == LayoutKind::Mountains ? static_cast<int>(k) : mountains;
+    }
+    ASSERT_GE(mountains, 0);
+    layout.FillEllipse(mountains, 6.0f, 6.0f, 26.0f, 26.0f, 1.0f, false);
+    const field::Grid like(65, 65, 2.0f, 0.0f, 0.0f);
+    field::Grid plain;
+    field::Grid weathered;
+    field::Grid again;
+    std::string error;
+    ASSERT_TRUE(BuildLayout(layout, like, LayoutBuildOptions{}, plain, nullptr, error)) << error;
+    LayoutBuildOptions weather;
+    weather.weather = 0.6f;
+    ASSERT_TRUE(BuildLayout(layout, like, weather, weathered, nullptr, error)) << error;
+    ASSERT_TRUE(BuildLayout(layout, like, weather, again, nullptr, error)) << error;
+    ASSERT_EQ(weathered.v.size(), plain.v.size());
+    float changed = 0.0f;
+    for (std::size_t k = 0; k < plain.v.size(); ++k) {
+      changed = std::max(changed, std::fabs(weathered.v[k] - plain.v[k]));
+    }
+    EXPECT_GT(changed, 0.1f) << "the droplets moved ground";
+    EXPECT_EQ(weathered.v, again.v) << "the same seed weathers the same way";
+  }
 } // namespace faf::editor

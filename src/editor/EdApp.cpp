@@ -2210,7 +2210,9 @@ namespace faf::editor
         const field::Grid like(facts.fieldWidth, facts.fieldHeight, 1.0f, 0.0f, 0.0f);
         field::Grid heights;
         std::string error;
-        if (!BuildLayout(layout, like, LayoutBuildOptions{}, heights, nullptr, error)) {
+        LayoutBuildOptions buildOptions;
+        buildOptions.weather = layout.weather;
+        if (!BuildLayout(layout, like, buildOptions, heights, nullptr, error)) {
           panel.SetStatus("Generate terrain: " + error);
           return;
         }
@@ -2523,6 +2525,31 @@ namespace faf::editor
         }(),
           mDocument.Armies().size()
         );
+        // `/layouttest picture:<file>`: the picture into the Hills layer, Generate terrain weathered, then two undos.
+        if (std::string(arg[0].c_str()).rfind("picture:", 0) == 0) {
+          EdLayoutPanel& panel = mShell->LayoutPanel();
+          switch (mLayoutTestStage) {
+          case 0:
+            mShell->SwitchWorkspace(3);
+            mShell->HideHome();
+            mShell->ShowLayout();
+            mDocument.Layout().selected = 0;
+            gpg::Logf("editor: layout test: %s", panel.ImportPicture(std::string(arg[0].c_str()).substr(8)).c_str());
+            mDocument.Layout().weather = 0.5f;
+            break;
+          case 1:
+            panel.AskGenerate();
+            break;
+          case 2:
+          case 3:
+            gpg::Logf("editor: layout test: undo %s", mScene.Undo() ? "took a step back" : "had nothing");
+            break;
+          default:
+            break;
+          }
+          ++mLayoutTestStage;
+          return;
+        }
         // `/layouttest graph`: the Duel drawn, then Studio's layout_terrain graph built from it in the Generate
         // workspace (its Map layout nodes read the drawing), its node errors, undo.
         if (std::string(arg[0].c_str()) == "graph") {

@@ -1,6 +1,7 @@
 #include "editor/ui/EdLayoutPanel.h"
 
 #include "editor/doc/EdDocument.h"
+#include "editor/tools/EdHeightFile.h"
 #include "editor/ui/EdControls.h"
 #include "editor/ui/EdIconFont.h"
 #include "editor/ui/EdImGuiRenderer.h"
@@ -239,6 +240,33 @@ namespace faf::editor
         }
         Changed(std::move(before));
       }
+      // A picture becomes what is drawn on this layer (white drawn, black empty).
+      RowLabel("Picture");
+      ImGui::SetNextItemWidth(-1.0f);
+      ImGui::InputTextWithHint(
+        "##layoutpicture", "PNG, BMP, TIFF, .raw / .r16 file", mPicturePath, sizeof(mPicturePath)
+      );
+      ImGui::Checkbox("Invert", &mPicture.invert);
+      ImGui::SameLine();
+      ImGui::Checkbox("Stretch", &mPicture.stretch);
+      ImGui::SameLine();
+      ImGui::Checkbox("Hard edge", &mPicture.hard);
+      ImGui::Checkbox("Keep its aspect", &mPicture.contain);
+      ImGui::SameLine();
+      ImGui::Checkbox("Add", &mPicture.add);
+      ImGui::SameLine();
+      ImGui::Checkbox("Flip X", &mPicture.flipX);
+      ImGui::SameLine();
+      ImGui::Checkbox("Flip Z", &mPicture.flipZ);
+      if (ImGui::Button("Import picture...", ImVec2(-1.0f, 0.0f))) {
+        mStatus = ImportPicture(mPicturePath);
+      }
+      if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip(
+          "The picture fitted over the drawing as this layer (one undo step). Stretch: its darkest value "
+          "becomes empty and its brightest full (heightmaps)."
+        );
+      }
     }
     if (Section("Generate")) {
       float x0 = 0.0f, z0 = 0.0f, x1 = 0.0f, z1 = 0.0f;
@@ -291,6 +319,13 @@ namespace faf::editor
       edited = FillDragInt("##layoutseed", &layout.seed, 0.2f, 1, 99999, "Seed %d");
       BeginChange();
       EndChange(edited);
+      ImGui::SetNextItemWidth(-1.0f);
+      edited = FillSliderFloat("##layoutweather", &layout.weather, 0.0f, 1.0f, "Weathering (gullies) %.2f");
+      BeginChange();
+      EndChange(edited);
+      if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("Droplet erosion over the generated heights: 0 = none; more digs more gullies (slower)");
+      }
       if (PrimaryButton(ICON_TERRAIN " Generate terrain", ImVec2(-1.0f, 0.0f))) {
         mGenerateAsked = true;
       }
@@ -692,5 +727,41 @@ namespace faf::editor
       ImGui::PopTextWrapPos();
     }
     ImGui::End();
+  }
+  std::string EdLayoutPanel::ImportPicture(
+    const std::string& path
+  )
+  {
+    MapLayout& layout = mDocument.Layout();
+    if (path.empty()) {
+      return "Type the picture's file first.";
+    }
+    HeightImage image;
+    std::string error;
+    if (!ReadHeightImage(std::filesystem::path(path), 0, 0, image, error)) {
+      return "The picture couldn't be read: " + error;
+    }
+    std::vector<float> grey(image.words.size());
+    for (std::size_t k = 0; k < grey.size(); ++k) {
+      grey[k] = static_cast<float>(image.words[k]) / 65535.0f;
+    }
+    if (!layout.BeginStroke(layout.selected)) {
+      return "No layer is selected.";
+    }
+    const int changed = layout.ImportPicture(layout.selected, grey, image.width, image.height, mPicture);
+    LayoutStroke stroke;
+    if (layout.EndStroke(stroke)) {
+      mDocument.LayoutStroked(std::move(stroke));
+    }
+    gpg::Logf(
+      "editor: layout: picture %s (%d x %d) into layer %d: %d cells changed",
+      path.c_str(),
+      image.width,
+      image.height,
+      layout.selected + 1,
+      changed
+    );
+    return "The picture is on layer " + std::to_string(layout.selected + 1) + ": " + std::to_string(changed) +
+      " cells changed (one undo step).";
   }
 } // namespace faf::editor

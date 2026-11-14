@@ -93,6 +93,18 @@ namespace faf::editor
     std::vector<float> after;
   };
 
+  /** How a picture becomes a layer (Studio's ImportImage): white is drawn, black is empty. */
+  struct LayoutPictureOptions
+  {
+    bool invert = false;  // black is drawn
+    bool stretch = false; // the picture's darkest value becomes 0 and its brightest 1 (heightmaps)
+    bool hard = false;    // above one half: 1, else 0
+    bool contain = false; // the whole picture inside the drawing with its aspect (else stretched over it)
+    bool add = false;     // added to what is drawn (the larger value wins)
+    bool flipX = false;
+    bool flipZ = false;
+  };
+
   /** A blob drawn on the Base layers: its centre in world units and its size in cells. */
   struct LayoutBase
   {
@@ -139,7 +151,7 @@ namespace faf::editor
     float base = 25.0f;  // ground height (units)
     float water = 20.0f; // water level (units)
     int seed = 1;
-    float weather = 0.0f; // 0..1 (kept; the generator doesn't weather yet)
+    float weather = 0.0f; // 0..1: droplet erosion on top (gullies)
     /** The markers the start and resource generator placed last (name and place): the next Place replaces those
      * still there. */
     struct Generated
@@ -196,6 +208,11 @@ namespace faf::editor
     void Fill(int i, float value);
     void Smooth(int i);
     void Invert(int i);
+    /**
+     * A picture (`grey` 0..1, `w` x `h`, rows along z) fitted over the drawing as layer i's cells (bilinear, values in
+     * 1/255 steps); how many cells changed, -1 for no such layer or an empty picture. Wrap it in a stroke for undo.
+     */
+    int ImportPicture(int i, const std::vector<float>& grey, int w, int h, const LayoutPictureOptions& options);
 
     /** Is anything drawn? */
     [[nodiscard]] bool Drawn() const;
@@ -250,6 +267,8 @@ namespace faf::editor
     float cx = 0.0f;
     float cz = 0.0f;
     int turns = 3; // rotn: the number of turns
+    /** 0..1: droplet erosion over the result before the symmetry (Studio's weathering: gullies). */
+    float weather = 0.0f;
   };
 
   /**

@@ -3863,14 +3863,15 @@ namespace faf::editor::terrain
         "The height field the Layout workspace makes from the layers drawn on its canvas (hills, mountains, plateaus, "
         "water, valleys, flat ground, bases), at the graph's resolution, with the layout's ground height and water "
         "level. Carry on with it like any generator: erosion, texturing, props. With Apply the editor symmetry the "
-        "result is made symmetric as Generate terrain makes it. Weathering is kept for Studio's graphs but not applied "
-        "yet.",
+        "result is made symmetric as Generate terrain makes it. Weathering runs droplet erosion over it (gullies) "
+        "before the symmetry.",
         {},
         kHeightOut,
         {N("weather", "Weathering (gullies)", 0, 1, 0.05f, "%.2f", 0), B("sym", "Apply the editor symmetry", true)},
         [layoutOf](const Env& E, const Values& v, const Inputs&) {
         const MapLayout& layout = layoutOf(E);
         LayoutBuildOptions options;
+        options.weather = static_cast<float>(v.N("weather"));
         if (v.B("sym")) {
           options.symmetry = E.ground->layoutSymmetry;
           options.turns = E.ground->layoutTurns;

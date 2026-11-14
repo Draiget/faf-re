@@ -111,6 +111,8 @@ namespace faf::editor
     }
     /** A template applied (test runs, `/layouttest`); the drawing's state as one undo step. */
     bool ApplyTemplate(const std::string& id);
+    /** A picture file onto the selected layer with the panel's options (one undo step); what happened. */
+    std::string ImportPicture(const std::string& path);
 
     enum class Tool : std::uint8_t
     {
@@ -153,6 +155,8 @@ namespace faf::editor
     int mImageSelected = -1;
     std::vector<std::uint64_t> mRetired;
     std::function<LayoutImages(const std::string&)> mImagesFor;
+    char mPicturePath[512] = {};
+    LayoutPictureOptions mPicture;
     LayoutMarkerSettings mMarkers;
     std::optional<LayoutMarkerPlan> mPlan;
     std::string mStartsStatus;
