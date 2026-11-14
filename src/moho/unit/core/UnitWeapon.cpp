@@ -54,7 +54,9 @@
 #include "moho/sim/STIMap.h"
 #include "moho/task/CTask.h"
 #include "moho/task/CTaskThread.h"
+#include "moho/sim/FafGameVersion.h"
 #include "moho/unit/core/Unit.h"
+#include "moho/unit/core/WadingTargetLayer.h"
 #include "moho/unit/tasks/CFireWeaponTask.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 #include "moho/sim/SimStartupRegistrations.h"
@@ -361,7 +363,26 @@ namespace
       return false;
     }
 
-    const moho::ELayer targetLayer = targetEntity->mVarDat.mLayerMask;
+    moho::ELayer targetLayer = targetEntity->mVarDat.mLayerMask;
+
+    // Engine rule fix (off unless `sim_FixWadingTargetLayer 1`, see WadingTargetLayer.h): a wading `Land` target
+    // is checked as `Seabed` by a weapon that cannot target `Land`, so it also gets the above-/below-water
+    // target point checks below. Not in the binary at 0x006D5590.
+    if (targetLayer == moho::LAYER_Land && moho::FAF_IsSimFixActive(moho::EFafSimFix::WadingTargetLayer)) {
+      const moho::STIMap* const mapData =
+        (weapon->mUnit != nullptr && weapon->mUnit->SimulationRef != nullptr) ? weapon->mUnit->SimulationRef->mMapData : nullptr;
+      if (mapData != nullptr) {
+        targetLayer = moho::WadingTargetLayer(
+          true,
+          targetLayer,
+          weapon->mFireTargetLayerCaps,
+          targetEntity->mVarDat.mCurTransform.pos_.y,
+          true,
+          mapData->GetWaterElevationAt(targetEntity->mVarDat.mCurTransform.pos_.x, targetEntity->mVarDat.mCurTransform.pos_.z)
+        );
+      }
+    }
+
     if ((weapon->mFireTargetLayerCaps & targetLayer) == 0) {
       return false;
     }

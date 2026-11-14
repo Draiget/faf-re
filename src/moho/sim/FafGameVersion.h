@@ -36,7 +36,11 @@ namespace moho
     /// Engine feature, not an FA-Binary-Patches one: a map's `ScenarioInfo.WaterBodies` add water levels
     /// besides its sea (.plans/water-levels/PLAN.md). In no release yet: on only by `sim_FixWaterBodies`.
     WaterBodies = 6,
-    Count = 7,
+    /// Engine addition, not a FAF patch and in no release: a wading `Land` unit counts as `Seabed` for weapons that
+    /// cannot target `Land` (torpedo bombers vs a half-submerged experimental). On only by `sim_FixWadingTargetLayer 1`;
+    /// see `WadingTargetLayer.h`.
+    WadingTargetLayer = 7,
+    Count = 8,
   };
 
   /// `SFafSimFixInfo::mFirstGameVersion` of a fix no FAF release carries yet: on only by its switch.

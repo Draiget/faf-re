@@ -266,6 +266,7 @@ The switches below are read when a session begins. In a multiplayer game every c
 | `sim_FixShieldRepair` | −1 | `/con` | next game | #175 (from 3840): shield repair scales with the builder's resources, and a switched-off shield is not repaired |
 | `sim_FixProjectileMapEdgeCollision` | −1 | `/con` | next game | #180 (from 3841): a surface-colliding projectile outside the map hits the terrain at the height of the nearest map edge, and #154's impact below height 0 is off. Projectiles with `CollideSurface = false`, such as the UEF build effect projectile, are no longer destroyed below 0 |
 | `sim_FixWaterBodies` | −1 | `/con` | next game | Water bodies (in no FAF release yet, so −1 means off): a map's `ScenarioInfo.WaterBodies` (lakes at their own levels, dry areas below the sea) are filled, played and drawn; off, such a map has only its sea. See [WATER_BODIES.md](WATER_BODIES.md) |
+| `sim_FixWadingTargetLayer` | −1 (off) | `/con` | next game | Engine addition, in no FAF game version, so it changes the sim against the FAF exe: a `Land` unit whose ground point is under the water surface counts as `Seabed` for weapons that list `Seabed` but not `Land` (torpedo bombers vs a half-submerged Ythotha, Colossus, Monkeylord; their layer stays `Land` until deeper than `LayerChangeOffsetHeight`, -5 for the Ythotha). Only 1 turns it on. Every client and every replay of one game must use the same value; the replay does not record it |
 
 ## Protection against other players
 

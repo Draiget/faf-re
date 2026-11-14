@@ -1,5 +1,8 @@
 #include "moho/unit/core/UserUnitPrivate.h"
 
+#include "moho/sim/FafGameVersion.h"
+#include "moho/unit/core/WadingTargetLayer.h"
+
 #include "moho/resource/CSimResources.h"
 
 namespace
@@ -2075,11 +2078,34 @@ bool UserUnit::CanAttackTarget(
       : 0.0f;
     const std::uint32_t targetLayerMask = targetEntity->mVariableData.mLayerMask;
 
+    // Engine rule fix (off unless `sim_FixWadingTargetLayer 1`, see WadingTargetLayer.h): the same wading-target
+    // rule as the sim's `CanWeaponAttackEntityTarget`, so the attack cursor agrees with what the sim accepts.
+    const STIMap* wadingMap = nullptr;
+    if (targetLayerMask == static_cast<std::uint32_t>(LAYER_Land) && FAF_IsSimFixActive(EFafSimFix::WadingTargetLayer)) {
+      const CWldSession* const session = WLD_GetActiveSession();
+      if (session != nullptr && session->mWldMap != nullptr && session->mWldMap->mTerrainRes != nullptr) {
+        wadingMap = session->mWldMap->mTerrainRes->mMap;
+      }
+    }
+
     const UnitWeaponInfo* weaponInfo = GetWeaponInfoBegin(this);
     const UnitWeaponInfo* const weaponInfoEnd = GetWeaponInfoEnd(this);
     while (weaponInfo != weaponInfoEnd) {
+      std::uint32_t weaponTargetLayer = targetLayerMask;
+      if (wadingMap != nullptr) {
+        weaponTargetLayer = static_cast<std::uint32_t>(WadingTargetLayer(
+          true,
+          static_cast<ELayer>(targetLayerMask),
+          static_cast<ELayer>(weaponInfo->mLayer),
+          targetEntity->mVariableData.mCurTransform.pos_.y,
+          true,
+          wadingMap->GetWaterElevationAt(
+            targetEntity->mVariableData.mCurTransform.pos_.x, targetEntity->mVariableData.mCurTransform.pos_.z
+          )
+        ));
+      }
       if (
-        (static_cast<std::uint32_t>(weaponInfo->mLayer) & targetLayerMask) != 0u &&
+        (static_cast<std::uint32_t>(weaponInfo->mLayer) & weaponTargetLayer) != 0u &&
         WeaponAllowsBlueprint(*weaponInfo, targetBlueprint)
       ) {
         if (
