@@ -99,7 +99,13 @@ func Start(cfg Config, j *journal.Journal) (*Server, error) {
 		}
 	}
 	if ip == nil {
-		ip = firstPrivateIPv4()
+		// The default route's private source address first: interface order would pick a virtual adapter
+		// (VirtualBox, Hyper-V) that the ICE adapters' sockets can't reach on hosts that list it first.
+		if o := outboundIPv4(); o != nil && o.IsPrivate() {
+			ip = o
+		} else {
+			ip = firstPrivateIPv4()
+		}
 	}
 
 	raw, err := net.ListenPacket("udp4", fmt.Sprintf("%s:%d", cfg.ListenIP, cfg.Port))

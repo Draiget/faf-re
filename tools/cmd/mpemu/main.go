@@ -292,7 +292,7 @@ func cmdSelftest(ctx context.Context, args []string) int {
 				continue
 			}
 			opts := scenario.Options{RunDir: filepath.Join(root, sc.Name), Verbose: c.verbose,
-				Hub: hubURL, HubSecret: secret, Advertise: "127.0.0.1"}
+				Hub: hubURL, HubSecret: secret, Advertise: "127.0.0.1", TurnIP: c.turnIP}
 			// Selftests are unattended: a console step must only end the way it
 			// would with nobody typing, so it gets input that never arrives.
 			never, _ := io.Pipe()

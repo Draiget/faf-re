@@ -173,7 +173,7 @@ func New(cfg Config, j *journal.Journal) (*Launcher, error) {
 			j.Note(journal.Note, 0, "link steps shape every netlink link's sends: "+l.shapingFile, nil)
 		}
 		if !cfg.Contract.NoTurn {
-			l.turn, err = turnsrv.Start(turnsrv.Config{Port: cfg.TurnPort, PublicIP: cfg.TurnIP}, j)
+			l.turn, err = turnsrv.Start(turnConfig(cfg), j)
 			if err != nil {
 				job.Close()
 				return nil, err
@@ -182,7 +182,7 @@ func New(cfg Config, j *journal.Journal) (*Launcher, error) {
 		}
 	case cfg.Mode == ModeICE && l.hub == nil:
 		if !cfg.ICE.NoTurn {
-			l.turn, err = turnsrv.Start(turnsrv.Config{Port: cfg.TurnPort, PublicIP: cfg.TurnIP}, j)
+			l.turn, err = turnsrv.Start(turnConfig(cfg), j)
 			if err != nil {
 				job.Close()
 				return nil, err
@@ -865,4 +865,15 @@ func (l *Launcher) closeServices() {
 	if l.turn != nil {
 		_ = l.turn.Close()
 	}
+}
+
+// turnConfig is the local TURN server for cfg: it announces cfg.TurnIP, and listens (relay sockets included) on it
+// when that is a loopback address, so a run that keeps everything on 127.0.0.1 works on a host that turns a socket
+// bound to every interface into one bound to its LAN address (mpemu selftest -bindip).
+func turnConfig(cfg Config) turnsrv.Config {
+	c := turnsrv.Config{Port: cfg.TurnPort, PublicIP: cfg.TurnIP}
+	if ip := net.ParseIP(cfg.TurnIP); ip != nil && ip.IsLoopback() {
+		c.ListenIP = cfg.TurnIP
+	}
+	return c
 }

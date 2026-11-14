@@ -50,6 +50,7 @@ func main() {
 		turnRange   = flag.String("turn-relay-ports", "", "TURN relay allocation ports, e.g. 40000-40015 (default: any)")
 		relayRange  = flag.String("relay-ports", "", "game relay ports, e.g. 40100-40131 (default: any)")
 		relayIP     = flag.String("relay-ip", "", "address the game relay's sockets bind to (default: every interface)")
+		turnIP      = flag.String("turn-ip", "", "address TURN binds to and announces, relay sockets included (default: every interface, -public-host)")
 		forceRelay  = flag.Bool("force-relay", false, "tell ICE adapters to use TURN relay candidates only")
 		secretFile  = flag.String("secret-file", os.Getenv("MPEMU_SECRET_FILE"), "file holding the shared secret")
 		logDir      = flag.String("logs", "mpemu-server-logs", "directory for the journal and uploaded adapter logs")
@@ -99,8 +100,15 @@ func main() {
 
 	var turn *turnsrv.Server
 	if *turnPort != 0 {
-		turn, err = turnsrv.Start(turnsrv.Config{Port: *turnPort, PublicHost: *publicHost,
-			PublicIP: os.Getenv("MPEMU_PUBLIC_IP"), RelayMinPort: turnMin, RelayMaxPort: turnMax, Secret: secret}, j)
+		tc := turnsrv.Config{Port: *turnPort, PublicHost: *publicHost,
+			PublicIP: os.Getenv("MPEMU_PUBLIC_IP"), RelayMinPort: turnMin, RelayMaxPort: turnMax, Secret: secret}
+		if *turnIP != "" {
+			tc.ListenIP, tc.PublicIP = *turnIP, *turnIP
+			if tc.PublicHost == "" {
+				tc.PublicHost = *turnIP
+			}
+		}
+		turn, err = turnsrv.Start(tc, j)
 		if err != nil {
 			fail(err)
 		}
