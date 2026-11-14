@@ -1,5 +1,6 @@
 #pragma once
 
+#include "editor/tools/EdLayoutMarkers.h"
 #include "editor/tools/EdMapLayout.h"
 
 #include <cstdint>
@@ -30,6 +31,46 @@ namespace faf::editor
 
     void DrawLayersPanel(bool& open, bool mapOpen);
     void DrawCanvasPanel(bool& open, bool mapOpen);
+    /**
+     * Starts and resources (Studio's start and resource generator): where the starts come from, what lies around
+     * each, the rules; Preview shows the plan on the canvas, Place markers writes it as one undo step.
+     */
+    void DrawStartsPanel(bool& open, bool mapOpen);
+
+    [[nodiscard]] LayoutMarkerSettings& MarkerSettings() noexcept
+    {
+      return mMarkers;
+    }
+    /** Preview or Place was pressed (the app plans against the map, and places). */
+    [[nodiscard]] bool TakePlanAsk() noexcept
+    {
+      const bool asked = mPlanAsked;
+      mPlanAsked = false;
+      return asked;
+    }
+    [[nodiscard]] bool TakePlaceAsk() noexcept
+    {
+      const bool asked = mPlaceAsked;
+      mPlaceAsked = false;
+      return asked;
+    }
+    void AskPlace() noexcept
+    {
+      mPlaceAsked = true;
+    }
+    void AskPlan() noexcept
+    {
+      mPlanAsked = true;
+    }
+    /** The plan shown on the canvas (none: nothing shown), and what the last plan or placing gave. */
+    void SetPlan(
+      std::optional<LayoutMarkerPlan> plan,
+      std::string status
+    )
+    {
+      mPlan = std::move(plan);
+      mStartsStatus = std::move(status);
+    }
 
     /** Generate terrain was pressed (the app builds the heights and writes them). */
     [[nodiscard]] bool TakeGenerateAsk() noexcept
@@ -112,5 +153,10 @@ namespace faf::editor
     int mImageSelected = -1;
     std::vector<std::uint64_t> mRetired;
     std::function<LayoutImages(const std::string&)> mImagesFor;
+    LayoutMarkerSettings mMarkers;
+    std::optional<LayoutMarkerPlan> mPlan;
+    std::string mStartsStatus;
+    bool mPlanAsked = false;
+    bool mPlaceAsked = false;
   };
 } // namespace faf::editor

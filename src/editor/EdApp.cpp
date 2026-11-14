@@ -42,6 +42,7 @@
 #include "editor/EdPlay.h"
 #include "editor/EdShell.h"
 #include "editor/tools/EdHeightFile.h"
+#include "editor/tools/EdLayoutMarkers.h"
 #include "editor/tools/EdMapLayout.h"
 #include "editor/tools/EdSymmetrize.h"
 #include "editor/tools/EdSymmetryCheck.h"
@@ -2184,6 +2185,18 @@ namespace faf::editor
         }
         const HeightBrush brush = mShell->Tools().CurrentHeightBrush();
         layout.SetImages(LayoutImagesOf(brush.symmetry, brush.turns));
+        const bool planAsked = panel.TakePlanAsk();
+        const bool placeAsked = panel.TakePlaceAsk();
+        if ((planAsked || placeAsked) && (!mScene.Attached() || mScene.ModelsPending())) {
+          panel.SetPlan(std::nullopt, "The map isn't ready yet; try again in a moment.");
+        } else if (placeAsked) {
+          PlaceLayoutMarkers();
+        } else if (planAsked) {
+          const LayoutMarkerPlan plan = PlanLayoutNow();
+          gpg::Logf("editor: layout markers: plan: %s", plan.text.c_str());
+          std::string text = "Plan: " + plan.text + ".";
+          panel.SetPlan(plan, std::move(text));
+        }
         if (!panel.TakeGenerateAsk()) {
           return;
         }
@@ -2239,6 +2252,228 @@ namespace faf::editor
         panel.SetStatus(status);
       }
 
+      /** What the start and resource generator checks against: the playable area, the heights, the sea. */
+      LayoutGround LayoutGroundNow() const
+      {
+        LayoutGround g;
+        mDocument.LayoutArea(g.x0, g.z0, g.x1, g.z1);
+        const moho::CHeightField* const field = mDocument.Map() != nullptr && mDocument.Map()->mTerrainRes != nullptr
+          ? mDocument.Map()->mTerrainRes->GetHeightField()
+          : nullptr;
+        if (field != nullptr) {
+          g.height = [field](const float x, const float z) {
+            const int ix = std::clamp(static_cast<int>(x), 0, field->width - 1);
+            const int iz = std::clamp(static_cast<int>(z), 0, field->height - 1);
+            return static_cast<float>(field->data[static_cast<std::size_t>(iz) * field->width + ix]) / 128.0f;
+          };
+        }
+        const WaterState water = mDocument.WaterNow();
+        g.water = water.enabled ? water.elevation : -1000.0f;
+        return g;
+      }
+
+      /** Whether a marker the generator made is still there (its name at its place). */
+      static bool GeneratedStill(
+        const MapLayout::Generated& made,
+        const SaveEntry& marker
+      )
+      {
+        float x = 0.0f, y = 0.0f, z = 0.0f;
+        return marker.name == made.name && MarkerPosition(marker, x, y, z) && std::fabs(x - made.x) < 0.05f &&
+          std::fabs(z - made.z) < 0.05f;
+      }
+
+      /** The map's start positions (its ARMY_<n> start markers, in the order of its armies). */
+      std::vector<LayoutPoint> MapStarts() const
+      {
+        std::vector<LayoutPoint> out;
+        for (const std::string& army : mDocument.Armies()) {
+          for (const SaveEntry& marker : mDocument.SaveData().Markers()) {
+            float x = 0.0f, y = 0.0f, z = 0.0f;
+            if (marker.name == army && MarkerPosition(marker, x, y, z)) {
+              out.push_back({x, z, marker.name});
+            }
+          }
+        }
+        return out;
+      }
+
+      /** The resource markers that stay where they are (with Remove the old ones, not those the generator made). */
+      std::vector<LayoutPoint> StayingResources(
+        const bool clear
+      ) const
+      {
+        std::vector<LayoutPoint> out;
+        for (const SaveEntry& marker : mDocument.SaveData().Markers()) {
+          const std::string type = MarkerTypeOf(marker);
+          float x = 0.0f, y = 0.0f, z = 0.0f;
+          if ((type != "Mass" && type != "Hydrocarbon") || !MarkerPosition(marker, x, y, z)) {
+            continue;
+          }
+          bool made = false;
+          for (const MapLayout::Generated& g : mDocument.Layout().generated) {
+            made = made || GeneratedStill(g, marker);
+          }
+          if (!(clear && made)) {
+            out.push_back({x, z, marker.name});
+          }
+        }
+        return out;
+      }
+
+      LayoutMarkerPlan PlanLayoutNow() const
+      {
+        const LayoutMarkerSettings& s = mShell->LayoutPanel().MarkerSettings();
+        const LayoutGround ground = LayoutGroundNow();
+        std::vector<LayoutPoint> bases;
+        for (const LayoutBase& base : mDocument.Layout().BaseCentres()) {
+          bases.push_back({base.x, base.z, {}});
+        }
+        const std::vector<LayoutPoint> starts = LayoutStarts(s, ground, MapStarts(), bases);
+        return PlanLayoutMarkers(s, ground, starts, StayingResources(s.clear));
+      }
+
+      /**
+       * Place markers: the generator's markers from last time removed (Remove the old ones), the starts moved, added
+       * or removed to match (Replace the start markers; armies follow), then the resources planned against the map
+       * as it is now and placed; one undo step.
+       */
+      void PlaceLayoutMarkers()
+      {
+        EdLayoutPanel& panel = mShell->LayoutPanel();
+        const LayoutMarkerSettings& s = panel.MarkerSettings();
+        MapLayout& layout = mDocument.Layout();
+        const LayoutGround ground = LayoutGroundNow();
+        std::vector<LayoutPoint> bases;
+        for (const LayoutBase& base : layout.BaseCentres()) {
+          bases.push_back({base.x, base.z, {}});
+        }
+        const std::vector<LayoutPoint> starts = LayoutStarts(s, ground, MapStarts(), bases);
+        if (s.starts != LayoutStartMode::Existing && starts.empty()) {
+          panel.SetPlan(
+            std::nullopt,
+            s.starts == LayoutStartMode::Bases ? "No base is drawn in the layout (draw blobs on a Base layer)."
+                                               : "No start positions."
+          );
+          return;
+        }
+        const MarkerType* const blank = FindMarkerType("Blank Marker");
+        const MarkerType* const massType = FindMarkerType("Mass");
+        const MarkerType* const hydroType = FindMarkerType("Hydrocarbon");
+        if (blank == nullptr || massType == nullptr || hydroType == nullptr) {
+          panel.SetPlan(std::nullopt, "The marker types are missing.");
+          return;
+        }
+        EdDocument::SaveSnapshot before = mDocument.SaveDataNow();
+        std::vector<SaveEntry>& markers = mDocument.SaveData().Markers();
+        const auto groundAt = [&](const float x, const float z) {
+          return ground.height ? ground.height(x, z) : 0.0f;
+        };
+        std::size_t removed = 0;
+        if (s.clear) {
+          const std::size_t count0 = markers.size();
+          markers.erase(
+            std::remove_if(
+              markers.begin(),
+              markers.end(),
+              [&](const SaveEntry& marker) {
+            for (const MapLayout::Generated& g : layout.generated) {
+              if (GeneratedStill(g, marker)) {
+                return true;
+              }
+            }
+            return false;
+          }
+            ),
+            markers.end()
+          );
+          removed = count0 - markers.size();
+        }
+        layout.generated.clear();
+        int startsMoved = 0;
+        int startsAdded = 0;
+        int startsRemoved = 0;
+        if (s.starts != LayoutStartMode::Existing) {
+          const std::vector<LayoutPoint> old = MapStarts();
+          const auto freeArmy = [&] {
+            const std::vector<std::string> taken = mDocument.ArmyNamesInUse();
+            for (int k = 1;; ++k) {
+              const std::string name = "ARMY_" + std::to_string(k);
+              const bool used = std::find(taken.begin(), taken.end(), name) != taken.end() ||
+                std::any_of(markers.begin(), markers.end(), [&](const SaveEntry& m) {
+                return m.name == name;
+              });
+              if (!used) {
+                return name;
+              }
+            }
+          };
+          for (std::size_t i = 0; i < starts.size(); ++i) {
+            const LayoutPoint& p = starts[i];
+            const float x = std::floor(p.x) + 0.5f;
+            const float z = std::floor(p.z) + 0.5f;
+            if (s.replaceStarts && i < old.size()) {
+              for (SaveEntry& marker : markers) {
+                if (marker.name == old[i].name) {
+                  marker.Set("position", Vector3Value(x, groundAt(x, z), z));
+                }
+              }
+              ++startsMoved;
+            } else {
+              const std::string name = freeArmy();
+              mDocument.AddArmy(name);
+              markers.push_back(NewMarker(*blank, name, x, groundAt(x, z), z));
+              ++startsAdded;
+            }
+          }
+          if (s.replaceStarts) {
+            for (std::size_t i = starts.size(); i < old.size(); ++i) {
+              const std::string name = old[i].name;
+              markers.erase(
+                std::remove_if(
+                  markers.begin(),
+                  markers.end(),
+                  [&](const SaveEntry& m) {
+                return m.name == name;
+              }
+                ),
+                markers.end()
+              );
+              mDocument.RemoveArmy(name);
+              ++startsRemoved;
+            }
+          }
+        }
+        // The resources, planned against the map as it is now (the old ones gone, the starts moved).
+        const std::vector<LayoutPoint> planStarts =
+          s.starts == LayoutStartMode::Existing || !s.replaceStarts ? starts : MapStarts();
+        const LayoutMarkerPlan plan = PlanLayoutMarkers(s, ground, planStarts, StayingResources(false));
+        for (const LayoutMarkerItem& item : plan.items) {
+          const MarkerType& type = item.hydro ? *hydroType : *massType;
+          const std::string name = NextMarkerName(markers, type);
+          markers.push_back(NewMarker(type, name, item.x, groundAt(item.x, item.z), item.z));
+          layout.generated.push_back({name, item.x, item.z});
+        }
+        mDocument.SaveDataEdited(std::move(before));
+        layout.Touch();
+        char text[320];
+        (void)std::snprintf(
+          text,
+          sizeof(text),
+          "Placed %d mass and %d hydrocarbon%s; starts: %d moved, %d added, %d removed; %zu old markers removed. One "
+          "undo step.",
+          plan.masses,
+          plan.hydros,
+          plan.failed > 0 ? (", " + std::to_string(plan.failed) + " did not fit").c_str() : "",
+          startsMoved,
+          startsAdded,
+          startsRemoved,
+          removed
+        );
+        gpg::Logf("editor: layout markers: %s", text);
+        panel.SetPlan(std::nullopt, text);
+      }
+
       /**
        * `/layouttest <template>` (test runs): the Layout workspace, the template drawn, Generate terrain, then undo of
        * the terrain and of the template; the heights' checksum, the water level and the undo steps at each stage.
@@ -2247,7 +2482,7 @@ namespace faf::editor
       {
         fa::vector<fa::string> arg;
         if (
-          mLayoutTestStage >= 6 || mScene.ModelsPending() || !mScene.Attached() ||
+          mLayoutTestStage >= 7 || mScene.ModelsPending() || !mScene.Attached() ||
           !moho::CFG_GetArgOption("/layouttest", 1, &arg) || arg.empty() || ++mLayoutTestFrames % 120 != 0
         ) {
           return;
@@ -2259,7 +2494,7 @@ namespace faf::editor
         const MapLayout& layout = mDocument.Layout();
         gpg::Logf(
           "editor: layout test stage %d: heights %016llx%s, water %s %.1f, layout %s with %zu bases (%d x %d cells), "
-          "%zu undo steps; undo: %s",
+          "%zu undo steps; undo: %s; markers: %d mass, %d hydrocarbon, %zu armies",
           mLayoutTestStage,
           static_cast<unsigned long long>(hash),
           hash == mLayoutTestStart ? " (the original)" : "",
@@ -2270,8 +2505,49 @@ namespace faf::editor
           layout.Frame().rw,
           layout.Frame().rh,
           mDocument.UndoOrder().size(),
-          mDocument.UndoStepName() != nullptr ? mDocument.UndoStepName() : "-"
+          mDocument.UndoStepName() != nullptr ? mDocument.UndoStepName() : "-",
+          [this] {
+          int n = 0;
+          for (const SaveEntry& m : mDocument.SaveData().Markers()) {
+            n += MarkerTypeOf(m) == "Mass" ? 1 : 0;
+          }
+          return n;
+        }(),
+          [this] {
+          int n = 0;
+          for (const SaveEntry& m : mDocument.SaveData().Markers()) {
+            n += MarkerTypeOf(m) == "Hydrocarbon" ? 1 : 0;
+          }
+          return n;
+        }(),
+          mDocument.Armies().size()
         );
+        // `/layouttest starts`: Preview, Place markers, undo, redo, Place markers again (the old ones replaced).
+        if (std::string(arg[0].c_str()) == "starts") {
+          EdLayoutPanel& panel = mShell->LayoutPanel();
+          switch (mLayoutTestStage) {
+          case 0:
+            mShell->SwitchWorkspace(3);
+            mShell->HideHome();
+            mShell->ShowLayout();
+            panel.AskPlan();
+            break;
+          case 1:
+          case 4:
+            panel.AskPlace();
+            break;
+          case 2:
+            gpg::Logf("editor: layout test: undo %s", mScene.Undo() ? "took a step back" : "had nothing");
+            break;
+          case 3:
+            gpg::Logf("editor: layout test: redo %s", mScene.Redo() ? "did a step again" : "had nothing");
+            break;
+          default:
+            break;
+          }
+          ++mLayoutTestStage;
+          return;
+        }
         switch (mLayoutTestStage) {
         case 0:
           mShell->SwitchWorkspace(3);

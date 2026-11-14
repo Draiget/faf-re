@@ -141,6 +141,15 @@ namespace faf::editor
       ASSERT_NEAR(back.Layers()[0].data[k], layout.Layers()[0].data[k], 0.5f / 255.0f) << k;
     }
     EXPECT_FALSE(back.Load("{\"layers\": []}", error));
+    // The generator's markers are kept with it (also when nothing is drawn).
+    MapLayout markers;
+    markers.New(64, 0.0f, 0.0f, 256.0f, 256.0f);
+    markers.generated = {{"Mass 07", 12.5f, 40.5f}, {"Hydrocarbon 01", 30.5f, 60.5f}};
+    MapLayout markersBack;
+    ASSERT_TRUE(markersBack.Load(markers.Save(), error)) << error;
+    ASSERT_EQ(markersBack.generated.size(), 2U);
+    EXPECT_EQ(markersBack.generated[0].name, "Mass 07");
+    EXPECT_FLOAT_EQ(markersBack.generated[1].z, 60.5f);
   }
 
   TEST(

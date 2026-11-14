@@ -394,6 +394,10 @@ namespace faf::editor
     {
       return mLayout;
     }
+    [[nodiscard]] const MapLayout& Layout() const noexcept
+    {
+      return mLayout;
+    }
     /** A stroke's record as an undo step. */
     void LayoutStroked(LayoutStroke stroke);
     /** A change to the whole drawing (layers, template, settings) as an undo step: `before` is how it was. */

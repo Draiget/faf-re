@@ -386,6 +386,7 @@ add_executable(faf_editor_field_tests EXCLUDE_FROM_ALL editor/FieldTests.cpp edi
   editor/ScToolsTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdScTools.cpp
   editor/TerrainChecksTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdTerrainChecks.cpp
   editor/MapLayoutTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdMapLayout.cpp
+  editor/LayoutMarkersTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdLayoutMarkers.cpp
   editor/TerrainGraphTests.cpp ${_faf_terrain_graph_files} ${CMAKE_SOURCE_DIR}/src/editor/graph/EdTerrainGraph.cpp ${CMAKE_SOURCE_DIR}/src/editor/graph/EdTerrainNodes.cpp
   ${CMAKE_SOURCE_DIR}/src/editor/graph/EdNodeGraph.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdJson.cpp
   ${CMAKE_SOURCE_DIR}/src/editor/terrain/EdErosion.cpp ${CMAKE_SOURCE_DIR}/src/editor/terrain/EdFieldEro2.cpp

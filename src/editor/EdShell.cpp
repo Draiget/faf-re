@@ -520,6 +520,9 @@ namespace faf::editor
       if (mShowLayoutCanvas) {
         mLayoutPanel.DrawCanvasPanel(mShowLayoutCanvas, mDocument.Map() != nullptr);
       }
+      if (mShowLayoutStarts) {
+        mLayoutPanel.DrawStartsPanel(mShowLayoutStarts, mDocument.Map() != nullptr);
+      }
       if (mShowParticleEditor) {
         mParticleEditor.Draw(mShowParticleEditor);
       }
@@ -709,6 +712,7 @@ namespace faf::editor
       {"Inspector###GenerateInspector", &EdShell::mShowGenInspector},
       {"Layout layers###LayoutLayers", &EdShell::mShowLayoutLayers},
       {"Layout canvas###LayoutCanvas", &EdShell::mShowLayoutCanvas},
+      {"Starts and resources###LayoutStarts", &EdShell::mShowLayoutStarts},
     };
     return kFlags;
   }

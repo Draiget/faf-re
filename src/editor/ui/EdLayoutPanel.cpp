@@ -536,6 +536,23 @@ namespace faf::editor
         draw->AddCircle(toScreen(ix, iz), mSize * scale, IM_COL32(255, 255, 255, 170), 0, 1.5f);
       }
     }
+    // The plan of the start and resource generator: white starts, orange mass, green hydrocarbon.
+    if (mPlan.has_value()) {
+      for (const LayoutPoint& start : mPlan->starts) {
+        float sx = 0.0f, sz = 0.0f;
+        layout.ToCell(start.x, start.z, sx, sz);
+        const ImVec2 c = toScreen(sx, sz);
+        const float r = Em(5.0f);
+        draw->AddRectFilled(ImVec2(c.x - r, c.y - r), ImVec2(c.x + r, c.y + r), IM_COL32(255, 255, 255, 235));
+      }
+      for (const LayoutMarkerItem& item : mPlan->items) {
+        float ix = 0.0f, iz = 0.0f;
+        layout.ToCell(item.x, item.z, ix, iz);
+        draw->AddCircleFilled(
+          toScreen(ix, iz), Em(3.0f), item.hydro ? IM_COL32(90, 220, 110, 255) : IM_COL32(255, 160, 40, 255)
+        );
+      }
+    }
     // The start positions the bases give.
     for (const LayoutBase& base : layout.BaseCentres()) {
       float bx = 0.0f, bz = 0.0f;
@@ -549,5 +566,131 @@ namespace faf::editor
       layout.ToWorld(cx, cz, wx, wz);
       ImGui::SetTooltip("%.0f, %.0f", static_cast<double>(wx), static_cast<double>(wz));
     }
+  }
+  void EdLayoutPanel::DrawStartsPanel(
+    bool& open,
+    const bool mapOpen
+  )
+  {
+    if (!ImGui::Begin(Panel("Starts and resources###LayoutStarts"), &open)) {
+      ImGui::End();
+      return;
+    }
+    if (!mapOpen) {
+      ImGui::TextDisabled("Open a map to place its starts and resources.");
+      ImGui::End();
+      return;
+    }
+    LayoutMarkerSettings& s = mMarkers;
+    bool changed = false;
+    const auto slider = [&](const char* id, float* v, const float lo, const float hi, const char* format) {
+      ImGui::SetNextItemWidth(-1.0f);
+      changed |= FillSliderFloat(id, v, lo, hi, format);
+    };
+    const auto count = [&](const char* id, int* v, const int lo, const int hi, const char* format) {
+      ImGui::SetNextItemWidth(-1.0f);
+      changed |= FillSliderInt(id, v, lo, hi, format);
+    };
+    const auto shapeCombo = [&](const char* id, LayoutShape* shape) {
+      static const char* const kNames[] = {"Ring", "Arc", "Cluster", "Line", "Pairs"};
+      int index = static_cast<int>(*shape);
+      RowLabel("Shape");
+      ImGui::SetNextItemWidth(-1.0f);
+      if (EdCombo(id, &index, kNames, 5)) {
+        *shape = static_cast<LayoutShape>(index);
+        changed = true;
+      }
+    };
+    if (Section("Starts")) {
+      static const char* const kFrom[] = {"The map's start markers", "The bases drawn", "A pattern"};
+      int from = static_cast<int>(s.starts);
+      RowLabel("From");
+      ImGui::SetNextItemWidth(-1.0f);
+      if (EdCombo("##startsfrom", &from, kFrom, 3)) {
+        s.starts = static_cast<LayoutStartMode>(from);
+        changed = true;
+      }
+      if (s.starts == LayoutStartMode::Pattern) {
+        static const char* const kPatterns[] = {"Ring", "Corners", "Two sides", "Line"};
+        int pattern = static_cast<int>(s.pattern);
+        RowLabel("Pattern");
+        ImGui::SetNextItemWidth(-1.0f);
+        if (EdCombo("##startspattern", &pattern, kPatterns, 4)) {
+          s.pattern = static_cast<LayoutPattern>(pattern);
+          changed = true;
+        }
+        count("##startscount", &s.count, 1, 16, "Players %d");
+        slider("##startsradius", &s.radius, 0.1f, 0.95f, "Distance from the middle %.2f");
+        slider("##startsrot", &s.rotation, -180.0f, 180.0f, "Rotation %.0f");
+      }
+      if (s.starts != LayoutStartMode::Existing) {
+        changed |= ImGui::Checkbox("Replace the start markers", &s.replaceStarts);
+        if (ImGui::IsItemHovered()) {
+          ImGui::SetTooltip(
+            "The map's start positions move to the new ones (armies added or removed to match); off: "
+            "the new ones are added as more armies"
+          );
+        }
+      }
+    }
+    if (Section("Mass per start")) {
+      count("##masscount", &s.mass, 0, 16, "Count %d");
+      slider("##massmin", &s.massMin, 4.0f, 120.0f, "Nearest %.0f");
+      slider("##massmax", &s.massMax, 4.0f, 160.0f, "Farthest %.0f");
+      shapeCombo("##massshape", &s.massShape);
+      slider("##massarc", &s.arc, 20.0f, 360.0f, "Arc width %.0f");
+      changed |= ImGui::Checkbox("Face away from the middle", &s.facingAway);
+    }
+    if (Section("Hydrocarbon")) {
+      count("##hydrocount", &s.hydro, 0, 4, "Count %d");
+      slider("##hydromin", &s.hydroMin, 8.0f, 160.0f, "Nearest %.0f");
+      slider("##hydromax", &s.hydroMax, 8.0f, 200.0f, "Farthest %.0f");
+    }
+    if (Section("Expansions")) {
+      count("##extracount", &s.extra, 0, 16, "Extra mass per start %d");
+      slider("##extramin", &s.extraMin, 20.0f, 300.0f, "Nearest %.0f");
+      slider("##extramax", &s.extraMax, 20.0f, 400.0f, "Farthest %.0f");
+      shapeCombo("##extrashape", &s.extraShape);
+      count("##middlecount", &s.middle, 0, 16, "Mass in the middle %d");
+      slider("##middleradius", &s.middleRadius, 4.0f, 200.0f, "Middle radius %.0f");
+    }
+    if (Section("Rules")) {
+      slider("##spacing", &s.spacing, 2.0f, 30.0f, "Spacing %.1f");
+      slider("##maxslope", &s.maxSlope, 2.0f, 60.0f, "Steepest ground %.0f");
+      ImGui::SetNextItemWidth(-1.0f);
+      changed |= FillDragInt("##markerseed", &s.seed, 0.2f, 1, 99999, "Seed %d");
+      changed |= ImGui::Checkbox("Remove the old ones", &s.clear);
+      if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("The markers the generator placed last time are replaced");
+      }
+    }
+    // A plan on show follows the settings.
+    if (changed && mPlan.has_value()) {
+      mPlanAsked = true;
+    }
+    const float half = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) / 2.0f;
+    if (ImGui::Button(mPlan.has_value() ? "Hide the plan" : "Preview", ImVec2(half, 0.0f))) {
+      if (mPlan.has_value()) {
+        mPlan.reset();
+      } else {
+        mPlanAsked = true;
+      }
+    }
+    if (ImGui::IsItemHovered()) {
+      ImGui::SetTooltip("The plan on the canvas: white starts, orange mass, green hydrocarbon");
+    }
+    ImGui::SameLine();
+    if (PrimaryButton("Place markers", ImVec2(half, 0.0f))) {
+      mPlaceAsked = true;
+    }
+    if (ImGui::IsItemHovered()) {
+      ImGui::SetTooltip("Writes the starts and the resources into the map as one undo step");
+    }
+    if (!mStartsStatus.empty()) {
+      ImGui::PushTextWrapPos(0.0f);
+      ImGui::TextUnformatted(mStartsStatus.c_str());
+      ImGui::PopTextWrapPos();
+    }
+    ImGui::End();
   }
 } // namespace faf::editor

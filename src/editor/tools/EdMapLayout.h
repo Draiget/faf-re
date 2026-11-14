@@ -140,6 +140,15 @@ namespace faf::editor
     float water = 20.0f; // water level (units)
     int seed = 1;
     float weather = 0.0f; // 0..1 (kept; the generator doesn't weather yet)
+    /** The markers the start and resource generator placed last (name and place): the next Place replaces those
+     * still there. */
+    struct Generated
+    {
+      std::string name;
+      float x = 0.0f;
+      float z = 0.0f;
+    };
+    std::vector<Generated> generated;
     int selected = 0;
     /** Goes up on every change: views and the graph's layout nodes compare it. */
     std::uint64_t revision = 1;
@@ -214,7 +223,8 @@ namespace faf::editor
     };
     [[nodiscard]] static const std::vector<TemplateInfo>& Templates();
 
-    /** The drawing as JSON (cells run-length coded in 1/255 steps); "" when nothing is drawn. */
+    /** The drawing as JSON (cells run-length coded in 1/255 steps); "" when nothing is drawn and no marker was
+     * generated. */
     [[nodiscard]] std::string Save() const;
     bool Load(const std::string& text, std::string& error);
 

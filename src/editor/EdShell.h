@@ -153,11 +153,11 @@ namespace faf::editor
     /** Shows the layout's panels (Terrain > Layout canvas). */
     void ShowLayout() noexcept
     {
-      mShowLayoutLayers = mShowLayoutCanvas = true;
+      mShowLayoutLayers = mShowLayoutCanvas = mShowLayoutStarts = true;
     }
     [[nodiscard]] bool LayoutShown() const noexcept
     {
-      return mShowLayoutLayers || mShowLayoutCanvas;
+      return mShowLayoutLayers || mShowLayoutCanvas || mShowLayoutStarts;
     }
     /** The material editor (View > Material Editor): node graphs that make terrain textures. */
     bool& ShowMaterialEditor() noexcept
@@ -473,6 +473,7 @@ namespace faf::editor
     bool mShowGenInspector = false;
     bool mShowLayoutLayers = false;
     bool mShowLayoutCanvas = false;
+    bool mShowLayoutStarts = false;
     bool mDebugWasPaused = false;
     char mWatchInput[160] = {};
     std::vector<std::string> mWatches;

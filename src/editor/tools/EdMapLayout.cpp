@@ -1150,7 +1150,7 @@ namespace faf::editor
 
   std::string MapLayout::Save() const
   {
-    if (!Drawn()) {
+    if (!Drawn() && generated.empty()) {
       return {};
     }
     std::string out = "{\n";
@@ -1188,7 +1188,22 @@ namespace faf::editor
       }
       out += "}, \"data\": \"" + Encode(layer.data) + "\"}" + (i + 1 < mLayers.size() ? ",\n" : "\n");
     }
-    out += "  ]\n}\n";
+    out += "  ]";
+    if (!generated.empty()) {
+      out += ",\n  \"generated\": [\n";
+      for (std::size_t i = 0; i < generated.size(); ++i) {
+        std::string name;
+        for (const char c : generated[i].name) {
+          if (c != '"' && c != '\\') {
+            name += c;
+          }
+        }
+        out += "    {\"name\": " + JsonQuoted(name) + ", \"x\": " + JsonNumber(generated[i].x) +
+          ", \"z\": " + JsonNumber(generated[i].z) + "}" + (i + 1 < generated.size() ? ",\n" : "\n");
+      }
+      out += "  ]";
+    }
+    out += "\n}\n";
     return out;
   }
 
@@ -1281,6 +1296,15 @@ namespace faf::editor
       return false;
     }
     loaded.selected = std::clamp(static_cast<int>(sel), 0, static_cast<int>(loaded.mLayers.size()) - 1);
+    std::string generatedText;
+    if (JsonValue(text, "generated", generatedText)) {
+      for (const std::string& object : JsonObjects(generatedText)) {
+        Generated g;
+        if (JsonValue(object, "name", g.name) && JsonFloat(object, "x", g.x) && JsonFloat(object, "z", g.z)) {
+          loaded.generated.push_back(std::move(g));
+        }
+      }
+    }
     LayoutImages images = std::move(mImages);
     const std::uint64_t rev = revision;
     *this = std::move(loaded);

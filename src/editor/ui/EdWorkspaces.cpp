@@ -72,7 +72,7 @@ namespace faf::editor
        "Alt+4",
        "The map's layout: its drawing in layers, the terrain made from it, start positions and resources",
        "Layout layers###LayoutLayers,Markers",
-       "",
+       "Starts and resources###LayoutStarts",
        "Layout canvas###LayoutCanvas",
        "Properties,Armies",
        "Check,Log,Map",
@@ -219,6 +219,7 @@ namespace faf::editor
       {"GenerateInspector", ICON_INFO},
       {"LayoutLayers", ICON_LAYERS},
       {"LayoutCanvas", ICON_LAYOUT},
+      {"LayoutStarts", ICON_FLAG},
     };
     for (const auto& [panel, icon] : kIcons) {
       if (panel == id) {
@@ -236,7 +237,8 @@ namespace faf::editor
     // 2: Terrain's right dock as the mockup's (Layers and Info, Properties under them).
     // 2: Generate's terrain graph panels (Nodes, Inspector, Graph).
     // 2: Layout's drawing panels (Layout layers, Layout canvas).
-    return key == "terrain" || key == "generate" || key == "layout" ? 2 : 1;
+    // 3: Layout's Starts and resources under its layers.
+    return key == "layout" ? 3 : key == "terrain" || key == "generate" ? 2 : 1;
   }
 
   std::map<std::string, int>& LayoutVersions()
