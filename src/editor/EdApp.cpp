@@ -149,22 +149,30 @@ namespace faf::editor
     [[nodiscard]] bool IsTestRunCommandLine()
     {
       static const char* const kOptions[] = {
-        "/command",        "/palette",        "/theme",          "/keysfile",        "/focuspanel",  "/uiclicks",
-        "/hidegameunits",  "/movelayer",      "/pickfilter",     "/mapwide",         "/tool",        "/proptool",
-        "/play",           "/debugarm",       "/breakpoint",     "/check",           "/decaltool",   "/markertool",
-        "/unittool",       "/hoverprop",      "/selectprops",    "/selectunit",      "/propswap",    "/saveas",
-        "/settingsfile",   "/autosavefolder", "/askunsaved",     "/particlebrowser", "/particlenew", "/particleopen",
-        "/materialeditor", "/uiscale",        "/testrun",        "/openall",         "/roundtrip",   "/vault",
-        "/vaultsearch",    "/vaultmap",       "/newmap",         "/stamp",           "/brush",       "/layer",
-        "/waterbody",      "/ruler",          "/adaptivewindow", "/maskrule",        "/maskgen",     "/symhover",
-        "/stbfont",        "/recipe",         "/texset",         "/layerop",         "/slopeview",   "/typesfromlayers",
-        "/uncapped",       "/nominimap",      "/followtest",     "/arrangetest",     "/findtest",    "/findopen",
-        "/filltest",       "/modaltest",      "/looktest",       "/looksfolder",     "/envtest",     "/watermasktest",
-        "/nowaterhires",   "/camat",          "/erosiontest",    "/sctest",          "/symmenu",     "/panelbottom",
-        "/shader",         "/brushtest",      "/brushshape",     "/stampsource",     "/stampstroke", "/symoptions",
-        "/maskoptions",    "/masktest",       "/shaderbrowser",  "/convertlayers",   "/interoptest", "/gentest",
-        "/layouttest",     "/playcopytest",   "/missiontest",    "/modtest",         "/unitlabtest", "/effectmodtest",
-        "/assettest",      "/thumbcache",     "/assetmarks",
+        "/command",        "/palette",         "/theme",          "/keysfile",
+        "/focuspanel",     "/uiclicks",        "/hidegameunits",  "/movelayer",
+        "/pickfilter",     "/mapwide",         "/tool",           "/proptool",
+        "/play",           "/debugarm",        "/breakpoint",     "/check",
+        "/decaltool",      "/markertool",      "/unittool",       "/hoverprop",
+        "/selectprops",    "/selectunit",      "/propswap",       "/saveas",
+        "/settingsfile",   "/autosavefolder",  "/askunsaved",     "/particlebrowser",
+        "/particlenew",    "/particleopen",    "/materialeditor", "/uiscale",
+        "/testrun",        "/openall",         "/roundtrip",      "/vault",
+        "/vaultsearch",    "/vaultmap",        "/newmap",         "/stamp",
+        "/brush",          "/layer",           "/waterbody",      "/ruler",
+        "/adaptivewindow", "/maskrule",        "/maskgen",        "/symhover",
+        "/stbfont",        "/recipe",          "/texset",         "/layerop",
+        "/slopeview",      "/typesfromlayers", "/uncapped",       "/nominimap",
+        "/followtest",     "/arrangetest",     "/findtest",       "/findopen",
+        "/filltest",       "/modaltest",       "/looktest",       "/looksfolder",
+        "/envtest",        "/watermasktest",   "/nowaterhires",   "/camat",
+        "/erosiontest",    "/sctest",          "/symmenu",        "/panelbottom",
+        "/shader",         "/brushtest",       "/brushshape",     "/stampsource",
+        "/stampstroke",    "/symoptions",      "/maskoptions",    "/masktest",
+        "/shaderbrowser",  "/convertlayers",   "/interoptest",    "/gentest",
+        "/layouttest",     "/playcopytest",    "/missiontest",    "/modtest",
+        "/unitlabtest",    "/effectmodtest",   "/assettest",      "/thumbcache",
+        "/assetmarks",     "/editormods",      "/editormodtest",
       };
       for (const char* const option : kOptions) {
         if (moho::CFG_GetArgOption(option, 0, nullptr)) {
@@ -2837,6 +2845,57 @@ namespace faf::editor
         }
         ++mAssetTestStage;
       }
+      /**
+       * `/editormodtest` (test runs): the test vault's EditorModApiTest turned on (its commands registered), its hello
+       * command run through the registry (it logs the map's path and runs view.frame), then its failing command (the
+       * mod turned off, its commands saying why).
+       */
+      void TestEditorMods()
+      {
+        if (
+          mEditorModTestDone || !mScene.Attached() || !moho::CFG_GetArgOption("/editormodtest", 0, nullptr) ||
+          ++mEditorModTestFrames < 150
+        ) {
+          return;
+        }
+        mEditorModTestDone = true;
+        mShell->SwitchWorkspace(7);
+        mShell->HideHome();
+        mShell->ShowEditorMods();
+        EdModHost& host = mShell->ModHost();
+        for (const auto& mod : host.Mods()) {
+          gpg::Logf(
+            "editor: editor mod test: found %s (%s), api %d, %s",
+            mod->info.name.c_str(),
+            mod->info.uid.c_str(),
+            mod->info.api,
+            mod->running ? "running" : ("not running: " + mod->error).c_str()
+          );
+        }
+        const std::string uid = "11111111-2222-4333-a444-555555555555";
+        (void)host.SetEnabled(uid, true);
+        const auto hello = EditorModCommandId("EditorModApiTest", "hello");
+        const auto broken = EditorModCommandId("EditorModApiTest", "broken");
+        gpg::Logf(
+          "editor: editor mod test: %s in the registry: %s",
+          hello.c_str(),
+          mCommands.Find(hello) != nullptr ? "yes" : "no"
+        );
+        gpg::Logf(
+          "editor: editor mod test: run hello: %s", mCommands.Run(hello) ? "ran" : mCommands.WhyNot(hello).c_str()
+        );
+        gpg::Logf(
+          "editor: editor mod test: run broken: %s", mCommands.Run(broken) ? "ran" : mCommands.WhyNot(broken).c_str()
+        );
+        gpg::Logf(
+          "editor: editor mod test: hello now: %s",
+          mCommands.WhyNot(hello).empty() ? "can run" : mCommands.WhyNot(hello).c_str()
+        );
+        (void)host.SetEnabled(uid, false);
+      }
+      bool mEditorModTestDone = false;
+      int mEditorModTestFrames = 0;
+
       int mAssetTestStage = 0;
       int mAssetTestFrames = 0;
 
@@ -4841,6 +4900,15 @@ namespace faf::editor
         }
       }
       mShell->SetCommands(&mCommands, &mMenus);
+      // Editor mods: the turned-on ones (settings folder; a test run only with `/editormods <file>`) run now.
+      if (fa::vector<fa::string> file; moho::CFG_GetArgOption("/editormods", 1, &file) && !file.empty()) {
+        mShell->ModHost().SetEnabledFile(file[0].c_str());
+      } else if (!IsTestRunCommandLine() && !EditorSettingsFolder().empty()) {
+        mShell->ModHost().SetEnabledFile(EditorSettingsFolder() / "editor_mods.txt");
+      }
+      if (!mDocument.VaultFolder().empty()) {
+        mShell->ModHost().Scan(mDocument.VaultFolder() / "mods");
+      }
       SetUpWindowChrome(frame);
       // The game view's ambient occlusion makes its GPU programs on first use, which the editor's own view never
       // is: made now, so the first Play's first frame doesn't wait for them (WPE.15).
@@ -8650,6 +8718,7 @@ namespace faf::editor
       TestUnitLab();
       TestEffectMod();
       TestAssets();
+      TestEditorMods();
       // `/sctest` (test runs): the SC tools window's buttons in turn, a second apart, the heights' checksum each time.
       if (
         mScTestStage < 8 && moho::CFG_GetArgOption("/sctest", 0, nullptr) && !mScene.ModelsPending() &&

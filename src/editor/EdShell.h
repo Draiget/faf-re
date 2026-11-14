@@ -20,6 +20,7 @@
 #include "editor/ui/EdMissionPanel.h"
 #include "editor/ui/EdModPanel.h"
 #include "editor/ui/EdAssetBrowser.h"
+#include "editor/ui/EdModHost.h"
 #include "editor/ui/EdUnitLabPanel.h"
 #include "editor/ui/EdMaterialEditor.h"
 #include "editor/ui/EdParticleEditor.h"
@@ -463,6 +464,15 @@ namespace faf::editor
     {
       mCommands = commands;
       mMenus = menus;
+      mModHost.Attach(commands);
+    }
+    [[nodiscard]] EdModHost& ModHost() noexcept
+    {
+      return mModHost;
+    }
+    void ShowEditorMods() noexcept
+    {
+      mShowEditorMods = true;
     }
 
   private:
@@ -515,6 +525,7 @@ namespace faf::editor
     bool mShowModProject = false;
     bool mShowUnitLab = false;
     bool mShowAssets = false;
+    bool mShowEditorMods = false;
     bool mDebugWasPaused = false;
     char mWatchInput[160] = {};
     std::vector<std::string> mWatches;
@@ -773,6 +784,7 @@ namespace faf::editor
     EdModPanel mModPanel{mDocument};
     EdUnitLabPanel mUnitLab{mModPanel};
     EdAssetBrowser mAssets{mTools};
+    EdModHost mModHost{mDocument};
     ImVec4 mGameView{0.0f, 0.0f, 0.0f, 0.0f};
     /** The document path the Info tab was last brought to the front for. */
     std::string mInfoShownFor;

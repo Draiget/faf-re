@@ -22,6 +22,7 @@ set(FAF_EDITOR_SOURCES
   doc/EdJson.cpp
   doc/EdModProject.cpp
   doc/EdEffectMerge.cpp
+  doc/EdEditorMods.cpp
   doc/EdLighting.cpp
   doc/EdMarkerPreset.cpp
   doc/EdUnitPreset.cpp
@@ -73,6 +74,7 @@ set(FAF_EDITOR_SOURCES
   ui/EdModPanel.cpp
   ui/EdUnitLabPanel.cpp
   ui/EdAssetBrowser.cpp
+  ui/EdModHost.cpp
   ui/EdMapBrowser.cpp
   doc/EdWaterBodies.cpp
   view/EdWaterBodyView.cpp
