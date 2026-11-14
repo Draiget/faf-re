@@ -119,7 +119,7 @@ namespace gpg::gal
     }
 
     locked_ = true;
-    return reinterpret_cast<std::int16_t*>(mappedData_);
+    return static_cast<std::int16_t*>(mappedData_);
   }
 
   /**

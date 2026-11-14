@@ -263,7 +263,7 @@ moho::CScrLuaInitForm* moho::func_CMauiBitmapSetUV_LuaFuncDef()
  * Clamps one bitmap UV quad `(u0,v0,u1,v1)` to `[0,1]` and writes the
  * runtime UV lanes.
  */
-[[maybe_unused]] static moho::CMauiBitmap* func_SetBitmapUvClamped(
+static moho::CMauiBitmap* func_SetBitmapUvClamped(
   moho::CMauiBitmap* const bitmap,
   const float u0,
   const float v0,
@@ -759,7 +759,7 @@ moho::CScrLuaInitForm* moho::func_CMauiBitmapSetFrameRate_LuaFuncDef()
  * What it does:
  * Updates one bitmap frame-duration lane from `frameRate` as `1.0f / fps`.
  */
-[[maybe_unused]] static moho::CMauiBitmap* func_SetBitmapFrameRate(
+static moho::CMauiBitmap* func_SetBitmapFrameRate(
   moho::CMauiBitmap* const bitmap,
   const float frameRate
 ) noexcept
@@ -1260,7 +1260,7 @@ namespace
    * What it does:
    * Stores one alpha-hit-test boolean lane into one bitmap runtime view.
    */
-  [[maybe_unused]] moho::CMauiBitmap* SetBitmapAlphaHitTestEnabled(
+  moho::CMauiBitmap* SetBitmapAlphaHitTestEnabled(
     moho::CMauiBitmap* const bitmap,
     const bool enabled
   ) noexcept
@@ -1275,7 +1275,7 @@ namespace
    * What it does:
    * Stores one tiled-render boolean lane into one bitmap runtime view.
    */
-  [[maybe_unused]] moho::CMauiBitmap* SetBitmapTiledEnabled(
+  moho::CMauiBitmap* SetBitmapTiledEnabled(
     moho::CMauiBitmap* const bitmap,
     const bool enabled
   ) noexcept
@@ -1290,7 +1290,7 @@ namespace
    * What it does:
    * Stores one loop-enabled boolean lane into one bitmap runtime view.
    */
-  [[maybe_unused]] moho::CMauiBitmap* SetBitmapLoopEnabled(
+  moho::CMauiBitmap* SetBitmapLoopEnabled(
     moho::CMauiBitmap* const bitmap,
     const bool enabled
   ) noexcept
@@ -1305,7 +1305,7 @@ namespace
    * What it does:
    * Reads one current-frame index lane from one bitmap runtime view.
    */
-  [[maybe_unused]] std::int32_t ReadBitmapCurrentFrame(
+  std::int32_t ReadBitmapCurrentFrame(
     const moho::CMauiBitmap* const bitmap
   ) noexcept
   {
@@ -1319,7 +1319,7 @@ namespace
    * Enables bitmap animation/frame updates when there are at least two queued
    * textures; returns remaining texture-slot count.
    */
-  [[maybe_unused]] std::uint32_t EnableBitmapAnimationIfMultipleTextures(
+  std::uint32_t EnableBitmapAnimationIfMultipleTextures(
     moho::CMauiBitmap* const bitmap
   ) noexcept
   {

@@ -102,7 +102,7 @@ namespace moho
     // Address: 0x006FDE40 (FUN_006FDE40)
     virtual std::shared_ptr<void>* GetUnknownSharedRef(std::shared_ptr<void>* outValue) = 0;
     // Address: 0x006FDE70 (FUN_006FDE70)
-    virtual std::uint32_t SetUnknownVectorWithMeta(const SArmyVectorWithMeta* value) = 0;
+    virtual void SetPathPreview(const SArmyPathPreview& preview) = 0;
     // Address: 0x006FDE90 (FUN_006FDE90)
     virtual void GetPlatoonsList(ArmyPool& outPool) = 0;
     // Address: 0x00700410 (FUN_00700410)

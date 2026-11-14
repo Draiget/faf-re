@@ -130,7 +130,7 @@ namespace
    * Clears and reassigns one destination string from projectile
    * `mDamageTypeName`.
    */
-  [[maybe_unused]] fa::string* CopyProjectileDamageTypeName(
+  fa::string* CopyProjectileDamageTypeName(
     const moho::Projectile* const projectile,
     fa::string* const outName
   )
@@ -159,7 +159,7 @@ namespace
    * What it does:
    * Writes projectile collide-entity enable lane.
    */
-  [[maybe_unused]] moho::Projectile* SetProjectileCollideEntity(
+  moho::Projectile* SetProjectileCollideEntity(
     moho::Projectile* const projectile,
     const bool enabled
   ) noexcept
@@ -174,7 +174,7 @@ namespace
    * What it does:
    * Writes projectile collide-surface enable lane.
    */
-  [[maybe_unused]] moho::Projectile* SetProjectileCollideSurface(
+  moho::Projectile* SetProjectileCollideSurface(
     moho::Projectile* const projectile,
     const bool enabled
   ) noexcept
@@ -189,7 +189,7 @@ namespace
    * What it does:
    * Writes projectile target-tracking enable lane.
    */
-  [[maybe_unused]] moho::Projectile* SetProjectileTrackTarget(
+  moho::Projectile* SetProjectileTrackTarget(
     moho::Projectile* const projectile,
     const bool enabled
   ) noexcept
@@ -204,7 +204,7 @@ namespace
    * What it does:
    * Writes projectile stay-underwater lane.
    */
-  [[maybe_unused]] moho::Projectile* SetProjectileStayUnderwater(
+  moho::Projectile* SetProjectileStayUnderwater(
     moho::Projectile* const projectile,
     const bool enabled
   ) noexcept
@@ -219,7 +219,7 @@ namespace
    * What it does:
    * Writes projectile stay-upright enable lane.
    */
-  [[maybe_unused]] moho::Projectile* SetProjectileStayUpright(
+  moho::Projectile* SetProjectileStayUpright(
     moho::Projectile* const projectile,
     const bool enabled
   ) noexcept
@@ -234,7 +234,7 @@ namespace
    * What it does:
    * Writes projectile velocity-alignment enable lane.
    */
-  [[maybe_unused]] moho::Projectile* SetProjectileVelocityAlign(
+  moho::Projectile* SetProjectileVelocityAlign(
     moho::Projectile* const projectile,
     const bool enabled
   ) noexcept
@@ -249,7 +249,7 @@ namespace
    * What it does:
    * Writes projectile destroy-on-water lane.
    */
-  [[maybe_unused]] moho::Projectile* SetProjectileDestroyOnWater(
+  moho::Projectile* SetProjectileDestroyOnWater(
     moho::Projectile* const projectile,
     const bool enabled
   ) noexcept
@@ -2915,7 +2915,7 @@ namespace moho
    * `CProjectileAttributesTypeInfo` instance while preserving outer storage
    * ownership.
    */
-  [[maybe_unused]] void DestroyCProjectileAttributesTypeInfoBody(
+  void DestroyCProjectileAttributesTypeInfoBody(
     CProjectileAttributesTypeInfo* const typeInfo
   ) noexcept
   {

@@ -445,38 +445,6 @@ namespace
 {
   // Forward declarations: CTextureScrollerSerializer's constructor binds
   // these as its load/save callback pointers; bodies defined below.
-  void DeserializeCTextureScrollerSerializerCallback(
-    gpg::ReadArchive* archive,
-    void* objectPtr,
-    int unusedTag,
-    gpg::RRef* ownerRef
-  );
-  void SerializeCTextureScrollerSerializerCallback(
-    gpg::WriteArchive* archive,
-    void* objectPtr,
-    int unusedTag,
-    gpg::RRef* ownerRef
-  );
-
-  [[maybe_unused]] void DeserializeCTextureScrollerSerializerCallback(
-    gpg::ReadArchive* const archive,
-    void* const objectPtr,
-    const int,
-    gpg::RRef*
-  )
-  {
-    static_cast<moho::CTextureScroller*>(objectPtr)->MemberDeserialize(archive);
-  }
-
-  [[maybe_unused]] void SerializeCTextureScrollerSerializerCallback(
-    gpg::WriteArchive* const archive,
-    void* const objectPtr,
-    const int,
-    gpg::RRef*
-  )
-  {
-    static_cast<const moho::CTextureScroller*>(objectPtr)->MemberSerialize(archive);
-  }
 
 } // namespace
 

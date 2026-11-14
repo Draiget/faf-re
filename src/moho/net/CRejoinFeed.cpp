@@ -109,7 +109,7 @@ namespace
     CMessage proof(EClientMsg::CLIMSG_PeerFeatures);
     CMessageStream stream(proof);
     stream.Write(static_cast<std::uint8_t>(EPeerMessageKind::RejoinProof));
-    stream.Write(reinterpret_cast<const char*>(signature.data()), signature.size());
+    stream.Write(signature.data(), signature.size());
     return proof;
   }
 
@@ -1598,7 +1598,7 @@ namespace
       CMessage challenge(EClientMsg::CLIMSG_PeerFeatures);
       CMessageStream stream(challenge);
       stream.Write(static_cast<std::uint8_t>(EPeerMessageKind::RejoinChallenge));
-      stream.Write(reinterpret_cast<const char*>(nonce.data()), nonce.size());
+      stream.Write(nonce.data(), nonce.size());
       NetDataSpan span{
         reinterpret_cast<std::uint8_t*>(challenge.mBuff.start_),
         reinterpret_cast<std::uint8_t*>(challenge.mBuff.end_),

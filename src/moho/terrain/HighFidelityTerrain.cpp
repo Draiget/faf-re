@@ -784,7 +784,7 @@ namespace moho
                 &command.startIndex,
                 &addedIndexCount,
                 &command.startVertex,
-                reinterpret_cast<std::uint32_t*>(&command.endVertex)
+                &command.endVertex
               );
               command.indexCount = static_cast<std::int32_t>(addedIndexCount);
 

@@ -28,7 +28,8 @@ typedef void (*lua_FreeFunction)(void* ptr, int oldsize, void* data);
 LUA_API void lua_getdefaultmemoryfunctions(lua_ReallocFunction* reallocFunc, lua_FreeFunction* freeFunc, void** data);
 LUA_API void lua_setdefaultmemoryfunctions(lua_ReallocFunction reallocFunc, lua_FreeFunction freeFunc, void* data);
 
-LUA_API void lua_setusergcfunction(lua_State *L, void (*userGCFunction)(void*));
+struct GCState;
+LUA_API void lua_setusergcfunction(lua_State *L, void (*userGCFunction)(GCState*));
 
 LUA_API void* lua_getglobaluserdata(lua_State *L);
 LUA_API void lua_setglobaluserdata(lua_State *L, void* globalUserData);

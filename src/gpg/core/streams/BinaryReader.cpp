@@ -33,22 +33,23 @@ BinaryReader::PrematureEOF::~PrematureEOF() noexcept = default;
  * Reads exactly `size` bytes or throws PrematureEOF on underrun.
  */
 void BinaryReader::Read(
-  char* buf,
+  void* const buf,
   const size_t size
 ) const
 {
+  auto* const bytes = static_cast<char*>(buf);
   Stream* const stream = mStream;
   const char* const readHead = stream->mReadHead;
   const auto available = static_cast<size_t>(stream->mReadEnd - readHead);
 
   if (size > available) {
-    const size_t got = stream->VirtRead(buf, size);
+    const size_t got = stream->VirtRead(bytes, size);
     if (got != size) {
       throw PrematureEOF();
     }
   } else if (size != 0) {
     // Raw byte-stream read from the buffered read head.
-    std::copy_n(readHead, size, buf);
+    std::copy_n(readHead, size, bytes);
     stream->mReadHead += size;
   }
 }
@@ -113,7 +114,7 @@ int BinaryReader::ReadInt32() const
 std::uint8_t BinaryReader::ReadChar() const
 {
   std::uint8_t value = 0;
-  Read(reinterpret_cast<char*>(&value), 1U);
+  Read(&value, 1U);
   return value;
 }
 

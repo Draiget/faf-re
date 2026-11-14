@@ -16,7 +16,7 @@
 // positionally as `Sim::Sync` fills them, each sent whole when it differs from the record the
 // client holds and as one bit when it does not. `SArmyRecord` is `SSTIArmyVariableData` without
 // its pointers: the category filter goes as category bits, and the path preview's cells and
-// footprint pointer (`mWordVectorWithMeta`, `Sim.cpp:2916`) are not sent; the client's preview,
+// footprint pointer (`mPathPreview`) are not sent; the client's preview,
 // a debug view behind `ui_PathPreview` (off by default, `CWldSession.cpp:769`), shows nothing.
 //
 // Grid lane: the vision and water grids of the view's army and of every army that lists it as an

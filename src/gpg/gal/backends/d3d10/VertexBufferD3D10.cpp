@@ -120,7 +120,7 @@ namespace gpg::gal
     }
 
     locked_ = true;
-    auto* const mappedBytes = reinterpret_cast<std::uint8_t*>(mappedData_);
+    auto* const mappedBytes = static_cast<std::uint8_t*>(mappedData_);
     return mappedBytes + offset;
   }
 

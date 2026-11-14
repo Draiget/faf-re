@@ -48,64 +48,6 @@ namespace
   // Forward declarations: SSTITargetSerializer's constructor below binds
   // these as its load/save callback pointers; their bodies are defined
   // further down in this same anonymous namespace.
-  void DeserializeSSTITargetSerializerCallback(
-    gpg::ReadArchive* archive,
-    void* objectPtr,
-    int unusedTag,
-    gpg::RRef* ownerRef
-  );
-  void SerializeSSTITargetSerializerCallback(
-    gpg::WriteArchive* archive,
-    void* objectPtr,
-    int unusedTag,
-    gpg::RRef* ownerRef
-  );
-
-  /**
-   * Address: 0x0055B120 (FUN_0055B120, Moho::SSTITargetSerializer::Deserialize)
-   *
-   * What it does:
-   * Reflection load-callback facade for `SSTITarget`. Forwards the
-   * reflected object pointer to `SSTITarget::MemberDeserialize`
-   * (FUN_0055B3A0 body); `version` and the owner-ref lane are unused by the
-   * member (mirrors the binary tail call).
-   */
-  [[maybe_unused]] void DeserializeSSTITargetSerializerCallback(
-    gpg::ReadArchive* const archive,
-    void* const objectPtr,
-    const int,
-    gpg::RRef* const
-  )
-  {
-    auto* const target = static_cast<moho::SSTITarget*>(objectPtr);
-    if (target == nullptr) {
-      return;
-    }
-    target->MemberDeserialize(archive);
-  }
-
-  /**
-   * Address: 0x0055B130 (FUN_0055B130, Moho::SSTITargetSerializer::Serialize)
-   *
-   * What it does:
-   * Reflection save-callback facade for `SSTITarget`. Forwards the
-   * reflected object pointer to `SSTITarget::MemberSerialize`
-   * (FUN_0055B460 body); `version` and the owner-ref lane are unused by the
-   * member (mirrors the binary tail call).
-   */
-  [[maybe_unused]] void SerializeSSTITargetSerializerCallback(
-    gpg::WriteArchive* const archive,
-    void* const objectPtr,
-    const int,
-    gpg::RRef* const
-  )
-  {
-    const auto* const target = static_cast<const moho::SSTITarget*>(objectPtr);
-    if (target == nullptr) {
-      return;
-    }
-    target->MemberSerialize(archive);
-  }
 
   [[nodiscard]] gpg::RType* ResolveTargetType()
   {

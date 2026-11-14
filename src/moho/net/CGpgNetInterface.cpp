@@ -1909,7 +1909,7 @@ void CGpgNetInterface::ReadFromSocket()
   try {
     for (;;) {
       uint32_t commandNameLength = 0;
-      const size_t got = mTcpSocket->Read(reinterpret_cast<char*>(&commandNameLength), sizeof(commandNameLength));
+      const size_t got = mTcpSocket->Read(&commandNameLength, sizeof(commandNameLength));
       if (got == 0) {
         EnqueueCommand0("ConnectionShutdown", kNetStateEstablishing);
         return;

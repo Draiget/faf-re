@@ -1363,7 +1363,7 @@ namespace moho
    * Constructs and preregisters the reflected type-info object for
    * `moho::PathQueue`.
    */
-  [[maybe_unused]] [[nodiscard]] gpg::RType* RegisterPathQueueTypeInfo()
+  [[nodiscard]] gpg::RType* RegisterPathQueueTypeInfo()
   {
     static PathQueueTypeInfo typeInfo;
     gpg::PreRegisterRType(typeid(PathQueue), &typeInfo);
@@ -1377,7 +1377,7 @@ namespace moho
    * Constructs and preregisters the reflected type-info object for
    * `moho::PathQueue::Impl`.
    */
-  [[maybe_unused]] [[nodiscard]] gpg::RType* RegisterPathQueueImplTypeInfo()
+  [[nodiscard]] gpg::RType* RegisterPathQueueImplTypeInfo()
   {
     static PathQueueImplTypeInfo typeInfo;
     gpg::PreRegisterRType(typeid(PathQueue::Impl), &typeInfo);

@@ -1,4 +1,5 @@
 #include "moho/ai/CAiBrainLuaPrivate.h"
+#include "moho/sim/SimConVarAccess.h"
 
 namespace
 {
@@ -301,11 +302,7 @@ int moho::cfunc_CAiBrainIsOpponentAIRunningL(
 
   bool shouldRunOpponentAi = false;
   if (!CFG_GetArgOption("/noai", 0u, nullptr)) {
-    CSimConVarBase* const runOpponentAiConVar = &moho::gSimConVar_AI_RunOpponentAI;
-    CSimConVarInstanceBase* const runOpponentAiVar =
-      (sim && runOpponentAiConVar) ? sim->GetSimVar(runOpponentAiConVar) : nullptr;
-    const void* const runOpponentAiStorage = runOpponentAiVar ? runOpponentAiVar->GetValueStorage() : nullptr;
-    shouldRunOpponentAi = runOpponentAiStorage && (*reinterpret_cast<const std::uint8_t*>(runOpponentAiStorage) != 0u);
+    shouldRunOpponentAi = sim != nullptr && ReadSimConVar(sim, moho::gSimConVar_AI_RunOpponentAI);
   }
 
   lua_pushboolean(rawState, shouldRunOpponentAi ? 1 : 0);

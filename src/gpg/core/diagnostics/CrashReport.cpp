@@ -204,7 +204,7 @@ namespace gpg::diag
                   // CV_INFO_PDB70: 'RSDS', GUID, age, zero-terminated path.
                   // AddressOfRawData is the mapped RVA (PointerToRawData is a
                   // file offset and does not map into memory).
-                  const auto* const cv = reinterpret_cast<const unsigned char*>(base) + debug[e].AddressOfRawData;
+                  const auto* const cv = base + debug[e].AddressOfRawData;
                   if (cv[0] == 'R' && cv[1] == 'S' && cv[2] == 'D' && cv[3] == 'S') {
                     const GUID& sig = *reinterpret_cast<const GUID*>(cv + 4);
                     const DWORD age = *reinterpret_cast<const DWORD*>(cv + 20);

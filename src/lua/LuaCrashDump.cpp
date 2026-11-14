@@ -343,7 +343,7 @@ namespace
           break; // GC chain is corrupt; stop rather than walk garbage
         }
         if (obj->gch.tt == LUA_TTHREAD) {
-          const auto* const thread = reinterpret_cast<const lua_State*>(obj);
+          const auto* const thread = &obj->th;
           // Same global state, not the root, and not already covered by
           // the lstate follow in DescribeVm.
           if (thread != state && thread->l_G == g) {

@@ -79,7 +79,7 @@ namespace
    * What it does:
    * Returns the process-global error-report output directory wide string.
    */
-  [[maybe_unused]] std::wstring* GetLegacyErrorReportOutputDirStorage() noexcept
+  std::wstring* GetLegacyErrorReportOutputDirStorage() noexcept
   {
     return &sLegacyErrorReportOutputDir;
   }
@@ -90,7 +90,7 @@ namespace
    * Initializes one local wide string into empty SSO state, then assigns from
    * one zero-terminated wide source.
    */
-  [[maybe_unused]] std::wstring* InitializeAndAssignWideStringFromNullTerminatedInput(
+  std::wstring* InitializeAndAssignWideStringFromNullTerminatedInput(
     std::wstring* const destination,
     const wchar_t* const source
   )
@@ -107,7 +107,7 @@ namespace
    * What it does:
    * Returns whether the global error-report output directory is empty.
    */
-  [[maybe_unused]] bool IsLegacyErrorReportOutputDirEmpty() noexcept
+  bool IsLegacyErrorReportOutputDirEmpty() noexcept
   {
     return GetLegacyErrorReportOutputDirStorage()->empty();
   }
@@ -118,7 +118,7 @@ namespace
    * What it does:
    * Appends one zero-terminated wide source to the destination string.
    */
-  [[maybe_unused]] std::wstring* AppendWideStringFromNullTerminatedInputA(
+  std::wstring* AppendWideStringFromNullTerminatedInputA(
     std::wstring* const destination,
     const wchar_t* const source
   )
@@ -133,7 +133,7 @@ namespace
    * Assigns the global error-report output directory from one zero-terminated
    * wide source.
    */
-  [[maybe_unused]] std::wstring* AssignErrorReportOutputDirFromNullTerminatedInput(
+  std::wstring* AssignErrorReportOutputDirFromNullTerminatedInput(
     const wchar_t* const source
   )
   {

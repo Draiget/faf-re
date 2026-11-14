@@ -55,7 +55,7 @@ namespace
    * Binds allocation/construction/destruction callback lanes for one
    * `CAiPathFinderTypeInfo` descriptor.
    */
-  [[maybe_unused]] [[nodiscard]] CAiPathFinderTypeInfo* BindCAiPathFinderTypeInfoCallbacks(
+  [[nodiscard]] CAiPathFinderTypeInfo* BindCAiPathFinderTypeInfoCallbacks(
     CAiPathFinderTypeInfo* const typeInfo
   ) noexcept
   {

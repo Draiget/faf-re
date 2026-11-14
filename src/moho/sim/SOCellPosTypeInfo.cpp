@@ -32,7 +32,7 @@ namespace moho
    * What it does:
    * Writes the canonical invalid cell-position sentinel (`x = z = 0x8000`).
    */
-  [[maybe_unused]] [[nodiscard]] SOCellPos* InitializeInvalidSOCellPos(
+  [[nodiscard]] SOCellPos* InitializeInvalidSOCellPos(
     SOCellPos* const result
   ) noexcept
   {

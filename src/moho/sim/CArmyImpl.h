@@ -185,8 +185,8 @@ namespace moho
     std::shared_ptr<void>* SetUnknownSharedRef(std::shared_ptr<void>* value) override;
     /** Address: 0x006FDE40 (FUN_006FDE40, Moho::CArmyImpl::GetUnknownSharedRef) */
     std::shared_ptr<void>* GetUnknownSharedRef(std::shared_ptr<void>* outValue) override;
-    /** Address: 0x006FDE70 (FUN_006FDE70, Moho::CArmyImpl::SetUnknownVectorWithMeta) */
-    std::uint32_t SetUnknownVectorWithMeta(const SArmyVectorWithMeta* value) override;
+    /** Address: 0x006FDE70 (FUN_006FDE70, Moho::CArmyImpl::SetPathPreview) */
+    void SetPathPreview(const SArmyPathPreview& preview) override;
     /** Address: 0x006FDE90 (FUN_006FDE90, Moho::CArmyImpl::GetPlatoonsList) */
     void GetPlatoonsList(ArmyPool& outPool) override;
     /** Address: 0x00700410 (FUN_00700410, Moho::CArmyImpl::MakePlatoon) */

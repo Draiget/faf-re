@@ -69,7 +69,7 @@ namespace
    * Binds `CDecalBuffer` new/construct/delete/destruct callback lanes into
    * the reflected type callback slots.
    */
-  [[maybe_unused]] moho::CDecalBufferTypeInfo* BindDecalBufferTypeCallbackSlotsPrimary(
+  moho::CDecalBufferTypeInfo* BindDecalBufferTypeCallbackSlotsPrimary(
     moho::CDecalBufferTypeInfo* const typeInfo
   )
   {

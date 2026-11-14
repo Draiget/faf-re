@@ -832,10 +832,8 @@ PipeBuf::PipeBuf()
   mChunks.push_back(first);
   mReadLimit = first->bytes;
   mWriteCommit = first->bytes;
-  setg(
-    reinterpret_cast<char*>(first->bytes), reinterpret_cast<char*>(first->bytes), reinterpret_cast<char*>(first->bytes)
-  );
-  setp(reinterpret_cast<char*>(first->bytes), reinterpret_cast<char*>(first->bytes + kPipeChunkSize));
+  setg(first->bytes, first->bytes, first->bytes);
+  setp(first->bytes, first->bytes + kPipeChunkSize);
 }
 
 /**
@@ -901,14 +899,14 @@ PipeBuf::int_type PipeBuf::overflow(
   {
     std::lock_guard<std::mutex> lock(mMutex);
     if (IsSingleBuffer()) {
-      mReadLimit = reinterpret_cast<std::uint8_t*>(putEnd);
+      mReadLimit = putEnd;
     }
     mChunks.push_back(fresh);
     mWriteCommit = fresh->bytes;
   }
 
-  fresh->bytes[0] = static_cast<std::uint8_t>(traits_type::to_char_type(ch));
-  setp(reinterpret_cast<char*>(fresh->bytes + 1), reinterpret_cast<char*>(fresh->bytes + kPipeChunkSize));
+  fresh->bytes[0] = traits_type::to_char_type(ch);
+  setp(fresh->bytes + 1, fresh->bytes + kPipeChunkSize);
   return ch;
 }
 
@@ -948,13 +946,13 @@ std::streamsize PipeBuf::xsputn(
     {
       std::lock_guard<std::mutex> lock(mMutex);
       if (IsSingleBuffer()) {
-        mReadLimit = reinterpret_cast<std::uint8_t*>(epptr());
+        mReadLimit = epptr();
       }
       mChunks.push_back(fresh);
       mWriteCommit = fresh->bytes;
     }
 
-    setp(reinterpret_cast<char*>(fresh->bytes), reinterpret_cast<char*>(fresh->bytes + kPipeChunkSize));
+    setp(fresh->bytes, fresh->bytes + kPipeChunkSize);
   }
 
   return count;
@@ -977,7 +975,7 @@ std::streamsize PipeBuf::showmanyc()
     return 0;
   }
 
-  std::streamsize available = static_cast<std::streamsize>(mReadLimit - reinterpret_cast<const std::uint8_t*>(gptr()));
+  std::streamsize available = static_cast<std::streamsize>(mReadLimit - gptr());
   if (head != tail) {
     for (DListItem<StreamBuffer>* node = head->mNext; node != tail; node = node->mNext) {
       available += static_cast<std::streamsize>(kPipeChunkSize);
@@ -997,8 +995,8 @@ std::streamsize PipeBuf::showmanyc()
  */
 PipeBuf::int_type PipeBuf::underflow()
 {
-  std::uint8_t* readNext = reinterpret_cast<std::uint8_t*>(gptr());
-  std::uint8_t* readEnd = reinterpret_cast<std::uint8_t*>(egptr());
+  char* readNext = gptr();
+  char* readEnd = egptr();
   if (readNext < readEnd) {
     return traits_type::to_int_type(*readNext);
   }
@@ -1012,10 +1010,8 @@ PipeBuf::int_type PipeBuf::underflow()
       return traits_type::eof();
     }
 
-    if (reinterpret_cast<std::uintptr_t>(readEnd) < reinterpret_cast<std::uintptr_t>(mReadLimit)) {
-      setg(
-        reinterpret_cast<char*>(head->bytes), reinterpret_cast<char*>(readNext), reinterpret_cast<char*>(mReadLimit)
-      );
+    if (readEnd < mReadLimit) {
+      setg(head->bytes, readNext, mReadLimit);
       return traits_type::to_int_type(*readNext);
     }
 
@@ -1033,12 +1029,10 @@ PipeBuf::int_type PipeBuf::underflow()
     }
 
     mReadLimit = (head == tail) ? mWriteCommit : (head->bytes + kPipeChunkSize);
-    setg(
-      reinterpret_cast<char*>(head->bytes), reinterpret_cast<char*>(head->bytes), reinterpret_cast<char*>(mReadLimit)
-    );
+    setg(head->bytes, head->bytes, mReadLimit);
 
-    readNext = reinterpret_cast<std::uint8_t*>(gptr());
-    readEnd = reinterpret_cast<std::uint8_t*>(egptr());
+    readNext = gptr();
+    readEnd = egptr();
     if (readNext < readEnd) {
       return traits_type::to_int_type(*readNext);
     }
@@ -1063,8 +1057,8 @@ std::streamsize PipeBuf::xsgetn(
 
   std::streamsize copied = 0;
   while (copied < count) {
-    std::uint8_t* const readNext = reinterpret_cast<std::uint8_t*>(gptr());
-    std::uint8_t* const readEnd = reinterpret_cast<std::uint8_t*>(egptr());
+    char* const readNext = gptr();
+    char* const readEnd = egptr();
     const std::streamsize available = static_cast<std::streamsize>(readEnd - readNext);
     if (available > 0) {
       const std::streamsize chunk = ((count - copied) < available) ? (count - copied) : available;
@@ -1085,10 +1079,8 @@ std::streamsize PipeBuf::xsgetn(
       break;
     }
 
-    if (reinterpret_cast<std::uintptr_t>(readEnd) < reinterpret_cast<std::uintptr_t>(mReadLimit)) {
-      setg(
-        reinterpret_cast<char*>(head->bytes), reinterpret_cast<char*>(readNext), reinterpret_cast<char*>(mReadLimit)
-      );
+    if (readEnd < mReadLimit) {
+      setg(head->bytes, readNext, mReadLimit);
       continue;
     }
 
@@ -1106,9 +1098,7 @@ std::streamsize PipeBuf::xsgetn(
     }
 
     mReadLimit = (head == tail) ? mWriteCommit : (head->bytes + kPipeChunkSize);
-    setg(
-      reinterpret_cast<char*>(head->bytes), reinterpret_cast<char*>(head->bytes), reinterpret_cast<char*>(mReadLimit)
-    );
+    setg(head->bytes, head->bytes, mReadLimit);
   }
 
   return copied;
@@ -1124,7 +1114,7 @@ std::streamsize PipeBuf::xsgetn(
 int PipeBuf::sync()
 {
   std::lock_guard<std::mutex> lock(mMutex);
-  mWriteCommit = reinterpret_cast<std::uint8_t*>(pptr());
+  mWriteCommit = pptr();
   if (IsSingleBuffer()) {
     mReadLimit = mWriteCommit;
   }
@@ -1604,8 +1594,11 @@ fa::string gpg::FileTimeToString(
   const LONGLONG time
 )
 {
+  ULARGE_INTEGER ticks{};
+  ticks.QuadPart = static_cast<ULONGLONG>(time) * 10ULL; // microseconds -> 100 ns
   FILETIME ft100ns{};
-  *reinterpret_cast<ULONGLONG*>(&ft100ns) = static_cast<ULONGLONG>(*reinterpret_cast<const ULONGLONG*>(&time)) * 10ULL;
+  ft100ns.dwLowDateTime = ticks.LowPart;
+  ft100ns.dwHighDateTime = ticks.HighPart;
 
   FILETIME localFt{};
   SYSTEMTIME st{};

@@ -139,7 +139,7 @@ moho::IUIManager* moho::UI_GetManager()
  * What it does:
  * Returns the global UI-manager singleton lane.
  */
-[[maybe_unused]] moho::CUIManager* moho::GetUiManagerGlobalLaneA() noexcept
+moho::CUIManager* moho::GetUiManagerGlobalLaneA() noexcept
 {
   return g_UIManager;
 }

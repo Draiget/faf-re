@@ -617,9 +617,7 @@ namespace gpg
     const RField* const baseEnd = source.mType->bases_.end();
     for (; base != baseEnd; ++base) {
       RRef baseRef{};
-      baseRef.mObj = reinterpret_cast<void*>(
-        reinterpret_cast<std::uintptr_t>(source.mObj) + static_cast<std::uintptr_t>(base->mOffset)
-      );
+      baseRef.mObj = static_cast<std::byte*>(source.mObj) + base->mOffset;
       baseRef.mType = base->mType;
 
       const RRef upcast = REF_UpcastPtr(baseRef, targetType);

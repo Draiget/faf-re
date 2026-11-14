@@ -327,17 +327,18 @@ void Stream::Write(
  * Writes one byte span via inline buffer fast path or virtual write fallback.
  */
 void Stream::Write(
-  const char* buf,
+  const void* const buf,
   const size_t size
 )
 {
+  const auto* const bytes = static_cast<const char*>(buf);
   if (size > LeftToWrite()) {
-    VirtWrite(buf, size);
+    VirtWrite(bytes, size);
     return;
   }
 
   // Raw byte-stream IO through the read/write head.
-  std::copy_n(buf, size, mWriteHead);
+  std::copy_n(bytes, size, mWriteHead);
   mWriteHead += size;
 }
 
@@ -365,13 +366,7 @@ void Stream::WriteInt32(
   const std::int32_t value
 )
 {
-  if (static_cast<unsigned int>(mWriteEnd - mWriteHead) < sizeof(value)) {
-    VirtWrite(reinterpret_cast<const char*>(&value), sizeof(value));
-    return;
-  }
-
-  *reinterpret_cast<std::int32_t*>(mWriteHead) = value;
-  mWriteHead += sizeof(value);
+  Write(&value, sizeof(value));
 }
 
 /**
@@ -407,15 +402,16 @@ bool Stream::Close(
  * Reads one byte span from inline read window or virtual read fallback.
  */
 size_t Stream::Read(
-  char* buf,
+  void* const buf,
   size_t size
 )
 {
+  auto* const bytes = static_cast<char*>(buf);
   if (size > BytesRead()) {
-    size = VirtRead(buf, size);
+    size = VirtRead(bytes, size);
   } else if (size) {
     // Raw byte-stream IO through the read/write head.
-    std::copy_n(mReadHead, size, buf);
+    std::copy_n(mReadHead, size, bytes);
     mReadHead += size;
   }
   return size;

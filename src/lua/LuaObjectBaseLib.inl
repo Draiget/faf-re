@@ -346,43 +346,6 @@ int luaB_yield(
 }
 
 /**
- * Address: 0x00914580 (FUN_00914580, resume)
- *
- * What it does:
- * Applies one coroutine resume step: restores pending frame state when
- * resuming after yield, executes VM, then finalizes any immediate return.
- */
-[[maybe_unused]] void resume(
-  int* const userData,
-  lua_State* const state
-)
-{
-  const int argumentCount = *userData;
-  CallInfo* const currentFrame = state->ci;
-
-  if (currentFrame == state->base_ci) {
-    (void)luaD_precall(state, &state->top[-argumentCount - 1]);
-  } else if (currentFrame->state == 4) {
-    CallInfo* const previousFrame = currentFrame - 1;
-    const std::uint32_t instruction = static_cast<std::uint32_t>(*(previousFrame->savedpc - 1));
-    previousFrame->state = 0;
-
-    const int wantedResults = static_cast<int>((instruction >> 6u) & 0x1FFu) - 1;
-    (void)luaD_poscall(state, wantedResults, &state->top[-argumentCount]);
-    if (wantedResults >= 0) {
-      state->top = state->ci->top;
-    }
-  } else {
-    currentFrame->state = 0;
-  }
-
-  StkId firstResult = luaV_execute(state);
-  if (firstResult != nullptr) {
-    (void)luaD_poscall(state, -1, firstResult);
-  }
-}
-
-/**
  * Address: 0x00913CF0 (FUN_00913CF0, callrethooks)
  *
  * What it does:
@@ -976,7 +939,7 @@ const TString* FindInternedString(
   GCObject* current = strings.hash[hash & static_cast<unsigned int>(strings.size - 1)];
   while (current != nullptr) {
     if (current->gch.tt == LUA_TSTRING) {
-      const auto* candidate = reinterpret_cast<const TString*>(current);
+      const auto* candidate = &current->ts;
       if (
         candidate->len == static_cast<size_t>(keyLength) &&
         std::memcmp(candidate->str, key, static_cast<size_t>(keyLength)) == 0
@@ -1449,8 +1412,8 @@ namespace LuaPlus
     proto->source = (loadedSource != nullptr) ? loadedSource : fallbackSource;
     faf_lua51_gc_barrier_f(
       loadState->state,
-      reinterpret_cast<GCObject*>(proto),
-      reinterpret_cast<GCObject*>(proto->source)
+      valtogco(proto),
+      valtogco(proto->source)
     ); // Lua 5.1.5 lparser.c: Proto source barrier
 
     int lineDefined = 0;
@@ -1789,7 +1752,7 @@ namespace
       for (int bucket = 0; bucket < g->strt.size; ++bucket) {
         addList(g->strt.hash[bucket]);
       }
-      out.push_back(reinterpret_cast<GCObject*>(g->mainthread));
+      out.push_back(valtogco(g->mainthread));
       addOpen(g->mainthread);
       for (GCObject* thread = g->rootgc1; thread != nullptr; thread = thread->gch.next) {
         if (thread->gch.tt == LUA_TTHREAD) {

@@ -128,14 +128,6 @@ namespace
     }
   }
 
-  [[nodiscard]] moho::SArmyVectorWithMeta* GetWordVectorWithMeta(
-    moho::CArmyImpl* army
-  )
-  {
-    // Evidence: FUN_006FDE70 targets (this + 0x17C): CArmyImpl::mVarDat.mWordVectorWithMeta.
-    return &army->mVarDat.mWordVectorWithMeta;
-  }
-
   constexpr const char* kCAiBrainTypeNames[] = {"Moho::CAiBrain", "CAiBrain"};
   constexpr const char* kCAiReconDBImplTypeNames[] = {"Moho::CAiReconDBImpl", "CAiReconDBImpl"};
   constexpr const char* kIAiReconDBTypeNames[] = {"Moho::IAiReconDB", "IAiReconDB"};
@@ -2179,20 +2171,13 @@ namespace moho
   }
 
   /**
-   * Address: 0x006FDE70 (FUN_006FDE70, Moho::CArmyImpl::SetUnknownVectorWithMeta)
+   * Address: 0x006FDE70 (FUN_006FDE70, Moho::CArmyImpl::SetPathPreview)
    */
-  std::uint32_t CArmyImpl::SetUnknownVectorWithMeta(
-    const SArmyVectorWithMeta* value
+  void CArmyImpl::SetPathPreview(
+    const SArmyPathPreview& preview
   )
   {
-    if (value == nullptr) {
-      return 0;
-    }
-
-    SArmyVectorWithMeta* const target = GetWordVectorWithMeta(this);
-    target->CopyWordPayloadFrom(*value);
-    target->mMetaWord = value->mMetaWord;
-    return target->mMetaWord;
+    mVarDat.mPathPreview = preview;
   }
 
   /**

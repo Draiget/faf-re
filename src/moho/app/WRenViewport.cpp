@@ -229,7 +229,7 @@ void moho::WRenViewport::OnMouseEnter(
 
   const gpg::gal::Head& head = context->GetHead(0);
   if (head.mWindow != nullptr) {
-    (void)::SetFocus(reinterpret_cast<HWND>(head.mWindow));
+    (void)::SetFocus(static_cast<HWND>(head.mWindow));
   }
 }
 
@@ -263,7 +263,7 @@ void moho::WRenViewport::OnMouseLeave(
 
   const gpg::gal::Head& head = context->GetHead(1);
   if (head.mWindow != nullptr) {
-    (void)::SetFocus(reinterpret_cast<HWND>(head.mWindow));
+    (void)::SetFocus(static_cast<HWND>(head.mWindow));
   }
 }
 

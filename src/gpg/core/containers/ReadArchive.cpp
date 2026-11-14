@@ -196,7 +196,7 @@ namespace
      * serialization failure on EOF/read errors.
      */
     void ReadBytes(
-      char* const bytes,
+      void* const bytes,
       const size_t byteCount
     ) override
     {
@@ -511,7 +511,7 @@ namespace
       void* const outValue
     )
     {
-      ReadBytes(reinterpret_cast<char*>(outValue), sizeof(short));
+      ReadBytes(static_cast<char*>(outValue), sizeof(short));
     }
 
     /**
@@ -524,7 +524,7 @@ namespace
       void* const outValue
     )
     {
-      ReadBytes(reinterpret_cast<char*>(outValue), sizeof(unsigned short));
+      ReadBytes(static_cast<char*>(outValue), sizeof(unsigned short));
     }
 
     /**
@@ -600,7 +600,7 @@ namespace
       void* const outValue
     )
     {
-      ReadBytes(reinterpret_cast<char*>(outValue), sizeof(__int64));
+      ReadBytes(static_cast<char*>(outValue), sizeof(__int64));
     }
 
     /**
@@ -613,7 +613,7 @@ namespace
       void* const outValue
     )
     {
-      ReadBytes(reinterpret_cast<char*>(outValue), sizeof(unsigned __int64));
+      ReadBytes(static_cast<char*>(outValue), sizeof(unsigned __int64));
     }
 
     /**
@@ -626,7 +626,7 @@ namespace
       void* const outValue
     )
     {
-      ReadBytes(reinterpret_cast<char*>(outValue), sizeof(float));
+      ReadBytes(static_cast<char*>(outValue), sizeof(float));
     }
 
     // `gpg::CreateBinaryReadArchive` (0x009048B0) allocates 0x44 and sets
@@ -842,10 +842,11 @@ namespace
      * hexadecimal token per byte.
      */
     void ReadBytes(
-      char* const bytes,
+      void* const data,
       const size_t byteCount
     ) override
     {
+      auto* const bytes = static_cast<char*>(data);
       std::istream& stream = *mCachedStream;
       std::string token;
       for (size_t index = 0; index < byteCount; ++index) {
@@ -1273,17 +1274,16 @@ ReadArchive* ReadArchive::ReadPointer_Listener_NavPath(
  * at offset 0 -- the FUN_007638D0 asm links each node before `listHead`
  * itself.
  */
-moho::Listener<const moho::SNavPath&>* gpg::ReadAndLinkNavPathListeners(
+void gpg::ReadAndLinkNavPathListeners(
   ReadArchive* const archive,
-  moho::Broadcaster<const moho::SNavPath&>* const listHead,
-  const int version,
-  const gpg::RRef* const ownerRef
+  void* const objectPtr,
+  int,
+  gpg::RRef* const ownerRef
 )
 {
-  (void)version;
-
+  auto* const listHead = static_cast<moho::Broadcaster<const moho::SNavPath&>*>(objectPtr);
   if (archive == nullptr || listHead == nullptr) {
-    return nullptr;
+    return;
   }
 
   moho::Listener<const moho::SNavPath&>* listener = nullptr;
@@ -1292,8 +1292,6 @@ moho::Listener<const moho::SNavPath&>* gpg::ReadAndLinkNavPathListeners(
     listHead->AddListener(listener);
     archive->ReadPointer_Listener_NavPath(&listener, ownerRef);
   }
-
-  return listener;
 }
 
 /**

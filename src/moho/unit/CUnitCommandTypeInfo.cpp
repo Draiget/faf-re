@@ -111,7 +111,7 @@ namespace moho
    * Clears reflected base/field vector lanes for one `CUnitCommandTypeInfo`
    * instance while preserving outer storage ownership.
    */
-  [[maybe_unused]] void DestroyCUnitCommandTypeInfoBody(
+  void DestroyCUnitCommandTypeInfoBody(
     CUnitCommandTypeInfo* const typeInfo
   ) noexcept
   {

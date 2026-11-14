@@ -345,7 +345,7 @@ namespace moho
     reader.ReadExact(cloudRecordCount);
     for (std::int32_t record = 0; record < cloudRecordCount; ++record) {
       SkyDomeDecalVertices vertices{};
-      reader.Read(reinterpret_cast<char*>(vertices.mBytes), sizeof(vertices.mBytes));
+      reader.Read(vertices.mBytes, sizeof(vertices.mBytes));
       mDecalUploads.push_back(vertices);
     }
 
@@ -371,7 +371,7 @@ namespace moho
     constexpr std::size_t kCirrusLayerRecordSize = 20u;
     constexpr std::size_t kCirrusLayerCount = sizeof(mCirrusData) / kCirrusLayerRecordSize;
     for (std::size_t layer = 0; layer < kCirrusLayerCount; ++layer) {
-      reader.Read(reinterpret_cast<char*>(mCirrusData) + layer * kCirrusLayerRecordSize, kCirrusLayerRecordSize);
+      reader.Read(mCirrusData + layer * kCirrusLayerRecordSize, kCirrusLayerRecordSize);
     }
   }
 
@@ -396,15 +396,15 @@ namespace moho
     gpg::BinaryWriter& writer
   )
   {
-    writer.Write(reinterpret_cast<const char*>(&mDomeOrigin), sizeof(mDomeOrigin));
+    writer.Write(&mDomeOrigin, sizeof(mDomeOrigin));
     writer.Write(mDomeShapeParams.x);
     writer.Write(mDomeShapeParams.y);
     writer.Write(mDomeShapeParams.z);
     writer.Write(mWidth);
     writer.Write(mHeight);
     writer.Write(mHorizonSize);
-    writer.Write(reinterpret_cast<const char*>(&mHorizonColor), sizeof(mHorizonColor));
-    writer.Write(reinterpret_cast<const char*>(&mSkyColor), sizeof(mSkyColor));
+    writer.Write(&mHorizonColor, sizeof(mHorizonColor));
+    writer.Write(&mSkyColor, sizeof(mSkyColor));
     writer.Write(mHorizonBlend);
 
     writer.WriteString(mAtmosphereTexPath);
@@ -416,7 +416,7 @@ namespace moho
     // past the two link pointers (0x008167xx, `memcpy(..., v27 + 2, 0x28)`).
     writer.Write(static_cast<std::int32_t>(mDecalUploads.size()));
     for (const SkyDomeDecalVertices& vertices : mDecalUploads) {
-      writer.Write(reinterpret_cast<const char*>(vertices.mBytes), sizeof(vertices.mBytes));
+      writer.Write(vertices.mBytes, sizeof(vertices.mBytes));
     }
 
     writer.WriteString(mDecalTexPath1);
@@ -433,7 +433,7 @@ namespace moho
     constexpr std::size_t kCirrusLayerCount = sizeof(mCirrusData) / kCirrusLayerRecordSize;
     writer.Write(static_cast<std::int32_t>(kCirrusLayerCount));
     for (std::size_t layer = 0; layer < kCirrusLayerCount; ++layer) {
-      writer.Write(reinterpret_cast<const char*>(mCirrusData) + layer * kCirrusLayerRecordSize, kCirrusLayerRecordSize);
+      writer.Write(mCirrusData + layer * kCirrusLayerRecordSize, kCirrusLayerRecordSize);
     }
   }
 

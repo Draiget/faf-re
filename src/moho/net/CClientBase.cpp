@@ -323,7 +323,7 @@ void CClientBase::Process(
         // Engine addition: the stream's hash at this boundary, after the
         // binary's two fields.
         const CommandStreamCheck::AckDigest digest = streamCheck->NoteBoundary(mIndex, mQueuedBeat);
-        ackStream.Write(reinterpret_cast<const char*>(digest.data()), digest.size());
+        ackStream.Write(digest.data(), digest.size());
         if (streamCheck->HasFindings()) {
           mManager->NoteDivergentOrders();
         }
@@ -400,7 +400,7 @@ void CClientBase::Process(
         sizeof(uint8_t) + sizeof(int32_t) + CommandStreamCheck::kAckDigestBytes
     ) {
       CommandStreamCheck::AckDigest digest{};
-      reader.Read(reinterpret_cast<char*>(digest.data()), digest.size());
+      reader.Read(digest.data(), digest.size());
       streamCheck->NoteReport(mIndex, ackClientIndex, static_cast<uint32_t>(ackBeat), digest);
       if (streamCheck->HasFindings()) {
         mManager->NoteDivergentOrders();

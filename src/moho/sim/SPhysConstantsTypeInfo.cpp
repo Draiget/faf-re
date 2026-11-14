@@ -61,7 +61,7 @@ namespace moho
    * Clears reflected base/field vector lanes for one `SPhysConstantsTypeInfo`
    * instance while preserving outer storage ownership.
    */
-  [[maybe_unused]] void DestroySPhysConstantsTypeInfoBody(
+  void DestroySPhysConstantsTypeInfoBody(
     SPhysConstantsTypeInfo* const typeInfo
   ) noexcept
   {

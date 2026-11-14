@@ -51,7 +51,7 @@ namespace gpg::gal
       const RECT wholeSurface{};
       const TextureLockRect transfer = texture->Lock(0, wholeSurface, 2);
 
-      auto* const destinationPixels = reinterpret_cast<std::uint32_t*>(dibPixels);
+      auto* const destinationPixels = static_cast<std::uint32_t*>(dibPixels);
       const auto* const sourceBytes = static_cast<const std::uint8_t*>(transfer.bits);
       const std::uint32_t rowPitchBytes = static_cast<std::uint32_t>(transfer.pitch);
       const auto* sourceRow = reinterpret_cast<const std::uint32_t*>(sourceBytes + (rowPitchBytes * 31U));

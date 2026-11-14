@@ -308,23 +308,6 @@ namespace
     return paramIndex;
   }
 
-  [[maybe_unused]] void RecomputeEmitterCurveYBounds(
-    moho::SEfxCurve& curve
-  )
-  {
-    curve.mBoundsMin.y = std::numeric_limits<float>::infinity();
-    curve.mBoundsMax.y = -std::numeric_limits<float>::infinity();
-
-    for (Wm3::Vector3f* key = curve.mKeys.begin(); key != curve.mKeys.end(); ++key) {
-      if (curve.mBoundsMin.y > key->y) {
-        curve.mBoundsMin.y = key->y;
-      }
-      if (key->y > curve.mBoundsMax.y) {
-        curve.mBoundsMax.y = key->y;
-      }
-    }
-  }
-
   /**
    * Address: 0x0066D6E0 (FUN_0066D6E0, shared IEffect named-float-param lane)
    *

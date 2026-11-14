@@ -33,7 +33,7 @@ namespace
     CMessageStream payload{handshake};
 
     const auto localPort = static_cast<std::uint16_t>(connection.mConnector->GetLocalPort());
-    payload.Write(reinterpret_cast<const char*>(&localPort), sizeof(localPort));
+    payload.Write(&localPort, sizeof(localPort));
     connection.mOutputStream.Write(handshake.mBuff);
   }
 

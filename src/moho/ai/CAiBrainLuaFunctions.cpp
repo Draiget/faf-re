@@ -1192,7 +1192,7 @@ int moho::cfunc_CAiBrainCreateResourceBuildingNearest(
  */
 void moho::func_CAiBrainCreateResourceBuildingNearest_LuaFuncDef()
 {
-  [[maybe_unused]] static CScrLuaBinder binder(
+  static CScrLuaBinder binder(
     moho::SCR_SimLuaInitSet(),
     kAiBrainCreateResourceBuildingNearestName,
     &moho::cfunc_CAiBrainCreateResourceBuildingNearest,

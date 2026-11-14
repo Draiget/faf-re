@@ -65,7 +65,7 @@ namespace
    * Returns true when one shield owns a collision primitive and that
    * primitive contains the target entity world-position lane.
    */
-  [[maybe_unused]] bool ShieldContainsEntityPosition(
+  bool ShieldContainsEntityPosition(
     moho::Shield* const shield,
     moho::Entity* const entity
   )

@@ -669,7 +669,7 @@ namespace moho
       if (entity != nullptr) {
         CollisionDBRect rect = *static_cast<const CollisionShape<Entity>*>(entity);
         archive->WriteUInt(id);
-        archive->WriteBytes(reinterpret_cast<char*>(&rect), sizeof(rect));
+        archive->WriteBytes(&rect, sizeof(rect));
       }
     }
 
@@ -722,7 +722,7 @@ namespace moho
       unsigned int id = 0u;
       archive->ReadUInt(&id);
       CollisionDBRect rect{};
-      archive->ReadBytes(reinterpret_cast<char*>(&rect), sizeof(rect));
+      archive->ReadBytes(&rect, sizeof(rect));
 
       const auto found = entities.mAllUnits.find(id);
       if (found == entities.mAllUnits.end() || found->second == nullptr) {

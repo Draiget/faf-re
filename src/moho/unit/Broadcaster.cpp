@@ -205,7 +205,7 @@ namespace
    * `RBroadcasterRType_ECommandEvent` instance while preserving outer storage
    * ownership.
    */
-  [[maybe_unused]] void DestroyBroadcasterCommandEventRTypeBody(
+  void DestroyBroadcasterCommandEventRTypeBody(
     RBroadcasterRType_ECommandEvent* const typeInfo
   ) noexcept
   {

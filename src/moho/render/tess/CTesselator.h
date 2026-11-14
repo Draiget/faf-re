@@ -72,7 +72,7 @@ namespace moho
       std::int32_t* outIndexStart,
       std::uint32_t* outIndexCount,
       std::int32_t* outRectStart,
-      std::uint32_t* outLastRectIndex
+      std::int32_t* outLastRectIndex
     ) = 0;
   };
 
@@ -246,7 +246,7 @@ namespace moho
       std::int32_t* outIndexStart,
       std::uint32_t* outIndexCount,
       std::int32_t* outRectStart,
-      std::uint32_t* outLastRectIndex
+      std::int32_t* outLastRectIndex
     ) override;
 
     /**

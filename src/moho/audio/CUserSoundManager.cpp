@@ -918,7 +918,7 @@ namespace moho
    * Destroys one entity-loop record when its cue is in stopped state, or
    * updates per-record playing-seconds when the cue remains in playing state.
    */
-  [[maybe_unused]] int UpdateEntityLoopPlayingSecondsOrDestroy(
+  int UpdateEntityLoopPlayingSecondsOrDestroy(
     SoundHandleRecord* const record,
     AudioEngine* const voiceEngine,
     const float frameSeconds
@@ -1674,7 +1674,7 @@ namespace moho
     }
 
     HSound* const sound = new HSound(params);
-    sound->mSimLoopLink.ListLinkBefore(reinterpret_cast<LoopNode*>(&mActiveLoops));
+    sound->mSimLoopLink.ListLinkBefore(static_cast<LoopNode*>(&mActiveLoops));
     (void)WriteSoundLoopCue(sound, cue);
     return sound;
   }
@@ -1734,7 +1734,7 @@ namespace moho
       }
     }
 
-    auto* const sentinel = reinterpret_cast<LoopNode*>(&mActiveLoops);
+    auto* const sentinel = static_cast<LoopNode*>(&mActiveLoops);
     while (mActiveLoops.mNext != sentinel) {
       HSound* const sound = LoopOwnerFromNode(mActiveLoops.mNext);
       if (ReadSoundLoopCue(*sound) != nullptr) {

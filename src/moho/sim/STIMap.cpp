@@ -460,41 +460,6 @@ namespace
     return {line.pos.x + line.dir.x * t, line.pos.y + line.dir.y * t, line.pos.z + line.dir.z * t};
   }
 
-  /**
-   * Address: 0x00577540 (FUN_00577540, Moho__CColHitResult__PlaneIntersection)
-   *
-   * What it does:
-   * Intersects parametric segment line against plane `{normal,dist}` and
-   * returns NaN vector when outside segment range.
-   */
-  [[maybe_unused]] [[nodiscard]] Wm3::Vec3f PlaneIntersection(
-    const moho::GeomLine3& line,
-    const moho::VecDist& plane,
-    moho::CGeomHitResult* outHit
-  )
-  {
-    // 0x00577540-0x0057756C: the denominator sums `(y + z) + x`; the
-    // numerator dot (0x0057757D-0x00577593) sums `(x + y) + z`.
-    const float dotDen = ((line.dir.y * plane.dir.y) + (line.dir.z * plane.dir.z)) + (line.dir.x * plane.dir.x);
-    if (dotDen == 0.0f) {
-      return Wm3::Vec3f::NaN();
-    }
-
-    const float dotPos = line.pos.x * plane.dir.x + line.pos.y * plane.dir.y + line.pos.z * plane.dir.z;
-    const float t = (plane.dist - dotPos) / dotDen;
-    // 0x005775A4 / 0x005775AF: both range tests are `comiss` + `jb`, so an
-    // unordered `t` is rejected.
-    if (!(t >= line.closest) || !(line.farthest >= t)) {
-      return Wm3::Vec3f::NaN();
-    }
-
-    if (outHit) {
-      outHit->distance = t;
-    }
-
-    return PointOnLine(line, t);
-  }
-
   constexpr float kHeightWordScale = 0.0078125f;
   constexpr float kNoWaterElevation = -10000.0f;
 

@@ -435,7 +435,7 @@ namespace
    * Emits the `OnCharPressed` script-warning lane for one caught C++ exception
    * during `CScriptObject::RunScriptOnCharPressed`.
    */
-  [[maybe_unused]] void LogOnCharPressedExceptionWarning(
+  void LogOnCharPressedExceptionWarning(
     const WeakPtr<CScriptObject>& weakGuard,
     const std::exception& exceptionObject
   )

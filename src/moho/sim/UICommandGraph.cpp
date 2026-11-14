@@ -2010,13 +2010,9 @@ namespace moho
    * `arg0`, the IDA-declared first parameter, is not a real argument - see
    * this function's declaration in CWldSession.h.
    *
-   * The runtime cell-position buffer's trailing "meta" dword
-   * (`SArmyVectorWithMeta::mMetaWord`, modeled as a plain pointer-sized word
-   * because different consumers reuse the same bytes differently) is read here
-   * as a pointer to a 3-byte `{sizeX, sizeZ, layer}` footprint descriptor -
-   * confirmed against the raw disassembly, not just the decompile, so the
-   * reinterpret is applied at this call site rather than changing the
-   * field's canonical type.
+   * The army's path preview (`SArmyPathPreview`) holds the cells and the
+   * footprint the path was searched with; its size and occupancy byte place
+   * each cell in the world.
    */
   void DrawPathPreview(
     UICommandGraph& graph,
@@ -2037,25 +2033,25 @@ namespace moho
       return;
     }
 
-    SArmyVectorWithMeta& scratch = army->mVarDat.mWordVectorWithMeta;
-    const std::size_t cellCount = scratch.mWords.size();
+    const SArmyPathPreview& preview = army->mVarDat.mPathPreview;
+    const std::size_t cellCount = preview.mCells.size();
     // The meta dword is only ever a real descriptor pointer once the army's
     // scratch buffer has been populated for STI/path-preview display; a
     // fresh/never-populated army leaves it null.
-    const auto* const footprintDescriptor = reinterpret_cast<const std::uint8_t*>(scratch.mMetaWord);
+    const SFootprint* const footprint = preview.mFootprint;
 
     fa::list<Wm3::Vector3f> simplifiedPath{};
     float capWidthSeed = 0.0f;
 
     if (ui_PathPreview) {
-      if (footprintDescriptor == nullptr || cellCount < 2) {
+      if (footprint == nullptr || cellCount < 2) {
         return;
       }
 
-      capWidthSeed = static_cast<float>(footprintDescriptor[0]);
+      capWidthSeed = static_cast<float>(footprint->mSizeX);
 
       STIMap* const stiMap = session->GetSTIMap();
-      const auto* const cellPositions = reinterpret_cast<const SOCellPos*>(scratch.mWords.begin());
+      const SOCellPos* const cellPositions = preview.mCells.data();
 
       // This count-only constructor call is FUN_0082A46C's `call sub_7E3730`
       // in the raw disassembly (Moho::DrawPathPreview is FUN_0082A380) --
@@ -2067,11 +2063,7 @@ namespace moho
       fa::vector<Wm3::Vector3f> worldPts(cellCount);
       for (std::size_t i = 0; i < cellCount; ++i) {
         worldPts[i] = COORDS_ToWorldPos(
-          stiMap,
-          cellPositions[i],
-          static_cast<ELayer>(footprintDescriptor[2]),
-          footprintDescriptor[0],
-          footprintDescriptor[1]
+          stiMap, cellPositions[i], static_cast<ELayer>(footprint->mOccupancyCaps), footprint->mSizeX, footprint->mSizeZ
         );
       }
 

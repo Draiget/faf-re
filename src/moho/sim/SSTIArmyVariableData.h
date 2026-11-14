@@ -9,55 +9,27 @@
 #include "legacy/containers/Vector.h"
 #include "moho/entity/EntityCategoryLookupResolver.h"
 #include "moho/sim/CSimArmyEconomyInfo.h"
+#include "moho/sim/SOCellPos.h"
 #include "Wm3Vector2.h"
 
 namespace moho
 {
+  struct SFootprint;
+
   /**
-   * Address context:
-   * - 0x006FDE70 (FUN_006FDE70)
-   * - 0x00700280 (FUN_00700280)
-   *
-   * What it does:
-   * Stores a legacy vector payload plus a trailing metadata dword used by
-   * SimArmy variable-data copy helpers.
+   * The path preview the sim publishes to an army (`CArmyImpl::SetPathPreview`,
+   * 0x006FDE70): the cells of the last accepted preview path and the footprint
+   * it was searched with, which the UI draws (`DrawPathPreview`).
    */
-  struct SArmyVectorWithMeta
+  struct SArmyPathPreview
   {
-    fa::vector<std::uint32_t> mWords; // +0x00
-    // A dword in the binary; the path preview stores a footprint pointer in
-    // it, so it is pointer-sized (the same unsigned int on x86).
-    std::uintptr_t mMetaWord; // +0x10
-
-    SArmyVectorWithMeta() = default;
-
-    /**
-     * Member-wise copy-ctor. Performs the engine-emitted out-of-line
-     * `fa::vector<uint32_t>` copy-construction via the per-type named
-     * helper `moho::CopyConstructVectorUint32` so the linker keeps the
-     * FUN_00560A90 symbol shape; trailing scalar `mMetaWord` is copied
-     * directly.
-     */
-    SArmyVectorWithMeta(const SArmyVectorWithMeta& other);
-
-    SArmyVectorWithMeta& operator=(const SArmyVectorWithMeta&) = default;
-    SArmyVectorWithMeta(SArmyVectorWithMeta&&) = default;
-    SArmyVectorWithMeta& operator=(SArmyVectorWithMeta&&) = default;
-    ~SArmyVectorWithMeta() = default;
-
-    /**
-     * Address: 0x007011C0 (FUN_007011C0)
-     *
-     * What it does:
-     * Copies only the vector payload (begin/end/capacity triplet) from `source`
-     * while preserving destination MSVC8 vector proxy semantics.
-     */
-    void CopyWordPayloadFrom(const SArmyVectorWithMeta& source);
+    fa::vector<SOCellPos> mCells;           // +0x00
+    const SFootprint* mFootprint = nullptr; // +0x10
   };
 
-  static_assert(offsetof(SArmyVectorWithMeta, mWords) == 0x00, "SArmyVectorWithMeta::mWords offset must be 0x00");
-  static_assert(offsetof(SArmyVectorWithMeta, mMetaWord) == 0x10, "SArmyVectorWithMeta::mMetaWord offset must be 0x10");
-  static_assert(sizeof(SArmyVectorWithMeta) == 0x14, "SArmyVectorWithMeta size must be 0x14");
+  static_assert(offsetof(SArmyPathPreview, mCells) == 0x00, "SArmyPathPreview::mCells offset must be 0x00");
+  static_assert(offsetof(SArmyPathPreview, mFootprint) == 0x10, "SArmyPathPreview::mFootprint offset must be 0x10");
+  static_assert(sizeof(SArmyPathPreview) == 0x14, "SArmyPathPreview size must be 0x14");
 
   /**
    * Address context:
@@ -100,7 +72,7 @@ namespace moho
     std::int32_t mFaction;          // 0x0EC
     std::uint8_t mUseWholeMap;      // 0x0F0
     std::uint8_t mPad_00F1_00F4[0x03]{};
-    SArmyVectorWithMeta mWordVectorWithMeta; // 0x0F4
+    SArmyPathPreview mPathPreview;           // 0x0F4
     std::uint8_t mShowScore;                 // 0x108
     std::uint8_t mRuntimePad_0109_0110[0x07]{};
     EntityCategorySet mCategoryFilterSet; // 0x110
@@ -183,8 +155,8 @@ namespace moho
     "SSTIArmyVariableData::mUseWholeMap offset must be 0x0F0"
   );
   static_assert(
-    offsetof(SSTIArmyVariableData, mWordVectorWithMeta) == 0x0F4,
-    "SSTIArmyVariableData::mWordVectorWithMeta offset must be 0x0F4"
+    offsetof(SSTIArmyVariableData, mPathPreview) == 0x0F4,
+    "SSTIArmyVariableData::mPathPreview offset must be 0x0F4"
   );
   static_assert(
     offsetof(SSTIArmyVariableData, mShowScore) == 0x108,

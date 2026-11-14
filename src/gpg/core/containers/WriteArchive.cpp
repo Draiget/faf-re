@@ -56,7 +56,6 @@ namespace
   // offset 0x28 directly. That read was out of bounds: the class was 0x24 bytes
   // here (its base was 4 short and the duplicate handle was missing), so the lane
   // picked up whatever followed the allocation and handed it to `fwrite`.
-  void WriteBinaryCompatibilityLane(BinaryWriteArchive* archive, const void* buffer, std::size_t elementSize);
 
   class TextWriteArchive final : public gpg::WriteArchive
   {
@@ -86,7 +85,7 @@ namespace
      * extra separator after every fourth byte).
      */
     void WriteBytes(
-      char* bytes,
+      const void* const data,
       size_t byteCount
     ) override
     {
@@ -94,9 +93,10 @@ namespace
         return;
       }
 
+      const auto* const bytes = static_cast<const unsigned char*>(data);
       int lineColumn = 0;
       for (size_t i = 0; i < byteCount; ++i) {
-        const unsigned char value = static_cast<unsigned char>(bytes[i]);
+        const unsigned char value = bytes[i];
         const fa::string encodedByte = STR_Printf("%02x", static_cast<unsigned int>(value));
         (*mStream) << encodedByte.c_str();
 
@@ -349,7 +349,7 @@ namespace
      * throws `SerializationError("nowrite")` when the stream write fails.
      */
     void WriteBytes(
-      char* bytes,
+      const void* const bytes,
       size_t byteCount
     ) override
     {
@@ -640,7 +640,7 @@ namespace
     }
 
     void WriteBytes(
-      char* const bytes,
+      const void* const bytes,
       const size_t byteCount
     ) override
     {
@@ -807,15 +807,6 @@ namespace
     std::size_t mUsed = 0u;
     TrackedPointerIndex mIndex;
   };
-
-  void WriteBinaryCompatibilityLane(
-    BinaryWriteArchive* const archive,
-    const void* const buffer,
-    const std::size_t elementSize
-  )
-  {
-    archive->WriteScalarLane(buffer, elementSize);
-  }
 
 } // namespace
 

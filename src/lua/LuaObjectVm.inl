@@ -14,7 +14,7 @@ UpVal* luaF_newupval(
 {
   auto* const upvalue = luaM_new<UpVal>(state);
   upvalue->v = &upvalue->value;
-  luaC_link(state, reinterpret_cast<GCObject*>(upvalue), LUA_TUPVALUE);
+  luaC_link(state, valtogco(upvalue), LUA_TUPVALUE);
   return upvalue;
 }
 
@@ -480,7 +480,7 @@ Proto* luaF_newproto(
 )
 {
   auto* const proto = luaM_new<Proto>(state);
-  luaC_link(state, reinterpret_cast<GCObject*>(proto), LUA_TPROTO);
+  luaC_link(state, valtogco(proto), LUA_TPROTO);
 
   proto->k = nullptr;
   proto->code = nullptr;
@@ -584,7 +584,7 @@ UpVal* luaF_findupval(
   }
   upvalue->v = level;
   upvalue->next = *link;
-  *link = reinterpret_cast<GCObject*>(upvalue);
+  *link = valtogco(upvalue);
   return upvalue;
 }
 
@@ -1453,11 +1453,8 @@ retentry: // resuming: the frame is already set up
         break;
       }
       *cl->upvals[upIndex]->v = *ra;
-      faf_lua51_gc_barrier_value(
-        L,
-        reinterpret_cast<GCObject*>(cl->upvals[upIndex]),
-        ra
-      ); // Lua 5.1.5 lvm.c: OP_SETUPVAL
+      faf_lua51_gc_barrier_value(L, valtogco(cl->upvals[upIndex]),
+                                 ra); // Lua 5.1.5 lvm.c: OP_SETUPVAL
       break;
     }
 
@@ -1931,11 +1928,8 @@ retentry: // resuming: the frame is already set up
         const int index = LuaGetArgB(*pc);
         closure->l.upvals[up] =
           (LuaGetOpcode(*pc) == kOpGetUpval) ? cl->upvals[index] : luaF_findupval(L, base + index);
-        faf_lua51_gc_barrier_f(
-          L,
-          reinterpret_cast<GCObject*>(closure),
-          reinterpret_cast<GCObject*>(closure->l.upvals[up])
-        ); // Lua 5.1.5 lvm.c: OP_CLOSURE
+        faf_lua51_gc_barrier_f(L, valtogco(closure),
+                               valtogco(closure->l.upvals[up])); // Lua 5.1.5 lvm.c: OP_CLOSURE
       }
 
       ra->tt = static_cast<int>(closure->l.tt);
@@ -2228,44 +2222,6 @@ void luaO_chunkid(
   }
 
   std::strcat(out, "\"]");
-}
-
-/**
- * Address: 0x00912F30 (FUN_00912F30, addinfo)
- *
- * IDA signature:
- * const char *__usercall addinfo(lua_State *L@<edi>, const char *msg);
- *
- * What it does:
- * Prefixes an error message with the chunk name and line it came from,
- * turning "attempt to call a nil value" into
- * "script.lua(42): attempt to call a nil value". Only frames still running
- * Lua bytecode carry that position, so a C frame is left unannotated.
- */
-[[maybe_unused]] static void addinfo(
-  lua_State* const state,
-  const char* const msg
-)
-{
-  constexpr int kChunkIdBufferSize = 60;
-  constexpr int kCallInfoStateRunningLua = 3;
-
-  CallInfo* const ci = state->ci;
-  if (ci->state >= kCallInfoStateRunningLua) {
-    return;
-  }
-
-  const Proto* const proto = static_cast<GCObject*>(ci->base[-1].value.p)->cl.l.p;
-  const ptrdiff_t pc = ci->savedpc - proto->code;
-
-  int line = -1;
-  if (pc >= 0) {
-    line = (proto->lineinfo != nullptr) ? proto->lineinfo[pc] : 0;
-  }
-
-  char chunkId[kChunkIdBufferSize];
-  luaO_chunkid(chunkId, proto->source->str, kChunkIdBufferSize);
-  (void)luaO_pushfstring(state, "%s(%d): %s", chunkId, line, msg);
 }
 
 /**
@@ -3297,7 +3253,7 @@ Closure* luaF_newCclosure(
 {
   auto* const closure = static_cast<Closure*>(luaM_reallocblock(state, nullptr, {0u, 0u}, sizeCclosure(nelems)));
 
-  luaC_link(state, reinterpret_cast<GCObject*>(closure), LUA_CFUNCTION);
+  luaC_link(state, valtogco(closure), LUA_CFUNCTION);
 
   // The binary clears 0x18 through 0x40 - the tail of the reserved span
   // whose fields are not named yet, plus the one-before-first upvalue
@@ -4272,7 +4228,7 @@ LuaState::LuaState(
 {
   m_state = lua_open();
   m_ownState = 1;
-  lua_setusergcfunction(m_state, reinterpret_cast<void(__cdecl*)(void*)>(&LuaPlusGCFunction));
+  lua_setusergcfunction(m_state, &LuaPlusGCFunction);
   lua_setstateuserdata(m_state, this);
 
   if (collectorRole != static_cast<int>(moho::lua_incremental::ELuaVmRole::Baseline)) {
@@ -4280,7 +4236,7 @@ LuaState::LuaState(
   }
 
   m_headObject.m_next = reinterpret_cast<LuaObject*>(&m_tailObject);
-  m_tailObject.m_prev = reinterpret_cast<LuaObject**>(&m_headObject.m_next);
+  m_tailObject.m_prev = (&m_headObject.m_next);
   m_headObject.m_prev = nullptr;
   m_tailObject.m_next = nullptr;
   m_luaTask = nullptr;

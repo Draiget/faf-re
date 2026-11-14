@@ -62,7 +62,7 @@ namespace
    * Installs the primary reference-lifecycle callbacks for
    * `EntityCategoryTypeInfo` (`NewRef`, `CtrRef`, `Delete`, `Destruct`).
    */
-  [[maybe_unused]] [[nodiscard]] EntityCategoryTypeInfo* ConfigureEntityCategoryTypeRefCallbacksPrimary(
+  [[nodiscard]] EntityCategoryTypeInfo* ConfigureEntityCategoryTypeRefCallbacksPrimary(
     EntityCategoryTypeInfo* const typeInfo
   ) noexcept
   {
@@ -80,7 +80,7 @@ namespace
    * Installs the copy/move reference-lifecycle callbacks for
    * `EntityCategoryTypeInfo` (`CpyRef`, `MovRef`, `Delete`, `Destruct`).
    */
-  [[maybe_unused]] [[nodiscard]] EntityCategoryTypeInfo* ConfigureEntityCategoryTypeRefCallbacksSecondary(
+  [[nodiscard]] EntityCategoryTypeInfo* ConfigureEntityCategoryTypeRefCallbacksSecondary(
     EntityCategoryTypeInfo* const typeInfo
   ) noexcept
   {
@@ -98,7 +98,7 @@ namespace
    * Configures `EntityCategoryTypeInfo` callback lanes, element size/version,
    * and serializer entrypoints for `EntityCategorySet`.
    */
-  [[maybe_unused]] [[nodiscard]] EntityCategoryTypeInfo* ConfigureEntityCategoryTypeInitLanes(
+  [[nodiscard]] EntityCategoryTypeInfo* ConfigureEntityCategoryTypeInitLanes(
     EntityCategoryTypeInfo* const typeInfo
   ) noexcept
   {

@@ -603,7 +603,7 @@ int LuaDebugAllObjects(
   ++globalState->gcTraversalLockDepth;
 
   for (GCObject* object = globalState->rootgc; object != nullptr; object = object->gch.next) {
-    if (object != reinterpret_cast<GCObject*>(outputTable)) {
+    if (object != valtogco(outputTable)) {
       LuaDebugAppendGcObject(state, outputTable, objectIndex, object);
     }
   }

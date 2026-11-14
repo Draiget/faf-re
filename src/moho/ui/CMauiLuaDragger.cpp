@@ -482,7 +482,7 @@ moho::CScrLuaInitForm* moho::func_PostDragger_LuaFuncDef()
  * Initializes one `SMauiEventData` lane to the default unknown-event state
  * used by dragger posting paths.
  */
-[[maybe_unused]] static moho::SMauiEventData* func_InitUnknownMauiEventData(
+static moho::SMauiEventData* func_InitUnknownMauiEventData(
   moho::SMauiEventData* const eventData
 ) noexcept
 {
@@ -532,9 +532,10 @@ int moho::cfunc_PostDraggerL(
       keyCodeName = "";
     }
 
-    gpg::RRef keyCodeEnumRef{};
-    keyCodeEnumRef = gpg::MakeRRef<moho::EMauiKeyCode>(reinterpret_cast<EMauiKeyCode*>(&keyCode));
+    EMauiKeyCode keyCodeEnum{};
+    gpg::RRef keyCodeEnumRef = gpg::MakeRRef<moho::EMauiKeyCode>(&keyCodeEnum);
     SCR_GetEnum(state, keyCodeName, keyCodeEnumRef);
+    keyCode = static_cast<std::int32_t>(keyCodeEnum);
   }
 
   keyCode = NormalizePostDraggerKeycode(keyCode);

@@ -482,19 +482,6 @@ namespace
   }
 
   /**
-   * Address: 0x005B0E60 (FUN_005B0E60)
-   *
-   * What it does:
-   * Extracts the high byte from one 32-bit packed lane value.
-   */
-  [[maybe_unused]] [[nodiscard]] std::uint8_t ExtractArgumentHighByte(
-    const std::uint32_t value
-  ) noexcept
-  {
-    return static_cast<std::uint8_t>((value >> 8u) & 0xFFu);
-  }
-
-  /**
    * Address: 0x005B03D0 (FUN_005B03D0)
    *
    * What it does:

@@ -342,9 +342,10 @@ WrapFile* NewFileUserdata(
  * the stream when close-enabled, then frees the payload block.
  */
 void DestroyWrapFileStorage(
-  WrapFile* const wrapFile
+  void* const storage
 )
 {
+  auto* const wrapFile = static_cast<WrapFile*>(storage);
   if (wrapFile == nullptr) {
     return;
   }
@@ -362,19 +363,18 @@ void DestroyWrapFileStorage(
  *
  * What it does:
  * Performs WrapFile close-on-destruct semantics in-place and clears the
- * stream lane, returning the raw x86 `EAX` result payload.
+ * stream lane.
  */
-std::intptr_t FinalizeWrapFileStorage(
-  WrapFile* const wrapFile
+void FinalizeWrapFileStorage(
+  void* const storage
 )
 {
-  std::intptr_t result = reinterpret_cast<std::intptr_t>(wrapFile->stream);
+  auto* const wrapFile = static_cast<WrapFile*>(storage);
   if (wrapFile->stream != nullptr && wrapFile->closeEnabled != 0u) {
-    result = static_cast<std::intptr_t>(std::fclose(wrapFile->stream));
+    (void)std::fclose(wrapFile->stream);
   }
 
   wrapFile->stream = nullptr;
-  return result;
 }
 
 /**
@@ -453,8 +453,8 @@ void WrapFileTypeInfo::Init()
   gpg::RType::Init();
   newRefFunc_ = &NewWrapFileStorageRef;
   ctorRefFunc_ = &ConstructWrapFileStorageRef;
-  deleteFunc_ = reinterpret_cast<gpg::RType::delete_func_t>(&DestroyWrapFileStorage);
-  dtrFunc_ = reinterpret_cast<gpg::RType::dtr_func_t>(reinterpret_cast<void (*)()>(&FinalizeWrapFileStorage));
+  deleteFunc_ = &DestroyWrapFileStorage;
+  dtrFunc_ = &FinalizeWrapFileStorage;
   Finish();
 }
 

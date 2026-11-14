@@ -2397,7 +2397,7 @@ namespace fa
      * copies its candidate list on entry because an empty one is refilled from the army; callers 0x0057AC30; formerly
      * `CopyFastvectorUnitToStdVector` in moho/misc/EngineVectorHelpers.cpp (RULE ONE), removed 2026-09-11.) Address:
      * 0x00560A90 (FUN_00560A90 -- `vector<T>::vector(const vector&)` for a 4-byte `std::uint32_t` element (`_Xlen`
-     * 0x005619C0): reached from `SArmyVectorWithMeta`'s copy constructor 0x0055FF80, which copies `mWords` in its
+     * 0x005619C0): reached from `SArmyPathPreview`'s copy constructor 0x0055FF80, which copies `mCells` in its
      * member-init list; callers 0x0055FF80, 0x00560134; formerly `AssignCopyVectorUint32` in
      * moho/misc/EngineVectorHelpers.cpp (RULE ONE), removed 2026-09-11.) Address: 0x008B2640 (FUN_008B2640 --
      * `vector<T>::vector(const vector&)` for the 8-byte `WeakPtr<moho::UserUnit>` element (`_Xlen` 0x008B3090 above
@@ -4272,7 +4272,7 @@ namespace fa
      * (FUN_007C9310 -- `_Tidy` for a trivially destructible element; zero callers, no xrefs, unreachable from every
      * seeded root: a linker-retained copy nothing runs.) Address: 0x00583B40 (FUN_00583B40 -- `_Tidy` of a `{{count,
      * vector}}` pair inside `CArmyImpl`: zeroes the leading count word, frees the block and nulls the three pointers.)
-     * Address: 0x0055FE70 (FUN_0055FE70 -- `_Tidy` for `fa::vector<std::uint32_t>` (`SArmyVectorWithMeta::mWords`):
+     * Address: 0x0055FE70 (FUN_0055FE70 -- `_Tidy` for `fa::vector<std::uint32_t>` (`SArmyPathPreview::mCells`):
      * free the block, null the triple; the catch arm of the copy constructor as instantiated by
      * `SSTIArmyVariableData`'s copy constructor 0x0055FF80 and by 0x00764A80 / 0x00764CF0 in Sim.cpp. Formerly
      * `ResetLegacyWordVectorStorage` over a deleted overlay in moho/sim/SSTIArmyVariableData.cpp (RULE ONE), removed

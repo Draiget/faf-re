@@ -354,8 +354,8 @@ void moho::SIM_DescribeStateForDesync(
       continue;
     }
     const float health = entity->mVarDat.mHealth;
-    const float* const pos = reinterpret_cast<const float*>(&entity->mVarDat.mCurTransform.pos_);
-    const float* const rot = reinterpret_cast<const float*>(&entity->mVarDat.mCurTransform.orient_);
+    const Wm3::Vec3f& pos = entity->mVarDat.mCurTransform.pos_;
+    const Wm3::Quatf& rot = entity->mVarDat.mCurTransform.orient_;
     Wm3::Vec3f velocity{};
     ReadEntityVelocity(entity, &velocity);
     const char* const blueprintId = ResolveBlueprintIdCString(entity);

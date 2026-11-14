@@ -519,7 +519,7 @@ void LuaObject::AddToUsedObjectList(
   m_next = root->m_headObject.m_next;
   root->m_headObject.m_next = this;
   m_next->m_prev = reinterpret_cast<LuaObject**>(this);
-  m_prev = reinterpret_cast<LuaObject**>(&root->m_headObject.m_next);
+  m_prev = (&root->m_headObject.m_next);
   m_object = *object;
 }
 
@@ -570,7 +570,7 @@ void LuaObject::AddToUsedList(
   m_next = root->m_headObject.m_next;
   root->m_headObject.m_next = this;
   m_next->m_prev = reinterpret_cast<LuaObject**>(this);
-  m_prev = reinterpret_cast<LuaObject**>(&root->m_headObject.m_next);
+  m_prev = (&root->m_headObject.m_next);
 }
 
 /**
@@ -1767,7 +1767,7 @@ namespace
   )
   {
     if (object->tt == LUA_TTABLE) {
-      static_cast<Table*>(object->value.p)->metatable = reinterpret_cast<Table*>(metatableObject);
+      static_cast<Table*>(object->value.p)->metatable = &metatableObject->h;
       faf_lua51_gc_barrier_f(
         state, static_cast<GCObject*>(object->value.p), metatableObject
       ); // Lua 5.1.5 lapi.c: setmetatable barrier
@@ -1775,7 +1775,7 @@ namespace
     }
 
     if (object->tt == LUA_TUSERDATA) {
-      static_cast<Udata*>(object->value.p)->metatable = reinterpret_cast<Table*>(metatableObject);
+      static_cast<Udata*>(object->value.p)->metatable = &metatableObject->h;
       faf_lua51_gc_barrier_f(
         state, static_cast<GCObject*>(object->value.p), metatableObject
       ); // Lua 5.1.5 lapi.c: setmetatable barrier
@@ -2453,7 +2453,7 @@ void LuaObject::Register(
     closure->c.upvalue[upvalueIndex] = closureState->top[upvalueIndex];
     faf_lua51_gc_barrier_value(
       closureState,
-      reinterpret_cast<GCObject*>(closure),
+      valtogco(closure),
       &closure->c.upvalue[upvalueIndex]
     ); // Lua 5.1.5 lapi.c: lua_pushcclosure()
     closureState->top[upvalueIndex].tt = 0;

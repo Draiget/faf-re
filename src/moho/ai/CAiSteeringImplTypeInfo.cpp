@@ -59,7 +59,7 @@ namespace
    * Assigns all lifecycle callback slots (`NewRef`, `CtrRef`, `Delete`,
    * `Destruct`) on one `CAiSteeringImplTypeInfo` descriptor.
    */
-  [[maybe_unused]] [[nodiscard]] CAiSteeringImplTypeInfo* AssignCAiSteeringImplLifecycleCallbacks(
+  [[nodiscard]] CAiSteeringImplTypeInfo* AssignCAiSteeringImplLifecycleCallbacks(
     CAiSteeringImplTypeInfo* const typeInfo
   ) noexcept
   {

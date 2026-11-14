@@ -456,7 +456,7 @@ namespace gpg
    * Wrapper lane that materializes one temporary `RRef_CFootPlantManipulator`
    * and copies object/type fields into the destination reference record.
    */
-  [[maybe_unused]] gpg::RRef* AssignCFootPlantManipulatorRef(
+  gpg::RRef* AssignCFootPlantManipulatorRef(
     RRef* const out,
     moho::CFootPlantManipulator* const value
   )

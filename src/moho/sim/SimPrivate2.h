@@ -48,7 +48,7 @@ namespace
     if (!valuePtr) {
       return defaultValue;
     }
-    return *reinterpret_cast<const uint8_t*>(valuePtr) != 0;
+    return *static_cast<const uint8_t*>(valuePtr) != 0;
   }
 
   int ReadSimConVarInt(
@@ -62,7 +62,7 @@ namespace
     if (!valuePtr) {
       return defaultValue;
     }
-    return *reinterpret_cast<const int*>(valuePtr);
+    return *static_cast<const int*>(valuePtr);
   }
 
   // `CUnitIterAllArmies` (0x006B6AA0 ctor, 0x005C87A0 step): the unit-family

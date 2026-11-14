@@ -86,16 +86,16 @@ namespace
 				return;
 
 			case LUA_TUSERDATA: {
-				auto* const userdata = reinterpret_cast<Udata*>(object);
+				auto* const userdata = &object->u;
 				IncrGrayToBlack(object); // userdata are never gray
 				if (userdata->metatable != nullptr) {
-					IncrMarkObject(state, reinterpret_cast<GCObject*>(userdata->metatable));
+					IncrMarkObject(state, valtogco(userdata->metatable));
 				}
 				return;
 			}
 
 			case LUA_TUPVALUE: {
-				auto* const upvalue = reinterpret_cast<UpVal*>(object);
+				auto* const upvalue = &object->uv;
 				IncrMarkValue(state, *upvalue->v);
 				if (upvalue->v == &upvalue->value) {
 					IncrGrayToBlack(object); // closed upvalues are black
@@ -151,7 +151,7 @@ namespace
 		constexpr int kTagMethodMode = 2;
 
 		Table* const metatable = table->metatable;
-		IncrMarkObject(state, reinterpret_cast<GCObject*>(metatable));
+		IncrMarkObject(state, valtogco(metatable));
 
 		bool weakKey = false;
 		bool weakValue = false;
@@ -174,7 +174,7 @@ namespace
 				table->marked |= kValueWeakBit;
 			}
 			table->gclist = state.weak;
-			state.weak = reinterpret_cast<GCObject*>(table);
+			state.weak = valtogco(table);
 		}
 
 		if (weakKey && weakValue) {
@@ -216,9 +216,9 @@ namespace
 		}
 
 		IncrMarkValue(state, closure->l.g);
-		IncrMarkObject(state, reinterpret_cast<GCObject*>(closure->l.p));
+		IncrMarkObject(state, valtogco(closure->l.p));
 		for (int index = 0; index < closure->l.nupvalues; ++index) {
-			IncrMarkObject(state, reinterpret_cast<GCObject*>(closure->l.upvals[index]));
+			IncrMarkObject(state, valtogco(closure->l.upvals[index]));
 		}
 	}
 
@@ -237,7 +237,7 @@ namespace
 			}
 		}
 		for (int index = 0; index < proto->sizep; ++index) {
-			IncrMarkObject(state, reinterpret_cast<GCObject*>(proto->p[index]));
+			IncrMarkObject(state, valtogco(proto->p[index]));
 		}
 		for (int index = 0; index < proto->sizelocvars; ++index) {
 			if (proto->locvars[index].varname != nullptr) {
@@ -378,8 +378,8 @@ namespace
 		// The main thread is not linked into any sweep list in this fork, so
 		// nothing turns it white between cycles. 5.1's mainthread is a rootgc
 		// object and gets makewhite() during sweep; do the equivalent here.
-		IncrMakeWhite(incremental, reinterpret_cast<GCObject*>(globalState->mainthread));
-		IncrMarkObject(incremental, reinterpret_cast<GCObject*>(globalState->mainthread));
+		IncrMakeWhite(incremental, valtogco(globalState->mainthread));
+		IncrMarkObject(incremental, valtogco(globalState->mainthread));
 		IncrMarkValue(incremental, globalState->mainthread->_gt);
 		IncrMarkValue(incremental, globalState->_registry);
 		IncrMarkValue(incremental, globalState->_defaultmeta);
@@ -387,7 +387,7 @@ namespace
 			IncrMarkValue(incremental, slot);
 		}
 		if (state != globalState->mainthread) {
-			IncrMarkObject(incremental, reinterpret_cast<GCObject*>(state));
+			IncrMarkObject(incremental, valtogco(state));
 		}
 
 		incremental.state = EState::Propagate;
@@ -601,9 +601,9 @@ namespace
 		// by traversetable() and are collected on the weak list.
 		state.gray = state.weak;
 		state.weak = nullptr;
-		IncrMarkObject(state, reinterpret_cast<GCObject*>(L));
-		IncrMarkObject(state, reinterpret_cast<GCObject*>(globalState->mainthread));
-		IncrMarkObject(state, reinterpret_cast<GCObject*>(globalState->lstate));
+		IncrMarkObject(state, valtogco(L));
+		IncrMarkObject(state, valtogco(globalState->mainthread));
+		IncrMarkObject(state, valtogco(globalState->lstate));
 		IncrMarkValue(state, globalState->mainthread->_gt);
 		IncrMarkValue(state, globalState->_registry);
 		IncrMarkValue(state, globalState->_defaultmeta);
@@ -782,7 +782,7 @@ namespace
 	void IncrLinkUpVal(lua_State* const L, UpVal* const upvalue)
 	{
 		SState& state = Acquire(L->l_G);
-		auto* const object = reinterpret_cast<GCObject*>(upvalue);
+		auto* const object = valtogco(upvalue);
 		object->gch.next = L->l_G->rootgc;
 		L->l_G->rootgc = object;
 		if (IsGray(object)) {
@@ -842,7 +842,7 @@ namespace
 		if (state.state == EState::Pause || state.state == EState::Finalize) {
 			return;
 		}
-		auto* const object = reinterpret_cast<GCObject*>(table);
+		auto* const object = valtogco(table);
 		if (!IsBlack(object) || IsDead(state, object)) {
 			return;
 		}
@@ -982,7 +982,7 @@ namespace
 		state.state = EState::Pause;
 		// The main thread is not linked into rootgc in this fork; 5.1 relies
 		// on every object already carrying a white colour when markroot runs.
-		IncrMakeWhite(state, reinterpret_cast<GCObject*>(L->l_G->mainthread));
+		IncrMakeWhite(state, valtogco(L->l_G->mainthread));
 		state.gray = nullptr;
 		state.grayagain = nullptr;
 		state.weak = nullptr;

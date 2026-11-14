@@ -29,7 +29,7 @@ namespace
    * Assigns all lifecycle callback slots (`NewRef`, `CtrRef`, `Delete`,
    * `Destruct`) on one `LAiAttackerImplTypeInfo` descriptor.
    */
-  [[maybe_unused]] [[nodiscard]] moho::LAiAttackerImplTypeInfo* AssignLAiAttackerImplLifecycleCallbacks(
+  [[nodiscard]] moho::LAiAttackerImplTypeInfo* AssignLAiAttackerImplLifecycleCallbacks(
     moho::LAiAttackerImplTypeInfo* const typeInfo
   ) noexcept
   {

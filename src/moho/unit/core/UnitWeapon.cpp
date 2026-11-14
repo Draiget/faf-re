@@ -59,6 +59,7 @@
 #include "gpg/core/reflection/StaticInitPhase.h"
 #include "moho/sim/SimStartupRegistrations.h"
 #include "gpg/core/containers/ArchiveSerialization.h"
+#include "moho/sim/SimConVarAccess.h"
 
 namespace
 {
@@ -320,10 +321,7 @@ namespace
     moho::Sim* const sim
   )
   {
-    moho::CSimConVarInstanceBase* const instance =
-      sim ? sim->GetSimVar(&moho::gSimConVar_AI_RenderBombDropZone) : nullptr;
-    const void* const valueStorage = instance ? instance->GetValueStorage() : nullptr;
-    return valueStorage != nullptr && *static_cast<const bool*>(valueStorage);
+    return sim != nullptr && moho::ReadSimConVar(sim, moho::gSimConVar_AI_RenderBombDropZone);
   }
 
   /**

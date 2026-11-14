@@ -50,7 +50,7 @@ namespace
    * What it does:
    * Restores unit spawn-elevation lane from blueprint physics elevation.
    */
-  [[maybe_unused]] moho::UnitAttributes* RestoreSpawnElevationFromBlueprint(
+  moho::UnitAttributes* RestoreSpawnElevationFromBlueprint(
     moho::UnitAttributes* const attributes
   ) noexcept
   {
@@ -64,7 +64,7 @@ namespace
    * What it does:
    * Restores unit regen-rate lane from blueprint defense data.
    */
-  [[maybe_unused]] moho::UnitAttributes* RestoreRegenRateFromBlueprint(
+  moho::UnitAttributes* RestoreRegenRateFromBlueprint(
     moho::UnitAttributes* const attributes
   ) noexcept
   {
@@ -78,7 +78,7 @@ namespace
    * What it does:
    * Restores unit build-rate lane from blueprint economy data.
    */
-  [[maybe_unused]] moho::UnitAttributes* RestoreBuildRateFromBlueprint(
+  moho::UnitAttributes* RestoreBuildRateFromBlueprint(
     moho::UnitAttributes* const attributes
   ) noexcept
   {
@@ -92,7 +92,7 @@ namespace
    * What it does:
    * Restores unit command-capability mask from blueprint general data.
    */
-  [[maybe_unused]] moho::UnitAttributes* RestoreCommandCapsFromBlueprint(
+  moho::UnitAttributes* RestoreCommandCapsFromBlueprint(
     moho::UnitAttributes* const attributes
   ) noexcept
   {
@@ -106,7 +106,7 @@ namespace
    * What it does:
    * Restores unit toggle-capability mask from blueprint general data.
    */
-  [[maybe_unused]] moho::UnitAttributes* RestoreToggleCapsFromBlueprint(
+  moho::UnitAttributes* RestoreToggleCapsFromBlueprint(
     moho::UnitAttributes* const attributes
   ) noexcept
   {

@@ -126,7 +126,7 @@ namespace
    * Initializes one pose-bone array runtime lane set to use its inline storage
    * block: begin/end/original point at inline, capacity points one element past.
    */
-  [[maybe_unused]] [[nodiscard]] moho::CAniPoseBoneArray* InitializePoseBoneArrayInlineLanes(
+  [[nodiscard]] moho::CAniPoseBoneArray* InitializePoseBoneArrayInlineLanes(
     moho::CAniPoseBoneArray* const storage
   ) noexcept
   {

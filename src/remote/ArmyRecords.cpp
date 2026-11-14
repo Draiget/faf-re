@@ -109,7 +109,7 @@ namespace faf::remote
     army.mArmyType.assign(record.armyType.c_str());
     army.mFaction = record.faction;
     army.mUseWholeMap = record.useWholeMap;
-    army.mWordVectorWithMeta = moho::SArmyVectorWithMeta{};
+    army.mPathPreview = moho::SArmyPathPreview{};
     army.mShowScore = record.showScore;
     army.mCategoryFilterSet.mUniverse.mRules = rules;
     army.mCategoryFilterSet.mBits.mFirstWordIndex = record.categoryFilter.firstWord;

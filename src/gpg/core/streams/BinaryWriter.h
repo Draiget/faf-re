@@ -32,7 +32,7 @@ namespace gpg
      * Writes exactly `size` bytes using the stream inline write window when
      * possible, falling back to `VirtWrite` on short local space.
      */
-    void Write(const char* data, std::size_t size) const;
+    void Write(const void* data, std::size_t size) const;
 
     /**
      * Address: <paired with Stream::Write(fa::string)>
@@ -58,7 +58,7 @@ namespace gpg
       const TValue& value
     ) const
     {
-      Write(reinterpret_cast<const char*>(&value), sizeof(value));
+      Write(&value, sizeof(value));
     }
 
     [[nodiscard]] Stream* stream() const noexcept

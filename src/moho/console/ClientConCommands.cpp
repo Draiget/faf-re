@@ -100,159 +100,6 @@ namespace
 {
   // ---- UISelectionByCategory support (FUN_008662B0) ----
 
-  /**
-   * Address: 0x008662B0 (FUN_008662B0, sub_8662B0, SelectUnitsByCategory)
-   *
-   * What it does:
-   * Core of UISelectionByCategory. Gathers candidate units (camera frustum or the
-   * spatial DB), filters by selectability / focus-army ownership / optional idle /
-   * category (+ optional engineer/command exclusion), then either replaces or
-   * extends the world selection. Optionally frames the result with the camera.
-   */
-  [[maybe_unused]] void SelectUnitsByCategory(
-    moho::CWldSession* const session,
-    moho::CameraImpl* const camera,
-    const char* const categoryExpr,
-    const bool addToSelection,        // a4
-    const bool inViewFrustum,         // a5
-    const bool nearestToMouse,        // a6
-    const bool mustBeIdle,            // a7
-    const bool doCameraTarget,        // a8
-    const bool excludeEngineerCommand // a9
-  )
-  {
-    // ---- Gather candidate entities ----
-    gpg::fastvector<moho::UserEntity*> gathered{};
-    if (inViewFrustum && camera != nullptr) {
-      for (const moho::WeakPtr<moho::UserEntity>& ref : *camera->GetArmyUnitsInFrustum()) {
-        if (moho::UserEntity* const entity = ref.GetObjectPtr(); entity != nullptr) {
-          gathered.push_back(entity);
-        }
-      }
-    } else {
-      auto* const spatialDb = session->GetEntitySpatialDbStorage();
-      (void)spatialDb->Collect(gathered, moho::ENTITYTYPE_Unit);
-    }
-
-    // Parse the category expression once (RRuleGameRules slot 23).
-    const moho::EntityCategorySet parsedCategory = session->mRules->ParseEntityCategory(categoryExpr);
-
-    // Result set: start empty, optionally seed with the current selection
-    // (`operator=`, its `_Copy` 0x00867B20).
-    moho::WeakSet<moho::UserEntity> resultSet;
-    if (addToSelection) {
-      resultSet = session->mSelection;
-    }
-
-    // ---- Per-candidate filter ----
-    const moho::UserArmy* const focusArmy = session->GetFocusArmy();
-
-    moho::UserEntity* nearestEntity = nullptr;
-    float nearestDistance = gpg::pInf;
-
-    for (moho::UserEntity* const candidate : gathered) {
-      moho::UserUnit* const unit = candidate->IsUserUnit();
-      if (unit == nullptr) {
-        continue;
-      }
-
-      // Selectable AND (owned by focus army OR cheat-select).
-      if (!unit->IsSelectable()) {
-        continue;
-      }
-      const bool ownedByFocusArmy = (focusArmy == candidate->mArmy);
-      if (!ownedByFocusArmy && !(moho::UI_SelectAnything && session->IsCheatsEnabled)) {
-        continue;
-      }
-
-      // Optional idle filter: not busy AND no queued commands.
-      if (mustBeIdle) {
-        if (unit->mUnitVarDat.mIsBusy) {
-          continue;
-        }
-        if (moho::GetUserUnitManagerQueueSize(unit->mManager) != 0) {
-          continue;
-        }
-      }
-
-      // Category test (open-coded bitset in the binary -> EntityCategory::HasBlueprint).
-      const moho::IUnit* const iunit = moho::GetIUnitBridge(unit);
-      if (!moho::EntityCategory::HasBlueprint(iunit->GetBlueprint(), &parsedCategory)) {
-        continue;
-      }
-
-      // Optional engineer/command exclusion (a9).
-      if (excludeEngineerCommand) {
-        const fa::string engineerCategory("ENGINEER");
-        const fa::string commandCategory("COMMAND");
-        if (candidate->IsInCategory(engineerCategory) || candidate->IsInCategory(commandCategory)) {
-          continue;
-        }
-      }
-
-      if (nearestToMouse) {
-        // Keep only the single unit nearest the cursor world position.
-        const Wm3::Vec3f& unitPos = iunit->GetPosition();
-        const float dx = unitPos.x - session->mCursorInfo.mMouseWorldPos.x;
-        const float dy = unitPos.y - session->mCursorInfo.mMouseWorldPos.y;
-        const float dz = unitPos.z - session->mCursorInfo.mMouseWorldPos.z;
-        const float distance = std::sqrt(dx * dx + dy * dy + dz * dz);
-        if (nearestDistance > distance) {
-          nearestEntity = candidate;
-          nearestDistance = distance;
-        }
-      } else if (!iunit->IsUnitState(moho::UNITSTATE_BeingUpgraded)) {
-        // Add every passing unit (skip units mid-upgrade).
-        (void)resultSet.Add(candidate);
-      }
-    }
-
-    if (nearestToMouse && nearestEntity != nullptr) {
-      (void)resultSet.Add(nearestEntity);
-    }
-
-    // ---- Optional camera framing of the result ----
-    if (!resultSet.Empty() && doCameraTarget && camera != nullptr) {
-      if (mustBeIdle) {
-        moho::IdleUnitSelector::CycleCameraFocus(resultSet, camera);
-      } else if (resultSet.Size() == 1) {
-        camera->TargetEntityBox(*resultSet.begin(), 0.0f);
-      } else {
-        // Combined AABB over all selected entities, then frame it.
-        Wm3::AxisAlignedBox3f combined = moho::Empty<Wm3::AxisAlignedBox3f>();
-        for (moho::UserEntity* const entity : resultSet) {
-          const Wm3::Box3f orientedBox(*SelectionEntityMeshBox(entity));
-          Wm3::AxisAlignedBox3f entityBox{};
-          entityBox = moho::AxisAlignedBoundsFromBox(orientedBox);
-
-          if (entityBox.Min.x <= combined.Min.x) {
-            combined.Min.x = entityBox.Min.x;
-          }
-          if (entityBox.Min.y <= combined.Min.y) {
-            combined.Min.y = entityBox.Min.y;
-          }
-          if (entityBox.Min.z <= combined.Min.z) {
-            combined.Min.z = entityBox.Min.z;
-          }
-          if (entityBox.Max.x > combined.Max.x) {
-            combined.Max.x = entityBox.Max.x;
-          }
-          if (entityBox.Max.y > combined.Max.y) {
-            combined.Max.y = entityBox.Max.y;
-          }
-          if (entityBox.Max.z > combined.Max.z) {
-            combined.Max.z = entityBox.Max.z;
-          }
-        }
-
-        camera->TargetBox(combined, 0.0f);
-        camera->TargetNothing();
-      }
-    }
-
-    session->SetSelection(resultSet);
-  }
-
   constexpr const char* kConsoleStartupShowArmyStatsDescription = "Show engine statistics";
   constexpr const char* kConsoleStartupShowStatsDescription = "Show engine statistics";
 
@@ -1984,7 +1831,7 @@ void moho::CON_StartCommandMode(
  * Invokes `CWldSession::GenerateBuildTemplates()` on the global active
  * session when it is present, then returns 0.
  */
-[[maybe_unused]] int GenerateBuildTemplatesOnGlobalSessionIfPresent()
+int GenerateBuildTemplatesOnGlobalSessionIfPresent()
 {
   if (moho::CWldSession* const activeSession = moho::WLD_GetActiveSession(); activeSession != nullptr) {
     activeSession->GenerateBuildTemplates();
@@ -3804,7 +3651,9 @@ namespace moho
   CConFunc gCConFunc_UI_ShowRenameDialog(
     "UI_ShowRenameDialog",
     kConsoleStartupUIShowRenameDialogDescription,
-    reinterpret_cast<CConFunc::Callback>(&moho::UI_ShowRenameDialog)
+    [](const fa::vector<fa::string>&) {
+      moho::UI_ShowRenameDialog();
+    }
   );
 
   /**
@@ -3821,7 +3670,9 @@ namespace moho
   CConFunc gCConFunc_DumpActiveLoops(
     "DumpActiveLoops",
     kConsoleStartupDumpActiveLoopsDescription,
-    reinterpret_cast<CConFunc::Callback>(&moho::Con_DumpActiveLoops)
+    [](const fa::vector<fa::string>&) {
+      moho::Con_DumpActiveLoops();
+    }
   );
 
   /**
@@ -3848,18 +3699,18 @@ namespace moho
   CConFunc gCConFunc_ren_ShowSkeletons(
     "ren_ShowSkeletons",
     kConsoleStartupRenShowSkeletonsDescription,
-    reinterpret_cast<CConFunc::Callback>(&moho::REN_ShowSkeletons)
+    [](const fa::vector<fa::string>&) {
+      moho::REN_ShowSkeletons();
+    }
   );
 
   /**
    * Address: 0x00BE9600 (FUN_00BE9600, dynamic initializer for `gCConFunc_timestamp`)
    * Address: 0x00C08E50 (FUN_00C08E50, dynamic atexit destructor for `gCConFunc_timestamp`)
    */
-  CConFunc gCConFunc_timestamp(
-    "timestamp",
-    kConsoleStartupTimestampDescription,
-    reinterpret_cast<CConFunc::Callback>(&moho::PrintExecutableTimestampToConsole)
-  );
+  CConFunc gCConFunc_timestamp("timestamp", kConsoleStartupTimestampDescription, [](const fa::vector<fa::string>&) {
+    moho::PrintExecutableTimestampToConsole();
+  });
 
   /**
    * Address: 0x00BE9640 (FUN_00BE9640, dynamic initializer for `gCConFunc_SC_CreateEntityDialog`)
@@ -3868,7 +3719,9 @@ namespace moho
   CConFunc gCConFunc_SC_CreateEntityDialog(
     "SC_CreateEntityDialog",
     kConsoleStartupSCCreateEntityDialogDescription,
-    reinterpret_cast<CConFunc::Callback>(&moho::funcl_SC_CreateEntityDialog)
+    [](const fa::vector<fa::string>&) {
+      moho::funcl_SC_CreateEntityDialog();
+    }
   );
 
   /**
@@ -3884,7 +3737,9 @@ namespace moho
   CConFunc gCConFunc_WLD_IncreaseSimRate(
     "WLD_IncreaseSimRate",
     kConsoleStartupWLDIncreaseSimRateDescription,
-    reinterpret_cast<CConFunc::Callback>(&moho::WLD_IncreaseSimRate)
+    [](const fa::vector<fa::string>&) {
+      moho::WLD_IncreaseSimRate();
+    }
   );
 
   /**
@@ -3894,7 +3749,9 @@ namespace moho
   CConFunc gCConFunc_WLD_DecreaseSimRate(
     "WLD_DecreaseSimRate",
     kConsoleStartupWLDDecreaseSimRateDescription,
-    reinterpret_cast<CConFunc::Callback>(&moho::WLD_DecreaseSimRate)
+    [](const fa::vector<fa::string>&) {
+      moho::WLD_DecreaseSimRate();
+    }
   );
 
   /**
@@ -3904,7 +3761,9 @@ namespace moho
   CConFunc gCConFunc_WLD_ResetSimRate(
     "WLD_ResetSimRate",
     kConsoleStartupWLDResetSimRateDescription,
-    reinterpret_cast<CConFunc::Callback>(&moho::WLD_ResetSimRate)
+    [](const fa::vector<fa::string>&) {
+      moho::WLD_ResetSimRate();
+    }
   );
 
   /**
@@ -3959,7 +3818,9 @@ namespace
   CConFunc gCConFunc_ExecutePasteBuffer(
     "ExecutePasteBuffer",
     kConsoleStartupConExecutePasteBufferDescription,
-    reinterpret_cast<CConFunc::Callback>(&moho::CON_ExecutePasteBuffer)
+    [](const fa::vector<fa::string>&) {
+      moho::CON_ExecutePasteBuffer();
+    }
   );
 
   /**
@@ -4109,11 +3970,9 @@ namespace
    * Address: 0x00BC7270 (FUN_00BC7270, dynamic initializer for `gCConFunc_exit`)
    * Address: 0x00BF1880 (FUN_00BF1880, dynamic atexit destructor for `gCConFunc_exit`)
    */
-  CConFunc gCConFunc_exit(
-    "exit",
-    kConsoleStartupConExitDescription,
-    reinterpret_cast<CConFunc::Callback>(&WIN_AppRequestExit)
-  );
+  CConFunc gCConFunc_exit("exit", kConsoleStartupConExitDescription, [](const fa::vector<fa::string>&) {
+    WIN_AppRequestExit();
+  });
 
   /**
    * Address: 0x00BC7360 (FUN_00BC7360, dynamic initializer for `gCConFunc_WIN_ToggleLogDialog`)
@@ -4122,7 +3981,9 @@ namespace
   CConFunc gCConFunc_WIN_ToggleLogDialog(
     "WIN_ToggleLogDialog",
     kConsoleStartupConWinToggleLogDialogDescription,
-    reinterpret_cast<CConFunc::Callback>(&WIN_ToggleLogDialog)
+    [](const fa::vector<fa::string>&) {
+      WIN_ToggleLogDialog();
+    }
   );
 
   /**
@@ -4132,7 +3993,7 @@ namespace
   CConFunc gCConFunc_WIN_ShowLogDialog(
     "WIN_ShowLogDialog",
     kConsoleStartupConWinShowLogDialogDescription,
-    reinterpret_cast<CConFunc::Callback>(&WIN_ShowLogDialog)
+    (&WIN_ShowLogDialog)
   );
 
   /**
@@ -4141,11 +4002,7 @@ namespace
    *
    * The binary's command is `WxInputBox`; it is `InputBox` since the box left wxWindows (issue #415).
    */
-  CConFunc gCConFunc_InputBox(
-    "InputBox",
-    kConsoleStartupConInputBoxDescription,
-    reinterpret_cast<CConFunc::Callback>(&CON_InputBox)
-  );
+  CConFunc gCConFunc_InputBox("InputBox", kConsoleStartupConInputBoxDescription, (&CON_InputBox));
 
   /**
    * Address: 0x00BC3D00 (FUN_00BC3D00, dynamic initializer for `gTConVar_graphics_Fidelity`)
@@ -4490,7 +4347,9 @@ namespace
   CConFunc gCConFunc_ANI_DumpSkeleton(
     "ANI_DumpSkeleton",
     kConsoleStartupConAniDumpSkeletonDescription,
-    reinterpret_cast<CConFunc::Callback>(&moho::ANI_DumpSkeleton)
+    [](const fa::vector<fa::string>&) {
+      moho::ANI_DumpSkeleton();
+    }
   );
 } // namespace
 

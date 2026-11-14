@@ -49,6 +49,7 @@
 #include "moho/unit/core/IUnit.h"
 #include "moho/unit/core/Unit.h"
 #include "moho/sim/SimDebugCommandRegistrations.h"
+#include "moho/sim/SimConVarAccess.h"
 
 namespace
 {
@@ -575,10 +576,7 @@ namespace moho
         spawnBlueprint = mSim->mRules->GetUnitBlueprint(seedBlueprintId);
       }
 
-      CSimConVarInstanceBase* const instaBuildVar = mSim->GetSimVar(&moho::gSimConVar_ai_InstaBuild);
-      void* const instaBuildStorage = instaBuildVar != nullptr ? instaBuildVar->GetValueStorage() : nullptr;
-      const bool instaBuild =
-        instaBuildStorage != nullptr && (*reinterpret_cast<const std::uint8_t*>(instaBuildStorage) != 0u);
+      const bool instaBuild = ReadSimConVar(mSim, moho::gSimConVar_ai_InstaBuild);
 
       const std::int32_t layer = mUnit->mVarDat.mLayerMask;
       const VTransform spawnTransform{mBuildPosition, mBuildOrientation};

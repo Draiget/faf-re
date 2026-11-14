@@ -37,7 +37,7 @@ namespace moho
      * Initializes solid-texture map storage/sentinel state.
      * In recovered C++, static storage construction already performs this once.
      */
-    [[maybe_unused]] [[nodiscard]] SolidTextureMap& InitializeSolidTextureMapStorage()
+    [[nodiscard]] SolidTextureMap& InitializeSolidTextureMapStorage()
     {
       return GetSolidTextureMap();
     }

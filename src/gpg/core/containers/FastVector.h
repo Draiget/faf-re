@@ -57,31 +57,6 @@ namespace gpg::core
     }
 
     /**
-     * Address: 0x00581270 (FUN_00581270, gpg::fastvector_Entity copy helper lane)
-     * Address: 0x00822990 (FUN_00822990, gpg::fastvector_UserUnit copy helper lane)
-     *
-     * What it does:
-     * Copies one dword lane range `[sourceBegin, sourceEnd)` into `destination`
-     * and returns the advanced destination pointer. When destination is null, it
-     * only advances the pointer lane.
-     */
-    [[nodiscard]] inline std::uint32_t* CopyDwordRangeForward(
-      std::uint32_t* destination,
-      const std::uint32_t* sourceBegin,
-      const std::uint32_t* sourceEnd
-    ) noexcept
-    {
-      std::uintptr_t destinationAddress = reinterpret_cast<std::uintptr_t>(destination);
-      for (const std::uint32_t* source = sourceBegin; source != sourceEnd; ++source) {
-        if (destinationAddress != 0u) {
-          *reinterpret_cast<std::uint32_t*>(destinationAddress) = *source;
-        }
-        destinationAddress += sizeof(std::uint32_t);
-      }
-      return reinterpret_cast<std::uint32_t*>(destinationAddress);
-    }
-
-    /**
      * Address: 0x00562A80 (FUN_00562A80, _Copy_backward for a 152-byte element)
      *
      * IDA signature:
@@ -2893,21 +2868,7 @@ namespace gpg::core
       const T* copyEnd
     )
     {
-      if constexpr (std::is_trivially_copyable_v<T> && ElemSize == sizeof(std::uint32_t)) {
-        auto* const destWords = reinterpret_cast<std::uint32_t*>(dest);
-        auto* const beginWords = reinterpret_cast<const std::uint32_t*>(copyBegin);
-        auto* const endWords = reinterpret_cast<const std::uint32_t*>(copyEnd);
-        return reinterpret_cast<T*>(detail::CopyDwordRangeForward(destWords, beginWords, endWords));
-      }
-
-      std::uintptr_t destinationAddress = reinterpret_cast<std::uintptr_t>(dest);
-      for (const T* cur = copyBegin; cur != copyEnd; ++cur) {
-        if (destinationAddress != 0u) {
-          *reinterpret_cast<T*>(destinationAddress) = *cur;
-        }
-        destinationAddress += ElemSize;
-      }
-      return reinterpret_cast<T*>(destinationAddress);
+      return std::copy(copyBegin, copyEnd, dest);
     }
 
     /**
@@ -3498,10 +3459,11 @@ namespace gpg::core
 
     /**
      * Address: 0x00402C20 (FUN_00402C20, fastvector_uint copy-range helper)
+     * Address: 0x00581270 (FUN_00581270, gpg::fastvector_Entity copy helper lane)
+     * Address: 0x00822990 (FUN_00822990, gpg::fastvector_UserUnit copy helper lane)
      *
      * What it does:
      * Copies `[srcBegin, srcEnd)` into `out` and returns the advanced output pointer.
-     * Matches the legacy helper shape that also advances when `out == nullptr`.
      */
     template <class T>
     [[nodiscard]] inline T* CopyRangeForward(
@@ -3510,21 +3472,7 @@ namespace gpg::core
       const T* srcEnd
     ) noexcept
     {
-      if constexpr (std::is_trivially_copyable_v<T> && sizeof(T) == sizeof(std::uint32_t)) {
-        auto* const outWords = reinterpret_cast<std::uint32_t*>(out);
-        auto* const beginWords = reinterpret_cast<const std::uint32_t*>(srcBegin);
-        auto* const endWords = reinterpret_cast<const std::uint32_t*>(srcEnd);
-        return reinterpret_cast<T*>(detail::CopyDwordRangeForward(outWords, beginWords, endWords));
-      }
-
-      std::uintptr_t outAddress = reinterpret_cast<std::uintptr_t>(out);
-      for (const T* cur = srcBegin; cur != srcEnd; ++cur) {
-        if (outAddress != 0u) {
-          *reinterpret_cast<T*>(outAddress) = *cur;
-        }
-        outAddress += sizeof(T);
-      }
-      return reinterpret_cast<T*>(outAddress);
+      return std::copy(srcBegin, srcEnd, out);
     }
 
     /**

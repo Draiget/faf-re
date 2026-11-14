@@ -241,7 +241,7 @@ namespace gpg
      * What it does:
      * Writes one byte span through inline-buffer fast path or virtual write fallback.
      */
-    void Write(const char* buf, size_t size);
+    void Write(const void* buf, size_t size);
 
     /**
      * Address: 0x004CCD80 (FUN_004CCD80)
@@ -271,7 +271,7 @@ namespace gpg
       const T& value
     )
     {
-      Write(reinterpret_cast<const char*>(&value), sizeof(T));
+      Write(&value, sizeof(T));
     }
 
     /**
@@ -286,7 +286,7 @@ namespace gpg
     {
       using U = std::underlying_type_t<E>;
       U tmp = static_cast<U>(value);
-      Write(reinterpret_cast<const char*>(&tmp), sizeof(U));
+      Write(&tmp, sizeof(U));
     }
 
     /**
@@ -299,7 +299,7 @@ namespace gpg
       const T (&arr)[N]
     )
     {
-      Write(reinterpret_cast<const char*>(arr), sizeof(arr));
+      Write(arr, sizeof(arr));
     }
 
     /**
@@ -323,7 +323,7 @@ namespace gpg
      * What it does:
      * Reads one byte span from inline read window or virtual read fallback.
      */
-    size_t Read(char* buf, size_t size);
+    size_t Read(void* buf, size_t size);
 
     /**
      * Address: 0x004CCC10 (FUN_004CCC10)

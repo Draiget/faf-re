@@ -141,15 +141,15 @@ namespace
     SkipValue<std::uint32_t>(reader); // mNumDecals
 
     std::uint32_t decalCount = 0;
-    reader.Read(reinterpret_cast<char*>(&decalCount), sizeof(decalCount));
+    reader.Read(&decalCount, sizeof(decalCount));
     for (; decalCount != 0u; --decalCount) {
       SkipValue<std::int32_t>(reader); // index
       SkipValue<std::int32_t>(reader); // type
       std::int32_t nameCount = 0;
-      reader.Read(reinterpret_cast<char*>(&nameCount), sizeof(nameCount));
+      reader.Read(&nameCount, sizeof(nameCount));
       for (std::int32_t slot = 0; slot < nameCount; ++slot) {
         std::int32_t nameLength = 0;
-        reader.Read(reinterpret_cast<char*>(&nameLength), sizeof(nameLength));
+        reader.Read(&nameLength, sizeof(nameLength));
         std::vector<char> nameBytes(static_cast<std::size_t>(nameLength));
         if (nameLength > 0) {
           reader.Read(nameBytes.data(), static_cast<std::size_t>(nameLength));
@@ -160,12 +160,12 @@ namespace
     }
 
     std::uint32_t groupCount = 0;
-    reader.Read(reinterpret_cast<char*>(&groupCount), sizeof(groupCount));
+    reader.Read(&groupCount, sizeof(groupCount));
     for (; groupCount != 0u; --groupCount) {
       SkipValue<std::int32_t>(reader); // mIndex
       SkipString(reader);              // mName
       std::int32_t memberCount = 0;
-      reader.Read(reinterpret_cast<char*>(&memberCount), sizeof(memberCount));
+      reader.Read(&memberCount, sizeof(memberCount));
       for (std::int32_t member = 0; member < memberCount; ++member) {
         SkipValue<std::int32_t>(reader);
       }
@@ -236,14 +236,14 @@ namespace
   )
   {
     std::int32_t batchCount = 0;
-    reader.Read(reinterpret_cast<char*>(&batchCount), sizeof(batchCount));
+    reader.Read(&batchCount, sizeof(batchCount));
     while (batchCount > 0) {
       if (version >= 0x3Cu) {
         SkipString(reader);
       }
       SkipString(reader);
       std::int32_t decalCount = 0;
-      reader.Read(reinterpret_cast<char*>(&decalCount), sizeof(decalCount));
+      reader.Read(&decalCount, sizeof(decalCount));
       for (std::int32_t remaining = decalCount; remaining > 0; --remaining) {
         SkipBytes(reader, 36u);
       }
@@ -660,7 +660,7 @@ namespace
     }
 
     moho::CHeightField* const field = mMap->mHeightField.get();
-    reader.Read(reinterpret_cast<char*>(field->data), static_cast<std::size_t>(2 * field->width * field->height));
+    reader.Read(field->data, static_cast<std::size_t>(2 * field->width * field->height));
 
     // (CWldTerrainRes makes its decal manager here.)
 
@@ -787,7 +787,7 @@ namespace
     {
       moho::STIMap* const map = mMap;
       const std::size_t terrainTypeBytes = static_cast<std::size_t>(map->mTerrainType.width * map->mTerrainType.height);
-      reader.Read(reinterpret_cast<char*>(map->mTerrainType.data), terrainTypeBytes);
+      reader.Read(map->mTerrainType.data, terrainTypeBytes);
     }
 
     if (version < 0x35u) {

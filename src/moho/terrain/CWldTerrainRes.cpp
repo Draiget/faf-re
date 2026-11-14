@@ -1052,9 +1052,7 @@ namespace moho
     // 0x008909DD-0x00890A2C: the name goes out as UTF-16 with its NUL, sized
     // `2 * length + 2` straight from the converted wide string.
     const std::wstring previewNameWide = gpg::STR_Utf8ToWide(mPreviewName.c_str());
-    writer.Write(
-      reinterpret_cast<const char*>(previewNameWide.c_str()), (previewNameWide.size() + 1U) * sizeof(wchar_t)
-    );
+    writer.Write(previewNameWide.c_str(), (previewNameWide.size() + 1U) * sizeof(wchar_t));
 
     writer.Write(kPreviewMetadataEntryCount);
 
@@ -3106,7 +3104,7 @@ namespace moho
     writer.Write(heightField.height - 1);
     writer.Write(kTerrainHeightSampleScale);
     writer.Write(
-      reinterpret_cast<const char*>(heightField.data),
+      heightField.data,
       static_cast<std::size_t>(heightField.width) * static_cast<std::size_t>(heightField.height) * sizeof(std::uint16_t)
     );
 
@@ -3203,13 +3201,13 @@ namespace moho
     const std::size_t waterPlaneBytes =
       static_cast<std::size_t>(static_cast<std::int32_t>(waterMapDimensions.y * waterMapDimensions.x));
 
-    writer.Write(reinterpret_cast<const char*>(mWaterFoam), waterPlaneBytes);
-    writer.Write(reinterpret_cast<const char*>(mWaterFlatness), waterPlaneBytes);
-    writer.Write(reinterpret_cast<const char*>(mWaterDepthBias), waterPlaneBytes);
+    writer.Write(mWaterFoam, waterPlaneBytes);
+    writer.Write(mWaterFlatness, waterPlaneBytes);
+    writer.Write(mWaterDepthBias, waterPlaneBytes);
 
     const TerrainTypeGrid& terrainTypeGrid = map.mTerrainType;
     writer.Write(
-      reinterpret_cast<const char*>(terrainTypeGrid.data),
+      terrainTypeGrid.data,
       static_cast<std::size_t>(terrainTypeGrid.width) * static_cast<std::size_t>(terrainTypeGrid.height)
     );
 
@@ -3454,7 +3452,7 @@ namespace moho
 
     // Heightfield samples: width*height uint16 values read straight into data.
     CHeightField* const field = mMap->mHeightField.get();
-    reader.Read(reinterpret_cast<char*>(field->data), static_cast<std::size_t>(2 * field->width * field->height));
+    reader.Read(field->data, static_cast<std::size_t>(2 * field->width * field->height));
 
     // Fresh decal manager (destroy the previous through its virtual dtor).
     {
@@ -3558,16 +3556,16 @@ namespace moho
     const std::int32_t maskTileY = (mMap->mHeightField.get()->height - 1) >> 1;
     const std::size_t maskBytes = static_cast<std::size_t>(maskTileX * maskTileY);
     CreateWaterMasks(maskTileX, maskTileY);
-    reader.Read(reinterpret_cast<char*>(mWaterFoam), maskBytes);
-    reader.Read(reinterpret_cast<char*>(mWaterFlatness), maskBytes);
-    reader.Read(reinterpret_cast<char*>(mWaterDepthBias), maskBytes);
+    reader.Read(mWaterFoam, maskBytes);
+    reader.Read(mWaterFlatness, maskBytes);
+    reader.Read(mWaterDepthBias, maskBytes);
     TickLoadingProgress(loadControl);
 
     // Terrain-type grid: raw read into the map terrain-type storage.
     {
       STIMap* const map = mMap;
       const std::size_t terrainTypeBytes = static_cast<std::size_t>(map->mTerrainType.width * map->mTerrainType.height);
-      reader.Read(reinterpret_cast<char*>(map->mTerrainType.data), terrainTypeBytes);
+      reader.Read(map->mTerrainType.data, terrainTypeBytes);
     }
 
     // Legacy album/normal strings discarded on pre-0x35 maps.

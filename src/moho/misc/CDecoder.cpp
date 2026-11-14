@@ -729,7 +729,7 @@ namespace moho
     // (FUN_006E5720): the count-taking ctor that inline-binds the lanes and
     // zero-fills `count` slots through FastVectorInline<T>::ResizeFill_.
     gpg::core::FastVectorN<EntId, 4> rawIds(static_cast<std::size_t>(count));
-    reader.Read(reinterpret_cast<char*>(rawIds.start_), static_cast<std::size_t>(count) * sizeof(EntId));
+    reader.Read(rawIds.start_, static_cast<std::size_t>(count) * sizeof(EntId));
 
     const auto firstEntityId = static_cast<std::uint32_t>(rawIds[0]);
     const auto firstType = firstEntityId >> 28;
@@ -902,7 +902,7 @@ namespace moho
 
     cells.resize(static_cast<std::size_t>(count));
     if (count != 0) {
-      reader.Read(reinterpret_cast<char*>(cells.start_), static_cast<std::size_t>(count) * sizeof(SOCellPos));
+      reader.Read(cells.start_, static_cast<std::size_t>(count) * sizeof(SOCellPos));
     }
   }
 

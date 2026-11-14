@@ -185,8 +185,8 @@ void LuaLoadProtoUpvalueNames(
     proto->upvalues[index] = LuaLoadTString(loadState);
     faf_lua51_gc_barrier_f(
       loadState->state,
-      reinterpret_cast<GCObject*>(proto),
-      reinterpret_cast<GCObject*>(proto->upvalues[index])
+      valtogco(proto),
+      valtogco(proto->upvalues[index])
     ); // Lua 5.1.5 lparser.c: Proto upvalue-name barrier
   }
 }
@@ -236,8 +236,8 @@ void LuaLoadProtoConstantsAndNestedProtos(
       constantLane.value.p = stringValue;
       faf_lua51_gc_barrier_f(
         loadState->state,
-        reinterpret_cast<GCObject*>(proto),
-        reinterpret_cast<GCObject*>(stringValue)
+        valtogco(proto),
+        valtogco(stringValue)
       ); // Lua 5.1.5 lparser.c: Proto constant barrier
       continue;
     }
@@ -258,8 +258,8 @@ void LuaLoadProtoConstantsAndNestedProtos(
     proto->p[index] = LuaLoadProtoObject(loadState, proto->source);
     faf_lua51_gc_barrier_f(
       loadState->state,
-      reinterpret_cast<GCObject*>(proto),
-      reinterpret_cast<GCObject*>(proto->p[index])
+      valtogco(proto),
+      valtogco(proto->p[index])
     ); // Lua 5.1.5 lparser.c: nested Proto barrier
   }
 }
@@ -330,7 +330,7 @@ extern "C" void reallymarkobject(
       return;
 
     case 3:
-      current = reinterpret_cast<GCObject*>(current->u.metatable);
+      current = valtogco(current->u.metatable);
       if (current != nullptr && (current->gch.marked & 0x11u) == 0u) {
         current->gch.marked |= 1u;
         if (static_cast<unsigned int>(current->gch.tt - LUA_TTABLE) <= 5u) {
@@ -405,7 +405,7 @@ extern "C" void traversetable(
   bool weakkey = false;
   bool weakvalue = false;
   if ((metatable->marked & 0x11u) == 0u) {
-    reallymarkobject(st, reinterpret_cast<GCObject*>(metatable));
+    reallymarkobject(st, valtogco(metatable));
   }
 
   if ((metatable->flags & 4) == 0 && sKeepWeakTablesOf.load(std::memory_order_relaxed) != st->g) {
@@ -428,7 +428,7 @@ extern "C" void traversetable(
 
     GCObject** const weaklist = weakkey ? (weakvalue ? &st->wkv : &st->wk) : &st->wv;
     h->gclist = *weaklist;
-    *weaklist = reinterpret_cast<GCObject*>(h);
+    *weaklist = valtogco(h);
   }
 
   if (!weakvalue) {
@@ -475,7 +475,7 @@ extern "C" void traverseproto(
   for (int index = 0; index < f->sizep; ++index) {
     Proto* const nested = f->p[index];
     if ((nested->marked & 0x11u) == 0u) {
-      reallymarkobject(st, reinterpret_cast<GCObject*>(nested));
+      reallymarkobject(st, valtogco(nested));
     }
   }
 
@@ -499,9 +499,7 @@ extern "C" void traverseproto(
           static_cast<const void*>(varname),
           static_cast<const void*>(f->code),
           f->sizecode,
-          reinterpret_cast<const void*>(
-            reinterpret_cast<std::uintptr_t>(f->code) + sizeof(Instruction) * static_cast<std::size_t>(f->sizecode)
-          ),
+          static_cast<const void*>(f->code + f->sizecode),
           static_cast<const void*>(f->k),
           f->sizek,
           static_cast<const void*>(f->p),
@@ -558,7 +556,7 @@ extern "C" void traverselclosure(
   }
 
   if (cl->p != nullptr && (cl->p->marked & 0x11u) == 0u) {
-    reallymarkobject(st, reinterpret_cast<GCObject*>(cl->p));
+    reallymarkobject(st, valtogco(cl->p));
   }
 
   for (int index = 0; index < cl->nupvalues; ++index) {
@@ -660,8 +658,7 @@ extern "C" void cleartablekeys(
     }
   };
 
-  for (Table* table = reinterpret_cast<Table*>(tableList); table != nullptr;
-       table = reinterpret_cast<Table*>(static_cast<GCObject*>(table->gclist))) {
+  for (Table* table = &tableList->h; table != nullptr; table = &(static_cast<GCObject*>(table->gclist))->h) {
     const int nodeCount = 1 << table->lsizenode;
     for (int nodeIndex = nodeCount; nodeIndex != 0; --nodeIndex) {
       Node& node = table->node[nodeIndex - 1];
@@ -696,8 +693,7 @@ extern "C" void cleartablevalues(
     }
   };
 
-  for (Table* table = reinterpret_cast<Table*>(tableList); table != nullptr;
-       table = reinterpret_cast<Table*>(static_cast<GCObject*>(table->gclist))) {
+  for (Table* table = &tableList->h; table != nullptr; table = &(static_cast<GCObject*>(table->gclist))->h) {
     for (int arrayIndex = table->sizearray; arrayIndex != 0; --arrayIndex) {
       LuaPlus::TObject& valueSlot = table->array[arrayIndex - 1];
       markStringValue(valueSlot);
@@ -753,19 +749,19 @@ extern "C" void freeobj(
 {
   switch (object->gch.tt) {
   case LUA_TPROTO:
-    luaF_freeproto(state, reinterpret_cast<Proto*>(object));
+    luaF_freeproto(state, &object->p);
     break;
   case LUA_TFUNCTION:
-    luaF_freeclosure(state, reinterpret_cast<Closure*>(object));
+    luaF_freeclosure(state, &object->cl);
     break;
   case LUA_TUPVALUE:
-    luaM_freelem<UpVal>(state, reinterpret_cast<UpVal*>(object));
+    luaM_freelem<UpVal>(state, &object->uv);
     break;
   case LUA_TTABLE:
-    luaH_free(state, reinterpret_cast<Table*>(object));
+    luaH_free(state, &object->h);
     break;
   case LUA_TTHREAD:
-    luaE_freethread(state, reinterpret_cast<lua_State*>(object));
+    luaE_freethread(state, &object->th);
     break;
   case LUA_TSTRING: {
     // `len + 21` in the binary (0x00915950), which is exactly what
@@ -775,7 +771,7 @@ extern "C" void freeobj(
     // bytes that were never allocated and `nblocks` drifted below
     // the true total - eventually underflowing and leaving the
     // collector running against a bogus threshold.
-    const auto* const ts = reinterpret_cast<const TString*>(object);
+    const auto* const ts = &object->ts;
     (void)luaM_reallocblock(state, object, sizestring(ts->len), {0u, 0u});
     break;
   }
@@ -787,7 +783,7 @@ extern "C" void freeobj(
     // `GCthreshold`, so `luaC_checkGC` ran a full collection on every
     // single allocation from then on. Must mirror the allocation in
     // `luaS_newudata` exactly.
-    const auto* const ud = reinterpret_cast<const Udata*>(object);
+    const auto* const ud = &object->u;
     const auto* const type = ud->type;
     (void)luaM_reallocblock(state, object, sizeudata(type), {0u, 0u});
     break;
@@ -940,7 +936,7 @@ void markroot(
 
   traversestack(gcGlobals->mainthread, st);
   if (state != gcGlobals->mainthread && (state->marked & 0x11u) == 0u) {
-    reallymarkobject(st, reinterpret_cast<GCObject*>(state));
+    reallymarkobject(st, valtogco(state));
   }
 
   if (globalState->userGCFunction != nullptr) {

@@ -112,13 +112,6 @@ namespace
     return self->mVisionHandle;
   }
 
-  [[maybe_unused]] [[nodiscard]] const VisionDB::Handle* GetUserUnitVisionHandle(
-    const UserUnit* const self
-  ) noexcept
-  {
-    return self->mVisionHandle;
-  }
-
   /**
    * Address: 0x008C06A0 (FUN_008C06A0)
    *

@@ -38,7 +38,7 @@ namespace moho
    * Clears reflected base/field vector lanes for one `CCommandDBTypeInfo`
    * instance while preserving outer storage ownership.
    */
-  [[maybe_unused]] void DestroyCCommandDbTypeInfoBody(
+  void DestroyCCommandDbTypeInfoBody(
     CCommandDBTypeInfo* const typeInfo
   ) noexcept
   {

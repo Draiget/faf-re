@@ -368,14 +368,6 @@ namespace moho
       return nullptr;
     }
 
-    [[maybe_unused]] [[nodiscard]] const RRuleGameRulesLuaExportBinding* FindExportBinding(
-      const RRuleGameRulesImpl& rules,
-      LuaPlus::LuaState* const rootState
-    ) noexcept
-    {
-      return FindExportBinding(const_cast<RRuleGameRulesImpl&>(rules), rootState);
-    }
-
     /**
      * Address: 0x0052DBE0 (FUN_0052DBE0, `fa::vector<
      * RRuleGameRulesLuaExportBinding>::insert(pos, count, value)`, cited in

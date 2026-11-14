@@ -73,7 +73,7 @@ namespace
     void* obj
   ) noexcept
   {
-    return reinterpret_cast<moho::IFormationInstance**>(obj);
+    return static_cast<moho::IFormationInstance**>(obj);
   }
 
   [[nodiscard]] gpg::RRef MakeIFormationInstanceRef(

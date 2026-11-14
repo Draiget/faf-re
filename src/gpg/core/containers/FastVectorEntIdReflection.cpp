@@ -58,7 +58,7 @@ namespace
 
     gpg::RType* const entIdType = CachedEntIdType();
     const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-    auto& elements = *static_cast<gpg::core::FastVectorInline<unsigned int>*>(storage);
+    auto& elements = *static_cast<gpg::core::FastVectorInline<moho::EntId>*>(storage);
     for (unsigned int i = 0; i < count; ++i) {
       archive->Read(entIdType, elements.Data() + (i), owner);
     }
@@ -85,7 +85,7 @@ namespace
       return;
     }
 
-    const auto& elements = *static_cast<const gpg::core::FastVectorInline<unsigned int>*>(storage);
+    const auto& elements = *static_cast<const gpg::core::FastVectorInline<moho::EntId>*>(storage);
     const unsigned int count = elements.Data() ? static_cast<unsigned int>(elements.Size()) : 0u;
     archive->WriteUInt(count);
 
@@ -206,9 +206,9 @@ gpg::RRef gpg::RFastVectorType<moho::EntId>::SubscriptIndex(
   const int ind
 ) const
 {
-  auto& elements = *static_cast<gpg::core::FastVectorInline<unsigned int>*>(obj);
+  auto& elements = *static_cast<gpg::core::FastVectorInline<moho::EntId>*>(obj);
   gpg::RRef out{};
-  out = gpg::MakeRRef<std::int32_t>(reinterpret_cast<std::int32_t*>(elements.Data() + (static_cast<std::size_t>(ind))));
+  out = gpg::MakeRRef<std::int32_t>(elements.Data() + static_cast<std::size_t>(ind));
   return out;
 }
 
@@ -219,7 +219,7 @@ size_t gpg::RFastVectorType<moho::EntId>::GetCount(
   void* obj
 ) const
 {
-  const auto& elements = *static_cast<const gpg::core::FastVectorInline<unsigned int>*>(obj);
+  const auto& elements = *static_cast<const gpg::core::FastVectorInline<moho::EntId>*>(obj);
   return elements.Size();
 }
 

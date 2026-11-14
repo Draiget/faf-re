@@ -1004,7 +1004,7 @@ namespace moho
    */
   CEntityDbAllUnitsNode* EntityDB::AllUnitsHead() const noexcept
   {
-    return reinterpret_cast<CEntityDbAllUnitsNode*>(const_cast<void*>(mAllUnits.header_ptr()));
+    return static_cast<CEntityDbAllUnitsNode*>(const_cast<void*>(mAllUnits.header_ptr()));
   }
 
   /**

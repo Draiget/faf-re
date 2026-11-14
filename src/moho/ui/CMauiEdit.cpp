@@ -76,7 +76,7 @@ namespace
    * What it does:
    * Reads edit-bound font height lane (`0.0f` when font is missing).
    */
-  [[maybe_unused]] float ReadEditFontHeightLane(
+  float ReadEditFontHeightLane(
     const CMauiEdit* const edit
   ) noexcept
   {
@@ -90,7 +90,7 @@ namespace
    * What it does:
    * Enables background rendering and stores edit background color lane.
    */
-  [[maybe_unused]] CMauiEdit* EnableEditBackgroundAndWriteColor(
+  CMauiEdit* EnableEditBackgroundAndWriteColor(
     CMauiEdit* const edit,
     const std::uint32_t color
   ) noexcept
@@ -106,7 +106,7 @@ namespace
    * What it does:
    * Returns whether selection start/end lanes differ.
    */
-  [[maybe_unused]] bool HasEditSelectionRange(
+  bool HasEditSelectionRange(
     const CMauiEdit* const edit
   ) noexcept
   {
@@ -120,7 +120,7 @@ namespace
    * Writes edit input/caret-enabled lanes; when disabling, also abandons
    * keyboard focus through virtual dispatch path.
    */
-  [[maybe_unused]] bool WriteEditInputEnabledAndCaretVisible(
+  bool WriteEditInputEnabledAndCaretVisible(
     moho::CMauiEdit* const edit,
     const bool enabled
   )
@@ -1196,7 +1196,7 @@ moho::CScrLuaInitForm* moho::func_CMauiEditSetNewCaretColor_LuaFuncDef()
  * What it does:
  * Masks one caret color lane to RGB24 and stores it in edit runtime state.
  */
-[[maybe_unused]] static std::uint32_t func_SetEditCaretColorRgb24(
+static std::uint32_t func_SetEditCaretColorRgb24(
   moho::CMauiEdit* const edit,
   const std::uint32_t color
 ) noexcept

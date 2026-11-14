@@ -1133,7 +1133,7 @@ namespace moho
     ClearCartographicBatchList(*this);
 
     std::int32_t batchCount = 0;
-    reader.Read(reinterpret_cast<char*>(&batchCount), sizeof(batchCount));
+    reader.Read(&batchCount, sizeof(batchCount));
 
     while (batchCount > 0) {
       CartographicDecalBatch localBatch(version, reader);
@@ -1227,7 +1227,7 @@ namespace moho
 
     // 3. Decal payload count.
     std::int32_t decalCount = 0;
-    reader.Read(reinterpret_cast<char*>(&decalCount), sizeof(decalCount));
+    reader.Read(&decalCount, sizeof(decalCount));
 
     // 4. Per-decal nine-float instance payload. The binary splits the
     //    36 bytes into 8 + 4 + 8 + 8 + 8 byte reads with the middle
@@ -1238,15 +1238,15 @@ namespace moho
     for (std::int32_t remaining = decalCount; remaining > 0; --remaining) {
       CartographicDecal decal{};
 
-      reader.Read(reinterpret_cast<char*>(&decal.mVertexData[0]), 8u);
+      reader.Read(&decal.mVertexData[0], 8u);
 
       float lane2 = 0.0f;
-      reader.Read(reinterpret_cast<char*>(&lane2), 4u);
+      reader.Read(&lane2, 4u);
       decal.mVertexData[2] = lane2;
 
-      reader.Read(reinterpret_cast<char*>(&decal.mVertexData[3]), 8u);
-      reader.Read(reinterpret_cast<char*>(&decal.mVertexData[5]), 8u);
-      reader.Read(reinterpret_cast<char*>(&decal.mVertexData[7]), 8u);
+      reader.Read(&decal.mVertexData[3], 8u);
+      reader.Read(&decal.mVertexData[5], 8u);
+      reader.Read(&decal.mVertexData[7], 8u);
 
       AppendCartographicDecalListNodeBeforeSentinel(mDecals, decal);
     }

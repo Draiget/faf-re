@@ -404,7 +404,7 @@ bool CLobbyPeerFeatures::Receive(
       CMessage reply(ELobbyMsg::LOBMSG_PeerFeatures);
       CMessageStream stream(reply);
       stream.Write(kKindChallenge);
-      stream.Write(reinterpret_cast<const char*>(state.challenge.data()), state.challenge.size());
+      stream.Write(state.challenge.data(), state.challenge.size());
       peer.peerConnection->Write(reply);
     }
     return false;
@@ -424,8 +424,8 @@ bool CLobbyPeerFeatures::Receive(
     CMessage reply(ELobbyMsg::LOBMSG_PeerFeatures);
     CMessageStream stream(reply);
     stream.Write(kKindProof);
-    stream.Write(reinterpret_cast<const char*>(mLocalStyle.data()), mLocalStyle.size());
-    stream.Write(reinterpret_cast<const char*>(signature.data()), signature.size());
+    stream.Write(mLocalStyle.data(), mLocalStyle.size());
+    stream.Write(signature.data(), signature.size());
     peer.peerConnection->Write(reply);
     return false;
   }

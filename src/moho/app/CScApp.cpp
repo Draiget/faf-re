@@ -1411,9 +1411,9 @@ bool CScApp::Init()
   if (context->GetHeadCount() > 0) {
     const gpg::gal::Head& primaryHead = context->GetHead(0);
     if (primaryHead.mWindowed && primaryHead.mHandle != nullptr) {
-      PublishWindowedPresentationBounds(reinterpret_cast<HWND>(primaryHead.mHandle));
+      PublishWindowedPresentationBounds(static_cast<HWND>(primaryHead.mHandle));
     } else if (!primaryHead.mWindowed && primaryHead.mHandle != nullptr && moho::USER_DebugFacilitiesEnabled()) {
-      (void)AppendLuaDebuggerSystemMenu(reinterpret_cast<HWND>(primaryHead.mHandle));
+      (void)AppendLuaDebuggerSystemMenu(static_cast<HWND>(primaryHead.mHandle));
     }
   }
 

@@ -104,7 +104,7 @@ namespace moho
   public:
     fa::string mVariableName{};                                    // +0x00
     fa::string mEffectFileName{};                                  // +0x1C
-    CD3DEffect::AttachedLink mEffectLink{};                        // +0x38
+    WeakPtr<CD3DEffect> mEffectLink{};                             // +0x38
     std::shared_ptr<gpg::gal::EffectVariable> mEffectVariable{};   // +0x40
   };
 

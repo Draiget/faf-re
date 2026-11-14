@@ -562,10 +562,10 @@ static void close_state(
  */
 void lua_setusergcfunction(
   lua_State* const state,
-  void(__cdecl* userGCFunction)(void*)
+  void(__cdecl* userGCFunction)(GCState*)
 )
 {
-  state->l_G->userGCFunction = reinterpret_cast<void(__cdecl*)(GCState*)>(userGCFunction);
+  state->l_G->userGCFunction = userGCFunction;
 }
 
 /**
@@ -640,7 +640,7 @@ lua_State* lua_newthread(
   luaC_checkGC(state);
 
   lua_State* const newThread = luaE_newthread(state);
-  auto* const threadObject = reinterpret_cast<GCObject*>(newThread);
+  auto* const threadObject = valtogco(newThread);
   TObject* const top = state->top;
   top->tt = static_cast<int>(threadObject->gch.tt);
   top->value.p = threadObject;

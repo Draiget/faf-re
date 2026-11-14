@@ -109,7 +109,7 @@ void CPeerFeatures::SendKeyTo(
   CMessageStream stream(message);
   stream.Write(static_cast<std::uint8_t>(EPeerMessageKind::RejoinKey));
   const SRejoinPublicKey& key = REJOIN_PublicKey();
-  stream.Write(reinterpret_cast<const char*>(key.data()), key.size());
+  stream.Write(key.data(), key.size());
   peer.Process(message);
 }
 

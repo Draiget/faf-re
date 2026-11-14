@@ -322,7 +322,7 @@ namespace moho
     outTransform->pos_.y = 0.0f;
     outTransform->pos_.z = 0.0f;
 
-    reader->Read(reinterpret_cast<char*>(outTransform), sizeof(VTransform));
+    reader->Read(outTransform, sizeof(VTransform));
     return outTransform;
   }
 

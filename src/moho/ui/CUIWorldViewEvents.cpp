@@ -589,7 +589,7 @@ void moho::CBuildDragPreview::RefreshQueuedBuildGhosts()
  * Initializes one build-drag stepping lane from start/end world XZ
  * coordinates, deriving normalized per-step deltas and integer step count.
  */
-[[maybe_unused]] static void InitBuildDragStepState(
+static void InitBuildDragStepState(
   SBuildDragStep* const state,
   const float stepLength,
   const float startX,
@@ -903,7 +903,7 @@ void moho::UIBuildDragger::DragRelease(
  * Thin forwarding lane that adapts drag-step initializer arguments and
  * returns the same state pointer.
  */
-[[maybe_unused]] static SBuildDragStep* InitBuildDragStepStateAndReturnState(
+static SBuildDragStep* InitBuildDragStepStateAndReturnState(
   SBuildDragStep* const state,
   const float stepLength,
   const float startX,

@@ -245,7 +245,7 @@ namespace gpg
   private:
     struct StreamBuffer : DListItem<StreamBuffer>
     {
-      std::uint8_t bytes[0x1000]{};
+      char bytes[0x1000]{};
     };
     static_assert(sizeof(StreamBuffer) == 0x1008, "PipeBuf::StreamBuffer size must be 0x1008");
 
@@ -255,8 +255,8 @@ namespace gpg
 
     std::mutex mMutex{};
     DList<StreamBuffer, void> mChunks{};
-    std::uint8_t* mReadLimit{};
-    std::uint8_t* mWriteCommit{};
+    char* mReadLimit{};
+    char* mWriteCommit{};
   };
 
   /**

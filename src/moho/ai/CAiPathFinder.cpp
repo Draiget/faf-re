@@ -94,7 +94,7 @@ namespace
    * What it does:
    * Copies one packed `HPathCell` lane into destination storage.
    */
-  [[maybe_unused]] [[nodiscard]] moho::HPathCell* CopyPackedPathCell(
+  [[nodiscard]] moho::HPathCell* CopyPackedPathCell(
     moho::HPathCell* const outCell,
     const moho::HPathCell* const sourceCell
   ) noexcept
@@ -113,7 +113,7 @@ namespace
    * What it does:
    * Returns the owner-unit alt-footprint mode flag byte.
    */
-  [[maybe_unused]] [[nodiscard]] std::uint8_t ReadUnitAltFootprintFlag(
+  [[nodiscard]] std::uint8_t ReadUnitAltFootprintFlag(
     const moho::Unit* const unit
   ) noexcept
   {
@@ -126,7 +126,7 @@ namespace
    * What it does:
    * Returns whether one path-finder currently has an active queued-path flag.
    */
-  [[maybe_unused]] [[nodiscard]] std::uint8_t ReadPathFinderQueuedFlag(
+  [[nodiscard]] std::uint8_t ReadPathFinderQueuedFlag(
     const moho::CAiPathFinder& pathFinder
   ) noexcept
   {
@@ -139,7 +139,7 @@ namespace
    * What it does:
    * Stores one raw search-mode lane into the path-finder search-type field.
    */
-  [[maybe_unused]] [[nodiscard]] moho::CAiPathFinder* SetPathFinderSearchModeRaw(
+  [[nodiscard]] moho::CAiPathFinder* SetPathFinderSearchModeRaw(
     moho::CAiPathFinder* const pathFinder,
     const std::int32_t mode
   ) noexcept
@@ -158,7 +158,7 @@ namespace
    * What it does:
    * Stores one goal-boundary probe mode flag byte onto a path-finder.
    */
-  [[maybe_unused]] [[nodiscard]] moho::CAiPathFinder* SetPathFinderGoalBoundaryProbeFlag(
+  [[nodiscard]] moho::CAiPathFinder* SetPathFinderGoalBoundaryProbeFlag(
     moho::CAiPathFinder* const pathFinder,
     const std::uint8_t enabled
   ) noexcept
@@ -349,11 +349,12 @@ namespace
    */
   void WriteNavPathListeners(
     gpg::WriteArchive* const archive,
-    moho::Broadcaster<const moho::SNavPath&>* const listHead,
+    void* const objectPtr,
     const int,
     gpg::RRef* const ownerRef
   )
   {
+    auto* const listHead = static_cast<moho::Broadcaster<const moho::SNavPath&>*>(objectPtr);
     if (archive == nullptr || listHead == nullptr) {
       return;
     }
@@ -399,8 +400,8 @@ void moho::RBroadcasterRType_NavPath::Init()
   );
   size_ = sizeof(moho::Broadcaster<const moho::SNavPath&>);
   version_ = 1;
-  serLoadFunc_ = reinterpret_cast<load_func_t>(reinterpret_cast<void (*)()>(&gpg::ReadAndLinkNavPathListeners));
-  serSaveFunc_ = reinterpret_cast<save_func_t>(reinterpret_cast<void (*)()>(&WriteNavPathListeners));
+  serLoadFunc_ = &gpg::ReadAndLinkNavPathListeners;
+  serSaveFunc_ = &WriteNavPathListeners;
 }
 
 /**

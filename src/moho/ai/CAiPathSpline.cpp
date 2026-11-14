@@ -1206,7 +1206,7 @@ void CAiPathSpline::Generate(
     static_cast<int>(std::lrintf(destination.z - (static_cast<float>(footprint.mSizeZ) * 0.5f)));
   [[maybe_unused]] const int destinationCellX =
     static_cast<int>(std::lrintf(destination.x - (static_cast<float>(footprint.mSizeX) * 0.5f)));
-  [[maybe_unused]] const VAxes3 orientationAxes(unit->GetTransform().orient_);
+  const VAxes3 orientationAxes(unit->GetTransform().orient_);
 
   float deltaX = destination.x - point.mPosition.x;
   float deltaZ = destination.z - point.mPosition.z;

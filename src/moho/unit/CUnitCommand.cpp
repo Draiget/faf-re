@@ -243,13 +243,6 @@ namespace
     return static_cast<Broadcaster<ECommandEvent>*>(command);
   }
 
-  [[maybe_unused]] [[nodiscard]] const void* BroadcasterSubobjectPtr(
-    const CUnitCommand* const command
-  ) noexcept
-  {
-    return static_cast<const Broadcaster<ECommandEvent>*>(command);
-  }
-
 } // namespace
 
 namespace moho

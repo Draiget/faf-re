@@ -453,9 +453,7 @@ void Sim::SerializeLoadBody(
     // The entities' load rebuilt these bits differently from play: a prop's footprint is not
     // occupied again, and a release clears cells a neighbour also covers until something re-marks them.
     for (gpg::BitArray2D* const bits : {&mOGrid->terrainOccupation, &mOGrid->waterOccupation, &mOGrid->mOccupation}) {
-      archive->ReadBytes(
-        reinterpret_cast<char*>(bits->ptr), static_cast<std::size_t>(bits->size) * sizeof(std::int32_t)
-      );
+      archive->ReadBytes(bits->ptr, static_cast<std::size_t>(bits->size) * sizeof(std::int32_t));
     }
   }
 }
@@ -609,9 +607,7 @@ void Sim::SerializeSaveBody(
     mPathTables->SaveExact(archive);
     mOGrid->mEntityOccupationManager.SaveBucketOrder(archive, *mEntityDB);
     for (gpg::BitArray2D* const bits : {&mOGrid->terrainOccupation, &mOGrid->waterOccupation, &mOGrid->mOccupation}) {
-      archive->WriteBytes(
-        reinterpret_cast<char*>(bits->ptr), static_cast<std::size_t>(bits->size) * sizeof(std::int32_t)
-      );
+      archive->WriteBytes(bits->ptr, static_cast<std::size_t>(bits->size) * sizeof(std::int32_t));
     }
   }
 }

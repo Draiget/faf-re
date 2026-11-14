@@ -46,7 +46,7 @@ namespace
    * What it does:
    * Assigns one retained frame owner into one weak self-owner lane.
    */
-  [[maybe_unused]] std::weak_ptr<moho::CMauiFrame>* AssignFrameWeakSelfFromSharedOwner(
+  std::weak_ptr<moho::CMauiFrame>* AssignFrameWeakSelfFromSharedOwner(
     const std::shared_ptr<moho::CMauiFrame>& owner,
     std::weak_ptr<moho::CMauiFrame>* const destination
   )

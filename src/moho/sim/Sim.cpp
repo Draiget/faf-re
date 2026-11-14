@@ -1,5 +1,6 @@
 #include "moho/lua/ScrLuaUserData.h"
 #include "moho/sim/SimPrivate2.h"
+#include "moho/sim/SimConVarAccess.h"
 #include "moho/entity/EntityMemoryManager.h"
 #include "moho/sim/SimBlockLane.h"
 
@@ -845,27 +846,24 @@ namespace moho
    *
    * What it does:
    * Publishes the accepted/rejected path's cells to the owning army through
-   * `CArmyImpl::SetUnknownVectorWithMeta` (vtable slot +0x5C on the owner),
-   * reusing the same generic word-vector-with-meta payload
-   * (`Moho::SArmyVectorWithMeta`) `CArmyImpl` uses for its variable-data copy
-   * lane: each 4-byte `SOCellPos` cell is packed into one `mWords` element and
-   * the previous footprint pointer is carried in `mMetaWord`. Clears the
-   * active footprint lane before publishing.
+   * `CArmyImpl::SetPathPreview` (vtable slot +0x5C on the owner), with the
+   * footprint it was searched with. Clears the active footprint lane before
+   * publishing.
    */
   void PathPreviewFinder::OnPathAccepted(
     const SNavPath& path
   )
   {
-    SArmyVectorWithMeta payload{};
+    SArmyPathPreview preview{};
     const std::size_t cellCount = path.Count();
-    payload.mWords.resize(cellCount);
+    preview.mCells.resize(cellCount);
     for (std::size_t i = 0; i < cellCount; ++i) {
-      payload.mWords[i] = std::bit_cast<std::uint32_t>(path.start[i]);
+      preview.mCells[i] = path.start[i];
     }
-    payload.mMetaWord = reinterpret_cast<std::uintptr_t>(mFootprint);
+    preview.mFootprint = mFootprint;
     mFootprint = nullptr;
 
-    mOwnerContext->SetUnknownVectorWithMeta(&payload);
+    mOwnerContext->SetPathPreview(preview);
   }
 
   bool PathPreviewFinder::ShouldSearchRect(
@@ -905,8 +903,7 @@ namespace moho
    */
   std::int32_t PathPreviewFinder::GetPathcap() const
   {
-    CSimConVarInstanceBase* const instance = mSim->GetSimVar(&gSimConVar_path_TimeoutPreview);
-    return *reinterpret_cast<const std::int32_t*>(instance->GetValueStorage());
+    return ReadSimConVar(mSim, gSimConVar_path_TimeoutPreview);
   }
 
   // Address: 0x007647D0 (FUN_007647D0) -- clears one output result-cell lane.
@@ -1162,8 +1159,7 @@ namespace moho
         std::shared_ptr<void> clearedSlot;
         focusArmy->SetUnknownSharedRef(&clearedSlot);
 
-        SArmyVectorWithMeta clearedPayload{};
-        focusArmy->SetUnknownVectorWithMeta(&clearedPayload);
+        focusArmy->SetPathPreview(SArmyPathPreview{});
       }
     }
 

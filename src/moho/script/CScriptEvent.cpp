@@ -431,7 +431,7 @@ namespace
    * What it does:
    * Assigns `newRefFunc_` and `ctorRefFunc_` callback lanes on one RType.
    */
-  [[maybe_unused]] gpg::RType* ConfigureScriptEventRefCreateCallbacks(
+  gpg::RType* ConfigureScriptEventRefCreateCallbacks(
     gpg::RType* const typeInfo
   )
   {
@@ -446,7 +446,7 @@ namespace
    * What it does:
    * Assigns `deleteFunc_` and `dtrFunc_` callback lanes on one RType.
    */
-  [[maybe_unused]] gpg::RType* ConfigureScriptEventRefDestroyCallbacks(
+  gpg::RType* ConfigureScriptEventRefDestroyCallbacks(
     gpg::RType* const typeInfo
   )
   {
@@ -461,7 +461,7 @@ namespace
    * What it does:
    * Assigns all reflection object-lifecycle callback lanes on one RType.
    */
-  [[maybe_unused]] gpg::RType* ConfigureScriptEventRefCallbacks(
+  gpg::RType* ConfigureScriptEventRefCallbacks(
     gpg::RType* const typeInfo
   )
   {

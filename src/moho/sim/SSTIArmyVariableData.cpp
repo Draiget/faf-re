@@ -24,27 +24,6 @@ namespace
     return sInstance;
   }
 
-  /**
-   * Address: 0x00704250 (FUN_00704250)
-   *
-   * What it does:
-   * Copies one contiguous 32-bit range `[sourceBegin, sourceEnd)` into
-   * destination storage and returns one-past the last written slot.
-   */
-  std::uint32_t* CopyWordRangeForward(
-    std::uint32_t* destination,
-    const std::uint32_t* sourceBegin,
-    const std::uint32_t* const sourceEnd
-  ) noexcept
-  {
-    while (sourceBegin != sourceEnd) {
-      *destination = *sourceBegin;
-      ++destination;
-      ++sourceBegin;
-    }
-    return destination;
-  }
-
   struct SSTIArmyVariableDataOwnerSlot
   {
     std::uint8_t reserved00_7F[0x80]{};
@@ -84,7 +63,6 @@ namespace moho
     , mHandicapExtra(0.0f)
   {
     std::memset(&mEconomyTotals, 0, sizeof(mEconomyTotals));
-    mWordVectorWithMeta.mMetaWord = 0u;
     mCategoryFilterSet.ResetToEmpty(EntityCategoryHelper{});
     mArmyStart = Wm3::Vector2f(0.0f, 0.0f);
     mNoRushOffset = Wm3::Vector2f(0.0f, 0.0f);
@@ -112,7 +90,7 @@ namespace moho
     , mArmyType(other.mArmyType)
     , mFaction(other.mFaction)
     , mUseWholeMap(other.mUseWholeMap)
-    , mWordVectorWithMeta(other.mWordVectorWithMeta)
+    , mPathPreview(other.mPathPreview)
     , mShowScore(other.mShowScore)
     , mCategoryFilterSet(other.mCategoryFilterSet)
     , mIsOutOfGame(other.mIsOutOfGame)
@@ -139,32 +117,6 @@ namespace moho
    * Tears down set/vector/string member lanes for one army-variable payload.
    */
   SSTIArmyVariableData::~SSTIArmyVariableData() = default;
-
-  /**
-   * Address: 0x007011C0 (FUN_007011C0)
-   */
-  void SArmyVectorWithMeta::CopyWordPayloadFrom(
-    const SArmyVectorWithMeta& source
-  )
-  {
-    if (this == &source) {
-      return;
-    }
-
-    mWords.resize(source.mWords.size());
-    (void)CopyWordRangeForward(mWords.data(), source.mWords.data(), source.mWords.data() + source.mWords.size());
-  }
-
-  /**
-   * Member-wise copy constructor. `mWords`' own copy constructor is what the
-   * engine emitted at 0x00560A90; the body says nothing.
-   */
-  SArmyVectorWithMeta::SArmyVectorWithMeta(
-    const SArmyVectorWithMeta& other
-  )
-    : mWords(other.mWords)
-    , mMetaWord(other.mMetaWord)
-  {}
 
   /**
    * Address: 0x00551270 (FUN_00551270, Moho::SSTIArmyVariableData::MemberDeserialize)

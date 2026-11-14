@@ -44,7 +44,7 @@ namespace
   /**
    * Address: 0x00509CF0 (FUN_00509CF0, STIMap RTTI cache resolve duplicate)
    */
-  [[maybe_unused]] [[nodiscard]] gpg::RType* CachedSTIMapTypeVariant2()
+  [[nodiscard]] gpg::RType* CachedSTIMapTypeVariant2()
   {
     return CachedSTIMapTypeVariant1();
   }

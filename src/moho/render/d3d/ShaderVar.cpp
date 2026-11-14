@@ -84,7 +84,7 @@ namespace
     const moho::ShaderVar& shaderVar
   ) noexcept
   {
-    return reinterpret_cast<moho::CD3DEffect*>(shaderVar.mEffectLink.mLinkLane);
+    return shaderVar.mEffectLink.GetObjectPtr();
   }
 
   /**
@@ -99,25 +99,7 @@ namespace
     moho::CD3DEffect* const effect
   ) noexcept
   {
-    moho::CD3DEffect* const currentOwner = ResolveOwnerEffect(shaderVar);
-    if (currentOwner != effect) {
-      if (currentOwner != nullptr) {
-        moho::CD3DEffect::AttachedLink** it = &currentOwner->mAttachedLinks;
-        while (*it != &shaderVar.mEffectLink) {
-          it = &((*it)->mNext);
-        }
-        *it = shaderVar.mEffectLink.mNext;
-      }
-
-      shaderVar.mEffectLink.mLinkLane = reinterpret_cast<moho::CD3DEffect::AttachedLink*>(effect);
-      if (effect != nullptr) {
-        shaderVar.mEffectLink.mNext = effect->mAttachedLinks;
-        effect->mAttachedLinks = &shaderVar.mEffectLink;
-      } else {
-        shaderVar.mEffectLink.mNext = nullptr;
-      }
-    }
-
+    shaderVar.mEffectLink.ResetFromObject(effect);
     return shaderVar;
   }
 
@@ -175,8 +157,7 @@ namespace moho
     shaderVar->mEffectFileName.tidy(true, 0U);
     shaderVar->mEffectFileName.assign_owned(safeEffectFileName);
 
-    shaderVar->mEffectLink.mLinkLane = nullptr;
-    shaderVar->mEffectLink.mNext = nullptr;
+    shaderVar->mEffectLink.ClearLinkState();
     shaderVar->mEffectVariable.reset();
     return shaderVar;
   }

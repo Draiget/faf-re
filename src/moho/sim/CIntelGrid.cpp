@@ -140,7 +140,7 @@ namespace
   /**
    * Address: 0x005089C0 (FUN_005089C0, STIMap unowned pointer write helper)
    */
-  [[maybe_unused]] [[nodiscard]] gpg::WriteArchive* WriteUnownedSTIMapPointerVariant1(
+  [[nodiscard]] gpg::WriteArchive* WriteUnownedSTIMapPointerVariant1(
     moho::STIMap* const* const mapSlot,
     gpg::WriteArchive* const archive,
     const gpg::RRef& ownerRef
@@ -159,7 +159,7 @@ namespace
   /**
    * Address: 0x00508A40 (FUN_00508A40, STIMap unowned pointer read helper)
    */
-  [[maybe_unused]] [[nodiscard]] gpg::ReadArchive* ReadUnownedSTIMapPointerVariant1(
+  [[nodiscard]] gpg::ReadArchive* ReadUnownedSTIMapPointerVariant1(
     const gpg::RRef& ownerRef,
     gpg::ReadArchive* const archive,
     moho::STIMap** const mapSlot
@@ -174,7 +174,7 @@ namespace
   /**
    * Address: 0x00508A50 (FUN_00508A50, CIntelGrid RRef fill helper)
    */
-  [[maybe_unused]] [[nodiscard]] gpg::RRef* FillCIntelGridRef(
+  [[nodiscard]] gpg::RRef* FillCIntelGridRef(
     moho::CIntelGrid* const value,
     gpg::RRef* const outRef
   )

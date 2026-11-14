@@ -1166,7 +1166,7 @@ namespace
    * What it does:
    * Returns frame count from one bitmap frame-pattern vector lane.
    */
-  [[maybe_unused]] std::int32_t CountBitmapFramePatternEntries(
+  std::int32_t CountBitmapFramePatternEntries(
     const moho::CMauiBitmap* const bitmap
   ) noexcept
   {

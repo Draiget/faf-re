@@ -94,7 +94,7 @@ int addk(
   functionProto->k[functionState->nk] = *valueObject;
   faf_lua51_gc_barrier_value(
     functionState->L,
-    reinterpret_cast<GCObject*>(functionProto),
+    valtogco(functionProto),
     valueObject
   ); // Lua 5.1.5 lcode.c: addk() constant barrier
 
@@ -583,7 +583,7 @@ Table* luaH_new(
 )
 {
   Table* const table = luaM_new<Table>(state);
-  luaC_link(state, reinterpret_cast<GCObject*>(table), LUA_TTABLE);
+  luaC_link(state, valtogco(table), LUA_TTABLE);
 
   global_State* const globalState = state->l_G;
   table->metatable = DefaultTableMetatable(globalState);
@@ -934,7 +934,7 @@ int indexupvalue(
   );
 
   proto->upvalues[existingUpvalueCount] = name;
-  faf_lua51_gc_barrier_f(fs->L, reinterpret_cast<GCObject*>(proto), reinterpret_cast<GCObject*>(name));
+  faf_lua51_gc_barrier_f(fs->L, valtogco(proto), valtogco(name));
   fs->upvalues[existingUpvalueCount] = *value;
   proto->nups = static_cast<lu_byte>(existingUpvalueCount + 1);
   return existingUpvalueCount;
@@ -1021,9 +1021,9 @@ namespace
       global_State* const globalState = state->l_G;
       userdata->metatable = DefaultUserdataMetatable(globalState);
       userdata->next = globalState->rootudata;
-      globalState->rootudata = reinterpret_cast<GCObject*>(userdata);
+      globalState->rootudata = valtogco(userdata);
       sweep_boundaries::NoteLinked(
-        globalState, sweep_boundaries::kListUserdata, reinterpret_cast<GCObject*>(userdata)
+        globalState, sweep_boundaries::kListUserdata, valtogco(userdata)
       ); // engine addition: lua_ParallelSweep
     }
 
@@ -1075,9 +1075,9 @@ extern "C" Udata* luaS_newudata(
   global_State* const globalState = state->l_G;
   userdata->metatable = DefaultUserdataMetatable(globalState);
   userdata->next = globalState->rootudata;
-  globalState->rootudata = reinterpret_cast<GCObject*>(userdata);
+  globalState->rootudata = valtogco(userdata);
   sweep_boundaries::NoteLinked(
-    globalState, sweep_boundaries::kListUserdata, reinterpret_cast<GCObject*>(userdata)
+    globalState, sweep_boundaries::kListUserdata, valtogco(userdata)
   ); // engine addition: lua_ParallelSweep
   return userdata;
 }
@@ -1120,9 +1120,9 @@ namespace
     global_State* const globalState = state->l_G;
     userdata->metatable = DefaultUserdataMetatable(globalState);
     userdata->next = globalState->rootudata;
-    globalState->rootudata = reinterpret_cast<GCObject*>(userdata);
+    globalState->rootudata = valtogco(userdata);
     sweep_boundaries::NoteLinked(
-      globalState, sweep_boundaries::kListUserdata, reinterpret_cast<GCObject*>(userdata)
+      globalState, sweep_boundaries::kListUserdata, valtogco(userdata)
     ); // engine addition: lua_ParallelSweep
     return userdata;
   }

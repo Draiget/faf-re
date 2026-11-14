@@ -39,7 +39,7 @@ namespace
    * Installs all six `CAniPose` reflection reference lifecycle callbacks on one
    * `RType` lane.
    */
-  [[maybe_unused]] [[nodiscard]] gpg::RType* InstallPoseTypeInfoAllRefCallbacks(
+  [[nodiscard]] gpg::RType* InstallPoseTypeInfoAllRefCallbacks(
     gpg::RType* const result
   )
   {

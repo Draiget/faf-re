@@ -936,8 +936,8 @@ void Sim::UpdateChecksum()
 
     entityChecksum.Update(&entity->mVarDat.mCurTransform.orient_, 0x1Cu);
     if (syncLog) {
-      const float* const pos = reinterpret_cast<const float*>(&entity->mVarDat.mCurTransform.pos_);
-      const float* const rot = reinterpret_cast<const float*>(&entity->mVarDat.mCurTransform.orient_);
+      const Wm3::Vec3f& pos = entity->mVarDat.mCurTransform.pos_;
+      const Wm3::Quatf& rot = entity->mVarDat.mCurTransform.orient_;
       Logf(
         "    pos: <%7.2f,%7.2f,%7.2f> [0x%08x 0x%08x 0x%08x]\n",
         pos[0],

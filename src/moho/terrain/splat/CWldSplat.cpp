@@ -1239,11 +1239,11 @@ namespace moho
     const unsigned int version
   )
   {
-    reader.Read(reinterpret_cast<char*>(&mDecalCount), sizeof(mDecalCount));
-    reader.Read(reinterpret_cast<char*>(&mNumDecals), sizeof(mNumDecals));
+    reader.Read(&mDecalCount, sizeof(mDecalCount));
+    reader.Read(&mNumDecals, sizeof(mNumDecals));
 
     std::uint32_t decalCount = 0;
-    reader.Read(reinterpret_cast<char*>(&decalCount), sizeof(decalCount));
+    reader.Read(&decalCount, sizeof(decalCount));
     for (; decalCount != 0u; --decalCount) {
       auto* const decal = new CWldTerrainDecal(&mSpatialDb, mWldTerrain);
       decal->DecalLoad(reader);
@@ -1251,7 +1251,7 @@ namespace moho
     }
 
     std::uint32_t groupCount = 0;
-    reader.Read(reinterpret_cast<char*>(&groupCount), sizeof(groupCount));
+    reader.Read(&groupCount, sizeof(groupCount));
     for (; groupCount != 0u; --groupCount) {
       auto* const group = new CDecalGroup(0);
       group->ReadFromStream(reader, static_cast<int>(version));

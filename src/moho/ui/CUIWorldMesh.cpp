@@ -25,7 +25,7 @@ namespace moho
      * What it does:
      * Returns the lazily cached reflection descriptor for `CUIWorldMesh`.
      */
-    [[maybe_unused]] [[nodiscard]] gpg::RType* CachedCUIWorldMeshTypeBridge()
+    [[nodiscard]] gpg::RType* CachedCUIWorldMeshTypeBridge()
     {
       if (CUIWorldMesh::sType == nullptr) {
         CUIWorldMesh::sType = gpg::LookupRType(typeid(CUIWorldMesh));

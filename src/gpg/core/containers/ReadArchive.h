@@ -168,7 +168,7 @@ namespace gpg
      * Slot: 1
      * Demangled: _purecall
      */
-    virtual void ReadBytes(char*, size_t) = 0;
+    virtual void ReadBytes(void*, size_t) = 0;
 
     /**
      * Address: 0x00A82547
@@ -373,12 +373,7 @@ namespace gpg
    * relinks each non-null listener node into the intrusive ring immediately
    * before `listHead`.
    */
-  moho::Listener<const moho::SNavPath&>* ReadAndLinkNavPathListeners(
-    ReadArchive* archive,
-    moho::Broadcaster<const moho::SNavPath&>* listHead,
-    int version,
-    const gpg::RRef* ownerRef
-  );
+  void ReadAndLinkNavPathListeners(ReadArchive* archive, void* objectPtr, int version, gpg::RRef* ownerRef);
 
   /**
    * Address: 0x009048B0 (FUN_009048B0)

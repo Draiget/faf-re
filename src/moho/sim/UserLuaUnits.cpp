@@ -216,7 +216,7 @@ namespace
       return nullptr;
     }
 
-    auto* const entity = reinterpret_cast<UserEntity*>(unit);
+    UserEntity* const entity = unit;
     const std::uint32_t attachmentParentRef = entity->mVariableData.mAttachmentParentRef;
     if (attachmentParentRef == 0u || attachmentParentRef == ToRaw(EEntityIdSentinel::Invalid)) {
       return nullptr;
@@ -1252,7 +1252,7 @@ int moho::cfunc_GetAttachedUnitsListL(
         continue;
       }
 
-      UserEntity* const sourceEntity = reinterpret_cast<UserEntity*>(sourceUnit);
+      UserEntity* const sourceEntity = sourceUnit;
       CWldSession* const session = sourceEntity->mSession;
       if (session == nullptr) {
         continue;
@@ -1422,9 +1422,8 @@ int moho::cfunc_GetAssistingUnitsListL(
   const EntityCategorySet* const podStagingCategoryRange = session->mRules->GetEntityCategory("PODSTAGINGPLATFORM");
   const EntityCategorySet* const podCategoryRange = session->mRules->GetEntityCategory("POD");
   const EntityCategorySet* const podStagingCategory =
-    podStagingCategoryRange != nullptr ? reinterpret_cast<const EntityCategorySet*>(podStagingCategoryRange) : nullptr;
-  const EntityCategorySet* const podCategory =
-    podCategoryRange != nullptr ? reinterpret_cast<const EntityCategorySet*>(podCategoryRange) : nullptr;
+    podStagingCategoryRange != nullptr ? podStagingCategoryRange : nullptr;
+  const EntityCategorySet* const podCategory = podCategoryRange != nullptr ? podCategoryRange : nullptr;
   const UserArmy* const focusArmy = session->GetFocusUserArmy();
   if (!sourceUnitsObject.IsTable() || podCategory == nullptr || focusArmy == nullptr) {
     resultTable.PushStack(state);
@@ -1465,7 +1464,7 @@ int moho::cfunc_GetAssistingUnitsListL(
         continue;
       }
 
-      UserEntity* const candidateEntity = reinterpret_cast<UserEntity*>(candidateUnit);
+      UserEntity* const candidateEntity = candidateUnit;
       if (candidateEntity->mArmy != focusArmy) {
         continue;
       }

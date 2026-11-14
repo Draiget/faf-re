@@ -480,7 +480,7 @@ void lua_pushcclosure(
     closure->c.upvalue[upvalueIndex] = state->top[upvalueIndex];
     faf_lua51_gc_barrier_value(
       state,
-      reinterpret_cast<GCObject*>(closure),
+      valtogco(closure),
       &closure->c.upvalue[upvalueIndex]
     ); // Lua 5.1.5 lapi.c: lua_pushcclosure()
   }

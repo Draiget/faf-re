@@ -377,9 +377,9 @@ namespace moho
       writer.Write(name.raw_data_unsafe(), static_cast<std::size_t>(nameByteLength));
     }
 
-    writer.Write(reinterpret_cast<const char*>(&mScale), sizeof(mScale));
-    writer.Write(reinterpret_cast<const char*>(&mPosition), sizeof(mPosition));
-    writer.Write(reinterpret_cast<const char*>(&mOrientation), sizeof(mOrientation));
+    writer.Write(&mScale, sizeof(mScale));
+    writer.Write(&mPosition, sizeof(mPosition));
+    writer.Write(&mOrientation, sizeof(mOrientation));
     writer.Write(mCutoffLOD);
     writer.Write(mNearCutoff);
     writer.Write(mArmy);
@@ -404,21 +404,21 @@ namespace moho
     mCachedFlatResult = 0;
 
     std::int32_t indexValue = 0;
-    reader.Read(reinterpret_cast<char*>(&indexValue), sizeof(indexValue));
+    reader.Read(&indexValue, sizeof(indexValue));
     mIndex = indexValue;
 
     std::int32_t typeValue = 0;
-    reader.Read(reinterpret_cast<char*>(&typeValue), sizeof(typeValue));
+    reader.Read(&typeValue, sizeof(typeValue));
     mType = static_cast<EWldTerrainDecalType>(typeValue);
 
     mFidelity = 1;
 
     std::int32_t nameCount = 0;
-    reader.Read(reinterpret_cast<char*>(&nameCount), sizeof(nameCount));
+    reader.Read(&nameCount, sizeof(nameCount));
 
     for (std::int32_t slot = 0; slot < nameCount; ++slot) {
       std::int32_t nameLength = 0;
-      reader.Read(reinterpret_cast<char*>(&nameLength), sizeof(nameLength));
+      reader.Read(&nameLength, sizeof(nameLength));
 
       std::vector<char> nameBytes(static_cast<std::size_t>(nameLength));
       if (nameLength > 0) {
@@ -432,27 +432,27 @@ namespace moho
     }
 
     Wm3::Vec3f scale{};
-    reader.Read(reinterpret_cast<char*>(&scale), sizeof(scale));
+    reader.Read(&scale, sizeof(scale));
     mScale = scale;
 
     Wm3::Vec3f position{};
-    reader.Read(reinterpret_cast<char*>(&position), sizeof(position));
+    reader.Read(&position, sizeof(position));
     mPosition = position;
 
     Wm3::Vec3f orientation{};
-    reader.Read(reinterpret_cast<char*>(&orientation), sizeof(orientation));
+    reader.Read(&orientation, sizeof(orientation));
     mOrientation = orientation;
 
     float cutoffLod = 0.0f;
-    reader.Read(reinterpret_cast<char*>(&cutoffLod), sizeof(cutoffLod));
+    reader.Read(&cutoffLod, sizeof(cutoffLod));
     mCutoffLOD = cutoffLod;
 
     float nearCutoff = 0.0f;
-    reader.Read(reinterpret_cast<char*>(&nearCutoff), sizeof(nearCutoff));
+    reader.Read(&nearCutoff, sizeof(nearCutoff));
     mNearCutoff = nearCutoff;
 
     std::int32_t armyIndex = 0;
-    reader.Read(reinterpret_cast<char*>(&armyIndex), sizeof(armyIndex));
+    reader.Read(&armyIndex, sizeof(armyIndex));
     mArmy = armyIndex;
 
     Update();

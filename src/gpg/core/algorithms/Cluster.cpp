@@ -1910,9 +1910,7 @@ namespace gpg::HaStar
 
     for (std::uint32_t level = 1u; level <= mNumLevels; ++level) {
       const gpg::BitArray2D& bits = mCheckLevels[level];
-      archive->WriteBytes(
-        reinterpret_cast<char*>(bits.ptr), static_cast<std::size_t>(bits.size) * sizeof(std::int32_t)
-      );
+      archive->WriteBytes(bits.ptr, static_cast<std::size_t>(bits.size) * sizeof(std::int32_t));
 
       const Subcluster& clusters = mLevels[level];
       const int count = clusters.mWidth * clusters.mHeight;
@@ -1928,7 +1926,7 @@ namespace gpg::HaStar
         const std::size_t bytes =
           nodes * sizeof(Cluster::Node) + Cluster::TriangularSize(static_cast<std::uint32_t>(nodes));
         if (bytes != 0u) {
-          archive->WriteBytes(const_cast<char*>(reinterpret_cast<const char*>(&data->mNodes[0])), bytes);
+          archive->WriteBytes(&data->mNodes[0], bytes);
         }
       }
     }
@@ -1947,7 +1945,7 @@ namespace gpg::HaStar
     std::string payload;
     for (std::uint32_t level = 1u; level <= mNumLevels; ++level) {
       gpg::BitArray2D& bits = mCheckLevels[level];
-      archive->ReadBytes(reinterpret_cast<char*>(bits.ptr), static_cast<std::size_t>(bits.size) * sizeof(std::int32_t));
+      archive->ReadBytes(bits.ptr, static_cast<std::size_t>(bits.size) * sizeof(std::int32_t));
 
       Subcluster& clusters = mLevels[level];
       const int count = clusters.mWidth * clusters.mHeight;

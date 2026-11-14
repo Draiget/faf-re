@@ -35,7 +35,7 @@ void CompareWeak(
   std::sort(parallel.begin(), parallel.end());
   std::vector<GCObject*> par(parallel.size());
   for (std::size_t index = 0; index < parallel.size(); ++index) {
-    par[index] = reinterpret_cast<GCObject*>(parallel[index]);
+    par[index] = valtogco(parallel[index]);
   }
   if (par != serial && Report()) {
     gpg::Warnf(
@@ -370,7 +370,7 @@ namespace
           return;
         case LUA_TUSERDATA: {
           // A userdata has nothing to traverse but its metatable, marked in place.
-          auto* const metatable = reinterpret_cast<GCObject*>(object->u.metatable);
+          auto* const metatable = valtogco(object->u.metatable);
           if (metatable == nullptr || !Claim(metatable->gch.marked)) {
             return;
           }
@@ -411,7 +411,7 @@ namespace
     )
     {
       Table* const metatable = h->metatable;
-      MarkObject(lists, reinterpret_cast<GCObject*>(metatable));
+      MarkObject(lists, valtogco(metatable));
 
       bool weakkey = false;
       bool weakvalue = false;
@@ -440,10 +440,10 @@ namespace
         GCObject** const weaktail =
           kind == kWeakBoth ? &lists.wkvTail : (kind == kWeakKeys ? &lists.wkTail : &lists.wvTail);
         if (*weaklist == nullptr) {
-          *weaktail = reinterpret_cast<GCObject*>(h);
+          *weaktail = valtogco(h);
         }
         h->gclist = *weaklist;
-        *weaklist = reinterpret_cast<GCObject*>(h);
+        *weaklist = valtogco(h);
         lists.weakTables[kind].push_back(h);
       }
 
@@ -485,7 +485,7 @@ namespace
         SetBits(f->upvalues[index]->marked, kMarkedBit);
       }
       for (int index = 0; index < f->sizep; ++index) {
-        MarkObject(lists, reinterpret_cast<GCObject*>(f->p[index]));
+        MarkObject(lists, valtogco(f->p[index]));
       }
       for (int index = 0; index < f->sizelocvars; ++index) {
         TString* const varname = f->locvars[index].varname;
@@ -505,7 +505,7 @@ namespace
     )
     {
       MarkValue(lists, cl->g);
-      MarkObject(lists, reinterpret_cast<GCObject*>(cl->p));
+      MarkObject(lists, valtogco(cl->p));
       for (int index = 0; index < cl->nupvalues; ++index) {
         UpVal* const upvalue = cl->upvals[index];
         if (upvalue == nullptr) {
@@ -998,7 +998,7 @@ namespace
     markSlot(g->_registry);
     traversestack(mainthread, st);
     if (state != mainthread && (state->marked & 0x11u) == 0u) {
-      reallymarkobject(st, reinterpret_cast<GCObject*>(state));
+      reallymarkobject(st, valtogco(state));
     }
     st->L = mainthread;
     return rootState;
