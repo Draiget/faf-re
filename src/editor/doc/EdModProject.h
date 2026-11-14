@@ -167,6 +167,40 @@ namespace faf::editor
     const std::string& text,
     std::string& error
   );
+  /** What the checks know about the game and the disk. */
+  struct ModCheckFacts
+  {
+    std::function<bool(const std::string&)> gameHas;     // the game has this unit
+    ModWeaponIndex weaponIndex;                          // a unit's weapon place by label (0: none)
+    std::function<bool(const std::string&)> gameHasFile; // the game's files have this path (a derived unit's icon)
+    std::string diskUid;                                 // mod_info.lua's uid on disk ("" when none)
+    bool written = true;                                 // the project hasn't changed since it was written
+  };
+  struct ModIssue
+  {
+    char level = 'W'; // 'E' the game won't take it as meant, 'W' likely a mistake, 'I' worth knowing
+    std::string text;
+  };
+  /**
+   * The open project's checks (FAF Studio's modcheck): its name and uid, mod_info.lua on disk, unit ids, units the
+   * game doesn't have, derived units' bases and ids, weapon changes whose label the unit doesn't have, keys that aren't
+   * blueprint paths, values that break a unit (no health, nothing to build it), derived units without a name or an
+   * icon, and changes not written yet.
+   */
+  [[nodiscard]] std::vector<ModIssue> CheckModProject(const ModProject& project, const ModCheckFacts& facts);
+
+  /**
+   * A release of the project for the vault: the files under its folder but the editor's own (editor_project.json and
+   * its .bak, half-written files), in the zip under one folder named for the project; with the version in the name.
+   */
+  struct ModRelease
+  {
+    std::string folder; // the zip's top folder
+    std::string zipName;
+    std::vector<std::string> files;
+  };
+  [[nodiscard]] ModRelease PlanModRelease(const ModProject& project, const std::vector<std::string>& files);
+
   /** Reads a project folder: editor_project.json, else its .bak (`fromBackup`); the uid from mod_info.lua. */
   bool OpenModProject(
     const std::filesystem::path& folder,

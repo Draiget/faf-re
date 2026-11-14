@@ -829,6 +829,117 @@ namespace faf::editor
     return report;
   }
 
+  std::vector<ModIssue> CheckModProject(
+    const ModProject& p,
+    const ModCheckFacts& f
+  )
+  {
+    std::vector<ModIssue> out;
+    const auto add = [&](const char level, const std::string& text) {
+      out.push_back({level, text});
+    };
+    if (!ModProjectNameOk(p.name)) {
+      add('E', "the project's name takes letters, digits, spaces, _ and -");
+    }
+    if (p.uid.size() != 36) {
+      add('E', "the project has no uid (write it to make one)");
+    } else if (!f.diskUid.empty() && f.diskUid != p.uid) {
+      add('W', "mod_info.lua on disk has another uid (" + f.diskUid + "): the next write puts the project's back");
+    }
+    if (p.Empty()) {
+      add('I', "nothing changed yet: the unit lab and the particle editor put changes in");
+    }
+    for (const auto& [id, d] : p.derived) {
+      if (f.gameHas && f.gameHas(id)) {
+        add('E', "derived unit " + id + ": the game has a unit with that id");
+      }
+      if (f.gameHas && !f.gameHas(d.base)) {
+        add('E', "derived unit " + id + ": the game has no unit " + d.base + " to copy");
+      }
+      if (d.name.empty()) {
+        add('I', "derived unit " + id + " has no name: the game shows the base unit's");
+      }
+      if (f.gameHasFile && !f.gameHasFile("/textures/ui/common/icons/units/" + id + "_icon.dds")) {
+        add(
+          'W',
+          "derived unit " + id + " has no icon (/textures/ui/common/icons/units/" + id +
+            "_icon.dds): the build menu shows none"
+        );
+      }
+    }
+    for (const auto& [id, keys] : p.edits) {
+      const bool derived = p.derived.count(id) != 0;
+      if (!ModUnitIdOk(id)) {
+        add('E', "unit " + id + ": not a unit id (lower case letters and digits)");
+        continue;
+      }
+      if (!derived && f.gameHas && !f.gameHas(id)) {
+        add('E', "unit " + id + ": the game has no such unit (a merge blueprint changes nothing)");
+      }
+      const std::string source = ModSourceUnit(p, id);
+      for (const auto& [key, value] : keys) {
+        std::string label;
+        std::string field;
+        if (ModWeaponKey(key, label, field)) {
+          if (f.weaponIndex && f.weaponIndex(source, label) <= 0) {
+            add('W', "unit " + id + ": " + source + " has no weapon " + label + " (the change is left out)");
+          }
+        } else if (
+          key.empty() || key.front() == '.' || key.back() == '.' || key.find("..") != std::string::npos ||
+          std::any_of(key.begin(), key.end(), [](const char c) {
+          return !(std::isalnum(static_cast<unsigned char>(c)) != 0 || c == '_' || c == '.');
+        })
+        ) {
+          add('E', "unit " + id + ": " + key + " isn't a blueprint path");
+        }
+        if (key == "Defense.MaxHealth" && value <= 0.0) {
+          add('E', "unit " + id + ": health " + Number(value) + " (it dies as it is made)");
+        } else if ((key == "Economy.BuildTime" || key == "Economy.BuildRate") && value <= 0.0) {
+          add(
+            'W',
+            "unit " + id + ": " + key.substr(8) + " " + Number(value) + " (nothing builds it, or it builds nothing)"
+          );
+        } else if (value < 0.0) {
+          add('W', "unit " + id + ": " + key + " is below 0");
+        }
+      }
+    }
+    if (!f.written) {
+      add('I', "changes not written yet (Write project)");
+    }
+    return out;
+  }
+
+  ModRelease PlanModRelease(
+    const ModProject& project,
+    const std::vector<std::string>& files
+  )
+  {
+    ModRelease r;
+    std::string base;
+    for (const char c : project.name) {
+      base += c == ' ' ? '_' : c;
+    }
+    r.folder = base;
+    r.zipName = base + ".v" + std::to_string(std::max(1, project.version)) + ".zip";
+    for (const std::string& file : files) {
+      std::string lower = file;
+      std::transform(lower.begin(), lower.end(), lower.begin(), [](const unsigned char c) {
+        return static_cast<char>(std::tolower(c));
+      });
+      if (
+        lower == "editor_project.json" || lower == "editor_project.json.bak" ||
+        (lower.size() > 8 && lower.compare(lower.size() - 8, 8, ".writing") == 0) || lower == "thumbs.db" ||
+        lower == "desktop.ini"
+      ) {
+        continue;
+      }
+      r.files.push_back(file);
+    }
+    std::sort(r.files.begin(), r.files.end());
+    return r;
+  }
+
   bool ModWriteGenerated(
     const std::filesystem::path& folder,
     const std::string& relative,

@@ -4,6 +4,7 @@
 #include "editor/tools/EdUnitLab.h"
 
 #include <filesystem>
+#include <map>
 #include <optional>
 #include <string>
 #include <vector>
@@ -31,6 +32,13 @@ namespace faf::editor
     bool Open(const std::string& name, std::string& error);
     /** Writes the open project; its report. */
     ModWriteReport Write();
+    /** The open project's checks now. */
+    [[nodiscard]] std::vector<ModIssue> Check();
+    /**
+     * Zip for the vault: the project written, then its files but the editor's own zipped under one folder into the
+     * vault's `editor_releases` folder; the zip's path, or empty with `error`.
+     */
+    std::filesystem::path Release(std::string& error);
     [[nodiscard]] ModProject* Project() noexcept
     {
       return mProject ? &*mProject : nullptr;
@@ -67,5 +75,6 @@ namespace faf::editor
     std::string mMessage;
     std::vector<std::string> mReport;
     ModEditHistory mHistory;
+    std::map<std::string, bool> mIcons; // derived unit icon path -> the game has it
   };
 } // namespace faf::editor

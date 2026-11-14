@@ -2406,6 +2406,7 @@ namespace faf::editor
           while (std::getline(in, line)) {
             gpg::Logf("editor: mod test: bp | %s", line.c_str());
           }
+          in.close(); // (Windows won't write over an open file)
           ModProject back;
           std::string reopenError;
           const bool reopened = OpenModProject(panel.Folder(), back, reopenError);
@@ -2415,6 +2416,26 @@ namespace faf::editor
             back.uid == p.uid ? "kept" : "changed",
             back.edits.size()
           );
+          // The checks, with a derived unit (no icon of its own) and a broken change, then the release.
+          std::string error;
+          (void)AddModDerived(p, "xaa0206", id, "", "", [&](const std::string& unit) {
+            moho::RResId res{};
+            res.name.assign(unit.c_str());
+            return rules->GetUnitBlueprint(res) != nullptr;
+          }, error);
+          (void)SetModEdit(p, id, "Defense.MaxHealth", 0.0, 1.0);
+          for (const ModIssue& issue : panel.Check()) {
+            gpg::Logf("editor: mod test: check %c %s", issue.level, issue.text.c_str());
+          }
+          std::string releaseError;
+          gpg::Logf(
+            "editor: mod test: release with a broken change: %s",
+            panel.Release(releaseError).empty() ? ("refused: " + releaseError).c_str() : "made"
+          );
+          p.edits[id].erase("Defense.MaxHealth");
+          p.derived.clear();
+          const std::filesystem::path zip = panel.Release(releaseError);
+          gpg::Logf("editor: mod test: release %s", zip.empty() ? releaseError.c_str() : zip.string().c_str());
           return;
         }
         gpg::Warnf("editor: mod test: no unit with a labelled weapon");

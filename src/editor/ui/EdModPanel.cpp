@@ -1,6 +1,8 @@
 #include "editor/ui/EdModPanel.h"
 
 #include "editor/doc/EdDocument.h"
+#include "editor/doc/EdMapFile.h"
+#include "editor/doc/EdPackage.h"
 #include "editor/ui/EdControls.h"
 #include "editor/ui/EdIconFont.h"
 #include "editor/ui/EdWorkspaces.h"
@@ -11,6 +13,8 @@
 
 #include <algorithm>
 #include <cstdio>
+#include <fstream>
+#include <sstream>
 #include <system_error>
 
 namespace faf::editor
@@ -166,6 +170,82 @@ namespace faf::editor
       gpg::Warnf("editor: mod project: %s", problem.c_str());
     }
     return report;
+  }
+
+  std::vector<ModIssue> EdModPanel::Check()
+  {
+    if (!mProject) {
+      return {};
+    }
+    ModCheckFacts facts;
+    facts.gameHas = [](const std::string& id) {
+      moho::RRuleGameRules* const rules = moho::RULE_PeekKept();
+      if (rules == nullptr) {
+        return true; // not known yet: no finding
+      }
+      moho::RResId resId{};
+      resId.name.assign(id.c_str());
+      return rules->GetUnitBlueprint(resId) != nullptr;
+    };
+    facts.weaponIndex = &EdModPanel::WeaponIndex;
+    facts.gameHasFile = [this](const std::string& path) {
+      const auto it = mIcons.find(path);
+      if (it != mIcons.end()) {
+        return it->second;
+      }
+      std::string bytes;
+      return mIcons[path] = ReadGameFile(path, bytes);
+    };
+    std::ifstream in(mFolder / "mod_info.lua", std::ios::binary);
+    if (in) {
+      std::ostringstream text;
+      text << in.rdbuf();
+      facts.diskUid = ModInfoUid(text.str());
+    }
+    facts.written = !mDirty;
+    return CheckModProject(*mProject, facts);
+  }
+
+  std::filesystem::path EdModPanel::Release(
+    std::string& error
+  )
+  {
+    if (!mProject) {
+      error = "no project open";
+      return {};
+    }
+    const ModWriteReport written = Write();
+    if (!written.problems.empty()) {
+      error = "the project didn't write cleanly: " + written.problems.front();
+      return {};
+    }
+    for (const ModIssue& issue : Check()) {
+      if (issue.level == 'E') {
+        error = "fix it first: " + issue.text;
+        return {};
+      }
+    }
+    const ModRelease release = PlanModRelease(*mProject, FilesUnder(mFolder));
+    std::vector<ZipEntry> entries;
+    for (const std::string& file : release.files) {
+      std::ifstream in(mFolder / file, std::ios::binary);
+      std::ostringstream bytes;
+      bytes << in.rdbuf();
+      entries.push_back({release.folder + "/" + file, bytes.str()});
+    }
+    const std::filesystem::path out = mDocument.VaultFolder() / "editor_releases" / release.zipName;
+    std::error_code ec;
+    std::filesystem::create_directories(out.parent_path(), ec);
+    std::ofstream zip(out, std::ios::binary | std::ios::trunc);
+    const std::string bytes = WriteZip(entries);
+    zip.write(bytes.data(), static_cast<std::streamsize>(bytes.size()));
+    if (!zip) {
+      error = "couldn't write " + out.string();
+      return {};
+    }
+    mMessage = "zipped " + std::to_string(entries.size()) + " files into " + out.string();
+    gpg::Logf("editor: mod project %s: %s (%zu bytes)", mProject->name.c_str(), mMessage.c_str(), bytes.size());
+    return out;
   }
 
   void EdModPanel::Draw(
@@ -324,8 +404,32 @@ namespace faf::editor
         "one the project didn't make, is left as it is"
       );
     }
+    ImGui::SameLine();
+    if (ImGui::Button(ICON_PACKAGE " Zip for the vault")) {
+      std::string error;
+      if (Release(error).empty()) {
+        mMessage = "No zip: " + error;
+      }
+    }
+    if (ImGui::IsItemHovered()) {
+      EdSetTooltip(
+        "Writes the project, checks it, and zips its files (not the editor's own) under one folder into the "
+        "vault's editor_releases folder"
+      );
+    }
     for (const std::string& problem : mReport) {
       ImGui::TextColored(ImVec4(1.0f, 0.75f, 0.35f, 1.0f), "%s", problem.c_str());
+    }
+    // The checks, live.
+    const std::vector<ModIssue> issues = Check();
+    ImGui::SeparatorText(("Checks (" + std::to_string(issues.size()) + ")").c_str());
+    for (const ModIssue& issue : issues) {
+      const ImVec4 colour = issue.level == 'E' ? ImVec4(1.0f, 0.45f, 0.40f, 1.0f)
+        : issue.level == 'W'                   ? ImVec4(1.0f, 0.75f, 0.35f, 1.0f)
+                                               : ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled);
+      ImGui::PushStyleColor(ImGuiCol_Text, colour);
+      ImGui::TextWrapped("%s", issue.text.c_str());
+      ImGui::PopStyleColor();
     }
     ImGui::End();
   }

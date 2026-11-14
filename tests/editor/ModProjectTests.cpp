@@ -248,4 +248,86 @@ namespace faf::editor
     report = WriteModProject(folder, p, Weapons, {});
     EXPECT_FALSE(std::filesystem::exists(folder / kModHookFile));
   }
+
+  TEST(
+    ModProject,
+    ChecksFindWhatTheGameWouldNotTake
+  )
+  {
+    ModProject p;
+    p.name = "Checks";
+    p.uid = NewModUid();
+    ModCheckFacts facts;
+    facts.gameHas = [](const std::string& id) {
+      return id == "uel0201" || id == "ura0203";
+    };
+    facts.weaponIndex = Weapons;
+    facts.gameHasFile = [](const std::string& path) {
+      return path.find("xel0201") == std::string::npos;
+    };
+    const auto count = [](const std::vector<ModIssue>& issues, const std::string& part) {
+      return std::count_if(issues.begin(), issues.end(), [&](const ModIssue& i) {
+        return i.text.find(part) != std::string::npos;
+      });
+    };
+    std::vector<ModIssue> issues = CheckModProject(p, facts);
+    EXPECT_EQ(count(issues, "nothing changed yet"), 1);
+    p.edits["uel0201"]["Weapon:Missing.Damage"] = 5;
+    p.edits["uel0201"]["Defense.MaxHealth"] = 0;
+    p.edits["uel0201"]["Economy.BuildTime"] = -1;
+    p.edits["zzz0001"]["Economy.BuildCostMass"] = 10;
+    p.edits["uel0201"]["Bad Key!"] = 1;
+    p.derived["xel0201"] = {"uel0201", "", ""};
+    p.derived["ura0203"] = {"nope0001", "Name", ""};
+    facts.diskUid = "00000000-0000-4000-a000-000000000000";
+    facts.written = false;
+    issues = CheckModProject(p, facts);
+    EXPECT_EQ(count(issues, "uel0201 has no weapon Missing"), 1);
+    EXPECT_EQ(count(issues, "health 0 (it dies"), 1);
+    EXPECT_EQ(count(issues, "BuildTime -1"), 1);
+    EXPECT_EQ(count(issues, "zzz0001: the game has no such unit"), 1);
+    EXPECT_EQ(count(issues, "Bad Key! isn't a blueprint path"), 1);
+    EXPECT_EQ(count(issues, "derived unit xel0201 has no name"), 1);
+    EXPECT_EQ(count(issues, "derived unit xel0201 has no icon"), 1);
+    EXPECT_EQ(count(issues, "derived unit ura0203: the game has a unit with that id"), 1);
+    EXPECT_EQ(count(issues, "the game has no unit nope0001"), 1);
+    EXPECT_EQ(count(issues, "another uid"), 1);
+    EXPECT_EQ(count(issues, "not written yet"), 1);
+    EXPECT_EQ(
+      std::count_if(
+        issues.begin(),
+        issues.end(),
+        [](const ModIssue& i) {
+      return i.level == 'E';
+    }
+      ),
+      5
+    ) << "health, the unknown unit, the bad key, the two derived ones; BuildTime is a warning";
+  }
+
+  TEST(
+    ModProject,
+    AReleaseLeavesTheEditorsOwnFilesOut
+  )
+  {
+    ModProject p;
+    p.name = "My Balance";
+    p.version = 3;
+    const ModRelease r = PlanModRelease(
+      p,
+      {"mod_info.lua",
+       "editor_project.json",
+       "editor_project.json.bak",
+       "units/uel0201/uel0201_unit.bp",
+       "hook/lua/system/Blueprints.lua",
+       "units/x.bp.writing",
+       "Thumbs.db"}
+    );
+    EXPECT_EQ(r.folder, "My_Balance");
+    EXPECT_EQ(r.zipName, "My_Balance.v3.zip");
+    EXPECT_EQ(
+      r.files,
+      (std::vector<std::string>{"hook/lua/system/Blueprints.lua", "mod_info.lua", "units/uel0201/uel0201_unit.bp"})
+    );
+  }
 } // namespace faf::editor
