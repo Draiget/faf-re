@@ -68,7 +68,7 @@ namespace
     gpg::core::FastVectorN<Vertex, N> vertices;
     const auto* inlineData = vertices.Data();
     constexpr std::size_t inlineQuads = N / 4;
-    const std::size_t caps[] = {inlineQuads - 1, N * 10, N * 50, N * 200};
+    const std::size_t caps[] = {inlineQuads - 1, N * 2, N * 5, N * 10};
     ASSERT_EQ(sizeof(Vertex), 28u);
     for (const int tier :
          {0, 1, 2, 3, -1, 4, 5, 6, 7, std::numeric_limits<int>::min(), std::numeric_limits<int>::max()}) {
@@ -127,7 +127,7 @@ namespace
     const ScopedBackoff isolate;
     constexpr std::size_t inlineQuads = N / 4;
     for (const int tier : {0, 1, 2, 3}) {
-      constexpr std::size_t factors[] = {0, 40, 200, 800};
+      constexpr std::size_t factors[] = {0, 8, 20, 40};
       const auto limit = tier == 0 ? inlineQuads - 1 : inlineQuads * factors[tier];
       for (const std::size_t beforeRestart :
            {std::size_t(1),
@@ -138,11 +138,7 @@ namespace
             inlineQuads * 4 + 1,
             inlineQuads * 8 + 1,
             inlineQuads * 16 + 1,
-            inlineQuads * 32 + 1,
-            inlineQuads * 64 + 1,
-            inlineQuads * 128 + 1,
-            inlineQuads * 256 + 1,
-            inlineQuads * 512 + 1}) {
+            inlineQuads * 32 + 1}) {
         if (beforeRestart > limit) {
           continue;
         }
@@ -300,7 +296,7 @@ TEST(
   const ScopedBackoff isolate;
   gpg::core::FastVectorN<Vertex, 10000> vertices;
   const auto budget = moho::PrepareSplatOutput(vertices, 3);
-  ASSERT_EQ(budget.limit, 2000000u);
+  ASSERT_EQ(budget.limit, 100000u);
   // Check against the 32-bit bound even when this target is built for x64.
   ASSERT_LE(budget.limit, 2147483647u / (4 * sizeof(Vertex)));
   const auto vertexCount = budget.limit * 4;
@@ -312,7 +308,7 @@ TEST(
     offset += count;
     ++draws;
   }
-  EXPECT_EQ(draws, 800u);
+  EXPECT_EQ(draws, 40u);
 }
 
 TEST(
@@ -372,7 +368,7 @@ TEST(
   preference = 0;
   vertices.Clear();
   ASSERT_TRUE(moho::TryGrowSplatOutput(vertices, budget));
-  EXPECT_EQ(budget.limit, 10000u);
+  EXPECT_EQ(budget.limit, 2000u);
   EXPECT_EQ(budget.available, 500u);
   const auto next = moho::PrepareSplatOutput(vertices, preference);
   EXPECT_EQ(next.limit, 249u);

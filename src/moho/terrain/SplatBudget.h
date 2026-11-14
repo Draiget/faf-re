@@ -33,7 +33,7 @@ namespace moho
       return {inlineQuads - 1, inlineQuads - 1};
     }
     // Higher settings raise the existing per-view limits; growth remains bounded.
-    constexpr std::size_t multipliers[] = {0, 40, 200, 800};
+    constexpr std::size_t multipliers[] = {0, 8, 20, 40};
     const std::size_t limit = inlineQuads * multipliers[tier];
     if (vertices.Capacity() / 4 > limit) {
       vertices.ResetStorageToInline();
