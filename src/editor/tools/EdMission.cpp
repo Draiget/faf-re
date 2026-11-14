@@ -3,6 +3,7 @@
 #include "editor/doc/EdJson.h"
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -677,6 +678,76 @@ namespace faf::editor
       }
       );
       add(
+        "platoon_group",
+        "action",
+        "Spawn a group as a platoon (template, orders)",
+        {army,
+         group,
+         Optional(P("platoon", "Platoon template (optional)", "platoon")),
+         P("formation", "Formation", "choice", "GrowthFormation", kFormations),
+         Optional(P("orders", "Order queue (optional)", "orders")),
+         Defines(P("var", "Keep as variable (optional)", "var"), "platoon")},
+        [](const MissionValues& n, const MissionEmit& C) -> Lines {
+        Lines out;
+        const std::string target = n.S("var").empty() ? std::string("platoon") : Var(n.S("var"));
+        if (!n.S("platoon").empty()) {
+          // The group's units are matched against this template when the platoon is made.
+          out.push_back("do");
+          out.push_back(
+            "    local node = ScenarioUtils.FindUnitGroup(" + Q(n.S("group")) + ", Scenario.Armies[" + Q(n.S("army")) +
+            "].Units)"
+          );
+          out.push_back("    if node then node.platoon = " + Q(n.S("platoon")) + " end");
+          out.push_back("end");
+        }
+        out.push_back(
+          (target == "platoon" ? "local " : "") + target + " = ScenarioUtils.CreateArmyGroupAsPlatoon(" +
+          Q(n.S("army")) + ", " + Q(n.S("group")) + ", " + Q(n.S("formation")) + ")"
+        );
+        if (!n.S("orders").empty() && C.mission != nullptr) {
+          for (const std::string& line : MissionOrderLines(*C.mission, target, n.S("orders"))) {
+            out.push_back(line);
+          }
+        }
+        return out;
+      }
+      );
+      add(
+        "orders_apply",
+        "action",
+        "Give a platoon an order queue",
+        {P("var", "Platoon variable", "var"),
+         P("orders", "Order queue", "orders"),
+         P("clear", "Stop what it is doing first", "bool", "true")},
+        [](const MissionValues& n, const MissionEmit& C) -> Lines {
+        const std::string target = Var(n.S("var"));
+        Lines out;
+        if (n.B("clear")) {
+          out.push_back(target + ":Stop()");
+        }
+        if (C.mission != nullptr) {
+          for (const std::string& line : MissionOrderLines(*C.mission, target, n.S("orders"))) {
+            out.push_back(line);
+          }
+        }
+        return out;
+      }
+      );
+      add(
+        "pbm_remove",
+        "action",
+        "Stop a platoon builder",
+        {army, P("builder", "Builder", "builder")},
+        [](const MissionValues& n, const MissionEmit&) -> Lines {
+        return {
+          "do",
+          "    local brain = GetArmyBrain(" + Q(n.S("army")) + ")",
+          "    if brain and brain.PBMRemoveBuilder then brain:PBMRemoveBuilder(" + Q(n.S("builder")) + ") end",
+          "end"
+        };
+      }
+      );
+      add(
         "raw",
         "action",
         "Raw Lua",
@@ -1111,6 +1182,7 @@ namespace faf::editor
         C.section = section;
         C.problems = problems;
         C.compiles = &o.compiles;
+        C.mission = &m;
         for (const std::string& line :
              EmitList(std::string(section) == "enter" ? stage.enter : stage.ready, C, "    ")) {
           out.push_back(line);
@@ -1776,6 +1848,153 @@ namespace faf::editor
     return "(" + text + ")";
   }
 
+  // ---- platoons and orders
+  const std::vector<std::string>& MissionPlatoonSquads()
+  {
+    static const std::vector<std::string> k = {"attack", "artillery", "guard", "scout", "support"};
+    return k;
+  }
+  const std::vector<std::string>& MissionPlatoonFormations()
+  {
+    static const std::vector<std::string> k = {
+      "None",
+      "NoFormation",
+      "AttackFormation",
+      "GrowthFormation",
+      "GuardFormation",
+      "BlockFormation",
+      "CircleFormation",
+      "ColumnFormation",
+      "ChevronFormation",
+      "LBlockFormation"
+    };
+    return k;
+  }
+  const std::vector<std::string>& MissionOrderTypes()
+  {
+    static const std::vector<std::string> k = {"Move", "Patrol", "Attack", "Stop"};
+    return k;
+  }
+  bool MissionIsTemplateName(
+    const std::string& text
+  )
+  {
+    return !text.empty() && std::all_of(text.begin(), text.end(), [](const char c) {
+      return std::isalnum(static_cast<unsigned char>(c)) != 0 || c == '_' || c == '-';
+    });
+  }
+  std::vector<std::string> MissionBuilderNames(
+    const std::string& text
+  )
+  {
+    std::vector<std::string> out;
+    // The Builders table: from its key to its matching brace.
+    std::size_t at = text.find("Builders");
+    while (at != std::string::npos && at > 0 &&
+           (std::isalnum(static_cast<unsigned char>(text[at - 1])) != 0 || text[at - 1] == '_')) {
+      at = text.find("Builders", at + 1); // (PlatoonBuilders itself)
+    }
+    if (at == std::string::npos) {
+      return out;
+    }
+    at = text.find('{', at);
+    if (at == std::string::npos) {
+      return out;
+    }
+    int depth = 0;
+    std::string pending; // a name or quoted key at depth 1, waiting for its '='
+    for (std::size_t i = at; i < text.size(); ++i) {
+      const char c = text[i];
+      if (c == '\'' || c == '"') {
+        std::string value;
+        std::size_t k = i + 1;
+        for (; k < text.size() && text[k] != c; ++k) {
+          if (text[k] == '\\' && k + 1 < text.size()) {
+            ++k;
+          }
+          value += text[k];
+        }
+        if (depth == 1) {
+          pending = value;
+        }
+        i = k;
+        continue;
+      }
+      if (c == '-' && i + 1 < text.size() && text[i + 1] == '-') {
+        while (i < text.size() && text[i] != '\n') {
+          ++i;
+        }
+        continue;
+      }
+      if (c == '{') {
+        ++depth;
+        pending.clear();
+      } else if (c == '}') {
+        if (--depth == 0) {
+          break;
+        }
+      } else if (depth == 1 && (std::isalpha(static_cast<unsigned char>(c)) != 0 || c == '_')) {
+        std::size_t k = i;
+        while (k < text.size() && (std::isalnum(static_cast<unsigned char>(text[k])) != 0 || text[k] == '_')) {
+          ++k;
+        }
+        pending = text.substr(i, k - i);
+        i = k - 1;
+      } else if (depth == 1 && c == '=' && !pending.empty()) {
+        out.push_back(pending);
+        pending.clear();
+      } else if (depth == 1 && c == ',') {
+        pending.clear();
+      }
+    }
+    return out;
+  }
+  std::vector<std::string> MissionOrderLines(
+    const Mission& mission,
+    const std::string& target,
+    const std::string& queue
+  )
+  {
+    const auto it =
+      std::find_if(mission.orderQueues.begin(), mission.orderQueues.end(), [&](const MissionOrderQueue& q) {
+      return q.name == queue;
+    });
+    if (it == mission.orderQueues.end()) {
+      return {"-- (order queue " + OneLine(queue) + " does not exist)"};
+    }
+    std::vector<std::string> out;
+    for (const MissionOrder& o : it->orders) {
+      const std::string pos = "ScenarioUtils.MarkerToPosition(" + Q(o.target) + ")";
+      const bool chain = !o.chain.empty();
+      const bool marker = !o.target.empty();
+      if (o.type == "Stop") {
+        out.push_back(target + ":Stop()");
+      } else if (o.type == "Move") {
+        if (chain) {
+          out.push_back("ScenarioFramework.PlatoonMoveChain(" + target + ", " + Q(o.chain) + ")");
+        } else if (marker) {
+          out.push_back(target + ":MoveToLocation(" + pos + ", false)");
+        }
+      } else if (o.type == "Patrol") {
+        if (chain) {
+          out.push_back("ScenarioFramework.PlatoonPatrolChain(" + target + ", " + Q(o.chain) + ")");
+        } else if (marker) {
+          out.push_back(target + ":Patrol(" + pos + ")");
+        }
+      } else if (o.type == "Attack") {
+        if (chain) {
+          out.push_back("ScenarioFramework.PlatoonAttackChain(" + target + ", " + Q(o.chain) + ")");
+        } else if (marker) {
+          out.push_back(target + ":AggressiveMoveToLocation(" + pos + ")");
+        }
+      }
+    }
+    if (out.empty()) {
+      out.push_back("-- (order queue " + OneLine(queue) + " is empty)");
+    }
+    return out;
+  }
+
   // ---- bases
   const std::vector<std::string>& MissionBaseActive()
   {
@@ -2165,6 +2384,25 @@ namespace faf::editor
     for (const std::string& line : CompileBases(m)) {
       add(line);
     }
+    if (!m.platoons.empty()) {
+      add("-- platoon templates (the save file's Platoons layout)");
+      add("Scenario.Platoons = Scenario.Platoons or {}");
+      for (const MissionPlatoon& t : m.platoons) {
+        if (!MissionIsTemplateName(t.name)) {
+          continue;
+        }
+        std::string line = "Scenario.Platoons[" + Q(t.name) + "] = { " + Q(t.name) + ", " + Q(t.plan);
+        for (const MissionPlatoonRow& r : t.rows) {
+          if (r.bp.empty()) {
+            continue;
+          }
+          line += ", { " + Q(r.bp) + ", " + Num(r.min, 1) + ", " + Num(r.max, 1) + ", " + Q(r.squad) + ", " +
+            Q(r.formation) + " }";
+        }
+        add(line + " }");
+      }
+      add("");
+    }
     add("ScenarioInfo.MissionNumber = 0");
     add("");
     if (!m.stages.empty()) {
@@ -2350,6 +2588,24 @@ namespace faf::editor
               problem('E', "no marker " + value);
             } else if (p.kind == "dialogue" && dialogues.count(value) == 0) {
               problem('E', "no dialogue " + value);
+            } else if (
+              p.kind == "platoon" && std::none_of(m.platoons.begin(), m.platoons.end(), [&](const MissionPlatoon& t) {
+              return t.name == value;
+            })
+            ) {
+              problem('E', "no platoon template " + value + " (Platoons panel)");
+            } else if (
+              p.kind == "orders" &&
+              std::none_of(m.orderQueues.begin(), m.orderQueues.end(), [&](const MissionOrderQueue& q) {
+              return q.name == value;
+            })
+            ) {
+              problem('E', "no order queue " + value + " (Platoons panel)");
+            } else if (p.kind == "builder") {
+              const auto builders = facts.builders.find(v.S("army"));
+              if (builders == facts.builders.end() || !has(builders->second, value)) {
+                problem('E', "army " + v.S("army") + " has no platoon builder " + value);
+              }
             } else if (p.kind == "base" && std::none_of(m.bases.begin(), m.bases.end(), [&](const MissionBase& b) {
               return b.name == value;
             })) {
@@ -2457,6 +2713,49 @@ namespace faf::editor
         }
       }
     }
+    // The platoon templates and order queues.
+    std::set<std::string> templateNames;
+    for (const MissionPlatoon& t : m.platoons) {
+      const std::string where = "platoon template " + t.name + ": ";
+      if (!MissionIsTemplateName(t.name)) {
+        out.push_back({'E', where + "not a usable name (letters, digits, _ and -)", 0, {}, {}});
+      }
+      if (!templateNames.insert(t.name).second) {
+        out.push_back({'E', where + "name used twice", 0, {}, {}});
+      }
+      if (t.rows.empty()) {
+        out.push_back({'W', where + "no unit rows", 0, {}, {}});
+      }
+      for (const MissionPlatoonRow& r : t.rows) {
+        if (r.bp.empty()) {
+          out.push_back({'W', where + "a row has no unit", 0, {}, {}});
+        } else if (Finite(r.min) && Finite(r.max) && r.max < r.min) {
+          out.push_back({'W', where + r.bp + ": its most is below its least", 0, {}, {}});
+        }
+      }
+    }
+    std::set<std::string> queueNames;
+    for (const MissionOrderQueue& q : m.orderQueues) {
+      const std::string where = "order queue " + q.name + ": ";
+      if (!MissionIsTemplateName(q.name)) {
+        out.push_back({'E', where + "not a usable name (letters, digits, _ and -)", 0, {}, {}});
+      }
+      if (!queueNames.insert(q.name).second) {
+        out.push_back({'E', where + "name used twice", 0, {}, {}});
+      }
+      for (const MissionOrder& o : q.orders) {
+        if (o.type == "Stop") {
+          continue;
+        }
+        if (o.chain.empty() && o.target.empty()) {
+          out.push_back({'W', where + "a " + o.type + " order has no chain or marker (left out)", 0, {}, {}});
+        } else if (!o.chain.empty() && !has(facts.chains, o.chain)) {
+          out.push_back({'E', where + "no chain " + o.chain, 0, {}, {}});
+        } else if (o.chain.empty() && !has(facts.markers, o.target)) {
+          out.push_back({'E', where + "no marker " + o.target, 0, {}, {}});
+        }
+      }
+    }
     if (!m.stages.empty() && !ends) {
       out.push_back({'W', "the mission never ends (no End node, and the last stage has no objectives)", 0, {}, {}});
     }
@@ -2468,7 +2767,7 @@ namespace faf::editor
     const Mission& m
   )
   {
-    if (m.stages.empty() && m.dialogues.empty() && m.bases.empty()) {
+    if (m.stages.empty() && m.dialogues.empty() && m.bases.empty() && m.platoons.empty() && m.orderQueues.empty()) {
       return {};
     }
     std::string out = "{\n  \"schema\": 1,\n  \"mode\": " + JsonQuoted(m.mode) + ",\n  \"stages\": [\n";
@@ -2522,6 +2821,30 @@ namespace faf::editor
           ", \"cond1flag\": " + JsonQuoted(o.condFlag[0]) + ", \"cond2flag\": " + JsonQuoted(o.condFlag[1]) + "}";
       }
       out += "]}" + std::string(bi + 1 < m.bases.size() ? ",\n" : "\n");
+    }
+    out += "  ],\n  \"platoons\": [\n";
+    for (std::size_t ti = 0; ti < m.platoons.size(); ++ti) {
+      const MissionPlatoon& t = m.platoons[ti];
+      out += "    {\"name\": " + JsonQuoted(t.name) + ", \"plan\": " + JsonQuoted(t.plan) + ", \"rows\": [";
+      for (std::size_t r = 0; r < t.rows.size(); ++r) {
+        const MissionPlatoonRow& row = t.rows[r];
+        out += std::string(r > 0 ? ", " : "") + "{\"bp\": " + JsonQuoted(row.bp) +
+          ", \"min\": " + JsonNumber(static_cast<float>(row.min)) +
+          ", \"max\": " + JsonNumber(static_cast<float>(row.max)) + ", \"squad\": " + JsonQuoted(row.squad) +
+          ", \"formation\": " + JsonQuoted(row.formation) + "}";
+      }
+      out += "]}" + std::string(ti + 1 < m.platoons.size() ? ",\n" : "\n");
+    }
+    out += "  ],\n  \"orderQueues\": [\n";
+    for (std::size_t qi = 0; qi < m.orderQueues.size(); ++qi) {
+      const MissionOrderQueue& q = m.orderQueues[qi];
+      out += "    {\"name\": " + JsonQuoted(q.name) + ", \"orders\": [";
+      for (std::size_t k = 0; k < q.orders.size(); ++k) {
+        const MissionOrder& o = q.orders[k];
+        out += std::string(k > 0 ? ", " : "") + "{\"type\": " + JsonQuoted(o.type) +
+          ", \"target\": " + JsonQuoted(o.target) + ", \"chain\": " + JsonQuoted(o.chain) + "}";
+      }
+      out += "]}" + std::string(qi + 1 < m.orderQueues.size() ? ",\n" : "\n");
     }
     out += "  ],\n  \"dialogues\": [\n";
     for (std::size_t d = 0; d < m.dialogues.size(); ++d) {
@@ -2679,6 +3002,33 @@ namespace faf::editor
         b.opai.push_back(std::move(o));
       }
       m.bases.push_back(std::move(b));
+    }
+    for (const std::string& tt : Items(NestedOf(root, "platoons"))) {
+      MissionPlatoon t;
+      (void)StringOf(tt, "name", t.name);
+      (void)StringOf(tt, "plan", t.plan);
+      for (const std::string& rt : Items(NestedOf(tt, "rows"))) {
+        MissionPlatoonRow r;
+        (void)StringOf(rt, "bp", r.bp);
+        (void)NumberOf(rt, "min", r.min);
+        (void)NumberOf(rt, "max", r.max);
+        (void)StringOf(rt, "squad", r.squad);
+        (void)StringOf(rt, "formation", r.formation);
+        t.rows.push_back(r);
+      }
+      m.platoons.push_back(std::move(t));
+    }
+    for (const std::string& qt : Items(NestedOf(root, "orderQueues"))) {
+      MissionOrderQueue q;
+      (void)StringOf(qt, "name", q.name);
+      for (const std::string& ot : Items(NestedOf(qt, "orders"))) {
+        MissionOrder o;
+        (void)StringOf(ot, "type", o.type);
+        (void)StringOf(ot, "target", o.target);
+        (void)StringOf(ot, "chain", o.chain);
+        q.orders.push_back(o);
+      }
+      m.orderQueues.push_back(std::move(q));
     }
     mission = std::move(m);
     return true;

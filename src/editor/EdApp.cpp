@@ -2273,6 +2273,15 @@ namespace faf::editor
           MissionNode after = NewMissionNode("dialogue");
           after.p["text"] = "Mission test: after the base";
           two.enter.push_back(after);
+          // A platoon template, registered when the script loads: a line reports it from the play.
+          MissionPlatoon platoon;
+          platoon.name = "PLATOON_Test";
+          platoon.rows = {{"uel0201", 0, 4, "attack", "None"}, {"uel0103", 1, 2, "artillery", "None"}};
+          m.platoons = {platoon};
+          MissionNode report = NewMissionNode("raw");
+          report.p["code"] = "LOG('EDMISSIONTEST platoon template PLATOON_Test: ' .. "
+                             "table.getn(Scenario.Platoons['PLATOON_Test'] or {}) .. ' entries')";
+          two.enter.push_back(report);
           m.stages = {one, two};
           mDocument.MissionEdited(std::move(before));
           std::size_t baseProblems = 0;

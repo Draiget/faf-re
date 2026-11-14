@@ -104,12 +104,56 @@ namespace faf::editor
   /** A new base on an army, with its marker named `<name>_Marker`. */
   [[nodiscard]] MissionBase NewMissionBase(const std::string& name, const std::string& army);
 
+  /**
+   * A platoon template (the save file's `Platoons` layout: name, AI plan, one row per unit type), registered in
+   * `Scenario.Platoons` when the script loads: a Spawn a group as a platoon node can make a group's units that platoon.
+   */
+  struct MissionPlatoonRow
+  {
+    std::string bp;
+    double min = 1.0;
+    double max = 1.0;
+    std::string squad = "attack";   // MissionPlatoonSquads
+    std::string formation = "None"; // MissionPlatoonFormations
+  };
+
+  struct MissionPlatoon
+  {
+    std::string name;
+    std::string plan;
+    std::vector<MissionPlatoonRow> rows;
+  };
+
+  /** An order queue: orders given in turn to a platoon (along a chain or to one marker). */
+  struct MissionOrder
+  {
+    std::string type = "Move"; // MissionOrderTypes
+    std::string target;        // a marker
+    std::string chain;         // a chain (used before the marker)
+  };
+
+  struct MissionOrderQueue
+  {
+    std::string name;
+    std::vector<MissionOrder> orders;
+  };
+
+  [[nodiscard]] const std::vector<std::string>& MissionPlatoonSquads();
+  [[nodiscard]] const std::vector<std::string>& MissionPlatoonFormations();
+  [[nodiscard]] const std::vector<std::string>& MissionOrderTypes();
+  /** A template or queue name: letters, digits, _ and -. */
+  [[nodiscard]] bool MissionIsTemplateName(const std::string& text);
+  /** The builder names of an army's `PlatoonBuilders` table text (`{ Builders = { name = {...}, ... } }`). */
+  [[nodiscard]] std::vector<std::string> MissionBuilderNames(const std::string& platoonBuilders);
+
   struct Mission
   {
     std::string mode = "campaign"; // campaign, coop, both
     std::vector<MissionStage> stages;
     std::vector<MissionDialogue> dialogues;
     std::vector<MissionBase> bases;
+    std::vector<MissionPlatoon> platoons;
+    std::vector<MissionOrderQueue> orderQueues;
     [[nodiscard]] bool Empty() const noexcept
     {
       return stages.empty();
@@ -186,6 +230,7 @@ namespace faf::editor
     std::vector<int> path;
     std::vector<MissionProblem>* problems = nullptr;
     const LuaCompiles* compiles = nullptr;
+    const Mission* mission = nullptr; // its order queues
     [[nodiscard]] std::string Addr() const;
     /** A container's children as lines, each with `prefix` in front (a callback's children run in it). */
     [[nodiscard]] std::vector<std::string>
@@ -261,7 +306,12 @@ namespace faf::editor
     std::vector<std::string> chains;
     std::vector<std::string> areas;
     std::vector<std::string> markers;
+    std::map<std::string, std::vector<std::string>> builders; // army -> its platoon builders
   };
+
+  /** The lines that give platoon expression `target` the orders of queue `queue` (a comment when there's none). */
+  [[nodiscard]] std::vector<std::string>
+  MissionOrderLines(const Mission& mission, const std::string& target, const std::string& queue);
 
   /**
    * Checks: an empty stage, an unknown node, a value that had to be replaced, a missing army / group / chain / area /

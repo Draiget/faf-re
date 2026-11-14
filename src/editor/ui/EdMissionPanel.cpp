@@ -18,6 +18,27 @@ namespace faf::editor
 {
   namespace
   {
+    /** The unit types of a group of the tree (nested groups included), with how many of each. */
+    bool CountGroup(
+      const UnitGroup& group,
+      const std::string& name,
+      std::map<std::string, int>& counts,
+      const bool inside = false
+    )
+    {
+      const bool here = inside || group.name == name;
+      if (here) {
+        for (const SaveUnit& u : group.units) {
+          ++counts[u.type];
+        }
+      }
+      bool found = here;
+      for (const UnitGroup& g : group.groups) {
+        found = CountGroup(g, name, counts, here) || found;
+      }
+      return found;
+    }
+
     void CollectGroups(
       const UnitGroup& group,
       std::vector<std::string>& out
@@ -124,6 +145,7 @@ namespace faf::editor
       if (ParseUnitGroup(army.Get("Units"), root, error)) {
         CollectGroups(root, facts.groups[army.name]);
       }
+      facts.builders[army.name] = MissionBuilderNames(army.Get("PlatoonBuilders"));
     }
     return facts;
   }
@@ -266,6 +288,19 @@ namespace faf::editor
       } else if (p.kind == "base") {
         for (const MissionBase& b : m.bases) {
           names.push_back(b.name);
+        }
+      } else if (p.kind == "platoon") {
+        for (const MissionPlatoon& t : m.platoons) {
+          names.push_back(t.name);
+        }
+      } else if (p.kind == "orders") {
+        for (const MissionOrderQueue& q : m.orderQueues) {
+          names.push_back(q.name);
+        }
+      } else if (p.kind == "builder") {
+        const auto found = facts.builders.find(node.p["army"]);
+        if (found != facts.builders.end()) {
+          names = found->second;
         }
       } else if (p.kind == "group") {
         const auto found = facts.groups.find(node.p["army"]);
@@ -1084,6 +1119,296 @@ namespace faf::editor
       ImGui::PopID();
     }
     ImGui::PopID();
+    ImGui::End();
+  }
+  void EdMissionPanel::DrawPlatoonsPanel(
+    bool& open,
+    const bool mapOpen
+  )
+  {
+    if (!ImGui::Begin(Panel("Platoons###MissionPlatoons"), &open)) {
+      ImGui::End();
+      return;
+    }
+    if (!mapOpen) {
+      ImGui::TextDisabled("Open a map to give its mission platoon templates and orders.");
+      ImGui::End();
+      return;
+    }
+    Mission& m = mDocument.EditMission();
+    const MissionFacts facts = MissionFactsOf(mDocument);
+    const auto pick = [&](const char* id, std::string& value, const std::vector<std::string>& names) {
+      std::string copy = value;
+      ImGui::SetNextItemWidth(-1.0f);
+      if (EdBeginCombo(id, copy.empty() ? "(choose)" : copy.c_str())) {
+        for (const std::string& name : names) {
+          if (ImGui::Selectable(name.c_str(), name == copy)) {
+            Mission before = mDocument.MissionNow();
+            value = name;
+            Edited(std::move(before));
+          }
+        }
+        ImGui::EndCombo();
+      }
+    };
+    const auto text = [&](const char* id, std::string& value) {
+      ImGui::SetNextItemWidth(-1.0f);
+      const bool edited = TextField(id, value);
+      BeginField();
+      EndField(edited);
+    };
+    // ---- templates
+    ImGui::SeparatorText("Platoon templates");
+    for (std::size_t t = 0; t < m.platoons.size(); ++t) {
+      const std::string label =
+        m.platoons[t].name + "  (" + std::to_string(m.platoons[t].rows.size()) + " unit types)##t" + std::to_string(t);
+      if (ImGui::Selectable(label.c_str(), mPlatoon == static_cast<int>(t))) {
+        mPlatoon = static_cast<int>(t);
+      }
+    }
+    if (ImGui::SmallButton(ICON_PLUS " Template")) {
+      Mission before = m;
+      MissionPlatoon t;
+      t.name = "PLATOON_" + std::to_string(m.platoons.size() + 1);
+      m.platoons.push_back(t);
+      mPlatoon = static_cast<int>(m.platoons.size()) - 1;
+      Edited(std::move(before));
+    }
+    // From a group: one row per unit type, at most as many as the group has.
+    ImGui::SameLine();
+    if (ImGui::SmallButton(ICON_PLUS " From a group")) {
+      ImGui::OpenPopup("##fromgroup");
+    }
+    if (ImGui::BeginPopup("##fromgroup")) {
+      ImGui::TextUnformatted("A template from the units of a group");
+      ImGui::SetNextItemWidth(220.0f);
+      if (EdBeginCombo("Army##fg", mFromArmy.empty() ? "(choose)" : mFromArmy.c_str())) {
+        for (const std::string& a : facts.armies) {
+          if (ImGui::Selectable(a.c_str(), a == mFromArmy)) {
+            mFromArmy = a;
+            mFromGroup.clear();
+          }
+        }
+        ImGui::EndCombo();
+      }
+      ImGui::SetNextItemWidth(220.0f);
+      const auto groups = facts.groups.find(mFromArmy);
+      if (EdBeginCombo("Group##fg", mFromGroup.empty() ? "(choose)" : mFromGroup.c_str())) {
+        if (groups != facts.groups.end()) {
+          for (const std::string& g : groups->second) {
+            if (ImGui::Selectable(g.c_str(), g == mFromGroup)) {
+              mFromGroup = g;
+            }
+          }
+        }
+        ImGui::EndCombo();
+      }
+      std::map<std::string, int> counts;
+      for (const SaveEntry& army : mDocument.SaveData().Armies()) {
+        UnitGroup root;
+        std::string error;
+        if (army.name == mFromArmy && ParseUnitGroup(army.Get("Units"), root, error)) {
+          (void)CountGroup(root, mFromGroup, counts);
+        }
+      }
+      ImGui::BeginDisabled(counts.empty());
+      if (ImGui::Button(("Make it (" + std::to_string(counts.size()) + " unit types)").c_str())) {
+        Mission before = m;
+        MissionPlatoon t;
+        t.name = "PLATOON_" + mFromGroup;
+        for (std::size_t k = 2; std::any_of(
+               m.platoons.begin(),
+               m.platoons.end(),
+               [&](const MissionPlatoon& o) {
+          return o.name == t.name;
+        }
+             );
+             ++k) {
+          t.name = "PLATOON_" + mFromGroup + "_" + std::to_string(k);
+        }
+        for (const auto& [bp, count] : counts) {
+          MissionPlatoonRow row;
+          row.bp = bp;
+          row.min = 0.0;
+          row.max = count;
+          t.rows.push_back(row);
+        }
+        m.platoons.push_back(t);
+        mPlatoon = static_cast<int>(m.platoons.size()) - 1;
+        Edited(std::move(before));
+        ImGui::CloseCurrentPopup();
+      }
+      ImGui::EndDisabled();
+      ImGui::EndPopup();
+    }
+    if (mPlatoon >= 0 && mPlatoon < static_cast<int>(m.platoons.size())) {
+      ImGui::SameLine();
+      if (ImGui::SmallButton(ICON_TRASH " Template")) {
+        Mission before = m;
+        m.platoons.erase(m.platoons.begin() + mPlatoon);
+        mPlatoon = std::min(mPlatoon, static_cast<int>(m.platoons.size()) - 1);
+        Edited(std::move(before));
+      }
+    }
+    if (mPlatoon >= 0 && mPlatoon < static_cast<int>(m.platoons.size())) {
+      MissionPlatoon& t = m.platoons[static_cast<std::size_t>(mPlatoon)];
+      ImGui::PushID("template");
+      RowLabel("Name");
+      text("##name", t.name);
+      RowLabel("AI plan");
+      text("##plan", t.plan);
+      if (ImGui::IsItemHovered()) {
+        EdSetTooltip("The platoon's AI function (empty: none); the platoon build manager runs it");
+      }
+      int remove = -1;
+      if (ImGui::BeginTable("##rows", 6, ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_RowBg)) {
+        ImGui::TableSetupColumn("Unit", ImGuiTableColumnFlags_WidthStretch, 1.4f);
+        ImGui::TableSetupColumn("Least", ImGuiTableColumnFlags_WidthStretch, 0.6f);
+        ImGui::TableSetupColumn("Most", ImGuiTableColumnFlags_WidthStretch, 0.6f);
+        ImGui::TableSetupColumn("Squad", ImGuiTableColumnFlags_WidthStretch, 1.0f);
+        ImGui::TableSetupColumn("Formation", ImGuiTableColumnFlags_WidthStretch, 1.2f);
+        ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed, ImGui::GetFrameHeight());
+        ImGui::TableHeadersRow();
+        for (std::size_t r = 0; r < t.rows.size(); ++r) {
+          MissionPlatoonRow& row = t.rows[r];
+          ImGui::PushID(static_cast<int>(r));
+          ImGui::TableNextRow();
+          ImGui::TableNextColumn();
+          text("##bp", row.bp);
+          for (double* v : {&row.min, &row.max}) {
+            ImGui::TableNextColumn();
+            ImGui::PushID(v == &row.min ? "min" : "max");
+            float x = static_cast<float>(*v);
+            ImGui::SetNextItemWidth(-1.0f);
+            const bool edited = FillDragFloat("##n", &x, 0.1f, 0.0f, 200.0f, "%.0f");
+            BeginField();
+            if (edited) {
+              *v = x;
+            }
+            EndField(edited);
+            ImGui::PopID();
+          }
+          ImGui::TableNextColumn();
+          pick("##squad", row.squad, MissionPlatoonSquads());
+          ImGui::TableNextColumn();
+          pick("##formation", row.formation, MissionPlatoonFormations());
+          ImGui::TableNextColumn();
+          if (ImGui::SmallButton(ICON_TRASH)) {
+            remove = static_cast<int>(r);
+          }
+          ImGui::PopID();
+        }
+        ImGui::EndTable();
+      }
+      if (remove >= 0) {
+        Mission before = m;
+        t.rows.erase(t.rows.begin() + remove);
+        Edited(std::move(before));
+      }
+      if (ImGui::SmallButton(ICON_PLUS " Unit type")) {
+        Mission before = m;
+        t.rows.push_back({});
+        Edited(std::move(before));
+      }
+      ImGui::PopID();
+    }
+    // ---- order queues
+    ImGui::SeparatorText("Order queues");
+    for (std::size_t q = 0; q < m.orderQueues.size(); ++q) {
+      const std::string label = m.orderQueues[q].name + "  (" + std::to_string(m.orderQueues[q].orders.size()) +
+        " orders)##q" + std::to_string(q);
+      if (ImGui::Selectable(label.c_str(), mQueue == static_cast<int>(q))) {
+        mQueue = static_cast<int>(q);
+      }
+    }
+    if (ImGui::SmallButton(ICON_PLUS " Queue")) {
+      Mission before = m;
+      MissionOrderQueue q;
+      q.name = "ORDERS_" + std::to_string(m.orderQueues.size() + 1);
+      MissionOrder o;
+      if (!facts.chains.empty()) {
+        o.chain = facts.chains.front();
+      }
+      q.orders.push_back(o);
+      m.orderQueues.push_back(q);
+      mQueue = static_cast<int>(m.orderQueues.size()) - 1;
+      Edited(std::move(before));
+    }
+    if (mQueue >= 0 && mQueue < static_cast<int>(m.orderQueues.size())) {
+      ImGui::SameLine();
+      if (ImGui::SmallButton(ICON_TRASH " Queue")) {
+        Mission before = m;
+        m.orderQueues.erase(m.orderQueues.begin() + mQueue);
+        mQueue = std::min(mQueue, static_cast<int>(m.orderQueues.size()) - 1);
+        Edited(std::move(before));
+      }
+    }
+    if (mQueue >= 0 && mQueue < static_cast<int>(m.orderQueues.size())) {
+      MissionOrderQueue& q = m.orderQueues[static_cast<std::size_t>(mQueue)];
+      ImGui::PushID("queue");
+      RowLabel("Name");
+      text("##name", q.name);
+      int remove = -1;
+      int raise = -1;
+      std::vector<std::string> chains = facts.chains;
+      chains.insert(chains.begin(), std::string());
+      std::vector<std::string> markers = facts.markers;
+      markers.insert(markers.begin(), std::string());
+      if (ImGui::BeginTable("##orders", 4, ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_RowBg)) {
+        ImGui::TableSetupColumn("Order", ImGuiTableColumnFlags_WidthStretch, 0.8f);
+        ImGui::TableSetupColumn("Along a chain", ImGuiTableColumnFlags_WidthStretch, 1.2f);
+        ImGui::TableSetupColumn("or to a marker", ImGuiTableColumnFlags_WidthStretch, 1.2f);
+        ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed, ImGui::GetFrameHeight() * 2.2f);
+        ImGui::TableHeadersRow();
+        for (std::size_t k = 0; k < q.orders.size(); ++k) {
+          MissionOrder& o = q.orders[k];
+          ImGui::PushID(static_cast<int>(k));
+          ImGui::TableNextRow();
+          ImGui::TableNextColumn();
+          pick("##type", o.type, MissionOrderTypes());
+          ImGui::TableNextColumn();
+          if (o.type != "Stop") {
+            pick("##chain", o.chain, chains);
+          }
+          ImGui::TableNextColumn();
+          if (o.type != "Stop") {
+            ImGui::BeginDisabled(!o.chain.empty());
+            pick("##marker", o.target, markers);
+            ImGui::EndDisabled();
+          }
+          ImGui::TableNextColumn();
+          if (k > 0 && ImGui::SmallButton("Up")) {
+            raise = static_cast<int>(k);
+          }
+          if (k > 0) {
+            ImGui::SameLine();
+          }
+          if (ImGui::SmallButton(ICON_TRASH)) {
+            remove = static_cast<int>(k);
+          }
+          ImGui::PopID();
+        }
+        ImGui::EndTable();
+      }
+      if (remove >= 0) {
+        Mission before = m;
+        q.orders.erase(q.orders.begin() + remove);
+        Edited(std::move(before));
+      } else if (raise > 0) {
+        Mission before = m;
+        std::swap(q.orders[static_cast<std::size_t>(raise)], q.orders[static_cast<std::size_t>(raise - 1)]);
+        Edited(std::move(before));
+      }
+      if (ImGui::SmallButton(ICON_PLUS " Order")) {
+        Mission before = m;
+        MissionOrder o;
+        o.type = "Patrol";
+        q.orders.push_back(o);
+        Edited(std::move(before));
+      }
+      ImGui::TextDisabled("Given in turn by a Spawn a group as a platoon or a Give a platoon an order queue node.");
+      ImGui::PopID();
+    }
     ImGui::End();
   }
 } // namespace faf::editor

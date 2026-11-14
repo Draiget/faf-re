@@ -96,7 +96,7 @@ namespace faf::editor
        "Alt+6",
        "The map's mission (stages, dialogues), scripts, lobby options and armies",
        "Stages###MissionStages,Armies",
-       "Strings###MissionStrings,Bases###MissionBases",
+       "Strings###MissionStrings,Bases###MissionBases,Platoons###MissionPlatoons",
        "Script Editor###ScriptEditor,Adaptive Map###AdaptiveMap",
        "Properties",
        "Run###MissionRun,Problems,Check,Log,Debugger",
@@ -224,6 +224,7 @@ namespace faf::editor
       {"MissionStrings", ICON_SCRIPT},
       {"MissionRun", ICON_PLAY},
       {"MissionBases", ICON_FLAG},
+      {"MissionPlatoons", ICON_UNIT},
     };
     for (const auto& [panel, icon] : kIcons) {
       if (panel == id) {
@@ -245,7 +246,8 @@ namespace faf::editor
     // 2: Mission's Stages and Strings.
     // 3: Mission's Run beside Problems.
     // 4: Mission's Bases beside Strings.
-    return key == "mission" ? 4 : key == "layout" ? 3 : key == "terrain" || key == "generate" ? 2 : 1;
+    // 5: Mission's Platoons beside Bases.
+    return key == "mission" ? 5 : key == "layout" ? 3 : key == "terrain" || key == "generate" ? 2 : 1;
   }
 
   std::map<std::string, int>& LayoutVersions()

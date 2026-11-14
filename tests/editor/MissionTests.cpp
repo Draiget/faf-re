@@ -397,4 +397,120 @@ namespace faf::editor
     only.bases.push_back(NewMissionBase("Solo", "ARMY_2"));
     EXPECT_FALSE(SaveMission(only).empty());
   }
+
+  namespace
+  {
+    Mission WithPlatoons()
+    {
+      Mission m = TwoStages();
+      MissionPlatoon t;
+      t.name = "PLATOON_North";
+      t.rows = {{"uel0201", 0, 4, "attack", "None"}, {"uel0103", 1, 2, "artillery", "GrowthFormation"}};
+      m.platoons.push_back(t);
+      MissionOrderQueue q;
+      q.name = "ORDERS_North";
+      q.orders = {{"Move", "", "Approach"}, {"Attack", "Base", ""}, {"Patrol", "", ""}, {"Stop", "", ""}};
+      m.orderQueues.push_back(q);
+      m.stages[0].enter.push_back(Node(
+        "platoon_group",
+        {{"army", "ARMY_2"},
+         {"group", "NorthAttack"},
+         {"platoon", "PLATOON_North"},
+         {"orders", "ORDERS_North"},
+         {"var", "north"}}
+      ));
+      m.stages[0].enter.push_back(Node("orders_apply", {{"var", "north"}, {"orders", "ORDERS_North"}}));
+      m.stages[0].enter.push_back(Node("pbm_remove", {{"army", "ARMY_2"}, {"builder", "NorthAir"}}));
+      return m;
+    }
+  } // namespace
+
+  TEST(
+    Mission,
+    PlatoonTemplatesAndOrderQueuesCompile
+  )
+  {
+    const std::string lua = CompileMission(WithPlatoons(), MissionCompileOptions{});
+    EXPECT_TRUE(Has(lua, "Scenario.Platoons = Scenario.Platoons or {}"));
+    EXPECT_TRUE(Has(
+      lua,
+      "Scenario.Platoons['PLATOON_North'] = { 'PLATOON_North', '', { 'uel0201', 0, 4, 'attack', 'None' }, "
+      "{ 'uel0103', 1, 2, 'artillery', 'GrowthFormation' } }"
+    ));
+    EXPECT_LT(lua.find("Scenario.Platoons['PLATOON_North']"), lua.find("ScenarioInfo.MissionNumber = 0"));
+    EXPECT_TRUE(Has(lua, "local node = ScenarioUtils.FindUnitGroup('NorthAttack', Scenario.Armies['ARMY_2'].Units)"));
+    EXPECT_TRUE(Has(lua, "if node then node.platoon = 'PLATOON_North' end"));
+    EXPECT_TRUE(Has(lua, " = ScenarioUtils.CreateArmyGroupAsPlatoon('ARMY_2', 'NorthAttack', 'GrowthFormation')"));
+    EXPECT_TRUE(Has(lua, "ScenarioFramework.PlatoonMoveChain("));
+    EXPECT_TRUE(Has(lua, ":AggressiveMoveToLocation(ScenarioUtils.MarkerToPosition('Base'))"));
+    EXPECT_TRUE(Has(lua, "brain:PBMRemoveBuilder('NorthAir')"));
+    // The queue: Move (chain), Attack (marker), Patrol with nothing (left out), Stop.
+    const std::vector<std::string> lines = MissionOrderLines(WithPlatoons(), "p", "ORDERS_North");
+    ASSERT_EQ(lines.size(), 3U);
+    EXPECT_EQ(lines[0], "ScenarioFramework.PlatoonMoveChain(p, 'Approach')");
+    EXPECT_EQ(lines[2], "p:Stop()");
+    EXPECT_EQ(MissionOrderLines(WithPlatoons(), "p", "Nope").front(), "-- (order queue Nope does not exist)");
+    // A name that isn't one registers nothing.
+    Mission m = WithPlatoons();
+    m.platoons[0].name = "x'] = os.exit() --";
+    EXPECT_FALSE(Has(CompileMission(m, MissionCompileOptions{}), "os.exit"));
+  }
+
+  TEST(
+    Mission,
+    PlatoonChecksAndBuilderNames
+  )
+  {
+    EXPECT_EQ(
+      MissionBuilderNames(
+        "{\n  Builders = {\n    ['NorthAir'] = { PlatoonTemplate = 'X', Priority = 100, -- a = b\n"
+        "      BuildConditions = { { '/lua/x.lua', 'F', { 'a' } } } },\n    South_Land = { Priority = 5 },\n  },\n}"
+      ),
+      (std::vector<std::string>{"NorthAir", "South_Land"})
+    );
+    EXPECT_TRUE(MissionBuilderNames("").empty());
+    EXPECT_TRUE(MissionBuilderNames("{ PlatoonBuilders = {} }").empty());
+    Mission m = WithPlatoons();
+    MissionFacts facts;
+    facts.armies = {"ARMY_1", "ARMY_2"};
+    facts.groups["ARMY_2"] = {"NorthAttack"};
+    facts.chains = {"Approach"};
+    facts.markers = {"Base"};
+    facts.builders["ARMY_2"] = {"NorthAir"};
+    std::vector<MissionProblem> p = CheckMission(m, facts);
+    EXPECT_EQ(CountOf(p, "platoon builder"), 0U);
+    EXPECT_EQ(CountOf(p, "no platoon template"), 0U);
+    EXPECT_EQ(CountOf(p, "order queue ORDERS_North: a Patrol order has no chain or marker"), 1U);
+    std::vector<MissionNode>& enter = m.stages[0].enter;
+    enter[enter.size() - 1].p["builder"] = "Gone";
+    enter[enter.size() - 2].p["orders"] = "Missing";
+    m.platoons.push_back(m.platoons[0]);
+    m.orderQueues[0].orders[1].target = "Elsewhere";
+    p = CheckMission(m, facts);
+    EXPECT_EQ(CountOf(p, "army ARMY_2 has no platoon builder Gone"), 1U);
+    EXPECT_EQ(CountOf(p, "no order queue Missing"), 1U);
+    EXPECT_EQ(CountOf(p, "platoon template PLATOON_North: name used twice"), 1U);
+    EXPECT_EQ(CountOf(p, "order queue ORDERS_North: no marker Elsewhere"), 1U);
+  }
+
+  TEST(
+    Mission,
+    SavedPlatoonsReadBack
+  )
+  {
+    const Mission m = WithPlatoons();
+    Mission back;
+    std::string error;
+    ASSERT_TRUE(LoadMission(SaveMission(m), back, error)) << error;
+    ASSERT_EQ(back.platoons.size(), 1U);
+    ASSERT_EQ(back.platoons[0].rows.size(), 2U);
+    EXPECT_EQ(back.platoons[0].rows[1].bp, "uel0103");
+    EXPECT_DOUBLE_EQ(back.platoons[0].rows[1].min, 1);
+    EXPECT_EQ(back.platoons[0].rows[1].formation, "GrowthFormation");
+    ASSERT_EQ(back.orderQueues.size(), 1U);
+    ASSERT_EQ(back.orderQueues[0].orders.size(), 4U);
+    EXPECT_EQ(back.orderQueues[0].orders[1].target, "Base");
+    EXPECT_EQ(back.orderQueues[0].orders[0].chain, "Approach");
+    EXPECT_EQ(CompileMission(back, MissionCompileOptions{}), CompileMission(m, MissionCompileOptions{}));
+  }
 } // namespace faf::editor

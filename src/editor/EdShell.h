@@ -163,7 +163,7 @@ namespace faf::editor
     /** Shows the Mission workspace's Stages and Strings. */
     void ShowMission() noexcept
     {
-      mShowMissionStages = mShowMissionStrings = mShowMissionRun = mShowMissionBases = true;
+      mShowMissionStages = mShowMissionStrings = mShowMissionRun = mShowMissionBases = mShowMissionPlatoons = true;
     }
     [[nodiscard]] bool LayoutShown() const noexcept
     {
@@ -488,6 +488,7 @@ namespace faf::editor
     bool mShowMissionStrings = false;
     bool mShowMissionRun = false;
     bool mShowMissionBases = false;
+    bool mShowMissionPlatoons = false;
     bool mDebugWasPaused = false;
     char mWatchInput[160] = {};
     std::vector<std::string> mWatches;

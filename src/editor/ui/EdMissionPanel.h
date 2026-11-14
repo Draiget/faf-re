@@ -26,6 +26,8 @@ namespace faf::editor
     void DrawStringsPanel(bool& open, bool mapOpen);
     /** Bases: the mission's BaseManagers (groups, engineers, switches) and their attacks (OpAI). */
     void DrawBasesPanel(bool& open, bool mapOpen);
+    /** Platoons: the mission's platoon templates (a unit type per row) and order queues. */
+    void DrawPlatoonsPanel(bool& open, bool mapOpen);
     /**
      * Run: a test play's progress (the stage it is in, the nodes it reached, a trigger dropped because its stage had
      * moved on), each entry a jump to its node in Stages; Play from a stage.
@@ -61,6 +63,10 @@ namespace faf::editor
     std::optional<Mission> mFieldBefore; // a text field being typed in: the mission before it
     std::vector<std::string> mTrace;
     int mBase = -1;
+    int mPlatoon = -1;
+    int mQueue = -1;
+    std::string mFromArmy;
+    std::string mFromGroup;
     int mAttack = -1;
     bool mWasPlaying = false;
     bool mPlayAsked = false;
