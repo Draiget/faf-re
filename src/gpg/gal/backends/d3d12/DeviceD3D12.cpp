@@ -21,6 +21,7 @@
 #include "gpg/core/utils/Global.h"
 #include "gpg/core/utils/Logging.h"
 #include "gpg/gal/backends/common/BackendErrors.h"
+#include "gpg/gal/backends/common/CopyRegion.h"
 #include "gpg/gal/backends/common/ImageCodec.h"
 #include "gpg/gal/backends/common/RuntimeInfo.h"
 #include "gpg/gal/backends/d3d11/D3D11VertexLayouts.h"
@@ -2477,32 +2478,6 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     target->DiscardCpuCopy();
   }
 
-  namespace
-  {
-    // A D3D9 style rectangle copy takes a source rectangle that may reach past the surface (the engine's refraction
-    // copy passes the view rectangle, which can be a row taller than a 1280x720 window). D3D11's backend passes it on
-    // unclipped too, where Microsoft leaves the result undefined; D3D12's CopyTextureRegion makes the command list
-    // invalid (Close returns E_INVALIDARG and every later frame fails). Clip
-    // the box to the source and to what fits at (x, y) in the destination. False when nothing is left to copy.
-    bool ClampCopyBox(
-      D3D12_BOX& box,
-      const UINT sourceWidth,
-      const UINT sourceHeight,
-      const UINT x,
-      const UINT y,
-      const UINT destinationWidth,
-      const UINT destinationHeight
-    )
-    {
-      if (x >= destinationWidth || y >= destinationHeight) {
-        return false;
-      }
-      box.right = std::min({box.right, sourceWidth, box.left + (destinationWidth - x)});
-      box.bottom = std::min({box.bottom, sourceHeight, box.top + (destinationHeight - y)});
-      return box.left < box.right && box.top < box.bottom;
-    }
-  } // namespace
-
   void DeviceD3D12::StretchRect(
     const std::shared_ptr<RenderTarget>& source,
     const std::shared_ptr<RenderTarget>& destination,
@@ -2551,29 +2526,27 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
       D3D12_TEXTURE_COPY_LOCATION origin{};
       origin.pResource = from.resource.resource.Get();
       origin.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
-      D3D12_BOX box{};
-      box.left = static_cast<UINT>(fromRect.left);
-      box.top = static_cast<UINT>(fromRect.top);
-      box.right = static_cast<UINT>(fromRect.right);
-      box.bottom = static_cast<UINT>(fromRect.bottom);
-      box.front = 0U;
-      box.back = 1U;
-      // a source box or a destination that reaches past a surface is cut to it (the copy would be a device error)
-      if (!ClampCopyBox(
-            box,
+      // a box or a destination that reaches past a surface is cut to it (an invalid copy makes the command list
+      // unusable); D3D9's StretchRect would fail it, and the engine's refraction copy can be a row too tall
+      CopyRegion region{fromRect.left, fromRect.top, fromRect.right, fromRect.bottom, toRect.left, toRect.top};
+      if (!ClampCopyRegion(
+            region,
             sourceContext->width_,
             sourceContext->height_,
-            static_cast<UINT>(toRect.left),
-            static_cast<UINT>(toRect.top),
             destinationContext->width_,
             destinationContext->height_
           )) {
         return;
       }
+      D3D12_BOX box{};
+      box.left = static_cast<UINT>(region.left);
+      box.top = static_cast<UINT>(region.top);
+      box.right = static_cast<UINT>(region.right);
+      box.bottom = static_cast<UINT>(region.bottom);
+      box.front = 0U;
+      box.back = 1U;
       MarkDraw("StretchRect copy");
-      mList->CopyTextureRegion(
-        &target, static_cast<UINT>(toRect.left), static_cast<UINT>(toRect.top), 0U, &origin, &box
-      );
+      mList->CopyTextureRegion(&target, static_cast<UINT>(region.x), static_cast<UINT>(region.y), 0U, &origin, &box);
       FinishDraw();
       return;
     }
@@ -2718,35 +2691,37 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
       D3D12_TEXTURE_COPY_LOCATION origin{};
       origin.pResource = sourceTexture->Resource().resource.Get();
       origin.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
-      D3D12_BOX box{};
-      const D3D12_BOX* boxPointer = nullptr;
+      // The box is cut to both surfaces whether or not a source rectangle is given: the whole source copied to an
+      // offset of the destination reaches past it too.
+      CopyRegion region{0, 0, static_cast<std::int64_t>(sourceDesc.Width), sourceDesc.Height, 0, 0};
       if (sourceRect != nullptr) {
-        box.left = static_cast<UINT>(sourceRect->left);
-        box.top = static_cast<UINT>(sourceRect->top);
-        box.right = static_cast<UINT>(sourceRect->right);
-        box.bottom = static_cast<UINT>(sourceRect->bottom);
-        box.front = 0U;
-        box.back = 1U;
-        boxPointer = &box;
+        region.left = sourceRect->left;
+        region.top = sourceRect->top;
+        region.right = sourceRect->right;
+        region.bottom = sourceRect->bottom;
       }
-      const UINT x = (destinationRect != nullptr) ? static_cast<UINT>(destinationRect->left) : 0U;
-      const UINT y = (destinationRect != nullptr) ? static_cast<UINT>(destinationRect->top) : 0U;
-      if (
-        boxPointer != nullptr &&
-        !ClampCopyBox(
-          box,
-          static_cast<UINT>(sourceDesc.Width),
-          sourceDesc.Height,
-          x,
-          y,
-          static_cast<UINT>(destinationDesc.Width),
-          destinationDesc.Height
-        )
-      ) {
+      if (destinationRect != nullptr) {
+        region.x = destinationRect->left;
+        region.y = destinationRect->top;
+      }
+      if (!ClampCopyRegion(
+            region,
+            static_cast<std::int64_t>(sourceDesc.Width),
+            sourceDesc.Height,
+            static_cast<std::int64_t>(destinationDesc.Width),
+            destinationDesc.Height
+          )) {
         return;
       }
+      D3D12_BOX box{};
+      box.left = static_cast<UINT>(region.left);
+      box.top = static_cast<UINT>(region.top);
+      box.right = static_cast<UINT>(region.right);
+      box.bottom = static_cast<UINT>(region.bottom);
+      box.front = 0U;
+      box.back = 1U;
       MarkDraw("UpdateSurface copy");
-      mList->CopyTextureRegion(&target, x, y, 0U, &origin, boxPointer);
+      mList->CopyTextureRegion(&target, static_cast<UINT>(region.x), static_cast<UINT>(region.y), 0U, &origin, &box);
       FinishDraw();
       destinationTexture->DiscardCpuCopy();
       return;

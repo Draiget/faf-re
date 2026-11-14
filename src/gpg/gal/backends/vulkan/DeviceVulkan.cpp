@@ -21,6 +21,7 @@
 
 #include "gpg/core/utils/Logging.h"
 #include "gpg/gal/backends/common/BackendErrors.h"
+#include "gpg/gal/backends/common/CopyRegion.h"
 #include "gpg/gal/backends/common/ImageCodec.h"
 #include "gpg/gal/backends/common/RuntimeInfo.h"
 #include "gpg/gal/backends/d3d11/D3D11VertexLayouts.h"
@@ -2629,17 +2630,27 @@ namespace gpg::gal
       VkImageCopy region{};
       region.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0U, 0U, 1U};
       region.dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0U, 0U, 1U};
-      std::uint32_t width = std::min(source.width, destination.width);
-      std::uint32_t height = std::min(source.height, destination.height);
+      // The box is cut to both images (a copy past one is invalid in Vulkan, as in Direct3D 12): the whole source, or
+      // the source rectangle, at the destination rectangle's corner.
+      CopyRegion area{0, 0, source.width, source.height, 0, 0};
       if (sourceRect != nullptr) {
-        region.srcOffset = {sourceRect->left, sourceRect->top, 0};
-        width = static_cast<std::uint32_t>(sourceRect->right - sourceRect->left);
-        height = static_cast<std::uint32_t>(sourceRect->bottom - sourceRect->top);
+        area.left = sourceRect->left;
+        area.top = sourceRect->top;
+        area.right = sourceRect->right;
+        area.bottom = sourceRect->bottom;
       }
       if (destinationRect != nullptr) {
-        region.dstOffset = {destinationRect->left, destinationRect->top, 0};
+        area.x = destinationRect->left;
+        area.y = destinationRect->top;
       }
-      region.extent = {width, height, 1U};
+      if (!ClampCopyRegion(area, source.width, source.height, destination.width, destination.height)) {
+        return;
+      }
+      region.srcOffset = {static_cast<std::int32_t>(area.left), static_cast<std::int32_t>(area.top), 0};
+      region.dstOffset = {static_cast<std::int32_t>(area.x), static_cast<std::int32_t>(area.y), 0};
+      region.extent = {
+        static_cast<std::uint32_t>(area.right - area.left), static_cast<std::uint32_t>(area.bottom - area.top), 1U
+      };
       Vk().vkCmdCopyImage(
         mCommands,
         source.image,
