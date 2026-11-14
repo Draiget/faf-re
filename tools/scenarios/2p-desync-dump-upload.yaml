@@ -9,7 +9,7 @@ description: >
   real desync. Each client must write its zip and a .tar.gz copy, and post the
   copy with HTTP 201; the receiver then holds both armies' dumps of game
   424242 and compares them. Needs init_mpemu_localvault.lua. Run with
-  -advertise 192.168.42.77 on the isolated account. Do not click into the game
+  -advertise <lan-address> on the isolated account. Do not click into the game
   windows.
 timeout: 15m
 

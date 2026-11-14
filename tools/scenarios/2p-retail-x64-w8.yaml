@@ -5,7 +5,7 @@ description: >
   match on faf_re_lockstep, where the map script hands every army to FAF's AI.
   Run B: our x64 with /simworkers 8 (Automatic renderer).
   Compare the "faf_re_lockstep: status tick=N ..." lines across game-*.log.
-  Needs init_mpemu_localvault.lua. Run with -advertise 192.168.42.77 on the
+  Needs init_mpemu_localvault.lua. Run with -advertise <lan-address> on the
   isolated account. Do not click into the game windows.
 timeout: 40m
 

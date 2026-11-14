@@ -347,12 +347,12 @@ func TestRequestChecks(t *testing.T) {
 func TestClientIP(t *testing.T) {
 	r := httptest.NewRequest("POST", "/", nil)
 	r.RemoteAddr = "198.51.100.1:5000"
-	r.Header.Set("X-Forwarded-For", "10.0.0.1")
+	r.Header.Set("X-Forwarded-For", "203.0.113.99")
 	if got := clientIP(r); got != "198.51.100.1" {
 		t.Fatalf("a direct client claiming another address: %s", got)
 	}
 	r.RemoteAddr = "127.0.0.1:5000"
-	r.Header.Set("X-Forwarded-For", "10.9.9.9, 198.51.100.2")
+	r.Header.Set("X-Forwarded-For", "203.0.113.98, 198.51.100.2")
 	if got := clientIP(r); got != "198.51.100.2" {
 		t.Fatalf("behind a local proxy: %s", got)
 	}

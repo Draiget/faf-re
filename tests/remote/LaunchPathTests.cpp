@@ -37,8 +37,9 @@ namespace
     BadAddressIsRefused
   )
   {
-    for (const char* const endpoint :
-         {"", "203.0.113.7", "203.0.113.7:0", "203.0.113.7:70000", "server:27050", "1.2.3:27050", " 1.2.3.4:27050"}) {
+    for (const char* const endpoint : {
+           "", "203.0.113.7", "203.0.113.7:0", "203.0.113.7:70000", "server:27050", "1.2.3:27050", " 203.0.113.4:27050"
+         }) {
       SServerConnectRequest request;
       std::string error;
       EXPECT_FALSE(MakeServerConnectRequest(endpoint, "token", 1001, request, error)) << endpoint;
@@ -57,7 +58,7 @@ namespace
          {std::string(), std::string("two words"), std::string("tab\there"), tooLong, std::string("caf\xC3\xA9")}) {
       SServerConnectRequest request;
       std::string error;
-      EXPECT_FALSE(MakeServerConnectRequest("10.0.0.1:27050", token, 1001, request, error)) << token;
+      EXPECT_FALSE(MakeServerConnectRequest("192.0.2.1:27050", token, 1001, request, error)) << token;
       EXPECT_FALSE(error.empty());
       if (!token.empty()) {
         EXPECT_EQ(error.find(token), std::string::npos) << "the error must not repeat the token";
@@ -65,7 +66,7 @@ namespace
     }
     SServerConnectRequest longest;
     std::string error;
-    EXPECT_TRUE(MakeServerConnectRequest("10.0.0.1:27050", std::string(1024, 'a'), 1001, longest, error)) << error;
+    EXPECT_TRUE(MakeServerConnectRequest("192.0.2.1:27050", std::string(1024, 'a'), 1001, longest, error)) << error;
   }
 
   TEST(
@@ -76,7 +77,7 @@ namespace
     for (const std::int32_t uid : {0, -1, -1001}) {
       SServerConnectRequest request;
       std::string error;
-      EXPECT_FALSE(MakeServerConnectRequest("10.0.0.1:27050", "token", uid, request, error)) << uid;
+      EXPECT_FALSE(MakeServerConnectRequest("192.0.2.1:27050", "token", uid, request, error)) << uid;
       EXPECT_NE(error.find("above 0"), std::string::npos) << error;
     }
   }

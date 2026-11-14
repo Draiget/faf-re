@@ -163,8 +163,8 @@ namespace
     if (a == nullptr || b == nullptr) {
       return r;
     }
-    constexpr std::uint32_t kAddrA = 0x0AFF0001; // 10.255.0.1
-    constexpr std::uint32_t kAddrB = 0x0AFF0002; // 10.255.0.2
+    constexpr std::uint32_t kAddrA = 0xC6336401; // 198.51.100.1
+    constexpr std::uint32_t kAddrB = 0xC6336402; // 198.51.100.2
     auto toB = std::make_shared<LossyPipe>();
     toB->to = b;
     toB->fromAddr = kAddrA;

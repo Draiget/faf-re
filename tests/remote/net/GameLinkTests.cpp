@@ -176,9 +176,16 @@ namespace
       "an address reads"
     );
     Check(endpoint.Text() == "192.0.2.7:7777", "and writes back");
-    for (const char* const bad : {
-           "", "1.2.3", "1.2.3.4", "1.2.3.4:", "1.2.3.4:0", "1.2.3.4:70000", "1.2.3.256:80", "a.b.c.d:80", "1.2.3.4:80x"
-         }) {
+    for (const char* const bad :
+         {"",
+          "1.2.3",
+          "203.0.113.4",
+          "203.0.113.4:",
+          "203.0.113.4:0",
+          "203.0.113.4:70000",
+          "1.2.3.256:80",
+          "a.b.c.d:80",
+          "203.0.113.4:80x"}) {
       SEndpoint ignored;
       Check(!ParseEndpoint(bad, ignored), "a bad address doesn't read");
     }

@@ -74,7 +74,7 @@ namespace fa
   ) noexcept
   {
     // `ldiv`'s quotient and remainder are by definition `key / 127773` and `key % 127773` (both
-    // truncating, C99 7.20.6.2); written out, the compiler turns the constant division into a
+    // truncating, C99 section 7.20.6.2); written out, the compiler turns the constant division into a
     // multiply instead of a library call on every hash.
     const long quot = key / 127773L;
     const long rem = key % 127773L;

@@ -27,8 +27,8 @@ namespace
     AddressText
   )
   {
-    EXPECT_EQ(faf::server::NftablesAddressText(0xC0A82A4Du), "192.168.42.77");
-    EXPECT_EQ(faf::server::NftablesAddressText(0x0A000001u), "10.0.0.1");
+    EXPECT_EQ(faf::server::NftablesAddressText(0xC000024Du), "192.0.2.77");
+    EXPECT_EQ(faf::server::NftablesAddressText(0xC6336401u), "198.51.100.1");
   }
 
   TEST(
@@ -38,11 +38,11 @@ namespace
   {
     SNftablesConfig config;
     config.port = 27050;
-    config.listed = {0xC0A82A4Du, 0x0A000001u};
+    config.listed = {0xC000024Du, 0xC6336401u};
     const std::string rules = MakeNftablesRuleset(config);
     EXPECT_TRUE(Has(rules, "table inet faf_server_27050 {"));
     EXPECT_TRUE(Has(rules, "delete table inet faf_server_27050\n")) << "loading it twice must replace, not add";
-    EXPECT_TRUE(Has(rules, "elements = { 192.168.42.77, 10.0.0.1 }"));
+    EXPECT_TRUE(Has(rules, "elements = { 192.0.2.77, 198.51.100.1 }"));
     EXPECT_TRUE(Has(rules, "udp dport 27050 ip saddr @listed4 counter accept"));
     EXPECT_FALSE(Has(rules, "meter")) << "no admission path";
     EXPECT_TRUE(Has(rules, "udp dport 27050 counter drop comment \"unlisted\""));

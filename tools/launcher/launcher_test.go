@@ -79,7 +79,7 @@ func TestAutolobbyNeedsDistinctStartSpots(t *testing.T) {
 
 func serverConfig() Config {
 	return Config{Mode: ModeServer, Game: GameConfig{Exe: "game.exe"},
-		Server: ServerConfig{Address: "10.0.0.1:27050"},
+		Server: ServerConfig{Address: "192.0.2.1:27050"},
 		Players: []PlayerConfig{
 			{UID: 1001, ServerToken: "token-of-seat-one"},
 			{UID: 1002, ServerToken: "token-of-seat-two", ServerDelivery: seat.DeliverArgs},
@@ -127,7 +127,7 @@ func TestServerModeSeatsCarryOnlyTheirOwnToken(t *testing.T) {
 		for other, tok := range tokens {
 			inConfig, inArgs := strings.Contains(string(raw), tok), strings.Contains(line, tok)
 			if other == uid {
-				if !inConfig || sc.Server == nil || sc.Server.Token != tok || sc.Server.Address != "10.0.0.1:27050" {
+				if !inConfig || sc.Server == nil || sc.Server.Token != tok || sc.Server.Address != "192.0.2.1:27050" {
 					t.Fatalf("player %d lacks its own connection string: %s", uid, raw)
 				}
 				if inArgs != (sc.Server.Delivery == seat.DeliverArgs) {
@@ -157,16 +157,16 @@ func TestCheckServerTokensFindsLeaks(t *testing.T) {
 	l := newTestLauncher(t, serverConfig())
 	tag := func(tok string) string { return seat.TokenTag(tok) }
 	l.j.Add(journal.Record{Kind: journal.GpgOut, UID: 1001, Command: "JoinServer",
-		Args: []any{"10.0.0.1:27050", tag("token-of-seat-one"), int32(1001)}})
+		Args: []any{"192.0.2.1:27050", tag("token-of-seat-one"), int32(1001)}})
 	l.j.Add(journal.Record{Kind: journal.GpgOut, UID: 1003, Command: "JoinServer",
-		Args: []any{"10.0.0.1:27050", tag("token-of-seat-three"), int32(1003)}})
+		Args: []any{"192.0.2.1:27050", tag("token-of-seat-three"), int32(1003)}})
 	_ = os.WriteFile(filepath.Join(l.cfg.RunDir, "debug-args-1002.txt"), []byte("/servertoken token-of-seat-two"), 0o644)
 	if res := l.CheckServerTokens(); len(res.Fails) != 0 {
 		t.Fatalf("a clean run fails: %v", res.Fails)
 	}
 
 	l.j.Add(journal.Record{Kind: journal.GpgOut, UID: 1003, Command: "JoinServer",
-		Args: []any{"10.0.0.1:27050", tag("token-of-seat-one"), int32(1003)}})
+		Args: []any{"192.0.2.1:27050", tag("token-of-seat-one"), int32(1003)}})
 	l.j.Add(journal.Record{Kind: journal.Note, Text: "token-of-seat-two"})
 	_ = os.WriteFile(filepath.Join(l.cfg.RunDir, "game-1001.log"), []byte("x token-of-seat-three y"), 0o644)
 	res := l.CheckServerTokens()

@@ -8,7 +8,7 @@ description: >
   float step at beat 300 (/desynctestbeat), a real desync. Each client must
   send one faf.desync record (game id 424242 from its gpgnet:// /savereplay)
   and, when /exitattick quits it at tick 450, one faf.game.end record.
-  Needs init_mpemu_localvault.lua. Run with -advertise 192.168.42.77 on the
+  Needs init_mpemu_localvault.lua. Run with -advertise <lan-address> on the
   isolated account. Do not click into the game windows.
 timeout: 15m
 

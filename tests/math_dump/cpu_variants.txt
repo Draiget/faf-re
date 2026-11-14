@@ -4,7 +4,7 @@
 #
 # acos runs retail's own x87 sequence (X87Math.cpp fa::acos, X87Math64.S msvc8_x87_acos: (1+x)(1-x), fsqrt, fpatan at
 # 24-bit precision). fpatan's last bit isn't fixed by IEEE, and CPUs differ: retail on the same CPU gives the same.
-# golden.txt is Intel's (this PC i9-10980XE Windows x64, fw0 Xeon Gold 6144 Linux x64 pass with no variant).
+# golden.txt is Intel's (this PC i9-10980XE Windows x64, a Xeon Gold 6144 Linux x64 pass with no variant).
 # Seen on GitHub's ubuntu-24.04 runners from 2026-11-11 (AddressSanitizer run 43029796119, af9763ce9):
 acos 0 f80255785993ca27 54528528e4839452 AuthenticAMD AMD EPYC 9V45 96-Core Processor: x87 fpatan rounds differently
 acos 1 ff54899e5ff37024 fe58a42f03e586b0 AuthenticAMD AMD EPYC 9V45 96-Core Processor: x87 fpatan rounds differently

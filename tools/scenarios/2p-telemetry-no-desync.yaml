@@ -4,7 +4,7 @@ description: >
   (bin_x64\desync_test.exe) with telemetry on and no desync. Each must send
   only one faf.game.end record when /exitattick quits it at tick 300. Start an
   OpenTelemetry collector on 127.0.0.1:4318 first. Needs
-  init_mpemu_localvault.lua; run with -advertise 192.168.42.77 on the
+  init_mpemu_localvault.lua; run with -advertise <lan-address> on the
   isolated account.
 timeout: 12m
 

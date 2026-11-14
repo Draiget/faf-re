@@ -119,13 +119,13 @@ type ContractConfig struct {
 	// "native": no adapter, the game links every peer itself (issue #274).
 	Adapter string `yaml:"adapter"`
 	// NativeBind is /nativenetbind for "native" players: the address ICE host
-	// candidates use (e.g. 192.168.42.77 where inbound UDP to 0.0.0.0 is dropped).
+	// candidates use (e.g. 192.0.2.77 where inbound UDP to 0.0.0.0 is dropped).
 	NativeBind string `yaml:"nativeBind"`
 	// ExeArgs go after the launcher's arguments for native adapters only
-	// (e.g. --bind-address 192.168.42.77 where inbound UDP to 0.0.0.0 is dropped).
+	// (e.g. --bind-address 192.0.2.77 where inbound UDP to 0.0.0.0 is dropped).
 	ExeArgs []string `yaml:"exeArgs"`
 	// JarBind is for players on FAF's jar where loopback UDP to sockets bound to
-	// every interface is dropped (e.g. 192.168.42.77): mpemu then stands between
+	// every interface is dropped (e.g. 192.0.2.77): mpemu then stands between
 	// the game and the jar (seat.jarBridge).
 	JarBind string `yaml:"jarBind"`
 	// ForceRelay passes --force-relay.
