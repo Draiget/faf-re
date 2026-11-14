@@ -12,13 +12,6 @@ namespace faf::editor
   {
     constexpr double kPi = 3.141592653589793;
 
-    [[nodiscard]] int SizeUnits(
-      const NewMapSettings& settings
-    )
-    {
-      return kNewMapSizes[std::clamp(settings.size, 0, kNewMapSizeCount - 1)].units;
-    }
-
     [[nodiscard]] int Players(
       const NewMapSettings& settings
     )
@@ -118,25 +111,41 @@ namespace faf::editor
     }
   } // namespace
 
+  int NewMapWidth(
+    const NewMapSettings& settings
+  )
+  {
+    return kNewMapSizes[std::clamp(settings.size, 0, kNewMapSizeCount - 1)].units;
+  }
+
+  int NewMapDepth(
+    const NewMapSettings& settings
+  )
+  {
+    return settings.sizeZ < 0 ? NewMapWidth(settings)
+                              : kNewMapSizes[std::clamp(settings.sizeZ, 0, kNewMapSizeCount - 1)].units;
+  }
+
   std::vector<NewMapSpawn> NewMapSpawns(
     const NewMapSettings& settings
   )
   {
     const int players = Players(settings);
-    const double size = SizeUnits(settings);
-    const double centre = size * 0.5;
+    const double width = NewMapWidth(settings);
+    const double depth = NewMapDepth(settings);
+    const double cx = width * 0.5;
+    const double cz = depth * 0.5;
     std::vector<NewMapSpawn> spawns;
     if (players == 1) {
-      spawns.push_back({static_cast<float>(centre), static_cast<float>(centre)});
+      spawns.push_back({static_cast<float>(cx), static_cast<float>(cz)});
       return spawns;
     }
-    const double radius = size * 0.35;
     for (int i = 0; i < players; ++i) {
       // From the top (smallest z), going round clockwise as seen from above.
       const double angle = -kPi * 0.5 + 2.0 * kPi * i / players;
       spawns.push_back(
-        {static_cast<float>(std::round((centre + radius * std::cos(angle)) * 2.0) * 0.5),
-         static_cast<float>(std::round((centre + radius * std::sin(angle)) * 2.0) * 0.5)}
+        {static_cast<float>(std::round((cx + width * 0.35 * std::cos(angle)) * 2.0) * 0.5),
+         static_cast<float>(std::round((cz + depth * 0.35 * std::sin(angle)) * 2.0) * 0.5)}
       );
     }
     return spawns;
@@ -147,7 +156,8 @@ namespace faf::editor
     const std::string& base
   )
   {
-    const int size = SizeUnits(settings);
+    const int width = NewMapWidth(settings);
+    const int depth = NewMapDepth(settings);
     const int players = Players(settings);
     const std::string prefix = "/maps/" + settings.folder + "/" + base;
     std::string armies;
@@ -163,7 +173,7 @@ namespace faf::editor
     text += "    map_version = 1,\n";
     text += std::string("    type = '") + (settings.campaign ? "campaign" : "skirmish") + "',\n";
     text += "    starts = true,\n";
-    text += "    size = {" + std::to_string(size) + ", " + std::to_string(size) + "},\n";
+    text += "    size = {" + std::to_string(width) + ", " + std::to_string(depth) + "},\n";
     text += "    reclaim = {0, 0},\n";
     text += "    map = '" + prefix + ".scmap',\n";
     text += "    save = '" + prefix + "_save.lua',\n";
@@ -261,12 +271,14 @@ namespace faf::editor
   )
   {
     constexpr std::uint32_t kSide = 256;
-    const float size = static_cast<float>(SizeUnits(settings));
+    const float width = static_cast<float>(NewMapWidth(settings));
+    const float depth = static_cast<float>(NewMapDepth(settings));
+    const float size = std::max(width, depth); // (the preview is square: the map at its longer side's scale)
     std::vector<char> out;
     AppendWord(out, 0xBEEFFEEDu);
     AppendWord(out, 2u);
-    AppendFloat(out, size);
-    AppendFloat(out, size);
+    AppendFloat(out, width);
+    AppendFloat(out, depth);
     out.push_back(0); // the name: empty, in UTF-16
     out.push_back(0);
     AppendWord(out, 0u); // no tag/value pairs

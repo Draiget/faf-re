@@ -298,11 +298,10 @@ namespace faf::editor
       load.lua = NewDocumentState();
       LuaPlus::LuaState* const state = load.lua.get();
       const NewMapSettings& settings = load.settings;
-      const int units = kNewMapSizes[std::clamp(settings.size, 0, kNewMapSizeCount - 1)].units;
-
-      // The engine's empty map: terrain (default layers, cleared masks, water off), no props.
+      // The engine's empty map: terrain (default layers, cleared masks, water off), no props; as wide and deep as
+      // asked.
       auto map = std::make_unique<moho::CWldMap>();
-      (void)map->MapNew(units, units, state);
+      (void)map->MapNew(NewMapWidth(settings), NewMapDepth(settings), state);
       moho::CHeightField* const field = map->mTerrainRes != nullptr ? map->mTerrainRes->GetHeightField() : nullptr;
       if (field == nullptr) {
         load.error = "the engine made no terrain";

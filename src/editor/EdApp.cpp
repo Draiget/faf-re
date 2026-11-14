@@ -10120,6 +10120,9 @@ namespace faf::editor
           settings.seaLevel = static_cast<float>(std::atof(parts[4].c_str()));
           settings.sea = settings.seaLevel > 0.0f;
         }
+        if (parts.size() >= 6) {
+          settings.sizeZ = std::atoi(parts[5].c_str()); // a depth of its own (the size list's index)
+        }
         mNewMapSpec.clear();
         std::string message;
         if (mDocument.CreateNew(settings, message)) {

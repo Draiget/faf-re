@@ -2575,6 +2575,20 @@ namespace faf::editor
         mNewMap.size = i;
       }
     }
+    // A map that isn't square: its depth (north-south) of its own.
+    ImGui::TextUnformatted("Depth");
+    ImGui::SameLine(Em(110.0f));
+    if (ImGui::RadioButton("Square", mNewMap.sizeZ < 0)) {
+      mNewMap.sizeZ = -1;
+    }
+    for (int i = 0; i < kNewMapSizeCount; ++i) {
+      ImGui::SameLine();
+      ImGui::PushID(100 + i);
+      if (ImGui::RadioButton(kNewMapSizes[i].name, mNewMap.sizeZ == i)) {
+        mNewMap.sizeZ = i;
+      }
+      ImGui::PopID();
+    }
     ImGui::SetNextItemWidth(kWidth);
     FillSliderInt("Players", &mNewMap.players, 1, kNewMapMaxPlayers);
     ImGui::SetNextItemWidth(kWidth);
