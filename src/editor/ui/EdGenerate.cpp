@@ -407,6 +407,11 @@ namespace faf::editor
         mStatus = "Build stopped: the ground kinds couldn't be resolved (" + paintError + ").";
       } else if (!hasHeights && !hasPaint) {
         mStatus = "Nothing to build: no output node with an input.";
+        // Why an output wrote nothing ("Output: roughness / height atlas: the map's shader reads no atlas ...").
+        for (const std::string& note : writes.notes) {
+          mStatus += " " + note + ".";
+        }
+        gpg::Logf("editor: generate: %s", mStatus.c_str());
       } else {
         mAsk = HeightsAsk{HeightsAsk::Kind::Build, hasHeights ? std::move(heights) : field::Grid{}, plain};
         mAsk.writes = std::move(writes);
@@ -832,7 +837,9 @@ namespace faf::editor
       TerrainRun run(step);
       const TerrainReport report = run.Evaluate(*mGraph, item.seed, ground);
       field::Grid heights;
-      if (report.errors.empty() && run.FinalHeight(*mGraph, ground, heights) && heights.w > 1) {
+      const bool hasHeights = report.errors.empty() && run.FinalHeight(*mGraph, ground, heights);
+      item.noHeights = report.errors.empty() && !hasHeights;
+      if (hasHeights && heights.w > 1) {
         field::Downsample(heights, kSize, kSize, small);
         if (small.size() == pixels.size()) {
           const auto [lo, hi] = std::minmax_element(small.begin(), small.end());
@@ -859,6 +866,12 @@ namespace faf::editor
   {
     if (mGallery.empty()) {
       ImGui::TextDisabled("Working out the variations...");
+      return;
+    }
+    if (std::all_of(mGallery.begin(), mGallery.end(), [](const GalleryItem& item) {
+      return item.noHeights;
+    })) {
+      ImGui::TextDisabled("The graph writes no heights: there is nothing to picture.");
       return;
     }
     const float gap = ImGui::GetStyle().ItemSpacing.x;

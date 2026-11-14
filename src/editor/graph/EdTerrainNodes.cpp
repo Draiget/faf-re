@@ -3528,9 +3528,11 @@ namespace faf::editor::terrain
         "out_atlas",
         "Output: roughness / height atlas",
         "outputs",
-        "The roughness / height atlas of the Upper layer for the Terrain1xx and Terrain2xx shaders (not written by "
-        "this editor "
-        "yet).",
+        "Build makes the roughness / height atlas of the Upper layer from the layers' textures and their kinds of "
+        "ground (rock stands above grass above wet ground, so the 2xx splatting lets the right layer win); the "
+        "Terrain1xx and Terrain2xx shaders read it. It holds one tile per layer, so it follows the textures and the "
+        "kinds, not the masks: shape the transitions with the style or the settings, and on the 2xx shaders with the "
+        "splat softness / contrast (0 leaves the map's).",
         {},
         {},
         {C("size", "Texture size (pixels)", {"512", "1024"}, {"512", "1024"}, "1024"),

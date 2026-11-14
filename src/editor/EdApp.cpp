@@ -42,6 +42,7 @@
 #include "editor/EdPlay.h"
 #include "editor/EdShell.h"
 #include "editor/tools/EdHeightFile.h"
+#include "editor/tools/EdAlphaGen.h"
 #include "editor/tools/EdLayoutMarkers.h"
 #include "editor/tools/EdMapLayout.h"
 #include "editor/tools/EdSymmetrize.h"
@@ -2613,6 +2614,159 @@ namespace faf::editor
         ++mLayoutTestStage;
       }
 
+      /**
+       * A terrain graph's Output: roughness / height atlas: each layer's tile from its textures (read at 256 pixels)
+       * and its kind of ground, packed 2 x 2 into map_atlas.dds beside the map and put in the Upper layer (its own
+       * undo step, as the map-wide textures are); on the Terrain2xx shaders the splat softness / contrast too.
+       */
+      std::string MakeAtlasTexture(
+        const TerrainBuildWrites& writes
+      )
+      {
+        const std::filesystem::path scmap = mDocument.MapDiskFile();
+        const std::vector<EdTools::LayerSlot> slots = mScene.LayerSlots();
+        gpg::gal::imaging::ImageCodec* const codec = gpg::gal::imaging::ImageCodec::Instance();
+        if (scmap.empty()) {
+          return "The atlas wasn't made: the map has no folder of its own (save it as a new map first).";
+        }
+        if (slots.size() < 10 || codec == nullptr) {
+          return "The atlas wasn't made: the map has no Upper layer.";
+        }
+        const auto started = std::chrono::steady_clock::now();
+        // A texture as kAtlasTile square BGRA bytes.
+        const auto decode = [&](const std::string& path, std::vector<std::uint8_t>& bgra) {
+          std::string bytes;
+          if (path.empty() || !ReadGameFile(path, bytes)) {
+            return false;
+          }
+          gpg::gal::imaging::DecodeOptions options;
+          options.format = DXGI_FORMAT_B8G8R8A8_UNORM;
+          options.width = kAtlasTile;
+          options.height = kAtlasTile;
+          options.mipLevels = 1;
+          gpg::gal::imaging::Image image;
+          if (
+            FAILED(codec->Decode(bytes.data(), bytes.size(), options, image)) || image.subresources.empty() ||
+            image.format != DXGI_FORMAT_B8G8R8A8_UNORM
+          ) {
+            return false;
+          }
+          const auto& level = image.subresources.front();
+          if (
+            level.width != static_cast<std::uint32_t>(kAtlasTile) ||
+            level.height != static_cast<std::uint32_t>(kAtlasTile)
+          ) {
+            return false;
+          }
+          bgra.resize(static_cast<std::size_t>(kAtlasTile) * kAtlasTile * 4);
+          for (int y = 0; y < kAtlasTile; ++y) {
+            std::memcpy(
+              bgra.data() + static_cast<std::size_t>(y) * kAtlasTile * 4,
+              image.bytes.data() + level.offset + static_cast<std::size_t>(y) * level.rowPitch,
+              static_cast<std::size_t>(kAtlasTile) * 4
+            );
+          }
+          return true;
+        };
+        EdTextureLibrary& library = mShell->Tools().Library();
+        std::array<AtlasTile, 8> made;
+        std::array<const AtlasTile*, 8> tiles{};
+        std::array<GroundKind, 8> kinds{};
+        std::string kindText;
+        int textured = 0;
+        for (int layer = 0; layer < 8; ++layer) {
+          const EdTools::LayerSlot& slot = slots[static_cast<std::size_t>(layer)];
+          if (slot.albedo.empty()) {
+            continue;
+          }
+          float rgb[3] = {0.4f, 0.4f, 0.4f};
+          const bool read = library.AverageColour(slot.albedo, rgb);
+          kinds[static_cast<std::size_t>(layer)] = GroundKindOf(slot.albedo, read ? rgb : nullptr).kind;
+          kindText += (kindText.empty() ? "" : ", ") + std::to_string(layer) + " " +
+            GroundKindName(kinds[static_cast<std::size_t>(layer)]);
+          std::vector<std::uint8_t> albedo;
+          std::vector<std::uint8_t> normal;
+          if (!decode(slot.albedo, albedo)) {
+            continue; // a texture the game can't read keeps the neutral tile
+          }
+          (void)decode(slot.normals, normal);
+          std::string error;
+          if (
+            MakeAtlasTile(
+              albedo,
+              normal,
+              kinds[static_cast<std::size_t>(layer)],
+              writes.atlasSettings,
+              made[static_cast<std::size_t>(layer)],
+              error
+            )
+          ) {
+            tiles[static_cast<std::size_t>(layer)] = &made[static_cast<std::size_t>(layer)];
+            ++textured;
+          } else {
+            gpg::Warnf("editor: atlas: layer %d: %s", layer, error.c_str());
+          }
+        }
+        std::vector<float> rgba;
+        PackAtlas(tiles, kinds, writes.atlasSettings, writes.atlasSize, rgba);
+        TexImage image;
+        image.Reset(writes.atlasSize, 4, 0.0f);
+        image.data = std::move(rgba);
+        std::vector<std::uint8_t> dds;
+        std::string error;
+        if (!EncodeDds(image, DdsKind::Bgra, dds, error)) {
+          return "The atlas wasn't encoded: " + error + ".";
+        }
+        const std::filesystem::path folder = scmap.parent_path() / "env" / "layers";
+        std::error_code ec;
+        std::filesystem::create_directories(folder, ec);
+        {
+          std::ofstream out(folder / "map_atlas.dds", std::ios::binary | std::ios::trunc);
+          out.write(reinterpret_cast<const char*>(dds.data()), static_cast<std::streamsize>(dds.size()));
+          if (!out) {
+            return "Can't write " + (folder / "map_atlas.dds").string() + ".";
+          }
+        }
+        const std::string game = "/maps/" + mDocument.FolderName() + "/env/layers/map_atlas.dds";
+        EdTools::LayerSlot upper = slots[9];
+        upper.albedo = game;
+        mScene.ChangeLayerSlot(9, upper);
+        std::string splat;
+        if (writes.splatSoft > 0.0f || writes.splatContrast > 0.0f) {
+          const LightingState before = mDocument.LightingNow();
+          LightingState lighting = before;
+          if (writes.splatSoft > 0.0f) {
+            lighting.specular[0] = writes.splatSoft;
+          }
+          if (writes.splatContrast > 0.0f) {
+            lighting.specular[1] = writes.splatContrast;
+          }
+          mDocument.ApplyLighting(lighting);
+          mDocument.LightingEdited(before);
+          char text[96];
+          (void)std::snprintf(
+            text,
+            sizeof(text),
+            " Splat softness %.2f, height contrast %.2f (its own undo step).",
+            static_cast<double>(lighting.specular[0]),
+            static_cast<double>(lighting.specular[1])
+          );
+          splat = text;
+        }
+        const double seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - started).count();
+        gpg::Logf(
+          "editor: atlas %s made in %.1f s: %dx%d, %d of 8 layers from their textures (%s)",
+          game.c_str(),
+          seconds,
+          writes.atlasSize,
+          writes.atlasSize,
+          textured,
+          kindText.c_str()
+        );
+        return "Roughness / height atlas made from " + std::to_string(textured) +
+          " layers' textures and put in the Upper layer (its own undo step)." + splat;
+      }
+
       void DriveGenerate()
       {
         EdGenerate& generate = mShell->Generate();
@@ -2644,6 +2798,9 @@ namespace faf::editor
                                : "macrotexture") +
                 (made ? " made (its own undo step)."
                       : " not made: the map's shader doesn't read it, or it couldn't be written.");
+            }
+            if (ask.writes.atlas) {
+              status += " " + MakeAtlasTexture(ask.writes);
             }
             generate.SetStatus(status);
             break;

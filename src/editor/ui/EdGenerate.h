@@ -123,7 +123,8 @@ namespace faf::editor
     struct GalleryItem
     {
       int seed = 0;
-      std::uint64_t image = 0; // 0: the graph failed for this seed
+      std::uint64_t image = 0; // 0: the graph failed for this seed, or writes no heights
+      bool noHeights = false;  // ran without errors, but has no height output with an input
     };
     [[nodiscard]] const std::vector<GalleryItem>& Gallery() const noexcept
     {

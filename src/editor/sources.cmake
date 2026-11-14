@@ -58,6 +58,7 @@ set(FAF_EDITOR_SOURCES
   tools/EdTerrainChecks.cpp
   tools/EdMapLayout.cpp
   tools/EdLayoutMarkers.cpp
+  tools/EdAlphaGen.cpp
   tools/EdInterop.cpp
   graph/EdTerrainGraph.cpp
   graph/EdTerrainNodes.cpp

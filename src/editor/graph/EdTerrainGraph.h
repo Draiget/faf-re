@@ -1,5 +1,6 @@
 #pragma once
 
+#include "editor/tools/EdAlphaGen.h"
 #include "editor/tools/EdMapLayout.h"
 #include "editor/graph/EdNodeGraph.h"
 #include "editor/terrain/EdFieldCore.h"
@@ -288,11 +289,18 @@ namespace faf::editor
     /** The map-wide textures to make from the built map: 0 normals, 1 lighting, 2 specular, 3 macro (MapTextureKind).
      */
     std::vector<int> mapTextures;
+    /** Output: roughness / height atlas: made from the layers' textures and kinds into the Upper layer (Terrain1xx /
+     * 2xx), with the Terrain2xx splat softness / contrast (0: leave the map's). */
+    bool atlas = false;
+    AtlasSettings atlasSettings;
+    int atlasSize = 1024;
+    float splatSoft = 0.0f;
+    float splatContrast = 0.0f;
     /** Outputs left out, with why ("Output: ground kind (snow): no layer holds snow"). */
     std::vector<std::string> notes;
     [[nodiscard]] bool Empty() const noexcept
     {
-      return kinds.empty() && layers.empty() && types.empty() && scatters.empty() && mapTextures.empty();
+      return kinds.empty() && layers.empty() && types.empty() && scatters.empty() && mapTextures.empty() && !atlas;
     }
   };
 

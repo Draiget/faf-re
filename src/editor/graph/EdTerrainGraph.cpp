@@ -809,7 +809,29 @@ namespace faf::editor
         }
         continue;
       }
-      if (type == "out_atlas" || type == "out_texalpha") {
+      if (type == "out_atlas") {
+        if (!ground.pbr) {
+          writes.notes.push_back(
+            node->type->title + ": the map's shader reads no atlas (the Terrain1xx and Terrain2xx shaders do)"
+          );
+          continue;
+        }
+        writes.atlas = true;
+        writes.atlasSettings.spread = static_cast<float>(TerrainParamNumber(*node, "spread", 1.0));
+        writes.atlasSettings.biasScale = static_cast<float>(TerrainParamNumber(*node, "biasScale", 1.0));
+        writes.atlasSettings.cavity = static_cast<float>(TerrainParamNumber(*node, "cavity", 0.35));
+        writes.atlasSettings.roughDetail = static_cast<float>(TerrainParamNumber(*node, "roughDetail", 1.0));
+        writes.splatSoft = static_cast<float>(TerrainParamNumber(*node, "splatSoft", 0.0));
+        writes.splatContrast = static_cast<float>(TerrainParamNumber(*node, "splatContrast", 0.0));
+        ApplyAtlasStyle(TerrainParamText(*node, "style"), writes.atlasSettings, writes.splatSoft, writes.splatContrast);
+        writes.atlasSize = TerrainParamText(*node, "size") == "512" ? 512 : 1024;
+        if (!ground.splat) {
+          writes.splatSoft = 0.0f; // only the Terrain2xx shaders read the splat settings
+          writes.splatContrast = 0.0f;
+        }
+        continue;
+      }
+      if (type == "out_texalpha") {
         writes.notes.push_back(node->type->title + ": not written by this editor yet");
         continue;
       }
