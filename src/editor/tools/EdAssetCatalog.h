@@ -43,6 +43,12 @@ namespace faf::editor
     std::string search;                      // lower case: key, name, sub and tags
   };
 
+  /**
+   * An effect's picture: the texture its blueprint draws with (an emitter's TextureFileName, a beam's or trail's
+   * texture), or "" when it names none.
+   */
+  [[nodiscard]] std::string EffectPictureTexture(const std::string& blueprintText);
+
   struct AssetFacet
   {
     const char* id;

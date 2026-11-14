@@ -1,6 +1,10 @@
 #include "editor/tools/EdAssetCatalog.h"
 
 #include "editor/doc/EdEmitter.h"
+
+#include <regex>
+
+#include "editor/doc/EdEmitter.h"
 #include "editor/tools/EdDecals.h"
 #include "editor/tools/EdMarkers.h"
 #include "editor/tools/EdTextureLibrary.h"
@@ -461,5 +465,22 @@ namespace faf::editor
     height = size[1];
     pixels = std::move(out);
     return true;
+  }
+
+  std::string EffectPictureTexture(
+    const std::string& text
+  )
+  {
+    EmitterBlueprint emitter;
+    std::string error;
+    if (ParseEmitter(text, emitter, error) && !emitter.texture.empty()) {
+      return emitter.texture;
+    }
+    // A beam's or a trail's: the first texture it names.
+    static const std::regex kTexture(R"((\w*Texture\w*)\s*=\s*['"]([^'"]+\.dds)['"])", std::regex::icase);
+    if (std::smatch m; std::regex_search(text, m, kTexture)) {
+      return m[2].str();
+    }
+    return {};
   }
 } // namespace faf::editor

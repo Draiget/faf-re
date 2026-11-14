@@ -127,4 +127,19 @@ namespace faf::editor
     EXPECT_FALSE(ReadThumbFile(folder / "missing.thumb", w, h, back));
     EXPECT_FALSE(WriteThumbFile(a, 0, 3, pixels.data()));
   }
+
+  TEST(
+    AssetCatalog,
+    AnEffectsPictureIsTheTextureItDrawsWith
+  )
+  {
+    EXPECT_EQ(
+      faf::editor::EffectPictureTexture(
+        "TrailEmitterBlueprint {\n    RepeatTexture = true,\n    TextureName = "
+        "'/textures/particles/beam_white_01.dds',\n}"
+      ),
+      "/textures/particles/beam_white_01.dds"
+    );
+    EXPECT_EQ(faf::editor::EffectPictureTexture("SomethingBlueprint { Lifetime = 1 }"), "");
+  }
 } // namespace faf::editor

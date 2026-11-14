@@ -87,6 +87,8 @@ namespace faf::editor
     bool mRecent = false;
     std::map<std::string, std::string> mFilters; // per kind: "<kind>.<facet>" -> value
     std::string mEffectAsk;
+    std::map<std::string, std::string> mEffectTextures; // effect blueprint -> the texture its tile shows
+    int mEffectReads = 0;                               // blueprints read this frame (a few a frame)
     bool mDragging = false;
     AssetEntry mDragged;
     bool mDropAsked = false;

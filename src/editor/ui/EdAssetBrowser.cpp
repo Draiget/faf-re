@@ -1,5 +1,7 @@
 #include "editor/ui/EdAssetBrowser.h"
 
+#include "editor/doc/EdMapFile.h"
+
 #include "editor/EdTools.h"
 #include "editor/tools/EdDecals.h"
 #include "editor/tools/EdMarkers.h"
@@ -149,6 +151,20 @@ namespace faf::editor
       return mTools.Library().Thumbnail(e.key, true);
     case AssetKind::Textures:
       return mTools.Library().Thumbnail(e.key);
+    case AssetKind::Effects: {
+      // The texture the effect draws with (its blueprint read once, a few a frame).
+      auto found = mEffectTextures.find(e.key);
+      if (found == mEffectTextures.end()) {
+        if (mEffectReads >= 8) {
+          return 0U;
+        }
+        ++mEffectReads;
+        std::string text;
+        found =
+          mEffectTextures.emplace(e.key, ReadGameFile(e.key, text) ? EffectPictureTexture(text) : std::string()).first;
+      }
+      return found->second.empty() ? 0U : mTools.Library().Thumbnail(found->second, true);
+    }
     default:
       return 0U;
     }
@@ -204,6 +220,7 @@ namespace faf::editor
     bool& open
   )
   {
+    mEffectReads = 0;
     if (!ImGui::Begin(Panel("Assets###AssetBrowser"), &open)) {
       ImGui::End();
       return;
