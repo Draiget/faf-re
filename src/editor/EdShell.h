@@ -16,6 +16,7 @@
 #include "editor/doc/EdSaveFile.h"
 #include "editor/ui/EdMapBrowser.h"
 #include "editor/ui/EdGenerate.h"
+#include "editor/ui/EdLayoutPanel.h"
 #include "editor/ui/EdMaterialEditor.h"
 #include "editor/ui/EdParticleEditor.h"
 #include "imgui.h"
@@ -143,6 +144,20 @@ namespace faf::editor
     [[nodiscard]] bool GenerateShown() const noexcept
     {
       return mShowGenGraph || mShowGenNodes || mShowGenInspector;
+    }
+    /** The Layout workspace's drawing and its two panels. */
+    [[nodiscard]] EdLayoutPanel& LayoutPanel() noexcept
+    {
+      return mLayoutPanel;
+    }
+    /** Shows the layout's panels (Terrain > Layout canvas). */
+    void ShowLayout() noexcept
+    {
+      mShowLayoutLayers = mShowLayoutCanvas = true;
+    }
+    [[nodiscard]] bool LayoutShown() const noexcept
+    {
+      return mShowLayoutLayers || mShowLayoutCanvas;
     }
     /** The material editor (View > Material Editor): node graphs that make terrain textures. */
     bool& ShowMaterialEditor() noexcept
@@ -456,6 +471,8 @@ namespace faf::editor
     float mCornerBottom = 0.0f; // the view's top-right buttons' lower edge (the compass goes under them)
     bool mShowGenGraph = false;
     bool mShowGenInspector = false;
+    bool mShowLayoutLayers = false;
+    bool mShowLayoutCanvas = false;
     bool mDebugWasPaused = false;
     char mWatchInput[160] = {};
     std::vector<std::string> mWatches;
@@ -704,6 +721,7 @@ namespace faf::editor
     EdMaterialEditor mMaterialEditor;
     EdParticleEditor mParticleEditor;
     EdGenerate mGenerate;
+    EdLayoutPanel mLayoutPanel{mDocument};
     ImVec4 mGameView{0.0f, 0.0f, 0.0f, 0.0f};
     /** The document path the Info tab was last brought to the front for. */
     std::string mInfoShownFor;

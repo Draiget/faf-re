@@ -16,6 +16,7 @@
 #include "editor/tools/EdWaves.h"
 #include "editor/doc/EdWater.h"
 #include "editor/doc/EdWaterBodies.h"
+#include "editor/tools/EdMapLayout.h"
 #include "editor/tools/EdChecks.h"
 #include "editor/tools/EdDecals.h"
 #include "editor/tools/EdSymmetryCheck.h"
@@ -284,6 +285,8 @@ namespace faf::editor
       /** A terrain graph's Build: the heights, its mask strokes and the terrain types it changed (BuildUndo says
          which). */
       GraphBuild,
+      /** The map layout's drawing (a stroke, a layer added or removed, a template, its settings). */
+      Layout,
     };
     /** The water's three masks, a byte for every 2 x 2 units (the map's size halved). */
     struct WaterMaskSnapshot
@@ -361,24 +364,45 @@ namespace faf::editor
     void TerrainTypesEdited(std::vector<std::uint8_t> before, bool ownStep = true);
     /**
      * A Build's parts, one entry per GraphBuild step: bit 0 a heights stroke, bits 1-5 how many mask strokes, bit 6 a
-     * terrain type change, bit 7 a props change. The view undoes and redoes those parts together.
+     * terrain type change, bit 7 a props change, bit 8 a water change (the layout's water level). The view undoes and
+     * redoes those parts together.
      */
     void BuildEdited(
-      const std::uint8_t parts
+      const std::uint16_t parts
     )
     {
       mBuildUndo.push_back(parts);
       EditEnded(EditKind::GraphBuild);
       mModified = true;
     }
-    [[nodiscard]] std::vector<std::uint8_t>& BuildUndo() noexcept
+    [[nodiscard]] std::vector<std::uint16_t>& BuildUndo() noexcept
     {
       return mBuildUndo;
     }
-    [[nodiscard]] std::vector<std::uint8_t>& BuildRedo() noexcept
+    [[nodiscard]] std::vector<std::uint16_t>& BuildRedo() noexcept
     {
       return mBuildRedo;
     }
+    /** A water change joins the newest Build step (the layout's Generate terrain sets the water level). */
+    void BuildAddWater(WaterState before);
+
+    /**
+     * The map layout (the Layout workspace's drawing): kept with the map in `<map>_layout.editor` beside the .scmap (a
+     * file the vault package leaves out), read when the map opens; a fresh drawing over the playable area otherwise.
+     */
+    [[nodiscard]] MapLayout& Layout() noexcept
+    {
+      return mLayout;
+    }
+    /** A stroke's record as an undo step. */
+    void LayoutStroked(LayoutStroke stroke);
+    /** A change to the whole drawing (layers, template, settings) as an undo step: `before` is how it was. */
+    void LayoutReplaced(MapLayout before);
+    bool UndoLayout(bool redo);
+    /** The layout file of the map (empty for a map without a file of its own). */
+    [[nodiscard]] std::filesystem::path LayoutFile() const;
+    /** The playable area as world units (x0, z0, x1, z1): the whole map without one. */
+    void LayoutArea(float& x0, float& z0, float& x1, float& z1) const;
     /** Counts each change to the grid, for the overlay. */
     [[nodiscard]] int TerrainTypeRevision() const noexcept
     {
@@ -755,6 +779,8 @@ namespace faf::editor
         return "heights and texture masks";
       case EditKind::GraphBuild:
         return "terrain graph build";
+      case EditKind::Layout:
+        return "layout drawing";
       }
       return "edit";
     }
@@ -855,8 +881,19 @@ namespace faf::editor
     std::vector<ConversionEdit> mConversionRedo;
     std::vector<LayerEdit> mLayerRedo;
     std::vector<std::pair<std::vector<std::uint8_t>, std::vector<std::uint8_t>>> mTerrainTypesUndo;
-    std::vector<std::uint8_t> mBuildUndo;
-    std::vector<std::uint8_t> mBuildRedo;
+    std::vector<std::uint16_t> mBuildUndo;
+    std::vector<std::uint16_t> mBuildRedo;
+    MapLayout mLayout;
+    std::string mLayoutRead; // the layout file's text as read or last saved
+    struct LayoutEdit
+    {
+      LayoutStroke stroke;
+      std::shared_ptr<MapLayout> before; // set: the whole drawing swapped
+      std::shared_ptr<MapLayout> after;
+    };
+    std::vector<LayoutEdit> mLayoutUndo;
+    std::vector<LayoutEdit> mLayoutRedo;
+    void LoadLayout();
     std::vector<std::pair<std::vector<std::uint8_t>, std::vector<std::uint8_t>>> mTerrainTypesRedo;
     int mTerrainTypeRevision = 0;
     std::vector<std::pair<std::vector<WaveRecord>, std::vector<WaveRecord>>> mWavesUndo;

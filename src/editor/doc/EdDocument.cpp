@@ -1839,6 +1839,7 @@ namespace faf::editor
     mWavesRedo.clear();
     mTerrainTypesRedo.clear();
     mBuildRedo.clear();
+    mLayoutRedo.clear();
   }
 
   bool EdDocument::PopUndo(
@@ -1946,6 +1947,7 @@ namespace faf::editor
       ) {
         mHeights.Reset(field->width, field->height);
       }
+      LoadLayout();
       gpg::Logf(
         "editor: opened %s in %.2f s: %d x %d, %zu layers named, %d props, %d decals, %d markers, %zu armies%s%s",
         mPath.c_str(),
@@ -2385,6 +2387,16 @@ namespace faf::editor
       message = "Saved " + file.string() + ", but " + failure;
       return false;
     }
+    // The layout's drawing beside the map (only when it changed; an emptied drawing empties the file).
+    if (const std::string layout = mLayout.Save(); layout != mLayoutRead && !LayoutFile().empty()) {
+      std::ofstream out(LayoutFile(), std::ios::binary | std::ios::trunc);
+      out.write(layout.data(), static_cast<std::streamsize>(layout.size()));
+      if (!out) {
+        message = "Saved " + file.string() + ", but the layout file " + LayoutFile().string() + " couldn't be written";
+        return false;
+      }
+      mLayoutRead = layout;
+    }
     mModified = false;
     message = "Saved " + file.string();
     return true;
@@ -2429,5 +2441,127 @@ namespace faf::editor
     mError.clear();
     mPath.clear();
     mState = State::Empty;
+  }
+  void EdDocument::BuildAddWater(
+    WaterState before
+  )
+  {
+    if (!mUndoOrder.empty() && mUndoOrder.back() == EditKind::Heights) {
+      // A build of heights only is a heights step: it becomes a build step of the heights and the water.
+      mUndoOrder.back() = EditKind::GraphBuild;
+      mBuildUndo.push_back(1);
+    } else if (mBuildUndo.empty() || mUndoOrder.empty() || mUndoOrder.back() != EditKind::GraphBuild) {
+      WaterEdited(std::move(before));
+      return;
+    }
+    mWaterUndo.emplace_back(std::move(before), WaterNow());
+    mBuildUndo.back() = static_cast<std::uint16_t>(mBuildUndo.back() | 256U);
+    mModified = true;
+  }
+
+  void EdDocument::LayoutStroked(
+    LayoutStroke stroke
+  )
+  {
+    LayoutEdit edit;
+    edit.stroke = std::move(stroke);
+    mLayoutUndo.push_back(std::move(edit));
+    if (mLayoutUndo.size() > 100) {
+      mLayoutUndo.erase(mLayoutUndo.begin());
+    }
+    EditEnded(EditKind::Layout);
+    mModified = true;
+  }
+
+  void EdDocument::LayoutReplaced(
+    MapLayout before
+  )
+  {
+    LayoutEdit edit;
+    edit.before = std::make_shared<MapLayout>(std::move(before));
+    edit.after = std::make_shared<MapLayout>(mLayout);
+    mLayoutUndo.push_back(std::move(edit));
+    if (mLayoutUndo.size() > 100) {
+      mLayoutUndo.erase(mLayoutUndo.begin());
+    }
+    EditEnded(EditKind::Layout);
+    mModified = true;
+  }
+
+  bool EdDocument::UndoLayout(
+    const bool redo
+  )
+  {
+    std::vector<LayoutEdit>& from = redo ? mLayoutRedo : mLayoutUndo;
+    std::vector<LayoutEdit>& to = redo ? mLayoutUndo : mLayoutRedo;
+    if (from.empty()) {
+      return false;
+    }
+    LayoutEdit edit = std::move(from.back());
+    from.pop_back();
+    const std::uint64_t revision = mLayout.revision;
+    if (edit.before != nullptr) {
+      mLayout = redo ? *edit.after : *edit.before;
+    } else {
+      (void)mLayout.SetCells(edit.stroke.layerId, redo ? edit.stroke.after : edit.stroke.before);
+    }
+    mLayout.revision = revision + 1;
+    to.push_back(std::move(edit));
+    mModified = true;
+    return true;
+  }
+
+  std::filesystem::path EdDocument::LayoutFile() const
+  {
+    const std::filesystem::path map = MapDiskFile();
+    if (map.empty()) {
+      return {};
+    }
+    return map.parent_path() / (map.stem().string() + "_layout.editor");
+  }
+
+  void EdDocument::LayoutArea(
+    float& x0,
+    float& z0,
+    float& x1,
+    float& z1
+  ) const
+  {
+    x0 = 0.0f;
+    z0 = 0.0f;
+    x1 = static_cast<float>(std::max(8, mFacts.fieldWidth - 1));
+    z1 = static_cast<float>(std::max(8, mFacts.fieldHeight - 1));
+    if (const std::optional<PlayableRect> area = PlayableArea()) {
+      x0 = static_cast<float>(area->x0);
+      z0 = static_cast<float>(area->z0);
+      x1 = static_cast<float>(area->x1);
+      z1 = static_cast<float>(area->z1);
+    }
+  }
+
+  void EdDocument::LoadLayout()
+  {
+    mLayoutUndo.clear();
+    mLayoutRedo.clear();
+    mLayoutRead.clear();
+    float x0 = 0.0f, z0 = 0.0f, x1 = 0.0f, z1 = 0.0f;
+    LayoutArea(x0, z0, x1, z1);
+    const std::uint64_t revision = mLayout.revision;
+    mLayout.New(MapLayout::kDefaultRes, x0, z0, x1, z1);
+    mLayout.revision = revision + 1;
+    const std::filesystem::path file = LayoutFile();
+    std::error_code ignored;
+    if (file.empty() || !std::filesystem::exists(file, ignored)) {
+      return;
+    }
+    std::ifstream in(file, std::ios::binary);
+    const std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+    std::string error;
+    if (!text.empty() && !mLayout.Load(text, error)) {
+      gpg::Warnf("editor: %s: the layout couldn't be read (%s)", file.string().c_str(), error.c_str());
+      return;
+    }
+    mLayoutRead = text;
+    gpg::Logf("editor: layout read from %s: %zu layers", file.string().c_str(), mLayout.Layers().size());
   }
 } // namespace faf::editor

@@ -1834,6 +1834,7 @@ namespace faf::editor
       : kind == EdDocument::EditKind::WaterMasks          ? UndoWaterMasks(false)
       : kind == EdDocument::EditKind::HeightsAndMasks     ? UndoHeightsAndMasks(false)
       : kind == EdDocument::EditKind::GraphBuild          ? UndoGraphBuild(false)
+      : kind == EdDocument::EditKind::Layout              ? mDocument.UndoLayout(false)
                                                           : UndoHeights(false);
     if (done) {
       mDocument.PushRedo(kind);
@@ -1862,6 +1863,7 @@ namespace faf::editor
       : kind == EdDocument::EditKind::WaterMasks          ? UndoWaterMasks(true)
       : kind == EdDocument::EditKind::HeightsAndMasks     ? UndoHeightsAndMasks(true)
       : kind == EdDocument::EditKind::GraphBuild          ? UndoGraphBuild(true)
+      : kind == EdDocument::EditKind::Layout              ? mDocument.UndoLayout(true)
                                                           : UndoHeights(true);
     if (done) {
       mDocument.PushUndo(kind);
@@ -5266,7 +5268,7 @@ namespace faf::editor
       return heights.w > 1 ? ApplyGraphHeights(heights, plain, false) : "Nothing to build.";
     }
     // The heights' stroke, the mask strokes and the terrain types, ended as one step (BuildEdited).
-    std::uint8_t parts = 0;
+    std::uint16_t parts = 0;
     std::string message;
     if (heights.w > 1) {
       message = ApplyGraphHeights(heights, plain, false, false);
@@ -5381,16 +5383,19 @@ namespace faf::editor
     const bool redo
   )
   {
-    std::vector<std::uint8_t>& from = redo ? mDocument.BuildRedo() : mDocument.BuildUndo();
-    std::vector<std::uint8_t>& to = redo ? mDocument.BuildUndo() : mDocument.BuildRedo();
+    std::vector<std::uint16_t>& from = redo ? mDocument.BuildRedo() : mDocument.BuildUndo();
+    std::vector<std::uint16_t>& to = redo ? mDocument.BuildUndo() : mDocument.BuildRedo();
     if (from.empty()) {
       return false;
     }
-    const std::uint8_t parts = from.back();
+    const std::uint16_t parts = from.back();
     from.pop_back();
     const int strokes = (parts >> 1) & 31;
-    // Undo in the reverse order of the build (props, types, masks, heights); redo in its order.
+    // Undo in the reverse order of the build (water, props, types, masks, heights); redo in its order.
     if (!redo) {
+      if ((parts & 256) != 0) {
+        (void)UndoWater(false);
+      }
       if ((parts & 128) != 0) {
         (void)UndoProps(false);
       }
@@ -5415,6 +5420,9 @@ namespace faf::editor
       }
       if ((parts & 128) != 0) {
         (void)UndoProps(true);
+      }
+      if ((parts & 256) != 0) {
+        (void)UndoWater(true);
       }
     }
     to.push_back(parts);

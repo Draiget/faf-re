@@ -514,6 +514,12 @@ namespace faf::editor
       if (mShowGenInspector) {
         mGenerate.DrawInspectorPanel(mShowGenInspector);
       }
+      if (mShowLayoutLayers) {
+        mLayoutPanel.DrawLayersPanel(mShowLayoutLayers, mDocument.Map() != nullptr);
+      }
+      if (mShowLayoutCanvas) {
+        mLayoutPanel.DrawCanvasPanel(mShowLayoutCanvas, mDocument.Map() != nullptr);
+      }
       if (mShowParticleEditor) {
         mParticleEditor.Draw(mShowParticleEditor);
       }
@@ -701,6 +707,8 @@ namespace faf::editor
       {"Nodes###GenerateNodes", &EdShell::mShowGenNodes},
       {"Graph###GenerateGraph", &EdShell::mShowGenGraph},
       {"Inspector###GenerateInspector", &EdShell::mShowGenInspector},
+      {"Layout layers###LayoutLayers", &EdShell::mShowLayoutLayers},
+      {"Layout canvas###LayoutCanvas", &EdShell::mShowLayoutCanvas},
     };
     return kFlags;
   }

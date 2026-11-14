@@ -70,12 +70,12 @@ namespace faf::editor
       {"layout",
        "Layout",
        "Alt+4",
-       "Start positions, resources, armies and the playable area",
-       "Markers",
-       "Properties",
-       "Armies,Map",
+       "The map's layout: its drawing in layers, the terrain made from it, start positions and resources",
+       "Layout layers###LayoutLayers,Markers",
        "",
-       "Check,Log",
+       "Layout canvas###LayoutCanvas",
+       "Properties,Armies",
+       "Check,Log,Map",
        0.24f,
        0.24f,
        false},
@@ -217,6 +217,8 @@ namespace faf::editor
       {"GenerateNodes", ICON_GENERATE},
       {"GenerateGraph", ICON_GRAPH},
       {"GenerateInspector", ICON_INFO},
+      {"LayoutLayers", ICON_LAYERS},
+      {"LayoutCanvas", ICON_LAYOUT},
     };
     for (const auto& [panel, icon] : kIcons) {
       if (panel == id) {
@@ -233,7 +235,8 @@ namespace faf::editor
     // Raised when a workspace's first layout changes, so a layout saved before is laid out again once.
     // 2: Terrain's right dock as the mockup's (Layers and Info, Properties under them).
     // 2: Generate's terrain graph panels (Nodes, Inspector, Graph).
-    return key == "terrain" || key == "generate" ? 2 : 1;
+    // 2: Layout's drawing panels (Layout layers, Layout canvas).
+    return key == "terrain" || key == "generate" || key == "layout" ? 2 : 1;
   }
 
   std::map<std::string, int>& LayoutVersions()

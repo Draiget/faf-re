@@ -42,6 +42,9 @@
 #include "editor/EdPlay.h"
 #include "editor/EdShell.h"
 #include "editor/tools/EdHeightFile.h"
+#include "editor/tools/EdMapLayout.h"
+#include "editor/tools/EdSymmetrize.h"
+#include "editor/tools/EdSymmetryCheck.h"
 #include "editor/tools/EdTextureLibrary.h"
 #include "editor/ui/EdCommands.h"
 #include "editor/ui/EdFonts.h"
@@ -2121,6 +2124,181 @@ namespace faf::editor
        * The Generate workspace's terrain graph, each frame while its panels are shown: it runs on the view's ground,
        * and what it asks (a preview on the map, a build, taking the preview off) goes to the view.
        */
+      /** The copies of a world point under a symmetry about the map's middle (none: an empty function). */
+      LayoutImages LayoutImagesOf(
+        const Symmetry symmetry,
+        const int turns
+      ) const
+      {
+        if (symmetry == Symmetry::None) {
+          return {};
+        }
+        const MapFacts& facts = mDocument.Facts();
+        const float cx = static_cast<float>(facts.fieldWidth - 1) * 0.5f;
+        const float cz = static_cast<float>(facts.fieldHeight - 1) * 0.5f;
+        return [symmetry, turns, cx, cz](const float x, const float z) {
+          float outX[kMaxSymmetryCopies];
+          float outZ[kMaxSymmetryCopies];
+          const int n = SymmetryImages(symmetry, turns, cx, cz, x, z, outX, outZ);
+          std::vector<std::pair<float, float>> out;
+          for (int i = 0; i < n; ++i) {
+            out.emplace_back(outX[i], outZ[i]);
+          }
+          return out;
+        };
+      }
+
+      static Symmetry SymmetryOfOp(
+        const std::string& name
+      )
+      {
+        return name == "rot2"   ? Symmetry::HalfTurn
+          : name == "mirror_xz" ? Symmetry::BothAxes
+          : name == "mirror_x"  ? Symmetry::LeftRight
+          : name == "mirror_z"  ? Symmetry::TopBottom
+          : name == "rot4"      ? Symmetry::QuarterTurns
+                                : Symmetry::None;
+      }
+
+      /**
+       * The Layout workspace: strokes follow the editor's symmetry, a template's symmetry becomes the editor's, and
+       * Generate terrain builds the layers' heights at the map's resolution (made symmetric by the editor's symmetry,
+       * as Studio's generator does) and writes them with the water level as one undo step.
+       */
+      void DriveLayout()
+      {
+        EdLayoutPanel& panel = mShell->LayoutPanel();
+        MapLayout& layout = mDocument.Layout();
+        if (!mLayoutWired) {
+          mLayoutWired = true;
+          panel.SetImagesFor([this](const std::string& name) {
+            return LayoutImagesOf(SymmetryOfOp(name), 3);
+          });
+        }
+        if (mDocument.Map() == nullptr) {
+          return;
+        }
+        std::string symmetryName;
+        if (panel.TakeSymmetryAsk(symmetryName)) {
+          mShell->Tools().PickSymmetry(static_cast<int>(SymmetryOfOp(symmetryName)));
+        }
+        const HeightBrush brush = mShell->Tools().CurrentHeightBrush();
+        layout.SetImages(LayoutImagesOf(brush.symmetry, brush.turns));
+        if (!panel.TakeGenerateAsk()) {
+          return;
+        }
+        if (!mScene.Attached() || mScene.ModelsPending()) {
+          panel.SetStatus("The map isn't ready yet; generate again in a moment.");
+          return;
+        }
+        const auto t0 = std::chrono::steady_clock::now();
+        const MapFacts& facts = mDocument.Facts();
+        const field::Grid like(facts.fieldWidth, facts.fieldHeight, 1.0f, 0.0f, 0.0f);
+        field::Grid heights;
+        std::string error;
+        if (!BuildLayout(layout, like, LayoutBuildOptions{}, heights, nullptr, error)) {
+          panel.SetStatus("Generate terrain: " + error);
+          return;
+        }
+        if (brush.symmetry != Symmetry::None) {
+          std::vector<std::uint16_t> words(heights.v.size());
+          for (std::size_t k = 0; k < words.size(); ++k) {
+            words[k] = static_cast<std::uint16_t>(std::clamp(std::lround(heights.v[k] * 128.0f), 0L, 65535L));
+          }
+          SymmetrizeOptions options;
+          options.symmetry = brush.symmetry;
+          options.turns = brush.turns;
+          options.seam = 12.0f;
+          std::string why;
+          if (SymmetrizeHeights(words.data(), heights.w, heights.h, options, why)) {
+            for (std::size_t k = 0; k < words.size(); ++k) {
+              heights.v[k] = static_cast<float>(words[k]) / 128.0f;
+            }
+          }
+        }
+        std::string status = mScene.ApplyGraphBuild(heights, true, TerrainBuildWrites{});
+        bool wet = false;
+        for (const LayoutLayer& layer : layout.Layers()) {
+          wet = wet || (layer.kind == LayoutKind::Water && layer.visible && LayoutLayerHas(layer, 0.3f));
+        }
+        if (wet) {
+          const WaterState before = mDocument.WaterNow();
+          WaterState water = before;
+          water.enabled = true;
+          water.elevation = layout.water;
+          water.deep = layout.water - 12.0f;
+          water.abyss = layout.water - 30.0f;
+          if (!(water == before)) {
+            mDocument.ApplyWater(water);
+            mDocument.BuildAddWater(before);
+            status += " The water level is now " + std::to_string(static_cast<int>(layout.water)) + ".";
+          }
+        }
+        const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+        gpg::Logf("editor: layout: generated in %.0f ms: %s", ms, status.c_str());
+        panel.SetStatus(status);
+      }
+
+      /**
+       * `/layouttest <template>` (test runs): the Layout workspace, the template drawn, Generate terrain, then undo of
+       * the terrain and of the template; the heights' checksum, the water level and the undo steps at each stage.
+       */
+      void TestLayout()
+      {
+        fa::vector<fa::string> arg;
+        if (
+          mLayoutTestStage >= 6 || mScene.ModelsPending() || !mScene.Attached() ||
+          !moho::CFG_GetArgOption("/layouttest", 1, &arg) || arg.empty() || ++mLayoutTestFrames % 120 != 0
+        ) {
+          return;
+        }
+        const std::uint64_t hash = mScene.HeightsHash();
+        if (mLayoutTestStage == 0) {
+          mLayoutTestStart = hash;
+        }
+        const MapLayout& layout = mDocument.Layout();
+        gpg::Logf(
+          "editor: layout test stage %d: heights %016llx%s, water %s %.1f, layout %s with %zu bases (%d x %d cells), "
+          "%zu undo steps; undo: %s",
+          mLayoutTestStage,
+          static_cast<unsigned long long>(hash),
+          hash == mLayoutTestStart ? " (the original)" : "",
+          mDocument.WaterNow().enabled ? "on" : "off",
+          static_cast<double>(mDocument.WaterNow().elevation),
+          layout.Drawn() ? "drawn" : "empty",
+          layout.BaseCentres().size(),
+          layout.Frame().rw,
+          layout.Frame().rh,
+          mDocument.UndoOrder().size(),
+          mDocument.UndoStepName() != nullptr ? mDocument.UndoStepName() : "-"
+        );
+        switch (mLayoutTestStage) {
+        case 0:
+          mShell->SwitchWorkspace(3);
+          mShell->HideHome();
+          mShell->ShowLayout();
+          gpg::Logf(
+            "editor: layout test: template %s: %s",
+            arg[0].c_str(),
+            mShell->LayoutPanel().ApplyTemplate(arg[0].c_str()) ? "drawn" : "no such template"
+          );
+          break;
+        case 1:
+          mShell->LayoutPanel().AskGenerate();
+          break;
+        case 2:
+        case 3:
+          gpg::Logf("editor: layout test: undo %s", mScene.Undo() ? "took a step back" : "had nothing");
+          break;
+        case 4:
+          gpg::Logf("editor: layout test: redo %s", mScene.Redo() ? "did a step again" : "had nothing");
+          break;
+        default:
+          break;
+        }
+        ++mLayoutTestStage;
+      }
+
       void DriveGenerate()
       {
         EdGenerate& generate = mShell->Generate();
@@ -2753,6 +2931,10 @@ namespace faf::editor
       int mScTestFrames = 0;
       int mInteropTestStage = 0;
       bool mGenerateWired = false;
+      bool mLayoutWired = false;
+      int mLayoutTestStage = 0;
+      int mLayoutTestFrames = 0;
+      std::uint64_t mLayoutTestStart = 0;
       int mGenTestStage = 0;
       int mGenTestFrames = 0;
       std::uint64_t mGenTestStart = 0;
@@ -3493,6 +3675,13 @@ namespace faf::editor
         mShell->ShowGenerate();
       }, mapOpen, {}, "The terrain graph in the Generate workspace: nodes, a preview on the map, Build as one undo step"
       );
+      add(
+        "terrain.layout", "Layout canvas...", "Terrain", "", [this] {
+        mShell->SwitchWorkspace(3);
+        mShell->HideHome();
+        mShell->ShowLayout();
+      }, mapOpen, {}, "The map drawn in layers (hills, mountains, water, bases...) and turned into terrain in one step"
+      );
       add("terrain.interop", "Import / Export...", "Terrain", "", [this] {
         mShell->Tools().OpenInterop();
       }, mapOpen, {}, "Heightmaps from and to other tools: mapping, turns and blends, a live link, a sidecar");
@@ -3809,7 +3998,12 @@ namespace faf::editor
            arrange}
         },
         EdMenu{
-          "&Terrain", {cmd("terrain.generate"), cmd("terrain.interop"), cmd("terrain.erosion"), cmd("terrain.sctools")}
+          "&Terrain",
+          {cmd("terrain.generate"),
+           cmd("terrain.layout"),
+           cmd("terrain.interop"),
+           cmd("terrain.erosion"),
+           cmd("terrain.sctools")}
         },
         EdMenu{
           "&View",
@@ -7025,6 +7219,8 @@ namespace faf::editor
       TestInterop();
       DriveGenerate();
       TestGenerate();
+      DriveLayout();
+      TestLayout();
       // `/sctest` (test runs): the SC tools window's buttons in turn, a second apart, the heights' checksum each time.
       if (
         mScTestStage < 8 && moho::CFG_GetArgOption("/sctest", 0, nullptr) && !mScene.ModelsPending() &&

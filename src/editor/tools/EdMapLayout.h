@@ -155,6 +155,14 @@ namespace faf::editor
     {
       mImages = std::move(images);
     }
+    /** The copies of a canvas point under the symmetry (canvas cells), the point itself first. */
+    [[nodiscard]] std::vector<std::pair<float, float>> BrushImages(
+      const float cx,
+      const float cz
+    ) const
+    {
+      return CellImages(cx, cz);
+    }
 
     void ToWorld(float cx, float cz, float& x, float& z) const;
     void ToCell(float x, float z, float& cx, float& cz) const;

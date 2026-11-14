@@ -61,6 +61,7 @@ set(FAF_EDITOR_SOURCES
   graph/EdTerrainGraph.cpp
   graph/EdTerrainNodes.cpp
   ui/EdGenerate.cpp
+  ui/EdLayoutPanel.cpp
   ui/EdMapBrowser.cpp
   doc/EdWaterBodies.cpp
   view/EdWaterBodyView.cpp
