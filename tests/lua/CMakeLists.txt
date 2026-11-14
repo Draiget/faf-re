@@ -25,7 +25,9 @@ add_executable(faf_lua_tests EXCLUDE_FROM_ALL
   LuaCrashDumpTests.cpp
   ScrImportTests.cpp
   ScrFromLuaTests.cpp
+  ChatMentionTests.cpp
 )
+target_compile_definitions(faf_lua_tests PRIVATE FAF_CHAT_MENTION_DIR="${PROJECT_SOURCE_DIR}/mods/Microchip-Chat-Mention")
 target_link_libraries(faf_lua_tests PRIVATE faf_engine gtest_main)
 set_target_properties(faf_lua_tests PROPERTIES FOLDER "Tests/Lua")
 add_test(NAME lua COMMAND faf_lua_tests)
