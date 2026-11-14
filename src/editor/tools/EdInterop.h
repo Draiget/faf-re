@@ -45,6 +45,8 @@ namespace faf::editor
     int regionZ1 = 256;
     /** Samples in from the edge (of the region, or of the map) over which the import fades in; 0: a hard edge. */
     float feather = 0.0f;
+    /** How the image is read between its samples when it isn't the map's size (FAF Studio's filters). */
+    ResampleFilter filter = ResampleFilter::Bilinear;
   };
 
   /** The image flipped and turned as the settings say. */
@@ -81,6 +83,20 @@ namespace faf::editor
   };
   /** The sidecar `<file>.json`: the facts, and how to read the words back as heights. */
   [[nodiscard]] std::string ExportSidecar(const ExportFacts& facts);
+
+  /**
+   * The sheet `<file>.txt` for people setting up Gaea or World Machine (FAF Studio's interop README): the map's size
+   * in kilometres and the height range in metres as those tools ask for them (a map unit is 1/51.2 km: 20 km maps are
+   * 1024 units), and the export's size and range.
+   */
+  [[nodiscard]] std::string ExportSheet(const ExportFacts& facts);
+
+  /**
+   * A named mask another tool exported beside the heightmap (FAF Studio adopts them by name: flow, wear, deposit...):
+   * the first of `files` whose name without its extension is `name` or ends in `_name` / `-name` / ` name`, case
+   * ignored, with a height image's extension. Empty when none.
+   */
+  [[nodiscard]] std::string FindNamedMask(const std::vector<std::string>& files, const std::string& name);
 
   /** A file's stamp for the live link: its size and its last write (0 for none). */
   struct FileStamp

@@ -1,5 +1,7 @@
 #include "editor/tools/EdInterop.h"
 
+#include <cctype>
+
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
@@ -84,7 +86,7 @@ namespace faf::editor
     const int z1 = s.region ? std::clamp(std::max(s.regionZ0, s.regionZ1), 0, height - 1) : height - 1;
     const int rw = x1 - x0 + 1;
     const int rh = z1 - z0 + 1;
-    const HeightImage fitted = ResampleHeights(OrientHeights(image, s.flipX, s.flipZ, s.turns), rw, rh);
+    const HeightImage fitted = ResampleHeights(OrientHeights(image, s.flipX, s.flipZ, s.turns), rw, rh, s.filter);
     std::uint16_t darkest = 0, brightest = 0;
     HeightImageRange(fitted, darkest, brightest);
     const float span = std::max(1.0f, static_cast<float>(brightest - darkest));
@@ -125,6 +127,98 @@ namespace faf::editor
       }
     }
     return out;
+  }
+
+  std::string ExportSheet(
+    const ExportFacts& f
+  )
+  {
+    constexpr double kMetresPerUnit = 1000.0 / 51.2; // 20 km = 1024 units
+    const double widthKm = f.mapWidth / 51.2;
+    const double depthKm = f.mapHeight / 51.2;
+    const double lowM = f.lowest * kMetresPerUnit;
+    const double highM = f.highest * kMetresPerUnit;
+    char text[2048];
+    (void)std::snprintf(
+      text,
+      sizeof(text),
+      "Heightmap of %s for Gaea / World Machine\n"
+      "==========================================\n\n"
+      "Map: %d x %d units = %.2f x %.2f km (a unit is %.2f m).\n"
+      "Image: %d x %d samples, 16-bit, corners on the map's corners, the top row is the map's top (z = 0).\n"
+      "Heights now: %.2f to %.2f units = %.0f to %.0f m; sea level %.2f units (%.0f m).\n"
+      "The image's words are the heights times %.3f: word / %.1f = height in units.\n\n"
+      "Gaea: Terrain > Scale %.2f km, Height %.0f m; export the heightmap as 16-bit PNG or .r32 at %d.\n"
+      "World Machine: Extents %.2f x %.2f km, Elevation range %.0f m; export .r16 or 16-bit PNG at %d.\n"
+      "Import back in the editor's Terrain > Import / Export with the same scale (Live link re-reads the file).\n",
+      f.map.c_str(),
+      f.mapWidth,
+      f.mapHeight,
+      widthKm,
+      depthKm,
+      kMetresPerUnit,
+      f.imageWidth,
+      f.imageHeight,
+      static_cast<double>(f.lowest),
+      static_cast<double>(f.highest),
+      lowM,
+      highM,
+      static_cast<double>(f.sea),
+      f.sea * kMetresPerUnit,
+      static_cast<double>(f.scale),
+      128.0 * f.scale,
+      widthKm,
+      std::max(1.0, highM),
+      f.imageWidth,
+      widthKm,
+      depthKm,
+      std::max(1.0, highM),
+      f.imageWidth
+    );
+    return text;
+  }
+
+  std::string FindNamedMask(
+    const std::vector<std::string>& files,
+    const std::string& name
+  )
+  {
+    const auto lower = [](std::string text) {
+      for (char& c : text) {
+        c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+      }
+      return text;
+    };
+    const std::string wanted = lower(name);
+    if (wanted.empty()) {
+      return {};
+    }
+    for (const std::string& file : files) {
+      const std::size_t slash = file.find_last_of("/\\");
+      const std::string base = lower(slash == std::string::npos ? file : file.substr(slash + 1));
+      const std::size_t dot = base.find_last_of('.');
+      if (dot == std::string::npos) {
+        continue;
+      }
+      const std::string stem = base.substr(0, dot);
+      const std::string extension = base.substr(dot);
+      if (
+        extension != ".png" && extension != ".tif" && extension != ".tiff" && extension != ".r16" &&
+        extension != ".raw" && extension != ".r32" && extension != ".bmp"
+      ) {
+        continue;
+      }
+      if (stem == wanted) {
+        return file;
+      }
+      if (stem.size() > wanted.size() && stem.compare(stem.size() - wanted.size(), wanted.size(), wanted) == 0) {
+        const char before = stem[stem.size() - wanted.size() - 1];
+        if (before == '_' || before == '-' || before == ' ' || before == '.') {
+          return file;
+        }
+      }
+    }
+    return {};
   }
 
   std::string ExportSidecar(

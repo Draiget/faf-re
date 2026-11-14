@@ -5,6 +5,7 @@
 #include <string>
 #include <utility>
 
+#include "editor/ui/EdFieldsPanel.h"
 #include "editor/doc/EdLuaApi.h"
 #include "editor/EdTools.h"
 #include "editor/doc/EdAdaptiveModel.h"
@@ -510,6 +511,10 @@ namespace faf::editor
       mMenus = menus;
       mModHost.Attach(commands);
     }
+    [[nodiscard]] EdFieldsPanel& Fields() noexcept
+    {
+      return mFieldsPanel;
+    }
     [[nodiscard]] EdModHost& ModHost() noexcept
     {
       return mModHost;
@@ -596,6 +601,8 @@ namespace faf::editor
     bool mShowAssets = false;
     bool mShowEditorMods = false;
     bool mShowUnitViewer = false;
+    bool mShowFields = false;
+    EdFieldsPanel mFieldsPanel;
     bool mViewMenuAsk = false;
     char mSaveAsParent[512] = {};
     /** Map info's fields being typed in: key -> text (the scenario's value otherwise). */

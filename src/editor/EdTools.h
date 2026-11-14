@@ -225,10 +225,22 @@ namespace faf::editor
       mPathQuads = std::move(land);
       mShipQuads = std::move(ships);
     }
-    /** The layer shown: the land unit's (0) or the ship's (1). */
+    /** The hover and amphibious layers (FAF Studio's pathing for those kinds of units). */
+    void SetPathingMore(
+      std::vector<PathQuad> hover,
+      std::vector<PathQuad> amphibious
+    )
+    {
+      mHoverQuads = std::move(hover);
+      mAmphibiousQuads = std::move(amphibious);
+    }
+    /** The layer shown: the land unit's (0), the ship's (1), the hover unit's (2) or the amphibious unit's (3). */
     [[nodiscard]] const std::vector<PathQuad>& PathingQuads() const noexcept
     {
-      return mPathingLayer == 1 ? mShipQuads : mPathQuads;
+      return mPathingLayer == 1 ? mShipQuads
+        : mPathingLayer == 2    ? mHoverQuads
+        : mPathingLayer == 3    ? mAmphibiousQuads
+                                : mPathQuads;
     }
     [[nodiscard]] bool& ShowPathing() noexcept
     {
@@ -1201,6 +1213,16 @@ namespace faf::editor
     [[nodiscard]] bool DrawingChain() const noexcept
     {
       return MarkersToolActive() && mDrawChain;
+    }
+    /** Export the heights at 8 bits (Import / Export > 8-bit). */
+    [[nodiscard]] bool ExportEightBit() const noexcept
+    {
+      return mExportEightBit;
+    }
+    /** The Terrain tool's weight overlay: the brush's weight on each sample under it. */
+    [[nodiscard]] bool ShowBrushWeight() const noexcept
+    {
+      return mShowBrushWeight;
     }
     /** Alt+C: the Markers tool's chain drawing on (the tool itself is picked by the command). */
     void SetDrawChain(
@@ -3140,6 +3162,8 @@ namespace faf::editor
     std::vector<PathQuad> mPathQuads;
     bool mShowPathing = false;
     std::vector<PathQuad> mShipQuads;
+    std::vector<PathQuad> mHoverQuads;
+    std::vector<PathQuad> mAmphibiousQuads;
     int mPathingLayer = 0;
     WaterState mWater;
     bool mWaterEditing = false;
@@ -3194,6 +3218,10 @@ namespace faf::editor
     bool mShowRangeRings = true;
     bool mDrawChain = false;
     char mChainName[64] = "Chain_01";
+    bool mShowBrushWeight = false;
+    bool mExportEightBit = false;
+    /** The symmetry's centre as an offset from the map's middle (samples). */
+    float mSymmetryCentre[2] = {0.0f, 0.0f};
     bool mGiveUnits = false;
     std::vector<DecalTexture> mDecalTextures;
     bool mDecalTexturesListed = false;

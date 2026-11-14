@@ -210,11 +210,26 @@ namespace faf::editor::field
   {
     return ThePool().Threads();
   }
+  namespace
+  {
+    std::atomic<ParallelBackend> gParallelBackend{nullptr};
+  } // namespace
+
+  void SetParallelBackend(
+    const ParallelBackend backend
+  )
+  {
+    gParallelBackend = backend;
+  }
+
   void ParallelFor(
     const int count,
     const std::function<void(int)>& fn
   )
   {
+    if (const ParallelBackend backend = gParallelBackend.load(); backend != nullptr && backend(count, fn)) {
+      return;
+    }
     ThePool().For(count, fn);
   }
 

@@ -1117,6 +1117,28 @@ namespace faf::editor
       ImGui::SetNextItemWidth(-1.0f);
       FillSliderFloat("##falloff", &mFalloff, 0.0f, 1.0f, "Falloff %.2f");
       DrawFalloffCurve();
+      ImGui::Checkbox("Show the brush's weight", &mShowBrushWeight);
+      if (ImGui::IsItemHovered()) {
+        EdSetTooltip("A dot on each sample under the brush, brighter where it works harder (its shape and falloff)");
+      }
+      // The symmetry's centre (FAF Studio's Centre X / Z): mirrors and turns are made about it.
+      if (ImGui::TreeNode("Symmetry centre")) {
+        bool moved = false;
+        ImGui::SetNextItemWidth(-1.0f);
+        moved = FillSliderFloat("##symx", &mSymmetryCentre[0], -1024.0f, 1024.0f, "Centre X %+.1f") || moved;
+        ImGui::SetNextItemWidth(-1.0f);
+        moved = FillSliderFloat("##symz", &mSymmetryCentre[1], -1024.0f, 1024.0f, "Centre Z %+.1f") || moved;
+        if (ImGui::Button("Back to the middle")) {
+          mSymmetryCentre[0] = 0.0f;
+          mSymmetryCentre[1] = 0.0f;
+          moved = true;
+        }
+        ImGui::TextDisabled("From the map's middle, in game units: the brushes' copies and the view's lines follow.");
+        if (moved) {
+          SetSymmetryCentreOffset(mSymmetryCentre[0], mSymmetryCentre[1]);
+        }
+        ImGui::TreePop();
+      }
       ImGui::Checkbox("Airbrush", &mAirbrush);
       if (ImGui::IsItemHovered()) {
         EdSetTooltip(
@@ -1438,6 +1460,17 @@ namespace faf::editor
       }
       ImGui::SetNextItemWidth(-1.0f);
       FillSliderFloat("##interopstrength", &s.strength, 0.0f, 1.0f, "Strength %.2f");
+      {
+        static constexpr const char* kFilters[] = {
+          "Read between samples: bilinear", "Nearest sample", "Bicubic (sharper)", "Lanczos 3 (sharpest)"
+        };
+        int filter = static_cast<int>(s.filter);
+        ImGui::SetNextItemWidth(-1.0f);
+        if (EdCombo("##interopfilter", &filter, kFilters, IM_ARRAYSIZE(kFilters))) {
+          s.filter = static_cast<ResampleFilter>(filter);
+        }
+        EdSetItemTooltip("How an image of another size is fitted to the map; shrinking also smooths by the step");
+      }
       ImGui::Checkbox("Only a region", &s.region);
       EdSetItemTooltip("The image fitted onto a rectangle of the map (in samples, one a game unit); the rest stays.");
       if (s.region) {
@@ -1495,7 +1528,7 @@ namespace faf::editor
     if (Section("Export the heights")) {
       ImGui::SetNextItemWidth(-browseWidth - ImGui::GetStyle().ItemSpacing.x);
       ImGui::InputTextWithHint(
-        "##interopout", "16-bit PNG or .raw / .r16 file", mInteropExportPath, sizeof(mInteropExportPath)
+        "##interopout", "PNG, TIFF, .raw / .r16 or .r32 file", mInteropExportPath, sizeof(mInteropExportPath)
       );
       ImGui::SameLine();
       if (ImGui::Button("Browse...##out")) {
@@ -1506,10 +1539,13 @@ namespace faf::editor
       (void)EdCombo("##interopsize", &mInteropExportSize, kSizes, IM_ARRAYSIZE(kSizes));
       ImGui::SetNextItemWidth(-1.0f);
       FillSliderFloat("##interopexportscale", &mInteropExportScale, 0.05f, 4.0f, "Heights times %.2f");
-      ImGui::Checkbox("Write a sidecar (.json)", &mInteropSidecar);
+      ImGui::Checkbox("Write a sidecar (.json) and a sheet (.txt)", &mInteropSidecar);
       EdSetItemTooltip(
-        "The map, the image's size, the sea level and how a value becomes a height, for the other tool."
+        "The map, the image's size, the sea level and how a value becomes a height, for the other tool; the sheet "
+        "gives Gaea's and World Machine's settings (size in km, height in m)."
       );
+      ImGui::Checkbox("8-bit (PNG / TIFF)", &mExportEightBit);
+      EdSetItemTooltip("For tools that read only 8 bits: 256 steps over the height range instead of 65,536");
       const bool haveFile = mInteropExportPath[0] != '\0';
       ImGui::BeginDisabled(!haveFile);
       if (PrimaryButton("Export")) {
@@ -1889,9 +1925,9 @@ namespace faf::editor
       ImGui::SetNextItemWidth(-1.0f);
       EdCombo("##exportsize", &mExportSize, kSizes, IM_ARRAYSIZE(kSizes));
       Note(
-        "Import reads .png, .raw, .r16 (World Machine), .bmp or .tif, resampled to the map's size; export writes .png "
-        "(16-bit grey), "
-        ".raw or .r16. Heights are times the scale both ways. An import is one undo step."
+        "Import opens Terrain > Import / Export with the file (one import for both: its mapping, region, feather "
+        "and filter). Files: .png, .tif, .raw, .r16 (World Machine), .r32 (floats), .bmp; export writes 16-bit .png "
+        "or .tif, .raw, .r16, .r32. Heights are times the scale both ways. An import is one undo step."
       );
     }
   }

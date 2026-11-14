@@ -41,9 +41,12 @@ namespace faf::editor
       return std::clamp(turns, 2, kMaxSymmetryCopies);
     }
 
-    /** The copies of a point under `symmetry`, for samples (T int) and for the brush's centre (T float). */
+    float gCentreOffsetX = 0.0f;
+    float gCentreOffsetZ = 0.0f;
+
+    /** The copies of a point under `symmetry` about the map's middle, for samples (T int) and the brush (T float). */
     template <typename T>
-    int Copies(
+    int CopiesAboutMiddle(
       const Symmetry symmetry,
       const int turns,
       const T w,
@@ -112,6 +115,43 @@ namespace faf::editor
       }
       default:
         break;
+      }
+      return n;
+    }
+
+    /** The copies about the symmetry's centre (SetSymmetryCentreOffset): moved to the middle, copied, moved back. */
+    template <typename T>
+    int Copies(
+      const Symmetry symmetry,
+      const int turns,
+      const T w,
+      const T h,
+      const T x,
+      const T z,
+      T (&outX)[kMaxSymmetryCopies],
+      T (&outZ)[kMaxSymmetryCopies]
+    )
+    {
+      if (gCentreOffsetX == 0.0f && gCentreOffsetZ == 0.0f) {
+        return CopiesAboutMiddle<T>(symmetry, turns, w, h, x, z, outX, outZ);
+      }
+      T ox = 0;
+      T oz = 0;
+      if constexpr (std::is_integral_v<T>) {
+        ox = static_cast<T>(std::lround(gCentreOffsetX));
+        oz = static_cast<T>(std::lround(gCentreOffsetZ));
+      } else {
+        ox = static_cast<T>(gCentreOffsetX);
+        oz = static_cast<T>(gCentreOffsetZ);
+      }
+      const int n = CopiesAboutMiddle<T>(symmetry, turns, w, h, x - ox, z - oz, outX, outZ);
+      for (int i = 0; i < n; ++i) {
+        outX[i] += ox;
+        outZ[i] += oz;
+        if (outX[i] < 0 || outZ[i] < 0 || outX[i] > w || outZ[i] > h) {
+          outX[i] = x;
+          outZ[i] = z;
+        }
       }
       return n;
     }
@@ -1291,6 +1331,25 @@ namespace faf::editor
     value = (at(x0, z0) * (1.0 - fx) + at(x0 + 1, z0) * fx) * (1.0 - fz) +
       (at(x0, z0 + 1) * (1.0 - fx) + at(x0 + 1, z0 + 1) * fx) * fz;
     return true;
+  }
+
+  void SetSymmetryCentreOffset(
+    const float x,
+    const float z
+  ) noexcept
+  {
+    gCentreOffsetX = x;
+    gCentreOffsetZ = z;
+  }
+
+  float SymmetryCentreOffsetX() noexcept
+  {
+    return gCentreOffsetX;
+  }
+
+  float SymmetryCentreOffsetZ() noexcept
+  {
+    return gCentreOffsetZ;
   }
 
   Symmetry EffectiveSymmetry(

@@ -386,8 +386,12 @@ namespace faf::editor
         walls.insert(walls.end(), {wa, wb, tb, ta});
       }
     };
+    // The symmetry's centre (Terrain tool > Symmetry centre; the map's middle unless moved).
+    const float symX = w * 0.5f + SymmetryCentreOffsetX();
+    const float symZ = h * 0.5f + SymmetryCentreOffsetZ();
+    const float symReach = std::max(w, h);
     const auto turnAxis = [&]() {
-      moho::CD3DPrimBatcher::Vertex top = groundVertex(w * 0.5f, h * 0.5f, kMirrorColor, 0.0f);
+      moho::CD3DPrimBatcher::Vertex top = groundVertex(symX, symZ, kMirrorColor, 0.0f);
       moho::CD3DPrimBatcher::Vertex bottom = top;
       top.mY += std::max(w, h) * 0.15f;
       batcher->DrawLine(bottom, top);
@@ -395,32 +399,32 @@ namespace faf::editor
     const bool square = field->width == field->height;
     switch (brush.symmetry) {
     case Symmetry::LeftRight:
-      groundLine(w * 0.5f, 0.0f, w * 0.5f, h);
+      groundLine(symX, 0.0f, symX, h);
       break;
     case Symmetry::TopBottom:
-      groundLine(0.0f, h * 0.5f, w, h * 0.5f);
+      groundLine(0.0f, symZ, w, symZ);
       break;
     case Symmetry::DiagonalBack:
       if (square) {
-        groundLine(0.0f, 0.0f, w, h);
+        groundLine(symX - symReach, symZ - symReach, symX + symReach, symZ + symReach);
       }
       break;
     case Symmetry::DiagonalForward:
       if (square) {
-        groundLine(w, 0.0f, 0.0f, h);
+        groundLine(symX + symReach, symZ - symReach, symX - symReach, symZ + symReach);
       }
       break;
     case Symmetry::HalfTurn:
       turnAxis();
       break;
     case Symmetry::BothAxes:
-      groundLine(w * 0.5f, 0.0f, w * 0.5f, h);
-      groundLine(0.0f, h * 0.5f, w, h * 0.5f);
+      groundLine(symX, 0.0f, symX, h);
+      groundLine(0.0f, symZ, w, symZ);
       break;
     case Symmetry::BothDiagonals:
       if (square) {
-        groundLine(0.0f, 0.0f, w, h);
-        groundLine(w, 0.0f, 0.0f, h);
+        groundLine(symX - symReach, symZ - symReach, symX + symReach, symZ + symReach);
+        groundLine(symX + symReach, symZ - symReach, symX - symReach, symZ + symReach);
       }
       break;
     case Symmetry::QuarterTurns:
@@ -439,7 +443,7 @@ namespace faf::editor
           const float dz = std::sin(angle);
           // To the square's edge along this ray.
           const float reach = 0.5f * w / std::max(std::fabs(dx), std::fabs(dz));
-          groundLine(w * 0.5f, h * 0.5f, w * 0.5f + dx * reach, h * 0.5f + dz * reach);
+          groundLine(symX, symZ, symX + dx * reach, symZ + dz * reach);
         }
       }
       break;
@@ -628,6 +632,46 @@ namespace faf::editor
               batcher->DrawLine(groundVertex(x0, lz, shade(x0, lz), 0.25f), groundVertex(x1, lz, shade(x1, lz), 0.25f));
             }
           }
+        }
+      }
+    }
+
+    // The brush's weight on each sample under it (FAF Studio's weight overlay): a dot per sample (or per few on a
+    // wide brush), brighter where the brush works harder, so shapes, falloff and stamps show before a dab.
+    if (mTools->TerrainToolActive() && mTools->ShowBrushWeight()) {
+      float gx = 0.0f;
+      float gz = 0.0f;
+      if (CursorGround(gx, gz)) {
+        const HeightBrush& weightBrush = brush;
+        const int reach = static_cast<int>(std::ceil(weightBrush.radius));
+        const int stride = std::max(1, reach / 32);
+        const float half = 0.16f * static_cast<float>(stride) + 0.12f;
+        std::vector<moho::CD3DPrimBatcher::Vertex> dots;
+        const int cx = static_cast<int>(std::lround(gx));
+        const int cz = static_cast<int>(std::lround(gz));
+        for (int dz = -reach; dz <= reach; dz += stride) {
+          for (int dx = -reach; dx <= reach; dx += stride) {
+            const int sx = cx + dx;
+            const int sz = cz + dz;
+            if (sx < 0 || sz < 0 || sx >= field->width || sz >= field->height) {
+              continue;
+            }
+            const float weight = BrushWeightAt(weightBrush, static_cast<float>(sx) - gx, static_cast<float>(sz) - gz);
+            if (weight <= 0.02f) {
+              continue;
+            }
+            const std::uint32_t colour =
+              (static_cast<std::uint32_t>(40.0f + 200.0f * std::min(weight, 1.0f)) << 24) | 0x0040E0FFu;
+            const float fx = static_cast<float>(sx);
+            const float fz = static_cast<float>(sz);
+            dots.push_back(groundVertex(fx - half, fz - half, colour, 0.5f));
+            dots.push_back(groundVertex(fx + half, fz - half, colour, 0.5f));
+            dots.push_back(groundVertex(fx + half, fz + half, colour, 0.5f));
+            dots.push_back(groundVertex(fx - half, fz + half, colour, 0.5f));
+          }
+        }
+        if (!dots.empty()) {
+          batcher->DrawQuads(dots.data(), static_cast<std::uint32_t>(dots.size() / 4));
         }
       }
     }
@@ -3834,7 +3878,7 @@ namespace faf::editor
     }
     ScaleHeights(image, scale);
     std::string error;
-    if (!WriteHeightImage(file, image, error)) {
+    if (!WriteHeightImage(file, image, error, mTools != nullptr && mTools->ExportEightBit())) {
       message = "Export failed: " + error;
       return false;
     }
@@ -6013,6 +6057,36 @@ namespace faf::editor
         }
         return true;
       };
+      // Named masks: files beside the window's heightmap, by name (FAF Studio's adopted files).
+      out.loadExternalMask =
+        [windowFile, width, height](const std::string& name, field::Grid& grid, std::string& error) {
+        if (windowFile.empty()) {
+          error = "no heightmap chosen in Terrain > Import / Export: named masks are found beside it";
+          return false;
+        }
+        std::vector<std::string> files;
+        std::error_code ignored;
+        for (const auto& item :
+             std::filesystem::directory_iterator(std::filesystem::path(windowFile).parent_path(), ignored)) {
+          files.push_back(item.path().string());
+        }
+        const std::string found = FindNamedMask(files, name);
+        if (found.empty()) {
+          error = "no mask named " + name + " beside " + std::filesystem::path(windowFile).filename().string();
+          return false;
+        }
+        HeightImage image;
+        if (!ReadHeightImage(found, 0, 0, image, error)) {
+          error = found + ": " + error;
+          return false;
+        }
+        image = ResampleHeights(image, width, height);
+        grid = field::Grid(width, height, 1.0f, 0.0f, 0.0f);
+        for (std::size_t k = 0; k < image.words.size(); ++k) {
+          grid.v[k] = static_cast<float>(image.words[k]) / 65535.0f;
+        }
+        return true;
+      };
     }
     // The map's light.
     const LightingState lighting = mDocument.LightingNow();
@@ -6526,6 +6600,14 @@ namespace faf::editor
           message += ", with " + sidecar.filename().string();
         } else {
           message += "; the sidecar couldn't be written";
+        }
+        // The sheet for Gaea / World Machine (size in km, heights in metres).
+        const std::filesystem::path sheet = std::filesystem::path(file).string() + ".txt";
+        if (std::FILE* out = std::fopen(sheet.string().c_str(), "wb"); out != nullptr) {
+          const std::string text = ExportSheet(facts);
+          (void)std::fwrite(text.data(), 1, text.size(), out);
+          (void)std::fclose(out);
+          message += " and " + sheet.filename().string();
         }
       }
       gpg::Logf("editor: interop: %s", message.c_str());

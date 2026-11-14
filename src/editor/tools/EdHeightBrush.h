@@ -316,6 +316,15 @@ namespace faf::editor
   /** The rectangles `ApplyHeightBrush` would write for the same arguments, without writing (undo saves them first). */
   std::vector<SampleRect> HeightBrushRects(int width, int height, float x, float z, const HeightBrush& brush);
 
+  /**
+   * The symmetry's centre, as an offset from the map's middle in samples (FAF Studio's Centre X / Z): every mirror,
+   * turn and N-way copy of the brushes and of SymmetricSamples is made about it. A copy that would fall off the map is
+   * the point itself (a repeat, as copies that coincide are).
+   */
+  void SetSymmetryCentreOffset(float x, float z) noexcept;
+  [[nodiscard]] float SymmetryCentreOffsetX() noexcept;
+  [[nodiscard]] float SymmetryCentreOffsetZ() noexcept;
+
   /** The brush's centre and its symmetric copies (the cursor's first), as the brush paints them. */
   int HeightBrushCentres(
     int width,

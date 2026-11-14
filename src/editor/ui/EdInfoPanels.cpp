@@ -1134,6 +1134,84 @@ namespace faf::editor
         }
       }
     }
+    // Hover (land and the water's surface) and amphibious (land and the sea bed) units, as FAF Studio's pathing
+    // shows them: how far each start gets with them, and their overlay layers (a T2 hover tank and an amphibious
+    // tank's footprints from the rules, fallbacks when they lack them).
+    {
+      const char* const hoverId = "uel0203";
+      const char* const amphibiousId = "url0203";
+      const PathFootprint hover = footprintOf(hoverId, PathFootprint{0x9, 0.75f, 0.0f, 0.0f});
+      const PathFootprint amphibious = footprintOf(amphibiousId, PathFootprint{0x3, 0.75f, 0.0f, 25.0f});
+      std::vector<EdTools::PathQuad> layers[2];
+      const PathFootprint* const kinds[2] = {&hover, &amphibious};
+      const char* const names[2] = {"hover", "amphibious"};
+      for (int k = 0; k < 2; ++k) {
+        const std::vector<std::uint8_t> kindCells =
+          PassableCells(field->data, field->width, field->height, input.water, input.waterLevel, *kinds[k]);
+        std::vector<int> kindAreas;
+        const int kindAreaCount = ConnectAreas(kindCells, cellsX, cellsZ, kindAreas);
+        std::vector<int> kindStarts;
+        int reached = 0;
+        for (const Start& start : starts) {
+          const int area = AreaNear(kindAreas, cellsX, cellsZ, start.x, start.z, 1);
+          if (area != 0 && std::find(kindStarts.begin(), kindStarts.end(), area) == kindStarts.end()) {
+            kindStarts.push_back(area);
+          }
+          for (const SaveEntry& marker : *input.markers) {
+            float x = 0.0f, y = 0.0f, z = 0.0f;
+            if (
+              MarkerTypeOf(marker) == "Mass" && MarkerPosition(marker, x, y, z) && area != 0 &&
+              AreaNear(kindAreas, cellsX, cellsZ, x, z, 3) == area
+            ) {
+              ++reached;
+            }
+          }
+        }
+        for (int bz = 0; bz < cellsZ; bz += block) {
+          for (int bx = 0; bx < cellsX; bx += block) {
+            int blocked = 0;
+            int lone = 0;
+            int total = 0;
+            for (int z = bz; z < std::min(bz + block, cellsZ); ++z) {
+              for (int x = bx; x < std::min(bx + block, cellsX); ++x) {
+                const int area = kindAreas
+                  [static_cast<std::size_t>(z) * static_cast<std::size_t>(cellsX) + static_cast<std::size_t>(x)];
+                ++total;
+                if (area == 0) {
+                  ++blocked;
+                } else if (std::find(kindStarts.begin(), kindStarts.end(), area) == kindStarts.end()) {
+                  ++lone;
+                }
+              }
+            }
+            const float x0 = static_cast<float>(bx);
+            const float z0 = static_cast<float>(bz);
+            const float x1 = static_cast<float>(std::min(bx + block, cellsX));
+            const float z1 = static_cast<float>(std::min(bz + block, cellsZ));
+            if (blocked * 2 >= total) {
+              layers[k].push_back({x0, z0, x1, z1, 0x60FF3020u});
+            } else if (lone * 2 >= total) {
+              layers[k].push_back({x0, z0, x1, z1, 0x50FFB020u});
+            }
+          }
+        }
+        gpg::Logf(
+          "editor: pathing: %d %s areas, starts on %zu of them, %d mass points reached from the starts in all",
+          kindAreaCount,
+          names[k],
+          kindStarts.size(),
+          reached
+        );
+        if (kindStarts.size() > 1) {
+          CheckIssue issue;
+          issue.level = CheckIssue::Level::Note;
+          issue.text = std::string("the starts are on ") + std::to_string(kindStarts.size()) + " separate " + names[k] +
+            " areas (a " + (k == 0 ? hoverId : amphibiousId) + " can't reach every start)";
+          mCheckIssues.push_back(issue);
+        }
+      }
+      mTools.SetPathingMore(std::move(layers[0]), std::move(layers[1]));
+    }
     const std::size_t landBlocks = quads.size();
     const std::size_t shipBlocks = shipQuads.size();
     mTools.SetPathing(std::move(quads), std::move(shipQuads));
@@ -1466,6 +1544,10 @@ namespace faf::editor
     ImGui::RadioButton("Land", &mTools.PathingLayer(), 0);
     ImGui::SameLine();
     ImGui::RadioButton("Ships", &mTools.PathingLayer(), 1);
+    ImGui::SameLine();
+    ImGui::RadioButton("Hover", &mTools.PathingLayer(), 2);
+    ImGui::SameLine();
+    ImGui::RadioButton("Amphibious", &mTools.PathingLayer(), 3);
     HelpNote(
       "The scripts' syntax (_scenario.lua, _save.lua, _script.lua as edited), then start positions and mass and "
       "hydrocarbon points: off the playable area, under water, without a partner at their symmetric copies (the Tools "

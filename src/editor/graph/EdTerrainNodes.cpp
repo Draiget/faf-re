@@ -3837,15 +3837,22 @@ namespace faf::editor::terrain
         "external_mask",
         "External mask (Gaea / World Machine)",
         "sources",
-        "A named mask imported from another tool (flow, wear, deposit). This editor imports no named masks yet: with "
-        "Optional "
-        "the output is empty, else the node fails.",
+        "A named mask another tool exported beside the Import / Export window's heightmap (flow, wear, deposit): "
+        "a file named <name>, or ending in _<name>, in that folder (.png, .tif, .r16, .raw, .r32), 0..1 over the map. "
+        "With Optional a missing mask is empty, else the node fails.",
         {},
         kMaskOut,
         {T("name", "Name of the named mask", "wear"), B("optional", "Empty when there is no such mask", true)},
         [](const Env& E, const Values& v, const Inputs&) {
+        auto mask = std::make_shared<field::Grid>();
+        std::string error;
+        if (
+          E.ground != nullptr && E.ground->loadExternalMask && E.ground->loadExternalMask(v.S("name"), *mask, error)
+        ) {
+          return One(E.Op("resample", {{"a", field::GridPtr(mask)}, {"like", E.like}}));
+        }
         if (!v.B("optional")) {
-          Fail("this editor imports no named masks yet (" + v.S("name") + ")");
+          Fail(error.empty() ? "no mask named " + v.S("name") : error);
         }
         return One(E.Const(0.0));
       }

@@ -99,6 +99,11 @@ namespace faf::editor
      * the window's file, its stamp or the mapping does.
      */
     std::function<bool(const std::string& file, field::Grid& out, std::string& error)> loadExternal;
+    /**
+     * A named mask another tool exported beside the Import / Export window's heightmap (flow, wear, deposit...), 0..1
+     * over the whole map; false with `error` when there is none.
+     */
+    std::function<bool(const std::string& name, field::Grid& out, std::string& error)> loadExternalMask;
     std::string externalKey;
     /**
      * The Layout workspace's drawing (null: none) for the Map layout nodes, a key that changes with it and the editor's

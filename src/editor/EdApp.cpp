@@ -92,6 +92,7 @@
 #include "gpg/core/diagnostics/CrashHooks.h"
 #include "gpg/core/diagnostics/CrashReport.h"
 #include "gpg/core/utils/Global.h"
+#include "moho/app/UserWorkerPool.h"
 #include "editor/ui/EdPopouts.h"
 #include "editor/ui/EdTipCheck.h"
 #include "editor/tools/EdMarkers.h"
@@ -162,59 +163,113 @@ namespace faf::editor
     [[nodiscard]] bool IsTestRunCommandLine()
     {
       static const char* const kOptions[] = {
-        "/command",         "/palette",
-        "/theme",           "/keysfile",
-        "/focuspanel",      "/uiclicks",
-        "/tipcheck",        "/hidegameunits",
-        "/movelayer",       "/pickfilter",
-        "/mapwide",         "/tool",
-        "/proptool",        "/play",
-        "/debugarm",        "/breakpoint",
-        "/check",           "/decaltool",
-        "/markertool",      "/unittool",
-        "/hoverprop",       "/selectprops",
-        "/selectunit",      "/propswap",
-        "/saveas",          "/settingsfile",
-        "/autosavefolder",  "/askunsaved",
-        "/particlebrowser", "/particlenew",
-        "/particleopen",    "/materialeditor",
-        "/uiscale",         "/testrun",
-        "/openall",         "/roundtrip",
-        "/vault",           "/vaultsearch",
-        "/vaultmap",        "/newmap",
-        "/stamp",           "/brush",
-        "/layer",           "/waterbody",
-        "/ruler",           "/adaptivewindow",
-        "/maskrule",        "/maskgen",
-        "/symhover",        "/stbfont",
-        "/recipe",          "/texset",
-        "/layerop",         "/slopeview",
-        "/typesfromlayers", "/uncapped",
-        "/nominimap",       "/followtest",
-        "/arrangetest",     "/findtest",
-        "/findopen",        "/filltest",
-        "/modaltest",       "/looktest",
-        "/looksfolder",     "/envtest",
-        "/watermasktest",   "/nowaterhires",
-        "/camat",           "/erosiontest",
-        "/sctest",          "/symmenu",
-        "/panelbottom",     "/shader",
-        "/brushtest",       "/brushshape",
-        "/stampsource",     "/stampstroke",
-        "/symoptions",      "/maskoptions",
-        "/masktest",        "/shaderbrowser",
-        "/convertlayers",   "/interoptest",
-        "/gentest",         "/layouttest",
-        "/playcopytest",    "/missiontest",
-        "/modtest",         "/unitlabtest",
-        "/effectmodtest",   "/assettest",
-        "/thumbcache",      "/assetmarks",
-        "/editormods",      "/editormodtest",
-        "/unitviewtest",    "/runmarker",
-        "/pausetest",       "/viewmenu",
-        "/mapinfotest",     "/dropdefaultcube",
-        "/exportpreview",   "/resizetest",
-        "/console",         "/pathtest",
+        "/command",
+        "/palette",
+        "/theme",
+        "/keysfile",
+        "/focuspanel",
+        "/uiclicks",
+        "/tipcheck",
+        "/fieldstest",
+        "/hidegameunits",
+        "/movelayer",
+        "/pickfilter",
+        "/mapwide",
+        "/tool",
+        "/proptool",
+        "/play",
+        "/debugarm",
+        "/breakpoint",
+        "/check",
+        "/decaltool",
+        "/markertool",
+        "/unittool",
+        "/hoverprop",
+        "/selectprops",
+        "/selectunit",
+        "/propswap",
+        "/saveas",
+        "/settingsfile",
+        "/autosavefolder",
+        "/askunsaved",
+        "/particlebrowser",
+        "/particlenew",
+        "/particleopen",
+        "/materialeditor",
+        "/uiscale",
+        "/testrun",
+        "/openall",
+        "/roundtrip",
+        "/vault",
+        "/vaultsearch",
+        "/vaultmap",
+        "/newmap",
+        "/stamp",
+        "/brush",
+        "/layer",
+        "/waterbody",
+        "/ruler",
+        "/adaptivewindow",
+        "/maskrule",
+        "/maskgen",
+        "/symhover",
+        "/stbfont",
+        "/recipe",
+        "/texset",
+        "/layerop",
+        "/slopeview",
+        "/typesfromlayers",
+        "/uncapped",
+        "/nominimap",
+        "/followtest",
+        "/arrangetest",
+        "/findtest",
+        "/findopen",
+        "/filltest",
+        "/modaltest",
+        "/looktest",
+        "/looksfolder",
+        "/envtest",
+        "/watermasktest",
+        "/nowaterhires",
+        "/camat",
+        "/erosiontest",
+        "/sctest",
+        "/symmenu",
+        "/panelbottom",
+        "/shader",
+        "/brushtest",
+        "/brushshape",
+        "/stampsource",
+        "/stampstroke",
+        "/symoptions",
+        "/maskoptions",
+        "/masktest",
+        "/shaderbrowser",
+        "/convertlayers",
+        "/interoptest",
+        "/gentest",
+        "/layouttest",
+        "/playcopytest",
+        "/missiontest",
+        "/modtest",
+        "/unitlabtest",
+        "/effectmodtest",
+        "/assettest",
+        "/thumbcache",
+        "/assetmarks",
+        "/editormods",
+        "/editormodtest",
+        "/unitviewtest",
+        "/runmarker",
+        "/pausetest",
+        "/viewmenu",
+        "/mapinfotest",
+        "/dropdefaultcube",
+        "/exportpreview",
+        "/resizetest",
+        "/console",
+        "/pathtest",
       };
       for (const char* const option : kOptions) {
         if (moho::CFG_GetArgOption(option, 0, nullptr)) {
@@ -5036,6 +5091,8 @@ namespace faf::editor
       /** File > New sample map: once the new map is open, the Generate workspace's island graph builds its ground. */
       bool mSampleMapPending = false;
       bool mSampleBuildDue = false;
+      std::string mFieldsTest;
+      int mFieldsTestFrames = 0;
       /**
        * The Log panel's console line: `sim <code>` runs in the sim (the engine's SimLua, with a session), `con
        * <command>` is the engine's console, anything else runs in the interface's Lua; `=expr` prints its value.
@@ -5964,6 +6021,7 @@ namespace faf::editor
       windowPanel("window.modproject", "Mod project", "ModProject");
       windowPanel("window.editormods", "Editor mods", "EditorMods");
       windowPanel("window.assets", "Asset browser", "AssetBrowser");
+      windowPanel("window.fields", "Fields (op by op)", "Fields");
       if (EdCommand* const assets = const_cast<EdCommand*>(c.Find("window.assets")); assets != nullptr) {
         (void)c.SetKeys("window.assets", "Ctrl+Alt+A");
       }
@@ -6188,7 +6246,8 @@ namespace faf::editor
            cmd("terrain.layout"),
            cmd("terrain.interop"),
            cmd("terrain.erosion"),
-           cmd("terrain.sctools")}
+           cmd("terrain.sctools"),
+           cmd("window.fields")}
         },
         EdMenu{
           "&Select",
@@ -7259,6 +7318,11 @@ namespace faf::editor
       }
       if (moho::CFG_GetArgOption("/tipcheck", 0, nullptr)) {
         mTipCheck.Start(360);
+      }
+      if (
+        fa::vector<fa::string> fieldsTest; moho::CFG_GetArgOption("/fieldstest", 1, &fieldsTest) && !fieldsTest.empty()
+      ) {
+        mFieldsTest = fieldsTest[0].c_str();
       }
       if (fa::vector<fa::string> clicks; moho::CFG_GetArgOption("/uiclicks", 1, &clicks) && !clicks.empty()) {
         const std::string list = clicks[0].c_str();
@@ -9042,15 +9106,16 @@ namespace faf::editor
         dialog.lpstrFile = path;
         dialog.nMaxFile = MAX_PATH;
         if (save) {
-          dialog.lpstrFilter =
-            L"16-bit grey PNG (*.png)\0*.png\0Raw 16-bit (*.raw)\0*.raw\0World Machine (*.r16)\0*.r16\0";
+          dialog.lpstrFilter = L"16-bit grey PNG (*.png)\0*.png\0TIFF (*.tif)\0*.tif\0Raw 16-bit (*.raw)\0*.raw\0"
+                               L"World Machine (*.r16)\0*.r16\0Floats (*.r32)\0*.r32\0";
           dialog.lpstrDefExt = L"png";
           dialog.lpstrTitle = L"Export the height field";
           dialog.Flags = OFN_OVERWRITEPROMPT | OFN_PATHMUSTEXIST | OFN_NOCHANGEDIR;
           return ::GetSaveFileNameW(&dialog) != FALSE ? std::filesystem::path(path) : std::filesystem::path{};
         }
         dialog.lpstrFilter =
-          L"Height images (*.png;*.raw;*.r16;*.bmp;*.tif;*.tiff)\0*.png;*.raw;*.r16;*.bmp;*.tif;*.tiff\0All "
+          L"Height images "
+          L"(*.png;*.raw;*.r16;*.r32;*.bmp;*.tif;*.tiff)\0*.png;*.raw;*.r16;*.r32;*.bmp;*.tif;*.tiff\0All "
           L"files\0*.*\0";
         dialog.lpstrTitle = L"Import a height field";
         dialog.Flags = OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST | OFN_NOCHANGEDIR;
@@ -9552,7 +9617,11 @@ namespace faf::editor
           }
           if (fa::vector<fa::string> layer; moho::CFG_GetArgOption("/pathing", 1, &layer)) {
             mShell->Tools().ShowPathing() = true;
-            mShell->Tools().PathingLayer() = !layer.empty() && std::string(layer[0].c_str()) == "ships" ? 1 : 0;
+            const std::string layerName = !layer.empty() ? std::string(layer[0].c_str()) : std::string();
+            mShell->Tools().PathingLayer() = layerName == "ships" ? 1
+              : layerName == "hover"                              ? 2
+              : layerName == "amphibious"                         ? 3
+                                                                  : 0;
           } else if (moho::CFG_GetArgOption("/pathing", 0, nullptr)) {
             mShell->Tools().ShowPathing() = true;
           }
@@ -10966,8 +11035,19 @@ namespace faf::editor
       }
       std::string message;
       if (importAsked) {
+        // One import (FAF Studio had two): the file goes to Import / Export, read with its words as heights times the
+        // tool's scale, over the whole map; that window shows it and can change the mapping, region and filter.
         if (const std::filesystem::path file = AskHeightFile(HandleOf(mGame.supcomFrame), false); !file.empty()) {
-          report(mScene.ImportHeights(file, tools.HeightScale(), message), message);
+          ImportSettings& s = tools.InteropSettings();
+          s.mapping = ImportSettings::Mapping::Absolute;
+          s.scale = tools.HeightScale();
+          s.blend = ImportSettings::Blend::Replace;
+          s.strength = 1.0f;
+          s.region = false;
+          tools.SetInteropFile(false, file.string());
+          tools.OpenInterop();
+          tools.AskInterop(EdTools::InteropAsk::Import);
+          gpg::Logf("editor: heights import of %s through Import / Export", file.string().c_str());
         }
       }
       if (exportAsked) {
@@ -11059,6 +11139,59 @@ namespace faf::editor
         gpg::Logf(
           "editor: check fix: %s moved to %.1f, %.1f", marker.c_str(), static_cast<double>(x), static_cast<double>(z)
         );
+      }
+      // Terrain > Fields: its source is the map's heights; "Put on the map" writes the top of its stack (one step).
+      {
+        EdFieldsPanel& fields = mShell->Fields();
+        static bool sourced = false;
+        if (!sourced) {
+          sourced = true;
+          // One pool (FAF Studio's library had its own beside the engine's): the field library's jobs started on the
+          // main thread run on CUserWorkerPool; from other threads (graph previews) its own pool stays.
+          field::SetParallelBackend([](const int count, const std::function<void(int)>& fn) {
+            if (!moho::CUserWorkerPool::IsDispatcherThread() || moho::CUserWorkerPool::ConfiguredWorkerCount() == 0) {
+              return false;
+            }
+            moho::CUserWorkerPool::Get().ParallelFor(
+              static_cast<std::size_t>(count), 1U, [&fn](const std::size_t begin, const std::size_t end) {
+              for (std::size_t i = begin; i < end; ++i) {
+                fn(static_cast<int>(i));
+              }
+            }
+            );
+            return true;
+          });
+          fields.SetGroundSource([this](field::Grid& out) {
+            TerrainGround ground;
+            if (!mScene.Attached() || mScene.ModelsPending() || !mScene.GraphGround(ground) || !ground.heights) {
+              return false;
+            }
+            out = field::Grid(ground.width, ground.height, 1.0f, 0.0f, 0.0f);
+            out.v = *ground.heights;
+            return out.Count() == out.v.size() && out.Count() > 0;
+          });
+        }
+        if (field::Grid heights; fields.TakeCommit(heights) && mScene.Attached()) {
+          const std::string status = mScene.ApplyGraphBuild(heights, true, TerrainBuildWrites{});
+          gpg::Logf("editor: fields: put on the map: %s", status.c_str());
+          PostStatusMessage("Fields: the result is on the map (one undo step)");
+        }
+        // `/fieldstest <op>;<key=value,...>` (test runs): that op on the map's heights, put on the map.
+        if (
+          !mFieldsTest.empty() && mDocument.GetState() == EdDocument::State::Open && mScene.Attached() &&
+          !mScene.ModelsPending() && ++mFieldsTestFrames > 90
+        ) {
+          const std::size_t semicolon = mFieldsTest.find(';');
+          const std::string op = mFieldsTest.substr(0, semicolon);
+          std::string params = semicolon == std::string::npos ? std::string() : mFieldsTest.substr(semicolon + 1);
+          for (char& c : params) {
+            c = c == ',' ? '\n' : c;
+          }
+          std::string status;
+          const bool ok = fields.RunForTest(op, params, status);
+          (ok ? gpg::Logf : gpg::Warnf)("editor: fields test: %s", status.c_str());
+          mFieldsTest.clear();
+        }
       }
       // The sample map open: its ground from the island graph (Generate's Build, one undo step).
       if (mSampleBuildDue && mDocument.GetState() == EdDocument::State::Open && mScene.Attached()) {

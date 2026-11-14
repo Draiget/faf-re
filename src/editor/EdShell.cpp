@@ -561,6 +561,9 @@ namespace faf::editor
       if (mShowUnitViewer) {
         mUnitViewer.Draw(mShowUnitViewer);
       }
+      if (mShowFields) {
+        mFieldsPanel.Draw(mShowFields, mDocument.Map() != nullptr);
+      }
       mUnitViewer.Frame();
       DrawViewMenu();
       if (std::string effect; mAssets.TakeEffectAsk(effect)) {
@@ -793,6 +796,7 @@ namespace faf::editor
       {"Assets###AssetBrowser", &EdShell::mShowAssets},
       {"Editor mods###EditorMods", &EdShell::mShowEditorMods},
       {"Unit viewer###UnitViewer", &EdShell::mShowUnitViewer},
+      {"Fields###Fields", &EdShell::mShowFields},
     };
     return kFlags;
   }

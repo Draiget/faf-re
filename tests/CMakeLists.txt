@@ -377,6 +377,7 @@ faf_embed_terrain_graphs(_faf_terrain_graph_files)
 # the Generate ops, the interop ops. Engine independent.
 add_executable(faf_editor_field_tests EXCLUDE_FROM_ALL editor/FieldTests.cpp editor/FieldLandTests.cpp editor/FieldInteropTests.cpp editor/ErosionTests.cpp
   editor/MapTexturesTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdMapTextures.cpp
+  editor/FieldStackTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdFieldStack.cpp
   editor/GroundKindTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdGroundKind.cpp
   editor/MaskGenTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdMaskGen.cpp
   editor/RecipeTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdRecipes.cpp
@@ -471,6 +472,7 @@ add_executable(faf_editor_brush_tests EXCLUDE_FROM_ALL editor/HeightBrushTests.c
   editor/WorkspacesTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/ui/EdWorkspaces.cpp
   editor/StatusTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/ui/EdStatus.cpp
   editor/SettingsTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/ui/EdSettings.cpp
+  editor/TerrainExtrasTests.cpp
   editor/ShellExtrasTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdUserFiles.cpp ${CMAKE_SOURCE_DIR}/src/editor/ui/EdFramePacing.cpp ${CMAKE_SOURCE_DIR}/src/editor/ui/EdTipTally.cpp
   editor/HomeModelTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/ui/EdHomeModel.cpp
   editor/AutosaveTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdAutosave.cpp

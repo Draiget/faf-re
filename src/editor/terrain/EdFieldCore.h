@@ -149,6 +149,12 @@ namespace faf::editor::field
   [[nodiscard]] int Threads();
   /** Runs fn(i) for i in [0, count); i is handed out dynamically, fn must only write data that belongs to i. */
   void ParallelFor(int count, const std::function<void(int)>& fn);
+  /**
+   * Another pool for ParallelFor (the editor hands its jobs to the engine's CUserWorkerPool, so one pool serves the
+   * editor): it runs fn(i) for every i and returns true, or returns false and the library's own pool runs them.
+   */
+  using ParallelBackend = bool (*)(int count, const std::function<void(int)>& fn);
+  void SetParallelBackend(ParallelBackend backend);
 
   // ---- analysis helpers
   // ------------------------------------------------------------------------------------------------------------------------
