@@ -429,3 +429,20 @@ The tools are picked in the **tool strip** down the window's left edge (the mock
 
 - Each Play still keeps a little private memory after it ends: over 20 plays of SCMP_009 on Direct3D 12 the lowest point after a play rose 1248 to 1380 MB, 82 MB of it the first play's warm-up, then about 1.9 MB a play, 0.7 MB over the last ten (it was 15 MB a play). The heap, the Lua range and the GPU's memory stay flat once warm; what grows is in the graphics driver's write-combined blocks. Freed before: a sync packet's shared references (the sim's height field, 4 MB), the world meshes the game UI never destroys, the cursor each UI state switch made, the Lua range's unmerged free blocks, the particle buffers a play first used (FAF's 4096-buffer pool was handed out oldest first), and the UI Lua state's garbage, now collected after each play.
 - The editor started by a tool that can't reach the desktop's browser (Windows reports no association) can't open FAF's sign-in page; the card shows the link to copy instead.
+
+## Credits
+
+Much of this editor is **Marlo**'s work. His FAF Studio editor (the `editor` branch of his fork) was written first, and these parts were ported from it, its tests and golden checksums included, or follow its design closely:
+
+- **Terrain field library** (`terrain/EdField*.cpp`) and **erosion** (`terrain/EdErosion.cpp`, `terrain/EdFieldEro2.cpp`, `tools/EdErosionSuite.cpp`): noise, filters, analysis masks, the Generate and Supreme Commander ops, path ops, resamplers; hydraulic, droplet, thermal, glacier and the other erosion models, the Rain / Deposit brush session and the erosion presets.
+- **Height brushes** (`tools/EdHeightBrush.cpp`): Plateau, Sharpen, wide Smooth, smooth Noise, the brush shapes, the brush and stamp library (`tools/EdBrushLibrary.cpp`).
+- **Symmetry** (`tools/EdSymmetrize.cpp`, `tools/EdSymmetryCheck.h`): symmetry found from the markers, an off-centre axis, Make symmetric with its part / seam / combine options.
+- **Texturing**: the mask brush options (`tools/EdMaskBrush.h`), the terrain shader profiles and browser (`tools/EdShaderProfiles.cpp`), converting a map's paint to another shader (`tools/EdLayerConvert.h`), map-wide textures (`tools/EdMapTextures.cpp`), the mask generator and stratum recipes (`tools/EdMaskGen.cpp`, `tools/EdRecipes.cpp`), texture sets and themes (`tools/EdTextureSets.cpp`), terrain types from textures (`tools/EdTerrainTypes.cpp`, `tools/EdGroundKind.cpp`), tile scale (`tools/EdTexScale.h`), the alpha generator (`tools/EdAlphaGen.h`), texture file import (`tools/EdTextureFiles.h`).
+- **Terrain graph and Generate** (`graph/EdTerrainGraph.cpp`, `graph/EdTerrainNodes.cpp`, `ui/EdGenerate.h`, the graph presets): the nodes, Studio's graph files, the gallery of seeds; the **Layout** workspace (`tools/EdMapLayout.cpp`, `tools/EdLayoutMarkers.cpp`) and the **SC tools** (`tools/EdScTools.h`: base pads, resource rings, the slope limit, the ramp check).
+- **Environment**: looks (`doc/EdLooks.h`), water presets (`doc/EdWaterPreset.h`), the skybox tools (`doc/EdSkybox.h`), the finer water map for drawing lake shores (`ren_WaterHiRes`).
+- **Checks** (`tools/EdChecks.h`, `tools/EdTerrainChecks.h`, `tools/EdSlopeRules.h`): the map-wide checks, the build-slope rules, the mission API dry run (`doc/EdLuaApi.h`) and the log's console line.
+- **Mission** (`tools/EdMission.cpp`, `ui/EdMissionPanel.h`): the mission model and compiler.
+- **Units, mods and assets**: mod projects and the merge blueprint writer (`doc/EdModProject.h`, `doc/EdEffectMerge.h`), the unit lab (`tools/EdUnitLab.cpp`), the unit icon render (`tools/EdUnitIcon.h`), the unit viewer, the asset browser (`tools/EdAssetCatalog.h`), editor mods (`doc/EdEditorMods.h`), the Lua API table (`doc/EdLuaApi.h`).
+- **Map tools**: resize (`tools/EdResize.h`), terrain paths (`tools/EdTerrainPath.h`), the interop readers and writers (`tools/EdInterop.h`).
+
+The rest (the shell, the panels' look, the view, the object tools, Play inside the editor) is this project's, and many of those parts were compared with FAF Studio's along the way. Thank you, Marlo.

@@ -192,3 +192,5 @@ This rebuild took a lot of time and paid AI compute. If it is useful to you, don
 ## Credits
 
 Built on many years of engine study by the Forged Alliance Forever community. Particular thanks to [Hdt80bro](https://github.com/Hdt80bro) and [4z0t](https://github.com/4z0t).
+
+The map editor's terrain, texturing, generator, mission and unit tools are largely Marlo's work from his FAF Studio editor; [docs/MAP_EDITOR.md](docs/MAP_EDITOR.md#credits) lists what came from it.
