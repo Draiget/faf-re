@@ -966,7 +966,6 @@ namespace
   int luaZ_fill(ZIO* stream);
   size_t luaZ_read(ZIO* stream, void* buffer, size_t size);
   char* luaZ_openspace(lua_State* L, Mbuffer* buff, size_t n);
-  std::FILE* __cdecl __iob_func(void);
   void luaO_chunkid(char* out, const char* source, int bufflen);
   void luaA_pushobject(lua_State* L, const TObject* o);
   int luaopen_serialize(lua_State* L);

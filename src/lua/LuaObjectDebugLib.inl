@@ -235,11 +235,11 @@ int LuaDebugConsole(
 {
   char inputBuffer[kLuaDebugInputBufferSize]{};
 
-  std::FILE* ioBase = __iob_func();
-  std::fputs(kLuaDebugPrompt, &ioBase[2]);
+  // `stderr` and `stdin` are MSVC8's `&__iob_func()[2]` and `&__iob_func()[0]`,
+  // the stream addresses the binary computes before each call.
+  std::fputs(kLuaDebugPrompt, stderr);
 
-  ioBase = __iob_func();
-  if (std::fgets(inputBuffer, kLuaDebugReadLineLimit, &ioBase[0]) == nullptr) {
+  if (std::fgets(inputBuffer, kLuaDebugReadLineLimit, stdin) == nullptr) {
     return 0;
   }
 
@@ -251,10 +251,8 @@ int LuaDebugConsole(
     lua_dostring(state, inputBuffer);
     lua_settop(state, 0);
 
-    ioBase = __iob_func();
-    std::fputs(kLuaDebugPrompt, &ioBase[2]);
-    ioBase = __iob_func();
-  } while (std::fgets(inputBuffer, kLuaDebugReadLineLimit, &ioBase[0]) != nullptr);
+    std::fputs(kLuaDebugPrompt, stderr);
+  } while (std::fgets(inputBuffer, kLuaDebugReadLineLimit, stdin) != nullptr);
 
   return 0;
 }
