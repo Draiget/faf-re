@@ -10633,6 +10633,22 @@ namespace faf::editor
       if (EdShell::ResizeRequest ask; mShell->TakeResize(ask)) {
         StartResize(ask);
       }
+      // An asset dragged from the browser and let go over the map: it becomes the tool's, and the tool gets a click
+      // there (sent to the view's window, as the panels pass the mouse on; the real cursor isn't touched).
+      if (EdAssetBrowser::DropAsk drop; mShell->Assets().TakeDrop(drop) && gViewWindow != nullptr) {
+        const POINT at{static_cast<LONG>(std::lround(drop.x)), static_cast<LONG>(std::lround(drop.y))};
+        bool over = ::PtInRect(&gViewRect, at) != FALSE;
+        for (const RECT& covered : gOverView) {
+          over = over && ::PtInRect(&covered, at) == FALSE;
+        }
+        if (over && mScene.Attached()) {
+          mShell->Assets().Pick(drop.entry);
+          const LPARAM point = MAKELPARAM(at.x - gViewRect.left, at.y - gViewRect.top);
+          (void)::SendMessageW(gViewWindow, WM_LBUTTONDOWN, MK_LBUTTON, point);
+          (void)::SendMessageW(gViewWindow, WM_LBUTTONUP, 0, point);
+          gpg::Logf("editor: %s dropped on the map", drop.entry.name.c_str());
+        }
+      }
       // A terrain graph built on the open map goes with it when it is saved.
       if (mShell->Generate().TakeBuilt() && mDocument.GetState() == EdDocument::State::Open) {
         mGraphMap = mDocument.Path();

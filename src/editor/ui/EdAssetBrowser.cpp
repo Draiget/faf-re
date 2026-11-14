@@ -311,6 +311,19 @@ namespace faf::editor
           if (clicked) {
             Pick(e);
           }
+          // Dragged out onto the map: placed where it is let go (the app sends the tool a click there).
+          if (
+            e.kind != AssetKind::Effects && e.kind != AssetKind::Textures &&
+            ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID)
+          ) {
+            const std::size_t index = found[at];
+            ImGui::SetDragDropPayload("FAF_ASSET", &index, sizeof(index));
+            ImGui::TextUnformatted(e.name.c_str());
+            ImGui::TextDisabled("Let go over the map to place it");
+            mDragging = true;
+            mDragged = e;
+            ImGui::EndDragDropSource();
+          }
           if (ImGui::IsItemClicked(ImGuiMouseButton_Right)) {
             mMarks.ToggleFavourite(e);
             SaveMarks();
@@ -337,5 +350,10 @@ namespace faf::editor
     }
     ImGui::EndChild();
     ImGui::End();
+    if (mDragging && ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
+      mDragging = false;
+      mDrop = {mDragged, ImGui::GetIO().MousePos.x, ImGui::GetIO().MousePos.y};
+      mDropAsked = true;
+    }
   }
 } // namespace faf::editor

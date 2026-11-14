@@ -32,6 +32,24 @@ namespace faf::editor
     [[nodiscard]] const std::vector<AssetEntry>& Entries(AssetKind kind);
     /** What a click does (the tool's asset), and the entry used. */
     void Pick(const AssetEntry& entry);
+    /** A tile dragged out and let go: the entry and where (the panels' window's pixels), taken once. */
+    struct DropAsk
+    {
+      AssetEntry entry;
+      float x = 0.0f;
+      float y = 0.0f;
+    };
+    [[nodiscard]] bool TakeDrop(
+      DropAsk& out
+    )
+    {
+      if (!mDropAsked) {
+        return false;
+      }
+      mDropAsked = false;
+      out = mDrop;
+      return true;
+    }
     /** An effect picked: its game path for the particle editor (taken once). */
     [[nodiscard]] bool TakeEffectAsk(std::string& path);
     [[nodiscard]] AssetMarks& Marks() noexcept
@@ -69,6 +87,10 @@ namespace faf::editor
     bool mRecent = false;
     std::map<std::string, std::string> mFilters; // per kind: "<kind>.<facet>" -> value
     std::string mEffectAsk;
+    bool mDragging = false;
+    AssetEntry mDragged;
+    bool mDropAsked = false;
+    DropAsk mDrop;
     std::string mStatus;
   };
 } // namespace faf::editor
