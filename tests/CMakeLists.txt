@@ -272,6 +272,12 @@ set_target_properties(faf_water_bodies_map_tests PROPERTIES FOLDER "Tests/Sim")
 add_test(NAME water_bodies_map COMMAND faf_water_bodies_map_tests)
 set_tests_properties(water_bodies_map PROPERTIES TIMEOUT 120 LABELS "Sim")
 
+# Engine rule fix (sim_FixWadingTargetLayer): a wading Land unit counts as Seabed for weapons that cannot target Land
+# (torpedo bombers vs a half-submerged experimental). Header-only rule, no engine objects.
+add_executable(faf_wading_target_layer_tests EXCLUDE_FROM_ALL sim/WadingTargetLayerTests.cpp)
+target_include_directories(faf_wading_target_layer_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
+add_test(NAME wading_target_layer COMMAND faf_wading_target_layer_tests)
+
 # Lua coroutine tests (coroutine.create / resume / yield / status / wrap).
 add_executable(faf_coroutine_tests EXCLUDE_FROM_ALL lua/CoroutineTests.cpp)
 target_link_libraries(faf_coroutine_tests PRIVATE faf_engine gtest_main)
