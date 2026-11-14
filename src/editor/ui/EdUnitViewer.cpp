@@ -90,7 +90,7 @@ namespace faf::editor
   {}
 
   bool EdUnitViewer::Request(
-    boost::shared_ptr<moho::CD3DDynamicTextureSheet>& sheet,
+    std::shared_ptr<moho::CD3DDynamicTextureSheet>& sheet,
     const int side,
     const std::string& unit,
     const int projectileOf

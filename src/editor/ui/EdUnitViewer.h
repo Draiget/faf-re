@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 
-#include "boost/shared_ptr.h"
+#include <memory>
 
 namespace moho
 {
@@ -63,7 +63,7 @@ namespace faf::editor
 
   private:
     bool Request(
-      boost::shared_ptr<moho::CD3DDynamicTextureSheet>& sheet,
+      std::shared_ptr<moho::CD3DDynamicTextureSheet>& sheet,
       int side,
       const std::string& unit,
       int projectileOf = -1
@@ -74,14 +74,14 @@ namespace faf::editor
 
     EdUnitLabPanel& mLab;
     EdModPanel& mProject;
-    boost::shared_ptr<moho::CD3DDynamicTextureSheet> mSheet;
+    std::shared_ptr<moho::CD3DDynamicTextureSheet> mSheet;
     std::string mShown; // unit and angles the sheet was asked for
     int mSinceAsked = 0;
     int mDrawnPixels = 0;
     float mHeading = 35.0f; // degrees
     float mPitch = 15.0f;
     // An icon being made.
-    boost::shared_ptr<moho::CD3DDynamicTextureSheet> mIconSheet;
+    std::shared_ptr<moho::CD3DDynamicTextureSheet> mIconSheet;
     std::string mIconUnit;
     int mIconFrames = -1;
     int mIconPass = 0;                       // 0 the black render, 1 the white one

@@ -4808,7 +4808,7 @@ namespace faf::editor
       void CopyMiniMap(
         gpg::gal::Device& device,
         moho::CD3DDevice& d3d,
-        const boost::shared_ptr<gpg::gal::RenderTarget>& output
+        const std::shared_ptr<gpg::gal::RenderTarget>& output
       );
       moho::ID3DDeviceResources::RenderTargetHandle mMiniCopy;
       moho::ID3DRenderTarget::SurfaceHandle mMiniSurface;
@@ -11117,7 +11117,7 @@ namespace faf::editor
     void EditorApp::CopyMiniMap(
       gpg::gal::Device& device,
       moho::CD3DDevice& d3d,
-      const boost::shared_ptr<gpg::gal::RenderTarget>& output
+      const std::shared_ptr<gpg::gal::RenderTarget>& output
     )
     {
       EdTools& tools = mShell->Tools();
