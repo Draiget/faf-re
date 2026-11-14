@@ -1,6 +1,10 @@
 ## What changed
 
-<!-- What the PR does and why. Link the issue or replay that shows the problem, if there is one. -->
+<!-- What the PR does and why. Link the issue it closes. -->
+
+## Evidence
+
+<!-- Required: a CI check fails the PR when this section is empty. For each change, what shows the problem and what shows the change fixes it, so a reviewer can check it without testing everything again: a replay ID and the beat it goes wrong at, log lines, a crash stack, the binary addresses you read for recovered code (`0x008581BB: ...`), before/after screenshots or a video for UI and rendering, the test that covers it. "Should work" or "not built" is not evidence: a PR that was not built and run is closed without review. -->
 
 ## Sim impact
 
@@ -20,16 +24,17 @@
 
 ## Build
 
-- Arch: <!-- x64 / x86 / both -->
-- Compiler and config: <!-- e.g. clang-cl Release via build.ps1 -->
+- Arch: both <!-- every PR that changes code or build files is built and played on x64 and x86 -->
+- Compiler and config: <!-- e.g. clang-cl Release via build.ps1 -Arch both -->
 
 ## Testing
 
-<!-- Required for "Replay or network only", "Sim code touched" and "Sim behaviour changes"; a CI check fails the PR without at least one row. Play the core set from docs/PR_REPLAY_CHECK.md (the extended set too for pathfinding, formations, x87 math, AI-facing engine functions or sim threading) and list every replay you played, including the ones that failed. -->
+<!-- Required for every PR that changes anything besides documentation and CI: a CI check fails the PR without at least 3 different replays from docs/PR_REPLAY_CHECK.md played on x64 AND 3 on x86. Sim, replay and network changes play the whole core set on both (the extended set too for pathfinding, formations, x87 math, AI-facing engine functions or sim threading). One row per replay and arch; list every replay you played, including the ones that failed. -->
 
 | Replay ID | Arch | `sim_Workers` | Renderer | Result |
 |---|---|---|---|---|
-| | | | | <!-- all checksums match / first mismatch at beat N / crash --> |
+| | x64 | | | <!-- all checksums match / first mismatch at beat N / crash --> |
+| | x86 | | | |
 
 - [ ] Played in a live lobby (which clients: ours, retail, both)
 - [ ] Checked in game by hand (what you looked at)

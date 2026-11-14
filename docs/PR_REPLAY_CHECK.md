@@ -6,7 +6,8 @@ Every replay here plays back on master with every recorded checksum matching, so
 
 ## Which replays
 
-- **Core set:** required for any PR that touches sim code, replay playback or the network layer. Eight games, 2 to 12 players, the built-in AI and two M28AI versions.
+- **Every PR that changes more than documentation and CI:** at least 3 different core-set replays on x64 and 3 on x86, one row per replay and architecture in the PR's Testing table. The `PR sim impact` check counts them ([What every pull request needs](../CONTRIBUTING.md#what-every-pull-request-needs)).
+- **Core set:** required in full, on x64 and on x86, for any PR that touches sim code, replay playback or the network layer. Eight games, 2 to 12 players, the built-in AI and two M28AI versions.
 - **Extended set:** the core set plus ten longer or larger games. Run it as well for changes to pathfinding, formations, x87 math helpers, engine functions the AI scripts call, and sim worker threading, where past divergences only showed up late in long games ([Where divergences came from](RETAIL_REPLAY_PARITY.md#where-divergences-came-from)).
 - **Performance switches:** play the core set with the switch on and with it off. Both runs must match ([Switches](SWITCHES.md)).
 - **Server mode:** for a server-mode build, also run the [focus gate](FOCUS_GATE.md) on the core set: the sim must give the same game whichever army it builds its view for.
@@ -71,7 +72,7 @@ Every replay here plays back on master with every recorded checksum matching, so
 
 ## Playing a replay
 
-1. **Build** your branch, for example `.\build.ps1` (x64 Release, copied to `C:\ProgramData\FAForever\bin_x64\main_x64.exe`).
+1. **Build** your branch for both architectures: `.\build.ps1 -Arch both -Name main_test` copies the x64 build to `C:\ProgramData\FAForever\bin_x64\main_test.exe` and the x86 build to `C:\ProgramData\FAForever\bin\main_test_x86.exe`. Play each replay with both.
 2. **Download and convert** the replay. The engine reads `.scfareplay`; the vault serves `.fafreplay`:
 
    ```bash
@@ -83,10 +84,10 @@ Every replay here plays back on master with every recorded checksum matching, so
 4. **Run** it from the build's own folder:
 
    ```
-   main_x64.exe /init init.lua /nobugreport /replay C:\full\path\26902315.scfareplay /replayid 26902315 /nosound /windowed 1280 720 /log game.log
+   main_test.exe /init init.lua /nobugreport /replay C:\full\path\26902315.scfareplay /replayid 26902315 /nosound /windowed 1280 720 /log game.log
    ```
 
-   Press numpad `+` a few times once the game starts so the sim runs flat out. Add `/simworkers 8` to test the threaded sim. Replays without a game-over event stop on their last frame; close the game once the game time stops moving. More options: [scripts/perf/README.md](../scripts/perf/README.md#playing-a-replay-on-the-rebuilt-engine).
+   For x86, run `main_test_x86.exe` from the `bin` folder the same way. Press numpad `+` a few times once the game starts so the sim runs flat out. Add `/simworkers 8` to test the threaded sim. Replays without a game-over event stop on their last frame; close the game once the game time stops moving. More options: [scripts/perf/README.md](../scripts/perf/README.md#playing-a-replay-on-the-rebuilt-engine).
 
 ## Reading the result
 
@@ -100,4 +101,4 @@ Checksum for beat 3400 mismatched: <md5> (sim) != <md5> (<player>).
 - **One or more lines:** report "first mismatch at beat N" with the beat of the first line, and keep the log. The parity doc explains how a divergence is narrowed down to one beat.
 - **Crash or hang:** report it with the last game time the log shows.
 
-In the PR, fill one row of the testing table per replay: ID, arch (x64 or x86), `sim_Workers` (0, or the value you passed), renderer and result.
+In the PR, fill one row of the testing table per replay and architecture: ID, arch (`x64` or `x86`, as the check reads it), `sim_Workers` (0, or the value you passed), renderer and result.

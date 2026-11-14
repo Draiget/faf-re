@@ -7,7 +7,14 @@ Thanks for helping. This engine has one job above all others: play every game ex
 - For anything bigger than a small fix, open an issue first (or comment on one) and say what you plan to do. A short plan saves a rewrite.
 - Say when you start, so nobody else does the same work: comment "working on this" on the issue, or open a draft PR early. Check open issues and draft PRs before you begin. If you stop, say so, so someone else can take it over.
 - One topic per pull request. A bug fix, a refactor and a new switch are three PRs.
-- Build and run it yourself: [Build](README.md#build). `.\build.ps1` builds x64 Release; `.\build.ps1 -Arch both` builds x86 too.
+- Build and run it yourself, on x64 and x86: [Build](README.md#build). `.\build.ps1 -Arch both` builds both. A pull request whose description says it was not built, or not run, is closed without review.
+
+## What every pull request needs
+
+Reviewing a change means checking it, and the maintainers can't test every pull request from scratch. So every pull request brings its own proof:
+
+1. **Evidence for every change.** The template's **Evidence** section says, for each change, what shows the problem and what shows the change fixes it: a replay ID and the beat it goes wrong at, log lines, a crash stack, the binary addresses you read for recovered code, before/after screenshots or a video for UI and rendering, the test that covers it. A change with no evidence behind it is taken out of the PR or the PR is closed. "Should work" is not evidence.
+2. **Replays on x64 and x86.** Every pull request that changes anything besides documentation and CI plays replays from [docs/PR_REPLAY_CHECK.md](docs/PR_REPLAY_CHECK.md) on both architectures and lists them in the **Testing** table, failures included: at least 3 different core-set replays on x64 and 3 on x86, and the whole core set on both for sim, replay and network changes ([Sim parity](#sim-parity-the-rule-that-decides-most-reviews), rule 5). The `PR sim impact` check fails without them, and the PR is not merged until it passes.
 
 ## Sim parity: the rule that decides most reviews
 
@@ -19,7 +26,7 @@ Code under `src/moho/{sim,unit,ai,entity,command,collision,path,projectile,visio
 2. **A switch never changes what the sim computes.** Every performance switch gives the same checksums whether it is on or off ([docs/SWITCHES.md](docs/SWITCHES.md)). A setting that changes the result is a gameplay change, not a switch: rule 1 applies.
 3. **No new sim setting that changes the result.** A sim console variable or sim command (`TSimConVar`, `CSimConFunc`, a `DoSimCommand` alias) goes to every player through the command stream and into the replay. Debug tools that only draw or print are fine, as long as they are registered cheat-only (`allowWithoutCheats = false`). Anything that changes sim state through one needs the maintainer's agreement before you write it.
 4. **Nothing local reaches the sim.** Thread count, frame rate, wall-clock time, hardware, file timestamps, UI state and local console variables must not change what the sim computes.
-5. **Prove it with replays.** Play the core set from [docs/PR_REPLAY_CHECK.md](docs/PR_REPLAY_CHECK.md) (the extended set too for pathfinding, formations, x87 math, AI-facing engine functions or sim threading) and list every replay in the PR, failures included. How parity is measured: [docs/RETAIL_REPLAY_PARITY.md](docs/RETAIL_REPLAY_PARITY.md).
+5. **Prove it with replays.** Play the core set from [docs/PR_REPLAY_CHECK.md](docs/PR_REPLAY_CHECK.md) on x64 and on x86 (the extended set too for pathfinding, formations, x87 math, AI-facing engine functions or sim threading) and list every replay in the PR, failures included. How parity is measured: [docs/RETAIL_REPLAY_PARITY.md](docs/RETAIL_REPLAY_PARITY.md).
 
 A PR that ticks "Sim behaviour changes" or "Not sure", or that adds a sim console variable or sim command, gets the **`parity: at risk`** label automatically. It is not merged until the maintainer has signed off on why it cannot desync a game or a replay; they remove the label when it is settled.
 
@@ -136,7 +143,7 @@ Commits made before this rule use an older `Area: sentence` style; they stay as 
 
 ## Pull requests
 
-- Fill in the template ([.github/pull_request_template.md](.github/pull_request_template.md)), especially **Sim impact** (tick exactly one box) and **Testing** (the replays you played). The `PR sim impact` check fails without them.
+- Fill in the template ([.github/pull_request_template.md](.github/pull_request_template.md)), especially **Evidence**, **Sim impact** (tick exactly one box) and **Testing** (the replays you played on x64 and x86). The `PR sim impact` check fails without them ([What every pull request needs](#what-every-pull-request-needs)).
 - Most labels are set automatically from the template, the changed files and the diff: `sim: ...`, `area: ...`, `parity: at risk`, `recovery`, `needs template`, `needs replay check`, `merge conflict`. A label a maintainer sets or removes by hand is left alone.
 - Say what you could not test. "Not tested on x86" is useful; silence is not.
 - Keep the PR up to date with `master` and resolve conflicts yourself.

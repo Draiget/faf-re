@@ -1,7 +1,8 @@
 name: PR sim impact
 
-# Checks the PR description against the template: one sim impact box ticked,
-# no "None" on sim code, played replays listed for sim, replay and network changes.
+# Checks the PR description against the template: an Evidence section, one sim
+# impact box ticked, no "None" on sim code, and played replays on x64 and x86 for
+# every PR that changes more than documentation and CI.
 # pull_request_target checks out the base branch, so the PR cannot change the
 # check it is held to; no code from the PR is run.
 on:
