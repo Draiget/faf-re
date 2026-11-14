@@ -69,7 +69,7 @@ namespace
    * Binds `CDecalBuffer` new/construct/delete/destruct callback lanes into
    * the reflected type callback slots.
    */
-  [[maybe_unused]] moho::CDecalBufferTypeInfo* BindDecalBufferTypeCallbackSlotsPrimary(
+  moho::CDecalBufferTypeInfo* BindDecalBufferTypeCallbackSlotsPrimary(
     moho::CDecalBufferTypeInfo* const typeInfo
   )
   {
@@ -80,19 +80,6 @@ namespace
     return typeInfo;
   }
 
-  /**
-   * Address: 0x0077A740 (FUN_0077A740)
-   *
-   * What it does:
-   * Secondary callback-slot binder for `CDecalBuffer` reflected type
-   * lifecycle lanes.
-   */
-  [[maybe_unused]] moho::CDecalBufferTypeInfo* BindDecalBufferTypeCallbackSlotsSecondary(
-    moho::CDecalBufferTypeInfo* const typeInfo
-  )
-  {
-    return BindDecalBufferTypeCallbackSlotsPrimary(typeInfo);
-  }
 } // namespace
 
 namespace moho

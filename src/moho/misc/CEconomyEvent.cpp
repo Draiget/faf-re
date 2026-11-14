@@ -20,7 +20,7 @@
 #include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/entity/Entity.h"
 #include "moho/sim/CArmyImpl.h"
-#include "moho/sim/CSimArmyEconomyInfo.h"
+#include "moho/sim/CEconomy.h"
 #include "moho/sim/CEconomy.h"
 #include "moho/sim/Sim.h"
 #include "moho/unit/core/Unit.h"
@@ -149,8 +149,7 @@ namespace
       return outRef;
     }
 
-    outRef->mObj =
-      reinterpret_cast<void*>(reinterpret_cast<std::uintptr_t>(value) - static_cast<std::uintptr_t>(baseOffset));
+    outRef->mObj = gpg::CompleteObject(value, baseOffset);
     outRef->mType = runtimeType;
     return outRef;
   }
@@ -584,13 +583,13 @@ moho::CEconomyEvent::CEconomyEvent(
   mRequestedPerTick.mass = requestedMass * scale;
 
   auto* const army = entity->ArmyRef;
-  CSimArmyEconomyInfo* const economyInfo = army->GetEconomy();
+  CEconomy* const economyInfo = army->GetEconomy();
 
   mRequest = new CEconRequest{};
   mRequest->mRequested = mRequestedPerTick;
   mRequest->mGranted.energy = 0.0f;
   mRequest->mGranted.mass = 0.0f;
-  IntrusiveLinkBefore(mRequest->mNode, economyInfo->registrationNode);
+  IntrusiveLinkBefore(mRequest->mNode, economyInfo->mConsumptionData);
 }
 
 /**

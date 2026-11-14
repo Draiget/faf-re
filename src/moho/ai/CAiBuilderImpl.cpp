@@ -93,8 +93,7 @@ namespace
       return out;
     }
 
-    out.mObj =
-      reinterpret_cast<void*>(reinterpret_cast<std::uintptr_t>(unit) - static_cast<std::uintptr_t>(baseOffset));
+    out.mObj = gpg::CompleteObject(unit, baseOffset);
     out.mType = dynamicType;
     return out;
   }

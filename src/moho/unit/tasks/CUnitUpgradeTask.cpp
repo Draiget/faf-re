@@ -19,6 +19,7 @@
 #include "moho/unit/core/Unit.h"
 #include "moho/unit/core/SUnitConstructionParams.h"
 #include "moho/sim/SimDebugCommandRegistrations.h"
+#include "moho/sim/SimConVarAccess.h"
 
 namespace
 {
@@ -37,9 +38,7 @@ namespace
     moho::Sim* const sim
   )
   {
-    moho::CSimConVarInstanceBase* const instance = sim ? sim->GetSimVar(&moho::gSimConVar_ai_InstaBuild) : nullptr;
-    void* const valueStorage = instance ? instance->GetValueStorage() : nullptr;
-    return valueStorage != nullptr && (*reinterpret_cast<const std::uint8_t*>(valueStorage) != 0u);
+    return sim != nullptr && moho::ReadSimConVar(sim, moho::gSimConVar_ai_InstaBuild);
   }
 
 } // namespace

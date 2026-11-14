@@ -1,8 +1,23 @@
 #pragma once
 
+#include "editor/ui/EdUnitCatalog.h"
 #include "editor/ui/EdProperties.h"
+#include "editor/tools/EdArrange.h"
+#include "editor/tools/EdTerrainPath.h"
+#include "editor/tools/EdWaterMasks.h"
+#include "editor/tools/EdErosionSuite.h"
+#include "editor/tools/EdInterop.h"
+#include "editor/tools/EdScTools.h"
 #include "editor/tools/EdHeightBrush.h"
+#include "editor/tools/EdBrushLibrary.h"
+#include "editor/tools/EdSymmetrize.h"
+#include "editor/tools/EdShaderProfiles.h"
+#include "editor/tools/EdLayerConvert.h"
+#include "editor/tools/EdSymmetryCheck.h"
 #include "editor/tools/EdMaskBrush.h"
+#include "editor/tools/EdMaskGen.h"
+#include "editor/tools/EdRecipes.h"
+#include "editor/tools/EdTextureSets.h"
 #include "editor/doc/EdPropPaint.h"
 #include "editor/doc/EdUnits.h"
 #include "editor/tools/EdWaves.h"
@@ -11,14 +26,18 @@
 #include "editor/doc/EdWaterBodies.h"
 #include "editor/tools/EdDecals.h"
 #include "editor/tools/EdMarkers.h"
+#include "editor/tools/EdPickFilter.h"
 #include "editor/doc/EdViewState.h"
 #include "editor/tools/EdTextureLibrary.h"
+
+#include "imgui.h"
 
 #include <algorithm>
 #include <cstdio>
 #include <functional>
 #include <cmath>
 #include <array>
+#include <filesystem>
 #include <memory>
 #include <optional>
 #include <set>
@@ -28,10 +47,12 @@
 
 namespace faf::editor
 {
+  class EdDocument;
   /**
-   * The tool box, as the mockup lays it out (tmp/claude/map-editor/editor-mockup.html): a strip of tool icons
-   * and, beside it, the chosen tool's settings (brush modes, size, strength, falloff, the symmetry modes with
-   * their diagrams, limits). The settings are kept here; the tools act on a map from stages 3 to 6 of the plan.
+   * The tool box, as the mockup lays it out: a strip of tool icons at the window's left edge (DrawStrip, drawn by
+   * the shell) and the chosen tool's settings in the Tools panel (brush modes, size, strength, falloff, the symmetry
+   * modes with their diagrams, limits). The settings are kept here; the tools act on a map from stages 3 to 6 of the
+   * plan.
    */
   class EdTools
   {
@@ -59,7 +80,19 @@ namespace faf::editor
       Single,
       Scatter,
       Erase,
+      /** A drag from a start to an end: props along it, the spacing apart (FAF Studio's line placement). */
+      Line,
     };
+    /** Line mode: the props' distance apart along the line, in game units. */
+    [[nodiscard]] float PropLineSpacing() const noexcept
+    {
+      return mPropLineSpacing;
+    }
+    /** Line mode: each prop turned along the line (else as Random turn says). */
+    [[nodiscard]] bool PropLineAlong() const noexcept
+    {
+      return mPropLineAlong;
+    }
     [[nodiscard]] const std::string& PropBlueprint() const noexcept
     {
       return mPropBlueprint;
@@ -193,10 +226,22 @@ namespace faf::editor
       mPathQuads = std::move(land);
       mShipQuads = std::move(ships);
     }
-    /** The layer shown: the land unit's (0) or the ship's (1). */
+    /** The hover and amphibious layers (FAF Studio's pathing for those kinds of units). */
+    void SetPathingMore(
+      std::vector<PathQuad> hover,
+      std::vector<PathQuad> amphibious
+    )
+    {
+      mHoverQuads = std::move(hover);
+      mAmphibiousQuads = std::move(amphibious);
+    }
+    /** The layer shown: the land unit's (0), the ship's (1), the hover unit's (2) or the amphibious unit's (3). */
     [[nodiscard]] const std::vector<PathQuad>& PathingQuads() const noexcept
     {
-      return mPathingLayer == 1 ? mShipQuads : mPathQuads;
+      return mPathingLayer == 1 ? mShipQuads
+        : mPathingLayer == 2    ? mHoverQuads
+        : mPathingLayer == 3    ? mAmphibiousQuads
+                                : mPathQuads;
     }
     [[nodiscard]] bool& ShowPathing() noexcept
     {
@@ -255,7 +300,24 @@ namespace faf::editor
       float spacing = 4.0f;
       float centre = 0.0f;
       float range = 180.0f;
+      /** Each picked place copied through the map's symmetry (the brushes' setting). */
+      bool symmetric = false;
     };
+    /** Pick waves: a click picks a wave generator (Ctrl adds, Shift removes it), a drag moves the picked. */
+    [[nodiscard]] bool WavePicking() const noexcept
+    {
+      return mTool == 3 && mWavePick;
+    }
+    void SetWaveSelectionCount(
+      const int count
+    ) noexcept
+    {
+      mWaveSelectionCount = count;
+    }
+    [[nodiscard]] bool TakeWaveDelete() noexcept
+    {
+      return std::exchange(mWaveDelete, false);
+    }
     void SetWaveCount(
       const int count
     ) noexcept
@@ -276,7 +338,8 @@ namespace faf::editor
         mWaveDensity,
         mWaveSpacing,
         mWaveCentre,
-        mWaveRange
+        mWaveRange,
+        mWaveSymmetric
       };
       return std::exchange(mWaveAsk, WaveAsk::None);
     }
@@ -303,6 +366,45 @@ namespace faf::editor
       mWaveDensity = density;
       mWaveSpacing = spacing;
       mWaveAsk = WaveAsk::AddAlongShore;
+    }
+    /** The Water tool's mask brush: on (a drag in the view paints), which mask, and the brush. */
+    [[nodiscard]] bool WaterMaskPainting() const noexcept
+    {
+      return mTool == 3 && mWaterMaskPaint;
+    }
+    [[nodiscard]] WaterMask WaterMaskKind() const noexcept
+    {
+      return static_cast<WaterMask>(mWaterMaskKind);
+    }
+    [[nodiscard]] WaterMaskBrush WaterMaskBrushNow() const noexcept
+    {
+      WaterMaskBrush brush = mWaterMaskBrush;
+      brush.value = static_cast<std::uint8_t>(std::clamp(mWaterMaskValue, 0, 255));
+      return brush;
+    }
+    /** Test runs (`/watermasktest`): the Water tool painting this mask towards this value. */
+    void SetWaterMaskPaint(
+      const WaterMask mask,
+      const int value,
+      const float radius
+    ) noexcept
+    {
+      mTool = 3;
+      mWaterMaskPaint = true;
+      mWaterMaskKind = static_cast<int>(mask);
+      mWaterMaskValue = value;
+      mWaterMaskBrush.radius = radius;
+      mWaterMaskBrush.strength = 1.0f;
+    }
+    /** The water's sun turns with the Lighting panel's sun (on by default). */
+    [[nodiscard]] bool WaterSunFollows() const noexcept
+    {
+      return mWaterSunFollows;
+    }
+    /** "Take it now": the water's sun set from the lighting sun once, as its own undo step. */
+    [[nodiscard]] bool TakeWaterTakeLightingSun() noexcept
+    {
+      return std::exchange(mWaterTakeLightingSun, false);
     }
     [[nodiscard]] bool TakeWaterChange(
       WaterState& water,
@@ -484,6 +586,17 @@ namespace faf::editor
     {
       return !mUnitTypes.empty();
     }
+    /** Each unit's faction, kind and tech (its blueprint's categories), for the unit browser. */
+    void SetUnitInfos(
+      std::vector<EdUnitInfo> infos
+    )
+    {
+      mUnitInfos = std::move(infos);
+    }
+    [[nodiscard]] const std::vector<EdUnitInfo>& UnitInfos() const noexcept
+    {
+      return mUnitInfos;
+    }
     /** A unit blueprint's name ("Mass Extractor"), or "" when the rules don't have it. */
     [[nodiscard]] std::string UnitTypeName(
       const std::string& id
@@ -499,6 +612,16 @@ namespace faf::editor
         }
       }
       return {};
+    }
+    /** The selected units' rings: weapons' reach (and their least), vision and radar, from the blueprints. */
+    [[nodiscard]] bool ShowRangeRings() const noexcept
+    {
+      return mShowRangeRings;
+    }
+    /** The Units panel's Give: the selected units to its army (taken once). */
+    [[nodiscard]] bool TakeGiveUnits() noexcept
+    {
+      return std::exchange(mGiveUnits, false);
     }
     void SetUnitSelectionCount(
       const int count
@@ -573,6 +696,37 @@ namespace faf::editor
     {
       return mDecalMode == 2;
     }
+    /** Select mode: pick, drag, delete. */
+    [[nodiscard]] bool DecalSelectMode() const noexcept
+    {
+      return mDecalMode == 1;
+    }
+    /** Scatter: a drag strews the texture over the brush's circle, apart from each other (FAF Studio's). */
+    [[nodiscard]] bool DecalScatterMode() const noexcept
+    {
+      return mDecalMode == 3;
+    }
+    /** Erase: a drag removes the decals in the brush's circle (only the chosen texture's, when asked). */
+    [[nodiscard]] bool DecalEraseMode() const noexcept
+    {
+      return mDecalMode == 4;
+    }
+    struct DecalBrush
+    {
+      float radius = 24.0f;
+      int count = 3;      // decals a dab
+      float apart = 8.0f; // the least distance between two
+      bool onlyThisTexture = false;
+    };
+    [[nodiscard]] const DecalBrush& DecalBrushSettings() const noexcept
+    {
+      return mDecalBrush;
+    }
+    /** Each click or scattered decal: its size times 1 +- this at random (one draw shared by the symmetric copies). */
+    [[nodiscard]] float DecalSizeVariation() const noexcept
+    {
+      return mDecalSizeVariation;
+    }
     /** How much each decal along a path overlaps the next (0 to 0.9 of its length). */
     [[nodiscard]] float DecalOverlap() const noexcept
     {
@@ -602,6 +756,55 @@ namespace faf::editor
     [[nodiscard]] const std::string& DecalTexturePath() const noexcept
     {
       return mDecalTexture;
+    }
+    /** The albedo's normals texture, placed as a decal of its own at the same place (FAF Studio), or "". */
+    [[nodiscard]] std::string DecalNormalsPath() const
+    {
+      if (!mDecalWithNormals) {
+        return {};
+      }
+      const std::size_t at = mDecalTexture.rfind("_albedo");
+      if (at == std::string::npos) {
+        return {};
+      }
+      std::string normals = mDecalTexture;
+      normals.replace(at, 7, "_normals");
+      for (const DecalTexture& texture : mDecalTextures) {
+        if (texture.path == normals) {
+          return normals;
+        }
+      }
+      return {};
+    }
+    /** The terrain shader the Layers panel shows (the map's). */
+    [[nodiscard]] const std::string& ShaderNow() const noexcept
+    {
+      return mShader;
+    }
+    /** The sky's textures through the texture picker: 0 the planets' atlas, 1 their glow atlas, 2 cirrus. */
+    void OpenSkyTexturePick(
+      const int which
+    ) noexcept
+    {
+      mWaterTexturePick = 6 + which;
+      mWaterTexturePickOpen = true;
+    }
+    [[nodiscard]] bool TakeSkyTexturePick(
+      int& which,
+      std::string& path
+    )
+    {
+      if (mSkyPickWhich < 0) {
+        return false;
+      }
+      which = std::exchange(mSkyPickWhich, -1);
+      path = std::move(mSkyPickPath);
+      return true;
+    }
+    /** The texture picker's popup, for panels other than Water that open it (the sky's). */
+    void DrawTexturePickerPopup()
+    {
+      DrawWaterTexturePicker();
     }
     /** The albedo's spec map, the decal's second texture, or "" when it has none or the option is off. */
     [[nodiscard]] std::string DecalPairPath() const
@@ -706,6 +909,56 @@ namespace faf::editor
       count = mAirGridCount;
       replace = mAirGridReplace;
       return std::exchange(mAirGridAsked, false);
+    }
+    /** The path graph's kind: 0 air, 1 land (a T1 tank's ground), 2 water (a frigate's). */
+    [[nodiscard]] int PathGridKind() const noexcept
+    {
+      return mPathGridKind;
+    }
+    void SetPathGridKind(
+      const int kind
+    ) noexcept
+    {
+      mPathGridKind = kind;
+    }
+    /** Props > Scatter by area (FAF Studio's): props per 100 square units in the brush, at least `spacing` apart. */
+    [[nodiscard]] bool PropScatterByArea() const noexcept
+    {
+      return mPropByArea;
+    }
+    [[nodiscard]] float PropAreaDensity() const noexcept
+    {
+      return mPropAreaDensity;
+    }
+    [[nodiscard]] float PropSpacing() const noexcept
+    {
+      return mPropSpacing;
+    }
+    /** What the view measured for the picked unit at the cursor ("" when it fits). */
+    void SetUnitFitNote(
+      std::string note
+    )
+    {
+      mUnitFitNote = std::move(note);
+    }
+    [[nodiscard]] const std::string& UnitFitNote() const noexcept
+    {
+      return mUnitFitNote;
+    }
+    /** Props > Erase: only props of the picked blueprint. */
+    [[nodiscard]] bool EraseOnlyThisProp() const noexcept
+    {
+      return mEraseOnlyThis;
+    }
+    /** The map's areas (Markers tool > Areas): the one being edited, and an add asked from the view (Alt+Shift+A). */
+    void AskAddAreaAt(
+      const float x,
+      const float z
+    ) noexcept
+    {
+      mAreaAddAt[0] = x;
+      mAreaAddAt[1] = z;
+      mAreaAddAsked = true;
     }
     /** The Markers tool's type to place (an entry of MarkerTypes()). */
     [[nodiscard]] const MarkerType& PlaceMarkerType() const noexcept
@@ -1056,6 +1309,38 @@ namespace faf::editor
     }
 
     /** The Markers tool's connect mode: a click on a path node links it to the selection. */
+    /** Draw chain (FAF Studio's chains.lua): each marker placed joins the chain named in the panel. */
+    [[nodiscard]] bool DrawingChain() const noexcept
+    {
+      return MarkersToolActive() && mDrawChain;
+    }
+    /** Export the heights at 8 bits (Import / Export > 8-bit). */
+    [[nodiscard]] bool ExportEightBit() const noexcept
+    {
+      return mExportEightBit;
+    }
+    /** The Terrain tool's weight overlay: the brush's weight on each sample under it. */
+    [[nodiscard]] bool ShowBrushWeight() const noexcept
+    {
+      return mShowBrushWeight;
+    }
+    /** Alt+C: the Markers tool's chain drawing on (the tool itself is picked by the command). */
+    void SetDrawChain(
+      const bool on
+    ) noexcept
+    {
+      mDrawChain = on;
+    }
+    [[nodiscard]] std::string ChainName() const
+    {
+      return mChainName;
+    }
+    void SetChainName(
+      const std::string& name
+    )
+    {
+      (void)std::snprintf(mChainName, sizeof(mChainName), "%s", name.c_str());
+    }
     [[nodiscard]] bool ConnectPathNodes() const noexcept
     {
       return mConnectNodes;
@@ -1112,11 +1397,13 @@ namespace faf::editor
     /** The Select tool's panel: what is selected and what a click would pick, in words (the view gives them). */
     void SetSelectInfo(
       std::string selected,
-      std::string hover
+      std::string hover,
+      const bool any
     )
     {
       mSelectSelected = std::move(selected);
       mSelectHover = std::move(hover);
+      mSelectAny = any;
     }
     /** Test runs (`/proptool`): the Props tool with this blueprint and mode, the list filtered to its name. */
     void SetPropTool(
@@ -1169,6 +1456,233 @@ namespace faf::editor
     {
       return mTool;
     }
+    /** How many tools the strip has, and each one's name ("Select", "Terrain", ...). */
+    [[nodiscard]] static int ToolCount() noexcept;
+    [[nodiscard]] static const char* ToolName(int tool) noexcept;
+    /** A tool's icon (ui/EdIconFont.h). */
+    [[nodiscard]] static const char* ToolIcon(int tool) noexcept;
+    /**
+     * The tool strip (the shell's, at the window's left edge, `width` wide): a button per tool and the measuring
+     * button. True when a tool was picked.
+     */
+    bool DrawStrip(float width);
+    /** The Layers panel (the right dock): the shader, the ten layers, the paint layer, moving one. */
+    void DrawLayersPanel();
+    /** The symmetry the brushes and the check use (the Terrain panel's tiles: 0 None ... 9 N-way). */
+    [[nodiscard]] int SymmetryIndex() const noexcept
+    {
+      return mSymmetry;
+    }
+    void PickSymmetry(
+      const int mode
+    ) noexcept
+    {
+      mSymmetry = mode;
+    }
+    /** The symmetry mode the toolbar's pointer is over (-1: none): the map previews it. Set every frame. */
+    void SetSymmetryHover(
+      const int mode
+    ) noexcept
+    {
+      mSymmetryHover = mode;
+    }
+    [[nodiscard]] int SymmetryHover() const noexcept
+    {
+      return mSymmetryHover;
+    }
+    [[nodiscard]] static const char* SymmetryName(int mode) noexcept;
+    /**
+     * The view's camera for its overlays, the scene's each frame: the directions on the ground of the view's up and
+     * right (unit vectors in x, z), the ground under the view's corners (top-left, top-right, bottom-right,
+     * bottom-left; fewer when a corner shows sky), and the map's rectangle.
+     */
+    struct ViewFrame
+    {
+      bool valid = false;
+      float upX = 0.0f;
+      float upZ = -1.0f;
+      float rightX = 1.0f;
+      float rightZ = 0.0f;
+      int corners = 0;
+      float cornerX[4]{};
+      float cornerZ[4]{};
+      float minX = 0.0f;
+      float minZ = 0.0f;
+      float maxX = 0.0f;
+      float maxZ = 0.0f;
+    };
+    [[nodiscard]] ViewFrame& View() noexcept
+    {
+      return mViewFrame;
+    }
+    [[nodiscard]] const ViewFrame& View() const noexcept
+    {
+      return mViewFrame;
+    }
+    /**
+     * Where the minimap sits in the view, in the view's pixels (x, y, width, height; zero size when it isn't shown):
+     * the scene draws the map from above into it.
+     */
+    /** The minimap's last copy as an image (0: none; the scene's view then draws under the frame every frame). */
+    void SetMinimapImage(
+      const std::uint64_t image
+    ) noexcept
+    {
+      mMinimapImage = image;
+    }
+    [[nodiscard]] std::uint64_t MinimapImage() const noexcept
+    {
+      return mMinimapImage;
+    }
+    void SetMinimapRect(
+      const float x,
+      const float y,
+      const float width,
+      const float height
+    ) noexcept
+    {
+      mMinimapRect[0] = x;
+      mMinimapRect[1] = y;
+      mMinimapRect[2] = width;
+      mMinimapRect[3] = height;
+    }
+    [[nodiscard]] const float* MinimapRect() const noexcept
+    {
+      return mMinimapRect;
+    }
+    /** Move stratum `from` to place `to` (0..7) with its mask, next frame (the scene takes it; one undo step). */
+    void AskLayerMove(
+      const int from,
+      const int to
+    ) noexcept
+    {
+      mLayerMoveFrom = from;
+      mLayerMoveTo = to;
+    }
+    [[nodiscard]] bool TakeLayerMove(
+      int& from,
+      int& to
+    ) noexcept
+    {
+      from = std::exchange(mLayerMoveFrom, -1);
+      to = mLayerMoveTo;
+      return from >= 0;
+    }
+    /** What the Select tool may pick (its panel's Pick pills). */
+    [[nodiscard]] PickFilter& Pickable() noexcept
+    {
+      return mPickable;
+    }
+    [[nodiscard]] const PickFilter& Pickable() const noexcept
+    {
+      return mPickable;
+    }
+    /** The Layers panel's map-wide textures: what a row asks (kind 0 the normal map, 1 the lighting, 2 the specular, 3
+     * the macrotexture), and its state. */
+    enum class MapTextureOp : std::uint8_t
+    {
+      None,
+      Make,
+      Clear,
+      Export,
+      Import,
+    };
+    struct MapTextureRow
+    {
+      bool available = false; // the shader reads this kind
+      bool shared = false;    // one texture holds both kinds (TerrainPBR, Terrain301)
+      bool present = false;   // the slot holds a texture
+      bool made = false;      // made here
+      bool stale = false;     // made here, and what it was made from changed since
+      std::string state;      // one line for the panel
+    };
+    /** `file`: a test run's path instead of the dialog (Export, Import); `raiseAfter`: a test run's height edit after
+     * Make. */
+    void AskMapTexture(
+      const int kind,
+      const MapTextureOp op,
+      std::string file = {},
+      const bool raiseAfter = false
+    )
+    {
+      mMapTextureKind = kind;
+      mMapTextureOp = op;
+      mMapTextureFile = std::move(file);
+      mMapTextureRaise = raiseAfter;
+    }
+    [[nodiscard]] const std::string& MapTextureFile() const noexcept
+    {
+      return mMapTextureFile;
+    }
+    [[nodiscard]] bool MapTextureRaiseAfter() const noexcept
+    {
+      return mMapTextureRaise;
+    }
+    [[nodiscard]] bool TakeMapTextureAsk(
+      int& kind,
+      MapTextureOp& op
+    ) noexcept
+    {
+      kind = mMapTextureKind;
+      op = std::exchange(mMapTextureOp, MapTextureOp::None);
+      return op != MapTextureOp::None;
+    }
+    [[nodiscard]] MapTextureRow& MapTextureState(
+      const int kind
+    ) noexcept
+    {
+      return mMapTextureRows[std::clamp(kind, 0, 3)];
+    }
+    /** The minimap's click: the camera looks at (x, z) next frame (the scene takes it). */
+    void AskCameraAt(
+      const float x,
+      const float z
+    ) noexcept
+    {
+      mCameraAsk = true;
+      mCameraAskX = x;
+      mCameraAskZ = z;
+    }
+    [[nodiscard]] bool TakeCameraAsk(
+      float& x,
+      float& z
+    ) noexcept
+    {
+      x = mCameraAskX;
+      z = mCameraAskZ;
+      return std::exchange(mCameraAsk, false);
+    }
+    /** The view's HUD: the terrain brush's mode by name ("Raise"), or null for the other tools. */
+    [[nodiscard]] const char* HudMode() const noexcept;
+    /** The view's HUD: how many copies an edit makes (the symmetry's), 1 for tools that don't mirror. */
+    [[nodiscard]] int HudCopies() const noexcept;
+    /** A symmetry's picture (its tile's) in the square at `p`, `s` wide. */
+    void DrawSymmetryPicture(ImDrawList* draw, int mode, ImVec2 p, float s) const;
+    /**
+     * A symmetry mode's tooltip body (call between BeginTooltip and EndTooltip): its name, what it does in a sentence,
+     * and a small map in motion with its mirror lines or turn centre and a dab painting with its copies. `fromToolbar`
+     * adds where the other modes are.
+     */
+    void DrawSymmetryTooltip(int mode, bool fromToolbar) const;
+    /** The toolbar's symmetry menu body: the ten modes as pictures, the N-way count, what the map's heights fit. */
+    void DrawSymmetryMenu();
+    /** The key each tool's command has (Settings > Keys), shown in the strip's corner and its tooltip. */
+    void SetToolKeys(
+      std::vector<std::string> keys
+    )
+    {
+      mToolKeys = std::move(keys);
+    }
+    /** The Review workspace: only the Select tool (the strip's others say why); the tool becomes Select. */
+    void SetReadOnly(
+      const bool readOnly
+    ) noexcept
+    {
+      mReadOnly = readOnly;
+      if (readOnly) {
+        mTool = 0;
+      }
+    }
 
     /** Whether the Texture tool is the chosen one (the viewport's left button paints a layer's mask). */
     [[nodiscard]] bool TextureToolActive() const noexcept
@@ -1195,6 +1709,11 @@ namespace faf::editor
     {
       mTerrainTypes = std::move(types);
     }
+    /** The game's terrain types (codes and names). */
+    [[nodiscard]] const std::vector<TerrainTypeInfo>& TerrainTypeList() const noexcept
+    {
+      return mTerrainTypes;
+    }
     [[nodiscard]] bool HasTerrainTypes() const noexcept
     {
       return !mTerrainTypes.empty();
@@ -1211,6 +1730,377 @@ namespace faf::editor
       return 0xFFFF00FFu;
     }
     /** The view aids: the slope bands, the km grid with the centre lines, and the status bar's cursor and ruler. */
+    /** The slope view's rule: mobile units by footprint, or structures by skirt and building rule, against a limit. */
+    struct SlopeView
+    {
+      bool buildings = false;
+      int footprint = 1; // cells
+      int skirt = 2;     // cells
+      bool ring = true;  // a flattened skirt (most buildings); else the whole area
+      float unitLimit = 0.75f;
+      float ringLimit = 1.0f;
+      float areaLimit = 1.0f;
+      /** The rule as the ratings name it: 0 path, 1 area, 2 ring; its window in cells; its limit in world units. */
+      [[nodiscard]] int Kind() const noexcept
+      {
+        return !buildings ? 0 : ring ? 2 : 1;
+      }
+      [[nodiscard]] int Window() const noexcept
+      {
+        return buildings ? skirt : footprint;
+      }
+      [[nodiscard]] float Limit() const noexcept
+      {
+        return !buildings ? unitLimit : ring ? ringLimit : areaLimit;
+      }
+    };
+    [[nodiscard]] SlopeView& SlopeSettings() noexcept
+    {
+      return mSlopeView;
+    }
+    /** Terrain types from the layers: Generate asked, with each layer's type (0 the base) and whether only Default
+     * cells change. */
+    [[nodiscard]] bool TakeTypesFromLayers(
+      std::array<int, 9>& types,
+      bool& onlyDefault
+    )
+    {
+      if (!mTypesFromLayersAsk) {
+        return false;
+      }
+      mTypesFromLayersAsk = false;
+      for (std::size_t layer = 0; layer < types.size(); ++layer) {
+        types[layer] = mLayerTypeOverride[layer] >= 0 || layer >= mSlots.size()
+          ? std::max(1, mLayerTypeOverride[layer])
+          : DefaultTerrainTypeFor(mSlots[layer].albedo, mTerrainTypes);
+      }
+      onlyDefault = mTypesOnlyDefault;
+      return true;
+    }
+    void AskTypesFromLayers(
+      const bool onlyDefault
+    ) noexcept
+    {
+      mTypesFromLayersAsk = true;
+      mTypesOnlyDefault = onlyDefault;
+    }
+    /** Follow symmetry: moving, turning or deleting an object does the same to its mirrored copies. */
+    [[nodiscard]] bool FollowSymmetry() const noexcept
+    {
+      return mFollowSymmetry;
+    }
+    /** The Erosion window: open it, what it asks the view (with the solver and its settings), and what it hears back.
+     */
+    enum class ErosionAsk
+    {
+      None,
+      Preview,
+      Revert,
+      Apply,
+    };
+    void OpenErosion() noexcept
+    {
+      mErosionOpen = true;
+    }
+    [[nodiscard]] bool TakeErosionAsk(
+      ErosionAsk& ask,
+      std::string& solver,
+      ErosionValues& values
+    )
+    {
+      ask = std::exchange(mErosionAsk, ErosionAsk::None);
+      if (ask == ErosionAsk::None) {
+        return false;
+      }
+      solver = mErosionSolver;
+      values = mErosionValues[mErosionSolver];
+      if (values.empty()) {
+        if (const ErosionSolver* const s = FindErosionSolver(solver); s != nullptr) {
+          values = ErosionDefaults(*s);
+        }
+      }
+      return true;
+    }
+    /** Which of a full run's masks go to which texture layer (1 to 8): wear, deposit, flow, drainage. */
+    struct ErosionMaskChoice
+    {
+      bool on[4] = {false, false, false, false};
+      int layer[4] = {1, 2, 3, 4};
+    };
+    [[nodiscard]] const ErosionMaskChoice& ErosionMasksChosen() const noexcept
+    {
+      return mErosionMasks;
+    }
+    /** Test runs: masks to layers as the window's ticks set them. */
+    void SetErosionMasks(
+      const ErosionMaskChoice& choice
+    ) noexcept
+    {
+      mErosionMasks = choice;
+    }
+    /** Test runs (`/erosiontest`): a preset chosen and an ask made, as the window's buttons do. */
+    void AskErosion(
+      const std::string& preset,
+      const ErosionAsk ask
+    )
+    {
+      for (const ErosionPreset& p : ErosionPresets()) {
+        if (preset == p.id) {
+          mErosionPreset = p.id;
+          mErosionSolver = p.solver;
+          mErosionValues[p.solver] = ErosionPresetValues(p);
+        }
+      }
+      mErosionOpen = true;
+      mErosionAsk = ask;
+    }
+    void SetErosionStatus(
+      std::string status,
+      const bool previewShown
+    )
+    {
+      mErosionStatus = std::move(status);
+      mErosionPreviewShown = previewShown;
+    }
+    void DrawErosionWindow();
+    /** The SC tools window: open it, what it asks the view, and what the view says back. */
+    enum class ScAsk
+    {
+      None,
+      PadsApply,
+      PadsRemove,
+      SlopeReport,
+      SlopeApply,
+      Ramp,
+    };
+    void OpenScTools() noexcept
+    {
+      mScToolsOpen = true;
+    }
+    [[nodiscard]] ScAsk TakeScAsk() noexcept
+    {
+      return std::exchange(mScAsk, ScAsk::None);
+    }
+    /** Test runs (`/sctest`): an ask as the window's buttons make it. */
+    void AskSc(
+      const ScAsk ask
+    ) noexcept
+    {
+      mScToolsOpen = true;
+      mScAsk = ask;
+    }
+    [[nodiscard]] PadSettings& PadSettingsNow() noexcept
+    {
+      return mPadSettings;
+    }
+    [[nodiscard]] const SlopeLimitSettings& SlopeSettingsNow() const noexcept
+    {
+      return mSlope;
+    }
+    void SetPadsState(
+      const bool applied,
+      const bool stale
+    ) noexcept
+    {
+      mPadsApplied = applied;
+      mPadsStale = stale;
+    }
+    void SetScStatus(
+      std::string status
+    )
+    {
+      if (!status.empty()) {
+        mScStatus = std::move(status);
+      }
+    }
+    void SetSlopeReport(
+      std::string report
+    )
+    {
+      mSlopeReport = std::move(report);
+    }
+    void SetRampReport(
+      std::string report
+    )
+    {
+      mRampReport = std::move(report);
+    }
+    void DrawScToolsWindow();
+    /**
+     * The Import / Export window (Terrain > Import / Export...): a heightmap from another tool mapped, turned and
+     * blended onto the map's heights, a live link that imports it again whenever that tool saves it, and an export with
+     * a sidecar telling that tool what the image is.
+     */
+    enum class InteropAsk
+    {
+      None,
+      Probe,        // read the import file and say what it holds
+      Import,       // one undo step
+      Revert,       // the last import undone, while it is the newest step
+      Export,       // the export file (and its sidecar)
+      SendAndWatch, // export, then link the same file back in (a round trip through another tool)
+    };
+    void OpenInterop() noexcept
+    {
+      mInteropOpen = true;
+    }
+    [[nodiscard]] InteropAsk TakeInteropAsk() noexcept
+    {
+      return std::exchange(mInteropAsk, InteropAsk::None);
+    }
+    /** Test runs (`/interoptest`): an ask as the window's buttons make it. */
+    void AskInterop(
+      const InteropAsk ask
+    ) noexcept
+    {
+      mInteropOpen = true;
+      mInteropAsk = ask;
+    }
+    /** The Browse buttons, taken by the app (it asks for the file): 1 the import file, 2 the export file. */
+    [[nodiscard]] int TakeInteropBrowse() noexcept
+    {
+      return std::exchange(mInteropBrowse, 0);
+    }
+    void SetInteropFile(bool exportFile, const std::string& file);
+    [[nodiscard]] std::string InteropFile(
+      const bool exportFile
+    ) const
+    {
+      return exportFile ? mInteropExportPath : mInteropImportPath;
+    }
+    [[nodiscard]] ImportSettings& InteropSettings() noexcept
+    {
+      return mImport;
+    }
+    [[nodiscard]] bool InteropLive() const noexcept
+    {
+      return mInteropLive;
+    }
+    void SetInteropLive(
+      const bool on
+    ) noexcept
+    {
+      mInteropLive = on;
+    }
+    [[nodiscard]] bool InteropSidecar() const noexcept
+    {
+      return mInteropSidecar;
+    }
+    /** The export's width in samples (0 for the map's own) and its words per height. */
+    [[nodiscard]] int InteropExportWidth() const noexcept
+    {
+      return kExportWidths[mInteropExportSize];
+    }
+    [[nodiscard]] float InteropExportScale() const noexcept
+    {
+      return mInteropExportScale;
+    }
+    void SetInteropStatus(
+      std::string status
+    )
+    {
+      if (!status.empty()) {
+        mInteropStatus = std::move(status);
+      }
+    }
+    void SetInteropProbe(
+      std::string probe
+    )
+    {
+      mInteropProbe = std::move(probe);
+    }
+    /** The view says whether the last import can still be reverted and when the link last imported. */
+    void SetInteropState(
+      const bool canRevert,
+      std::string linkNote
+    )
+    {
+      mInteropCanRevert = canRevert;
+      mInteropLinkNote = std::move(linkNote);
+    }
+    void DrawInteropWindow();
+    /** How many of each kind the map has now (the view gives them each frame), for Properties with nothing chosen. */
+    /** The map's counts as the view gave them last: 0 markers, 1 props, 2 units, 3 decals. */
+    [[nodiscard]] int MapCount(
+      const int kind
+    ) const noexcept
+    {
+      return kind >= 0 && kind < 4 ? mMapCounts[kind] : 0;
+    }
+    void SetMapCounts(
+      const int markers,
+      const int props,
+      const int units,
+      const int decals
+    ) noexcept
+    {
+      mMapCounts[0] = markers;
+      mMapCounts[1] = props;
+      mMapCounts[2] = units;
+      mMapCounts[3] = decals;
+    }
+    [[nodiscard]] const int* MapCounts() const noexcept
+    {
+      return mMapCounts;
+    }
+    /** The view's HUD while G or R runs: what it is doing (empty: the tool's own mode). */
+    void SetHudOverride(
+      std::string text
+    )
+    {
+      mHudOverride = std::move(text);
+    }
+    /** The Props tool's Fill the map: its options, the button (taken by the view), and what the last fill did. */
+    struct FillOptions
+    {
+      float density = 10.0f; // per 100 x 100 units
+      float spacing = 6.0f;
+      float maxSlope = 30.0f; // degrees
+      bool dry = true;
+    };
+    [[nodiscard]] bool TakeFillRequest(
+      FillOptions& options
+    ) noexcept
+    {
+      options = mFill;
+      return std::exchange(mFillRequest, false);
+    }
+    void RequestFill(
+      const FillOptions& options
+    ) noexcept
+    {
+      mFill = options;
+      mFillRequest = true;
+    }
+    void SetFillMessage(
+      std::string message
+    )
+    {
+      mFillMessage = std::move(message);
+    }
+    /** Arrange's buttons (and the Edit menu's): the op asked, taken by the view each frame, and its grid step. */
+    void RequestArrange(
+      const ArrangeOp op
+    ) noexcept
+    {
+      mArrangeRequest = op;
+    }
+    [[nodiscard]] bool TakeArrangeRequest(
+      ArrangeOp& op,
+      float& step
+    ) noexcept
+    {
+      op = std::exchange(mArrangeRequest, ArrangeOp::Count);
+      step = static_cast<float>(1 << mArrangeSnap);
+      return op != ArrangeOp::Count;
+    }
+    /** Why the last arrange did nothing ("" when it was done), shown under the buttons. */
+    void SetArrangeMessage(
+      std::string message
+    )
+    {
+      mArrangeMessage = std::move(message);
+    }
     [[nodiscard]] bool ShowSlope() const noexcept
     {
       return mShowSlope;
@@ -1220,6 +2110,30 @@ namespace faf::editor
     ) noexcept
     {
       mShowSlope = on;
+    }
+    /** The heights view: the ground coloured by height in bands, the sea's ground blue (the view's shading: Heights).
+     */
+    [[nodiscard]] bool ShowHeights() const noexcept
+    {
+      return mShowHeights;
+    }
+    void SetShowHeights(
+      const bool on
+    ) noexcept
+    {
+      mShowHeights = on;
+    }
+    /** The view's shading as its corner button cycles it: 0 lit, 1 heights, 2 slope. */
+    [[nodiscard]] int Shading() const noexcept
+    {
+      return mShowSlope ? 2 : mShowHeights ? 1 : 0;
+    }
+    void SetShading(
+      const int shading
+    ) noexcept
+    {
+      mShowHeights = shading == 1;
+      mShowSlope = shading == 2;
     }
     [[nodiscard]] bool ShowKmGrid() const noexcept
     {
@@ -1269,6 +2183,30 @@ namespace faf::editor
     }
 
     /** The texture brush as the panel sets it: the brush's shape, the layer, the mode. */
+    /**
+     * The texture brush's stamp stroke (FAF Studio's stamp_paint): the brush's shape pressed into the layer as
+     * separate dabs `spacing` of its width apart, each turned (at random or not), its size and place jittered.
+     */
+    struct MaskStamp
+    {
+      bool on = false;
+      float spacing = 0.6f;
+      bool randomTurn = true;
+      float jitter = 0.2f; // size and place, a share of the radius
+    };
+    [[nodiscard]] MaskStamp CurrentMaskStamp() const noexcept
+    {
+      return {mMaskStamp, mMaskStampSpacing, mMaskStampRandomTurn, mMaskStampJitter};
+    }
+    /** Test runs: the texture stamp stroke on or off, with its spacing. */
+    void SetMaskStamp(
+      const bool on,
+      const float spacing
+    ) noexcept
+    {
+      mMaskStamp = on;
+      mMaskStampSpacing = std::clamp(spacing, 0.1f, 4.0f);
+    }
     [[nodiscard]] MaskBrush CurrentMaskBrush() const noexcept
     {
       MaskBrush brush;
@@ -1276,6 +2214,10 @@ namespace faf::editor
       brush.mode = static_cast<MaskBrushMode>(mMaskMode);
       brush.layer = mMaskLayer;
       brush.lowerAbove = mLowerAbove;
+      brush.target = mMaskTarget;
+      brush.scatter = mMaskScatter;
+      brush.limitMinSlope = std::tan(mMaskMinSlopeDegrees * 0.0174532925f);
+      brush.buildUp = mMaskBuildUp;
       return brush;
     }
     /** The open map's layer texture paths (lower, strata 1-8, upper), for the layer list. */
@@ -1355,6 +2297,7 @@ namespace faf::editor
     {
       None,
       Clear,
+      Fill,
       Import,
       Export,
     };
@@ -1385,6 +2328,58 @@ namespace faf::editor
     {
       mShaders = std::move(shaders);
       mShader = std::move(current);
+    }
+    /** Test runs (`/shaderbrowser <name>`): the shader browser open on that shader. */
+    void OpenShaderBrowser(
+      std::string shader
+    )
+    {
+      mShaderBrowserOpen = true;
+      mBrowsedShader = std::move(shader);
+    }
+    void DrawShaderBrowser();
+    /** The browser's Convert section: the shader and options it shows a plan for (changed since the last plan). */
+    [[nodiscard]] bool TakeConversionPlanRequest(
+      std::string& shader,
+      LayerConvertOptions& options
+    )
+    {
+      const std::string key = mBrowsedShader + "|" + std::to_string(static_cast<int>(mConvertOptions.lost)) + "|" +
+        std::to_string(mConvertOptions.mergeInto) + "|" + (mConvertOptions.arrange ? "1" : "0");
+      if (!mShaderBrowserOpen || mBrowsedShader.empty() || key == mConvertPlanKey) {
+        return false;
+      }
+      mConvertPlanKey = key;
+      shader = mBrowsedShader;
+      options = mConvertOptions;
+      return true;
+    }
+    void SetConversionPlan(
+      LayerConvertPlan plan
+    )
+    {
+      mConvertPlan = std::move(plan);
+    }
+    /** Convert was pressed: the shader and options. */
+    [[nodiscard]] bool TakeConversionRequest(
+      std::string& shader,
+      LayerConvertOptions& options
+    )
+    {
+      if (!mConvertRequested) {
+        return false;
+      }
+      mConvertRequested = false;
+      shader = mBrowsedShader;
+      options = mConvertOptions;
+      return true;
+    }
+    void SetConversionReport(
+      std::vector<std::string> report
+    )
+    {
+      mConvertReport = std::move(report);
+      mConvertPlanKey.clear(); // the map changed: plan again
     }
     [[nodiscard]] bool TakeShaderChange(
       std::string& shader
@@ -1418,6 +2413,185 @@ namespace faf::editor
     {
       mRulesRequested = true;
     }
+    /** The Mask generator: its rules, where it writes, and what the panel asks of the app. */
+    struct MaskGenTarget
+    {
+      int layer = 1;
+      MaskWriteMode mode = MaskWriteMode::Replace;
+      float strength = 1.0f;
+      bool takeAway = false; // only where the layers above leave the ground free
+      /** -1: the layer; 0, 1, 2: the water's foam, flatness or depth bias (FAF Studio's "Apply to water mask"). */
+      int water = -1;
+    };
+    [[nodiscard]] const std::vector<MaskGenRule>& GenRules() const noexcept
+    {
+      return mGenRules;
+    }
+    void SetGenRules(
+      std::vector<MaskGenRule> rules
+    )
+    {
+      mGenRules = std::move(rules);
+      ++mGenRevision;
+    }
+    [[nodiscard]] MaskGenTarget& GenTarget() noexcept
+    {
+      return mGenTarget;
+    }
+    /** Changes to the rules: the app re-evaluates the preview when it moves. */
+    [[nodiscard]] int GenRevision() const noexcept
+    {
+      return mGenRevision;
+    }
+    /** A starting point picked ("cliffs" ...): the app fills its rules (it knows the map's heights). */
+    [[nodiscard]] bool TakeGenPresetAsk(
+      std::string& id
+    )
+    {
+      if (mGenPresetAsk.empty()) {
+        return false;
+      }
+      id = std::exchange(mGenPresetAsk, {});
+      return true;
+    }
+    void AskGenPreset(
+      std::string id
+    )
+    {
+      mGenPresetAsk = std::move(id);
+    }
+    [[nodiscard]] bool TakeGenApply() noexcept
+    {
+      return std::exchange(mGenApply, false);
+    }
+    void AskGenApply() noexcept
+    {
+      mGenApply = true;
+    }
+    /** The preview the app made: an image (0: none), its share of the map, or why there is none. */
+    void SetGenPreview(
+      const std::uint64_t image,
+      const float coverage,
+      std::string note
+    )
+    {
+      mGenPreviewImage = image;
+      mGenCoverage = coverage;
+      mGenNote = std::move(note);
+    }
+    [[nodiscard]] std::uint64_t GenPreviewImage() const noexcept
+    {
+      return mGenPreviewImage;
+    }
+    [[nodiscard]] bool GenSectionOpen() const noexcept
+    {
+      return mGenOpen;
+    }
+
+    /** The Stratum recipes section: the style, its settings, each layer's kind (detected by the app, or chosen). */
+    [[nodiscard]] int RecipeStyle() const noexcept
+    {
+      return mRecipeStyle;
+    }
+    [[nodiscard]] const RecipeKnobs& RecipeSettings() const noexcept
+    {
+      return mRecipeKnobs;
+    }
+    void SetRecipeStyle(
+      const int style
+    )
+    {
+      mRecipeStyle = style;
+      mRecipeKnobs = RecipeKnobsOf(style);
+    }
+    /** -1: as detected; 0: not used; 1..8: the GroundKind chosen for the layer. */
+    [[nodiscard]] const std::array<int, 9>& RecipeOverrides() const noexcept
+    {
+      return mRecipeOverride;
+    }
+    void SetRecipeDetected(
+      const std::array<GroundKind, 9>& kinds,
+      const std::array<std::string, 9>& names,
+      const int cap
+    )
+    {
+      mRecipeDetected = kinds;
+      mRecipeNames = names;
+      mRecipeCap = cap;
+    }
+    [[nodiscard]] bool TakeRecipeApply() noexcept
+    {
+      return std::exchange(mRecipeApply, false);
+    }
+    void AskRecipeApply() noexcept
+    {
+      mRecipeApply = true;
+    }
+    void SetRecipeResult(
+      std::string text
+    )
+    {
+      mRecipeResult = std::move(text);
+    }
+    [[nodiscard]] bool RecipesOpen() const noexcept
+    {
+      return mRecipesOpen;
+    }
+
+    /** Each slot's optimal tile size (EdTexScale, from its texture's width; 0: unknown), for the row menus. */
+    void SetOptimalTiles(
+      const std::array<float, 10>& tiles
+    ) noexcept
+    {
+      mOptimalTiles = tiles;
+    }
+    /** The Texture sets section: the theme picked, what it would give, and what the panel asks. */
+    enum class ThemeOp : std::uint8_t
+    {
+      None,
+      Try,   // applied, the layers before kept to go back to
+      Keep,  // the tried theme stays
+      Back,  // the layers as they were before Try
+      Apply, // applied and kept at once
+    };
+    [[nodiscard]] int ThemeIndex() const noexcept
+    {
+      return mThemeIndex;
+    }
+    void SetThemeIndex(
+      const int index
+    ) noexcept
+    {
+      mThemeIndex = index;
+    }
+    void AskTheme(
+      const ThemeOp op
+    ) noexcept
+    {
+      mThemeOp = op;
+    }
+    [[nodiscard]] ThemeOp TakeThemeOp() noexcept
+    {
+      return std::exchange(mThemeOp, ThemeOp::None);
+    }
+    /** The app: whether a theme is being tried, and what the picked one would give each layer ("2  Rock  EvRock006c").
+     */
+    void SetThemeState(
+      const bool trying,
+      std::vector<std::string> preview
+    )
+    {
+      mThemeTrying = trying;
+      mThemePreview = std::move(preview);
+    }
+    /** Test runs (`/layerop`): a row menu item of the Layers panel on `slot` (fill, remove, optimal). False when it
+     * can't. */
+    bool RunLayerMenuItem(int slot, const std::string& item);
+    [[nodiscard]] bool LayersPanelShown() const noexcept
+    {
+      return mLayersShown;
+    }
+
     /** Test runs (`/browse`): the texture browser opened for a slot. */
     void OpenBrowser(
       const int slot
@@ -1437,18 +2611,38 @@ namespace faf::editor
     }
 
     /** The terrain brush as the panel sets it (Flatten's height is the stroke's, set by the viewport). */
+    /** The brush with the hovered symmetry mode when one is hovered (the map's preview), else the current one. */
+    [[nodiscard]] HeightBrush PreviewHeightBrush() const noexcept
+    {
+      HeightBrush brush = CurrentHeightBrush();
+      if (mSymmetryHover >= 0) {
+        brush.symmetry = static_cast<Symmetry>(mSymmetryHover);
+      }
+      return brush;
+    }
     [[nodiscard]] HeightBrush CurrentHeightBrush() const noexcept
     {
       HeightBrush brush;
       brush.mode = static_cast<HeightBrushMode>(mBrushMode);
       brush.symmetry = static_cast<Symmetry>(mSymmetry);
       brush.radius = mRadius;
-      brush.strength = mStrength;
+      // A negative strength does the mode's opposite (FAF Studio's inversion).
+      brush.strength = std::abs(mStrength);
+      if (mStrength < 0.0f) {
+        brush.mode = InvertedHeightMode(brush.mode);
+      }
       brush.falloff = mFalloff;
       brush.turns = mNWay;
       brush.setTo = mSetHeight * 128.0f;
       brush.terraceStep = mTerraceStep * 128.0f;
       brush.erodeTalus = mErodeTalus;
+      brush.shape = static_cast<BrushShape>(mBrushShape);
+      brush.shapeImage = mShapeImage.get();
+      brush.stampMode = static_cast<StampMode>(mStampMode);
+      brush.shapeAngle = mShapeAngle;
+      brush.noiseScale = mNoiseScale;
+      brush.noiseOctaves = mNoiseOctaves;
+      brush.noiseRoughness = mNoiseRoughness;
       brush.planeSet = mPlaneSet;
       brush.planeX = mPlaneX;
       brush.planeZ = mPlaneZ;
@@ -1465,6 +2659,67 @@ namespace faf::editor
 
     /** Plane mode: a picked point (game units: x, height, z); the plane goes through the last three. */
     void AddPlanePoint(float x, float height, float z) noexcept;
+    /** The Path brush: its clicked points (x, ground height, z), in order. */
+    void AddPathPoint(
+      const float x,
+      const float height,
+      const float z
+    )
+    {
+      mPathPoints.push_back({x, z, height});
+    }
+    [[nodiscard]] const std::vector<TerrainPathPoint>& PathPoints() const noexcept
+    {
+      return mPathPoints;
+    }
+    void RemoveLastPathPoint() noexcept
+    {
+      if (!mPathPoints.empty()) {
+        mPathPoints.pop_back();
+      }
+    }
+    void ClearPathPoints() noexcept
+    {
+      mPathPoints.clear();
+    }
+    /** The path's options: the brush's width (its diameter) and falloff, the panel's mode, depth and loop. */
+    [[nodiscard]] PathOptions CurrentPathOptions() const noexcept
+    {
+      PathOptions o;
+      o.mode = static_cast<PathMode>(mPathMode);
+      o.width = mRadius * 2.0f;
+      o.falloff = mFalloff;
+      o.depth = mPathDepth;
+      o.closed = mPathClosed;
+      return o;
+    }
+    void RequestPathApply() noexcept
+    {
+      mPathApply = true;
+    }
+    [[nodiscard]] bool TakePathApply() noexcept
+    {
+      return std::exchange(mPathApply, false);
+    }
+    /** Off: the brush lays dabs a third of its radius apart along the mouse's way (nothing while held still). */
+    [[nodiscard]] bool Airbrush() const noexcept
+    {
+      return mAirbrush;
+    }
+    /** What the last height stroke did (ground moved up and down), under the brush's sliders. */
+    /** Why the Texture tool won't paint the chosen layer (empty: it will). */
+    void SetPaintNote(
+      std::string text
+    )
+    {
+      mPaintNote = std::move(text);
+    }
+    void SetStrokeStats(
+      std::string text
+    )
+    {
+      mStrokeStats = std::move(text);
+    }
     void ClearPlanePoints() noexcept
     {
       mPlanePoints = 0;
@@ -1472,6 +2727,54 @@ namespace faf::editor
     }
     /** The picked points, oldest first, for the view to mark. */
     [[nodiscard]] int PlanePoints(float (&x)[3], float (&height)[3], float (&z)[3]) const noexcept;
+
+    /** Stamp strokes (FAF Studio's stamp.lua): each dab's turn, size and place, and how far apart dabs fall. */
+    struct StampStroke
+    {
+      float turn = 0.0f; // degrees
+      bool randomTurn = false;
+      float sizeJitter = 0.0f;     // each dab's radius varies by up to this share
+      float placeJitter = 0.0f;    // each dab moves by up to this share of the radius
+      float spacing = 0.0f;        // between dabs, a share of the stamp's width; 0: one per click
+      bool baseFromStroke = false; // Max, Min, Replace: from the ground under the stroke's first dab, not each dab's
+    };
+    [[nodiscard]] StampStroke CurrentStampStroke() const noexcept
+    {
+      return {mStampTurn, mStampRandomTurn, mStampSizeJitter, mStampPlaceJitter, mStampSpacing, mStampBaseFromStroke};
+    }
+    /** Test runs (`/stampstroke <spacing>,<random turn>,<size jitter>,<place jitter>,<mode>`; shares, 0/1, a
+     * StampMode). */
+    void SetStampStroke(
+      const float spacing,
+      const bool randomTurn,
+      const float sizeJitter,
+      const float placeJitter,
+      const int mode
+    ) noexcept
+    {
+      mStampSpacing = spacing;
+      mStampRandomTurn = randomTurn;
+      mStampSizeJitter = sizeJitter;
+      mStampPlaceJitter = placeJitter;
+      mStampMode = std::clamp(mode, 0, 4);
+    }
+    /** The brush library's folder (`%LOCALAPPDATA%\FAForever\Editor\brushes`); its images are listed again. */
+    void SetBrushFolder(std::filesystem::path folder);
+    [[nodiscard]] const std::filesystem::path& BrushFolder() const noexcept
+    {
+      return mBrushFolder;
+    }
+    /** Lists the brush folder's images again (after an import). */
+    void RescanBrushes();
+    /** The Import button: pick images to copy into the brush folder. */
+    [[nodiscard]] bool TakeBrushImportRequest() noexcept
+    {
+      return std::exchange(mBrushImportRequested, false);
+    }
+    /** The stamp's source: 1 to 9 a procedural shape (BrushShape), from 10 the brush folder's images in order. */
+    bool ChooseStampSource(int index);
+    /** The brush shape from the brush folder's image `index`. */
+    bool ChooseShapeImage(int index);
 
     /** Stamp mode: the image the Stamp image button loaded. */
     [[nodiscard]] bool TakeStampRequest() noexcept
@@ -1497,15 +2800,24 @@ namespace faf::editor
       mSymmetry = index;
       mNWay = turns;
     }
-    /** A newly opened map's symmetry as DetectSymmetry found it (the panel's index and turns; -1: none found). */
+    /**
+     * A newly opened map's symmetry as DetectSymmetry found it, and how far its centre is off the map's middle (height
+     * samples).
+     */
     void SetDetectedSymmetry(
-      const int index,
-      const int turns,
-      const float matched
+      const DetectedSymmetry& found,
+      const float offsetX,
+      const float offsetZ
     ) noexcept
     {
+      const int index = found.symmetry == Symmetry::None ? -1 : static_cast<int>(found.symmetry);
+      const int turns = found.turns;
       mDetectedSymmetry = index;
-      mDetectedMatch = matched;
+      mDetectedMatch = found.matched;
+      mDetectedStarts = found.startsMatched;
+      mDetectedResources = found.resourcesMatched;
+      mDetectedOffsetX = offsetX;
+      mDetectedOffsetZ = offsetZ;
       if (index >= 0) {
         mSymmetry = index;
         mNWay = index == 9 ? turns : mNWay;
@@ -1528,6 +2840,29 @@ namespace faf::editor
     {
       mTool = 1;
       mBrushMode = mode;
+    }
+    /** Test runs (`/maskoptions <target>,<scatter>,<min slope degrees>,<build up>`). */
+    void SetMaskOptions(
+      const float target,
+      const float scatter,
+      const float minSlopeDegrees,
+      const bool buildUp
+    ) noexcept
+    {
+      mMaskTarget = std::clamp(target, 0.05f, 1.0f);
+      mMaskScatter = std::clamp(scatter, 0.0f, 1.0f);
+      mMaskMinSlopeDegrees = std::clamp(minSlopeDegrees, 0.0f, 60.0f);
+      mMaskBuildUp = buildUp;
+    }
+    void DrawShapePicker();
+    /** Test runs (`/brushshape`): the height brush's shape (a BrushShape) and turn in degrees. */
+    void SetBrushShape(
+      const int shape,
+      const float angle
+    ) noexcept
+    {
+      mBrushShape = shape < 0 || shape >= kBrushShapeCount ? 0 : shape;
+      mShapeAngle = angle;
     }
     /** Test runs (`/erodetalus`): the Erode brush's talus slope. */
     void SetErodeTalus(
@@ -1601,6 +2936,49 @@ namespace faf::editor
     {
       return std::exchange(mCheckRequested, false);
     }
+    /**
+     * Make symmetric's options for the chosen symmetry; the centre is the detected one (as its offset from the middle,
+     * `offsetX` / `offsetZ`) when the chosen symmetry is the detected one, else the middle (both 0).
+     */
+    [[nodiscard]] SymmetrizeOptions CurrentSymmetrize(
+      float& offsetX,
+      float& offsetZ
+    ) const noexcept
+    {
+      SymmetrizeOptions options;
+      options.symmetry = static_cast<Symmetry>(mSymmetry);
+      options.turns = mNWay;
+      options.part = mSymPart;
+      options.combine = static_cast<SymmetryCombine>(mSymCombine);
+      options.seam = mSymSeam;
+      const bool detected = mSymmetry == mDetectedSymmetry;
+      offsetX = detected ? mDetectedOffsetX : 0.0f;
+      offsetZ = detected ? mDetectedOffsetZ : 0.0f;
+      return options;
+    }
+    [[nodiscard]] bool SymmetrizeMasksToo() const noexcept
+    {
+      return mSymMasks;
+    }
+    [[nodiscard]] bool SymmetrizeTypesToo() const noexcept
+    {
+      return mSymTypes;
+    }
+    /** Test runs (`/symoptions <part>,<combine>,<seam>,<masks>,<types>`). */
+    void SetSymmetrizeOptions(
+      const int part,
+      const int combine,
+      const float seam,
+      const bool masks,
+      const bool types
+    ) noexcept
+    {
+      mSymPart = std::max(0, part);
+      mSymCombine = std::clamp(combine, 0, 3);
+      mSymSeam = std::max(0.0f, seam);
+      mSymMasks = masks;
+      mSymTypes = types;
+    }
     [[nodiscard]] bool TakeRepairRequest() noexcept
     {
       return std::exchange(mRepairRequested, false);
@@ -1636,7 +3014,6 @@ namespace faf::editor
     }
 
   private:
-    void DrawStrip();
     void DrawTerrain();
     void DrawTexture();
     void DrawWater();
@@ -1646,11 +3023,20 @@ namespace faf::editor
     void DrawMarkers();
     void DrawUnits();
     void DrawSelect();
+    void DrawFalloffCurve();
+    void DrawArrange();
     void DrawBrush(bool withModes);
     void DrawSymmetry(bool withCheck = true);
     void DrawLimits();
 
     int mTool = 1;
+    std::vector<std::string> mToolKeys;
+    /** The Units tool's browser (ui/EdUnitBrowser.cpp): the units by group, its chips' picks, tiles or a list. */
+    void DrawUnitBrowser();
+    std::vector<EdUnitInfo> mUnitInfos;
+    EdUnitFilter mUnitBrowse;
+    bool mUnitGrid = true;
+    bool mReadOnly = false;
 
     int mBrushMode = 0;
     float mRadius = 14.0f;
@@ -1658,6 +3044,19 @@ namespace faf::editor
     float mFalloff = 0.6f;
     int mSymmetry = 6; // both axes
     int mNWay = 3;
+    ViewFrame mViewFrame;
+    float mMinimapRect[4]{};
+    int mLayerMoveFrom = -1;
+    PickFilter mPickable;
+    MapTextureRow mMapTextureRows[4];
+    int mMapTextureKind = 0;
+    MapTextureOp mMapTextureOp = MapTextureOp::None;
+    std::string mMapTextureFile;
+    bool mMapTextureRaise = false;
+    int mLayerMoveTo = -1;
+    bool mCameraAsk = false;
+    float mCameraAskX = 0.0f;
+    float mCameraAskZ = 0.0f;
     bool mLimitHeight = false;
     float mLimitLow = 0.0f;
     float mLimitHigh = 100.0f;
@@ -1666,7 +3065,22 @@ namespace faf::editor
     float mSetHeight = 20.0f;
     float mTerraceStep = 5.0f;
     float mErodeTalus = 0.6f;
+    int mBrushShape = 0; // BrushShape
+    float mShapeAngle = 0.0f;
+    float mNoiseScale = 8.0f;
+    int mNoiseOctaves = 2;
+    float mNoiseRoughness = 0.5f;
     float mPlanePointX[3]{};
+    std::vector<TerrainPathPoint> mPathPoints;
+    int mPathMode = static_cast<int>(PathMode::Ramp);
+    float mPathDepth = 4.0f;
+    bool mPathClosed = false;
+    bool mPathApply = false;
+    bool mAirbrush = true;
+    std::string mStrokeStats;
+    std::string mPaintNote;
+    bool mBrowseNormals = false; // the browser picks the normal map alone
+    bool mBrowseRelief = true;   // normal maps shown as lit relief
     float mPlanePointH[3]{};
     float mPlanePointZ[3]{};
     int mPlanePoints = 0;
@@ -1675,6 +3089,18 @@ namespace faf::editor
     double mPlaneZ = 0.0;
     double mPlaneC = 0.0;
     std::shared_ptr<HeightStamp> mStamp;
+    int mStampMode = 0; // StampMode
+    float mStampTurn = 0.0f;
+    bool mStampRandomTurn = false;
+    float mStampSizeJitter = 0.0f;
+    float mStampPlaceJitter = 0.0f;
+    float mStampSpacing = 0.0f;
+    bool mStampBaseFromStroke = false;
+    std::filesystem::path mBrushFolder;
+    std::vector<BrushImage> mBrushImages;
+    std::shared_ptr<ShapeGrid> mShapeImage;
+    std::string mShapeImageName;
+    bool mBrushImportRequested = false;
     std::string mStampName;
     float mStampHeight = 20.0f;
     bool mStampRequested = false;
@@ -1709,6 +3135,7 @@ namespace faf::editor
     int mTerrainTypeCode = 81;
     bool mShowTerrainTypes = true;
     bool mShowSlope = false;
+    bool mShowHeights = false;
     bool mShowKmGrid = false;
     std::string mCursorText;
     std::string mRulerText;
@@ -1724,6 +3151,21 @@ namespace faf::editor
     int mMaskLayer = 0;
     int mMaskMode = 0;
     bool mLowerAbove = true;
+    bool mShaderBrowserOpen = false;
+    LayerConvertOptions mConvertOptions;
+    LayerConvertPlan mConvertPlan;
+    std::string mConvertPlanKey;
+    std::vector<std::string> mConvertReport;
+    bool mConvertRequested = false;
+    std::string mBrowsedShader;
+    float mMaskTarget = 1.0f;
+    float mMaskScatter = 0.0f;
+    float mMaskMinSlopeDegrees = 0.0f;
+    bool mMaskBuildUp = false; // FAF Studio's stroke model by default
+    bool mMaskStamp = false;
+    float mMaskStampSpacing = 0.6f;
+    bool mMaskStampRandomTurn = true;
+    float mMaskStampJitter = 0.2f;
     std::vector<std::string> mLayerNames;
     std::vector<LayerSlot> mSlots;
     int mChangedSlot = -1;
@@ -1737,6 +3179,81 @@ namespace faf::editor
     int mMaterialAsk = -1;
     char mBrowseFilter[64]{};
     std::vector<MaskRule> mRules;
+    int mSymmetryHover = -1;
+    void DrawMaskGenerator();
+    std::vector<MaskGenRule> mGenRules;
+    MaskGenTarget mGenTarget;
+    int mGenRevision = 0;
+    std::string mGenPresetAsk;
+    bool mGenApply = false;
+    bool mGenOpen = false;
+    std::uint64_t mGenPreviewImage = 0;
+    float mGenCoverage = 0.0f;
+    std::string mGenNote;
+    void DrawRecipes();
+    int mRecipeStyle = 0;
+    RecipeKnobs mRecipeKnobs;
+    std::array<int, 9> mRecipeOverride{-1, -1, -1, -1, -1, -1, -1, -1, -1};
+    std::array<GroundKind, 9> mRecipeDetected{};
+    std::array<std::string, 9> mRecipeNames;
+    int mRecipeCap = 8;
+    bool mRecipeApply = false;
+    bool mRecipesOpen = false;
+    std::string mRecipeResult;
+    bool mFollowSymmetry = true;
+    bool mSelectAny = false; // something is selected (Arrange's buttons)
+    std::string mHudOverride;
+    bool mErosionOpen = false;
+    bool mScToolsOpen = false;
+    ScAsk mScAsk = ScAsk::None;
+    PadSettings mPadSettings;
+    SlopeLimitSettings mSlope;
+    bool mPadsApplied = false;
+    bool mPadsStale = false;
+    std::string mScStatus;
+    std::string mSlopeReport;
+    std::string mRampReport;
+    bool mInteropOpen = false;
+    InteropAsk mInteropAsk = InteropAsk::None;
+    int mInteropBrowse = 0;
+    char mInteropImportPath[1024]{};
+    char mInteropExportPath[1024]{};
+    ImportSettings mImport;
+    bool mInteropLive = false;
+    bool mInteropSidecar = true;
+    int mInteropExportSize = 0;
+    float mInteropExportScale = 1.0f;
+    bool mInteropCanRevert = false;
+    std::string mInteropLinkNote;
+    std::string mInteropStatus;
+    std::string mInteropProbe;
+    ErosionAsk mErosionAsk = ErosionAsk::None;
+    std::string mErosionSolver = "hydraulic";
+    std::string mErosionPreset = "hills";
+    std::map<std::string, ErosionValues> mErosionValues;
+    std::string mErosionStatus;
+    bool mErosionPreviewShown = false;
+    ErosionMaskChoice mErosionMasks;
+    int mMapCounts[4] = {0, 0, 0, 0};
+    FillOptions mFill;
+    bool mFillRequest = false;
+    std::string mFillMessage;
+    ArrangeOp mArrangeRequest = ArrangeOp::Count;
+    int mArrangeSnap = 0; // the grid step 1 << n: 1, 2, 4, 8
+    std::string mArrangeMessage;
+    std::uint64_t mMinimapImage = 0;
+    SlopeView mSlopeView;
+    std::array<int, 9> mLayerTypeOverride{-1, -1, -1, -1, -1, -1, -1, -1, -1};
+    bool mTypesFromLayersAsk = false;
+    bool mTypesOnlyDefault = false;
+    void DrawTypesFromLayers();
+    std::array<float, 10> mOptimalTiles{};
+    int mThemeIndex = 1;
+    ThemeOp mThemeOp = ThemeOp::None;
+    bool mThemeTrying = false;
+    std::vector<std::string> mThemePreview;
+    bool mLayersShown = false;
+    void DrawThemes();
     bool mRulesRequested = false;
 
     bool mCheckedMasks = false;
@@ -1747,6 +3264,8 @@ namespace faf::editor
     std::function<std::uint64_t(const std::string&)> mPropPictures;
     std::string mPropBlueprint;
     int mPropMode = 0;
+    float mPropLineSpacing = 6.0f;
+    bool mPropLineAlong = true;
     float mPropDensity = 8.0f;
     bool mPropRandomTurn = true;
     std::vector<PropPaintEntry> mPaintList;
@@ -1757,6 +3276,22 @@ namespace faf::editor
     std::vector<std::string> mReclaimRows;
     char mPropFilter[64]{};
     int mAirGridCount = 16;
+    int mPathGridKind = 0;
+    bool mPropByArea = false;
+    float mPropAreaDensity = 2.0f;
+    float mPropSpacing = 3.0f;
+    bool mEraseOnlyThis = false;
+    std::string mUnitFitNote;
+    bool mAreaAddAsked = false;
+    float mAreaAddAt[2] = {0.0f, 0.0f};
+    int mAreaChosen = -1;
+    char mAreaName[64] = {};
+
+  public:
+    /** The Areas section's edits on the map's `_save.lua` areas (the playable one too), one undo step each. */
+    void DrawAreas(EdDocument& document);
+
+  private:
     bool mAirGridReplace = true;
     bool mAirGridAsked = false;
     bool mEditBorder = false;
@@ -1773,6 +3308,8 @@ namespace faf::editor
     std::vector<PathQuad> mPathQuads;
     bool mShowPathing = false;
     std::vector<PathQuad> mShipQuads;
+    std::vector<PathQuad> mHoverQuads;
+    std::vector<PathQuad> mAmphibiousQuads;
     int mPathingLayer = 0;
     WaterState mWater;
     bool mWaterEditing = false;
@@ -1787,6 +3324,22 @@ namespace faf::editor
     WaveAsk mWaveAsk = WaveAsk::None;
     bool mWaterChanged = false;
     bool mWaterFinal = false;
+    bool mWaterSunFollows = true;
+    bool mWaterMaskPaint = false;
+    bool mWavePick = false;
+    // The water textures' picker: the slot it is for (-1 closed), the game's textures listed once, the search.
+    int mWaterTexturePick = -1;
+    bool mWaterTexturePickOpen = false;
+    std::vector<std::string> mGameTextures;
+    char mWaterTextureFilter[64]{};
+    void DrawWaterTexturePicker();
+    bool mWaveSymmetric = false;
+    bool mWaveDelete = false;
+    int mWaveSelectionCount = 0;
+    int mWaterMaskKind = 0;
+    int mWaterMaskValue = 255;
+    WaterMaskBrush mWaterMaskBrush;
+    bool mWaterTakeLightingSun = false;
     bool mWaterImport = false;
     bool mWaterExport = false;
     void DrawWaterBodies();
@@ -1808,6 +3361,14 @@ namespace faf::editor
     bool mUnitRandomTurn = false;
     char mUnitFilter[64]{};
     int mUnitSelectionCount = 0;
+    bool mShowRangeRings = true;
+    bool mDrawChain = false;
+    char mChainName[64] = "Chain_01";
+    bool mShowBrushWeight = false;
+    bool mExportEightBit = false;
+    /** The symmetry's centre as an offset from the map's middle (samples). */
+    float mSymmetryCentre[2] = {0.0f, 0.0f};
+    bool mGiveUnits = false;
     std::vector<DecalTexture> mDecalTextures;
     bool mDecalTexturesListed = false;
     std::string mDecalTexture;
@@ -1817,7 +3378,12 @@ namespace faf::editor
     float mDecalTurn = 0.0f;
     bool mDecalRandomTurn = false;
     bool mDecalWithPair = true;
+    bool mDecalWithNormals = false;
+    int mSkyPickWhich = -1;
+    std::string mSkyPickPath;
     float mDecalOverlap = 0.1f;
+    DecalBrush mDecalBrush;
+    float mDecalSizeVariation = 0.0f;
     DecalPathAction mDecalPathAction = DecalPathAction::None;
     int mDecalPathPoints = 0;
     int mDecalPathDecals = 0;
@@ -1836,6 +3402,16 @@ namespace faf::editor
     bool mAskPointSet = false;
     int mDetectedSymmetry = -2; // -2: no map opened yet
     float mDetectedMatch = 0.0f;
+    int mDetectedStarts = 0;
+    int mDetectedResources = 0;
+    float mDetectedOffsetX = 0.0f;
+    float mDetectedOffsetZ = 0.0f;
+    // Make symmetric: the source part, how copies combine (SymmetryCombine), the seam, and the layers it reaches.
+    int mSymPart = 0;
+    int mSymCombine = 0;
+    float mSymSeam = 0.0f;
+    bool mSymMasks = false;
+    bool mSymTypes = false;
     std::vector<std::string> mArmies;
     std::vector<std::string> mExtraArmies;
     std::vector<ScenarioTeam> mTeams;

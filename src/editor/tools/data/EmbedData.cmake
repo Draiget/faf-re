@@ -1,0 +1,28 @@
+# Data files the editor ships as text (FAF Studio's generated tables), built into the editor so they need no data folder
+# beside the exe. faf_embed_editor_data(<var>) sets <var> to the generated source with EmbeddedEditorData(name): the
+# file's text, or empty. Written again only when a file changed.
+
+function(faf_embed_editor_data out_var)
+  set(_dir "${CMAKE_SOURCE_DIR}/src/editor/tools/data")
+  set(_out "${CMAKE_BINARY_DIR}/generated/EdEditorData.cpp")
+  file(GLOB _files RELATIVE "${_dir}" CONFIGURE_DEPENDS "${_dir}/*.lua")
+  list(SORT _files)
+  set(_text "// Generated from src/editor/tools/data by EmbedData.cmake: do not edit.\n#include <string>\n\nnamespace faf::editor\n{\n  const std::string& EmbeddedEditorData(const std::string& name)\n  {\n")
+  foreach(_file IN LISTS _files)
+    string(MAKE_C_IDENTIFIER "${_file}" _id)
+    file(READ "${_dir}/${_file}" _content)
+    string(LENGTH "${_content}" _length)
+    string(APPEND _text "    static const std::string k_${_id} = std::string()")
+    set(_at 0)
+    while(_at LESS _length)
+      string(SUBSTRING "${_content}" ${_at} 4000 _piece)
+      string(APPEND _text " +\n      R\"faf(${_piece})faf\"")
+      math(EXPR _at "${_at} + 4000")
+    endwhile()
+    string(APPEND _text ";\n    if (name == \"${_file}\") {\n      return k_${_id};\n    }\n")
+  endforeach()
+  string(APPEND _text "    static const std::string kNone;\n    return kNone;\n  }\n} // namespace faf::editor\n")
+  file(WRITE "${_out}.tmp" "${_text}")
+  configure_file("${_out}.tmp" "${_out}" COPYONLY)
+  set(${out_var} "${_out}" PARENT_SCOPE)
+endfunction()

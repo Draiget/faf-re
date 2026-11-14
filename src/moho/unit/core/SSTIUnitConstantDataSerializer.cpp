@@ -55,24 +55,6 @@ namespace
     return gpg::RRef(value, gpg::RTypeOf<moho::Stats<moho::StatItem>>());
   }
 
-  /**
-   * Address: 0x005CC860 (FUN_005CC860, destroy_Stats_StatItem_if_present)
-   *
-   * What it does:
-   * Runs one `Stats_StatItem` destructor and frees storage when the incoming
-   * pointer lane is non-null.
-   */
-  [[maybe_unused]] void DestroyStatsStatItemIfPresent(
-    moho::Stats_StatItem* const statItem
-  ) noexcept
-  {
-    if (statItem == nullptr) {
-      return;
-    }
-
-    GPG_NONVIRTUAL_DESTROY(delete statItem);
-  }
-
 } // namespace
 
 namespace moho

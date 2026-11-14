@@ -74,25 +74,6 @@ namespace
   }
 
   /**
-   * Address: 0x00887BB0 (FUN_00887BB0)
-   *
-   * What it does:
-   * Runs one deleting-destructor thunk for `WaveGenerator`, forwarding through
-   * non-deleting `WaveGenerator::~WaveGenerator` and optional storage release.
-   */
-  [[maybe_unused]] [[nodiscard]] moho::WaveGenerator* DestroyWaveGeneratorDeleting(
-    moho::WaveGenerator* const generator,
-    const unsigned char deleteFlag
-  )
-  {
-    generator->~WaveGenerator();
-    if ((deleteFlag & 1u) != 0u) {
-      ::operator delete(static_cast<void*>(generator));
-    }
-    return generator;
-  }
-
-  /**
    * Address: 0x0088A7B0 (FUN_0088A7B0, sub_88A7B0)
    * Mangled: (out-of-line std::vector<Moho::WaveGenerator*>::_Insert_n grow lane)
    *

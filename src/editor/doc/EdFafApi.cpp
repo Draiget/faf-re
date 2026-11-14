@@ -1,5 +1,7 @@
 #include "editor/doc/EdFafApi.h"
 
+#include <sstream>
+
 #include <algorithm>
 #include <chrono>
 #include <cmath>
@@ -954,6 +956,110 @@ namespace faf::editor
     SetMessage("Logged out of FAF");
   }
 
+  std::string MapUploadBody(
+    const std::string& boundary,
+    const std::string& zipName,
+    const std::string& zipBytes,
+    const bool ranked
+  )
+  {
+    std::string body;
+    body.reserve(zipBytes.size() + 512U);
+    body += "--" + boundary + "\r\n";
+    body += "Content-Disposition: form-data; name=\"file\"; filename=\"" + zipName + "\"\r\n";
+    body += "Content-Type: application/octet-stream\r\n\r\n";
+    body += zipBytes;
+    body += "\r\n--" + boundary + "\r\n";
+    body += "Content-Disposition: form-data; name=\"metadata\"\r\n";
+    body += "Content-Type: application/json\r\n\r\n";
+    body += std::string("{\"isRanked\":") + (ranked ? "true" : "false") + "}";
+    body += "\r\n--" + boundary + "--\r\n";
+    return body;
+  }
+
+  EdFafSession::UploadState EdFafSession::Upload() const
+  {
+    std::lock_guard<std::mutex> lock(mLock);
+    return mUpload;
+  }
+
+  void EdFafSession::UploadMap(
+    std::filesystem::path zip,
+    const bool ranked
+  )
+  {
+    {
+      std::lock_guard<std::mutex> lock(mLock);
+      if (mUpload.running) {
+        return;
+      }
+      if (mState.load() != State::LoggedIn) {
+        mUpload = UploadState{false, true, false, "Sign in to FAF first (the start screen's FAF vault page)"};
+        return;
+      }
+      mUpload = UploadState{true, false, false, "Uploading " + zip.filename().string() + "..."};
+    }
+    Run([this, zip, ranked] {
+      std::string bytes;
+      {
+        std::ifstream in(zip, std::ios::binary);
+        std::ostringstream all;
+        all << in.rdbuf();
+        bytes = all.str();
+      }
+      UploadState result{false, true, false, {}};
+      if (bytes.empty()) {
+        result.message = "Couldn't read " + zip.string();
+      } else {
+        // A boundary the zip doesn't hold (practically always the first).
+        std::string boundary = "----FafEditorUpload7d3b";
+        for (int n = 0; bytes.find(boundary) != std::string::npos; ++n) {
+          boundary = "----FafEditorUpload" + std::to_string(n) + "x9q";
+        }
+        for (int attempt = 0; attempt < 2; ++attempt) {
+          HttpCall call;
+          call.method = "POST";
+          call.url = std::string(kFafApiUrl) + "/maps/upload";
+          {
+            std::lock_guard<std::mutex> lock(mLock);
+            call.headers = "Accept: application/json\r\nAuthorization: Bearer " + mAccessToken +
+              "\r\nContent-Type: multipart/form-data; boundary=" + boundary + "\r\n";
+          }
+          call.body = MapUploadBody(boundary, zip.filename().string(), bytes, ranked);
+          long status = 0;
+          std::string body;
+          std::string error;
+          if (!HttpRequest(call, status, body, error)) {
+            result.message = "The upload didn't reach FAF: " + error;
+            break;
+          }
+          if (status == 401 && attempt == 0 && RefreshAccess(error)) {
+            continue;
+          }
+          if (status >= 200 && status < 300) {
+            result.ok = true;
+            result.message = "Uploaded to the FAF vault: " + zip.filename().string();
+          } else {
+            JsonNode answer;
+            std::string detail;
+            if (ParseJson(body, answer, detail)) {
+              if (const JsonNode* const errors = answer.Get("errors"); errors != nullptr && !errors->items.empty()) {
+                detail = errors->items.front().String("detail");
+                if (detail.empty()) {
+                  detail = errors->items.front().String("title");
+                }
+              }
+            }
+            result.message = "FAF's vault answered " + std::to_string(status) + (detail.empty() ? "" : ": " + detail);
+          }
+          break;
+        }
+      }
+      std::lock_guard<std::mutex> lock(mLock);
+      mUpload = result;
+    });
+  }
+
   void EdFafSession::Search(
     const VaultQuery& query,
     const int page
@@ -966,6 +1072,73 @@ namespace faf::editor
       std::string error;
       std::vector<VaultMap> maps;
       int pages = 0;
+      (void)FetchMaps(query, page, maps, pages, error);
+      {
+        std::lock_guard<std::mutex> lock(mLock);
+        mResults = std::move(maps);
+        mPages = pages;
+        mHaveResults = true;
+      }
+      SetMessage(error.empty() ? std::string() : error);
+      mSearching = false;
+    });
+  }
+
+  void EdFafSession::SearchNamed(
+    const std::string& name,
+    const VaultQuery& query
+  )
+  {
+    if (mState.load() != State::LoggedIn) {
+      return;
+    }
+    {
+      std::lock_guard<std::mutex> lock(mLock);
+      mNamed[name] = Named{};
+    }
+    Run([this, name, query] {
+      Named result;
+      int pages = 0;
+      (void)FetchMaps(query, 1, result.maps, pages, result.error);
+      result.done = true;
+      std::lock_guard<std::mutex> lock(mLock);
+      mNamed[name] = std::move(result);
+    });
+  }
+
+  bool EdFafSession::NamedResults(
+    const std::string& name,
+    std::vector<VaultMap>& maps,
+    std::string& error
+  ) const
+  {
+    std::lock_guard<std::mutex> lock(mLock);
+    const auto found = mNamed.find(name);
+    if (found == mNamed.end() || !found->second.done) {
+      return false;
+    }
+    maps = found->second.maps;
+    error = found->second.error;
+    return true;
+  }
+
+  bool EdFafSession::NamedAsked(
+    const std::string& name
+  ) const
+  {
+    std::lock_guard<std::mutex> lock(mLock);
+    return mNamed.find(name) != mNamed.end();
+  }
+
+  bool EdFafSession::FetchMaps(
+    const VaultQuery& query,
+    const int page,
+    std::vector<VaultMap>& maps,
+    int& pages,
+    std::string& error
+  )
+  {
+    {
       for (int attempt = 0; attempt < 2; ++attempt) {
         HttpCall call;
         call.url = VaultSearchUrl(query, page);
@@ -1004,15 +1177,8 @@ namespace faf::editor
         error.clear();
         break;
       }
-      {
-        std::lock_guard<std::mutex> lock(mLock);
-        mResults = std::move(maps);
-        mPages = pages;
-        mHaveResults = true;
-      }
-      SetMessage(error.empty() ? std::string() : error);
-      mSearching = false;
-    });
+    }
+    return error.empty();
   }
 
   bool EdFafSession::TakeResults(

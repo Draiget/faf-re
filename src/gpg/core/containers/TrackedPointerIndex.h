@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <vector>
 
@@ -95,8 +96,8 @@ namespace gpg
       const RRef& key
     ) noexcept
     {
-      const std::uint64_t object = reinterpret_cast<std::uintptr_t>(key.mObj);
-      const std::uint64_t type = reinterpret_cast<std::uintptr_t>(key.mType);
+      const std::uint64_t object = std::hash<const void*>{}(key.mObj);
+      const std::uint64_t type = std::hash<const void*>{}(key.mType);
       const std::uint64_t mixed = (object ^ (type << 21u)) * 0x9E3779B97F4A7C15ull;
       return static_cast<std::size_t>(mixed >> 20u);
     }

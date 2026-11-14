@@ -69,6 +69,20 @@ namespace faf::editor
     {
       mShown = true;
     }
+    /**
+     * The device's context is about to be re-made (FitGameView): its targets go with it, so they are let go of and
+     * the image is none until the next render (a panel drawing the old one read a freed target).
+     */
+    void DropTargets() noexcept
+    {
+      mImage = 0;
+      mTarget.reset();
+      mDepth.reset();
+      mRetired.reset();
+      mRetiredDepth.reset();
+      mTargetWidth = 0;
+      mTargetHeight = 0;
+    }
 
   private:
     Options mOptions;
@@ -84,5 +98,8 @@ namespace faf::editor
     std::uint64_t mImage = 0;
     moho::ID3DDeviceResources::RenderTargetHandle mTarget;
     moho::ID3DDeviceResources::DepthStencilHandle mDepth;
+    // The targets a resize replaced: the frame's panels were built with their image, so they live one frame more.
+    moho::ID3DDeviceResources::RenderTargetHandle mRetired;
+    moho::ID3DDeviceResources::DepthStencilHandle mRetiredDepth;
   };
 } // namespace faf::editor

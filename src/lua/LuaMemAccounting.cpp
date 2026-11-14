@@ -28,7 +28,7 @@ namespace
     {"WrapFile", 0x08u},       // LuaObject.cpp (io library file handle)
   };
 
-  [[maybe_unused]] [[nodiscard]] lu_mem LookupX86PayloadSize(
+  [[nodiscard]] lu_mem LookupX86PayloadSize(
     const gpg::RType* const type
   ) noexcept
   {

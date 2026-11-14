@@ -60,7 +60,7 @@ namespace
    * Constructs one static `EAllianceTypeInfo` instance and pre-registers RTTI
    * ownership for `EAlliance`.
    */
-  [[maybe_unused]] gpg::REnumType* ConstructEAllianceTypeInfoInternal()
+  gpg::REnumType* ConstructEAllianceTypeInfoInternal()
   {
     auto* const typeInfo = AcquireEAllianceTypeInfo();
     if (!gEAllianceTypeInfoPreregistered) {

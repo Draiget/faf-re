@@ -1,5 +1,6 @@
 #pragma once
 
+#include <functional>
 #include <chrono>
 #include <map>
 #include <string>
@@ -150,8 +151,15 @@ namespace faf::editor
     }
     /** The mods the setup plays with: its own and the chosen AI's; a uid set as Lua text (`{ ['uid'] = true }`). */
     [[nodiscard]] std::vector<std::string> PlayedMods() const;
+    /** Sim mods every play adds (the turned-on editor mods with sim hooks; set by the app). */
+    std::vector<std::string> extraSimMods;
     /** After the setup's mods change: the game's rules for them built ahead on a thread, so the next Play is quick. */
     void PrepareRules();
+    /** After a mod folder is mounted (a mod project's Test): the sim mods, and the AI types, found again. */
+    void FindModsAgain()
+    {
+      FindChoices();
+    }
     /** The profiles: the built-in ones, then the saved ones by name. */
     [[nodiscard]] std::vector<PlayProfile> Profiles() const;
     /** The setup becomes the profile's (`slots` is how many start positions the map has, for the built-in ones). */
@@ -187,6 +195,16 @@ namespace faf::editor
     {
       mPlayRequested = true;
     }
+    /**
+     * What a play starts for the selected map's scenario: the open map's play copy when it has unsaved edits (the app
+     * writes it), else the map as saved. Empty: the selected map.
+     */
+    void SetScenarioFor(
+      std::function<std::string(const std::string& selected)> scenarioFor
+    )
+    {
+      mScenarioFor = std::move(scenarioFor);
+    }
     /** Ends the session on the next frame. */
     void Stop() noexcept
     {
@@ -206,6 +224,13 @@ namespace faf::editor
      */
     void ReadCommandLine();
 
+    /**
+     * The coop shim (FAF Studio's coopshim.lua): a small sim mod in the vault's mods folder, played with coop maps in
+     * place of FAF's coop mod. It hooks ScenarioFramework (shared unit cap, restrictions for all humans, an on-screen
+     * announcement, a commander's spawn) and fills ScenarioInfo.HumanPlayers before the armies are made. Written (or
+     * rewritten) by the editor; false with `error` when the folder can't be written.
+     */
+    static bool WriteCoopShim(const std::filesystem::path& modsFolder, std::string& error);
     /** The command line's runs are over and asked for the editor to close. */
     [[nodiscard]] bool QuitRequested() const noexcept
     {
@@ -274,6 +299,7 @@ namespace faf::editor
     bool mWholeMap = false;
     bool mFogHidden = false;
     int mSelected = 0;
+    std::function<std::string(const std::string&)> mScenarioFor;
     bool mPlayRequested = false;
     bool mStopRequested = false;
 

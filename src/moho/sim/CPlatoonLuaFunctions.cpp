@@ -2,6 +2,7 @@
 #include "moho/script/CScriptObject.h"
 #include "moho/sim/CPlatoonPrivate.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
+#include "moho/sim/SimConVarAccess.h"
 
 namespace
 {
@@ -103,7 +104,7 @@ namespace
     if (!blueprint || !categorySet) {
       return false;
     }
-    return categorySet->Bits().Contains(blueprint->mCategoryBitIndex);
+    return categorySet->Bits().Contains(blueprint->mBlueprintOrdinal);
   }
 
   /**
@@ -908,12 +909,7 @@ namespace moho
     SimArmy* const army = platoon->mArmy;
     Sim* const sim = army ? army->GetSim() : nullptr;
 
-    CSimConVarBase* const runOpponentAiConVar = &moho::gSimConVar_AI_RunOpponentAI;
-    CSimConVarInstanceBase* const runOpponentAiVar =
-      (sim && runOpponentAiConVar) ? sim->GetSimVar(runOpponentAiConVar) : nullptr;
-    const void* const runOpponentAiStorage = runOpponentAiVar ? runOpponentAiVar->GetValueStorage() : nullptr;
-    const bool shouldRunOpponentAi =
-      runOpponentAiStorage && (*reinterpret_cast<const std::uint8_t*>(runOpponentAiStorage) != 0u);
+    const bool shouldRunOpponentAi = sim != nullptr && ReadSimConVar(sim, moho::gSimConVar_AI_RunOpponentAI);
 
     lua_pushboolean(state->m_state, shouldRunOpponentAi ? 1 : 0);
     (void)lua_gettop(state->m_state);

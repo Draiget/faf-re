@@ -24,7 +24,7 @@ Wm3::Vector3f Unit::GetFormationVector() const
     }
   }
 
-  const auto* const formationLayer = reinterpret_cast<const CAiFormationInstance*>(mInfoCache.mFormationLayer);
+  const auto* const formationLayer = static_cast<const CAiFormationInstance*>(mInfoCache.mFormationLayer);
   if (formationLayer != nullptr && formationLayer->CommandIsForm()) {
     formationLayer->GetForwardVector(&result, const_cast<Unit*>(this));
   }
@@ -77,7 +77,7 @@ void Unit::UpdateInfoCache()
     return;
   }
 
-  CAiFormationInstance* const formation = reinterpret_cast<CAiFormationInstance*>(GetFormation());
+  CAiFormationInstance* const formation = static_cast<CAiFormationInstance*>(GetFormation());
   SOffsetInfo* offsetInfo = nullptr;
 
   if (formation != nullptr && formation->CommandIsForm() && formation->Contains(this, false)) {
@@ -85,7 +85,7 @@ void Unit::UpdateInfoCache()
     // GetPriority, GetLeader, GetTargetPosition, GetDistFromLeader,
     // IsInFormation.
     offsetInfo = formation->GetOffsetInfo(this);
-    mInfoCache.mFormationLayer = reinterpret_cast<CFormationInstance*>(formation);
+    mInfoCache.mFormationLayer = static_cast<CFormationInstance*>(formation);
     mInfoCache.mFormationPriorityOrder = formation->GetPriority(this, offsetInfo);
 
     Unit* const formationLead = formation->GetLeader(this, offsetInfo);
@@ -558,10 +558,7 @@ void Unit::ReserveOgridRect(
 {
   FreeOgridRect();
 
-  ReservedOgridRectMinX = ogridRect.x0;
-  ReservedOgridRectMinZ = ogridRect.z0;
-  ReservedOgridRectMaxX = ogridRect.x1;
-  ReservedOgridRectMaxZ = ogridRect.z1;
+  mReservedOgridRect = ogridRect;
 
   FillReservedOgridRect(*this, true);
 }
@@ -574,17 +571,14 @@ void Unit::FreeOgridRect()
   // 0x006AB7C9: `je` past both the vacate and the zeroing when the reserved
   // rect quantises to the zero collision rect -- the stored bounds are left
   // untouched in that case.
-  const gpg::Rect2i reservedRect = GetReservedOgridRect(*this);
+  const gpg::Rect2i reservedRect = mReservedOgridRect;
   if (IsCollisionRectEquivalentToZero(reservedRect)) {
     return;
   }
 
   FillReservedOgridRect(*this, false);
 
-  ReservedOgridRectMinX = 0;
-  ReservedOgridRectMinZ = 0;
-  ReservedOgridRectMaxX = 0;
-  ReservedOgridRectMaxZ = 0;
+  mReservedOgridRect = gpg::Rect2i{0, 0, 0, 0};
 }
 
 /**
@@ -594,7 +588,7 @@ bool Unit::CanReserveOgridRect(
   const gpg::Rect2i& ogridRect
 )
 {
-  const gpg::Rect2i reservedRect = GetReservedOgridRect(*this);
+  const gpg::Rect2i reservedRect = mReservedOgridRect;
   const bool hadReservation = !IsCollisionRectEquivalentToZero(reservedRect);
   if (hadReservation) {
     FillReservedOgridRect(*this, false);

@@ -266,7 +266,7 @@ namespace
       return false;
     }
 
-    CArmyImpl* const blipArmy = reinterpret_cast<Entity*>(blip)->ArmyRef;
+    CArmyImpl* const blipArmy = static_cast<Entity*>(blip)->ArmyRef;
     if (!blipArmy) {
       return false;
     }
@@ -282,24 +282,7 @@ namespace
       return {};
     }
 
-    return reinterpret_cast<Entity*>(blip)->mPendingTransform.pos_;
-  }
-
-  /**
-   * Address: 0x005C9830 (FUN_005C9830)
-   *
-   * What it does:
-   * Forwards one entity-backed blip lane into `CInfluenceMap::UpdateBlipPosition`
-   * using `Entity::id_`, current `Entity::Position`, and current blueprint.
-   */
-  [[maybe_unused]] void UpdateInfluenceMapFromEntityState(
-    Entity* const blipEntity,
-    CInfluenceMap* const influenceMap
-  )
-  {
-    const auto blipId = static_cast<std::uint32_t>(blipEntity->id_);
-    const RUnitBlueprint* const blueprint = static_cast<const RUnitBlueprint*>(blipEntity->BluePrint);
-    influenceMap->UpdateBlipPosition(blipId, blipEntity->mVarDat.mCurTransform.pos_, blueprint);
+    return static_cast<Entity*>(blip)->mPendingTransform.pos_;
   }
 
   [[nodiscard]] bool DoesBlipSourceCollideBox(
@@ -742,8 +725,7 @@ void CAiReconDBImpl::ReconTick(
   for (auto it = mTempBlips.begin(); it != mTempBlips.end();) {
     ReconBlip* const blip = *it;
     const bool shouldDelete = BlipArmyTreatsViewerAsAlly(this, blip) ||
-      (ReconCanDetectEntity(this, reinterpret_cast<Entity*>(blip), BlipProbePosition(blip), RECON_LOSNow) !=
-       RECON_None);
+      (ReconCanDetectEntity(this, static_cast<Entity*>(blip), BlipProbePosition(blip), RECON_LOSNow) != RECON_None);
     if (shouldDelete) {
       // 0x005C0D39-0x005C0D74: the orphan teardown logs the confirmation and
       // feeds the sim checksum -- tag 2, then the blip id, four bytes each, the
@@ -814,8 +796,7 @@ void CAiReconDBImpl::ReconTick(
         blip->DestroyIfUnused(); // 0x005C0F14
       } else {
         const bool shouldDeleteFake = BlipArmyTreatsViewerAsAlly(this, blip) ||
-          (ReconCanDetectEntity(this, reinterpret_cast<Entity*>(blip), BlipProbePosition(blip), RECON_LOSNow) !=
-           RECON_None);
+          (ReconCanDetectEntity(this, static_cast<Entity*>(blip), BlipProbePosition(blip), RECON_LOSNow) != RECON_None);
         if (shouldDeleteFake) {
           // 0x005C0F8A. Same influence-map release as the orphan arm. The
           // stale-mobile arm below deliberately has none -- the binary does not
@@ -861,7 +842,7 @@ void CAiReconDBImpl::ReconTick(
       if (unit->ArmyRef == mArmy) {
         continue;
       }
-      if (!mVisibleToReconCategory.ContainsBit(unit->BluePrint->mCategoryBitIndex)) {
+      if (!mVisibleToReconCategory.ContainsBit(unit->BluePrint->mBlueprintOrdinal)) {
         continue;
       }
 
@@ -2052,7 +2033,7 @@ void CAiReconDBImpl::ReconGetBlips(
       continue;
     }
     if (DoesBlipSourceCollideBox(blip, box)) {
-      outBlips->PushBack(reinterpret_cast<Entity*>(blip));
+      outBlips->PushBack(static_cast<Entity*>(blip));
     }
   }
 }
@@ -2381,7 +2362,7 @@ namespace
   )
   {
     return !unit->DestroyQueued() && unit->BluePrint != nullptr && unit->ArmyRef != db.mArmy &&
-      db.mVisibleToReconCategory.ContainsBit(unit->BluePrint->mCategoryBitIndex);
+      db.mVisibleToReconCategory.ContainsBit(unit->BluePrint->mBlueprintOrdinal);
   }
 
   /// ReconTick's query of `unit`, the `index`th unit its main loop queries: the cached result when

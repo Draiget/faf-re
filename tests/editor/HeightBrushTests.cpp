@@ -437,6 +437,121 @@ namespace
     EXPECT_TRUE(CopiesEqual(field, Symmetry::LeftRight));
   }
 
+  // Rain and Deposit (FAF Studio's erosion session) and the session that lives for a stroke.
+
+  HeightBrush ErosionBrush(
+    const HeightBrushMode mode
+  )
+  {
+    HeightBrush brush = Rain();
+    brush.mode = mode;
+    brush.radius = 9.0f;
+    return brush;
+  }
+
+  /** Left-right mirrored hills sloping along z (the slope the water follows). */
+  Field MirroredHills()
+  {
+    Field field(65, 65, 0);
+    for (int z = 0; z < 65; ++z) {
+      for (int x = 0; x < 65; ++x) {
+        const int mx = std::min(x, 64 - x);
+        field.words[static_cast<std::size_t>(z) * 65 + static_cast<std::size_t>(x)] =
+          static_cast<std::uint16_t>(8000 + 60 * mx + 40 * z);
+      }
+    }
+    return field;
+  }
+
+  TEST(
+    HeightBrush,
+    ErosionStrokeKeepsAMirroredMapMirroredOnTheMirrorLine
+  )
+  {
+    // One session for the stroke: a dab across the mirror line reads ground the previous step's copy wrote, which the
+    // session has only because the copies written are stored back into it.
+    for (const HeightBrushMode mode : {HeightBrushMode::WaterErode, HeightBrushMode::Rain, HeightBrushMode::Deposit}) {
+      Field field = MirroredHills();
+      HeightBrush brush = ErosionBrush(mode);
+      brush.symmetry = Symmetry::LeftRight;
+      faf::editor::ErosionStrokePtr stroke = faf::editor::MakeErosionStroke();
+      for (int step = 0; step < 40; ++step) {
+        brush.seed = static_cast<std::uint32_t>(step + 1);
+        (void)ApplyHeightBrush(
+          field.words.data(), 65, 65, 29.0f + static_cast<float>(step % 7), 30.0f, brush, 1.0f / 60.0f, stroke.get()
+        );
+      }
+      EXPECT_TRUE(CopiesEqual(field, Symmetry::LeftRight)) << "mode " << static_cast<int>(mode);
+      EXPECT_NE(field.words, MirroredHills().words) << "mode " << static_cast<int>(mode) << " changed nothing";
+    }
+  }
+
+  TEST(
+    HeightBrush,
+    ErosionWritesOnlyWhereUndoSaved
+  )
+  {
+    // Rain digs past the brush: the rectangles undo saves first (HeightBrushRects) cover all it writes.
+    for (const HeightBrushMode mode : {HeightBrushMode::WaterErode, HeightBrushMode::Rain, HeightBrushMode::Deposit}) {
+      Field field = MirroredHills();
+      HeightBrush brush = ErosionBrush(mode);
+      brush.symmetry = Symmetry::LeftRight;
+      faf::editor::ErosionStrokePtr stroke = faf::editor::MakeErosionStroke();
+      for (int step = 0; step < 20; ++step) {
+        const Field before = field;
+        brush.seed = static_cast<std::uint32_t>(step + 1);
+        const float x = 12.0f + static_cast<float>(step);
+        const std::vector<SampleRect> saved = faf::editor::HeightBrushRects(65, 65, x, 20.0f, brush);
+        (void)ApplyHeightBrush(field.words.data(), 65, 65, x, 20.0f, brush, 1.0f / 30.0f, stroke.get());
+        for (int z = 0; z < 65; ++z) {
+          for (int sx = 0; sx < 65; ++sx) {
+            if (field.At(sx, z) == before.At(sx, z)) {
+              continue;
+            }
+            const bool inside = std::any_of(saved.begin(), saved.end(), [&](const SampleRect& r) {
+              return sx >= r.x0 && sx <= r.x1 && z >= r.z0 && z <= r.z1;
+            });
+            ASSERT_TRUE(inside) << "mode " << static_cast<int>(mode) << " wrote " << sx << "," << z << " unsaved";
+          }
+        }
+      }
+    }
+  }
+
+  TEST(
+    HeightBrush,
+    DepositMakesGroundAndRainDigsPastTheBrush
+  )
+  {
+    Field deposit = MirroredHills();
+    const Field start = deposit;
+    HeightBrush brush = ErosionBrush(HeightBrushMode::Deposit);
+    faf::editor::ErosionStrokePtr stroke = faf::editor::MakeErosionStroke();
+    for (int step = 0; step < 30; ++step) {
+      (void)ApplyHeightBrush(deposit.words.data(), 65, 65, 32.0f, 24.0f, brush, 1.0f / 60.0f, stroke.get());
+    }
+    EXPECT_GT(TotalOf(deposit), TotalOf(start) + 128 * 50) << "a heap was laid";
+    EXPECT_GT(deposit.At(32, 24), start.At(32, 24)) << "the centre rose";
+
+    // Rain on the high end of the slope: ground changes farther than the brush's radius from its centre.
+    Field rain = MirroredHills();
+    brush = ErosionBrush(HeightBrushMode::Rain);
+    stroke = faf::editor::MakeErosionStroke();
+    for (int step = 0; step < 60; ++step) {
+      brush.seed = static_cast<std::uint32_t>(step + 1);
+      (void)ApplyHeightBrush(rain.words.data(), 65, 65, 20.0f, 52.0f, brush, 1.0f / 60.0f, stroke.get());
+    }
+    float farthest = 0.0f;
+    for (int z = 0; z < 65; ++z) {
+      for (int x = 0; x < 65; ++x) {
+        if (rain.At(x, z) != start.At(x, z)) {
+          farthest = std::max(farthest, std::hypot(static_cast<float>(x) - 20.0f, static_cast<float>(z) - 52.0f));
+        }
+      }
+    }
+    EXPECT_GT(farthest, brush.radius + 1.0f) << "Rain dug past the brush";
+  }
+
   TEST(
     HeightBrush,
     ErodeLeavesGroundGentlerThanTheTalusAlone
@@ -604,5 +719,210 @@ namespace
       }
     }
     EXPECT_GT(changed, 0);
+  }
+
+  // FAF Studio's modes and shapes (D1c): Plateau, Sharpen, the wide Smooth, smooth Noise, shaped brushes.
+
+  /** The samples within `reach` of (cx, cz) equal those of `other` around (ox, oz), mirrored in x when asked. */
+  ::testing::AssertionResult SameAround(
+    const Field& a,
+    const int cx,
+    const int cz,
+    const Field& b,
+    const int reach
+  )
+  {
+    for (int dz = -reach; dz <= reach; ++dz) {
+      for (int dx = -reach; dx <= reach; ++dx) {
+        if (a.At(cx + dx, cz + dz) != b.At(cx + dx, cz + dz)) {
+          return ::testing::AssertionFailure() << "differs at offset " << dx << "," << dz << ": "
+                                               << a.At(cx + dx, cz + dz) << " vs " << b.At(cx + dx, cz + dz);
+        }
+      }
+    }
+    return ::testing::AssertionSuccess();
+  }
+
+  TEST(
+    HeightBrush,
+    ShapedDabUnderSymmetryIsTheCursorsDabAtEveryCopy
+  )
+  {
+    // The cursor on the right: each group's first member (lowest x) lies by the copy. A turned ridge, and a stamp that
+    // isn't symmetric: around the cursor the result equals the same dab without symmetry, and the copy is its mirror
+    // image (each group is read in the cursor's frame).
+    faf::editor::HeightStamp stamp;
+    stamp.width = 8;
+    stamp.height = 8;
+    for (int i = 0; i < 64; ++i) {
+      stamp.words.push_back(static_cast<std::uint16_t>((i % 8) * 9000 + (i / 8) * 500)); // rises towards +x
+    }
+    for (const bool stamped : {false, true}) {
+      HeightBrush brush;
+      brush.mode = stamped ? HeightBrushMode::Stamp : HeightBrushMode::Raise;
+      brush.stamp = stamped ? &stamp : nullptr;
+      brush.shape = stamped ? faf::editor::BrushShape::Round : faf::editor::BrushShape::Ridge;
+      brush.shapeAngle = 30.0f;
+      brush.radius = 10.0f;
+      brush.strength = 1.0f;
+      Field plain(65, 65, 4000);
+      (void)ApplyHeightBrush(plain.words.data(), 65, 65, 44.0f, 30.0f, brush, 0.1f);
+      Field mirrored(65, 65, 4000);
+      brush.symmetry = Symmetry::LeftRight;
+      (void)ApplyHeightBrush(mirrored.words.data(), 65, 65, 44.0f, 30.0f, brush, 0.1f);
+      EXPECT_TRUE(SameAround(plain, 44, 30, mirrored, 11)) << (stamped ? "stamp" : "ridge");
+      EXPECT_TRUE(CopiesEqual(mirrored, Symmetry::LeftRight));
+      EXPECT_NE(plain.words, Field(65, 65, 4000).words);
+    }
+  }
+
+  TEST(
+    HeightBrush,
+    ShapedDabUnderFourTurnsIsTheCursorsDab
+  )
+  {
+    // The cursor half a turn from the first sector, and a shape that isn't the same turned half a turn.
+    HeightBrush brush;
+    brush.mode = HeightBrushMode::Raise;
+    brush.shape = faf::editor::BrushShape::Mountain;
+    brush.shapeAngle = 20.0f;
+    brush.radius = 8.0f;
+    brush.strength = 1.0f;
+    Field plain(65, 65, 4000);
+    (void)ApplyHeightBrush(plain.words.data(), 65, 65, 16.0f, 22.0f, brush, 0.1f);
+    Field turned(65, 65, 4000);
+    brush.symmetry = Symmetry::NWay;
+    brush.turns = 4;
+    (void)ApplyHeightBrush(turned.words.data(), 65, 65, 16.0f, 22.0f, brush, 0.1f);
+    EXPECT_TRUE(SameAround(plain, 16, 22, turned, 9));
+  }
+
+  TEST(
+    HeightBrush,
+    ShapesStayInTheirSquareAndBetweenZeroAndOne
+  )
+  {
+    using faf::editor::BrushShape;
+    for (int k = 0; k < faf::editor::kBrushShapeCount; ++k) {
+      const auto shape = static_cast<BrushShape>(k);
+      for (int j = -10; j <= 10; ++j) {
+        for (int i = -10; i <= 10; ++i) {
+          const float w = faf::editor::BrushShapeAt(shape, i / 10.0f, j / 10.0f);
+          EXPECT_GE(w, 0.0f) << faf::editor::BrushShapeName(shape);
+          EXPECT_LE(w, 1.0f) << faf::editor::BrushShapeName(shape);
+        }
+      }
+      EXPECT_FLOAT_EQ(faf::editor::BrushShapeAt(shape, 1.0f, 1.0f), 0.0f) << faf::editor::BrushShapeName(shape);
+    }
+    EXPECT_FLOAT_EQ(faf::editor::BrushShapeAt(BrushShape::Ridge, 0.0f, 0.5f), 0.0f) << "a ridge is narrow across";
+    EXPECT_GT(faf::editor::BrushShapeAt(BrushShape::Ridge, 0.7f, 0.0f), 0.9f) << "and long along";
+  }
+
+  TEST(
+    HeightBrush,
+    PlateauLevelsTheMiddleInOneStep
+  )
+  {
+    Field field = Ramp(49, 60);
+    HeightBrush brush;
+    brush.mode = HeightBrushMode::Plateau;
+    brush.radius = 12.0f;
+    brush.falloff = 0.4f;
+    brush.strength = 0.5f;
+    brush.flattenTo = 9000.0f;
+    (void)ApplyHeightBrush(field.words.data(), 49, 49, 24.0f, 24.0f, brush, 1.0f / 60.0f);
+    for (int d = -6; d <= 6; ++d) {
+      EXPECT_EQ(field.At(24 + d, 24), 9000) << "offset " << d;
+    }
+    EXPECT_NE(field.At(24 + 11, 24), 9000) << "the shoulder blends";
+  }
+
+  /** The largest difference between neighbouring samples in a square around (c, c). */
+  int Roughness(
+    const Field& field,
+    const int c,
+    const int reach
+  )
+  {
+    int most = 0;
+    for (int z = c - reach; z <= c + reach; ++z) {
+      for (int x = c - reach; x < c + reach; ++x) {
+        most = std::max(most, std::abs(static_cast<int>(field.At(x + 1, z)) - static_cast<int>(field.At(x, z))));
+      }
+    }
+    return most;
+  }
+
+  TEST(
+    HeightBrush,
+    SharpenIsTheOppositeOfSmoothAndSmoothWidensWithStrength
+  )
+  {
+    std::mt19937 random(5);
+    Field rough(49, 49, 0);
+    for (std::uint16_t& w : rough.words) {
+      w = static_cast<std::uint16_t>(8000 + random() % 600);
+    }
+    HeightBrush brush;
+    brush.radius = 16.0f;
+    brush.falloff = 0.2f;
+    const auto run = [&](const HeightBrushMode mode, const float strength) {
+      Field field = rough;
+      brush.mode = mode;
+      brush.strength = strength;
+      for (int step = 0; step < 10; ++step) {
+        (void)ApplyHeightBrush(field.words.data(), 49, 49, 24.0f, 24.0f, brush, 1.0f / 60.0f);
+      }
+      return Roughness(field, 24, 6);
+    };
+    const int start = Roughness(rough, 24, 6);
+    EXPECT_LT(run(HeightBrushMode::Smooth, 0.3f), start);
+    EXPECT_GT(run(HeightBrushMode::Sharpen, 0.3f), start);
+    // Sharpening feeds on its own result: a second of it at full strength keeps the relief within a few times.
+    {
+      Field field = rough;
+      brush.mode = HeightBrushMode::Sharpen;
+      brush.strength = 1.0f;
+      for (int step = 0; step < 60; ++step) {
+        (void)ApplyHeightBrush(field.words.data(), 49, 49, 24.0f, 24.0f, brush, 1.0f / 60.0f);
+      }
+      EXPECT_LT(Roughness(field, 24, 6), start * 8) << "a second of Sharpen ran away";
+    }
+    // A strong smooth blurs wider, so the same steps leave the ground smoother.
+    EXPECT_LT(run(HeightBrushMode::Smooth, 1.0f), run(HeightBrushMode::Smooth, 0.1f));
+  }
+
+  TEST(
+    HeightBrush,
+    NoiseIsSmoothAndFollowsItsSeed
+  )
+  {
+    HeightBrush brush;
+    brush.mode = HeightBrushMode::Noise;
+    brush.radius = 20.0f;
+    brush.falloff = 0.1f;
+    brush.strength = 1.0f;
+    brush.noiseScale = 8.0f;
+    const auto run = [&](const std::uint32_t seed) {
+      Field field(49, 49, 20000);
+      brush.noiseSeed = seed;
+      for (int step = 0; step < 20; ++step) {
+        (void)ApplyHeightBrush(field.words.data(), 49, 49, 24.0f, 24.0f, brush, 1.0f / 60.0f);
+      }
+      return field;
+    };
+    const Field a = run(1);
+    int lowest = 65535;
+    int highest = 0;
+    for (int z = 14; z <= 34; ++z) {
+      for (int x = 14; x <= 34; ++x) {
+        lowest = std::min(lowest, static_cast<int>(a.At(x, z)));
+        highest = std::max(highest, static_cast<int>(a.At(x, z)));
+      }
+    }
+    EXPECT_GT(highest - lowest, 200) << "the noise made relief";
+    EXPECT_LT(Roughness(a, 24, 10), (highest - lowest) / 2) << "in bumps, not speckle";
+    EXPECT_EQ(run(1).words, a.words) << "the same seed, the same ground";
+    EXPECT_NE(run(2).words, a.words) << "another stroke, another pattern";
   }
 } // namespace

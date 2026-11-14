@@ -29,6 +29,8 @@ add_library(faf_freetype STATIC
   "${FAF_FREETYPE_DIR}/src/base/ftbitmap.c"
   "${FAF_FREETYPE_DIR}/src/base/ftdebug.c"
   "${FAF_FREETYPE_DIR}/src/base/ftinit.c"
+  # Synthetic bold and oblique (FT_GlyphSlot_Embolden / _Oblique): the map editor's panel text (imgui_freetype).
+  "${FAF_FREETYPE_DIR}/src/base/ftsynth.c"
   "${FAF_FREETYPE_DIR}/src/base/ftsystem.c"
   "${FAF_FREETYPE_DIR}/src/cff/cff.c"
   "${FAF_FREETYPE_DIR}/src/psaux/psaux.c"

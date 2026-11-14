@@ -179,6 +179,8 @@ namespace moho
     /**
      * Engine addition (map editor): mounts one more directory at `mountpoint`, after the others, as an init
      * file's MountDirectory does at startup. The editor mounts the map folders it makes this way.
+     * The mounts have no lock (retail mounts only at startup): the caller makes sure no other thread reads
+     * them meanwhile (RULE_FinishPreparingKept, SIM_FinishPreparingLuaState).
      */
     void MountDirectoryLate(const std::filesystem::path& directory, gpg::StrArg mountpoint);
 

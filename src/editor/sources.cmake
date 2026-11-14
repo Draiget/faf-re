@@ -20,12 +20,17 @@ set(FAF_EDITOR_SOURCES
   doc/EdPackage.cpp
   doc/EdWaterPreset.cpp
   doc/EdJson.cpp
+  doc/EdModProject.cpp
+  doc/EdEffectMerge.cpp
+  doc/EdEditorMods.cpp
+  doc/EdScenarioInfo.cpp
   doc/EdLighting.cpp
   doc/EdMarkerPreset.cpp
   doc/EdUnitPreset.cpp
   doc/EdLayerPreset.cpp
   doc/EdPropPaint.cpp
   doc/EdSkybox.cpp
+  doc/EdLooks.cpp
   doc/EdImageChunks.cpp
   tools/EdWaves.cpp
   tools/EdTerrainTypes.cpp
@@ -37,10 +42,75 @@ set(FAF_EDITOR_SOURCES
   doc/EdVault.cpp
   doc/EdHttp.cpp
   doc/EdFafApi.cpp
+  ui/EdControls.cpp
+  ui/EdIconFont.cpp
+  ui/EdCards.cpp
+  tools/EdMapTextures.cpp
+  tools/EdGroundKind.cpp
+  tools/EdMaskGen.cpp
+  tools/EdRecipes.cpp
+  tools/EdTexScale.cpp
+  tools/EdTextureSets.cpp
+  tools/EdSymmetryFollow.cpp
+  tools/EdArrange.cpp
+  tools/EdFindReplace.cpp
+  tools/EdScatter.cpp
+  tools/EdModalTransform.cpp
+  tools/EdWaterMasks.cpp
+  tools/EdErosionSuite.cpp
+  tools/EdScTools.cpp
+  tools/EdTerrainChecks.cpp
+  tools/EdMapLayout.cpp
+  tools/EdLayoutMarkers.cpp
+  tools/EdAlphaGen.cpp
+  tools/EdMission.cpp
+  tools/EdUnitLab.cpp
+  tools/EdAssetCatalog.cpp
+  tools/EdUnitIcon.cpp
+  tools/EdSelectModes.cpp
+  tools/EdInterop.cpp
+  graph/EdTerrainGraph.cpp
+  graph/EdTerrainNodes.cpp
+  ui/EdGenerate.cpp
+  ui/EdLayoutPanel.cpp
+  ui/EdMissionPanel.cpp
+  ui/EdModPanel.cpp
+  ui/EdUnitLabPanel.cpp
+  ui/EdAssetBrowser.cpp
+  ui/EdModHost.cpp
+  ui/EdUnitViewer.cpp
+  ui/EdViewMenu.cpp
   ui/EdMapBrowser.cpp
   doc/EdWaterBodies.cpp
   view/EdWaterBodyView.cpp
   ui/EdHelp.cpp
+  ui/EdCommands.cpp
+  ui/EdKeymap.cpp
+  ui/EdKeysPage.cpp
+  ui/EdWorkspaces.cpp
+  ui/EdStatus.cpp
+  ui/EdSettings.cpp
+  ui/EdHomeModel.cpp
+  ui/EdHomePage.cpp
+  doc/EdAutosave.cpp
+  ui/EdHistory.cpp
+  ui/EdHistoryPanel.cpp
+  ui/EdHelpTopics.cpp
+  ui/EdHelpWindow.cpp
+  ui/EdProblems.cpp
+  ui/EdProblemsPanel.cpp
+  ui/EdCanvasFit.cpp
+  doc/EdLuaApi.cpp
+  EdLuaDebugger.cpp
+  EdDebugRules.cpp
+  ui/EdDebuggerPanel.cpp
+  ui/EdUnitCatalog.cpp
+  ui/EdUnitBrowser.cpp
+  ui/EdWindowChrome.cpp
+  ui/EdTitleBar.cpp
+  ui/EdPalette.cpp
+  ui/EdTheme.cpp
+  ui/EdThemeStyle.cpp
   ui/EdIcons.cpp
   view/EdPropThumbnails.cpp
   ui/EdArmiesPanel.cpp
@@ -50,8 +120,54 @@ set(FAF_EDITOR_SOURCES
   doc/EdRoundTrip.cpp
   tools/EdHeightBrush.cpp
   tools/EdHeightFile.cpp
+  tools/EdBrushLibrary.cpp
+  tools/EdLayerConvert.cpp
   tools/EdMaskBrush.cpp
+  tools/EdShaderProfiles.cpp
+  tools/EdSymmetrize.cpp
+  terrain/EdErosion.cpp
+  terrain/EdFieldCore.cpp
+  terrain/EdFieldEro2.cpp
+  terrain/EdFieldFilt.cpp
+  terrain/EdFieldGen.cpp
+  terrain/EdFieldLand.cpp
+  terrain/EdFieldSc.cpp
+  terrain/EdFieldPath.cpp
+  terrain/EdFieldInterop.cpp
   tools/EdMarkers.cpp
+  tools/EdCameraFrame.cpp
+  tools/EdResize.cpp
+  tools/EdTerrainPath.cpp
+  tools/EdKeptPaths.cpp
+  tools/EdSkeleton.cpp
+  doc/EdJsonTree.cpp
+  view/EdMapScenePaths.cpp
+  ui/EdPathsPanel.cpp
+  tools/EdDetailPass.cpp
+  view/EdMapSceneDetail.cpp
+  ui/EdDetailPanel.cpp
+  tools/EdMissionImport.cpp
+  terrain/gpu/EdGpu.cpp
+  terrain/gpu/EdGpuOps.cpp
+  terrain/gpu/EdGpuErosion.cpp
+  terrain/gpu/EdGpuFieldFilt.cpp
+  terrain/gpu/EdGpuFieldFlow.cpp
+  terrain/gpu/EdGpuFieldIter.cpp
+  terrain/gpu/EdGpuGen.cpp
+  terrain/gpu/EdGpuGenFilt.cpp
+  doc/EdLuaTable.cpp
+  tools/EdUnitWizard.cpp
+  ui/EdUnitWizardPanel.cpp
+  tools/EdScaAnim.cpp
+  view/EdMapSceneUnitPreview.cpp
+  tools/EdMeshData.cpp
+  tools/EdMeshScan.cpp
+  view/EdMapSceneMesh.cpp
+  ui/EdUiQa.cpp
+  ui/EdSelfTests.cpp
+  tools/EdTextureFiles.cpp
+  tools/EdScm.cpp
+  doc/EdPreview.cpp
   tools/EdDecalShape.cpp
   tools/EdDecals.cpp
   tools/EdChecks.cpp
@@ -83,5 +199,18 @@ set(FAF_EDITOR_SOURCES
   undo/EdHeightHistory.cpp
   view/EdMapScene.cpp
   ui/EdImGuiRenderer.cpp
+  ui/EdPopouts.cpp
+  ui/EdAssetPanels.cpp
+  tools/EdMeshImport.cpp
+  tools/EdBuilders.cpp
+  ui/EdStatsPanel.cpp
+  tools/EdMapStats.cpp
+  doc/EdLookMoods.cpp
+  ui/EdFieldsPanel.cpp
+  tools/EdFieldStack.cpp
+  ui/EdTipCheck.cpp
+  ui/EdTipTally.cpp
+  ui/EdFramePacing.cpp
+  doc/EdUserFiles.cpp
   ui/EdInfoPanels.cpp
 )

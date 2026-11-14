@@ -102,6 +102,9 @@ namespace moho
   /** Waits for the build USER_StartSoundEarly started, if any. */
   void USER_FinishSoundEarly();
 
+  /** Whether the build USER_StartSoundEarly started may still be making audio engines. */
+  [[nodiscard]] bool USER_SoundBuildPending();
+
   /**
    * Runs `work` with the user sound manager: on the thread building it while that build runs (after
    * the build, in the order given), here otherwise. For work whose caller needs nothing back, such

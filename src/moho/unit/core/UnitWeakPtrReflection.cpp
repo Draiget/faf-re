@@ -45,8 +45,7 @@ namespace
     if (
       dynamicType && gpg::RTypeOf<moho::Unit>() && dynamicType->IsDerivedFrom(gpg::RTypeOf<moho::Unit>(), &baseOffset)
     ) {
-      out.mObj =
-        reinterpret_cast<void*>(reinterpret_cast<std::uintptr_t>(unit) - static_cast<std::uintptr_t>(baseOffset));
+      out.mObj = gpg::CompleteObject(unit, baseOffset);
       out.mType = dynamicType;
       return out;
     }
@@ -104,12 +103,12 @@ namespace moho
    */
   void WeakPtr_Unit::Deserialize(
     gpg::ReadArchive* const archive,
-    const std::intptr_t objectPtr,
+    void* const objectPtr,
     int,
     gpg::RRef* ownerRef
   )
   {
-    auto* const weak = reinterpret_cast<WeakPtr<Unit>*>(objectPtr);
+    auto* const weak = static_cast<WeakPtr<Unit>*>(objectPtr);
     if (!archive || !weak) {
       return;
     }
@@ -123,12 +122,12 @@ namespace moho
    */
   void WeakPtr_Unit::Serialize(
     gpg::WriteArchive* const archive,
-    const std::intptr_t objectPtr,
+    void* const objectPtr,
     int,
     gpg::RRef* ownerRef
   )
   {
-    auto* const weak = reinterpret_cast<WeakPtr<Unit>*>(objectPtr);
+    auto* const weak = static_cast<WeakPtr<Unit>*>(objectPtr);
     if (!archive || !weak) {
       return;
     }

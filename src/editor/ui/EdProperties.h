@@ -34,6 +34,8 @@ namespace faf::editor
     float heading = 0.0f;
     /** A decal's size (x, z). */
     float size[2] = {0.0f, 0.0f};
+    /** A prop's scale in its file record (x, y, z). */
+    float scale[3] = {1.0f, 1.0f, 1.0f};
     /** A marker's other properties, as `_save.lua` writes them (`STRING( 'x' )`, `FLOAT( 1 )`). */
     std::vector<std::pair<std::string, std::string>> fields;
   };
@@ -51,6 +53,8 @@ namespace faf::editor
       Field,
       /** Props: every selected prop takes the blueprint in `value` (its path), as one undo step. */
       Blueprint,
+      /** Props: every selected prop's scale in the file (values). */
+      Scale,
     };
     What what = What::None;
     float values[3] = {0.0f, 0.0f, 0.0f};

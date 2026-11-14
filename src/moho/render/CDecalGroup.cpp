@@ -247,18 +247,18 @@ namespace moho
 
     mDecals.clear();
 
-    reader.Read(reinterpret_cast<char*>(&mIndex), sizeof(mIndex));
+    reader.Read(&mIndex, sizeof(mIndex));
 
     fa::string name;
     reader.ReadString(&name);
     mName = name;
 
     std::int32_t decalCount = 0;
-    reader.Read(reinterpret_cast<char*>(&decalCount), sizeof(decalCount));
+    reader.Read(&decalCount, sizeof(decalCount));
 
     for (std::int32_t i = 0; i < decalCount; ++i) {
       std::int32_t decalIndex = 0;
-      reader.Read(reinterpret_cast<char*>(&decalIndex), sizeof(decalIndex));
+      reader.Read(&decalIndex, sizeof(decalIndex));
       mDecals.push_back(decalIndex);
     }
   }

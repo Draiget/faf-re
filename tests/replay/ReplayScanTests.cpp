@@ -27,7 +27,7 @@ namespace
     moho::CMessage message(moho::ECmdStreamOp::CMDST_Advance);
     {
       moho::CMessageStream output(message);
-      output.Write(reinterpret_cast<const char*>(&beats), sizeof(beats));
+      output.Write(&beats, sizeof(beats));
     }
     stream.Write(message.mBuff.data(), message.mBuff.size());
   }

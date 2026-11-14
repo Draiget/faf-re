@@ -1,5 +1,6 @@
 #pragma once
 
+#include "editor/ui/EdLayout.h"
 #include "imgui.h"
 
 namespace faf::editor
@@ -13,5 +14,14 @@ namespace faf::editor
   )
   {
     return px * ImGui::GetFontSize() / 16.0f;
+  }
+
+  /** FillHeightFor from where the cursor is now in the current window. */
+  [[nodiscard]] inline float FillHeight(
+    const float reserve,
+    const float minimum
+  )
+  {
+    return FillHeightFor(ImGui::GetContentRegionAvail().y, reserve, minimum);
   }
 } // namespace faf::editor

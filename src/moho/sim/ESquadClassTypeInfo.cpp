@@ -18,7 +18,7 @@ namespace
    * Constructs one static `ESquadClassTypeInfo` object and pre-registers RTTI
    * ownership for `ESquadClass`.
    */
-  [[maybe_unused]] gpg::REnumType* ConstructESquadClassTypeInfo()
+  gpg::REnumType* ConstructESquadClassTypeInfo()
   {
     static moho::ESquadClassTypeInfo sInstance;
     gpg::PreRegisterRType(typeid(moho::ESquadClass), &sInstance);

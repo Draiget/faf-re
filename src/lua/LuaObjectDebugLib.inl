@@ -601,7 +601,7 @@ int LuaDebugAllObjects(
   ++globalState->gcTraversalLockDepth;
 
   for (GCObject* object = globalState->rootgc; object != nullptr; object = object->gch.next) {
-    if (object != reinterpret_cast<GCObject*>(outputTable)) {
+    if (object != valtogco(outputTable)) {
       LuaDebugAppendGcObject(state, outputTable, objectIndex, object);
     }
   }
@@ -742,7 +742,7 @@ std::size_t LuaDebugGetTObjectSize(
 
     // This fork keeps the payload's RType in `len` rather than a byte
     // count, so the size comes from the descriptor.
-    const auto* const payloadType = reinterpret_cast<const gpg::RType*>(userData->len);
+    const auto* const payloadType = userData->type;
     if (payloadType == nullptr) {
       return 0;
     }

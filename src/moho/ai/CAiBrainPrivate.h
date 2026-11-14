@@ -56,7 +56,7 @@
 #include "moho/sim/CInfluenceMap.h"
 #include "moho/sim/SConditionTriggerTypes.h"
 #include "moho/sim/CEconStorage.h"
-#include "moho/sim/CSimArmyEconomyInfo.h"
+#include "moho/sim/CEconomy.h"
 #include "moho/sim/COGrid.h"
 #include "moho/sim/EAllianceTypeInfo.h"
 #include "moho/sim/CPlatoon.h"
@@ -287,12 +287,12 @@ namespace
      */
     static void SerLoad(
       gpg::ReadArchive* const archive,
-      const std::intptr_t objectPtr,
+      void* const objectPtr,
       const int,
       gpg::RRef* const ownerRef
     )
     {
-      auto* const mapObject = reinterpret_cast<BuildReserveMapStorage*>(objectPtr);
+      auto* const mapObject = static_cast<BuildReserveMapStorage*>(objectPtr);
       if (!archive || !mapObject) {
         return;
       }
@@ -334,12 +334,12 @@ namespace
      */
     static void SerSave(
       gpg::WriteArchive* const archive,
-      const std::intptr_t objectPtr,
+      void* const objectPtr,
       const int,
       gpg::RRef* const ownerRef
     )
     {
-      const auto* const mapObject = reinterpret_cast<const BuildReserveMapStorage*>(objectPtr);
+      const auto* const mapObject = static_cast<const BuildReserveMapStorage*>(objectPtr);
       if (!archive || !mapObject) {
         return;
       }

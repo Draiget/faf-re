@@ -4,6 +4,7 @@
 // game's UI Lua, changed through the sim's own Lua (view/EdLiveUnits).
 
 #include <algorithm>
+#include "editor/ui/EdControls.h"
 #include <cctype>
 #include <cstdio>
 #include <map>
@@ -86,7 +87,7 @@ namespace faf::editor
       ImGui::SameLine(labelWidth + ImGui::GetStyle().WindowPadding.x);
     };
 
-    if (ImGui::CollapsingHeader("State##live", ImGuiTreeNodeFlags_DefaultOpen)) {
+    if (Section("State##live")) {
       // Health: dragged, set when let go.
       static float health = 0.0f;
       static bool editingHealth = false;
@@ -97,7 +98,7 @@ namespace faf::editor
       ImGui::SetNextItemWidth(
         -ImGui::CalcTextSize("Full").x - ImGui::GetStyle().FramePadding.x * 2.0f - ImGui::GetStyle().ItemSpacing.x
       );
-      ImGui::SliderFloat("##health", &health, 1.0f, std::max(info.maxHealth, 1.0f), "%.0f");
+      FillSliderFloat("##health", &health, 1.0f, std::max(info.maxHealth, 1.0f), "%.0f");
       editingHealth = ImGui::IsItemActive();
       if (ImGui::IsItemDeactivatedAfterEdit()) {
         char lua[96];
@@ -108,12 +109,12 @@ namespace faf::editor
       if (ImGui::Button("Full")) {
         each("u:SetHealth(u, u:GetMaxHealth())");
       }
-      ImGui::SetItemTooltip("Health to its most (%.0f)", static_cast<double>(info.maxHealth));
+      EdSetItemTooltip("Health to its most (%.0f)", static_cast<double>(info.maxHealth));
       // Veterancy: FAF's veterancy component (SetVeterancy), levels 0 to 5.
       row("Veterancy");
       int vet = info.veteran;
       ImGui::SetNextItemWidth(-1.0f);
-      if (ImGui::SliderInt("##vet", &vet, 0, 5, vet == 0 ? "none" : "level %d")) {
+      if (FillSliderInt("##vet", &vet, 0, 5, vet == 0 ? "none" : "level %d")) {
         char lua[96];
         (void)std::snprintf(lua, sizeof(lua), "if u.SetVeterancy then u:SetVeterancy(%d) end", vet);
         each(lua);
@@ -121,7 +122,7 @@ namespace faf::editor
     }
 
     // Toggles the blueprint has: the game's own switches (as the order panel's).
-    if (!info.toggles.empty() && ImGui::CollapsingHeader("Toggles##live", ImGuiTreeNodeFlags_DefaultOpen)) {
+    if (!info.toggles.empty() && Section("Toggles##live")) {
       for (const LiveUnitInfo::Toggle& toggle : info.toggles) {
         // The game's script bit: set means off for the shield, intel, jamming, production, stealth and cloak switches
         // (setting the shield's bit disables it), so those show "on" while the bit is clear; the weapon, generic and
@@ -134,7 +135,7 @@ namespace faf::editor
           const bool bit = inverted ? !on : on;
           each("u:SetScriptBit('" + toggle.cap + "', " + (bit ? "true" : "false") + ")");
         }
-        ImGui::SetItemTooltip(
+        EdSetItemTooltip(
           "%s: the unit's script bit %s, as the game's order button sets it",
           toggle.cap.c_str(),
           toggle.on ? "set" : "clear"
@@ -143,7 +144,7 @@ namespace faf::editor
     }
 
     // Enhancements by slot: has it, add, remove (through its <name>Remove where the blueprint has one).
-    if (!info.enhancements.empty() && ImGui::CollapsingHeader("Enhancements##live", ImGuiTreeNodeFlags_DefaultOpen)) {
+    if (!info.enhancements.empty() && Section("Enhancements##live")) {
       std::map<std::string, std::vector<const LiveUnitInfo::Enhancement*>> slots;
       for (const LiveUnitInfo::Enhancement& e : info.enhancements) {
         slots[e.slot.empty() ? std::string("(no slot)") : e.slot].push_back(&e);
@@ -159,7 +160,7 @@ namespace faf::editor
           }
           ImGui::EndDisabled();
           if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-            ImGui::SetTooltip(
+            EdSetTooltip(
               "%s%s%s",
               e->has ? (e->removable ? "Click to take it off (its Remove enhancement)"
                                      : "The blueprint has no way to take it off")
@@ -173,16 +174,16 @@ namespace faf::editor
       }
     }
 
-    if (ImGui::CollapsingHeader("Actions##live", ImGuiTreeNodeFlags_DefaultOpen)) {
+    if (Section("Actions##live")) {
       if (ImGui::Button("Kill")) {
         each("u:Kill()");
       }
-      ImGui::SetItemTooltip("Dies as in the game (its wreck and death effects)");
+      EdSetItemTooltip("Dies as in the game (its wreck and death effects)");
       ImGui::SameLine();
       if (ImGui::Button("Remove")) {
         each("u:Destroy()");
       }
-      ImGui::SetItemTooltip("Taken out of the game at once, no wreck");
+      EdSetItemTooltip("Taken out of the game at once, no wreck");
     }
     HelpNote(
       "The game's own unit, live in the running play: a drag in the view moves it (Warp), and each change here is "

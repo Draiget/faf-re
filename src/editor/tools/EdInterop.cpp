@@ -1,0 +1,304 @@
+#include "editor/tools/EdInterop.h"
+
+#include <cctype>
+
+#include <algorithm>
+#include <cmath>
+#include <cstdio>
+#include <filesystem>
+
+namespace faf::editor
+{
+  HeightImage OrientHeights(
+    const HeightImage& image,
+    const bool flipX,
+    const bool flipZ,
+    int turns
+  )
+  {
+    HeightImage out = image;
+    if (image.width <= 0 || image.height <= 0) {
+      return out;
+    }
+    const auto at = [](const HeightImage& img, const int x, const int z) {
+      return img.words[static_cast<std::size_t>(z) * img.width + x];
+    };
+    if (flipX || flipZ) {
+      for (int z = 0; z < image.height; ++z) {
+        for (int x = 0; x < image.width; ++x) {
+          out.words[static_cast<std::size_t>(z) * image.width + x] =
+            at(image, flipX ? image.width - 1 - x : x, flipZ ? image.height - 1 - z : z);
+        }
+      }
+    }
+    turns = ((turns % 4) + 4) % 4;
+    for (int t = 0; t < turns; ++t) {
+      // A quarter turn clockwise: the new (x, z) is the old (z, width-1-x) seen from above with z down.
+      HeightImage turned;
+      turned.width = out.height;
+      turned.height = out.width;
+      turned.words.resize(out.words.size());
+      for (int z = 0; z < turned.height; ++z) {
+        for (int x = 0; x < turned.width; ++x) {
+          turned.words[static_cast<std::size_t>(z) * turned.width + x] = at(out, z, out.height - 1 - x);
+        }
+      }
+      out = std::move(turned);
+    }
+    return out;
+  }
+
+  void HeightImageRange(
+    const HeightImage& image,
+    std::uint16_t& darkest,
+    std::uint16_t& brightest
+  )
+  {
+    darkest = 65535;
+    brightest = 0;
+    for (const std::uint16_t w : image.words) {
+      darkest = std::min(darkest, w);
+      brightest = std::max(brightest, w);
+    }
+    if (image.words.empty()) {
+      darkest = 0;
+    }
+  }
+
+  std::vector<std::uint16_t> ImportedHeights(
+    const HeightImage& image,
+    const std::vector<std::uint16_t>& current,
+    const int width,
+    const int height,
+    const ImportSettings& s
+  )
+  {
+    std::vector<std::uint16_t> out = current;
+    if (
+      image.words.empty() || width <= 0 || height <= 0 || current.size() != static_cast<std::size_t>(width) * height
+    ) {
+      return out;
+    }
+    // The part that takes the import: the region (clipped to the map), else all of it.
+    const int x0 = s.region ? std::clamp(std::min(s.regionX0, s.regionX1), 0, width - 1) : 0;
+    const int x1 = s.region ? std::clamp(std::max(s.regionX0, s.regionX1), 0, width - 1) : width - 1;
+    const int z0 = s.region ? std::clamp(std::min(s.regionZ0, s.regionZ1), 0, height - 1) : 0;
+    const int z1 = s.region ? std::clamp(std::max(s.regionZ0, s.regionZ1), 0, height - 1) : height - 1;
+    const int rw = x1 - x0 + 1;
+    const int rh = z1 - z0 + 1;
+    const HeightImage fitted = ResampleHeights(OrientHeights(image, s.flipX, s.flipZ, s.turns), rw, rh, s.filter);
+    std::uint16_t darkest = 0, brightest = 0;
+    HeightImageRange(fitted, darkest, brightest);
+    const float span = std::max(1.0f, static_cast<float>(brightest - darkest));
+    const float strength = std::clamp(s.strength, 0.0f, 1.0f);
+    for (int z = z0; z <= z1; ++z) {
+      for (int x = x0; x <= x1; ++x) {
+        const std::size_t k = static_cast<std::size_t>(z) * width + x;
+        const float word = static_cast<float>(fitted.words[static_cast<std::size_t>(z - z0) * rw + (x - x0)]);
+        // The image's value as a height in map units.
+        const float units = s.mapping == ImportSettings::Mapping::Normalised
+          ? s.low + (word - static_cast<float>(darkest)) / span * (s.high - s.low)
+          : word * s.scale / 128.0f;
+        const float now = static_cast<float>(current[k]) / 128.0f;
+        float result = units;
+        switch (s.blend) {
+        case ImportSettings::Blend::Add:
+          // On top of the map's: the import's lowest point adds nothing.
+          result = now + units - (s.mapping == ImportSettings::Mapping::Normalised ? s.low : 0.0f);
+          break;
+        case ImportSettings::Blend::Max:
+          result = std::max(now, units);
+          break;
+        case ImportSettings::Blend::Min:
+          result = std::min(now, units);
+          break;
+        default:
+          break;
+        }
+        // The feather: in from the edge, a smooth fade from nothing to all.
+        float weight = strength;
+        if (s.feather > 0.0f) {
+          const float in = static_cast<float>(std::min({x - x0, x1 - x, z - z0, z1 - z}));
+          const float t = std::clamp(in / s.feather, 0.0f, 1.0f);
+          weight *= t * t * (3.0f - 2.0f * t);
+        }
+        result = now + (result - now) * weight;
+        out[k] = static_cast<std::uint16_t>(std::clamp(std::lround(result * 128.0f), 0L, 65535L));
+      }
+    }
+    return out;
+  }
+
+  std::string ExportSheet(
+    const ExportFacts& f
+  )
+  {
+    constexpr double kMetresPerUnit = 1000.0 / 51.2; // 20 km = 1024 units
+    const double widthKm = f.mapWidth / 51.2;
+    const double depthKm = f.mapHeight / 51.2;
+    const double lowM = f.lowest * kMetresPerUnit;
+    const double highM = f.highest * kMetresPerUnit;
+    char text[2048];
+    (void)std::snprintf(
+      text,
+      sizeof(text),
+      "Heightmap of %s for Gaea / World Machine\n"
+      "==========================================\n\n"
+      "Map: %d x %d units = %.2f x %.2f km (a unit is %.2f m).\n"
+      "Image: %d x %d samples, 16-bit, corners on the map's corners, the top row is the map's top (z = 0).\n"
+      "Heights now: %.2f to %.2f units = %.0f to %.0f m; sea level %.2f units (%.0f m).\n"
+      "The image's words are the heights times %.3f: word / %.1f = height in units.\n\n"
+      "Gaea: Terrain > Scale %.2f km, Height %.0f m; export the heightmap as 16-bit PNG or .r32 at %d.\n"
+      "World Machine: Extents %.2f x %.2f km, Elevation range %.0f m; export .r16 or 16-bit PNG at %d.\n"
+      "Import back in the editor's Terrain > Import / Export with the same scale (Live link re-reads the file).\n",
+      f.map.c_str(),
+      f.mapWidth,
+      f.mapHeight,
+      widthKm,
+      depthKm,
+      kMetresPerUnit,
+      f.imageWidth,
+      f.imageHeight,
+      static_cast<double>(f.lowest),
+      static_cast<double>(f.highest),
+      lowM,
+      highM,
+      static_cast<double>(f.sea),
+      f.sea * kMetresPerUnit,
+      static_cast<double>(f.scale),
+      128.0 * f.scale,
+      widthKm,
+      std::max(1.0, highM),
+      f.imageWidth,
+      widthKm,
+      depthKm,
+      std::max(1.0, highM),
+      f.imageWidth
+    );
+    return text;
+  }
+
+  std::string FindNamedMask(
+    const std::vector<std::string>& files,
+    const std::string& name
+  )
+  {
+    const auto lower = [](std::string text) {
+      for (char& c : text) {
+        c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+      }
+      return text;
+    };
+    const std::string wanted = lower(name);
+    if (wanted.empty()) {
+      return {};
+    }
+    for (const std::string& file : files) {
+      const std::size_t slash = file.find_last_of("/\\");
+      const std::string base = lower(slash == std::string::npos ? file : file.substr(slash + 1));
+      const std::size_t dot = base.find_last_of('.');
+      if (dot == std::string::npos) {
+        continue;
+      }
+      const std::string stem = base.substr(0, dot);
+      const std::string extension = base.substr(dot);
+      if (
+        extension != ".png" && extension != ".tif" && extension != ".tiff" && extension != ".r16" &&
+        extension != ".raw" && extension != ".r32" && extension != ".bmp"
+      ) {
+        continue;
+      }
+      if (stem == wanted) {
+        return file;
+      }
+      if (stem.size() > wanted.size() && stem.compare(stem.size() - wanted.size(), wanted.size(), wanted) == 0) {
+        const char before = stem[stem.size() - wanted.size() - 1];
+        if (before == '_' || before == '-' || before == ' ' || before == '.') {
+          return file;
+        }
+      }
+    }
+    return {};
+  }
+
+  std::string ExportSidecar(
+    const ExportFacts& f
+  )
+  {
+    // Hand written: a few fields, and the strings are map and symmetry names (no quotes or backslashes in them).
+    const auto quoted = [](const std::string& text) {
+      std::string out = "\"";
+      for (const char c : text) {
+        if (c == '"' || c == '\\') {
+          out += '\\';
+        }
+        out += c;
+      }
+      return out + "\"";
+    };
+    char text[1024];
+    (void)std::snprintf(
+      text,
+      sizeof(text),
+      "{\n"
+      "  \"map\": %s,\n"
+      "  \"mapSize\": [%d, %d],\n"
+      "  \"imageSize\": [%d, %d],\n"
+      "  \"heightPerWord\": %.9g,\n"
+      "  \"lowest\": %.3f,\n"
+      "  \"highest\": %.3f,\n"
+      "  \"seaLevel\": %.3f,\n"
+      "  \"symmetry\": %s,\n"
+      "  \"howToRead\": \"height in map units = word * heightPerWord; the image's top row is the map's top (z = 0)\"\n"
+      "}\n",
+      quoted(f.map).c_str(),
+      f.mapWidth,
+      f.mapHeight,
+      f.imageWidth,
+      f.imageHeight,
+      static_cast<double>(1.0f / (128.0f * std::max(1e-6f, f.scale))),
+      static_cast<double>(f.lowest),
+      static_cast<double>(f.highest),
+      static_cast<double>(f.sea),
+      quoted(f.symmetry).c_str()
+    );
+    return text;
+  }
+
+  FileStamp StampOf(
+    const std::string& file
+  )
+  {
+    FileStamp stamp;
+    std::error_code error;
+    const std::filesystem::path path(file);
+    if (file.empty() || !std::filesystem::is_regular_file(path, error)) {
+      return stamp;
+    }
+    stamp.size = std::filesystem::file_size(path, error);
+    stamp.written = static_cast<long long>(std::filesystem::last_write_time(path, error).time_since_epoch().count());
+    return stamp;
+  }
+
+  bool LiveLink::Poll(
+    const FileStamp& now,
+    const double seconds,
+    const double settle
+  ) noexcept
+  {
+    if (now.written == 0) {
+      return false; // gone (a tool saving by delete and write): wait for it
+    }
+    if (!(now == mSeen)) {
+      mSeen = now;
+      mSince = seconds;
+      return false;
+    }
+    if (now == mApplied || mSince < 0.0 || seconds - mSince < settle) {
+      return false;
+    }
+    mApplied = now;
+    mSince = -1.0;
+    return true;
+  }
+} // namespace faf::editor

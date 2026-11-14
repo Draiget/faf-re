@@ -177,7 +177,7 @@ namespace
       return false;
     }
 
-    return showQueueCategory->ContainsBit(blueprint->mCategoryBitIndex);
+    return showQueueCategory->ContainsBit(blueprint->mBlueprintOrdinal);
   }
 
   [[nodiscard]] const UserCommandQueue* SelectActiveQueue(

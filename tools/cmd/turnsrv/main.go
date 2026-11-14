@@ -2,7 +2,7 @@
 // outside mpemu and fafclient: it prints the URLs and one set of REST
 // credentials, then serves until interrupted.
 //
-//	turnsrv [-ip 192.168.1.2] [-port 3478] [-for 60s]
+//	turnsrv [-ip 192.0.2.10] [-port 3478] [-for 60s]
 package main
 
 import (

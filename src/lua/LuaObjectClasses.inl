@@ -136,19 +136,6 @@ __declspec(naked) void __stdcall LuaStateSlotLoadBufferBridge(
 #endif // _M_IX86
 
 /**
- * Address: 0x004CCAB0 (FUN_004CCAB0)
- *
- * What it does:
- * Pops one value from a Lua stack slot by rebasing top to `-2`.
- */
-[[maybe_unused]] static void LuaStateSlotPopOne(
-  lua_State** const stateSlot
-)
-{
-  lua_settop(*stateSlot, -2);
-}
-
-/**
  * Address: 0x004CCA10 (FUN_004CCA10, LuaPlus::LuaState::PushNil)
  *
  * What it does:
@@ -532,7 +519,7 @@ void LuaObject::AddToUsedObjectList(
   m_next = root->m_headObject.m_next;
   root->m_headObject.m_next = this;
   m_next->m_prev = reinterpret_cast<LuaObject**>(this);
-  m_prev = reinterpret_cast<LuaObject**>(&root->m_headObject.m_next);
+  m_prev = (&root->m_headObject.m_next);
   m_object = *object;
 }
 
@@ -583,7 +570,7 @@ void LuaObject::AddToUsedList(
   m_next = root->m_headObject.m_next;
   root->m_headObject.m_next = this;
   m_next->m_prev = reinterpret_cast<LuaObject**>(this);
-  m_prev = reinterpret_cast<LuaObject**>(&root->m_headObject.m_next);
+  m_prev = (&root->m_headObject.m_next);
 }
 
 /**
@@ -800,8 +787,8 @@ gpg::RRef LuaObject::GetUserData() const
   auto* const userdata = static_cast<Udata*>(m_object.value.p);
 
   gpg::RRef out{};
-  out.mObj = reinterpret_cast<std::uint8_t*>(userdata) + sizeof(Udata);
-  out.mType = reinterpret_cast<gpg::RType*>(userdata->len);
+  out.mObj = userdata->Payload();
+  out.mType = userdata->type;
   return out;
 }
 
@@ -1761,25 +1748,6 @@ namespace
   static_assert(sizeof(OwnerWordWritePair) == 0x08, "OwnerWordWritePair size must be 0x08");
 
   /**
-   * Address: 0x00929BE0 (FUN_00929BE0)
-   *
-   * What it does:
-   * Stores one 32-bit value into owner field `+0x44` (`+0x68` bytes) and
-   * returns the owner pointer lane.
-   */
-  [[maybe_unused]] OwnerWordLaneAt68* StoreOwnerWordLaneAt68(
-    OwnerWordWritePair* const writePair
-  )
-  {
-    if (writePair == nullptr || writePair->owner == nullptr) {
-      return nullptr;
-    }
-
-    writePair->owner->lane44 = writePair->value;
-    return writePair->owner;
-  }
-
-  /**
    * Address: 0x009284D0 (FUN_009284D0)
    *
    * IDA signature:
@@ -1799,7 +1767,7 @@ namespace
   )
   {
     if (object->tt == LUA_TTABLE) {
-      static_cast<Table*>(object->value.p)->metatable = reinterpret_cast<Table*>(metatableObject);
+      static_cast<Table*>(object->value.p)->metatable = &metatableObject->h;
       faf_lua51_gc_barrier_f(
         state, static_cast<GCObject*>(object->value.p), metatableObject
       ); // Lua 5.1.5 lapi.c: setmetatable barrier
@@ -1807,7 +1775,7 @@ namespace
     }
 
     if (object->tt == LUA_TUSERDATA) {
-      static_cast<Udata*>(object->value.p)->metatable = reinterpret_cast<Table*>(metatableObject);
+      static_cast<Udata*>(object->value.p)->metatable = &metatableObject->h;
       faf_lua51_gc_barrier_f(
         state, static_cast<GCObject*>(object->value.p), metatableObject
       ); // Lua 5.1.5 lapi.c: setmetatable barrier
@@ -2485,7 +2453,7 @@ void LuaObject::Register(
     closure->c.upvalue[upvalueIndex] = closureState->top[upvalueIndex];
     faf_lua51_gc_barrier_value(
       closureState,
-      reinterpret_cast<GCObject*>(closure),
+      valtogco(closure),
       &closure->c.upvalue[upvalueIndex]
     ); // Lua 5.1.5 lapi.c: lua_pushcclosure()
     closureState->top[upvalueIndex].tt = 0;

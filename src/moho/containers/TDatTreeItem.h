@@ -3,41 +3,38 @@
 
 namespace moho
 {
-  // Intrusive tree base used by Moho. The template param is the *final* type.
-  // Layout is inferred; use as a view. No virtuals here (StatItem vtable has only 2 slots).
+  /**
+   * Intrusive tree base: each item sits in its parent's circular child list and
+   * heads its own. `T` is the most-derived type; the base follows its vptr, so
+   * the offsets below are the derived object's.
+   */
   template <class T>
   struct TDatTreeItem
   {
-    // NOTE: In the real binary this base sits right after the most-derived vptr.
-    // Offsets below are relative to the *most-derived* object base (ECX).
+    /** One link of a circular list: an item's place among its siblings, or a list head. */
+    struct Link
+    {
+      Link* mPrev;
+      Link* mNext;
+    };
 
-    // 0x04..0x23 - eight dwords; most plausible mapping for an intrusive tree:
-    // T* parent;      // 0x04
-    // T* firstChild;  // 0x08
-    // T* lastChild;   // 0x0C
-    // T* nextSibling; // 0x10
-    // T* prevSibling; // 0x14
-    // int32_t  childCount;  // 0x18
-    // int32_t  flags;       // 0x1C   // unknown bitfield (visibility/sort/etc.)
-    // int32_t  userData;    // 0x20   // unknown (often an index/order/id)
+    /** An item's own link, with its parent and the item itself. */
+    struct Node : Link
+    {
+      T* mParent;
+      T* mOwner;
+    };
 
-    // After this base, your StatItem-specific fields continue, e.g.:
-    // 0x24: int/float storage (interpreted by getters)
-    // 0x78: MSVC8 std::string Name (SSO < 16)
-    // 0x90: uint32_t valueType (0=float,1=int,2=string)
-    // 0x94: uint32_t useCurrent (==1)
-    // 0x98: void* criticalSection
-    // 0x9C: uint8_t lockMode
+    /** The item a sibling link belongs to (every link but a list head is a `Node`). */
+    [[nodiscard]] static T* OwnerOf(
+      Link* const link
+    ) noexcept
+    {
+      return static_cast<Node*>(link)->mOwner;
+    }
 
-    // head #1 (children) sentinel at +0x04
-    void* head1Prev; // +0x04
-    void* head1Next; // +0x08
-    T* parent;       // +0x0C
-    T* owner1;       // +0x10
-
-    // head #2 (aux) sentinel at +0x14
-    void* head2Prev; // +0x14
-    void* head2Next; // +0x18
-    T* owner2;       // +0x1C
+    Node mSiblings; // +0x04 prev, +0x08 next, +0x0C parent, +0x10 owner
+    Link mChildren; // +0x14 head of the child list
+    T* mChildOwner; // +0x1C
   };
 } // namespace moho

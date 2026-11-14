@@ -361,7 +361,7 @@ bool Unit::CanBuild(
   const EntityCategorySet& unitBlueprintBuildCategories = GetBlueprint()->Economy.CategoryCache;
   const EntityCategorySet& unitBuildRestrictions = GetAttributes().restrictionCategory;
 
-  const std::uint32_t categoryBitIndex = blueprint->mCategoryBitIndex;
+  const std::uint32_t categoryBitIndex = blueprint->mBlueprintOrdinal;
   return armyBuildCategories.ContainsBit(categoryBitIndex) &&
     unitBlueprintBuildCategories.ContainsBit(categoryBitIndex) && !unitBuildRestrictions.ContainsBit(categoryBitIndex);
 }
@@ -384,7 +384,7 @@ bool Unit::CanStartBuilding(
     return false;
   }
 
-  const CSimArmyEconomyInfo* const economyInfo = ArmyRef->GetEconomy();
+  const CEconomy* const economyInfo = ArmyRef->GetEconomy();
   if (economyInfo == nullptr) {
     return false;
   }
@@ -392,7 +392,7 @@ bool Unit::CanStartBuilding(
   // The tests are written the way the binary's branches read (0x0062D7A5..0x0062D7DB), not simplified: its comiss
   // leaves a NaN passing each of them, and an army's income can be NaN (replay 26939667, where a factory waited a tick
   // too long on a NaN mass income).
-  const SEconTotals& totals = economyInfo->economy;
+  const SEconTotals& totals = economyInfo->mTotals;
   if (!(kBuildResourceEpsilon >= totals.mStored.ENERGY) && !(kBuildResourceEpsilon >= totals.mStored.MASS)) {
     return true;
   }

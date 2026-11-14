@@ -122,14 +122,14 @@ void ZLibOutputFilterStream::DoWrite(
       }
 
       const size_t produced = static_cast<size_t>(mZStream.next_out - out);
-      mPipeStream->Write(reinterpret_cast<const char*>(out), produced);
+      mPipeStream->Write(out, produced);
     }
 
     if (result != Z_BUF_ERROR) {
       if (result == Z_STREAM_END) {
         mEnded = true;
         const size_t produced = static_cast<size_t>(mZStream.next_out - out);
-        mPipeStream->Write(reinterpret_cast<const char*>(out), produced);
+        mPipeStream->Write(out, produced);
         if (mZStream.avail_in == 0) {
           return;
         }
@@ -143,7 +143,7 @@ void ZLibOutputFilterStream::DoWrite(
     }
 
     const size_t produced = static_cast<size_t>(mZStream.next_out - out);
-    mPipeStream->Write(reinterpret_cast<const char*>(out), produced);
+    mPipeStream->Write(out, produced);
   }
 
   if (mZStream.avail_in != 0) {

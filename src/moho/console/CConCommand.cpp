@@ -1842,7 +1842,9 @@ namespace
   CConFunc gCConFunc_CON_ExecuteLastCommand(
     "CON_ExecuteLastCommand",
     kConsoleStartupConExecuteLastCommandDescription,
-    reinterpret_cast<CConFunc::Callback>(&moho::CON_ExecuteLastCommand)
+    [](const fa::vector<fa::string>&) {
+      moho::CON_ExecuteLastCommand();
+    }
   );
 
   /**

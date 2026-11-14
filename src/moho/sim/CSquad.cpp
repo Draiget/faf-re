@@ -260,7 +260,7 @@ namespace moho
       }
 
       const RUnitBlueprint* const blueprint = unit->GetBlueprint();
-      if (categorySet->Bits().Contains(blueprint->mCategoryBitIndex)) {
+      if (categorySet->Bits().Contains(blueprint->mBlueprintOrdinal)) {
         ++count;
       }
     }
@@ -454,7 +454,7 @@ namespace moho
       }
 
       const RUnitBlueprint* const blueprint = unit->GetBlueprint();
-      if (!categorySet->Bits().Contains(blueprint->mCategoryBitIndex)) {
+      if (!categorySet->Bits().Contains(blueprint->mBlueprintOrdinal)) {
         continue;
       }
 

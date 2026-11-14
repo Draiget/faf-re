@@ -15,7 +15,7 @@ namespace
    * What it does:
    * Stores active cursor hotspot `(x,y)` lanes.
    */
-  [[maybe_unused]] CMauiCursor* SetCursorHotspotXY(
+  CMauiCursor* SetCursorHotspotXY(
     CMauiCursor* const cursor,
     const std::int32_t hotspotX,
     const std::int32_t hotspotY
@@ -32,7 +32,7 @@ namespace
    * What it does:
    * Stores default cursor hotspot `(x,y)` lanes.
    */
-  [[maybe_unused]] CMauiCursor* SetCursorDefaultHotspotXY(
+  CMauiCursor* SetCursorDefaultHotspotXY(
     CMauiCursor* const cursor,
     const std::int32_t hotspotX,
     const std::int32_t hotspotY

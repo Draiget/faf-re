@@ -346,913 +346,94 @@ namespace
   }
 
   /**
-   * Address: 0x008E1D00 (FUN_008E1D00, RIntType_char::NewRef)
+   * Every reflected integer type binds the same six value-ref callbacks; the
+   * binary emits one copy per type:
+   *   0x008E1D00 RIntType_char::NewRef
+   *   0x008E1DC0 RIntType_char::CtrRef
+   *   0x008E1D30 RIntType_char::CpyRef
+   *   0x008E1DF0 RIntType_char::MovRef
+   *   0x008DDA40 RIntType_char::Delete
+   *   0x008DDA50 RIntType_char::Destruct
+   *   0x008E1E70 RIntType_short::NewRef
+   *   0x008E1F30 RIntType_short::CtrRef
+   *   0x008E1EA0 RIntType_short::CpyRef
+   *   0x008E1F60 RIntType_short::MovRef
+   *   0x008DDC90 RIntType_short::Delete
+   *   0x008DDCA0 RIntType_short::Destruct
+   *   0x008E1FE0 RIntType_int::NewRef
+   *   0x008E20A0 RIntType_int::CtrRef
+   *   0x008E2010 RIntType_int::CpyRef
+   *   0x008E20D0 RIntType_int::MovRef
+   *   0x008DDF00 RIntType_int::Delete
+   *   0x008DDF10 RIntType_int::Destruct
+   *   0x008E2150 RIntType_long::NewRef
+   *   0x008E2210 RIntType_long::CtrRef
+   *   0x008E2180 RIntType_long::CpyRef
+   *   0x008E2240 RIntType_long::MovRef
+   *   0x008DE0B0 RIntType_long::Delete
+   *   0x008DE0C0 RIntType_long::Destruct
+   *   0x008E22C0 RIntType_schar::NewRef
+   *   0x008E2380 RIntType_schar::CtrRef
+   *   0x008E22F0 RIntType_schar::CpyRef
+   *   0x008E23B0 RIntType_schar::MovRef
+   *   0x008DE310 RIntType_schar::Delete
+   *   0x008DE320 RIntType_schar::Destruct
+   *   0x008E2430 RIntType_uchar::NewRef
+   *   0x008E24F0 RIntType_uchar::CtrRef
+   *   0x008E2460 RIntType_uchar::CpyRef
+   *   0x008E2520 RIntType_uchar::MovRef
+   *   0x008DE570 RIntType_uchar::Delete
+   *   0x008DE580 RIntType_uchar::Destruct
+   *   0x008E25A0 RIntType_ushort::NewRef
+   *   0x008E2660 RIntType_ushort::CtrRef
+   *   0x008E25D0 RIntType_ushort::CpyRef
+   *   0x008E2690 RIntType_ushort::MovRef
+   *   0x008DE7C0 RIntType_ushort::Delete
+   *   0x008DE7D0 RIntType_ushort::Destruct
+   *   0x008E2710 RIntType_uint::NewRef
+   *   0x008E27D0 RIntType_uint::CtrRef
+   *   0x008E2740 RIntType_uint::CpyRef
+   *   0x008E2800 RIntType_uint::MovRef
+   *   0x008DEA30 RIntType_uint::Delete
+   *   0x008DEA40 RIntType_uint::Destruct
+   *   0x008E2880 RIntType_ulong::NewRef
+   *   0x008E2940 RIntType_ulong::CtrRef
+   *   0x008E28B0 RIntType_ulong::CpyRef
+   *   0x008E2970 RIntType_ulong::MovRef
+   *   0x008DEC80 RIntType_ulong::Delete
+   *   0x008DEC90 RIntType_ulong::Destruct
+   *   0x008E2C30 (binds one callback subset)
+   *   0x008E2C60 (binds one callback subset)
+   *   0x008E2C90 (binds one callback subset)
+   *   0x008E2CC0 (binds one callback subset)
+   *   0x008E2CF0 (binds one callback subset)
+   *   0x008E2D20 (binds one callback subset)
+   *   0x008E2D50 (binds one callback subset)
+   *   0x008E2D80 (binds one callback subset)
+   *   0x008E2DB0 (binds one callback subset)
+   *   0x008E2DE0 (binds one callback subset)
+   *   0x008E2E10 (binds one callback subset)
+   *   0x008E2E40 (binds one callback subset)
+   *   0x008E2E70 (binds one callback subset)
+   *   0x008E2EA0 (binds one callback subset)
+   *   0x008E2ED0 (binds one callback subset)
+   *   0x008E2F00 (binds one callback subset)
+   *   0x008E2F30 (binds one callback subset)
+   *   0x008E2F60 (binds one callback subset)
    */
-  [[nodiscard]] gpg::RRef NewCharRef()
-  {
-    return NewIntegerValueRef<char>();
-  }
-
-  /**
-   * Address: 0x008E1DC0 (FUN_008E1DC0, RIntType_char::CtrRef)
-   */
-  [[nodiscard]] gpg::RRef ConstructCharRef(
-    void* const slotObject
-  )
-  {
-    return ConstructIntegerValueRef<char>(slotObject);
-  }
-
-  /**
-   * Address: 0x008E1D30 (FUN_008E1D30, RIntType_char::CpyRef)
-   */
-  [[nodiscard]] gpg::RRef CopyCharRef(
-    gpg::RRef* const sourceRef
-  )
-  {
-    return CopyIntegerValueRef<char>(sourceRef);
-  }
-
-  /**
-   * Address: 0x008E1DF0 (FUN_008E1DF0, RIntType_char::MovRef)
-   */
-  [[nodiscard]] gpg::RRef MoveCharRef(
-    void* const slotObject,
-    gpg::RRef* const sourceRef
-  )
-  {
-    return MoveIntegerValueRef<char>(slotObject, sourceRef);
-  }
-
-  /**
-   * Address: 0x008DDA40 (FUN_008DDA40, RIntType_char::Delete)
-   *
-   * What it does:
-   * Releases one `char` integer-ref allocation lane via `operator delete`.
-   */
-  void DeleteCharRef(
-    void* const slotObject
-  )
-  {
-    ::operator delete(slotObject);
-  }
-
-  /**
-   * Address: 0x008DDA50 (FUN_008DDA50, RIntType_char::Destruct)
-   *
-   * What it does:
-   * No-op destructor lane for `char` integer-ref storage.
-   */
-  void DestructCharRef(
-    void* const slotObject
-  )
-  {
-    static_cast<void>(slotObject);
-  }
-
-  /**
-   * Address: 0x008E1E70 (FUN_008E1E70, RIntType_short::NewRef)
-   */
-  [[nodiscard]] gpg::RRef NewShortRef()
-  {
-    return NewIntegerValueRef<short>();
-  }
-
-  /**
-   * Address: 0x008E1F30 (FUN_008E1F30, RIntType_short::CtrRef)
-   */
-  [[nodiscard]] gpg::RRef ConstructShortRef(
-    void* const slotObject
-  )
-  {
-    return ConstructIntegerValueRef<short>(slotObject);
-  }
-
-  /**
-   * Address: 0x008E1EA0 (FUN_008E1EA0, RIntType_short::CpyRef)
-   */
-  [[nodiscard]] gpg::RRef CopyShortRef(
-    gpg::RRef* const sourceRef
-  )
-  {
-    return CopyIntegerValueRef<short>(sourceRef);
-  }
-
-  /**
-   * Address: 0x008E1F60 (FUN_008E1F60, RIntType_short::MovRef)
-   */
-  [[nodiscard]] gpg::RRef MoveShortRef(
-    void* const slotObject,
-    gpg::RRef* const sourceRef
-  )
-  {
-    return MoveIntegerValueRef<short>(slotObject, sourceRef);
-  }
-
-  /**
-   * Address: 0x008DDC90 (FUN_008DDC90, RIntType_short::Delete)
-   *
-   * What it does:
-   * Releases one `short` integer-ref allocation lane via `operator delete`.
-   */
-  void DeleteShortRef(
-    void* const slotObject
-  )
-  {
-    ::operator delete(slotObject);
-  }
-
-  /**
-   * Address: 0x008DDCA0 (FUN_008DDCA0, RIntType_short::Destruct)
-   *
-   * What it does:
-   * No-op destructor lane for `short` integer-ref storage.
-   */
-  void DestructShortRef(
-    void* const slotObject
-  )
-  {
-    static_cast<void>(slotObject);
-  }
-
-  /**
-   * Address: 0x008E1FE0 (FUN_008E1FE0, RIntType_int::NewRef)
-   */
-  [[nodiscard]] gpg::RRef NewIntRef()
-  {
-    return NewIntegerValueRef<int>();
-  }
-
-  /**
-   * Address: 0x008E20A0 (FUN_008E20A0, RIntType_int::CtrRef)
-   */
-  [[nodiscard]] gpg::RRef ConstructIntRef(
-    void* const slotObject
-  )
-  {
-    return ConstructIntegerValueRef<int>(slotObject);
-  }
-
-  /**
-   * Address: 0x008E2010 (FUN_008E2010, RIntType_int::CpyRef)
-   */
-  [[nodiscard]] gpg::RRef CopyIntRef(
-    gpg::RRef* const sourceRef
-  )
-  {
-    return CopyIntegerValueRef<int>(sourceRef);
-  }
-
-  /**
-   * Address: 0x008E20D0 (FUN_008E20D0, RIntType_int::MovRef)
-   */
-  [[nodiscard]] gpg::RRef MoveIntRef(
-    void* const slotObject,
-    gpg::RRef* const sourceRef
-  )
-  {
-    return MoveIntegerValueRef<int>(slotObject, sourceRef);
-  }
-
-  /**
-   * Address: 0x008DDF00 (FUN_008DDF00, RIntType_int::Delete)
-   *
-   * What it does:
-   * Releases one `int` integer-ref allocation lane via `operator delete`.
-   */
-  void DeleteIntRef(
-    void* const slotObject
-  )
-  {
-    ::operator delete(slotObject);
-  }
-
-  /**
-   * Address: 0x008DDF10 (FUN_008DDF10, RIntType_int::Destruct)
-   *
-   * What it does:
-   * No-op destructor lane for `int` integer-ref storage.
-   */
-  void DestructIntRef(
-    void* const slotObject
-  )
-  {
-    static_cast<void>(slotObject);
-  }
-
-  /**
-   * Address: 0x008E2150 (FUN_008E2150, RIntType_long::NewRef)
-   */
-  [[nodiscard]] gpg::RRef NewLongRef()
-  {
-    return NewIntegerValueRef<long>();
-  }
-
-  /**
-   * Address: 0x008E2210 (FUN_008E2210, RIntType_long::CtrRef)
-   */
-  [[nodiscard]] gpg::RRef ConstructLongRef(
-    void* const slotObject
-  )
-  {
-    return ConstructIntegerValueRef<long>(slotObject);
-  }
-
-  /**
-   * Address: 0x008E2180 (FUN_008E2180, RIntType_long::CpyRef)
-   */
-  [[nodiscard]] gpg::RRef CopyLongRef(
-    gpg::RRef* const sourceRef
-  )
-  {
-    return CopyIntegerValueRef<long>(sourceRef);
-  }
-
-  /**
-   * Address: 0x008E2240 (FUN_008E2240, RIntType_long::MovRef)
-   */
-  [[nodiscard]] gpg::RRef MoveLongRef(
-    void* const slotObject,
-    gpg::RRef* const sourceRef
-  )
-  {
-    return MoveIntegerValueRef<long>(slotObject, sourceRef);
-  }
-
-  /**
-   * Address: 0x008DE0B0 (FUN_008DE0B0, RIntType_long::Delete)
-   *
-   * What it does:
-   * Releases one `long` integer-ref allocation lane via `operator delete`.
-   */
-  void DeleteLongRef(
-    void* const slotObject
-  )
-  {
-    ::operator delete(slotObject);
-  }
-
-  /**
-   * Address: 0x008DE0C0 (FUN_008DE0C0, RIntType_long::Destruct)
-   *
-   * What it does:
-   * No-op destructor lane for `long` integer-ref storage.
-   */
-  void DestructLongRef(
-    void* const slotObject
-  )
-  {
-    static_cast<void>(slotObject);
-  }
-
-  /**
-   * Address: 0x008E22C0 (FUN_008E22C0, RIntType_schar::NewRef)
-   */
-  [[nodiscard]] gpg::RRef NewSignedCharRef()
-  {
-    return NewIntegerValueRef<signed char>();
-  }
-
-  /**
-   * Address: 0x008E2380 (FUN_008E2380, RIntType_schar::CtrRef)
-   */
-  [[nodiscard]] gpg::RRef ConstructSignedCharRef(
-    void* const slotObject
-  )
-  {
-    return ConstructIntegerValueRef<signed char>(slotObject);
-  }
-
-  /**
-   * Address: 0x008E22F0 (FUN_008E22F0, RIntType_schar::CpyRef)
-   */
-  [[nodiscard]] gpg::RRef CopySignedCharRef(
-    gpg::RRef* const sourceRef
-  )
-  {
-    return CopyIntegerValueRef<signed char>(sourceRef);
-  }
-
-  /**
-   * Address: 0x008E23B0 (FUN_008E23B0, RIntType_schar::MovRef)
-   */
-  [[nodiscard]] gpg::RRef MoveSignedCharRef(
-    void* const slotObject,
-    gpg::RRef* const sourceRef
-  )
-  {
-    return MoveIntegerValueRef<signed char>(slotObject, sourceRef);
-  }
-
-  /**
-   * Address: 0x008DE310 (FUN_008DE310, RIntType_schar::Delete)
-   *
-   * What it does:
-   * Releases one `signed char` integer-ref allocation lane via `operator delete`.
-   */
-  void DeleteSignedCharRef(
-    void* const slotObject
-  )
-  {
-    ::operator delete(slotObject);
-  }
-
-  /**
-   * Address: 0x008DE320 (FUN_008DE320, RIntType_schar::Destruct)
-   *
-   * What it does:
-   * No-op destructor lane for `signed char` integer-ref storage.
-   */
-  void DestructSignedCharRef(
-    void* const slotObject
-  )
-  {
-    static_cast<void>(slotObject);
-  }
-
-  /**
-   * Address: 0x008E2430 (FUN_008E2430, RIntType_uchar::NewRef)
-   */
-  [[nodiscard]] gpg::RRef NewUnsignedCharRef()
-  {
-    return NewIntegerValueRef<unsigned char>();
-  }
-
-  /**
-   * Address: 0x008E24F0 (FUN_008E24F0, RIntType_uchar::CtrRef)
-   */
-  [[nodiscard]] gpg::RRef ConstructUnsignedCharRef(
-    void* const slotObject
-  )
-  {
-    return ConstructIntegerValueRef<unsigned char>(slotObject);
-  }
-
-  /**
-   * Address: 0x008E2460 (FUN_008E2460, RIntType_uchar::CpyRef)
-   */
-  [[nodiscard]] gpg::RRef CopyUnsignedCharRef(
-    gpg::RRef* const sourceRef
-  )
-  {
-    return CopyIntegerValueRef<unsigned char>(sourceRef);
-  }
-
-  /**
-   * Address: 0x008E2520 (FUN_008E2520, RIntType_uchar::MovRef)
-   */
-  [[nodiscard]] gpg::RRef MoveUnsignedCharRef(
-    void* const slotObject,
-    gpg::RRef* const sourceRef
-  )
-  {
-    return MoveIntegerValueRef<unsigned char>(slotObject, sourceRef);
-  }
-
-  /**
-   * Address: 0x008DE570 (FUN_008DE570, RIntType_uchar::Delete)
-   *
-   * What it does:
-   * Releases one `unsigned char` integer-ref allocation lane via `operator delete`.
-   */
-  void DeleteUnsignedCharRef(
-    void* const slotObject
-  )
-  {
-    ::operator delete(slotObject);
-  }
-
-  /**
-   * Address: 0x008DE580 (FUN_008DE580, RIntType_uchar::Destruct)
-   *
-   * What it does:
-   * No-op destructor lane for `unsigned char` integer-ref storage.
-   */
-  void DestructUnsignedCharRef(
-    void* const slotObject
-  )
-  {
-    static_cast<void>(slotObject);
-  }
-
-  /**
-   * Address: 0x008E25A0 (FUN_008E25A0, RIntType_ushort::NewRef)
-   */
-  [[nodiscard]] gpg::RRef NewUnsignedShortRef()
-  {
-    return NewIntegerValueRef<unsigned short>();
-  }
-
-  /**
-   * Address: 0x008E2660 (FUN_008E2660, RIntType_ushort::CtrRef)
-   */
-  [[nodiscard]] gpg::RRef ConstructUnsignedShortRef(
-    void* const slotObject
-  )
-  {
-    return ConstructIntegerValueRef<unsigned short>(slotObject);
-  }
-
-  /**
-   * Address: 0x008E25D0 (FUN_008E25D0, RIntType_ushort::CpyRef)
-   */
-  [[nodiscard]] gpg::RRef CopyUnsignedShortRef(
-    gpg::RRef* const sourceRef
-  )
-  {
-    return CopyIntegerValueRef<unsigned short>(sourceRef);
-  }
-
-  /**
-   * Address: 0x008E2690 (FUN_008E2690, RIntType_ushort::MovRef)
-   */
-  [[nodiscard]] gpg::RRef MoveUnsignedShortRef(
-    void* const slotObject,
-    gpg::RRef* const sourceRef
-  )
-  {
-    return MoveIntegerValueRef<unsigned short>(slotObject, sourceRef);
-  }
-
-  /**
-   * Address: 0x008DE7C0 (FUN_008DE7C0, RIntType_ushort::Delete)
-   *
-   * What it does:
-   * Releases one `unsigned short` integer-ref allocation lane via `operator delete`.
-   */
-  void DeleteUnsignedShortRef(
-    void* const slotObject
-  )
-  {
-    ::operator delete(slotObject);
-  }
-
-  /**
-   * Address: 0x008DE7D0 (FUN_008DE7D0, RIntType_ushort::Destruct)
-   *
-   * What it does:
-   * No-op destructor lane for `unsigned short` integer-ref storage.
-   */
-  void DestructUnsignedShortRef(
-    void* const slotObject
-  )
-  {
-    static_cast<void>(slotObject);
-  }
-
-  /**
-   * Address: 0x008E2710 (FUN_008E2710, RIntType_uint::NewRef)
-   */
-  [[nodiscard]] gpg::RRef NewUnsignedIntRef()
-  {
-    return NewIntegerValueRef<unsigned int>();
-  }
-
-  /**
-   * Address: 0x008E27D0 (FUN_008E27D0, RIntType_uint::CtrRef)
-   */
-  [[nodiscard]] gpg::RRef ConstructUnsignedIntRef(
-    void* const slotObject
-  )
-  {
-    return ConstructIntegerValueRef<unsigned int>(slotObject);
-  }
-
-  /**
-   * Address: 0x008E2740 (FUN_008E2740, RIntType_uint::CpyRef)
-   */
-  [[nodiscard]] gpg::RRef CopyUnsignedIntRef(
-    gpg::RRef* const sourceRef
-  )
-  {
-    return CopyIntegerValueRef<unsigned int>(sourceRef);
-  }
-
-  /**
-   * Address: 0x008E2800 (FUN_008E2800, RIntType_uint::MovRef)
-   */
-  [[nodiscard]] gpg::RRef MoveUnsignedIntRef(
-    void* const slotObject,
-    gpg::RRef* const sourceRef
-  )
-  {
-    return MoveIntegerValueRef<unsigned int>(slotObject, sourceRef);
-  }
-
-  /**
-   * Address: 0x008DEA30 (FUN_008DEA30, RIntType_uint::Delete)
-   *
-   * What it does:
-   * Releases one `unsigned int` integer-ref allocation lane via `operator delete`.
-   */
-  void DeleteUnsignedIntRef(
-    void* const slotObject
-  )
-  {
-    ::operator delete(slotObject);
-  }
-
-  /**
-   * Address: 0x008DEA40 (FUN_008DEA40, RIntType_uint::Destruct)
-   *
-   * What it does:
-   * No-op destructor lane for `unsigned int` integer-ref storage.
-   */
-  void DestructUnsignedIntRef(
-    void* const slotObject
-  )
-  {
-    static_cast<void>(slotObject);
-  }
-
-  /**
-   * Address: 0x008E2880 (FUN_008E2880, RIntType_ulong::NewRef)
-   */
-  [[nodiscard]] gpg::RRef NewUnsignedLongRef()
-  {
-    return NewIntegerValueRef<unsigned long>();
-  }
-
-  /**
-   * Address: 0x008E2940 (FUN_008E2940, RIntType_ulong::CtrRef)
-   */
-  [[nodiscard]] gpg::RRef ConstructUnsignedLongRef(
-    void* const slotObject
-  )
-  {
-    return ConstructIntegerValueRef<unsigned long>(slotObject);
-  }
-
-  /**
-   * Address: 0x008E28B0 (FUN_008E28B0, RIntType_ulong::CpyRef)
-   */
-  [[nodiscard]] gpg::RRef CopyUnsignedLongRef(
-    gpg::RRef* const sourceRef
-  )
-  {
-    return CopyIntegerValueRef<unsigned long>(sourceRef);
-  }
-
-  /**
-   * Address: 0x008E2970 (FUN_008E2970, RIntType_ulong::MovRef)
-   */
-  [[nodiscard]] gpg::RRef MoveUnsignedLongRef(
-    void* const slotObject,
-    gpg::RRef* const sourceRef
-  )
-  {
-    return MoveIntegerValueRef<unsigned long>(slotObject, sourceRef);
-  }
-
-  /**
-   * Address: 0x008DEC80 (FUN_008DEC80, RIntType_ulong::Delete)
-   *
-   * What it does:
-   * Releases one `unsigned long` integer-ref allocation lane via `operator delete`.
-   */
-  void DeleteUnsignedLongRef(
-    void* const slotObject
-  )
-  {
-    ::operator delete(slotObject);
-  }
-
-  /**
-   * Address: 0x008DEC90 (FUN_008DEC90, RIntType_ulong::Destruct)
-   *
-   * What it does:
-   * No-op destructor lane for `unsigned long` integer-ref storage.
-   */
-  void DestructUnsignedLongRef(
-    void* const slotObject
-  )
-  {
-    static_cast<void>(slotObject);
-  }
-
-  /**
-   * Address: 0x008E2C30 (FUN_008E2C30)
-   *
-   * What it does:
-   * Binds the `char` create/destroy callback subset on one reflected type
-   * descriptor lane (`new/ctor/delete/dtor`).
-   */
-  [[maybe_unused]] gpg::RType* BindCharCreateDestroyRefLanes(
+  template <class T>
+  void BindIntegerRefCallbacks(
     gpg::RType* const typeInfo
   )
   {
-    typeInfo->newRefFunc_ = &NewCharRef;
-    typeInfo->ctorRefFunc_ = &ConstructCharRef;
-    typeInfo->deleteFunc_ = &DeleteCharRef;
-    typeInfo->dtrFunc_ = &DestructCharRef;
-    return typeInfo;
+    typeInfo->newRefFunc_ = &NewIntegerValueRef<T>;
+    typeInfo->ctorRefFunc_ = &ConstructIntegerValueRef<T>;
+    typeInfo->cpyRefFunc_ = &CopyIntegerValueRef<T>;
+    typeInfo->movRefFunc_ = &MoveIntegerValueRef<T>;
+    typeInfo->deleteFunc_ = &DeleteIntegerValue<T>;
+    typeInfo->dtrFunc_ = &DestructIntegerValue<T>;
   }
 
-  /**
-   * Address: 0x008E2C60 (FUN_008E2C60)
-   *
-   * What it does:
-   * Binds the `char` copy/move callback subset on one reflected type
-   * descriptor lane (`copy/move/delete/dtor`).
-   */
-  [[maybe_unused]] gpg::RType* BindCharCopyMoveDestroyRefLanes(
-    gpg::RType* const typeInfo
-  )
-  {
-    typeInfo->cpyRefFunc_ = &CopyCharRef;
-    typeInfo->movRefFunc_ = &MoveCharRef;
-    typeInfo->deleteFunc_ = &DeleteCharRef;
-    typeInfo->dtrFunc_ = &DestructCharRef;
-    return typeInfo;
-  }
-
-  /**
-   * Address: 0x008E2C90 (FUN_008E2C90)
-   *
-   * What it does:
-   * Binds the `short` create/destroy callback subset on one reflected type
-   * descriptor lane (`new/ctor/delete/dtor`).
-   */
-  [[maybe_unused]] gpg::RType* BindShortCreateDestroyRefLanes(
-    gpg::RType* const typeInfo
-  )
-  {
-    typeInfo->newRefFunc_ = &NewShortRef;
-    typeInfo->ctorRefFunc_ = &ConstructShortRef;
-    typeInfo->deleteFunc_ = &DeleteShortRef;
-    typeInfo->dtrFunc_ = &DestructShortRef;
-    return typeInfo;
-  }
-
-  /**
-   * Address: 0x008E2CC0 (FUN_008E2CC0)
-   *
-   * What it does:
-   * Binds the `short` copy/move callback subset on one reflected type
-   * descriptor lane (`copy/move/delete/dtor`).
-   */
-  [[maybe_unused]] gpg::RType* BindShortCopyMoveDestroyRefLanes(
-    gpg::RType* const typeInfo
-  )
-  {
-    typeInfo->cpyRefFunc_ = &CopyShortRef;
-    typeInfo->movRefFunc_ = &MoveShortRef;
-    typeInfo->deleteFunc_ = &DeleteShortRef;
-    typeInfo->dtrFunc_ = &DestructShortRef;
-    return typeInfo;
-  }
-
-  /**
-   * Address: 0x008E2CF0 (FUN_008E2CF0)
-   *
-   * What it does:
-   * Binds the `int` create/destroy callback subset on one reflected type
-   * descriptor lane (`new/ctor/delete/dtor`).
-   */
-  [[maybe_unused]] gpg::RType* BindIntCreateDestroyRefLanes(
-    gpg::RType* const typeInfo
-  )
-  {
-    typeInfo->newRefFunc_ = &NewIntRef;
-    typeInfo->ctorRefFunc_ = &ConstructIntRef;
-    typeInfo->deleteFunc_ = &DeleteIntRef;
-    typeInfo->dtrFunc_ = &DestructIntRef;
-    return typeInfo;
-  }
-
-  /**
-   * Address: 0x008E2D20 (FUN_008E2D20)
-   *
-   * What it does:
-   * Binds the `int` copy/move callback subset on one reflected type
-   * descriptor lane (`copy/move/delete/dtor`).
-   */
-  [[maybe_unused]] gpg::RType* BindIntCopyMoveDestroyRefLanes(
-    gpg::RType* const typeInfo
-  )
-  {
-    typeInfo->cpyRefFunc_ = &CopyIntRef;
-    typeInfo->movRefFunc_ = &MoveIntRef;
-    typeInfo->deleteFunc_ = &DeleteIntRef;
-    typeInfo->dtrFunc_ = &DestructIntRef;
-    return typeInfo;
-  }
-
-  /**
-   * Address: 0x008E2D50 (FUN_008E2D50)
-   *
-   * What it does:
-   * Binds the `long` create/destroy callback subset on one reflected type
-   * descriptor lane (`new/ctor/delete/dtor`).
-   */
-  [[maybe_unused]] gpg::RType* BindLongCreateDestroyRefLanes(
-    gpg::RType* const typeInfo
-  )
-  {
-    typeInfo->newRefFunc_ = &NewLongRef;
-    typeInfo->ctorRefFunc_ = &ConstructLongRef;
-    typeInfo->deleteFunc_ = &DeleteLongRef;
-    typeInfo->dtrFunc_ = &DestructLongRef;
-    return typeInfo;
-  }
-
-  /**
-   * Address: 0x008E2D80 (FUN_008E2D80)
-   *
-   * What it does:
-   * Binds the `long` copy/move callback subset on one reflected type
-   * descriptor lane (`copy/move/delete/dtor`).
-   */
-  [[maybe_unused]] gpg::RType* BindLongCopyMoveDestroyRefLanes(
-    gpg::RType* const typeInfo
-  )
-  {
-    typeInfo->cpyRefFunc_ = &CopyLongRef;
-    typeInfo->movRefFunc_ = &MoveLongRef;
-    typeInfo->deleteFunc_ = &DeleteLongRef;
-    typeInfo->dtrFunc_ = &DestructLongRef;
-    return typeInfo;
-  }
-
-  /**
-   * Address: 0x008E2DB0 (FUN_008E2DB0)
-   *
-   * What it does:
-   * Binds the `signed char` create/destroy callback subset on one reflected
-   * type descriptor lane (`new/ctor/delete/dtor`).
-   */
-  [[maybe_unused]] gpg::RType* BindSignedCharCreateDestroyRefLanes(
-    gpg::RType* const typeInfo
-  )
-  {
-    typeInfo->newRefFunc_ = &NewSignedCharRef;
-    typeInfo->ctorRefFunc_ = &ConstructSignedCharRef;
-    typeInfo->deleteFunc_ = &DeleteSignedCharRef;
-    typeInfo->dtrFunc_ = &DestructSignedCharRef;
-    return typeInfo;
-  }
-
-  /**
-   * Address: 0x008E2DE0 (FUN_008E2DE0)
-   *
-   * What it does:
-   * Binds the `signed char` copy/move callback subset on one reflected type
-   * descriptor lane (`copy/move/delete/dtor`).
-   */
-  [[maybe_unused]] gpg::RType* BindSignedCharCopyMoveDestroyRefLanes(
-    gpg::RType* const typeInfo
-  )
-  {
-    typeInfo->cpyRefFunc_ = &CopySignedCharRef;
-    typeInfo->movRefFunc_ = &MoveSignedCharRef;
-    typeInfo->deleteFunc_ = &DeleteSignedCharRef;
-    typeInfo->dtrFunc_ = &DestructSignedCharRef;
-    return typeInfo;
-  }
-
-  /**
-   * Address: 0x008E2E10 (FUN_008E2E10)
-   *
-   * What it does:
-   * Binds the `unsigned char` create/destroy callback subset on one reflected
-   * type descriptor lane (`new/ctor/delete/dtor`).
-   */
-  [[maybe_unused]] gpg::RType* BindUnsignedCharCreateDestroyRefLanes(
-    gpg::RType* const typeInfo
-  )
-  {
-    typeInfo->newRefFunc_ = &NewUnsignedCharRef;
-    typeInfo->ctorRefFunc_ = &ConstructUnsignedCharRef;
-    typeInfo->deleteFunc_ = &DeleteUnsignedCharRef;
-    typeInfo->dtrFunc_ = &DestructUnsignedCharRef;
-    return typeInfo;
-  }
-
-  /**
-   * Address: 0x008E2E40 (FUN_008E2E40)
-   *
-   * What it does:
-   * Binds the `unsigned char` copy/move callback subset on one reflected
-   * type descriptor lane (`copy/move/delete/dtor`).
-   */
-  [[maybe_unused]] gpg::RType* BindUnsignedCharCopyMoveDestroyRefLanes(
-    gpg::RType* const typeInfo
-  )
-  {
-    typeInfo->cpyRefFunc_ = &CopyUnsignedCharRef;
-    typeInfo->movRefFunc_ = &MoveUnsignedCharRef;
-    typeInfo->deleteFunc_ = &DeleteUnsignedCharRef;
-    typeInfo->dtrFunc_ = &DestructUnsignedCharRef;
-    return typeInfo;
-  }
-
-  /**
-   * Address: 0x008E2E70 (FUN_008E2E70)
-   *
-   * What it does:
-   * Binds the `unsigned short` create/destroy callback subset on one reflected
-   * type descriptor lane (`new/ctor/delete/dtor`).
-   */
-  [[maybe_unused]] gpg::RType* BindUnsignedShortCreateDestroyRefLanes(
-    gpg::RType* const typeInfo
-  )
-  {
-    typeInfo->newRefFunc_ = &NewUnsignedShortRef;
-    typeInfo->ctorRefFunc_ = &ConstructUnsignedShortRef;
-    typeInfo->deleteFunc_ = &DeleteUnsignedShortRef;
-    typeInfo->dtrFunc_ = &DestructUnsignedShortRef;
-    return typeInfo;
-  }
-
-  /**
-   * Address: 0x008E2EA0 (FUN_008E2EA0)
-   *
-   * What it does:
-   * Binds the `unsigned short` copy/move callback subset on one reflected type
-   * descriptor lane (`copy/move/delete/dtor`).
-   */
-  [[maybe_unused]] gpg::RType* BindUnsignedShortCopyMoveDestroyRefLanes(
-    gpg::RType* const typeInfo
-  )
-  {
-    typeInfo->cpyRefFunc_ = &CopyUnsignedShortRef;
-    typeInfo->movRefFunc_ = &MoveUnsignedShortRef;
-    typeInfo->deleteFunc_ = &DeleteUnsignedShortRef;
-    typeInfo->dtrFunc_ = &DestructUnsignedShortRef;
-    return typeInfo;
-  }
-
-  /**
-   * Address: 0x008E2ED0 (FUN_008E2ED0)
-   *
-   * What it does:
-   * Binds the `unsigned int` create/destroy callback subset on one reflected
-   * type descriptor lane (`new/ctor/delete/dtor`).
-   */
-  [[maybe_unused]] gpg::RType* BindUnsignedIntCreateDestroyRefLanes(
-    gpg::RType* const typeInfo
-  )
-  {
-    typeInfo->newRefFunc_ = &NewUnsignedIntRef;
-    typeInfo->ctorRefFunc_ = &ConstructUnsignedIntRef;
-    typeInfo->deleteFunc_ = &DeleteUnsignedIntRef;
-    typeInfo->dtrFunc_ = &DestructUnsignedIntRef;
-    return typeInfo;
-  }
-
-  /**
-   * Address: 0x008E2F00 (FUN_008E2F00)
-   *
-   * What it does:
-   * Binds the `unsigned int` copy/move callback subset on one reflected type
-   * descriptor lane (`copy/move/delete/dtor`).
-   */
-  [[maybe_unused]] gpg::RType* BindUnsignedIntCopyMoveDestroyRefLanes(
-    gpg::RType* const typeInfo
-  )
-  {
-    typeInfo->cpyRefFunc_ = &CopyUnsignedIntRef;
-    typeInfo->movRefFunc_ = &MoveUnsignedIntRef;
-    typeInfo->deleteFunc_ = &DeleteUnsignedIntRef;
-    typeInfo->dtrFunc_ = &DestructUnsignedIntRef;
-    return typeInfo;
-  }
-
-  /**
-   * Address: 0x008E2F30 (FUN_008E2F30)
-   *
-   * What it does:
-   * Binds the `unsigned long` create/destroy callback subset on one reflected
-   * type descriptor lane (`new/ctor/delete/dtor`).
-   */
-  [[maybe_unused]] gpg::RType* BindUnsignedLongCreateDestroyRefLanes(
-    gpg::RType* const typeInfo
-  )
-  {
-    typeInfo->newRefFunc_ = &NewUnsignedLongRef;
-    typeInfo->ctorRefFunc_ = &ConstructUnsignedLongRef;
-    typeInfo->deleteFunc_ = &DeleteUnsignedLongRef;
-    typeInfo->dtrFunc_ = &DestructUnsignedLongRef;
-    return typeInfo;
-  }
-
-  /**
-   * Address: 0x008E2F60 (FUN_008E2F60)
-   *
-   * What it does:
-   * Binds the `unsigned long` copy/move callback subset on one reflected type
-   * descriptor lane (`copy/move/delete/dtor`).
-   */
-  [[maybe_unused]] gpg::RType* BindUnsignedLongCopyMoveDestroyRefLanes(
-    gpg::RType* const typeInfo
-  )
-  {
-    typeInfo->cpyRefFunc_ = &CopyUnsignedLongRef;
-    typeInfo->movRefFunc_ = &MoveUnsignedLongRef;
-    typeInfo->deleteFunc_ = &DeleteUnsignedLongRef;
-    typeInfo->dtrFunc_ = &DestructUnsignedLongRef;
-    return typeInfo;
-  }
 } // namespace
 
 // ---------------------------------------------------------------------------
@@ -1338,123 +519,15 @@ bool RIntType<T>::SetLexical(
 }
 
 /**
- * Address: 0x008E2F90 (FUN_008E2F90, RIntType_char::Init)
- *
- * What it does:
- * Binds callback lanes for reflected `char` value refs.
+ * Binds the value-ref callbacks for `T` (addresses per type on the
+ * declaration in RIntegerTypes.h).
  */
-template <>
-void RIntType<char>::Init()
+template <class T>
+void RIntType<T>::Init()
 {
-  (void)BindCharCreateDestroyRefLanes(this);
-  (void)BindCharCopyMoveDestroyRefLanes(this);
+  BindIntegerRefCallbacks<T>(this);
 }
 
-/**
- * Address: 0x008E2FC0 (FUN_008E2FC0, RIntType_short::Init)
- *
- * What it does:
- * Binds callback lanes for reflected `short` value refs.
- */
-template <>
-void RIntType<short>::Init()
-{
-  (void)BindShortCreateDestroyRefLanes(this);
-  (void)BindShortCopyMoveDestroyRefLanes(this);
-}
-
-/**
- * Address: 0x008E2FF0 (FUN_008E2FF0, RIntType_int::Init)
- *
- * What it does:
- * Binds callback lanes for reflected `int` value refs.
- */
-template <>
-void RIntType<int>::Init()
-{
-  (void)BindIntCreateDestroyRefLanes(this);
-  (void)BindIntCopyMoveDestroyRefLanes(this);
-}
-
-/**
- * Address: 0x008E3020 (FUN_008E3020, RIntType_long::Init)
- *
- * What it does:
- * Binds callback lanes for reflected `long` value refs.
- */
-template <>
-void RIntType<long>::Init()
-{
-  (void)BindLongCreateDestroyRefLanes(this);
-  (void)BindLongCopyMoveDestroyRefLanes(this);
-}
-
-/**
- * Address: 0x008E3050 (FUN_008E3050, RIntType_schar::Init)
- *
- * What it does:
- * Binds callback lanes for reflected `signed char` value refs.
- */
-template <>
-void RIntType<signed char>::Init()
-{
-  (void)BindSignedCharCreateDestroyRefLanes(this);
-  (void)BindSignedCharCopyMoveDestroyRefLanes(this);
-}
-
-/**
- * Address: 0x008E3080 (FUN_008E3080, RIntType_uchar::Init)
- *
- * What it does:
- * Binds callback lanes for reflected `unsigned char` value refs.
- */
-template <>
-void RIntType<unsigned char>::Init()
-{
-  (void)BindUnsignedCharCreateDestroyRefLanes(this);
-  (void)BindUnsignedCharCopyMoveDestroyRefLanes(this);
-}
-
-/**
- * Address: 0x008E30B0 (FUN_008E30B0, RIntType_ushort::Init)
- *
- * What it does:
- * Binds callback lanes for reflected `unsigned short` value refs.
- */
-template <>
-void RIntType<unsigned short>::Init()
-{
-  (void)BindUnsignedShortCreateDestroyRefLanes(this);
-  (void)BindUnsignedShortCopyMoveDestroyRefLanes(this);
-}
-
-/**
- * Address: 0x008E30E0 (FUN_008E30E0, RIntType_uint::Init)
- *
- * What it does:
- * Binds callback lanes for reflected `unsigned int` value refs.
- */
-template <>
-void RIntType<unsigned int>::Init()
-{
-  (void)BindUnsignedIntCreateDestroyRefLanes(this);
-  (void)BindUnsignedIntCopyMoveDestroyRefLanes(this);
-}
-
-/**
- * Address: 0x008E3110 (FUN_008E3110, RIntType_ulong::Init)
- *
- * What it does:
- * Binds callback lanes for reflected `unsigned long` value refs.
- */
-template <>
-void RIntType<unsigned long>::Init()
-{
-  (void)BindUnsignedLongCreateDestroyRefLanes(this);
-  (void)BindUnsignedLongCopyMoveDestroyRefLanes(this);
-}
-
-// Explicit instantiations for the binary's concrete types
 template class RIntType<char>;
 template class RIntType<signed char>;
 template class RIntType<unsigned char>;
@@ -1527,12 +600,12 @@ IMPLEMENT_INT_TYPE_INFO(
   charTypeInfo,
   char,
   "char",
-  &NewCharRef,
-  &CopyCharRef,
-  &ConstructCharRef,
-  &MoveCharRef,
-  &DeleteCharRef,
-  &DestructCharRef
+  &NewIntegerValueRef<char>,
+  &CopyIntegerValueRef<char>,
+  &ConstructIntegerValueRef<char>,
+  &MoveIntegerValueRef<char>,
+  &DeleteIntegerValue<char>,
+  &DestructIntegerValue<char>
 )
 /**
  * Address: 0x008DFE50 (FUN_008DFE50, signedcharTypeInfo::signedcharTypeInfo)
@@ -1548,12 +621,12 @@ IMPLEMENT_INT_TYPE_INFO(
   signedcharTypeInfo,
   signed char,
   "signed char",
-  &NewSignedCharRef,
-  &CopySignedCharRef,
-  &ConstructSignedCharRef,
-  &MoveSignedCharRef,
-  &DeleteSignedCharRef,
-  &DestructSignedCharRef
+  &NewIntegerValueRef<signed char>,
+  &CopyIntegerValueRef<signed char>,
+  &ConstructIntegerValueRef<signed char>,
+  &MoveIntegerValueRef<signed char>,
+  &DeleteIntegerValue<signed char>,
+  &DestructIntegerValue<signed char>
 )
 /**
  * Address: 0x008DFF30 (FUN_008DFF30, unsignedcharTypeInfo::unsignedcharTypeInfo)
@@ -1569,12 +642,12 @@ IMPLEMENT_INT_TYPE_INFO(
   unsignedcharTypeInfo,
   unsigned char,
   "unsigned char",
-  &NewUnsignedCharRef,
-  &CopyUnsignedCharRef,
-  &ConstructUnsignedCharRef,
-  &MoveUnsignedCharRef,
-  &DeleteUnsignedCharRef,
-  &DestructUnsignedCharRef
+  &NewIntegerValueRef<unsigned char>,
+  &CopyIntegerValueRef<unsigned char>,
+  &ConstructIntegerValueRef<unsigned char>,
+  &MoveIntegerValueRef<unsigned char>,
+  &DeleteIntegerValue<unsigned char>,
+  &DestructIntegerValue<unsigned char>
 )
 /**
  * Address: 0x008DFBB0 (FUN_008DFBB0, shortTypeInfo::shortTypeInfo)
@@ -1590,12 +663,12 @@ IMPLEMENT_INT_TYPE_INFO(
   shortTypeInfo,
   short,
   "short",
-  &NewShortRef,
-  &CopyShortRef,
-  &ConstructShortRef,
-  &MoveShortRef,
-  &DeleteShortRef,
-  &DestructShortRef
+  &NewIntegerValueRef<short>,
+  &CopyIntegerValueRef<short>,
+  &ConstructIntegerValueRef<short>,
+  &MoveIntegerValueRef<short>,
+  &DeleteIntegerValue<short>,
+  &DestructIntegerValue<short>
 )
 /**
  * Address: 0x008E0010 (FUN_008E0010, unsignedshortTypeInfo::unsignedshortTypeInfo)
@@ -1611,12 +684,12 @@ IMPLEMENT_INT_TYPE_INFO(
   unsignedshortTypeInfo,
   unsigned short,
   "unsigned short",
-  &NewUnsignedShortRef,
-  &CopyUnsignedShortRef,
-  &ConstructUnsignedShortRef,
-  &MoveUnsignedShortRef,
-  &DeleteUnsignedShortRef,
-  &DestructUnsignedShortRef
+  &NewIntegerValueRef<unsigned short>,
+  &CopyIntegerValueRef<unsigned short>,
+  &ConstructIntegerValueRef<unsigned short>,
+  &MoveIntegerValueRef<unsigned short>,
+  &DeleteIntegerValue<unsigned short>,
+  &DestructIntegerValue<unsigned short>
 )
 /**
  * Address: 0x008DFC90 (FUN_008DFC90, intTypeInfo::intTypeInfo)
@@ -1632,12 +705,12 @@ IMPLEMENT_INT_TYPE_INFO(
   intTypeInfo,
   int,
   "int",
-  &NewIntRef,
-  &CopyIntRef,
-  &ConstructIntRef,
-  &MoveIntRef,
-  &DeleteIntRef,
-  &DestructIntRef
+  &NewIntegerValueRef<int>,
+  &CopyIntegerValueRef<int>,
+  &ConstructIntegerValueRef<int>,
+  &MoveIntegerValueRef<int>,
+  &DeleteIntegerValue<int>,
+  &DestructIntegerValue<int>
 )
 /**
  * Address: 0x008E00F0 (FUN_008E00F0, unsignedintTypeInfo::unsignedintTypeInfo)
@@ -1653,12 +726,12 @@ IMPLEMENT_INT_TYPE_INFO(
   unsignedintTypeInfo,
   unsigned int,
   "unsigned int",
-  &NewUnsignedIntRef,
-  &CopyUnsignedIntRef,
-  &ConstructUnsignedIntRef,
-  &MoveUnsignedIntRef,
-  &DeleteUnsignedIntRef,
-  &DestructUnsignedIntRef
+  &NewIntegerValueRef<unsigned int>,
+  &CopyIntegerValueRef<unsigned int>,
+  &ConstructIntegerValueRef<unsigned int>,
+  &MoveIntegerValueRef<unsigned int>,
+  &DeleteIntegerValue<unsigned int>,
+  &DestructIntegerValue<unsigned int>
 )
 /**
  * Address: 0x008DFD70 (FUN_008DFD70, longTypeInfo::longTypeInfo)
@@ -1674,12 +747,12 @@ IMPLEMENT_INT_TYPE_INFO(
   longTypeInfo,
   long,
   "long",
-  &NewLongRef,
-  &CopyLongRef,
-  &ConstructLongRef,
-  &MoveLongRef,
-  &DeleteLongRef,
-  &DestructLongRef
+  &NewIntegerValueRef<long>,
+  &CopyIntegerValueRef<long>,
+  &ConstructIntegerValueRef<long>,
+  &MoveIntegerValueRef<long>,
+  &DeleteIntegerValue<long>,
+  &DestructIntegerValue<long>
 )
 /**
  * Address: 0x008E01D0 (FUN_008E01D0, unsignedlongTypeInfo::unsignedlongTypeInfo)
@@ -1695,12 +768,12 @@ IMPLEMENT_INT_TYPE_INFO(
   unsignedlongTypeInfo,
   unsigned long,
   "unsigned long",
-  &NewUnsignedLongRef,
-  &CopyUnsignedLongRef,
-  &ConstructUnsignedLongRef,
-  &MoveUnsignedLongRef,
-  &DeleteUnsignedLongRef,
-  &DestructUnsignedLongRef
+  &NewIntegerValueRef<unsigned long>,
+  &CopyIntegerValueRef<unsigned long>,
+  &ConstructIntegerValueRef<unsigned long>,
+  &MoveIntegerValueRef<unsigned long>,
+  &DeleteIntegerValue<unsigned long>,
+  &DestructIntegerValue<unsigned long>
 )
 
 #undef IMPLEMENT_INT_TYPE_INFO

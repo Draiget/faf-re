@@ -74,6 +74,20 @@ namespace faf::editor
     {
       NewFlat(kind == "beam" ? "BeamBlueprint" : "TrailEmitterBlueprint");
     }
+    /**
+     * The Effects workspace's stage: the effect's own view filling the current window (the map view's place), its
+     * controls along the top; drag turns round it, the wheel comes closer. While it is drawn (`SetStaged`), the small
+     * previews in this editor and the browser give way to it.
+     */
+    void DrawStage();
+    void SetStaged(
+      const bool staged
+    ) noexcept
+    {
+      mStaged = staged;
+    }
+    /** File > New effect, and the start screen's New Effect: an effect with one emitter (asks first if edited). */
+    void NewEffect();
     /** Test runs (`/particleopen <game path>`): opens a game emitter. */
     bool OpenGameEmitter(const std::string& path);
     /** Test runs (`/particleswitch <game path>`): the open effect marked edited, then that one opened through the
@@ -92,6 +106,36 @@ namespace faf::editor
     void TestTexturePicker() noexcept
     {
       mTexturePicker.AskOpen();
+    }
+    /** The open mod project (the Units workspace's): Save to mod project writes there; empty when none is open. */
+    void SetModProject(
+      const std::filesystem::path& folder,
+      const std::string& name
+    )
+    {
+      mModFolder = folder;
+      mModName = name;
+    }
+    /**
+     * Save to mod project: each emitter of the effect that is a game file becomes a merge blueprint naming it (or a
+     * replacement when a merge can't say the change), a beam or trail the same; an emitter of the effect's own is
+     * written whole. The status line says what was written.
+     */
+    bool SaveToMod();
+    /** The same for given emitters (test runs edit a copy); `paths` the game files they came from (';' between). */
+    bool
+    SaveEmittersToMod(const std::vector<std::pair<std::string, EmitterBlueprint>>& emitters, const std::string& paths);
+    [[nodiscard]] const std::string& Status() const noexcept
+    {
+      return mStatus;
+    }
+    [[nodiscard]] const std::vector<std::pair<std::string, EmitterBlueprint>>& Emitters() const noexcept
+    {
+      return mFxEmitters;
+    }
+    [[nodiscard]] const std::string& OpenedPaths() const noexcept
+    {
+      return mOpenedPaths;
     }
     /** Opens one of FAF's effect templates (its emitters played together) as a graph. */
     bool OpenTemplate(const EffectTemplate& effect);
@@ -131,6 +175,10 @@ namespace faf::editor
     bool mPlaying = true;
     bool mLoop = true;
     std::filesystem::path mMapFolder;
+    std::filesystem::path mModFolder;
+    std::string mModName;
+    /** The game files the open effect was opened from (';' between), kept when it is saved elsewhere. */
+    std::string mOpenedPaths;
     std::string mMapFolderName;
     std::string mStatus;
     EdParticlePreview mPreview;
@@ -148,6 +196,10 @@ namespace faf::editor
     bool mOpenSave = false;
     /** The Preview pane: the middle of the 3D view, where the effect plays, magnified. */
     void DrawPreviewPane();
+    /** The preview's controls (play, restart, loop, background, ground, grid, turn, height, cameras), one wrapping row.
+     */
+    void DrawPreviewOptions();
+    bool mStaged = false;
     EdParticleViewport mViewport;
     /** The view comes to the effect's size when one opens. */
     bool mFrameAsk = true;
@@ -169,6 +221,15 @@ namespace faf::editor
     void GraphUndo(bool redo);
     bool SaveGraph(const std::string& effectName);
     void ListTemplates();
+
+  public:
+    /**
+     * Where the templates come from first (FAF Studio imports /lua/EffectTemplates.lua and takes every table of
+     * /effects/ paths, computed ones too): the app's Lua import; the file's text is read when it gives none.
+     */
+    static void SetTemplateSource(std::vector<EffectTemplate> (*source)());
+
+  private:
     std::unique_ptr<NodeGraph> mGraph;
     EdNodeCanvas mCanvas;
     std::string mEffectName = "new_effect";

@@ -77,7 +77,7 @@ namespace gpg
      * Slot: 1
      * Demangled: _purecall
      */
-    virtual void WriteBytes(char*, size_t) = 0;
+    virtual void WriteBytes(const void*, size_t) = 0;
 
     /**
      * Address: 0x00A82547

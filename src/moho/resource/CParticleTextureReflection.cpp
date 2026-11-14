@@ -57,6 +57,6 @@ gpg::RRef* gpg::RRef_CParticleTexture(
   }
 
   outRef->mType = dynamicType;
-  outRef->mObj = reinterpret_cast<std::uint8_t*>(value) - static_cast<std::ptrdiff_t>(baseOffset);
+  outRef->mObj = gpg::CompleteObject(value, baseOffset);
   return outRef;
 }

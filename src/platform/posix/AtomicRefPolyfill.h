@@ -3,7 +3,9 @@
 // Engine addition (dedicated-server plan WPL.5): std::atomic_ref for the Linux build. The
 // shared code uses std::atomic_ref (C++20) on bytes and ints of engine structures; libc++ 18,
 // the pinned Linux toolchain's library, does not ship it yet (__cpp_lib_atomic_ref unset).
-// This is the subset the engine uses, on the compiler's __atomic builtins, with the
+// This is the subset the engine uses, on the compiler's __atomic builtins (the generic
+// forms for load/store/exchange/compare-exchange, so enums and other trivially copyable
+// types work as the standard allows), with the
 // standard's semantics. platform/PosixCompat.h includes it on Linux only; the Windows builds
 // use the MSVC STL's own std::atomic_ref.
 
@@ -35,7 +37,9 @@ namespace std
       const memory_order order = memory_order_seq_cst
     ) const noexcept
     {
-      return __atomic_load_n(mObject, ToBuiltin(order));
+      T result;
+      __atomic_load(mObject, &result, ToBuiltin(order));
+      return result;
     }
 
     void store(
@@ -43,7 +47,8 @@ namespace std
       const memory_order order = memory_order_seq_cst
     ) const noexcept
     {
-      __atomic_store_n(mObject, value, ToBuiltin(order));
+      T copy = value;
+      __atomic_store(mObject, &copy, ToBuiltin(order));
     }
 
     operator T() const noexcept
@@ -56,7 +61,10 @@ namespace std
       const memory_order order = memory_order_seq_cst
     ) const noexcept
     {
-      return __atomic_exchange_n(mObject, value, ToBuiltin(order));
+      T copy = value;
+      T result;
+      __atomic_exchange(mObject, &copy, &result, ToBuiltin(order));
+      return result;
     }
 
     bool compare_exchange_weak(
@@ -66,7 +74,8 @@ namespace std
       const memory_order failure
     ) const noexcept
     {
-      return __atomic_compare_exchange_n(mObject, &expected, desired, true, ToBuiltin(success), ToBuiltin(failure));
+      T copy = desired;
+      return __atomic_compare_exchange(mObject, &expected, &copy, true, ToBuiltin(success), ToBuiltin(failure));
     }
 
     bool compare_exchange_weak(
@@ -85,7 +94,8 @@ namespace std
       const memory_order failure
     ) const noexcept
     {
-      return __atomic_compare_exchange_n(mObject, &expected, desired, false, ToBuiltin(success), ToBuiltin(failure));
+      T copy = desired;
+      return __atomic_compare_exchange(mObject, &expected, &copy, false, ToBuiltin(success), ToBuiltin(failure));
     }
 
     bool compare_exchange_strong(

@@ -185,9 +185,6 @@
 #include "gpg/core/reflection/StaticInitPhase.h"
 #include "gpg/core/reflection/Reflection.h"
 
-// The MSVC runtime's polymorphic typeid entry point (vcruntime). cl declares
-// it implicitly; clang-cl needs the declaration.
-extern "C" void* __cdecl __RTtypeid(void* object);
 using namespace gpg;
 namespace
 {
@@ -276,7 +273,7 @@ namespace
     }
 
     out->mType = runtimeRType;
-    out->mObj = static_cast<void*>(reinterpret_cast<char*>(object) - baseOffset);
+    out->mObj = static_cast<void*>(gpg::CompleteObject(object, baseOffset));
     return out;
   }
 

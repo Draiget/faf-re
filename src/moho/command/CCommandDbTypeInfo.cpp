@@ -18,23 +18,6 @@ namespace
     return sInstance;
   }
 
-  gpg::RType* gLegacyCCommandDbType = nullptr;
-
-  /**
-   * Address: 0x006E2290 (FUN_006E2290)
-   *
-   * What it does:
-   * Resolves and caches RTTI for one `CCommandDB` lane.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::RType* ResolveLegacyCCommandDbType()
-  {
-    gpg::RType* type = gLegacyCCommandDbType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::CCommandDB));
-      gLegacyCCommandDbType = type;
-    }
-    return type;
-  }
 } // namespace
 
 namespace moho
@@ -55,7 +38,7 @@ namespace moho
    * Clears reflected base/field vector lanes for one `CCommandDBTypeInfo`
    * instance while preserving outer storage ownership.
    */
-  [[maybe_unused]] void DestroyCCommandDbTypeInfoBody(
+  void DestroyCCommandDbTypeInfoBody(
     CCommandDBTypeInfo* const typeInfo
   ) noexcept
   {

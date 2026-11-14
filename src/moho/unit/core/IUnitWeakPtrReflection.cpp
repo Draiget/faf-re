@@ -97,8 +97,7 @@ namespace
       return out;
     }
 
-    out.mObj =
-      reinterpret_cast<void*>(reinterpret_cast<std::uintptr_t>(rawObject) - static_cast<std::uintptr_t>(baseOffset));
+    out.mObj = gpg::CompleteObject(rawObject, baseOffset);
     out.mType = dynamicType;
     return out;
   }
@@ -120,20 +119,6 @@ namespace
   static_assert(sizeof(BoundThiscallInvoker) == 0x08, "BoundThiscallInvoker size must be 0x08");
 
   /**
-   * Address: 0x00541290 (FUN_00541290)
-   *
-   * What it does:
-   * Invokes one stored thiscall callback lane with the bound object lane at
-   * offset `+0x04`.
-   */
-  [[maybe_unused]] int InvokeBoundThiscallCallback(
-    BoundThiscallInvoker* const invoker
-  )
-  {
-    return invoker->invoke(invoker->boundObject);
-  }
-
-  /**
    * Address: 0x00541900 (FUN_00541900, FA), 0x1012F280 (MohoEngine)
    *
    * What it does:
@@ -141,12 +126,12 @@ namespace
    */
   void LoadWeakPtrIUnit(
     gpg::ReadArchive* archive,
-    std::intptr_t objectPtr,
+    void* objectPtr,
     int,
     gpg::RRef* ownerRef
   )
   {
-    auto* const weak = reinterpret_cast<moho::WeakPtr<moho::IUnit>*>(objectPtr);
+    auto* const weak = static_cast<moho::WeakPtr<moho::IUnit>*>(objectPtr);
     GPG_ASSERT(weak != nullptr);
 
     const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
@@ -184,12 +169,12 @@ namespace
    */
   void SaveWeakPtrIUnit(
     gpg::WriteArchive* archive,
-    std::intptr_t objectPtr,
+    void* objectPtr,
     int,
     gpg::RRef* ownerRef
   )
   {
-    auto* const weak = reinterpret_cast<moho::WeakPtr<moho::IUnit>*>(objectPtr);
+    auto* const weak = static_cast<moho::WeakPtr<moho::IUnit>*>(objectPtr);
     GPG_ASSERT(weak != nullptr);
 
     const gpg::RRef objectRef = MakeIUnitRefFromWeakPtr(*weak);
@@ -209,12 +194,12 @@ namespace
    */
   void LoadFastVectorWeakPtrIUnit(
     gpg::ReadArchive* archive,
-    std::intptr_t objectPtr,
+    void* objectPtr,
     int,
     gpg::RRef* ownerRef
   )
   {
-    auto& weakUnits = *reinterpret_cast<gpg::core::FastVectorInline<moho::WeakPtr<moho::IUnit>>*>(objectPtr);
+    auto& weakUnits = *static_cast<gpg::core::FastVectorInline<moho::WeakPtr<moho::IUnit>>*>(objectPtr);
 
     unsigned int count = 0;
     archive->ReadUInt(&count);
@@ -233,7 +218,7 @@ namespace
    */
   void SaveFastVectorWeakPtrIUnit(
     gpg::WriteArchive* archive,
-    std::intptr_t objectPtr,
+    void* objectPtr,
     int,
     gpg::RRef* ownerRef
   )

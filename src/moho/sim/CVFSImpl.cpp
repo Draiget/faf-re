@@ -278,20 +278,6 @@ namespace
   static_assert(sizeof(SearchPathCandidate) == 0x20, "SearchPathCandidate size must be 0x20");
 
   /**
-   * Address: 0x004699A0 (FUN_004699A0, sub_4699A0)
-   *
-   * What it does:
-   * Destroys one search-candidate string lane and resets it to empty SSO
-   * state.
-   */
-  [[maybe_unused]] void DestroySearchPathCandidate(
-    SearchPathCandidate& candidate
-  )
-  {
-    candidate.mResolvedPath.tidy(true, 0U);
-  }
-
-  /**
    * What it does:
    * Wildcard-expansion core of `AddMountPoint` (0x00466370). The binary
    * walks matches through the CRT find-first/find-next/find-close triad
@@ -723,61 +709,6 @@ namespace
     }
   }
 
-  /**
-   * Address: 0x00469930 (FUN_00469930, sub_469930)
-   *
-   * What it does:
-   * Copy-constructs one mount-point element into provided storage when
-   * destination storage is non-null.
-   */
-  [[maybe_unused]] moho::SVFSMountPoint* ConstructMountPointCopyIfPresent(
-    const moho::SVFSMountPoint& source,
-    moho::SVFSMountPoint* destination
-  )
-  {
-    if (destination == nullptr) {
-      return nullptr;
-    }
-    return new (destination) moho::SVFSMountPoint(source);
-  }
-
-  /**
-   * Address: 0x0046A3F0 (FUN_0046A3F0, sub_46A3F0)
-   *
-   * What it does:
-   * Copies one mount-point range backward, preserving intrusive zip-handle
-   * retain/release ownership via typed assignment.
-   */
-  [[maybe_unused]] moho::SVFSMountPoint* CopyMountPointRangeBackward(
-    moho::SVFSMountPoint* destinationEnd,
-    const moho::SVFSMountPoint* sourceEnd,
-    const moho::SVFSMountPoint* sourceBegin
-  )
-  {
-    return std::copy_backward(sourceBegin, sourceEnd, destinationEnd);
-  }
-
-  /**
-   * Address: 0x0046A4B0 (FUN_0046A4B0, sub_46A4B0)
-   *
-   * What it does:
-   * Copies one search-candidate range backward for string + directory-flag
-   * elements.
-   */
-  [[maybe_unused]] SearchPathCandidate* CopySearchPathCandidateRangeBackward(
-    SearchPathCandidate* destinationEnd,
-    const SearchPathCandidate* sourceEnd,
-    const SearchPathCandidate* sourceBegin
-  )
-  {
-    while (sourceEnd != sourceBegin) {
-      --sourceEnd;
-      --destinationEnd;
-      destinationEnd->mResolvedPath.reset_and_assign(sourceEnd->mResolvedPath);
-      destinationEnd->mIsDirectory = sourceEnd->mIsDirectory;
-    }
-    return destinationEnd;
-  }
 } // namespace
 
 namespace moho

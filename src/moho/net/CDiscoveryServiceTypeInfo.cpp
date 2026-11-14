@@ -13,38 +13,6 @@ using namespace moho;
 
 namespace
 {
-  gpg::RType* gCDiscoveryServiceTypeCache = nullptr;
-
-  /**
-   * Address: 0x007BF490 (FUN_007BF490)
-   *
-   * What it does:
-   * Returns the lazily cached reflection descriptor for
-   * `CDiscoveryService`.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::RType* CachedCDiscoveryServiceTypePrimary()
-  {
-    if (gCDiscoveryServiceTypeCache == nullptr) {
-      gCDiscoveryServiceTypeCache = gpg::LookupRType(typeid(CDiscoveryService));
-    }
-    return gCDiscoveryServiceTypeCache;
-  }
-
-  /**
-   * Address: 0x007C8910 (FUN_007C8910)
-   *
-   * What it does:
-   * Secondary cache accessor returning the reflection descriptor for
-   * `CDiscoveryService`.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::RType* CachedCDiscoveryServiceTypeSecondary()
-  {
-    if (gCDiscoveryServiceTypeCache == nullptr) {
-      gCDiscoveryServiceTypeCache = gpg::LookupRType(typeid(CDiscoveryService));
-    }
-    return gCDiscoveryServiceTypeCache;
-  }
-
   /**
    * Address: 0x007CB2A0 (FUN_007CB2A0)
    *

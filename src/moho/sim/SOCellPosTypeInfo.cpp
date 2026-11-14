@@ -20,20 +20,6 @@ namespace
     return &sInstance;
   }
 
-  /**
-   * Address: 0x0050BEF0 (FUN_0050BEF0)
-   *
-   * What it does:
-   * Executes one non-deleting `gpg::RType` base-teardown lane for
-   * `SOCellPosTypeInfo`.
-   */
-  [[maybe_unused]] void cleanup_SOCellPosTypeInfoRTypeBase(
-    moho::SOCellPosTypeInfo* const typeInfo
-  ) noexcept
-  {
-    gpg::ClearTypeLists(typeInfo);
-  }
-
 } // namespace
 
 namespace moho
@@ -46,7 +32,7 @@ namespace moho
    * What it does:
    * Writes the canonical invalid cell-position sentinel (`x = z = 0x8000`).
    */
-  [[maybe_unused]] [[nodiscard]] SOCellPos* InitializeInvalidSOCellPos(
+  [[nodiscard]] SOCellPos* InitializeInvalidSOCellPos(
     SOCellPos* const result
   ) noexcept
   {

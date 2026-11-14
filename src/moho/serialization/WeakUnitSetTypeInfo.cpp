@@ -41,7 +41,7 @@ namespace moho
    * Clears reflected base/field vector lanes for one `WeakUnitSetTypeInfo`
    * instance while preserving outer storage ownership.
    */
-  [[maybe_unused]] void DestroyWeakUnitSetTypeInfoBody(
+  void DestroyWeakUnitSetTypeInfoBody(
     WeakUnitSetTypeInfo* const typeInfo
   ) noexcept
   {

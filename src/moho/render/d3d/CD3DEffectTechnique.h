@@ -8,6 +8,7 @@
 #include <memory>
 #include "legacy/containers/String.h"
 #include "legacy/containers/Vector.h"
+#include "moho/misc/WeakObject.h"
 
 namespace gpg::gal
 {
@@ -28,15 +29,13 @@ namespace moho
    */
   extern bool ren_EditorMeshOutline;
 
-  class CD3DEffect
+  /**
+   * The weak-reference head at +0x00 is `ShaderVar::mEffectLink`'s chain: an
+   * effect going away clears every shader var still bound to it.
+   */
+  class CD3DEffect : public WeakObject
   {
   public:
-    struct AttachedLink
-    {
-      AttachedLink* mLinkLane; // +0x00
-      AttachedLink* mNext;     // +0x04
-    };
-
     template <typename NodeT>
     struct TreeMap
     {
@@ -183,12 +182,9 @@ namespace moho
        */
       void FinalizeMissingImplementations();
 
-      [[nodiscard]] Implementation* GetImplementationLanes() noexcept;
-      [[nodiscard]] const Implementation* GetImplementationLanes() const noexcept;
-
     public:
       fa::string mName;                                                                        // +0x04
-      alignas(Implementation) std::uint8_t mImplementationStorage[sizeof(Implementation) * 3]; // +0x20
+      Implementation mImplementations[3]; // +0x20, one per fidelity
     };
 
     /**
@@ -354,7 +350,6 @@ namespace moho
     void SetTexture(const char* variableName, std::shared_ptr<ID3DTextureSheet> texture);
 
   public:
-    AttachedLink* mAttachedLinks;                                   // +0x00
     TechniqueSet mTechniques;                                       // +0x04
     fa::string mName;                                               // +0x10
     fa::string mFile;                                               // +0x2C
@@ -381,12 +376,11 @@ namespace moho
 
   static_assert(offsetof(CD3DEffect::Technique, mName) == 0x04, "CD3DEffect::Technique::mName offset must be 0x04");
   static_assert(
-    offsetof(CD3DEffect::Technique, mImplementationStorage) == 0x20,
-    "CD3DEffect::Technique::mImplementationStorage offset must be 0x20"
+    offsetof(CD3DEffect::Technique, mImplementations) == 0x20,
+    "CD3DEffect::Technique::mImplementations offset must be 0x20"
   );
   static_assert(sizeof(CD3DEffect::Technique) == 0xC8, "CD3DEffect::Technique size must be 0xC8");
 
-  static_assert(offsetof(CD3DEffect, mAttachedLinks) == 0x00, "CD3DEffect::mAttachedLinks offset must be 0x00");
   static_assert(offsetof(CD3DEffect, mTechniques) == 0x04, "CD3DEffect::mTechniques offset must be 0x04");
   static_assert(offsetof(CD3DEffect, mName) == 0x10, "CD3DEffect::mName offset must be 0x10");
   static_assert(offsetof(CD3DEffect, mFile) == 0x2C, "CD3DEffect::mFile offset must be 0x2C");

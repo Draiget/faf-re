@@ -16,7 +16,7 @@
 // Typical run against a host sitting in a lobby, binding the advertised source
 // address an isolated host requires:
 //
-//	netfuzz -target 192.168.42.77:17890 -bind 192.168.42.77:0 -probe
+//	netfuzz -target 192.0.2.77:17890 -bind 192.0.2.77:0 -probe
 //
 // Exit status: 0 when the corpus was sent. With -probe, a nonzero status when
 // the host answered the pre-run probe but not the post-run one (-fail-on-death),

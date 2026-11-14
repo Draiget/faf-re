@@ -74,65 +74,12 @@ namespace
     return &sInstance;
   }
 
-  /**
-   * Address: 0x004CB710 (FUN_004CB710, CLuaTask reflected ref store helper)
-   *
-   * What it does:
-   * Writes one `gpg::RRef` lane for a CLuaTask pointer into caller-provided
-   * output storage.
-   */
-  [[maybe_unused]] gpg::RRef* StoreCLuaTaskRef(
-    gpg::RRef* const outRef,
-    CLuaTask* const task
-  )
-  {
-    *outRef = gpg::MakeRRef<moho::CLuaTask>(task);
-    return outRef;
-  }
-
-  /**
-   * Address: 0x004CB740 (FUN_004CB740, CLuaTask member-deserialize thunk)
-   *
-   * What it does:
-   * Thin wrapper that forwards archive + object lanes into
-   * `CLuaTask::MemberDeserialize`. Invoked from
-   * `CLuaTaskSerializer::Deserialize` below.
-   */
-  [[maybe_unused]] void DeserializeCLuaTaskThunk(
-    gpg::ReadArchive* const archive,
-    CLuaTask* const task
-  )
-  {
-    GPG_ASSERT(task != nullptr);
-    task->MemberDeserialize(archive);
-  }
-
   // Address 0x004CBD10 (the duplicate "ThunkAlias" one-line forward to
   // DeserializeCLuaTaskThunk formerly modeled here) is dead: zero data_refs
   // and zero call_edges in the callgraph index, and no source-level caller
   // anywhere in src/**. DeserializeCLuaTaskThunk above already covers
   // this address's behavior and is the one genuinely wired into
   // CLuaTaskSerializer::Deserialize.
-
-  /**
-   * Address: 0x004CB750 (FUN_004CB750, CLuaTask member-serialize thunk)
-   * Address: 0x004CBD20 (FUN_004CBD20, duplicate member-serialize thunk emission --
-   *   same one-line forward to `CLuaTask::MemberSerialize`, distinct compiled
-   *   address; not an ICF twin since the encoded jmp displacement differs)
-   *
-   * What it does:
-   * Thin wrapper that forwards archive + object lanes into
-   * `CLuaTask::MemberSerialize`. Invoked from `CLuaTaskSerializer::Serialize`
-   * below.
-   */
-  [[maybe_unused]] void SerializeCLuaTaskThunk(
-    gpg::WriteArchive* const archive,
-    CLuaTask* const task
-  )
-  {
-    GPG_ASSERT(task != nullptr);
-    task->MemberSerialize(archive);
-  }
 
   /**
    * Address: 0x004CC6A0 (FUN_004CC6A0)

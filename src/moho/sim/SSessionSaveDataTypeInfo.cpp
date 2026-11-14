@@ -22,23 +22,6 @@ namespace
   }
 
   /**
-   * Address: 0x008991D0 (FUN_008991D0)
-   *
-   * What it does:
-   * Installs one `SSessionSaveDataTypeInfo` lifecycle callback set into one reflected type record.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::RType* InstallSSessionSaveDataTypeInfoLifecycleCallbacks(
-    gpg::RType* const typeInfo
-  )
-  {
-    typeInfo->newRefFunc_ = &SSessionSaveDataTypeInfo::NewRef;
-    typeInfo->ctorRefFunc_ = &SSessionSaveDataTypeInfo::CtrRef;
-    typeInfo->deleteFunc_ = &SSessionSaveDataTypeInfo::Delete;
-    typeInfo->dtrFunc_ = &SSessionSaveDataTypeInfo::Destruct;
-    return typeInfo;
-  }
-
-  /**
    * Address: 0x00C081C0 (FUN_00C081C0, atexit destructor of the SSessionSaveDataTypeInfo object)
    */
   [[nodiscard]] SSessionSaveDataTypeInfo& AcquireSSessionSaveDataTypeInfo()

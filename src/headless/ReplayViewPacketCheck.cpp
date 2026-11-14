@@ -187,7 +187,7 @@ namespace faf::headless
           digest.Add(army.mNoRushRadius);
           digest.Add(army.mNoRushOffset.x);
           digest.Add(army.mNoRushOffset.y);
-          digest.Add(static_cast<std::uint32_t>(army.mWordVectorWithMeta.mWords.size()));
+          digest.Add(static_cast<std::uint32_t>(army.mPathPreview.mCells.size()));
         }
       }
       return digest.Value();

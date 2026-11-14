@@ -56,7 +56,7 @@ namespace gpg
      * Reads unowned `IPathTraveler` pointers until null and links each
      * traveler node into the destination intrusive list.
      */
-    static void SerLoad(gpg::ReadArchive* archive, std::intptr_t objectPtr, int version, gpg::RRef* ownerRef);
+    static void SerLoad(gpg::ReadArchive* archive, void* objectPtr, int version, gpg::RRef* ownerRef);
 
     /**
      * Address: 0x00767480 (FUN_00767480, gpg::RDListType_IPathTraveler::SerSave)
@@ -65,21 +65,13 @@ namespace gpg
      * Serializes each intrusive-list traveler as an unowned raw-pointer lane,
      * then emits a trailing null traveler sentinel.
      */
-    static void SerSave(gpg::WriteArchive* archive, std::intptr_t objectPtr, int version, gpg::RRef* ownerRef);
+    static void SerSave(gpg::WriteArchive* archive, void* objectPtr, int version, gpg::RRef* ownerRef);
   };
 } // namespace gpg
 
 namespace
 {
   using PathTravelerList = gpg::DList<moho::IPathTraveler>;
-
-  template <class TObject>
-  [[nodiscard]] TObject* PointerFromArchiveInt(
-    const std::intptr_t objectPtr
-  )
-  {
-    return reinterpret_cast<TObject*>(objectPtr);
-  }
 
 } // namespace
 
@@ -137,12 +129,12 @@ void gpg::RDListType_IPathTraveler::Init()
  */
 void gpg::RDListType_IPathTraveler::SerLoad(
   gpg::ReadArchive* const archive,
-  const std::intptr_t objectPtr,
+  void* const objectPtr,
   const int,
   gpg::RRef* const ownerRef
 )
 {
-  auto* const listHead = PointerFromArchiveInt<PathTravelerList>(objectPtr);
+  auto* const listHead = static_cast<PathTravelerList*>(objectPtr);
   GPG_ASSERT(archive != nullptr);
   GPG_ASSERT(listHead != nullptr);
   if (!archive || !listHead) {
@@ -172,12 +164,12 @@ void gpg::RDListType_IPathTraveler::SerLoad(
  */
 void gpg::RDListType_IPathTraveler::SerSave(
   gpg::WriteArchive* const archive,
-  const std::intptr_t objectPtr,
+  void* const objectPtr,
   const int,
   gpg::RRef* const ownerRef
 )
 {
-  auto* const listHead = PointerFromArchiveInt<PathTravelerList>(objectPtr);
+  auto* const listHead = static_cast<PathTravelerList*>(objectPtr);
   if (archive == nullptr || listHead == nullptr) {
     return;
   }

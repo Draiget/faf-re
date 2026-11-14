@@ -12,8 +12,10 @@ namespace faf::editor
     std::string title = "New map";
     /** The folder under `<vault>/maps`, FAF's `<name>.v0001` form; its name without the version names the files. */
     std::string folder = "new_map.v0001";
-    /** Index into kNewMapSizes. */
-    int size = 1;
+    /** Index into kNewMapSizes: the map's width (east-west). */
+    int size = 2;
+    /** Its depth (north-south), an index into kNewMapSizes; -1: as wide as it is (a square map). */
+    int sizeZ = -1;
     /** 1 to 16 start positions, `ARMY_1`... in a ring; `ARMY_17` and `NEUTRAL_CIVILIAN` are added as extra armies. */
     int players = 2;
     bool campaign = false;
@@ -31,7 +33,7 @@ namespace faf::editor
     int units;
   };
   inline constexpr NewMapSize kNewMapSizes[] =
-    {{"5 km", 256}, {"10 km", 512}, {"20 km", 1024}, {"40 km", 2048}, {"81 km", 4096}};
+    {{"2.5 km", 128}, {"5 km", 256}, {"10 km", 512}, {"20 km", 1024}, {"40 km", 2048}, {"81 km", 4096}};
   inline constexpr int kNewMapSizeCount = static_cast<int>(sizeof(kNewMapSizes) / sizeof(kNewMapSizes[0]));
   inline constexpr int kNewMapMaxPlayers = 16;
 
@@ -42,7 +44,13 @@ namespace faf::editor
     float z;
   };
 
-  /** The start positions: one in the middle, or a ring at 35% of the map's size around it, the first at the top. */
+  /** The map's width and depth in game units. */
+  [[nodiscard]] int NewMapWidth(const NewMapSettings& settings);
+  [[nodiscard]] int NewMapDepth(const NewMapSettings& settings);
+  /**
+   * The start positions: one in the middle, or a ring around it (an ellipse on a map that isn't square) at 35% of each
+   * side, the first at the top.
+   */
   std::vector<NewMapSpawn> NewMapSpawns(const NewMapSettings& settings);
 
   /** `<base>_scenario.lua`, as FAF's maps write it (version 3), for the files in `/maps/<folder>/<base>...`. */

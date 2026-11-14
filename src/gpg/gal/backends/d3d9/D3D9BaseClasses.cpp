@@ -98,30 +98,6 @@ namespace gpg::gal
   PipelineState::~PipelineState() = default;
   namespace
   {
-    constexpr int kCubeFaceCount = 6;
-
-    constexpr unsigned int kCubeFaceByIndex[kCubeFaceCount] = {
-      0U,
-      1U,
-      2U,
-      3U,
-      4U,
-      5U,
-    };
-
-    /**
-     * Address: 0x00941280 (FUN_00941280)
-     *
-     * What it does:
-     * Maps one cube-face index (`0..5`) to the backend D3D9 face token.
-     */
-    [[maybe_unused]] [[nodiscard]] int ResolveD3D9CubeFaceToken(
-      const int faceIndex
-    ) noexcept
-    {
-      return static_cast<int>(kCubeFaceByIndex[faceIndex]);
-    }
-
   } // namespace
 
 } // namespace gpg::gal

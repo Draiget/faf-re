@@ -8,6 +8,7 @@
 #include "gpg/core/utils/Global.h"
 #include "moho/ai/CAiAttackerImpl.h"
 #include "moho/effects/rendering/IEffect.h"
+#include "moho/effects/rendering/CEffectManagerImpl.h"
 #include "moho/effects/rendering/IEffectManager.h"
 #include "moho/effects/rendering/IEffectWeakPtrReflection.h"
 #include "moho/entity/EntityDb.h"
@@ -457,7 +458,7 @@ namespace moho
     Entity::OnDestroy();
 
     if (IEffect* const activeEffect = mEffect.GetObjectPtr(); activeEffect != nullptr) {
-      reinterpret_cast<IEffectManager*>(SimulationRef->mEffectManager)->DestroyEffect(activeEffect);
+      SimulationRef->mEffectManager->DestroyEffect(activeEffect);
       mEffect.UnlinkFromOwnerChain();
     }
   }

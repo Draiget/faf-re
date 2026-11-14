@@ -428,7 +428,7 @@ namespace moho
     WeakPtr<UnitWeapon> mWeapon{};                             // +0x88
     fa::string mLabel{};                                       // +0x90
     RUnitBlueprintWeapon* mUnitWepBlueprint = nullptr;         // +0xAC
-    RProjectileBlueprintPhysics* mProjPhysBlueprint = nullptr; // +0xB0
+    RProjectileBlueprint* mProjBlueprint = nullptr;            // +0xB0 (the binary keeps &blueprint->Physics)
     bool mEnabled = false;                                     // +0xB4
     std::uint8_t mPadB5ToB7[0x3]{};
     float mHeading = 0.0f;        // +0xB8

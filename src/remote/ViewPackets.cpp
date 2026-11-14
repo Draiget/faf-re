@@ -88,7 +88,7 @@ namespace faf::remote
       record.mEconomyTotals = moho::SEconTotals{};
       record.mIsResourceSharingEnabled = 0u;
       record.mUseWholeMap = 0u;
-      record.mWordVectorWithMeta = moho::SArmyVectorWithMeta{};
+      record.mPathPreview = moho::SArmyPathPreview{};
       record.mArmyStart = Wm3::Vector2f{0.0f, 0.0f};
       record.mNoRushTimer = 0;
       record.mNoRushRadius = 0.0f;

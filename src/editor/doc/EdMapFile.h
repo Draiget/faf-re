@@ -58,6 +58,10 @@ namespace faf::editor
   /** The preview chunk's bytes from the start of a `.scmap` (after the 8-byte file header), or empty. */
   std::vector<char> ReadPreviewRecord(const std::string& file);
 
+  /** The picture (a DDS file's bytes) inside a preview record, or empty: the one reader of it (the Maps window's too).
+   */
+  [[nodiscard]] std::string PreviewPictureOf(const std::vector<char>& record);
+
   /**
    * The stored records of `map`'s props, from the end of its `.scmap` (the props section is the file's
    * last: a count, then each prop's path and 15 floats). Empty when the tail doesn't match the props the

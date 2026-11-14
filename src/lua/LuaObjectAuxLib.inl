@@ -837,9 +837,9 @@ lua_State* luaE_newthread(
   auto* const thread = luaM_new<lua_State>(state);
 
   thread->next = state->l_G->rootgc1;
-  state->l_G->rootgc1 = reinterpret_cast<GCObject*>(thread);
+  state->l_G->rootgc1 = valtogco(thread);
   sweep_boundaries::NoteLinked(
-    state->l_G, sweep_boundaries::kListThreads, reinterpret_cast<GCObject*>(thread)
+    state->l_G, sweep_boundaries::kListThreads, valtogco(thread)
   ); // engine addition: lua_ParallelSweep
 
   thread->marked = 0;
@@ -944,7 +944,7 @@ int luaZ_fill(
 )
 {
   size_t available = 0;
-  const char* const block = reinterpret_cast<const char*>(stream->reader(nullptr, stream->readerData, &available));
+  const char* const block = stream->reader(nullptr, stream->readerData, &available);
 
   if (block == nullptr || available == 0u) {
     return kLuaEndOfStream;
@@ -1281,7 +1281,7 @@ int luaL_loadfile(
     }
   }
 
-  const int status = lua_load(state, reinterpret_cast<lua_Chunkreader>(getWF), &lf, lua_tostring(state, -1));
+  const int status = lua_load(state, getWF, &lf, lua_tostring(state, -1));
 
   const int readstatus = std::ferror(lf.f);
   if (lf.f != stdin) {
@@ -1312,7 +1312,7 @@ int luaL_loadbuffer(
   LuaLoadStringState ls;
   ls.s = buff;
   ls.size = size;
-  return lua_load(state, reinterpret_cast<lua_Chunkreader>(getS), &ls, name);
+  return lua_load(state, getS, &ls, name);
 }
 
 /**
@@ -1413,12 +1413,12 @@ Closure* luaF_newLclosure(
 {
   auto* const closure = static_cast<Closure*>(luaM_reallocblock(state, nullptr, {0u, 0u}, sizeLclosure(nelems)));
 
-  luaC_link(state, reinterpret_cast<GCObject*>(closure), LUA_TFUNCTION);
+  luaC_link(state, valtogco(closure), LUA_TFUNCTION);
 
   closure->l.g = *environment;
   faf_lua51_gc_barrier_value(
     state,
-    reinterpret_cast<GCObject*>(closure),
+    valtogco(closure),
     environment
   ); // Lua 5.1.5 lfunc.c: luaF_newLclosure() environment barrier
   closure->l.nupvalues = static_cast<lu_byte>(nelems);

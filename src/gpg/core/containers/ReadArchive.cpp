@@ -196,7 +196,7 @@ namespace
      * serialization failure on EOF/read errors.
      */
     void ReadBytes(
-      char* const bytes,
+      void* const bytes,
       const size_t byteCount
     ) override
     {
@@ -511,7 +511,7 @@ namespace
       void* const outValue
     )
     {
-      ReadBytes(reinterpret_cast<char*>(outValue), sizeof(short));
+      ReadBytes(static_cast<char*>(outValue), sizeof(short));
     }
 
     /**
@@ -524,7 +524,7 @@ namespace
       void* const outValue
     )
     {
-      ReadBytes(reinterpret_cast<char*>(outValue), sizeof(unsigned short));
+      ReadBytes(static_cast<char*>(outValue), sizeof(unsigned short));
     }
 
     /**
@@ -600,7 +600,7 @@ namespace
       void* const outValue
     )
     {
-      ReadBytes(reinterpret_cast<char*>(outValue), sizeof(__int64));
+      ReadBytes(static_cast<char*>(outValue), sizeof(__int64));
     }
 
     /**
@@ -613,7 +613,7 @@ namespace
       void* const outValue
     )
     {
-      ReadBytes(reinterpret_cast<char*>(outValue), sizeof(unsigned __int64));
+      ReadBytes(static_cast<char*>(outValue), sizeof(unsigned __int64));
     }
 
     /**
@@ -626,7 +626,7 @@ namespace
       void* const outValue
     )
     {
-      ReadBytes(reinterpret_cast<char*>(outValue), sizeof(float));
+      ReadBytes(static_cast<char*>(outValue), sizeof(float));
     }
 
     // `gpg::CreateBinaryReadArchive` (0x009048B0) allocates 0x44 and sets
@@ -641,25 +641,6 @@ namespace
   };
 
   static_assert(sizeof(BinaryReadArchive) == 0x44, "BinaryReadArchive size must be 0x44");
-
-  /**
-   * Address: 0x00904890 (FUN_00904890)
-   *
-   * What it does:
-   * Runs one deleting-destructor thunk for `BinaryReadArchive`, forwarding
-   * through non-deleting teardown and optional storage release.
-   */
-  [[maybe_unused]] [[nodiscard]] BinaryReadArchive* DestroyBinaryReadArchiveDeleting(
-    BinaryReadArchive* const archive,
-    const unsigned char deleteFlag
-  )
-  {
-    archive->~BinaryReadArchive();
-    if ((deleteFlag & 1u) != 0u) {
-      ::operator delete(static_cast<void*>(archive));
-    }
-    return archive;
-  }
 
   class TextReadArchive : public gpg::ReadArchive
   {
@@ -861,10 +842,11 @@ namespace
      * hexadecimal token per byte.
      */
     void ReadBytes(
-      char* const bytes,
+      void* const data,
       const size_t byteCount
     ) override
     {
+      auto* const bytes = static_cast<char*>(data);
       std::istream& stream = *mCachedStream;
       std::string token;
       for (size_t index = 0; index < byteCount; ++index) {
@@ -1014,25 +996,6 @@ namespace
   };
 
   static_assert(sizeof(TextReadArchive) == 0x44, "TextReadArchive size must be 0x44");
-
-  /**
-   * Address: 0x009397E0 (FUN_009397E0, TextReadArchive::dtr)
-   *
-   * What it does:
-   * Runs one deleting-destructor thunk for `TextReadArchive`, forwarding
-   * through non-deleting teardown and optional storage release.
-   */
-  [[maybe_unused]] [[nodiscard]] TextReadArchive* DestroyTextReadArchiveDeleting(
-    TextReadArchive* const archive,
-    const unsigned char deleteFlag
-  )
-  {
-    archive->~TextReadArchive();
-    if ((deleteFlag & 1u) != 0u) {
-      ::operator delete(static_cast<void*>(archive));
-    }
-    return archive;
-  }
 
   /**
    * Address: 0x00952C90 (FUN_00952C90)
@@ -1197,7 +1160,7 @@ void ReadArchive::Read(
     ));
   }
 
-  type->serLoadFunc_(this, reinterpret_cast<std::intptr_t>(object), handle.version, const_cast<RRef*>(&ownerRef));
+  type->serLoadFunc_(this, object, handle.version, const_cast<RRef*>(&ownerRef));
 
   if (NextMarker() != static_cast<int>(ArchiveToken::ObjectTerminator)) {
     ThrowSerializationError(STR_Printf(
@@ -1311,17 +1274,16 @@ ReadArchive* ReadArchive::ReadPointer_Listener_NavPath(
  * at offset 0 -- the FUN_007638D0 asm links each node before `listHead`
  * itself.
  */
-moho::Listener<const moho::SNavPath&>* gpg::ReadAndLinkNavPathListeners(
+void gpg::ReadAndLinkNavPathListeners(
   ReadArchive* const archive,
-  moho::Broadcaster<const moho::SNavPath&>* const listHead,
-  const int version,
-  const gpg::RRef* const ownerRef
+  void* const objectPtr,
+  int,
+  gpg::RRef* const ownerRef
 )
 {
-  (void)version;
-
+  auto* const listHead = static_cast<moho::Broadcaster<const moho::SNavPath&>*>(objectPtr);
   if (archive == nullptr || listHead == nullptr) {
-    return nullptr;
+    return;
   }
 
   moho::Listener<const moho::SNavPath&>* listener = nullptr;
@@ -1330,8 +1292,6 @@ moho::Listener<const moho::SNavPath&>* gpg::ReadAndLinkNavPathListeners(
     listHead->AddListener(listener);
     archive->ReadPointer_Listener_NavPath(&listener, ownerRef);
   }
-
-  return listener;
 }
 
 /**

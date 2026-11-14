@@ -76,6 +76,8 @@ namespace faf::editor
   )
   {
     gHidden = hidden;
+    // The game's own visibility update keeps them hidden too (it showed them again between frames: they flickered).
+    moho::ed_HideUserUnits = hidden;
   }
 
   std::string ToggleName(

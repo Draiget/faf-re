@@ -71,7 +71,7 @@ TEST(
   EXPECT_EQ(full->host, "replay.example.org");
   EXPECT_EQ(full->port, 15001);
   EXPECT_EQ(full->path, "/12345/live.scfareplay");
-  const auto noPort = faf::server::ParseGpgNetAddress("gpgnet://10.0.0.5/9");
+  const auto noPort = faf::server::ParseGpgNetAddress("gpgnet://192.0.2.5/9");
   ASSERT_TRUE(noPort.has_value());
   EXPECT_EQ(noPort->port, 15000); // the engine's default
   EXPECT_EQ(noPort->path, "/9");

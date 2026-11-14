@@ -2,42 +2,6 @@
 
 namespace
 {
-  /**
-   * Address: 0x00861DC0 (FUN_00861DC0)
-   *
-   * IDA signature:
-   * void* __cdecl sub_861DC0();
-   *
-   * What it does:
-   * Allocates one 3152-byte (0xC50) buffer through VC8's `_Allocate` with the
-   * count folded to the constant (0x008620F0, cited on
-   * `fa::detail::allocate_checked`), zeroes the first three dwords and marks
-   * a two-byte initialized / not-yet-flushed flag pair near the end
-   * (`+0xC48 = 1`, `+0xC49 = 0`).
-   *
-   * Reached directly from the CRT static-initializer table (`__xc_a`, depth
-   * 1): the constructor body of a namespace-scope static object with
-   * non-trivial construction. Its address neighbours (0x00861D70, then
-   * 0x00861EB0 in this file) place it in this translation unit; the owning
-   * global is not yet identified from the binary (its callers 0x00860DE0,
-   * 0x008614D0, 0x00861A60 and the `__xc_a` registrar 0x00BE5CF0 are
-   * unrecovered), so it stays a free function until that declaration lands.
-   */
-  [[maybe_unused]] void* AllocateAndTagStaticBootstrapBuffer3152()
-  {
-    void* const buffer = fa::detail::allocate_checked<std::uint8_t>(0xC50u);
-    if (buffer != nullptr) {
-      auto* const dwords = static_cast<std::uint32_t*>(buffer);
-      dwords[0] = 0u;
-      dwords[1] = 0u;
-      dwords[2] = 0u;
-
-      auto* const bytes = static_cast<std::uint8_t*>(buffer);
-      bytes[0xC48] = 1u;
-      bytes[0xC49] = 0u;
-    }
-    return buffer;
-  }
 } // namespace
 
 namespace moho
@@ -336,7 +300,7 @@ namespace
    */
   void DeserializeEntIdStringMultiMap(
     gpg::ReadArchive* const archive,
-    const std::intptr_t objectPtr,
+    void* const objectPtr,
     const int,
     gpg::RRef* const ownerRef
   )
@@ -345,7 +309,7 @@ namespace
       return;
     }
 
-    auto* const destination = reinterpret_cast<EntIdStringMultiMap*>(objectPtr);
+    auto* const destination = static_cast<EntIdStringMultiMap*>(objectPtr);
     unsigned int count = 0u;
     archive->ReadUInt(&count);
 
@@ -372,7 +336,7 @@ namespace
    */
   void SerializeEntIdStringMultiMap(
     gpg::WriteArchive* const archive,
-    const std::intptr_t objectPtr,
+    void* const objectPtr,
     const int,
     gpg::RRef* const ownerRef
   )
@@ -381,7 +345,7 @@ namespace
       return;
     }
 
-    const auto* const source = reinterpret_cast<const EntIdStringMultiMap*>(objectPtr);
+    const auto* const source = static_cast<const EntIdStringMultiMap*>(objectPtr);
     const unsigned int count = source != nullptr ? static_cast<unsigned int>(source->size()) : 0u;
     archive->WriteUInt(count);
     if (source == nullptr) {
@@ -497,28 +461,6 @@ namespace moho
   {
     // gWldFrameAction: moho/sim/WldSessionState.cpp (WldSessionState.h).
 
-    /**
-     * Address: 0x00869870 (FUN_00869870, session-listener attach dispatch)
-     *
-     * What it does:
-     * Attaches every registered session listener to the current active world
-     * session. The binary calls **vtable slot 0** here -
-     * `(**v4)(v4, Moho::sWldSession)` - which is
-     * `ISessionListener::AttachToSessionListenerLane`, not the detach slot the
-     * teardown pass uses (see `DoTeardownCallbacks`, FUN_008698B0, which takes
-     * `*v4 + 4`).
-     */
-    [[maybe_unused]] void DispatchSessionListenerAttach(
-      WldTeardownCallbackVector* const callbacks
-    )
-    {
-      const std::size_t callbackCount = callbacks->size();
-      for (std::size_t i = 0; i < callbackCount; ++i) {
-        ISessionListener* const listener = (*callbacks)[i];
-        listener->AttachToSessionListenerLane(gActiveWldSession);
-      }
-    }
-
     // `RebindAndCopyBuildTemplateBufferInline` (0x00898E50) was the hand-rolled
     // rebind-to-inline + copy-construct pass that duplicated
     // `gpg::core::FastVectorN<SBuildTemplateInfo, 16>`'s own copy constructor
@@ -528,38 +470,6 @@ namespace moho
     // sites use placement-new (`GetActiveBuildTemplate` below) or plain
     // copy-construction, matching the binary's hidden-return-slot ABI for
     // returning a non-trivial type by value.
-
-    /**
-     * Address: 0x00823D30 (FUN_00823D30, sub_823D30)
-     *
-     * What it does:
-     * Returns one first-dword lane from one build-template helper payload.
-     */
-    [[maybe_unused]] [[nodiscard]] std::uint32_t ReadBuildTemplateHelperLane0(
-      const void* const value
-    ) noexcept
-    {
-      if (value == nullptr) {
-        return 0u;
-      }
-      return *static_cast<const std::uint32_t*>(value);
-    }
-
-    /**
-     * Address: 0x00823D40 (FUN_00823D40, sub_823D40)
-     *
-     * What it does:
-     * Returns one second-dword lane from one build-template helper payload.
-     */
-    [[maybe_unused]] [[nodiscard]] std::uint32_t ReadBuildTemplateHelperLane4(
-      const void* const value
-    ) noexcept
-    {
-      if (value == nullptr) {
-        return 0u;
-      }
-      return *(reinterpret_cast<const std::uint32_t*>(value) + 1);
-    }
 
     constexpr std::uint32_t kBuildPreviewValidColor = 0xD800D800u;
     constexpr std::uint32_t kBuildPreviewInvalidColor = 0xD8D80000u;
@@ -661,18 +571,16 @@ namespace moho
 
   /**
    * Bridge for the recovered `cfunc_IssueDockCommandL` worker: resolves the world
-   * position of one unit's last-queued command. `QueuedUserCommandRecord` is
-   * the opaque cross-TU name `GetLastQueuedUserCommandAnchor` (UserUnit.cpp)
-   * hands out for that command's `UserCommandIssueHelper`; the handle points at
-   * the helper itself, so this is a pointer conversion, not an offset. Forwards
-   * to `ResolveCommandIssueTargetPosition` (FUN_0081CFD0).
+   * position of one unit's last-queued command (the helper
+   * `GetLastQueuedUserCommandAnchor` returns). Forwards to
+   * `ResolveCommandIssueTargetPosition` (FUN_0081CFD0).
    */
   Wm3::Vector3f ResolveLastQueuedCommandAnchorPosition(
-    const QueuedUserCommandRecord* const record
+    const UserCommandIssueHelper* const record
   )
   {
     Wm3::Vector3f out{};
-    (void)ResolveCommandIssueTargetPosition(&out, *reinterpret_cast<const UserCommandIssueHelper*>(record));
+    (void)ResolveCommandIssueTargetPosition(&out, *record);
     return out;
   }
 

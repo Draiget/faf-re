@@ -1,5 +1,8 @@
 #include "editor/tools/EdDecalShape.h"
 
+#include <cmath>
+#include <cstdint>
+
 #include <algorithm>
 #include <cctype>
 #include <cmath>
@@ -213,5 +216,76 @@ namespace faf::editor
     default:
       return "undefined";
     }
+  }
+
+  std::vector<std::pair<float, float>> ScatterInCircle(
+    const float cx,
+    const float cz,
+    const float radius,
+    const int count,
+    const float apart,
+    const std::vector<std::pair<float, float>>& taken,
+    std::uint32_t& seed
+  )
+  {
+    std::vector<std::pair<float, float>> out;
+    const auto unit = [&seed]() {
+      seed = seed * 1664525U + 1013904223U;
+      return static_cast<float>(seed >> 8) / 16777216.0f;
+    };
+    const auto free = [&](const float x, const float z) {
+      const float a2 = apart * apart;
+      for (const auto& [tx, tz] : taken) {
+        if ((tx - x) * (tx - x) + (tz - z) * (tz - z) < a2) {
+          return false;
+        }
+      }
+      for (const auto& [ox, oz] : out) {
+        if ((ox - x) * (ox - x) + (oz - z) * (oz - z) < a2) {
+          return false;
+        }
+      }
+      return true;
+    };
+    // A few tries a point (a full circle gives up).
+    for (int tries = 0; static_cast<int>(out.size()) < count && tries < count * 12; ++tries) {
+      const float angle = unit() * 6.2831853f;
+      const float reach = radius * std::sqrt(unit());
+      const float x = cx + std::cos(angle) * reach;
+      const float z = cz + std::sin(angle) * reach;
+      if (free(x, z)) {
+        out.emplace_back(x, z);
+      }
+    }
+    return out;
+  }
+
+  std::vector<DecalPlace> DecalCopyPlaces(
+    const int width,
+    const int height,
+    const float x,
+    const float z,
+    const float heading,
+    const Symmetry symmetry,
+    const int turns
+  )
+  {
+    float centreX[kMaxSymmetryCopies], centreZ[kMaxSymmetryCopies], aheadX[kMaxSymmetryCopies],
+      aheadZ[kMaxSymmetryCopies];
+    const int copies = HeightBrushCentres(width, height, x, z, symmetry, turns, centreX, centreZ);
+    (void)HeightBrushCentres(
+      width, height, x + std::cos(heading), z + std::sin(heading), symmetry, turns, aheadX, aheadZ
+    );
+    std::vector<DecalPlace> out;
+    for (int c = 0; c < copies; ++c) {
+      if (
+        centreX[c] < 0.0f || centreZ[c] < 0.0f || centreX[c] > static_cast<float>(width - 1) ||
+        centreZ[c] > static_cast<float>(height - 1)
+      ) {
+        continue;
+      }
+      out.push_back(DecalPlace{centreX[c], centreZ[c], std::atan2(aheadZ[c] - centreZ[c], aheadX[c] - centreX[c])});
+    }
+    return out;
   }
 } // namespace faf::editor

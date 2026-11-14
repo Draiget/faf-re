@@ -1349,8 +1349,7 @@ namespace moho
     loaderData.done = false;
 
     const fa::string chunkName = gpg::STR_Printf("@%s", filename);
-    const int loadStatus =
-      lua_load(rawState, reinterpret_cast<lua_Chunkreader>(func_LuaFileLoader), &loaderData, chunkName.c_str());
+    const int loadStatus = lua_load(rawState, func_LuaFileLoader, &loaderData, chunkName.c_str());
 
     if (loadStatus != 0) {
       LuaPlus::LuaStackObject errorObject{};
@@ -1462,8 +1461,7 @@ namespace moho
       }
       loadStatus = SCR_LoadScriptChunk(state->m_state, source, chunkName.c_str());
     } else {
-      loadStatus =
-        lua_load(state->m_state, reinterpret_cast<lua_Chunkreader>(func_LoadConcat), &loadData, chunkName.c_str());
+      loadStatus = lua_load(state->m_state, func_LoadConcat, &loadData, chunkName.c_str());
     }
     if (loadStatus != 0) {
       LuaPlus::LuaStackObject errorObject{};

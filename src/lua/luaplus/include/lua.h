@@ -58,7 +58,7 @@ typedef wchar_t lua_WChar;
 typedef unsigned short lua_WChar;
 #endif
 
-typedef const lua_WChar * (*lua_Chunkreader) (lua_State *L, void *ud, size_t *sz);
+typedef const char * (*lua_Chunkreader) (lua_State *L, void *ud, size_t *sz);
 
 typedef int (*lua_Chunkwriter) (lua_State *L, const void* p,
                                 size_t sz, void* ud);

@@ -50,7 +50,7 @@ namespace moho
    * Clears reflected base/field vector lanes for one `ProjectileTypeInfo`
    * instance while preserving outer storage ownership.
    */
-  [[maybe_unused]] void DestroyProjectileTypeInfoBody(
+  void DestroyProjectileTypeInfoBody(
     ProjectileTypeInfo* const typeInfo
   ) noexcept
   {

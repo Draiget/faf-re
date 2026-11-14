@@ -998,10 +998,10 @@ int luaH_next(
   TObject* valueSlot = &nodeBase[nodeIndex].i_val;
   while (valueSlot->tt == LUA_TNIL) {
     ++nodeIndex;
-    valueSlot = reinterpret_cast<TObject*>(reinterpret_cast<std::uint8_t*>(valueSlot) + sizeof(Node));
     if (nodeIndex >= nodeCount) {
       return 0;
     }
+    valueSlot = &nodeBase[nodeIndex].i_val;
   }
 
   key[0] = nodeBase[nodeIndex].Key();

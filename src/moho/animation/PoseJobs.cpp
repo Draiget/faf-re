@@ -21,7 +21,7 @@
 #include "moho/animation/IAniManipulator.h"
 #include "moho/console/CConCommand.h"
 #include "moho/sim/CArmyImpl.h"
-#include "moho/sim/CSimArmyEconomyInfo.h"
+#include "moho/sim/CEconomy.h"
 #include "moho/sim/SimJobStream.h"
 #include "moho/sim/SimThreadRole.h"
 #include "moho/sim/SimWorkerPool.h"
@@ -283,12 +283,12 @@ namespace moho
         return;
       }
       if (CArmyImpl* const army = unit.ArmyRef; army != nullptr) {
-        if (const CSimArmyEconomyInfo* const economyInfo = army->GetEconomy(); economyInfo != nullptr) {
+        if (const CEconomy* const economyInfo = army->GetEconomy(); economyInfo != nullptr) {
           inputs.mHasEconomy = true;
-          inputs.mMaxStorageEnergy = economyInfo->economy.MaxStorageOf(ECON_ENERGY);
-          inputs.mMaxStorageMass = economyInfo->economy.MaxStorageOf(ECON_MASS);
-          inputs.mStoredEnergy = economyInfo->economy.mStored.ENERGY;
-          inputs.mStoredMass = economyInfo->economy.mStored.MASS;
+          inputs.mMaxStorageEnergy = economyInfo->mTotals.MaxStorageOf(ECON_ENERGY);
+          inputs.mMaxStorageMass = economyInfo->mTotals.MaxStorageOf(ECON_MASS);
+          inputs.mStoredEnergy = economyInfo->mTotals.mStored.ENERGY;
+          inputs.mStoredMass = economyInfo->mTotals.mStored.MASS;
         }
       }
     }

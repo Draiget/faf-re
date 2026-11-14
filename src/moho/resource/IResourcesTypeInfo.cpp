@@ -16,20 +16,6 @@ namespace
     return sInstance;
   }
 
-  /**
-   * Address: 0x00546E20 (FUN_00546E20)
-   *
-   * What it does:
-   * Executes one non-deleting `gpg::RType` base-teardown lane for
-   * `IResourcesTypeInfo`.
-   */
-  [[maybe_unused]] void cleanup_IResourcesTypeInfoRTypeBase(
-    moho::IResourcesTypeInfo* const typeInfo
-  ) noexcept
-  {
-    gpg::ClearTypeLists(typeInfo);
-  }
-
   struct IResourcesTypeInfoStartup
   {
     IResourcesTypeInfoStartup()

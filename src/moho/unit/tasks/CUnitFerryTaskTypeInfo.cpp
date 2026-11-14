@@ -36,7 +36,7 @@ namespace
    * Binds lifecycle callback lanes (`new/ctor/delete/destruct`) for one
    * `CUnitFerryTaskTypeInfo` descriptor.
    */
-  [[maybe_unused]] gpg::RType* BindCUnitFerryTaskTypeLifecycleCallbacks(
+  gpg::RType* BindCUnitFerryTaskTypeLifecycleCallbacks(
     gpg::RType* const typeInfo
   ) noexcept
   {

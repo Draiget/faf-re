@@ -131,4 +131,24 @@ namespace
     EXPECT_EQ(faf::editor::DecalTypeForTexture("/env/normalworld/decals/crater.dds"), 1);
     EXPECT_STREQ(faf::editor::DecalTypeName(2), "normals");
   }
+
+  TEST(
+    DecalShape,
+    ScatterKeepsPointsApartAndInside
+  )
+  {
+    std::uint32_t seed = 7;
+    const std::vector<std::pair<float, float>> taken{{100.0f, 100.0f}};
+    const auto points = faf::editor::ScatterInCircle(100.0f, 100.0f, 30.0f, 8, 6.0f, taken, seed);
+    ASSERT_GE(points.size(), 4U);
+    for (std::size_t i = 0; i < points.size(); ++i) {
+      EXPECT_LE(std::hypot(points[i].first - 100.0f, points[i].second - 100.0f), 30.0f + 1e-3f);
+      EXPECT_GE(std::hypot(points[i].first - 100.0f, points[i].second - 100.0f), 6.0f) << "apart from the taken one";
+      for (std::size_t j = i + 1; j < points.size(); ++j) {
+        EXPECT_GE(std::hypot(points[i].first - points[j].first, points[i].second - points[j].second), 6.0f);
+      }
+    }
+    std::uint32_t full = 1;
+    EXPECT_LE(faf::editor::ScatterInCircle(0.0f, 0.0f, 2.0f, 50, 5.0f, {}, full).size(), 1U) << "no room for more";
+  }
 } // namespace

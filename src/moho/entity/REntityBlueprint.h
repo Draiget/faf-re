@@ -46,13 +46,15 @@ namespace moho
    *   previously-flagged (and now closed) +0x60-vs-+0x64 discrepancy.
    */
   /**
-   * The binary derives this from `RBlueprint` (RTTI:
-   * `REntityBlueprint : RBlueprint, gpg::RObject, InstanceCounter<RBlueprint>`).
-   * This tree repeats `RBlueprint`'s fields inline instead, so it names the
-   * base's `InstanceCounter<RBlueprint>` itself: every unit, projectile and
-   * prop blueprint is one more live `RBlueprint`, as it is in the game.
+   * Derives from `RBlueprint`, as in the binary (RTTI:
+   * `REntityBlueprint : RBlueprint, gpg::RObject, InstanceCounter<RBlueprint>`;
+   * the ctor 0x00511C30 runs `RBlueprint::RBlueprint` 0x0050DD60 on `this`, and
+   * the dtor 0x00511E80 ends with the `RBlueprint::~RBlueprint` call at
+   * 0x0051203A). The base holds +0x04..+0x5F: `mOwner`, `mBlueprintId`,
+   * `mDescription` (+0x24, the optional label used by unique-name formatting),
+   * `mSource` and `mBlueprintOrdinal` (+0x5C, the category bit index).
    */
-  struct REntityBlueprint : public gpg::RObject, public InstanceCounter<RBlueprint>
+  struct REntityBlueprint : public RBlueprint
   {
     // +0x00 is the vtable word. It is a real vptr rather than an opaque pointer
     // field, because the type tests below are virtuals in the binary
@@ -60,11 +62,6 @@ namespace moho
     // fills in a hand-rolled table. Being polymorphic is also what lets the
     // blueprint-kind test work: 0x00677360 asks the reflection system to
     // upcast the blueprint to RUnitBlueprint, which needs a dynamic type.
-    RRuleGameRules* mOwner;          // +0x04 (owner game-rules pointer)
-    fa::string mBlueprintId;         // +0x08
-    fa::string mBlueprintLabel;      // +0x24 (optional label used by unique-name formatting)
-    fa::string mSource;              // +0x40 (source blueprint path/id string)
-    std::uint32_t mCategoryBitIndex; // +0x5C
     /**
      * Address: 0x00512870 (`Moho::REntityBlueprintTypeInfo::AddFields`) --
      * `push 60h` / `push offset "Categories"` / `call
@@ -206,11 +203,11 @@ namespace moho
      * Initializes default footprint extents and inertia tensor values for
      * entity blueprints before derived blueprint init code runs.
      *
-     * Virtual, and the first slot this class adds above gpg::RObject's three:
-     * slot 3, which is what puts IsMobile and IsUnitBlueprint at the slots 4
-     * and 5 the class comment cites from ??_7RUnitBlueprint@Moho@@6B@.
+     * Overrides `RBlueprint::OnInitBlueprint` (slot 3, 0x0050DBA0); IsMobile
+     * and IsUnitBlueprint follow at the slots 4 and 5 the class comment cites
+     * from ??_7RUnitBlueprint@Moho@@6B@.
      */
-    virtual void OnInitBlueprint();
+    void OnInitBlueprint() override;
 
     /**
      * Address: 0x00511B60 (FUN_00511B60)
@@ -227,28 +224,8 @@ namespace moho
      * Base entity-blueprint unit cast hook. Returns nullptr for the base type.
      */
     [[nodiscard]] virtual const RUnitBlueprint* IsUnitBlueprint() const;
-
-    /**
-     * Address: 0x0050DF90 (FUN_0050DF90, Moho::RBlueprint::GetLuaBlueprint)
-     *
-     * What it does:
-     * Returns `__blueprints[BlueprintOrdinal]` through the base `RBlueprint`
-     * layout prefix shared by `REntityBlueprint`.
-     */
-    [[nodiscard]] LuaPlus::LuaObject GetLuaBlueprint(LuaPlus::LuaState* state) const;
   };
 
-  static_assert(offsetof(REntityBlueprint, mOwner) == 0x04, "REntityBlueprint::mOwner offset must be 0x04");
-  static_assert(offsetof(REntityBlueprint, mBlueprintId) == 0x08, "REntityBlueprint::mBlueprintId offset must be 0x08");
-  static_assert(
-    offsetof(REntityBlueprint, mBlueprintLabel) == 0x24,
-    "REntityBlueprint::mBlueprintLabel offset must be 0x24"
-  );
-  static_assert(offsetof(REntityBlueprint, mSource) == 0x40, "REntityBlueprint::mSource offset must be 0x40");
-  static_assert(
-    offsetof(REntityBlueprint, mCategoryBitIndex) == 0x5C,
-    "REntityBlueprint::mCategoryBitIndex offset must be 0x5C"
-  );
   static_assert(offsetof(REntityBlueprint, mCategories) == 0x60, "REntityBlueprint::mCategories offset must be 0x60");
   static_assert(
     offsetof(REntityBlueprint, mScriptModule) == 0x70,

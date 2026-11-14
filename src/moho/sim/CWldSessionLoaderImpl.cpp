@@ -312,7 +312,7 @@ namespace moho
       const bool startSimEarly = wld_StartSimEarly && loadedEarly != nullptr;
       if (startSimEarly) {
         AcceptMap(scenario, loadedEarly);
-        RULE_DeferScriptBlueprintRelease(scenario->mGameRules); // freed below, after the session's export
+        RULE_DeferScriptBlueprintRelease(scenario->mGameRules); // freed once the session and the sim both copied it
         SIM_PrepareLuaState(scenario->mGameRules);
         gEarlySimScenario.store(scenario, std::memory_order_release);
         SIM_FinishPreparingLuaState(); // the session's export below would take the rules' lock first
@@ -351,7 +351,7 @@ namespace moho
       }
 
       if (startSimEarly) {
-        RULE_ReleaseDeferredScriptBlueprints(scenario->mGameRules); // the session and the sim both have their copy
+        RULE_ReleaseDeferredScriptBlueprints(scenario->mGameRules); // the session has its copy now
       } else {
         fa::auto_ptr<CWldMap> loadedMap(earlyMap ? loadedEarly : new CWldMap());
         if (

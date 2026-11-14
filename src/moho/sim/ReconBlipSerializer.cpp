@@ -11,28 +11,7 @@
 
 namespace
 {
-  gpg::RType* gReconBlipType = nullptr;
   gpg::RType* gWeakPtrUnitType = nullptr;
-
-  /**
-   * Address: 0x005C90A0 (FUN_005C90A0)
-   *
-   * What it does:
-   * Fills one reflected object reference from a `ReconBlip*` lane.
-   */
-  [[maybe_unused]] gpg::RRef* FillReconBlipObjectRef(
-    gpg::RRef* const outRef,
-    moho::ReconBlip* const object
-  )
-  {
-    if (!outRef) {
-      return nullptr;
-    }
-
-    outRef->mObj = object;
-    outRef->mType = object ? gpg::CachedLookup<moho::ReconBlip>(gReconBlipType) : nullptr;
-    return outRef;
-  }
 
   [[nodiscard]] gpg::RType* ResolveWeakPtrUnitType()
   {
@@ -78,7 +57,11 @@ namespace moho
 
     archive->Read(gpg::RTypeOf<moho::Entity>(), static_cast<moho::Entity*>(this), ownerRef);
     archive->Read(ResolveWeakPtrUnitType(), &mCreator, ownerRef);
-    archive->ReadBool(reinterpret_cast<bool*>(&mDeleteWhenStale));
+    {
+      bool value{};
+      archive->ReadBool(&value);
+      mDeleteWhenStale = static_cast<decltype(mDeleteWhenStale)>(value);
+    }
     archive->Read(gpg::RTypeOf<Wm3::Vector3f>(), &mJamOffset, ownerRef);
     archive->Read(gpg::RTypeOf<moho::SSTIUnitConstantData>(), &mUnitConstDat, ownerRef);
     archive->Read(gpg::RTypeOf<moho::SSTIUnitVariableData>(), &mUnitVarDat, ownerRef);

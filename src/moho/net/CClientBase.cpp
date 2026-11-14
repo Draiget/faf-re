@@ -52,22 +52,6 @@ namespace
   }
 
   /**
-   * Address: 0x00540A70 (FUN_00540A70)
-   *
-   * What it does:
-   * Reads one 32-bit integer value from a `BinaryReader` lane and returns it
-   * by value.
-   */
-  [[maybe_unused]] int ReadClientMessageInt32Raw(
-    gpg::BinaryReader* const reader
-  )
-  {
-    int value = 0;
-    reader->Read(reinterpret_cast<char*>(&value), sizeof(value));
-    return value;
-  }
-
-  /**
    * Engine addition, not in the binary: the fewest payload bytes each message
    * `Process` (and `UpdateState`, for the two command-stream ops it reads)
    * parses with `ReadExact` needs. The binary read them unchecked, so a
@@ -339,7 +323,7 @@ void CClientBase::Process(
         // Engine addition: the stream's hash at this boundary, after the
         // binary's two fields.
         const CommandStreamCheck::AckDigest digest = streamCheck->NoteBoundary(mIndex, mQueuedBeat);
-        ackStream.Write(reinterpret_cast<const char*>(digest.data()), digest.size());
+        ackStream.Write(digest.data(), digest.size());
         if (streamCheck->HasFindings()) {
           mManager->NoteDivergentOrders();
         }
@@ -416,7 +400,7 @@ void CClientBase::Process(
         sizeof(uint8_t) + sizeof(int32_t) + CommandStreamCheck::kAckDigestBytes
     ) {
       CommandStreamCheck::AckDigest digest{};
-      reader.Read(reinterpret_cast<char*>(digest.data()), digest.size());
+      reader.Read(digest.data(), digest.size());
       streamCheck->NoteReport(mIndex, ackClientIndex, static_cast<uint32_t>(ackBeat), digest);
       if (streamCheck->HasFindings()) {
         mManager->NoteDivergentOrders();

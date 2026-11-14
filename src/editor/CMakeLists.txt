@@ -13,6 +13,12 @@ if(NOT TARGET faf_imgui)
 endif()
 
 include(sources.cmake)
+include(graph/presets/EmbedGraphs.cmake)
+faf_embed_terrain_graphs(_faf_terrain_graph_files)
+list(APPEND FAF_EDITOR_SOURCES "${_faf_terrain_graph_files}")
+include(tools/data/EmbedData.cmake)
+faf_embed_editor_data(_faf_editor_data_files)
+list(APPEND FAF_EDITOR_SOURCES "${_faf_editor_data_files}")
 
 add_executable(faf_editor WIN32 ${FAF_EDITOR_SOURCES})
 if(FAF_TARGET_ARCH STREQUAL "x64")
@@ -24,7 +30,7 @@ target_link_libraries(faf_editor PRIVATE faf_engine faf_imgui)
 # /memtrace names the call sites of what a play leaves behind (EdMemTrace.cpp).
 target_link_libraries(faf_editor PRIVATE dbghelp)
 # Height images (tools/EdHeightFile.cpp) through the Windows imaging component; the file dialogs.
-target_link_libraries(faf_editor PRIVATE ole32 windowscodecs comdlg32 winhttp crypt32)
+target_link_libraries(faf_editor PRIVATE ole32 windowscodecs comdlg32 winhttp crypt32 dwmapi)
 target_link_options(faf_editor PRIVATE "/ENTRY:mainCRTStartup")
 
 # The game's window resources (the icon) and manifest, as faf_main has them (src/CMakeLists.txt):

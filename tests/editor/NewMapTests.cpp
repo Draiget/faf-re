@@ -20,7 +20,7 @@ namespace
   )
   {
     NewMapSettings settings;
-    settings.size = 1; // 512
+    settings.size = 2; // 512
     settings.players = 6;
     const auto spawns = faf::editor::NewMapSpawns(settings);
     ASSERT_EQ(spawns.size(), 6u);
@@ -58,7 +58,7 @@ namespace
   )
   {
     NewMapSettings settings;
-    settings.size = 2; // 1024
+    settings.size = 3; // 1024
     const std::vector<char> chunk = faf::editor::NewMapPreviewRecord(settings);
     std::uint32_t word = 0;
     float size = 0.0f;
@@ -75,5 +75,27 @@ namespace
     EXPECT_EQ(word, 128u + 256u * 256u * 4u);
     EXPECT_EQ(chunk.size(), 26u + word);
     EXPECT_EQ(std::memcmp(chunk.data() + 26, "DDS ", 4), 0);
+  }
+
+  TEST(
+    NewMap,
+    AMapThatIsntSquareKeepsBothSides
+  )
+  {
+    NewMapSettings settings;
+    settings.size = 3;  // 1024 wide
+    settings.sizeZ = 2; // 512 deep
+    settings.players = 2;
+    EXPECT_EQ(faf::editor::NewMapWidth(settings), 1024);
+    EXPECT_EQ(faf::editor::NewMapDepth(settings), 512);
+    const auto spawns = faf::editor::NewMapSpawns(settings);
+    ASSERT_EQ(spawns.size(), 2U);
+    EXPECT_FLOAT_EQ(spawns[0].x, 512.0f);
+    EXPECT_FLOAT_EQ(spawns[0].z, 77.0f) << "the ring follows the depth: 256 - 0.35 x 512, to half units";
+    EXPECT_NE(faf::editor::NewMapScenarioText(settings, "m").find("size = {1024, 512}"), std::string::npos);
+    settings.sizeZ = -1;
+    EXPECT_EQ(faf::editor::NewMapDepth(settings), 1024) << "square";
+    settings.size = 0;
+    EXPECT_EQ(faf::editor::NewMapWidth(settings), 128) << "2.5 km";
   }
 } // namespace

@@ -34,20 +34,6 @@ namespace
   // established modeling.
   moho::SNavGoalSerializer gSNavGoalSerializer;
 
-  /**
-   * Address: 0x0050C120 (FUN_0050C120)
-   *
-   * What it does:
-   * Executes one non-deleting `gpg::RType` base-teardown lane for
-   * `SNavGoalTypeInfo`.
-   */
-  [[maybe_unused]] void cleanup_SNavGoalTypeInfoRTypeBase(
-    moho::SNavGoalTypeInfo* const typeInfo
-  ) noexcept
-  {
-    gpg::ClearTypeLists(typeInfo);
-  }
-
 } // namespace
 
 namespace moho

@@ -33,7 +33,7 @@ namespace
    * Appends one canonical `"x"/"y"/"z"` float-field trio to the current
    * reflection type at offsets `0/4/8` and returns the `z` field handle.
    */
-  [[maybe_unused]] gpg::RField* RegisterXyzFloatReflectionFields(
+  gpg::RField* RegisterXyzFloatReflectionFields(
     gpg::RType* const typeInfo
   )
   {
@@ -54,7 +54,7 @@ namespace
    * Appends one canonical `"x"/"y"` float-field pair to the current
    * reflection type at offsets `0/4` and returns the `y` field handle.
    */
-  [[maybe_unused]] gpg::RField* RegisterXyFloatReflectionFields(
+  gpg::RField* RegisterXyFloatReflectionFields(
     gpg::RType* const typeInfo
   )
   {

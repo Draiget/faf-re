@@ -609,7 +609,7 @@ namespace moho
      * Writes one playable-map rectangle through the owned terrain map and emits
      * warning text when bounds are invalid.
      */
-    [[nodiscard]] bool SetPlayableMapRect(const VisibilityRect& rect) override;
+    [[nodiscard]] bool SetPlayableMapRect(const gpg::Rect2i& rect) override;
 
     /**
      * Address: 0x0089E710 (FUN_0089E710, ?GetPlayableMapRect@IWldTerrainRes@Moho@@UBE?AV?$Rect2@H@gpg@@XZ)
@@ -618,7 +618,7 @@ namespace moho
      * Copies playable map bounds from terrain-res internal storage into `outRect`
      * and returns `&outRect`.
      */
-    [[nodiscard]] const VisibilityRect* GetPlayableMapRect(VisibilityRect& outRect) const override;
+    [[nodiscard]] const gpg::Rect2i* GetPlayableMapRect(gpg::Rect2i& outRect) const override;
 
     /**
      * Address: 0x008A6DD0 (FUN_008A6DD0, ?IsInPlayableRect@CWldTerrainRes@Moho@@EAE_NABV?$Vector3@M@Wm3@@@Z)

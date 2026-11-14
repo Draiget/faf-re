@@ -115,4 +115,24 @@ namespace
     }
     EXPECT_FALSE(faf::editor::WaterFromScmwtr("{ \"Lighting\": 1 }", again, error));
   }
+
+  TEST(
+    WaterPreset,
+    MotionPresetsChangeOnlyTheWaves
+  )
+  {
+    faf::editor::WaterNumbers water;
+    water.mFresnelPower = 7.0f;
+    faf::editor::ApplyWaterMotionPreset(water, 0);
+    EXPECT_FLOAT_EQ(water.mNormal1Movement[0], 0.5f);
+    EXPECT_FLOAT_EQ(water.mNormal1Movement[1], -0.95f);
+    EXPECT_FLOAT_EQ(water.mNormalRepeatRate[3], 0.5f);
+    faf::editor::ApplyWaterMotionPreset(water, 1);
+    EXPECT_FLOAT_EQ(water.mNormal1Movement[0], 0.125f) << "calm: a quarter";
+    faf::editor::ApplyWaterMotionPreset(water, 2);
+    EXPECT_FLOAT_EQ(water.mNormal2Movement[1], -0.2375f);
+    EXPECT_FLOAT_EQ(water.mNormalRepeatRate[0], 0.00135f);
+    EXPECT_FLOAT_EQ(water.mFresnelPower, 7.0f) << "the rest kept";
+    EXPECT_STREQ(faf::editor::WaterMotionPresetName(3), "Ocean swell");
+  }
 } // namespace

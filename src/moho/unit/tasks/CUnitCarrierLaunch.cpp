@@ -423,12 +423,12 @@ namespace
    */
   void DeserializeCUnitCarrierLaunchSerializerCallback(
     gpg::ReadArchive* const archive,
-    const std::intptr_t objectPtr,
+    void* const objectPtr,
     const int,
     gpg::RRef* const
   )
   {
-    auto* const task = reinterpret_cast<moho::CUnitCarrierLaunch*>(objectPtr);
+    auto* const task = static_cast<moho::CUnitCarrierLaunch*>(objectPtr);
     if (task == nullptr) {
       return;
     }
@@ -446,12 +446,12 @@ namespace
    */
   void SerializeCUnitCarrierLaunchSerializerCallback(
     gpg::WriteArchive* const archive,
-    const std::intptr_t objectPtr,
+    void* const objectPtr,
     const int,
     gpg::RRef* const
   )
   {
-    auto* const task = reinterpret_cast<moho::CUnitCarrierLaunch*>(objectPtr);
+    auto* const task = static_cast<moho::CUnitCarrierLaunch*>(objectPtr);
     if (task == nullptr) {
       return;
     }

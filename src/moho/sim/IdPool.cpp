@@ -18,35 +18,10 @@ namespace
 {
   constexpr int kHistoryCapacity = 100;
 
-  static_assert(
-    offsetof(SimSubRes3, mValue) == offsetof(BVIntSet, mFirstWordIndex),
-    "SimSubRes3/BVIntSet offset mismatch"
-  );
-  static_assert(
-    offsetof(SimSubRes3, mReserved04) == offsetof(BVIntSet, mReservedMetaWord),
-    "SimSubRes3/BVIntSet offset mismatch"
-  );
-  static_assert(offsetof(SimSubRes3, mValues) == offsetof(BVIntSet, mWords), "SimSubRes3/BVIntSet offset mismatch");
-  static_assert(sizeof(SimSubRes3) == sizeof(BVIntSet), "SimSubRes3/BVIntSet size mismatch");
-
   [[nodiscard]] const gpg::RRef& NullOwnerRef()
   {
     static const gpg::RRef kNullOwner{nullptr, nullptr};
     return kNullOwner;
-  }
-
-  [[nodiscard]] BVIntSet& AsBitSet(
-    SimSubRes3& slot
-  ) noexcept
-  {
-    return *reinterpret_cast<BVIntSet*>(&slot);
-  }
-
-  [[nodiscard]] const BVIntSet& AsBitSet(
-    const SimSubRes3& slot
-  ) noexcept
-  {
-    return *reinterpret_cast<const BVIntSet*>(&slot);
   }
 
   /**
@@ -67,37 +42,6 @@ namespace
     return MakeBVIntSetIndex(&set, value);
   }
 
-  /**
-   * Address: 0x00686DF0 (FUN_00686DF0, copy_IdPool_payload_for_map_lanes)
-   *
-   * What it does:
-   * Copies one `IdPool` payload into destination storage, including the
-   * released-id bitset and recycle-history ring snapshots.
-   */
-  [[maybe_unused]] moho::IdPool* CopyIdPoolPayloadForMapLanes(
-    const moho::IdPool* const source,
-    moho::IdPool* const destination
-  )
-  {
-    if (source == nullptr || destination == nullptr) {
-      return destination;
-    }
-
-    if (source == destination) {
-      return destination;
-    }
-
-    destination->mNextLowId = source->mNextLowId;
-    destination->mReleasedLows.mFirstWordIndex = source->mReleasedLows.mFirstWordIndex;
-    destination->mReleasedLows.mWords.ResetFrom(source->mReleasedLows.mWords);
-
-    destination->mSubRes2.mStart = 0;
-    destination->mSubRes2.mEnd = 0;
-    destination->mSubRes2 = source->mSubRes2;
-
-    return destination;
-  }
-
   struct IdPoolMapLaneCopy
   {
     std::uint32_t mKey; // +0x00
@@ -107,57 +51,6 @@ namespace
   static_assert(offsetof(IdPoolMapLaneCopy, mKey) == 0x00, "IdPoolMapLaneCopy::mKey offset must be 0x00");
   static_assert(offsetof(IdPoolMapLaneCopy, mPayload) == 0x08, "IdPoolMapLaneCopy::mPayload offset must be 0x08");
 
-  /**
-   * Address: 0x00686D10 (FUN_00686D10)
-   *
-   * What it does:
-   * Copies one map-lane key dword and then clones the associated IdPool payload
-   * into destination storage.
-   */
-  [[maybe_unused]] IdPoolMapLaneCopy* CopyIdPoolMapLaneEntryForMapLanes(
-    const std::uint32_t* const sourceKey,
-    IdPoolMapLaneCopy* const destination,
-    const moho::IdPool* const sourcePayload
-  )
-  {
-    destination->mKey = *sourceKey;
-    (void)CopyIdPoolPayloadForMapLanes(sourcePayload, &destination->mPayload);
-    return destination;
-  }
-
-  /**
-   * Address: 0x00688A10 (FUN_00688A10)
-   *
-   * What it does:
-   * Copies one packed map-lane key/payload entry into destination storage.
-   */
-  [[maybe_unused]] IdPoolMapLaneCopy* CopyPackedIdPoolMapLaneEntryForMapLanes(
-    const IdPoolMapLaneCopy* const source,
-    IdPoolMapLaneCopy* const destination
-  )
-  {
-    destination->mKey = source->mKey;
-    (void)CopyIdPoolPayloadForMapLanes(&source->mPayload, &destination->mPayload);
-    return destination;
-  }
-
-  /**
-   * Address: 0x00686E60 (FUN_00686E60)
-   *
-   * What it does:
-   * Clears destination ring indices and repopulates history snapshots using the
-   * shared IdPool ring-copy behavior.
-   */
-  [[maybe_unused]] moho::SimSubRes2* ResetAndCopyIdPoolHistoryRingForMapLanes(
-    moho::SimSubRes2* const destination,
-    const moho::SimSubRes2* const source
-  )
-  {
-    destination->mStart = 0;
-    destination->mEnd = 0;
-    *destination = *source;
-    return destination;
-  }
 } // namespace
 
 /**
@@ -170,7 +63,7 @@ void SimSubRes2::PushSnapshot(
   const BVIntSet& snapshot
 )
 {
-  BVIntSet& destination = AsBitSet(mData[mEnd]);
+  BVIntSet& destination = mData[mEnd];
   destination.mFirstWordIndex = snapshot.mFirstWordIndex;
   destination.mWords.ResetFrom(snapshot.mWords);
   mEnd = (mEnd + 1) % kHistoryCapacity;
@@ -184,7 +77,7 @@ void SimSubRes2::PushSnapshot(
  */
 void SimSubRes2::PopOldest()
 {
-  mData[mStart].mValues.ResetStorageToInline();
+  mData[mStart].mWords.ResetStorageToInline();
   mStart = (mStart + 1) % kHistoryCapacity;
 }
 
@@ -225,7 +118,7 @@ SimSubRes2& SimSubRes2::operator=(
   if (this != &other) {
     Reset();
     for (int index = other.mStart; index != other.mEnd; index = (index + 1) % kHistoryCapacity) {
-      PushSnapshot(AsBitSet(other.mData[index]));
+      PushSnapshot(other.mData[index]);
     }
   }
   return *this;
@@ -258,7 +151,7 @@ BVIntSetAddResult IdPool::QueueReleasedLowId(
 )
 {
   const int bucketIndex = (mSubRes2.mEnd + (kHistoryCapacity - 1)) % kHistoryCapacity;
-  return AsBitSet(mSubRes2.mData[bucketIndex]).Add(lowId);
+  return mSubRes2.mData[bucketIndex].Add(lowId);
 }
 
 /**
@@ -277,7 +170,7 @@ void IdPool::Update()
 
   const int nextEnd = (mSubRes2.mEnd + 1) % kHistoryCapacity;
   if (nextEnd == mSubRes2.mStart) {
-    BVIntSet& oldestSet = AsBitSet(mSubRes2.mData[mSubRes2.mStart]);
+    BVIntSet& oldestSet = mSubRes2.mData[mSubRes2.mStart];
     if (!oldestSet.mWords.Empty()) {
       const unsigned int lower = oldestSet.GetNext(std::numeric_limits<unsigned int>::max());
       const unsigned int upper = oldestSet.Max();
@@ -355,7 +248,7 @@ void IdPool::MemberSerialize(
     }
     archive->WriteUInt(slots);
     for (int index = mSubRes2.mStart; index != mSubRes2.mEnd; index = (index + 1) % kHistoryCapacity) {
-      BVIntSet snapshot = AsBitSet(mSubRes2.mData[index]);
+      BVIntSet snapshot = mSubRes2.mData[index];
       archive->Write(gpg::CachedLookup<BVIntSet>(BVIntSet::sType), &snapshot, NullOwnerRef());
     }
     return;
@@ -364,7 +257,7 @@ void IdPool::MemberSerialize(
   BVIntSet compactedReleased = mReleasedLows;
 
   for (int index = mSubRes2.mStart; index != mSubRes2.mEnd; index = (index + 1) % kHistoryCapacity) {
-    const BVIntSet& slot = AsBitSet(mSubRes2.mData[index]);
+    const BVIntSet& slot = mSubRes2.mData[index];
     const unsigned int slotMax = slot.Max();
     const unsigned int firstReleased = slot.GetNext(std::numeric_limits<unsigned int>::max());
     compactedReleased.AddFrom(&slot, firstReleased, slotMax);

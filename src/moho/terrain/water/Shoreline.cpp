@@ -28,20 +28,6 @@ namespace
 {
   using ShoreCellRef = std::shared_ptr<moho::ShoreCell>;
 
-  /**
-   * Address: 0x00813DB0 (FUN_00813DB0, boost::shared_ptr_ShoreCell::shared_ptr_ShoreCell)
-   *
-   * What it does:
-   * Constructs one `shared_ptr<ShoreCell>` from one raw shoreline-cell pointer lane.
-   */
-  [[maybe_unused]] ShoreCellRef* ConstructSharedShoreCellFromRaw(
-    ShoreCellRef* const outShoreCell,
-    moho::ShoreCell* const shoreCell
-  )
-  {
-    return ::new (outShoreCell) ShoreCellRef(shoreCell);
-  }
-
   struct ShoreCorner3
   {
     float x;

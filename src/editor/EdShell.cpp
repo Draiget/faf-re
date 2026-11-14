@@ -1,4 +1,12 @@
+#include "editor/ui/EdPopouts.h"
+#include "editor/ui/EdViewMenu.h"
 #include "editor/EdShell.h"
+#include "editor/ui/EdControls.h"
+#include "editor/ui/EdFonts.h"
+#include "editor/ui/EdIconFont.h"
+#include "editor/ui/EdCommands.h"
+#include "editor/ui/EdPalette.h"
+#include "editor/ui/EdTitleBar.h"
 #include "editor/ui/EdUiScale.h"
 #include "editor/ui/EdIcons.h"
 #include "editor/tools/EdMarkers.h"
@@ -9,16 +17,23 @@
 #include <algorithm>
 #include <cstdio>
 #include <cstdlib>
+#include <utility>
 
 #include "editor/EdLog.h"
 #include "editor/EdPlay.h"
 #include "editor/doc/EdDocument.h"
 #include "gpg/gal/Device.hpp"
 #include "gpg/core/utils/Logging.h"
+#include "editor/EdLuaDebugger.h"
+#include "editor/ui/EdProblems.h"
+#include "editor/ui/EdStatus.h"
+#include "editor/ui/EdThemeColors.h"
+#include "editor/ui/EdWorkspaces.h"
 #include "imgui.h"
 #include "imgui_internal.h"
 #include "legacy/containers/String.h"
 #include "moho/misc/StartupHelpers.h"
+#include "moho/sim/CWldSession.h"
 
 namespace faf::editor
 {
@@ -30,7 +45,6 @@ namespace faf::editor
     constexpr const char* kMarkersWindow = "Markers";
     constexpr const char* kCheckWindow = "Check";
     constexpr const char* kLogWindow = "Log";
-    constexpr const char* kDockSpace = "EditorDockSpace";
 
     const ImVec4 kPlayGreen(0.24f, 0.55f, 0.28f, 1.0f);
     const ImVec4 kStopRed(0.62f, 0.22f, 0.20f, 1.0f);
@@ -53,21 +67,125 @@ namespace faf::editor
     }
   }
 
-  void EdShell::HandleKeys()
+  namespace
   {
-    // F5 plays the picked map or stops the running one, wherever the focus is (EdApp.cpp keeps it from the game).
-    if (ImGui::IsKeyPressed(ImGuiKey_F5, false)) {
-      if (mPlay.Active()) {
-        mPlay.Stop();
-      } else if (mPlay.CanPlay()) {
-        mPlay.Play();
-      }
+    // The panels' scales the toolbar's - and + (and Ctrl+- / Ctrl+=) step between.
+    constexpr float kUiScaleSteps[] = {0.75f, 0.85f, 1.0f, 1.1f, 1.25f, 1.4f, 1.6f, 1.8f, 2.0f};
+  } // namespace
+
+  void EdShell::StepUiScale(
+    const int direction
+  )
+  {
+    if (direction == 0) {
+      mUiScale = 1.0f;
+      return;
     }
+    float smaller = kUiScaleSteps[0];
+    float larger = kUiScaleSteps[std::size(kUiScaleSteps) - 1];
+    for (const float step : kUiScaleSteps) {
+      smaller = step < mUiScale - 0.01f ? step : smaller;
+    }
+    for (auto it = std::rbegin(kUiScaleSteps); it != std::rend(kUiScaleSteps); ++it) {
+      larger = *it > mUiScale + 0.01f ? *it : larger;
+    }
+    mUiScale = direction < 0 ? smaller : larger;
   }
 
   void EdShell::UpdateTestRun()
   {
     const double now = ImGui::GetTime();
+    // `/mapwide normals|lighting[,clear]` (test runs): the Layers panel's Make (or Clear) once the map is open.
+    {
+      static bool mapWideDone = false;
+      fa::vector<fa::string> value;
+      if (
+        !mapWideDone && mDocument.GetState() == EdDocument::State::Open && ImGui::GetTime() > 8.0 &&
+        moho::CFG_GetArgOption("/mapwide", 1, &value) && !value.empty()
+      ) {
+        mapWideDone = true;
+        const std::string what = value[0].c_str();
+        const int kind = what.rfind("lighting", 0) == 0 ? 1
+          : what.rfind("specular", 0) == 0              ? 2
+          : what.rfind("macro", 0) == 0                 ? 3
+                                                        : 0;
+        const auto fileAfter = [&](const char* const key) {
+          const std::size_t at = what.find(key);
+          return at == std::string::npos ? std::string() : what.substr(at + std::string(key).size());
+        };
+        if (const std::string out = fileAfter(",export="); !out.empty()) {
+          mTools.AskMapTexture(
+            kind,
+            what.find(",make,") != std::string::npos ? EdTools::MapTextureOp::Make : EdTools::MapTextureOp::Export,
+            out
+          );
+        } else if (const std::string in = fileAfter(",import="); !in.empty()) {
+          mTools.AskMapTexture(kind, EdTools::MapTextureOp::Import, in);
+        } else {
+          mTools.AskMapTexture(
+            kind,
+            what.find(",clear") != std::string::npos ? EdTools::MapTextureOp::Clear : EdTools::MapTextureOp::Make,
+            {},
+            what.find(",stale") != std::string::npos
+          );
+        }
+        gpg::Logf("editor: /mapwide %s", what.c_str());
+      }
+    }
+    // `/pickfilter <kinds>` (test runs): the Select tool picks only these (markers, pathnodes, units, props, decals).
+    {
+      static bool pickDone = false;
+      fa::vector<fa::string> value;
+      if (!pickDone && moho::CFG_GetArgOption("/pickfilter", 1, &value) && !value.empty()) {
+        pickDone = true;
+        const std::string kinds = std::string(",") + value[0].c_str() + ",";
+        PickFilter& pickable = mTools.Pickable();
+        pickable.markers = kinds.find(",markers,") != std::string::npos;
+        pickable.pathNodes = kinds.find(",pathnodes,") != std::string::npos;
+        pickable.units = kinds.find(",units,") != std::string::npos;
+        pickable.props = kinds.find(",props,") != std::string::npos;
+        pickable.decals = kinds.find(",decals,") != std::string::npos;
+        gpg::Logf("editor: /pickfilter %s", value[0].c_str());
+      }
+    }
+    // `/movelayer from,to` (test runs, strata 1 to 8): the layer moved once the map is open.
+    {
+      static bool moveDone = false;
+      static double moveUndoAt = 0.0;
+      fa::vector<fa::string> value;
+      if (
+        !moveDone && mDocument.GetState() == EdDocument::State::Open && ImGui::GetTime() > 6.0 &&
+        moho::CFG_GetArgOption("/movelayer", 1, &value) && !value.empty()
+      ) {
+        moveDone = true;
+        int from = 0;
+        int to = 0;
+        if (std::sscanf(value[0].c_str(), "%d,%d", &from, &to) == 2) {
+          mTools.AskLayerMove(from - 1, to - 1);
+          gpg::Logf("editor: /movelayer %d to %d", from, to);
+          // `,undo`: Edit > Undo two seconds after, as a click would.
+          if (std::string(value[0].c_str()).find(",undo") != std::string::npos) {
+            moveUndoAt = ImGui::GetTime() + 2.0;
+          }
+        }
+      }
+      if (moveUndoAt > 0.0 && ImGui::GetTime() > moveUndoAt && mCommands != nullptr) {
+        moveUndoAt = 0.0;
+        gpg::Logf("editor: /movelayer: Edit > Undo");
+        (void)mCommands->Run("edit.undo");
+      }
+    }
+    // `/hidegameunits` (test runs): once a play runs, the editor's view in front of it with the game's units hidden.
+    {
+      static const bool hideTest = moho::CFG_GetArgOption("/hidegameunits", 0, nullptr);
+      static bool hideDone = false;
+      if (hideTest && !hideDone && mPlay.Active() && moho::WLD_GetFrameAction() == moho::EWldFrameAction::Playing) {
+        hideDone = true;
+        mEditorViewInPlay = true;
+        mTools.ShowGameUnits() = false;
+        gpg::Logf("editor: /hidegameunits: the editor's view in front of the play, its units hidden");
+      }
+    }
     switch (mTestRunStep) {
     case 1: {
       // The open map, picked in the Map panel's list, and played.
@@ -169,8 +287,14 @@ namespace faf::editor
       }
       mAdaptivePreviewDone.clear();
     }
-    HandleKeys();
     UpdateTestRun();
+    // A list row's Delete (its menu): the row was selected a frame or two ago, now the selection goes.
+    if (mDeleteAsked && --mDeleteWait <= 0) {
+      mDeleteAsked = false;
+      if (mCommands != nullptr) {
+        (void)mCommands->Run("edit.delete");
+      }
+    }
     mBrowser.Update();
     const bool playing = mPlay.Active();
     const bool panels = !playing || mPanelsWhilePlaying;
@@ -178,11 +302,65 @@ namespace faf::editor
     // The dock space over the window. Its middle stays empty: the game's viewport is put over it (EdApp.cpp), so
     // the game's picture and input are there, inside the panels.
     const ImGuiViewport* const viewport = ImGui::GetMainViewport();
-    const float statusHeight = ImGui::GetFrameHeight();
-    const float toolbarHeight = ImGui::GetFrameHeight() + 12.0f;
-    DrawToolbar(toolbarHeight);
-    ImGui::SetNextWindowPos(ImVec2(viewport->WorkPos.x, viewport->WorkPos.y + toolbarHeight));
-    ImGui::SetNextWindowSize(ImVec2(viewport->WorkSize.x, viewport->WorkSize.y - statusHeight - toolbarHeight));
+    const float statusHeight = StatusBarHeight();
+    const float toolbarHeight = std::round(Em(38.0f));
+    // The first frame: the first workspace's panels' saved places under the names their tabs have now.
+    if (!mPanelPlacesCarried) {
+      mPanelPlacesCarried = true;
+      CarryPanelPlaces();
+    }
+    // The title row first (the editor draws its own: map name, menus, search, the window's buttons), always, also
+    // while a play runs, so the window can be moved and closed.
+    float titleHeight = 0.0f;
+    if (mCommands != nullptr && mMenus != nullptr) {
+      EdTitleInfo info;
+      if (mDocument.GetState() == EdDocument::State::Open) {
+        // The map's own title (as the game's list has it), else its folder.
+        info.document = mDocument.FolderName();
+        const std::vector<std::string>& maps = mPlay.Maps();
+        for (std::size_t i = 0; i < maps.size() && i < mPlay.Titles().size(); ++i) {
+          if (_stricmp(maps[i].c_str(), mDocument.Path().c_str()) == 0) {
+            info.document = mPlay.Titles()[i];
+            break;
+          }
+        }
+        info.modified = mDocument.Modified();
+      } else if (mDocument.GetState() == EdDocument::State::Loading) {
+        info.document = "Opening a map...";
+      } else {
+        info.document = "FAF Map Editor";
+      }
+      if (playing) {
+        info.state = mPlay.StateText();
+      }
+      for (std::size_t i = 0; i < Workspaces().size(); ++i) {
+        const EdWorkspace& workspace = Workspaces()[i];
+        EdTitleInfo::Tab tab;
+        tab.command = "workspace." + std::to_string(i);
+        tab.label = workspace.name;
+        const char* const icon = WorkspaceIcon(workspace.key);
+        tab.icon = icon != nullptr ? icon : "";
+        tab.keys = workspace.keys;
+        tab.about = workspace.about;
+        // The mockup's groups: making the map (Terrain to Mission), its assets (Effects to Materials), Review.
+        tab.groupStart = std::string_view(workspace.key) == "effects" || std::string_view(workspace.key) == "review";
+        info.tabs.push_back(std::move(tab));
+      }
+      info.activeTab = ActiveWorkspace();
+      titleHeight = DrawTitleBar(*mCommands, *mMenus, info, [] {
+        OpenCommandPalette();
+      });
+      DrawCommandPalette(*mCommands);
+    }
+    DrawToolbar(toolbarHeight, titleHeight);
+    const float top = titleHeight + toolbarHeight;
+    // The tool strip down the window's left edge (the mockup's), the panels and the view beside it.
+    const float stripWidth = panels ? std::round(Em(40.0f)) : 0.0f;
+    if (stripWidth > 0.0f) {
+      DrawToolStrip(top, stripWidth, statusHeight);
+    }
+    ImGui::SetNextWindowPos(ImVec2(viewport->WorkPos.x + stripWidth, viewport->WorkPos.y + top));
+    ImGui::SetNextWindowSize(ImVec2(viewport->WorkSize.x - stripWidth, viewport->WorkSize.y - statusHeight - top));
     ImGui::SetNextWindowViewport(viewport->ID);
     constexpr ImGuiWindowFlags kHostFlags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse |
       ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus |
@@ -192,11 +370,36 @@ namespace faf::editor
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
     ImGui::Begin("##EditorDockHost", nullptr, kHostFlags);
     ImGui::PopStyleVar(3);
-    const ImGuiID dockspaceId = ImGui::GetID(kDockSpace);
-    if (!mLayoutBuilt || mResetLayout) {
-      if (mResetLayout || ImGui::DockBuilderGetNode(dockspaceId) == nullptr) {
+    // The workspace's own dock space: laid out from its EdWorkspace the first time (no layout saved for it), or on
+    // Reset layout. The panels it showed last, at the start (layout.ini has them by then).
+    if (!mWorkspaceStarted) {
+      mWorkspaceStarted = true;
+      const auto saved = ShownPanels().find(Workspaces()[static_cast<std::size_t>(ActiveWorkspace())].key);
+      ShowPanels(saved != ShownPanels().end() ? saved->second : DefaultPanels(ActiveWorkspace()));
+      mTools.SetReadOnly(Workspaces()[static_cast<std::size_t>(ActiveWorkspace())].readOnly);
+    }
+    const int workspace = ActiveWorkspace();
+    if (mWorkspaceBuilt.size() < Workspaces().size()) {
+      mWorkspaceBuilt.resize(Workspaces().size(), false);
+    }
+    const ImGuiID dockspaceId = ImGui::GetID(DockSpaceName(workspace).c_str());
+    if (!mWorkspaceBuilt[static_cast<std::size_t>(workspace)] || mResetLayout) {
+      // A layout saved before this workspace's first layout changed is laid out again once.
+      const std::string key = Workspaces()[static_cast<std::size_t>(workspace)].key;
+      const auto kept = LayoutVersions().find(key);
+      const bool stale = (kept == LayoutVersions().end() ? 0 : kept->second) < LayoutVersionOf(key);
+      if (mResetLayout || stale || ImGui::DockBuilderGetNode(dockspaceId) == nullptr) {
         BuildDefaultLayout(dockspaceId);
+        if (mResetLayout || stale) {
+          ShowPanels(DefaultPanels(workspace));
+        }
+        if (stale) {
+          gpg::Logf("editor: workspace %s laid out again (its layout changed)", key.c_str());
+        }
       }
+      LayoutVersions()[key] = LayoutVersionOf(key);
+      ImGui::MarkIniSettingsDirty();
+      mWorkspaceBuilt[static_cast<std::size_t>(workspace)] = true;
       mLayoutBuilt = true;
       mResetLayout = false;
     }
@@ -205,15 +408,19 @@ namespace faf::editor
     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(Em(9.0f), Em(5.0f)));
     ImGui::DockSpace(dockspaceId, ImVec2(0.0f, 0.0f), ImGuiDockNodeFlags_PassthruCentralNode);
     ImGui::PopStyleVar();
-    // A layout saved before the Properties panel existed: the panel goes under the Tools panel, once.
-    if (!mPropertiesPlaced) {
-      if (const ImGuiWindow* const tools = ImGui::FindWindowByName(kToolsWindow); tools != nullptr) {
+    // A layout saved before the Properties panel existed: the panel goes under the Tools panel, once (the first
+    // workspace's windows are the ones from before workspaces).
+    if (!mPropertiesPlaced && workspace == 0) {
+      if (const ImGuiWindow* const tools = ImGui::FindWindowByName(Panel(kToolsWindow)); tools != nullptr) {
         mPropertiesPlaced = true;
-        if (ImGui::FindWindowSettingsByID(ImHashStr("Properties")) == nullptr && tools->DockId != 0) {
+        if (
+          ImGui::FindWindowSettingsByID(ImHashStr(PanelWindowName("Properties", 0).c_str())) == nullptr &&
+          tools->DockId != 0
+        ) {
           ImGuiID top = 0;
           ImGuiID bottom = 0;
           ImGui::DockBuilderSplitNode(tools->DockId, ImGuiDir_Down, 0.42f, &bottom, &top);
-          ImGui::DockBuilderDockWindow("Properties", bottom);
+          ImGui::DockBuilderDockWindow(PanelWindowName("Properties", 0).c_str(), bottom);
           ImGui::DockBuilderFinish(dockspaceId);
         }
       }
@@ -223,6 +430,16 @@ namespace faf::editor
         ImVec4(middle->Pos.x - viewport->Pos.x, middle->Pos.y - viewport->Pos.y, middle->Size.x, middle->Size.y);
     }
     ImGui::End();
+    DrawEffectStage();
+    // The panels shown now are the workspace's to keep (layout.ini, [FafEditor][Ui] Panels.<key>=).
+    {
+      std::vector<std::string>& kept = ShownPanels()[Workspaces()[static_cast<std::size_t>(workspace)].key];
+      std::vector<std::string> now = ShownPanelIds();
+      if (kept != now) {
+        kept = std::move(now);
+        ImGui::MarkIniSettingsDirty();
+      }
+    }
 
     // The map is up but its props and units aren't yet (they wait for the game's blueprints): said at the view's top,
     // with a spinner and the time so far, so a map without its trees and wrecks isn't taken for finished (user report).
@@ -241,7 +458,7 @@ namespace faf::editor
           "Loading models: trees, rocks, wrecks and units appear when the game's blueprints are ready (%.0f s)",
           now - loadingSince
         );
-        ImDrawList* const dl = ImGui::GetForegroundDrawList();
+        ImDrawList* const dl = ImGui::GetForegroundDrawList(ImGui::GetMainViewport());
         const ImVec2 size = ImGui::CalcTextSize(text);
         const float pad = 8.0f;
         const float spinner = size.y;
@@ -274,12 +491,19 @@ namespace faf::editor
       if (mShowMap) {
         DrawMapPanel();
       }
+      if (mShowLayers) {
+        if (ImGui::Begin(Panel("Layers"), &mShowLayers)) {
+          mTools.DrawLayersPanel();
+        }
+        ImGui::End();
+      }
       if (mShowInfo) {
         DrawInfoPanel();
       }
       if (mShowMarkers) {
         DrawMarkersPanel();
       }
+      AutoRecheck();
       if (mShowCheck) {
         DrawCheckPanel();
       }
@@ -291,6 +515,126 @@ namespace faf::editor
       }
       if (mShowMaterialEditor) {
         mMaterialEditor.Draw(mShowMaterialEditor);
+      }
+      if (mShowGenNodes) {
+        mGenerate.DrawNodesPanel(mShowGenNodes);
+      }
+      if (mShowGenGraph) {
+        mGenerate.DrawGraphPanel(mShowGenGraph);
+      }
+      if (mShowGenInspector) {
+        mGenerate.DrawInspectorPanel(mShowGenInspector);
+      }
+      if (mShowLayoutLayers) {
+        mLayoutPanel.DrawLayersPanel(mShowLayoutLayers, mDocument.Map() != nullptr);
+      }
+      if (mShowLayoutCanvas) {
+        mLayoutPanel.DrawCanvasPanel(mShowLayoutCanvas, mDocument.Map() != nullptr);
+      }
+      if (mShowLayoutStarts) {
+        mLayoutPanel.DrawStartsPanel(mShowLayoutStarts, mDocument.Map() != nullptr);
+      }
+      if (mShowMissionStages) {
+        mMissionPanel.DrawStagesPanel(mShowMissionStages, mDocument.Map() != nullptr);
+      }
+      if (mShowMissionStrings) {
+        mMissionPanel.DrawStringsPanel(mShowMissionStrings, mDocument.Map() != nullptr);
+      }
+      if (mShowMissionBases) {
+        mMissionPanel.DrawBasesPanel(mShowMissionBases, mDocument.Map() != nullptr);
+      }
+      if (mShowMissionPlatoons) {
+        mMissionPanel.DrawPlatoonsPanel(mShowMissionPlatoons, mDocument.Map() != nullptr);
+      }
+      if (mShowModProject) {
+        mModPanel.Draw(mShowModProject);
+      }
+      mParticleEditor.SetModProject(
+        mModPanel.Project() != nullptr ? mModPanel.Folder() : std::filesystem::path(),
+        mModPanel.Project() != nullptr ? mModPanel.Project()->name : std::string()
+      );
+      if (mShowAssets) {
+        mAssets.Draw(mShowAssets);
+      }
+      if (mShowEditorMods) {
+        mModHost.Draw(mShowEditorMods);
+      }
+      mModHost.DrawPanels();
+      // An editor mod's tool that is on: a note at the top of the view, Esc turns it off.
+      if (const EdModHost::ModTool* const tool = mModHost.ActiveTool(); tool != nullptr) {
+        if (ImGui::IsKeyPressed(ImGuiKey_Escape) && !ImGui::GetIO().WantTextInput) {
+          mModHost.StopTool();
+        } else {
+          const ImGuiViewport* const main = ImGui::GetMainViewport();
+          const std::string note = tool->title + " (" + tool->mod->info.name + "): click the map. Esc turns it off.";
+          const ImVec2 size = ImGui::CalcTextSize(note.c_str());
+          const ImVec2 at(main->WorkPos.x + (main->WorkSize.x - size.x) * 0.5f, main->WorkPos.y + Em(64.0f));
+          ImDrawList* const draw = ImGui::GetForegroundDrawList(ImGui::GetMainViewport());
+          draw->AddRectFilled(
+            ImVec2(at.x - Em(10.0f), at.y - Em(5.0f)),
+            ImVec2(at.x + size.x + Em(10.0f), at.y + size.y + Em(5.0f)),
+            IM_COL32(20, 24, 30, 220),
+            Em(4.0f)
+          );
+          draw->AddText(at, IM_COL32(255, 224, 96, 255), note.c_str());
+        }
+      }
+      if (mShowUnitViewer) {
+        mUnitViewer.Draw(mShowUnitViewer);
+      }
+      if (mShowFields) {
+        mFieldsPanel.Draw(mShowFields, mDocument.Map() != nullptr);
+      }
+      if (mShowStatistics) {
+        DrawStatisticsPanel();
+      }
+      if (mShowImages) {
+        DrawImagesPanel();
+      }
+      if (mShowMesh) {
+        DrawMeshPanel();
+      }
+      if (mShowDetail) {
+        DrawDetailPanel();
+      }
+      if (mShowUnitWizard) {
+        mUnitWizard.Draw(mShowUnitWizard);
+      }
+      if (mShowPaths) {
+        mPathsPanel.Draw(mShowPaths, mDocument.Map() != nullptr);
+      } else {
+        // The view edits paths only while the panel is up.
+        mPathsPanel.State().editing = false;
+      }
+      mUnitViewer.Frame();
+      DrawViewMenu();
+      if (std::string effect; mAssets.TakeEffectAsk(effect)) {
+        mShowParticleEditor = true;
+        (void)mParticleEditor.OpenGameEmitter(effect);
+      }
+      if (mShowUnitLab) {
+        mUnitLab.Draw(
+          mShowUnitLab, mTools.UnitInfos(), mDocument.Map() != nullptr && mPlay.CanPlay() && !mPlay.Active()
+        );
+      }
+      {
+        // The test play's trace arrives in the log whether or not Run is shown.
+        const std::vector<std::string> trace = mLog.TakeMissionTrace();
+        std::string live;
+        const bool hasLive = mLog.TakeMissionLive(live);
+        if (mShowMissionRun) {
+          mMissionPanel.DrawRunPanel(
+            mShowMissionRun, mDocument.Map() != nullptr, mPlay.Active(), trace, hasLive ? &live : nullptr
+          );
+        }
+      }
+      if (mMissionPanel.TakePlayAsk() && !mPlay.Active() && mPlay.CanPlay()) {
+        const std::vector<std::string>& maps = mPlay.Maps();
+        const auto at = std::find(maps.begin(), maps.end(), mDocument.Path());
+        if (at != maps.end()) {
+          mPlay.Select(static_cast<int>(at - maps.begin()));
+          mPlay.Play();
+        }
       }
       if (mShowParticleEditor) {
         mParticleEditor.Draw(mShowParticleEditor);
@@ -319,18 +663,58 @@ namespace faf::editor
       if (mShowProperties) {
         DrawPropertiesPanel();
       }
+      if (mShowHistory) {
+        DrawHistoryPanel();
+      }
+      if (mShowProblems) {
+        DrawProblemsPanel();
+      }
+      // The debugger's pause brings its panel up, whether shown or not.
+      if (mShowDebugger || EdLuaDebugger::Get().Snapshot().paused) {
+        mShowDebugger = true;
+        DrawDebuggerPanel();
+      }
       if (mShowLog) {
-        if (ImGui::Begin(kLogWindow, &mShowLog)) {
+        if (ImGui::Begin(Panel(kLogWindow), &mShowLog)) {
           mLog.Draw();
         }
         ImGui::End();
       }
+    } else if (mShowMissionRun && popouts::IsOut(Panel("Run###MissionRun"))) {
+      // A play hides the panels, but the mission's Run panel stays when it is out in a window of its own (as FAF
+      // Studio's Run window during a test play).
+      const std::vector<std::string> trace = mLog.TakeMissionTrace();
+      mMissionPanel.DrawRunPanel(mShowMissionRun, mDocument.Map() != nullptr, mPlay.Active(), trace);
     }
     if (mShowDemo) {
       ImGui::ShowDemoWindow(&mShowDemo);
     }
+    // The view's overlays: a map open, its view showing (not the start screen, not the effect or material stage).
+    {
+      mTools.SetMinimapRect(0.0f, 0.0f, 0.0f, 0.0f);
+      const std::string key = Workspaces()[static_cast<std::size_t>(ActiveWorkspace())].key;
+      const bool stage = key == "effects" || key == "materials";
+      if (
+        panels && !mShowHome && !stage && mDocument.GetState() == EdDocument::State::Open &&
+        (!playing || mEditorViewInPlay) && mGameView.z > Em(320.0f) && mGameView.w > Em(200.0f)
+      ) {
+        DrawViewOverlays();
+      }
+    }
+    // A layout just built: each group's first panel in front, once its window exists.
+    for (auto it = mFrontPanels.begin(); it != mFrontPanels.end();) {
+      if (ImGuiWindow* const window = ImGui::FindWindowByName(it->c_str()); window != nullptr && window->WasActive) {
+        ImGui::FocusWindow(window);
+        it = mFrontPanels.erase(it);
+      } else {
+        ++it;
+      }
+    }
     DrawSaveAsDialog();
-    mBrowser.Draw();
+    DrawResizeDialog();
+    DrawHome(top, statusHeight);
+    DrawHelpWindow();
+    DrawTour();
     DrawNewMapDialog();
     DrawPackageDialog();
     DrawStatusBar();
@@ -341,110 +725,447 @@ namespace faf::editor
   )
   {
     const ImGuiViewport* const viewport = ImGui::GetMainViewport();
+    const EdWorkspace& w = Workspaces()[static_cast<std::size_t>(ActiveWorkspace())];
     ImGui::DockBuilderRemoveNode(dockspaceId);
     ImGui::DockBuilderAddNode(dockspaceId, ImGuiDockNodeFlags_DockSpace);
     ImGui::DockBuilderSetNodeSize(dockspaceId, viewport->WorkSize);
+    mFrontPanels.clear();
+    const auto dock = [this](const char* const list, const ImGuiID node) {
+      const std::vector<std::string> panels = SplitPanelList(list);
+      for (const std::string& panel : panels) {
+        ImGui::DockBuilderDockWindow(PanelWindowName(panel, ActiveWorkspace()).c_str(), node);
+      }
+      // The group's first panel goes in front once its window is up (ImGui shows the last one made).
+      if (!panels.empty()) {
+        mFrontPanels.push_back(PanelWindowName(panels.front(), ActiveWorkspace()));
+      }
+    };
+    // Left and right columns (each split in two when the workspace has a lower part), then the bottom row under the
+    // middle; what is left in the middle is the view.
     ImGuiID center = dockspaceId;
-    ImGuiID left = ImGui::DockBuilderSplitNode(center, ImGuiDir_Left, 0.21f, nullptr, &center);
-    // The Properties panel under the Tools panel.
-    const ImGuiID leftBottom = ImGui::DockBuilderSplitNode(left, ImGuiDir_Down, 0.42f, nullptr, &left);
-    ImGui::DockBuilderDockWindow("Properties", leftBottom);
-    const ImGuiID right = ImGui::DockBuilderSplitNode(center, ImGuiDir_Right, 0.22f, nullptr, &center);
-    const ImGuiID bottom = ImGui::DockBuilderSplitNode(center, ImGuiDir_Down, 0.22f, nullptr, &center);
-    ImGui::DockBuilderDockWindow(kToolsWindow, left);
-    ImGui::DockBuilderDockWindow(kMapWindow, right);
-    ImGui::DockBuilderDockWindow(kInfoWindow, right);
-    ImGui::DockBuilderDockWindow(kMarkersWindow, right);
-    ImGui::DockBuilderDockWindow(kCheckWindow, right);
-    ImGui::DockBuilderDockWindow(kLogWindow, bottom);
+    if (w.leftWidth > 0.0f && (w.left[0] != 0 || w.leftBottom[0] != 0)) {
+      ImGuiID left = ImGui::DockBuilderSplitNode(center, ImGuiDir_Left, w.leftWidth, nullptr, &center);
+      if (w.leftBottom[0] != 0 && w.left[0] != 0) {
+        const ImGuiID lower = ImGui::DockBuilderSplitNode(left, ImGuiDir_Down, 0.42f, nullptr, &left);
+        dock(w.leftBottom, lower);
+      } else if (w.leftBottom[0] != 0) {
+        dock(w.leftBottom, left);
+      }
+      dock(w.left, left);
+    }
+    if (w.right[0] != 0 || w.rightBottom[0] != 0) {
+      ImGuiID right = ImGui::DockBuilderSplitNode(center, ImGuiDir_Right, w.rightWidth, nullptr, &center);
+      if (w.rightBottom[0] != 0 && w.right[0] != 0) {
+        const ImGuiID lower = ImGui::DockBuilderSplitNode(right, ImGuiDir_Down, 0.40f, nullptr, &right);
+        dock(w.rightBottom, lower);
+      } else if (w.rightBottom[0] != 0) {
+        dock(w.rightBottom, right);
+      }
+      dock(w.right, right);
+    }
+    if (w.bottom[0] != 0) {
+      const ImGuiID bottom = ImGui::DockBuilderSplitNode(center, ImGuiDir_Down, 0.22f, nullptr, &center);
+      dock(w.bottom, bottom);
+    }
     ImGui::DockBuilderFinish(dockspaceId);
+    gpg::Logf("editor: workspace %s laid out", w.name);
+  }
+
+  void EdShell::DrawEffectStage()
+  {
+    // The Effects workspace: the effect's own view in the map view's place (design §4), while the particle editor or
+    // browser is shown and no play runs.
+    const std::string key = Workspaces()[static_cast<std::size_t>(ActiveWorkspace())].key;
+    const bool free = !mPlay.Active() && !mShowHome;
+    const bool effects = key == "effects" && (mShowParticleEditor || mShowParticleBrowser) && free;
+    // The Materials workspace likewise: the material's preview there.
+    const bool materials = key == "materials" && mShowMaterialEditor && free;
+    mParticleEditor.SetStaged(effects);
+    mMaterialEditor.SetStaged(materials);
+    if ((!effects && !materials) || mGameView.z < 64.0f || mGameView.w < 64.0f) {
+      return;
+    }
+    const ImGuiViewport* const viewport = ImGui::GetMainViewport();
+    ImGui::SetNextWindowPos(ImVec2(viewport->Pos.x + mGameView.x, viewport->Pos.y + mGameView.y));
+    ImGui::SetNextWindowSize(ImVec2(mGameView.z, mGameView.w));
+    // A floating window (not NoBringToFrontOnFocus), so the game's view is cut out under it.
+    constexpr ImGuiWindowFlags kFlags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove |
+      ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoScrollbar |
+      ImGuiWindowFlags_NoScrollWithMouse;
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+    if (ImGui::Begin("Stage###EffectStage", nullptr, kFlags)) {
+      if (effects) {
+        mParticleEditor.DrawStage();
+      } else {
+        mMaterialEditor.DrawStage();
+      }
+    }
+    ImGui::End();
+    ImGui::PopStyleVar(2);
+  }
+
+  const std::vector<EdShell::PanelFlag>& EdShell::PanelFlags()
+  {
+    static const std::vector<PanelFlag> kFlags = {
+      {kToolsWindow, &EdShell::mShowTools},
+      {"Properties", &EdShell::mShowProperties},
+      {kMapWindow, &EdShell::mShowMap},
+      {kInfoWindow, &EdShell::mShowInfo},
+      {"Layers", &EdShell::mShowLayers},
+      {kMarkersWindow, &EdShell::mShowMarkers},
+      {kCheckWindow, &EdShell::mShowCheck},
+      {"Armies", &EdShell::mShowArmies},
+      {"Lighting", &EdShell::mShowLighting},
+      {"Script Editor###ScriptEditor", &EdShell::mShowScript},
+      {"Adaptive Map###AdaptiveMap", &EdShell::mShowAdaptiveWindow},
+      {"Material Editor", &EdShell::mShowMaterialEditor},
+      {"Particle Editor", &EdShell::mShowParticleEditor},
+      {"Particle Browser", &EdShell::mShowParticleBrowser},
+      {kLogWindow, &EdShell::mShowLog},
+      {"History", &EdShell::mShowHistory},
+      {"Problems", &EdShell::mShowProblems},
+      {"Debugger", &EdShell::mShowDebugger},
+      {"Nodes###GenerateNodes", &EdShell::mShowGenNodes},
+      {"Graph###GenerateGraph", &EdShell::mShowGenGraph},
+      {"Inspector###GenerateInspector", &EdShell::mShowGenInspector},
+      {"Layout layers###LayoutLayers", &EdShell::mShowLayoutLayers},
+      {"Layout canvas###LayoutCanvas", &EdShell::mShowLayoutCanvas},
+      {"Starts and resources###LayoutStarts", &EdShell::mShowLayoutStarts},
+      {"Stages###MissionStages", &EdShell::mShowMissionStages},
+      {"Strings###MissionStrings", &EdShell::mShowMissionStrings},
+      {"Run###MissionRun", &EdShell::mShowMissionRun},
+      {"Bases###MissionBases", &EdShell::mShowMissionBases},
+      {"Platoons###MissionPlatoons", &EdShell::mShowMissionPlatoons},
+      {"Mod project###ModProject", &EdShell::mShowModProject},
+      {"Unit lab###UnitLab", &EdShell::mShowUnitLab},
+      {"Assets###AssetBrowser", &EdShell::mShowAssets},
+      {"Editor mods###EditorMods", &EdShell::mShowEditorMods},
+      {"Unit viewer###UnitViewer", &EdShell::mShowUnitViewer},
+      {"Fields###Fields", &EdShell::mShowFields},
+      {"Statistics###Statistics", &EdShell::mShowStatistics},
+      {"Images###Images", &EdShell::mShowImages},
+      {"Mesh terrain###MeshTerrain", &EdShell::mShowMesh},
+      {"Paths###Paths", &EdShell::mShowPaths},
+      {"Detail pass###DetailPass", &EdShell::mShowDetail},
+      {"New unit###UnitWizard", &EdShell::mShowUnitWizard},
+    };
+    return kFlags;
+  }
+
+  void EdShell::DrawViewMenu()
+  {
+    if (std::exchange(mViewMenuAsk, false)) {
+      ImGui::OpenPopup("##viewmenu");
+      gpg::Logf("editor: the view's menu (%s)", mViewMenuSelection ? "with a selection" : "nothing selected");
+    }
+    if (mCommands == nullptr || !ImGui::BeginPopup("##viewmenu")) {
+      return;
+    }
+    for (const std::string& id : ViewMenuCommands(mViewMenuSelection)) {
+      if (id.empty()) {
+        ImGui::Separator();
+        continue;
+      }
+      const EdCommand* const command = mCommands->Find(id);
+      if (command == nullptr) {
+        continue;
+      }
+      const std::string why = mCommands->WhyNot(id);
+      if (ImGui::MenuItem(command->title.c_str(), command->keys.c_str(), false, why.empty())) {
+        (void)mCommands->Run(id);
+      }
+      if (!why.empty() && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+        EdSetTooltip("%s", why.c_str());
+      }
+    }
+    ImGui::EndPopup();
+  }
+
+  bool* EdShell::PanelShown(
+    const std::string_view id
+  )
+  {
+    for (const PanelFlag& flag : PanelFlags()) {
+      if (PanelId(flag.window) == id) {
+        return &(this->*flag.shown);
+      }
+    }
+    return nullptr;
+  }
+
+  std::vector<std::string> EdShell::PanelWindows() const
+  {
+    // The names the panels' Begin uses now (icon in front, the workspace after the id), as ImGui knows the windows.
+    std::vector<std::string> out;
+    for (const PanelFlag& flag : PanelFlags()) {
+      out.push_back(PanelWindowName(flag.window, ActiveWorkspace()));
+    }
+    return out;
+  }
+
+  bool EdShell::ShowPanelWindow(
+    const std::string& window,
+    const bool on
+  )
+  {
+    for (const PanelFlag& flag : PanelFlags()) {
+      if (window == PanelWindowName(flag.window, ActiveWorkspace())) {
+        return std::exchange(this->*flag.shown, on);
+      }
+    }
+    return false;
+  }
+
+  std::vector<std::string> EdShell::ShownPanelIds() const
+  {
+    std::vector<std::string> out;
+    for (const PanelFlag& flag : PanelFlags()) {
+      if (this->*flag.shown) {
+        out.push_back(PanelId(flag.window));
+      }
+    }
+    return out;
+  }
+
+  void EdShell::ShowPanels(
+    const std::vector<std::string>& ids
+  )
+  {
+    for (const PanelFlag& flag : PanelFlags()) {
+      this->*flag.shown = std::find(ids.begin(), ids.end(), PanelId(flag.window)) != ids.end();
+    }
+  }
+
+  void EdShell::SwitchWorkspace(
+    const int workspace
+  )
+  {
+    mShowHome = false;
+    if (workspace < 0 || workspace >= static_cast<int>(Workspaces().size()) || workspace == ActiveWorkspace()) {
+      return;
+    }
+    ShownPanels()[Workspaces()[static_cast<std::size_t>(ActiveWorkspace())].key] = ShownPanelIds();
+    SetActiveWorkspace(workspace);
+    const EdWorkspace& w = Workspaces()[static_cast<std::size_t>(workspace)];
+    const auto saved = ShownPanels().find(w.key);
+    ShowPanels(saved != ShownPanels().end() ? saved->second : DefaultPanels(workspace));
+    mTools.SetReadOnly(w.readOnly);
+    ImGui::MarkIniSettingsDirty();
+    gpg::Logf("editor: workspace %s", w.name);
+    PostStatusMessage(std::string(w.name) + " workspace");
   }
 
   void EdShell::DrawToolbar(
-    const float height
+    const float height,
+    const float top
   )
   {
+    // The mockup's toolbar (styles.css .toolbar): flat buttons (an icon, maybe a word) in groups with thin rules
+    // between them; a pressed toggle in the accent's soft fill and colour; Play in green.
     const ImGuiViewport* const viewport = ImGui::GetMainViewport();
-    ImGui::SetNextWindowPos(viewport->WorkPos);
+    ImGui::SetNextWindowPos(ImVec2(viewport->WorkPos.x, viewport->WorkPos.y + top));
     ImGui::SetNextWindowSize(ImVec2(viewport->WorkSize.x, height));
     ImGui::SetNextWindowViewport(viewport->ID);
     constexpr ImGuiWindowFlags kFlags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove |
       ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing |
       ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoScrollbar;
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8.0f, 6.0f));
+    const float buttonHeight = std::round(Em(26.0f));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(Em(7.0f), std::round((height - buttonHeight) * 0.5f)));
     ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
-    ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 4.0f);
-    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(Em(10.0f), ImGui::GetStyle().FramePadding.y));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, Em(4.0f));
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(Em(2.0f), 0.0f));
+    ImGui::PushStyleColor(ImGuiCol_WindowBg, ImGui::GetStyleColorVec4(ImGuiCol_FrameBg));
     if (ImGui::Begin("##Toolbar", nullptr, kFlags)) {
       const bool playing = mPlay.Active();
       const bool open = mDocument.GetState() == EdDocument::State::Open;
-      const float buttonHeight = ImGui::GetFrameHeight();
-      const auto tip = [](const char* const text) {
+      ImDrawList* const draw = ImGui::GetWindowDrawList();
+      ImFont* const font = ImGui::GetFont();
+      const float fontSize = ImGui::GetFontSize();
+      const ImVec4 text = ImGui::GetStyleColorVec4(ImGuiCol_Text);
+      const ImVec4 dim = ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled);
+      // The mockup's text-1: the toolbar's words, between the bright and the dimmed text.
+      const ImU32 ink1 = ImGui::GetColorU32(
+        ImVec4((text.x * 3.0f + dim.x) / 4.0f, (text.y * 3.0f + dim.y) / 4.0f, (text.z * 3.0f + dim.z) / 4.0f, 1.0f)
+      );
+      {
+        // The line under the toolbar.
+        const ImVec2 at = ImGui::GetWindowPos();
+        const ImVec2 size = ImGui::GetWindowSize();
+        draw->AddLine(
+          ImVec2(at.x, at.y + size.y - 0.5f),
+          ImVec2(at.x + size.x, at.y + size.y - 0.5f),
+          ImGui::GetColorU32(ImGuiCol_Border)
+        );
+      }
+      const auto tip = [](const char* const words) {
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled | ImGuiHoveredFlags_DelayShort)) {
-          ImGui::SetTooltip("%s", text);
+          EdSetTooltip("%s", words);
         }
       };
-      const auto divider = [] {
+      const auto withAlpha = [](const ImU32 colour, const float alpha) {
+        const auto a = static_cast<ImU32>(static_cast<float>((colour >> IM_COL32_A_SHIFT) & 0xFFU) * alpha);
+        return (colour & ~IM_COL32_A_MASK) | (a << IM_COL32_A_SHIFT);
+      };
+      // A flat button: its icon, then its word if any. `pressed` (toggles) fills it with the accent's soft colour.
+      const auto button = [&](
+                            const char* const id,
+                            const char* const icon,
+                            const char* const label,
+                            const bool pressed = false,
+                            const bool enabled = true,
+                            const float inkAlpha = 1.0f
+                          ) {
+        const ImVec2 iconSize = icon != nullptr ? ImGui::CalcTextSize(icon) : ImVec2(0.0f, 0.0f);
+        const ImVec2 labelSize = label != nullptr ? ImGui::CalcTextSize(label) : ImVec2(0.0f, 0.0f);
+        const float pad = label != nullptr ? Em(8.0f) : Em(6.0f);
+        const float gap = icon != nullptr && label != nullptr ? Em(5.0f) : 0.0f;
+        const float width = std::round(std::max(buttonHeight, pad * 2.0f + iconSize.x + gap + labelSize.x));
+        const ImVec2 at = ImGui::GetCursorScreenPos();
+        ImGui::PushID(id);
+        const bool clicked = ImGui::InvisibleButton("##tb", ImVec2(width, buttonHeight)) && enabled;
+        const bool hovered = enabled && ImGui::IsItemHovered();
+        const bool held = enabled && ImGui::IsItemActive();
+        ImGui::PopID();
+        const ImVec2 end(at.x + width, at.y + buttonHeight);
+        if (pressed) {
+          draw->AddRectFilled(at, end, AccentU32(held ? 0.30f : hovered ? 0.24f : 0.16f), Em(4.0f));
+        } else if (hovered) {
+          draw->AddRectFilled(at, end, ImGui::GetColorU32(held ? ImGuiCol_ButtonHovered : ImGuiCol_Button), Em(4.0f));
+        }
+        ImU32 ink = pressed ? AccentU32() : hovered ? ImGui::GetColorU32(ImGuiCol_Text) : ink1;
+        if (!enabled) {
+          ink = withAlpha(ink, 0.55f);
+        } else if (inkAlpha < 1.0f && !hovered) {
+          ink = withAlpha(ink, inkAlpha);
+        }
+        float x = at.x + (label != nullptr ? pad : (width - iconSize.x) * 0.5f);
+        // Segoe UI's capitals centre 0.55 of the size below the line's top: that point on the button's middle.
+        const float y = std::round(at.y + buttonHeight * 0.5f - fontSize * 0.55f);
+        if (icon != nullptr) {
+          draw->AddText(ImVec2(std::round(x), std::round(y)), ink, icon);
+          x += iconSize.x + gap;
+        }
+        if (label != nullptr) {
+          draw->AddText(ImVec2(std::round(x), std::round(y)), ink, label);
+        }
         ImGui::SameLine();
-        ImGui::SeparatorEx(ImGuiSeparatorFlags_Vertical);
-        ImGui::SameLine();
+        return clicked;
+      };
+      // The rule between groups (the mockup's .tb-group border).
+      const auto group = [&] {
+        ImGui::SameLine(0.0f, Em(5.0f));
+        const ImVec2 at = ImGui::GetCursorScreenPos();
+        const float x = std::round(at.x) + 0.5f;
+        draw->AddLine(
+          ImVec2(x, at.y + Em(4.0f)),
+          ImVec2(x, at.y + buttonHeight - Em(4.0f)),
+          ImGui::GetColorU32(ImGuiCol_TableBorderLight)
+        );
+        ImGui::Dummy(ImVec2(1.0f, buttonHeight));
+        ImGui::SameLine(0.0f, Em(5.0f));
       };
 
-      // Play / Stop: green or red, its icon drawn, the key beside the word.
+      // Play / Stop: the mockup's green (red to stop) with dark words, the key beside them; the setup at its side.
       {
-        const ImVec4 base = playing ? kStopRed : kPlayGreen;
-        ImGui::PushStyleColor(ImGuiCol_Button, base);
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(base.x * 1.25f, base.y * 1.25f, base.z * 1.25f, 1.0f));
-        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(base.x * 0.85f, base.y * 0.85f, base.z * 0.85f, 1.0f));
-        ImGui::BeginDisabled(!playing && !mPlay.CanPlay());
+        const ImU32 base = playing ? IM_COL32(0xFF, 0x5D, 0x5D, 0xFF) : IM_COL32(0x3F, 0xCF, 0x7A, 0xFF);
+        const ImU32 onBase = playing ? IM_COL32(0x2A, 0x06, 0x06, 0xFF) : IM_COL32(0x06, 0x21, 0x0F, 0xFF);
+        const bool canPlay = playing || mPlay.CanPlay();
+        const char* const icon = playing ? ICON_STOP : ICON_PLAY;
+        const char* const word = playing ? "Stop" : "Play";
+        const ImVec2 iconSize = ImGui::CalcTextSize(icon);
+        const ImVec2 wordSize = ImGui::CalcTextSize(word);
+        const float pad = Em(11.0f);
+        const float keyFont = fontSize * 0.85f;
+        const ImVec2 keyText = font->CalcTextSizeA(keyFont, FLT_MAX, 0.0f, "F5");
+        const float capWidth = std::round(keyText.x + Em(10.0f));
+        // The same room at both ends (the cap ended nearer the edge than the icon began).
+        const float width = std::round(
+          pad - std::round(iconSize.y * 7.0f / 24.0f * 0.8f) + iconSize.x + Em(6.0f) + wordSize.x + Em(9.0f) +
+          capWidth + pad
+        );
         const ImVec2 at = ImGui::GetCursorScreenPos();
-        const ImVec2 size(Em(118.0f), buttonHeight);
-        if (ImGui::Button("##playstop", size)) {
+        const bool clicked = ImGui::InvisibleButton("##playstop", ImVec2(width, buttonHeight)) && canPlay;
+        const bool hovered = canPlay && ImGui::IsItemHovered();
+        tip(playing ? "Stop the session and go back to editing (F5)" : "Play the map picked in the Map panel (F5)");
+        ImGui::SameLine(0.0f, 0.0f);
+        const float splitWidth = std::round(Em(22.0f));
+        const ImVec2 splitAt = ImGui::GetCursorScreenPos();
+        if (ImGui::InvisibleButton("##playsetup", ImVec2(splitWidth, buttonHeight))) {
+          ImGui::OpenPopup("##playsetuppopup");
+        }
+        const bool splitHovered = ImGui::IsItemHovered();
+        tip(
+          "Play options: start slot, faction, AI opponents, fog, prebuilt units; while playing, hide the fog or watch "
+          "as an observer"
+        );
+        // One green shape, the split a step lighter when hovered, a thin dark line between the halves.
+        const float brighten = 1.08f;
+        const auto lit = [&](const ImU32 colour, const bool on) {
+          if (!on) {
+            return colour;
+          }
+          ImVec4 c = ImGui::ColorConvertU32ToFloat4(colour);
+          c.x = std::min(1.0f, c.x * brighten);
+          c.y = std::min(1.0f, c.y * brighten);
+          c.z = std::min(1.0f, c.z * brighten);
+          return ImGui::ColorConvertFloat4ToU32(c);
+        };
+        const ImU32 shown = canPlay ? base : withAlpha(base, 0.45f);
+        draw->AddRectFilled(
+          at, ImVec2(at.x + width, at.y + buttonHeight), lit(shown, hovered), Em(4.0f), ImDrawFlags_RoundCornersLeft
+        );
+        draw->AddRectFilled(
+          splitAt,
+          ImVec2(splitAt.x + splitWidth, splitAt.y + buttonHeight),
+          lit(base, splitHovered),
+          Em(4.0f),
+          ImDrawFlags_RoundCornersRight
+        );
+        draw->AddLine(
+          ImVec2(splitAt.x + 0.5f, splitAt.y), ImVec2(splitAt.x + 0.5f, splitAt.y + buttonHeight), IM_COL32(0, 0, 0, 46)
+        );
+        const float y = std::round(at.y + buttonHeight * 0.5f - fontSize * 0.55f);
+        // The play glyph has empty space at its left (7 of 24 units): it counts toward the padding.
+        float x = at.x + pad - std::round(iconSize.y * 7.0f / 24.0f * 0.8f);
+        draw->AddText(ImVec2(x, y), onBase, icon);
+        x += iconSize.x + Em(6.0f);
+        if (gBoldFont != nullptr) {
+          draw->AddText(gBoldFont, fontSize, ImVec2(x, y), onBase, word);
+        } else {
+          draw->AddText(ImVec2(x, y), onBase, word);
+        }
+        x += wordSize.x + Em(9.0f);
+        // The key on an outlined cap, as the mockup's kbd.
+        // The cap on the words' line (centred on their capitals, as the icon is), not on the button's middle.
+        const float lineMid = y + fontSize * 0.55f;
+        const float capHalf = std::round((buttonHeight - Em(10.0f)) * 0.5f);
+        const ImVec2 capMin(std::round(x), std::round(lineMid - capHalf));
+        const ImVec2 capMax(std::round(x + capWidth), std::round(lineMid + capHalf));
+        draw->AddRect(capMin, capMax, IM_COL32(0, 0, 0, 64), Em(3.0f));
+        // Its capitals on the cap's middle: at this smaller size they sit 0.63 of it below the line's top (measured
+        // on a capture; 0.55 left them 1.3 px low).
+        draw->AddText(
+          font,
+          keyFont,
+          ImVec2(
+            std::round(capMin.x + (capMax.x - capMin.x - keyText.x) * 0.5f),
+            std::round((capMin.y + capMax.y) * 0.5f - keyFont * 0.63f)
+          ),
+          onBase,
+          "F5"
+        );
+        const char* const chevron = ICON_CHEVRON;
+        const ImVec2 chevronSize = ImGui::CalcTextSize(chevron);
+        draw->AddText(ImVec2(std::round(splitAt.x + (splitWidth - chevronSize.x) * 0.5f), y), onBase, chevron);
+        if (clicked) {
           if (playing) {
             mPlay.Stop();
           } else {
             mPlay.Play();
           }
         }
-        ImDrawList* const draw = ImGui::GetWindowDrawList();
-        const ImU32 white = ImGui::GetColorU32(ImGuiCol_Text);
-        const float cy = at.y + size.y * 0.5f;
-        const float r = size.y * 0.24f;
-        const float left = Em(12.0f);
-        if (playing) {
-          draw->AddRectFilled(ImVec2(at.x + left, cy - r), ImVec2(at.x + left + 2.0f * r, cy + r), white, 1.5f);
-        } else {
-          draw->AddTriangleFilled(
-            ImVec2(at.x + left, cy - r * 1.1f),
-            ImVec2(at.x + left, cy + r * 1.1f),
-            ImVec2(at.x + left + 2.0f * r, cy),
-            white
-          );
-        }
-        const char* const word = playing ? "Stop" : "Play";
-        const float textY = at.y + (size.y - ImGui::GetTextLineHeight()) * 0.5f;
-        draw->AddText(ImVec2(at.x + Em(20.0f) + 2.0f * r, textY), white, word);
-        // The key, on a darker cap so it reads on the green and the red.
-        const ImVec2 keySize = ImGui::CalcTextSize("F5");
-        const ImVec2 capMin(at.x + size.x - keySize.x - Em(14.0f), at.y + Em(4.0f));
-        const ImVec2 capMax(at.x + size.x - Em(6.0f), at.y + size.y - Em(4.0f));
-        draw->AddRectFilled(capMin, capMax, IM_COL32(0, 0, 0, 90), 3.0f);
-        draw->AddRect(capMin, capMax, IM_COL32(255, 255, 255, 70), 3.0f);
-        draw->AddText(ImVec2(capMin.x + Em(4.0f), textY), IM_COL32(255, 255, 255, 230), "F5");
-        ImGui::EndDisabled();
-        tip(playing ? "Stop the session and go back to editing (F5)" : "Play the map picked in the Map panel (F5)");
-        // The setup, one click away.
-        ImGui::SameLine(0.0f, 1.0f);
-        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(4.0f, ImGui::GetStyle().FramePadding.y));
-        if (ImGui::ArrowButton("##playsetup", ImGuiDir_Down)) {
-          ImGui::OpenPopup("##playsetuppopup");
-        }
-        ImGui::PopStyleVar();
-        ImGui::PopStyleColor(3);
-        tip(
-          "Play options: start slot, faction, AI opponents, fog, prebuilt units; while playing, hide the fog or watch "
-          "as an observer"
-        );
         ImGui::SetNextWindowSize(ImVec2(ImGui::GetFontSize() * 22.0f, 0.0f));
         if (ImGui::BeginPopup("##playsetuppopup")) {
           const std::vector<std::string>& playMaps = mPlay.Maps();
@@ -457,127 +1178,174 @@ namespace faf::editor
           DrawPlaySetup();
           ImGui::EndPopup();
         }
+        ImGui::SameLine();
         // While a play runs: the editor's view or the game's (F6); the game runs on behind the editor's.
         if (playing) {
-          ImGui::SameLine();
+          ImGui::SameLine(0.0f, Em(6.0f));
           const bool editorView = mEditorViewInPlay;
-          ImGui::PushStyleColor(
-            ImGuiCol_Button, editorView ? ImVec4(0.75f, 0.50f, 0.15f, 1.0f) : ImGui::GetStyleColorVec4(ImGuiCol_Button)
-          );
-          if (ImGui::Button(editorView ? "Editor view  F6" : "Game view  F6", ImVec2(0.0f, buttonHeight))) {
+          if (button("##view", ICON_REVIEW, editorView ? "Editor view" : "Game view", editorView)) {
             mEditorViewInPlay = !mEditorViewInPlay;
             gpg::Logf("editor: the toolbar: the %s view", mEditorViewInPlay ? "editor's" : "game's");
           }
-          ImGui::PopStyleColor();
           tip(
             editorView ? "The editor's view of the map, the play running on behind it: F6 for the game's view"
                        : "The game's view: F6 for the editor's view of the map (the play keeps running)"
           );
-          if (editorView) {
-            ImGui::SameLine();
-            ImGui::Checkbox("Game units", &mTools.ShowGameUnits());
-            tip(
-              "The play's own units in the editor's view: shown (click one to select it, drag to move it, change it in "
-              "Properties) or hidden"
-            );
-          }
         }
       }
-      divider();
+      group();
 
       // File.
-      ImGui::BeginDisabled(playing);
-      if (EdToolButton("##new", EdIcon::NewFile, "New", false, false)) {
+      const std::vector<std::string>& maps = mPlay.Maps();
+      if (button("##new", ICON_NEW, nullptr, false, !playing)) {
         mOpenNewMap = true;
       }
-      tip("A new map: size, players, height and sea (Ctrl+N)");
-      ImGui::SameLine();
-      const std::vector<std::string>& maps = mPlay.Maps();
-      ImGui::BeginDisabled(maps.empty() || mDocument.GetState() == EdDocument::State::Loading);
-      if (EdToolButton("##open", EdIcon::Folder, "Open", false, false)) {
+      tip("New map: size, players, height and sea (Ctrl+N)");
+      if (
+        button(
+          "##open",
+          ICON_OPEN,
+          "Open",
+          false,
+          !playing && !maps.empty() && mDocument.GetState() != EdDocument::State::Loading
+        )
+      ) {
         mBrowser.Show();
       }
-      ImGui::EndDisabled();
       tip("Browse maps: every map on this computer (the game's, FAF's folder, your vault) and maps from the FAF vault");
-      ImGui::SameLine();
-      ImGui::BeginDisabled(!open);
-      if (EdToolButton("##save", EdIcon::Save, "Save", false, false)) {
+      if (button("##save", ICON_SAVE, "Save", false, !playing && open)) {
         mCommand = Command::Save;
       }
-      tip("Save the map into its folder (Ctrl+S)");
-      ImGui::SameLine();
-      if (EdToolButton("##saveas", EdIcon::SaveAs, "Save as", false, false)) {
-        mOpenSaveAs = true;
-      }
-      tip("Save the map as a new folder in your vault");
-      ImGui::EndDisabled();
-      divider();
+      tip("Save the map into its folder (Ctrl+S). Save as a new folder is in the File menu.");
+      group();
 
-      // Edit.
-      ImGui::BeginDisabled(!open || !mDocument.CanUndo());
-      if (EdToolButton("##undo", EdIcon::Undo, "Undo", false, false, EdSegment::First)) {
-        mCommand = Command::Undo;
+      // Edit: Undo names its step, as the mockup's.
+      {
+        const bool canUndo = open && !playing && mDocument.CanUndo();
+        std::string undo = "Undo";
+        if (const char* const step = mDocument.UndoStepName(); canUndo && step != nullptr) {
+          undo = std::string("Undo ") + step;
+          if (undo.size() > 27) {
+            undo = undo.substr(0, 26) + "...";
+          }
+        }
+        if (button("##undo", ICON_UNDO, undo.c_str(), false, canUndo)) {
+          mCommand = Command::Undo;
+        }
+        tip("Undo the last edit (Ctrl+Z)");
+        if (button("##redo", ICON_REDO, nullptr, false, open && !playing && mDocument.CanRedo())) {
+          mCommand = Command::Redo;
+        }
+        tip("Redo (Ctrl+Y)");
       }
-      ImGui::EndDisabled();
-      tip("Undo the last edit (Ctrl+Z)");
-      ImGui::SameLine(0.0f, 1.0f);
-      ImGui::BeginDisabled(!open || !mDocument.CanRedo());
-      if (EdToolButton("##redo", EdIcon::Redo, "Redo", false, false, EdSegment::Last)) {
-        mCommand = Command::Redo;
-      }
-      ImGui::EndDisabled();
-      tip("Redo (Ctrl+Y)");
-      ImGui::EndDisabled();
-      divider();
+      group();
 
-      // The build grid and snapping.
-      const auto toggle = [](const char* const label, const EdIcon icon, const bool on) {
-        ImGui::PushID(label);
-        const bool clicked = EdToolButton("##toggle", icon, label, true, on);
-        ImGui::PopID();
-        return clicked;
-      };
-      if (toggle("Grid", EdIcon::Grid, mTools.ShowGrid())) {
-        mTools.SetShowGrid(!mTools.ShowGrid());
+      // Symmetry: the five common modes as pictures; all ten are in the Terrain tool's settings.
+      {
+        const float wordSize = std::round(fontSize * 0.85f);
+        const ImVec2 word = font->CalcTextSizeA(wordSize, FLT_MAX, 0.0f, "Symmetry");
+        const ImVec2 at = ImGui::GetCursorScreenPos();
+        draw->AddText(
+          font, wordSize, ImVec2(at.x + Em(2.0f), std::round(at.y + (buttonHeight - word.y) * 0.5f)), ink1, "Symmetry"
+        );
+        ImGui::Dummy(ImVec2(word.x + Em(5.0f), buttonHeight));
+        ImGui::SameLine(0.0f, 0.0f);
+        static constexpr int kModes[] = {0, 1, 5, 6, 8};
+        mTools.SetSymmetryHover(-1);
+        // `/symhover <mode>` (test runs): that button held as hovered, its tooltip under it.
+        static const int testHover = [] {
+          fa::vector<fa::string> value;
+          return moho::CFG_GetArgOption("/symhover", 1, &value) && !value.empty() ? std::atoi(value[0].c_str()) : -1;
+        }();
+        for (const int mode : kModes) {
+          ImGui::PushID(mode);
+          const ImVec2 p = ImGui::GetCursorScreenPos();
+          const float side = buttonHeight;
+          const bool on = mTools.SymmetryIndex() == mode;
+          if (ImGui::InvisibleButton("##sym", ImVec2(side, side)) && !playing) {
+            mTools.PickSymmetry(mode);
+          }
+          const bool hovered =
+            ImGui::IsItemHovered() || (mode == testHover && mDocument.GetState() == EdDocument::State::Open);
+          if (on) {
+            draw->AddRectFilled(p, ImVec2(p.x + side, p.y + side), AccentU32(0.16f), Em(4.0f));
+          } else if (hovered) {
+            draw->AddRectFilled(p, ImVec2(p.x + side, p.y + side), ImGui::GetColorU32(ImGuiCol_Button), Em(4.0f));
+          }
+          const float picture = std::round(side * 0.92f);
+          mTools.DrawSymmetryPicture(
+            draw, mode, ImVec2(p.x + (side - picture) * 0.5f, p.y + (side - picture) * 0.5f), picture
+          );
+          if (hovered) {
+            // The map previews the mode while the pointer is here (EdMapScene::DrawBrushRings).
+            mTools.SetSymmetryHover(mode);
+            if (mode == testHover) {
+              ImGui::SetNextWindowPos(ImVec2(p.x, p.y + side + Em(8.0f)));
+            }
+            EdBeginTooltip();
+            mTools.DrawSymmetryTooltip(mode, true);
+            ImGui::EndTooltip();
+          }
+          ImGui::PopID();
+          ImGui::SameLine();
+        }
+        // The other five modes, the N-way count and what the map fits: a menu. Lit when the mode in use is one of them.
+        {
+          const ImVec2 p = ImGui::GetCursorScreenPos();
+          const float width = std::round(buttonHeight * 0.62f);
+          const bool other =
+            std::find(std::begin(kModes), std::end(kModes), mTools.SymmetryIndex()) == std::end(kModes);
+          // `/symmenu` (test runs): the menu opened once the map is open.
+          static bool testMenu = moho::CFG_GetArgOption("/symmenu", 0, nullptr);
+          const bool openForTest =
+            testMenu && mDocument.GetState() == EdDocument::State::Open && ImGui::GetTime() > 6.0;
+          if ((ImGui::InvisibleButton("##symmore", ImVec2(width, buttonHeight)) && !playing) || openForTest) {
+            ImGui::OpenPopup("##symmenu");
+            testMenu = false;
+          }
+          const bool hovered = ImGui::IsItemHovered();
+          if (other) {
+            draw->AddRectFilled(p, ImVec2(p.x + width, p.y + buttonHeight), AccentU32(0.16f), Em(4.0f));
+          } else if (hovered) {
+            draw->AddRectFilled(
+              p, ImVec2(p.x + width, p.y + buttonHeight), ImGui::GetColorU32(ImGuiCol_Button), Em(4.0f)
+            );
+          }
+          const ImVec2 glyph = ImGui::CalcTextSize(ICON_CHEVRON);
+          draw->AddText(
+            ImVec2(std::round(p.x + (width - glyph.x) * 0.5f), std::round(p.y + (buttonHeight - glyph.y) * 0.5f)),
+            other ? AccentU32() : ink1,
+            ICON_CHEVRON
+          );
+          if (hovered) {
+            if (other) {
+              EdSetTooltip(
+                "Symmetry: %s\nAll ten modes, the N-way count and what the map's heights fit",
+                EdTools::SymmetryName(mTools.SymmetryIndex())
+              );
+            } else {
+              EdSetTooltip("All ten symmetry modes\nThe N-way count and what the map's heights fit");
+            }
+          }
+          ImGui::SetNextWindowPos(ImVec2(p.x, p.y + buttonHeight + Em(4.0f)), ImGuiCond_Appearing);
+          if (ImGui::BeginPopup("##symmenu")) {
+            mTools.DrawSymmetryMenu();
+            ImGui::EndPopup();
+          }
+          ImGui::SameLine();
+        }
       }
-      tip(
-        "The build grid on the ground around the cursor: cells of the step's size, one unit being the cell units are "
-        "built on"
-      );
-      ImGui::SameLine();
-      if (toggle("Snap", EdIcon::Magnet, mTools.SnapToGrid())) {
+      group();
+
+      // Snapping to the build grid and its step, keeping things on the ground.
+      // Grid and Slope change what the view shows: they are the view's pills (DrawViewOverlays), not here twice.
+      if (button("##snap", ICON_MAGNET, "Snap", mTools.SnapToGrid())) {
         mTools.SetSnapToGrid(!mTools.SnapToGrid());
       }
       tip(
         "Markers and props placed or dragged go to the middle of a grid cell (mass and hydrocarbon points always sit "
         "on half units, as the game's saves place them)"
       );
-      ImGui::SameLine();
-      if (toggle("On ground", EdIcon::OnGround, mTools.KeepOnGround())) {
-        mTools.SetKeepOnGround(!mTools.KeepOnGround());
-      }
-      tip(
-        "The move arrows keep markers and props on the ground when they move across it; off, they keep their height. "
-        "Nothing is moved under the ground either way."
-      );
-      ImGui::SameLine();
-      if (toggle("Slope", EdIcon::Slope, mTools.ShowSlope())) {
-        mTools.SetShowSlope(!mTools.ShowSlope());
-      }
-      tip(
-        "Each cell's slope as the game's pathing reads it (its steepest edge): yellow above 0.25 (too steep to build "
-        "on), orange "
-        "above 0.5, red above 0.75 (steeper than most land units climb)"
-      );
-      ImGui::SameLine();
-      if (toggle("Km grid", EdIcon::Ruler, mTools.ShowKmGrid())) {
-        mTools.SetShowKmGrid(!mTools.ShowKmGrid());
-      }
-      tip(
-        "Lines every kilometre (51.2 units, the game's scale) and the map's centre lines. Alt+drag in the view "
-        "measures a distance."
-      );
-      ImGui::SameLine();
       {
         static constexpr float kSteps[] = {0.5f, 1.0f, 2.0f, 4.0f, 8.0f};
         static constexpr const char* kStepNames[] = {"0.5", "1", "2", "4", "8"};
@@ -587,8 +1355,23 @@ namespace faf::editor
             current = i;
           }
         }
-        ImGui::SetNextItemWidth(ImGui::CalcTextSize("0.5").x + ImGui::GetFrameHeight() * 2.0f);
-        if (ImGui::BeginCombo("##gridstep", kStepNames[current])) {
+        ImGui::SameLine(0.0f, Em(4.0f));
+        const float framePad = std::max(0.0f, std::round((buttonHeight - fontSize) * 0.5f) - 1.0f);
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(Em(7.0f), framePad));
+        ImGui::SetNextItemWidth(std::round(Em(52.0f)));
+        const bool stepOpen = EdBeginCombo("##gridstep", kStepNames[current], ImGuiComboFlags_NoArrowButton);
+        {
+          // The mockup's select: the value and a small chevron at the right.
+          const ImVec2 max = ImGui::GetItemRectMax();
+          const ImVec2 min = ImGui::GetItemRectMin();
+          const ImVec2 chevron = ImGui::CalcTextSize(ICON_CHEVRON);
+          draw->AddText(
+            ImVec2(std::round(max.x - chevron.x - Em(6.0f)), std::round((min.y + max.y - fontSize) * 0.5f)),
+            ink1,
+            ICON_CHEVRON
+          );
+        }
+        if (stepOpen) {
           for (int i = 0; i < 5; ++i) {
             if (ImGui::Selectable(kStepNames[i], i == current)) {
               mTools.SetGridStep(kSteps[i]);
@@ -596,12 +1379,21 @@ namespace faf::editor
           }
           ImGui::EndCombo();
         }
+        ImGui::PopStyleVar();
         tip("The grid's step in game units");
+        ImGui::SameLine(0.0f, Em(4.0f));
       }
-      ImGui::SameLine();
-      divider();
-      // The map border, edited from any tool.
-      if (IconToggle("##border", EdIcon::Border, mTools.EditingBorder())) {
+      if (button("##onground", ICON_GROUND, "On ground", mTools.KeepOnGround())) {
+        mTools.SetKeepOnGround(!mTools.KeepOnGround());
+      }
+      tip(
+        "The move arrows keep markers and props on the ground when they move across it; off, they keep their height. "
+        "Nothing is moved under the ground either way."
+      );
+      group();
+
+      // What the view shows, one toggle per kind (Blender's object type visibility); hidden things aren't picked.
+      if (button("##border", ICON_AREA, nullptr, mTools.EditingBorder())) {
         mTools.EditingBorder() = !mTools.EditingBorder();
         mShowProperties = mShowProperties || mTools.EditingBorder();
       }
@@ -609,99 +1401,35 @@ namespace faf::editor
         mTools.EditingBorder() ? "Map border: on. Drag its edges in the view; its settings are in the Properties panel"
                                : "Map border (the playable area): edit it from any tool"
       );
-      divider();
-      // What the view shows, one toggle per kind (Blender's object type visibility); hidden things aren't picked.
-      // One joined row (1 px apart, rounded at its ends), as Blender's and the image editors' toggle groups.
-      if (IconToggle("##showprops", EdIcon::Tree, mTools.ShowProps(), EdSegment::First)) {
-        mTools.ShowProps() = !mTools.ShowProps();
-      }
-      tip(
-        mTools.ShowProps() ? "Props shown (trees, rocks, wrecks): click to hide them"
-                           : "Props hidden: click to show them"
-      );
-      ImGui::SameLine(0.0f, 1.0f);
-      if (IconToggle("##showunits", EdIcon::Tank, mTools.ShowUnits(), EdSegment::Middle)) {
-        mTools.ShowUnits() = !mTools.ShowUnits();
-      }
-      tip(
-        mTools.ShowUnits() ? "Units shown (the armies' and civilians' units): click to hide them"
-                           : "Units hidden: click to show them"
-      );
-      // Markers by the palette's groups: shown while none of the group's types is hidden; a click shows or hides all of
-      // them.
-      struct MarkerGroup
-      {
-        const char* group;
-        EdIcon icon;
-        const char* what;
-      };
-      static constexpr MarkerGroup kGroups[] = {
-        {"Resources", EdIcon::Resource, "Mass and hydrocarbon markers"},
-        {"Starts", EdIcon::Flag, "Start positions"},
-        {"AI", EdIcon::Crosshair, "AI markers (expansions, rally points, defensive points...)"},
-        {"Path nodes", EdIcon::PathNodes, "Path nodes and their links (land, air, water, amphibious)"},
-        {"Other", EdIcon::Pin, "Other markers (camera, weather, effects...)"},
-      };
-      std::set<std::string>& hidden = mTools.HiddenMarkerTypes();
-      for (const MarkerGroup& group : kGroups) {
-        const EdSegment segment = &group == &kGroups[std::size(kGroups) - 1] ? EdSegment::Last : EdSegment::Middle;
-        bool shown = true;
-        for (const MarkerType& type : MarkerTypes()) {
-          shown = shown && (std::string(group.group) != type.group || hidden.count(type.type) == 0);
-        }
-        ImGui::SameLine(0.0f, 1.0f);
-        ImGui::PushID(group.group);
-        if (IconToggle("##showmarkers", group.icon, shown, segment)) {
-          for (const MarkerType& type : MarkerTypes()) {
-            if (std::string(group.group) == type.group) {
-              if (shown) {
-                hidden.insert(type.type);
-              } else {
-                hidden.erase(type.type);
-              }
-            }
-          }
-        }
-        ImGui::PopID();
-        if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) {
-          ImGui::SetTooltip("%s %s: click to %s them", group.what, shown ? "shown" : "hidden", shown ? "hide" : "show");
-        }
-      }
-
-      // At the right: the open map (its name, its folder, "edited" while it has unsaved edits), then the UI scale.
+      // At the right: Check and Release, then the panels' scale.
       const float scaleWidth = DrawUiScaleButtons(true);
-      if (open) {
-        const MapFacts& facts = mDocument.Facts();
-        const std::string name = facts.name.empty() ? MapDisplayName(facts.scenarioPath) : facts.name;
-        const std::string folder = MapDisplayName(facts.scenarioPath);
-        const char* const edited = mDocument.Modified() ? "  edited" : "";
-        const ImGuiStyle& style = ImGui::GetStyle();
-        const float width = ImGui::CalcTextSize(name.c_str()).x + style.ItemSpacing.x +
-          ImGui::CalcTextSize(folder.c_str()).x + (mDocument.Modified() ? 4.0f + ImGui::CalcTextSize(edited).x : 0.0f) +
-          Em(16.0f) + scaleWidth;
-        ImGui::SameLine(
-          std::max(ImGui::GetCursorPosX() + Em(16.0f), ImGui::GetWindowWidth() - width - style.WindowPadding.x)
-        );
-        ImGui::AlignTextToFramePadding();
-        ImGui::TextUnformatted(name.c_str());
-        ImGui::SameLine();
-        ImGui::TextDisabled("%s", folder.c_str());
-        if (mDocument.Modified()) {
-          ImGui::SameLine(0.0f, 4.0f);
-          ImGui::TextColored(ImVec4(0.95f, 0.75f, 0.30f, 1.0f), "%s", edited);
-        }
-        ImGui::SameLine(0.0f, Em(16.0f));
-      } else {
-        ImGui::SameLine(
-          std::max(
-            ImGui::GetCursorPosX() + Em(16.0f), ImGui::GetWindowWidth() - scaleWidth - ImGui::GetStyle().WindowPadding.x
-          )
-        );
+      const auto width = [&](const char* const icon, const char* const label) {
+        return std::round(Em(16.0f) + ImGui::CalcTextSize(icon).x + Em(5.0f) + ImGui::CalcTextSize(label).x);
+      };
+      const float rightWidth =
+        width(ICON_OK, "Check") + width(ICON_PACKAGE, "Release") + Em(2.0f) + Em(11.0f) + 1.0f + scaleWidth;
+      ImGui::SameLine(
+        std::max(
+          ImGui::GetCursorPosX() + Em(10.0f), ImGui::GetWindowWidth() - rightWidth - ImGui::GetStyle().WindowPadding.x
+        )
+      );
+      if (button("##check", ICON_OK, "Check", false, open)) {
+        mShowCheck = true;
+        mRunCheck = true;
       }
+      tip("Run the map check and show its findings in the Check panel");
+      if (button("##release", ICON_PACKAGE, "Release", false, open && !playing) && mCommands != nullptr) {
+        (void)mCommands->Run("file.package");
+      }
+      tip("Package the map for the FAF vault");
+      group();
+      ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(Em(7.0f), std::round((buttonHeight - fontSize) * 0.5f)));
       (void)DrawUiScaleButtons(false);
+      ImGui::PopStyleVar();
     }
     ImGui::End();
-    ImGui::PopStyleVar(4);
+    ImGui::PopStyleColor();
+    ImGui::PopStyleVar(5);
   }
 
   float EdShell::DrawUiScaleButtons(
@@ -709,7 +1437,7 @@ namespace faf::editor
   )
   {
     // The steps a click moves between; the middle button shows the scale and puts it back to 100%.
-    static constexpr float kSteps[] = {0.75f, 0.85f, 1.0f, 1.1f, 1.25f, 1.4f, 1.6f, 1.8f, 2.0f};
+    const auto& kSteps = kUiScaleSteps;
     // One joined row, as the view's toggle groups: - | 100% | +, the ends square buttons.
     char percent[16];
     (void)std::snprintf(percent, sizeof(percent), "%d%%", static_cast<int>(std::lround(mUiScale * 100.0f)));
@@ -730,28 +1458,646 @@ namespace faf::editor
       mUiScale = smaller;
     }
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled | ImGuiHoveredFlags_DelayShort)) {
-      ImGui::SetTooltip("Smaller panels and text");
+      EdSetTooltip("Smaller panels and text");
     }
     ImGui::SameLine(0.0f, 1.0f);
     if (EdTextSegment("##uiscale", percent, EdSegment::Middle, true, middle)) {
       mUiScale = 1.0f;
     }
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) {
-      ImGui::SetTooltip("The panels' scale (kept over restarts); click for 100%%");
+      EdSetTooltip("The panels' scale (kept over restarts); click for 100%%");
     }
     ImGui::SameLine(0.0f, 1.0f);
     if (EdTextSegment("##uiscaleup", "+", EdSegment::Last, mUiScale < kSteps[std::size(kSteps) - 1] - 0.01f, side)) {
       mUiScale = larger;
     }
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled | ImGuiHoveredFlags_DelayShort)) {
-      ImGui::SetTooltip("Larger panels and text");
+      EdSetTooltip("Larger panels and text");
     }
     return 0.0f;
   }
 
+  void EdShell::DrawToolStrip(
+    const float top,
+    const float width,
+    const float bottom
+  )
+  {
+    const ImGuiViewport* const viewport = ImGui::GetMainViewport();
+    ImGui::SetNextWindowPos(ImVec2(viewport->WorkPos.x, viewport->WorkPos.y + top));
+    ImGui::SetNextWindowSize(ImVec2(width, viewport->WorkSize.y - top - bottom));
+    ImGui::SetNextWindowViewport(viewport->ID);
+    constexpr ImGuiWindowFlags kFlags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove |
+      ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing |
+      ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoBringToFrontOnFocus;
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, Em(7.0f)));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+    ImGui::PushStyleColor(ImGuiCol_WindowBg, ImGui::GetStyleColorVec4(ImGuiCol_FrameBg));
+    if (ImGui::Begin("##ToolStrip", nullptr, kFlags)) {
+      const ImVec2 at = ImGui::GetWindowPos();
+      const ImVec2 size = ImGui::GetWindowSize();
+      ImGui::GetWindowDrawList()->AddLine(
+        ImVec2(at.x + size.x - 0.5f, at.y),
+        ImVec2(at.x + size.x - 0.5f, at.y + size.y),
+        ImGui::GetColorU32(ImGuiCol_Border)
+      );
+      if (mTools.DrawStrip(width - 1.0f)) {
+        mShowTools = true;
+        mFocusTools = true;
+      }
+    }
+    ImGui::End();
+    ImGui::PopStyleColor();
+    ImGui::PopStyleVar(3);
+  }
+
+  void EdShell::DrawViewOverlays()
+  {
+    // The mockup's view overlays (styles.css .vp-header .pill-group, .vp-hud): dark see-through pill bars at the
+    // view's top-left, the tool's line at its bottom. They are floating windows, so the mouse over them is theirs
+    // (EdApp cuts them out of the view's input).
+    const ImGuiViewport* const viewport = ImGui::GetMainViewport();
+    const ImVec2 view(viewport->Pos.x + mGameView.x, viewport->Pos.y + mGameView.y);
+    const ImVec2 viewSize(mGameView.z, mGameView.w);
+    const ImU32 ground = IM_COL32(13, 16, 20, 184);
+    const ImU32 edge = IM_COL32(255, 255, 255, 18);
+    const ImU32 ink = IM_COL32(0xD6, 0xDD, 0xE6, 0xFF);
+    constexpr ImGuiWindowFlags kFlags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize |
+      ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoDocking |
+      ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav;
+    const float margin = std::round(Em(8.0f));
+    const float pillHeight = std::round(Em(28.0f));
+    const float fontSize = ImGui::GetFontSize();
+
+    const auto begin = [&](const char* const id, const ImVec2 at, const ImVec2 pivot) {
+      ImGui::SetNextWindowPos(at, ImGuiCond_Always, pivot);
+      ImGui::SetNextWindowViewport(viewport->ID);
+      ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(Em(3.0f), Em(3.0f)));
+      ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, Em(9.0f));
+      ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 1.0f);
+      ImGui::PushStyleVar(ImGuiStyleVar_WindowMinSize, ImVec2(1.0f, 1.0f));
+      ImGui::PushStyleColor(ImGuiCol_WindowBg, ImGui::ColorConvertU32ToFloat4(ground));
+      ImGui::PushStyleColor(ImGuiCol_Border, ImGui::ColorConvertU32ToFloat4(edge));
+      const bool shown = ImGui::Begin(id, nullptr, kFlags);
+      ImGui::PopStyleColor(2);
+      ImGui::PopStyleVar(4);
+      ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(Em(2.0f), 0.0f));
+      return shown;
+    };
+    const auto end = [] {
+      ImGui::PopStyleVar();
+      ImGui::End();
+    };
+    // A pill (.pill-group button): an icon and maybe a word; on, the accent's fill and white words.
+    const auto pill = [&](const char* const id, const char* const icon, const char* const label, const bool on) {
+      const ImVec2 iconSize = ImGui::CalcTextSize(icon);
+      const ImVec2 labelSize = label != nullptr ? ImGui::CalcTextSize(label) : ImVec2(0.0f, 0.0f);
+      const float pad = Em(9.0f);
+      const float gap = label != nullptr ? Em(6.0f) : 0.0f;
+      const float width = std::round(pad * 2.0f + iconSize.x + gap + labelSize.x);
+      const ImVec2 at = ImGui::GetCursorScreenPos();
+      ImGui::PushID(id);
+      const bool clicked = ImGui::InvisibleButton("##pill", ImVec2(width, pillHeight));
+      const bool hovered = ImGui::IsItemHovered();
+      ImGui::PopID();
+      ImDrawList* const dl = ImGui::GetWindowDrawList();
+      const ImVec2 to(at.x + width, at.y + pillHeight);
+      if (on) {
+        dl->AddRectFilled(at, to, AccentU32(hovered ? 0.34f : 0.25f), Em(7.0f));
+      } else if (hovered) {
+        dl->AddRectFilled(at, to, IM_COL32(255, 255, 255, 20), Em(7.0f));
+      }
+      const ImU32 words = on ? IM_COL32_WHITE : ink;
+      // The capitals on the pill's middle (Segoe UI's centre 0.55 of the size below the line's top).
+      const float y = std::round(at.y + pillHeight * 0.5f - fontSize * 0.55f);
+      dl->AddText(ImVec2(std::round(at.x + pad), y), words, icon);
+      if (label != nullptr) {
+        dl->AddText(ImVec2(std::round(at.x + pad + iconSize.x + gap), y), words, label);
+      }
+      ImGui::SameLine();
+      return clicked;
+    };
+    const auto tip = [](const char* const words) {
+      if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) {
+        EdSetTooltip("%s", words);
+      }
+    };
+
+    // The top-left: the camera, then what the view shows.
+    float x = view.x + margin;
+    if (begin("##viewcamera", ImVec2(x, view.y + margin), ImVec2(0.0f, 0.0f))) {
+      if (pill("camera", ICON_CAMERA, "Camera", false)) {
+        ImGui::OpenPopup("##cameramenu");
+      }
+      tip("The camera: WASD moves, the right button turns, the wheel zooms");
+      if (pill("frame", ICON_FRAME, nullptr, false) && mCommands != nullptr) {
+        (void)mCommands->Run("view.frame");
+      }
+      tip("Frame the whole map (Home)");
+      if (ImGui::BeginPopup("##cameramenu")) {
+        if (ImGui::MenuItem("Frame the whole map", "Home") && mCommands != nullptr) {
+          (void)mCommands->Run("view.frame");
+        }
+        ImGui::Separator();
+        ImGui::TextDisabled("WASD moves, the right button turns, the wheel zooms");
+        ImGui::EndPopup();
+      }
+      x += ImGui::GetWindowWidth() + Em(6.0f);
+    }
+    end();
+    if (begin("##viewshows", ImVec2(x, view.y + margin), ImVec2(0.0f, 0.0f))) {
+      if (pill("grid", ICON_GRID, "Grid", mTools.ShowGrid())) {
+        mTools.SetShowGrid(!mTools.ShowGrid());
+      }
+      tip("The build grid on the ground around the cursor");
+      if (pill("slope", ICON_SLOPE, "Slope", mTools.ShowSlope())) {
+        mTools.SetShowSlope(!mTools.ShowSlope());
+      }
+      tip("Each cell's slope as the game's pathing reads it: yellow, orange, red as it gets steeper");
+      if (pill("weight", ICON_LAYERS, "Weight", mTools.ShowLayerWeight())) {
+        mTools.SetShowLayerWeight(!mTools.ShowLayerWeight());
+      }
+      tip("The paint layer's weight on the terrain");
+      if (pill("pathing", ICON_PATH, "Pathing", mTools.ShowPathing())) {
+        mTools.ShowPathing() = !mTools.ShowPathing();
+      }
+      tip("Where units can go: the land unit's or the ship's pathing (the layer is in the Check panel)");
+      // Markers by the palette's groups: Paths are the path nodes, Markers the rest.
+      std::set<std::string>& hidden = mTools.HiddenMarkerTypes();
+      const auto groupShown = [&](const bool paths) {
+        for (const MarkerType& type : MarkerTypes()) {
+          if ((std::string(type.group) == "Path nodes") == paths && hidden.count(type.type) != 0) {
+            return false;
+          }
+        }
+        return true;
+      };
+      const auto setGroup = [&](const bool paths, const bool show) {
+        for (const MarkerType& type : MarkerTypes()) {
+          if ((std::string(type.group) == "Path nodes") == paths) {
+            if (show) {
+              hidden.erase(type.type);
+            } else {
+              hidden.insert(type.type);
+            }
+          }
+        }
+      };
+      const bool markers = groupShown(false);
+      if (pill("markers", ICON_MARKER, "Markers", markers)) {
+        setGroup(false, !markers);
+      }
+      tip("Start positions, resources, AI and other markers");
+      const bool paths = groupShown(true);
+      if (pill("paths", ICON_CHAIN, "Paths", paths)) {
+        setGroup(true, !paths);
+      }
+      tip("Path nodes and their links (land, air, water, amphibious)");
+      if (pill("props", ICON_TREE, "Props", mTools.ShowProps())) {
+        mTools.ShowProps() = !mTools.ShowProps();
+      }
+      tip("Trees, rocks and wrecks");
+      if (pill("units", ICON_UNIT, "Units", mTools.ShowUnits())) {
+        mTools.ShowUnits() = !mTools.ShowUnits();
+      }
+      tip("The armies' and civilians' units");
+    }
+    end();
+
+    // The top-right (.vp-header's last pill group): the view's shading, and during play the fog and the play's units.
+    if (begin("##viewcorner", ImVec2(view.x + viewSize.x - margin, view.y + margin), ImVec2(1.0f, 0.0f))) {
+      static constexpr const char* kShading[] = {"Lit", "Heights", "Slope"};
+      const int shading = mTools.Shading();
+      if (pill("shading", ICON_SUN, kShading[shading], shading != 0)) {
+        mTools.SetShading((shading + 1) % 3);
+        gpg::Logf("editor: the view's shading: %s", kShading[(shading + 1) % 3]);
+      }
+      tip(
+        "Shading: lit / heights / slope. Heights colours the ground by height, the sea's ground blue; slope rates it "
+        "as "
+        "the game's pathing does"
+      );
+      const bool playing = moho::WLD_GetFrameAction() == moho::EWldFrameAction::Playing;
+      ImGui::BeginDisabled(!playing);
+      const bool fog = !mPlay.FogHidden();
+      if (pill("fog", ICON_EYE, nullptr, playing && fog)) {
+        mPlay.SetFogHidden(fog);
+      }
+      if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort | ImGuiHoveredFlags_AllowWhenDisabled)) {
+        EdSetTooltip(
+          "%s",
+          playing ? (fog ? "Fog of war: shown. Click to leave out the fog's shading (the player keeps their army)"
+                         : "Fog of war: left out. Click to show it again")
+                  : "Fog of war during play (Play, F5)"
+        );
+      }
+      const bool units = mTools.ShowGameUnits();
+      if (pill("gameunits", ICON_UNIT, nullptr, playing && units)) {
+        mTools.ShowGameUnits() = !units;
+      }
+      if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort | ImGuiHoveredFlags_AllowWhenDisabled)) {
+        EdSetTooltip(
+          "%s",
+          playing ? (units ? "Show the game units during play: shown (click one to select it, drag to move it). Click "
+                             "to hide them"
+                           : "The game units are hidden. Click to show them")
+                  : "Show the game units during play (Play, F5)"
+        );
+      }
+      ImGui::EndDisabled();
+      mCornerBottom = ImGui::GetWindowPos().y + ImGui::GetWindowHeight();
+    }
+    end();
+
+    // The Select tool: what a click, the hover and a box may pick, under the camera row (it was the panel's Pick
+    // section). Kinds switched off stay drawn but can't be grabbed or moved.
+    if (mTools.SelectToolActive()) {
+      const float below = view.y + margin + pillHeight + Em(6.0f) * 2.0f + Em(4.0f);
+      if (begin("##viewpick", ImVec2(view.x + margin, below), ImVec2(0.0f, 0.0f))) {
+        // Its name, dim: a label, not a button.
+        {
+          const char* const word = ICON_SELECT "  Pick";
+          const ImVec2 size = ImGui::CalcTextSize(word);
+          const ImVec2 at = ImGui::GetCursorScreenPos();
+          ImGui::GetWindowDrawList()->AddText(
+            ImVec2(std::round(at.x + Em(8.0f)), std::round(at.y + pillHeight * 0.5f - fontSize * 0.55f)),
+            IM_COL32(0xD6, 0xDD, 0xE6, 0x99),
+            word
+          );
+          ImGui::Dummy(ImVec2(size.x + Em(14.0f), pillHeight));
+          ImGui::SameLine();
+        }
+        PickFilter& pick = mTools.Pickable();
+        const auto kind =
+          [&](const char* const id, const char* const icon, const char* const name, bool& on, const char* const what) {
+          if (pill(id, icon, nullptr, on)) {
+            on = !on;
+            gpg::Logf("editor: Select picks %s: %s", name, on ? "on" : "off");
+          }
+          if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) {
+            EdSetTooltip(
+              "%s: %s\n%s\nClick to %s.",
+              name,
+              on ? "picked" : "not picked (drawn, but a click, the hover and a box pass them by)",
+              what,
+              on ? "stop picking them" : "pick them again"
+            );
+          }
+        };
+        kind("pickmarkers", ICON_MARKER, "Markers", pick.markers, "Start positions, resources, AI and other markers");
+        kind("pickpaths", ICON_CHAIN, "Path nodes", pick.pathNodes, "Land, water, amphibious and air path nodes");
+        kind("pickunits", ICON_UNIT, "Units", pick.units, "The armies' and civilians' units");
+        kind("pickprops", ICON_TREE, "Props", pick.props, "Trees, rocks and wrecks (a box selects props)");
+        kind("pickdecals", ICON_DECAL, "Decals", pick.decals, "Decals on the ground");
+      }
+      end();
+    }
+
+    // The slope view's rule (shown with the Slope pill): the sim's rule for mobile units or for buildings.
+    if (mTools.ShowSlope()) {
+      const float row = pillHeight + Em(6.0f) * 2.0f + Em(4.0f);
+      const float below = view.y + margin + row * (mTools.SelectToolActive() ? 2.0f : 1.0f);
+      if (begin("##viewslope", ImVec2(view.x + margin, below), ImVec2(0.0f, 0.0f))) {
+        EdTools::SlopeView& slope = mTools.SlopeSettings();
+        if (pill("slopeunits", ICON_UNIT, "Units", !slope.buildings)) {
+          slope.buildings = false;
+        }
+        tip(
+          "Mobile units: the steepest step between neighbouring samples under a footprint, against its MaxSlope (0.75 "
+          "for every land, amphibious and hover footprint)"
+        );
+        if (pill("slopebuild", ICON_BOX, "Buildings", slope.buildings)) {
+          slope.buildings = true;
+        }
+        tip(
+          "Structures: the ground under the skirt against the blueprint's MaxGroundVariation (1.0 for most, 1.1 for "
+          "factories)"
+        );
+        const auto small = [&](const char* const id, const char* const preview, const float width) {
+          ImGui::SetNextItemWidth(Em(width));
+          ImGui::SetCursorPosY(ImGui::GetCursorPosY() + (pillHeight - ImGui::GetFrameHeight()) * 0.5f);
+          return EdBeginCombo(id, preview);
+        };
+        char sizeText[32];
+        if (!slope.buildings) {
+          std::snprintf(sizeText, sizeof(sizeText), "Footprint %d x %d", slope.footprint, slope.footprint);
+          if (small("##slopefoot", sizeText, 120.0f)) {
+            for (const int n : {1, 2, 3, 4, 5, 6}) {
+              char label[32];
+              std::snprintf(label, sizeof(label), "%d x %d", n, n);
+              if (ImGui::Selectable(label, slope.footprint == n)) {
+                slope.footprint = n;
+              }
+            }
+            ImGui::EndCombo();
+          }
+        } else {
+          std::snprintf(sizeText, sizeof(sizeText), "Skirt %d x %d", slope.skirt, slope.skirt);
+          if (small("##slopeskirt", sizeText, 110.0f)) {
+            static constexpr std::pair<int, const char*> kSkirts[] = {
+              {1, "point defence, radar"},
+              {2, "power, T2 defences"},
+              {3, "T2 / T3 defences"},
+              {5, "campaign"},
+              {6, "shields, missile launchers"},
+              {8, "factories, T3 power"},
+              {10, "gateways, Paragon"},
+              {12, "naval factory (short side)"},
+              {15, "naval factory (long side)"},
+            };
+            for (const auto& [n, what] : kSkirts) {
+              char label[80];
+              std::snprintf(label, sizeof(label), "%d x %d  %s", n, n, what);
+              if (ImGui::Selectable(label, slope.skirt == n)) {
+                slope.skirt = n;
+              }
+            }
+            ImGui::EndCombo();
+          }
+          ImGui::SameLine();
+          if (small("##sloperule", slope.ring ? "Levelled skirt" : "Whole area", 110.0f)) {
+            if (ImGui::Selectable("Levelled skirt (most buildings)", slope.ring)) {
+              slope.ring = true;
+            }
+            if (ImGui::Selectable("Whole area (point defence, radar, naval factories)", !slope.ring)) {
+              slope.ring = false;
+            }
+            ImGui::EndCombo();
+          }
+        }
+        ImGui::SameLine();
+        float& limit = !slope.buildings ? slope.unitLimit : slope.ring ? slope.ringLimit : slope.areaLimit;
+        char limitText[32];
+        std::snprintf(limitText, sizeof(limitText), "Up to %.2f", static_cast<double>(limit));
+        if (small("##slopelimit", limitText, 90.0f)) {
+          for (const float value : slope.buildings ? std::initializer_list<float>{1.0f, 1.1f, 1.2f}
+                                                   : std::initializer_list<float>{0.5f, 0.75f, 1.0f}) {
+            char label[16];
+            std::snprintf(label, sizeof(label), "%.2f", static_cast<double>(value));
+            if (ImGui::Selectable(label, std::fabs(limit - value) < 0.001f)) {
+              limit = value;
+            }
+          }
+          ImGui::EndCombo();
+        }
+        tip("Green to red up to this limit (world units); darker red beyond it: there the rule refuses");
+        ImGui::SameLine();
+      }
+      end();
+    }
+
+    // The bottom: the tool, its mode, how many copies an edit makes (.vp-hud).
+    if (begin("##viewhud", ImVec2(view.x + viewSize.x * 0.5f, view.y + viewSize.y - margin), ImVec2(0.5f, 1.0f))) {
+      const int tool = mTools.Tool();
+      ImGui::Dummy(ImVec2(Em(6.0f), pillHeight));
+      ImGui::SameLine(0.0f, 0.0f);
+      const float y = std::round(ImGui::GetCursorScreenPos().y + pillHeight * 0.5f - fontSize * 0.55f);
+      const auto words = [&](const char* const text, ImFont* const font, const ImU32 colour, const float after) {
+        const ImVec2 at = ImGui::GetCursorScreenPos();
+        ImFont* const use = font != nullptr ? font : ImGui::GetFont();
+        const ImVec2 size = use->CalcTextSizeA(fontSize, FLT_MAX, 0.0f, text);
+        ImGui::GetWindowDrawList()->AddText(use, fontSize, ImVec2(at.x, y), colour, text);
+        ImGui::Dummy(ImVec2(size.x, pillHeight));
+        ImGui::SameLine(0.0f, after);
+      };
+      words(EdTools::ToolIcon(tool), nullptr, ink, Em(7.0f));
+      words(EdTools::ToolName(tool), gBoldFont, IM_COL32_WHITE, Em(12.0f));
+      if (const char* const mode = mTools.HudMode(); mode != nullptr) {
+        words(mode, nullptr, ink, Em(12.0f));
+      }
+      if (const int copies = mTools.HudCopies(); copies > 1) {
+        char text[32];
+        (void)std::snprintf(text, sizeof(text), "%d copies", copies);
+        words(ICON_SYM, nullptr, IM_COL32(0x8E, 0x9A, 0xA7, 0xFF), Em(5.0f));
+        words(text, nullptr, IM_COL32(0x8E, 0x9A, 0xA7, 0xFF), Em(6.0f));
+      }
+      ImGui::Dummy(ImVec2(0.0f, pillHeight));
+    }
+    end();
+
+    // The view's right side (.vp-gizmo, .vp-mini): the compass, and the minimap with what the camera sees.
+    const EdTools::ViewFrame& frame = mTools.View();
+    if (frame.valid && frame.maxX > frame.minX && frame.maxZ > frame.minZ) {
+      // The compass: where the map's north (-z) and east (+x) are on the screen.
+      const float radius = std::round(Em(30.0f));
+      // Under the corner's buttons.
+      const float compassTop = std::max(view.y + margin, mCornerBottom + Em(8.0f));
+      ImGui::SetNextWindowPos(ImVec2(view.x + viewSize.x - margin, compassTop), ImGuiCond_Always, ImVec2(1.0f, 0.0f));
+      ImGui::SetNextWindowSize(ImVec2(radius * 2.0f, radius * 2.0f));
+      ImGui::SetNextWindowViewport(viewport->ID);
+      ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
+      ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+      ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
+      if (ImGui::Begin("##viewcompass", nullptr, kFlags & ~ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImDrawList* const dl = ImGui::GetWindowDrawList();
+        const ImVec2 centre(ImGui::GetWindowPos().x + radius, ImGui::GetWindowPos().y + radius);
+        dl->AddCircleFilled(centre, radius, ground, 40);
+        dl->AddCircle(centre, radius, edge, 40);
+        // A world direction (x, z) as a screen direction: its parts along the view's right and up.
+        const auto onScreen = [&](const float x, const float z) {
+          ImVec2 d(x * frame.rightX + z * frame.rightZ, -(x * frame.upX + z * frame.upZ));
+          const float length = std::max(1e-4f, std::hypot(d.x, d.y));
+          return ImVec2(d.x / length, d.y / length);
+        };
+        const auto axis = [&](const ImVec2 dir, const ImU32 colour, const char* const letter) {
+          const ImVec2 tip(centre.x + dir.x * radius * 0.62f, centre.y + dir.y * radius * 0.62f);
+          dl->AddLine(centre, tip, colour, Em(2.0f));
+          const float dot = Em(8.0f);
+          dl->AddCircleFilled(tip, dot, colour, 20);
+          const float size = std::round(fontSize * 0.7f);
+          const ImVec2 text = ImGui::GetFont()->CalcTextSizeA(size, FLT_MAX, 0.0f, letter);
+          dl->AddText(
+            gBoldFont != nullptr ? gBoldFont : ImGui::GetFont(),
+            size,
+            ImVec2(std::round(tip.x - text.x * 0.5f), std::round(tip.y - text.y * 0.5f)),
+            IM_COL32(0x10, 0x12, 0x16, 0xFF),
+            letter
+          );
+        };
+        axis(onScreen(1.0f, 0.0f), IM_COL32(0x4F, 0xD1, 0x8B, 0xFF), "E");
+        axis(onScreen(0.0f, -1.0f), IM_COL32(0xFF, 0x5D, 0x5D, 0xFF), "N");
+        dl->AddCircleFilled(centre, Em(5.0f), IM_COL32(0xE9, 0xED, 0xF2, 0xFF), 16);
+        if (ImGui::IsWindowHovered()) {
+          EdSetTooltip("Where the map's north and east are");
+        }
+      }
+      ImGui::End();
+      ImGui::PopStyleColor();
+      ImGui::PopStyleVar(2);
+
+      // The minimap: the map's picture, the camera's ground as a frame; a click or a drag moves the camera there.
+      const float mapW = frame.maxX - frame.minX;
+      const float mapH = frame.maxZ - frame.minZ;
+      const float longest = std::round(Em(160.0f));
+      const ImVec2 size = mapW >= mapH ? ImVec2(longest, std::round(longest * mapH / mapW))
+                                       : ImVec2(std::round(longest * mapW / mapH), longest);
+      ImGui::SetNextWindowPos(
+        ImVec2(view.x + viewSize.x - margin, view.y + viewSize.y - margin), ImGuiCond_Always, ImVec2(1.0f, 1.0f)
+      );
+      ImGui::SetNextWindowSize(size);
+      ImGui::SetNextWindowViewport(viewport->ID);
+      ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
+      ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, Em(8.0f));
+      ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 1.0f);
+      ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
+      ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(1.0f, 1.0f, 1.0f, 0.14f));
+      if (ImGui::Begin("##viewminimap", nullptr, kFlags & ~ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImDrawList* const dl = ImGui::GetWindowDrawList();
+        const ImVec2 at = ImGui::GetWindowPos();
+        // The map itself is the scene's: an overhead camera draws it into this rectangle of the view (no cursor, no
+        // markers), so the window only frames it.
+        // `/nominimap` (test runs): no overhead camera, to measure what the minimap's second world view costs.
+        static const bool noMinimap = moho::CFG_GetArgOption("/nominimap", 0, nullptr);
+        mTools.SetMinimapRect(at.x - view.x, at.y - view.y, noMinimap ? 0.0f : size.x, noMinimap ? 0.0f : size.y);
+        const auto toMini = [&](const float x, const float z) {
+          return ImVec2(at.x + (x - frame.minX) / mapW * size.x, at.y + (z - frame.minZ) / mapH * size.y);
+        };
+        // The concept's .vp-mini: a drop shadow (0 .6rem 2rem / .45 and 0 .1rem .3rem / .35), the map with rounded
+        // corners, the start positions as white dots; the window draws the 1 px border at 14 % white.
+        const float radius = Em(8.0f);
+        if (const std::uint64_t image = mTools.MinimapImage(); image != 0) {
+          dl->PushClipRectFullScreen();
+          const auto shadow = [&](const float offsetY, const float blur, const float alpha) {
+            constexpr int kLayers = 8;
+            for (int i = kLayers; i >= 1; --i) {
+              const float grow = blur * static_cast<float>(i) / kLayers;
+              const float a = alpha / kLayers * (1.0f - static_cast<float>(i - 1) / kLayers);
+              dl->AddRectFilled(
+                ImVec2(at.x - grow, at.y + offsetY - grow),
+                ImVec2(at.x + size.x + grow, at.y + size.y + offsetY + grow),
+                IM_COL32(0, 0, 0, static_cast<int>(a * 255.0f)),
+                radius + grow
+              );
+            }
+          };
+          shadow(Em(9.6f), Em(20.0f), 0.45f);
+          shadow(Em(1.6f), Em(3.0f), 0.35f);
+          dl->PopClipRect();
+          dl->AddImageRounded(
+            static_cast<ImTextureID>(image),
+            at,
+            ImVec2(at.x + size.x, at.y + size.y),
+            ImVec2(0.0f, 0.0f),
+            ImVec2(1.0f, 1.0f),
+            IM_COL32_WHITE,
+            radius
+          );
+        }
+        for (const SaveEntry& marker : mDocument.SaveData().Markers()) {
+          if (marker.name.rfind("ARMY_", 0) != 0) {
+            continue;
+          }
+          const std::vector<double> position = ValueNumbers(marker.Get("position"));
+          if (position.size() >= 3) {
+            dl->AddCircleFilled(
+              toMini(static_cast<float>(position[0]), static_cast<float>(position[2])),
+              Em(2.2f),
+              IM_COL32(255, 255, 255, 230)
+            );
+          }
+        }
+        if (frame.corners >= 3) {
+          ImVec2 points[4];
+          for (int i = 0; i < frame.corners; ++i) {
+            points[i] = toMini(frame.cornerX[i], frame.cornerZ[i]);
+          }
+          dl->PushClipRect(at, ImVec2(at.x + size.x, at.y + size.y), true);
+          dl->AddPolyline(points, frame.corners, IM_COL32_WHITE, ImDrawFlags_Closed, Em(1.5f));
+          dl->PopClipRect();
+        }
+        ImGui::SetCursorScreenPos(at);
+        (void)ImGui::InvisibleButton("##minimapjump", size);
+        if (ImGui::IsItemActive()) {
+          const ImVec2 mouse = ImGui::GetIO().MousePos;
+          const float u = std::clamp((mouse.x - at.x) / size.x, 0.0f, 1.0f);
+          const float v = std::clamp((mouse.y - at.y) / size.y, 0.0f, 1.0f);
+          mTools.AskCameraAt(frame.minX + u * mapW, frame.minZ + v * mapH);
+        }
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) {
+          EdSetTooltip("The map: click or drag to look there");
+        }
+      }
+      ImGui::End();
+      ImGui::PopStyleColor(2);
+      ImGui::PopStyleVar(3);
+    }
+  }
+
+  void EdShell::CarryPanelPlaces()
+  {
+    // Before the tabs had icons, the first workspace's windows were named by their titles alone, which were their
+    // ids. Their places in layout.ini (dock node, order, size) go to the new names once.
+    static constexpr const char* kPanels[] = {
+      "Tools",
+      "Properties",
+      "Map",
+      "Info",
+      "Markers",
+      "Check",
+      "Log",
+      "History",
+      "Problems",
+      "Lighting",
+      "Debugger",
+      "Armies",
+      "Material Editor",
+      "Particle Browser",
+      "Particle Editor",
+    };
+    ImGuiContext& g = *GImGui;
+    int carried = 0;
+    for (const char* const panel : kPanels) {
+      const std::string before = PanelWindowNameBeforeIcons(panel, 0);
+      const std::string now = PanelWindowName(panel, 0);
+      const ImGuiID oldId = ImHashStr(before.c_str());
+      const ImGuiID newId = ImHashStr(now.c_str());
+      if (oldId == newId || ImGui::FindWindowSettingsByID(newId) != nullptr) {
+        continue;
+      }
+      const ImGuiWindowSettings* const old = ImGui::FindWindowSettingsByID(oldId);
+      if (old == nullptr) {
+        continue;
+      }
+      // Copied first: a new entry can move the settings' storage.
+      const ImGuiWindowSettings kept = *old;
+      ImGuiWindowSettings* const moved = ImGui::CreateNewWindowSettings(now.c_str());
+      moved->Pos = kept.Pos;
+      moved->Size = kept.Size;
+      moved->ViewportPos = kept.ViewportPos;
+      moved->ViewportId = kept.ViewportId;
+      moved->DockId = kept.DockId;
+      moved->ClassId = kept.ClassId;
+      moved->DockOrder = kept.DockOrder;
+      moved->Collapsed = kept.Collapsed;
+      // The tab a dock node shows is kept by the window's id (the nodes are built from layout.ini by now).
+      for (const ImGuiStoragePair& pair : g.DockContext.Nodes.Data) {
+        if (
+          auto* const node = static_cast<ImGuiDockNode*>(pair.val_p); node != nullptr && node->SelectedTabId == oldId
+        ) {
+          node->SelectedTabId = newId;
+        }
+      }
+      ++carried;
+    }
+    if (carried > 0) {
+      gpg::Logf("editor: %d panels' places carried to their names with icons", carried);
+      ImGui::MarkIniSettingsDirty();
+    }
+  }
+
   void EdShell::DrawToolsPanel()
   {
-    if (ImGui::Begin(kToolsWindow, &mShowTools)) {
+    // The tab is the chosen tool's name and icon (the mockup's), the window's id staying the panel's.
+    const std::string panel = Panel(kToolsWindow);
+    const std::size_t id = panel.find("###");
+    const std::string window = std::string(EdTools::ToolIcon(mTools.Tool())) + "  " + EdTools::ToolName(mTools.Tool()) +
+      (id == std::string::npos ? "###" + panel : panel.substr(id));
+    if (mFocusTools) {
+      mFocusTools = false;
+      ImGui::SetNextWindowFocus();
+    }
+    if (ImGui::Begin(window.c_str(), &mShowTools)) {
       mTools.Draw();
       if (int slot = -1; mTools.TakeMaterialAsk(slot)) {
         mShowMaterialEditor = true;
@@ -759,6 +2105,9 @@ namespace faf::editor
       }
     }
     ImGui::End();
+    mTools.DrawErosionWindow();
+    mTools.DrawScToolsWindow();
+    mTools.DrawInteropWindow();
   }
 
   void EdShell::DrawPlaySetup()
@@ -786,7 +2135,7 @@ namespace faf::editor
     {
       const std::vector<PlayProfile> profiles = mPlay.Profiles();
       ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x * 0.55f);
-      if (ImGui::BeginCombo("##profile", "Profile...")) {
+      if (EdBeginCombo("##profile", "Profile...")) {
         bool savedHeader = false;
         for (const PlayProfile& profile : profiles) {
           if (!profile.builtIn && !savedHeader) {
@@ -812,7 +2161,7 @@ namespace faf::editor
       }
       ImGui::EndDisabled();
       if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-        ImGui::SetTooltip("Keep this setup as a profile of that name (play_setups.ini)");
+        EdSetTooltip("Keep this setup as a profile of that name (play_setups.ini)");
       }
     }
 
@@ -822,12 +2171,12 @@ namespace faf::editor
     ImGui::SameLine();
     ImGui::RadioButton("Against AI", &mode, 1);
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-      ImGui::SetTooltip("Other slots get an AI. The AI's map analysis adds about 2 s to each start.");
+      EdSetTooltip("Other slots get an AI. The AI's map analysis adds about 2 s to each start.");
     }
     ImGui::SameLine();
     ImGui::RadioButton("Custom", &mode, 2);
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-      ImGui::SetTooltip("Slot by slot: you, an AI or empty, and teams (a team's armies start allied)");
+      EdSetTooltip("Slot by slot: you, an AI or empty, and teams (a team's armies start allied)");
     }
     if (mode != modeBefore) {
       setup.withAi = mode != 0;
@@ -860,7 +2209,7 @@ namespace faf::editor
     };
     if (!custom) {
       label("Start");
-      if (ImGui::BeginCombo("##slot", slotName(setup.slot).c_str())) {
+      if (EdBeginCombo("##slot", slotName(setup.slot).c_str())) {
         for (int i = 0; i < slotCount; ++i) {
           if (ImGui::Selectable(slotName(i).c_str(), i == setup.slot)) {
             setup.slot = i;
@@ -869,14 +2218,14 @@ namespace faf::editor
         ImGui::EndCombo();
       }
       if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-        ImGui::SetTooltip("The lobby slot you play (its army's start position)");
+        EdSetTooltip("The lobby slot you play (its army's start position)");
       }
     }
     const std::vector<PlayChoice>& factions = mPlay.Factions();
     setup.faction = std::clamp(setup.faction, 0, static_cast<int>(factions.size()));
     label("Faction");
     if (
-      ImGui::BeginCombo(
+      EdBeginCombo(
         "##faction", setup.faction == 0 ? "Random" : factions[static_cast<std::size_t>(setup.faction - 1)].name.c_str()
       )
     ) {
@@ -894,7 +2243,7 @@ namespace faf::editor
     if (setup.withAi && !aiTypes.empty()) {
       setup.ai = std::clamp(setup.ai, 0, static_cast<int>(aiTypes.size()) - 1);
       label("AI");
-      if (ImGui::BeginCombo("##ai", aiTypes[static_cast<std::size_t>(setup.ai)].name.c_str())) {
+      if (EdBeginCombo("##ai", aiTypes[static_cast<std::size_t>(setup.ai)].name.c_str())) {
         for (int i = 0; i < static_cast<int>(aiTypes.size()); ++i) {
           if (ImGui::Selectable(aiTypes[static_cast<std::size_t>(i)].name.c_str(), i == setup.ai)) {
             setup.ai = i;
@@ -907,7 +2256,7 @@ namespace faf::editor
         setup.aiCount = std::clamp(setup.aiCount, 0, slotCount - 1);
         label("AI opponents");
         const std::string count = setup.aiCount == 0 ? std::string("Every other slot") : std::to_string(setup.aiCount);
-        if (ImGui::BeginCombo("##aicount", count.c_str())) {
+        if (EdBeginCombo("##aicount", count.c_str())) {
           if (ImGui::Selectable("Every other slot", setup.aiCount == 0)) {
             setup.aiCount = 0;
           }
@@ -919,7 +2268,7 @@ namespace faf::editor
           ImGui::EndCombo();
         }
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-          ImGui::SetTooltip("How many slots get an AI, taken in slot order; the rest stay empty");
+          EdSetTooltip("How many slots get an AI, taken in slot order; the rest stay empty");
         }
       }
     }
@@ -939,7 +2288,7 @@ namespace faf::editor
         ImGui::SameLine(ImGui::GetFontSize() * 1.6f);
         int role = static_cast<int>(slot.role);
         ImGui::SetNextItemWidth(roleWidth);
-        if (ImGui::Combo("##role", &role, kRoles, 3)) {
+        if (EdCombo("##role", &role, kRoles, 3)) {
           slot.role = static_cast<PlaySlot::Role>(role);
           if (slot.role == PlaySlot::Role::You) {
             for (std::size_t k = 0; k < setup.slots.size(); ++k) {
@@ -956,7 +2305,7 @@ namespace faf::editor
         if (slot.role == PlaySlot::Role::Ai) {
           slot.ai = std::clamp(slot.ai, 0, static_cast<int>(aiTypes.size()) - 1);
           ImGui::SetNextItemWidth(aiWidth);
-          if (ImGui::BeginCombo("##slotai", aiTypes[static_cast<std::size_t>(slot.ai)].name.c_str())) {
+          if (EdBeginCombo("##slotai", aiTypes[static_cast<std::size_t>(slot.ai)].name.c_str())) {
             for (int k = 0; k < static_cast<int>(aiTypes.size()); ++k) {
               if (ImGui::Selectable(aiTypes[static_cast<std::size_t>(k)].name.c_str(), k == slot.ai)) {
                 slot.ai = k;
@@ -974,7 +2323,7 @@ namespace faf::editor
           slot.faction = std::clamp(slot.faction, 0, static_cast<int>(factions.size()));
           ImGui::SetNextItemWidth(factionWidth);
           if (
-            ImGui::BeginCombo(
+            EdBeginCombo(
               "##slotfaction",
               slot.faction == 0 ? "Random" : factions[static_cast<std::size_t>(slot.faction - 1)].name.c_str()
             )
@@ -995,7 +2344,7 @@ namespace faf::editor
         ImGui::SameLine();
         slot.team = std::clamp(slot.team, 0, 4);
         ImGui::SetNextItemWidth(teamWidth);
-        changed = ImGui::Combo("##team", &slot.team, kTeams, 5) || changed;
+        changed = EdCombo("##team", &slot.team, kTeams, 5) || changed;
         ImGui::PopID();
       }
       if (changed) {
@@ -1023,6 +2372,34 @@ namespace faf::editor
           }
           ImGui::PopID();
         }
+        // The map's own list (FAF Studio keeps it with the map): a file beside the map, a uid a line.
+        const std::filesystem::path modsFile = mDocument.ModsFile();
+        ImGui::BeginDisabled(modsFile.empty());
+        if (ImGui::SmallButton("Keep these mods with the map")) {
+          std::ofstream out(modsFile, std::ios::binary | std::ios::trunc);
+          for (const std::string& uid : setup.mods) {
+            out << uid << '\n';
+          }
+          gpg::Logf("editor: play: %zu mods kept with the map in %s", setup.mods.size(), modsFile.string().c_str());
+        }
+        ImGui::SameLine();
+        if (ImGui::SmallButton("Use the map's mods")) {
+          std::ifstream in(modsFile, std::ios::binary);
+          std::vector<std::string> mods;
+          for (std::string line; std::getline(in, line);) {
+            while (!line.empty() && (line.back() == '\r' || line.back() == ' ')) {
+              line.pop_back();
+            }
+            if (!line.empty()) {
+              mods.push_back(line);
+            }
+          }
+          setup.mods = std::move(mods);
+          changed = true;
+          gpg::Logf("editor: play: the map's %zu mods", setup.mods.size());
+        }
+        ImGui::EndDisabled();
+        EdSetItemTooltip("The map's own mod list: a file beside the map (_mods.editor), so it goes along with the map");
         if (changed) {
           mPlay.PrepareRules();
         }
@@ -1031,17 +2408,17 @@ namespace faf::editor
     }
     ImGui::Checkbox("Fog of war", &setup.fog);
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-      ImGui::SetTooltip("The game's Fog of War option (explored, or none), set when the play starts");
+      EdSetTooltip("The game's Fog of War option (explored, or none), set when the play starts");
     }
     ImGui::SameLine();
     ImGui::Checkbox("Prebuilt units", &setup.prebuilt);
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-      ImGui::SetTooltip("The game's Prebuilt Units option: each army starts with a small base");
+      EdSetTooltip("The game's Prebuilt Units option: each army starts with a small base");
     }
     ImGui::SameLine();
     ImGui::Checkbox("Quick start", &setup.quickStart);
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-      ImGui::SetTooltip(
+      EdSetTooltip(
         "The commanders are there and take orders at once, without the game's warp-in\n"
         "(about 5 s), and the camera starts over yours. Off: the game's own start."
       );
@@ -1058,16 +2435,16 @@ namespace faf::editor
         victory = setup.victory == kVictoryKeys[i] ? i : victory;
       }
       label("Victory");
-      if (ImGui::Combo("##victory", &victory, kVictoryNames, 5)) {
+      if (EdCombo("##victory", &victory, kVictoryNames, 5)) {
         setup.victory = kVictoryKeys[victory];
       }
       label("Unit cap");
-      ImGui::SliderInt("##unitcap", &setup.unitCap, 250, 1500, "%d units");
+      FillSliderInt("##unitcap", &setup.unitCap, 250, 1500, "%d units");
       setup.unitCap = std::clamp(setup.unitCap / 50 * 50, 250, 1500);
       label("AI cheat x");
-      ImGui::SliderFloat("##cheatmult", &setup.cheatMult, 1.0f, 5.0f, "%.1f");
+      FillSliderFloat("##cheatmult", &setup.cheatMult, 1.0f, 5.0f, "%.1f");
       if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-        ImGui::SetTooltip("The cheating AIs' resource and build multiplier (the lobby's AIx options)");
+        EdSetTooltip("The cheating AIs' resource and build multiplier (the lobby's AIx options)");
       }
       setup.cheatMult = std::round(setup.cheatMult * 10.0f) / 10.0f;
     }
@@ -1076,7 +2453,7 @@ namespace faf::editor
       mPlay.SetKeepsOwnSetup(keepOwn);
     }
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-      ImGui::SetTooltip(
+      EdSetTooltip(
         "On: this map plays with its own setup, saved at each Play.\n"
         "Off: it plays with the setup of the last Play on any map."
       );
@@ -1090,7 +2467,7 @@ namespace faf::editor
       mPlay.SetFogHidden(noFog);
     }
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-      ImGui::SetTooltip(
+      EdSetTooltip(
         "While playing: the view leaves out the fog's shading and you keep your army.\n"
         "Enemy units your army has no intel on stay unseen; Observer view shows them."
       );
@@ -1101,9 +2478,7 @@ namespace faf::editor
       mPlay.SetSeesWholeMap(wholeMap);
     }
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-      ImGui::SetTooltip(
-        "While playing: view the map as an observer (every army's units, no fog), then back to your army."
-      );
+      EdSetTooltip("While playing: view the map as an observer (every army's units, no fog), then back to your army.");
     }
     ImGui::EndDisabled();
   }
@@ -1117,7 +2492,7 @@ namespace faf::editor
         ImGui::SetNextWindowScroll(ImVec2(-1.0f, static_cast<float>(std::atof(value[0].c_str()))));
       }
     }
-    if (!ImGui::Begin(kMapWindow, &mShowMap)) {
+    if (!ImGui::Begin(Panel(kMapWindow), &mShowMap)) {
       ImGui::End();
       return;
     }
@@ -1135,7 +2510,7 @@ namespace faf::editor
     if (ImGui::Button("Open a map...", ImVec2(-1.0f, 0.0f))) {
       mBrowser.Show();
     }
-    ImGui::SetItemTooltip(
+    EdSetItemTooltip(
       "Every map on this computer and the FAF vault (File > Open, Ctrl+O); recent ones are in File > Open Recent"
     );
     ImGui::Separator();
@@ -1146,7 +2521,7 @@ namespace faf::editor
     if (mDocument.GetState() == EdDocument::State::Open) {
       const MapFacts& facts = mDocument.Facts();
       ImGui::Separator();
-      if (ImGui::CollapsingHeader("Map", ImGuiTreeNodeFlags_DefaultOpen)) {
+      if (Section("Map")) {
         const auto row = [](const char* const label) {
           ImGui::AlignTextToFramePadding();
           ImGui::TextDisabled("%s", label);
@@ -1195,14 +2570,10 @@ namespace faf::editor
         }
         if (ImGui::SmallButton("More in the Info panel")) {
           mShowInfo = true;
-          ImGui::SetWindowFocus(kInfoWindow);
+          ImGui::SetWindowFocus(Panel(kInfoWindow));
         }
       }
-      if (
-        ImGui::CollapsingHeader(
-          "Adaptive map", mDocument.Adaptive() ? ImGuiTreeNodeFlags_DefaultOpen : ImGuiTreeNodeFlags_None
-        )
-      ) {
+      if (Section("Adaptive map", mDocument.Adaptive())) {
         ImGui::PushID("adaptive");
         DrawAdaptivePanel();
         ImGui::PopID();
@@ -1221,26 +2592,147 @@ namespace faf::editor
         return;
       }
       (void)std::snprintf(mSaveAsName, sizeof(mSaveAsName), "%s", mDocument.NextVersionFolder().c_str());
+      (void)std::snprintf(
+        mSaveAsParent, sizeof(mSaveAsParent), "%s", (mDocument.VaultFolder() / "maps").string().c_str()
+      );
       ImGui::OpenPopup(kTitle);
     }
     if (!ImGui::BeginPopupModal(kTitle, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
       return;
     }
-    ImGui::TextUnformatted("The new folder goes into your vault's maps folder:");
-    ImGui::TextDisabled("%s", (mDocument.VaultFolder() / "maps").string().c_str());
+    ImGui::TextUnformatted("The new folder goes into (your vault's maps folder, or another):");
+    ImGui::SetNextItemWidth(Em(420.0f));
+    ImGui::InputText("Into", mSaveAsParent, sizeof(mSaveAsParent));
+    if (ImGui::IsItemHovered()) {
+      EdSetTooltip(
+        "A map outside the vault's maps folder is saved there, but the game doesn't see it until it is in "
+        "the vault (Package for the FAF vault, or copy it there)"
+      );
+    }
     ImGui::SetNextItemWidth(Em(420.0f));
     const bool enter =
       ImGui::InputText("Folder", mSaveAsName, sizeof(mSaveAsName), ImGuiInputTextFlags_EnterReturnsTrue);
     ImGui::TextDisabled("FAF names map folders name.vNNNN; the files take the name without the version.");
     if (ImGui::Button("Save", ImVec2(Em(120.0f), 0.0f)) || enter) {
       std::string message;
-      if (mDocument.SaveAsNewFolder(mSaveAsName, message)) {
+      if (mDocument.SaveAsNewFolderIn(mSaveAsParent, mSaveAsName, message)) {
         gpg::Logf("editor: %s", message.c_str());
         ImGui::CloseCurrentPopup();
       } else {
         gpg::Warnf("editor: %s", message.c_str());
       }
     }
+    ImGui::SameLine();
+    if (ImGui::Button("Cancel", ImVec2(Em(120.0f), 0.0f)) || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+      ImGui::CloseCurrentPopup();
+    }
+    ImGui::EndPopup();
+  }
+
+  void EdShell::DrawResizeDialog()
+  {
+    constexpr const char* kTitle = "Resize map";
+    ResizeRequest& r = mResizeRequest;
+    if (mOpenResize) {
+      mOpenResize = false;
+      if (mDocument.GetState() != EdDocument::State::Open) {
+        gpg::Warnf("editor: open a map first");
+        return;
+      }
+      const MapFacts& facts = mDocument.Facts();
+      r = ResizeRequest{};
+      r.options.oldWidth = facts.sizeX > 0 ? facts.sizeX : facts.fieldWidth - 1;
+      r.options.oldDepth = facts.sizeZ > 0 ? facts.sizeZ : r.options.oldWidth;
+      for (int i = 0; i < kNewMapSizeCount; ++i) {
+        if (kNewMapSizes[i].units == r.options.oldWidth) {
+          r.widthIndex = i;
+        }
+        if (kNewMapSizes[i].units == r.options.oldDepth) {
+          r.depthIndex = i;
+        }
+      }
+      (void)std::snprintf(mResizeFolder, sizeof(mResizeFolder), "%s", mDocument.NextVersionFolder().c_str());
+      ImGui::OpenPopup(kTitle);
+    }
+    if (!ImGui::BeginPopupModal(kTitle, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+      return;
+    }
+    ImGui::Text("Now %d x %d game units.", r.options.oldWidth, r.options.oldDepth);
+    ImGui::TextDisabled("The resized map is a new folder in the vault; the map open now stays as it is.");
+    ImGui::Separator();
+    const auto sizeRow = [&](const char* label, int& index, const int id) {
+      ImGui::TextUnformatted(label);
+      ImGui::SameLine(Em(110.0f));
+      for (int i = 0; i < kNewMapSizeCount; ++i) {
+        if (i > 0) {
+          ImGui::SameLine();
+        }
+        ImGui::PushID(id + i);
+        if (ImGui::RadioButton(kNewMapSizes[i].name, index == i)) {
+          index = i;
+        }
+        ImGui::PopID();
+      }
+    };
+    sizeRow("Width", r.widthIndex, 0);
+    sizeRow("Depth", r.depthIndex, 100);
+    ImGui::TextUnformatted("Way");
+    ImGui::SameLine(Em(110.0f));
+    if (ImGui::RadioButton("Canvas (cut or add)", r.options.mode == ResizeMode::Canvas)) {
+      r.options.mode = ResizeMode::Canvas;
+    }
+    if (ImGui::IsItemHovered()) {
+      EdSetTooltip("The terrain as it is, cut or padded around the anchor; what falls outside is dropped");
+    }
+    ImGui::SameLine();
+    if (ImGui::RadioButton("Scale (stretch)", r.options.mode == ResizeMode::Scale)) {
+      r.options.mode = ResizeMode::Scale;
+    }
+    if (ImGui::IsItemHovered()) {
+      EdSetTooltip("The whole map stretched or shrunk to the new size; every position moves with it, nothing dropped");
+    }
+    if (r.options.mode == ResizeMode::Canvas) {
+      ImGui::TextUnformatted("Anchor");
+      ImGui::SameLine(Em(110.0f));
+      ImGui::BeginGroup();
+      for (int a = 0; a < 9; ++a) {
+        if (a % 3 != 0) {
+          ImGui::SameLine();
+        }
+        ImGui::PushID(200 + a);
+        if (
+          ImGui::Selectable(r.options.anchor == a ? "X" : ".", r.options.anchor == a, 0, ImVec2(Em(20.0f), Em(20.0f)))
+        ) {
+          r.options.anchor = a;
+        }
+        ImGui::PopID();
+      }
+      ImGui::EndGroup();
+      if (ImGui::IsItemHovered()) {
+        EdSetTooltip("Where the map now sits in the new one (a corner, an edge's middle or the centre)");
+      }
+      ImGui::Checkbox("Pad with the edge heights", &r.options.padEdge);
+      if (!r.options.padEdge) {
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(Em(120.0f));
+        ImGui::InputFloat("Pad level", &r.options.padLevel, 1.0f, 10.0f, "%.1f");
+        r.options.padLevel = std::clamp(r.options.padLevel, 0.0f, 511.0f);
+      }
+    }
+    ImGui::Separator();
+    ImGui::SetNextItemWidth(Em(420.0f));
+    ImGui::InputText("New folder", mResizeFolder, sizeof(mResizeFolder));
+    ImGui::TextDisabled("In %s", (mDocument.VaultFolder() / "maps").string().c_str());
+    r.options.newWidth = kNewMapSizes[std::clamp(r.widthIndex, 0, kNewMapSizeCount - 1)].units;
+    r.options.newDepth = kNewMapSizes[std::clamp(r.depthIndex, 0, kNewMapSizeCount - 1)].units;
+    const bool same = r.options.newWidth == r.options.oldWidth && r.options.newDepth == r.options.oldDepth;
+    ImGui::BeginDisabled(same || mResizeFolder[0] == '\0');
+    if (ImGui::Button("Resize", ImVec2(Em(120.0f), 0.0f))) {
+      r.folder = mResizeFolder;
+      mResizeAsked = true;
+      ImGui::CloseCurrentPopup();
+    }
+    ImGui::EndDisabled();
     ImGui::SameLine();
     if (ImGui::Button("Cancel", ImVec2(Em(120.0f), 0.0f)) || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
       ImGui::CloseCurrentPopup();
@@ -1315,15 +2807,29 @@ namespace faf::editor
         mNewMap.size = i;
       }
     }
+    // A map that isn't square: its depth (north-south) of its own.
+    ImGui::TextUnformatted("Depth");
+    ImGui::SameLine(Em(110.0f));
+    if (ImGui::RadioButton("Square", mNewMap.sizeZ < 0)) {
+      mNewMap.sizeZ = -1;
+    }
+    for (int i = 0; i < kNewMapSizeCount; ++i) {
+      ImGui::SameLine();
+      ImGui::PushID(100 + i);
+      if (ImGui::RadioButton(kNewMapSizes[i].name, mNewMap.sizeZ == i)) {
+        mNewMap.sizeZ = i;
+      }
+      ImGui::PopID();
+    }
     ImGui::SetNextItemWidth(kWidth);
-    ImGui::SliderInt("Players", &mNewMap.players, 1, kNewMapMaxPlayers);
+    FillSliderInt("Players", &mNewMap.players, 1, kNewMapMaxPlayers);
     ImGui::SetNextItemWidth(kWidth);
-    ImGui::DragFloat("Ground height", &mNewMap.height, 0.25f, 0.0f, 500.0f, "%.1f");
+    FillDragFloat("Ground height", &mNewMap.height, 0.25f, 0.0f, 500.0f, "%.1f");
     ImGui::Checkbox("Sea", &mNewMap.sea);
     if (mNewMap.sea) {
       ImGui::SameLine();
       ImGui::SetNextItemWidth(kWidth - 60.0f);
-      ImGui::DragFloat("Sea level", &mNewMap.seaLevel, 0.25f, 0.0f, 500.0f, "%.1f");
+      FillDragFloat("Sea level", &mNewMap.seaLevel, 0.25f, 0.0f, 500.0f, "%.1f");
     }
     ImGui::TextDisabled(
       "Start positions ARMY_1 to ARMY_%d in a ring; ARMY_17 and NEUTRAL_CIVILIAN as extra armies.", mNewMap.players
@@ -1358,6 +2864,23 @@ namespace faf::editor
       }
       mPackagePlan = mDocument.PlanPackage();
       mPackageMessage.clear();
+      // The map's own check too: a map with errors there doesn't go to the vault (each one named; fix it in Check).
+      RunCheck();
+      int checkErrors = 0;
+      for (const CheckIssue& issue : mCheckIssues) {
+        if (issue.level == CheckIssue::Level::Error) {
+          mPackagePlan.errors.push_back("the map's check: " + issue.text);
+          ++checkErrors;
+        }
+      }
+      gpg::Logf(
+        "editor: package %s: %zu errors (%d from the map's check), %zu warnings, %zu files",
+        mPackagePlan.folder.c_str(),
+        mPackagePlan.errors.size(),
+        checkErrors,
+        mPackagePlan.warnings.size(),
+        mPackagePlan.files.size()
+      );
       ImGui::OpenPopup(kTitle);
     }
     if (!ImGui::BeginPopupModal(kTitle, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
@@ -1405,49 +2928,208 @@ namespace faf::editor
     if (!mPackageMessage.empty()) {
       ImGui::TextWrapped("%s", mPackageMessage.c_str());
     }
-    ImGui::TextDisabled("Uploading to the vault is done in the FAF client (or its website) for now.");
+    // Upload to the FAF vault (as the FAF client's map upload): the package written above, ranked or not.
+    {
+      static bool ranked = true;
+      EdFafSession& faf = mBrowser.Faf();
+      const EdFafSession::UploadState upload = faf.Upload();
+      const std::filesystem::path zip = mDocument.VaultFolder() / "packages" / (mPackagePlan.folder + ".zip");
+      std::error_code missing;
+      const bool packaged = std::filesystem::exists(zip, missing);
+      const bool signedIn = faf.GetState() == EdFafSession::State::LoggedIn;
+      ImGui::Separator();
+      ImGui::Checkbox("Ranked", &ranked);
+      EdSetItemTooltip("Whether the map may be picked for ranked games (the vault's ranked flag)");
+      ImGui::SameLine();
+      ImGui::BeginDisabled(!packaged || !signedIn || upload.running || !mPackagePlan.errors.empty());
+      if (ImGui::Button("Upload to the FAF vault", ImVec2(Em(200.0f), 0.0f))) {
+        faf.UploadMap(zip, ranked);
+      }
+      ImGui::EndDisabled();
+      if (!signedIn) {
+        EdSetItemTooltip("Sign in to FAF on the start screen's FAF vault page first");
+      } else if (!packaged) {
+        EdSetItemTooltip("Package the map first: the upload sends its zip");
+      }
+      // The upload's end said once in the log.
+      static std::string told;
+      if (upload.done && told != upload.message) {
+        told = upload.message;
+        (upload.ok ? gpg::Logf : gpg::Warnf)("editor: vault upload: %s", upload.message.c_str());
+      }
+      if (upload.running || upload.done) {
+        ImGui::TextColored(
+          upload.running ? ImGui::GetStyleColorVec4(ImGuiCol_Text)
+            : upload.ok  ? ImVec4(0.45f, 0.85f, 0.45f, 1.0f)
+                         : ImVec4(0.95f, 0.45f, 0.40f, 1.0f),
+          "%s",
+          upload.message.c_str()
+        );
+      }
+    }
     ImGui::EndPopup();
+  }
+
+  float EdShell::StatusBarHeight()
+  {
+    return std::round(Em(24.0f));
   }
 
   void EdShell::DrawStatusBar()
   {
+    // The mockup's status bar (styles.css .statusbar): a live dot by the renderer, the items in the dimmed text with
+    // room between them, the problems count in the warning colour with its icon (a click shows them), the last message
+    // and the frame rate at the right.
     const ImGuiViewport* const viewport = ImGui::GetMainViewport();
-    const float height = ImGui::GetFrameHeight();
+    const float height = StatusBarHeight();
     ImGui::SetNextWindowPos(ImVec2(viewport->WorkPos.x, viewport->WorkPos.y + viewport->WorkSize.y - height));
     ImGui::SetNextWindowSize(ImVec2(viewport->WorkSize.x, height));
     ImGui::SetNextWindowViewport(viewport->ID);
     constexpr ImGuiWindowFlags kFlags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove |
       ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing |
       ImGuiWindowFlags_NoNav;
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8.0f, 2.0f));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(Em(10.0f), 0.0f));
     ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 0.0f));
+    ImGui::PushStyleColor(ImGuiCol_WindowBg, ImGui::GetStyleColorVec4(ImGuiCol_FrameBg));
     if (ImGui::Begin("##StatusBar", nullptr, kFlags)) {
-      ImGui::Text("%s", mApi.empty() ? "?" : mApi.c_str());
+      ImDrawList* const draw = ImGui::GetWindowDrawList();
+      const ImVec2 origin = ImGui::GetWindowPos();
+      const float barWidth = ImGui::GetWindowWidth();
+      draw->AddLine(
+        ImVec2(origin.x, origin.y + 0.5f),
+        ImVec2(origin.x + barWidth, origin.y + 0.5f),
+        ImGui::GetColorU32(ImGuiCol_Border)
+      );
+      ImFont* const font = ImGui::GetFont();
+      const float size = std::round(ImGui::GetFontSize() * 0.9f);
+      const float textY = std::round(origin.y + (height - size) * 0.5f);
+      const ImVec4 text = ImGui::GetStyleColorVec4(ImGuiCol_Text);
+      const ImVec4 dimmed = ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled);
+      const ImU32 dim = ImGui::GetColorU32(ImGuiCol_TextDisabled);
+      const ImU32 plain = ImGui::GetColorU32(ImVec4(
+        (text.x * 2.0f + dimmed.x) / 3.0f, (text.y * 2.0f + dimmed.y) / 3.0f, (text.z * 2.0f + dimmed.z) / 3.0f, 1.0f
+      ));
+      const ImU32 warn = IM_COL32(0xF0, 0xB0, 0x4A, 0xFF);
+      const ImU32 ok = IM_COL32(0x4F, 0xD1, 0x8B, 0xFF);
+
+      // The items (design §3), each with how much it is wanted when the window is narrow (0 always stays; the
+      // highest number goes first): the mode, the problems, cursor and ruler, selection, the undo step, then the
+      // renderer and the GPU.
+      struct Item
+      {
+        std::string text;
+        int priority;
+        ImU32 ink;
+        const char* icon = nullptr; // drawn before the text, in its colour
+        bool live = false;          // the green dot before it (the renderer)
+        bool problems = false;      // a click shows the problems
+      };
+      std::vector<Item> items;
+      const EdWorkspace& workspace = Workspaces()[static_cast<std::size_t>(ActiveWorkspace())];
+      const std::string mode = mPlay.Active() ? mPlay.StateText()
+        : workspace.readOnly                  ? "Review (read-only)"
+                                              : "Editing";
+      items.push_back({mApi.empty() ? "?" : mApi, 7, plain, nullptr, true});
       if (!mAdapter.empty()) {
-        ImGui::SameLine();
-        ImGui::TextDisabled("| %s", mAdapter.c_str());
+        items.push_back({mAdapter, 8, dim});
       }
-      ImGui::SameLine();
-      ImGui::TextDisabled("| %s", mPlay.StateText());
-      const int warnings = mLog.WarningCount();
+      items.push_back({mode, 0, mPlay.Active() || workspace.readOnly ? AccentU32() : plain});
+      // The Problems panel's count: the check's findings (for this map) and each different log warning once.
+      const bool checked = mCheckRan && mCheckedPath == mDocument.Path();
+      static const std::vector<CheckIssue> kNoChecks;
+      const EdProblemCounts problems =
+        CountProblems(ProblemRows(checked ? mCheckIssues : kNoChecks, mLog.Warnings(), 0x7U, 0x3U));
+      const int warnings = problems.errors + problems.warnings + problems.notes;
       if (warnings > 0) {
-        ImGui::SameLine();
-        ImGui::TextColored(ImVec4(0.95f, 0.75f, 0.30f, 1.0f), "| %d warnings in the log", warnings);
+        items.push_back(
+          {std::to_string(warnings) + (warnings == 1 ? " warning" : " warnings"), 1, warn, ICON_WARN, false, true}
+        );
+      } else {
+        items.push_back({"no warnings", 1, dim, ICON_OK, false, true});
       }
       if (!mTools.CursorText().empty()) {
-        ImGui::SameLine();
-        ImGui::TextDisabled("| %s", mTools.CursorText().c_str());
+        items.push_back({mTools.CursorText(), 2, dim});
       }
       if (!mTools.RulerText().empty()) {
-        ImGui::SameLine();
-        ImGui::TextColored(ImVec4(1.0f, 0.86f, 0.40f, 1.0f), "| ruler %s", mTools.RulerText().c_str());
+        items.push_back({"ruler " + mTools.RulerText(), 2, warn, ICON_RULER});
       }
-      char text[32];
-      (void)std::snprintf(text, sizeof(text), "%.0f fps", ImGui::GetIO().Framerate);
-      ImGui::SameLine(ImGui::GetWindowWidth() - ImGui::CalcTextSize(text).x - 12.0f);
-      ImGui::TextUnformatted(text);
+      const std::string count = SelectionCountText(mStatusSelection);
+      items.push_back({count.empty() ? std::string("nothing selected") : count + " selected", 3, dim});
+      const char* const step = mDocument.UndoStepName();
+      items.push_back({std::string("undo: ") + (step != nullptr ? step : "\xE2\x80\x94"), 5, dim});
+
+      const auto measure = [&](const Item& item) {
+        float width = font->CalcTextSizeA(size, FLT_MAX, 0.0f, item.text.c_str()).x;
+        if (item.icon != nullptr) {
+          width += font->CalcTextSizeA(size, FLT_MAX, 0.0f, item.icon).x + Em(5.0f);
+        }
+        if (item.live) {
+          width += Em(13.0f);
+        }
+        return width;
+      };
+      // At the right: the last message (shown while there is room for it), then the frame rate.
+      char fps[32];
+      (void)std::snprintf(fps, sizeof(fps), "%.0f fps", ImGui::GetIO().Framerate);
+      const float fpsWidth = font->CalcTextSizeA(size, FLT_MAX, 0.0f, fps).x;
+      const std::string message = StatusMessage().empty()
+        ? std::string(mDocument.Modified() ? "Unsaved changes" : "")
+        : StatusMessage() + " (" + AgoText(StatusClock() - StatusMessageTime()) + ")";
+      const float messageWidth = message.empty() ? 0.0f : font->CalcTextSizeA(size, FLT_MAX, 0.0f, message.c_str()).x;
+
+      const float gap = Em(14.0f);
+      const float left = origin.x + ImGui::GetStyle().WindowPadding.x;
+      const float right = origin.x + barWidth - ImGui::GetStyle().WindowPadding.x;
+      std::vector<float> widths;
+      std::vector<int> priorities;
+      for (const Item& item : items) {
+        widths.push_back(measure(item));
+        priorities.push_back(item.priority);
+      }
+      const float room = right - left - fpsWidth - gap;
+      const std::vector<std::size_t> shown = FitStatusItems(widths, priorities, room, gap);
+      float x = left;
+      for (const std::size_t i : shown) {
+        const Item& item = items[i];
+        const float width = widths[i];
+        if (item.problems) {
+          // A button: the mockup's hover fill, a click opens the Problems panel.
+          ImGui::SetCursorScreenPos(ImVec2(x - Em(4.0f), origin.y + Em(3.0f)));
+          if (ImGui::InvisibleButton("##problems", ImVec2(width + Em(8.0f), height - Em(6.0f)))) {
+            OpenProblems();
+            gpg::Logf("editor: status bar: the problems, %d", warnings);
+          }
+          if (ImGui::IsItemHovered()) {
+            draw->AddRectFilled(
+              ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), ImGui::GetColorU32(ImGuiCol_Button), Em(4.0f)
+            );
+            ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+            EdSetTooltip("Show the problems");
+          }
+        }
+        float at = x;
+        if (item.live) {
+          const ImVec2 centre(at + Em(4.0f), origin.y + height * 0.5f);
+          draw->AddCircleFilled(centre, Em(6.0f), (ok & ~IM_COL32_A_MASK) | (0x2EU << IM_COL32_A_SHIFT));
+          draw->AddCircleFilled(centre, Em(4.0f), ok);
+          at += Em(13.0f);
+        }
+        if (item.icon != nullptr) {
+          draw->AddText(font, size, ImVec2(at, textY), item.ink, item.icon);
+          at += font->CalcTextSizeA(size, FLT_MAX, 0.0f, item.icon).x + Em(5.0f);
+        }
+        draw->AddText(font, size, ImVec2(at, textY), item.ink, item.text.c_str());
+        x += width + gap;
+      }
+      draw->AddText(font, size, ImVec2(right - fpsWidth, textY), dim, fps);
+      if (!message.empty() && x + messageWidth < right - fpsWidth - gap) {
+        draw->AddText(font, size, ImVec2(right - fpsWidth - gap - messageWidth, textY), plain, message.c_str());
+      }
     }
     ImGui::End();
-    ImGui::PopStyleVar(2);
+    ImGui::PopStyleColor();
+    ImGui::PopStyleVar(4);
   }
 } // namespace faf::editor

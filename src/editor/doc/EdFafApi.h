@@ -133,6 +133,13 @@ namespace faf::editor
   bool ParseVaultSearch(const std::string& json, std::vector<VaultMap>& maps, int& pages, std::string& error);
 
   /**
+   * The body FAF's API takes at `/maps/upload` (as the FAF client sends it, MapUploadTask): a multipart form with the
+   * map's zip as `file` and `metadata`, the JSON `{"isRanked": ...}`. `boundary` must not occur in the zip.
+   */
+  [[nodiscard]] std::string
+  MapUploadBody(const std::string& boundary, const std::string& zipName, const std::string& zipBytes, bool ranked);
+
+  /**
    * The editor's FAF session: logs in with the device flow (FAF's page in the browser, with the code already in it),
    * keeps the refresh token in `tokenFile` encrypted for this Windows user (DPAPI), and searches the vault. Every
    * request runs on its own thread; the panel reads the state each frame.
@@ -159,11 +166,33 @@ namespace faf::editor
     void CancelLogin();
     /** The FAF name logged in with (from the API's /me), empty until known. */
     [[nodiscard]] std::string UserName() const;
+    /**
+     * Uploads a packaged map (its zip) to the vault as the FAF client does, on a worker thread; UploadState says how
+     * it went. Only while logged in, one at a time.
+     */
+    void UploadMap(std::filesystem::path zip, bool ranked);
+    struct UploadState
+    {
+      bool running = false;
+      bool done = false;
+      bool ok = false;
+      std::string message;
+    };
+    [[nodiscard]] UploadState Upload() const;
     /** Seconds left before the login code runs out, while waiting for approval. */
     [[nodiscard]] int SecondsLeft() const;
     void Search(const VaultQuery& query, int page);
     /** A finished search's maps (once each search). */
     bool TakeResults(std::vector<VaultMap>& maps, int& pages);
+    /**
+     * A search kept by name, beside the vault page's (the start screen's "Your uploads", "Most played", its search
+     * box): runs when asked while logged in, its first page kept to read until asked again.
+     */
+    void SearchNamed(const std::string& name, const VaultQuery& query);
+    /** The named search's maps once it finished (`error` says why there are none); false before. */
+    bool NamedResults(const std::string& name, std::vector<VaultMap>& maps, std::string& error) const;
+    /** Whether it was asked (running or done). */
+    [[nodiscard]] bool NamedAsked(const std::string& name) const;
     /**
      * The bytes behind a link (a map's picture): from the FAF client's preview cache (`%ProgramData%\FAForever\cache\
      * maps\large` or `small`, named after the link's last part, as its AssetService keeps them), else the editor's own
@@ -202,6 +231,16 @@ namespace faf::editor
     bool RefreshAccess(std::string& error);
     void SaveRefreshToken() const;
     void FetchUserName();
+    /** One page of a search (a new access token and again when the old one ran out); false with `error`. */
+    bool FetchMaps(const VaultQuery& query, int page, std::vector<VaultMap>& maps, int& pages, std::string& error);
+    struct Named
+    {
+      bool done = false;
+      std::vector<VaultMap> maps;
+      std::string error;
+    };
+    std::map<std::string, Named> mNamed;
+    UploadState mUpload;
 
     std::filesystem::path mTokenFile;
     std::atomic<State> mState{State::LoggedOut};

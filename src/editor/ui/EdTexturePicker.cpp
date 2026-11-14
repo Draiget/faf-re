@@ -1,4 +1,6 @@
 #include "editor/ui/EdTexturePicker.h"
+#include "editor/ui/EdControls.h"
+#include "editor/ui/EdThemeColors.h"
 #include "editor/ui/EdUiScale.h"
 
 #include "editor/tools/EdTextureLibrary.h"
@@ -53,12 +55,12 @@ namespace faf::editor
       const ImVec2 at = ImGui::GetCursorScreenPos();
       ImDrawList* dl = ImGui::GetWindowDrawList();
       dl->AddRectFilled(
-        at, ImVec2(at.x + size, at.y + size), withAlpha ? IM_COL32(12, 12, 16, 255) : IM_COL32(40, 40, 44, 255), 3.0f
+        at, ImVec2(at.x + size, at.y + size), withAlpha ? IM_COL32(12, 12, 16, 255) : SurfaceU32(), 3.0f
       );
       if (const std::uint64_t image = path.empty() ? 0 : library.Thumbnail(path, withAlpha); image != 0) {
         dl->AddImage(ImTextureRef(static_cast<ImTextureID>(image)), at, ImVec2(at.x + size, at.y + size));
       } else if (path.empty()) {
-        dl->AddText(ImVec2(at.x + 6.0f, at.y + size * 0.5f - 7.0f), IM_COL32(150, 150, 150, 255), "(none)");
+        dl->AddText(ImVec2(at.x + 6.0f, at.y + size * 0.5f - 7.0f), InkDimU32(), "(none)");
       }
       ImGui::Dummy(ImVec2(size, size));
     }
@@ -84,14 +86,12 @@ namespace faf::editor
     ) {
       ImGui::OpenPopup("Pick a texture");
     }
-    ImGui::SetItemTooltip("%s\nClick to browse the textures", path.empty() ? "(none)" : path.c_str());
+    EdSetItemTooltip("%s\nClick to browse the textures", path.empty() ? "(none)" : path.c_str());
     {
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const float pad = ImGui::GetStyle().FramePadding.y;
       const ImVec2 a(start.x + pad, start.y + pad);
-      dl->AddRectFilled(
-        a, ImVec2(a.x + side, a.y + side), withAlpha ? IM_COL32(12, 12, 16, 255) : IM_COL32(40, 40, 44, 255), 2.0f
-      );
+      dl->AddRectFilled(a, ImVec2(a.x + side, a.y + side), withAlpha ? IM_COL32(12, 12, 16, 255) : SurfaceU32(), 2.0f);
       if (const std::uint64_t image = path.empty() ? 0 : library.Thumbnail(path, withAlpha); image != 0) {
         dl->AddImage(ImTextureRef(static_cast<ImTextureID>(image)), a, ImVec2(a.x + side, a.y + side));
       }
@@ -131,7 +131,7 @@ namespace faf::editor
       ImGui::SameLine();
       ImGui::SetNextItemWidth(Em(260.0f));
       if (
-        ImGui::BeginCombo(
+        EdBeginCombo(
           "##folder",
           mFolder == 0 ? "All folders" : mFolders[static_cast<std::size_t>(mFolder - 1)].c_str(),
           ImGuiComboFlags_HeightLarge
@@ -149,14 +149,14 @@ namespace faf::editor
       }
       ImGui::SameLine();
       ImGui::SetNextItemWidth(Em(140.0f));
-      ImGui::SliderFloat("##tile", &mTile, 64.0f, 192.0f, "tiles %.0f px");
+      FillSliderFloat("##tile", &mTile, 64.0f, 192.0f, "tiles %.0f px");
       ImGui::SameLine();
       if (ImGui::Button("None")) {
         picked = !path.empty();
         path.clear();
         ImGui::CloseCurrentPopup();
       }
-      ImGui::SetItemTooltip("No texture");
+      EdSetItemTooltip("No texture");
 
       const std::string search = Lower(mSearch);
       const std::string folder = mFolder == 0 ? std::string() : mFolders[static_cast<std::size_t>(mFolder - 1)];
@@ -202,9 +202,9 @@ namespace faf::editor
               ImGui::GetWindowDrawList()->AddRect(
                 at,
                 ImVec2(at.x + mTile, at.y + mTile),
-                current     ? IM_COL32(250, 200, 80, 255)
-                  : hovered ? IM_COL32(220, 220, 220, 255)
-                            : IM_COL32(50, 50, 56, 255),
+                current     ? AccentU32()
+                  : hovered ? InkU32()
+                            : LineU32(),
                 3.0f,
                 0,
                 current ? 2.5f : 1.0f
@@ -218,7 +218,7 @@ namespace faf::editor
               ImGui::TextUnformatted(name.c_str());
               ImGui::EndGroup();
               if (hovered) {
-                ImGui::BeginTooltip();
+                EdBeginTooltip();
                 Picture(library, choice, withAlpha, 256.0f);
                 ImGui::TextUnformatted(choice.c_str());
                 ImGui::EndTooltip();

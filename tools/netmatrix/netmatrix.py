@@ -31,7 +31,7 @@ Example (from tools/, after `go build -o mpemu.exe ./cmd/mpemu`):
   python netmatrix/netmatrix.py --mpemu mpemu.exe --out ../tmp/matrix \\
       --ours %ProgramData%/FAForever/bin_x64/main_x64.exe \\
       --retail %ProgramData%/FAForever/bin/ForgedAlliance.exe \\
-      --bridge path/to/faf-netbridge.exe --bind 192.168.42.77
+      --bridge path/to/faf-netbridge.exe --bind 192.0.2.77
 """
 
 from __future__ import annotations

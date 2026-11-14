@@ -41,7 +41,7 @@ namespace
     TSerializer& serializer
   ) noexcept
   {
-    return reinterpret_cast<gpg::SerHelperBase*>(&serializer.mHelperNext);
+    return static_cast<gpg::SerHelperBase*>(&serializer.mHelperNext);
   }
 
   template <typename TSerializer>
@@ -223,12 +223,12 @@ void gpg::RVectorType<moho::SPointVector>::Init()
  */
 void gpg::RVectorType<moho::SPointVector>::SerLoad(
   gpg::ReadArchive* const archive,
-  const std::intptr_t objectPtr,
+  void* const objectPtr,
   const int,
   gpg::RRef* const
 )
 {
-  auto* const storage = reinterpret_cast<SPointVectorVector*>(objectPtr);
+  auto* const storage = static_cast<SPointVectorVector*>(objectPtr);
   GPG_ASSERT(archive != nullptr);
   GPG_ASSERT(storage != nullptr);
   if (!archive || !storage) {
@@ -264,12 +264,12 @@ void gpg::RVectorType<moho::SPointVector>::SerLoad(
  */
 void gpg::RVectorType<moho::SPointVector>::SerSave(
   gpg::WriteArchive* const archive,
-  const std::intptr_t objectPtr,
+  void* const objectPtr,
   const int,
   gpg::RRef* const ownerRef
 )
 {
-  const auto* const storage = reinterpret_cast<const SPointVectorVector*>(objectPtr);
+  const auto* const storage = static_cast<const SPointVectorVector*>(objectPtr);
   GPG_ASSERT(archive != nullptr);
   GPG_ASSERT(storage != nullptr);
   if (!archive || !storage) {

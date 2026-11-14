@@ -2,6 +2,9 @@
 // settings.
 
 #include <algorithm>
+#include "editor/ui/EdControls.h"
+#include "editor/ui/EdThemeColors.h"
+#include "editor/ui/EdWorkspaces.h"
 #include <cstdio>
 #include <string>
 #include <vector>
@@ -30,7 +33,6 @@ namespace faf::editor
       ImVec4(0.85f, 0.25f, 0.25f, 1.0f),
       ImVec4(0.90f, 0.75f, 0.25f, 1.0f),
     };
-    const ImU32 kAccentBorder = IM_COL32(230, 150, 60, 255);
 
     struct ArmyCard
     {
@@ -87,13 +89,13 @@ namespace faf::editor
 
   void EdShell::DrawArmiesPanel()
   {
-    if (const ImGuiWindow* const map = ImGui::FindWindowByName(kMapWindow); map != nullptr && map->DockId != 0) {
+    if (const ImGuiWindow* const map = ImGui::FindWindowByName(Panel(kMapWindow)); map != nullptr && map->DockId != 0) {
       ImGui::SetNextWindowDockID(map->DockId, ImGuiCond_FirstUseEver);
     }
     if (std::exchange(mFocusArmies, false)) {
       ImGui::SetNextWindowFocus();
     }
-    if (!ImGui::Begin(kArmiesWindow, &mShowArmies)) {
+    if (!ImGui::Begin(Panel(kArmiesWindow), &mShowArmies)) {
       ImGui::End();
       return;
     }
@@ -135,11 +137,11 @@ namespace faf::editor
         mArmySelected = army.name;
       }
       ImDrawList* const draw = ImGui::GetWindowDrawList();
-      const ImU32 background = ImGui::GetColorU32(ImGui::IsItemHovered() ? ImGuiCol_FrameBgHovered : ImGuiCol_FrameBg);
+      // The chosen army filled in the accent (selection by fill), the others the frame colour.
+      const ImU32 background = chosen
+        ? AccentU32(0.32f)
+        : ImGui::GetColorU32(ImGui::IsItemHovered() ? ImGuiCol_FrameBgHovered : ImGuiCol_FrameBg);
       draw->AddRectFilled(at, ImVec2(at.x + width, at.y + height), background, 5.0f);
-      if (chosen) {
-        draw->AddRect(at, ImVec2(at.x + width, at.y + height), kAccentBorder, 5.0f, 0, 1.5f);
-      }
       // The badge: the slot number, or a tag for an extra army.
       const ImVec2 badgeAt(at.x + pad, at.y + ImGui::GetStyle().FramePadding.y);
       const ImVec2 badgeSize = ImGui::CalcTextSize(badge);
@@ -162,14 +164,14 @@ namespace faf::editor
       const float whereWidth = ImGui::CalcTextSize(where).x;
       draw->AddText(
         ImVec2(at.x + width - buttons - pad - whereWidth, badgeAt.y),
-        army.start || civilian ? ImGui::GetColorU32(ImGuiCol_TextDisabled) : IM_COL32(240, 180, 70, 255),
+        army.start || civilian ? ImGui::GetColorU32(ImGuiCol_TextDisabled) : AccentU32(),
         where
       );
       // Its mirror's slot beside its name, in the accent colour.
       if (!mirror.empty()) {
         const std::string tag = "<> " + mirror;
         draw->AddText(
-          ImVec2(textX + ImGui::CalcTextSize(army.name.c_str()).x + pad * 2.0f, badgeAt.y), kAccentBorder, tag.c_str()
+          ImVec2(textX + ImGui::CalcTextSize(army.name.c_str()).x + pad * 2.0f, badgeAt.y), AccentU32(), tag.c_str()
         );
       }
       char detail[160];
@@ -251,7 +253,7 @@ namespace faf::editor
       }
       ImGui::EndDisabled();
       if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-        ImGui::SetTooltip(
+        EdSetTooltip(
           "Orders the slots so each start is followed by its mirror under the map's symmetry (the Tools\n"
           "panel's): slots 1 and 2, 3 and 4... face each other, so the lobby's \"odd vs even\" auto teams\n"
           "are fair. Players then pick slots knowing which start faces which."
@@ -300,7 +302,7 @@ namespace faf::editor
         mTools.AskExtraArmiesChange(list);
       }
       if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("Take %s off the extra armies (its units stay in _save.lua)", extra[i].c_str());
+        EdSetTooltip("Take %s off the extra armies (its units stay in _save.lua)", extra[i].c_str());
       }
       endCard(next);
       ImGui::PopID();
@@ -330,7 +332,7 @@ namespace faf::editor
           mTools.AskExtraArmiesChange(list + offers[i]);
         }
         if (ImGui::IsItemHovered()) {
-          ImGui::SetTooltip(
+          EdSetTooltip(
             "Add %s as an extra army: an owner for neutral or civilian units, not a lobby slot", offers[i].c_str()
           );
         }
@@ -394,13 +396,13 @@ namespace faf::editor
       float energy = static_cast<float>(edit.energy);
       ImGui::SetNextItemWidth(half);
       ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.20f, 0.30f, 0.16f, 1.0f));
-      ImGui::DragFloat("##mass", &mass, 10.0f, 0.0f, 1000000.0f, "Mass %.0f");
+      FillDragFloat("##mass", &mass, 10.0f, 0.0f, 1000000.0f, "Mass %.0f");
       ImGui::PopStyleColor();
       watch();
       ImGui::SameLine();
       ImGui::SetNextItemWidth(half);
       ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.32f, 0.28f, 0.10f, 1.0f));
-      ImGui::DragFloat("##energy", &energy, 10.0f, 0.0f, 1000000.0f, "Energy %.0f");
+      FillDragFloat("##energy", &energy, 10.0f, 0.0f, 1000000.0f, "Energy %.0f");
       ImGui::PopStyleColor();
       watch();
       edit.mass = mass;
@@ -427,13 +429,13 @@ namespace faf::editor
       }
 
       ImGui::SetNextItemWidth(half);
-      ImGui::DragInt("##colour", &edit.color, 0.1f, 0, 32, "Colour %d");
+      FillDragInt("##colour", &edit.color, 0.1f, 0, 32, "Colour %d");
       watch();
       ImGui::SameLine();
       ImGui::TextDisabled("a palette number");
 
       // Alliances: this army's stance toward each other one.
-      if (ImGui::CollapsingHeader("Alliances")) {
+      if (Section("Alliances", false)) {
         static const char* const kStances[4] = {"-", "Enemy", "Ally", "Neutral"};
         static const ImVec4 kStanceColours[4] = {
           ImVec4(0.30f, 0.32f, 0.36f, 1.0f),
@@ -488,7 +490,7 @@ namespace faf::editor
           ImGui::PopID();
         }
       }
-      if (ImGui::CollapsingHeader("Scripting")) {
+      if (Section("Scripting", false)) {
         char plans[256];
         (void)std::snprintf(plans, sizeof(plans), "%s", edit.plans.c_str());
         ImGui::SetNextItemWidth(-1.0f);

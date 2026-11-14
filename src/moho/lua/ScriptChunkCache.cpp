@@ -514,7 +514,7 @@ namespace
   )
   {
     SWholeBuffer buffer{text};
-    return lua_load(state, reinterpret_cast<lua_Chunkreader>(ReadWholeBuffer), &buffer, chunkName);
+    return lua_load(state, ReadWholeBuffer, &buffer, chunkName);
   }
 
   [[nodiscard]] SChunkKey KeyOf(
@@ -639,10 +639,7 @@ namespace
       }
       const int top = lua_gettop(state);
       std::string code;
-      if (
-        LoadBuffer(state, source, chunkName.c_str()) == 0 &&
-        lua_dump(state, reinterpret_cast<lua_Chunkwriter>(AppendDump), &code) != 0
-      ) {
+      if (LoadBuffer(state, source, chunkName.c_str()) == 0 && lua_dump(state, AppendDump, &code) != 0) {
         Chunks().Keep(key, std::move(code), false);
       }
       lua_settop(state, top);
@@ -740,7 +737,7 @@ int moho::SCR_LoadScriptChunk(
 
   const int status = LoadBuffer(state, source, chunkName);
   code.clear();
-  if (status == 0 && lua_dump(state, reinterpret_cast<lua_Chunkwriter>(AppendDump), &code) != 0) {
+  if (status == 0 && lua_dump(state, AppendDump, &code) != 0) {
     chunks.Keep(key, std::move(code), true);
   }
   return status;

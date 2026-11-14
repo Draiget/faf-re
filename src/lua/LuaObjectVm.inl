@@ -14,7 +14,7 @@ UpVal* luaF_newupval(
 {
   auto* const upvalue = luaM_new<UpVal>(state);
   upvalue->v = &upvalue->value;
-  luaC_link(state, reinterpret_cast<GCObject*>(upvalue), LUA_TUPVALUE);
+  luaC_link(state, valtogco(upvalue), LUA_TUPVALUE);
   return upvalue;
 }
 
@@ -480,7 +480,7 @@ Proto* luaF_newproto(
 )
 {
   auto* const proto = luaM_new<Proto>(state);
-  luaC_link(state, reinterpret_cast<GCObject*>(proto), LUA_TPROTO);
+  luaC_link(state, valtogco(proto), LUA_TPROTO);
 
   proto->k = nullptr;
   proto->code = nullptr;
@@ -584,7 +584,7 @@ UpVal* luaF_findupval(
   }
   upvalue->v = level;
   upvalue->next = *link;
-  *link = reinterpret_cast<GCObject*>(upvalue);
+  *link = valtogco(upvalue);
   return upvalue;
 }
 
@@ -804,9 +804,9 @@ void luaV_concat(
         luaV_concat_raise_typeerror(state, top - 2, top - 1);
       }
 
-      const ptrdiff_t resultOffset = reinterpret_cast<char*>(top - 2) - reinterpret_cast<char*>(state->stack);
+      const ptrdiff_t resultOffset = top - 2 - state->stack;
       (void)callTMres(handler, top - 2, top - 1, state);
-      *reinterpret_cast<StkId>(reinterpret_cast<char*>(state->stack) + resultOffset) = *state->top;
+      *(state->stack + resultOffset) = *state->top;
     } else if (static_cast<TString*>(top[-1].value.p)->len > 0u) {
       // Two strings at least. Reach back over as many more as are
       // convertible so the whole run costs one allocation.
@@ -1453,11 +1453,8 @@ retentry: // resuming: the frame is already set up
         break;
       }
       *cl->upvals[upIndex]->v = *ra;
-      faf_lua51_gc_barrier_value(
-        L,
-        reinterpret_cast<GCObject*>(cl->upvals[upIndex]),
-        ra
-      ); // Lua 5.1.5 lvm.c: OP_SETUPVAL
+      faf_lua51_gc_barrier_value(L, valtogco(cl->upvals[upIndex]),
+                                 ra); // Lua 5.1.5 lvm.c: OP_SETUPVAL
       break;
     }
 
@@ -1931,11 +1928,8 @@ retentry: // resuming: the frame is already set up
         const int index = LuaGetArgB(*pc);
         closure->l.upvals[up] =
           (LuaGetOpcode(*pc) == kOpGetUpval) ? cl->upvals[index] : luaF_findupval(L, base + index);
-        faf_lua51_gc_barrier_f(
-          L,
-          reinterpret_cast<GCObject*>(closure),
-          reinterpret_cast<GCObject*>(closure->l.upvals[up])
-        ); // Lua 5.1.5 lvm.c: OP_CLOSURE
+        faf_lua51_gc_barrier_f(L, valtogco(closure),
+                               valtogco(closure->l.upvals[up])); // Lua 5.1.5 lvm.c: OP_CLOSURE
       }
 
       ra->tt = static_cast<int>(closure->l.tt);
@@ -2231,44 +2225,6 @@ void luaO_chunkid(
 }
 
 /**
- * Address: 0x00912F30 (FUN_00912F30, addinfo)
- *
- * IDA signature:
- * const char *__usercall addinfo(lua_State *L@<edi>, const char *msg);
- *
- * What it does:
- * Prefixes an error message with the chunk name and line it came from,
- * turning "attempt to call a nil value" into
- * "script.lua(42): attempt to call a nil value". Only frames still running
- * Lua bytecode carry that position, so a C frame is left unannotated.
- */
-[[maybe_unused]] static void addinfo(
-  lua_State* const state,
-  const char* const msg
-)
-{
-  constexpr int kChunkIdBufferSize = 60;
-  constexpr int kCallInfoStateRunningLua = 3;
-
-  CallInfo* const ci = state->ci;
-  if (ci->state >= kCallInfoStateRunningLua) {
-    return;
-  }
-
-  const Proto* const proto = static_cast<GCObject*>(ci->base[-1].value.p)->cl.l.p;
-  const ptrdiff_t pc = ci->savedpc - proto->code;
-
-  int line = -1;
-  if (pc >= 0) {
-    line = (proto->lineinfo != nullptr) ? proto->lineinfo[pc] : 0;
-  }
-
-  char chunkId[kChunkIdBufferSize];
-  luaO_chunkid(chunkId, proto->source->str, kChunkIdBufferSize);
-  (void)luaO_pushfstring(state, "%s(%d): %s", chunkId, line, msg);
-}
-
-/**
  * Address: 0x0090D430 (FUN_0090D430, lua_call)
  *
  * IDA signature:
@@ -2349,7 +2305,7 @@ static StkId tryFuncTM(
   constexpr int kTagMethodCall = 17;
 
   const TObject* const handler = luaT_gettmbyobj(state, func, kTagMethodCall);
-  const ptrdiff_t funcOffset = reinterpret_cast<char*>(func) - reinterpret_cast<char*>(state->stack);
+  const ptrdiff_t funcOffset = func - state->stack;
 
   if (!IsCallableTag(handler->tt)) {
     luaG_typeerror(state, func, "call");
@@ -2366,7 +2322,7 @@ static StkId tryFuncTM(
 
   ++state->top;
 
-  StkId const target = reinterpret_cast<StkId>(reinterpret_cast<char*>(state->stack) + funcOffset);
+  StkId const target = state->stack + funcOffset;
   target->tt = handler->tt;
   target->value.p = handler->value.p;
   return target;
@@ -2462,7 +2418,7 @@ StkId luaD_precall(
   // loaded through dofile faulted the moment it finished.
   constexpr int kFrameCFunction = 3;
 
-  const ptrdiff_t funcOffset = reinterpret_cast<char*>(func) - reinterpret_cast<char*>(state->stack);
+  const ptrdiff_t funcOffset = func - state->stack;
 
   if (!IsCallableTag(func->tt)) {
     func = tryFuncTM(func, state);
@@ -2486,7 +2442,7 @@ StkId luaD_precall(
     }
 
     CallInfo* const ci = ++state->ci;
-    ci->base = reinterpret_cast<StkId>(reinterpret_cast<char*>(state->stack) + funcOffset) + 1;
+    ci->base = state->stack + funcOffset + 1;
     state->base = ci->base;
     ci->top = state->base + proto->maxstacksize;
     ci->savedpc = proto->code;
@@ -2514,7 +2470,7 @@ StkId luaD_precall(
   }
 
   CallInfo* const ci = ++state->ci;
-  ci->base = reinterpret_cast<StkId>(reinterpret_cast<char*>(state->stack) + funcOffset) + 1;
+  ci->base = state->stack + funcOffset + 1;
   state->base = ci->base;
   ci->top = state->top + kMinCStackSlots;
   ci->state = kFrameCFunction;
@@ -2579,10 +2535,10 @@ int luaD_call(
   constexpr unsigned int kMaxCCalls = 200;
   constexpr unsigned int kMaxCCallsHandling = kMaxCCalls + (kMaxCCalls >> 3);
 
-  const ptrdiff_t frameOffset = reinterpret_cast<char*>(state->ci) - reinterpret_cast<char*>(state->base_ci);
+  const ptrdiff_t frameOffset = state->ci - state->base_ci;
   const std::uint16_t savedNestedCalls = state->nCcalls;
   const lu_byte savedAllowHook = state->l_G->allowhook;
-  const ptrdiff_t funcOffset = reinterpret_cast<char*>(func) - reinterpret_cast<char*>(state->stack);
+  const ptrdiff_t funcOffset = func - state->stack;
 
   ++state->nCcalls;
 
@@ -2590,11 +2546,11 @@ int luaD_call(
   // message where the caller expects it, then let the error continue
   // outward. Shared by the two handlers below.
   const auto unwindFrameForError = [&](const char* const message) {
-    StkId const errorSlot = reinterpret_cast<StkId>(reinterpret_cast<char*>(state->stack) + funcOffset);
+    StkId const errorSlot = state->stack + funcOffset;
     luaF_close(state, errorSlot);
     (void)PushLuaStringAtStackSlot(state, errorSlot, message);
 
-    state->ci = reinterpret_cast<CallInfo*>(reinterpret_cast<char*>(state->base_ci) + frameOffset);
+    state->ci = state->base_ci + frameOffset;
     state->base = state->ci->base;
     state->nCcalls = savedNestedCalls;
     state->l_G->allowhook = savedAllowHook;
@@ -2671,7 +2627,7 @@ static size_t luaC_separateudata(
     }
 
     // The payload's x86 size: deadmem is charged against nblocks (x64 port, LuaMemAccounting.h).
-    deadmem += static_cast<size_t>(LuaX86PayloadSize(reinterpret_cast<gpg::RType*>(current->u.len)));
+    deadmem += static_cast<size_t>(LuaX86PayloadSize(current->u.type));
     *survivor = current->gch.next;
     current->gch.next = nullptr;
     *lastCollected = current;
@@ -2726,7 +2682,7 @@ static void luaC_callGCTM(
 
     udata->gch.marked &= kClearFinaliserBits;
 
-    auto* const type = reinterpret_cast<gpg::RType*>(udata->u.len);
+    auto* const type = udata->u.type;
     type->dtrFunc_(static_cast<void*>(&udata->u + 1));
   }
 
@@ -3297,7 +3253,7 @@ Closure* luaF_newCclosure(
 {
   auto* const closure = static_cast<Closure*>(luaM_reallocblock(state, nullptr, {0u, 0u}, sizeCclosure(nelems)));
 
-  luaC_link(state, reinterpret_cast<GCObject*>(closure), LUA_CFUNCTION);
+  luaC_link(state, valtogco(closure), LUA_CFUNCTION);
 
   // The binary clears 0x18 through 0x40 - the tail of the reserved span
   // whose fields are not named yet, plus the one-before-first upvalue
@@ -4272,7 +4228,7 @@ LuaState::LuaState(
 {
   m_state = lua_open();
   m_ownState = 1;
-  lua_setusergcfunction(m_state, reinterpret_cast<void(__cdecl*)(void*)>(&LuaPlusGCFunction));
+  lua_setusergcfunction(m_state, &LuaPlusGCFunction);
   lua_setstateuserdata(m_state, this);
 
   if (collectorRole != static_cast<int>(moho::lua_incremental::ELuaVmRole::Baseline)) {
@@ -4280,7 +4236,7 @@ LuaState::LuaState(
   }
 
   m_headObject.m_next = reinterpret_cast<LuaObject*>(&m_tailObject);
-  m_tailObject.m_prev = reinterpret_cast<LuaObject**>(&m_headObject.m_next);
+  m_tailObject.m_prev = (&m_headObject.m_next);
   m_headObject.m_prev = nullptr;
   m_tailObject.m_next = nullptr;
   m_luaTask = nullptr;

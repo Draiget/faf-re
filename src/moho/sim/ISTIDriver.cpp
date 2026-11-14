@@ -4,31 +4,6 @@
 
 using namespace moho;
 
-namespace
-{
-  struct ISTIDriverHandle
-  {
-    void* vtable;
-  };
-
-  /**
-   * Address: 0x0073B930 (FUN_0073B930)
-   *
-   * What it does:
-   * Rebinds one runtime payload to the base `ISTIDriver` vtable lane.
-   */
-  [[maybe_unused]] [[nodiscard]] ISTIDriverHandle* ResetISTIDriverBaseVtableLane(
-    ISTIDriverHandle* const runtime
-  ) noexcept
-  {
-    static std::uint8_t sISTIDriverRuntimeVTableTag = 0;
-    if (runtime != nullptr) {
-      runtime->vtable = &sISTIDriverRuntimeVTableTag;
-    }
-    return runtime;
-  }
-} // namespace
-
 /**
  * Address: 0x0073B0C0 (FUN_0073B0C0, ??0ISTIDriver@Moho@@QAE@XZ)
  *

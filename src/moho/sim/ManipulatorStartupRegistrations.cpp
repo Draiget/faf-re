@@ -110,8 +110,8 @@ namespace
     [[nodiscard]] fa::string GetLexical(const gpg::RRef& ref) const override;
     [[nodiscard]] const gpg::RIndexed* IsIndexed() const override;
     void Init() override;
-    static void SerLoad(gpg::ReadArchive* archive, std::intptr_t objectPtr, int version, gpg::RRef* ownerRef);
-    static void SerSave(gpg::WriteArchive* archive, std::intptr_t objectPtr, int version, gpg::RRef* ownerRef);
+    static void SerLoad(gpg::ReadArchive* archive, void* objectPtr, int version, gpg::RRef* ownerRef);
+    static void SerSave(gpg::WriteArchive* archive, void* objectPtr, int version, gpg::RRef* ownerRef);
 
     /**
      * Address: 0x00641DB0 (FUN_00641DB0, gpg::RVectorType_bool::SubscriptIndex)
@@ -127,22 +127,6 @@ namespace
 
   using VectorBoolStorage = moho::SBitStorage32;
 
-  template <class TObject>
-  [[nodiscard]] TObject* PointerFromArchiveInt(
-    const std::intptr_t objectPtr
-  )
-  {
-    return reinterpret_cast<TObject*>(objectPtr);
-  }
-
-  template <class TObject>
-  [[nodiscard]] const TObject* ConstPointerFromArchiveInt(
-    const std::intptr_t objectPtr
-  )
-  {
-    return reinterpret_cast<const TObject*>(objectPtr);
-  }
-
   thread_local fa::detail::vector_bool_word_cursor gRecoveredRVectorTypeBoolSubscriptCursorScratch{};
 
   /**
@@ -152,28 +136,6 @@ namespace
   {
     static RVectorTypeBool sInstance;
     return &sInstance;
-  }
-
-  /**
-   * Orphan: no caller anywhere in src and no `Address:` citation of its
-   * own. `gpg::RTypeOf<bool>()` right below does the same
-   * `LookupRType(typeid(bool))` lookup (minus the `REF_FindTypeNamed`
-   * fallback) and is the one with real, evidenced usage: it is called from
-   * `RVectorTypeBool::GetName()` (FUN_00641C20, address-cited below). No
-   * evidence ties this function's extra fallback branch to any call site, so
-   * it is left undisturbed rather than merged into the evidenced one on a
-   * guess.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::RType* ResolveBoolType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(bool));
-      if (!cached) {
-        cached = gpg::REF_FindTypeNamed("bool");
-      }
-    }
-    return cached;
   }
 
   /**
@@ -396,12 +358,12 @@ namespace
    */
   void RVectorTypeBool::SerLoad(
     gpg::ReadArchive* const archive,
-    const std::intptr_t objectPtr,
+    void* const objectPtr,
     const int,
     gpg::RRef* const
   )
   {
-    auto* const storage = PointerFromArchiveInt<VectorBoolStorage>(objectPtr);
+    auto* const storage = static_cast<VectorBoolStorage*>(objectPtr);
     GPG_ASSERT(archive != nullptr);
     GPG_ASSERT(storage != nullptr);
     if (!archive || !storage) {
@@ -453,12 +415,12 @@ namespace
    */
   void RVectorTypeBool::SerSave(
     gpg::WriteArchive* const archive,
-    const std::intptr_t objectPtr,
+    void* const objectPtr,
     const int,
     gpg::RRef* const
   )
   {
-    const auto* const storage = ConstPointerFromArchiveInt<VectorBoolStorage>(objectPtr);
+    const auto* const storage = static_cast<const VectorBoolStorage*>(objectPtr);
     GPG_ASSERT(archive != nullptr);
     GPG_ASSERT(storage != nullptr);
     if (!archive || !storage) {

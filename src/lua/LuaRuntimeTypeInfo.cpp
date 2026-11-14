@@ -635,7 +635,7 @@ void Udata::MemberSaveConstructArgs(
   gpg::SerSaveConstructArgsResult& result
 )
 {
-  archive.WriteRefCounts(reinterpret_cast<const gpg::RType*>(len));
+  archive.WriteRefCounts(type);
   result.SetOwned(0u);
 }
 

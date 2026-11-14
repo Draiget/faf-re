@@ -93,9 +93,12 @@ namespace platform::window
   [[nodiscard]] bool IsInitialized();
 
   // A top-level window, hidden until Show. x, y: the frame's (outer) screen position, as the retail
-  // window library placed frames; -1: centred. width, height: the client size. Null when it can't
-  // be made.
-  [[nodiscard]] Handle CreateTopLevel(const char* utf8Title, int x, int y, int width, int height, bool resizable);
+  // window library placed frames; -1: centred. width, height: the client size. bordered: false for
+  // a window with no caption or border, as the full-screen frame is. Null when it can't be made.
+  [[nodiscard]] Handle
+  CreateTopLevel(const char* utf8Title, int x, int y, int width, int height, bool resizable, bool bordered);
+  // Gives a top-level window a caption and border or takes them away, and lets it be resized or not.
+  void SetFrameStyle(Handle window, bool bordered, bool resizable);
   // A window inside `parent`'s client area at x, y (relative to it), shown, with input of its own,
   // as the window library's child windows were on Windows (the game's viewport, the map editor's view of it). Null
   // where the system has none; the engine's child then shares its parent's window.
@@ -160,6 +163,10 @@ namespace platform::window
   // dialog answers through a callback, which this waits for). True with the chosen folder in
   // `utf8Path`; false when cancelled or without a window system, `utf8Path` unchanged.
   bool PickFolder(const char* utf8Title, std::string& utf8Path);
+
+  // The bounds, in screen pixels, of the first display that is not the primary one: where the game's second
+  // head goes (its full-screen swap chain takes the display its window is on). False with one display.
+  bool GetSecondaryDisplayBounds(int* x, int* y, int* width, int* height);
 
   // A borderless window centred on the primary display showing the PNG file scaled to
   // width x height, above other windows, until HideSplash. False when the file can't be read.

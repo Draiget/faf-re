@@ -65,20 +65,6 @@ namespace
   static_assert(sizeof(EntityCategoryLuaMetatableFactory) == 0x8, "EntityCategoryLuaMetatableFactory size must be 0x8");
 
   /**
-   * Address: 0x00537070 (FUN_00537070)
-   *
-   * What it does:
-   * Rebinds the startup metatable-factory index lane for the entity-category
-   * Lua metatable factory singleton and returns that singleton.
-   */
-  [[maybe_unused]] EntityCategoryLuaMetatableFactory* startup_EntityCategoryLuaMetatableFactory_Index()
-  {
-    auto& instance = EntityCategoryLuaMetatableFactory::Instance();
-    instance.SetFactoryObjectIndexForRecovery(moho::CScrLuaObjectFactory::AllocateFactoryObjectIndex());
-    return &instance;
-  }
-
-  /**
    * Address: 0x00BC8F70 (FUN_00BC8F70, register_EntityCategoryLuaMetatableFactoryIndexStartup)
    *
    * What it does:
@@ -295,7 +281,7 @@ namespace moho
     const EntityCategorySet* const categorySet
   )
   {
-    return blueprint != nullptr && categorySet != nullptr && categorySet->mBits.Contains(blueprint->mCategoryBitIndex);
+    return blueprint != nullptr && categorySet != nullptr && categorySet->mBits.Contains(blueprint->mBlueprintOrdinal);
   }
 
   /**
@@ -726,12 +712,12 @@ namespace moho
    */
   void EntityCategory::SerSave(
     gpg::WriteArchive* archive,
-    const std::intptr_t objectPtr,
+    void* const objectPtr,
     const int,
     gpg::RRef* ownerRef
   )
   {
-    auto* const set = reinterpret_cast<EntityCategorySet*>(objectPtr);
+    auto* const set = static_cast<EntityCategorySet*>(objectPtr);
     GPG_ASSERT(set != nullptr);
     if (!set) {
       return;
@@ -749,12 +735,12 @@ namespace moho
    */
   void EntityCategory::SerLoad(
     gpg::ReadArchive* archive,
-    const std::intptr_t objectPtr,
+    void* const objectPtr,
     const int,
     gpg::RRef* ownerRef
   )
   {
-    auto* const set = reinterpret_cast<EntityCategorySet*>(objectPtr);
+    auto* const set = static_cast<EntityCategorySet*>(objectPtr);
     GPG_ASSERT(set != nullptr);
     if (!set) {
       return;

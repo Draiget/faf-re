@@ -25,6 +25,18 @@ namespace faf::editor
   class EdMaterialEditor
   {
   public:
+    /**
+     * The Materials workspace's stage: the preview as large as the middle of the window allows (the map view's
+     * place), its mode and light along the top. While it is drawn (`SetStaged`), the window's own preview gives way
+     * to the map's saved graphs.
+     */
+    void DrawStage();
+    void SetStaged(
+      const bool staged
+    ) noexcept
+    {
+      mStaged = staged;
+    }
     EdMaterialEditor();
     ~EdMaterialEditor();
     EdMaterialEditor(const EdMaterialEditor&) = delete;
@@ -143,6 +155,15 @@ namespace faf::editor
     Doc& Make(const std::string& name);
     void DrawToolbar();
     void DrawPreview(Doc& doc, float size);
+    /** The preview image made again when stale, at `size` pixels a side (256 in the window, 512 on the stage). */
+    void RenderPreview(Doc& doc, int size);
+    /** The preview's mode and light, as one row. */
+    void DrawPreviewOptions();
+    /** The map's saved graphs (its folder, else the editor's own): a click opens one; the open ones marked. */
+    void DrawGraphList();
+    bool mStaged = false;
+    /** The preview image's size now (RenderPreview), apart from the graph's edit size (mPreviewSize). */
+    int mPreviewImageSize = 0;
     void DrawDetails(Doc& doc);
     void DrawStats(Doc& doc);
     void DrawPalette(Doc& doc);

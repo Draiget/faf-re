@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Wm3Vector3.h"
+#include "Wm3Quaternion.h"
 #include <cstddef>
 #include <cstdint>
 
@@ -64,8 +66,8 @@ namespace moho
 
   struct SScaAnimKey
   {
-    float position[3]; // +0x00: x, y, z
-    float rotation[4]; // +0x0C: quaternion components
+    Wm3::Vector3f position; // +0x00
+    Wm3::Quatf rotation;    // +0x0C (w, x, y, z)
   };
 
   static_assert(sizeof(SScaAnimKey) == 0x1C);

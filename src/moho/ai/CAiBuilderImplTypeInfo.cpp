@@ -90,10 +90,7 @@ namespace
     std::int32_t baseOffset = 0;
     const bool derived =
       dynamicType != nullptr && out.mType != nullptr && dynamicType->IsDerivedFrom(out.mType, &baseOffset);
-    out.mObj = derived ? reinterpret_cast<void*>(
-                           reinterpret_cast<std::uintptr_t>(mutableBlueprint) - static_cast<std::uintptr_t>(baseOffset)
-                         )
-                       : static_cast<void*>(mutableBlueprint);
+    out.mObj = derived ? gpg::CompleteObject(mutableBlueprint, baseOffset) : static_cast<void*>(mutableBlueprint);
     out.mType = dynamicType ? dynamicType : out.mType;
     return out;
   }
@@ -140,7 +137,7 @@ namespace
    */
   void DeserializeBuilderRebuildMap(
     gpg::ReadArchive* const archive,
-    const std::intptr_t objectPtr,
+    void* const objectPtr,
     const int,
     gpg::RRef* const ownerRef
   )
@@ -149,7 +146,7 @@ namespace
       return;
     }
 
-    auto* const map = reinterpret_cast<SBuilderRebuildMap*>(objectPtr);
+    auto* const map = static_cast<SBuilderRebuildMap*>(objectPtr);
 
     unsigned int count = 0u;
     archive->ReadUInt(&count);
@@ -173,7 +170,7 @@ namespace
    */
   void SerializeBuilderRebuildMap(
     gpg::WriteArchive* const archive,
-    const std::intptr_t objectPtr,
+    void* const objectPtr,
     const int,
     gpg::RRef* const ownerRef
   )
@@ -182,7 +179,7 @@ namespace
       return;
     }
 
-    const auto* const map = reinterpret_cast<const SBuilderRebuildMap*>(objectPtr);
+    const auto* const map = static_cast<const SBuilderRebuildMap*>(objectPtr);
     const unsigned int count = map ? static_cast<unsigned int>(map->size()) : 0u;
     archive->WriteUInt(count);
 

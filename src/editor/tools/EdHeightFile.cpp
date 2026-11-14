@@ -83,6 +83,64 @@ namespace faf::editor
       }
     };
 
+    /** `.r32`: 32-bit little-endian floats, square or of the expected size (Gaea's and World Machine's float export).
+     */
+    bool ReadFloats(
+      const std::filesystem::path& file,
+      const int expectWidth,
+      const int expectHeight,
+      HeightImage& out,
+      std::string& error
+    )
+    {
+      std::ifstream in(file, std::ios::binary | std::ios::ate);
+      if (!in) {
+        error = "can't open " + file.string();
+        return false;
+      }
+      const auto bytes = static_cast<std::size_t>(in.tellg());
+      const std::size_t count = bytes / 4;
+      int width = 0;
+      int height = 0;
+      if (
+        expectWidth > 0 && expectHeight > 0 &&
+        count == static_cast<std::size_t>(expectWidth) * static_cast<std::size_t>(expectHeight)
+      ) {
+        width = expectWidth;
+        height = expectHeight;
+      } else {
+        const auto side = static_cast<int>(std::lround(std::sqrt(static_cast<double>(count))));
+        if (bytes % 4 != 0 || static_cast<std::size_t>(side) * static_cast<std::size_t>(side) != count || side < 2) {
+          error = file.filename().string() + " is " + std::to_string(bytes) +
+            " bytes: not a square of 32-bit heights, nor the map's size";
+          return false;
+        }
+        width = side;
+        height = side;
+      }
+      std::vector<float> floats(count);
+      in.seekg(0);
+      in.read(reinterpret_cast<char*>(floats.data()), static_cast<std::streamsize>(count * 4));
+      if (!in) {
+        error = "can't read " + file.string();
+        return false;
+      }
+      // 0..1 is the tools' normalised range; anything above 1 is read as game units (128 words a unit).
+      bool normalised = true;
+      for (const float value : floats) {
+        normalised = normalised && value <= 1.0001f;
+      }
+      out.width = width;
+      out.height = height;
+      out.words.resize(count);
+      for (std::size_t i = 0; i < count; ++i) {
+        const double word = normalised ? floats[i] * 65535.0 : floats[i] * 128.0;
+        out.words[i] =
+          static_cast<std::uint16_t>(std::lround(std::clamp(std::isfinite(word) ? word : 0.0, 0.0, 65535.0)));
+      }
+      return true;
+    }
+
     bool ReadRaw(
       const std::filesystem::path& file,
       const int expectWidth,
@@ -185,9 +243,19 @@ namespace faf::editor
     bool WritePng(
       const std::filesystem::path& file,
       const HeightImage& image,
-      std::string& error
+      std::string& error,
+      const bool eightBit = false
     )
     {
+      const std::string extension = Lower(file.extension().string());
+      const bool tiff = extension == ".tif" || extension == ".tiff";
+      std::vector<std::uint8_t> bytes;
+      if (eightBit) {
+        bytes.resize(image.words.size());
+        for (std::size_t i = 0; i < image.words.size(); ++i) {
+          bytes[i] = static_cast<std::uint8_t>(image.words[i] >> 8);
+        }
+      }
       const ComScope com;
       ComPtr<IWICImagingFactory> factory;
       HRESULT hr = ::CoCreateInstance(CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&factory.p));
@@ -200,7 +268,7 @@ namespace faf::editor
       }
       ComPtr<IWICBitmapEncoder> encoder;
       if (SUCCEEDED(hr)) {
-        hr = factory->CreateEncoder(GUID_ContainerFormatPng, nullptr, &encoder);
+        hr = factory->CreateEncoder(tiff ? GUID_ContainerFormatTiff : GUID_ContainerFormatPng, nullptr, &encoder);
       }
       if (SUCCEEDED(hr)) {
         hr = encoder->Initialize(stream.p, WICBitmapEncoderNoCache);
@@ -215,20 +283,27 @@ namespace faf::editor
       if (SUCCEEDED(hr)) {
         hr = frame->SetSize(static_cast<UINT>(image.width), static_cast<UINT>(image.height));
       }
-      WICPixelFormatGUID format = GUID_WICPixelFormat16bppGray;
+      const WICPixelFormatGUID wanted = eightBit ? GUID_WICPixelFormat8bppGray : GUID_WICPixelFormat16bppGray;
+      WICPixelFormatGUID format = wanted;
       if (SUCCEEDED(hr)) {
         hr = frame->SetPixelFormat(&format);
       }
-      if (SUCCEEDED(hr) && format != GUID_WICPixelFormat16bppGray) {
+      if (SUCCEEDED(hr) && format != wanted) {
         hr = E_FAIL;
       }
       if (SUCCEEDED(hr)) {
-        hr = frame->WritePixels(
-          static_cast<UINT>(image.height),
-          static_cast<UINT>(image.width) * 2,
-          static_cast<UINT>(image.words.size() * 2),
-          reinterpret_cast<BYTE*>(const_cast<std::uint16_t*>(image.words.data()))
-        );
+        hr = eightBit ? frame->WritePixels(
+                          static_cast<UINT>(image.height),
+                          static_cast<UINT>(image.width),
+                          static_cast<UINT>(bytes.size()),
+                          reinterpret_cast<BYTE*>(bytes.data())
+                        )
+                      : frame->WritePixels(
+                          static_cast<UINT>(image.height),
+                          static_cast<UINT>(image.width) * 2,
+                          static_cast<UINT>(image.words.size() * 2),
+                          reinterpret_cast<BYTE*>(const_cast<std::uint16_t*>(image.words.data()))
+                        );
       }
       if (SUCCEEDED(hr)) {
         hr = frame->Commit();
@@ -244,6 +319,73 @@ namespace faf::editor
     }
   } // namespace
 
+  bool WriteColourPng(
+    const std::filesystem::path& file,
+    const int width,
+    const int height,
+    const std::vector<std::uint32_t>& bgra,
+    std::string& error
+  )
+  {
+    if (width <= 0 || height <= 0 || bgra.size() != static_cast<std::size_t>(width) * height) {
+      error = "no picture to write";
+      return false;
+    }
+    const ComScope com;
+    ComPtr<IWICImagingFactory> factory;
+    HRESULT hr = ::CoCreateInstance(CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&factory.p));
+    ComPtr<IWICStream> stream;
+    if (SUCCEEDED(hr)) {
+      hr = factory->CreateStream(&stream);
+    }
+    if (SUCCEEDED(hr)) {
+      hr = stream->InitializeFromFilename(file.wstring().c_str(), GENERIC_WRITE);
+    }
+    ComPtr<IWICBitmapEncoder> encoder;
+    if (SUCCEEDED(hr)) {
+      hr = factory->CreateEncoder(GUID_ContainerFormatPng, nullptr, &encoder);
+    }
+    if (SUCCEEDED(hr)) {
+      hr = encoder->Initialize(stream.p, WICBitmapEncoderNoCache);
+    }
+    ComPtr<IWICBitmapFrameEncode> frame;
+    if (SUCCEEDED(hr)) {
+      hr = encoder->CreateNewFrame(&frame, nullptr);
+    }
+    if (SUCCEEDED(hr)) {
+      hr = frame->Initialize(nullptr);
+    }
+    if (SUCCEEDED(hr)) {
+      hr = frame->SetSize(static_cast<UINT>(width), static_cast<UINT>(height));
+    }
+    WICPixelFormatGUID format = GUID_WICPixelFormat32bppBGRA;
+    if (SUCCEEDED(hr)) {
+      hr = frame->SetPixelFormat(&format);
+    }
+    if (SUCCEEDED(hr) && format != GUID_WICPixelFormat32bppBGRA) {
+      hr = E_FAIL;
+    }
+    if (SUCCEEDED(hr)) {
+      hr = frame->WritePixels(
+        static_cast<UINT>(height),
+        static_cast<UINT>(width) * 4,
+        static_cast<UINT>(bgra.size() * 4),
+        reinterpret_cast<BYTE*>(const_cast<std::uint32_t*>(bgra.data()))
+      );
+    }
+    if (SUCCEEDED(hr)) {
+      hr = frame->Commit();
+    }
+    if (SUCCEEDED(hr)) {
+      hr = encoder->Commit();
+    }
+    if (FAILED(hr)) {
+      error = "can't write " + file.string() + " (" + HResultText(hr) + ")";
+      return false;
+    }
+    return true;
+  }
+
   bool ReadHeightImage(
     const std::filesystem::path& file,
     const int expectWidth,
@@ -253,13 +395,17 @@ namespace faf::editor
   )
   {
     out = {};
+    if (Lower(file.extension().string()) == ".r32") {
+      return ReadFloats(file, expectWidth, expectHeight, out, error);
+    }
     return IsRaw(file) ? ReadRaw(file, expectWidth, expectHeight, out, error) : ReadImage(file, out, error);
   }
 
   bool WriteHeightImage(
     const std::filesystem::path& file,
     const HeightImage& image,
-    std::string& error
+    std::string& error,
+    const bool eightBit
   )
   {
     if (
@@ -283,17 +429,48 @@ namespace faf::editor
       }
       return true;
     }
-    if (Lower(file.extension().string()) != ".png") {
-      error = "heights are written as .png, .raw or .r16";
+    const std::string extension = Lower(file.extension().string());
+    if (extension == ".r32") {
+      std::vector<float> floats(image.words.size());
+      for (std::size_t i = 0; i < image.words.size(); ++i) {
+        floats[i] = static_cast<float>(image.words[i]) / 65535.0f;
+      }
+      std::ofstream out(file, std::ios::binary);
+      out.write(reinterpret_cast<const char*>(floats.data()), static_cast<std::streamsize>(floats.size() * 4));
+      if (!out) {
+        error = "can't write " + file.string();
+        return false;
+      }
+      return true;
+    }
+    if (extension != ".png" && extension != ".tif" && extension != ".tiff") {
+      error = "heights are written as .png, .tif, .raw, .r16 or .r32";
       return false;
     }
-    return WritePng(file, image, error);
+    return WritePng(file, image, error, eightBit);
+  }
+
+  const char* ResampleFilterName(
+    const ResampleFilter filter
+  ) noexcept
+  {
+    switch (filter) {
+    case ResampleFilter::Nearest:
+      return "Nearest";
+    case ResampleFilter::Bicubic:
+      return "Bicubic";
+    case ResampleFilter::Lanczos3:
+      return "Lanczos 3";
+    default:
+      return "Bilinear";
+    }
   }
 
   HeightImage ResampleHeights(
     const HeightImage& image,
     const int width,
-    const int height
+    const int height,
+    const ResampleFilter filter
   )
   {
     if (image.width == width && image.height == height) {
@@ -310,6 +487,68 @@ namespace faf::editor
         image.words[static_cast<std::size_t>(z) * static_cast<std::size_t>(image.width) + static_cast<std::size_t>(x)]
       );
     };
+    if (filter != ResampleFilter::Bilinear) {
+      // Separable kernels over the source samples (clamped at the edges); shrinking widens the kernel by the step so
+      // it low-passes instead of skipping samples (FAF Studio's resampler does the same).
+      const int taps = filter == ResampleFilter::Nearest ? 0 : filter == ResampleFilter::Bicubic ? 2 : 3;
+      const auto kernel = [filter](const double t) {
+        const double a = std::fabs(t);
+        if (filter == ResampleFilter::Bicubic) {
+          constexpr double b = -0.5; // Catmull-Rom
+          return a <= 1.0 ? (b + 2.0) * a * a * a - (b + 3.0) * a * a + 1.0
+            : a < 2.0     ? b * a * a * a - 5.0 * b * a * a + 8.0 * b * a - 4.0 * b
+                          : 0.0;
+        }
+        if (a < 1.0e-9) {
+          return 1.0;
+        }
+        if (a >= 3.0) {
+          return 0.0;
+        }
+        constexpr double pi = 3.14159265358979323846;
+        return 3.0 * std::sin(pi * a) * std::sin(pi * a / 3.0) / (pi * pi * a * a);
+      };
+      const double scaleX = std::max(1.0, stepX);
+      const double scaleZ = std::max(1.0, stepZ);
+      for (int z = 0; z < height; ++z) {
+        const double pz = z * stepZ;
+        for (int x = 0; x < width; ++x) {
+          const double px = x * stepX;
+          double value = 0.0;
+          if (taps == 0) {
+            value = at(
+              std::clamp(static_cast<int>(std::lround(px)), 0, image.width - 1),
+              std::clamp(static_cast<int>(std::lround(pz)), 0, image.height - 1)
+            );
+          } else {
+            double sum = 0.0;
+            double total = 0.0;
+            const int reachX = static_cast<int>(std::ceil(taps * scaleX));
+            const int reachZ = static_cast<int>(std::ceil(taps * scaleZ));
+            const int bx = static_cast<int>(std::floor(px));
+            const int bz = static_cast<int>(std::floor(pz));
+            for (int sz = bz - reachZ + 1; sz <= bz + reachZ; ++sz) {
+              const double wz = kernel((pz - sz) / scaleZ);
+              if (wz == 0.0) {
+                continue;
+              }
+              for (int sx = bx - reachX + 1; sx <= bx + reachX; ++sx) {
+                const double weight = wz * kernel((px - sx) / scaleX);
+                if (weight == 0.0) {
+                  continue;
+                }
+                sum += weight * at(std::clamp(sx, 0, image.width - 1), std::clamp(sz, 0, image.height - 1));
+                total += weight;
+              }
+            }
+            value = total != 0.0 ? sum / total : 0.0;
+          }
+          out.words[static_cast<std::size_t>(z) * static_cast<std::size_t>(width) + static_cast<std::size_t>(x)] =
+            static_cast<std::uint16_t>(std::lround(std::clamp(value, 0.0, 65535.0)));
+        }
+      }
+      return out;
+    }
     for (int z = 0; z < height; ++z) {
       const double pz = z * stepZ;
       const int z0 = std::min(image.height - 1, static_cast<int>(pz));

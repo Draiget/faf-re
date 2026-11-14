@@ -194,24 +194,6 @@ namespace
   }
 
   /**
-   * Address: 0x00648920 (FUN_00648920)
-   *
-   * What it does:
-   * Upcasts one reflected reference lane to `moho::CSlideManipulator*`.
-   */
-  [[maybe_unused]] [[nodiscard]] void* TryUpcastCSlideManipulatorRefObject(
-    gpg::RRef* const sourceRef
-  )
-  {
-    if (!sourceRef) {
-      return nullptr;
-    }
-
-    const gpg::RRef upcast = gpg::REF_UpcastPtr(*sourceRef, CachedCSlideManipulatorType());
-    return upcast.mObj;
-  }
-
-  /**
    * Address: 0x006487E0 (FUN_006487E0, func_GetCSlideManipulatorOpt)
    *
    * What it does:

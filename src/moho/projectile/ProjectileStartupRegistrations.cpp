@@ -35,14 +35,16 @@ namespace gpg
 {
   void LoadAndBroadcastManyToOneListenerEProjectileImpactEvent(
     gpg::ReadArchive* archive,
-    moho::ManyToOneBroadcaster<moho::EProjectileImpactEvent>* broadcaster,
+    void* objectPtr,
     int version,
     gpg::RRef* ownerRef
   );
 
   void SaveUnownedRawPointerFromManyToOneListener_EProjectileImpactEventIntrusiveHeadLane1(
     gpg::WriteArchive* archive,
-    std::uint32_t* intrusiveListHeadSlot
+    void* objectPtr,
+    int version,
+    gpg::RRef* ownerRef
   );
 } // namespace gpg
 
@@ -128,7 +130,7 @@ namespace
    * Clears and reassigns one destination string from projectile
    * `mDamageTypeName`.
    */
-  [[maybe_unused]] fa::string* CopyProjectileDamageTypeName(
+  fa::string* CopyProjectileDamageTypeName(
     const moho::Projectile* const projectile,
     fa::string* const outName
   )
@@ -157,7 +159,7 @@ namespace
    * What it does:
    * Writes projectile collide-entity enable lane.
    */
-  [[maybe_unused]] moho::Projectile* SetProjectileCollideEntity(
+  moho::Projectile* SetProjectileCollideEntity(
     moho::Projectile* const projectile,
     const bool enabled
   ) noexcept
@@ -172,7 +174,7 @@ namespace
    * What it does:
    * Writes projectile collide-surface enable lane.
    */
-  [[maybe_unused]] moho::Projectile* SetProjectileCollideSurface(
+  moho::Projectile* SetProjectileCollideSurface(
     moho::Projectile* const projectile,
     const bool enabled
   ) noexcept
@@ -187,7 +189,7 @@ namespace
    * What it does:
    * Writes projectile target-tracking enable lane.
    */
-  [[maybe_unused]] moho::Projectile* SetProjectileTrackTarget(
+  moho::Projectile* SetProjectileTrackTarget(
     moho::Projectile* const projectile,
     const bool enabled
   ) noexcept
@@ -202,7 +204,7 @@ namespace
    * What it does:
    * Writes projectile stay-underwater lane.
    */
-  [[maybe_unused]] moho::Projectile* SetProjectileStayUnderwater(
+  moho::Projectile* SetProjectileStayUnderwater(
     moho::Projectile* const projectile,
     const bool enabled
   ) noexcept
@@ -217,7 +219,7 @@ namespace
    * What it does:
    * Writes projectile stay-upright enable lane.
    */
-  [[maybe_unused]] moho::Projectile* SetProjectileStayUpright(
+  moho::Projectile* SetProjectileStayUpright(
     moho::Projectile* const projectile,
     const bool enabled
   ) noexcept
@@ -232,7 +234,7 @@ namespace
    * What it does:
    * Writes projectile velocity-alignment enable lane.
    */
-  [[maybe_unused]] moho::Projectile* SetProjectileVelocityAlign(
+  moho::Projectile* SetProjectileVelocityAlign(
     moho::Projectile* const projectile,
     const bool enabled
   ) noexcept
@@ -247,7 +249,7 @@ namespace
    * What it does:
    * Writes projectile destroy-on-water lane.
    */
-  [[maybe_unused]] moho::Projectile* SetProjectileDestroyOnWater(
+  moho::Projectile* SetProjectileDestroyOnWater(
     moho::Projectile* const projectile,
     const bool enabled
   ) noexcept
@@ -352,12 +354,8 @@ namespace
       );
       size_ = sizeof(moho::ManyToOneBroadcaster_EProjectileImpactEvent);
       version_ = 1;
-      serLoadFunc_ = reinterpret_cast<gpg::RType::load_func_t>(
-        reinterpret_cast<void (*)()>(&gpg::LoadAndBroadcastManyToOneListenerEProjectileImpactEvent)
-      );
-      serSaveFunc_ = reinterpret_cast<gpg::RType::save_func_t>(reinterpret_cast<void (*)()>(
-        &gpg::SaveUnownedRawPointerFromManyToOneListener_EProjectileImpactEventIntrusiveHeadLane1
-      ));
+      serLoadFunc_ = &gpg::LoadAndBroadcastManyToOneListenerEProjectileImpactEvent;
+      serSaveFunc_ = &gpg::SaveUnownedRawPointerFromManyToOneListener_EProjectileImpactEventIntrusiveHeadLane1;
     }
   };
 
@@ -2917,7 +2915,7 @@ namespace moho
    * `CProjectileAttributesTypeInfo` instance while preserving outer storage
    * ownership.
    */
-  [[maybe_unused]] void DestroyCProjectileAttributesTypeInfoBody(
+  void DestroyCProjectileAttributesTypeInfoBody(
     CProjectileAttributesTypeInfo* const typeInfo
   ) noexcept
   {
@@ -3083,11 +3081,12 @@ namespace gpg
    */
   void LoadAndBroadcastManyToOneListenerEProjectileImpactEvent(
     ReadArchive* const archive,
-    moho::ManyToOneBroadcaster<moho::EProjectileImpactEvent>* const broadcaster,
+    void* objectPtr,
     const int version,
     RRef* const ownerRef
   )
   {
+    auto* const broadcaster = static_cast<moho::ManyToOneBroadcaster<moho::EProjectileImpactEvent>*>(objectPtr);
     (void)version;
 
     moho::ManyToOneListener<moho::EProjectileImpactEvent>* listener = nullptr;

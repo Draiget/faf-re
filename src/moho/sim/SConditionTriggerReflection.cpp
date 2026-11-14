@@ -160,7 +160,7 @@ namespace
     )
     {
       // Address: 0x007110F0 (FUN_007110F0)
-      auto* const object = reinterpret_cast<moho::STrigger*>(objectPtr);
+      auto* const object = static_cast<moho::STrigger*>(objectPtr);
       if (object) {
         new (object) moho::STrigger();
       }
@@ -172,7 +172,7 @@ namespace
     )
     {
       // Address: 0x007110D0 (FUN_007110D0)
-      auto* const object = reinterpret_cast<moho::STrigger*>(objectPtr);
+      auto* const object = static_cast<moho::STrigger*>(objectPtr);
       delete object;
     }
 
@@ -181,7 +181,7 @@ namespace
     )
     {
       // Address: 0x00711190 (FUN_00711190)
-      auto* const object = reinterpret_cast<moho::STrigger*>(objectPtr);
+      auto* const object = static_cast<moho::STrigger*>(objectPtr);
       if (object) {
         object->~STrigger();
       }
@@ -297,12 +297,12 @@ namespace
      */
     static void Deserialize(
       gpg::ReadArchive* archive,
-      const std::intptr_t objectPtr,
+      void* const objectPtr,
       const int,
       gpg::RRef* const ownerRef
     )
     {
-      auto& vec = *reinterpret_cast<gpg::fastvector_n<moho::SCondition, 2>*>(objectPtr);
+      auto& vec = *static_cast<gpg::fastvector_n<moho::SCondition, 2>*>(objectPtr);
       unsigned int count = 0;
       archive->ReadUInt(&count);
 
@@ -324,12 +324,12 @@ namespace
      */
     static void Serialize(
       gpg::WriteArchive* archive,
-      const std::intptr_t objectPtr,
+      void* const objectPtr,
       const int,
       gpg::RRef* const ownerRef
     )
     {
-      auto& vec = *reinterpret_cast<gpg::fastvector_n<moho::SCondition, 2>*>(objectPtr);
+      auto& vec = *static_cast<gpg::fastvector_n<moho::SCondition, 2>*>(objectPtr);
       const unsigned int count = static_cast<unsigned int>(vec.size());
       archive->WriteUInt(count);
 
@@ -421,7 +421,7 @@ namespace
    */
   void DeserializeUnitBlueprintWeightMap(
     gpg::ReadArchive* const archive,
-    const std::intptr_t objectPtr,
+    void* const objectPtr,
     const int,
     gpg::RRef* const ownerRef
   )
@@ -430,7 +430,7 @@ namespace
       return;
     }
 
-    auto* const destination = reinterpret_cast<UnitBlueprintWeightMap*>(objectPtr);
+    auto* const destination = static_cast<UnitBlueprintWeightMap*>(objectPtr);
     unsigned int count = 0u;
     archive->ReadUInt(&count);
     destination->clear();
@@ -454,7 +454,7 @@ namespace
    */
   void SerializeUnitBlueprintWeightMap(
     gpg::WriteArchive* const archive,
-    const std::intptr_t objectPtr,
+    void* const objectPtr,
     const int,
     gpg::RRef* const ownerRef
   )
@@ -463,7 +463,7 @@ namespace
       return;
     }
 
-    const auto* const source = reinterpret_cast<const UnitBlueprintWeightMap*>(objectPtr);
+    const auto* const source = static_cast<const UnitBlueprintWeightMap*>(objectPtr);
     const unsigned int count = source != nullptr ? static_cast<unsigned int>(source->size()) : 0u;
     archive->WriteUInt(count);
     if (source == nullptr) {
@@ -494,7 +494,7 @@ namespace
    */
   void DeserializeStringArmyStatItemMap(
     gpg::ReadArchive* const archive,
-    const std::intptr_t objectPtr,
+    void* const objectPtr,
     const int,
     gpg::RRef* const ownerRef
   )
@@ -503,7 +503,7 @@ namespace
       return;
     }
 
-    auto* const destination = reinterpret_cast<StringToArmyStatItemMap*>(objectPtr);
+    auto* const destination = static_cast<StringToArmyStatItemMap*>(objectPtr);
     unsigned int count = 0u;
     archive->ReadUInt(&count);
     destination->clear();
@@ -527,7 +527,7 @@ namespace
    */
   void SerializeStringArmyStatItemMap(
     gpg::WriteArchive* const archive,
-    const std::intptr_t objectPtr,
+    void* const objectPtr,
     const int,
     gpg::RRef* const ownerRef
   )
@@ -536,7 +536,7 @@ namespace
       return;
     }
 
-    const auto* const source = reinterpret_cast<const StringToArmyStatItemMap*>(objectPtr);
+    const auto* const source = static_cast<const StringToArmyStatItemMap*>(objectPtr);
     const unsigned int count = source != nullptr ? static_cast<unsigned int>(source->size()) : 0u;
     archive->WriteUInt(count);
     if (source == nullptr) {
@@ -562,10 +562,12 @@ namespace
    */
   void DeserializeStatsCArmyStatItemOwnedRootLane(
     gpg::ReadArchive* const archive,
-    const std::intptr_t ownerToken
+    void* const objectPtr,
+    int,
+    gpg::RRef*
   )
   {
-    auto* const stats = reinterpret_cast<moho::Stats<moho::CArmyStatItem>*>(ownerToken);
+    auto* const stats = static_cast<moho::Stats<moho::CArmyStatItem>*>(objectPtr);
     if (archive == nullptr || stats == nullptr) {
       return;
     }
@@ -590,12 +592,12 @@ namespace
    */
   void SerializeStatsCArmyStatItemOwnedRoot(
     gpg::WriteArchive* const archive,
-    const std::intptr_t objectPtr,
+    void* const objectPtr,
     const int,
     gpg::RRef* const
   )
   {
-    auto* const stats = reinterpret_cast<moho::Stats<moho::CArmyStatItem>*>(objectPtr);
+    auto* const stats = static_cast<moho::Stats<moho::CArmyStatItem>*>(objectPtr);
     fa::mutex::scoped_lock lock(stats->mLock);
     archive->WritePointer(stats->mItem.get(), gpg::TrackedPointerState::Owned, gpg::RRef{});
   }
@@ -608,7 +610,7 @@ namespace
    * publishes it as an unowned serializer construct result.
    */
   void ConstructStatsCArmyStatItemForSerializer(
-    const int,
+    gpg::ReadArchive* const,
     const int,
     gpg::RRef* const,
     gpg::SerConstructResult* const constructResult
@@ -736,13 +738,9 @@ namespace
     {
       size_ = sizeof(moho::Stats<moho::CArmyStatItem>);
       version_ = 1;
-      serLoadFunc_ = reinterpret_cast<gpg::RType::load_func_t>(
-        reinterpret_cast<void (*)()>(&DeserializeStatsCArmyStatItemOwnedRootLane)
-      );
+      serLoadFunc_ = &DeserializeStatsCArmyStatItemOwnedRootLane;
       serSaveFunc_ = &SerializeStatsCArmyStatItemOwnedRoot;
-      serConstructFunc_ = reinterpret_cast<gpg::RType::construct_func_t>(
-        reinterpret_cast<void (*)()>(&ConstructStatsCArmyStatItemForSerializer)
-      );
+      serConstructFunc_ = &ConstructStatsCArmyStatItemForSerializer;
       deleteFunc_ = &DeleteStatsCArmyStatItemOwnedObject;
     }
   };

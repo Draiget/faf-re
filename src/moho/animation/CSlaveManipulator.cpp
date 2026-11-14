@@ -70,24 +70,6 @@ namespace
     return out;
   }
 
-  /**
-   * Address: 0x00646A50 (FUN_00646A50)
-   *
-   * What it does:
-   * Upcasts one reflected reference lane to `moho::CSlaveManipulator*`.
-   */
-  [[maybe_unused]] [[nodiscard]] void* TryUpcastCSlaveManipulatorRefObject(
-    gpg::RRef* const sourceRef
-  )
-  {
-    if (!sourceRef) {
-      return nullptr;
-    }
-
-    const gpg::RRef upcast = gpg::REF_UpcastPtr(*sourceRef, gpg::RTypeOf<moho::CSlaveManipulator>());
-    return upcast.mObj;
-  }
-
   // Address: 0x00BD31F0 (dynamic initializer for the global
   // `CSlaveManipulatorSerializer` singleton, __xc_a-reachable) -- MSVC's own
   // compiler-generated dynamic initializer for this global runs the real

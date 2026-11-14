@@ -2,6 +2,8 @@
 // editor (it shares its preview and opens effects in it).
 
 #include "editor/ui/EdParticleEditor.h"
+#include "editor/ui/EdControls.h"
+#include "editor/ui/EdWorkspaces.h"
 #include "editor/ui/EdUiScale.h"
 
 #include "editor/doc/EdMapFile.h"
@@ -122,7 +124,7 @@ namespace faf::editor
       ImVec2(0.5f, 0.5f)
     );
     ImGui::SetNextWindowCollapsed(false, ImGuiCond_Always);
-    if (!ImGui::Begin("Particle Browser", &open, ImGuiWindowFlags_NoCollapse)) {
+    if (!ImGui::Begin(Panel("Particle Browser"), &open, ImGuiWindowFlags_NoCollapse)) {
       ImGui::End();
       return;
     }
@@ -158,14 +160,14 @@ namespace faf::editor
         if (ImGui::Button("Edit in the Particle Editor", ImVec2(-1.0f, 0.0f))) {
           mOpenEditorAsk = true; // the editor opens and this browser closes (EdShell)
         }
-        ImGui::SetItemTooltip(
+        EdSetItemTooltip(
           "Opens it in the Particle Editor to change (this browser closes); Save there writes a copy into the map's "
           "folder"
         );
         if (ImGui::Button("Place on the map", ImVec2(-1.0f, 0.0f))) {
           mPlaceAsk = mBrowserPick;
         }
-        ImGui::SetItemTooltip(
+        EdSetItemTooltip(
           "An effect decoration at the middle of the map's view (an Effect marker: move it with the Markers tool; "
           "the map's script plays it in the game)"
         );
@@ -178,14 +180,14 @@ namespace faf::editor
       // The grid: filters, then a tile per effect.
       ImGui::TableSetColumnIndex(1);
       ImGui::SetNextItemWidth(Em(130.0f));
-      (void)ImGui::Combo("##faction", &mBrowseFaction, kEffectFactions, static_cast<int>(std::size(kEffectFactions)));
+      (void)EdCombo("##faction", &mBrowseFaction, kEffectFactions, static_cast<int>(std::size(kEffectFactions)));
       ImGui::SameLine();
       ImGui::SetNextItemWidth(Em(130.0f));
-      (void)ImGui::Combo("##kind", &mBrowseKind, kEffectKinds, static_cast<int>(std::size(kEffectKinds)));
+      (void)EdCombo("##kind", &mBrowseKind, kEffectKinds, static_cast<int>(std::size(kEffectKinds)));
       ImGui::SameLine();
       ImGui::SetNextItemWidth(Em(110.0f));
-      (void)ImGui::Combo("##type", &mBrowseType, kTypes, 4);
-      ImGui::SetItemTooltip("Types are read from the files as their tiles show");
+      (void)EdCombo("##type", &mBrowseType, kTypes, 4);
+      EdSetItemTooltip("Types are read from the files as their tiles show");
       ImGui::SameLine();
       ImGui::SetNextItemWidth(-1.0f);
       ImGui::InputTextWithHint("##search", "Search names", mGridFilter, sizeof(mGridFilter));
@@ -272,7 +274,7 @@ namespace faf::editor
               ImGui::PopTextWrapPos();
               ImGui::EndGroup();
               if (hovered) {
-                ImGui::SetTooltip(
+                EdSetTooltip(
                   "%s\n%s, %s, %s\nClick to play it in the preview",
                   info.path.c_str(),
                   kEffectFactions[info.faction],

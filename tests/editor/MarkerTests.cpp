@@ -2,6 +2,7 @@
 // carries its type's properties in the saves' order, and positions, colours and path links read back.
 
 #include "editor/tools/EdMarkers.h"
+#include "editor/tools/EdPickFilter.h"
 
 #include <algorithm>
 
@@ -112,6 +113,25 @@ namespace
 
   TEST(
     Markers,
+    PickFilterSeparatesPathNodesFromOtherMarkers
+  )
+  {
+    using faf::editor::MarkerGroup;
+    faf::editor::PickFilter filter;
+    EXPECT_TRUE(filter.All()) << "everything pickable at first";
+    filter.markers = false;
+    EXPECT_FALSE(filter.Marker(MarkerGroup::Resources));
+    EXPECT_FALSE(filter.Marker(MarkerGroup::Starts));
+    EXPECT_TRUE(filter.Marker(MarkerGroup::PathNodes)) << "path nodes are their own kind";
+    filter.markers = true;
+    filter.pathNodes = false;
+    EXPECT_FALSE(filter.Marker(MarkerGroup::PathNodes));
+    EXPECT_TRUE(filter.Marker(MarkerGroup::Ai));
+    EXPECT_FALSE(filter.All());
+  }
+
+  TEST(
+    Markers,
     NearestOfATypeWithinReach
   )
   {
@@ -198,4 +218,70 @@ namespace
     EXPECT_EQ(other.kind, MarkerValue::Kind::Raw);
     EXPECT_EQ(faf::editor::WriteMarkerValue(other), "{ 'a', 'b' }");
   }
+
+  TEST(
+    Markers,
+    GameTemplatesAddTypesAndATypeChanges
+  )
+  {
+    const std::string lua = "MarkerTemplates = {\n"
+                            "    ['Mass'] = {\n        resource = true,\n        amount = 100,\n    },\n"
+                            "    ['Mod Beacon'] = {\n        hint = true,\n        scale = 1.5,\n"
+                            "\t\tprop = \"/env/common/props/markers/M_Expansion_prop.bp\",\n"
+                            "\t\tcolor = \"ff123456\",\n        offset = VECTOR3(0,1,0),\n    },\n}\n";
+    EXPECT_EQ(faf::editor::AddMarkerTemplates(lua), 1) << "Mass is built in already";
+    const faf::editor::MarkerType* const beacon = faf::editor::FindMarkerType("Mod Beacon");
+    ASSERT_NE(beacon, nullptr);
+    EXPECT_STREQ(beacon->group, "Game");
+    EXPECT_STREQ(beacon->color, "ff123456");
+    EXPECT_STREQ(beacon->prop, "M_Expansion_prop.bp");
+    ASSERT_EQ(beacon->extra.size(), 3U);
+    EXPECT_EQ(beacon->extra[0].second, "BOOLEAN( true )");
+    EXPECT_EQ(beacon->extra[1].second, "FLOAT( 1.500000 )");
+    EXPECT_EQ(beacon->extra[2].first, "offset");
+    EXPECT_EQ(faf::editor::AddMarkerTemplates(lua), 0) << "once";
+    // A mass point turned into the beacon: Mass's own properties go, the beacon's come, the place stays.
+    const faf::editor::MarkerType* const mass = faf::editor::FindMarkerType("Mass");
+    ASSERT_NE(mass, nullptr);
+    const faf::editor::SaveEntry point = faf::editor::NewMarker(*mass, "Mass 07", 10.0f, 20.0f, 30.0f);
+    const faf::editor::SaveEntry changed = faf::editor::WithMarkerType(point, *beacon);
+    EXPECT_EQ(changed.name, "Mass 07");
+    EXPECT_EQ(faf::editor::MarkerTypeOf(changed), "Mod Beacon");
+    EXPECT_TRUE(changed.Get("amount").empty());
+    EXPECT_EQ(changed.Get("hint"), "BOOLEAN( true )");
+    float x = 0, y = 0, z = 0;
+    ASSERT_TRUE(faf::editor::MarkerPosition(changed, x, y, z));
+    EXPECT_FLOAT_EQ(z, 30.0f);
+  }
+  TEST(
+    Markers,
+    StrayMarkersArePulledOntoTheMap
+  )
+  {
+    const faf::editor::MarkerType* const mass = faf::editor::FindMarkerType("Mass");
+    ASSERT_NE(mass, nullptr);
+    std::vector<SaveEntry> markers = {
+      faf::editor::NewMarker(*mass, "Mass 00", 100.0f, 5.0f, 100.0f), // inside: stays
+      faf::editor::NewMarker(*mass, "Mass 01", -20.0f, 5.0f, 300.0f), // off the left edge
+      faf::editor::NewMarker(*mass, "Mass 02", 600.0f, 5.0f, 700.0f), // off a corner
+      faf::editor::NewMarker(*mass, "Mass 03", 256.0f, 5.0f, 512.0f), // on the edge: inside
+    };
+    const auto moved = faf::editor::PullMarkersInside(markers, 0.0f, 0.0f, 512.0f, 512.0f, 2.0f, [](float x, float z) {
+      return x * 0.01f + z * 0.001f;
+    });
+    ASSERT_EQ(moved.size(), 2u);
+    EXPECT_EQ(moved[0], "Mass 01");
+    EXPECT_EQ(moved[1], "Mass 02");
+    float x = 0.0f, y = 0.0f, z = 0.0f;
+    ASSERT_TRUE(faf::editor::MarkerPosition(markers[1], x, y, z));
+    EXPECT_FLOAT_EQ(x, 2.0f);
+    EXPECT_FLOAT_EQ(z, 300.0f);
+    EXPECT_NEAR(y, 0.02f + 0.3f, 1e-4f);
+    ASSERT_TRUE(faf::editor::MarkerPosition(markers[2], x, y, z));
+    EXPECT_FLOAT_EQ(x, 510.0f);
+    EXPECT_FLOAT_EQ(z, 510.0f);
+    ASSERT_TRUE(faf::editor::MarkerPosition(markers[0], x, y, z));
+    EXPECT_FLOAT_EQ(y, 5.0f);
+  }
+
 } // namespace

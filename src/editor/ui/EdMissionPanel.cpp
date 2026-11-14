@@ -1,0 +1,1740 @@
+#include "editor/ui/EdMissionPanel.h"
+
+#include "editor/tools/EdBuilders.h"
+#include "gpg/core/utils/Logging.h"
+
+#include "editor/doc/EdDocument.h"
+#include "editor/doc/EdUnits.h"
+#include "editor/tools/EdMarkers.h"
+#include "editor/ui/EdControls.h"
+#include "editor/ui/EdIconFont.h"
+#include "editor/ui/EdUiScale.h"
+#include "editor/ui/EdWorkspaces.h"
+#include "moho/console/CConCommand.h"
+#include "imgui.h"
+
+#include <algorithm>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <filesystem>
+#include <fstream>
+#include <iterator>
+
+namespace faf::editor
+{
+  namespace
+  {
+    /** The unit types of a group of the tree (nested groups included), with how many of each. */
+    bool CountGroup(
+      const UnitGroup& group,
+      const std::string& name,
+      std::map<std::string, int>& counts,
+      const bool inside = false
+    )
+    {
+      const bool here = inside || group.name == name;
+      if (here) {
+        for (const SaveUnit& u : group.units) {
+          ++counts[u.type];
+        }
+      }
+      bool found = here;
+      for (const UnitGroup& g : group.groups) {
+        found = CountGroup(g, name, counts, here) || found;
+      }
+      return found;
+    }
+
+    void CollectGroups(
+      const UnitGroup& group,
+      std::vector<std::string>& out
+    )
+    {
+      for (const UnitGroup& g : group.groups) {
+        out.push_back(g.name);
+        CollectGroups(g, out);
+      }
+    }
+
+    /** An InputText over a std::string. */
+    bool TextField(
+      const char* id,
+      std::string& value,
+      const bool multiline = false
+    )
+    {
+      char buffer[2048];
+      std::snprintf(buffer, sizeof(buffer), "%s", value.c_str());
+      const bool changed = multiline
+        ? ImGui::InputTextMultiline(id, buffer, sizeof(buffer), ImVec2(-1.0f, ImGui::GetTextLineHeight() * 6.0f))
+        : ImGui::InputText(id, buffer, sizeof(buffer));
+      if (changed) {
+        value = buffer;
+      }
+      return changed;
+    }
+
+    const char* const kSections[] = {"When it starts", "Then"};
+
+    /** A combo over names; true when one was picked. */
+    bool NameCombo(
+      const char* id,
+      std::string& value,
+      const std::vector<std::string>& names
+    )
+    {
+      bool picked = false;
+      if (EdBeginCombo(id, value.empty() ? "(choose)" : value.c_str())) {
+        for (const std::string& name : names) {
+          if (ImGui::Selectable(name.c_str(), name == value)) {
+            value = name;
+            picked = true;
+          }
+        }
+        ImGui::EndCombo();
+      }
+      return picked;
+    }
+
+    /** Checkboxes for a set of names (in rows of three); true when one changed. */
+    bool NameSet(
+      const char* id,
+      std::vector<std::string>& set,
+      const std::vector<std::string>& names
+    )
+    {
+      bool changed = false;
+      ImGui::PushID(id);
+      const float column = ImGui::GetContentRegionAvail().x / 3.0f;
+      for (std::size_t i = 0; i < names.size(); ++i) {
+        if (i % 3 != 0) {
+          ImGui::SameLine(column * static_cast<float>(i % 3));
+        }
+        const auto at = std::find(set.begin(), set.end(), names[i]);
+        bool on = at != set.end();
+        if (ImGui::Checkbox(names[i].c_str(), &on)) {
+          if (on) {
+            set.push_back(names[i]);
+          } else {
+            set.erase(at);
+          }
+          changed = true;
+        }
+      }
+      ImGui::PopID();
+      return changed;
+    }
+  } // namespace
+
+  MissionFacts MissionFactsOf(
+    const EdDocument& document
+  )
+  {
+    MissionFacts facts;
+    facts.armies = document.Armies();
+    for (const std::string& extra : document.ExtraArmies()) {
+      facts.armies.push_back(extra);
+    }
+    const SaveFile& save = document.SaveData();
+    for (const MarkerChain& chain : save.Chains()) {
+      facts.chains.push_back(chain.name);
+    }
+    for (const SaveEntry& area : save.Areas()) {
+      facts.areas.push_back(area.name);
+    }
+    for (const SaveEntry& marker : save.Markers()) {
+      facts.markers.push_back(marker.name);
+    }
+    for (const SaveEntry& army : save.Armies()) {
+      UnitGroup root;
+      std::string error;
+      if (ParseUnitGroup(army.Get("Units"), root, error)) {
+        CollectGroups(root, facts.groups[army.name]);
+      }
+      facts.builders[army.name] = MissionBuilderNames(army.Get("PlatoonBuilders"));
+    }
+    return facts;
+  }
+
+  EdMissionPanel::EdMissionPanel(
+    EdDocument& document
+  )
+    : mDocument(document)
+  {}
+
+  void EdMissionPanel::Edited(
+    Mission before
+  )
+  {
+    mDocument.MissionEdited(std::move(before));
+  }
+
+  void EdMissionPanel::BeginField()
+  {
+    if (ImGui::IsItemActivated()) {
+      mFieldBefore = mDocument.MissionNow();
+    }
+  }
+
+  void EdMissionPanel::EndField(
+    const bool
+  )
+  {
+    if (ImGui::IsItemDeactivated() && mFieldBefore.has_value()) {
+      if (ImGui::IsItemDeactivatedAfterEdit()) {
+        mDocument.MissionEdited(std::move(*mFieldBefore));
+      }
+      mFieldBefore.reset();
+    }
+  }
+
+  std::vector<MissionNode>* EdMissionPanel::ListOf(
+    Mission& m,
+    const int section,
+    const std::vector<int>& path
+  )
+  {
+    if (mStage < 0 || mStage >= static_cast<int>(m.stages.size()) || path.empty()) {
+      return nullptr;
+    }
+    MissionStage& stage = m.stages[static_cast<std::size_t>(mStage)];
+    std::vector<MissionNode>* list = section == 0 ? &stage.enter : &stage.ready;
+    for (std::size_t k = 0; k + 1 < path.size(); ++k) {
+      if (path[k] < 0 || path[k] >= static_cast<int>(list->size())) {
+        return nullptr;
+      }
+      list = &(*list)[static_cast<std::size_t>(path[k])].children;
+    }
+    return path.back() >= 0 && path.back() < static_cast<int>(list->size()) ? list : nullptr;
+  }
+
+  MissionNode* EdMissionPanel::NodeAt(
+    Mission& m,
+    const int section,
+    const std::vector<int>& path
+  )
+  {
+    std::vector<MissionNode>* list = ListOf(m, section, path);
+    return list != nullptr ? &(*list)[static_cast<std::size_t>(path.back())] : nullptr;
+  }
+
+  void EdMissionPanel::DrawNodes(
+    std::vector<MissionNode>& list,
+    const int section,
+    std::vector<int> path,
+    const int depth
+  )
+  {
+    for (std::size_t i = 0; i < list.size(); ++i) {
+      std::vector<int> here = path;
+      here.push_back(static_cast<int>(i));
+      const MissionNode& node = list[i];
+      const MissionNodeType* t = FindMissionNodeType(node.type);
+      std::string label =
+        std::string(static_cast<std::size_t>(depth) * 2, ' ') + (t != nullptr ? t->title : "Unknown: " + node.type);
+      // A short summary: the first text-like value.
+      if (t != nullptr) {
+        for (const MissionParam& p : t->params) {
+          const auto it = node.p.find(p.key);
+          if (
+            it != node.p.end() && !it->second.empty() && p.kind != "bool" && p.kind != "number" && p.kind != "choice"
+          ) {
+            label += "  (" + it->second.substr(0, 32) + ")";
+            break;
+          }
+        }
+      }
+      ImGui::PushID(static_cast<int>(i));
+      if (ImGui::Selectable(label.c_str(), mSection == section && mPath == here)) {
+        mSection = section;
+        mPath = here;
+      }
+      if (t != nullptr && t->container) {
+        ImGui::PushID("children");
+        DrawNodes(list[i].children, section, here, depth + 1);
+        ImGui::PopID();
+      }
+      ImGui::PopID();
+    }
+  }
+
+  void EdMissionPanel::DrawParams(
+    MissionNode& node,
+    const MissionFacts& facts
+  )
+  {
+    const MissionNodeType* t = FindMissionNodeType(node.type);
+    if (t == nullptr) {
+      ImGui::TextDisabled("Unknown node type %s: it is left out of the script.", node.type.c_str());
+      return;
+    }
+    if (t->params.empty()) {
+      ImGui::TextDisabled("No settings.");
+    }
+    const Mission& m = mDocument.MissionNow();
+    for (const MissionParam& p : t->params) {
+      ImGui::PushID(p.key.c_str());
+      std::string& value = node.p[p.key];
+      RowLabel(p.label.c_str());
+      ImGui::SetNextItemWidth(-1.0f);
+      // A list to choose from (the map's names), or typed text.
+      std::vector<std::string> names;
+      if (p.kind == "army") {
+        names = facts.armies;
+      } else if (p.kind == "chain") {
+        names = facts.chains;
+      } else if (p.kind == "area") {
+        names = facts.areas;
+      } else if (p.kind == "marker") {
+        names = facts.markers;
+      } else if (p.kind == "dialogue") {
+        for (const MissionDialogue& d : m.dialogues) {
+          names.push_back(d.name);
+        }
+      } else if (p.kind == "base") {
+        for (const MissionBase& b : m.bases) {
+          names.push_back(b.name);
+        }
+      } else if (p.kind == "platoon") {
+        for (const MissionPlatoon& t : m.platoons) {
+          names.push_back(t.name);
+        }
+      } else if (p.kind == "orders") {
+        for (const MissionOrderQueue& q : m.orderQueues) {
+          names.push_back(q.name);
+        }
+      } else if (p.kind == "builder") {
+        const auto found = facts.builders.find(node.p["army"]);
+        if (found != facts.builders.end()) {
+          names = found->second;
+        }
+      } else if (p.kind == "group") {
+        const auto found = facts.groups.find(node.p["army"]);
+        if (found != facts.groups.end()) {
+          names = found->second;
+        }
+      } else if (p.kind == "choice") {
+        names = p.choices;
+      }
+      if (p.kind == "bool") {
+        bool on = value == "true";
+        if (ImGui::Checkbox("##v", &on)) {
+          Mission before = mDocument.MissionNow();
+          value = on ? "true" : "false";
+          Edited(std::move(before));
+        }
+      } else if (p.kind == "number") {
+        float x = static_cast<float>(std::atof(value.c_str()));
+        const bool edited =
+          FillDragFloat("##v", &x, 0.25f, static_cast<float>(p.min), static_cast<float>(p.max), "%.1f");
+        BeginField();
+        if (edited) {
+          char buffer[32];
+          std::snprintf(buffer, sizeof(buffer), "%g", static_cast<double>(x));
+          value = buffer;
+        }
+        EndField(edited);
+      } else if (!names.empty() || p.kind == "choice") {
+        if (EdBeginCombo("##v", value.empty() ? "(choose)" : value.c_str())) {
+          if (p.optional && ImGui::Selectable("(none)", value.empty())) {
+            Mission before = mDocument.MissionNow();
+            value.clear();
+            Edited(std::move(before));
+          }
+          for (const std::string& name : names) {
+            if (ImGui::Selectable(name.c_str(), name == value)) {
+              Mission before = mDocument.MissionNow();
+              value = name;
+              Edited(std::move(before));
+            }
+          }
+          ImGui::EndCombo();
+        }
+      } else {
+        const bool edited = TextField("##v", value, node.type == "raw");
+        BeginField();
+        EndField(edited);
+      }
+      ImGui::PopID();
+    }
+  }
+
+  void EdMissionPanel::DrawStagesPanel(
+    bool& open,
+    const bool mapOpen
+  )
+  {
+    if (mFocusStages) {
+      mFocusStages = false;
+      ImGui::SetNextWindowFocus();
+    }
+    if (!ImGui::Begin(Panel("Stages###MissionStages"), &open)) {
+      ImGui::End();
+      return;
+    }
+    if (!mapOpen) {
+      ImGui::TextDisabled("Open a map to give it a mission.");
+      ImGui::End();
+      return;
+    }
+    Mission& m = mDocument.EditMission();
+    const MissionFacts facts = MissionFactsOf(mDocument);
+    // The mode.
+    {
+      static const char* const kModes[] = {"campaign", "coop", "both"};
+      int mode = m.mode == "coop" ? 1 : m.mode == "both" ? 2 : 0;
+      RowLabel("Mode");
+      ImGui::SetNextItemWidth(-1.0f);
+      if (EdCombo("##missionmode", &mode, kModes, 3)) {
+        Mission before = m;
+        m.mode = kModes[mode];
+        Edited(std::move(before));
+      }
+    }
+    DrawImported();
+    // The stages.
+    if (Section("Stages")) {
+      for (std::size_t s = 0; s < m.stages.size(); ++s) {
+        const MissionStage& stage = m.stages[s];
+        char label[160];
+        std::snprintf(
+          label,
+          sizeof(label),
+          "%zu  %s  (%zu nodes)##stage%zu",
+          s + 1,
+          stage.name.empty() ? "(no name)" : stage.name.c_str(),
+          stage.enter.size() + stage.ready.size(),
+          s
+        );
+        if (ImGui::Selectable(label, mStage == static_cast<int>(s))) {
+          mStage = static_cast<int>(s);
+          mPath.clear();
+        }
+      }
+      if (ImGui::SmallButton(ICON_PLUS " Stage")) {
+        Mission before = m;
+        MissionStage stage;
+        stage.name = "Stage " + std::to_string(m.stages.size() + 1);
+        m.stages.push_back(stage);
+        mStage = static_cast<int>(m.stages.size()) - 1;
+        mPath.clear();
+        Edited(std::move(before));
+      }
+      const bool has = mStage >= 0 && mStage < static_cast<int>(m.stages.size());
+      ImGui::BeginDisabled(!has);
+      ImGui::SameLine();
+      if (ImGui::SmallButton("Up") && mStage > 0) {
+        Mission before = m;
+        std::swap(m.stages[static_cast<std::size_t>(mStage)], m.stages[static_cast<std::size_t>(mStage - 1)]);
+        --mStage;
+        Edited(std::move(before));
+      }
+      ImGui::SameLine();
+      if (ImGui::SmallButton("Down") && mStage + 1 < static_cast<int>(m.stages.size())) {
+        Mission before = m;
+        std::swap(m.stages[static_cast<std::size_t>(mStage)], m.stages[static_cast<std::size_t>(mStage + 1)]);
+        ++mStage;
+        Edited(std::move(before));
+      }
+      ImGui::SameLine();
+      if (ImGui::SmallButton(ICON_TRASH " Stage") && has) {
+        Mission before = m;
+        m.stages.erase(m.stages.begin() + mStage);
+        mStage = std::max(0, mStage - 1);
+        mPath.clear();
+        Edited(std::move(before));
+      }
+      ImGui::EndDisabled();
+    }
+    if (mStage < 0 || mStage >= static_cast<int>(m.stages.size())) {
+      ImGui::TextDisabled(m.stages.empty() ? "No stages: add one to start the mission." : "Pick a stage.");
+      ImGui::End();
+      return;
+    }
+    MissionStage& stage = m.stages[static_cast<std::size_t>(mStage)];
+    RowLabel("Name");
+    ImGui::SetNextItemWidth(-1.0f);
+    bool edited = TextField("##stagename", stage.name);
+    BeginField();
+    EndField(edited);
+    float failsafe = static_cast<float>(stage.failsafe);
+    ImGui::SetNextItemWidth(-1.0f);
+    edited = FillDragFloat("##failsafe", &failsafe, 1.0f, 0.0f, 7200.0f, "Failsafe (seconds, 0 = none) %.0f");
+    BeginField();
+    if (edited) {
+      stage.failsafe = failsafe;
+    }
+    EndField(edited);
+    // The nodes.
+    for (int section = 0; section < 2; ++section) {
+      ImGui::SeparatorText(kSections[section]);
+      ImGui::PushID(section);
+      DrawNodes(section == 0 ? stage.enter : stage.ready, section, {}, 0);
+      ImGui::PopID();
+    }
+    // Add: inside the selected container, after the selected node, or at the end of "Then".
+    if (EdBeginCombo("##addnode", ICON_PLUS " Add a node")) {
+      std::string family;
+      std::vector<const MissionNodeType*> types;
+      for (const MissionNodeType& t : MissionNodeTypes()) {
+        types.push_back(&t);
+      }
+      const std::vector<const MissionNodeType*> modTypes = MissionModNodeTypes();
+      types.insert(types.end(), modTypes.begin(), modTypes.end());
+      for (std::size_t ti = 0; ti < types.size(); ++ti) {
+        const MissionNodeType& t = *types[ti];
+        const std::string heading = ti >= types.size() - modTypes.size() ? "from editor mods" : t.family;
+        if (heading != family) {
+          family = heading;
+          ImGui::SeparatorText(family.c_str());
+        }
+        if (ImGui::Selectable(t.title.c_str())) {
+          Mission before = m;
+          MissionNode* selected = NodeAt(m, mSection, mPath);
+          const MissionNodeType* selectedType = selected != nullptr ? FindMissionNodeType(selected->type) : nullptr;
+          if (selected != nullptr && selectedType != nullptr && selectedType->container) {
+            selected->children.push_back(NewMissionNode(t.id));
+            mPath.push_back(static_cast<int>(selected->children.size()) - 1);
+          } else if (std::vector<MissionNode>* list = ListOf(m, mSection, mPath)) {
+            list->insert(list->begin() + mPath.back() + 1, NewMissionNode(t.id));
+            ++mPath.back();
+          } else {
+            m.stages[static_cast<std::size_t>(mStage)].ready.push_back(NewMissionNode(t.id));
+            mSection = 1;
+            mPath = {static_cast<int>(m.stages[static_cast<std::size_t>(mStage)].ready.size()) - 1};
+          }
+          Edited(std::move(before));
+        }
+      }
+      ImGui::EndCombo();
+    }
+    MissionNode* node = NodeAt(m, mSection, mPath);
+    if (node != nullptr) {
+      ImGui::SameLine();
+      if (ImGui::SmallButton("Up") && mPath.back() > 0) {
+        Mission before = m;
+        std::vector<MissionNode>* list = ListOf(m, mSection, mPath);
+        std::swap((*list)[static_cast<std::size_t>(mPath.back())], (*list)[static_cast<std::size_t>(mPath.back() - 1)]);
+        --mPath.back();
+        Edited(std::move(before));
+      }
+      ImGui::SameLine();
+      if (ImGui::SmallButton("Down")) {
+        std::vector<MissionNode>* list = ListOf(m, mSection, mPath);
+        if (mPath.back() + 1 < static_cast<int>(list->size())) {
+          Mission before = m;
+          list = ListOf(m, mSection, mPath);
+          std::swap(
+            (*list)[static_cast<std::size_t>(mPath.back())], (*list)[static_cast<std::size_t>(mPath.back() + 1)]
+          );
+          ++mPath.back();
+          Edited(std::move(before));
+        }
+      }
+      ImGui::SameLine();
+      if (ImGui::SmallButton(ICON_TRASH)) {
+        Mission before = m;
+        std::vector<MissionNode>* list = ListOf(m, mSection, mPath);
+        list->erase(list->begin() + mPath.back());
+        mPath.clear();
+        Edited(std::move(before));
+      }
+      node = NodeAt(m, mSection, mPath);
+    }
+    if (node != nullptr) {
+      ImGui::SeparatorText("Settings");
+      DrawParams(*node, facts);
+    }
+    // The mission's findings (the Check lists them too).
+    const std::vector<MissionProblem> problems = CheckMission(m, facts);
+    if (!problems.empty()) {
+      ImGui::SeparatorText("Findings");
+      for (const MissionProblem& p : problems) {
+        ImGui::TextColored(
+          p.level == 'E' ? ImVec4(1.0f, 0.45f, 0.4f, 1.0f) : ImVec4(1.0f, 0.8f, 0.35f, 1.0f),
+          "%s%s",
+          p.stage > 0 ? ("stage " + std::to_string(p.stage) + ": ").c_str() : "",
+          p.text.c_str()
+        );
+      }
+    }
+    ImGui::End();
+  }
+
+  void EdMissionPanel::DrawStringsPanel(
+    bool& open,
+    const bool mapOpen
+  )
+  {
+    if (!ImGui::Begin(Panel("Strings###MissionStrings"), &open)) {
+      ImGui::End();
+      return;
+    }
+    if (!mapOpen) {
+      ImGui::TextDisabled("Open a map to write its dialogues.");
+      ImGui::End();
+      return;
+    }
+    Mission& m = mDocument.EditMission();
+    for (std::size_t d = 0; d < m.dialogues.size(); ++d) {
+      const std::string label =
+        m.dialogues[d].name + "  (" + std::to_string(m.dialogues[d].lines.size()) + " lines)##d" + std::to_string(d);
+      if (ImGui::Selectable(label.c_str(), mDialogue == static_cast<int>(d))) {
+        mDialogue = static_cast<int>(d);
+      }
+    }
+    if (ImGui::SmallButton(ICON_PLUS " Dialogue")) {
+      Mission before = m;
+      MissionDialogue dialogue;
+      dialogue.name = "Dialogue" + std::to_string(m.dialogues.size() + 1);
+      dialogue.lines.push_back({"", "", 5.0});
+      m.dialogues.push_back(dialogue);
+      mDialogue = static_cast<int>(m.dialogues.size()) - 1;
+      Edited(std::move(before));
+    }
+    if (mDialogue < 0 || mDialogue >= static_cast<int>(m.dialogues.size())) {
+      ImGui::End();
+      return;
+    }
+    ImGui::SameLine();
+    if (ImGui::SmallButton(ICON_TRASH " Dialogue")) {
+      Mission before = m;
+      m.dialogues.erase(m.dialogues.begin() + mDialogue);
+      mDialogue = std::max(0, mDialogue - 1);
+      Edited(std::move(before));
+      ImGui::End();
+      return;
+    }
+    MissionDialogue& dialogue = m.dialogues[static_cast<std::size_t>(mDialogue)];
+    RowLabel("Name");
+    ImGui::SetNextItemWidth(-1.0f);
+    bool edited = TextField("##dialoguename", dialogue.name);
+    BeginField();
+    EndField(edited);
+    int removeLine = -1;
+    for (std::size_t l = 0; l < dialogue.lines.size(); ++l) {
+      ImGui::PushID(static_cast<int>(l));
+      MissionDialogueLine& line = dialogue.lines[l];
+      ImGui::SeparatorText(("Line " + std::to_string(l + 1)).c_str());
+      RowLabel("Speaker");
+      ImGui::SetNextItemWidth(-1.0f);
+      edited = TextField("##speaker", line.speaker);
+      BeginField();
+      EndField(edited);
+      RowLabel("Text");
+      ImGui::SetNextItemWidth(-1.0f);
+      edited = TextField("##text", line.text);
+      BeginField();
+      EndField(edited);
+      float seconds = static_cast<float>(line.seconds);
+      ImGui::SetNextItemWidth(-ImGui::GetFrameHeight() * 1.5f);
+      edited = FillDragFloat("##seconds", &seconds, 0.1f, 0.0f, 60.0f, "Shown for %.1f s");
+      BeginField();
+      if (edited) {
+        line.seconds = seconds;
+      }
+      EndField(edited);
+      ImGui::SameLine();
+      if (ImGui::SmallButton(ICON_TRASH)) {
+        removeLine = static_cast<int>(l);
+      }
+      ImGui::PopID();
+    }
+    if (removeLine >= 0) {
+      Mission before = m;
+      dialogue.lines.erase(dialogue.lines.begin() + removeLine);
+      Edited(std::move(before));
+    }
+    if (ImGui::SmallButton(ICON_PLUS " Line")) {
+      Mission before = m;
+      dialogue.lines.push_back({"", "", 5.0});
+      Edited(std::move(before));
+    }
+    ImGui::End();
+  }
+  void EdMissionPanel::DrawRunPanel(
+    bool& open,
+    const bool mapOpen,
+    const bool playing,
+    const std::vector<std::string>& newTrace,
+    const std::string* live
+  )
+  {
+    // A new play starts a new trace.
+    if (playing && !mWasPlaying) {
+      mTrace.clear();
+      mHasLive = false;
+      mLiveAskedAt = -10.0;
+    }
+    if (live != nullptr && ParseMissionLive(*live, mLive)) {
+      mHasLive = true;
+    }
+    // While it plays: the sim is asked for its state once a second (the answer comes through the log).
+    if (playing && ImGui::GetTime() - mLiveAskedAt >= 1.0) {
+      mLiveAskedAt = ImGui::GetTime();
+      moho::CON_Execute(MissionLiveQuery().c_str());
+    }
+    mWasPlaying = playing;
+    mTrace.insert(mTrace.end(), newTrace.begin(), newTrace.end());
+    if (mTrace.size() > 2000) {
+      mTrace.erase(mTrace.begin(), mTrace.begin() + static_cast<std::ptrdiff_t>(mTrace.size() - 2000));
+    }
+    if (!ImGui::Begin(Panel("Run###MissionRun"), &open)) {
+      ImGui::End();
+      return;
+    }
+    if (!mapOpen) {
+      ImGui::TextDisabled("Open a map to run its mission.");
+      ImGui::End();
+      return;
+    }
+    Mission& m = mDocument.EditMission();
+    // Where the play is: the last stage entered.
+    int current = 0;
+    for (auto it = mTrace.rbegin(); it != mTrace.rend(); ++it) {
+      MissionTraceId id;
+      if (ParseMissionTrace(*it, id) && id.section.empty()) {
+        current = id.stage;
+        break;
+      }
+    }
+    if (playing) {
+      ImGui::Text(
+        "Playing: %s", current > 0 ? ("stage " + std::to_string(current)).c_str() : "the mission hasn't started"
+      );
+    } else {
+      ImGui::TextDisabled(mTrace.empty() ? "No play yet." : "The last play's trace:");
+    }
+    // Play from a stage.
+    const int stages = static_cast<int>(m.stages.size());
+    int start = std::clamp(mDocument.PlayStartStage(), 1, std::max(1, stages));
+    ImGui::BeginDisabled(playing || stages == 0);
+    ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x * 0.45f);
+    if (EdBeginCombo("##startstage", ("Stage " + std::to_string(start)).c_str())) {
+      for (int i = 1; i <= stages; ++i) {
+        const std::string label = std::to_string(i) + "  " + m.stages[static_cast<std::size_t>(i - 1)].name;
+        if (ImGui::Selectable(label.c_str(), i == start)) {
+          start = i;
+          mDocument.SetPlayStartStage(i);
+        }
+      }
+      ImGui::EndCombo();
+    }
+    ImGui::SameLine();
+    if (ImGui::Button(ICON_PLAY " Play from this stage")) {
+      mDocument.SetPlayStartStage(start);
+      mPlayAsked = true;
+    }
+    ImGui::EndDisabled();
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+      ImGui::SetTooltip(
+        "Plays the open map with its mission from a copy (test run: every node traced here), starting at "
+        "the chosen stage"
+      );
+    }
+    // While it plays (the test run's hooks: ScenarioInfo.EditorSkip, EditorTimeScale, the stage functions).
+    if (playing) {
+      if (ImGui::Button("Skip waits")) {
+        moho::CON_Execute("SimLua ScenarioInfo.EditorSkip = (ScenarioInfo.EditorSkip or 0) + 1");
+      }
+      EdSetItemTooltip("Every wait and timer running now ends at once");
+      ImGui::SameLine();
+      static const char* const kScales[] = {"Timers x1", "Timers x2", "Timers x4", "Timers x10"};
+      static constexpr int kScaleOf[] = {1, 2, 4, 10};
+      ImGui::SetNextItemWidth(Em(110.0f));
+      if (EdCombo("##timerscale", &mTimerScale, kScales, 4)) {
+        char command[96];
+        (void)std::snprintf(
+          command, sizeof(command), "SimLua ScenarioInfo.EditorTimeScale = %d", kScaleOf[mTimerScale]
+        );
+        moho::CON_Execute(command);
+      }
+      EdSetItemTooltip("The mission's waits and timers run this much faster (the game itself as fast as before)");
+      ImGui::SameLine();
+      ImGui::BeginDisabled(stages == 0);
+      if (ImGui::Button(("Jump to stage " + std::to_string(start)).c_str())) {
+        char command[96];
+        (void)std::snprintf(command, sizeof(command), "SimLua ForkThread(ScenarioInfo.EditorMission.Stage[%d])", start);
+        moho::CON_Execute(command);
+      }
+      ImGui::EndDisabled();
+      EdSetItemTooltip("Starts the stage chosen above now, as its turn would (the one running goes on too)");
+      ImGui::SameLine();
+      if (ImGui::Button("State to the log")) {
+        // The run's state as the sim has it: the tick, each variable, the objectives, whether it ended.
+        moho::CON_Execute(
+          "SimLua local m = ScenarioInfo.EditorMission or {} local n = 0 "
+          "for k, v in m.V or {} do LOG('EDMISSION var ' .. tostring(k) .. ' = ' .. tostring(v)) n = n + 1 end "
+          "LOG('EDMISSION state: tick ' .. GetGameTick() .. ', ' .. n .. ' variables, ' .. "
+          "table.getsize(m.Objectives or {}) .. ' objectives, ' .. (m.TraceCount or 0) .. ' nodes reached, ended: ' .. "
+          "tostring(ScenarioInfo.EditorEnded or 'no'))"
+        );
+      }
+      EdSetItemTooltip("The game tick, the mission's variables and objectives, and its end, written to the Log panel");
+      // The state the play reported last (FAF Studio's live view): a true / false variable is a box to flip.
+      if (mHasLive && ImGui::CollapsingHeader("Live state", ImGuiTreeNodeFlags_DefaultOpen)) {
+        ImGui::Text("Tick %d, stage %d", mLive.tick, mLive.stage);
+        for (const MissionLive::Objective& objective : mLive.objectives) {
+          const ImVec4 colour = objective.state == "done" ? ImVec4(0.5f, 0.85f, 0.5f, 1.0f)
+            : objective.state == "active"                 ? ImVec4(1.0f, 0.85f, 0.4f, 1.0f)
+                                                          : ImVec4(0.6f, 0.6f, 0.6f, 1.0f);
+          ImGui::TextColored(colour, "Objective: %s (%s)", objective.title.c_str(), objective.state.c_str());
+        }
+        for (const auto& [name, value] : mLive.vars) {
+          if (value == "true" || value == "false") {
+            bool on = value == "true";
+            if (ImGui::Checkbox(name.c_str(), &on)) {
+              std::string command;
+              if (MissionSetVariable(name, on, command)) {
+                moho::CON_Execute(command.c_str());
+                mLiveAskedAt = -10.0; // asked again at once
+              }
+            }
+            EdSetItemTooltip("Sets the mission variable in the running play");
+          } else {
+            ImGui::TextDisabled("%s = %s", name.c_str(), value.c_str());
+          }
+        }
+        if (mLive.vars.empty() && mLive.objectives.empty()) {
+          ImGui::TextDisabled("No variables or objectives yet.");
+        }
+      }
+    }
+    ImGui::Separator();
+    // The trace, newest last; a click selects the node in Stages.
+    ImGui::BeginChild("##trace", ImVec2(0.0f, 0.0f), false);
+    for (std::size_t k = 0; k < mTrace.size(); ++k) {
+      MissionTraceId id;
+      if (mTrace[k].rfind("end.", 0) == 0) {
+        // The operation's end (the test run records it instead of ending the game).
+        const bool won = mTrace[k] == "end.won";
+        ImGui::TextColored(
+          won ? ImVec4(0.5f, 0.85f, 0.5f, 1.0f) : ImVec4(0.95f, 0.45f, 0.4f, 1.0f),
+          "The operation ended: %s",
+          won ? "won" : "lost"
+        );
+        continue;
+      }
+      if (!ParseMissionTrace(mTrace[k], id)) {
+        continue;
+      }
+      std::string text;
+      if (id.section.empty()) {
+        text = "stage " + std::to_string(id.stage) + " entered";
+      } else {
+        std::string title = "a node";
+        if (id.stage >= 1 && id.stage <= stages) {
+          const MissionStage& stage = m.stages[static_cast<std::size_t>(id.stage - 1)];
+          const std::vector<MissionNode>* list = id.section == "enter" ? &stage.enter : &stage.ready;
+          const MissionNode* node = nullptr;
+          for (const int i : id.path) {
+            if (list == nullptr || i < 1 || i > static_cast<int>(list->size())) {
+              node = nullptr;
+              break;
+            }
+            node = &(*list)[static_cast<std::size_t>(i - 1)];
+            list = &node->children;
+          }
+          if (node != nullptr) {
+            const MissionNodeType* t = FindMissionNodeType(node->type);
+            title = t != nullptr ? t->title : node->type;
+          }
+        }
+        text = "  " + std::to_string(id.stage) + " " + (id.section == "enter" ? "start" : "then") + ": " + title +
+          (id.mark == '!'     ? "  (its trigger fired)"
+             : id.mark == '~' ? "  (dropped: the stage had moved on)"
+                              : "");
+      }
+      ImGui::PushID(static_cast<int>(k));
+      if (id.mark == '~') {
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.75f, 0.35f, 1.0f));
+      }
+      if (ImGui::Selectable(text.c_str(), false) && id.stage >= 1 && id.stage <= stages) {
+        mStage = id.stage - 1;
+        mSection = id.section == "enter" ? 0 : 1;
+        mPath.clear();
+        for (const int i : id.path) {
+          mPath.push_back(i - 1);
+        }
+        mFocusStages = true;
+      }
+      if (id.mark == '~') {
+        ImGui::PopStyleColor();
+      }
+      ImGui::PopID();
+    }
+    if (playing && ImGui::GetScrollY() >= ImGui::GetScrollMaxY() - 4.0f) {
+      ImGui::SetScrollHereY(1.0f);
+    }
+    ImGui::EndChild();
+    ImGui::End();
+  }
+  void EdMissionPanel::DrawBasesPanel(
+    bool& open,
+    const bool mapOpen
+  )
+  {
+    if (!ImGui::Begin(Panel("Bases###MissionBases"), &open)) {
+      ImGui::End();
+      return;
+    }
+    if (!mapOpen) {
+      ImGui::TextDisabled("Open a map to give its mission AI bases.");
+      ImGui::End();
+      return;
+    }
+    Mission& m = mDocument.EditMission();
+    const MissionFacts facts = MissionFactsOf(mDocument);
+    // A drag over a number with its undo.
+    const auto number =
+      [&](const char* id, double& v, const float speed, const float lo, const float hi, const char* format) {
+      float x = static_cast<float>(v);
+      const bool edited = FillDragFloat(id, &x, speed, lo, hi, format);
+      BeginField();
+      if (edited) {
+        v = x;
+      }
+      EndField(edited);
+    };
+    // Three numbers, one per difficulty.
+    const auto three = [&](const char* id, std::array<double, 3>& v, const float hi) {
+      ImGui::PushID(id);
+      const float w = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x * 2.0f) / 3.0f;
+      static const char* const kDiff[] = {"Easy %.0f", "Normal %.0f", "Hard %.0f"};
+      for (int d = 0; d < 3; ++d) {
+        if (d > 0) {
+          ImGui::SameLine();
+        }
+        ImGui::SetNextItemWidth(w);
+        ImGui::PushID(d);
+        number("##d", v[static_cast<std::size_t>(d)], 0.1f, 0.0f, hi, kDiff[d]);
+        ImGui::PopID();
+      }
+      ImGui::PopID();
+    };
+    // The list of bases.
+    for (std::size_t b = 0; b < m.bases.size(); ++b) {
+      const std::string label = m.bases[b].name + "  (" + m.bases[b].army + ", " +
+        std::to_string(m.bases[b].opai.size()) + " attacks)##b" + std::to_string(b);
+      if (ImGui::Selectable(label.c_str(), mBase == static_cast<int>(b))) {
+        mBase = static_cast<int>(b);
+        mAttack = -1;
+      }
+    }
+    if (ImGui::SmallButton(ICON_PLUS " Base")) {
+      Mission before = m;
+      std::string army = facts.armies.size() > 1 ? facts.armies[1] : facts.armies.empty() ? "ARMY_2" : facts.armies[0];
+      m.bases.push_back(NewMissionBase("Base" + std::to_string(m.bases.size() + 1), army));
+      mBase = static_cast<int>(m.bases.size()) - 1;
+      mAttack = -1;
+      Edited(std::move(before));
+    }
+    if (ImGui::IsItemHovered()) {
+      EdSetTooltip(
+        "A BaseManager on an AI army: started by a Start a base node, it spawns (or builds) the army's unit "
+        "groups around a marker and sends its attacks"
+      );
+    }
+    if (mBase < 0 || mBase >= static_cast<int>(m.bases.size())) {
+      ImGui::End();
+      return;
+    }
+    ImGui::SameLine();
+    if (ImGui::SmallButton(ICON_TRASH " Base")) {
+      Mission before = m;
+      m.bases.erase(m.bases.begin() + mBase);
+      mBase = std::min(mBase, static_cast<int>(m.bases.size()) - 1);
+      mAttack = -1;
+      Edited(std::move(before));
+      ImGui::End();
+      return;
+    }
+    MissionBase& base = m.bases[static_cast<std::size_t>(mBase)];
+    ImGui::SeparatorText("Base");
+    RowLabel("Name");
+    ImGui::SetNextItemWidth(-1.0f);
+    bool edited = TextField("##basename", base.name);
+    BeginField();
+    EndField(edited);
+    RowLabel("Army");
+    ImGui::SetNextItemWidth(-1.0f);
+    {
+      std::string army = base.army;
+      if (NameCombo("##basearmy", army, facts.armies)) {
+        Mission before = mDocument.MissionNow();
+        base.army = army;
+        Edited(std::move(before));
+      }
+    }
+    RowLabel("Marker");
+    ImGui::SetNextItemWidth(-1.0f);
+    {
+      std::string marker = base.marker;
+      if (NameCombo("##basemarker", marker, facts.markers)) {
+        Mission before = mDocument.MissionNow();
+        base.marker = marker;
+        Edited(std::move(before));
+      }
+    }
+    RowLabel("Radius");
+    ImGui::SetNextItemWidth(-1.0f);
+    number("##radius", base.radius, 0.5f, 5.0f, 500.0f, "%.0f");
+    const auto toggle = [&](const char* label, bool& v, const char* tip) {
+      bool on = v;
+      if (ImGui::Checkbox(label, &on)) {
+        Mission before = mDocument.MissionNow();
+        v = on;
+        Edited(std::move(before));
+      }
+      if (ImGui::IsItemHovered()) {
+        EdSetTooltip("%s", tip);
+      }
+    };
+    toggle(
+      "Starts empty", base.startEmpty, "Its engineers build the groups (else every group is spawned when it starts)"
+    );
+    ImGui::SameLine();
+    toggle("Groups per difficulty", base.diff, "Each group has _D1, _D2 and _D3 versions (InitializeDifficultyTables)");
+    ImGui::SameLine();
+    toggle("Always assist", base.alwaysAssist, "Engineers assist construction whenever they're idle");
+    ImGui::SeparatorText("Build groups");
+    int removeGroup = -1;
+    const auto groups = facts.groups.find(base.army);
+    std::vector<std::string> groupNames;
+    if (groups != facts.groups.end()) {
+      for (const std::string& g : groups->second) {
+        // A per-difficulty group is offered by its base name.
+        if (base.diff && g.size() > 3 && g.compare(g.size() - 3, 2, "_D") == 0) {
+          const std::string stem = g.substr(0, g.size() - 3);
+          if (std::find(groupNames.begin(), groupNames.end(), stem) == groupNames.end()) {
+            groupNames.push_back(stem);
+          }
+        } else if (!base.diff) {
+          groupNames.push_back(g);
+        }
+      }
+    }
+    for (std::size_t g = 0; g < base.groups.size(); ++g) {
+      ImGui::PushID(static_cast<int>(g));
+      const float w = ImGui::GetContentRegionAvail().x;
+      ImGui::SetNextItemWidth(w * 0.55f);
+      std::string name = base.groups[g].name;
+      if (NameCombo("##group", name, groupNames)) {
+        Mission before = mDocument.MissionNow();
+        base.groups[g].name = name;
+        Edited(std::move(before));
+      }
+      ImGui::SameLine();
+      ImGui::SetNextItemWidth(w * 0.45f - ImGui::GetFrameHeight() * 1.5f);
+      number("##priority", base.groups[g].priority, 1.0f, 0.0f, 1000.0f, "Priority %.0f");
+      ImGui::SameLine();
+      if (ImGui::SmallButton(ICON_TRASH)) {
+        removeGroup = static_cast<int>(g);
+      }
+      ImGui::PopID();
+    }
+    if (removeGroup >= 0) {
+      Mission before = m;
+      base.groups.erase(base.groups.begin() + removeGroup);
+      Edited(std::move(before));
+    }
+    if (ImGui::SmallButton(ICON_PLUS " Group")) {
+      Mission before = m;
+      base.groups.push_back(
+        {groupNames.empty() ? std::string() : groupNames.front(),
+         100.0 - 10.0 * static_cast<double>(base.groups.size())}
+      );
+      Edited(std::move(before));
+    }
+    if (groupNames.empty()) {
+      ImGui::SameLine();
+      ImGui::TextDisabled(base.diff ? "(the army has no _D1.._D3 groups)" : "(the army has no unit groups)");
+    }
+    ImGui::SeparatorText("Engineers");
+    RowLabel("Engineers");
+    three("##engineers", base.engineers, 50.0f);
+    RowLabel("Assisting");
+    three("##assist", base.assist, 50.0f);
+    RowLabel("Building at once");
+    ImGui::SetNextItemWidth(-1.0f);
+    number("##maxbuild", base.maxBuild, 0.1f, 0.0f, 50.0f, base.maxBuild > 0.0 ? "%.0f" : "no limit");
+    RowLabel("Support ACUs");
+    ImGui::SetNextItemWidth(-1.0f);
+    number("##sacus", base.supportAcus, 0.1f, 0.0f, 20.0f, "%.0f");
+    if (ImGui::TreeNode("Switches")) {
+      ImGui::TextDisabled("Turned on");
+      const auto set = [&](const char* id, std::vector<std::string>& v, const std::vector<std::string>& names) {
+        std::vector<std::string> copy = v;
+        if (NameSet(id, copy, names)) {
+          Mission before = mDocument.MissionNow();
+          v = std::move(copy);
+          Edited(std::move(before));
+        }
+      };
+      set("on", base.switchOn, MissionBaseActive());
+      ImGui::TextDisabled("Turned off");
+      set("off", base.switchOff, MissionBaseActive());
+      ImGui::TextDisabled("Never builds");
+      set("nobuild", base.noBuild, MissionBaseBuild());
+      ImGui::TreePop();
+    }
+    // The attacks.
+    ImGui::SeparatorText("Attacks");
+    for (std::size_t k = 0; k < base.opai.size(); ++k) {
+      const std::string label = base.opai[k].name + "  (" + base.opai[k].ptype + ")##a" + std::to_string(k);
+      if (ImGui::Selectable(label.c_str(), mAttack == static_cast<int>(k))) {
+        mAttack = static_cast<int>(k);
+      }
+    }
+    if (ImGui::SmallButton(ICON_PLUS " Attack")) {
+      Mission before = m;
+      MissionOpAI o;
+      o.name = base.name + "_Attack" + std::to_string(base.opai.size() + 1);
+      o.children = {MissionOpAIChildren(o.ptype).front()};
+      if (!facts.chains.empty()) {
+        o.chains.push_back(facts.chains.front());
+      }
+      base.opai.push_back(o);
+      mAttack = static_cast<int>(base.opai.size()) - 1;
+      Edited(std::move(before));
+    }
+    if (mAttack < 0 || mAttack >= static_cast<int>(base.opai.size())) {
+      ImGui::End();
+      return;
+    }
+    ImGui::SameLine();
+    if (ImGui::SmallButton(ICON_TRASH " Attack")) {
+      Mission before = m;
+      base.opai.erase(base.opai.begin() + mAttack);
+      mAttack = std::min(mAttack, static_cast<int>(base.opai.size()) - 1);
+      Edited(std::move(before));
+      ImGui::End();
+      return;
+    }
+    MissionOpAI& o = base.opai[static_cast<std::size_t>(mAttack)];
+    ImGui::PushID("attack");
+    RowLabel("Name");
+    ImGui::SetNextItemWidth(-1.0f);
+    edited = TextField("##name", o.name);
+    BeginField();
+    EndField(edited);
+    RowLabel("Kind");
+    ImGui::SetNextItemWidth(-1.0f);
+    {
+      std::string ptype = o.ptype;
+      if (NameCombo("##ptype", ptype, MissionOpAITypes()) && ptype != o.ptype) {
+        Mission before = mDocument.MissionNow();
+        o.ptype = ptype;
+        o.children = {MissionOpAIChildren(ptype).front()};
+        Edited(std::move(before));
+      }
+    }
+    if (ImGui::TreeNodeEx("Platoon kinds", ImGuiTreeNodeFlags_DefaultOpen)) {
+      if (std::vector<std::string> copy = o.children; NameSet("children", copy, MissionOpAIChildren(o.ptype))) {
+        Mission before = mDocument.MissionNow();
+        o.children = std::move(copy);
+        Edited(std::move(before));
+      }
+      ImGui::TreePop();
+    }
+    RowLabel("Units");
+    three("##qty", o.qty, 100.0f);
+    RowLabel("Orders");
+    ImGui::SetNextItemWidth(-1.0f);
+    {
+      std::string master = o.master;
+      if (NameCombo("##master", master, MissionOpAIMasters())) {
+        Mission before = mDocument.MissionNow();
+        o.master = master;
+        Edited(std::move(before));
+      }
+    }
+    if (o.master != "default") {
+      ImGui::TextDisabled(o.master == "patrol chain picker" ? "Chains (one picked per platoon)" : "Chain");
+      if (o.master == "patrol chain picker") {
+        if (std::vector<std::string> copy = o.chains; NameSet("chains", copy, facts.chains)) {
+          Mission before = mDocument.MissionNow();
+          o.chains = std::move(copy);
+          Edited(std::move(before));
+        }
+      } else {
+        std::string chain = o.chains.empty() ? std::string() : o.chains.front();
+        ImGui::SetNextItemWidth(-1.0f);
+        if (NameCombo("##chain", chain, facts.chains)) {
+          Mission before = mDocument.MissionNow();
+          o.chains = {chain};
+          Edited(std::move(before));
+        }
+      }
+      if (facts.chains.empty()) {
+        ImGui::TextDisabled("(the map has no marker chains)");
+      }
+    }
+    RowLabel("Priority");
+    ImGui::SetNextItemWidth(-1.0f);
+    number("##priority", o.priority, 1.0f, 0.0f, 1000.0f, "%.0f");
+    RowLabel("Lock");
+    ImGui::SetNextItemWidth(o.lock == "None" ? -1.0f : ImGui::GetContentRegionAvail().x * 0.5f);
+    {
+      std::string lock = o.lock;
+      if (NameCombo("##lock", lock, MissionOpAILocks())) {
+        Mission before = mDocument.MissionNow();
+        o.lock = lock;
+        Edited(std::move(before));
+      }
+    }
+    if (o.lock != "None") {
+      ImGui::SameLine();
+      ImGui::SetNextItemWidth(-1.0f);
+      number(
+        "##locksecs",
+        o.lockSecs,
+        0.5f,
+        0.0f,
+        o.lock == "DeathRatio" ? 100.0f : 3600.0f,
+        o.lock == "DeathRatio" ? "%.0f%% lost" : "%.0f s"
+      );
+    }
+    for (int slot = 0; slot < 2; ++slot) {
+      ImGui::PushID(slot);
+      const std::size_t i = static_cast<std::size_t>(slot);
+      RowLabel(slot == 0 ? "Builds when" : "and when");
+      ImGui::SetNextItemWidth(-1.0f);
+      std::string cond = o.cond[i];
+      if (NameCombo("##cond", cond, MissionOpAIConditions())) {
+        Mission before = mDocument.MissionNow();
+        o.cond[i] = cond;
+        Edited(std::move(before));
+      }
+      if (o.cond[i] == "humans have units") {
+        RowLabel("At least");
+        three("##condn", o.condCount[i], 1000.0f);
+      } else if (o.cond[i] == "stage reached") {
+        RowLabel("Stage");
+        ImGui::SetNextItemWidth(-1.0f);
+        number("##stage", o.condStage[i], 0.1f, 1.0f, 50.0f, "%.0f");
+      } else if (o.cond[i] == "flag is set") {
+        RowLabel("Flag");
+        ImGui::SetNextItemWidth(-1.0f);
+        edited = TextField("##flag", o.condFlag[i]);
+        BeginField();
+        EndField(edited);
+      }
+      ImGui::PopID();
+    }
+    ImGui::PopID();
+    ImGui::End();
+  }
+  void EdMissionPanel::DrawPlatoonsPanel(
+    bool& open,
+    const bool mapOpen
+  )
+  {
+    if (!ImGui::Begin(Panel("Platoons###MissionPlatoons"), &open)) {
+      ImGui::End();
+      return;
+    }
+    if (!mapOpen) {
+      ImGui::TextDisabled("Open a map to give its mission platoon templates and orders.");
+      ImGui::End();
+      return;
+    }
+    Mission& m = mDocument.EditMission();
+    const MissionFacts facts = MissionFactsOf(mDocument);
+    const auto pick = [&](const char* id, std::string& value, const std::vector<std::string>& names) {
+      std::string copy = value;
+      ImGui::SetNextItemWidth(-1.0f);
+      if (EdBeginCombo(id, copy.empty() ? "(choose)" : copy.c_str())) {
+        for (const std::string& name : names) {
+          if (ImGui::Selectable(name.c_str(), name == copy)) {
+            Mission before = mDocument.MissionNow();
+            value = name;
+            Edited(std::move(before));
+          }
+        }
+        ImGui::EndCombo();
+      }
+    };
+    const auto text = [&](const char* id, std::string& value) {
+      ImGui::SetNextItemWidth(-1.0f);
+      const bool edited = TextField(id, value);
+      BeginField();
+      EndField(edited);
+    };
+    // ---- templates
+    ImGui::SeparatorText("Platoon templates");
+    for (std::size_t t = 0; t < m.platoons.size(); ++t) {
+      const std::string label =
+        m.platoons[t].name + "  (" + std::to_string(m.platoons[t].rows.size()) + " unit types)##t" + std::to_string(t);
+      if (ImGui::Selectable(label.c_str(), mPlatoon == static_cast<int>(t))) {
+        mPlatoon = static_cast<int>(t);
+      }
+    }
+    if (ImGui::SmallButton(ICON_PLUS " Template")) {
+      Mission before = m;
+      MissionPlatoon t;
+      t.name = "PLATOON_" + std::to_string(m.platoons.size() + 1);
+      m.platoons.push_back(t);
+      mPlatoon = static_cast<int>(m.platoons.size()) - 1;
+      Edited(std::move(before));
+    }
+    // From a group: one row per unit type, at most as many as the group has.
+    ImGui::SameLine();
+    if (ImGui::SmallButton(ICON_PLUS " From a group")) {
+      ImGui::OpenPopup("##fromgroup");
+    }
+    if (ImGui::BeginPopup("##fromgroup")) {
+      ImGui::TextUnformatted("A template from the units of a group");
+      ImGui::SetNextItemWidth(220.0f);
+      if (EdBeginCombo("Army##fg", mFromArmy.empty() ? "(choose)" : mFromArmy.c_str())) {
+        for (const std::string& a : facts.armies) {
+          if (ImGui::Selectable(a.c_str(), a == mFromArmy)) {
+            mFromArmy = a;
+            mFromGroup.clear();
+          }
+        }
+        ImGui::EndCombo();
+      }
+      ImGui::SetNextItemWidth(220.0f);
+      const auto groups = facts.groups.find(mFromArmy);
+      if (EdBeginCombo("Group##fg", mFromGroup.empty() ? "(choose)" : mFromGroup.c_str())) {
+        if (groups != facts.groups.end()) {
+          for (const std::string& g : groups->second) {
+            if (ImGui::Selectable(g.c_str(), g == mFromGroup)) {
+              mFromGroup = g;
+            }
+          }
+        }
+        ImGui::EndCombo();
+      }
+      std::map<std::string, int> counts;
+      for (const SaveEntry& army : mDocument.SaveData().Armies()) {
+        UnitGroup root;
+        std::string error;
+        if (army.name == mFromArmy && ParseUnitGroup(army.Get("Units"), root, error)) {
+          (void)CountGroup(root, mFromGroup, counts);
+        }
+      }
+      ImGui::BeginDisabled(counts.empty());
+      if (ImGui::Button(("Make it (" + std::to_string(counts.size()) + " unit types)").c_str())) {
+        Mission before = m;
+        MissionPlatoon t;
+        t.name = "PLATOON_" + mFromGroup;
+        for (std::size_t k = 2; std::any_of(
+               m.platoons.begin(),
+               m.platoons.end(),
+               [&](const MissionPlatoon& o) {
+          return o.name == t.name;
+        }
+             );
+             ++k) {
+          t.name = "PLATOON_" + mFromGroup + "_" + std::to_string(k);
+        }
+        for (const auto& [bp, count] : counts) {
+          MissionPlatoonRow row;
+          row.bp = bp;
+          row.min = 0.0;
+          row.max = count;
+          t.rows.push_back(row);
+        }
+        m.platoons.push_back(t);
+        mPlatoon = static_cast<int>(m.platoons.size()) - 1;
+        Edited(std::move(before));
+        ImGui::CloseCurrentPopup();
+      }
+      ImGui::EndDisabled();
+      ImGui::EndPopup();
+    }
+    if (mPlatoon >= 0 && mPlatoon < static_cast<int>(m.platoons.size())) {
+      ImGui::SameLine();
+      if (ImGui::SmallButton(ICON_TRASH " Template")) {
+        Mission before = m;
+        m.platoons.erase(m.platoons.begin() + mPlatoon);
+        mPlatoon = std::min(mPlatoon, static_cast<int>(m.platoons.size()) - 1);
+        Edited(std::move(before));
+      }
+    }
+    if (mPlatoon >= 0 && mPlatoon < static_cast<int>(m.platoons.size())) {
+      MissionPlatoon& t = m.platoons[static_cast<std::size_t>(mPlatoon)];
+      ImGui::PushID("template");
+      RowLabel("Name");
+      text("##name", t.name);
+      RowLabel("AI plan");
+      text("##plan", t.plan);
+      if (ImGui::IsItemHovered()) {
+        EdSetTooltip("The platoon's AI function (empty: none); the platoon build manager runs it");
+      }
+      int remove = -1;
+      if (ImGui::BeginTable("##rows", 6, ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_RowBg)) {
+        ImGui::TableSetupColumn("Unit", ImGuiTableColumnFlags_WidthStretch, 1.4f);
+        ImGui::TableSetupColumn("Least", ImGuiTableColumnFlags_WidthStretch, 0.6f);
+        ImGui::TableSetupColumn("Most", ImGuiTableColumnFlags_WidthStretch, 0.6f);
+        ImGui::TableSetupColumn("Squad", ImGuiTableColumnFlags_WidthStretch, 1.0f);
+        ImGui::TableSetupColumn("Formation", ImGuiTableColumnFlags_WidthStretch, 1.2f);
+        ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed, ImGui::GetFrameHeight());
+        ImGui::TableHeadersRow();
+        for (std::size_t r = 0; r < t.rows.size(); ++r) {
+          MissionPlatoonRow& row = t.rows[r];
+          ImGui::PushID(static_cast<int>(r));
+          ImGui::TableNextRow();
+          ImGui::TableNextColumn();
+          text("##bp", row.bp);
+          for (double* v : {&row.min, &row.max}) {
+            ImGui::TableNextColumn();
+            ImGui::PushID(v == &row.min ? "min" : "max");
+            float x = static_cast<float>(*v);
+            ImGui::SetNextItemWidth(-1.0f);
+            const bool edited = FillDragFloat("##n", &x, 0.1f, 0.0f, 200.0f, "%.0f");
+            BeginField();
+            if (edited) {
+              *v = x;
+            }
+            EndField(edited);
+            ImGui::PopID();
+          }
+          ImGui::TableNextColumn();
+          pick("##squad", row.squad, MissionPlatoonSquads());
+          ImGui::TableNextColumn();
+          pick("##formation", row.formation, MissionPlatoonFormations());
+          ImGui::TableNextColumn();
+          if (ImGui::SmallButton(ICON_TRASH)) {
+            remove = static_cast<int>(r);
+          }
+          ImGui::PopID();
+        }
+        ImGui::EndTable();
+      }
+      if (remove >= 0) {
+        Mission before = m;
+        t.rows.erase(t.rows.begin() + remove);
+        Edited(std::move(before));
+      }
+      if (ImGui::SmallButton(ICON_PLUS " Unit type")) {
+        Mission before = m;
+        t.rows.push_back({});
+        Edited(std::move(before));
+      }
+      ImGui::PopID();
+    }
+    // ---- order queues
+    ImGui::SeparatorText("Order queues");
+    for (std::size_t q = 0; q < m.orderQueues.size(); ++q) {
+      const std::string label = m.orderQueues[q].name + "  (" + std::to_string(m.orderQueues[q].orders.size()) +
+        " orders)##q" + std::to_string(q);
+      if (ImGui::Selectable(label.c_str(), mQueue == static_cast<int>(q))) {
+        mQueue = static_cast<int>(q);
+      }
+    }
+    if (ImGui::SmallButton(ICON_PLUS " Queue")) {
+      Mission before = m;
+      MissionOrderQueue q;
+      q.name = "ORDERS_" + std::to_string(m.orderQueues.size() + 1);
+      MissionOrder o;
+      if (!facts.chains.empty()) {
+        o.chain = facts.chains.front();
+      }
+      q.orders.push_back(o);
+      m.orderQueues.push_back(q);
+      mQueue = static_cast<int>(m.orderQueues.size()) - 1;
+      Edited(std::move(before));
+    }
+    if (mQueue >= 0 && mQueue < static_cast<int>(m.orderQueues.size())) {
+      ImGui::SameLine();
+      if (ImGui::SmallButton(ICON_TRASH " Queue")) {
+        Mission before = m;
+        m.orderQueues.erase(m.orderQueues.begin() + mQueue);
+        mQueue = std::min(mQueue, static_cast<int>(m.orderQueues.size()) - 1);
+        Edited(std::move(before));
+      }
+    }
+    if (mQueue >= 0 && mQueue < static_cast<int>(m.orderQueues.size())) {
+      MissionOrderQueue& q = m.orderQueues[static_cast<std::size_t>(mQueue)];
+      ImGui::PushID("queue");
+      RowLabel("Name");
+      text("##name", q.name);
+      int remove = -1;
+      int raise = -1;
+      std::vector<std::string> chains = facts.chains;
+      chains.insert(chains.begin(), std::string());
+      std::vector<std::string> markers = facts.markers;
+      markers.insert(markers.begin(), std::string());
+      if (ImGui::BeginTable("##orders", 4, ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_RowBg)) {
+        ImGui::TableSetupColumn("Order", ImGuiTableColumnFlags_WidthStretch, 0.8f);
+        ImGui::TableSetupColumn("Along a chain", ImGuiTableColumnFlags_WidthStretch, 1.2f);
+        ImGui::TableSetupColumn("or to a marker", ImGuiTableColumnFlags_WidthStretch, 1.2f);
+        ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed, ImGui::GetFrameHeight() * 2.2f);
+        ImGui::TableHeadersRow();
+        for (std::size_t k = 0; k < q.orders.size(); ++k) {
+          MissionOrder& o = q.orders[k];
+          ImGui::PushID(static_cast<int>(k));
+          ImGui::TableNextRow();
+          ImGui::TableNextColumn();
+          pick("##type", o.type, MissionOrderTypes());
+          ImGui::TableNextColumn();
+          if (o.type != "Stop") {
+            pick("##chain", o.chain, chains);
+          }
+          ImGui::TableNextColumn();
+          if (o.type != "Stop") {
+            ImGui::BeginDisabled(!o.chain.empty());
+            pick("##marker", o.target, markers);
+            ImGui::EndDisabled();
+          }
+          ImGui::TableNextColumn();
+          if (k > 0 && ImGui::SmallButton("Up")) {
+            raise = static_cast<int>(k);
+          }
+          if (k > 0) {
+            ImGui::SameLine();
+          }
+          if (ImGui::SmallButton(ICON_TRASH)) {
+            remove = static_cast<int>(k);
+          }
+          ImGui::PopID();
+        }
+        ImGui::EndTable();
+      }
+      if (remove >= 0) {
+        Mission before = m;
+        q.orders.erase(q.orders.begin() + remove);
+        Edited(std::move(before));
+      } else if (raise > 0) {
+        Mission before = m;
+        std::swap(q.orders[static_cast<std::size_t>(raise)], q.orders[static_cast<std::size_t>(raise - 1)]);
+        Edited(std::move(before));
+      }
+      if (ImGui::SmallButton(ICON_PLUS " Order")) {
+        Mission before = m;
+        MissionOrder o;
+        o.type = "Patrol";
+        q.orders.push_back(o);
+        Edited(std::move(before));
+      }
+      ImGui::TextDisabled("Given in turn by a Spawn a group as a platoon or a Give a platoon an order queue node.");
+      ImGui::PopID();
+    }
+    DrawBuilders();
+    ImGui::End();
+  }
+
+  void EdMissionPanel::DrawBuilders()
+  {
+    // ---- platoon builders (FAF Studio's builders view): an army's PlatoonBuilders, the game's PBM reads them
+    ImGui::SeparatorText("Platoon builders");
+    std::vector<SaveEntry>& armies = mDocument.SaveData().Armies();
+    if (armies.empty()) {
+      ImGui::TextDisabled("The map has no armies.");
+      return;
+    }
+    static int armyIndex = 0;
+    static int chosen = -1;
+    static char newName[64] = "Builder_1";
+    static char newTemplate[64] = "";
+    static char newLocation[64] = "MAIN";
+    armyIndex = std::clamp(armyIndex, 0, static_cast<int>(armies.size()) - 1);
+    ImGui::SetNextItemWidth(-1.0f);
+    if (EdBeginCombo("##builderarmy", armies[static_cast<std::size_t>(armyIndex)].name.c_str())) {
+      for (int i = 0; i < static_cast<int>(armies.size()); ++i) {
+        if (ImGui::Selectable(armies[static_cast<std::size_t>(i)].name.c_str(), i == armyIndex)) {
+          armyIndex = i;
+          chosen = -1;
+        }
+      }
+      ImGui::EndCombo();
+    }
+    SaveEntry& army = armies[static_cast<std::size_t>(armyIndex)];
+    std::vector<MissionBuilder> builders;
+    std::string error;
+    if (!ParseBuilders(army.Get("PlatoonBuilders"), builders, error)) {
+      ImGui::TextColored(ImVec4(0.95f, 0.5f, 0.4f, 1.0f), "Its builders can't be read: %s", error.c_str());
+      return;
+    }
+    const auto write = [&](const std::string& what) {
+      EdDocument::SaveSnapshot before = mDocument.SaveDataNow();
+      army.Set("PlatoonBuilders", FormatBuilders(builders));
+      mDocument.SaveDataEdited(std::move(before));
+      gpg::Logf("editor: platoon builders of %s: %s (%zu now)", army.name.c_str(), what.c_str(), builders.size());
+    };
+    for (int i = 0; i < static_cast<int>(builders.size()); ++i) {
+      ImGui::PushID(i);
+      const std::string label = builders[static_cast<std::size_t>(i)].name + "  " +
+        builders[static_cast<std::size_t>(i)].Get("PlatoonTemplate");
+      if (ImGui::Selectable(label.c_str(), chosen == i)) {
+        chosen = i;
+      }
+      ImGui::PopID();
+    }
+    if (builders.empty()) {
+      ImGui::TextDisabled("No builders in this army.");
+    }
+    if (chosen >= 0 && chosen < static_cast<int>(builders.size())) {
+      MissionBuilder& builder = builders[static_cast<std::size_t>(chosen)];
+      bool changed = false;
+      for (auto& [key, value] : builder.fields) {
+        ImGui::PushID(key.c_str());
+        RowLabel(key.c_str());
+        char buffer[512];
+        (void)std::snprintf(buffer, sizeof(buffer), "%s", value.c_str());
+        ImGui::SetNextItemWidth(-1.0f);
+        if (ImGui::InputText("##v", buffer, sizeof(buffer))) {
+          value = buffer;
+        }
+        changed = changed || ImGui::IsItemDeactivatedAfterEdit();
+        ImGui::PopID();
+      }
+      if (changed) {
+        write(builder.name + " edited");
+      }
+      if (ImGui::Button("Delete this builder")) {
+        const std::string gone = builder.name;
+        builders.erase(builders.begin() + chosen);
+        chosen = -1;
+        write("deleted " + gone);
+      }
+    }
+    ImGui::SetNextItemWidth(Em(120.0f));
+    ImGui::InputText("##newbuilder", newName, sizeof(newName));
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(Em(120.0f));
+    ImGui::InputTextWithHint("##newtemplate", "platoon template", newTemplate, sizeof(newTemplate));
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(Em(80.0f));
+    ImGui::InputTextWithHint("##newlocation", "base", newLocation, sizeof(newLocation));
+    SameLineIfFits(ButtonWidth("Add builder"));
+    ImGui::BeginDisabled(newName[0] == '\0' || newTemplate[0] == '\0');
+    if (ImGui::Button("Add builder")) {
+      builders.push_back(NewBuilder(newName, newTemplate, newLocation));
+      chosen = static_cast<int>(builders.size()) - 1;
+      write(std::string("added ") + newName);
+    }
+    ImGui::EndDisabled();
+    ImGui::TextDisabled("Values are Lua (strings quoted); BuildConditions and other tables stay as written.");
+  }
+
+  void EdMissionPanel::ReadImported()
+  {
+    mImportedRead = true;
+    mImportedFor = mDocument.Path();
+    mImported = ParseMissionScript(mDocument.Script());
+    mImportedRows = ImportedStages(mImported);
+    mImportedDialogues.clear();
+    // The strings file beside the map (`<map>_strings.lua`), read from disk; maps in the game's archives have none
+    // here.
+    const std::filesystem::path map = mDocument.MapDiskFile();
+    std::string strings;
+    if (!map.empty()) {
+      std::vector<std::filesystem::path> candidates = {map.parent_path() / (map.stem().string() + "_strings.lua")};
+      // The script's own base name (`SCCA_Coop_A01_script.lua` -> `SCCA_Coop_A01_strings.lua`).
+      const std::string script = std::filesystem::path(mDocument.Facts().scriptPath).filename().string();
+      if (const std::size_t at = script.rfind("_script.lua"); at != std::string::npos) {
+        candidates.push_back(map.parent_path() / (script.substr(0, at) + "_strings.lua"));
+      }
+      for (const std::filesystem::path& file : candidates) {
+        std::error_code ignored;
+        if (!file.empty() && std::filesystem::exists(file, ignored)) {
+          std::ifstream in(file, std::ios::binary);
+          strings.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+          break;
+        }
+      }
+    }
+    if (!strings.empty()) {
+      mImportedDialogues = ParseMissionStrings(strings);
+    }
+    char note[240];
+    (void)std::snprintf(
+      note,
+      sizeof(note),
+      "%d lines: %zu stages, %zu functions, %zu objectives, %zu triggers, %zu AI helpers, %zu dialogues used; %s",
+      mImported.lineCount,
+      mImported.stages.size(),
+      mImported.functions.size(),
+      mImported.objectives.size(),
+      mImported.triggers.size(),
+      mImported.helpers.size(),
+      mImported.dialogueRefs.size(),
+      strings.empty() ? "no _strings.lua beside the map"
+                      : (std::to_string(mImportedDialogues.size()) + " dialogues in its _strings.lua").c_str()
+    );
+    mImportNote = note;
+    gpg::Logf("editor: mission import: %s", mImportNote.c_str());
+  }
+
+  void EdMissionPanel::DrawImported()
+  {
+    if (mImportedRead && mImportedFor != mDocument.Path()) {
+      mImportedRead = false;
+      mImportedRows.clear();
+      mImportedDialogues.clear();
+      mImportNote.clear();
+    }
+    if (!Section("Hand-written script", false)) {
+      return;
+    }
+    ImGui::TextWrapped(
+      "A campaign map's own script, read as text into an outline. It is shown here read-only: the editor never runs, "
+      "rewrites or compiles it; edit the file in a text editor."
+    );
+    if (ImGui::Button(mImportedRead ? "Read it again" : "Read the map's script")) {
+      ReadImported();
+    }
+    if (!mImportedRead) {
+      return;
+    }
+    ImGui::TextDisabled("%s", mImportNote.c_str());
+    for (const ImportedStageRows& stage : mImportedRows) {
+      char title[160];
+      (void)std::snprintf(
+        title, sizeof(title), "%s  (%zu rows)###imported%d", stage.name.c_str(), stage.rows.size(), stage.number
+      );
+      if (ImGui::TreeNode(title)) {
+        for (const ImportedRow& row : stage.rows) {
+          const ImU32 colour = row.kind == "objective" ? IM_COL32(120, 210, 255, 255)
+            : row.kind == "trigger"                    ? IM_COL32(255, 200, 110, 255)
+            : row.kind == "ai"                         ? IM_COL32(200, 160, 255, 255)
+            : row.kind == "note"                       ? IM_COL32(160, 160, 160, 255)
+                                                       : ImGui::GetColorU32(ImGuiCol_Text);
+          ImGui::PushStyleColor(ImGuiCol_Text, colour);
+          ImGui::TextUnformatted(row.text.c_str());
+          ImGui::PopStyleColor();
+          if (!row.extra.empty()) {
+            ImGui::SameLine();
+            ImGui::TextDisabled("%s", row.extra.c_str());
+          }
+        }
+        ImGui::TreePop();
+      }
+    }
+    if (!mImportedDialogues.empty()) {
+      Mission& m = mDocument.EditMission();
+      std::size_t fresh = 0;
+      for (const MissionDialogue& d : mImportedDialogues) {
+        fresh += std::none_of(
+                   m.dialogues.begin(),
+                   m.dialogues.end(),
+                   [&d](const MissionDialogue& own) {
+          return own.name == d.name;
+        }
+                 )
+          ? 1u
+          : 0u;
+      }
+      ImGui::BeginDisabled(fresh == 0);
+      char label[120];
+      (void)std::snprintf(label, sizeof(label), "Add its %zu dialogues to the Strings", fresh);
+      if (ImGui::Button(label)) {
+        Mission before = m;
+        for (const MissionDialogue& d : mImportedDialogues) {
+          if (std::none_of(m.dialogues.begin(), m.dialogues.end(), [&d](const MissionDialogue& own) {
+            return own.name == d.name;
+          })) {
+            m.dialogues.push_back(d);
+          }
+        }
+        Edited(std::move(before));
+      }
+      ImGui::EndDisabled();
+    }
+  }
+} // namespace faf::editor

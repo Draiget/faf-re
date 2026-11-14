@@ -1097,12 +1097,12 @@ namespace moho
    */
   void DeserializeCUnitFerryTaskSerializerCallback(
     gpg::ReadArchive* const archive,
-    const std::intptr_t objectPtr,
+    void* const objectPtr,
     const int /*version*/,
     gpg::RRef* const /*ownerRef*/
   )
   {
-    reinterpret_cast<CUnitFerryTask*>(objectPtr)->MemberDeserialize(archive);
+    static_cast<CUnitFerryTask*>(objectPtr)->MemberDeserialize(archive);
   }
 
   /**
@@ -1120,12 +1120,12 @@ namespace moho
    */
   void SerializeCUnitFerryTaskSerializerCallback(
     gpg::WriteArchive* const archive,
-    const std::intptr_t objectPtr,
+    void* const objectPtr,
     const int /*version*/,
     gpg::RRef* const /*ownerRef*/
   )
   {
-    reinterpret_cast<const CUnitFerryTask*>(objectPtr)->MemberSerialize(archive);
+    static_cast<const CUnitFerryTask*>(objectPtr)->MemberSerialize(archive);
   }
 } // namespace moho
 

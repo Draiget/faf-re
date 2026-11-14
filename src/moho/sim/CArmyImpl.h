@@ -27,7 +27,7 @@ namespace moho
   class CAiReconDBImpl;
   class CArmyStats;
   class CPlatoon;
-  class CSimArmyEconomyInfo;
+  class CEconomy;
   class CIntelGrid;
   class UserArmy;
   class Unit;
@@ -126,7 +126,7 @@ namespace moho
     /** Address: 0x006FDCA0 (FUN_006FDCA0, Moho::CArmyImpl::GetReconDB) */
     CAiReconDBImpl* GetReconDB() override;
     /** Address: 0x006FDCB0 (FUN_006FDCB0, Moho::CArmyImpl::GetEconomy) */
-    CSimArmyEconomyInfo* GetEconomy() override;
+    CEconomy* GetEconomy() override;
     /** Address: 0x006FFCB0 (FUN_006FFCB0, Moho::CArmyImpl::GenerateArmyStart) */
     void GenerateArmyStart() override;
     /** Address: 0x006FDCC0 (FUN_006FDCC0, Moho::CArmyImpl::SetArmyStart) */
@@ -185,8 +185,8 @@ namespace moho
     std::shared_ptr<void>* SetUnknownSharedRef(std::shared_ptr<void>* value) override;
     /** Address: 0x006FDE40 (FUN_006FDE40, Moho::CArmyImpl::GetUnknownSharedRef) */
     std::shared_ptr<void>* GetUnknownSharedRef(std::shared_ptr<void>* outValue) override;
-    /** Address: 0x006FDE70 (FUN_006FDE70, Moho::CArmyImpl::SetUnknownVectorWithMeta) */
-    std::uint32_t SetUnknownVectorWithMeta(const SArmyVectorWithMeta* value) override;
+    /** Address: 0x006FDE70 (FUN_006FDE70, Moho::CArmyImpl::SetPathPreview) */
+    void SetPathPreview(const SArmyPathPreview& preview) override;
     /** Address: 0x006FDE90 (FUN_006FDE90, Moho::CArmyImpl::GetPlatoonsList) */
     void GetPlatoonsList(ArmyPool& outPool) override;
     /** Address: 0x00700410 (FUN_00700410, Moho::CArmyImpl::MakePlatoon) */
@@ -312,11 +312,11 @@ namespace moho
     Sim* Simulation;                            // 0x01E8
     CAiBrain* AiBrain;                          // 0x01EC
     CAiReconDBImpl* AiReconDb;                  // 0x01F0
-    CSimArmyEconomyInfo* EconomyInfo;           // 0x01F4
+    CEconomy* EconomyInfo;                      // 0x01F4
     fa::string ArmyPlans;                       // 0x01F8
     CArmyStats* Stats;                          // 0x0214
     CInfluenceMap* InfluenceMap;                // 0x0218 (FUN_006FDC80 / mIMmap)
-    void* PathFinder;                           // 0x021C
+    PathQueue* PathFinder;                      // 0x021C
     std::shared_ptr<void> UnknownShared220;     // 0x0220
     ArmyPool PlatoonPool;                       // 0x0228
     /**

@@ -395,7 +395,7 @@ void CMarshaller::VerifyChecksum(
 {
   CMessage message{ECmdStreamOp::CMDST_VerifyChecksum};
   CMessageStream stream{message};
-  stream.Write(reinterpret_cast<const char*>(&digest), sizeof(digest));
+  stream.Write(&digest, sizeof(digest));
   stream.Write(seqNo);
   mClientManager->ProcessClients(message);
 }
@@ -446,7 +446,7 @@ void CMarshaller::CreateUnit(
   const auto armyByte = static_cast<std::uint8_t>(armyIndex);
   stream.Write(armyByte);
   stream.Write(blueprintId.name);
-  stream.Write(reinterpret_cast<const char*>(&pos), sizeof(pos));
+  stream.Write(&pos, sizeof(pos));
   stream.Write(heading);
   mClientManager->ProcessClients(message);
 }
@@ -463,7 +463,7 @@ void CMarshaller::CreateProp(
   CMessage message{ECmdStreamOp::CMDST_CreateProp};
   CMessageStream stream{message};
   stream.Write(blueprintPath);
-  stream.Write(reinterpret_cast<const char*>(&pos), sizeof(pos));
+  stream.Write(&pos, sizeof(pos));
   mClientManager->ProcessClients(message);
 }
 
@@ -493,7 +493,7 @@ void CMarshaller::WarpEntity(
   CMessage message{ECmdStreamOp::CMDST_WarpEntity};
   CMessageStream stream{message};
   stream.Write(entityId);
-  stream.Write(reinterpret_cast<const char*>(&transform), sizeof(transform));
+  stream.Write(&transform, sizeof(transform));
   mClientManager->ProcessClients(message);
 }
 
@@ -632,7 +632,7 @@ void CMarshaller::SetCommandCells(
   CMessageStream stream{message};
   stream.Write(cmdId);
   WriteCells(stream, cells);
-  stream.Write(reinterpret_cast<const char*>(&pos), sizeof(pos));
+  stream.Write(&pos, sizeof(pos));
   mClientManager->ProcessClients(message);
 }
 
@@ -666,7 +666,7 @@ void CMarshaller::ExecuteDebugCommand(
   CMessage message{ECmdStreamOp::CMDST_DebugCommand};
   CMessageStream stream{message};
   stream.Write(commandText);
-  stream.Write(reinterpret_cast<const char*>(&worldPos), sizeof(worldPos));
+  stream.Write(&worldPos, sizeof(worldPos));
   const auto armyByte = static_cast<std::uint8_t>(armyIndex);
   stream.Write(armyByte);
   WriteEntIdSet(stream, entities);
@@ -776,7 +776,7 @@ void CMarshaller::WriteCommandData(
 
   stream.Write(commandData.unk38);
   if (commandData.unk38 != -1) {
-    stream.Write(reinterpret_cast<const char*>(&commandData.mOri), sizeof(commandData.mOri));
+    stream.Write(&commandData.mOri, sizeof(commandData.mOri));
     stream.Write(commandData.unk4C);
   }
 
@@ -808,7 +808,7 @@ void CMarshaller::WriteTarget(
   if (targetTypeWord == static_cast<std::int32_t>(EAiTargetType::AITARGET_Entity)) {
     stream.Write(target.mEntityId);
   } else if (targetTypeWord == static_cast<std::int32_t>(EAiTargetType::AITARGET_Ground)) {
-    stream.Write(reinterpret_cast<const char*>(&target.mPos), sizeof(target.mPos));
+    stream.Write(&target.mPos, sizeof(target.mPos));
   }
 }
 
@@ -825,7 +825,7 @@ void CMarshaller::WriteCells(
   stream.Write(count);
 
   if (count > 0) {
-    stream.Write(reinterpret_cast<const char*>(cells.start_), static_cast<std::size_t>(count) * sizeof(SOCellPos));
+    stream.Write(cells.start_, static_cast<std::size_t>(count) * sizeof(SOCellPos));
   }
 }
 

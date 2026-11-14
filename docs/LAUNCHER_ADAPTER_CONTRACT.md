@@ -8,10 +8,10 @@ Sources, read for this document:
 |---|---|
 | downlords-faf-client `IceAdapterImpl`, `IceAdapterApi`, `IceAdapterCallbacks`, `IceServerMapper` | `develop` at 5da818ba1a, launch options at 66e624f119; the installed client is 2026.4.1 |
 | java-ice-adapter `IceAdapter`, `RPCHandler`, `RPCService`, `GPGNetServer`, `GameSession`, `PeerIceModule`, `PeerConnectivityCheckerModule`, `CandidatesMessage`, `CandidatePacket` | `master` at d49f9fe992 = release 3.3.14 (2025-08-11); the changes in 3.3.15 (tag at d81b88c, 2026-11-01) are in [section 9](#9-adapter-3315) |
-| the shipped `natives/faf-ice-adapter.jar` (sha256 `5d1348f57d29e51c…`), read with `javap` and small probes | classes dated 2025-08-11, bundles jackson-databind 2.13.4.2, ice4j 3.0-66-g1c60acc, JJsonRpc (faforever fork) |
+| the shipped `natives/faf-ice-adapter.jar` (sha256 `5d1348f57d29e51c…`), read with `javap` and small probes | classes dated 2025-08-11, bundles jackson-databind version 2.13.4.2, ice4j 3.0-66-g1c60acc, JJsonRpc (faforever fork) |
 | FAForever/server `server/gameconnection.py` | `develop` at fa1ddac865 |
 
-A full trace of two shipped adapters through `tools/fafclient` is in [launcher-adapter-contract/trace-2p.jsonl](launcher-adapter-contract/trace-2p.jsonl) (direct) and [trace-2p-relay.jsonl](launcher-adapter-contract/trace-2p-relay.jsonl) (`--force-relay`).
+`tools/fafclient` records the same exchange for any two adapters (direct, or with `--force-relay`); those traces stay local, as they carry the machine's network addresses.
 
 ## 1. Launch
 
@@ -124,7 +124,7 @@ So the host offers to every joiner, and a joiner offers to every player who was 
 
 ```json
 {"srcId":101,"destId":102,"password":"6cmvb8d7e03sma550p6dtta5vn","ufrag":"eb31i1k68fj1m5",
- "candidates":[{"foundation":"1","protocol":"udp","priority":2130706431,"ip":"192.168.42.77","port":6112,
+ "candidates":[{"foundation":"1","protocol":"udp","priority":2130706431,"ip":"192.0.2.77","port":6112,
    "type":"HOST_CANDIDATE","generation":0,"id":"…","relAddr":null,"relPort":0}]}
 ```
 

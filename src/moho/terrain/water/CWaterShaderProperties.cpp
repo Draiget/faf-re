@@ -40,7 +40,7 @@ namespace
     float& value
   )
   {
-    reader.Read(reinterpret_cast<char*>(&value), sizeof(value));
+    reader.Read(&value, sizeof(value));
   }
 } // namespace
 

@@ -108,7 +108,7 @@ namespace moho
     void* const objectPtr
   )
   {
-    auto* const object = reinterpret_cast<CArmyStatItem*>(objectPtr);
+    auto* const object = static_cast<CArmyStatItem*>(objectPtr);
     if (object) {
       new (object) CArmyStatItem("Root");
     }
@@ -122,7 +122,7 @@ namespace moho
     void* const objectPtr
   )
   {
-    auto* const object = reinterpret_cast<CArmyStatItem*>(objectPtr);
+    auto* const object = static_cast<CArmyStatItem*>(objectPtr);
     delete object;
   }
 
@@ -133,7 +133,7 @@ namespace moho
     void* const objectPtr
   )
   {
-    auto* const object = reinterpret_cast<CArmyStatItem*>(objectPtr);
+    auto* const object = static_cast<CArmyStatItem*>(objectPtr);
     if (!object) {
       return;
     }
@@ -196,8 +196,7 @@ namespace gpg
     }
 
     outRef->mType = dynamicType;
-    outRef->mObj =
-      reinterpret_cast<void*>(reinterpret_cast<std::uintptr_t>(value) - static_cast<std::uintptr_t>(baseOffset));
+    outRef->mObj = gpg::CompleteObject(value, baseOffset);
     return outRef;
   }
 

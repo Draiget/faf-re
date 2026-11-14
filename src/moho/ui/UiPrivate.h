@@ -1195,7 +1195,7 @@ static IMauiDragger* func_GetCurrentDragger2()
 
   HWND secondHeadWindow = nullptr;
   if (static_cast<unsigned int>(context->GetHeadCount()) > 1u) {
-    secondHeadWindow = reinterpret_cast<HWND>(context->GetHead(1u).mWindow);
+    secondHeadWindow = static_cast<HWND>(context->GetHead(1u).mWindow);
   }
 
   RECT viewportRect{};

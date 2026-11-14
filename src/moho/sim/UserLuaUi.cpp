@@ -561,7 +561,8 @@ int moho::cfunc_GetMouseScreenPosL(
     LuaPlus::LuaState::Error(state, kNoSessionStartedText);
   }
 
-  const LuaPlus::LuaObject screenPositionObject = SCR_ToLua<Wm3::Vector2<float>>(state, session->CursorScreenPos);
+  const LuaPlus::LuaObject screenPositionObject =
+    SCR_ToLua<Wm3::Vector2<float>>(state, session->mCursorInfo.mMouseScreenPos);
   screenPositionObject.PushStack(state);
   return 1;
 }

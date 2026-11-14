@@ -412,35 +412,6 @@ namespace
 {
 
   /**
-   * Address: 0x00552050 (FUN_00552050)
-   *
-   * What it does:
-   * Writes the invalid `EntId` sentinel word (`0xF0000000`) to output
-   * storage.
-   */
-  [[maybe_unused]] [[nodiscard]] unsigned int* WriteInvalidEntIdSentinelWordLaneA(
-    unsigned int* const outWord
-  ) noexcept
-  {
-    *outWord = 0xF0000000u;
-    return outWord;
-  }
-
-  /**
-   * Address: 0x00552080 (FUN_00552080)
-   *
-   * What it does:
-   * Writes the all-bits-set sentinel word (`0xFFFFFFFF`) to output storage.
-   */
-  [[maybe_unused]] [[nodiscard]] unsigned int* WriteAllBitsSetWordLaneA(
-    unsigned int* const outWord
-  ) noexcept
-  {
-    *outWord = 0xFFFFFFFFu;
-    return outWord;
-  }
-
-  /**
    * Address: 0x004027F0 (FUN_004027F0)
    *
    * What it does:
@@ -448,12 +419,12 @@ namespace
    */
   void LoadFastVectorUInt(
     gpg::ReadArchive* archive,
-    std::intptr_t objectPtr,
+    void* objectPtr,
     int,
     gpg::RRef*
   )
   {
-    auto* const storage = reinterpret_cast<void*>(objectPtr);
+    auto* const storage = objectPtr;
     GPG_ASSERT(archive != nullptr);
     GPG_ASSERT(storage != nullptr);
     if (!archive || !storage) {
@@ -480,12 +451,12 @@ namespace
    */
   void SaveFastVectorUInt(
     gpg::WriteArchive* archive,
-    std::intptr_t objectPtr,
+    void* objectPtr,
     int,
     gpg::RRef*
   )
   {
-    auto* const storage = reinterpret_cast<void*>(objectPtr);
+    auto* const storage = objectPtr;
     GPG_ASSERT(archive != nullptr);
     GPG_ASSERT(storage != nullptr);
     if (!archive || !storage) {
@@ -609,12 +580,12 @@ namespace
    */
   void LoadFastVectorFloat(
     gpg::ReadArchive* archive,
-    std::intptr_t objectPtr,
+    void* objectPtr,
     int,
     gpg::RRef*
   )
   {
-    auto* const storage = reinterpret_cast<void*>(objectPtr);
+    auto* const storage = objectPtr;
     GPG_ASSERT(archive != nullptr);
     GPG_ASSERT(storage != nullptr);
     if (!archive || !storage) {
@@ -641,12 +612,12 @@ namespace
    */
   void SaveFastVectorFloat(
     gpg::WriteArchive* archive,
-    std::intptr_t objectPtr,
+    void* objectPtr,
     int,
     gpg::RRef*
   )
   {
-    auto* const storage = reinterpret_cast<void*>(objectPtr);
+    auto* const storage = objectPtr;
     GPG_ASSERT(archive != nullptr);
     GPG_ASSERT(storage != nullptr);
     if (!archive || !storage) {
@@ -691,12 +662,12 @@ namespace
    */
   void LoadFastVectorString(
     gpg::ReadArchive* archive,
-    std::intptr_t objectPtr,
+    void* objectPtr,
     int,
     gpg::RRef*
   )
   {
-    auto* const storage = reinterpret_cast<void*>(objectPtr);
+    auto* const storage = objectPtr;
     GPG_ASSERT(archive != nullptr);
     GPG_ASSERT(storage != nullptr);
     if (!archive || !storage) {
@@ -724,12 +695,12 @@ namespace
    */
   void SaveFastVectorString(
     gpg::WriteArchive* archive,
-    std::intptr_t objectPtr,
+    void* objectPtr,
     int,
     gpg::RRef*
   )
   {
-    auto* const storage = reinterpret_cast<void*>(objectPtr);
+    auto* const storage = objectPtr;
     GPG_ASSERT(archive != nullptr);
     GPG_ASSERT(storage != nullptr);
     if (!archive || !storage) {
@@ -834,12 +805,12 @@ namespace
    */
   void LoadFastVectorVector3f(
     gpg::ReadArchive* archive,
-    std::intptr_t objectPtr,
+    void* objectPtr,
     int,
     gpg::RRef* ownerRef
   )
   {
-    auto* const storage = reinterpret_cast<void*>(objectPtr);
+    auto* const storage = objectPtr;
     GPG_ASSERT(archive != nullptr);
     GPG_ASSERT(storage != nullptr);
     if (!archive || !storage) {
@@ -870,12 +841,12 @@ namespace
    */
   void LoadFastVectorSSTIEntityAttachInfo(
     gpg::ReadArchive* archive,
-    std::intptr_t objectPtr,
+    void* objectPtr,
     int,
     gpg::RRef* ownerRef
   )
   {
-    auto* const storage = reinterpret_cast<void*>(objectPtr);
+    auto* const storage = objectPtr;
     GPG_ASSERT(archive != nullptr);
     GPG_ASSERT(storage != nullptr);
     if (!archive || !storage) {
@@ -906,12 +877,12 @@ namespace
    */
   void SaveFastVectorVector3f(
     gpg::WriteArchive* archive,
-    std::intptr_t objectPtr,
+    void* objectPtr,
     int,
     gpg::RRef* ownerRef
   )
   {
-    auto* const storage = reinterpret_cast<void*>(objectPtr);
+    auto* const storage = objectPtr;
     GPG_ASSERT(archive != nullptr);
     GPG_ASSERT(storage != nullptr);
     if (!archive || !storage) {
@@ -938,12 +909,12 @@ namespace
    */
   void SaveFastVectorSSTIEntityAttachInfo(
     gpg::WriteArchive* archive,
-    std::intptr_t objectPtr,
+    void* objectPtr,
     int,
     gpg::RRef* ownerRef
   )
   {
-    auto* const storage = reinterpret_cast<void*>(objectPtr);
+    auto* const storage = objectPtr;
     GPG_ASSERT(archive != nullptr);
     GPG_ASSERT(storage != nullptr);
     if (!archive || !storage) {
@@ -982,12 +953,12 @@ namespace
    */
   void LoadFastVectorUnitWeaponInfo(
     gpg::ReadArchive* archive,
-    std::intptr_t objectPtr,
+    void* objectPtr,
     int,
     gpg::RRef* ownerRef
   )
   {
-    auto* const storage = reinterpret_cast<void*>(objectPtr);
+    auto* const storage = objectPtr;
     GPG_ASSERT(archive != nullptr);
     GPG_ASSERT(storage != nullptr);
     if (!archive || !storage) {

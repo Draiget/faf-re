@@ -46,9 +46,7 @@ namespace
     const bool isDerived = dynamicType != nullptr && moho::IEffect::StaticGetClass() != nullptr &&
       dynamicType->IsDerivedFrom(moho::IEffect::StaticGetClass(), &baseOffset);
 
-    out.mObj = isDerived
-      ? reinterpret_cast<void*>(reinterpret_cast<std::uintptr_t>(effect) - static_cast<std::uintptr_t>(baseOffset))
-      : static_cast<void*>(effect);
+    out.mObj = isDerived ? gpg::CompleteObject(effect, baseOffset) : static_cast<void*>(effect);
     out.mType = dynamicType ? dynamicType : moho::IEffect::StaticGetClass();
     return out;
   }
@@ -122,12 +120,12 @@ namespace moho
    */
   void WeakPtr_IEffect::Deserialize(
     gpg::ReadArchive* const archive,
-    const std::intptr_t objectPtr,
+    void* const objectPtr,
     int,
     gpg::RRef* ownerRef
   )
   {
-    auto* const weak = reinterpret_cast<WeakPtr<IEffect>*>(objectPtr);
+    auto* const weak = static_cast<WeakPtr<IEffect>*>(objectPtr);
     if (!archive || !weak) {
       return;
     }
@@ -141,12 +139,12 @@ namespace moho
    */
   void WeakPtr_IEffect::Serialize(
     gpg::WriteArchive* const archive,
-    const std::intptr_t objectPtr,
+    void* const objectPtr,
     int,
     gpg::RRef* ownerRef
   )
   {
-    auto* const weak = reinterpret_cast<WeakPtr<IEffect>*>(objectPtr);
+    auto* const weak = static_cast<WeakPtr<IEffect>*>(objectPtr);
     if (!archive || !weak) {
       return;
     }

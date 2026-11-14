@@ -1,5 +1,8 @@
 #include "editor/tools/EdMaskBrush.h"
 
+#include <cctype>
+#include <string>
+
 #include <algorithm>
 #include <cmath>
 
@@ -40,6 +43,21 @@ namespace faf::editor
       }
       const float u = (t - inner) / (1.0f - inner);
       return 1.0f - u * u * (3.0f - 2.0f * u);
+    }
+
+    /** A value in [0, 1) per texel and stroke, for scatter. */
+    [[nodiscard]] float ScatterHash(
+      const int x,
+      const int z,
+      const std::uint32_t seed
+    )
+    {
+      std::uint32_t v =
+        static_cast<std::uint32_t>(x) * 0x8DA6B343u ^ static_cast<std::uint32_t>(z) * 0xD8163841u ^ seed * 0xCB1AB31Fu;
+      v ^= v >> 13;
+      v *= 0x5BD1E995u;
+      v ^= v >> 15;
+      return static_cast<float>(v & 0xFFFFu) / 65536.0f;
     }
 
     /** A value in [0, 1) per texel, layer and brush step. */
@@ -195,42 +213,84 @@ namespace faf::editor
       const int z,
       const float weight,
       const MaskBrush& brush,
-      const float seconds
+      const float seconds,
+      MaskStroke* const stroke,
+      const std::size_t index
     )
     {
       const std::uint64_t texel = snapshot.At(x, z);
       const float strength = std::clamp(brush.shape.strength, 0.0f, 1.0f);
       const int layer = std::clamp(brush.layer, 0, 7);
-      const float current = MaskByte(texel, layer);
+      // The brush works in the weight the map's shader shows (C1: TTerrain and most others read saturate(2m-1)) and
+      // stores the byte for it.
+      const auto remappedLayer = [&](const int which) {
+        return (brush.remapped & (1U << which)) != 0;
+      };
+      const auto weightOf = [&](const std::uint64_t t, const int which) {
+        return MaskWeight(MaskByte(t, which), remappedLayer(which));
+      };
+      const float current = weightOf(texel, layer);
       const float step = weight * strength * kWeightPerSecond * seconds;
       std::uint64_t out = texel;
       const auto settle = [&](const float value, const int which) {
-        return static_cast<std::uint8_t>(std::clamp(std::floor(value + Dither(x, z, which, brush.step)), 0.0f, 255.0f));
+        return std::clamp(std::floor(value + Dither(x, z, which, brush.step)), 0.0f, 255.0f);
       };
-      switch (brush.mode) {
-      case MaskBrushMode::Paint:
-        out = WithMaskByte(out, layer, std::max(MaskByte(texel, layer), settle(current + step, layer)));
+      const auto store = [&](const int which, const float value) {
+        out = WithMaskByte(out, which, MaskStoredFor(value, remappedLayer(which), MaskByte(texel, which)));
+      };
+      const float target = std::clamp(brush.target, 0.0f, 1.0f) * 255.0f;
+      // The stroke model: from the texel before the stroke, by the strongest coverage the stroke gave it.
+      if (
+        stroke != nullptr && !brush.buildUp && index < stroke->before.size() &&
+        (brush.mode == MaskBrushMode::Paint || brush.mode == MaskBrushMode::Erase)
+      ) {
+        float& coverage = stroke->coverage[index];
+        coverage = std::max(coverage, std::min(1.0f, weight * strength));
+        const std::uint64_t before = stroke->before[index];
+        const float start = weightOf(before, layer);
+        if (brush.mode == MaskBrushMode::Erase) {
+          store(layer, std::min(current, std::round(start * (1.0f - coverage))));
+          return out;
+        }
+        if (start < target) {
+          store(layer, std::max(current, std::round(start + (target - start) * coverage)));
+        }
         if (brush.lowerAbove) {
           for (int above = layer + 1; above < 8; ++above) {
-            const float value = MaskByte(texel, above);
+            const float value = weightOf(texel, above);
             if (value > 0.0f) {
-              out = WithMaskByte(out, above, std::min(MaskByte(texel, above), settle(value - step, above)));
+              store(above, std::min(value, std::round(weightOf(before, above) * (1.0f - coverage))));
+            }
+          }
+        }
+        return out;
+      }
+      switch (brush.mode) {
+      case MaskBrushMode::Paint:
+        if (current < target) {
+          store(layer, std::max(current, std::min(target, settle(current + step, layer))));
+        }
+        if (brush.lowerAbove) {
+          for (int above = layer + 1; above < 8; ++above) {
+            const float value = weightOf(texel, above);
+            if (value > 0.0f) {
+              store(above, std::min(value, settle(value - step, above)));
             }
           }
         }
         break;
       case MaskBrushMode::Erase:
-        out = WithMaskByte(out, layer, std::min(MaskByte(texel, layer), settle(current - step, layer)));
+        store(layer, std::min(current, settle(current - step, layer)));
         break;
       case MaskBrushMode::Smooth: {
         float sum = 0.0f;
         for (int dz = -1; dz <= 1; ++dz) {
           for (int dx = -1; dx <= 1; ++dx) {
-            sum += MaskByte(snapshot.At(x + dx, z + dz), layer);
+            sum += weightOf(snapshot.At(x + dx, z + dz), layer);
           }
         }
         const float blend = std::min(1.0f, strength * kBlendPerSecond * seconds);
-        out = WithMaskByte(out, layer, settle(current + (sum / 9.0f - current) * blend * weight, layer));
+        store(layer, settle(current + (sum / 9.0f - current) * blend * weight, layer));
         break;
       }
       }
@@ -242,10 +302,12 @@ namespace faf::editor
       const float perTexel,
       const int x,
       const int z,
-      const HeightBrush& shape
+      const MaskBrush& brush
     )
     {
-      if (!shape.limitHeight && !shape.limitSlope) {
+      const HeightBrush& shape = brush.shape;
+      const bool minSlope = brush.limitMinSlope > 0.0f;
+      if (!shape.limitHeight && !shape.limitSlope && !minSlope) {
         return true;
       }
       float height = 0.0f;
@@ -254,7 +316,67 @@ namespace faf::editor
       if (shape.limitHeight && (height < shape.limitLow || height > shape.limitHigh)) {
         return false;
       }
+      if (minSlope && slope < brush.limitMinSlope) {
+        return false;
+      }
       return !shape.limitSlope || slope <= shape.limitMaxSlope;
+    }
+
+    /**
+     * The brush's weight for a texel's group: round, its falloff at the nearest copy (WeightAt); shaped, the cursor
+     * copy's shape read at whichever member it reaches most strongly (each copy shows the mirror or turned image of
+     * the cursor's dab); then the scatter, hashed on the group's first texel `(x, z)`.
+     */
+    [[nodiscard]] float GroupWeight(
+      const Shape& shape,
+      const int x,
+      const int z,
+      const int maskWidth,
+      const int maskHeight,
+      const MaskBrush& brush
+    )
+    {
+      float weight = 0.0f;
+      if (brush.shape.shape == BrushShape::Round) {
+        weight = WeightAt(shape, x, z, brush);
+      } else {
+        HeightBrush texels = brush.shape;
+        texels.radius = shape.radius;
+        if (shape.symmetry == Symmetry::NWay) {
+          for (int c = 0; c < shape.centres; ++c) {
+            const double angle = -kTwoPi * c / shape.centres;
+            const double dx = static_cast<double>(x) - shape.centreX[c];
+            const double dz = static_cast<double>(z) - shape.centreZ[c];
+            weight = std::max(
+              weight,
+              BrushWeightAt(
+                texels,
+                static_cast<float>(dx * std::cos(angle) - dz * std::sin(angle)),
+                static_cast<float>(dx * std::sin(angle) + dz * std::cos(angle))
+              )
+            );
+          }
+        } else {
+          int memberX[kMaxSymmetryCopies];
+          int memberZ[kMaxSymmetryCopies];
+          const int members =
+            SymmetricSamples(shape.symmetry, brush.shape.turns, maskWidth, maskHeight, x, z, memberX, memberZ);
+          for (int m = 0; m < members; ++m) {
+            weight = std::max(
+              weight,
+              BrushWeightAt(
+                texels,
+                static_cast<float>(memberX[m]) - shape.centreX[0],
+                static_cast<float>(memberZ[m]) - shape.centreZ[0]
+              )
+            );
+          }
+        }
+      }
+      if (weight > 0.0f && brush.scatter > 0.0f) {
+        weight *= 1.0f - std::clamp(brush.scatter, 0.0f, 1.0f) * ScatterHash(x, z, brush.scatterSeed);
+      }
+      return weight;
     }
   } // namespace
 
@@ -281,11 +403,18 @@ namespace faf::editor
     const float x,
     const float z,
     const MaskBrush& brush,
-    const float seconds
+    const float seconds,
+    MaskStroke* const stroke
   )
   {
     if (texels == nullptr || maskWidth < 2 || maskHeight < 2 || brush.shape.radius <= 0.0f || seconds <= 0.0f) {
       return {};
+    }
+    const std::size_t count = static_cast<std::size_t>(maskWidth) * static_cast<std::size_t>(maskHeight);
+    if (stroke != nullptr && stroke->before.size() != count) {
+      // The stroke's first step: the texels as they are now, no coverage yet.
+      stroke->before.assign(texels, texels + count);
+      stroke->coverage.assign(count, 0.0f);
     }
     const float perTexel = SamplesPerTexel(maskWidth, terrain);
     const Shape shape = ShapeOf(maskWidth, maskHeight, terrain, x, z, brush);
@@ -318,9 +447,9 @@ namespace faf::editor
             if (TurnSector(maskWidth, maskHeight, turns, tx, tz) != 0 || !FirstRectHolding(shape.rects, r, tx, tz)) {
               continue;
             }
-            const float weight = WeightAt(shape, tx, tz, brush);
-            if (weight > 0.0f && WithinLimits(terrain, perTexel, tx, tz, brush.shape)) {
-              texels[index(tx, tz)] = Brushed(snapshots[r], tx, tz, weight, brush, seconds);
+            const float weight = GroupWeight(shape, tx, tz, maskWidth, maskHeight, brush);
+            if (weight > 0.0f && WithinLimits(terrain, perTexel, tx, tz, brush)) {
+              texels[index(tx, tz)] = Brushed(snapshots[r], tx, tz, weight, brush, seconds, stroke, index(tx, tz));
             }
           }
         }
@@ -368,11 +497,11 @@ namespace faf::editor
           if (!first || !FirstRectHolding(shape.rects, r, tx, tz)) {
             continue;
           }
-          const float weight = WeightAt(shape, tx, tz, brush);
-          if (weight <= 0.0f || !WithinLimits(terrain, perTexel, tx, tz, brush.shape)) {
+          const float weight = GroupWeight(shape, tx, tz, maskWidth, maskHeight, brush);
+          if (weight <= 0.0f || !WithinLimits(terrain, perTexel, tx, tz, brush)) {
             continue;
           }
-          const std::uint64_t texel = Brushed(snapshots[r], tx, tz, weight, brush, seconds);
+          const std::uint64_t texel = Brushed(snapshots[r], tx, tz, weight, brush, seconds, stroke, index(tx, tz));
           for (int m = 0; m < members; ++m) {
             texels[index(memberX[m], memberZ[m])] = texel;
           }
@@ -542,19 +671,68 @@ namespace faf::editor
   void MaskCoverage(
     const std::uint64_t* const texels,
     const std::size_t count,
-    float (&coverage)[8]
+    float (&coverage)[8],
+    const std::uint8_t remapped
   )
   {
-    std::uint64_t sums[8]{};
+    double sums[8] = {};
     for (std::size_t i = 0; i < count; ++i) {
       for (int layer = 0; layer < 8; ++layer) {
-        sums[layer] += MaskByte(texels[i], layer);
+        sums[layer] += MaskWeight(MaskByte(texels[i], layer), (remapped & (1U << layer)) != 0);
       }
     }
     for (int layer = 0; layer < 8; ++layer) {
-      coverage[layer] =
-        count == 0 ? 0.0f : static_cast<float>(static_cast<double>(sums[layer]) / (255.0 * static_cast<double>(count)));
+      coverage[layer] = count == 0 ? 0.0f : static_cast<float>(sums[layer] / (255.0 * static_cast<double>(count)));
     }
+  }
+
+  std::uint8_t RemappedStrata(
+    std::string_view shader
+  )
+  {
+    std::string name(shader);
+    for (char& c : name) {
+      c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    }
+    // From effects/terrain.fx: the original shaders read every mask through saturate(2m - 1); the numbered ones pass
+    // a `halfRange` flag to their pixel shader, set exactly when the name's middle digit is 5 (Terrain050, Terrain151,
+    // Terrain252B ...), and the 1xx / 2xx shaders leave stratum 8 (the second mask's alpha, their roughness multiplier)
+    // out of it; Terrain301 passes it set; TerrainPBR reads the masks as they are.
+    if (name == "terrainpbr") {
+      return 0;
+    }
+    if (name == "terrain301") {
+      return 0xFF;
+    }
+    if (
+      name.size() >= 10 && name.rfind("terrain", 0) == 0 && std::isdigit(static_cast<unsigned char>(name[7])) != 0 &&
+      std::isdigit(static_cast<unsigned char>(name[8])) != 0 && std::isdigit(static_cast<unsigned char>(name[9])) != 0
+    ) {
+      if (name[8] != '5') {
+        return 0; // full range
+      }
+      return name[7] == '1' || name[7] == '2' ? std::uint8_t{0x7F} : std::uint8_t{0xFF};
+    }
+    return 0xFF; // TTerrain, TTerrainXP, TTerrainGlow, TTerrainXPExt, and a shader the table doesn't know
+  }
+
+  MaskRangeReport CheckMaskRange(
+    const std::uint64_t* const texels,
+    const std::size_t count,
+    const std::uint8_t remapped
+  )
+  {
+    MaskRangeReport report;
+    for (std::size_t i = 0; i < count; ++i) {
+      for (int layer = 0; layer < 8; ++layer) {
+        const std::uint8_t stored = MaskByte(texels[i], layer);
+        if ((remapped & (1U << layer)) == 0 || stored == 0) {
+          continue;
+        }
+        ++(stored <= 127 ? report.hidden : report.shown)[static_cast<std::size_t>(layer)];
+      }
+    }
+    return report;
   }
 
   SampleRect ApplyMaskRules(

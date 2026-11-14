@@ -590,66 +590,6 @@ namespace
     return result;
   }
 
-  /**
-   * Address: 0x0047E4B0 (FUN_0047E4B0, ExtractArgumentHighByte)
-   */
-  unsigned char ExtractArgumentHighByte(
-    const uint32_t value
-  ) noexcept
-  {
-    return static_cast<unsigned char>((value >> 8u) & 0xFFu);
-  }
-
-  /**
-   * Address: 0x0047E570 (FUN_0047E570, ExtractArgumentHighByteAlias)
-   */
-  [[maybe_unused]] unsigned char ExtractArgumentHighByteAlias(
-    const uint32_t value
-  ) noexcept
-  {
-    return ExtractArgumentHighByte(value);
-  }
-
-  /**
-   * Address: 0x0047E5C0 (FUN_0047E5C0, ExtractArgumentHighByteAlias2)
-   */
-  [[maybe_unused]] unsigned char ExtractArgumentHighByteAlias2(
-    const uint32_t value
-  ) noexcept
-  {
-    return ExtractArgumentHighByte(value);
-  }
-
-  /**
-   * Address: 0x0047E630 (FUN_0047E630, ExtractArgumentHighByteAlias3)
-   */
-  [[maybe_unused]] unsigned char ExtractArgumentHighByteAlias3(
-    const uint32_t value
-  ) noexcept
-  {
-    return ExtractArgumentHighByte(value);
-  }
-
-  /**
-   * Address: 0x0047E6F0 (FUN_0047E6F0, ExtractArgumentHighByteAlias4)
-   */
-  [[maybe_unused]] unsigned char ExtractArgumentHighByteAlias4(
-    const uint32_t value
-  ) noexcept
-  {
-    return ExtractArgumentHighByte(value);
-  }
-
-  /**
-   * Address: 0x0047E930 (FUN_0047E930, ExtractArgumentHighByteAlias5)
-   */
-  [[maybe_unused]] unsigned char ExtractArgumentHighByteAlias5(
-    const uint32_t value
-  ) noexcept
-  {
-    return ExtractArgumentHighByte(value);
-  }
-
   [[nodiscard]] uint32_t FindFirstStampAtOrAfter(
     const SSendStampWindow& stamps,
     const uint64_t thresholdUs

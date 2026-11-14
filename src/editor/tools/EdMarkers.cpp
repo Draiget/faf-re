@@ -5,6 +5,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <deque>
 #include <set>
 #include <sstream>
 
@@ -13,6 +14,26 @@ namespace faf::editor
   namespace
   {
     const char* const kProps = "/env/common/props/markers/";
+
+    /** The palette: the built-in types, then the game's templates (room kept so that pointers into it stay good). */
+    std::vector<MarkerType>& Registry(
+      const std::vector<MarkerType>& builtIn
+    )
+    {
+      static std::vector<MarkerType> all = [&builtIn] {
+        std::vector<MarkerType> types;
+        types.reserve(512);
+        types.insert(types.end(), builtIn.begin(), builtIn.end());
+        return types;
+      }();
+      return all;
+    }
+    /** The added types' strings (a MarkerType points at them). */
+    std::deque<std::string>& Strings()
+    {
+      static std::deque<std::string> strings;
+      return strings;
+    }
 
     std::string Prop(
       const char* const file
@@ -100,7 +121,7 @@ namespace faf::editor
         {"scale", Float(1.0)},
         {"height", Float(0.0)}}},
     };
-    return types;
+    return Registry(types);
   }
 
   const char* MarkerTypeUse(
@@ -278,6 +299,38 @@ namespace faf::editor
     y = static_cast<float>(numbers[1]);
     z = static_cast<float>(numbers[2]);
     return true;
+  }
+
+  std::vector<std::string> PullMarkersInside(
+    std::vector<SaveEntry>& markers,
+    const float x0,
+    const float z0,
+    const float x1,
+    const float z1,
+    const float inset,
+    const std::function<float(float, float)>& height
+  )
+  {
+    std::vector<std::string> moved;
+    // An area narrower than twice the inset keeps its middle.
+    const float lowX = std::min(x0 + inset, (x0 + x1) * 0.5f);
+    const float highX = std::max(x1 - inset, (x0 + x1) * 0.5f);
+    const float lowZ = std::min(z0 + inset, (z0 + z1) * 0.5f);
+    const float highZ = std::max(z1 - inset, (z0 + z1) * 0.5f);
+    for (SaveEntry& marker : markers) {
+      float x = 0.0f, y = 0.0f, z = 0.0f;
+      if (!MarkerPosition(marker, x, y, z) || (x >= x0 && x <= x1 && z >= z0 && z <= z1)) {
+        continue;
+      }
+      x = std::clamp(x, lowX, highX);
+      z = std::clamp(z, lowZ, highZ);
+      if (height) {
+        y = height(x, z);
+      }
+      marker.Set("position", Vector3Value(x, y, z));
+      moved.push_back(marker.name);
+    }
+    return moved;
   }
 
   std::uint32_t MarkerColor(
@@ -645,6 +698,214 @@ namespace faf::editor
             const std::string other = grid[static_cast<std::size_t>(r * count + c)].name;
             (void)SetMarkerLink(grid, name, other, true);
           }
+        }
+      }
+    }
+    return grid;
+  }
+
+  int AddMarkerTemplates(
+    const std::string& lua
+  )
+  {
+    std::vector<MarkerType>& types = const_cast<std::vector<MarkerType>&>(MarkerTypes());
+    const auto keep = [](std::string text) -> const char* {
+      Strings().push_back(std::move(text));
+      return Strings().back().c_str();
+    };
+    // A value as the saves write it: a quoted text, a number, true or false, VECTOR3(...).
+    const auto saved = [](std::string value) -> std::string {
+      while (!value.empty() && (value.back() == ',' || std::isspace(static_cast<unsigned char>(value.back())) != 0)) {
+        value.pop_back();
+      }
+      if (value.size() >= 2 && (value.front() == '"' || value.front() == '\'')) {
+        return StringValue(value.substr(1, value.size() - 2));
+      }
+      if (value == "true" || value == "false") {
+        return "BOOLEAN( " + value + " )";
+      }
+      if (value.rfind("VECTOR3", 0) == 0) {
+        const std::vector<double> n = ValueNumbers(value);
+        return n.size() >= 3 ? Vector3Value(n[0], n[1], n[2]) : value;
+      }
+      char* end = nullptr;
+      const double number = std::strtod(value.c_str(), &end);
+      if (end != value.c_str() && *end == '\0') {
+        return Float(number);
+      }
+      return value;
+    };
+    int added = 0;
+    std::size_t at = 0;
+    while ((at = lua.find("['", at)) != std::string::npos) {
+      const std::size_t nameEnd = lua.find("']", at + 2);
+      const std::size_t open = nameEnd == std::string::npos ? nameEnd : lua.find('{', nameEnd);
+      const std::size_t close = open == std::string::npos ? open : lua.find('}', open);
+      if (close == std::string::npos) {
+        break;
+      }
+      const std::string name = lua.substr(at + 2, nameEnd - at - 2);
+      at = close + 1;
+      if (FindMarkerType(name) != nullptr || name.empty()) {
+        continue;
+      }
+      std::string color = "ff808080";
+      std::string prop = "M_Blank_prop.bp";
+      std::vector<std::pair<std::string, std::string>> extra;
+      std::istringstream body(lua.substr(open + 1, close - open - 1));
+      std::string line;
+      while (std::getline(body, line)) {
+        const std::size_t comment = line.find("--");
+        if (comment != std::string::npos) {
+          line.erase(comment);
+        }
+        const std::size_t equals = line.find('=');
+        if (equals == std::string::npos) {
+          continue;
+        }
+        std::string key = line.substr(0, equals);
+        key.erase(
+          std::remove_if(
+            key.begin(),
+            key.end(),
+            [](const unsigned char c) {
+          return std::isspace(c) != 0;
+        }
+          ),
+          key.end()
+        );
+        std::string value = line.substr(equals + 1);
+        value.erase(0, value.find_first_not_of(" \t"));
+        const std::string text = saved(value);
+        if (key == "color") {
+          color = ValueString(text);
+        } else if (key == "prop") {
+          const std::string path = ValueString(text);
+          prop = path.rfind(kProps, 0) == 0 ? path.substr(std::string(kProps).size()) : prop;
+        } else if (!key.empty()) {
+          extra.emplace_back(key, text);
+        }
+      }
+      if (types.size() >= types.capacity()) {
+        break; // (the palette's room is kept: pointers into it stay good)
+      }
+      types.push_back({keep(name), "Game", keep(name + " "), keep(color), keep(prop), std::move(extra)});
+      ++added;
+    }
+    return added;
+  }
+
+  SaveEntry WithMarkerType(
+    const SaveEntry& marker,
+    const MarkerType& type
+  )
+  {
+    SaveEntry out = marker;
+    // The old type's own properties go (the new one brings its own).
+    if (const MarkerType* const old = FindMarkerType(MarkerTypeOf(marker)); old != nullptr) {
+      for (const auto& [key, value] : old->extra) {
+        out.properties.erase(
+          std::remove_if(
+            out.properties.begin(),
+            out.properties.end(),
+            [&key](const auto& property) {
+          return property.first == key;
+        }
+          ),
+          out.properties.end()
+        );
+      }
+    }
+    for (const auto& [key, value] : type.extra) {
+      if (out.Get(key).empty()) {
+        out.properties.emplace(out.properties.begin(), key, value);
+      }
+    }
+    out.Set("color", StringValue(type.color));
+    out.Set("type", StringValue(type.type));
+    out.Set("prop", StringValue(Prop(type.prop)));
+    return out;
+  }
+
+  std::vector<ResourceSnap> ResourceSnaps(
+    const std::vector<SaveEntry>& markers
+  )
+  {
+    std::vector<ResourceSnap> out;
+    for (const SaveEntry& marker : markers) {
+      const std::string type = MarkerTypeOf(marker);
+      float x = 0.0f;
+      float y = 0.0f;
+      float z = 0.0f;
+      if ((type != "Mass" && type != "Hydrocarbon") || !MarkerPosition(marker, x, y, z)) {
+        continue;
+      }
+      const float sx = std::floor(x) + 0.5f;
+      const float sz = std::floor(z) + 0.5f;
+      if (std::fabs(sx - x) > 0.02f || std::fabs(sz - z) > 0.02f) {
+        out.push_back(ResourceSnap{marker.name, sx, sz});
+      }
+    }
+    return out;
+  }
+
+  std::vector<SaveEntry> PathNodeGrid(
+    const std::vector<SaveEntry>& existing,
+    const char* const typeName,
+    const int count,
+    const float x0,
+    const float z0,
+    const float x1,
+    const float z1,
+    const std::function<float(float, float)>& height,
+    const std::function<bool(float, float)>& stands,
+    const std::function<bool(float, float, float, float)>& reaches
+  )
+  {
+    std::vector<SaveEntry> grid;
+    const MarkerType* const type = FindMarkerType(typeName);
+    if (type == nullptr || count < 2 || x1 <= x0 || z1 <= z0) {
+      return grid;
+    }
+    std::vector<SaveEntry> taken = existing;
+    const float stepX = (x1 - x0) / static_cast<float>(count);
+    const float stepZ = (z1 - z0) / static_cast<float>(count);
+    // -1 where no node stands; else its index in `grid`.
+    std::vector<int> at(static_cast<std::size_t>(count) * static_cast<std::size_t>(count), -1);
+    std::vector<std::pair<float, float>> place(at.size());
+    for (int row = 0; row < count; ++row) {
+      for (int column = 0; column < count; ++column) {
+        const float x = std::floor(x0 + stepX * (static_cast<float>(column) + 0.5f)) + 0.5f;
+        const float z = std::floor(z0 + stepZ * (static_cast<float>(row) + 0.5f)) + 0.5f;
+        if (!stands(x, z)) {
+          continue;
+        }
+        SaveEntry node = NewMarker(*type, NextMarkerName(taken, *type), x, height(x, z), z);
+        taken.push_back({node.name, {}});
+        const std::size_t cell = static_cast<std::size_t>(row * count + column);
+        at[cell] = static_cast<int>(grid.size());
+        place[cell] = {x, z};
+        grid.push_back(std::move(node));
+      }
+    }
+    for (int row = 0; row < count; ++row) {
+      for (int column = 0; column < count; ++column) {
+        const std::size_t from = static_cast<std::size_t>(row * count + column);
+        if (at[from] < 0) {
+          continue;
+        }
+        for (const auto& [dr, dc] : {std::pair{0, 1}, std::pair{1, -1}, std::pair{1, 0}, std::pair{1, 1}}) {
+          const int r = row + dr;
+          const int c = column + dc;
+          if (r >= count || c < 0 || c >= count) {
+            continue;
+          }
+          const std::size_t to = static_cast<std::size_t>(r * count + c);
+          if (at[to] < 0 || !reaches(place[from].first, place[from].second, place[to].first, place[to].second)) {
+            continue;
+          }
+          const std::string other = grid[static_cast<std::size_t>(at[to])].name;
+          (void)SetMarkerLink(grid, grid[static_cast<std::size_t>(at[from])].name, other, true);
         }
       }
     }

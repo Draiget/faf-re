@@ -1,0 +1,27 @@
+# The terrain graphs the editor ships (FAF Studio's graphpresets: one Lua file per graph and index.lua), built into the
+# editor as text (EmbeddedTerrainGraphFiles() in the generated .cpp), so they need no data folder beside the exe.
+# faf_embed_terrain_graphs(<var>) sets <var> to the generated source; it is written again only when a file changed.
+
+function(faf_embed_terrain_graphs out_var)
+  set(_dir "${CMAKE_SOURCE_DIR}/src/editor/graph/presets")
+  set(_out "${CMAKE_BINARY_DIR}/generated/EdTerrainGraphFiles.cpp")
+  file(GLOB _files RELATIVE "${_dir}" CONFIGURE_DEPENDS "${_dir}/*.lua")
+  list(SORT _files)
+  set(_text "// Generated from src/editor/graph/presets by EmbedGraphs.cmake: do not edit.\n#include <string>\n#include <utility>\n#include <vector>\n\nnamespace faf::editor\n{\n  const std::vector<std::pair<std::string, std::string>>& EmbeddedTerrainGraphFiles()\n  {\n    static const std::vector<std::pair<std::string, std::string>> kFiles = {\n")
+  foreach(_file IN LISTS _files)
+    file(READ "${_dir}/${_file}" _content)
+    string(LENGTH "${_content}" _length)
+    string(APPEND _text "      {\"${_file}\",\n       std::string()")
+    set(_at 0)
+    while(_at LESS _length)
+      string(SUBSTRING "${_content}" ${_at} 4000 _piece)
+      string(APPEND _text " +\n         R\"faf(${_piece})faf\"")
+      math(EXPR _at "${_at} + 4000")
+    endwhile()
+    string(APPEND _text "},\n")
+  endforeach()
+  string(APPEND _text "    };\n    return kFiles;\n  }\n} // namespace faf::editor\n")
+  file(WRITE "${_out}.tmp" "${_text}")
+  configure_file("${_out}.tmp" "${_out}" COPYONLY)
+  set(${out_var} "${_out}" PARENT_SCOPE)
+endfunction()

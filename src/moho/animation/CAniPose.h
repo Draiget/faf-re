@@ -231,22 +231,6 @@ namespace moho
      *   `[first, last)` bone range into fresh storage
      */
 
-    /**
-     * Reads back the capacity pointer stashed in the first pointer-sized
-     * slot of `mInlineStorage` the last time this array grew past inline
-     * storage. `mOriginal` always points at `mInlineStorage`, so once the
-     * array is rebound to heap storage (`mBegin != mOriginal`), that inline
-     * slot is dead space the grow path repurposes to remember the capacity
-     * it had before growing -- the same small-buffer-optimization idiom
-     * already named `InlineCapacityFromHeader_`/`SaveInlineCapacity_` on
-     * `gpg::core::FastVectorN<T,N>` (`gpg/core/containers/FastVector.h`),
-     * applied here to this hand-rolled single-inline-element array.
-     */
-    [[nodiscard]] CAniPoseBone* InlineCapacityFromHeader() const noexcept
-    {
-      return *reinterpret_cast<CAniPoseBone* const*>(mOriginal);
-    }
-
   public:
     /**
      * Grows or shrinks the live range to `count` bones, filling any new slots
@@ -262,11 +246,9 @@ namespace moho
      * The inline-storage rule is the one thing that makes this not a plain
      * vector: `mOriginal` always points at `mInlineStorage`, so while
      * `mBegin == mOriginal` the storage is the object's own single-slot window
-     * and must never be freed. On the first grow past it the binary stashes the
-     * outgoing capacity sentinel into that now-dead inline slot instead of
-     * deleting anything (see `InlineCapacityFromHeader_` / `SaveInlineCapacity_`
-     * on the `gpg` fastvectors, and the same branch in
-     * `gpg::core::FastVectorInline<T>::ReallocateInsert_`).
+     * and must never be freed. (The binary also stashes the outgoing capacity
+     * in that dead inline slot on the first grow; only `~CAniPose` read it
+     * back, into an object being destroyed, so it is not kept.)
      */
     /// 11 bones of 0x4C bytes are 0x344, the one bone count in the binary's 896-byte allocator class (see
     /// SimBlockLane).
@@ -314,12 +296,8 @@ namespace moho
           grown[i] = mBegin[i];
         }
 
-        if (mBegin == mOriginal) {
-          // Inline window: never freed. The outgoing capacity goes into the
-          // slot the live range has just vacated.
-          *reinterpret_cast<CAniPoseBone**>(mOriginal) = mCapacity;
-        } else {
-          FreeHeapBones();
+        if (mBegin != mOriginal) {
+          FreeHeapBones(); // the inline window is never freed
         }
 
         mBegin = grown;

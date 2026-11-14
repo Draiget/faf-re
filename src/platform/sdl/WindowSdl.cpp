@@ -633,13 +633,15 @@ namespace platform::window
     const int y,
     const int width,
     const int height,
-    const bool resizable
+    const bool resizable,
+    const bool bordered
   )
   {
     if (!gInitialized) {
       return nullptr;
     }
     SDL_PropertiesID properties = SDL_CreateProperties();
+    (void)SDL_SetBooleanProperty(properties, SDL_PROP_WINDOW_CREATE_BORDERLESS_BOOLEAN, !bordered);
     (void)SDL_SetStringProperty(properties, SDL_PROP_WINDOW_CREATE_TITLE_STRING, utf8Title != nullptr ? utf8Title : "");
     (void)SDL_SetNumberProperty(properties, SDL_PROP_WINDOW_CREATE_X_NUMBER, x < 0 ? SDL_WINDOWPOS_CENTERED : x);
     (void)SDL_SetNumberProperty(properties, SDL_PROP_WINDOW_CREATE_Y_NUMBER, y < 0 ? SDL_WINDOWPOS_CENTERED : y);
@@ -913,6 +915,21 @@ namespace platform::window
     }
   }
 
+  void SetFrameStyle(
+    const Handle window,
+    const bool bordered,
+    const bool resizable
+  )
+  {
+    if (window == nullptr || sdl::IsChild(AsWindow(window))) {
+      return;
+    }
+    (void)SDL_SetWindowBordered(AsWindow(window), bordered);
+    (void)SDL_SetWindowResizable(AsWindow(window), resizable);
+    (void)SDL_SyncWindow(AsWindow(window));
+    sdl::OnWindowRectChanged(AsWindow(window));
+  }
+
   void SetFullscreen(
     const Handle window,
     const bool fullscreen
@@ -1184,6 +1201,31 @@ namespace platform::window
     gFolderPickAnswer.pending = true;
     gFolderPickAnswer.chosen = chosen;
     gFolderPickAnswer.path = utf8Path != nullptr ? utf8Path : "";
+  }
+
+  bool GetSecondaryDisplayBounds(
+    int* const x,
+    int* const y,
+    int* const width,
+    int* const height
+  )
+  {
+    const SDL_DisplayID primary = SDL_GetPrimaryDisplay();
+    int count = 0;
+    SDL_DisplayID* const displays = SDL_GetDisplays(&count);
+    bool found = false;
+    for (int index = 0; displays != nullptr && index < count && !found; ++index) {
+      SDL_Rect bounds{};
+      if (displays[index] != primary && SDL_GetDisplayBounds(displays[index], &bounds)) {
+        *x = bounds.x;
+        *y = bounds.y;
+        *width = bounds.w;
+        *height = bounds.h;
+        found = true;
+      }
+    }
+    SDL_free(displays);
+    return found;
   }
 
   bool ShowSplash(

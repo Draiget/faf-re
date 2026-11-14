@@ -1,4 +1,5 @@
 #include "editor/EdPlay.h"
+#include "editor/EdLuaDebugger.h"
 #include "editor/EdMemTrace.h"
 
 #ifndef NOMINMAX
@@ -88,7 +89,14 @@ function EditorStartPlay(mapPath, aiKey, faction, fog)
     if scenario.type == 'campaign' then
         info.scenarioMods = import('/lua/mods.lua').GetCampaignMods(scenario)
     else
-        info.scenarioMods = import('/lua/mods.lua').GetGameMods(extra.mods or {})
+        -- A mod folder mounted since the last look (a mod project's Test) is found again.
+        import('/lua/mods.lua').ClearCache()
+        local mods = extra.mods or {}
+        -- A coop map without FAF's coop mod: the editor's coop shim (FAF Studio's coopshim.lua) stands in for it.
+        if scenario.type == 'campaign_coop' and extra.coopShim then
+            mods[extra.coopShim] = true
+        end
+        info.scenarioMods = import('/lua/mods.lua').GetGameMods(mods)
     end
 
     local GetDefaultPlayerOptions = import('/lua/ui/lobby/lobbycomm.lua').GetDefaultPlayerOptions
@@ -119,7 +127,31 @@ function EditorStartPlay(mapPath, aiKey, faction, fog)
         return player
     end
 
-    if extra.slots and table.getn(extra.slots) > 0 then
+    if scenario.type == 'campaign_coop' then
+        -- A coop mission (FAF Studio's way): you are the first Player<N> army, the other players' armies stand by
+        -- (passive), and every other army gets the campaign brain (no skirmish AI: the mission's script runs it).
+        local you = nil
+        for index, name in armies do
+            if not you and string.find(name, '^Player') then
+                you = index
+                info.teamInfo[1] = newPlayer(index, 1)
+            end
+        end
+        if not you then
+            you = 1
+            info.teamInfo[1] = newPlayer(1, 1)
+        end
+        for index, name in armies do
+            if index ~= you then
+                local army = newAi(index, '', string.find(name, '^Player') and 1 or 2)
+                army.AIPersonality = ''
+                if string.find(name, '^Player') then
+                    army.Civilian = true
+                end
+                info.teamInfo[table.getn(info.teamInfo) + 1] = army
+            end
+        end
+    elseif extra.slots and table.getn(extra.slots) > 0 then
         -- A custom setup, slot by slot: you first (army 1 is the player's), then the AIs in slot order. No You
         -- row: you watch, as an observer (the session's focus army stays -1).
         local you = nil
@@ -403,6 +435,7 @@ end
     static constexpr char kListMods[] = R"lua(
 function EditorListMods()
     local out = {}
+    import('/lua/mods.lua').ClearCache()
     for uid, mod in import('/lua/mods.lua').AllSelectableMods() do
         if not mod.ui_only then
             local entry = { uid = uid, name = mod.name or uid, ai = {} }
@@ -491,6 +524,115 @@ end
     PrepareRules();
   }
 
+  bool EdPlay::WriteCoopShim(
+    const std::filesystem::path& modsFolder,
+    std::string& error
+  )
+  {
+    static constexpr char kModInfo[] = R"lua(name = "Editor coop shim"
+uid = "faf-editor-coop-shim-v1"
+version = 1
+copyright = "FAF map editor"
+description = "Stands in for FAF's coop mod while the map editor plays a coop map: shared unit cap, restrictions for all humans, announcements, commanders' spawn."
+author = "FAF map editor"
+selectable = false
+enabled = true
+exclusive = false
+ui_only = false
+requires = {}
+requiresNames = {}
+conflicts = {}
+before = {}
+after = {}
+)lua";
+    static constexpr char kFramework[] = R"lua(
+-- The map editor's coop shim: what FAF's coop mod adds to ScenarioFramework, for test plays of coop maps. Each
+-- function only when the game's own file hasn't got it.
+local function EditorHumans()
+    local humans = {}
+    for index, brain in ArmyBrains do
+        if brain.BrainType == 'Human' then
+            humans[brain.Name] = index
+        end
+    end
+    return humans
+end
+if not rawget(getfenv(1), 'SetSharedUnitCap') then
+    function SetSharedUnitCap(cap)
+        local humans = ScenarioInfo.HumanPlayers or EditorHumans()
+        local count = math.max(1, table.getsize(humans))
+        for _, index in humans do
+            SetArmyUnitCap(index, math.floor(cap / count))
+        end
+    end
+end
+if not rawget(getfenv(1), 'AddRestrictionForAllHumans') then
+    function AddRestrictionForAllHumans(categories)
+        for _, index in ScenarioInfo.HumanPlayers or EditorHumans() do
+            AddBuildRestriction(index, categories)
+        end
+    end
+end
+if not rawget(getfenv(1), 'RemoveRestrictionForAllHumans') then
+    function RemoveRestrictionForAllHumans(categories)
+        for _, index in ScenarioInfo.HumanPlayers or EditorHumans() do
+            RemoveBuildRestriction(index, categories)
+        end
+    end
+end
+if not rawget(getfenv(1), 'SimAnnouncement') then
+    function SimAnnouncement(title, text)
+        LOG('coop shim: announcement: ' .. tostring(title) .. ' ' .. tostring(text or ''))
+        PrintText(tostring(title), 20, 'ffffffff', 5, 'center')
+    end
+end
+if not rawget(getfenv(1), 'SpawnCommander') then
+    function SpawnCommander(armyName, unitName, effect)
+        local ScenarioUtils = import('/lua/sim/scenarioutilities.lua')
+        local unit = ScenarioUtils.CreateArmyUnit(armyName, unitName)
+        LOG('coop shim: commander ' .. tostring(unitName) .. ' for ' .. tostring(armyName))
+        return unit
+    end
+end
+)lua";
+    static constexpr char kUtilities[] = R"lua(
+-- The map editor's coop shim: ScenarioInfo.HumanPlayers (army name -> index) before the armies are made.
+do
+    local EditorOriginalInitializeArmies = InitializeScenarioArmies
+    InitializeScenarioArmies = function()
+        if not ScenarioInfo.HumanPlayers then
+            local humans = {}
+            for index, brain in ArmyBrains do
+                if brain.BrainType == 'Human' then
+                    humans[brain.Name] = index
+                end
+            end
+            ScenarioInfo.HumanPlayers = humans
+            LOG('coop shim: ' .. table.getsize(humans) .. ' human player(s)')
+        end
+        return EditorOriginalInitializeArmies()
+    end
+end
+)lua";
+    const std::filesystem::path folder = modsFolder / "EditorCoopShim";
+    std::error_code made;
+    std::filesystem::create_directories(folder / "hook" / "lua" / "sim", made);
+    const auto write = [&](const std::filesystem::path& file, const char* text) {
+      std::ofstream out(file, std::ios::binary | std::ios::trunc);
+      out << text;
+      return out.good();
+    };
+    if (
+      !write(folder / "mod_info.lua", kModInfo) ||
+      !write(folder / "hook" / "lua" / "ScenarioFramework.lua", kFramework) ||
+      !write(folder / "hook" / "lua" / "sim" / "ScenarioUtilities.lua", kUtilities)
+    ) {
+      error = "couldn't write " + folder.string();
+      return false;
+    }
+    return true;
+  }
+
   std::vector<std::string> EdPlay::PlayedMods() const
   {
     std::vector<std::string> mods = mSetup.mods;
@@ -504,6 +646,13 @@ end
     };
     if (mSetup.slots.empty() && mSetup.withAi) {
       addAiMod(mSetup.ai);
+    }
+    // The turned-on editor mods with sim hooks (`ui_only = false`, Studio's sim_hooks): they play as the game's sim
+    // mods do (their hook/ files on the sim's), with nothing more than any FAF mod has.
+    for (const std::string& uid : extraSimMods) {
+      if (std::find(mods.begin(), mods.end(), uid) == mods.end()) {
+        mods.push_back(uid);
+      }
     }
     for (const PlaySlot& slot : mSetup.slots) {
       if (slot.role == PlaySlot::Role::Ai) {
@@ -1021,7 +1170,7 @@ end
     (void)std::snprintf(
       extra,
       sizeof(extra),
-      "__EditorPlayExtra = { slot = %d, aiCount = %d, prebuilt = %s, mods = {",
+      "__EditorPlayExtra = { coopShim = 'faf-editor-coop-shim-v1', slot = %d, aiCount = %d, prebuilt = %s, mods = {",
       mSetup.slot + 1,
       mSetup.aiCount,
       mSetup.prebuilt ? "true" : "false"
@@ -1454,6 +1603,10 @@ end
 
   void EdPlay::BeforeGameFrame()
   {
+    // A stop while the script debugger holds the sim: let the sim thread go first, so the session can end.
+    if (mStopRequested) {
+      EdLuaDebugger::Get().Release();
+    }
     LogPhases();
     DriveCommandLineRuns();
     DriveQuickStart();
@@ -1576,7 +1729,9 @@ end
     if (mPlayRequested) {
       mPlayRequested = false;
       if (CanPlay() && mSelected >= 0 && mSelected < static_cast<int>(mMaps.size())) {
-        (void)StartSession(mMaps[static_cast<std::size_t>(mSelected)]);
+        const std::string& selected = mMaps[static_cast<std::size_t>(mSelected)];
+        const std::string scenario = mScenarioFor ? mScenarioFor(selected) : selected;
+        (void)StartSession(scenario.empty() ? selected : scenario);
       }
     }
   }

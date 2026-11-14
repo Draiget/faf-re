@@ -76,48 +76,6 @@ namespace moho
 
   namespace
   {
-    /**
-     * Address: 0x00A3AD70 (FUN_00A3AD70)
-     *
-     * What it does:
-     * Converts one quaternion lane set in binary order `(x, y, z, w)` into a
-     * 3x3 rotation matrix lane buffer.
-     */
-    [[maybe_unused]] double* QuaternionToRotationMatrix3x3(
-      const double* const quaternionLanes,
-      double* const outMatrixLanes
-    ) noexcept
-    {
-      const double x = quaternionLanes[0];
-      const double y = quaternionLanes[1];
-      const double z = quaternionLanes[2];
-      const double w = quaternionLanes[3];
-
-      const double twoY = y * 2.0;
-      const double twoZ = z * 2.0;
-      const double twoW = w * 2.0;
-
-      const double twoXY = x * twoY;
-      const double twoXZ = x * twoZ;
-      const double twoXW = x * twoW;
-      const double twoYY = y * twoY;
-      const double twoYZ = y * twoZ;
-      const double twoYW = y * twoW;
-      const double twoZZ = z * twoZ;
-      const double twoZW = z * twoW;
-      const double twoWW = w * twoW;
-
-      outMatrixLanes[0] = 1.0 - (twoWW + twoZZ);
-      outMatrixLanes[1] = twoYZ - twoXW;
-      outMatrixLanes[2] = twoYW + twoXZ;
-      outMatrixLanes[3] = twoXW + twoYZ;
-      outMatrixLanes[4] = 1.0 - (twoWW + twoYY);
-      outMatrixLanes[5] = twoZW - twoXY;
-      outMatrixLanes[6] = twoYW - twoXZ;
-      outMatrixLanes[7] = twoZW + twoXY;
-      outMatrixLanes[8] = 1.0 - (twoYY + twoZZ);
-      return outMatrixLanes;
-    }
   } // namespace
 
   /**
@@ -164,10 +122,12 @@ namespace moho
   /**
    * Address: 0x0062FBA0 (FUN_0062FBA0)
    *
+   * Checked against retail by tools/difffuzz (targets_math.cpp).
+   *
    * What it does:
    * Rotates one vector by the conjugate of one raw quaternion lane set.
    */
-  [[maybe_unused]] Wm3::Vector3f* RotateVectorByConjugateQuaternionLanes(
+  Wm3::Vector3f* RotateVectorByConjugateQuaternionLanes(
     const float* const quaternionLanes,
     Wm3::Vector3f* const outVector,
     const Wm3::Vector3f* const sourceVector
@@ -188,11 +148,13 @@ namespace moho
   /**
    * Address: 0x00694AF0 (FUN_00694AF0)
    *
+   * Checked against retail by tools/difffuzz (targets_math.cpp).
+   *
    * What it does:
    * Extracts the quaternion-derived Y-axis matrix column
    * `(m01, m11, m21)` into `outAxis` for one `(w,x,y,z)` quaternion lane.
    */
-  [[maybe_unused]] Wm3::Vector3f* QuaternionExtractYAxisColumn(
+  Wm3::Vector3f* QuaternionExtractYAxisColumn(
     Wm3::Vector3f* const outAxis,
     const Wm3::Quaternionf* const quaternion
   ) noexcept

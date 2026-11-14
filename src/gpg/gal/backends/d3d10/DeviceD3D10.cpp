@@ -1812,7 +1812,7 @@ namespace gpg::gal
     }
 
     char* const destinationBytes = outTextureData->GetPtr(0U, 0U);
-    const auto* const sourceBytesPtr = reinterpret_cast<const std::uint8_t*>(mappedTexture.pData);
+    const auto* const sourceBytesPtr = static_cast<const std::uint8_t*>(mappedTexture.pData);
     if (static_cast<unsigned int>(mappedTexture.RowPitch) == rowBytes) {
       // Raw texture blob copy from the mapped subresource.
       std::copy_n(sourceBytesPtr, requiredBytes, destinationBytes);

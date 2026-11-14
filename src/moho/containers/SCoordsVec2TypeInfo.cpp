@@ -13,19 +13,6 @@
 namespace
 {
 
-  /**
-   * Address: 0x0050BCC0 (FUN_0050BCC0)
-   *
-   * What it does:
-   * Executes one non-deleting `gpg::RType` base-teardown lane for
-   * `SCoordsVec2TypeInfo`.
-   */
-  [[maybe_unused]] void cleanup_SCoordsVec2TypeInfoRTypeBase(
-    moho::SCoordsVec2TypeInfo* const typeInfo
-  ) noexcept
-  {
-    gpg::ClearTypeLists(typeInfo);
-  }
 } // namespace
 
 namespace moho

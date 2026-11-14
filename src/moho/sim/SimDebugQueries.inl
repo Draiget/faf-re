@@ -55,7 +55,7 @@ int Sim::BlingBling(
     return 0;
   }
 
-  CSimArmyEconomyInfo* const economyInfo = focusArmy->GetEconomy();
+  CEconomy* const economyInfo = focusArmy->GetEconomy();
   CEconStorage* const storage = GetArmyEconStorage(*focusArmy);
   if (economyInfo == nullptr || storage == nullptr) {
     return 0;
@@ -69,9 +69,9 @@ int Sim::BlingBling(
   // 0x0064BC79..0x0064BC96 adds into economy-info +0x08 (this tick's banked
   // resources), not the stored totals; the next economy tick moves it into storage.
   SEconPair grantedStorage{};
-  (void)BuildSignedMaxStorageFloatPair(&grantedStorage, economyInfo->economy);
-  economyInfo->mResources.ENERGY += grantedStorage.ENERGY;
-  economyInfo->mResources.MASS += grantedStorage.MASS;
+  (void)BuildSignedMaxStorageFloatPair(&grantedStorage, economyInfo->mTotals);
+  economyInfo->mResources.energy += grantedStorage.ENERGY;
+  economyInfo->mResources.mass += grantedStorage.MASS;
 
   return 0;
 }

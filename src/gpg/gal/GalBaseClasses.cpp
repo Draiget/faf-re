@@ -42,20 +42,6 @@ namespace gpg::gal
   namespace
   {
     /**
-     * Address: 0x00940940 (FUN_00940940)
-     *
-     * What it does:
-     * Re-runs `Class` constructor side effects for ABI adapter lanes that
-     * ignore constructor return values.
-     */
-    [[maybe_unused]] void ResetClassVtableVoidAdapter(
-      Class* const instance
-    ) noexcept
-    {
-      static_cast<void>(::new (instance) Class());
-    }
-
-    /**
      * Address: 0x0093F710 (FUN_0093F710)
      * Mangled: ??1EffectMacro@gal@gpg@@UAE@XZ
      *

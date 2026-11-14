@@ -995,6 +995,13 @@ namespace moho
    * "UndulatingDepthClip"). */
   bool MeshMaterialAlphaTraced(MeshMaterial& material);
 
+  /**
+   * The colour MeshRenderer::RenderThumbnail clears its target to: retail's opaque black (0xFF000000, FUN_007E11C0)
+   * unless the map editor sets another for one render (a unit icon drawn on black and on white keys its background
+   * out). The game never changes it.
+   */
+  extern std::uint32_t ren_ThumbnailClearColor;
+
   class MeshRenderer
   {
   public:

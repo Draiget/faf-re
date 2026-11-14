@@ -1235,7 +1235,7 @@ namespace moho
     std::int32_t* const outIndexStart,
     std::uint32_t* const outIndexCount,
     std::int32_t* const outRectStart,
-    std::uint32_t* const outLastRectIndex
+    std::int32_t* const outLastRectIndex
   )
   {
     static constexpr float kHeightScale = 128.0f;

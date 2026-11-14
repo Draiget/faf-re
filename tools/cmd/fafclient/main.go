@@ -40,7 +40,7 @@ func main() {
 	nativeDir := flag.String("native-dir", "", "folder with faf-ice-adapter.jar (the client's nativeDir)")
 	java := flag.String("java", `C:\Program Files\FAF Client\jre\bin\java.exe`, "java executable; empty with -exe runs a native adapter")
 	exe := flag.String("exe", "", `native adapter executable (instead of the jar), comma-separated per player to mix ("jar" keeps the jar for that player)`)
-	exeArgs := flag.String("exe-args", "", "extra arguments for native adapters only, after the launcher's (e.g. --bind-address 192.168.42.77)")
+	exeArgs := flag.String("exe-args", "", "extra arguments for native adapters only, after the launcher's (e.g. --bind-address 192.0.2.77)")
 	clientLib := flag.String("client-lib", `C:\Program Files\FAF Client\lib`, "the client's lib folder; its javafx-* jars go on the class path, as the client adds them (read only)")
 	forceRelay := flag.Bool("force-relay", false, "pass --force-relay to every adapter")
 	useTurn := flag.Bool("turn", true, "start a local STUN/TURN server and hand it out with setIceServers")

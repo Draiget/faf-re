@@ -103,9 +103,8 @@ namespace
       return nullptr;
     }
 
-    return reinterpret_cast<moho::IAniManipulator*>(
-      reinterpret_cast<std::uintptr_t>(link) - offsetof(moho::IAniManipulator, mActorOrderLink)
-    );
+    return moho::TDatListItem<moho::IAniManipulator, void>::
+      owner_from_member_node<moho::IAniManipulator, &moho::IAniManipulator::mActorOrderLink>(link);
   }
 
   [[nodiscard]] gpg::RRef BuildFootPlantManipulatorRef(
@@ -154,8 +153,7 @@ namespace
 
     int baseOffset = 0;
     if (runtimeType != nullptr && sStaticType != nullptr && runtimeType->IsDerivedFrom(sStaticType, &baseOffset)) {
-      out.mObj =
-        reinterpret_cast<void*>(reinterpret_cast<std::uintptr_t>(object) - static_cast<std::uintptr_t>(baseOffset));
+      out.mObj = gpg::CompleteObject(object, baseOffset);
       out.mType = runtimeType;
       return out;
     }

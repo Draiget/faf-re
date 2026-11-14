@@ -98,7 +98,7 @@ namespace moho
         if (mMessage.Read(&mStream)) {
           CMessageStream stream{mMessage};
           u_short port = 0;
-          stream.Read(reinterpret_cast<char*>(&port), sizeof(port));
+          stream.Read(&port, sizeof(port));
 
           mConnector->ReadFromStream(mSocket, mAddr, port, mStream);
           mSocket = platform::net::kInvalidSocket;

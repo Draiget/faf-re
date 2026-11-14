@@ -1066,20 +1066,6 @@ namespace moho
     }
 
     /**
-     * Address: 0x004283E0 (FUN_004283E0)
-     *
-     * What it does:
-     * Tail-thunk adapter that forwards one glyph-page cache init lane into
-     * `FUN_00429140`.
-     */
-    [[maybe_unused]] void InitializeGlyphPageCacheThunk(
-      CD3DFont::SCharInfoPages& pages
-    )
-    {
-      InitializeGlyphPageCache(pages);
-    }
-
-    /**
      * Address: 0x00426D70 (FUN_00426D70)
      * Address: 0x004294B0 (FUN_004294B0)
      * Address: 0x004298C0 (FUN_004298C0)
@@ -1130,20 +1116,6 @@ namespace moho
      */
     [[nodiscard]] CD3DFont::SKerningPair* GetKerningPairAt(
       CD3DFont::SKerningPair* const begin,
-      const std::size_t index
-    )
-    {
-      return begin + index;
-    }
-
-    /**
-     * Address: 0x00426BF0 (FUN_00426BF0)
-     *
-     * What it does:
-     * Computes element pointer for one indexed glyph-info slot.
-     */
-    [[maybe_unused]] [[nodiscard]] CD3DFont::SCharInfo* GetGlyphInfoAt(
-      CD3DFont::SCharInfo* const begin,
       const std::size_t index
     )
     {
@@ -1306,41 +1278,6 @@ namespace moho
     }
 
     /**
-     * Address: 0x004274B0 (FUN_004274B0)
-     * Address: 0x00428220 (FUN_00428220)
-     * Address: 0x004292F0 (FUN_004292F0)
-     *
-     * What it does:
-     * Resizes one DXT scratch lane as 8-byte word-pairs with fill pattern.
-     */
-    void ResizeDxtWordPairScratch(
-      const std::size_t count,
-      DxtWordPairVector& scratch,
-      const DxtWordPair& fillValue
-    )
-    {
-      if (count > GetDxtWordPairMaxCount()) {
-        ThrowVectorTooLong();
-      }
-      scratch.assign(count, fillValue);
-    }
-
-    /**
-     * Address: 0x00426C00 (FUN_00426C00)
-     *
-     * What it does:
-     * Resizes one DXT scratch lane as zero-filled 8-byte word-pairs.
-     */
-    [[maybe_unused]] void ResizeDxtWordPairScratchZeroFill(
-      const std::size_t count,
-      DxtWordPairVector& scratch
-    )
-    {
-      const DxtWordPair fill{};
-      ResizeDxtWordPairScratch(count, scratch, fill);
-    }
-
-    /**
      * Address: 0x00427990 (FUN_00427990)
      * Address: 0x00428440 (FUN_00428440)
      * Address: 0x00428700 (FUN_00428700)
@@ -1442,20 +1379,6 @@ namespace moho
         return PackKerningKey(lhs) < PackKerningKey(rhs);
       }
       );
-    }
-
-    /**
-     * Address: 0x00429D90 (FUN_00429D90)
-     *
-     * What it does:
-     * Tail-thunk adapter that forwards one kerning-pair sort lane into
-     * `FUN_0042A3F0`.
-     */
-    [[maybe_unused]] void SortKerningPairsByPackedKeyThunk(
-      CD3DFont::KerningPairVector& pairs
-    )
-    {
-      SortKerningPairsByPackedKey(pairs);
     }
 
     /**

@@ -785,7 +785,7 @@ namespace moho
       return 1.0f;
     }
 
-    const auto* const blueprint = reinterpret_cast<const RPropBlueprint*>(BluePrint);
+    const auto* const blueprint = static_cast<const RPropBlueprint*>(BluePrint);
     return blueprint->Display.UniformScale;
   }
 

@@ -9,7 +9,7 @@ description: >
   copied into the vault as maps/faf_re_patchtest, with the faf_re_lockstep scmap and save
   copied or hard-linked in as faf_re_patchtest.scmap / faf_re_patchtest_save.lua; copy
   tools/scenarios/faf-patches/init_patchtest.lua into C:\ProgramData\FAForever\bin. Run with
-  -advertise 192.168.42.77 on the isolated account. Do not click into the game window.
+  -advertise <lan-address> on the isolated account. Do not click into the game window.
 timeout: 6m
 
 mode: direct

@@ -160,63 +160,9 @@ namespace
     return gpg::CachedLookup<moho::IAniManipulator>(moho::IAniManipulator::sType);
   }
 
-  /**
-   * Address: 0x00633540 (FUN_00633540)
-   *
-   * What it does:
-   * Upcasts one reflected reference lane to `moho::CAimManipulator*`.
-   */
-  [[maybe_unused]] [[nodiscard]] void* TryUpcastCAimManipulatorRefObject(
-    gpg::RRef* const sourceRef
-  )
-  {
-    if (!sourceRef) {
-      return nullptr;
-    }
-
-    const gpg::RRef upcast = gpg::REF_UpcastPtr(*sourceRef, CachedCAimManipulatorType());
-    return upcast.mObj;
-  }
-
-  /**
-   * Address: 0x00633CD0 (FUN_00633CD0)
-   *
-   * What it does:
-   * Reads one archive object lane using cached `IAniManipulator` reflection
-   * type metadata.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::ReadArchive* ReadIAniManipulatorArchiveObjectLane(
-    gpg::ReadArchive* const archive,
-    void* const objectStorage,
-    gpg::RRef* const ownerRef
-  )
-  {
-    if (!archive) {
-      return nullptr;
-    }
-
-    const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-    archive->Read(CachedIAniManipulatorType(), objectStorage, owner);
-    return archive;
-  }
-
   [[nodiscard]] gpg::RRef NullOwnerRef() noexcept
   {
     return {};
-  }
-
-  /**
-   * The projectile blueprint whose `Physics` member `physics` is, or null.
-   */
-  [[nodiscard]] moho::RProjectileBlueprint* ProjectileBlueprintOfPhysics(
-    const moho::RProjectileBlueprintPhysics* const physics
-  ) noexcept
-  {
-    if (physics == nullptr) {
-      return nullptr;
-    }
-    auto* const bytes = reinterpret_cast<const std::uint8_t*>(physics) - offsetof(moho::RProjectileBlueprint, Physics);
-    return const_cast<moho::RProjectileBlueprint*>(reinterpret_cast<const moho::RProjectileBlueprint*>(bytes));
   }
 
   [[nodiscard]] moho::CAniPoseBone* ResolveWatchBone(
@@ -560,7 +506,7 @@ moho::CAimManipulator::CAimManipulator()
 {
   this->mLabel.clear();
   this->mUnitWepBlueprint = nullptr;
-  this->mProjPhysBlueprint = nullptr;
+  this->mProjBlueprint = nullptr;
   this->mEnabled = false;
   this->mMuzzleBone = 0;
   this->mIsTracking = false;
@@ -630,7 +576,7 @@ moho::CAimManipulator::CAimManipulator(
   this->mMaxPitch = 30.0f;
   this->mPitchMaxSlew = 0.061086524f;
   this->mUnitWepBlueprint = weapon->mWeaponBlueprint;
-  this->mProjPhysBlueprint = nullptr;
+  this->mProjBlueprint = nullptr;
   this->mEnabled = true;
   this->mHeading = 0.0f;
   this->mPitch = 0.0f;
@@ -664,7 +610,7 @@ moho::CAimManipulator::CAimManipulator(
   // Resolve the projectile physics sub-blueprint from the weapon's projectile
   // blueprint (typed navigation of the binary's weapon->blueprint->physics chain).
   if (RProjectileBlueprint* const projectileBlueprint = weapon->mProjectileBlueprint; projectileBlueprint != nullptr) {
-    this->mProjPhysBlueprint = &projectileBlueprint->Physics;
+    this->mProjBlueprint = projectileBlueprint;
   }
 
   // Read the owner actor skeleton (RAII shared_ptr; released at scope end).
@@ -1097,7 +1043,8 @@ Wm3::Vector3f* moho::CAimManipulator::Aim(
       targetVelocity.y * kAimVelocityScale,
       targetVelocity.z * kAimVelocityScale,
     };
-    const RProjectileBlueprintPhysics* const projPhys = this->mProjPhysBlueprint;
+    const RProjectileBlueprintPhysics* const projPhys =
+      this->mProjBlueprint != nullptr ? &this->mProjBlueprint->Physics : nullptr;
     if (projPhys != nullptr && projPhys->TrackTarget != 0u) {
       (void)PredictInterceptPointConstantSpeed(
         &predictedImpact, predictedImpact, scaledTargetVelocity, projPhys->MaxSpeed, muzzlePosition
@@ -1113,7 +1060,8 @@ Wm3::Vector3f* moho::CAimManipulator::Aim(
     }
   }
 
-  const RProjectileBlueprintPhysics* const projPhys = this->mProjPhysBlueprint;
+  const RProjectileBlueprintPhysics* const projPhys =
+    this->mProjBlueprint != nullptr ? &this->mProjBlueprint->Physics : nullptr;
   if (projPhys != nullptr && projPhys->TrackTarget == 0u && projPhys->UseGravity != 0u) {
     Sim* const sim = this->mOwnerSim;
     float highArc = 0.0f;
@@ -1941,7 +1889,7 @@ void moho::CAimManipulator::MemberDeserialize(
     RProjectileBlueprint* projectileBlueprint = weapon->mProjectileBlueprint;
     archive->ReadPointer(&projectileBlueprint, &ownerRef);
     if (projectileBlueprint != nullptr && !exact) {
-      mProjPhysBlueprint = &projectileBlueprint->Physics;
+      mProjBlueprint = projectileBlueprint;
     }
   }
 
@@ -1968,7 +1916,7 @@ void moho::CAimManipulator::MemberDeserialize(
   if (exact) {
     RProjectileBlueprint* cachedBlueprint = nullptr;
     archive->ReadPointer(&cachedBlueprint, &ownerRef);
-    mProjPhysBlueprint = cachedBlueprint != nullptr ? &cachedBlueprint->Physics : nullptr;
+    mProjBlueprint = cachedBlueprint;
   }
 }
 
@@ -2006,7 +1954,7 @@ void moho::CAimManipulator::MemberSerialize(
     RProjectileBlueprint* const projectileBlueprint = weapon->mProjectileBlueprint;
     archive->WritePointer<moho::RProjectileBlueprint>(projectileBlueprint, gpg::TrackedPointerState::Unowned, ownerRef);
     if (projectileBlueprint != nullptr && !exact) {
-      self->mProjPhysBlueprint = &projectileBlueprint->Physics;
+      self->mProjBlueprint = projectileBlueprint;
     }
   }
 
@@ -2032,7 +1980,7 @@ void moho::CAimManipulator::MemberSerialize(
   // Engine addition (keyframes): the cached physics as it is, which may be null or an older
   // projectile blueprint than the weapon's current one; retail stores neither.
   if (exact) {
-    RProjectileBlueprint* const cachedBlueprint = ProjectileBlueprintOfPhysics(mProjPhysBlueprint);
+    RProjectileBlueprint* const cachedBlueprint = mProjBlueprint;
     archive->WritePointer<moho::RProjectileBlueprint>(cachedBlueprint, gpg::TrackedPointerState::Unowned, ownerRef);
   }
 }

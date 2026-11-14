@@ -10,39 +10,6 @@
 
 namespace
 {
-  /**
-   * Address: 0x004B0070 (FUN_004B0070)
-   *
-   * What it does:
-   * Thunk lane that returns active locale conversion table storage.
-   */
-  [[maybe_unused]] std::lconv* GetLocaleConventions() noexcept
-  {
-    return std::localeconv();
-  }
-
-  /**
-   * Address: 0x004B0080 (FUN_004B0080)
-   *
-   * What it does:
-   * Returns the literal false token used by breakpoint string lanes.
-   */
-  [[maybe_unused]] const char* GetFalseLiteral() noexcept
-  {
-    return "false";
-  }
-
-  /**
-   * Address: 0x004B0090 (FUN_004B0090)
-   *
-   * What it does:
-   * Returns the literal true token used by breakpoint string lanes.
-   */
-  [[maybe_unused]] const char* GetTrueLiteral() noexcept
-  {
-    return "true";
-  }
-
   struct DwordLane
   {
     std::uint32_t lane0;
@@ -56,94 +23,6 @@ namespace
 
   static_assert(sizeof(DwordLane) == 0x1C, "DwordLane size must be 0x1C");
 
-  /**
-   * Address: 0x004B00A0 (FUN_004B00A0)
-   *
-   * What it does:
-   * Stores one caller-provided dword into lane0 of output storage.
-   */
-  [[maybe_unused]] DwordLane* StoreDwordLane0(
-    DwordLane* const outLanes,
-    const std::uint32_t lane0
-  ) noexcept
-  {
-    outLanes->lane0 = lane0;
-    return outLanes;
-  }
-
-  /**
-   * Address: 0x004B00D0 (FUN_004B00D0)
-   *
-   * What it does:
-   * Returns dword lane4 from caller-provided lane storage.
-   */
-  [[maybe_unused]] std::uint32_t ReadDwordLane4(
-    const DwordLane* const lanes
-  ) noexcept
-  {
-    return lanes->lane4;
-  }
-
-  /**
-   * Address: 0x004B00E0 (FUN_004B00E0)
-   *
-   * What it does:
-   * Returns dword lane5 from caller-provided lane storage.
-   */
-  [[maybe_unused]] std::uint32_t ReadDwordLane5(
-    const DwordLane* const lanes
-  ) noexcept
-  {
-    return lanes->lane5;
-  }
-
-  /**
-   * Address: 0x004B00F0 (FUN_004B00F0)
-   *
-   * What it does:
-   * Returns dword lane6 from caller-provided lane storage.
-   */
-  [[maybe_unused]] std::uint32_t ReadDwordLane6(
-    const DwordLane* const lanes
-  ) noexcept
-  {
-    return lanes->lane6;
-  }
-
-  /**
-   * Address: 0x004B0100 (FUN_004B0100)
-   *
-   * What it does:
-   * Exchanges dword lane6 and returns the previously stored lane value.
-   */
-  [[maybe_unused]] std::uint32_t ExchangeDwordLane6(
-    DwordLane* const lanes,
-    const std::uint32_t replacementLane6
-  ) noexcept
-  {
-    const std::uint32_t previousLane6 = lanes->lane6;
-    lanes->lane6 = replacementLane6;
-    return previousLane6;
-  }
-
-  /**
-   * Address: 0x004B0170 (FUN_004B0170)
-   *
-   * What it does:
-   * Constructs one breakpoint in caller-provided storage with disabled/default
-   * state then parses serialized breakpoint lanes.
-   */
-  [[maybe_unused]] moho::ScrBreakpoint* ConstructScrBreakpointFromString(
-    moho::ScrBreakpoint* const outBreakpoint,
-    const fa::string& serializedBreakpoint
-  )
-  {
-    static const fa::string kEmptyName("");
-    ::new (static_cast<void*>(outBreakpoint)) moho::ScrBreakpoint(kEmptyName, -1);
-    outBreakpoint->enabled = false;
-    outBreakpoint->FromString(serializedBreakpoint);
-    return outBreakpoint;
-  }
 } // namespace
 
 /**

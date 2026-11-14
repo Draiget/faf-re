@@ -43,7 +43,7 @@ namespace
    * Assigns all lifecycle callback slots (`NewRef`, `CtrRef`, `Delete`,
    * `Destruct`) on one `CAcquireTargetTaskTypeInfo` descriptor.
    */
-  [[maybe_unused]] [[nodiscard]] moho::CAcquireTargetTaskTypeInfo* AssignAcquireTargetTaskLifecycleCallbacks(
+  [[nodiscard]] moho::CAcquireTargetTaskTypeInfo* AssignAcquireTargetTaskLifecycleCallbacks(
     moho::CAcquireTargetTaskTypeInfo* const typeInfo
   ) noexcept
   {

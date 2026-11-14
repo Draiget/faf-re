@@ -258,6 +258,10 @@ namespace LuaPlus
 
 namespace gpg
 {
+  /** Byte offset of the `Base` subobject inside `Derived`; defined below. */
+  template <class Derived, class Base>
+  [[nodiscard]] int BaseSubobjectOffset() noexcept;
+
   class RObject;
   class RRef;
   class RType;
@@ -1263,7 +1267,7 @@ namespace gpg
    * addressed by `vectorPtr`. Signature matches `RType::load_func_t`; the
    * trailing version/owner lanes are unused by this vector body.
    */
-  void DeserializeSimArmyPtrVector(ReadArchive* archive, std::intptr_t vectorPtr, int version, RRef* ownerRef);
+  void DeserializeSimArmyPtrVector(ReadArchive* archive, void* vectorPtr, int version, RRef* ownerRef);
 
   /**
    * Address: 0x0074E350 (FUN_0074E350, gpg::RVectorType<SimArmy*> element serializer)
@@ -1273,7 +1277,7 @@ namespace gpg
    * unowned tracked raw pointer. Signature matches `RType::save_func_t`; the
    * trailing version/owner lanes are unused by this vector body.
    */
-  void SerializeSimArmyPtrVector(WriteArchive* archive, std::intptr_t vectorPtr, int version, RRef* ownerRef);
+  void SerializeSimArmyPtrVector(WriteArchive* archive, void* vectorPtr, int version, RRef* ownerRef);
 
   /**
    * Address: 0x008E0810 (FUN_008E0810, gpg::REF_RegisterAllTypes)
@@ -2301,9 +2305,9 @@ namespace gpg
     // and forwards arg_0, arg_4 and arg_10 to the body at 0x004E0CD0.
     using save_construct_args_func_t =
       void (*)(WriteArchive* archive, void* object, int version, RRef* ownerRef, SerSaveConstructArgsResult* result);
-    using save_func_t = void (*)(WriteArchive*, std::intptr_t, int, RRef*);
+    using save_func_t = void (*)(WriteArchive*, void*, int, RRef*);
     using construct_func_t = void (*)(ReadArchive* archive, int version, RRef* ownerRef, SerConstructResult* result);
-    using load_func_t = void (*)(ReadArchive*, std::intptr_t, int, RRef*);
+    using load_func_t = void (*)(ReadArchive*, void*, int, RRef*);
     using new_ref_func_t = RRef (*)();
     using cpy_ref_func_t = RRef (*)(RRef*);
     using delete_func_t = void (*)(void*);
@@ -2599,16 +2603,6 @@ namespace gpg
     bool v24;
 
   public:
-    template <class T, class B>
-    static int BaseSubobjectOffset()
-    {
-      static_assert(std::is_base_of<B, T>::value, "B must be a base of T");
-
-      const auto* t = reinterpret_cast<const T*>(0x1000);
-      const auto* b = static_cast<const B*>(t);
-      return static_cast<int>(reinterpret_cast<std::uintptr_t>(b) - reinterpret_cast<std::uintptr_t>(t));
-    }
-
     /**
      * Address: 0x0040DFA0 (FUN_0040DFA0 -- `AddField<float>`, binary name `AddField_float`.)
      * Address: 0x0040E020 (FUN_0040E020 -- `AddField<unsigned int>`, binary name `AddField_uint`.)
@@ -2742,7 +2736,7 @@ namespace gpg
     void AddBase()
     {
       RType* type = const_cast<RType*>(B::StaticGetClass());
-      this->AddBase(RField{type->GetName(), type, BaseSubobjectOffset<T, B>()});
+      this->AddBase(RField{type->GetName(), type, gpg::BaseSubobjectOffset<T, B>()});
     }
   };
   static_assert(sizeof(RType) == 0x64, "RType must be 0x64 bytes on x86");
@@ -2931,12 +2925,12 @@ namespace gpg
      */
     static void Deserialize(
       ReadArchive* const archive,
-      const std::intptr_t objectPtr,
+      void* const objectPtr,
       const int version,
       RRef* const ownerRef
     )
     {
-      T& object = *reinterpret_cast<T*>(objectPtr);
+      T& object = *static_cast<T*>(objectPtr);
       if constexpr (requires { object.MemberDeserialize(archive, version, *ownerRef); }) {
         object.MemberDeserialize(archive, version, *ownerRef);
       } else if constexpr (requires { object.MemberDeserialize(archive, version); }) {
@@ -2956,12 +2950,12 @@ namespace gpg
      */
     static void Serialize(
       WriteArchive* const archive,
-      const std::intptr_t objectPtr,
+      void* const objectPtr,
       const int version,
       RRef* const ownerRef
     )
     {
-      T& object = *reinterpret_cast<T*>(objectPtr);
+      T& object = *static_cast<T*>(objectPtr);
       if constexpr (requires { object.MemberSerialize(archive, version, *ownerRef); }) {
         object.MemberSerialize(archive, version, *ownerRef);
       } else if constexpr (requires { object.MemberSerialize(archive, version); }) {
@@ -3343,14 +3337,14 @@ namespace gpg
      */
     static void Deserialize(
       ReadArchive* const archive,
-      const std::intptr_t objectPtr,
+      void* const objectPtr,
       const int,
       RRef* const
     )
     {
       IntType value{};
       archive->ReadInt(&value);
-      *reinterpret_cast<T*>(objectPtr) = static_cast<T>(value);
+      *static_cast<T*>(objectPtr) = static_cast<T>(value);
     }
 
     /**
@@ -3381,12 +3375,12 @@ namespace gpg
      */
     static void Serialize(
       WriteArchive* const archive,
-      const std::intptr_t objectPtr,
+      void* const objectPtr,
       const int,
       RRef* const
     )
     {
-      const auto value = *reinterpret_cast<const T*>(objectPtr);
+      const auto value = *static_cast<const T*>(objectPtr);
       archive->WriteInt(static_cast<int>(value));
     }
 
@@ -5242,6 +5236,7 @@ namespace gpg
   template <class Derived, class Base>
   [[nodiscard]] inline int BaseSubobjectOffset() noexcept
   {
+    static_assert(std::is_base_of_v<Base, Derived>, "Base must be a base of Derived");
     constexpr std::uintptr_t kProbeAddress = 0x1000u;
     auto* const derived = reinterpret_cast<Derived*>(kProbeAddress);
     return static_cast<int>(reinterpret_cast<std::uintptr_t>(static_cast<Base*>(derived)) - kProbeAddress);
@@ -7042,6 +7037,29 @@ namespace gpg
   }
 
   /**
+   * The object a reflection reference to `object` points at, given the base
+   * offset `IsDerivedFrom` reported for its type: 0 means `object` already is
+   * that object (which includes the fallback to the static type when the
+   * dynamic type isn't registered), anything else the complete (most-derived)
+   * object `object` is a subobject of, which is where the registered offset
+   * (`BaseSubobjectOffset`, the real layout) leads.
+   */
+  template <class TObject>
+  [[nodiscard]] void* CompleteObject(
+    TObject* const object,
+    const std::int32_t baseOffset
+  ) noexcept
+  {
+    auto* const mutableObject = const_cast<std::remove_cv_t<TObject>*>(object);
+    if constexpr (std::is_polymorphic_v<TObject>) {
+      if (baseOffset != 0) {
+        return dynamic_cast<void*>(mutableObject);
+      }
+    }
+    return mutableObject;
+  }
+
+  /**
    * Engine addition: the reference the recovered code built by hand in each
    * file. Asks the object for its dynamic type and rebases the pointer to it.
    */
@@ -7074,7 +7092,7 @@ namespace gpg
       return out;
     }
 
-    out.mObj = reinterpret_cast<void*>(reinterpret_cast<char*>(object) - baseOffset);
+    out.mObj = CompleteObject(object, baseOffset);
     out.mType = dynamicType;
     return out;
   }
@@ -7208,8 +7226,7 @@ namespace gpg
       return out;
     }
 
-    out.mObj =
-      reinterpret_cast<void*>(reinterpret_cast<std::uintptr_t>(object) - static_cast<std::uintptr_t>(baseOffset));
+    out.mObj = CompleteObject(object, baseOffset);
     out.mType = dynamicType;
     return out;
   }
@@ -7295,7 +7312,7 @@ namespace gpg
         if (!runtime->IsDerivedFrom(declared, &baseOffset)) {
           HandleAssertFailure("isDer", 458, "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore\\reflection\\reflection.h");
         }
-        return RRef{reinterpret_cast<char*>(object) - baseOffset, runtime};
+        return RRef{CompleteObject(object, baseOffset), runtime};
       }
     }
     return RRef{object, declared};

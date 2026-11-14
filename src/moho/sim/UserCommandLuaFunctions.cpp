@@ -490,9 +490,9 @@ namespace
       if (nearestToMouse) {
         // Keep only the single unit nearest the cursor world position.
         const Wm3::Vec3f& unitPos = iunit->GetPosition();
-        const float dx = unitPos.x - session->CursorWorldPos.x;
-        const float dy = unitPos.y - session->CursorWorldPos.y;
-        const float dz = unitPos.z - session->CursorWorldPos.z;
+        const float dx = unitPos.x - session->mCursorInfo.mMouseWorldPos.x;
+        const float dy = unitPos.y - session->mCursorInfo.mMouseWorldPos.y;
+        const float dz = unitPos.z - session->mCursorInfo.mMouseWorldPos.z;
         const float distance = std::sqrt(dx * dx + dy * dy + dz * dz);
         if (nearestDistance > distance) {
           nearestEntity = candidate;
@@ -1646,7 +1646,7 @@ namespace moho
         if (unit != nullptr) {
           IUnit* const bridge = GetIUnitBridge(unit);
           if ((bridge->GetAttributes().commandCapsMask & kRuleUccDock) != 0u) {
-            const QueuedUserCommandRecord* const anchor = GetLastQueuedUserCommandAnchor(unit);
+            const UserCommandIssueHelper* const anchor = GetLastQueuedUserCommandAnchor(unit);
             if (clear || anchor == nullptr) {
               const Wm3::Vec3f& position = bridge->GetPosition();
               centroidX += position.x;

@@ -32,6 +32,19 @@ namespace faf::editor
   const MarkerType* FindMarkerType(const std::string& type);
 
   /**
+   * FAF's `/lua/MarkerTemplates.lua` (`MarkerTemplates = { ['Mass'] = { resource = true, amount = 100, prop = "...",
+   * color = "..." }, ... }`, which mods add to): the types the palette hasn't got are added to it in the group "Game",
+   * their properties as the saves write them. Returns how many were added.
+   */
+  int AddMarkerTemplates(const std::string& lua);
+
+  /**
+   * The marker as another type: its type, colour and prop that type's, the old type's own properties replaced by the
+   * new one's; its name, position, orientation and any other property kept.
+   */
+  SaveEntry WithMarkerType(const SaveEntry& marker, const MarkerType& type);
+
+  /**
    * What FAF's game code does with markers of `type` (its Lua as of 2026-11: lua/AI, lua/sim), one or two sentences;
    * empty for a type it doesn't know.
    */
@@ -48,6 +61,20 @@ namespace faf::editor
 
   /** A marker's position (from `position`); false when it has none. */
   bool MarkerPosition(const SaveEntry& marker, float& x, float& y, float& z);
+
+  /**
+   * Markers off the area (x0, z0, x1, z1) moved onto it (FAF Studio's "move stray markers onto the map"): each to the
+   * nearest point `inset` inside the edge, its height from `height` (or kept without one). Returns their names.
+   */
+  std::vector<std::string> PullMarkersInside(
+    std::vector<SaveEntry>& markers,
+    float x0,
+    float z0,
+    float x1,
+    float z1,
+    float inset,
+    const std::function<float(float, float)>& height
+  );
   /** A marker's colour as ARGB (from `color`, else grey). */
   std::uint32_t MarkerColor(const SaveEntry& marker);
 
@@ -78,6 +105,16 @@ namespace faf::editor
   std::string MarkerColourOf(const float rgba[4]);
   /** A marker's `type` string. */
   std::string MarkerTypeOf(const SaveEntry& marker);
+
+  /** A resource marker off its extractor cell's middle and where it belongs (x.5, z.5). */
+  struct ResourceSnap
+  {
+    std::string name;
+    float x = 0.0f;
+    float z = 0.0f;
+  };
+  /** Map > Snap resource markers to grid (FAF Studio): every Mass and Hydrocarbon marker more than 0.02 off. */
+  [[nodiscard]] std::vector<ResourceSnap> ResourceSnaps(const std::vector<SaveEntry>& markers);
   /** A path node's neighbours (`adjacentTo`, names split on spaces). */
   std::vector<std::string> MarkerLinks(const SaveEntry& marker);
 
@@ -96,6 +133,24 @@ namespace faf::editor
    * neighbours, as FAForeverMapEditor's air presets lay them (16 x 16 over the map, a sixteenth apart, half a step in).
    * Named after `existing` (AirPN<nn> not yet taken); heights from `height`. Returned in rows, the links set.
    */
+  /**
+   * A grid of path nodes of `typeName` (Land Path Node, Water Path Node) over the rectangle, as AirNodeGrid lays them,
+   * but only where `stands(x, z)` holds, each linked to its 8 neighbours where `reaches(ax, az, bx, bz)` holds (the
+   * ground or water between them is passable for the kind of unit, in one connected area).
+   */
+  std::vector<SaveEntry> PathNodeGrid(
+    const std::vector<SaveEntry>& existing,
+    const char* typeName,
+    int count,
+    float x0,
+    float z0,
+    float x1,
+    float z1,
+    const std::function<float(float, float)>& height,
+    const std::function<bool(float, float)>& stands,
+    const std::function<bool(float, float, float, float)>& reaches
+  );
+
   std::vector<SaveEntry> AirNodeGrid(
     const std::vector<SaveEntry>& existing,
     int count,

@@ -872,7 +872,7 @@ void Sim::UpdateChecksum()
     CArmyImpl* const army = *it;
     Logf("  \"%s\" [%s]\n", army->mConstDat.mPlayerName.raw_data_unsafe(), army->mConstDat.mArmyName.raw_data_unsafe());
 
-    const SEconTotals& economy = army->GetEconomy()->economy;
+    const SEconTotals& economy = army->GetEconomy()->mTotals;
     mContext.Update(&economy, sizeof(economy));
     if (stateTap != nullptr) {
       const std::int32_t armyIndex = army->mConstDat.mArmyIndex;
@@ -936,8 +936,8 @@ void Sim::UpdateChecksum()
 
     entityChecksum.Update(&entity->mVarDat.mCurTransform.orient_, 0x1Cu);
     if (syncLog) {
-      const float* const pos = reinterpret_cast<const float*>(&entity->mVarDat.mCurTransform.pos_);
-      const float* const rot = reinterpret_cast<const float*>(&entity->mVarDat.mCurTransform.orient_);
+      const Wm3::Vec3f& pos = entity->mVarDat.mCurTransform.pos_;
+      const Wm3::Quatf& rot = entity->mVarDat.mCurTransform.orient_;
       Logf(
         "    pos: <%7.2f,%7.2f,%7.2f> [0x%08x 0x%08x 0x%08x]\n",
         pos[0],
@@ -1167,7 +1167,7 @@ namespace
 } // namespace
 
 // Engine addition (moho/sim/SimEditorHook.h): the map editor's per-beat hook, never set in the game.
-void (*moho::gSimBeforeBeat)(Sim& sim) = nullptr;
+std::atomic<moho::SimBeforeBeatHook> moho::gSimBeforeBeat{nullptr};
 
 /**
  * Address: 0x00749F40 (FUN_00749F40)
@@ -1192,9 +1192,10 @@ void Sim::AdvanceBeat(
 {
   (void)amt; // Binary implementation does not consume this parameter at 0x00749F40.
 
-  // Engine addition: the map editor's edits into its solo play, between beats (null in the game).
-  if (gSimBeforeBeat != nullptr) {
-    gSimBeforeBeat(*this);
+  // Engine addition: the map editor's edits into its solo play, between beats (null in the game). Read once: the
+  // editor may clear it from its own thread at any time.
+  if (const SimBeforeBeatHook beforeBeat = gSimBeforeBeat.load(std::memory_order_acquire); beforeBeat != nullptr) {
+    beforeBeat(*this);
   }
 
   Logf("********** beat %u **********\n", mCurBeat);

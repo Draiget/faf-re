@@ -1107,8 +1107,16 @@ void CAiBrain::MemberDeserialize(
     archive->Read(scriptObjectType, static_cast<CScriptObject*>(this), owner);
   }
 
-  (void)archive->ReadPointer(reinterpret_cast<moho::SimArmy**>(&mArmy), &owner);
-  (void)archive->ReadPointer(reinterpret_cast<moho::SimArmy**>(&mCurrentEnemy), &owner);
+  {
+    moho::SimArmy* value = nullptr;
+    (void)archive->ReadPointer(&value, &owner);
+    mArmy = static_cast<decltype(mArmy)>(value);
+  }
+  {
+    moho::SimArmy* value = nullptr;
+    (void)archive->ReadPointer(&value, &owner);
+    mCurrentEnemy = static_cast<decltype(mCurrentEnemy)>(value);
+  }
 
   CAiPersonality* loadedPersonality = nullptr;
   (void)archive->ReadPointerOwned(&loadedPersonality, &owner);

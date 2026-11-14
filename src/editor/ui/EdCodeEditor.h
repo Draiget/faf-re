@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <vector>
 
 namespace faf::editor
 {
@@ -11,7 +12,15 @@ namespace faf::editor
    * globals), with line numbers beside it and `errorLine` (1-based; 0 for none) marked. The monospace font when there
    * is one. True when the text changed.
    */
-  bool LuaCodeInput(const char* id, std::string& text, int errorLine, float height);
+  /** The debugger's marks in the gutter: breakpoints (red dots), the line paused at, and a click on a line's number. */
+  struct EdCodeMarks
+  {
+    std::vector<int> breakpoints; // 1-based lines
+    int pausedLine = 0;
+    int clickedLine = 0; // out: the line whose number was clicked this frame (0: none)
+  };
+
+  bool LuaCodeInput(const char* id, std::string& text, int errorLine, float height, EdCodeMarks* marks = nullptr);
 
   /** Scrolls the code input to a line at its next draw (a Check's error line). */
   void LuaCodeScrollTo(int line);

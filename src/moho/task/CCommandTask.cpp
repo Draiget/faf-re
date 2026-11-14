@@ -38,66 +38,6 @@ namespace
     return &sInstance;
   }
 
-  /**
-   * Address: 0x005F22B0 (FUN_005F22B0)
-   *
-   * What it does:
-   * Upcasts one reflected reference lane to `moho::CCommandTask*`.
-   */
-  [[maybe_unused]] [[nodiscard]] void* TryUpcastCCommandTaskRefObject(
-    gpg::RRef* const sourceRef
-  )
-  {
-    if (!sourceRef) {
-      return nullptr;
-    }
-
-    const gpg::RRef upcast = gpg::REF_UpcastPtr(*sourceRef, gpg::RTypeOf<CCommandTask>());
-    return upcast.mObj;
-  }
-
-  /**
-   * Address: 0x0060D1F0 (FUN_0060D1F0)
-   *
-   * What it does:
-   * Reads one archive object lane using cached `CCommandTask` reflection type.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::ReadArchive* ReadCCommandTaskArchiveObjectLane(
-    gpg::ReadArchive* const archive,
-    void* const objectStorage,
-    gpg::RRef* const ownerRef
-  )
-  {
-    if (!archive) {
-      return nullptr;
-    }
-
-    const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-    archive->Read(gpg::RTypeOf<CCommandTask>(), objectStorage, owner);
-    return archive;
-  }
-
-  /**
-   * Address: 0x0060D230 (FUN_0060D230)
-   *
-   * What it does:
-   * Writes one archive object lane using cached `CCommandTask` reflection type.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::WriteArchive* WriteCCommandTaskArchiveObjectLane(
-    gpg::WriteArchive* const archive,
-    void** const objectSlot,
-    const gpg::RRef* const ownerRef
-  )
-  {
-    if (!archive) {
-      return nullptr;
-    }
-
-    const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-    archive->Write(gpg::RTypeOf<CCommandTask>(), objectSlot, owner);
-    return archive;
-  }
-
   gpg::RRef MakeEAiResultRef(
     EAiResult* const value
   )

@@ -1570,6 +1570,8 @@ namespace moho
    * texture sheets (albedo/normals/specular), then draws the single instance
    * through the LOD's static hardware batch (un-mirrored).
    */
+  std::uint32_t ren_ThumbnailClearColor = 0xFF000000u;
+
   void MeshRenderer::RenderThumbnail(
     const GeomCamera3& camera,
     MeshInstance* const meshInstance,
@@ -1596,7 +1598,7 @@ namespace moho
     // Target1 param) then depthStencil (arg_10, second) — matching the caller
     // MeshThumbnailRenderer::RenderThumbnail which passes (mColorTarget,
     // mDepthStencil). (FUN_007E11C0 @0x007E11FF..0x007E1220.)
-    device->SetRenderTarget1(renderTarget, depthStencil, true, 0xFF000000, 1.0f, 0);
+    device->SetRenderTarget1(renderTarget, depthStencil, true, ren_ThumbnailClearColor, 1.0f, 0);
 
     // Select the mesh effect file, then bind the mesh shader-constant lane for
     // this thumbnail pass (no shadow, not mirrored).

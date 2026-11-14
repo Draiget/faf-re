@@ -990,7 +990,8 @@ namespace moho
 
     auto* const terrainRes = mTerrainResource;
 
-    bool dirty = terrainRes->IsInEditMode();
+    // Engine addition: in edit mode only when the heights moved (TerrainHeightsMoved), not every frame.
+    bool dirty = terrainRes->IsInEditMode() && TerrainHeightsMoved(this);
     if (!dirty) {
       dirty = mCamera->tranform.Compare(mCachedCameraTransform);
     }
@@ -1085,11 +1086,11 @@ namespace moho
           if (isFlat) {
             std::uint32_t addedIndexCount = 0;
             (void)mTesselator->EmitCollisionQuad(
-              reinterpret_cast<const Wm3::Vector3f*>(&flatnessQuad.mCorner0),
+              static_cast<const Wm3::Vector3f*>(&flatnessQuad.mCorner0),
               &command.startIndex,
               &addedIndexCount,
               &command.startVertex,
-              reinterpret_cast<std::uint32_t*>(&command.endVertex)
+              &command.endVertex
             );
             command.indexCount = static_cast<std::int32_t>(addedIndexCount);
 

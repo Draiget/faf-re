@@ -64,36 +64,6 @@ namespace
   constexpr float kProjectileUnsetValue = -1.0f;
   constexpr float kProjectileBounceVelocityDampingDefault = 0.5f;
 
-  [[nodiscard]] gpg::RRef MakeProjectileRef(
-    moho::Projectile* const object
-  )
-  {
-    // Delegates to the recovered gpg::RRef_Projectile (FUN_0069FEA0), which
-    // performs the polymorphic derived-type normalization the earlier inline
-    // stand-in elided.
-    gpg::RRef out{};
-    out = gpg::MakeRRef<moho::Projectile>(object);
-    return out;
-  }
-
-  /**
-   * Address: 0x0069F8B0 (FUN_0069F8B0)
-   *
-   * What it does:
-   * Builds one temporary projectile reference and copies its `(mObj,mType)`
-   * pair into caller-owned output storage.
-   */
-  [[maybe_unused]] gpg::RRef* PackProjectileRef(
-    gpg::RRef* const out,
-    moho::Projectile* const object
-  )
-  {
-    const gpg::RRef ref = MakeProjectileRef(object);
-    out->mObj = ref.mObj;
-    out->mType = ref.mType;
-    return out;
-  }
-
   // Pops the top task off the entity's own CTask-subobject owner thread, deleting
   // it only when the thread owns it. Mirrors the inline teardown the projectile
   // ctor performs after each immediate Entity::Destroy() (asm 0x0069BC0F-0069BC3C

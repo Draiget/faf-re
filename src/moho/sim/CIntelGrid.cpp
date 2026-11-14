@@ -49,24 +49,6 @@ namespace
     typeInfo.bases_ = fa::vector<gpg::RField>{};
   }
 
-  /**
-   * Address: 0x005071C0 (FUN_005071C0)
-   *
-   * What it does:
-   * Executes one non-deleting `gpg::RType` base-teardown lane for
-   * `CIntelGridTypeInfo`.
-   */
-  [[maybe_unused]] void cleanup_CIntelGridTypeInfoRTypeBase(
-    moho::CIntelGridTypeInfo* const typeInfo
-  ) noexcept
-  {
-    if (typeInfo == nullptr) {
-      return;
-    }
-
-    ResetTypeInfoVectors(*typeInfo);
-  }
-
   // 0x005BE081..0x005BE0A7: the binary forms `1.0f / gridSize` once (divss)
   // and multiplies every coordinate by that reciprocal (mulss); it never
   // divides the coordinate itself, so the scaled value rounds like `v * (1/g)`.
@@ -156,42 +138,9 @@ namespace
   }
 
   /**
-   * Address: 0x005089B0 (FUN_005089B0, CIntelGrid save-construct forwarding lane)
-   */
-  [[maybe_unused]] void ForwardCIntelGridMemberSaveConstructArgs(
-    gpg::SerSaveConstructArgsResult* const result,
-    moho::CIntelGrid* const intelGrid,
-    gpg::WriteArchive* const archive,
-    const int version,
-    const gpg::RRef& ownerRef
-  )
-  {
-    if (result && intelGrid && archive) {
-      intelGrid->MemberSaveConstructArgs(*archive, version, ownerRef, *result);
-    }
-  }
-
-  /**
-   * Address: 0x005072C0 (FUN_005072C0, CIntelGrid save-construct forwarding lane)
-   *
-   * What it does:
-   * Forwards save-construct argument serialization with default
-   * `version=0` and a null owner-reference lane.
-   */
-  [[maybe_unused]] void ForwardCIntelGridMemberSaveConstructArgs_DefaultOwner(
-    gpg::SerSaveConstructArgsResult* const result,
-    moho::CIntelGrid* const intelGrid,
-    gpg::WriteArchive* const archive
-  )
-  {
-    const gpg::RRef nullOwner{};
-    ForwardCIntelGridMemberSaveConstructArgs(result, intelGrid, archive, 0, nullOwner);
-  }
-
-  /**
    * Address: 0x005089C0 (FUN_005089C0, STIMap unowned pointer write helper)
    */
-  [[maybe_unused]] [[nodiscard]] gpg::WriteArchive* WriteUnownedSTIMapPointerVariant1(
+  [[nodiscard]] gpg::WriteArchive* WriteUnownedSTIMapPointerVariant1(
     moho::STIMap* const* const mapSlot,
     gpg::WriteArchive* const archive,
     const gpg::RRef& ownerRef
@@ -210,7 +159,7 @@ namespace
   /**
    * Address: 0x00508A40 (FUN_00508A40, STIMap unowned pointer read helper)
    */
-  [[maybe_unused]] [[nodiscard]] gpg::ReadArchive* ReadUnownedSTIMapPointerVariant1(
+  [[nodiscard]] gpg::ReadArchive* ReadUnownedSTIMapPointerVariant1(
     const gpg::RRef& ownerRef,
     gpg::ReadArchive* const archive,
     moho::STIMap** const mapSlot
@@ -225,36 +174,12 @@ namespace
   /**
    * Address: 0x00508A50 (FUN_00508A50, CIntelGrid RRef fill helper)
    */
-  [[maybe_unused]] [[nodiscard]] gpg::RRef* FillCIntelGridRef(
+  [[nodiscard]] gpg::RRef* FillCIntelGridRef(
     moho::CIntelGrid* const value,
     gpg::RRef* const outRef
   )
   {
     return gpg::RRef_CIntelGrid(outRef, value);
-  }
-
-  /**
-   * Address: 0x00508E50 (FUN_00508E50, STIMap unowned pointer read helper duplicate)
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::ReadArchive* ReadUnownedSTIMapPointerVariant2(
-    const gpg::RRef& ownerRef,
-    moho::STIMap** const mapSlot,
-    gpg::ReadArchive* const archive
-  )
-  {
-    return ReadUnownedSTIMapPointerVariant1(ownerRef, archive, mapSlot);
-  }
-
-  /**
-   * Address: 0x00508E60 (FUN_00508E60, STIMap unowned pointer write helper duplicate)
-   */
-  [[maybe_unused]] void WriteUnownedSTIMapPointerVariant2(
-    moho::STIMap* const* const mapSlot,
-    gpg::WriteArchive* const archive,
-    const gpg::RRef& ownerRef
-  )
-  {
-    (void)WriteUnownedSTIMapPointerVariant1(mapSlot, archive, ownerRef);
   }
 
 } // namespace

@@ -2,20 +2,6 @@
 
 namespace
 {
-  /**
-   * Address: 0x004B2B40 (FUN_004B2B40, sub_4B2B40)
-   *
-   * What it does:
-   * Runs base `XException` destruction for one throw/unwind lane.
-   */
-  [[maybe_unused]] void DestroyXDataErrorThrowObject(
-    moho::XException* const exception
-  ) noexcept
-  {
-    if (exception) {
-      exception->moho::XException::~XException();
-    }
-  }
 } // namespace
 
 using namespace moho;

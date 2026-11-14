@@ -34,7 +34,7 @@
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/sim/CArmyImpl.h"
 #include "moho/sim/COGrid.h"
-#include "moho/sim/CSimArmyEconomyInfo.h"
+#include "moho/sim/CEconomy.h"
 #include "moho/sim/EAllianceTypeInfo.h"
 #include "moho/sim/SFootprint.h"
 #include "moho/sim/SOCellPos.h"
@@ -509,8 +509,8 @@ namespace moho
     // this resource". A prop is worth reclaiming only for a resource that is
     // *not* near-capped, and an ally is worth assisting only when both stores
     // are, i.e. when there is surplus to spend.
-    const CSimArmyEconomyInfo* const economy = army->GetEconomy();
-    const SEconTotals& totals = economy->economy;
+    const CEconomy* const economy = army->GetEconomy();
+    const SEconTotals& totals = economy->mTotals;
     const bool energyStorageNearFull = totals.mStored.ENERGY > static_cast<float>(totals.mMaxStorage.ENERGY) * 0.75f;
     const bool massStorageNearFull = totals.mStored.MASS > static_cast<float>(totals.mMaxStorage.MASS) * 0.75f;
 
@@ -564,7 +564,7 @@ namespace moho
           continue;
         }
         if (energyStorageNearFull || massStorageNearFull) {
-          const auto* const propBlueprint = reinterpret_cast<const RPropBlueprint*>(candidateProp->BluePrint);
+          const auto* const propBlueprint = static_cast<const RPropBlueprint*>(candidateProp->BluePrint);
           bool hasReclaimValue = false;
           if (!energyStorageNearFull) {
             hasReclaimValue = propBlueprint->Economy.ReclaimEnergyMax > 0.0f;

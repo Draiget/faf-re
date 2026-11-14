@@ -262,7 +262,7 @@ namespace gpg::gal::Math
   )
   {
     // The caller passes D3DX's lane order, x, y, z, w (VMatrix4::LoadRotate).
-    const float* const q = reinterpret_cast<const float*>(rotation);
+    const float* const q = *rotation;
     const float x = q[0];
     const float y = q[1];
     const float z = q[2];

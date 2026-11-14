@@ -56,32 +56,6 @@ namespace
 
   BlinkyBoxListNode gBlinkyBoxesListHead{&gBlinkyBoxesListHead, &gBlinkyBoxesListHead};
 
-  /**
-   * Address: 0x007FE040 (FUN_007FE040)
-   *
-   * What it does:
-   * Unlinks one blinky-box node from its current intrusive list and reinserts
-   * it at the head of the global blinky-box list.
-   */
-  [[maybe_unused]] [[nodiscard]] BlinkyBoxListNode* RelinkBlinkyBoxNodeToGlobalHead(
-    BlinkyBoxListNode* const node
-  )
-  {
-    if (node == nullptr || node->next == nullptr || node->prev == nullptr) {
-      return node;
-    }
-
-    node->next->prev = node->prev;
-    node->prev->next = node->next;
-    node->next = node;
-    node->prev = node;
-
-    node->next = gBlinkyBoxesListHead.next;
-    node->prev = &gBlinkyBoxesListHead;
-    gBlinkyBoxesListHead.next = node;
-    node->next->prev = node;
-    return node;
-  }
 } // namespace
 
 namespace moho

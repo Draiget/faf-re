@@ -20,21 +20,6 @@ namespace
     typeInfo->RegisterOverlayClass("Display the world radar", "Radar");
   }
 
-  /**
-   * Address: 0x0064EBF0 (FUN_0064EBF0)
-   *
-   * What it does:
-   * Stores one `*base + index * 72` address lane into caller output storage.
-   */
-  [[maybe_unused]] std::uintptr_t* StoreStride72BaseAddressByIndex(
-    std::uintptr_t* const outAddress,
-    const std::uintptr_t* const baseAddress,
-    const std::int32_t index
-  ) noexcept
-  {
-    *outAddress = *baseAddress + (static_cast<std::uintptr_t>(index) * 72u);
-    return outAddress;
-  }
 } // namespace
 
 namespace moho

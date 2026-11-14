@@ -123,8 +123,7 @@ namespace
       return out;
     }
 
-    out.mObj =
-      reinterpret_cast<void*>(reinterpret_cast<std::uintptr_t>(object) - static_cast<std::uintptr_t>(baseOffset));
+    out.mObj = gpg::CompleteObject(object, baseOffset);
     out.mType = dynamicType;
     return out;
   }
@@ -401,154 +400,6 @@ namespace
 
     RRef out{};
     out = gpg::MakeRRef<moho::CEconomyEvent*>(resolvedSlot);
-    return out;
-  }
-
-  /**
-   * Address: 0x00750B60 (FUN_00750B60)
-   *
-   * What it does:
-   * Allocates one `SimArmy*` slot, copies the source lane pointer, and wraps it
-   * as `gpg::RRef_SimArmy_P`.
-   */
-  [[maybe_unused]] RRef CopySimArmyPointerSlotRef(
-    RRef* const sourceRef
-  )
-  {
-    auto* slot = static_cast<moho::SimArmy**>(::operator new(sizeof(moho::SimArmy*), std::nothrow));
-    if (slot) {
-      try {
-        *slot = *sourceRef->TryUpcastSimArmyPointerSlot();
-      } catch (...) {
-        ::operator delete(slot);
-        throw;
-      }
-    }
-
-    RRef out{};
-    out = gpg::MakeRRef<moho::SimArmy*>(slot);
-    return out;
-  }
-
-  /**
-   * Address: 0x00750BF0 (FUN_00750BF0)
-   *
-   * What it does:
-   * Wraps one existing `SimArmy*` slot lane as `gpg::RRef_SimArmy_P`.
-   */
-  [[maybe_unused]] RRef ConstructSimArmyPointerSlotRef(
-    void* const slotObject
-  )
-  {
-    RRef out{};
-    out = gpg::MakeRRef<moho::SimArmy*>(static_cast<moho::SimArmy**>(slotObject));
-    return out;
-  }
-
-  /**
-   * Address: 0x00750C20 (FUN_00750C20)
-   *
-   * What it does:
-   * Moves one reflected `SimArmy*` source slot into one destination slot lane
-   * and wraps the destination as one `gpg::RRef_SimArmy_P` payload.
-   */
-  [[maybe_unused]] RRef MoveSimArmyPointerSlotRef(
-    void* const slotObject,
-    RRef* const sourceRef
-  )
-  {
-    auto* slot = static_cast<moho::SimArmy**>(slotObject);
-    moho::SimArmy** resolvedSlot = slot;
-    if (slot != nullptr) {
-      *slot = *sourceRef->TryUpcastSimArmyPointerSlot();
-    } else {
-      resolvedSlot = nullptr;
-    }
-
-    RRef out{};
-    out = gpg::MakeRRef<moho::SimArmy*>(resolvedSlot);
-    return out;
-  }
-
-  /**
-   * Address: 0x00750D60 (FUN_00750D60)
-   *
-   * What it does:
-   * Wraps one `Shield*` slot pointer as a reflected `gpg::RRef_Shield_P`
-   * payload.
-   */
-  [[maybe_unused]] RRef CopyShieldPointerSlotRef(
-    moho::Shield** const slot
-  )
-  {
-    RRef out{};
-    out = gpg::MakeRRef<moho::Shield*>(slot);
-    return out;
-  }
-
-  /**
-   * Address: 0x00750D90 (FUN_00750D90)
-   *
-   * What it does:
-   * Moves one reflected `Shield*` source slot into one destination slot lane
-   * and wraps the destination as one `gpg::RRef_Shield_P` payload.
-   */
-  [[maybe_unused]] RRef MoveShieldPointerSlotRef(
-    void* const slotObject,
-    RRef* const sourceRef
-  )
-  {
-    auto* slot = static_cast<moho::Shield**>(slotObject);
-    moho::Shield** resolvedSlot = slot;
-    if (slot != nullptr) {
-      *slot = *sourceRef->TryUpcastShieldPointerSlot();
-    } else {
-      resolvedSlot = nullptr;
-    }
-
-    RRef out{};
-    out = gpg::MakeRRef<moho::Shield*>(resolvedSlot);
-    return out;
-  }
-
-  /**
-   * Address: 0x0077F040 (FUN_0077F040)
-   *
-   * What it does:
-   * Wraps one `CDecalHandle*` slot pointer as a reflected
-   * `gpg::RRef_CDecalHandle_P` payload.
-   */
-  [[maybe_unused]] RRef CopyCDecalHandlePointerSlotRef(
-    moho::CDecalHandle** const slot
-  )
-  {
-    RRef out{};
-    out = gpg::MakeRRef<moho::CDecalHandle*>(slot);
-    return out;
-  }
-
-  /**
-   * Address: 0x0077F070 (FUN_0077F070)
-   *
-   * What it does:
-   * Moves one reflected `CDecalHandle*` source slot into one destination slot
-   * lane and wraps the destination as one `gpg::RRef_CDecalHandle_P` payload.
-   */
-  [[maybe_unused]] RRef MoveCDecalHandlePointerSlotRef(
-    void* const slotObject,
-    RRef* const sourceRef
-  )
-  {
-    auto* slot = static_cast<moho::CDecalHandle**>(slotObject);
-    moho::CDecalHandle** resolvedSlot = slot;
-    if (slot != nullptr) {
-      *slot = *sourceRef->TryUpcastCDecalHandlePointerSlot();
-    } else {
-      resolvedSlot = nullptr;
-    }
-
-    RRef out{};
-    out = gpg::MakeRRef<moho::CDecalHandle*>(resolvedSlot);
     return out;
   }
 
@@ -1289,21 +1140,6 @@ namespace
     return out;
   }
 
-  /**
-   * Address: 0x004E6380 (FUN_004E6380)
-   *
-   * What it does:
-   * Upcasts one reflected reference to a `CSndParams*` pointer-slot lane and
-   * returns the upcast object pointer lane without mismatch checks.
-   */
-  [[maybe_unused]] [[nodiscard]] void* UpcastCSndParamsPointerSlotUnchecked(
-    const gpg::RRef* const sourceRef
-  )
-  {
-    gpg::RType* const pointerType = moho::CSndParams::GetPointerType();
-    const gpg::RRef upcast = gpg::REF_UpcastPtr(*sourceRef, pointerType);
-    return upcast.mObj;
-  }
   gpg::RPointerType<moho::CAcquireTargetTask> gCAcquireTargetTaskPointerType;
   gpg::RPointerType<moho::SimArmy> gSimArmyPointerType;
   gpg::RPointerType<moho::Shield> gShieldPointerType;

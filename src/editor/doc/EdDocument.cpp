@@ -1,4 +1,9 @@
+#include "gpg/gal/backends/common/ImageCodec.h"
+#include "editor/tools/EdHeightFile.h"
+#include "editor/doc/EdScenarioInfo.h"
 #include "editor/doc/EdDocument.h"
+#include "moho/sim/CVFSImpl.h"
+#include "editor/doc/EdAutosave.h"
 #include "editor/doc/EdRecentMaps.h"
 #include "editor/doc/EdAdaptiveTables.h"
 #include "editor/view/EdLiveTerrain.h"
@@ -10,6 +15,7 @@
 #include <ctime>
 #include <cstring>
 #include <fstream>
+#include <cstring>
 #include <iterator>
 #include <cstdlib>
 #include <cstdio>
@@ -172,7 +178,6 @@ namespace faf::editor
       if (const moho::CHeightField* const field = terrain->GetHeightField(); field != nullptr) {
         facts.fieldWidth = field->width;
         facts.fieldHeight = field->height;
-        facts.symmetry = DetectSymmetry(field->data, field->width, field->height);
       }
       facts.water = terrain->IsWaterEnabled();
       facts.waterElevation = terrain->GetWaterElevation();
@@ -293,11 +298,10 @@ namespace faf::editor
       load.lua = NewDocumentState();
       LuaPlus::LuaState* const state = load.lua.get();
       const NewMapSettings& settings = load.settings;
-      const int units = kNewMapSizes[std::clamp(settings.size, 0, kNewMapSizeCount - 1)].units;
-
-      // The engine's empty map: terrain (default layers, cleared masks, water off), no props.
+      // The engine's empty map: terrain (default layers, cleared masks, water off), no props; as wide and deep as
+      // asked.
       auto map = std::make_unique<moho::CWldMap>();
-      (void)map->MapNew(units, units, state);
+      (void)map->MapNew(NewMapWidth(settings), NewMapDepth(settings), state);
       moho::CHeightField* const field = map->mTerrainRes != nullptr ? map->mTerrainRes->GetHeightField() : nullptr;
       if (field == nullptr) {
         load.error = "the engine made no terrain";
@@ -413,6 +417,35 @@ namespace faf::editor
           facts.optionsPath = beside;
         }
       }
+      // The symmetry the map was made with: its heights, start positions and resource markers.
+      if (
+        const moho::CHeightField* const field =
+          load.map->mTerrainRes != nullptr ? load.map->mTerrainRes->GetHeightField() : nullptr;
+        field != nullptr
+      ) {
+        std::vector<SymmetryMarker> markers;
+        for (const SaveEntry& marker : load.save.Markers()) {
+          const std::vector<double> at = ValueNumbers(marker.Get("position"));
+          if (at.size() < 3) {
+            continue;
+          }
+          const std::string type = ValueString(marker.Get("type"));
+          SymmetryMarker m;
+          m.x = static_cast<float>(at[0]);
+          m.z = static_cast<float>(at[2]);
+          if (marker.name.rfind("ARMY_", 0) == 0) {
+            m.kind = SymmetryMarker::Kind::Start;
+          } else if (type == "Mass") {
+            m.kind = SymmetryMarker::Kind::Mass;
+          } else if (type == "Hydrocarbon") {
+            m.kind = SymmetryMarker::Kind::Hydrocarbon;
+          } else {
+            continue;
+          }
+          markers.push_back(m);
+        }
+        facts.symmetry = DetectSymmetry(field->data, field->width, field->height, markers);
+      }
       (void)ReadGameFile(load.scenarioPath, load.scenario);
       if (!facts.savePath.empty()) {
         const LuaPlus::LuaObject save = RunInTable(state, facts.savePath);
@@ -429,11 +462,83 @@ namespace faf::editor
     }
   }
 
+  bool EdDocument::Guarded(
+    std::function<void()> proceed
+  )
+  {
+    if (mGuardPassed || !mModified || mState != State::Open || !mUnsavedGuard) {
+      return false;
+    }
+    return mUnsavedGuard([this, proceed = std::move(proceed)] {
+      mGuardPassed = true;
+      proceed();
+      mGuardPassed = false;
+    });
+  }
+
+  bool EdDocument::WriteSnapshot(
+    const std::filesystem::path& folder,
+    std::string& error
+  )
+  {
+    if (mState != State::Open || mMap == nullptr) {
+      error = "no map is open";
+      return false;
+    }
+    if (mMap->mTerrainRes == nullptr || !mMap->mTerrainRes->GetBool()) {
+      error = "the terrain is still being prepared";
+      return false;
+    }
+    std::error_code code;
+    std::filesystem::create_directories(folder, code);
+    if (code) {
+      error = "can't make " + folder.string() + ": " + code.message();
+      return false;
+    }
+    const std::filesystem::path disk = MapDiskFile();
+    const std::string scmapName = disk.empty() ? FolderName() + ".scmap" : disk.filename().string();
+    MarkKeptImages();
+    if (!WriteMapFile(*mMap, mFileRecords, folder / scmapName, error)) {
+      return false;
+    }
+    // Every Lua file as Save would write it, the "as saved" texts untouched.
+    SyncEffectScript();
+    std::string scenario = mScenario;
+    if (const ReclaimTotals reclaim = PropReclaim(); reclaim.props > 0) {
+      scenario = WithScenarioReclaim(scenario, reclaim.mass, reclaim.energy);
+    }
+    const std::pair<const std::string*, std::string> files[] = {
+      {&mFacts.scenarioPath, scenario},
+      {&mFacts.savePath, mSave.Loaded() ? mSave.Text() : std::string()},
+      {&mFacts.scriptPath, mScript},
+      {&mFacts.tablesPath, mTables},
+      {&mFacts.optionsPath, mOptions},
+    };
+    for (const auto& [gamePath, text] : files) {
+      if (gamePath->empty() || text.empty()) {
+        continue;
+      }
+      const std::filesystem::path file = folder / gamePath->substr(gamePath->find_last_of('/') + 1);
+      std::ofstream out(file, std::ios::binary | std::ios::trunc);
+      out.write(text.data(), static_cast<std::streamsize>(text.size()));
+      if (!out) {
+        error = "can't write " + file.string();
+        return false;
+      }
+    }
+    return true;
+  }
+
   bool EdDocument::Open(
     const std::string& scenarioPath
   )
   {
     if (mState == State::Loading) {
+      return false;
+    }
+    if (Guarded([this, scenarioPath] {
+      (void)Open(scenarioPath);
+    })) {
       return false;
     }
     Close();
@@ -454,6 +559,13 @@ namespace faf::editor
   {
     if (mState == State::Loading) {
       message = "A map is still opening.";
+      return false;
+    }
+    if (Guarded([this, settings] {
+      std::string ignored;
+      (void)CreateNew(settings, ignored);
+    })) {
+      message = "The open map has unsaved changes: answer the question first.";
       return false;
     }
     if (
@@ -830,7 +942,8 @@ namespace faf::editor
   }
 
   void EdDocument::PropsEdited(
-    PropSnapshot before
+    PropSnapshot before,
+    const bool ownStep
   )
   {
     mPropUndo.emplace_back(std::move(before), PropsNow());
@@ -838,7 +951,9 @@ namespace faf::editor
     if (mPropUndo.size() > 200) {
       mPropUndo.erase(mPropUndo.begin());
     }
-    EditEnded(EditKind::Props);
+    if (ownStep) {
+      EditEnded(EditKind::Props);
+    }
     mModified = true;
   }
 
@@ -1052,7 +1167,8 @@ namespace faf::editor
   }
 
   void EdDocument::TerrainTypesEdited(
-    std::vector<std::uint8_t> before
+    std::vector<std::uint8_t> before,
+    const bool ownStep
   )
   {
     mTerrainTypesUndo.emplace_back(std::move(before), TerrainTypesNow());
@@ -1060,7 +1176,9 @@ namespace faf::editor
     if (mTerrainTypesUndo.size() > 20) {
       mTerrainTypesUndo.erase(mTerrainTypesUndo.begin());
     }
-    EditEnded(EditKind::TerrainTypes);
+    if (ownStep) {
+      EditEnded(EditKind::TerrainTypes);
+    }
     mModified = true;
   }
 
@@ -1200,6 +1318,9 @@ namespace faf::editor
     sky.cirrusTexture = dome.mCirrusTexPath.c_str();
     static_assert(sizeof(sky.cirrus) == sizeof(dome.mCirrusData), "four 20-byte cirrus layers");
     std::memcpy(sky.cirrus, dome.mCirrusData, sizeof(sky.cirrus));
+    const moho::IWldTerrainRes& terrain = *mMap->mTerrainRes;
+    sky.skycube = terrain.GetSkycubeFile().c_str();
+    sky.background = terrain.GetBackgroundFile().c_str();
     return sky;
   }
 
@@ -1235,6 +1356,18 @@ namespace faf::editor
     dome.mCirrusColor_B = sky.cirrusColor[2];
     dome.mCirrusTexPath.assign(sky.cirrusTexture.c_str());
     std::memcpy(dome.mCirrusData, sky.cirrus, sizeof(sky.cirrus));
+    // The cube and the background: only a name given changes them (a `.scmskybox` has neither).
+    moho::IWldTerrainRes& terrain = *mMap->mTerrainRes;
+    if (!sky.skycube.empty() && sky.skycube != terrain.GetSkycubeFile().c_str()) {
+      fa::string path;
+      path.assign(sky.skycube.c_str());
+      terrain.SetSkycube(path);
+    }
+    if (!sky.background.empty() && sky.background != terrain.GetBackgroundFile().c_str()) {
+      fa::string path;
+      path.assign(sky.background.c_str());
+      terrain.SetBackground(path);
+    }
     mModified = true;
   }
 
@@ -1275,11 +1408,11 @@ namespace faf::editor
     lighting.bloom = terrain.GetBloom();
     // The fog as WRenViewport::FogOn reads it: the colour from the first three floats, start and end from the next two.
     const moho::SFogInfo& fog = terrain.GetFogInfo();
-    lighting.fogColor[0] = fog.mStartDistance;
-    lighting.fogColor[1] = fog.mCutoffDistance;
-    lighting.fogColor[2] = fog.mMinClamp;
-    lighting.fogStart = fog.mMaxClamp;
-    lighting.fogEnd = fog.mCurveExponent;
+    lighting.fogColor[0] = fog.mColorR;
+    lighting.fogColor[1] = fog.mColorG;
+    lighting.fogColor[2] = fog.mColorB;
+    lighting.fogStart = fog.mStart;
+    lighting.fogEnd = fog.mEnd;
     return lighting;
   }
 
@@ -1319,11 +1452,11 @@ namespace faf::editor
     terrain.SetSpecularColor(specular);
     terrain.SetBloom(lighting.bloom);
     moho::SFogInfo fog = terrain.GetFogInfo();
-    fog.mStartDistance = lighting.fogColor[0];
-    fog.mCutoffDistance = lighting.fogColor[1];
-    fog.mMinClamp = lighting.fogColor[2];
-    fog.mMaxClamp = lighting.fogStart;
-    fog.mCurveExponent = lighting.fogEnd;
+    fog.mColorR = lighting.fogColor[0];
+    fog.mColorG = lighting.fogColor[1];
+    fog.mColorB = lighting.fogColor[2];
+    fog.mStart = lighting.fogStart;
+    fog.mEnd = lighting.fogEnd;
     terrain.SetFogInfo(fog);
   }
 
@@ -1336,6 +1469,143 @@ namespace faf::editor
       mLightingUndo.erase(mLightingUndo.begin());
     }
     EditEnded(EditKind::Lighting);
+    mModified = true;
+  }
+
+  std::vector<std::pair<std::string, std::string>> EdDocument::CubesNow() const
+  {
+    std::vector<std::pair<std::string, std::string>> cubes;
+    if (mMap == nullptr || mMap->mTerrainRes == nullptr) {
+      return cubes;
+    }
+    moho::TerrainEnvironmentLookupPairs pairs;
+    static_cast<const moho::IWldTerrainRes&>(*mMap->mTerrainRes).EnumerateEnvLookup(pairs);
+    for (const auto& [name, cube] : pairs) {
+      cubes.emplace_back(name.c_str(), cube.c_str());
+    }
+    return cubes;
+  }
+
+  void EdDocument::ApplyCubes(
+    const std::vector<std::pair<std::string, std::string>>& cubes
+  )
+  {
+    if (mMap == nullptr || mMap->mTerrainRes == nullptr) {
+      return;
+    }
+    moho::IWldTerrainRes& terrain = *mMap->mTerrainRes;
+    terrain.ClearEnvLookup();
+    for (const auto& [name, cube] : cubes) {
+      terrain.AddEnvLookup(fa::string(name.c_str()), fa::string(cube.c_str()));
+    }
+    mModified = true;
+  }
+
+  std::uint8_t* EdDocument::WaterMaskCells(
+    const WaterMask mask,
+    int& width,
+    int& height
+  ) const
+  {
+    width = 0;
+    height = 0;
+    if (mMap == nullptr || mMap->mTerrainRes == nullptr || mMap->mTerrainRes->mMap == nullptr) {
+      return nullptr;
+    }
+    const moho::CHeightField* const field = mMap->mTerrainRes->mMap->mHeightField.get();
+    if (field == nullptr) {
+      return nullptr;
+    }
+    // CWldTerrainRes::CreateWaterMasks' size: the height field's cells halved.
+    width = (field->width - 1) >> 1;
+    height = (field->height - 1) >> 1;
+    moho::IWldTerrainRes& terrain = *mMap->mTerrainRes;
+    switch (mask) {
+    case WaterMask::Foam:
+      return terrain.GetWaterFoam();
+    case WaterMask::Flatness:
+      return terrain.GetWaterFlatness();
+    default:
+      return terrain.GetWaterDepthBias();
+    }
+  }
+
+  EdDocument::WaterMaskSnapshot EdDocument::WaterMasksNow() const
+  {
+    WaterMaskSnapshot masks;
+    int width = 0, height = 0;
+    const auto copy = [&](const WaterMask mask, std::vector<std::uint8_t>& out) {
+      if (const std::uint8_t* const cells = WaterMaskCells(mask, width, height); cells != nullptr) {
+        out.assign(cells, cells + static_cast<std::size_t>(width) * static_cast<std::size_t>(height));
+      }
+    };
+    copy(WaterMask::Foam, masks.foam);
+    copy(WaterMask::Flatness, masks.flatness);
+    copy(WaterMask::DepthBias, masks.depthBias);
+    masks.width = width;
+    masks.height = height;
+    return masks;
+  }
+
+  void EdDocument::ApplyWaterMasks(
+    const WaterMaskSnapshot& masks
+  )
+  {
+    int width = 0, height = 0;
+    const auto put = [&](const WaterMask mask, const std::vector<std::uint8_t>& from) {
+      std::uint8_t* const cells = WaterMaskCells(mask, width, height);
+      if (cells != nullptr && from.size() == static_cast<std::size_t>(width) * static_cast<std::size_t>(height)) {
+        std::copy(from.begin(), from.end(), cells);
+      }
+    };
+    put(WaterMask::Foam, masks.foam);
+    put(WaterMask::Flatness, masks.flatness);
+    put(WaterMask::DepthBias, masks.depthBias);
+    WaterMasksChanged(0, 0, width, height);
+  }
+
+  void EdDocument::WaterMasksChanged(
+    const int x0,
+    const int z0,
+    const int x1,
+    const int z1
+  )
+  {
+    ++mWaterMaskRevision;
+    mModified = true;
+    if (mMap == nullptr || mMap->mTerrainRes == nullptr) {
+      return;
+    }
+    // The water map's rect in map units (a mask cell is 2 x 2), a cell's margin for the shader's bilinear reads.
+    gpg::Rect2i rect{};
+    rect.x0 = std::max(0, x0 - 1) * 2;
+    rect.z0 = std::max(0, z0 - 1) * 2;
+    rect.x1 = (x1 + 1) * 2;
+    rect.z1 = (z1 + 1) * 2;
+    mMap->mTerrainRes->UpdateWaterMap(rect);
+  }
+
+  void EdDocument::WaterMasksEdited(
+    WaterMaskSnapshot before
+  )
+  {
+    mWaterMaskUndo.emplace_back(std::move(before), WaterMasksNow());
+    if (mWaterMaskUndo.size() > 20) {
+      mWaterMaskUndo.erase(mWaterMaskUndo.begin());
+    }
+    EditEnded(EditKind::WaterMasks);
+    mModified = true;
+  }
+
+  void EdDocument::LookApplied(
+    LookEnvironment before
+  )
+  {
+    mLookUndo.emplace_back(std::move(before), LookEnvironmentNow());
+    if (mLookUndo.size() > 100) {
+      mLookUndo.erase(mLookUndo.begin());
+    }
+    EditEnded(EditKind::Look);
     mModified = true;
   }
 
@@ -1499,7 +1769,8 @@ namespace faf::editor
   }
 
   void EdDocument::DecalsEdited(
-    DecalSnapshot before
+    DecalSnapshot before,
+    const bool ownStep
   )
   {
     DecalSnapshot now = DecalsNow();
@@ -1509,8 +1780,66 @@ namespace faf::editor
     if (mDecalUndo.size() > 100) {
       mDecalUndo.erase(mDecalUndo.begin());
     }
-    EditEnded(EditKind::Decals);
+    if (ownStep) {
+      EditEnded(EditKind::Decals);
+    }
     mModified = true;
+  }
+
+  std::array<float, 3> EdDocument::PropScale(
+    const std::size_t index
+  ) const
+  {
+    if (
+      mMap != nullptr && mMap->mProps != nullptr && index < mMap->mProps->mEntries.size() &&
+      index < mFileRecords.props.size() &&
+      mFileRecords.props[index].path == mMap->mProps->mEntries[index].mBlueprintPath.c_str()
+    ) {
+      const PropRecord& record = mFileRecords.props[index];
+      return {record.values[12], record.values[13], record.values[14]};
+    }
+    return {1.0f, 1.0f, 1.0f};
+  }
+
+  void EdDocument::SetPropScale(
+    const std::size_t index,
+    const std::array<float, 3>& scale
+  )
+  {
+    if (mMap == nullptr || mMap->mProps == nullptr || index >= mMap->mProps->mEntries.size()) {
+      return;
+    }
+    const moho::CWldPropEntry& entry = mMap->mProps->mEntries[index];
+    mFileRecords.props.resize(mMap->mProps->mEntries.size());
+    PropRecord& record = mFileRecords.props[index];
+    if (record.path != entry.mBlueprintPath.c_str()) {
+      record = PropRecordFor(entry.mBlueprintPath.c_str(), entry.mTransform);
+    }
+    record.values[12] = scale[0];
+    record.values[13] = scale[1];
+    record.values[14] = scale[2];
+    mModified = true;
+  }
+
+  bool EdDocument::SaveNeedsOverwriteConsent() const
+  {
+    if (mState != State::Open || mMap == nullptr) {
+      return false;
+    }
+    const std::filesystem::path file = MapDiskFile();
+    if (file.empty() || (mSaveOutsideVault && file == mSaveTarget) || file == mOverwriteFile || mVault.empty()) {
+      return false;
+    }
+    std::error_code ignored;
+    const std::filesystem::path vaultMaps = std::filesystem::weakly_canonical(mVault / "maps", ignored);
+    const std::filesystem::path relative =
+      std::filesystem::relative(std::filesystem::weakly_canonical(file, ignored), vaultMaps, ignored);
+    return relative.empty() || relative.native().rfind(L"..", 0) == 0;
+  }
+
+  void EdDocument::AllowOverwrite()
+  {
+    mOverwriteFile = MapDiskFile();
   }
 
   void EdDocument::SetPropRecord(
@@ -1554,9 +1883,25 @@ namespace faf::editor
   }
 
   void EdDocument::EditEnded(
-    const EditKind kind
+    EditKind kind
   )
   {
+    // A heights or masks step whose stroke changed nothing has nothing to undo (the history keeps no stroke for it):
+    // no step, so the next undo isn't taken by an older stroke of that history. A pair keeps the half that changed.
+    if (kind == EditKind::Heights || kind == EditKind::Masks || kind == EditKind::HeightsAndMasks) {
+      const bool heights = mHeights.LastStrokeKept();
+      const bool masks = mMaskHistory.LastStrokeKept();
+      if ((kind == EditKind::Heights && !heights) || (kind == EditKind::Masks && !masks)) {
+        return;
+      }
+      if (kind == EditKind::HeightsAndMasks) {
+        if (!heights && !masks) {
+          return;
+        }
+        kind = !heights ? EditKind::Masks : !masks ? EditKind::Heights : kind;
+      }
+    }
+    ++mEditCount;
     mUndoOrder.push_back(kind);
     mRedoOrder.clear();
     mHeights.ClearRedo();
@@ -1567,15 +1912,27 @@ namespace faf::editor
     mDecalRedo.clear();
     mWaterRedo.clear();
     mLightingRedo.clear();
+    mLookRedo.clear();
+    mWaterMaskRedo.clear();
     mSkyboxRedo.clear();
     mWavesRedo.clear();
     mTerrainTypesRedo.clear();
+    mBuildRedo.clear();
+    mLayoutRedo.clear();
+    mMissionRedo.clear();
+    mMapInfoRedo.clear();
+    mPathsRedo.clear();
+    if (onEditEnded) {
+      const char* const step = UndoStepName();
+      onEditEnded(step != nullptr ? step : "");
+    }
   }
 
   bool EdDocument::PopUndo(
     EditKind& kind
   )
   {
+    ++mEditCount;
     if (mUndoOrder.empty()) {
       return false;
     }
@@ -1588,6 +1945,7 @@ namespace faf::editor
     EditKind& kind
   )
   {
+    ++mEditCount;
     if (mRedoOrder.empty()) {
       return false;
     }
@@ -1677,6 +2035,9 @@ namespace faf::editor
       ) {
         mHeights.Reset(field->width, field->height);
       }
+      LoadLayout();
+      LoadMissionFile();
+      LoadPathsFile();
       gpg::Logf(
         "editor: opened %s in %.2f s: %d x %d, %zu layers named, %d props, %d decals, %d markers, %zu armies%s%s",
         mPath.c_str(),
@@ -1809,34 +2170,15 @@ namespace faf::editor
     return base + suffix;
   }
 
-  bool EdDocument::SaveAsNewFolder(
+  bool EdDocument::WriteFolderCopy(
     const std::string& folder,
+    std::filesystem::path& newMapFile,
+    int& copied,
     std::string& message
   )
   {
-    if (mState != State::Open || mMap == nullptr) {
-      message = "No map is open.";
-      return false;
-    }
-    SyncEffectScript();
-    if (mMap->mTerrainRes == nullptr || !mMap->mTerrainRes->GetBool()) {
-      message = "The map isn't ready yet (its terrain is still being prepared); save again in a moment.";
-      return false;
-    }
-    if (folder.empty() || folder.find_first_of("\\/:*?\"<>|") != std::string::npos) {
-      message = "\"" + folder + "\" can't be a folder name.";
-      return false;
-    }
-    if (mVault.empty()) {
-      message = "There is no vault folder to save into.";
-      return false;
-    }
-    const std::filesystem::path target = mVault / "maps" / folder;
+    const std::filesystem::path target = (mCopyParent.empty() ? mVault / "maps" : mCopyParent) / folder;
     std::error_code error;
-    if (std::filesystem::exists(target, error)) {
-      message = target.string() + " already exists; pick another name.";
-      return false;
-    }
 
     const std::string oldFolder = FolderName();
     std::string oldBase = mFacts.scenarioPath.substr(mFacts.scenarioPath.find_last_of('/') + 1);
@@ -1902,8 +2244,7 @@ namespace faf::editor
       return false;
     }
 
-    std::filesystem::path newMapFile;
-    int copied = 0;
+    copied = 0;
     for (const fa::string& file : files) {
       const std::string source = file.c_str();
       if (Lower(source).rfind(Lower(oldPrefix), 0) != 0) {
@@ -1925,6 +2266,9 @@ namespace faf::editor
       std::string bytes;
       if (Lower(source) == Lower(mFacts.savePath) && mSave.Loaded() && mSave.Changed()) {
         bytes = mSave.Text(); // the edited markers and areas
+      } else if (Lower(source) == Lower(mFacts.scriptPath) && !mMission.Empty()) {
+        MissionPatch patch = MissionPatch::None;
+        bytes = ScriptWithMission(mCopyTestMission, patch); // the script with the mission compiled into it
       } else if (Lower(source) == Lower(mFacts.scriptPath) && mScript != mScriptRead) {
         bytes = mScript; // the edited script (its playable area)
       } else if (Lower(source) == Lower(mFacts.tablesPath) && !mTables.empty()) {
@@ -1970,6 +2314,145 @@ namespace faf::editor
       message = "Saving " + newMapFile.string() + " failed: " + failure;
       return false;
     }
+    return true;
+  }
+
+  bool EdDocument::WritePlayCopy(
+    std::string& scenario,
+    std::string& message
+  )
+  {
+    if (mState != State::Open || mMap == nullptr) {
+      message = "No map is open.";
+      return false;
+    }
+    SyncEffectScript();
+    if (mMap->mTerrainRes == nullptr || !mMap->mTerrainRes->GetBool()) {
+      message = "The map isn't ready yet (its terrain is still being prepared).";
+      return false;
+    }
+    if (mVault.empty()) {
+      message = "There is no vault folder to write the play copy into.";
+      return false;
+    }
+    // One copy per map, written again for every play: the last one goes first.
+    const std::string folder = WithoutVersion(FolderName()) + kPlayCopySuffix;
+    RemovePlayCopy(folder);
+    std::filesystem::path newMapFile;
+    int copied = 0;
+    mCopyTestMission = true;
+    const bool written = WriteFolderCopy(folder, newMapFile, copied, message);
+    mCopyTestMission = false;
+    if (!written) {
+      return false;
+    }
+    mPlayCopy = folder;
+    moho::DISK_InvalidateFileLookups();
+    scenario = "/maps/" + folder + "/" + folder + "_scenario.lua";
+    message = "the open map with its unsaved edits copied to " + (mVault / "maps" / folder).string() + " (" +
+      std::to_string(copied + 1) + " files)";
+    return true;
+  }
+
+  void EdDocument::RemovePlayCopy(
+    std::string folder
+  )
+  {
+    if (folder.empty()) {
+      folder = mPlayCopy;
+    }
+    // Only a folder this editor names: never anything of the mapper's.
+    if (
+      folder.empty() || mVault.empty() || folder.size() <= std::strlen(kPlayCopySuffix) ||
+      folder.compare(folder.size() - std::strlen(kPlayCopySuffix), std::string::npos, kPlayCopySuffix) != 0 ||
+      folder.find_first_of("\\/:") != std::string::npos
+    ) {
+      return;
+    }
+    const std::filesystem::path target = mVault / "maps" / folder;
+    std::error_code error;
+    if (!std::filesystem::exists(target, error)) {
+      if (folder == mPlayCopy) {
+        mPlayCopy.clear();
+      }
+      return;
+    }
+    std::filesystem::remove_all(target, error);
+    if (error) {
+      gpg::Warnf("editor: the play copy %s stays for now: %s", target.string().c_str(), error.message().c_str());
+      return;
+    }
+    moho::DISK_InvalidateFileLookups();
+    gpg::Logf("editor: the play copy %s removed", target.string().c_str());
+    if (folder == mPlayCopy) {
+      mPlayCopy.clear();
+    }
+  }
+
+  bool EdDocument::SaveAsNewFolderIn(
+    const std::filesystem::path& parent,
+    const std::string& folder,
+    std::string& message
+  )
+  {
+    std::error_code error;
+    if (!parent.empty() && !std::filesystem::is_directory(parent, error)) {
+      message = parent.string() + " isn't a folder.";
+      return false;
+    }
+    const std::filesystem::path vaultMaps = std::filesystem::weakly_canonical(mVault / "maps", error);
+    const bool outside = !parent.empty() && std::filesystem::weakly_canonical(parent, error) != vaultMaps;
+    mCopyParent = outside ? parent : std::filesystem::path();
+    const bool saved = SaveAsNewFolder(folder, message);
+    mCopyParent.clear();
+    if (saved) {
+      mSaveOutsideVault = outside;
+      if (outside) {
+        message += " (outside the vault: the game doesn't see it there)";
+      }
+    }
+    return saved;
+  }
+
+  bool EdDocument::SaveAsNewFolder(
+    const std::string& folder,
+    std::string& message
+  )
+  {
+    if (mState != State::Open || mMap == nullptr) {
+      message = "No map is open.";
+      return false;
+    }
+    SyncEffectScript();
+    if (mMap->mTerrainRes == nullptr || !mMap->mTerrainRes->GetBool()) {
+      message = "The map isn't ready yet (its terrain is still being prepared); save again in a moment.";
+      return false;
+    }
+    if (folder.empty() || folder.find_first_of("\\/:*?\"<>|") != std::string::npos) {
+      message = "\"" + folder + "\" can't be a folder name.";
+      return false;
+    }
+    if (mVault.empty()) {
+      message = "There is no vault folder to save into.";
+      return false;
+    }
+    const std::filesystem::path target = (mCopyParent.empty() ? mVault / "maps" : mCopyParent) / folder;
+    std::error_code error;
+    if (std::filesystem::exists(target, error)) {
+      message = target.string() + " already exists; pick another name.";
+      return false;
+    }
+    std::filesystem::path newMapFile;
+    int copied = 0;
+    if (!WriteFolderCopy(folder, newMapFile, copied, message)) {
+      return false;
+    }
+    const std::string oldFolder = FolderName();
+    std::string oldBase = mFacts.scenarioPath.substr(mFacts.scenarioPath.find_last_of('/') + 1);
+    oldBase = oldBase.substr(0, oldBase.size() - std::min(oldBase.size(), std::string("_scenario.lua").size()));
+    const std::string newBase = WithoutVersion(folder);
+    const std::string oldPrefix = "/maps/" + oldFolder + "/";
+    const std::string newPrefix = "/maps/" + folder + "/";
     mSaveTarget = newMapFile;
     mBackedUp = true; // a new folder has nothing to back up
     mModified = false;
@@ -2066,6 +2549,59 @@ namespace faf::editor
     return true;
   }
 
+  bool EdDocument::ExportPreview(
+    const std::filesystem::path& file,
+    std::string& message
+  ) const
+  {
+    // The DDS inside the preview chunk the map was read with.
+    const std::vector<char>& chunk = mFileRecords.preview;
+    std::size_t at = std::string::npos;
+    for (std::size_t i = 0; i + 4 <= chunk.size(); ++i) {
+      if (chunk[i] == 'D' && chunk[i + 1] == 'D' && chunk[i + 2] == 'S' && chunk[i + 3] == ' ') {
+        at = i;
+        break;
+      }
+    }
+    if (at == std::string::npos || chunk.size() < at + 128) {
+      message = "The map has no preview picture in its file (a new map gets one when it is saved).";
+      return false;
+    }
+    std::uint32_t size[2] = {};
+    std::memcpy(size, chunk.data() + at + 12, sizeof(size)); // the DDS header's height, then width
+    gpg::gal::imaging::ImageCodec* const codec = gpg::gal::imaging::ImageCodec::Instance();
+    gpg::gal::imaging::DecodeOptions options;
+    options.format = DXGI_FORMAT_B8G8R8A8_UNORM;
+    options.width = size[1];
+    options.height = size[0];
+    options.mipLevels = 1;
+    gpg::gal::imaging::Image image;
+    if (
+      codec == nullptr || FAILED(codec->Decode(chunk.data() + at, chunk.size() - at, options, image)) ||
+      image.subresources.empty() || image.format != DXGI_FORMAT_B8G8R8A8_UNORM
+    ) {
+      message = "The preview picture couldn't be decoded.";
+      return false;
+    }
+    const auto& level = image.subresources.front();
+    std::vector<std::uint32_t> pixels(static_cast<std::size_t>(level.width) * level.height);
+    for (std::uint32_t y = 0; y < level.height; ++y) {
+      std::memcpy(
+        pixels.data() + static_cast<std::size_t>(y) * level.width,
+        image.bytes.data() + level.offset + static_cast<std::size_t>(y) * level.rowPitch,
+        static_cast<std::size_t>(level.width) * 4U
+      );
+    }
+    std::string error;
+    if (!WriteColourPng(file, static_cast<int>(level.width), static_cast<int>(level.height), pixels, error)) {
+      message = error;
+      return false;
+    }
+    message = "Exported the lobby preview (" + std::to_string(level.width) + " x " + std::to_string(level.height) +
+      ") to " + file.string();
+    return true;
+  }
+
   bool EdDocument::Save(
     std::string& message
   )
@@ -2085,7 +2621,10 @@ namespace faf::editor
     const std::filesystem::path vaultMaps = std::filesystem::weakly_canonical(mVault / "maps", ignored);
     const std::filesystem::path relative =
       std::filesystem::relative(std::filesystem::weakly_canonical(file, ignored), vaultMaps, ignored);
-    if (mVault.empty() || relative.empty() || relative.native().rfind(L"..", 0) == 0) {
+    // Save as put it in a folder picked for it, or the overwrite there was confirmed (SaveNeedsOverwriteConsent).
+    const bool picked =
+      (mSaveOutsideVault && file == mSaveTarget) || (!mOverwriteFile.empty() && file == mOverwriteFile);
+    if (!picked && (mVault.empty() || relative.empty() || relative.native().rfind(L"..", 0) == 0)) {
       message = "This map isn't in your vault (" + (mVault / "maps").string() + "); save it as a new map folder there.";
       return false;
     }
@@ -2095,25 +2634,32 @@ namespace faf::editor
       message = "The map isn't ready yet (its terrain is still being prepared); save again in a moment.";
       return false;
     }
-    std::error_code error;
-    if (!mBackedUp) {
-      char stamp[32];
-      const std::time_t now = std::time(nullptr);
-      std::tm local{};
-      (void)localtime_s(&local, &now);
-      (void)std::strftime(stamp, sizeof(stamp), "%Y%m%d-%H%M%S", &local);
-      const std::filesystem::path backup = file.parent_path() / ".editor_backup" / stamp;
-      std::filesystem::create_directories(backup, error);
-      if (!error) {
-        std::filesystem::copy_file(
-          file, backup / file.filename(), std::filesystem::copy_options::overwrite_existing, error
-        );
-      }
-      if (error) {
-        message = "The backup of " + file.string() + " failed (" + error.message() + "); nothing was saved.";
+    // Before the session's first save: the map's files (all five) backed up outside the maps folder.
+    if (!mBackedUp && !mBackupRoot.empty() && mBackupKeep > 0) {
+      std::filesystem::path made;
+      std::string failure;
+      if (!BackupMapFolder(file.parent_path(), mBackupRoot, mBackupKeep, made, failure)) {
+        message = "The backup failed (" + failure + "); nothing was saved.";
         return false;
       }
+      gpg::Logf("editor: the map's files backed up to %s", made.string().c_str());
       mBackedUp = true;
+    }
+    // A map without a <default> reflection cube gets the game's (units without one of their own reflect nothing
+    // else), as one undo step, said in the message.
+    std::string note;
+    {
+      std::vector<std::pair<std::string, std::string>> cubes = CubesNow();
+      if (std::none_of(cubes.begin(), cubes.end(), [](const auto& cube) {
+        return cube.first == "<default>";
+      })) {
+        const LookEnvironment before = LookEnvironmentNow();
+        cubes.emplace_back("<default>", "/textures/environment/defaultenvcube.dds");
+        ApplyCubes(cubes);
+        LookApplied(before);
+        note = " (added the <default> reflection cube it lacked)";
+        gpg::Logf("editor: save: the map had no <default> reflection cube: the game's added");
+      }
     }
     std::string failure;
     MarkKeptImages();
@@ -2121,12 +2667,57 @@ namespace faf::editor
       message = "Saving " + file.string() + " failed: " + failure;
       return false;
     }
+    if (!mMission.Empty()) {
+      MissionPatch patch = MissionPatch::None;
+      const std::string patched = ScriptWithMission(false, patch);
+      if (patch == MissionPatch::Written) {
+        mScript = patched;
+      } else if (patch == MissionPatch::Detached) {
+        gpg::Warnf(
+          "editor: the script's mission region was edited by hand: left alone (delete it to generate it again)"
+        );
+      }
+    }
     if (!WriteLuaFiles(file.parent_path(), failure)) {
       message = "Saved " + file.string() + ", but " + failure;
       return false;
     }
+    if (const std::string mission = SaveMission(mMission); mission != mMissionRead && !MissionFile().empty()) {
+      std::ofstream out(MissionFile(), std::ios::binary | std::ios::trunc);
+      out.write(mission.data(), static_cast<std::streamsize>(mission.size()));
+      if (!out) {
+        message =
+          "Saved " + file.string() + ", but the mission file " + MissionFile().string() + " couldn't be written";
+        return false;
+      }
+      mMissionRead = mission;
+    }
+    // The kept paths beside the map (only when they changed; no paths and no file: none written).
+    if (
+      const std::string paths =
+        mPaths.set.paths.empty() && mPathsRead.empty() ? std::string() : KeptPathsText(mPaths.set);
+      paths != mPathsRead && !PathsFile().empty()
+    ) {
+      std::ofstream out(PathsFile(), std::ios::binary | std::ios::trunc);
+      out.write(paths.data(), static_cast<std::streamsize>(paths.size()));
+      if (!out) {
+        message = "Saved " + file.string() + ", but the paths file " + PathsFile().string() + " couldn't be written";
+        return false;
+      }
+      mPathsRead = paths;
+    }
+    // The layout's drawing beside the map (only when it changed; an emptied drawing empties the file).
+    if (const std::string layout = mLayout.Save(); layout != mLayoutRead && !LayoutFile().empty()) {
+      std::ofstream out(LayoutFile(), std::ios::binary | std::ios::trunc);
+      out.write(layout.data(), static_cast<std::streamsize>(layout.size()));
+      if (!out) {
+        message = "Saved " + file.string() + ", but the layout file " + LayoutFile().string() + " couldn't be written";
+        return false;
+      }
+      mLayoutRead = layout;
+    }
     mModified = false;
-    message = "Saved " + file.string();
+    message = "Saved " + file.string() + note;
     return true;
   }
 
@@ -2146,6 +2737,8 @@ namespace faf::editor
     mRedoOrder.clear();
     mLayerUndo.clear();
     mLayerRedo.clear();
+    mConversionUndo.clear();
+    mConversionRedo.clear();
     mPropUndo.clear();
     mPropRedo.clear();
     mSave = {};
@@ -2167,5 +2760,403 @@ namespace faf::editor
     mError.clear();
     mPath.clear();
     mState = State::Empty;
+  }
+  void EdDocument::BuildAddWater(
+    WaterState before
+  )
+  {
+    if (!mUndoOrder.empty() && mUndoOrder.back() == EditKind::Heights) {
+      // A build of heights only is a heights step: it becomes a build step of the heights and the water.
+      mUndoOrder.back() = EditKind::GraphBuild;
+      mBuildUndo.push_back(1);
+    } else if (mBuildUndo.empty() || mUndoOrder.empty() || mUndoOrder.back() != EditKind::GraphBuild) {
+      WaterEdited(std::move(before));
+      return;
+    }
+    mWaterUndo.emplace_back(std::move(before), WaterNow());
+    mBuildUndo.back() = static_cast<std::uint16_t>(mBuildUndo.back() | 256U);
+    mModified = true;
+  }
+
+  void EdDocument::LayoutStroked(
+    LayoutStroke stroke
+  )
+  {
+    LayoutEdit edit;
+    edit.stroke = std::move(stroke);
+    mLayoutUndo.push_back(std::move(edit));
+    if (mLayoutUndo.size() > 100) {
+      mLayoutUndo.erase(mLayoutUndo.begin());
+    }
+    EditEnded(EditKind::Layout);
+    mModified = true;
+  }
+
+  void EdDocument::LayoutReplaced(
+    MapLayout before
+  )
+  {
+    LayoutEdit edit;
+    edit.before = std::make_shared<MapLayout>(std::move(before));
+    edit.after = std::make_shared<MapLayout>(mLayout);
+    mLayoutUndo.push_back(std::move(edit));
+    if (mLayoutUndo.size() > 100) {
+      mLayoutUndo.erase(mLayoutUndo.begin());
+    }
+    EditEnded(EditKind::Layout);
+    mModified = true;
+  }
+
+  bool EdDocument::UndoLayout(
+    const bool redo
+  )
+  {
+    std::vector<LayoutEdit>& from = redo ? mLayoutRedo : mLayoutUndo;
+    std::vector<LayoutEdit>& to = redo ? mLayoutUndo : mLayoutRedo;
+    if (from.empty()) {
+      return false;
+    }
+    LayoutEdit edit = std::move(from.back());
+    from.pop_back();
+    const std::uint64_t revision = mLayout.revision;
+    if (edit.before != nullptr) {
+      mLayout = redo ? *edit.after : *edit.before;
+    } else {
+      (void)mLayout.SetCells(edit.stroke.layerId, redo ? edit.stroke.after : edit.stroke.before);
+    }
+    mLayout.revision = revision + 1;
+    to.push_back(std::move(edit));
+    mModified = true;
+    return true;
+  }
+
+  std::filesystem::path EdDocument::LayoutFile() const
+  {
+    const std::filesystem::path map = MapDiskFile();
+    if (map.empty()) {
+      return {};
+    }
+    return map.parent_path() / (map.stem().string() + "_layout.editor");
+  }
+
+  std::filesystem::path EdDocument::ModsFile() const
+  {
+    const std::filesystem::path map = MapDiskFile();
+    return map.empty() ? std::filesystem::path() : map.parent_path() / (map.stem().string() + "_mods.editor");
+  }
+
+  std::filesystem::path EdDocument::TerrainGraphFile() const
+  {
+    const std::filesystem::path map = MapDiskFile();
+    if (map.empty()) {
+      return {};
+    }
+    return map.parent_path() / (map.stem().string() + "_terrain.editor");
+  }
+
+  void EdDocument::LayoutArea(
+    float& x0,
+    float& z0,
+    float& x1,
+    float& z1
+  ) const
+  {
+    x0 = 0.0f;
+    z0 = 0.0f;
+    x1 = static_cast<float>(std::max(8, mFacts.fieldWidth - 1));
+    z1 = static_cast<float>(std::max(8, mFacts.fieldHeight - 1));
+    if (const std::optional<PlayableRect> area = PlayableArea()) {
+      x0 = static_cast<float>(area->x0);
+      z0 = static_cast<float>(area->z0);
+      x1 = static_cast<float>(area->x1);
+      z1 = static_cast<float>(area->z1);
+    }
+  }
+
+  void EdDocument::LoadLayout()
+  {
+    mLayoutUndo.clear();
+    mLayoutRedo.clear();
+    mLayoutRead.clear();
+    float x0 = 0.0f, z0 = 0.0f, x1 = 0.0f, z1 = 0.0f;
+    LayoutArea(x0, z0, x1, z1);
+    const std::uint64_t revision = mLayout.revision;
+    mLayout.New(MapLayout::kDefaultRes, x0, z0, x1, z1);
+    mLayout.revision = revision + 1;
+    const std::filesystem::path file = LayoutFile();
+    std::error_code ignored;
+    if (file.empty() || !std::filesystem::exists(file, ignored)) {
+      return;
+    }
+    std::ifstream in(file, std::ios::binary);
+    const std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+    std::string error;
+    if (!text.empty() && !mLayout.Load(text, error)) {
+      gpg::Warnf("editor: %s: the layout couldn't be read (%s)", file.string().c_str(), error.c_str());
+      return;
+    }
+    mLayoutRead = text;
+    gpg::Logf("editor: layout read from %s: %zu layers", file.string().c_str(), mLayout.Layers().size());
+  }
+  void EdDocument::MissionEdited(
+    Mission before
+  )
+  {
+    mMissionUndo.emplace_back(std::move(before), mMission);
+    if (mMissionUndo.size() > 200) {
+      mMissionUndo.erase(mMissionUndo.begin());
+    }
+    EditEnded(EditKind::Mission);
+    mModified = true;
+  }
+
+  void EdDocument::RefreshInfoFacts()
+  {
+    std::string value;
+    mFacts.name = ReadScenarioField(mScenario, "name", value) ? WithoutLoc(value) : std::string();
+    mFacts.description = ReadScenarioField(mScenario, "description", value) ? WithoutLoc(value) : std::string();
+    mFacts.mapVersion = ReadScenarioField(mScenario, "map_version", value) ? std::atoi(value.c_str()) : 0;
+  }
+
+  bool EdDocument::SetScenarioField(
+    const std::string& key,
+    const std::string& value,
+    const bool text
+  )
+  {
+    MapInfoStep step;
+    step.key = key;
+    step.text = text;
+    step.after = value;
+    step.had = ReadScenarioField(mScenario, key, step.before);
+    if (step.had && step.before == value) {
+      return false;
+    }
+    std::string changed = WithScenarioField(mScenario, key, value, text);
+    if (changed == mScenario) {
+      return false;
+    }
+    if (!step.had) {
+      step.scenarioBefore = mScenario;
+    }
+    mScenario = std::move(changed);
+    RefreshInfoFacts();
+    mMapInfoUndo.push_back(std::move(step));
+    EditEnded(EditKind::MapInfo);
+    mModified = true;
+    return true;
+  }
+
+  bool EdDocument::SetSlotFactions(
+    const SlotFactions& factions
+  )
+  {
+    const SlotFactions before = ReadSlotFactions(mScenario);
+    std::string changed = WithSlotFactions(mScenario, factions);
+    if (changed == mScenario) {
+      return false;
+    }
+    mScenario = std::move(changed);
+    MapInfoStep step;
+    step.key = "factions";
+    step.slotFactions = true;
+    step.factionsBefore = before;
+    step.factionsAfter = ReadSlotFactions(mScenario);
+    mMapInfoUndo.push_back(std::move(step));
+    EditEnded(EditKind::MapInfo);
+    mModified = true;
+    return true;
+  }
+
+  bool EdDocument::UndoMapInfo(
+    const bool redo
+  )
+  {
+    auto& from = redo ? mMapInfoRedo : mMapInfoUndo;
+    auto& to = redo ? mMapInfoUndo : mMapInfoRedo;
+    if (from.empty()) {
+      return false;
+    }
+    MapInfoStep step = std::move(from.back());
+    from.pop_back();
+    if (step.slotFactions) {
+      mScenario = WithSlotFactions(mScenario, redo ? step.factionsAfter : step.factionsBefore);
+      to.push_back(std::move(step));
+      mModified = true;
+      return true;
+    }
+    if (redo) {
+      mScenario = WithScenarioField(mScenario, step.key, step.after, step.text);
+    } else if (step.had) {
+      mScenario = WithScenarioField(mScenario, step.key, step.before, step.text);
+    } else {
+      // Added: the line goes (the text it was added to; later scenario changes of other kinds are kept by them).
+      std::string value;
+      if (ReadScenarioField(mScenario, step.key, value) && value == step.after) {
+        const std::string line =
+          std::string("    ") + step.key + " = " + (step.text ? "\"" + step.after + "\"" : step.after) + ",";
+        const std::size_t at = mScenario.find(line);
+        if (at != std::string::npos) {
+          const std::size_t end = at + line.size();
+          std::size_t start = mScenario.rfind('\n', at);
+          start = start == std::string::npos ? at : start;
+          if (start > 0 && mScenario[start] == '\n' && mScenario[start - 1] == '\r') {
+            --start; // (the line's CR LF as WithScenarioField added it)
+          }
+          mScenario.erase(start, end - start);
+        }
+      }
+    }
+    RefreshInfoFacts();
+    to.push_back(std::move(step));
+    mModified = true;
+    return true;
+  }
+
+  bool EdDocument::UndoMission(
+    const bool redo
+  )
+  {
+    auto& from = redo ? mMissionRedo : mMissionUndo;
+    auto& to = redo ? mMissionUndo : mMissionRedo;
+    if (from.empty()) {
+      return false;
+    }
+    auto step = std::move(from.back());
+    from.pop_back();
+    mMission = redo ? step.second : step.first;
+    to.push_back(std::move(step));
+    mModified = true;
+    return true;
+  }
+
+  void EdDocument::PathsEdited(
+    PathsState before,
+    const bool ownStep
+  )
+  {
+    mPathsUndo.emplace_back(std::move(before), mPaths);
+    if (mPathsUndo.size() > 200) {
+      mPathsUndo.erase(mPathsUndo.begin());
+    }
+    ++mPathsRevision;
+    if (ownStep) {
+      EditEnded(EditKind::Paths);
+    } else {
+      mPathsRedo.clear();
+    }
+    mModified = true;
+  }
+
+  bool EdDocument::UndoPaths(
+    const bool redo
+  )
+  {
+    auto& from = redo ? mPathsRedo : mPathsUndo;
+    auto& to = redo ? mPathsUndo : mPathsRedo;
+    if (from.empty()) {
+      return false;
+    }
+    auto step = std::move(from.back());
+    from.pop_back();
+    mPaths = redo ? step.second : step.first;
+    to.push_back(std::move(step));
+    ++mPathsRevision;
+    mModified = true;
+    return true;
+  }
+
+  std::filesystem::path EdDocument::PathsFile() const
+  {
+    const std::filesystem::path map = MapDiskFile();
+    if (map.empty()) {
+      return {};
+    }
+    return map.parent_path() / (map.stem().string() + "_paths.editor");
+  }
+
+  void EdDocument::LoadPathsFile()
+  {
+    mPaths = PathsState{};
+    mPathsRead.clear();
+    mPathsUndo.clear();
+    mPathsRedo.clear();
+    ++mPathsRevision;
+    const std::filesystem::path file = PathsFile();
+    std::error_code ignored;
+    if (file.empty() || !std::filesystem::exists(file, ignored)) {
+      return;
+    }
+    std::ifstream in(file, std::ios::binary);
+    const std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+    std::string error;
+    if (!text.empty() && !ReadKeptPaths(text, mPaths.set, error)) {
+      gpg::Warnf("editor: %s: the paths couldn't be read (%s)", file.string().c_str(), error.c_str());
+      mPaths = PathsState{};
+      return;
+    }
+    mPathsRead = text;
+    gpg::Logf("editor: paths read from %s: %zu paths", file.string().c_str(), mPaths.set.paths.size());
+  }
+
+  std::filesystem::path EdDocument::MissionFile() const
+  {
+    const std::filesystem::path map = MapDiskFile();
+    if (map.empty()) {
+      return {};
+    }
+    return map.parent_path() / (map.stem().string() + "_mission.editor");
+  }
+
+  LuaCompiles EdDocument::MissionCompiler() const
+  {
+    return [this](const std::string& code, std::string& error) {
+      const CheckIssue issue = CheckLuaText(code, "mission");
+      if (issue.text.empty()) {
+        return true;
+      }
+      error = issue.text;
+      return false;
+    };
+  }
+
+  std::string EdDocument::ScriptWithMission(
+    const bool test,
+    MissionPatch& status
+  ) const
+  {
+    MissionCompileOptions options;
+    options.test = test;
+    options.startStage = test ? mPlayStartStage : 1;
+    options.compiles = MissionCompiler();
+    for (const SaveEntry& area : mSave.Areas()) {
+      options.hasArea1 = options.hasArea1 || area.name == "AREA_1";
+    }
+    return PatchMissionScript(mScript, mMission, options, status);
+  }
+
+  void EdDocument::LoadMissionFile()
+  {
+    mMission = Mission{};
+    mMissionRead.clear();
+    mMissionUndo.clear();
+    mMissionRedo.clear();
+    mMapInfoUndo.clear();
+    mMapInfoRedo.clear();
+    const std::filesystem::path file = MissionFile();
+    std::error_code ignored;
+    if (file.empty() || !std::filesystem::exists(file, ignored)) {
+      return;
+    }
+    std::ifstream in(file, std::ios::binary);
+    const std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+    std::string error;
+    if (!text.empty() && !LoadMission(text, mMission, error)) {
+      gpg::Warnf("editor: %s: the mission couldn't be read (%s)", file.string().c_str(), error.c_str());
+      mMission = Mission{};
+      return;
+    }
+    mMissionRead = text;
+    gpg::Logf("editor: mission read from %s: %zu stages", file.string().c_str(), mMission.stages.size());
   }
 } // namespace faf::editor

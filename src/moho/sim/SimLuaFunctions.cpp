@@ -444,7 +444,7 @@ namespace
    * and dereferences the insert result without a null check. The guards are
    * defensive additions; removing them would restore 1:1 behavior, but this
    * lane is load-bearing for the whole unit-category system and the identity
-   * of the bit-index field (`mCategoryBitIndex` here vs IDA's
+   * of the bit-index field (`mBlueprintOrdinal` here vs IDA's
    * `mBlueprintOrdinal`) is not independently confirmed, so that correction
    * is left for a pass that can verify it at runtime.
    */
@@ -549,7 +549,7 @@ namespace
       return;
     }
 
-    const unsigned int categoryBitIndex = blueprint->mCategoryBitIndex;
+    const unsigned int categoryBitIndex = blueprint->mBlueprintOrdinal;
     for (const fa::string& category : blueprint->mCategories) {
       AddCategoryMemberBit(*lookup, category, categoryBitIndex);
     }
@@ -1482,7 +1482,7 @@ int moho::cfunc_EntityCategoryContainsSimL(
   const REntityBlueprint* const blueprint = ResolveEntityCategoryCountBlueprint(valueObject, rules);
 
   const bool contains =
-    categorySet != nullptr && blueprint != nullptr && categorySet->Bits().Contains(blueprint->mCategoryBitIndex);
+    categorySet != nullptr && blueprint != nullptr && categorySet->Bits().Contains(blueprint->mBlueprintOrdinal);
   lua_pushboolean(rawState, contains ? 1 : 0);
   return 1;
 }
@@ -1585,7 +1585,7 @@ int moho::cfunc_EntityCategoryFilterDownSimL(
   for (int sourceIndex = 1; sourceIndex <= sourceCount; ++sourceIndex) {
     const LuaPlus::LuaObject valueObject = sourceListObject[sourceIndex];
     const REntityBlueprint* const blueprint = ResolveEntityCategoryCountBlueprint(valueObject, rules);
-    if (categorySet != nullptr && blueprint != nullptr && categorySet->Bits().Contains(blueprint->mCategoryBitIndex)) {
+    if (categorySet != nullptr && blueprint != nullptr && categorySet->Bits().Contains(blueprint->mBlueprintOrdinal)) {
       resultObject.SetObject(resultIndex, valueObject); // 0x00759E53: plain table set, not table.insert
       ++resultIndex;
     }
@@ -1628,7 +1628,7 @@ int moho::cfunc_EntityCategoryCountL(
   for (int sourceIndex = 1; sourceIndex <= sourceCount; ++sourceIndex) {
     LuaPlus::LuaObject valueObject = sourceListObject[sourceIndex];
     const REntityBlueprint* const blueprint = ResolveEntityCategoryCountBlueprint(valueObject, rules);
-    if (categorySet != nullptr && blueprint != nullptr && categorySet->Bits().Contains(blueprint->mCategoryBitIndex)) {
+    if (categorySet != nullptr && blueprint != nullptr && categorySet->Bits().Contains(blueprint->mBlueprintOrdinal)) {
       ++categoryCount;
     }
   }
@@ -1753,7 +1753,7 @@ int moho::cfunc_EntityCategoryCountAroundPositionL(
     const float deltaX = center.x - entityPosition.x;
     const float deltaZ = center.z - entityPosition.z;
     const float distanceSquared = (deltaX * deltaX) + (deltaZ * deltaZ);
-    if (radiusSquared > distanceSquared && categorySet->Bits().Contains(entity->BluePrint->mCategoryBitIndex)) {
+    if (radiusSquared > distanceSquared && categorySet->Bits().Contains(entity->BluePrint->mBlueprintOrdinal)) {
       ++categoryCount;
     }
   }

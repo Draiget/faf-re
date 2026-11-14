@@ -1,4 +1,5 @@
 #include "moho/ai/CAiBrainLuaPrivate.h"
+#include "moho/sim/SimConVarAccess.h"
 
 namespace
 {
@@ -185,7 +186,7 @@ namespace
       return false;
     }
 
-    return categorySet->Bits().Contains(blueprint->mCategoryBitIndex);
+    return categorySet->Bits().Contains(blueprint->mBlueprintOrdinal);
   }
 
   [[nodiscard]] bool UnitHasHeadCommand(
@@ -301,11 +302,7 @@ int moho::cfunc_CAiBrainIsOpponentAIRunningL(
 
   bool shouldRunOpponentAi = false;
   if (!CFG_GetArgOption("/noai", 0u, nullptr)) {
-    CSimConVarBase* const runOpponentAiConVar = &moho::gSimConVar_AI_RunOpponentAI;
-    CSimConVarInstanceBase* const runOpponentAiVar =
-      (sim && runOpponentAiConVar) ? sim->GetSimVar(runOpponentAiConVar) : nullptr;
-    const void* const runOpponentAiStorage = runOpponentAiVar ? runOpponentAiVar->GetValueStorage() : nullptr;
-    shouldRunOpponentAi = runOpponentAiStorage && (*reinterpret_cast<const std::uint8_t*>(runOpponentAiStorage) != 0u);
+    shouldRunOpponentAi = sim != nullptr && ReadSimConVar(sim, moho::gSimConVar_AI_RunOpponentAI);
   }
 
   lua_pushboolean(rawState, shouldRunOpponentAi ? 1 : 0);
@@ -1503,9 +1500,9 @@ int moho::cfunc_CAiBrainGetEconomyStoredL(
   CAiBrain* const brain = DecodeEconomyResourceQueryArgs(state, kAiBrainGetEconomyStoredHelpText, resource);
 
   float value = 0.0f;
-  CSimArmyEconomyInfo* const economyInfo = brain->mArmy->GetEconomy();
+  CEconomy* const economyInfo = brain->mArmy->GetEconomy();
   if (economyInfo != nullptr) {
-    value = SelectResourceLane(economyInfo->economy.mStored, resource);
+    value = SelectResourceLane(economyInfo->mTotals.mStored, resource);
   }
 
   lua_State* const rawState = state->m_state;
@@ -1562,9 +1559,9 @@ int moho::cfunc_CAiBrainGetEconomyIncomeL(
   CAiBrain* const brain = DecodeEconomyResourceQueryArgs(state, kAiBrainGetEconomyIncomeHelpText, resource);
 
   float value = 0.0f;
-  CSimArmyEconomyInfo* const economyInfo = brain->mArmy->GetEconomy();
+  CEconomy* const economyInfo = brain->mArmy->GetEconomy();
   if (economyInfo != nullptr) {
-    value = SelectResourceLane(economyInfo->economy.mIncome, resource);
+    value = SelectResourceLane(economyInfo->mTotals.mIncome, resource);
   }
 
   lua_State* const rawState = state->m_state;
@@ -1620,9 +1617,9 @@ int moho::cfunc_CAiBrainGetEconomyUsageL(
   CAiBrain* const brain = DecodeEconomyResourceQueryArgs(state, kAiBrainGetEconomyUsageHelpText, resource);
 
   float value = 0.0f;
-  CSimArmyEconomyInfo* const economyInfo = brain->mArmy->GetEconomy();
+  CEconomy* const economyInfo = brain->mArmy->GetEconomy();
   if (economyInfo != nullptr) {
-    value = SelectResourceLane(economyInfo->economy.mLastUseActual, resource);
+    value = SelectResourceLane(economyInfo->mTotals.mLastUseActual, resource);
   }
 
   lua_State* const rawState = state->m_state;
@@ -1680,9 +1677,9 @@ int moho::cfunc_CAiBrainGetEconomyRequestedL(
   CAiBrain* const brain = DecodeEconomyResourceQueryArgs(state, kAiBrainGetEconomyRequestedHelpText, resource);
 
   float value = 0.0f;
-  CSimArmyEconomyInfo* const economyInfo = brain->mArmy->GetEconomy();
+  CEconomy* const economyInfo = brain->mArmy->GetEconomy();
   if (economyInfo != nullptr) {
-    value = SelectResourceLane(economyInfo->economy.mLastUseRequested, resource);
+    value = SelectResourceLane(economyInfo->mTotals.mLastUseRequested, resource);
   }
 
   lua_State* const rawState = state->m_state;
@@ -1738,10 +1735,10 @@ int moho::cfunc_CAiBrainGetEconomyTrendL(
   CAiBrain* const brain = DecodeEconomyResourceQueryArgs(state, kAiBrainGetEconomyTrendHelpText, resource);
 
   float trend = 0.0f;
-  CSimArmyEconomyInfo* const economyInfo = brain->mArmy->GetEconomy();
+  CEconomy* const economyInfo = brain->mArmy->GetEconomy();
   if (economyInfo != nullptr) {
-    trend = SelectResourceLane(economyInfo->economy.mIncome, resource) -
-      SelectResourceLane(economyInfo->economy.mLastUseActual, resource);
+    trend = SelectResourceLane(economyInfo->mTotals.mIncome, resource) -
+      SelectResourceLane(economyInfo->mTotals.mLastUseActual, resource);
   }
 
   lua_State* const rawState = state->m_state;
@@ -1866,14 +1863,14 @@ int moho::cfunc_CAiBrainGetEconomyStoredRatioL(
   SCR_GetEnum(state, resourceTypeName, enumRef);
 
   float ratio = 0.0f;
-  CSimArmyEconomyInfo* const economyInfo = brain->mArmy->GetEconomy();
+  CEconomy* const economyInfo = brain->mArmy->GetEconomy();
   if (economyInfo != nullptr) {
     // 0x0058F6A4-0x0058F6F7: the u64 max-storage lane is converted to float
     // (fild/fchs/faddp at PC24, then `fst dword`), compared `> 0`, and the
     // ratio is a float `divss stored, maxStorage` -- not a double division.
-    const float maxStorage = static_cast<float>(SelectResourceLane(economyInfo->economy.mMaxStorage, resource));
+    const float maxStorage = static_cast<float>(SelectResourceLane(economyInfo->mTotals.mMaxStorage, resource));
     if (maxStorage > 0.0f) {
-      ratio = SelectResourceLane(economyInfo->economy.mStored, resource) / maxStorage;
+      ratio = SelectResourceLane(economyInfo->mTotals.mStored, resource) / maxStorage;
     }
   }
 
@@ -3352,7 +3349,7 @@ int moho::cfunc_CAiBrainFindClosestArmyWithBaseL(
     if (structureCategory == nullptr) {
       continue;
     }
-    if (!structureCategory->ContainsBit(static_cast<std::uint32_t>(sourceUnit->GetBlueprint()->mCategoryBitIndex))) {
+    if (!structureCategory->ContainsBit(static_cast<std::uint32_t>(sourceUnit->GetBlueprint()->mBlueprintOrdinal))) {
       continue;
     }
 

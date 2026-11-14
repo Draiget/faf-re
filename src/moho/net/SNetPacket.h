@@ -204,7 +204,7 @@ namespace moho
     {
       auto& self = *static_cast<Derived*>(this);
       static_assert(sizeof(T) <= kNetPacketMaxPayload, "Body too large");
-      return reinterpret_cast<T*>(self.data);
+      return static_cast<T*>(self.data);
     }
 
     /**
@@ -215,7 +215,7 @@ namespace moho
     {
       auto& self = *static_cast<const Derived*>(this);
       static_assert(sizeof(T) <= kNetPacketMaxPayload, "Body too large");
-      return reinterpret_cast<const T*>(self.data);
+      return static_cast<const T*>(self.data);
     }
 
     /**
@@ -319,7 +319,7 @@ namespace moho
      */
     Body* GetBody() noexcept
     {
-      return reinterpret_cast<Body*>(data);
+      return static_cast<Body*>(data);
     }
 
     /**
@@ -327,7 +327,7 @@ namespace moho
      */
     const Body& GetBody() const noexcept
     {
-      return *reinterpret_cast<const Body*>(data);
+      return *static_cast<const Body*>(data);
     }
 
     /**

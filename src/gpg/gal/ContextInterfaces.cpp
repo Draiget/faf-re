@@ -95,49 +95,6 @@ namespace gpg::gal
       );
     }
 
-    /**
-     * Address: 0x008E7B00 (FUN_008E7B00)
-     *
-     * What it does:
-     * Initializes one texture-context payload from a render-target context
-     * and remaps legacy render-target format tokens to texture-format lanes.
-     */
-    [[maybe_unused]] TextureContext* InitializeTextureContextFromRenderTargetContext(
-      TextureContext* const outContext,
-      const RenderTargetContext* const sourceContext
-    ) noexcept
-    {
-      if (outContext == nullptr || sourceContext == nullptr) {
-        return outContext;
-      }
-
-      ::new (static_cast<void*>(outContext)) TextureContext();
-      outContext->width_ = sourceContext->width_;
-      outContext->height_ = sourceContext->height_;
-
-      switch (sourceContext->format_) {
-      case 0:
-        outContext->format_ = 0;
-        break;
-      case 2:
-        outContext->format_ = 2;
-        break;
-      case 3:
-        outContext->format_ = 3;
-        break;
-      case 6:
-        outContext->format_ = 4;
-        break;
-      case 7:
-        outContext->format_ = 14;
-        break;
-      default:
-        outContext->format_ = 20;
-        break;
-      }
-
-      return outContext;
-    }
   } // namespace
 
   /**

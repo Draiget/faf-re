@@ -792,14 +792,8 @@ namespace moho
               drawNode->mPositionSum.x * inverseWeight, drawNode->mPositionSum.z * inverseWeight
             };
             SOccupationResult buildInfo{};
-            const bool canBuild = USERUNIT_CanBeBuiltAt(
-              *graph.mSession,
-              unitBlueprint,
-              buildCenter,
-              false,
-              &buildInfo,
-              reinterpret_cast<const UserCommand*>(helper)
-            );
+            const bool canBuild =
+              USERUNIT_CanBeBuiltAt(*graph.mSession, unitBlueprint, buildCenter, false, &buildInfo, helper);
             drawNode->mIsVisible = (canBuild || !graph.mSession->mShowInvalidBuildPlacementPreview) ? 1u : 0u;
           }
         }
@@ -960,25 +954,25 @@ namespace moho
         if (entity.mSession == nullptr || entity.mParams.mBlueprint == nullptr) {
           return false;
         }
-        const EntityCategoryLookupResolver* const resolver = entity.mSession->GetCategoryLookupResolver();
-        if (resolver == nullptr) {
+        const RRuleGameRules* const rules = entity.mSession->mRules;
+        if (rules == nullptr) {
           return false;
         }
-        if (resolver != mResolver) {
-          mResolver = resolver;
-          mCategory = resolver->GetEntityCategory(mName);
+        if (rules != mRules) {
+          mRules = rules;
+          mCategory = rules->GetEntityCategory(mName);
         }
         if (mCategory == nullptr) {
           return false;
         }
-        const std::uint32_t categoryBitIndex = entity.mParams.mBlueprint->mCategoryBitIndex;
+        const std::uint32_t categoryBitIndex = entity.mParams.mBlueprint->mBlueprintOrdinal;
         const auto wordIt = mCategory->FindWord(categoryBitIndex >> 5u);
         return wordIt != mCategory->WordEnd() && ((*wordIt >> (categoryBitIndex & 0x1Fu)) & 1u) != 0u;
       }
 
     private:
       const char* mName;
-      mutable const EntityCategoryLookupResolver* mResolver = nullptr;
+      mutable const RRuleGameRules* mRules = nullptr;
       mutable const EntityCategorySet* mCategory = nullptr;
     };
 
@@ -1160,10 +1154,10 @@ namespace moho
       //
       // Group 1: TELEPORTATION(candidate) or EXPERIMENTAL(hover) skips the candidate, so an
       // experimental hover skips them all.
-      if (reinterpret_cast<const UserEntity*>(hoverUnit)->IsInCategory(fa::string("EXPERIMENTAL"))) {
+      if (static_cast<const UserEntity*>(hoverUnit)->IsInCategory(fa::string("EXPERIMENTAL"))) {
         return false;
       }
-      const bool hoverIsCommander = reinterpret_cast<const UserEntity*>(hoverUnit)->IsInCategory(fa::string("COMMAND"));
+      const bool hoverIsCommander = static_cast<const UserEntity*>(hoverUnit)->IsInCategory(fa::string("COMMAND"));
       const CNamedCategory teleportation{"TELEPORTATION"};
       const CNamedCategory transportFocus{"TRANSPORTFOCUS"};
       const CNamedCategory canTransportCommander{"CANTRANSPORTCOMMANDER"};
@@ -1268,7 +1262,7 @@ namespace moho
     SSTICommandIssueData commandIssueData(EUnitCommandType::UNITCOMMAND_None);
     commandIssueData.mCommandType = EUnitCommandType::UNITCOMMAND_BuildFactory;
     commandIssueData.mIndex = helper->mConstantData.cmd;
-    commandIssueData.mBlueprint = reinterpret_cast<RUnitBlueprint*>(helper->mConstantData.blueprint);
+    commandIssueData.mBlueprint = static_cast<RUnitBlueprint*>(helper->mConstantData.blueprint);
 
     // The command's units: a copy of the helper's cursor set (rebuilt first if
     // dirty, 0x008B43F0; copied through the range constructor 0x00831310),
@@ -2944,7 +2938,7 @@ namespace moho
           continue;
         }
 
-        const UserEntity* const sessionEntity = reinterpret_cast<const UserEntity*>(sessionUnit);
+        const UserEntity* const sessionEntity = static_cast<const UserEntity*>(sessionUnit);
         if (sessionEntity == nullptr || sessionEntity->mArmy != focusArmy) {
           continue;
         }
@@ -3217,7 +3211,7 @@ moho::CommandModeData* func_GetRightMouseButtonAction(
   ERuleBPUnitCommandCaps selectionCommandCaps = RULEUCC_None;
   {
     for (UserEntity* const selectedEntity : wldSession->mSelection) {
-      (void)categoryOrdinals.Add(static_cast<unsigned int>(selectedEntity->mParams.mBlueprint->mCategoryBitIndex));
+      (void)categoryOrdinals.Add(static_cast<unsigned int>(selectedEntity->mParams.mBlueprint->mBlueprintOrdinal));
       if (UserUnit* const selectedUnit = selectedEntity->IsUserUnit()) {
         selectionCommandCaps = static_cast<ERuleBPUnitCommandCaps>(
           selectionCommandCaps | GetIUnitBridge(selectedUnit)->GetAttributes().commandCapsMask

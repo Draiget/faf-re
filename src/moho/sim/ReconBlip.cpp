@@ -150,7 +150,7 @@ namespace
       return {};
     }
 
-    const auto* const blueprint = reinterpret_cast<const RUnitBlueprint*>(sourceUnit->BluePrint);
+    const auto* const blueprint = static_cast<const RUnitBlueprint*>(sourceUnit->BluePrint);
     if (!blueprint) {
       return {};
     }
@@ -697,7 +697,11 @@ void SPerArmyReconInfo::MemberDeserialize(
   }
 
   archive->ReadUInt(&mReconFlags);
-  archive->ReadBool(reinterpret_cast<bool*>(&mNeedsFlush));
+  {
+    bool value{};
+    archive->ReadBool(&value);
+    mNeedsFlush = static_cast<decltype(mNeedsFlush)>(value);
+  }
   if (mNeedsFlush == 0u) {
     return;
   }
@@ -710,7 +714,11 @@ void SPerArmyReconInfo::MemberDeserialize(
   archive->ReadFloat(&mHealth);
   archive->ReadFloat(&mHealth);
   archive->ReadFloat(&mFractionComplete);
-  archive->ReadBool(reinterpret_cast<bool*>(&mMaybeDead));
+  {
+    bool value{};
+    archive->ReadBool(&value);
+    mMaybeDead = static_cast<decltype(mMaybeDead)>(value);
+  }
 }
 
 /**
@@ -817,7 +825,7 @@ ReconBlip::ReconBlip(
   }
 
   if (sourceUnit) {
-    BluePrint = const_cast<REntityBlueprint*>(reinterpret_cast<const REntityBlueprint*>(sourceUnit->GetBlueprint()));
+    BluePrint = const_cast<REntityBlueprint*>(static_cast<const REntityBlueprint*>(sourceUnit->GetBlueprint()));
     mVarDat.mLayerMask = sourceUnit->mVarDat.mLayerMask;
   }
   mUnitConstDat.mFake = static_cast<std::uint8_t>(fake ? 1u : 0u);
@@ -911,7 +919,7 @@ ReconBlip* ReconBlip::IsReconBlip()
  */
 const RUnitBlueprint* ReconBlip::GetBlueprint() const
 {
-  return reinterpret_cast<const RUnitBlueprint*>(BluePrint);
+  return static_cast<const RUnitBlueprint*>(BluePrint);
 }
 
 /**

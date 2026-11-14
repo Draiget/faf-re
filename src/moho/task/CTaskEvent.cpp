@@ -86,8 +86,7 @@ namespace
       return out;
     }
 
-    out.mObj =
-      reinterpret_cast<void*>(reinterpret_cast<std::uintptr_t>(linkage) - static_cast<std::uintptr_t>(baseOffset));
+    out.mObj = gpg::CompleteObject(linkage, baseOffset);
     out.mType = dynamicType;
     return out;
   }
@@ -176,12 +175,12 @@ namespace
    */
   void LoadWeakPtrSTaskEventLinkage(
     gpg::ReadArchive* archive,
-    std::intptr_t objectPtr,
+    void* objectPtr,
     int /*version*/,
     gpg::RRef* ownerRef
   )
   {
-    auto* const weak = reinterpret_cast<WeakPtr<STaskEventLinkage>*>(objectPtr);
+    auto* const weak = static_cast<WeakPtr<STaskEventLinkage>*>(objectPtr);
     GPG_ASSERT(weak != nullptr);
 
     const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
@@ -197,12 +196,12 @@ namespace
    */
   void SaveWeakPtrSTaskEventLinkage(
     gpg::WriteArchive* archive,
-    std::intptr_t objectPtr,
+    void* objectPtr,
     int /*version*/,
     gpg::RRef* ownerRef
   )
   {
-    auto* const weak = reinterpret_cast<WeakPtr<STaskEventLinkage>*>(objectPtr);
+    auto* const weak = static_cast<WeakPtr<STaskEventLinkage>*>(objectPtr);
     GPG_ASSERT(weak != nullptr);
 
     const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
@@ -638,9 +637,7 @@ void CTaskEvent::SerializeWaitLinks(
 ) const
 {
   const gpg::RRef owner{};
-  auto* const listEnd = reinterpret_cast<const STaskEventLinkage*>(&mWaitLinks);
-  for (auto* node = static_cast<STaskEventLinkage*>(mWaitLinks.mNext); node != listEnd;
-       node = static_cast<STaskEventLinkage*>(node->mNext)) {
+  for (STaskEventLinkage* const node : mWaitLinks.owners()) {
     const gpg::RRef objectRef = MakeSTaskEventLinkageRef(node);
     gpg::WriteRawPointer(archive, objectRef, gpg::TrackedPointerState::Owned, owner);
   }

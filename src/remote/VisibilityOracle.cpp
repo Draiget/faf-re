@@ -116,7 +116,7 @@ namespace faf::remote
       const moho::Entity& entity
     )
     {
-      const auto* const blueprint = reinterpret_cast<const moho::RUnitBlueprint*>(entity.BluePrint);
+      const auto* const blueprint = static_cast<const moho::RUnitBlueprint*>(entity.BluePrint);
       if (blueprint == nullptr) {
         return false;
       }

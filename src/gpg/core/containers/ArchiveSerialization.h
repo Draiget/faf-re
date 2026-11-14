@@ -287,7 +287,7 @@ namespace gpg
    * (FastVectorUIntReflection.cpp) can bind it into `serSaveFunc_`, which is
    * the binary's only reference to this body.
    */
-  void SaveFastVectorUnitWeaponInfo(WriteArchive* archive, std::intptr_t objectPtr, int version, RRef* ownerRef);
+  void SaveFastVectorUnitWeaponInfo(WriteArchive* archive, void* objectPtr, int version, RRef* ownerRef);
 
   /**
    * Address: 0x005C5860 (FUN_005C5860)
@@ -298,7 +298,7 @@ namespace gpg
    * `SPerArmyReconInfoVectorTypeRuntime::Init` (ReconBlipTypeInfo.cpp) can
    * bind it into `serSaveFunc_`.
    */
-  void SaveVectorSPerArmyReconInfo(WriteArchive* archive, std::intptr_t objectPtr, int version, RRef* ownerRef);
+  void SaveVectorSPerArmyReconInfo(WriteArchive* archive, void* objectPtr, int version, RRef* ownerRef);
 
   /**
    * Address: 0x005C5700 (FUN_005C5700)
@@ -310,5 +310,5 @@ namespace gpg
    * so `SPerArmyReconInfoVectorTypeRuntime::Init` (ReconBlipTypeInfo.cpp)
    * can bind it into `serLoadFunc_`.
    */
-  void LoadVectorSPerArmyReconInfo(ReadArchive* archive, std::intptr_t objectPtr, int version, RRef* ownerRef);
+  void LoadVectorSPerArmyReconInfo(ReadArchive* archive, void* objectPtr, int version, RRef* ownerRef);
 } // namespace gpg

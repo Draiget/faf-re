@@ -2,7 +2,7 @@
 //
 // Two real CNetUDPConnectors in this process. First over their sockets on
 // 127.0.0.1 (or --host <ip>), as a game does; then a second pair connected to addresses that
-// exist only in the transport tables (10.255.0.1:1 and 10.255.0.2:2), so
+// exist only in the transport tables (198.51.100.1:1 and 198.51.100.2:2), so
 // every datagram goes through NET_SendThroughPeerTransport and
 // NET_DeliverFromPeerTransport and none could have used the network. Both
 // pairs exchange the same messages in both directions, in order.
@@ -175,8 +175,8 @@ TEST(
   ASSERT_TRUE(NET_Init()) << "NET_Init failed";
   auto* a = static_cast<CNetUDPConnector*>(NET_MakeUDPConnector(0, {}));
   auto* b = static_cast<CNetUDPConnector*>(NET_MakeUDPConnector(0, {}));
-  constexpr std::uint32_t kAddrA = 0x0AFF0001; // 10.255.0.1
-  constexpr std::uint32_t kAddrB = 0x0AFF0002; // 10.255.0.2
+  constexpr std::uint32_t kAddrA = 0xC6336401; // 198.51.100.1
+  constexpr std::uint32_t kAddrB = 0xC6336402; // 198.51.100.2
   auto toB = std::make_shared<Pipe>();
   toB->to = b;
   toB->fromAddr = kAddrA;

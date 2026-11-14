@@ -268,7 +268,7 @@ namespace moho
      *
      * `const`-qualified to match `gpg::SerSaveLoadHelper<StatItem>::Serialize`,
      * which the real binary's `StatItemSerializer` vtable dispatches through
-     * (`reinterpret_cast<const StatItem*>(objectPtr)->MemberSerialize(...)`);
+     * (`static_cast<const StatItem*>(objectPtr)->MemberSerialize(...)`);
      * `mLock` is `mutable` for the same reason every other locked-under-const
      * read path in the engine marks its mutex `mutable`.
      */

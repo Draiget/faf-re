@@ -1,4 +1,6 @@
 #include "editor/ui/EdParticleEditor.h"
+#include "editor/ui/EdControls.h"
+#include "editor/ui/EdWorkspaces.h"
 #include "editor/ui/EdUiScale.h"
 
 #include "editor/doc/EdMapFile.h"
@@ -119,7 +121,7 @@ namespace faf::editor
         proceed();
       }
     }
-    ImGui::SetItemTooltip("Saves it into %s, then opens the other", Folder().string().c_str());
+    EdSetItemTooltip("Saves it into %s, then opens the other", Folder().string().c_str());
     ImGui::SameLine();
     if (ImGui::Button("Don't save")) {
       mDirty = false;
@@ -326,7 +328,7 @@ namespace faf::editor
       ImVec2(0.5f, 0.5f)
     );
     ImGui::SetNextWindowCollapsed(false, ImGuiCond_Always);
-    if (!ImGui::Begin("Particle Editor", &open, ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoCollapse)) {
+    if (!ImGui::Begin(Panel("Particle Editor"), &open, ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoCollapse)) {
       ImGui::End();
       return;
     }
@@ -381,11 +383,45 @@ namespace faf::editor
     ImGui::End();
   }
 
+  void EdParticleEditor::DrawStage()
+  {
+    // The controls first, along the top; the view fills the rest.
+    ImGui::SetCursorPos(ImVec2(ImGui::GetStyle().WindowPadding.x, ImGui::GetStyle().WindowPadding.y));
+    DrawPreviewOptions();
+    ImGui::SameLine();
+    ImGui::TextDisabled("  %s", mName.empty() ? "no effect" : mName.c_str());
+    const float width = std::max(ImGui::GetContentRegionAvail().x, 64.0f);
+    const float height = std::max(ImGui::GetContentRegionAvail().y, 64.0f);
+    mViewport.SetSize(static_cast<int>(width), static_cast<int>(height));
+    mViewport.MarkShown();
+    if (const std::uint64_t image = mViewport.Image(); image != 0) {
+      ImGui::Image(ImTextureRef(static_cast<ImTextureID>(image)), ImVec2(width, height));
+    } else {
+      ImGui::Dummy(ImVec2(width, height));
+    }
+    ImGui::SetItemKeyOwner(ImGuiKey_MouseWheelY);
+    if (ImGui::IsItemHovered()) {
+      const ImGuiIO& io = ImGui::GetIO();
+      if (io.MouseWheel != 0.0f) {
+        mViewport.Zoom(io.MouseWheel);
+      }
+      if (ImGui::IsMouseDragging(ImGuiMouseButton_Left, 0.0f) || ImGui::IsMouseDragging(ImGuiMouseButton_Right, 0.0f)) {
+        mViewport.Turn(io.MouseDelta.x, io.MouseDelta.y);
+      }
+    }
+  }
+
   void EdParticleEditor::DrawPreviewPane()
   {
+    // In the Effects workspace the effect plays in the middle of the window instead (DrawStage).
+    if (mStaged) {
+      ImGui::PushTextWrapPos(0.0f);
+      ImGui::TextDisabled("The effect plays in the middle of the window.");
+      ImGui::PopTextWrapPos();
+      return;
+    }
     // The particle view: the effect alone, in its own 3D view (EdParticleViewport), not the map. A drag turns round it,
     // the wheel comes closer; the options under it pick the ground, grid, background and height.
-    EdParticleViewport::Options& options = mViewport.Opts();
     const float width = std::max(ImGui::GetContentRegionAvail().x, 64.0f);
     const float height = std::clamp(ImGui::GetContentRegionAvail().y * 0.6f, 64.0f, width);
     mViewport.SetSize(static_cast<int>(width), static_cast<int>(height));
@@ -404,8 +440,14 @@ namespace faf::editor
       if (ImGui::IsMouseDragging(ImGuiMouseButton_Left, 0.0f) || ImGui::IsMouseDragging(ImGuiMouseButton_Right, 0.0f)) {
         mViewport.Turn(io.MouseDelta.x, io.MouseDelta.y);
       }
-      ImGui::SetTooltip("Drag to turn round the effect, the wheel to come closer");
+      EdSetTooltip("Drag to turn round the effect, the wheel to come closer");
     }
+    DrawPreviewOptions();
+  }
+
+  void EdParticleEditor::DrawPreviewOptions()
+  {
+    EdParticleViewport::Options& options = mViewport.Opts();
     // The options as one row that wraps: each control as wide as its text, on the same line while it fits, else on the
     // next (user report: the height slider's text was cut).
     const ImGuiStyle& style = ImGui::GetStyle();
@@ -435,30 +477,30 @@ namespace faf::editor
     }
     flow(checkboxWidth("Loop"));
     ImGui::Checkbox("Loop", &mLoop);
-    ImGui::SetItemTooltip("Starts the effect again each time its Lifetime ends");
+    EdSetItemTooltip("Starts the effect again each time its Lifetime ends");
 
     static const char* const kBackgrounds[] = {"Night", "Grey", "Sky", "Black"};
     const float comboWidth =
       ImGui::CalcTextSize("Black").x + style.FramePadding.x * 2.0f + ImGui::GetFrameHeight() + style.ItemInnerSpacing.x;
     flow(comboWidth);
     ImGui::SetNextItemWidth(comboWidth);
-    (void)ImGui::Combo("##bg", &options.background, kBackgrounds, 4);
-    ImGui::SetItemTooltip("The view's background");
+    (void)EdCombo("##bg", &options.background, kBackgrounds, 4);
+    EdSetItemTooltip("The view's background");
     flow(checkboxWidth("Ground"));
     ImGui::Checkbox("Ground", &options.ground);
     flow(checkboxWidth("Grid"));
     ImGui::Checkbox("Grid", &options.grid);
-    ImGui::SetItemTooltip("A line every game unit, stronger every five; the emitter's spot in orange");
+    EdSetItemTooltip("A line every game unit, stronger every five; the emitter's spot in orange");
     flow(checkboxWidth("Turn"));
     ImGui::Checkbox("Turn", &options.turn);
-    ImGui::SetItemTooltip("The camera turns slowly round the effect");
+    EdSetItemTooltip("The camera turns slowly round the effect");
     // As wide as its longest text, and a little for the grab.
     const float sliderWidth =
       ImGui::CalcTextSize("above ground 30.0").x + style.FramePadding.x * 2.0f + ImGui::GetFrameHeight();
     flow(sliderWidth);
     ImGui::SetNextItemWidth(sliderWidth);
-    ImGui::SliderFloat("##height", &options.height, 0.0f, 30.0f, "above ground %.1f");
-    ImGui::SetItemTooltip("The emitter this high above the ground (most effects play on a unit, some way up)");
+    FillSliderFloat("##height", &options.height, 0.0f, 30.0f, "above ground %.1f");
+    EdSetItemTooltip("The emitter this high above the ground (most effects play on a unit, some way up)");
     flow(buttonWidth("Front"));
     if (ImGui::Button("Front")) {
       mViewport.Look(3.14159265f, 0.15f);
@@ -500,6 +542,14 @@ namespace faf::editor
     return mDirty ? std::string() : mGamePath;
   }
 
+  void EdParticleEditor::NewEffect()
+  {
+    OpenOther([this] {
+      mGamePath.clear();
+      SetGraph("new_effect", {{"new_emitter", NewEmitter()}}, "");
+    });
+  }
+
   void EdParticleEditor::DrawToolbar()
   {
     if (!ImGui::BeginMenuBar()) {
@@ -517,10 +567,7 @@ namespace faf::editor
         });
       }
       if (ImGui::MenuItem("New effect")) {
-        OpenOther([this] {
-          mGamePath.clear();
-          SetGraph("new_effect", {{"new_emitter", NewEmitter()}}, "");
-        });
+        NewEffect();
       }
       if (ImGui::MenuItem("Browse the game's effects...")) {
         mOpenBrowserAsk = true;
@@ -542,6 +589,18 @@ namespace faf::editor
         std::snprintf(mSaveName, sizeof(mSaveName), "%s", (mFlatMode ? mName : mEffectName).c_str());
         mOpenSave = true;
       }
+      if (ImGui::MenuItem("Save to mod project", nullptr, false, !mModFolder.empty())) {
+        (void)SaveToMod();
+      }
+      if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+        EdSetTooltip(
+          "%s",
+          mModFolder.empty()
+            ? "Open a mod project first (Units workspace, Mod project)"
+            : "The game's emitters you changed, as merge blueprints naming their files; the game's own "
+              "stay as they are"
+        );
+      }
       ImGui::EndMenu();
     }
     ImGui::Separator();
@@ -554,7 +613,7 @@ namespace faf::editor
         mPlaceAsk = place;
       }
       ImGui::EndDisabled();
-      ImGui::SetItemTooltip(
+      EdSetItemTooltip(
         "%s",
         place.empty()
           ? "Save the effect into the map's folder first (or open a game effect): the map plays it by its path"
@@ -562,7 +621,7 @@ namespace faf::editor
             "at"
       );
     }
-    ImGui::SetItemTooltip("Starts the emitter again each time its Lifetime ends");
+    EdSetItemTooltip("Starts the emitter again each time its Lifetime ends");
     {
       float age = mPreview.Age();
       unsigned long long emitted = mPreview.Emitted();
@@ -575,7 +634,7 @@ namespace faf::editor
       }
       ImGui::TextDisabled("age %.0f ticks, %llu particles", static_cast<double>(age), emitted);
     }
-    ImGui::SetItemTooltip("The preview emits at the centre of the map's view (10 ticks a second)");
+    EdSetItemTooltip("The preview emits at the centre of the map's view (10 ticks a second)");
     if (!mStatus.empty()) {
       ImGui::TextDisabled("%s", mStatus.c_str());
     }
@@ -612,7 +671,7 @@ namespace faf::editor
       ImGui::SetNextItemWidth(Em(260.0f));
       switch (field.kind) {
       case FlatValue::Kind::Number:
-        edited = ImGui::DragFloat(field.key, &value.number, 0.01f, 0.0f, 0.0f, "%.4g");
+        edited = FillDragFloat(field.key, &value.number, 0.01f, 0.0f, 0.0f, "%.4g");
         break;
       case FlatValue::Kind::Bool:
         edited = ImGui::Checkbox(field.key, &value.flag);
@@ -639,7 +698,7 @@ namespace faf::editor
       case FlatValue::Kind::Raw:
         break;
       }
-      ImGui::SetItemTooltip("%s", field.help);
+      EdSetItemTooltip("%s", field.help);
       if (present == nullptr) {
         ImGui::SameLine();
         ImGui::TextDisabled("(not in the file: the engine's default)");

@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "editor/EdShell.h"
+#include "editor/ui/EdControls.h"
 #include "editor/doc/EdDocument.h"
 #include "editor/doc/EdGroupOptions.h"
 #include "editor/doc/EdUnitFate.h"
@@ -148,12 +149,12 @@ namespace faf::editor
     if (never) {
       ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.95f, 0.75f, 0.30f, 1.0f));
     }
-    const bool open = ImGui::BeginCombo("##spawns", preview.c_str(), ImGuiComboFlags_HeightLarge);
+    const bool open = EdBeginCombo("##spawns", preview.c_str(), ImGuiComboFlags_HeightLarge);
     if (never) {
       ImGui::PopStyleColor();
     }
     if (!open && ImGui::IsItemHovered()) {
-      ImGui::BeginTooltip();
+      EdBeginTooltip();
       ImGui::PushTextWrapPos(ImGui::GetFontSize() * 30.0f);
       ImGui::TextUnformatted(fateText.c_str());
       for (const std::string& line : lobbyLines) {
@@ -192,7 +193,7 @@ namespace faf::editor
           }
         }
         if (ImGui::IsItemHovered()) {
-          ImGui::BeginTooltip();
+          EdBeginTooltip();
           for (const std::string& line : DescribeLobbyRule(
                  target.rule,
                  ParseLobbyOptions(target.optionsWith.empty() ? mDocument.OptionsText() : target.optionsWith)
@@ -217,7 +218,7 @@ namespace faf::editor
       if (ImGui::Button("Option...")) {
         OpenAdaptiveWindow(optionKey);
       }
-      ImGui::SetItemTooltip(
+      EdSetItemTooltip(
         "The lobby option %s in the Adaptive Map window: its choices, what each puts on the map", optionKey.c_str()
       );
     }
@@ -303,7 +304,7 @@ namespace faf::editor
         ImGui::Text(
           "%.0f mass, %.0f energy%s", value.wreck.mass, value.wreck.energy, underwater ? " (under water: x0.6)" : ""
         );
-        ImGui::SetItemTooltip(
+        EdSetItemTooltip(
           "Build cost %.0f mass, %.0f energy, times the blueprint's Wreckage MassMult and EnergyMult, the mass "
           "times 0.9 / 0.8 / 0.7 / 0.6 for tech 1 / 2 / 3 / experimental, and both times 0.6 under water (FAF's "
           "Unit.lua).%s",

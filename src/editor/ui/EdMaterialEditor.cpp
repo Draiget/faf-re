@@ -1,4 +1,6 @@
 #include "editor/ui/EdMaterialEditor.h"
+#include "editor/ui/EdControls.h"
+#include "editor/ui/EdWorkspaces.h"
 #include "editor/ui/EdUiScale.h"
 
 #include "editor/doc/EdMapFile.h"
@@ -598,7 +600,7 @@ namespace faf::editor
       ImGui::SetNextWindowCollapsed(false);
     }
     ImGui::SetNextWindowCollapsed(false, ImGuiCond_Always);
-    if (!ImGui::Begin("Material Editor", &open, ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoCollapse)) {
+    if (!ImGui::Begin(Panel("Material Editor"), &open, ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoCollapse)) {
       ImGui::End();
       return;
     }
@@ -762,24 +764,24 @@ namespace faf::editor
       if (ImGui::Button("Save") && doc != nullptr) {
         (void)Save(*doc);
       }
-      ImGui::SetItemTooltip(
+      EdSetItemTooltip(
         "Writes the graph to %s",
         (Folder() / ((doc != nullptr ? doc->name : std::string("name")) + kExtension)).string().c_str()
       );
       if (ImGui::Button("Home") && doc != nullptr) {
         doc->canvas.FrameAll();
       }
-      ImGui::SetItemTooltip("Frames the whole graph (F frames the selection)");
+      EdSetItemTooltip("Frames the whole graph (F frames the selection)");
       if (ImGui::Button("Refresh map")) {
         mTerrain.reset();
         for (const auto& each : mDocs) {
           each->eval->SetTerrain(nullptr);
         }
       }
-      ImGui::SetItemTooltip("Reads the open map's heights again for the Map Height and Map Slope nodes");
+      EdSetItemTooltip("Reads the open map's heights again for the Map Height and Map Slope nodes");
       ImGui::SetNextItemWidth(Em(90.0f));
       static const int kSizes[] = {128, 256, 512, 1024};
-      if (ImGui::BeginCombo("##size", (std::to_string(mPreviewSize) + " px").c_str())) {
+      if (EdBeginCombo("##size", (std::to_string(mPreviewSize) + " px").c_str())) {
         for (const int size : kSizes) {
           if (ImGui::Selectable((std::to_string(size) + " px").c_str(), size == mPreviewSize)) {
             mPreviewSize = size;
@@ -787,7 +789,7 @@ namespace faf::editor
         }
         ImGui::EndCombo();
       }
-      ImGui::SetItemTooltip("The graph's working size: larger is finer and slower");
+      EdSetItemTooltip("The graph's working size: larger is finer and slower");
 
       // The slot the result goes into, live and on Apply.
       ImGui::Separator();
@@ -797,7 +799,7 @@ namespace faf::editor
       const std::string current = haveMap && mTargetSlot < static_cast<int>(mSlotNames.size())
         ? mSlotNames[static_cast<std::size_t>(mTargetSlot)]
         : std::string("(no map open)");
-      if (ImGui::BeginCombo("##slot", current.c_str())) {
+      if (EdBeginCombo("##slot", current.c_str())) {
         for (std::size_t s = 0; s < mSlotNames.size(); ++s) {
           if (ImGui::Selectable(mSlotNames[s].c_str(), static_cast<int>(s) == mTargetSlot)) {
             mTargetSlot = static_cast<int>(s);
@@ -806,12 +808,12 @@ namespace faf::editor
         }
         ImGui::EndCombo();
       }
-      ImGui::SetItemTooltip("The map's texture slot the graph's result goes into");
+      EdSetItemTooltip("The map's texture slot the graph's result goes into");
       if (ImGui::Checkbox("Live Update", &mLive) && !mLive) {
         StopLive();
       }
       mLiveStale = mLiveStale || ImGui::IsItemDeactivatedAfterEdit();
-      ImGui::SetItemTooltip(
+      EdSetItemTooltip(
         "Shows the result on the map's terrain in that slot as you edit (not saved: Apply writes it into the map)"
       );
       ImGui::EndDisabled();
@@ -821,7 +823,7 @@ namespace faf::editor
         ApplyBake(*doc);
       }
       ImGui::EndDisabled();
-      ImGui::SetItemTooltip(
+      EdSetItemTooltip(
         "%s",
         canApply
           ? "Bakes the graph at the bake size into DDS files in the map's env/layers folder and sets the slot to them "
@@ -830,7 +832,7 @@ namespace faf::editor
             "changed; File > Save as new map folder makes one)"
       );
       ImGui::SetNextItemWidth(Em(80.0f));
-      if (ImGui::BeginCombo("##bake", (std::to_string(mBakeSize) + " px").c_str())) {
+      if (EdBeginCombo("##bake", (std::to_string(mBakeSize) + " px").c_str())) {
         for (const int size : {512, 1024, 2048}) {
           if (ImGui::Selectable((std::to_string(size) + " px").c_str(), size == mBakeSize)) {
             mBakeSize = size;
@@ -838,7 +840,7 @@ namespace faf::editor
         }
         ImGui::EndCombo();
       }
-      ImGui::SetItemTooltip("The size Apply bakes at");
+      EdSetItemTooltip("The size Apply bakes at");
       if (!mStatus.empty()) {
         ImGui::TextDisabled("%s", mStatus.c_str());
       }
@@ -846,29 +848,61 @@ namespace faf::editor
     }
   }
 
-  void EdMaterialEditor::DrawPreview(
-    Doc& doc,
-    const float width
-  )
+  void EdMaterialEditor::DrawPreviewOptions()
   {
     static const char* const kModes[] = {"Sphere", "Plane 2x2", "Albedo", "Normal", "Mask"};
     ImGui::SetNextItemWidth(Em(110.0f));
-    if (ImGui::Combo("##mode", &mPreviewMode, kModes, IM_ARRAYSIZE(kModes))) {
+    if (EdCombo("##mode", &mPreviewMode, kModes, IM_ARRAYSIZE(kModes))) {
       mPreviewStale = true;
     }
     ImGui::SameLine();
-    ImGui::SetNextItemWidth(-1.0f);
+    ImGui::SetNextItemWidth(mStaged ? Em(220.0f) : -1.0f);
     float lightDegrees = mLightYaw * 180.0f / kPi;
-    if (ImGui::SliderFloat("##light", &lightDegrees, -180.0f, 180.0f, "Light %.0f deg")) {
+    if (FillSliderFloat("##light", &lightDegrees, -180.0f, 180.0f, "Light %.0f deg")) {
       mLightYaw = lightDegrees * kPi / 180.0f;
       mPreviewStale = true;
     }
-    const float side = std::max(64.0f, width);
+  }
+
+  void EdMaterialEditor::DrawStage()
+  {
+    Doc* const doc = Active();
+    ImGui::SetCursorPos(ImVec2(ImGui::GetStyle().WindowPadding.x, ImGui::GetStyle().WindowPadding.y));
+    DrawPreviewOptions();
+    if (doc == nullptr) {
+      ImGui::TextDisabled("No graph open.");
+      return;
+    }
+    ImGui::SameLine();
+    ImGui::TextDisabled("  %s", doc->name.c_str());
+    // A square as large as the middle allows, centred, at 512 px.
+    RenderPreview(*doc, 512);
+    const ImVec2 avail = ImGui::GetContentRegionAvail();
+    const float side = std::max(64.0f, std::min(avail.x, avail.y));
+    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (avail.x - side) * 0.5f);
+    if (mPreviewImage != 0) {
+      ImGui::Image(static_cast<ImTextureID>(mPreviewImage), ImVec2(side, side));
+      if (ImGui::IsItemHovered() && ImGui::IsMouseDragging(ImGuiMouseButton_Left, 0.0f)) {
+        mPreviewYaw -= ImGui::GetIO().MouseDelta.x * 0.01f;
+        mPreviewStale = mPreviewStale || ImGui::GetIO().MouseDelta.x != 0.0f;
+      }
+      EdSetItemTooltip("The output's albedo lit through its normal map. Drag to turn the sphere.");
+    }
+  }
+
+  void EdMaterialEditor::RenderPreview(
+    Doc& doc,
+    const int size
+  )
+  {
+    if (size != mPreviewImageSize) {
+      mPreviewImageSize = size;
+      mPreviewStale = true;
+    }
     if (mPreviewStale) {
       const TexImagePtr albedo = doc.eval->Result("Albedo");
       const TexImagePtr normal = doc.eval->Result("Normal");
       const TexImagePtr mask = doc.eval->Result("Mask");
-      const int size = 256;
       std::vector<std::uint32_t> pixels;
       if (mPreviewMode <= 1) {
         pixels = RenderMaterialPreview(albedo.get(), normal.get(), mPreviewMode, size, mPreviewYaw, mLightYaw);
@@ -887,6 +921,24 @@ namespace faf::editor
       mPreviewImage = EdImGuiRenderer::CreateImage(size, size, pixels.data());
       mPreviewStale = false;
     }
+  }
+
+  void EdMaterialEditor::DrawPreview(
+    Doc& doc,
+    const float width
+  )
+  {
+    // In the Materials workspace the preview fills the middle of the window (DrawStage): the map's graphs here instead.
+    if (mStaged) {
+      ImGui::PushTextWrapPos(0.0f);
+      ImGui::TextDisabled("The preview is in the middle of the window.");
+      ImGui::PopTextWrapPos();
+      DrawGraphList();
+      return;
+    }
+    DrawPreviewOptions();
+    const float side = std::max(64.0f, width);
+    RenderPreview(doc, 256);
     if (mPreviewImage != 0) {
       ImGui::Image(static_cast<ImTextureID>(mPreviewImage), ImVec2(side, side));
       // Dragging turns the sphere.
@@ -894,7 +946,7 @@ namespace faf::editor
         mPreviewYaw -= ImGui::GetIO().MouseDelta.x * 0.01f;
         mPreviewStale = mPreviewStale || ImGui::GetIO().MouseDelta.x != 0.0f;
       }
-      ImGui::SetItemTooltip("The output's albedo lit through its normal map. Drag to turn the sphere.");
+      EdSetItemTooltip("The output's albedo lit through its normal map. Drag to turn the sphere.");
     }
   }
 
@@ -936,11 +988,11 @@ namespace faf::editor
       ImGui::SetNextItemWidth(-100.0f);
       switch (def.kind) {
       case ParamKind::Float:
-        changed = ImGui::SliderFloat(def.name.c_str(), &value.value[0], def.min, def.max, "%.3f");
+        changed = FillSliderFloat(def.name.c_str(), &value.value[0], def.min, def.max, "%.3f");
         break;
       case ParamKind::Int: {
         int v = static_cast<int>(std::lround(value.value[0]));
-        changed = ImGui::SliderInt(def.name.c_str(), &v, static_cast<int>(def.min), static_cast<int>(def.max));
+        changed = FillSliderInt(def.name.c_str(), &v, static_cast<int>(def.min), static_cast<int>(def.max));
         value.value[0] = static_cast<float>(v);
         break;
       }
@@ -958,7 +1010,7 @@ namespace faf::editor
         const char* current = v >= 0 && static_cast<std::size_t>(v) < def.choices.size()
           ? def.choices[static_cast<std::size_t>(v)].c_str()
           : "?";
-        if (ImGui::BeginCombo(def.name.c_str(), current)) {
+        if (EdBeginCombo(def.name.c_str(), current)) {
           for (std::size_t c = 0; c < def.choices.size(); ++c) {
             if (ImGui::Selectable(def.choices[c].c_str(), static_cast<int>(c) == v)) {
               value.value[0] = static_cast<float>(c);
@@ -989,7 +1041,7 @@ namespace faf::editor
       }
       }
       if (!def.help.empty()) {
-        ImGui::SetItemTooltip("%s", def.help.c_str());
+        EdSetItemTooltip("%s", def.help.c_str());
       }
       ImGui::PopID();
       if (changed) {
@@ -1023,6 +1075,54 @@ namespace faf::editor
       ImGui::BulletText("Warnings: %d (the nodes outlined in red)", warnings);
     } else {
       ImGui::BulletText("No warnings");
+    }
+    // What Apply writes at the bake size: the albedo as DXT5, the normals as DXT1, each with its mips.
+    const auto withCommas = [](std::uint64_t value) {
+      std::string digits = std::to_string(value);
+      for (int at = static_cast<int>(digits.size()) - 3; at > 0; at -= 3) {
+        digits.insert(static_cast<std::size_t>(at), ",");
+      }
+      return digits;
+    };
+    ImGui::BulletText(
+      "Bake at %d px: albedo %s bytes (DXT5), normals %s bytes (DXT1), with their mips",
+      mBakeSize,
+      withCommas(DdsFileSize(mBakeSize, DdsKind::Bc3)).c_str(),
+      withCommas(DdsFileSize(mBakeSize, DdsKind::Bc1)).c_str()
+    );
+  }
+
+  void EdMaterialEditor::DrawGraphList()
+  {
+    ImGui::SeparatorText("Graphs");
+    int found = 0;
+    for (const std::filesystem::path& folder : {Folder(), OwnFolder()}) {
+      std::error_code ec;
+      if (!std::filesystem::is_directory(folder, ec)) {
+        continue;
+      }
+      for (const auto& entry : std::filesystem::directory_iterator(folder, ec)) {
+        const std::string file = entry.path().filename().string();
+        if (file.size() <= std::strlen(kExtension) || file.rfind(kExtension) != file.size() - std::strlen(kExtension)) {
+          continue;
+        }
+        ++found;
+        const std::string name = NameOf(entry.path());
+        bool open = false;
+        for (const auto& doc : mDocs) {
+          open = open || doc->name == name;
+        }
+        if (ImGui::Selectable(name.c_str(), open)) {
+          (void)Open(entry.path());
+        }
+        EdSetItemTooltip("%s", entry.path().string().c_str());
+      }
+      if (folder == OwnFolder()) {
+        break;
+      }
+    }
+    if (found == 0) {
+      ImGui::TextDisabled("None saved yet: File > Save.");
     }
   }
 
@@ -1067,7 +1167,7 @@ namespace faf::editor
           ImGui::Text("%s", type->title.c_str());
           ImGui::EndDragDropSource();
         }
-        ImGui::SetItemTooltip("%s\n\nDouble-click or drag into the graph.", type->help.c_str());
+        EdSetItemTooltip("%s\n\nDouble-click or drag into the graph.", type->help.c_str());
       }
       ImGui::TreePop();
     }

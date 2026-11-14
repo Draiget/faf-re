@@ -832,20 +832,6 @@ technique EditorPropOverSway_LowFidelity
   )
   {
     mName.assign(techniqueName, 0U, fa::string::npos);
-
-    Implementation* const lanes = GetImplementationLanes();
-    std::uint32_t constructedCount = 0;
-    try {
-      for (; constructedCount < 3U; ++constructedCount) {
-        ::new (static_cast<void*>(lanes + constructedCount)) Implementation();
-      }
-    } catch (...) {
-      while (constructedCount > 0U) {
-        --constructedCount;
-        lanes[constructedCount].Implementation::~Implementation();
-      }
-      throw;
-    }
   }
 
   /**
@@ -857,11 +843,6 @@ technique EditorPropOverSway_LowFidelity
    */
   CD3DEffect::Technique::~Technique()
   {
-    Implementation* const lanes = GetImplementationLanes();
-    for (std::int32_t index = 2; index >= 0; --index) {
-      lanes[index].Implementation::~Implementation();
-    }
-
     mName.tidy(true, 0U);
   }
 
@@ -873,7 +854,7 @@ technique EditorPropOverSway_LowFidelity
    */
   void CD3DEffect::Technique::FinalizeMissingImplementations()
   {
-    Implementation* const lanes = GetImplementationLanes();
+    Implementation* const lanes = mImplementations;
     if (HasConstructedLaneName(lanes[0]) && HasConstructedLaneName(lanes[1]) && HasConstructedLaneName(lanes[2])) {
       return;
     }
@@ -908,16 +889,6 @@ technique EditorPropOverSway_LowFidelity
     lanes[2] = *lane2Source;
   }
 
-  CD3DEffect::Technique::Implementation* CD3DEffect::Technique::GetImplementationLanes() noexcept
-  {
-    return reinterpret_cast<Implementation*>(mImplementationStorage);
-  }
-
-  const CD3DEffect::Technique::Implementation* CD3DEffect::Technique::GetImplementationLanes() const noexcept
-  {
-    return reinterpret_cast<const Implementation*>(mImplementationStorage);
-  }
-
   /**
    * Address: 0x0042C430 (FUN_0042C430)
    * Mangled: ??0CD3DEffect@Moho@@QAE@@Z
@@ -926,7 +897,7 @@ technique EditorPropOverSway_LowFidelity
    * Initializes one effect object with empty technique tree and cleared shared handles.
    */
   CD3DEffect::CD3DEffect()
-    : mAttachedLinks(nullptr)
+    : WeakObject()
     , mTechniques{}
     , mName{}
     , mFile{}
@@ -957,13 +928,7 @@ technique EditorPropOverSway_LowFidelity
 
     mFile.tidy(true, 0U);
     mName.tidy(true, 0U);
-
-    while (mAttachedLinks != nullptr) {
-      AttachedLink* const detached = mAttachedLinks;
-      mAttachedLinks = detached->mNext;
-      detached->mLinkLane = nullptr;
-      detached->mNext = nullptr;
-    }
+    // ~WeakObject then clears every shader var still bound to this effect.
   }
 
   /**
@@ -1211,7 +1176,7 @@ technique EditorPropOverSway_LowFidelity
         }
 
         const TechniqueSet::iterator definition = mTechniques.emplace(abstractTechniqueName).first;
-        Technique::Implementation* const lanes = MutableTechnique(definition).GetImplementationLanes();
+        Technique::Implementation* const lanes = MutableTechnique(definition).mImplementations;
         if (HasConstructedLaneName(lanes[0]) && HasConstructedLaneName(lanes[1]) && HasConstructedLaneName(lanes[2])) {
           gpg::Warnf(
             "technique %s in effect %s has been finalized (attempt to define a redundant fidelity)",
@@ -1350,7 +1315,7 @@ technique EditorPropOverSway_LowFidelity
     }
 
     const std::int32_t fidelityIndex = ResolveGraphicsFidelityIndex();
-    Technique::Implementation* const lanes = MutableTechnique(definition).GetImplementationLanes();
+    Technique::Implementation* const lanes = MutableTechnique(definition).mImplementations;
     Technique::Implementation& selectedLane = lanes[fidelityIndex];
     if (!HasConstructedLaneName(selectedLane)) {
       selectAndWarnInvalid();
@@ -1428,7 +1393,7 @@ technique EditorPropOverSway_LowFidelity
     }
 
     const std::int32_t fidelityIndex = ResolveGraphicsFidelityIndex();
-    Technique::Implementation& lane = MutableTechnique(definition).GetImplementationLanes()[fidelityIndex];
+    Technique::Implementation& lane = MutableTechnique(definition).mImplementations[fidelityIndex];
     if (!lane.TryGetIntegerAnnotation(annotationName, &resolvedValue)) {
       (void)GetImplAnnotation(&resolvedValue, lane.mName, annotationName);
       lane.mIntegerAnnotations[annotationName] = resolvedValue;
@@ -1489,7 +1454,7 @@ technique EditorPropOverSway_LowFidelity
     }
 
     const std::int32_t fidelityIndex = ResolveGraphicsFidelityIndex();
-    Technique::Implementation& lane = MutableTechnique(definition).GetImplementationLanes()[fidelityIndex];
+    Technique::Implementation& lane = MutableTechnique(definition).mImplementations[fidelityIndex];
     if (!lane.TryGetStringAnnotation(annotationName, &resolvedValue)) {
       (void)GetImplAnnotation(&resolvedValue, lane.mName, annotationName);
       lane.mStringAnnotations[annotationName] = resolvedValue;

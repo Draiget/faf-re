@@ -26,44 +26,6 @@ namespace
   int gRecoveredCScrLuaMetatableFactoryReconBlipIndex = 0;
   int gRecoveredCScrLuaMetatableFactoryEntityIndex = 0;
 
-  /**
-   * Address: 0x00736830 (FUN_00736830)
-   *
-   * What it does:
-   * Returns one raw storage pointer for the per-sim `sim_TestVarUByte`
-   * runtime convar instance.
-   */
-  [[maybe_unused]] [[nodiscard]] void* GetSimTestVarUByteStorage(
-    moho::Sim* const sim
-  )
-  {
-    if (sim == nullptr) {
-      return nullptr;
-    }
-
-    moho::CSimConVarInstanceBase* const instance = sim->GetSimVar(&moho::gSimConVar_sim_TestVarUByte);
-    return instance != nullptr ? instance->GetValueStorage() : nullptr;
-  }
-
-  /**
-   * Address: 0x00736850 (FUN_00736850)
-   *
-   * What it does:
-   * Returns one raw storage pointer for the per-sim `sim_TestVarStr`
-   * runtime convar instance.
-   */
-  [[maybe_unused]] [[nodiscard]] void* GetSimTestVarStrStorage(
-    moho::Sim* const sim
-  )
-  {
-    if (sim == nullptr) {
-      return nullptr;
-    }
-
-    moho::CSimConVarInstanceBase* const instance = sim->GetSimVar(&moho::gSimConVar_sim_TestVarStr);
-    return instance != nullptr ? instance->GetValueStorage() : nullptr;
-  }
-
   template <int* TargetIndex>
   int RegisterRecoveredFactoryIndex() noexcept
   {

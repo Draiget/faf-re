@@ -554,8 +554,17 @@ ShellTopLevelWindow::ShellTopLevelWindow(
 {
   // The 2.4.2 window library frames with a parent are still desktop windows; the parent only owns them.
   (void)parent;
+  // A frame styled SHELL_NO_BORDER has no caption or border, so its window is its client area. The
+  // full-screen frame is one: a framed window there grows by its border when Direct3D 9 (or DXVK)
+  // takes it to full screen (#418).
   void* const native = platform::window::CreateTopLevel(
-    Utf8(title).c_str(), pos.x, pos.y, size.x, size.y, (style & SHELL_RESIZE_BORDER) != 0
+    Utf8(title).c_str(),
+    pos.x,
+    pos.y,
+    size.x,
+    size.y,
+    (style & SHELL_RESIZE_BORDER) != 0,
+    (style & SHELL_NO_BORDER) == 0
   );
   if (native == nullptr) {
     return; // no window system: the window keeps its requested area, as before
@@ -568,6 +577,18 @@ ShellTopLevelWindow::ShellTopLevelWindow(
   int clientHeight = 0;
   platform::window::GetBounds(native, &screenX, &screenY, &clientWidth, &clientHeight);
   SetClientArea(screenX, screenY, clientWidth, clientHeight);
+}
+
+void ShellTopLevelWindow::SetWindowStyleFlag(
+  const long style
+)
+{
+  m_windowStyle = style;
+  if (GetPlatformWindow() != nullptr) {
+    platform::window::SetFrameStyle(
+      GetPlatformWindow(), (style & SHELL_NO_BORDER) == 0, (style & SHELL_RESIZE_BORDER) != 0
+    );
+  }
 }
 
 void ShellTopLevelWindow::Maximize(

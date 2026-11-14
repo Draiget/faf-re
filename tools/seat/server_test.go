@@ -68,7 +68,7 @@ func newServerSeat(t *testing.T, delivery string) (*Seat, *recorder) {
 	t.Helper()
 	rec := &recorder{}
 	s, err := New(Config{UID: 1001, Name: "Seat One", Window: Window{Width: 800, Height: 600},
-		Server: &ServerJoin{Address: "10.0.0.1:27050", Token: "token-of-seat-one", Delivery: delivery}}, nil, rec.add)
+		Server: &ServerJoin{Address: "192.0.2.1:27050", Token: "token-of-seat-one", Delivery: delivery}}, nil, rec.add)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -84,7 +84,7 @@ func TestJoinServerInPlaceOfCreateLobby(t *testing.T) {
 	g.send(t, gpgnet.New("PeerFeatures", fmt.Sprint(1<<featureServerBit), "abc1234"))
 	g.send(t, gpgnet.New("GameState", "Idle"))
 	m := g.next(5 * time.Second)
-	if m.Command != "JoinServer" || m.Str(0) != "10.0.0.1:27050" || m.Str(1) != "token-of-seat-one" {
+	if m.Command != "JoinServer" || m.Str(0) != "192.0.2.1:27050" || m.Str(1) != "token-of-seat-one" {
 		t.Fatalf("got %v, want JoinServer with this seat's address and token", m)
 	}
 	if uid, ok := m.Int(2); !ok || uid != 1001 {
@@ -135,7 +135,7 @@ func TestJoinServerNeedsTheAnnouncement(t *testing.T) {
 func TestArgsDelivery(t *testing.T) {
 	s, _ := newServerSeat(t, DeliverArgs)
 	line := strings.Join(s.cfg.GameArgs(1234), " ")
-	if !strings.Contains(line, "/connectserver 10.0.0.1:27050 /servertoken token-of-seat-one /serveruid 1001") {
+	if !strings.Contains(line, "/connectserver 192.0.2.1:27050 /servertoken token-of-seat-one /serveruid 1001") {
 		t.Fatalf("args delivery: %s", line)
 	}
 	if !strings.Contains(line, "/gpgnetfeatures") || !strings.Contains(line, "/gpgnet 127.0.0.1:1234") {

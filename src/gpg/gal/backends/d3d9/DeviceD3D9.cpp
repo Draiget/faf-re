@@ -905,7 +905,7 @@ namespace gpg::gal
       CollectAllAdaptersForSetup(*this);
       CheckAdapterSelectionForSetup(*this, *context);
 
-      const HWND primaryWindow = reinterpret_cast<HWND>(context->GetHead(0U).mHandle);
+      const HWND primaryWindow = static_cast<HWND>(context->GetHead(0U).mHandle);
       const unsigned int behaviorFlags = ((headCount > 1) ? 0x200U : 0U) | 0x44U;
       GetDeviceParameters(presentParameters, context);
 
@@ -1057,8 +1057,8 @@ namespace gpg::gal
       outParameters->MultiSampleType = static_cast<D3DMULTISAMPLE_TYPE>(head.antialiasingHigh);
       outParameters->MultiSampleQuality = head.antialiasingLow;
       outParameters->SwapEffect = D3DSWAPEFFECT_DISCARD;
-      outParameters->hDeviceWindow = (headIndex == 0U && head.mWindowed) ? reinterpret_cast<HWND>(head.mHandle)
-                                                                         : reinterpret_cast<HWND>(head.mWindow);
+      outParameters->hDeviceWindow =
+        (headIndex == 0U && head.mWindowed) ? static_cast<HWND>(head.mHandle) : static_cast<HWND>(head.mWindow);
       outParameters->Windowed = head.mWindowed ? 0 : 1;
       outParameters->EnableAutoDepthStencil = 0;
       outParameters->AutoDepthStencilFormat = D3DFMT_UNKNOWN;

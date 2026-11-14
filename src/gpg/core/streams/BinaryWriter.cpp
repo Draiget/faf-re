@@ -14,19 +14,20 @@ namespace gpg
    * possible, falling back to `VirtWrite` when the inline space is exhausted.
    */
   void BinaryWriter::Write(
-    const char* const data,
+    const void* const data,
     const std::size_t size
   ) const
   {
+    const auto* const bytes = static_cast<const char*>(data);
     Stream* const targetStream = mStream;
     if (size > static_cast<std::size_t>(targetStream->mWriteEnd - targetStream->mWriteHead)) {
-      targetStream->VirtWrite(data, size);
+      targetStream->VirtWrite(bytes, size);
       return;
     }
 
     if (size != 0u) {
       // Raw byte-stream write into the buffered write head.
-      std::copy_n(data, size, targetStream->mWriteHead);
+      std::copy_n(bytes, size, targetStream->mWriteHead);
       targetStream->mWriteHead += size;
     }
   }

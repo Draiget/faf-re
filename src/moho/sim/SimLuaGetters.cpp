@@ -1551,7 +1551,8 @@ int moho::cfunc_GetMouseWorldPosL(
     LuaPlus::LuaState::Error(state, kGetMouseWorldPosNoSessionText);
   }
 
-  const LuaPlus::LuaObject worldPositionObject = SCR_ToLua<Wm3::Vector3<float>>(state, session->CursorWorldPos);
+  const LuaPlus::LuaObject worldPositionObject =
+    SCR_ToLua<Wm3::Vector3<float>>(state, session->mCursorInfo.mMouseWorldPos);
   worldPositionObject.PushStack(state);
   return 1;
 }

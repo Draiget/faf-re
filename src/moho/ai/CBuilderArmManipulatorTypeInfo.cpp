@@ -85,8 +85,7 @@ namespace
 
     int baseOffset = 0;
     if (runtimeType != nullptr && staticType != nullptr && runtimeType->IsDerivedFrom(staticType, &baseOffset)) {
-      out.mObj =
-        reinterpret_cast<void*>(reinterpret_cast<std::uintptr_t>(object) - static_cast<std::uintptr_t>(baseOffset));
+      out.mObj = gpg::CompleteObject(object, baseOffset);
       out.mType = runtimeType;
       return out;
     }

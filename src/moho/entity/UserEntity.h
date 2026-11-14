@@ -27,6 +27,12 @@ namespace moho
   class CSndParams;
   struct REntityBlueprint;
 
+  /**
+   * Not in the binary (the game never sets it): the map editor's "Game units" off. While set, a unit's mesh stays
+   * hidden whatever its visibility mode. Drawing only: nothing the sim reads.
+   */
+  extern bool ed_HideUserUnits;
+
   class UserEntity : public WeakObject
   {
   public:

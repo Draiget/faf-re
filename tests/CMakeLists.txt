@@ -371,13 +371,75 @@ set_target_properties(faf_occupation_manager_tests PROPERTIES FOLDER "Tests/Sim"
 add_test(NAME occupation_manager COMMAND faf_occupation_manager_tests)
 set_tests_properties(occupation_manager PROPERTIES LABELS "Sim")
 
+include(${CMAKE_SOURCE_DIR}/src/editor/graph/presets/EmbedGraphs.cmake)
+faf_embed_terrain_graphs(_faf_terrain_graph_files)
+# The map editor's terrain field library (src/editor/terrain, from FAF Studio): golden checksums at every thread count,
+# the Generate ops, the interop ops. Engine independent.
+add_executable(faf_editor_field_tests EXCLUDE_FROM_ALL editor/FieldTests.cpp editor/FieldLandTests.cpp editor/FieldInteropTests.cpp editor/ErosionTests.cpp
+  editor/MapTexturesTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdMapTextures.cpp
+  editor/FieldStackTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdFieldStack.cpp
+  editor/GroundKindTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdGroundKind.cpp
+  editor/MaskGenTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdMaskGen.cpp
+  editor/RecipeTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdRecipes.cpp
+  editor/TextureSetsTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdTexScale.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdTextureSets.cpp
+  editor/SlopeRulesTests.cpp
+  editor/ErosionSuiteTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdErosionSuite.cpp
+  editor/ScToolsTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdScTools.cpp
+  editor/TerrainChecksTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdTerrainChecks.cpp
+  editor/MapLayoutTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdMapLayout.cpp
+  editor/LayoutMarkersTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdLayoutMarkers.cpp
+  editor/AlphaGenTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdAlphaGen.cpp
+  editor/MissionTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdMission.cpp
+  editor/ModProjectTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdModProject.cpp
+  editor/EffectMergeTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdEffectMerge.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdEmitter.cpp
+  editor/UnitLabTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdUnitLab.cpp
+  editor/EditorModsTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdEditorMods.cpp
+  editor/UnitIconTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdUnitIcon.cpp
+  editor/RoundTwoFieldTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdKeptPaths.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdJsonTree.cpp
+  ${CMAKE_SOURCE_DIR}/src/editor/tools/EdSkeleton.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdDetailPass.cpp
+  ${CMAKE_SOURCE_DIR}/src/editor/tools/EdMissionImport.cpp
+  editor/SelectModesTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdSelectModes.cpp
+  editor/ViewMenuTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/ui/EdViewMenu.cpp
+  editor/ScenarioInfoTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdScenarioInfo.cpp
+  editor/AssetCatalogTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdAssetCatalog.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdEmitter.cpp
+  editor/TerrainGraphTests.cpp ${_faf_terrain_graph_files} ${CMAKE_SOURCE_DIR}/src/editor/graph/EdTerrainGraph.cpp ${CMAKE_SOURCE_DIR}/src/editor/graph/EdTerrainNodes.cpp
+  ${CMAKE_SOURCE_DIR}/src/editor/graph/EdNodeGraph.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdJson.cpp
+  ${CMAKE_SOURCE_DIR}/src/editor/terrain/EdErosion.cpp ${CMAKE_SOURCE_DIR}/src/editor/terrain/EdFieldEro2.cpp
+  ${CMAKE_SOURCE_DIR}/src/editor/terrain/EdFieldCore.cpp ${CMAKE_SOURCE_DIR}/src/editor/terrain/EdFieldFilt.cpp ${CMAKE_SOURCE_DIR}/src/editor/terrain/EdFieldGen.cpp ${CMAKE_SOURCE_DIR}/src/editor/terrain/EdFieldLand.cpp ${CMAKE_SOURCE_DIR}/src/editor/terrain/EdFieldSc.cpp ${CMAKE_SOURCE_DIR}/src/editor/terrain/EdFieldPath.cpp ${CMAKE_SOURCE_DIR}/src/editor/terrain/EdFieldInterop.cpp)
+target_include_directories(faf_editor_field_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_compile_definitions(faf_editor_field_tests PRIVATE FAF_FIELD_CASES="${CMAKE_CURRENT_SOURCE_DIR}/editor/data/field_cases.lua"
+  FAF_EROSION_CASES="${CMAKE_CURRENT_SOURCE_DIR}/editor/data/erosion_cases.lua"
+  FAF_TERRAIN_GRAPHS="${CMAKE_CURRENT_SOURCE_DIR}/editor/data/graphs")
+target_compile_options(faf_editor_field_tests PRIVATE /EHsc -Wno-unused-function)
+target_link_libraries(faf_editor_field_tests PRIVATE gtest_main)
+set_target_properties(faf_editor_field_tests PROPERTIES FOLDER "Tests/Editor")
+add_test(NAME editor_field COMMAND faf_editor_field_tests)
+
 # The map editor height brush, symmetry check, height files and undo (src/editor/tools, src/editor/undo): exact symmetry,
 # byte-exact undo, height images read back as written.
 add_executable(faf_editor_brush_tests EXCLUDE_FROM_ALL editor/HeightBrushTests.cpp editor/HeightHistoryTests.cpp editor/SymmetryCheckTests.cpp editor/HeightFileTests.cpp
   editor/NewMapTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdNewMap.cpp
-  editor/MaskBrushTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdMaskBrush.cpp
+  editor/PreviewTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdPreview.cpp
+  editor/MaskBrushTests.cpp editor/MaskEncodingTests.cpp editor/MaskBrushOptionsTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdMaskBrush.cpp
+  editor/BrushLibraryTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdBrushLibrary.cpp
+  editor/SymmetryFollowTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdSymmetryFollow.cpp
+  editor/ArrangeTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdArrange.cpp
+  editor/FindReplaceTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdFindReplace.cpp
+  editor/ScatterTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdScatter.cpp
+  editor/ModalTransformTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdModalTransform.cpp
+  editor/LooksTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdLooks.cpp
+  editor/WaterMaskTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdWaterMasks.cpp
+  editor/InteropTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdInterop.cpp
+  editor/ShaderProfileTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdShaderProfiles.cpp
+  editor/LayerConvertTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdLayerConvert.cpp
+  editor/SymmetrizeTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdSymmetrize.cpp ${CMAKE_SOURCE_DIR}/src/editor/terrain/EdFieldSc.cpp
   editor/SaveFileTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdSaveFile.cpp
   editor/MarkerTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdMarkers.cpp
+  editor/CameraFrameTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdCameraFrame.cpp
+  editor/ResizeTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdResize.cpp
+  editor/TerrainPathTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdTerrainPath.cpp
+  editor/TextureFilesTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdTextureFiles.cpp
+  editor/ScmTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdScm.cpp
   editor/DecalShapeTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdDecalShape.cpp
   editor/UnitTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdUnits.cpp
   editor/UnitFateTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdUnitFate.cpp
@@ -394,7 +456,7 @@ add_executable(faf_editor_brush_tests EXCLUDE_FROM_ALL editor/HeightBrushTests.c
   editor/PathingTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdPathing.cpp
   editor/PackageTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdPackage.cpp
   editor/WaterPresetTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdWaterPreset.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdJson.cpp
-  editor/LightingTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdLighting.cpp
+  editor/LightingTests.cpp editor/ColourTextTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdLighting.cpp
   editor/MarkerPresetTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdMarkerPreset.cpp
   editor/UnitPresetTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdUnitPreset.cpp
   editor/LayerPresetTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdLayerPreset.cpp
@@ -409,12 +471,41 @@ add_executable(faf_editor_brush_tests EXCLUDE_FROM_ALL editor/HeightBrushTests.c
   editor/RecentMapsTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdRecentMaps.cpp
   editor/VaultTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdVault.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdHttp.cpp
   editor/FafApiTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdFafApi.cpp
+  editor/CommandsTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/ui/EdCommands.cpp ${CMAKE_SOURCE_DIR}/src/editor/ui/EdWindowChrome.cpp
+  editor/KeymapTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/ui/EdKeymap.cpp
+  editor/WorkspacesTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/ui/EdWorkspaces.cpp
+  editor/StatusTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/ui/EdStatus.cpp
+  editor/SettingsTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/ui/EdSettings.cpp
+  editor/TerrainExtrasTests.cpp
+  editor/MeshImportTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdMeshImport.cpp
+  editor/RoundTwoAssetTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdLuaTable.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdJsonTree.cpp
+  ${CMAKE_SOURCE_DIR}/src/editor/tools/EdUnitWizard.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdScaAnim.cpp
+  ${CMAKE_SOURCE_DIR}/src/editor/tools/EdMeshData.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdMeshScan.cpp
+  editor/BuildersTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdBuilders.cpp
+  editor/ObjectsExtrasTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdMapStats.cpp
+  editor/EnvironmentExtrasTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdLookMoods.cpp
+  editor/ShellExtrasTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdUserFiles.cpp ${CMAKE_SOURCE_DIR}/src/editor/ui/EdFramePacing.cpp ${CMAKE_SOURCE_DIR}/src/editor/ui/EdTipTally.cpp
+  editor/HomeModelTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/ui/EdHomeModel.cpp
+  editor/AutosaveTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdAutosave.cpp
+  editor/HistoryTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/ui/EdHistory.cpp
+  editor/HelpTopicsTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/ui/EdHelpTopics.cpp
+  editor/ProblemsTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/ui/EdProblems.cpp
+  editor/CanvasFitTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/ui/EdCanvasFit.cpp
+  editor/DdsSizeTests.cpp
+  editor/LuaApiTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdLuaApi.cpp
+  editor/DebugRulesTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/EdDebugRules.cpp
+  editor/UnitCatalogTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/ui/EdUnitCatalog.cpp
+  editor/LayoutTests.cpp
   editor/WaterBodiesEditTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdWaterBodies.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdLuaText.cpp
   ${CMAKE_SOURCE_DIR}/src/moho/sim/WaterBodies.cpp
   ${CMAKE_SOURCE_DIR}/src/editor/tools/EdHeightBrush.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdSymmetryCheck.cpp
+  ${CMAKE_SOURCE_DIR}/src/editor/terrain/EdErosion.cpp ${CMAKE_SOURCE_DIR}/src/editor/terrain/EdFieldCore.cpp
   ${CMAKE_SOURCE_DIR}/src/editor/tools/EdHeightFile.cpp
   ${CMAKE_SOURCE_DIR}/src/editor/undo/EdHeightHistory.cpp)
 target_include_directories(faf_editor_brush_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_compile_definitions(faf_editor_brush_tests PRIVATE FAF_UNITWIZ_DATA="${CMAKE_SOURCE_DIR}/src/editor/tools/data/unitwizdata.lua")
+# The terrain library (Water erode, Rain and Deposit) turns running out of memory into an op error.
+target_compile_options(faf_editor_brush_tests PRIVATE /EHsc)
 # The zlib the engine links: 1.2.3 on both architectures (src/CMakeLists.txt).
 target_link_libraries(faf_editor_brush_tests PRIVATE gtest_main ole32 windowscodecs zlib123 winhttp crypt32 shell32)
 set_target_properties(faf_editor_brush_tests PROPERTIES FOLDER "Tests/Editor")
@@ -423,12 +514,22 @@ set_tests_properties(editor_height_brush PROPERTIES LABELS "Editor")
 
 # The material editor's DDS files, read back by the engine's own decoder (so it links the engine).
 add_executable(faf_editor_bake_tests EXCLUDE_FROM_ALL editor/TextureBakeTests.cpp editor/SoundMuteTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/graph/EdTextureBake.cpp
-  ${CMAKE_SOURCE_DIR}/src/editor/graph/EdTextureGraph.cpp ${CMAKE_SOURCE_DIR}/src/editor/graph/EdNodeGraph.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdJson.cpp)
+  ${CMAKE_SOURCE_DIR}/src/editor/graph/EdTextureGraph.cpp ${CMAKE_SOURCE_DIR}/src/editor/graph/EdNodeGraph.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdJson.cpp
+  editor/ThemeTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/ui/EdTheme.cpp)
 target_include_directories(faf_editor_bake_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
 target_link_libraries(faf_editor_bake_tests PRIVATE faf_engine gtest_main)
 set_target_properties(faf_editor_bake_tests PROPERTIES FOLDER "Tests/Editor")
 add_test(NAME editor_texture_bake COMMAND faf_editor_bake_tests)
 set_tests_properties(editor_texture_bake PROPERTIES LABELS "Editor")
+
+# Engine addition: the cue AudioEngine::Play hands out, which outlives a rebuild of the XACT engine
+# on a new sound output (src/moho/audio/RecoverableCue.h). Fake XACT cues and banks; no audio device.
+add_executable(faf_audio_tests EXCLUDE_FROM_ALL audio/AudioCueRecoveryTests.cpp)
+target_include_directories(faf_audio_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_link_libraries(faf_audio_tests PRIVATE faf_engine gtest_main)
+set_target_properties(faf_audio_tests PROPERTIES FOLDER "Tests/Audio")
+add_test(NAME audio_cue_recovery COMMAND faf_audio_tests)
+set_tests_properties(audio_cue_recovery PROPERTIES LABELS "Audio")
 
 # The shell's mouse events from window-system events: wheel positions on the screen, as
 # WM_MOUSEWHEEL's (src/platform/shell/mouse.h). Shell.cpp is a client file, in faf_engine here;

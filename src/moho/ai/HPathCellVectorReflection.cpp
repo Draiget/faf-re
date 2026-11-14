@@ -41,12 +41,12 @@ namespace
    */
   void LoadHPathCellVector(
     gpg::ReadArchive* archive,
-    std::intptr_t objectPtr,
+    void* objectPtr,
     int,
     gpg::RRef*
   )
   {
-    auto* const storage = reinterpret_cast<HPathCellVector*>(objectPtr);
+    auto* const storage = static_cast<HPathCellVector*>(objectPtr);
     GPG_ASSERT(archive != nullptr);
     GPG_ASSERT(storage != nullptr);
     if (!archive || !storage) {
@@ -80,12 +80,12 @@ namespace
    */
   void SaveHPathCellVector(
     gpg::WriteArchive* archive,
-    std::intptr_t objectPtr,
+    void* objectPtr,
     int,
     gpg::RRef* ownerRef
   )
   {
-    auto* const storage = reinterpret_cast<const HPathCellVector*>(objectPtr);
+    auto* const storage = static_cast<const HPathCellVector*>(objectPtr);
     GPG_ASSERT(archive != nullptr);
     GPG_ASSERT(storage != nullptr);
     if (!archive || !storage) {

@@ -18,7 +18,7 @@ type Options struct {
 	// Bind is the local UDP address to send from, "host:port". Empty lets the
 	// OS pick. On an isolated host the engine insists on a specific advertised
 	// source address, so set this to that address with port 0 (e.g.
-	// "192.168.42.77:0") to make the host accept our datagrams.
+	// "192.0.2.77:0") to make the host accept our datagrams.
 	Bind string
 	// Prime sends one valid CONNECT before the corpus so the host registers a
 	// pending connection from our endpoint; without it the per-connection

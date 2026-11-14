@@ -38,7 +38,7 @@ namespace moho
      * reading listener pointers until a null sentinel and relinking each
      * listener node into the broadcaster ring.
      */
-    static void SerLoad(gpg::ReadArchive* archive, std::intptr_t objectPtr, int version, gpg::RRef* ownerRef);
+    static void SerLoad(gpg::ReadArchive* archive, void* objectPtr, int version, gpg::RRef* ownerRef);
 
     /**
      * Address: 0x005DC470 (FUN_005DC470, Moho::RBroadcasterRType_EAiAttackerEvent::SerSave)
@@ -47,7 +47,7 @@ namespace moho
      * Serializes one intrusive `Broadcaster<EAiAttackerEvent>` lane by writing
      * each listener pointer as `UNOWNED`, terminated by one null pointer.
      */
-    static void SerSave(gpg::WriteArchive* archive, std::intptr_t objectPtr, int version, gpg::RRef* ownerRef);
+    static void SerSave(gpg::WriteArchive* archive, void* objectPtr, int version, gpg::RRef* ownerRef);
 
     [[nodiscard]] const char* GetName() const override;
 
@@ -128,7 +128,7 @@ namespace gpg
      * Deserializes one `fa::vector<moho::UnitWeapon*>` payload from archive
      * count + reflected pointer lanes.
      */
-    static void SerLoad(gpg::ReadArchive* archive, std::intptr_t objectPtr, int version, gpg::RRef* ownerRef);
+    static void SerLoad(gpg::ReadArchive* archive, void* objectPtr, int version, gpg::RRef* ownerRef);
 
     /**
      * Address: 0x005DC5F0 (FUN_005DC5F0, gpg::RVectorType_UnitWeapon_P::SerSave)
@@ -137,7 +137,7 @@ namespace gpg
      * Save mirror of `SerLoad`: writes the element count, then each weapon as
      * an unowned tracked pointer.
      */
-    static void SerSave(gpg::WriteArchive* archive, std::intptr_t objectPtr, int version, gpg::RRef* ownerRef);
+    static void SerSave(gpg::WriteArchive* archive, void* objectPtr, int version, gpg::RRef* ownerRef);
 
     gpg::RRef SubscriptIndex(void* obj, int ind) const override;
     size_t GetCount(void* obj) const override;
@@ -172,7 +172,7 @@ namespace gpg
      * Deserializes one `fa::vector<moho::CAcquireTargetTask*>` payload from
      * archive count + pointer lanes.
      */
-    static void SerLoad(gpg::ReadArchive* archive, std::intptr_t objectPtr, int version, gpg::RRef* ownerRef);
+    static void SerLoad(gpg::ReadArchive* archive, void* objectPtr, int version, gpg::RRef* ownerRef);
 
     /**
      * Address: 0x005DC770 (FUN_005DC770, gpg::RVectorType_CAcquireTargetTask_P::SerSave)
@@ -181,7 +181,7 @@ namespace gpg
      * Serializes one `fa::vector<moho::CAcquireTargetTask*>` payload as
      * count + unowned reflected pointer lanes.
      */
-    static void SerSave(gpg::WriteArchive* archive, std::intptr_t objectPtr, int version, gpg::RRef* ownerRef);
+    static void SerSave(gpg::WriteArchive* archive, void* objectPtr, int version, gpg::RRef* ownerRef);
 
     gpg::RRef SubscriptIndex(void* obj, int ind) const override;
     size_t GetCount(void* obj) const override;
@@ -198,14 +198,6 @@ namespace
 
   using UnitWeaponPtrVector = fa::vector<moho::UnitWeapon*>;
   using CAcquireTargetTaskPtrVector = fa::vector<moho::CAcquireTargetTask*>;
-
-  template <class TObject>
-  [[nodiscard]] TObject* PointerFromArchiveInt(
-    const std::intptr_t objectPtr
-  )
-  {
-    return reinterpret_cast<TObject*>(objectPtr);
-  }
 
   [[nodiscard]] BroadcasterAttackerType* AcquireBroadcasterAttackerType()
   {
@@ -330,12 +322,12 @@ const char* moho::RListenerRType_EAiAttackerEvent::GetName() const
  */
 void moho::RBroadcasterRType_EAiAttackerEvent::SerLoad(
   gpg::ReadArchive* const archive,
-  const std::intptr_t objectPtr,
+  void* const objectPtr,
   const int,
   gpg::RRef* const ownerRef
 )
 {
-  auto* const broadcaster = PointerFromArchiveInt<moho::Broadcaster<moho::EAiAttackerEvent>>(objectPtr);
+  auto* const broadcaster = static_cast<moho::Broadcaster<moho::EAiAttackerEvent>*>(objectPtr);
   GPG_ASSERT(archive != nullptr);
   GPG_ASSERT(broadcaster != nullptr);
   if (!archive || !broadcaster) {
@@ -360,12 +352,12 @@ void moho::RBroadcasterRType_EAiAttackerEvent::SerLoad(
  */
 void moho::RBroadcasterRType_EAiAttackerEvent::SerSave(
   gpg::WriteArchive* const archive,
-  const std::intptr_t objectPtr,
+  void* const objectPtr,
   const int,
   gpg::RRef* const
 )
 {
-  auto* const broadcaster = PointerFromArchiveInt<moho::Broadcaster<moho::EAiAttackerEvent>>(objectPtr);
+  auto* const broadcaster = static_cast<moho::Broadcaster<moho::EAiAttackerEvent>*>(objectPtr);
   GPG_ASSERT(archive != nullptr);
   GPG_ASSERT(broadcaster != nullptr);
   if (!archive || !broadcaster) {
@@ -437,12 +429,12 @@ void gpg::RVectorType_UnitWeaponPtr::Init()
  */
 void gpg::RVectorType_UnitWeaponPtr::SerLoad(
   gpg::ReadArchive* const archive,
-  const std::intptr_t objectPtr,
+  void* const objectPtr,
   const int,
   gpg::RRef* const ownerRef
 )
 {
-  auto* const storage = PointerFromArchiveInt<UnitWeaponPtrVector>(objectPtr);
+  auto* const storage = static_cast<UnitWeaponPtrVector*>(objectPtr);
   GPG_ASSERT(archive != nullptr);
   GPG_ASSERT(storage != nullptr);
   if (!archive || !storage) {
@@ -476,12 +468,12 @@ void gpg::RVectorType_UnitWeaponPtr::SerLoad(
  */
 void gpg::RVectorType_UnitWeaponPtr::SerSave(
   gpg::WriteArchive* const archive,
-  const std::intptr_t objectPtr,
+  void* const objectPtr,
   const int,
   gpg::RRef* const
 )
 {
-  const auto* const storage = PointerFromArchiveInt<const UnitWeaponPtrVector>(objectPtr);
+  const auto* const storage = static_cast<const UnitWeaponPtrVector*>(objectPtr);
   GPG_ASSERT(archive != nullptr);
   GPG_ASSERT(storage != nullptr);
   if (!archive || !storage) {
@@ -587,12 +579,12 @@ void gpg::RVectorType_CAcquireTargetTaskPtr::Init()
  */
 void gpg::RVectorType_CAcquireTargetTaskPtr::SerLoad(
   gpg::ReadArchive* const archive,
-  const std::intptr_t objectPtr,
+  void* const objectPtr,
   const int,
   gpg::RRef* const ownerRef
 )
 {
-  auto* const storage = PointerFromArchiveInt<CAcquireTargetTaskPtrVector>(objectPtr);
+  auto* const storage = static_cast<CAcquireTargetTaskPtrVector*>(objectPtr);
   GPG_ASSERT(archive != nullptr);
   GPG_ASSERT(storage != nullptr);
   if (!archive || !storage) {
@@ -622,12 +614,12 @@ void gpg::RVectorType_CAcquireTargetTaskPtr::SerLoad(
  */
 void gpg::RVectorType_CAcquireTargetTaskPtr::SerSave(
   gpg::WriteArchive* const archive,
-  const std::intptr_t objectPtr,
+  void* const objectPtr,
   const int,
   gpg::RRef* const
 )
 {
-  const auto* const storage = PointerFromArchiveInt<const CAcquireTargetTaskPtrVector>(objectPtr);
+  const auto* const storage = static_cast<const CAcquireTargetTaskPtrVector*>(objectPtr);
   GPG_ASSERT(archive != nullptr);
   GPG_ASSERT(storage != nullptr);
   if (!archive || !storage) {

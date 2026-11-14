@@ -24,91 +24,6 @@
 
 namespace
 {
-
-  struct DestroyInstanceVtableTag
-  {
-    virtual ~DestroyInstanceVtableTag() = default;
-  };
-
-  struct SurfaceVtableResetTag
-  {
-    virtual ~SurfaceVtableResetTag() = default;
-  };
-
-  struct SeedVtableResetTag
-  {
-    virtual ~SeedVtableResetTag() = default;
-  };
-
-  struct DestroyInstanceLane
-  {
-    void* vtable;
-    moho::MeshRenderer* instance;
-  };
-
-  DestroyInstanceVtableTag gDestroyInstanceVtableTag{};
-  SurfaceVtableResetTag gSurfaceVtableResetTag{};
-  SeedVtableResetTag gSeedVtableResetTag{};
-
-  // FUN_007D5EE0 (Region ctor, store at 0x7D5EE6) and FUN_007D5F20 (dtor,
-  // store at 0x7D5F3D) write this fixed .data address into the region's
-  // vtable slot; no code in the binary ever reads through it - it is a
-  // reset/poison sentinel, so it is recovered as the plain constant it is.
-  void* const kRegionVtableResetSentinel = reinterpret_cast<void*>(0x00E3F04C);
-
-  [[nodiscard]] void* DestroyInstanceVtableToken()
-  {
-    return *reinterpret_cast<void**>(&gDestroyInstanceVtableTag);
-  }
-
-  /**
-   * Address: 0x007D9820 (FUN_007D9820)
-   *
-   * What it does:
-   * Initializes one destroy-instance lane from another lane's payload while
-   * restoring the destroy-instance vtable token.
-   */
-  [[maybe_unused]] DestroyInstanceLane* InitializeDestroyInstanceLaneFromSource(
-    DestroyInstanceLane* const outLane,
-    const DestroyInstanceLane* const sourceLane
-  ) noexcept
-  {
-    if (outLane == nullptr) {
-      return nullptr;
-    }
-
-    outLane->vtable = DestroyInstanceVtableToken();
-    outLane->instance = sourceLane != nullptr ? sourceLane->instance : nullptr;
-    return outLane;
-  }
-
-  /**
-   * Address: 0x007D5EA0 (FUN_007D5EA0)
-   *
-   * What it does:
-   * Resets one destroy-instance helper lane to the `DestroyInstance` vtable.
-   */
-  void ResetDestroyInstanceLaneVtable(
-    DestroyInstanceLane* const lane
-  ) noexcept
-  {
-    if (lane == nullptr) {
-      return;
-    }
-
-    lane->vtable = DestroyInstanceVtableToken();
-  }
-
-  [[nodiscard]] void* SurfaceVtableResetToken()
-  {
-    return *reinterpret_cast<void**>(&gSurfaceVtableResetTag);
-  }
-
-  [[nodiscard]] void* SeedVtableResetToken()
-  {
-    return *reinterpret_cast<void**>(&gSeedVtableResetTag);
-  }
-
   [[nodiscard]] moho::RRuleGameRules* GetActiveRules() noexcept
   {
     const moho::CWldSession* const session = moho::WLD_GetActiveSession();
@@ -220,93 +135,6 @@ namespace
   }
 
   /**
-   * Address: 0x007D9390 (FUN_007D9390)
-   */
-  void ApplyDestroyInstanceToRegionPayloads(
-    moho::ClutterPayloadList& payloads,
-    DestroyInstanceLane& destroyLane,
-    moho::MeshRenderer* const instance
-  )
-  {
-    for (void* const entry : payloads) {
-      auto* const payload = static_cast<moho::ClutterRegionMapPayloadHeader*>(entry);
-      payload->vtable->destroy(payload, 1);
-    }
-
-    destroyLane.instance = instance;
-    ResetDestroyInstanceLaneVtable(&destroyLane);
-  }
-
-  [[nodiscard]] moho::ClutterRegion* AllocateRegionPoolBlock()
-  {
-    constexpr std::uint32_t kRegionPoolCount = 128u;
-
-    auto* const rawStorage = static_cast<std::uint8_t*>(
-      ::operator new(sizeof(std::uint32_t) + sizeof(moho::ClutterRegion) * kRegionPoolCount)
-    );
-    *reinterpret_cast<std::uint32_t*>(rawStorage) = kRegionPoolCount;
-
-    auto* const regionBase = reinterpret_cast<moho::ClutterRegion*>(rawStorage + sizeof(std::uint32_t));
-    std::uint32_t constructedCount = 0u;
-
-    try {
-      for (; constructedCount < kRegionPoolCount; ++constructedCount) {
-        ::new (static_cast<void*>(regionBase + constructedCount)) moho::ClutterRegion();
-      }
-    } catch (...) {
-      while (constructedCount > 0u) {
-        --constructedCount;
-        regionBase[constructedCount].~ClutterRegion();
-      }
-      ::operator delete(rawStorage);
-      throw;
-    }
-
-    return regionBase;
-  }
-
-  /**
-   * Address: 0x007D60C0 (FUN_007D60C0)
-   */
-  void ResetClutterSeedVtable(
-    moho::ClutterSurfaceElement* const seed
-  )
-  {
-    seed->vtable = reinterpret_cast<moho::ClutterSurfaceElementVTable*>(SeedVtableResetToken());
-  }
-
-  /**
-   * Address: 0x007D5FE0 (FUN_007D5FE0)
-   */
-  moho::ClutterSurfaceElement* InitializeClutterSeedFromBlueprintPath(
-    moho::ClutterSurfaceElement* const seed,
-    const float selectionWeight,
-    const fa::string& meshBlueprintId
-  )
-  {
-    ResetClutterSeedVtable(seed);
-    seed->selectionWeight = selectionWeight;
-    seed->uniformScale = 1.0f;
-    seed->meshBlueprint = nullptr;
-
-    moho::RRuleGameRules* const rules = GetActiveRules();
-    if (!rules) {
-      return seed;
-    }
-
-    fa::string normalizedPath{};
-    gpg::STR_CopyFilename(&normalizedPath, &meshBlueprintId);
-    moho::RPropBlueprint* const propBlueprint = rules->GetPropBlueprint(normalizedPath);
-    if (!propBlueprint) {
-      return seed;
-    }
-
-    seed->uniformScale = propBlueprint->Display.UniformScale;
-    seed->meshBlueprint = rules->GetMeshBlueprint(propBlueprint->Display.MeshBlueprint);
-    return seed;
-  }
-
-  /**
    * Address: 0x007D78B0 (FUN_007D78B0)
    *
    * What it does:
@@ -335,151 +163,47 @@ namespace moho
 {
   float ren_ClutterRadius = 50.0f; // 0x00F57F34 (shipped .data)
 
-  /**
-   * Address: 0x007D7E00 (FUN_007D7E00, inlined into the tail-destroy loop of
-   * `fa::vector<ClutterSurfaceElement>::erase(first,last)` --
-   * `legacy/containers/Vector.h`)
-   * Address: 0x007D7EB0 (FUN_007D7EB0, ??1Surface@Clutter@Moho@@QAE@@Z,
-   * inlined into `Surface::~Surface`'s own `mSeeds` teardown sweep, below)
-   * Address: 0x007D7920 (unnamed 22-byte register-convention fragment --
-   * see the `erase(first,last)` citation in `Vector.h` for detail)
-   *
-   * What it does:
-   * Dispatches through the element's own "poisoned" vtable slot 0 with a
-   * delete-flag of 0. No source line calls this by name at any of the
-   * addresses above -- each is the compiler inlining this one-statement
-   * method (and the destructor that forwards to it, below) at its own call
-   * site. Reduces to a runtime no-op: every live element's `vtable` is set
-   * exactly once, via `ResetClutterSeedVtable`, to `SeedVtableResetToken()`,
-   * and `SeedVtableResetTag`'s destructor is defaulted with the delete flag
-   * skipping `operator delete` -- but the call itself is real and is part of
-   * the type's actual destructor, so it must happen for binary-exact
-   * fidelity.
-   */
-  void ClutterSurfaceElement::DestroyInPlace()
-  {
-    vtable->destroy(this, 0);
-  }
-
-  /**
-   * The real destructor's body is exactly `DestroyInPlace()` above -- MSVC
-   * inlines a one-statement destructor at each call site rather than
-   * emitting a standalone symbol, so there is no separate address to cite
-   * beyond the ones already on `DestroyInPlace()`. Declaring this as a real
-   * (non-trivial) destructor, instead of leaving the type implicitly
-   * trivial, is what makes `fa::vector<ClutterSurfaceElement>`'s
-   * existing, unmodified `destroy_range`/`erase`/`clear`/`tidy` machinery
-   * (`Vector.h`) emit the per-element call `FUN_007D7E00` and `FUN_007D7EB0`
-   * both show -- previously the struct was (wrongly) trivially destructible
-   * and that machinery's `if constexpr (!is_trivially_destructible_v<T>)`
-   * guard silently skipped the call.
-   */
-  ClutterSurfaceElement::~ClutterSurfaceElement()
-  {
-    DestroyInPlace();
-  }
-
-  /**
-   * Address: 0x007D94B0 (FUN_007D94B0, inlined into the tail-shift step of
-   * `fa::vector<ClutterSurfaceElement>::erase(first,last)` --
-   * `legacy/containers/Vector.h`)
-   *
-   * What it does:
-   * Copies the three payload fields (`selectionWeight`, `uniformScale`,
-   * `meshBlueprint`) from `rhs` and deliberately leaves `vtable` untouched.
-   * Every live element's `vtable` already holds the same
-   * `SeedVtableResetToken()` value (`ResetClutterSeedVtable` sets it once;
-   * it never changes for the life of the slot), so the original source
-   * skips re-copying it on every shift-assign during an erase. Declaring
-   * this explicitly (instead of leaving the implicit memberwise copy) is
-   * what makes `erase(first,last)`'s per-element
-   * `first[i] = std::move(last[i])` shift loop produce this exact 3-field
-   * copy instead of copying all four fields -- a user-declared destructor
-   * alone already routes `erase` into that loop (it makes the type
-   * non-trivially-copyable), but without this operator the loop would fall
-   * back to the implicit, all-4-field copy-assignment.
-   */
-  ClutterSurfaceElement& ClutterSurfaceElement::operator=(
-    const ClutterSurfaceElement& rhs
+  ClutterSurfaceElement::ClutterSurfaceElement(
+    const float selectionWeight,
+    const fa::string& meshBlueprintId
   )
+    : selectionWeight(selectionWeight)
   {
-    selectionWeight = rhs.selectionWeight;
-    uniformScale = rhs.uniformScale;
-    meshBlueprint = rhs.meshBlueprint;
-    return *this;
+    RRuleGameRules* const rules = GetActiveRules();
+    if (!rules) {
+      return;
+    }
+
+    fa::string normalizedPath{};
+    gpg::STR_CopyFilename(&normalizedPath, &meshBlueprintId);
+    RPropBlueprint* const propBlueprint = rules->GetPropBlueprint(normalizedPath);
+    if (!propBlueprint) {
+      return;
+    }
+
+    uniformScale = propBlueprint->Display.UniformScale;
+    meshBlueprint = rules->GetMeshBlueprint(propBlueprint->Display.MeshBlueprint);
   }
 
   /**
    * Address: 0x007D5EE0 (FUN_007D5EE0, ??0Region@Clutter@Moho@@QAE@@Z)
    *
    * What it does:
-   * Initializes region links and key coordinates, then allocates one empty
-   * region-map list sentinel.
+   * Clears the region links and marks the key coordinates unset.
    */
   ClutterRegion::ClutterRegion()
-  {
-    vtable = kRegionVtableResetSentinel;
-    mNext = nullptr;
-    mPrev = nullptr;
-    mX = -1;
-    mZ = -1;
-  }
-
-  /**
-   * Address: 0x007D5F20 (FUN_007D5F20, ??1Region@Clutter@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Resets region runtime links/payloads, clears map-node list storage, then
-   * releases the map-list sentinel allocation.
-   */
-  ClutterRegion::~ClutterRegion()
-  {
-    vtable = kRegionVtableResetSentinel;
-    (void)ResetState();
-  }
-
-  /**
-   * Address: 0x007D5CF0 (FUN_007D5CF0, ??0Surface@Clutter@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Resets the vtable to the poison/reset token and zeroes `density`.
-   * `mSeeds` default-constructs itself via member init (empty, no
-   * allocation) -- matches the real binary exactly: `Clutter::Clutter`
-   * (`FUN_007D60D0`) constructs the 256-entry `mSurfaces` array through the
-   * compiler-emitted `` `eh vector constructor iterator' `` helper calling
-   * this constructor, rather than an explicit hand-written per-entry loop.
-   */
-  ClutterSurfaceEntry::ClutterSurfaceEntry()
-    : vtable(SurfaceVtableResetToken())
-    , density(0)
+    : mNext(nullptr)
+    , mPrev(nullptr)
+    , mX(-1)
+    , mZ(-1)
   {}
 
   /**
-   * Address: 0x007D5D10 (FUN_007D5D10)
-   * Address: 0x007D7EB0 (FUN_007D7EB0, ??1Surface@Clutter@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Resets the vtable to the poison/reset token; `mSeeds` destroys its live
-   * elements and releases its buffer through its own destructor. Confirmed
-   * against `FUN_007D7EB0`'s raw disassembly: an inline sweep calling each
-   * element's own vtable-slot-0 dispatch, then `operator delete` on the
-   * buffer, then zeroing `{first_,last_,end_}` (`myProxy_` deliberately left
-   * alone) -- exactly `ClutterSurfaceElement::~ClutterSurfaceElement()`
-   * (which forwards to `DestroyInPlace()`) run per live element by
-   * `fa::vector<ClutterSurfaceElement>`'s own `tidy()`-shaped teardown
-   * (`Vector.h`), which reduces to a runtime no-op per element since
-   * `ClutterSurfaceElement`'s poisoned vtable resets to
-   * `SeedVtableResetTag`'s trivial defaulted destructor -- see
-   * `ResetClutterSeedVtable`/`SeedVtableResetToken` above, and
-   * `ClutterSurfaceElement::DestroyInPlace`'s own citation (`Clutter.h`) for
-   * the full evidence chain. Reached via `Clutter::~Clutter`
-   * (`FUN_007D61E0`)'s compiler-emitted
-   * `` `eh vector destructor iterator' `` teardown of `mSurfaces`, rather
-   * than an explicit hand-written per-entry loop.
+   * Address: 0x007D5F20 (FUN_007D5F20, ??1Region@Clutter@Moho@@QAE@@Z)
    */
-  ClutterSurfaceEntry::~ClutterSurfaceEntry()
+  ClutterRegion::~ClutterRegion()
   {
-    vtable = SurfaceVtableResetToken();
+    ResetState();
   }
 
   /**
@@ -694,48 +418,24 @@ namespace moho
   }
 
   /**
-   * Address: 0x007D9400 (FUN_007D9400)
-   */
-  std::uint8_t ReleaseRegionListPayloads(
-    ClutterRegionList& poolBlocks,
-    const std::uint8_t passthrough
-  )
-  {
-    for (ClutterRegion* const block : poolBlocks) {
-      auto* const payload = reinterpret_cast<ClutterPayloadHeader*>(block);
-      if (!payload) {
-        continue;
-      }
-
-      auto* const refLane = reinterpret_cast<std::uint32_t*>(payload) - 1;
-      if (*refLane != 0u) {
-        payload->vtable->destroy(payload, 3);
-      } else {
-        ::operator delete[](refLane);
-      }
-    }
-
-    return passthrough;
-  }
-
-  /**
    * Address: 0x007D5F80 (FUN_007D5F80)
+   * Address: 0x007D9390 (FUN_007D9390) - the delete loop over `mMap`, each
+   *   instance through its virtual scalar deleting destructor (slot 0, flag 1).
    */
-  ClutterPayloadList* ClutterRegion::ResetState()
+  void ClutterRegion::ResetState()
   {
     mPrev = nullptr;
     mNext = nullptr;
     mZ = -1;
     mX = -1;
 
-    DestroyInstanceLane destroyLane{};
-    ResetDestroyInstanceLaneVtable(&destroyLane);
-    destroyLane.instance = nullptr;
-
-    MeshRenderer* const meshRenderer = MeshRenderer::GetInstance();
-    ApplyDestroyInstanceToRegionPayloads(mMap, destroyLane, meshRenderer);
+    // The binary fetches the mesh renderer here (it creates the singleton on
+    // first use) before deleting the instances it made.
+    (void)MeshRenderer::GetInstance();
+    for (MeshInstance* const instance : mMap) {
+      delete instance;
+    }
     mMap.clear();
-    return &mMap;
   }
 
   /**
@@ -780,10 +480,7 @@ namespace moho
       const float selectionWeight = static_cast<float>(seedObject[1].GetNumber());
 
       fa::string meshBlueprintId(meshBlueprintPath ? meshBlueprintPath : "");
-      ClutterSurfaceElement seed{};
-      (void)InitializeClutterSeedFromBlueprintPath(&seed, selectionWeight, meshBlueprintId);
-      (void)AppendSurfaceSeed(&surface, seed);
-      ResetClutterSeedVtable(&seed);
+      (void)AppendSurfaceSeed(&surface, ClutterSurfaceElement(selectionWeight, meshBlueprintId));
     }
 
     return surface;
@@ -903,7 +600,7 @@ namespace moho
     constexpr std::uint32_t kRegionPoolCount = 128u;
 
     if (mList2.empty()) {
-      ClutterRegion* const regionPool = AllocateRegionPoolBlock();
+      ClutterRegion* const regionPool = new ClutterRegion[kRegionPoolCount];
       mList1.push_back(regionPool);
 
       for (std::uint32_t index = 0; index < kRegionPoolCount; ++index) {
@@ -945,7 +642,7 @@ namespace moho
 
     UnlinkRegion(region);
 
-    (void)region->ResetState();
+    region->ResetState();
 
     mList2.push_back(region);
   }
@@ -999,9 +696,12 @@ namespace moho
 
     mList2.clear();
 
-    // Each entry is a 128-region pool block; release the blocks before the
-    // nodes that point at them.
-    (void)ReleaseRegionListPayloads(mList1, 0);
+    // Each entry is a 128-region pool block (0x007D9400: `delete[]` through
+    // vtable slot 0 with flag 3); free the blocks before the nodes that
+    // point at them.
+    for (ClutterRegion* const block : mList1) {
+      delete[] block;
+    }
     mList1.clear();
   }
 } // namespace moho

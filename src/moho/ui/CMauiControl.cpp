@@ -127,7 +127,7 @@ namespace
    * Advances one `(subtreeRoot,current)` depth-first traversal cursor lane to
    * the next control and returns the updated cursor.
    */
-  [[maybe_unused]] CMauiDepthTraversalCursor* AdvanceDepthTraversalCursor(
+  CMauiDepthTraversalCursor* AdvanceDepthTraversalCursor(
     CMauiDepthTraversalCursor* const cursor
   ) noexcept
   {

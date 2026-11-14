@@ -73,8 +73,7 @@ namespace moho
     TConVar<int> gTConVar_sim_FixProjectileMapEdgeCollision(
       "sim_FixProjectileMapEdgeCollision",
       "FA-Binary-Patches #180: a surface-colliding projectile outside the map hits the terrain extended from the "
-      "nearest map edge, instead of #154's impact below height 0 (-1 game version: no release has it yet, 0 off, 1 "
-      "on).",
+      "nearest map edge, instead of #154's impact below height 0 (-1 game version, from 3841; 0 off, 1 on).",
       &sim_FixProjectileMapEdgeCollision
     );
     TConVar<int> gTConVar_sim_FixWaterBodies(
@@ -93,15 +92,19 @@ namespace moho
 
     // Game versions from the FAForever/fa changelogs: 3836 (2026-05-16) shipped #143, #145 and
     // #157; 3840 (2026-10-20) shipped every engine patch merged since, #154, #169 and #175 among
-    // them. 3837..3839 changed only Lua. #180 was an open PR on 2026-11-06, in no release: when
-    // a release ships it, put that game version here and raise kFafGameVersionLatest.
+    // them. 3837..3839 changed only Lua. 3841 (2026-11-13) shipped #180, the one engine patch
+    // merged after 3840's exe. Without it, 3841 replays 28115815 and 28115876 give the checksum of
+    // the one client that desynced live (beat 2400, beat 6050); with it, the other eleven
+    // players' checksum. A patch no release carries yet
+    // gets kFafGameVersionUnreleased; when a release ships it, put that game version here and
+    // raise kFafGameVersionLatest.
     const std::array<SFafSimFixInfo, static_cast<std::size_t>(EFafSimFix::Count)> kFafSimFixes{{
       {"sim_FixAimLeadOncePerTick", 3836, &sim_FixAimLeadOncePerTick},
       {"sim_FixTargetPointCollisionCentre", 3836, &sim_FixTargetPointCollisionCentre},
       {"sim_FixProjectileImpactBelowZero", 3840, &sim_FixProjectileImpactBelowZero},
       {"sim_FixRefuelUndockAboveMaxHealth", 3840, &sim_FixRefuelUndockAboveMaxHealth},
       {"sim_FixShieldRepair", 3840, &sim_FixShieldRepair},
-      {"sim_FixProjectileMapEdgeCollision", kFafGameVersionUnreleased, &sim_FixProjectileMapEdgeCollision},
+      {"sim_FixProjectileMapEdgeCollision", 3841, &sim_FixProjectileMapEdgeCollision},
       {"sim_FixWaterBodies", kFafGameVersionUnreleased, &sim_FixWaterBodies},
     }};
 

@@ -14,21 +14,9 @@ namespace gpg
 
 namespace moho
 {
-  struct SimSubRes3
-  {
-    // Copied by 0x00403CB0 into SimSubRes2 history ring.
-    int32_t mValue; // +0x00
-    int32_t mReserved04;
-    gpg::core::FastVectorN<int32_t, 2> mValues; // +0x08
-  };
-  static_assert(offsetof(SimSubRes3, mValue) == 0x00, "SimSubRes3::mValue offset must be 0x00");
-  static_assert(offsetof(SimSubRes3, mReserved04) == 0x04, "SimSubRes3::mReserved04 offset must be 0x04");
-  static_assert(offsetof(SimSubRes3, mValues) == 0x08, "SimSubRes3::mValues offset must be 0x08");
-  static_assert(sizeof(SimSubRes3) == 0x20, "SimSubRes3 size must be 0x20");
-
   struct SimSubRes2
   {
-    SimSubRes3 mData[100]; // +0x0000..+0x0C7F
+    BVIntSet mData[100];   // +0x0000..+0x0C7F
     int32_t mStart;        // +0x0C80
     int32_t mEnd;          // +0x0C84
 

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <array>
 #include <deque>
 #include <set>
 #include <string>
@@ -43,9 +44,20 @@ namespace faf::editor
      * default (a layer's alpha is its specular, not its shape); `withAlpha` keeps it (a decal's alpha is its shape).
      */
     std::uint64_t Thumbnail(const std::string& path, bool withAlpha = false);
+    /** A normal map's thumbnail as a lit relief (NormalRelief) instead of its raw colours. */
+    std::uint64_t Relief(
+      const std::string& normals
+    )
+    {
+      return normals.empty() ? 0U : Thumbnail(std::string(kReliefPrefix) + normals);
+    }
+    static constexpr const char* kReliefPrefix = "relief:";
 
     /** Decodes up to `count` asked-for thumbnails; called once a frame. */
     void Pump(int count);
+
+    /** A texture's average colour (0..1 r, g, b), decoded now and kept; false when it can't be read. */
+    bool AverageColour(const std::string& path, float (&rgb)[3]);
 
     /** Thumbnails are this many pixels on a side. */
     static constexpr int kThumbnail = 64;
@@ -56,7 +68,11 @@ namespace faf::editor
     std::unordered_map<std::string, std::uint64_t> mThumbnails; // 0: asked, not decoded (or failed)
     std::deque<std::string> mWanted;
     std::set<std::string> mWithAlpha;
+    std::unordered_map<std::string, std::array<float, 3>> mAverages; // r < 0: couldn't be read
   };
+
+  /** Every `.dds` the game's files have under `folder` (its sub-folders too), sorted, each once. */
+  [[nodiscard]] std::vector<std::string> ListGameTextures(const std::string& folder);
 
   /** "grass001" from ".../grass001_albedo.dds"; "(empty)" for none. */
   std::string LayerTextureName(const std::string& path);

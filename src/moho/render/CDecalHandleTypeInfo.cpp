@@ -71,7 +71,7 @@ namespace
    * Binds `CDecalHandle` new/construct/delete/destruct callback lanes into
    * the reflected type callback slots.
    */
-  [[maybe_unused]] moho::CDecalHandleTypeInfo* BindDecalHandleTypeCallbackSlots(
+  moho::CDecalHandleTypeInfo* BindDecalHandleTypeCallbackSlots(
     moho::CDecalHandleTypeInfo* const typeInfo
   )
   {

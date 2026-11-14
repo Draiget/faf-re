@@ -22,23 +22,6 @@ namespace
   }
 
   /**
-   * Address: 0x006DFDE0 (FUN_006DFDE0)
-   *
-   * What it does:
-   * Deserializes one `vector<EntityCategorySet>` object lane through archive
-   * owner context and returns the archive instance.
-   */
-  [[maybe_unused]] gpg::ReadArchive* ReadEntityCategorySetVectorArchiveAdapter(
-    gpg::ReadArchive* const archive,
-    void* const object,
-    gpg::RRef* const ownerRef
-  )
-  {
-    archive->Read(gpg::RTypeOf<EntityCategorySetVector>(), object, *ownerRef);
-    return archive;
-  }
-
-  /**
    * Address: 0x006DBEB0 (FUN_006DBEB0)
    *
    * What it does:
@@ -50,12 +33,12 @@ namespace
    */
   void LoadEntityCategorySetVector(
     gpg::ReadArchive* archive,
-    std::intptr_t objectPtr,
+    void* objectPtr,
     int,
     gpg::RRef* ownerRef
   )
   {
-    auto* const storage = reinterpret_cast<EntityCategorySetVector*>(objectPtr);
+    auto* const storage = static_cast<EntityCategorySetVector*>(objectPtr);
     GPG_ASSERT(archive != nullptr);
     GPG_ASSERT(storage != nullptr);
     if (!archive || !storage) {
@@ -99,12 +82,12 @@ namespace
    */
   void SaveEntityCategorySetVector(
     gpg::WriteArchive* archive,
-    std::intptr_t objectPtr,
+    void* objectPtr,
     int,
     gpg::RRef* ownerRef
   )
   {
-    auto* const storage = reinterpret_cast<const EntityCategorySetVector*>(objectPtr);
+    auto* const storage = static_cast<const EntityCategorySetVector*>(objectPtr);
     GPG_ASSERT(archive != nullptr);
     GPG_ASSERT(storage != nullptr);
     if (!archive || !storage) {

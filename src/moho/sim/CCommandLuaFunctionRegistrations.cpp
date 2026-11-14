@@ -4145,7 +4145,7 @@ namespace moho
           continue;
         }
 
-        if (!categorySet->Bits().Contains(blueprint->mCategoryBitIndex)) {
+        if (!categorySet->Bits().Contains(blueprint->mBlueprintOrdinal)) {
           continue;
         }
 

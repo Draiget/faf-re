@@ -471,7 +471,7 @@ namespace
     TSerializer& serializer
   ) noexcept
   {
-    return reinterpret_cast<gpg::SerHelperBase*>(&serializer.mHelperNext);
+    return static_cast<gpg::SerHelperBase*>(&serializer.mHelperNext);
   }
 
   template <typename TSerializer>
@@ -584,7 +584,7 @@ namespace
    */
   void LoadFastVectorCPathPoint(
     gpg::ReadArchive* archive,
-    std::intptr_t objectPtr,
+    void* objectPtr,
     int,
     gpg::RRef* ownerRef
   )
@@ -593,7 +593,7 @@ namespace
       return;
     }
 
-    auto& vec = *reinterpret_cast<gpg::core::FastVectorInline<moho::CPathPoint>*>(objectPtr);
+    auto& vec = *static_cast<gpg::core::FastVectorInline<moho::CPathPoint>*>(objectPtr);
     unsigned int count = 0;
     archive->ReadUInt(&count);
 
@@ -624,7 +624,7 @@ namespace
    */
   void SaveFastVectorCPathPoint(
     gpg::WriteArchive* archive,
-    std::intptr_t objectPtr,
+    void* objectPtr,
     int,
     gpg::RRef* ownerRef
   )
@@ -633,7 +633,7 @@ namespace
       return;
     }
 
-    const auto& vec = *reinterpret_cast<const gpg::fastvector<moho::CPathPoint>*>(objectPtr);
+    const auto& vec = *static_cast<const gpg::fastvector<moho::CPathPoint>*>(objectPtr);
     const unsigned int count = static_cast<unsigned int>(vec.size());
     archive->WriteUInt(count);
 
@@ -724,7 +724,11 @@ void SCollisionInfo::MemberDeserialize(
   archive->Read(weakUnitType, &mUnit, ownerRef);
   archive->Read(vectorType, &mPos, ownerRef);
   archive->Read(collisionType, &mCollisionType, ownerRef);
-  archive->ReadUInt(reinterpret_cast<unsigned int*>(&mTickGate));
+  {
+    unsigned int value{};
+    archive->ReadUInt(&value);
+    mTickGate = static_cast<decltype(mTickGate)>(value);
+  }
 }
 
 /**
@@ -1202,7 +1206,7 @@ void CAiPathSpline::Generate(
     static_cast<int>(std::lrintf(destination.z - (static_cast<float>(footprint.mSizeZ) * 0.5f)));
   [[maybe_unused]] const int destinationCellX =
     static_cast<int>(std::lrintf(destination.x - (static_cast<float>(footprint.mSizeX) * 0.5f)));
-  [[maybe_unused]] const VAxes3 orientationAxes(unit->GetTransform().orient_);
+  const VAxes3 orientationAxes(unit->GetTransform().orient_);
 
   float deltaX = destination.x - point.mPosition.x;
   float deltaZ = destination.z - point.mPosition.z;

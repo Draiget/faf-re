@@ -73,7 +73,7 @@ namespace
     void* obj
   ) noexcept
   {
-    return reinterpret_cast<moho::IFormationInstance**>(obj);
+    return static_cast<moho::IFormationInstance**>(obj);
   }
 
   [[nodiscard]] gpg::RRef MakeIFormationInstanceRef(
@@ -174,8 +174,7 @@ namespace gpg
     }
 
     out->mType = dynamicType;
-    out->mObj =
-      reinterpret_cast<void*>(reinterpret_cast<std::uintptr_t>(value) - static_cast<std::uintptr_t>(baseOffset));
+    out->mObj = gpg::CompleteObject(value, baseOffset);
     return out;
   }
 } // namespace gpg
@@ -424,12 +423,12 @@ namespace moho
    */
   void RCountedPtrType<moho::IFormationInstance>::SerLoad(
     gpg::ReadArchive* archive,
-    std::intptr_t objectPtr,
+    void* objectPtr,
     int,
     gpg::RRef* ownerRef
   )
   {
-    auto* const slot = reinterpret_cast<moho::IFormationInstance**>(objectPtr);
+    auto* const slot = static_cast<moho::IFormationInstance**>(objectPtr);
     if (!slot) {
       return;
     }
@@ -455,12 +454,12 @@ namespace moho
    */
   void RCountedPtrType<moho::IFormationInstance>::SerSave(
     gpg::WriteArchive* archive,
-    std::intptr_t objectPtr,
+    void* objectPtr,
     int,
     gpg::RRef* ownerRef
   )
   {
-    auto* const slot = reinterpret_cast<moho::IFormationInstance**>(objectPtr);
+    auto* const slot = static_cast<moho::IFormationInstance**>(objectPtr);
     const gpg::RRef objectRef = MakeIFormationInstanceRef(slot ? *slot : nullptr);
     const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
     gpg::WriteRawPointer(archive, objectRef, gpg::TrackedPointerState::Shared, owner);

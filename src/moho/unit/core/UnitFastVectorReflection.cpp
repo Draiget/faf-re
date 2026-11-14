@@ -91,9 +91,7 @@ namespace
     const bool isDerived = dynamicType != nullptr && CachedReconBlipType() != nullptr &&
       dynamicType->IsDerivedFrom(CachedReconBlipType(), &baseOffset);
 
-    out.mObj = isDerived
-      ? reinterpret_cast<void*>(reinterpret_cast<std::uintptr_t>(blip) - static_cast<std::uintptr_t>(baseOffset))
-      : static_cast<void*>(blip);
+    out.mObj = isDerived ? gpg::CompleteObject(blip, baseOffset) : static_cast<void*>(blip);
     out.mType = dynamicType ? dynamicType : CachedReconBlipType();
     return out;
   }
@@ -150,12 +148,12 @@ namespace
    */
   void LoadFastVectorWeakPtrEntity(
     gpg::ReadArchive* const archive,
-    const std::intptr_t objectPtr,
+    void* const objectPtr,
     int,
     gpg::RRef* const ownerRef
   )
   {
-    auto& vec = *reinterpret_cast<gpg::core::FastVectorInline<moho::WeakPtr<moho::Entity>>*>(objectPtr);
+    auto& vec = *static_cast<gpg::core::FastVectorInline<moho::WeakPtr<moho::Entity>>*>(objectPtr);
 
     unsigned int count = 0;
     archive->ReadUInt(&count);
@@ -173,12 +171,12 @@ namespace
    */
   void SaveFastVectorWeakPtrEntity(
     gpg::WriteArchive* const archive,
-    const std::intptr_t objectPtr,
+    void* const objectPtr,
     int,
     gpg::RRef* const ownerRef
   )
   {
-    const auto& vec = *reinterpret_cast<const gpg::fastvector<moho::WeakPtr<moho::Entity>>*>(objectPtr);
+    const auto& vec = *static_cast<const gpg::fastvector<moho::WeakPtr<moho::Entity>>*>(objectPtr);
 
     const unsigned int count = static_cast<unsigned int>(vec.size());
     archive->WriteUInt(count);
@@ -195,7 +193,7 @@ namespace
    */
   void LoadFastVectorReconBlipPointer(
     gpg::ReadArchive* archive,
-    std::intptr_t objectPtr,
+    void* objectPtr,
     int,
     gpg::RRef* ownerRef
   )
@@ -204,7 +202,7 @@ namespace
       return;
     }
 
-    auto& vec = *reinterpret_cast<gpg::core::FastVectorInline<moho::ReconBlip*>*>(objectPtr);
+    auto& vec = *static_cast<gpg::core::FastVectorInline<moho::ReconBlip*>*>(objectPtr);
 
     unsigned int count = 0;
     archive->ReadUInt(&count);
@@ -226,7 +224,7 @@ namespace
    */
   void SaveFastVectorReconBlipPointer(
     gpg::WriteArchive* archive,
-    std::intptr_t objectPtr,
+    void* objectPtr,
     int,
     gpg::RRef* ownerRef
   )
@@ -235,7 +233,7 @@ namespace
       return;
     }
 
-    const auto& vec = *reinterpret_cast<const gpg::fastvector<moho::ReconBlip*>*>(objectPtr);
+    const auto& vec = *static_cast<const gpg::fastvector<moho::ReconBlip*>*>(objectPtr);
 
     const unsigned int count = static_cast<unsigned int>(vec.size());
     archive->WriteUInt(count);

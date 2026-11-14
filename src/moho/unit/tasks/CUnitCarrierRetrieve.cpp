@@ -493,22 +493,22 @@ namespace
 
   void DeserializeCUnitCarrierRetrieveSerializerCallback(
     gpg::ReadArchive* const archive,
-    const std::intptr_t objectPtr,
+    void* const objectPtr,
     const int,
     gpg::RRef*
   )
   {
-    reinterpret_cast<moho::CUnitCarrierRetrieve*>(objectPtr)->MemberDeserialize(archive);
+    static_cast<moho::CUnitCarrierRetrieve*>(objectPtr)->MemberDeserialize(archive);
   }
 
   void SerializeCUnitCarrierRetrieveSerializerCallback(
     gpg::WriteArchive* const archive,
-    const std::intptr_t objectPtr,
+    void* const objectPtr,
     const int,
     gpg::RRef*
   )
   {
-    reinterpret_cast<const moho::CUnitCarrierRetrieve*>(objectPtr)->MemberSerialize(archive);
+    static_cast<const moho::CUnitCarrierRetrieve*>(objectPtr)->MemberSerialize(archive);
   }
 
   CUnitCarrierRetrieveSerializerHelper::CUnitCarrierRetrieveSerializerHelper()

@@ -270,7 +270,7 @@ namespace moho
      * call). Signature matches `gpg::RType::save_func_t` since this is
      * stored directly into the reflected serializer helper's callback slot.
      */
-    static void Serialize(gpg::WriteArchive* archive, std::intptr_t objectPtr, int version, gpg::RRef* ownerRef);
+    static void Serialize(gpg::WriteArchive* archive, void* objectPtr, int version, gpg::RRef* ownerRef);
 
     /**
      * Address: 0x00566500 (FUN_00566500, Moho::SOffsetInfoSerializer::Deserialize)
@@ -282,7 +282,7 @@ namespace moho
      * call). Signature matches `gpg::RType::load_func_t` since this is
      * stored directly into the reflected serializer helper's callback slot.
      */
-    static void Deserialize(gpg::ReadArchive* archive, std::intptr_t objectPtr, int version, gpg::RRef* ownerRef);
+    static void Deserialize(gpg::ReadArchive* archive, void* objectPtr, int version, gpg::RRef* ownerRef);
   };
 
   /**
@@ -368,7 +368,7 @@ namespace moho
    * `gpg::RFastVectorType<Moho::SOffsetInfo>::Init` (FastVectorUIntReflection.cpp)
    * stores this address into `serLoadFunc_`.
    */
-  void LoadFastVectorSOffsetInfo(gpg::ReadArchive* archive, std::intptr_t objectPtr, int version, gpg::RRef* ownerRef);
+  void LoadFastVectorSOffsetInfo(gpg::ReadArchive* archive, void* objectPtr, int version, gpg::RRef* ownerRef);
 
   /**
    * Address: 0x0056DF80 (FUN_0056DF80, gpg::RFastVectorType_SOffsetInfo::SerSave)
@@ -377,7 +377,7 @@ namespace moho
    * `RIndexed`-owning `SerSave` callback body for `gpg::fastvector<SOffsetInfo>`
    * reflection. Exposed for the same reason as `LoadFastVectorSOffsetInfo`.
    */
-  void SaveFastVectorSOffsetInfo(gpg::WriteArchive* archive, std::intptr_t objectPtr, int version, gpg::RRef* ownerRef);
+  void SaveFastVectorSOffsetInfo(gpg::WriteArchive* archive, void* objectPtr, int version, gpg::RRef* ownerRef);
 
   /**
    * Address: 0x0056C1A0 (FUN_0056C1A0, gpg::RFastVectorType_SOffsetInfo::SetCount)
@@ -397,8 +397,7 @@ namespace moho
    * `gpg::RFastVectorType<Moho::SAssignedLocInfo>::Init`
    * (FastVectorUIntReflection.cpp) can store this address into `serLoadFunc_`.
    */
-  void
-  LoadFastVectorSAssignedLocInfo(gpg::ReadArchive* archive, std::intptr_t objectPtr, int version, gpg::RRef* ownerRef);
+  void LoadFastVectorSAssignedLocInfo(gpg::ReadArchive* archive, void* objectPtr, int version, gpg::RRef* ownerRef);
 
   /**
    * Address: 0x0056E0A0 (FUN_0056E0A0, gpg::RFastVectorType_SAssignedLocInfo::SerSave)
@@ -408,8 +407,7 @@ namespace moho
    * `gpg::fastvector<SAssignedLocInfo>` reflection. Exposed for the same
    * reason as `LoadFastVectorSAssignedLocInfo`.
    */
-  void
-  SaveFastVectorSAssignedLocInfo(gpg::WriteArchive* archive, std::intptr_t objectPtr, int version, gpg::RRef* ownerRef);
+  void SaveFastVectorSAssignedLocInfo(gpg::WriteArchive* archive, void* objectPtr, int version, gpg::RRef* ownerRef);
 
   /**
    * Address: 0x0056C3B0 (FUN_0056C3B0, gpg::RFastVectorType_SAssignedLocInfo::SetCount)

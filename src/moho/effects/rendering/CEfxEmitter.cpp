@@ -692,10 +692,18 @@ namespace moho
     (void)archive->ReadPointer(&mBlueprint, &blueprintOwner);
 
     archive->ReadFloat(&mTotalEmissions);
-    archive->ReadInt(reinterpret_cast<int*>(&mLife));
+    {
+      int value{};
+      archive->ReadInt(&value);
+      mLife = static_cast<decltype(mLife)>(value);
+    }
     archive->Read(gpg::RTypeOf<moho::SWorldParticle>(), &mParticle, nullOwner);
     archive->ReadBool(&mValid);
-    archive->ReadInt(reinterpret_cast<int*>(&mZCurveMask));
+    {
+      int value{};
+      archive->ReadInt(&value);
+      mZCurveMask = static_cast<decltype(mZCurveMask)>(value);
+    }
     archive->ReadInt(&mMaxLifetime);
     archive->ReadBool(&mVisible);
     archive->ReadUInt(&mLastUpdate);

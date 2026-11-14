@@ -87,12 +87,12 @@ namespace
   private:
     static void Save(
       gpg::WriteArchive* const archive,
-      const std::intptr_t object,
+      void* const object,
       int,
       gpg::RRef*
     )
     {
-      auto& point = *reinterpret_cast<ArchivePoint*>(object);
+      auto& point = *static_cast<ArchivePoint*>(object);
       archive->WriteInt(point.x);
       archive->WriteFloat(point.y);
       archive->WriteString(&point.name);
@@ -100,13 +100,13 @@ namespace
 
     static void Load(
       gpg::ReadArchive* const archive,
-      const std::intptr_t object,
+      void* const object,
       const int version,
       gpg::RRef*
     )
     {
       gLoadedVersion = version;
-      auto& point = *reinterpret_cast<ArchivePoint*>(object);
+      auto& point = *static_cast<ArchivePoint*>(object);
       archive->ReadInt(&point.x);
       archive->ReadFloat(&point.y);
       archive->ReadString(&point.name);

@@ -1,5 +1,7 @@
 #include "editor/tools/EdHeightBrush.h"
 
+#include "editor/terrain/EdErosion.h"
+
 #include <algorithm>
 #include <cmath>
 #include <type_traits>
@@ -14,6 +16,9 @@ namespace faf::editor
     constexpr float kNoiseUnitsPerSecond = 15.0f;
     // Smooth and Flatten at full strength close this share of the gap each second (capped at all of it).
     constexpr float kBlendPerSecond = 8.0f;
+    // Sharpen grows the ground's detail by this share of its difference from the blur each second at full strength:
+    // it feeds on its own result, so Smooth's rate would multiply the relief some fifty times a second.
+    constexpr float kSharpenPerSecond = 1.5f;
     constexpr float kErodeStepsPerSecond = 60.0f;
     constexpr float kWordsPerUnit = 128.0f;
     constexpr double kTwoPi = 6.283185307179586;
@@ -36,9 +41,12 @@ namespace faf::editor
       return std::clamp(turns, 2, kMaxSymmetryCopies);
     }
 
-    /** The copies of a point under `symmetry`, for samples (T int) and for the brush's centre (T float). */
+    float gCentreOffsetX = 0.0f;
+    float gCentreOffsetZ = 0.0f;
+
+    /** The copies of a point under `symmetry` about the map's middle, for samples (T int) and the brush (T float). */
     template <typename T>
-    int Copies(
+    int CopiesAboutMiddle(
       const Symmetry symmetry,
       const int turns,
       const T w,
@@ -111,6 +119,43 @@ namespace faf::editor
       return n;
     }
 
+    /** The copies about the symmetry's centre (SetSymmetryCentreOffset): moved to the middle, copied, moved back. */
+    template <typename T>
+    int Copies(
+      const Symmetry symmetry,
+      const int turns,
+      const T w,
+      const T h,
+      const T x,
+      const T z,
+      T (&outX)[kMaxSymmetryCopies],
+      T (&outZ)[kMaxSymmetryCopies]
+    )
+    {
+      if (gCentreOffsetX == 0.0f && gCentreOffsetZ == 0.0f) {
+        return CopiesAboutMiddle<T>(symmetry, turns, w, h, x, z, outX, outZ);
+      }
+      T ox = 0;
+      T oz = 0;
+      if constexpr (std::is_integral_v<T>) {
+        ox = static_cast<T>(std::lround(gCentreOffsetX));
+        oz = static_cast<T>(std::lround(gCentreOffsetZ));
+      } else {
+        ox = static_cast<T>(gCentreOffsetX);
+        oz = static_cast<T>(gCentreOffsetZ);
+      }
+      const int n = CopiesAboutMiddle<T>(symmetry, turns, w, h, x - ox, z - oz, outX, outZ);
+      for (int i = 0; i < n; ++i) {
+        outX[i] += ox;
+        outZ[i] += oz;
+        if (outX[i] < 0 || outZ[i] < 0 || outX[i] > w || outZ[i] > h) {
+          outX[i] = x;
+          outZ[i] = z;
+        }
+      }
+      return n;
+    }
+
     [[nodiscard]] float Weight(
       const float distance,
       const HeightBrush& brush
@@ -128,8 +173,125 @@ namespace faf::editor
       return 1.0f - u * u * (3.0f - 2.0f * u);
     }
 
+    // FAF Studio's smooth value noise (EdBrush.h, terrain.lua): one hashed value in -1..1 per lattice point, blended
+    // with a smoothstep between them; a function of the sample and the seed only, so a group's first member gives
+    // every member the same change and the dabs of a stroke join into continuous bumps.
+    [[nodiscard]] float LatticeNoise(
+      const int x,
+      const int z,
+      const int seed
+    )
+    {
+      const int a = (((x % 4093) + 4093) % 4093 * 1103 + 17) % 4093;
+      const int b = (((z % 4091) + 4091) % 4091 * 1999 + 31) % 4091;
+      const int c = ((seed % 4079) * 997 + 5) % 4079;
+      int n = (a * 4001 + b) % 4093;
+      n = (n * n + c) % 4093;
+      n = (n * n + a) % 4093;
+      n = (n * n + b) % 4093;
+      return static_cast<float>(n) / 4093.0f * 2.0f - 1.0f;
+    }
+
+    [[nodiscard]] float ValueNoise(
+      const int x,
+      const int z,
+      const float cell,
+      const int seed
+    )
+    {
+      const float fx = static_cast<float>(x) / cell;
+      const float fz = static_cast<float>(z) / cell;
+      const float flx = std::floor(fx);
+      const float flz = std::floor(fz);
+      float tx = fx - flx;
+      float tz = fz - flz;
+      tx = tx * tx * (3.0f - 2.0f * tx);
+      tz = tz * tz * (3.0f - 2.0f * tz);
+      const int ix = static_cast<int>(flx);
+      const int iz = static_cast<int>(flz);
+      const float top = LatticeNoise(ix, iz, seed) + (LatticeNoise(ix + 1, iz, seed) - LatticeNoise(ix, iz, seed)) * tx;
+      const float bottom =
+        LatticeNoise(ix, iz + 1, seed) + (LatticeNoise(ix + 1, iz + 1, seed) - LatticeNoise(ix, iz + 1, seed)) * tx;
+      return top + (bottom - top) * tz;
+    }
+
+    /** Up to four octaves of ValueNoise, each half the cell and `roughness` as strong, kept in -1..1. */
+    [[nodiscard]] float SmoothNoise(
+      const int x,
+      const int z,
+      const HeightBrush& brush
+    )
+    {
+      float cell = std::max(1.0f, brush.noiseScale);
+      const int octaves = std::clamp(brush.noiseOctaves, 1, 4);
+      const float rough = std::clamp(brush.noiseRoughness, 0.0f, 1.0f);
+      const int seed = static_cast<int>(brush.noiseSeed % 4079u);
+      float total = 0.0f;
+      float amp = 1.0f;
+      float norm = 0.0f;
+      for (int o = 0; o < octaves; ++o) {
+        if (o > 0 && cell < 1.0f) {
+          break;
+        }
+        total += ValueNoise(x, z, cell, seed + o * 1013) * amp;
+        norm += amp;
+        amp *= rough;
+        cell *= 0.5f;
+      }
+      return norm > 0.0f ? total / norm : 0.0f;
+    }
+
+    // FAF Studio's procedural brush shapes (brushes.lua), in doubles.
+    [[nodiscard]] double ShapeSmooth(
+      const double a,
+      const double b,
+      const double x
+    )
+    {
+      const double t = std::clamp((x - a) / (b - a), 0.0, 1.0);
+      return t * t * (3.0 - 2.0 * t);
+    }
+
+    [[nodiscard]] double ShapeHash(
+      const double ix,
+      const double iz
+    )
+    {
+      double n = std::fmod(ix * 374761393.0 + iz * 668265263.0, 2147483647.0);
+      n = std::fmod(n * 1103515245.0 + 12345.0, 2147483647.0);
+      return std::fmod(n, 65536.0) / 65535.0;
+    }
+
+    [[nodiscard]] double ShapeValueNoise(
+      const double x,
+      const double z
+    )
+    {
+      const double ix = std::floor(x);
+      const double iz = std::floor(z);
+      double fx = x - ix;
+      double fz = z - iz;
+      fx = fx * fx * (3.0 - 2.0 * fx);
+      fz = fz * fz * (3.0 - 2.0 * fz);
+      const double a = ShapeHash(ix, iz);
+      const double b = ShapeHash(ix + 1.0, iz);
+      const double c = ShapeHash(ix, iz + 1.0);
+      const double d = ShapeHash(ix + 1.0, iz + 1.0);
+      const double top = a + (b - a) * fx;
+      return top + ((c + (d - c) * fx) - top) * fz;
+    }
+
+    [[nodiscard]] double ShapeFractal(
+      const double x,
+      const double z
+    )
+    {
+      return 0.55 * ShapeValueNoise(x * 2.0, z * 2.0) + 0.3 * ShapeValueNoise(x * 4.0 + 7.0, z * 4.0 + 3.0) +
+        0.15 * ShapeValueNoise(x * 8.0 + 1.0, z * 8.0 + 11.0);
+    }
+
     /** A fixed value in [-1, 1] per sample, so Noise gives every member of a group the same change. */
-    [[nodiscard]] float SampleNoise(
+    [[maybe_unused]] [[nodiscard]] float SampleNoise(
       const int x,
       const int z
     )
@@ -180,6 +342,17 @@ namespace faf::editor
     {
       SampleRect area;
       std::vector<std::uint16_t> words;
+      /** Smooth and Sharpen: the area blurred (BlurSnapshot); empty for the other modes. */
+      std::vector<float> blurred;
+      [[nodiscard]] float Blurred(
+        const int sx,
+        const int sz
+      ) const
+      {
+        const int cx = std::clamp(sx, area.x0, area.x1);
+        const int cz = std::clamp(sz, area.z0, area.z1);
+        return blurred[static_cast<std::size_t>((cz - area.z0) * (area.x1 - area.x0 + 1) + (cx - area.x0))];
+      }
       [[nodiscard]] float At(
         const int sx,
         const int sz
@@ -191,11 +364,63 @@ namespace faf::editor
       }
     };
 
+    /** A box blur of half width `kr` over a w x h grid, the edge samples repeated (FAF Studio's BoxBlur). */
+    void BoxBlur(
+      const std::vector<float>& src,
+      const int w,
+      const int h,
+      const int kr,
+      std::vector<float>& out
+    )
+    {
+      const float n = static_cast<float>(2 * kr + 1);
+      std::vector<float> tmp(src.size());
+      out.assign(src.size(), 0.0f);
+      const auto at = [w](const int x, const int z) {
+        return static_cast<std::size_t>(z) * static_cast<std::size_t>(w) + static_cast<std::size_t>(x);
+      };
+      for (int z = 0; z < h; ++z) {
+        float sum = 0.0f;
+        for (int k = -kr; k <= kr; ++k) {
+          sum += src[at(std::clamp(k, 0, w - 1), z)];
+        }
+        for (int x = 0; x < w; ++x) {
+          tmp[at(x, z)] = sum / n;
+          sum += src[at(std::min(x + kr + 1, w - 1), z)];
+          sum -= src[at(std::max(x - kr, 0), z)];
+        }
+      }
+      for (int x = 0; x < w; ++x) {
+        float sum = 0.0f;
+        for (int k = -kr; k <= kr; ++k) {
+          sum += tmp[at(x, std::clamp(k, 0, h - 1))];
+        }
+        for (int z = 0; z < h; ++z) {
+          out[at(x, z)] = sum / n;
+          sum += tmp[at(x, std::min(z + kr + 1, h - 1))];
+          sum -= tmp[at(x, std::max(z - kr, 0))];
+        }
+      }
+    }
+
+    /**
+     * Smooth and Sharpen read the ground blurred twice with a box that widens with strength: 3 x 3 when weak, up to
+     * a quarter of the radius (at most 6 samples each way) when strong (FAF Studio's terrain.lua).
+     */
+    [[nodiscard]] int BlurHalfWidth(
+      const HeightBrush& brush
+    )
+    {
+      const float room = std::max(0.0f, std::min(brush.radius * 0.25f, 6.0f) - 1.0f);
+      return 1 + static_cast<int>(std::floor(std::clamp(brush.strength, 0.0f, 1.0f) * room + 0.5f));
+    }
+
     std::vector<Snapshot> TakeSnapshots(
       const std::uint16_t* const heights,
       const int width,
       const int height,
-      const std::vector<SampleRect>& rects
+      const std::vector<SampleRect>& rects,
+      const HeightBrush& brush
     )
     {
       std::vector<Snapshot> snapshots;
@@ -212,6 +437,15 @@ namespace faf::editor
           const std::uint16_t* const row = heights + static_cast<std::size_t>(sz) * static_cast<std::size_t>(width);
           snapshot.words.insert(snapshot.words.end(), row + snapshot.area.x0, row + snapshot.area.x1 + 1);
         }
+        if (brush.mode == HeightBrushMode::Smooth || brush.mode == HeightBrushMode::Sharpen) {
+          const int w = snapshot.area.x1 - snapshot.area.x0 + 1;
+          const int h = snapshot.area.z1 - snapshot.area.z0 + 1;
+          const int kr = BlurHalfWidth(brush);
+          std::vector<float> src(snapshot.words.begin(), snapshot.words.end());
+          std::vector<float> pass;
+          BoxBlur(src, w, h, kr, pass);
+          BoxBlur(pass, w, h, kr, snapshot.blurred);
+        }
         snapshots.push_back(std::move(snapshot));
       }
       return snapshots;
@@ -220,14 +454,19 @@ namespace faf::editor
     /** The stamp's value (0..1) at offset (dx, dz) from the brush's centre, over the brush's square; 0 outside. */
     [[nodiscard]] float StampAt(
       const HeightStamp& stamp,
-      const float dx,
-      const float dz,
-      const float radius
+      const float rawDx,
+      const float rawDz,
+      const float radius,
+      const float turnDegrees = 0.0f
     )
     {
       if (stamp.width < 2 || stamp.height < 2 || radius <= 0.0f) {
         return 0.0f;
       }
+      // Turned with the stamp: the offset read in the picture's own frame.
+      const double angle = static_cast<double>(turnDegrees) * (kTwoPi / 360.0);
+      const float dx = static_cast<float>(rawDx * std::cos(angle) + rawDz * std::sin(angle));
+      const float dz = static_cast<float>(-rawDx * std::sin(angle) + rawDz * std::cos(angle));
       const float u = (dx / radius * 0.5f + 0.5f) * static_cast<float>(stamp.width - 1);
       const float v = (dz / radius * 0.5f + 0.5f) * static_cast<float>(stamp.height - 1);
       if (u < 0.0f || v < 0.0f || u > static_cast<float>(stamp.width - 1) || v > static_cast<float>(stamp.height - 1)) {
@@ -291,19 +530,19 @@ namespace faf::editor
         return current + weight * strength * kRaiseUnitsPerSecond * kWordsPerUnit * seconds;
       case HeightBrushMode::Lower:
         return current - weight * strength * kRaiseUnitsPerSecond * kWordsPerUnit * seconds;
-      case HeightBrushMode::Smooth: {
-        float sum = 0.0f;
-        for (int dz = -1; dz <= 1; ++dz) {
-          for (int dx = -1; dx <= 1; ++dx) {
-            sum += snapshot.At(sx + dx, sz + dz);
-          }
-        }
-        return current + (sum / 9.0f - current) * blend * weight;
-      }
+      case HeightBrushMode::Smooth:
+        return current + (snapshot.Blurred(sx, sz) - current) * blend * weight;
+      case HeightBrushMode::Sharpen:
+        return current -
+          (snapshot.Blurred(sx, sz) - current) * std::min(1.0f, strength * kSharpenPerSecond * seconds) * weight;
+      case HeightBrushMode::Plateau:
+        // To the level in one go where the brush is full at strength 0.5 and more; the falloff shapes the shoulder.
+        return current + (brush.flattenTo - current) * std::min(1.0f, 2.0f * strength * weight);
       case HeightBrushMode::Flatten:
         return current + (brush.flattenTo - current) * blend * weight;
       case HeightBrushMode::Noise:
-        return current + SampleNoise(sx, sz) * weight * strength * kNoiseUnitsPerSecond * kWordsPerUnit * seconds;
+        return current +
+          SmoothNoise(sx, sz, brush) * weight * strength * kNoiseUnitsPerSecond * kWordsPerUnit * seconds;
       case HeightBrushMode::SetHeight:
         return current + (brush.setTo - current) * blend * weight;
       case HeightBrushMode::Terrace: {
@@ -320,7 +559,28 @@ namespace faf::editor
         if (brush.stamp == nullptr) {
           return current;
         }
-        return current + StampAt(*brush.stamp, dx, dz, brush.radius) * brush.stampHeight * strength * weight;
+        {
+          // The stamp's value here (0..1), turned; `weight` is its edge (the brush's falloff, or its shape).
+          const float m = StampAt(*brush.stamp, dx, dz, brush.radius, brush.stampTurn);
+          const float k = strength * weight;
+          switch (brush.stampMode) {
+          case StampMode::Add:
+            return current + m * brush.stampHeight * k;
+          case StampMode::Subtract:
+            return current - m * brush.stampHeight * k;
+          case StampMode::Max: {
+            const float target = brush.stampBase + m * brush.stampHeight;
+            return target > current ? current + (target - current) * k : current;
+          }
+          case StampMode::Min: {
+            const float target = brush.stampBase - m * brush.stampHeight;
+            return target < current ? current + (target - current) * k : current;
+          }
+          case StampMode::Replace:
+            return current + (brush.stampBase + m * brush.stampHeight - current) * k;
+          }
+          return current;
+        }
       case HeightBrushMode::Erode: {
         // Each of the 8 neighbours: the part of the difference over the talus slope at its distance, towards it. A
         // sixteenth of each (half of a pair's excess, shared by 8 neighbours) keeps a step from overshooting.
@@ -345,7 +605,9 @@ namespace faf::editor
         return current + change * 0.0625f * steps * weight;
       }
       case HeightBrushMode::WaterErode:
-        return current; // simulated over the whole area at once (ApplyWater), not sample by sample
+      case HeightBrushMode::Rain:
+      case HeightBrushMode::Deposit:
+        return current; // simulated over the whole area at once (ApplyErosion), not sample by sample
       }
       return current;
     }
@@ -379,6 +641,97 @@ namespace faf::editor
         weight = std::max(weight, w);
       }
       return weight;
+    }
+
+    /** The brush's weight at offset (dx, dz) from its centre in its own frame: its shape, turned, cut at the radius. */
+    [[nodiscard]] float ShapeWeight(
+      const HeightBrush& brush,
+      const float dx,
+      const float dz
+    )
+    {
+      const float distance = std::hypot(dx, dz);
+      if (brush.shape == BrushShape::Round) {
+        return Weight(distance, brush);
+      }
+      if (distance >= brush.radius) {
+        return 0.0f;
+      }
+      const double angle = static_cast<double>(brush.shapeAngle) * (kTwoPi / 360.0);
+      const double c = std::cos(angle);
+      const double s = std::sin(angle);
+      const double u = (dx * c + dz * s) / brush.radius;
+      const double v = (-dx * s + dz * c) / brush.radius;
+      if (std::abs(u) > 1.0 || std::abs(v) > 1.0) {
+        return 0.0f;
+      }
+      if (brush.shape == BrushShape::Image) {
+        return brush.shapeImage != nullptr
+          ? std::clamp(brush.shapeImage->Sample(static_cast<float>(u), static_cast<float>(v)), 0.0f, 1.0f)
+          : Weight(distance, brush);
+      }
+      return std::clamp(BrushShapeAt(brush.shape, static_cast<float>(u), static_cast<float>(v)), 0.0f, 1.0f);
+    }
+
+    /** Shapes and stamps aren't round: they are read in the cursor copy's frame (CursorFrameWeight). */
+    [[nodiscard]] bool ReadsCursorFrame(
+      const HeightBrush& brush
+    )
+    {
+      return brush.shape != BrushShape::Round || brush.mode == HeightBrushMode::Stamp;
+    }
+
+    /**
+     * A shaped brush's (or a stamp's) weight for a sample's group and the offset it was read at, in the frame of the
+     * cursor's copy (centre 0): copy k at a sample reads the cursor's dab at the sample taken back through copy k's
+     * symmetry, which is one of the group's members (mirrors and half or quarter turns), or, for N-way turns, the
+     * sample's offset from centre k turned back by k turns. The strongest wins, as for the round brush, so a stroke
+     * across a mirror line doesn't apply twice, and every copy is the mirror or turned image of the cursor's dab.
+     */
+    [[nodiscard]] float CursorFrameWeight(
+      const int sx,
+      const int sz,
+      const Symmetry symmetry,
+      const int width,
+      const int height,
+      const float (&centreX)[kMaxSymmetryCopies],
+      const float (&centreZ)[kMaxSymmetryCopies],
+      const int centres,
+      const HeightBrush& brush,
+      float& outDx,
+      float& outDz
+    )
+    {
+      float best = 0.0f;
+      outDx = static_cast<float>(sx) - centreX[0];
+      outDz = static_cast<float>(sz) - centreZ[0];
+      const auto consider = [&](const float dx, const float dz) {
+        const float w = ShapeWeight(brush, dx, dz);
+        if (w > best) {
+          best = w;
+          outDx = dx;
+          outDz = dz;
+        }
+      };
+      if (symmetry == Symmetry::NWay) {
+        for (int c = 0; c < centres; ++c) {
+          const double angle = -kTwoPi * c / centres;
+          const double dx = static_cast<double>(sx) - centreX[c];
+          const double dz = static_cast<double>(sz) - centreZ[c];
+          consider(
+            static_cast<float>(dx * std::cos(angle) - dz * std::sin(angle)),
+            static_cast<float>(dx * std::sin(angle) + dz * std::cos(angle))
+          );
+        }
+        return best;
+      }
+      int memberX[kMaxSymmetryCopies];
+      int memberZ[kMaxSymmetryCopies];
+      const int members = Copies<int>(symmetry, brush.turns, width - 1, height - 1, sx, sz, memberX, memberZ);
+      for (int m = 0; m < members; ++m) {
+        consider(static_cast<float>(memberX[m]) - centreX[0], static_cast<float>(memberZ[m]) - centreZ[0]);
+      }
+      return best;
     }
 
     /** True if the sample is within `reach` of a centre. */
@@ -607,6 +960,223 @@ namespace faf::editor
       }
     }
 
+    namespace erosion = faf::editor::field::erosion;
+
+    // The erosion brushes' settings (FAF Studio's erosionbrush.lua Values). Studio puts down a dab every so often
+    // along a stroke; here a step lasts a frame, so a dab's rounds of droplets and its deposit follow the step's time
+    // as if 15 dabs a second were put down.
+    constexpr double kErosionDabsPerSecond = 15.0;
+    constexpr double kErosionRoundsPerDab = 4.0;
+    constexpr double kDepositPerDab = 0.5; // game units at the centre
+
+    [[nodiscard]] int ErosionModeOf(
+      const HeightBrushMode mode
+    )
+    {
+      return mode == HeightBrushMode::Rain ? 1 : (mode == HeightBrushMode::Deposit ? 2 : 0);
+    }
+
+    /** How far from its centre an erosion step can write: the brush, Rain's reach past it, and the window's rim. */
+    [[nodiscard]] float ErosionReach(
+      const HeightBrush& brush
+    )
+    {
+      const double radius = std::max(1.0, static_cast<double>(brush.radius));
+      return static_cast<float>(radius + erosion::BrushDefaultMargin(ErosionModeOf(brush.mode), radius) + 2.0);
+    }
+
+    [[nodiscard]] erosion::HydroParams ErosionParams(
+      const HeightBrush& brush
+    )
+    {
+      erosion::HydroParams p;
+      p.rain = 0.006f;
+      p.evaporation = 0.02f;
+      p.capacity = 1.0f;
+      p.erosion = 0.2f;
+      p.deposition = 0.1f;
+      p.inertia = 0.3f;
+      p.conserve = 0.7f;
+      p.thermal = 0.15f;
+      p.talus = 0.8f;
+      p.vary = 0.5f;
+      p.vary_scale = 24.0f;
+      p.track = false;
+      p.seed = brush.seed;
+      return p;
+    }
+  } // namespace
+
+  float BrushWeightAt(
+    const HeightBrush& brush,
+    const float dx,
+    const float dz
+  )
+  {
+    return ShapeWeight(brush, dx, dz);
+  }
+
+  const char* BrushShapeName(
+    const BrushShape shape
+  )
+  {
+    static const char* const kNames[kBrushShapeCount] = {
+      "Round", "Square", "Diamond", "Cone", "Plateau", "Ring", "Ridge", "Mountain", "Rocks", "Bump"
+    };
+    if (shape == BrushShape::Image) {
+      return "Image";
+    }
+    const int i = static_cast<int>(shape);
+    return i >= 0 && i < kBrushShapeCount ? kNames[i] : "Round";
+  }
+
+  float BrushShapeAt(
+    const BrushShape shape,
+    const float uf,
+    const float vf
+  )
+  {
+    const double u = uf;
+    const double v = vf;
+    const double d = std::sqrt(u * u + v * v);
+    switch (shape) {
+    case BrushShape::Round:
+      return d < 1.0 ? 1.0f : 0.0f;
+    case BrushShape::Square:
+      return static_cast<float>(ShapeSmooth(1.0, 0.85, std::max(std::abs(u), std::abs(v))));
+    case BrushShape::Diamond:
+      return static_cast<float>(ShapeSmooth(1.0, 0.8, std::abs(u) + std::abs(v)));
+    case BrushShape::Cone:
+      return static_cast<float>(std::max(0.0, 1.0 - d));
+    case BrushShape::Plateau:
+      return static_cast<float>(ShapeSmooth(1.0, 0.7, d));
+    case BrushShape::Ring:
+      return static_cast<float>(ShapeSmooth(0.45, 0.7, d) * ShapeSmooth(1.0, 0.85, d));
+    case BrushShape::Ridge:
+      return static_cast<float>(ShapeSmooth(1.0, 0.85, std::abs(u)) * ShapeSmooth(0.35, 0.0, std::abs(v)));
+    case BrushShape::Mountain:
+      return static_cast<float>(std::min(1.0, std::max(0.0, 1.0 - d) * (0.35 + 1.3 * ShapeFractal(u + 3.7, v + 1.9))));
+    case BrushShape::Rocks:
+      return d >= 1.0
+        ? 0.0f
+        : static_cast<float>(ShapeSmooth(0.5, 0.62, ShapeValueNoise(u * 3.0 + 11.0, v * 3.0 + 5.0)) * (1.0 - d));
+    case BrushShape::Bump:
+      return d >= 1.0 ? 0.0f : static_cast<float>(0.5 * (1.0 + std::cos(3.14159265358979 * d)));
+    case BrushShape::Image:
+      return 0.0f; // its grid is the brush's (ShapeGrid)
+    }
+    return 0.0f;
+  }
+
+  class ErosionStroke
+  {
+  public:
+    erosion::ErodeSession session;
+  };
+
+  void ErosionStrokeDelete::operator()(
+    ErosionStroke* const stroke
+  ) const noexcept
+  {
+    delete stroke;
+  }
+
+  ErosionStrokePtr MakeErosionStroke()
+  {
+    return ErosionStrokePtr(new ErosionStroke);
+  }
+
+  namespace
+  {
+    /**
+     * Rain and Deposit: one dab of the erosion session on the cursor's copy (centred on cx, cz), then
+     * every sample it changed written to every member of its symmetry group, and the session told what was written.
+     * A change the limits turn down is put back in the session too.
+     */
+    void ApplyErosion(
+      std::uint16_t* const heights,
+      const int width,
+      const int height,
+      const float cx,
+      const float cz,
+      const Symmetry symmetry,
+      const HeightBrush& brush,
+      const float seconds,
+      ErosionStroke* const stroke
+    )
+    {
+      ErosionStroke own;
+      ErosionStroke& state = stroke != nullptr ? *stroke : own;
+      if (!state.session.Active()) {
+        state.session.Begin(width, height, heights, ErosionParams(brush));
+      }
+      const double strength = std::clamp(static_cast<double>(brush.strength), 0.0, 1.0);
+      const double dabs = static_cast<double>(seconds) * kErosionDabsPerSecond;
+      erosion::BrushDab dab;
+      dab.cx = cx;
+      dab.cz = cz;
+      dab.radius = brush.radius;
+      dab.falloff = brush.falloff;
+      dab.mode = ErosionModeOf(brush.mode);
+      dab.iterations = std::clamp(static_cast<int>(std::lround(strength * kErosionRoundsPerDab * dabs)), 1, 60);
+      dab.strength = 1.0;
+      dab.amount = kDepositPerDab * strength * dabs;
+      int x0 = 0;
+      int z0 = 0;
+      int x1 = 0;
+      int z1 = 0;
+      std::vector<std::uint16_t> words;
+      if (!state.session.Dab(dab, x0, z0, x1, z1, words)) {
+        return;
+      }
+      const int windowW = x1 - x0 + 1;
+      const auto at = [&](const int x, const int z) -> std::uint16_t& {
+        return heights[static_cast<std::size_t>(z) * static_cast<std::size_t>(width) + static_cast<std::size_t>(x)];
+      };
+      // The heights before this step, for the limits (the window plus a sample around it for the slope).
+      const auto before = [&](const int x, const int z) {
+        return static_cast<float>(at(std::clamp(x, 0, width - 1), std::clamp(z, 0, height - 1)));
+      };
+      std::vector<std::uint16_t> original(words.size());
+      for (int z = z0; z <= z1; ++z) {
+        for (int x = x0; x <= x1; ++x) {
+          original
+            [static_cast<std::size_t>(z - z0) * static_cast<std::size_t>(windowW) + static_cast<std::size_t>(x - x0)] =
+              at(x, z);
+        }
+      }
+      for (int z = z0; z <= z1; ++z) {
+        for (int x = x0; x <= x1; ++x) {
+          const std::size_t i =
+            static_cast<std::size_t>(z - z0) * static_cast<std::size_t>(windowW) + static_cast<std::size_t>(x - x0);
+          const std::uint16_t word = words[i];
+          if (word == original[i]) {
+            continue;
+          }
+          const float was = static_cast<float>(original[i]);
+          bool allowed = !brush.limitHeight || (was >= brush.limitLow && was <= brush.limitHigh);
+          if (allowed && brush.limitSlope) {
+            const float sx = (before(x + 1, z) - before(x - 1, z)) * 0.5f / kWordsPerUnit;
+            const float sz = (before(x, z + 1) - before(x, z - 1)) * 0.5f / kWordsPerUnit;
+            allowed = std::hypot(sx, sz) <= brush.limitMaxSlope;
+          }
+          if (!allowed) {
+            state.session.Store(x, z, original[i]);
+            continue;
+          }
+          int memberX[kMaxSymmetryCopies];
+          int memberZ[kMaxSymmetryCopies];
+          const int members = Copies<int>(symmetry, brush.turns, width - 1, height - 1, x, z, memberX, memberZ);
+          for (int m = 0; m < members; ++m) {
+            at(memberX[m], memberZ[m]) = word;
+            if (memberX[m] != x || memberZ[m] != z) {
+              state.session.Store(memberX[m], memberZ[m], word);
+            }
+          }
+        }
+      }
+    }
+
     /** N-way turns: see ApplyHeightBrush. */
     void ApplyTurned(
       std::uint16_t* const heights,
@@ -621,7 +1191,7 @@ namespace faf::editor
     )
     {
       // The first sector, painted with the brush from the heights before the step.
-      const std::vector<Snapshot> snapshots = TakeSnapshots(heights, width, height, rects);
+      const std::vector<Snapshot> snapshots = TakeSnapshots(heights, width, height, rects, brush);
       for (std::size_t r = 0; r < rects.size(); ++r) {
         const SampleRect& rect = rects[r];
         for (int sz = rect.z0; sz <= rect.z1; ++sz) {
@@ -630,19 +1200,20 @@ namespace faf::editor
               continue;
             }
             int nearest = 0;
-            const float weight = StrongestWeight(sx, sz, centreX, centreZ, centres, brush, &nearest);
+            float dx = 0.0f;
+            float dz = 0.0f;
+            float weight = 0.0f;
+            if (ReadsCursorFrame(brush)) {
+              weight =
+                CursorFrameWeight(sx, sz, Symmetry::NWay, width, height, centreX, centreZ, centres, brush, dx, dz);
+            } else {
+              weight = StrongestWeight(sx, sz, centreX, centreZ, centres, brush, &nearest);
+              dx = static_cast<float>(sx) - centreX[nearest];
+              dz = static_cast<float>(sz) - centreZ[nearest];
+            }
             if (weight > 0.0f && WithinLimits(snapshots[r], sx, sz, brush)) {
               heights[static_cast<std::size_t>(sz) * static_cast<std::size_t>(width) + static_cast<std::size_t>(sx)] =
-                ToWord(BrushedHeight(
-                  snapshots[r],
-                  sx,
-                  sz,
-                  weight,
-                  brush,
-                  seconds,
-                  static_cast<float>(sx) - centreX[nearest],
-                  static_cast<float>(sz) - centreZ[nearest]
-                ));
+                ToWord(BrushedHeight(snapshots[r], sx, sz, weight, brush, seconds, dx, dz));
             }
           }
         }
@@ -762,6 +1333,25 @@ namespace faf::editor
     return true;
   }
 
+  void SetSymmetryCentreOffset(
+    const float x,
+    const float z
+  ) noexcept
+  {
+    gCentreOffsetX = x;
+    gCentreOffsetZ = z;
+  }
+
+  float SymmetryCentreOffsetX() noexcept
+  {
+    return gCentreOffsetX;
+  }
+
+  float SymmetryCentreOffsetZ() noexcept
+  {
+    return gCentreOffsetZ;
+  }
+
   Symmetry EffectiveSymmetry(
     const Symmetry symmetry,
     const int width,
@@ -823,7 +1413,8 @@ namespace faf::editor
     float centreZ[kMaxSymmetryCopies];
     const int centres = HeightBrushCentres(width, height, x, z, brush.symmetry, brush.turns, centreX, centreZ);
     const bool turned = EffectiveSymmetry(brush.symmetry, width, height) == Symmetry::NWay;
-    return RectsAround(width, height, centreX, centreZ, centres, brush.radius + (turned ? kTurnRim : 0.0f));
+    const float reach = IsErosionMode(brush.mode) ? ErosionReach(brush) : brush.radius;
+    return RectsAround(width, height, centreX, centreZ, centres, reach + (turned ? kTurnRim : 0.0f));
   }
 
   std::vector<SampleRect> ApplyHeightBrush(
@@ -833,7 +1424,8 @@ namespace faf::editor
     const float x,
     const float z,
     const HeightBrush& brush,
-    const float seconds
+    const float seconds,
+    ErosionStroke* const stroke
   )
   {
     if (heights == nullptr || width < 2 || height < 2 || brush.radius <= 0.0f || seconds <= 0.0f) {
@@ -845,13 +1437,19 @@ namespace faf::editor
     float centreX[kMaxSymmetryCopies];
     float centreZ[kMaxSymmetryCopies];
     const int centres = HeightBrushCentres(width, height, x, z, symmetry, brush.turns, centreX, centreZ);
-    const std::vector<SampleRect> rects = RectsAround(
-      width, height, centreX, centreZ, centres, brush.radius + (symmetry == Symmetry::NWay ? kTurnRim : 0.0f)
-    );
+    const float reach = IsErosionMode(brush.mode) ? ErosionReach(brush) : brush.radius;
+    const std::vector<SampleRect> rects =
+      RectsAround(width, height, centreX, centreZ, centres, reach + (symmetry == Symmetry::NWay ? kTurnRim : 0.0f));
+    // Simulated around the cursor's copy; its changes written to every symmetric copy.
     if (brush.mode == HeightBrushMode::WaterErode) {
-      // Simulated around the cursor's copy; its changes written to every symmetric copy.
       if (!rects.empty()) {
         ApplyWater(heights, width, height, rects.front(), centreX[0], centreZ[0], symmetry, brush, seconds);
+      }
+      return rects;
+    }
+    if (IsErosionMode(brush.mode)) {
+      if (!rects.empty()) {
+        ApplyErosion(heights, width, height, centreX[0], centreZ[0], symmetry, brush, seconds, stroke);
       }
       return rects;
     }
@@ -861,7 +1459,7 @@ namespace faf::editor
     }
 
     // Smooth reads its neighbours as they were before this step.
-    const std::vector<Snapshot> snapshots = TakeSnapshots(heights, width, height, rects);
+    const std::vector<Snapshot> snapshots = TakeSnapshots(heights, width, height, rects, brush);
     for (std::size_t r = 0; r < rects.size(); ++r) {
       const SampleRect& rect = rects[r];
       for (int sz = rect.z0; sz <= rect.z1; ++sz) {
@@ -878,20 +1476,20 @@ namespace faf::editor
             continue;
           }
           int nearest = 0;
-          const float weight = StrongestWeight(sx, sz, centreX, centreZ, centres, brush, &nearest);
+          float dx = 0.0f;
+          float dz = 0.0f;
+          float weight = 0.0f;
+          if (ReadsCursorFrame(brush)) {
+            weight = CursorFrameWeight(sx, sz, symmetry, width, height, centreX, centreZ, centres, brush, dx, dz);
+          } else {
+            weight = StrongestWeight(sx, sz, centreX, centreZ, centres, brush, &nearest);
+            dx = static_cast<float>(sx) - centreX[nearest];
+            dz = static_cast<float>(sz) - centreZ[nearest];
+          }
           if (weight <= 0.0f || !WithinLimits(snapshots[r], sx, sz, brush)) {
             continue;
           }
-          const std::uint16_t word = ToWord(BrushedHeight(
-            snapshots[r],
-            sx,
-            sz,
-            weight,
-            brush,
-            seconds,
-            static_cast<float>(sx) - centreX[nearest],
-            static_cast<float>(sz) - centreZ[nearest]
-          ));
+          const std::uint16_t word = ToWord(BrushedHeight(snapshots[r], sx, sz, weight, brush, seconds, dx, dz));
           for (int m = 0; m < members; ++m) {
             heights
               [static_cast<std::size_t>(memberZ[m]) * static_cast<std::size_t>(width) +

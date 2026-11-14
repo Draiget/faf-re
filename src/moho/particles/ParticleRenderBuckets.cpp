@@ -82,32 +82,6 @@ namespace
   }
 
   /**
-   * Address: 0x004987C0 (FUN_004987C0, sub_4987C0)
-   *
-   * What it does:
-   * Recreates one vertex-sheet slot from device resources with fixed stream
-   * usage token `1`, releasing the replaced sheet when the pointer changes.
-   */
-  [[maybe_unused]] moho::ID3DVertexSheet* RecreateVertexSheetWithUsageTokenOne(
-    moho::ID3DVertexSheet*& vertexSheet,
-    moho::CD3DVertexFormat* const vertexFormat,
-    const std::int32_t streamFrequencyToken
-  )
-  {
-    moho::CD3DDevice* const device = moho::D3D_GetDevice();
-    moho::ID3DDeviceResources* const resources = device->GetResources();
-    moho::ID3DVertexSheet* const newSheet = resources->NewVertexSheet(1U, streamFrequencyToken, vertexFormat);
-
-    moho::ID3DVertexSheet* const oldSheet = vertexSheet;
-    if (newSheet != oldSheet && oldSheet != nullptr) {
-      delete oldSheet;
-    }
-
-    vertexSheet = newSheet;
-    return vertexSheet;
-  }
-
-  /**
    * Address: 0x00496750 (FUN_00496750, sub_496750)
    *
    * What it does:
@@ -268,21 +242,6 @@ namespace
     emit(1U, trail.mEndPos, negatedEndTangent, trail.mEndAge, trail.mTexCoordEnd, 1.0f);
     emit(2U, trail.mEndPos, endTangent, trail.mEndAge, trail.mTexCoordEnd, 0.0f);
     emit(3U, trail.mStartPos, startTangent, trail.mStartAge, trail.mTexCoordStart, 0.0f);
-  }
-
-  /**
-   * Address: 0x00497C70 (FUN_00497C70, sub_497C70)
-   *
-   * What it does:
-   * Writes one pointer-sized value to caller output storage.
-   */
-  [[maybe_unused]] const void** WritePointerToOutputSlot(
-    const void** const outPointer,
-    const void* const value
-  ) noexcept
-  {
-    *outPointer = value;
-    return outPointer;
   }
 
 } // namespace

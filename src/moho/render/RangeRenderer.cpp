@@ -44,7 +44,7 @@
 #include "moho/sim/CWldSession.h"
 #include "moho/sim/SFootprint.h"
 #include "moho/sim/UserArmy.h"
-#include "moho/sim/VisibilityRect.h"
+#include "gpg/core/containers/Rect2.h"
 #include "moho/unit/core/IUnit.h"
 #include "moho/unit/core/UserUnit.h"
 
@@ -954,10 +954,10 @@ namespace
       return;
     }
 
-    moho::VisibilityRect playableRect{};
+    gpg::Rect2i playableRect{};
     (void)terrainRes->GetPlayableMapRect(playableRect);
-    const std::int32_t widthSpan = playableRect.maxX - playableRect.minX;
-    const std::int32_t heightSpan = playableRect.maxZ - playableRect.minZ;
+    const std::int32_t widthSpan = playableRect.x1 - playableRect.x0;
+    const std::int32_t heightSpan = playableRect.z1 - playableRect.z0;
     const float playableMapSpan = static_cast<float>(widthSpan < heightSpan ? heightSpan : widthSpan);
 
     auto* const device = gpg::gal::Device::GetInstance();

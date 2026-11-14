@@ -1,5 +1,13 @@
 #include "editor/EdLog.h"
 
+#include <cstring>
+#include "editor/ui/EdControls.h"
+#include "editor/ui/EdUiScale.h"
+
+#include <algorithm>
+
+#include <cstdio>
+
 #include "imgui.h"
 
 namespace faf::editor
@@ -33,6 +41,44 @@ namespace faf::editor
     mTimesFile = std::fopen(path.c_str(), "w");
   }
 
+  std::vector<std::string> EdLog::Warnings() const
+  {
+    const std::lock_guard<std::mutex> lock(mMutex);
+    std::vector<std::string> out;
+    for (const Line& line : mLines) {
+      if (line.level == gpg::LogSeverity::Warn) {
+        out.push_back(line.text);
+      }
+    }
+    return out;
+  }
+
+  std::vector<std::string> EdLog::Tail(
+    const std::size_t count
+  ) const
+  {
+    const std::lock_guard<std::mutex> lock(mMutex);
+    std::vector<std::string> out;
+    const std::size_t first = mLines.size() > count ? mLines.size() - count : 0;
+    for (std::size_t i = first; i < mLines.size(); ++i) {
+      const Line& line = mLines[i];
+      const char* const level = line.level == gpg::LogSeverity::Warn ? "warning"
+        : line.level == gpg::LogSeverity::Info                       ? "info"
+                                                                     : "debug";
+      char head[48];
+      (void)std::snprintf(head, sizeof(head), "%9.2f %s: ", line.seconds, level);
+      out.push_back(head + line.text);
+    }
+    return out;
+  }
+
+  void EdLog::SetFilter(
+    const std::string& text
+  )
+  {
+    (void)std::snprintf(mFilter, sizeof(mFilter), "%s", text.c_str());
+  }
+
   void EdLog::OnMessage(
     const gpg::LogSeverity level,
     const fa::string& message,
@@ -44,6 +90,12 @@ namespace faf::editor
     (void)previousDepth;
     const double seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - mStart).count();
     const std::lock_guard<std::mutex> lock(mMutex);
+    // The Run panel's state line, once a second during a test play: kept apart, not shown.
+    static constexpr char kLive[] = "EDMISSION live ";
+    if (std::strncmp(message.c_str(), kLive, sizeof(kLive) - 1) == 0) {
+      mMissionLive = message.c_str() + sizeof(kLive) - 1;
+      return;
+    }
     mLines.push_back(Line{level, std::string(message.c_str()), seconds});
     if (mTimesFile != nullptr) {
       std::fprintf(mTimesFile, "%9.3f %s\n", seconds, message.c_str());
@@ -51,6 +103,10 @@ namespace faf::editor
     }
     if (mLines.size() > kMaxLines) {
       mLines.pop_front();
+    }
+    static constexpr char kTrace[] = "EDMISSION trace ";
+    if (std::strncmp(message.c_str(), kTrace, sizeof(kTrace) - 1) == 0 && mMissionTrace.size() < 5000) {
+      mMissionTrace.emplace_back(message.c_str() + sizeof(kTrace) - 1);
     }
     if (level == gpg::LogSeverity::Warn) {
       ++mWarnings;
@@ -82,27 +138,54 @@ namespace faf::editor
 
   void EdLog::Draw()
   {
-    ImGui::SetNextItemWidth(-270.0f);
+    // The filter takes what the controls after it leave (at least 12 em); they wrap when the panel is narrower.
+    const float spacing = ImGui::GetStyle().ItemSpacing.x;
+    const float controls = CheckboxWidth("Info") + CheckboxWidth("Warnings") + CheckboxWidth("Debug") +
+      ButtonWidth("Copy") + CheckboxWidth("Times") + CheckboxWidth("Follow") + ButtonWidth("Clear") + spacing * 7.0f;
+    ImGui::SetNextItemWidth(std::max(Em(12.0f), ImGui::GetContentRegionAvail().x - controls));
     ImGui::InputTextWithHint("##filter", "Filter", mFilter, sizeof(mFilter));
-    ImGui::SameLine();
+    SameLineIfFits(CheckboxWidth("Info"));
+    ImGui::Checkbox("Info", &mShowInfo);
+    SameLineIfFits(CheckboxWidth("Warnings"));
+    ImGui::Checkbox("Warnings", &mShowWarnings);
+    SameLineIfFits(CheckboxWidth("Debug"));
+    ImGui::Checkbox("Debug", &mShowDebug);
+    SameLineIfFits(ButtonWidth("Copy"));
+    if (ImGui::Button("Copy")) {
+      // The lines shown (filter and levels), as text.
+      const std::lock_guard<std::mutex> lock(mMutex);
+      std::string text;
+      for (const Line& line : mLines) {
+        if (Shown(line)) {
+          text += line.text + "\n";
+        }
+      }
+      ImGui::SetClipboardText(text.c_str());
+    }
+    if (ImGui::IsItemHovered()) {
+      EdSetTooltip("The lines shown, to the clipboard");
+    }
+    SameLineIfFits(CheckboxWidth("Times"));
     ImGui::Checkbox("Times", &mShowTimes);
     if (ImGui::IsItemHovered()) {
-      ImGui::SetTooltip("Each line's time, in seconds since the editor started");
+      EdSetTooltip("Each line's time, in seconds since the editor started");
     }
-    ImGui::SameLine();
+    SameLineIfFits(CheckboxWidth("Follow"));
     ImGui::Checkbox("Follow", &mAutoScroll);
-    ImGui::SameLine();
+    SameLineIfFits(ButtonWidth("Clear"));
     if (ImGui::Button("Clear")) {
       const std::lock_guard<std::mutex> lock(mMutex);
       mLines.clear();
     }
     ImGui::Separator();
 
-    if (ImGui::BeginChild("##lines", ImVec2(0.0f, 0.0f), ImGuiChildFlags_None, ImGuiWindowFlags_HorizontalScrollbar)) {
+    const float footer = ImGui::GetFrameHeightWithSpacing();
+    if (
+      ImGui::BeginChild("##lines", ImVec2(0.0f, -footer), ImGuiChildFlags_None, ImGuiWindowFlags_HorizontalScrollbar)
+    ) {
       const std::lock_guard<std::mutex> lock(mMutex);
-      const bool filtered = mFilter[0] != '\0';
       for (const Line& line : mLines) {
-        if (filtered && line.text.find(mFilter) == std::string::npos) {
+        if (!Shown(line)) {
           continue;
         }
         if (mShowTimes) {
@@ -122,5 +205,90 @@ namespace faf::editor
       }
     }
     ImGui::EndChild();
+    // The console line: Enter runs it, Up and Down walk the history.
+    ImGui::SetNextItemWidth(-1.0f);
+    if (
+      ImGui::InputTextWithHint(
+        "##console",
+        "Lua (=expr prints it; sim <code> runs in the sim; con <command> the engine's console)",
+        mCommand,
+        sizeof(mCommand),
+        ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_CallbackHistory,
+        &EdLog::HistoryCallback,
+        this
+      )
+    ) {
+      std::string line = mCommand;
+      if (!line.empty()) {
+        mCommands.push_back(line);
+        if (mHistory.empty() || mHistory.back() != line) {
+          mHistory.push_back(line);
+          if (mHistory.size() > 50) {
+            mHistory.erase(mHistory.begin());
+          }
+        }
+      }
+      mCommand[0] = '\0';
+      mHistoryAt = -1;
+      ImGui::SetKeyboardFocusHere(-1); // stays in the line for the next one
+    }
+  }
+
+  int EdLog::HistoryCallback(
+    ImGuiInputTextCallbackData* const data
+  )
+  {
+    auto* const log = static_cast<EdLog*>(data->UserData);
+    if (log == nullptr || log->mHistory.empty()) {
+      return 0;
+    }
+    const int count = static_cast<int>(log->mHistory.size());
+    if (data->EventKey == ImGuiKey_UpArrow) {
+      log->mHistoryAt = log->mHistoryAt < 0 ? count - 1 : std::max(0, log->mHistoryAt - 1);
+    } else if (data->EventKey == ImGuiKey_DownArrow) {
+      log->mHistoryAt = log->mHistoryAt < 0 || log->mHistoryAt + 1 >= count ? -1 : log->mHistoryAt + 1;
+    }
+    data->DeleteChars(0, data->BufTextLen);
+    if (log->mHistoryAt >= 0) {
+      data->InsertChars(0, log->mHistory[static_cast<std::size_t>(log->mHistoryAt)].c_str());
+    }
+    return 0;
+  }
+  bool EdLog::Shown(
+    const Line& line
+  ) const
+  {
+    if (mFilter[0] != '\0' && line.text.find(mFilter) == std::string::npos) {
+      return false;
+    }
+    switch (line.level) {
+    case gpg::LogSeverity::Warn:
+      return mShowWarnings;
+    case gpg::LogSeverity::Debug:
+      return mShowDebug;
+    default:
+      return mShowInfo;
+    }
+  }
+
+  bool EdLog::TakeMissionLive(
+    std::string& out
+  )
+  {
+    const std::lock_guard<std::mutex> lock(mMutex);
+    if (mMissionLive.empty()) {
+      return false;
+    }
+    out.swap(mMissionLive);
+    mMissionLive.clear();
+    return true;
+  }
+
+  std::vector<std::string> EdLog::TakeMissionTrace()
+  {
+    const std::lock_guard<std::mutex> lock(mMutex);
+    std::vector<std::string> out;
+    out.swap(mMissionTrace);
+    return out;
   }
 } // namespace faf::editor

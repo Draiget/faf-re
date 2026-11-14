@@ -34,12 +34,12 @@ namespace
    */
   void LoadSBlackListInfoVector(
     gpg::ReadArchive* const archive,
-    const std::intptr_t objectPtr,
+    void* const objectPtr,
     int,
     gpg::RRef*
   )
   {
-    auto& storage = *reinterpret_cast<fa::vector<moho::SBlackListInfo>*>(objectPtr);
+    auto& storage = *static_cast<fa::vector<moho::SBlackListInfo>*>(objectPtr);
 
     unsigned int count = 0;
     archive->ReadUInt(&count);
@@ -65,12 +65,12 @@ namespace
    */
   void SaveSBlackListInfoVector(
     gpg::WriteArchive* const archive,
-    const std::intptr_t objectPtr,
+    void* const objectPtr,
     int,
     gpg::RRef* const ownerRef
   )
   {
-    const auto& storage = *reinterpret_cast<const fa::vector<moho::SBlackListInfo>*>(objectPtr);
+    const auto& storage = *static_cast<const fa::vector<moho::SBlackListInfo>*>(objectPtr);
     const unsigned int count = static_cast<unsigned int>(storage.size());
     archive->WriteUInt(count);
     for (unsigned int i = 0; i < count; ++i) {

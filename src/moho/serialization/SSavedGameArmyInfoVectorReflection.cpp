@@ -46,22 +46,6 @@ namespace
   }
 
   /**
-   * Address: 0x00882650 (FUN_00882650, sub_882650)
-   *
-   * What it does:
-   * Releases backing storage for one saved-game-army-info vector lane and
-   * resets begin/end/capacity pointers to null.
-   */
-  [[maybe_unused]] void ReleaseSavedGameArmyInfoVectorStorage(
-    fa::vector<moho::SSavedGameArmyInfo>& storage
-  )
-  {
-    // Per-element destructor sweep, free, then null all three lanes: VC8
-    // _Tidy(), which is what move-assigning an empty vector compiles to.
-    storage = fa::vector<moho::SSavedGameArmyInfo>{};
-  }
-
-  /**
    * Address: 0x008826C0 (FUN_008826C0)
    *
    * What it does:
@@ -70,12 +54,12 @@ namespace
    */
   void LoadSavedGameArmyInfoVector(
     gpg::ReadArchive* archive,
-    std::intptr_t objectPtr,
+    void* objectPtr,
     int,
     gpg::RRef*
   )
   {
-    auto* const storage = reinterpret_cast<fa::vector<moho::SSavedGameArmyInfo>*>(objectPtr);
+    auto* const storage = static_cast<fa::vector<moho::SSavedGameArmyInfo>*>(objectPtr);
     GPG_ASSERT(archive != nullptr);
     GPG_ASSERT(storage != nullptr);
     if (!archive || !storage) {
@@ -129,12 +113,12 @@ namespace
    */
   void SaveSavedGameArmyInfoVector(
     gpg::WriteArchive* archive,
-    std::intptr_t objectPtr,
+    void* objectPtr,
     int,
     gpg::RRef* ownerRef
   )
   {
-    auto* const storage = reinterpret_cast<fa::vector<moho::SSavedGameArmyInfo>*>(objectPtr);
+    auto* const storage = static_cast<fa::vector<moho::SSavedGameArmyInfo>*>(objectPtr);
     GPG_ASSERT(archive != nullptr);
     GPG_ASSERT(storage != nullptr);
     if (!archive || !storage) {

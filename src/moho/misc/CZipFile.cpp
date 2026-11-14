@@ -220,16 +220,14 @@ namespace
     (void)stream.Seek(gpg::Stream::OriginBegin, static_cast<std::int64_t>(entry.mLocalHeaderOffset));
 
     moho::SZipLocalFileHeader localHeader{};
-    const std::size_t signatureRead =
-      stream.Read(reinterpret_cast<char*>(&localHeader.mSignature), sizeof(localHeader.mSignature));
+    const std::size_t signatureRead = stream.Read(&localHeader.mSignature, sizeof(localHeader.mSignature));
     if (signatureRead != sizeof(localHeader.mSignature) || localHeader.mSignature != kZipLocalFileHeaderMagic) {
       entry.mLocalHeaderOffset = kInvalidZipOffset;
       return false;
     }
 
-    const std::size_t tailRead = stream.Read(
-      reinterpret_cast<char*>(&localHeader.mVersionNeeded), sizeof(localHeader) - sizeof(localHeader.mSignature)
-    );
+    const std::size_t tailRead =
+      stream.Read(&localHeader.mVersionNeeded, sizeof(localHeader) - sizeof(localHeader.mSignature));
     if (tailRead != sizeof(localHeader) - sizeof(localHeader.mSignature)) {
       entry.mLocalHeaderOffset = kInvalidZipOffset;
       return false;

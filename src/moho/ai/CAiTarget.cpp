@@ -528,7 +528,7 @@ void CAiTarget::UpdateTargetIsMobile(
   // 0x005E2880..0x005E28E1: the MOBILE set is looked up and bit-tested with
   // no further guards; an index outside the set's words stores false.
   const EntityCategorySet* const mobileRange = sim->mRules->GetEntityCategory("MOBILE");
-  targetIsMobile = mobileRange->ContainsBit(entity->BluePrint->mCategoryBitIndex);
+  targetIsMobile = mobileRange->ContainsBit(entity->BluePrint->mBlueprintOrdinal);
 }
 
 /**

@@ -448,8 +448,7 @@ namespace
       return {};
     }
 
-    const auto* const baseBlueprint = reinterpret_cast<const moho::RBlueprint*>(blueprint);
-    return baseBlueprint->GetLuaBlueprint(state);
+    return blueprint->GetLuaBlueprint(state);
   }
 
   [[nodiscard]] const char* ResolveEntityBlueprintName(
@@ -461,8 +460,8 @@ namespace
     }
 
     const moho::REntityBlueprint* const blueprint = entity->BluePrint;
-    if (!blueprint->mBlueprintLabel.empty()) {
-      return blueprint->mBlueprintLabel.c_str();
+    if (!blueprint->mDescription.empty()) {
+      return blueprint->mDescription.c_str();
     }
     if (!blueprint->mBlueprintId.empty()) {
       return blueprint->mBlueprintId.c_str();

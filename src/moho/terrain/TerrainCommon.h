@@ -343,4 +343,11 @@ namespace moho
 
   static_assert(offsetof(TerrainCommon, mDecalMask) == 0x04, "TerrainCommon::mDecalMask offset must be 0x04");
   static_assert(sizeof(TerrainCommon) == 0x0C, "TerrainCommon size must be 0x0C");
+  /**
+   * Engine addition, not in the shipped binary: whether the heights moved since `terrain` last asked
+   * (HeightFieldRevision), the first ask answering yes. The binary's UpdateRenderContext takes edit mode
+   * (IsInEditMode, the editor) as "the heights may have changed" and rebuilds the mesh and the decal list
+   * every frame (3 ms a frame on a 20 km map); this lets it rebuild only when they did.
+   */
+  [[nodiscard]] bool TerrainHeightsMoved(const void* terrain);
 } // namespace moho

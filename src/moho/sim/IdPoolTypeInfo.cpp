@@ -120,7 +120,7 @@ namespace moho
     void* const objectStorage
   )
   {
-    auto* const object = reinterpret_cast<IdPool*>(objectStorage);
+    auto* const object = static_cast<IdPool*>(objectStorage);
     if (object) {
       new (object) IdPool();
     }
@@ -134,7 +134,7 @@ namespace moho
     void* const objectStorage
   )
   {
-    auto* const object = reinterpret_cast<IdPool*>(objectStorage);
+    auto* const object = static_cast<IdPool*>(objectStorage);
     if (!object) {
       return;
     }
@@ -150,7 +150,7 @@ namespace moho
     void* const objectStorage
   )
   {
-    auto* const object = reinterpret_cast<IdPool*>(objectStorage);
+    auto* const object = static_cast<IdPool*>(objectStorage);
     if (!object) {
       return;
     }

@@ -15,7 +15,7 @@ func TestRoundTrip(t *testing.T) {
 		New("JoinGame", "127.0.0.1:14081", "Bravo", 2),
 		New("GameState", "Idle"),
 		New("JsonStats", big),
-		New("SendNatPacket", "1.2.3.4:5", Data{0, 1, 2, 255}),
+		New("SendNatPacket", "203.0.113.4:5", Data{0, 1, 2, 255}),
 		New("Empty"),
 	}
 	var buf bytes.Buffer

@@ -89,7 +89,7 @@ namespace moho
    * Writes reciprocal lanes for one source vector (`1/x`, `1/y`, `1/z`) into
    * `out`.
    */
-  [[maybe_unused]] [[nodiscard]] Wm3::Vec3f* ReciprocalVectorLanes(
+  [[nodiscard]] Wm3::Vec3f* ReciprocalVectorLanes(
     Wm3::Vec3f* const out,
     const Wm3::Vec3f* const source
   ) noexcept
@@ -107,7 +107,7 @@ namespace moho
    * Initializes one body lane with identity/default runtime values and binds
    * the owning constants pointer.
    */
-  [[maybe_unused]] [[nodiscard]] SPhysBody* InitializeSPhysBodyDefaults(
+  [[nodiscard]] SPhysBody* InitializeSPhysBodyDefaults(
     SPhysBody* const body,
     SPhysConstants* const constants
   ) noexcept
@@ -143,7 +143,7 @@ namespace moho
    * Applies mass/inertia/collision-offset lanes from one params payload into a
    * body lane and recomputes inverse inertia tensor lanes.
    */
-  [[maybe_unused]] [[nodiscard]] const SPhysBodyParams* ApplySPhysBodyParamsToBody(
+  [[nodiscard]] const SPhysBodyParams* ApplySPhysBodyParamsToBody(
     const SPhysBodyParams* const params,
     SPhysBody* const body
   ) noexcept
@@ -457,7 +457,7 @@ namespace moho
    * Clears reflected base/field vector lanes for one `SPhysBodyTypeInfo`
    * instance while preserving outer storage ownership.
    */
-  [[maybe_unused]] void DestroySPhysBodyTypeInfoBody(
+  void DestroySPhysBodyTypeInfoBody(
     SPhysBodyTypeInfo* const typeInfo
   ) noexcept
   {

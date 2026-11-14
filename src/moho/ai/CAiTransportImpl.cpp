@@ -190,7 +190,7 @@ namespace
       return false;
     }
 
-    return category->ContainsBit(static_cast<std::uint32_t>(blueprint->mCategoryBitIndex));
+    return category->ContainsBit(static_cast<std::uint32_t>(blueprint->mBlueprintOrdinal));
   }
 
   template <class TObject>
@@ -1127,7 +1127,7 @@ bool CAiTransportImpl::TransportValidateType(
     return false;
   }
 
-  const std::uint32_t ordinal = static_cast<std::uint32_t>(unitBlueprint->mCategoryBitIndex);
+  const std::uint32_t ordinal = static_cast<std::uint32_t>(unitBlueprint->mBlueprintOrdinal);
   const auto it = category->FindWord(ordinal >> 5u);
   if (it == category->WordEnd()) {
     return false;

@@ -260,22 +260,6 @@ namespace
     return vector->size();
   }
 
-  template <class TObject>
-  [[nodiscard]] TObject* PointerFromArchiveInt(
-    const std::intptr_t objectPtr
-  )
-  {
-    return reinterpret_cast<TObject*>(objectPtr);
-  }
-
-  template <class TObject>
-  [[nodiscard]] const TObject* ConstPointerFromArchiveInt(
-    const std::intptr_t objectPtr
-  )
-  {
-    return reinterpret_cast<const TObject*>(objectPtr);
-  }
-
   [[nodiscard]] float DecayThreatLane(
     const float value,
     const float decay
@@ -318,27 +302,6 @@ namespace
     return owner->mVarDat.mAllies.Contains(static_cast<std::uint32_t>(source->mConstDat.mArmyIndex));
   }
 
-  /**
-   * Address: 0x0071CA70 (FUN_0071CA70)
-   *
-   * IDA signature:
-   * void __usercall sub_71CA70(const void *word@<eax>, Moho::Sim *sim@<ecx>);
-   *
-   * What it does:
-   * Folds one 32-bit word into the sim's desync checksum: `add ecx, 0x50`
-   * lands on `Sim::mContext` (the MD5 context right after `mIsDesyncFree` at
-   * +0x4C), then `MD5Context::Update(word, 4)` -- the same
-   * `sim->mContext.Update(&value, sizeof(float))` step `CInfluenceMap::Update`
-   * performs per entry.
-   */
-  [[maybe_unused]] void UpdateSimChecksumWord(
-    const void* const word,
-    moho::Sim* const sim
-  )
-  {
-    sim->mContext.Update(word, 4u);
-  }
-
   [[nodiscard]] gpg::RType* CachedUIntType()
   {
     static gpg::RType* type = nullptr;
@@ -367,176 +330,6 @@ namespace
   }
 
   /**
-   * Address: 0x0071D220 (FUN_0071D220)
-   *
-   * What it does:
-   * Loads one reflected `InfluenceGrid` payload through cached RTTI lookup and
-   * returns the archive pointer for chaining.
-   */
-  gpg::ReadArchive* ReadInfluenceGridArchiveAndReturnArchive(
-    gpg::ReadArchive* const archive,
-    void* const objectPtr,
-    gpg::RRef* const ownerRef
-  )
-  {
-    if (archive != nullptr) {
-      const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-      if (gpg::RType* const type = gpg::CachedLookup<moho::InfluenceGrid>(moho::InfluenceGrid::sType)) {
-        archive->Read(type, objectPtr, owner);
-      }
-    }
-
-    return archive;
-  }
-
-  /**
-   * Address: 0x0071D290 (FUN_0071D290)
-   *
-   * What it does:
-   * Saves one reflected `InfluenceGrid` payload through cached RTTI lookup and
-   * returns the archive pointer for chaining.
-   */
-  gpg::WriteArchive* WriteInfluenceGridArchiveAndReturnArchive(
-    gpg::WriteArchive* const archive,
-    void* const objectPtr,
-    const gpg::RRef* const ownerRef
-  )
-  {
-    if (archive != nullptr) {
-      const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-      if (gpg::RType* const type = gpg::CachedLookup<moho::InfluenceGrid>(moho::InfluenceGrid::sType)) {
-        archive->Write(type, objectPtr, owner);
-      }
-    }
-
-    return archive;
-  }
-
-  /**
-   * Address: 0x0071D2D0 (FUN_0071D2D0)
-   *
-   * What it does:
-   * Loads one reflected `InfluenceMapEntry` payload through cached RTTI lookup
-   * and returns the archive pointer for chaining.
-   */
-  [[maybe_unused]] gpg::ReadArchive* ReadInfluenceMapEntryArchiveAndReturnArchive(
-    gpg::ReadArchive* const archive,
-    void* const objectPtr,
-    gpg::RRef* const ownerRef
-  )
-  {
-    if (archive != nullptr) {
-      const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-      if (gpg::RType* const type = gpg::CachedLookup<moho::InfluenceMapEntry>(moho::InfluenceMapEntry::sType)) {
-        archive->Read(type, objectPtr, owner);
-      }
-    }
-
-    return archive;
-  }
-
-  /**
-   * Address: 0x0071D310 (FUN_0071D310)
-   *
-   * What it does:
-   * Saves one reflected `InfluenceMapEntry` payload through cached RTTI lookup
-   * and returns the archive pointer for chaining.
-   */
-  [[maybe_unused]] gpg::WriteArchive* WriteInfluenceMapEntryArchiveAndReturnArchive(
-    gpg::WriteArchive* const archive,
-    void* const objectPtr,
-    const gpg::RRef* const ownerRef
-  )
-  {
-    if (archive != nullptr) {
-      const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-      if (gpg::RType* const type = gpg::CachedLookup<moho::InfluenceMapEntry>(moho::InfluenceMapEntry::sType)) {
-        archive->Write(type, objectPtr, owner);
-      }
-    }
-
-    return archive;
-  }
-
-  /**
-   * Address: 0x0071D350 (FUN_0071D350)
-   *
-   * What it does:
-   * Loads one reflected `SThreat` payload through cached RTTI lookup and
-   * returns the archive pointer for chaining.
-   */
-  [[maybe_unused]] gpg::ReadArchive* ReadSThreatArchiveAndReturnArchive(
-    gpg::ReadArchive* const archive,
-    void* const objectPtr,
-    gpg::RRef* const ownerRef
-  )
-  {
-    if (archive != nullptr) {
-      const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-      if (gpg::RType* const type = gpg::CachedLookup<moho::SThreat>(moho::SThreat::sType)) {
-        archive->Read(type, objectPtr, owner);
-      }
-    }
-
-    return archive;
-  }
-
-  /**
-   * Address: 0x0071D3C0 (FUN_0071D3C0)
-   *
-   * What it does:
-   * Saves one reflected `SThreat` payload through cached RTTI lookup and
-   * returns the archive pointer for chaining.
-   */
-  [[maybe_unused]] gpg::WriteArchive* WriteSThreatArchiveAndReturnArchive(
-    gpg::WriteArchive* const archive,
-    void* const objectPtr,
-    const gpg::RRef* const ownerRef
-  )
-  {
-    if (archive != nullptr) {
-      const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-      if (gpg::RType* const type = gpg::CachedLookup<moho::SThreat>(moho::SThreat::sType)) {
-        archive->Write(type, objectPtr, owner);
-      }
-    }
-
-    return archive;
-  }
-
-  /**
-   * Address: 0x0071DB20 (FUN_0071DB20)
-   *
-   * What it does:
-   * Read-callback bridge that loads one reflected `InfluenceGrid` payload
-   * through cached RTTI lookup.
-   */
-  [[maybe_unused]] void ReadInfluenceGridArchiveCallback(
-    gpg::ReadArchive* const archive,
-    void* const objectPtr,
-    gpg::RRef* const ownerRef
-  )
-  {
-    (void)ReadInfluenceGridArchiveAndReturnArchive(archive, objectPtr, ownerRef);
-  }
-
-  /**
-   * Address: 0x0071DB50 (FUN_0071DB50)
-   *
-   * What it does:
-   * Write-callback bridge that saves one reflected `InfluenceGrid` payload
-   * through cached RTTI lookup.
-   */
-  [[maybe_unused]] void WriteInfluenceGridArchiveCallback(
-    gpg::WriteArchive* const archive,
-    void* const objectPtr,
-    const gpg::RRef* const ownerRef
-  )
-  {
-    (void)WriteInfluenceGridArchiveAndReturnArchive(archive, objectPtr, ownerRef);
-  }
-
-  /**
    * Address: 0x0071A220 (FUN_0071A220)
    *
    * What it does:
@@ -544,12 +337,12 @@ namespace
    */
   void LoadUIntIntMap(
     gpg::ReadArchive* const archive,
-    const std::intptr_t objectPtr,
+    void* const objectPtr,
     const int,
     gpg::RRef*
   )
   {
-    auto* const mapObject = PointerFromArchiveInt<UIntIntMap>(objectPtr);
+    auto* const mapObject = static_cast<UIntIntMap*>(objectPtr);
     GPG_ASSERT(archive != nullptr);
     GPG_ASSERT(mapObject != nullptr);
     if (!archive || !mapObject) {
@@ -577,12 +370,12 @@ namespace
    */
   void SaveUIntIntMap(
     gpg::WriteArchive* const archive,
-    const std::intptr_t objectPtr,
+    void* const objectPtr,
     const int,
     gpg::RRef*
   )
   {
-    const auto* const mapObject = ConstPointerFromArchiveInt<UIntIntMap>(objectPtr);
+    const auto* const mapObject = static_cast<const UIntIntMap*>(objectPtr);
     GPG_ASSERT(archive != nullptr);
     GPG_ASSERT(mapObject != nullptr);
     if (!archive || !mapObject) {
@@ -604,12 +397,12 @@ namespace
    */
   void LoadUIntInfluenceMapEntryMap(
     gpg::ReadArchive* const archive,
-    const std::intptr_t objectPtr,
+    void* const objectPtr,
     const int,
     gpg::RRef* const ownerRef
   )
   {
-    auto* const mapObject = PointerFromArchiveInt<UIntInfluenceMapEntryMap>(objectPtr);
+    auto* const mapObject = static_cast<UIntInfluenceMapEntryMap*>(objectPtr);
     GPG_ASSERT(archive != nullptr);
     GPG_ASSERT(mapObject != nullptr);
     if (!archive || !mapObject) {
@@ -644,12 +437,12 @@ namespace
    */
   void SaveUIntInfluenceMapEntryMap(
     gpg::WriteArchive* const archive,
-    const std::intptr_t objectPtr,
+    void* const objectPtr,
     const int,
     gpg::RRef* const ownerRef
   )
   {
-    const auto* const mapObject = ConstPointerFromArchiveInt<UIntInfluenceMapEntryMap>(objectPtr);
+    const auto* const mapObject = static_cast<const UIntInfluenceMapEntryMap*>(objectPtr);
     GPG_ASSERT(archive != nullptr);
     GPG_ASSERT(mapObject != nullptr);
     if (!archive || !mapObject) {
@@ -706,12 +499,12 @@ namespace
    */
   void LoadInfluenceGridVectorArchive(
     gpg::ReadArchive* const archive,
-    const std::intptr_t objectPtr,
+    void* const objectPtr,
     const int,
     gpg::RRef*
   )
   {
-    auto* const vectorObject = PointerFromArchiveInt<InfluenceGridVector>(objectPtr);
+    auto* const vectorObject = static_cast<InfluenceGridVector*>(objectPtr);
     GPG_ASSERT(archive != nullptr);
     GPG_ASSERT(vectorObject != nullptr);
     if (!archive || !vectorObject) {
@@ -753,12 +546,12 @@ namespace
    */
   void SaveInfluenceGridVectorArchive(
     gpg::WriteArchive* const archive,
-    const std::intptr_t objectPtr,
+    void* const objectPtr,
     const int,
     gpg::RRef* const ownerRef
   )
   {
-    const auto* const vectorObject = ConstPointerFromArchiveInt<InfluenceGridVector>(objectPtr);
+    const auto* const vectorObject = static_cast<const InfluenceGridVector*>(objectPtr);
     GPG_ASSERT(archive != nullptr);
     if (!archive) {
       return;
@@ -803,12 +596,12 @@ namespace
    */
   void LoadSThreatVectorArchive(
     gpg::ReadArchive* const archive,
-    const std::intptr_t objectPtr,
+    void* const objectPtr,
     const int,
     gpg::RRef* const
   )
   {
-    auto* const vectorObject = PointerFromArchiveInt<SThreatVector>(objectPtr);
+    auto* const vectorObject = static_cast<SThreatVector*>(objectPtr);
     GPG_ASSERT(archive != nullptr);
     GPG_ASSERT(vectorObject != nullptr);
     if (!archive || !vectorObject) {
@@ -839,12 +632,12 @@ namespace
 
   void SaveSThreatVectorArchive(
     gpg::WriteArchive* const archive,
-    const std::intptr_t objectPtr,
+    void* const objectPtr,
     const int,
     gpg::RRef* const ownerRef
   )
   {
-    const auto* const vectorObject = ConstPointerFromArchiveInt<SThreatVector>(objectPtr);
+    const auto* const vectorObject = static_cast<const SThreatVector*>(objectPtr);
     GPG_ASSERT(archive != nullptr);
     if (!archive) {
       return;
@@ -901,27 +694,6 @@ namespace
     }
 
     return it;
-  }
-
-  /**
-   * Address: 0x00716110 (FUN_00716110)
-   *
-   * What it does:
-   * Adapts one linear cell index into `(x, z)` and forwards to
-   * `CInfluenceMap::GetThreatRect`.
-   */
-  [[maybe_unused]] float GetThreatRectByLinearCellIndex(
-    const moho::CInfluenceMap* const influenceMap,
-    const int linearIndex,
-    const int radius,
-    const bool onMap,
-    const moho::EThreatType threatType,
-    const int armyIndex
-  )
-  {
-    const int x = linearIndex % influenceMap->mWidth;
-    const int z = linearIndex / influenceMap->mWidth;
-    return influenceMap->GetThreatRect(x, z, radius, onMap, threatType, armyIndex);
   }
 
 } // namespace
@@ -1655,42 +1427,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x0071D4B0 (FUN_0071D4B0, func_NewArray_SThreat)
-   *
-   * What it does:
-   * Allocates contiguous storage for `count` `SThreat` elements with the same
-   * overflow guard semantics as the original VC8 array-allocation helper.
-   */
-  [[maybe_unused]] static SThreat* func_NewArray_SThreat(
-    const unsigned int count
-  )
-  {
-    if (count != 0u && (0xFFFFFFFFu / count) < sizeof(SThreat)) {
-      throw std::bad_alloc{};
-    }
-
-    return static_cast<SThreat*>(::operator new(sizeof(SThreat) * static_cast<std::size_t>(count)));
-  }
-
-  /**
-   * Address: 0x0071D5E0 (FUN_0071D5E0, func_NewArray_InfluenceMap)
-   *
-   * What it does:
-   * Allocates contiguous storage for `count` `InfluenceGrid` elements with the
-   * same overflow guard semantics as the original VC8 array-allocation helper.
-   */
-  [[maybe_unused]] static InfluenceGrid* func_NewArray_InfluenceMap(
-    const unsigned int count
-  )
-  {
-    if (count != 0u && (0xFFFFFFFFu / count) < sizeof(InfluenceGrid)) {
-      throw std::bad_alloc{};
-    }
-
-    return static_cast<InfluenceGrid*>(::operator new(sizeof(InfluenceGrid) * static_cast<std::size_t>(count)));
-  }
-
-  /**
    * Address: 0x00715750 (FUN_00715750, ?GetThreat@InfluenceGrid@Moho@@QBEMW4EThreatType@2@H@Z)
    */
   float InfluenceGrid::GetThreat(
@@ -2244,7 +1980,7 @@ namespace moho
           if (!entry.sourceBlueprint->IsMobile()) {
             // 0x007167F8..0x00716841: a mex adds to +0x04 only; any other
             // structure adds to +0x08 first, then +0x04.
-            if (IsInCategory(massExtractorCategory, entry.sourceBlueprint->mCategoryBitIndex)) {
+            if (IsInCategory(massExtractorCategory, entry.sourceBlueprint->mBlueprintOrdinal)) {
               armyThreat.influenceStructures += total;
             } else {
               armyThreat.influenceStructuresNotMex += total;
@@ -2265,13 +2001,13 @@ namespace moho
           }
 
           if (entry.isDetailed != 0u) {
-            if (IsInCategory(experimentalCategory, entry.sourceBlueprint->mCategoryBitIndex)) {
+            if (IsInCategory(experimentalCategory, entry.sourceBlueprint->mBlueprintOrdinal)) {
               armyThreat.experimentalInfluence += total;
             }
-            if (IsInCategory(commandCategory, entry.sourceBlueprint->mCategoryBitIndex)) {
+            if (IsInCategory(commandCategory, entry.sourceBlueprint->mBlueprintOrdinal)) {
               armyThreat.commanderInfluence += total;
             }
-            if (IsInCategory(artilleryCategory, entry.sourceBlueprint->mCategoryBitIndex)) {
+            if (IsInCategory(artilleryCategory, entry.sourceBlueprint->mBlueprintOrdinal)) {
               armyThreat.artilleryInfluence += total;
             }
 

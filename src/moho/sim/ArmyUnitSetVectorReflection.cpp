@@ -133,12 +133,12 @@ void gpg::RVectorType<moho::EntitySetTemplate<moho::Unit>>::Init()
 
 void gpg::RVectorType<moho::EntitySetTemplate<moho::Unit>>::SerLoad(
   ReadArchive* const archive,
-  const std::intptr_t objectPtr,
+  void* const objectPtr,
   const int,
   RRef* const
 )
 {
-  auto* const storage = reinterpret_cast<EntitySetVector*>(objectPtr);
+  auto* const storage = static_cast<EntitySetVector*>(objectPtr);
   unsigned int count = 0;
   archive->ReadUInt(&count);
 
@@ -155,12 +155,12 @@ void gpg::RVectorType<moho::EntitySetTemplate<moho::Unit>>::SerLoad(
 
 void gpg::RVectorType<moho::EntitySetTemplate<moho::Unit>>::SerSave(
   WriteArchive* const archive,
-  const std::intptr_t objectPtr,
+  void* const objectPtr,
   const int,
   RRef* const ownerRef
 )
 {
-  const auto* const storage = reinterpret_cast<const EntitySetVector*>(objectPtr);
+  const auto* const storage = static_cast<const EntitySetVector*>(objectPtr);
   archive->WriteUInt(static_cast<unsigned int>(storage->size()));
   for (const auto& element : *storage) {
     archive->Write(gpg::RTypeOf<moho::EntitySetTemplate<moho::Unit>>(), &element, *ownerRef);

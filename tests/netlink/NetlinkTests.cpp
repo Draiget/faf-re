@@ -48,11 +48,11 @@ namespace
     EXPECT_TRUE(ok) << what;
   }
 
-  // From docs/launcher-adapter-contract/trace-2p.jsonl: the shipped adapter's
-  // onIceMsg payload (one candidate kept).
+  // The shipped adapter's onIceMsg payload as it writes it (one candidate kept, the address
+  // moved to the documentation range).
   constexpr const char* kJavaMessage =
     R"({"srcId":101,"destId":102,"password":"6cmvb8d7e03sma550p6dtta5vn","ufrag":"eb31i1k68fj1m5",)"
-    R"("candidates":[{"foundation":"1","protocol":"udp","priority":2130706431,"ip":"192.168.42.77","port":6271,)"
+    R"("candidates":[{"foundation":"1","protocol":"udp","priority":2130706431,"ip":"192.0.2.77","port":6271,)"
     R"("type":"HOST_CANDIDATE","generation":0,"id":"0","relAddr":null,"relPort":0}]})";
 
   void UnitTests()
@@ -97,16 +97,16 @@ namespace
     // SDP lines.
     {
       std::optional<Candidate> c =
-        CandidateFromSdp("a=candidate:12 1 UDP 1045759 192.168.42.77 55889 typ relay raddr 0.0.0.0 rport 0");
+        CandidateFromSdp("a=candidate:12 1 UDP 1045759 192.0.2.77 55889 typ relay raddr 0.0.0.0 rport 0");
       Check(
         c && c->type == CandidateType::Relayed && c->priority == 1045759 && c->port == 55889 && !c->relAddr,
         "libjuice relay line; hidden base becomes null"
       );
       std::optional<Candidate> s =
-        CandidateFromSdp("a=candidate:3 1 UDP 1678767615 1.2.3.4 50000 typ srflx raddr 10.0.0.2 rport 6112");
-      Check(s && s->relAddr && *s->relAddr == "10.0.0.2" && s->relPort == 6112, "srflx related address kept");
+        CandidateFromSdp("a=candidate:3 1 UDP 1678767615 203.0.113.4 50000 typ srflx raddr 192.0.2.2 rport 6112");
+      Check(s && s->relAddr && *s->relAddr == "192.0.2.2" && s->relPort == 6112, "srflx related address kept");
       Check(
-        CandidateToSdp(*s) == "a=candidate:3 1 UDP 1678767615 1.2.3.4 50000 typ srflx raddr 10.0.0.2 rport 6112",
+        CandidateToSdp(*s) == "a=candidate:3 1 UDP 1678767615 203.0.113.4 50000 typ srflx raddr 192.0.2.2 rport 6112",
         "candidate back to SDP"
       );
     }

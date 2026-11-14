@@ -162,7 +162,7 @@ namespace moho
      * What it does:
      * Reads the raw `EntId` value directly through the archive.
      */
-    static void Deserialize(gpg::ReadArchive* archive, std::intptr_t objectPtr, int version, gpg::RRef* ownerRef);
+    static void Deserialize(gpg::ReadArchive* archive, void* objectPtr, int version, gpg::RRef* ownerRef);
 
     /**
      * Address: 0x00557F10 (FUN_00557F10, Moho::EntIdSerializer::Serialize)
@@ -170,7 +170,7 @@ namespace moho
      * What it does:
      * Writes the raw `EntId` value directly through the archive.
      */
-    static void Serialize(gpg::WriteArchive* archive, std::intptr_t objectPtr, int version, gpg::RRef* ownerRef);
+    static void Serialize(gpg::WriteArchive* archive, void* objectPtr, int version, gpg::RRef* ownerRef);
 
     /**
      * Address: 0x005589E0 (FUN_005589E0, shared Init() body -- also serves

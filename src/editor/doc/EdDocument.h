@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <filesystem>
 #include <functional>
 #include <map>
@@ -9,12 +10,18 @@
 #include <thread>
 #include <vector>
 
+#include "editor/doc/EdScenarioInfo.h"
 #include "editor/doc/EdPackage.h"
 #include "editor/doc/EdLighting.h"
+#include "editor/tools/EdWaterMasks.h"
 #include "editor/doc/EdSkybox.h"
 #include "editor/tools/EdWaves.h"
 #include "editor/doc/EdWater.h"
 #include "editor/doc/EdWaterBodies.h"
+#include "editor/tools/EdMapLayout.h"
+#include "editor/tools/EdMission.h"
+#include "editor/tools/EdKeptPaths.h"
+#include "editor/tools/EdScTools.h"
 #include "editor/tools/EdChecks.h"
 #include "editor/tools/EdDecals.h"
 #include "editor/tools/EdSymmetryCheck.h"
@@ -153,12 +160,42 @@ namespace faf::editor
       return mMap.get();
     }
     /**
-     * Saves the map's `.scmap` over its own file, when it has one on disk (a map in the game's archives has
-     * none; it is saved as a new folder instead). Before the first overwrite of a session the old file is
-     * copied to `<map folder>/.editor_backup/<time>/`. The scenario, save and script files are left as they
-     * are: nothing edits them yet. `message` says what happened, for the log and the status bar.
+     * Saves the map over its own files, when it has them on disk (a map in the game's archives has none; it is
+     * saved as a new folder instead): the `.scmap` and the Lua files that changed. Before the first save of a
+     * session the map's files are backed up outside the maps folder (SetBackups). `message` says what happened, for
+     * the log and the status bar.
      */
     bool Save(std::string& message);
+
+    /** Where Save backs the map's files up first (`<root>/<map folder>/<time>/`) and how many backups a map keeps
+     * (0: no backups). */
+    void SetBackups(
+      std::filesystem::path root,
+      const int keep
+    )
+    {
+      mBackupRoot = std::move(root);
+      mBackupKeep = keep;
+    }
+
+    /**
+     * Autosave: every file of the map (the `.scmap` and its Lua files, as Save would write them) into `folder`,
+     * which is made; the document stays as it is (unsaved, its baselines unmoved), so a later Save still writes
+     * what changed. False with `error` when the map can't be written yet or a file fails.
+     */
+    bool WriteSnapshot(const std::filesystem::path& folder, std::string& error);
+
+    /**
+     * Asked before Open and CreateNew drop unsaved changes: the guard (the editor's "Save changes?" question)
+     * returns true when it takes over, and calls `proceed` once the user chose to go on (after saving or not);
+     * false lets the call go ahead now. No guard, or no changes: the call goes ahead.
+     */
+    void SetUnsavedGuard(
+      std::function<bool(std::function<void()> proceed)> guard
+    )
+    {
+      mUnsavedGuard = std::move(guard);
+    }
 
     /**
      * The FAF vault (its `maps` folder holds the mapper's maps). Save writes over a map only there: the
@@ -183,6 +220,29 @@ namespace faf::editor
      * the new folder from its next start (its file system is mounted at startup).
      */
     bool SaveAsNewFolder(const std::string& folder, std::string& message);
+    /**
+     * The same into another folder (`parent`, not the vault's maps): the game doesn't see a map there, but Save writes
+     * it from then on (the folder was picked for it). Empty `parent`: the vault's maps.
+     */
+    bool SaveAsNewFolderIn(const std::filesystem::path& parent, const std::string& folder, std::string& message);
+    /**
+     * Play of unsaved edits: the open map, edits included, copied to `<vault>/maps/<map>_editor_playtest` (the files
+     * and names as Save as new folder writes them; the document's own files, save target and saved state untouched).
+     * `scenario` gets the copy's scenario path for the session.
+     */
+    bool WritePlayCopy(std::string& scenario, std::string& message);
+    /** Removes the play copy (`folder` empty: the last one written); only a folder ending in the copy's suffix. */
+    void RemovePlayCopy(std::string folder = {});
+    [[nodiscard]] const std::string& PlayCopy() const noexcept
+    {
+      return mPlayCopy;
+    }
+    /** The play copy's folder on disk (empty when there is none). */
+    [[nodiscard]] std::filesystem::path PlayCopyFolder() const
+    {
+      return mPlayCopy.empty() || mVault.empty() ? std::filesystem::path{} : mVault / "maps" / mPlayCopy;
+    }
+    static constexpr const char* kPlayCopySuffix = "_editor_playtest";
 
     /** The map's folder name (`scmp_009`, `seton.v0003`) and the suggestion for a new version of it. */
     [[nodiscard]] std::string FolderName() const;
@@ -196,6 +256,19 @@ namespace faf::editor
      */
     bool WritePackage(const PackagePlan& plan, std::filesystem::path& written, std::string& message) const;
 
+    /**
+     * File › Export › Lobby preview: the map's preview picture (the DDS in the file's preview chunk, as the lobby shows
+     * it) written as a PNG at its own size; false with `message`.
+     */
+    bool ExportPreview(const std::filesystem::path& file, std::string& message) const;
+    /** Map > Regenerate preview: the preview chunk a save writes from now on (EdPreview); the map counts as changed. */
+    void SetPreviewRecord(
+      std::vector<char> record
+    )
+    {
+      mFileRecords.preview = std::move(record);
+      mModified = true;
+    }
     /** What the map file stored that a save writes back as it was (the preview, unchanged props). */
     [[nodiscard]] const MapFileRecords& FileRecords() const noexcept
     {
@@ -242,13 +315,233 @@ namespace faf::editor
       Skybox,
       Waves,
       TerrainTypes,
+      /** Convert layers: the masks, the layer slots and the shader, together. */
+      LayerConversion,
+      /** A look applied: the lighting, the water and the sky, together. */
+      Look,
+      /** The water's foam, flatness and depth-bias masks (a brush stroke). */
+      WaterMasks,
+      /** The heights and the texture masks together (an erosion run painting its masks into layers). */
+      HeightsAndMasks,
+      /** A terrain graph's Build: the heights, its mask strokes and the terrain types it changed (BuildUndo says
+         which). */
+      GraphBuild,
+      /** The map layout's drawing (a stroke, a layer added or removed, a template, its settings). */
+      Layout,
+      /** The mission (stages, nodes, dialogues). */
+      Mission,
+      /** The map's own fields in its scenario (Map info: name, description, type, version, no-rush radius). */
+      MapInfo,
+      /** The kept paths (their points and settings; an Apply's results join a GraphBuild step). */
+      Paths,
     };
+    /** The water's three masks, a byte for every 2 x 2 units (the map's size halved). */
+    struct WaterMaskSnapshot
+    {
+      int width = 0;
+      int height = 0;
+      std::vector<std::uint8_t> foam;
+      std::vector<std::uint8_t> flatness;
+      std::vector<std::uint8_t> depthBias;
+      bool operator==(const WaterMaskSnapshot& other) const = default;
+    };
+    [[nodiscard]] WaterMaskSnapshot WaterMasksNow() const;
+    /** The masks put back and the water map rebuilt from them (no undo step; WaterMasksEdited records one). */
+    void ApplyWaterMasks(const WaterMaskSnapshot& masks);
+    /** One mask's cells on the map, painted in place (then WaterMasksChanged); null without a map. */
+    [[nodiscard]] std::uint8_t* WaterMaskCells(WaterMask mask, int& width, int& height) const;
+    /** After cells changed in [x0, x1) x [z0, z1) (mask cells): the water map there rebuilt, the overlay told. */
+    void WaterMasksChanged(int x0, int z0, int x1, int z1);
+    /** After each new undo step (its name): the app queues it for the editor mods' "edit" event. */
+    std::function<void(const std::string& step)> onEditEnded;
+    /** Goes up with every edit, undo and redo (the check runs again when it changed). */
+    [[nodiscard]] std::uint64_t EditCount() const noexcept
+    {
+      return mEditCount;
+    }
+    [[nodiscard]] int WaterMaskRevision() const noexcept
+    {
+      return mWaterMaskRevision;
+    }
+    void WaterMasksEdited(WaterMaskSnapshot before);
+    [[nodiscard]] std::vector<std::pair<WaterMaskSnapshot, WaterMaskSnapshot>>& WaterMaskUndo() noexcept
+    {
+      return mWaterMaskUndo;
+    }
+    [[nodiscard]] std::vector<std::pair<WaterMaskSnapshot, WaterMaskSnapshot>>& WaterMaskRedo() noexcept
+    {
+      return mWaterMaskRedo;
+    }
+    /** What a look changes: the map's lighting, water and sky. */
+    struct LookEnvironment
+    {
+      LightingState lighting;
+      WaterState water;
+      SkyboxState sky;
+      /** The environment cube lookups (CWldTerrainRes::EnumerateEnvLookup): a name, its cube texture. */
+      std::vector<std::pair<std::string, std::string>> cubes;
+    };
+    [[nodiscard]] std::vector<std::pair<std::string, std::string>> CubesNow() const;
+    /** The lookups replaced by these (ClearEnvLookup, then AddEnvLookup each); no undo step. */
+    void ApplyCubes(const std::vector<std::pair<std::string, std::string>>& cubes);
+    [[nodiscard]] LookEnvironment LookEnvironmentNow() const
+    {
+      return {LightingNow(), WaterNow(), SkyboxNow(), CubesNow()};
+    }
+    /** Puts a look's lighting, water and sky on the map (no undo step; LookApplied records one). */
+    void ApplyLookEnvironment(
+      const LookEnvironment& look
+    )
+    {
+      ApplyLighting(look.lighting);
+      ApplyWater(look.water);
+      ApplySkybox(look.sky);
+      if (!look.cubes.empty()) {
+        ApplyCubes(look.cubes);
+      }
+    }
+    void LookApplied(LookEnvironment before);
+    [[nodiscard]] std::vector<std::pair<LookEnvironment, LookEnvironment>>& LookUndo() noexcept
+    {
+      return mLookUndo;
+    }
+    [[nodiscard]] std::vector<std::pair<LookEnvironment, LookEnvironment>>& LookRedo() noexcept
+    {
+      return mLookRedo;
+    }
     /** The map's terrain type grid (a byte a cell, STIMap::mTerrainType, saved with the terrain): its cells, or null.
      */
     [[nodiscard]] std::uint8_t* TerrainTypeCells(int& width, int& height) const;
     [[nodiscard]] std::vector<std::uint8_t> TerrainTypesNow() const;
     void ApplyTerrainTypes(const std::vector<std::uint8_t>& cells);
-    void TerrainTypesEdited(std::vector<std::uint8_t> before);
+    /** `ownStep` false: the change joins a step its caller ends (a terrain graph's Build). */
+    void TerrainTypesEdited(std::vector<std::uint8_t> before, bool ownStep = true);
+    /**
+     * A Build's parts, one entry per GraphBuild step: bit 0 a heights stroke, bits 1-5 how many mask strokes, bit 6 a
+     * terrain type change, bit 7 a props change, bit 8 a water change (the layout's water level), bit 9 a decals
+     * change. The view undoes and
+     * redoes those parts together.
+     */
+    void BuildEdited(
+      const std::uint16_t parts
+    )
+    {
+      mBuildUndo.push_back(parts);
+      EditEnded(EditKind::GraphBuild);
+      mModified = true;
+    }
+    [[nodiscard]] std::vector<std::uint16_t>& BuildUndo() noexcept
+    {
+      return mBuildUndo;
+    }
+    [[nodiscard]] std::vector<std::uint16_t>& BuildRedo() noexcept
+    {
+      return mBuildRedo;
+    }
+    /** A water change joins the newest Build step (the layout's Generate terrain sets the water level). */
+    void BuildAddWater(WaterState before);
+
+    /**
+     * The map layout (the Layout workspace's drawing): kept with the map in `<map>_layout.editor` beside the .scmap (a
+     * file the vault package leaves out), read when the map opens; a fresh drawing over the playable area otherwise.
+     */
+    [[nodiscard]] MapLayout& Layout() noexcept
+    {
+      return mLayout;
+    }
+    [[nodiscard]] const MapLayout& Layout() const noexcept
+    {
+      return mLayout;
+    }
+    /** A stroke's record as an undo step. */
+    void LayoutStroked(LayoutStroke stroke);
+    /** A change to the whole drawing (layers, template, settings) as an undo step: `before` is how it was. */
+    void LayoutReplaced(MapLayout before);
+    bool UndoLayout(bool redo);
+    /** The layout file of the map (empty for a map without a file of its own). */
+    [[nodiscard]] std::filesystem::path LayoutFile() const;
+    /**
+     * The terrain graph built on this map, kept beside it (`<map>_terrain.editor`, the graph's own JSON; packages leave
+     * `.editor` files out): saved with the map, opened in Generate when the map opens.
+     */
+    [[nodiscard]] std::filesystem::path TerrainGraphFile() const;
+    /** The map's own mods for plays, beside its file (`<map>_mods.editor`, a uid a line), empty without a disk file. */
+    [[nodiscard]] std::filesystem::path ModsFile() const;
+    /**
+     * The mission (the Mission workspace's stages and dialogues): kept beside the map in `<map>_mission.editor`, read
+     * when the map opens; Save compiles it into the script's generated region, a play copy gets the test run's.
+     */
+    [[nodiscard]] const faf::editor::Mission& MissionNow() const noexcept
+    {
+      return mMission;
+    }
+    [[nodiscard]] faf::editor::Mission& EditMission() noexcept
+    {
+      return mMission;
+    }
+    /** A change to the mission as one undo step: `before` is how it was. */
+    void MissionEdited(faf::editor::Mission before);
+    /**
+     * The kept paths (Studio's spline paths), kept beside the map in `<map>_paths.editor` (the paths only; what an
+     * Apply did stays while the map is open), and the result each applied path has on the map now.
+     */
+    struct PathsState
+    {
+      KeptPathSet set;
+      std::map<std::string, std::shared_ptr<const KeptPathResult>> results;
+      /** The skeleton's pads as its last Apply all put them down (the next one replaces them). */
+      std::shared_ptr<const PadResult> skeletonPads;
+    };
+    [[nodiscard]] const PathsState& PathsNow() const noexcept
+    {
+      return mPaths;
+    }
+    [[nodiscard]] PathsState& EditPaths() noexcept
+    {
+      return mPaths;
+    }
+    /** A change to the paths as an undo step (`ownStep` false: it joins a GraphBuild step its caller ends, bit 1024).
+     */
+    void PathsEdited(PathsState before, bool ownStep = true);
+    bool UndoPaths(bool redo);
+    [[nodiscard]] std::filesystem::path PathsFile() const;
+    /** Counts every change of the paths (the view redraws their lines). */
+    [[nodiscard]] int PathsRevision() const noexcept
+    {
+      return mPathsRevision;
+    }
+    void PathsTouched() noexcept
+    {
+      ++mPathsRevision;
+    }
+    bool UndoMission(bool redo);
+    /**
+     * Sets one of the scenario's own fields (ScenarioFields) as one undo step ("map info"); false when it is the same
+     * or can't be placed. Only that field goes back on undo (other scenario changes stay), a field the file didn't have
+     * goes away again.
+     */
+    bool SetScenarioField(const std::string& key, const std::string& value, bool text);
+    bool UndoMapInfo(bool redo);
+    /** The lobby slots' factions (one undo step, "map info"); false when they are the same. */
+    bool SetSlotFactions(const SlotFactions& factions);
+    /** The stage a play's test run starts at (1: the first). */
+    void SetPlayStartStage(
+      const int stage
+    ) noexcept
+    {
+      mPlayStartStage = std::max(1, stage);
+    }
+    [[nodiscard]] int PlayStartStage() const noexcept
+    {
+      return mPlayStartStage;
+    }
+    [[nodiscard]] std::filesystem::path MissionFile() const;
+    /** Whether Lua text compiles in the document's Lua (the mission compiler's checks). */
+    [[nodiscard]] LuaCompiles MissionCompiler() const;
+    /** The script with the mission's region (`test`: the test run's flavour); `status` says what happened. */
+    [[nodiscard]] std::string ScriptWithMission(bool test, MissionPatch& status) const;
+    /** The playable area as world units (x0, z0, x1, z1): the whole map without one. */
+    void LayoutArea(float& x0, float& z0, float& x1, float& z1) const;
     /** Counts each change to the grid, for the overlay. */
     [[nodiscard]] int TerrainTypeRevision() const noexcept
     {
@@ -360,8 +653,9 @@ namespace faf::editor
     [[nodiscard]] DecalSnapshot DecalsNow() const;
     /** Puts a snapshot back as the map's decals. */
     void RestoreDecals(const DecalSnapshot& decals);
-    /** A decal edit ended: its before and the decals now become the newest undo step. */
-    void DecalsEdited(DecalSnapshot before);
+    /** A decal edit ended: its before and the decals now become the newest undo step (`ownStep` false: it joins a step
+     * its caller ends, a terrain graph's Build). */
+    void DecalsEdited(DecalSnapshot before, bool ownStep = true);
     [[nodiscard]] std::vector<std::pair<DecalSnapshot, DecalSnapshot>>& DecalUndo() noexcept
     {
       return mDecalUndo;
@@ -513,7 +807,8 @@ namespace faf::editor
     /** Puts a snapshot back as the map's props (the view rebuilds their meshes). */
     void RestoreProps(const PropSnapshot& props);
     /** A prop edit ended: its before and the props now become the newest undo step. */
-    void PropsEdited(PropSnapshot before);
+    /** `ownStep` false: the change joins a step its caller ends (a terrain graph's Build). */
+    void PropsEdited(PropSnapshot before, bool ownStep = true);
     [[nodiscard]] std::vector<std::pair<PropSnapshot, PropSnapshot>>& PropUndo() noexcept
     {
       return mPropUndo;
@@ -525,6 +820,19 @@ namespace faf::editor
     /** A prop added at the end (with an empty record: it is saved from its transform) or removed at `index`. */
     void AddProp(const moho::CWldPropEntry& entry, const PropRecord& record);
     void SetPropRecord(std::size_t index, const PropRecord& record);
+    /**
+     * A prop's scale as its file record keeps it (the three floats after its rotation; FAF Studio edits them). The game
+     * draws props at their blueprint's size and ignores them, other tools read them; a save keeps what is set here.
+     */
+    [[nodiscard]] std::array<float, 3> PropScale(std::size_t index) const;
+    void SetPropScale(std::size_t index, const std::array<float, 3>& scale);
+    /**
+     * Save writes over a map outside the vault's maps folder (opened from another folder) only once asked
+     * (FAF Studio overwrote any folder; the editor confirms first). True while that question is due.
+     */
+    [[nodiscard]] bool SaveNeedsOverwriteConsent() const;
+    /** The answer: Save may write over the map's own file where it is. */
+    void AllowOverwrite();
     void DeletePropAt(std::size_t index);
     /** A texture slot's change (path or size), for undo: its values before and after, as the terrain has them. */
     struct LayerEdit
@@ -535,6 +843,22 @@ namespace faf::editor
       /** Edits made together (a layer set imported) share a non-zero batch and are one undo step. */
       int batch = 0;
     };
+    /** Convert layers: the masks before and after, and the layer slot and shader edits it made (slot -1: the shader).
+     */
+    struct ConversionEdit
+    {
+      std::vector<std::uint64_t> masksBefore;
+      std::vector<std::uint64_t> masksAfter;
+      std::vector<LayerEdit> layers;
+    };
+    [[nodiscard]] std::vector<ConversionEdit>& ConversionUndo() noexcept
+    {
+      return mConversionUndo;
+    }
+    [[nodiscard]] std::vector<ConversionEdit>& ConversionRedo() noexcept
+    {
+      return mConversionRedo;
+    }
     [[nodiscard]] std::vector<LayerEdit>& LayerUndo() noexcept
     {
       return mLayerUndo;
@@ -569,6 +893,73 @@ namespace faf::editor
     )
     {
       mUndoOrder.push_back(kind);
+    }
+    /** What an edit of this kind is, for "Undo <step>" and the status bar: "height stroke", "props", ... */
+    [[nodiscard]] static const char* EditKindName(
+      const EditKind kind
+    ) noexcept
+    {
+      switch (kind) {
+      case EditKind::Heights:
+        return "height stroke";
+      case EditKind::Masks:
+        return "texture paint";
+      case EditKind::Layers:
+        return "texture layers";
+      case EditKind::Props:
+        return "props";
+      case EditKind::SaveData:
+        return "markers, units and armies";
+      case EditKind::Decals:
+        return "decals";
+      case EditKind::Water:
+        return "water";
+      case EditKind::Lighting:
+        return "lighting";
+      case EditKind::Skybox:
+        return "sky";
+      case EditKind::Waves:
+        return "waves";
+      case EditKind::TerrainTypes:
+        return "terrain types";
+      case EditKind::LayerConversion:
+        return "layer conversion";
+      case EditKind::Look:
+        return "environment";
+      case EditKind::WaterMasks:
+        return "water masks";
+      case EditKind::HeightsAndMasks:
+        return "heights and texture masks";
+      case EditKind::GraphBuild:
+        return "terrain graph build";
+      case EditKind::Layout:
+        return "layout drawing";
+      case EditKind::Mission:
+        return "mission";
+      case EditKind::MapInfo:
+        return "map info";
+      case EditKind::Paths:
+        return "paths";
+      }
+      return "edit";
+    }
+    /** The steps in Undo's order (oldest first) and Redo's (the next Redo last), for the History panel. */
+    [[nodiscard]] const std::vector<EditKind>& UndoOrder() const noexcept
+    {
+      return mUndoOrder;
+    }
+    [[nodiscard]] const std::vector<EditKind>& RedoOrder() const noexcept
+    {
+      return mRedoOrder;
+    }
+    /** The step Undo (Redo) would take back, or null when there is none. */
+    [[nodiscard]] const char* UndoStepName() const noexcept
+    {
+      return mUndoOrder.empty() ? nullptr : EditKindName(mUndoOrder.back());
+    }
+    [[nodiscard]] const char* RedoStepName() const noexcept
+    {
+      return mRedoOrder.empty() ? nullptr : EditKindName(mRedoOrder.back());
     }
     /** Whether there is an edit to undo (redo), for the toolbar. */
     [[nodiscard]] bool CanUndo() const noexcept
@@ -645,8 +1036,51 @@ namespace faf::editor
     std::vector<std::pair<PropSnapshot, PropSnapshot>> mPropUndo;
     std::vector<std::pair<PropSnapshot, PropSnapshot>> mPropRedo;
     std::vector<LayerEdit> mLayerUndo;
+    std::vector<ConversionEdit> mConversionUndo;
+    std::vector<ConversionEdit> mConversionRedo;
     std::vector<LayerEdit> mLayerRedo;
     std::vector<std::pair<std::vector<std::uint8_t>, std::vector<std::uint8_t>>> mTerrainTypesUndo;
+    std::vector<std::uint16_t> mBuildUndo;
+    std::vector<std::uint16_t> mBuildRedo;
+    MapLayout mLayout;
+    std::string mLayoutRead; // the layout file's text as read or last saved
+    struct LayoutEdit
+    {
+      LayoutStroke stroke;
+      std::shared_ptr<MapLayout> before; // set: the whole drawing swapped
+      std::shared_ptr<MapLayout> after;
+    };
+    faf::editor::Mission mMission;
+    std::string mMissionRead; // the mission file's text as read or last saved
+    std::vector<std::pair<faf::editor::Mission, faf::editor::Mission>> mMissionUndo;
+    std::vector<std::pair<faf::editor::Mission, faf::editor::Mission>> mMissionRedo;
+    struct MapInfoStep
+    {
+      std::string key;
+      bool text = true;
+      bool had = true; // the file had the field before
+      std::string before;
+      std::string after;
+      std::string scenarioBefore; // the whole text, when the field was added
+      bool slotFactions = false;  // a step of the slots' factions (the two lists below)
+      SlotFactions factionsBefore;
+      SlotFactions factionsAfter;
+    };
+    std::vector<MapInfoStep> mMapInfoUndo;
+    std::vector<MapInfoStep> mMapInfoRedo;
+    void RefreshInfoFacts();
+    bool mCopyTestMission = false; // WriteFolderCopy writes the test run's mission (a play copy)
+    int mPlayStartStage = 1;
+    void LoadMissionFile();
+    PathsState mPaths;
+    std::string mPathsRead;
+    std::vector<std::pair<PathsState, PathsState>> mPathsUndo;
+    std::vector<std::pair<PathsState, PathsState>> mPathsRedo;
+    int mPathsRevision = 0;
+    void LoadPathsFile();
+    std::vector<LayoutEdit> mLayoutUndo;
+    std::vector<LayoutEdit> mLayoutRedo;
+    void LoadLayout();
     std::vector<std::pair<std::vector<std::uint8_t>, std::vector<std::uint8_t>>> mTerrainTypesRedo;
     int mTerrainTypeRevision = 0;
     std::vector<std::pair<std::vector<WaveRecord>, std::vector<WaveRecord>>> mWavesUndo;
@@ -655,6 +1089,12 @@ namespace faf::editor
     std::vector<std::pair<SkyboxState, SkyboxState>> mSkyboxRedo;
     std::vector<std::pair<LightingState, LightingState>> mLightingUndo;
     std::vector<std::pair<LightingState, LightingState>> mLightingRedo;
+    std::vector<std::pair<LookEnvironment, LookEnvironment>> mLookUndo;
+    std::vector<std::pair<LookEnvironment, LookEnvironment>> mLookRedo;
+    std::vector<std::pair<WaterMaskSnapshot, WaterMaskSnapshot>> mWaterMaskUndo;
+    std::vector<std::pair<WaterMaskSnapshot, WaterMaskSnapshot>> mWaterMaskRedo;
+    int mWaterMaskRevision = 0;
+    std::uint64_t mEditCount = 0;
     std::vector<std::pair<WaterState, WaterState>> mWaterUndo;
     std::vector<std::pair<WaterState, WaterState>> mWaterRedo;
     std::vector<std::pair<DecalSnapshot, DecalSnapshot>> mDecalUndo;
@@ -670,8 +1110,24 @@ namespace faf::editor
     [[nodiscard]] std::uint64_t MasksHash() const;
     bool mModified = false;
     bool mBackedUp = false;
+    std::filesystem::path mBackupRoot;
+    int mBackupKeep = 10;
+    std::function<bool(std::function<void()>)> mUnsavedGuard;
+    bool mGuardPassed = false;
+    /** The guard, when there are changes to lose: true when it took over (the caller stops). */
+    bool Guarded(std::function<void()> proceed);
     std::filesystem::path mVault;
+    /** Where WriteFolderCopy makes the folder (empty: the vault's maps). */
+    std::filesystem::path mCopyParent;
+    /** Save as put the map outside the vault: Save writes there (that folder was picked). */
+    bool mSaveOutsideVault = false;
+    /** The map file Save may write over outside the vault (AllowOverwrite). */
+    std::filesystem::path mOverwriteFile;
     /** Set by SaveAsNewFolder: where Save writes from then on (else the map's own file). */
     std::filesystem::path mSaveTarget;
+    std::string mPlayCopy; // the play copy's folder while one is on disk
+    /** The map's files, edits included, copied to `<vault>/maps/<folder>` with their paths and names moved to it. */
+    bool
+    WriteFolderCopy(const std::string& folder, std::filesystem::path& newMapFile, int& copied, std::string& message);
   };
 } // namespace faf::editor

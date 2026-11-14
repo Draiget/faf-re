@@ -34,8 +34,8 @@ namespace moho
    * is exactly what `fa::map` lays out for an 8-byte `value_type`. The key
    * comparison in the binary is a raw pointer compare, so the default
    * `std::less` is the right predicate rather than a name-ordering one.
-   * The consumers read the key's `mBlueprintId` (+0x08), `mBlueprintLabel`
-   * (+0x24) and `mCategoryBitIndex` (+0x5C); callers pass unit blueprints.
+   * The consumers read the key's `mBlueprintId` (+0x08), `mDescription`
+   * (+0x24) and `mBlueprintOrdinal` (+0x5C); callers pass unit blueprints.
    */
   using ArmyBlueprintStatTree = fa::map<const RUnitBlueprint*, float>;
   // The 0x18 node is not nameable from here -- `fa::map` keeps `node_type`

@@ -6,6 +6,7 @@
 #include <set>
 
 #include "editor/doc/EdMapFile.h"
+#include "editor/tools/EdTextureFiles.h"
 #include "editor/ui/EdImGuiRenderer.h"
 #include "gpg/gal/backends/common/ImageCodec.h"
 #include "legacy/containers/String.h"
@@ -139,6 +140,82 @@ namespace faf::editor
     return 0U;
   }
 
+  std::vector<std::string> ListGameTextures(
+    const std::string& folder
+  )
+  {
+    std::vector<std::string> out;
+    moho::CVirtualFileSystem* const vfs = moho::DISK_GetVFS();
+    if (vfs == nullptr) {
+      return out;
+    }
+    fa::vector<fa::string> found;
+    vfs->EnumerateFiles(folder.c_str(), "*.dds", true, &found);
+    std::set<std::string> seen;
+    for (const fa::string& file : found) {
+      std::string lower = file.c_str();
+      for (char& c : lower) {
+        c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+      }
+      if (seen.insert(lower).second) {
+        out.emplace_back(file.c_str());
+      }
+    }
+    std::sort(out.begin(), out.end());
+    return out;
+  }
+
+  bool EdTextureLibrary::AverageColour(
+    const std::string& path,
+    float (&rgb)[3]
+  )
+  {
+    auto found = mAverages.find(path);
+    if (found == mAverages.end()) {
+      std::array<float, 3> average{-1.0f, 0.0f, 0.0f};
+      std::string bytes;
+      gpg::gal::imaging::ImageCodec* const codec = gpg::gal::imaging::ImageCodec::Instance();
+      if (codec != nullptr && !path.empty() && ReadGameFile(path, bytes)) {
+        gpg::gal::imaging::DecodeOptions options;
+        options.format = DXGI_FORMAT_B8G8R8A8_UNORM;
+        options.width = 16;
+        options.height = 16;
+        options.mipLevels = 1;
+        gpg::gal::imaging::Image image;
+        if (
+          SUCCEEDED(codec->Decode(bytes.data(), bytes.size(), options, image)) && !image.subresources.empty() &&
+          image.format == DXGI_FORMAT_B8G8R8A8_UNORM
+        ) {
+          const auto& level = image.subresources.front();
+          double sums[3] = {};
+          for (std::uint32_t y = 0; y < level.height; ++y) {
+            const std::uint8_t* const row =
+              image.bytes.data() + level.offset + static_cast<std::size_t>(y) * level.rowPitch;
+            for (std::uint32_t x = 0; x < level.width; ++x) {
+              sums[0] += row[x * 4U + 2U]; // B G R A
+              sums[1] += row[x * 4U + 1U];
+              sums[2] += row[x * 4U];
+            }
+          }
+          const double count = std::max(1.0, static_cast<double>(level.width) * level.height) * 255.0;
+          average = {
+            static_cast<float>(sums[0] / count),
+            static_cast<float>(sums[1] / count),
+            static_cast<float>(sums[2] / count)
+          };
+        }
+      }
+      found = mAverages.emplace(path, average).first;
+    }
+    if (found->second[0] < 0.0f) {
+      return false;
+    }
+    for (int c = 0; c < 3; ++c) {
+      rgb[c] = found->second[static_cast<std::size_t>(c)];
+    }
+    return true;
+  }
+
   void EdTextureLibrary::Pump(
     const int count
   )
@@ -147,8 +224,10 @@ namespace faf::editor
     for (int i = 0; i < count && !mWanted.empty() && codec != nullptr; ++i) {
       const std::string path = mWanted.front();
       mWanted.pop_front();
+      const std::size_t prefix = std::strlen(kReliefPrefix);
+      const bool relief = path.compare(0, prefix, kReliefPrefix) == 0;
       std::string bytes;
-      if (!ReadGameFile(path, bytes)) {
+      if (!ReadGameFile(relief ? path.substr(prefix) : path, bytes)) {
         continue;
       }
       // Decoded straight to a small 32-bit image (the decoder resizes and converts).
@@ -174,8 +253,11 @@ namespace faf::editor
           std::uint32_t pixel = 0;
           std::memcpy(&pixel, row + static_cast<std::size_t>(x) * 4U, 4U);
           // Opaque: a layer's alpha is its specular or the upper layer's blend, not its shape.
-          pixels[static_cast<std::size_t>(y) * level.width + x] = pixel | opaque;
+          pixels[static_cast<std::size_t>(y) * level.width + x] = relief ? pixel : pixel | opaque;
         }
+      }
+      if (relief) {
+        NormalRelief(pixels);
       }
       mThumbnails[path] =
         EdImGuiRenderer::CreateImage(static_cast<int>(level.width), static_cast<int>(level.height), pixels.data());

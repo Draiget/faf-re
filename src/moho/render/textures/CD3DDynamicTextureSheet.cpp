@@ -242,7 +242,7 @@ namespace moho
     }
 
     std::uint32_t byteCount = 0;
-    reader->Read(reinterpret_cast<char*>(&byteCount), sizeof(byteCount));
+    reader->Read(&byteCount, sizeof(byteCount));
 
     gpg::MemBuffer<char> textureBytes = gpg::AllocMemBuffer(byteCount);
     if (byteCount != 0) {

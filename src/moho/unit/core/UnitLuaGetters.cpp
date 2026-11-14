@@ -2561,7 +2561,7 @@ int moho::cfunc_UnitGetNumBuildOrdersL(
           continue;
         }
 
-        if (categorySet->Bits().Contains(blueprint->mCategoryBitIndex)) {
+        if (categorySet->Bits().Contains(blueprint->mBlueprintOrdinal)) {
           buildOrderCount += command->mVarDat.mCount;
         }
       }

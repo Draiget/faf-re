@@ -100,6 +100,9 @@ namespace platform::window::sdl
   {
     // The window library's full-screen frame stayed up when another program took the keyboard.
     (void)SDL_SetHint(SDL_HINT_VIDEO_MINIMIZE_ON_FOCUS_LOSS, "0");
+    // A borderless window is a plain popup (WS_POPUP), as the window library made the full-screen
+    // frame (style 0x200800), not SDL's popup with caption bits that it hides itself (#418).
+    (void)SDL_SetHint("SDL_BORDERLESS_WINDOWED_STYLE", "0");
   }
 
   void OnShutdown() {}

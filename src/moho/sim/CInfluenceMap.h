@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 
@@ -91,6 +92,9 @@ namespace moho
     float antiSubInfluence;          // +0x2C
     float economyInfluence;          // +0x30
     float unknownInfluence;          // +0x34
+
+    /** The fourteen fields in declaration order, for the archive (0x00717AF0 / 0x00717B00). */
+    [[nodiscard]] std::array<float*, 14> Fields() noexcept;
 
     void Clear() noexcept;
     void RecomputeOverall() noexcept;

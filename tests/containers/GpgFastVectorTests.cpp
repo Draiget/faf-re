@@ -930,15 +930,12 @@ TEST(
 
 TEST(
   GpgFastVectorLegacy,
-  CopyDwordRangeForward
+  CopyRangeForward
 )
 {
-  // The null test is per slot, on the running address (MSVC's `if (dest != 0)` construct
-  // idiom), so only the first slot of a null destination is skipped; a null destination is not
-  // a supported input and is not tested.
   const std::uint32_t words[] = {1, 2, 3};
   std::uint32_t out[3]{};
-  EXPECT_EQ(gpg::core::detail::CopyDwordRangeForward(out, words, words + 3), out + 3);
+  EXPECT_EQ(gpg::core::legacy::CopyRangeForward(out, words, words + 3), out + 3);
   EXPECT_EQ((std::vector<std::uint32_t>(out, out + 3)), (std::vector<std::uint32_t>{1, 2, 3}));
-  EXPECT_EQ(gpg::core::detail::CopyDwordRangeForward(out, words, words), out);
+  EXPECT_EQ(gpg::core::legacy::CopyRangeForward(out, words, words), out);
 }

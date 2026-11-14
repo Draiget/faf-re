@@ -48,7 +48,7 @@ namespace gpg
      * What it does:
      * Reads exactly `size` bytes or throws `PrematureEOF` when source underruns.
      */
-    void Read(char* buf, size_t size) const;
+    void Read(void* buf, size_t size) const;
 
     /**
      * Address: 0x00540A10 (FUN_00540A10, gpg::BinaryReader::ReadInt)
@@ -104,7 +104,7 @@ namespace gpg
       T& out
     ) const
     {
-      Read(reinterpret_cast<char*>(std::addressof(out)), sizeof(T));
+      Read(std::addressof(out), sizeof(T));
     }
 
     /**
@@ -116,7 +116,7 @@ namespace gpg
       std::size_t count
     ) const
     {
-      Read(reinterpret_cast<char*>(out), sizeof(T) * count);
+      Read(out, sizeof(T) * count);
     }
 
     /**

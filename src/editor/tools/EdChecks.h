@@ -28,7 +28,22 @@ namespace faf::editor
     /** For a script finding: the file (`_script.lua`...) and the line (0 when none). */
     std::string file;
     int line = 0;
+    /**
+     * A fix the Check offers (FAF Studio's validate.lua): the marker moved to (fixX, fixZ): pulled inside the map or
+     * the playable area, or snapped to its build grid.
+     */
+    enum class Fix
+    {
+      None,
+      PullInside,
+      SnapToGrid,
+    };
+    Fix fix = Fix::None;
+    float fixX = 0.0f;
+    float fixZ = 0.0f;
   };
+  /** A fix's name for its button. */
+  const char* CheckFixName(CheckIssue::Fix fix);
 
   /**
    * Splits a Lua compile error (`[string "x_script.lua"]:12: '=' expected near 'end'`, or `x_script.lua:12: ...`) into
@@ -61,6 +76,28 @@ namespace faf::editor
    * of its symmetric copies within 2 units (warning), and two resources whose 2 x 2 extractors would overlap (error).
    */
   std::vector<CheckIssue> CheckMarkers(const MarkerCheckInput& input);
+
+  /** What the map-wide checks look at (FAF Studio's validate.lua): markers, the scenario's armies, chains, names. */
+  struct MapBasicsInput
+  {
+    const std::vector<SaveEntry>* markers = nullptr;
+    /** The scenario's team list (its extra armies, like ARMY_9 and NEUTRAL_CIVILIAN, have no start). */
+    std::vector<std::string> armies;
+    const std::vector<MarkerChain>* chains = nullptr;
+    std::string name;
+    std::string description;
+    /** Prop blueprints the game hasn't got (each with one prop's place): the caller asks the rules. */
+    std::vector<std::pair<std::string, std::array<float, 2>>> missingProps;
+  };
+
+  /**
+   * The map-wide checks: no start position (error) or one (warning); a start the army list hasn't got (warning) and
+   * an army without its start (error); no mass point (warning) or fewer than four for each start (note); a resource
+   * off the build grid (its extractor's cell middle, x.5: warning); a marker with a broken position (error); a chain
+   * naming a marker the map hasn't got (warning); a prop blueprint the game hasn't got (warning, one per blueprint);
+   * no name (warning) or description (note).
+   */
+  std::vector<CheckIssue> CheckMapBasics(const MapBasicsInput& input);
 
   /** One prop for the symmetry check: its blueprint, place and reclaim mass. */
   struct PropPoint

@@ -82,7 +82,7 @@ namespace moho
     void* const objectPtr
   )
   {
-    auto* const object = reinterpret_cast<CIntel*>(objectPtr);
+    auto* const object = static_cast<CIntel*>(objectPtr);
     if (object) {
       new (object) CIntel();
     }
@@ -96,7 +96,7 @@ namespace moho
     void* const objectPtr
   )
   {
-    auto* const object = reinterpret_cast<CIntel*>(objectPtr);
+    auto* const object = static_cast<CIntel*>(objectPtr);
     if (!object) {
       return;
     }

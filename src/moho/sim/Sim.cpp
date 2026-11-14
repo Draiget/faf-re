@@ -1,5 +1,6 @@
 #include "moho/lua/ScrLuaUserData.h"
 #include "moho/sim/SimPrivate2.h"
+#include "moho/sim/SimConVarAccess.h"
 #include "moho/entity/EntityMemoryManager.h"
 #include "moho/sim/SimBlockLane.h"
 
@@ -73,7 +74,7 @@ namespace
 // Engine addition (dedicated-server plan WPL.4), declared in CSimSoundManager.h.
 moho::SoundEnabledHook moho::sSoundEnabled = nullptr;
 
-std::uint8_t moho::ren_Steering = 0;
+bool moho::ren_Steering = false;
 bool moho::sim_KeepAllLogFiles = false;
 bool moho::sim_ShowDamage = false;
 const char* moho::sim_LuaPairsDumpPath = nullptr;
@@ -264,32 +265,6 @@ namespace
   constexpr const char* kUnknownArmyMessage = "Unknown army: %s";
   constexpr const char* kUnexpectedArmyTypeMessage = "Unexpected type for army object";
 
-  /**
-   * Address: 0x005794A0 (FUN_005794A0)
-   *
-   * What it does:
-   * Returns the `Sim::mRules` pointer lane.
-   */
-  [[maybe_unused]] [[nodiscard]] RRuleGameRules* ReadSimRulesLane(
-    Sim* const sim
-  ) noexcept
-  {
-    return sim != nullptr ? sim->mRules : nullptr;
-  }
-
-  /**
-   * Address: 0x005794B0 (FUN_005794B0)
-   *
-   * What it does:
-   * Returns the `Sim::mMapData` pointer lane.
-   */
-  [[maybe_unused]] [[nodiscard]] STIMap* ReadSimMapDataLane(
-    Sim* const sim
-  ) noexcept
-  {
-    return sim != nullptr ? sim->mMapData : nullptr;
-  }
-
   template <class THandler>
   void ForEachSelectedUnit(
     EntitySetTemplate<Unit>* const selectedUnits,
@@ -331,22 +306,8 @@ namespace
     CArmyImpl& army
   ) noexcept
   {
-    CSimArmyEconomyInfo* const economyInfo = army.GetEconomy();
-    return economyInfo != nullptr ? economyInfo->storageDelta : nullptr;
-  }
-
-  /**
-   * Address: 0x006E0850 (FUN_006E0850)
-   *
-   * What it does:
-   * Extracts the low 24-bit command-id/index payload lane from packed command
-   * id storage.
-   */
-  [[maybe_unused]] [[nodiscard]] std::uint32_t ExtractPackedCommandIdLow24Bits(
-    const std::uint32_t* const packedValue
-  ) noexcept
-  {
-    return packedValue != nullptr ? (*packedValue & 0x00FFFFFFu) : 0u;
+    CEconomy* const economyInfo = army.GetEconomy();
+    return economyInfo != nullptr ? economyInfo->mExtraStorage.get() : nullptr;
   }
 
   [[nodiscard]] CUnitCommand* AddIssueDataToCommandDb(
@@ -699,35 +660,6 @@ namespace
     entity->Warp(transform);
   }
 
-  /**
-   * Address: 0x00754C60 (FUN_00754C60, sub_754C60)
-   *
-   * What it does:
-   * Core Sim load-serialization routine used by Sim serializer callback.
-   */
-  [[maybe_unused]] gpg::RType* FindRTypeByNameAny(
-    const std::initializer_list<const char*>& names
-  )
-  {
-    gpg::TypeMap& map = gpg::GetRTypeMap();
-    for (const char* name : names) {
-      if (!name || !*name) {
-        continue;
-      }
-      auto it = map.find(name);
-      if (it != map.end()) {
-        return it->second;
-      }
-      for (auto jt = map.begin(); jt != map.end(); ++jt) {
-        const char* registered = jt->first;
-        if (registered && std::strstr(registered, name) != nullptr) {
-          return jt->second;
-        }
-      }
-    }
-    return nullptr;
-  }
-
   bool IsSimDebugCheatsEnabled()
   {
     return moho::console::SimDebugCheatsEnabled();
@@ -855,78 +787,6 @@ namespace moho
 
 namespace
 {
-  /**
-   * Address: 0x00763DC0 (FUN_00763DC0)
-   * Address: 0x00764760 (FUN_00764760)
-   *
-   * What it does:
-   * Copies one contiguous 32-bit lane range `[sourceBegin, sourceEnd)` into
-   * destination storage and returns one-past the copied destination cursor.
-   */
-  [[maybe_unused]] std::uint32_t* CopyDwordRangeNullable(
-    std::uint32_t* destination,
-    const std::uint32_t* const sourceBegin,
-    const std::uint32_t* const sourceEnd
-  ) noexcept
-  {
-    std::uintptr_t destinationAddress = reinterpret_cast<std::uintptr_t>(destination);
-    for (const std::uint32_t* source = sourceBegin; source != sourceEnd; ++source) {
-      if (destinationAddress != 0u) {
-        *reinterpret_cast<std::uint32_t*>(destinationAddress) = *source;
-      }
-      destinationAddress += sizeof(std::uint32_t);
-    }
-
-    return reinterpret_cast<std::uint32_t*>(destinationAddress);
-  }
-
-  /**
-   * Address: 0x00764610 (FUN_00764610)
-   *
-   * What it does:
-   * Adapter lane that forwards one dword-range copy into the canonical
-   * `CopyDwordRangeNullable` helper.
-   */
-  [[maybe_unused]] [[nodiscard]] std::uint32_t* CopyDwordRangeNullableAdapterLaneA(
-    const std::uint32_t* const sourceBegin,
-    const std::uint32_t* const sourceEnd,
-    std::uint32_t* const destination
-  ) noexcept
-  {
-    return CopyDwordRangeNullable(destination, sourceBegin, sourceEnd);
-  }
-
-  /**
-   * Address: 0x007646F0 (FUN_007646F0)
-   *
-   * What it does:
-   * Secondary adapter lane that forwards one dword-range copy into
-   * `CopyDwordRangeNullable`.
-   */
-  [[maybe_unused]] [[nodiscard]] std::uint32_t* CopyDwordRangeNullableAdapterLaneB(
-    const std::uint32_t* const sourceBegin,
-    const std::uint32_t* const sourceEnd,
-    std::uint32_t* const destination
-  ) noexcept
-  {
-    return CopyDwordRangeNullable(destination, sourceBegin, sourceEnd);
-  }
-
-  /**
-   * Address: 0x00764720 (FUN_00764720)
-   *
-   * What it does:
-   * Third adapter lane that forwards one dword-range copy into
-   * `CopyDwordRangeNullable`.
-   */
-  [[maybe_unused]] [[nodiscard]] std::uint32_t* CopyDwordRangeNullableAdapterLaneC(
-    const std::uint32_t* const sourceBegin,
-    const std::uint32_t* const sourceEnd,
-    std::uint32_t* const destination
-  ) noexcept
-  {
-    return CopyDwordRangeNullable(destination, sourceBegin, sourceEnd);
-  }
 } // namespace
 
 namespace moho
@@ -986,27 +846,24 @@ namespace moho
    *
    * What it does:
    * Publishes the accepted/rejected path's cells to the owning army through
-   * `CArmyImpl::SetUnknownVectorWithMeta` (vtable slot +0x5C on the owner),
-   * reusing the same generic word-vector-with-meta payload
-   * (`Moho::SArmyVectorWithMeta`) `CArmyImpl` uses for its variable-data copy
-   * lane: each 4-byte `SOCellPos` cell is packed into one `mWords` element and
-   * the previous footprint pointer is carried in `mMetaWord`. Clears the
-   * active footprint lane before publishing.
+   * `CArmyImpl::SetPathPreview` (vtable slot +0x5C on the owner), with the
+   * footprint it was searched with. Clears the active footprint lane before
+   * publishing.
    */
   void PathPreviewFinder::OnPathAccepted(
     const SNavPath& path
   )
   {
-    SArmyVectorWithMeta payload{};
+    SArmyPathPreview preview{};
     const std::size_t cellCount = path.Count();
-    payload.mWords.resize(cellCount);
+    preview.mCells.resize(cellCount);
     for (std::size_t i = 0; i < cellCount; ++i) {
-      payload.mWords[i] = std::bit_cast<std::uint32_t>(path.start[i]);
+      preview.mCells[i] = path.start[i];
     }
-    payload.mMetaWord = reinterpret_cast<std::uintptr_t>(mFootprint);
+    preview.mFootprint = mFootprint;
     mFootprint = nullptr;
 
-    mOwnerContext->SetUnknownVectorWithMeta(&payload);
+    mOwnerContext->SetPathPreview(preview);
   }
 
   bool PathPreviewFinder::ShouldSearchRect(
@@ -1046,8 +903,7 @@ namespace moho
    */
   std::int32_t PathPreviewFinder::GetPathcap() const
   {
-    CSimConVarInstanceBase* const instance = mSim->GetSimVar(&gSimConVar_path_TimeoutPreview);
-    return *reinterpret_cast<const std::int32_t*>(instance->GetValueStorage());
+    return ReadSimConVar(mSim, gSimConVar_path_TimeoutPreview);
   }
 
   // Address: 0x007647D0 (FUN_007647D0) -- clears one output result-cell lane.
@@ -1303,8 +1159,7 @@ namespace moho
         std::shared_ptr<void> clearedSlot;
         focusArmy->SetUnknownSharedRef(&clearedSlot);
 
-        SArmyVectorWithMeta clearedPayload{};
-        focusArmy->SetUnknownVectorWithMeta(&clearedPayload);
+        focusArmy->SetPathPreview(SArmyPathPreview{});
       }
     }
 

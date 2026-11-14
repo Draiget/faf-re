@@ -143,12 +143,12 @@ TEST_F(
   std::int32_t indexStart = -1;
   std::uint32_t indexCount = 0;
   std::int32_t rectStart = -1;
-  std::uint32_t lastRect = 0;
+  std::int32_t lastRect = 0;
   const std::uint16_t* const last =
     mTesselator->EmitCollisionQuad(corners, &indexStart, &indexCount, &rectStart, &lastRect);
 
   EXPECT_EQ(rectStart, 1);
-  EXPECT_EQ(lastRect, 4u);
+  EXPECT_EQ(lastRect, 4);
   EXPECT_EQ(indexStart, 0);
   EXPECT_EQ(indexCount, 6u);
   ASSERT_EQ(mTesselator->GetCollisionIndexCount(), 6);

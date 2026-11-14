@@ -12,7 +12,7 @@
 #include "legacy/containers/Map.h"
 #include "moho/misc/ID3DDeviceResources.h"
 #include "moho/render/camera/VTransform.h"
-#include "moho/sim/VisibilityRect.h"
+#include "gpg/core/containers/Rect2.h"
 #include "Wm3AxisAlignedBox3.h"
 #include "Wm3Vector2.h"
 #include "Wm3Vector3.h"
@@ -371,18 +371,22 @@ namespace moho
   static_assert(offsetof(SNormalMapInfo, mHeight) == 0x34, "SNormalMapInfo::mHeight offset must be 0x34");
   static_assert(sizeof(SNormalMapInfo) == 0x38, "SNormalMapInfo size must be 0x38");
 
+  /**
+   * The map's distance fog. WRenViewport::FogOn (0x007F8A30) reads +0x00..+0x08 times 255 as the colour's red, green
+   * and blue, and +0x0C and +0x10 (plus the viewport's offset) as where the fog starts and where it is full.
+   */
   struct SFogInfo
   {
-    float mStartDistance;               // +0x00
-    float mCutoffDistance;              // +0x04
-    float mMinClamp;                    // +0x08
-    float mMaxClamp;                    // +0x0C
-    float mCurveExponent;               // +0x10
+    float mColorR;                      // +0x00
+    float mColorG;                      // +0x04
+    float mColorB;                      // +0x08
+    float mStart;                       // +0x0C
+    float mEnd;                         // +0x10
     std::uint8_t mUnknown14_2F[0x1C]{}; // +0x14
   };
   static_assert(sizeof(SFogInfo) == 0x30, "SFogInfo size must be 0x30");
-  static_assert(offsetof(SFogInfo, mStartDistance) == 0x00, "SFogInfo::mStartDistance offset must be 0x00");
-  static_assert(offsetof(SFogInfo, mCurveExponent) == 0x10, "SFogInfo::mCurveExponent offset must be 0x10");
+  static_assert(offsetof(SFogInfo, mColorR) == 0x00, "SFogInfo::mColorR offset must be 0x00");
+  static_assert(offsetof(SFogInfo, mEnd) == 0x10, "SFogInfo::mEnd offset must be 0x10");
 
   /**
    * Chart dimensions handed by value into `CWldTerrainRes::Reset`
@@ -491,8 +495,8 @@ namespace moho
     virtual void SetWaterElevation(float elevation) = 0;
     virtual void SetWaterElevationDeep(float elevation) = 0;
     virtual void SetWaterElevationAbyss(float elevation) = 0;
-    [[nodiscard]] virtual bool SetPlayableMapRect(const VisibilityRect& rect) = 0;
-    [[nodiscard]] virtual const VisibilityRect* GetPlayableMapRect(VisibilityRect& outRect) const = 0;
+    [[nodiscard]] virtual bool SetPlayableMapRect(const gpg::Rect2i& rect) = 0;
+    [[nodiscard]] virtual const gpg::Rect2i* GetPlayableMapRect(gpg::Rect2i& outRect) const = 0;
     [[nodiscard]] virtual bool IsInPlayableRect(const Wm3::Vec3f& worldPos) = 0;
     virtual void SetWaterShaderProperties(const CWaterShaderProperties& properties) = 0;
     [[nodiscard]] virtual CWaterShaderProperties* GetWaterShaderProperties() = 0;

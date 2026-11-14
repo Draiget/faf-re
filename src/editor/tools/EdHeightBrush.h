@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <memory>
 #include <vector>
 
 namespace faf::editor
@@ -33,7 +34,158 @@ namespace faf::editor
      * ground is moved, not made.
      */
     WaterErode,
+    /**
+     * Like Water erode, but the water runs on past the brush and keeps digging downhill, up to 0.8 of the radius
+     * beyond it (FAF Studio's Rain brush).
+     */
+    Rain,
+    /**
+     * Sediment laid under the brush as an even heap that the water then carries a little downhill, so it settles
+     * like washed-in ground (FAF Studio's Deposit brush). Ground is made. Right-dragging Water erode does this.
+     */
+    Deposit,
+    /**
+     * Towards the stroke's level (the ground under its first point) in one go where the brush is full, the falloff
+     * shaping the shoulder (FAF Studio's Plateau): a flat top with a soft edge.
+     */
+    Plateau,
+    /** Away from the blurred ground, the opposite of Smooth: edges and ridges stand out. Right-dragging Smooth does it.
+     */
+    Sharpen,
+    /** A drag from a start to an end: a straight slope as wide as the brush between the ground's heights there. */
+    Ramp,
+    /** Clicked points make a curve that shapes the ground along it (EdTerrainPath), applied in one go. */
+    Path,
   };
+  /**
+   * The mode that does the opposite (a negative strength, a right-drag): Raise and Lower swap, Smooth sharpens and
+   * Sharpen smooths, Water erode deposits and Deposit erodes; the others have no opposite and stay.
+   */
+  [[nodiscard]] constexpr HeightBrushMode InvertedHeightMode(
+    const HeightBrushMode mode
+  ) noexcept
+  {
+    switch (mode) {
+    case HeightBrushMode::Raise:
+      return HeightBrushMode::Lower;
+    case HeightBrushMode::Lower:
+      return HeightBrushMode::Raise;
+    case HeightBrushMode::Smooth:
+      return HeightBrushMode::Sharpen;
+    case HeightBrushMode::Sharpen:
+      return HeightBrushMode::Smooth;
+    case HeightBrushMode::WaterErode:
+      return HeightBrushMode::Deposit;
+    case HeightBrushMode::Deposit:
+      return HeightBrushMode::WaterErode;
+    default:
+      return mode;
+    }
+  }
+
+  /**
+   * The brush's shape (FAF Studio's brushes.lua): Round follows the falloff; the others are masks over the brush's
+   * square, read at (u, v) in -1..1 and turned by the brush's angle.
+   */
+  enum class BrushShape
+  {
+    Round,
+    Square,
+    Diamond,
+    Cone,
+    Plateau,
+    Ring,
+    Ridge,
+    Mountain,
+    Rocks,
+    Bump,
+    /** A greyscale image of the brush library, on the brush's `shapeImage` grid. */
+    Image,
+  };
+  /** Round and the procedural shapes (Image comes from the brush library). */
+  inline constexpr int kBrushShapeCount = 10;
+
+  /** A shape on an n x n grid over its square (-1..1 on both axes, corners on the samples), row by row. */
+  struct ShapeGrid
+  {
+    int n = 0;
+    std::vector<float> values;
+    /** Read between samples at (u, v); 0 outside the square. */
+    [[nodiscard]] float Sample(
+      const float u,
+      const float v
+    ) const noexcept
+    {
+      if (n < 2 || u < -1.0f || v < -1.0f || u > 1.0f || v > 1.0f) {
+        return 0.0f;
+      }
+      const float top = static_cast<float>(n - 1);
+      const float fx = (u + 1.0f) * 0.5f * top;
+      const float fz = (v + 1.0f) * 0.5f * top;
+      const int x0 = fx >= top ? n - 2 : static_cast<int>(fx);
+      const int z0 = fz >= top ? n - 2 : static_cast<int>(fz);
+      const float tx = fx - static_cast<float>(x0);
+      const float tz = fz - static_cast<float>(z0);
+      const auto at = [&](const int x, const int z) {
+        return values[static_cast<std::size_t>(z) * static_cast<std::size_t>(n) + static_cast<std::size_t>(x)];
+      };
+      return (at(x0, z0) * (1.0f - tx) + at(x0 + 1, z0) * tx) * (1.0f - tz) +
+        (at(x0, z0 + 1) * (1.0f - tx) + at(x0 + 1, z0 + 1) * tx) * tz;
+    }
+  };
+
+  /** How a stamp meets the ground (FAF Studio's stamp.lua). Max, Min and Replace measure from the brush's `stampBase`.
+   */
+  enum class StampMode
+  {
+    /** The stamp is added to the ground. */
+    Add,
+    Subtract,
+    /** The ground rises to the stamp where the stamp is higher. */
+    Max,
+    /** The ground sinks to the stamp turned upside down where that is lower. */
+    Min,
+    /** Inside its circle the ground becomes the stamp: a mountain set into the landscape. */
+    Replace,
+  };
+
+  /**
+   * The brush's weight (0..1) at offset (dx, dz) from its centre, in its own frame: the falloff for Round, else its
+   * shape turned by its angle, cut at the radius (the mask brush reads its shape through this too).
+   */
+  struct HeightBrush;
+  [[nodiscard]] float BrushWeightAt(const HeightBrush& brush, float dx, float dz);
+
+  /** A shape's name for the panel. */
+  [[nodiscard]] const char* BrushShapeName(BrushShape shape);
+
+  /** A shape's weight (0..1) at (u, v) of its square (-1..1 on both axes); Round: 1 inside the unit circle. */
+  [[nodiscard]] float BrushShapeAt(BrushShape shape, float u, float v);
+
+  /**
+   * Rain and Deposit: droplets on FAF Studio's erosion session (src/editor/terrain/EdErosion.h). Water erode keeps the
+   * editor's own droplets: Studio's carries part of what runs out of the brush away, and Water erode moves ground
+   * without losing any.
+   */
+  [[nodiscard]] constexpr bool IsErosionMode(
+    const HeightBrushMode mode
+  ) noexcept
+  {
+    return mode == HeightBrushMode::Rain || mode == HeightBrushMode::Deposit;
+  }
+
+  /**
+   * The erosion brushes' state for one stroke: the map's heights as floats, so ground a droplet moves keeps its
+   * fractions from step to step, and the stroke's droplet seed. The caller makes one when a stroke starts and drops it
+   * when the stroke ends; without one, each step starts afresh from the map's words.
+   */
+  class ErosionStroke;
+  struct ErosionStrokeDelete
+  {
+    void operator()(ErosionStroke* stroke) const noexcept;
+  };
+  using ErosionStrokePtr = std::unique_ptr<ErosionStroke, ErosionStrokeDelete>;
+  [[nodiscard]] ErosionStrokePtr MakeErosionStroke();
 
   /** A height image for stamps: `width` x `height` words, read between samples over the brush's square. */
   struct HeightStamp
@@ -89,6 +241,23 @@ namespace faf::editor
     float stampHeight = 2560.0f;
     /** Erode: the steepest slope (rise over run, game units) the ground keeps. */
     float erodeTalus = 0.6f;
+    /** The brush's shape and how far it is turned (degrees, towards +z); Round uses `falloff`. */
+    BrushShape shape = BrushShape::Round;
+    float shapeAngle = 0.0f;
+    /** Image: the library image's grid (null: the brush is round). */
+    const ShapeGrid* shapeImage = nullptr;
+    /** Stamp: how it meets the ground, the height Max, Min and Replace measure from (words), its turn (degrees). */
+    StampMode stampMode = StampMode::Add;
+    float stampBase = 0.0f;
+    float stampTurn = 0.0f;
+    /**
+     * Noise: smooth value noise with a lattice cell of `noiseScale` samples and `noiseOctaves` (1 to 4) layers, each
+     * half the cell and `noiseRoughness` as strong as the one before; `noiseSeed` picks the pattern (one per stroke).
+     */
+    float noiseScale = 8.0f;
+    int noiseOctaves = 2;
+    float noiseRoughness = 0.5f;
+    std::uint32_t noiseSeed = 0;
     /** Water erode: where this step's droplets start and how it rounds (the caller changes it every step). */
     std::uint32_t seed = 1;
     /** Limits: only samples between these heights (height words), and only where the slope (rise over run) is at most
@@ -140,11 +309,21 @@ namespace faf::editor
     float x,
     float z,
     const HeightBrush& brush,
-    float seconds
+    float seconds,
+    ErosionStroke* stroke = nullptr
   );
 
   /** The rectangles `ApplyHeightBrush` would write for the same arguments, without writing (undo saves them first). */
   std::vector<SampleRect> HeightBrushRects(int width, int height, float x, float z, const HeightBrush& brush);
+
+  /**
+   * The symmetry's centre, as an offset from the map's middle in samples (FAF Studio's Centre X / Z): every mirror,
+   * turn and N-way copy of the brushes and of SymmetricSamples is made about it. A copy that would fall off the map is
+   * the point itself (a repeat, as copies that coincide are).
+   */
+  void SetSymmetryCentreOffset(float x, float z) noexcept;
+  [[nodiscard]] float SymmetryCentreOffsetX() noexcept;
+  [[nodiscard]] float SymmetryCentreOffsetZ() noexcept;
 
   /** The brush's centre and its symmetric copies (the cursor's first), as the brush paints them. */
   int HeightBrushCentres(

@@ -52,17 +52,6 @@ namespace
     return moho::MotorFallDown::sType;
   }
 
-  /**
-   * Address: 0x006959F0 (FUN_006959F0)
-   *
-   * What it does:
-   * Secondary duplicated RTTI-resolve lane for `MotorFallDown`.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::RType* CachedMotorFallDownTypeVariantB()
-  {
-    return CachedMotorFallDownType();
-  }
-
   [[nodiscard]] gpg::RType* CachedMotorType()
   {
     if (!moho::Motor::sType) {
@@ -128,38 +117,6 @@ namespace
   )
   {
     return moho::CScrLuaMetatableFactory<moho::MotorFallDown>::Instance().Get(state);
-  }
-
-  /**
-   * Address: 0x00695F00 (FUN_00695F00, gpg::RRef_MotorFallDown)
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::RRef MakeMotorFallDownRef(
-    moho::MotorFallDown* const object
-  )
-  {
-    gpg::RRef ref{};
-    ref.mObj = object;
-    ref.mType = CachedMotorFallDownType();
-    return ref;
-  }
-
-  /**
-   * Address: 0x006960D0 (FUN_006960D0)
-   *
-   * What it does:
-   * Upcasts one reflected reference lane to `MotorFallDown` object storage
-   * using the cached motor-fall-down RTTI descriptor.
-   */
-  [[maybe_unused]] [[nodiscard]] void* TryUpcastMotorFallDownRefObject(
-    gpg::RRef* const sourceRef
-  )
-  {
-    if (!sourceRef) {
-      return nullptr;
-    }
-
-    const gpg::RRef upcast = gpg::REF_UpcastPtr(*sourceRef, CachedMotorFallDownType());
-    return upcast.mObj;
   }
 
   /**
@@ -380,7 +337,7 @@ namespace moho
   )
   {
     gpg::RType* const baseType = CachedCScriptObjectType();
-    gpg::AddReflectedBaseType(typeInfo, baseType, gpg::RType::BaseSubobjectOffset<MotorFallDown, CScriptObject>());
+    gpg::AddReflectedBaseType(typeInfo, baseType, gpg::BaseSubobjectOffset<MotorFallDown, CScriptObject>());
   }
 
   /**

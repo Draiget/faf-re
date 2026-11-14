@@ -78,7 +78,7 @@ namespace gpg
    */
   void RMapStringFloatTypeInfo::SerLoad(
     gpg::ReadArchive* const archive,
-    const std::intptr_t objectPtr,
+    void* const objectPtr,
     const int,
     gpg::RRef* const
   )
@@ -87,7 +87,7 @@ namespace gpg
       return;
     }
 
-    auto* const destination = reinterpret_cast<fa::map<fa::string, float>*>(objectPtr);
+    auto* const destination = static_cast<fa::map<fa::string, float>*>(objectPtr);
     unsigned int count = 0u;
     archive->ReadUInt(&count);
 
@@ -109,7 +109,7 @@ namespace gpg
    */
   void RMapStringFloatTypeInfo::SerSave(
     gpg::WriteArchive* const archive,
-    const std::intptr_t objectPtr,
+    void* const objectPtr,
     const int,
     gpg::RRef*
   )
@@ -118,7 +118,7 @@ namespace gpg
       return;
     }
 
-    const auto* const source = reinterpret_cast<const fa::map<fa::string, float>*>(objectPtr);
+    const auto* const source = static_cast<const fa::map<fa::string, float>*>(objectPtr);
     const unsigned int count = source != nullptr ? static_cast<unsigned int>(source->size()) : 0u;
     archive->WriteUInt(count);
 

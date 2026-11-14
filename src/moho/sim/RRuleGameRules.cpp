@@ -90,6 +90,8 @@ namespace moho
 
   /// The rules whose Lua blueprints the session loader frees (RULE_DeferScriptBlueprintRelease).
   std::atomic<const RRuleGameRules*> gLoaderReleasesBlueprints{nullptr};
+  /// For those rules: how many of the session and the sim still have to copy the blueprints (2, 1, 0).
+  std::atomic<int> gDeferredCopiesPending{0};
 
   /**
    * One blueprint file waiting to be reloaded, linked into
@@ -159,17 +161,6 @@ namespace moho
 
   namespace
   {
-    // The rules keep their lock inline at +0x38, so it is stored as raw bytes
-    // to preserve the layout and constructed in place by the constructor.
-    static_assert(sizeof(fa::mutex) <= 0x08, "fa::mutex must fit RRuleGameRulesImpl::mLockStorage at +0x38");
-
-    [[nodiscard]] fa::mutex& RuleMutexView(
-      RRuleGameRulesImpl& rules
-    ) noexcept
-    {
-      return *reinterpret_cast<fa::mutex*>(&rules.mLockStorage[0]);
-    }
-
     template <typename TValue>
     [[nodiscard]] TValue* StoreAdapterLane(
       TValue* const outValue,
@@ -178,115 +169,6 @@ namespace moho
     {
       *outValue = value;
       return outValue;
-    }
-
-    [[nodiscard]] void** StoreOpaquePointerLane(
-      void** const outValue,
-      void* const value
-    ) noexcept
-    {
-      return StoreAdapterLane(outValue, value);
-    }
-
-    /**
-     * Address: 0x0052BD80 (FUN_0052BD80)
-     *
-     * What it does:
-     * Stores one opaque pointer lane into caller output storage.
-     */
-    [[maybe_unused]] [[nodiscard]] void** StoreOpaquePointerLaneA(
-      void** const outValue,
-      void* const value
-    ) noexcept
-    {
-      return StoreOpaquePointerLane(outValue, value);
-    }
-
-    /**
-     * Address: 0x0052C5E0 (FUN_0052C5E0)
-     *
-     * What it does:
-     * Stores one opaque pointer lane into caller output storage.
-     */
-    [[maybe_unused]] [[nodiscard]] void** StoreOpaquePointerLaneB(
-      void** const outValue,
-      void* const value
-    ) noexcept
-    {
-      return StoreOpaquePointerLane(outValue, value);
-    }
-
-    /**
-     * Address: 0x0052CC00 (FUN_0052CC00)
-     *
-     * What it does:
-     * Stores one opaque pointer lane into caller output storage.
-     */
-    [[maybe_unused]] [[nodiscard]] void** StoreOpaquePointerLaneC(
-      void** const outValue,
-      void* const value
-    ) noexcept
-    {
-      return StoreOpaquePointerLane(outValue, value);
-    }
-
-    /**
-     * Address: 0x0052D5E0 (FUN_0052D5E0)
-     *
-     * What it does:
-     * Swaps two 32-bit value lanes and returns the left-hand storage pointer.
-     */
-    [[maybe_unused]] [[nodiscard]] std::uint32_t* SwapDwordLaneValues(
-      std::uint32_t* const lhs,
-      std::uint32_t* const rhs
-    ) noexcept
-    {
-      const std::uint32_t value = *lhs;
-      *lhs = *rhs;
-      *rhs = value;
-      return lhs;
-    }
-
-    /**
-     * Address: 0x0052D600 (FUN_0052D600)
-     *
-     * What it does:
-     * Stores one iterator-node pointer lane into caller output storage.
-     */
-    [[maybe_unused]] [[nodiscard]] void** StoreIteratorNodePointerLaneA(
-      void** const outValue,
-      void* const value
-    ) noexcept
-    {
-      return StoreOpaquePointerLane(outValue, value);
-    }
-
-    /**
-     * Address: 0x0052D650 (FUN_0052D650)
-     *
-     * What it does:
-     * Stores one iterator-node pointer lane into caller output storage.
-     */
-    [[maybe_unused]] [[nodiscard]] void** StoreIteratorNodePointerLaneB(
-      void** const outValue,
-      void* const value
-    ) noexcept
-    {
-      return StoreOpaquePointerLane(outValue, value);
-    }
-
-    /**
-     * Address: 0x0052D6A0 (FUN_0052D6A0)
-     *
-     * What it does:
-     * Stores one iterator-node pointer lane into caller output storage.
-     */
-    [[maybe_unused]] [[nodiscard]] void** StoreIteratorNodePointerLaneC(
-      void** const outValue,
-      void* const value
-    ) noexcept
-    {
-      return StoreOpaquePointerLane(outValue, value);
     }
 
     /**
@@ -469,48 +351,6 @@ namespace moho
       }
     }
 
-    /**
-     * Address: 0x0052DBA0 (FUN_0052DBA0)
-     *
-     * What it does:
-     * Releases one raw runtime storage lane through global `operator delete`.
-     */
-    [[maybe_unused]] void DeleteStorageLane(
-      void* const storage
-    )
-    {
-      ::operator delete(storage);
-    }
-
-    /**
-     * Grows `mMaps` to at least `requestedCapacity` live-binding slots.
-     *
-     * No address of its own (the binary inlines this as part of
-     * `ExportToLuaState`'s own capacity check ahead of its `insert` call,
-     * cited in full on `legacy/containers/Vector.h`'s `insert(pos, count,
-     * value)` member as `FUN_0052DBE0`). Delegates entirely to
-     * `fa::vector<T>::reserve()`, which is the fix for a genuine
-     * behavioral divergence the previous hand-rolled body had: it allocated
-     * via `new RRuleGameRulesLuaExportBinding[requestedCapacity]{}`
-     * (default-constructing every slot up to the full new capacity, not
-     * just the live prefix) and *assigned* the live elements into those
-     * already-live slots, whereas the real binary's growth path -- and this
-     * member's own `reserve()`/`reallocate_to()` -- allocates raw,
-     * unconstructed memory and only *constructs* exactly the live prefix
-     * into it (see the divergence note on `RRuleGameRulesImpl::mMaps`,
-     * RRuleGameRules.h, for the full evidence trail: `FUN_0052D590`'s and
-     * `FUN_00536DF0`'s raw disassembly both show a scalar `operator
-     * delete`, never `delete[]`, which only pairs with a real vector's
-     * raw-allocate/exact-construct shape).
-     */
-    [[maybe_unused]] void ReserveExportBindingCapacity(
-      RRuleGameRulesImpl& rules,
-      const std::size_t requestedCapacity
-    )
-    {
-      rules.mMaps.reserve(requestedCapacity);
-    }
-
     [[nodiscard]] RRuleGameRulesLuaExportBinding* FindExportBinding(
       RRuleGameRulesImpl& rules,
       LuaPlus::LuaState* const rootState
@@ -526,14 +366,6 @@ namespace moho
         }
       }
       return nullptr;
-    }
-
-    [[maybe_unused]] [[nodiscard]] const RRuleGameRulesLuaExportBinding* FindExportBinding(
-      const RRuleGameRulesImpl& rules,
-      LuaPlus::LuaState* const rootState
-    ) noexcept
-    {
-      return FindExportBinding(const_cast<RRuleGameRulesImpl&>(rules), rootState);
     }
 
     /**
@@ -966,7 +798,8 @@ namespace moho
     CBackgroundTaskControl* const initHandler
   )
     : mUnknown04(0u)
-    , mLockStorage{}
+    , mDiskWatchListener("*.bp")
+    , mLock()
     , mLuaState(nullptr)
     , mMaps{}
     , mFootprints{}
@@ -980,11 +813,6 @@ namespace moho
     , mBlueprintsByOrdinal()
     , mEntityCategoryLookup(nullptr)
   {
-    // 0x00553... constructs the blueprint watcher in place; it has no default
-    // state, which is why it is built here rather than in the member list.
-    new (mDiskWatchListenerStorage) CDiskWatchListener("*.bp");
-    new (&RuleMutexView(*this)) fa::mutex();
-
     mLuaState = new (std::nothrow) LuaPlus::LuaState(LuaPlus::LuaState::LIB_BASE);
     lua::NameLuaVm(mLuaState->m_state, "GameRules"); // diagnostics label only
 
@@ -1155,9 +983,6 @@ namespace moho
 
     delete mLuaState;
     mLuaState = nullptr;
-
-    RuleMutexView(*this).~mutex();
-    DiskWatchListener().CDiskWatchListener::~CDiskWatchListener();
   }
 
   /**
@@ -1194,7 +1019,7 @@ namespace moho
       return;
     }
 
-    const fa::mutex::scoped_lock exportLock(RuleMutexView(*this));
+    const fa::mutex::scoped_lock exportLock(mLock);
 
     LuaPlus::LuaState* const rootState = ResolveRootState(luaState);
     if (!rootState) {
@@ -1234,18 +1059,41 @@ namespace moho
     if (mLuaState == nullptr) {
       return;
     }
-    const fa::mutex::scoped_lock releaseLock(RuleMutexView(*this));
+    const fa::mutex::scoped_lock releaseLock(mLock);
     LuaPlus::LuaObject globals = mLuaState->GetGlobals();
     globals.SetNil("__blueprints");
     lua_setgcthreshold(mLuaState->m_state, 0);
   }
 
+  namespace
+  {
+    /**
+     * The session or the sim has its copy of deferred rules' blueprints; the second of the two frees
+     * the rules' own. The sim may copy before the session (a state prepared ahead) or after it (built
+     * in `Sim::Sim` when the prepare was skipped, as after a previous game in this process).
+     */
+    void DeferredCopyDone(
+      RRuleGameRulesImpl& rules
+    )
+    {
+      if (gDeferredCopiesPending.fetch_sub(1, std::memory_order_acq_rel) != 1) {
+        return;
+      }
+      const RRuleGameRules* expected = &rules;
+      if (
+        gLoaderReleasesBlueprints.compare_exchange_strong(expected, nullptr, std::memory_order_acq_rel) &&
+        rule_ReleaseScriptBlueprints && !KeepsScriptBlueprints()
+      ) {
+        rules.ReleaseScriptBlueprints();
+      }
+    }
+  } // namespace
+
   void RRuleGameRulesImpl::OnSimHasBlueprints()
   {
-    if (
-      rule_ReleaseScriptBlueprints && !KeepsScriptBlueprints() &&
-      gLoaderReleasesBlueprints.load(std::memory_order_acquire) != this
-    ) {
+    if (gLoaderReleasesBlueprints.load(std::memory_order_acquire) == this) {
+      DeferredCopyDone(*this);
+    } else if (rule_ReleaseScriptBlueprints && !KeepsScriptBlueprints()) {
       ReleaseScriptBlueprints();
     }
   }
@@ -1254,6 +1102,7 @@ namespace moho
     RRuleGameRules* const rules
   ) noexcept
   {
+    gDeferredCopiesPending.store(2, std::memory_order_relaxed);
     gLoaderReleasesBlueprints.store(rules, std::memory_order_release);
   }
 
@@ -1261,11 +1110,8 @@ namespace moho
     RRuleGameRules* const rules
   )
   {
-    if (
-      rule_ReleaseScriptBlueprints && !KeepsScriptBlueprints() && rules != nullptr &&
-      gLoaderReleasesBlueprints.load(std::memory_order_acquire) == rules
-    ) {
-      static_cast<RRuleGameRulesImpl*>(rules)->ReleaseScriptBlueprints();
+    if (rules != nullptr && gLoaderReleasesBlueprints.load(std::memory_order_acquire) == rules) {
+      DeferredCopyDone(*static_cast<RRuleGameRulesImpl*>(rules));
     }
   }
 
@@ -1327,6 +1173,11 @@ namespace moho
       );
       delete dropped;
     });
+  }
+
+  void RULE_FinishPreparingKept()
+  {
+    FinishPreparing();
   }
 
   RRuleGameRules* RULE_TakeOrCreate(
@@ -1437,7 +1288,7 @@ namespace moho
     // rules' own `lua_State` inside `SynchronizeBlueprintTable`. Without the
     // lock the two threads interleave inside one 5000-entry `SCR_Copy` loop
     // over a single `lua_State`, which corrupts it and faults in `luaV_index`.
-    fa::mutex::scoped_lock rulesLock(RuleMutexView(*this));
+    fa::mutex::scoped_lock rulesLock(mLock);
 
     // Drain pending file-watcher notifications. Each new path that isn't
     // already enqueued for reload becomes a fresh `LuaReloadRequestNode`
@@ -1718,19 +1569,8 @@ namespace moho
     return mUnitBlueprints.size();
   }
 
-  /**
-   * Alias of FUN_0052B1E0 (non-canonical helper lane).
-   *
-   * What it does:
-   * Delegates category-name lookup to the shared resolver implementation.
-   */
-  const EntityCategorySet* RRuleGameRulesImpl::GetEntityCategory(
-    const char* categoryName
-  ) const
-  {
-    const auto* const resolver = reinterpret_cast<const EntityCategoryLookupResolver*>(this);
-    return resolver->EntityCategoryLookupResolver::GetEntityCategory(categoryName);
-  }
+  // `RRuleGameRulesImpl::GetEntityCategory` (0x0052B1E0) lives in
+  // moho/entity/EntityCategoryLookupResolver.cpp with its lookup cache.
 
   /**
    * Address: 0x0052B280 (FUN_0052B280, Moho::RRuleGameRulesImpl::ParseEntityCategory)

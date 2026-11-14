@@ -253,52 +253,6 @@ namespace moho
 namespace
 {
 
-  /**
-   * Address: 0x00606CD0 (FUN_00606CD0, Moho::CUnitCarrierLandSerializer::Deserialize)
-   *
-   * What it does:
-   * Reflection load-callback facade for `CUnitCarrierLand`. Forwards the
-   * reflected object pointer to `CUnitCarrierLand::MemberDeserialize`;
-   * `version` and the owner-ref lane are unused by the member (mirrors the
-   * binary tail call).
-   */
-  [[maybe_unused]] void DeserializeCUnitCarrierLandSerializerCallback(
-    gpg::ReadArchive* const archive,
-    const std::intptr_t objectPtr,
-    const int,
-    gpg::RRef* const
-  )
-  {
-    auto* const task = reinterpret_cast<moho::CUnitCarrierLand*>(objectPtr);
-    if (task == nullptr) {
-      return;
-    }
-    task->MemberDeserialize(archive);
-  }
-
-  /**
-   * Address: 0x00606CE0 (FUN_00606CE0, Moho::CUnitCarrierLandSerializer::Serialize)
-   *
-   * What it does:
-   * Reflection save-callback facade for `CUnitCarrierLand`. Forwards the
-   * reflected object pointer to `CUnitCarrierLand::MemberSerialize`;
-   * `version` and the owner-ref lane are unused by the member (mirrors the
-   * binary tail call).
-   */
-  [[maybe_unused]] void SerializeCUnitCarrierLandSerializerCallback(
-    gpg::WriteArchive* const archive,
-    const std::intptr_t objectPtr,
-    const int,
-    gpg::RRef* const
-  )
-  {
-    auto* const task = reinterpret_cast<moho::CUnitCarrierLand*>(objectPtr);
-    if (task == nullptr) {
-      return;
-    }
-    task->MemberSerialize(archive);
-  }
-
 } // namespace
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of

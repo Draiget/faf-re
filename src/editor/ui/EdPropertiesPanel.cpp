@@ -2,6 +2,11 @@
 // header with its kind and name, its transform as labelled rows, then what its kind has.
 
 #include <cctype>
+#include "editor/ui/EdControls.h"
+#include "editor/ui/EdFonts.h"
+#include "editor/ui/EdThemeColors.h"
+#include "editor/ui/EdUiScale.h"
+#include "editor/ui/EdWorkspaces.h"
 #include <cstdint>
 #include <cstdio>
 #include <iterator>
@@ -63,13 +68,13 @@ namespace faf::editor
 
   void EdShell::DrawPropertiesPanel()
   {
-    if (!ImGui::Begin("Properties", &mShowProperties)) {
+    if (!ImGui::Begin(Panel("Properties"), &mShowProperties)) {
       ImGui::End();
       return;
     }
     // The map border while the toolbar's border button is on.
     if (mTools.EditingBorder()) {
-      if (ImGui::CollapsingHeader("Map border", ImGuiTreeNodeFlags_DefaultOpen)) {
+      if (Section("Map border")) {
         mTools.DrawPlayableArea();
       }
       ImGui::Spacing();
@@ -85,6 +90,40 @@ namespace faf::editor
       mPropertiesEditing = false;
       ImGui::TextDisabled("Nothing selected.");
       HelpNote("Select a marker, unit, prop or decal (the Select tool picks any of them) to see and edit it here.");
+      // The mockup's cards: what the map holds, a big number over its kind.
+      static constexpr const char* kKinds[4] = {"markers", "props", "units", "decals"};
+      const int* const counts = mTools.MapCounts();
+      const float gap = ImGui::GetStyle().ItemSpacing.x;
+      const float cardWidth = (ImGui::GetContentRegionAvail().x - gap * 3.0f) / 4.0f;
+      const float big = std::round(ImGui::GetFontSize() * 1.45f);
+      const float small = std::round(ImGui::GetFontSize() * 0.85f);
+      const float cardHeight = std::round(big + small + ImGui::GetStyle().FramePadding.y * 4.0f);
+      ImDrawList* const draw = ImGui::GetWindowDrawList();
+      for (int k = 0; k < 4; ++k) {
+        if (k > 0) {
+          ImGui::SameLine(0.0f, gap);
+        }
+        const ImVec2 at = ImGui::GetCursorScreenPos();
+        ImGui::Dummy(ImVec2(cardWidth, cardHeight));
+        const ImVec2 end(at.x + cardWidth, at.y + cardHeight);
+        const float rounding = ImGui::GetStyle().FrameRounding;
+        draw->AddRectFilled(at, end, ImGui::GetColorU32(ImGuiCol_FrameBg), rounding);
+        draw->AddRect(at, end, ImGui::GetColorU32(ImGuiCol_Border), rounding);
+        char number[24];
+        (void)std::snprintf(number, sizeof(number), "%d", counts[k]);
+        const float left = at.x + ImGui::GetStyle().FramePadding.x + 2.0f;
+        const float top = at.y + ImGui::GetStyle().FramePadding.y * 1.5f;
+        draw->AddText(
+          gBoldFont != nullptr ? gBoldFont : ImGui::GetFont(),
+          big,
+          ImVec2(left, top),
+          ImGui::GetColorU32(ImGuiCol_Text),
+          number
+        );
+        draw->AddText(
+          ImGui::GetFont(), small, ImVec2(left, top + big), ImGui::GetColorU32(ImGuiCol_TextDisabled), kKinds[k]
+        );
+      }
       ImGui::End();
       return;
     }
@@ -130,7 +169,7 @@ namespace faf::editor
           ImGui::Image(static_cast<ImTextureID>(image), ImVec2(side, side));
         } else {
           ImGui::Dummy(ImVec2(side, side));
-          ImGui::GetWindowDrawList()->AddRect(at, ImVec2(at.x + side, at.y + side), IM_COL32(58, 65, 75, 255), 4.0f);
+          ImGui::GetWindowDrawList()->AddRect(at, ImVec2(at.x + side, at.y + side), LineU32(), 4.0f);
         }
         ImGui::SameLine();
         ImGui::BeginGroup();
@@ -151,13 +190,32 @@ namespace faf::editor
     }
     // The header: its kind as a chip, its name (a marker's can be renamed), how many more are selected.
     {
+      // The mockup's pill: the kind's colour faint behind its words in that colour, as tall as the name field beside
+      // it.
       const ImVec4 colour = KindColour(now.kind);
-      ImGui::PushStyleColor(ImGuiCol_Button, colour);
-      ImGui::PushStyleColor(ImGuiCol_ButtonHovered, colour);
-      ImGui::PushStyleColor(ImGuiCol_ButtonActive, colour);
-      // Its own id: the section header below has the same word ("Unit"), and two items with one id are an ImGui error.
-      ImGui::SmallButton((std::string(KindName(now.kind)) + "##kindtag").c_str());
-      ImGui::PopStyleColor(3);
+      const char* const kind = KindName(now.kind);
+      const ImVec2 words = ImGui::CalcTextSize(kind);
+      const float height = ImGui::GetFrameHeight();
+      const float width = std::round(words.x + ImGui::GetStyle().FramePadding.x * 2.0f);
+      const ImVec2 at = ImGui::GetCursorScreenPos();
+      // Its own id: the section below has the same word ("Unit"), and two items with one id are an ImGui error.
+      ImGui::Dummy(ImVec2(width, height));
+      ImDrawList* const draw = ImGui::GetWindowDrawList();
+      draw->AddRectFilled(
+        at,
+        ImVec2(at.x + width, at.y + height),
+        ImGui::GetColorU32(ImVec4(colour.x, colour.y, colour.z, 0.22f)),
+        ImGui::GetStyle().FrameRounding
+      );
+      const ImVec4 ink(
+        colour.x + (1.0f - colour.x) * 0.35f,
+        colour.y + (1.0f - colour.y) * 0.35f,
+        colour.z + (1.0f - colour.z) * 0.35f,
+        1.0f
+      );
+      draw->AddText(
+        ImVec2(at.x + (width - words.x) * 0.5f, at.y + (height - words.y) * 0.5f), ImGui::GetColorU32(ink), kind
+      );
       ImGui::SameLine();
       if (now.kind == SelectionProperties::Kind::Marker) {
         ImGui::SetNextItemWidth(-1.0f);
@@ -189,37 +247,58 @@ namespace faf::editor
       ImGui::SameLine(labelWidth + ImGui::GetStyle().WindowPadding.x);
       ImGui::SetNextItemWidth(-1.0f);
     };
-    if (ImGui::CollapsingHeader("Transform", ImGuiTreeNodeFlags_DefaultOpen)) {
+    if (Section("Transform")) {
       bool moved = false;
       row("Location X");
-      ImGui::DragFloat("##x", &edit.position[0], 0.1f, 0.0f, 0.0f, "%.2f");
+      FillDragFloat("##x", &edit.position[0], 0.1f, 0.0f, 0.0f, "%.2f");
       moved = moved || ImGui::IsItemDeactivatedAfterEdit();
       active = active || ImGui::IsItemActive();
       row("Height");
-      ImGui::DragFloat("##y", &edit.position[1], 0.05f, 0.0f, 0.0f, "%.2f");
+      FillDragFloat("##y", &edit.position[1], 0.05f, 0.0f, 0.0f, "%.2f");
       moved = moved || ImGui::IsItemDeactivatedAfterEdit();
       active = active || ImGui::IsItemActive();
       row("Z");
-      ImGui::DragFloat("##z", &edit.position[2], 0.1f, 0.0f, 0.0f, "%.2f");
+      FillDragFloat("##z", &edit.position[2], 0.1f, 0.0f, 0.0f, "%.2f");
       moved = moved || ImGui::IsItemDeactivatedAfterEdit();
       active = active || ImGui::IsItemActive();
       if (moved) {
         send(PropertyEdit::What::Position, edit.position[0], edit.position[1], edit.position[2]);
       }
       row("Heading");
-      ImGui::DragFloat("##heading", &edit.heading, 0.5f, -180.0f, 180.0f, "%.1f deg");
+      FillDragFloat("##heading", &edit.heading, 0.5f, -180.0f, 180.0f, "%.1f deg");
       if (ImGui::IsItemDeactivatedAfterEdit()) {
         send(PropertyEdit::What::Heading, edit.heading, 0.0f, 0.0f);
       }
       active = active || ImGui::IsItemActive();
+      if (now.kind == SelectionProperties::Kind::Prop) {
+        // The prop's scale as the .scmap record keeps it (FAF Studio's prop scale); the game draws the blueprint's.
+        bool scaled = false;
+        for (int axis = 0; axis < 3; ++axis) {
+          static const char* const kRows[] = {"Scale X", "Scale Y", "Scale Z"};
+          static const char* const kIds[] = {"##scx", "##scy", "##scz"};
+          row(kRows[axis]);
+          FillDragFloat(kIds[axis], &edit.scale[axis], 0.01f, 0.01f, 100.0f, "%.2f");
+          if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) {
+            EdSetTooltip(
+              "The scale the map file keeps for this prop (other tools read it); FAF's game draws props at their "
+              "blueprint's size"
+            );
+          }
+          scaled = scaled || ImGui::IsItemDeactivatedAfterEdit();
+          active = active || ImGui::IsItemActive();
+        }
+        if (scaled) {
+          send(PropertyEdit::What::Scale, edit.scale[0], edit.scale[1], edit.scale[2]);
+        }
+      }
       if (now.kind == SelectionProperties::Kind::Decal) {
         bool sized = false;
         row("Size X");
-        ImGui::DragFloat("##sx", &edit.size[0], 0.1f, 0.1f, 4096.0f, "%.2f");
+        FillDragFloat("##sx", &edit.size[0], 0.1f, 0.1f, 4096.0f, "%.2f");
         sized = sized || ImGui::IsItemDeactivatedAfterEdit();
         active = active || ImGui::IsItemActive();
         row("Size Z");
-        ImGui::DragFloat("##sz", &edit.size[1], 0.1f, 0.1f, 4096.0f, "%.2f");
+        FillDragFloat("##sz", &edit.size[1], 0.1f, 0.1f, 4096.0f, "%.2f");
         sized = sized || ImGui::IsItemDeactivatedAfterEdit();
         active = active || ImGui::IsItemActive();
         if (sized) {
@@ -231,7 +310,7 @@ namespace faf::editor
     // What the kind has.
     switch (now.kind) {
     case SelectionProperties::Kind::Marker:
-      if (ImGui::CollapsingHeader("Marker", ImGuiTreeNodeFlags_DefaultOpen)) {
+      if (Section("Marker")) {
         row("Type");
         ImGui::TextUnformatted(now.type.c_str());
         if (const MarkerType* const type = FindMarkerType(now.type); type != nullptr) {
@@ -267,7 +346,7 @@ namespace faf::editor
           if (held.rfind("FLOAT(", 0) == 0) {
             const std::vector<double> numbers = ValueNumbers(held);
             float number = numbers.empty() ? 0.0f : static_cast<float>(numbers.front());
-            if (ImGui::DragFloat("##float", &number, 0.1f, 0.0f, 0.0f, "%.2f")) {
+            if (FillDragFloat("##float", &number, 0.1f, 0.0f, 0.0f, "%.2f")) {
               held = FloatValue(number);
             }
             if (ImGui::IsItemDeactivatedAfterEdit()) {
@@ -313,6 +392,14 @@ namespace faf::editor
             if (ImGui::IsItemDeactivatedAfterEdit()) {
               ask(held);
             }
+          } else if (held.rfind("STRING(", 0) == 0 && key == "prop" && FindMarkerType(now.type) != nullptr) {
+            // A known type's model: the type sets it (editors draw it; the game doesn't read it), so it isn't typed in.
+            ImGui::AlignTextToFramePadding();
+            ImGui::TextDisabled("%s", ValueString(held).c_str());
+            EdSetItemTooltip(
+              "Set by the marker's type (%s): the model editors draw for it. The game doesn't read it.",
+              now.type.c_str()
+            );
           } else if (held.rfind("STRING(", 0) == 0) {
             char buffer[512];
             (void)std::snprintf(buffer, sizeof(buffer), "%s", ValueString(held).c_str());
@@ -331,16 +418,13 @@ namespace faf::editor
           }
           active = active || ImGui::IsItemActive();
           if (const char* const use = MarkerFieldUse(key); use[0] != '\0') {
-            ImGui::SetItemTooltip("%s", use);
+            EdSetItemTooltip("%s", use);
           }
           ImGui::PopID();
         }
       }
       // An adaptive map: which army this resource spawns with, which option group it belongs to (_tables.lua).
-      if (
-        (now.type == "Mass" || now.type == "Hydrocarbon") &&
-        ImGui::CollapsingHeader("Adaptive map", ImGuiTreeNodeFlags_DefaultOpen)
-      ) {
+      if ((now.type == "Mass" || now.type == "Hydrocarbon") && Section("Adaptive map")) {
         const bool hydro = now.type == "Hydrocarbon";
         const std::vector<ScenarioTeam> teams = mDocument.Teams();
         const int slots = teams.empty() ? 0 : static_cast<int>(teams.front().armies.size());
@@ -424,7 +508,7 @@ namespace faf::editor
             return a == 0 ? std::string("Always (any players)") : "ARMY_" + std::to_string(a);
           };
           row("Spawns with");
-          if (ImGui::BeginCombo("##adaptivearmy", armyName(army).c_str())) {
+          if (EdBeginCombo("##adaptivearmy", armyName(army).c_str())) {
             for (int a = 0; a <= armyCount; ++a) {
               if (ImGui::Selectable(armyName(a).c_str(), a == army) && a != army) {
                 for (std::vector<std::string>& list : byArmy) {
@@ -484,7 +568,7 @@ namespace faf::editor
             edited = true;
           };
           row("Option");
-          if (ImGui::BeginCombo("##adaptivetable", labelOf(table).c_str())) {
+          if (EdBeginCombo("##adaptivetable", labelOf(table).c_str())) {
             if (ImGui::Selectable("None", table.empty()) && !table.empty()) {
               place("", 0);
             }
@@ -537,16 +621,16 @@ namespace faf::editor
           );
           if (ImGui::Button("The whole map's adaptive setup (Map panel)", ImVec2(-1.0f, 0.0f))) {
             mShowMap = true;
-            ImGui::SetWindowFocus("Map");
+            ImGui::SetWindowFocus(Panel("Map"));
           }
-          ImGui::SetItemTooltip(
+          EdSetItemTooltip(
             "Every army's resources, the option tables and their groups, and the lobby options in _options.lua"
           );
         }
       }
       break;
     case SelectionProperties::Kind::Unit:
-      if (ImGui::CollapsingHeader("Unit", ImGuiTreeNodeFlags_DefaultOpen)) {
+      if (Section("Unit")) {
         row("Blueprint");
         ImGui::TextUnformatted(now.type.c_str());
         row("Army");
@@ -555,7 +639,7 @@ namespace faf::editor
       }
       break;
     case SelectionProperties::Kind::Prop:
-      if (ImGui::CollapsingHeader("Prop", ImGuiTreeNodeFlags_DefaultOpen)) {
+      if (Section("Prop")) {
         ImGui::TextWrapped("%s", now.type.c_str());
         if (!now.details.empty()) {
           ImGui::TextDisabled("%s", now.details.c_str());
@@ -572,7 +656,7 @@ namespace faf::editor
       }
       break;
     case SelectionProperties::Kind::Decal:
-      if (ImGui::CollapsingHeader("Decal", ImGuiTreeNodeFlags_DefaultOpen)) {
+      if (Section("Decal")) {
         ImGui::TextWrapped("%s", now.type.c_str());
       }
       break;
@@ -618,7 +702,11 @@ namespace faf::editor
     const float labelHeight = ImGui::GetTextLineHeight() + 2.0f;
     const float spacing = ImGui::GetStyle().ItemSpacing.x;
     if (
-      ImGui::BeginChild("##propbrowser", ImVec2(0.0f, (tile + labelHeight + spacing) * 3.5f), ImGuiChildFlags_Borders)
+      ImGui::BeginChild(
+        "##propbrowser",
+        ImVec2(0.0f, FillHeight(ImGui::GetFrameHeightWithSpacing() * 4.0f, (tile + labelHeight + spacing) * 2.5f)),
+        ImGuiChildFlags_Borders
+      )
     ) {
       const int columns =
         std::max(1, static_cast<int>((ImGui::GetContentRegionAvail().x + spacing) / (tile + spacing)));
@@ -644,7 +732,7 @@ namespace faf::editor
           continue;
         }
         const bool isCurrent = blueprint == current;
-        draw->AddRectFilled(at, ImVec2(at.x + tile, at.y + tile), IM_COL32(24, 27, 32, 255), 4.0f);
+        draw->AddRectFilled(at, ImVec2(at.x + tile, at.y + tile), SurfaceU32(), 4.0f);
         if (const std::uint64_t image = mTools.PropPicture(blueprint); image != 0U) {
           draw->AddImage(
             static_cast<ImTextureID>(image),
@@ -652,9 +740,7 @@ namespace faf::editor
             ImVec2(at.x + tile - 2.0f, at.y + tile - 2.0f)
           );
         }
-        const ImU32 border = isCurrent ? IM_COL32(227, 148, 66, 255)
-          : hovered                    ? IM_COL32(200, 200, 200, 255)
-                                       : IM_COL32(58, 65, 75, 255);
+        const ImU32 border = isCurrent ? AccentU32() : hovered ? InkU32() : LineU32();
         draw->AddRect(at, ImVec2(at.x + tile, at.y + tile), border, 4.0f, 0, isCurrent ? 2.0f : 1.0f);
         std::string name = shortName(blueprint);
         while (name.size() > 3 && ImGui::CalcTextSize(name.c_str()).x > tile) {
@@ -666,7 +752,7 @@ namespace faf::editor
           name.c_str()
         );
         if (hovered) {
-          ImGui::SetTooltip(
+          EdSetTooltip(
             "%s\nclick: %s",
             blueprint.c_str(),
             selected > 1 ? "every selected prop becomes this one" : "the prop becomes this one"

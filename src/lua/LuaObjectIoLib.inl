@@ -342,9 +342,10 @@ WrapFile* NewFileUserdata(
  * the stream when close-enabled, then frees the payload block.
  */
 void DestroyWrapFileStorage(
-  WrapFile* const wrapFile
+  void* const storage
 )
 {
+  auto* const wrapFile = static_cast<WrapFile*>(storage);
   if (wrapFile == nullptr) {
     return;
   }
@@ -362,19 +363,18 @@ void DestroyWrapFileStorage(
  *
  * What it does:
  * Performs WrapFile close-on-destruct semantics in-place and clears the
- * stream lane, returning the raw x86 `EAX` result payload.
+ * stream lane.
  */
-std::intptr_t FinalizeWrapFileStorage(
-  WrapFile* const wrapFile
+void FinalizeWrapFileStorage(
+  void* const storage
 )
 {
-  std::intptr_t result = reinterpret_cast<std::intptr_t>(wrapFile->stream);
+  auto* const wrapFile = static_cast<WrapFile*>(storage);
   if (wrapFile->stream != nullptr && wrapFile->closeEnabled != 0u) {
-    result = static_cast<std::intptr_t>(std::fclose(wrapFile->stream));
+    (void)std::fclose(wrapFile->stream);
   }
 
   wrapFile->stream = nullptr;
-  return result;
 }
 
 /**
@@ -453,47 +453,9 @@ void WrapFileTypeInfo::Init()
   gpg::RType::Init();
   newRefFunc_ = &NewWrapFileStorageRef;
   ctorRefFunc_ = &ConstructWrapFileStorageRef;
-  deleteFunc_ = reinterpret_cast<gpg::RType::delete_func_t>(&DestroyWrapFileStorage);
-  dtrFunc_ = reinterpret_cast<gpg::RType::dtr_func_t>(reinterpret_cast<void (*)()>(&FinalizeWrapFileStorage));
+  deleteFunc_ = &DestroyWrapFileStorage;
+  dtrFunc_ = &FinalizeWrapFileStorage;
   Finish();
-}
-
-/**
- * Address: 0x00918070 (FUN_00918070, WrapFileTypeInfo deleting-dtor thunk)
- *
- * What it does:
- * Tears down one `WrapFileTypeInfo` descriptor via `gpg::RType` base
- * teardown and conditionally frees storage when `deleteFlag & 1`.
- */
-[[maybe_unused]] gpg::RType* DestroyWrapFileTypeInfoDeleting(
-  WrapFileTypeInfo* const typeInfo,
-  const unsigned char deleteFlag
-)
-{
-  typeInfo->gpg::RType::~RType();
-  if ((deleteFlag & 1u) != 0u) {
-    ::operator delete(static_cast<void*>(typeInfo));
-  }
-  return typeInfo;
-}
-
-/**
- * Address: 0x009231F0 (FUN_009231F0, TObjectTypeInfo deleting-dtor thunk)
- *
- * What it does:
- * Tears down one `TObjectTypeInfo` descriptor via `gpg::RType` base teardown
- * and conditionally frees storage when `deleteFlag & 1`.
- */
-[[maybe_unused]] gpg::RType* DestroyTObjectTypeInfoDeleting(
-  TObjectTypeInfo* const typeInfo,
-  const unsigned char deleteFlag
-)
-{
-  typeInfo->gpg::RType::~RType();
-  if ((deleteFlag & 1u) != 0u) {
-    ::operator delete(static_cast<void*>(typeInfo));
-  }
-  return typeInfo;
 }
 
 /**
@@ -566,73 +528,6 @@ struct LuaObjectTypeInfoBootstrap
 LuaObjectTypeInfoBootstrap gLuaObjectTypeInfoBootstrap;
 
 /**
- * Address: 0x00917CE0 (FUN_00917CE0, sub_917CE0)
- *
- * What it does:
- * Binds WrapFile cleanup callbacks (`delete`, `destruct`) onto one
- * reflection type descriptor lane.
- */
-[[maybe_unused]] gpg::RType* ConfigureWrapFileCleanupCallbacks(
-  gpg::RType* const type
-)
-{
-  type->deleteFunc_ = reinterpret_cast<gpg::RType::delete_func_t>(&DestroyWrapFileStorage);
-  type->dtrFunc_ = reinterpret_cast<gpg::RType::dtr_func_t>(reinterpret_cast<void (*)()>(&FinalizeWrapFileStorage));
-  return type;
-}
-
-/**
- * Address: 0x00917F10 (FUN_00917F10, sub_917F10)
- *
- * What it does:
- * Binds WrapFile `new-ref` and `construct-ref` callbacks onto one
- * reflection type descriptor lane.
- */
-[[maybe_unused]] gpg::RType* ConfigureWrapFileRefCallbacks(
-  gpg::RType* const type
-)
-{
-  type->newRefFunc_ = &NewWrapFileStorageRef;
-  type->ctorRefFunc_ = &ConstructWrapFileStorageRef;
-  return type;
-}
-
-/**
- * Address: 0x00917F30 (FUN_00917F30, sub_917F30)
- *
- * What it does:
- * Binds full WrapFile callback suite (`new/construct/delete/destruct`) onto
- * one reflection type descriptor lane.
- */
-[[maybe_unused]] gpg::RType* ConfigureWrapFileAllCallbacks(
-  gpg::RType* const type
-)
-{
-  type->newRefFunc_ = &NewWrapFileStorageRef;
-  type->ctorRefFunc_ = &ConstructWrapFileStorageRef;
-  type->deleteFunc_ = reinterpret_cast<gpg::RType::delete_func_t>(&DestroyWrapFileStorage);
-  type->dtrFunc_ = reinterpret_cast<gpg::RType::dtr_func_t>(reinterpret_cast<void (*)()>(&FinalizeWrapFileStorage));
-  return type;
-}
-
-/**
- * Address: 0x00917F60 (FUN_00917F60, sub_917F60)
- *
- * What it does:
- * Binds the full WrapFile callback suite directly onto one reflection type
- * descriptor lane without returning the descriptor.
- */
-[[maybe_unused]] void ConfigureWrapFileAllCallbacksInPlace(
-  gpg::RType* const type
-)
-{
-  type->newRefFunc_ = &NewWrapFileStorageRef;
-  type->ctorRefFunc_ = &ConstructWrapFileStorageRef;
-  type->deleteFunc_ = reinterpret_cast<gpg::RType::delete_func_t>(&DestroyWrapFileStorage);
-  type->dtrFunc_ = reinterpret_cast<gpg::RType::dtr_func_t>(reinterpret_cast<void (*)()>(&FinalizeWrapFileStorage));
-}
-
-/**
  * Address: 0x00917100 (FUN_00917100, sub_917100)
  *
  * What it does:
@@ -651,52 +546,6 @@ gpg::RRef* BuildWrapFileRef(
   out->mObj = wrapFile;
   out->mType = CachedType<WrapFile>(gWrapFileType);
   return out;
-}
-
-/**
- * Address: 0x00916E60 (FUN_00916E60, gpg::RRef_WrapFile)
- *
- * IDA signature:
- * gpg::RRef *__cdecl gpg::RRef_WrapFile(gpg::RRef *out, char *object);
- *
- * What it does:
- * Builds a reflected reference for a `WrapFile` payload using the cached
- * RTTI lookup and a 3-slot TLS derived-type normalization helper,
- * matching the binary's TLS-cached `IsDerivedFrom` adjustment chain.
- * `WrapFile` is a non-polymorphic struct so the runtime-type
- * compare-equal fast path always fires and the derived-type TLS-cache
- * lanes are dead code in this instantiation; the effective behavior is
- * the same `(out->mObj = object; out->mType = CachedType<WrapFile>())`
- * assignment as the caller-pack entry at 0x00917100.
- */
-[[maybe_unused]] gpg::RRef* RRefWrapFileImpl(
-  gpg::RRef* const out,
-  WrapFile* const object
-)
-{
-  if (out == nullptr) {
-    return nullptr;
-  }
-
-  out->mObj = object;
-  out->mType = CachedType<WrapFile>(gWrapFileType);
-  return out;
-}
-
-/**
- * Address: 0x00917130 (FUN_00917130, sub_917130)
- *
- * What it does:
- * Validates that one userdata stack lane resolves to a WrapFile payload.
- */
-[[maybe_unused]] void ValidateWrapFileUserdataAt(
-  lua_State* const state,
-  const int index
-)
-{
-  gpg::RRef reference{};
-  GetRRefFromUserdata(&reference, state, index);
-  (void)TryUpcastWrapFile(&reference);
 }
 
 /**

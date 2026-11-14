@@ -84,23 +84,6 @@ namespace
   constexpr const char* kScriptedDecalCreateDecalName = "_c_CreateDecal";
   constexpr const char* kScriptedDecalCreateDecalHelpText = "Create a decal in the user layer";
 
-  /**
-   * Address: 0x0087FA80 (FUN_0087FA80)
-   *
-   * What it does:
-   * Adapter lane that forwards scripted-decal RTTI cache lookup to the
-   * canonical cached-type helper.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::RType* CachedScriptedDecalTypeAdapter()
-  {
-    gpg::RType* result = ScriptedDecal::sType;
-    if (!ScriptedDecal::sType) {
-      result = gpg::LookupRType(typeid(ScriptedDecal));
-      ScriptedDecal::sType = result;
-    }
-    return result;
-  }
-
   [[nodiscard]] gpg::RRef MakeScriptedDecalRef(
     ScriptedDecal* object
   )

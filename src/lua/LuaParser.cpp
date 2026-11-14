@@ -364,29 +364,6 @@ namespace
   }
 
   /**
-   * Address: 0x00912F00 (FUN_00912F00, isinstack)
-   *
-   * What it does:
-   * Returns `1` when `stackValue` is within one call frame stack window
-   * `[base, top)`; returns `0` otherwise.
-   */
-  [[maybe_unused]] [[nodiscard]] std::int32_t isinstack(
-    CallInfo* const callInfo,
-    LuaPlus::TObject* const stackValue
-  )
-  {
-    LuaPlus::StkId cursor = callInfo->base;
-    const LuaPlus::StkId top = callInfo->top;
-    while (cursor < top) {
-      if (cursor == stackValue) {
-        return 1;
-      }
-      ++cursor;
-    }
-    return 0;
-  }
-
-  /**
    * Address: 0x009103C0 (FUN_009103C0, freereg)
    *
    * What it does:
@@ -1714,7 +1691,7 @@ namespace
     const int c
   )
   {
-    auto* const lexState = reinterpret_cast<LexState*>(fs->ls);
+    auto* const lexState = fs->ls;
     const Instruction instruction = static_cast<Instruction>(op | ((c | ((b | (a << 9)) << 9)) << 6));
     luaK_code(fs, instruction, lexState->lastline);
 
@@ -1740,7 +1717,7 @@ namespace
     const int c
   )
   {
-    auto* const lexState = reinterpret_cast<LexState*>(fs->ls);
+    auto* const lexState = fs->ls;
     fs->lasttarget = fs->pc;
     const Instruction instruction = static_cast<Instruction>((((c | ((b | (a << 9)) << 9)) << 6) | 2));
     return luaK_code(fs, instruction, lexState->lastline);
@@ -1790,7 +1767,7 @@ namespace
       return;
     }
 
-    auto* const lexState = reinterpret_cast<LexState*>(fs->ls);
+    auto* const lexState = fs->ls;
     const Instruction instruction = CREATE_ABC(binaryOperator + OP_ADD, 0, leftOperand, rightOperand);
     const int opcodeIndex = luaK_code(fs, instruction, lexState->lastline);
     result->k = VRELOCABLE;
@@ -2124,7 +2101,7 @@ namespace
     const int c
   )
   {
-    auto* const lexState = reinterpret_cast<LexState*>(fs->ls);
+    auto* const lexState = fs->ls;
     return luaK_code(fs, CREATE_ABC(o, a, b, c), lexState->lastline);
   }
 
@@ -2142,7 +2119,7 @@ namespace
     const unsigned int bc
   )
   {
-    auto* const lexState = reinterpret_cast<LexState*>(fs->ls);
+    auto* const lexState = fs->ls;
     return luaK_code(fs, CREATE_ABx(o, a, bc), lexState->lastline);
   }
 
@@ -2186,7 +2163,7 @@ namespace
     FuncState* const fs
   )
   {
-    auto* const lexState = reinterpret_cast<LexState*>(fs->ls);
+    auto* const lexState = fs->ls;
 
     const std::int32_t jpc = fs->jpc; // save list of jumps to here
     fs->jpc = NO_JUMP;
@@ -2245,7 +2222,7 @@ namespace
     const int n
   )
   {
-    auto* const lexState = reinterpret_cast<LexState*>(fs->ls);
+    auto* const lexState = fs->ls;
 
     const std::int32_t newstack = fs->freereg + n;
     if (newstack > fs->f->maxstacksize) {
@@ -2377,7 +2354,7 @@ namespace
     expdesc* const e
   )
   {
-    auto* const lexState = reinterpret_cast<LexState*>(fs->ls);
+    auto* const lexState = fs->ls;
 
     switch (e->k) {
     case VLOCAL:
@@ -2561,7 +2538,7 @@ namespace
     expdesc* const ex
   )
   {
-    auto* const lexState = reinterpret_cast<LexState*>(fs->ls);
+    auto* const lexState = fs->ls;
 
     switch (var->k) {
     case VLOCAL:
@@ -2695,7 +2672,7 @@ namespace
       return;
     }
 
-    auto* const lexState = reinterpret_cast<LexState*>(fs->ls);
+    auto* const lexState = fs->ls;
 
     luaK_exp2val(fs, e);
     LuaPlus::TObject* const constants = fs->f->k;
@@ -2762,7 +2739,7 @@ namespace
     expdesc* const e2
   )
   {
-    auto* const lexState = reinterpret_cast<LexState*>(fs->ls);
+    auto* const lexState = fs->ls;
 
     switch (op) {
     case OPR_AND:
@@ -2849,9 +2826,9 @@ namespace
     parser.buff.buffer = nullptr;
     parser.buff.buffsize = 0;
 
-    const std::ptrdiff_t oldTopOffset = reinterpret_cast<char*>(L->top) - reinterpret_cast<char*>(L->stack);
+    const std::ptrdiff_t oldTopOffset = L->top - L->stack;
     const auto plantErrorAtOldTop = [L, oldTopOffset](const char* const message) {
-      const auto oldTop = reinterpret_cast<LuaPlus::StkId>(reinterpret_cast<char*>(L->stack) + oldTopOffset);
+      const auto oldTop = L->stack + oldTopOffset;
       (void)PushLuaStringAtStackSlot(L, oldTop, message);
     };
 
@@ -3417,24 +3394,6 @@ namespace
   }
 
   /**
-   * Address: 0x0091CE70 (FUN_0091CE70)
-   *
-   * What it does:
-   * Parses one expression, emits it into the next free register, and returns
-   * the original expression-kind lane.
-   */
-  [[maybe_unused]] std::int32_t ParseExpressionToNextRegisterAndReturnKind(
-    LexState* const ls
-  )
-  {
-    expdesc expression{};
-    subexpr(ls, &expression, -1);
-    const std::int32_t kind = expression.k;
-    luaK_exp2nextreg(ls->fs, &expression);
-    return kind;
-  }
-
-  /**
    * Address: 0x0091BD30 (FUN_0091BD30, explist1)
    *
    * What it does:
@@ -3568,7 +3527,7 @@ namespace
    * Rewrites indexed-assignment lanes that alias the RHS local register and
    * emits one `OP_MOVE` spill when conflicts are found.
    */
-  [[maybe_unused]] void check_conflict(
+  void check_conflict(
     LHS_assign* const lhs,
     LexState* const ls,
     expdesc* const value
@@ -3665,7 +3624,7 @@ namespace
    * Opens one nested parser function scope by allocating a fresh `Proto`,
    * wiring lexical parent links, and resetting all function-state counters.
    */
-  [[maybe_unused]] void open_func(
+  void open_func(
     LexState* const ls,
     FuncState* const fs
   )
@@ -3779,7 +3738,7 @@ namespace
     BlockCnt* const bl = fs->bl;
 
     fs->bl = bl->previous;
-    removevars(reinterpret_cast<LexState*>(fs->ls), bl->nactvar);
+    removevars(fs->ls, bl->nactvar);
     if (bl->upval != 0) {
       luaK_codeABC(fs, OP_CLOSE, bl->nactvar, 0, 0);
     }

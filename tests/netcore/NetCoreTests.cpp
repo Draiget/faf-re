@@ -108,10 +108,10 @@ TEST(
   DottedAddressesRoundTrip
 )
 {
-  EXPECT_EQ(Str(moho::NET_GetDottedOctetFromUInt32(0xC0A80102u)), "192.168.1.2");
+  EXPECT_EQ(Str(moho::NET_GetDottedOctetFromUInt32(0xC0000201u)), "192.0.2.1");
   EXPECT_EQ(Str(moho::NET_GetDottedOctetFromUInt32(0u)), "0.0.0.0");
-  EXPECT_EQ(moho::NET_GetUInt32FromDottedOcted(fa::string("192.168.1.2")), 0xC0A80102u);
-  EXPECT_EQ(moho::NET_GetUInt32FromDottedOcted(fa::string("10.0.0.255")), 0x0A0000FFu);
+  EXPECT_EQ(moho::NET_GetUInt32FromDottedOcted(fa::string("192.0.2.1")), 0xC0000201u);
+  EXPECT_EQ(moho::NET_GetUInt32FromDottedOcted(fa::string("198.51.100.255")), 0xC63364FFu);
   for (const std::uint32_t address : {0x7F000001u, 0xFFFFFFFFu, 0x01020304u}) {
     EXPECT_EQ(moho::NET_GetUInt32FromDottedOcted(moho::NET_GetDottedOctetFromUInt32(address)), address);
   }

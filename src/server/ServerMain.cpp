@@ -3427,7 +3427,7 @@ int main(
   }
   // Plan WP17.13: a server started on chosen CPUs (server-host pins each lobby's process before it starts, or
   // `--cpus`) keeps them. Without the lock FAF's init script moves the process onto its own CPU range through
-  // `SetProcessAffinityMask` (2-23 on fw0); headless locks the same way (`--cpus`).
+  // `SetProcessAffinityMask` (2-23 on the Linux test server); headless locks the same way (`--cpus`).
   {
     std::string cpuList;
     if (ReadOption("--cpus", cpuList) && !moho::AssignProcessCpus(cpuList.c_str())) {

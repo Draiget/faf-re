@@ -87,12 +87,12 @@ namespace gpg
      */
     static void SerLoad(
       ReadArchive* const archive,
-      const std::intptr_t objectPtr,
+      void* const objectPtr,
       const int,
       RRef* const ownerRef
     )
     {
-      list_type& list = *reinterpret_cast<list_type*>(objectPtr);
+      list_type& list = *static_cast<list_type*>(objectPtr);
 
       unsigned int count = 0;
       archive->ReadUInt(&count);
@@ -110,12 +110,12 @@ namespace gpg
      */
     static void SerSave(
       WriteArchive* const archive,
-      const std::intptr_t objectPtr,
+      void* const objectPtr,
       const int,
       RRef* const ownerRef
     )
     {
-      const list_type& list = *reinterpret_cast<const list_type*>(objectPtr);
+      const list_type& list = *static_cast<const list_type*>(objectPtr);
 
       archive->WriteUInt(static_cast<unsigned int>(list.size()));
       for (const T& value : list) {

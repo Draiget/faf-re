@@ -846,7 +846,7 @@ Entity* CAiAttackerImpl::FindBestEnemy(
   const Wm3::Vector3f weaponForward = UnitWeapon::GetForwardVector(weapon);
 
   const auto* const benignRange = unit->SimulationRef->mRules->GetEntityCategory("BENIGN");
-  const auto* const benignCategory = reinterpret_cast<const EntityCategorySet*>(benignRange);
+  const auto* const benignCategory = static_cast<const EntityCategorySet*>(benignRange);
 
   // 0x005D7A10: `mov ebx, offset WeaponTerrainBlockageTest; call Sim::GetSimVar`
   // -- the registered global, never a by-name registry search.

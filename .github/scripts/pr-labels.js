@@ -12,8 +12,9 @@
 //                       alias): those reach every player through the command stream.
 //   recovery            the diff adds an "Address: 0x..." anchor.
 //   documentation       every changed file is documentation.
-//   needs template      no "## Sim impact" section, or not exactly one box ticked.
-//   needs replay check  the ticked box needs played replays and the Testing table lists none.
+//   needs template      no "## Sim impact" section, not exactly one box ticked, or no "## Evidence".
+//   needs replay check  the PR needs played replays (it changes more than documentation and CI,
+//                       or its box says so) and the Testing table lacks enough on x64 or x86.
 //   merge conflict      GitHub reports the PR no longer merges into its base.
 //
 // Reviewers win. A label whose last add or remove was done by a person is left
@@ -25,11 +26,11 @@ const fs = require('fs');
 const path = require('path');
 const {
   SIM_PATHS,
-  NEEDS_REPLAYS,
   stripComments,
   section,
   tickedOptions,
-  replayRows,
+  replayProblems,
+  evidenceProblems,
 } = require('./pr-sim-impact.js');
 
 const CATALOG = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'labels.json'), 'utf8'));
@@ -110,12 +111,13 @@ function wantedLabels(rawBody, files) {
   if (choice !== null && SIM_LABELS[choice]) {
     const touchesSim = names.some((f) => SIM_PATHS.some((p) => p.test(f)));
     want.add(choice === 'none' && touchesSim ? 'sim: not sure' : SIM_LABELS[choice]);
-    if (NEEDS_REPLAYS.includes(choice) && replayRows(section(body, 'Testing') ?? '').length === 0) {
+    if (replayProblems(body, names, choice).length > 0) {
       want.add('needs replay check');
     }
   } else {
     want.add('needs template');
   }
+  if (evidenceProblems(body).length > 0) want.add('needs template');
 
   for (const [label, patterns] of Object.entries(AREAS)) {
     if (names.some((f) => patterns.some((p) => p.test(f)))) want.add(label);

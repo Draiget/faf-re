@@ -913,30 +913,6 @@ namespace moho
     }
 
     /**
-     * Address: 0x0088BFD0 (FUN_0088BFD0)
-     *
-     * What it does:
-     * Signals one trailing post-init sim-driver lane, transitions world-frame
-     * dispatch to `Playing`, and notifies the active world-UI provider through
-     * `OnStart` when present.
-     */
-    [[maybe_unused]] int WLD_EnterPlayingAndNotifyUIProvider()
-    {
-      int dispatchResult = 0;
-      if (ISTIDriver* const simDriver = sSimDriver.get(); simDriver != nullptr) {
-        simDriver->DecrementOutstandingRequestsAndSignal();
-      }
-
-      gWldFrameAction = EWldFrameAction::Playing;
-
-      if (IWldUIProvider* const wldUIProvider = ResolveWldUIProvider(); wldUIProvider != nullptr) {
-        wldUIProvider->OnStart();
-      }
-
-      return dispatchResult;
-    }
-
-    /**
      * Address: 0x0088C6D0 (FUN_0088C6D0, func_DoPostInitializing)
      *
      * What it does:

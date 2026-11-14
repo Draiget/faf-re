@@ -1460,7 +1460,7 @@ SNetPacket* CNetUDPConnection::NewPacket(
   SNetPacket* pkt;
   if (mConnector->mPacketList.mNext != &mConnector->mPacketList) {
     --mConnector->mPacketPoolSize;
-    pkt = reinterpret_cast<SNetPacket*>(mConnector->mPacketList.mNext);
+    pkt = static_cast<SNetPacket*>(mConnector->mPacketList.mNext);
     // unlink from pool
     pkt->ListUnlink();
   } else {

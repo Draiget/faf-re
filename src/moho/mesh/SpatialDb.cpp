@@ -1666,7 +1666,7 @@ namespace moho
    * AABBs intersect `bounds`, then appends matches from inline root shard data.
    */
   template <class T>
-  [[maybe_unused]] std::int32_t CollectShardsInBoxIntoDestination(
+  std::int32_t CollectShardsInBoxIntoDestination(
     const Wm3::AxisAlignedBox3f& bounds,
     gpg::fastvector<T*>& destination,
     moho::SpatialDB<T>& db,

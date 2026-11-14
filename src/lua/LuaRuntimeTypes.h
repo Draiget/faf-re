@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <type_traits>
 
 #include "lua/LuaPrimitives.h"
 
@@ -323,10 +324,16 @@ struct Udata
   lu_byte tt;
   lu_byte marked;
   Table* metatable;
-  /// Reused by this fork to carry the object's `gpg::RType*` rather than a
-  /// byte count - see LuaObject::GetUserData (0x00907BC0), which reads it
-  /// from +0x0C and takes the payload from +0x10.
-  size_t len;
+  /// The payload's reflected type. Stock Lua keeps a byte count here; this
+  /// fork keeps the type - see LuaObject::GetUserData (0x00907BC0), which reads
+  /// it from +0x0C and takes the payload from +0x10.
+  gpg::RType* type;
+
+  /** The payload object, which directly follows this header. */
+  [[nodiscard]] void* Payload() noexcept
+  {
+    return this + 1;
+  }
 
   /**
    * Address: 0x009207E0 (FUN_009207E0, Udata::MemberSerialize)
@@ -370,7 +377,7 @@ struct Udata
   static gpg::RType* sType;
 };
 static_assert(offsetof(Udata, metatable) == 0x08, "Udata::metatable offset must be 0x08");
-static_assert(offsetof(Udata, len) == 0x0C, "Udata::len offset must be 0x0C");
+static_assert(offsetof(Udata, type) == 0x0C, "Udata::type offset must be 0x0C");
 static_assert(sizeof(Udata) == 0x10, "Udata size must be 0x10");
 
 struct CClosure
@@ -802,6 +809,31 @@ union GCObject
   UpVal uv;
   lua_State th;
 };
+
+/**
+ * Lua 5.0's `valtogco` (lstate.h): every collectable object is a member of the
+ * `GCObject` union (a closure through `Closure`), and a union is
+ * pointer-interconvertible with its members, so one of them is the union. The
+ * way back is the member: `&o->ts`, `&o->h`, `&o->cl.l`.
+ */
+template <class T>
+  requires(
+    std::is_same_v<std::remove_const_t<T>, GCheader> || std::is_same_v<std::remove_const_t<T>, TString> ||
+    std::is_same_v<std::remove_const_t<T>, Udata> || std::is_same_v<std::remove_const_t<T>, Closure> ||
+    std::is_same_v<std::remove_const_t<T>, CClosure> || std::is_same_v<std::remove_const_t<T>, LClosure> ||
+    std::is_same_v<std::remove_const_t<T>, Table> || std::is_same_v<std::remove_const_t<T>, Proto> ||
+    std::is_same_v<std::remove_const_t<T>, UpVal> || std::is_same_v<std::remove_const_t<T>, lua_State>
+  )
+[[nodiscard]] inline auto* valtogco(
+  T* const object
+) noexcept
+{
+  if constexpr (std::is_const_v<T>) {
+    return reinterpret_cast<const GCObject*>(object);
+  } else {
+    return reinterpret_cast<GCObject*>(object);
+  }
+}
 
 #if INTPTR_MAX == INT32_MAX
 static_assert(offsetof(lua_State, l_G) == 0x10, "lua_State::l_G must be at +0x10 (x86)");

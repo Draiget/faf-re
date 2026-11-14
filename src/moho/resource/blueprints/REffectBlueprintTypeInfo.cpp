@@ -19,20 +19,6 @@ namespace
     return sInstance;
   }
 
-  /**
-   * Address: 0x0050F120 (FUN_0050F120)
-   *
-   * What it does:
-   * Executes one non-deleting `gpg::RType` base-teardown lane for
-   * `REffectBlueprintTypeInfo`.
-   */
-  [[maybe_unused]] void cleanup_REffectBlueprintTypeInfoRTypeBase(
-    TypeInfo* const typeInfo
-  ) noexcept
-  {
-    gpg::ClearTypeLists(typeInfo);
-  }
-
   struct REffectBlueprintTypeInfoBootstrap
   {
     REffectBlueprintTypeInfoBootstrap()

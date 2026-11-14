@@ -237,8 +237,8 @@ namespace moho
    *
    * What it does:
    * Initializes session/camera lanes, captures drag-start screen coordinates
-   * from `CWldSession::CursorScreenPos`, and seeds the world position from
-   * `CWldSession::CursorWorldPos` when available (otherwise from the
+   * from `CWldSession::mCursorInfo.mMouseScreenPos`, and seeds the world position from
+   * `CWldSession::mCursorInfo.mMouseWorldPos` when available (otherwise from the
    * process-wide invalid vector singleton). The `mov dword ptr [eax+4], 0` the
    * body opens with (0x008637F0) is the inlined `IMauiDragger` base
    * constructor clearing its own `WeakObject` head, not a member of this
@@ -258,12 +258,12 @@ namespace moho
       return;
     }
 
-    if (session->mCursorWorldState[0] != 0u) {
-      mPos = session->CursorWorldPos;
+    if (session->mCursorInfo.mHitValid != 0u) {
+      mPos = session->mCursorInfo.mMouseWorldPos;
     }
 
-    mX0 = session->CursorScreenPos.x;
-    mY0 = session->CursorScreenPos.y;
+    mX0 = session->mCursorInfo.mMouseScreenPos.x;
+    mY0 = session->mCursorInfo.mMouseScreenPos.y;
   }
 
   /**

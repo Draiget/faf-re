@@ -312,7 +312,7 @@ namespace
    * Returns active path-cell count when path storage is allocated; otherwise
    * returns zero.
    */
-  [[maybe_unused]] [[nodiscard]] std::int32_t CountPathCellsIfAllocated(
+  [[nodiscard]] std::int32_t CountPathCellsIfAllocated(
     const SNavPath& path
   ) noexcept
   {
@@ -329,7 +329,7 @@ namespace
    * Builds one cell projection from `toCell` toward `fromCell` by `distance`
    * units using truncating scalar conversion semantics.
    */
-  [[maybe_unused]] [[nodiscard]] SOCellPos ProjectCellToward(
+  [[nodiscard]] SOCellPos ProjectCellToward(
     const SOCellPos fromCell,
     const SOCellPos toCell,
     const float distance

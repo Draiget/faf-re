@@ -1,4 +1,5 @@
 #include "editor/ui/EdHelp.h"
+#include "editor/ui/EdControls.h"
 
 #include <string>
 
@@ -58,7 +59,7 @@ namespace faf::editor
     draw->AddText(ImVec2(at.x + badge + size * 0.35f, at.y), colour, line.c_str());
     ImGui::Dummy(ImVec2(ImGui::GetContentRegionAvail().x, height));
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) {
-      ImGui::BeginTooltip();
+      EdBeginTooltip();
       ImGui::PushTextWrapPos(size * 26.0f);
       ImGui::TextUnformatted(text);
       ImGui::PopTextWrapPos();

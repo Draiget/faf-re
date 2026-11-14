@@ -526,7 +526,7 @@ namespace faf::remote::client
     rebuilder.HeldPoseUpdates(packet->mEntityUpdates, packet->mUnitUpdates);
 
     auto* const stream = new gpg::MemBufferStream(static_cast<unsigned int>(mEmptySync.size() + 16u));
-    stream->Write(reinterpret_cast<const char*>(mEmptySync.data()), mEmptySync.size());
+    stream->Write(mEmptySync.data(), mEmptySync.size());
     packet->mStream = stream;
     if (mInterp.Stats().synthesized <= 5u) {
       gpg::Logf(
@@ -941,7 +941,7 @@ namespace faf::remote::client
       );
     }
     auto* const stream = new gpg::MemBufferStream(static_cast<unsigned int>(sync.size() + 16u));
-    stream->Write(reinterpret_cast<const char*>(sync.data()), sync.size());
+    stream->Write(sync.data(), sync.size());
     packet->mStream = stream;
     StampView(view, *packet); // plan WP10.9: its display tick, with its stamp queued beside it
     mLastBeat = packet->mCurBeat;

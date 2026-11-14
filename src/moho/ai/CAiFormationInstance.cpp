@@ -68,12 +68,12 @@ namespace
    */
   void LoadBroadcasterEFormationdStatusListeners(
     gpg::ReadArchive* const archive,
-    const std::intptr_t objectPtr,
+    void* const objectPtr,
     const int,
     gpg::RRef* const ownerRef
   )
   {
-    auto* const broadcaster = reinterpret_cast<moho::Broadcaster<moho::EFormationdStatus>*>(objectPtr);
+    auto* const broadcaster = static_cast<moho::Broadcaster<moho::EFormationdStatus>*>(objectPtr);
     GPG_ASSERT(archive != nullptr);
     GPG_ASSERT(broadcaster != nullptr);
     if (archive == nullptr || broadcaster == nullptr) {
@@ -101,12 +101,12 @@ namespace
    */
   void SaveBroadcasterEFormationdStatusListeners(
     gpg::WriteArchive* const archive,
-    const std::intptr_t objectPtr,
+    void* const objectPtr,
     const int,
     gpg::RRef* const
   )
   {
-    auto* const broadcaster = reinterpret_cast<moho::Broadcaster<moho::EFormationdStatus>*>(objectPtr);
+    auto* const broadcaster = static_cast<moho::Broadcaster<moho::EFormationdStatus>*>(objectPtr);
     GPG_ASSERT(archive != nullptr);
     GPG_ASSERT(broadcaster != nullptr);
     if (archive == nullptr || broadcaster == nullptr) {
@@ -456,12 +456,12 @@ namespace
    */
   void DeserializeSUnitOffsetInfoSerializerCallback(
     gpg::ReadArchive* const archive,
-    const std::intptr_t objectPtr,
+    void* const objectPtr,
     const int,
     gpg::RRef* const
   )
   {
-    auto* const info = reinterpret_cast<moho::SUnitOffsetInfo*>(objectPtr);
+    auto* const info = static_cast<moho::SUnitOffsetInfo*>(objectPtr);
     if (info == nullptr) {
       return;
     }
@@ -479,12 +479,12 @@ namespace
    */
   void SerializeSUnitOffsetInfoSerializerCallback(
     gpg::WriteArchive* const archive,
-    const std::intptr_t objectPtr,
+    void* const objectPtr,
     const int,
     gpg::RRef* const
   )
   {
-    auto* const info = reinterpret_cast<moho::SUnitOffsetInfo*>(objectPtr);
+    auto* const info = static_cast<moho::SUnitOffsetInfo*>(objectPtr);
     if (info == nullptr) {
       return;
     }
@@ -524,12 +524,12 @@ namespace
    */
   void DeserializeIFormationInstanceSerializerCallback(
     gpg::ReadArchive* const archive,
-    const std::intptr_t objectPtr,
+    void* const objectPtr,
     const int,
     gpg::RRef* const
   )
   {
-    auto* const instance = reinterpret_cast<moho::IFormationInstance*>(objectPtr);
+    auto* const instance = static_cast<moho::IFormationInstance*>(objectPtr);
     if (instance == nullptr) {
       return;
     }
@@ -547,12 +547,12 @@ namespace
    */
   void SerializeIFormationInstanceSerializerCallback(
     gpg::WriteArchive* const archive,
-    const std::intptr_t objectPtr,
+    void* const objectPtr,
     const int,
     gpg::RRef* const
   )
   {
-    auto* const instance = reinterpret_cast<moho::IFormationInstance*>(objectPtr);
+    auto* const instance = static_cast<moho::IFormationInstance*>(objectPtr);
     if (instance == nullptr) {
       return;
     }
@@ -581,12 +581,12 @@ namespace
    */
   void DeserializeSAssignedLocInfoSerializerCallback(
     gpg::ReadArchive* const archive,
-    const std::intptr_t objectPtr,
+    void* const objectPtr,
     const int,
     gpg::RRef* const
   )
   {
-    auto* const slot = reinterpret_cast<moho::SAssignedLocInfo*>(objectPtr);
+    auto* const slot = static_cast<moho::SAssignedLocInfo*>(objectPtr);
     if (slot == nullptr) {
       return;
     }
@@ -604,12 +604,12 @@ namespace
    */
   void SerializeSAssignedLocInfoSerializerCallback(
     gpg::WriteArchive* const archive,
-    const std::intptr_t objectPtr,
+    void* const objectPtr,
     const int,
     gpg::RRef* const
   )
   {
-    const auto* const slot = reinterpret_cast<const moho::SAssignedLocInfo*>(objectPtr);
+    const auto* const slot = static_cast<const moho::SAssignedLocInfo*>(objectPtr);
     if (slot == nullptr) {
       return;
     }
@@ -666,12 +666,12 @@ namespace
      */
     static void SerSave(
       gpg::WriteArchive* const archive,
-      const std::intptr_t objectPtr,
+      void* const objectPtr,
       const int,
       gpg::RRef* const ownerRef
     )
     {
-      const auto* const mapObject = reinterpret_cast<const UnitOffsetMap*>(objectPtr);
+      const auto* const mapObject = static_cast<const UnitOffsetMap*>(objectPtr);
       if (!archive || !mapObject) {
         return;
       }
@@ -697,7 +697,7 @@ namespace
      * Address: 0x0056D9D0 (FUN_0056D9D0, gpg::RMapType_EntId_SUnitOffsetInfo::SerLoad)
      *
      * IDA signature:
-     * gpg::RType *__cdecl sub_56D9D0(gpg::ReadArchive *archive, std::intptr_t objectPtr, int version, gpg::RRef
+     * gpg::RType *__cdecl sub_56D9D0(gpg::ReadArchive *archive, void* objectPtr, int version, gpg::RRef
      * *ownerRef);
      *
      * What it does:
@@ -712,12 +712,12 @@ namespace
      */
     static void SerLoad(
       gpg::ReadArchive* const archive,
-      const std::intptr_t objectPtr,
+      void* const objectPtr,
       const int,
       gpg::RRef* const ownerRef
     )
     {
-      auto* const mapObject = reinterpret_cast<UnitOffsetMap*>(objectPtr);
+      auto* const mapObject = static_cast<UnitOffsetMap*>(objectPtr);
       if (!archive) {
         return;
       }
@@ -833,12 +833,12 @@ namespace
      */
     static void SerSave(
       gpg::WriteArchive* const archive,
-      const std::intptr_t objectPtr,
+      void* const objectPtr,
       const int,
       gpg::RRef* const ownerRef
     )
     {
-      const auto* const mapObject = reinterpret_cast<const CoordMap*>(objectPtr);
+      const auto* const mapObject = static_cast<const CoordMap*>(objectPtr);
       if (!archive || !mapObject) {
         return;
       }
@@ -870,12 +870,12 @@ namespace
      */
     static void SerLoad(
       gpg::ReadArchive* const archive,
-      const std::intptr_t objectPtr,
+      void* const objectPtr,
       const int,
       gpg::RRef* const ownerRef
     )
     {
-      auto* const mapObject = reinterpret_cast<CoordMap*>(objectPtr);
+      auto* const mapObject = static_cast<CoordMap*>(objectPtr);
       if (!archive) {
         return;
       }
@@ -1121,7 +1121,7 @@ namespace
       return out;
     }
 
-    out.mObj = reinterpret_cast<void*>(reinterpret_cast<std::uintptr_t>(sim) - static_cast<std::uintptr_t>(baseOffset));
+    out.mObj = gpg::CompleteObject(sim, baseOffset);
     out.mType = dynamicType;
     return out;
   }
@@ -1617,12 +1617,12 @@ namespace moho
    */
   void LoadFastVectorSOffsetInfo(
     gpg::ReadArchive* archive,
-    std::intptr_t objectPtr,
+    void* objectPtr,
     int,
     gpg::RRef* ownerRef
   )
   {
-    auto* const groups = reinterpret_cast<gpg::fastvector_n<SOffsetInfo, 2>*>(objectPtr);
+    auto* const groups = static_cast<gpg::fastvector_n<SOffsetInfo, 2>*>(objectPtr);
     GPG_ASSERT(archive != nullptr);
     GPG_ASSERT(groups != nullptr);
     if (!archive || !groups) {
@@ -1649,12 +1649,12 @@ namespace moho
    */
   void SaveFastVectorSOffsetInfo(
     gpg::WriteArchive* archive,
-    std::intptr_t objectPtr,
+    void* objectPtr,
     int,
     gpg::RRef* ownerRef
   )
   {
-    auto* const groups = reinterpret_cast<gpg::fastvector_n<SOffsetInfo, 2>*>(objectPtr);
+    auto* const groups = static_cast<gpg::fastvector_n<SOffsetInfo, 2>*>(objectPtr);
     GPG_ASSERT(archive != nullptr);
     GPG_ASSERT(groups != nullptr);
     if (!archive || !groups) {
@@ -1701,12 +1701,12 @@ namespace moho
    */
   void LoadFastVectorSAssignedLocInfo(
     gpg::ReadArchive* archive,
-    std::intptr_t objectPtr,
+    void* objectPtr,
     int,
     gpg::RRef* ownerRef
   )
   {
-    auto* const slots = reinterpret_cast<gpg::fastvector_n<SAssignedLocInfo, 16>*>(objectPtr);
+    auto* const slots = static_cast<gpg::fastvector_n<SAssignedLocInfo, 16>*>(objectPtr);
     GPG_ASSERT(archive != nullptr);
     GPG_ASSERT(slots != nullptr);
     if (!archive || !slots) {
@@ -1734,12 +1734,12 @@ namespace moho
    */
   void SaveFastVectorSAssignedLocInfo(
     gpg::WriteArchive* archive,
-    std::intptr_t objectPtr,
+    void* objectPtr,
     int,
     gpg::RRef* ownerRef
   )
   {
-    auto* const slots = reinterpret_cast<gpg::fastvector_n<SAssignedLocInfo, 16>*>(objectPtr);
+    auto* const slots = static_cast<gpg::fastvector_n<SAssignedLocInfo, 16>*>(objectPtr);
     GPG_ASSERT(archive != nullptr);
     GPG_ASSERT(slots != nullptr);
     if (!archive || !slots) {
@@ -1971,12 +1971,12 @@ namespace moho
    */
   void SOffsetInfoSerializer::Serialize(
     gpg::WriteArchive* const archive,
-    const std::intptr_t objectPtr,
+    void* const objectPtr,
     const int,
     gpg::RRef* const
   )
   {
-    auto* const offsetInfo = reinterpret_cast<SOffsetInfo*>(objectPtr);
+    auto* const offsetInfo = static_cast<SOffsetInfo*>(objectPtr);
     if (offsetInfo != nullptr) {
       offsetInfo->MemberSerialize(archive);
     }
@@ -2043,12 +2043,12 @@ namespace moho
    */
   void SOffsetInfoSerializer::Deserialize(
     gpg::ReadArchive* const archive,
-    const std::intptr_t objectPtr,
+    void* const objectPtr,
     const int,
     gpg::RRef* const
   )
   {
-    auto* const offsetInfo = reinterpret_cast<SOffsetInfo*>(objectPtr);
+    auto* const offsetInfo = static_cast<SOffsetInfo*>(objectPtr);
     if (offsetInfo != nullptr) {
       offsetInfo->MemberDeserialize(archive);
     }

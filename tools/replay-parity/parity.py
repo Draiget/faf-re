@@ -60,6 +60,9 @@ import urllib.parse
 import urllib.request
 import zipfile
 
+# An embedded Python (a ._pth file next to python.exe, as the Azure CLI's 3.14 ships) runs in
+# safe-path mode and leaves this folder off sys.path, so add it before importing the sibling module.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from replayfile import (HL_ENDED_RE, HL_LOADED_RE, HL_PROGRESS_RE, HL_SUMMARY_RE, HL_TROUBLE_RE,
                         HL_VERDICT_RE, MISMATCH_RE, decode_fafreplay, extract_map, has_scenario, header_summary,
                         live_client_desync, replay_beats, replay_body_info, replay_checksums)

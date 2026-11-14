@@ -5,29 +5,49 @@
 #include <string>
 #include <utility>
 
+#include "editor/tools/EdMeshImport.h"
+#include "editor/ui/EdFieldsPanel.h"
+#include "editor/doc/EdLuaApi.h"
 #include "editor/EdTools.h"
 #include "editor/doc/EdAdaptiveModel.h"
 #include "editor/tools/EdChecks.h"
 #include "editor/doc/EdLighting.h"
+#include "editor/doc/EdLooks.h"
 #include "editor/doc/EdNewMap.h"
 #include "editor/doc/EdPackage.h"
 #include "editor/doc/EdSaveFile.h"
+#include "editor/tools/EdResize.h"
 #include "editor/ui/EdMapBrowser.h"
+#include "editor/ui/EdGenerate.h"
+#include "editor/ui/EdLayoutPanel.h"
+#include "editor/ui/EdMissionPanel.h"
+#include "editor/ui/EdModPanel.h"
+#include "editor/ui/EdAssetBrowser.h"
+#include "editor/ui/EdModHost.h"
+#include "editor/ui/EdUnitViewer.h"
+#include "editor/ui/EdUnitLabPanel.h"
+#include "editor/ui/EdPathsPanel.h"
+#include "editor/ui/EdUnitWizardPanel.h"
+#include "editor/tools/EdDetailPass.h"
 #include "editor/ui/EdMaterialEditor.h"
 #include "editor/ui/EdParticleEditor.h"
 #include "imgui.h"
 
+#include <vector>
+
 namespace faf::editor
 {
+  class EdCommands;
+  struct EdMenu;
   class EdDocument;
   class EdLog;
   class EdPlay;
 
   /**
-   * The editor's panels over the game's frame: the docked panels (tools, map, log) around an empty middle where
-   * the game's picture shows through, and the status bar. The window's own menu bar (EdApp.cpp) holds File,
-   * View and Play, outside the game's picture, so the game's interface keeps its whole area. While a session
-   * runs the panels and the status bar step aside unless "Panels while playing" is on.
+   * The editor's panels over the game's frame: the title row (the editor draws its own, with the menus; ui/EdTitleBar),
+   * the toolbar, the docked panels (tools, map, log) around an empty middle where the game's picture shows through,
+   * and the status bar. While a session runs the panels and the status bar step aside unless "Panels while playing" is
+   * on; the title row stays.
    */
   class EdShell
   {
@@ -50,6 +70,10 @@ namespace faf::editor
     bool& ShowMap() noexcept
     {
       return mShowMap;
+    }
+    bool& ShowLayers() noexcept
+    {
+      return mShowLayers;
     }
     bool& ShowInfo() noexcept
     {
@@ -77,6 +101,8 @@ namespace faf::editor
     {
       return mUiScale;
     }
+    /** The toolbar's - and + as keys (Ctrl+- / Ctrl+=): the next smaller or larger step; 0 puts it back to 100 %. */
+    void StepUiScale(int direction);
     /** The Adaptive Map window (View > Adaptive Map). */
     bool& ShowAdaptiveWindow() noexcept
     {
@@ -116,6 +142,114 @@ namespace faf::editor
     bool& ShowLighting() noexcept
     {
       return mShowLighting;
+    }
+    /** The Generate workspace's terrain graph and its three panels. */
+    [[nodiscard]] EdGenerate& Generate() noexcept
+    {
+      return mGenerate;
+    }
+    /** Shows the terrain graph's panels (Terrain > Generate). */
+    void ShowGenerate() noexcept
+    {
+      mShowGenNodes = mShowGenGraph = mShowGenInspector = true;
+    }
+    [[nodiscard]] bool GenerateShown() const noexcept
+    {
+      return mShowGenGraph || mShowGenNodes || mShowGenInspector;
+    }
+    /** The Layout workspace's drawing and its two panels. */
+    [[nodiscard]] EdLayoutPanel& LayoutPanel() noexcept
+    {
+      return mLayoutPanel;
+    }
+    /** Shows the layout's panels (Terrain > Layout canvas). */
+    void ShowLayout() noexcept
+    {
+      mShowLayoutLayers = mShowLayoutCanvas = mShowLayoutStarts = true;
+    }
+    [[nodiscard]] EdMissionPanel& MissionPanel() noexcept
+    {
+      return mMissionPanel;
+    }
+    [[nodiscard]] EdPathsPanel& PathsPanel() noexcept
+    {
+      return mPathsPanel;
+    }
+    [[nodiscard]] EdUnitWizardPanel& UnitWizard() noexcept
+    {
+      return mUnitWizard;
+    }
+    /** Terrain > Paths: the Paths panel up, editing on the map on. */
+    void ShowPaths() noexcept
+    {
+      mShowPaths = true;
+    }
+    void ShowDetail() noexcept
+    {
+      mShowDetail = true;
+    }
+    /** The Detail pass panel's ask (1 plan, 2 run, 3 measure; 0 none) and its run settings; the app answers with
+     * SetDetailText. `environment` empty: the panel wants the map's guess. */
+    int TakeDetailAsk(
+      DetailRun& run
+    ) noexcept
+    {
+      run = mDetailRun;
+      run.only.clear();
+      return std::exchange(mDetailAsk, 0);
+    }
+    void SetDetailText(
+      std::string text
+    )
+    {
+      mDetailText = std::move(text);
+    }
+    /** The map's guessed environment, once a map is open (the panel's default). */
+    void SetDetailEnvironment(
+      const std::string& environment
+    )
+    {
+      if (!mDetailEnvironmentSet) {
+        mDetailRun.environment = environment;
+        mDetailEnvironmentSet = true;
+      }
+    }
+    void ResetDetailEnvironment() noexcept
+    {
+      mDetailEnvironmentSet = false;
+    }
+    [[nodiscard]] const std::vector<std::string>& DetailClassesOff() const noexcept
+    {
+      return mDetailClassesOff;
+    }
+    [[nodiscard]] EdModPanel& ModPanel() noexcept
+    {
+      return mModPanel;
+    }
+    void ShowModProject() noexcept
+    {
+      mShowModProject = mShowUnitLab = true;
+    }
+    [[nodiscard]] EdUnitLabPanel& UnitLab() noexcept
+    {
+      return mUnitLab;
+    }
+    [[nodiscard]] EdAssetBrowser& Assets() noexcept
+    {
+      return mAssets;
+    }
+    void ShowAssets() noexcept
+    {
+      mShowAssets = true;
+    }
+    /** Shows the Mission workspace's Stages and Strings. */
+    void ShowMission() noexcept
+    {
+      mShowMissionStages = mShowMissionStrings = mShowMissionRun = mShowMissionBases = mShowMissionPlatoons = true;
+    }
+    [[nodiscard]] bool LayoutShown() const noexcept
+    {
+      return mShowLayoutLayers || mShowLayoutCanvas || mShowLayoutStarts;
     }
     /** The material editor (View > Material Editor): node graphs that make terrain textures. */
     bool& ShowMaterialEditor() noexcept
@@ -164,6 +298,68 @@ namespace faf::editor
     {
       return std::exchange(mSkyboxImport, false);
     }
+    /** The Looks section's asks, taken by the app: try one, apply or revert the one tried, save or delete one. */
+    struct LookRequest
+    {
+      enum class What
+      {
+        None,
+        Try,
+        Apply,
+        Revert,
+        Save,
+        Delete,
+      };
+      What what = What::None;
+      std::string id; // a map's scenario path, or "mine:<name>"
+      unsigned sections = kLookAll;
+      float blend = 1.0f;
+      std::string name; // Save: the new look's name
+    };
+    [[nodiscard]] bool TakeLookRequest(
+      LookRequest& request
+    )
+    {
+      request = std::exchange(mLookRequest, LookRequest{});
+      return request.what != LookRequest::What::None;
+    }
+    void RequestLook(
+      LookRequest request
+    )
+    {
+      mLookRequest = std::move(request);
+    }
+    /** What the app says of the looks: the one tried (empty: none), its words, the user's own looks. */
+    void SetLookState(
+      std::string tried,
+      std::string status
+    )
+    {
+      mLookTried = std::move(tried);
+      mLookStatus = std::move(status);
+    }
+    void SetMyLooks(
+      std::vector<std::string> names
+    )
+    {
+      mMyLooks = std::move(names);
+    }
+    /** A look's colours once it has been read (sky horizon and zenith, sun, water), for its row. */
+    struct LookSwatch
+    {
+      float colours[4][3]{};
+    };
+    void SetLookSwatch(
+      const std::string& id,
+      const LookSwatch& swatch
+    )
+    {
+      mLookSwatches[id] = swatch;
+    }
+    [[nodiscard]] bool LookTrying() const noexcept
+    {
+      return !mLookTried.empty();
+    }
     [[nodiscard]] std::string TakeLightingFromMap()
     {
       return std::exchange(mLightingFromMap, std::string());
@@ -206,14 +402,111 @@ namespace faf::editor
     {
       return mPanelsWhilePlaying;
     }
+    /** View > Reset layout: the workspace shown now gets its first layout again. */
     void ResetLayout() noexcept
     {
       mResetLayout = true;
+    }
+    /**
+     * Shows workspace `workspace` (ui/EdWorkspaces): its own layout and the panels it showed last (its first ones
+     * the first time). The panels shown in the one left are kept for it.
+     */
+    void SwitchWorkspace(int workspace);
+    /**
+     * The start screen (design §8 Files) over the panels: `page` 0 Home, 1 On this computer, 2 FAF vault. File > Open
+     * and every "Open a map..." show its pages; a map opening, a workspace tab or Continue put it away.
+     */
+    void ShowHome(int page = 0) noexcept;
+    void HideHome() noexcept
+    {
+      mShowHome = false;
+    }
+    [[nodiscard]] bool HomeShown() const noexcept
+    {
+      return mShowHome;
+    }
+    /** Settings > General: the start screen when the editor starts; its FAF vault rows. */
+    bool& HomeAtStart() noexcept
+    {
+      return mHomeAtStart;
+    }
+    bool& HomeVaultItems() noexcept
+    {
+      return mHomeVaultItems;
+    }
+    bool& ShowHistory() noexcept
+    {
+      return mShowHistory;
+    }
+    bool& ShowDebugger() noexcept
+    {
+      return mShowDebugger;
+    }
+    bool& ShowProblems() noexcept
+    {
+      return mShowProblems;
+    }
+    /** The Problems panel shown and in front (the status bar's count). */
+    void OpenProblems() noexcept;
+    /** Help (ui/EdHelpWindow.cpp): the Help window on a topic (ui/EdHelpTopics), F1's topic, the tour. */
+    void OpenHelp(const std::string& topic);
+    [[nodiscard]] std::string HelpTopicUnderMouse() const;
+    void StartTour();
+    /** The scene's selection, said in the status bar as a count ("3 markers"). */
+    void SetStatusSelection(
+      std::string text
+    )
+    {
+      mStatusSelection = std::move(text);
+    }
+    /** The ids of the panels shown now (PanelId), in the shell's order. */
+    [[nodiscard]] std::vector<std::string> ShownPanelIds() const;
+    /** A Check fix asked for: the marker and where it goes (taken once each). */
+    [[nodiscard]] bool TakeCheckFix(
+      std::string& marker,
+      float& x,
+      float& z
+    )
+    {
+      if (mCheckFixes.empty()) {
+        return false;
+      }
+      marker = mCheckFixes.front().marker;
+      x = mCheckFixes.front().fixX;
+      z = mCheckFixes.front().fixZ;
+      mCheckFixes.erase(mCheckFixes.begin());
+      return true;
     }
     /** File > Save as new map folder: the dialog asks for the folder's name. */
     void OpenSaveAs() noexcept
     {
       mOpenSaveAs = true;
+    }
+    /** Map > Resize: the dialog asks for the new size, the way (canvas or scale) and the new folder. */
+    void OpenResize() noexcept
+    {
+      mOpenResize = true;
+    }
+    struct ResizeRequest
+    {
+      ResizeOptions options;
+      /** The new map's folder in the vault's maps (the new size is a copy; the map open now stays as it is). */
+      std::string folder;
+      /** kNewMapSizes' indexes of the new width and depth. */
+      int widthIndex = 2;
+      int depthIndex = 2;
+    };
+    /** The dialog's Resize, once. */
+    [[nodiscard]] bool TakeResize(
+      ResizeRequest& out
+    ) noexcept
+    {
+      if (!mResizeAsked) {
+        return false;
+      }
+      mResizeAsked = false;
+      out = mResizeRequest;
+      return true;
     }
     /** File > New map: the dialog asks for the map's name, size, players, height and sea. */
     void OpenNewMap() noexcept
@@ -260,14 +553,268 @@ namespace faf::editor
       return mGameView;
     }
 
-  private:
-    void BuildDefaultLayout(unsigned int dockspaceId);
-    /** The toolbar over the panels: Play/Stop (F5) first, then New, Open, Save, Save as, Undo, Redo, and the open map.
+    /**
+     * The command registry and the title row's menus (EdApp owns both): the title row draws the menus and the command
+     * palette runs the commands. Without them the shell draws no title row.
      */
+    void SetCommands(
+      EdCommands* commands,
+      const std::vector<EdMenu>* menus
+    ) noexcept
+    {
+      mCommands = commands;
+      mMenus = menus;
+      mModHost.Attach(commands);
+    }
+    [[nodiscard]] EdFieldsPanel& Fields() noexcept
+    {
+      return mFieldsPanel;
+    }
+    /** The Images panel's asks: export or import one picture ("heights", "preview", "mask<n>", "water<n>", "all"). */
+    struct ImageAsk
+    {
+      std::string what;
+      bool exportIt = true;
+    };
+    [[nodiscard]] bool TakeImageAsk(
+      ImageAsk& out
+    )
+    {
+      if (mImageAsks.empty()) {
+        return false;
+      }
+      out = mImageAsks.front();
+      mImageAsks.erase(mImageAsks.begin());
+      return true;
+    }
+    void SetImageStatus(
+      std::string status
+    )
+    {
+      mImageStatus = std::move(status);
+    }
+    /** The Mesh terrain panel's import ask. */
+    struct MeshAsk
+    {
+      bool import = false;
+      std::string file;
+      MeshImportOptions options;
+      /** The scenario names the manifest: the map becomes a mesh terrain map. */
+      bool makeMeshMap = false;
+    };
+    /** The mesh terrain view's mode (0 the height field, 1 the mesh, 2 both) and its other asks. */
+    int mMeshMode = 1;
+    bool mMeshMakeMap = true;
+    int mMeshAskMore = 0; // 1 load again, 2 check
+    std::vector<std::string> mMeshFindings;
+    [[nodiscard]] int MeshMode() const noexcept
+    {
+      return mMeshMode;
+    }
+    [[nodiscard]] int TakeMeshMore() noexcept
+    {
+      return std::exchange(mMeshAskMore, 0);
+    }
+    void SetMeshFindings(
+      std::vector<std::string> findings
+    )
+    {
+      mMeshFindings = std::move(findings);
+    }
+    /** An import asked for from outside the panel (`/meshtest`), as its Import button asks after the file dialog. */
+    void AskMeshImport(
+      const std::string& file,
+      const bool makeMeshMap
+    )
+    {
+      mMeshAsk = MeshAsk{};
+      mMeshAsk.import = true;
+      mMeshAsk.file = file;
+      mMeshAsk.makeMeshMap = makeMeshMap;
+    }
+    [[nodiscard]] bool TakeMeshAsk(
+      MeshAsk& out
+    )
+    {
+      if (!mMeshAsk.import) {
+        return false;
+      }
+      out = mMeshAsk;
+      mMeshAsk = MeshAsk{};
+      return true;
+    }
+    void SetMeshStatus(
+      std::string status
+    )
+    {
+      mMeshStatus = std::move(status);
+    }
+    [[nodiscard]] bool MeshShown() const noexcept
+    {
+      return mMeshShown;
+    }
+    [[nodiscard]] EdModHost& ModHost() noexcept
+    {
+      return mModHost;
+    }
+    void ShowEditorMods() noexcept
+    {
+      mShowEditorMods = true;
+    }
+    [[nodiscard]] EdUnitViewer& UnitViewer() noexcept
+    {
+      return mUnitViewer;
+    }
+    void ShowUnitViewer() noexcept
+    {
+      mShowUnitViewer = true;
+    }
+    /** The view's context menu, at the mouse, the next frame (ViewMenuCommands). */
+    void OpenViewMenu(
+      const bool selection
+    ) noexcept
+    {
+      mViewMenuAsk = true;
+      mViewMenuSelection = selection;
+    }
+
+  private:
+    EdCommands* mCommands = nullptr;
+    /** A list row's Delete: edit.delete once its selection has been made (a couple of frames later). */
+    bool mDeleteAsked = false;
+    std::vector<ImageAsk> mImageAsks;
+    MeshAsk mMeshAsk;
+    int mDeleteWait = 0;
+    const std::vector<EdMenu>* mMenus = nullptr;
+    /** The active workspace's first layout (its EdWorkspace's places) in its dock space. */
+    void BuildDefaultLayout(unsigned int dockspaceId);
+    /** Shows exactly these panels (ids), hides the others. */
+    void ShowPanels(const std::vector<std::string>& ids);
+    /** Each panel's window name (as its Begin has it) and its shown flag. */
+    struct PanelFlag
+    {
+      const char* window;
+      bool EdShell::* shown;
+    };
+    static const std::vector<PanelFlag>& PanelFlags();
+
+  public:
+    /** A panel's shown flag by its id (`Properties`, `MissionStages`, `UnitLab`), or null. */
+    [[nodiscard]] bool* PanelShown(std::string_view id);
+    /** Every panel's window name (as its Begin has it), for the QA runs that walk the panels. */
+    [[nodiscard]] std::vector<std::string> PanelWindows() const;
+    /** Shows or hides a panel by its window name; whether it was shown before. */
+    bool ShowPanelWindow(const std::string& window, bool on);
+
+  private:
+    /** The workspaces whose dock space has been laid out this run. */
+    std::vector<bool> mWorkspaceBuilt;
+    bool mWorkspaceStarted = false;
+    std::string mStatusSelection;
+    // The start screen (ui/EdHomePage.cpp).
+    void DrawHome(float top, float bottom);
+    void DrawHomePage();
+    void DrawHomeRecent();
+    void DrawHomeVault(bool loggedIn);
+    void DrawHomeSearch(bool loggedIn);
+    /** View > History (ui/EdHistoryPanel.cpp): the edits, a click goes back or forward to one. */
+    void DrawHistoryPanel();
+    bool mShowHistory = false;
+    // The Script panel's check as you type: the text it last checked, when it was last typed in, the typos found.
+    std::size_t mScriptCheckedHash = 0;
+    double mScriptTypedAt = 0.0;
+    std::vector<EdLuaTypo> mScriptTypos;
+    void DrawHelpWindow();
+    /** The Debugger panel (ui/EdDebuggerPanel.cpp): arm, breakpoints, a pause's place, locals, watches, stack. */
+    void DrawDebuggerPanel();
+    bool mShowDebugger = false;
+    bool mShowGenNodes = false;
+    float mCornerBottom = 0.0f; // the view's top-right buttons' lower edge (the compass goes under them)
+    bool mShowGenGraph = false;
+    bool mShowGenInspector = false;
+    bool mShowLayoutLayers = false;
+    bool mShowLayoutCanvas = false;
+    bool mShowLayoutStarts = false;
+    bool mShowMissionStages = false;
+    bool mShowMissionStrings = false;
+    bool mShowMissionRun = false;
+    bool mShowMissionBases = false;
+    bool mShowMissionPlatoons = false;
+    bool mShowModProject = false;
+    bool mShowUnitLab = false;
+    bool mShowUnitWizard = false;
+    bool mShowAssets = false;
+    bool mShowEditorMods = false;
+    bool mShowUnitViewer = false;
+    bool mShowFields = false;
+    bool mShowStatistics = false;
+    bool mShowImages = false;
+    bool mShowMesh = false;
+    bool mShowPaths = false;
+    bool mShowDetail = false;
+    void DrawDetailPanel();
+    DetailRun mDetailRun;
+    bool mDetailEnvironmentSet = false;
+    std::vector<std::string> mDetailClassesOff;
+    std::string mDetailText;
+    int mDetailAsk = 0; // 1 plan, 2 run, 3 measure
+    char mMeshFile[512] = {};
+    MeshImportOptions mMeshOptions;
+    bool mMeshShown = true;
+    std::string mMeshStatus;
+    std::string mImageStatus;
+    EdFieldsPanel mFieldsPanel;
+    bool mViewMenuAsk = false;
+    char mSaveAsParent[512] = {};
+    /** Map info's fields being typed in: key -> text (the scenario's value otherwise). */
+    std::map<std::string, std::string> mInfoEdits;
+    void DrawMapInfoFields();
+    bool mViewMenuSelection = false;
+    void DrawViewMenu();
+    bool mDebugWasPaused = false;
+    char mWatchInput[160] = {};
+    std::vector<std::string> mWatches;
+    /** The Effects workspace's stage: the effect's view where the map view is. */
+    void DrawEffectStage();
+    /** The Problems panel (ui/EdProblemsPanel.cpp): the check's findings and the log's warnings in one list. */
+    void DrawProblemsPanel();
+    /** A check finding's place: its script line, its prop's place, or its marker selected and framed. */
+    void GoToIssue(const CheckIssue& issue);
+    bool mShowProblems = false;
+    bool mFocusProblems = false;
+    unsigned mProblemLevels = 0x7U;
+    unsigned mProblemSources = 0x3U;
+    void DrawTour();
+    bool mShowHelp = false;
+    bool mHelpFront = false;
+    std::string mHelpTopic = "view";
+    char mHelpSearch[96] = {};
+    int mTourStep = -1;
+    bool mShowHome = false;
+    bool mHomeFocusSearch = false;
+    bool mHomeFront = false;
+    int mHomePage = 0;
+    char mHomeSearch[128] = {};
+    std::string mHomeSearchAsked;
+    double mHomeTypedAt = 0.0;
+    bool mHomeAtStart = true;
+    bool mHomeVaultItems = true;
+    /** The toolbar under the title row: Play/Stop (F5) first, then New, Open, Save, Save as, Undo, Redo, and the open
+     * map. `top` is where it starts (the title row's height). */
     EdMapBrowser mBrowser;
-    void DrawToolbar(float height);
+    void DrawToolbar(float height, float top);
+    /** The tool strip down the window's left edge, `width` wide, between the toolbar and the status bar. */
+    void DrawToolStrip(float top, float width, float bottom);
+    /** The first frame: the first workspace's panels' saved places under the names their tabs have now. */
+    void CarryPanelPlaces();
+    /** The view's overlays: the camera and show pills at its top-left, the tool's line at its bottom. */
+    void DrawViewOverlays();
+    /** The status bar's height at the current scale. */
+    [[nodiscard]] static float StatusBarHeight();
+    bool mPanelPlacesCarried = false;
+    std::vector<std::string> mFrontPanels; // a layout just built: the windows to bring in front once
+    bool mFocusTools = false; // the strip picked a tool: the Tools panel comes forward
     Command mCommand = Command::None;
-    void HandleKeys();
     void DrawToolsPanel();
     void DrawMapPanel();
     /** The Play setup (opponents, AI, faction, start slot, fog, prebuilt units) and the in-play view switches. */
@@ -288,6 +835,12 @@ namespace faf::editor
     /** The Markers panel's chains: made, renamed, deleted, their markers added, ordered, taken out
      * (ui/EdInfoPanels.cpp). */
     void DrawChains();
+    /** The Markers panel's Areas section (the save's AREA_n rectangles). */
+    void DrawAreasSection();
+    /** View > Statistics: the map's counts and each start's resources and reclaim (ui/EdStatsPanel.cpp). */
+    void DrawStatisticsPanel();
+    void DrawImagesPanel();
+    void DrawMeshPanel();
     /** The player slots and extra armies as cards, and the chosen army's settings (ui/EdArmiesPanel.cpp). */
     void DrawArmiesPanel();
     void DrawPropertiesPanel();
@@ -392,12 +945,36 @@ namespace faf::editor
     LightingState mLighting;
     LightingState mLightingBefore;
     bool mLightingEditing = false;
+    WaterState mLightingWaterBefore; // the water, when the lighting sun turns its sun too
+    bool mLightingMovedWater = false;
+    // The Sky and Reflection cubes sections: the panel's copies while a control is held, and their befores.
+    SkyboxState mSky;
+    SkyboxState mSkyBefore;
+    bool mSkyEditing = false;
+    std::vector<std::pair<std::string, std::string>> mCubes;
+    char mCubeName[64]{};
+    char mCubePath[256]{};
+    void DrawSkyEditor();
+    /** The strategic view's settings (FAF Studio's panel): contours, imager offset, the five height colours. */
+    void DrawStrategicView();
+    void DrawCubes();
     bool mLightingImport = false;
     bool mLightingExport = false;
     bool mSkyboxImport = false;
     /** The Lighting panel's "from another map": the scenario picked, taken by the app. */
     std::string mLightingFromMap;
     char mLightingFromFilter[64]{};
+    LookRequest mLookRequest;
+    unsigned mLookSections = kLookAll;
+    float mLookBlend = 1.0f;
+    bool mLookTryOnClick = true;
+    std::string mLookChosen;
+    std::string mLookTried;
+    std::string mLookStatus;
+    std::vector<std::string> mMyLooks;
+    std::map<std::string, LookSwatch> mLookSwatches;
+    char mLookSaveName[64]{};
+    void DrawLooks();
     bool mSkyboxExport = false;
     bool mShowScript = false;
     bool mFocusScript = false;
@@ -413,6 +990,11 @@ namespace faf::editor
     bool mShowCheck = true;
     std::vector<CheckIssue> mCheckIssues;
     bool mCheckRan = false;
+    /** The edits the last check saw; a change runs it again once the edits have rested a second. */
+    std::uint64_t mCheckedEdits = 0;
+    std::uint64_t mRecheckEdits = 0;
+    double mRecheckAt = -1.0;
+    void AutoRecheck();
     bool mRunCheck = false;
     void UpdateTestRun();
     /** 0 idle, 1 asked, 2 starting, 3 playing, 4 stopping. */
@@ -420,6 +1002,7 @@ namespace faf::editor
     double mTestRunStarted = 0.0;
     std::string mTestRunMap;
     std::vector<CheckIssue> mTestRunIssues;
+    std::vector<CheckIssue> mCheckFixes;
     bool mTestRunDone = false;
     std::string mTestRunSummary;
     std::string mCheckedPath;
@@ -429,6 +1012,11 @@ namespace faf::editor
     void DrawSaveAsDialog();
     bool mOpenSaveAs = false;
     char mSaveAsName[128]{};
+    void DrawResizeDialog();
+    bool mOpenResize = false;
+    bool mResizeAsked = false;
+    ResizeRequest mResizeRequest;
+    char mResizeFolder[128]{};
     void DrawNewMapDialog();
     void DrawPackageDialog();
     bool mOpenPackage = false;
@@ -449,6 +1037,16 @@ namespace faf::editor
     EdTools mTools;
     EdMaterialEditor mMaterialEditor;
     EdParticleEditor mParticleEditor;
+    EdGenerate mGenerate;
+    EdLayoutPanel mLayoutPanel{mDocument};
+    EdMissionPanel mMissionPanel{mDocument};
+    EdPathsPanel mPathsPanel{mDocument};
+    EdModPanel mModPanel{mDocument};
+    EdUnitLabPanel mUnitLab{mModPanel};
+    EdUnitWizardPanel mUnitWizard{mModPanel};
+    EdAssetBrowser mAssets{mTools};
+    EdModHost mModHost{mDocument};
+    EdUnitViewer mUnitViewer{mUnitLab, mModPanel};
     ImVec4 mGameView{0.0f, 0.0f, 0.0f, 0.0f};
     /** The document path the Info tab was last brought to the front for. */
     std::string mInfoShownFor;
@@ -457,6 +1055,7 @@ namespace faf::editor
     bool mShowTools = true;
     bool mShowMap = true;
     bool mShowInfo = true;
+    bool mShowLayers = true;
     bool mShowLog = true;
     bool mPanelsWhilePlaying = true;
     bool mLayoutBuilt = false;

@@ -1,4 +1,7 @@
 #include "moho/terrain/TerrainCommon.h"
+#include "moho/sim/STIMap.h"
+
+#include <unordered_map>
 #include "moho/terrain/SplatBudget.h"
 
 #include "moho/console/CConCommand.h"
@@ -62,5 +65,22 @@ namespace moho
   TerrainCommon::~TerrainCommon()
   {
     mDecalMask.reset();
+  }
+  bool TerrainHeightsMoved(
+    const void* const terrain
+  )
+  {
+    // Render thread only. A terrain object's slot stays after it is gone (a few per session).
+    static std::unordered_map<const void*, std::uint64_t> seen;
+    const std::uint64_t now = HeightFieldRevision();
+    const auto [it, added] = seen.try_emplace(terrain, now);
+    if (added) {
+      return true;
+    }
+    if (it->second == now) {
+      return false;
+    }
+    it->second = now;
+    return true;
   }
 } // namespace moho

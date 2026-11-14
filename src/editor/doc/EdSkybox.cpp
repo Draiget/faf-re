@@ -1,5 +1,6 @@
 #include "editor/doc/EdSkybox.h"
 
+#include <algorithm>
 #include <cstdlib>
 
 #include "editor/doc/EdJson.h"
@@ -59,7 +60,8 @@ namespace faf::editor
       subdivisionsHeight == other.subdivisionsHeight && zenithHeight == other.zenithHeight &&
       same(horizonColor, other.horizonColor, sizeof(horizonColor)) &&
       same(zenithColor, other.zenithColor, sizeof(zenithColor)) && decalGlow == other.decalGlow &&
-      albedo == other.albedo && glow == other.glow && planets.size() == other.planets.size() &&
+      albedo == other.albedo && glow == other.glow && skycube == other.skycube && background == other.background &&
+      planets.size() == other.planets.size() &&
       (planets.empty() || same(planets.data(), other.planets.data(), planets.size() * sizeof(SkyboxPlanet))) &&
       cirrusMultiplier == other.cirrusMultiplier && same(cirrusColor, other.cirrusColor, sizeof(cirrusColor)) &&
       cirrusTexture == other.cirrusTexture && same(cirrus, other.cirrus, sizeof(cirrus));
@@ -189,5 +191,31 @@ namespace faf::editor
     }
     sky = std::move(read);
     return true;
+  }
+
+  float RescaleSkybox(
+    SkyboxState& sky,
+    const float mapWidth,
+    const float mapDepth
+  )
+  {
+    const float from = std::max(sky.position[0], sky.position[2]) * 2.0f;
+    const float to = std::max(mapWidth, mapDepth);
+    if (from <= 0.0f || to <= 0.0f) {
+      return 1.0f;
+    }
+    const float ratio = to / from;
+    const float cx = mapWidth * 0.5f;
+    const float cz = mapDepth * 0.5f;
+    for (SkyboxPlanet& planet : sky.planets) {
+      planet.position[0] = cx + (planet.position[0] - sky.position[0]) * ratio;
+      planet.position[2] = cz + (planet.position[2] - sky.position[2]) * ratio;
+      planet.scale[0] *= ratio;
+      planet.scale[1] *= ratio;
+    }
+    sky.position[0] = cx;
+    sky.position[2] = cz;
+    sky.scale *= ratio;
+    return ratio;
   }
 } // namespace faf::editor

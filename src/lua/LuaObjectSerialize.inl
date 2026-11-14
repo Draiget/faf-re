@@ -193,7 +193,7 @@ void LuaState::SetState(
     m_ownState = 1;
     m_headObject.m_prev = nullptr;
     m_headObject.m_next = reinterpret_cast<LuaObject*>(&m_tailObject);
-    m_tailObject.m_prev = reinterpret_cast<LuaObject**>(&m_headObject.m_next);
+    m_tailObject.m_prev = (&m_headObject.m_next);
     m_tailObject.m_next = nullptr;
     m_state->l_G->userGCFunction = &LuaPlusGCFunction;
     m_state->stateUserData = this;
@@ -470,7 +470,7 @@ void Proto::MemberSerialize(
     archive->Write(CachedType<TObject>(gLuaTObjectType), &k[index], ownerRef);
   }
 
-  archive->WriteBytes(reinterpret_cast<char*>(code), sizeof(Instruction) * static_cast<std::size_t>(sizecode));
+  archive->WriteBytes(code, sizeof(Instruction) * static_cast<std::size_t>(sizecode));
 
   for (int index = 0; index < sizep; ++index) {
     archive->WritePointer<Proto>(p[index], gpg::TrackedPointerState::Unowned, ownerRef);
@@ -532,7 +532,7 @@ void Proto::MemberDeserialize(
   }
 
   code = luaM_newvector<Instruction>(ownerState, static_cast<lu_mem>(sizecode));
-  archive->ReadBytes(reinterpret_cast<char*>(code), sizeof(Instruction) * static_cast<std::size_t>(sizecode));
+  archive->ReadBytes(code, sizeof(Instruction) * static_cast<std::size_t>(sizecode));
 
   p = luaM_newvector<Proto*>(ownerState, static_cast<lu_mem>(sizep));
   for (int index = 0; index < sizep; ++index) {
@@ -804,8 +804,8 @@ void Udata::MemberSerialize(
 
   archive->WritePointer<Table>(metatable, gpg::TrackedPointerState::Unowned, ownerRef);
 
-  gpg::RType* const payloadType = reinterpret_cast<gpg::RType*>(len);
-  const void* const payload = reinterpret_cast<const std::uint8_t*>(this) + sizeof(Udata);
+  gpg::RType* const payloadType = type;
+  const void* const payload = Payload();
   archive->Write(payloadType, payload, ownerRef);
 }
 
@@ -845,8 +845,8 @@ void Udata::MemberDeserialize(
   } lockGuard(ownerState->l_G);
 
   (void)archive->ReadPointer(&metatable, &ownerRef);
-  gpg::RType* const payloadType = reinterpret_cast<gpg::RType*>(len);
-  void* const payload = reinterpret_cast<std::uint8_t*>(this) + sizeof(Udata);
+  gpg::RType* const payloadType = type;
+  void* const payload = Payload();
   archive->Read(payloadType, payload, ownerRef);
 }
 
@@ -1010,7 +1010,7 @@ void lua_State::MemberDeserialize(
 
     // 0x0092303B: `call 0x915E20` moves it off the global list luaF_newupval put it on, so that its
     // next link can chain this thread's open upvalues.
-    auto* const upvalueObject = reinterpret_cast<GCObject*>(upvalue);
+    auto* const upvalueObject = valtogco(upvalue);
     UnlinkUpvalueFromRootList(this, upvalueObject);
 
     upvalue->v = &stack[upvalueStackIndex];
