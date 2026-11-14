@@ -22,6 +22,7 @@ namespace faf::editor
 {
   void EdShell::DrawStatisticsPanel()
   {
+    ImGui::SetNextWindowSize(ImVec2(Em(380.0f), Em(460.0f)), ImGuiCond_FirstUseEver);
     if (!ImGui::Begin(Panel("Statistics###Statistics"), &mShowStatistics)) {
       ImGui::End();
       return;

@@ -16,6 +16,7 @@ namespace faf::editor
 {
   void EdShell::DrawImagesPanel()
   {
+    ImGui::SetNextWindowSize(ImVec2(Em(380.0f), Em(460.0f)), ImGuiCond_FirstUseEver);
     if (!ImGui::Begin(Panel("Images###Images"), &mShowImages)) {
       ImGui::End();
       return;
@@ -67,6 +68,7 @@ namespace faf::editor
 
   void EdShell::DrawMeshPanel()
   {
+    ImGui::SetNextWindowSize(ImVec2(Em(380.0f), Em(460.0f)), ImGuiCond_FirstUseEver);
     if (!ImGui::Begin(Panel("Mesh terrain###MeshTerrain"), &mShowMesh)) {
       ImGui::End();
       return;

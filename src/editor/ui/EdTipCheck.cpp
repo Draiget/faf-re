@@ -34,7 +34,9 @@ namespace faf::editor
       std::vector<TipRect> rects;
       for (const ImGuiWindow* const window : g.Windows) {
         if (
-          !window->WasActive || window->Hidden || (window->Flags & ImGuiWindowFlags_ChildWindow) != 0 ||
+          // (a docked panel is flagged as a child window of its dock's host: it counts)
+          !window->WasActive || window->Hidden ||
+          ((window->Flags & ImGuiWindowFlags_ChildWindow) != 0 && !window->DockIsActive) ||
           (window->Flags & (ImGuiWindowFlags_Tooltip | ImGuiWindowFlags_Popup)) != 0 || window->Viewport != main ||
           (window->Flags & ImGuiWindowFlags_NoBringToFrontOnFocus) != 0 || std::strncmp(window->Name, "##", 2) == 0
         ) {
@@ -42,7 +44,7 @@ namespace faf::editor
         }
         rects.push_back(TipRect{window->Name, window->Pos.x, window->Pos.y, window->Size.x, window->Size.y});
       }
-      mPoints = TipCheckPoints(rects, 14.0f);
+      mPoints = TipCheckPoints(rects, 24.0f);
       ImGuiStyle& style = ImGui::GetStyle();
       mSavedDelays[0] = style.HoverDelayShort;
       mSavedDelays[1] = style.HoverDelayNormal;

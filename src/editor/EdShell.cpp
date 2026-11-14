@@ -457,7 +457,7 @@ namespace faf::editor
           "Loading models: trees, rocks, wrecks and units appear when the game's blueprints are ready (%.0f s)",
           now - loadingSince
         );
-        ImDrawList* const dl = ImGui::GetForegroundDrawList();
+        ImDrawList* const dl = ImGui::GetForegroundDrawList(ImGui::GetMainViewport());
         const ImVec2 size = ImGui::CalcTextSize(text);
         const float pad = 8.0f;
         const float spinner = size.y;

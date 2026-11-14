@@ -2,6 +2,7 @@
 
 #include "editor/ui/EdImGuiRenderer.h"
 #include "gpg/core/utils/Logging.h"
+#include "moho/misc/StartupHelpers.h"
 #include "gpg/gal/Device.hpp"
 #include "gpg/gal/DeviceContext.hpp"
 #include "gpg/gal/Head.hpp"
@@ -273,6 +274,11 @@ namespace faf::editor::popouts
     platform.Platform_CreateWindow = &CreatePooled;
     platform.Platform_DestroyWindow = &DestroyPooled;
     platform.Platform_ShowWindow = &ShowPooled;
+    // `/popouttest` (test runs): every floating panel gets a window of its own, as a drag out of the window would.
+    if (moho::CFG_GetArgOption("/popouttest", 0, nullptr)) {
+      io.ConfigViewportsNoAutoMerge = true;
+      gpg::Logf("editor: pop-out test: every floating panel in a window of its own");
+    }
     gpg::Logf("editor: pop-out windows: up to %d panels out of the window", Capacity());
   }
 

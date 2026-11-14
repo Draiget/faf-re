@@ -166,113 +166,33 @@ namespace faf::editor
     [[nodiscard]] bool IsTestRunCommandLine()
     {
       static const char* const kOptions[] = {
-        "/command",
-        "/palette",
-        "/theme",
-        "/keysfile",
-        "/focuspanel",
-        "/uiclicks",
-        "/tipcheck",
-        "/fieldstest",
-        "/hidegameunits",
-        "/movelayer",
-        "/pickfilter",
-        "/mapwide",
-        "/tool",
-        "/proptool",
-        "/play",
-        "/debugarm",
-        "/breakpoint",
-        "/check",
-        "/decaltool",
-        "/markertool",
-        "/unittool",
-        "/hoverprop",
-        "/selectprops",
-        "/selectunit",
-        "/propswap",
-        "/saveas",
-        "/settingsfile",
-        "/autosavefolder",
-        "/askunsaved",
-        "/particlebrowser",
-        "/particlenew",
-        "/particleopen",
-        "/materialeditor",
-        "/uiscale",
-        "/testrun",
-        "/openall",
-        "/roundtrip",
-        "/vault",
-        "/vaultsearch",
-        "/vaultmap",
-        "/newmap",
-        "/stamp",
-        "/brush",
-        "/layer",
-        "/waterbody",
-        "/ruler",
-        "/adaptivewindow",
-        "/maskrule",
-        "/maskgen",
-        "/symhover",
-        "/stbfont",
-        "/recipe",
-        "/texset",
-        "/layerop",
-        "/slopeview",
-        "/typesfromlayers",
-        "/uncapped",
-        "/nominimap",
-        "/followtest",
-        "/arrangetest",
-        "/findtest",
-        "/findopen",
-        "/filltest",
-        "/modaltest",
-        "/looktest",
-        "/looksfolder",
-        "/envtest",
-        "/watermasktest",
-        "/nowaterhires",
-        "/camat",
-        "/erosiontest",
-        "/sctest",
-        "/symmenu",
-        "/panelbottom",
-        "/shader",
-        "/brushtest",
-        "/brushshape",
-        "/stampsource",
-        "/stampstroke",
-        "/symoptions",
-        "/maskoptions",
-        "/masktest",
-        "/shaderbrowser",
-        "/convertlayers",
-        "/interoptest",
-        "/gentest",
-        "/layouttest",
-        "/playcopytest",
-        "/missiontest",
-        "/modtest",
-        "/unitlabtest",
-        "/effectmodtest",
-        "/assettest",
-        "/thumbcache",
-        "/assetmarks",
-        "/editormods",
-        "/editormodtest",
-        "/unitviewtest",
-        "/runmarker",
-        "/pausetest",
-        "/viewmenu",
-        "/mapinfotest",
-        "/dropdefaultcube",
-        "/exportpreview",
-        "/resizetest",
-        "/console",
-        "/pathtest",
+        "/command",         "/palette",        "/theme",           "/keysfile",
+        "/focuspanel",      "/uiclicks",       "/tipcheck",        "/fieldstest",
+        "/popouttest",      "/hidegameunits",  "/movelayer",       "/pickfilter",
+        "/mapwide",         "/tool",           "/proptool",        "/play",
+        "/debugarm",        "/breakpoint",     "/check",           "/decaltool",
+        "/markertool",      "/unittool",       "/hoverprop",       "/selectprops",
+        "/selectunit",      "/propswap",       "/saveas",          "/settingsfile",
+        "/autosavefolder",  "/askunsaved",     "/particlebrowser", "/particlenew",
+        "/particleopen",    "/materialeditor", "/uiscale",         "/testrun",
+        "/openall",         "/roundtrip",      "/vault",           "/vaultsearch",
+        "/vaultmap",        "/newmap",         "/stamp",           "/brush",
+        "/layer",           "/waterbody",      "/ruler",           "/adaptivewindow",
+        "/maskrule",        "/maskgen",        "/symhover",        "/stbfont",
+        "/recipe",          "/texset",         "/layerop",         "/slopeview",
+        "/typesfromlayers", "/uncapped",       "/nominimap",       "/followtest",
+        "/arrangetest",     "/findtest",       "/findopen",        "/filltest",
+        "/modaltest",       "/looktest",       "/looksfolder",     "/envtest",
+        "/watermasktest",   "/nowaterhires",   "/camat",           "/erosiontest",
+        "/sctest",          "/symmenu",        "/panelbottom",     "/shader",
+        "/brushtest",       "/brushshape",     "/stampsource",     "/stampstroke",
+        "/symoptions",      "/maskoptions",    "/masktest",        "/shaderbrowser",
+        "/convertlayers",   "/interoptest",    "/gentest",         "/layouttest",
+        "/playcopytest",    "/missiontest",    "/modtest",         "/unitlabtest",
+        "/effectmodtest",   "/assettest",      "/thumbcache",      "/assetmarks",
+        "/editormods",      "/editormodtest",  "/unitviewtest",    "/runmarker",
+        "/pausetest",       "/viewmenu",       "/mapinfotest",     "/dropdefaultcube",
+        "/exportpreview",   "/resizetest",     "/console",         "/pathtest",
       };
       for (const char* const option : kOptions) {
         if (moho::CFG_GetArgOption(option, 0, nullptr)) {
@@ -4992,6 +4912,7 @@ namespace faf::editor
       int mUiClickFrame = 0;
       /** `/tipcheck`: the tooltip coverage check, then the editor closes. */
       EdTipCheck mTipCheck;
+      bool mTipCheckAsked = false;
       void FeedUiClicks();
       /**
        * Test runs: `/command <id>[,<id>...]` runs those commands once the map is open (each logs what it did, or why
@@ -7061,6 +6982,14 @@ namespace faf::editor
         ImGui_ImplWin32_NewFrame();
         popouts::BeforeNewFrame(gPanelWindow);
         FeedUiClicks();
+        // `/tipcheck` starts once the map is open and its models are in (the panels are its then).
+        if (
+          mTipCheckAsked && mDocument.GetState() == EdDocument::State::Open && mScene.Attached() &&
+          !mScene.ModelsPending()
+        ) {
+          mTipCheckAsked = false;
+          mTipCheck.Start(180);
+        }
         mTipCheck.BeforeNewFrame();
         ImGui::NewFrame();
         popouts::AfterNewFrame();
@@ -7295,7 +7224,8 @@ namespace faf::editor
           const ImVec2 to(
             origin.x + static_cast<float>(gViewRect.right), origin.y + static_cast<float>(gViewRect.bottom)
           );
-          ImGui::GetBackgroundDrawList()->AddImage(static_cast<ImTextureID>(EdImGuiRenderer::kGameViewImage), from, to);
+          ImGui::GetBackgroundDrawList(ImGui::GetMainViewport())
+            ->AddImage(static_cast<ImTextureID>(EdImGuiRenderer::kGameViewImage), from, to);
         }
         {
           const gpg::gal::RenderProfileScope profilePanels("EdPanelsRender");
@@ -7361,9 +7291,7 @@ namespace faf::editor
       if (fa::vector<fa::string> tool; moho::CFG_GetArgOption("/tool", 1, &tool) && !tool.empty()) {
         mToolArg = std::atoi(tool[0].c_str());
       }
-      if (moho::CFG_GetArgOption("/tipcheck", 0, nullptr)) {
-        mTipCheck.Start(360);
-      }
+      mTipCheckAsked = moho::CFG_GetArgOption("/tipcheck", 0, nullptr);
       if (
         fa::vector<fa::string> fieldsTest; moho::CFG_GetArgOption("/fieldstest", 1, &fieldsTest) && !fieldsTest.empty()
       ) {
@@ -11477,10 +11405,15 @@ namespace faf::editor
         }
       }
       DriveImagesAndMesh();
-      // The coop shim mod in the vault's mods folder, once a run (played with coop maps, EdPlay::WriteCoopShim).
+      // The coop shim mod in the vault's mods folder (played with coop maps, EdPlay::WriteCoopShim): written once a
+      // run, only when a coop map is open, so the vault gets it only when it is used.
       {
         static bool shimWritten = false;
-        if (!shimWritten && !mDocument.VaultFolder().empty()) {
+        std::string mapType;
+        if (
+          !shimWritten && !mDocument.VaultFolder().empty() && mDocument.GetState() == EdDocument::State::Open &&
+          ReadScenarioField(mDocument.Scenario(), "type", mapType) && mapType == "campaign_coop"
+        ) {
           shimWritten = true;
           std::string error;
           if (EdPlay::WriteCoopShim(mDocument.VaultFolder() / "mods", error)) {
@@ -11496,6 +11429,12 @@ namespace faf::editor
       if (mSampleBuildDue && mDocument.GetState() == EdDocument::State::Open && mScene.Attached()) {
         mSampleBuildDue = false;
         if (mShell->Generate().OpenShipped("island")) {
+          // The graph builds while the Generate workspace shows it.
+          for (std::size_t w = 0; w < Workspaces().size(); ++w) {
+            if (std::string(Workspaces()[w].key) == "generate") {
+              mShell->SwitchWorkspace(static_cast<int>(w));
+            }
+          }
           mShell->Generate().AskBuild();
           gpg::Logf("editor: sample map: the island graph builds the ground");
         } else {

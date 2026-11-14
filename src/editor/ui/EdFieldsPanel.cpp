@@ -75,6 +75,7 @@ namespace faf::editor
     const bool mapOpen
   )
   {
+    ImGui::SetNextWindowSize(ImVec2(Em(380.0f), Em(460.0f)), ImGuiCond_FirstUseEver);
     if (!ImGui::Begin(Panel("Fields###Fields"), &open)) {
       ImGui::End();
       return;
