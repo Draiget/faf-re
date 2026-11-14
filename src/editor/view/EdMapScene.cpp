@@ -1482,6 +1482,32 @@ namespace faf::editor
       }
     }
 
+    // Path: the clicked points as posts and the curve through them. Ramp: the drag from its start to the cursor.
+    if (brush.mode == HeightBrushMode::Path || mRampDrag) {
+      std::vector<TerrainPathPoint> points =
+        brush.mode == HeightBrushMode::Path ? mTools->PathPoints() : std::vector<TerrainPathPoint>{};
+      float cx = 0.0f;
+      float cz = 0.0f;
+      if (mRampDrag && CursorGround(cx, cz)) {
+        points = {mRampFrom, {cx, cz, 0.0f}};
+      }
+      constexpr std::uint32_t kPathColor = 0xF04AD2FFu;
+      for (const TerrainPathPoint& point : points) {
+        moho::CD3DPrimBatcher::Vertex bottom = groundVertex(point.x, point.z, kPathColor, 0.0f);
+        moho::CD3DPrimBatcher::Vertex top = bottom;
+        top.mY += 6.0f;
+        batcher->DrawLine(bottom, top);
+      }
+      const PathOptions options = mTools->CurrentPathOptions();
+      const std::vector<TerrainPathPoint> curve = SamplePath(points, options.closed && !mRampDrag, 2.0f);
+      for (std::size_t i = 1; i < curve.size(); ++i) {
+        batcher->DrawLine(
+          groundVertex(curve[i - 1].x, curve[i - 1].z, kPathColor, 1.0f),
+          groundVertex(curve[i].x, curve[i].z, kPathColor, 1.0f)
+        );
+      }
+    }
+
     // The Texture tool: the paint layer's weight, green over the ground where it is full.
     if (mTools->TextureToolActive() && mTools->ShowLayerWeight() && !mDocument.Masks().texels.empty()) {
       if (mWeightStale || mWeightLayer != mTools->MaskLayer()) {
@@ -1674,11 +1700,10 @@ namespace faf::editor
     brush.noiseSeed = mNoiseSeed;   // Noise: one pattern for the stroke
     // A right-button stroke does the opposite: Raise lowers, Lower raises, Water erode deposits.
     if (mPaintInverted) {
-      brush.mode = brush.mode == HeightBrushMode::Raise ? HeightBrushMode::Lower
-        : brush.mode == HeightBrushMode::Lower          ? HeightBrushMode::Raise
-        : brush.mode == HeightBrushMode::WaterErode     ? HeightBrushMode::Deposit
-        : brush.mode == HeightBrushMode::Smooth         ? HeightBrushMode::Sharpen
-                                                        : brush.mode;
+      brush.mode = InvertedHeightMode(brush.mode);
+    }
+    if (brush.mode == HeightBrushMode::Ramp || brush.mode == HeightBrushMode::Path) {
+      return; // (they act on the mouse's release and the panel's Apply)
     }
     // The erosion brushes keep the map as floats for the whole stroke (ground moves in fractions of a word).
     if (IsErosionMode(brush.mode) && mErosionStroke == nullptr) {
@@ -1692,6 +1717,33 @@ namespace faf::editor
       if (const std::vector<SampleRect> rects = PaintStamps(brush, groundX, groundZ); !rects.empty()) {
         mDocument.SetModified(true);
         RefreshHeights(rects);
+      }
+      return;
+    }
+    // The airbrush off: dabs a third of the radius apart along the mouse's way, each a fixed step's worth.
+    if (!mTools->Airbrush() && !IsErosionMode(brush.mode) && brush.mode != HeightBrushMode::WaterErode) {
+      const float spacing = std::max(1.0f, brush.radius / 3.0f);
+      if (!mDabbed) {
+        mDabbed = true;
+        mDabTravelled = spacing; // the first point is a dab
+        mDabLastX = groundX;
+        mDabLastZ = groundZ;
+      }
+      const std::vector<StampDab> dabs = StampDabsAlong(mDabLastX, mDabLastZ, groundX, groundZ, spacing, mDabTravelled);
+      mDabLastX = groundX;
+      mDabLastZ = groundZ;
+      std::vector<SampleRect> written;
+      for (const StampDab& dab : dabs) {
+        for (const SampleRect& rect : HeightBrushRects(field->width, field->height, dab.x, dab.z, brush)) {
+          mDocument.Heights().BeforeWrite(field->data, rect);
+        }
+        const std::vector<SampleRect> rects =
+          ApplyHeightBrush(field->data, field->width, field->height, dab.x, dab.z, brush, 0.05f);
+        written.insert(written.end(), rects.begin(), rects.end());
+      }
+      if (!written.empty()) {
+        mDocument.SetModified(true);
+        RefreshHeights(written);
       }
       return;
     }
@@ -1713,6 +1765,46 @@ namespace faf::editor
       mDocument.SetModified(true);
       RefreshHeights(rects);
     }
+  }
+
+  std::string EdMapScene::ApplyPathNow(
+    const std::vector<TerrainPathPoint>& points,
+    const PathOptions& options
+  )
+  {
+    moho::CHeightField* const field = mMap != nullptr ? mMap->mTerrainRes->GetHeightField() : nullptr;
+    if (field == nullptr || points.size() < 2 || mPainting) {
+      return "A path needs two points or more.";
+    }
+    mDocument.Heights().BeginStroke();
+    mDocument.Heights().BeforeWrite(field->data, PathRect(field->width, field->height, points, options));
+    const SampleRect rect = ApplyTerrainPath(field->data, field->width, field->height, points, options);
+    const std::size_t before = mDocument.Heights().UndoCount();
+    mDocument.Heights().EndStroke(field->data);
+    if (mDocument.Heights().UndoCount() == before || rect.x1 < rect.x0) {
+      return "The path changed nothing.";
+    }
+    mDocument.EditEnded(EdDocument::EditKind::Heights);
+    mDocument.SetModified(true);
+    RefreshHeights({rect});
+    HeightChange change;
+    mDocument.Heights().ForEachNewest([&change](const std::uint16_t was, const std::uint16_t now) {
+      AddHeightChange(change, was, now);
+    });
+    char text[200];
+    (void)std::snprintf(
+      text,
+      sizeof(text),
+      "%s through %zu points, %.0f wide: %zu samples, %.0f taken away, %.0f put down",
+      PathModeName(options.mode),
+      points.size(),
+      static_cast<double>(options.width),
+      change.samples,
+      change.removed,
+      change.added
+    );
+    gpg::Logf("editor: %s", text);
+    return text;
   }
 
   std::vector<SampleRect> EdMapScene::PaintStamps(
@@ -1801,6 +1893,28 @@ namespace faf::editor
         if (mDocument.Heights().UndoCount() > before) {
           mDocument.EditEnded(EdDocument::EditKind::Heights);
           gpg::Logf("editor: height stroke changed %zu samples", mDocument.Heights().NewestChangedSamples());
+          // What the stroke did to the ground (the erosion brushes move it; the panel shows how much).
+          HeightChange change;
+          mDocument.Heights().ForEachNewest([&change](const std::uint16_t was, const std::uint16_t now) {
+            AddHeightChange(change, was, now);
+          });
+          char stats[200];
+          (void)std::snprintf(
+            stats,
+            sizeof(stats),
+            "Last stroke: %zu samples; %.0f taken away, %.0f put down (net %+.0f cubic units); deepest %.1f, highest "
+            "%+.1f",
+            change.samples,
+            change.removed,
+            change.added,
+            change.added - change.removed,
+            static_cast<double>(change.deepest),
+            static_cast<double>(change.highest)
+          );
+          gpg::Logf("editor: %s", stats);
+          if (mTools != nullptr) {
+            mTools->SetStrokeStats(stats);
+          }
         }
         // A check that was made is kept up to date as the map changes.
         if (mCheckDone) {
@@ -3454,12 +3568,14 @@ namespace faf::editor
     if (mode == HeightBrushMode::Stamp && brush.stamp != nullptr) {
       // A drag of 40 samples along +x over `seconds`, as the mouse would make it.
       mStamped = false;
+      mDabbed = false;
       int dabSteps = 0;
       for (float done = 0.0f; done <= seconds; done += stepSeconds, ++dabSteps) {
         const std::vector<SampleRect> step = PaintStamps(brush, x + 40.0f * std::min(1.0f, done / seconds), z);
         rects.insert(rects.end(), step.begin(), step.end());
       }
       mStamped = false;
+      mDabbed = false;
       gpg::Logf("editor: brush test: stamp stroke of %d steps put down %zu rectangles", dabSteps, rects.size());
     }
     for (float left = mode == HeightBrushMode::Stamp ? 0.0f : seconds; left > 0.0f; left -= stepSeconds) {
@@ -3983,6 +4099,10 @@ namespace faf::editor
           }
           mTools->SetErosionStatus(status, mErosionPreviewShown);
         }
+      }
+      if (mTools->TakePathApply()) {
+        mTools->SetStrokeStats(ApplyPathNow(mTools->PathPoints(), mTools->CurrentPathOptions()));
+        mTools->ClearPathPoints();
       }
       if (const EdTools::ScAsk sc = mTools->TakeScAsk(); sc != EdTools::ScAsk::None) {
         mTools->SetScStatus(RunScTool(sc));
@@ -12260,9 +12380,22 @@ namespace faf::editor
         mTools->AddPlanePoint(groundX, groundHeight, groundZ);
         return true;
       }
+      // Path: a click adds a point. Ramp: the drag's start (the slope goes down on the release).
+      if (mTools->CurrentHeightBrush().mode == HeightBrushMode::Path) {
+        mTools->AddPathPoint(groundX, groundHeight, groundZ);
+        return true;
+      }
+      if (mTools->CurrentHeightBrush().mode == HeightBrushMode::Ramp) {
+        mRampDrag = true;
+        mRampFrom = {groundX, groundZ, groundHeight};
+        ::SetCapture(window);
+        ::SetFocus(window);
+        return true;
+      }
       // Flatten keeps the height under the stroke's first point.
       mFlattenTo = groundHeight * 128.0f;
       mStamped = false;
+      mDabbed = false;
       mPaintInverted = false;
       mStrokeStartHeight = groundHeight;
       mPainting = true;
@@ -12273,6 +12406,25 @@ namespace faf::editor
     }
     case WM_LBUTTONUP:
       mGizmoDrag = GizmoPart::None;
+      if (mRampDrag) {
+        mRampDrag = false;
+        ::ReleaseCapture();
+        float toX = 0.0f;
+        float toZ = 0.0f;
+        if (
+          mMap != nullptr && mTools != nullptr && CursorGround(toX, toZ) &&
+          std::hypot(toX - mRampFrom.x, toZ - mRampFrom.z) >= 1.0f
+        ) {
+          const float toHeight = mMap->mTerrainRes->GetHeightAt(
+            static_cast<std::int32_t>(std::lround(toX)), static_cast<std::int32_t>(std::lround(toZ))
+          );
+          PathOptions ramp = mTools->CurrentPathOptions();
+          ramp.mode = PathMode::Ramp;
+          ramp.closed = false;
+          mTools->SetStrokeStats(ApplyPathNow({mRampFrom, {toX, toZ, toHeight}}, ramp));
+        }
+        return true;
+      }
       if (mPaintingWaterMask) {
         mPaintingWaterMask = false;
         ::ReleaseCapture();
@@ -12439,6 +12591,7 @@ namespace faf::editor
         ) {
           mPaintInverted = true;
           mStamped = false;
+          mDabbed = false;
           mStrokeStartHeight = mMap->mTerrainRes->GetHeightAt(
             static_cast<std::int32_t>(std::lround(groundX)), static_cast<std::int32_t>(std::lround(groundZ))
           );

@@ -32,6 +32,7 @@
 #include "editor/tools/EdScatter.h"
 #include "editor/tools/EdModalTransform.h"
 #include "editor/tools/EdHeightBrush.h"
+#include "editor/tools/EdTerrainPath.h"
 #include "editor/tools/EdMaskGen.h"
 #include "editor/tools/EdRecipes.h"
 #include "editor/tools/EdLayerConvert.h"
@@ -688,6 +689,8 @@ namespace faf::editor
      * (FAF Studio's stamp.lua), undo kept; returns the rectangles written.
      */
     std::vector<SampleRect> PaintStamps(const HeightBrush& brush, float x, float z);
+    /** A path (or a ramp's two points) on the heights as one undo step; what it did, for the log and the panel. */
+    std::string ApplyPathNow(const std::vector<TerrainPathPoint>& points, const PathOptions& options);
     void EndStroke();
     /** Hands written samples back to the height field (its tiers and revision) and redraws their terrain. */
     void RefreshHeights(const std::vector<SampleRect>& rects);
@@ -1179,6 +1182,14 @@ namespace faf::editor
     bool UndoMasks(bool redo);
     /** Stamp mode: the click's stamp is down. */
     bool mStamped = false;
+    // Spaced dabs (the brush with its airbrush off): where the last went and the way since.
+    bool mDabbed = false;
+    float mDabTravelled = 0.0f;
+    float mDabLastX = 0.0f;
+    float mDabLastZ = 0.0f;
+    // The Ramp brush: a drag from its start.
+    bool mRampDrag = false;
+    TerrainPathPoint mRampFrom;
     // The stamp stroke in progress: where the last step ended, the way since the last dab, its base, its draws.
     float mStampLastX = 0.0f;
     float mStampLastZ = 0.0f;

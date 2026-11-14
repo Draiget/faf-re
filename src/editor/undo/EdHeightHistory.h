@@ -61,6 +61,20 @@ namespace faf::editor
       }
       return changed;
     }
+    /** Each sample of the newest undo step: `f(before, after)` (a stroke's statistics). */
+    template <typename F>
+    void ForEachNewest(
+      F&& f
+    ) const
+    {
+      if (!mUndo.empty()) {
+        for (const Tile& tile : mUndo.back().tiles) {
+          for (std::size_t i = 0; i < tile.before.size() && i < tile.after.size(); ++i) {
+            f(tile.before[i], tile.after[i]);
+          }
+        }
+      }
+    }
     [[nodiscard]] std::size_t RedoCount() const noexcept
     {
       return mRedo.size();

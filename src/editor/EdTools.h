@@ -3,6 +3,7 @@
 #include "editor/ui/EdUnitCatalog.h"
 #include "editor/ui/EdProperties.h"
 #include "editor/tools/EdArrange.h"
+#include "editor/tools/EdTerrainPath.h"
 #include "editor/tools/EdWaterMasks.h"
 #include "editor/tools/EdErosionSuite.h"
 #include "editor/tools/EdInterop.h"
@@ -2384,7 +2385,11 @@ namespace faf::editor
       brush.mode = static_cast<HeightBrushMode>(mBrushMode);
       brush.symmetry = static_cast<Symmetry>(mSymmetry);
       brush.radius = mRadius;
-      brush.strength = mStrength;
+      // A negative strength does the mode's opposite (FAF Studio's inversion).
+      brush.strength = std::abs(mStrength);
+      if (mStrength < 0.0f) {
+        brush.mode = InvertedHeightMode(brush.mode);
+      }
       brush.falloff = mFalloff;
       brush.turns = mNWay;
       brush.setTo = mSetHeight * 128.0f;
@@ -2413,6 +2418,60 @@ namespace faf::editor
 
     /** Plane mode: a picked point (game units: x, height, z); the plane goes through the last three. */
     void AddPlanePoint(float x, float height, float z) noexcept;
+    /** The Path brush: its clicked points (x, ground height, z), in order. */
+    void AddPathPoint(
+      const float x,
+      const float height,
+      const float z
+    )
+    {
+      mPathPoints.push_back({x, z, height});
+    }
+    [[nodiscard]] const std::vector<TerrainPathPoint>& PathPoints() const noexcept
+    {
+      return mPathPoints;
+    }
+    void RemoveLastPathPoint() noexcept
+    {
+      if (!mPathPoints.empty()) {
+        mPathPoints.pop_back();
+      }
+    }
+    void ClearPathPoints() noexcept
+    {
+      mPathPoints.clear();
+    }
+    /** The path's options: the brush's width (its diameter) and falloff, the panel's mode, depth and loop. */
+    [[nodiscard]] PathOptions CurrentPathOptions() const noexcept
+    {
+      PathOptions o;
+      o.mode = static_cast<PathMode>(mPathMode);
+      o.width = mRadius * 2.0f;
+      o.falloff = mFalloff;
+      o.depth = mPathDepth;
+      o.closed = mPathClosed;
+      return o;
+    }
+    void RequestPathApply() noexcept
+    {
+      mPathApply = true;
+    }
+    [[nodiscard]] bool TakePathApply() noexcept
+    {
+      return std::exchange(mPathApply, false);
+    }
+    /** Off: the brush lays dabs a third of its radius apart along the mouse's way (nothing while held still). */
+    [[nodiscard]] bool Airbrush() const noexcept
+    {
+      return mAirbrush;
+    }
+    /** What the last height stroke did (ground moved up and down), under the brush's sliders. */
+    void SetStrokeStats(
+      std::string text
+    )
+    {
+      mStrokeStats = std::move(text);
+    }
     void ClearPlanePoints() noexcept
     {
       mPlanePoints = 0;
@@ -2764,6 +2823,13 @@ namespace faf::editor
     int mNoiseOctaves = 2;
     float mNoiseRoughness = 0.5f;
     float mPlanePointX[3]{};
+    std::vector<TerrainPathPoint> mPathPoints;
+    int mPathMode = static_cast<int>(PathMode::Ramp);
+    float mPathDepth = 4.0f;
+    bool mPathClosed = false;
+    bool mPathApply = false;
+    bool mAirbrush = true;
+    std::string mStrokeStats;
     float mPlanePointH[3]{};
     float mPlanePointZ[3]{};
     int mPlanePoints = 0;

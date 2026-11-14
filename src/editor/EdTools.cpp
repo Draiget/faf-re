@@ -586,6 +586,8 @@ namespace faf::editor
       "Deposit",
       "Plateau",
       "Sharpen",
+      "Ramp",
+      "Path",
     };
     if (mTool != 1 || mBrushMode < 0 || mBrushMode >= static_cast<int>(std::size(kModes))) {
       return nullptr;
@@ -854,27 +856,29 @@ namespace faf::editor
     if (Section("Brush")) {
       if (withModes) {
         // Rows of up to three; each entry is its HeightBrushMode.
-        static const char* const kRows[5][3] = {
+        static const char* const kRows[6][3] = {
           {"Raise", "Lower", "Smooth"},
           {"Flatten", "Set height", "Noise"},
           {"Terrace", "Plane", "Stamp"},
           {"Erode", "Water erode", "Rain"},
-          {"Deposit", "Plateau", "Sharpen"}
+          {"Deposit", "Plateau", "Sharpen"},
+          {"Ramp", "Path", ""}
         };
-        static constexpr int kModeOf[5][3] = {{0, 1, 2}, {3, 5, 4}, {6, 7, 8}, {9, 10, 11}, {12, 13, 14}};
-        static constexpr int kRowSize[5] = {3, 3, 3, 3, 3};
+        static constexpr int kModeOf[6][3] = {{0, 1, 2}, {3, 5, 4}, {6, 7, 8}, {9, 10, 11}, {12, 13, 14}, {15, 16, -1}};
+        static constexpr int kRowSize[6] = {3, 3, 3, 3, 3, 2};
         // The mockup's mode grid: bordered tiles, three a row, each its icon above its name, the picked one in the
         // accent's soft fill.
-        static const char* const kIcons[5][3] = {
+        static const char* const kIcons[6][3] = {
           {ICON_RAISE, ICON_LOWER, ICON_SMOOTH},
           {ICON_FLATTEN, ICON_HEIGHTS, ICON_NOISE},
           {ICON_TERRACE, ICON_RAMP, ICON_STAMP},
           {ICON_ERODE, ICON_WATER, ICON_RAIN},
-          {ICON_LAYERS, ICON_PLATEAU, ICON_SLOPE}
+          {ICON_LAYERS, ICON_PLATEAU, ICON_SLOPE},
+          {ICON_RAMP, ICON_PATH, ""}
         };
         const float gap = ImGui::GetStyle().ItemSpacing.x;
         const float tileWidth = (ImGui::GetContentRegionAvail().x - gap * 2.0f) / 3.0f;
-        for (int row = 0; row < 5; ++row) {
+        for (int row = 0; row < 6; ++row) {
           for (int i = 0; i < kRowSize[row]; ++i) {
             if (i > 0) {
               ImGui::SameLine();
@@ -1022,6 +1026,54 @@ namespace faf::editor
         case HeightBrushMode::Sharpen:
           Note("Pushes the ground away from its blurred self: edges, ridges and gullies stand out.");
           break;
+        case HeightBrushMode::Ramp:
+          Note(
+            "Drag from the start to the end: a straight slope as wide as the brush between the ground's heights "
+            "there, its edges softened by the falloff. One undo step."
+          );
+          break;
+        case HeightBrushMode::Path: {
+          ImGui::SetNextItemWidth(-1.0f);
+          if (EdBeginCombo("##pathmode", PathModeName(static_cast<PathMode>(mPathMode)))) {
+            for (int m = 0; m < kPathModeCount; ++m) {
+              if (ImGui::Selectable(PathModeName(static_cast<PathMode>(m)), m == mPathMode)) {
+                mPathMode = m;
+              }
+            }
+            ImGui::EndCombo();
+          }
+          const auto mode = static_cast<PathMode>(mPathMode);
+          if (mode == PathMode::Carve || mode == PathMode::Raise || mode == PathMode::River) {
+            ImGui::SetNextItemWidth(-1.0f);
+            FillDragFloat("##pathdepth", &mPathDepth, 0.1f, 0.5f, 100.0f, "Depth %.1f");
+          }
+          ImGui::Checkbox("Loop (back to the first point)", &mPathClosed);
+          char text[200];
+          (void)std::snprintf(
+            text,
+            sizeof(text),
+            "Click points on the terrain (%zu so far); the curve through them shapes the ground as wide as the brush. "
+            "Carve and River dig, Raise builds up, Level flattens to the first point, Ramp climbs from point to point.",
+            mPathPoints.size()
+          );
+          Note(text);
+          ImGui::BeginDisabled(mPathPoints.size() < 2);
+          if (ImGui::Button("Apply")) {
+            RequestPathApply();
+          }
+          ImGui::EndDisabled();
+          ImGui::SameLine();
+          ImGui::BeginDisabled(mPathPoints.empty());
+          if (ImGui::Button("Remove last")) {
+            RemoveLastPathPoint();
+          }
+          ImGui::SameLine();
+          if (ImGui::Button("Clear")) {
+            ClearPathPoints();
+          }
+          ImGui::EndDisabled();
+          break;
+        }
         case HeightBrushMode::Plateau:
           Note(
             "Brings the ground to the height under the stroke's first point in one go where the brush is full; the "
@@ -1044,17 +1096,36 @@ namespace faf::editor
         }
         // The brush's shape: every mode that paints sample by sample (the droplet brushes keep a round brush).
         const auto mode = static_cast<HeightBrushMode>(mBrushMode);
-        if (mode != HeightBrushMode::WaterErode && !IsErosionMode(mode)) {
+        if (
+          mode != HeightBrushMode::WaterErode && !IsErosionMode(mode) && mode != HeightBrushMode::Ramp &&
+          mode != HeightBrushMode::Path
+        ) {
           DrawShapePicker();
         }
       }
       ImGui::SetNextItemWidth(-1.0f);
-      FillSliderFloat("##radius", &mRadius, 3.0f, 40.0f, "Radius %.0f");
+      FillSliderFloat("##radius", &mRadius, 1.0f, 128.0f, "Radius %.0f");
+      if (ImGui::IsItemHovered()) {
+        EdSetTooltip("1 to 128 game units; Ctrl+click to type a size");
+      }
       ImGui::SetNextItemWidth(-1.0f);
-      FillSliderFloat("##strength", &mStrength, 0.05f, 1.0f, "Strength %.2f");
+      FillSliderFloat("##strength", &mStrength, -1.0f, 1.0f, "Strength %.2f");
+      if (ImGui::IsItemHovered()) {
+        EdSetTooltip("Below zero the mode does its opposite: raise lowers, smooth sharpens, water erode deposits");
+      }
       ImGui::SetNextItemWidth(-1.0f);
       FillSliderFloat("##falloff", &mFalloff, 0.0f, 1.0f, "Falloff %.2f");
       DrawFalloffCurve();
+      ImGui::Checkbox("Airbrush", &mAirbrush);
+      if (ImGui::IsItemHovered()) {
+        EdSetTooltip(
+          "On: the brush keeps working where the cursor is, also held still. Off: it lays dabs a third of its radius "
+          "apart along the stroke, none while held still (FAF Studio's way)"
+        );
+      }
+      if (!mStrokeStats.empty()) {
+        Note(mStrokeStats.c_str());
+      }
     }
   }
 

@@ -52,7 +52,36 @@ namespace faf::editor
     /** Away from the blurred ground, the opposite of Smooth: edges and ridges stand out. Right-dragging Smooth does it.
      */
     Sharpen,
+    /** A drag from a start to an end: a straight slope as wide as the brush between the ground's heights there. */
+    Ramp,
+    /** Clicked points make a curve that shapes the ground along it (EdTerrainPath), applied in one go. */
+    Path,
   };
+  /**
+   * The mode that does the opposite (a negative strength, a right-drag): Raise and Lower swap, Smooth sharpens and
+   * Sharpen smooths, Water erode deposits and Deposit erodes; the others have no opposite and stay.
+   */
+  [[nodiscard]] constexpr HeightBrushMode InvertedHeightMode(
+    const HeightBrushMode mode
+  ) noexcept
+  {
+    switch (mode) {
+    case HeightBrushMode::Raise:
+      return HeightBrushMode::Lower;
+    case HeightBrushMode::Lower:
+      return HeightBrushMode::Raise;
+    case HeightBrushMode::Smooth:
+      return HeightBrushMode::Sharpen;
+    case HeightBrushMode::Sharpen:
+      return HeightBrushMode::Smooth;
+    case HeightBrushMode::WaterErode:
+      return HeightBrushMode::Deposit;
+    case HeightBrushMode::Deposit:
+      return HeightBrushMode::WaterErode;
+    default:
+      return mode;
+    }
+  }
 
   /**
    * The brush's shape (FAF Studio's brushes.lua): Round follows the falloff; the others are masks over the brush's
