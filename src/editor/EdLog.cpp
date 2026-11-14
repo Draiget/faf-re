@@ -110,8 +110,29 @@ namespace faf::editor
 
   void EdLog::Draw()
   {
-    ImGui::SetNextItemWidth(-270.0f);
+    ImGui::SetNextItemWidth(-560.0f);
     ImGui::InputTextWithHint("##filter", "Filter", mFilter, sizeof(mFilter));
+    ImGui::SameLine();
+    ImGui::Checkbox("Info", &mShowInfo);
+    ImGui::SameLine();
+    ImGui::Checkbox("Warnings", &mShowWarnings);
+    ImGui::SameLine();
+    ImGui::Checkbox("Debug", &mShowDebug);
+    ImGui::SameLine();
+    if (ImGui::Button("Copy")) {
+      // The lines shown (filter and levels), as text.
+      const std::lock_guard<std::mutex> lock(mMutex);
+      std::string text;
+      for (const Line& line : mLines) {
+        if (Shown(line)) {
+          text += line.text + "\n";
+        }
+      }
+      ImGui::SetClipboardText(text.c_str());
+    }
+    if (ImGui::IsItemHovered()) {
+      EdSetTooltip("The lines shown, to the clipboard");
+    }
     ImGui::SameLine();
     ImGui::Checkbox("Times", &mShowTimes);
     if (ImGui::IsItemHovered()) {
@@ -128,9 +149,8 @@ namespace faf::editor
 
     if (ImGui::BeginChild("##lines", ImVec2(0.0f, 0.0f), ImGuiChildFlags_None, ImGuiWindowFlags_HorizontalScrollbar)) {
       const std::lock_guard<std::mutex> lock(mMutex);
-      const bool filtered = mFilter[0] != '\0';
       for (const Line& line : mLines) {
-        if (filtered && line.text.find(mFilter) == std::string::npos) {
+        if (!Shown(line)) {
           continue;
         }
         if (mShowTimes) {
@@ -151,6 +171,23 @@ namespace faf::editor
     }
     ImGui::EndChild();
   }
+  bool EdLog::Shown(
+    const Line& line
+  ) const
+  {
+    if (mFilter[0] != '\0' && line.text.find(mFilter) == std::string::npos) {
+      return false;
+    }
+    switch (line.level) {
+    case gpg::LogSeverity::Warn:
+      return mShowWarnings;
+    case gpg::LogSeverity::Debug:
+      return mShowDebug;
+    default:
+      return mShowInfo;
+    }
+  }
+
   std::vector<std::string> EdLog::TakeMissionTrace()
   {
     const std::lock_guard<std::mutex> lock(mMutex);

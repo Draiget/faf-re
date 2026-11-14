@@ -451,6 +451,30 @@ namespace faf::editor
     /** View › Focus selection: the camera over the selection's middle, far enough to see all of it; false without one.
      */
     bool FrameSelection();
+
+    /** Where the camera is: what it looks at, its heading and pitch (radians) and distance (camera bookmarks). */
+    struct CameraPose
+    {
+      float targetX = 0.0f;
+      float targetZ = 0.0f;
+      float heading = 0.0f;
+      float pitch = 0.0f;
+      float distance = 0.0f;
+    };
+    [[nodiscard]] CameraPose GetCameraPose() const noexcept
+    {
+      return {mTargetX, mTargetZ, mHeading, mPitch, mDistance};
+    }
+    void SetCameraPose(const CameraPose& pose);
+    /** The camera's keys as commands: turned by `turn` radians, its distance times `zoom`. */
+    void StepCamera(float turn, float zoom);
+    /** View › Camera › Face north (N): heading 0, the map's top at the top. */
+    void FaceNorth();
+    /** View › Camera › Look straight down (T). */
+    void LookDown();
+    /** Q / E with props selected under the Select tool: they turn (false: nothing to turn). */
+    [[nodiscard]] bool CanTurnSelectedProps() const;
+    bool TurnSelectedProps(float radians);
     /** The view to the point (x, z) of the map, from no farther than `distance`. */
     void FramePoint(float x, float z, float distance = 80.0f);
     /** Test runs (`/selectunit <army>,<unit>`): that unit selected and the view on it. */

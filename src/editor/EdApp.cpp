@@ -173,6 +173,7 @@ namespace faf::editor
         "/layouttest",     "/playcopytest",    "/missiontest",    "/modtest",
         "/unitlabtest",    "/effectmodtest",   "/assettest",      "/thumbcache",
         "/assetmarks",     "/editormods",      "/editormodtest",  "/unitviewtest",
+        "/runmarker",      "/pausetest",
       };
       for (const char* const option : kOptions) {
         if (moho::CFG_GetArgOption(option, 0, nullptr)) {
@@ -2978,6 +2979,65 @@ namespace faf::editor
         }
         ++mViewTestStage;
       }
+      /**
+       * `/pausetest` (test runs): the open map played; Play › Pause, the session's pause state and sim tick logged a
+       * few seconds apart, then Pause again (resume), then Stop.
+       */
+      void TestPause()
+      {
+        if (
+          mPauseTestStage >= 6 || (mPauseTestStage == 0 && !mScene.Attached()) ||
+          !moho::CFG_GetArgOption("/pausetest", 0, nullptr) || ++mPauseTestFrames % 150 != 0
+        ) {
+          return;
+        }
+        const auto state = [this](const char* when) {
+          moho::CWldSession* const session = moho::WLD_GetActiveSession();
+          if (session == nullptr) {
+            gpg::Logf("editor: pause test %s: no session", when);
+            return;
+          }
+          const bool paused =
+            session->mRequestingPauseState != 0U ? session->mRequestingPause != 0 : session->mSessionPauseStateA != 0;
+          gpg::Logf("editor: pause test %s: paused %s, game tick %d", when, paused ? "yes" : "no", session->mGameTick);
+        };
+        switch (mPauseTestStage) {
+        case 0: {
+          const std::vector<std::string>& maps = mPlay.Maps();
+          const auto at = std::find_if(maps.begin(), maps.end(), [&](const std::string& p) {
+            return LowerPath(p) == LowerPath(mDocument.Path());
+          });
+          if (at != maps.end()) {
+            mPlay.Select(static_cast<int>(at - maps.begin()));
+            mPlay.Play();
+          }
+          break;
+        }
+        case 2:
+          state("before");
+          gpg::Logf(
+            "editor: pause test: play.pause %s",
+            mCommands.Run("play.pause") ? "ran" : mCommands.WhyNot("play.pause").c_str()
+          );
+          break;
+        case 3:
+          state("paused a while");
+          (void)mCommands.Run("play.pause");
+          break;
+        case 4:
+          state("resumed a while");
+          break;
+        case 5:
+          mPlay.Stop();
+          break;
+        default:
+          break;
+        }
+        ++mPauseTestStage;
+      }
+      int mPauseTestStage = 0;
+      int mPauseTestFrames = 0;
+
       int mViewTestStage = 0;
       int mViewTestFrames = 0;
 
@@ -4533,6 +4593,12 @@ namespace faf::editor
       EdMapScene mScene{mDocument};
       std::chrono::steady_clock::time_point mLastFrame = std::chrono::steady_clock::now();
       EdShell* mShell = nullptr;
+      /** Camera bookmarks per map (lower-case path), for this run. */
+      std::map<std::string, std::array<std::optional<EdMapScene::CameraPose>, 9>> mBookmarks;
+      /** Ids of commands made in a loop (EdCommand keeps its own copy; these keep the c_str()s alive meanwhile). */
+      std::vector<std::string> mCommandIds;
+      /** A file there while the editor runs: found at the start, the last run didn't end normally. */
+      std::filesystem::path mRunMarker;
       // `/openall`: every map opened in turn (the next to open, how many opened, the ones that did not).
       bool mOpenAll = false;
       std::size_t mOpenAllNext = 0;
@@ -4932,6 +4998,23 @@ namespace faf::editor
       mPlay.FindMaps();
       mPlay.ReadCommandLine();
       mShell = new EdShell(mLog, mPlay, mDocument);
+      // The last run's marker still there: it didn't end normally (a crash, or killed).
+      if (fa::vector<fa::string> marker; moho::CFG_GetArgOption("/runmarker", 1, &marker) && !marker.empty()) {
+        mRunMarker = marker[0].c_str();
+      } else if (!IsTestRunCommandLine() && !EditorSettingsFolder().empty()) {
+        mRunMarker = EditorSettingsFolder() / "editor_running.txt";
+      }
+      if (!mRunMarker.empty()) {
+        std::error_code ec;
+        if (std::filesystem::exists(mRunMarker, ec)) {
+          gpg::Warnf(
+            "editor: the last run didn't end normally (a crash, or it was stopped); its log is in the logs folder, and "
+            "File > Recover offers an autosave when there is one"
+          );
+          PostStatusMessage("The last run didn't end normally: see the Log, and File > Recover");
+        }
+        std::ofstream(mRunMarker, std::ios::trunc) << "running\n";
+      }
       if (!mPendingFafTokenFile.empty()) {
         mShell->Browser().Faf().SetTokenFile(mPendingFafTokenFile);
         mShell->Browser().Faf().SetPictureCache(mPendingFafTokenFile.parent_path() / "cache" / "maps");
@@ -5361,6 +5444,82 @@ namespace faf::editor
       add("view.frame", "Frame the whole map", "View", "Home", [this] {
         mScene.FrameMap();
       }, mapOpen);
+      // Q / E: the selected props turn under the Select tool, else the camera (the first that can run takes the key).
+      add("object.turnleft", "Turn the selection left", "Object", "Q", [this] {
+        (void)mScene.TurnSelectedProps(-0.2617994f);
+      }, [this]() -> std::string {
+        return mScene.CanTurnSelectedProps() ? std::string() : "no props selected under the Select tool";
+      });
+      add("object.turnright", "Turn the selection right", "Object", "E", [this] {
+        (void)mScene.TurnSelectedProps(0.2617994f);
+      }, [this]() -> std::string {
+        return mScene.CanTurnSelectedProps() ? std::string() : "no props selected under the Select tool";
+      });
+      add("view.turnleft", "Turn the camera left", "View", "Q", [this] {
+        mScene.StepCamera(-0.2617994f, 1.0f);
+      }, mapOpen);
+      add("view.turnright", "Turn the camera right", "View", "E", [this] {
+        mScene.StepCamera(0.2617994f, 1.0f);
+      }, mapOpen);
+      add("view.zoomin", "Closer", "View", "PageUp", [this] {
+        mScene.StepCamera(0.0f, 0.8f);
+      }, mapOpen);
+      add("view.zoomout", "Farther", "View", "PageDown", [this] {
+        mScene.StepCamera(0.0f, 1.25f);
+      }, mapOpen);
+      add("view.north", "Face north", "View", "N", [this] {
+        mScene.FaceNorth();
+      }, mapOpen);
+      add("view.down", "Look straight down", "View", "T", [this] {
+        mScene.LookDown();
+      }, mapOpen);
+      // Camera bookmarks: Ctrl+Shift+1..9 keeps the camera, Ctrl+1..9 goes back to it (per map, for this run).
+      for (int b = 1; b <= 9; ++b) {
+        const std::string n = std::to_string(b);
+        mCommandIds.push_back("view.bookmark.save." + n);
+        mCommandIds.push_back("view.bookmark.go." + n);
+        add(
+          mCommandIds[mCommandIds.size() - 2].c_str(),
+          ("Keep the camera as bookmark " + n).c_str(),
+          "View",
+          ("Ctrl+Shift+" + n).c_str(),
+          [this, b] {
+          mBookmarks[LowerPath(mDocument.Path())][static_cast<std::size_t>(b - 1)] = mScene.GetCameraPose();
+          PostStatusMessage("Camera bookmark " + std::to_string(b) + " kept");
+        },
+          mapOpen
+        );
+        add(
+          mCommandIds.back().c_str(), ("Go to camera bookmark " + n).c_str(), "View", ("Ctrl+" + n).c_str(), [this, b] {
+          mScene.SetCameraPose(*mBookmarks[LowerPath(mDocument.Path())][static_cast<std::size_t>(b - 1)]);
+        }, [this, mapOpen, b]() -> std::string {
+          if (std::string why = mapOpen(); !why.empty()) {
+            return why;
+          }
+          const auto it = mBookmarks.find(LowerPath(mDocument.Path()));
+          return it == mBookmarks.end() || !it->second[static_cast<std::size_t>(b - 1)]
+            ? "no camera bookmark " + std::to_string(b) + " yet (Ctrl+Shift+" + std::to_string(b) + " keeps one)"
+            : std::string();
+        }
+        );
+      }
+      add("play.pause", "Pause / resume", "Play", "Pause", [this] {
+        moho::CWldSession* const session = moho::WLD_GetActiveSession();
+        if (session == nullptr) {
+          return;
+        }
+        // As SessionIsPaused reads it (UserLuaSession.cpp).
+        const bool paused =
+          session->mRequestingPauseState != 0U ? session->mRequestingPause != 0 : session->mSessionPauseStateA != 0;
+        if (paused) {
+          session->Resume();
+        } else {
+          session->RequestPause();
+        }
+        gpg::Logf("editor: play %s", paused ? "resumed" : "paused");
+      }, [this]() -> std::string {
+        return mPlay.Active() && moho::WLD_GetActiveSession() != nullptr ? std::string() : "no play running";
+      });
       add("view.focus", "Focus selection", "View", "F", [this] {
         if (!mScene.FrameSelection()) {
           PostStatusMessage("Nothing selected to focus on");
@@ -5646,7 +5805,19 @@ namespace faf::editor
         },
         EdMenu{
           "&View",
-          {EdMenuItem{"", "Camera", false, {cmd("view.frame"), cmd("view.focus")}},
+          {EdMenuItem{
+             "",
+             "Camera",
+             false,
+             {cmd("view.frame"),
+              cmd("view.focus"),
+              cmd("view.north"),
+              cmd("view.down"),
+              cmd("view.turnleft"),
+              cmd("view.turnright"),
+              cmd("view.zoomin"),
+              cmd("view.zoomout")}
+           },
            world,
            sep(),
            cmd("view.palette"),
@@ -5710,7 +5881,7 @@ namespace faf::editor
            cmd("window.assets"),
            cmd("view.script")}
         },
-        EdMenu{"&Play", {cmd("play.toggle"), cmd("play.editorview"), playMaps}},
+        EdMenu{"&Play", {cmd("play.toggle"), cmd("play.pause"), cmd("play.editorview"), playMaps}},
         EdMenu{"&Help", {cmd("help.open"), cmd("help.tour"), sep(), cmd("view.palette"), cmd("settings.keys")}},
       };
       const auto clashes = c.Clashes();
@@ -8906,6 +9077,7 @@ namespace faf::editor
       TestAssets();
       TestEditorMods();
       TestUnitViewer();
+      TestPause();
       // `/sctest` (test runs): the SC tools window's buttons in turn, a second apart, the heights' checksum each time.
       if (
         mScTestStage < 8 && moho::CFG_GetArgOption("/sctest", 0, nullptr) && !mScene.ModelsPending() &&
@@ -10215,6 +10387,11 @@ namespace faf::editor
       mScene.SetTools(nullptr);
       delete mShell;
       mShell = nullptr;
+      // Ended normally: the marker goes.
+      if (!mRunMarker.empty()) {
+        std::error_code ec;
+        std::filesystem::remove(mRunMarker, ec);
+      }
       if (const HWND viewport = HandleOf(moho::ren_Viewport); viewport != nullptr && gViewportProc != nullptr) {
         (void)::SetWindowLongPtrW(viewport, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(gViewportProc));
       }

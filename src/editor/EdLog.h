@@ -69,6 +69,11 @@ namespace faf::editor
     std::vector<std::string> mMissionTrace;
     bool mAutoScroll = true;
     bool mShowTimes = false;
+    /** Whether a line passes the filter and the level toggles. */
+    [[nodiscard]] bool Shown(const Line& line) const;
+    bool mShowInfo = true;
+    bool mShowWarnings = true;
+    bool mShowDebug = true;
     char mFilter[128]{};
   };
 } // namespace faf::editor

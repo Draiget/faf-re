@@ -4948,6 +4948,67 @@ namespace faf::editor
     return true;
   }
 
+  void EdMapScene::SetCameraPose(
+    const CameraPose& pose
+  )
+  {
+    if (mMap == nullptr) {
+      return;
+    }
+    mTargetX = pose.targetX;
+    mTargetZ = pose.targetZ;
+    mHeading = pose.heading;
+    mPitch = pose.pitch;
+    mDistance = pose.distance;
+    ApplyCamera();
+  }
+
+  void EdMapScene::StepCamera(
+    const float turn,
+    const float zoom
+  )
+  {
+    if (mMap == nullptr) {
+      return;
+    }
+    mHeading += turn;
+    mDistance *= zoom;
+    ApplyCamera();
+  }
+
+  void EdMapScene::FaceNorth()
+  {
+    if (mMap != nullptr) {
+      mHeading = kPi; // as FrameWholeMap: the map's top at the top
+      ApplyCamera();
+    }
+  }
+
+  void EdMapScene::LookDown()
+  {
+    if (mMap != nullptr) {
+      mPitch = kMaxPitch;
+      ApplyCamera();
+    }
+  }
+
+  bool EdMapScene::CanTurnSelectedProps() const
+  {
+    return mMap != nullptr && mTools != nullptr && mTools->SelectToolActive() && !mSelection.empty() &&
+      SelectedKind() == PickKind::Prop;
+  }
+
+  bool EdMapScene::TurnSelectedProps(
+    const float radians
+  )
+  {
+    if (!CanTurnSelectedProps()) {
+      return false;
+    }
+    TurnSelection(radians);
+    return true;
+  }
+
   void EdMapScene::SetRuler(
     const float x0,
     const float z0,
