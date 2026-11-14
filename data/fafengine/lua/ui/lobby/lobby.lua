@@ -140,3 +140,111 @@ do
         AddChatText(text)
     end
 end
+
+do
+local UIUtil = import('/lua/ui/uiutil.lua')
+-- Ranked preferences are independent of LastColorFAF (FAF overwrites that on redraw).
+local colourPrefs = Prefs.GetFromCurrentProfile('MicrochipLobbyColours') or {6, 11, 8}
+if type(colourPrefs) ~= 'table' then colourPrefs = {6, 11, 8} end
+local colourAttempt, applyingColour
+local function ApplyPreferredColour()
+    if applyingColour or singlePlayer or not GUI or not GUI.uiCreated or not lobbyComm
+        or rawget(_G, 'ServerLobbyControl') == 'organiser'
+        or not gameInfo or not gameInfo.PlayerOptions or not gameInfo.PlayerOptions.pairs then return end
+    local slot = FindSlotForID(localPlayerID)
+    local player = slot and gameInfo.PlayerOptions[slot]
+    if not player or not player.Human or player.Ready then return end
+    local signature = {tostring(slot), tostring(player.PlayerColor)}
+    local occupied = {}
+    for index, other in gameInfo.PlayerOptions:pairs() do
+        if index ~= slot then occupied[other.PlayerColor] = true end
+        table.insert(signature, tostring(index) .. ':' .. tostring(other.OwnerID) .. ':' .. tostring(other.PlayerColor))
+    end
+    table.sort(signature)
+    for rank = 1, 3 do
+        local colour = colourPrefs[rank]
+        if type(colour) == 'number' and gameColors.PlayerColors[colour] and not occupied[colour] then
+            if player.PlayerColor == colour then colourAttempt = nil; return end
+            local attempt = tostring(colour) .. '/' .. table.concat(signature, ',')
+            -- One request per observed roster state: rejection must not create a request loop.
+            if colourAttempt == attempt then return end
+            if lobbyComm:IsHost() then
+                colourAttempt = attempt
+                applyingColour = true
+                GUI.slots[slot].color:OnClick(colour)
+                applyingColour = false
+            elseif hostID then
+                colourAttempt = attempt
+                -- Wait for the authoritative SetColor; never claim a colour locally before approval.
+                lobbyComm:SendData(hostID, {Type = 'RequestColor', Color = colour})
+            end
+            return
+        end
+    end
+end
+
+local originalColourUpdate = UpdateGame
+UpdateGame = function(...)
+    local result = originalColourUpdate(unpack(arg))
+    ApplyPreferredColour()
+    return result
+end
+local originalColourSlot = SetSlotInfo
+SetSlotInfo = function(...)
+    local result = originalColourSlot(unpack(arg))
+    ApplyPreferredColour()
+    return result
+end
+
+local function ShowColourPreferences()
+    local Layout = import('/lua/maui/layouthelpers.lua')
+    local BitmapCombo = import('/lua/ui/controls/combo.lua').BitmapCombo
+    local button = UIUtil.CreateButtonWithDropshadow(GUI.panel, '/BUTTON/medium/', 'Colour prefs')
+    GUI.colourPreferencesButton = button
+    -- Share the existing bottom row; Presets/Unit Manager was centered across
+    -- both columns and would overlap a new button below Patchnotes.
+    Layout.AtHorizontalCenterIn(GUI.restrictedUnitsOrPresetsBtn, GUI.gameoptionsButton)
+    Layout.AtVerticalCenterIn(button, GUI.restrictedUnitsOrPresetsBtn)
+    Layout.AtHorizontalCenterIn(button, GUI.patchnotesButton)
+    Tooltip.AddControlTooltipManual(button, 'Colour preferences',
+        'Choose your first, second and third preferred lobby colours.')
+    button.OnClick = function()
+        local content = import('/lua/maui/group.lua').Group(GUI)
+        Layout.SetDimensions(content, 430, 255)
+        local title = UIUtil.CreateText(content, 'Preferred lobby colours', 18, UIUtil.titleFont)
+        Layout.AtLeftTopIn(title, content, 20, 15)
+        local hint = UIUtil.CreateText(content, 'Uses the first free colour; upgrades when available.', 12, UIUtil.bodyFont)
+        Layout.AtLeftTopIn(hint, content, 20, 45)
+        for rank = 1, 3 do
+            local preference = rank
+            local label = UIUtil.CreateText(content, 'Preference ' .. rank, 14, UIUtil.bodyFont)
+            Layout.AtLeftTopIn(label, content, 25, 50 + rank * 35)
+            local selected = colourPrefs[rank]
+            if not gameColors.PlayerColors[selected] then selected = 6 end
+            local combo = BitmapCombo(content, gameColors.PlayerColors, selected, true)
+            Layout.SetWidth(combo, 150)
+            Layout.AtLeftTopIn(combo, content, 200, 45 + rank * 35)
+            combo.OnClick = function(self, index)
+                colourPrefs[preference] = index
+                Prefs.SetToCurrentProfile('MicrochipLobbyColours', colourPrefs)
+                colourAttempt = nil
+                ApplyPreferredColour()
+            end
+        end
+        local popup = import('/lua/ui/controls/popups/popup.lua').Popup(GUI, content)
+        local close = UIUtil.CreateButtonStd(content, '/BUTTON/medium/', 'Close', 12)
+        Layout.AtLeftBottomIn(close, content, 150, 10)
+        close.OnClick = function() popup:Destroy() end
+        popup.OnEscapePressed = close.OnClick
+        popup.OnShadowClicked = close.OnClick
+    end
+end
+
+local originalCreateUI = CreateUI
+function CreateUI(maxPlayers)
+    originalCreateUI(maxPlayers)
+    if singlePlayer then return end
+    ShowColourPreferences()
+    ApplyPreferredColour()
+end
+end
