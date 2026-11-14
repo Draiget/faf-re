@@ -9396,7 +9396,10 @@ namespace faf::editor
       const std::string type = MarkerTypeOf(marker);
       const bool start = type == "Blank Marker";
       const bool resource = type == "Mass" || type == "Hydrocarbon";
-      if ((!all && !start && !resource) || MarkerHidden(marker)) {
+      // A selected marker shows whatever the tool (a Camera Info marker's view frame with it).
+      const bool picked =
+        std::find(mMarkerSelection.begin(), mMarkerSelection.end(), marker.name) != mMarkerSelection.end();
+      if ((!all && !start && !resource && !picked) || MarkerHidden(marker)) {
         continue;
       }
       float x = 0.0f, y = 0.0f, z = 0.0f;

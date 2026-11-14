@@ -186,6 +186,50 @@ namespace faf::editor
     }
 
     /** Editor.AddMarker(type, x, z) -> its name, or nil and why (one undo step) */
+    /** Editor.SetMarker(name, key, value) -> true, or nil and why (one undo step). A number is a FLOAT, a boolean a
+     * BOOLEAN, a string a STRING, a table of three numbers a VECTOR3 (position, orientation). */
+    int LuaSetMarker(
+      lua_State* L
+    )
+    {
+      const std::string name = ArgString(L, 1);
+      const std::string key = ArgString(L, 2);
+      std::string value;
+      if (lua_type(L, 3) == LUA_TNUMBER) {
+        value = FloatValue(lua_tonumber(L, 3));
+      } else if (lua_type(L, 3) == LUA_TBOOLEAN) {
+        value = lua_toboolean(L, 3) != 0 ? "BOOLEAN( true )" : "BOOLEAN( false )";
+      } else if (lua_type(L, 3) == LUA_TSTRING) {
+        value = StringValue(lua_tostring(L, 3));
+      } else if (lua_type(L, 3) == LUA_TTABLE) {
+        double v[3] = {};
+        for (int i = 0; i < 3; ++i) {
+          lua_rawgeti(L, 3, i + 1);
+          v[i] = lua_tonumber(L, -1);
+          lua_pop(L, 1);
+        }
+        value = Vector3Value(v[0], v[1], v[2]);
+      }
+      if (gHost == nullptr || gHost->Document().Map() == nullptr || key.empty() || value.empty() || key == "type") {
+        lua_pushnil(L);
+        lua_pushstring(L, "Editor.SetMarker(name, key, value): a map, a key other than type, and a value");
+        return 2;
+      }
+      EdDocument& document = gHost->Document();
+      EdDocument::SaveSnapshot before = document.SaveDataNow();
+      for (SaveEntry& marker : document.SaveData().Markers()) {
+        if (marker.name == name) {
+          marker.Set(key, value);
+          document.SaveDataEdited(std::move(before));
+          lua_pushboolean(L, 1);
+          return 1;
+        }
+      }
+      lua_pushnil(L);
+      lua_pushstring(L, ("no marker named " + name).c_str());
+      return 2;
+    }
+
     int LuaAddMarker(
       lua_State* L
     )
@@ -600,6 +644,7 @@ namespace faf::editor
     SetFunction(L, "HeightAt", &LuaHeightAt, &mod);
     SetFunction(L, "Markers", &LuaMarkers, &mod);
     SetFunction(L, "AddMarker", &LuaAddMarker, &mod);
+    SetFunction(L, "SetMarker", &LuaSetMarker, &mod);
     SetFunction(L, "Panel", &LuaPanel, &mod);
     SetFunction(L, "Menu", &LuaMenu, &mod);
     SetFunction(L, "Has", &LuaHas, &mod);

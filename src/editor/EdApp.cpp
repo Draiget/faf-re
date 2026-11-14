@@ -166,34 +166,61 @@ namespace faf::editor
     [[nodiscard]] bool IsTestRunCommandLine()
     {
       static const char* const kOptions[] = {
-        "/command",         "/palette",        "/theme",           "/keysfile",
-        "/focuspanel",      "/uiclicks",       "/tipcheck",        "/fieldstest",
-        "/popouttest",      "/hidegameunits",  "/movelayer",       "/pickfilter",
-        "/mapwide",         "/tool",           "/proptool",        "/play",
-        "/debugarm",        "/breakpoint",     "/check",           "/decaltool",
-        "/markertool",      "/unittool",       "/hoverprop",       "/selectprops",
-        "/selectunit",      "/propswap",       "/saveas",          "/settingsfile",
-        "/autosavefolder",  "/askunsaved",     "/particlebrowser", "/particlenew",
-        "/particleopen",    "/materialeditor", "/uiscale",         "/testrun",
-        "/openall",         "/roundtrip",      "/vault",           "/vaultsearch",
-        "/vaultmap",        "/newmap",         "/stamp",           "/brush",
-        "/layer",           "/waterbody",      "/ruler",           "/adaptivewindow",
-        "/maskrule",        "/maskgen",        "/symhover",        "/stbfont",
-        "/recipe",          "/texset",         "/layerop",         "/slopeview",
-        "/typesfromlayers", "/uncapped",       "/nominimap",       "/followtest",
-        "/arrangetest",     "/findtest",       "/findopen",        "/filltest",
-        "/modaltest",       "/looktest",       "/looksfolder",     "/envtest",
-        "/watermasktest",   "/nowaterhires",   "/camat",           "/erosiontest",
-        "/sctest",          "/symmenu",        "/panelbottom",     "/shader",
-        "/brushtest",       "/brushshape",     "/stampsource",     "/stampstroke",
-        "/symoptions",      "/maskoptions",    "/masktest",        "/shaderbrowser",
-        "/maskstamptest",   "/convertlayers",  "/interoptest",     "/gentest",
-        "/layouttest",      "/playcopytest",   "/missiontest",     "/modtest",
-        "/unitlabtest",     "/effectmodtest",  "/assettest",       "/thumbcache",
-        "/assetmarks",      "/editormods",     "/editormodtest",   "/unitviewtest",
-        "/runmarker",       "/pausetest",      "/viewmenu",        "/mapinfotest",
-        "/dropdefaultcube", "/exportpreview",  "/resizetest",      "/console",
-        "/pathtest",
+        "/command",         "/palette",
+        "/theme",           "/keysfile",
+        "/focuspanel",      "/uiclicks",
+        "/tipcheck",        "/fieldstest",
+        "/popouttest",      "/hidegameunits",
+        "/movelayer",       "/pickfilter",
+        "/mapwide",         "/tool",
+        "/proptool",        "/play",
+        "/debugarm",        "/breakpoint",
+        "/check",           "/decaltool",
+        "/markertool",      "/unittool",
+        "/hoverprop",       "/selectprops",
+        "/selectunit",      "/propswap",
+        "/saveas",          "/settingsfile",
+        "/autosavefolder",  "/askunsaved",
+        "/particlebrowser", "/particlenew",
+        "/particleopen",    "/materialeditor",
+        "/uiscale",         "/testrun",
+        "/openall",         "/roundtrip",
+        "/vault",           "/vaultsearch",
+        "/vaultmap",        "/newmap",
+        "/stamp",           "/brush",
+        "/layer",           "/waterbody",
+        "/ruler",           "/adaptivewindow",
+        "/maskrule",        "/maskgen",
+        "/symhover",        "/stbfont",
+        "/recipe",          "/texset",
+        "/layerop",         "/slopeview",
+        "/typesfromlayers", "/uncapped",
+        "/nominimap",       "/followtest",
+        "/arrangetest",     "/findtest",
+        "/findopen",        "/filltest",
+        "/modaltest",       "/looktest",
+        "/looksfolder",     "/envtest",
+        "/watermasktest",   "/nowaterhires",
+        "/camat",           "/erosiontest",
+        "/sctest",          "/symmenu",
+        "/panelbottom",     "/shader",
+        "/brushtest",       "/brushshape",
+        "/stampsource",     "/stampstroke",
+        "/symoptions",      "/maskoptions",
+        "/masktest",        "/shaderbrowser",
+        "/maskstamptest",   "/flattentest",
+        "/convertlayers",   "/interoptest",
+        "/gentest",         "/layouttest",
+        "/playcopytest",    "/missiontest",
+        "/modtest",         "/unitlabtest",
+        "/effectmodtest",   "/assettest",
+        "/thumbcache",      "/assetmarks",
+        "/editormods",      "/editormodtest",
+        "/unitviewtest",    "/runmarker",
+        "/pausetest",       "/viewmenu",
+        "/mapinfotest",     "/dropdefaultcube",
+        "/exportpreview",   "/resizetest",
+        "/console",         "/pathtest",
       };
       for (const char* const option : kOptions) {
         if (moho::CFG_GetArgOption(option, 0, nullptr)) {
@@ -3012,6 +3039,14 @@ namespace faf::editor
             );
           }
           if (panelsOnly) {
+            // The Camera Info marker the mod added, selected: its view frame shows in the capture.
+            for (const SaveEntry& marker : mDocument.SaveData().Markers()) {
+              if (MarkerTypeOf(marker) == "Camera Info") {
+                mScene.SelectMarkers({marker.name}, false);
+                gpg::Logf("editor: editor mod test: selected %s", marker.name.c_str());
+                break;
+              }
+            }
             return;
           }
           gpg::Logf(
@@ -4563,7 +4598,9 @@ namespace faf::editor
         (void)std::strftime(stamp, sizeof(stamp), "%Y%m%d_%H%M%S", &local);
         out << "== FAF map editor diagnostics, " << stamp << "\n";
         out << "build: " << __DATE__ << " " << __TIME__ << "\n";
-        out << "settings folder: " << EditorSettingsFolder().string() << "\n";
+        const std::filesystem::path settingsFolder =
+          mSettingsFile.empty() ? EditorSettingsFolder() : mSettingsFile.parent_path();
+        out << "settings folder: " << settingsFolder.string() << "\n";
         gpg::gal::DeviceRuntimeInfo device;
         if (gpg::gal::Device::IsReady() && gpg::gal::Device::GetInstance()->GetRuntimeInfo(device)) {
           out << "renderer: " << device.api.c_str() << " on " << device.adapter.c_str() << "\n";
@@ -4594,7 +4631,8 @@ namespace faf::editor
           }
           return text;
         };
-        out << "\n== settings.ini\n" << readFile(EditorSettingsFolder() / "settings.ini", 32768) << "\n";
+        out << "\n== settings.ini\n"
+            << readFile(mSettingsFile.empty() ? settingsFolder / "settings.ini" : mSettingsFile, 32768) << "\n";
         out << "\n== the log (the last 400 lines)\n";
         for (const std::string& line : mLog.Tail(400)) {
           out << line << "\n";
@@ -4620,7 +4658,7 @@ namespace faf::editor
         if (!newest.empty()) {
           out << readFile(newest, 65536) << "\n";
         }
-        const std::filesystem::path folder = EditorSettingsFolder() / "diagnostics";
+        const std::filesystem::path folder = settingsFolder / "diagnostics";
         std::filesystem::create_directories(folder, ignored);
         const std::filesystem::path file = folder / (std::string("diagnostics_") + stamp + ".txt");
         const std::string text = out.str();
@@ -5048,6 +5086,8 @@ namespace faf::editor
       std::string mMaskTestArg;
       int mMaskTestFrames = 0;
       std::string mMaskStampArg; // `/maskstamptest <layer>,<x0>,<z0>,<x1>,<z1>,<spacing>`
+      bool mFlattenTestDone = false;
+      int mFlattenTestFrames = 0;
       int mMaskStampFrames = 0;
       // `/masklayer <1-8>` and `/maskrule <layer>,<low>,<high>` (test runs): the Texture tool on that layer;
       // a height rule applied to the whole map once the map has been shown for 120 frames.
@@ -10435,6 +10475,24 @@ namespace faf::editor
         (void)std::sscanf(mMaskTestArg.c_str(), "%d,%f,%f,%f", &layer, &x, &z, &seconds);
         mScene.TestMaskStroke(layer - 1, x, z, seconds);
         mMaskTestArg.clear();
+      }
+      // `/flattentest <height>` (test runs): Flatten map to that height, its range logged, then undone.
+      if (!mFlattenTestDone && mScene.Attached() && ++mFlattenTestFrames == 120) {
+        mFlattenTestDone = true;
+        if (fa::vector<fa::string> value; moho::CFG_GetArgOption("/flattentest", 1, &value) && !value.empty()) {
+          float low = 0.0f, high = 0.0f, mean = 0.0f;
+          (void)mScene.HeightRange(low, high, mean);
+          gpg::Logf("editor: flatten test: before %.2f .. %.2f, mean %.2f", low, high, mean);
+          std::string message;
+          const bool flattened = mScene.FlattenWhole(static_cast<float>(std::atof(value[0].c_str())), message);
+          (void)mScene.HeightRange(low, high, mean);
+          gpg::Logf("editor: flatten test: %s; now %.2f .. %.2f", flattened ? message.c_str() : "refused", low, high);
+          const bool undone = mCommands.Run("edit.undo");
+          (void)mScene.HeightRange(low, high, mean);
+          gpg::Logf(
+            "editor: flatten test: undo %s; now %.2f .. %.2f, mean %.2f", undone ? "ran" : "refused", low, high, mean
+          );
+        }
       }
       // `/maskstamptest <layer>,<x0>,<z0>,<x1>,<z1>,<spacing>` (test runs): a texture stamp stroke along a line, the
       // brush's shape as it is (a library image with /brushshape).
