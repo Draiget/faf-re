@@ -140,3 +140,24 @@ do
         AddChatText(text)
     end
 end
+
+do
+local originalCreateUI = CreateUI
+function CreateUI(maxPlayers)
+    originalCreateUI(maxPlayers)
+    if singlePlayer then return end
+    -- The lobby can load before selected UI mods are active as script hooks.
+    for _, mod in ipairs(Mods.GetUiMods()) do
+        if mod.uid == 'a16bec45-d3ab-4be7-9915-0a43194c83fe' then
+            local screen = GUI
+            local alert = import(mod.location .. '/readyalert.lua')
+            ForkThread(alert.WatchLobby, function()
+                if GUI == screen and lobbyComm then
+                    return gameInfo.PlayerOptions
+                end
+            end)
+            break
+        end
+    end
+end
+end

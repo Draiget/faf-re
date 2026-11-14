@@ -19,6 +19,21 @@
 
 namespace
 {
+  void FlashGameWindow(const fa::vector<fa::string>&)
+  {
+    if (!moho::sMainWindow) {
+      return;
+    }
+
+    const auto window = reinterpret_cast<HWND>(static_cast<std::uintptr_t>(moho::sMainWindow->GetHandle()));
+    if (window) {
+      FLASHWINFO flash{sizeof(FLASHWINFO), window, FLASHW_ALL, 3, 0};
+      ::FlashWindowEx(&flash);
+    }
+  }
+
+  moho::CConFunc gFlashGameWindow("SC_FlashGameWindow", "Flash the game title bar and taskbar button", &FlashGameWindow);
+
   /// 0x00E00779, the `.data` initializer of `Moho::CConFunc_SC_PrimaryAdapter`
   /// (+0x08). This startup command carries no console-help text in the
   /// binary.

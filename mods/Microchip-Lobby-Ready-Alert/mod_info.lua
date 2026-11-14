@@ -1,0 +1,9 @@
+name = 'Microchip Lobby Ready Alert'
+uid = 'a16bec45-d3ab-4be7-9915-0a43194c83fe'
+version = 1
+description = 'Flashes the Windows title bar and taskbar button and plays a sound when all human players are Ready. Requires faf-re with lobby ready alert support.'
+author = 'Microchip'
+ui_only = true
+exclusive = false
+selectable = true
+enabled = true
