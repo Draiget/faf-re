@@ -27,6 +27,8 @@
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/sim/RRuleGameRules.h"
 #include "editor/tools/EdPathing.h"
+#include "editor/tools/EdSlopeRules.h"
+#include "editor/doc/EdUnits.h"
 #include "editor/tools/EdTerrainChecks.h"
 #include "editor/ui/EdMissionPanel.h"
 #include "gpg/core/utils/Logging.h"
@@ -1245,6 +1247,89 @@ namespace faf::editor
       }
     }
     CheckPathing(input);
+    // The build check: each structure the save places, rated by the sim's flatness rule for its blueprint
+    // (OCCUPY_CheckEdgeFlatness 0x00564F80 for a flattened skirt, else OCCUPY_CheckAreaFlatness 0x005651F0) against
+    // its MaxGroundVariation: ground the game wouldn't let it be built on.
+    if (moho::CWldMap* const map = mDocument.Map(); map != nullptr && map->mTerrainRes != nullptr) {
+      const moho::CHeightField* const field = map->mTerrainRes->GetHeightField();
+      moho::RRuleGameRules* const rules = moho::RULE_PeekKept();
+      if (field != nullptr && rules != nullptr) {
+        const auto word = [field](const int x, const int z) {
+          const int cx = std::clamp(x, 0, field->width - 1);
+          const int cz = std::clamp(z, 0, field->height - 1);
+          return static_cast<int>(field->data[static_cast<std::size_t>(cz) * field->width + cx]);
+        };
+        int rated = 0;
+        int unknown = 0;
+        int mobile = 0;
+        int noFootprint = 0;
+        for (const SaveEntry& army : mDocument.SaveData().Armies()) {
+          UnitGroup group;
+          std::string error;
+          if (!ParseUnitGroup(army.Get("Units"), group, error)) {
+            continue;
+          }
+          std::vector<const SaveUnit*> units;
+          CollectUnits(group, units);
+          for (const SaveUnit* const unit : units) {
+            std::string lower = unit->type;
+            for (char& c : lower) {
+              c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+            }
+            moho::RResId id{};
+            id.name.assign(lower.c_str());
+            const moho::RUnitBlueprint* const blueprint = rules->GetUnitBlueprint(id);
+            if (blueprint == nullptr) {
+              ++unknown;
+              continue;
+            }
+            if (blueprint->Physics.MotionType != moho::RULEUMT_None) {
+              ++mobile;
+              continue;
+            }
+            // The blueprint's own footprint (the rules the editor keeps don't resolve the sim's pointer).
+            const moho::SFootprint& footprint = blueprint->mFootprint;
+            if (footprint.mSizeX == 0U || footprint.mSizeZ == 0U || blueprint->Physics.MaxGroundVariation <= 0.0f) {
+              ++noFootprint;
+              continue;
+            }
+            const int n = std::max<int>(1, std::max(footprint.mSizeX, footprint.mSizeZ));
+            const int cx = static_cast<int>(std::floor(unit->position[0] - footprint.mSizeX * 0.5f));
+            const int cz = static_cast<int>(std::floor(unit->position[2] - footprint.mSizeZ * 0.5f));
+            const int kind = blueprint->Physics.FlattenSkirt != 0U ? sloperules::kKindRing : sloperules::kKindBuild;
+            const float varies = static_cast<float>(sloperules::CellRating(kind, n, cx, cz, word)) / 128.0f;
+            ++rated;
+            if (varies > blueprint->Physics.MaxGroundVariation + 1e-3f) {
+              CheckIssue issue;
+              issue.level = CheckIssue::Level::Warning;
+              issue.marker = unit->name;
+              char text[240];
+              (void)std::snprintf(
+                text,
+                sizeof(text),
+                "%s (%s): the ground under it varies %.2f; the game builds it where it varies %.2f at most",
+                unit->type.c_str(),
+                army.name.c_str(),
+                static_cast<double>(varies),
+                static_cast<double>(blueprint->Physics.MaxGroundVariation)
+              );
+              issue.text = text;
+              issue.x = unit->position[0];
+              issue.z = unit->position[2];
+              mCheckIssues.push_back(std::move(issue));
+            }
+          }
+        }
+        gpg::Logf(
+          "editor: build check: %d structures rated (%d units move, %d without a footprint or a ground limit, %d "
+          "blueprints the rules haven't got)",
+          rated,
+          mobile,
+          noFootprint,
+          unknown
+        );
+      }
+    }
     // The scripts' syntax, as the files are now (edits included).
     for (CheckIssue& issue : mDocument.CheckScripts()) {
       mCheckIssues.insert(mCheckIssues.begin(), std::move(issue));

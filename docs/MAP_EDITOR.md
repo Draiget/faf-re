@@ -116,7 +116,7 @@ In VS Code, the Run view has "Editor (x64, Debug)" and "Editor (x64, Release)": 
 - The Check runs every call of the game's script modules in `_script.lua` against the API table (a function a module hasn't got, too many arguments) and offers fixes: Pull inside for a start or resource off the map or playable area, Snap to grid for a resource off its cell's middle; a row's fix button and Fix all. On a test map with both planted: "ScenarioFramework has no function NoSuchFunction" at line 11, Mass 08 off its grid; a simulated click on Snap to grid moved it to 112.5, 305.5 (the button didn't get the click before: fixed).
 - The Log panel has a Lua console line with a history: the interface's Lua, `=expr` prints (`=1+2` gave `= 3`), `sim <code>` runs in the sim of a play (without one it says so), `con <command>` the engine's console.
 - The Run panel, while a test play runs: Skip waits, Timers x2 / x4 / x10, Jump to stage, State to the log; the test run records the operation's end (won or lost) instead of ending the game. Not run in a play yet.
-- Not here: the sim build check (it needs the sim's own placement test).
+- The build check: each structure the save places is rated by the sim's flatness rule for its blueprint (OCCUPY_CheckEdgeFlatness 0x00564F80 with a flattened skirt, else OCCUPY_CheckAreaFlatness 0x005651F0, as `tools/EdSlopeRules.h` ports them) over its footprint, against its MaxGroundVariation; one over it is a warning. SCMP_001: 774 structures rated, none over (SCMP_009's 43 units all move). A flagged case wasn't made in a run.
 
 **Help**: F1 topics for the mod project, unit lab, unit viewer, assets, editor mods and the mission's Run panel.
 
