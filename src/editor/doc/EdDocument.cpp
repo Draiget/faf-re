@@ -2486,6 +2486,22 @@ namespace faf::editor
       gpg::Logf("editor: the map's files backed up to %s", made.string().c_str());
       mBackedUp = true;
     }
+    // A map without a <default> reflection cube gets the game's (units without one of their own reflect nothing
+    // else), as one undo step, said in the message.
+    std::string note;
+    {
+      std::vector<std::pair<std::string, std::string>> cubes = CubesNow();
+      if (std::none_of(cubes.begin(), cubes.end(), [](const auto& cube) {
+        return cube.first == "<default>";
+      })) {
+        const LookEnvironment before = LookEnvironmentNow();
+        cubes.emplace_back("<default>", "/textures/environment/defaultenvcube.dds");
+        ApplyCubes(cubes);
+        LookApplied(before);
+        note = " (added the <default> reflection cube it lacked)";
+        gpg::Logf("editor: save: the map had no <default> reflection cube: the game's added");
+      }
+    }
     std::string failure;
     MarkKeptImages();
     if (!WriteMapFile(*mMap, mFileRecords, file, failure)) {
@@ -2528,7 +2544,7 @@ namespace faf::editor
       mLayoutRead = layout;
     }
     mModified = false;
-    message = "Saved " + file.string();
+    message = "Saved " + file.string() + note;
     return true;
   }
 
