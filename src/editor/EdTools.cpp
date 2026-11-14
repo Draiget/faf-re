@@ -4646,6 +4646,24 @@ namespace faf::editor
         ImGui::TextUnformatted(count);
       } else {
         const SaveEntry& marker = mMarkerSelection.front();
+        // Its type, changeable (the palette's types, the game's templates among them).
+        {
+          const std::string current = MarkerTypeOf(marker);
+          ImGui::SetNextItemWidth(-1.0f);
+          if (EdBeginCombo("##markerchangetype", current.c_str())) {
+            for (const MarkerType& type : MarkerTypes()) {
+              if (ImGui::Selectable(type.type, current == type.type) && current != type.type) {
+                mMarkerEditName = marker.name;
+                mMarkerEditKey = "settype";
+                mMarkerEditValue = type.type;
+              }
+            }
+            ImGui::EndCombo();
+          }
+          EdSetItemTooltip(
+            "The marker's type: a change brings that type's colour, prop and properties (one undo step)"
+          );
+        }
         // The labels' column: as wide as the longest key ("orientation"), so the badges never sit on a name.
         float labelColumn = ImGui::CalcTextSize("name").x;
         for (const auto& [key, value] : marker.properties) {

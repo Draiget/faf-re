@@ -218,4 +218,39 @@ namespace
     EXPECT_EQ(other.kind, MarkerValue::Kind::Raw);
     EXPECT_EQ(faf::editor::WriteMarkerValue(other), "{ 'a', 'b' }");
   }
+
+  TEST(
+    Markers,
+    GameTemplatesAddTypesAndATypeChanges
+  )
+  {
+    const std::string lua = "MarkerTemplates = {\n"
+                            "    ['Mass'] = {\n        resource = true,\n        amount = 100,\n    },\n"
+                            "    ['Mod Beacon'] = {\n        hint = true,\n        scale = 1.5,\n"
+                            "\t\tprop = \"/env/common/props/markers/M_Expansion_prop.bp\",\n"
+                            "\t\tcolor = \"ff123456\",\n        offset = VECTOR3(0,1,0),\n    },\n}\n";
+    EXPECT_EQ(faf::editor::AddMarkerTemplates(lua), 1) << "Mass is built in already";
+    const faf::editor::MarkerType* const beacon = faf::editor::FindMarkerType("Mod Beacon");
+    ASSERT_NE(beacon, nullptr);
+    EXPECT_STREQ(beacon->group, "Game");
+    EXPECT_STREQ(beacon->color, "ff123456");
+    EXPECT_STREQ(beacon->prop, "M_Expansion_prop.bp");
+    ASSERT_EQ(beacon->extra.size(), 3U);
+    EXPECT_EQ(beacon->extra[0].second, "BOOLEAN( true )");
+    EXPECT_EQ(beacon->extra[1].second, "FLOAT( 1.500000 )");
+    EXPECT_EQ(beacon->extra[2].first, "offset");
+    EXPECT_EQ(faf::editor::AddMarkerTemplates(lua), 0) << "once";
+    // A mass point turned into the beacon: Mass's own properties go, the beacon's come, the place stays.
+    const faf::editor::MarkerType* const mass = faf::editor::FindMarkerType("Mass");
+    ASSERT_NE(mass, nullptr);
+    const faf::editor::SaveEntry point = faf::editor::NewMarker(*mass, "Mass 07", 10.0f, 20.0f, 30.0f);
+    const faf::editor::SaveEntry changed = faf::editor::WithMarkerType(point, *beacon);
+    EXPECT_EQ(changed.name, "Mass 07");
+    EXPECT_EQ(faf::editor::MarkerTypeOf(changed), "Mod Beacon");
+    EXPECT_TRUE(changed.Get("amount").empty());
+    EXPECT_EQ(changed.Get("hint"), "BOOLEAN( true )");
+    float x = 0, y = 0, z = 0;
+    ASSERT_TRUE(faf::editor::MarkerPosition(changed, x, y, z));
+    EXPECT_FLOAT_EQ(z, 30.0f);
+  }
 } // namespace

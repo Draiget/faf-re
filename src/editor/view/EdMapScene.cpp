@@ -7997,6 +7997,17 @@ namespace faf::editor
         continue;
       }
       EdDocument::SaveSnapshot before = mDocument.SaveDataNow();
+      // `settype`: the marker becomes another type (its colour, prop and the type's own properties with it).
+      if (key == "settype") {
+        const MarkerType* const type = FindMarkerType(value);
+        if (type == nullptr || MarkerTypeOf(marker) == value) {
+          return;
+        }
+        marker = WithMarkerType(marker, *type);
+        mDocument.SaveDataEdited(std::move(before));
+        gpg::Logf("editor: marker %s is a %s now", name.c_str(), value.c_str());
+        return;
+      }
       if (key == "name") {
         // A free name only; links naming the marker follow it.
         for (const SaveEntry& other : markers) {

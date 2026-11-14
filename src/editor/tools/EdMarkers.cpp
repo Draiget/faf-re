@@ -5,6 +5,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <deque>
 #include <set>
 #include <sstream>
 
@@ -13,6 +14,26 @@ namespace faf::editor
   namespace
   {
     const char* const kProps = "/env/common/props/markers/";
+
+    /** The palette: the built-in types, then the game's templates (room kept so that pointers into it stay good). */
+    std::vector<MarkerType>& Registry(
+      const std::vector<MarkerType>& builtIn
+    )
+    {
+      static std::vector<MarkerType> all = [&builtIn] {
+        std::vector<MarkerType> types;
+        types.reserve(512);
+        types.insert(types.end(), builtIn.begin(), builtIn.end());
+        return types;
+      }();
+      return all;
+    }
+    /** The added types' strings (a MarkerType points at them). */
+    std::deque<std::string>& Strings()
+    {
+      static std::deque<std::string> strings;
+      return strings;
+    }
 
     std::string Prop(
       const char* const file
@@ -100,7 +121,7 @@ namespace faf::editor
         {"scale", Float(1.0)},
         {"height", Float(0.0)}}},
     };
-    return types;
+    return Registry(types);
   }
 
   const char* MarkerTypeUse(
@@ -649,5 +670,128 @@ namespace faf::editor
       }
     }
     return grid;
+  }
+
+  int AddMarkerTemplates(
+    const std::string& lua
+  )
+  {
+    std::vector<MarkerType>& types = const_cast<std::vector<MarkerType>&>(MarkerTypes());
+    const auto keep = [](std::string text) -> const char* {
+      Strings().push_back(std::move(text));
+      return Strings().back().c_str();
+    };
+    // A value as the saves write it: a quoted text, a number, true or false, VECTOR3(...).
+    const auto saved = [](std::string value) -> std::string {
+      while (!value.empty() && (value.back() == ',' || std::isspace(static_cast<unsigned char>(value.back())) != 0)) {
+        value.pop_back();
+      }
+      if (value.size() >= 2 && (value.front() == '"' || value.front() == '\'')) {
+        return StringValue(value.substr(1, value.size() - 2));
+      }
+      if (value == "true" || value == "false") {
+        return "BOOLEAN( " + value + " )";
+      }
+      if (value.rfind("VECTOR3", 0) == 0) {
+        const std::vector<double> n = ValueNumbers(value);
+        return n.size() >= 3 ? Vector3Value(n[0], n[1], n[2]) : value;
+      }
+      char* end = nullptr;
+      const double number = std::strtod(value.c_str(), &end);
+      if (end != value.c_str() && *end == '\0') {
+        return Float(number);
+      }
+      return value;
+    };
+    int added = 0;
+    std::size_t at = 0;
+    while ((at = lua.find("['", at)) != std::string::npos) {
+      const std::size_t nameEnd = lua.find("']", at + 2);
+      const std::size_t open = nameEnd == std::string::npos ? nameEnd : lua.find('{', nameEnd);
+      const std::size_t close = open == std::string::npos ? open : lua.find('}', open);
+      if (close == std::string::npos) {
+        break;
+      }
+      const std::string name = lua.substr(at + 2, nameEnd - at - 2);
+      at = close + 1;
+      if (FindMarkerType(name) != nullptr || name.empty()) {
+        continue;
+      }
+      std::string color = "ff808080";
+      std::string prop = "M_Blank_prop.bp";
+      std::vector<std::pair<std::string, std::string>> extra;
+      std::istringstream body(lua.substr(open + 1, close - open - 1));
+      std::string line;
+      while (std::getline(body, line)) {
+        const std::size_t comment = line.find("--");
+        if (comment != std::string::npos) {
+          line.erase(comment);
+        }
+        const std::size_t equals = line.find('=');
+        if (equals == std::string::npos) {
+          continue;
+        }
+        std::string key = line.substr(0, equals);
+        key.erase(
+          std::remove_if(
+            key.begin(),
+            key.end(),
+            [](const unsigned char c) {
+          return std::isspace(c) != 0;
+        }
+          ),
+          key.end()
+        );
+        std::string value = line.substr(equals + 1);
+        value.erase(0, value.find_first_not_of(" \t"));
+        const std::string text = saved(value);
+        if (key == "color") {
+          color = ValueString(text);
+        } else if (key == "prop") {
+          const std::string path = ValueString(text);
+          prop = path.rfind(kProps, 0) == 0 ? path.substr(std::string(kProps).size()) : prop;
+        } else if (!key.empty()) {
+          extra.emplace_back(key, text);
+        }
+      }
+      if (types.size() >= types.capacity()) {
+        break; // (the palette's room is kept: pointers into it stay good)
+      }
+      types.push_back({keep(name), "Game", keep(name + " "), keep(color), keep(prop), std::move(extra)});
+      ++added;
+    }
+    return added;
+  }
+
+  SaveEntry WithMarkerType(
+    const SaveEntry& marker,
+    const MarkerType& type
+  )
+  {
+    SaveEntry out = marker;
+    // The old type's own properties go (the new one brings its own).
+    if (const MarkerType* const old = FindMarkerType(MarkerTypeOf(marker)); old != nullptr) {
+      for (const auto& [key, value] : old->extra) {
+        out.properties.erase(
+          std::remove_if(
+            out.properties.begin(),
+            out.properties.end(),
+            [&key](const auto& property) {
+          return property.first == key;
+        }
+          ),
+          out.properties.end()
+        );
+      }
+    }
+    for (const auto& [key, value] : type.extra) {
+      if (out.Get(key).empty()) {
+        out.properties.emplace(out.properties.begin(), key, value);
+      }
+    }
+    out.Set("color", StringValue(type.color));
+    out.Set("type", StringValue(type.type));
+    out.Set("prop", StringValue(Prop(type.prop)));
+    return out;
   }
 } // namespace faf::editor

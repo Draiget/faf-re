@@ -32,6 +32,19 @@ namespace faf::editor
   const MarkerType* FindMarkerType(const std::string& type);
 
   /**
+   * FAF's `/lua/MarkerTemplates.lua` (`MarkerTemplates = { ['Mass'] = { resource = true, amount = 100, prop = "...",
+   * color = "..." }, ... }`, which mods add to): the types the palette hasn't got are added to it in the group "Game",
+   * their properties as the saves write them. Returns how many were added.
+   */
+  int AddMarkerTemplates(const std::string& lua);
+
+  /**
+   * The marker as another type: its type, colour and prop that type's, the old type's own properties replaced by the
+   * new one's; its name, position, orientation and any other property kept.
+   */
+  SaveEntry WithMarkerType(const SaveEntry& marker, const MarkerType& type);
+
+  /**
    * What FAF's game code does with markers of `type` (its Lua as of 2026-11: lua/AI, lua/sim), one or two sentences;
    * empty for a type it doesn't know.
    */

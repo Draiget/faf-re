@@ -4939,6 +4939,7 @@ namespace faf::editor
       // `/roundtripframes <n>` (test runs): /roundtrip and /saveas wait this many frames of the drawn map (180).
       int mRoundTripAfter = 180;
       void SaveDocument();
+      bool mMarkerTemplatesRead = false;
       std::string mGraphMap;       // the map the Generate graph was built on (or came with): saved beside it
       std::string mGraphOpenedFor; // the map whose own graph was looked for
       /**
@@ -10671,6 +10672,13 @@ namespace faf::editor
       }
       if (EdShell::ResizeRequest ask; mShell->TakeResize(ask)) {
         StartResize(ask);
+      }
+      // The game's marker templates (FAF's /lua/MarkerTemplates.lua, mods' types too), once the files are there.
+      if (!mMarkerTemplatesRead && mDocument.GetState() == EdDocument::State::Open) {
+        mMarkerTemplatesRead = true;
+        if (std::string text; ReadGameFile("/lua/MarkerTemplates.lua", text)) {
+          gpg::Logf("editor: %d marker types from the game's MarkerTemplates.lua", AddMarkerTemplates(text));
+        }
       }
       // An asset dragged from the browser and let go over the map: it becomes the tool's, and the tool gets a click
       // there (sent to the view's window, as the panels pass the mouse on; the real cursor isn't touched).
