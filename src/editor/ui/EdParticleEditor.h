@@ -221,6 +221,15 @@ namespace faf::editor
     void GraphUndo(bool redo);
     bool SaveGraph(const std::string& effectName);
     void ListTemplates();
+
+  public:
+    /**
+     * Where the templates come from first (FAF Studio imports /lua/EffectTemplates.lua and takes every table of
+     * /effects/ paths, computed ones too): the app's Lua import; the file's text is read when it gives none.
+     */
+    static void SetTemplateSource(std::vector<EffectTemplate> (*source)());
+
+  private:
     std::unique_ptr<NodeGraph> mGraph;
     EdNodeCanvas mCanvas;
     std::string mEffectName = "new_effect";

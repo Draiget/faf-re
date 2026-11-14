@@ -227,6 +227,18 @@ namespace faf::editor
     return true;
   }
 
+  namespace
+  {
+    std::vector<EffectTemplate> (*sTemplateSource)() = nullptr;
+  } // namespace
+
+  void EdParticleEditor::SetTemplateSource(
+    std::vector<EffectTemplate> (*source)()
+  )
+  {
+    sTemplateSource = source;
+  }
+
   void EdParticleEditor::ListTemplates()
   {
     if (mTemplatesListed) {
@@ -234,8 +246,18 @@ namespace faf::editor
     }
     mTemplatesListed = true;
     std::string text;
+    if (sTemplateSource != nullptr) {
+      mTemplates = sTemplateSource();
+    }
+    // The text parser's for anything the module import didn't give (or all of them without it).
     if (ReadGameFile("/lua/EffectTemplates.lua", text)) {
-      mTemplates = ParseEffectTemplates(text);
+      for (EffectTemplate& parsed : ParseEffectTemplates(text)) {
+        if (std::none_of(mTemplates.begin(), mTemplates.end(), [&parsed](const EffectTemplate& known) {
+          return known.name == parsed.name;
+        })) {
+          mTemplates.push_back(std::move(parsed));
+        }
+      }
       std::sort(mTemplates.begin(), mTemplates.end(), [](const EffectTemplate& a, const EffectTemplate& b) {
         return LowerName(a.name) < LowerName(b.name);
       });

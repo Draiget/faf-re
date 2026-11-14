@@ -350,6 +350,21 @@ namespace faf::editor
     void FillAirGrid(int count, bool replace);
     /** The path node graph of a kind (0 air, 1 land, 2 water) over the playable area; one undo step. */
     void FillPathGrid(int kind, int count, bool replace);
+    /** The imported mesh terrain as wires over the map (pairs of ends, map units), drawn while `shown`. */
+    void SetMeshWire(
+      std::vector<std::array<float, 3>> lines
+    )
+    {
+      mMeshWire = std::move(lines);
+    }
+    void SetMeshWireShown(
+      const bool shown
+    ) noexcept
+    {
+      mMeshWireShown = shown;
+    }
+    std::vector<std::array<float, 3>> mMeshWire;
+    bool mMeshWireShown = true;
     /** Whether `type` fits at (x, z) by the game's rules (empty: it fits; else why not), and its footprint. */
     [[nodiscard]] std::string UnitFitAt(const std::string& type, float x, float z, int& sizeX, int& sizeZ) const;
     /**

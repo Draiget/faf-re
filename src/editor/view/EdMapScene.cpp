@@ -329,7 +329,8 @@ namespace faf::editor
        mDocument.SaveData().Chains().empty() && !mTools->ShowGrid() && !mTools->DecalsToolActive() &&
        !mTools->UnitsToolActive() && !mTools->EditingBorder() && !mTools->WaterToolActive() &&
        mTools->SymmetryHover() < 0 && mTools->CheckPins().empty() && !mTools->ShowingPathing() &&
-       !mTools->ShowSlope() && !mTools->ShowHeights() && !mTools->ShowKmGrid() && !mRulerShown && !mBoxing) ||
+       !mTools->ShowSlope() && !mTools->ShowHeights() && !mTools->ShowKmGrid() && !mRulerShown && !mBoxing &&
+       mMeshWire.empty()) ||
       moho::ren_Viewport == nullptr
     ) {
       return;
@@ -680,6 +681,21 @@ namespace faf::editor
       }
     }
 
+    // The mesh terrain's wires (Mesh terrain panel), a little above their own heights.
+    if (mMeshWireShown && !mMeshWire.empty()) {
+      for (std::size_t i = 0; i + 1 < mMeshWire.size(); i += 2) {
+        moho::CD3DPrimBatcher::Vertex a{};
+        moho::CD3DPrimBatcher::Vertex b{};
+        a.mX = mMeshWire[i][0];
+        a.mY = mMeshWire[i][1] + 0.2f;
+        a.mZ = mMeshWire[i][2];
+        b.mX = mMeshWire[i + 1][0];
+        b.mY = mMeshWire[i + 1][1] + 0.2f;
+        b.mZ = mMeshWire[i + 1][2];
+        a.mColor = b.mColor = 0xA0FFD060u;
+        batcher->DrawLine(a, b);
+      }
+    }
     // The Units tool's fit (FAF Studio's ghost): the picked unit's footprint at the cursor, green where it fits by
     // the game's rules, red where it doesn't.
     if (mTools->UnitsToolActive()) {

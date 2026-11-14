@@ -94,6 +94,8 @@
 #include "gpg/core/utils/Global.h"
 #include "moho/app/UserWorkerPool.h"
 #include "editor/doc/EdLookMoods.h"
+#include "editor/tools/EdMeshImport.h"
+#include "lua/LuaTableIterator.h"
 #include "editor/ui/EdPopouts.h"
 #include "editor/ui/EdTipCheck.h"
 #include "editor/tools/EdMarkers.h"
@@ -5094,6 +5096,10 @@ namespace faf::editor
       // `/roundtripframes <n>` (test runs): /roundtrip and /saveas wait this many frames of the drawn map (180).
       int mRoundTripAfter = 180;
       void SaveDocument();
+      /** The Images panel's exports and imports, and the Mesh terrain panel's import. */
+      void DriveImagesAndMesh();
+      std::string mModsMapSeen;
+      const void* mRulesSeen = nullptr;
       /** Save's question for a map outside the vault: write over it there, Save as, or nothing. */
       void DrawOverwriteAsk();
       bool mAskOverwrite = false;
@@ -6055,6 +6061,8 @@ namespace faf::editor
       windowPanel("window.assets", "Asset browser", "AssetBrowser");
       windowPanel("window.fields", "Fields (op by op)", "Fields");
       windowPanel("window.statistics", "Statistics", "Statistics");
+      windowPanel("window.images", "Images", "Images");
+      windowPanel("window.mesh", "Mesh terrain", "MeshTerrain");
       if (EdCommand* const assets = const_cast<EdCommand*>(c.Find("window.assets")); assets != nullptr) {
         (void)c.SetKeys("window.assets", "Ctrl+Alt+A");
       }
@@ -6281,7 +6289,8 @@ namespace faf::editor
            cmd("terrain.interop"),
            cmd("terrain.erosion"),
            cmd("terrain.sctools"),
-           cmd("window.fields")}
+           cmd("window.fields"),
+           cmd("window.mesh")}
         },
         EdMenu{
           "&Select",
@@ -6321,6 +6330,7 @@ namespace faf::editor
            cmd("view.markers"),
            cmd("view.check"),
            cmd("window.statistics"),
+           cmd("window.images"),
            sep(),
            cmd("view.script"),
            cmd("view.adaptive"),
@@ -8792,6 +8802,194 @@ namespace faf::editor
       }
     }
 
+    namespace
+    {
+      /** The height image dialog (defined with the other file dialogs below). */
+      std::filesystem::path AskHeightFile(HWND owner, bool save);
+    } // namespace
+
+    void EditorApp::DriveImagesAndMesh()
+    {
+      // The map's own mods (a file beside it) put into the play setup when the map opens, and the rules built with
+      // them, so their units and props are in the palettes while editing (FAF Studio's per-map mods).
+      if (mDocument.GetState() == EdDocument::State::Open && mModsMapSeen != mDocument.Path()) {
+        mModsMapSeen = mDocument.Path();
+        if (const std::filesystem::path file = mDocument.ModsFile(); !file.empty()) {
+          std::ifstream in(file, std::ios::binary);
+          std::vector<std::string> mods;
+          for (std::string line; std::getline(in, line);) {
+            while (!line.empty() && (line.back() == '\r' || line.back() == ' ')) {
+              line.pop_back();
+            }
+            if (!line.empty()) {
+              mods.push_back(line);
+            }
+          }
+          if (!mods.empty()) {
+            mPlay.Setup().mods = mods;
+            mPlay.PrepareRules();
+            gpg::Logf("editor: the map's %zu mods are on for editing and plays", mods.size());
+          }
+        }
+      }
+      // New rules (built with other mods): the palettes are read again from them.
+      if (const void* const rules = moho::RULE_PeekKept(); rules != nullptr && rules != mRulesSeen) {
+        if (mRulesSeen != nullptr) {
+          mShell->Tools().SetUnitTypes({});
+          mShell->Tools().SetUnitInfos({});
+          mShell->Tools().SetPropBlueprints({});
+          gpg::Logf("editor: the rules changed (mods): units and props are listed again");
+        }
+        mRulesSeen = rules;
+      }
+      mScene.SetMeshWireShown(mShell->MeshShown());
+      const HWND owner = HandleOf(mGame.supcomFrame);
+      for (EdShell::ImageAsk ask; mShell->TakeImageAsk(ask);) {
+        if (!mScene.Attached()) {
+          break;
+        }
+        std::string message;
+        const auto waterExport = [&](const int kind, const std::filesystem::path& file) {
+          int width = 0;
+          int height = 0;
+          const std::uint8_t* const cells = mDocument.WaterMaskCells(static_cast<WaterMask>(kind), width, height);
+          if (cells == nullptr) {
+            message = "the map has no water masks";
+            return false;
+          }
+          HeightImage image;
+          image.width = width;
+          image.height = height;
+          for (int i = 0; i < width * height; ++i) {
+            image.words.push_back(static_cast<std::uint16_t>(cells[i] * 257));
+          }
+          std::string error;
+          const bool ok = WriteHeightImage(file, image, error);
+          message = ok ? "written to " + file.string() : error;
+          return ok;
+        };
+        const auto waterImport = [&](const int kind, const std::filesystem::path& file) {
+          int width = 0;
+          int height = 0;
+          std::uint8_t* const cells = mDocument.WaterMaskCells(static_cast<WaterMask>(kind), width, height);
+          HeightImage image;
+          std::string error;
+          if (cells == nullptr || !ReadHeightImage(file, width, height, image, error)) {
+            message = cells == nullptr ? "the map has no water masks" : error;
+            return false;
+          }
+          image = ResampleHeights(image, width, height);
+          EdDocument::WaterMaskSnapshot before = mDocument.WaterMasksNow();
+          for (int i = 0; i < width * height; ++i) {
+            cells[i] = static_cast<std::uint8_t>(image.words[static_cast<std::size_t>(i)] >> 8);
+          }
+          mDocument.WaterMasksChanged(0, 0, width, height);
+          mDocument.WaterMasksEdited(std::move(before));
+          message = "read from " + file.string() + " (one undo step)";
+          return true;
+        };
+        const auto one = [&](const std::string& what, const bool exportIt, const std::filesystem::path& file) {
+          if (what == "heights") {
+            return exportIt ? mScene.ExportHeights(file, 0, 1.0f, message) : mScene.ImportHeights(file, 1.0f, message);
+          }
+          if (what == "preview") {
+            return mDocument.ExportPreview(file, message);
+          }
+          if (what.rfind("mask", 0) == 0) {
+            const int layer = std::clamp(std::atoi(what.c_str() + 4), 1, 8) - 1;
+            return exportIt ? mScene.ExportMaskLayer(layer, file, message)
+                            : mScene.ImportMaskLayer(layer, file, message);
+          }
+          if (what.rfind("water", 0) == 0) {
+            const int kind = std::clamp(std::atoi(what.c_str() + 5), 0, 2);
+            return exportIt ? waterExport(kind, file) : waterImport(kind, file);
+          }
+          message = "nothing called " + what;
+          return false;
+        };
+        if (ask.what == "all") {
+          const std::filesystem::path map = mDocument.MapDiskFile();
+          if (map.empty()) {
+            mShell->SetImageStatus("The map has no folder of its own (save it as a new map first).");
+            continue;
+          }
+          const std::filesystem::path folder = map.parent_path() / "images";
+          std::error_code made;
+          std::filesystem::create_directories(folder, made);
+          int written = 0;
+          std::vector<std::pair<std::string, std::string>> all = {
+            {"heights", "heights.png"}, {"preview", "preview.png"}
+          };
+          for (int layer = 1; layer <= 8; ++layer) {
+            all.emplace_back("mask" + std::to_string(layer), "mask" + std::to_string(layer) + ".png");
+          }
+          all.emplace_back("water0", "water_foam.png");
+          all.emplace_back("water1", "water_flatness.png");
+          all.emplace_back("water2", "water_depthbias.png");
+          for (const auto& [what, name] : all) {
+            written += one(what, true, folder / name) ? 1 : 0;
+          }
+          const std::string status =
+            std::to_string(written) + " of " + std::to_string(all.size()) + " pictures written to " + folder.string();
+          mShell->SetImageStatus(status);
+          gpg::Logf("editor: images: %s", status.c_str());
+          continue;
+        }
+        const std::filesystem::path file = AskHeightFile(owner, ask.exportIt);
+        if (file.empty()) {
+          continue;
+        }
+        const bool ok = one(ask.what, ask.exportIt, file);
+        mShell->SetImageStatus(ask.what + ": " + message);
+        (ok ? gpg::Logf : gpg::Warnf)("editor: images: %s: %s", ask.what.c_str(), message.c_str());
+      }
+      for (EdShell::MeshAsk ask; mShell->TakeMeshAsk(ask);) {
+        std::string text;
+        {
+          std::ifstream in(ask.file, std::ios::binary);
+          text.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+        }
+        ObjMesh mesh;
+        std::string error;
+        if (text.empty() || !ParseObj(text, mesh, error)) {
+          mShell->SetMeshStatus("Couldn't read " + ask.file + (error.empty() ? "" : ": " + error));
+          continue;
+        }
+        const ObjMesh placed = TransformMesh(mesh, ask.options);
+        const std::filesystem::path map = mDocument.MapDiskFile();
+        std::size_t tiles = 0;
+        std::size_t failed = 0;
+        if (!map.empty()) {
+          const std::filesystem::path folder = map.parent_path() / "mesh";
+          std::error_code made;
+          std::filesystem::create_directories(folder, made);
+          std::map<std::pair<int, int>, std::string> files;
+          for (const auto& [key, part] : SplitByTile(placed, ask.options.tile)) {
+            const std::string name = "tile_" + std::to_string(key.first) + "_" + std::to_string(key.second) + ".scm";
+            std::string partError;
+            const std::vector<std::uint8_t> scm =
+              ScmFromObj(part, "tile", 1.0f, "FAF map editor mesh terrain", partError);
+            if (scm.empty()) {
+              ++failed;
+              continue;
+            }
+            std::ofstream out(folder / name, std::ios::binary | std::ios::trunc);
+            out.write(reinterpret_cast<const char*>(scm.data()), static_cast<std::streamsize>(scm.size()));
+            files[key] = name;
+            ++tiles;
+          }
+          std::ofstream manifest(folder / "mesh.lua", std::ios::binary | std::ios::trunc);
+          manifest << MeshManifest(files, ask.options.tile);
+        }
+        mScene.SetMeshWire(MeshWire(placed, 200000));
+        const std::string status = std::to_string(placed.triangles.size()) + " triangles, " + std::to_string(tiles) +
+          " tiles written to the map's mesh folder" + (failed > 0 ? " (" + std::to_string(failed) + " too big)" : "") +
+          (map.empty() ? " (no map folder: shown only)" : "");
+        mShell->SetMeshStatus(status);
+        gpg::Logf("editor: mesh terrain: %s", status.c_str());
+      }
+    }
+
     void EditorApp::DrawOverwriteAsk()
     {
       constexpr const char* kTitle = "Write over the map there?";
@@ -11195,6 +11393,42 @@ namespace faf::editor
         static bool sourced = false;
         if (!sourced) {
           sourced = true;
+          // The particle editor's effect templates from the module itself (computed tables too), in the UI's Lua.
+          EdParticleEditor::SetTemplateSource([]() {
+            std::vector<EffectTemplate> out;
+            LuaPlus::LuaState* const state = moho::USER_GetLuaState();
+            if (state == nullptr) {
+              return out;
+            }
+            try {
+              const LuaPlus::LuaObject module = moho::SCR_Import(state, "/lua/EffectTemplates.lua");
+              if (!module.IsTable()) {
+                return out;
+              }
+              for (LuaPlus::LuaTableIterator entry(module, 1); entry.IsValid(); entry.Next()) {
+                const LuaPlus::LuaObject key = entry.GetKey();
+                const LuaPlus::LuaObject value = entry.GetValue();
+                if (!key.IsString() || !value.IsTable()) {
+                  continue;
+                }
+                EffectTemplate effect;
+                effect.name = key.GetString();
+                for (LuaPlus::LuaTableIterator item(value, 1); item.IsValid(); item.Next()) {
+                  const LuaPlus::LuaObject path = item.GetValue();
+                  if (path.IsString() && std::string(path.GetString()).find("/effects/") != std::string::npos) {
+                    effect.paths.emplace_back(path.GetString());
+                  }
+                }
+                if (!effect.paths.empty()) {
+                  out.push_back(std::move(effect));
+                }
+              }
+            } catch (const std::exception& error) {
+              gpg::Warnf("editor: effect templates: %s", error.what());
+            }
+            gpg::Logf("editor: effect templates: %zu from the module", out.size());
+            return out;
+          });
           // One pool (FAF Studio's library had its own beside the engine's): the field library's jobs started on the
           // main thread run on CUserWorkerPool; from other threads (graph previews) its own pool stays.
           field::SetParallelBackend([](const int count, const std::function<void(int)>& fn) {
@@ -11242,6 +11476,7 @@ namespace faf::editor
           mFieldsTest.clear();
         }
       }
+      DriveImagesAndMesh();
       // The coop shim mod in the vault's mods folder, once a run (played with coop maps, EdPlay::WriteCoopShim).
       {
         static bool shimWritten = false;

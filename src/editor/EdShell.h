@@ -5,6 +5,7 @@
 #include <string>
 #include <utility>
 
+#include "editor/tools/EdMeshImport.h"
 #include "editor/ui/EdFieldsPanel.h"
 #include "editor/doc/EdLuaApi.h"
 #include "editor/EdTools.h"
@@ -515,6 +516,57 @@ namespace faf::editor
     {
       return mFieldsPanel;
     }
+    /** The Images panel's asks: export or import one picture ("heights", "preview", "mask<n>", "water<n>", "all"). */
+    struct ImageAsk
+    {
+      std::string what;
+      bool exportIt = true;
+    };
+    [[nodiscard]] bool TakeImageAsk(
+      ImageAsk& out
+    )
+    {
+      if (mImageAsks.empty()) {
+        return false;
+      }
+      out = mImageAsks.front();
+      mImageAsks.erase(mImageAsks.begin());
+      return true;
+    }
+    void SetImageStatus(
+      std::string status
+    )
+    {
+      mImageStatus = std::move(status);
+    }
+    /** The Mesh terrain panel's import ask. */
+    struct MeshAsk
+    {
+      bool import = false;
+      std::string file;
+      MeshImportOptions options;
+    };
+    [[nodiscard]] bool TakeMeshAsk(
+      MeshAsk& out
+    )
+    {
+      if (!mMeshAsk.import) {
+        return false;
+      }
+      out = mMeshAsk;
+      mMeshAsk = MeshAsk{};
+      return true;
+    }
+    void SetMeshStatus(
+      std::string status
+    )
+    {
+      mMeshStatus = std::move(status);
+    }
+    [[nodiscard]] bool MeshShown() const noexcept
+    {
+      return mMeshShown;
+    }
     [[nodiscard]] EdModHost& ModHost() noexcept
     {
       return mModHost;
@@ -544,6 +596,8 @@ namespace faf::editor
     EdCommands* mCommands = nullptr;
     /** A list row's Delete: edit.delete once its selection has been made (a couple of frames later). */
     bool mDeleteAsked = false;
+    std::vector<ImageAsk> mImageAsks;
+    MeshAsk mMeshAsk;
     int mDeleteWait = 0;
     const std::vector<EdMenu>* mMenus = nullptr;
     /** The active workspace's first layout (its EdWorkspace's places) in its dock space. */
@@ -603,6 +657,13 @@ namespace faf::editor
     bool mShowUnitViewer = false;
     bool mShowFields = false;
     bool mShowStatistics = false;
+    bool mShowImages = false;
+    bool mShowMesh = false;
+    char mMeshFile[512] = {};
+    MeshImportOptions mMeshOptions;
+    bool mMeshShown = true;
+    std::string mMeshStatus;
+    std::string mImageStatus;
     EdFieldsPanel mFieldsPanel;
     bool mViewMenuAsk = false;
     char mSaveAsParent[512] = {};
@@ -679,6 +740,8 @@ namespace faf::editor
     void DrawAreasSection();
     /** View > Statistics: the map's counts and each start's resources and reclaim (ui/EdStatsPanel.cpp). */
     void DrawStatisticsPanel();
+    void DrawImagesPanel();
+    void DrawMeshPanel();
     /** The player slots and extra armies as cards, and the chosen army's settings (ui/EdArmiesPanel.cpp). */
     void DrawArmiesPanel();
     void DrawPropertiesPanel();

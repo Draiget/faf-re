@@ -567,6 +567,12 @@ namespace faf::editor
       if (mShowStatistics) {
         DrawStatisticsPanel();
       }
+      if (mShowImages) {
+        DrawImagesPanel();
+      }
+      if (mShowMesh) {
+        DrawMeshPanel();
+      }
       mUnitViewer.Frame();
       DrawViewMenu();
       if (std::string effect; mAssets.TakeEffectAsk(effect)) {
@@ -801,6 +807,8 @@ namespace faf::editor
       {"Unit viewer###UnitViewer", &EdShell::mShowUnitViewer},
       {"Fields###Fields", &EdShell::mShowFields},
       {"Statistics###Statistics", &EdShell::mShowStatistics},
+      {"Images###Images", &EdShell::mShowImages},
+      {"Mesh terrain###MeshTerrain", &EdShell::mShowMesh},
     };
     return kFlags;
   }

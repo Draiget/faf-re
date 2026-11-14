@@ -172,6 +172,8 @@ set(FAF_EDITOR_SOURCES
   view/EdMapScene.cpp
   ui/EdImGuiRenderer.cpp
   ui/EdPopouts.cpp
+  ui/EdAssetPanels.cpp
+  tools/EdMeshImport.cpp
   tools/EdBuilders.cpp
   ui/EdStatsPanel.cpp
   tools/EdMapStats.cpp
