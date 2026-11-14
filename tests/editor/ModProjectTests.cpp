@@ -225,7 +225,8 @@ namespace faf::editor
     EXPECT_TRUE(Has(hook, "local bp = table.merged(table.deepcopy(source), delta)"));
     EXPECT_TRUE(Has(
       hook,
-      "        Derive('xel0201', 'uel0201', 'Lab \\'Tank\\'', 'Heavier', false, false, {\n            Economy = {\n"
+      "        Derive('xel0201', 'uel0201', 'Lab \\'Tank\\'', 'Heavier', false, false, false, {\n            Economy = "
+      "{\n"
       "                BuildCostMass = 156,\n            },\n            Weapon = {\n                [1] = {\n"
       "                    Damage = 40,\n                },\n            },\n        })\n"
     )) << hook;
@@ -292,7 +293,7 @@ namespace faf::editor
     p.derived["xel0201"].icon = true;
     EXPECT_EQ(count(CheckModProject(p, facts), "shows uel0201's icon"), 0);
     EXPECT_NE(
-      ModDerivedHook(p, Weapons).find("Derive('xel0201', 'uel0201', '', '', true, false, {"), std::string::npos
+      ModDerivedHook(p, Weapons).find("Derive('xel0201', 'uel0201', '', '', true, false, false, {"), std::string::npos
     );
     EXPECT_NE(ModDerivedHook(p, Weapons).find("bp.Display.IconName = id"), std::string::npos);
     EXPECT_EQ(ModUnitIconFile("xel0201"), "icons/units/xel0201_icon.dds");
@@ -377,7 +378,8 @@ namespace faf::editor
     const std::string hook = ModDerivedHook(p, Weapons);
     EXPECT_TRUE(Has(hook, "if mod.uid == '11111111-2222-3333-4444-555555555555' then here = mod.location end"));
     EXPECT_TRUE(Has(hook, "bp.ScriptModule = here .. '/units/' .. id .. '/' .. id .. '_script.lua'"));
-    EXPECT_TRUE(Has(hook, "Derive('xel0202', 'uel0201', 'Scripted', '', false, true, {"));
+    EXPECT_TRUE(Has(hook, "Derive('xel0202', 'uel0201', 'Scripted', '', false, true, false, {"));
+    EXPECT_TRUE(Has(hook, "lod.MeshName = here .. '/units/' .. id .. '/' .. id .. '_lod0.scm'"));
     // Written once, then the modder's.
     const std::filesystem::path folder = Fresh("script");
     (void)WriteModProject(folder, p, Weapons, {});

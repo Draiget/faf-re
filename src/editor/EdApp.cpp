@@ -51,6 +51,7 @@
 #include "lua/LuaPrimitives.h"
 #include "lua/luaplus/include/lauxlib.h"
 #include "editor/tools/EdTextureFiles.h"
+#include "editor/tools/EdScm.h"
 #include "editor/doc/EdPreview.h"
 #include "editor/tools/EdAlphaGen.h"
 #include "editor/tools/EdLayoutMarkers.h"
@@ -2685,6 +2686,23 @@ namespace faf::editor
                 made->second.script = true;
               }
             }
+            // And a model of its own: a 4-unit cube from an OBJ.
+            {
+              std::error_code ec;
+              const std::filesystem::path obj = std::filesystem::temp_directory_path(ec) / "FafEditor" / "labcube.obj";
+              std::filesystem::create_directories(obj.parent_path(), ec);
+              std::ofstream cube(obj, std::ios::binary | std::ios::trunc);
+              cube << "v -2 0 -2\nv 2 0 -2\nv 2 4 -2\nv -2 4 -2\nv -2 0 2\nv 2 0 2\nv 2 4 2\nv -2 4 2\n"
+                      "vt 0 0\nvt 1 0\nvt 1 1\nvt 0 1\n"
+                      "f 1/1 4/4 3/3 2/2\nf 5/1 6/2 7/3 8/4\nf 1/1 2/2 6/3 5/4\nf 4/1 8/2 7/3 3/4\nf 1/1 5/2 8/3 4/4\n"
+                      "f 2/1 3/2 7/3 6/4\n";
+              cube.close();
+              std::string message;
+              gpg::Logf(
+                "editor: unit lab test: model from an OBJ: %s",
+                ImportUnitModel("xel0201", obj, message) ? message.c_str() : message.c_str()
+              );
+            }
             gpg::Logf(
               "editor: unit lab test: derived xel0201 from %s, mass %g; %zu history steps",
               unit.c_str(),
@@ -2731,7 +2749,7 @@ namespace faf::editor
             "SimLua local d = __blueprints['xel0201'] if d then LOG('editor: unit lab test: the sim has xel0201: mass "
             "', "
             "d.Economy.BuildCostMass, ', name ', d.General.UnitName, ', weapon 1 damage ', d.Weapon[1].Damage, "
-            "', script ', tostring(d.ScriptModule)) "
+            "', script ', tostring(d.ScriptModule), ', mesh ', tostring(d.Display.Mesh.LODs[1].MeshName)) "
             "else LOG('editor: unit lab test: the sim has no xel0201') end"
           );
           moho::CON_Execute(command);
@@ -5082,6 +5100,8 @@ namespace faf::editor
       void TransferMapTexture(MapTextureKind kind, bool exporting, const std::string& testFile);
       /** The eight strata masks to or from one set of files (`name_1` .. `name_8`); a file dialog asks for the name. */
       void TransferAllMasks(bool exporting);
+      /** A derived unit's model from an OBJ, into its mod project (EdScm); false with `message`. */
+      bool ImportUnitModel(const std::string& unit, const std::filesystem::path& obj, std::string& message);
       bool mMapTexturesStale[4]{};
       /** The paint's textures: the heights, the masks and the layers' textures in one sum. */
       [[nodiscard]] std::uint64_t PaintChecksum(std::uint64_t heights);
@@ -8147,6 +8167,58 @@ namespace faf::editor
       );
     }
 
+    bool EditorApp::ImportUnitModel(
+      const std::string& unit,
+      const std::filesystem::path& obj,
+      std::string& message
+    )
+    {
+      EdModPanel& panel = mShell->ModPanel();
+      ModProject* const project = panel.Project();
+      const auto derived = project != nullptr ? project->derived.find(unit) : decltype(project->derived.end()){};
+      if (project == nullptr || derived == project->derived.end()) {
+        message = "A model from an OBJ is for a derived unit of the open mod project";
+        return false;
+      }
+      std::ifstream in(obj, std::ios::binary);
+      const std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+      ObjMesh mesh;
+      std::string error;
+      if (!ParseObj(text, mesh, error)) {
+        message = obj.filename().string() + ": " + error;
+        return false;
+      }
+      // The OBJ in game units: the model is scaled by the blueprint's UniformScale when drawn, so divided by it here.
+      float scale = 1.0f;
+      if (moho::RRuleGameRules* const rules = moho::RULE_PeekKept(); rules != nullptr) {
+        moho::RResId id{};
+        id.name.assign(derived->second.base.c_str());
+        if (
+          const moho::RUnitBlueprint* const base = rules->GetUnitBlueprint(id);
+          base != nullptr && base->Display.UniformScale > 1e-6f
+        ) {
+          scale = 1.0f / base->Display.UniformScale;
+        }
+      }
+      const std::vector<std::uint8_t> scm =
+        ScmFromObj(mesh, unit, scale, "made from " + obj.filename().string() + " by the FAF map editor", error);
+      if (
+        scm.empty() ||
+        !ModWriteBinary(*project, panel.Folder(), ModUnitModelFile(unit), std::string(scm.begin(), scm.end()), error)
+      ) {
+        message = "No model: " + error;
+        return false;
+      }
+      const ModChanges before = ModChangesOf(*project);
+      derived->second.model = true;
+      (void)panel.History().Record("model of " + unit, before, ModChangesOf(*project), "", ImGui::GetTime());
+      panel.Touch();
+      message = "Wrote " + ModUnitModelFile(unit) + " (" + std::to_string(mesh.triangles.size()) + " triangles, " +
+        std::to_string(scm.size()) + " bytes)";
+      gpg::Logf("editor: %s", message.c_str());
+      return true;
+    }
+
     void EditorApp::TransferAllMasks(
       const bool exporting
     )
@@ -9818,6 +9890,20 @@ namespace faf::editor
       TestModProject();
       if (mShell->UnitLab().TakeTestAsk()) {
         (void)PlayModProject();
+      }
+      if (std::string unit; mShell->UnitLab().TakeModelAsk(unit)) {
+        const std::filesystem::path obj = AskFile(
+          HandleOf(mGame.supcomFrame),
+          false,
+          L"Wavefront OBJ (*.obj)\0*.obj\0All files\0*.*\0",
+          L"obj",
+          L"A model for the unit"
+        );
+        if (!obj.empty()) {
+          std::string message;
+          (void)ImportUnitModel(unit, obj, message);
+          PostStatusMessage(message);
+        }
       }
       TestUnitLab();
       TestEffectMod();

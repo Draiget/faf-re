@@ -39,6 +39,8 @@ namespace faf::editor
      * written once and then the modder's.
      */
     bool script = false;
+    /** Its model is the project's `units/<id>/<id>_lod0.scm` (made from an OBJ): the hook points every LOD at it. */
+    bool model = false;
     bool operator==(const ModDerived&) const = default;
   };
 
@@ -152,6 +154,8 @@ namespace faf::editor
   [[nodiscard]] std::string ModUnitIconFile(const std::string& id);
   /** A derived unit's own script: its file in the project and its first text (a class on the base unit's). */
   [[nodiscard]] std::string ModUnitScriptFile(const std::string& id);
+  /** A derived unit's own model in the project. */
+  [[nodiscard]] std::string ModUnitModelFile(const std::string& id);
   [[nodiscard]] std::string ModUnitScriptText(const std::string& id, const std::string& base);
   /** Where the hook goes in the project's folder. */
   extern const char* const kModHookFile;

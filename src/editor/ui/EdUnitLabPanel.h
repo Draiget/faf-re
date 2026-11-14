@@ -42,6 +42,17 @@ namespace faf::editor
     /** Changes a field of the selected unit (an undo step merged with the last one of the same key); false when it
      * didn't change. */
     bool SetField(const UnitLabField& field, double value, bool merge);
+    /** Model from an OBJ was pressed for this derived unit (the app asks for the file and makes the model). */
+    [[nodiscard]] bool TakeModelAsk(
+      std::string& unit
+    )
+    {
+      if (mModelAsk.empty()) {
+        return false;
+      }
+      unit = std::exchange(mModelAsk, {});
+      return true;
+    }
     /** Test was pressed (the app writes, mounts and plays). */
     [[nodiscard]] bool TakeTestAsk() noexcept
     {
@@ -60,5 +71,6 @@ namespace faf::editor
     bool mDeriveScript = false;
     std::string mDeriveError;
     bool mTestAsked = false;
+    std::string mModelAsk;
   };
 } // namespace faf::editor

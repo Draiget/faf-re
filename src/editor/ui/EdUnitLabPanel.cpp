@@ -274,6 +274,16 @@ namespace faf::editor
     ImGui::EndDisabled();
     ImGui::SameLine();
     ImGui::BeginDisabled(!canPlay || p->Empty());
+    if (p->derived.count(mUnit) != 0) {
+      if (ImGui::Button("Model from an OBJ...")) {
+        mModelAsk = mUnit;
+      }
+      EdSetItemTooltip(
+        "The derived unit's model made from a Wavefront OBJ (its units game units, y up): written as "
+        "units/<id>/<id>_lod0.scm, every LOD of the unit drawn with it; the base unit's textures stay"
+      );
+      ImGui::SameLine();
+    }
     if (ImGui::Button(ICON_PLAY " Test")) {
       mTestAsked = true;
     }

@@ -617,7 +617,7 @@ namespace faf::editor
     out += "        for _, mod in __active_mods or {} do\n";
     out += "            if mod.uid == " + LuaQuote(project.uid) + " then here = mod.location end\n";
     out += "        end\n\n";
-    out += "        local function Derive(id, base, name, description, icon, script, delta)\n";
+    out += "        local function Derive(id, base, name, description, icon, script, model, delta)\n";
     out += "            local source = all_bps.Unit[base]\n";
     out +=
       "            if not source then WARN('derived unit ' .. id .. ': the game has no unit ' .. base) return end\n";
@@ -628,6 +628,10 @@ namespace faf::editor
     out += "            if icon then bp.Display = bp.Display or {} bp.Display.IconName = id end\n";
     out += "            if script and here then bp.ScriptModule = here .. '/units/' .. id .. '/' .. id .. "
            "'_script.lua' end\n";
+    out += "            if model and here and bp.Display and bp.Display.Mesh then\n";
+    out += "                for _, lod in bp.Display.Mesh.LODs or {} do lod.MeshName = here .. '/units/' .. id .. "
+           "'/' .. id .. '_lod0.scm' end\n";
+    out += "            end\n";
     out += "            all_bps.Unit[id] = bp\n";
     out += "        end\n\n";
     for (const auto& [id, d] : project.derived) {
@@ -649,7 +653,8 @@ namespace faf::editor
         }
       }
       out += "        Derive(" + LuaQuote(id) + ", " + LuaQuote(d.base) + ", " + LuaQuote(d.name) + ", " +
-        LuaQuote(d.description) + ", " + (d.icon ? "true" : "false") + ", " + (d.script ? "true" : "false") + ", {\n";
+        LuaQuote(d.description) + ", " + (d.icon ? "true" : "false") + ", " + (d.script ? "true" : "false") + ", " +
+        (d.model ? "true" : "false") + ", {\n";
       Dump(delta, "            ", out);
       out += "        })\n";
     }
@@ -688,7 +693,8 @@ namespace faf::editor
     for (const auto& [id, d] : p.derived) {
       out += std::string(first ? "\n" : ",\n") + "    {\"id\": " + JsonQuote(id) + ", \"base\": " + JsonQuote(d.base) +
         ", \"name\": " + JsonQuote(d.name) + ", \"description\": " + JsonQuote(d.description) + ", \"icon\": \"" +
-        (d.icon ? "true" : "false") + "\", \"script\": \"" + (d.script ? "true" : "false") + "\"}";
+        (d.icon ? "true" : "false") + "\", \"script\": \"" + (d.script ? "true" : "false") + "\", \"model\": \"" +
+        (d.model ? "true" : "false") + "\"}";
       first = false;
     }
     out += first ? "]\n}\n" : "\n  ]\n}\n";
@@ -755,7 +761,8 @@ namespace faf::editor
           d["name"].first,
           d["description"].first,
           d["icon"].first == "true",
-          d["script"].first == "true"
+          d["script"].first == "true",
+          d["model"].first == "true"
         };
       }
     }
@@ -988,6 +995,13 @@ namespace faf::editor
   )
   {
     return "units/" + id + "/" + id + "_script.lua";
+  }
+
+  std::string ModUnitModelFile(
+    const std::string& id
+  )
+  {
+    return "units/" + id + "/" + id + "_lod0.scm";
   }
 
   std::string ModUnitScriptText(
