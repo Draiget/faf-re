@@ -1,5 +1,8 @@
 #include "editor/tools/EdDecalShape.h"
 
+#include <cmath>
+#include <cstdint>
+
 #include <algorithm>
 #include <cctype>
 #include <cmath>
@@ -213,5 +216,47 @@ namespace faf::editor
     default:
       return "undefined";
     }
+  }
+
+  std::vector<std::pair<float, float>> ScatterInCircle(
+    const float cx,
+    const float cz,
+    const float radius,
+    const int count,
+    const float apart,
+    const std::vector<std::pair<float, float>>& taken,
+    std::uint32_t& seed
+  )
+  {
+    std::vector<std::pair<float, float>> out;
+    const auto unit = [&seed]() {
+      seed = seed * 1664525U + 1013904223U;
+      return static_cast<float>(seed >> 8) / 16777216.0f;
+    };
+    const auto free = [&](const float x, const float z) {
+      const float a2 = apart * apart;
+      for (const auto& [tx, tz] : taken) {
+        if ((tx - x) * (tx - x) + (tz - z) * (tz - z) < a2) {
+          return false;
+        }
+      }
+      for (const auto& [ox, oz] : out) {
+        if ((ox - x) * (ox - x) + (oz - z) * (oz - z) < a2) {
+          return false;
+        }
+      }
+      return true;
+    };
+    // A few tries a point (a full circle gives up).
+    for (int tries = 0; static_cast<int>(out.size()) < count && tries < count * 12; ++tries) {
+      const float angle = unit() * 6.2831853f;
+      const float reach = radius * std::sqrt(unit());
+      const float x = cx + std::cos(angle) * reach;
+      const float z = cz + std::sin(angle) * reach;
+      if (free(x, z)) {
+        out.emplace_back(x, z);
+      }
+    }
+    return out;
   }
 } // namespace faf::editor

@@ -44,6 +44,20 @@ namespace faf::editor
   std::pair<float, float> PathPoint(const std::vector<std::pair<float, float>>& points, float t);
 
   /**
+   * Up to `count` points spread over the circle at (cx, cz), none nearer than `apart` to another or to `taken` (the
+   * scatter brush's stroke so far), from the seed (advanced); fewer when the circle has no room.
+   */
+  [[nodiscard]] std::vector<std::pair<float, float>> ScatterInCircle(
+    float cx,
+    float cz,
+    float radius,
+    int count,
+    float apart,
+    const std::vector<std::pair<float, float>>& taken,
+    std::uint32_t& seed
+  );
+
+  /**
    * Decals laid end to end along the curve through `points`: each `length` long along the curve and `width` across,
    * turned along it, the next starting `length * (1 - overlap)` further on, until the curve ends (the last one may
    * pass its end). Empty for fewer than two points.

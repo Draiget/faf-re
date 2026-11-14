@@ -643,6 +643,37 @@ namespace faf::editor
     {
       return mDecalMode == 2;
     }
+    /** Select mode: pick, drag, delete. */
+    [[nodiscard]] bool DecalSelectMode() const noexcept
+    {
+      return mDecalMode == 1;
+    }
+    /** Scatter: a drag strews the texture over the brush's circle, apart from each other (FAF Studio's). */
+    [[nodiscard]] bool DecalScatterMode() const noexcept
+    {
+      return mDecalMode == 3;
+    }
+    /** Erase: a drag removes the decals in the brush's circle (only the chosen texture's, when asked). */
+    [[nodiscard]] bool DecalEraseMode() const noexcept
+    {
+      return mDecalMode == 4;
+    }
+    struct DecalBrush
+    {
+      float radius = 24.0f;
+      int count = 3;      // decals a dab
+      float apart = 8.0f; // the least distance between two
+      bool onlyThisTexture = false;
+    };
+    [[nodiscard]] const DecalBrush& DecalBrushSettings() const noexcept
+    {
+      return mDecalBrush;
+    }
+    /** Each click or scattered decal: its size times 1 +- this at random (one draw shared by the symmetric copies). */
+    [[nodiscard]] float DecalSizeVariation() const noexcept
+    {
+      return mDecalSizeVariation;
+    }
     /** How much each decal along a path overlaps the next (0 to 0.9 of its length). */
     [[nodiscard]] float DecalOverlap() const noexcept
     {
@@ -3096,6 +3127,8 @@ namespace faf::editor
     bool mDecalRandomTurn = false;
     bool mDecalWithPair = true;
     float mDecalOverlap = 0.1f;
+    DecalBrush mDecalBrush;
+    float mDecalSizeVariation = 0.0f;
     DecalPathAction mDecalPathAction = DecalPathAction::None;
     int mDecalPathPoints = 0;
     int mDecalPathDecals = 0;

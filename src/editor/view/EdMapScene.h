@@ -1053,6 +1053,17 @@ namespace faf::editor
     [[nodiscard]] int PickDecal(float x, float z) const;
     /** Places the Decals tool's texture centred at (x, z), with its symmetric copies, as one undo step. */
     void PlaceDecals(float x, float z);
+    /** The decal and its symmetric copies at (x, z), heading `yaw`, its size times `sizeFactor`; how many went down. */
+    int PlaceDecalCopies(float x, float z, float yaw, float sizeFactor);
+    /** The size factor of the next click or scattered decal (1 +- the tools' variation). */
+    float NextDecalSizeFactor();
+    /** The scatter or erase brush at (x, z) during its drag. */
+    void DecalBrushAt(float x, float z);
+    bool mDecalBrushing = false;
+    float mDecalBrushLastX = -1.0e9f;
+    float mDecalBrushLastZ = -1.0e9f;
+    std::vector<std::pair<float, float>> mDecalBrushPoints;
+    std::vector<DecalState> mDecalBrushBefore;
     void DeleteSelectedDecals();
     /** The selected decals' outlines, the one under the cursor, and in Place mode the decal to come. */
     void DrawDecalOutlines(moho::CD3DPrimBatcher& batcher, const moho::CHeightField& field);

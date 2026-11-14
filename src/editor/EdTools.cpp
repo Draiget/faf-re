@@ -4005,9 +4005,29 @@ namespace faf::editor
   void EdTools::DrawDecals()
   {
     if (Section("Mode")) {
-      static const char* const kModes[] = {"Place", "Select", "Path"};
-      mDecalMode = std::clamp(mDecalMode, 0, 2);
-      Segmented(kModes, 3, mDecalMode);
+      static const char* const kModes[] = {"Place", "Select", "Path", "Scatter", "Erase"};
+      mDecalMode = std::clamp(mDecalMode, 0, 4);
+      Segmented(kModes, 5, mDecalMode);
+      if (mDecalMode == 3 || mDecalMode == 4) {
+        ImGui::SetNextItemWidth(-1.0f);
+        FillSliderFloat("##decalbrushradius", &mDecalBrush.radius, 2.0f, 256.0f, "Radius %.0f");
+        if (mDecalMode == 3) {
+          ImGui::SetNextItemWidth(-1.0f);
+          FillSliderInt("##decalbrushcount", &mDecalBrush.count, 1, 20, "%d a dab");
+          ImGui::SetNextItemWidth(-1.0f);
+          FillSliderFloat("##decalbrushapart", &mDecalBrush.apart, 0.0f, 128.0f, "At least %.0f apart");
+          Note(
+            "Drag over the ground: the texture strewn over the circle, apart from each other, with the symmetry's "
+            "copies. One undo step a stroke."
+          );
+        } else {
+          ImGui::Checkbox("Only the chosen texture", &mDecalBrush.onlyThisTexture);
+          Note(
+            "Drag over the ground: the decals inside the circle go, with the symmetry's copies. One undo step a "
+            "stroke."
+          );
+        }
+      }
       if (mDecalMode == 2) {
         char text[96];
         (void)std::snprintf(text, sizeof(text), "%d points, %d decals", mDecalPathPoints, mDecalPathDecals);
@@ -4165,6 +4185,9 @@ namespace faf::editor
       ImGui::SetNextItemWidth(-1.0f);
       FillSliderFloat("##decalturn", &mDecalTurn, -180.0f, 180.0f, "Turn %.0f deg");
       ImGui::Checkbox("Random turn", &mDecalRandomTurn);
+      ImGui::SetNextItemWidth(-1.0f);
+      FillSliderFloat("##decalvariation", &mDecalSizeVariation, 0.0f, 0.9f, "Size variation %.2f");
+      EdSetItemTooltip("Each decal's size times 1 plus or minus this, at random; the symmetric copies share it");
       ImGui::SetNextItemWidth(-1.0f);
       FillDragFloat(
         "##decalcutoff",
