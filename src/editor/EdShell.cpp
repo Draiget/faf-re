@@ -2608,6 +2608,23 @@ namespace faf::editor
       }
       mPackagePlan = mDocument.PlanPackage();
       mPackageMessage.clear();
+      // The map's own check too: a map with errors there doesn't go to the vault (each one named; fix it in Check).
+      RunCheck();
+      int checkErrors = 0;
+      for (const CheckIssue& issue : mCheckIssues) {
+        if (issue.level == CheckIssue::Level::Error) {
+          mPackagePlan.errors.push_back("the map's check: " + issue.text);
+          ++checkErrors;
+        }
+      }
+      gpg::Logf(
+        "editor: package %s: %zu errors (%d from the map's check), %zu warnings, %zu files",
+        mPackagePlan.folder.c_str(),
+        mPackagePlan.errors.size(),
+        checkErrors,
+        mPackagePlan.warnings.size(),
+        mPackagePlan.files.size()
+      );
       ImGui::OpenPopup(kTitle);
     }
     if (!ImGui::BeginPopupModal(kTitle, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
