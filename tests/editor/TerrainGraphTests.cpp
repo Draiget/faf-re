@@ -690,6 +690,71 @@ namespace
 
   TEST(
     TerrainGraph,
+    GraphSymmetryMakesWhatItWritesSymmetric
+  )
+  {
+    // Noise into the height output: not symmetric by itself.
+    NodeGraph graph(TerrainNodeTypes());
+    const int noise = graph.AddNode("perlin", 0, 0);
+    const int range = graph.AddNode("range", 200, 0);
+    const int out = graph.AddNode("out_height", 400, 0);
+    ASSERT_EQ(graph.Link(noise, 0, range, 0), LinkResult::Ok);
+    ASSERT_EQ(graph.Link(range, 0, out, 0), LinkResult::Ok);
+    TerrainGround ground = Ground();
+    TerrainRun run(4); // 33 x 33 samples, 4 units apart, over the 128-unit map
+    ASSERT_TRUE(run.Evaluate(graph, 3, ground).errors.empty());
+    field::Grid h;
+    // A half turn: sample (2, 5) and (30, 27) carry the same height (away from the seam); none: they differ.
+    ground.graphSymmetry = "rot2";
+    ASSERT_TRUE(run.FinalHeight(graph, ground, h));
+    EXPECT_FLOAT_EQ(h.At(2, 5), h.At(30, 27));
+    EXPECT_FLOAT_EQ(h.At(5, 3), h.At(27, 29));
+    ground.graphSymmetry = "off";
+    ASSERT_TRUE(run.FinalHeight(graph, ground, h));
+    EXPECT_NE(h.At(2, 5), h.At(30, 27));
+    // Follow the map: the editor's symmetry (a left / right mirror here); the map without one: none.
+    ground.graphSymmetry = "map";
+    ground.layoutSymmetry = "mirror_x";
+    ASSERT_TRUE(run.FinalHeight(graph, ground, h));
+    EXPECT_FLOAT_EQ(h.At(3, 7), h.At(29, 7));
+    ground.layoutSymmetry.clear();
+    ASSERT_TRUE(run.FinalHeight(graph, ground, h));
+    EXPECT_NE(h.At(3, 7), h.At(29, 7));
+    // N-fold turns by their id; the choices are Studio's.
+    std::string mode;
+    int turns = 0;
+    EXPECT_TRUE(faf::editor::ResolveGraphSymmetry("rotn6", ground, mode, turns));
+    EXPECT_EQ(mode, "rotn");
+    EXPECT_EQ(turns, 6);
+    EXPECT_FALSE(faf::editor::ResolveGraphSymmetry("off", ground, mode, turns));
+    EXPECT_EQ(faf::editor::GraphSymmetryChoices().size(), 13U);
+    // Studio's graphs carry it (a mode, or { mode = 'rotn', n = 6 }), and a saved graph keeps it.
+    std::map<std::string, std::string> expected = {{"lib_duel_turn", "rot2"}, {"lib_hex6", "rotn6"}, {"hills", "map"}};
+    for (const faf::editor::ShippedGraph& shipped : faf::editor::ShippedTerrainGraphs()) {
+      const auto want = expected.find(shipped.id);
+      if (want == expected.end()) {
+        continue;
+      }
+      NodeGraph g(TerrainNodeTypes());
+      StudioGraphFacts facts;
+      std::string error;
+      ASSERT_TRUE(ReadStudioGraph(shipped.text, g, facts, error)) << error;
+      EXPECT_EQ(facts.symmetry, want->second) << shipped.id;
+      expected.erase(want);
+    }
+    EXPECT_TRUE(expected.empty()) << expected.size() << " shipped graphs not found";
+    const std::string saved = faf::editor::SaveTerrainGraph(graph, 7, "sym", "mirror_xz");
+    NodeGraph back(TerrainNodeTypes());
+    int seed = 0;
+    std::string name;
+    std::string error;
+    std::string symmetry;
+    ASSERT_TRUE(faf::editor::LoadTerrainGraph(saved, back, seed, name, error, &symmetry)) << error;
+    EXPECT_EQ(symmetry, "mirror_xz");
+  }
+
+  TEST(
+    TerrainGraph,
     SavedGraphReadsBack
   )
   {

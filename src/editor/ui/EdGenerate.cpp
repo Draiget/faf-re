@@ -10,6 +10,7 @@
 #include "imgui.h"
 
 #include <algorithm>
+#include <chrono>
 #include <cctype>
 #include <cmath>
 #include <cstdio>
@@ -96,6 +97,11 @@ namespace faf::editor
 
   EdGenerate::~EdGenerate()
   {
+    for (const GalleryItem& item : mGallery) {
+      if (item.image != 0) {
+        mRetired.push_back(item.image);
+      }
+    }
     RetireThumbs();
     FreeRetired();
   }
@@ -128,6 +134,7 @@ namespace faf::editor
     mNote = "Fractal noise scaled to heights: add nodes from the Nodes panel, or open a sample graph.";
     mLoadNote.clear();
     mSeed = 1;
+    mSymmetry = "map";
     Open(mName, {}, false);
   }
 
@@ -147,6 +154,7 @@ namespace faf::editor
           return;
         }
         mSeed = facts.seed;
+        mSymmetry = facts.symmetry;
         mLoadNote.clear();
         if (!facts.unknownTypes.empty()) {
           mLoadNote = "Left out (not in this editor yet):";
@@ -157,7 +165,7 @@ namespace faf::editor
         }
       } else {
         std::string savedName;
-        if (!LoadTerrainGraph(text, *graph, mSeed, savedName, error)) {
+        if (!LoadTerrainGraph(text, *graph, mSeed, savedName, error, &mSymmetry)) {
           mStatus = "Can't read " + name + ": " + error;
           return;
         }
@@ -252,7 +260,7 @@ namespace faf::editor
     std::filesystem::create_directories(OwnFolder(), error);
     const std::filesystem::path path = OwnFolder() / (file + kExtension);
     std::ofstream out(path, std::ios::binary);
-    out << SaveTerrainGraph(*mGraph, mSeed, mName);
+    out << SaveTerrainGraph(*mGraph, mSeed, mName, mSymmetry);
     mStatus = out ? "Saved " + path.string() : "Can't write " + path.string();
     gpg::Logf("editor: generate: %s", mStatus.c_str());
   }
@@ -265,6 +273,7 @@ namespace faf::editor
       return;
     }
     mGroundWidth = ground.width;
+    ground.graphSymmetry = mSymmetry;
     const int step =
       mPreviewCap == 2 ? 1 : ErosionPreviewStep(ground.width, ground.height, mPreviewCap == 0 ? 257 : 513);
     mPreview.SetStep(step);
@@ -347,7 +356,7 @@ namespace faf::editor
     }
     const std::string key = std::to_string(mGraph->Changes()) + "|" +
       std::to_string(reinterpret_cast<std::uintptr_t>(mGraph.get())) + "|" + std::to_string(mSeed) + "|" +
-      std::to_string(mPreviewCap) + "|" + (mShowOnMap ? "on" : "off");
+      std::to_string(mPreviewCap) + "|" + mSymmetry + "|" + (mShowOnMap ? "on" : "off");
     if (key != mPendingKey) {
       mPendingKey = key;
       mRest = 0.0f;
@@ -357,6 +366,13 @@ namespace faf::editor
       mRefreshAsked = false;
       mEvaluatedKey = key;
       Evaluate();
+    }
+    // The variations follow the graph, its seed and its symmetry once a change has rested.
+    const std::string galleryKey = std::to_string(mGraph->Changes()) + "|" +
+      std::to_string(reinterpret_cast<std::uintptr_t>(mGraph.get())) + "|" + std::to_string(mSeed) + "|" + mSymmetry;
+    if (mGalleryShown && galleryKey != mGalleryKey && mRest >= 0.35f) {
+      mGalleryKey = galleryKey;
+      UpdateGallery();
     }
     if (!mShowOnMap && mShownOnMap && !mAsked) {
       mAsk = HeightsAsk{};
@@ -371,6 +387,7 @@ namespace faf::editor
         mStatus = "Open a map: the graph runs on its ground.";
         return;
       }
+      ground.graphSymmetry = mSymmetry;
       TerrainRun full(1);
       const TerrainReport report = full.Evaluate(*mGraph, mSeed, ground);
       field::Grid heights;
@@ -399,7 +416,7 @@ namespace faf::editor
         // The preview's key is the same: the run after Build doesn't put a preview back.
         mEvaluatedKey = mPendingKey = std::to_string(mGraph->Changes()) + "|" +
           std::to_string(reinterpret_cast<std::uintptr_t>(mGraph.get())) + "|" + std::to_string(mSeed) + "|" +
-          std::to_string(mPreviewCap) + "|off";
+          std::to_string(mPreviewCap) + "|" + mSymmetry + "|off";
         char text[128];
         (void)std::snprintf(
           text, sizeof(text), "Built at full resolution: %d nodes in %.0f ms.", report.evaluated, report.ms
@@ -552,6 +569,30 @@ namespace faf::editor
     ImGui::SetNextItemWidth(Em(150.0f));
     (void)EdCombo("##previewsize", &mPreviewCap, kSizes, IM_ARRAYSIZE(kSizes));
     EdSetItemTooltip("How many samples a side the preview runs on (the map's own size can be slow with erosion).");
+    ImGui::SameLine();
+    {
+      const std::vector<GraphSymmetryChoice>& choices = GraphSymmetryChoices();
+      const char* shown = mSymmetry.c_str();
+      for (const GraphSymmetryChoice& choice : choices) {
+        if (mSymmetry == choice.id) {
+          shown = choice.label;
+        }
+      }
+      ImGui::SetNextItemWidth(Em(210.0f));
+      if (EdBeginCombo("##graphsymmetry", (std::string("Symmetry: ") + shown).c_str())) {
+        for (const GraphSymmetryChoice& choice : choices) {
+          if (ImGui::Selectable(choice.label, mSymmetry == choice.id)) {
+            mSymmetry = choice.id;
+          }
+        }
+        ImGui::EndCombo();
+      }
+      EdSetItemTooltip(
+        "The symmetry of the result: the heights, the paint and the terrain types are made symmetric where the graph "
+        "writes them (the master part copied over the rest), so erosion and noise after a Symmetrize node can't break "
+        "it. Scattered props aren't mirrored. \"Follow the map\" takes the editor's symmetry (the toolbar's)."
+      );
+    }
     ImGui::SameLine();
     ImGui::Checkbox("Show on the map", &mShowOnMap);
     EdSetItemTooltip(
@@ -758,6 +799,96 @@ namespace faf::editor
     if (ImGui::Button("Random")) {
       mSeed = static_cast<int>((static_cast<unsigned>(mSeed) * 2654435761u + 12345u) % 100000u);
     }
+    ImGui::Checkbox("Show six seeds", &mGalleryShown);
+    EdSetItemTooltip("The result for this seed and the next five as small pictures; a click takes that seed.");
+    if (mGalleryShown) {
+      DrawGallery();
+    }
     ImGui::End();
+  }
+
+  void EdGenerate::UpdateGallery()
+  {
+    for (const GalleryItem& item : mGallery) {
+      if (item.image != 0) {
+        mRetired.push_back(item.image);
+      }
+    }
+    mGallery.clear();
+    TerrainGround ground;
+    if (!mGround || !mGround(ground)) {
+      return;
+    }
+    ground.graphSymmetry = mSymmetry;
+    constexpr int kSize = 64;
+    const auto t0 = std::chrono::steady_clock::now();
+    const int step = ErosionPreviewStep(ground.width, ground.height, 129);
+    std::vector<float> small;
+    std::vector<std::uint32_t> pixels(static_cast<std::size_t>(kSize) * kSize);
+    int made = 0;
+    for (int i = 0; i < 6; ++i) {
+      GalleryItem item;
+      item.seed = mSeed + i;
+      TerrainRun run(step);
+      const TerrainReport report = run.Evaluate(*mGraph, item.seed, ground);
+      field::Grid heights;
+      if (report.errors.empty() && run.FinalHeight(*mGraph, ground, heights) && heights.w > 1) {
+        field::Downsample(heights, kSize, kSize, small);
+        if (small.size() == pixels.size()) {
+          const auto [lo, hi] = std::minmax_element(small.begin(), small.end());
+          const float span = std::max(1e-6f, *hi - *lo);
+          for (std::size_t k = 0; k < pixels.size(); ++k) {
+            pixels[k] = HeightColour((small[k] - *lo) / span);
+          }
+          item.image = EdImGuiRenderer::CreateImage(kSize, kSize, pixels.data());
+          made += item.image != 0 ? 1 : 0;
+        }
+      }
+      mGallery.push_back(item);
+    }
+    gpg::Logf(
+      "editor: generate: variations for seeds %d to %d: %d pictures in %.0f ms",
+      mSeed,
+      mSeed + 5,
+      made,
+      std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count()
+    );
+  }
+
+  void EdGenerate::DrawGallery()
+  {
+    if (mGallery.empty()) {
+      ImGui::TextDisabled("Working out the variations...");
+      return;
+    }
+    const float gap = ImGui::GetStyle().ItemSpacing.x;
+    const float size = std::max(Em(40.0f), (ImGui::GetContentRegionAvail().x - gap * 2.0f) / 3.0f);
+    for (std::size_t i = 0; i < mGallery.size(); ++i) {
+      const GalleryItem& item = mGallery[i];
+      if (i % 3 != 0) {
+        ImGui::SameLine();
+      }
+      ImGui::BeginGroup();
+      ImGui::PushID(static_cast<int>(i));
+      const bool current = item.seed == mSeed;
+      if (item.image != 0) {
+        // The button adds its frame padding around the picture.
+        const float picture = std::max(8.0f, size - ImGui::GetStyle().FramePadding.x * 2.0f);
+        if (ImGui::ImageButton("##variation", static_cast<ImTextureID>(item.image), ImVec2(picture, picture))) {
+          mSeed = item.seed;
+        }
+      } else {
+        ImGui::Button("failed", ImVec2(size, size));
+      }
+      if (current) {
+        ImGui::GetWindowDrawList()->AddRect(
+          ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), ImGui::GetColorU32(ImGuiCol_CheckMark), 2.0f, 0, 2.0f
+        );
+      }
+      EdSetItemTooltip(item.image != 0 ? "Click to use this seed" : "The graph has errors with this seed");
+      ImGui::TextDisabled("%s%d", current ? "> " : "", item.seed);
+      ImGui::PopID();
+      ImGui::EndGroup();
+    }
   }
 } // namespace faf::editor

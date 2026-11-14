@@ -506,6 +506,94 @@ namespace faf::editor
     return Value(link->fromNode, from->type->outputs[static_cast<std::size_t>(link->fromPin)].name);
   }
 
+  const std::vector<GraphSymmetryChoice>& GraphSymmetryChoices()
+  {
+    static const std::vector<GraphSymmetryChoice> kChoices = {
+      {"map", "Follow the map (the editor's symmetry)"},
+      {"off", "None"},
+      {"mirror_x", "Mirror left / right"},
+      {"mirror_z", "Mirror top / bottom"},
+      {"mirror_xz", "Mirror both (4)"},
+      {"rot2", "Turn by 180"},
+      {"rot4", "Turn by 90 (4)"},
+      {"diag", "Diagonal mirror"},
+      {"adiag", "Anti-diagonal mirror"},
+      {"diag_both", "Both diagonals (4)"},
+      {"rotn3", "Turn by 120 (3)"},
+      {"rotn5", "Turn by 72 (5)"},
+      {"rotn6", "Turn by 60 (6)"},
+    };
+    return kChoices;
+  }
+
+  bool ResolveGraphSymmetry(
+    const std::string& setting,
+    const TerrainGround& ground,
+    std::string& mode,
+    int& turns
+  )
+  {
+    turns = 3;
+    if (setting.empty() || setting == "off") {
+      return false;
+    }
+    if (setting == "map") {
+      mode = ground.layoutSymmetry;
+      turns = ground.layoutTurns;
+      return !mode.empty();
+    }
+    if (setting.rfind("rotn", 0) == 0) {
+      mode = "rotn";
+      turns = std::clamp(std::atoi(setting.c_str() + 4), 2, 16);
+      return true;
+    }
+    mode = setting;
+    return true;
+  }
+
+  namespace
+  {
+    /** A field the graph writes, made symmetric by the graph's setting about the map's middle (`nearest`: codes). */
+    field::GridPtr GraphSymmetric(
+      const field::GridPtr& f,
+      const TerrainGround& ground,
+      const bool nearest = false
+    )
+    {
+      std::string mode;
+      int turns = 3;
+      if (f == nullptr || !ResolveGraphSymmetry(ground.graphSymmetry, ground, mode, turns)) {
+        return f;
+      }
+      terrain::Env env;
+      return env.Op(
+        "symmetrize",
+        {{"a", f},
+         {"mode", mode},
+         {"side", 0.0},
+         {"n", static_cast<double>(turns)},
+         {"combine", "copy"},
+         {"seam", nearest ? 0.0 : 12.0},
+         {"nearest", nearest ? 1.0 : 0.0},
+         {"cx", static_cast<double>(ground.width - 1) * 0.5},
+         {"cz", static_cast<double>(ground.height - 1) * 0.5}}
+      );
+    }
+
+    void MakeSymmetric(
+      field::Grid& g,
+      const TerrainGround& ground,
+      const bool nearest = false
+    )
+    {
+      if (g.w < 2) {
+        return;
+      }
+      const field::GridPtr done = GraphSymmetric(std::make_shared<field::Grid>(g), ground, nearest);
+      g = *done;
+    }
+  } // namespace
+
   bool TerrainRun::FinalHeight(
     const NodeGraph& graph,
     const TerrainGround& ground,
@@ -538,21 +626,23 @@ namespace faf::editor
         : TerrainParamNumber(*node, "strength", 1.0);
       const std::string mode = TerrainParamText(*node, "mode");
       const TerrainValue* maskValue = Input(graph, id, "mask");
-      const field::GridPtr mask = maskValue != nullptr ? maskValue->grid : nullptr;
+      // What the output writes is symmetric whatever the nodes before it did (the graph's symmetry setting).
+      const field::GridPtr mask = GraphSymmetric(maskValue != nullptr ? maskValue->grid : nullptr, ground);
+      const field::GridPtr written = GraphSymmetric(in->grid, ground);
       any = true;
       if (mode == "replace" && strength >= 0.9999 && mask == nullptr) {
-        current = in->grid;
+        current = written;
         continue;
       }
       isPlain = false;
       if (mode == "add") {
         const field::GridPtr gained =
-          env.Op("affine", {{"a", in->grid}, {"mul", TerrainParamNumber(*node, "gain", 1.0)}, {"add", 0.0}});
+          env.Op("affine", {{"a", written}, {"mul", TerrainParamNumber(*node, "gain", 1.0)}, {"add", 0.0}});
         current =
           env.Op("blend", {{"a", current}, {"b", gained}, {"mode", "add"}, {"opacity", strength}, {"mask", mask}});
       } else {
         current =
-          env.Op("blend", {{"a", current}, {"b", in->grid}, {"mode", "normal"}, {"opacity", strength}, {"mask", mask}});
+          env.Op("blend", {{"a", current}, {"b", written}, {"mode", "normal"}, {"opacity", strength}, {"mask", mask}});
       }
     }
     if (!any) {
@@ -844,6 +934,20 @@ namespace faf::editor
       write.takeAway = TerrainParamNumber(*node, "takeAway", 0.0) >= 0.5;
       writes.layers.push_back(std::move(write));
     }
+    // The paint and the terrain types symmetric as written (the graph's symmetry setting); a scatter's density too,
+    // though its dice still fall differently on each side.
+    for (auto& [layer, weight] : writes.kinds) {
+      MakeSymmetric(weight, ground);
+    }
+    for (TerrainBuildWrites::Layer& layer : writes.layers) {
+      MakeSymmetric(layer.mask, ground);
+    }
+    for (TerrainBuildWrites::Types& types : writes.types) {
+      MakeSymmetric(types.mask, ground, true);
+    }
+    for (TerrainBuildWrites::Scatter& scatter : writes.scatters) {
+      MakeSymmetric(scatter.density, ground);
+    }
     return true;
   }
 
@@ -1117,6 +1221,18 @@ namespace faf::editor
     facts = StudioGraphFacts{};
     facts.name = root.Str("name");
     facts.seed = static_cast<int>(root.Num("seed", 1.0));
+    // The symmetry setting: absent (follow the map), a mode, or { mode = 'rotn', n = 6 }.
+    if (const LuaValue* symmetry = root.Get("symmetry"); symmetry != nullptr) {
+      if (symmetry->kind == LuaValue::Kind::Table) {
+        const std::string mode = symmetry->Str("mode");
+        facts.symmetry = mode == "rotn" ? "rotn" + std::to_string(static_cast<int>(symmetry->Num("n", 3.0))) : mode;
+      } else {
+        facts.symmetry = root.Str("symmetry");
+      }
+      if (facts.symmetry.empty()) {
+        facts.symmetry = "map";
+      }
+    }
     const LuaValue* nodes = root.Get("nodes");
     if (nodes == nullptr || nodes->kind != LuaValue::Kind::Table) {
       error = "the graph has no nodes";
@@ -1255,7 +1371,8 @@ namespace faf::editor
   std::string SaveTerrainGraph(
     const NodeGraph& graph,
     const int seed,
-    const std::string& name
+    const std::string& name,
+    const std::string& symmetry
   )
   {
     // The graph's own fields before the nodes: JsonValue finds a key's first use, and the nodes have seeds too.
@@ -1264,7 +1381,9 @@ namespace faf::editor
     const std::size_t at = text.find(anchor);
     if (at != std::string::npos) {
       text.insert(
-        at + anchor.size(), "  \"seed\": " + std::to_string(seed) + ",\n  \"name\": " + JsonQuoted(name) + ",\n"
+        at + anchor.size(),
+        "  \"seed\": " + std::to_string(seed) + ",\n  \"name\": " + JsonQuoted(name) +
+          ",\n  \"graphSymmetry\": " + JsonQuoted(symmetry) + ",\n"
       );
     }
     return text;
@@ -1275,11 +1394,15 @@ namespace faf::editor
     NodeGraph& graph,
     int& seed,
     std::string& name,
-    std::string& error
+    std::string& error,
+    std::string* symmetry
   )
   {
     if (!graph.Load(text, error)) {
       return false;
+    }
+    if (symmetry != nullptr && !JsonValue(text, "graphSymmetry", *symmetry)) {
+      *symmetry = "map";
     }
     float s = 1.0f;
     seed = JsonFloat(text, "seed", s) ? static_cast<int>(s) : 1;

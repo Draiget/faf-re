@@ -102,12 +102,41 @@ namespace faf::editor
     }
     /** Selects the first node of a type (test runs, `/gentest`), for the inspector. */
     void SelectFirst(const std::string& type);
+    /** The graph's symmetry setting (GraphSymmetryChoices' ids). */
+    [[nodiscard]] const std::string& Symmetry() const noexcept
+    {
+      return mSymmetry;
+    }
+    void SetSymmetry(
+      std::string symmetry
+    )
+    {
+      mSymmetry = std::move(symmetry);
+    }
+    /** The variations: the result for six seeds from the graph's, as small pictures (a click takes the seed). */
+    void SetGalleryShown(
+      const bool shown
+    ) noexcept
+    {
+      mGalleryShown = shown;
+    }
+    struct GalleryItem
+    {
+      int seed = 0;
+      std::uint64_t image = 0; // 0: the graph failed for this seed
+    };
+    [[nodiscard]] const std::vector<GalleryItem>& Gallery() const noexcept
+    {
+      return mGallery;
+    }
 
   private:
     void NewGraph();
     void Open(const std::string& name, const std::string& text, bool studio);
     void Evaluate();
     void UpdateThumbnails();
+    void UpdateGallery();
+    void DrawGallery();
     void DrawToolbar();
     void DrawGraphMenu();
     void DrawParams(GraphNode& node);
@@ -122,6 +151,10 @@ namespace faf::editor
     std::string mNote;
     std::string mLoadNote; // node types a Studio graph had that this editor doesn't
     int mSeed = 1;
+    std::string mSymmetry = "map";
+    bool mGalleryShown = false;
+    std::string mGalleryKey;
+    std::vector<GalleryItem> mGallery;
     int mPreviewCap = 1; // 0: 257, 1: 513, 2: the map's own samples
     bool mShowOnMap = false;
     bool mShownOnMap = false;

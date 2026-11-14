@@ -107,7 +107,23 @@ namespace faf::editor
     std::string layoutKey;
     std::string layoutSymmetry;
     int layoutTurns = 3;
+    /**
+     * The symmetry of what the graph writes (GraphSymmetryChoices: "map" follows the editor's, `layoutSymmetry`; "off"
+     * none): the height outputs, the paint and the terrain types are made symmetric where the graph writes them, so
+     * nodes after a Symmetrize node (erosion, noise) can't break it.
+     */
+    std::string graphSymmetry = "off";
   };
+
+  /** FAF Studio's gensym choices: the setting's id and its label. */
+  struct GraphSymmetryChoice
+  {
+    const char* id;
+    const char* label;
+  };
+  [[nodiscard]] const std::vector<GraphSymmetryChoice>& GraphSymmetryChoices();
+  /** The symmetrize op's mode and turns a setting gives on `ground` (false: none). */
+  bool ResolveGraphSymmetry(const std::string& setting, const TerrainGround& ground, std::string& mode, int& turns);
 
   /** The eight kinds of ground by the names graph files use, bottom to top, with their roughness (0 shiny .. 1 rough).
    */
@@ -282,6 +298,7 @@ namespace faf::editor
   {
     std::string name;
     int seed = 1;
+    std::string symmetry = "map";          // the graph's symmetry setting (GraphSymmetryChoices' ids)
     std::vector<std::string> unknownTypes; // node types this editor doesn't have (those nodes are left out)
     int droppedLinks = 0;                  // links to or from left-out nodes or unknown pins
   };
@@ -301,8 +318,17 @@ namespace faf::editor
   [[nodiscard]] const std::vector<std::pair<std::string, std::string>>& EmbeddedTerrainGraphFiles();
 
   /** The editor's own graph file (`.fafgraph.json`): the node graph with the graph's seed and name. */
-  [[nodiscard]] std::string SaveTerrainGraph(const NodeGraph& graph, int seed, const std::string& name);
-  bool LoadTerrainGraph(const std::string& text, NodeGraph& graph, int& seed, std::string& name, std::string& error);
+  [[nodiscard]] std::string
+  SaveTerrainGraph(const NodeGraph& graph, int seed, const std::string& name, const std::string& symmetry = "map");
+  /** `symmetry` (when given) gets the saved setting, "map" for a file without one. */
+  bool LoadTerrainGraph(
+    const std::string& text,
+    NodeGraph& graph,
+    int& seed,
+    std::string& name,
+    std::string& error,
+    std::string* symmetry = nullptr
+  );
 
   /** A node's parameter by name as the evaluations read it (numbers, a choice's id, text). */
   [[nodiscard]] double TerrainParamNumber(const GraphNode& node, const std::string& name, double fallback);

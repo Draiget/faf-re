@@ -2716,6 +2716,7 @@ namespace faf::editor
               : "no such graph"
           );
           generate.SetShowOnMap(true);
+          generate.SetGalleryShown(true);
           generate.SelectFirst("range");
           break;
         case 1:
