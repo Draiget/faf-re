@@ -23,6 +23,7 @@ add_executable(faf_gal_tests EXCLUDE_FROM_ALL
   D3DErrorTests.cpp
   GalMathTests.cpp
   BackendHelperTests.cpp
+  CopyRegionTests.cpp
   PipelineDeferTests.cpp
 )
 target_link_libraries(faf_gal_tests PRIVATE faf_engine gtest_main)
