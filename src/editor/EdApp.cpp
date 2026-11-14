@@ -164,6 +164,7 @@ namespace faf::editor
         "/shader",         "/brushtest",      "/brushshape",     "/stampsource",     "/stampstroke", "/symoptions",
         "/maskoptions",    "/masktest",       "/shaderbrowser",  "/convertlayers",   "/interoptest", "/gentest",
         "/layouttest",     "/playcopytest",   "/missiontest",    "/modtest",         "/unitlabtest", "/effectmodtest",
+        "/assettest",      "/thumbcache",     "/assetmarks",
       };
       for (const char* const option : kOptions) {
         if (moho::CFG_GetArgOption(option, 0, nullptr)) {
@@ -2750,6 +2751,74 @@ namespace faf::editor
         }
         ++mFxTestStage;
       }
+      /**
+       * `/assettest` (test runs): the asset browser in Objects: each kind listed and searched, a prop picked (the Props
+       * tool takes it), a favourite and the recent list; the prop pictures' cache counts logged.
+       */
+      void TestAssets()
+      {
+        if (
+          mAssetTestStage >= 4 || !mScene.Attached() || moho::RULE_PeekKept() == nullptr ||
+          !moho::CFG_GetArgOption("/assettest", 0, nullptr) || ++mAssetTestFrames % 120 != 0
+        ) {
+          return;
+        }
+        EdAssetBrowser& assets = mShell->Assets();
+        switch (mAssetTestStage) {
+        case 0: {
+          mShell->SwitchWorkspace(1);
+          mShell->HideHome();
+          mShell->ShowAssets();
+          for (int k = 0; k < kAssetKindCount; ++k) {
+            const AssetKind kind = static_cast<AssetKind>(k);
+            const std::vector<AssetEntry>& entries = assets.Entries(kind);
+            std::string facets;
+            for (const AssetFacet& facet : AssetFacets(kind)) {
+              facets += std::string(" ") + facet.id + "=" + std::to_string(AssetFacetValues(entries, facet.id).size());
+            }
+            gpg::Logf(
+              "editor: asset test: %s %zu entries, facets%s", AssetKindName(kind), entries.size(), facets.c_str()
+            );
+          }
+          AssetQuery query;
+          query.text = "pine";
+          const std::vector<AssetEntry>& props = assets.Entries(AssetKind::Props);
+          const std::vector<std::size_t> pines = FindAssets(props, query, assets.Marks());
+          gpg::Logf("editor: asset test: 'pine' finds %zu props", pines.size());
+          if (!pines.empty()) {
+            assets.Pick(props[pines.front()]);
+            assets.Marks().ToggleFavourite(props[pines.back()]);
+            gpg::Logf(
+              "editor: asset test: picked %s; the Props tool places %s; favourite %s",
+              props[pines.front()].key.c_str(),
+              mShell->Tools().PropBlueprint().c_str(),
+              props[pines.back()].name.c_str()
+            );
+          }
+          assets.Show(AssetKind::Props, "pine");
+          break;
+        }
+        case 3: {
+          AssetQuery recent;
+          recent.recent = true;
+          const std::vector<AssetEntry>& props = assets.Entries(AssetKind::Props);
+          gpg::Logf(
+            "editor: asset test: recent %zu, favourites %zu; prop pictures from the cache %d, written to it %d",
+            FindAssets(props, recent, assets.Marks()).size(),
+            assets.Marks().FavouriteCount(),
+            mPropThumbnails.CacheHits(),
+            mPropThumbnails.CacheWrites()
+          );
+          break;
+        }
+        default:
+          break;
+        }
+        ++mAssetTestStage;
+      }
+      int mAssetTestStage = 0;
+      int mAssetTestFrames = 0;
+
       int mFxTestStage = 0;
       int mFxTestFrames = 0;
       std::string mFxCutPath;
@@ -4706,6 +4775,18 @@ namespace faf::editor
       mShell->Tools().SetPropPictures([this](const std::string& blueprint) {
         return mPropThumbnails.Get(blueprint);
       });
+      // The prop pictures kept between runs, and the asset browser's favourites and recent: in the settings folder;
+      // a test run only with `/thumbcache <folder>` and `/assetmarks <file>`.
+      if (fa::vector<fa::string> folder; moho::CFG_GetArgOption("/thumbcache", 1, &folder) && !folder.empty()) {
+        mPropThumbnails.SetCacheFolder(folder[0].c_str());
+      } else if (!IsTestRunCommandLine() && !EditorSettingsFolder().empty()) {
+        mPropThumbnails.SetCacheFolder(EditorSettingsFolder() / "cache" / "props");
+      }
+      if (fa::vector<fa::string> file; moho::CFG_GetArgOption("/assetmarks", 1, &file) && !file.empty()) {
+        mShell->Assets().SetMarksFile(file[0].c_str());
+      } else if (!IsTestRunCommandLine() && !EditorSettingsFolder().empty()) {
+        mShell->Assets().SetMarksFile(EditorSettingsFolder() / "asset_marks.txt");
+      }
       ReadOpenCommandLine();
       gEditorApp = this;
       // The particle editor's own view renders at the start of the game head's frame (moho::gViewportBeforeFrame).
@@ -8547,6 +8628,7 @@ namespace faf::editor
       }
       TestUnitLab();
       TestEffectMod();
+      TestAssets();
       // `/sctest` (test runs): the SC tools window's buttons in turn, a second apart, the heights' checksum each time.
       if (
         mScTestStage < 8 && moho::CFG_GetArgOption("/sctest", 0, nullptr) && !mScene.ModelsPending() &&

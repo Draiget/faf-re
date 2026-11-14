@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <filesystem>
 #include <map>
 #include <string>
 #include <vector>
@@ -22,6 +23,26 @@ namespace faf::editor
   class EdPropThumbnails
   {
   public:
+    ~EdPropThumbnails();
+    /**
+     * Where the pictures are kept between runs (empty: not kept): a picture made once is written there after the view
+     * has drawn it, and read from there the next time instead of drawing the model again.
+     */
+    void SetCacheFolder(
+      const std::filesystem::path& folder
+    )
+    {
+      mCacheFolder = folder;
+    }
+    /** How many pictures came from the cache and how many were written to it, this run. */
+    [[nodiscard]] int CacheHits() const noexcept
+    {
+      return mCacheHits;
+    }
+    [[nodiscard]] int CacheWrites() const noexcept
+    {
+      return mCacheWrites;
+    }
     /** The picture of a prop blueprint (`/env/.../x_prop.bp`) as an ImTextureID, or 0 until its sheet exists. */
     [[nodiscard]] std::uint64_t Get(const std::string& blueprintPath);
 
@@ -43,7 +64,13 @@ namespace faf::editor
     {
       std::shared_ptr<moho::CD3DDynamicTextureSheet> sheet;
       bool failed = false;
+      std::uint64_t image = 0; // read from the cache
+      int age = 0;             // pumps since the model was asked to be drawn
+      bool kept = false;       // written to the cache (or came from it)
     };
+    std::filesystem::path mCacheFolder;
+    int mCacheHits = 0;
+    int mCacheWrites = 0;
     std::map<std::string, Entry> mEntries;
     std::vector<std::string> mWanted;
   };

@@ -543,6 +543,13 @@ namespace faf::editor
         mModPanel.Project() != nullptr ? mModPanel.Folder() : std::filesystem::path(),
         mModPanel.Project() != nullptr ? mModPanel.Project()->name : std::string()
       );
+      if (mShowAssets) {
+        mAssets.Draw(mShowAssets);
+      }
+      if (std::string effect; mAssets.TakeEffectAsk(effect)) {
+        mShowParticleEditor = true;
+        (void)mParticleEditor.OpenGameEmitter(effect);
+      }
       if (mShowUnitLab) {
         mUnitLab.Draw(
           mShowUnitLab, mTools.UnitInfos(), mDocument.Map() != nullptr && mPlay.CanPlay() && !mPlay.Active()
@@ -760,6 +767,7 @@ namespace faf::editor
       {"Platoons###MissionPlatoons", &EdShell::mShowMissionPlatoons},
       {"Mod project###ModProject", &EdShell::mShowModProject},
       {"Unit lab###UnitLab", &EdShell::mShowUnitLab},
+      {"Assets###AssetBrowser", &EdShell::mShowAssets},
     };
     return kFlags;
   }

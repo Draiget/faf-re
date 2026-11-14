@@ -87,7 +87,8 @@ namespace
     ) << "Terrain: the tool at the left, Layers and Info at the right with Properties under them, the rest below";
     // A layout saved before Terrain's changed is laid out again once; the others keep theirs.
     EXPECT_EQ(faf::editor::LayoutVersionOf("terrain"), 2);
-    EXPECT_EQ(faf::editor::LayoutVersionOf("objects"), 1);
+    EXPECT_EQ(faf::editor::LayoutVersionOf("environment"), 1);
+    EXPECT_EQ(faf::editor::LayoutVersionOf("objects"), 2) << "Objects: Assets beside Properties";
     const std::vector<std::string> mission = DefaultPanels(5);
     EXPECT_NE(std::find(mission.begin(), mission.end(), "ScriptEditor"), mission.end()) << "ids, not window names";
     EXPECT_TRUE(DefaultPanels(42).empty());

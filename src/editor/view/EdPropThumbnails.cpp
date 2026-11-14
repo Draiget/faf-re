@@ -1,5 +1,8 @@
 #include "editor/view/EdPropThumbnails.h"
 
+#include "editor/tools/EdAssetCatalog.h"
+#include "editor/ui/EdImGuiRenderer.h"
+
 #include <algorithm>
 #include <cmath>
 #include <cstring>
@@ -32,12 +35,28 @@ namespace faf::editor
     const std::string& blueprintPath
   )
   {
-    const auto found = mEntries.find(blueprintPath);
+    auto found = mEntries.find(blueprintPath);
+    if (found == mEntries.end() && !mCacheFolder.empty()) {
+      // Drawn in an earlier run: the picture from the cache.
+      int width = 0;
+      int height = 0;
+      std::vector<std::uint32_t> pixels;
+      if (ReadThumbFile(ThumbCacheFile(mCacheFolder, blueprintPath), width, height, pixels)) {
+        Entry& entry = mEntries[blueprintPath];
+        entry.image = EdImGuiRenderer::CreateImage(width, height, pixels.data());
+        entry.kept = true;
+        ++mCacheHits;
+        return entry.image;
+      }
+    }
     if (found == mEntries.end()) {
       if (std::find(mWanted.begin(), mWanted.end(), blueprintPath) == mWanted.end()) {
         mWanted.push_back(blueprintPath);
       }
       return 0U;
+    }
+    if (found->second.image != 0U) {
+      return found->second.image;
     }
     if (found->second.failed || !found->second.sheet) {
       return 0U;
@@ -102,6 +121,45 @@ namespace faf::editor
     if (rules == nullptr || device == nullptr || device->GetResources() == nullptr) {
       return;
     }
+    // Pictures the view has drawn by now (a few pumps after asking) go into the cache, a few a pump.
+    if (!mCacheFolder.empty()) {
+      int writes = 4;
+      for (auto& [path, entry] : mEntries) {
+        if (writes == 0) {
+          break;
+        }
+        if (entry.kept || entry.failed || !entry.sheet || ++entry.age < 4) {
+          continue;
+        }
+        entry.kept = true;
+        --writes;
+        std::uint32_t pitch = 0;
+        void* bits = nullptr;
+        if (!entry.sheet->Lock(&pitch, &bits)) {
+          continue;
+        }
+        std::vector<std::uint32_t> pixels(static_cast<std::size_t>(kSide) * kSide);
+        bool drawn = false;
+        for (int y = 0; y < kSide; ++y) {
+          std::memcpy(
+            pixels.data() + static_cast<std::size_t>(y) * kSide,
+            static_cast<const std::uint8_t*>(bits) + static_cast<std::size_t>(y) * pitch,
+            static_cast<std::size_t>(kSide) * 4
+          );
+        }
+        (void)entry.sheet->Unlock();
+        for (const std::uint32_t pixel : pixels) {
+          drawn = drawn || (pixel >> 24U) != 0U;
+        }
+        // An empty sheet (not drawn yet, or a model that drew nothing) isn't kept.
+        if (drawn && WriteThumbFile(ThumbCacheFile(mCacheFolder, path), kSide, kSide, pixels.data())) {
+          ++mCacheWrites;
+        } else if (!drawn) {
+          entry.kept = false;
+          entry.age = entry.age > 40 ? -1000000 : entry.age; // gives up after a while
+        }
+      }
+    }
     while (count > 0 && !mWanted.empty()) {
       const std::string path = mWanted.front();
       mWanted.erase(mWanted.begin());
@@ -144,8 +202,18 @@ namespace faf::editor
     }
   }
 
+  EdPropThumbnails::~EdPropThumbnails()
+  {
+    Clear();
+  }
+
   void EdPropThumbnails::Clear()
   {
+    for (const auto& [path, entry] : mEntries) {
+      if (entry.image != 0U) {
+        EdImGuiRenderer::DestroyImage(entry.image);
+      }
+    }
     mEntries.clear();
     mWanted.clear();
   }
