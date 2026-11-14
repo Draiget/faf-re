@@ -9141,26 +9141,14 @@ namespace faf::editor
     const std::string& texture = mTools->DecalTexturePath();
     const std::string pair = mTools->DecalPairPath();
     const HeightBrush brush = mTools->CurrentHeightBrush();
-    // Each copy's heading is the cursor's carried through the symmetry (the copies of a point one unit ahead).
-    float centreX[kMaxSymmetryCopies], centreZ[kMaxSymmetryCopies], aheadX[kMaxSymmetryCopies],
-      aheadZ[kMaxSymmetryCopies];
-    const int copies =
-      HeightBrushCentres(field->width, field->height, x, z, brush.symmetry, brush.turns, centreX, centreZ);
-    (void)HeightBrushCentres(
-      field->width, field->height, x + std::cos(yaw), z + std::sin(yaw), brush.symmetry, brush.turns, aheadX, aheadZ
-    );
+    const std::string normals = mTools->DecalNormalsPath();
+    // Each copy's middle and heading (the cursor's carried through the symmetry; EdDecalShape's DecalCopyPlaces).
     int placed = 0;
-    for (int c = 0; c < copies; ++c) {
-      if (
-        centreX[c] < 0.0f || centreZ[c] < 0.0f || centreX[c] > static_cast<float>(field->width - 1) ||
-        centreZ[c] > static_cast<float>(field->height - 1)
-      ) {
-        continue;
-      }
-      const float heading = std::atan2(aheadZ[c] - centreZ[c], aheadX[c] - centreX[c]);
-      const DecalFootprint footprint = DecalAround(
-        centreX[c], centreZ[c], mTools->DecalSizeX() * sizeFactor, mTools->DecalSizeZ() * sizeFactor, heading
-      );
+    for (const DecalPlace& place :
+         DecalCopyPlaces(field->width, field->height, x, z, yaw, brush.symmetry, brush.turns)) {
+      const float heading = place.heading;
+      const DecalFootprint footprint =
+        DecalAround(place.x, place.z, mTools->DecalSizeX() * sizeFactor, mTools->DecalSizeZ() * sizeFactor, heading);
       DecalState state;
       state.type = DecalTypeForTexture(texture);
       state.names[0] = texture;
@@ -9169,7 +9157,7 @@ namespace faf::editor
       state.scale[2] = footprint.sizeZ;
       state.position[0] = footprint.x;
       state.position[1] = mMap->mTerrainRes->GetHeightAt(
-        static_cast<std::int32_t>(std::lround(centreX[c])), static_cast<std::int32_t>(std::lround(centreZ[c]))
+        static_cast<std::int32_t>(std::lround(place.x)), static_cast<std::int32_t>(std::lround(place.z))
       );
       state.position[2] = footprint.z;
       state.orientation[1] = heading;
@@ -9180,8 +9168,133 @@ namespace faf::editor
         mDecalSelection.push_back(decal->mIndex);
         ++placed;
       }
+      // Its normals as a decal of their own at the same place (FAF Studio's separate normals decal).
+      if (!normals.empty()) {
+        DecalState second = state;
+        second.type = DecalTypeForTexture(normals);
+        second.names[0] = normals;
+        second.names[1].clear();
+        if (const moho::CWldTerrainDecal* const decal = AddDecal(*decals, second); decal != nullptr) {
+          mDecalSelection.push_back(decal->mIndex);
+        }
+      }
     }
     return placed;
+  }
+
+  int EdMapScene::WriteGeneratedWaterMask(
+    const field::Grid& mask,
+    const WaterMask kind,
+    const int mode,
+    const float strength,
+    std::string& message
+  )
+  {
+    int width = 0;
+    int height = 0;
+    std::uint8_t* const cells = mDocument.WaterMaskCells(kind, width, height);
+    if (cells == nullptr || mask.Count() == 0) {
+      message = "No water masks on this map.";
+      return 0;
+    }
+    EdDocument::WaterMaskSnapshot before = mDocument.WaterMasksNow();
+    const int changed = WriteIntoWaterMask(cells, width, height, [&mask](const float x, const float z) {
+      return field::SampleWorld(mask, x, z);
+    }, mode, strength);
+    mDocument.WaterMasksChanged(0, 0, width, height);
+    if (!(before == mDocument.WaterMasksNow())) {
+      mDocument.WaterMasksEdited(std::move(before));
+    }
+    message = std::string("The water's ") + WaterMaskName(kind) + ": " + std::to_string(changed) + " cells changed.";
+    return changed;
+  }
+
+  int EdMapScene::MirrorHalf()
+  {
+    const moho::CHeightField* const field = mMap != nullptr ? mMap->mTerrainRes->GetHeightField() : nullptr;
+    if (field == nullptr || mTools == nullptr || mMap->mProps == nullptr) {
+      return 0;
+    }
+    const HeightBrush brush = mTools->CurrentHeightBrush();
+    if (brush.symmetry == Symmetry::None) {
+      return 0;
+    }
+    // A place is in the first part when it is the first of its copies, ordered by z then x (one of each group).
+    const auto inFirst = [&](const float x, const float z) {
+      float cx[kMaxSymmetryCopies], cz[kMaxSymmetryCopies];
+      const int n = HeightBrushCentres(field->width, field->height, x, z, brush.symmetry, brush.turns, cx, cz);
+      for (int c = 1; c < n; ++c) {
+        if (cz[c] < z - 0.01f || (std::fabs(cz[c] - z) <= 0.01f && cx[c] < x - 0.01f)) {
+          return false;
+        }
+      }
+      return true;
+    };
+    // Props: those outside the first part go, those in it become the selection.
+    mSelection.clear();
+    std::vector<int> drop;
+    for (std::size_t i = 0; i < mMap->mProps->mEntries.size(); ++i) {
+      const moho::CWldPropEntry& entry = mMap->mProps->mEntries[i];
+      (inFirst(entry.mTransform.pos_.x, entry.mTransform.pos_.z) ? mSelection : drop).push_back(static_cast<int>(i));
+    }
+    const std::vector<int> keepProps = mSelection;
+    mSelection = drop;
+    const int droppedProps = static_cast<int>(drop.size());
+    if (!drop.empty()) {
+      DeleteSelection();
+    }
+    // The kept props' indices moved down by the ones removed before them.
+    mSelection.clear();
+    for (const int index : keepProps) {
+      const auto before = std::count_if(drop.begin(), drop.end(), [index](const int d) {
+        return d < index;
+      });
+      mSelection.push_back(index - static_cast<int>(before));
+    }
+    // Decals the same way.
+    mDecalSelection.clear();
+    std::vector<int> keepDecals;
+    if (moho::IDecalManager* const decals = mDocument.Decals(); decals != nullptr) {
+      for (std::int32_t i = 0; i < decals->GetDecalCount(); ++i) {
+        const moho::CWldTerrainDecal* const decal = decals->GetDecal(i);
+        if (decal == nullptr) {
+          continue;
+        }
+        float cx = 0.0f, cz = 0.0f;
+        DecalCentre(FootprintOf(*decal), cx, cz);
+        (inFirst(cx, cz) ? keepDecals : mDecalSelection).push_back(decal->mIndex);
+      }
+    }
+    const int droppedDecals = static_cast<int>(mDecalSelection.size());
+    if (!mDecalSelection.empty()) {
+      DeleteSelectedDecals();
+    }
+    mDecalSelection = keepDecals;
+    // Markers (not the starts: an army each).
+    mMarkerSelection.clear();
+    std::vector<std::string> keepMarkers;
+    for (const SaveEntry& marker : mDocument.SaveData().Markers()) {
+      float x = 0.0f, y = 0.0f, z = 0.0f;
+      if (MarkerTypeOf(marker) == "Blank Marker" || !ShownMarkerPosition(marker, x, y, z)) {
+        continue;
+      }
+      (inFirst(x, z) ? keepMarkers : mMarkerSelection).push_back(marker.name);
+    }
+    const int droppedMarkers = static_cast<int>(mMarkerSelection.size());
+    if (!mMarkerSelection.empty()) {
+      DeleteSelectedMarkers();
+    }
+    mMarkerSelection = keepMarkers;
+    mUnitSelection.clear();
+    const int made = MirrorSelection();
+    gpg::Logf(
+      "editor: mirror half: removed %d props, %d decals and %d markers outside the first part; %d copies made",
+      droppedProps,
+      droppedDecals,
+      droppedMarkers,
+      made
+    );
+    return made;
   }
 
   void EdMapScene::PlaceDecals(

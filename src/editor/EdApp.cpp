@@ -93,6 +93,7 @@
 #include "gpg/core/diagnostics/CrashReport.h"
 #include "gpg/core/utils/Global.h"
 #include "moho/app/UserWorkerPool.h"
+#include "editor/doc/EdLookMoods.h"
 #include "editor/ui/EdPopouts.h"
 #include "editor/ui/EdTipCheck.h"
 #include "editor/tools/EdMarkers.h"
@@ -2111,6 +2112,19 @@ namespace faf::editor
       {
         if (const auto cached = mLookCache.find(id); cached != mLookCache.end()) {
           look = cached->second;
+          return true;
+        }
+        if (id.rfind("mood:", 0) == 0) {
+          // A shipped mood or biome (doc/EdLookMoods): its light over the map's own look.
+          const LookMood* const mood = FindLookMood(id.substr(5));
+          if (mood == nullptr) {
+            error = "no look " + id;
+            return false;
+          }
+          look = LookOfEnvironment(mDocument.LookEnvironmentNow());
+          look.name = mood->name;
+          look.lighting = MoodLighting(*mood, look.lighting);
+          mLookCache[id] = look;
           return true;
         }
         if (id.rfind("mine:", 0) == 0) {
@@ -5953,6 +5967,13 @@ namespace faf::editor
         PostStatusMessage("Draw chain: each marker placed joins " + mShell->Tools().ChainName());
       }, mapOpen, {}, "The Markers tool with Draw chain on: each marker placed joins the chain named in the panel");
       // Map > Snap resource markers to grid (FAF Studio): every mass and hydrocarbon in its cell's middle.
+      add("edit.mirrorhalf", "Mirror half the map", "Edit", "", [this] {
+        const int made = mScene.MirrorHalf();
+        PostStatusMessage(
+          made > 0 ? "Mirror half: " + std::to_string(made) + " copies of the first part's objects"
+                   : "Mirror half: pick a symmetry on the toolbar first"
+        );
+      }, mapOpen, {}, "Props, decals and markers of the symmetry's first part copied over the rest (the rest removed)");
       add("map.snapresources", "Snap resource markers to grid", "Map", "", [this] {
         const std::vector<ResourceSnap> snaps = ResourceSnaps(mDocument.SaveData().Markers());
         for (const ResourceSnap& snap : snaps) {
@@ -6235,6 +6256,7 @@ namespace faf::editor
            cmd("edit.paste"),
            cmd("edit.duplicate"),
            cmd("edit.mirror"),
+           cmd("edit.mirrorhalf"),
            cmd("edit.delete"),
            sep(),
            cmd("edit.find"),
@@ -7918,6 +7940,20 @@ namespace faf::editor
           PostStatusMessage("The mask wasn't made: " + error);
           gpg::Warnf("editor: mask generator: %s", error.c_str());
         } else {
+          if (target.water >= 0) {
+            // Into one of the water's masks (FAF Studio's "Apply to water mask"), one undo step.
+            std::string message;
+            const int cells = mScene.WriteGeneratedWaterMask(
+              mask,
+              static_cast<WaterMask>(std::clamp(target.water, 0, 2)),
+              static_cast<int>(target.mode),
+              target.strength,
+              message
+            );
+            PostStatusMessage(message);
+            gpg::Logf("editor: mask generator: %s (%d cells)", message.c_str(), cells);
+            return;
+          }
           float before[8] = {};
           (void)mScene.MaskCoverage(before);
           std::string message;

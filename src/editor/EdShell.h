@@ -788,6 +788,8 @@ namespace faf::editor
     char mCubeName[64]{};
     char mCubePath[256]{};
     void DrawSkyEditor();
+    /** The strategic view's settings (FAF Studio's panel): contours, imager offset, the five height colours. */
+    void DrawStrategicView();
     void DrawCubes();
     bool mLightingImport = false;
     bool mLightingExport = false;

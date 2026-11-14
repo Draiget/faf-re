@@ -106,4 +106,29 @@ namespace faf::editor
     }
     return bands;
   }
+
+  int WriteIntoWaterMask(
+    std::uint8_t* const cells,
+    const int width,
+    const int height,
+    const std::function<float(float x, float z)>& sample,
+    const int mode,
+    const float strength
+  )
+  {
+    int changed = 0;
+    const float s = std::clamp(strength, 0.0f, 1.0f);
+    for (int j = 0; j < height; ++j) {
+      for (int i = 0; i < width; ++i) {
+        const float value = std::clamp(sample(2.0f * i + 1.0f, 2.0f * j + 1.0f), 0.0f, 1.0f) * 255.0f;
+        std::uint8_t& cell = cells[static_cast<std::size_t>(j) * static_cast<std::size_t>(width) + i];
+        const float now = cell;
+        const float next = mode == 1 ? now + value * s : mode == 2 ? now - value * s : now + (value - now) * s;
+        const auto written = static_cast<std::uint8_t>(std::lround(std::clamp(next, 0.0f, 255.0f)));
+        changed += written != cell ? 1 : 0;
+        cell = written;
+      }
+    }
+    return changed;
+  }
 } // namespace faf::editor

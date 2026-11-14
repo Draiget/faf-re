@@ -2113,6 +2113,10 @@ namespace faf::editor
             mBrowseSlot = slot;
             mBrowseOpen = true;
           }
+          // The design's LAYERS row: a texture made in the Material Editor for this layer (as the browser offers).
+          if (stratum && ImGui::MenuItem("Make a texture with nodes...")) {
+            mMaterialAsk = slot;
+          }
           if (stratum) {
             ImGui::Separator();
             if (ImGui::MenuItem("Move up", nullptr, false, slot < 8)) {
@@ -3301,11 +3305,21 @@ namespace faf::editor
     } else if (!mGenRules.empty()) {
       ImGui::TextDisabled("The mask covers %.1f %% of the map", static_cast<double>(mGenCoverage * 100.0f));
     }
-    // Where it goes.
+    // Where it goes: a layer, or one of the water's masks.
+    {
+      static const char* const kTargets[] = {"A layer", "Water foam", "Water flatness", "Water depth bias"};
+      int target = mGenTarget.water + 1;
+      ImGui::SetNextItemWidth(Em(160.0f));
+      if (EdCombo("Into", &target, kTargets, 4)) {
+        mGenTarget.water = target - 1;
+      }
+    }
+    ImGui::BeginDisabled(mGenTarget.water >= 0);
     ImGui::SetNextItemWidth(Em(120.0f));
     if (ImGui::InputInt("Layer", &mGenTarget.layer)) {
       mGenTarget.layer = std::clamp(mGenTarget.layer, 1, 8);
     }
+    ImGui::EndDisabled();
     static const char* const kModes[] = {"Replace", "Add to", "Subtract from"};
     int mode = static_cast<int>(mGenTarget.mode);
     ImGui::SetNextItemWidth(Em(120.0f));
@@ -3317,7 +3331,12 @@ namespace faf::editor
     ImGui::Checkbox("Only where the layers above leave it free", &mGenTarget.takeAway);
     ImGui::BeginDisabled(mGenRules.empty());
     char label[48];
-    std::snprintf(label, sizeof(label), "Write into layer %d", mGenTarget.layer);
+    static const char* const kWaterNames[] = {"water foam", "water flatness", "water depth bias"};
+    if (mGenTarget.water >= 0) {
+      std::snprintf(label, sizeof(label), "Write into the %s", kWaterNames[std::clamp(mGenTarget.water, 0, 2)]);
+    } else {
+      std::snprintf(label, sizeof(label), "Write into layer %d", mGenTarget.layer);
+    }
     if (ImGui::Button(label)) {
       mGenApply = true;
     }
@@ -4094,12 +4113,20 @@ namespace faf::editor
     if (!ImGui::BeginPopupModal(kTitle, nullptr)) {
       return;
     }
-    const int slot = std::clamp(mWaterTexturePick, 0, 5);
-    static const char* const kSlots[6] = {
-      "cube map", "colour ramp", "normals 1", "normals 2", "normals 3", "normals 4"
+    const int slot = std::clamp(mWaterTexturePick, 0, 8);
+    static const char* const kSlots[9] = {
+      "cube map",
+      "colour ramp",
+      "normals 1",
+      "normals 2",
+      "normals 3",
+      "normals 4",
+      "sky: planets' atlas",
+      "sky: planets' glow atlas",
+      "sky: cirrus"
     };
-    // What fits the slot by name: cube maps, ramps, wave normal maps (the search shows the rest).
-    static const char* const kHints[6] = {"cube", "ramp", "wave", "wave", "wave", "wave"};
+    // What fits the slot by name: cube maps, ramps, wave normal maps, sky textures (the search shows the rest).
+    static const char* const kHints[9] = {"cube", "ramp", "wave", "wave", "wave", "wave", "sky", "glow", "cirrus"};
     ImGui::Text("The %s", kSlots[slot]);
     ImGui::SameLine();
     ImGui::SetNextItemWidth(Em(240.0f));
@@ -4143,7 +4170,11 @@ namespace faf::editor
         if (ImGui::IsItemHovered()) {
           EdSetTooltip("%s", path.c_str());
         }
-        if (picked) {
+        if (picked && slot >= 6) {
+          mSkyPickWhich = slot - 6;
+          mSkyPickPath = path;
+          ImGui::CloseCurrentPopup();
+        } else if (picked) {
           mWater.textures[slot] = path;
           mWaterChanged = true;
           mWaterFinal = true; // one undo step
@@ -4329,6 +4360,11 @@ namespace faf::editor
         ImGui::BeginDisabled(!hasPair);
         ImGui::Checkbox("With its spec map", &mDecalWithPair);
         ImGui::EndDisabled();
+        ImGui::Checkbox("And its normals decal", &mDecalWithNormals);
+        EdSetItemTooltip(
+          "An _albedo decal brings its _normals texture as a second decal at the same place (FAF Studio's way); "
+          "both are selected together"
+        );
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled | ImGuiHoveredFlags_DelayShort)) {
           EdSetTooltip(
             hasPair ? "The decal's second texture is its _spec map, as the game's maps keep albedo decals"

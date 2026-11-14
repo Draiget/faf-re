@@ -259,4 +259,33 @@ namespace faf::editor
     }
     return out;
   }
+
+  std::vector<DecalPlace> DecalCopyPlaces(
+    const int width,
+    const int height,
+    const float x,
+    const float z,
+    const float heading,
+    const Symmetry symmetry,
+    const int turns
+  )
+  {
+    float centreX[kMaxSymmetryCopies], centreZ[kMaxSymmetryCopies], aheadX[kMaxSymmetryCopies],
+      aheadZ[kMaxSymmetryCopies];
+    const int copies = HeightBrushCentres(width, height, x, z, symmetry, turns, centreX, centreZ);
+    (void)HeightBrushCentres(
+      width, height, x + std::cos(heading), z + std::sin(heading), symmetry, turns, aheadX, aheadZ
+    );
+    std::vector<DecalPlace> out;
+    for (int c = 0; c < copies; ++c) {
+      if (
+        centreX[c] < 0.0f || centreZ[c] < 0.0f || centreX[c] > static_cast<float>(width - 1) ||
+        centreZ[c] > static_cast<float>(height - 1)
+      ) {
+        continue;
+      }
+      out.push_back(DecalPlace{centreX[c], centreZ[c], std::atan2(aheadZ[c] - centreZ[c], aheadX[c] - centreX[c])});
+    }
+    return out;
+  }
 } // namespace faf::editor

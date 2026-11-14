@@ -1,5 +1,6 @@
 #pragma once
 
+#include "editor/tools/EdHeightBrush.h"
 #include <string>
 #include <utility>
 #include <vector>
@@ -24,6 +25,20 @@ namespace faf::editor
 
   /** Its middle. */
   void DecalCentre(const DecalFootprint& decal, float& cx, float& cz);
+
+  /** Where a decal placed at (x, z) with `heading` and each symmetric copy go: their middles and headings. */
+  struct DecalPlace
+  {
+    float x = 0.0f;
+    float z = 0.0f;
+    float heading = 0.0f;
+  };
+  /**
+   * The copies of a decal's middle under the symmetry (the brush's centres) and each one's heading (the copies of a
+   * point one unit ahead), the original first; copies off the map left out. The middle is mirrored, never the corner.
+   */
+  [[nodiscard]] std::vector<DecalPlace>
+  DecalCopyPlaces(int width, int height, float x, float z, float heading, Symmetry symmetry, int turns);
 
   /** Its four corners in order, as CWldTerrainDecal::ComputeCorner (0x0089D9C0) gives (0,0), (1,0), (1,1), (0,1). */
   void DecalCorners(const DecalFootprint& decal, float (&x)[4], float (&z)[4]);

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 #include <vector>
 
 namespace faf::editor
@@ -53,4 +54,18 @@ namespace faf::editor
    */
   [[nodiscard]] std::vector<std::uint8_t>
   WaterMaskBands(const std::uint8_t* cells, int width, int height, WaterMask mask);
+
+  /**
+   * A generated mask (0..1 by `sample(x, z)` in map units) written into a water mask (FAF Studio's "Apply to water
+   * mask"): `mode` 0 replaces (each cell moves to value x 255 by `strength`), 1 adds value x 255 x strength, 2 takes it
+   * away. Each cell is sampled at its middle (2i + 1, 2j + 1). Returns how many cells changed.
+   */
+  int WriteIntoWaterMask(
+    std::uint8_t* cells,
+    int width,
+    int height,
+    const std::function<float(float x, float z)>& sample,
+    int mode,
+    float strength
+  );
 } // namespace faf::editor

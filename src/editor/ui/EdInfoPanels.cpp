@@ -1,5 +1,7 @@
 // The Info panel (what the open map is) and the Markers panel (its markers as a tree), EdShell's right-hand panels.
 
+#include "editor/tools/EdShaderProfiles.h"
+#include "editor/doc/EdLookMoods.h"
 #include "editor/doc/EdScenarioInfo.h"
 #include "editor/EdShell.h"
 #include "editor/ui/EdControls.h"
@@ -1931,13 +1933,34 @@ namespace faf::editor
     watch(ColourField("##cirruscolour", mSky.cirrusColor, true));
     ImGui::SetNextItemWidth(-1.0f);
     watch(FillDragFloat("##cirrusmultiplier", &mSky.cirrusMultiplier, 0.01f, 0.0f, 10.0f, "Strength %.2f"));
-    char texture[256];
-    (void)std::snprintf(texture, sizeof(texture), "%s", mSky.cirrusTexture.c_str());
-    ImGui::SetNextItemWidth(-1.0f);
-    if (ImGui::InputTextWithHint("##cirrustexture", "cirrus texture", texture, sizeof(texture))) {
-      mSky.cirrusTexture = texture;
+    // The sky's textures, typed or picked (FAF Studio's picker per slot): the planets' atlas and glow, cirrus.
+    {
+      std::string* const slots[3] = {&mSky.albedo, &mSky.glow, &mSky.cirrusTexture};
+      static const char* const kHints[3] = {"planets' atlas texture", "planets' glow atlas", "cirrus texture"};
+      for (int t = 0; t < 3; ++t) {
+        ImGui::PushID(100 + t);
+        char texture[256];
+        (void)std::snprintf(texture, sizeof(texture), "%s", slots[t]->c_str());
+        ImGui::SetNextItemWidth(-Em(70.0f));
+        if (ImGui::InputTextWithHint("##skytexture", kHints[t], texture, sizeof(texture))) {
+          *slots[t] = texture;
+        }
+        watch(ImGui::IsItemDeactivatedAfterEdit());
+        ImGui::SameLine();
+        if (ImGui::Button("Browse...")) {
+          mTools.OpenSkyTexturePick(t);
+        }
+        ImGui::PopID();
+      }
+      mTools.DrawTexturePickerPopup();
+      int which = -1;
+      std::string picked;
+      if (mTools.TakeSkyTexturePick(which, picked)) {
+        *slots[std::clamp(which, 0, 2)] = picked;
+        changed = true;
+        finished = true;
+      }
     }
-    watch(ImGui::IsItemDeactivatedAfterEdit());
     for (int i = 0; i < 4; ++i) {
       ImGui::PushID(i);
       SkyboxCirrusLayer& layer = mSky.cirrus[i];
@@ -1952,6 +1975,29 @@ namespace faf::editor
       ImGui::PopID();
     }
     ImGui::SeparatorText("Planets");
+    // Add one where the sun is (FAF Studio's "Add (at the sun)"), or a copy of the last.
+    if (ImGui::SmallButton("Add at the sun")) {
+      const LightingState light = mDocument.LightingNow();
+      SkyboxPlanet planet;
+      const float distance = std::max(100.0f, mSky.scale * 0.9f);
+      for (int c = 0; c < 3; ++c) {
+        planet.position[c] = light.sunDirection[c] * distance;
+      }
+      planet.scale[0] = planet.scale[1] = distance * 0.08f;
+      mSky.planets.push_back(planet);
+      changed = true;
+      finished = true;
+    }
+    ImGui::SameLine();
+    ImGui::BeginDisabled(mSky.planets.empty() || mSky.planets.size() >= 1024);
+    if (ImGui::SmallButton("Duplicate the last")) {
+      SkyboxPlanet copy = mSky.planets.back();
+      copy.position[0] += 10.0f;
+      mSky.planets.push_back(copy);
+      changed = true;
+      finished = true;
+    }
+    ImGui::EndDisabled();
     int remove = -1;
     for (std::size_t i = 0; i < mSky.planets.size(); ++i) {
       ImGui::PushID(static_cast<int>(i));
@@ -1968,6 +2014,33 @@ namespace faf::editor
       watch(FillDragFloat("##rotation", &planet.rotation, 0.01f, -10.0f, 10.0f, "Turn %.2f"));
       ImGui::SetNextItemWidth(-1.0f);
       watch(ImGui::DragFloat2("##scale", planet.scale, 0.1f, 0.0f, 2000.0f, "size %.1f"));
+      // Where it is as angles and a distance, and its cell of the atlas.
+      {
+        const float distance = std::sqrt(
+          planet.position[0] * planet.position[0] + planet.position[1] * planet.position[1] +
+          planet.position[2] * planet.position[2]
+        );
+        float angles[2] = {};
+        const float direction[3] = {planet.position[0], planet.position[1], planet.position[2]};
+        SunAnglesOf(direction, angles[0], angles[1]);
+        float reach = distance;
+        ImGui::SetNextItemWidth(-1.0f);
+        const bool turned = ImGui::DragFloat2("##angles", angles, 0.2f, -180.0f, 180.0f, "%.1f deg");
+        EdSetItemTooltip("Azimuth and elevation, as the sun's");
+        ImGui::SetNextItemWidth(-1.0f);
+        const bool moved = FillDragFloat("##distance", &reach, 1.0f, 1.0f, 10000.0f, "Distance %.0f");
+        if (turned || moved) {
+          float unit[3];
+          SunDirectionOf(angles[0], std::clamp(angles[1], -89.9f, 89.9f), unit);
+          for (int c = 0; c < 3; ++c) {
+            planet.position[c] = unit[c] * reach;
+          }
+        }
+        watch(turned || moved);
+        ImGui::SetNextItemWidth(-1.0f);
+        watch(ImGui::DragFloat4("##uv", planet.uv, 0.005f, 0.0f, 1.0f, "%.3f"));
+        EdSetItemTooltip("Its cell of the atlas: u0, v0, u1, v1");
+      }
       ImGui::PopID();
     }
     if (remove >= 0) {
@@ -2171,6 +2244,29 @@ namespace faf::editor
     if (
       ImGui::BeginChild("##looks", ImVec2(0.0f, ImGui::GetTextLineHeightWithSpacing() * 9.0f), ImGuiChildFlags_Borders)
     ) {
+      // The shipped moods and biomes (FAF Studio's library), their thumbnails their colours: sky, sun, shade.
+      for (const LookMood& mood : LookMoods()) {
+        std::string key = std::string(mood.name) + " " + mood.group;
+        for (char& c : key) {
+          c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+        }
+        if (!filter.empty() && key.find(filter) == std::string::npos) {
+          continue;
+        }
+        const std::string id = std::string("mood:") + mood.id;
+        if (mLookSwatches.find(id) == mLookSwatches.end()) {
+          LookSwatch swatch;
+          for (int c = 0; c < 3; ++c) {
+            swatch.colours[0][c] = mood.fog[c];
+            swatch.colours[1][c] = mood.fog[c] * 0.75f;
+            swatch.colours[2][c] =
+              mood.sun[c] / std::max(1.0f, std::max(mood.sun[0], std::max(mood.sun[1], mood.sun[2])));
+            swatch.colours[3][c] = std::min(1.0f, mood.ambience[c] * 2.0f);
+          }
+          mLookSwatches[id] = swatch;
+        }
+        row(id, mood.name, mood.group);
+      }
       for (const std::string& name : mMyLooks) {
         std::string key = name;
         for (char& c : key) {
@@ -2310,14 +2406,26 @@ namespace faf::editor
       watch(ColourField("##shadow", mLighting.shadowFill, true));
     }
     if (Section("Specular", false)) {
-      float colour[3] = {mLighting.specular[0], mLighting.specular[1], mLighting.specular[2]};
-      RowLabel("Colour");
-      const bool tinted = ColourField("##specular", colour, true);
-      watch(tinted);
-      if (tinted) {
-        mLighting.specular[0] = colour[0];
-        mLighting.specular[1] = colour[1];
-        mLighting.specular[2] = colour[2];
+      // What the map's shader reads from these numbers: Terrain2xx's splatting takes them as its settings (FAF
+      // Studio shows them so), the others as the specular colour.
+      if (ShaderProfileOf(mTools.ShaderNow()).family == ShaderFamily::Splat) {
+        ImGui::TextDisabled("%s reads these as its splat settings:", mTools.ShaderNow().c_str());
+        static const char* const kSplat[3] = {"Softness %.3f", "Height contrast %.3f", "Rotation %.3f"};
+        static const char* const kIds[3] = {"##splatsoft", "##splatcontrast", "##splatturn"};
+        for (int c = 0; c < 3; ++c) {
+          ImGui::SetNextItemWidth(-1.0f);
+          watch(FillDragFloat(kIds[c], &mLighting.specular[c], 0.005f, 0.0f, 4.0f, kSplat[c]));
+        }
+      } else {
+        float colour[3] = {mLighting.specular[0], mLighting.specular[1], mLighting.specular[2]};
+        RowLabel("Colour");
+        const bool tinted = ColourField("##specular", colour, true);
+        watch(tinted);
+        if (tinted) {
+          mLighting.specular[0] = colour[0];
+          mLighting.specular[1] = colour[1];
+          mLighting.specular[2] = colour[2];
+        }
       }
       ImGui::SetNextItemWidth(-1.0f);
       watch(FillDragFloat("##specularpower", &mLighting.specular[3], 0.01f, 0.0f, 10.0f, "Power %.2f"));
@@ -2384,6 +2492,7 @@ namespace faf::editor
       HelpNote("FAForeverMapEditor's lighting settings file: the sun, ambience, shadow, specular, bloom and fog.");
     }
     DrawSkyEditor();
+    DrawStrategicView();
     if (ImGui::Button("Import .scmskybox...")) {
       mSkyboxImport = true;
     }
@@ -2397,5 +2506,45 @@ namespace faf::editor
     );
     DrawCubes();
     ImGui::End();
+  }
+
+  void EdShell::DrawStrategicView()
+  {
+    moho::CWldMap* const map = mDocument.Map();
+    if (map == nullptr || map->mTerrainRes == nullptr || !Section("Strategic view", false)) {
+      return;
+    }
+    // The zoomed-out map's look (the engine's cartographic settings on the terrain). The map file doesn't keep them:
+    // the game sets them, so these show how the strategic view looks with other numbers, for this session.
+    moho::IWldTerrainRes& terrain = *map->mTerrainRes;
+    int samples = terrain.GetTopographicSamples();
+    ImGui::SetNextItemWidth(-1.0f);
+    if (ImGui::SliderInt("##contours", &samples, 2, 64, "Contour lines %d")) {
+      terrain.SetTopographicSamples(samples);
+    }
+    float offset = terrain.GetImagerElevationOffset();
+    ImGui::SetNextItemWidth(-1.0f);
+    if (FillDragFloat("##imageroffset", &offset, 0.1f, -200.0f, 200.0f, "Imager offset %.1f")) {
+      terrain.SetImagerElevationOffset(offset);
+    }
+    static const char* const kNames[5] = {"Deep water", "Water", "Shallows", "Low ground", "Peaks"};
+    for (int i = 0; i < 5; ++i) {
+      const std::uint32_t argb = terrain.GetHypsometricColor(i);
+      float rgb[3] = {
+        static_cast<float>((argb >> 16) & 0xFFu) / 255.0f,
+        static_cast<float>((argb >> 8) & 0xFFu) / 255.0f,
+        static_cast<float>(argb & 0xFFu) / 255.0f
+      };
+      ImGui::PushID(i);
+      RowLabel(kNames[i]);
+      if (ColourField("##hypso", rgb)) {
+        const auto byte = [](const float v) {
+          return static_cast<std::uint32_t>(std::lround(std::clamp(v, 0.0f, 1.0f) * 255.0f));
+        };
+        terrain.SetHypsometricColor(i, 0xFF000000u | (byte(rgb[0]) << 16) | (byte(rgb[1]) << 8) | byte(rgb[2]));
+      }
+      ImGui::PopID();
+    }
+    HelpNote("Not kept in the map file: the game sets the strategic view's colours itself.");
   }
 } // namespace faf::editor

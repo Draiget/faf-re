@@ -756,6 +756,55 @@ namespace faf::editor
     {
       return mDecalTexture;
     }
+    /** The albedo's normals texture, placed as a decal of its own at the same place (FAF Studio), or "". */
+    [[nodiscard]] std::string DecalNormalsPath() const
+    {
+      if (!mDecalWithNormals) {
+        return {};
+      }
+      const std::size_t at = mDecalTexture.rfind("_albedo");
+      if (at == std::string::npos) {
+        return {};
+      }
+      std::string normals = mDecalTexture;
+      normals.replace(at, 7, "_normals");
+      for (const DecalTexture& texture : mDecalTextures) {
+        if (texture.path == normals) {
+          return normals;
+        }
+      }
+      return {};
+    }
+    /** The terrain shader the Layers panel shows (the map's). */
+    [[nodiscard]] const std::string& ShaderNow() const noexcept
+    {
+      return mShader;
+    }
+    /** The sky's textures through the texture picker: 0 the planets' atlas, 1 their glow atlas, 2 cirrus. */
+    void OpenSkyTexturePick(
+      const int which
+    ) noexcept
+    {
+      mWaterTexturePick = 6 + which;
+      mWaterTexturePickOpen = true;
+    }
+    [[nodiscard]] bool TakeSkyTexturePick(
+      int& which,
+      std::string& path
+    )
+    {
+      if (mSkyPickWhich < 0) {
+        return false;
+      }
+      which = std::exchange(mSkyPickWhich, -1);
+      path = std::move(mSkyPickPath);
+      return true;
+    }
+    /** The texture picker's popup, for panels other than Water that open it (the sky's). */
+    void DrawTexturePickerPopup()
+    {
+      DrawWaterTexturePicker();
+    }
     /** The albedo's spec map, the decal's second texture, or "" when it has none or the option is off. */
     [[nodiscard]] std::string DecalPairPath() const
     {
@@ -2296,6 +2345,8 @@ namespace faf::editor
       MaskWriteMode mode = MaskWriteMode::Replace;
       float strength = 1.0f;
       bool takeAway = false; // only where the layers above leave the ground free
+      /** -1: the layer; 0, 1, 2: the water's foam, flatness or depth bias (FAF Studio's "Apply to water mask"). */
+      int water = -1;
     };
     [[nodiscard]] const std::vector<MaskGenRule>& GenRules() const noexcept
     {
@@ -3232,6 +3283,9 @@ namespace faf::editor
     float mDecalTurn = 0.0f;
     bool mDecalRandomTurn = false;
     bool mDecalWithPair = true;
+    bool mDecalWithNormals = false;
+    int mSkyPickWhich = -1;
+    std::string mSkyPickPath;
     float mDecalOverlap = 0.1f;
     DecalBrush mDecalBrush;
     float mDecalSizeVariation = 0.0f;

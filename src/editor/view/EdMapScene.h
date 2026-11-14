@@ -1185,6 +1185,14 @@ namespace faf::editor
      */
     int MirrorSelection();
     /**
+     * Edit > Mirror half the map (FAF Studio's mirrorhalf): the props, decals and markers (starts aside) outside the
+     * symmetry's first part removed, and the first part's copied over the rest as the symmetry maps it.
+     */
+    int MirrorHalf();
+    /** The mask generator's result written into one of the water's masks, one undo step; cells changed. */
+    int
+    WriteGeneratedWaterMask(const field::Grid& mask, WaterMask kind, int mode, float strength, std::string& message);
+    /**
      * `/pathtest <carve|raise|level|ramp|river>,x0,z0,x1,z1[,...]` (test runs): a path through those points (their
      * ground heights) applied as the Path brush's Apply does, as wide as the brush; what it did, for the log.
      */
