@@ -17,6 +17,7 @@
 #include "editor/ui/EdMapBrowser.h"
 #include "editor/ui/EdGenerate.h"
 #include "editor/ui/EdLayoutPanel.h"
+#include "editor/ui/EdMissionPanel.h"
 #include "editor/ui/EdMaterialEditor.h"
 #include "editor/ui/EdParticleEditor.h"
 #include "imgui.h"
@@ -154,6 +155,11 @@ namespace faf::editor
     void ShowLayout() noexcept
     {
       mShowLayoutLayers = mShowLayoutCanvas = mShowLayoutStarts = true;
+    }
+    /** Shows the Mission workspace's Stages and Strings. */
+    void ShowMission() noexcept
+    {
+      mShowMissionStages = mShowMissionStrings = true;
     }
     [[nodiscard]] bool LayoutShown() const noexcept
     {
@@ -474,6 +480,8 @@ namespace faf::editor
     bool mShowLayoutLayers = false;
     bool mShowLayoutCanvas = false;
     bool mShowLayoutStarts = false;
+    bool mShowMissionStages = false;
+    bool mShowMissionStrings = false;
     bool mDebugWasPaused = false;
     char mWatchInput[160] = {};
     std::vector<std::string> mWatches;
@@ -728,6 +736,7 @@ namespace faf::editor
     EdParticleEditor mParticleEditor;
     EdGenerate mGenerate;
     EdLayoutPanel mLayoutPanel{mDocument};
+    EdMissionPanel mMissionPanel{mDocument};
     ImVec4 mGameView{0.0f, 0.0f, 0.0f, 0.0f};
     /** The document path the Info tab was last brought to the front for. */
     std::string mInfoShownFor;

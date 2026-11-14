@@ -17,6 +17,7 @@
 #include "editor/doc/EdWater.h"
 #include "editor/doc/EdWaterBodies.h"
 #include "editor/tools/EdMapLayout.h"
+#include "editor/tools/EdMission.h"
 #include "editor/tools/EdChecks.h"
 #include "editor/tools/EdDecals.h"
 #include "editor/tools/EdSymmetryCheck.h"
@@ -305,6 +306,8 @@ namespace faf::editor
       GraphBuild,
       /** The map layout's drawing (a stroke, a layer added or removed, a template, its settings). */
       Layout,
+      /** The mission (stages, nodes, dialogues). */
+      Mission,
     };
     /** The water's three masks, a byte for every 2 x 2 units (the map's size halved). */
     struct WaterMaskSnapshot
@@ -429,6 +432,26 @@ namespace faf::editor
     bool UndoLayout(bool redo);
     /** The layout file of the map (empty for a map without a file of its own). */
     [[nodiscard]] std::filesystem::path LayoutFile() const;
+    /**
+     * The mission (the Mission workspace's stages and dialogues): kept beside the map in `<map>_mission.editor`, read
+     * when the map opens; Save compiles it into the script's generated region, a play copy gets the test run's.
+     */
+    [[nodiscard]] const faf::editor::Mission& MissionNow() const noexcept
+    {
+      return mMission;
+    }
+    [[nodiscard]] faf::editor::Mission& EditMission() noexcept
+    {
+      return mMission;
+    }
+    /** A change to the mission as one undo step: `before` is how it was. */
+    void MissionEdited(faf::editor::Mission before);
+    bool UndoMission(bool redo);
+    [[nodiscard]] std::filesystem::path MissionFile() const;
+    /** Whether Lua text compiles in the document's Lua (the mission compiler's checks). */
+    [[nodiscard]] LuaCompiles MissionCompiler() const;
+    /** The script with the mission's region (`test`: the test run's flavour); `status` says what happened. */
+    [[nodiscard]] std::string ScriptWithMission(bool test, MissionPatch& status) const;
     /** The playable area as world units (x0, z0, x1, z1): the whole map without one. */
     void LayoutArea(float& x0, float& z0, float& x1, float& z1) const;
     /** Counts each change to the grid, for the overlay. */
@@ -810,6 +833,8 @@ namespace faf::editor
         return "terrain graph build";
       case EditKind::Layout:
         return "layout drawing";
+      case EditKind::Mission:
+        return "mission";
       }
       return "edit";
     }
@@ -920,6 +945,12 @@ namespace faf::editor
       std::shared_ptr<MapLayout> before; // set: the whole drawing swapped
       std::shared_ptr<MapLayout> after;
     };
+    faf::editor::Mission mMission;
+    std::string mMissionRead; // the mission file's text as read or last saved
+    std::vector<std::pair<faf::editor::Mission, faf::editor::Mission>> mMissionUndo;
+    std::vector<std::pair<faf::editor::Mission, faf::editor::Mission>> mMissionRedo;
+    bool mCopyTestMission = false; // WriteFolderCopy writes the test run's mission (a play copy)
+    void LoadMissionFile();
     std::vector<LayoutEdit> mLayoutUndo;
     std::vector<LayoutEdit> mLayoutRedo;
     void LoadLayout();

@@ -1837,6 +1837,7 @@ namespace faf::editor
       : kind == EdDocument::EditKind::HeightsAndMasks     ? UndoHeightsAndMasks(false)
       : kind == EdDocument::EditKind::GraphBuild          ? UndoGraphBuild(false)
       : kind == EdDocument::EditKind::Layout              ? mDocument.UndoLayout(false)
+      : kind == EdDocument::EditKind::Mission             ? mDocument.UndoMission(false)
                                                           : UndoHeights(false);
     if (done) {
       mDocument.PushRedo(kind);
@@ -1866,6 +1867,7 @@ namespace faf::editor
       : kind == EdDocument::EditKind::HeightsAndMasks     ? UndoHeightsAndMasks(true)
       : kind == EdDocument::EditKind::GraphBuild          ? UndoGraphBuild(true)
       : kind == EdDocument::EditKind::Layout              ? mDocument.UndoLayout(true)
+      : kind == EdDocument::EditKind::Mission             ? mDocument.UndoMission(true)
                                                           : UndoHeights(true);
     if (done) {
       mDocument.PushUndo(kind);

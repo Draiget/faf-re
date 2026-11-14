@@ -160,7 +160,7 @@ namespace faf::editor
         "/nowaterhires",   "/camat",          "/erosiontest",    "/sctest",          "/symmenu",     "/panelbottom",
         "/shader",         "/brushtest",      "/brushshape",     "/stampsource",     "/stampstroke", "/symoptions",
         "/maskoptions",    "/masktest",       "/shaderbrowser",  "/convertlayers",   "/interoptest", "/gentest",
-        "/layouttest",     "/playcopytest",
+        "/layouttest",     "/playcopytest",   "/missiontest",
       };
       for (const char* const option : kOptions) {
         if (moho::CFG_GetArgOption(option, 0, nullptr)) {
@@ -2211,6 +2211,92 @@ namespace faf::editor
         }
         mPlayCopyWasActive = active;
       }
+      /**
+       * `/missiontest` (test runs): a two-stage mission (a line, a wait, the next stage's line) made in the Mission
+       * workspace, checked, compiled into the script (it must load), then played from the play copy: its traces
+       * (EDMISSION) come back in the log; then Stop, undo.
+       */
+      void TestMission()
+      {
+        if (
+          mMissionTestStage >= 7 || (mMissionTestStage < 3 && (mScene.ModelsPending() || !mScene.Attached())) ||
+          !moho::CFG_GetArgOption("/missiontest", 0, nullptr) || ++mMissionTestFrames % 120 != 0
+        ) {
+          return;
+        }
+        gpg::Logf(
+          "editor: mission test stage %d: %zu stages, play %s, %zu undo steps; undo: %s",
+          mMissionTestStage,
+          mDocument.MissionNow().stages.size(),
+          mPlay.Active() ? "on" : "off",
+          mDocument.UndoOrder().size(),
+          mDocument.UndoStepName() != nullptr ? mDocument.UndoStepName() : "-"
+        );
+        switch (mMissionTestStage) {
+        case 0: {
+          mShell->SwitchWorkspace(5);
+          mShell->HideHome();
+          mShell->ShowMission();
+          Mission before = mDocument.MissionNow();
+          Mission& m = mDocument.EditMission();
+          m = Mission{};
+          MissionStage one;
+          one.name = "Start";
+          MissionNode text = NewMissionNode("dialogue");
+          text.p["text"] = "Mission test: stage one";
+          one.enter.push_back(text);
+          MissionNode wait = NewMissionNode("wait");
+          wait.p["seconds"] = "2";
+          one.enter.push_back(wait);
+          MissionStage two;
+          two.name = "Next";
+          MissionNode second = NewMissionNode("dialogue");
+          second.p["text"] = "Mission test: stage two";
+          two.enter.push_back(second);
+          m.stages = {one, two};
+          mDocument.MissionEdited(std::move(before));
+          break;
+        }
+        case 1: {
+          mShell->RequestCheck();
+          MissionPatch patch = MissionPatch::None;
+          const std::string script = mDocument.ScriptWithMission(false, patch);
+          const CheckIssue compiled = mDocument.CheckLuaText(script, "_script.lua");
+          gpg::Logf(
+            "editor: mission test: the script with the mission: %s, %zu bytes, %s",
+            patch == MissionPatch::Written      ? "written"
+              : patch == MissionPatch::Detached ? "detached"
+                                                : "none",
+            script.size(),
+            compiled.text.empty() ? "it compiles" : ("does not compile: " + compiled.text).c_str()
+          );
+          break;
+        }
+        case 2: {
+          const std::vector<std::string>& maps = mPlay.Maps();
+          const auto at = std::find_if(maps.begin(), maps.end(), [&](const std::string& p) {
+            return LowerPath(p) == LowerPath(mDocument.Path());
+          });
+          if (at != maps.end()) {
+            mPlay.Select(static_cast<int>(at - maps.begin()));
+            mPlay.Play();
+          }
+          break;
+        }
+        case 5:
+          mPlay.Stop();
+          break;
+        case 6:
+          gpg::Logf("editor: mission test: undo %s", mScene.Undo() ? "took a step back" : "had nothing");
+          break;
+        default:
+          break;
+        }
+        ++mMissionTestStage;
+      }
+      int mMissionTestStage = 0;
+      int mMissionTestFrames = 0;
+
       bool mPlayCopyWired = false;
       bool mPlayCopyWasActive = false;
       std::set<std::string> mPlayCopyMounted;
@@ -7985,6 +8071,7 @@ namespace faf::editor
       TestLayout();
       DrivePlayCopy();
       TestPlayCopy();
+      TestMission();
       // `/sctest` (test runs): the SC tools window's buttons in turn, a second apart, the heights' checksum each time.
       if (
         mScTestStage < 8 && moho::CFG_GetArgOption("/sctest", 0, nullptr) && !mScene.ModelsPending() &&

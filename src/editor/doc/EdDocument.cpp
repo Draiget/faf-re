@@ -1846,6 +1846,7 @@ namespace faf::editor
     mTerrainTypesRedo.clear();
     mBuildRedo.clear();
     mLayoutRedo.clear();
+    mMissionRedo.clear();
   }
 
   bool EdDocument::PopUndo(
@@ -1956,6 +1957,7 @@ namespace faf::editor
         mHeights.Reset(field->width, field->height);
       }
       LoadLayout();
+      LoadMissionFile();
       gpg::Logf(
         "editor: opened %s in %.2f s: %d x %d, %zu layers named, %d props, %d decals, %d markers, %zu armies%s%s",
         mPath.c_str(),
@@ -2184,6 +2186,9 @@ namespace faf::editor
       std::string bytes;
       if (Lower(source) == Lower(mFacts.savePath) && mSave.Loaded() && mSave.Changed()) {
         bytes = mSave.Text(); // the edited markers and areas
+      } else if (Lower(source) == Lower(mFacts.scriptPath) && !mMission.Empty()) {
+        MissionPatch patch = MissionPatch::None;
+        bytes = ScriptWithMission(mCopyTestMission, patch); // the script with the mission compiled into it
       } else if (Lower(source) == Lower(mFacts.scriptPath) && mScript != mScriptRead) {
         bytes = mScript; // the edited script (its playable area)
       } else if (Lower(source) == Lower(mFacts.tablesPath) && !mTables.empty()) {
@@ -2255,7 +2260,10 @@ namespace faf::editor
     RemovePlayCopy(folder);
     std::filesystem::path newMapFile;
     int copied = 0;
-    if (!WriteFolderCopy(folder, newMapFile, copied, message)) {
+    mCopyTestMission = true;
+    const bool written = WriteFolderCopy(folder, newMapFile, copied, message);
+    mCopyTestMission = false;
+    if (!written) {
       return false;
     }
     mPlayCopy = folder;
@@ -2482,9 +2490,30 @@ namespace faf::editor
       message = "Saving " + file.string() + " failed: " + failure;
       return false;
     }
+    if (!mMission.Empty()) {
+      MissionPatch patch = MissionPatch::None;
+      const std::string patched = ScriptWithMission(false, patch);
+      if (patch == MissionPatch::Written) {
+        mScript = patched;
+      } else if (patch == MissionPatch::Detached) {
+        gpg::Warnf(
+          "editor: the script's mission region was edited by hand: left alone (delete it to generate it again)"
+        );
+      }
+    }
     if (!WriteLuaFiles(file.parent_path(), failure)) {
       message = "Saved " + file.string() + ", but " + failure;
       return false;
+    }
+    if (const std::string mission = SaveMission(mMission); mission != mMissionRead && !MissionFile().empty()) {
+      std::ofstream out(MissionFile(), std::ios::binary | std::ios::trunc);
+      out.write(mission.data(), static_cast<std::streamsize>(mission.size()));
+      if (!out) {
+        message =
+          "Saved " + file.string() + ", but the mission file " + MissionFile().string() + " couldn't be written";
+        return false;
+      }
+      mMissionRead = mission;
     }
     // The layout's drawing beside the map (only when it changed; an emptied drawing empties the file).
     if (const std::string layout = mLayout.Save(); layout != mLayoutRead && !LayoutFile().empty()) {
@@ -2662,5 +2691,91 @@ namespace faf::editor
     }
     mLayoutRead = text;
     gpg::Logf("editor: layout read from %s: %zu layers", file.string().c_str(), mLayout.Layers().size());
+  }
+  void EdDocument::MissionEdited(
+    Mission before
+  )
+  {
+    mMissionUndo.emplace_back(std::move(before), mMission);
+    if (mMissionUndo.size() > 200) {
+      mMissionUndo.erase(mMissionUndo.begin());
+    }
+    EditEnded(EditKind::Mission);
+    mModified = true;
+  }
+
+  bool EdDocument::UndoMission(
+    const bool redo
+  )
+  {
+    auto& from = redo ? mMissionRedo : mMissionUndo;
+    auto& to = redo ? mMissionUndo : mMissionRedo;
+    if (from.empty()) {
+      return false;
+    }
+    auto step = std::move(from.back());
+    from.pop_back();
+    mMission = redo ? step.second : step.first;
+    to.push_back(std::move(step));
+    mModified = true;
+    return true;
+  }
+
+  std::filesystem::path EdDocument::MissionFile() const
+  {
+    const std::filesystem::path map = MapDiskFile();
+    if (map.empty()) {
+      return {};
+    }
+    return map.parent_path() / (map.stem().string() + "_mission.editor");
+  }
+
+  LuaCompiles EdDocument::MissionCompiler() const
+  {
+    return [this](const std::string& code, std::string& error) {
+      const CheckIssue issue = CheckLuaText(code, "mission");
+      if (issue.text.empty()) {
+        return true;
+      }
+      error = issue.text;
+      return false;
+    };
+  }
+
+  std::string EdDocument::ScriptWithMission(
+    const bool test,
+    MissionPatch& status
+  ) const
+  {
+    MissionCompileOptions options;
+    options.test = test;
+    options.compiles = MissionCompiler();
+    for (const SaveEntry& area : mSave.Areas()) {
+      options.hasArea1 = options.hasArea1 || area.name == "AREA_1";
+    }
+    return PatchMissionScript(mScript, mMission, options, status);
+  }
+
+  void EdDocument::LoadMissionFile()
+  {
+    mMission = Mission{};
+    mMissionRead.clear();
+    mMissionUndo.clear();
+    mMissionRedo.clear();
+    const std::filesystem::path file = MissionFile();
+    std::error_code ignored;
+    if (file.empty() || !std::filesystem::exists(file, ignored)) {
+      return;
+    }
+    std::ifstream in(file, std::ios::binary);
+    const std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+    std::string error;
+    if (!text.empty() && !LoadMission(text, mMission, error)) {
+      gpg::Warnf("editor: %s: the mission couldn't be read (%s)", file.string().c_str(), error.c_str());
+      mMission = Mission{};
+      return;
+    }
+    mMissionRead = text;
+    gpg::Logf("editor: mission read from %s: %zu stages", file.string().c_str(), mMission.stages.size());
   }
 } // namespace faf::editor

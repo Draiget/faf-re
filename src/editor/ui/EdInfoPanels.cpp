@@ -27,6 +27,7 @@
 #include "moho/sim/RRuleGameRules.h"
 #include "editor/tools/EdPathing.h"
 #include "editor/tools/EdTerrainChecks.h"
+#include "editor/ui/EdMissionPanel.h"
 #include "gpg/core/utils/Logging.h"
 #include "moho/sim/CWldMap.h"
 #include <cmath>
@@ -1072,6 +1073,38 @@ namespace faf::editor
       }
       for (CheckIssue& issue : CheckMapBasics(basics)) {
         mCheckIssues.push_back(std::move(issue));
+      }
+    }
+    // The mission: missing names, variables read before they are set, a mission that never ends ...
+    if (!mDocument.MissionNow().Empty()) {
+      const LuaCompiles compiles = mDocument.MissionCompiler();
+      for (const MissionProblem& p : CheckMission(mDocument.MissionNow(), MissionFactsOf(mDocument), &compiles)) {
+        CheckIssue issue;
+        issue.level = p.level == 'E' ? CheckIssue::Level::Error
+          : p.level == 'W'           ? CheckIssue::Level::Warning
+                                     : CheckIssue::Level::Note;
+        issue.marker = p.stage > 0 ? "mission stage " + std::to_string(p.stage) : "mission";
+        issue.text = p.text;
+        mCheckIssues.push_back(std::move(issue));
+      }
+      MissionPatch patch = MissionPatch::None;
+      const std::string script = mDocument.ScriptWithMission(false, patch);
+      if (patch == MissionPatch::Detached) {
+        mCheckIssues.push_back(
+          {CheckIssue::Level::Warning,
+           "mission",
+           "the script's mission region was edited by hand: Save leaves it alone (delete the region to "
+           "generate it again)",
+           0.0f,
+           0.0f,
+           std::string(),
+           0}
+        );
+      } else if (
+        const CheckIssue compiled = mDocument.CheckLuaText(script, "_script.lua (with the mission)");
+        !compiled.text.empty()
+      ) {
+        mCheckIssues.push_back(compiled);
       }
     }
     // The props under the same symmetry: each one's partner of its blueprint at its copies, and the reclaim that isn't.
