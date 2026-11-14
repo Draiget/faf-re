@@ -364,7 +364,8 @@ namespace faf::editor
     void TerrainTypesEdited(std::vector<std::uint8_t> before, bool ownStep = true);
     /**
      * A Build's parts, one entry per GraphBuild step: bit 0 a heights stroke, bits 1-5 how many mask strokes, bit 6 a
-     * terrain type change, bit 7 a props change, bit 8 a water change (the layout's water level). The view undoes and
+     * terrain type change, bit 7 a props change, bit 8 a water change (the layout's water level), bit 9 a decals
+     * change. The view undoes and
      * redoes those parts together.
      */
     void BuildEdited(
@@ -518,8 +519,9 @@ namespace faf::editor
     [[nodiscard]] DecalSnapshot DecalsNow() const;
     /** Puts a snapshot back as the map's decals. */
     void RestoreDecals(const DecalSnapshot& decals);
-    /** A decal edit ended: its before and the decals now become the newest undo step. */
-    void DecalsEdited(DecalSnapshot before);
+    /** A decal edit ended: its before and the decals now become the newest undo step (`ownStep` false: it joins a step
+     * its caller ends, a terrain graph's Build). */
+    void DecalsEdited(DecalSnapshot before, bool ownStep = true);
     [[nodiscard]] std::vector<std::pair<DecalSnapshot, DecalSnapshot>>& DecalUndo() noexcept
     {
       return mDecalUndo;

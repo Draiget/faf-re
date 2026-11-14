@@ -841,11 +841,8 @@ namespace faf::editor
         return wired != nullptr && wired->isNumber ? wired->number : TerrainParamNumber(*node, name, fallback);
       };
       if (type == "out_scatter") {
-        if (TerrainParamText(*node, "kind") == "decals") {
-          writes.notes.push_back(node->type->title + ": scattering decals isn't written yet");
-          continue;
-        }
         TerrainBuildWrites::Scatter scatter;
+        scatter.decals = TerrainParamText(*node, "kind") == "decals";
         if (a != nullptr && a->grid != nullptr) {
           scatter.density = *a->grid; // (no link: everywhere)
         }

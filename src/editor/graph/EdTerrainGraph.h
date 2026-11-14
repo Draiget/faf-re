@@ -280,6 +280,9 @@ namespace faf::editor
       float margin = 4.0f;
       bool underWater = false;
       std::uint32_t seed = 1;
+      /** Decals instead of props: `entries` are decal textures (none: the Decals tool's), the scale a share of the
+       * Decals tool's size. */
+      bool decals = false;
     };
     std::vector<Scatter> scatters;
     /** The map-wide textures to make from the built map: 0 normals, 1 lighting, 2 specular, 3 macro (MapTextureKind).

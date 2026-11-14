@@ -1750,7 +1750,8 @@ namespace faf::editor
   }
 
   void EdDocument::DecalsEdited(
-    DecalSnapshot before
+    DecalSnapshot before,
+    const bool ownStep
   )
   {
     DecalSnapshot now = DecalsNow();
@@ -1760,7 +1761,9 @@ namespace faf::editor
     if (mDecalUndo.size() > 100) {
       mDecalUndo.erase(mDecalUndo.begin());
     }
-    EditEnded(EditKind::Decals);
+    if (ownStep) {
+      EditEnded(EditKind::Decals);
+    }
     mModified = true;
   }
 

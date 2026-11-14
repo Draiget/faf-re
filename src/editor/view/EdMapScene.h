@@ -707,6 +707,9 @@ namespace faf::editor
     bool mFilling = false;  // Fill the map: PlaceProps takes the paint list in any mode
     const std::vector<PropPaintEntry>* mFillList = nullptr; // a terrain graph's scatter: its own list
     /** A terrain graph's scatter, inside the Build's props stroke: the props placed (with their copies). */
+    /** A graph's decal scatter: decals by its textures (none: the Decals tool's) where its density allows, on the
+     * symmetry's copies; how many placed. */
+    int ScatterDecalsFromGraph(const TerrainBuildWrites::Scatter& scatter, std::string& note);
     int ScatterFromGraph(const TerrainBuildWrites::Scatter& scatter, std::string& note);
     bool mMiniCached = false;
     bool mMiniDrawNow = true;

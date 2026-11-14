@@ -482,6 +482,18 @@ namespace
     EXPECT_FLOAT_EQ(s.scaleMin, 0.8f) << "the node's 80 %";
     EXPECT_EQ(s.seed, static_cast<std::uint32_t>((1 * 1009 + scatter * 101 + 1) % 1000003))
       << "the graph's seed mixed in";
+    EXPECT_FALSE(s.decals);
+    // The same node scattering decals: their textures as its entries, written (no note any more).
+    set(scatter, "kind", 1); // decals
+    (void)run.Evaluate(graph, 1, ground);
+    ASSERT_TRUE(run.BuildWrites(graph, ground, field::Grid(65, 65, 1.0f, 0.0f, 0.0f), writes, error)) << error;
+    ASSERT_EQ(writes.scatters.size(), 1U);
+    EXPECT_TRUE(writes.scatters[0].decals);
+    EXPECT_EQ(writes.scatters[0].entries.size(), 2U);
+    EXPECT_TRUE(std::none_of(writes.notes.begin(), writes.notes.end(), [](const std::string& n) {
+      return n.find("decals") != std::string::npos;
+    }));
+    set(scatter, "kind", 0); // props again for what follows
 
     // The map-wide textures to make from the built map, the atlas not written yet, the roughness mask into layer 8.
     (void)graph.AddNode("out_normalmap", 300, 700);

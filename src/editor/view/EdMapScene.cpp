@@ -5363,10 +5363,16 @@ namespace faf::editor
         paintText += " Terrain types: " + std::to_string(changed) + " cells.";
       }
     }
-    if (!writes.scatters.empty() && mMap != nullptr && mMap->mProps != nullptr) {
+    const bool anyProps = std::any_of(writes.scatters.begin(), writes.scatters.end(), [](const auto& s) {
+      return !s.decals;
+    });
+    if (anyProps && mMap != nullptr && mMap->mProps != nullptr) {
       BeginObjectStroke();
       int placed = 0;
       for (const TerrainBuildWrites::Scatter& scatter : writes.scatters) {
+        if (scatter.decals) {
+          continue;
+        }
         std::string note;
         placed += ScatterFromGraph(scatter, note);
         if (!note.empty()) {
@@ -5377,6 +5383,31 @@ namespace faf::editor
         parts |= 128;
       }
       paintText += " Props: " + std::to_string(placed) + " placed.";
+    }
+    // Decal scatters: one decals change joined to the build.
+    if (
+      mMap != nullptr && mDocument.Decals() != nullptr &&
+      std::any_of(writes.scatters.begin(), writes.scatters.end(), [](const auto& s) {
+      return s.decals;
+    })
+    ) {
+      EdDocument::DecalSnapshot decalsBefore = mDocument.DecalsNow();
+      int placed = 0;
+      for (const TerrainBuildWrites::Scatter& scatter : writes.scatters) {
+        if (!scatter.decals) {
+          continue;
+        }
+        std::string note;
+        placed += ScatterDecalsFromGraph(scatter, note);
+        if (!note.empty()) {
+          paintText += " " + note + ".";
+        }
+      }
+      if (placed > 0) {
+        mDocument.DecalsEdited(std::move(decalsBefore), false);
+        parts |= 512;
+      }
+      paintText += " Decals: " + std::to_string(placed) + " placed.";
     }
     if (parts != 0) {
       mDocument.BuildEdited(parts);
@@ -5403,6 +5434,9 @@ namespace faf::editor
     const int strokes = (parts >> 1) & 31;
     // Undo in the reverse order of the build (water, props, types, masks, heights); redo in its order.
     if (!redo) {
+      if ((parts & 512) != 0) {
+        (void)UndoDecals(false);
+      }
       if ((parts & 256) != 0) {
         (void)UndoWater(false);
       }
@@ -5433,6 +5467,9 @@ namespace faf::editor
       }
       if ((parts & 256) != 0) {
         (void)UndoWater(true);
+      }
+      if ((parts & 512) != 0) {
+        (void)UndoDecals(true);
       }
     }
     to.push_back(parts);
@@ -10324,6 +10361,147 @@ namespace faf::editor
     mFillList = nullptr;
     mFilling = false;
     return static_cast<int>(mMap->mProps->mEntries.size() - before);
+  }
+
+  int EdMapScene::ScatterDecalsFromGraph(
+    const TerrainBuildWrites::Scatter& scatter,
+    std::string& note
+  )
+  {
+    const moho::CHeightField* const field = mMap != nullptr ? mMap->mTerrainRes->GetHeightField() : nullptr;
+    moho::IDecalManager* const decals = mDocument.Decals();
+    if (field == nullptr || mTools == nullptr || decals == nullptr) {
+      return 0;
+    }
+    // The node's textures with their weights, else the Decals tool's texture.
+    std::vector<std::pair<std::string, int>> list = scatter.entries;
+    if (list.empty()) {
+      if (mTools->DecalTexturePath().empty()) {
+        note = "Decal scatter: no textures in the node and none picked in the Decals tool";
+        return 0;
+      }
+      list.emplace_back(mTools->DecalTexturePath(), 100);
+    }
+    int total = 0;
+    for (const auto& entry : list) {
+      total += std::max(1, entry.second);
+    }
+    float x0 = scatter.margin;
+    float z0 = scatter.margin;
+    float x1 = static_cast<float>(field->width - 1) - scatter.margin;
+    float z1 = static_cast<float>(field->height - 1) - scatter.margin;
+    if (const std::optional<EdDocument::PlayableRect> area = mDocument.PlayableArea(); area.has_value()) {
+      x0 = std::max(x0, static_cast<float>(area->x0) + scatter.margin);
+      z0 = std::max(z0, static_cast<float>(area->z0) + scatter.margin);
+      x1 = std::min(x1, static_cast<float>(area->x1) - scatter.margin);
+      z1 = std::min(z1, static_cast<float>(area->z1) - scatter.margin);
+    }
+    const HeightBrush brush = mTools->CurrentHeightBrush();
+    const WaterState water = mDocument.WaterNow();
+    const auto height = [this](const float x, const float z) {
+      return mMap->mTerrainRes->GetHeightAt(
+        static_cast<std::int32_t>(std::lround(x)), static_cast<std::int32_t>(std::lround(z))
+      );
+    };
+    // A number 0..1 by a hash of the place, the seed and a salt (the same build places the same decals).
+    const auto hash01 = [&](const float x, const float z, const std::uint32_t salt) {
+      std::uint32_t h = (scatter.seed + salt * 977u) * 2654435761u ^
+        static_cast<std::uint32_t>(std::lround(x * 16.0f)) * 40503u ^
+        static_cast<std::uint32_t>(std::lround(z * 16.0f)) * 2246822519u;
+      h ^= h >> 15;
+      h *= 2654435761u;
+      h ^= h >> 13;
+      return static_cast<float>(h & 0xFFFFFFu) / 16777216.0f;
+    };
+    const auto accept = [&](const float x, const float z) {
+      if (!InFirstPart(field->width, field->height, brush.symmetry, brush.turns, x, z)) {
+        return false;
+      }
+      if (!scatter.underWater && water.enabled && height(x, z) <= water.elevation) {
+        return false;
+      }
+      if (
+        SlopeDegrees(height(x - 1.0f, z), height(x + 1.0f, z), height(x, z - 1.0f), height(x, z + 1.0f)) >
+        scatter.slopeMax
+      ) {
+        return false;
+      }
+      const float density =
+        scatter.density.w > 1 ? std::clamp(field::SampleWorld(scatter.density, x, z), 0.0f, 1.0f) : 1.0f;
+      if (hash01(x, z, 0) >= density * scatter.fill) {
+        return false;
+      }
+      float cx[kMaxSymmetryCopies], cz[kMaxSymmetryCopies];
+      const int copies = HeightBrushCentres(field->width, field->height, x, z, brush.symmetry, brush.turns, cx, cz);
+      for (int c = 1; c < copies; ++c) {
+        if (std::hypot(cx[c] - x, cz[c] - z) < scatter.minDist) {
+          return false;
+        }
+      }
+      return true;
+    };
+    ScatterOptions options;
+    options.x0 = x0;
+    options.z0 = z0;
+    options.x1 = x1;
+    options.z1 = z1;
+    options.density = 10000.0f / std::max(1.0f, scatter.minDist * scatter.minDist);
+    options.spacing = scatter.minDist;
+    options.seed = scatter.seed;
+    options.limit = scatter.count;
+    const std::vector<std::pair<float, float>> points = ScatterPoints(options, accept);
+    const std::string toolTexture = mTools->DecalTexturePath();
+    const std::string toolPair = mTools->DecalPairPath();
+    int placed = 0;
+    for (const auto& [x, z] : points) {
+      // The texture by the weights, a free turn, a scale between the node's bounds.
+      int pick = static_cast<int>(hash01(x, z, 1) * static_cast<float>(total));
+      const std::pair<std::string, int>* chosen = &list.front();
+      for (const auto& entry : list) {
+        pick -= std::max(1, entry.second);
+        if (pick < 0) {
+          chosen = &entry;
+          break;
+        }
+      }
+      const float yaw = hash01(x, z, 2) * 2.0f * kPi;
+      const float scale = scatter.scaleMin + (scatter.scaleMax - scatter.scaleMin) * hash01(x, z, 3);
+      float centreX[kMaxSymmetryCopies], centreZ[kMaxSymmetryCopies], aheadX[kMaxSymmetryCopies],
+        aheadZ[kMaxSymmetryCopies];
+      const int copies =
+        HeightBrushCentres(field->width, field->height, x, z, brush.symmetry, brush.turns, centreX, centreZ);
+      (void)HeightBrushCentres(
+        field->width, field->height, x + std::cos(yaw), z + std::sin(yaw), brush.symmetry, brush.turns, aheadX, aheadZ
+      );
+      for (int c = 0; c < copies; ++c) {
+        if (
+          centreX[c] < 0.0f || centreZ[c] < 0.0f || centreX[c] > static_cast<float>(field->width - 1) ||
+          centreZ[c] > static_cast<float>(field->height - 1)
+        ) {
+          continue;
+        }
+        const float heading = std::atan2(aheadZ[c] - centreZ[c], aheadX[c] - centreX[c]);
+        const DecalFootprint footprint =
+          DecalAround(centreX[c], centreZ[c], mTools->DecalSizeX() * scale, mTools->DecalSizeZ() * scale, heading);
+        DecalState state;
+        state.type = DecalTypeForTexture(chosen->first);
+        state.names[0] = chosen->first;
+        state.names[1] = chosen->first == toolTexture ? toolPair : std::string();
+        state.scale[0] = footprint.sizeX;
+        state.scale[1] = std::max(footprint.sizeX, footprint.sizeZ);
+        state.scale[2] = footprint.sizeZ;
+        state.position[0] = footprint.x;
+        state.position[1] = height(centreX[c], centreZ[c]);
+        state.position[2] = footprint.z;
+        state.orientation[1] = heading;
+        state.cutoff = mTools->DecalCutoff();
+        if (AddDecal(*decals, state) != nullptr) {
+          ++placed;
+        }
+      }
+    }
+    gpg::Logf("editor: generate: %d decals scattered (%zu textures)", placed, list.size());
+    return placed;
   }
 
   std::string EdMapScene::ScatterOverMap(
