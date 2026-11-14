@@ -530,6 +530,9 @@ namespace faf::editor
       if (mShowMissionStrings) {
         mMissionPanel.DrawStringsPanel(mShowMissionStrings, mDocument.Map() != nullptr);
       }
+      if (mShowMissionBases) {
+        mMissionPanel.DrawBasesPanel(mShowMissionBases, mDocument.Map() != nullptr);
+      }
       {
         // The test play's trace arrives in the log whether or not Run is shown.
         const std::vector<std::string> trace = mLog.TakeMissionTrace();
@@ -738,6 +741,7 @@ namespace faf::editor
       {"Stages###MissionStages", &EdShell::mShowMissionStages},
       {"Strings###MissionStrings", &EdShell::mShowMissionStrings},
       {"Run###MissionRun", &EdShell::mShowMissionRun},
+      {"Bases###MissionBases", &EdShell::mShowMissionBases},
     };
     return kFlags;
   }

@@ -2255,8 +2255,34 @@ namespace faf::editor
           MissionNode second = NewMissionNode("dialogue");
           second.p["text"] = "Mission test: stage two";
           two.enter.push_back(second);
+          // A base on the second army, started empty at that army's start marker, and a line after it.
+          const MissionFacts facts = MissionFactsOf(mDocument);
+          const std::string army = facts.armies.size() > 1 ? facts.armies[1] : "ARMY_2";
+          MissionBase base = NewMissionBase("TestBase", army);
+          base.marker = army;
+          base.startEmpty = true;
+          MissionOpAI attack;
+          attack.name = "TestAttack";
+          attack.children = {"LightTanks"};
+          attack.master = "default";
+          base.opai.push_back(attack);
+          m.bases = {base};
+          MissionNode start = NewMissionNode("base_start");
+          start.p["base"] = "TestBase";
+          two.enter.push_back(start);
+          MissionNode after = NewMissionNode("dialogue");
+          after.p["text"] = "Mission test: after the base";
+          two.enter.push_back(after);
           m.stages = {one, two};
           mDocument.MissionEdited(std::move(before));
+          std::size_t baseProblems = 0;
+          for (const MissionProblem& p : CheckMission(m, facts)) {
+            if (p.text.rfind("base ", 0) == 0) {
+              ++baseProblems;
+              gpg::Logf("editor: mission test: check: %c %s", p.level, p.text.c_str());
+            }
+          }
+          gpg::Logf("editor: mission test: base on %s, %zu base problems", army.c_str(), baseProblems);
           break;
         }
         case 1: {

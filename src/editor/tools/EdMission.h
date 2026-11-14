@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <functional>
 #include <map>
 #include <string>
@@ -45,11 +46,70 @@ namespace faf::editor
     std::vector<MissionDialogueLine> lines;
   };
 
+  /**
+   * A base (FAF Studio's mbase.lua): a BaseManager the mission starts with a Start a base node. It is set up with the
+   * army's unit groups and their priorities, spawns them (or starts empty for its engineers to build), and arms its
+   * attack AIs (OpAI: platoons of a kind built and sent along patrol chains). The campaign AI brain builds them.
+   */
+  struct MissionBaseGroup
+  {
+    std::string name;
+    double priority = 100.0;
+  };
+
+  struct MissionOpAI
+  {
+    std::string name = "Attack1";
+    std::string ptype = "BasicLandAttack"; // MissionOpAITypes
+    std::vector<std::string> children;     // the platoon kinds (MissionOpAIChildren)
+    std::array<double, 3> qty{4.0, 6.0, 8.0};
+    std::string master = "patrol chain picker"; // MissionOpAIMasters
+    std::vector<std::string> chains;
+    double priority = 100.0;
+    std::string lock = "None"; // MissionOpAILocks
+    double lockSecs = 60.0;
+    std::array<std::string, 2> cond{"none", "none"}; // MissionOpAIConditions
+    std::array<std::array<double, 3>, 2> condCount{{{10.0, 6.0, 4.0}, {10.0, 6.0, 4.0}}};
+    std::array<double, 2> condStage{1.0, 1.0};
+    std::array<std::string, 2> condFlag;
+  };
+
+  struct MissionBase
+  {
+    std::string name;
+    std::string army;
+    std::string marker;
+    double radius = 40.0;
+    bool diff = false;       // groups per difficulty (<group>_D1 .. _D3)
+    bool startEmpty = false; // engineers build it (else all groups are spawned)
+    std::array<double, 3> engineers{2.0, 4.0, 6.0};
+    std::array<double, 3> assist{0.0, 0.0, 0.0};
+    double maxBuild = 0.0;
+    bool alwaysAssist = false;
+    double supportAcus = 0.0;
+    std::vector<std::string> switchOn;
+    std::vector<std::string> switchOff;
+    std::vector<std::string> noBuild;
+    std::vector<MissionBaseGroup> groups;
+    std::vector<MissionOpAI> opai;
+  };
+
+  [[nodiscard]] const std::vector<std::string>& MissionBaseActive(); // Shields, Fabrication, ... (SetActive)
+  [[nodiscard]] const std::vector<std::string>& MissionBaseBuild();  // Engineers, AntiAir, ... (SetBuild)
+  [[nodiscard]] const std::vector<std::string>& MissionOpAITypes();
+  [[nodiscard]] const std::vector<std::string>& MissionOpAIChildren(const std::string& type);
+  [[nodiscard]] const std::vector<std::string>& MissionOpAIMasters();
+  [[nodiscard]] const std::vector<std::string>& MissionOpAILocks();
+  [[nodiscard]] const std::vector<std::string>& MissionOpAIConditions();
+  /** A new base on an army, with its marker named `<name>_Marker`. */
+  [[nodiscard]] MissionBase NewMissionBase(const std::string& name, const std::string& army);
+
   struct Mission
   {
     std::string mode = "campaign"; // campaign, coop, both
     std::vector<MissionStage> stages;
     std::vector<MissionDialogue> dialogues;
+    std::vector<MissionBase> bases;
     [[nodiscard]] bool Empty() const noexcept
     {
       return stages.empty();

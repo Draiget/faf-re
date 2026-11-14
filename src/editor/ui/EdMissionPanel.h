@@ -24,6 +24,8 @@ namespace faf::editor
     explicit EdMissionPanel(EdDocument& document);
     void DrawStagesPanel(bool& open, bool mapOpen);
     void DrawStringsPanel(bool& open, bool mapOpen);
+    /** Bases: the mission's BaseManagers (groups, engineers, switches) and their attacks (OpAI). */
+    void DrawBasesPanel(bool& open, bool mapOpen);
     /**
      * Run: a test play's progress (the stage it is in, the nodes it reached, a trigger dropped because its stage had
      * moved on), each entry a jump to its node in Stages; Play from a stage.
@@ -58,6 +60,8 @@ namespace faf::editor
     int mDialogue = 0;
     std::optional<Mission> mFieldBefore; // a text field being typed in: the mission before it
     std::vector<std::string> mTrace;
+    int mBase = -1;
+    int mAttack = -1;
     bool mWasPlaying = false;
     bool mPlayAsked = false;
     bool mFocusStages = false;

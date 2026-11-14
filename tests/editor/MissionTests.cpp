@@ -257,4 +257,144 @@ namespace faf::editor
     EXPECT_FALSE(ParseMissionTrace("nonsense", id));
     EXPECT_FALSE(ParseMissionTrace("1.enter.0", id));
   }
+
+  namespace
+  {
+    Mission WithABase()
+    {
+      Mission m = TwoStages();
+      MissionBase b = NewMissionBase("North", "ARMY_2");
+      b.groups = {{"NorthDefense", 100}, {"NorthFactories", 90}};
+      b.engineers = {2, 4, 6};
+      b.alwaysAssist = true;
+      b.switchOn = {"Shields", "NotASwitch"};
+      b.noBuild = {"Experimentals"};
+      MissionOpAI o;
+      o.name = "NorthLand";
+      o.children = {"HeavyTanks", "Bombers"}; // Bombers isn't a land platoon: left out
+      o.qty = {4, 6, 8};
+      o.chains = {"Patrol"};
+      o.lock = "DeathTimer";
+      o.lockSecs = 90;
+      o.cond[0] = "stage reached";
+      o.condStage[0] = 2;
+      o.cond[1] = "flag is set";
+      o.condFlag[1] = "Alarm";
+      b.opai.push_back(o);
+      m.bases.push_back(b);
+      m.stages[0].enter.push_back(Node("base_start", {{"base", "North"}}));
+      return m;
+    }
+  } // namespace
+
+  TEST(
+    Mission,
+    ABaseCompilesToABaseManagerWithItsAttacks
+  )
+  {
+    const std::string lua = CompileMission(WithABase(), MissionCompileOptions{});
+    EXPECT_TRUE(Has(lua, "local BaseManager = import('/lua/ai/opai/basemanager.lua')"));
+    EXPECT_TRUE(Has(lua, "function Base.Start_North()"));
+    EXPECT_TRUE(Has(lua, "if Base.Manager_North then return end"));
+    EXPECT_LT(lua.find("if name == 'ARMY_2' then present = true end"), lua.find("local brain = GetArmyBrain('ARMY_2')"))
+      << "an army that isn't in the game only warns";
+    EXPECT_TRUE(Has(lua, "if not brain.PBMAddBuildLocation then"));
+    EXPECT_TRUE(
+      Has(lua, "bm:Initialize(brain, 'North', 'North_Marker', 40, { ['NorthDefense'] = 100, ['NorthFactories'] = 90 })")
+    );
+    EXPECT_TRUE(Has(lua, "bm:StartNonZeroBase({ { 2, 4, 6 }, { 0, 0, 0 } })"));
+    EXPECT_TRUE(Has(lua, "bm:SetConstructionAlwaysAssist(true)"));
+    EXPECT_TRUE(Has(lua, "bm:SetActive('Shields', true)"));
+    EXPECT_FALSE(Has(lua, "NotASwitch")) << "an unknown switch is left out";
+    EXPECT_TRUE(Has(lua, "bm:SetBuild('Experimentals', false)"));
+    EXPECT_TRUE(Has(lua, "op = bm:AddOpAI('BasicLandAttack', 'NorthLand', {"));
+    EXPECT_TRUE(Has(lua, "MasterPlatoonFunction = { '/lua/scenarioplatoonai.lua', 'PatrolChainPickerThread' },"));
+    EXPECT_TRUE(Has(lua, "PlatoonData = { PatrolChains = { 'Patrol' } },"));
+    EXPECT_TRUE(Has(lua, "op:SetChildQuantity({ 'HeavyTanks' }, ({ 4, 6, 8 })[Difficulty])"));
+    EXPECT_TRUE(Has(lua, "op:SetLockingStyle('DeathTimer', { LockTimer = 90 })"));
+    EXPECT_TRUE(Has(lua, "'MissionNumberGreaterOrEqual', { 2 })"));
+    EXPECT_TRUE(Has(lua, "'CheckScenarioInfoVarTable', { 'Alarm' })"));
+    EXPECT_TRUE(Has(lua, "Base.Start_North()\n")) << "the stage's node starts it";
+    // The bases come before the stages start.
+    EXPECT_LT(lua.find("function Base.Start_North()"), lua.find("ScenarioInfo.MissionNumber = 0"));
+    // Starting empty, per difficulty.
+    Mission m = WithABase();
+    m.bases[0].startEmpty = true;
+    m.bases[0].diff = true;
+    const std::string empty = CompileMission(m, MissionCompileOptions{});
+    EXPECT_TRUE(Has(empty, "bm:InitializeDifficultyTables(brain, 'North'"));
+    EXPECT_TRUE(Has(empty, "bm:StartEmptyBase({ { 2, 4, 6 }, { 0, 0, 0 } })"));
+    // A name that isn't one leaves no function.
+    m.bases[0].name = "North'); os.exit(";
+    EXPECT_FALSE(Has(CompileMission(m, MissionCompileOptions{}), "os.exit"));
+  }
+
+  TEST(
+    Mission,
+    BaseChecksFindWhatTheBaseManagerWouldMiss
+  )
+  {
+    Mission m = WithABase();
+    MissionFacts facts;
+    facts.armies = {"ARMY_1", "ARMY_2"};
+    facts.groups["ARMY_2"] = {"NorthDefense"};
+    facts.chains = {"Patrol"};
+    facts.markers = {"North_Marker"};
+    std::vector<MissionProblem> p = CheckMission(m, facts);
+    EXPECT_EQ(CountOf(p, "base North: army ARMY_2 has no group NorthFactories"), 1U);
+    EXPECT_EQ(CountOf(p, "base North: there is no marker"), 0U);
+    EXPECT_EQ(CountOf(p, "no stage starts it"), 0U);
+    EXPECT_EQ(CountOf(p, "no base North"), 0U);
+    m.bases[0].diff = true;
+    m.bases[0].marker = "Nowhere";
+    m.bases[0].opai[0].chains = {"Gone"};
+    m.bases[0].opai.push_back(m.bases[0].opai[0]);
+    m.bases.push_back(NewMissionBase("Spare", "ARMY_7"));
+    m.stages[0].enter.push_back(Node("base_active", {{"base", "Missing"}, {"on", "true"}}));
+    p = CheckMission(m, facts);
+    EXPECT_EQ(CountOf(p, "army ARMY_2 has no group NorthDefense_D1"), 1U);
+    EXPECT_EQ(CountOf(p, "base North: there is no marker Nowhere"), 1U);
+    EXPECT_EQ(CountOf(p, "attack NorthLand: no chain Gone"), 2U);
+    EXPECT_EQ(CountOf(p, "attack NorthLand: name used twice"), 1U);
+    EXPECT_EQ(CountOf(p, "base Spare: army ARMY_7 is not in the army list"), 1U);
+    EXPECT_EQ(CountOf(p, "base Spare: no build group"), 1U);
+    EXPECT_EQ(CountOf(p, "base Spare: no stage starts it"), 1U);
+    EXPECT_EQ(CountOf(p, "no base Missing"), 1U);
+  }
+
+  TEST(
+    Mission,
+    SavedBasesReadBack
+  )
+  {
+    Mission m = WithABase();
+    m.bases[0].radius = 55;
+    m.bases[0].supportAcus = 2;
+    m.bases[0].opai[0].master = "random patrol";
+    m.bases[0].opai[0].condCount[1] = {12, 8, 3};
+    Mission back;
+    std::string error;
+    ASSERT_TRUE(LoadMission(SaveMission(m), back, error)) << error;
+    ASSERT_EQ(back.bases.size(), 1U);
+    const MissionBase& b = back.bases[0];
+    EXPECT_EQ(b.name, "North");
+    EXPECT_EQ(b.marker, "North_Marker");
+    EXPECT_DOUBLE_EQ(b.radius, 55);
+    EXPECT_TRUE(b.alwaysAssist);
+    EXPECT_FALSE(b.startEmpty);
+    EXPECT_DOUBLE_EQ(b.supportAcus, 2);
+    EXPECT_EQ(b.switchOn, (std::vector<std::string>{"Shields", "NotASwitch"}));
+    ASSERT_EQ(b.groups.size(), 2U);
+    EXPECT_EQ(b.groups[1].name, "NorthFactories");
+    EXPECT_DOUBLE_EQ(b.groups[1].priority, 90);
+    ASSERT_EQ(b.opai.size(), 1U);
+    EXPECT_EQ(b.opai[0].master, "random patrol");
+    EXPECT_EQ(b.opai[0].condFlag[1], "Alarm");
+    EXPECT_DOUBLE_EQ(b.opai[0].condCount[1][2], 3);
+    EXPECT_EQ(CompileMission(back, MissionCompileOptions{}), CompileMission(m, MissionCompileOptions{}));
+    // Bases alone are still a mission to save.
+    Mission only;
+    only.bases.push_back(NewMissionBase("Solo", "ARMY_2"));
+    EXPECT_FALSE(SaveMission(only).empty());
+  }
 } // namespace faf::editor

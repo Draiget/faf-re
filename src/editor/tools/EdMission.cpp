@@ -1142,6 +1142,185 @@ namespace faf::editor
       return out;
     }
 
+    std::string Diff3(
+      const std::array<double, 3>& v,
+      const double fallback
+    )
+    {
+      return "{ " + Num(v[0], fallback) + ", " + Num(v[1], fallback) + ", " + Num(v[2], fallback) + " }";
+    }
+
+    std::string StrList(
+      const std::vector<std::string>& list
+    )
+    {
+      std::string out = "{ ";
+      for (std::size_t i = 0; i < list.size(); ++i) {
+        out += (i > 0 ? ", " : "") + Q(list[i]);
+      }
+      return out + " }";
+    }
+
+    bool In(
+      const std::vector<std::string>& list,
+      const std::string& v
+    )
+    {
+      return std::find(list.begin(), list.end(), v) != list.end();
+    }
+
+    void CompileOpAI(
+      const MissionOpAI& o,
+      Lines& out
+    )
+    {
+      const auto add = [&](const std::string& line) {
+        out.push_back("        " + line);
+      };
+      const std::string ptype = In(MissionOpAITypes(), o.ptype) ? o.ptype : "BasicLandAttack";
+      add("op = bm:AddOpAI(" + Q(ptype) + ", " + Q(o.name) + ", {");
+      if (o.master == "patrol chain picker") {
+        add("    MasterPlatoonFunction = { '/lua/scenarioplatoonai.lua', 'PatrolChainPickerThread' },");
+        add("    PlatoonData = { PatrolChains = " + StrList(o.chains) + " },");
+      } else if (o.master == "patrol one chain" || o.master == "random patrol") {
+        add(
+          std::string("    MasterPlatoonFunction = { '/lua/scenarioplatoonai.lua', ") +
+          (o.master == "patrol one chain" ? "'PatrolThread'" : "'RandomPatrolThread'") + " },"
+        );
+        add("    PlatoonData = { PatrolChain = " + Q(o.chains.empty() ? std::string() : o.chains.front()) + " },");
+      }
+      add("    Priority = " + Num(o.priority, 100) + ",");
+      add("})");
+      std::vector<std::string> children;
+      for (const std::string& c : o.children) {
+        if (In(MissionOpAIChildren(ptype), c)) {
+          children.push_back(c);
+        }
+      }
+      if (!children.empty()) {
+        add("op:SetChildQuantity(" + StrList(children) + ", (" + Diff3(o.qty, 4) + ")[Difficulty])");
+      }
+      if (o.lock == "DeathTimer" || o.lock == "BuildTimer") {
+        add("op:SetLockingStyle(" + Q(o.lock) + ", { LockTimer = " + Num(o.lockSecs, 60) + " })");
+      } else if (o.lock == "DeathRatio") {
+        add(
+          "op:SetLockingStyle('DeathRatio', { Ratio = " + Num((Finite(o.lockSecs) ? o.lockSecs : 50.0) / 100.0) + " })"
+        );
+      } else {
+        add("op:SetLockingStyle('None')");
+      }
+      for (int slot = 0; slot < 2; ++slot) {
+        const std::string& kind = o.cond[static_cast<std::size_t>(slot)];
+        if (kind == "humans have units") {
+          add(
+            "op:AddBuildCondition('/lua/editor/otherarmyunitcountbuildconditions.lua', 'BrainsCompareNumCategory', { { "
+            "'HumanPlayers' }, (" +
+            Diff3(o.condCount[static_cast<std::size_t>(slot)], 6) +
+            ")[Difficulty], categories.ALLUNITS - categories.DEFENSE, '>=' })"
+          );
+        } else if (kind == "flag is set") {
+          add(
+            "op:AddBuildCondition('/lua/editor/miscbuildconditions.lua', 'CheckScenarioInfoVarTable', { " +
+            Q(o.condFlag[static_cast<std::size_t>(slot)]) + " })"
+          );
+        } else if (kind == "stage reached") {
+          add(
+            "op:AddBuildCondition('/lua/editor/miscbuildconditions.lua', 'MissionNumberGreaterOrEqual', { " +
+            Num(o.condStage[static_cast<std::size_t>(slot)], 1) + " })"
+          );
+        }
+      }
+    }
+
+    /** The bases' start functions (Studio's mbase Compile): a base that can't be generated only warns when started. */
+    Lines CompileBases(
+      const Mission& m
+    )
+    {
+      Lines out;
+      if (m.bases.empty()) {
+        return out;
+      }
+      out.push_back("local BaseManager = import('/lua/ai/opai/basemanager.lua')");
+      out.push_back("");
+      for (const MissionBase& b : m.bases) {
+        if (!MissionIsName(b.name)) {
+          continue; // (the check says so; a node starting it compiles to a comment)
+        }
+        const auto add = [&](const std::string& line) {
+          out.push_back(line);
+        };
+        add("-- base " + b.name + " (army " + OneLine(b.army) + "): started by a Start a base node");
+        add("function Base.Start_" + b.name + "()");
+        add("    if Base.Manager_" + b.name + " then return end");
+        // An army nobody plays isn't in the game (a skirmish test play): GetArmyBrain would stop the stage.
+        add("    local present = false");
+        add("    for _, name in ListArmies() do");
+        add("        if name == " + Q(b.army) + " then present = true end");
+        add("    end");
+        add("    if not present then");
+        add("        WARN(" + Q("base " + b.name + ": army " + b.army + " is not in this game") + ")");
+        add("        return");
+        add("    end");
+        add("    local brain = GetArmyBrain(" + Q(b.army) + ")");
+        add("    if not brain.PBMAddBuildLocation then");
+        add(
+          "        WARN(" +
+          Q("base " + b.name + ": army " + b.army + " has no campaign AI brain (set the map type to campaign)") + ")"
+        );
+        add("        return");
+        add("    end");
+        add("    local bm = BaseManager.CreateBaseManager()");
+        add("    Base.Manager_" + b.name + " = bm");
+        std::string levels;
+        for (std::size_t g = 0; g < b.groups.size(); ++g) {
+          levels +=
+            (g > 0 ? ", " : "") + std::string("[") + Q(b.groups[g].name) + "] = " + Num(b.groups[g].priority, 100);
+        }
+        add(
+          std::string("    bm:") + (b.diff ? "InitializeDifficultyTables" : "Initialize") + "(brain, " + Q(b.name) +
+          ", " + Q(b.marker) + ", " + Num(b.radius, 40) + ", { " + levels + " })"
+        );
+        const std::string eng = "{ " + Diff3(b.engineers, 2) + ", " + Diff3(b.assist, 0) + " }";
+        add(std::string("    bm:") + (b.startEmpty ? "StartEmptyBase(" : "StartNonZeroBase(") + eng + ")");
+        if (Finite(b.maxBuild) && b.maxBuild > 0.0) {
+          add("    bm:SetMaximumConstructionEngineers(" + Num(b.maxBuild) + ")");
+        }
+        if (b.alwaysAssist) {
+          add("    bm:SetConstructionAlwaysAssist(true)");
+        }
+        if (Finite(b.supportAcus) && b.supportAcus > 0.0) {
+          add("    bm:SetSupportACUCount(" + Num(b.supportAcus) + ")");
+        }
+        for (const std::string& a : b.switchOn) {
+          if (In(MissionBaseActive(), a)) {
+            add("    bm:SetActive(" + Q(a) + ", true)");
+          }
+        }
+        for (const std::string& a : b.switchOff) {
+          if (In(MissionBaseActive(), a)) {
+            add("    bm:SetActive(" + Q(a) + ", false)");
+          }
+        }
+        for (const std::string& a : b.noBuild) {
+          if (In(MissionBaseBuild(), a)) {
+            add("    bm:SetBuild(" + Q(a) + ", false)");
+          }
+        }
+        if (!b.opai.empty()) {
+          add("    local op");
+          for (const MissionOpAI& o : b.opai) {
+            add("    do");
+            CompileOpAI(o, out);
+            add("    end");
+          }
+        }
+        add("end");
+        add("");
+      }
+      return out;
+    }
+
     std::size_t FindAtLineStart(
       const std::string& text,
       const std::string& marker,
@@ -1597,6 +1776,131 @@ namespace faf::editor
     return "(" + text + ")";
   }
 
+  // ---- bases
+  const std::vector<std::string>& MissionBaseActive()
+  {
+    static const std::vector<std::string> k = {
+      "Shields",
+      "Fabrication",
+      "Intel",
+      "CounterIntel",
+      "TML",
+      "Nuke",
+      "Patrol",
+      "Reclaim",
+      "LandScouting",
+      "AirScouting"
+    };
+    return k;
+  }
+  const std::vector<std::string>& MissionBaseBuild()
+  {
+    static const std::vector<std::string> k = {"Engineers",      "AntiAir",        "GroundDefense",    "Torpedo",
+                                               "AirFactories",   "LandFactories",  "SeaFactories",     "Factories",
+                                               "MissileDefense", "Shields",        "Artillery",        "Experimentals",
+                                               "Walls",          "Defenses",       "Jammers",          "Radar",
+                                               "Sonar",          "Intel",          "Missiles",         "Fabrication",
+                                               "AirStaging",     "MassExtraction", "EnergyProduction", "Storage"};
+    return k;
+  }
+  const std::vector<std::string>& MissionOpAITypes()
+  {
+    static const std::vector<std::string> k = {"BasicLandAttack", "AirAttacks", "NavalAttacks", "EngineerAttack"};
+    return k;
+  }
+  const std::vector<std::string>& MissionOpAIChildren(
+    const std::string& type
+  )
+  {
+    static const std::map<std::string, std::vector<std::string>> k = {
+      {"BasicLandAttack",
+       {"LightBots",
+        "LightTanks",
+        "LightArtillery",
+        "MobileAntiAir",
+        "HeavyTanks",
+        "AmphibiousTanks",
+        "MobileShields",
+        "MobileStealth",
+        "MobileMissiles",
+        "MobileFlak",
+        "MobileBombs",
+        "RangeBots",
+        "SiegeBots",
+        "HeavyBots",
+        "MobileHeavyArtillery",
+        "HeavyMobileAntiAir",
+        "T1Transports",
+        "T2Transports",
+        "T3Transports"}},
+      {"AirAttacks",
+       {"Interceptors",
+        "Bombers",
+        "LightGunships",
+        "CombatFighters",
+        "TorpedoBombers",
+        "Gunships",
+        "GuidedMissiles",
+        "AirSuperiority",
+        "StratBombers",
+        "HeavyGunships",
+        "HeavyTorpedoBombers"}},
+      {"NavalAttacks",
+       {"Frigates",
+        "Submarines",
+        "Destroyers",
+        "Cruisers",
+        "Battleships",
+        "T2Submarines",
+        "T3Submarines",
+        "UtilityBoats",
+        "Carriers",
+        "NukeSubmarines",
+        "AABoats",
+        "BattleCruisers",
+        "MissileShips",
+        "TorpedoBoats"}},
+      {"EngineerAttack",
+       {"T1Engineers",
+        "T2Engineers",
+        "T3Engineers",
+        "CombatEngineers",
+        "MobileShields",
+        "T1Transports",
+        "T2Transports",
+        "T3Transports"}},
+    };
+    static const std::vector<std::string> kNone;
+    const auto it = k.find(type);
+    return it != k.end() ? it->second : kNone;
+  }
+  const std::vector<std::string>& MissionOpAIMasters()
+  {
+    static const std::vector<std::string> k = {"patrol chain picker", "patrol one chain", "random patrol", "default"};
+    return k;
+  }
+  const std::vector<std::string>& MissionOpAILocks()
+  {
+    static const std::vector<std::string> k = {"None", "DeathTimer", "BuildTimer", "DeathRatio"};
+    return k;
+  }
+  const std::vector<std::string>& MissionOpAIConditions()
+  {
+    static const std::vector<std::string> k = {"none", "humans have units", "flag is set", "stage reached"};
+    return k;
+  }
+  MissionBase NewMissionBase(
+    const std::string& name,
+    const std::string& army
+  )
+  {
+    MissionBase b;
+    b.name = name;
+    b.army = army;
+    b.marker = name + "_Marker";
+    return b;
+  }
+
   // ---- catalogue
   const std::vector<MissionNodeType>& MissionNodeTypes()
   {
@@ -1858,6 +2162,9 @@ namespace faf::editor
       add("end");
       add("");
     }
+    for (const std::string& line : CompileBases(m)) {
+      add(line);
+    }
     add("ScenarioInfo.MissionNumber = 0");
     add("");
     if (!m.stages.empty()) {
@@ -2043,6 +2350,10 @@ namespace faf::editor
               problem('E', "no marker " + value);
             } else if (p.kind == "dialogue" && dialogues.count(value) == 0) {
               problem('E', "no dialogue " + value);
+            } else if (p.kind == "base" && std::none_of(m.bases.begin(), m.bases.end(), [&](const MissionBase& b) {
+              return b.name == value;
+            })) {
+              problem('E', "no base " + value + " (Bases panel)");
             } else if (p.kind == "var") {
               if (!MissionIsName(value)) {
                 problem('E', p.label + " is not a name (letters, digits and _)");
@@ -2064,6 +2375,88 @@ namespace faf::editor
       walk(stage.enter, "enter", {});
       walk(stage.ready, "ready", {});
     }
+    // The bases (Studio's mbase Check).
+    std::set<std::string> started;
+    for (const MissionStage& stage : m.stages) {
+      std::function<void(const std::vector<MissionNode>&)> scan = [&](const std::vector<MissionNode>& list) {
+        for (const MissionNode& n : list) {
+          if (n.type == "base_start") {
+            const auto it = n.p.find("base");
+            if (it != n.p.end()) {
+              started.insert(it->second);
+            }
+          }
+          scan(n.children);
+        }
+      };
+      scan(stage.enter);
+      scan(stage.ready);
+    }
+    std::set<std::string> baseNames;
+    for (const MissionBase& b : m.bases) {
+      const std::string where = "base " + b.name + ": ";
+      const auto add = [&](const char level, const std::string& text) {
+        out.push_back({level, where + text, 0, {}, {}});
+      };
+      if (!MissionIsName(b.name)) {
+        add('E', "not a usable name (letters, digits and _)");
+      }
+      if (!baseNames.insert(b.name).second) {
+        add('E', "name used twice");
+      }
+      if (!facts.armies.empty() && !has(facts.armies, b.army)) {
+        add('E', "army " + b.army + " is not in the army list");
+      }
+      if (!has(facts.markers, b.marker)) {
+        add('E', "there is no marker " + b.marker);
+      }
+      if (b.groups.empty() && !b.startEmpty) {
+        add('W', "no build group: nothing to spawn (start it empty or add a group)");
+      }
+      const auto armyGroups = facts.groups.find(b.army);
+      if (armyGroups != facts.groups.end()) {
+        for (const MissionBaseGroup& g : b.groups) {
+          if (b.diff) {
+            for (int d = 1; d <= 3; ++d) {
+              if (!has(armyGroups->second, g.name + "_D" + std::to_string(d))) {
+                add('E', "army " + b.army + " has no group " + g.name + "_D" + std::to_string(d));
+              }
+            }
+          } else if (!has(armyGroups->second, g.name)) {
+            add('E', "army " + b.army + " has no group " + g.name);
+          }
+        }
+      }
+      if (started.count(b.name) == 0) {
+        add('W', "no stage starts it (add a Start a base node)");
+      }
+      std::set<std::string> attacks;
+      for (const MissionOpAI& o : b.opai) {
+        const std::string w2 = "attack " + o.name + ": ";
+        if (!MissionIsName(o.name)) {
+          add('E', w2 + "not a usable name");
+        }
+        if (!attacks.insert(o.name).second) {
+          add('E', w2 + "name used twice");
+        }
+        if (!In(MissionOpAITypes(), o.ptype)) {
+          add('E', w2 + "unknown kind of attack " + o.ptype);
+        }
+        if (o.children.empty()) {
+          add('W', w2 + "no platoon kind chosen (the family default is built)");
+        }
+        if (o.master != "default") {
+          if (o.chains.empty()) {
+            add('E', w2 + "no patrol chain chosen");
+          }
+          for (const std::string& c : o.chains) {
+            if (!has(facts.chains, c)) {
+              add('E', w2 + "no chain " + c);
+            }
+          }
+        }
+      }
+    }
     if (!m.stages.empty() && !ends) {
       out.push_back({'W', "the mission never ends (no End node, and the last stage has no objectives)", 0, {}, {}});
     }
@@ -2075,7 +2468,7 @@ namespace faf::editor
     const Mission& m
   )
   {
-    if (m.stages.empty() && m.dialogues.empty()) {
+    if (m.stages.empty() && m.dialogues.empty() && m.bases.empty()) {
       return {};
     }
     std::string out = "{\n  \"schema\": 1,\n  \"mode\": " + JsonQuoted(m.mode) + ",\n  \"stages\": [\n";
@@ -2087,6 +2480,48 @@ namespace faf::editor
       out += ",\n";
       WriteList(out, "ready", st.ready, "      ");
       out += "\n    }" + std::string(s + 1 < m.stages.size() ? ",\n" : "\n");
+    }
+    out += "  ],\n  \"bases\": [\n";
+    const auto list = [](const std::vector<std::string>& v) {
+      std::string text = "[";
+      for (std::size_t i = 0; i < v.size(); ++i) {
+        text += (i > 0 ? ", " : "") + JsonQuoted(v[i]);
+      }
+      return text + "]";
+    };
+    const auto three = [](const std::array<double, 3>& v) {
+      return "[" + JsonNumber(static_cast<float>(v[0])) + ", " + JsonNumber(static_cast<float>(v[1])) + ", " +
+        JsonNumber(static_cast<float>(v[2])) + "]";
+    };
+    for (std::size_t bi = 0; bi < m.bases.size(); ++bi) {
+      const MissionBase& b = m.bases[bi];
+      out += "    {\"name\": " + JsonQuoted(b.name) + ", \"army\": " + JsonQuoted(b.army) +
+        ", \"marker\": " + JsonQuoted(b.marker) + ", \"radius\": " + JsonNumber(static_cast<float>(b.radius)) +
+        ", \"diff\": \"" + (b.diff ? "true" : "false") + "\", \"startEmpty\": \"" + (b.startEmpty ? "true" : "false") +
+        "\", \"engineers\": " + three(b.engineers) + ", \"assist\": " + three(b.assist) +
+        ", \"maxBuild\": " + JsonNumber(static_cast<float>(b.maxBuild)) + ", \"alwaysAssist\": \"" +
+        (b.alwaysAssist ? "true" : "false") + "\", \"supportAcus\": " + JsonNumber(static_cast<float>(b.supportAcus)) +
+        ", \"switchOn\": " + list(b.switchOn) + ", \"switchOff\": " + list(b.switchOff) +
+        ", \"noBuild\": " + list(b.noBuild) + ",\n      \"groups\": [";
+      for (std::size_t g = 0; g < b.groups.size(); ++g) {
+        out += std::string(g > 0 ? ", " : "") + "{\"name\": " + JsonQuoted(b.groups[g].name) +
+          ", \"priority\": " + JsonNumber(static_cast<float>(b.groups[g].priority)) + "}";
+      }
+      out += "],\n      \"opai\": [";
+      for (std::size_t k = 0; k < b.opai.size(); ++k) {
+        const MissionOpAI& o = b.opai[k];
+        out += std::string(k > 0 ? ",\n        " : "\n        ") + "{\"name\": " + JsonQuoted(o.name) +
+          ", \"ptype\": " + JsonQuoted(o.ptype) + ", \"children\": " + list(o.children) + ", \"qty\": " + three(o.qty) +
+          ", \"master\": " + JsonQuoted(o.master) + ", \"chains\": " + list(o.chains) +
+          ", \"priority\": " + JsonNumber(static_cast<float>(o.priority)) + ", \"lock\": " + JsonQuoted(o.lock) +
+          ", \"lockSecs\": " + JsonNumber(static_cast<float>(o.lockSecs)) + ", \"cond1\": " + JsonQuoted(o.cond[0]) +
+          ", \"cond2\": " + JsonQuoted(o.cond[1]) + ", \"cond1n\": " + three(o.condCount[0]) +
+          ", \"cond2n\": " + three(o.condCount[1]) +
+          ", \"cond1stage\": " + JsonNumber(static_cast<float>(o.condStage[0])) +
+          ", \"cond2stage\": " + JsonNumber(static_cast<float>(o.condStage[1])) +
+          ", \"cond1flag\": " + JsonQuoted(o.condFlag[0]) + ", \"cond2flag\": " + JsonQuoted(o.condFlag[1]) + "}";
+      }
+      out += "]}" + std::string(bi + 1 < m.bases.size() ? ",\n" : "\n");
     }
     out += "  ],\n  \"dialogues\": [\n";
     for (std::size_t d = 0; d < m.dialogues.size(); ++d) {
@@ -2156,6 +2591,94 @@ namespace faf::editor
         dialogue.lines.push_back(std::move(line));
       }
       m.dialogues.push_back(std::move(dialogue));
+    }
+    // The bases.
+    const auto strings = [](const std::string& array) {
+      std::vector<std::string> out;
+      for (std::size_t i = 0; i < array.size();) {
+        if (array[i] == '"') {
+          std::string value;
+          std::size_t k = i + 1;
+          for (; k < array.size() && array[k] != '"'; ++k) {
+            if (array[k] == '\\' && k + 1 < array.size()) {
+              ++k;
+            }
+            value += array[k];
+          }
+          out.push_back(value);
+          i = k + 1;
+        } else {
+          ++i;
+        }
+      }
+      return out;
+    };
+    const auto numbers = [](const std::string& array, std::array<double, 3>& out) {
+      const char* p = array.c_str();
+      for (double& v : out) {
+        while (*p != '\0' && (*p == '[' || *p == ',' || *p == ' ')) {
+          ++p;
+        }
+        char* end = nullptr;
+        const double x = std::strtod(p, &end);
+        if (end == p) {
+          return;
+        }
+        if (Finite(x)) {
+          v = x;
+        }
+        p = end;
+      }
+    };
+    const auto flag = [](const std::string& object, const std::string& key, bool& out) {
+      std::string v;
+      if (StringOf(object, key, v)) {
+        out = v == "true";
+      }
+    };
+    for (const std::string& bt : Items(NestedOf(root, "bases"))) {
+      MissionBase b;
+      (void)StringOf(bt, "name", b.name);
+      (void)StringOf(bt, "army", b.army);
+      (void)StringOf(bt, "marker", b.marker);
+      (void)NumberOf(bt, "radius", b.radius);
+      flag(bt, "diff", b.diff);
+      flag(bt, "startEmpty", b.startEmpty);
+      numbers(NestedOf(bt, "engineers"), b.engineers);
+      numbers(NestedOf(bt, "assist"), b.assist);
+      (void)NumberOf(bt, "maxBuild", b.maxBuild);
+      flag(bt, "alwaysAssist", b.alwaysAssist);
+      (void)NumberOf(bt, "supportAcus", b.supportAcus);
+      b.switchOn = strings(NestedOf(bt, "switchOn"));
+      b.switchOff = strings(NestedOf(bt, "switchOff"));
+      b.noBuild = strings(NestedOf(bt, "noBuild"));
+      for (const std::string& gt : Items(NestedOf(bt, "groups"))) {
+        MissionBaseGroup g;
+        (void)StringOf(gt, "name", g.name);
+        (void)NumberOf(gt, "priority", g.priority);
+        b.groups.push_back(g);
+      }
+      for (const std::string& ot : Items(NestedOf(bt, "opai"))) {
+        MissionOpAI o;
+        (void)StringOf(ot, "name", o.name);
+        (void)StringOf(ot, "ptype", o.ptype);
+        o.children = strings(NestedOf(ot, "children"));
+        numbers(NestedOf(ot, "qty"), o.qty);
+        (void)StringOf(ot, "master", o.master);
+        o.chains = strings(NestedOf(ot, "chains"));
+        (void)NumberOf(ot, "priority", o.priority);
+        (void)StringOf(ot, "lock", o.lock);
+        (void)NumberOf(ot, "lockSecs", o.lockSecs);
+        for (int slot = 0; slot < 2; ++slot) {
+          const std::string k = "cond" + std::to_string(slot + 1);
+          (void)StringOf(ot, k, o.cond[static_cast<std::size_t>(slot)]);
+          numbers(NestedOf(ot, k + "n"), o.condCount[static_cast<std::size_t>(slot)]);
+          (void)NumberOf(ot, k + "stage", o.condStage[static_cast<std::size_t>(slot)]);
+          (void)StringOf(ot, k + "flag", o.condFlag[static_cast<std::size_t>(slot)]);
+        }
+        b.opai.push_back(std::move(o));
+      }
+      m.bases.push_back(std::move(b));
     }
     mission = std::move(m);
     return true;
