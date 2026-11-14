@@ -3223,6 +3223,14 @@ fa::string moho::FILE_Dir(
   if (filename == nullptr || filename[0] == '\0') {
     ThrowStartupFileError("Moho::FILE_Dir", "Null argument.");
   }
+#if FAFRE_PLATFORM_POSIX
+  // Engine addition: a system path here starts with '/' and has no drive. The check below (0x00410D10) would refuse
+  // every one, InternalSaveGame's save path among them, and the end of this function would put the current drive,
+  // which POSIX does not have (_getdrive() is 0), before it. The Linux client, issue #255.
+  if (filename[0] == '/') {
+    return FILE_DirPrefix(filename);
+  }
+#endif
   if (filename[0] == '/' && filename[1] != ':' && filename[1] != '/') {
     ThrowStartupFileError("Moho::FILE_Dir", "System path expected, got local.");
   }
