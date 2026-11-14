@@ -160,7 +160,7 @@ namespace faf::editor
         "/nowaterhires",   "/camat",          "/erosiontest",    "/sctest",          "/symmenu",     "/panelbottom",
         "/shader",         "/brushtest",      "/brushshape",     "/stampsource",     "/stampstroke", "/symoptions",
         "/maskoptions",    "/masktest",       "/shaderbrowser",  "/convertlayers",   "/interoptest", "/gentest",
-        "/layouttest",     "/playcopytest",   "/missiontest",
+        "/layouttest",     "/playcopytest",   "/missiontest",    "/modtest",
       };
       for (const char* const option : kOptions) {
         if (moho::CFG_GetArgOption(option, 0, nullptr)) {
@@ -2336,6 +2336,88 @@ namespace faf::editor
         }
         ++mMissionTestStage;
       }
+      /**
+       * `/modtest` (test runs): a mod project in the vault's mods folder (made, or opened when it is there), a unit
+       * with a weapon changed (mass cost, the first weapon's damage), written; the merge blueprint is logged and the
+       * project reopened.
+       */
+      void TestModProject()
+      {
+        if (
+          mModTestDone || !mScene.Attached() || !moho::CFG_GetArgOption("/modtest", 0, nullptr) ||
+          ++mModTestFrames < 120
+        ) {
+          return;
+        }
+        moho::RRuleGameRules* const rules = moho::RULE_PeekKept();
+        if (rules == nullptr) {
+          return;
+        }
+        mModTestDone = true;
+        mShell->SwitchWorkspace(7);
+        mShell->HideHome();
+        mShell->ShowModProject();
+        EdModPanel& panel = mShell->ModPanel();
+        std::string error;
+        if (!panel.Open("EditorModTest", error) && !panel.Create("EditorModTest", error)) {
+          gpg::Warnf("editor: mod test: no project: %s", error.c_str());
+          return;
+        }
+        // The first unit (by id) with a labelled weapon that does damage.
+        std::vector<std::string> ids;
+        for (const auto& [id, entry] : rules->GetUnitBlueprints()) {
+          ids.emplace_back(id.c_str());
+        }
+        std::sort(ids.begin(), ids.end());
+        for (const std::string& id : ids) {
+          moho::RResId resId{};
+          resId.name.assign(id.c_str());
+          const moho::RUnitBlueprint* const bp = rules->GetUnitBlueprint(resId);
+          if (bp == nullptr || bp->Weapons.WeaponBlueprints.empty()) {
+            continue;
+          }
+          const moho::RUnitBlueprintWeapon& weapon = bp->Weapons.WeaponBlueprints.front();
+          if (weapon.Label.empty() || weapon.Damage <= 0.0f) {
+            continue;
+          }
+          ModProject& p = *panel.Project();
+          const double mass = bp->Economy.BuildCostMass;
+          (void)SetModEdit(p, id, "Economy.BuildCostMass", mass + 10.0, mass);
+          (void)SetModEdit(
+            p, id, std::string("Weapon:") + weapon.Label.c_str() + ".Damage", weapon.Damage * 2.0, weapon.Damage
+          );
+          panel.Touch();
+          const ModWriteReport report = panel.Write();
+          gpg::Logf(
+            "editor: mod test: %s (mass %g, %s damage %g): %zu files written, %zu problems",
+            id.c_str(),
+            mass,
+            weapon.Label.c_str(),
+            static_cast<double>(weapon.Damage),
+            report.written.size(),
+            report.problems.size()
+          );
+          std::ifstream in(panel.Folder() / "units" / id / (id + "_unit.bp"), std::ios::binary);
+          std::string line;
+          while (std::getline(in, line)) {
+            gpg::Logf("editor: mod test: bp | %s", line.c_str());
+          }
+          ModProject back;
+          std::string reopenError;
+          const bool reopened = OpenModProject(panel.Folder(), back, reopenError);
+          gpg::Logf(
+            "editor: mod test: reopened %s, uid %s, %zu units changed",
+            reopened ? "fine" : reopenError.c_str(),
+            back.uid == p.uid ? "kept" : "changed",
+            back.edits.size()
+          );
+          return;
+        }
+        gpg::Warnf("editor: mod test: no unit with a labelled weapon");
+      }
+      bool mModTestDone = false;
+      int mModTestFrames = 0;
+
       int mMissionTestStage = 0;
       int mMissionTestFrames = 0;
 
@@ -8114,6 +8196,7 @@ namespace faf::editor
       DrivePlayCopy();
       TestPlayCopy();
       TestMission();
+      TestModProject();
       // `/sctest` (test runs): the SC tools window's buttons in turn, a second apart, the heights' checksum each time.
       if (
         mScTestStage < 8 && moho::CFG_GetArgOption("/sctest", 0, nullptr) && !mScene.ModelsPending() &&
