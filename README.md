@@ -9,7 +9,7 @@
 [![Platforms](https://img.shields.io/badge/platforms-Windows%20x64%20%7C%20x86-blue)](#build)
 [![Line coverage](https://img.shields.io/badge/line%20coverage-71.3%25-yellowgreen)](tests/README.md#coverage)
 
-[Build](#build) · [Retail parity](#retail-parity) · [Performance](#performance) · [Contributing](CONTRIBUTING.md)
+[Build](#build) · [Map editor](#map-editor) · [Retail parity](#retail-parity) · [Performance](#performance) · [Contributing](CONTRIBUTING.md)
 
 </div>
 
@@ -28,6 +28,22 @@ The Moho engine behind *Supreme Commander: Forged Alliance* (2007), rebuilt as r
 | Recovery | Complete: every engine function the game uses is written as source (40,617 functions). The rest of the shipped exe is library code (its window library, the MSVC runtime, libpng, Wild Magic, ...) or unreferenced fragments; 0 functions are outstanding. The window library is replaced by SDL3 and Dear ImGui on every platform (#416) |
 
 Most symbols in the retail engine were never hand-written: they are template instantiations, folded aliases, unwind glue and static-init thunks the 2007 compiler emitted from a single source line. Those are rebuilt as that one line, so the function count understates how much is covered.
+
+## Map editor
+
+![The map editor: the Terrain workspace on Seton's Clutch, with the brush modes, the 3D view and the texture layers](docs/images/editor-terrain.jpg)
+
+`FafEditor_x64.exe` is a map editor built from the same engine. It draws with Direct3D 12 or Vulkan, opens maps from the game, any folder or the FAF vault, and plays them inside its own window. Started without arguments, it finds FAF's game data by itself.
+
+- **Terrain:** 17 brush modes (erosion, rain, plateau, paths and ramps among them), stamps, symmetry about any centre, a node-based terrain generator with seed galleries, erosion presets, and height maps to and from Gaea and World Machine.
+- **Texturing and environment:** layer painting with a mask generator, converting a map to another terrain shader, a node-based material editor, lighting, water, sky and decals, and moods and biomes to try on the map.
+- **Objects:** markers, units, props and areas placed with symmetric copies, land, water and air path graphs, pathing overlays for each kind of unit, and statistics for each start position.
+- **Missions and play:** a mission compiler with stages, dialogue, bases and platoons, a Lua editor and debugger, the map check, test plays inside the editor, packaging and upload to the FAF vault.
+- **Assets and mods:** a particle editor, an asset browser, a unit lab for mod projects, and editor mods.
+
+![Four more workspaces: the terrain generator, objects with the pathing overlay, environment looks and lighting, the material editor](docs/images/editor-tour.jpg)
+
+Generate · Objects &nbsp;/&nbsp; Environment · Materials. [docs/MAP_EDITOR.md](docs/MAP_EDITOR.md) describes every tool and how to build and run it. Much of the terrain, texturing, generator, mission and unit tooling is Marlo's work from his FAF Studio editor ([credits](docs/MAP_EDITOR.md#credits)).
 
 ## Retail parity
 
