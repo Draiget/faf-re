@@ -61,6 +61,12 @@
 #include "moho/sim/SimThreadRole.h"
 #include "moho/sim/SimWorkerPool.h"
 #include "moho/console/CConCommand.h"
+#if FAFRE_PLATFORM_POSIX
+#include "platform/posix/NativePath.h"
+
+#include <sys/stat.h>
+#include <unistd.h>
+#endif
 
 using namespace LuaPlus;
 

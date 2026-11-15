@@ -1,6 +1,43 @@
 // Part of LuaObject.cpp, included there: the io library (liolib).
 
 /**
+ * Engine addition (issue #255): a path a script hands io.open, io.lines, io.input, io.output,
+ * os.remove, os.rename, loadfile, dofile or require (luaL_loadfile), as the C library takes it. On
+ * POSIX that is platform::posix::NativePath's form, '/' for '\' and each folder as spelled on disk,
+ * as Windows would find it: scripts join the engine's folders (SHGetFolderPath ends with '\') with
+ * their own names. Windows takes the path as given.
+ */
+class LuaIoPath
+{
+public:
+  explicit LuaIoPath(
+    const char* const path
+  )
+#if FAFRE_PLATFORM_POSIX
+    : mPath(platform::posix::NativePath(path))
+#else
+    : mPath(path)
+#endif
+  {}
+
+  [[nodiscard]] const char* c_str() const noexcept
+  {
+#if FAFRE_PLATFORM_POSIX
+    return mPath.c_str();
+#else
+    return mPath;
+#endif
+  }
+
+private:
+#if FAFRE_PLATFORM_POSIX
+  std::string mPath;
+#else
+  const char* mPath;
+#endif
+};
+
+/**
  * Address: 0x00917B10 (FUN_00917B10, lua::f_flush)
  *
  * What it does:
@@ -750,7 +787,7 @@ int LuaIoOpen(
   const char* const mode = luaL_optlstring(state, 2, "r", nullptr);
 
   WrapFile* const wrapFile = NewFileUserdata(state, true);
-  wrapFile->stream = std::fopen(filePath, mode);
+  wrapFile->stream = std::fopen(LuaIoPath(filePath).c_str(), mode);
   if (wrapFile->stream != nullptr) {
     return 1;
   }
@@ -805,12 +842,74 @@ int io_execute(
  * Removes one filesystem path from Lua arg-1 and returns standard
  * io-library success/error tuple via `pushresult`.
  */
+#if FAFRE_PLATFORM_POSIX
+/**
+ * Engine addition (issue #255): os.remove and os.rename as the MSVC CRT runs them. Its remove()
+ * deletes files only (DeleteFile), where POSIX remove() also deletes an empty folder; its rename()
+ * (MoveFile) refuses a destination that exists, unless it is the source itself (a change of case,
+ * which takes the new spelling), where POSIX rename() replaces it. Both fail with EACCES there, as
+ * the CRT does. Both take the script's paths (LuaIoPath).
+ */
+int LuaIoRemoveFile(
+  const char* const path
+)
+{
+  const LuaIoPath resolved(path);
+  struct stat info{};
+  if (::stat(resolved.c_str(), &info) == 0 && S_ISDIR(info.st_mode)) {
+    errno = EACCES;
+    return -1;
+  }
+  return ::unlink(resolved.c_str());
+}
+
+int LuaIoRenameFile(
+  const char* const from,
+  const char* const to
+)
+{
+  const std::string resolvedFrom = LuaIoPath(from).c_str();
+  const std::string resolvedTo = LuaIoPath(to).c_str();
+  struct stat source{};
+  struct stat target{};
+  if (::stat(resolvedTo.c_str(), &target) != 0) {
+    return std::rename(resolvedFrom.c_str(), resolvedTo.c_str());
+  }
+  if (::stat(resolvedFrom.c_str(), &source) != 0 || source.st_dev != target.st_dev || source.st_ino != target.st_ino) {
+    errno = EACCES;
+    return -1;
+  }
+  // The same file under another case: the folder as found, the name as the script spells it.
+  const std::string given = to;
+  const std::size_t leafAt = given.find_last_of("/\\");
+  const std::size_t folderEnd = resolvedTo.find_last_of('/');
+  const std::string renamed = (folderEnd == std::string::npos ? std::string() : resolvedTo.substr(0, folderEnd + 1)) +
+    (leafAt == std::string::npos ? given : given.substr(leafAt + 1));
+  return std::rename(resolvedFrom.c_str(), renamed.c_str());
+}
+#else
+int LuaIoRemoveFile(
+  const char* const path
+)
+{
+  return std::remove(LuaIoPath(path).c_str());
+}
+
+int LuaIoRenameFile(
+  const char* const from,
+  const char* const to
+)
+{
+  return std::rename(LuaIoPath(from).c_str(), LuaIoPath(to).c_str());
+}
+#endif
+
 int io_remove(
   lua_State* const state
 )
 {
   const char* const path = luaL_checklstring(state, 1, nullptr);
-  const int removeResult = std::remove(path);
+  const int removeResult = LuaIoRemoveFile(path);
   moho::DISK_InvalidateFileLookups(); // engine addition (res_CacheFileLookups)
   return pushresult(path, state, removeResult == 0);
 }
@@ -828,7 +927,7 @@ int io_rename(
 {
   const char* const sourcePath = luaL_checklstring(state, 1, nullptr);
   const char* const destinationPath = luaL_checklstring(state, 2, nullptr);
-  const int renameResult = std::rename(sourcePath, destinationPath);
+  const int renameResult = LuaIoRenameFile(sourcePath, destinationPath);
   moho::DISK_InvalidateFileLookups(); // engine addition (res_CacheFileLookups)
   return pushresult(sourcePath, state, renameResult == 0);
 }
@@ -974,7 +1073,7 @@ int LuaIoFile(
 
     if (argument != nullptr) {
       WrapFile* const wrapFile = NewFileUserdata(state, true);
-      wrapFile->stream = std::fopen(argument, mode);
+      wrapFile->stream = std::fopen(LuaIoPath(argument).c_str(), mode);
       if (wrapFile->stream == nullptr) {
         const int errorCode = *_errno();
         lua_pushfstring(state, "%s: %s", argument, std::strerror(errorCode));
@@ -1232,7 +1331,7 @@ int LuaIoLines(
 
   const char* const fileName = luaL_checklstring(state, 1, nullptr);
   WrapFile* const wrapFile = NewFileUserdata(state, true);
-  wrapFile->stream = std::fopen(fileName, "r");
+  wrapFile->stream = std::fopen(LuaIoPath(fileName).c_str(), "r");
   if (wrapFile->stream == nullptr) {
     luaL_argerror(state, 1, std::strerror(errno));
   }

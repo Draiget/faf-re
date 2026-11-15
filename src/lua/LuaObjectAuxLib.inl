@@ -1245,7 +1245,7 @@ int luaL_loadfile(
   LuaLoadFileState lf;
   if (filename != nullptr) {
     lua_pushfstring(state, "@%s", filename);
-    lf.f = std::fopen(filename, "r");
+    lf.f = std::fopen(LuaIoPath(filename).c_str(), "r"); // LuaObjectIoLib.inl: POSIX paths as Windows finds them
   } else {
     lua_pushlstring(state, "=stdin", 6u);
     lf.f = stdin;
@@ -1275,7 +1275,7 @@ int luaL_loadfile(
   std::ungetc(first, lf.f);
   if (std::isspace(first) == 0 && std::isprint(first) == 0 && lf.f != stdin) {
     std::fclose(lf.f);
-    lf.f = std::fopen(filename, "rb");
+    lf.f = std::fopen(LuaIoPath(filename).c_str(), "rb");
     if (lf.f == nullptr) {
       return errfile(state, fnameindex);
     }
