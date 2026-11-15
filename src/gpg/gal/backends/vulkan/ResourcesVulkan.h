@@ -120,6 +120,7 @@ namespace gpg::gal
   private:
     RenderTargetContext mContext;
     std::vector<Buffer> mBuffers;
+    Buffer mNoImage; // Current() of a back buffer whose head has no acquired image: no image, no view
     DXGI_FORMAT mDxgiFormat = DXGI_FORMAT_UNKNOWN;
     int mSwapChainIndex = -1;
   };

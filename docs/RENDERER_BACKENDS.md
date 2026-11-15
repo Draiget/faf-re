@@ -154,6 +154,7 @@ Both are optional; without them the game falls back to Direct3D 9.
 | `FAF_GAL_UPLOAD_SUBMIT_KB=<n>` | Direct3D 12: submits the recorded commands after every n KB of uploads (default 48 MB on x86, 96 MB on x64), which exercises the mid-frame submission paths |
 | `FAF_CRASH_NO_DIALOG=1` | The crash report and minidump are written, but no dialog waits for a click (unattended test runs) |
 | `FAF_GAL_FAIL_SETUP=1`, `=d3d12,vulkan` | Device creation fails (every newer backend, or the listed ones), which exercises the renderer fallback |
+| `FAF_GAL_SURFACE_LOSS=<seconds>` | Vulkan: each window surface goes after that many seconds, and the window has none for a second after it, the route an Android activity's surface takes when the activity goes to the back and comes again: the game draws nothing until the head has the next surface (`TestCooperativeLevel`) |
 | `FAF_IMAGECODEC_DIRECTXTEX=1` | Direct3D 12 and Vulkan: textures decode and encode with DirectXTex even when `d3dx11_43.dll` is installed, the route players without the DirectX runtime take (issue #318) |
 | `FAF_IMAGECODEC_OWN_DDS=1` | Direct3D 12 and Vulkan: DDS files are always written by the engine, not D3DX11, which exercises on Windows the route Wine takes |
 | `FAF_GAL_DUMP_DIR`, `FAF_GAL_DUMP_SECONDS` | Writes the back buffer as BMP every N seconds |

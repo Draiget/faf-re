@@ -503,6 +503,8 @@ _faf_linux_portable_test(faf_texture_quality_tests texture_quality tests/image_c
 _faf_linux_portable_test(faf_profiler_tests profiler_facade tests/profiling/ProfilerFacadeTests.cpp)
 _faf_linux_portable_test(faf_sfd_parser_tests sfd_header_parser
   tests/movie/SfdHeaderParserTests.cpp src/moho/movie/sfd/SfdHeaderParser.cpp)
+_faf_linux_portable_test(faf_vulkan_surface_lifecycle_tests vulkan_surface_lifecycle
+  tests/vulkan/SurfaceLifecycleTests.cpp)
 
 file(GLOB _faf_core_test_sources "${PROJECT_SOURCE_DIR}/tests/core/*.cpp")
 add_executable(faf_core_tests EXCLUDE_FROM_ALL ${_faf_core_test_sources})
