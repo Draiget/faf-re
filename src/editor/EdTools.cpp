@@ -912,6 +912,14 @@ namespace faf::editor
     put("unitMode", mUnitMode);
     put("decalMode", mDecalMode);
     put("airbrush", mAirbrush ? 1 : 0);
+    // The texture browser's stars, its recent textures (latest first) and the list view (FAF Studio keeps them too).
+    put("textureList", mBrowseList ? 1 : 0);
+    for (const std::string& path : mStarredTextures) {
+      text += "textureStar=" + path + "\n";
+    }
+    for (const std::string& path : mRecentTextures) {
+      text += "textureRecent=" + path + "\n";
+    }
     return text;
   }
 
@@ -919,6 +927,10 @@ namespace faf::editor
     const std::string& text
   )
   {
+    if (text.find("textureStar=") != std::string::npos || text.find("textureRecent=") != std::string::npos) {
+      mStarredTextures.clear();
+      mRecentTextures.clear();
+    }
     std::size_t at = 0;
     while (at < text.size()) {
       const std::size_t end = std::min(text.find('\n', at), text.size());
@@ -932,6 +944,25 @@ namespace faf::editor
       const char* const value = line.c_str() + equals + 1;
       const float number = static_cast<float>(std::atof(value));
       const int whole = std::atoi(value);
+      if (key == "textureStar" || key == "textureRecent") {
+        // (a line read from a file written on Windows may end in a carriage return)
+        std::string path = value;
+        while (!path.empty() && (path.back() == '\r' || path.back() == ' ')) {
+          path.pop_back();
+        }
+        if (!path.empty()) {
+          if (key == "textureStar") {
+            mStarredTextures.push_back(path);
+          } else if (mRecentTextures.size() < 12) {
+            mRecentTextures.push_back(path);
+          }
+        }
+        continue;
+      }
+      if (key == "textureList") {
+        mBrowseList = whole != 0;
+        continue;
+      }
       if (key.rfind("brush.", 0) == 0) {
         float r = 0.0f, s = 0.0f, f = 0.0f;
         if (std::sscanf(value, "%f,%f,%f", &r, &s, &f) == 3) {

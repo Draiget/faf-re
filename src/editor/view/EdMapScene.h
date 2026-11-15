@@ -602,13 +602,19 @@ namespace faf::editor
     [[nodiscard]] AreaHit AreaUnder(POINT at) const;
     /**
      * The cursor over the view for the tool and what is under it (FAF Studio's cursors.lua): a brush's crosshair with
-     * + or - (raise or lower), the move cross over what a drag moves, resize arrows over an area's handles, a
-     * crosshair where a click places; 0 keeps the arrow. A Windows cursor resource id or one of the editor's own (1,
-     * 2).
+     * its kind's sign, the move cross over what a drag moves, resize arrows over an area's handles, the pin where a
+     * click places a marker, a crosshair where another tool places; 0 keeps the arrow. A Windows cursor resource id, or
+     * one of the editor's own (1..6, EditorCursor's kinds 0..5).
      */
     [[nodiscard]] int ViewCursor() const;
-    /** The height brush's cursor, made once: a crosshair with + (raise) or - (lower). */
-    static HCURSOR BrushCursor(bool lower);
+    /**
+     * The editor's own cursors, made once (FAF Studio's cursors.lua): 0 raise (+), 1 lower (-), 2 flatten (a level
+     * bar), 3 smooth (a wave), 4 noise (scattered dots), each a crosshair with its sign at the lower right; 5 the
+     * marker pin (its point the hot spot).
+     */
+    static HCURSOR EditorCursor(int kind);
+    /** ViewCursor's numbers 1..6 are EditorCursor's kinds 0..5. */
+    static constexpr int kEditorCursors = 6;
     void AreaMouseMove(POINT at);
     void AreaMouseUp();
     bool AreaCtrlKey(char key);
@@ -655,6 +661,24 @@ namespace faf::editor
     bool mMeshInstancesTried = false;
     bool mMeshHidesTerrain = false;
     void BuildMeshInstances();
+    /**
+     * FAF Studio's mesh material baked for one patch (its shader minus the view-dependent sun highlight and the dynamic
+     * shadow): the two layers blended by light mask 1's alpha, the three baked light masks through the blended normal
+     * map, glow, alpha test, the water ramp below the water level, haze into the void colour; one texture over the
+     * patch seen from above, with a copy of the patch whose first texture coordinates span it, both in the editor's
+     * cache (mounted at /editor_meshview). False (and `why`) when it can't be made; the patch is drawn lit instead.
+     */
+    bool
+    BakeMeshPatch(std::size_t index, int generation, std::string& meshPath, std::string& albedoPath, std::string& why);
+    /** Where the baked patches go (the app's cache folder; empty: no bake). */
+    void SetMeshViewCache(
+      std::filesystem::path folder
+    )
+    {
+      mMeshViewCache = std::move(folder);
+    }
+    std::filesystem::path mMeshViewCache;
+    int mMeshBakeGeneration = 0;
     void DeleteMeshInstances();
     void SyncMeshView();
     /** Test runs: the cursor the view would show with the pointer at `at` (view pixels). */

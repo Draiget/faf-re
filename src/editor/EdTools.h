@@ -998,6 +998,25 @@ namespace faf::editor
     {
       mAreaLimit = limit;
     }
+    /** Test runs: the texture browser's stars, recent textures and list view (as tools.ini keeps them). */
+    [[nodiscard]] std::vector<std::string>& StarredTextures() noexcept
+    {
+      return mStarredTextures;
+    }
+    [[nodiscard]] std::vector<std::string>& RecentTextures() noexcept
+    {
+      return mRecentTextures;
+    }
+    void SetBrowseList(
+      const bool list
+    ) noexcept
+    {
+      mBrowseList = list;
+    }
+    [[nodiscard]] bool BrowseList() const noexcept
+    {
+      return mBrowseList;
+    }
     /** The open map's folder in the game's files (`/maps/<folder>`): the texture browser lists its own textures. */
     void SetMapFolder(
       std::string folder

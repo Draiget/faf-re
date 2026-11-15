@@ -8360,6 +8360,75 @@ namespace faf::editor
        * areas with the markers (duplicated together, arranged, following a drag); with `/meshtest`, the mesh drawn as
        * models, the height field hidden in Mesh only and the pointer on the mesh.
        */
+      /**
+       * `/r11test` (test runs): the brush cursors for each brush kind and the marker pin; the texture browser's stars,
+       * recent and list view as read from the tools file (`/toolsfile`), then a star, a recent texture and the list
+       * view set (the file keeps them for the next run).
+       */
+      int mR11Stage = 0;
+      int mR11Frames = 0;
+      void DriveRoundElevenTest()
+      {
+        if (
+          mR11Stage >= 4 || !mScene.Attached() || mScene.ModelsPending() ||
+          !moho::CFG_GetArgOption("/r11test", 0, nullptr) || ++mR11Frames % 90 != 0
+        ) {
+          return;
+        }
+        EdTools& tools = mShell->Tools();
+        const float cx = static_cast<float>(mDocument.Facts().fieldWidth - 1) * 0.5f;
+        const float cz = static_cast<float>(mDocument.Facts().fieldHeight - 1) * 0.5f;
+        switch (mR11Stage++) {
+        case 0: {
+          std::string stars;
+          for (const std::string& path : tools.StarredTextures()) {
+            stars += path + " ";
+          }
+          gpg::Logf(
+            "editor: /r11test: read: %zu starred (%s), %zu recent, list view %s",
+            tools.StarredTextures().size(),
+            stars.c_str(),
+            tools.RecentTextures().size(),
+            tools.BrowseList() ? "on" : "off"
+          );
+          mScene.FrameMap();
+          break;
+        }
+        case 1: {
+          const POINT middle = mScene.ScreenOf(cx, cz);
+          std::string cursors;
+          static constexpr std::pair<HeightBrushMode, const char*> kModes[] = {
+            {HeightBrushMode::Raise, "raise"},
+            {HeightBrushMode::Lower, "lower"},
+            {HeightBrushMode::Flatten, "flatten"},
+            {HeightBrushMode::Smooth, "smooth"},
+            {HeightBrushMode::Noise, "noise"},
+            {HeightBrushMode::SetHeight, "set height"},
+            {HeightBrushMode::WaterErode, "water erode"},
+            {HeightBrushMode::Stamp, "stamp"},
+          };
+          for (const auto& [mode, name] : kModes) {
+            tools.SetBrushMode(static_cast<int>(mode));
+            cursors += std::string(name) + " " + std::to_string(mScene.ViewCursorAt(middle)) + ", ";
+          }
+          tools.SetTool(6);
+          cursors += "markers tool " + std::to_string(mScene.ViewCursorAt(middle));
+          gpg::Logf("editor: /r11test: cursors: %s", cursors.c_str());
+          break;
+        }
+        case 2:
+          tools.StarredTextures() = {"/env/evergreen/layers/SandLight_albedo.dds"};
+          tools.RecentTextures() = {"/env/evergreen/layers/RockMed_albedo.dds"};
+          tools.SetBrowseList(true);
+          gpg::Logf("editor: /r11test: starred SandLight, recent RockMed, list view on");
+          break;
+        case 3:
+          gpg::Logf("editor: /r11test: done");
+          break;
+        default:
+          break;
+        }
+      }
       int mR10Stage = 0;
       int mR10Frames = 0;
       void DriveRoundTenTest()
@@ -13523,6 +13592,10 @@ namespace faf::editor
           mShell->mMeshMode = std::clamp(std::atoi(mode[0].c_str()), 0, 2);
         }
       }
+      if (static bool cacheSet = false; !cacheSet && !EditorSettingsFolder().empty()) {
+        cacheSet = true;
+        mScene.SetMeshViewCache(EditorSettingsFolder() / "cache" / "meshview");
+      }
       mScene.SetMeshMode(mShell->MeshMode());
       if (mScene.Attached() && mMeshLoadedFor != mDocument.Path()) {
         mMeshLoadedFor = mDocument.Path();
@@ -14428,6 +14501,7 @@ namespace faf::editor
         DriveRoundEightTest();
         DriveRoundNineTest();
         DriveRoundTenTest();
+        DriveRoundElevenTest();
         RecipesUpdate();
         TexturesUpdate();
         DriveMaterialEditor();

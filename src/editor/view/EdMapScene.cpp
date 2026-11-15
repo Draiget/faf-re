@@ -9116,14 +9116,15 @@ namespace faf::editor
     return bounds;
   }
 
-  HCURSOR EdMapScene::BrushCursor(
-    const bool lower
+  HCURSOR EdMapScene::EditorCursor(
+    const int kind
   )
   {
-    // 32 x 32: a crosshair round the hot spot (16, 16) with a gap, and a + or - at the lower right; the lines invert
-    // the screen under them (AND 1, XOR 1), so they show on any ground.
-    static HCURSOR made[2] = {nullptr, nullptr};
-    HCURSOR& cursor = made[lower ? 1 : 0];
+    // 32 x 32: a crosshair round the hot spot (16, 16) with a gap and the brush's sign at the lower right, or the pin;
+    // the lines invert the screen under them (AND 1, XOR 1), so they show on any ground.
+    static HCURSOR made[kEditorCursors] = {};
+    const int k = std::clamp(kind, 0, kEditorCursors - 1);
+    HCURSOR& cursor = made[k];
     if (cursor != nullptr) {
       return cursor;
     }
@@ -9136,19 +9137,65 @@ namespace faf::editor
       andMask[bit / 8] |= static_cast<std::uint8_t>(0x80 >> (bit % 8));
       xorMask[bit / 8] |= static_cast<std::uint8_t>(0x80 >> (bit % 8));
     };
+    if (k == 5) {
+      // The marker pin: a ring head and a stem to its point at the bottom, the hot spot.
+      for (int a = 0; a < 48; ++a) {
+        const double t = a * 6.2831853 / 48.0;
+        dot(
+          16 + static_cast<int>(std::lround(5.0 * std::cos(t))), 9 + static_cast<int>(std::lround(5.0 * std::sin(t)))
+        );
+      }
+      for (int y = 14; y <= 30; ++y) {
+        dot(16, y);
+      }
+      cursor = ::CreateCursor(::GetModuleHandleW(nullptr), 16, 30, 32, 32, andMask, xorMask);
+      return cursor != nullptr ? cursor : ::LoadCursorW(nullptr, IDC_CROSS);
+    }
     for (int d = 3; d <= 11; ++d) {
       dot(16 + d, 16);
       dot(16 - d, 16);
       dot(16, 16 + d);
       dot(16, 16 - d);
     }
-    for (int d = -3; d <= 3; ++d) {
-      dot(26 + d, 26);
-      dot(26 + d, 27);
-      if (!lower) {
-        dot(26, 26 + d);
-        dot(27, 26 + d);
+    // The sign at the lower right, round (26, 26).
+    switch (k) {
+    case 0: // raise: +
+    case 1: // lower: -
+      for (int d = -3; d <= 3; ++d) {
+        dot(26 + d, 26);
+        dot(26 + d, 27);
+        if (k == 0) {
+          dot(26, 26 + d);
+          dot(27, 26 + d);
+        }
       }
+      break;
+    case 2: // flatten: a level bar on two feet
+      for (int d = -4; d <= 4; ++d) {
+        dot(26 + d, 24);
+      }
+      for (int d = 25; d <= 28; ++d) {
+        dot(22, d);
+        dot(30, d);
+      }
+      break;
+    case 3: // smooth: a wave
+      for (int d = -4; d <= 4; ++d) {
+        dot(26 + d, 26 + static_cast<int>(std::lround(1.6 * std::sin(d * 0.8))));
+      }
+      break;
+    default: // noise: scattered dots
+      for (const auto& [x, y] :
+           {std::pair{23, 23},
+            std::pair{27, 24},
+            std::pair{30, 26},
+            std::pair{24, 27},
+            std::pair{28, 29},
+            std::pair{22, 30},
+            std::pair{26, 31}}) {
+        dot(x, y);
+      }
+      break;
     }
     cursor = ::CreateCursor(::GetModuleHandleW(nullptr), 16, 16, 32, 32, andMask, xorMask);
     return cursor != nullptr ? cursor : ::LoadCursorW(nullptr, IDC_CROSS);
@@ -9267,11 +9314,30 @@ namespace faf::editor
       if (PickGizmo(at) != GizmoPart::None || !mHoverMarker.empty()) {
         return 32646; // over a marker or the gizmo: a drag moves it
       }
-      return 32515; // a click places a marker
+      return 6; // a click places a marker: the pin
     }
     if (mTools->TerrainToolActive()) {
-      // The brush's crosshair, + raising, - lowering (the editor's own two cursors).
-      return mTools->PreviewHeightBrush().mode == HeightBrushMode::Lower ? 2 : 1;
+      // The brush's crosshair with its kind's sign (Studio's five brush cursors): raise, lower, flatten, smooth, noise.
+      switch (mTools->PreviewHeightBrush().mode) {
+      case HeightBrushMode::Lower:
+      case HeightBrushMode::Erode:
+      case HeightBrushMode::WaterErode:
+      case HeightBrushMode::Rain:
+        return 2;
+      case HeightBrushMode::Flatten:
+      case HeightBrushMode::SetHeight:
+      case HeightBrushMode::Terrace:
+      case HeightBrushMode::Plane:
+      case HeightBrushMode::Plateau:
+      case HeightBrushMode::Ramp:
+        return 3;
+      case HeightBrushMode::Smooth:
+        return 4;
+      case HeightBrushMode::Noise:
+        return 5;
+      default: // raise, stamp, deposit, sharpen, path
+        return 1;
+      }
     }
     if (mTools->SelectToolActive()) {
       if (PickGizmo(at) != GizmoPart::None || PickAnything(at).kind != PickKind::None) {
@@ -11120,17 +11186,26 @@ namespace faf::editor
           const fa::string file(place.first.c_str());
           gpg::STR_CopyFilename(&id.name, &file);
           moho::RPropBlueprint* const blueprint = rules->GetPropBlueprint(id);
+          moho::RMeshBlueprint* mesh =
+            blueprint != nullptr ? rules->GetMeshBlueprint(blueprint->Display.MeshBlueprint) : nullptr;
+          // A mesh whose first level names no model file (no <name>_lod0.scm beside the blueprint) has nothing to draw:
+          // asked for, the engine warns "GetResource: Invalid name" and returns no instance, again every frame.
+          const bool noModel = mesh != nullptr && (mesh->mLods.empty() || mesh->mLods.begin()->mMeshName.empty());
+          if (noModel) {
+            mesh = nullptr;
+          }
           found = meshes
                     .emplace(
                       place.first,
                       std::pair<moho::RMeshBlueprint*, float>{
-                        blueprint != nullptr ? rules->GetMeshBlueprint(blueprint->Display.MeshBlueprint) : nullptr,
-                        blueprint != nullptr ? blueprint->Display.UniformScale : 1.0f
+                        mesh, blueprint != nullptr ? blueprint->Display.UniformScale : 1.0f
                       }
                     )
                     .first;
           gpg::Logf(
-            "editor: marker model %s: %s", place.first.c_str(), found->second.first != nullptr ? "found" : "missing"
+            "editor: marker model %s: %s",
+            place.first.c_str(),
+            found->second.first != nullptr ? "found" : (noModel ? "no model file (drawn as its marker)" : "missing")
           );
         }
         if (found->second.first == nullptr) {
@@ -15108,7 +15183,9 @@ namespace faf::editor
     // The tool's cursor over the view (FAF Studio's cursors), not while a play has it.
     if (message == WM_SETCURSOR && LOWORD(lParam) == HTCLIENT && mMap != nullptr && !OverPlay()) {
       if (const int cursor = ViewCursor(); cursor != 0) {
-        ::SetCursor(cursor <= 2 ? BrushCursor(cursor == 2) : ::LoadCursorW(nullptr, MAKEINTRESOURCEW(cursor)));
+        ::SetCursor(
+          cursor <= kEditorCursors ? EditorCursor(cursor - 1) : ::LoadCursorW(nullptr, MAKEINTRESOURCEW(cursor))
+        );
         return true;
       }
       return false;
