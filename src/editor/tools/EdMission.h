@@ -38,6 +38,12 @@ namespace faf::editor
     std::string text;
     std::string speaker;
     double seconds = 5.0;
+    /** Optional (ScenarioFramework.Dialogue): a voice-over (sound bank and cue), a movie of /movies, the portrait's
+     * faction (UEF, Aeon, Cybran, Seraphim). */
+    std::string bank;
+    std::string cue;
+    std::string vid;
+    std::string faction;
   };
 
   struct MissionDialogue
@@ -303,8 +309,12 @@ namespace faf::editor
       std::string state; // active, done, off
     };
     std::vector<Objective> objectives;
+    /** The flags (ScenarioInfo.VarTable's true / false entries: Set a flag, OpAI build conditions), by name. */
+    std::vector<std::pair<std::string, bool>> flags;
   };
   bool ParseMissionLive(const std::string& line, MissionLive& out);
+  /** The SimLua line that sets a flag (ScenarioInfo.VarTable[name]) in the running play; false for a bad name. */
+  bool MissionSetFlag(const std::string& name, bool value, std::string& command);
   /** The SimLua line that makes the sim log that state (`EDMISSION live ...`). */
   [[nodiscard]] std::string MissionLiveQuery();
   /** The SimLua line that sets a mission variable to true or false (false: the name isn't one a script can have). */

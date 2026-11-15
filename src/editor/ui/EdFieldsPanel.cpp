@@ -85,6 +85,8 @@ namespace faf::editor
       ImGui::End();
       return;
     }
+    DrawQuickGen();
+    ImGui::SeparatorText("Ops on a copy of the heights");
     if (ImGui::Button(mStack.Empty() ? "Start from the map's heights" : "Start again from the map")) {
       field::Grid ground;
       if (mGround && mGround(ground)) {
@@ -134,7 +136,35 @@ namespace faf::editor
       mCommitAsked = true;
     }
     EdSetItemTooltip("The top of the stack becomes the map's heights, as one undo step");
+    ImGui::SetNextItemWidth(Em(70.0f));
+    FillSliderInt("##commitlayer", &mCommitLayer, 1, 8, "layer %d");
+    ImGui::SameLine();
+    if (ImGui::Button("Commit to layer")) {
+      mLayerCommitAsked = true;
+    }
+    EdSetItemTooltip("The top of the stack (0..1) as that layer's paint, as one undo step");
+    ImGui::Checkbox("Live preview", &mLive);
+    EdSetItemTooltip("The last op is applied again half a second after its parameters change");
     ImGui::EndDisabled();
+    // Live: the parameters changed and the wait passed: the last op off and on again with them.
+    if (mLive && !mStack.Empty() && !mStack.Steps().empty() && !names.empty()) {
+      const double now = ImGui::GetTime();
+      if (mLiveParams != mParams) {
+        mLiveParams = mParams;
+        mLiveDue = now + 0.5;
+      } else if (mLiveDue > 0.0 && now >= mLiveDue) {
+        mLiveDue = -1.0;
+        const std::string& op = names[static_cast<std::size_t>(mOp)];
+        std::string error;
+        if (mStack.Back() && mStack.Apply(op, ParseOpParams(mParams), error)) {
+          mStatus = op + " again with the new values (live).";
+        } else if (!error.empty()) {
+          mStatus = op + ": " + error;
+        }
+      }
+    } else {
+      mLiveParams = mParams;
+    }
     if (!mStatus.empty()) {
       ImGui::TextWrapped("%s", mStatus.c_str());
     }
@@ -147,6 +177,103 @@ namespace faf::editor
       }
     }
     ImGui::End();
+  }
+
+  const std::vector<EdFieldsPanel::QuickGenPreset>& EdFieldsPanel::QuickGenPresets()
+  {
+    // FAF Studio's fieldgen.lua presets: noise kind, feature size, the relief's size, crest sharpness, warp, detail.
+    static const std::vector<QuickGenPreset> presets = {
+      {"Hills", "fbm", 140.0f, 18.0f, 2.0f, 0.0f, 0.5f},
+      {"Mountains", "ridged", 260.0f, 70.0f, 2.0f, 30.0f, 0.5f},
+      {"Badlands", "ridged", 90.0f, 25.0f, 3.0f, 10.0f, 0.55f},
+      {"Dunes", "billow", 60.0f, 6.0f, 2.0f, 20.0f, 0.4f},
+      {"Plains", "fbm", 320.0f, 5.0f, 2.0f, 0.0f, 0.45f},
+      {"Rocks", "ridged", 40.0f, 8.0f, 2.5f, 6.0f, 0.6f},
+    };
+    return presets;
+  }
+
+  void EdFieldsPanel::DrawQuickGen()
+  {
+    if (!ImGui::CollapsingHeader("Generate into the map", ImGuiTreeNodeFlags_DefaultOpen)) {
+      return;
+    }
+    QuickGenSettings& q = mQuick;
+    std::vector<const char*> names;
+    for (const QuickGenPreset& p : QuickGenPresets()) {
+      names.push_back(p.label);
+    }
+    ImGui::SetNextItemWidth(Em(140.0f));
+    if (EdCombo("##qgpreset", &q.preset, names.data(), static_cast<int>(names.size()))) {
+      const QuickGenPreset& p = QuickGenPresets()[static_cast<std::size_t>(q.preset)];
+      q.scale = p.scale;
+      q.amplitude = p.amplitude;
+      q.warp = p.warp;
+      q.detail = p.detail;
+    }
+    ImGui::SameLine();
+    static constexpr const char* kBlends[] = {"Add", "Multiply", "Raise only", "Lower only", "Replace"};
+    ImGui::SetNextItemWidth(Em(120.0f));
+    (void)EdCombo("##qgblend", &q.blend, kBlends, 5);
+    EdSetItemTooltip(
+      "Add: on top of the ground. Multiply: more on higher ground. Raise only / Lower only. Replace: in "
+      "place of the ground (the mean height stays)"
+    );
+    ImGui::SetNextItemWidth(-1.0f);
+    FillSliderFloat("##qgamp", &q.amplitude, 0.5f, 150.0f, "Relief %.1f units");
+    ImGui::SetNextItemWidth(-1.0f);
+    FillSliderFloat("##qgstrength", &q.strength, 0.0f, 1.0f, "Strength %.2f");
+    ImGui::SetNextItemWidth(-1.0f);
+    FillSliderFloat("##qgscale", &q.scale, 10.0f, 800.0f, "Feature size %.0f units");
+    ImGui::SetNextItemWidth(Em(100.0f));
+    ImGui::InputInt("Seed##qg", &q.seed);
+    ImGui::SameLine();
+    if (ImGui::SmallButton("Random##qg")) {
+      q.seed = static_cast<int>(ImGui::GetFrameCount() * 2654435761u % 9999u) + 1;
+    }
+    ImGui::SetNextItemWidth(-1.0f);
+    FillSliderFloat("##qgdetail", &q.detail, 0.2f, 0.8f, "Detail %.2f");
+    ImGui::SetNextItemWidth(-1.0f);
+    FillSliderFloat("##qgwarp", &q.warp, 0.0f, 80.0f, "Warp %.0f units");
+    static constexpr const char* kMasks[] = {"Whole map", "Playable area", "An area"};
+    ImGui::SetNextItemWidth(Em(140.0f));
+    (void)EdCombo("##qgmask", &q.mask, kMasks, 3);
+    if (q.mask == 2) {
+      ImGui::SameLine();
+      ImGui::SetNextItemWidth(Em(120.0f));
+      if (EdBeginCombo("##qgarea", q.area.empty() ? "(choose)" : q.area.c_str())) {
+        for (const std::string& a : mAreas) {
+          if (ImGui::Selectable(a.c_str(), a == q.area)) {
+            q.area = a;
+          }
+        }
+        ImGui::EndCombo();
+      }
+    }
+    ImGui::SetNextItemWidth(-1.0f);
+    FillSliderFloat("##qgfeather", &q.feather, 0.0f, 120.0f, "Soft border %.0f units");
+    ImGui::Checkbox("Keep start and resource spots flat", &q.keepFlat);
+    if (q.keepFlat) {
+      ImGui::SameLine();
+      ImGui::SetNextItemWidth(Em(90.0f));
+      FillSliderFloat("##qgflat", &q.flatRadius, 4.0f, 80.0f, "%.0f units");
+    }
+    ImGui::Checkbox("Keep the water level", &q.keepWater);
+    EdSetItemTooltip("Dry ground stays above the water and the sea floor below it");
+    if (ImGui::Button("Preview##qg")) {
+      mQuickAsk = 1;
+    }
+    ImGui::SameLine();
+    if (PrimaryButton("Apply to terrain##qg")) {
+      mQuickAsk = 2;
+    }
+    EdSetItemTooltip("Mixed into the map's heights, one undo step");
+    if (!mQuickText.empty()) {
+      ImGui::TextWrapped("%s", mQuickText.c_str());
+    }
+    if (mQuickChange.w > 1) {
+      DrawGrid(mQuickChange, std::min(ImGui::GetContentRegionAvail().x, Em(200.0f)));
+    }
   }
 
   bool EdFieldsPanel::TakeCommit(
@@ -162,6 +289,27 @@ namespace faf::editor
     }
     out = *mStack.Top();
     mStatus = "Put on the map (one undo step).";
+    return true;
+  }
+
+  bool EdFieldsPanel::TakeLayerCommit(
+    field::Grid& out,
+    int& layer
+  )
+  {
+    if (!mLayerCommitAsked) {
+      return false;
+    }
+    mLayerCommitAsked = false;
+    if (mStack.Top() == nullptr) {
+      return false;
+    }
+    out = *mStack.Top();
+    for (float& v : out.v) {
+      v = std::clamp(v, 0.0f, 1.0f);
+    }
+    layer = mCommitLayer;
+    mStatus = "Put into layer " + std::to_string(layer) + " (one undo step).";
     return true;
   }
 

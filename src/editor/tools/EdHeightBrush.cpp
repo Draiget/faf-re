@@ -982,25 +982,27 @@ namespace faf::editor
     )
     {
       const double radius = std::max(1.0, static_cast<double>(brush.radius));
-      return static_cast<float>(radius + erosion::BrushDefaultMargin(ErosionModeOf(brush.mode), radius) + 2.0);
+      const double margin = ErosionModeOf(brush.mode) == 1 ? static_cast<double>(brush.ero.reach) * radius + 3.0 : 0.0;
+      return static_cast<float>(radius + margin + 2.0);
     }
 
     [[nodiscard]] erosion::HydroParams ErosionParams(
       const HeightBrush& brush
     )
     {
+      const ErosionBrushValues& v = brush.ero;
       erosion::HydroParams p;
-      p.rain = 0.006f;
+      p.rain = v.rain;
       p.evaporation = 0.02f;
-      p.capacity = 1.0f;
-      p.erosion = 0.2f;
-      p.deposition = 0.1f;
-      p.inertia = 0.3f;
-      p.conserve = 0.7f;
-      p.thermal = 0.15f;
+      p.capacity = v.capacity;
+      p.erosion = v.erosion;
+      p.deposition = v.deposition;
+      p.inertia = v.inertia;
+      p.conserve = v.conserve;
+      p.thermal = v.thermal;
       p.talus = 0.8f;
-      p.vary = 0.5f;
-      p.vary_scale = 24.0f;
+      p.vary = v.vary;
+      p.vary_scale = v.varyScale;
       p.track = false;
       p.seed = brush.seed;
       return p;
@@ -1118,9 +1120,13 @@ namespace faf::editor
       dab.radius = brush.radius;
       dab.falloff = brush.falloff;
       dab.mode = ErosionModeOf(brush.mode);
-      dab.iterations = std::clamp(static_cast<int>(std::lround(strength * kErosionRoundsPerDab * dabs)), 1, 60);
+      dab.iterations =
+        std::clamp(static_cast<int>(std::lround(strength * static_cast<double>(brush.ero.iterations) * dabs)), 1, 60);
       dab.strength = 1.0;
-      dab.amount = kDepositPerDab * strength * dabs;
+      dab.amount = static_cast<double>(brush.ero.amount) * strength * dabs;
+      if (dab.mode == 1) {
+        dab.margin = static_cast<double>(brush.ero.reach) * static_cast<double>(brush.radius) + 3.0;
+      }
       int x0 = 0;
       int z0 = 0;
       int x1 = 0;

@@ -213,9 +213,28 @@ namespace faf::editor
   /** The most copies a symmetry makes (N-way turns go up to this many). */
   constexpr int kMaxSymmetryCopies = 16;
 
+  /** The erosion brushes' settings (FAF Studio's erosionbrush.lua Values, edited in the brush's Erosion settings). */
+  struct ErosionBrushValues
+  {
+    float iterations = 4.0f; // rounds of drops per dab at full strength
+    float rain = 0.006f;     // drops a round releases
+    float capacity = 1.0f;   // sediment a fast drop can carry
+    float erosion = 0.2f;    // dissolving rate
+    float deposition = 0.1f; // settling rate
+    float inertia = 0.3f;    // how much a drop keeps its direction
+    float conserve = 0.7f;   // keep volume: what runs out is put back low in the brush
+    float thermal = 0.15f;   // thermal slides
+    float reach = 0.8f;      // Rain: how far past the radius it digs (share of the radius)
+    float amount = 0.5f;     // Deposit: sediment at the centre per dab (game units)
+    float vary = 0.5f;       // hardness variation
+    float varyScale = 24.0f; // its feature size (samples)
+  };
+
   struct HeightBrush
   {
     HeightBrushMode mode = HeightBrushMode::Raise;
+    /** Water erode, Rain and Deposit: their settings. */
+    ErosionBrushValues ero;
     Symmetry symmetry = Symmetry::None;
     /** Radius in height samples (one sample per game unit). */
     float radius = 14.0f;

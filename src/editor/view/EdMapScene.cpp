@@ -2106,6 +2106,7 @@ namespace faf::editor
       float x;
       float z;
       float heading;
+      int index; // which copy of the symmetry (1..n-1)
     };
     const auto copiesOf = [&](const float x, const float z, const float heading) {
       float cx[kMaxSymmetryCopies], cz[kMaxSymmetryCopies], ax[kMaxSymmetryCopies], az[kMaxSymmetryCopies];
@@ -2119,7 +2120,7 @@ namespace faf::editor
           cx[c] >= 0.0f && cz[c] >= 0.0f && cx[c] <= static_cast<float>(field->width - 1) &&
           cz[c] <= static_cast<float>(field->height - 1)
         ) {
-          out.push_back({cx[c], cz[c], std::atan2(az[c] - cz[c], ax[c] - cx[c])});
+          out.push_back({cx[c], cz[c], std::atan2(az[c] - cz[c], ax[c] - cx[c]), c});
         }
       }
       return out;
@@ -2168,6 +2169,41 @@ namespace faf::editor
           highest = std::max(highest, HighestUnitNumber(group));
         }
       }
+      // The army of each copy (FAF Studio's ArmyMode 'map'): the start position nearest the copy of the army's start.
+      const auto armyImage = [&](const std::string& army, const int index) {
+        if (!mMirrorMapArmies) {
+          return army;
+        }
+        float sx = 0.0f, sy = 0.0f, sz = 0.0f;
+        bool have = false;
+        for (const SaveEntry& marker : mDocument.SaveData().Markers()) {
+          if (marker.name == army && MarkerPosition(marker, sx, sy, sz)) {
+            have = true;
+            break;
+          }
+        }
+        if (!have) {
+          return army;
+        }
+        float cx[kMaxSymmetryCopies], cz[kMaxSymmetryCopies];
+        const int n = HeightBrushCentres(field->width, field->height, sx, sz, brush.symmetry, brush.turns, cx, cz);
+        if (index <= 0 || index >= n) {
+          return army;
+        }
+        std::string best = army;
+        float bestDistance = 12.0f;
+        for (const SaveEntry& marker : mDocument.SaveData().Markers()) {
+          float mx = 0.0f, my = 0.0f, mz = 0.0f;
+          if (MarkerTypeOf(marker) == "Blank Marker" && MarkerPosition(marker, mx, my, mz)) {
+            const float d = std::hypot(mx - cx[index], mz - cz[index]);
+            if (d < bestDistance) {
+              bestDistance = d;
+              best = marker.name;
+            }
+          }
+        }
+        return best;
+      };
       for (const auto& [army, name] : std::vector<std::pair<std::string, std::string>>(mUnitSelection)) {
         SaveUnit unit;
         bool found = false;
@@ -2187,7 +2223,7 @@ namespace faf::editor
           mirrored.position[2] = copy.z;
           mirrored.position[1] = UnitRestHeight(copy.x, copy.z);
           mirrored.orientation[1] = copy.heading;
-          if (EditArmyUnits(army, [&](UnitGroup& group) {
+          if (EditArmyUnits(armyImage(army, copy.index), [&](UnitGroup& group) {
             AddUnit(group, mirrored);
           })) {
             ++changed;
@@ -10309,6 +10345,30 @@ namespace faf::editor
 
   int EdMapScene::MirrorHalf()
   {
+    return MirrorHalf(MirrorHalfOptions{});
+  }
+
+  int EdMapScene::SymmetryParts() const
+  {
+    const moho::CHeightField* const field = mMap != nullptr ? mMap->mTerrainRes->GetHeightField() : nullptr;
+    if (field == nullptr || mTools == nullptr) {
+      return 1;
+    }
+    const HeightBrush brush = mTools->CurrentHeightBrush();
+    if (brush.symmetry == Symmetry::None) {
+      return 1;
+    }
+    float cx[kMaxSymmetryCopies], cz[kMaxSymmetryCopies];
+    // A point off the axes: every copy is its own.
+    return HeightBrushCentres(
+      field->width, field->height, field->width * 0.31f, field->height * 0.17f, brush.symmetry, brush.turns, cx, cz
+    );
+  }
+
+  int EdMapScene::MirrorHalf(
+    const MirrorHalfOptions& options
+  )
+  {
     const moho::CHeightField* const field = mMap != nullptr ? mMap->mTerrainRes->GetHeightField() : nullptr;
     if (field == nullptr || mTools == nullptr || mMap->mProps == nullptr) {
       return 0;
@@ -10317,23 +10377,30 @@ namespace faf::editor
     if (brush.symmetry == Symmetry::None) {
       return 0;
     }
-    // A place is in the first part when it is the first of its copies, ordered by z then x (one of each group).
+    // A place is in the source part when it is that one (`options.source`) of its copies ordered by z then x.
     const auto inFirst = [&](const float x, const float z) {
       float cx[kMaxSymmetryCopies], cz[kMaxSymmetryCopies];
       const int n = HeightBrushCentres(field->width, field->height, x, z, brush.symmetry, brush.turns, cx, cz);
+      int rank = 0;
       for (int c = 1; c < n; ++c) {
         if (cz[c] < z - 0.01f || (std::fabs(cz[c] - z) <= 0.01f && cx[c] < x - 0.01f)) {
-          return false;
+          ++rank;
         }
       }
-      return true;
+      return rank == options.source;
     };
-    // Props: those outside the first part go, those in it become the selection.
+    // Props: those outside the source part go (replace), those in it become the selection.
     mSelection.clear();
     std::vector<int> drop;
-    for (std::size_t i = 0; i < mMap->mProps->mEntries.size(); ++i) {
-      const moho::CWldPropEntry& entry = mMap->mProps->mEntries[i];
-      (inFirst(entry.mTransform.pos_.x, entry.mTransform.pos_.z) ? mSelection : drop).push_back(static_cast<int>(i));
+    if (options.props) {
+      for (std::size_t i = 0; i < mMap->mProps->mEntries.size(); ++i) {
+        const moho::CWldPropEntry& entry = mMap->mProps->mEntries[i];
+        if (inFirst(entry.mTransform.pos_.x, entry.mTransform.pos_.z)) {
+          mSelection.push_back(static_cast<int>(i));
+        } else if (options.replace) {
+          drop.push_back(static_cast<int>(i));
+        }
+      }
     }
     const std::vector<int> keepProps = mSelection;
     mSelection = drop;
@@ -10352,7 +10419,7 @@ namespace faf::editor
     // Decals the same way.
     mDecalSelection.clear();
     std::vector<int> keepDecals;
-    if (moho::IDecalManager* const decals = mDocument.Decals(); decals != nullptr) {
+    if (moho::IDecalManager* const decals = mDocument.Decals(); decals != nullptr && options.decals) {
       for (std::int32_t i = 0; i < decals->GetDecalCount(); ++i) {
         const moho::CWldTerrainDecal* const decal = decals->GetDecal(i);
         if (decal == nullptr) {
@@ -10360,7 +10427,11 @@ namespace faf::editor
         }
         float cx = 0.0f, cz = 0.0f;
         DecalCentre(FootprintOf(*decal), cx, cz);
-        (inFirst(cx, cz) ? keepDecals : mDecalSelection).push_back(decal->mIndex);
+        if (inFirst(cx, cz)) {
+          keepDecals.push_back(decal->mIndex);
+        } else if (options.replace) {
+          mDecalSelection.push_back(decal->mIndex);
+        }
       }
     }
     const int droppedDecals = static_cast<int>(mDecalSelection.size());
@@ -10373,24 +10444,128 @@ namespace faf::editor
     std::vector<std::string> keepMarkers;
     for (const SaveEntry& marker : mDocument.SaveData().Markers()) {
       float x = 0.0f, y = 0.0f, z = 0.0f;
-      if (MarkerTypeOf(marker) == "Blank Marker" || !ShownMarkerPosition(marker, x, y, z)) {
+      if (!options.markers || MarkerTypeOf(marker) == "Blank Marker" || !ShownMarkerPosition(marker, x, y, z)) {
         continue;
       }
-      (inFirst(x, z) ? keepMarkers : mMarkerSelection).push_back(marker.name);
+      if (inFirst(x, z)) {
+        keepMarkers.push_back(marker.name);
+      } else if (options.replace) {
+        mMarkerSelection.push_back(marker.name);
+      }
     }
     const int droppedMarkers = static_cast<int>(mMarkerSelection.size());
     if (!mMarkerSelection.empty()) {
       DeleteSelectedMarkers();
     }
     mMarkerSelection = keepMarkers;
+    // Units: those outside the source part go (replace), those in it are copied.
     mUnitSelection.clear();
-    const int made = MirrorSelection();
+    int droppedUnits = 0;
+    if (options.units) {
+      std::vector<std::pair<std::string, std::string>> drop;
+      for (const UnitRef& ref : mUnitRefs) {
+        if (inFirst(ref.position.x, ref.position.z)) {
+          mUnitSelection.emplace_back(ref.army, ref.name);
+        } else if (options.replace) {
+          drop.emplace_back(ref.army, ref.name);
+        }
+      }
+      if (!drop.empty()) {
+        const auto keep = mUnitSelection;
+        mUnitSelection = drop;
+        droppedUnits = static_cast<int>(drop.size());
+        DeleteSelectedUnits();
+        mUnitSelection = keep;
+      }
+    }
+    mMirrorMapArmies = options.mapArmies;
+    int made = MirrorSelection();
+    mMirrorMapArmies = false;
+    // Areas: each in the source part gets its copies (the rectangle's corners mapped); AREA_1 stays as it is.
+    int areasMade = 0;
+    int areasDropped = 0;
+    if (options.areas) {
+      EdDocument::SaveSnapshot before = mDocument.SaveDataNow();
+      std::vector<SaveEntry>& areas = mDocument.SaveData().Areas();
+      std::vector<SaveEntry> copies;
+      std::vector<SaveEntry> kept;
+      int next = 1;
+      for (const SaveEntry& a : areas) {
+        if (a.name.rfind("AREA_", 0) == 0) {
+          next = std::max(next, std::atoi(a.name.c_str() + 5) + 1);
+        }
+      }
+      for (const SaveEntry& a : areas) {
+        const std::vector<double> r = ValueNumbers(a.Get("rectangle"));
+        if (a.name == "AREA_1" || r.size() < 4) {
+          kept.push_back(a);
+          continue;
+        }
+        const float cx = static_cast<float>((r[0] + r[2]) * 0.5);
+        const float cz = static_cast<float>((r[1] + r[3]) * 0.5);
+        if (!inFirst(cx, cz)) {
+          if (options.replace) {
+            ++areasDropped;
+          } else {
+            kept.push_back(a);
+          }
+          continue;
+        }
+        kept.push_back(a);
+        float ax[kMaxSymmetryCopies], az[kMaxSymmetryCopies], bx[kMaxSymmetryCopies], bz[kMaxSymmetryCopies];
+        const int n = HeightBrushCentres(
+          field->width,
+          field->height,
+          static_cast<float>(r[0]),
+          static_cast<float>(r[1]),
+          brush.symmetry,
+          brush.turns,
+          ax,
+          az
+        );
+        (void)HeightBrushCentres(
+          field->width,
+          field->height,
+          static_cast<float>(r[2]),
+          static_cast<float>(r[3]),
+          brush.symmetry,
+          brush.turns,
+          bx,
+          bz
+        );
+        for (int c = 1; c < n; ++c) {
+          SaveEntry copy = a;
+          copy.name = "AREA_" + std::to_string(next++);
+          copy.Set(
+            "rectangle",
+            RectangleValue(
+              std::min(ax[c], bx[c]), std::min(az[c], bz[c]), std::max(ax[c], bx[c]), std::max(az[c], bz[c])
+            )
+          );
+          copies.push_back(std::move(copy));
+          ++areasMade;
+        }
+      }
+      if (areasMade > 0 || areasDropped > 0) {
+        kept.insert(kept.end(), copies.begin(), copies.end());
+        areas = std::move(kept);
+        mDocument.SaveDataEdited(std::move(before));
+      }
+      made += areasMade;
+    }
     gpg::Logf(
-      "editor: mirror half: removed %d props, %d decals and %d markers outside the first part; %d copies made",
+      "editor: mirror half from part %d (%s, units %s): removed %d props, %d decals, %d markers, %d units, %d areas; "
+      "%d copies made (%d areas)",
+      options.source,
+      options.replace ? "replace" : "add",
+      options.mapArmies ? "to the mirrored armies" : "kept in their armies",
       droppedProps,
       droppedDecals,
       droppedMarkers,
-      made
+      droppedUnits,
+      areasDropped,
+      made,
+      areasMade
     );
     return made;
   }

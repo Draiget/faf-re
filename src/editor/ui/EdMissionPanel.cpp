@@ -5,6 +5,7 @@
 
 #include "editor/doc/EdDocument.h"
 #include "editor/doc/EdUnits.h"
+#include "editor/doc/EdSaveFile.h"
 #include "editor/tools/EdMarkers.h"
 #include "editor/ui/EdControls.h"
 #include "editor/ui/EdIconFont.h"
@@ -13,6 +14,10 @@
 #include "moho/console/CConCommand.h"
 #include "imgui.h"
 
+#include <cmath>
+#include <cctype>
+#include <algorithm>
+#include <tuple>
 #include <algorithm>
 #include <cstdio>
 #include <cstdlib>
@@ -126,6 +131,78 @@ namespace faf::editor
       return changed;
     }
   } // namespace
+
+  bool EdMissionPanel::DefineBaseFromArea(
+    const std::string& name,
+    const std::string& army,
+    const std::string& area,
+    std::string& why
+  )
+  {
+    Mission& m = mDocument.EditMission();
+    if (
+      name.empty() || std::isdigit(static_cast<unsigned char>(name[0])) != 0 ||
+      std::any_of(name.begin(), name.end(), [](const char c) {
+      return std::isalnum(static_cast<unsigned char>(c)) == 0 && c != '_';
+    })
+    ) {
+      why = "a base name takes letters, digits and _ and starts with a letter";
+      return false;
+    }
+    if (std::any_of(m.bases.begin(), m.bases.end(), [&](const MissionBase& b) {
+      return b.name == name;
+    })) {
+      why = "there is already a base " + name;
+      return false;
+    }
+    const SaveFile& save = mDocument.SaveData();
+    std::vector<double> rect;
+    for (const SaveEntry& a : save.Areas()) {
+      if (a.name == area) {
+        rect = ValueNumbers(a.Get("rectangle"));
+      }
+    }
+    if (rect.size() < 4) {
+      why = "there is no area " + area;
+      return false;
+    }
+    const double x0 = std::min(rect[0], rect[2]);
+    const double x1 = std::max(rect[0], rect[2]);
+    const double z0 = std::min(rect[1], rect[3]);
+    const double z1 = std::max(rect[1], rect[3]);
+    DefineBaseAsk ask;
+    ask.name = name;
+    ask.army = army;
+    ask.x = static_cast<float>((x0 + x1) * 0.5);
+    ask.z = static_cast<float>((z0 + z1) * 0.5);
+    for (const SaveEntry& entry : save.Armies()) {
+      UnitGroup root;
+      std::string error;
+      if (entry.name != army || !ParseUnitGroup(entry.Get("Units"), root, error)) {
+        continue;
+      }
+      std::vector<const SaveUnit*> units;
+      CollectUnits(root, units);
+      for (const SaveUnit* const u : units) {
+        if (u->position[0] >= x0 && u->position[0] <= x1 && u->position[2] >= z0 && u->position[2] <= z1) {
+          ask.units.push_back(u->name);
+        }
+      }
+    }
+    // The mission's side: the base, its marker, the radius half the area's diagonal, its group when units stand there.
+    Mission before = mDocument.MissionNow();
+    MissionBase base = NewMissionBase(name, army);
+    base.marker = name + "_Marker";
+    base.radius = std::clamp(std::ceil(std::hypot(x1 - x0, z1 - z0) * 0.5), 5.0, 300.0);
+    if (!ask.units.empty()) {
+      base.groups.push_back({name, 100.0});
+    }
+    m.bases.push_back(std::move(base));
+    mBase = static_cast<int>(m.bases.size()) - 1;
+    Edited(std::move(before));
+    mDefineAsk = std::move(ask);
+    return true;
+  }
 
   MissionFacts MissionFactsOf(
     const EdDocument& document
@@ -471,6 +548,12 @@ namespace faf::editor
       ImGui::SeparatorText(kSections[section]);
       ImGui::PushID(section);
       DrawNodes(section == 0 ? stage.enter : stage.ready, section, {}, 0);
+      // Add here: nothing selected, Add puts the node at this section's end (an empty "When it starts" too).
+      const bool target = mPath.empty() && mAddSection == section;
+      if (ImGui::SmallButton(target ? "Add goes here" : "Add here")) {
+        mPath.clear();
+        mAddSection = section;
+      }
       ImGui::PopID();
     }
     // Add: inside the selected container, after the selected node, or at the end of "Then".
@@ -500,9 +583,11 @@ namespace faf::editor
             list->insert(list->begin() + mPath.back() + 1, NewMissionNode(t.id));
             ++mPath.back();
           } else {
-            m.stages[static_cast<std::size_t>(mStage)].ready.push_back(NewMissionNode(t.id));
-            mSection = 1;
-            mPath = {static_cast<int>(m.stages[static_cast<std::size_t>(mStage)].ready.size()) - 1};
+            std::vector<MissionNode>& target = mAddSection == 0 ? m.stages[static_cast<std::size_t>(mStage)].enter
+                                                                : m.stages[static_cast<std::size_t>(mStage)].ready;
+            target.push_back(NewMissionNode(t.id));
+            mSection = mAddSection;
+            mPath = {static_cast<int>(target.size()) - 1};
           }
           Edited(std::move(before));
         }
@@ -531,6 +616,47 @@ namespace faf::editor
           ++mPath.back();
           Edited(std::move(before));
         }
+      }
+      // In: into the trigger (container) just above it; Out: out of its trigger, after it (FAF Studio's In / Out).
+      ImGui::SameLine();
+      {
+        std::vector<MissionNode>* list = ListOf(m, mSection, mPath);
+        const int index = mPath.back();
+        MissionNode* const above =
+          list != nullptr && index > 0 ? &(*list)[static_cast<std::size_t>(index - 1)] : nullptr;
+        const MissionNodeType* const aboveType = above != nullptr ? FindMissionNodeType(above->type) : nullptr;
+        ImGui::BeginDisabled(aboveType == nullptr || !aboveType->container);
+        if (ImGui::SmallButton("In")) {
+          Mission before = m;
+          list = ListOf(m, mSection, mPath);
+          MissionNode moving = std::move((*list)[static_cast<std::size_t>(index)]);
+          list->erase(list->begin() + index);
+          MissionNode& into = (*list)[static_cast<std::size_t>(index - 1)];
+          into.children.push_back(std::move(moving));
+          mPath.back() = index - 1;
+          mPath.push_back(static_cast<int>(into.children.size()) - 1);
+          Edited(std::move(before));
+        }
+        ImGui::EndDisabled();
+        EdSetItemTooltip("Into the trigger above it: it runs when that fires");
+        ImGui::SameLine();
+        ImGui::BeginDisabled(mPath.size() < 2);
+        if (ImGui::SmallButton("Out") && mPath.size() >= 2) {
+          Mission before = m;
+          const std::vector<int> parentPath(mPath.begin(), mPath.end() - 1);
+          std::vector<MissionNode>* outer = ListOf(m, mSection, parentPath);
+          MissionNode* const parent = NodeAt(m, mSection, parentPath);
+          if (outer != nullptr && parent != nullptr) {
+            MissionNode moving = std::move(parent->children[static_cast<std::size_t>(mPath.back())]);
+            parent->children.erase(parent->children.begin() + mPath.back());
+            outer->insert(outer->begin() + parentPath.back() + 1, std::move(moving));
+            mPath = parentPath;
+            ++mPath.back();
+            Edited(std::move(before));
+          }
+        }
+        ImGui::EndDisabled();
+        EdSetItemTooltip("Out of its trigger, right after it");
       }
       ImGui::SameLine();
       if (ImGui::SmallButton(ICON_TRASH)) {
@@ -613,6 +739,8 @@ namespace faf::editor
     BeginField();
     EndField(edited);
     int removeLine = -1;
+    int moveLine = -1;
+    int moveBy = 0;
     for (std::size_t l = 0; l < dialogue.lines.size(); ++l) {
       ImGui::PushID(static_cast<int>(l));
       MissionDialogueLine& line = dialogue.lines[l];
@@ -639,11 +767,49 @@ namespace faf::editor
       if (ImGui::SmallButton(ICON_TRASH)) {
         removeLine = static_cast<int>(l);
       }
+      // The voice-over, video and portrait (FAF Studio's line form), all optional.
+      if (ImGui::TreeNode("Voice-over, video, portrait")) {
+        for (const auto& [label, hint, value] :
+             {std::tuple<const char*, const char*, std::string*>{"Sound bank", "e.g. XGG", &line.bank},
+              {"Cue", "the voice-over's cue", &line.cue},
+              {"Video", "a movie of /movies, e.g. UEF_Commander.sfd", &line.vid},
+              {"Portrait", "UEF, Aeon, Cybran or Seraphim", &line.faction}}) {
+          RowLabel(label);
+          ImGui::SetNextItemWidth(-1.0f);
+          edited = TextField((std::string("##") + label).c_str(), *value);
+          if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) {
+            EdSetTooltip("%s", hint);
+          }
+          BeginField();
+          EndField(edited);
+        }
+        ImGui::TreePop();
+      }
+      // Up / Down: the line's place in the dialogue.
+      ImGui::BeginDisabled(l == 0);
+      if (ImGui::SmallButton("Up")) {
+        moveLine = static_cast<int>(l);
+        moveBy = -1;
+      }
+      ImGui::EndDisabled();
+      ImGui::SameLine();
+      ImGui::BeginDisabled(l + 1 >= dialogue.lines.size());
+      if (ImGui::SmallButton("Down")) {
+        moveLine = static_cast<int>(l);
+        moveBy = 1;
+      }
+      ImGui::EndDisabled();
       ImGui::PopID();
     }
     if (removeLine >= 0) {
       Mission before = m;
       dialogue.lines.erase(dialogue.lines.begin() + removeLine);
+      Edited(std::move(before));
+    } else if (moveLine >= 0) {
+      Mission before = m;
+      std::swap(
+        dialogue.lines[static_cast<std::size_t>(moveLine)], dialogue.lines[static_cast<std::size_t>(moveLine + moveBy)]
+      );
       Edited(std::move(before));
     }
     if (ImGui::SmallButton(ICON_PLUS " Line")) {
@@ -796,8 +962,33 @@ namespace faf::editor
             ImGui::TextDisabled("%s = %s", name.c_str(), value.c_str());
           }
         }
-        if (mLive.vars.empty() && mLive.objectives.empty()) {
-          ImGui::TextDisabled("No variables or objectives yet.");
+        // The flags (FAF Studio's mission run: click to toggle, New flag sets one on).
+        for (const auto& [name, on] : mLive.flags) {
+          bool value = on;
+          if (ImGui::Checkbox(("flag " + name).c_str(), &value)) {
+            std::string command;
+            if (MissionSetFlag(name, value, command)) {
+              moho::CON_Execute(command.c_str());
+              mLiveAskedAt = -10.0;
+            }
+          }
+          EdSetItemTooltip("A flag the mission's Set a flag nodes and the attacks' conditions read; click to flip it");
+        }
+        ImGui::SetNextItemWidth(Em(140.0f));
+        ImGui::InputTextWithHint("##newflag", "ATTACK_NOW", mNewFlag, sizeof(mNewFlag));
+        ImGui::SameLine();
+        ImGui::BeginDisabled(mNewFlag[0] == '\0');
+        if (ImGui::Button("New flag (on)")) {
+          std::string command;
+          if (MissionSetFlag(mNewFlag, true, command)) {
+            moho::CON_Execute(command.c_str());
+            mLiveAskedAt = -10.0;
+            mNewFlag[0] = '\0';
+          }
+        }
+        ImGui::EndDisabled();
+        if (mLive.vars.empty() && mLive.objectives.empty() && mLive.flags.empty()) {
+          ImGui::TextDisabled("No variables, objectives or flags yet.");
         }
       }
     }
@@ -921,6 +1112,41 @@ namespace faf::editor
         mBase = static_cast<int>(b);
         mAttack = -1;
       }
+    }
+    // Define from area: an area of the map becomes a base (its middle the marker, its units the base's group).
+    if (!facts.areas.empty() && !facts.armies.empty() && ImGui::TreeNode("Define from area")) {
+      mDefineArea = std::clamp(mDefineArea, 0, static_cast<int>(facts.areas.size()) - 1);
+      mDefineArmy = std::clamp(mDefineArmy, 0, static_cast<int>(facts.armies.size()) - 1);
+      std::vector<const char*> areas;
+      for (const std::string& a : facts.areas) {
+        areas.push_back(a.c_str());
+      }
+      std::vector<const char*> armies;
+      for (const std::string& a : facts.armies) {
+        armies.push_back(a.c_str());
+      }
+      ImGui::SetNextItemWidth(Em(120.0f));
+      ImGui::InputText("Name##definebase", mDefineName, sizeof(mDefineName));
+      ImGui::SetNextItemWidth(Em(120.0f));
+      (void)EdCombo("Area##definebase", &mDefineArea, areas.data(), static_cast<int>(areas.size()));
+      ImGui::SetNextItemWidth(Em(120.0f));
+      (void)EdCombo("Army##definebase", &mDefineArmy, armies.data(), static_cast<int>(armies.size()));
+      if (ImGui::Button("Define the base")) {
+        std::string why;
+        if (!DefineBaseFromArea(
+              mDefineName,
+              facts.armies[static_cast<std::size_t>(mDefineArmy)],
+              facts.areas[static_cast<std::size_t>(mDefineArea)],
+              why
+            )) {
+          gpg::Warnf("editor: define base: %s", why.c_str());
+        }
+      }
+      EdSetItemTooltip(
+        "A marker at the area's middle, the radius half its diagonal, the army's units in it as the "
+        "base's group"
+      );
+      ImGui::TreePop();
     }
     if (ImGui::SmallButton(ICON_PLUS " Base")) {
       Mission before = m;
@@ -1347,6 +1573,9 @@ namespace faf::editor
       ImGui::EndPopup();
     }
     if (mPlatoon >= 0 && mPlatoon < static_cast<int>(m.platoons.size())) {
+      DrawPlatoonTools(true, m.platoons[static_cast<std::size_t>(mPlatoon)].name, facts);
+    }
+    if (mPlatoon >= 0 && mPlatoon < static_cast<int>(m.platoons.size())) {
       ImGui::SameLine();
       if (ImGui::SmallButton(ICON_TRASH " Template")) {
         Mission before = m;
@@ -1440,6 +1669,9 @@ namespace faf::editor
       Edited(std::move(before));
     }
     if (mQueue >= 0 && mQueue < static_cast<int>(m.orderQueues.size())) {
+      DrawPlatoonTools(false, m.orderQueues[static_cast<std::size_t>(mQueue)].name, facts);
+    }
+    if (mQueue >= 0 && mQueue < static_cast<int>(m.orderQueues.size())) {
       ImGui::SameLine();
       if (ImGui::SmallButton(ICON_TRASH " Queue")) {
         Mission before = m;
@@ -1518,6 +1750,227 @@ namespace faf::editor
     ImGui::End();
   }
 
+  void EdMissionPanel::DrawPlatoonTools(
+    const bool templateKind,
+    const std::string& name,
+    const MissionFacts& facts
+  )
+  {
+    // What names it: mission nodes, the armies' groups and units, the builders (templates only).
+    Mission& m = mDocument.EditMission();
+    const char* const key = templateKind ? "platoon" : "orders";
+    const auto countNodes = [&](auto&& self, const std::vector<MissionNode>& nodes) -> int {
+      int n = 0;
+      for (const MissionNode& node : nodes) {
+        const auto it = node.p.find(key);
+        n += it != node.p.end() && it->second == name ? 1 : 0;
+        n += self(self, node.children);
+      }
+      return n;
+    };
+    int nodes = 0;
+    for (const MissionStage& stage : m.stages) {
+      nodes += countNodes(countNodes, stage.enter) + countNodes(countNodes, stage.ready);
+    }
+    int groups = 0;
+    int builders = 0;
+    for (const SaveEntry& army : mDocument.SaveData().Armies()) {
+      UnitGroup root;
+      std::string error;
+      if (ParseUnitGroup(army.Get("Units"), root, error)) {
+        const auto walk = [&](auto&& self, const UnitGroup& g) -> void {
+          groups += (templateKind ? g.platoon : g.orders) == name ? 1 : 0;
+          for (const SaveUnit& u : g.units) {
+            groups += (templateKind ? u.platoon : u.orders) == name ? 1 : 0;
+          }
+          for (const UnitGroup& child : g.groups) {
+            self(self, child);
+          }
+        };
+        walk(walk, root);
+      }
+      if (templateKind) {
+        std::vector<MissionBuilder> list;
+        if (ParseBuilders(army.Get("PlatoonBuilders"), list, error)) {
+          for (const MissionBuilder& b : list) {
+            builders +=
+              b.Get("PlatoonTemplate") == "'" + name + "'" || b.Get("PlatoonTemplate") == "\"" + name + "\"" ? 1 : 0;
+          }
+        }
+      }
+    }
+    ImGui::TextDisabled(
+      "Used by %d mission nodes, %d groups or units%s",
+      nodes,
+      groups,
+      templateKind ? (", " + std::to_string(builders) + " builders").c_str() : ""
+    );
+    // Copy.
+    if (ImGui::SmallButton(templateKind ? "Copy##template" : "Copy##queue")) {
+      Mission before = mDocument.MissionNow();
+      if (templateKind) {
+        MissionPlatoon copy = m.platoons[static_cast<std::size_t>(mPlatoon)];
+        copy.name += "_copy";
+        m.platoons.push_back(copy);
+        mPlatoon = static_cast<int>(m.platoons.size()) - 1;
+      } else {
+        MissionOrderQueue copy = m.orderQueues[static_cast<std::size_t>(mQueue)];
+        copy.name += "_copy";
+        m.orderQueues.push_back(copy);
+        mQueue = static_cast<int>(m.orderQueues.size()) - 1;
+      }
+      Edited(std::move(before));
+      return;
+    }
+    // Rename, and everything that names it with it.
+    ImGui::SameLine();
+    char* const buffer = templateKind ? mRenameTemplate : mRenameQueue;
+    ImGui::SetNextItemWidth(Em(110.0f));
+    ImGui::InputTextWithHint(templateKind ? "##renametemplate" : "##renamequeue", "new name", buffer, 64);
+    ImGui::SameLine();
+    ImGui::BeginDisabled(buffer[0] == '\0' || name == buffer);
+    if (ImGui::SmallButton(templateKind ? "Rename##template" : "Rename##queue")) {
+      const std::string to = buffer;
+      Mission before = mDocument.MissionNow();
+      (templateKind ? m.platoons[static_cast<std::size_t>(mPlatoon)].name
+                    : m.orderQueues[static_cast<std::size_t>(mQueue)].name) = to;
+      const auto renameNodes = [&](auto&& self, std::vector<MissionNode>& list) -> void {
+        for (MissionNode& node : list) {
+          if (auto it = node.p.find(key); it != node.p.end() && it->second == name) {
+            it->second = to;
+          }
+          self(self, node.children);
+        }
+      };
+      for (MissionStage& stage : m.stages) {
+        renameNodes(renameNodes, stage.enter);
+        renameNodes(renameNodes, stage.ready);
+      }
+      Edited(std::move(before));
+      // The save: groups' and units' names of it, and the builders' templates.
+      EdDocument::SaveSnapshot saveBefore = mDocument.SaveDataNow();
+      int renamed = 0;
+      for (SaveEntry& army : mDocument.SaveData().Armies()) {
+        UnitGroup root;
+        std::string error;
+        if (ParseUnitGroup(army.Get("Units"), root, error)) {
+          int here = 0;
+          const auto walk = [&](auto&& self, UnitGroup& g) -> void {
+            std::string& own = templateKind ? g.platoon : g.orders;
+            if (own == name) {
+              own = to;
+              ++here;
+            }
+            for (SaveUnit& u : g.units) {
+              std::string& field = templateKind ? u.platoon : u.orders;
+              if (field == name) {
+                field = to;
+                ++here;
+              }
+            }
+            for (UnitGroup& child : g.groups) {
+              self(self, child);
+            }
+          };
+          walk(walk, root);
+          if (here > 0) {
+            army.Set("Units", FormatUnitGroup(root, 12));
+            renamed += here;
+          }
+        }
+        std::vector<MissionBuilder> list;
+        if (templateKind && ParseBuilders(army.Get("PlatoonBuilders"), list, error)) {
+          int here = 0;
+          for (MissionBuilder& b : list) {
+            if (b.Get("PlatoonTemplate") == "'" + name + "'" || b.Get("PlatoonTemplate") == "\"" + name + "\"") {
+              b.Set("PlatoonTemplate", "'" + to + "'");
+              ++here;
+            }
+          }
+          if (here > 0) {
+            army.Set("PlatoonBuilders", FormatBuilders(list));
+            renamed += here;
+          }
+        }
+      }
+      if (renamed > 0) {
+        mDocument.SaveDataEdited(std::move(saveBefore));
+      }
+      gpg::Logf(
+        "editor: platoons: %s renamed to %s (%d groups, units and builders followed)", name.c_str(), to.c_str(), renamed
+      );
+      buffer[0] = '\0';
+    }
+    ImGui::EndDisabled();
+    // Assign to a group of an army (its units follow it in the game).
+    if (!facts.armies.empty()) {
+      ImGui::SetNextItemWidth(Em(100.0f));
+      if (
+        EdBeginCombo(
+          templateKind ? "##assignarmy" : "##assignarmyq", mAssignArmy.empty() ? "army" : mAssignArmy.c_str()
+        )
+      ) {
+        for (const std::string& a : facts.armies) {
+          if (ImGui::Selectable(a.c_str(), a == mAssignArmy)) {
+            mAssignArmy = a;
+            mAssignGroup.clear();
+          }
+        }
+        ImGui::EndCombo();
+      }
+      ImGui::SameLine();
+      ImGui::SetNextItemWidth(Em(120.0f));
+      const auto found = facts.groups.find(mAssignArmy);
+      if (
+        EdBeginCombo(
+          templateKind ? "##assigngroup" : "##assigngroupq", mAssignGroup.empty() ? "group" : mAssignGroup.c_str()
+        )
+      ) {
+        if (found != facts.groups.end()) {
+          for (const std::string& g : found->second) {
+            if (ImGui::Selectable(g.c_str(), g == mAssignGroup)) {
+              mAssignGroup = g;
+            }
+          }
+        }
+        ImGui::EndCombo();
+      }
+      ImGui::SameLine();
+      ImGui::BeginDisabled(mAssignArmy.empty() || mAssignGroup.empty());
+      if (ImGui::SmallButton(templateKind ? "Assign to group##t" : "Assign to group##q")) {
+        EdDocument::SaveSnapshot before = mDocument.SaveDataNow();
+        for (SaveEntry& army : mDocument.SaveData().Armies()) {
+          UnitGroup root;
+          std::string error;
+          if (army.name != mAssignArmy || !ParseUnitGroup(army.Get("Units"), root, error)) {
+            continue;
+          }
+          bool done = false;
+          const auto walk = [&](auto&& self, UnitGroup& g) -> void {
+            if (!done && g.name == mAssignGroup) {
+              (templateKind ? g.platoon : g.orders) = name;
+              done = true;
+              return;
+            }
+            for (UnitGroup& child : g.groups) {
+              self(self, child);
+            }
+          };
+          walk(walk, root);
+          if (done) {
+            army.Set("Units", FormatUnitGroup(root, 12));
+            mDocument.SaveDataEdited(std::move(before));
+            gpg::Logf(
+              "editor: platoons: %s is now on %s of %s", name.c_str(), mAssignGroup.c_str(), mAssignArmy.c_str()
+            );
+          }
+          break;
+        }
+      }
+      ImGui::EndDisabled();
+    }
+  }
+
   void EdMissionPanel::DrawBuilders()
   {
     // ---- platoon builders (FAF Studio's builders view): an army's PlatoonBuilders, the game's PBM reads them
@@ -1571,6 +2024,71 @@ namespace faf::editor
     if (chosen >= 0 && chosen < static_cast<int>(builders.size())) {
       MissionBuilder& builder = builders[static_cast<std::size_t>(chosen)];
       bool changed = false;
+      // The AI function and the build conditions as their parts (FAF Studio's builder editor): file, function, data.
+      const auto callFields = [&](BuilderCall& call) {
+        bool edited = false;
+        for (const auto& [label, value] :
+             {std::pair<const char*, std::string*>{"file", &call.file},
+              {"function", &call.function},
+              {"data", &call.rest}}) {
+          char buffer[512];
+          (void)std::snprintf(buffer, sizeof(buffer), "%s", value->c_str());
+          ImGui::SetNextItemWidth(-1.0f);
+          if (ImGui::InputTextWithHint((std::string("##") + label).c_str(), label, buffer, sizeof(buffer))) {
+            *value = buffer;
+          }
+          edited = edited || ImGui::IsItemDeactivatedAfterEdit();
+        }
+        return edited;
+      };
+      if (BuilderCall ai; ParseBuilderCall(builder.Get("PlatoonAIFunction"), ai)) {
+        ImGui::SeparatorText("AI function");
+        ImGui::PushID("ai");
+        if (callFields(ai)) {
+          builder.Set("PlatoonAIFunction", FormatBuilderCall(ai));
+          changed = true;
+        }
+        ImGui::PopID();
+      }
+      {
+        ImGui::SeparatorText("Build conditions");
+        std::vector<std::string> conditions = LuaTableItems(builder.Get("BuildConditions"));
+        int remove = -1;
+        bool conditionsEdited = false;
+        for (std::size_t c = 0; c < conditions.size(); ++c) {
+          ImGui::PushID(static_cast<int>(c) + 100);
+          BuilderCall call;
+          if (ParseBuilderCall(conditions[c], call)) {
+            if (callFields(call)) {
+              conditions[c] = FormatBuilderCall(call);
+              conditionsEdited = true;
+            }
+          } else {
+            ImGui::TextDisabled("%s", conditions[c].c_str());
+          }
+          if (ImGui::SmallButton("Remove condition")) {
+            remove = static_cast<int>(c);
+          }
+          ImGui::PopID();
+        }
+        if (ImGui::SmallButton(ICON_PLUS " Condition")) {
+          conditions.push_back(FormatBuilderCall({"/lua/editor/miscbuildconditions.lua", "True", "{'default_brain'}"}));
+          conditionsEdited = true;
+        }
+        if (remove >= 0) {
+          conditions.erase(conditions.begin() + remove);
+          conditionsEdited = true;
+        }
+        if (conditionsEdited) {
+          std::string table = "{";
+          for (std::size_t c = 0; c < conditions.size(); ++c) {
+            table += (c > 0 ? ", " : " ") + conditions[c];
+          }
+          builder.Set("BuildConditions", table + (conditions.empty() ? "}" : " }"));
+          changed = true;
+        }
+      }
+      ImGui::SeparatorText("Every field as Lua");
       for (auto& [key, value] : builder.fields) {
         ImGui::PushID(key.c_str());
         RowLabel(key.c_str());

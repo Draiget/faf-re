@@ -880,7 +880,13 @@ namespace faf::editor
         econ.Set(k, JsonTree::Number(v));
       }
       if (t->builder) {
-        if (const JsonTree* b = d.Get("buildableCategory"); b != nullptr) {
+        if (!spec.buildable.empty()) {
+          JsonTree list = JsonTree::MakeArray();
+          for (const std::string& c : spec.buildable) {
+            list.Push(JsonTree::Text(c));
+          }
+          econ.Set("BuildableCategory", std::move(list));
+        } else if (const JsonTree* b = d.Get("buildableCategory"); b != nullptr) {
           econ.Set("BuildableCategory", *b);
         }
       }
@@ -928,6 +934,9 @@ namespace faf::editor
       Remove(ph, "RollOffPoints");
       for (const auto& [k, v] : spec.physics) {
         ph.Set(k, JsonTree::Number(v));
+      }
+      if (!spec.motionType.empty()) {
+        ph.Set("MotionType", JsonTree::Text(spec.motionType));
       }
       ph.Set("MeshExtentsX", JsonTree::Number(R2(dims[0])));
       ph.Set("MeshExtentsY", JsonTree::Number(R2(dims[1])));
@@ -1776,6 +1785,8 @@ namespace faf::editor
       n.Set("physics", numbers(s.physics));
       n.Set("intel", numbers(s.intel));
       n.Set("sounds", JsonTree::Text(s.sounds));
+      n.Set("motionType", JsonTree::Text(s.motionType));
+      n.Set("buildable", strings(s.buildable));
       n.Set("anim", JsonTree::Text(s.anim));
       JsonTree& weapons = n.Set("weapons", JsonTree::MakeArray());
       for (const UnitWizardWeapon& w : s.weapons) {
@@ -1861,6 +1872,8 @@ namespace faf::editor
       s.physics = numbers(n.Get("physics"));
       s.intel = numbers(n.Get("intel"));
       s.sounds = n.Str("sounds", "");
+      s.motionType = n.Str("motionType", "");
+      s.buildable = strings(n.Get("buildable"));
       s.anim = n.Str("anim", "template");
       if (const JsonTree* weapons = n.Get("weapons"); weapons != nullptr) {
         for (const JsonTree& o : weapons->items) {

@@ -1213,6 +1213,8 @@ namespace faf::editor
     [[nodiscard]] bool PickPlace(const PickHit& hit, float& x, float& z, float& radius) const;
     PickKind mSelectKind = PickKind::None;
     ContextPoint mContextPoint;
+    /** MirrorSelection: units' copies to the mirrored army (MirrorHalf's choice), else their own. */
+    bool mMirrorMapArmies = false;
     /** The ground point under `at` and what stands there (selected when it wasn't), for the view's menu. */
     void TakeContextPick(POINT at);
     /** The stroke under way was started with the right button: the brush's opposite (Raise/Lower, Paint/Erase). */
@@ -1535,6 +1537,21 @@ namespace faf::editor
      * symmetry's first part removed, and the first part's copied over the rest as the symmetry maps it.
      */
     int MirrorHalf();
+    /** Edit > Mirror the whole half's choices (FAF Studio's mirrorhalf.lua). */
+    struct MirrorHalfOptions
+    {
+      int source = 0;      // which of the symmetry's parts is copied (0 = the first, by z then x)
+      bool markers = true; // start positions never
+      bool props = true;
+      bool decals = true;
+      bool units = false;
+      bool areas = false;     // AREA_1 (the playable area) is never removed
+      bool replace = true;    // the other parts emptied first, else the copies added
+      bool mapArmies = false; // a unit's copy to the army whose start is the copy of its army's start
+    };
+    int MirrorHalf(const MirrorHalfOptions& options);
+    /** How many parts the symmetry has (1 = none). */
+    [[nodiscard]] int SymmetryParts() const;
     /** The mask generator's result written into one of the water's masks, one undo step; cells changed. */
     int
     WriteGeneratedWaterMask(const field::Grid& mask, WaterMask kind, int mode, float strength, std::string& message);

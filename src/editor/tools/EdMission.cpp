@@ -2273,6 +2273,9 @@ namespace faf::editor
         out.vars.emplace_back(rest.substr(0, rest.find('=')), rest.substr(rest.find('=') + 1));
       } else if (key == "obj" && eq != std::string::npos) {
         out.objectives.push_back({rest.substr(0, eq), rest.substr(eq + 1)});
+      } else if (key == "flag" && eq != std::string::npos && eq > 0) {
+        out.flags.emplace_back(rest.substr(0, eq), rest.substr(eq + 1) == "1");
+        std::sort(out.flags.begin(), out.flags.end());
       }
     }
     return any;
@@ -2288,6 +2291,8 @@ namespace faf::editor
            "for _, o in m.Objectives or {} do "
            "table.insert(t, 'obj ' .. c(o.Title or o.Tag or '?') .. '=' .. "
            "(o.Complete and 'done' or (o.Active and 'active' or 'off'))) end "
+           "for k, v in ScenarioInfo.VarTable or {} do if type(v) == 'boolean' then "
+           "table.insert(t, 'flag ' .. c(k) .. '=' .. (v and '1' or '0')) end end "
            "LOG('EDMISSION live ' .. table.concat(t, '|')) end";
   }
 
@@ -2307,6 +2312,25 @@ namespace faf::editor
     }
     command = "SimLua local m = ScenarioInfo.EditorMission if m and m.V then m.V." + name + " = " +
       (value ? "true" : "false") + " end";
+    return true;
+  }
+
+  bool MissionSetFlag(
+    const std::string& name,
+    const bool value,
+    std::string& command
+  )
+  {
+    if (name.empty()) {
+      return false;
+    }
+    for (const char c : name) {
+      if (std::isalnum(static_cast<unsigned char>(c)) == 0 && c != '_') {
+        return false;
+      }
+    }
+    command = "SimLua ScenarioInfo.VarTable = ScenarioInfo.VarTable or {} ScenarioInfo.VarTable['" + name +
+      "'] = " + (value ? "true" : "false");
     return true;
   }
 
@@ -2397,7 +2421,18 @@ namespace faf::editor
       add("    [" + Q(d.name) + "] = {");
       for (const MissionDialogueLine& l : d.lines) {
         const std::string text = l.speaker.empty() ? l.text : l.speaker + ": " + l.text;
-        add("        { text = " + Q(text) + ", delay = " + Num(l.seconds, 5) + " },");
+        // The voice-over, video and portrait when given (FAF Studio's mission.lua StringsLines).
+        std::string extra;
+        for (const auto& [key, value] :
+             {std::pair<const char*, const std::string*>{"bank", &l.bank},
+              {"cue", &l.cue},
+              {"vid", &l.vid},
+              {"faction", &l.faction}}) {
+          if (!value->empty()) {
+            extra += std::string(", ") + key + " = " + Q(*value);
+          }
+        }
+        add("        { text = " + Q(text) + ", delay = " + Num(l.seconds, 5) + extra + " },");
       }
       add("    },");
     }
@@ -2978,7 +3013,11 @@ namespace faf::editor
       for (std::size_t l = 0; l < dl.lines.size(); ++l) {
         out += std::string(l > 0 ? ", " : "") + "{\"text\": " + JsonQuoted(dl.lines[l].text) +
           ", \"speaker\": " + JsonQuoted(dl.lines[l].speaker) +
-          ", \"seconds\": " + JsonNumber(static_cast<float>(dl.lines[l].seconds)) + "}";
+          ", \"seconds\": " + JsonNumber(static_cast<float>(dl.lines[l].seconds)) +
+          (dl.lines[l].bank.empty() ? std::string() : ", \"bank\": " + JsonQuoted(dl.lines[l].bank)) +
+          (dl.lines[l].cue.empty() ? std::string() : ", \"cue\": " + JsonQuoted(dl.lines[l].cue)) +
+          (dl.lines[l].vid.empty() ? std::string() : ", \"vid\": " + JsonQuoted(dl.lines[l].vid)) +
+          (dl.lines[l].faction.empty() ? std::string() : ", \"faction\": " + JsonQuoted(dl.lines[l].faction)) + "}";
       }
       out += "]}" + std::string(d + 1 < m.dialogues.size() ? ",\n" : "\n");
     }
@@ -3032,6 +3071,10 @@ namespace faf::editor
         MissionDialogueLine line;
         (void)StringOf(l, "text", line.text);
         (void)StringOf(l, "speaker", line.speaker);
+        (void)StringOf(l, "bank", line.bank);
+        (void)StringOf(l, "cue", line.cue);
+        (void)StringOf(l, "vid", line.vid);
+        (void)StringOf(l, "faction", line.faction);
         double seconds = 5.0;
         if (NumberOf(l, "seconds", seconds)) {
           line.seconds = seconds;

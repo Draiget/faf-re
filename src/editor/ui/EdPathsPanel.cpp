@@ -1,4 +1,5 @@
 #include "editor/ui/EdPathsPanel.h"
+#include "gpg/core/utils/Logging.h"
 
 #include "editor/ui/EdControls.h"
 #include "editor/ui/EdHelp.h"
@@ -586,6 +587,43 @@ namespace faf::editor
       mDocument.PathsEdited(std::move(before));
       mFrameStart = mDocument.PathsNow();
       return;
+    }
+    // Copy / Paste (FAF Studio's paths): the path as the paths file's text on the clipboard, pasted as a new path
+    // (into this map or another one).
+    ImGui::SameLine();
+    if (ImGui::Button("Copy")) {
+      KeptPathSet one;
+      one.paths.push_back(path);
+      ImGui::SetClipboardText(KeptPathsText(one).c_str());
+      gpg::Logf("editor: paths: %s copied", path.name.c_str());
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Paste")) {
+      KeptPathSet pasted;
+      std::string error;
+      const char* const text = ImGui::GetClipboardText();
+      if (text != nullptr && ReadKeptPaths(text, pasted, error) && !pasted.paths.empty()) {
+        EdDocument::PathsState before = mDocument.PathsNow();
+        for (KeptPath& p : pasted.paths) {
+          p.id = mDocument.EditPaths().set.TakeId();
+          p.name += " (pasted)";
+          p.skeleton = false;
+          mState.current = p.id;
+          mDocument.EditPaths().set.paths.push_back(std::move(p));
+        }
+        mDocument.PathsEdited(std::move(before));
+        mFrameStart = mDocument.PathsNow();
+        gpg::Logf("editor: paths: %zu pasted", pasted.paths.size());
+        return;
+      }
+      gpg::Warnf("editor: paths: the clipboard holds no path%s%s", error.empty() ? "" : ": ", error.c_str());
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Select all points")) {
+      mState.selected.clear();
+      for (int i = 0; i < static_cast<int>(path.points.size()); ++i) {
+        mState.selected.push_back(i);
+      }
     }
     ImGui::SameLine();
     if (ImGui::Button("Delete path")) {

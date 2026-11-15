@@ -1328,6 +1328,17 @@ namespace faf::editor
      */
     [[nodiscard]] std::string SaveToolState();
     void LoadToolState(const std::string& text);
+    /** The symmetry's centre as an offset from the map's middle (the brushes' Centre X / Z, Layout's Centre symmetry).
+     */
+    void SetSymmetryCentre(
+      const float x,
+      const float z
+    ) noexcept
+    {
+      mSymmetryCentre[0] = x;
+      mSymmetryCentre[1] = z;
+      SetSymmetryCentreOffset(x, z);
+    }
     /** FAF Studio's markervis: markers drawn as their template's prop model (Markers and Select tools). */
     [[nodiscard]] bool MarkerModels() const noexcept
     {
@@ -2564,6 +2575,50 @@ namespace faf::editor
       mGenApply = true;
     }
     /** The preview the app made: an image (0: none), its share of the map, or why there is none. */
+    /** Stratum recipes' extra asks (FAF Studio's recipes panel): Assign textures, Layered textures, Measure, Show. */
+    enum class RecipeAsk
+    {
+      None,
+      Assign,
+      Layered,
+      Measure,
+      Show, // mRecipeShowLayer
+    };
+    [[nodiscard]] bool RecipeAsked() const noexcept
+    {
+      return mRecipeAsk != RecipeAsk::None;
+    }
+    [[nodiscard]] RecipeAsk TakeRecipeAsk(
+      int& layer
+    ) noexcept
+    {
+      layer = mRecipeShowLayer;
+      return std::exchange(mRecipeAsk, RecipeAsk::None);
+    }
+    void AskRecipe(
+      const RecipeAsk ask,
+      const int layer = 0
+    ) noexcept
+    {
+      mRecipeAsk = ask;
+      mRecipeShowLayer = layer;
+    }
+    [[nodiscard]] bool RecipeTypesToo() const noexcept
+    {
+      return mRecipeTypes;
+    }
+    [[nodiscard]] bool RecipeRoughnessToo() const noexcept
+    {
+      return mRecipeRoughness;
+    }
+    void SetRecipeShow(
+      const std::uint64_t image,
+      std::string text
+    )
+    {
+      mRecipeShowImage = image;
+      mRecipeShowText = std::move(text);
+    }
     void SetGenPreview(
       const std::uint64_t image,
       const float coverage,
@@ -2778,6 +2833,7 @@ namespace faf::editor
       brush.setTo = mSetHeight * 128.0f;
       brush.terraceStep = mTerraceStep * 128.0f;
       brush.erodeTalus = mErodeTalus;
+      brush.ero = mEroBrush;
       brush.shape = static_cast<BrushShape>(mBrushShape);
       brush.shapeImage = mShapeImage.get();
       brush.stampMode = static_cast<StampMode>(mStampMode);
@@ -3213,6 +3269,9 @@ namespace faf::editor
     float mSetHeight = 20.0f;
     float mTerraceStep = 5.0f;
     float mErodeTalus = 0.6f;
+    ErosionBrushValues mEroBrush;
+    /** Water erode, Rain and Deposit: their settings (FAF Studio's Erosion panel's brush sliders). */
+    void DrawErosionBrushValues();
     int mBrushShape = 0; // BrushShape
     float mShapeAngle = 0.0f;
     float mNoiseScale = 8.0f;
@@ -3381,6 +3440,11 @@ namespace faf::editor
     std::map<std::string, ErosionValues> mErosionValues;
     std::string mErosionStatus;
     bool mErosionPreviewShown = false;
+    /** Live (FAF Studio's erosion preview): a change of the solver or a setting runs Preview again, half a second
+     * after the last change. */
+    bool mErosionLive = false;
+    std::string mErosionLiveKey;
+    double mErosionLiveDue = -1.0;
     ErosionMaskChoice mErosionMasks;
     int mMapCounts[4] = {0, 0, 0, 0};
     FillOptions mFill;
@@ -3525,6 +3589,12 @@ namespace faf::editor
     char mStrataMap[96] = "";
     StrataThemeAsk mStrataAsk;
     std::string mStrataStatus;
+    RecipeAsk mRecipeAsk = RecipeAsk::None;
+    int mRecipeShowLayer = 0;
+    bool mRecipeTypes = false;
+    bool mRecipeRoughness = false;
+    std::uint64_t mRecipeShowImage = 0;
+    std::string mRecipeShowText;
     bool mDrawChain = false;
     char mChainName[64] = "Chain_01";
     bool mChainOnly = false;

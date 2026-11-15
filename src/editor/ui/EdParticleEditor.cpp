@@ -238,6 +238,7 @@ namespace faf::editor
     if (mFlatMode) {
       mPreview.SetPlaying(mPlaying);
       mPreview.SetLoop(mLoop);
+      mPreview.SetScale(mViewport.Opts().scale);
       mPreview.Frame();
       return;
     }
@@ -246,6 +247,7 @@ namespace faf::editor
       fx->SetPlace(mViewport.PlaceX(), EdParticleViewport::kPlaceY + mViewport.Opts().height, mViewport.PlaceZ());
       fx->SetPlaying(mPlaying);
       fx->SetLoop(mLoop);
+      fx->SetScale(mViewport.Opts().scale);
       fx->Frame();
     }
   }
@@ -501,6 +503,10 @@ namespace faf::editor
     ImGui::SetNextItemWidth(sliderWidth);
     FillSliderFloat("##height", &options.height, 0.0f, 30.0f, "above ground %.1f");
     EdSetItemTooltip("The emitter this high above the ground (most effects play on a unit, some way up)");
+    flow(sliderWidth);
+    ImGui::SetNextItemWidth(sliderWidth);
+    FillSliderFloat("##effectscale", &options.scale, 0.1f, 4.0f, "effect scale %.1f");
+    EdSetItemTooltip("The effect as the game scales it (ScaleEmitter): sizes, speeds and offsets times this");
     flow(buttonWidth("Front"));
     if (ImGui::Button("Front")) {
       mViewport.Look(3.14159265f, 0.15f);

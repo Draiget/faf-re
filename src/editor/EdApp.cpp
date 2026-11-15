@@ -237,7 +237,7 @@ namespace faf::editor
         "/lookthumbtest",   "/toolsfile",
         "/watermasks",      "/imagestest",
         "/themesfile",      "/themelib",
-        "/r6test",
+        "/r6test",          "/r7test",
       };
       for (const char* const option : kOptions) {
         if (moho::CFG_GetArgOption(option, 0, nullptr)) {
@@ -4159,6 +4159,21 @@ namespace faf::editor
           std::string text = "Plan: " + plan.text + ".";
           panel.SetPlan(plan, std::move(text));
         }
+        if (panel.TakeCentreSymmetryAsk()) {
+          float ax0 = 0.0f, az0 = 0.0f, ax1 = 0.0f, az1 = 0.0f;
+          mDocument.LayoutArea(ax0, az0, ax1, az1);
+          const MapFacts& f = mDocument.Facts();
+          const float ox = (ax0 + ax1) * 0.5f - static_cast<float>(f.fieldWidth - 1) * 0.5f;
+          const float oz = (az0 + az1) * 0.5f - static_cast<float>(f.fieldHeight - 1) * 0.5f;
+          mShell->Tools().SetSymmetryCentre(ox, oz);
+          panel.SetStatus(
+            "The symmetry's centre is the middle of the drawing (" + std::to_string(static_cast<int>(ox)) + ", " +
+            std::to_string(static_cast<int>(oz)) + " from the map's middle)."
+          );
+          gpg::Logf(
+            "editor: layout: symmetry centre offset %.1f, %.1f", static_cast<double>(ox), static_cast<double>(oz)
+          );
+        }
         if (!panel.TakeGenerateAsk()) {
           return;
         }
@@ -4213,6 +4228,10 @@ namespace faf::editor
         }
         const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
         gpg::Logf("editor: layout: generated in %.0f ms: %s", ms, status.c_str());
+        if (panel.PaintGroundToo()) {
+          mShell->Tools().AskRecipeApply();
+          status += " The ground is painted by the Stratum recipe next.";
+        }
         panel.SetStatus(status);
       }
 
@@ -5946,6 +5965,57 @@ namespace faf::editor
       // Find and replace objects: asked (Ctrl+F), the objects and types when it opened, the choices.
       bool mFindAsk = false;
       bool mFlattenAsk = false;
+      bool mMirrorHalfAsk = false;
+      EdMapScene::MirrorHalfOptions mMirrorHalf;
+      /** Edit > Mirror half the map (FAF Studio's dialogs_mirror.lua): the part copied and what follows it. */
+      void DrawMirrorHalf()
+      {
+        constexpr const char* kTitle = "Mirror half the map";
+        if (std::exchange(mMirrorHalfAsk, false) && mDocument.GetState() == EdDocument::State::Open) {
+          ImGui::OpenPopup(kTitle);
+        }
+        ImGui::SetNextWindowSize(ImVec2(Em(440.0f), 0.0f), ImGuiCond_Appearing);
+        if (!ImGui::BeginPopupModal(kTitle, nullptr, ImGuiWindowFlags_NoSavedSettings)) {
+          return;
+        }
+        const int parts = mScene.SymmetryParts();
+        if (parts <= 1) {
+          ImGui::TextWrapped("Pick a symmetry on the toolbar first: its parts are what is copied.");
+        } else {
+          mMirrorHalf.source = std::clamp(mMirrorHalf.source, 0, parts - 1);
+          ImGui::SetNextItemWidth(Em(200.0f));
+          FillSliderInt("##mirrorsource", &mMirrorHalf.source, 0, parts - 1, "Copy from part %d");
+          EdSetItemTooltip("The symmetry's parts in order by z then x: part 0 holds the top left");
+          ImGui::TextDisabled("What follows");
+          ImGui::Checkbox("Markers", &mMirrorHalf.markers);
+          ImGui::SameLine();
+          ImGui::Checkbox("Props", &mMirrorHalf.props);
+          ImGui::SameLine();
+          ImGui::Checkbox("Decals", &mMirrorHalf.decals);
+          ImGui::SameLine();
+          ImGui::Checkbox("Units", &mMirrorHalf.units);
+          ImGui::SameLine();
+          ImGui::Checkbox("Areas", &mMirrorHalf.areas);
+          ImGui::Checkbox("Units go to the mirrored army", &mMirrorHalf.mapArmies);
+          EdSetItemTooltip("The army whose start position is the copy of the unit's army's start; else their own");
+          ImGui::Checkbox("Replace what is on the other parts", &mMirrorHalf.replace);
+          EdSetItemTooltip("Off: the copies are added to what is there");
+          ImGui::TextDisabled(
+            "Start positions and AREA_1 never change; props and decals keep their pictures, only their "
+            "headings turn."
+          );
+          if (PrimaryButton("Mirror")) {
+            const int made = mScene.MirrorHalf(mMirrorHalf);
+            PostStatusMessage("Mirror half: " + std::to_string(made) + " copies");
+            ImGui::CloseCurrentPopup();
+          }
+          ImGui::SameLine();
+        }
+        if (ImGui::Button("Cancel") || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+          ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+      }
       float mFlattenHeight = 0.0f;
       float mFlattenLow = 0.0f;
       float mFlattenHigh = 0.0f;
@@ -7237,6 +7307,300 @@ namespace faf::editor
           break;
         }
       }
+      void RunQuickGen(
+        EdFieldsPanel& fields,
+        const EdFieldsPanel::QuickGenSettings& q,
+        const bool applyIt
+      )
+      {
+        const std::shared_ptr<TerrainSource> terrain = mScene.TerrainHeights();
+        if (terrain == nullptr || terrain->width < 2) {
+          fields.SetQuickGenResult({}, "No terrain.");
+          return;
+        }
+        const int w = terrain->width;
+        const int h = terrain->height;
+        auto heights = std::make_shared<field::Grid>(w, h, 1.0f, 0.0f, 0.0f);
+        heights->v = terrain->heights;
+        const auto run = [](const char* op, field::OpArgs args, std::string& error) -> std::shared_ptr<field::Grid> {
+          auto out = std::make_shared<field::Grid>();
+          return field::RunOpCpu(op, args, *out, error) ? out : nullptr;
+        };
+        std::string error;
+        const EdFieldsPanel::QuickGenPreset& preset =
+          EdFieldsPanel::QuickGenPresets()[static_cast<std::size_t>(std::clamp(q.preset, 0, 5))];
+        field::OpArgs noise;
+        noise.in["like"] = heights;
+        noise.p.num["seed"] = q.seed;
+        noise.p.num["scale"] = q.scale;
+        noise.p.num["octaves"] = 8;
+        noise.p.num["finest"] = 3;
+        noise.p.num["persistence"] = q.detail;
+        noise.p.num["sharpness"] = preset.sharpness;
+        noise.p.num["warp"] = q.warp;
+        noise.p.str["kind"] = preset.kind;
+        const std::shared_ptr<field::Grid> raw = run("fractal", noise, error);
+        field::OpArgs amp;
+        amp.in["a"] = raw;
+        amp.p.num["amplitude"] = q.amplitude;
+        const std::shared_ptr<field::Grid> relief = raw != nullptr ? run("amplitude", amp, error) : nullptr;
+        if (relief == nullptr) {
+          fields.SetQuickGenResult({}, "Generate: " + error);
+          return;
+        }
+        // The mask: the region (whole map, playable area or an area) with a soft border, the flat spots kept.
+        auto mask = std::make_shared<field::Grid>(w, h, 1.0f, 0.0f, 0.0f);
+        float x0 = 0.0f, z0 = 0.0f, x1 = static_cast<float>(w - 1), z1 = static_cast<float>(h - 1);
+        bool region = false;
+        if (q.mask == 1) {
+          if (const std::optional<EdDocument::PlayableRect> area = mDocument.PlayableArea()) {
+            x0 = static_cast<float>(area->x0);
+            z0 = static_cast<float>(area->z0);
+            x1 = static_cast<float>(area->x1);
+            z1 = static_cast<float>(area->z1);
+            region = true;
+          }
+        } else if (q.mask == 2) {
+          for (const SaveEntry& a : mDocument.SaveData().Areas()) {
+            const std::vector<double> r = ValueNumbers(a.Get("rectangle"));
+            if (a.name == q.area && r.size() >= 4) {
+              x0 = static_cast<float>(std::min(r[0], r[2]));
+              z0 = static_cast<float>(std::min(r[1], r[3]));
+              x1 = static_cast<float>(std::max(r[0], r[2]));
+              z1 = static_cast<float>(std::max(r[1], r[3]));
+              region = true;
+            }
+          }
+          if (!region) {
+            fields.SetQuickGenResult({}, "Choose an area of the map.");
+            return;
+          }
+        }
+        std::vector<std::array<float, 3>> spots; // x, z, radius
+        if (q.keepFlat) {
+          for (const SaveEntry& marker : mDocument.SaveData().Markers()) {
+            float mx = 0.0f, my = 0.0f, mz = 0.0f;
+            const std::string type = MarkerTypeOf(marker);
+            if (MarkerPosition(marker, mx, my, mz)) {
+              if (type == "Blank Marker") {
+                spots.push_back({mx, mz, q.flatRadius});
+              } else if (type == "Mass" || type == "Hydrocarbon") {
+                spots.push_back({mx, mz, q.flatRadius * 0.4f});
+              }
+            }
+          }
+        }
+        const auto smooth = [](const float t) {
+          const float c = std::clamp(t, 0.0f, 1.0f);
+          return c * c * (3.0f - 2.0f * c);
+        };
+        for (int z = 0; z < h; ++z) {
+          for (int x = 0; x < w; ++x) {
+            float m = 1.0f;
+            if (region) {
+              const float inside = std::min(
+                {static_cast<float>(x) - x0,
+                 x1 - static_cast<float>(x),
+                 static_cast<float>(z) - z0,
+                 z1 - static_cast<float>(z)}
+              );
+              m = inside < 0.0f ? 0.0f : (q.feather > 0.0f ? smooth(inside / q.feather) : 1.0f);
+            }
+            for (const auto& s : spots) {
+              const float d = std::hypot(static_cast<float>(x) - s[0], static_cast<float>(z) - s[1]);
+              m *= smooth((d - s[2]) / std::max(4.0f, s[2] * 0.75f));
+            }
+            mask->v[static_cast<std::size_t>(z) * w + x] = m;
+          }
+        }
+        static constexpr const char* kModes[] = {"add", "multiply", "max", "min", "replace"};
+        field::OpArgs mix;
+        mix.in["a"] = heights;
+        mix.in["b"] = relief;
+        mix.in["mask"] = mask;
+        mix.p.str["mode"] = kModes[std::clamp(q.blend, 0, 4)];
+        mix.p.num["strength"] = q.strength;
+        std::shared_ptr<field::Grid> result = run("terrain_mix", mix, error);
+        const WaterState water = mDocument.WaterNow();
+        if (result != nullptr && q.keepWater && water.enabled) {
+          field::OpArgs keep;
+          keep.in["a"] = result;
+          keep.in["b"] = heights;
+          keep.p.num["level"] = water.elevation;
+          keep.p.num["margin"] = 0.25;
+          result = run("keep_side", keep, error);
+        }
+        if (result == nullptr) {
+          fields.SetQuickGenResult({}, "Generate: " + error);
+          return;
+        }
+        // What changed: the largest move, the mean, the share that moved more than 0.05.
+        field::Grid change(w, h, 1.0f, 0.0f, 0.0f);
+        float largest = 0.0f;
+        double sum = 0.0;
+        std::size_t moved = 0;
+        for (std::size_t i = 0; i < change.v.size(); ++i) {
+          const float d = result->v[i] - heights->v[i];
+          change.v[i] = d;
+          largest = std::max(largest, std::fabs(d));
+          sum += std::fabs(d);
+          moved += std::fabs(d) > 0.05f ? 1 : 0;
+        }
+        char text[200];
+        (void)std::snprintf(
+          text,
+          sizeof(text),
+          "%s (%s): the ground moves up to %.1f units, %.2f on average; %.0f %% of the map changes",
+          preset.label,
+          kModes[std::clamp(q.blend, 0, 4)],
+          static_cast<double>(largest),
+          sum / static_cast<double>(std::max<std::size_t>(change.v.size(), 1)),
+          100.0 * static_cast<double>(moved) / static_cast<double>(std::max<std::size_t>(change.v.size(), 1))
+        );
+        std::string status = text;
+        if (applyIt) {
+          status += ". " + mScene.ApplyGraphBuild(*result, true, TerrainBuildWrites{});
+        }
+        gpg::Logf("editor: fields: generate: %s", status.c_str());
+        fields.SetQuickGenResult(std::move(change), status);
+      }
+      /**
+       * `/r7test` (test runs): the fifth comparison's features a step at a time, each logged: mirror half from part 1
+       * with units, areas and the armies mapped (added, then undone); the recipes' Measure, Show, Assign and
+       * Layered; Generate into the map (then undone); a base defined from an area; the layout's Centre symmetry.
+       */
+      int mR7Stage = 0;
+      int mR7Frames = 0;
+      void DriveRoundSevenTest()
+      {
+        if (
+          mR7Stage >= 12 || !mScene.Attached() || !mScene.UnitsReady() ||
+          !moho::CFG_GetArgOption("/r7test", 0, nullptr) || ++mR7Frames % 90 != 0
+        ) {
+          return;
+        }
+        EdTools& tools = mShell->Tools();
+        const auto unitCount = [this]() {
+          std::size_t n = 0;
+          for (const SaveEntry& army : mDocument.SaveData().Armies()) {
+            UnitGroup root;
+            std::string error;
+            if (ParseUnitGroup(army.Get("Units"), root, error)) {
+              std::vector<const SaveUnit*> units;
+              CollectUnits(root, units);
+              n += units.size();
+            }
+          }
+          return n;
+        };
+        switch (mR7Stage++) {
+        case 0: {
+          tools.SetSymmetry(static_cast<int>(Symmetry::LeftRight), 3);
+          EdMapScene::MirrorHalfOptions o;
+          o.source = 1;
+          o.units = true;
+          o.areas = true;
+          o.replace = false;
+          o.mapArmies = true;
+          const std::size_t unitsBefore = unitCount();
+          const std::size_t areasBefore = mDocument.SaveData().Areas().size();
+          const int made = mScene.MirrorHalf(o);
+          gpg::Logf(
+            "editor: /r7test: mirror half from part 1 of %d (add, units mapped): %d copies; units %zu -> %zu; areas "
+            "%zu "
+            "-> %zu",
+            mScene.SymmetryParts(),
+            made,
+            unitsBefore,
+            unitCount(),
+            areasBefore,
+            mDocument.SaveData().Areas().size()
+          );
+          break;
+        }
+        case 1:
+          for (int i = 0; i < 6; ++i) {
+            (void)mScene.Undo();
+          }
+          tools.SetSymmetry(0, 3);
+          tools.AskRecipe(EdTools::RecipeAsk::Measure);
+          break;
+        case 2:
+          tools.AskRecipe(EdTools::RecipeAsk::Show, 2);
+          break;
+        case 3:
+          tools.AskRecipe(EdTools::RecipeAsk::Assign);
+          break;
+        case 4:
+          tools.AskRecipe(EdTools::RecipeAsk::Layered);
+          break;
+        case 5:
+          (void)mScene.Undo();
+          mShell->Fields().AskQuickGen(1, 0);
+          break;
+        case 6:
+          (void)mScene.Undo();
+          gpg::Logf("editor: /r7test: generate undone");
+          break;
+        case 7: {
+          // A base from an area put round the first unit of the first army that has units.
+          std::string army;
+          float ux = 0.0f, uz = 0.0f;
+          for (const SaveEntry& entry : mDocument.SaveData().Armies()) {
+            UnitGroup root;
+            std::string error;
+            std::vector<const SaveUnit*> units;
+            if (ParseUnitGroup(entry.Get("Units"), root, error)) {
+              CollectUnits(root, units);
+            }
+            if (!units.empty()) {
+              army = entry.name;
+              ux = units.front()->position[0];
+              uz = units.front()->position[2];
+              break;
+            }
+          }
+          EdDocument::SaveSnapshot before = mDocument.SaveDataNow();
+          SaveEntry area;
+          area.name = "AREA_R7";
+          area.Set("rectangle", RectangleValue(ux - 40.0, uz - 40.0, ux + 40.0, uz + 40.0));
+          mDocument.SaveData().Areas().push_back(area);
+          mDocument.SaveDataEdited(std::move(before));
+          std::string why;
+          const bool ok = mShell->MissionPanel().DefineBaseFromArea("R7Base", army, "AREA_R7", why);
+          gpg::Logf(
+            "editor: /r7test: define base from AREA_R7 round %.0f, %.0f for %s: %s",
+            static_cast<double>(ux),
+            static_cast<double>(uz),
+            army.c_str(),
+            ok ? "asked" : why.c_str()
+          );
+          break;
+        }
+        case 8: {
+          const auto& markers = mDocument.SaveData().Markers();
+          const bool marker = std::any_of(markers.begin(), markers.end(), [](const SaveEntry& m) {
+            return m.name == "R7Base_Marker";
+          });
+          const Mission& mission = mDocument.MissionNow();
+          const bool base = std::any_of(mission.bases.begin(), mission.bases.end(), [](const MissionBase& b) {
+            return b.name == "R7Base";
+          });
+          gpg::Logf(
+            "editor: /r7test: base in the mission: %s, its marker on the map: %s",
+            base ? "yes" : "no",
+            marker ? "yes" : "no"
+          );
+          mShell->LayoutPanel().AskCentreSymmetry();
+          break;
+        }
+        case 11:
+          gpg::Logf("editor: /r7test: done");
+          break;
+        default:
+          break;
+        }
+      }
       /** SC tools > Water: the asks, and Live's re-apply when the water level moved. */
       void WaterMasksUpdate();
       struct WaterApplied
@@ -7261,6 +7625,7 @@ namespace faf::editor
       int mRecipeFrame = 0;
       int mRecipeArg = -1; // `/recipe <style>` (test runs)
       int mRecipeArgFrames = 0;
+      std::uint64_t mRecipeShowImage = 0;
       /** The Layers panel's optimal tiles (once a second) and Texture sets (try, keep, back, apply). */
       void TexturesUpdate();
       [[nodiscard]] int TexturePixels(const std::string& path);
@@ -8327,13 +8692,18 @@ namespace faf::editor
         PostStatusMessage("Draw chain: each marker placed joins " + mShell->Tools().ChainName());
       }, mapOpen, {}, "The Markers tool with Draw chain on: each marker placed joins the chain named in the panel");
       // Map > Snap resource markers to grid (FAF Studio): every mass and hydrocarbon in its cell's middle.
-      add("edit.mirrorhalf", "Mirror half the map", "Edit", "", [this] {
-        const int made = mScene.MirrorHalf();
-        PostStatusMessage(
-          made > 0 ? "Mirror half: " + std::to_string(made) + " copies of the first part's objects"
-                   : "Mirror half: pick a symmetry on the toolbar first"
-        );
-      }, mapOpen, {}, "Props, decals and markers of the symmetry's first part copied over the rest (the rest removed)");
+      add(
+        "edit.mirrorhalf",
+        "Mirror half the map...",
+        "Edit",
+        "",
+        [this] {
+        mMirrorHalfAsk = true;
+      },
+        mapOpen,
+        {},
+        "A part of the symmetry copied over the rest: which part, what follows, the units' armies, add or replace"
+      );
       add("map.snapresources", "Snap resource markers to grid", "Map", "", [this] {
         const std::vector<ResourceSnap> snaps = ResourceSnaps(mDocument.SaveData().Markers());
         for (const ResourceSnap& snap : snaps) {
@@ -9671,6 +10041,7 @@ namespace faf::editor
         DrawUnsavedQuestion();
         DrawFind();
         DrawFlatten();
+        DrawMirrorHalf();
         DriveAutosave();
         // `/focuspanel <window>` (test runs): that panel in front, a while after the map opened (opening fronts Info).
         if (mFocusPanelFrames < 90 && mDocument.GetState() == EdDocument::State::Open) {
@@ -11025,7 +11396,7 @@ namespace faf::editor
         mRecipeFrame = 0;
       }
       const bool apply = tools.TakeRecipeApply();
-      if (!apply && (!tools.RecipesOpen() || mRecipeFrame++ % 60 != 0)) {
+      if (!apply && !tools.RecipeAsked() && (!tools.RecipesOpen() || mRecipeFrame++ % 60 != 0)) {
         return;
       }
       // Each layer's kind: its texture's name and average colour, or what the panel chose.
@@ -11047,7 +11418,118 @@ namespace faf::editor
           GroundKindOf(albedo, library.AverageColour(albedo, rgb) ? rgb : nullptr).kind;
       }
       tools.SetRecipeDetected(detected, names, profile.painted);
-      if (!apply) {
+      int showLayer = 0;
+      const EdTools::RecipeAsk extra = tools.TakeRecipeAsk(showLayer);
+      if (extra == EdTools::RecipeAsk::Assign || extra == EdTools::RecipeAsk::Layered) {
+        // Textures from the chosen texture set: Assign fills empty layers with the kinds the map lacks; Layered puts
+        // FAF Studio's seven layer mix (grass 2, rock 1, dirt 1, rock 2, wet 1, dirt 2, rock 3) on the painted layers.
+        const TextureTheme& set = TextureThemes()[static_cast<std::size_t>(
+          std::clamp(tools.ThemeIndex(), 0, static_cast<int>(TextureThemes().size()) - 1)
+        )];
+        const auto candidate = [&](const GroundKind kind, const int nth) -> std::string {
+          int found = 0;
+          for (const char* path : set.kinds[static_cast<std::size_t>(kind)]) {
+            if (GameFileExists(path) && found++ == nth) {
+              return path;
+            }
+          }
+          return {};
+        };
+        const auto tileOf = [&](const std::string& path) {
+          const int pixels = TexturePixels(path);
+          return pixels > 0 ? TileForPixels(pixels) : set.size;
+        };
+        std::vector<std::pair<int, LayerSettings>> layers;
+        std::string what;
+        if (extra == EdTools::RecipeAsk::Assign) {
+          std::array<bool, 9> present{};
+          for (int layer = 0; layer <= 8; ++layer) {
+            if (textured[static_cast<std::size_t>(layer)]) {
+              present[static_cast<std::size_t>(detected[static_cast<std::size_t>(layer)])] = true;
+            }
+          }
+          int slot = 1;
+          for (const GroundKind kind : RecipeOrder()) {
+            if (present[static_cast<std::size_t>(kind)]) {
+              continue;
+            }
+            while (slot <= profile.painted && slot < static_cast<int>(slots.size()) &&
+                   textured[static_cast<std::size_t>(slot)]) {
+              ++slot;
+            }
+            if (slot > profile.painted || slot >= static_cast<int>(slots.size())) {
+              break;
+            }
+            const std::string path = candidate(kind, 0);
+            if (path.empty()) {
+              continue;
+            }
+            layers.push_back({slot, LayerSettings{path, "", tileOf(path), tileOf(path)}});
+            what += std::string(what.empty() ? "" : ", ") + GroundKindName(kind) + " on " + std::to_string(slot);
+            ++slot;
+          }
+        } else {
+          static constexpr std::pair<GroundKind, int> kLayered[] = {
+            {GroundKind::Grass, 1},
+            {GroundKind::Rock, 0},
+            {GroundKind::Dirt, 0},
+            {GroundKind::Rock, 1},
+            {GroundKind::Wet, 0},
+            {GroundKind::Dirt, 1},
+            {GroundKind::Rock, 2},
+          };
+          for (int i = 0; i < 7 && i + 1 <= profile.painted && i + 1 < static_cast<int>(slots.size()); ++i) {
+            std::string path = candidate(kLayered[i].first, kLayered[i].second);
+            if (path.empty()) {
+              path = candidate(kLayered[i].first, 0);
+            }
+            if (!path.empty()) {
+              layers.push_back({i + 1, LayerSettings{path, "", tileOf(path), tileOf(path)}});
+              what += std::string(what.empty() ? "" : ", ") + GroundKindName(kLayered[i].first) + " on " +
+                std::to_string(i + 1);
+            }
+          }
+          for (std::size_t s = 0; s < RecipeStyles().size(); ++s) {
+            if (std::string(RecipeStyles()[s].id) == "layered") {
+              tools.SetRecipeStyle(static_cast<int>(s));
+            }
+          }
+        }
+        const int changed = layers.empty() ? 0 : mScene.ApplyLayerSettings({}, layers);
+        const std::string status = (extra == EdTools::RecipeAsk::Assign ? "Assign textures (" : "Layered textures (") +
+          std::string(set.label) + "): " + (what.empty() ? std::string("nothing to give") : what) + "; " +
+          std::to_string(changed) + " layers changed";
+        tools.SetRecipeResult(status);
+        gpg::Logf("editor: stratum recipe: %s", status.c_str());
+        mRecipeFrame = 0;
+        return;
+      }
+      if (extra == EdTools::RecipeAsk::Measure) {
+        float coverage[8] = {};
+        std::string status = "Coverage now:";
+        if (mScene.MaskCoverage(coverage)) {
+          // Only the layers this shader paints (a 4-layer shader's other bytes repeat the first four).
+          const int painted = std::clamp(profile.painted, 1, 8);
+          for (int layer = 0; layer < painted; ++layer) {
+            char part[32];
+            (void)std::snprintf(
+              part,
+              sizeof(part),
+              " %d %.0f %%%s",
+              layer + 1,
+              static_cast<double>(coverage[layer] * 100.0f),
+              layer + 1 < painted ? "," : ""
+            );
+            status += part;
+          }
+        } else {
+          status = "No paint masks to measure.";
+        }
+        tools.SetRecipeResult(status);
+        gpg::Logf("editor: stratum recipe: %s", status.c_str());
+        return;
+      }
+      if (!apply && extra != EdTools::RecipeAsk::Show) {
         return;
       }
       const auto started = std::chrono::steady_clock::now();
@@ -11072,6 +11554,52 @@ namespace faf::editor
       std::map<int, field::Grid> target;
       std::array<float, 9> shares{};
       std::string message;
+      if (extra == EdTools::RecipeAsk::Show) {
+        // Show: the layer's visible weight as the recipe resolves it, red over a dark map; nothing is painted.
+        if (
+          !RecipeRoles(context, plan, stats, tools.RecipeSettings(), tools.RecipeStyle(), roles, error) ||
+          !ResolveRecipe(context, plan, roles, tools.RecipeSettings(), tools.RecipeStyle(), target, error)
+        ) {
+          tools.SetRecipeShow(0, "Can't show it: " + error);
+          return;
+        }
+        const auto found = target.find(showLayer);
+        if (found == target.end() || found->second.w < 2) {
+          tools.SetRecipeShow(0, "Layer " + std::to_string(showLayer) + " isn't in the recipe (no kind, or the base).");
+          return;
+        }
+        constexpr int kSide = 128;
+        std::vector<std::uint32_t> pixels(static_cast<std::size_t>(kSide) * kSide);
+        double sum = 0.0;
+        const float mapSize = static_cast<float>(terrain->width - 1);
+        for (int y = 0; y < kSide; ++y) {
+          for (int x = 0; x < kSide; ++x) {
+            const float v = std::clamp(
+              SampleField(found->second, (x + 0.5f) * mapSize / kSide, (y + 0.5f) * mapSize / kSide), 0.0f, 1.0f
+            );
+            sum += v;
+            const auto r = static_cast<std::uint32_t>(40 + v * 215);
+            const auto g = static_cast<std::uint32_t>(40 * (1.0f - v));
+            pixels[static_cast<std::size_t>(y) * kSide + x] = 0xFF000000u | (r << 16) | (g << 8) | g;
+          }
+        }
+        if (mRecipeShowImage != 0U) {
+          EdImGuiRenderer::DestroyImage(mRecipeShowImage);
+        }
+        mRecipeShowImage = EdImGuiRenderer::CreateImage(kSide, kSide, pixels.data());
+        char text[160];
+        (void)std::snprintf(
+          text,
+          sizeof(text),
+          "Layer %d (%s): %.0f %% of the map",
+          showLayer,
+          GroundKindName(kinds[static_cast<std::size_t>(std::clamp(showLayer, 0, 8))]),
+          100.0 * sum / (kSide * kSide)
+        );
+        tools.SetRecipeShow(mRecipeShowImage, text);
+        gpg::Logf("editor: stratum recipe: show %s", text);
+        return;
+      }
       if (
         !RecipeRoles(context, plan, stats, tools.RecipeSettings(), tools.RecipeStyle(), roles, error) ||
         !ResolveRecipe(context, plan, roles, tools.RecipeSettings(), tools.RecipeStyle(), target, error) ||
@@ -11105,6 +11633,20 @@ namespace faf::editor
       const double seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - started).count();
       const std::string style = RecipeStyles()[static_cast<std::size_t>(tools.RecipeStyle())].name;
       tools.SetRecipeResult("Painted (" + style + "): " + summary + ". " + message + ".");
+      // Terrain types too, roughness too (FAF Studio's recipe toggles).
+      if (tools.RecipeTypesToo()) {
+        tools.AskTypesFromLayers(false);
+      }
+      if (tools.RecipeRoughnessToo()) {
+        const std::string shader = mScene.TerrainShader();
+        if (shader.rfind("Terrain1", 0) == 0 || shader.rfind("Terrain2", 0) == 0) {
+          TerrainBuildWrites writes;
+          writes.atlas = true;
+          gpg::Logf("editor: stratum recipe: roughness: %s", MakeAtlasTexture(writes).c_str());
+        } else {
+          gpg::Logf("editor: stratum recipe: roughness skipped: %s has no roughness atlas", shader.c_str());
+        }
+      }
       PostStatusMessage("Painted the map with the recipe: " + message);
       gpg::Logf(
         "editor: stratum recipe %s in %.2f s: %s; %s; layers outside the recipe %zu, beyond the shader %zu",
@@ -11427,7 +11969,10 @@ namespace faf::editor
         }
         value.normals = gameFolder + base + "_normals.dds";
       }
-      if (value.albedoSize <= 1.0f) {
+      if (bake.tile > 0.0f) {
+        value.albedoSize = bake.tile;
+        value.normalsSize = bake.tile;
+      } else if (value.albedoSize <= 1.0f) {
         value.albedoSize = 10.0f;
         value.normalsSize = 10.0f;
       }
@@ -12425,6 +12970,7 @@ namespace faf::editor
         MaskGenUpdate();
         WaterMasksUpdate();
         DriveRoundSixTest();
+        DriveRoundSevenTest();
         RecipesUpdate();
         TexturesUpdate();
         DriveMaterialEditor();
@@ -12502,6 +13048,31 @@ namespace faf::editor
             point.what.c_str()
           );
           mShell->OpenViewMenu(selection || !here.what.empty(), std::move(point));
+        }
+        // Bases > Define from area: the base's marker at the area's middle, the army's units there into its group.
+        if (EdMissionPanel::DefineBaseAsk ask; mScene.Attached() && mShell->MissionPanel().TakeDefineBaseAsk(ask)) {
+          const std::string marker = ask.name + "_Marker";
+          std::vector<SaveEntry>& markers = mDocument.SaveData().Markers();
+          if (std::none_of(markers.begin(), markers.end(), [&](const SaveEntry& e) {
+            return e.name == marker;
+          })) {
+            EdDocument::SaveSnapshot before = mDocument.SaveDataNow();
+            markers.push_back(
+              NewMarker(*FindMarkerType("Blank Marker"), marker, ask.x, mScene.GroundHeightAt(ask.x, ask.z), ask.z)
+            );
+            mDocument.SaveDataEdited(std::move(before));
+          }
+          const bool grouped = !ask.units.empty() && mScene.MoveUnitsToGroup(ask.army, ask.units, {ask.name});
+          gpg::Logf(
+            "editor: base %s defined at %.1f, %.1f: marker %s, %zu of %s's units into its group%s",
+            ask.name.c_str(),
+            static_cast<double>(ask.x),
+            static_cast<double>(ask.z),
+            marker.c_str(),
+            ask.units.size(),
+            ask.army.c_str(),
+            grouped || ask.units.empty() ? "" : " (not moved)"
+          );
         }
         // The view menu's entries that act at its point (place, focus, snap, give, group).
         if (EdShell::ViewMenuPoint at; mScene.Attached()) {
@@ -14547,6 +15118,29 @@ namespace faf::editor
           const std::string status = mScene.ApplyGraphBuild(heights, true, TerrainBuildWrites{});
           gpg::Logf("editor: fields: put on the map: %s", status.c_str());
           PostStatusMessage("Fields: the result is on the map (one undo step)");
+        }
+        // Generate into the map (FAF Studio's fieldgen.lua): relief, mask, mix, water kept; Preview or Apply.
+        {
+          std::vector<std::string> areaNames;
+          for (const SaveEntry& a : mDocument.SaveData().Areas()) {
+            areaNames.push_back(a.name);
+          }
+          fields.SetAreaNames(std::move(areaNames));
+        }
+        if (EdFieldsPanel::QuickGenSettings q; mScene.Attached()) {
+          bool applyIt = false;
+          if (fields.TakeQuickGen(q, applyIt)) {
+            RunQuickGen(fields, q, applyIt);
+          }
+        }
+        if (field::Grid mask; mScene.Attached()) {
+          int layer = 1;
+          if (fields.TakeLayerCommit(mask, layer)) {
+            std::string message;
+            const int changed = mScene.WriteGeneratedMask(mask, layer, MaskWriteMode::Replace, 1.0f, false, message);
+            gpg::Logf("editor: fields: commit to layer %d: %s (%d)", layer, message.c_str(), changed);
+            PostStatusMessage("Fields: " + message);
+          }
         }
         // `/fieldstest <op>;<key=value,...>` (test runs): that op on the map's heights, put on the map.
         if (

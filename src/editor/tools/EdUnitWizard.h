@@ -118,6 +118,10 @@ namespace faf::editor
     bool icon = true;
     int footprintX = 1;
     int footprintZ = 1;
+    /** Physics.MotionType (RULEUMT_Land ...); empty: the template's. */
+    std::string motionType;
+    /** Economy.BuildableCategory (what the unit builds), one expression each; empty: the template's. */
+    std::vector<std::string> buildable;
   };
 
   /** The first line of the files the wizard writes: change the unit in the wizard; without it a file is the user's. */

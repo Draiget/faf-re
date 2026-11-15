@@ -320,9 +320,10 @@ namespace faf::editor
       mStatus = "Apply: " + error;
       return;
     }
-    if (mTargetSlot >= 1 && mTargetSlot <= 8) {
+    if (mTargetSlot >= 1 && mTargetSlot <= 8 && mApplyMask) {
       out.mask = bake.Result("Mask");
     }
+    out.tile = mApplyTile;
     mBakeOut = std::move(out);
     mBakeReady = true;
     StopLive();
@@ -841,6 +842,11 @@ namespace faf::editor
         ImGui::EndCombo();
       }
       EdSetItemTooltip("The size Apply bakes at");
+      ImGui::SetNextItemWidth(Em(90.0f));
+      FillSliderFloat("##applytile", &mApplyTile, 0.0f, 200.0f, mApplyTile <= 0.0f ? "tile: the layer's" : "tile %.0f");
+      EdSetItemTooltip("How many game units the texture repeats over; 0 keeps the layer's own (10 when it has none)");
+      ImGui::Checkbox("Paint the mask", &mApplyMask);
+      EdSetItemTooltip("Also paints the layer's mask from the output's Mask input");
       if (!mStatus.empty()) {
         ImGui::TextDisabled("%s", mStatus.c_str());
       }

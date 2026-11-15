@@ -45,6 +45,28 @@ namespace faf::editor
     {
       return mLive;
     }
+    /** Bases > Define from area (FAF Studio's mbase.lua DefineFromArea): what the map gets (the app does it). */
+    struct DefineBaseAsk
+    {
+      std::string name;
+      std::string army;
+      float x = 0.0f; // the area's middle
+      float z = 0.0f;
+      std::vector<std::string> units; // the army's units inside the area
+    };
+    [[nodiscard]] bool TakeDefineBaseAsk(
+      DefineBaseAsk& ask
+    )
+    {
+      if (mDefineAsk.name.empty()) {
+        return false;
+      }
+      ask = std::exchange(mDefineAsk, {});
+      return true;
+    }
+    /** Test runs (`/definebase <name>,<army>,<area>`): as the section's button. */
+    bool
+    DefineBaseFromArea(const std::string& name, const std::string& army, const std::string& area, std::string& why);
     /** Play from a stage was pressed (the shell starts the open map). */
     [[nodiscard]] bool TakePlayAsk() noexcept
     {
@@ -85,6 +107,7 @@ namespace faf::editor
     EdDocument& mDocument;
     int mStage = 0;
     int mSection = 0;       // 0 enter, 1 ready
+    int mAddSection = 1;    // where Add puts a node when none is selected (Add here)
     std::vector<int> mPath; // the selected node (0-based through the children); empty: none
     int mDialogue = 0;
     std::optional<Mission> mFieldBefore; // a text field being typed in: the mission before it
@@ -100,6 +123,17 @@ namespace faf::editor
     int mTimerScale = 0;
     MissionLive mLive;
     bool mHasLive = false;
+    /** Platoons: a template's or an order queue's used-by line, Copy, Rename (with its references), Assign to group. */
+    void DrawPlatoonTools(bool templateKind, const std::string& name, const MissionFacts& facts);
+    char mRenameTemplate[64] = "";
+    char mRenameQueue[64] = "";
+    std::string mAssignArmy;
+    std::string mAssignGroup;
+    DefineBaseAsk mDefineAsk;
+    char mDefineName[48] = "Base1";
+    int mDefineArmy = 0;
+    int mDefineArea = 0;
+    char mNewFlag[64] = "";
     double mLiveAskedAt = -10.0;
     bool mFocusStages = false;
   };

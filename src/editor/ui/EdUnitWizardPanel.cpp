@@ -231,6 +231,99 @@ namespace faf::editor
         mChecks = CheckWizardUnit(mData, spec, mFolder, game);
       }
       ImGui::SameLine();
+      if (ImGui::Button("Check mesh")) {
+        // The mesh as Write would build it: its size and anything wrong with it (FAF Studio's Check mesh).
+        std::string objText;
+        std::string error;
+        if (!spec.mesh.source.empty()) {
+          std::ifstream in(spec.mesh.source, std::ios::binary);
+          objText.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+        }
+        UnitMeshInfo info;
+        const std::vector<std::uint8_t> mesh = UnitMesh(mData, spec, objText, info, error);
+        if (mesh.empty()) {
+          mReport = {"mesh: " + error};
+        } else {
+          const std::array<float, 3> dims = UnitDims(mData, spec, info.bounds);
+          char line[256];
+          (void)std::snprintf(
+            line,
+            sizeof(line),
+            "%s%d vertices, %d triangles, %d bones; %.2f x %.2f x %.2f world units",
+            info.placeholder ? "placeholder: " : "",
+            info.vertices,
+            info.triangles,
+            info.bones,
+            static_cast<double>(dims[0]),
+            static_cast<double>(dims[1]),
+            static_cast<double>(dims[2])
+          );
+          mReport = {line};
+          mReport.insert(mReport.end(), info.warnings.begin(), info.warnings.end());
+        }
+        gpg::Logf("editor: unit wizard: check mesh of %s: %s", spec.id.c_str(), mReport.front().c_str());
+      }
+      // Fix (FAF Studio's): what Write mends (missing files, the script's weapons, the icon), and no builder: the
+      // template's builders.
+      const bool fixable = std::any_of(mChecks.begin(), mChecks.end(), [](const UnitCheck& c) {
+        return c.text.find("Write") != std::string::npos || c.text.find("nothing can build") != std::string::npos;
+      });
+      if (fixable) {
+        ImGui::SameLine();
+        if (ImGui::Button("Fix")) {
+          if (std::any_of(mChecks.begin(), mChecks.end(), [](const UnitCheck& c) {
+            return c.text.find("nothing can build") != std::string::npos;
+          })) {
+            if (const UnitTemplate* t = UnitTemplateOf(spec.templateId); t != nullptr) {
+              spec.buildBy = DefaultBuildBy(*t, spec.tech);
+            }
+          }
+          SaveSpecs();
+          mReport.clear();
+          const ModProject* p = mProject.Project();
+          const auto edits = p->edits.find(spec.id);
+          (void)WriteWizardUnit(
+            mData, spec, edits != p->edits.end() ? edits->second : std::map<std::string, double>{}, mFolder, mReport
+          );
+          UnitCheckGame game;
+          game.unitExists = gameHasUnit;
+          game.projectileExists = gameFileExists;
+          game.fileExists = gameFileExists;
+          mChecks = CheckWizardUnit(mData, spec, mFolder, game);
+          gpg::Logf("editor: unit wizard: %s fixed: %zu findings left", spec.id.c_str(), mChecks.size());
+        }
+        EdSetItemTooltip(
+          "Writes the unit again (files, the script's weapons, the icon) and gives it the template's "
+          "builders when nothing builds it"
+        );
+      }
+      // The files the unit has in the project.
+      if (ImGui::TreeNode("Files")) {
+        const std::string id = spec.id;
+        for (const std::string& rel :
+             {"units/" + id + "/" + id + "_unit.bp",
+              "units/" + id + "/" + id + "_script.lua",
+              "units/" + id + "/" + id + "_strings.lua",
+              "units/" + id + "/" + id + "_lod0.scm",
+              "units/" + id + "/" + id + "_albedo.dds",
+              "units/" + id + "/" + id + "_normalsts.dds",
+              "units/" + id + "/" + id + "_specteam.dds",
+              "textures/ui/common/icons/units/" + id + "_icon.dds"}) {
+          std::error_code ec;
+          const std::filesystem::path file = std::filesystem::path(mFolder) / rel;
+          if (std::filesystem::exists(file, ec)) {
+            ImGui::Text(
+              "ok       %s (%llu bytes)",
+              rel.c_str(),
+              static_cast<unsigned long long>(std::filesystem::file_size(file, ec))
+            );
+          } else {
+            ImGui::TextColored(ImVec4(1.0f, 0.75f, 0.35f, 1.0f), "missing  %s", rel.c_str());
+          }
+        }
+        ImGui::TreePop();
+      }
+      ImGui::SameLine();
       if (ImGui::Button("Remove from the list")) {
         mSpecs.erase(mSpecs.begin() + mCurrent);
         mCurrent = mSpecs.empty() ? -1 : 0;
@@ -374,7 +467,32 @@ namespace faf::editor
       number("##regen", spec.defense, "RegenRate", 0.0f, 500.0f, "Regeneration %.1f");
       if (const UnitTemplate* t = UnitTemplateOf(spec.templateId); t != nullptr && t->mobile) {
         number("##speed", spec.physics, "MaxSpeed", 0.0f, 60.0f, "Speed %.2f");
+        number("##accel", spec.physics, "MaxAcceleration", 0.0f, 60.0f, "Acceleration %.1f");
+        number("##brake", spec.physics, "MaxBrake", 0.0f, 60.0f, "Braking %.1f");
         number("##turn", spec.physics, "TurnRate", 0.0f, 360.0f, "Turn rate %.0f");
+        // The motion type (FAF Studio's Motion), and an air unit's cruise altitude.
+        static constexpr const char* kMotions[] = {
+          "(the template's)",
+          "RULEUMT_Land",
+          "RULEUMT_Air",
+          "RULEUMT_Water",
+          "RULEUMT_Hover",
+          "RULEUMT_Amphibious",
+          "RULEUMT_AmphibiousFloating",
+          "RULEUMT_SurfacingSub"
+        };
+        int motion = 0;
+        for (int i = 1; i < IM_ARRAYSIZE(kMotions); ++i) {
+          motion = spec.motionType == kMotions[i] ? i : motion;
+        }
+        ImGui::SetNextItemWidth(-1.0f);
+        if (EdCombo("##motion", &motion, kMotions, IM_ARRAYSIZE(kMotions))) {
+          spec.motionType = motion == 0 ? std::string() : kMotions[motion];
+          mDirty = true;
+        }
+        if (std::string(t->layer) == "air") {
+          number("##elevation", spec.physics, "Elevation", 1.0f, 120.0f, "Cruise altitude %.0f");
+        }
       } else {
         ImGui::SetNextItemWidth(Em(140.0f));
         if (FillSliderInt("##fx", &spec.footprintX, 1, 20, "Footprint %d")) {
@@ -387,13 +505,66 @@ namespace faf::editor
         }
       }
       number("##vision", spec.intel, "VisionRadius", 0.0f, 300.0f, "Vision %.0f");
+      if (const UnitTemplate* t = UnitTemplateOf(spec.templateId); t != nullptr && t->builder) {
+        number("##buildrate", spec.economy, "BuildRate", 0.0f, 500.0f, "Build rate %.1f");
+        // What it builds: BuildableCategory expressions, | between them (empty: the template's).
+        std::string list;
+        for (const std::string& c : spec.buildable) {
+          list += (list.empty() ? "" : " | ") + c;
+        }
+        const std::string was = list;
+        text("##buildable", "this unit builds (BUILTBYTIER1ENGINEER UEF | ...; empty: the template's)", list);
+        if (list != was) {
+          spec.buildable.clear();
+          std::string part;
+          for (const char c : list + "|") {
+            if (c == '|') {
+              const std::size_t a = part.find_first_not_of(' ');
+              const std::size_t b = part.find_last_not_of(' ');
+              if (a != std::string::npos) {
+                spec.buildable.push_back(part.substr(a, b - a + 1));
+              }
+              part.clear();
+            } else {
+              part += c;
+            }
+          }
+        }
+      }
+      if (spec.templateId == "economy") {
+        number("##energyprod", spec.economy, "ProductionPerSecondEnergy", 0.0f, 20000.0f, "Energy produced %.0f / s");
+      }
+      text("##sounds", "sound set: a unit id whose sounds it takes (empty: the template's)", spec.sounds);
+      static constexpr const char* kAnims[] = {"Animations: the template's", "Animations: none"};
+      int anim = spec.anim == "none" ? 1 : 0;
+      ImGui::SetNextItemWidth(-1.0f);
+      if (EdCombo("##anim", &anim, kAnims, 2)) {
+        spec.anim = anim == 1 ? "none" : "template";
+        mDirty = true;
+      }
     }
     if (Section("Weapons", false)) {
       int remove = -1;
       for (std::size_t i = 0; i < spec.weapons.size(); ++i) {
         UnitWizardWeapon& w = spec.weapons[i];
         ImGui::PushID(static_cast<int>(i));
-        ImGui::TextDisabled("%s", UnitWeaponKindName(w.kind));
+        // Its kind (the template's kinds): a change takes the donor's numbers for that kind, the label kept.
+        if (const UnitTemplate* tk = UnitTemplateOf(spec.templateId); tk != nullptr && !tk->kinds.empty()) {
+          std::vector<const char*> kinds;
+          int index = 0;
+          for (std::size_t k = 0; k < tk->kinds.size(); ++k) {
+            kinds.push_back(UnitWeaponKindName(tk->kinds[k]));
+            index = w.kind == tk->kinds[k] ? static_cast<int>(k) : index;
+          }
+          ImGui::SetNextItemWidth(-1.0f);
+          if (EdCombo("##kind", &index, kinds.data(), static_cast<int>(kinds.size()))) {
+            const std::string label = w.label;
+            w = NewUnitWeapon(mData, spec, tk->kinds[static_cast<std::size_t>(index)], label);
+            mDirty = true;
+          }
+        } else {
+          ImGui::TextDisabled("%s", UnitWeaponKindName(w.kind));
+        }
         text("##label", "label (the script's weapon name)", w.label);
         const auto weaponNumber =
           [this](const char* id, double& value, const float lo, const float hi, const char* format) {
@@ -406,6 +577,7 @@ namespace faf::editor
         };
         weaponNumber("##damage", w.damage, 0.0f, 100000.0f, "Damage %.1f");
         weaponNumber("##range", w.range, 0.0f, 1000.0f, "Range %.1f");
+        weaponNumber("##minrange", w.minRange, 0.0f, 500.0f, "Minimum range %.1f");
         weaponNumber("##rof", w.rof, 0.01f, 20.0f, "Rate of fire %.2f");
         weaponNumber("##radius", w.damageRadius, 0.0f, 50.0f, "Damage radius %.1f");
         text("##proj", "projectile blueprint", w.projectile);
@@ -438,6 +610,11 @@ namespace faf::editor
     }
     if (Section("Mesh and textures", false)) {
       text("##obj", "OBJ file (empty: a placeholder)", spec.mesh.source);
+      ImGui::SetNextItemWidth(Em(120.0f));
+      if (FillSliderInt("##lods", &spec.mesh.lods, 1, 2, "LODs %d")) {
+        mDirty = true;
+      }
+      EdSetItemTooltip("2: a second level of detail (the same mesh) for zoomed out views");
       static const char* const kAxis[2] = {"Y up", "Z up"};
       int axis = spec.mesh.axis == "z_up" ? 1 : 0;
       RowLabel("Up axis");

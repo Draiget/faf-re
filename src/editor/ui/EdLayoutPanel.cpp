@@ -1,6 +1,8 @@
 #include "editor/ui/EdLayoutPanel.h"
 
 #include "editor/doc/EdDocument.h"
+#include "editor/doc/EdSaveFile.h"
+#include "editor/tools/EdMarkers.h"
 #include "editor/tools/EdHeightFile.h"
 #include "editor/ui/EdControls.h"
 #include "editor/ui/EdIconFont.h"
@@ -326,6 +328,20 @@ namespace faf::editor
       if (ImGui::IsItemHovered()) {
         ImGui::SetTooltip("Droplet erosion over the generated heights: 0 = none; more digs more gullies (slower)");
       }
+      ImGui::Checkbox("Show the heights", &mViewHeights);
+      EdSetItemTooltip("The canvas shows the heights the drawing would make (nothing is written)");
+      ImGui::SameLine();
+      ImGui::Checkbox("Map's markers", &mShowMapMarkers);
+      EdSetItemTooltip("The map's own start positions and resources on the canvas");
+      ImGui::SameLine();
+      ImGui::Checkbox("Only this layer", &mSolo);
+      ImGui::Checkbox("Paint the ground too", &mPaintGround);
+      EdSetItemTooltip("After the heights, the Stratum recipe paints the layers (textures by slope, height and water)");
+      ImGui::SameLine();
+      if (ImGui::SmallButton("Centre symmetry")) {
+        mCentreAsked = true;
+      }
+      EdSetItemTooltip("The editor symmetry's centre to the middle of the drawing (the playable area)");
       if (PrimaryButton(ICON_TERRAIN " Generate terrain", ImVec2(-1.0f, 0.0f))) {
         mGenerateAsked = true;
       }
@@ -348,11 +364,56 @@ namespace faf::editor
   void EdLayoutPanel::UpdateImage()
   {
     const MapLayout& layout = mDocument.Layout();
-    if (mImage != 0 && mImageRevision == layout.revision && mImageSelected == layout.selected) {
+    if (
+      mImage != 0 && mImageRevision == layout.revision && mImageSelected == layout.selected &&
+      mImageHeights == mViewHeights && mImageSolo == mSolo
+    ) {
       return;
     }
+    mImageHeights = mViewHeights;
+    mImageSolo = mSolo;
     std::vector<std::uint8_t> rgba;
-    layout.Pixels(rgba);
+    const LayoutFrame& frame = layout.Frame();
+    field::Grid heights;
+    std::string error;
+    if (
+      mViewHeights && frame.rw > 1 && frame.rh > 1 &&
+      BuildLayout(
+        layout,
+        field::Grid(frame.rw, frame.rh, frame.cell, frame.ox, frame.oz),
+        LayoutBuildOptions{},
+        heights,
+        nullptr,
+        error
+      )
+    ) {
+      // The heights the drawing makes: the sea blue by depth, the land green to brown to white.
+      const auto [low, high] = std::minmax_element(heights.v.begin(), heights.v.end());
+      const float span = std::max(*high - layout.water, 1.0f);
+      rgba.resize(heights.v.size() * 4);
+      for (std::size_t k = 0; k < heights.v.size(); ++k) {
+        const float hgt = heights.v[k];
+        float r = 0.0f, g = 0.0f, b = 0.0f;
+        if (hgt < layout.water) {
+          const float d = std::clamp((layout.water - hgt) / 30.0f, 0.0f, 1.0f);
+          r = 0.15f * (1.0f - d);
+          g = 0.35f * (1.0f - d) + 0.1f;
+          b = 0.75f - 0.35f * d;
+        } else {
+          const float t = std::clamp((hgt - layout.water) / span, 0.0f, 1.0f);
+          r = t < 0.5f ? 0.3f + t * 0.6f : 0.6f + (t - 0.5f) * 0.8f;
+          g = t < 0.5f ? 0.55f - t * 0.2f : 0.45f + (t - 0.5f) * 1.1f;
+          b = t < 0.5f ? 0.25f : 0.25f + (t - 0.5f) * 1.5f;
+        }
+        rgba[k * 4 + 0] = static_cast<std::uint8_t>(std::clamp(r, 0.0f, 1.0f) * 255.0f);
+        rgba[k * 4 + 1] = static_cast<std::uint8_t>(std::clamp(g, 0.0f, 1.0f) * 255.0f);
+        rgba[k * 4 + 2] = static_cast<std::uint8_t>(std::clamp(b, 0.0f, 1.0f) * 255.0f);
+        rgba[k * 4 + 3] = 255;
+      }
+      (void)low;
+    } else {
+      layout.Pixels(rgba, mSolo ? layout.selected : -1);
+    }
     std::vector<std::uint32_t> bgra(rgba.size() / 4);
     for (std::size_t k = 0; k < bgra.size(); ++k) {
       bgra[k] = 0xFF000000u | (static_cast<std::uint32_t>(rgba[k * 4]) << 16) |
@@ -586,6 +647,31 @@ namespace faf::editor
         draw->AddCircleFilled(
           toScreen(ix, iz), Em(3.0f), item.hydro ? IM_COL32(90, 220, 110, 255) : IM_COL32(255, 160, 40, 255)
         );
+      }
+    }
+    // The map's own starts and resources (FAF Studio's Markers view).
+    if (mShowMapMarkers) {
+      for (const SaveEntry& marker : mDocument.SaveData().Markers()) {
+        float mx = 0.0f, my = 0.0f, mz = 0.0f;
+        const std::string type = MarkerTypeOf(marker);
+        if (
+          (type != "Blank Marker" && type != "Mass" && type != "Hydrocarbon") || !MarkerPosition(marker, mx, my, mz)
+        ) {
+          continue;
+        }
+        float ix = 0.0f, iz = 0.0f;
+        layout.ToCell(mx, mz, ix, iz);
+        const ImVec2 c = toScreen(ix, iz);
+        if (type == "Blank Marker") {
+          const float r = Em(4.0f);
+          draw->AddRect(
+            ImVec2(c.x - r, c.y - r), ImVec2(c.x + r, c.y + r), IM_COL32(255, 255, 255, 235), 0.0f, 0, 2.0f
+          );
+        } else {
+          draw->AddCircle(
+            c, Em(2.5f), type == "Mass" ? IM_COL32(255, 160, 40, 255) : IM_COL32(90, 220, 110, 255), 0, 2.0f
+          );
+        }
       }
     }
     // The start positions the bases give.

@@ -1144,6 +1144,15 @@ namespace faf::editor
             "like washed-in ground. Ground is made."
           );
           break;
+        default:
+          break;
+        }
+        switch (static_cast<HeightBrushMode>(mBrushMode)) {
+        case HeightBrushMode::WaterErode:
+        case HeightBrushMode::Rain:
+        case HeightBrushMode::Deposit:
+          DrawErosionBrushValues();
+          break;
         case HeightBrushMode::Smooth:
           Note("Evens the ground out; a stronger brush blurs wider. Right-drag sharpens.");
           break;
@@ -1378,6 +1387,27 @@ namespace faf::editor
       mErosionAsk = ErosionAsk::Preview;
     }
     EdSetItemTooltip("A quick run on every few samples, its change put on the map (the fine detail stays).");
+    ImGui::SameLine();
+    ImGui::Checkbox("Live", &mErosionLive);
+    EdSetItemTooltip("Previews again by itself half a second after a setting changes");
+    if (mErosionLive) {
+      // The solver and its values as text: a change starts the wait; when it has passed, Preview runs.
+      std::string key = mErosionSolver;
+      for (const auto& [name, value] : mErosionValues[mErosionSolver]) {
+        key += "|" + name + "=" + std::to_string(value);
+      }
+      const double now = ImGui::GetTime();
+      if (key != mErosionLiveKey) {
+        const bool first = mErosionLiveKey.empty();
+        mErosionLiveKey = key;
+        mErosionLiveDue = first ? -1.0 : now + 0.5;
+      } else if (mErosionLiveDue > 0.0 && now >= mErosionLiveDue && mErosionAsk == ErosionAsk::None) {
+        mErosionLiveDue = -1.0;
+        mErosionAsk = ErosionAsk::Preview;
+      }
+    } else {
+      mErosionLiveKey.clear();
+    }
     ImGui::SameLine();
     ImGui::BeginDisabled(!mErosionPreviewShown);
     if (ImGui::Button("Revert")) {
@@ -3346,6 +3376,47 @@ namespace faf::editor
     DrawStrataThemes();
   }
 
+  void EdTools::DrawErosionBrushValues()
+  {
+    if (!ImGui::TreeNode("Erosion settings")) {
+      return;
+    }
+    struct Slider
+    {
+      float ErosionBrushValues::* member;
+      const char* label;
+      float min;
+      float max;
+      const char* format;
+    };
+    static constexpr Slider kSliders[] = {
+      {&ErosionBrushValues::iterations, "Drop rounds per strength", 1.0f, 12.0f, "%.0f"},
+      {&ErosionBrushValues::rain, "Rain amount", 0.0005f, 0.05f, "%.4f"},
+      {&ErosionBrushValues::capacity, "Sediment capacity", 0.05f, 4.0f, "%.2f"},
+      {&ErosionBrushValues::erosion, "Dissolving rate", 0.01f, 0.6f, "%.2f"},
+      {&ErosionBrushValues::deposition, "Settling rate", 0.01f, 0.6f, "%.2f"},
+      {&ErosionBrushValues::inertia, "Inertia", 0.0f, 0.9f, "%.2f"},
+      {&ErosionBrushValues::conserve, "Keep volume", 0.0f, 1.0f, "%.2f"},
+      {&ErosionBrushValues::thermal, "Thermal slides", 0.0f, 1.0f, "%.2f"},
+      {&ErosionBrushValues::reach, "Rain run-off reach", 0.1f, 2.0f, "%.2f"},
+      {&ErosionBrushValues::amount, "Deposit amount (units)", 0.05f, 5.0f, "%.2f"},
+      {&ErosionBrushValues::vary, "Hardness variation", 0.0f, 1.0f, "%.2f"},
+      {&ErosionBrushValues::varyScale, "Hardness feature size", 4.0f, 200.0f, "%.0f"},
+    };
+    for (const Slider& s : kSliders) {
+      ImGui::PushID(s.label);
+      ImGui::SetNextItemWidth(Em(120.0f));
+      FillSliderFloat("##v", &(mEroBrush.*s.member), s.min, s.max, s.format);
+      ImGui::SameLine();
+      ImGui::TextUnformatted(s.label);
+      ImGui::PopID();
+    }
+    if (ImGui::SmallButton("Defaults##ero")) {
+      mEroBrush = ErosionBrushValues{};
+    }
+    ImGui::TreePop();
+  }
+
   void EdTools::DrawStrataThemes()
   {
     if (!Section("Theme library", false)) {
@@ -3492,6 +3563,51 @@ namespace faf::editor
       }
       ImGui::TreePop();
     }
+    // FAF Studio's recipe extras: textures for the kinds the map lacks, the layered set, coverage, a kind shown.
+    if (ImGui::Button("Assign textures")) {
+      mRecipeAsk = RecipeAsk::Assign;
+    }
+    EdSetItemTooltip(
+      "Empty layers get the texture set's textures of the kinds of ground the map lacks; textured "
+      "layers stay"
+    );
+    SameLineIfFits(ButtonWidth("Layered textures"));
+    if (ImGui::Button("Layered textures")) {
+      mRecipeAsk = RecipeAsk::Layered;
+    }
+    EdSetItemTooltip(
+      "Several textures of a kind on the painted layers (three rocks, two dirts, a second grass, wet "
+      "ground) from the texture set, and the Layered style; replaces the painted layers' textures"
+    );
+    SameLineIfFits(ButtonWidth("Measure"));
+    if (ImGui::Button("Measure")) {
+      mRecipeAsk = RecipeAsk::Measure;
+    }
+    EdSetItemTooltip("How much of the map each layer covers now, from its paint");
+    ImGui::SetNextItemWidth(Em(70.0f));
+    FillSliderInt("##recipeshow", &mRecipeShowLayer, 1, 8, "layer %d");
+    ImGui::SameLine();
+    if (ImGui::Button("Show")) {
+      mRecipeAsk = RecipeAsk::Show;
+    }
+    EdSetItemTooltip("Where the recipe puts that layer's kind of ground, as a picture of the map (nothing is painted)");
+    if (mRecipeShowImage != 0U) {
+      const float side = std::min(ImGui::GetContentRegionAvail().x, Em(180.0f));
+      ImGui::Image(static_cast<ImTextureID>(mRecipeShowImage), ImVec2(side, side));
+    }
+    if (!mRecipeShowText.empty()) {
+      ImGui::PushTextWrapPos(0.0f);
+      ImGui::TextDisabled("%s", mRecipeShowText.c_str());
+      ImGui::PopTextWrapPos();
+    }
+    ImGui::Checkbox("Terrain types too", &mRecipeTypes);
+    EdSetItemTooltip("After painting, the terrain types (how the ground sounds and slows units) follow the textures");
+    ImGui::SameLine();
+    ImGui::Checkbox("Roughness too", &mRecipeRoughness);
+    EdSetItemTooltip(
+      "Terrain1xx and Terrain2xx: after painting, the roughness / height atlas in the Upper layer from "
+      "each layer's kind of ground"
+    );
     if (ImGui::Button("Paint the map")) {
       mRecipeApply = true;
     }
