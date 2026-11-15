@@ -24,6 +24,7 @@
 #include <ctime>
 #include <filesystem>
 #include <fstream>
+#include <iterator>
 #include <memory>
 #include <mutex>
 #include <shared_mutex>
@@ -36,7 +37,6 @@
 #include <dlfcn.h>
 #include <fcntl.h>
 #include <malloc.h>
-#include <fnmatch.h>
 #include <pthread.h>
 #include <sched.h>
 #include <sys/mman.h>
@@ -139,17 +139,172 @@ namespace
     return out;
   }
 
+  /// Where NextCodePoint puts a byte that isn't UTF-8: past Unicode, so it folds to nothing and
+  /// matches only itself (a Latin-1 name on disk is no UTF-8 letter).
+  constexpr std::uint32_t kNotUtf8Byte = 0x110000u;
+
+  /**
+   * The code point well-formed UTF-8 has at `at`, which moves past it. A byte that doesn't start
+   * one (a stray continuation byte, an overlong form, a surrogate, a code point past U+10FFFF) is
+   * kNotUtf8Byte plus the byte, and `at` moves one byte: such a name matches only its own bytes.
+   */
+  [[nodiscard]] std::uint32_t NextCodePoint(
+    const char*& at
+  ) noexcept
+  {
+    const auto byte = [&at](const std::size_t k) {
+      return static_cast<unsigned char>(at[k]);
+    };
+    const unsigned char lead = byte(0);
+    if (lead < 0x80u) {
+      ++at;
+      return lead;
+    }
+    std::size_t extra = 0;
+    unsigned char low = 0x80u;  // the second byte's range, which rules out overlong forms,
+    unsigned char high = 0xBFu; // surrogates and code points past U+10FFFF
+    std::uint32_t c = 0;
+    if (lead >= 0xC2u && lead <= 0xDFu) {
+      extra = 1;
+      c = lead & 0x1Fu;
+    } else if (lead >= 0xE0u && lead <= 0xEFu) {
+      extra = 2;
+      c = lead & 0x0Fu;
+      low = lead == 0xE0u ? 0xA0u : 0x80u;
+      high = lead == 0xEDu ? 0x9Fu : 0xBFu;
+    } else if (lead >= 0xF0u && lead <= 0xF4u) {
+      extra = 3;
+      c = lead & 0x07u;
+      low = lead == 0xF0u ? 0x90u : 0x80u;
+      high = lead == 0xF4u ? 0x8Fu : 0xBFu;
+    }
+    bool wellFormed = extra != 0 && byte(1) >= low && byte(1) <= high;
+    for (std::size_t k = 2; wellFormed && k <= extra; ++k) {
+      wellFormed = (byte(k) & 0xC0u) == 0x80u;
+    }
+    if (!wellFormed) {
+      ++at;
+      return kNotUtf8Byte + lead;
+    }
+    for (std::size_t k = 1; k <= extra; ++k) {
+      c = (c << 6) | (byte(k) & 0x3Fu);
+    }
+    at += extra + 1;
+    return c;
+  }
+
+  struct NtfsCasePair
+  {
+    std::uint16_t letter;
+    std::uint16_t upper;
+  };
+
+  /// Windows' upper-case table, the one NTFS compares names by ($UpCase): every BMP letter from
+  /// U+0080 whose upper case differs (tools/linux/ntfs_upcase_table.py).
+  constexpr NtfsCasePair kNtfsUpcase[] = {
+#include "platform/posix/NtfsUpcaseTable.inc"
+  };
+
+  [[maybe_unused]] [[nodiscard]] constexpr bool SortedByLetter() noexcept
+  {
+    for (std::size_t k = 1; k < std::size(kNtfsUpcase); ++k) {
+      if (kNtfsUpcase[k - 1].letter >= kNtfsUpcase[k].letter) {
+        return false;
+      }
+    }
+    return true;
+  }
+  static_assert(SortedByLetter(), "NtfsUpcaseTable.inc must be sorted by letter (binary search)");
+
+  /**
+   * A letter as NTFS compares names, by its upper case: Windows' own table, which is narrower than
+   * Unicode's ('ı', 'ſ', 'µ', 'ς', 'ǅ', Georgian and Cherokee letters keep their own case there), and
+   * ASCII folded here, without the process's locale (Lua's os.setlocale can change that). Letters
+   * past U+FFFF, which NTFS compares as UTF-16 halves, don't fold.
+   */
+  [[nodiscard]] std::uint32_t NtfsUpcase(
+    const std::uint32_t c
+  ) noexcept
+  {
+    if (c < 0x80u) {
+      return c >= 'a' && c <= 'z' ? c - ('a' - 'A') : c;
+    }
+    if (c > 0xFFFFu) {
+      return c;
+    }
+    const auto* const end = std::end(kNtfsUpcase);
+    const auto* const found =
+      std::lower_bound(std::begin(kNtfsUpcase), end, c, [](const NtfsCasePair& pair, const std::uint32_t letter) {
+      return pair.letter < letter;
+    });
+    return found != end && found->letter == c ? found->upper : c;
+  }
+
+  /**
+   * Whether two names are one on NTFS (NtfsUpcase letter by letter): 'Игрок' and 'игрок', 'Ä' and 'ä'
+   * are one name there.
+   */
   [[nodiscard]] bool SameNameIgnoringCase(
     const char* a,
     const char* b
   ) noexcept
   {
-    for (; *a != '\0' && *b != '\0'; ++a, ++b) {
-      if (std::tolower(static_cast<unsigned char>(*a)) != std::tolower(static_cast<unsigned char>(*b))) {
+    while (*a != '\0' && *b != '\0') {
+      const std::uint32_t ca = NextCodePoint(a);
+      const std::uint32_t cb = NextCodePoint(b);
+      if (ca != cb && NtfsUpcase(ca) != NtfsUpcase(cb)) {
         return false;
       }
     }
     return *a == *b;
+  }
+
+  /**
+   * Windows' match of one name against a FindFirstFile wildcard: '*' any run of letters, '?' one,
+   * letters compared as NTFS compares names, and "*.*" every name, with or without a dot. ('[' is
+   * no wildcard there.)
+   */
+  [[nodiscard]] bool ShellNameMatches(
+    const char* const pattern,
+    const char* const name
+  ) noexcept
+  {
+    if (std::strcmp(pattern, "*.*") == 0) {
+      return true;
+    }
+    const char* p = pattern;
+    const char* n = name;
+    const char* starPattern = nullptr;
+    const char* starName = nullptr;
+    while (*n != '\0') {
+      if (*p == '*') {
+        starPattern = ++p;
+        starName = n;
+        continue;
+      }
+      if (*p != '\0') {
+        const char* nextP = p;
+        const char* nextN = n;
+        const std::uint32_t cp = NextCodePoint(nextP);
+        const std::uint32_t cn = NextCodePoint(nextN);
+        if (cp == '?' || cp == cn || NtfsUpcase(cp) == NtfsUpcase(cn)) {
+          p = nextP;
+          n = nextN;
+          continue;
+        }
+      }
+      if (starPattern == nullptr) {
+        return false;
+      }
+      // Let the last '*' take one more letter of the name.
+      p = starPattern;
+      (void)NextCodePoint(starName);
+      n = starName;
+    }
+    while (*p == '*') {
+      ++p;
+    }
+    return *p == '\0';
   }
 
   // Plan WPR.23: the `--path-spelling` file, and the pairs it already holds.
@@ -2285,42 +2440,33 @@ namespace
     return out;
   }
 
+  enum class TrashMove
+  {
+    Moved,
+    OtherFileSystem, // the trash is on another file system than the entry
+    Failed,
+  };
+
   /**
-   * FOF_ALLOWUNDO's recycle bin on a desktop: the home trash of the freedesktop.org Trash
-   * specification ($XDG_DATA_HOME/Trash, else ~/.local/share/Trash), where file managers list and
-   * restore it. The entry goes to Trash/files under a free name, with Trash/info/<name>.trashinfo
-   * naming where it came from. False when it cannot move there (no home, another file system), and
-   * the caller deletes it then, as Windows does on a drive with no recycle bin.
+   * Moves `absolute` into the trash folder `trash` of the freedesktop.org Trash specification: to
+   * <trash>/files under a free name, with <trash>/info/<name>.trashinfo holding `infoPath` (where it
+   * came from) and the time, which file managers restore it from. With `copyAcrossMounts`, an entry
+   * the rename can't move there (another mount of the same file system: a sandbox's or container's
+   * bind mount) is copied there and then removed.
    */
-  [[nodiscard]] bool MoveToHomeTrash(
-    const std::string& path
+  [[nodiscard]] TrashMove MoveIntoTrash(
+    const std::string& trash,
+    const std::string& absolute,
+    const std::string& infoPath,
+    const bool copyAcrossMounts = false
   )
   {
-    const char* const home = std::getenv("HOME");
-    const char* const dataHome = std::getenv("XDG_DATA_HOME");
-    std::string trash;
-    if (dataHome != nullptr && dataHome[0] == '/') {
-      trash = std::string(dataHome) + "/Trash";
-    } else if (home != nullptr && home[0] == '/') {
-      trash = std::string(home) + "/.local/share/Trash";
-    } else {
-      return false;
-    }
     std::error_code error;
     std::filesystem::create_directories(trash + "/files", error);
     std::filesystem::create_directories(trash + "/info", error);
-    std::filesystem::permissions(trash, std::filesystem::perms::owner_all, error);
-
-    std::string absolute = path;
-    if (absolute.empty() || absolute[0] != '/') {
-      absolute = std::filesystem::absolute(path, error).string();
-    }
-    while (absolute.size() > 1 && absolute.back() == '/') {
-      absolute.pop_back();
-    }
     const std::string leaf = absolute.substr(absolute.rfind('/') + 1);
     if (leaf.empty()) {
-      return false;
+      return TrashMove::Failed;
     }
 
     char deletedAt[32]{};
@@ -2328,36 +2474,310 @@ namespace
     std::tm local{};
     (void)::localtime_r(&now, &local);
     (void)std::strftime(deletedAt, sizeof(deletedAt), "%Y-%m-%dT%H:%M:%S", &local);
-    const std::string info = "[Trash Info]\nPath=" + TrashInfoPath(absolute) + "\nDeletionDate=" + deletedAt + "\n";
+    const std::string info = "[Trash Info]\nPath=" + TrashInfoPath(infoPath) + "\nDeletionDate=" + deletedAt + "\n";
 
     for (int attempt = 1; attempt < 10000; ++attempt) {
       const std::string name = attempt == 1 ? leaf : leaf + "." + std::to_string(attempt);
-      const std::string infoPath = trash + "/info/" + name + ".trashinfo";
       // The info file is made first and exclusively: it claims the name (the specification's order).
-      const int fd = ::open(infoPath.c_str(), O_WRONLY | O_CREAT | O_EXCL, 0600);
+      const std::string infoFile = trash + "/info/" + name + ".trashinfo";
+      const int fd = ::open(infoFile.c_str(), O_WRONLY | O_CREAT | O_EXCL, 0600);
       if (fd < 0) {
         if (errno == EEXIST) {
           continue;
         }
-        return false;
+        return TrashMove::Failed;
       }
       const bool written = ::write(fd, info.data(), info.size()) == static_cast<ssize_t>(info.size());
       (void)::close(fd);
       if (!written) {
-        (void)::unlink(infoPath.c_str());
-        return false;
+        (void)::unlink(infoFile.c_str());
+        return TrashMove::Failed;
       }
       const std::string target = trash + "/files/" + name;
       if (::access(target.c_str(), F_OK) == 0) {
         // A file left there with no info file: the name stays taken.
-        (void)::unlink(infoPath.c_str());
+        (void)::unlink(infoFile.c_str());
         continue;
       }
       if (::rename(absolute.c_str(), target.c_str()) == 0) {
+        return TrashMove::Moved;
+      }
+      const int renameError = errno;
+      if (renameError == EXDEV && copyAcrossMounts) {
+        std::filesystem::copy(
+          absolute,
+          target,
+          std::filesystem::copy_options::recursive | std::filesystem::copy_options::copy_symlinks,
+          error
+        );
+        if (!error) {
+          // A copy gets new times; a restored save or replay keeps its own (the dialogs show them).
+          const std::filesystem::path from(absolute);
+          const std::filesystem::path to(target);
+          const auto keepTime = [](const std::filesystem::path& source, const std::filesystem::path& copy) {
+            std::error_code timeError;
+            if (!std::filesystem::is_symlink(source, timeError)) {
+              const auto time = std::filesystem::last_write_time(source, timeError);
+              if (!timeError) {
+                std::filesystem::last_write_time(copy, time, timeError);
+              }
+            }
+          };
+          std::error_code walkError;
+          if (std::filesystem::is_directory(from, walkError)) {
+            for (std::filesystem::recursive_directory_iterator walk(from, walkError), done; !walkError && walk != done;
+                 walk.increment(walkError)) {
+              keepTime(walk->path(), to / walk->path().lexically_relative(from));
+            }
+          }
+          keepTime(from, to);
+          (void)std::filesystem::remove_all(absolute, error);
+          if (!error) {
+            return TrashMove::Moved;
+          }
+          // Part of it couldn't be removed: the copy in the trash stays, and so does what's left.
+          return TrashMove::Failed;
+        }
+        std::error_code ignored;
+        (void)std::filesystem::remove_all(target, ignored);
+      }
+      (void)::unlink(infoFile.c_str());
+      return renameError == EXDEV ? TrashMove::OtherFileSystem : TrashMove::Failed;
+    }
+    return TrashMove::Failed;
+  }
+
+  /**
+   * The mount points of the process's mount table (/proc/self/mountinfo). A bind mount (a
+   * container's or a sandbox's home) is a mount point of its own there, though its files share the
+   * device of the file system it shows. Empty when there is no table (not Linux).
+   */
+  [[nodiscard]] std::vector<std::string> MountPoints()
+  {
+    std::vector<std::string> points;
+    std::ifstream table("/proc/self/mountinfo");
+    for (std::string line; std::getline(table, line);) {
+      // "<id> <parent> <major:minor> <root> <mount point> ...", spaces in it as \040.
+      std::size_t at = 0;
+      for (int field = 0; field < 4 && at != std::string::npos; ++field) {
+        at = line.find(' ', at);
+        if (at != std::string::npos) {
+          ++at;
+        }
+      }
+      if (at == std::string::npos) {
+        continue;
+      }
+      const std::size_t end = line.find(' ', at);
+      const std::string escaped = line.substr(at, end == std::string::npos ? std::string::npos : end - at);
+      std::string point;
+      for (std::size_t k = 0; k < escaped.size(); ++k) {
+        if (
+          escaped[k] == '\\' && k + 3 < escaped.size() && escaped[k + 1] >= '0' && escaped[k + 1] <= '3' &&
+          escaped[k + 2] >= '0' && escaped[k + 2] <= '7' && escaped[k + 3] >= '0' && escaped[k + 3] <= '7'
+        ) {
+          point.push_back(
+            static_cast<char>((escaped[k + 1] - '0') * 64 + (escaped[k + 2] - '0') * 8 + (escaped[k + 3] - '0'))
+          );
+          k += 3;
+        } else {
+          point.push_back(escaped[k]);
+        }
+      }
+      points.push_back(std::move(point));
+    }
+    return points;
+  }
+
+  /// Whether `folder` is `point`'s folder or `point` itself is below `folder`.
+  [[nodiscard]] bool IsBelow(
+    const std::string& point,
+    const std::string& folder
+  )
+  {
+    return folder == "/"
+      ? point != "/"
+      : point.size() > folder.size() && point.compare(0, folder.size(), folder) == 0 && point[folder.size()] == '/';
+  }
+
+  /// The mount point holding `absolute`: the longest one of the mount table that is a folder of it.
+  [[nodiscard]] std::string MountPointOf(
+    const std::string& absolute
+  )
+  {
+    std::string best;
+    for (const std::string& point : MountPoints()) {
+      if ((point == "/" || IsBelow(absolute, point)) && point.size() > best.size()) {
+        best = point;
+      }
+    }
+    return best;
+  }
+
+  /// Whether a file system is mounted at `real` (resolved, no trailing '/') or anywhere below it.
+  [[nodiscard]] bool HoldsAMount(
+    const std::string& real
+  )
+  {
+    for (const std::string& point : MountPoints()) {
+      if (point == real || IsBelow(point, real)) {
         return true;
       }
-      (void)::unlink(infoPath.c_str());
-      return false;
+    }
+    return false;
+  }
+
+  /**
+   * The folder holding `absolute` that is the top of its device, found by walking up while the
+   * device stays the same: a btrfs subvolume that isn't mounted on its own has a device of its own
+   * inside its mount, and a rename only stays within it.
+   */
+  [[nodiscard]] std::string DeviceTopOf(
+    const std::string& absolute
+  )
+  {
+    struct stat entry{};
+    if (::lstat(absolute.c_str(), &entry) != 0) {
+      return {};
+    }
+    std::string folder = absolute.substr(0, absolute.rfind('/'));
+    if (folder.empty()) {
+      return "/";
+    }
+    struct stat at{};
+    if (::stat(folder.c_str(), &at) != 0 || at.st_dev != entry.st_dev) {
+      // The entry is a mount point itself; it has no trash of its own file system to go to.
+      return {};
+    }
+    while (!folder.empty()) {
+      const std::size_t slash = folder.rfind('/');
+      const std::string parent = slash == 0 ? std::string("/") : folder.substr(0, slash);
+      struct stat above{};
+      if (::stat(parent.c_str(), &above) != 0 || above.st_dev != entry.st_dev) {
+        return folder;
+      }
+      if (parent == "/") {
+        return parent;
+      }
+      folder = parent;
+    }
+    return "/";
+  }
+
+  /// A folder the user owns, made with mode 0700 when missing; false for a symbolic link or another's.
+  [[nodiscard]] bool OwnTrashFolder(
+    const std::string& folder
+  )
+  {
+    (void)::mkdir(folder.c_str(), 0700);
+    struct stat info{};
+    return ::lstat(folder.c_str(), &info) == 0 && S_ISDIR(info.st_mode) && info.st_uid == ::getuid();
+  }
+
+  /**
+   * The trash of the file system `top` is the top of, as the specification names it: $top/.Trash/$uid
+   * when $top/.Trash is a real folder with the sticky bit (an administrator's shared trash), else
+   * $top/.Trash-$uid. Empty when neither can be used (no write access, a link planted there).
+   */
+  [[nodiscard]] std::string TopDirectoryTrash(
+    const std::string& top
+  )
+  {
+    const std::string base = top == "/" ? std::string() : top;
+    const std::string uid = std::to_string(::getuid());
+    struct stat shared{};
+    if (
+      ::lstat((base + "/.Trash").c_str(), &shared) == 0 && S_ISDIR(shared.st_mode) && (shared.st_mode & S_ISVTX) != 0 &&
+      OwnTrashFolder(base + "/.Trash/" + uid)
+    ) {
+      return base + "/.Trash/" + uid;
+    }
+    if (OwnTrashFolder(base + "/.Trash-" + uid)) {
+      return base + "/.Trash-" + uid;
+    }
+    return {};
+  }
+
+  /**
+   * FOF_ALLOWUNDO's recycle bin on a desktop: the freedesktop.org Trash specification, where file
+   * managers list and restore it. An entry goes to the home trash ($XDG_DATA_HOME/Trash, else
+   * ~/.local/share/Trash) when that is on its file system, else to the trash at the top of its own
+   * file system (a second disk, a USB stick), which names it relative to that top. False when
+   * neither takes it, and the caller deletes it then, as Windows does on a drive with no recycle bin.
+   */
+  [[nodiscard]] bool MoveToTrash(
+    const std::string& path
+  )
+  {
+    std::string absolute = path;
+    std::error_code error;
+    if (absolute.empty() || absolute[0] != '/') {
+      absolute = std::filesystem::absolute(path, error).string();
+    }
+    while (absolute.size() > 1 && absolute.back() == '/') {
+      absolute.pop_back();
+    }
+    // The folder as it is on disk (links resolved), so the info file names where it really was.
+    const std::size_t slash = absolute.rfind('/');
+    const std::string folder = slash == 0 ? std::string("/") : absolute.substr(0, slash);
+    if (char* const real = ::realpath(folder.c_str(), nullptr)) {
+      const std::string realFolder = real;
+      std::free(real);
+      absolute = (realFolder == "/" ? std::string() : realFolder) + absolute.substr(slash);
+    }
+
+    const char* const home = std::getenv("HOME");
+    const char* const dataHome = std::getenv("XDG_DATA_HOME");
+    std::string homeTrash;
+    if (dataHome != nullptr && dataHome[0] == '/') {
+      homeTrash = std::string(dataHome) + "/Trash";
+    } else if (home != nullptr && home[0] == '/') {
+      homeTrash = std::string(home) + "/.local/share/Trash";
+    }
+    if (!homeTrash.empty()) {
+      std::filesystem::create_directories(homeTrash, error);
+      std::filesystem::permissions(homeTrash, std::filesystem::perms::owner_all, error);
+      // The home trash's file system is that of the nearest part of its path that exists.
+      std::string homeAt = homeTrash;
+      struct stat homeInfo{};
+      while (::stat(homeAt.c_str(), &homeInfo) != 0 && homeAt.size() > 1) {
+        const std::size_t up = homeAt.rfind('/');
+        homeAt = up == 0 || up == std::string::npos ? std::string("/") : homeAt.substr(0, up);
+      }
+      struct stat entryInfo{};
+      const bool sameFileSystem = ::lstat(absolute.c_str(), &entryInfo) == 0 &&
+        ::stat(homeAt.c_str(), &homeInfo) == 0 && homeInfo.st_dev == entryInfo.st_dev;
+      // An entry on the home trash's file system goes there even through another mount of it (a
+      // sandbox's bind mount), by a copy; a trash at the bind point would be hidden from the desktop.
+      const TrashMove moved = MoveIntoTrash(homeTrash, absolute, absolute, sameFileSystem);
+      if (moved == TrashMove::Moved) {
+        return true;
+      }
+      // A home trash that can't take it (read-only, full, not a folder) only ends here for an entry
+      // on its own file system; one on another disk still has that disk's trash.
+      if (sameFileSystem) {
+        return false;
+      }
+    }
+
+    // The trash at the top of its file system: its mount point, and where the rename can't reach
+    // that (a btrfs subvolume inside the mount), the top of its own device.
+    const std::string mountTop = MountPointOf(absolute);
+    const std::string deviceTop = DeviceTopOf(absolute);
+    const std::string tops[] = {mountTop, deviceTop == mountTop ? std::string() : deviceTop};
+    for (const std::string& top : tops) {
+      if (top.empty()) {
+        continue;
+      }
+      const std::string trash = TopDirectoryTrash(top);
+      if (trash.empty()) {
+        continue;
+      }
+      const std::string relative = absolute.substr(top == "/" ? 1 : top.size() + 1);
+      const TrashMove moved = MoveIntoTrash(trash, absolute, relative);
+      if (moved != TrashMove::OtherFileSystem) {
+        return moved == TrashMove::Moved;
+      }
     }
     return false;
   }
@@ -2372,7 +2792,26 @@ namespace
     if (::lstat(path.c_str(), &info) != 0) {
       return ERROR_FILE_NOT_FOUND;
     }
-    if (allowUndo && MoveToHomeTrash(path)) {
+    // A folder that is a mount point itself (another disk mounted there) is not deleted: neither
+    // trash can take it by a rename, and removing it would empty that whole disk.
+    if (S_ISDIR(info.st_mode)) {
+      const std::size_t slash = path.find_last_of('/', path.size() > 1 ? path.size() - 2 : 0);
+      const std::string parent = slash == std::string::npos ? std::string(".")
+        : slash == 0                                        ? std::string("/")
+                                                            : path.substr(0, slash);
+      struct stat above{};
+      std::string real = path;
+      if (char* const resolved = ::realpath(path.c_str(), nullptr)) {
+        real = resolved;
+        std::free(resolved);
+      }
+      // Nor one with another file system mounted anywhere below it: removing or copying it would walk
+      // into that one too.
+      if ((::stat(parent.c_str(), &above) == 0 && above.st_dev != info.st_dev) || HoldsAMount(real)) {
+        return ERROR_ACCESS_DENIED;
+      }
+    }
+    if (allowUndo && MoveToTrash(path)) {
       return 0;
     }
     std::error_code error;
@@ -2386,7 +2825,7 @@ namespace
    * double-null list's paths, '/' for '\' already; each is looked up as NTFS would find it, and a
    * last component with '*' or '?' deletes every name in its folder that matches. With
    * FOF_ALLOWUNDO an entry goes to the desktop's trash instead. 0 when every source went, else the
-   * first failure's code, as Windows 10 answers them: 2 for a source that isn't there, 0x7C for a
+   * first failure's code, as Windows 11 answers them: 2 for a source that isn't there, 0x7C for a
    * pattern in a folder that isn't there, and 0 for a pattern that matches nothing.
    */
   [[nodiscard]] int ShellDelete(
@@ -2413,17 +2852,16 @@ namespace
         : ResolveCase(slash == 0 ? std::string("/") : source.substr(0, slash));
       DIR* const dir = ::opendir(folder.c_str());
       if (dir == nullptr) {
-        // What Windows 10 answers for a pattern in a folder that isn't there (DE_INVALIDFILES).
+        // What Windows 11 answers for a pattern in a folder that isn't there (DE_INVALIDFILES).
         note(0x7Cu);
         continue;
       }
-      // Matched as _findfirst64 and FindFirstFile here match, so a folder's listing and its delete
-      // take the same names: case-insensitive, "*.*" for every name.
-      const std::string pattern = leaf == "*.*" ? std::string("*") : leaf;
+      // Matched as _findfirst64 and FindFirstFile here match (ShellNameMatches), so a folder's listing
+      // and its delete take the same names.
       std::vector<std::string> matches;
       while (const dirent* const entry = ::readdir(dir)) {
         const std::string name = entry->d_name;
-        if (name != "." && name != ".." && ::fnmatch(pattern.c_str(), name.c_str(), FNM_CASEFOLD) == 0) {
+        if (name != "." && name != ".." && ShellNameMatches(leaf.c_str(), name.c_str())) {
           matches.push_back(folder == "/" ? "/" + name : folder + "/" + name);
         }
       }
@@ -2905,7 +3343,7 @@ namespace
   )
   {
     while (dirent* const entry = ::readdir(search.directory)) {
-      if (::fnmatch(search.pattern.c_str(), entry->d_name, FNM_CASEFOLD) != 0) {
+      if (!ShellNameMatches(search.pattern.c_str(), entry->d_name)) {
         continue;
       }
       WIN32_FILE_ATTRIBUTE_DATA attributes{};
@@ -3209,7 +3647,7 @@ std::intptr_t _findfirst64(
   }
   auto search = std::make_unique<FindSearch>();
   while (const dirent* const entry = ::readdir(dir)) {
-    if (::fnmatch(pattern.c_str(), entry->d_name, FNM_CASEFOLD) != 0) {
+    if (!ShellNameMatches(pattern.c_str(), entry->d_name)) {
       continue;
     }
     __finddata64_t match{};
