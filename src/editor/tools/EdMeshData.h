@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <functional>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -59,7 +60,32 @@ namespace faf::editor
       float waterOuterMin = 0.0f, waterOuterSpan = 0.0f;
       float waterBeyondTriangles = -1.0f, waterInsideTriangles = -1.0f;
       std::string waterMap, waterMapOuter, waterBeyond, waterInside;
+      /** The keys the manifest gives (read from it, or set in the panel); Unset takes one out. */
+      std::set<std::string> given;
     };
+
+    /** One manifest setting (FAF Studio's meshmap.lua Keys): its decimals (-1 whole, -2 a file name), range, meaning.
+     */
+    struct SettingKey
+    {
+      const char* key;
+      int decimals;
+      float min;
+      float max;
+      const char* help;
+    };
+    /** Every manifest setting in the file's order. */
+    [[nodiscard]] const std::vector<SettingKey>& SettingKeys();
+    /** The number or file name a key holds (null for the other kind or an unknown key). */
+    [[nodiscard]] float* SettingNumber(Settings& s, const std::string& key);
+    [[nodiscard]] std::string* SettingText(Settings& s, const std::string& key);
+    /** Whether the manifest writes the key (given, or a value away from its "none"). */
+    [[nodiscard]] bool SettingSet(const Settings& s, const std::string& key);
+    /**
+     * Set: the key is given (a number at its "none" takes its lowest value, a file name Studio's default name).
+     * Unset: it goes, back to the value a manifest without it has.
+     */
+    void SetSettingGiven(Settings& s, const std::string& key, bool given);
 
     struct RayHit
     {
@@ -79,7 +105,8 @@ namespace faf::editor
       Settings settings;
       std::vector<Material> materials;
       std::vector<Patch> patches;
-      std::string error; // why the last Load failed
+      std::string error;                 // why the last Load failed
+      std::vector<std::string> warnings; // lines the reader didn't understand (Studio's V18)
 
       /// Reads the manifest and every patch through the engine's virtual file system. False (and `error`) when it names
       /// no patch or a file is unusable.

@@ -1183,6 +1183,12 @@ namespace faf::editor
     }
     /** The patches' checks (EdMeshScan), as lines. */
     [[nodiscard]] std::vector<std::string> CheckMeshTerrain();
+    /**
+     * FAF Studio's Sync map: size, playable area, water, the ground range and the sun from the open map into the mesh
+     * map's settings (given). `fresh` (Studio's New): a new manifest first, with no materials or patches, at the map's
+     * terrain/terrain.lua. The status line.
+     */
+    std::string SyncMeshFromMap(bool fresh);
     /** The ground things are placed on: the mesh surface while it is shown (the highest one up to 40 above the field).
      */
     [[nodiscard]] float PlacementHeight(float x, float z) const;

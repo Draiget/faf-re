@@ -15,6 +15,7 @@
 #include <fstream>
 #include <iterator>
 #include <map>
+#include <set>
 
 namespace faf::editor
 {
@@ -233,5 +234,104 @@ C = [[long text]]
       }
     }
     edmesh::SetMeshFileReader({});
+  }
+
+  TEST(
+    MeshTerrain,
+    SettingsSetUnsetAndRoundTrip
+  )
+  {
+    // Every one of Studio's 34 manifest settings has a slot; set ones are written and read back, unset ones vanish.
+    EXPECT_EQ(edmesh::SettingKeys().size(), 34U);
+    edmesh::Settings s;
+    for (const edmesh::SettingKey& key : edmesh::SettingKeys()) {
+      const bool slot = edmesh::SettingNumber(s, key.key) != nullptr || edmesh::SettingText(s, key.key) != nullptr;
+      EXPECT_TRUE(slot) << key.key;
+      EXPECT_EQ(key.decimals == -2, edmesh::SettingText(s, key.key) != nullptr) << key.key;
+    }
+    edmesh::MeshMap map;
+    map.patches.push_back({});
+    map.patches.back().file = "tile.scm";
+    map.patches.back().sky = true;
+    map.materials.push_back({});
+    map.materials.back().name = "Rock";
+    map.materials.back().alphaTest = 100.0f;
+    edmesh::SetSettingGiven(map.settings, "shadow_a", true);
+    *edmesh::SettingNumber(map.settings, "shadow_a") = 0.25f;
+    edmesh::SetSettingGiven(map.settings, "sun_x", true);
+    *edmesh::SettingNumber(map.settings, "sun_x") = 0.5f;
+    edmesh::SetSettingGiven(map.settings, "void_g", true);
+    edmesh::SetSettingGiven(map.settings, "water_map", true);
+    std::string text = map.ManifestText();
+    EXPECT_NE(text.find("shadow_a = 0.25"), std::string::npos) << text;
+    EXPECT_NE(text.find("sun_x = 0.5"), std::string::npos) << text;
+    EXPECT_NE(text.find("water_map = 'watermap.dds'"), std::string::npos) << text;
+    EXPECT_NE(text.find("alpha_test = 100"), std::string::npos) << text;
+    EXPECT_NE(text.find("sky = 1"), std::string::npos) << text;
+    EXPECT_EQ(text.find("shadow_r"), std::string::npos) << "an unset key isn't written";
+    edmesh::SetSettingGiven(map.settings, "sun_x", false);
+    EXPECT_EQ(*edmesh::SettingNumber(map.settings, "sun_x"), 0.0f);
+    text = map.ManifestText();
+    EXPECT_EQ(text.find("sun_x"), std::string::npos) << text;
+    // Read back: the given keys come back given, a stray line is a V18 warning.
+    text += "something odd\n";
+    std::map<std::string, std::vector<std::uint8_t>> disk{
+      {"/maps/m/terrain/terrain.lua", std::vector<std::uint8_t>(text.begin(), text.end())}
+    };
+    edmesh::SetMeshFileReader([&disk](const std::string& path) {
+      const auto it = disk.find(path);
+      return it != disk.end() ? it->second : std::vector<std::uint8_t>{};
+    });
+    edmesh::MeshMap back;
+    (void)back.Load("/maps/m/terrain/terrain.lua");
+    EXPECT_EQ(back.settings.given.count("shadow_a"), 1U);
+    EXPECT_NEAR(back.settings.shadowColor[3], 0.25f, 1e-6f);
+    EXPECT_TRUE(back.settings.haveVoid);
+    ASSERT_EQ(back.warnings.size(), 1U);
+    EXPECT_NE(back.warnings[0].find("something odd"), std::string::npos);
+    edmesh::SetMeshFileReader({});
+  }
+
+  TEST(
+    MeshTerrain,
+    ManifestChecksAgainstTheMap
+  )
+  {
+    // Studio's manifest checks: size, playable area, water, the scenario, unused materials, missing files.
+    edmesh::MeshMap map;
+    map.dir = "/maps/m/terrain";
+    map.settings.given = {"size"};
+    map.settings.size = 512.0f;
+    map.settings.playable[2] = map.settings.playable[3] = 512.0f;
+    map.settings.water = 20.0f;
+    map.materials.resize(2);
+    map.materials[0].files[0] = "rock_a.dds";
+    map.patches.push_back({});
+    map.patches.back().file = "tile.scm";
+    MeshManifestFacts facts;
+    facts.mapSize = 1024;
+    facts.havePlayable = true;
+    facts.playable[2] = facts.playable[3] = 1024.0f;
+    facts.water = false;
+    facts.groundHighest = 300.0f;
+    facts.haveScenario = true;
+    facts.terrainSystem = "mesh";
+    facts.terrainMesh = "/maps/other/terrain/terrain.lua";
+    facts.expectedMesh = "/maps/m/terrain/terrain.lua";
+    facts.read = [](const std::string&) {
+      return std::vector<std::uint8_t>{};
+    };
+    std::set<std::string> codes;
+    std::string all;
+    for (const MeshScanFinding& f : CheckMeshManifest(map, facts)) {
+      codes.insert(f.code);
+      all += f.code + " " + f.text + "\n";
+    }
+    for (const char* code : {"V19", "V11", "V9", "V12", "V14", "V2", "V1", "V5", "V20"}) {
+      EXPECT_EQ(codes.count(code), 1U) << code << " missing in\n" << all;
+    }
+    EXPECT_NE(all.find("size 512 but the map is 1024"), std::string::npos) << all;
+    EXPECT_NE(all.find("material 2 '' is not used"), std::string::npos) << all;
+    EXPECT_NE(all.find("texture 'rock_a.dds'"), std::string::npos) << all;
   }
 } // namespace faf::editor

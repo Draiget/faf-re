@@ -8712,6 +8712,8 @@ namespace faf::editor
       }
       /** Import / Export > Export package: the folder for Gaea / World Machine; the folder watch. */
       std::map<std::string, long long> mPackageStamps;
+      int mMeshAskFrames = 0; // `/meshask`
+      int mMeshAskDone = 0;
       bool mPackageTestDone = false;
       double mPackageWatchAt = 0.0;
       void PackageUpdate()
@@ -13745,15 +13747,40 @@ namespace faf::editor
         mMeshLoadedFor.clear();
       }
       mShell->SetMeshMapView(&mScene.MeshMapRef());
+      // `/meshask <n,n,...>` (test runs): the Mesh terrain panel's buttons, one every 30 frames once the map is up
+      // (1 load, 2 check, 3 save, 4 unset, 5 set, 6 sync map, 7 new from the map).
+      if (
+        fa::vector<fa::string> asks; mScene.Attached() && !mScene.ModelsPending() &&
+        moho::CFG_GetArgOption("/meshask", 1, &asks) && !asks.empty() && ++mMeshAskFrames % 30 == 0 &&
+        (mScene.MeshMapRef().Loaded() || mMeshAskFrames > 600)
+      ) {
+        const std::string list = asks[0].c_str();
+        std::size_t at = 0;
+        for (int k = 0; k < mMeshAskDone && at != std::string::npos; ++k) {
+          at = list.find(',', at);
+          at = at == std::string::npos ? at : at + 1;
+        }
+        if (at != std::string::npos && at < list.size()) {
+          const int ask = std::atoi(list.c_str() + at);
+          ++mMeshAskDone;
+          gpg::Logf("editor: /meshask: %d", ask);
+          mShell->AskMeshMore(ask);
+        }
+      }
       if (const int more = mShell->TakeMeshMore(); more == 1) {
         mShell->SetMeshStatus(mScene.LoadMeshTerrain());
       } else if (more == 2) {
-        mShell->SetMeshFindings(mScene.CheckMeshTerrain());
+        std::vector<std::string> findings = mScene.CheckMeshTerrain();
+        gpg::Logf("editor: mesh terrain check: %zu findings", findings.size());
+        for (const std::string& line : findings) {
+          gpg::Logf("editor: mesh terrain check: %s", line.c_str());
+        }
+        mShell->SetMeshFindings(std::move(findings));
       } else if (more == 3) {
         // Save: the manifest as the panel edited it, into the map's folder, then read again (Sync).
         const edmesh::MeshMap& mesh = mScene.MeshMapRef();
         const std::filesystem::path scmap = mDocument.MapDiskFile();
-        if (!mesh.Loaded() || scmap.empty()) {
+        if (mesh.manifestPath.empty() || scmap.empty()) {
           mShell->SetMeshStatus("No mesh terrain loaded, or the map has no folder of its own.");
         } else {
           std::string rel = mesh.manifestPath;
@@ -13786,6 +13813,8 @@ namespace faf::editor
         (void)mDocument.SetScenarioField("TerrainSystem", "mesh", true);
         (void)mDocument.SetScenarioField("TerrainMesh", manifest, true);
         mShell->SetMeshStatus("The scenario names " + manifest + "; " + mScene.LoadMeshTerrain());
+      } else if (more == 6 || more == 7) {
+        mShell->SetMeshStatus(mScene.SyncMeshFromMap(more == 7));
       }
       const HWND owner = HandleOf(mGame.supcomFrame);
       ImagesPanelThumbs();

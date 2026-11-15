@@ -253,7 +253,9 @@ namespace faf::editor
     ImGui::SameLine();
     ImGui::Checkbox("Show over the map", &mMeshShown);
     // The loaded mesh map: its materials, its patches and its settings, edited in place; Save writes the manifest.
-    if (edmesh::MeshMap* const mesh = mMeshMapView; mesh != nullptr && mesh->Loaded()) {
+    if (
+      edmesh::MeshMap* const mesh = mMeshMapView; mesh != nullptr && (mesh->Loaded() || !mesh->manifestPath.empty())
+    ) {
       if (Section("Materials", false)) {
         static constexpr const char* kSlots[edmesh::kSlots] = {
           "Diffuse A",
@@ -307,6 +309,16 @@ namespace faf::editor
           ImGui::Checkbox("Highlight", &material.highlight);
           ImGui::SameLine();
           ImGui::Checkbox("Additive", &material.additive);
+          bool alphaTest = material.alphaTest >= 0.0f;
+          if (ImGui::Checkbox("Alpha test", &alphaTest)) {
+            material.alphaTest = alphaTest ? 128.0f : -1.0f;
+          }
+          EdSetItemTooltip("SC2's ALPHA_TEST: a pixel is drawn where its alpha x 255 is above the reference");
+          if (alphaTest) {
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(-1.0f);
+            FillSliderFloat("##alpharef", &material.alphaTest, 0.0f, 255.0f, "Reference %.0f");
+          }
         }
       }
       if (Section("Patches", false)) {
@@ -337,6 +349,9 @@ namespace faf::editor
             ImGui::EndCombo();
           }
           ImGui::SameLine();
+          ImGui::Checkbox("Sky", &patch.sky);
+          EdSetItemTooltip("A sky piece (SC2's): it follows the camera, unlit, instead of being ground");
+          ImGui::SameLine();
           if (ImGui::SmallButton("Remove")) {
             remove = static_cast<int>(p);
           }
@@ -347,25 +362,72 @@ namespace faf::editor
         }
       }
       if (Section("The mesh map's settings", false)) {
+        // FAF Studio's list: every manifest setting, its value or "-" when the manifest leaves it out; the chosen
+        // one's meaning, its value (a number by a slider, a file name typed) and Set / unset.
         edmesh::Settings& s = mesh->settings;
-        ImGui::SetNextItemWidth(-1.0f);
-        FillDragFloat("##meshsize", &s.size, 1.0f, 64.0f, 8192.0f, "Size %.0f");
-        ImGui::SetNextItemWidth(-1.0f);
-        FillDragFloat(
-          "##meshwater", &s.water, 0.5f, -10000.0f, 1000.0f, s.water > -9999.0f ? "Water %.1f" : "Water: none"
-        );
-        ImGui::SetNextItemWidth(-1.0f);
-        FillDragFloat("##meshhigh", &s.meshHigh, 0.5f, -10000.0f, 2000.0f, "Mesh high %.1f");
-        ImGui::SetNextItemWidth(-1.0f);
-        ImGui::DragFloat4("##meshplayable", s.playable, 1.0f, 0.0f, 8192.0f, "%.0f");
-        EdSetItemTooltip("The playable rectangle: x0, z0, x1, z1");
+        const std::vector<edmesh::SettingKey>& keys = edmesh::SettingKeys();
+        mMeshSetting = std::clamp(mMeshSetting, 0, static_cast<int>(keys.size()) - 1);
+        if (ImGui::BeginChild("##meshsettings", ImVec2(0.0f, Em(150.0f)), ImGuiChildFlags_Borders)) {
+          for (std::size_t k = 0; k < keys.size(); ++k) {
+            const edmesh::SettingKey& key = keys[k];
+            char value[96] = "-";
+            if (edmesh::SettingSet(s, key.key)) {
+              if (const std::string* text = edmesh::SettingText(s, key.key)) {
+                (void)std::snprintf(value, sizeof(value), "%s", text->c_str());
+              } else if (const float* number = edmesh::SettingNumber(s, key.key)) {
+                (void)std::snprintf(
+                  value, sizeof(value), "%.*f", std::max(0, key.decimals), static_cast<double>(*number)
+                );
+              }
+            }
+            ImGui::PushID(static_cast<int>(k));
+            if (ImGui::Selectable(key.key, mMeshSetting == static_cast<int>(k))) {
+              mMeshSetting = static_cast<int>(k);
+            }
+            ImGui::SameLine(Em(180.0f));
+            ImGui::TextDisabled("%s", value);
+            ImGui::PopID();
+          }
+        }
+        ImGui::EndChild();
+        const edmesh::SettingKey& key = keys[static_cast<std::size_t>(mMeshSetting)];
+        ImGui::TextDisabled("%s: %s", key.key, key.help);
+        if (std::string* text = edmesh::SettingText(s, key.key)) {
+          char buffer[260];
+          (void)std::snprintf(buffer, sizeof(buffer), "%s", text->c_str());
+          ImGui::SetNextItemWidth(-Em(110.0f));
+          if (ImGui::InputTextWithHint("##meshsettingtext", "file name beside terrain.lua", buffer, sizeof(buffer))) {
+            *text = buffer;
+            edmesh::SetSettingGiven(s, key.key, !text->empty());
+          }
+        } else if (float* number = edmesh::SettingNumber(s, key.key)) {
+          float shown = edmesh::SettingSet(s, key.key) ? *number : key.min;
+          char format[32];
+          (void)std::snprintf(format, sizeof(format), "Value %%.%df", std::max(0, key.decimals));
+          ImGui::SetNextItemWidth(-Em(110.0f));
+          if (FillSliderFloat("##meshsettingvalue", &shown, key.min, key.max, format)) {
+            *number = key.decimals == -1 ? std::round(shown) : shown;
+            edmesh::SetSettingGiven(s, key.key, true);
+          }
+          EdSetItemTooltip("The value of %s; a setting the manifest leaves out uses the game's default", key.key);
+        }
+        ImGui::SameLine();
+        if (
+          ImGui::Button(edmesh::SettingSet(s, key.key) ? "Unset##meshsetting" : "Set##meshsetting", ImVec2(-1.0f, 0.0f))
+        ) {
+          edmesh::SetSettingGiven(s, key.key, !edmesh::SettingSet(s, key.key));
+        }
+        if (ImGui::Button("Sync map")) {
+          mMeshAskMore = 6;
+        }
+        EdSetItemTooltip("Size, playable area, water, the ground's lowest and highest point and the sun from the map");
       }
       if (PrimaryButton("Save the manifest")) {
         mMeshAskMore = 3;
       }
       EdSetItemTooltip("Writes terrain.lua as edited here and reads the mesh again");
       ImGui::SameLine();
-      if (ImGui::Button("Sync (read it again)")) {
+      if (ImGui::Button("Load (read it again)")) {
         mMeshAskMore = 1;
       }
       ImGui::SameLine();
@@ -377,6 +439,10 @@ namespace faf::editor
       if (ImGui::Button("Set: the map's terrain/terrain.lua is its ground")) {
         mMeshAskMore = 5;
       }
+      if (ImGui::Button("New manifest from the map")) {
+        mMeshAskMore = 7;
+      }
+      EdSetItemTooltip("A manifest with the map's size, playable area, water, heights and sun, no patches yet");
     }
     if (!mMeshStatus.empty()) {
       ImGui::TextWrapped("%s", mMeshStatus.c_str());

@@ -130,13 +130,6 @@ namespace faf::editor
       }
       return true;
     }
-
-    float LinearOf(
-      const float c
-    )
-    {
-      return std::pow(std::max(c, 0.0001f), 2.2f);
-    }
   } // namespace
 
   bool EdMapScene::BakeMeshMaterial(
@@ -749,10 +742,119 @@ namespace faf::editor
   std::vector<std::string> EdMapScene::CheckMeshTerrain()
   {
     std::vector<std::string> lines;
-    for (const MeshScanFinding& f : ScanMeshMap(mMeshMap).findings) {
+    if (mMeshMap.manifestPath.empty()) {
+      lines.push_back("I: no mesh terrain manifest is loaded (Set, Load or New manifest from the map first)");
+      return lines;
+    }
+    // Studio's manifest checks against the open map and the files, then the patches' own.
+    MeshManifestFacts facts;
+    if (const std::shared_ptr<TerrainSource> terrain = TerrainHeights(); terrain != nullptr && terrain->width > 1) {
+      facts.mapSize = terrain->width - 1;
+      facts.groundHighest = *std::max_element(terrain->heights.begin(), terrain->heights.end());
+    }
+    if (const std::optional<EdDocument::PlayableRect> area = mDocument.PlayableArea()) {
+      facts.havePlayable = true;
+      facts.playable[0] = static_cast<float>(area->x0);
+      facts.playable[1] = static_cast<float>(area->z0);
+      facts.playable[2] = static_cast<float>(area->x1);
+      facts.playable[3] = static_cast<float>(area->z1);
+    }
+    const WaterState water = mDocument.WaterNow();
+    facts.water = water.enabled;
+    facts.waterLevel = water.elevation;
+    const std::string& scenario = mDocument.Scenario();
+    facts.haveScenario = !scenario.empty();
+    (void)ReadScenarioField(scenario, "TerrainSystem", facts.terrainSystem);
+    (void)ReadScenarioField(scenario, "TerrainMesh", facts.terrainMesh);
+    facts.expectedMesh = "/maps/" + mDocument.FolderName() + "/terrain/terrain.lua";
+    facts.read = [](const std::string& path) {
+      return edmesh::ReadVfs(path);
+    };
+    for (const MeshScanFinding& f : CheckMeshManifest(mMeshMap, facts)) {
       lines.push_back(std::string(1, f.severity) + " " + f.code + ": " + f.text);
     }
+    if (mMeshMap.Loaded()) {
+      for (const MeshScanFinding& f : ScanMeshMap(mMeshMap).findings) {
+        lines.push_back(std::string(1, f.severity) + " " + f.code + ": " + f.text);
+      }
+    }
     return lines;
+  }
+
+  std::string EdMapScene::SyncMeshFromMap(
+    const bool fresh
+  )
+  {
+    const std::shared_ptr<TerrainSource> terrain = TerrainHeights();
+    if (terrain == nullptr || terrain->width < 2) {
+      return "No map open.";
+    }
+    if (fresh) {
+      DeleteMeshInstances();
+      mMeshMap.Clear();
+      mMeshTris.clear();
+      mMeshEdges.clear();
+      mMeshMap.manifestPath = "/maps/" + mDocument.FolderName() + "/terrain/terrain.lua";
+      mMeshMap.dir = "/maps/" + mDocument.FolderName() + "/terrain";
+    } else if (mMeshMap.manifestPath.empty()) {
+      return "Load a mesh terrain manifest, or make a new one from the map, first.";
+    }
+    edmesh::Settings& s = mMeshMap.settings;
+    const auto give = [&s](const char* key, const float value) {
+      if (float* slot = edmesh::SettingNumber(s, key)) {
+        *slot = value;
+        s.given.insert(key);
+      }
+    };
+    const float size = static_cast<float>(terrain->width - 1);
+    give("size", size);
+    if (const std::optional<EdDocument::PlayableRect> area = mDocument.PlayableArea()) {
+      give("playable_x0", static_cast<float>(area->x0));
+      give("playable_z0", static_cast<float>(area->z0));
+      give("playable_x1", static_cast<float>(area->x1));
+      give("playable_z1", static_cast<float>(area->z1));
+    } else {
+      give("playable_x0", 0.0f);
+      give("playable_z0", 0.0f);
+      give("playable_x1", size);
+      give("playable_z1", size);
+    }
+    const WaterState water = mDocument.WaterNow();
+    if (water.enabled) {
+      give("water", water.elevation);
+      give("water_abyss", std::min(water.abyss, water.elevation - 1.0f));
+    } else {
+      for (const char* key : {"water", "water_abyss", "water_tint"}) {
+        edmesh::SetSettingGiven(s, key, false);
+      }
+    }
+    const auto [low, high] = std::minmax_element(terrain->heights.begin(), terrain->heights.end());
+    give("ground_low", *low);
+    give("ground_high", *high);
+    const LightingState lighting = mDocument.LightingNow();
+    const float length = std::sqrt(
+      lighting.sunDirection[0] * lighting.sunDirection[0] + lighting.sunDirection[1] * lighting.sunDirection[1] +
+      lighting.sunDirection[2] * lighting.sunDirection[2]
+    );
+    if (length > 0.0001f) {
+      give("sun_x", lighting.sunDirection[0] / length);
+      give("sun_y", lighting.sunDirection[1] / length);
+      give("sun_z", lighting.sunDirection[2] / length);
+    }
+    gpg::Logf(
+      "editor: mesh terrain: %s: size %.0f, playable %.0f,%.0f - %.0f,%.0f, water %s, ground %.2f .. %.2f",
+      fresh ? "new manifest from the map" : "synced from the map",
+      static_cast<double>(s.size),
+      static_cast<double>(s.playable[0]),
+      static_cast<double>(s.playable[1]),
+      static_cast<double>(s.playable[2]),
+      static_cast<double>(s.playable[3]),
+      water.enabled ? std::to_string(water.elevation).c_str() : "none",
+      static_cast<double>(*low),
+      static_cast<double>(*high)
+    );
+    return fresh ? "A new manifest from the map (no patches yet: import an OBJ, then Save)."
+                 : "Size, playable area, water, heights and sun taken from the map (Save writes them).";
   }
 
   float EdMapScene::PlacementHeight(

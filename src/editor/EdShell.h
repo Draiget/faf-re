@@ -675,7 +675,8 @@ namespace faf::editor
     /** The mesh terrain view's mode (0 the height field, 1 the mesh, 2 both) and its other asks. */
     int mMeshMode = 1;
     bool mMeshMakeMap = true;
-    int mMeshAskMore = 0; // 1 load again, 2 check, 3 save the manifest, 4 unset, 5 set
+    int mMeshAskMore = 0; // 1 load again, 2 check, 3 save the manifest, 4 unset, 5 set, 6 sync map, 7 new
+    int mMeshSetting = 0; // the settings list's chosen row (edmesh::SettingKeys)
     edmesh::MeshMap* mMeshMapView = nullptr;
     int mMeshMaterial = 0;
     void SetMeshMapView(
