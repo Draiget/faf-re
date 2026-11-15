@@ -46,6 +46,12 @@ namespace moho
   };
   inline constexpr int kMwsfcreStreamMps = 1, kMwsfcreStreamVideoOnly = 3;
   using AdxmErrorCallback = int(__cdecl*)(std::uint32_t, const char*);
+  /**
+   * Engine addition, not a legacy name: the texture the movie's frames are copied into was made again
+   * and holds none of them (CMovie::CreateTexture). mwPlyGetCurFrm hands out only a frame the texture
+   * lacks, so from here it hands out the current one again.
+   */
+  void ForgetUploadedMovieFrame(MwsfdPlaybackStateSubobj* p);
 } // namespace moho
 void mwPlyGetHdrInf(const char*, std::int32_t, moho::MwsfdHdrInf*);
 std::int32_t mwPlyCalcWorkCprmSfd(const moho::MwsfcreCreateParams*);

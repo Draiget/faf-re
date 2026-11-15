@@ -28,7 +28,16 @@ namespace moho
     sfd::Player player;
     int outputPitch{}, outputHeight{};
     std::shared_ptr<sfd::DecodedVideoFrame> borrowedFrame;
+    // The frame the texture has (mwPlyFxCnvFrmARGB8888), held so that no new frame can take its address.
+    std::shared_ptr<sfd::DecodedVideoFrame> uploadedFrame;
   };
+  void ForgetUploadedMovieFrame(
+    MwsfdPlaybackStateSubobj* p
+  )
+  {
+    if (p)
+      p->uploadedFrame.reset();
+  }
 } // namespace moho
 std::int32_t mwPlyCalcWorkCprmSfd(
   const moho::MwsfcreCreateParams*
@@ -83,6 +92,7 @@ void mwPlyStartFname(
 {
   if (p) {
     p->borrowedFrame.reset();
+    p->uploadedFrame.reset();
     p->player.Open(path);
   }
 }
@@ -101,7 +111,10 @@ moho::MwsfdFrameInfo* mwPlyGetCurFrm(
     return nullptr;
   out->bufferAddress = nullptr;
   if (p) {
-    p->borrowedFrame = p->player.CurrentFrame();
+    // Only a frame the texture lacks. The game draws faster than a movie runs, and each copy is the whole
+    // picture, 7.1 MiB for main_menu.sfd's 1824x1024, copied once more on its way to the GPU.
+    auto current = p->player.CurrentFrame();
+    p->borrowedFrame = current != p->uploadedFrame ? std::move(current) : nullptr;
     out->bufferAddress = p->borrowedFrame.get();
   }
   return out;
@@ -150,6 +163,7 @@ void mwPlyFxCnvFrmARGB8888(
       frame.bgra.data() + static_cast<std::size_t>(y) * frame.pitch,
       frame.pitch
     );
+  p->uploadedFrame = p->borrowedFrame;
 }
 std::int32_t mwPlyGetSubtitle(
   moho::MwsfdPlaybackStateSubobj*,

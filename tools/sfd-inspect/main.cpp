@@ -135,6 +135,14 @@ namespace
         "Texture overrun"
       );
       mwPlyRelCurFrm(p);
+      // The texture has the frame now: nothing to copy until the picture changes or the texture is made again.
+      mwPlyGetCurFrm(p, &info);
+      Require(info.bufferAddress == nullptr, "Unchanged frame handed out again");
+      moho::ForgetUploadedMovieFrame(p);
+      mwPlyGetCurFrm(p, &info);
+      Require(info.bufferAddress == frame, "Frame withheld from a new texture");
+      mwPlyFxCnvFrmARGB8888(p, &info, destination.data());
+      mwPlyRelCurFrm(p);
       const auto playbackStart = std::chrono::steady_clock::now();
       Require(mwPlyPause(p, 0) != 0, "Resume failed");
       std::this_thread::sleep_for(std::chrono::milliseconds(3100));

@@ -195,6 +195,9 @@ namespace moho
     }
 
     if (textureReady) {
+      // Engine addition: a new texture holds no frame, after a device reset or a resize too, and
+      // mwPlyGetCurFrm hands out only a frame the texture lacks.
+      ForgetUploadedMovieFrame(mPly);
       return true;
     }
 
