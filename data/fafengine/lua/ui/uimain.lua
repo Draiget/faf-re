@@ -166,6 +166,26 @@ if not rawget(getfenv(1), 'UpdateRejoinScreen') then
     end
 end
 
+-- A window resize kept FAF's deselect (the construction panel lays itself out for the selection it had, so it went
+-- wrong at the new size), but the same units are selected again a frame later, so the panel is built anew for them
+-- and the player keeps the selection.
+do
+    local OldOnApplicationResize = OnApplicationResize
+    function OnApplicationResize(head, width, height)
+        import('/fafengine/modules/lua/ui/uiscale.lua').KeepSelection(function()
+            OldOnApplicationResize(head, width, height)
+        end)
+    end
+end
+
+-- The engine calls this when the display scale of the game window changed (moved to another display, or the system's
+-- scale setting changed): the interface follows it when the player lets it.
+if not rawget(getfenv(1), 'OnDisplayScaleChanged') then
+    function OnDisplayScaleChanged(scale)
+        import('/fafengine/modules/lua/ui/uiscale.lua').OnDisplayScaleChanged(scale)
+    end
+end
+
 if not DiskGetFileInfo('/lua/ui/game/replay_timeline.lua') then
     local OldEscapeHandler = EscapeHandler
     function EscapeHandler()

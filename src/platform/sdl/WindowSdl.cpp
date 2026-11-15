@@ -1230,6 +1230,18 @@ namespace platform::window
     return found;
   }
 
+  float DisplayScale(
+    Handle const window
+  )
+  {
+    if (!gInitialized) {
+      return 1.0f;
+    }
+    const float scale = window != nullptr ? SDL_GetWindowDisplayScale(static_cast<SDL_Window*>(window))
+                                          : SDL_GetDisplayContentScale(SDL_GetPrimaryDisplay());
+    return scale > 0.0f ? scale : 1.0f;
+  }
+
   bool ShowSplash(
     const char* const utf8PngPath,
     const int width,

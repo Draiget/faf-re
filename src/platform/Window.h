@@ -170,6 +170,12 @@ namespace platform::window
   // head goes (its full-screen swap chain takes the display its window is on). False with one display.
   bool GetSecondaryDisplayBounds(int* x, int* y, int* width, int* height);
 
+  // How much larger than 96 DPI the system draws text and controls on the display the window is
+  // on (Windows' "Scale" setting: 1.5 at 150 %, a Retina display's 2.0), as SDL_GetWindowDisplayScale
+  // gives it. Moving the window to a display with another scale changes it. Null: the primary
+  // display's scale (where a window opens before it has one). 1.0 when not known.
+  [[nodiscard]] float DisplayScale(Handle window);
+
   // A borderless window centred on the primary display showing the PNG file scaled to
   // width x height, above other windows, until HideSplash. False when the file can't be read.
   bool ShowSplash(const char* utf8PngPath, int width, int height);

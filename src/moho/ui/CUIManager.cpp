@@ -17,6 +17,7 @@
 #include "moho/render/d3d/CD3DPrimBatcher.h"
 #include "moho/console/TConVarbool.h"
 #include "moho/app/UserWorkerPool.h"
+#include "moho/ui/UiDisplayScale.h"
 
 namespace moho
 {
@@ -494,6 +495,9 @@ void moho::CUIManager::UpdateFrameRate(
   if (CMauiCursor* const cursor = GetCursor()) {
     MAUI_UpdateCursor(cursor);
   }
+
+  // Engine addition (UI scaling and DPI): tells the UI when the window's display scale changed.
+  UI_NoteDisplayScale(mLuaState);
 
   if (mLuaState != nullptr) {
     PublishEngineStatsToLua(mLuaState);

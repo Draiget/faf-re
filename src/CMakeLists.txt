@@ -42,7 +42,7 @@ endif()
 
 # --- Resources ------------------------------------------------------------------------
 # MohoResources.rc carries the game's icon.
-# MohoManifest.rc embeds the application manifest (asInvoker, system DPI
+# MohoManifest.rc embeds the application manifest (asInvoker, per-monitor DPI
 # aware).
 # MohoVersion.rc is the version resource FAF's client reads (issue #314), from the build
 # info header and faf/ExeName.h, the file name it names as the original one.

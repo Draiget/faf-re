@@ -340,6 +340,7 @@ set(FAF_ENGINE_SOURCES
   moho/terrain/water/WaterBodySurfaces.cpp
   moho/ui/CUIWorldView.cpp
   moho/ui/CUIManager.cpp
+  moho/ui/UiDisplayScale.cpp
   moho/lua/SCR_Math.cpp
   moho/lua/SCR_String.cpp
   moho/audio/AudioEngine.cpp
