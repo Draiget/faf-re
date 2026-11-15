@@ -428,6 +428,9 @@ namespace faf::headless
       netConfig.joinSeconds = 1.0e9;
       netConfig.reconnectSeconds = 1.0e9;
       netConfig.holdViewsForJoin = !options.targetAudit;
+      // Each player's stream compressed as the server compresses it (`srv_ViewCompression`), so a seat run measures
+      // the bytes a real server sends; a probe with --no-view-compression still gets it uncompressed.
+      netConfig.viewCompression = faf::server::ViewCompressionSwitch();
       seatNet = std::make_unique<faf::server::CServerNet>(netConfig);
       for (faf::remote::CServerClient* const seat : seatFeed->Seats()) {
         seatNet->AddSeat(
