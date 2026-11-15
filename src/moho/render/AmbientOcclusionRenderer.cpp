@@ -1,4 +1,5 @@
 #include "moho/render/AmbientOcclusionRenderer.h"
+#include "moho/render/camera/EyeRelative.h"
 
 #include <algorithm>
 #include <cstdio>
@@ -351,7 +352,7 @@ namespace moho
     }
 
     AoConstants constants{};
-    constants.inverseViewProjection = camera.inverseViewProjection;
+    constants.inverseViewProjection = EyeRelativeInverseViewProjection(camera);
     constants.viewRect[0] = static_cast<float>(x);
     constants.viewRect[1] = static_cast<float>(y);
     constants.viewRect[2] = static_cast<float>(width);
