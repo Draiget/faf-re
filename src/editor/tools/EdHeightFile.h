@@ -29,6 +29,27 @@ namespace faf::editor
     std::string& error
   );
 
+  /** How an import reads its file (FAF Studio's import options): an image's channel, a raw file's layout. */
+  struct HeightReadOptions
+  {
+    int channel = 0; // 0 grey (the image as it is), 1 red, 2 green, 3 blue, 4 alpha
+    // A .raw / .r16 / .r32 file: its sample size, float or whole numbers, byte order, its size (0: square / the map's).
+    int rawBits = 16; // 8, 16 or 32
+    bool rawFloat = false;
+    bool bigEndian = false;
+    int rawWidth = 0;
+    int rawHeight = 0;
+  };
+  /** ReadHeightImage with those options (the defaults read as ReadHeightImage does). */
+  bool ReadHeightImageWith(
+    const std::filesystem::path& file,
+    int expectWidth,
+    int expectHeight,
+    const HeightReadOptions& options,
+    HeightImage& out,
+    std::string& error
+  );
+
   /** Writes a 32-bit BGRA picture (B in the low byte) as a PNG; false with `error`. */
   bool WriteColourPng(
     const std::filesystem::path& file,

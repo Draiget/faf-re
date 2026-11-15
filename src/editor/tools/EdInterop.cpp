@@ -1,4 +1,5 @@
 #include "editor/tools/EdInterop.h"
+#include "editor/doc/EdJsonTree.h"
 
 #include <cctype>
 
@@ -86,20 +87,58 @@ namespace faf::editor
     const int z1 = s.region ? std::clamp(std::max(s.regionZ0, s.regionZ1), 0, height - 1) : height - 1;
     const int rw = x1 - x0 + 1;
     const int rh = z1 - z0 + 1;
-    const HeightImage fitted = ResampleHeights(OrientHeights(image, s.flipX, s.flipZ, s.turns), rw, rh, s.filter);
+    HeightImage fitted = ResampleHeights(OrientHeights(image, s.flipX, s.flipZ, s.turns), rw, rh, s.filter);
+    if (s.invert) {
+      for (std::uint16_t& w : fitted.words) {
+        w = static_cast<std::uint16_t>(65535 - w);
+      }
+    }
     std::uint16_t darkest = 0, brightest = 0;
     HeightImageRange(fitted, darkest, brightest);
+    if (!s.stretch) {
+      darkest = 0;
+      brightest = 65535;
+    }
     const float span = std::max(1.0f, static_cast<float>(brightest - darkest));
+    // The sea level in the image: the value seaValue lands on the map's water.
+    float seaShift = 0.0f;
+    if (s.seaPin) {
+      const float seaWord = std::clamp(s.seaValue, 0.0f, 1.0f) * 65535.0f;
+      const float at = s.mapping == ImportSettings::Mapping::Normalised
+        ? s.low + (seaWord - static_cast<float>(darkest)) / span * (s.high - s.low)
+        : seaWord * s.scale / 128.0f;
+      seaShift = s.seaLevel - at;
+    }
+    const auto unitsAt = [&](const int x, const int z) {
+      const float word = static_cast<float>(fitted.words[static_cast<std::size_t>(z - z0) * rw + (x - x0)]);
+      return (s.mapping == ImportSettings::Mapping::Normalised
+                ? s.low + (word - static_cast<float>(darkest)) / span * (s.high - s.low)
+                : word * s.scale / 128.0f) +
+        seaShift;
+    };
+    // Pads: the new ground's height at each spot (flatten), for the spots inside the region.
+    std::vector<float> padHeights;
+    for (const auto& p : s.padPoints) {
+      const int px = std::clamp(static_cast<int>(std::lround(p[0])), x0, x1);
+      const int pz = std::clamp(static_cast<int>(std::lround(p[1])), z0, z1);
+      padHeights.push_back(unitsAt(px, pz));
+    }
     const float strength = std::clamp(s.strength, 0.0f, 1.0f);
     for (int z = z0; z <= z1; ++z) {
       for (int x = x0; x <= x1; ++x) {
         const std::size_t k = static_cast<std::size_t>(z) * width + x;
-        const float word = static_cast<float>(fitted.words[static_cast<std::size_t>(z - z0) * rw + (x - x0)]);
         // The image's value as a height in map units.
-        const float units = s.mapping == ImportSettings::Mapping::Normalised
-          ? s.low + (word - static_cast<float>(darkest)) / span * (s.high - s.low)
-          : word * s.scale / 128.0f;
+        float units = unitsAt(x, z);
         const float now = static_cast<float>(current[k]) / 128.0f;
+        // Pads: flatten the new ground round each spot to its height there.
+        if (s.pads == 2) {
+          for (std::size_t p = 0; p < s.padPoints.size(); ++p) {
+            const float d =
+              std::hypot(static_cast<float>(x) - s.padPoints[p][0], static_cast<float>(z) - s.padPoints[p][1]);
+            const float t = std::clamp((d - s.padRadius) / std::max(4.0f, s.padRadius * 0.6f), 0.0f, 1.0f);
+            units = padHeights[p] + (units - padHeights[p]) * (t * t * (3.0f - 2.0f * t));
+          }
+        }
         float result = units;
         switch (s.blend) {
         case ImportSettings::Blend::Add:
@@ -117,6 +156,17 @@ namespace faf::editor
         }
         // The feather: in from the edge, a smooth fade from nothing to all.
         float weight = strength;
+        if (!s.maskWeights.empty() && k < s.maskWeights.size()) {
+          weight *= std::clamp(s.maskWeights[k], 0.0f, 1.0f);
+        }
+        if (s.pads == 1) {
+          // Keep the old ground round each spot.
+          for (const auto& p : s.padPoints) {
+            const float d = std::hypot(static_cast<float>(x) - p[0], static_cast<float>(z) - p[1]);
+            const float t = std::clamp((d - s.padRadius) / std::max(4.0f, s.padRadius * 0.6f), 0.0f, 1.0f);
+            weight *= t * t * (3.0f - 2.0f * t);
+          }
+        }
         if (s.feather > 0.0f) {
           const float in = static_cast<float>(std::min({x - x0, x1 - x, z - z0, z1 - z}));
           const float t = std::clamp(in / s.feather, 0.0f, 1.0f);
@@ -127,6 +177,95 @@ namespace faf::editor
       }
     }
     return out;
+  }
+
+  MaskImportFile GuessMaskImport(
+    const std::string& path,
+    const std::array<std::string, 9>& layerKinds
+  )
+  {
+    MaskImportFile f;
+    f.path = path;
+    std::string name = std::filesystem::path(path).stem().string();
+    for (char& c : name) {
+      c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    }
+    for (const char* const prefix : {"layer", "mask", "stratum"}) {
+      const std::size_t at = name.find(prefix);
+      if (at != std::string::npos) {
+        const std::size_t digit = at + std::string(prefix).size();
+        const std::size_t n = digit < name.size() && name[digit] == '_' ? digit + 1 : digit;
+        if (n < name.size() && std::isdigit(static_cast<unsigned char>(name[n])) != 0) {
+          f.target = MaskImportFile::Target::Layer;
+          f.layer = std::clamp(name[n] - '0', 1, 8);
+          return f;
+        }
+      }
+    }
+    if (name.find("splat") != std::string::npos) {
+      f.target = MaskImportFile::Target::Splat;
+      f.layer = 1;
+      return f;
+    }
+    if (name.find("type") != std::string::npos) {
+      f.target = MaskImportFile::Target::TerrainType;
+      return f;
+    }
+    // A kind of ground: its words, then the layer whose texture is of that kind.
+    // (The two-word kinds first: "rock_high" is the high rock layer when there is one.)
+    static const std::vector<std::pair<const char*, const char*>> kWords = {
+      {"high", "high rock"},
+      {"dark", "dark rock"},
+      {"grass", "grass"},
+      {"rock", "rock"},
+      {"cliff", "rock"},
+      {"sand", "sand"},
+      {"beach", "sand"},
+      {"dirt", "dirt"},
+      {"soil", "dirt"},
+      {"wet", "wet ground"},
+      {"mud", "wet ground"},
+      {"snow", "snow"},
+      {"ice", "snow"},
+    };
+    for (const auto& [word, kind] : kWords) {
+      if (name.find(word) == std::string::npos) {
+        continue;
+      }
+      for (int layer = 1; layer <= 8; ++layer) {
+        if (layerKinds[static_cast<std::size_t>(layer)] == kind) {
+          f.target = MaskImportFile::Target::Layer;
+          f.layer = layer;
+          return f;
+        }
+      }
+    }
+    f.target = MaskImportFile::Target::Skip;
+    return f;
+  }
+
+  bool ImportFromSidecar(
+    const std::string& json,
+    ImportSettings& settings,
+    std::string& error
+  )
+  {
+    JsonTree root;
+    if (!ParseJsonTree(json, root, error)) {
+      return false;
+    }
+    const double perWord = root.Num("heightPerWord", 0.0);
+    if (perWord <= 0.0) {
+      error = "it has no heightPerWord (not one of the editor's exports)";
+      return false;
+    }
+    settings.mapping = ImportSettings::Mapping::Absolute;
+    settings.scale = static_cast<float>(perWord * 128.0);
+    settings.invert = false;
+    settings.seaPin = false;
+    settings.low = static_cast<float>(root.Num("lowest", settings.low));
+    settings.high = static_cast<float>(root.Num("highest", settings.high));
+    return true;
   }
 
   std::string ExportSheet(

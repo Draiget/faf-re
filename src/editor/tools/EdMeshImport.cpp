@@ -1,5 +1,6 @@
 #include "editor/tools/EdMeshImport.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <cstring>
@@ -122,20 +123,113 @@ namespace faf::editor
   )
   {
     ObjMesh out = mesh;
+    if (options.zUp) {
+      // Z up (Blender): (x, y, z) -> (x, z, -y), the same handedness.
+      for (auto& p : out.positions) {
+        p = {p[0], p[2], -p[1]};
+      }
+      for (auto& n : out.normals) {
+        n = {n[0], n[2], -n[1]};
+      }
+    }
     for (auto& p : out.positions) {
-      p[0] *= options.flipX ? -options.scale : options.scale;
-      p[1] *= options.scale;
-      p[2] *= options.flipZ ? -options.scale : options.scale;
+      p[0] = p[0] * (options.flipX ? -options.scale : options.scale) + options.offset[0];
+      p[1] = p[1] * options.scale + options.offset[1];
+      p[2] = p[2] * (options.flipZ ? -options.scale : options.scale) + options.offset[2];
     }
     for (auto& n : out.normals) {
       n[0] = options.flipX ? -n[0] : n[0];
       n[2] = options.flipZ ? -n[2] : n[2];
     }
-    // A single mirror turns the triangles inside out: their corners go the other way round.
-    if (options.flipX != options.flipZ) {
+    // A single mirror turns the triangles inside out: their corners go the other way round (and the asked flip too).
+    if ((options.flipX != options.flipZ) != options.flipWinding) {
       for (auto& triangle : out.triangles) {
         std::swap(triangle[1], triangle[2]);
       }
+    }
+    if (options.flipV) {
+      for (auto& uv : out.uvs) {
+        uv[1] = 1.0f - uv[1];
+      }
+    }
+    if (options.normals == 1) {
+      // Made from the faces: the file's normals dropped (ScmFromObj makes them).
+      out.normals.clear();
+      for (auto& triangle : out.triangles) {
+        for (ObjMesh::Corner& c : triangle) {
+          c.normal = -1;
+        }
+      }
+    }
+    if (out.uvs.empty() && options.uvRepeat > 0.0f) {
+      // Texture coordinates from the ground plan: one per position.
+      for (const auto& p : out.positions) {
+        out.uvs.push_back({p[0] / options.uvRepeat, p[2] / options.uvRepeat});
+      }
+      for (auto& triangle : out.triangles) {
+        for (ObjMesh::Corner& c : triangle) {
+          c.uv = c.position;
+        }
+      }
+    }
+    return out;
+  }
+
+  std::map<std::pair<int, int>, ObjMesh> SplitMesh(
+    const ObjMesh& mesh,
+    const MeshImportOptions& options
+  )
+  {
+    // Square tiles, or one part for each o / g group (key: group + 1, 0).
+    std::map<std::pair<int, int>, ObjMesh> parts;
+    if (options.byGroup && !mesh.triangleGroup.empty()) {
+      for (std::size_t t = 0; t < mesh.triangles.size(); ++t) {
+        const int group = t < mesh.triangleGroup.size() ? mesh.triangleGroup[t] : -1;
+        ObjMesh& part = parts[{group + 1, 0}];
+        if (part.positions.empty()) {
+          part.positions = mesh.positions;
+          part.uvs = mesh.uvs;
+          part.normals = mesh.normals;
+        }
+        part.triangles.push_back(mesh.triangles[t]);
+      }
+    } else {
+      parts = SplitByTile(mesh, options.tile);
+    }
+    // A part with more corners than the limit is cut into pieces (key second: the piece's number + 1000 a step).
+    const std::size_t limit = static_cast<std::size_t>(std::clamp(options.maxVertices, 3, 65535));
+    std::map<std::pair<int, int>, ObjMesh> out;
+    for (auto& [key, part] : parts) {
+      int piece = 0;
+      ObjMesh current;
+      std::set<int> used;
+      const auto flush = [&]() {
+        if (!current.triangles.empty()) {
+          out[{key.first, key.second + piece * 1000}] = std::move(current);
+          ++piece;
+        }
+        current = ObjMesh{};
+        used.clear();
+      };
+      for (const auto& triangle : part.triangles) {
+        std::size_t extra = 0;
+        for (const ObjMesh::Corner& c : triangle) {
+          extra += used.count(c.position) == 0 ? 1 : 0;
+        }
+        if (used.size() + extra > limit) {
+          flush();
+        }
+        if (current.positions.empty()) {
+          current.positions = part.positions;
+          current.uvs = part.uvs;
+          current.normals = part.normals;
+        }
+        for (const ObjMesh::Corner& c : triangle) {
+          used.insert(c.position);
+        }
+        current.triangles.push_back(triangle);
+      }
+      flush();
     }
     return out;
   }

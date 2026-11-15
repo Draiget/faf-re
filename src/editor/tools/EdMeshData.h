@@ -84,6 +84,8 @@ namespace faf::editor
       /// Reads the manifest and every patch through the engine's virtual file system. False (and `error`) when it names
       /// no patch or a file is unusable.
       bool Load(const std::string& manifestVfsPath);
+      /** The manifest as text (what Load reads back): the settings, one line a material, one line a patch. */
+      [[nodiscard]] std::string ManifestText() const;
       void Clear();
       bool Loaded() const
       {

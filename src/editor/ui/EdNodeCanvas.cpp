@@ -54,6 +54,26 @@ namespace faf::editor
       return node.y + kHeader + 6.0f + (static_cast<float>(pin) + 0.5f) * kRow;
     }
 
+    /** A Frame (group) node: a box behind the nodes, taken by its title bar, that moves the nodes inside it. */
+    bool IsFrame(
+      const GraphNode& node
+    )
+    {
+      return node.type->name == "frame" && node.params.size() >= 4;
+    }
+    float FrameW(
+      const GraphNode& node
+    )
+    {
+      return std::max(160.0f, node.params[1].value[0]);
+    }
+    float FrameH(
+      const GraphNode& node
+    )
+    {
+      return std::max(96.0f, node.params[2].value[0]);
+    }
+
     ImU32 PinColor(
       const PinType type
     )
@@ -197,6 +217,30 @@ namespace faf::editor
     mScale = mZoom * mUnit;
   }
 
+  std::set<int> EdNodeCanvas::MoveSetFor(
+    const NodeGraph& graph,
+    const std::set<int>& selection
+  ) const
+  {
+    gHasSquare = &mHasSquare;
+    std::set<int> moving = selection;
+    for (const int id : selection) {
+      const GraphNode* frame = graph.Find(id);
+      if (frame == nullptr || !IsFrame(*frame)) {
+        continue;
+      }
+      for (const GraphNode& node : graph.Nodes()) {
+        if (
+          !IsFrame(node) && node.x >= frame->x && node.y >= frame->y && node.x + kNodeW <= frame->x + FrameW(*frame) &&
+          node.y + NodeHeight(*node.type) <= frame->y + FrameH(*frame)
+        ) {
+          moving.insert(node.id);
+        }
+      }
+    }
+    return moving;
+  }
+
   bool EdNodeCanvas::Draw(
     NodeGraph& graph
   )
@@ -276,13 +320,23 @@ namespace faf::editor
         }
       }
       if (
-        nodeHit == 0 && mouseGX >= node.x && mouseGX <= node.x + kNodeW && mouseGY >= node.y &&
+        nodeHit == 0 && !IsFrame(node) && mouseGX >= node.x && mouseGX <= node.x + kNodeW && mouseGY >= node.y &&
         mouseGY <= node.y + NodeHeight(*node.type)
       ) {
         nodeHit = node.id;
       }
       if (pinHit.node != 0) {
         break;
+      }
+    }
+    // A frame is taken by its title bar, under the nodes on it.
+    for (auto it = graph.Nodes().rbegin(); it != graph.Nodes().rend() && hovered && nodeHit == 0 && pinHit.node == 0;
+         ++it) {
+      if (
+        IsFrame(*it) && mouseGX >= it->x && mouseGX <= it->x + FrameW(*it) && mouseGY >= it->y &&
+        mouseGY <= it->y + kHeader
+      ) {
+        nodeHit = it->id;
       }
     }
 
@@ -368,6 +422,8 @@ namespace faf::editor
           mSelection.insert(nodeHit);
         }
         mDrag = mSelection.count(nodeHit) != 0 ? Drag::Move : Drag::None;
+        // A frame takes the nodes inside it along (FAF Studio's groups).
+        mMoving = MoveSetFor(graph, mSelection);
       } else {
         if (!io.KeyCtrl && !io.KeyShift) {
           mSelection.clear();
@@ -381,7 +437,7 @@ namespace faf::editor
         const float dy = io.MouseDelta.y / scale;
         if (dx != 0.0f || dy != 0.0f) {
           mAutoFit = false;
-          for (const int id : mSelection) {
+          for (const int id : mMoving) {
             if (const GraphNode* node = graph.Find(id)) {
               graph.MoveNode(id, node->x + dx, node->y + dy);
             }
@@ -389,7 +445,7 @@ namespace faf::editor
         }
       } else {
         // Whole units, so the file doesn't keep fractions of a pixel.
-        for (const int id : mSelection) {
+        for (const int id : mMoving) {
           if (const GraphNode* node = graph.Find(id)) {
             graph.MoveNode(id, std::round(node->x), std::round(node->y));
           }
@@ -404,7 +460,11 @@ namespace faf::editor
       const float y1 = std::max(mDragStartY, mouseGY);
       if (x1 - x0 > 2.0f || y1 - y0 > 2.0f) {
         for (const GraphNode& node : graph.Nodes()) {
-          if (node.x + kNodeW >= x0 && node.x <= x1 && node.y + NodeHeight(*node.type) >= y0 && node.y <= y1) {
+          // A frame only when the box holds all of it.
+          const bool inside = IsFrame(node)
+            ? node.x >= x0 && node.x + FrameW(node) <= x1 && node.y >= y0 && node.y + FrameH(node) <= y1
+            : node.x + kNodeW >= x0 && node.x <= x1 && node.y + NodeHeight(*node.type) >= y0 && node.y <= y1;
+          if (inside) {
             mSelection.insert(node.id);
           }
         }
@@ -441,6 +501,26 @@ namespace faf::editor
         mAutoFit = true;
         mFitNodes = graph.Nodes().size();
       }
+      // Copy and cut put the selection on the clipboard as graph text (it pastes into another graph too).
+      const bool cut = io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_X);
+      if ((cut || (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_C))) && !mSelection.empty()) {
+        ImGui::SetClipboardText(graph.SaveSome(mSelection).c_str());
+        if (cut) {
+          for (const int id : mSelection) {
+            (void)graph.RemoveNode(id);
+          }
+          mSelection.clear();
+        }
+      }
+      if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_V)) {
+        if (const char* const text = ImGui::GetClipboardText(); text != nullptr && *text != '\0') {
+          std::string error;
+          const std::vector<int> pasted = graph.Paste(text, std::round(mouseGX), std::round(mouseGY), error);
+          if (!pasted.empty()) {
+            mSelection = std::set<int>(pasted.begin(), pasted.end());
+          }
+        }
+      }
       if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_D) && !mSelection.empty()) {
         // Duplicates the selection with the links between its nodes, 40 units down and right.
         std::map<int, int> copies;
@@ -454,6 +534,8 @@ namespace faf::editor
           for (std::size_t p = 0; p < original.params.size(); ++p) {
             graph.SetParam(copy, p, original.params[p]);
           }
+          graph.SetName(copy, original.name);
+          graph.SetBypass(copy, original.bypass);
           copies[id] = copy;
         }
         const std::vector<GraphLink> links = graph.Links();
@@ -482,6 +564,51 @@ namespace faf::editor
         }
       }
       ImGui::EndDragDropTarget();
+    }
+
+    // Frames, under the links and the nodes: a tinted box with its title bar.
+    {
+      ImGui::PushFont(nullptr, ImGui::GetStyle().FontSizeBase * mZoom);
+      static constexpr ImU32 kTints[] = {
+        IM_COL32(70, 110, 190, 255),
+        IM_COL32(70, 160, 90, 255),
+        IM_COL32(190, 70, 70, 255),
+        IM_COL32(130, 130, 130, 255),
+        IM_COL32(200, 180, 60, 255),
+      };
+      for (const GraphNode& node : graph.Nodes()) {
+        if (!IsFrame(node)) {
+          continue;
+        }
+        const ImVec2 a = toScreen(node.x, node.y);
+        const ImVec2 b = toScreen(node.x + FrameW(node), node.y + FrameH(node));
+        if (b.x < origin.x || a.x > origin.x + size.x || b.y < origin.y || a.y > origin.y + size.y) {
+          continue;
+        }
+        const ImU32 tint = kTints[std::clamp(static_cast<int>(node.params[3].value[0] + 0.5f), 0, 4)];
+        const float rounding = 6.0f * scale;
+        dl->AddRectFilled(a, b, (tint & ~IM_COL32_A_MASK) | (40u << IM_COL32_A_SHIFT), rounding);
+        dl->AddRectFilled(
+          a,
+          ImVec2(b.x, a.y + kHeader * scale),
+          (tint & ~IM_COL32_A_MASK) | (200u << IM_COL32_A_SHIFT),
+          rounding,
+          ImDrawFlags_RoundCornersTop
+        );
+        const bool selected = mSelection.count(node.id) != 0;
+        dl->AddRect(a, b, selected ? IM_COL32(250, 200, 80, 255) : tint, rounding, 0, selected ? 2.0f : 1.0f);
+        if (mZoom >= 0.2f) {
+          const std::string& title = node.name.empty() ? node.params[0].text : node.name;
+          dl->AddText(
+            ImGui::GetFont(),
+            ImGui::GetFontSize(),
+            ImVec2(a.x + 7.0f * scale, a.y + (kHeader * scale - ImGui::GetFontSize()) * 0.5f),
+            IM_COL32(245, 245, 245, 255),
+            title.c_str()
+          );
+        }
+      }
+      ImGui::PopFont();
     }
 
     // Links.
@@ -516,6 +643,9 @@ namespace faf::editor
     ImFont* font = ImGui::GetFont();
     const float fontSize = ImGui::GetFontSize();
     for (const GraphNode& node : graph.Nodes()) {
+      if (IsFrame(node)) {
+        continue;
+      }
       const NodeType& type = *node.type;
       const ImVec2 a = toScreen(node.x, node.y);
       const ImVec2 b = toScreen(node.x + kNodeW, node.y + NodeHeight(type));
@@ -528,7 +658,11 @@ namespace faf::editor
       );
       dl->AddRectFilled(a, b, IM_COL32(36, 36, 40, 245), rounding);
       dl->AddRectFilled(
-        a, ImVec2(b.x, a.y + kHeader * scale), NodeCategoryColor(type.category), rounding, ImDrawFlags_RoundCornersTop
+        a,
+        ImVec2(b.x, a.y + kHeader * scale),
+        node.bypass ? IM_COL32(80, 80, 84, 255) : NodeCategoryColor(type.category),
+        rounding,
+        ImDrawFlags_RoundCornersTop
       );
       const std::string warning = mWarning ? mWarning(node) : std::string();
       const bool selected = mSelection.count(node.id) != 0;
@@ -541,8 +675,8 @@ namespace faf::editor
           font,
           fontSize,
           ImVec2(a.x + 7.0f * scale, a.y + (kHeader * scale - fontSize) * 0.5f),
-          IM_COL32(240, 240, 240, 255),
-          type.title.c_str()
+          node.bypass ? IM_COL32(170, 170, 170, 255) : IM_COL32(240, 240, 240, 255),
+          ((node.bypass ? "(off) " : "") + (node.name.empty() ? type.title : node.name)).c_str()
         );
       }
       for (std::size_t i = 0; i < type.inputs.size(); ++i) {

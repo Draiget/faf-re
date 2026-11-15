@@ -211,6 +211,35 @@ namespace faf::editor
     ImGui::Checkbox("Mirror X", &mMeshOptions.flipX);
     ImGui::SameLine();
     ImGui::Checkbox("Mirror Z", &mMeshOptions.flipZ);
+    ImGui::SameLine();
+    ImGui::Checkbox("Z up", &mMeshOptions.zUp);
+    ImGui::SameLine();
+    ImGui::Checkbox("Flip winding", &mMeshOptions.flipWinding);
+    ImGui::SameLine();
+    ImGui::Checkbox("Flip V", &mMeshOptions.flipV);
+    ImGui::SetNextItemWidth(-1.0f);
+    ImGui::DragFloat3("##meshoffset", mMeshOptions.offset, 0.5f, -10000.0f, 10000.0f, "%.1f");
+    EdSetItemTooltip("Offset X / Y / Z after the scale, in map units");
+    static constexpr const char* kNormals[] = {"Normals: the file's", "Normals: from the faces"};
+    ImGui::SetNextItemWidth(Em(160.0f));
+    (void)EdCombo("##meshnormals", &mMeshOptions.normals, kNormals, 2);
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(Em(120.0f));
+    FillDragFloat(
+      "##meshuv",
+      &mMeshOptions.uvRepeat,
+      1.0f,
+      0.0f,
+      4096.0f,
+      mMeshOptions.uvRepeat > 0.0f ? "UV every %.0f" : "UV: the file's"
+    );
+    EdSetItemTooltip(
+      "A file without texture coordinates gets them from the ground plan, repeating every so many units"
+    );
+    ImGui::Checkbox("A patch for each object / group", &mMeshOptions.byGroup);
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(Em(110.0f));
+    ImGui::DragInt("##meshmaxv", &mMeshOptions.maxVertices, 100.0f, 300, 65535, "%d corners a patch");
     ImGui::SetNextItemWidth(-1.0f);
     FillDragFloat("##meshtile", &mMeshOptions.tile, 1.0f, 16.0f, 4096.0f, "Tiles of %.0f units");
     ImGui::BeginDisabled(mMeshFile[0] == '\0' || mDocument.Map() == nullptr);
@@ -223,6 +252,132 @@ namespace faf::editor
     EdSetItemTooltip("The scenario names the patches (TerrainSystem = 'mesh', TerrainMesh), one undo step");
     ImGui::SameLine();
     ImGui::Checkbox("Show over the map", &mMeshShown);
+    // The loaded mesh map: its materials, its patches and its settings, edited in place; Save writes the manifest.
+    if (edmesh::MeshMap* const mesh = mMeshMapView; mesh != nullptr && mesh->Loaded()) {
+      if (Section("Materials", false)) {
+        static constexpr const char* kSlots[edmesh::kSlots] = {
+          "Diffuse A",
+          "Diffuse B",
+          "Light mask 0",
+          "Light mask 1",
+          "Light mask 2",
+          "Normal A",
+          "Normal B",
+          "Specular A",
+          "Specular B"
+        };
+        for (std::size_t m = 0; m < mesh->materials.size(); ++m) {
+          if (
+            ImGui::Selectable(
+              (std::to_string(m + 1) + " " + mesh->materials[m].name).c_str(), mMeshMaterial == static_cast<int>(m)
+            )
+          ) {
+            mMeshMaterial = static_cast<int>(m);
+          }
+        }
+        if (ImGui::SmallButton("+ Material")) {
+          edmesh::Material material;
+          material.name = "Material" + std::to_string(mesh->materials.size() + 1);
+          mesh->materials.push_back(material);
+          mMeshMaterial = static_cast<int>(mesh->materials.size()) - 1;
+        }
+        if (mMeshMaterial >= 0 && mMeshMaterial < static_cast<int>(mesh->materials.size())) {
+          edmesh::Material& material = mesh->materials[static_cast<std::size_t>(mMeshMaterial)];
+          char buffer[260];
+          (void)std::snprintf(buffer, sizeof(buffer), "%s", material.name.c_str());
+          ImGui::SetNextItemWidth(-1.0f);
+          if (ImGui::InputText("##matname", buffer, sizeof(buffer))) {
+            material.name = buffer;
+          }
+          for (int k = 0; k < edmesh::kSlots; ++k) {
+            (void)std::snprintf(buffer, sizeof(buffer), "%s", material.files[k].c_str());
+            ImGui::SetNextItemWidth(-1.0f);
+            if (
+              ImGui::InputTextWithHint(
+                (std::string("##slot") + std::to_string(k)).c_str(), kSlots[k], buffer, sizeof(buffer)
+              )
+            ) {
+              material.files[k] = buffer;
+            }
+          }
+          ImGui::Checkbox("Blending", &material.blending);
+          ImGui::SameLine();
+          ImGui::Checkbox("Glow", &material.glow);
+          ImGui::SameLine();
+          ImGui::Checkbox("Highlight", &material.highlight);
+          ImGui::SameLine();
+          ImGui::Checkbox("Additive", &material.additive);
+        }
+      }
+      if (Section("Patches", false)) {
+        int remove = -1;
+        std::vector<std::string> names;
+        for (const edmesh::Material& material : mesh->materials) {
+          names.push_back(material.name);
+        }
+        for (std::size_t p = 0; p < mesh->patches.size(); ++p) {
+          edmesh::Patch& patch = mesh->patches[p];
+          ImGui::PushID(static_cast<int>(p));
+          ImGui::TextUnformatted(patch.file.c_str());
+          ImGui::SameLine(Em(160.0f));
+          ImGui::SetNextItemWidth(Em(120.0f));
+          if (
+            EdBeginCombo(
+              "##material",
+              patch.material >= 0 && patch.material < static_cast<int>(names.size())
+                ? names[static_cast<std::size_t>(patch.material)].c_str()
+                : "(none)"
+            )
+          ) {
+            for (std::size_t m = 0; m < names.size(); ++m) {
+              if (ImGui::Selectable(names[m].c_str(), patch.material == static_cast<int>(m))) {
+                patch.material = static_cast<int>(m);
+              }
+            }
+            ImGui::EndCombo();
+          }
+          ImGui::SameLine();
+          if (ImGui::SmallButton("Remove")) {
+            remove = static_cast<int>(p);
+          }
+          ImGui::PopID();
+        }
+        if (remove >= 0) {
+          mesh->patches.erase(mesh->patches.begin() + remove);
+        }
+      }
+      if (Section("The mesh map's settings", false)) {
+        edmesh::Settings& s = mesh->settings;
+        ImGui::SetNextItemWidth(-1.0f);
+        FillDragFloat("##meshsize", &s.size, 1.0f, 64.0f, 8192.0f, "Size %.0f");
+        ImGui::SetNextItemWidth(-1.0f);
+        FillDragFloat(
+          "##meshwater", &s.water, 0.5f, -10000.0f, 1000.0f, s.water > -9999.0f ? "Water %.1f" : "Water: none"
+        );
+        ImGui::SetNextItemWidth(-1.0f);
+        FillDragFloat("##meshhigh", &s.meshHigh, 0.5f, -10000.0f, 2000.0f, "Mesh high %.1f");
+        ImGui::SetNextItemWidth(-1.0f);
+        ImGui::DragFloat4("##meshplayable", s.playable, 1.0f, 0.0f, 8192.0f, "%.0f");
+        EdSetItemTooltip("The playable rectangle: x0, z0, x1, z1");
+      }
+      if (PrimaryButton("Save the manifest")) {
+        mMeshAskMore = 3;
+      }
+      EdSetItemTooltip("Writes terrain.lua as edited here and reads the mesh again");
+      ImGui::SameLine();
+      if (ImGui::Button("Sync (read it again)")) {
+        mMeshAskMore = 1;
+      }
+      ImGui::SameLine();
+      if (ImGui::Button("Unset")) {
+        mMeshAskMore = 4;
+      }
+      EdSetItemTooltip("The scenario no longer names the mesh: the height field is the ground (one undo step)");
+    } else if (mDocument.Map() != nullptr) {
+      if (ImGui::Button("Set: the map's terrain/terrain.lua is its ground")) {
+        mMeshAskMore = 5;
+      }
+    }
     if (!mMeshStatus.empty()) {
       ImGui::TextWrapped("%s", mMeshStatus.c_str());
     }

@@ -1,5 +1,6 @@
 #include "editor/tools/EdHeightFile.h"
 
+#include <cstring>
 #include <algorithm>
 #include <cctype>
 #include <cmath>
@@ -579,5 +580,122 @@ namespace faf::editor
     for (std::uint16_t& word : image.words) {
       word = static_cast<std::uint16_t>(std::lround(std::clamp(static_cast<double>(word) * scale, 0.0, 65535.0)));
     }
+  }
+
+  bool ReadHeightImageWith(
+    const std::filesystem::path& file,
+    const int expectWidth,
+    const int expectHeight,
+    const HeightReadOptions& options,
+    HeightImage& out,
+    std::string& error
+  )
+  {
+    const std::string extension = Lower(file.extension().string());
+    const bool rawFile = extension == ".raw" || extension == ".r16" || extension == ".r32";
+    const bool plainRaw = options.rawBits == (extension == ".r32" ? 32 : 16) &&
+      options.rawFloat == (extension == ".r32") && !options.bigEndian && options.rawWidth <= 0;
+    if (rawFile && !plainRaw) {
+      // A raw file laid out as asked: samples of rawBits, whole or float, in either byte order.
+      std::ifstream in(file, std::ios::binary | std::ios::ate);
+      if (!in) {
+        error = "can't open " + file.string();
+        return false;
+      }
+      const auto bytes = static_cast<std::size_t>(in.tellg());
+      in.seekg(0);
+      std::vector<std::uint8_t> data(bytes);
+      in.read(reinterpret_cast<char*>(data.data()), static_cast<std::streamsize>(bytes));
+      const int size = std::max(1, options.rawBits / 8);
+      const std::size_t count = bytes / static_cast<std::size_t>(size);
+      int width = options.rawWidth;
+      int height = options.rawHeight > 0 ? options.rawHeight : options.rawWidth;
+      if (width <= 0) {
+        if (
+          expectWidth > 0 && count == static_cast<std::size_t>(expectWidth) * static_cast<std::size_t>(expectHeight)
+        ) {
+          width = expectWidth;
+          height = expectHeight;
+        } else {
+          width = height = static_cast<int>(std::lround(std::sqrt(static_cast<double>(count))));
+        }
+      }
+      if (width < 2 || height < 2 || static_cast<std::size_t>(width) * static_cast<std::size_t>(height) > count) {
+        error = file.filename().string() + " holds " + std::to_string(count) + " samples, not " +
+          std::to_string(width) + " x " + std::to_string(height);
+        return false;
+      }
+      out.width = width;
+      out.height = height;
+      out.words.resize(static_cast<std::size_t>(width) * static_cast<std::size_t>(height));
+      for (std::size_t i = 0; i < out.words.size(); ++i) {
+        std::uint32_t v = 0;
+        for (int b = 0; b < size; ++b) {
+          const std::uint32_t byte = data[i * static_cast<std::size_t>(size) + static_cast<std::size_t>(b)];
+          v |= options.bigEndian ? byte << (8 * (size - 1 - b)) : byte << (8 * b);
+        }
+        double word = 0.0;
+        if (options.rawFloat && size == 4) {
+          float f = 0.0f;
+          std::memcpy(&f, &v, 4);
+          word = std::clamp(static_cast<double>(f), 0.0, 1.0) * 65535.0;
+        } else {
+          word = static_cast<double>(v) / static_cast<double>((std::uint64_t{1} << (8 * size)) - 1) * 65535.0;
+        }
+        out.words[i] = static_cast<std::uint16_t>(std::clamp(std::lround(word), 0L, 65535L));
+      }
+      return true;
+    }
+    if (options.channel <= 0 || rawFile) {
+      return ReadHeightImage(file, expectWidth, expectHeight, out, error);
+    }
+    // One channel of a colour picture (a splat's red, a mask in the alpha).
+    const ComScope com;
+    ComPtr<IWICImagingFactory> factory;
+    HRESULT hr = ::CoCreateInstance(CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&factory.p));
+    ComPtr<IWICBitmapDecoder> decoder;
+    if (SUCCEEDED(hr)) {
+      hr = factory->CreateDecoderFromFilename(
+        file.wstring().c_str(), nullptr, GENERIC_READ, WICDecodeMetadataCacheOnDemand, &decoder
+      );
+    }
+    ComPtr<IWICBitmapFrameDecode> frame;
+    if (SUCCEEDED(hr)) {
+      hr = decoder->GetFrame(0, &frame);
+    }
+    ComPtr<IWICFormatConverter> converter;
+    if (SUCCEEDED(hr)) {
+      hr = factory->CreateFormatConverter(&converter);
+    }
+    if (SUCCEEDED(hr)) {
+      hr = converter->Initialize(
+        frame.p, GUID_WICPixelFormat64bppRGBA, WICBitmapDitherTypeNone, nullptr, 0.0, WICBitmapPaletteTypeCustom
+      );
+    }
+    UINT width = 0;
+    UINT height = 0;
+    if (SUCCEEDED(hr)) {
+      hr = converter->GetSize(&width, &height);
+    }
+    if (FAILED(hr) || width < 2 || height < 2) {
+      error = "can't read " + file.filename().string() + " as a colour image (" + HResultText(hr) + ")";
+      return false;
+    }
+    std::vector<std::uint16_t> rgba(static_cast<std::size_t>(width) * height * 4);
+    hr = converter->CopyPixels(
+      nullptr, width * 8, static_cast<UINT>(rgba.size() * 2), reinterpret_cast<BYTE*>(rgba.data())
+    );
+    if (FAILED(hr)) {
+      error = "can't read the pixels of " + file.filename().string() + " (" + HResultText(hr) + ")";
+      return false;
+    }
+    out.width = static_cast<int>(width);
+    out.height = static_cast<int>(height);
+    out.words.resize(static_cast<std::size_t>(width) * height);
+    const int c = std::clamp(options.channel, 1, 4) - 1;
+    for (std::size_t i = 0; i < out.words.size(); ++i) {
+      out.words[i] = rgba[i * 4 + static_cast<std::size_t>(c)];
+    }
+    return true;
   }
 } // namespace faf::editor

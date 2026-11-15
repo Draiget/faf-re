@@ -14,6 +14,8 @@
 #include "editor/ui/EdHelp.h"
 #include "gpg/core/utils/Logging.h"
 
+#include <fstream>
+#include <iterator>
 #include <cmath>
 #include <string>
 #include <cctype>
@@ -1697,6 +1699,72 @@ namespace faf::editor
         ImGui::SetNextItemWidth(-1.0f);
         FillSliderFloat("##interopscale", &s.scale, 0.05f, 4.0f, "Heights times %.2f");
       }
+      if (ImGui::TreeNode("More import options")) {
+        static constexpr const char* kChannels[] = {"Grey (as it is)", "Red", "Green", "Blue", "Alpha"};
+        ImGui::SetNextItemWidth(Em(160.0f));
+        (void)EdCombo("Channel##imp", &s.read.channel, kChannels, 5);
+        ImGui::Checkbox("Invert (bright is low)", &s.invert);
+        ImGui::SameLine();
+        ImGui::Checkbox("Stretch to the image's range", &s.stretch);
+        ImGui::Checkbox("Sea level in the image", &s.seaPin);
+        if (s.seaPin) {
+          ImGui::SameLine();
+          ImGui::SetNextItemWidth(Em(110.0f));
+          FillSliderFloat("##impsea", &s.seaValue, 0.0f, 1.0f, "value %.3f");
+          EdSetItemTooltip("The image's value (0..1) that lands on the map's water level");
+        }
+        static constexpr const char* kPads[] = {
+          "Pads: none", "Pads: keep the old ground", "Pads: flatten the new ground"
+        };
+        ImGui::SetNextItemWidth(Em(200.0f));
+        (void)EdCombo("##imppads", &s.pads, kPads, 3);
+        if (s.pads != 0) {
+          ImGui::SameLine();
+          ImGui::SetNextItemWidth(Em(90.0f));
+          FillSliderFloat("##imppadr", &s.padRadius, 4.0f, 60.0f, "%.0f units");
+        }
+        ImGui::Checkbox("Make it symmetric (the toolbar's)", &s.symmetric);
+        ImGui::Checkbox("The playable area is the region", &s.regionPlayable);
+        {
+          char mask[260];
+          (void)std::snprintf(mask, sizeof(mask), "%s", s.maskFile.c_str());
+          ImGui::SetNextItemWidth(-1.0f);
+          if (ImGui::InputTextWithHint("##impmask", "blend by a mask image (bright: the import)", mask, sizeof(mask))) {
+            s.maskFile = mask;
+          }
+        }
+        ImGui::TextDisabled("Raw files");
+        static constexpr const char* kBits[] = {"8-bit", "16-bit", "32-bit"};
+        int bits = s.read.rawBits == 8 ? 0 : s.read.rawBits == 32 ? 2 : 1;
+        ImGui::SetNextItemWidth(Em(90.0f));
+        if (EdCombo("##impbits", &bits, kBits, 3)) {
+          s.read.rawBits = bits == 0 ? 8 : bits == 2 ? 32 : 16;
+        }
+        ImGui::SameLine();
+        ImGui::Checkbox("Float", &s.read.rawFloat);
+        ImGui::SameLine();
+        ImGui::Checkbox("Big endian", &s.read.bigEndian);
+        ImGui::SetNextItemWidth(Em(90.0f));
+        ImGui::InputInt("Width##impw", &s.read.rawWidth);
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(Em(90.0f));
+        ImGui::InputInt("Height##imph", &s.read.rawHeight);
+        // The export's own .json beside the image: its heights back with no typing.
+        if (ImGui::Button("Read the export's .json")) {
+          const std::string sidecar = std::string(mInteropImportPath) + ".json";
+          std::ifstream in(sidecar, std::ios::binary);
+          const std::string json((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+          std::string error;
+          if (json.empty()) {
+            mInteropStatus = "No " + sidecar + " beside the image.";
+          } else if (ImportFromSidecar(json, s, error)) {
+            mInteropStatus = "Settings from the export's .json: heights as written (absolute).";
+          } else {
+            mInteropStatus = "The .json: " + error;
+          }
+        }
+        ImGui::TreePop();
+      }
       ImGui::Checkbox("Flip left-right", &s.flipX);
       ImGui::SameLine();
       ImGui::Checkbox("Flip top-bottom", &s.flipZ);
@@ -1814,6 +1882,141 @@ namespace faf::editor
         "Export, then link the same file back in as heights: edit it in another tool, save, and the map follows."
       );
       ImGui::EndDisabled();
+    }
+    if (Section("Masks (several files)", false)) {
+      MaskImport& mi = mMaskImport;
+      ImGui::SetNextItemWidth(-ButtonWidth("Add") - ImGui::GetStyle().ItemSpacing.x);
+      ImGui::InputTextWithHint(
+        "##maskadd", "a mask image (or a folder: every image in it)", mi.adding, sizeof(mi.adding)
+      );
+      ImGui::SameLine();
+      if (ImGui::Button("Add")) {
+        std::error_code ec;
+        const std::filesystem::path path(mi.adding);
+        const auto add = [&](const std::filesystem::path& file) {
+          MaskImportFile f;
+          f.path = file.string();
+          mi.files.push_back(f);
+        };
+        if (std::filesystem::is_directory(path, ec)) {
+          for (const auto& item : std::filesystem::directory_iterator(path, ec)) {
+            std::string ext = item.path().extension().string();
+            for (char& c : ext) {
+              c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+            }
+            if (ext == ".png" || ext == ".tif" || ext == ".tiff" || ext == ".r16" || ext == ".raw") {
+              add(item.path());
+            }
+          }
+        } else if (!path.empty()) {
+          add(path);
+        }
+        mMaskImportAsk = 1; // their uses guessed from the names
+      }
+      int remove = -1;
+      static constexpr const char* kTargets[] = {"A layer", "A terrain type", "RGBA splat into 4 layers", "Skip"};
+      static constexpr const char* kChannels[] = {"grey", "R", "G", "B", "A"};
+      for (std::size_t i = 0; i < mi.files.size(); ++i) {
+        MaskImportFile& f = mi.files[i];
+        ImGui::PushID(static_cast<int>(i));
+        ImGui::TextUnformatted(std::filesystem::path(f.path).filename().string().c_str());
+        int target = static_cast<int>(f.target);
+        ImGui::SetNextItemWidth(Em(150.0f));
+        if (EdCombo("##target", &target, kTargets, 4)) {
+          f.target = static_cast<MaskImportFile::Target>(target);
+        }
+        if (f.target == MaskImportFile::Target::Layer || f.target == MaskImportFile::Target::Splat) {
+          ImGui::SameLine();
+          ImGui::SetNextItemWidth(Em(70.0f));
+          FillSliderInt("##layer", &f.layer, 1, f.target == MaskImportFile::Target::Splat ? 5 : 8, "layer %d");
+        } else if (f.target == MaskImportFile::Target::TerrainType) {
+          ImGui::SameLine();
+          ImGui::SetNextItemWidth(Em(60.0f));
+          ImGui::InputInt("##code", &f.typeCode, 0);
+          ImGui::SameLine();
+          ImGui::SetNextItemWidth(Em(80.0f));
+          FillSliderFloat("##threshold", &f.threshold, 0.05f, 0.95f, "above %.2f");
+        }
+        if (f.target != MaskImportFile::Target::Splat && f.target != MaskImportFile::Target::Skip) {
+          ImGui::SetNextItemWidth(Em(60.0f));
+          (void)EdCombo("##channel", &f.channel, kChannels, 5);
+          ImGui::SameLine();
+          ImGui::Checkbox("Invert", &f.invert);
+          ImGui::SameLine();
+          ImGui::Checkbox("Stretch", &f.stretch);
+          ImGui::SameLine();
+        }
+        if (ImGui::SmallButton("Remove")) {
+          remove = static_cast<int>(i);
+        }
+        ImGui::PopID();
+      }
+      if (remove >= 0) {
+        mi.files.erase(mi.files.begin() + remove);
+      }
+      static constexpr const char* kModes[] = {"Replace", "Add to", "Subtract from"};
+      ImGui::SetNextItemWidth(Em(140.0f));
+      (void)EdCombo("##maskmode", &mi.mode, kModes, 3);
+      ImGui::SameLine();
+      ImGui::Checkbox("Higher layers take away", &mi.takeAway);
+      ImGui::BeginDisabled(mi.files.empty());
+      if (PrimaryButton("Import the masks")) {
+        mMaskImportAsk = 2;
+      }
+      EdSetItemTooltip("Every file into its layer (one undo step for the paint; terrain types one more)");
+      ImGui::SameLine();
+      if (ImGui::Button("Guess again")) {
+        mMaskImportAsk = 1;
+      }
+      ImGui::EndDisabled();
+    }
+    if (Section("Export package (one folder)", false)) {
+      ExportPackage& p = mPackage;
+      ImGui::SetNextItemWidth(-1.0f);
+      ImGui::InputTextWithHint("##pkgfolder", "folder for the package", p.folder, sizeof(p.folder));
+      ImGui::Checkbox("Heights##pkg", &p.height);
+      ImGui::SameLine();
+      ImGui::Checkbox("Water##pkg", &p.water);
+      ImGui::SameLine();
+      ImGui::Checkbox("Slope##pkg", &p.slope);
+      ImGui::SameLine();
+      ImGui::Checkbox("Flow##pkg", &p.flow);
+      ImGui::SameLine();
+      ImGui::Checkbox("Wear##pkg", &p.wear);
+      ImGui::Checkbox("Layers##pkg", &p.layers);
+      ImGui::SameLine();
+      ImGui::Checkbox("Terrain types##pkg", &p.types);
+      ImGui::SameLine();
+      ImGui::Checkbox("Markers##pkg", &p.markers);
+      ImGui::SameLine();
+      ImGui::Checkbox("Playable area##pkg", &p.playable);
+      ImGui::SameLine();
+      ImGui::Checkbox("README##pkg", &p.readme);
+      ImGui::Checkbox("Normalised heights (else absolute)", &p.normalised);
+      if (p.normalised) {
+        ImGui::Checkbox("A fixed range", &p.fixedRange);
+        if (p.fixedRange) {
+          ImGui::SetNextItemWidth(-1.0f);
+          ImGui::DragFloatRange2("##pkgrange", &p.low, &p.high, 0.5f, 0.0f, 512.0f, "%.0f", "%.0f");
+        }
+      }
+      ImGui::Checkbox("32-bit float heights (.r32)", &p.float32);
+      ImGui::SameLine();
+      ImGui::Checkbox("8-bit masks", &p.mask8);
+      ImGui::BeginDisabled(p.folder[0] == '\0');
+      if (PrimaryButton("Export the package")) {
+        mPackageAsk = true;
+      }
+      ImGui::EndDisabled();
+      ImGui::Checkbox("Watch the folder", &p.watch);
+      EdSetItemTooltip(
+        "New heights (height*) and masks (layer<n>*, mask<n>*) saved into the folder come in by themselves"
+      );
+      if (p.watch) {
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(Em(100.0f));
+        FillSliderFloat("##pkginterval", &p.interval, 0.5f, 30.0f, "every %.1f s");
+      }
     }
     if (!mInteropStatus.empty()) {
       ImGui::Separator();
@@ -2673,10 +2876,70 @@ namespace faf::editor
           AskMapTexture(kind, MapTextureOp::Import);
         }
         EdSetItemTooltip("A .dds made elsewhere (packed as this shader reads it), copied into the map's folder");
+        if (const std::uint64_t preview = mMapTexPreview[kind]; preview != 0U) {
+          const float side = std::min(ImGui::GetContentRegionAvail().x, Em(110.0f));
+          ImGui::Image(static_cast<ImTextureID>(preview), ImVec2(side, side));
+        }
         ImGui::EndGroup();
         ImGui::Spacing();
         ImGui::PopID();
       };
+      // What Make reads besides the map's sun and sea (FAF Studio's maptextures settings).
+      if (
+        (normals.available || lighting.available || specular.available || macro.available) &&
+        ImGui::TreeNode("Settings")
+      ) {
+        MapTextureOptions& o = mMapTexOptions;
+        MapPaintOptions& p = mMapPaintOptions;
+        if (normals.available) {
+          ImGui::SetNextItemWidth(-1.0f);
+          FillSliderFloat("##mtnormal", &o.normalStrength, 0.2f, 4.0f, "Normal map: slope strength %.2f");
+        }
+        if (lighting.available) {
+          ImGui::SetNextItemWidth(-1.0f);
+          FillSliderFloat("##mtsoft", &o.soft, 0.0f, 10.0f, "Shadow softness %.1f degrees");
+          ImGui::SetNextItemWidth(-1.0f);
+          FillSliderFloat("##mtreach", &o.reach, 20.0f, 2000.0f, "Longest shadow %.0f units");
+          ImGui::SetNextItemWidth(-1.0f);
+          FillSliderFloat("##mtocc", &o.occlusion, 0.0f, 1.0f, "Ambient occlusion %.2f");
+          ImGui::SetNextItemWidth(-1.0f);
+          FillSliderFloat("##mtoccr", &o.occlusionRadius, 4.0f, 200.0f, "Occlusion reach %.0f units");
+        }
+        if (macro.available) {
+          ImGui::SetNextItemWidth(-1.0f);
+          FillSliderFloat("##mtscale", &p.scale, 20.0f, 800.0f, "Macro patch size %.0f units");
+          ImGui::SetNextItemWidth(-1.0f);
+          FillSliderFloat("##mtcontrast", &p.contrast, 0.0f, 1.0f, "Lighter / darker patches %.2f");
+          ImGui::SetNextItemWidth(-1.0f);
+          FillSliderFloat("##mtcavity", &p.cavity, 0.0f, 1.0f, "Darker cavities %.2f");
+          ImGui::SetNextItemWidth(-1.0f);
+          FillSliderFloat("##mtopacity", &p.opacity, 0.0f, 1.0f, "Coverage %.2f");
+          ImGui::SetNextItemWidth(Em(100.0f));
+          ImGui::InputInt("Seed##mtseed", &p.seed);
+        }
+        if (specular.available) {
+          ImGui::SetNextItemWidth(-1.0f);
+          FillSliderFloat("##mtshine", &p.strength, 0.0f, 2.0f, "Wet ground and snow shine %.2f");
+          ImGui::SetNextItemWidth(-1.0f);
+          FillSliderFloat("##mtsharp", &p.sharpness, 0.0f, 2.0f, "Shine sharpness %.2f");
+        }
+        static constexpr const char* kSizes[] = {"Size: the map's", "256", "512", "1024", "2048"};
+        static constexpr int kSizeValues[] = {0, 256, 512, 1024, 2048};
+        int sizeIndex = 0;
+        for (int i = 0; i < 5; ++i) {
+          sizeIndex = kSizeValues[i] == mMapTexSize ? i : sizeIndex;
+        }
+        ImGui::SetNextItemWidth(Em(160.0f));
+        if (EdCombo("##mtsize", &sizeIndex, kSizes, 5)) {
+          mMapTexSize = kSizeValues[sizeIndex];
+        }
+        if (ImGui::SmallButton("Defaults##mt")) {
+          mMapTexOptions = MapTextureOptions{};
+          mMapPaintOptions = MapPaintOptions{};
+          mMapTexSize = 0;
+        }
+        ImGui::TreePop();
+      }
       if (normals.available && normals.shared) {
         row(0, "Normals and lighting (shadow, water depth)", normals);
       } else {
@@ -3773,13 +4036,40 @@ namespace faf::editor
     }
     // Where it goes: a layer, or one of the water's masks.
     {
-      static const char* const kTargets[] = {"A layer", "Water foam", "Water flatness", "Water depth bias"};
-      int target = mGenTarget.water + 1;
+      static const char* const kTargets[] = {
+        "A layer", "Water foam", "Water flatness", "Water depth bias", "A terrain type"
+      };
+      int target = mGenTarget.toTypes ? 4 : mGenTarget.water + 1;
       ImGui::SetNextItemWidth(Em(160.0f));
-      if (EdCombo("Into", &target, kTargets, 4)) {
-        mGenTarget.water = target - 1;
+      if (EdCombo("Into", &target, kTargets, 5)) {
+        mGenTarget.toTypes = target == 4;
+        mGenTarget.water = target == 4 ? -1 : target - 1;
       }
     }
+    if (mGenTarget.toTypes) {
+      // The type where the mask is above the threshold (FAF Studio's mask generator > terrain types).
+      std::string current = std::to_string(mGenTarget.typeCode);
+      for (const TerrainTypeInfo& t : mTerrainTypes) {
+        if (t.code == mGenTarget.typeCode) {
+          current += " " + t.name;
+        }
+      }
+      ImGui::SetNextItemWidth(Em(200.0f));
+      if (EdBeginCombo("Type##gentype", current.c_str())) {
+        for (const TerrainTypeInfo& t : mTerrainTypes) {
+          if (ImGui::Selectable((std::to_string(t.code) + " " + t.name).c_str(), t.code == mGenTarget.typeCode)) {
+            mGenTarget.typeCode = t.code;
+          }
+        }
+        ImGui::EndCombo();
+      }
+      ImGui::SetNextItemWidth(Em(120.0f));
+      ImGui::SliderFloat("Above##genthreshold", &mGenTarget.threshold, 0.05f, 0.95f, "%.2f");
+    }
+    if (ImGui::Checkbox("Show the mask on the map", &mGenShowOnMap)) {
+      ++mGenRevision; // evaluated again, so the map gets it
+    }
+    EdSetItemTooltip("Red crosses on the terrain where the mask is, as strong as it is (nothing is written)");
     ImGui::BeginDisabled(mGenTarget.water >= 0);
     ImGui::SetNextItemWidth(Em(120.0f));
     if (ImGui::InputInt("Layer", &mGenTarget.layer)) {
@@ -3798,7 +4088,9 @@ namespace faf::editor
     ImGui::BeginDisabled(mGenRules.empty());
     char label[48];
     static const char* const kWaterNames[] = {"water foam", "water flatness", "water depth bias"};
-    if (mGenTarget.water >= 0) {
+    if (mGenTarget.toTypes) {
+      std::snprintf(label, sizeof(label), "Write terrain type %d", mGenTarget.typeCode);
+    } else if (mGenTarget.water >= 0) {
       std::snprintf(label, sizeof(label), "Write into the %s", kWaterNames[std::clamp(mGenTarget.water, 0, 2)]);
     } else {
       std::snprintf(label, sizeof(label), "Write into layer %d", mGenTarget.layer);
@@ -4538,8 +4830,42 @@ namespace faf::editor
         ImGui::SetNextItemWidth(-1.0f);
         FillSliderFloat("##fillslope", &mFill.maxSlope, 5.0f, 90.0f, "Slopes up to %.0f degrees");
         ImGui::Checkbox("Only above the water", &mFill.dry);
-        ImGui::BeginDisabled(mPaintList.empty() && mPropBlueprint.empty());
+        if (ImGui::TreeNode("More (FAF Studio's scatter)")) {
+          ImGui::SetNextItemWidth(-1.0f);
+          FillSliderFloat("##fillminslope", &mFill.minSlope, 0.0f, 60.0f, "Slopes from %.0f degrees");
+          ImGui::Checkbox("Height window", &mFill.heightWindow);
+          if (mFill.heightWindow) {
+            ImGui::SetNextItemWidth(-1.0f);
+            ImGui::DragFloatRange2(
+              "##fillheights", &mFill.heightLow, &mFill.heightHigh, 0.5f, 0.0f, 512.0f, "%.0f", "%.0f"
+            );
+          }
+          ImGui::SetNextItemWidth(-1.0f);
+          FillSliderFloat("##fillmargin", &mFill.margin, 0.0f, 100.0f, "%.0f units from the edge");
+          ImGui::SetNextItemWidth(-1.0f);
+          FillSliderFloat(
+            "##fillkeep",
+            &mFill.keepAway,
+            0.0f,
+            40.0f,
+            mFill.keepAway > 0.0f ? "%.0f units from props there" : "Near props there: allowed"
+          );
+          ImGui::Checkbox("Density from the mask generator's rules", &mFill.maskRules);
+          EdSetItemTooltip("Where the Texture tool's mask generator's mask is, as strong as it is");
+          ImGui::Checkbox("Decals instead of props (the Decals tool's)", &mFill.decals);
+          ImGui::SetNextItemWidth(Em(100.0f));
+          ImGui::InputInt("Seed (0 new)##fillseed", &mFill.seed);
+          ImGui::TreePop();
+        }
+        ImGui::BeginDisabled(!mFill.decals && mPaintList.empty() && mPropBlueprint.empty());
+        if (ImGui::Button("Count")) {
+          mFill.countOnly = true;
+          mFillRequest = true;
+        }
+        EdSetItemTooltip("How many would be placed; nothing is");
+        ImGui::SameLine();
         if (ImGui::Button("Fill the map", ImVec2(-1.0f, 0.0f))) {
+          mFill.countOnly = false;
           mFillRequest = true;
         }
         ImGui::EndDisabled();

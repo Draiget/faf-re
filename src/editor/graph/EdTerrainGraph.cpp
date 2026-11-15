@@ -372,6 +372,32 @@ namespace faf::editor
         failed(blocked, blockedUp);
         continue;
       }
+      if (node->bypass) {
+        // Bypassed (FAF Studio's bypass): the first input linked goes to every output unchanged.
+        const TerrainValue* through = nullptr;
+        for (const PinDef& def : node->type->inputs) {
+          if (const auto in = ins.find(def.name); in != ins.end() && through == nullptr) {
+            through = in->second;
+          }
+        }
+        if (through == nullptr) {
+          failed("bypassed, with no input to pass on", false);
+          continue;
+        }
+        key = "bypass|" + key;
+        if (entry.key == key && entry.error.empty()) {
+          ++report.cached;
+          continue;
+        }
+        entry = Entry{};
+        entry.key = key;
+        entry.version = ++mVersion;
+        for (const PinDef& out : node->type->outputs) {
+          entry.outs[out.name] = *through;
+        }
+        ++report.evaluated;
+        continue;
+      }
       terrain::Values values;
       for (std::size_t p = 0; p < node->type->params.size() && p < node->params.size(); ++p) {
         const ParamDef& def = node->type->params[p];

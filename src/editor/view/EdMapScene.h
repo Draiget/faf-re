@@ -323,6 +323,14 @@ namespace faf::editor
      * drawn in the symmetry's first part and placed with their copies, as one undo step; what it did, in words.
      */
     std::string ScatterOverMap(const EdTools::FillOptions& fill);
+    /** The mask generator's mask over the map (the app evaluates its rules), for Fill's "density from the rules". */
+    void SetMaskRulesSource(
+      std::function<bool(field::Grid&)> source
+    )
+    {
+      mMaskRulesSource = std::move(source);
+    }
+    std::function<bool(field::Grid&)> mMaskRulesSource;
     /** `/watermasktest foam|flatness|bias,<value>,<radius>[,keep]` (test runs): a dab at the map's middle and its undo.
      */
     void TestWaterMask(const std::string& spec);
@@ -411,6 +419,13 @@ namespace faf::editor
       float strength,
       std::vector<std::uint8_t>& base,
       std::vector<std::uint8_t>& last,
+      std::string& message
+    );
+    /** Several layer masks written as one undo step (Import / Export > Masks): `layers` layer -> mask (0..1). */
+    int WriteMasksTogether(
+      const std::vector<std::pair<int, field::Grid>>& layers,
+      MaskWriteMode mode,
+      bool takeAway,
       std::string& message
     );
     int WriteGeneratedMask(
@@ -711,6 +726,13 @@ namespace faf::editor
     {
       return GiveSelectedUnits(army);
     }
+    /** The Import / Export window's import (the package watch brings a file in this way). */
+    std::string InteropImportNow(
+      const bool live
+    )
+    {
+      return InteropImport(live);
+    }
     /** Test runs: a unit line as a drag would place it; how many marker models are drawn. */
     void PlaceUnitLineHere(
       const float x0,
@@ -980,6 +1002,11 @@ namespace faf::editor
      * patches read (again), what happened in words; an empty one when the map isn't one.
      */
     std::string LoadMeshTerrain();
+    /** The mesh terrain map as loaded: the Mesh terrain panel edits it in place, Save writes and loads it again. */
+    [[nodiscard]] edmesh::MeshMap& MeshMapRef() noexcept
+    {
+      return mMeshMap;
+    }
     /** What the view shows: 0 the height field, 1 the mesh, 2 both (the mesh and its edges). */
     void SetMeshMode(
       const int mode
@@ -1213,6 +1240,24 @@ namespace faf::editor
     [[nodiscard]] bool PickPlace(const PickHit& hit, float& x, float& z, float& radius) const;
     PickKind mSelectKind = PickKind::None;
     ContextPoint mContextPoint;
+    /** A mask shown on the terrain (the mask generator's "Show the mask on the map"); empty: none. */
+    field::Grid mOverlayMask;
+
+  public:
+    void SetOverlayMask(
+      field::Grid mask
+    )
+    {
+      mOverlayMask = std::move(mask);
+    }
+    [[nodiscard]] const field::Grid& OverlayMask() const noexcept
+    {
+      return mOverlayMask;
+    }
+    /** Test runs: how many props the map has. */
+    [[nodiscard]] std::size_t PropCountNow() const;
+
+  private:
     /** MirrorSelection: units' copies to the mirrored army (MirrorHalf's choice), else their own. */
     bool mMirrorMapArmies = false;
     /** The ground point under `at` and what stands there (selected when it wasn't), for the view's menu. */

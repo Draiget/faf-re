@@ -41,9 +41,20 @@ namespace faf::editor
     bool flipX = false;
     bool flipZ = false;
     float tile = 256.0f;
+    // FAF Studio's OBJ import options.
+    bool zUp = false;            // the file's Z is up (Blender): Y and Z swapped
+    float offset[3] = {0, 0, 0}; // added after the scale (map units)
+    bool flipWinding = false;    // the triangles turned inside out
+    bool flipV = false;          // the texture's v turned over
+    int normals = 0;             // 0 the file's (or made from the faces), 1 made from the faces
+    float uvRepeat = 0.0f;       // a file without texture coordinates: u, v = x, z / this (0: none)
+    bool byGroup = false;        // one patch for each o / g group instead of square tiles
+    int maxVertices = 65000;     // a patch is split before it has more corners than this
   };
   [[nodiscard]] ObjMesh TransformMesh(const ObjMesh& mesh, const MeshImportOptions& options);
   [[nodiscard]] std::map<std::pair<int, int>, ObjMesh> SplitByTile(const ObjMesh& mesh, float tile);
+  /** The patches an import makes: tiles (or o / g groups), each cut again past `maxVertices` corners. */
+  [[nodiscard]] std::map<std::pair<int, int>, ObjMesh> SplitMesh(const ObjMesh& mesh, const MeshImportOptions& options);
 
   /** The triangles' edges as line pairs (each edge once), at most `maxLines`, for the view's wire preview. */
   [[nodiscard]] std::vector<std::array<float, 3>> MeshWire(const ObjMesh& mesh, std::size_t maxLines);

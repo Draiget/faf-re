@@ -238,6 +238,7 @@ namespace faf::editor
         "/watermasks",      "/imagestest",
         "/themesfile",      "/themelib",
         "/r6test",          "/r7test",
+        "/r8test",          "/r8inspect",
       };
       for (const char* const option : kOptions) {
         if (moho::CFG_GetArgOption(option, 0, nullptr)) {
@@ -4967,6 +4968,13 @@ namespace faf::editor
             return mScene.Attached() && !mScene.ModelsPending() && mScene.GraphGround(ground);
           });
         }
+        // A graph node shown on the map as a mask (the inspector's "Show on the map as a mask").
+        if (!mShell->GenerateShown() && generate.MaskNode() != 0) {
+          generate.ShowAsMask(0);
+        }
+        if (field::Grid mask; generate.TakeMaskAsk(mask)) {
+          mScene.SetOverlayMask(std::move(mask));
+        }
         if (!mShell->GenerateShown()) {
           return;
         }
@@ -4978,7 +4986,32 @@ namespace faf::editor
             generate.SetStatus(mScene.ApplyGraphHeights(ask.result, ask.plain, true));
             break;
           case EdGenerate::HeightsAsk::Kind::Build: {
+            // The graph's own symmetry (when not "follow the map") for its scatters too: the props and decals are
+            // placed in its first part with their copies (FAF Studio's Scatter.Plan{ symmetry }).
+            EdTools& symTools = mShell->Tools();
+            const int keptSymmetry = symTools.SymmetryIndex();
+            const int keptTurns = symTools.NWayTurns();
+            {
+              static const std::map<std::string, std::pair<Symmetry, int>> kGraphSymmetry = {
+                {"off", {Symmetry::None, 3}},
+                {"mirror_x", {Symmetry::LeftRight, 3}},
+                {"mirror_z", {Symmetry::TopBottom, 3}},
+                {"mirror_xz", {Symmetry::BothAxes, 3}},
+                {"rot2", {Symmetry::HalfTurn, 3}},
+                {"rot4", {Symmetry::QuarterTurns, 3}},
+                {"diag", {Symmetry::DiagonalBack, 3}},
+                {"adiag", {Symmetry::DiagonalForward, 3}},
+                {"diag_both", {Symmetry::BothDiagonals, 3}},
+                {"rotn3", {Symmetry::NWay, 3}},
+                {"rotn5", {Symmetry::NWay, 5}},
+                {"rotn6", {Symmetry::NWay, 6}},
+              };
+              if (const auto found = kGraphSymmetry.find(generate.Symmetry()); found != kGraphSymmetry.end()) {
+                symTools.SetSymmetryOnly(static_cast<int>(found->second.first), found->second.second);
+              }
+            }
             std::string status = mScene.ApplyGraphBuild(ask.result, ask.plain, ask.writes);
+            symTools.SetSymmetryOnly(keptSymmetry, keptTurns);
             // The map-wide textures from the built map (each its own step, as the Map-wide textures panel makes them).
             for (const int kind : ask.writes.mapTextures) {
               const bool made = MakeMapTexture(static_cast<MapTextureKind>(std::clamp(kind, 0, kMapTextureKinds - 1)));
@@ -7601,6 +7634,702 @@ namespace faf::editor
           break;
         }
       }
+      /**
+       * `/r8test` (test runs): the sixth comparison's features a step at a time, each logged: the terrain graph's
+       * frame, undo, copy and paste, a node as a mask on the map, its scatter with the graph's symmetry; Fill the map's
+       * Count; the mask generator into a terrain type; masks imported by name; a raw heightmap with its options; the
+       * export package; a map-wide texture at a set size; the mesh terrain's manifest saved (with `/meshtest`).
+       */
+      int mR8Stage = 0;
+      int mR8Frames = 0;
+      int mR8Nodes = 0;
+      int mR8First = 0;
+      std::size_t mR8Props = 0;
+      void DriveRoundEightTest()
+      {
+        // `/r8inspect <node type>` (test runs): the graph workspace with a curve and a scatter node added, the first
+        // node of the type selected, so a picture of the window shows its inspector (curve, presets, blueprint list).
+        if (
+          fa::vector<fa::string> inspect; mR8Stage == 0 && mScene.Attached() && !mScene.ModelsPending() &&
+          moho::CFG_GetArgOption("/r8inspect", 1, &inspect) && !inspect.empty() && ++mR8Frames == 60
+        ) {
+          mR8Stage = 100;
+          mShell->SwitchWorkspace(4);
+          mShell->ShowGenerate();
+          EdGenerate& generate = mShell->Generate();
+          (void)generate.OpenShipped("hills");
+          NodeGraph& graph = generate.Graph();
+          const int curve = graph.AddNode("remap", -300.0f, 0.0f);
+          if (GraphNode* node = graph.Find(curve)) {
+            ParamValue v = node->params[0];
+            v.text = "0 0 0.3 0.1 0.6 0.7 1 1";
+            graph.SetParam(curve, 0, v);
+          }
+          const int scatter = graph.AddNode("out_scatter", -300.0f, 300.0f);
+          if (GraphNode* node = graph.Find(scatter)) {
+            for (std::size_t p = 0; p < node->type->params.size(); ++p) {
+              if (node->type->params[p].name == "entries") {
+                ParamValue v = node->params[p];
+                v.text = "/env/evergreen/props/rocks/rock01_prop.bp:300;/env/evergreen/props/trees/pine06_prop.bp:100";
+                graph.SetParam(scatter, p, v);
+              }
+            }
+          }
+          generate.SelectFirst(inspect[0].c_str());
+          gpg::Logf("editor: /r8inspect: %s selected (%zu nodes)", inspect[0].c_str(), graph.Nodes().size());
+          return;
+        }
+        if (
+          mR8Stage >= 20 || !mScene.Attached() || mScene.ModelsPending() ||
+          !moho::CFG_GetArgOption("/r8test", 0, nullptr) || ++mR8Frames % 90 != 0
+        ) {
+          return;
+        }
+        EdTools& tools = mShell->Tools();
+        EdGenerate& generate = mShell->Generate();
+        const std::filesystem::path folder = std::filesystem::temp_directory_path() / "faf_r8test";
+        std::error_code ec;
+        std::filesystem::create_directories(folder, ec);
+        const int width = mDocument.Facts().fieldWidth;
+        const int height = mDocument.Facts().fieldHeight;
+        if (mR8Stage == 0) {
+          mShell->ShowGenerate();
+          (void)generate.OpenShipped("hills"); // (a new graph: fetched after)
+        }
+        NodeGraph& graph = generate.Graph();
+        switch (mR8Stage++) {
+        case 0: {
+          const bool opened = !graph.Nodes().empty();
+          mR8First = 0;
+          for (const GraphNode& node : graph.Nodes()) {
+            if (mR8First == 0 && !node.type->outputs.empty() && !node.type->inputs.empty()) {
+              mR8First = node.id;
+            }
+          }
+          gpg::Logf(
+            "editor: /r8test: graph hills %s, %zu nodes, first %d",
+            opened ? "opened" : "missing",
+            graph.Nodes().size(),
+            mR8First
+          );
+          break;
+        }
+        case 1: {
+          // A frame round the first node takes it along; then the node removed (a step to undo).
+          const GraphNode* first = graph.Find(mR8First);
+          if (first == nullptr) {
+            gpg::Logf("editor: /r8test: no node to frame");
+            break;
+          }
+          const int frame = graph.AddNode("frame", first->x - 40.0f, first->y - 60.0f);
+          GraphNode* f = graph.Find(frame);
+          ParamValue w = f->params[1];
+          w.value[0] = 800.0f;
+          graph.SetParam(frame, 1, w);
+          ParamValue h = f->params[2];
+          h.value[0] = 900.0f;
+          graph.SetParam(frame, 2, h);
+          const std::set<int> moving = generate.Canvas().MoveSetFor(graph, {frame});
+          graph.SetName(mR8First, "R8 first");
+          mR8Nodes = static_cast<int>(graph.Nodes().size());
+          gpg::Logf(
+            "editor: /r8test: frame %d drags %zu nodes (the first in it: %s)",
+            frame,
+            moving.size(),
+            moving.count(mR8First) != 0 ? "yes" : "no"
+          );
+          break;
+        }
+        case 2:
+          (void)graph.RemoveNode(mR8First);
+          gpg::Logf("editor: /r8test: removed node %d: %zu nodes", mR8First, graph.Nodes().size());
+          break;
+        case 3: {
+          generate.Undo();
+          const GraphNode* back = graph.Find(mR8First);
+          gpg::Logf(
+            "editor: /r8test: undo: %zu nodes (were %d), node %d back: %s, its name %s; %zu steps left",
+            graph.Nodes().size(),
+            mR8Nodes,
+            mR8First,
+            back != nullptr ? "yes" : "no",
+            back != nullptr ? back->name.c_str() : "-",
+            generate.UndoSteps()
+          );
+          generate.Redo();
+          const std::size_t afterRedo = graph.Nodes().size();
+          generate.Undo();
+          std::string error;
+          const std::vector<int> pasted = graph.Paste(graph.SaveSome({mR8First}), 0.0f, 3000.0f, error);
+          gpg::Logf(
+            "editor: /r8test: redo %zu nodes, undo again %zu; pasted %zu (%s)",
+            afterRedo,
+            graph.Nodes().size(),
+            pasted.size(),
+            error.c_str()
+          );
+          break;
+        }
+        case 4:
+          generate.ShowAsMask(mR8First);
+          generate.EvaluateNow();
+          break;
+        case 5: {
+          const field::Grid& mask = mScene.OverlayMask();
+          gpg::Logf(
+            "editor: /r8test: node %d as a mask on the map: %d x %d samples", generate.MaskNode(), mask.w, mask.h
+          );
+          generate.ShowAsMask(0);
+          break;
+        }
+        case 6: {
+          // The graph's scatter with its own symmetry: the props placed with their mirrored copies.
+          generate.ShowAsMask(0);
+          const int noise = graph.AddNode("perlin", 0.0f, 4000.0f);
+          const int scatter = graph.AddNode("out_scatter", 300.0f, 4000.0f);
+          (void)graph.Link(noise, 0, scatter, 0);
+          GraphNode* s = graph.Find(scatter);
+          for (std::size_t p = 0; p < s->type->params.size(); ++p) {
+            ParamValue v = s->params[p];
+            if (s->type->params[p].name == "entries") {
+              v.text = "/env/evergreen/props/rocks/rock01_prop.bp:100";
+            } else if (s->type->params[p].name == "count") {
+              v.value[0] = 30.0f;
+            } else {
+              continue;
+            }
+            graph.SetParam(scatter, p, v);
+          }
+          generate.SetSymmetry("mirror_x");
+          mR8Props = mScene.PropCountNow();
+          generate.AskBuild();
+          gpg::Logf("editor: /r8test: scatter build asked (mirror_x), props %zu", mR8Props);
+          break;
+        }
+        case 8: {
+          gpg::Logf("editor: /r8test: after the build: props %zu -> %zu", mR8Props, mScene.PropCountNow());
+          for (int i = 0; i < 4 && mScene.PropCountNow() != mR8Props; ++i) {
+            (void)mScene.Undo();
+          }
+          gpg::Logf("editor: /r8test: undone: props %zu", mScene.PropCountNow());
+          // Two mask files guessed by name: layer2 (grey 50 %) and one with no use in its name.
+          const std::filesystem::path layer = folder / "layer2.png";
+          const std::filesystem::path notes = folder / "notes.png";
+          std::string error;
+          const int w = std::max(width, 2);
+          const int h = std::max(height, 2);
+          const bool wrote =
+            WriteColourPng(
+              layer, w, h, std::vector<std::uint32_t>(static_cast<std::size_t>(w) * h, 0xFF808080u), error
+            ) &&
+            WriteColourPng(notes, 4, 4, std::vector<std::uint32_t>(16, 0xFFFFFFFFu), error);
+          EdTools::MaskImport& mi = tools.MaskImportSettings();
+          mi.files.clear();
+          mi.files.push_back(MaskImportFile{layer.string()});
+          mi.files.push_back(MaskImportFile{notes.string()});
+          tools.AskMaskImport(1);
+          gpg::Logf("editor: /r8test: mask files %s (%s)", wrote ? "written" : "not written", error.c_str());
+          break;
+        }
+        case 9: {
+          const EdTools::MaskImport& mi = tools.MaskImportSettings();
+          std::string guessed;
+          for (const MaskImportFile& f : mi.files) {
+            guessed += std::filesystem::path(f.path).filename().string() + "=" +
+              (f.target == MaskImportFile::Target::Layer    ? "layer " + std::to_string(f.layer)
+                 : f.target == MaskImportFile::Target::Skip ? std::string("skip")
+                                                            : std::string("other")) +
+              " ";
+          }
+          gpg::Logf("editor: /r8test: masks guessed: %s", guessed.c_str());
+          tools.AskMaskImport(2);
+          break;
+        }
+        case 10: {
+          (void)mScene.Undo();
+          // A raw heightmap: 16-bit big-endian, a ramp along x, read inverted into 10..60 (kept for the next steps).
+          const std::filesystem::path raw = folder / "ramp.r16";
+          {
+            std::ofstream out(raw, std::ios::binary | std::ios::trunc);
+            for (int z = 0; z < height; ++z) {
+              for (int x = 0; x < width; ++x) {
+                const std::uint16_t word = static_cast<std::uint16_t>(65535.0 * x / std::max(1, width - 1));
+                const char bytes[2] = {static_cast<char>(word >> 8), static_cast<char>(word & 0xFF)};
+                out.write(bytes, 2);
+              }
+            }
+          }
+          tools.SetInteropFile(false, raw.string());
+          ImportSettings& s = tools.InteropSettings();
+          const ImportSettings kept = s;
+          s = ImportSettings{};
+          s.low = 10.0f;
+          s.high = 60.0f;
+          s.invert = true;
+          s.read.bigEndian = true;
+          const std::string status = mScene.InteropImportNow(false);
+          const std::shared_ptr<TerrainSource> terrain = mScene.TerrainHeights();
+          float left = -1.0f;
+          float right = -1.0f;
+          if (terrain != nullptr && !terrain->heights.empty()) {
+            const std::size_t row = static_cast<std::size_t>(height / 2) * static_cast<std::size_t>(width);
+            left = terrain->heights[row];
+            right = terrain->heights[row + static_cast<std::size_t>(width - 1)];
+          }
+          gpg::Logf(
+            "editor: /r8test: raw import (big-endian, inverted, 10..60): %s; left %.1f right %.1f",
+            status.c_str(),
+            static_cast<double>(left),
+            static_cast<double>(right)
+          );
+          s = kept;
+          break;
+        }
+        case 11: {
+          // On the ramp: Fill the map's Count with the new limits, and the mask generator into terrain type 2.
+          tools.SetPropTool("/env/evergreen/props/rocks/rock01_prop.bp", 0);
+          EdTools::FillOptions fill;
+          fill.countOnly = true;
+          fill.heightWindow = true;
+          fill.heightLow = 0.0f;
+          fill.heightHigh = 40.0f;
+          fill.minSlope = 2.0f;
+          fill.keepAway = 8.0f;
+          fill.margin = 20.0f;
+          fill.seed = 7;
+          tools.RequestFill(fill);
+          EdTools::MaskGenTarget& target = tools.GenTarget();
+          target.toTypes = true;
+          target.typeCode = 2;
+          target.threshold = 0.5f;
+          tools.AskGenPreset("buildable");
+          tools.AskGenApply();
+          break;
+        }
+        case 12: {
+          gpg::Logf("editor: /r8test: fill count: %s; props %zu", tools.FillMessage().c_str(), mScene.PropCountNow());
+          tools.GenTarget().toTypes = false;
+          (void)mScene.Undo(); // the terrain types
+          (void)mScene.Undo(); // the raw import
+          EdTools::ExportPackage& p = tools.PackageSettings();
+          (void)std::snprintf(p.folder, sizeof(p.folder), "%s", (folder / "package").string().c_str());
+          p.flow = true;
+          p.wear = true;
+          p.types = true;
+          tools.AskPackage();
+          break;
+        }
+        case 13: {
+          std::string files;
+          for (const auto& entry : std::filesystem::directory_iterator(folder / "package", ec)) {
+            files += entry.path().filename().string() + " ";
+          }
+          gpg::Logf("editor: /r8test: package folder: %s", files.c_str());
+          // A shader that reads map-wide textures, for Make.
+          mScene.ChangeTerrainShader("Terrain301");
+          break;
+        }
+        case 14: {
+          tools.SetMapTextureSize(128);
+          const bool made = MakeMapTexture(static_cast<MapTextureKind>(0));
+          gpg::Logf(
+            "editor: /r8test: map-wide normal map at 128 (shader %s): %s, preview %s",
+            mScene.TerrainShader().c_str(),
+            made ? "made" : "not made",
+            tools.MapTexturePreview(0) != 0 ? "yes" : "no"
+          );
+          if (made) {
+            (void)mScene.Undo();
+          }
+          (void)mScene.Undo(); // the shader
+          tools.SetMapTextureSize(0);
+          break;
+        }
+        case 15:
+          if (mScene.MeshMapRef().Loaded()) {
+            mShell->AskMeshMore(3);
+          } else {
+            gpg::Logf("editor: /r8test: no mesh terrain (run with /meshtest for the manifest)");
+          }
+          break;
+        case 16:
+          if (mScene.MeshMapRef().Loaded()) {
+            gpg::Logf("editor: /r8test: manifest read back:\n%s", mScene.MeshMapRef().ManifestText().c_str());
+            mShell->AskMeshMore(4);
+          } else {
+            gpg::Logf("editor: /r8test: the mesh terrain isn't loaded after the save");
+          }
+          break;
+        case 17:
+          if (mScene.MeshMapRef().Loaded()) {
+            const bool heightfield = mDocument.Scenario().find("heightfield") != std::string::npos;
+            gpg::Logf(
+              "editor: /r8test: after unset, the scenario names the height field: %s", heightfield ? "yes" : "no"
+            );
+          }
+          break;
+        case 19:
+          gpg::Logf("editor: /r8test: done");
+          break;
+        default:
+          break;
+        }
+      }
+      /** Import / Export > Masks: the files' uses guessed by name, then read and written together. */
+      void MaskImportUpdate()
+      {
+        EdTools& tools = mShell->Tools();
+        const int ask = tools.TakeMaskImportAsk();
+        if (ask == 0 || !mScene.Attached()) {
+          return;
+        }
+        EdTools::MaskImport& mi = tools.MaskImportSettings();
+        if (ask == 1) {
+          // Each layer's kind of ground from its texture, for names like "rock" or "snow".
+          std::array<std::string, 9> kinds;
+          const std::vector<EdTools::LayerSlot> slots = mScene.LayerSlots();
+          for (int layer = 1; layer <= 8 && layer < static_cast<int>(slots.size()); ++layer) {
+            const std::string& albedo = slots[static_cast<std::size_t>(layer)].albedo;
+            if (!albedo.empty()) {
+              float rgb[3] = {};
+              kinds[static_cast<std::size_t>(layer)] =
+                GroundKindName(GroundKindOf(albedo, tools.Library().AverageColour(albedo, rgb) ? rgb : nullptr).kind);
+            }
+          }
+          for (MaskImportFile& f : mi.files) {
+            const MaskImportFile guessed = GuessMaskImport(f.path, kinds);
+            f.target = guessed.target;
+            f.layer = guessed.layer;
+          }
+          return;
+        }
+        const MapFacts& facts = mDocument.Facts();
+        const int w = facts.fieldWidth;
+        const int h = facts.fieldHeight;
+        std::vector<std::pair<int, field::Grid>> layers;
+        std::string report;
+        const auto toGrid = [&](const HeightImage& image, const MaskImportFile& f) {
+          HeightImage fitted = ResampleHeights(image, w, h);
+          std::uint16_t lo = 0, hi = 65535;
+          if (f.stretch) {
+            HeightImageRange(fitted, lo, hi);
+          }
+          field::Grid g(w, h, 1.0f, 0.0f, 0.0f);
+          const float span = std::max(1.0f, static_cast<float>(hi - lo));
+          for (std::size_t i = 0; i < g.v.size(); ++i) {
+            float v = std::clamp((static_cast<float>(fitted.words[i]) - lo) / span, 0.0f, 1.0f);
+            g.v[i] = f.invert ? 1.0f - v : v;
+          }
+          return g;
+        };
+        int typeCells = 0;
+        for (const MaskImportFile& f : mi.files) {
+          if (f.target == MaskImportFile::Target::Skip) {
+            continue;
+          }
+          std::string error;
+          const std::string name = std::filesystem::path(f.path).filename().string();
+          if (f.target == MaskImportFile::Target::Splat) {
+            for (int c = 0; c < 4 && f.layer + c <= 8; ++c) {
+              HeightReadOptions read;
+              read.channel = c + 1;
+              HeightImage image;
+              if (ReadHeightImageWith(f.path, w, h, read, image, error)) {
+                layers.emplace_back(f.layer + c, toGrid(image, f));
+              }
+            }
+            report +=
+              name + " -> layers " + std::to_string(f.layer) + "-" + std::to_string(std::min(8, f.layer + 3)) + "; ";
+            continue;
+          }
+          HeightReadOptions read;
+          read.channel = f.channel;
+          HeightImage image;
+          if (!ReadHeightImageWith(f.path, w, h, read, image, error)) {
+            report += name + ": " + error + "; ";
+            continue;
+          }
+          const field::Grid g = toGrid(image, f);
+          if (f.target == MaskImportFile::Target::Layer) {
+            layers.emplace_back(std::clamp(f.layer, 1, 8), g);
+            report += name + " -> layer " + std::to_string(f.layer) + "; ";
+          } else {
+            int tw = 0;
+            int th = 0;
+            if (mDocument.TerrainTypeCells(tw, th) != nullptr) {
+              std::vector<std::uint8_t> cells = mDocument.TerrainTypesNow();
+              const std::vector<std::uint8_t> before = cells;
+              for (int z = 0; z < th; ++z) {
+                for (int x = 0; x < tw; ++x) {
+                  const float wx = (x + 0.5f) * static_cast<float>(w - 1) / static_cast<float>(tw);
+                  const float wz = (z + 0.5f) * static_cast<float>(h - 1) / static_cast<float>(th);
+                  if (SampleField(g, wx, wz) > f.threshold) {
+                    std::uint8_t& cell = cells[static_cast<std::size_t>(z) * tw + x];
+                    typeCells += cell != static_cast<std::uint8_t>(f.typeCode) ? 1 : 0;
+                    cell = static_cast<std::uint8_t>(f.typeCode);
+                  }
+                }
+              }
+              if (cells != before) {
+                mDocument.ApplyTerrainTypes(cells);
+                mDocument.TerrainTypesEdited(before);
+              }
+            }
+            report += name + " -> terrain type " + std::to_string(f.typeCode) + "; ";
+          }
+        }
+        std::string message;
+        if (!layers.empty()) {
+          static constexpr MaskWriteMode kModes[] = {
+            MaskWriteMode::Replace, MaskWriteMode::AddTo, MaskWriteMode::SubtractFrom
+          };
+          (void)mScene.WriteMasksTogether(layers, kModes[std::clamp(mi.mode, 0, 2)], mi.takeAway, message);
+        }
+        const std::string status = "Masks: " + report + message +
+          (typeCells > 0 ? " Terrain types: " + std::to_string(typeCells) + " cells." : "");
+        tools.SetInteropStatus(status);
+        gpg::Logf("editor: mask import: %s", status.c_str());
+      }
+      /** Import / Export > Export package: the folder for Gaea / World Machine; the folder watch. */
+      std::map<std::string, long long> mPackageStamps;
+      double mPackageWatchAt = 0.0;
+      void PackageUpdate()
+      {
+        EdTools& tools = mShell->Tools();
+        EdTools::ExportPackage& p = tools.PackageSettings();
+        if (tools.TakePackageAsk() && mScene.Attached()) {
+          const std::string status = ExportPackageNow(p);
+          tools.SetInteropStatus(status);
+          gpg::Logf("editor: export package: %s", status.c_str());
+          mPackageStamps.clear();
+        }
+        // The watch: a file whose stamp changed comes in by its name.
+        const double now = ImGui::GetTime();
+        if (!p.watch || p.folder[0] == '\0' || !mScene.Attached() || now < mPackageWatchAt) {
+          return;
+        }
+        mPackageWatchAt = now + std::max(0.5f, p.interval);
+        std::error_code ec;
+        for (const auto& item : std::filesystem::directory_iterator(std::filesystem::path(p.folder), ec)) {
+          std::string name = item.path().filename().string();
+          for (char& c : name) {
+            c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+          }
+          const std::string ext = item.path().extension().string();
+          if (ext != ".png" && ext != ".tif" && ext != ".tiff" && ext != ".r16" && ext != ".raw" && ext != ".r32") {
+            continue;
+          }
+          const long long stamp =
+            static_cast<long long>(std::filesystem::last_write_time(item.path(), ec).time_since_epoch().count());
+          const auto kept = mPackageStamps.find(name);
+          const bool fresh = kept != mPackageStamps.end() && kept->second != stamp;
+          mPackageStamps[name] = stamp;
+          if (!fresh) {
+            continue; // the first look only notes the stamps
+          }
+          std::string message;
+          if (name.rfind("height", 0) == 0) {
+            tools.SetInteropFile(false, item.path().string());
+            tools.SetInteropStatus(mScene.InteropImportNow(true));
+            gpg::Logf("editor: package watch: %s as the heights", name.c_str());
+          } else if (name.rfind("layer", 0) == 0 || name.rfind("mask", 0) == 0) {
+            const int n = std::atoi(name.c_str() + (name[0] == 'l' ? 5 : 4));
+            if (n >= 1 && n <= 8 && mScene.ImportMaskLayer(n - 1, item.path(), message)) {
+              gpg::Logf("editor: package watch: %s into layer %d", name.c_str(), n);
+            }
+          }
+        }
+      }
+      std::string ExportPackageNow(
+        const EdTools::ExportPackage& p
+      )
+      {
+        const std::shared_ptr<TerrainSource> terrain = mScene.TerrainHeights();
+        if (terrain == nullptr || terrain->width < 2) {
+          return "No terrain.";
+        }
+        const std::filesystem::path folder(p.folder);
+        std::error_code ec;
+        std::filesystem::create_directories(folder, ec);
+        const int w = terrain->width;
+        const int h = terrain->height;
+        const auto [lowIt, highIt] = std::minmax_element(terrain->heights.begin(), terrain->heights.end());
+        const float low = p.fixedRange ? p.low : *lowIt;
+        const float high = p.fixedRange ? p.high : *highIt;
+        const std::string hext = p.float32 ? ".r32" : ".png";
+        std::vector<std::string> written;
+        std::string error;
+        const auto writeGrid = [&](const std::string& name, const std::vector<float>& values, const bool mask) {
+          HeightImage image;
+          image.width = w;
+          image.height = h;
+          image.words.resize(values.size());
+          for (std::size_t i = 0; i < values.size(); ++i) {
+            image.words[i] = static_cast<std::uint16_t>(std::clamp(std::lround(values[i] * 65535.0f), 0L, 65535L));
+          }
+          if (WriteHeightImage(folder / name, image, error, mask && p.mask8)) {
+            written.push_back(name);
+          }
+        };
+        auto heights = std::make_shared<field::Grid>(w, h, 1.0f, 0.0f, 0.0f);
+        heights->v = terrain->heights;
+        const auto run = [&](const char* op, field::OpArgs args) -> std::shared_ptr<field::Grid> {
+          args.in["a"] = heights;
+          auto out = std::make_shared<field::Grid>();
+          return field::RunOpCpu(op, args, *out, error) ? out : nullptr;
+        };
+        if (p.height) {
+          HeightImage image;
+          image.width = w;
+          image.height = h;
+          for (const float v : terrain->heights) {
+            const float word = p.normalised ? (v - low) / std::max(high - low, 0.001f) * 65535.0f : v * 128.0f;
+            image.words.push_back(static_cast<std::uint16_t>(std::clamp(std::lround(word), 0L, 65535L)));
+          }
+          if (WriteHeightImage(folder / ("height" + hext), image, error)) {
+            written.push_back("height" + hext);
+          }
+        }
+        const WaterState water = mDocument.WaterNow();
+        if (p.water && water.enabled) {
+          std::vector<float> depth(terrain->heights.size());
+          for (std::size_t i = 0; i < depth.size(); ++i) {
+            depth[i] = std::clamp((water.elevation - terrain->heights[i]) / 30.0f, 0.0f, 1.0f);
+          }
+          writeGrid("water.png", depth, true);
+        }
+        if (p.slope) {
+          field::OpArgs a;
+          a.p.num["radius"] = 1;
+          a.p.str["mode"] = "degrees";
+          if (const auto g = run("slope", a); g != nullptr) {
+            std::vector<float> v(g->v.size());
+            for (std::size_t i = 0; i < v.size(); ++i) {
+              v[i] = g->v[i] / 90.0f;
+            }
+            writeGrid("slope.png", v, true);
+          }
+        }
+        if (p.flow) {
+          field::OpArgs a;
+          a.p.num["range"] = 4000;
+          a.p.str["mode"] = "log";
+          if (const auto g = run("flow", a); g != nullptr) {
+            writeGrid("flow.png", g->v, true);
+          }
+        }
+        if (p.wear) {
+          field::OpArgs a;
+          a.p.str["output"] = "wear";
+          if (const auto g = run("erode_hydraulic", a); g != nullptr) {
+            const float top = std::max(1e-6f, *std::max_element(g->v.begin(), g->v.end()));
+            std::vector<float> v(g->v.size());
+            for (std::size_t i = 0; i < v.size(); ++i) {
+              v[i] = g->v[i] / top;
+            }
+            writeGrid("wear.png", v, true);
+          }
+        }
+        if (p.layers) {
+          const ShaderProfile profile = ShaderProfileOf(mScene.TerrainShader());
+          for (int layer = 0; layer < std::clamp(profile.painted, 1, 8); ++layer) {
+            std::string message;
+            const std::string name = "layer" + std::to_string(layer + 1) + ".png";
+            if (mScene.ExportMaskLayer(layer, folder / name, message)) {
+              written.push_back(name);
+            }
+          }
+        }
+        if (p.types) {
+          int tw = 0;
+          int th = 0;
+          if (mDocument.TerrainTypeCells(tw, th) != nullptr) {
+            HeightImage image;
+            image.width = tw;
+            image.height = th;
+            for (const std::uint8_t id : mDocument.TerrainTypesNow()) {
+              image.words.push_back(static_cast<std::uint16_t>(id * 257));
+            }
+            if (WriteHeightImage(folder / "types.png", image, error)) {
+              written.push_back("types.png");
+            }
+          }
+        }
+        if (p.markers) {
+          // Discs: starts 1.0, mass 0.66, hydrocarbon 0.33.
+          std::vector<float> discs(terrain->heights.size(), 0.0f);
+          for (const SaveEntry& marker : mDocument.SaveData().Markers()) {
+            float mx = 0.0f, my = 0.0f, mz = 0.0f;
+            const std::string type = MarkerTypeOf(marker);
+            const float value = type == "Blank Marker" ? 1.0f
+              : type == "Mass"                         ? 0.66f
+              : type == "Hydrocarbon"                  ? 0.33f
+                                                       : 0.0f;
+            if (value <= 0.0f || !MarkerPosition(marker, mx, my, mz)) {
+              continue;
+            }
+            const float r = p.markerRadius * (type == "Blank Marker" ? 2.0f : 1.0f);
+            for (int z = std::max(0, static_cast<int>(mz - r)); z <= std::min(h - 1, static_cast<int>(mz + r)); ++z) {
+              for (int x = std::max(0, static_cast<int>(mx - r)); x <= std::min(w - 1, static_cast<int>(mx + r)); ++x) {
+                if (std::hypot(static_cast<float>(x) - mx, static_cast<float>(z) - mz) <= r) {
+                  float& d = discs[static_cast<std::size_t>(z) * w + x];
+                  d = std::max(d, value);
+                }
+              }
+            }
+          }
+          writeGrid("markers.png", discs, true);
+        }
+        if (p.playable) {
+          std::vector<float> area(terrain->heights.size(), 1.0f);
+          if (const std::optional<EdDocument::PlayableRect> rect = mDocument.PlayableArea()) {
+            for (int z = 0; z < h; ++z) {
+              for (int x = 0; x < w; ++x) {
+                area[static_cast<std::size_t>(z) * w + x] =
+                  x >= rect->x0 && x <= rect->x1 && z >= rect->z0 && z <= rect->z1 ? 1.0f : 0.0f;
+              }
+            }
+          }
+          writeGrid("playable.png", area, true);
+        }
+        if (p.readme) {
+          char text[1600];
+          (void)std::snprintf(
+            text,
+            sizeof(text),
+            "Package of %s for Gaea / World Machine\n\n"
+            "Map: %d x %d samples (%.1f x %.1f km; a map unit is 19.53 m).\n"
+            "height%s: %s.\n"
+            "Masks are 0..1 over the whole map (%s): water = depth below the sea (%.1f) over 30 units; slope = degrees "
+            "/ "
+            "90; flow = drainage (log); wear = the erosion's wear; layer<n> = the paint of texture layer n; types = "
+            "terrain type ids (id x 257); markers = start positions 1.0, mass 0.66, hydrocarbon 0.33; playable = the "
+            "playable area.\n"
+            "Saved back into this folder with the editor watching it: height* comes in as the heights, layer<n>* / "
+            "mask<n>* as layer n's paint.\n",
+            mDocument.Facts().name.c_str(),
+            w,
+            h,
+            (w - 1) / 51.2,
+            (h - 1) / 51.2,
+            hext.c_str(),
+            p.normalised ? ("the map's heights " + std::to_string(low) + " .. " + std::to_string(high) +
+                            " stretched over the whole range")
+                             .c_str()
+                         : "a word is 1/128 of a map unit",
+            p.mask8 ? "8-bit" : "16-bit",
+            static_cast<double>(water.elevation)
+          );
+          std::ofstream(folder / "README.txt", std::ios::binary) << text;
+          written.push_back("README.txt");
+        }
+        std::string list;
+        for (const std::string& name : written) {
+          list += (list.empty() ? "" : ", ") + name;
+        }
+        return std::to_string(written.size()) + " files in " + folder.string() + ": " + list +
+          (error.empty() ? std::string() : " (" + error + ")");
+      }
       /** SC tools > Water: the asks, and Live's re-apply when the water level moved. */
       void WaterMasksUpdate();
       struct WaterApplied
@@ -7616,6 +8345,8 @@ namespace faf::editor
       int mWaterTestFrames = 0;
       int mWaterTestId = 0;
       int mMaskGenEvaluated = -1;
+      /** The map's overlay is the mask generator's (so taking it off leaves a graph node's mask alone). */
+      bool mMaskGenOverlay = false;
       int mMaskGenWait = 0;
       std::uint64_t mMaskGenImage = 0;
       std::string mMaskGenArg; // `/maskgen <preset>,<layer>[,add|sub][,free]`
@@ -10129,8 +10860,8 @@ namespace faf::editor
         // or the panels' keyboard navigation use themselves, and not in the material editor, which keeps its own.
         if (!mShell->MaterialEditor().Focused() && !mScene.ModalOn()) {
           if (
-            const std::string chord = PanelChordPressed();
-            !chord.empty() && !PanelsKeepChord(chord, ImGui::GetIO().WantTextInput)
+            const std::string chord = PanelChordPressed(); !chord.empty() &&
+            !PanelsKeepChord(chord, ImGui::GetIO().WantTextInput) && !mShell->Generate().GraphKeepsChord(chord)
           ) {
             (void)RunChord(chord, false);
           }
@@ -10659,8 +11390,8 @@ namespace faf::editor
         );
         return false;
       }
-      // The map's own sun and sea.
-      MapTextureOptions options;
+      // The panel's settings, with the map's own sun and sea.
+      MapTextureOptions options = mShell->Tools().MapTextureSettings();
       const LightingState lighting = mDocument.LightingNow();
       SunAnglesOf(lighting.sunDirection, options.azimuth, options.altitude);
       options.altitude = std::clamp(options.altitude, 5.0f, 85.0f);
@@ -10669,7 +11400,8 @@ namespace faf::editor
       options.waterElevation = water.elevation;
       options.abyss = water.abyss;
       const int mapSize = std::max(terrain->width, terrain->height) - 1;
-      const int size = std::clamp(mapSize, 64, 1024);
+      const int size =
+        mShell->Tools().MapTextureSize() > 0 ? mShell->Tools().MapTextureSize() : std::clamp(mapSize, 64, 1024);
       const auto started = std::chrono::steady_clock::now();
       std::vector<float> rgba;
       std::string error;
@@ -10707,7 +11439,7 @@ namespace faf::editor
             paint,
             target,
             options,
-            MapPaintOptions{},
+            mShell->Tools().MapPaintSettings(),
             size,
             rgba,
             error
@@ -10722,6 +11454,27 @@ namespace faf::editor
         PostStatusMessage("The map-wide texture wasn't made: " + error);
         gpg::Warnf("editor: map-wide texture: %s", error.c_str());
         return false;
+      }
+      // A small picture for the row: the texture's colour (its alpha as grey where the colour is empty).
+      {
+        constexpr int kPreview = 96;
+        std::vector<std::uint32_t> pixels(static_cast<std::size_t>(kPreview) * kPreview);
+        for (int y = 0; y < kPreview; ++y) {
+          for (int x = 0; x < kPreview; ++x) {
+            const std::size_t at = (static_cast<std::size_t>(y * size / kPreview) * size + x * size / kPreview) * 4;
+            const auto c = [&](const int i) {
+              return static_cast<std::uint32_t>(
+                std::clamp(rgba[at + static_cast<std::size_t>(i)], 0.0f, 1.0f) * 255.0f
+              );
+            };
+            pixels[static_cast<std::size_t>(y) * kPreview + x] = 0xFF000000u | (c(0) << 16) | (c(1) << 8) | c(2);
+          }
+        }
+        const int row = static_cast<int>(kind);
+        if (const std::uint64_t old = mShell->Tools().MapTexturePreview(row); old != 0U) {
+          EdImGuiRenderer::DestroyImage(old);
+        }
+        mShell->Tools().SetMapTexturePreview(row, EdImGuiRenderer::CreateImage(kPreview, kPreview, pixels.data()));
       }
       TexImage image;
       image.Reset(size, 4, 0.0f);
@@ -11037,6 +11790,40 @@ namespace faf::editor
         ) {
           PostStatusMessage("The mask wasn't made: " + error);
           gpg::Warnf("editor: mask generator: %s", error.c_str());
+        } else if (target.toTypes) {
+          // A terrain type where the mask is above the threshold (FAF Studio's ApplyToTypes), one undo step.
+          int width = 0;
+          int height = 0;
+          if (mDocument.TerrainTypeCells(width, height) == nullptr || width < 1 || height < 1) {
+            PostStatusMessage("The map has no terrain types.");
+          } else {
+            std::vector<std::uint8_t> cells = mDocument.TerrainTypesNow();
+            const std::vector<std::uint8_t> before = cells;
+            const float mapW = static_cast<float>(mDocument.Facts().fieldWidth - 1);
+            const float mapH = static_cast<float>(mDocument.Facts().fieldHeight - 1);
+            int changed = 0;
+            for (int z = 0; z < height; ++z) {
+              for (int x = 0; x < width; ++x) {
+                const float wx = (static_cast<float>(x) + 0.5f) * mapW / static_cast<float>(width);
+                const float wz = (static_cast<float>(z) + 0.5f) * mapH / static_cast<float>(height);
+                if (SampleField(mask, wx, wz) > target.threshold) {
+                  std::uint8_t& cell = cells[static_cast<std::size_t>(z) * static_cast<std::size_t>(width) + x];
+                  if (cell != static_cast<std::uint8_t>(target.typeCode)) {
+                    cell = static_cast<std::uint8_t>(target.typeCode);
+                    ++changed;
+                  }
+                }
+              }
+            }
+            if (changed > 0) {
+              mDocument.ApplyTerrainTypes(cells);
+              mDocument.TerrainTypesEdited(before);
+            }
+            const std::string message =
+              "Terrain type " + std::to_string(target.typeCode) + " on " + std::to_string(changed) + " cells";
+            PostStatusMessage(message);
+            gpg::Logf("editor: mask generator: %s", message.c_str());
+          }
         } else {
           if (target.water >= 0) {
             // Into one of the water's masks (FAF Studio's "Apply to water mask"), one undo step.
@@ -11071,6 +11858,12 @@ namespace faf::editor
           (void)changed;
         }
       }
+      // The map overlay goes with the section and its tick (only the generator's own: the terrain graph's inspector
+      // shows a node's mask there too).
+      if ((!tools.GenSectionOpen() || !tools.GenShowOnMap()) && mMaskGenOverlay) {
+        mScene.SetOverlayMask({});
+        mMaskGenOverlay = false;
+      }
       // The preview: when the rules changed and the section is open, a moment after the last change.
       if (!tools.GenSectionOpen() || tools.GenRevision() == mMaskGenEvaluated) {
         mMaskGenWait = 0;
@@ -11098,6 +11891,11 @@ namespace faf::editor
       ) {
         tools.SetGenPreview(0, 0.0f, error);
         return;
+      }
+      // On the map too when asked (FAF Studio draws the preview on the terrain).
+      if (tools.GenShowOnMap() || mMaskGenOverlay) {
+        mScene.SetOverlayMask(tools.GenShowOnMap() ? mask : field::Grid{});
+        mMaskGenOverlay = tools.GenShowOnMap();
       }
       // A small picture: the mask in red over a dark ground, as the map shows it from above.
       constexpr int kSide = 160;
@@ -12118,10 +12916,48 @@ namespace faf::editor
       } else if (!mScene.Attached()) {
         mMeshLoadedFor.clear();
       }
+      mShell->SetMeshMapView(&mScene.MeshMapRef());
       if (const int more = mShell->TakeMeshMore(); more == 1) {
         mShell->SetMeshStatus(mScene.LoadMeshTerrain());
       } else if (more == 2) {
         mShell->SetMeshFindings(mScene.CheckMeshTerrain());
+      } else if (more == 3) {
+        // Save: the manifest as the panel edited it, into the map's folder, then read again (Sync).
+        const edmesh::MeshMap& mesh = mScene.MeshMapRef();
+        const std::filesystem::path scmap = mDocument.MapDiskFile();
+        if (!mesh.Loaded() || scmap.empty()) {
+          mShell->SetMeshStatus("No mesh terrain loaded, or the map has no folder of its own.");
+        } else {
+          std::string rel = mesh.manifestPath;
+          const std::string prefix = "/maps/" + mDocument.FolderName() + "/";
+          if (rel.rfind(prefix, 0) == 0) {
+            rel = rel.substr(prefix.size());
+          } else {
+            rel = "terrain/terrain.lua";
+          }
+          const std::filesystem::path file = scmap.parent_path() / rel;
+          std::error_code ec;
+          std::filesystem::create_directories(file.parent_path(), ec);
+          std::ofstream(file, std::ios::binary | std::ios::trunc) << mesh.ManifestText();
+          gpg::Logf(
+            "editor: mesh terrain: manifest saved to %s (%zu materials, %zu patches)",
+            file.string().c_str(),
+            mesh.materials.size(),
+            mesh.patches.size()
+          );
+          mShell->SetMeshStatus("Saved " + file.string() + "; " + mScene.LoadMeshTerrain());
+        }
+      } else if (more == 4) {
+        // Unset: the scenario no longer names a mesh terrain (the height field is the ground again).
+        (void)mDocument.SetScenarioField("TerrainSystem", "heightfield", true);
+        mShell->SetMeshStatus(
+          "The map's ground is its height field again (the manifest and patches stay in its folder)."
+        );
+      } else if (more == 5) {
+        const std::string manifest = "/maps/" + mDocument.FolderName() + "/terrain/terrain.lua";
+        (void)mDocument.SetScenarioField("TerrainSystem", "mesh", true);
+        (void)mDocument.SetScenarioField("TerrainMesh", manifest, true);
+        mShell->SetMeshStatus("The scenario names " + manifest + "; " + mScene.LoadMeshTerrain());
       }
       const HWND owner = HandleOf(mGame.supcomFrame);
       ImagesPanelThumbs();
@@ -12314,7 +13150,7 @@ namespace faf::editor
           for (const auto& p : placed.positions) {
             meshHigh = std::max(meshHigh, p[1]);
           }
-          for (const auto& [key, part] : SplitByTile(placed, ask.options.tile)) {
+          for (const auto& [key, part] : SplitMesh(placed, ask.options)) {
             const std::string name = "tile_" + std::to_string(key.first) + "_" + std::to_string(key.second) + ".scm";
             std::string partError;
             const std::vector<std::uint8_t> scm =
@@ -12969,8 +13805,11 @@ namespace faf::editor
         MapTexturesUpdate();
         MaskGenUpdate();
         WaterMasksUpdate();
+        PackageUpdate();
+        MaskImportUpdate();
         DriveRoundSixTest();
         DriveRoundSevenTest();
+        DriveRoundEightTest();
         RecipesUpdate();
         TexturesUpdate();
         DriveMaterialEditor();
@@ -15126,6 +15965,18 @@ namespace faf::editor
             areaNames.push_back(a.name);
           }
           fields.SetAreaNames(std::move(areaNames));
+        }
+        // Fill the map's "density from the mask generator's rules": the rules evaluated over the map.
+        static bool rulesWired = false;
+        if (!rulesWired) {
+          rulesWired = true;
+          mScene.SetMaskRulesSource([this](field::Grid& out) {
+            const std::vector<MaskGenRule>& rules = mShell->Tools().GenRules();
+            MaskGenContext context;
+            std::string error;
+            return !rules.empty() && MaskGenContextOf(rules, context, error) &&
+              EvaluateMaskRules(context, rules, out, error);
+          });
         }
         if (EdFieldsPanel::QuickGenSettings q; mScene.Attached()) {
           bool applyIt = false;

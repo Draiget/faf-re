@@ -305,6 +305,79 @@ namespace faf::editor
       gridBuilt_ = false;
     }
 
+    std::string MeshMap::ManifestText() const
+    {
+      static const char* const kSlotNames[kSlots] = {
+        "diffuse_a",
+        "diffuse_b",
+        "light_mask_0",
+        "light_mask_1",
+        "light_mask_2",
+        "normal_a",
+        "normal_b",
+        "specular",
+        "specular_b"
+      };
+      const Settings& s = settings;
+      std::string out = "-- mesh terrain manifest (FAF map editor): one entry a line\n";
+      char line[256];
+      const auto number = [&](const char* key, const float value, const bool keep) {
+        if (keep) {
+          (void)std::snprintf(line, sizeof(line), "%s = %g\n", key, static_cast<double>(value));
+          out += line;
+        }
+      };
+      const auto text = [&](const char* key, const std::string& value) {
+        if (!value.empty()) {
+          out += std::string(key) + " = '" + value + "'\n";
+        }
+      };
+      number("size", s.size, true);
+      number("playable_x0", s.playable[0], true);
+      number("playable_z0", s.playable[1], true);
+      number("playable_x1", s.playable[2], true);
+      number("playable_z1", s.playable[3], true);
+      number("water", s.water, s.water > -9999.0f);
+      number("water_abyss", s.waterAbyss, s.water > -9999.0f);
+      number("water_tint", s.waterTint, s.waterTint != 1.0f);
+      number("haze", s.haze, s.haze > -9999.0f);
+      number("haze_span", s.hazeSpan, s.haze > -9999.0f);
+      number("ground_low", s.groundLow, s.groundLow > -9999.0f);
+      number("ground_high", s.groundHigh, s.groundHigh > -9999.0f);
+      number("mesh_high", s.meshHigh, s.meshHigh > -9999.0f);
+      if (s.haveVoid) {
+        number("void_r", s.voidColor[0], true);
+        number("void_g", s.voidColor[1], true);
+        number("void_b", s.voidColor[2], true);
+      }
+      text("water_map", s.waterMap);
+      text("water_map_outer", s.waterMapOuter);
+      text("water_beyond", s.waterBeyond);
+      text("water_inside", s.waterInside);
+      for (const Material& m : materials) {
+        std::string entry = "name = '" + m.name + "'";
+        for (int k = 0; k < kSlots; ++k) {
+          if (!m.files[k].empty()) {
+            entry += std::string(", ") + kSlotNames[k] + " = '" + m.files[k] + "'";
+          }
+        }
+        entry += m.blending ? ", blending = 1" : "";
+        entry += m.glow ? ", glow = 1" : "";
+        entry += m.highlight ? ", highlight = 1" : "";
+        entry += m.additive ? ", additive = 1" : "";
+        if (m.alphaTest >= 0.0f) {
+          (void)std::snprintf(line, sizeof(line), ", alpha_test = %g", static_cast<double>(m.alphaTest));
+          entry += line;
+        }
+        out += entry + "\n";
+      }
+      for (const Patch& patch : patches) {
+        out += "mesh = '" + patch.file + "', material = " + std::to_string(patch.material + 1) +
+          (patch.sky ? ", sky = 1" : "") + "\n";
+      }
+      return out;
+    }
+
     bool MeshMap::Load(
       const std::string& manifestVfsPath
     )

@@ -3,8 +3,10 @@
 #include "editor/doc/EdJson.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdlib>
 #include <functional>
+#include <map>
 #include <unordered_map>
 
 namespace faf::editor
@@ -411,14 +413,73 @@ namespace faf::editor
     ++mChanges;
   }
 
+  void NodeGraph::SetBypass(
+    const int id,
+    const bool on
+  )
+  {
+    GraphNode* node = Find(id);
+    if (node == nullptr || node->bypass == on) {
+      return;
+    }
+    node->bypass = on;
+    Touch(id);
+  }
+
+  void NodeGraph::SetName(
+    const int id,
+    const std::string& name
+  )
+  {
+    GraphNode* node = Find(id);
+    if (node == nullptr || node->name == name) {
+      return;
+    }
+    node->name = name;
+    ++mChanges;
+  }
+
   std::string NodeGraph::Save() const
   {
+    return SaveNodes(nullptr);
+  }
+
+  std::string NodeGraph::SaveSome(
+    const std::set<int>& ids
+  ) const
+  {
+    return SaveNodes(&ids);
+  }
+
+  std::string NodeGraph::SaveNodes(
+    const std::set<int>* only
+  ) const
+  {
+    std::vector<const GraphNode*> nodes;
+    for (const GraphNode& node : mNodes) {
+      if (only == nullptr || only->count(node.id) != 0) {
+        nodes.push_back(&node);
+      }
+    }
+    std::vector<const GraphLink*> links;
+    for (const GraphLink& link : mLinks) {
+      if (only == nullptr || (only->count(link.fromNode) != 0 && only->count(link.toNode) != 0)) {
+        links.push_back(&link);
+      }
+    }
     std::string out = "{\n  \"graph\": \"fafgraph\",\n  \"version\": 1,\n  \"nodes\": [\n";
-    for (std::size_t n = 0; n < mNodes.size(); ++n) {
-      const GraphNode& node = mNodes[n];
+    for (std::size_t n = 0; n < nodes.size(); ++n) {
+      const GraphNode& node = *nodes[n];
       // The node's own fields before its parameters: JsonValue finds a key's first use.
       out += "    {\"id\": " + std::to_string(node.id) + ", \"type\": " + JsonQuoted(node.type->name) +
-        ", \"x\": " + JsonNumber(node.x) + ", \"y\": " + JsonNumber(node.y) + ", \"params\": {";
+        ", \"x\": " + JsonNumber(node.x) + ", \"y\": " + JsonNumber(node.y);
+      if (node.bypass) {
+        out += ", \"bypass\": 1";
+      }
+      if (!node.name.empty()) {
+        out += ", \"name\": " + JsonQuoted(node.name);
+      }
+      out += ", \"params\": {";
       for (std::size_t p = 0; p < node.params.size(); ++p) {
         const ParamDef& def = node.type->params[p];
         out += (p == 0 ? "" : ", ") + JsonQuoted(def.name) + ": ";
@@ -433,18 +494,18 @@ namespace faf::editor
         }
       }
       out += "}}";
-      out += n + 1 < mNodes.size() ? ",\n" : "\n";
+      out += n + 1 < nodes.size() ? ",\n" : "\n";
     }
     out += "  ],\n  \"links\": [\n";
-    for (std::size_t l = 0; l < mLinks.size(); ++l) {
-      const GraphLink& link = mLinks[l];
+    for (std::size_t l = 0; l < links.size(); ++l) {
+      const GraphLink& link = *links[l];
       const GraphNode* from = Find(link.fromNode);
       const GraphNode* to = Find(link.toNode);
       out += "    {\"from\": " + std::to_string(link.fromNode) +
         ", \"out\": " + JsonQuoted(from->type->outputs[static_cast<std::size_t>(link.fromPin)].name) +
         ", \"to\": " + std::to_string(link.toNode) +
         ", \"in\": " + JsonQuoted(to->type->inputs[static_cast<std::size_t>(link.toPin)].name) + "}";
-      out += l + 1 < mLinks.size() ? ",\n" : "\n";
+      out += l + 1 < links.size() ? ",\n" : "\n";
     }
     out += "  ]\n}\n";
     return out;
@@ -480,6 +541,10 @@ namespace faf::editor
       }
       (void)JsonFloat(head, "x", x);
       (void)JsonFloat(head, "y", y);
+      float bypass = 0.0f;
+      (void)JsonFloat(head, "bypass", bypass);
+      std::string nodeName;
+      (void)JsonValue(head, "name", nodeName);
       const NodeType* type = mRegistry->Find(typeName);
       if (type == nullptr) {
         continue; // a node type this editor doesn't have
@@ -489,6 +554,8 @@ namespace faf::editor
       node.type = type;
       node.x = x;
       node.y = y;
+      node.bypass = bypass >= 0.5f;
+      node.name = nodeName;
       node.revision = ++mRevisionSeed;
       std::string params;
       if (paramsAt != std::string::npos) {
@@ -536,6 +603,69 @@ namespace faf::editor
       (void)Link(fromNode->id, PinIndex(fromNode->type->outputs, out), toNode->id, PinIndex(toNode->type->inputs, in));
     }
     mChanges = 0;
+    return true;
+  }
+
+  std::vector<int> NodeGraph::Paste(
+    const std::string& text,
+    const float x,
+    const float y,
+    std::string& error
+  )
+  {
+    NodeGraph copied(*mRegistry);
+    if (!copied.Load(text, error)) {
+      return {};
+    }
+    float minX = 1e9f;
+    float minY = 1e9f;
+    for (const GraphNode& node : copied.mNodes) {
+      minX = std::min(minX, node.x);
+      minY = std::min(minY, node.y);
+    }
+    std::map<int, int> ids;
+    std::vector<int> added;
+    for (const GraphNode& node : copied.mNodes) {
+      if (node.type->isOutput && OutputNode() != 0) {
+        continue; // one output node a graph
+      }
+      const int id = AddNode(node.type->name, std::round(x + node.x - minX), std::round(y + node.y - minY));
+      GraphNode* made = Find(id);
+      if (made == nullptr) {
+        continue;
+      }
+      made->params = node.params;
+      made->bypass = node.bypass;
+      made->name = node.name;
+      ids[node.id] = id;
+      added.push_back(id);
+    }
+    for (const GraphLink& link : copied.mLinks) {
+      const auto from = ids.find(link.fromNode);
+      const auto to = ids.find(link.toNode);
+      if (from != ids.end() && to != ids.end()) {
+        (void)Link(from->second, link.fromPin, to->second, link.toPin);
+      }
+    }
+    for (const int id : added) {
+      Touch(id);
+    }
+    if (added.empty()) {
+      error = "nothing to paste";
+    }
+    return added;
+  }
+
+  bool NodeGraph::Restore(
+    const std::string& text,
+    std::string& error
+  )
+  {
+    const std::uint64_t before = mChanges;
+    if (!Load(text, error)) {
+      return false;
+    }
+    mChanges = before + 1;
     return true;
   }
 

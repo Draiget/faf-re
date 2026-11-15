@@ -1168,6 +1168,24 @@ namespace faf::editor
       line(mapW * 0.5f, 0.0f, mapW * 0.5f, mapH, 0xE040C0FFu);
       line(0.0f, mapH * 0.5f, mapW, mapH * 0.5f, 0xE040C0FFu);
     }
+    // The mask generator's mask on the terrain: a red cross on each cell where it is, as strong as it is.
+    if (mOverlayMask.w > 1 && mOverlayMask.h > 1) {
+      const float span = static_cast<float>(std::max(field->width, field->height) - 1);
+      const float step = std::max(4.0f, span / 64.0f);
+      for (float z = step * 0.5f; z < static_cast<float>(field->height - 1); z += step) {
+        for (float x = step * 0.5f; x < static_cast<float>(field->width - 1); x += step) {
+          const float v = std::clamp(field::SampleWorld(mOverlayMask, x, z), 0.0f, 1.0f);
+          if (v < 0.05f) {
+            continue;
+          }
+          const auto alpha = static_cast<std::uint32_t>(60.0f + 195.0f * v);
+          const std::uint32_t colour = (alpha << 24) | 0x00FF3030u;
+          const float r = step * 0.35f;
+          batcher->DrawLine(groundVertex(x - r, z - r, colour, 0.5f), groundVertex(x + r, z + r, colour, 0.5f));
+          batcher->DrawLine(groundVertex(x - r, z + r, colour, 0.5f), groundVertex(x + r, z - r, colour, 0.5f));
+        }
+      }
+    }
     // The chains: a line through each one's markers in order, and a small post at its first. The current chain (the
     // selected marker's, else the one the Markers tool names) is yellow with a ring on each member (FAF Studio's
     // chain view); "Selected chain only" draws just that one, with any tool.
@@ -3937,6 +3955,49 @@ namespace faf::editor
     message = std::string(mask == nullptr ? "Took the water mask off layer " : "Wrote the water mask into layer ") +
       std::to_string(layer) + ": " + std::to_string(changed) + " texels changed";
     return changed;
+  }
+
+  int EdMapScene::WriteMasksTogether(
+    const std::vector<std::pair<int, field::Grid>>& layers,
+    const MaskWriteMode mode,
+    const bool takeAway,
+    std::string& message
+  )
+  {
+    LoadMasks();
+    EdDocument::MaskGrid& masks = mDocument.Masks();
+    if (masks.texels.empty() || mPaintingMask) {
+      message = "No map's masks to write into.";
+      return -1;
+    }
+    const SampleRect whole{0, 0, masks.width - 1, masks.height - 1};
+    mDocument.MaskUndo().BeginStroke();
+    mDocument.MaskUndo().BeforeWrite(masks.texels.data(), whole);
+    const float mapSize = static_cast<float>(std::max(mDocument.Facts().sizeX, mDocument.Facts().sizeZ));
+    // From the top layer down, so "higher layers take away" reads the new paint above.
+    std::vector<std::pair<int, field::Grid>> ordered = layers;
+    std::sort(ordered.begin(), ordered.end(), [](const auto& a, const auto& b) {
+      return a.first > b.first;
+    });
+    std::size_t changed = 0;
+    for (const auto& [layer, mask] : ordered) {
+      changed += WriteMaskLayer(
+        masks.texels.data(),
+        masks.width,
+        masks.height,
+        mapSize,
+        layer,
+        RemappedStrata(TerrainShader()),
+        mask,
+        mode,
+        1.0f,
+        takeAway
+      );
+    }
+    WholeMaskChanged(whole);
+    message = std::to_string(ordered.size()) + " layers written: " + std::to_string(changed) +
+      " texels changed (one undo step)";
+    return static_cast<int>(changed);
   }
 
   int EdMapScene::WriteGeneratedMask(
@@ -6772,6 +6833,11 @@ namespace faf::editor
     return true;
   }
 
+  std::size_t EdMapScene::PropCountNow() const
+  {
+    return mMap != nullptr && mMap->mProps != nullptr ? mMap->mProps->mEntries.size() : 0;
+  }
+
   std::string EdMapScene::ApplyGraphBuild(
     const field::Grid& heights,
     const bool plain,
@@ -7121,18 +7187,62 @@ namespace faf::editor
       return "No map, or a stroke is under way.";
     }
     const std::string file = mTools->InteropFile(false);
+    ImportSettings settings = mTools->InteropSettings();
     HeightImage image;
     std::string error;
-    if (!ReadHeightImage(file, field->width, field->height, image, error)) {
+    if (!ReadHeightImageWith(file, field->width, field->height, settings.read, image, error)) {
       return "Import failed: " + error;
+    }
+    // FAF Studio's further options: the playable area as the region, the pads' spots, the mask image, the sea.
+    if (settings.regionPlayable) {
+      if (const std::optional<EdDocument::PlayableRect> area = mDocument.PlayableArea(); area.has_value()) {
+        settings.region = true;
+        settings.regionX0 = area->x0;
+        settings.regionZ0 = area->z0;
+        settings.regionX1 = area->x1;
+        settings.regionZ1 = area->z1;
+      }
+    }
+    if (settings.pads != 0) {
+      for (const SaveEntry& marker : mDocument.SaveData().Markers()) {
+        float mx = 0.0f, my = 0.0f, mz = 0.0f;
+        const std::string type = MarkerTypeOf(marker);
+        if ((type == "Blank Marker" || type == "Mass" || type == "Hydrocarbon") && MarkerPosition(marker, mx, my, mz)) {
+          settings.padPoints.push_back({mx, mz});
+        }
+      }
+    }
+    if (!settings.maskFile.empty()) {
+      HeightImage mask;
+      if (!ReadHeightImage(settings.maskFile, field->width, field->height, mask, error)) {
+        return "Import failed: the mask image: " + error;
+      }
+      mask = ResampleHeights(mask, field->width, field->height);
+      settings.maskWeights.resize(mask.words.size());
+      for (std::size_t i = 0; i < mask.words.size(); ++i) {
+        settings.maskWeights[i] = static_cast<float>(mask.words[i]) / 65535.0f;
+      }
+    }
+    if (settings.seaPin) {
+      settings.seaLevel = mDocument.WaterNow().elevation;
     }
     // The link's import replaces its last one while that is still the newest step: the history keeps one.
     const bool replace = live && mImportLive && ImportIsNewest() && Undo();
     auto* const words = reinterpret_cast<std::uint16_t*>(field->data);
     const std::size_t count = static_cast<std::size_t>(field->width) * static_cast<std::size_t>(field->height);
     const std::vector<std::uint16_t> current(words, words + count);
-    const std::vector<std::uint16_t> next =
-      ImportedHeights(image, current, field->width, field->height, mTools->InteropSettings());
+    std::vector<std::uint16_t> next = ImportedHeights(image, current, field->width, field->height, settings);
+    if (settings.symmetric) {
+      // Made symmetric as the toolbar's symmetry says (its first part copied over the rest).
+      const HeightBrush brush = mTools->CurrentHeightBrush();
+      if (brush.symmetry != Symmetry::None) {
+        SymmetrizeOptions options;
+        options.symmetry = brush.symmetry;
+        options.turns = brush.turns;
+        std::string why;
+        (void)SymmetrizeHeights(next.data(), field->width, field->height, options, why);
+      }
+    }
     std::size_t changed = 0;
     for (std::size_t k = 0; k < count; ++k) {
       changed += next[k] != current[k] ? 1u : 0u;
@@ -12876,18 +12986,37 @@ namespace faf::editor
     if (field == nullptr || mTools == nullptr || mMap->mProps == nullptr) {
       return "no map is open";
     }
-    if (mTools->PaintList().empty() && mTools->PropBlueprint().empty()) {
+    if (!fill.decals && mTools->PaintList().empty() && mTools->PropBlueprint().empty()) {
       return "choose a prop or fill the paint list first";
     }
-    // The playable area (else the whole map), a unit in from its edge.
-    float x0 = 1.0f, z0 = 1.0f;
-    float x1 = static_cast<float>(field->width - 2), z1 = static_cast<float>(field->height - 2);
-    if (const std::optional<EdDocument::PlayableRect> area = mDocument.PlayableArea(); area.has_value()) {
-      x0 = std::max(x0, static_cast<float>(area->x0) + 1.0f);
-      z0 = std::max(z0, static_cast<float>(area->z0) + 1.0f);
-      x1 = std::min(x1, static_cast<float>(area->x1) - 1.0f);
-      z1 = std::min(z1, static_cast<float>(area->z1) - 1.0f);
+    if (fill.decals && mTools->DecalTexturePath().empty()) {
+      return "pick a decal texture in the Decals tool first";
     }
+    // The playable area (else the whole map), the margin in from its edge.
+    const float m = std::max(1.0f, fill.margin);
+    float x0 = m, z0 = m;
+    float x1 = static_cast<float>(field->width - 1) - m, z1 = static_cast<float>(field->height - 1) - m;
+    if (const std::optional<EdDocument::PlayableRect> area = mDocument.PlayableArea(); area.has_value()) {
+      x0 = std::max(x0, static_cast<float>(area->x0) + m);
+      z0 = std::max(z0, static_cast<float>(area->z0) + m);
+      x1 = std::min(x1, static_cast<float>(area->x1) - m);
+      z1 = std::min(z1, static_cast<float>(area->z1) - m);
+    }
+    // The mask generator's rules as the density (FAF Studio's "density from mask rules").
+    field::Grid rules;
+    if (fill.maskRules && (!mMaskRulesSource || !mMaskRulesSource(rules))) {
+      return "the mask generator has no rules to read";
+    }
+    // Room round the props already there: a grid of buckets of their places.
+    const float keep = fill.keepAway;
+    std::map<std::pair<int, int>, std::vector<std::pair<float, float>>> existing;
+    if (keep > 0.0f) {
+      for (const moho::CWldPropEntry& entry : mMap->mProps->mEntries) {
+        existing[{static_cast<int>(entry.mTransform.pos_.x / keep), static_cast<int>(entry.mTransform.pos_.z / keep)}]
+          .emplace_back(entry.mTransform.pos_.x, entry.mTransform.pos_.z);
+      }
+    }
+    int high = 0, nearby = 0, sparse = 0;
     const HeightBrush brush = mTools->CurrentHeightBrush();
     const WaterState water = mDocument.WaterNow();
     const auto height = [this](const float x, const float z) {
@@ -12906,10 +13035,48 @@ namespace faf::editor
         return false;
       }
       if (
-        SlopeDegrees(height(x - 1.0f, z), height(x + 1.0f, z), height(x, z - 1.0f), height(x, z + 1.0f)) > fill.maxSlope
+        const float slope =
+          SlopeDegrees(height(x - 1.0f, z), height(x + 1.0f, z), height(x, z - 1.0f), height(x, z + 1.0f));
+        slope > fill.maxSlope || slope < fill.minSlope
       ) {
         ++steep;
         return false;
+      }
+      if (fill.heightWindow && (height(x, z) < fill.heightLow || height(x, z) > fill.heightHigh)) {
+        ++high;
+        return false;
+      }
+      if (rules.w > 1) {
+        // The mask's strength as the chance, by a hash of the place (the same seed, the same props).
+        std::uint32_t h = static_cast<std::uint32_t>(std::lround(x * 16.0f)) * 40503u ^
+          static_cast<std::uint32_t>(std::lround(z * 16.0f)) * 2246822519u ^ mScatterSeed;
+        h ^= h >> 15;
+        h *= 2654435761u;
+        h ^= h >> 13;
+        if (
+          static_cast<float>(h & 0xFFFFFFu) / 16777216.0f >= std::clamp(field::SampleWorld(rules, x, z), 0.0f, 1.0f)
+        ) {
+          ++sparse;
+          return false;
+        }
+      }
+      if (keep > 0.0f) {
+        const int bx = static_cast<int>(x / keep);
+        const int bz = static_cast<int>(z / keep);
+        for (int dz = -1; dz <= 1; ++dz) {
+          for (int dx = -1; dx <= 1; ++dx) {
+            const auto found = existing.find({bx + dx, bz + dz});
+            if (found == existing.end()) {
+              continue;
+            }
+            for (const auto& [px, pz] : found->second) {
+              if (std::hypot(px - x, pz - z) < keep) {
+                ++nearby;
+                return false;
+              }
+            }
+          }
+        }
       }
       // A point whose own copy would stand nearer than the spacing (by a mirror line) is left out.
       float cx[kMaxSymmetryCopies], cz[kMaxSymmetryCopies];
@@ -12929,27 +13096,47 @@ namespace faf::editor
     options.z1 = z1;
     options.density = fill.density;
     options.spacing = fill.spacing;
-    mScatterSeed = mScatterSeed * 1664525U + 1013904223U;
+    mScatterSeed = fill.seed > 0 ? static_cast<std::uint32_t>(fill.seed) : mScatterSeed * 1664525U + 1013904223U;
     options.seed = mScatterSeed;
     const std::vector<std::pair<float, float>> points = ScatterPoints(options, accept);
-    const std::size_t before = mMap->mProps->mEntries.size();
-    BeginObjectStroke();
-    mFilling = true;
-    for (const auto& [x, z] : points) {
-      PlaceProps(x, z);
+    std::size_t placed = 0;
+    if (fill.countOnly) {
+      // Count (FAF Studio's dry run): nothing is placed.
+    } else if (fill.decals) {
+      EdDocument::DecalSnapshot before = mDocument.DecalsNow();
+      mDecalSelection.clear();
+      for (const auto& [x, z] : points) {
+        placed += static_cast<std::size_t>(std::max(0, PlaceDecalCopies(x, z, 0.0f, NextDecalSizeFactor())));
+      }
+      if (placed > 0) {
+        mDocument.DecalsEdited(std::move(before));
+      }
+    } else {
+      const std::size_t before = mMap->mProps->mEntries.size();
+      BeginObjectStroke();
+      mFilling = true;
+      for (const auto& [x, z] : points) {
+        PlaceProps(x, z);
+      }
+      mFilling = false;
+      EndObjectStroke();
+      placed = mMap->mProps->mEntries.size() - before;
     }
-    mFilling = false;
-    EndObjectStroke();
-    const std::size_t placed = mMap->mProps->mEntries.size() - before;
-    char text[200];
+    char text[320];
     (void)std::snprintf(
       text,
       sizeof(text),
-      "%zu props placed (%zu points and their copies); left out: %d under water, %d too steep, %d by a mirror line",
-      placed,
+      "%s%zu %s (%zu points and their copies); left out: %d under water, %d by the slope, %d by the height, %d by the "
+      "mask, %d near props there, %d by a mirror line",
+      fill.countOnly ? "Count: " : "",
+      fill.countOnly ? points.size() : placed,
+      fill.countOnly ? "points would be placed" : (fill.decals ? "decals placed" : "props placed"),
       points.size(),
       wet,
       steep,
+      high,
+      sparse,
+      nearby,
       crowded
     );
     gpg::Logf("editor: fill the map: %s", text);

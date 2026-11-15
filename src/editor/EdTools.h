@@ -7,6 +7,7 @@
 #include "editor/tools/EdWaterMasks.h"
 #include "editor/tools/EdErosionSuite.h"
 #include "editor/tools/EdInterop.h"
+#include "editor/tools/EdMapTextures.h"
 #include "editor/tools/EdScTools.h"
 #include "editor/tools/EdHeightBrush.h"
 #include "editor/tools/EdBrushLibrary.h"
@@ -1668,6 +1669,93 @@ namespace faf::editor
       op = std::exchange(mMapTextureOp, MapTextureOp::None);
       return op != MapTextureOp::None;
     }
+    /** The map-wide textures' settings (FAF Studio's maptextures panel): what Make reads besides the map's sun and sea.
+     */
+    [[nodiscard]] const MapTextureOptions& MapTextureSettings() const noexcept
+    {
+      return mMapTexOptions;
+    }
+    [[nodiscard]] const MapPaintOptions& MapPaintSettings() const noexcept
+    {
+      return mMapPaintOptions;
+    }
+    /** The textures' size in pixels; 0: the map's size (64 .. 1024). */
+    [[nodiscard]] int MapTextureSize() const noexcept
+    {
+      return mMapTexSize;
+    }
+    void SetMapTextureSize(
+      const int size
+    ) noexcept
+    {
+      mMapTexSize = size;
+    }
+    /** A made texture's small picture for its row (an ImTextureID, 0 none). */
+    void SetMapTexturePreview(
+      const int kind,
+      const std::uint64_t image
+    ) noexcept
+    {
+      mMapTexPreview[std::clamp(kind, 0, 3)] = image;
+    }
+    [[nodiscard]] std::uint64_t MapTexturePreview(
+      const int kind
+    ) const noexcept
+    {
+      return mMapTexPreview[std::clamp(kind, 0, 3)];
+    }
+    /** Import / Export > Export package (FAF Studio's interopexport.lua): one folder for Gaea or World Machine. */
+    struct ExportPackage
+    {
+      char folder[512] = "";
+      bool normalised = true; // else absolute (a word is 1/128 unit)
+      bool fixedRange = false;
+      float low = 0.0f;
+      float high = 100.0f;
+      bool float32 = false; // .r32 heights
+      bool mask8 = false;   // 8-bit masks
+      bool height = true, water = true, slope = true, flow = false, wear = false, layers = true, types = false,
+           markers = true, playable = true, readme = true;
+      float markerRadius = 3.0f;
+      // The link watches the folder: new heights or masks by their names (height*, layer<n>*, mask<n>*).
+      bool watch = false;
+      float interval = 2.0f;
+    };
+    /** Import / Export > Masks: the files and what the whole import does. */
+    struct MaskImport
+    {
+      std::vector<MaskImportFile> files;
+      int mode = 0;          // 0 replace, 1 add, 2 subtract
+      bool takeAway = false; // higher layers take away from the ones below
+      char adding[512] = "";
+    };
+    [[nodiscard]] MaskImport& MaskImportSettings() noexcept
+    {
+      return mMaskImport;
+    }
+    /** 1: guess the files' uses again (the app knows the layers' kinds); 2: import. */
+    [[nodiscard]] int TakeMaskImportAsk() noexcept
+    {
+      return std::exchange(mMaskImportAsk, 0);
+    }
+    void AskMaskImport(
+      const int ask
+    ) noexcept
+    {
+      mMaskImportAsk = ask;
+    }
+    [[nodiscard]] ExportPackage& PackageSettings() noexcept
+    {
+      return mPackage;
+    }
+    [[nodiscard]] bool TakePackageAsk() noexcept
+    {
+      return std::exchange(mPackageAsk, false);
+    }
+    void AskPackage() noexcept
+    {
+      mPackageAsk = true;
+    }
     [[nodiscard]] MapTextureRow& MapTextureState(
       const int kind
     ) noexcept
@@ -2163,6 +2251,18 @@ namespace faf::editor
       float spacing = 6.0f;
       float maxSlope = 30.0f; // degrees
       bool dry = true;
+      // FAF Studio's scatter panel: a lowest slope, a height window, the margin from the edge, room round the props
+      // already there, the mask generator's rules as the density, decals instead, a dry run, a seed.
+      float minSlope = 0.0f;
+      bool heightWindow = false;
+      float heightLow = 0.0f;
+      float heightHigh = 200.0f;
+      float margin = 1.0f;
+      float keepAway = 0.0f; // units from the props there (0: none)
+      bool maskRules = false;
+      bool decals = false;
+      bool countOnly = false;
+      int seed = 0; // 0: a new one each time
     };
     [[nodiscard]] bool TakeFillRequest(
       FillOptions& options
@@ -2177,6 +2277,10 @@ namespace faf::editor
     {
       mFill = options;
       mFillRequest = true;
+    }
+    [[nodiscard]] const std::string& FillMessage() const noexcept
+    {
+      return mFillMessage;
     }
     void SetFillMessage(
       std::string message
@@ -2528,7 +2632,16 @@ namespace faf::editor
       bool takeAway = false; // only where the layers above leave the ground free
       /** -1: the layer; 0, 1, 2: the water's foam, flatness or depth bias (FAF Studio's "Apply to water mask"). */
       int water = -1;
+      /** A terrain type instead (FAF Studio's ApplyToTypes): `typeCode` where the mask is above `threshold`. */
+      bool toTypes = false;
+      int typeCode = 1;
+      float threshold = 0.5f;
     };
+    /** The mask generator's preview on the map too (FAF Studio draws it on the terrain). */
+    [[nodiscard]] bool GenShowOnMap() const noexcept
+    {
+      return mGenShowOnMap;
+    }
     [[nodiscard]] const std::vector<MaskGenRule>& GenRules() const noexcept
     {
       return mGenRules;
@@ -2989,6 +3102,19 @@ namespace faf::editor
     }
 
     /** Test runs (`/symcheck`): the Terrain tool with this symmetry (the panel's index), then Check or Copy. */
+    /** The symmetry alone (the tool stays): a graph build's own symmetry while it places its scatters. */
+    void SetSymmetryOnly(
+      const int index,
+      const int turns
+    ) noexcept
+    {
+      mSymmetry = index;
+      mNWay = turns;
+    }
+    [[nodiscard]] int NWayTurns() const noexcept
+    {
+      return mNWay;
+    }
     void SetSymmetry(
       const int index,
       const int turns
@@ -3595,6 +3721,15 @@ namespace faf::editor
     bool mRecipeRoughness = false;
     std::uint64_t mRecipeShowImage = 0;
     std::string mRecipeShowText;
+    bool mGenShowOnMap = false;
+    MapTextureOptions mMapTexOptions;
+    MapPaintOptions mMapPaintOptions;
+    int mMapTexSize = 0;
+    std::uint64_t mMapTexPreview[4] = {0, 0, 0, 0};
+    ExportPackage mPackage;
+    MaskImport mMaskImport;
+    int mMaskImportAsk = 0;
+    bool mPackageAsk = false;
     bool mDrawChain = false;
     char mChainName[64] = "Chain_01";
     bool mChainOnly = false;

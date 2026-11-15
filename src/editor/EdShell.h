@@ -10,6 +10,7 @@
 #include "editor/ui/EdFieldsPanel.h"
 #include "editor/doc/EdLuaApi.h"
 #include "editor/EdTools.h"
+#include "editor/tools/EdMeshData.h"
 #include "editor/doc/EdAdaptiveModel.h"
 #include "editor/tools/EdChecks.h"
 #include "editor/doc/EdLighting.h"
@@ -658,7 +659,15 @@ namespace faf::editor
     /** The mesh terrain view's mode (0 the height field, 1 the mesh, 2 both) and its other asks. */
     int mMeshMode = 1;
     bool mMeshMakeMap = true;
-    int mMeshAskMore = 0; // 1 load again, 2 check
+    int mMeshAskMore = 0; // 1 load again, 2 check, 3 save the manifest, 4 unset, 5 set
+    edmesh::MeshMap* mMeshMapView = nullptr;
+    int mMeshMaterial = 0;
+    void SetMeshMapView(
+      edmesh::MeshMap* mesh
+    ) noexcept
+    {
+      mMeshMapView = mesh;
+    }
     std::vector<std::string> mMeshFindings;
     [[nodiscard]] int MeshMode() const noexcept
     {
@@ -667,6 +676,13 @@ namespace faf::editor
     [[nodiscard]] int TakeMeshMore() noexcept
     {
       return std::exchange(mMeshAskMore, 0);
+    }
+    /** Test runs: the panel's Load / Check / Save / Unset / Set (1..5). */
+    void AskMeshMore(
+      const int ask
+    ) noexcept
+    {
+      mMeshAskMore = ask;
     }
     void SetMeshFindings(
       std::vector<std::string> findings
