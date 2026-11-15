@@ -3276,6 +3276,46 @@ namespace faf::editor
     if (ImGui::Button("Cancel") || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
       ImGui::CloseCurrentPopup();
     }
+    // FAF Studio's browser: a list instead of the grid, the files looked at again, any texture by its path.
+    ImGui::Checkbox("List", &mBrowseList);
+    ImGui::SameLine();
+    if (ImGui::Button("Rescan")) {
+      mLibrary.Refresh();
+    }
+    EdSetItemTooltip("Look for textures again (new files in the map's folder or a mod)");
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(-Em(70.0f));
+    ImGui::InputTextWithHint(
+      "##browsepath", "or a texture's path: /maps/<map>/env/layers/x.dds, /env/...", mBrowsePath, sizeof(mBrowsePath)
+    );
+    ImGui::SameLine();
+    const auto choose = [&](const std::string& albedo, const std::string& normals) {
+      if (mBrowseSlot < 0 || mBrowseSlot >= static_cast<int>(mSlots.size())) {
+        return;
+      }
+      mChangedSlot = mBrowseSlot;
+      mChangedValue = mSlots[static_cast<std::size_t>(mBrowseSlot)];
+      if (mBrowseNormals) {
+        mChangedValue.normals = normals.empty() ? albedo : normals;
+      } else {
+        mChangedValue.albedo = albedo;
+        if (!normals.empty()) {
+          mChangedValue.normals = normals;
+        }
+      }
+      const std::string used = mBrowseNormals ? mChangedValue.normals : albedo;
+      mRecentTextures.erase(std::remove(mRecentTextures.begin(), mRecentTextures.end(), used), mRecentTextures.end());
+      mRecentTextures.insert(mRecentTextures.begin(), used);
+      if (mRecentTextures.size() > 12) {
+        mRecentTextures.resize(12);
+      }
+      ImGui::CloseCurrentPopup();
+    };
+    ImGui::BeginDisabled(mBrowsePath[0] == '\0');
+    if (ImGui::Button("Use##browsepath")) {
+      choose(mBrowsePath, {});
+    }
+    ImGui::EndDisabled();
     std::string filter = mBrowseFilter;
     for (char& c : filter) {
       c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
@@ -3283,64 +3323,129 @@ namespace faf::editor
     if (ImGui::BeginChild("##grid", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Borders)) {
       const float cell = 128.0f;
       const int columns = std::max(1, static_cast<int>(ImGui::GetContentRegionAvail().x / (cell + 8.0f)));
-      int shown = 0;
-      std::string biome;
-      for (const LayerTexture& texture : mLibrary.Textures()) {
-        std::string key = texture.biome + "/" + texture.name;
-        for (char& c : key) {
-          c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-        }
-        if (!filter.empty() && key.find(filter) == std::string::npos) {
-          continue;
-        }
-        if (mBrowseNormals && texture.normals.empty()) {
-          continue; // (normal maps only)
-        }
-        if (texture.biome != biome) {
-          biome = texture.biome;
-          shown = 0;
-          ImGui::SeparatorText(biome.c_str());
-        }
-        if (shown % columns != 0) {
-          ImGui::SameLine();
-        }
-        ++shown;
-        ImGui::PushID(texture.path.c_str());
-        ImGui::BeginGroup();
-        const std::uint64_t image = !mBrowseNormals ? mLibrary.Thumbnail(texture.path)
-          : mBrowseRelief                           ? mLibrary.Relief(texture.normals)
-                                                    : mLibrary.Thumbnail(texture.normals);
-        bool picked = false;
-        if (image != 0U) {
-          picked = ImGui::ImageButton("##pick", static_cast<ImTextureID>(image), ImVec2(cell, cell));
-        } else {
-          picked = ImGui::Button("...", ImVec2(cell + 6.0f, cell + 6.0f));
-        }
-        ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + cell);
-        ImGui::TextUnformatted(texture.name.c_str());
-        ImGui::PopTextWrapPos();
-        ImGui::EndGroup();
-        if (ImGui::IsItemHovered()) {
-          EdSetTooltip(
-            "%s\n%s",
-            texture.path.c_str(),
-            texture.normals.empty() ? "(no normal map beside it)" : texture.normals.c_str()
-          );
-        }
-        if (picked && mBrowseSlot >= 0 && mBrowseSlot < static_cast<int>(mSlots.size())) {
-          mChangedSlot = mBrowseSlot;
-          mChangedValue = mSlots[static_cast<std::size_t>(mBrowseSlot)];
-          if (mBrowseNormals) {
-            mChangedValue.normals = texture.normals;
-          } else {
-            mChangedValue.albedo = texture.path;
-            if (!texture.normals.empty()) {
-              mChangedValue.normals = texture.normals;
+      // The sections: the map's own textures, the starred, the recent, then the game's by biome.
+      const std::vector<LayerTexture>& game = mLibrary.Textures();
+      const std::vector<LayerTexture>& own = mLibrary.MapTextures(mMapFolder);
+      const auto byPath = [&](const std::string& path) -> const LayerTexture* {
+        for (const std::vector<LayerTexture>* list : {&own, &game}) {
+          for (const LayerTexture& t : *list) {
+            if (t.path == path || (mBrowseNormals && t.normals == path)) {
+              return &t;
             }
           }
-          ImGui::CloseCurrentPopup();
         }
-        ImGui::PopID();
+        return nullptr;
+      };
+      std::vector<std::pair<std::string, std::vector<const LayerTexture*>>> sections;
+      sections.push_back({"This map", {}});
+      for (const LayerTexture& t : own) {
+        sections.back().second.push_back(&t);
+      }
+      sections.push_back({"Starred (right-click a texture)", {}});
+      for (const std::string& path : mStarredTextures) {
+        if (const LayerTexture* t = byPath(path)) {
+          sections.back().second.push_back(t);
+        }
+      }
+      sections.push_back({"Recent", {}});
+      for (const std::string& path : mRecentTextures) {
+        if (const LayerTexture* t = byPath(path)) {
+          sections.back().second.push_back(t);
+        }
+      }
+      for (const LayerTexture& t : game) {
+        if (sections.back().first != t.biome || sections.size() <= 3) {
+          sections.push_back({t.biome, {}});
+        }
+        sections.back().second.push_back(&t);
+      }
+      int id = 0;
+      for (const auto& [title, list] : sections) {
+        std::vector<const LayerTexture*> shownList;
+        for (const LayerTexture* texture : list) {
+          std::string key = texture->biome + "/" + texture->name;
+          for (char& c : key) {
+            c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+          }
+          if (
+            (!filter.empty() && key.find(filter) == std::string::npos) || (mBrowseNormals && texture->normals.empty())
+          ) {
+            continue;
+          }
+          shownList.push_back(texture);
+        }
+        if (shownList.empty()) {
+          continue;
+        }
+        ImGui::SeparatorText(title.c_str());
+        int shown = 0;
+        for (const LayerTexture* texture : shownList) {
+          ImGui::PushID(++id);
+          const std::uint64_t image = !mBrowseNormals ? mLibrary.Thumbnail(texture->path)
+            : mBrowseRelief                           ? mLibrary.Relief(texture->normals)
+                                                      : mLibrary.Thumbnail(texture->normals);
+          const bool starred =
+            std::find(mStarredTextures.begin(), mStarredTextures.end(), texture->path) != mStarredTextures.end();
+          bool picked = false;
+          if (mBrowseList) {
+            const ImVec2 corner = ImGui::GetCursorScreenPos();
+            const float side = Em(36.0f);
+            picked = ImGui::Selectable("##row", false, ImGuiSelectableFlags_AllowOverlap, ImVec2(0.0f, side));
+            ImDrawList* dl = ImGui::GetWindowDrawList();
+            if (image != 0U) {
+              dl->AddImage(static_cast<ImTextureID>(image), corner, ImVec2(corner.x + side, corner.y + side));
+            }
+            dl->AddText(
+              ImVec2(corner.x + side + Em(8.0f), corner.y),
+              ImGui::GetColorU32(ImGuiCol_Text),
+              ((starred ? std::string(ICON_STAR " ") : std::string()) + texture->name).c_str()
+            );
+            dl->AddText(
+              ImVec2(corner.x + side + Em(8.0f), corner.y + ImGui::GetTextLineHeight()),
+              ImGui::GetColorU32(ImGuiCol_TextDisabled),
+              texture->path.c_str()
+            );
+          } else {
+            if (shown % columns != 0) {
+              ImGui::SameLine();
+            }
+            ++shown;
+            ImGui::BeginGroup();
+            if (image != 0U) {
+              picked = ImGui::ImageButton("##pick", static_cast<ImTextureID>(image), ImVec2(cell, cell));
+            } else {
+              picked = ImGui::Button("...", ImVec2(cell + 6.0f, cell + 6.0f));
+            }
+            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + cell);
+            ImGui::TextUnformatted(((starred ? std::string(ICON_STAR " ") : std::string()) + texture->name).c_str());
+            ImGui::PopTextWrapPos();
+            ImGui::EndGroup();
+          }
+          if (ImGui::IsItemClicked(ImGuiMouseButton_Right)) {
+            if (starred) {
+              mStarredTextures.erase(std::find(mStarredTextures.begin(), mStarredTextures.end(), texture->path));
+            } else {
+              mStarredTextures.push_back(texture->path);
+            }
+          }
+          if (ImGui::IsItemHovered()) {
+            // A large preview (Studio's), with where it comes from.
+            ImGui::BeginTooltip();
+            if (image != 0U) {
+              ImGui::Image(static_cast<ImTextureID>(image), ImVec2(Em(256.0f), Em(256.0f)));
+            }
+            ImGui::TextUnformatted(texture->path.c_str());
+            ImGui::TextDisabled(
+              "%s", texture->normals.empty() ? "(no normal map beside it)" : texture->normals.c_str()
+            );
+            ImGui::TextDisabled("Right-click: %s", starred ? "unstar" : "star");
+            ImGui::EndTooltip();
+          }
+          if (picked) {
+            choose(texture->path, texture->normals);
+          }
+          ImGui::PopID();
+        }
       }
     }
     ImGui::EndChild();

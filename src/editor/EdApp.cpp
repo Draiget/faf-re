@@ -81,6 +81,7 @@
 #include "editor/ui/EdKeysPage.h"
 #include "editor/ui/EdPalette.h"
 #include "editor/ui/EdPerf.h"
+#include "editor/tools/EdErosionSuite.h"
 #include "editor/ui/EdSettings.h"
 #include "editor/ui/EdStatus.h"
 #include "editor/ui/EdTheme.h"
@@ -145,6 +146,11 @@
 
 // imgui_impl_win32.h leaves this declaration to the application.
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
+
+namespace moho
+{
+  extern bool ren_Terrain; // the height field drawn (RuntimeTuningGlobals.cpp)
+} // namespace moho
 
 namespace faf::editor
 {
@@ -635,7 +641,7 @@ namespace faf::editor
     {
       // Between plays the opened map's camera takes the mouse (EdMapScene).
       if (OnViewportMessage(window, message, wParam, lParam)) {
-        return 0;
+        return message == WM_SETCURSOR ? TRUE : 0; // (the cursor set: no further processing)
       }
       // The editor's view in front of a play: what it doesn't take doesn't reach the game behind it either (a click
       // there must not order the session's units).
@@ -7446,23 +7452,214 @@ namespace faf::editor
           return field::RunOpCpu(op, args, *out, error) ? out : nullptr;
         };
         std::string error;
-        const EdFieldsPanel::QuickGenPreset& preset =
-          EdFieldsPanel::QuickGenPresets()[static_cast<std::size_t>(std::clamp(q.preset, 0, 5))];
-        field::OpArgs noise;
-        noise.in["like"] = heights;
-        noise.p.num["seed"] = q.seed;
-        noise.p.num["scale"] = q.scale;
-        noise.p.num["octaves"] = 8;
-        noise.p.num["finest"] = 3;
-        noise.p.num["persistence"] = q.detail;
-        noise.p.num["sharpness"] = preset.sharpness;
-        noise.p.num["warp"] = q.warp;
-        noise.p.str["kind"] = preset.kind;
-        const std::shared_ptr<field::Grid> raw = run("fractal", noise, error);
-        field::OpArgs amp;
-        amp.in["a"] = raw;
-        amp.p.num["amplitude"] = q.amplitude;
-        const std::shared_ptr<field::Grid> relief = raw != nullptr ? run("amplitude", amp, error) : nullptr;
+        // FAF Studio's presets (fieldgen.lua): each an op chain of the field library, then, with gullies, a brief
+        // droplet erosion, then the relief's size.
+        using Num = std::map<std::string, double>;
+        using Str = std::map<std::string, std::string>;
+        const auto op = [&](
+                          const char* name,
+                          const std::map<std::string, std::shared_ptr<field::Grid>>& in,
+                          const Num& num,
+                          const Str& str = {}
+                        ) -> std::shared_ptr<field::Grid> {
+          if (!error.empty()) {
+            return nullptr;
+          }
+          field::OpArgs args;
+          for (const auto& [key, grid] : in) {
+            if (grid == nullptr) {
+              error = std::string(name) + ": an input failed";
+              return nullptr;
+            }
+            args.in[key] = grid;
+          }
+          for (const auto& [key, value] : num) {
+            args.p.num[key] = value;
+          }
+          for (const auto& [key, value] : str) {
+            args.p.str[key] = value;
+          }
+          return run(name, args, error);
+        };
+        const double scale = q.scale;
+        const double warp = q.warp;
+        const double finest = std::max(3.0, scale * (0.22 - 0.19 * q.detail));
+        const auto fractal = [&](const int k, Num num, Str str = {}) {
+          num.emplace("seed", q.seed + k);
+          num.emplace("octaves", 8);
+          num.emplace("finest", finest);
+          return op("fractal", {{"like", heights}}, num, str);
+        };
+        const auto centred = [&](const std::shared_ptr<field::Grid>& f) {
+          return op("affine", {{"a", f}}, {{"mul", 1.0}, {"add", -0.5}});
+        };
+        const auto blend = [&](
+                             const std::shared_ptr<field::Grid>& a,
+                             const std::shared_ptr<field::Grid>& b,
+                             const char* mode,
+                             const double opacity
+                           ) {
+          return op("blend", {{"a", a}, {"b", b}}, {{"opacity", opacity}}, {{"mode", mode}});
+        };
+        std::shared_ptr<field::Grid> raw;
+        switch (std::clamp(q.preset, 0, 5)) {
+        case 0: { // hills
+          const auto a = fractal(
+            0,
+            {{"scale", scale}, {"persistence", 0.42}, {"warp", warp * 0.2 * scale}, {"erosion", 1.5}},
+            {{"kind", "billow"}, {"style", "erosive"}}
+          );
+          const auto b = fractal(
+            1,
+            {{"scale", scale * 1.8},
+             {"persistence", 0.5},
+             {"warp", warp * 0.15 * scale},
+             {"slope_detail", 0.3},
+             {"erosion", 1.5}},
+            {{"kind", "fbm"}, {"style", "erosive"}}
+          );
+          raw = blend(a, b, "normal", 0.5);
+          break;
+        }
+        case 1: { // mountains: ridged crests over a broad massif
+          const auto r = fractal(
+            0,
+            {{"scale", scale},
+             {"persistence", 0.5},
+             {"sharpness", 2.2},
+             {"warp", warp * 0.2 * scale},
+             {"slope_detail", 0.5},
+             {"erosion", 1.0}},
+            {{"kind", "ridged"}, {"style", "erosive"}}
+          );
+          const auto peaks = op("gamma", {{"a", r}}, {{"gamma", 1.3}});
+          const auto massif = fractal(
+            1,
+            {{"scale", scale * 1.35}, {"persistence", 0.5}, {"warp", warp * 0.2 * scale}, {"erosion", 1.5}},
+            {{"kind", "fbm"}, {"style", "erosive"}}
+          );
+          raw = blend(peaks, massif, "normal", 0.4);
+          break;
+        }
+        case 2: { // badlands: stepped mesas, rough cliffs
+          const auto base = op(
+            "fractal",
+            {{"like", heights}},
+            {{"seed", q.seed},
+             {"scale", scale},
+             {"octaves", 3},
+             {"finest", std::max(finest, scale * 0.18)},
+             {"warp", warp * 0.1 * scale}}
+          );
+          const auto shaped = op("smoothstep", {{"a", base}}, {{"edge0", 0.3}, {"edge1", 0.7}});
+          const auto steps =
+            op("terrace", {{"a", shaped}}, {{"steps", 5}, {"sharpness", 0.9}, {"lo", 0.0}, {"hi", 1.0}});
+          const auto slope = op("slope", {{"a", steps}}, {}, {{"mode", "gradient"}});
+          const auto cliff = op(
+            "blur",
+            {{"a",
+              op(
+                "clamp",
+                {{"a", op("affine", {{"a", slope}}, {{"mul", 10.0}, {"add", 0.0}})}},
+                {{"lo", 0.0}, {"hi", 1.0}}
+              )}},
+            {{"radius", 2.0}}
+          );
+          const auto rough = fractal(1, {{"scale", scale * 0.18}, {"persistence", 0.55}}, {{"kind", "ridged"}});
+          const auto detail = op("mul", {{"a", centred(rough)}, {"b", cliff}}, {});
+          const auto sum = blend(steps, detail, "add", 0.35);
+          const auto grit = fractal(2, {{"scale", scale * 0.15}, {"octaves", 3}}, {{"kind", "fbm"}});
+          raw = blend(sum, centred(grit), "add", 0.03);
+          break;
+        }
+        case 3: { // dunes: crests, some stretches flat
+          const auto d = op(
+            "dunes",
+            {{"like", heights}},
+            {{"seed", q.seed},
+             {"wavelength", scale},
+             {"angle", static_cast<double>((q.seed * 47) % 180)},
+             {"asym", 0.9},
+             {"warp", warp * 0.5 * scale},
+             {"warp_size", scale * 2.0},
+             {"variation", 0.6},
+             {"ripples", 0.0}}
+          );
+          const auto patches = fractal(1, {{"scale", scale * 2.5}, {"octaves", 2}, {"finest", scale}});
+          const auto patchy = op("smoothstep", {{"a", patches}}, {{"edge0", 0.35}, {"edge1", 0.65}});
+          const auto big = blend(d, patchy, "mul", 0.8);
+          raw = blend(big, fractal(2, {{"scale", scale * 0.75}, {"persistence", 0.45}}), "normal", 0.25);
+          break;
+        }
+        case 4: // plains detail
+          raw = fractal(
+            0,
+            {{"scale", scale},
+             {"persistence", 0.45},
+             {"warp", warp * 0.15 * scale},
+             {"slope_detail", 0.7},
+             {"erosion", 1.0}},
+            {{"kind", "fbm"}, {"style", "erosive"}}
+          );
+          break;
+        default: { // rocks: boulder domes
+          const auto cells = op(
+            "cells",
+            {{"like", heights}},
+            {{"seed", q.seed}, {"scale", scale}, {"warp", warp * 0.2 * scale}, {"warp_scale", scale * 0.8}},
+            {{"mode", "f1"}}
+          );
+          const auto domes = op("invert", {{"a", cells}}, {{"lo", 0.0}, {"hi", 1.0}});
+          raw = blend(domes, fractal(1, {{"scale", scale * 0.8}, {"persistence", 0.5}}), "normal", 0.3);
+          break;
+        }
+        }
+        // Gullies: a brief droplet erosion of the relief at twice its size (Studio's Weather).
+        if (raw != nullptr && q.gullies > 0.001f) {
+          const auto range = op(
+            "amplitude",
+            {{"a", raw}},
+            {{"amplitude", std::max(1.0, static_cast<double>(q.amplitude)) * 2.0}},
+            {{"mode", "range"}, {"centre", "min"}}
+          );
+          const ErosionSolver* const droplet = FindErosionSolver("droplet");
+          if (range != nullptr && droplet != nullptr) {
+            ErosionValues v = ErosionDefaults(*droplet);
+            const std::map<std::string, double> mine = {
+              {"density", 0.3 + 3.2 * q.gullies},
+              {"lifetime", 70},
+              {"inertia", 0.25},
+              {"capacity", 6},
+              {"erode", 0.45},
+              {"deposit", 0.12},
+              {"gravity", 5},
+              {"thermal", 0.4},
+              {"thermal_steps", 3},
+              {"talus", 0.9},
+              {"vary", 0.4},
+              {"protect", 0.5},
+              {"drop_vary", 0.6},
+              {"radius", 2},
+              {"creep", 1.5},
+              {"max_change", std::max(1.0, q.amplitude * 0.5)}
+            };
+            for (const auto& [key, value] : mine) {
+              v[key] = value;
+            }
+            field::OpArgs args;
+            args.in["a"] = range;
+            for (const auto& [key, value] : ErosionOpValues(*droplet, v, 1.0)) {
+              args.p.num[key] = value;
+            }
+            args.p.num["seed"] = q.seed + 100;
+            args.p.num["masks"] = 0;
+            if (const auto eroded = run(droplet->op, args, error); eroded != nullptr) {
+              raw = eroded;
+            }
+          }
+        }
+        const std::shared_ptr<field::Grid> relief =
+          raw != nullptr ? op("amplitude", {{"a", raw}}, {{"amplitude", q.amplitude}}, {{"mode", "peak"}}) : nullptr;
         if (relief == nullptr) {
           fields.SetQuickGenResult({}, "Generate: " + error);
           return;
@@ -7570,7 +7767,7 @@ namespace faf::editor
           text,
           sizeof(text),
           "%s (%s): the ground moves up to %.1f units, %.2f on average; %.0f %% of the map changes",
-          preset.label,
+          EdFieldsPanel::QuickGenPresets()[static_cast<std::size_t>(std::clamp(q.preset, 0, 5))].label,
           kModes[std::clamp(q.blend, 0, 4)],
           static_cast<double>(largest),
           sum / static_cast<double>(std::max<std::size_t>(change.v.size(), 1)),
@@ -8157,6 +8354,178 @@ namespace faf::editor
         }
       }
       std::string mR9Marker;
+      /**
+       * `/r10test` (test runs): the eighth comparison's features, each logged: the view's cursor for the tools and an
+       * area's parts; Generate into the map with each preset (then undone); the map's own textures listed; the picked
+       * areas with the markers (duplicated together, arranged, following a drag); with `/meshtest`, the mesh drawn as
+       * models, the height field hidden in Mesh only and the pointer on the mesh.
+       */
+      int mR10Stage = 0;
+      int mR10Frames = 0;
+      void DriveRoundTenTest()
+      {
+        if (
+          mR10Stage >= 20 || !mScene.Attached() || mScene.ModelsPending() ||
+          !moho::CFG_GetArgOption("/r10test", 0, nullptr) || ++mR10Frames % 90 != 0
+        ) {
+          return;
+        }
+        EdTools& tools = mShell->Tools();
+        const int width = mDocument.Facts().fieldWidth;
+        const int height = mDocument.Facts().fieldHeight;
+        const float cx = static_cast<float>(width - 1) * 0.5f;
+        const float cz = static_cast<float>(height - 1) * 0.5f;
+        const auto count = [this](const char* what) {
+          return what[0] == 'a' ? mDocument.SaveData().Areas().size() : mDocument.SaveData().Markers().size();
+        };
+        switch (mR10Stage++) {
+        case 0: {
+          mScene.FrameMap();
+          tools.SetTool(1); // the Terrain tool
+          break;
+        }
+        case 1: {
+          const POINT middle = mScene.ScreenOf(cx, cz);
+          gpg::Logf("editor: /r10test: cursor, Terrain tool raising: %d", mScene.ViewCursorAt(middle));
+          tools.SetTool(6); // the Markers tool
+          // An area round the middle, picked: its corner and its outline.
+          EdDocument::SaveSnapshot before = mDocument.SaveDataNow();
+          SaveEntry area{"AREA_R10", {}};
+          area.Set("rectangle", RectangleValue(cx - 60.0, cz - 40.0, cx + 60.0, cz + 40.0));
+          mDocument.SaveData().Areas().push_back(area);
+          mDocument.SaveDataEdited(std::move(before));
+          tools.AreaSelection() = {"AREA_R10"};
+          break;
+        }
+        case 2: {
+          gpg::Logf(
+            "editor: /r10test: cursor, Markers tool: corner %d, right edge %d, outline %d, open ground %d",
+            mScene.ViewCursorAt(mScene.ScreenOf(cx + 60.0f, cz + 40.0f)),
+            mScene.ViewCursorAt(mScene.ScreenOf(cx + 60.0f, cz)),
+            mScene.ViewCursorAt(mScene.ScreenOf(cx + 30.0f, cz - 40.0f)),
+            mScene.ViewCursorAt(mScene.ScreenOf(cx + 20.0f, cz + 5.0f))
+          );
+          // The area with the first marker: duplicated together, then arranged.
+          const std::size_t areas = count("areas");
+          const std::size_t markers = count("markers");
+          std::string first;
+          for (const SaveEntry& marker : mDocument.SaveData().Markers()) {
+            if (!marker.name.empty()) {
+              first = marker.name;
+              break;
+            }
+          }
+          mScene.SelectMarkers({first}, false);
+          tools.AreaSelection() = {"AREA_R10"};
+          mScene.CtrlKey('D');
+          gpg::Logf(
+            "editor: /r10test: marker %s and AREA_R10 duplicated together: areas %zu -> %zu, markers %zu -> %zu",
+            first.c_str(),
+            areas,
+            count("areas"),
+            markers,
+            count("markers")
+          );
+          break;
+        }
+        case 3: {
+          // Follow: the picked areas go along with a marker drag (here its start and a move of 12, 0).
+          tools.AreaSelection() = {"AREA_R10"};
+          mScene.BeginAreaFollow();
+          mScene.FollowAreas(12.0f, 0.0f);
+          std::string rect;
+          for (const SaveEntry& area : mDocument.SaveData().Areas()) {
+            if (area.name == "AREA_R10") {
+              const std::vector<double> e = ValueNumbers(area.Get("rectangle"));
+              char text[80];
+              (void)std::snprintf(text, sizeof(text), "%.0f,%.0f,%.0f,%.0f", e[0], e[1], e[2], e[3]);
+              rect = text;
+            }
+          }
+          gpg::Logf(
+            "editor: /r10test: AREA_R10 after a marker drag of 12, 0: %s (was %.0f,%.0f,%.0f,%.0f)",
+            rect.c_str(),
+            cx - 60.0,
+            cz - 40.0,
+            cx + 60.0,
+            cz + 40.0
+          );
+          for (int i = 0; i < 4; ++i) {
+            (void)mScene.Undo();
+          }
+          break;
+        }
+        case 4: {
+          // The map's own textures in the browser's first section.
+          const std::vector<LayerTexture>& own = tools.Library().MapTextures("/maps/" + mDocument.FolderName());
+          gpg::Logf(
+            "editor: /r10test: this map's textures (/maps/%s): %zu, first %s",
+            mDocument.FolderName().c_str(),
+            own.size(),
+            own.empty() ? "-" : own.front().path.c_str()
+          );
+          tools.OpenBrowser(1);
+          break;
+        }
+        case 5:
+        case 6:
+        case 7:
+        case 8:
+        case 9:
+        case 10: {
+          // Generate into the map: each preset, applied (its status logs the change), then undone.
+          if (mR10Stage > 6) {
+            (void)mScene.Undo();
+          }
+          mShell->Fields().AskQuickGen(mR10Stage - 6, 0);
+          break;
+        }
+        case 11:
+          (void)mScene.Undo();
+          gpg::Logf("editor: /r10test: generate undone");
+          break;
+        case 12: {
+          // With /meshtest: the mesh as models; Mesh only hides the height field; the pointer on the mesh.
+          if (!mScene.MeshMapRef().Loaded()) {
+            gpg::Logf("editor: /r10test: no mesh terrain (run with /meshtest)");
+            break;
+          }
+          mShell->mMeshMode = 1;
+          break;
+        }
+        case 13: {
+          if (!mScene.MeshMapRef().Loaded()) {
+            break;
+          }
+          float gx = 0.0f, gz = 0.0f;
+          const POINT middle = mScene.ScreenOf(256.0f, 256.0f);
+          const bool hit = mScene.GroundAtForTest(static_cast<float>(middle.x), static_cast<float>(middle.y), gx, gz);
+          gpg::Logf(
+            "editor: /r10test: mesh only: %zu patch models, height field drawn %s; the pointer at the hill's "
+            "middle (256, 256 on the height field) meets the mesh at %.1f, %.1f (%s); placement height there %.2f",
+            mScene.MeshPatchModels(),
+            moho::ren_Terrain ? "yes" : "no",
+            static_cast<double>(gx),
+            static_cast<double>(gz),
+            hit ? "hit" : "missed",
+            static_cast<double>(mScene.PlacementHeight(gx, gz))
+          );
+          mShell->mMeshMode = 0;
+          break;
+        }
+        case 14:
+          if (mScene.MeshMapRef().Loaded()) {
+            gpg::Logf("editor: /r10test: terrain only: height field drawn %s", moho::ren_Terrain ? "yes" : "no");
+            mShell->mMeshMode = 1;
+          }
+          break;
+        case 19:
+          gpg::Logf("editor: /r10test: done");
+          break;
+        default:
+          break;
+        }
+      }
       /** Import / Export > Masks: the files' uses guessed by name, then read and written together. */
       void MaskImportUpdate()
       {
@@ -13146,6 +13515,14 @@ namespace faf::editor
         mShell->ModHost().Notify("edit", step);
       }
       // A mesh terrain map's patches: read when its map is up, again when asked; the view's mode; the checks.
+      // `/meshmode <0|1|2>` (test runs): the mesh terrain view's mode (terrain, mesh, both) from the start.
+      if (fa::vector<fa::string> mode; moho::CFG_GetArgOption("/meshmode", 1, &mode) && !mode.empty()) {
+        static bool taken = false;
+        if (!taken) {
+          taken = true;
+          mShell->mMeshMode = std::clamp(std::atoi(mode[0].c_str()), 0, 2);
+        }
+      }
       mScene.SetMeshMode(mShell->MeshMode());
       if (mScene.Attached() && mMeshLoadedFor != mDocument.Path()) {
         mMeshLoadedFor = mDocument.Path();
@@ -14031,6 +14408,7 @@ namespace faf::editor
       if (mDocument.GetState() == EdDocument::State::Open && mLayerNamesOf != mDocument.Path()) {
         mLayerNamesOf = mDocument.Path();
         tools.SetLayerNames(mDocument.Facts().layers);
+        tools.SetMapFolder("/maps/" + mDocument.FolderName());
       }
       // The texture slots as the terrain has them, and a change the panel asked for.
       if (mScene.Attached()) {
@@ -14049,6 +14427,7 @@ namespace faf::editor
         DriveRoundSevenTest();
         DriveRoundEightTest();
         DriveRoundNineTest();
+        DriveRoundTenTest();
         RecipesUpdate();
         TexturesUpdate();
         DriveMaterialEditor();

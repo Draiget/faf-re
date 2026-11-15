@@ -998,6 +998,13 @@ namespace faf::editor
     {
       mAreaLimit = limit;
     }
+    /** The open map's folder in the game's files (`/maps/<folder>`): the texture browser lists its own textures. */
+    void SetMapFolder(
+      std::string folder
+    )
+    {
+      mMapFolder = std::move(folder);
+    }
     /** The Markers tool's type to place (an entry of MarkerTypes()). */
     [[nodiscard]] const MarkerType& PlaceMarkerType() const noexcept
     {
@@ -3444,6 +3451,11 @@ namespace faf::editor
     std::string mPaintNote;
     bool mBrowseNormals = false; // the browser picks the normal map alone
     bool mBrowseRelief = true;   // normal maps shown as lit relief
+    bool mBrowseList = false;    // a list instead of the grid
+    std::string mMapFolder;      // the open map's folder in the game's files (/maps/<folder>)
+    std::vector<std::string> mStarredTextures;
+    std::vector<std::string> mRecentTextures; // the latest first, at most 12
+    char mBrowsePath[512]{};
     float mPlanePointH[3]{};
     float mPlanePointZ[3]{};
     int mPlanePoints = 0;

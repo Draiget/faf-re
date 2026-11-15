@@ -42,8 +42,9 @@ namespace faf::editor
       float strength = 1.0f;
       float scale = 140.0f;
       int seed = 1;
-      float detail = 0.5f; // persistence
-      float warp = 0.0f;
+      float detail = 0.5f;  // how fine the finest octave is, 0..1
+      float warp = 0.5f;    // 0..1 of the feature size
+      float gullies = 0.0f; // 0..1: a brief droplet erosion after the relief (FAF Studio's gullies)
       int mask = 0; // 0 whole map, 1 playable area, 2 the area named below
       std::string area;
       float feather = 24.0f;
@@ -51,13 +52,14 @@ namespace faf::editor
       float flatRadius = 24.0f;
       bool keepWater = true;
     };
+    /** FAF Studio's fieldgen presets: their defaults; each builds its relief from several field ops (EdApp). */
     struct QuickGenPreset
     {
       const char* label;
-      const char* kind; // fbm | billow | ridged
+      const char* tip;
       float scale;
       float amplitude;
-      float sharpness;
+      float gullies;
       float warp;
       float detail;
     };
@@ -103,6 +105,7 @@ namespace faf::editor
       mQuick.amplitude = p.amplitude;
       mQuick.warp = p.warp;
       mQuick.detail = p.detail;
+      mQuick.gullies = p.gullies;
       mQuickAsk = 2;
     }
     /** Test runs: start from the map, apply `op` with `params`; the status says how it went. */

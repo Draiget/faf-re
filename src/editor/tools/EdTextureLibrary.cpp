@@ -120,6 +120,51 @@ namespace faf::editor
     return mTextures;
   }
 
+  const std::vector<LayerTexture>& EdTextureLibrary::MapTextures(
+    const std::string& folder
+  )
+  {
+    if (folder.empty() || mMapListedFor == folder) {
+      return mMapTextures;
+    }
+    mMapListedFor = folder;
+    mMapTextures.clear();
+    moho::CVirtualFileSystem* const vfs = moho::DISK_GetVFS();
+    if (vfs == nullptr) {
+      return mMapTextures;
+    }
+    fa::vector<fa::string> found;
+    vfs->EnumerateFiles(folder.c_str(), "*.dds", true, &found);
+    std::set<std::string> lowerAll;
+    for (const fa::string& file : found) {
+      lowerAll.insert(Lower(file.c_str()));
+    }
+    for (const fa::string& file : found) {
+      const std::string path = file.c_str();
+      const std::string lower = Lower(path);
+      if (EndsWith(lower, "_normals.dds") || EndsWith(lower, "_normal.dds")) {
+        continue;
+      }
+      LayerTexture texture;
+      texture.path = path;
+      texture.biome = "This map";
+      texture.name = LayerTextureName(path);
+      for (const char* const suffix : {"_normals.dds", "_normal.dds"}) {
+        const std::string base =
+          EndsWith(lower, "_albedo.dds") ? path.substr(0, path.size() - 11) : path.substr(0, path.size() - 4);
+        if (lowerAll.count(Lower(base + suffix)) != 0) {
+          texture.normals = base + suffix;
+          break;
+        }
+      }
+      mMapTextures.push_back(std::move(texture));
+    }
+    std::sort(mMapTextures.begin(), mMapTextures.end(), [](const LayerTexture& a, const LayerTexture& b) {
+      return Lower(a.name) < Lower(b.name);
+    });
+    return mMapTextures;
+  }
+
   std::uint64_t EdTextureLibrary::Thumbnail(
     const std::string& path,
     const bool withAlpha

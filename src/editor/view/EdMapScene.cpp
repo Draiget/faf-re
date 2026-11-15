@@ -71,6 +71,11 @@ namespace moho
 #include "moho/sim/CWldMap.h"
 #include "moho/sim/STIMap.h"
 
+namespace moho
+{
+  extern bool ren_Terrain; // the height field drawn (RuntimeTuningGlobals.cpp)
+} // namespace moho
+
 namespace faf::editor
 {
   /** The renderer's editor hook (IEdRenderHook, called at the end of WRenViewport::RenderUI): the brush rings. */
@@ -4830,6 +4835,14 @@ namespace faf::editor
     if (playIdle) {
       DropLiveHeights(); // a play's height queue doesn't outlive it
     }
+    // The mesh terrain's models and the height field's switch follow the mode every frame (not only while the
+    // overlays draw).
+    if (mMap != nullptr) {
+      SyncMeshView();
+    } else if (mMeshHidesTerrain) {
+      mMeshHidesTerrain = false;
+      moho::ren_Terrain = true;
+    }
     // The editor's map shows between plays, and in front of a running play when its view is asked for (user ask
     // 2026-11-11: switch between the editor's view and the game's while it plays).
     moho::CWldMap* const wanted =
@@ -8633,6 +8646,7 @@ namespace faf::editor
       mMarkerDragFromZ = groundZ;
       mMarkerBefore = mDocument.SaveDataNow();
       mMarkerDragStart.clear();
+      BeginAreaFollow();
       mMarkerFollow = FollowDrag() ? MarkerPartners() : std::vector<std::vector<std::string>>{};
       for (const std::string& selected : mMarkerSelection) {
         std::array<float, 3> start{};
@@ -9102,6 +9116,178 @@ namespace faf::editor
     return bounds;
   }
 
+  HCURSOR EdMapScene::BrushCursor(
+    const bool lower
+  )
+  {
+    // 32 x 32: a crosshair round the hot spot (16, 16) with a gap, and a + or - at the lower right; the lines invert
+    // the screen under them (AND 1, XOR 1), so they show on any ground.
+    static HCURSOR made[2] = {nullptr, nullptr};
+    HCURSOR& cursor = made[lower ? 1 : 0];
+    if (cursor != nullptr) {
+      return cursor;
+    }
+    std::uint8_t andMask[128];
+    std::uint8_t xorMask[128];
+    std::memset(andMask, 0xFF, sizeof(andMask));
+    std::memset(xorMask, 0x00, sizeof(xorMask));
+    const auto dot = [&](const int x, const int y) {
+      const int bit = y * 32 + x;
+      andMask[bit / 8] |= static_cast<std::uint8_t>(0x80 >> (bit % 8));
+      xorMask[bit / 8] |= static_cast<std::uint8_t>(0x80 >> (bit % 8));
+    };
+    for (int d = 3; d <= 11; ++d) {
+      dot(16 + d, 16);
+      dot(16 - d, 16);
+      dot(16, 16 + d);
+      dot(16, 16 - d);
+    }
+    for (int d = -3; d <= 3; ++d) {
+      dot(26 + d, 26);
+      dot(26 + d, 27);
+      if (!lower) {
+        dot(26, 26 + d);
+        dot(27, 26 + d);
+      }
+    }
+    cursor = ::CreateCursor(::GetModuleHandleW(nullptr), 16, 16, 32, 32, andMask, xorMask);
+    return cursor != nullptr ? cursor : ::LoadCursorW(nullptr, IDC_CROSS);
+  }
+
+  EdMapScene::AreaHit EdMapScene::AreaUnder(
+    const POINT at
+  ) const
+  {
+    AreaHit hit;
+    if (mTools == nullptr || mCamera == nullptr || mMap == nullptr || mMap->mTerrainRes == nullptr) {
+      return hit;
+    }
+    const auto rectOf = [](const SaveEntry& area, float (&r)[4]) {
+      const std::vector<double> e = ValueNumbers(area.Get("rectangle"));
+      if (e.size() < 4) {
+        return false;
+      }
+      r[0] = static_cast<float>(std::min(e[0], e[2]));
+      r[1] = static_cast<float>(std::min(e[1], e[3]));
+      r[2] = static_cast<float>(std::max(e[0], e[2]));
+      r[3] = static_cast<float>(std::max(e[1], e[3]));
+      return true;
+    };
+    const auto screen = [&](const float x, const float z) {
+      const float y = mMap->mTerrainRes->GetHeightAt(static_cast<std::int32_t>(x), static_cast<std::int32_t>(z));
+      return mCamera->Project(Wm3::Vec3f{x, y, z});
+    };
+    const Wm3::Vector2f cursor(static_cast<float>(at.x), static_cast<float>(at.y));
+    const std::vector<SaveEntry>& areas = mDocument.SaveData().Areas();
+    const std::vector<std::string>& picked = mTools->AreaSelection();
+    // A handle of a picked area first.
+    for (const std::string& name : picked) {
+      for (const SaveEntry& area : areas) {
+        float r[4];
+        if (area.name != name || !rectOf(area, r)) {
+          continue;
+        }
+        const float hx[3] = {r[0], (r[0] + r[2]) * 0.5f, r[2]};
+        const float hz[3] = {r[1], (r[1] + r[3]) * 0.5f, r[3]};
+        const int edgeX[3] = {1, 0, 4};
+        const int edgeZ[3] = {2, 0, 8};
+        for (int i = 0; i < 3; ++i) {
+          for (int j = 0; j < 3; ++j) {
+            if (i == 1 && j == 1) {
+              continue;
+            }
+            const Wm3::Vector2f h = screen(hx[i], hz[j]);
+            if (std::hypot(h.x - cursor.x, h.y - cursor.y) <= 9.0f) {
+              return AreaHit{name, edgeX[i] | edgeZ[j]};
+            }
+          }
+        }
+      }
+    }
+    // An outline within reach: the smallest area's.
+    float bestArea = 1e30f;
+    for (const SaveEntry& area : areas) {
+      float r[4];
+      if (!rectOf(area, r)) {
+        continue;
+      }
+      const Wm3::Vector2f c[4] = {screen(r[0], r[1]), screen(r[2], r[1]), screen(r[2], r[3]), screen(r[0], r[3])};
+      float closest = 1e9f;
+      for (int e = 0; e < 4; ++e) {
+        closest = std::min(closest, SegmentDistance(cursor, c[e], c[(e + 1) % 4]));
+      }
+      const float size = (r[2] - r[0]) * (r[3] - r[1]);
+      if (closest <= 7.0f && size < bestArea) {
+        bestArea = size;
+        hit = AreaHit{area.name, 16};
+      }
+    }
+    return hit;
+  }
+
+  POINT EdMapScene::ScreenOf(
+    const float x,
+    const float z
+  ) const
+  {
+    const float y = mMap != nullptr && mMap->mTerrainRes != nullptr
+      ? mMap->mTerrainRes->GetHeightAt(static_cast<std::int32_t>(x), static_cast<std::int32_t>(z))
+      : 0.0f;
+    const Wm3::Vector2f at = mCamera->Project(Wm3::Vec3f{x, y, z});
+    return POINT{static_cast<LONG>(std::lround(at.x)), static_cast<LONG>(std::lround(at.y))};
+  }
+
+  int EdMapScene::ViewCursor() const
+  {
+    if (mTools == nullptr || mMap == nullptr || mCamera == nullptr) {
+      return 0;
+    }
+    const POINT at = mCursor;
+    if (mTools->MarkersToolActive()) {
+      if (const AreaHit hit = AreaUnder(at); hit.part != 0) {
+        switch (hit.part) {
+        case 16:
+          return 32646; // IDC_SIZEALL
+        case 1 | 2:
+        case 4 | 8:
+          return 32642; // IDC_SIZENWSE
+        case 4 | 2:
+        case 1 | 8:
+          return 32643; // IDC_SIZENESW
+        case 1:
+        case 4:
+          return 32644; // IDC_SIZEWE
+        default:
+          return 32645; // IDC_SIZENS
+        }
+      }
+      if (mTools->DrawingAreas()) {
+        return 32515; // IDC_CROSS
+      }
+      if (PickGizmo(at) != GizmoPart::None || !mHoverMarker.empty()) {
+        return 32646; // over a marker or the gizmo: a drag moves it
+      }
+      return 32515; // a click places a marker
+    }
+    if (mTools->TerrainToolActive()) {
+      // The brush's crosshair, + raising, - lowering (the editor's own two cursors).
+      return mTools->PreviewHeightBrush().mode == HeightBrushMode::Lower ? 2 : 1;
+    }
+    if (mTools->SelectToolActive()) {
+      if (PickGizmo(at) != GizmoPart::None || PickAnything(at).kind != PickKind::None) {
+        return 32646;
+      }
+      return 0;
+    }
+    if (
+      mTools->PropsToolActive() || mTools->DecalsToolActive() || mTools->UnitsToolActive() ||
+      mTools->TextureToolActive()
+    ) {
+      return 32515;
+    }
+    return 0;
+  }
+
   bool EdMapScene::AreaMouseDown(
     const HWND window,
     const POINT at,
@@ -9218,7 +9404,14 @@ namespace faf::editor
       }
     }
     if (best == nullptr) {
-      if (!add) {
+      const int marker = PickMarker(groundX, groundZ);
+      const bool onSelected = marker >= 0 &&
+        std::find(
+          mMarkerSelection.begin(),
+          mMarkerSelection.end(),
+          mDocument.SaveData().Markers()[static_cast<std::size_t>(marker)].name
+        ) != mMarkerSelection.end();
+      if (!add && !onSelected) {
         picked.clear();
       }
       return false;
@@ -9455,57 +9648,61 @@ namespace faf::editor
     return true;
   }
 
-  bool EdMapScene::AreaCtrlKey(
-    const char key
-  )
+  void EdMapScene::BeginAreaFollow()
   {
-    if (mTools == nullptr || !mTools->MarkersToolActive() || !mMarkerSelection.empty()) {
-      return false;
+    mAreaFollowNames.clear();
+    mAreaFollowStart.clear();
+    if (mTools == nullptr || !mTools->MarkersToolActive()) {
+      return;
     }
-    std::vector<std::string>& picked = mTools->AreaSelection();
-    std::vector<SaveEntry>& areas = mDocument.SaveData().Areas();
-    if (key == 'C' || key == 'X' || key == 'D') {
-      if (picked.empty()) {
-        return false;
-      }
-      mAreaClipboard.clear();
-      for (const SaveEntry& area : areas) {
-        if (std::find(picked.begin(), picked.end(), area.name) != picked.end()) {
-          mAreaClipboard.push_back(area);
+    for (const std::string& name : mTools->AreaSelection()) {
+      for (const SaveEntry& area : mDocument.SaveData().Areas()) {
+        const std::vector<double> e = ValueNumbers(area.Get("rectangle"));
+        if (area.name == name && e.size() >= 4) {
+          mAreaFollowNames.push_back(name);
+          mAreaFollowStart.push_back(
+            {static_cast<float>(e[0]), static_cast<float>(e[1]), static_cast<float>(e[2]), static_cast<float>(e[3])}
+          );
         }
       }
-      if (key == 'X') {
-        (void)DeleteSelectedAreas();
-        return true;
-      }
-      if (key == 'C') {
-        gpg::Logf("editor: areas: %zu copied", mAreaClipboard.size());
-        return true;
+    }
+  }
+
+  void EdMapScene::FollowAreas(
+    const float dx,
+    const float dz
+  )
+  {
+    if (mAreaFollowNames.empty()) {
+      return;
+    }
+    const AreaBounds bounds = AreaLimitBounds();
+    const float mx = std::round(dx);
+    const float mz = std::round(dz);
+    for (std::size_t i = 0; i < mAreaFollowNames.size(); ++i) {
+      for (SaveEntry& area : mDocument.SaveData().Areas()) {
+        if (area.name != mAreaFollowNames[i]) {
+          continue;
+        }
+        float r[4] = {
+          mAreaFollowStart[i][0] + mx,
+          mAreaFollowStart[i][1] + mz,
+          mAreaFollowStart[i][2] + mx,
+          mAreaFollowStart[i][3] + mz
+        };
+        LimitArea(r, bounds, true);
+        area.Set("rectangle", RectangleValue(r[0], r[1], r[2], r[3]));
       }
     }
-    if ((key != 'V' && key != 'D') || mAreaClipboard.empty()) {
-      return false;
-    }
-    // Paste at the cursor (the copied group's middle there), Duplicate 8 units down and right; new AREA_n names.
-    float cx = 0.0f, cz = 0.0f;
-    for (const SaveEntry& area : mAreaClipboard) {
-      const std::vector<double> e = ValueNumbers(area.Get("rectangle"));
-      if (e.size() >= 4) {
-        cx += static_cast<float>(e[0] + e[2]) * 0.5f;
-        cz += static_cast<float>(e[1] + e[3]) * 0.5f;
-      }
-    }
-    cx /= static_cast<float>(mAreaClipboard.size());
-    cz /= static_cast<float>(mAreaClipboard.size());
-    float dx = 8.0f, dz = 8.0f;
-    if (key == 'V') {
-      float gx = 0.0f, gz = 0.0f;
-      if (!CursorGround(gx, gz)) {
-        return true;
-      }
-      dx = std::round(gx - cx);
-      dz = std::round(gz - cz);
-    }
+  }
+
+  void EdMapScene::PasteAreas(
+    const float dx,
+    const float dz
+  )
+  {
+    std::vector<std::string>& picked = mTools->AreaSelection();
+    std::vector<SaveEntry>& areas = mDocument.SaveData().Areas();
     EdDocument::SaveSnapshot before = mDocument.SaveDataNow();
     const AreaBounds bounds = AreaLimitBounds();
     picked.clear();
@@ -9537,8 +9734,75 @@ namespace faf::editor
       areas.push_back(std::move(area));
     }
     mDocument.SaveDataEdited(std::move(before));
-    gpg::Logf("editor: areas: %zu %s", picked.size(), key == 'V' ? "pasted" : "duplicated");
-    return true;
+  }
+
+  bool EdMapScene::AreaCtrlKey(
+    const char key
+  )
+  {
+    // True: the key was the areas' alone; false: the markers (or the other tools) go on with it.
+    if (mTools == nullptr || !mTools->MarkersToolActive()) {
+      return false;
+    }
+    std::vector<std::string>& picked = mTools->AreaSelection();
+    const std::vector<SaveEntry>& areas = mDocument.SaveData().Areas();
+    const bool withMarkers = !mMarkerSelection.empty();
+    if (key == 'C' || key == 'X' || key == 'D') {
+      mAreaClipboard.clear();
+      for (const SaveEntry& area : areas) {
+        if (std::find(picked.begin(), picked.end(), area.name) != picked.end()) {
+          mAreaClipboard.push_back(area);
+        }
+      }
+      if (mAreaClipboard.empty()) {
+        return false; // markers only: the area clipboard is empty, so a paste brings no old areas
+      }
+      if (!withMarkers) {
+        mClipboard = Clipboard{}; // areas only: no old markers come with a paste
+      }
+      if (key == 'X') {
+        // Cut: the areas go now; the markers' own cut follows when there are markers.
+        const std::size_t cut = mAreaClipboard.size();
+        (void)DeleteSelectedAreas();
+        gpg::Logf("editor: areas: %zu cut", cut);
+        return !withMarkers;
+      }
+      if (key == 'D') {
+        PasteAreas(8.0f, 8.0f); // as the markers' duplicate: 8 units down and right
+        gpg::Logf("editor: areas: %zu duplicated", picked.size());
+        return !withMarkers;
+      }
+      gpg::Logf("editor: areas: %zu copied", mAreaClipboard.size());
+      return !withMarkers;
+    }
+    if (key != 'V' || mAreaClipboard.empty()) {
+      return false;
+    }
+    // Paste: with copied markers, the areas keep their places beside them (both by the markers' middle at the
+    // cursor); alone, the areas' middle at the cursor.
+    float gx = 0.0f, gz = 0.0f;
+    if (!CursorGround(gx, gz)) {
+      return true;
+    }
+    const bool markersToo = !mClipboard.markers.empty();
+    float cx = 0.0f, cz = 0.0f;
+    if (markersToo) {
+      cx = mClipboard.centre[0];
+      cz = mClipboard.centre[1];
+    } else {
+      for (const SaveEntry& area : mAreaClipboard) {
+        const std::vector<double> e = ValueNumbers(area.Get("rectangle"));
+        if (e.size() >= 4) {
+          cx += static_cast<float>(e[0] + e[2]) * 0.5f;
+          cz += static_cast<float>(e[1] + e[3]) * 0.5f;
+        }
+      }
+      cx /= static_cast<float>(mAreaClipboard.size());
+      cz /= static_cast<float>(mAreaClipboard.size());
+    }
+    PasteAreas(std::round(gx - cx), std::round(gz - cz));
+    gpg::Logf("editor: areas: %zu pasted", picked.size());
+    return !markersToo;
   }
 
   std::vector<EdMapScene::ViewLabel> EdMapScene::ViewLabels() const
@@ -11938,7 +12202,10 @@ namespace faf::editor
     };
     ArrangePlaces places;
     std::string error;
-    const PickKind kind = SelectedKind();
+    // The Markers tool's picked areas go with the markers (or alone).
+    const std::vector<std::string> areaNames =
+      mTools != nullptr && mTools->MarkersToolActive() ? mTools->AreaSelection() : std::vector<std::string>{};
+    const PickKind kind = SelectedKind() == PickKind::None && !areaNames.empty() ? PickKind::Marker : SelectedKind();
     switch (kind) {
     case PickKind::Prop: {
       if (mMap->mProps == nullptr || !(error = tooFew(mSelection.size())).empty()) {
@@ -11979,7 +12246,7 @@ namespace faf::editor
       return {};
     }
     case PickKind::Marker: {
-      if (!(error = tooFew(mMarkerSelection.size())).empty()) {
+      if (!(error = tooFew(mMarkerSelection.size() + areaNames.size())).empty()) {
         break;
       }
       std::vector<SaveEntry>& markers = mDocument.SaveData().Markers();
@@ -11994,11 +12261,38 @@ namespace faf::editor
           }
         }
       }
+      std::vector<SaveEntry>& areas = mDocument.SaveData().Areas();
+      std::vector<std::size_t> areaIndices;
+      std::vector<std::array<float, 4>> areaRects;
+      for (const std::string& name : areaNames) {
+        for (std::size_t i = 0; i < areas.size(); ++i) {
+          const std::vector<double> e = ValueNumbers(areas[i].Get("rectangle"));
+          if (areas[i].name == name && e.size() >= 4) {
+            areaIndices.push_back(i);
+            areaRects.push_back(
+              {static_cast<float>(e[0]), static_cast<float>(e[1]), static_cast<float>(e[2]), static_cast<float>(e[3])}
+            );
+            places.x.push_back(static_cast<float>(e[0] + e[2]) * 0.5f);
+            places.z.push_back(static_cast<float>(e[1] + e[3]) * 0.5f);
+          }
+        }
+      }
+      const std::vector<float> beforeX = places.x;
+      const std::vector<float> beforeZ = places.z;
       if (!Arrange(op, places, step)) {
-        error = tooFew(indices.size());
+        error = tooFew(indices.size() + areaIndices.size());
         break;
       }
       EdDocument::SaveSnapshot before = mDocument.SaveDataNow();
+      const AreaBounds bounds = AreaLimitBounds();
+      for (std::size_t a = 0; a < areaIndices.size(); ++a) {
+        const std::size_t k = indices.size() + a;
+        const float dx = std::round(places.x[k] - beforeX[k]);
+        const float dz = std::round(places.z[k] - beforeZ[k]);
+        float r[4] = {areaRects[a][0] + dx, areaRects[a][1] + dz, areaRects[a][2] + dx, areaRects[a][3] + dz};
+        LimitArea(r, bounds, true);
+        areas[areaIndices[a]].Set("rectangle", RectangleValue(r[0], r[1], r[2], r[3]));
+      }
       for (std::size_t k = 0; k < indices.size(); ++k) {
         SaveEntry& marker = markers[indices[k]];
         float x = std::clamp(places.x[k], 0.0f, maxX);
@@ -14568,6 +14862,11 @@ namespace faf::editor
     DeleteUnits();
     DeleteDeposits();
     DeleteMarkerModels();
+    DeleteMeshInstances();
+    if (mMeshHidesTerrain) {
+      mMeshHidesTerrain = false;
+      moho::ren_Terrain = true;
+    }
     if (moho::MeshRenderer::GetInstance() != nullptr) {
       for (moho::MeshInstance* const instance : mProps) {
         delete instance;
@@ -14660,6 +14959,50 @@ namespace faf::editor
     }
     outX = point.x;
     outZ = point.z;
+    // On a mesh terrain map shown: where the ray from the eye first meets the mesh (FAF Studio's mesh pick), not the
+    // height field's point under it.
+    if (mMeshMode != 0 && mMeshMap.Loaded()) {
+      const Wm3::Vec3f eye = mCamera->CameraGetView().tranform.pos_;
+      const Wm3::Vec3f to{point.x - eye.x, point.y - eye.y, point.z - eye.z};
+      const float length = std::sqrt(to.x * to.x + to.y * to.y + to.z * to.z);
+      if (length > 1.0f) {
+        const int steps = std::clamp(static_cast<int>(length * 1.5f / 2.0f), 8, 4000);
+        const auto at = [&](const float t) {
+          return Wm3::Vec3f{eye.x + to.x * t, eye.y + to.y * t, eye.z + to.z * t};
+        };
+        // Above the mesh: the ray point's height over the highest surface below it.
+        const auto above = [&](const Wm3::Vec3f& p, bool& found) {
+          float y = 0.0f;
+          found = mMeshMap.HeightAt(p.x, p.z, p.y, y);
+          return p.y - y;
+        };
+        float lo = 0.0f;
+        for (int i = 1; i <= steps; ++i) {
+          const float t = 1.5f * static_cast<float>(i) / static_cast<float>(steps);
+          bool found = false;
+          const float gap = above(at(t), found);
+          const float stepDrop = std::fabs(to.y) * 1.5f / static_cast<float>(steps) + 0.25f;
+          if (found && gap <= stepDrop) {
+            // Narrowed down between the last point above and this one.
+            float hi = t;
+            for (int k = 0; k < 12; ++k) {
+              const float mid = (lo + hi) * 0.5f;
+              bool midFound = false;
+              const float midGap = above(at(mid), midFound);
+              if (midFound && midGap <= 0.05f) {
+                hi = mid;
+              } else {
+                lo = mid;
+              }
+            }
+            outX = at(hi).x;
+            outZ = at(hi).z;
+            return true;
+          }
+          lo = t;
+        }
+      }
+    }
     return true;
   }
 
@@ -14761,6 +15104,14 @@ namespace faf::editor
       default:
         break;
       }
+    }
+    // The tool's cursor over the view (FAF Studio's cursors), not while a play has it.
+    if (message == WM_SETCURSOR && LOWORD(lParam) == HTCLIENT && mMap != nullptr && !OverPlay()) {
+      if (const int cursor = ViewCursor(); cursor != 0) {
+        ::SetCursor(cursor <= 2 ? BrushCursor(cursor == 2) : ::LoadCursorW(nullptr, MAKEINTRESOURCEW(cursor)));
+        return true;
+      }
+      return false;
     }
     switch (message) {
     case WM_LBUTTONDOWN: {
@@ -14906,6 +15257,7 @@ namespace faf::editor
           mMarkersMoved = false;
           mMarkerBefore = mDocument.SaveDataNow();
           mMarkerDragStart.clear();
+          BeginAreaFollow();
           mMarkerFollow = FollowDrag() ? MarkerPartners() : std::vector<std::vector<std::string>>{};
           for (const std::string& selected : mMarkerSelection) {
             std::array<float, 3> start{};
@@ -14988,6 +15340,7 @@ namespace faf::editor
         mMarkerDragFromZ = groundZ;
         mMarkerBefore = mDocument.SaveDataNow();
         mMarkerDragStart.clear();
+        BeginAreaFollow();
         mMarkerFollow = FollowDrag() ? MarkerPartners() : std::vector<std::vector<std::string>>{};
         for (const std::string& selected : mMarkerSelection) {
           std::array<float, 3> start{};
@@ -15885,6 +16238,7 @@ namespace faf::editor
             }
           }
           mMarkersMoved = mMarkersMoved || move.x != 0.0f || move.y != 0.0f || move.z != 0.0f;
+          FollowAreas(move.x, move.z);
           return true;
         }
         if (mDragMarkers) {
@@ -15916,6 +16270,7 @@ namespace faf::editor
               }
               FollowMarkerMove(i, x, z);
             }
+            FollowAreas(groundX - mMarkerDragFromX, groundZ - mMarkerDragFromZ);
             mMarkersMoved = true;
           }
           return true;

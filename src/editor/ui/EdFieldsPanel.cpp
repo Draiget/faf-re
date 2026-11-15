@@ -181,14 +181,39 @@ namespace faf::editor
 
   const std::vector<EdFieldsPanel::QuickGenPreset>& EdFieldsPanel::QuickGenPresets()
   {
-    // FAF Studio's fieldgen.lua presets: noise kind, feature size, the relief's size, crest sharpness, warp, detail.
+    // FAF Studio's fieldgen.lua presets: feature size, the relief's size, gullies, warp, detail (their op chains are
+    // in EdApp's RunQuickGen).
     static const std::vector<QuickGenPreset> presets = {
-      {"Hills", "fbm", 140.0f, 18.0f, 2.0f, 0.0f, 0.5f},
-      {"Mountains", "ridged", 260.0f, 70.0f, 2.0f, 30.0f, 0.5f},
-      {"Badlands", "ridged", 90.0f, 25.0f, 3.0f, 10.0f, 0.55f},
-      {"Dunes", "billow", 60.0f, 6.0f, 2.0f, 20.0f, 0.4f},
-      {"Plains", "fbm", 320.0f, 5.0f, 2.0f, 0.0f, 0.45f},
-      {"Rocks", "ridged", 40.0f, 8.0f, 2.5f, 6.0f, 0.6f},
+      {"Hills",
+       "Rolling hills: rounded hills and broad swells with a little warp; fine detail damped on the steep ground.",
+       140.0f,
+       18.0f,
+       0.0f,
+       0.5f,
+       0.5f},
+      {"Mountains",
+       "Mountain ranges: ridged crests over a broad massif, finer detail on the steep ground, weathered by gullies.",
+       240.0f,
+       60.0f,
+       0.5f,
+       0.4f,
+       0.6f},
+      {"Badlands", "Flat topped mesas with steep stepped sides and rough cliffs.", 200.0f, 35.0f, 0.3f, 0.4f, 0.5f},
+      {"Dunes",
+       "Sand dunes: long crests with a gentle windward and a steep lee side, some stretches flat.",
+       120.0f,
+       10.0f,
+       0.0f,
+       0.5f,
+       0.4f},
+      {"Plains",
+       "Small, soft relief for flat ground: gentle swells and a little roughness.",
+       90.0f,
+       4.0f,
+       0.0f,
+       0.3f,
+       0.8f},
+      {"Rocks", "Fields of boulders: rounded cells roughened by fractal noise.", 45.0f, 10.0f, 0.0f, 0.3f, 0.6f},
     };
     return presets;
   }
@@ -210,7 +235,9 @@ namespace faf::editor
       q.amplitude = p.amplitude;
       q.warp = p.warp;
       q.detail = p.detail;
+      q.gullies = p.gullies;
     }
+    EdSetItemTooltip("%s", QuickGenPresets()[static_cast<std::size_t>(std::clamp(q.preset, 0, 5))].tip);
     ImGui::SameLine();
     static constexpr const char* kBlends[] = {"Add", "Multiply", "Raise only", "Lower only", "Replace"};
     ImGui::SetNextItemWidth(Em(120.0f));
@@ -232,9 +259,12 @@ namespace faf::editor
       q.seed = static_cast<int>(ImGui::GetFrameCount() * 2654435761u % 9999u) + 1;
     }
     ImGui::SetNextItemWidth(-1.0f);
-    FillSliderFloat("##qgdetail", &q.detail, 0.2f, 0.8f, "Detail %.2f");
+    FillSliderFloat("##qgdetail", &q.detail, 0.0f, 1.0f, "Detail %.2f");
     ImGui::SetNextItemWidth(-1.0f);
-    FillSliderFloat("##qgwarp", &q.warp, 0.0f, 80.0f, "Warp %.0f units");
+    FillSliderFloat("##qgwarp", &q.warp, 0.0f, 1.0f, "Warp %.2f");
+    ImGui::SetNextItemWidth(-1.0f);
+    FillSliderFloat("##qggullies", &q.gullies, 0.0f, 1.0f, q.gullies > 0.001f ? "Gullies %.2f" : "Gullies: off");
+    EdSetItemTooltip("A brief droplet erosion of the relief: gullies and drainage, more droplets the higher");
     static constexpr const char* kMasks[] = {"Whole map", "Playable area", "An area"};
     ImGui::SetNextItemWidth(Em(140.0f));
     (void)EdCombo("##qgmask", &q.mask, kMasks, 3);

@@ -52,6 +52,7 @@ namespace moho
   class CAniPose;
   class CWldMap;
   class MeshInstance;
+  struct RMeshBlueprint;
   class SimpleRenderWorldView;
   struct RUnitBlueprint;
 } // namespace moho
@@ -592,9 +593,32 @@ namespace faf::editor
     std::vector<SaveEntry> mAreaClipboard;
     [[nodiscard]] AreaBounds AreaLimitBounds() const;
     bool AreaMouseDown(HWND window, POINT at, float groundX, float groundZ, bool add);
+    /** The area part under a view point: a picked area's handle (its edges, 1 2 4 8), an outline (16), none (0). */
+    struct AreaHit
+    {
+      std::string name;
+      int part = 0;
+    };
+    [[nodiscard]] AreaHit AreaUnder(POINT at) const;
+    /**
+     * The cursor over the view for the tool and what is under it (FAF Studio's cursors.lua): a brush's crosshair with
+     * + or - (raise or lower), the move cross over what a drag moves, resize arrows over an area's handles, a
+     * crosshair where a click places; 0 keeps the arrow. A Windows cursor resource id or one of the editor's own (1,
+     * 2).
+     */
+    [[nodiscard]] int ViewCursor() const;
+    /** The height brush's cursor, made once: a crosshair with + (raise) or - (lower). */
+    static HCURSOR BrushCursor(bool lower);
     void AreaMouseMove(POINT at);
     void AreaMouseUp();
     bool AreaCtrlKey(char key);
+    /** The picked areas pasted (new AREA_n names) moved by (dx, dz), one undo step. */
+    void PasteAreas(float dx, float dz);
+    /** The picked areas go along with a marker drag (FAF Studio's selection moves its areas). */
+    std::vector<std::string> mAreaFollowNames;
+    std::vector<std::array<float, 4>> mAreaFollowStart;
+    void BeginAreaFollow();
+    void FollowAreas(float dx, float dz);
     [[nodiscard]] bool NamesShown() const noexcept
     {
       return mNamesShown;
@@ -621,6 +645,46 @@ namespace faf::editor
       int state = 0;
     };
     [[nodiscard]] std::vector<ResourceMark> ResourceMarks() const;
+    /**
+     * The mesh terrain drawn as the game draws models (FAF Studio's mesh view): each patch a model instance with its
+     * material's textures (the NormalMappedTerrain shader: lit, shadowed), the height field hidden in Mesh only
+     * (ren_Terrain), the patches hidden in Terrain only. Made once the rules are up; again on each load.
+     */
+    std::vector<moho::MeshInstance*> mMeshPatchInstances;
+    std::vector<moho::RMeshBlueprint*> mMeshPatchBlueprints;
+    bool mMeshInstancesTried = false;
+    bool mMeshHidesTerrain = false;
+    void BuildMeshInstances();
+    void DeleteMeshInstances();
+    void SyncMeshView();
+    /** Test runs: the cursor the view would show with the pointer at `at` (view pixels). */
+    [[nodiscard]] int ViewCursorAt(
+      const POINT at
+    )
+    {
+      const POINT kept = mCursor;
+      mCursor = at;
+      const int cursor = ViewCursor();
+      mCursor = kept;
+      return cursor;
+    }
+    /** Test runs: a world point in view pixels. */
+    [[nodiscard]] POINT ScreenOf(float x, float z) const;
+    /** Test runs: GroundAt from outside. */
+    bool GroundAtForTest(
+      const float x,
+      const float y,
+      float& outX,
+      float& outZ
+    ) const
+    {
+      return GroundAt(x, y, outX, outZ);
+    }
+    /** Test runs: how many patch models are made. */
+    [[nodiscard]] std::size_t MeshPatchModels() const noexcept
+    {
+      return mMeshPatchInstances.size();
+    }
     /** Test runs: the area tools a step at a time (draw, move, resize, keep inside, duplicate, delete), as a line. */
     std::string TestAreaTools();
     /** The resource footprints' build checks (marker name -> why it can't be built), every 30 frames. */
