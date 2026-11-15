@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include "gpg/core/containers/DList.h"
 #include "../../gpg/core/reflection/Reflection.h"
@@ -4542,6 +4542,50 @@ namespace moho
    * submits one create-unit command through the active sim driver.
    */
   int cfunc_CreateUnitAtMouseL(LuaPlus::LuaState* state);
+
+  int cfunc_GetPlannedFactories(lua_State* luaContext);
+  int cfunc_GetPlannedFactoriesL(LuaPlus::LuaState* state);
+  CScrLuaInitForm* func_GetPlannedFactories_LuaFuncDef();
+
+  int cfunc_GetPlannedFactoryAt(lua_State* luaContext);
+  int cfunc_GetPlannedFactoryAtL(LuaPlus::LuaState* state);
+  CScrLuaInitForm* func_GetPlannedFactoryAt_LuaFuncDef();
+
+  int cfunc_GetPlannedFactoriesInRect(lua_State* luaContext);
+  int cfunc_GetPlannedFactoriesInRectL(LuaPlus::LuaState* state);
+  CScrLuaInitForm* func_GetPlannedFactoriesInRect_LuaFuncDef();
+
+  int cfunc_SelectPlannedFactory(lua_State* luaContext);
+  int cfunc_SelectPlannedFactoryL(LuaPlus::LuaState* state);
+  CScrLuaInitForm* func_SelectPlannedFactory_LuaFuncDef();
+
+  int cfunc_ClearPlannedFactorySelection(lua_State* luaContext);
+  int cfunc_ClearPlannedFactorySelectionL(LuaPlus::LuaState* state);
+  CScrLuaInitForm* func_ClearPlannedFactorySelection_LuaFuncDef();
+
+  int cfunc_GetSelectedPlannedFactories(lua_State* luaContext);
+  int cfunc_GetSelectedPlannedFactoriesL(LuaPlus::LuaState* state);
+  CScrLuaInitForm* func_GetSelectedPlannedFactories_LuaFuncDef();
+
+  int cfunc_IssuePlannedFactoryBuildOrder(lua_State* luaContext);
+  int cfunc_IssuePlannedFactoryBuildOrderL(LuaPlus::LuaState* state);
+  CScrLuaInitForm* func_IssuePlannedFactoryBuildOrder_LuaFuncDef();
+
+  int cfunc_SetPlannedFactoryRallyPoint(lua_State* luaContext);
+  int cfunc_SetPlannedFactoryRallyPointL(LuaPlus::LuaState* state);
+  CScrLuaInitForm* func_SetPlannedFactoryRallyPoint_LuaFuncDef();
+
+  int cfunc_SetPlannedFactoryRepeat(lua_State* luaContext);
+  int cfunc_SetPlannedFactoryRepeatL(LuaPlus::LuaState* state);
+  CScrLuaInitForm* func_SetPlannedFactoryRepeat_LuaFuncDef();
+
+  int cfunc_GetPlannedFactoryQueue(lua_State* luaContext);
+  int cfunc_GetPlannedFactoryQueueL(LuaPlus::LuaState* state);
+  CScrLuaInitForm* func_GetPlannedFactoryQueue_LuaFuncDef();
+
+  int cfunc_DecreasePlannedFactoryBuildCount(lua_State* luaContext);
+  int cfunc_DecreasePlannedFactoryBuildCountL(LuaPlus::LuaState* state);
+  CScrLuaInitForm* func_DecreasePlannedFactoryBuildCount_LuaFuncDef();
 
   /**
    * Address: 0x00547030 (FUN_00547030, cfunc_CreateResourceDeposit)

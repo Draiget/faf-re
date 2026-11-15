@@ -1,4 +1,6 @@
 #include "moho/unit/core/UserUnitPrivate.h"
+#include "moho/console/CConCommand.h"
+#include "moho/sim/PlannedFactoryProxy.h"
 
 namespace
 {

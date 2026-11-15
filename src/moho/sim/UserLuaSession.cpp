@@ -2420,6 +2420,17 @@ namespace
       (void)::moho::func_TeamColorMode_LuaFuncDef();
       (void)::moho::func_GetUnitByIdUser_LuaFuncDef();
       (void)::moho::func_CreateUnitAtMouse_LuaFuncDef();
+      (void)::moho::func_GetPlannedFactories_LuaFuncDef();
+      (void)::moho::func_GetPlannedFactoryAt_LuaFuncDef();
+      (void)::moho::func_GetPlannedFactoriesInRect_LuaFuncDef();
+      (void)::moho::func_SelectPlannedFactory_LuaFuncDef();
+      (void)::moho::func_ClearPlannedFactorySelection_LuaFuncDef();
+      (void)::moho::func_GetSelectedPlannedFactories_LuaFuncDef();
+      (void)::moho::func_IssuePlannedFactoryBuildOrder_LuaFuncDef();
+      (void)::moho::func_SetPlannedFactoryRallyPoint_LuaFuncDef();
+      (void)::moho::func_SetPlannedFactoryRepeat_LuaFuncDef();
+      (void)::moho::func_GetPlannedFactoryQueue_LuaFuncDef();
+      (void)::moho::func_DecreasePlannedFactoryBuildCount_LuaFuncDef();
       (void)::moho::func_AudioSetLanguageUser_LuaFuncDef();
       (void)::moho::func_HasLocalizedVOUser_LuaFuncDef();
     }

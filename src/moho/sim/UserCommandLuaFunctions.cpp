@@ -36,6 +36,7 @@
 #include "moho/app/AllowedUrl.h"
 #include "moho/client/Localization.h"
 #include "moho/command/SSTICommandIssueData.h"
+#include "moho/sim/PlannedFactoryProxy.h"
 #include "moho/console/CConCommand.h"
 #include "moho/console/CConFunc.h"
 #include "moho/sim/SOCellPos.h"
@@ -1259,6 +1260,22 @@ namespace moho
       return 0;
     }
 
+    if (moho::IsFactoryPreOrdersEnabled()) {
+      if (
+        commandType == EUnitCommandType::UNITCOMMAND_BuildFactory ||
+        commandType == EUnitCommandType::UNITCOMMAND_BuildMobile
+      ) {
+        if (!blueprint->mBlueprintId.empty()) {
+          PlannedFactoryManager::Get().QueuePlannedFactoryOrders(
+            blueprint->mBlueprintId.c_str(), repeatCount, clearQueue
+          );
+        }
+      }
+    }
+
+    // Suppress redundant secondary buffering in ISSUE_Command during this issue batch
+    PlannedFactoryManager::ScopedBufferingSuppression suppressBuffering;
+
     // Silo builds bypass the command-issue pipeline (mirrors cfunc_IssueCommandL):
     // forward each selected entity id to the sync-driver as an "add" info-pair.
     if (
@@ -1298,6 +1315,9 @@ namespace moho
           selectedUnit != nullptr && factoryUnit != nullptr && !factoryUnit->IsDead() &&
           selectedEntity->IsInCategory(factoryCategory)
         ) {
+          if (moho::IsFactoryPreOrdersEnabled() && PlannedFactoryManager::Get().IsPlannedProxyUnit(selectedUnit)) {
+            continue;
+          }
           WeakSet<UserEntity> oneUnit;
           (void)oneUnit.Add(selectedEntity);
           for (int remaining = repeatCount; remaining > 0; --remaining) {

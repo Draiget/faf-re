@@ -426,6 +426,7 @@ set(FAF_ENGINE_SOURCES
   moho/sim/UserLuaArmies.cpp
   moho/app/WRefEditDialog.cpp
   moho/sim/UserCommandIssue.cpp
+  moho/sim/PlannedFactoryProxy.cpp
   moho/render/CDebugCanvasRender.cpp
   moho/sim/SimArmy.cpp
   moho/sim/RRuleGameRulesTypeInfo.cpp

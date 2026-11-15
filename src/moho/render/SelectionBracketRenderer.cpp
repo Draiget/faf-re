@@ -6,6 +6,8 @@
 
 #include <memory>
 #include "moho/collision/CColPrimitiveBox3f.h"
+#include "moho/console/CConCommand.h"
+#include "moho/sim/PlannedFactoryProxy.h"
 #include "moho/entity/REntityBlueprint.h"
 #include "moho/entity/UserEntity.h"
 #include "moho/math/QuaternionMath.h"
@@ -118,6 +120,13 @@ namespace
   )
   {
     for (moho::UserEntity* const entity : selection) {
+      if (entity != nullptr && moho::IsFactoryPreOrdersEnabled()) {
+        if (const auto* asUnit = entity->IsUserUnit()) {
+          if (moho::PlannedFactoryManager::Get().IsPlannedProxyUnit(asUnit)) {
+            continue;
+          }
+        }
+      }
       moho::DrawSelectionBrackets(entity, &batcher, &camera, interpolationAlpha);
     }
   }
@@ -145,6 +154,13 @@ namespace
     static std::vector<std::uint8_t> sBuilt;
     sEntities.clear();
     for (moho::UserEntity* const entity : session.mSelection) {
+      if (entity != nullptr && moho::IsFactoryPreOrdersEnabled()) {
+        if (const auto* asUnit = entity->IsUserUnit()) {
+          if (moho::PlannedFactoryManager::Get().IsPlannedProxyUnit(asUnit)) {
+            continue;
+          }
+        }
+      }
       sEntities.push_back(entity);
     }
     for (moho::UserEntity* const entity : moho::sSelectionBrackets) {
@@ -305,7 +321,18 @@ namespace moho
       meshInstance->UpdateInterpolatedFields();
     }
 
-    Wm3::Box3f selectionBox = meshInstance != nullptr ? meshInstance->box : Invalid<Wm3::Box3f>();
+    Wm3::Box3f selectionBox;
+    if (meshInstance != nullptr) {
+      selectionBox = meshInstance->box;
+    } else {
+      selectionBox.Center = entity->mVariableData.mCurTransform.pos_;
+      selectionBox.Axis[0] = Wm3::Vector3f(1.0f, 0.0f, 0.0f);
+      selectionBox.Axis[1] = Wm3::Vector3f(0.0f, 1.0f, 0.0f);
+      selectionBox.Axis[2] = Wm3::Vector3f(0.0f, 0.0f, 1.0f);
+      selectionBox.Extent[0] = 1.0f;
+      selectionBox.Extent[1] = 1.0f;
+      selectionBox.Extent[2] = 1.0f;
+    }
 
     float selectionSizeX = ren_SelectionSizeFudge * selectionBox.Extent[0];
     float selectionSizeZ = ren_SelectionSizeFudge * selectionBox.Extent[2];
@@ -364,10 +391,15 @@ namespace moho
     selectionBox.Extent[0] = selectionSizeX;
     selectionBox.Extent[1] = 0.0f;
     selectionBox.Extent[2] = selectionSizeZ;
-    selectionBox.Center.x = selectionBox.Center.x + selectionCenterOffset.x;
+    if (meshInstance != nullptr) {
+      selectionBox.Center.x = selectionBox.Center.x + selectionCenterOffset.x;
+      selectionBox.Center.z = selectionBox.Center.z + selectionCenterOffset.z;
+    } else {
+      selectionBox.Center.x = constEntity.GetInterpolatedTransform(interpolationAlpha).pos_.x + selectionCenterOffset.x;
+      selectionBox.Center.z = constEntity.GetInterpolatedTransform(interpolationAlpha).pos_.z + selectionCenterOffset.z;
+    }
     selectionBox.Center.y = constEntity.GetInterpolatedTransform(interpolationAlpha).pos_.y + ren_SelectionHeightFudge +
       selectionCenterOffset.y;
-    selectionBox.Center.z = selectionBox.Center.z + selectionCenterOffset.z;
 
     Wm3::Vector3f boxVertices[8]{};
     selectionBox.ComputeVertices(boxVertices);
@@ -456,6 +488,120 @@ namespace moho
    * at 0x007FD88E and 0x007FD9A1, and both callers clean all five with
    * `add esp, 14h`.
    */
+  bool BuildSelectionBracketGeometryForProxy(
+    const PlannedUnitProxy& proxy,
+    const GeomCamera3* const camera,
+    SelectionBracketInstance& out
+  )
+  {
+    if (camera == nullptr) {
+      return false;
+    }
+
+    float selectionSizeX = 4.0f;
+    float selectionSizeZ = 4.0f;
+    float bracketThickness = ren_SelectBracketSize;
+
+    if (proxy.mBlueprint != nullptr) {
+      if (proxy.mBlueprint->mSelectionSizeX > 0.0f) {
+        selectionSizeX = proxy.mBlueprint->mSelectionSizeX * ren_UnitSelectionScale;
+      }
+      if (proxy.mBlueprint->mSelectionSizeZ > 0.0f) {
+        selectionSizeZ = proxy.mBlueprint->mSelectionSizeZ * ren_UnitSelectionScale;
+      }
+      if (std::fabs(proxy.mBlueprint->mSelectionThickness) >= kSelectionThicknessEpsilon) {
+        bracketThickness = proxy.mBlueprint->mSelectionThickness;
+      }
+    }
+
+    const float maxSelectionSize = selectionSizeZ > selectionSizeX ? selectionSizeZ : selectionSizeX;
+
+    const Wm3::Vector3f pos{proxy.mPosition.x, proxy.mPosition.y, proxy.mPosition.z};
+    const float viewportPixelScale = ProjectViewportPixelScaleRow(camera->viewport, pos);
+    if (
+      viewportPixelScale > 0.0f &&
+      ren_SelectBracketMinPixelSize > ((maxSelectionSize * bracketThickness) / viewportPixelScale)
+    ) {
+      bracketThickness = (ren_SelectBracketMinPixelSize * viewportPixelScale) / maxSelectionSize;
+    }
+
+    Wm3::Box3f selectionBox;
+    selectionBox.Axis[0] = Wm3::Vector3f(1.0f, 0.0f, 0.0f);
+    selectionBox.Axis[1] = Wm3::Vector3f(0.0f, 1.0f, 0.0f);
+    selectionBox.Axis[2] = Wm3::Vector3f(0.0f, 0.0f, 1.0f);
+    selectionBox.Extent[0] = selectionSizeX;
+    selectionBox.Extent[1] = 0.0f;
+    selectionBox.Extent[2] = selectionSizeZ;
+    selectionBox.Center.x = proxy.mPosition.x;
+    selectionBox.Center.y = proxy.mPosition.y + ren_SelectionHeightFudge;
+    selectionBox.Center.z = proxy.mPosition.z;
+
+    Wm3::Vector3f boxVertices[8]{};
+    selectionBox.ComputeVertices(boxVertices);
+
+    const float positiveExtent = maxSelectionSize * bracketThickness;
+    const float negativeExtent = (-0.0f - bracketThickness) * maxSelectionSize;
+    const float flatExtent = 0.0f;
+
+    const Wm3::Vector3f localTileCorners[4] = {
+      {negativeExtent, flatExtent, negativeExtent},
+      {positiveExtent, flatExtent, negativeExtent},
+      {positiveExtent, flatExtent, positiveExtent},
+      {negativeExtent, flatExtent, positiveExtent},
+    };
+
+    for (std::size_t bracket = 0; bracket < 4u; ++bracket) {
+      const Wm3::Vector3f& boxCorner = boxVertices[kSelectionBracketCorners[bracket].boxVertexIndex];
+      out.mGroundCorners[bracket][0] = boxCorner.x;
+      out.mGroundCorners[bracket][1] = boxCorner.y;
+      out.mGroundCorners[bracket][2] = boxCorner.z;
+    }
+
+    for (std::size_t corner = 0; corner < 4u; ++corner) {
+      out.mTileOffsets[corner][0] = localTileCorners[corner].x;
+      out.mTileOffsets[corner][1] = localTileCorners[corner].y;
+      out.mTileOffsets[corner][2] = localTileCorners[corner].z;
+    }
+
+    return true;
+  }
+
+  void DrawSelectionBracketsForProxy(
+    const PlannedUnitProxy& proxy,
+    CD3DPrimBatcher* const batcher,
+    const GeomCamera3* const camera
+  )
+  {
+    SelectionBracketInstance geometry{};
+    if (!BuildSelectionBracketGeometryForProxy(proxy, camera, geometry)) {
+      return;
+    }
+
+    for (std::size_t bracketIndex = 0; bracketIndex < 4u; ++bracketIndex) {
+      const SelectionBracketCorner& bracket = kSelectionBracketCorners[bracketIndex];
+      const float* const boxCorner = geometry.mGroundCorners[bracketIndex];
+
+      CD3DPrimBatcher::Vertex quad[4]{};
+      for (std::size_t corner = 0; corner < 4u; ++corner) {
+        quad[corner].mX = boxCorner[0] + geometry.mTileOffsets[corner][0];
+        quad[corner].mY = boxCorner[1] + geometry.mTileOffsets[corner][1];
+        quad[corner].mZ = boxCorner[2] + geometry.mTileOffsets[corner][2];
+        quad[corner].mColor = ren_SelectColor;
+      }
+
+      quad[0].mU = bracket.atlasU0;
+      quad[0].mV = bracket.atlasV0;
+      quad[1].mU = bracket.atlasU0 + kSelectionBracketAtlasHalf;
+      quad[1].mV = bracket.atlasV0;
+      quad[2].mU = bracket.atlasU0 + kSelectionBracketAtlasHalf;
+      quad[2].mV = bracket.atlasV0 + kSelectionBracketAtlasHalf;
+      quad[3].mU = bracket.atlasU0;
+      quad[3].mV = bracket.atlasV0 + kSelectionBracketAtlasHalf;
+
+      batcher->DrawQuad(quad[0], quad[1], quad[2], quad[3]);
+    }
+  }
+
   void RenUI(
     CWldSession* const session,
     const GeomCamera3* const camera,
@@ -486,6 +632,24 @@ namespace moho
       }
 
       batcher->Flush();
+    }
+    if (IsFactoryPreOrdersEnabled() && sSelectionBrackets.Empty()) {
+      const auto selectedProxies = PlannedFactoryManager::Instance().GetSelectedProxies();
+      if (!selectedProxies.empty()) {
+        const boost::shared_ptr<CD3DBatchTexture> playerBrackets =
+          CD3DBatchTexture::FromFile(kSelectionBracketTexturePath, 1u);
+
+        (void)batcher->Setup(kSelectionBracketTechnique);
+        batcher->SetTexture(playerBrackets);
+
+        for (const auto* const proxy : selectedProxies) {
+          if (proxy != nullptr) {
+            DrawSelectionBracketsForProxy(*proxy, batcher, camera);
+          }
+        }
+
+        batcher->Flush();
+      }
     }
 
     // 0x007FD679..0x007FD7BC: the hovered unit gets its own army-coloured

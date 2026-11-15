@@ -22,6 +22,8 @@
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/sim/COGrid.h"
 #include "moho/sim/CWldSession.h"
+#include "moho/console/CConCommand.h"
+#include "moho/sim/PlannedFactoryProxy.h"
 #include "moho/terrain/splat/CWldSplat.h"
 #include "moho/unit/core/IUnit.h"
 #include "moho/unit/core/UserUnit.h"
@@ -108,7 +110,11 @@ namespace
   )
   {
     for (auto it = selection.begin(); it != selection.end();) {
-      if (session.CanSelectUnit(static_cast<moho::UserUnit*>(*it))) {
+      auto* const userUnit = static_cast<moho::UserUnit*>(*it);
+      if (
+        session.CanSelectUnit(userUnit) &&
+        (!moho::IsFactoryPreOrdersEnabled() || !moho::PlannedFactoryManager::Get().IsPlannedProxyUnit(userUnit))
+      ) {
         ++it;
       } else {
         it = selection.Erase(it);
@@ -340,6 +346,83 @@ namespace moho
     DragMove(eventData);
 
     if (!HasActiveSelectionDrag()) {
+      if (moho::IsFactoryPreOrdersEnabled()) {
+        auto& pfm = moho::PlannedFactoryManager::Get();
+        PlannedUnitProxy* hitProxy = nullptr;
+        if (mSess != nullptr && mSess->mCursorWorldState[0] != 0u) {
+          const Vector3f cursorWorldPos{mSess->CursorWorldPos.x, mSess->CursorWorldPos.y, mSess->CursorWorldPos.z};
+          for (const auto& proxy : pfm.GetAllProxies()) {
+            if (!proxy)
+              continue;
+            float halfX = 3.5f;
+            float halfZ = 3.5f;
+            if (const auto* rbp = dynamic_cast<const RUnitBlueprint*>(proxy->mBlueprint)) {
+              if (rbp->Physics.SkirtSizeX > 0.0f)
+                halfX = rbp->Physics.SkirtSizeX * 0.5f;
+              if (rbp->Physics.SkirtSizeZ > 0.0f)
+                halfZ = rbp->Physics.SkirtSizeZ * 0.5f;
+            }
+            if (
+              std::abs(cursorWorldPos.x - proxy->mPosition.x) <= halfX &&
+              std::abs(cursorWorldPos.z - proxy->mPosition.z) <= halfZ
+            ) {
+              hitProxy = proxy.get();
+              break;
+            }
+          }
+        }
+        if (hitProxy == nullptr && mCam != nullptr) {
+          const float mouseX = eventData != nullptr ? static_cast<float>(eventData->mMousePos.x) : mX0;
+          const float mouseY = eventData != nullptr ? static_cast<float>(eventData->mMousePos.y) : mY0;
+          const GeomCamera3& cameraView = mCam->CameraGetView();
+          hitProxy = pfm.HitTestScreenPoint(&cameraView, mouseX, mouseY, 40.0f);
+          if (hitProxy == nullptr) {
+            const Wm3::Vector2f screenPos(mouseX, mouseY);
+            const Wm3::Vector3f surfacePos = mCam->CameraScreenToSurface(screenPos);
+            for (const auto& proxy : pfm.GetAllProxies()) {
+              if (!proxy)
+                continue;
+              float halfX = 4.0f;
+              float halfZ = 4.0f;
+              if (const auto* rbp = dynamic_cast<const RUnitBlueprint*>(proxy->mBlueprint)) {
+                if (rbp->Physics.SkirtSizeX > 0.0f)
+                  halfX = rbp->Physics.SkirtSizeX * 0.5f;
+                if (rbp->Physics.SkirtSizeZ > 0.0f)
+                  halfZ = rbp->Physics.SkirtSizeZ * 0.5f;
+              }
+              if (
+                std::abs(surfacePos.x - proxy->mPosition.x) <= halfX &&
+                std::abs(surfacePos.z - proxy->mPosition.z) <= halfZ
+              ) {
+                hitProxy = proxy.get();
+                break;
+              }
+            }
+          }
+        }
+
+        if (hitProxy != nullptr && hitProxy->mUserUnit != nullptr) {
+          const bool isShift = eventData != nullptr && (eventData->mModifiers & MEM_Shift) != 0u;
+          WeakSet<UserEntity> newSelection;
+          if (isShift) {
+            newSelection = mSess->GetSelection();
+            if (newSelection.Find(hitProxy->mUserUnit) != newSelection.end()) {
+              (void)newSelection.Remove(hitProxy->mUserUnit);
+              pfm.DeselectProxy(hitProxy->mProxyId);
+            } else {
+              (void)newSelection.Add(hitProxy->mUserUnit);
+              pfm.SelectProxy(hitProxy->mProxyId, true);
+            }
+          } else {
+            pfm.ClearSelection();
+            (void)newSelection.Add(hitProxy->mUserUnit);
+            pfm.SelectProxy(hitProxy->mProxyId, false);
+          }
+          mSess->SetSelection(newSelection);
+          return;
+        }
+      }
+
       mSess->ReleaseDrag(eventData->mModifiers);
       return;
     }
@@ -386,6 +469,8 @@ namespace moho
           continue;
         }
 
+        const RUnitBlueprint* const blueprint = unitBridge ? unitBridge->GetBlueprint() : nullptr;
+
         MeshInstance* const meshInstance = unit->mMeshInstance;
         if (meshInstance == nullptr) {
           continue;
@@ -393,8 +478,6 @@ namespace moho
 
         meshInstance->UpdateInterpolatedFields();
         Wm3::Box3f scoredBox = meshInstance->box;
-
-        const RUnitBlueprint* const blueprint = unitBridge->GetBlueprint();
         scoredBox.Extent[1] *= blueprint->mSelectionMeshScaleX;
         scoredBox.Extent[2] *= blueprint->mSelectionMeshScaleY;
         scoredBox.Extent[0] *= blueprint->mSelectionMeshScaleZ;
