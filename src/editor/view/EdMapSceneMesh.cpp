@@ -414,6 +414,47 @@ namespace faf::editor
         }
       }
     }
+    // Each ground patch again about its own middle, the instance placed there: the renderer culls a model by a sphere
+    // round the instance's place (half the model's size: MeshInstance::UpdateInterpolatedFields), so a patch kept in
+    // world coordinates at the origin was culled by any view that doesn't hold the origin, the shadow map's above all.
+    std::map<std::size_t, std::pair<std::string, Wm3::Vec3f>> centred;
+    if (!mMeshViewCache.empty()) {
+      for (std::size_t i = 0; i < mMeshMap.patches.size(); ++i) {
+        const edmesh::Patch& patch = mMeshMap.patches[i];
+        std::string bytes;
+        if (patch.sky || !ReadGameFile(inFolder(patch.file), bytes) || bytes.size() < 0x1C) {
+          continue;
+        }
+        const auto word = [&](const std::size_t at) {
+          std::uint32_t v = 0;
+          std::memcpy(&v, bytes.data() + at, 4);
+          return v;
+        };
+        const std::size_t vertices = word(0x10);
+        const std::size_t count = word(0x18);
+        if (bytes.compare(0, 4, "MODL") != 0 || vertices + count * 68 > bytes.size()) {
+          continue;
+        }
+        const float middle[3] = {
+          (patch.boundsMin[0] + patch.boundsMax[0]) * 0.5f,
+          (patch.boundsMin[1] + patch.boundsMax[1]) * 0.5f,
+          (patch.boundsMin[2] + patch.boundsMax[2]) * 0.5f,
+        };
+        for (std::size_t v = 0; v < count; ++v) {
+          for (int k = 0; k < 3; ++k) {
+            float f = 0.0f;
+            char* const at = bytes.data() + vertices + v * 68 + static_cast<std::size_t>(k) * 4;
+            std::memcpy(&f, at, 4);
+            f -= middle[k];
+            std::memcpy(at, &f, 4);
+          }
+        }
+        const std::string file = "patch" + std::to_string(i) + ".scm";
+        std::ofstream(folder / file, std::ios::binary | std::ios::trunc)
+          .write(bytes.data(), static_cast<std::streamsize>(bytes.size()));
+        centred[i] = {vfs + "/" + file, Wm3::Vec3f{middle[0], middle[1], middle[2]}};
+      }
+    }
     // The fill to the horizon past the mesh: at the water (its deep colour) or below the mesh (the void's colour).
     const edmesh::Settings& settings = mMeshMap.settings;
     std::string fillMesh;
@@ -488,7 +529,8 @@ namespace faf::editor
                        const std::string& mesh,
                        const MeshMaterialView& view,
                        const std::string& shader,
-                       const int kind
+                       const int kind,
+                       const Wm3::Vec3f& place
                      ) {
       moho::RResId rid{};
       rid.name.assign(id.c_str());
@@ -512,7 +554,7 @@ namespace faf::editor
       }
       moho::VTransform at{};
       at.orient_ = Wm3::Quatf(1.0f, 0.0f, 0.0f, 0.0f);
-      at.pos_ = Wm3::Vec3f{0.0f, 0.0f, 0.0f};
+      at.pos_ = place;
       instance->SetStance(at, at);
       instance->isHidden = mMeshMode == 0 ? 1 : 0;
       mMeshPatchInstances.push_back(instance);
@@ -537,13 +579,15 @@ namespace faf::editor
         shader = std::string(view.lightMasks ? "EditorMeshTerrain" : "EditorMeshTerrainSun") +
           (view.alphaTest ? "Alpha" : "") + (mMeshMode == 2 ? "Both" : "");
       }
+      const auto own = centred.find(i);
       if (
         add(
           "/editor/meshterrain/patch" + std::to_string(i) + "_mesh",
-          inFolder(patch.file),
+          own != centred.end() ? own->second.first : inFolder(patch.file),
           view,
           shader,
-          patch.sky ? 1 : 0
+          patch.sky ? 1 : 0,
+          own != centred.end() ? own->second.second : Wm3::Vec3f{0.0f, 0.0f, 0.0f}
         )
       ) {
         ++made;
@@ -554,7 +598,7 @@ namespace faf::editor
       MeshMaterialView fill;
       fill.albedo = fill.secondary = fillTexture;
       fill.normals = fill.specular = fill.lookup = fillTexture;
-      (void)add("/editor/meshterrain/fill_mesh", fillMesh, fill, "EditorMeshFill", 2);
+      (void)add("/editor/meshterrain/fill_mesh", fillMesh, fill, "EditorMeshFill", 2, Wm3::Vec3f{0.0f, 0.0f, 0.0f});
     }
     gpg::Logf(
       "editor: mesh terrain: %d of %zu patches drawn by the mesh technique (%d sky)%s",
