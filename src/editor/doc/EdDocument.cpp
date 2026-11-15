@@ -2207,6 +2207,7 @@ namespace faf::editor
         "*.scm",
         "*.sca",
         "*.json",
+        "*.bin", // a mesh terrain map's water triangles
         "*.xwb",
         "*.xsb",
         "*.sfx"

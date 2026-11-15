@@ -269,6 +269,14 @@ C = [[long text]]
     EXPECT_NE(text.find("alpha_test = 100"), std::string::npos) << text;
     EXPECT_NE(text.find("sky = 1"), std::string::npos) << text;
     EXPECT_EQ(text.find("shadow_r"), std::string::npos) << "an unset key isn't written";
+    {
+      edmesh::MeshMap tiny = map;
+      edmesh::SetSettingGiven(tiny.settings, "sun_z", true);
+      *edmesh::SettingNumber(tiny.settings, "sun_z") = 0.00005f;
+      const std::string written = tiny.ManifestText();
+      EXPECT_NE(written.find("sun_z = 0.00005"), std::string::npos) << written;
+      EXPECT_EQ(written.find("e-"), std::string::npos) << "no exponent: " << written;
+    }
     edmesh::SetSettingGiven(map.settings, "sun_x", false);
     EXPECT_EQ(*edmesh::SettingNumber(map.settings, "sun_x"), 0.0f);
     text = map.ManifestText();

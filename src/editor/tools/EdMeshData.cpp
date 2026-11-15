@@ -321,6 +321,29 @@ namespace faf::editor
       gridBuilt_ = false;
     }
 
+    namespace
+    {
+      /** A number as the manifest's reader takes it: digits, a minus and a dot, never an exponent (6 decimals at most,
+       * trailing zeros dropped). */
+      std::string PlainNumber(
+        const float value
+      )
+      {
+        char text[64];
+        (void)std::snprintf(text, sizeof(text), "%.6f", static_cast<double>(value));
+        std::string out = text;
+        if (out.find('.') != std::string::npos) {
+          while (!out.empty() && out.back() == '0') {
+            out.pop_back();
+          }
+          if (!out.empty() && out.back() == '.') {
+            out.pop_back();
+          }
+        }
+        return out == "-0" ? "0" : out;
+      }
+    } // namespace
+
     const std::vector<SettingKey>& SettingKeys()
     {
       static const std::vector<SettingKey> keys = {
@@ -522,7 +545,7 @@ namespace faf::editor
       char line[256];
       const auto number = [&](const char* key, const float value, const bool keep) {
         if (keep) {
-          (void)std::snprintf(line, sizeof(line), "%s = %g\n", key, static_cast<double>(value));
+          (void)std::snprintf(line, sizeof(line), "%s = %s\n", key, PlainNumber(value).c_str());
           out += line;
         }
       };
@@ -553,7 +576,7 @@ namespace faf::editor
         entry += m.highlight ? ", highlight = 1" : "";
         entry += m.additive ? ", additive = 1" : "";
         if (m.alphaTest >= 0.0f) {
-          (void)std::snprintf(line, sizeof(line), ", alpha_test = %g", static_cast<double>(m.alphaTest));
+          (void)std::snprintf(line, sizeof(line), ", alpha_test = %s", PlainNumber(m.alphaTest).c_str());
           entry += line;
         }
         out += entry + "\n";
