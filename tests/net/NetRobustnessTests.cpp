@@ -773,13 +773,20 @@ namespace
   public:
     std::vector<FakeConnection*> connections;
     int connects = 0;
+    int linkedAtDestroy = -1; // the connections a receiver was still linked to when Destroy came
 
     FakeConnection* Last() const
     {
       return connections.empty() ? nullptr : connections.back();
     }
 
-    void Destroy() override {}
+    void Destroy() override
+    {
+      linkedAtDestroy = 0;
+      for (const FakeConnection* const connection : connections) {
+        linkedAtDestroy += connection->mLinkages.empty() ? 0 : 1;
+      }
+    }
     ENetProtocolType GetProtocol() override
     {
       return ENetProtocolType::kUdp;
@@ -1072,6 +1079,23 @@ namespace
       f->Deliver(bob, ELobbyMsg::LOBMSG_Join, join.substr(0, length));
     }
     EXPECT_TRUE(f->Peer(20) != nullptr);
+  }
+
+  // From the connector's Destroy on, its thread deletes the connections and their receiver linkages
+  // (CNetUDPConnector::Entry), while the lobby's own destructor goes on on this thread: the lobby has let go of
+  // every connection before Destroy (CLobby::~CLobby).
+  void TestLobbyLetsGoOfItsConnectionsBeforeDestroyingTheConnector()
+  {
+    LobbyFixture* const f = new LobbyFixture();
+    f->Deliver(f->host, ELobbyMsg::LOBMSG_Welcome, f->Welcome());
+    f->Deliver(f->host, ELobbyMsg::LOBMSG_NewPeer, f->NewPeer("bob", 0x0A000002u, 7001, 20));
+    ASSERT_EQ(f->connector.connections.size(), 2u);
+    ASSERT_FALSE(f->host->mLinkages.empty());
+    ASSERT_FALSE(f->connector.Last()->mLinkages.empty());
+
+    delete f->lobby;
+    f->lobby = nullptr;
+    EXPECT_EQ(f->connector.linkedAtDestroy, 0);
   }
 
   // --- Order stream check ------------------------------------------------------------------
@@ -1849,6 +1873,13 @@ TEST(
 )
 {
   TestLobbyPeerEvents();
+}
+TEST(
+  Lobby,
+  LetsGoOfItsConnectionsBeforeDestroyingTheConnector
+)
+{
+  TestLobbyLetsGoOfItsConnectionsBeforeDestroyingTheConnector();
 }
 TEST(
   Existing_NetRobustness,
