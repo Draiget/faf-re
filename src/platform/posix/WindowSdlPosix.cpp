@@ -384,6 +384,15 @@ namespace platform::window::sdl
     return false;
   }
 
+  void SetClipChildren(
+    SDL_Window* const window,
+    const bool clip
+  )
+  {
+    (void)window;
+    (void)clip;
+  }
+
   bool SetChildBounds(
     SDL_Window* const window,
     const int x,

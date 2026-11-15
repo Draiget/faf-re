@@ -98,7 +98,9 @@ namespace platform::window
   [[nodiscard]] Handle
   CreateTopLevel(const char* utf8Title, int x, int y, int width, int height, bool resizable, bool bordered);
   // Gives a top-level window a caption and border or takes them away, and lets it be resized or not.
-  void SetFrameStyle(Handle window, bool bordered, bool resizable);
+  // clipChildren: drawing into the window leaves out its child windows' areas (Windows'
+  // WS_CLIPCHILDREN); nothing where the window system has no such style.
+  void SetFrameStyle(Handle window, bool bordered, bool resizable, bool clipChildren);
   // A window inside `parent`'s client area at x, y (relative to it), shown, with input of its own,
   // as the window library's child windows were on Windows (the game's viewport, the map editor's view of it). Null
   // where the system has none; the engine's child then shares its parent's window.

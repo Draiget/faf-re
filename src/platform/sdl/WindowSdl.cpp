@@ -918,7 +918,8 @@ namespace platform::window
   void SetFrameStyle(
     const Handle window,
     const bool bordered,
-    const bool resizable
+    const bool resizable,
+    const bool clipChildren
   )
   {
     if (window == nullptr || sdl::IsChild(AsWindow(window))) {
@@ -926,6 +927,7 @@ namespace platform::window
     }
     (void)SDL_SetWindowBordered(AsWindow(window), bordered);
     (void)SDL_SetWindowResizable(AsWindow(window), resizable);
+    sdl::SetClipChildren(AsWindow(window), clipChildren);
     (void)SDL_SyncWindow(AsWindow(window));
     sdl::OnWindowRectChanged(AsWindow(window));
   }

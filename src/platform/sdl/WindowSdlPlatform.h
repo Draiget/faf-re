@@ -36,6 +36,9 @@ namespace platform::window::sdl
   [[nodiscard]] bool IsChild(SDL_Window* window);
   [[nodiscard]] bool SetChildBounds(SDL_Window* window, int x, int y, int width, int height);
   [[nodiscard]] bool GetChildBounds(SDL_Window* window, int* x, int* y, int* width, int* height);
+  // Drawing into a top-level window leaves out its child windows' areas, or doesn't (Windows'
+  // WS_CLIPCHILDREN, which SDL sets on every window it makes). Nothing elsewhere.
+  void SetClipChildren(SDL_Window* window, bool clip);
   // After SDL_DestroyWindow: the native window of a child, which SDL leaves to its maker.
   void DestroyChildNative(void* native);
   void SetKeyboardFocus(SDL_Window* window);

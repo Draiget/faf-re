@@ -271,6 +271,22 @@ namespace platform::window::sdl
     return IsChildHwnd(HwndOf(window));
   }
 
+  void SetClipChildren(
+    SDL_Window* const window,
+    const bool clip
+  )
+  {
+    HWND const hwnd = HwndOf(window);
+    if (hwnd == nullptr || IsChildHwnd(hwnd)) {
+      return;
+    }
+    const LONG_PTR style = ::GetWindowLongPtrW(hwnd, GWL_STYLE);
+    const LONG_PTR wanted = clip ? (style | WS_CLIPCHILDREN) : (style & ~static_cast<LONG_PTR>(WS_CLIPCHILDREN));
+    if (wanted != style) {
+      (void)::SetWindowLongPtrW(hwnd, GWL_STYLE, wanted);
+    }
+  }
+
   bool SetChildBounds(
     SDL_Window* const window,
     const int x,
