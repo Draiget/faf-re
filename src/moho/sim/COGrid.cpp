@@ -3,7 +3,6 @@
 #include "gpg/core/utils/Logging.h"
 #include "moho/sim/COGrid.h"
 
-#include <type_traits>
 #include <algorithm>
 #include <bit>
 #include <cassert>
@@ -294,38 +293,9 @@ namespace
    *              gpg::fastvector_CollisionShapeBase *a3,
    *              Moho::EntityOccupationManager *a4)
    */
-  /// A gather fills a vector of shapes or of the entities that own them
-  /// (`CollisionShape<Entity>`, the binary's `-0x4C`).
-  template <class TElement>
-  [[nodiscard]] TElement GatheredElement(
-    moho::CollisionShapeBase* const shape
-  ) noexcept
-  {
-    if constexpr (std::is_same_v<TElement, moho::Entity*>) {
-      return moho::CollisionShape<moho::Entity>::OwnerOf(shape);
-    } else {
-      return shape;
-    }
-  }
-
-  [[nodiscard]] moho::CollisionShapeBase* GatheredShape(
-    moho::CollisionShapeBase* const shape
-  ) noexcept
-  {
-    return shape;
-  }
-
-  [[nodiscard]] moho::CollisionShapeBase* GatheredShape(
-    moho::Entity* const entity
-  ) noexcept
-  {
-    return static_cast<moho::CollisionShape<moho::Entity>*>(entity);
-  }
-
-  template <class TElement>
   std::int32_t MarchLineAndGatherCollisionSpans(
     moho::EntityOccupationManager& manager,
-    gpg::core::FastVectorInline<TElement>& outSpans,
+    gpg::core::FastVectorInline<moho::CollisionShapeBase*>& outSpans,
     const Wm3::Vec3f& lineStart,
     const Wm3::Vec3f& lineEnd
   )
@@ -364,7 +334,7 @@ namespace
             continue;
           }
 
-          outSpans.PushBack(GatheredElement<TElement>(shape));
+          outSpans.PushBack(shape);
         }
       }
 
@@ -375,7 +345,7 @@ namespace
             continue;
           }
 
-          outSpans.PushBack(GatheredElement<TElement>(shape));
+          outSpans.PushBack(shape);
         }
       }
 
@@ -385,10 +355,28 @@ namespace
     const std::int32_t count = static_cast<std::int32_t>(outSpans.end_ - outSpans.start_);
     if (useSharedMarks) {
       for (std::int32_t index = 0; index < count; ++index) {
-        GatheredShape(outSpans.start_[index])->mMarked = 0u;
+        outSpans.start_[index]->mMarked = 0u;
       }
     }
     return count;
+  }
+
+  /// The binary gathers the shapes into the caller's entity vector and rewrites each
+  /// in place as its owning entity (`CollisionShape<Entity>`, the binary's `-0x4C`).
+  /// Here the shapes go into a vector of their own, sized like the binary's
+  /// (`FastVectorN<pointer, 20>`), and the owners into the caller's.
+  using GatheredShapes = gpg::core::FastVectorN<moho::CollisionShapeBase*, 20>;
+
+  std::int32_t CopyGatheredOwners(
+    const GatheredShapes& shapes,
+    gpg::core::FastVectorInline<moho::Entity*>& outEntities
+  )
+  {
+    outEntities.ResetStorageToInline();
+    for (moho::CollisionShapeBase* const* shape = shapes.start_; shape != shapes.end_; ++shape) {
+      outEntities.PushBack(moho::CollisionShape<moho::Entity>::OwnerOf(*shape));
+    }
+    return static_cast<std::int32_t>(outEntities.end_ - outEntities.start_);
   }
 
   /**
@@ -406,9 +394,9 @@ namespace
     const Wm3::Vec3f& lineEnd
   )
   {
-    // The binary gathers the shapes into the caller's buffer and rewrites each
-    // as its owning entity; gathering the owners directly fills it the same.
-    return MarchLineAndGatherCollisionSpans(manager, outEntities, lineStart, lineEnd);
+    GatheredShapes shapes;
+    (void)MarchLineAndGatherCollisionSpans(manager, shapes, lineStart, lineEnd);
+    return CopyGatheredOwners(shapes, outEntities);
   }
 
   using TypeInfo = moho::COGridTypeInfo;
@@ -924,10 +912,9 @@ namespace moho
     &sim_GatherPrefetch
   );
 
-  template <class TElement>
   int GatherUnmarkedInRect(
     EntityOccupationManager& manager,
-    gpg::core::FastVectorInline<TElement>& outSpans,
+    gpg::core::FastVectorInline<CollisionShapeBase*>& outSpans,
     const CollisionDBRect& rect,
     const EEntityType flags
   )
@@ -984,7 +971,7 @@ namespace moho
                 }
                 CollisionShapeBase* const shape = node->owner;
                 if (ClaimGatherShape(shape, useSharedMarks)) {
-                  outSpans.PushBack(GatheredElement<TElement>(shape));
+                  outSpans.PushBack(shape);
                 }
               }
             }
@@ -993,7 +980,7 @@ namespace moho
               for (EntityCollisionCellNode* node = propBuckets[bucketIndex]; node; node = node->next) {
                 CollisionShapeBase* const shape = node->owner;
                 if (ClaimGatherShape(shape, useSharedMarks)) {
-                  outSpans.PushBack(GatheredElement<TElement>(shape));
+                  outSpans.PushBack(shape);
                 }
               }
             }
@@ -1002,7 +989,7 @@ namespace moho
               for (EntityCollisionCellNode* node = entityBuckets[bucketIndex]; node; node = node->next) {
                 CollisionShapeBase* const shape = node->owner;
                 if (((flagBits & shape->mBucketFlags) != 0u) && ClaimGatherShape(shape, useSharedMarks)) {
-                  outSpans.PushBack(GatheredElement<TElement>(shape));
+                  outSpans.PushBack(shape);
                 }
               }
             }
@@ -1020,7 +1007,7 @@ namespace moho
     const int count = static_cast<int>(outSpans.end_ - outSpans.start_);
     if (useSharedMarks) {
       for (int index = 0; index < count; ++index) {
-        GatheredShape(outSpans.start_[index])->mMarked = 0u;
+        outSpans.start_[index]->mMarked = 0u;
       }
     }
 
@@ -1048,9 +1035,9 @@ namespace moho
     const EEntityType flags
   )
   {
-    // The binary gathers the shapes into the caller's buffer and rewrites each
-    // as its owning entity; gathering the owners directly fills it the same.
-    return GatherUnmarkedInRect(*this, outEntities, rect, flags);
+    GatheredShapes shapes;
+    (void)GatherUnmarkedUnitsInRect(shapes, rect, flags);
+    return CopyGatheredOwners(shapes, outEntities);
   }
 
   /**
