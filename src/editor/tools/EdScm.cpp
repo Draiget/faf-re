@@ -20,7 +20,8 @@ namespace faf::editor
     std::istringstream lines(text);
     std::string line;
     int number = 0;
-    int group = -1; // -1: before any `o` / `g` line
+    int group = -1;    // -1: before any `o` / `g` line
+    int material = -1; // -1: before any `usemtl` line
     const auto index = [](const std::string& part, const std::size_t count) {
       if (part.empty()) {
         return -1;
@@ -48,6 +49,14 @@ namespace faf::editor
         std::array<float, 3> n{};
         words >> n[0] >> n[1] >> n[2];
         out.normals.push_back(n);
+      } else if (kind == "usemtl") {
+        std::string name;
+        std::getline(words >> std::ws, name);
+        const auto found = std::find(out.materials.begin(), out.materials.end(), name);
+        material = static_cast<int>(found - out.materials.begin());
+        if (found == out.materials.end()) {
+          out.materials.push_back(name);
+        }
       } else if (kind == "o" || kind == "g") {
         std::string name;
         std::getline(words >> std::ws, name);
@@ -83,6 +92,7 @@ namespace faf::editor
         for (std::size_t k = 2; k < polygon.size(); ++k) {
           out.triangles.push_back({polygon[0], polygon[k - 1], polygon[k]});
           out.triangleGroup.push_back(group);
+          out.triangleMaterial.push_back(material);
         }
       }
     }
@@ -424,8 +434,14 @@ namespace faf::editor
       }
       PutFloat(out, v.uv[0]);
       PutFloat(out, v.uv[1]);
-      PutFloat(out, v.uv[0]); // the second set: the same
-      PutFloat(out, v.uv[1]);
+      if (mesh.uv2Size > 0.0f) {
+        // The second set over the map (FAF Studio's planar light mask coordinates).
+        PutFloat(out, std::clamp(v.position[0] / mesh.uv2Size, 0.0f, 1.0f));
+        PutFloat(out, std::clamp(v.position[2] / mesh.uv2Size, 0.0f, 1.0f));
+      } else {
+        PutFloat(out, v.uv[0]); // the second set: the same
+        PutFloat(out, v.uv[1]);
+      }
       Put32(out, static_cast<std::uint32_t>(v.bone)); // its bone (the first of four bytes)
     }
     Section(out, "TRIS");

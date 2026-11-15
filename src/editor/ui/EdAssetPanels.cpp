@@ -220,9 +220,12 @@ namespace faf::editor
     ImGui::SetNextItemWidth(-1.0f);
     ImGui::DragFloat3("##meshoffset", mMeshOptions.offset, 0.5f, -10000.0f, 10000.0f, "%.1f");
     EdSetItemTooltip("Offset X / Y / Z after the scale, in map units");
-    static constexpr const char* kNormals[] = {"Normals: the file's", "Normals: from the faces"};
+    static constexpr const char* kNormals[] = {
+      "Normals: the file's (smooth where none)", "Normals: smooth", "Normals: flat"
+    };
     ImGui::SetNextItemWidth(Em(160.0f));
-    (void)EdCombo("##meshnormals", &mMeshOptions.normals, kNormals, 2);
+    (void)EdCombo("##meshnormals", &mMeshOptions.normals, kNormals, 3);
+    EdSetItemTooltip("Smooth: each corner the area-weighted normal of its faces; flat: every triangle its own");
     ImGui::SameLine();
     ImGui::SetNextItemWidth(Em(120.0f));
     FillDragFloat(
@@ -236,6 +239,19 @@ namespace faf::editor
     EdSetItemTooltip(
       "A file without texture coordinates gets them from the ground plan, repeating every so many units"
     );
+    static constexpr const char* kMaterialsBy[] = {
+      "Materials: the OBJ's (usemtl)", "Materials: by o / g group", "Materials: one for all"
+    };
+    ImGui::SetNextItemWidth(Em(200.0f));
+    (void)EdCombo("##meshmaterials", &mMeshOptions.materialsBy, kMaterialsBy, 3);
+    EdSetItemTooltip("A material in the manifest for each, reused when one of that name is there");
+    ImGui::SameLine();
+    static constexpr const char* kLightMaskUv[] = {"Light mask uv: over the map", "Light mask uv: the texture's"};
+    ImGui::SetNextItemWidth(-1.0f);
+    (void)EdCombo("##meshuv2", &mMeshOptions.lightMaskUv, kLightMaskUv, 2);
+    EdSetItemTooltip(
+      "The second texture coordinates, which the light masks use: x, z over the map's size, or the texture's own"
+    );
     ImGui::Checkbox("A patch for each object / group", &mMeshOptions.byGroup);
     ImGui::SameLine();
     ImGui::SetNextItemWidth(Em(110.0f));
@@ -247,6 +263,9 @@ namespace faf::editor
       mMeshAsk = MeshAsk{true, mMeshFile, mMeshOptions, mMeshMakeMap};
     }
     ImGui::EndDisabled();
+    ImGui::SameLine();
+    ImGui::Checkbox("Replace the existing patches", &mMeshOptions.replace);
+    EdSetItemTooltip("Off: the new patches join the manifest's; on: its ground patches go first (sky pieces stay)");
     ImGui::SameLine();
     ImGui::Checkbox("Make it a mesh terrain map", &mMeshMakeMap);
     EdSetItemTooltip("The scenario names the patches (TerrainSystem = 'mesh', TerrainMesh), one undo step");

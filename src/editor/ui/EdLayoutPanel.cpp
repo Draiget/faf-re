@@ -260,6 +260,12 @@ namespace faf::editor
       ImGui::Checkbox("Flip X", &mPicture.flipX);
       ImGui::SameLine();
       ImGui::Checkbox("Flip Z", &mPicture.flipZ);
+      static constexpr const char* kChannels[5] = {
+        "Reads: brightness", "Reads: red", "Reads: green", "Reads: blue", "Reads: alpha"
+      };
+      ImGui::SetNextItemWidth(-1.0f);
+      (void)EdCombo("##layoutpicturechannel", &mPicture.channel, kChannels, 5);
+      EdSetItemTooltip("What of the picture becomes the layer: its brightness, or one channel (a mask kept in alpha)");
       if (ImGui::Button("Import picture...", ImVec2(-1.0f, 0.0f))) {
         mStatus = ImportPicture(mPicturePath);
       }
@@ -824,7 +830,9 @@ namespace faf::editor
     }
     HeightImage image;
     std::string error;
-    if (!ReadHeightImage(std::filesystem::path(path), 0, 0, image, error)) {
+    HeightReadOptions read;
+    read.channel = std::clamp(mPicture.channel, 0, 4);
+    if (!ReadHeightImageWith(std::filesystem::path(path), 0, 0, read, image, error)) {
       return "The picture couldn't be read: " + error;
     }
     std::vector<float> grey(image.words.size());

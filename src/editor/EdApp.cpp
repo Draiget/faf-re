@@ -297,6 +297,12 @@ namespace faf::editor
         "/layoutcheck",
         "/selftests",
         "/meshtest",
+        "/meshimport2",
+        "/layoutchannel",
+        "/meshask",
+        "/exportpkg",
+        "/checksettings",
+        "/meshwire",
         "/gfxpreset",
         "/resourcecheck",
         "/viewstage",
@@ -4607,6 +4613,12 @@ namespace faf::editor
             mShell->HideHome();
             mShell->ShowLayout();
             mDocument.Layout().selected = 0;
+            // `/layoutchannel <n>`: what the picture import reads (0 brightness, 1 red, 2 green, 3 blue, 4 alpha).
+            if (
+              fa::vector<fa::string> channel; moho::CFG_GetArgOption("/layoutchannel", 1, &channel) && !channel.empty()
+            ) {
+              panel.SetPictureChannel(std::atoi(channel[0].c_str()));
+            }
             gpg::Logf("editor: layout test: %s", panel.ImportPicture(std::string(arg[0].c_str()).substr(8)).c_str());
             mDocument.Layout().weather = 0.5f;
             break;
@@ -8713,6 +8725,7 @@ namespace faf::editor
       /** Import / Export > Export package: the folder for Gaea / World Machine; the folder watch. */
       std::map<std::string, long long> mPackageStamps;
       int mMeshAskFrames = 0; // `/meshask`
+      bool mMeshImport2Done = false; // `/meshimport2`
       int mMeshAskDone = 0;
       bool mPackageTestDone = false;
       double mPackageWatchAt = 0.0;
@@ -13767,6 +13780,15 @@ namespace faf::editor
           mShell->AskMeshMore(ask);
         }
       }
+      // `/meshimport2 <obj>` (test runs): a second import into the same manifest once the first mesh is in.
+      if (
+        fa::vector<fa::string> second; !mMeshImport2Done && mScene.MeshMapRef().Loaded() &&
+        moho::CFG_GetArgOption("/meshimport2", 1, &second) && !second.empty()
+      ) {
+        mMeshImport2Done = true;
+        gpg::Logf("editor: /meshimport2: %s", second[0].c_str());
+        mShell->AskMeshImport(second[0].c_str(), true);
+      }
       if (const int more = mShell->TakeMeshMore(); more == 1) {
         mShell->SetMeshStatus(mScene.LoadMeshTerrain());
       } else if (more == 2) {
@@ -13997,36 +14019,111 @@ namespace faf::editor
         std::size_t tiles = 0;
         std::size_t failed = 0;
         if (!map.empty()) {
-          // The mesh terrain map's own folder and manifest (FAF Studio's `terrain/terrain.lua`), which both editors
-          // read.
+          // Into the mesh terrain map's manifest (FAF Studio's meshimport Commit): the one the Mesh terrain panel
+          // holds, else a new one from the map; its settings, materials and sky patches stay, the new patches get free
+          // names and go before the sky patches, Replace drops the ground patches first (their files stay on disk).
           const std::filesystem::path folder = map.parent_path() / "terrain";
           std::error_code made;
           std::filesystem::create_directories(folder, made);
-          std::map<std::pair<int, int>, std::string> files;
-          float meshHigh = -10000.0f;
-          for (const auto& p : placed.positions) {
-            meshHigh = std::max(meshHigh, p[1]);
+          if (mScene.MeshMapRef().manifestPath.empty()) {
+            (void)mScene.SyncMeshFromMap(true);
           }
-          for (const auto& [key, part] : SplitMesh(placed, ask.options)) {
-            const std::string name = "tile_" + std::to_string(key.first) + "_" + std::to_string(key.second) + ".scm";
-            std::string partError;
-            const std::vector<std::uint8_t> scm =
-              ScmFromObj(part, "tile", 1.0f, "FAF map editor mesh terrain", partError);
-            if (scm.empty()) {
-              ++failed;
+          const edmesh::MeshMap& model = mScene.MeshMapRef();
+          edmesh::MeshMap next;
+          next.settings = model.settings;
+          next.materials = model.materials;
+          for (const edmesh::Patch& patch : model.patches) {
+            if (ask.options.replace && !patch.sky) {
               continue;
             }
-            std::ofstream out(folder / name, std::ios::binary | std::ios::trunc);
-            out.write(reinterpret_cast<const char*>(scm.data()), static_cast<std::streamsize>(scm.size()));
-            files[key] = name;
-            ++tiles;
+            edmesh::Patch entry;
+            entry.file = patch.file;
+            entry.material = patch.material;
+            entry.sky = patch.sky;
+            entry.boundsMax[1] = patch.boundsMax[1];
+            next.patches.push_back(std::move(entry));
+          }
+          std::set<std::string> taken;
+          int section = 0;
+          float meshHigh = -10000.0f;
+          for (const edmesh::Patch& patch : next.patches) {
+            std::string name = patch.file;
+            std::transform(name.begin(), name.end(), name.begin(), [](const unsigned char c) {
+              return static_cast<char>(std::tolower(c));
+            });
+            taken.insert(name);
+            if (int n = 0; std::sscanf(name.c_str(), "section%d_", &n) == 1) {
+              section = std::max(section, n + 1);
+            }
+            if (!patch.sky) {
+              meshHigh = std::max(meshHigh, patch.boundsMax[1]);
+            }
+          }
+          std::size_t at = next.patches.size();
+          for (std::size_t i = 0; i < next.patches.size(); ++i) {
+            if (next.patches[i].sky) {
+              at = i;
+              break;
+            }
+          }
+          const float size = next.settings.size > 0.0f
+            ? next.settings.size
+            : static_cast<float>(std::max(mDocument.Facts().sizeX, mDocument.Facts().sizeZ));
+          for (auto& [materialName, part] : SplitByMaterial(placed, ask.options.materialsBy)) {
+            int material = -1;
+            for (std::size_t m = 0; m < next.materials.size(); ++m) {
+              if (next.materials[m].name == materialName) {
+                material = static_cast<int>(m);
+              }
+            }
+            if (material < 0) {
+              edmesh::Material fresh;
+              fresh.name = materialName;
+              next.materials.push_back(fresh);
+              material = static_cast<int>(next.materials.size()) - 1;
+            }
+            int serial = 0;
+            for (auto& [key, piece] : SplitMesh(part, ask.options)) {
+              (void)key;
+              piece.uv2Size = ask.options.lightMaskUv == 0 ? size : 0.0f;
+              char name[64];
+              (void)std::snprintf(name, sizeof(name), "section%02d_%03d.scm", section, serial++);
+              std::string partError;
+              const std::vector<std::uint8_t> scm =
+                ScmFromObj(piece, "tile", 1.0f, "FAF map editor mesh terrain", partError);
+              if (scm.empty()) {
+                ++failed;
+                continue;
+              }
+              std::ofstream out(folder / name, std::ios::binary | std::ios::trunc);
+              out.write(reinterpret_cast<const char*>(scm.data()), static_cast<std::streamsize>(scm.size()));
+              for (const auto& triangle : piece.triangles) {
+                for (const ObjMesh::Corner& c : triangle) {
+                  meshHigh = std::max(meshHigh, piece.positions[static_cast<std::size_t>(c.position)][1]);
+                }
+              }
+              edmesh::Patch entry;
+              entry.file = name;
+              entry.material = material;
+              next.patches.insert(next.patches.begin() + static_cast<std::ptrdiff_t>(at++), std::move(entry));
+              ++tiles;
+            }
+            ++section;
+          }
+          if (meshHigh > -9999.0f) {
+            next.settings.meshHigh = meshHigh + kMeshHighMargin;
+            next.settings.given.insert("mesh_high");
           }
           {
             std::ofstream manifest(folder / "terrain.lua", std::ios::binary | std::ios::trunc);
-            manifest << MeshTerrainManifest(
-              files, static_cast<float>(std::max(mDocument.Facts().sizeX, mDocument.Facts().sizeZ)), meshHigh
-            );
+            manifest << next.ManifestText();
           }
+          gpg::Logf(
+            "editor: mesh terrain import: %zu patches in the manifest (%s), %zu materials",
+            next.patches.size(),
+            ask.options.replace ? "the ground patches replaced" : "added to the ones there",
+            next.materials.size()
+          );
           // A mesh terrain map: its scenario names the manifest (TerrainSystem = 'mesh', TerrainMesh), one undo step.
           if (ask.makeMeshMap) {
             const std::string manifest = "/maps/" + mDocument.FolderName() + "/terrain/terrain.lua";

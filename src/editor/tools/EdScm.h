@@ -23,6 +23,14 @@ namespace faf::editor
     /** The `o` / `g` names in file order, and each triangle's (an index into them; -1 before the first). */
     std::vector<std::string> groups;
     std::vector<int> triangleGroup;
+    /** The `usemtl` names in file order, and each triangle's (-1 before the first). */
+    std::vector<std::string> materials;
+    std::vector<int> triangleMaterial;
+    /**
+     * The second texture coordinates (the light masks'): over the map, x and z / `uv2Size` (0..1), when above zero;
+     * else the first set again.
+     */
+    float uv2Size = 0.0f;
   };
 
   /** Reads `v`, `vt`, `vn` and `f` lines (polygons fanned into triangles, negative indexes from the end). */

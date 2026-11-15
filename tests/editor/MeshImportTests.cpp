@@ -4,6 +4,8 @@
 
 #include <gtest/gtest.h>
 
+#include <cstring>
+
 namespace faf::editor
 {
   namespace
@@ -77,5 +79,62 @@ namespace faf::editor
     const std::string manifest = MeshManifest({{{0, 0}, "tile_0_0.scm"}, {{1, 0}, "tile_1_0.scm"}}, 256.0f);
     EXPECT_NE(manifest.find("tile = 256"), std::string::npos);
     EXPECT_NE(manifest.find("{ 1, 0, 'tile_1_0.scm' }"), std::string::npos);
+  }
+
+  TEST(
+    MeshImport,
+    MaterialsNormalsAndLightMaskCoordinates
+  )
+  {
+    // FAF Studio's import options: a part a usemtl material, smooth or flat normals, light masks over the map.
+    ObjMesh mesh;
+    std::string error;
+    ASSERT_TRUE(ParseObj(
+      "v 0 0 0\nv 10 0 0\nv 10 5 10\nv 0 5 10\n"
+      "usemtl rock\nf 1 2 3\nusemtl grass\nf 1 3 4\n",
+      mesh,
+      error
+    )) << error;
+    ASSERT_EQ(mesh.materials.size(), 2U);
+    const auto byMaterial = SplitByMaterial(mesh, 0);
+    ASSERT_EQ(byMaterial.size(), 2U);
+    EXPECT_EQ(byMaterial[0].first, "rock");
+    EXPECT_EQ(byMaterial[1].first, "grass");
+    EXPECT_EQ(SplitByMaterial(mesh, 2).size(), 1U);
+    EXPECT_EQ(SplitByMaterial(mesh, 2)[0].first, "ground");
+
+    MeshImportOptions options;
+    options.normals = 2; // flat: every triangle its own normal
+    const ObjMesh flat = TransformMesh(mesh, options);
+    EXPECT_EQ(flat.normals.size(), 2U);
+    EXPECT_NE(flat.triangles[0][0].normal, flat.triangles[1][0].normal);
+    options.normals = 1; // smooth: the shared corner (position 0) has one normal in both triangles
+    const ObjMesh smooth = TransformMesh(mesh, options);
+    EXPECT_EQ(smooth.triangles[0][0].normal, smooth.triangles[1][0].normal);
+
+    // The second coordinates over the map: a vertex at x 10, z 10 on a 20-unit map reads 0.5, 0.5.
+    ObjMesh placed = TransformMesh(mesh, MeshImportOptions{});
+    placed.uv2Size = 20.0f;
+    const std::vector<std::uint8_t> scm = ScmFromObj(placed, "tile", 1.0f, "test", error);
+    ASSERT_FALSE(scm.empty()) << error;
+    std::uint32_t at = 0;
+    std::uint32_t count = 0;
+    std::memcpy(&at, scm.data() + 0x10, 4);
+    std::memcpy(&count, scm.data() + 0x18, 4);
+    bool found = false;
+    for (std::uint32_t v = 0; v < count; ++v) {
+      float x = 0.0f;
+      float z = 0.0f;
+      float u2 = 0.0f;
+      float v2 = 0.0f;
+      std::memcpy(&x, scm.data() + at + v * 68, 4);
+      std::memcpy(&z, scm.data() + at + v * 68 + 8, 4);
+      std::memcpy(&u2, scm.data() + at + v * 68 + 56, 4);
+      std::memcpy(&v2, scm.data() + at + v * 68 + 60, 4);
+      EXPECT_NEAR(u2, x / 20.0f, 1e-6f);
+      EXPECT_NEAR(v2, z / 20.0f, 1e-6f);
+      found = found || (x == 10.0f && z == 10.0f);
+    }
+    EXPECT_TRUE(found);
   }
 } // namespace faf::editor

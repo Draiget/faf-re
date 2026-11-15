@@ -152,12 +152,56 @@ namespace faf::editor
         uv[1] = 1.0f - uv[1];
       }
     }
-    if (options.normals == 1) {
-      // Made from the faces: the file's normals dropped (ScmFromObj makes them).
+    // Normals (FAF Studio's File / auto, Smooth, Flat): smooth ones are each position's faces' normals weighted by
+    // their area; auto keeps the file's and smooths only the corners without one; flat gives each triangle its own.
+    if (options.normals == 2) {
       out.normals.clear();
       for (auto& triangle : out.triangles) {
-        for (ObjMesh::Corner& c : triangle) {
-          c.normal = -1;
+        const auto& a = out.positions[static_cast<std::size_t>(triangle[0].position)];
+        const auto& b = out.positions[static_cast<std::size_t>(triangle[1].position)];
+        const auto& c = out.positions[static_cast<std::size_t>(triangle[2].position)];
+        const std::array<float, 3> e1{b[0] - a[0], b[1] - a[1], b[2] - a[2]};
+        const std::array<float, 3> e2{c[0] - a[0], c[1] - a[1], c[2] - a[2]};
+        out.normals.push_back(
+          {e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]}
+        );
+        for (ObjMesh::Corner& corner : triangle) {
+          corner.normal = static_cast<int>(out.normals.size()) - 1;
+        }
+      }
+    } else {
+      bool missing = options.normals == 1;
+      for (const auto& triangle : out.triangles) {
+        for (const ObjMesh::Corner& corner : triangle) {
+          missing = missing || corner.normal < 0 || corner.normal >= static_cast<int>(out.normals.size());
+        }
+      }
+      if (missing) {
+        std::vector<std::array<float, 3>> smooth(out.positions.size(), std::array<float, 3>{0, 0, 0});
+        for (const auto& triangle : out.triangles) {
+          const auto& a = out.positions[static_cast<std::size_t>(triangle[0].position)];
+          const auto& b = out.positions[static_cast<std::size_t>(triangle[1].position)];
+          const auto& c = out.positions[static_cast<std::size_t>(triangle[2].position)];
+          const std::array<float, 3> e1{b[0] - a[0], b[1] - a[1], b[2] - a[2]};
+          const std::array<float, 3> e2{c[0] - a[0], c[1] - a[1], c[2] - a[2]};
+          const std::array<float, 3> n{
+            e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]
+          };
+          for (const ObjMesh::Corner& corner : triangle) {
+            for (int k = 0; k < 3; ++k) {
+              smooth[static_cast<std::size_t>(corner.position)][static_cast<std::size_t>(k)] +=
+                n[static_cast<std::size_t>(k)];
+            }
+          }
+        }
+        const int base = static_cast<int>(out.normals.size());
+        out.normals.insert(out.normals.end(), smooth.begin(), smooth.end());
+        for (auto& triangle : out.triangles) {
+          for (ObjMesh::Corner& corner : triangle) {
+            if (options.normals == 1 || corner.normal < 0 || corner.normal >= base) {
+              corner.normal = base + corner.position;
+            }
+          }
         }
       }
     }
@@ -173,6 +217,40 @@ namespace faf::editor
       }
     }
     return out;
+  }
+
+  std::vector<std::pair<std::string, ObjMesh>> SplitByMaterial(
+    const ObjMesh& mesh,
+    const int materialsBy
+  )
+  {
+    // FAF Studio's "Materials by": the OBJ's usemtl names, its o / g groups, or one for all ("ground").
+    const std::vector<int>& of = materialsBy == 0 ? mesh.triangleMaterial : mesh.triangleGroup;
+    const std::vector<std::string>& names = materialsBy == 0 ? mesh.materials : mesh.groups;
+    std::vector<std::pair<std::string, ObjMesh>> parts;
+    std::map<int, std::size_t> partOf;
+    for (std::size_t t = 0; t < mesh.triangles.size(); ++t) {
+      const int which = materialsBy == 2 || t >= of.size() ? -1 : of[t];
+      auto found = partOf.find(which);
+      if (found == partOf.end()) {
+        ObjMesh part;
+        part.positions = mesh.positions;
+        part.uvs = mesh.uvs;
+        part.normals = mesh.normals;
+        part.groups = mesh.groups;
+        part.materials = mesh.materials;
+        part.uv2Size = mesh.uv2Size;
+        const std::string name =
+          which >= 0 && which < static_cast<int>(names.size()) ? names[static_cast<std::size_t>(which)] : "ground";
+        found = partOf.emplace(which, parts.size()).first;
+        parts.emplace_back(name, std::move(part));
+      }
+      ObjMesh& part = parts[found->second].second;
+      part.triangles.push_back(mesh.triangles[t]);
+      part.triangleGroup.push_back(t < mesh.triangleGroup.size() ? mesh.triangleGroup[t] : -1);
+      part.triangleMaterial.push_back(t < mesh.triangleMaterial.size() ? mesh.triangleMaterial[t] : -1);
+    }
+    return parts;
   }
 
   std::map<std::pair<int, int>, ObjMesh> SplitMesh(

@@ -114,6 +114,13 @@ namespace faf::editor
     bool ApplyTemplate(const std::string& id);
     /** A picture file onto the selected layer with the panel's options (one undo step); what happened. */
     std::string ImportPicture(const std::string& path);
+    /** What a picture import reads (test runs: `/layoutchannel`): 0 brightness, 1 red, 2 green, 3 blue, 4 alpha. */
+    void SetPictureChannel(
+      const int channel
+    ) noexcept
+    {
+      mPicture.channel = channel;
+    }
 
     enum class Tool : std::uint8_t
     {

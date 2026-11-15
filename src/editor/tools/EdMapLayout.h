@@ -103,6 +103,7 @@ namespace faf::editor
     bool add = false;     // added to what is drawn (the larger value wins)
     bool flipX = false;
     bool flipZ = false;
+    int channel = 0; // what is read (Studio's "Reads"): 0 brightness, 1 red, 2 green, 3 blue, 4 alpha
   };
 
   /** A blob drawn on the Base layers: its centre in world units and its size in cells. */
