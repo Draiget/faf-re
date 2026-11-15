@@ -624,6 +624,13 @@ namespace moho
      * Address: 0x0073C4F0 (FUN_0073C4F0)
      */
     bool HasSyncData() override;
+
+    /**
+     * Engine addition (not in the binary): passes the session loop's frame state to
+     * the client manager's wait timing (`CClientManagerImpl::RecordNetworkWaitDemand`),
+     * with the beat it would dispatch next. Reads only; the driver's state is unchanged.
+     */
+    void RecordNetworkWaitDemand(bool demanded, bool waiting);
     /**
      * Address: 0x0073C520 (FUN_0073C520)
      */

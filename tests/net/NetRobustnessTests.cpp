@@ -9,6 +9,7 @@
 // Run:   build\clang-x64-release\tests\faf_net_tests.exe   (exit code = failures)
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
@@ -18,6 +19,7 @@
 #include <limits>
 #include <random>
 #include <string>
+#include <thread>
 #include <vector>
 
 #include <gtest/gtest.h>
@@ -36,6 +38,7 @@
 #include "moho/misc/CDecoder.h"
 #include "moho/misc/SessionStartup.h"
 #include "moho/net/CClientManagerImpl.h"
+#include "moho/net/NetworkWaitTracker.h"
 #include "moho/net/CLobby.h"
 #include "moho/net/CMessage.h"
 #include "moho/net/CNetClient.h"
@@ -861,6 +864,100 @@ namespace
       remote->ReceiveMessage(&msg, &connection);
     }
   };
+
+  // Wait timing for the Connectivity screen (NetworkWaitTracker): a window of the last
+  // 30 s and whole-game totals, from wall-clock samples the test gives it.
+  void TestNetworkWaitWindow()
+  {
+    moho::NetworkWaitTracker tracker;
+    tracker.Observe(0, true, 0);
+    EXPECT_EQ(tracker.Read(1, 1).waitingMs, 0.0);
+    tracker.Observe(1, true, 0b10);
+    tracker.Observe(1.2, true, 0b110); // peer 2 joins the stall; peer 1 is still waited on
+    tracker.Observe(1.5, true, 0);
+    const moho::NetworkWaitMetrics peer1 = tracker.Read(2, 1);
+    const moho::NetworkWaitMetrics peer2 = tracker.Read(2, 2);
+    EXPECT_NEAR(peer1.waitingMs, 500.0, 0.001);
+    EXPECT_NEAR(peer1.longestMs, 500.0, 0.001);
+    EXPECT_NEAR(peer2.waitingMs, 300.0, 0.001);
+    EXPECT_EQ(peer1.gameWaitEpisodes, 1u);
+    EXPECT_EQ(peer2.gameWaitEpisodes, 1u);
+
+    tracker.Observe(1.5, true, 0b10); // a zero-length stall is not an episode
+    tracker.Observe(1.5, true, 0);
+    tracker.Observe(2, false, 0); // paused time counts for nobody
+    tracker.Observe(12, true, 0);
+    EXPECT_NEAR(tracker.Read(13, 1).observedSeconds, 3.0, 0.001);
+    EXPECT_EQ(tracker.Read(43, 1).waitingMs, 0.0); // older than the 30 s window
+
+    tracker.Observe(43, true, 0b10);
+    EXPECT_NEAR(tracker.Read(74, 1).longestMs, 30000.0, 0.001);
+    tracker.Observe(74, true, 0b10);
+    EXPECT_EQ(tracker.Read(74, 1).gameWaitEpisodes, 2u); // kept after the window drops it
+    tracker.Observe(74, false, 0);
+    tracker.Observe(80, true, 0b10);
+    tracker.Observe(81, true, 0);
+    EXPECT_EQ(tracker.Read(81, 1).gameWaitEpisodes, 3u);
+
+    tracker.Observe(1, true, 0); // the clock went back: a new session starts empty
+    EXPECT_EQ(tracker.Read(2, 1).waitingMs, 0.0);
+    EXPECT_EQ(tracker.Read(2, 1).gameWaitEpisodes, 0u);
+    EXPECT_EQ(tracker.Read(2, 1).gameSeconds, 0.0);
+  }
+
+  void TestNetworkWaitGameTotals()
+  {
+    moho::NetworkWaitTracker tracker;
+    tracker.Observe(0, true, 0);
+    tracker.Observe(4, true, 0b10); // 4 s running, nobody waited on
+    tracker.Observe(5, true, 0);    // 1 s waiting on peer 1
+    tracker.Observe(10, false, 0);  // 5 s running, then paused
+    tracker.Observe(100, true, 0);  // the pause is not counted
+    const moho::NetworkWaitMetrics peer1 = tracker.Read(100, 1);
+    EXPECT_NEAR(peer1.gameSeconds, 10.0, 0.001);
+    EXPECT_NEAR(peer1.gameWaitPercent, 10.0, 0.001);
+    EXPECT_NEAR(peer1.gameAverageWaitMs, 1000.0, 0.001);
+    EXPECT_EQ(tracker.Read(100, 2).gameWaitPercent, 0.0);
+
+    moho::NetworkWaitTracker hitch;
+    hitch.Observe(0, true, 0b10);
+    hitch.Observe(60, true, 0); // one 60 s gap between samples adds at most 5 s
+    EXPECT_NEAR(hitch.Read(60, 1).gameSeconds, moho::NetworkWaitTracker::kMaxSampleGapSeconds, 0.001);
+  }
+
+  // The client manager counts a wait only while the session asks for a beat a peer
+  // has not sent, and stops as soon as the beat arrives.
+  void TestNetworkWaitDemand()
+  {
+    auto* const fixture = new ClientFixture; // left alive, as the fixture's manager is
+    CClientManagerImpl* const manager = fixture->manager;
+    manager->mWeAreReady = true;
+    manager->mEveryoneIsReady = true;
+    manager->mDispatchedBeat = 1;
+    manager->mAvailableBeat = 1;
+    manager->mLocalClient->mQueuedBeat = 10;
+    fixture->remote->mQueuedBeat = 1;
+
+    manager->RecordNetworkWaitDemand(true, false, 2); // beat 2 not due yet: not a stall
+    std::this_thread::sleep_for(std::chrono::milliseconds(2));
+    EXPECT_EQ(manager->GetNetworkWaitMetrics()[1].waitingMs, 0.0);
+
+    manager->RecordNetworkWaitDemand(true, true, 2);
+    std::this_thread::sleep_for(std::chrono::milliseconds(5));
+    EXPECT_GT(manager->GetNetworkWaitMetrics()[1].waitingMs, 0.0);
+    EXPECT_EQ(manager->GetNetworkWaitMetrics()[0].waitingMs, 0.0); // never the local client
+
+    manager->mAvailableBeat = 2; // the beat arrived: the next sample ends the wait
+    manager->RefreshNetworkWaitDiagnostics();
+    const double ended = manager->GetNetworkWaitMetrics()[1].waitingMs;
+    std::this_thread::sleep_for(std::chrono::milliseconds(2));
+    EXPECT_EQ(manager->GetNetworkWaitMetrics()[1].waitingMs, ended);
+
+    manager->RecordNetworkWaitDemand(false, false, 2); // paused: time stops counting
+    const double observed = manager->GetNetworkWaitMetrics()[1].observedSeconds;
+    std::this_thread::sleep_for(std::chrono::milliseconds(2));
+    EXPECT_EQ(manager->GetNetworkWaitMetrics()[1].observedSeconds, observed);
+  }
 
   void TestClientShortMessages()
   {
@@ -1907,4 +2004,25 @@ TEST(
 )
 {
   TestStreamCheckStopsOnDifferentOrders();
+}
+TEST(
+  Existing_NetRobustness,
+  NetworkWaitWindow
+)
+{
+  TestNetworkWaitWindow();
+}
+TEST(
+  Existing_NetRobustness,
+  NetworkWaitGameTotals
+)
+{
+  TestNetworkWaitGameTotals();
+}
+TEST(
+  Existing_NetRobustness,
+  NetworkWaitDemand
+)
+{
+  TestNetworkWaitDemand();
 }

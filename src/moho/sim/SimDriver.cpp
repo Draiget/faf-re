@@ -1924,6 +1924,23 @@ double CSimDriver::GetSimSpeed()
  * What it does:
  * Stores one driver-state lane and notifies all waiters on `mStateChanged`.
  */
+void CSimDriver::RecordNetworkWaitDemand(
+  const bool demanded,
+  const bool waiting
+)
+{
+  fa::mutex::scoped_lock lock(mLock);
+  if (mClientManager.get() == nullptr) {
+    return;
+  }
+  // Only network-paced sessions wait on peers; a replay or a local game never does.
+  mClientManager->RecordNetworkWaitDemand(
+    demanded && !mSimBusy && SIM_GetSessionPacing() == ESimSessionPacing::Network,
+    waiting && mSyncDataQueue.Empty(),
+    mLastDequeuedBeat + 1
+  );
+}
+
 void CSimDriver::SetStateAndNotify(
   const EDriverState state
 )
