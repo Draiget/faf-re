@@ -1689,8 +1689,11 @@ void CClientManagerImpl::RecordNetworkWaitDemand(
 }
 
 /**
- * Engine addition (not in the binary): samples the wait state now. A few comparisons
- * per client under `mLock`; no allocation beyond the tracker's 30 s history, no I/O.
+ * Engine addition (not in the binary): samples the wait state now, from every
+ * `DoBeat` and every session frame. Under `mLock` it reads each client's confirmations
+ * for the stalled beat (clients x clients comparisons, 256 at 16 players), takes the
+ * store's mutex for one map lookup and appends to the tracker's 30 s history when the
+ * state changed. No I/O.
  */
 void CClientManagerImpl::RefreshNetworkWaitDiagnostics()
 {
@@ -1702,36 +1705,62 @@ void CClientManagerImpl::RefreshNetworkWaitDiagnostics()
     return;
   }
   NetworkWaitState& state = found->second;
+  const std::size_t count = mClients.size();
   // The first 100 beats (10 s at speed +0) are the load-in, when every client is
-  // still catching up; nobody is blamed for them.
+  // still catching up; nobody is blamed for them. A stream the command check stopped
+  // is not waiting on anyone's connection.
   constexpr int kStartupBeats = 100;
   const bool active = state.demanded && mWeAreReady && mEveryoneIsReady && mDispatchedBeat > kStartupBeats &&
-    mClients.size() <= NetworkWaitTracker::kMaxPeers;
+    count <= NetworkWaitTracker::kMaxPeers && mLocalClient != nullptr &&
+    (mStreamCheck == nullptr || !mStreamCheck->StopsGame());
 
-  std::uint64_t missing = 0;
-  // Only the beat the session is stalled on, never beats queued ahead of time.
+  std::uint64_t waitedOn = 0;
+  const int beat = state.targetBeat;
+  // Only the beat the session is stalled on, never beats queued ahead of time, and only
+  // once this client has issued it: before that the wait is our own pacing.
   if (
-    active && state.waiting && state.targetBeat > mAvailableBeat && state.targetBeat > mDispatchedBeat &&
-    mLocalClient != nullptr && mLocalClient->mQueuedBeat >= static_cast<uint32_t>(state.targetBeat)
+    active && state.waiting && beat > mAvailableBeat && beat > mDispatchedBeat &&
+    mLocalClient->mQueuedBeat >= static_cast<uint32_t>(beat)
   ) {
-    std::uint64_t peers = 0;
-    for (std::size_t i = 0; i < mClients.size(); ++i) {
-      const CClientBase* const peer = mClients[i];
-      if (peer == nullptr || peer == mLocalClient || peer->mEjected || peer->mEjectPending) {
+    // The test `IsReadyForBeat` makes, kept per pair: lacks[r] bit s = client r has not
+    // confirmed client s's beat. Ejected clients confirm nothing and block nothing; a
+    // client being ejected blocks only the beats before its eject (as `IsReadyForBeat`).
+    std::uint64_t blocking = 0;
+    for (std::size_t s = 0; s < count; ++s) {
+      CClientBase* const sender = mClients[s];
+      if (sender == nullptr || sender->mEjected) {
         continue;
       }
-      peers |= std::uint64_t{1} << i;
-      if (peer->mQueuedBeat < static_cast<uint32_t>(state.targetBeat) || !peer->IsReadyForBeat(state.targetBeat)) {
-        missing |= std::uint64_t{1} << i;
+      bool blocks = !sender->mEjectPending;
+      if (sender->mEjectPending) {
+        int mostExpiredBeat = beat;
+        sender->GetMostExpiredEjectRequest(mostExpiredBeat);
+        blocks = beat < mostExpiredBeat;
+      }
+      if (blocks) {
+        blocking |= std::uint64_t{1} << s;
       }
     }
-    // With two or more peers, waiting on all of them at once is this client's own
-    // hold-up (its connection, a hitch, a pause on its side), not any one peer's.
-    if (missing == peers && (peers & (peers - 1)) != 0) {
-      missing = 0;
+    std::uint64_t lacks[NetworkWaitTracker::kMaxPeers]{};
+    unsigned local = 0;
+    for (std::size_t r = 0; r < count; ++r) {
+      const CClientBase* const receiver = mClients[r];
+      if (receiver == mLocalClient) {
+        local = static_cast<unsigned>(r);
+      }
+      if (receiver == nullptr || receiver->mEjected || receiver->mEjectPending) {
+        continue;
+      }
+      const fa::vector<int32_t>& acks = receiver->mLatestAckReceived;
+      for (std::size_t s = 0; s < count && s < acks.size(); ++s) {
+        if ((blocking & (std::uint64_t{1} << s)) != 0 && acks[s] < beat) {
+          lacks[r] |= std::uint64_t{1} << s;
+        }
+      }
     }
+    waitedOn = NetworkWaitBlame(lacks, static_cast<unsigned>(count), local, blocking);
   }
-  state.tracker.Observe(NetworkWaitClockSeconds(), active, missing);
+  state.tracker.Observe(NetworkWaitClockSeconds(), active, waitedOn);
 }
 
 /**

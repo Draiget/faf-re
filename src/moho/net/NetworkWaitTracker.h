@@ -25,6 +25,89 @@ namespace moho
   };
 
   /**
+   * Engine addition (not in the binary): which clients a stalled beat is waiting on.
+   *
+   * A beat runs once every client has confirmed every other client's commands for it
+   * (`CClientBase::IsReadyForBeat`). `lacks[r]` has bit s set when client r has not
+   * confirmed client s's beat yet: for the local client that is a beat we have not
+   * received, for a remote client a confirmation it has not sent us. A missing
+   * confirmation does not say whose fault it is: r may lack s's beat because s sends
+   * late, or r's own connection may be slow. Each gap is put on the side with more
+   * gaps: a sender most clients lack sends late; a client that lacks most senders
+   * (ourselves included, through the beats we have not received) has the slow
+   * connection. With as many on both sides, the client with more gaps of either kind
+   * is waited on, and both when that ties too: from here the two can't be told apart. A client that has not confirmed
+   * its own beat, which it sends together with the beat, is waited on.
+   *
+   * So one late sender is the only one waited on, not every client still missing its
+   * beat, and when the others have not confirmed our beat, the local client is the
+   * one waited on: our own connection is the slow one. When we lack the beat of every
+   * other client (two or more of them) and none of them has confirmed ours either, the
+   * one link they all share is ours, and the local client alone is waited on: a slow
+   * download of ours delays every beat and every confirmation we receive alike. Others
+   * that sent late but confirmed our beat on time are the ones waited on.
+   *
+   * `present` holds the clients that take part (not ejected); `count` is at most 64.
+   */
+  [[nodiscard]] inline std::uint64_t NetworkWaitBlame(
+    const std::uint64_t* const lacks,
+    const unsigned count,
+    const unsigned local,
+    const std::uint64_t present
+  )
+  {
+    const auto bit = [](const unsigned i) {
+      return std::uint64_t{1} << i;
+    };
+    unsigned rowGaps[64]{};
+    unsigned columnGaps[64]{};
+    for (unsigned r = 0; r < count; ++r) {
+      for (unsigned s = 0; s < count; ++s) {
+        if ((lacks[r] & bit(s)) != 0) {
+          ++rowGaps[r];
+          ++columnGaps[s];
+        }
+      }
+    }
+    std::uint64_t blamed = 0;
+    for (unsigned r = 0; r < count; ++r) {
+      for (unsigned s = 0; s < count; ++s) {
+        if ((lacks[r] & bit(s)) == 0) {
+          continue;
+        }
+        if (r == s) {
+          blamed |= bit(r);
+          continue;
+        }
+        unsigned receiverSide = rowGaps[r];
+        unsigned senderSide = columnGaps[s];
+        if (receiverSide == senderSide) {
+          // A tie: the client with more gaps of either kind; both when that ties too.
+          receiverSide = rowGaps[r] + columnGaps[r];
+          senderSide = rowGaps[s] + columnGaps[s];
+        }
+        if (receiverSide >= senderSide) {
+          blamed |= bit(r);
+        }
+        if (senderSide >= receiverSide) {
+          blamed |= bit(s);
+        }
+      }
+    }
+    const std::uint64_t others = present & ~bit(local);
+    bool everyConfirmationLate = true;
+    for (unsigned r = 0; r < count; ++r) {
+      if ((others & bit(r)) != 0 && (lacks[r] & bit(local)) == 0) {
+        everyConfirmationLate = false;
+      }
+    }
+    if ((others & (others - 1)) != 0 && (lacks[local] & others) == others && everyConfirmationLate) {
+      return bit(local);
+    }
+    return blamed;
+  }
+
+  /**
    * Engine addition (not in the binary): records, from wall-clock samples, when
    * the session was running and which peers (bit i = client index i, up to 64) it
    * was waiting on. It only reads what it is given; nothing it holds reaches the

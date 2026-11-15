@@ -935,16 +935,130 @@ namespace
     EXPECT_NEAR(hitch.Read(60, 1).gameSeconds, moho::NetworkWaitTracker::kMaxSampleGapSeconds, 0.001);
   }
 
+  // Three or two clients with every ack row sized, past the load-in and ready to stall on
+  // beat 102: beat 101 ran, and every client has issued and confirmed up to beat 200.
+  struct WaitFixture
+  {
+    QuietUi ui;
+    FakeConnection connections[2]{{0x7F000001u, 6001}, {0x7F000002u, 6002}};
+    CClientManagerImpl* manager;
+    CClientBase* clients[3]{};
+
+    explicit WaitFixture(
+      const int count
+    )
+      : manager(CLIENT_CreateClientManager(static_cast<std::size_t>(count), nullptr, 0, true))
+    {
+      manager->mInterface = &ui;
+      manager->CreateLocalClient("local", 0, 1, 0);
+      clients[0] = manager->mClients[0];
+      for (int i = 1; i < count; ++i) {
+        clients[i] = static_cast<CClientBase*>(
+          manager->CreateNetClient(i == 1 ? "a" : "b", i, i + 1, static_cast<uint32_t>(i), &connections[i - 1])
+        );
+      }
+      for (CClientBase* const client : manager->mClients) {
+        client->mLatestAckReceived.resize(static_cast<std::size_t>(count), 0);
+        for (int32_t& ack : client->mLatestAckReceived) {
+          ack = 200;
+        }
+      }
+      manager->mWeAreReady = true;
+      manager->mEveryoneIsReady = true;
+      manager->mDispatchedBeat = 101;
+      manager->mAvailableBeat = 101;
+      for (CClientBase* const client : manager->mClients) {
+        client->mQueuedBeat = 200;
+      }
+    }
+
+    // Client `receiver` has confirmed client `sender`'s beats only up to beat 101.
+    void Lacks(
+      const int receiver,
+      const int sender
+    )
+    {
+      clients[receiver]->mLatestAckReceived[static_cast<std::size_t>(sender)] = 101;
+      if (receiver == 0) {
+        clients[sender]->mQueuedBeat = 101; // what we have not received, we have not queued
+      }
+    }
+
+    std::vector<moho::NetworkWaitMetrics> WaitFor(
+      const int milliseconds
+    )
+    {
+      manager->RecordNetworkWaitDemand(true, true, 102);
+      std::this_thread::sleep_for(std::chrono::milliseconds(milliseconds));
+      manager->RefreshNetworkWaitDiagnostics();
+      return manager->GetNetworkWaitMetrics();
+    }
+  };
+
+  // Who a stalled beat waits on, from which client has not confirmed whose beat.
+  void TestNetworkWaitBlame()
+  {
+    const auto bit = [](const unsigned i) {
+      return std::uint64_t{1} << i;
+    };
+
+    const std::uint64_t all2 = 0b11;
+    const std::uint64_t all3 = 0b111;
+    const std::uint64_t all4 = 0b1111;
+
+    // B (2) sends late: nobody has it, and B's own confirmation comes with the beat.
+    std::uint64_t late[4]{bit(2), bit(2), bit(2), bit(2)};
+    EXPECT_EQ(moho::NetworkWaitBlame(late, 4, 0, all4), bit(2));
+
+    // We have B's beat now; A and C have not confirmed it yet.
+    std::uint64_t arriving[4]{0, bit(2), 0, bit(2)};
+    EXPECT_EQ(moho::NetworkWaitBlame(arriving, 4, 0, all4), bit(2));
+
+    // C (3) has a slow download: it has confirmed nobody's beat.
+    std::uint64_t slowDownload[4]{0, 0, 0, bit(0) | bit(1) | bit(2)};
+    EXPECT_EQ(moho::NetworkWaitBlame(slowDownload, 4, 0, all4), bit(3));
+
+    // Our (0) upload is slow: nobody has confirmed our beat.
+    std::uint64_t ownUpload[4]{0, bit(0), bit(0), bit(0)};
+    EXPECT_EQ(moho::NetworkWaitBlame(ownUpload, 4, 0, all4), bit(0));
+
+    // Two players, the other's upload is slow: its beat and its confirmation of ours are late.
+    std::uint64_t twoPlayers[2]{bit(1), bit(0) | bit(1)};
+    EXPECT_EQ(moho::NetworkWaitBlame(twoPlayers, 2, 0, all2), bit(1));
+
+    // One gap between two clients that both look fine otherwise: either side, so both.
+    std::uint64_t single[3]{0, bit(2), 0};
+    EXPECT_EQ(moho::NetworkWaitBlame(single, 3, 0, all3), bit(1) | bit(2));
+
+    // Our download is slow: every beat and every confirmation reaches us late, so every
+    // other client looks late at once; the link they share is ours.
+    std::uint64_t slowOwnDownload[4]{all4 & ~bit(0), all4, all4, all4};
+    EXPECT_EQ(moho::NetworkWaitBlame(slowOwnDownload, 4, 0, all4), bit(0));
+    // Both others send late, but confirmed our beat on time: they are waited on, not we.
+    std::uint64_t twoLate[3]{bit(1) | bit(2), bit(1) | bit(2), bit(1) | bit(2)};
+    EXPECT_EQ(moho::NetworkWaitBlame(twoLate, 3, 0, all3), bit(1) | bit(2));
+    // Seen live (three players, player 2's upload delayed 1 s): we have its beat, but
+    // player 1 has not confirmed it, and player 2 has not confirmed ours or player 1's.
+    // The 1-2 gap ties; player 2 has more gaps, and neither 1 nor we are waited on.
+    std::uint64_t slowUploadSeen[3]{0, bit(2), bit(0) | bit(1)};
+    EXPECT_EQ(moho::NetworkWaitBlame(slowUploadSeen, 3, 0, all3), bit(2));
+    // ... but not when an ejected client is the only other one left out.
+    std::uint64_t oneLeft[3]{bit(1), bit(1), 0};
+    EXPECT_EQ(moho::NetworkWaitBlame(oneLeft, 3, 0, bit(0) | bit(1)), bit(1));
+
+    std::uint64_t none[3]{};
+    EXPECT_EQ(moho::NetworkWaitBlame(none, 3, 0, all3), 0u);
+  }
+
   // The client manager counts a wait only while the session asks for a beat a peer
   // has not sent, after the load-in, and stops as soon as the beat arrives.
   void TestNetworkWaitDemand()
   {
-    auto* const fixture = new ClientFixture; // left alive, as the fixture's manager is
+    auto* const fixture = new WaitFixture(2); // left alive: the clients unlink from its connections
     CClientManagerImpl* const manager = fixture->manager;
-    manager->mWeAreReady = true;
-    manager->mEveryoneIsReady = true;
-    manager->mLocalClient->mQueuedBeat = 200;
-    fixture->remote->mQueuedBeat = 1;
+    fixture->Lacks(0, 1); // the remote's beat 102 has not reached us,
+    fixture->Lacks(1, 0); // nor its confirmation of ours,
+    fixture->Lacks(1, 1); // nor of its own
 
     // Load-in: the first 100 beats blame nobody.
     manager->mDispatchedBeat = 50;
@@ -963,7 +1077,7 @@ namespace
     manager->RecordNetworkWaitDemand(true, true, 102);
     std::this_thread::sleep_for(std::chrono::milliseconds(5));
     EXPECT_GT(manager->GetNetworkWaitMetrics()[1].waitingMs, 0.0);
-    EXPECT_EQ(manager->GetNetworkWaitMetrics()[0].waitingMs, 0.0); // never the local client
+    EXPECT_EQ(manager->GetNetworkWaitMetrics()[0].waitingMs, 0.0); // our side is fine
 
     manager->mAvailableBeat = 102; // the beat arrived: the next sample ends the wait
     manager->RefreshNetworkWaitDiagnostics();
@@ -978,42 +1092,81 @@ namespace
     EXPECT_EQ(manager->GetNetworkWaitMetrics()[1].observedSeconds, observed);
   }
 
-  // With two or more peers, a stall on all of them at once is this client's own
-  // hold-up and blames nobody; a stall on one of them blames that one.
+  // We lack both peers' beat at once: the one link they share is ours, so our own entry
+  // is waited on and neither peer's. A beat one peer sends late to everyone is that one's.
   void TestNetworkWaitSharedStall()
   {
-    // Three clients: this one and two peers. Left alive, as ClientFixture's manager is.
-    auto* const ui = new QuietUi;
-    auto* const firstConnection = new FakeConnection{0x7F000001u, 6001};
-    auto* const otherConnection = new FakeConnection{0x7F000002u, 6002};
-    CClientManagerImpl* const manager = CLIENT_CreateClientManager(3, nullptr, 0, true);
-    manager->mInterface = ui;
-    manager->CreateLocalClient("local", 0, 1, 0);
-    auto* const first = static_cast<CNetClient*>(manager->CreateNetClient("remote", 1, 2, 1, firstConnection));
-    auto* const other = static_cast<CNetClient*>(manager->CreateNetClient("other", 2, 3, 2, otherConnection));
-    manager->mWeAreReady = true;
-    manager->mEveryoneIsReady = true;
-    manager->mDispatchedBeat = 101;
-    manager->mAvailableBeat = 101;
-    manager->mLocalClient->mQueuedBeat = 200;
+    auto* const both = new WaitFixture(3);
+    both->Lacks(0, 1);
+    both->Lacks(0, 2);
+    const std::vector<moho::NetworkWaitMetrics> ours = both->WaitFor(5);
+    EXPECT_GT(ours[0].waitingMs, 0.0);
+    EXPECT_EQ(ours[1].waitingMs, 0.0);
+    EXPECT_EQ(ours[2].waitingMs, 0.0);
 
-    first->mQueuedBeat = 1; // both peers are missing beat 102
-    other->mQueuedBeat = 1;
-    manager->RecordNetworkWaitDemand(true, true, 102);
-    std::this_thread::sleep_for(std::chrono::milliseconds(5));
-    manager->RefreshNetworkWaitDiagnostics();
-    EXPECT_EQ(manager->GetNetworkWaitMetrics()[1].waitingMs, 0.0);
-    EXPECT_EQ(manager->GetNetworkWaitMetrics()[2].waitingMs, 0.0);
+    auto* const one = new WaitFixture(3);
+    one->Lacks(0, 1);
+    one->Lacks(2, 1);
+    const std::vector<moho::NetworkWaitMetrics> first = one->WaitFor(5);
+    EXPECT_GT(first[1].waitingMs, 0.0);
+    EXPECT_EQ(first[0].waitingMs, 0.0);
+    EXPECT_EQ(first[2].waitingMs, 0.0);
+  }
 
-    other->mQueuedBeat = 200; // only the first peer is missing it now
-    for (int32_t& ack : other->mLatestAckReceived) {
-      ack = 200; // and the second has acknowledged everyone up to it
-    }
-    manager->RefreshNetworkWaitDiagnostics();
-    std::this_thread::sleep_for(std::chrono::milliseconds(5));
-    manager->RefreshNetworkWaitDiagnostics();
-    EXPECT_GT(manager->GetNetworkWaitMetrics()[1].waitingMs, 0.0);
-    EXPECT_EQ(manager->GetNetworkWaitMetrics()[2].waitingMs, 0.0);
+  // A (1) has sent beat 102 and lacks only B's (2); B has not sent it. Only B is waited on,
+  // not A, which is still missing B's beat like we are.
+  void TestNetworkWaitLateSender()
+  {
+    auto* const fixture = new WaitFixture(3);
+    fixture->Lacks(0, 2);
+    fixture->Lacks(1, 2);
+    fixture->Lacks(2, 2);
+    const std::vector<moho::NetworkWaitMetrics> waits = fixture->WaitFor(10);
+    EXPECT_GT(waits[2].waitingMs, 0.0);
+    EXPECT_EQ(waits[1].waitingMs, 0.0);
+    EXPECT_EQ(waits[0].waitingMs, 0.0);
+  }
+
+  // Neither peer has confirmed our beat 102 although we have theirs: our own connection
+  // is the slow one, so the local client is waited on and the peers are not.
+  void TestNetworkWaitOwnUpload()
+  {
+    auto* const fixture = new WaitFixture(3);
+    fixture->Lacks(1, 0);
+    fixture->Lacks(2, 0);
+    const std::vector<moho::NetworkWaitMetrics> waits = fixture->WaitFor(10);
+    EXPECT_GT(waits[0].waitingMs, 0.0);
+    EXPECT_EQ(waits[1].waitingMs, 0.0);
+    EXPECT_EQ(waits[2].waitingMs, 0.0);
+  }
+
+  // What IsReadyForBeat lets through is no wait: a client being ejected whose eject comes
+  // before the beat, an ejected client's stale confirmations, and a beat this client has
+  // not issued yet (our own pacing, not the network).
+  void TestNetworkWaitSkips()
+  {
+    const auto noWaits = [](const std::vector<moho::NetworkWaitMetrics>& waits) {
+      for (const moho::NetworkWaitMetrics& wait : waits) {
+        EXPECT_EQ(wait.waitingMs, 0.0);
+      }
+    };
+
+    auto* const ejecting = new WaitFixture(3);
+    ejecting->Lacks(0, 2);
+    ejecting->Lacks(1, 2);
+    ejecting->clients[2]->mEjectPending = true; // no requests: its eject beat is its queued beat, 101
+    noWaits(ejecting->WaitFor(5));
+
+    auto* const ejected = new WaitFixture(3);
+    ejected->clients[1]->mEjected = true;
+    ejected->Lacks(1, 0);
+    ejected->Lacks(1, 2);
+    noWaits(ejected->WaitFor(5));
+
+    auto* const notIssued = new WaitFixture(3);
+    notIssued->Lacks(0, 2);
+    notIssued->clients[0]->mQueuedBeat = 1;
+    noWaits(notIssued->WaitFor(5));
   }
 
   void TestClientShortMessages()
@@ -2085,8 +2238,36 @@ TEST(
 }
 TEST(
   Existing_NetRobustness,
+  NetworkWaitBlame
+)
+{
+  TestNetworkWaitBlame();
+}
+TEST(
+  Existing_NetRobustness,
   NetworkWaitSharedStall
 )
 {
   TestNetworkWaitSharedStall();
+}
+TEST(
+  Existing_NetRobustness,
+  NetworkWaitLateSender
+)
+{
+  TestNetworkWaitLateSender();
+}
+TEST(
+  Existing_NetRobustness,
+  NetworkWaitOwnUpload
+)
+{
+  TestNetworkWaitOwnUpload();
+}
+TEST(
+  Existing_NetRobustness,
+  NetworkWaitSkips
+)
+{
+  TestNetworkWaitSkips();
 }
