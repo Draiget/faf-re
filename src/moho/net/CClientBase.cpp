@@ -935,7 +935,7 @@ CClientBase::CClientBase(
   CClientManagerImpl* manager,
   const char* name,
   const int32_t ownerId,
-  BVIntSet& commandSources,
+  const BVIntSet& commandSources,
   uint32_t sourceId
 )
   : IClient(name, clientIndex, ownerId)

@@ -107,12 +107,6 @@ namespace faf::editor
     constexpr float kMaxPitch = kPi * 0.5f;
   } // namespace
 
-  EdMapScene::EdMapScene(
-    EdDocument& document
-  )
-    : mDocument(document)
-  {}
-
   /**
    * The minimap's world view: the simple view's drawing, said to be a minimap (IsMiniMap), so the terrain draws its
    * minimap pass as the game's own minimap does. Held by its own type: the interface has no virtual destructor.
@@ -290,6 +284,14 @@ namespace faf::editor
     }
     mOverlaysDrawn = true;
   }
+
+  // The constructor and destructor come after EdMiniMapView and EdMainView: they destroy the unique_ptr members, and
+  // C++23's constexpr unique_ptr instantiates that delete where it is first used, so the views must be complete there.
+  EdMapScene::EdMapScene(
+    EdDocument& document
+  )
+    : mDocument(document)
+  {}
 
   EdMapScene::~EdMapScene()
   {
