@@ -972,7 +972,7 @@ void CLobby::OnNewPeer(
   const gpg::BinaryReader br{&s};
 
   fa::string name{};
-  u_long host{0};
+  std::uint32_t host{0}; // 4 bytes (0x007C70C2), as SPeer::SendInfoTo writes them, whatever this build's u_long is
   u_short port{0};
   int32_t uid{0};
 

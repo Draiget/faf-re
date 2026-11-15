@@ -29,6 +29,14 @@ set_target_properties(faf_platform_net_tests PROPERTIES FOLDER "Tests/Net")
 add_test(NAME platform_net COMMAND faf_platform_net_tests)
 set_tests_properties(platform_net PROPERTIES LABELS "Net")
 
+# What the lobby puts on the wire for another player (LOBMSG_NewPeer): the Windows game's
+# bytes; Linux runs the same file (cmake/FafLinux.cmake).
+add_executable(faf_lobby_wire_tests EXCLUDE_FROM_ALL net/LobbyWireTests.cpp)
+target_link_libraries(faf_lobby_wire_tests PRIVATE faf_engine gtest_main)
+set_target_properties(faf_lobby_wire_tests PROPERTIES FOLDER "Tests/Net")
+add_test(NAME lobby_wire COMMAND faf_lobby_wire_tests)
+set_tests_properties(lobby_wire PROPERTIES LABELS "Net")
+
 # net_FastRetransmit (issue #237): a lost DATA packet's recovery with the
 # switch off and on, at a fast rate and at the game's rate.
 add_executable(faf_fast_retransmit_tests EXCLUDE_FROM_ALL net/FastRetransmitTests.cpp)
