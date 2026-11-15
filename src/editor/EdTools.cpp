@@ -2,6 +2,7 @@
 #include "editor/doc/EdSaveFile.h"
 #include "editor/doc/EdDocument.h"
 #include "editor/EdTools.h"
+#include "editor/tools/EdAreaLimit.h"
 #include "editor/doc/EdLighting.h"
 #include "editor/doc/EdWaterPreset.h"
 #include "moho/misc/StartupHelpers.h"
@@ -5815,16 +5816,47 @@ namespace faf::editor
       mAreaChosen = static_cast<int>(areas.size()) - 1;
       edited(std::move(before), "added " + areas.back().name);
     }
+    // Drawing in the view and where areas are kept (FAF Studio's Place area tool and limits).
+    ImGui::Checkbox("Draw areas in the view", &mDrawingAreas);
+    EdSetItemTooltip("A drag over the map draws a new area (AREA_n); off, a click places markers again");
+    {
+      static constexpr const char* kLimits[] = {
+        "Keep areas: anywhere", "Keep areas: inside the map", "Keep areas: inside the playable area"
+      };
+      ImGui::SetNextItemWidth(-1.0f);
+      (void)EdCombo("##arealimit", &mAreaLimit, kLimits, IM_ARRAYSIZE(kLimits));
+      EdSetItemTooltip("Applied while an area is drawn, moved, resized or its edges typed");
+    }
+    // The view's picks show here; the first is the one edited below.
+    if (!mAreaSelection.empty()) {
+      for (std::size_t i = 0; i < areas.size(); ++i) {
+        if (areas[i].name == mAreaSelection.front() && mAreaChosen != static_cast<int>(i)) {
+          mAreaChosen = static_cast<int>(i);
+          (void)std::snprintf(mAreaName, sizeof(mAreaName), "%s", areas[i].name.c_str());
+        }
+      }
+    }
     for (std::size_t i = 0; i < areas.size(); ++i) {
       ImGui::PushID(static_cast<int>(i));
-      if (ImGui::Selectable(areas[i].name.c_str(), mAreaChosen == static_cast<int>(i))) {
+      const bool picked =
+        std::find(mAreaSelection.begin(), mAreaSelection.end(), areas[i].name) != mAreaSelection.end();
+      if (ImGui::Selectable(areas[i].name.c_str(), picked || mAreaChosen == static_cast<int>(i))) {
+        if (ImGui::GetIO().KeyCtrl) {
+          if (picked) {
+            mAreaSelection.erase(std::find(mAreaSelection.begin(), mAreaSelection.end(), areas[i].name));
+          } else {
+            mAreaSelection.push_back(areas[i].name);
+          }
+        } else {
+          mAreaSelection = {areas[i].name};
+        }
         mAreaChosen = static_cast<int>(i);
         (void)std::snprintf(mAreaName, sizeof(mAreaName), "%s", areas[i].name.c_str());
       }
       ImGui::PopID();
     }
     if (areas.empty()) {
-      ImGui::TextDisabled("No areas. Alt+Shift+A over the map adds one there.");
+      ImGui::TextDisabled("No areas. Draw one in the view, or Alt+Shift+A over the map adds one there.");
     }
     if (mAreaChosen >= 0 && mAreaChosen < static_cast<int>(areas.size())) {
       SaveEntry& area = areas[static_cast<std::size_t>(mAreaChosen)];
@@ -5838,9 +5870,33 @@ namespace faf::editor
       EdSetItemTooltip("Left, top, right, bottom in game units");
       if (ImGui::IsItemDeactivatedAfterEdit()) {
         EdDocument::SaveSnapshot before = document.SaveDataNow();
-        area.Set(
-          "rectangle", RectangleValue(box[0], box[1], std::max(box[0] + 1, box[2]), std::max(box[1] + 1, box[3]))
-        );
+        float rect[4] = {
+          static_cast<float>(box[0]),
+          static_cast<float>(box[1]),
+          static_cast<float>(std::max(box[0] + 1, box[2])),
+          static_cast<float>(std::max(box[1] + 1, box[3]))
+        };
+        AreaBounds bounds;
+        if (mAreaLimit == 1 && document.Facts().fieldWidth > 1) {
+          bounds = {
+            0.0f,
+            0.0f,
+            static_cast<float>(document.Facts().fieldWidth - 1),
+            static_cast<float>(document.Facts().fieldHeight - 1)
+          };
+        } else if (
+          const std::optional<EdDocument::PlayableRect> playable = document.PlayableArea();
+          mAreaLimit == 2 && playable.has_value()
+        ) {
+          bounds = {
+            static_cast<float>(playable->x0),
+            static_cast<float>(playable->z0),
+            static_cast<float>(playable->x1),
+            static_cast<float>(playable->z1)
+          };
+        }
+        LimitArea(rect, bounds, false);
+        area.Set("rectangle", RectangleValue(rect[0], rect[1], rect[2], rect[3]));
         edited(std::move(before), area.name + " edges set");
       }
       ImGui::SetNextItemWidth(-Em(80.0f));
@@ -5860,6 +5916,10 @@ namespace faf::editor
         edited(std::move(before), "deleted " + gone);
       }
     }
-    Note("The map's areas (the save file's AREA_n rectangles): mission scripts and the playable area use them.");
+    Note(
+      "The map's areas (the save file's AREA_n rectangles): mission scripts and the playable area use them. In the "
+      "view, a click on an area's outline picks it (Ctrl adds); drag the outline to move the picked areas, a corner or "
+      "edge square to resize; Delete, Ctrl+D, Ctrl+C / Ctrl+X / Ctrl+V take the picked areas."
+    );
   }
 } // namespace faf::editor

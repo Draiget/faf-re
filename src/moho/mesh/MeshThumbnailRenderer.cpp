@@ -1,5 +1,6 @@
 #include "MeshThumbnailRenderer.h"
 
+#include <algorithm>
 #include <cmath>
 #include <limits>
 #include <new>
@@ -205,6 +206,25 @@ namespace
     const float projectedHeight = projected.Max.Y() - projected.Min.Y();
     const float extent = std::max(projectedWidth, projectedHeight);
 
+    if (moho::ren_ThumbnailFov > 0.0f) {
+      // The map editor's perspective icon (not retail): the bounding sphere just inside the field of view, seen from
+      // the hint's direction.
+      const float fov = std::clamp(moho::ren_ThumbnailFov, 1.0f, 120.0f) * 3.14159265f / 180.0f;
+      const float hintLength = std::sqrt(
+        viewOffsetHint.x * viewOffsetHint.x + viewOffsetHint.y * viewOffsetHint.y + viewOffsetHint.z * viewOffsetHint.z
+      );
+      const float scale = hintLength > 0.0f ? 1.0f / hintLength : 1.0f;
+      const float distance = std::max(radius, 0.01f) / std::sin(fov * 0.5f) * 1.05f;
+      const Wm3::Vector3f near3(
+        center.X() + viewOffsetHint.x * scale * distance,
+        center.Y() + viewOffsetHint.y * scale * distance,
+        center.Z() + viewOffsetHint.z * scale * distance
+      );
+      moho::GeomCamera3 perspective{};
+      perspective.LookAt(near3, center, up);
+      perspective.ViewInitPerspective(fov, fov, std::max(0.01f, distance - radius * 1.5f), distance + radius * 1.5f);
+      return perspective;
+    }
     camera.ViewInitOrtho(static_cast<std::int32_t>(extent), static_cast<std::int32_t>(extent), nearDepth, farDepth);
     return camera;
   }

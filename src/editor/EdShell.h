@@ -920,6 +920,8 @@ namespace faf::editor
     int mTourStep = -1;
     bool mShowHome = false;
     bool mHomeFocusSearch = false;
+    /** The start screen's tip (FAF Studio's tips.lua): its number, -1 until the first is picked by the clock. */
+    int mHomeTip = -1;
     bool mHomeFront = false;
     int mHomePage = 0;
     char mHomeSearch[128] = {};

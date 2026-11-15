@@ -71,6 +71,21 @@ namespace faf::editor
       return mStatus;
     }
 
+    /** Test runs: the tiles' size and the list set and written to the marks file; that file. */
+    void SetViewForTest(
+      const float tile,
+      const bool list
+    )
+    {
+      mTileSize = tile;
+      mListView = list;
+      SaveMarks();
+    }
+    [[nodiscard]] const std::filesystem::path& MarksFile() const noexcept
+    {
+      return mMarksFile;
+    }
+
   private:
     [[nodiscard]] std::uint64_t Picture(const AssetEntry& entry);
     void SaveMarks();
@@ -85,6 +100,9 @@ namespace faf::editor
     char mSearch[96] = {};
     bool mFavourites = false;
     bool mRecent = false;
+    /** The tiles' size (FAF Studio's thumbnail size, 40..110) and the list instead of tiles; kept in the marks file. */
+    float mTileSize = 76.0f;
+    bool mListView = false;
     std::map<std::string, std::string> mFilters; // per kind: "<kind>.<facet>" -> value
     std::string mEffectAsk;
     std::map<std::string, std::string> mEffectTextures; // effect blueprint -> the texture its tile shows

@@ -80,6 +80,7 @@
 #include "editor/ui/EdKeymap.h"
 #include "editor/ui/EdKeysPage.h"
 #include "editor/ui/EdPalette.h"
+#include "editor/ui/EdPerf.h"
 #include "editor/ui/EdSettings.h"
 #include "editor/ui/EdStatus.h"
 #include "editor/ui/EdTheme.h"
@@ -172,73 +173,143 @@ namespace faf::editor
     [[nodiscard]] bool IsTestRunCommandLine()
     {
       static const char* const kOptions[] = {
-        "/command",         "/palette",
-        "/theme",           "/keysfile",
-        "/focuspanel",      "/uiclicks",
-        "/tipcheck",        "/fieldstest",
-        "/popouttest",      "/hidegameunits",
-        "/movelayer",       "/pickfilter",
-        "/mapwide",         "/tool",
-        "/proptool",        "/play",
-        "/debugarm",        "/breakpoint",
-        "/check",           "/decaltool",
-        "/markertool",      "/unittool",
-        "/hoverprop",       "/selectprops",
-        "/selectunit",      "/propswap",
-        "/saveas",          "/settingsfile",
-        "/autosavefolder",  "/askunsaved",
-        "/particlebrowser", "/particlenew",
-        "/particleopen",    "/materialeditor",
-        "/uiscale",         "/testrun",
-        "/openall",         "/roundtrip",
-        "/vault",           "/vaultsearch",
-        "/vaultmap",        "/newmap",
-        "/stamp",           "/brush",
-        "/layer",           "/waterbody",
-        "/ruler",           "/adaptivewindow",
-        "/maskrule",        "/maskgen",
-        "/symhover",        "/stbfont",
-        "/recipe",          "/texset",
-        "/layerop",         "/slopeview",
-        "/typesfromlayers", "/uncapped",
-        "/nominimap",       "/followtest",
-        "/arrangetest",     "/findtest",
-        "/findopen",        "/filltest",
-        "/modaltest",       "/looktest",
-        "/looksfolder",     "/envtest",
-        "/watermasktest",   "/nowaterhires",
-        "/camat",           "/erosiontest",
-        "/sctest",          "/symmenu",
-        "/panelbottom",     "/shader",
-        "/brushtest",       "/brushshape",
-        "/stampsource",     "/stampstroke",
-        "/symoptions",      "/maskoptions",
-        "/masktest",        "/shaderbrowser",
-        "/maskstamptest",   "/flattentest",
-        "/convertlayers",   "/interoptest",
-        "/gentest",         "/layouttest",
-        "/playcopytest",    "/missiontest",
-        "/modtest",         "/unitlabtest",
-        "/effectmodtest",   "/assettest",
-        "/thumbcache",      "/assetmarks",
-        "/editormods",      "/editormodtest",
-        "/unitviewtest",    "/runmarker",
-        "/pausetest",       "/viewmenu",
-        "/mapinfotest",     "/dropdefaultcube",
-        "/exportpreview",   "/resizetest",
-        "/console",         "/pathtest",
-        "/keptpathtest",    "/skeletontest",
-        "/gputest",         "/clicksweep",
-        "/layoutcheck",     "/selftests",
-        "/meshtest",        "/gfxpreset",
-        "/resourcecheck",   "/viewstage",
-        "/layoutsave",      "/unittestgame",
-        "/reseattest",      "/exportpreview512",
-        "/lookthumbtest",   "/toolsfile",
-        "/watermasks",      "/imagestest",
-        "/themesfile",      "/themelib",
-        "/r6test",          "/r7test",
-        "/r8test",          "/r8inspect",
+        "/command",
+        "/palette",
+        "/theme",
+        "/keysfile",
+        "/focuspanel",
+        "/uiclicks",
+        "/tipcheck",
+        "/fieldstest",
+        "/popouttest",
+        "/hidegameunits",
+        "/movelayer",
+        "/pickfilter",
+        "/mapwide",
+        "/tool",
+        "/proptool",
+        "/play",
+        "/debugarm",
+        "/breakpoint",
+        "/check",
+        "/decaltool",
+        "/markertool",
+        "/unittool",
+        "/hoverprop",
+        "/selectprops",
+        "/selectunit",
+        "/propswap",
+        "/saveas",
+        "/settingsfile",
+        "/autosavefolder",
+        "/askunsaved",
+        "/particlebrowser",
+        "/particlenew",
+        "/particleopen",
+        "/materialeditor",
+        "/uiscale",
+        "/testrun",
+        "/openall",
+        "/roundtrip",
+        "/vault",
+        "/vaultsearch",
+        "/vaultmap",
+        "/newmap",
+        "/stamp",
+        "/brush",
+        "/layer",
+        "/waterbody",
+        "/ruler",
+        "/adaptivewindow",
+        "/maskrule",
+        "/maskgen",
+        "/symhover",
+        "/stbfont",
+        "/recipe",
+        "/texset",
+        "/layerop",
+        "/slopeview",
+        "/typesfromlayers",
+        "/uncapped",
+        "/nominimap",
+        "/followtest",
+        "/arrangetest",
+        "/findtest",
+        "/findopen",
+        "/filltest",
+        "/modaltest",
+        "/looktest",
+        "/looksfolder",
+        "/envtest",
+        "/watermasktest",
+        "/nowaterhires",
+        "/camat",
+        "/erosiontest",
+        "/sctest",
+        "/symmenu",
+        "/panelbottom",
+        "/shader",
+        "/brushtest",
+        "/brushshape",
+        "/stampsource",
+        "/stampstroke",
+        "/symoptions",
+        "/maskoptions",
+        "/masktest",
+        "/shaderbrowser",
+        "/maskstamptest",
+        "/flattentest",
+        "/convertlayers",
+        "/interoptest",
+        "/gentest",
+        "/layouttest",
+        "/playcopytest",
+        "/missiontest",
+        "/modtest",
+        "/unitlabtest",
+        "/effectmodtest",
+        "/assettest",
+        "/thumbcache",
+        "/assetmarks",
+        "/editormods",
+        "/editormodtest",
+        "/unitviewtest",
+        "/runmarker",
+        "/pausetest",
+        "/viewmenu",
+        "/mapinfotest",
+        "/dropdefaultcube",
+        "/exportpreview",
+        "/resizetest",
+        "/console",
+        "/pathtest",
+        "/keptpathtest",
+        "/skeletontest",
+        "/gputest",
+        "/clicksweep",
+        "/perf",
+        "/layoutcheck",
+        "/selftests",
+        "/meshtest",
+        "/gfxpreset",
+        "/resourcecheck",
+        "/viewstage",
+        "/layoutsave",
+        "/unittestgame",
+        "/reseattest",
+        "/exportpreview512",
+        "/lookthumbtest",
+        "/toolsfile",
+        "/watermasks",
+        "/imagestest",
+        "/themesfile",
+        "/themelib",
+        "/r6test",
+        "/r7test",
+        "/r8test",
+        "/r8inspect",
+        "/r9test",
+        "/iconrecipe",
       };
       for (const char* const option : kOptions) {
         if (moho::CFG_GetArgOption(option, 0, nullptr)) {
@@ -3684,6 +3755,20 @@ namespace faf::editor
           viewer.SetAngles(35.0f, 15.0f);
           viewer.Focus();
           gpg::Logf("editor: unit view test: derived xel0301: %s", derived ? "yes" : deriveError.c_str());
+          // `/iconrecipe heading,pitch,fov,fill,edge`: the icon's recipe for this run.
+          if (fa::vector<fa::string> recipe; moho::CFG_GetArgOption("/iconrecipe", 1, &recipe) && !recipe.empty()) {
+            float v[5] = {35.0f, 15.0f, 0.0f, 0.9f, 0.0f};
+            (void)std::sscanf(recipe[0].c_str(), "%f,%f,%f,%f,%f", &v[0], &v[1], &v[2], &v[3], &v[4]);
+            mShell->UnitViewer().SetIconRecipe(v[0], v[1], v[2], v[3], v[4]);
+            gpg::Logf(
+              "editor: unit view test: icon recipe heading %.0f pitch %.0f fov %.0f fill %.2f edge %.1f",
+              v[0],
+              v[1],
+              v[2],
+              v[3],
+              v[4]
+            );
+          }
           break;
         }
         case 1:
@@ -3756,6 +3841,7 @@ namespace faf::editor
             "editor: unit view test: icon compared: %s",
             viewer.Comparison().empty() ? "(nothing)" : viewer.Comparison().c_str()
           );
+          gpg::Logf("editor: unit view test: icon pictures %d of 3", viewer.IconPictureCount());
           break;
         case 7:
           // The new-unit wizard: a UEF tank from its template into the project, then its checks.
@@ -7975,6 +8061,102 @@ namespace faf::editor
           break;
         }
       }
+      /**
+       * `/r9test` (test runs): the seventh comparison's features in the view, each logged: the area tools, the names
+       * written in the view far and close, the resource footprints' states (one Mass marker nudged off the grid, then
+       * back), the asset browser's view kept in its file, the shipped brush images.
+       */
+      int mR9Stage = 0;
+      int mR9Frames = 0;
+      void DriveRoundNineTest()
+      {
+        if (
+          mR9Stage >= 8 || !mScene.Attached() || mScene.ModelsPending() ||
+          !moho::CFG_GetArgOption("/r9test", 0, nullptr) || ++mR9Frames % 90 != 0
+        ) {
+          return;
+        }
+        EdTools& tools = mShell->Tools();
+        const auto states = [this]() {
+          int n[4] = {0, 0, 0, 0};
+          for (const EdMapScene::ResourceMark& mark : mScene.ResourceMarks()) {
+            ++n[std::clamp(mark.state, 0, 3)];
+          }
+          char text[120];
+          (void)std::snprintf(
+            text, sizeof(text), "%d fine, %d blocked, %d stacked, %d off the grid", n[0], n[1], n[2], n[3]
+          );
+          return std::string(text);
+        };
+        switch (mR9Stage++) {
+        case 0:
+          tools.SetTool(6); // the Markers tool (the areas' outlines and handles)
+          mScene.FrameMap();
+          break;
+        case 1:
+          gpg::Logf("editor: /r9test: names far: %zu", mScene.ViewLabels().size());
+          gpg::Logf("editor: /r9test: resources: %s", states().c_str());
+          break;
+        case 2: {
+          gpg::Logf("editor: /r9test: areas: %s", mScene.TestAreaTools().c_str());
+          // Close to the first Mass marker: every name there; that marker nudged off the build grid.
+          for (const SaveEntry& marker : mDocument.SaveData().Markers()) {
+            if (MarkerTypeOf(marker) == "Mass") {
+              mScene.FrameMarker(marker.name, 60.0f);
+              mR9Marker = marker.name;
+              EdDocument::SaveSnapshot before = mDocument.SaveDataNow();
+              for (SaveEntry& m : mDocument.SaveData().Markers()) {
+                if (m.name == marker.name) {
+                  const std::vector<double> p = ValueNumbers(m.Get("position"));
+                  if (p.size() >= 3) {
+                    m.Set("position", Vector3Value(p[0] + 0.3, p[1], p[2]));
+                  }
+                }
+              }
+              mDocument.SaveDataEdited(std::move(before));
+              break;
+            }
+          }
+          break;
+        }
+        case 3:
+          gpg::Logf("editor: /r9test: names close to %s: %zu", mR9Marker.c_str(), mScene.ViewLabels().size());
+          gpg::Logf("editor: /r9test: resources with %s nudged 0.3: %s", mR9Marker.c_str(), states().c_str());
+          (void)mScene.Undo();
+          break;
+        case 4: {
+          gpg::Logf("editor: /r9test: resources after undo: %s", states().c_str());
+          EdAssetBrowser& assets = mShell->Assets();
+          assets.SetViewForTest(58.0f, true);
+          std::ifstream in(assets.MarksFile(), std::ios::binary);
+          std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+          const bool tile = text.find("v:tile=58") != std::string::npos;
+          const bool list = text.find("v:list=1") != std::string::npos;
+          gpg::Logf(
+            "editor: /r9test: asset view kept: tile 58 %s, list %s (%s)",
+            tile ? "yes" : "no",
+            list ? "yes" : "no",
+            assets.MarksFile().string().c_str()
+          );
+          assets.SetViewForTest(76.0f, false);
+          break;
+        }
+        case 5: {
+          std::string names;
+          for (const BrushImage& image : ListBrushImages(tools.BrushFolder())) {
+            names += image.name + " ";
+          }
+          gpg::Logf("editor: /r9test: brush library %s: %s", tools.BrushFolder().string().c_str(), names.c_str());
+          break;
+        }
+        case 7:
+          gpg::Logf("editor: /r9test: done");
+          break;
+        default:
+          break;
+        }
+      }
+      std::string mR9Marker;
       /** Import / Export > Masks: the files' uses guessed by name, then read and written together. */
       void MaskImportUpdate()
       {
@@ -9326,6 +9508,18 @@ namespace faf::editor
       add("view.palette", "Command palette", "View", "Ctrl+K, Ctrl+Shift+P", [] {
         OpenCommandPalette();
       }, {}, {}, "Find any command by a few of its letters");
+      add("view.perf", "Performance timing", "View", "", [this] {
+        EdPerf::Get().SetOn(!EdPerf::Get().On());
+        PostStatusMessage(
+          EdPerf::Get().On() ? "Performance timing on: each section of a frame, every 5 s in the log"
+                             : "Performance timing off"
+        );
+        gpg::Logf("editor: performance timing %s", EdPerf::Get().On() ? "on" : "off");
+      }, {}, {}, "The time each part of the editor's frame takes, every 5 seconds in the Log panel");
+      add("view.names", "Names in the view", "View", "", [this] {
+        mScene.SetNamesShown(!mScene.NamesShown());
+        PostStatusMessage(mScene.NamesShown() ? "Marker and area names shown in the view" : "Names in the view hidden");
+      }, {}, {}, "The markers' and areas' names written beside them (all when close, the selected and hovered far)");
       add("view.frame", "Frame the whole map", "View", "Home", [this] {
         mScene.FrameMap();
       }, mapOpen);
@@ -10547,6 +10741,7 @@ namespace faf::editor
       {
         // FAF_GPU_PROFILE=<frames> lists the editor's own frame stages beside the render passes.
         const gpg::gal::RenderProfileScope profileScene("EdSceneUpdate");
+        const EdPerf::Scope perfScene("scene update");
         mScene.Update(
           frameSeconds,
           playIdle,
@@ -10729,6 +10924,7 @@ namespace faf::editor
         }
         {
           const gpg::gal::RenderProfileScope profileShell("EdPanels");
+          const EdPerf::Scope perfShell("panels");
           mShell->Draw();
         }
         SyncSettings();
@@ -10877,9 +11073,42 @@ namespace faf::editor
           );
           ImGui::GetBackgroundDrawList(ImGui::GetMainViewport())
             ->AddImage(static_cast<ImTextureID>(EdImGuiRenderer::kGameViewImage), from, to);
+          // The markers' and areas' names over the view (FAF Studio's labels), under the panels and their windows.
+          ImDrawList* const labels = ImGui::GetBackgroundDrawList(ImGui::GetMainViewport());
+          labels->PushClipRect(from, to, true);
+          // Names that would cover one another (markers on one spot) are stacked upwards.
+          std::vector<ImVec4> placed;
+          for (const EdMapScene::ViewLabel& label : mScene.ViewLabels()) {
+            const ImVec2 size = ImGui::CalcTextSize(label.text.c_str());
+            ImVec2 at(std::round(from.x + label.x - size.x * 0.5f), std::round(from.y + label.y - size.y - 4.0f));
+            for (int tries = 0; tries < 6; ++tries) {
+              bool clear = true;
+              for (const ImVec4& r : placed) {
+                if (at.x < r.z && at.x + size.x > r.x && at.y < r.w && at.y + size.y > r.y) {
+                  at.y = r.y - size.y - 3.0f;
+                  clear = false;
+                }
+              }
+              if (clear) {
+                break;
+              }
+            }
+            placed.emplace_back(at.x - 3.0f, at.y - 1.0f, at.x + size.x + 3.0f, at.y + size.y + 1.0f);
+            labels->AddRectFilled(
+              ImVec2(at.x - 3.0f, at.y - 1.0f),
+              ImVec2(at.x + size.x + 3.0f, at.y + size.y + 1.0f),
+              IM_COL32(0, 0, 0, 150),
+              3.0f
+            );
+            labels->AddText(
+              at, IM_COL32((label.rgb >> 16) & 0xFF, (label.rgb >> 8) & 0xFF, label.rgb & 0xFF, 255), label.text.c_str()
+            );
+          }
+          labels->PopClipRect();
         }
         {
           const gpg::gal::RenderProfileScope profilePanels("EdPanelsRender");
+          const EdPerf::Scope perfPanels("panels drawn");
           ImGui::Render();
           mTipCheck.AfterRender();
           if (mTipCheck.Done()) {
@@ -10925,7 +11154,11 @@ namespace faf::editor
 
       {
         const gpg::gal::RenderProfileScope profileGame("GameMain");
+        const EdPerf::Scope perfGame("game frame (view, sound, sim)");
         mGame.Main();
+      }
+      if (std::string report; EdPerf::Get().EndFrame(frameSeconds, report)) {
+        gpg::Logf("editor: %s", report.c_str());
       }
       CapBackgroundFrames();
 
@@ -10971,6 +11204,11 @@ namespace faf::editor
       }
       mTipCheckAsked = moho::CFG_GetArgOption("/tipcheck", 0, nullptr);
       mClickSweepAsked = moho::CFG_GetArgOption("/clicksweep", 0, nullptr);
+      // `/perf`: the performance timing on from the start (FAF Studio's).
+      if (moho::CFG_GetArgOption("/perf", 0, nullptr)) {
+        EdPerf::Get().SetOn(true);
+        gpg::Logf("editor: performance timing on (/perf): a report every 5 s");
+      }
       mLayoutCheckAsked = moho::CFG_GetArgOption("/layoutcheck", 0, nullptr);
       mSelfTestsAsked = moho::CFG_GetArgOption("/selftests", 0, nullptr);
       if (fa::vector<fa::string> file; moho::CFG_GetArgOption("/layoutsave", 1, &file) && !file.empty()) {
@@ -13810,6 +14048,7 @@ namespace faf::editor
         DriveRoundSixTest();
         DriveRoundSevenTest();
         DriveRoundEightTest();
+        DriveRoundNineTest();
         RecipesUpdate();
         TexturesUpdate();
         DriveMaterialEditor();
@@ -14704,6 +14943,16 @@ namespace faf::editor
       // The brush library's folder, once; the Import button copies picked images into it.
       if (tools.BrushFolder().empty()) {
         if (const std::filesystem::path folder = EditorSettingsFolder(); !folder.empty()) {
+          // FAF Studio's five ready-made images, the first time.
+          std::string error;
+          if (const int shipped = WriteShippedBrushImages(folder / "brushes", error); shipped > 0 || !error.empty()) {
+            gpg::Logf(
+              "editor: brush library: %d ready-made images written%s%s",
+              shipped,
+              error.empty() ? "" : ": ",
+              error.c_str()
+            );
+          }
           tools.SetBrushFolder(folder / "brushes");
         }
       }
@@ -16096,7 +16345,10 @@ namespace faf::editor
       ) {
         FinishResize();
       }
-      DriveHeightFiles();
+      {
+        const EdPerf::Scope perfTools("tool updates");
+        DriveHeightFiles();
+      }
       if (mSymCheckMode >= 0 && mScene.Attached()) {
         ++mSymCheckFrames;
         if (mSymCheckFrames == 120) {

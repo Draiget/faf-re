@@ -968,6 +968,36 @@ namespace faf::editor
       mAreaAddAt[1] = z;
       mAreaAddAsked = true;
     }
+    /**
+     * The areas picked in the view or the Areas list (FAF Studio's area selection), by name; the view moves, resizes,
+     * deletes and copies them, the section edits the first.
+     */
+    [[nodiscard]] std::vector<std::string>& AreaSelection() noexcept
+    {
+      return mAreaSelection;
+    }
+    /** A drag in the view draws a new area (FAF Studio's Place area tool). */
+    [[nodiscard]] bool DrawingAreas() const noexcept
+    {
+      return mDrawingAreas;
+    }
+    void SetDrawingAreas(
+      const bool on
+    ) noexcept
+    {
+      mDrawingAreas = on;
+    }
+    /** Where areas are kept while drawn, moved, resized or typed: 0 anywhere, 1 the map, 2 the playable area. */
+    [[nodiscard]] int AreaLimit() const noexcept
+    {
+      return mAreaLimit;
+    }
+    void SetAreaLimit(
+      const int limit
+    ) noexcept
+    {
+      mAreaLimit = limit;
+    }
     /** The Markers tool's type to place (an entry of MarkerTypes()). */
     [[nodiscard]] const MarkerType& PlaceMarkerType() const noexcept
     {
@@ -3623,6 +3653,9 @@ namespace faf::editor
     bool mAreaAddAsked = false;
     float mAreaAddAt[2] = {0.0f, 0.0f};
     int mAreaChosen = -1;
+    std::vector<std::string> mAreaSelection;
+    bool mDrawingAreas = false;
+    int mAreaLimit = 0;
     char mAreaName[64] = {};
 
   public:

@@ -7,6 +7,7 @@
 #include "moho/resource/blueprints/RProjectileBlueprint.h"
 #include "editor/ui/EdControls.h"
 #include "editor/ui/EdIconFont.h"
+#include "editor/ui/EdImGuiRenderer.h"
 #include "editor/ui/EdModPanel.h"
 #include "editor/ui/EdUiScale.h"
 #include "editor/ui/EdUnitLabPanel.h"
@@ -139,14 +140,16 @@ namespace faf::editor
       std::memset(bits, 0, static_cast<std::size_t>(sheet->GetTextureSizeInBytes()));
       (void)sheet->Unlock();
     }
-    // Heading about the vertical, then pitch about the across axis (w, x, y, z).
-    const float h = 0.5f * mHeading * 3.14159265f / 180.0f;
-    const float p = 0.5f * mPitch * 3.14159265f / 180.0f;
+    // Heading about the vertical, then pitch about the across axis (w, x, y, z); an icon by its own recipe.
+    const float h = 0.5f * (mIconRequest ? mIconHeading : mHeading) * 3.14159265f / 180.0f;
+    const float p = 0.5f * (mIconRequest ? mIconPitch : mPitch) * 3.14159265f / 180.0f;
     const Wm3::Quatf heading(std::cos(h), 0.0f, std::sin(h), 0.0f);
     const Wm3::Quatf tilt(std::cos(p), std::sin(p), 0.0f, 0.0f);
+    moho::ren_ThumbnailFov = mIconRequest ? mIconFov : 0.0f;
     (void)moho::REN_RequestThumbnail(
       mesh, tilt * heading, 0xFFFFFFFFu, Wm3::Vec3f{1.0f, 1.0f, 1.0f}, sheet, gpg::Rect2f{0.0f, 0.0f, 1.0f, 1.0f}
     );
+    moho::ren_ThumbnailFov = 0.0f;
     return true;
   }
 
@@ -187,7 +190,10 @@ namespace faf::editor
       error = "open a mod project and pick a unit in the unit lab";
       return false;
     }
-    if (!Request(mIconSheet, kIconRender, ModSourceUnit(*project, unit))) {
+    mIconRequest = true;
+    const bool asked = Request(mIconSheet, kIconRender, ModSourceUnit(*project, unit));
+    mIconRequest = false;
+    if (!asked) {
       error = "the game's rules or the renderer aren't ready, or the unit has no model";
       return false;
     }
@@ -199,8 +205,30 @@ namespace faf::editor
     return true;
   }
 
+  void EdUnitViewer::SetIconPicture(
+    const int which,
+    const std::vector<std::uint32_t>& bgra
+  )
+  {
+    if (mIconPictures[which] != 0U) {
+      mRetiredPictures.emplace_back(mIconPictures[which], 0);
+    }
+    mIconPictures[which] = bgra.size() == static_cast<std::size_t>(kIconSide) * kIconSide
+      ? EdImGuiRenderer::CreateImage(kIconSide, kIconSide, bgra.data())
+      : 0U;
+  }
+
   void EdUnitViewer::Frame()
   {
+    // Pictures replaced a few frames ago: no draw list holds them any more.
+    for (auto it = mRetiredPictures.begin(); it != mRetiredPictures.end();) {
+      if (++it->second > 3) {
+        EdImGuiRenderer::DestroyImage(it->first);
+        it = mRetiredPictures.erase(it);
+      } else {
+        ++it;
+      }
+    }
     if (++mSinceAsked == 4 && mSheet) {
       std::vector<std::uint32_t> pixels;
       mDrawnPixels = 0;
@@ -230,7 +258,10 @@ namespace faf::editor
       ModProject* const project = mProject.Project();
       mIconOnBlack = pixels;
       moho::ren_ThumbnailClearColor = 0xFFFFFFFFu;
-      if (project != nullptr && Request(mIconSheet, kIconRender, ModSourceUnit(*project, mIconUnit))) {
+      mIconRequest = true;
+      const bool asked = project != nullptr && Request(mIconSheet, kIconRender, ModSourceUnit(*project, mIconUnit));
+      mIconRequest = false;
+      if (asked) {
         mIconPass = 1;
         mIconFrames = 0;
         return;
@@ -259,7 +290,7 @@ namespace faf::editor
       gpg::Warnf("editor: unit viewer: %s", mStatus.c_str());
       return;
     }
-    std::vector<float> icon = IconPixels(pixels.data(), kIconRender, kIconSide, 0.9f);
+    std::vector<float> icon = IconPixels(pixels.data(), kIconRender, kIconSide, mIconFill);
     mIconFrames = -1;
     // Beside the icon the game ships (Studio's Icons panel): the silhouettes' overlap and the colours, and what the
     // faction's tone fit learns from it; the fit applied when asked.
@@ -307,6 +338,29 @@ namespace faf::editor
           icon[i] = static_cast<float>(made[i]) / 255.0f;
         }
       }
+    }
+    // The light edge (Studio's), then the pictures: the icon as written, the game's, their silhouettes' difference.
+    IconLightEdge(icon, kIconSide, mIconEdge, mIconEdge > 0.0f ? 3.5f : 0.0f);
+    {
+      const auto toBgra = [](const std::vector<std::uint8_t>& rgba) {
+        std::vector<std::uint32_t> out(rgba.size() / 4);
+        for (std::size_t i = 0; i < out.size(); ++i) {
+          out[i] = (static_cast<std::uint32_t>(rgba[i * 4 + 3]) << 24) |
+            (static_cast<std::uint32_t>(rgba[i * 4]) << 16) | (static_cast<std::uint32_t>(rgba[i * 4 + 1]) << 8) |
+            rgba[i * 4 + 2];
+        }
+        return out;
+      };
+      std::vector<std::uint8_t> written(icon.size());
+      for (std::size_t i = 0; i < icon.size(); ++i) {
+        written[i] = static_cast<std::uint8_t>(std::clamp(icon[i] * 255.0f + 0.5f, 0.0f, 255.0f));
+      }
+      SetIconPicture(0, toBgra(written));
+      const bool shippedHere = mShipped.size() == written.size() && mCompare.rfind("Beside", 0) == 0;
+      SetIconPicture(1, shippedHere ? toBgra(mShipped) : std::vector<std::uint32_t>{});
+      SetIconPicture(
+        2, shippedHere ? IconDifference(written.data(), mShipped.data(), kIconSide) : std::vector<std::uint32_t>{}
+      );
     }
     TexImage image;
     image.Reset(kIconSide, 4);
@@ -459,6 +513,53 @@ namespace faf::editor
     );
     if (!mBatch.empty()) {
       ImGui::TextDisabled("Batch: %d of %d left", static_cast<int>(mBatch.size()), mBatchTotal);
+    }
+    if (ImGui::TreeNode("Icon recipe")) {
+      ImGui::SetNextItemWidth(-1.0f);
+      (void)FillSliderFloat("##iconheading", &mIconHeading, 0.0f, 360.0f, "Heading %.0f deg");
+      ImGui::SetNextItemWidth(-1.0f);
+      (void)FillSliderFloat("##iconpitch", &mIconPitch, 0.0f, 85.0f, "Pitch %.0f deg");
+      ImGui::SetNextItemWidth(-1.0f);
+      (void)FillSliderFloat(
+        "##iconfov",
+        &mIconFov,
+        0.0f,
+        70.0f,
+        mIconFov > 0.0f ? "Field of view %.0f deg" : "Field of view: flat (the game's)"
+      );
+      EdSetItemTooltip("0 draws the model flat, as the game's thumbnails; a field of view draws it in perspective");
+      ImGui::SetNextItemWidth(-1.0f);
+      (void)FillSliderFloat("##iconfill", &mIconFill, 0.4f, 1.0f, "Fill %.2f of the icon");
+      ImGui::SetNextItemWidth(-1.0f);
+      (void)FillSliderFloat(
+        "##iconedge", &mIconEdge, 0.0f, 6.0f, mIconEdge > 0.0f ? "Light edge %.1f px" : "Light edge: off"
+      );
+      EdSetItemTooltip("A white halo round the unit, as the game's icons have");
+      if (ImGui::Button("As the view##iconasview")) {
+        mIconHeading = mHeading;
+        mIconPitch = mPitch;
+      }
+      EdSetItemTooltip("The icon turned as the unit is in the view");
+      ImGui::TreePop();
+    }
+    if (mIconPictures[0] != 0U) {
+      // The render, the game's icon, their difference (Studio's three pictures).
+      const float side = std::min(Em(96.0f), (ImGui::GetContentRegionAvail().x - Em(16.0f)) / 3.0f);
+      static constexpr const char* kCaptions[] = {"Render", "Game", "Difference"};
+      for (int k = 0; k < 3; ++k) {
+        if (k > 0) {
+          ImGui::SameLine();
+        }
+        ImGui::BeginGroup();
+        ImGui::TextDisabled("%s", kCaptions[k]);
+        if (mIconPictures[k] != 0U) {
+          ImGui::Image(static_cast<ImTextureID>(mIconPictures[k]), ImVec2(side, side));
+        } else {
+          ImGui::Dummy(ImVec2(side, side));
+        }
+        ImGui::EndGroup();
+      }
+      ImGui::TextDisabled("Difference: green both, red only the render, blue only the game's");
     }
     if (!mCompare.empty()) {
       ImGui::TextWrapped("%s", mCompare.c_str());

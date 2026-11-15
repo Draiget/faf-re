@@ -1571,6 +1571,7 @@ namespace moho
    * through the LOD's static hardware batch (un-mirrored).
    */
   std::uint32_t ren_ThumbnailClearColor = 0xFF000000u;
+  float ren_ThumbnailFov = 0.0f;
 
   void MeshRenderer::RenderThumbnail(
     const GeomCamera3& camera,

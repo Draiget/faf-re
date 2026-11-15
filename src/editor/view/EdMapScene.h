@@ -23,6 +23,7 @@
 #include "editor/doc/EdUnitPreset.h"
 #include "editor/doc/EdMarkerPreset.h"
 #include "editor/EdTools.h"
+#include "editor/tools/EdAreaLimit.h"
 #include "editor/doc/EdAdaptiveTables.h"
 #include "editor/doc/EdDocument.h"
 #include "editor/doc/EdUnits.h"
@@ -569,6 +570,62 @@ namespace faf::editor
     [[nodiscard]] SelectionProperties SelectionPropertiesNow() const;
     void ApplyPropertyEdit(const PropertyEdit& edit);
     [[nodiscard]] std::string HoverText() const;
+    /**
+     * Names written in the view (FAF Studio's overlay labels): the markers' and the areas' names at their places in
+     * view pixels (above the point), every one when the camera is close, else the selected and the hovered ones;
+     * marker types hidden on the toolbar are left out unless selected. `rgb` 0xRRGGBB.
+     */
+    struct ViewLabel
+    {
+      float x = 0.0f;
+      float y = 0.0f;
+      std::string text;
+      std::uint32_t rgb = 0xFFFFFF;
+    };
+    [[nodiscard]] std::vector<ViewLabel> ViewLabels() const;
+    // Areas in the view (FAF Studio's area tools): picked by their outline, moved, resized by their handles, drawn.
+    int mAreaDrag = 0; // 1 left, 2 top, 4 right, 8 bottom (resize), 16 move, 32 a new area
+    std::string mAreaDragName;
+    EdDocument::SaveSnapshot mAreaBefore;
+    float mAreaFrom[2] = {0.0f, 0.0f};
+    std::vector<std::array<float, 4>> mAreaStart;
+    std::vector<SaveEntry> mAreaClipboard;
+    [[nodiscard]] AreaBounds AreaLimitBounds() const;
+    bool AreaMouseDown(HWND window, POINT at, float groundX, float groundZ, bool add);
+    void AreaMouseMove(POINT at);
+    void AreaMouseUp();
+    bool AreaCtrlKey(char key);
+    [[nodiscard]] bool NamesShown() const noexcept
+    {
+      return mNamesShown;
+    }
+    void SetNamesShown(
+      const bool shown
+    ) noexcept
+    {
+      mNamesShown = shown;
+    }
+    bool mNamesShown = true;
+    /** A Mass / Hydrocarbon marker's footprint and skirt (game units) and its state: 0 fine, 1 blocked by the build
+     * rules, 2 another resource in it, 3 off the build grid. */
+    struct ResourceMark
+    {
+      std::string marker;
+      bool mass = true;
+      float x = 0.0f;
+      float z = 0.0f;
+      int sizeX = 1;
+      int sizeZ = 1;
+      float footprint[4] = {0, 0, 0, 0};
+      float skirt[4] = {0, 0, 0, 0};
+      int state = 0;
+    };
+    [[nodiscard]] std::vector<ResourceMark> ResourceMarks() const;
+    /** Test runs: the area tools a step at a time (draw, move, resize, keep inside, duplicate, delete), as a line. */
+    std::string TestAreaTools();
+    /** The resource footprints' build checks (marker name -> why it can't be built), every 30 frames. */
+    std::map<std::string, std::string> mResourceProblems;
+    int mResourceFrames = 0;
     /** The Decals tool's path: its points, and how many decals it would place (the cursor as its next point). */
     [[nodiscard]] int DecalPathPointCount() const noexcept
     {
@@ -778,8 +835,13 @@ namespace faf::editor
      * Edit > Delete selection (the Delete key): the active tool's selection (units, decals, markers), or with the
      * Select tool what it has selected, of whichever kind; props otherwise. One undo step.
      */
+    /** The picked areas (Markers tool) deleted as one undo step; false when none are picked. */
+    bool DeleteSelectedAreas();
     void DeleteSelected()
     {
+      if (mTools != nullptr && mTools->MarkersToolActive() && mMarkerSelection.empty() && DeleteSelectedAreas()) {
+        return;
+      }
       if (mTools != nullptr && mTools->SelectToolActive()) {
         switch (SelectedKind()) {
         case PickKind::Marker:

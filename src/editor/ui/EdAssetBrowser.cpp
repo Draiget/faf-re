@@ -18,6 +18,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cstdio>
+#include <cstdlib>
 #include <fstream>
 #include <sstream>
 
@@ -62,6 +63,16 @@ namespace faf::editor
       std::ostringstream text;
       text << in.rdbuf();
       mMarks.Load(text.str());
+      // The view's own lines (the marks skip them): the tiles' size and the list.
+      std::istringstream lines(text.str());
+      std::string line;
+      while (std::getline(lines, line)) {
+        if (line.rfind("v:tile=", 0) == 0) {
+          mTileSize = std::clamp(static_cast<float>(std::atof(line.c_str() + 7)), 40.0f, 110.0f);
+        } else if (line.rfind("v:list=", 0) == 0) {
+          mListView = line.size() > 7 && line[7] == '1';
+        }
+      }
     }
   }
 
@@ -71,7 +82,7 @@ namespace faf::editor
       return;
     }
     std::ofstream out(mMarksFile, std::ios::binary | std::ios::trunc);
-    out << mMarks.Save();
+    out << mMarks.Save() << "v:tile=" << static_cast<int>(mTileSize) << "\nv:list=" << (mListView ? 1 : 0) << "\n";
   }
 
   const std::vector<AssetEntry>& EdAssetBrowser::Entries(
@@ -290,9 +301,90 @@ namespace faf::editor
     if (entries.empty()) {
       ImGui::TextDisabled("Nothing listed yet (the game's rules are still being built).");
     }
+    // Tiles or a list, and the tiles' size (FAF Studio's), remembered.
+    if (ImGui::Checkbox("List", &mListView)) {
+      SaveMarks();
+    }
+    EdSetItemTooltip("One row an asset (picture, name, kind) instead of tiles");
+    if (!mListView) {
+      ImGui::SameLine();
+      ImGui::SetNextItemWidth(-1.0f);
+      (void)FillSliderFloat("##assettilesize", &mTileSize, 40.0f, 110.0f, "Tile size %.0f");
+      if (ImGui::IsItemDeactivatedAfterEdit()) {
+        SaveMarks();
+      }
+    }
+    if (mListView) {
+      ImGui::BeginChild("##assetlist", ImVec2(0.0f, 0.0f), false);
+      const float picture = Em(30.0f);
+      const float rowHeight = picture + ImGui::GetStyle().ItemSpacing.y;
+      ImGuiListClipper rows;
+      rows.Begin(static_cast<int>(found.size()), rowHeight);
+      while (rows.Step()) {
+        for (int row = rows.DisplayStart; row < rows.DisplayEnd; ++row) {
+          const AssetEntry& e = entries[found[static_cast<std::size_t>(row)]];
+          ImGui::PushID(static_cast<int>(found[static_cast<std::size_t>(row)]));
+          const ImVec2 corner = ImGui::GetCursorScreenPos();
+          const bool clicked =
+            ImGui::Selectable("##row", false, ImGuiSelectableFlags_AllowOverlap, ImVec2(0.0f, picture));
+          if (clicked) {
+            Pick(e);
+          }
+          if (
+            e.kind != AssetKind::Effects && e.kind != AssetKind::Textures &&
+            ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID)
+          ) {
+            const std::size_t index = found[static_cast<std::size_t>(row)];
+            ImGui::SetDragDropPayload("FAF_ASSET", &index, sizeof(index));
+            ImGui::TextUnformatted(e.name.c_str());
+            ImGui::TextDisabled("Let go over the map to place it");
+            mDragging = true;
+            mDragged = e;
+            ImGui::EndDragDropSource();
+          }
+          if (ImGui::IsItemClicked(ImGuiMouseButton_Right)) {
+            mMarks.ToggleFavourite(e);
+            SaveMarks();
+          }
+          if (ImGui::IsItemHovered()) {
+            EdSetTooltip("%s\n%s\n%s", e.name.c_str(), e.sub.c_str(), e.key.c_str());
+          }
+          ImDrawList* dl = ImGui::GetWindowDrawList();
+          if (const std::uint64_t image = Picture(e); image != 0U) {
+            dl->AddImage(static_cast<ImTextureID>(image), corner, ImVec2(corner.x + picture, corner.y + picture));
+          } else {
+            dl->AddText(
+              ImVec2(corner.x + picture * 0.3f, corner.y + picture * 0.25f),
+              ImGui::GetColorU32(ImGuiCol_TextDisabled),
+              KindIcon(e.kind)
+            );
+          }
+          const float textX = corner.x + picture + Em(8.0f);
+          dl->AddText(
+            ImVec2(textX, corner.y),
+            ImGui::GetColorU32(ImGuiCol_Text),
+            ((mMarks.Favourite(e) ? std::string(ICON_STAR " ") : std::string()) + e.name).c_str()
+          );
+          dl->AddText(
+            ImVec2(textX, corner.y + ImGui::GetTextLineHeight()),
+            ImGui::GetColorU32(ImGuiCol_TextDisabled),
+            e.sub.c_str()
+          );
+          ImGui::PopID();
+        }
+      }
+      ImGui::EndChild();
+      ImGui::End();
+      if (mDragging && ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
+        mDragging = false;
+        mDrop = {mDragged, ImGui::GetIO().MousePos.x, ImGui::GetIO().MousePos.y};
+        mDropAsked = true;
+      }
+      return;
+    }
     // The tiles.
     ImGui::BeginChild("##assettiles", ImVec2(0.0f, 0.0f), false);
-    const float tile = Em(76.0f);
+    const float tile = Em(mTileSize);
     const float gap = ImGui::GetStyle().ItemSpacing.x;
     // A tile is the picture and the button's frame on both sides.
     const float cell = tile + ImGui::GetStyle().FramePadding.x * 2.0f;

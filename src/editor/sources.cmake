@@ -109,6 +109,7 @@ set(FAF_EDITOR_SOURCES
   ui/EdWindowChrome.cpp
   ui/EdTitleBar.cpp
   ui/EdPalette.cpp
+  ui/EdPerf.cpp
   ui/EdTheme.cpp
   ui/EdThemeStyle.cpp
   ui/EdIcons.cpp

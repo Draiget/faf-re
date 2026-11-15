@@ -5,6 +5,8 @@
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <cstdint>
+#include <fstream>
 #include <system_error>
 
 namespace faf::editor
@@ -79,6 +81,131 @@ namespace faf::editor
       out.values[i] = static_cast<float>(grid.words[i]) / 65535.0f;
     }
     return true;
+  }
+
+  namespace
+  {
+    // FAF Studio's gen_brush_masks.py, as it is.
+    double Smooth(
+      const double a,
+      const double b,
+      const double x
+    )
+    {
+      const double t = std::clamp((x - a) / (b - a), 0.0, 1.0);
+      return t * t * (3.0 - 2.0 * t);
+    }
+
+    double ValueNoise(
+      const double x,
+      const double z,
+      const int seed
+    )
+    {
+      const auto hash = [seed](const std::int64_t ix, const std::int64_t iz) {
+        std::uint32_t n = static_cast<std::uint32_t>(ix * 374761393LL + iz * 668265263LL + seed * 1442695041LL);
+        n = static_cast<std::uint32_t>((static_cast<std::uint64_t>(n ^ (n >> 13)) * 1274126177ULL) & 0xFFFFFFFFULL);
+        return static_cast<double>(n & 0xFFFFU) / 65535.0;
+      };
+      const double fx0 = std::floor(x);
+      const double fz0 = std::floor(z);
+      const auto ix = static_cast<std::int64_t>(fx0);
+      const auto iz = static_cast<std::int64_t>(fz0);
+      double fx = x - fx0;
+      double fz = z - fz0;
+      fx = fx * fx * (3.0 - 2.0 * fx);
+      fz = fz * fz * (3.0 - 2.0 * fz);
+      const double a = hash(ix, iz);
+      const double b = hash(ix + 1, iz);
+      const double c = hash(ix, iz + 1);
+      const double d = hash(ix + 1, iz + 1);
+      return (a + (b - a) * fx) + ((c + (d - c) * fx) - (a + (b - a) * fx)) * fz;
+    }
+
+    double Fractal(
+      const double x,
+      const double z,
+      const int seed = 0
+    )
+    {
+      return 0.5 * ValueNoise(x * 2.0, z * 2.0, seed) + 0.3 * ValueNoise(x * 4.0, z * 4.0, seed + 1) +
+        0.2 * ValueNoise(x * 8.0, z * 8.0, seed + 2);
+    }
+
+    double ShippedValue(
+      const std::string& name,
+      const double u,
+      const double v
+    )
+    {
+      const double d = std::hypot(u, v);
+      if (name == "crater") {
+        return std::min(1.0, Smooth(0.35, 0.72, d) * Smooth(1.0, 0.8, d) + 0.25 * Smooth(0.5, 0.0, d));
+      }
+      if (name == "volcano") {
+        return Smooth(1.0, 0.15, d) * (1.0 - 0.45 * Smooth(0.18, 0.0, d)) *
+          (0.85 + 0.3 * Fractal(u * 1.5 + 5.0, v * 1.5 + 5.0));
+      }
+      if (name == "canyon") {
+        const double wobble = 0.18 * std::sin(u * 3.0) + 0.1 * std::sin(u * 7.0 + 1.0);
+        return Smooth(0.45, 0.05, std::fabs(v - wobble)) * Smooth(1.0, 0.8, std::fabs(u));
+      }
+      if (name == "dunes") {
+        return (0.5 + 0.5 * std::sin(u * 6.0 + 2.0 * Fractal(u, v) * 3.0)) * Smooth(1.0, 0.7, d);
+      }
+      // ridgeline
+      const double r = 1.0 - std::fabs(2.0 * Fractal(u * 1.2 + 9.0, v * 1.2 + 4.0, 7) - 1.0);
+      return std::clamp(r * r, 0.0, 1.0) * Smooth(1.0, 0.55, d);
+    }
+  } // namespace
+
+  std::vector<std::pair<std::string, HeightImage>> ShippedBrushImages(
+    const int n
+  )
+  {
+    std::vector<std::pair<std::string, HeightImage>> out;
+    for (const char* const name : {"canyon", "crater", "dunes", "ridgeline", "volcano"}) {
+      HeightImage image;
+      image.width = n;
+      image.height = n;
+      image.words.resize(static_cast<std::size_t>(n) * static_cast<std::size_t>(n));
+      for (int j = 0; j < n; ++j) {
+        const double v = (j + 0.5) / n * 2.0 - 1.0;
+        for (int i = 0; i < n; ++i) {
+          const double u = (i + 0.5) / n * 2.0 - 1.0;
+          const double value = std::clamp(ShippedValue(name, u, v), 0.0, 1.0);
+          image.words[static_cast<std::size_t>(j) * static_cast<std::size_t>(n) + static_cast<std::size_t>(i)] =
+            static_cast<std::uint16_t>(std::lround(value * 65535.0));
+        }
+      }
+      out.emplace_back(name, std::move(image));
+    }
+    return out;
+  }
+
+  int WriteShippedBrushImages(
+    const std::filesystem::path& folder,
+    std::string& error
+  )
+  {
+    std::error_code ec;
+    if (std::filesystem::exists(folder / ".shipped", ec)) {
+      return 0;
+    }
+    std::filesystem::create_directories(folder, ec);
+    int written = 0;
+    for (const auto& [name, image] : ShippedBrushImages()) {
+      const std::filesystem::path file = folder / (name + ".png");
+      if (std::filesystem::exists(file, ec)) {
+        continue;
+      }
+      if (WriteHeightImage(file, image, error)) {
+        ++written;
+      }
+    }
+    std::ofstream(folder / ".shipped", std::ios::binary | std::ios::trunc)
+      << "canyon crater dunes ridgeline volcano: written once; delete one and it stays deleted\n";
+    return written;
   }
 
   int ImportBrushImages(

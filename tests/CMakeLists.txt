@@ -392,6 +392,7 @@ add_executable(faf_editor_field_tests EXCLUDE_FROM_ALL editor/FieldTests.cpp edi
   editor/RoundSixFieldTests.cpp
   editor/RoundSevenFieldTests.cpp
   editor/RoundEightFieldTests.cpp
+  editor/RoundNineFieldTests.cpp
   editor/TextureSetsTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdTexScale.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdTextureSets.cpp
   editor/SlopeRulesTests.cpp
   editor/ErosionSuiteTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdErosionSuite.cpp
@@ -487,6 +488,7 @@ add_executable(faf_editor_brush_tests EXCLUDE_FROM_ALL editor/HeightBrushTests.c
   editor/RoundSixTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdStrataThemes.cpp
   editor/RoundSevenTests.cpp
   editor/RoundEightTests.cpp
+  editor/RoundNineTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/ui/EdPerf.cpp
   editor/WorkspacesTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/ui/EdWorkspaces.cpp
   editor/StatusTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/ui/EdStatus.cpp
   editor/SettingsTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/ui/EdSettings.cpp

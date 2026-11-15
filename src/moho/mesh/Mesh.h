@@ -1001,6 +1001,12 @@ namespace moho
    * out). The game never changes it.
    */
   extern std::uint32_t ren_ThumbnailClearColor;
+  /**
+   * The field of view (degrees) of a thumbnail asked for while it is above 0: a perspective camera framing the mesh's
+   * bounding sphere, for the map editor's unit icons (FAF Studio's icon recipe). 0, retail's: the orthographic camera
+   * of BuildThumbnailCamera. The game never changes it; the editor sets it around one request.
+   */
+  extern float ren_ThumbnailFov;
 
   class MeshRenderer
   {

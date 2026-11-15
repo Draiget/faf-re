@@ -5,9 +5,11 @@
 // stamp stroke puts its dabs. No engine types: tested on its own (tests/editor/BrushLibraryTests.cpp).
 
 #include "editor/tools/EdHeightBrush.h"
+#include "editor/tools/EdHeightFile.h"
 
 #include <filesystem>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace faf::editor
@@ -30,6 +32,17 @@ namespace faf::editor
 
   /** An image read as grey (0..1) on an n x n grid; false with `error` when it can't be read. */
   bool LoadBrushImage(const std::filesystem::path& file, int n, ShapeGrid& out, std::string& error);
+
+  /**
+   * The brush images FAF Studio ships (its gen_brush_masks.py): canyon, crater, dunes, ridgeline and volcano as n x n
+   * grey words (white the brush's full strength), made here so the editor needs no image files of its own.
+   */
+  [[nodiscard]] std::vector<std::pair<std::string, HeightImage>> ShippedBrushImages(int n = 128);
+  /**
+   * Writes the shipped images into `folder` the first time (a `.shipped` file remembers it, so one the user deletes
+   * stays deleted); how many were written.
+   */
+  int WriteShippedBrushImages(const std::filesystem::path& folder, std::string& error);
 
   /** Copies the images among `files` into `folder` (made when missing); the number copied, `error` for the others. */
   int ImportBrushImages(

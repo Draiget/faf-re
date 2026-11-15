@@ -755,6 +755,31 @@ namespace faf::editor
         mTools->SetUnitFitNote(problem);
       }
     }
+    // Under every Mass and Hydrocarbon marker shown, the extractor's or the plant's footprint (solid) and skirt
+    // (faint) (FAF Studio's resource footprints): red when the game's build rules refuse it there, orange when another
+    // resource stands in it, yellow when it isn't on the build grid.
+    if (mResourceFrames++ % 30 == 0) {
+      mResourceProblems.clear();
+      for (const ResourceFit& fit : ResourceFits("ueb1103", "ueb1102")) {
+        if (!fit.problem.empty()) {
+          mResourceProblems[fit.marker] = fit.problem;
+        }
+      }
+    }
+    for (const ResourceMark& mark : ResourceMarks()) {
+      static constexpr std::uint32_t kStateColour[4] = {0u, 0xF0FF4040u, 0xF0FFA030u, 0xF0FFE040u};
+      const std::uint32_t colour = mark.state != 0 ? kStateColour[mark.state] : mark.mass ? 0xC060E060u : 0xC060C0E0u;
+      const auto rect = [&](const float (&r)[4], const std::uint32_t c) {
+        batcher->DrawLine(groundVertex(r[0], r[1], c, 0.3f), groundVertex(r[2], r[1], c, 0.3f));
+        batcher->DrawLine(groundVertex(r[2], r[1], c, 0.3f), groundVertex(r[2], r[3], c, 0.3f));
+        batcher->DrawLine(groundVertex(r[2], r[3], c, 0.3f), groundVertex(r[0], r[3], c, 0.3f));
+        batcher->DrawLine(groundVertex(r[0], r[3], c, 0.3f), groundVertex(r[0], r[1], c, 0.3f));
+      };
+      rect(mark.footprint, colour);
+      if (mark.skirt[2] > mark.skirt[0]) {
+        rect(mark.skirt, (colour & 0x00FFFFFFu) | 0x70000000u);
+      }
+    }
     // The map's areas (the save's AREA_n), outlined in teal with their names' corner post.
     if (mTools->MarkersToolActive()) {
       for (const SaveEntry& area : mDocument.SaveData().Areas()) {
@@ -766,7 +791,28 @@ namespace faf::editor
         const float az0 = static_cast<float>(edges[1]);
         const float ax1 = static_cast<float>(edges[2]);
         const float az1 = static_cast<float>(edges[3]);
-        constexpr std::uint32_t kArea = 0xD040D0C0u;
+        const std::vector<std::string>& picked = mTools->AreaSelection();
+        const bool isPicked = std::find(picked.begin(), picked.end(), area.name) != picked.end();
+        const std::uint32_t kArea = isPicked ? 0xF0FFD060u : 0xD040D0C0u;
+        if (isPicked) {
+          // The handles: corners and the edges' middles, a square each a size that reads at any distance.
+          const float r = std::max(0.8f, mDistance / 220.0f);
+          const float hx[3] = {ax0, (ax0 + ax1) * 0.5f, ax1};
+          const float hz[3] = {az0, (az0 + az1) * 0.5f, az1};
+          for (int i = 0; i < 3; ++i) {
+            for (int j = 0; j < 3; ++j) {
+              if (i == 1 && j == 1) {
+                continue;
+              }
+              const float cx = hx[i];
+              const float cz = hz[j];
+              batcher->DrawLine(groundVertex(cx - r, cz - r, kArea, 1.0f), groundVertex(cx + r, cz - r, kArea, 1.0f));
+              batcher->DrawLine(groundVertex(cx + r, cz - r, kArea, 1.0f), groundVertex(cx + r, cz + r, kArea, 1.0f));
+              batcher->DrawLine(groundVertex(cx + r, cz + r, kArea, 1.0f), groundVertex(cx - r, cz + r, kArea, 1.0f));
+              batcher->DrawLine(groundVertex(cx - r, cz + r, kArea, 1.0f), groundVertex(cx - r, cz - r, kArea, 1.0f));
+            }
+          }
+        }
         const auto edge = [&](const float fx, const float fz, const float tx, const float tz) {
           const int steps = std::max(2, static_cast<int>(std::hypot(tx - fx, tz - fz) / 4.0f));
           for (int s = 0; s < steps; ++s) {
@@ -5572,6 +5618,9 @@ namespace faf::editor
     if (mMap == nullptr) {
       return;
     }
+    if (AreaCtrlKey(key)) {
+      return;
+    }
     if ((key == 'C' || key == 'D' || key == 'X') && CopySelection() == 0) {
       return;
     }
@@ -5942,6 +5991,24 @@ namespace faf::editor
       kind = "markers";
       if (!add) {
         mMarkerSelection.clear();
+        mTools->AreaSelection().clear();
+      }
+      // The areas whose four corners are in the box.
+      for (const SaveEntry& area : mDocument.SaveData().Areas()) {
+        const std::vector<double> e = ValueNumbers(area.Get("rectangle"));
+        if (e.size() < 4) {
+          continue;
+        }
+        bool all = true;
+        for (const auto& [cx, cz] :
+             {std::pair{e[0], e[1]}, std::pair{e[2], e[1]}, std::pair{e[2], e[3]}, std::pair{e[0], e[3]}}) {
+          const float y = mMap->mTerrainRes->GetHeightAt(static_cast<std::int32_t>(cx), static_cast<std::int32_t>(cz));
+          all = all && inside(Wm3::Vec3f{static_cast<float>(cx), y, static_cast<float>(cz)});
+        }
+        std::vector<std::string>& picked = mTools->AreaSelection();
+        if (all && std::find(picked.begin(), picked.end(), area.name) == picked.end()) {
+          picked.push_back(area.name);
+        }
       }
       for (const SaveEntry& marker : mDocument.SaveData().Markers()) {
         float x = 0.0f, y = 0.0f, z = 0.0f;
@@ -8952,6 +9019,581 @@ namespace faf::editor
     default:
       break;
     }
+  }
+
+  std::vector<EdMapScene::ResourceMark> EdMapScene::ResourceMarks() const
+  {
+    std::vector<ResourceMark> out;
+    moho::RRuleGameRules* const rules = moho::RULE_PeekKept();
+    if (rules == nullptr || mTools == nullptr) {
+      return out;
+    }
+    const std::set<std::string>& hidden = mTools->HiddenMarkerTypes();
+    for (const SaveEntry& marker : mDocument.SaveData().Markers()) {
+      const std::string type = MarkerTypeOf(marker);
+      if ((type != "Mass" && type != "Hydrocarbon") || hidden.count(type) != 0) {
+        continue;
+      }
+      float x = 0.0f, y = 0.0f, z = 0.0f;
+      if (!ShownMarkerPosition(marker, x, y, z)) {
+        continue;
+      }
+      moho::RResId id{};
+      id.name.assign(type == "Mass" ? "ueb1103" : "ueb1102");
+      const moho::RUnitBlueprint* const bp = rules->GetUnitBlueprint(id);
+      if (bp == nullptr) {
+        continue;
+      }
+      ResourceMark mark;
+      mark.marker = marker.name;
+      mark.mass = type == "Mass";
+      mark.x = x;
+      mark.z = z;
+      mark.sizeX = std::max<int>(1, bp->mFootprint.mSizeX);
+      mark.sizeZ = std::max<int>(1, bp->mFootprint.mSizeZ);
+      const float fx = mark.sizeX * 0.5f;
+      const float fz = mark.sizeZ * 0.5f;
+      mark.footprint[0] = x - fx;
+      mark.footprint[1] = z - fz;
+      mark.footprint[2] = x + fx;
+      mark.footprint[3] = z + fz;
+      if (bp->Physics.SkirtSizeX > 0.0f && bp->Physics.SkirtSizeZ > 0.0f) {
+        mark.skirt[0] = x - fx + bp->Physics.SkirtOffsetX;
+        mark.skirt[1] = z - fz + bp->Physics.SkirtOffsetZ;
+        mark.skirt[2] = mark.skirt[0] + bp->Physics.SkirtSizeX;
+        mark.skirt[3] = mark.skirt[1] + bp->Physics.SkirtSizeZ;
+      }
+      out.push_back(std::move(mark));
+    }
+    for (ResourceMark& mark : out) {
+      bool stacked = false;
+      for (const ResourceMark& other : out) {
+        stacked = stacked ||
+          (&other != &mark && std::fabs(other.x - mark.x) < mark.sizeX * 0.5f &&
+           std::fabs(other.z - mark.z) < mark.sizeZ * 0.5f);
+      }
+      const bool offGrid = std::fabs(SnapFootprint(mark.x, mark.sizeX) - mark.x) > 0.01f ||
+        std::fabs(SnapFootprint(mark.z, mark.sizeZ) - mark.z) > 0.01f;
+      mark.state = mResourceProblems.count(mark.marker) != 0 ? 1 : stacked ? 2 : offGrid ? 3 : 0;
+    }
+    return out;
+  }
+
+  AreaBounds EdMapScene::AreaLimitBounds() const
+  {
+    AreaBounds bounds;
+    if (mTools == nullptr || mMap == nullptr || mMap->mTerrainRes == nullptr) {
+      return bounds;
+    }
+    if (mTools->AreaLimit() == 1) {
+      if (const moho::CHeightField* const field = mMap->mTerrainRes->GetHeightField(); field != nullptr) {
+        bounds = {0.0f, 0.0f, static_cast<float>(field->width - 1), static_cast<float>(field->height - 1)};
+      }
+    } else if (mTools->AreaLimit() == 2) {
+      if (const std::optional<EdDocument::PlayableRect> playable = mDocument.PlayableArea(); playable.has_value()) {
+        bounds = {
+          static_cast<float>(playable->x0),
+          static_cast<float>(playable->z0),
+          static_cast<float>(playable->x1),
+          static_cast<float>(playable->z1)
+        };
+      }
+    }
+    return bounds;
+  }
+
+  bool EdMapScene::AreaMouseDown(
+    const HWND window,
+    const POINT at,
+    const float groundX,
+    const float groundZ,
+    const bool add
+  )
+  {
+    if (mTools == nullptr || mCamera == nullptr || mMap == nullptr) {
+      return false;
+    }
+    std::vector<SaveEntry>& areas = mDocument.SaveData().Areas();
+    std::vector<std::string>& picked = mTools->AreaSelection();
+    const auto rectOf = [](const SaveEntry& area, float (&r)[4]) {
+      const std::vector<double> e = ValueNumbers(area.Get("rectangle"));
+      if (e.size() < 4) {
+        return false;
+      }
+      r[0] = static_cast<float>(std::min(e[0], e[2]));
+      r[1] = static_cast<float>(std::min(e[1], e[3]));
+      r[2] = static_cast<float>(std::max(e[0], e[2]));
+      r[3] = static_cast<float>(std::max(e[1], e[3]));
+      return true;
+    };
+    const auto screen = [&](const float x, const float z) {
+      const float y = mMap->mTerrainRes->GetHeightAt(static_cast<std::int32_t>(x), static_cast<std::int32_t>(z));
+      return mCamera->Project(Wm3::Vec3f{x, y, z});
+    };
+    const Wm3::Vector2f cursor(static_cast<float>(at.x), static_cast<float>(at.y));
+    const auto begin = [&](const int kind) {
+      mAreaDrag = kind;
+      mAreaFrom[0] = groundX;
+      mAreaFrom[1] = groundZ;
+      mAreaStart.clear();
+      for (const std::string& name : picked) {
+        std::array<float, 4> start{};
+        for (const SaveEntry& area : areas) {
+          float r[4];
+          if (area.name == name && rectOf(area, r)) {
+            start = {r[0], r[1], r[2], r[3]};
+          }
+        }
+        mAreaStart.push_back(start);
+      }
+      ::SetCapture(window);
+      ::SetFocus(window);
+    };
+    // Drawing: a new area from here (Studio's Place area tool).
+    if (mTools->DrawingAreas()) {
+      mAreaBefore = mDocument.SaveDataNow();
+      int n = 1;
+      const auto taken = [&areas](const std::string& name) {
+        return std::any_of(areas.begin(), areas.end(), [&name](const SaveEntry& a) {
+          return a.name == name;
+        });
+      };
+      while (taken("AREA_" + std::to_string(n))) {
+        ++n;
+      }
+      SaveEntry area{"AREA_" + std::to_string(n), {}};
+      const float x = std::round(groundX);
+      const float z = std::round(groundZ);
+      area.Set("rectangle", RectangleValue(x, z, x + 1.0, z + 1.0));
+      areas.push_back(std::move(area));
+      picked = {areas.back().name};
+      mAreaDragName = areas.back().name;
+      begin(32);
+      return true;
+    }
+    // A handle of a picked area: resize that one.
+    for (const std::string& name : picked) {
+      for (const SaveEntry& area : areas) {
+        float r[4];
+        if (area.name != name || !rectOf(area, r)) {
+          continue;
+        }
+        const float hx[3] = {r[0], (r[0] + r[2]) * 0.5f, r[2]};
+        const float hz[3] = {r[1], (r[1] + r[3]) * 0.5f, r[3]};
+        const int edgeX[3] = {1, 0, 4};
+        const int edgeZ[3] = {2, 0, 8};
+        for (int i = 0; i < 3; ++i) {
+          for (int j = 0; j < 3; ++j) {
+            if (i == 1 && j == 1) {
+              continue;
+            }
+            const Wm3::Vector2f h = screen(hx[i], hz[j]);
+            if (std::hypot(h.x - cursor.x, h.y - cursor.y) <= 9.0f) {
+              mAreaBefore = mDocument.SaveDataNow();
+              mAreaDragName = name;
+              begin(edgeX[i] | edgeZ[j]);
+              return true;
+            }
+          }
+        }
+      }
+    }
+    // An outline within reach: pick that area (the smallest when several), then a drag moves the picked ones.
+    const SaveEntry* best = nullptr;
+    float bestArea = 1e30f;
+    for (const SaveEntry& area : areas) {
+      float r[4];
+      if (!rectOf(area, r)) {
+        continue;
+      }
+      const Wm3::Vector2f c[4] = {screen(r[0], r[1]), screen(r[2], r[1]), screen(r[2], r[3]), screen(r[0], r[3])};
+      float closest = 1e9f;
+      for (int e = 0; e < 4; ++e) {
+        closest = std::min(closest, SegmentDistance(cursor, c[e], c[(e + 1) % 4]));
+      }
+      const float size = (r[2] - r[0]) * (r[3] - r[1]);
+      if (closest <= 7.0f && size < bestArea) {
+        bestArea = size;
+        best = &area;
+      }
+    }
+    if (best == nullptr) {
+      if (!add) {
+        picked.clear();
+      }
+      return false;
+    }
+    const std::string name = best->name;
+    const bool already = std::find(picked.begin(), picked.end(), name) != picked.end();
+    if (add && already) {
+      picked.erase(std::find(picked.begin(), picked.end(), name));
+      return true;
+    }
+    if (!already) {
+      if (!add) {
+        picked.clear();
+      }
+      picked.push_back(name);
+    }
+    mAreaBefore = mDocument.SaveDataNow();
+    mAreaDragName = name;
+    begin(16);
+    return true;
+  }
+
+  void EdMapScene::AreaMouseMove(
+    const POINT at
+  )
+  {
+    float groundX = 0.0f;
+    float groundZ = 0.0f;
+    if (mTools == nullptr || !GroundAt(static_cast<float>(at.x), static_cast<float>(at.y), groundX, groundZ)) {
+      return;
+    }
+    const AreaBounds bounds = AreaLimitBounds();
+    std::vector<SaveEntry>& areas = mDocument.SaveData().Areas();
+    const std::vector<std::string>& picked = mTools->AreaSelection();
+    const float gx = std::round(groundX);
+    const float gz = std::round(groundZ);
+    if (mAreaDrag == 16) {
+      const float dx = std::round(groundX - mAreaFrom[0]);
+      const float dz = std::round(groundZ - mAreaFrom[1]);
+      for (std::size_t i = 0; i < picked.size() && i < mAreaStart.size(); ++i) {
+        for (SaveEntry& area : areas) {
+          if (area.name != picked[i]) {
+            continue;
+          }
+          float r[4] = {mAreaStart[i][0] + dx, mAreaStart[i][1] + dz, mAreaStart[i][2] + dx, mAreaStart[i][3] + dz};
+          LimitArea(r, bounds, true);
+          area.Set("rectangle", RectangleValue(r[0], r[1], r[2], r[3]));
+        }
+      }
+      return;
+    }
+    for (SaveEntry& area : areas) {
+      if (area.name != mAreaDragName) {
+        continue;
+      }
+      const std::vector<double> e = ValueNumbers(area.Get("rectangle"));
+      if (e.size() < 4) {
+        return;
+      }
+      float r[4] = {
+        static_cast<float>(e[0]), static_cast<float>(e[1]), static_cast<float>(e[2]), static_cast<float>(e[3])
+      };
+      if (mAreaDrag == 32) {
+        // A new area: from where the drag began to the cursor, whichever way.
+        r[0] = std::min(std::round(mAreaFrom[0]), gx);
+        r[2] = std::max(std::round(mAreaFrom[0]), gx);
+        r[1] = std::min(std::round(mAreaFrom[1]), gz);
+        r[3] = std::max(std::round(mAreaFrom[1]), gz);
+      } else {
+        if ((mAreaDrag & 1) != 0) {
+          r[0] = std::min(gx, r[2] - 1.0f);
+        }
+        if ((mAreaDrag & 4) != 0) {
+          r[2] = std::max(gx, r[0] + 1.0f);
+        }
+        if ((mAreaDrag & 2) != 0) {
+          r[1] = std::min(gz, r[3] - 1.0f);
+        }
+        if ((mAreaDrag & 8) != 0) {
+          r[3] = std::max(gz, r[1] + 1.0f);
+        }
+      }
+      LimitArea(r, bounds, false);
+      area.Set("rectangle", RectangleValue(r[0], r[1], r[2], r[3]));
+      return;
+    }
+  }
+
+  void EdMapScene::AreaMouseUp()
+  {
+    const int kind = std::exchange(mAreaDrag, 0);
+    ::ReleaseCapture();
+    std::vector<SaveEntry>& areas = mDocument.SaveData().Areas();
+    if (kind == 32) {
+      // A click, not a drag: no area.
+      for (auto it = areas.begin(); it != areas.end(); ++it) {
+        const std::vector<double> e = ValueNumbers(it->Get("rectangle"));
+        if (it->name == mAreaDragName && e.size() >= 4 && (e[2] - e[0] < 2.0 || e[3] - e[1] < 2.0)) {
+          areas.erase(it);
+          mTools->AreaSelection().clear();
+          break;
+        }
+      }
+    }
+    if (mAreaBefore.areas != areas) {
+      mDocument.SaveDataEdited(std::move(mAreaBefore));
+      gpg::Logf(
+        "editor: areas: %s %s",
+        kind == 32     ? "drew"
+          : kind == 16 ? "moved"
+                       : "resized",
+        kind == 16 ? (std::to_string(mTools->AreaSelection().size()) + " areas").c_str() : mAreaDragName.c_str()
+      );
+    }
+    mAreaBefore = {};
+  }
+
+  std::string EdMapScene::TestAreaTools()
+  {
+    if (mTools == nullptr || mCamera == nullptr || mMap == nullptr || mMap->mTerrainRes == nullptr) {
+      return "no map";
+    }
+    const auto screenOf = [&](const float x, const float z) {
+      const float y = mMap->mTerrainRes->GetHeightAt(static_cast<std::int32_t>(x), static_cast<std::int32_t>(z));
+      const Wm3::Vector2f at = mCamera->Project(Wm3::Vec3f{x, y, z});
+      return POINT{static_cast<LONG>(std::lround(at.x)), static_cast<LONG>(std::lround(at.y))};
+    };
+    const auto rectOf = [&](const std::string& name) {
+      std::string text = "-";
+      for (const SaveEntry& area : mDocument.SaveData().Areas()) {
+        if (area.name == name) {
+          const std::vector<double> e = ValueNumbers(area.Get("rectangle"));
+          char buffer[96];
+          (void)std::snprintf(buffer, sizeof(buffer), "%.0f,%.0f,%.0f,%.0f", e[0], e[1], e[2], e[3]);
+          text = buffer;
+        }
+      }
+      return text;
+    };
+    const auto drag = [&](const float fx, const float fz, const float tx, const float tz) {
+      const POINT from = screenOf(fx, fz);
+      const POINT to = screenOf(tx, tz);
+      float gx = 0.0f, gz = 0.0f;
+      if (!GroundAt(static_cast<float>(from.x), static_cast<float>(from.y), gx, gz)) {
+        return false;
+      }
+      if (!AreaMouseDown(nullptr, from, gx, gz, false)) {
+        return false;
+      }
+      AreaMouseMove(to);
+      AreaMouseUp();
+      return true;
+    };
+    const float c = std::round(mTargetX);
+    const float d = std::round(mTargetZ);
+    const std::size_t count = mDocument.SaveData().Areas().size();
+    std::string log;
+    // Draw.
+    mTools->SetDrawingAreas(true);
+    const bool drew = drag(c - 20.0f, d - 20.0f, c + 30.0f, d + 10.0f);
+    mTools->SetDrawingAreas(false);
+    const std::string name = mTools->AreaSelection().empty() ? "" : mTools->AreaSelection().front();
+    log += std::string("drew ") + (drew ? name + " " + rectOf(name) : "nothing");
+    // Move by its left edge (a quarter down, clear of the handles).
+    const bool moved = drag(c - 20.0f, d - 12.0f, c - 4.0f, d - 4.0f);
+    log += std::string("; moved by the outline: ") + (moved ? rectOf(name) : "no");
+    // Resize by the bottom right handle.
+    float r[4] = {0, 0, 0, 0};
+    for (const SaveEntry& area : mDocument.SaveData().Areas()) {
+      if (area.name == name) {
+        const std::vector<double> e = ValueNumbers(area.Get("rectangle"));
+        for (int i = 0; i < 4; ++i) {
+          r[i] = static_cast<float>(e[static_cast<std::size_t>(i)]);
+        }
+      }
+    }
+    const bool resized = drag(r[2], r[3], r[2] + 10.0f, r[3] + 6.0f);
+    log += std::string("; resized by its corner: ") + (resized ? rectOf(name) : "no");
+    // Kept inside the map: moved far past the left edge.
+    mTools->SetAreaLimit(1);
+    const POINT edge = screenOf(r[0], (r[1] + r[3]) * 0.5f - 7.0f);
+    float gx = 0.0f, gz = 0.0f;
+    if (
+      GroundAt(static_cast<float>(edge.x), static_cast<float>(edge.y), gx, gz) &&
+      AreaMouseDown(nullptr, edge, gx, gz, false)
+    ) {
+      mAreaFrom[0] += 4000.0f; // as if the drag had gone 4000 units left
+      AreaMouseMove(edge);
+      AreaMouseUp();
+    }
+    mTools->SetAreaLimit(0);
+    log += "; pushed 4000 left, kept inside the map: " + rectOf(name);
+    // Duplicate, then delete both.
+    CtrlKey('D');
+    const std::size_t afterDuplicate = mDocument.SaveData().Areas().size();
+    mTools->AreaSelection() = {name, mTools->AreaSelection().empty() ? name : mTools->AreaSelection().front()};
+    (void)DeleteSelectedAreas();
+    char tail[160];
+    (void)std::snprintf(
+      tail,
+      sizeof(tail),
+      "; areas %zu, %zu after drawing and duplicating, %zu after deleting both",
+      count,
+      afterDuplicate,
+      mDocument.SaveData().Areas().size()
+    );
+    return log + tail;
+  }
+
+  bool EdMapScene::DeleteSelectedAreas()
+  {
+    if (mTools == nullptr || mTools->AreaSelection().empty()) {
+      return false;
+    }
+    std::vector<std::string>& picked = mTools->AreaSelection();
+    EdDocument::SaveSnapshot before = mDocument.SaveDataNow();
+    std::vector<SaveEntry>& areas = mDocument.SaveData().Areas();
+    const std::size_t was = areas.size();
+    areas.erase(
+      std::remove_if(
+        areas.begin(),
+        areas.end(),
+        [&picked](const SaveEntry& a) {
+      return std::find(picked.begin(), picked.end(), a.name) != picked.end();
+    }
+      ),
+      areas.end()
+    );
+    picked.clear();
+    if (areas.size() != was) {
+      mDocument.SaveDataEdited(std::move(before));
+      gpg::Logf("editor: areas: %zu deleted", was - areas.size());
+    }
+    return true;
+  }
+
+  bool EdMapScene::AreaCtrlKey(
+    const char key
+  )
+  {
+    if (mTools == nullptr || !mTools->MarkersToolActive() || !mMarkerSelection.empty()) {
+      return false;
+    }
+    std::vector<std::string>& picked = mTools->AreaSelection();
+    std::vector<SaveEntry>& areas = mDocument.SaveData().Areas();
+    if (key == 'C' || key == 'X' || key == 'D') {
+      if (picked.empty()) {
+        return false;
+      }
+      mAreaClipboard.clear();
+      for (const SaveEntry& area : areas) {
+        if (std::find(picked.begin(), picked.end(), area.name) != picked.end()) {
+          mAreaClipboard.push_back(area);
+        }
+      }
+      if (key == 'X') {
+        (void)DeleteSelectedAreas();
+        return true;
+      }
+      if (key == 'C') {
+        gpg::Logf("editor: areas: %zu copied", mAreaClipboard.size());
+        return true;
+      }
+    }
+    if ((key != 'V' && key != 'D') || mAreaClipboard.empty()) {
+      return false;
+    }
+    // Paste at the cursor (the copied group's middle there), Duplicate 8 units down and right; new AREA_n names.
+    float cx = 0.0f, cz = 0.0f;
+    for (const SaveEntry& area : mAreaClipboard) {
+      const std::vector<double> e = ValueNumbers(area.Get("rectangle"));
+      if (e.size() >= 4) {
+        cx += static_cast<float>(e[0] + e[2]) * 0.5f;
+        cz += static_cast<float>(e[1] + e[3]) * 0.5f;
+      }
+    }
+    cx /= static_cast<float>(mAreaClipboard.size());
+    cz /= static_cast<float>(mAreaClipboard.size());
+    float dx = 8.0f, dz = 8.0f;
+    if (key == 'V') {
+      float gx = 0.0f, gz = 0.0f;
+      if (!CursorGround(gx, gz)) {
+        return true;
+      }
+      dx = std::round(gx - cx);
+      dz = std::round(gz - cz);
+    }
+    EdDocument::SaveSnapshot before = mDocument.SaveDataNow();
+    const AreaBounds bounds = AreaLimitBounds();
+    picked.clear();
+    for (const SaveEntry& copied : mAreaClipboard) {
+      const std::vector<double> e = ValueNumbers(copied.Get("rectangle"));
+      if (e.size() < 4) {
+        continue;
+      }
+      int n = 1;
+      const auto taken = [&areas](const std::string& name) {
+        return std::any_of(areas.begin(), areas.end(), [&name](const SaveEntry& a) {
+          return a.name == name;
+        });
+      };
+      while (taken("AREA_" + std::to_string(n))) {
+        ++n;
+      }
+      SaveEntry area = copied;
+      area.name = "AREA_" + std::to_string(n);
+      float r[4] = {
+        static_cast<float>(e[0]) + dx,
+        static_cast<float>(e[1]) + dz,
+        static_cast<float>(e[2]) + dx,
+        static_cast<float>(e[3]) + dz
+      };
+      LimitArea(r, bounds, true);
+      area.Set("rectangle", RectangleValue(r[0], r[1], r[2], r[3]));
+      picked.push_back(area.name);
+      areas.push_back(std::move(area));
+    }
+    mDocument.SaveDataEdited(std::move(before));
+    gpg::Logf("editor: areas: %zu %s", picked.size(), key == 'V' ? "pasted" : "duplicated");
+    return true;
+  }
+
+  std::vector<EdMapScene::ViewLabel> EdMapScene::ViewLabels() const
+  {
+    std::vector<ViewLabel> out;
+    if (!mNamesShown || mCamera == nullptr || mWidth <= 0 || mHeight <= 0) {
+      return out;
+    }
+    // Close: every name; far: the selected and the hovered.
+    const bool close = mDistance < 260.0f;
+    const std::set<std::string>& hidden = mTools->HiddenMarkerTypes();
+    const auto add =
+      [&](const float x, const float y, const float z, const std::string& text, const std::uint32_t rgb) {
+      const Wm3::Vector2f at = mCamera->Project(Wm3::Vec3f{x, y, z});
+      if (
+        at.x >= 0.0f && at.y >= 0.0f && at.x < static_cast<float>(mWidth) && at.y < static_cast<float>(mHeight) &&
+        out.size() < 400
+      ) {
+        out.push_back({at.x, at.y, text, rgb});
+      }
+    };
+    for (const SaveEntry& marker : mDocument.SaveData().Markers()) {
+      const bool selected =
+        std::find(mMarkerSelection.begin(), mMarkerSelection.end(), marker.name) != mMarkerSelection.end();
+      const bool hovered = marker.name == mHoverMarker;
+      if (!selected && !hovered && (!close || hidden.count(MarkerTypeOf(marker)) != 0)) {
+        continue;
+      }
+      float x = 0.0f, y = 0.0f, z = 0.0f;
+      if (ShownMarkerPosition(marker, x, y, z)) {
+        add(x, y + 2.5f, z, marker.name, selected ? 0xFFD060u : 0xF0F0F0u);
+      }
+    }
+    if (close || mTools->MarkersToolActive()) {
+      for (const SaveEntry& area : mDocument.SaveData().Areas()) {
+        const std::vector<double> edges = ValueNumbers(area.Get("rectangle"));
+        if (edges.size() < 4 || mMap == nullptr) {
+          continue;
+        }
+        const float x = static_cast<float>(edges[0]) + 2.0f;
+        const float z = static_cast<float>(edges[1]) + 2.0f;
+        float y = 0.0f;
+        if (
+          const moho::CHeightField* const field =
+            mMap->mTerrainRes != nullptr ? mMap->mTerrainRes->GetHeightField() : nullptr;
+          field != nullptr
+        ) {
+          const int sx = std::clamp(static_cast<int>(x), 0, field->width - 1);
+          const int sz = std::clamp(static_cast<int>(z), 0, field->height - 1);
+          y = static_cast<float>(field->data[sz * field->width + sx]) / 128.0f;
+        }
+        add(x, y + 1.0f, z, area.name, 0x40D0C0u);
+      }
+    }
+    return out;
   }
 
   std::string EdMapScene::HoverText() const
@@ -14279,6 +14921,9 @@ namespace faf::editor
           return true;
         }
         (void)area;
+        if (AreaMouseDown(window, at, groundX, groundZ, (wParam & MK_CONTROL) != 0)) {
+          return true;
+        }
         mBorderEdges = BorderEdgesAt(groundX, groundZ);
         if (mBorderEdges != 0) {
           mBorderBefore = mDocument.SaveDataNow();
@@ -14788,6 +15433,10 @@ namespace faf::editor
         }
         return true;
       }
+      if (mAreaDrag != 0) {
+        AreaMouseUp();
+        return true;
+      }
       if (mDecalBrushing) {
         mDecalBrushing = false;
         ::ReleaseCapture();
@@ -15172,6 +15821,10 @@ namespace faf::editor
             }
             mUnitsMoved = true;
           }
+          return true;
+        }
+        if (mAreaDrag != 0) {
+          AreaMouseMove(at);
           return true;
         }
         if (mDragDecals && mGizmoDrag != GizmoPart::None) {
