@@ -16,6 +16,7 @@
 #include "moho/misc/Stats.h"
 #include "moho/render/d3d/CD3DPrimBatcher.h"
 #include "moho/console/TConVarbool.h"
+#include "moho/lua/CScrLuaInitForm.h"
 #include "moho/app/UserWorkerPool.h"
 #include "moho/ui/UiDisplayScale.h"
 
@@ -252,6 +253,98 @@ namespace
     LuaPlus::LuaObject globals = state->GetGlobals();
     globals.SetObject("__EngineStats", engineStatsTable);
   }
+
+  /*
+   * Engine addition (ui_EngineStatsOnDemand), not in the binary: `__EngineStats` is a fixed, empty proxy table whose
+   * `__index` builds the statistics tree the first time a UI frame reads it and answers every read of that frame from
+   * the same table. The original rebuilds the tree every frame whether or not any script looks at it, which was about
+   * 0.14 ms and 264 of the UI's 302 Lua allocations a frame (issue 455's profile). Every reader in FAF's Lua reads a
+   * field (`__EngineStats.Children`), so each still sees a whole tree built this frame; a script that keeps the
+   * global in a local (`performance.lua`) now sees live values instead of the table of the frame it ran first.
+   */
+  bool ui_EngineStatsOnDemand = true;
+  moho::TConVar<bool> gTConVar_ui_EngineStatsOnDemand(
+    "ui_EngineStatsOnDemand",
+    "Build the engine statistics table __EngineStats only when UI script reads it, once a frame at most (1, the "
+    "default); 0 rebuilds it every frame as the original does.",
+    &ui_EngineStatsOnDemand
+  );
+
+  /// Counts UI frames from 1, so a stamp of 0 (a light userdata of null) never matches.
+  std::uintptr_t sEngineStatsFrame = 1U;
+  /// The UI state whose `__EngineStats` is the proxy; null while the plain table is published.
+  LuaPlus::LuaState* sEngineStatsProxyState = nullptr;
+
+  int EngineStatsProxyIndex(
+    lua_State* const L
+  )
+  {
+    // 1: the proxy, 2: the key.
+    if (lua_getmetatable(L, 1) == 0) {
+      return 0;
+    }
+    const int metatable = lua_gettop(L);
+    lua_pushstring(L, "__frame");
+    lua_rawget(L, metatable);
+    const bool fresh = lua_touserdata(L, -1) == reinterpret_cast<void*>(sEngineStatsFrame);
+    lua_pop(L, 1);
+    if (!fresh) {
+      LuaPlus::LuaState* const state = moho::SCR_ResolveBindingState(L);
+      LuaPlus::LuaObject engineStatsTable{};
+      moho::STAT_GetLuaTable(state, moho::GetEngineStats()->mItem.get(), engineStatsTable);
+      lua_pushstring(L, "__cache");
+      engineStatsTable.PushStack(state);
+      lua_rawset(L, metatable);
+      lua_pushstring(L, "__frame");
+      lua_pushlightuserdata(L, reinterpret_cast<void*>(sEngineStatsFrame));
+      lua_rawset(L, metatable);
+    }
+    lua_pushstring(L, "__cache");
+    lua_rawget(L, metatable);
+    lua_pushvalue(L, 2);
+    lua_gettable(L, -2);
+    return 1;
+  }
+
+  void InstallEngineStatsProxy(
+    LuaPlus::LuaState* const state
+  )
+  {
+    lua_State* const L = state->m_state;
+    const int top = lua_gettop(L);
+    lua_pushstring(L, "__EngineStats");
+    lua_newtable(L);
+    lua_newtable(L);
+    lua_pushstring(L, "__index");
+    lua_pushcfunction(L, &EngineStatsProxyIndex);
+    lua_rawset(L, -3);
+    (void)lua_setmetatable(L, -2);
+    lua_rawset(L, LUA_GLOBALSINDEX);
+    lua_settop(L, top);
+  }
+
+  /** Once a UI frame: the proxy when ui_EngineStatsOnDemand is on, else the whole tree as the original does. */
+  void UpdateEngineStatsForLua(
+    LuaPlus::LuaState* const state
+  )
+  {
+    if (state == nullptr || state->m_state == nullptr) {
+      return;
+    }
+    ++sEngineStatsFrame;
+    if (sEngineStatsFrame == 0U) {
+      sEngineStatsFrame = 1U;
+    }
+    if (ui_EngineStatsOnDemand) {
+      if (sEngineStatsProxyState != state) {
+        InstallEngineStatsProxy(state);
+        sEngineStatsProxyState = state;
+      }
+      return;
+    }
+    sEngineStatsProxyState = nullptr;
+    PublishEngineStatsToLua(state);
+  }
 } // namespace
 
 /**
@@ -388,6 +481,8 @@ bool moho::CUIManager::SetNewLuaState(
   // the stat tree before any frame exists.
   LuaPlus::LuaObject globals = mLuaState->GetGlobals();
   (void)globals.CreateTable("__EngineStats", 0, 0);
+  // A new state may reuse the old one's address; its placeholder still needs the proxy (ui_EngineStatsOnDemand).
+  sEngineStatsProxyState = nullptr;
 
   for (std::size_t head = 0; head < mInputWindows.Size(); ++head) {
     std::shared_ptr<CMauiFrame> frame = CMauiFrame::Create(mLuaState);
@@ -500,7 +595,7 @@ void moho::CUIManager::UpdateFrameRate(
   UI_NoteDisplayScale(mLuaState);
 
   if (mLuaState != nullptr) {
-    PublishEngineStatsToLua(mLuaState);
+    UpdateEngineStatsForLua(mLuaState);
 
     mGCTime += deltaSeconds;
 
