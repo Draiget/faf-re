@@ -1167,3 +1167,170 @@ TEST(
   };
   EXPECT_EQ((fa::find_equal_or_head_node<Node, &Node::isNil>(head, 3, nodeLess)), head);
 }
+
+// -----------------------------------------------------------------------------
+// Allocation Policy & Slab Allocator Tests
+// -----------------------------------------------------------------------------
+
+TEST(
+  FaTree,
+  DefaultAllocationPolicyMatchesPlatform
+)
+{
+#if defined(_M_X64) || defined(__x86_64__)
+  static_assert(
+    std::is_same_v<typename fa::set<int>::allocator_type, fa::local_slab_allocator<int, 32>>,
+    "fa::set should use local_slab_allocator<Key, 32> on x64"
+  );
+  static_assert(
+    std::is_same_v<typename fa::multiset<int>::allocator_type, fa::local_slab_allocator<int, 32>>,
+    "fa::multiset should use local_slab_allocator<Key, 32> on x64"
+  );
+  static_assert(
+    std::is_same_v<
+      typename fa::map<int, std::string>::allocator_type,
+      fa::local_slab_allocator<std::pair<const int, std::string>, 32>>,
+    "fa::map should use local_slab_allocator<std::pair<const Key, T>, 32> on x64"
+  );
+  static_assert(
+    std::is_same_v<
+      typename fa::multimap<int, std::string>::allocator_type,
+      fa::local_slab_allocator<std::pair<const int, std::string>, 32>>,
+    "fa::multimap should use local_slab_allocator<std::pair<const Key, T>, 32> on x64"
+  );
+#else
+  static_assert(
+    std::is_same_v<typename fa::set<int>::allocator_type, std::allocator<int>>,
+    "fa::set should use std::allocator<Key> on x86"
+  );
+  static_assert(
+    std::is_same_v<typename fa::multiset<int>::allocator_type, std::allocator<int>>,
+    "fa::multiset should use std::allocator<Key> on x86"
+  );
+  static_assert(
+    std::is_same_v<
+      typename fa::map<int, std::string>::allocator_type,
+      std::allocator<std::pair<const int, std::string>>>,
+    "fa::map should use std::allocator<std::pair<const Key, T>> on x86"
+  );
+  static_assert(
+    std::is_same_v<
+      typename fa::multimap<int, std::string>::allocator_type,
+      std::allocator<std::pair<const int, std::string>>>,
+    "fa::multimap should use std::allocator<std::pair<const Key, T>> on x86"
+  );
+#endif
+}
+
+TEST(
+  FaTree,
+  LocalSlabAllocatorAllocatesInBatchesOf32AndRecycles
+)
+{
+  using LocalAlloc = fa::local_slab_allocator<int, 32>;
+
+  {
+    fa::set<int, std::less<int>, LocalAlloc> s;
+    LocalAlloc alloc = s.get_allocator();
+
+    // Tree constructor allocates 1 sentinel head node
+    EXPECT_EQ(alloc.total_slabs(), 1u);
+    EXPECT_EQ(alloc.active_allocations(), 1u);
+
+    // Insert 31 elements: fits entirely into the first slab (1 head + 31 elements = 32 slots)
+    for (int i = 1; i <= 31; ++i) {
+      s.insert(i);
+    }
+    EXPECT_EQ(s.size(), 31u);
+    EXPECT_EQ(alloc.total_slabs(), 1u);
+    EXPECT_EQ(alloc.active_allocations(), 32u);
+
+    // Inserting the 32nd element requires a 33rd node, which triggers allocation of a 2nd slab
+    s.insert(32);
+    EXPECT_EQ(s.size(), 32u);
+    EXPECT_EQ(alloc.total_slabs(), 2u);
+    EXPECT_EQ(alloc.active_allocations(), 33u);
+
+    // Erase 10 elements: nodes are returned to the pool free list
+    for (int i = 1; i <= 10; ++i) {
+      s.erase(i);
+    }
+    EXPECT_EQ(s.size(), 22u);
+    EXPECT_EQ(alloc.total_slabs(), 2u);
+    EXPECT_EQ(alloc.active_allocations(), 23u);
+
+    // Re-insert 10 elements: should reuse nodes from the free list without allocating new slabs
+    for (int i = 1; i <= 10; ++i) {
+      s.insert(i);
+    }
+    EXPECT_EQ(s.size(), 32u);
+    EXPECT_EQ(alloc.total_slabs(), 2u);
+    EXPECT_EQ(alloc.active_allocations(), 33u);
+
+    // Clear releases all value nodes back to the free list, keeping only the sentinel head
+    s.clear();
+    EXPECT_EQ(s.size(), 0u);
+    EXPECT_EQ(alloc.total_slabs(), 2u);
+    EXPECT_EQ(alloc.active_allocations(), 1u);
+  }
+}
+
+TEST(
+  FaTree,
+  CustomAllocatorPolicyStdAllocator
+)
+{
+  // Custom allocation policy using std::allocator (default on x86, optional on x64)
+  fa::set<int, std::less<int>, std::allocator<int>> customSet;
+  EXPECT_TRUE(customSet.empty());
+
+  for (int i = 0; i < 100; ++i) {
+    customSet.insert(i);
+  }
+  EXPECT_EQ(customSet.size(), 100u);
+
+  for (int i = 0; i < 100; ++i) {
+    auto it = customSet.find(i);
+    ASSERT_NE(it, customSet.end());
+    EXPECT_EQ(*it, i);
+  }
+
+  for (int i = 0; i < 50; ++i) {
+    customSet.erase(i);
+  }
+  EXPECT_EQ(customSet.size(), 50u);
+
+  // Copy and move with custom allocator
+  fa::set<int, std::less<int>, std::allocator<int>> copySet = customSet;
+  EXPECT_EQ(copySet.size(), 50u);
+
+  fa::set<int, std::less<int>, std::allocator<int>> moveSet = std::move(copySet);
+  EXPECT_EQ(moveSet.size(), 50u);
+
+  // Map with std::allocator
+  fa::map<int, std::string, std::less<int>, std::allocator<std::pair<const int, std::string>>> customMap;
+  customMap[1] = "one";
+  customMap[2] = "two";
+  customMap[3] = "three";
+  EXPECT_EQ(customMap.size(), 3u);
+  EXPECT_EQ(customMap[2], "two");
+}
+
+TEST(
+  FaTree,
+  EmptyBaseOptimizationPreservesContainerSizeOnX86
+)
+{
+  // Stateless allocators should take 0 extra bytes in the tree structure due to EBO
+  // On x86 retail layout, std::allocator trees are exactly 12 bytes
+#if !defined(_M_X64) && !defined(__x86_64__)
+  static_assert(sizeof(fa::set<int, std::less<int>, std::allocator<int>>) == 12);
+  static_assert(sizeof(fa::map<int, int, std::less<int>, std::allocator<std::pair<const int, int>>>) == 12);
+#endif
+
+  // On any platform, two trees parameterized with different empty allocators share the same baseline size
+  EXPECT_EQ(
+    sizeof(fa::set<int, std::less<int>, std::allocator<int>>),
+    sizeof(fa::set<int, std::less<int>, std::allocator<int>>)
+  );
+}
