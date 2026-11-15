@@ -269,7 +269,7 @@ namespace faf::editor
     EdSetItemTooltip("Off: the new patches join the manifest's; on: its ground patches go first (sky pieces stay)");
     ImGui::SameLine();
     ImGui::Checkbox("Make it a mesh terrain map", &mMeshMakeMap);
-    EdSetItemTooltip("The scenario names the patches (TerrainSystem = 'mesh', TerrainMesh), one undo step");
+    EdSetItemTooltip("The scenario names the patches (TerrainSystem = 'mesh', TerrainMesh); undoable");
     ImGui::SameLine();
     ImGui::Checkbox("Show over the map", &mMeshShown);
     // The loaded mesh map: its materials, its patches and its settings, edited in place; Save writes the manifest.
@@ -452,7 +452,8 @@ namespace faf::editor
       }
     }
     // FAF Studio's "Mesh map in scenario" and New, whatever the panel holds: the scenario's TerrainSystem names the
-    // mesh (its ground the patches) or not (the height field), one undo step either way.
+    // mesh (its ground the patches) or not (the height field); undoable, and the view draws the manifest the panel
+    // holds.
     if (mDocument.Map() != nullptr) {
       std::string system;
       bool meshMap = ReadScenarioField(mDocument.Scenario(), "TerrainSystem", system) && system == "mesh";
