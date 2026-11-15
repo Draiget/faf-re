@@ -13783,7 +13783,15 @@ namespace faf::editor
       // `/meshimport2 <obj>` (test runs): a second import into the same manifest once the first mesh is in.
       if (
         fa::vector<fa::string> second; !mMeshImport2Done && mScene.MeshMapRef().Loaded() &&
-        moho::CFG_GetArgOption("/meshimport2", 1, &second) && !second.empty()
+        moho::CFG_GetArgOption("/meshimport2", 1, &second) && !second.empty() && [this] {
+        // After every `/meshask` press, when both are given.
+        fa::vector<fa::string> asks;
+        if (!moho::CFG_GetArgOption("/meshask", 1, &asks) || asks.empty()) {
+          return true;
+        }
+        const std::string list = asks[0].c_str();
+        return mMeshAskDone > static_cast<int>(std::count(list.begin(), list.end(), ',')) && mMeshAskFrames % 30 == 15;
+      }()
       ) {
         mMeshImport2Done = true;
         gpg::Logf("editor: /meshimport2: %s", second[0].c_str());
@@ -14026,7 +14034,15 @@ namespace faf::editor
           std::error_code made;
           std::filesystem::create_directories(folder, made);
           if (mScene.MeshMapRef().manifestPath.empty()) {
-            (void)mScene.SyncMeshFromMap(true);
+            // The map's own manifest first (the scenario's, else the folder's terrain/terrain.lua), a new one only
+            // when it has none: an import never writes over a manifest it didn't read.
+            (void)mScene.LoadMeshTerrain();
+          }
+          if (
+            const edmesh::MeshMap& had = mScene.MeshMapRef();
+            had.manifestPath.empty() || (had.patches.empty() && had.materials.empty() && had.settings.given.empty())
+          ) {
+            (void)mScene.SyncMeshFromMap(true); // nothing read: a new manifest from the map
           }
           const edmesh::MeshMap& model = mScene.MeshMapRef();
           edmesh::MeshMap next;

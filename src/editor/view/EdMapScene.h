@@ -696,6 +696,12 @@ namespace faf::editor
     int mMeshBakeGeneration = 0;
     bool mMeshSetsShadowRange = false; // this scene set the shadow map's extra height range (ren_ShadowExtraMinY)
     bool mMeshBuiltForBoth = false;    // the patches were made with the Both variants (pulled towards the camera)
+    /** The manifest is in the panel only: the scenario doesn't name a mesh, so the view draws the height field. */
+    bool mMeshViewOff = false;
+    [[nodiscard]] bool MeshInView() const noexcept
+    {
+      return mMeshMap.Loaded() && !mMeshViewOff;
+    }
     void DeleteMeshInstances();
     void SyncMeshView();
     /** Test runs: the cursor the view would show with the pointer at `at` (view pixels). */

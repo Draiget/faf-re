@@ -361,7 +361,7 @@ namespace faf::editor
     mMeshBuiltForBoth = mMeshMode == 2;
     moho::RRuleGameRules* const rules = Rules();
     moho::MeshRenderer* const renderer = moho::MeshRenderer::GetInstance();
-    if (rules == nullptr || renderer == nullptr || !mMeshMap.Loaded()) {
+    if (rules == nullptr || renderer == nullptr || !MeshInView()) {
       mMeshInstancesTried = false; // again once they are up
       return;
     }
@@ -606,12 +606,10 @@ namespace faf::editor
   {
     // Each frame: the patches' models made once the rules are up, shown or hidden by the mode; the height field off
     // in Mesh only (back on whenever the mesh isn't shown alone).
-    if (
-      mMeshMap.Loaded() && mMeshInstancesTried && !mMeshPatchInstances.empty() && (mMeshMode == 2) != mMeshBuiltForBoth
-    ) {
+    if (MeshInView() && mMeshInstancesTried && !mMeshPatchInstances.empty() && (mMeshMode == 2) != mMeshBuiltForBoth) {
       DeleteMeshInstances(); // into or out of Both: the patches again with or without the pull towards the camera
     }
-    if (mMeshMap.Loaded() && !mMeshInstancesTried) {
+    if (MeshInView() && !mMeshInstancesTried) {
       BuildMeshInstances();
     }
     // Their bounds published again each frame: SetStance publishes them only when the place changes (a patch at the
@@ -655,7 +653,7 @@ namespace faf::editor
       moho::ren_ShadowExtraMaxY = 0.0f;
       mMeshSetsShadowRange = false;
     }
-    const bool hide = mMeshMode == 1 && mMeshMap.Loaded() && !mMeshPatchInstances.empty();
+    const bool hide = mMeshMode == 1 && MeshInView() && !mMeshPatchInstances.empty();
     if (hide != mMeshHidesTerrain) {
       mMeshHidesTerrain = hide;
       moho::ren_TerrainSurface = !hide;
@@ -668,10 +666,28 @@ namespace faf::editor
     mMeshMap.Clear();
     mMeshTris.clear();
     mMeshEdges.clear();
+    mMeshViewOff = false;
     std::string system;
     std::string manifest;
     const std::string& scenario = mDocument.Scenario();
     if (!ReadScenarioField(scenario, "TerrainSystem", system) || system != "mesh") {
+      // FAF Studio keeps the manifest whatever the scenario says (meshmap.lua Load reads the folder's): the panel and
+      // the next import get it, the view keeps the height field.
+      const std::string own = "/maps/" + mDocument.FolderName() + "/terrain/terrain.lua";
+      if (!edmesh::ReadVfs(own).empty()) {
+        (void)mMeshMap.Load(own);
+        mMeshMap.manifestPath = own;
+        mMeshViewOff = true;
+        gpg::Logf(
+          "editor: mesh terrain: %s read into the panel (%zu patches, %zu materials); the scenario doesn't name it",
+          own.c_str(),
+          mMeshMap.patches.size(),
+          mMeshMap.materials.size()
+        );
+        return "This map isn't a mesh terrain map (its scenario has no TerrainSystem = 'mesh'); its "
+               "terrain/terrain.lua "
+               "is in the panel (Set makes it the ground).";
+      }
       return "This map isn't a mesh terrain map (its scenario has no TerrainSystem = 'mesh').";
     }
     if (!ReadScenarioField(scenario, "TerrainMesh", manifest) || manifest.empty()) {
@@ -867,7 +883,7 @@ namespace faf::editor
           static_cast<std::int32_t>(std::lround(x)), static_cast<std::int32_t>(std::lround(z))
         )
       : 0.0f;
-    if (mMeshMode != 0 && mMeshMap.Loaded()) {
+    if (mMeshMode != 0 && MeshInView()) {
       float y = 0.0f;
       if (mMeshMap.HeightAt(x, z, field + kReach, y)) {
         return y;

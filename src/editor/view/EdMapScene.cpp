@@ -15038,7 +15038,7 @@ namespace faf::editor
     outZ = point.z;
     // On a mesh terrain map shown: where the ray from the eye first meets the mesh (FAF Studio's mesh pick), not the
     // height field's point under it.
-    if (mMeshMode != 0 && mMeshMap.Loaded()) {
+    if (mMeshMode != 0 && MeshInView()) {
       const Wm3::Vec3f eye = mCamera->CameraGetView().tranform.pos_;
       const Wm3::Vec3f to{point.x - eye.x, point.y - eye.y, point.z - eye.z};
       const float length = std::sqrt(to.x * to.x + to.y * to.y + to.z * to.z);
