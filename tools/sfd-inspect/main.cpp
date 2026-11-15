@@ -17,6 +17,7 @@
 #include <windows.h>
 #include <mmsystem.h>
 #include <dsound.h>
+#include <psapi.h>
 // clang-format on
 
 using namespace moho::sfd;
@@ -29,6 +30,13 @@ namespace
   {
     if (!success)
       throw std::runtime_error(message);
+  }
+  // The process's private memory, its commit charge.
+  std::size_t PrivateBytes()
+  {
+    PROCESS_MEMORY_COUNTERS counters{};
+    Require(GetProcessMemoryInfo(GetCurrentProcess(), &counters, sizeof(counters)) != 0, "No process memory counters");
+    return counters.PagefileUsage;
   }
   void Inspect(
     const char* filename,
@@ -136,9 +144,27 @@ namespace
       );
       mwPlyRelCurFrm(p);
       const auto playbackStart = std::chrono::steady_clock::now();
+      const auto opened = PrivateBytes();
       Require(mwPlyPause(p, 0) != 0, "Resume failed");
-      std::this_thread::sleep_for(std::chrono::milliseconds(3100));
+      // What the player takes above the open is mostly its queued pictures, which must stay well under the
+      // 128 MiB at which it fails the movie ("Excessive SFD stream interleave"). Sampled while it plays: the
+      // process's own peak may be an earlier file's.
+      auto highest = opened;
+      while (std::chrono::steady_clock::now() - playbackStart < std::chrono::milliseconds(3100)) {
+        highest = std::max(highest, PrivateBytes());
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+      }
       Require(mwPlyGetStat(p) != 4, "Worker failed");
+      const auto peakAboveOpen = highest - opened;
+      // Not under ASan: it keeps freed memory committed for a while (its quarantine), so that the process grows
+      // with every picture decoded, not with the queue.
+#if !defined(FAF_SFD_ASAN)
+      Require(
+        peakAboveOpen < 96 * 1024 * 1024,
+        ("Queued pictures near the player's limit: " + std::to_string(peakAboveOpen >> 20) + " MiB above the open")
+          .c_str()
+      );
+#endif
       Require(mwPlyPause(p, 1) != 0, "Pause failed");
       mwPlyGetCurFrm(p, &info);
       Require(info.bufferAddress != nullptr, "Lost frame");
@@ -179,7 +205,8 @@ namespace
       Require(mwPlyGetStat(p) == 4, "Missing file was accepted");
       Shutdown();
       Shutdown();
-      std::cout << "Playback compatibility PASS sound=" << sound << " pausedPTS=" << frozen << '\n';
+      std::cout << "Playback compatibility PASS sound=" << sound << " pausedPTS=" << frozen
+                << " peakAboveOpenMiB=" << (peakAboveOpen >> 20) << '\n';
     } catch (...) {
       Shutdown();
       if (device)
