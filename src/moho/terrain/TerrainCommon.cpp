@@ -14,7 +14,7 @@ namespace moho
     TConVar<int> gTConVar_ren_SplatBudgetTier(
       "ren_SplatBudgetTier",
       "Visible ground splats per view: 0 original (2499 high/medium, 249 low), "
-      "1 high (20000/2000), 2 very high (50000/5000), 3 highest (100000/10000). "
+      "1 high (20000/2000), 2 very high (50000/5000), 3 highest (200000/20000). "
       "Higher settings use more memory and GPU time. Changes apply to the next view; "
       "invalid values use original limits.",
       &ren_SplatBudgetTier
