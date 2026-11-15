@@ -1501,10 +1501,11 @@ int main(
         return span > 0.0 && now >= from ? static_cast<double>(now - from) / 1024.0 / span : 0.0;
       };
       // View bytes as decoded, the channel's datagram bytes in and out, its RTT (RFC 6298 smoothing over acked
-      // datagrams) and the share of its last 256 datagrams lost.
+      // datagrams) and the share of its last 256 sent datagrams counted lost; then, so far on this channel, the
+      // server's datagrams received, those skipped and not (yet) filled by a late arrival, and those that came late.
       std::printf(
         "probe %d: rate %.0f-%.0f s: %.1f KB/s, wire in %.1f out %.1f KB/s, rtt latest %.1f smoothed %.1f min %.1f var "
-        "%.1f ms, loss %.1f%%\n",
+        "%.1f ms, loss %.1f%%, in datagrams %llu missing %llu reordered %llu\n",
         options.uid,
         rateFromAt,
         elapsed,
@@ -1515,7 +1516,10 @@ int main(
         channel != nullptr ? static_cast<double>(channel->rttSmoothedUs) / 1000.0 : -1.0,
         channel != nullptr ? static_cast<double>(channel->rttMinUs) / 1000.0 : -1.0,
         channel != nullptr ? static_cast<double>(channel->rttVarUs) / 1000.0 : -1.0,
-        channel != nullptr ? channel->lossRecent * 100.0 : -1.0
+        channel != nullptr ? channel->lossRecent * 100.0 : -1.0,
+        static_cast<unsigned long long>(channel != nullptr ? channel->datagramsReceived : 0u),
+        static_cast<unsigned long long>(channel != nullptr ? channel->inboundMissing : 0u),
+        static_cast<unsigned long long>(channel != nullptr ? channel->inboundReordered : 0u)
       );
       rateFromAt = elapsed;
       rateFromBytes = views.bytes;
