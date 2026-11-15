@@ -1994,6 +1994,12 @@ fa::auto_ptr<SWldSessionInfo> moho::REJOIN_PollSetup(
       *failureReason = reason;
     }
     *failed = true;
+    // The receivers let go of the links first, as the lobby does (CLobby::~CLobby): from Destroy on, the connector's
+    // thread deletes the links, and with them their linkages to the receivers, which sSetup.reset() would unlink on
+    // this thread with no lock in common.
+    for (const auto& peer : list) {
+      peer->receiver.RemoveAllLinkages();
+    }
     connector->Destroy();
     sSetup.reset();
     return fa::auto_ptr<SWldSessionInfo>();

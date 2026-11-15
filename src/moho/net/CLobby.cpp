@@ -577,6 +577,11 @@ CLobby::~CLobby()
         peer->peerConnection = nullptr;
       }
     }
+    // Engine addition: the lobby lets go of its connections here, not in ~IMessageReceiver (0x0047C4F0) after this
+    // body. From Destroy on, the UDP connector's thread deletes the connections, and each dispatcher's destructor its
+    // linkages to this receiver (0x0047C280), with no lock in common with this thread; until Destroy only Pull, on this
+    // thread, deletes a connection.
+    RemoveAllLinkages();
     connector->Push();
     connector->Destroy();
     connector = nullptr;
