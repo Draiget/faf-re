@@ -36,6 +36,17 @@ namespace gpg::gal::vulkan
   };
 
   [[nodiscard]] TextureFormat ToVulkanTexture(DXGI_FORMAT format) noexcept;
+  /**
+   * The format a texture of `format` is held in: on a device without BC textures (`blockCompression` false)
+   * BC1 to BC3 as R8G8B8A8 of their encoding (DecodedOnCpu), every other format as ToVulkanTexture maps it.
+   */
+  [[nodiscard]] TextureFormat HeldTextureFormat(DXGI_FORMAT format, bool blockCompression) noexcept;
+  /**
+   * BC1 to BC3 data an R8G8B8A8 image holds, decoded on the CPU for a device without BC textures
+   * (DeviceVulkan::CreateTexture): the engine keeps the BC format and its bytes, uploads decode them, readbacks
+   * encode them.
+   */
+  [[nodiscard]] bool DecodedOnCpu(DXGI_FORMAT format, VkFormat imageFormat) noexcept;
   [[nodiscard]] VkFormat ToVulkanVertex(DXGI_FORMAT format) noexcept;
   [[nodiscard]] bool IsDepthFormat(VkFormat format) noexcept;
   [[nodiscard]] bool HasStencil(VkFormat format) noexcept;

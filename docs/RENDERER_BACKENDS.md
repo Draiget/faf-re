@@ -134,7 +134,7 @@ Both are optional; without them the game falls back to Direct3D 9.
 
 - **D3DX11:** `/d3d11`, `/d3d12` and `/vulkan` decode textures with D3DX11 (`d3dx11_43.dll`, from the DirectX End-User Runtime of June 2010), as the shipped D3D10 path did with D3DX10. Direct3D 12 and Vulkan run it on a private WARP device (`backends/common/ImageCodec`). Without `d3dx11_43.dll`, Direct3D 12 and Vulkan decode with DirectXTex instead (`backends/common/ImageCodecDirectXTex.cpp`, issue #318): the same formats, sizes and mip counts, and every level a file has byte for byte; the levels D3DX11 builds for a file without them come out within about 30-48 dB of D3DX11's (the two filter and BC-encode differently), and screenshots differ less than two D3DX11 runs of the same scene. Wine's own `d3dx11_43.dll` decodes from version 11.0 on and doesn't save; Direct3D 12 and Vulkan write the DDS files they need themselves when it says so. `/d3d11` doesn't start on Wine 11.0 as it comes: Wine's compiler refuses its built-in effect, and that backend calls D3DX11's save directly.
 - **Direct3D 12** needs Windows 10 (d3d12.dll is loaded at run time).
-- **Vulkan** needs a Vulkan 1.3 driver with dynamic rendering, synchronization2, timeline semaphores, scalar block layout (`$Globals` keeps Direct3D's packing) and BC textures. It runs windowed or borderless only (no exclusive full screen).
+- **Vulkan** needs a Vulkan 1.3 driver with dynamic rendering, synchronization2, timeline semaphores and scalar block layout (`$Globals` keeps Direct3D's packing). Without BC textures (phones' GPUs mostly) BC1 to BC3, the game's DXT1 to DXT5, decode on the CPU into R8G8B8A8 images (`backends/common/BlockCompression.cpp`), and other BC formats don't load. It runs windowed or borderless only (no exclusive full screen).
 
 ## Known issues
 
@@ -156,6 +156,7 @@ Both are optional; without them the game falls back to Direct3D 9.
 | `FAF_GAL_FAIL_SETUP=1`, `=d3d12,vulkan` | Device creation fails (every newer backend, or the listed ones), which exercises the renderer fallback |
 | `FAF_IMAGECODEC_DIRECTXTEX=1` | Direct3D 12 and Vulkan: textures decode and encode with DirectXTex even when `d3dx11_43.dll` is installed, the route players without the DirectX runtime take (issue #318) |
 | `FAF_IMAGECODEC_OWN_DDS=1` | Direct3D 12 and Vulkan: DDS files are always written by the engine, not D3DX11, which exercises on Windows the route Wine takes |
+| `FAF_GAL_NO_BC=1` | Vulkan: the device is made without BC textures, and BC1 to BC3 textures decode on the CPU, the route a GPU without them takes |
 | `FAF_GAL_DUMP_DIR`, `FAF_GAL_DUMP_SECONDS` | Writes the back buffer as BMP every N seconds |
 | `FAF_GAL_TRACE_START`, `FAF_GAL_TRACE_FRAMES` | Logs every gal call of those frames |
 | `FAF_GAL_TRACE_FILE` | Direct3D 12: traces the frame after that file appears |

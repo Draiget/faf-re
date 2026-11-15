@@ -191,6 +191,15 @@ target_link_libraries(faf_client_imaging PUBLIC faf_directxtex_linux)
 target_compile_options(faf_client_imaging PRIVATE -pthread -Wall "SHELL:-include platform/PlatformDefines.h"
   -Wundef-prefix=FAFRE_PLATFORM_ -Werror=undef-prefix)
 
+# BC1 to BC3 decoded on the CPU for a Vulkan device without BC textures (BlockCompression.cpp), as Windows
+# runs it in faf_image_codec_tests: the decode alone, on the DXGI format numbers of DirectX-Headers.
+add_executable(faf_block_compression_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/image_codec/BlockCompressionTests.cpp"
+  "${PROJECT_SOURCE_DIR}/src/gpg/gal/backends/common/BlockCompression.cpp")
+target_include_directories(faf_block_compression_tests PRIVATE
+  "${PROJECT_SOURCE_DIR}/src" "${FAF_DEPENDENCIES_DIR}/DirectX-Headers/include/directx")
+target_link_libraries(faf_block_compression_tests PRIVATE gtest_main)
+add_test(NAME block_compression COMMAND faf_block_compression_tests)
+
 # Movies (moho/movie/sfd): FFmpeg 7.1.3 from the dependencies/ffmpeg submodule Windows compiles.
 # Its faf/ CMake build holds clang-cl configurations only, so here FFmpeg's own configure and make
 # build the same components (FAF_CONFIGURE_OPTIONS in dependencies/ffmpeg/faf/generate.sh) as static

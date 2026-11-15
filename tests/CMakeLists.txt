@@ -123,8 +123,13 @@ add_test(NAME scripted_decal_placement COMMAND faf_scripted_decal_tests)
 set_tests_properties(scripted_decal_placement PROPERTIES LABELS "Render")
 
 # Engine addition: ImageCodec's DDS writer against the d3dx11_43.dll the process loads, so the
-# same exe checks Microsoft's on Windows and Wine's under Wine.
-add_executable(faf_image_codec_tests EXCLUDE_FROM_ALL image_codec/ImageCodecTests.cpp)
+# same exe checks Microsoft's on Windows and Wine's under Wine; and BC1 to BC3 on the CPU, as the
+# Vulkan backend decodes them for a device without BC textures, against DirectXTex and WARP, and
+# the formats it holds them in (VulkanCore.h, hence the Vulkan headers).
+add_executable(faf_image_codec_tests EXCLUDE_FROM_ALL image_codec/ImageCodecTests.cpp
+  image_codec/BlockCompressionTests.cpp image_codec/BlockCompressionCodecTests.cpp
+  image_codec/BlockCompressionWarpTests.cpp)
+target_include_directories(faf_image_codec_tests PRIVATE ${FAF_DEPENDENCIES_DIR}/vulkan/include)
 target_link_libraries(faf_image_codec_tests PRIVATE faf_engine gtest_main)
 set_target_properties(faf_image_codec_tests PROPERTIES FOLDER "Tests/Existing")
 add_test(NAME image_codec COMMAND faf_image_codec_tests)

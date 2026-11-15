@@ -21,7 +21,9 @@
 
 #include "gpg/core/utils/Logging.h"
 #include "gpg/gal/backends/common/BackendErrors.h"
+#include "gpg/gal/backends/common/BlockCompression.h"
 #include "gpg/gal/backends/common/ImageCodec.h"
+#include "gpg/gal/backends/common/ImageCodecDirectXTex.h"
 #include "gpg/gal/backends/common/RuntimeInfo.h"
 #include "gpg/gal/backends/d3d11/D3D11VertexLayouts.h"
 #include "gpg/gal/backends/d3d11/EffectSourceD3D11.h"
@@ -671,13 +673,21 @@ namespace gpg::gal
     features.pNext = &features12;
     features.features.samplerAnisotropy = available.features.samplerAnisotropy;
     features.features.fillModeNonSolid = available.features.fillModeNonSolid;
-    features.features.textureCompressionBC = available.features.textureCompressionBC;
+    // Without BC textures (phones' GPUs mostly: the Galaxy S22's Xclipse 920 has ETC2 and ASTC), BC1 to BC3,
+    // the game's DXT1 to DXT5, are held as R8G8B8A8 and decoded on the CPU (CreateTexture). Diagnostics:
+    // FAF_GAL_NO_BC=1 takes that route on a device that has them, which is then made without them.
+    const char* const noBc = std::getenv("FAF_GAL_NO_BC");
+    mBlockCompression = available.features.textureCompressionBC == VK_TRUE && (noBc == nullptr || noBc[0] != '1');
+    features.features.textureCompressionBC = mBlockCompression ? VK_TRUE : VK_FALSE;
     features.features.tessellationShader = available.features.tessellationShader;
     mAnisotropy = available.features.samplerAnisotropy == VK_TRUE;
     mWireframeSupported = available.features.fillModeNonSolid == VK_TRUE;
     mTessellationSupported = available.features.tessellationShader == VK_TRUE;
-    if (available.features.textureCompressionBC != VK_TRUE) {
-      ThrowError("DeviceVulkan.cpp", __LINE__, "the Vulkan device has no BC texture compression");
+    if (!mBlockCompression) {
+      gpg::Logf(
+        "Vulkan: no BC textures%s: BC1 to BC3 textures decode on the CPU, other BC formats don't load",
+        (available.features.textureCompressionBC == VK_TRUE) ? " (FAF_GAL_NO_BC)" : ""
+      );
     }
     // A software rasterizer (llvmpipe, as in a virtual machine without 3D, issue #256) gets no ray
     // queries below: ray-traced shadows would trace on the CPU that already rasterizes every pixel.
@@ -1298,8 +1308,9 @@ namespace gpg::gal
     mDeviceContext.mVertexShaderProfile = 4;
     mDeviceContext.mPixelShaderProfile = 8;
 
+    // A format's textures as the device holds them: without BC textures, BC1 to BC3 as R8G8B8A8.
     const auto supports = [&](const DXGI_FORMAT format, const VkFormatFeatureFlags wanted) {
-      const vulkan::TextureFormat mapped = vulkan::ToVulkanTexture(format);
+      const vulkan::TextureFormat mapped = vulkan::HeldTextureFormat(format, mBlockCompression);
       if (mapped.format == VK_FORMAT_UNDEFINED) {
         return false;
       }
@@ -1879,9 +1890,16 @@ namespace gpg::gal
     const std::uint32_t height = std::max(1U, destination.height >> level);
     const std::uint32_t depth = std::max(1U, destination.depth >> level);
     const dxgi::LevelLayout layout = dxgi::ComputeLevelLayout(format, width, height);
-    const VkDeviceSize bytes = static_cast<VkDeviceSize>(layout.ByteSize()) * depth;
+    // BC data for an R8G8B8A8 image goes up as the texels a device with BC textures samples.
+    const bool decoded = vulkan::DecodedOnCpu(format, destination.format);
+    const VkDeviceSize bytes =
+      decoded ? static_cast<VkDeviceSize>(width) * height * 4U : static_cast<VkDeviceSize>(layout.ByteSize()) * depth;
     const vulkan::UploadAllocation upload = AllocateUpload(bytes, 16U);
-    std::memcpy(upload.cpu, data, static_cast<std::size_t>(bytes));
+    if (decoded) {
+      imaging::DecodeBc123(format, data, layout.rowPitch, width, height, upload.cpu);
+    } else {
+      std::memcpy(upload.cpu, data, static_cast<std::size_t>(bytes));
+    }
     EndRendering();
     TransitionForTransferWrite(destination);
     VkBufferImageCopy region{};
@@ -1905,10 +1923,12 @@ namespace gpg::gal
     const std::uint32_t width = std::max(1U, source.width >> level);
     const std::uint32_t height = std::max(1U, source.height >> level);
     const dxgi::LevelLayout layout = dxgi::ComputeLevelLayout(format, width, height);
+    // BC data an R8G8B8A8 image holds comes back compressed again (lossy, as D3DX would compress it).
+    const bool decoded = vulkan::DecodedOnCpu(format, source.format);
     vulkan::TrackedBuffer readback;
     VkBufferCreateInfo info{};
     info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-    info.size = layout.ByteSize();
+    info.size = decoded ? static_cast<VkDeviceSize>(width) * height * 4U : layout.ByteSize();
     info.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
     CheckVk("DeviceVulkan.cpp", __LINE__, Vk().vkCreateBuffer(mDevice, &info, nullptr, &readback.buffer));
     VkMemoryRequirements requirements{};
@@ -1930,9 +1950,18 @@ namespace gpg::gal
       mCommands, source.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, readback.buffer, 1U, &region
     );
     Submit(true, false);
-    bytes.assign(readback.memory.mapped, readback.memory.mapped + layout.ByteSize());
+    HRESULT encoded = S_OK;
+    if (decoded) {
+      bytes.resize(layout.ByteSize());
+      encoded = imaging::EncodeBc123WithDirectXTex(
+        format, readback.memory.mapped, width, height, bytes.data(), layout.rowPitch
+      );
+    } else {
+      bytes.assign(readback.memory.mapped, readback.memory.mapped + layout.ByteSize());
+    }
     Vk().vkDestroyBuffer(mDevice, readback.buffer, nullptr);
     mMemory.Free(readback.memory);
+    CheckHresult("DeviceVulkan.cpp", __LINE__, encoded);
   }
 
   void DeviceVulkan::ReadImage(
@@ -2295,10 +2324,23 @@ namespace gpg::gal
     } else {
       ThrowError("DeviceVulkan.cpp", __LINE__, "invalid source specified for texture data");
     }
-    const vulkan::TextureFormat format = vulkan::ToVulkanTexture(dxgiFormat);
+    // A device without BC textures (CreateLogicalDevice) holds BC1 to BC3 as R8G8B8A8, which the uploads
+    // decode into (UploadImageLevel); the engine still sees the BC format and its bytes.
+    const vulkan::TextureFormat format = vulkan::HeldTextureFormat(dxgiFormat, mBlockCompression);
     if (format.format == VK_FORMAT_UNDEFINED) {
       char message[128]{};
       std::snprintf(message, sizeof(message), "unsupported texture format (DXGI %d)", static_cast<int>(dxgiFormat));
+      ThrowError("DeviceVulkan.cpp", __LINE__, message);
+    }
+    if (!mBlockCompression && dxgi::IsBlockCompressed(dxgiFormat) && (!imaging::IsBc123(dxgiFormat) || depth > 1U)) {
+      char message[640]{};
+      std::snprintf(
+        message,
+        sizeof(message),
+        "texture %s is BC compressed (DXGI %d), which this device cannot sample",
+        context->location_.c_str(),
+        static_cast<int>(dxgiFormat)
+      );
       ThrowError("DeviceVulkan.cpp", __LINE__, message);
     }
 
