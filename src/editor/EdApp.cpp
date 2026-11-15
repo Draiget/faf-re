@@ -13831,14 +13831,17 @@ namespace faf::editor
       } else if (more == 4) {
         // Unset: the scenario no longer names a mesh terrain (the height field is the ground again).
         (void)mDocument.SetScenarioField("TerrainSystem", "heightfield", true);
-        mShell->SetMeshStatus(
-          "The map's ground is its height field again (the manifest and patches stay in its folder)."
-        );
+        mShell->SetMeshStatus(mScene.SetMeshInScenario(false));
       } else if (more == 5) {
+        // FAF Studio's toggle writes the scenario only: the panel's manifest (its unsaved edits, or a new one) is what
+        // the view draws; with none held, the folder's terrain.lua is read.
         const std::string manifest = "/maps/" + mDocument.FolderName() + "/terrain/terrain.lua";
         (void)mDocument.SetScenarioField("TerrainSystem", "mesh", true);
         (void)mDocument.SetScenarioField("TerrainMesh", manifest, true);
-        mShell->SetMeshStatus("The scenario names " + manifest + "; " + mScene.LoadMeshTerrain());
+        mShell->SetMeshStatus(
+          mScene.MeshMapRef().manifestPath.empty() ? "The scenario names " + manifest + "; " + mScene.LoadMeshTerrain()
+                                                   : mScene.SetMeshInScenario(true)
+        );
       } else if (more == 6 || more == 7) {
         mShell->SetMeshStatus(mScene.SyncMeshFromMap(more == 7));
       }

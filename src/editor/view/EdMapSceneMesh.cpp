@@ -686,7 +686,7 @@ namespace faf::editor
         );
         return "This map isn't a mesh terrain map (its scenario has no TerrainSystem = 'mesh'); its "
                "terrain/terrain.lua "
-               "is in the panel (Set makes it the ground).";
+               "is in the panel (Mesh map in scenario makes it the ground).";
       }
       return "This map isn't a mesh terrain map (its scenario has no TerrainSystem = 'mesh').";
     }
@@ -697,6 +697,30 @@ namespace faf::editor
       gpg::Warnf("editor: mesh terrain: %s", mMeshMap.error.c_str());
       return "The mesh terrain didn't load: " + mMeshMap.error;
     }
+    const std::size_t drawn = BuildMeshLines();
+    char text[200];
+    (void)std::snprintf(
+      text,
+      sizeof(text),
+      "Mesh terrain %s: %zu patches, %u triangles%s",
+      manifest.c_str(),
+      mMeshMap.patches.size(),
+      mMeshMap.TotalTriangles(),
+      drawn < mMeshMap.TotalTriangles() ? " (the view draws the first 1.5 million)" : ""
+    );
+    gpg::Logf("editor: %s", text);
+    if (!mMeshMap.error.empty()) {
+      // Patches whose files are missing or broken: their entries stay (Save writes them back), they aren't drawn.
+      gpg::Warnf("editor: mesh terrain: patches not read: %s", mMeshMap.error.c_str());
+      return std::string(text) + "; not read (kept in the manifest, Check names them): " + mMeshMap.error;
+    }
+    return text;
+  }
+
+  std::size_t EdMapScene::BuildMeshLines()
+  {
+    mMeshTris.clear();
+    mMeshEdges.clear();
     // The triangles shaded by their normals against a light from above, once; the edges for the Both mode.
     std::size_t drawn = 0;
     for (const edmesh::Patch& p : mMeshMap.patches) {
@@ -741,22 +765,35 @@ namespace faf::editor
         ++drawn;
       }
     }
+    return drawn;
+  }
+
+  std::string EdMapScene::SetMeshInScenario(
+    const bool on
+  )
+  {
+    // FAF Studio's "Mesh map in scenario": the view takes up (or leaves) the manifest the panel holds, as it is (its
+    // edits not saved yet stay), without reading it again.
+    DeleteMeshInstances();
+    if (!on || mMeshMap.manifestPath.empty()) {
+      mMeshViewOff = true;
+      mMeshTris.clear();
+      mMeshEdges.clear();
+      return on ? "No manifest in the panel: Load, New manifest from the map or an import first."
+                : "The map's ground is its height field again (the manifest stays in the panel and its folder).";
+    }
+    mMeshViewOff = false;
+    const std::size_t drawn = BuildMeshLines();
     char text[200];
     (void)std::snprintf(
       text,
       sizeof(text),
-      "Mesh terrain %s: %zu patches, %u triangles%s",
-      manifest.c_str(),
+      "The scenario names %s: %zu patches, %zu triangles drawn (the panel's manifest as it is; Save writes it)",
+      mMeshMap.manifestPath.c_str(),
       mMeshMap.patches.size(),
-      mMeshMap.TotalTriangles(),
-      drawn < mMeshMap.TotalTriangles() ? " (the view draws the first 1.5 million)" : ""
+      drawn
     );
-    gpg::Logf("editor: %s", text);
-    if (!mMeshMap.error.empty()) {
-      // Patches whose files are missing or broken: their entries stay (Save writes them back), they aren't drawn.
-      gpg::Warnf("editor: mesh terrain: patches not read: %s", mMeshMap.error.c_str());
-      return std::string(text) + "; not read (kept in the manifest, Check names them): " + mMeshMap.error;
-    }
+    gpg::Logf("editor: mesh terrain: %s", text);
     return text;
   }
 
@@ -764,7 +801,9 @@ namespace faf::editor
   {
     std::vector<std::string> lines;
     if (mMeshMap.manifestPath.empty()) {
-      lines.push_back("I: no mesh terrain manifest is loaded (Set, Load or New manifest from the map first)");
+      lines.push_back(
+        "I: no mesh terrain manifest is loaded (Mesh map in scenario, Load or New manifest from the map first)"
+      );
       return lines;
     }
     // Studio's manifest checks against the open map and the files, then the patches' own.

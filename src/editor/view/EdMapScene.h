@@ -703,6 +703,9 @@ namespace faf::editor
       return mMeshMap.Loaded() && !mMeshViewOff;
     }
     void DeleteMeshInstances();
+    /** The patches' shaded triangles and edges for the view (until the models are made, and Both's wires); the count.
+     */
+    std::size_t BuildMeshLines();
     void SyncMeshView();
     /** Test runs: the cursor the view would show with the pointer at `at` (view pixels). */
     [[nodiscard]] int ViewCursorAt(
@@ -1195,6 +1198,9 @@ namespace faf::editor
      * terrain/terrain.lua. The status line.
      */
     std::string SyncMeshFromMap(bool fresh);
+    /** The scenario names the mesh (`on`) or not: the view draws the manifest the panel holds as it is, or the height
+     * field; nothing is read again. The status line. */
+    std::string SetMeshInScenario(bool on);
     /** The ground things are placed on: the mesh surface while it is shown (the highest one up to 40 above the field).
      */
     [[nodiscard]] float PlacementHeight(float x, float z) const;

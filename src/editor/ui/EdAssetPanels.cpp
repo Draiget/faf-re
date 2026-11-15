@@ -461,7 +461,7 @@ namespace faf::editor
       }
       EdSetItemTooltip(
         "On: the scenario says TerrainSystem = 'mesh' and names terrain/terrain.lua; off: the height field is the "
-        "ground (one undo step)"
+        "ground (undoable); the view draws the manifest the panel holds, its unsaved edits too"
       );
       if (ImGui::Button("New manifest from the map")) {
         mMeshAskMore = 7;
