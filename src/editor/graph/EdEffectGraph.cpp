@@ -566,7 +566,7 @@ namespace faf::editor
             const std::string body = text.substr(p + 1, close > p ? close - p - 1 : 0);
             EffectTemplate made;
             made.name = name;
-            bool plain = body.find('{') == std::string::npos;
+            bool plain = !body.contains('{');
             std::size_t q = 0;
             while (plain && q < body.size()) {
               const std::size_t comma = body.find(',', q);

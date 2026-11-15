@@ -272,7 +272,7 @@ namespace faf::editor
         }
       }
       // ^Stage<n>
-      if (name.compare(0, 5, "Stage") == 0) {
+      if (name.starts_with("Stage")) {
         std::size_t j = 5;
         while (j < name.size() && std::isdigit(static_cast<unsigned char>(name[j]))) {
           ++j;
@@ -291,8 +291,7 @@ namespace faf::editor
       std::transform(path.begin(), path.end(), path.begin(), [](const unsigned char c) {
         return static_cast<char>(std::tolower(c));
       });
-      return (path.size() >= 6 && path.compare(path.size() - 6, 6, "ai.lua") == 0) ||
-        path.find("/opai/") != std::string::npos || path.find("basemanager") != std::string::npos;
+      return (path.size() >= 6 && path.ends_with("ai.lua")) || path.contains("/opai/") || path.contains("basemanager");
     }
 
     bool AllWord(
@@ -316,16 +315,13 @@ namespace faf::editor
       const std::string& last
     )
     {
-      if (callee.compare(0, 11, "Objectives.") == 0 && AllWord(callee, 11)) {
+      if (callee.starts_with("Objectives.") && AllWord(callee, 11)) {
         return last;
       }
-      if (callee.compare(0, 29, "ScenarioFramework.Objectives.") == 0 && AllWord(callee, 29)) {
+      if (callee.starts_with("ScenarioFramework.Objectives.") && AllWord(callee, 29)) {
         return last;
       }
-      if (
-        callee.compare(0, 18, "ScenarioFramework.") == 0 && AllWord(callee, 18) &&
-        last.find("Objective") != std::string::npos
-      ) {
+      if (callee.starts_with("ScenarioFramework.") && AllWord(callee, 18) && last.contains("Objective")) {
         return last;
       }
       return {};
@@ -353,13 +349,13 @@ namespace faf::editor
         const std::size_t n = std::char_traits<char>::length(suffix);
         return last.size() >= n && last.compare(last.size() - n, n, suffix) == 0;
       };
-      if (last.compare(0, 6, "Create") == 0 && ends("Trigger")) {
+      if (last.starts_with("Create") && ends("Trigger")) {
         return Letters(last, 6, last.size() - 7);
       }
-      if (last.compare(0, 3, "Add") == 0 && ends("Callback")) {
+      if (last.starts_with("Add") && ends("Callback")) {
         return Letters(last, 3, last.size() - 8);
       }
-      if (last.compare(0, 3, "Add") == 0 && ends("Taunt")) {
+      if (last.starts_with("Add") && ends("Taunt")) {
         return Letters(last, 3, last.size() - 5);
       }
       return false;
@@ -649,7 +645,7 @@ namespace faf::editor
       } else if (TriggerName(last)) {
         bool lit = false;
         std::string callback = arg(0, lit);
-        if (!callback.empty() && !lit && callback.compare(0, 8, "function") == 0) {
+        if (!callback.empty() && !lit && callback.starts_with("function")) {
           callback = "(inline function)";
         }
         std::string where;
@@ -672,11 +668,11 @@ namespace faf::editor
           }
         }
       }
-      if (!first.empty() && aiAlias.count(first) != 0 && callee != first) {
+      if (!first.empty() && aiAlias.contains(first) && callee != first) {
         helper(callee, "ai module", line, fn);
-      } else if (callee.find("OpAI") != std::string::npos || callee.find("BaseManager") != std::string::npos) {
+      } else if (callee.contains("OpAI") || callee.contains("BaseManager")) {
         helper(callee, "opai", line, fn);
-      } else if (PlatoonCalls().count(last) != 0) {
+      } else if (PlatoonCalls().contains(last)) {
         helper(callee, "platoon", line, fn);
       }
     };
@@ -700,7 +696,7 @@ namespace faf::editor
         pos = e;
         continue;
       }
-      if (Keywords().count(word) != 0) {
+      if (Keywords().contains(word)) {
         pos = e;
         if (word == "function") {
           std::size_t n = e;
@@ -752,7 +748,7 @@ namespace faf::editor
       if (const std::size_t paren = After(plain, ee, '('); paren != std::string::npos) {
         call(name, s, paren - 1, line, fn);
       }
-      if (!fn.empty() && refs.count(fn) != 0 && name.find_first_of(".:") == std::string::npos) {
+      if (!fn.empty() && refs.contains(fn) && name.find_first_of(".:") == std::string::npos) {
         refs[fn].insert(name);
       }
       if (name == "ScenarioInfo.MissionNumber") {
@@ -770,7 +766,7 @@ namespace faf::editor
           if (k < len && plain[k] == '=') {
             ++k;
           }
-          if (const int m = NumberAt(plain, k); m >= 0 && referenced.count(m) == 0) {
+          if (const int m = NumberAt(plain, k); m >= 0 && !referenced.contains(m)) {
             referenced[m] = line;
           }
         }
@@ -792,7 +788,7 @@ namespace faf::editor
         }
       }
       static const std::string kOptions = "ScenarioInfo.Options.";
-      if (name.compare(0, kOptions.size(), kOptions) == 0 && AllWord(name, kOptions.size())) {
+      if (name.starts_with(kOptions) && AllWord(name, kOptions.size())) {
         const std::string key = name.substr(kOptions.size());
         if (key != "Difficulty") {
           if (const auto it = optionAt.find(key); it != optionAt.end()) {
@@ -821,13 +817,13 @@ namespace faf::editor
     std::map<std::string, int> stageOf;
     std::map<std::string, std::string> howOf;
     for (const Assignment& a : assignments) {
-      if (!a.fn.empty() && byName.count(a.fn) != 0 && stageOf.count(a.fn) == 0) {
+      if (!a.fn.empty() && byName.contains(a.fn) && !stageOf.contains(a.fn)) {
         stageOf[a.fn] = a.n;
         howOf[a.fn] = "sets";
       }
     }
     for (const std::string& name : names) {
-      if (stageOf.count(name) == 0) {
+      if (!stageOf.contains(name)) {
         if (const int n = NumberInName(name); n >= 0) {
           stageOf[name] = n;
           howOf[name] = "name";
@@ -837,7 +833,7 @@ namespace faf::editor
     for (int round = 0; round < 5; ++round) {
       bool changed = false;
       for (const std::string& name : names) {
-        if (stageOf.count(name) != 0) {
+        if (stageOf.contains(name)) {
           continue;
         }
         int callers = 0;
@@ -845,7 +841,7 @@ namespace faf::editor
         bool many = false;
         int found = -1;
         for (const std::string& caller : names) {
-          if (caller != name && refs.count(caller) != 0 && refs[caller].count(name) != 0) {
+          if (caller != name && refs.contains(caller) && refs[caller].contains(name)) {
             ++callers;
             const auto cs = stageOf.find(caller);
             if (cs == stageOf.end()) {
@@ -889,9 +885,8 @@ namespace faf::editor
     for (const std::string& name : names) {
       const auto how = howOf.find(name);
       if (
-        how != howOf.end() && how->second == "name" &&
-        (name.compare(0, 5, "Intro") == 0 || name.compare(0, 5, "Start") == 0) && NumberInName(name) >= 0 &&
-        name.find("Mission") != std::string::npos
+        how != howOf.end() && how->second == "name" && (name.starts_with("Intro") || name.starts_with("Start")) &&
+        NumberInName(name) >= 0 && name.contains("Mission")
       ) {
         stage(stageOf[name], name);
       }
@@ -906,9 +901,9 @@ namespace faf::editor
       f.how = how != howOf.end() ? how->second : std::string();
       if (f.how == "sets") {
         f.role = "enters stage " + std::to_string(f.stage);
-      } else if (f.name.compare(0, 5, "Intro") == 0) {
+      } else if (f.name.starts_with("Intro")) {
         f.role = "intro";
-      } else if (f.name.compare(0, 5, "Start") == 0) {
+      } else if (f.name.starts_with("Start")) {
         f.role = "start";
       } else if (f.how == "called") {
         f.role = "called from stage " + std::to_string(f.stage);
@@ -937,7 +932,7 @@ namespace faf::editor
       numbered.insert(st.number);
     }
     for (const auto& [n, line] : referenced) {
-      if (numbered.count(n) == 0) {
+      if (!numbered.contains(n)) {
         o.notes.push_back(
           "MissionNumber " + std::to_string(n) + " is checked (line " + std::to_string(line) + ") but nothing sets it"
         );
@@ -1200,7 +1195,7 @@ namespace faf::editor
             continue;
           }
           // "[{i Speaker}]: text" names the speaker.
-          if (line.speaker.empty() && line.text.compare(0, 4, "[{i ") == 0) {
+          if (line.speaker.empty() && line.text.starts_with("[{i ")) {
             const std::size_t end = line.text.find("}]:");
             if (end != std::string::npos) {
               line.speaker = line.text.substr(4, end - 4);

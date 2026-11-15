@@ -87,7 +87,7 @@ namespace moho
       ) override
       {
         const std::string_view text(message.c_str(), message.size());
-        if (text.rfind("NETLINK:", 0) != 0 && text.rfind("NET:", 0) != 0) {
+        if (!text.starts_with("NETLINK:") && !text.starts_with("NET:")) {
           return;
         }
         std::lock_guard lock(mMutex);
@@ -660,7 +660,7 @@ namespace moho
   {
     namespace nl = faf::netlink;
     const auto command = name.view();
-    if (command.rfind("Netlink", 0) != 0) {
+    if (!command.starts_with("Netlink")) {
       return false;
     }
     if (net_InEngineLinks == 0) {
@@ -817,7 +817,7 @@ namespace moho
       Links().RemovePeer(IntArg(args[0]));
       return comingBack;
     }
-    if (command.rfind("Netlink", 0) == 0) {
+    if (command.starts_with("Netlink")) {
       gpg::Logf("NETLINK: %s ignored in native mode", name.c_str());
       return true;
     }

@@ -202,12 +202,12 @@ namespace faf::editor
         }
       }
     }
-    if (name.find("splat") != std::string::npos) {
+    if (name.contains("splat")) {
       f.target = MaskImportFile::Target::Splat;
       f.layer = 1;
       return f;
     }
-    if (name.find("type") != std::string::npos) {
+    if (name.contains("type")) {
       f.target = MaskImportFile::Target::TerrainType;
       return f;
     }
@@ -229,7 +229,7 @@ namespace faf::editor
       {"ice", "snow"},
     };
     for (const auto& [word, kind] : kWords) {
-      if (name.find(word) == std::string::npos) {
+      if (!name.contains(word)) {
         continue;
       }
       for (int layer = 1; layer <= 8; ++layer) {
@@ -459,7 +459,7 @@ namespace faf::editor
       if (stem == wanted) {
         return file;
       }
-      if (stem.size() > wanted.size() && stem.compare(stem.size() - wanted.size(), wanted.size(), wanted) == 0) {
+      if (stem.size() > wanted.size() && stem.ends_with(wanted)) {
         const char before = stem[stem.size() - wanted.size() - 1];
         if (before == '_' || before == '-' || before == ' ' || before == '.') {
           return file;

@@ -478,7 +478,7 @@ namespace moho
 
     Registry& registry = GetRegistry();
     const std::lock_guard<std::mutex> lock(registry.mMutex);
-    if (registry.mByName.count(family) != 0u) {
+    if (registry.mByName.contains(family)) {
       return family;
     }
     if (registry.mModFonts >= kMaxModFontsPerSession) {

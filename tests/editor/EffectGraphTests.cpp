@@ -142,7 +142,7 @@ namespace
       const std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
       EmitterBlueprint e;
       std::string error;
-      if (text.rfind("EmitterBlueprint", 0) != 0 || !ParseEmitter(text, e, error)) {
+      if (!text.starts_with("EmitterBlueprint") || !ParseEmitter(text, e, error)) {
         continue;
       }
       // Curves with no keys stay empty only through a Curve node; the file's own have keys (or none: kept as none).

@@ -132,7 +132,7 @@ namespace faf::editor
       mPendingOpen = nullptr;
       ImGui::CloseCurrentPopup();
     }
-    if (!mStatus.empty() && mStatus.rfind("Can't", 0) == 0) {
+    if (!mStatus.empty() && mStatus.starts_with("Can't")) {
       ImGui::TextColored(ImVec4(0.95f, 0.45f, 0.35f, 1.0f), "%s", mStatus.c_str());
     }
     ImGui::EndPopup();
@@ -774,7 +774,7 @@ namespace faf::editor
     if (ImGui::BeginChild("##list", ImVec2(0.0f, 0.0f))) {
       int shown = 0;
       for (const std::string& path : mGameEmitters) {
-        if (!filter.empty() && Lower(path).find(filter) == std::string::npos) {
+        if (!filter.empty() && !Lower(path).contains(filter)) {
           continue;
         }
         if (++shown > 400) {

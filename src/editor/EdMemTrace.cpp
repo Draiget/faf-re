@@ -187,7 +187,7 @@ namespace faf::editor::memtrace
         "malloc"
       };
       for (const char* skip : kSkip) {
-        if (text.rfind(skip, 0) == 0 || text.find(std::string("::") + skip) != std::string::npos) {
+        if (text.starts_with(skip) || text.contains(std::string("::") + skip)) {
           return true;
         }
       }

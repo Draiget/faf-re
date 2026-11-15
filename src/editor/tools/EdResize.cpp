@@ -199,7 +199,7 @@ namespace faf::editor
           it->markers.begin(),
           it->markers.end(),
           [&](const std::string& name) {
-        return dropped.count(name) != 0;
+        return dropped.contains(name);
       }
         ),
         it->markers.end()

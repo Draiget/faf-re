@@ -1532,7 +1532,7 @@ namespace faf::editor
           {"seed", layout.seed + 101},
         };
         for (const auto& [key, value] : mine) {
-          if (values.count(key) != 0) {
+          if (values.contains(key)) {
             values[key] = value;
           }
         }

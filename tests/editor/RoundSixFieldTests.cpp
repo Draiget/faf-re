@@ -105,12 +105,12 @@ namespace
   {
     int sets = 0;
     for (const TextureTheme& theme : TextureThemes()) {
-      sets += std::string(theme.id).rfind("m_", 0) == 0 ? 1 : 0;
+      sets += std::string(theme.id).starts_with("m_") ? 1 : 0;
     }
     EXPECT_EQ(sets, 35);
     int styles = 0;
     for (std::size_t i = 0; i < RecipeStyles().size(); ++i) {
-      if (std::string(RecipeStyles()[i].id).rfind("m_", 0) != 0) {
+      if (!std::string(RecipeStyles()[i].id).starts_with("m_")) {
         continue;
       }
       ++styles;

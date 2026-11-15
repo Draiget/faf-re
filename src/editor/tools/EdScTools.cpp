@@ -16,7 +16,7 @@ namespace faf::editor
       const std::string& name
     )
     {
-      if (name.rfind("ARMY_", 0) != 0 || name.size() == 5) {
+      if (!name.starts_with("ARMY_") || name.size() == 5) {
         return false;
       }
       return std::all_of(name.begin() + 5, name.end(), [](const char c) {

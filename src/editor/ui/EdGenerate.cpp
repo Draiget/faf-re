@@ -481,8 +481,7 @@ namespace faf::editor
           continue;
         }
         if (
-          !needle.empty() &&
-          Lower(type->title + " " + type->name + " " + title + " " + type->help).find(needle) == std::string::npos
+          !needle.empty() && !Lower(type->title + " " + type->name + " " + title + " " + type->help).contains(needle)
         ) {
           continue;
         }
@@ -1046,7 +1045,7 @@ namespace faf::editor
         ImGui::PopTextWrapPos();
       }
     }
-    if (part == 0 && type.name.rfind("erode_", 0) == 0) {
+    if (part == 0 && type.name.starts_with("erode_")) {
       const std::string solver = type.name.substr(6);
       bool first = true;
       for (const ErosionPreset& preset : ErosionPresets()) {

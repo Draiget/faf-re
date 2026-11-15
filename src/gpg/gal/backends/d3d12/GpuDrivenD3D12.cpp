@@ -99,7 +99,7 @@ namespace gpg::gal
       // Engine addition (ren_RayTracedShadows): a program with inline ray queries needs shader model 6.5.
       const std::string_view source(desc.source, desc.sourceBytes);
       std::wstring rayProfile = profile;
-      if (source.find("RayQuery<") != std::string_view::npos) {
+      if (source.contains("RayQuery<")) {
         rayProfile.back() = L'5';
       }
       const effects::CompiledShader compiled =

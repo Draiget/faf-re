@@ -2875,14 +2875,14 @@ namespace faf::editor::field
   )
   {
     if (
-      const OpInterceptor intercept = gInterceptor.load(); intercept != nullptr &&
-      (Registry().count(name) != 0 || ExternalOps().count(name) != 0) && intercept(name, args, out)
+      const OpInterceptor intercept = gInterceptor.load();
+      intercept != nullptr && (Registry().contains(name) || ExternalOps().contains(name)) && intercept(name, args, out)
     ) {
       return true;
     }
     const auto t0 = std::chrono::steady_clock::now();
     const bool ok = RunOpCpu(name, args, out, err);
-    if (Registry().count(name) != 0 || ExternalOps().count(name) != 0) {
+    if (Registry().contains(name) || ExternalOps().contains(name)) {
       const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
       const std::lock_guard<std::mutex> lock(gStatsMutex);
       OpStat& s = StatTable()[name];

@@ -908,7 +908,7 @@ technique EditorMeshFill
       }
 
       const char* const text = source.GetPtr(0U, 0U);
-      if (text == nullptr || std::string_view(text, source.Size()).find(kMacroName) == std::string_view::npos) {
+      if (text == nullptr || !std::string_view(text, source.Size()).contains(kMacroName)) {
         return false;
       }
 

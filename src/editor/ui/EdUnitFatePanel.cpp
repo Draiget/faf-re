@@ -97,7 +97,7 @@ namespace faf::editor
       }
       const char* const as = target.wreck && target.unit ? " (wreck or unit)" : target.wreck ? " (wreck)" : " (unit)";
       never = target.rule.Never();
-      preview = never                 ? "Never: " + target.when.substr(target.when.rfind("never: ", 0) == 0 ? 7 : 0)
+      preview = never                 ? "Never: " + target.when.substr(target.when.starts_with("never: ") ? 7 : 0)
         : target.when == "every game" ? std::string("In every game") + as
                                       : "When " + target.when + as;
       optionKey = target.rule.keys.empty() ? std::string() : target.rule.keys.front();

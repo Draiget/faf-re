@@ -108,10 +108,10 @@ namespace
   {
     for (const auto& solver : ErosionSolvers()) {
       auto values = ErosionDefaults(solver);
-      if (values.count("iterations") != 0u) {
+      if (values.contains("iterations")) {
         values["iterations"] = std::min(values["iterations"], 20.0);
       }
-      if (values.count("rounds") != 0u) {
+      if (values.contains("rounds")) {
         values["rounds"] = 4;
       }
       const auto before = Cone();

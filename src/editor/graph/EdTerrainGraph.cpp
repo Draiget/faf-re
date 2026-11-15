@@ -290,7 +290,7 @@ namespace faf::editor
     std::set<int> seen;
     for (const int id : order) {
       seen.insert(id);
-      if (only != nullptr && only->count(id) == 0) {
+      if (only != nullptr && !only->contains(id)) {
         continue;
       }
       const GraphNode* node = graph.Find(id);
@@ -333,7 +333,7 @@ namespace faf::editor
           }
         }
         if (value == nullptr) {
-          if (only == nullptr || only->count(link->fromNode) != 0) {
+          if (only == nullptr || only->contains(link->fromNode)) {
             blocked = "input " + def.name + " has no value";
             if (up != mCache.end() && !up->second.error.empty()) {
               blocked += " (" + up->second.error + ")";
@@ -353,18 +353,18 @@ namespace faf::editor
         node->type->name != "out_roughness"
       ) {
         for (const PinDef& def : node->type->inputs) {
-          if (def.name == "a" && def.type != PinType::Number && ins.count("a") == 0) {
+          if (def.name == "a" && def.type != PinType::Number && !ins.contains("a")) {
             blocked = "input a is not linked";
           }
         }
       }
       if (
-        node->type->name == "height_from_gradient" && blocked.empty() && (ins.count("dx") == 0 || ins.count("dz") == 0)
+        node->type->name == "height_from_gradient" && blocked.empty() && (!ins.contains("dx") || !ins.contains("dz"))
       ) {
         blocked = "inputs dx and dz must both be linked";
       }
       if (node->type->name == "path_shape" || node->type->name == "path_mask" || node->type->name == "path_dist") {
-        if (ins.count("pts") == 0 && blocked.empty()) {
+        if (!ins.contains("pts") && blocked.empty()) {
           blocked = "input pts is not linked";
         }
       }
@@ -431,7 +431,7 @@ namespace faf::editor
       if (node->type->name == "pad_flatten") {
         key += "|pads" + ground.padSignature;
       }
-      if (node->type->name.rfind("layout_", 0) == 0) {
+      if (node->type->name.starts_with("layout_")) {
         // The drawing (its revision) and the editor's symmetry: a stroke on the canvas runs the node again.
         key += "|layout" + ground.layoutKey;
       }
@@ -523,7 +523,7 @@ namespace faf::editor
         const GraphLink* link = pinIndex >= 0 ? graph.InputLink(id, pinIndex) : nullptr;
         const GraphNode* src = link != nullptr ? graph.Find(link->fromNode) : nullptr;
         if (
-          src == nullptr || src->type->name.rfind("erode_", 0) != 0 ||
+          src == nullptr || !src->type->name.starts_with("erode_") ||
           src->type->outputs[static_cast<std::size_t>(link->fromPin)].name != "out"
         ) {
           why = "the masks come from an erosion node: wire the height of Hydraulic, Droplet or Stream power erosion "
@@ -568,7 +568,7 @@ namespace faf::editor
           srcIns[src->type->inputs[p].name] = copy.get();
           kept.push_back(std::move(copy));
         }
-        if (srcIns.count("a") == 0) {
+        if (!srcIns.contains("a")) {
           why = "the erosion node before this one has no input value";
           return false;
         }
@@ -619,7 +619,7 @@ namespace faf::editor
     }
     // Nodes no longer in the graph give their results back.
     for (auto it = mCache.begin(); it != mCache.end();) {
-      it = graph.Find(it->first) == nullptr || seen.count(it->first) == 0 ? mCache.erase(it) : std::next(it);
+      it = graph.Find(it->first) == nullptr || !seen.contains(it->first) ? mCache.erase(it) : std::next(it);
     }
     report.ms = std::chrono::duration<double, std::milli>(Clock::now() - started).count();
     return report;
@@ -709,7 +709,7 @@ namespace faf::editor
       turns = ground.layoutTurns;
       return !mode.empty();
     }
-    if (setting.rfind("rotn", 0) == 0) {
+    if (setting.starts_with("rotn")) {
       mode = "rotn";
       turns = std::clamp(std::atoi(setting.c_str() + 4), 2, 16);
       return true;

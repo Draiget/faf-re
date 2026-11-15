@@ -141,7 +141,7 @@ namespace faf::editor
     plan.toRemapped = target.remapped;
     plan.toPainted = target.painted;
     plan.toRoughLayer8 = target.family == ShaderFamily::Pbr || target.family == ShaderFamily::Splat;
-    plan.toBiplanar = target.summary.find("biplanar") != std::string::npos;
+    plan.toBiplanar = target.summary.contains("biplanar");
     if (from == to) {
       plan.refused = "the map already uses " + to + ".";
       return plan;

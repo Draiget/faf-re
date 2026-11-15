@@ -306,7 +306,7 @@ namespace faf::editor
       return std::string(panel);
     }
     const std::string key = Workspaces()[static_cast<std::size_t>(workspace)].key;
-    if (panel.find("###") != std::string_view::npos) {
+    if (panel.contains("###")) {
       return std::string(panel) + "@" + key;
     }
     return std::string(panel) + "###" + std::string(panel) + "@" + key;

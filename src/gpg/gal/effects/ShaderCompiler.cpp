@@ -258,7 +258,7 @@ namespace gpg::gal::effects
     }
     // Engine addition (ren_RayTracedShadows): an effect with inline ray queries needs shader model 6.5 (DXR 1.1)
     // and, for SPIR-V, Vulkan 1.2's ray query extension. Every stage of it, since they share the declarations.
-    const bool rayQueries = hlsl.find("RayQuery<") != std::string_view::npos;
+    const bool rayQueries = hlsl.contains("RayQuery<");
     std::wstring rayProfile;
     if (rayQueries) {
       rayProfile = profile;

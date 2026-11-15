@@ -123,7 +123,7 @@ namespace gpg::gal
       };
       lower(commandLine);
       lower(needle);
-      return commandLine.find(needle) != std::string::npos;
+      return commandLine.contains(needle);
     }
 
     [[nodiscard]] bool IsRgbaTexture(

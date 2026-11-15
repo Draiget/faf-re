@@ -381,7 +381,7 @@ namespace faf::editor
       const std::string prefix = mDocument.FolderName() + "_";
       for (const auto& entry : std::filesystem::directory_iterator(mMeshViewCache, ec)) {
         const std::string name = entry.path().filename().string();
-        if (name.rfind(prefix, 0) == 0 && name != prefix + std::to_string(generation)) {
+        if (name.starts_with(prefix) && name != prefix + std::to_string(generation)) {
           std::error_code removeError;
           std::filesystem::remove_all(entry.path(), removeError);
         }
@@ -397,7 +397,7 @@ namespace faf::editor
     std::string bakeWhy;
     int masked = 0;
     for (const edmesh::Patch& patch : mMeshMap.patches) {
-      if (views.count(patch.material) == 0) {
+      if (!views.contains(patch.material)) {
         MeshMaterialView view;
         if (!mMeshViewCache.empty() && BakeMeshMaterial(patch.material, folder, vfs, view, bakeWhy)) {
           masked += view.lightMasks ? 1 : 0;

@@ -343,7 +343,7 @@ namespace faf::editor
             }
           };
           std::string& held = mPropertiesFields[i];
-          if (held.rfind("FLOAT(", 0) == 0) {
+          if (held.starts_with("FLOAT(")) {
             const std::vector<double> numbers = ValueNumbers(held);
             float number = numbers.empty() ? 0.0f : static_cast<float>(numbers.front());
             if (FillDragFloat("##float", &number, 0.1f, 0.0f, 0.0f, "%.2f")) {
@@ -352,13 +352,13 @@ namespace faf::editor
             if (ImGui::IsItemDeactivatedAfterEdit()) {
               ask(held);
             }
-          } else if (held.rfind("BOOLEAN(", 0) == 0) {
-            bool on = held.find("true") != std::string::npos;
+          } else if (held.starts_with("BOOLEAN(")) {
+            bool on = held.contains("true");
             if (ImGui::Checkbox("##bool", &on)) {
               held = BooleanValue(on);
               ask(held);
             }
-          } else if (held.rfind("VECTOR3(", 0) == 0) {
+          } else if (held.starts_with("VECTOR3(")) {
             const std::vector<double> numbers = ValueNumbers(held);
             float v[3] = {0.0f, 0.0f, 0.0f};
             for (std::size_t n = 0; n < 3 && n < numbers.size(); ++n) {
@@ -370,7 +370,7 @@ namespace faf::editor
             if (ImGui::IsItemDeactivatedAfterEdit()) {
               ask(held);
             }
-          } else if (held.rfind("STRING(", 0) == 0 && key == "color" && ValueString(held).size() == 8) {
+          } else if (held.starts_with("STRING(") && key == "color" && ValueString(held).size() == 8) {
             // A colour: the save's `aarrggbb` hex.
             const unsigned long argb = std::strtoul(ValueString(held).c_str(), nullptr, 16);
             float colour[4] = {
@@ -392,7 +392,7 @@ namespace faf::editor
             if (ImGui::IsItemDeactivatedAfterEdit()) {
               ask(held);
             }
-          } else if (held.rfind("STRING(", 0) == 0 && key == "prop" && FindMarkerType(now.type) != nullptr) {
+          } else if (held.starts_with("STRING(") && key == "prop" && FindMarkerType(now.type) != nullptr) {
             // A known type's model: the type sets it (editors draw it; the game doesn't read it), so it isn't typed in.
             ImGui::AlignTextToFramePadding();
             ImGui::TextDisabled("%s", ValueString(held).c_str());
@@ -400,7 +400,7 @@ namespace faf::editor
               "Set by the marker's type (%s): the model editors draw for it. The game doesn't read it.",
               now.type.c_str()
             );
-          } else if (held.rfind("STRING(", 0) == 0) {
+          } else if (held.starts_with("STRING(")) {
             char buffer[512];
             (void)std::snprintf(buffer, sizeof(buffer), "%s", ValueString(held).c_str());
             if (ImGui::InputText("##text", buffer, sizeof(buffer), ImGuiInputTextFlags_EnterReturnsTrue)) {
@@ -479,7 +479,7 @@ namespace faf::editor
           int highest = 0;
           const std::string prefix = hydro ? "Hydrocarbon " : "Mass ";
           for (const SaveEntry& marker : mDocument.SaveData().Markers()) {
-            if (marker.name.rfind(prefix, 0) == 0) {
+            if (marker.name.starts_with(prefix)) {
               highest = std::max(highest, std::atoi(marker.name.c_str() + prefix.size()));
             }
           }
@@ -711,7 +711,7 @@ namespace faf::editor
     const auto shortName = [](const std::string& path) {
       std::size_t start = path.find_last_of('/');
       std::string name = path.substr(start == std::string::npos ? 0 : start + 1);
-      if (name.size() > 8 && name.compare(name.size() - 8, 8, "_prop.bp") == 0) {
+      if (name.size() > 8 && name.ends_with("_prop.bp")) {
         name.resize(name.size() - 8);
       }
       return name;
@@ -732,7 +732,7 @@ namespace faf::editor
       int shown = 0;
       ImDrawList* const draw = ImGui::GetWindowDrawList();
       for (const std::string& blueprint : blueprints) {
-        if (!filter.empty() && blueprint.find(filter) == std::string::npos) {
+        if (!filter.empty() && !blueprint.contains(filter)) {
           continue;
         }
         if (shown % columns != 0) {
@@ -785,7 +785,7 @@ namespace faf::editor
       if (mTestPropSwap && shown > 0) {
         mTestPropSwap = false;
         for (const std::string& blueprint : blueprints) {
-          if (chosen.empty() && (filter.empty() || blueprint.find(filter) != std::string::npos)) {
+          if (chosen.empty() && (filter.empty() || blueprint.contains(filter))) {
             chosen = blueprint;
           }
         }

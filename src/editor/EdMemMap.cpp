@@ -155,10 +155,10 @@ namespace faf::editor::memmap
           snapshot.privateTotal += size;
           if (const auto heap = heapOwner.find(base); heap != heapOwner.end()) {
             snapshot.heaps[heap->second] += size;
-          } else if (stackBases.count(base) != 0) {
+          } else if (stackBases.contains(base)) {
             snapshot.stacks += size;
           } else {
-            if (snapshot.loose.count(base) == 0) {
+            if (!snapshot.loose.contains(base)) {
               snapshot.looseProtect[base] = info.Protect;
             }
             snapshot.loose[base] += size;
@@ -243,7 +243,7 @@ namespace faf::editor::memmap
       }
     }
     for (const auto& [heap, size] : before.heaps) {
-      if (after.heaps.count(heap) == 0) {
+      if (!after.heaps.contains(heap)) {
         gpg::Logf("editor:   %s: gone (was %.2f MB)", HeapName(before, heap).c_str(), size / kMB);
       }
     }
@@ -266,7 +266,7 @@ namespace faf::editor::memmap
       }
     }
     for (const auto& [base, size] : before.loose) {
-      if (after.loose.count(base) == 0) {
+      if (!after.loose.contains(base)) {
         goneBytes += static_cast<double>(size);
       }
     }

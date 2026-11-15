@@ -852,7 +852,7 @@ namespace faf::headless
     // resumes (28088230 at beat 4864, 27993035 at 14215) stalled headless for good. Issuing anyway plays the
     // recorded beats as the game ran them: paused beats advance without a tick. A live game's stream (gpgnet://)
     // and the rejoin modes keep the network rule.
-    if (!rejoinRehearsal && !liveRejoin && options.replayPath.rfind("gpgnet://", 0) != 0) {
+    if (!rejoinRehearsal && !liveRejoin && !options.replayPath.starts_with("gpgnet://")) {
       moho::SIM_SetIssueWhilePaused(true);
     }
     std::unique_ptr<moho::ISTIDriver> driver(
@@ -902,7 +902,7 @@ namespace faf::headless
     }
     // A live game's replay (a server's observer stream, gpgnet://): its digests are read as they're written, so the
     // file is opened shared (`fopen_s` denies other readers on Windows until it is closed).
-    const bool liveReplay = options.replayPath.rfind("gpgnet://", 0) == 0;
+    const bool liveReplay = options.replayPath.starts_with("gpgnet://");
     if (!options.digestPath.empty() && (digestFile = std::fopen(options.digestPath.c_str(), "w")) == nullptr) {
       result.error = "cannot write " + options.digestPath;
       return result;

@@ -510,7 +510,7 @@ namespace faf::editor
     }
     if (mChainBlock.found && mChains != mChainsRead) {
       replaces.push_back(
-        {&mChainBlock, ChainsText(mChains, mChainBlock.indent, mText.find("\r\n") != std::string::npos ? "\r\n" : "\n")}
+        {&mChainBlock, ChainsText(mChains, mChainBlock.indent, mText.contains("\r\n") ? "\r\n" : "\n")}
       );
     }
     std::sort(replaces.begin(), replaces.end(), [](const Replace& a, const Replace& b) {
@@ -529,7 +529,7 @@ namespace faf::editor
     const std::vector<SaveEntry>& read
   ) const
   {
-    const std::string nl = mText.find("\r\n") != std::string::npos ? "\r\n" : "\n";
+    const std::string nl = mText.contains("\r\n") ? "\r\n" : "\n";
     // A value written by the editor in the file's line ends.
     const auto lineEnds = [&nl](const std::string& value) {
       if (nl == "\n") {
@@ -790,7 +790,7 @@ namespace faf::editor
     }
     std::string out = script;
     // The import the call needs, at the top, if the script has none.
-    if (out.find("ScenarioFramework = import") == std::string::npos) {
+    if (!out.contains("ScenarioFramework = import")) {
       out = "local ScenarioFramework = import('/lua/ScenarioFramework.lua')\n" + out;
     }
     // After InitializeArmies in OnPopulate, or as OnPopulate's first line.

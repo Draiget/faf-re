@@ -615,7 +615,7 @@ namespace faf::editor
       if (groupOpen) {
         for (const auto& [type, list] : types) {
           ImGui::PushID(type.c_str());
-          const bool typeHidden = hidden.count(type) != 0;
+          const bool typeHidden = hidden.contains(type);
           // A type row: its eye, its colour, its name and count; open it for the markers.
           if (EyeButton("##eye", typeHidden)) {
             if (typeHidden) {
@@ -2395,11 +2395,11 @@ namespace faf::editor
         for (char& c : key) {
           c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
         }
-        if (!filter.empty() && key.find(filter) == std::string::npos) {
+        if (!filter.empty() && !key.contains(filter)) {
           continue;
         }
         const std::string id = std::string("mood:") + mood.id;
-        if (mLookSwatches.find(id) == mLookSwatches.end()) {
+        if (!mLookSwatches.contains(id)) {
           LookSwatch swatch;
           for (int c = 0; c < 3; ++c) {
             swatch.colours[0][c] = mood.fog[c];
@@ -2417,7 +2417,7 @@ namespace faf::editor
         for (char& c : key) {
           c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
         }
-        if (filter.empty() || key.find(filter) != std::string::npos) {
+        if (filter.empty() || key.contains(filter)) {
           row("mine:" + name, name, "yours");
         }
       }
@@ -2430,7 +2430,7 @@ namespace faf::editor
         for (char& c : key) {
           c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
         }
-        if (filter.empty() || key.find(filter) != std::string::npos) {
+        if (filter.empty() || key.contains(filter)) {
           row(maps[i], title, folder);
         }
       }
@@ -2469,7 +2469,7 @@ namespace faf::editor
       request(LookRequest::What::Save, {});
     }
     ImGui::EndDisabled();
-    if (mLookChosen.rfind("mine:", 0) == 0) {
+    if (mLookChosen.starts_with("mine:")) {
       ImGui::SameLine();
       if (ImGui::Button("Delete")) {
         request(LookRequest::What::Delete, mLookChosen);

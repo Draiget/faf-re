@@ -379,13 +379,13 @@ namespace
     for (std::size_t i = 0; i < gLines.size(); ++i) {
       const std::string& l = gLines[i];
       if (!inside) {
-        if (l.find("Cases = [[") == 0) {
+        if (l.starts_with("Cases = [[")) {
           inside = true;
           gBegin = i + 1;
         }
         continue;
       }
-      if (l.find("]]") == 0) {
+      if (l.starts_with("]]")) {
         gEnd = i;
         break;
       }
@@ -2250,7 +2250,7 @@ namespace
     Params parsed;
     ParseParams(params, parsed);
     auto scaled = [&](const char* key, double def, double div, double lo) {
-      const double v = parsed.num.count(key) ? parsed.num[key] : def;
+      const double v = parsed.num.contains(key) ? parsed.num[key] : def;
       char b[64];
       std::snprintf(b, sizeof(b), ",%s=%g", key, std::max(lo, std::floor(v / div + 0.5)));
       params += b;

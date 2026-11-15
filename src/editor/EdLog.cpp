@@ -269,7 +269,7 @@ namespace faf::editor
     const Line& line
   ) const
   {
-    if (mFilter[0] != '\0' && line.text.find(mFilter) == std::string::npos) {
+    if (mFilter[0] != '\0' && !line.text.contains(mFilter)) {
       return false;
     }
     switch (line.level) {

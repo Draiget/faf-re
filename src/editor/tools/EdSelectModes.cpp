@@ -46,8 +46,8 @@ namespace faf::editor
         continue;
       }
       const bool take = mode == SelectMode::All ? true
-        : mode == SelectMode::Invert            ? now.count(i) == 0
-                                                : types.count(keys[i]) != 0;
+        : mode == SelectMode::Invert            ? !now.contains(i)
+                                                : types.contains(keys[i]);
       if (take) {
         out.push_back(i);
       }

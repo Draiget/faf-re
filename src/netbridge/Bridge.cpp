@@ -93,7 +93,7 @@ namespace faf::netbridge
       std::string name = argv[i];
       std::string value;
       bool hasValue = false;
-      if (const std::size_t eq = name.find('='); name.rfind("--", 0) == 0 && eq != std::string::npos) {
+      if (const std::size_t eq = name.find('='); name.starts_with("--") && eq != std::string::npos) {
         value = name.substr(eq + 1);
         name = name.substr(0, eq);
         hasValue = true;
@@ -546,7 +546,7 @@ namespace faf::netbridge
     const JsonValue& msg
   )
   {
-    if (mEnginePeers.count(remoteId) != 0) {
+    if (mEnginePeers.contains(remoteId)) {
       const std::string text = msg.IsString() ? msg.AsString() : netlink::WriteJson(msg);
       SendToGame({netlink::kCmdIceMsg, {GpgArg::Int(static_cast<std::int32_t>(remoteId)), GpgArg::Str(text)}});
       return;
@@ -734,7 +734,7 @@ namespace faf::netbridge
       }
       return true;
     }
-    return m.command.rfind("Netlink", 0) == 0;
+    return m.command.starts_with("Netlink");
   }
 
   std::uint16_t Bridge::AddPeer(

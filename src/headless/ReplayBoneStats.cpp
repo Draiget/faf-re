@@ -140,7 +140,7 @@ namespace faf::headless
           return name;
         }
       }
-      return name.find("Manipulator") != std::string::npos ? name : std::string();
+      return name.contains("Manipulator") ? name : std::string();
     }
 
     void RecordLuaCall(

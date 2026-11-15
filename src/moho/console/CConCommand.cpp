@@ -660,7 +660,7 @@ namespace
     if (text.empty()) {
       return true;
     }
-    if (text.find("//") != std::string_view::npos) {
+    if (text.contains("//")) {
       return true;
     }
     return text.find_first_of("#; \t\"") != std::string_view::npos;

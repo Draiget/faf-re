@@ -29,7 +29,7 @@ namespace faf::editor
       const std::string& part
     )
     {
-      return text.find(part) != std::string::npos;
+      return text.contains(part);
     }
 
     std::size_t CountOf(
@@ -38,7 +38,7 @@ namespace faf::editor
     )
     {
       return static_cast<std::size_t>(std::count_if(problems.begin(), problems.end(), [&](const MissionProblem& p) {
-        return p.text.find(words) != std::string::npos;
+        return p.text.contains(words);
       }));
     }
 

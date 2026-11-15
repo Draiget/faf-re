@@ -267,7 +267,7 @@ namespace faf::editor
           add(CheckIssue::Level::Error, marker.name, "has a broken position (none, not a number or huge)", 0.0f, 0.0f);
           continue;
         }
-        if (type == "Blank Marker" && marker.name.rfind("ARMY_", 0) == 0) {
+        if (type == "Blank Marker" && marker.name.starts_with("ARMY_")) {
           starts.push_back({marker.name, {x, z}});
         }
         if (type == "Mass") {
@@ -347,7 +347,7 @@ namespace faf::editor
       for (const MarkerChain& chain : *in.chains) {
         std::vector<std::string> missing;
         for (const std::string& name : chain.markers) {
-          if (names.count(name) == 0) {
+          if (!names.contains(name)) {
             missing.push_back(name);
           }
         }

@@ -286,7 +286,7 @@ end
       std::string text
     )
     {
-      if (text.rfind("<LOC", 0) == 0) {
+      if (text.starts_with("<LOC")) {
         const std::size_t end = text.find('>');
         if (end != std::string::npos) {
           text.erase(0, end + 1);
@@ -886,9 +886,9 @@ end
         if (section == "last") {
           current = &mLastSetup;
           mHaveLastSetup = true;
-        } else if (section.rfind("map ", 0) == 0 && section.size() > 4) {
+        } else if (section.starts_with("map ") && section.size() > 4) {
           current = &mMapSetups[section.substr(4)];
-        } else if (section.rfind("profile ", 0) == 0 && section.size() > 8) {
+        } else if (section.starts_with("profile ") && section.size() > 8) {
           current = &mProfiles[section.substr(8)];
         } else {
           current = nullptr;

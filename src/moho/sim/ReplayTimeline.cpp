@@ -834,7 +834,7 @@ namespace moho
     )
     {
       std::FILE* file = nullptr;
-      if (path.size() < 4u || path.compare(path.size() - 4u, 4u, ".zst") != 0) {
+      if (path.size() < 4u || !path.ends_with(".zst")) {
         return fopen_s(&file, path.c_str(), "rb") == 0 ? file : nullptr;
       }
       const auto start = Clock::now();

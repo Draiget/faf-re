@@ -277,7 +277,7 @@ namespace
       };
       cb.onLog = [name, &laneOn](const std::string& t) {
         std::printf("  %s: %s\n", name, t.c_str());
-        if (t.find("redundant lane") != std::string::npos) {
+        if (t.contains("redundant lane")) {
           ++laneOn;
         }
       };
@@ -717,7 +717,7 @@ namespace
 
     const std::string mark = KeyMarkFor(a.Public());
     Check(
-      mark.size() == 2 + 64 && mark.rfind("k+", 0) == 0 && mark.find('+', 2) == std::string::npos,
+      mark.size() == 2 + 64 && mark.starts_with("k+") && mark.find('+', 2) == std::string::npos,
       "keys: the mark is k+ and 64 hex digits, no further '+'"
     );
     const std::string prefix = kOurUfragPrefix;
@@ -820,7 +820,7 @@ namespace
       };
       cb.onLog = [name, &offers](const std::string& text) {
         std::printf("    %s: %s\n", name, text.c_str());
-        if (text.rfind("initiating ICE as offerer", 0) == 0) {
+        if (text.starts_with("initiating ICE as offerer")) {
           ++offers;
         }
       };
@@ -960,7 +960,7 @@ namespace
     const auto said = [&](const char* text) {
       std::lock_guard lock(logMutex);
       return std::any_of(offererLog.begin(), offererLog.end(), [&](const std::string& line) {
-        return line.find(text) != std::string::npos;
+        return line.contains(text);
       });
     };
     const auto t0 = std::chrono::steady_clock::now();

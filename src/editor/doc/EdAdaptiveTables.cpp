@@ -668,7 +668,7 @@ namespace faf::editor
       return {};
     }
     const std::string path = script.substr(quote + 1, end + std::string("_tables.lua").size() - quote - 1);
-    return path.rfind("/maps/", 0) == 0 ? path : std::string();
+    return path.starts_with("/maps/") ? path : std::string();
   }
 
   std::string WithScenarioAdaptive(
@@ -700,7 +700,7 @@ namespace faf::editor
   )
   {
     const std::string prefix = hydro ? "Hydrocarbon " : "Mass ";
-    if (markerName.rfind(prefix, 0) != 0 || markerName.size() == prefix.size()) {
+    if (!markerName.starts_with(prefix) || markerName.size() == prefix.size()) {
       return {};
     }
     const std::string suffix = markerName.substr(prefix.size());

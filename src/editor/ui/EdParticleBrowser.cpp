@@ -77,7 +77,7 @@ namespace faf::editor
     (void)std::snprintf(mGridFilter, sizeof(mGridFilter), "%s", search.c_str());
     const std::string filter = LowerText(search);
     for (const EffectInfo& info : mEffects) {
-      if (LowerText(info.name).find(filter) != std::string::npos && OpenGameEmitter(info.path)) {
+      if (LowerText(info.name).contains(filter) && OpenGameEmitter(info.path)) {
         mBrowserPick = info.path;
         return;
       }
@@ -197,7 +197,7 @@ namespace faf::editor
         if (
           (mBrowseFaction != 0 && info.faction != mBrowseFaction) || (mBrowseKind != 0 && info.kind != mBrowseKind) ||
           (mBrowseType != 0 && info.read && info.type != mBrowseType) ||
-          (!filter.empty() && LowerText(info.name).find(filter) == std::string::npos)
+          (!filter.empty() && !LowerText(info.name).contains(filter))
         ) {
           continue;
         }

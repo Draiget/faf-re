@@ -310,7 +310,7 @@ namespace faf::editor
       const std::size_t end = t.find('/', at + 5);
       const std::string folder = t.substr(at + 5, end == std::string::npos ? std::string::npos : end - at - 5);
       for (const auto& [name, id] : kFolders) {
-        if (folder.find(name) != std::string::npos) {
+        if (folder.contains(name)) {
           ++votes[id];
           break;
         }
@@ -337,10 +337,7 @@ namespace faf::editor
     const std::string file = "/" + Lower(name) + "_prop.bp";
     for (const std::string& bp : blueprints) {
       const std::string l = Lower(bp);
-      if (
-        l.find(g) != std::string::npos && l.size() >= file.size() &&
-        l.compare(l.size() - file.size(), file.size(), file) == 0
-      ) {
+      if (l.contains(g) && l.size() >= file.size() && l.ends_with(file)) {
         return bp;
       }
     }

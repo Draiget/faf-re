@@ -137,7 +137,7 @@ namespace faf::editor
           label,
           sizeof(label),
           "%s%s  (%s, %zu points)%s###%s",
-          state.results.count(p.id) != 0 ? "\xE2\x97\x8F " : "",
+          state.results.contains(p.id) ? "\xE2\x97\x8F " : "",
           p.name.c_str(),
           KeptPathModeName(p.mode),
           p.points.size(),
@@ -530,7 +530,7 @@ namespace faf::editor
     if (!Section("Apply")) {
       return;
     }
-    const bool applied = mDocument.PathsNow().results.count(path.id) != 0;
+    const bool applied = mDocument.PathsNow().results.contains(path.id);
     const std::string id = path.id;
     if (ImGui::Button("Preview")) {
       mState.ask = PathEditState::Ask::Preview;

@@ -79,7 +79,7 @@ namespace faf::editor
     if (gameHasUnit && gameHasUnit(id)) {
       return true;
     }
-    if (const ModProject* p = const_cast<EdModPanel&>(mProject).Project(); p != nullptr && p->derived.count(id) != 0) {
+    if (const ModProject* p = const_cast<EdModPanel&>(mProject).Project(); p != nullptr && p->derived.contains(id)) {
       return true;
     }
     return std::any_of(mSpecs.begin(), mSpecs.end(), [&id](const UnitWizardSpec& s) {
@@ -266,13 +266,13 @@ namespace faf::editor
       // Fix (FAF Studio's): what Write mends (missing files, the script's weapons, the icon), and no builder: the
       // template's builders.
       const bool fixable = std::any_of(mChecks.begin(), mChecks.end(), [](const UnitCheck& c) {
-        return c.text.find("Write") != std::string::npos || c.text.find("nothing can build") != std::string::npos;
+        return c.text.contains("Write") || c.text.contains("nothing can build");
       });
       if (fixable) {
         ImGui::SameLine();
         if (ImGui::Button("Fix")) {
           if (std::any_of(mChecks.begin(), mChecks.end(), [](const UnitCheck& c) {
-            return c.text.find("nothing can build") != std::string::npos;
+            return c.text.contains("nothing can build");
           })) {
             if (const UnitTemplate* t = UnitTemplateOf(spec.templateId); t != nullptr) {
               spec.buildBy = DefaultBuildBy(*t, spec.tech);
@@ -373,7 +373,7 @@ namespace faf::editor
                           const float hi,
                           const char* format
                         ) {
-      float v = static_cast<float>(map.count(key) != 0 ? map[key] : 0.0);
+      float v = static_cast<float>(map.contains(key) ? map[key] : 0.0);
       ImGui::SetNextItemWidth(-1.0f);
       if (FillDragFloat(id, &v, (hi - lo) / 400.0f, lo, hi, format)) {
         map[key] = v;

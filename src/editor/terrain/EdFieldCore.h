@@ -85,7 +85,7 @@ namespace faf::editor::field
       const char* key
     ) const
     {
-      return num.count(key) != 0;
+      return num.contains(key);
     }
     [[nodiscard]] std::string S(const char* key, const char* fallback) const;
     [[nodiscard]] const std::vector<double>* A(const char* key) const;

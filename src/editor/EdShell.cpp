@@ -105,28 +105,26 @@ namespace faf::editor
       ) {
         mapWideDone = true;
         const std::string what = value[0].c_str();
-        const int kind = what.rfind("lighting", 0) == 0 ? 1
-          : what.rfind("specular", 0) == 0              ? 2
-          : what.rfind("macro", 0) == 0                 ? 3
-                                                        : 0;
+        const int kind = what.starts_with("lighting") ? 1
+          : what.starts_with("specular")              ? 2
+          : what.starts_with("macro")                 ? 3
+                                                      : 0;
         const auto fileAfter = [&](const char* const key) {
           const std::size_t at = what.find(key);
           return at == std::string::npos ? std::string() : what.substr(at + std::string(key).size());
         };
         if (const std::string out = fileAfter(",export="); !out.empty()) {
           mTools.AskMapTexture(
-            kind,
-            what.find(",make,") != std::string::npos ? EdTools::MapTextureOp::Make : EdTools::MapTextureOp::Export,
-            out
+            kind, what.contains(",make,") ? EdTools::MapTextureOp::Make : EdTools::MapTextureOp::Export, out
           );
         } else if (const std::string in = fileAfter(",import="); !in.empty()) {
           mTools.AskMapTexture(kind, EdTools::MapTextureOp::Import, in);
         } else {
           mTools.AskMapTexture(
             kind,
-            what.find(",clear") != std::string::npos ? EdTools::MapTextureOp::Clear : EdTools::MapTextureOp::Make,
+            what.contains(",clear") ? EdTools::MapTextureOp::Clear : EdTools::MapTextureOp::Make,
             {},
-            what.find(",stale") != std::string::npos
+            what.contains(",stale")
           );
         }
         gpg::Logf("editor: /mapwide %s", what.c_str());
@@ -140,11 +138,11 @@ namespace faf::editor
         pickDone = true;
         const std::string kinds = std::string(",") + value[0].c_str() + ",";
         PickFilter& pickable = mTools.Pickable();
-        pickable.markers = kinds.find(",markers,") != std::string::npos;
-        pickable.pathNodes = kinds.find(",pathnodes,") != std::string::npos;
-        pickable.units = kinds.find(",units,") != std::string::npos;
-        pickable.props = kinds.find(",props,") != std::string::npos;
-        pickable.decals = kinds.find(",decals,") != std::string::npos;
+        pickable.markers = kinds.contains(",markers,");
+        pickable.pathNodes = kinds.contains(",pathnodes,");
+        pickable.units = kinds.contains(",units,");
+        pickable.props = kinds.contains(",props,");
+        pickable.decals = kinds.contains(",decals,");
         gpg::Logf("editor: /pickfilter %s", value[0].c_str());
       }
     }
@@ -164,7 +162,7 @@ namespace faf::editor
           mTools.AskLayerMove(from - 1, to - 1);
           gpg::Logf("editor: /movelayer %d to %d", from, to);
           // `,undo`: Edit > Undo two seconds after, as a click would.
-          if (std::string(value[0].c_str()).find(",undo") != std::string::npos) {
+          if (std::string(value[0].c_str()).contains(",undo")) {
             moveUndoAt = ImGui::GetTime() + 2.0;
           }
         }
@@ -239,9 +237,9 @@ namespace faf::editor
           CheckIssue issue;
           issue.marker = "test run";
           issue.text = line.size() > 400 ? line.substr(0, 400) + "..." : line;
-          if (!lowerFolder.empty() && lower.find(lowerFolder) != std::string::npos) {
+          if (!lowerFolder.empty() && lower.contains(lowerFolder)) {
             issue.level = CheckIssue::Level::Error;
-          } else if (lower.find(".lua") != std::string::npos || lower.find("traceback") != std::string::npos) {
+          } else if (lower.contains(".lua") || lower.contains("traceback")) {
             issue.level = CheckIssue::Level::Warning;
           } else {
             issue.level = CheckIssue::Level::Note;
@@ -1717,7 +1715,7 @@ namespace faf::editor
       std::set<std::string>& hidden = mTools.HiddenMarkerTypes();
       const auto groupShown = [&](const bool paths) {
         for (const MarkerType& type : MarkerTypes()) {
-          if ((std::string(type.group) == "Path nodes") == paths && hidden.count(type.type) != 0) {
+          if ((std::string(type.group) == "Path nodes") == paths && hidden.contains(type.type)) {
             return false;
           }
         }
@@ -2075,7 +2073,7 @@ namespace faf::editor
           );
         }
         for (const SaveEntry& marker : mDocument.SaveData().Markers()) {
-          if (marker.name.rfind("ARMY_", 0) != 0) {
+          if (!marker.name.starts_with("ARMY_")) {
             continue;
           }
           const std::vector<double> position = ValueNumbers(marker.Get("position"));

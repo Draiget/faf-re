@@ -346,7 +346,7 @@ namespace faf::editor
     const std::string wantedExtra = mNewExtraArmy;
     const bool known = std::find(extra.begin(), extra.end(), wantedExtra) != extra.end() ||
       std::find(players.begin(), players.end(), wantedExtra) != players.end();
-    ImGui::BeginDisabled(wantedExtra.empty() || known || wantedExtra.find(' ') != std::string::npos);
+    ImGui::BeginDisabled(wantedExtra.empty() || known || wantedExtra.contains(' '));
     if (ImGui::Button("Add")) {
       std::string list;
       for (const std::string& army : extra) {

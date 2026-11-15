@@ -1420,9 +1420,8 @@ namespace faf::editor
       for (std::size_t at = text.find("function"); at != std::string::npos; at = text.find("function", at + 1)) {
         ++functions;
       }
-      return functions <= 2 && text.find("function OnPopulate") != std::string::npos &&
-        text.find("function OnStart") != std::string::npos && text.find("ForkThread") == std::string::npos &&
-        text.size() < 600;
+      return functions <= 2 && text.contains("function OnPopulate") && text.contains("function OnStart") &&
+        !text.contains("ForkThread") && text.size() < 600;
     }
 
     std::string Region(
@@ -1788,7 +1787,7 @@ namespace faf::editor
     static const std::set<std::string> kKeywords = {"and", "break",    "do",     "else", "elseif", "end",   "false",
                                                     "for", "function", "if",     "in",   "local",  "nil",   "not",
                                                     "or",  "repeat",   "return", "then", "true",   "until", "while"};
-    if (s.empty() || s.size() > 64 || std::isdigit(static_cast<unsigned char>(s[0])) != 0 || kKeywords.count(s) != 0) {
+    if (s.empty() || s.size() > 64 || std::isdigit(static_cast<unsigned char>(s[0])) != 0 || kKeywords.contains(s)) {
       return false;
     }
     return std::all_of(s.begin(), s.end(), [](const char c) {
@@ -1813,7 +1812,7 @@ namespace faf::editor
       return fallback;
     }
     // The alphabet a category expression needs: nothing that opens a table, a long string, a comment or a statement.
-    if (text.size() > 300 || text.find("--") != std::string::npos) {
+    if (text.size() > 300 || text.contains("--")) {
       return fallback;
     }
     int depth = 0;
@@ -2348,7 +2347,7 @@ namespace faf::editor
       out.mark = text.back();
       text.pop_back();
     }
-    if (text.rfind("stage.", 0) == 0) {
+    if (text.starts_with("stage.")) {
       out.stage = std::atoi(text.c_str() + 6);
       return out.stage > 0;
     }
@@ -2649,15 +2648,13 @@ namespace faf::editor
       }
       const std::string outside = text.substr(0, s) + text.substr(e);
       MissionCompileOptions o = options;
-      o.withEntry = outside.find("function OnPopulate") == std::string::npos &&
-        outside.find("function OnStart") == std::string::npos;
+      o.withEntry = !outside.contains("function OnPopulate") && !outside.contains("function OnStart");
       status = MissionPatch::Written;
       return text.substr(0, s) + Region(SafeCompile(mission, o)) + text.substr(e);
     }
     const bool stub = IsStub(text);
     MissionCompileOptions o = options;
-    o.withEntry = stub ||
-      (text.find("function OnPopulate") == std::string::npos && text.find("function OnStart") == std::string::npos);
+    o.withEntry = stub || (!text.contains("function OnPopulate") && !text.contains("function OnStart"));
     const std::string region = Region(SafeCompile(mission, o)) + "\n";
     status = MissionPatch::Written;
     if (stub) {
@@ -2746,7 +2743,7 @@ namespace faf::editor
               problem('E', "no area " + value);
             } else if (p.kind == "marker" && !has(facts.markers, value)) {
               problem('E', "no marker " + value);
-            } else if (p.kind == "dialogue" && dialogues.count(value) == 0) {
+            } else if (p.kind == "dialogue" && !dialogues.contains(value)) {
               problem('E', "no dialogue " + value);
             } else if (
               p.kind == "platoon" && std::none_of(m.platoons.begin(), m.platoons.end(), [&](const MissionPlatoon& t) {
@@ -2775,7 +2772,7 @@ namespace faf::editor
                 problem('E', p.label + " is not a name (letters, digits and _)");
               } else if (p.defines) {
                 defined.insert(value);
-              } else if (defined.count(value) == 0) {
+              } else if (!defined.contains(value)) {
                 problem('W', "variable " + value + " is read before any node sets it");
               }
             }
@@ -2843,7 +2840,7 @@ namespace faf::editor
           }
         }
       }
-      if (started.count(b.name) == 0) {
+      if (!started.contains(b.name)) {
         add('W', "no stage starts it (add a Start a base node)");
       }
       std::set<std::string> attacks;

@@ -189,10 +189,7 @@ namespace moho
     std::transform(lower.begin(), lower.end(), lower.begin(), [](const unsigned char c) {
       return static_cast<char>(std::tolower(c));
     });
-    if (
-      lower.find("..") != std::string::npos || lower.find('\\') != std::string::npos ||
-      lower.find(':') != std::string::npos
-    ) {
+    if (lower.contains("..") || lower.contains('\\') || lower.contains(':')) {
       return Refuse(reason, "the path has parts a font path can't have");
     }
     constexpr char kModsPrefix[] = "/mods/";

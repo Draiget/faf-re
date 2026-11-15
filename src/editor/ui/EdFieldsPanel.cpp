@@ -30,7 +30,7 @@ namespace faf::editor
       for (char& c : b) {
         c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
       }
-      return a.find(b) != std::string::npos;
+      return a.contains(b);
     }
 
     /** The grid as grey cells (its lowest black, its highest white), filling `size` x `size` pixels. */

@@ -50,8 +50,8 @@ namespace
         continue;
       }
       EXPECT_STREQ(CheckFixName(issue.fix), "To ground");
-      above += issue.marker == "LandPN 00" && issue.text.find("8.0 above") != std::string::npos ? 1 : 0;
-      below += issue.marker == "AirPN 00" && issue.text.find("6.0 below") != std::string::npos ? 1 : 0;
+      above += issue.marker == "LandPN 00" && issue.text.contains("8.0 above") ? 1 : 0;
+      below += issue.marker == "AirPN 00" && issue.text.contains("6.0 below") ? 1 : 0;
       EXPECT_NE(issue.marker, "LandPN 01") << "2 units is within the slack";
       EXPECT_FLOAT_EQ(issue.fixX, issue.x);
     }

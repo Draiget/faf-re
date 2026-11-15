@@ -44,8 +44,7 @@ namespace faf::editor
     const std::vector<ScriptGroupLoop> loops = ScriptGroupLoops(script);
     // The keys the script reads (local x = ScenarioInfo.Options.key, or the key itself).
     const auto scriptReads = [&](const std::string& key) {
-      return script.find("Options." + key) != std::string::npos ||
-        script.find("Options['" + key + "']") != std::string::npos;
+      return script.contains("Options." + key) || script.contains("Options['" + key + "']");
     };
     const auto tableOf = [&](const std::string& key) -> const OptionTable* {
       for (const OptionTable& table : KnownOptionTables()) {

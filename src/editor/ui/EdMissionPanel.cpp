@@ -997,7 +997,7 @@ namespace faf::editor
     ImGui::BeginChild("##trace", ImVec2(0.0f, 0.0f), false);
     for (std::size_t k = 0; k < mTrace.size(); ++k) {
       MissionTraceId id;
-      if (mTrace[k].rfind("end.", 0) == 0) {
+      if (mTrace[k].starts_with("end.")) {
         // The operation's end (the test run records it instead of ending the game).
         const bool won = mTrace[k] == "end.won";
         ImGui::TextColored(

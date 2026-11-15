@@ -586,15 +586,15 @@ namespace faf::editor::terrain
     {
       auto path = std::make_shared<TerrainPath>();
       path->closed = closed;
-      path->mode = v.text.count("mode") != 0 ? v.S("mode") : "carve";
-      path->profile = v.text.count("profile") != 0 ? v.S("profile") : PathModeOf(path->mode).profile;
+      path->mode = v.text.contains("mode") ? v.S("mode") : "carve";
+      path->profile = v.text.contains("profile") ? v.S("profile") : PathModeOf(path->mode).profile;
       for (const auto& [x, z] : points) {
         TerrainPath::Point p;
         p.x = static_cast<float>(x);
         p.z = static_cast<float>(z);
-        p.width = static_cast<float>(v.num.count("width") != 0 ? v.N("width") : 6.0);
-        p.falloff = static_cast<float>(v.num.count("falloff") != 0 ? v.N("falloff") : 4.0);
-        p.height = static_cast<float>(v.num.count("height") != 0 ? v.N("height") : 0.0);
+        p.width = static_cast<float>(v.num.contains("width") ? v.N("width") : 6.0);
+        p.falloff = static_cast<float>(v.num.contains("falloff") ? v.N("falloff") : 4.0);
+        p.height = static_cast<float>(v.num.contains("height") ? v.N("height") : 0.0);
         path->points.push_back(p);
       }
       return path;
@@ -1596,7 +1596,7 @@ namespace faf::editor::terrain
       Outputs out;
       out["out"].grid = E.Op("pad_flatten", args);
       for (const char* name : {"core", "weight"}) {
-        if (E.wanted.count(name) != 0) {
+        if (E.wanted.contains(name)) {
           std::vector<Arg> more = args;
           more.emplace_back("output", name);
           out[name].grid = E.Op("pad_flatten", more);
@@ -3400,10 +3400,10 @@ namespace faf::editor::terrain
         double azimuth = v.N("azimuth");
         double altitude = v.N("altitude");
         if (v.B("useMap")) {
-          if (ins.count("azimuth") == 0) {
+          if (!ins.contains("azimuth")) {
             azimuth = E.ground->sunAzimuth;
           }
-          if (ins.count("altitude") == 0) {
+          if (!ins.contains("altitude")) {
             altitude = E.ground->sunAltitude;
           }
         }
@@ -3439,7 +3439,7 @@ namespace faf::editor::terrain
         }
         field::GridPtr litOut = lit;
         field::GridPtr ao;
-        if (E.wanted.count("ao") != 0) {
+        if (E.wanted.contains("ao")) {
           ao = v.N("ao") > 0.0
             ? E.Op(
                 "affine",
@@ -3462,7 +3462,7 @@ namespace faf::editor::terrain
         }
         Outputs out;
         out["shadow"].grid = litOut;
-        if (E.wanted.count("light") != 0) {
+        if (E.wanted.contains("light")) {
           const field::GridPtr shade = E.Op(
             "hillshade",
             {{"a", a}, {"mode", "shade"}, {"azimuth", azimuth}, {"altitude", altitude}, {"ambient", v.N("ambient")}}
@@ -4121,7 +4121,7 @@ namespace faf::editor::terrain
       covered.insert(op);
     }
     for (const std::string& op : field::OpNames()) {
-      if (covered.count(op) != 0) {
+      if (covered.contains(op)) {
         continue;
       }
       c.Add(

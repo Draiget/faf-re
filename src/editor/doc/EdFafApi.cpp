@@ -1013,7 +1013,7 @@ namespace faf::editor
       } else {
         // A boundary the zip doesn't hold (practically always the first).
         std::string boundary = "----FafEditorUpload7d3b";
-        for (int n = 0; bytes.find(boundary) != std::string::npos; ++n) {
+        for (int n = 0; bytes.contains(boundary); ++n) {
           boundary = "----FafEditorUpload" + std::to_string(n) + "x9q";
         }
         for (int attempt = 0; attempt < 2; ++attempt) {
@@ -1127,7 +1127,7 @@ namespace faf::editor
   ) const
   {
     std::lock_guard<std::mutex> lock(mLock);
-    return mNamed.find(name) != mNamed.end();
+    return mNamed.contains(name);
   }
 
   bool EdFafSession::FetchMaps(
@@ -1226,7 +1226,7 @@ namespace faf::editor
           }
           // The link's last part is the file's name in both caches ("maps/previews/large/x.png" -> "large/x.png").
           const std::string file = next.substr(next.find_last_of('/') + 1);
-          const std::string size = next.find("/small/") != std::string::npos ? "small" : "large";
+          const std::string size = next.contains("/small/") ? "small" : "large";
           std::string body;
           const auto readFile = [&](const std::filesystem::path& path) {
             std::ifstream in(path, std::ios::binary);

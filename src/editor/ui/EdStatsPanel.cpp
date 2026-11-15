@@ -55,7 +55,7 @@ namespace faf::editor
         if (!MarkerPosition(marker, x, y, z)) {
           continue;
         }
-        if (type == "Blank Marker" && marker.name.rfind("ARMY_", 0) == 0) {
+        if (type == "Blank Marker" && marker.name.starts_with("ARMY_")) {
           StatStart start;
           start.name = marker.name;
           start.x = x;

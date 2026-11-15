@@ -1179,7 +1179,7 @@ namespace faf::editor
         continue;
       }
       for (const int layer : plan.byKind[K(kind)]) {
-        if (layer >= 1 && target.count(layer) == 0) {
+        if (layer >= 1 && !target.contains(layer)) {
           target[layer] = empty();
         }
       }

@@ -323,14 +323,11 @@ namespace faf::editor
     }
     const std::string disk = Lower(details.disk);
     const std::string vault = Lower(mDocument.VaultFolder().generic_string());
-    if (disk.find("/programdata/faforever/") != std::string::npos) {
+    if (disk.contains("/programdata/faforever/")) {
       details.where = kWhereNames[2];
-    } else if (!vault.empty() && disk.rfind(vault, 0) == 0) {
+    } else if (!vault.empty() && disk.starts_with(vault)) {
       details.where = kWhereNames[3];
-    } else if (
-      disk.find("/supreme commander forged alliance/maps/") != std::string::npos ||
-      disk.find(".scd") != std::string::npos
-    ) {
+    } else if (disk.contains("/supreme commander forged alliance/maps/") || disk.contains(".scd")) {
       details.where = kWhereNames[1];
     } else {
       details.where = kWhereNames[4];
@@ -415,7 +412,7 @@ namespace faf::editor
   {
     const std::string prefix = "/maps/" + Lower(folder) + "/";
     for (const std::string& scenario : mPlay.Maps()) {
-      if (Lower(scenario).rfind(prefix, 0) == 0) {
+      if (Lower(scenario).starts_with(prefix)) {
         return scenario;
       }
     }
@@ -471,7 +468,7 @@ namespace faf::editor
     if (ReadLuaAssignment(text, "ScenarioInfo", info, error)) {
       if (const LuaText* const map = info.Field("map")) {
         const std::string path = Lower(Unquote(map->atom));
-        if (path.rfind("/maps/", 0) == 0 && path.find('/', 6) != std::string::npos) {
+        if (path.starts_with("/maps/") && path.find('/', 6) != std::string::npos) {
           mount = path.substr(6, path.find('/', 6) - 6);
         }
       }

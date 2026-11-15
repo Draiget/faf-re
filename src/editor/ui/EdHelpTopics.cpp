@@ -392,7 +392,7 @@ namespace faf::editor
     for (const EdHelpTopic& topic : HelpTopics()) {
       const std::string text = Lower(std::string(topic.title) + " " + topic.text);
       if (std::all_of(words.begin(), words.end(), [&text](const std::string& w) {
-        return text.find(w) != std::string::npos;
+        return text.contains(w);
       })) {
         out.push_back(&topic);
       }

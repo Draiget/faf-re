@@ -229,7 +229,7 @@ C = [[long text]]
     for (const MeshScanFinding& f : scan.findings) {
       EXPECT_NE(f.severity, 'E') << f.text;
       // The import's own manifest passes its own mesh_high check (it once wrote the bare highest vertex).
-      if (f.text.find("mesh_high") != std::string::npos) {
+      if (f.text.contains("mesh_high")) {
         EXPECT_EQ(f.severity, 'I') << f.text;
       }
     }

@@ -231,7 +231,7 @@ namespace faf::editor
       use.layers = LayerAlphaUse::Unused;
       use.baseOpacity = true;
     } else if (
-      low.size() >= 10 && low.rfind("terrain", 0) == 0 && (low[7] == '1' || low[7] == '2') &&
+      low.size() >= 10 && low.starts_with("terrain") && (low[7] == '1' || low[7] == '2') &&
       std::isdigit(static_cast<unsigned char>(low[8])) != 0 && std::isdigit(static_cast<unsigned char>(low[9])) != 0
     ) {
       // Terrain1xx / 2xx (a B at the end: biplanar): roughness and height from the atlas; the last digit 1 or 2 lays

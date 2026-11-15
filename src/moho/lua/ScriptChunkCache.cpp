@@ -282,7 +282,7 @@ namespace
     )
     {
       const std::lock_guard<std::mutex> lock(mMutex);
-      return mChunks.find(key) != mChunks.end();
+      return mChunks.contains(key);
     }
 
     /// `used`: kept by the batch's loader, not ahead of it by a helper (which may compile a chunk the

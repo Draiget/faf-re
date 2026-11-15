@@ -175,7 +175,7 @@ namespace faf::editor
   {
     std::vector<std::pair<int, SkeletonStart>> list;
     for (const PadMarker& m : markers) {
-      if (m.name.size() > 5 && m.name.compare(0, 5, "ARMY_") == 0) {
+      if (m.name.size() > 5 && m.name.starts_with("ARMY_")) {
         const std::string digits = m.name.substr(5);
         if (!digits.empty() && std::all_of(digits.begin(), digits.end(), [](const char c) {
           return c >= '0' && c <= '9';

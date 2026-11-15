@@ -47,7 +47,7 @@ namespace faf::editor
         std::string word;
         for (const char c : Lower(filter.text) + " ") {
           if (c == ' ') {
-            if (!word.empty() && haystack.find(word) == std::string::npos) {
+            if (!word.empty() && !haystack.contains(word)) {
               return false;
             }
             word.clear();

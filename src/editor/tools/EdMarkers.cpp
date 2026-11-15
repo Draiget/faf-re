@@ -257,7 +257,7 @@ namespace faf::editor
       } else {
         (void)std::snprintf(name, sizeof(name), "%s%02d", type.prefix, number);
       }
-      if (used.count(name) == 0) {
+      if (!used.contains(name)) {
         return name;
       }
     }
@@ -724,7 +724,7 @@ namespace faf::editor
       if (value == "true" || value == "false") {
         return "BOOLEAN( " + value + " )";
       }
-      if (value.rfind("VECTOR3", 0) == 0) {
+      if (value.starts_with("VECTOR3")) {
         const std::vector<double> n = ValueNumbers(value);
         return n.size() >= 3 ? Vector3Value(n[0], n[1], n[2]) : value;
       }
@@ -781,7 +781,7 @@ namespace faf::editor
           color = ValueString(text);
         } else if (key == "prop") {
           const std::string path = ValueString(text);
-          prop = path.rfind(kProps, 0) == 0 ? path.substr(std::string(kProps).size()) : prop;
+          prop = path.starts_with(kProps) ? path.substr(std::string(kProps).size()) : prop;
         } else if (!key.empty()) {
           extra.emplace_back(key, text);
         }

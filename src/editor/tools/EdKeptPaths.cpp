@@ -1186,7 +1186,7 @@ namespace faf::editor
     }
     if (oldDelta != nullptr) {
       for (const auto& [layer, d] : *oldDelta) {
-        if (now.find(layer) == now.end() && d.size() == count) {
+        if (!now.contains(layer) && d.size() == count) {
           now[layer] = baseOf(layer);
         }
       }

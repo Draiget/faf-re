@@ -103,7 +103,7 @@ namespace faf::editor
     if (const std::size_t dot = name.find_last_of('.'); dot != std::string::npos && dot > 0) {
       name.resize(dot);
     }
-    if (kind == FindKind::Prop && name.size() > 5 && name.compare(name.size() - 5, 5, "_prop") == 0) {
+    if (kind == FindKind::Prop && name.size() > 5 && name.ends_with("_prop")) {
       name.resize(name.size() - 5);
     }
     return name;

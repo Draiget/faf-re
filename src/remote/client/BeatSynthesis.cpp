@@ -120,7 +120,7 @@ namespace faf::remote::client
     // Every entity shown off its place that no longer moves: back to its real place.
     std::vector<std::uint32_t> gone;
     for (const auto& [id, shown] : mShown) {
-      if (moving.count(id) != 0u) {
+      if (moving.contains(id)) {
         continue;
       }
       SSynthTransform last;
@@ -145,7 +145,7 @@ namespace faf::remote::client
     std::vector<std::pair<std::uint32_t, SSynthTransform>>& madeUp = mMadeUp[tick];
     madeUp.clear();
     for (const SSynthUpdate& update : out) {
-      if (moving.count(update.id) != 0u) {
+      if (moving.contains(update.id)) {
         mShown[update.id] = update.cur;
         madeUp.emplace_back(update.id, update.cur);
       }
@@ -186,7 +186,7 @@ namespace faf::remote::client
   {
     for (const SSynthUpdate& update : updates) {
       // The screen showed this entity at the transform the session had as current, which this update replaces.
-      if (Moves(update.last, update.cur) && mShown.count(update.id) == 0u) {
+      if (Moves(update.last, update.cur) && !mShown.contains(update.id)) {
         mShown.emplace(update.id, update.last);
       }
     }

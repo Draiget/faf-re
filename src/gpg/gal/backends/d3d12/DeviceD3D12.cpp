@@ -142,7 +142,7 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
       };
       lower(commandLine);
       lower(needle);
-      return commandLine.find(needle) != std::string::npos;
+      return commandLine.contains(needle);
     }
 
     /// Engine addition (ren_PrepareDeviceEarly): the device D3D12_PrepareDeviceEarly is creating.

@@ -356,7 +356,7 @@ namespace faf::editor
         written[i] = static_cast<std::uint8_t>(std::clamp(icon[i] * 255.0f + 0.5f, 0.0f, 255.0f));
       }
       SetIconPicture(0, toBgra(written));
-      const bool shippedHere = mShipped.size() == written.size() && mCompare.rfind("Beside", 0) == 0;
+      const bool shippedHere = mShipped.size() == written.size() && mCompare.starts_with("Beside");
       SetIconPicture(1, shippedHere ? toBgra(mShipped) : std::vector<std::uint32_t>{});
       SetIconPicture(
         2, shippedHere ? IconDifference(written.data(), mShipped.data(), kIconSide) : std::vector<std::uint32_t>{}

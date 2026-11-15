@@ -214,14 +214,14 @@ namespace faf::editor
         std::transform(lower.begin(), lower.end(), lower.begin(), [](const unsigned char c) {
           return static_cast<char>(std::tolower(c));
         });
-        if (!filter.empty() && lower.find(filter) == std::string::npos) {
+        if (!filter.empty() && !lower.contains(filter)) {
           continue;
         }
         if (++shown > 300) {
           ImGui::TextDisabled("... more: type to narrow");
           break;
         }
-        if (p->edits.count(u.id) != 0) {
+        if (p->edits.contains(u.id)) {
           text += "  (changed)";
         }
         if (ImGui::Selectable(text.c_str(), u.id == mUnit)) {
@@ -286,8 +286,8 @@ namespace faf::editor
       ImGui::EndPopup();
     }
     ImGui::SameLine();
-    ImGui::BeginDisabled(mUnit.empty() || (p->edits.count(mUnit) == 0 && p->derived.count(mUnit) == 0));
-    if (ImGui::Button(p->derived.count(mUnit) != 0 ? "Remove unit" : "Revert unit")) {
+    ImGui::BeginDisabled(mUnit.empty() || (!p->edits.contains(mUnit) && !p->derived.contains(mUnit)));
+    if (ImGui::Button(p->derived.contains(mUnit) ? "Remove unit" : "Revert unit")) {
       const ModChanges before = ModChangesOf(*p);
       p->edits.erase(mUnit);
       const bool removed = p->derived.erase(mUnit) != 0;
@@ -300,7 +300,7 @@ namespace faf::editor
     ImGui::EndDisabled();
     ImGui::SameLine();
     ImGui::BeginDisabled(!canPlay || p->Empty());
-    if (p->derived.count(mUnit) != 0) {
+    if (p->derived.contains(mUnit)) {
       if (ImGui::Button("Model from an OBJ...")) {
         mModelAsk = mUnit;
       }

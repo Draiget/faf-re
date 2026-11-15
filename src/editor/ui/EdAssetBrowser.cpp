@@ -67,9 +67,9 @@ namespace faf::editor
       std::istringstream lines(text.str());
       std::string line;
       while (std::getline(lines, line)) {
-        if (line.rfind("v:tile=", 0) == 0) {
+        if (line.starts_with("v:tile=")) {
           mTileSize = std::clamp(static_cast<float>(std::atof(line.c_str() + 7)), 40.0f, 110.0f);
-        } else if (line.rfind("v:list=", 0) == 0) {
+        } else if (line.starts_with("v:list=")) {
           mListView = line.size() > 7 && line[7] == '1';
         }
       }

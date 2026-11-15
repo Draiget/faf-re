@@ -166,10 +166,10 @@ namespace faf::netlink
     std::string_view line
   )
   {
-    if (line.substr(0, 2) == "a=") {
+    if (line.starts_with("a=")) {
       line.remove_prefix(2);
     }
-    if (line.substr(0, 10) != "candidate:") {
+    if (!line.starts_with("candidate:")) {
       return std::nullopt;
     }
     line.remove_prefix(10);
@@ -255,16 +255,16 @@ namespace faf::netlink
     )
     {
       IceServer s;
-      if (url.substr(0, 5) == "stun:") {
+      if (url.starts_with("stun:")) {
         s.kind = IceServer::Kind::Stun;
         url.remove_prefix(5);
-      } else if (url.substr(0, 5) == "turn:") {
+      } else if (url.starts_with("turn:")) {
         s.kind = IceServer::Kind::Turn;
         url.remove_prefix(5);
       } else {
         return; // turns:, stuns: and anything else
       }
-      if (url.substr(0, 2) == "//") {
+      if (url.starts_with("//")) {
         url.remove_prefix(2);
       }
       std::string_view query;
@@ -272,7 +272,7 @@ namespace faf::netlink
         query = url.substr(q + 1);
         url = url.substr(0, q);
       }
-      if (query.find("transport=tcp") != std::string_view::npos) {
+      if (query.contains("transport=tcp")) {
         return;
       }
       if (!url.empty() && url.front() == '[') { // [v6]:port

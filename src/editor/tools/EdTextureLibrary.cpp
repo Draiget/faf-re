@@ -33,7 +33,7 @@ namespace faf::editor
       const std::string& tail
     )
     {
-      return text.size() >= tail.size() && text.compare(text.size() - tail.size(), tail.size(), tail) == 0;
+      return text.size() >= tail.size() && text.ends_with(tail);
     }
   } // namespace
 
@@ -88,9 +88,7 @@ namespace faf::editor
     }
     for (const std::string& path : all) {
       const std::string lower = Lower(path);
-      if (
-        lower.find("/layers/") == std::string::npos || EndsWith(lower, "_normals.dds") || EndsWith(lower, "_normal.dds")
-      ) {
+      if (!lower.contains("/layers/") || EndsWith(lower, "_normals.dds") || EndsWith(lower, "_normal.dds")) {
         continue;
       }
       LayerTexture texture;
@@ -106,7 +104,7 @@ namespace faf::editor
       if (EndsWith(lower, "_albedo.dds")) {
         const std::string base = path.substr(0, path.size() - std::string("_albedo.dds").size());
         for (const char* const suffix : {"_normals.dds", "_normal.dds"}) {
-          if (lowerAll.count(Lower(base + suffix)) != 0) {
+          if (lowerAll.contains(Lower(base + suffix))) {
             texture.normals = base + suffix;
             break;
           }
@@ -152,7 +150,7 @@ namespace faf::editor
       for (const char* const suffix : {"_normals.dds", "_normal.dds"}) {
         const std::string base =
           EndsWith(lower, "_albedo.dds") ? path.substr(0, path.size() - 11) : path.substr(0, path.size() - 4);
-        if (lowerAll.count(Lower(base + suffix)) != 0) {
+        if (lowerAll.contains(Lower(base + suffix))) {
           texture.normals = base + suffix;
           break;
         }
@@ -289,7 +287,7 @@ namespace faf::editor
         continue;
       }
       const auto& level = image.subresources.front();
-      const std::uint32_t opaque = mWithAlpha.count(path) != 0 ? 0u : 0xFF000000u;
+      const std::uint32_t opaque = mWithAlpha.contains(path) ? 0u : 0xFF000000u;
       std::vector<std::uint32_t> pixels(static_cast<std::size_t>(level.width) * level.height);
       for (std::uint32_t y = 0; y < level.height; ++y) {
         const std::uint8_t* const row =

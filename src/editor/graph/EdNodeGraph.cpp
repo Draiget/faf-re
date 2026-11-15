@@ -457,13 +457,13 @@ namespace faf::editor
   {
     std::vector<const GraphNode*> nodes;
     for (const GraphNode& node : mNodes) {
-      if (only == nullptr || only->count(node.id) != 0) {
+      if (only == nullptr || only->contains(node.id)) {
         nodes.push_back(&node);
       }
     }
     std::vector<const GraphLink*> links;
     for (const GraphLink& link : mLinks) {
-      if (only == nullptr || (only->count(link.fromNode) != 0 && only->count(link.toNode) != 0)) {
+      if (only == nullptr || (only->contains(link.fromNode) && only->contains(link.toNode))) {
         links.push_back(&link);
       }
     }

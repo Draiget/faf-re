@@ -144,7 +144,7 @@ EmitterBlueprint {
           unix += c;
         }
       }
-      if (unix.rfind("EmitterBlueprint", 0) != 0) {
+      if (!unix.starts_with("EmitterBlueprint")) {
         ++others; // TrailEmitterBlueprint, BeamBlueprint
         continue;
       }
@@ -290,8 +290,8 @@ EmitterBlueprint {
     for (const auto& entry : std::filesystem::directory_iterator(folder)) {
       std::ifstream in(entry.path(), std::ios::binary);
       const std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
-      const bool beam = text.rfind("BeamBlueprint", 0) == 0;
-      if (!beam && text.rfind("TrailEmitterBlueprint", 0) != 0) {
+      const bool beam = text.starts_with("BeamBlueprint");
+      if (!beam && !text.starts_with("TrailEmitterBlueprint")) {
         continue;
       }
       (beam ? beams : trails) += 1;

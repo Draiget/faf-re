@@ -17,7 +17,7 @@ namespace faf::editor
       const std::string& part
     )
     {
-      return text.find(part) != std::string::npos;
+      return text.contains(part);
     }
 
     std::string Read(
@@ -177,7 +177,7 @@ namespace faf::editor
     p.edits.erase("uel0201");
     p.edits["xsl0101"]["Economy.BuildTime"] = 100.0;
     report = WriteModProject(folder, p, Weapons, [](const std::string& text, const std::string& name) {
-      return name.find("xsl0101") != std::string::npos ? std::string("line 3: unexpected symbol") : std::string();
+      return name.contains("xsl0101") ? std::string("line 3: unexpected symbol") : std::string();
     });
     EXPECT_FALSE(std::filesystem::exists(folder / "units" / "uel0201"));
     EXPECT_FALSE(std::filesystem::exists(folder / "units" / "xsl0101" / "xsl0101_unit.bp"));
@@ -264,11 +264,11 @@ namespace faf::editor
     };
     facts.weaponIndex = Weapons;
     facts.gameHasFile = [](const std::string& path) {
-      return path.find("xel0201") == std::string::npos;
+      return !path.contains("xel0201");
     };
     const auto count = [](const std::vector<ModIssue>& issues, const std::string& part) {
       return std::count_if(issues.begin(), issues.end(), [&](const ModIssue& i) {
-        return i.text.find(part) != std::string::npos;
+        return i.text.contains(part);
       });
     };
     std::vector<ModIssue> issues = CheckModProject(p, facts);

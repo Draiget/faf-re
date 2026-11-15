@@ -425,7 +425,7 @@ namespace faf::headless
       const moho::CmdId id
     ) const
     {
-      return mForeignCommands.count(static_cast<std::int32_t>(id)) != 0u;
+      return mForeignCommands.contains(static_cast<std::int32_t>(id));
     }
 
     [[nodiscard]] bool Own(

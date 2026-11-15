@@ -358,7 +358,7 @@ namespace faf::editor
     for (std::size_t start = 0; start < paths.size();) {
       const std::size_t end = paths.find(';', start);
       const std::string path = paths.substr(start, end == std::string::npos ? std::string::npos : end - start);
-      if (!path.empty() && path.rfind("/maps/", 0) != 0) {
+      if (!path.empty() && !path.starts_with("/maps/")) {
         sources.push_back(path);
       }
       if (end == std::string::npos) {
@@ -522,10 +522,7 @@ namespace faf::editor
     std::map<std::string, std::vector<const NodeType*>> byCategory;
     const std::string filter = LowerName(mPaletteFilter);
     for (const auto& type : mGraph->Registry().All()) {
-      if (
-        type->isOutput ||
-        (!filter.empty() && LowerName(type->title + " " + type->category).find(filter) == std::string::npos)
-      ) {
+      if (type->isOutput || (!filter.empty() && !LowerName(type->title + " " + type->category).contains(filter))) {
         continue;
       }
       byCategory[type->category].push_back(type.get());

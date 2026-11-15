@@ -343,7 +343,7 @@ namespace faf::editor
     {
       int highest = 0;
       for (const SaveUnit& unit : group.units) {
-        if (unit.name.rfind("UNIT_", 0) == 0) {
+        if (unit.name.starts_with("UNIT_")) {
           highest = std::max(highest, std::atoi(unit.name.c_str() + 5));
         }
       }
@@ -366,7 +366,7 @@ namespace faf::editor
       error = reader.error;
       return false;
     }
-    group.newline = text.find("\r\n") != std::string::npos ? "\r\n" : "\n";
+    group.newline = text.contains("\r\n") ? "\r\n" : "\n";
     return true;
   }
 

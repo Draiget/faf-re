@@ -18,7 +18,7 @@ namespace faf::editor
       const std::string& shader
     )
     {
-      if (shader.rfind("Terrain", 0) != 0 || shader.size() < 10) {
+      if (!shader.starts_with("Terrain") || shader.size() < 10) {
         return false;
       }
       for (std::size_t i = 7; i < 10; ++i) {

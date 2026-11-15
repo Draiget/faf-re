@@ -185,17 +185,13 @@ namespace faf::editor
       }
       for (const std::string& g : groups) {
         const std::string l = Lower(g);
-        if (out.yaw.empty() && (l.find("turret") != std::string::npos || l.find("yaw") != std::string::npos)) {
+        if (out.yaw.empty() && (l.contains("turret") || l.contains("yaw"))) {
           out.yaw = g;
         }
-        if (
-          out.pitch.empty() &&
-          (l.find("barrel") != std::string::npos || l.find("pitch") != std::string::npos ||
-           l.find("gun") != std::string::npos)
-        ) {
+        if (out.pitch.empty() && (l.contains("barrel") || l.contains("pitch") || l.contains("gun"))) {
           out.pitch = g;
         }
-        if (out.muzzle.empty() && l.find("muzzle") != std::string::npos) {
+        if (out.muzzle.empty() && l.contains("muzzle")) {
           out.muzzle = g;
         }
       }
@@ -606,16 +602,16 @@ namespace faf::editor
     spec.anim = d->Get("animationWalk") != nullptr || d->Get("death") != nullptr ? "template" : "none";
     const std::array<float, 3> dims = DonorDims(*d);
     spec.mesh.length = std::floor(std::max(dims[0], dims[2]) * 100.0f + 0.5f) / 100.0f;
-    if (spec.defense.count("MaxHealth") == 0) {
+    if (!spec.defense.contains("MaxHealth")) {
       spec.defense["MaxHealth"] = 100.0;
     }
-    if (spec.economy.count("BuildCostMass") == 0) {
+    if (!spec.economy.contains("BuildCostMass")) {
       spec.economy["BuildCostMass"] = 50.0;
     }
-    if (spec.economy.count("BuildCostEnergy") == 0) {
+    if (!spec.economy.contains("BuildCostEnergy")) {
       spec.economy["BuildCostEnergy"] = 200.0;
     }
-    if (spec.economy.count("BuildTime") == 0) {
+    if (!spec.economy.contains("BuildTime")) {
       spec.economy["BuildTime"] = 100.0;
     }
     if (t->defaultKind[0] != '\0' && d->Get("weapon") != nullptr) {
@@ -680,7 +676,7 @@ namespace faf::editor
     if (const JsonTree* d = data.Donor(data.DonorOf(spec.templateId, spec.faction)); d != nullptr) {
       if (const JsonTree* cats = d->Get("categories"); cats != nullptr) {
         for (const JsonTree& c : cats->items) {
-          if (kStrip.count(c.s) == 0 && c.s.compare(0, 7, "BUILTBY") != 0) {
+          if (!kStrip.contains(c.s) && !c.s.starts_with("BUILTBY")) {
             set.insert(c.s);
           }
         }
@@ -871,7 +867,7 @@ namespace faf::editor
       JsonTree econ = JsonTree::MakeObject();
       if (const JsonTree* e = d.Get("economy"); e != nullptr) {
         for (const auto& [k, v] : e->fields) {
-          if (k.compare(0, 8, "Teleport") != 0) {
+          if (!k.starts_with("Teleport")) {
             econ.Set(k, v);
           }
         }
@@ -1076,7 +1072,7 @@ namespace faf::editor
     }
     // The unit lab's edits.
     for (const auto& [key, value] : edits) {
-      if (key.compare(0, 7, "Weapon:") == 0) {
+      if (key.starts_with("Weapon:")) {
         const std::size_t dot = key.rfind('.');
         if (dot == std::string::npos) {
           continue;
@@ -1946,7 +1942,7 @@ namespace faf::editor
       add('W', "no icon: the build menu shows a blank one (Write makes a quick one)");
     }
     std::string bpText;
-    if (ReadText(unit / (id + "_unit.bp"), bpText) && bpText.rfind(kMark, 0) != 0) {
+    if (ReadText(unit / (id + "_unit.bp"), bpText) && !bpText.starts_with(kMark)) {
       add('I', "the blueprint was edited by hand: the wizard does not rewrite it");
     }
     const JsonTree bp = UnitBlueprint(data, spec, {}, nullptr);
@@ -1989,11 +1985,11 @@ namespace faf::editor
     // The script's weapons against the labels.
     std::string script;
     if (ReadText(unit / (id + "_script.lua"), script)) {
-      if (script.find("TypeClass") == std::string::npos) {
+      if (!script.contains("TypeClass")) {
         add('E', "the script does not set TypeClass");
       }
       for (const std::string& label : labels) {
-        if (script.find(label + " = ClassWeapon") == std::string::npos) {
+        if (!script.contains(label + " = ClassWeapon")) {
           add('E', "blueprint weapon " + label + " has no entry in the script (Write regenerates it)");
         }
       }
@@ -2065,19 +2061,19 @@ namespace faf::editor
     if (cats.count("LAND") + cats.count("NAVAL") + cats.count("AIR") + cats.count("STRUCTURE") == 0) {
       add('W', "no layer category (LAND, NAVAL, AIR or STRUCTURE)");
     }
-    const bool mobile = cats.count("MOBILE") != 0;
-    const bool structure = cats.count("STRUCTURE") != 0;
+    const bool mobile = cats.contains("MOBILE");
+    const bool structure = cats.contains("STRUCTURE");
     if (mobile && structure) {
       add('E', "MOBILE and STRUCTURE together");
     } else if (!mobile && !structure) {
       add('W', "neither MOBILE nor STRUCTURE");
     }
-    if (cats.count("SELECTABLE") == 0) {
+    if (!cats.contains("SELECTABLE")) {
       add('W', "no SELECTABLE category: the player cannot select the unit");
     }
     bool builtBy = false;
     for (const std::string& c : cats) {
-      builtBy = builtBy || c.compare(0, 7, "BUILTBY") == 0;
+      builtBy = builtBy || c.starts_with("BUILTBY");
     }
     if (!builtBy) {
       add('W', "no builder category (BUILTBY...): nothing can build the unit");
@@ -2153,7 +2149,7 @@ namespace faf::editor
     const auto writeText = [&](const std::string& name, const std::string& text) {
       const std::filesystem::path path = unit / name;
       std::string existing;
-      if (ReadText(path, existing) && existing.rfind(kMark, 0) != 0) {
+      if (ReadText(path, existing) && !existing.starts_with(kMark)) {
         report.push_back("units/" + spec.id + "/" + name + ": edited by hand, left as it is");
         return;
       }

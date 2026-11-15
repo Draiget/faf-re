@@ -106,7 +106,7 @@ namespace faf::editor
       }
       const std::string line = Trim(text.substr(at, end - at));
       at = end + 1;
-      if (line.empty() || line[0] == '#' || line.rfind("--", 0) == 0) {
+      if (line.empty() || line[0] == '#' || line.starts_with("--")) {
         continue;
       }
       const std::size_t equals = line.find('=');
@@ -124,7 +124,7 @@ namespace faf::editor
         continue;
       }
       // A list of numbers, comma separated.
-      if (value.find(',') != std::string::npos) {
+      if (value.contains(',')) {
         std::vector<double> list;
         bool all = true;
         std::size_t from = 0;

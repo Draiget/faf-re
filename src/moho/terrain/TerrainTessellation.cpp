@@ -41,7 +41,7 @@ namespace moho
     )
     {
       for (const std::string_view word : words) {
-        if (name.find(word) != std::string::npos) {
+        if (name.contains(word)) {
           return true;
         }
       }

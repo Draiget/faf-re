@@ -93,7 +93,7 @@ namespace faf::editor
       std::string text
     )
     {
-      if (text.rfind("<LOC", 0) == 0) {
+      if (text.starts_with("<LOC")) {
         if (const std::size_t end = text.find('>'); end != std::string::npos) {
           text.erase(0, end + 1);
         }
@@ -435,7 +435,7 @@ namespace faf::editor
           SymmetryMarker m;
           m.x = static_cast<float>(at[0]);
           m.z = static_cast<float>(at[2]);
-          if (marker.name.rfind("ARMY_", 0) == 0) {
+          if (marker.name.starts_with("ARMY_")) {
             m.kind = SymmetryMarker::Kind::Start;
           } else if (type == "Mass") {
             m.kind = SymmetryMarker::Kind::Mass;
@@ -1836,7 +1836,7 @@ namespace faf::editor
     const std::filesystem::path vaultMaps = std::filesystem::weakly_canonical(mVault / "maps", ignored);
     const std::filesystem::path relative =
       std::filesystem::relative(std::filesystem::weakly_canonical(file, ignored), vaultMaps, ignored);
-    return relative.empty() || relative.native().rfind(L"..", 0) == 0;
+    return relative.empty() || relative.native().starts_with(L"..");
   }
 
   void EdDocument::AllowOverwrite()
@@ -2250,14 +2250,14 @@ namespace faf::editor
     copied = 0;
     for (const fa::string& file : files) {
       const std::string source = file.c_str();
-      if (Lower(source).rfind(Lower(oldPrefix), 0) != 0) {
+      if (!Lower(source).starts_with(Lower(oldPrefix))) {
         continue;
       }
       std::string relative = source.substr(oldPrefix.size());
       // The file's own name takes the new base name where it had the old one.
       const std::size_t lastSlash = relative.find_last_of('/');
       const std::size_t nameAt = lastSlash == std::string::npos ? 0 : lastSlash + 1;
-      if (Lower(relative.substr(nameAt)).rfind(Lower(oldBase), 0) == 0) {
+      if (Lower(relative.substr(nameAt)).starts_with(Lower(oldBase))) {
         relative = relative.substr(0, nameAt) + newBase + relative.substr(nameAt + oldBase.size());
       }
       const std::filesystem::path destination = target / std::filesystem::path(relative).make_preferred();
@@ -2498,10 +2498,7 @@ namespace faf::editor
     const std::filesystem::path folder = file.parent_path();
     std::string scenario;
     for (const std::string& name : FilesUnder(folder)) {
-      if (
-        name.find('/') == std::string::npos && name.size() > 13 &&
-        name.compare(name.size() - 13, 13, "_scenario.lua") == 0
-      ) {
+      if (!name.contains('/') && name.size() > 13 && name.ends_with("_scenario.lua")) {
         std::ifstream in(folder / name, std::ios::binary);
         scenario.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
       }
@@ -2627,7 +2624,7 @@ namespace faf::editor
     // Save as put it in a folder picked for it, or the overwrite there was confirmed (SaveNeedsOverwriteConsent).
     const bool picked =
       (mSaveOutsideVault && file == mSaveTarget) || (!mOverwriteFile.empty() && file == mOverwriteFile);
-    if (!picked && (mVault.empty() || relative.empty() || relative.native().rfind(L"..", 0) == 0)) {
+    if (!picked && (mVault.empty() || relative.empty() || relative.native().starts_with(L".."))) {
       message = "This map isn't in your vault (" + (mVault / "maps").string() + "); save it as a new map folder there.";
       return false;
     }

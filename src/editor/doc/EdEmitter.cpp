@@ -608,7 +608,7 @@ namespace faf::editor
         out += value.flag ? "true" : "false";
         break;
       case FlatValue::Kind::Text:
-        out += value.text.find(']') == std::string::npos ? "[[" + value.text + "]]" : "'" + value.text + "'";
+        out += !value.text.contains(']') ? "[[" + value.text + "]]" : "'" + value.text + "'";
         break;
       case FlatValue::Kind::Color:
         out += "{x=" + Number(value.color[0]) + ",y=" + Number(value.color[1]) + ",z=" + Number(value.color[2]) +
@@ -644,7 +644,7 @@ namespace faf::editor
   {
     const std::string name = BaseLower(path);
     const auto starts = [&](const char* prefix) {
-      return name.rfind(prefix, 0) == 0;
+      return name.starts_with(prefix);
     };
     if (starts("aeon_")) {
       return 1;
@@ -684,7 +684,7 @@ namespace faf::editor
     };
     for (std::size_t kind = 1; kind < kWords.size(); ++kind) {
       for (const char* word : kWords[kind]) {
-        if (name.find(word) != std::string::npos) {
+        if (name.contains(word)) {
           return static_cast<int>(kind);
         }
       }

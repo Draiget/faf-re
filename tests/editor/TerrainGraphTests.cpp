@@ -282,7 +282,7 @@ namespace
     }();
     int ran = 0;
     for (const auto& type : TerrainNodeTypes().All()) {
-      if (type->category == "raw" || skip.count(type->name) != 0) {
+      if (type->category == "raw" || skip.contains(type->name)) {
         continue;
       }
       NodeGraph graph(TerrainNodeTypes());

@@ -1001,7 +1001,7 @@ namespace faf::editor
     const std::string& text
   )
   {
-    if (text.find("textureStar=") != std::string::npos || text.find("textureRecent=") != std::string::npos) {
+    if (text.contains("textureStar=") || text.contains("textureRecent=")) {
       mStarredTextures.clear();
       mRecentTextures.clear();
     }
@@ -1037,7 +1037,7 @@ namespace faf::editor
         mBrowseList = whole != 0;
         continue;
       }
-      if (key.rfind("brush.", 0) == 0) {
+      if (key.starts_with("brush.")) {
         float r = 0.0f, s = 0.0f, f = 0.0f;
         if (std::sscanf(value, "%f,%f,%f", &r, &s, &f) == 3) {
           mBrushByMode[std::atoi(key.c_str() + 6)] = {
@@ -3278,7 +3278,7 @@ namespace faf::editor
             for (char& c : key) {
               c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
             }
-            if (!filter.empty() && key.find(filter) == std::string::npos) {
+            if (!filter.empty() && !key.contains(filter)) {
               continue;
             }
             ImGui::PushID(type.code);
@@ -3494,9 +3494,7 @@ namespace faf::editor
           for (char& c : key) {
             c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
           }
-          if (
-            (!filter.empty() && key.find(filter) == std::string::npos) || (mBrowseNormals && texture->normals.empty())
-          ) {
+          if ((!filter.empty() && !key.contains(filter)) || (mBrowseNormals && texture->normals.empty())) {
             continue;
           }
           shownList.push_back(texture);
@@ -4667,7 +4665,7 @@ namespace faf::editor
         return i < mBodyReport.size() ? mBodyReport[i] : std::string();
       };
       const auto skipped = [](const std::string& line) {
-        return line.find("skipped") != std::string::npos || line.find("can't") != std::string::npos;
+        return line.contains("skipped") || line.contains("can't");
       };
 
       // The list: each body, what the fill made of it.
@@ -4917,7 +4915,7 @@ namespace faf::editor
         // Each prop with a picture of its model (only the rows in view ask for theirs).
         const float picture = ImGui::GetFrameHeight() * 1.8f;
         for (const std::string& blueprint : mPropBlueprints) {
-          if (!filter.empty() && blueprint.find(filter) == std::string::npos) {
+          if (!filter.empty() && !blueprint.contains(filter)) {
             continue;
           }
           // "/env/evergreen/props/trees/pine06_s1_prop.bp" shows as "trees/pine06_s1".
@@ -4925,7 +4923,7 @@ namespace faf::editor
           if (const std::size_t props = label.find("/props/"); props != std::string::npos) {
             label = label.substr(props + 7);
           }
-          if (label.size() > 8 && label.compare(label.size() - 8, 8, "_prop.bp") == 0) {
+          if (label.size() > 8 && label.ends_with("_prop.bp")) {
             label.resize(label.size() - 8);
           }
           ImGui::PushID(blueprint.c_str());
@@ -5000,7 +4998,7 @@ namespace faf::editor
           if (const std::size_t props = label.find("/props/"); props != std::string::npos) {
             label = label.substr(props + 7);
           }
-          if (label.size() > 8 && label.compare(label.size() - 8, 8, "_prop.bp") == 0) {
+          if (label.size() > 8 && label.ends_with("_prop.bp")) {
             label.resize(label.size() - 8);
           }
           ImGui::TextUnformatted(label.c_str());
@@ -5187,7 +5185,7 @@ namespace faf::editor
         }
         const std::size_t slash = lower.find_last_of('/');
         const std::string leaf = slash == std::string::npos ? lower : lower.substr(slash + 1);
-        if (filter.empty() ? leaf.find(kHints[slot]) == std::string::npos : lower.find(filter) == std::string::npos) {
+        if (filter.empty() ? !leaf.contains(kHints[slot]) : !lower.contains(filter)) {
           continue;
         }
         if (shown % columns != 0) {
@@ -5332,7 +5330,7 @@ namespace faf::editor
           for (char& c : lowerPath) {
             c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
           }
-          if (!filter.empty() && lowerPath.find(filter) == std::string::npos) {
+          if (!filter.empty() && !lowerPath.contains(filter)) {
             continue;
           }
           if (column > 0) {
@@ -5509,7 +5507,7 @@ namespace faf::editor
           for (char& c : lower) {
             c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
           }
-          if (!filter.empty() && lower.find(filter) == std::string::npos) {
+          if (!filter.empty() && !lower.contains(filter)) {
             continue;
           }
           ImGui::PushID(id.c_str());

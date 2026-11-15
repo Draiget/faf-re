@@ -473,7 +473,7 @@ namespace gpg::gal::imaging
           mListed = true;
           List();
         }
-        return mKeys.count(key) != 0U;
+        return mKeys.contains(key);
       }
 
       void Add(

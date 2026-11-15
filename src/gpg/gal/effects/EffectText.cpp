@@ -67,7 +67,7 @@ namespace gpg::gal::effects::text
     const std::string_view word
   ) noexcept
   {
-    return text.size() >= word.size() && text.compare(0U, word.size(), word) == 0 &&
+    return text.size() >= word.size() && text.starts_with(word) &&
       (text.size() == word.size() || !IsIdentifierChar(text[word.size()]));
   }
 
@@ -160,7 +160,7 @@ namespace gpg::gal::effects::text
           literal.push_back(text[index]);
           ++index;
         }
-        const bool hex = literal.find("0x") != std::string::npos || literal.find("0X") != std::string::npos;
+        const bool hex = literal.contains("0x") || literal.contains("0X");
         while (!hex && !literal.empty() &&
                (literal.back() == 'f' || literal.back() == 'F' || literal.back() == 'h' || literal.back() == 'H' ||
                 literal.back() == 'u' || literal.back() == 'U' || literal.back() == 'l' || literal.back() == 'L')) {

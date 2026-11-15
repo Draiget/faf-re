@@ -954,7 +954,7 @@ namespace faf::editor
   {
     std::vector<std::string> out;
     for (const std::unique_ptr<Mod>& mod : mMods) {
-      if (mod->info.simHooks && mEnabled.count(mod->info.uid) != 0 && !mod->info.uid.empty()) {
+      if (mod->info.simHooks && mEnabled.contains(mod->info.uid) && !mod->info.uid.empty()) {
         out.push_back(mod->info.uid);
       }
     }
@@ -1133,7 +1133,7 @@ namespace faf::editor
       bool added = false;
       for (const EditorModInfo& info : FindEditorMods(mods)) {
         if (known.insert(info.uid).second) {
-          if (mNewModsOn && mTrialOff.count(info.uid) == 0) {
+          if (mNewModsOn && !mTrialOff.contains(info.uid)) {
             mEnabled.insert(info.uid);
           }
           added = true;
@@ -1163,7 +1163,7 @@ namespace faf::editor
       mod->info = std::move(info);
       Mod& added = *mod;
       mMods.push_back(std::move(mod));
-      if (mEnabled.count(added.info.uid) != 0) {
+      if (mEnabled.contains(added.info.uid)) {
         Start(added);
       }
     }
@@ -1672,7 +1672,7 @@ namespace faf::editor
     }
     for (const std::unique_ptr<Mod>& mod : mMods) {
       ImGui::PushID(mod->info.uid.c_str());
-      bool on = mEnabled.count(mod->info.uid) != 0;
+      bool on = mEnabled.contains(mod->info.uid);
       if (ImGui::Checkbox(mod->info.name.c_str(), &on)) {
         (void)SetEnabled(mod->info.uid, on);
       }

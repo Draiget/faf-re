@@ -352,7 +352,7 @@ namespace
       if (!Matches(targets[t].name, opt.filter)) {
         continue;
       }
-      if (casesPerTarget.count(t) != 0) {
+      if (casesPerTarget.contains(t)) {
         ++covered;
       } else {
         std::printf("MISSING %s: no line in %s (a new target needs a new values file)\n", targets[t].name, opt.values);
@@ -484,7 +484,7 @@ namespace
       for (auto variant = variantFirst; variant != variantLast; ++variant) {
         // "inputs outputs note": the same 33 characters as a dump line's hashes, then the note.
         if (
-          variant->second.size() >= hashes.size() && variant->second.compare(0, hashes.size(), hashes) == 0 &&
+          variant->second.size() >= hashes.size() && variant->second.starts_with(hashes) &&
           (variant->second.size() == hashes.size() || variant->second[hashes.size()] == ' ')
         ) {
           variantNote =

@@ -224,7 +224,7 @@ namespace faf::editor
       DetailClasses("evergreen", [&blueprints](const std::string& group, const std::string& name) {
       return FindEnvironmentProp(blueprints, group, name);
     }, [](const std::string& path) {
-      return path.find("eg_cliff01") != std::string::npos;
+      return path.contains("eg_cliff01");
     });
     // small and stones (fieldstone01), big (rock03), cliff (one decal); crack and ground have nothing.
     ASSERT_EQ(classes.size(), 4U);

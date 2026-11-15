@@ -117,7 +117,7 @@ namespace faf::editor
       };
       lower(a);
       lower(b);
-      return a.find(b) != std::string::npos;
+      return a.contains(b);
     }
   } // namespace
 
@@ -177,7 +177,7 @@ namespace faf::editor
     float maxX = -1e9f;
     float maxY = -1e9f;
     for (const GraphNode& node : graph.Nodes()) {
-      if (selectionOnly && mSelection.count(node.id) == 0) {
+      if (selectionOnly && !mSelection.contains(node.id)) {
         continue;
       }
       minX = std::min(minX, node.x);
@@ -196,7 +196,7 @@ namespace faf::editor
       float sy = 0.0f;
       int count = 0;
       for (const GraphNode& node : graph.Nodes()) {
-        if (mSelection.count(node.id) != 0) {
+        if (mSelection.contains(node.id)) {
           sx += node.x + kNodeW * 0.5f;
           sy += node.y + NodeHeight(*node.type) * 0.5f;
           ++count;
@@ -410,18 +410,18 @@ namespace faf::editor
         }
       } else if (nodeHit != 0) {
         if (io.KeyCtrl) {
-          if (mSelection.count(nodeHit) != 0) {
+          if (mSelection.contains(nodeHit)) {
             mSelection.erase(nodeHit);
           } else {
             mSelection.insert(nodeHit);
           }
-        } else if (mSelection.count(nodeHit) == 0) {
+        } else if (!mSelection.contains(nodeHit)) {
           if (!io.KeyShift) {
             mSelection.clear();
           }
           mSelection.insert(nodeHit);
         }
-        mDrag = mSelection.count(nodeHit) != 0 ? Drag::Move : Drag::None;
+        mDrag = mSelection.contains(nodeHit) ? Drag::Move : Drag::None;
         // A frame takes the nodes inside it along (FAF Studio's groups).
         mMoving = MoveSetFor(graph, mSelection);
       } else {
@@ -595,7 +595,7 @@ namespace faf::editor
           rounding,
           ImDrawFlags_RoundCornersTop
         );
-        const bool selected = mSelection.count(node.id) != 0;
+        const bool selected = mSelection.contains(node.id);
         dl->AddRect(a, b, selected ? IM_COL32(250, 200, 80, 255) : tint, rounding, 0, selected ? 2.0f : 1.0f);
         if (mZoom >= 0.2f) {
           const std::string& title = node.name.empty() ? node.params[0].text : node.name;
@@ -620,7 +620,7 @@ namespace faf::editor
     for (const GraphLink& link : graph.Links()) {
       const GraphNode* from = graph.Find(link.fromNode);
       const GraphNode* to = graph.Find(link.toNode);
-      const bool lit = mSelection.count(link.fromNode) != 0 || mSelection.count(link.toNode) != 0;
+      const bool lit = mSelection.contains(link.fromNode) || mSelection.contains(link.toNode);
       const ImU32 color =
         lit ? IM_COL32(255, 255, 255, 255) : PinColor(from->type->outputs[static_cast<std::size_t>(link.fromPin)].type);
       curve(toScreen(from->x + kNodeW, PinY(*from, link.fromPin)), toScreen(to->x, PinY(*to, link.toPin)), color);
@@ -665,7 +665,7 @@ namespace faf::editor
         ImDrawFlags_RoundCornersTop
       );
       const std::string warning = mWarning ? mWarning(node) : std::string();
-      const bool selected = mSelection.count(node.id) != 0;
+      const bool selected = mSelection.contains(node.id);
       const ImU32 outline = !warning.empty() ? IM_COL32(230, 70, 60, 255)
         : selected                           ? IM_COL32(250, 200, 80, 255)
                                              : IM_COL32(15, 15, 15, 255);

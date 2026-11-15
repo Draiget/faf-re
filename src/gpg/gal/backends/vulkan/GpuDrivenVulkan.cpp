@@ -138,9 +138,8 @@ namespace gpg::gal
         L"-spirv",
         L"-fvk-use-dx-layout",
         // Engine addition (ren_RayTracedShadows): ray queries need Vulkan 1.2's SPIR-V.
-        (std::string_view(desc.source, desc.sourceBytes).find("RayQuery<") != std::string_view::npos)
-          ? L"-fspv-target-env=vulkan1.2"
-          : L"-fspv-target-env=vulkan1.1",
+        (std::string_view(desc.source, desc.sourceBytes).contains("RayQuery<")) ? L"-fspv-target-env=vulkan1.2"
+                                                                                : L"-fspv-target-env=vulkan1.1",
         L"-fvk-b-shift",
         L"0",
         L"0",

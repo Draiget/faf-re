@@ -1151,7 +1151,7 @@ namespace faf::editor
       std::transform(needle.begin(), needle.end(), needle.begin(), [](const unsigned char c) {
         return static_cast<char>(std::tolower(c));
       });
-      if (needle.empty() || haystack.find(needle) != std::string::npos) {
+      if (needle.empty() || haystack.contains(needle)) {
         byCategory[type->category].push_back(type.get());
       }
     }

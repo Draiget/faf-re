@@ -89,7 +89,7 @@ namespace
       const std::string key = kv.substr(0, eq);
       const std::string val = kv.substr(eq + 1);
       double n = 0.0;
-      if (val.find(':') != std::string::npos || val.find(';') != std::string::npos) {
+      if (val.contains(':') || val.contains(';')) {
         std::vector<double> flat;
         for (const std::string& pt : Split(val, ';')) {
           for (const std::string& c : Split(pt, ':')) {
@@ -165,13 +165,13 @@ namespace
     for (std::size_t i = 0; i < gLines.size(); ++i) {
       const std::string& l = gLines[i];
       if (!inside) {
-        if (l.find("Cases = [[") == 0) {
+        if (l.starts_with("Cases = [[")) {
           inside = true;
           gBegin = i + 1;
         }
         continue;
       }
-      if (l.find("]]") == 0) {
+      if (l.starts_with("]]")) {
         gEnd = i;
         break;
       }

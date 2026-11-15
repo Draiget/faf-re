@@ -591,10 +591,10 @@ namespace moho
         }
         return names;
       }();
-      if (name.compare(0, 10, "telemetry_") == 0) {
+      if (name.starts_with("telemetry_")) {
         return false;
       }
-      return name.compare(0, 4, "sim_") == 0 || name.compare(0, 4, "lua_") == 0 || sEngineSwitches.count(name) != 0;
+      return name.starts_with("sim_") || name.starts_with("lua_") || sEngineSwitches.contains(name);
     }
 
     /// `name=value` for every `ReportedSwitch`; text values only with `withText` (a text switch may
@@ -1747,7 +1747,7 @@ namespace moho
       }
       const std::string name = line.substr(0, eq);
       values += (values.empty() ? "" : ";") + line;
-      if (name.compare(0, 4, "sim_") == 0 || name.compare(0, 12, "lua_Parallel") == 0) {
+      if (name.starts_with("sim_") || name.starts_with("lua_Parallel")) {
         hashed += line + "\n";
       }
       // sim_Workers starts at -1 and the engine sets it from /simworkers when the sim starts:
@@ -1824,7 +1824,7 @@ namespace moho
       record.Add("faf.army.remote", static_cast<std::int64_t>(army));
       record.Add("faf.source.remote", static_cast<std::int64_t>(report.mSource));
       record.Add("faf.hash.remote", std::string(report.mReported.ToString().c_str()));
-      record.AddBool("faf.orders_altered", altered.count(report.mSource) != 0);
+      record.AddBool("faf.orders_altered", altered.contains(report.mSource));
       records.push_back(std::move(record));
     }
 

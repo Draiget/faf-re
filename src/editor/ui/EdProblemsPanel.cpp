@@ -26,8 +26,7 @@ namespace faf::editor
       // A script's error: its file in the Script Editor, at the line.
       const auto endsWith = [&](const char* const tail) {
         const std::string end = tail;
-        return issue.file.size() >= end.size() &&
-          issue.file.compare(issue.file.size() - end.size(), end.size(), end) == 0;
+        return issue.file.size() >= end.size() && issue.file.ends_with(end);
       };
       mScriptFile = endsWith("_options.lua") ? 1 : endsWith("_tables.lua") ? 2 : 0;
       mShowScript = true;
@@ -35,7 +34,7 @@ namespace faf::editor
       mScriptErrorLine = issue.line;
       mScriptMessage = issue.file + " line " + std::to_string(issue.line) + ": " + issue.text;
       LuaCodeScrollTo(issue.line);
-    } else if (issue.marker == "Props" || issue.marker.rfind("Prop ", 0) == 0) {
+    } else if (issue.marker == "Props" || issue.marker.starts_with("Prop ")) {
       // A prop's finding: the view to its place (props have no names to select by).
       mTools.AskPointFrame(issue.x, issue.z);
     } else if (!issue.marker.empty()) {

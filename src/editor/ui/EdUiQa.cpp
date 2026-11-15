@@ -115,7 +115,7 @@ namespace faf::editor
     }
     const std::string l = Lower(item.label);
     // "..." opens a dialog (a native file dialog blocks the editor's frame loop: the sweep would stall).
-    if (l.size() >= 3 && l.compare(l.size() - 3, 3, "...") == 0) {
+    if (l.size() >= 3 && l.ends_with("...")) {
       return false;
     }
     static const char* const kRisky[] = {
@@ -126,13 +126,12 @@ namespace faf::editor
       "make",    "log in",  "log out",    "sign",     "restart",
     };
     for (const char* risky : kRisky) {
-      if (l.find(risky) != std::string::npos) {
+      if (l.contains(risky)) {
         return false;
       }
     }
     const std::string w = Lower(item.window);
-    return w.find("log") == std::string::npos && w.find("settings") == std::string::npos &&
-      w.find("debug") == std::string::npos;
+    return !w.contains("log") && !w.contains("settings") && !w.contains("debug");
   }
 
   std::vector<QaLayoutProblem> QaLayoutProblems(
@@ -254,7 +253,7 @@ namespace faf::editor
       return false;
     }
     const std::string& panel = mPanels[mPanelAt - 1];
-    return panel.empty() || item.window == panel || item.window.rfind(panel + "/", 0) == 0;
+    return panel.empty() || item.window == panel || item.window.starts_with(panel + "/");
   }
 
   void EdUiQa::CollectTargets()

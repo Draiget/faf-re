@@ -209,7 +209,7 @@ namespace faf::editor
       error = what;
       return false;
     };
-    if (bytes.compare(0, 4, "Map\x1a") != 0) {
+    if (!bytes.starts_with("Map\x1a")) {
       return fail("not a .scmap (no Map header)");
     }
     // Magic, major version, two words, width and height as floats, a float, a short; then the preview.

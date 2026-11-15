@@ -100,7 +100,7 @@ namespace faf::headless
     const std::string_view text
   )
   {
-    return ReadSyncBytes(packet).find(text) != std::string::npos;
+    return ReadSyncBytes(packet).contains(text);
   }
 
   bool ReadSyncNaming(
@@ -115,7 +115,7 @@ namespace faf::headless
     }
     const std::string bytes = ReadSyncBytes(packet);
     const bool named = std::any_of(names.begin(), names.end(), [&](const std::string_view name) {
-      return bytes.find(name) != std::string::npos;
+      return bytes.contains(name);
     });
     if (!named) {
       return false;

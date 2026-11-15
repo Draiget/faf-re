@@ -292,7 +292,7 @@ namespace faf::editor
       for (const auto& triangle : part.triangles) {
         std::size_t extra = 0;
         for (const ObjMesh::Corner& c : triangle) {
-          extra += used.count(c.position) == 0 ? 1 : 0;
+          extra += !used.contains(c.position) ? 1 : 0;
         }
         if (used.size() + extra > limit) {
           flush();

@@ -917,7 +917,7 @@ namespace faf::editor
           }
         }
       }
-      const bool applied = state.results.find(path.id) != state.results.end();
+      const bool applied = state.results.contains(path.id);
       for (std::size_t i = 0; i < path.points.size(); ++i) {
         const KeptPathPoint& p = path.points[i];
         const bool selected = current && mPathEdit != nullptr &&
@@ -954,7 +954,7 @@ namespace faf::editor
     // The skeleton paths' results come off first (each its own undo step, as in Studio).
     std::vector<std::string> applied;
     for (const KeptPath& p : mDocument.PathsNow().set.paths) {
-      if (p.skeleton && mDocument.PathsNow().results.count(p.id) != 0) {
+      if (p.skeleton && mDocument.PathsNow().results.contains(p.id)) {
         applied.push_back(p.id);
       }
     }
@@ -1145,7 +1145,7 @@ namespace faf::editor
   {
     std::vector<std::string> applied;
     for (const KeptPath& p : mDocument.PathsNow().set.paths) {
-      if (p.skeleton && mDocument.PathsNow().results.count(p.id) != 0) {
+      if (p.skeleton && mDocument.PathsNow().results.contains(p.id)) {
         applied.push_back(p.id);
       }
     }

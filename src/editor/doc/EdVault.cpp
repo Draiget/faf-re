@@ -109,7 +109,7 @@ namespace faf::editor
       error = "give a vault map's folder name (dualgap_adaptive.v0012) or its download link";
       return false;
     }
-    if (name.find(".v") == std::string::npos) {
+    if (!name.contains(".v")) {
       error = "a vault map's name ends in its version, as dualgap_adaptive.v0012";
       return false;
     }
@@ -225,7 +225,7 @@ namespace faf::editor
       return {};
     }
     std::string rest = path.substr(slash + 1);
-    if (rest.empty() || rest.back() == '/' || rest.front() == '/' || rest.find(':') != std::string::npos) {
+    if (rest.empty() || rest.back() == '/' || rest.front() == '/' || rest.contains(':')) {
       return {};
     }
     std::size_t at = 0;
@@ -266,7 +266,7 @@ namespace faf::editor
         return false;
       }
       scenario = scenario ||
-        (path.find('/') == std::string::npos && Lower(path).size() > 13 &&
+        (!path.contains('/') && Lower(path).size() > 13 &&
          Lower(path).compare(path.size() - 13, 13, "_scenario.lua") == 0);
       files.emplace_back(path, &entry);
     }

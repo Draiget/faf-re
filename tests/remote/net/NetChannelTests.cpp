@@ -259,7 +259,7 @@ namespace
       } else if (newest - sequence >= ReceiveWindow::kSize) {
         expected = ReceiveWindow::Verdict::TooOld;
       } else {
-        expected = seen.count(sequence) ? ReceiveWindow::Verdict::Duplicate : ReceiveWindow::Verdict::New;
+        expected = seen.contains(sequence) ? ReceiveWindow::Verdict::Duplicate : ReceiveWindow::Verdict::New;
       }
       const ReceiveWindow::Verdict got = window.Check(sequence);
       EXPECT_EQ(got, expected);
@@ -273,7 +273,7 @@ namespace
       }
       std::uint32_t bits = 0;
       for (std::uint32_t k = 0; k < 32; ++k) {
-        if (newest > k + 1 && seen.count(newest - 1 - k)) {
+        if (newest > k + 1 && seen.contains(newest - 1 - k)) {
           bits |= 1u << k;
         }
       }
