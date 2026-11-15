@@ -330,6 +330,10 @@ namespace faf::server
   )
   {
     mKey = key;
+    if (!at.IsIpv4()) {
+      error = "control: an IPv4 address only, not " + at.Text();
+      return false;
+    }
     mListenSocket = ::socket(AF_INET, SOCK_STREAM | SOCK_CLOEXEC, 0);
     if (mListenSocket < 0) {
       error = "control: no TCP socket";
@@ -340,7 +344,7 @@ namespace faf::server
     sockaddr_in address{};
     address.sin_family = AF_INET;
     address.sin_port = htons(at.port);
-    address.sin_addr.s_addr = htonl(at.ip);
+    address.sin_addr.s_addr = htonl(at.Ipv4());
     if (
       ::bind(mListenSocket, reinterpret_cast<const sockaddr*>(&address), sizeof(address)) != 0 ||
       ::listen(mListenSocket, 4) != 0
@@ -536,8 +540,7 @@ namespace faf::server
         break;
       }
       remote::net::SEndpoint peer;
-      peer.ip = ntohl(from.sin_addr.s_addr);
-      peer.port = ntohs(from.sin_port);
+      peer = remote::net::SEndpoint(ntohl(from.sin_addr.s_addr), ntohs(from.sin_port));
       for (const std::unique_ptr<SConnection>& connection : mConnections) {
         if (PeerClosed(*connection)) {
           Close(*connection, connection->channel->Ready() ? "disconnected" : "disconnected during the handshake");

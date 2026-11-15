@@ -64,6 +64,10 @@ namespace faf::server
     std::string& error
   )
   {
+    if (!at.IsIpv4()) {
+      error = "observers: an IPv4 address only, not " + at.Text();
+      return false;
+    }
     mListenSocket = ::socket(AF_INET, SOCK_STREAM | SOCK_CLOEXEC | SOCK_NONBLOCK, 0);
     if (mListenSocket < 0) {
       error = "observe: no TCP socket";
@@ -74,7 +78,7 @@ namespace faf::server
     sockaddr_in address{};
     address.sin_family = AF_INET;
     address.sin_port = htons(at.port);
-    address.sin_addr.s_addr = htonl(at.ip);
+    address.sin_addr.s_addr = htonl(at.Ipv4());
     if (
       ::bind(mListenSocket, reinterpret_cast<const sockaddr*>(&address), sizeof(address)) != 0 ||
       ::listen(mListenSocket, 16) != 0
@@ -167,8 +171,7 @@ namespace faf::server
           break;
         }
         remote::net::SEndpoint peer;
-        peer.ip = ntohl(from.sin_addr.s_addr);
-        peer.port = ntohs(from.sin_port);
+        peer = remote::net::SEndpoint(ntohl(from.sin_addr.s_addr), ntohs(from.sin_port));
         if (connections.size() >= kMaxObservers) {
           Say("observe: " + peer.Text() + " refused: " + std::to_string(kMaxObservers) + " connections already");
           ::close(socket);

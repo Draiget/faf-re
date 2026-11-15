@@ -382,12 +382,13 @@ namespace
   }
 
   /**
-   * Plan WPR.45: `MatchAddresses`, by `OwnerID`, each an IPv4 address or a list of them, outside `MatchConfig` as the
-   * tokens are. The addresses FAF knows its players by. False with `error` for one that doesn't parse.
+   * Plan WPR.45: `MatchAddresses`, by `OwnerID`, each an IPv4 or IPv6 address or a list of them, outside `MatchConfig`
+   * as the tokens are. The addresses FAF knows its players by; an IPv6 one lists its /64 (`AddressPrefix`). False with
+   * `error` for one that doesn't parse.
    */
   [[nodiscard]] bool ReadAddresses(
     LuaPlus::LuaState* const state,
-    std::vector<std::uint32_t>& addresses,
+    std::vector<faf::remote::net::IpAddress>& addresses,
     std::string& error
   )
   {
@@ -396,13 +397,16 @@ namespace
       return true;
     }
     const auto add = [&](const LuaPlus::LuaObject& value) {
-      faf::remote::net::SEndpoint endpoint;
-      if (!value.IsString() || !faf::remote::net::ParseEndpoint(std::string(value.GetString()) + ":1", endpoint)) {
+      faf::remote::net::IpAddress address{};
+      if (
+        !value.IsString() || !faf::remote::net::ParseAddress(value.GetString(), address) ||
+        faf::remote::net::IsAnyAddress(address)
+      ) {
         error = std::string("MatchAddresses holds ") +
-          (value.IsString() ? value.GetString() : "a value that isn't a string") + ", not an IPv4 address";
+          (value.IsString() ? value.GetString() : "a value that isn't a string") + ", not an IPv4 or IPv6 address";
         return false;
       }
-      addresses.push_back(endpoint.ip);
+      addresses.push_back(address);
       return true;
     };
     for (LuaPlus::LuaTableIterator it(&table, 1); !it.m_isDone; it.Next()) {
@@ -1424,7 +1428,7 @@ namespace
       Say("Can't host: %s", end.error.c_str());
       return kExitBadInput;
     }
-    std::vector<std::uint32_t> allowedAddresses;
+    std::vector<faf::remote::net::IpAddress> allowedAddresses;
     if (!ReadAddresses(state, allowedAddresses, end.error)) {
       Say("Can't host: %s", end.error.c_str());
       return kExitBadInput;
@@ -1692,13 +1696,15 @@ namespace
     // The requests that mean the same in the lobby and the game; false for one the caller answers.
     const auto controlCommon = [&net, &control](const faf::server::SControlRequest& request) {
       if (request.op == "allow" || request.op == "disallow") {
-        faf::remote::net::SEndpoint address;
+        faf::remote::net::IpAddress address{};
         if (!net) {
           control->Refuse(request.id, "this server has no players (--listen)");
-        } else if (!faf::remote::net::ParseEndpoint(request.address + ":1", address)) {
-          control->Refuse(request.id, request.op + " needs an IPv4 address, a.b.c.d");
+        } else if (
+          !faf::remote::net::ParseAddress(request.address, address) || faf::remote::net::IsAnyAddress(address)
+        ) {
+          control->Refuse(request.id, request.op + " needs an IPv4 address (a.b.c.d) or an IPv6 address");
         } else {
-          net->RequestAddress(address.ip, request.op == "allow");
+          net->RequestAddress(address, request.op == "allow");
           Say(
             "The control service %s %s",
             request.op == "allow" ? "allows" : "takes off the allowlist",
@@ -1773,8 +1779,8 @@ namespace
       net->AddSeat(client.uid, client.name.c_str(), token->second, seat);
     }
     if (net) {
-      for (const std::uint32_t ip : allowedAddresses) {
-        net->AllowAddress(ip);
+      for (const faf::remote::net::IpAddress& address : allowedAddresses) {
+        net->AllowAddress(address);
       }
       if (!allowedAddresses.empty()) {
         Say(

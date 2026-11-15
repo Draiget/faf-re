@@ -120,9 +120,9 @@ namespace
       mServer = server;
       mConfig = config;
       mRandom.seed(seed);
-      SEndpoint any;
-      any.ip = 0x7F000001u;
-      if (!mPlayerSide.Open(any, error) || !mServerSide.Open(any, error)) {
+      // The player's side on loopback; the server's side on any address of the server's family, so the relay
+      // reaches a server elsewhere, IPv6 included.
+      if (!mPlayerSide.Open(SEndpoint(0x7F000001u, 0u), error) || !mServerSide.Open(SEndpoint{}, error)) {
         return false;
       }
       mStartUs = SteadyUs();

@@ -121,11 +121,13 @@ namespace faf::remote
     std::string& error
   )
   {
-    // The session's channel takes an IPv4 address and port (`StartServerSession`); a name isn't looked up.
+    // The session's channel takes an IPv4 or IPv6 address and port (`StartServerSession`); a name isn't looked up.
     const std::string endpointText(endpoint);
     net::SEndpoint parsed;
     if (!net::ParseEndpoint(endpointText, parsed)) {
-      error = "The game server's address must be an IPv4 address and port: \"" + endpointText + "\".";
+      error = "The game server's address must be an IPv4 address and port (a.b.c.d:port) or an IPv6 address in "
+              "brackets and port ([address]:port): \"" +
+        endpointText + "\".";
       return false;
     }
     if (!IsTokenText(token)) {
@@ -138,7 +140,7 @@ namespace faf::remote
       return false;
     }
     request.endpoint = endpointText;
-    request.address = parsed.ip;
+    request.address = parsed.address;
     request.port = parsed.port;
     request.token.assign(token);
     request.uid = uid;
@@ -572,7 +574,11 @@ namespace faf::remote
     // Plan WP12.1: the channel first (one handshake, the token), then the lobby over it.
     net::SEndpoint server;
     if (!net::ParseEndpoint(request.endpoint, server)) {
-      return fail("The game server's address must be an IPv4 address and port: \"" + request.endpoint + "\".");
+      return fail(
+        "The game server's address must be an IPv4 address and port (a.b.c.d:port) or an IPv6 address in brackets and "
+        "port ([address]:port): \"" +
+        request.endpoint + "\"."
+      );
     }
     sSession = std::make_unique<SServerSession>(request.uid, net::MakeToken(request.token), server);
     if (std::string openError; !sSession->link.Open(openError)) {

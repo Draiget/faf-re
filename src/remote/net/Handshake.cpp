@@ -204,15 +204,15 @@ namespace faf::remote::net
   {
     [[nodiscard]] Cookie CookieFor(
       const std::array<std::uint8_t, 32>& secret,
-      const std::uint64_t addressKey,
+      const AddressKey& addressKey,
       const std::uint64_t period
     ) noexcept
     {
-      std::array<std::uint8_t, 17> message{};
+      std::array<std::uint8_t, 1 + 18 + 8> message{};
       message[0] = kLabelCookie;
+      std::memcpy(message.data() + 1, addressKey.data(), addressKey.size());
       for (int i = 0; i < 8; ++i) {
-        message[static_cast<std::size_t>(1 + i)] = static_cast<std::uint8_t>(addressKey >> (8 * i));
-        message[static_cast<std::size_t>(9 + i)] = static_cast<std::uint8_t>(period >> (8 * i));
+        message[static_cast<std::size_t>(19 + i)] = static_cast<std::uint8_t>(period >> (8 * i));
       }
       Cookie cookie{};
       crypto_blake2b_keyed(cookie.data(), cookie.size(), secret.data(), secret.size(), message.data(), message.size());
@@ -229,7 +229,7 @@ namespace faf::remote::net
   } // namespace
 
   Cookie CCookieJar::Make(
-    const std::uint64_t addressKey,
+    const AddressKey& addressKey,
     const std::uint64_t nowUs
   ) const noexcept
   {
@@ -238,7 +238,7 @@ namespace faf::remote::net
 
   bool CCookieJar::Check(
     const Cookie& cookie,
-    const std::uint64_t addressKey,
+    const AddressKey& addressKey,
     const std::uint64_t nowUs
   ) const noexcept
   {
@@ -251,7 +251,7 @@ namespace faf::remote::net
     const std::uint8_t* const data,
     const std::size_t size,
     const CCookieJar& jar,
-    const std::uint64_t addressKey,
+    const AddressKey& addressKey,
     const std::uint64_t nowUs
   )
   {

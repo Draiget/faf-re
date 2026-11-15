@@ -165,7 +165,7 @@ int main(
   sockaddr_in address{};
   address.sin_family = AF_INET;
   address.sin_port = htons(at.port);
-  address.sin_addr.s_addr = htonl(at.ip);
+  address.sin_addr.s_addr = htonl(at.Ipv4());
   if (socket < 0 || ::connect(socket, reinterpret_cast<const sockaddr*>(&address), sizeof(address)) != 0) {
     std::printf("control: no connection to %s\n", server.c_str());
     return 2;

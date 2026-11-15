@@ -350,7 +350,7 @@ target_link_options(server PRIVATE -Wl,--error-limit=0)
 add_executable(faf_server_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/server/SpeedWatchTests.cpp"
   "${PROJECT_SOURCE_DIR}/tests/server/NftablesTests.cpp")
 target_include_directories(faf_server_tests PRIVATE "${PROJECT_SOURCE_DIR}/src")
-target_link_libraries(faf_server_tests PRIVATE gtest_main)
+target_link_libraries(faf_server_tests PRIVATE faf_netchannel faf_monocypher gtest_main)
 add_test(NAME server_speed_watch COMMAND faf_server_tests)
 
 add_executable(faf_seat_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/server/SeatTests.cpp" "${PROJECT_SOURCE_DIR}/src/server/SeatIntake.cpp"

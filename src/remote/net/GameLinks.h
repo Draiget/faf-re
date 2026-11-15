@@ -244,11 +244,11 @@ namespace faf::remote::net
      * Plan WPR.45, WPR.48: from the first call on, only datagrams from these addresses (any port) reach the handshake
      * at the normal budget. The rest share `kUnlistedHandshakesPerSecond`, so a player behind a VPN, whose address
      * the match didn't know, still gets in with a valid token, and their address is then listed. Without any call,
-     * every address is treated as listed.
+     * every address is treated as listed. An IPv6 address lists its /64 (`AddressPrefix`).
      */
-    void AllowAddress(std::uint32_t ip);
+    void AllowAddress(const IpAddress& address);
     /** Plan WP17.2: off the allowlist again (it shares the unlisted budget from now on); the list stays on. */
-    void DisallowAddress(std::uint32_t ip);
+    void DisallowAddress(const IpAddress& address);
 
     void AddPlayer(std::int32_t uid, const Token& token);
     /** No more handshakes for this uid, and its channel is gone. */
@@ -305,6 +305,7 @@ namespace faf::remote::net
       Token token{};
       std::unique_ptr<NetChannel> channel;
       SEndpoint from;
+      IpAddress local{}; // the server's address the player sends to, which its datagrams leave from
       PublicKey clientPublic{};
       std::vector<PublicKey> usedPublics;
       std::vector<std::uint8_t> accept;
@@ -324,6 +325,7 @@ namespace faf::remote::net
       const std::uint8_t* data,
       std::size_t size,
       const SEndpoint& from,
+      const IpAddress& local,
       std::uint64_t nowUs,
       IEvents& events
     );
@@ -331,12 +333,13 @@ namespace faf::remote::net
       const std::uint8_t* data,
       std::size_t size,
       const SEndpoint& from,
+      const IpAddress& local,
       std::uint64_t nowUs,
       IEvents& events
     );
     [[nodiscard]] bool TakeHandshakeBudget(std::uint64_t nowUs) noexcept;
-    /** One address's own budget (`kHandshakesPerAddressPerSecond`). */
-    [[nodiscard]] bool TakeAddressBudget(std::uint32_t ip, std::uint64_t nowUs) noexcept;
+    /** One address's own budget (`kHandshakesPerAddressPerSecond`); an IPv6 address's /64 shares one. */
+    [[nodiscard]] bool TakeAddressBudget(const IpAddress& address, std::uint64_t nowUs) noexcept;
     [[nodiscard]] bool TakeUnlistedBudget(std::uint64_t nowUs) noexcept;
 
     struct SAddressBucket
@@ -350,14 +353,14 @@ namespace faf::remote::net
     CUdpSocket mSocket;
     CCookieJar mCookies;
     std::map<std::int32_t, SPlayer> mPlayers;
-    std::unordered_map<std::uint64_t, std::int32_t> mByAddress;
+    std::unordered_map<SEndpoint, std::int32_t, SEndpointHash> mByAddress;
     SGameLinkStats mStats;
     double mHandshakeBudget = kHandshakesPerSecond;
     std::uint64_t mHandshakeBudgetUs = 0;
     std::array<SAddressBucket, kAddressBuckets> mAddressBuckets{};
     std::uint64_t mAddressSalt = 0;
     bool mAllowlistOn = false;
-    std::unordered_set<std::uint32_t> mAllowed;
+    std::unordered_set<IpAddress, IpAddressHash> mAllowed; // `AddressPrefix` of each
     double mUnlistedBudget = kUnlistedHandshakesPerSecond;
     std::uint64_t mUnlistedBudgetUs = 0;
     std::vector<std::vector<std::uint8_t>> mOut;

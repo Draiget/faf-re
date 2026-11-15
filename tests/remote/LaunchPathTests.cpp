@@ -26,10 +26,27 @@ namespace
     std::string error;
     ASSERT_TRUE(MakeServerConnectRequest("203.0.113.7:27050", "token-of-seat-one", 1001, request, error)) << error;
     EXPECT_EQ(request.endpoint, "203.0.113.7:27050");
-    EXPECT_EQ(request.address, (203u << 24) | (0u << 16) | (113u << 8) | 7u);
+    EXPECT_EQ(request.address, faf::remote::net::MapIpv4((203u << 24) | (0u << 16) | (113u << 8) | 7u));
     EXPECT_EQ(request.port, 27050);
     EXPECT_EQ(request.token, "token-of-seat-one");
     EXPECT_EQ(request.uid, 1001);
+  }
+
+  // Issue #160: a game server on IPv6.
+  TEST(
+    LaunchPath,
+    Ipv6ConnectionStringIsTaken
+  )
+  {
+    SServerConnectRequest request;
+    std::string error;
+    ASSERT_TRUE(MakeServerConnectRequest("[2001:db8::7]:27050", "token-of-seat-one", 1001, request, error)) << error;
+    EXPECT_EQ(request.endpoint, "[2001:db8::7]:27050");
+    EXPECT_EQ(faf::remote::net::AddressText(request.address), "2001:db8::7");
+    EXPECT_EQ(request.port, 27050);
+    SServerConnectRequest refused;
+    EXPECT_FALSE(MakeServerConnectRequest("2001:db8::7:27050", "token", 1001, refused, error))
+      << "an IPv6 address without brackets leaves the port unclear";
   }
 
   TEST(
@@ -44,6 +61,7 @@ namespace
       std::string error;
       EXPECT_FALSE(MakeServerConnectRequest(endpoint, "token", 1001, request, error)) << endpoint;
       EXPECT_NE(error.find("IPv4 address and port"), std::string::npos) << error;
+      EXPECT_NE(error.find("[address]:port"), std::string::npos) << error;
       EXPECT_TRUE(request.token.empty()) << "a refused request keeps nothing";
     }
   }
