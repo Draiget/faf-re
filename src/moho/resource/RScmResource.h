@@ -75,8 +75,32 @@ namespace moho
     /**
      * Address: 0x00538DB0 (FUN_00538DB0,
      * ?GetSkeleton@RScmResource@Moho@@QAE?AV?$shared_ptr@$$CBVCAniSkel@Moho@@@boost@@XZ)
+     *
+     * Returns a shared handle that keeps this resource, and so the skeleton it
+     * owns, alive for as long as the handle lives. The handle has its own control
+     * block, whose deleter holds a reference to the resource; it is not an alias of
+     * the resource's block.
+     *
+     * Callers that only read bones inside their own frame already hold the entity
+     * that owns the resource, and can use `PeekSkeleton` instead of paying for the
+     * handle.
      */
     [[nodiscard]] std::shared_ptr<const CAniSkel> GetSkeleton();
+
+    /**
+     * Engine addition: the owned skeleton, without a shared handle.
+     *
+     * The skeleton is built on first use and owned outright by this resource
+     * (`~RScmResource` deletes it), so the pointer stays valid for as long as the
+     * caller keeps the resource alive. The four `Entity` bone queries take it this
+     * way: each holds the resource through `mVarDat.mScmResource` for its own
+     * frame, so the resource cannot be released while they read. It is safe for
+     * that frame and no longer.
+     *
+     * The build is ordered exactly as `GetSkeleton` orders it; this is the same
+     * code, split out so a caller that does not need the handle can skip it.
+     */
+    [[nodiscard]] const CAniSkel* PeekSkeleton();
 
     /**
      * Engine addition (plan WPR.35): whether models keep their vertices and indices after they
@@ -93,12 +117,11 @@ namespace moho
     void DropGeometry();
 
   public:
-    fa::string mName;                        // +0x08
-    std::shared_ptr<const SScmFile> mFile;   // +0x24
-    // Engine addition: atomic so the lazy build below can claim it for one
-    // thread. `std::atomic<T*>` has the same size and alignment as `T*` on
-    // every target this builds for, so the +0x2C offset and the 0x4C size
-    // are unchanged.
+    fa::string mName;                      // +0x08
+    std::shared_ptr<const SScmFile> mFile; // +0x24
+    // Engine addition: atomic so the lazy build in `PeekSkeleton` can claim it.
+    // `std::atomic<T*>` has the same size and alignment as `T*` on every target
+    // this builds for, so the +0x2C offset and the 0x4C size above are unchanged.
     std::atomic<CAniSkel*> mSkeleton; // +0x2C
     Wm3::AxisAlignedBox3f mBounds;    // +0x30
     float mSize;                      // +0x48

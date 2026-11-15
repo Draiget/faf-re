@@ -1800,8 +1800,7 @@ namespace moho
       return 0;
     }
 
-    const std::shared_ptr<const CAniSkel> skeleton = scmResource->GetSkeleton();
-    const CAniSkel* const skel = skeleton.get();
+    const CAniSkel* const skel = scmResource->PeekSkeleton();
     if (skel == nullptr) {
       return 0;
     }
@@ -1825,8 +1824,7 @@ namespace moho
       return nullptr;
     }
 
-    const std::shared_ptr<const CAniSkel> skeleton = scmResource->GetSkeleton();
-    const CAniSkel* const skel = skeleton.get();
+    const CAniSkel* const skel = scmResource->PeekSkeleton();
     if (skel == nullptr) {
       return nullptr;
     }
@@ -1888,8 +1886,7 @@ namespace moho
       return -1;
     }
 
-    const std::shared_ptr<const CAniSkel> skeleton = scmResource->GetSkeleton();
-    const CAniSkel* const skel = skeleton.get();
+    const CAniSkel* const skel = scmResource->PeekSkeleton();
     if (skel == nullptr) {
       return -1;
     }
@@ -2192,7 +2189,7 @@ namespace moho
   {
     if (boneIndex >= 0) {
       if (RScmResource* const scmResource = mesh; scmResource != nullptr) {
-        const CAniSkel* const skeleton = scmResource->GetSkeleton().get();
+        const CAniSkel* const skeleton = scmResource->PeekSkeleton();
         if (skeleton != nullptr) {
           const SAniSkelBone* const bone = skeleton->GetBone(static_cast<std::uint32_t>(boneIndex));
           if (bone != nullptr) {

@@ -172,29 +172,23 @@ namespace moho
   } // namespace
 
   /**
-   * Address: 0x00538DB0 (FUN_00538DB0,
-   * ?GetSkeleton@RScmResource@Moho@@QAE?AV?$shared_ptr@$$CBVCAniSkel@Moho@@@boost@@XZ)
+   * Engine addition: the same build `GetSkeleton` does, without the handle.
    *
-   * What it does:
-   * Lazily constructs the owned skeleton on first request by parsing this
-   * resource's SCM file into a `CAniResourceSkel`, then returns one shared handle
-   * that keeps this resource, and so the skeleton, alive for as long as the
-   * handle lives.
+   * `mSkeleton` is the state: null means not built, the marker means a thread is
+   * parsing, anything else is the finished skeleton. One thread wins the exchange
+   * and publishes with release, so the parse never runs twice and no reader sees
+   * a half-built skeleton. A failed parse clears the slot before the exception
+   * leaves, so the next caller tries again.
    *
-   * The build is claimed by one thread through `mSkeleton` itself: null means not
-   * built, the marker means a thread is parsing, anything else is the result. That
-   * keeps two threads from parsing the same file into two skeletons and losing
-   * one, and it publishes with release so a reader never sees a half-built one.
-   * Without it the plain `if (mSkeleton == nullptr)` had both races.
+   * The pointer is valid while the caller keeps this resource alive; it does not
+   * extend that lifetime the way the handle `GetSkeleton` returns does.
    */
-  std::shared_ptr<const CAniSkel> RScmResource::GetSkeleton()
+  const CAniSkel* RScmResource::PeekSkeleton()
   {
-    CAniSkel* skeleton = nullptr;
     for (;;) {
       CAniSkel* const current = mSkeleton.load(std::memory_order_acquire);
       if (current != nullptr && current != kSkeletonBuildInProgress) {
-        skeleton = current;
-        break;
+        return current;
       }
 
       if (current == kSkeletonBuildInProgress) {
@@ -217,8 +211,9 @@ namespace moho
         // The binary allocates a 0x48-byte CAniResourceSkel and constructs it
         // from this resource's name + SCM file, storing it through the CAniSkel*
         // base pointer lane.
-        skeleton = new CAniResourceSkel(mName, mFile);
-        mSkeleton.store(skeleton, std::memory_order_release);
+        CAniSkel* const built = new CAniResourceSkel(mName, mFile);
+        mSkeleton.store(built, std::memory_order_release);
+        return built;
       } catch (...) {
         // Parsing can fail (the bone tables are resized). Put the slot back to
         // "not built" before letting the exception out, so the next caller tries
@@ -226,8 +221,23 @@ namespace moho
         mSkeleton.store(nullptr, std::memory_order_release);
         throw;
       }
-      break;
     }
+  }
+
+  /**
+   * Address: 0x00538DB0 (FUN_00538DB0,
+   * ?GetSkeleton@RScmResource@Moho@@QAE?AV?$shared_ptr@$$CBVCAniSkel@Moho@@@boost@@XZ)
+   *
+   * What it does:
+   * Returns a shared handle that keeps this resource, and so the skeleton it
+   * owns, alive for as long as the handle lives. The handle has its own control
+   * block, whose deleter holds a reference to the resource.
+   *
+   * The build belongs to `PeekSkeleton`.
+   */
+  std::shared_ptr<const CAniSkel> RScmResource::GetSkeleton()
+  {
+    const CAniSkel* const skeleton = PeekSkeleton();
 
     struct KeepOwnerAlive
     {
