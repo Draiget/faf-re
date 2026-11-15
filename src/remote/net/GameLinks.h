@@ -436,6 +436,12 @@ namespace faf::remote::net
       return mCompression;
     }
 
+    /** The live channel's statistics (RTT, losses, bytes), or null before the handshake ends. */
+    [[nodiscard]] const ChannelStats* LiveChannelStats() const noexcept
+    {
+      return mChannel ? &mChannel->Stats() : nullptr;
+    }
+
   private:
     std::int32_t mUid;
     Token mToken;
