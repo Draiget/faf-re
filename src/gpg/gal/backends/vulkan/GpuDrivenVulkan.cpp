@@ -461,6 +461,7 @@ namespace gpg::gal
     Vk().vkCmdCopyBuffer(
       mCommands, static_cast<GpuBufferVulkan&>(buffer).Buffer().buffer, readback.buffer, 1U, &region
     );
+    HostReadBarrier();
     Submit(true, false);
     std::memcpy(out, readback.memory.mapped, static_cast<std::size_t>(bytes));
     Vk().vkDestroyBuffer(mDevice, readback.buffer, nullptr);

@@ -1713,6 +1713,24 @@ namespace gpg::gal
     Vk().vkCmdPipelineBarrier2(mCommands, &dependency);
   }
 
+  void DeviceVulkan::HostReadBarrier()
+  {
+    // Waiting for the submission on the host does not make the device's writes visible to it: the wait's
+    // scope covers only device accesses (the specification's "host access types"). A GPU whose caches a
+    // submission's end does not flush, as a phone's can be, would hand the host stale bytes without this.
+    VkMemoryBarrier2 barrier{};
+    barrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER_2;
+    barrier.srcStageMask = VK_PIPELINE_STAGE_2_ALL_TRANSFER_BIT;
+    barrier.srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
+    barrier.dstStageMask = VK_PIPELINE_STAGE_2_HOST_BIT;
+    barrier.dstAccessMask = VK_ACCESS_2_HOST_READ_BIT;
+    VkDependencyInfo dependency{};
+    dependency.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+    dependency.memoryBarrierCount = 1U;
+    dependency.pMemoryBarriers = &barrier;
+    Vk().vkCmdPipelineBarrier2(mCommands, &dependency);
+  }
+
   void DeviceVulkan::UploadBuffer(
     vulkan::TrackedBuffer& destination,
     const VkDeviceSize offset,
@@ -1929,6 +1947,7 @@ namespace gpg::gal
     Vk().vkCmdCopyImageToBuffer(
       mCommands, source.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, readback.buffer, 1U, &region
     );
+    HostReadBarrier();
     Submit(true, false);
     bytes.assign(readback.memory.mapped, readback.memory.mapped + layout.ByteSize());
     Vk().vkDestroyBuffer(mDevice, readback.buffer, nullptr);
