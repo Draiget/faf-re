@@ -11,10 +11,12 @@
 #include "gpg/gal/backends/common/ImageCodec.h"
 #include "editor/doc/EdScenarioInfo.h"
 #include "editor/tools/EdMeshScan.h"
+#include "editor/tools/EdScm.h"
 #include "gpg/core/utils/Logging.h"
 #include "moho/sim/CWldMap.h"
 #include "moho/sim/STIMap.h"
 #include "moho/mesh/Mesh.h"
+#include "moho/render/camera/CameraImpl.h"
 #include "moho/misc/StartupHelpers.h"
 #include "moho/resource/blueprints/RPropBlueprint.h"
 #include "moho/resource/RResId.h"
@@ -33,7 +35,9 @@
 
 namespace moho
 {
-  extern bool ren_Terrain; // the height field drawn (RuntimeTuningGlobals.cpp)
+  extern bool ren_TerrainSurface;   // the height field's surface drawn (WRenViewport.cpp)
+  extern float ren_ShadowExtraMinY; // heights the shadow map must also hold (Shadow.cpp)
+  extern float ren_ShadowExtraMaxY;
 } // namespace moho
 
 namespace faf::editor
@@ -135,327 +139,148 @@ namespace faf::editor
     }
   } // namespace
 
-  bool EdMapScene::BakeMeshPatch(
-    const std::size_t index,
-    const int generation,
-    std::string& meshPath,
-    std::string& albedoPath,
+  bool EdMapScene::BakeMeshMaterial(
+    const int materialIndex,
+    const std::filesystem::path& folder,
+    const std::string& vfs,
+    MeshMaterialView& out,
     std::string& why
   )
   {
-    if (mMeshViewCache.empty()) {
-      why = "no cache folder";
-      return false;
-    }
-    const edmesh::Patch& patch = mMeshMap.patches[index];
-    const edmesh::Settings& s = mMeshMap.settings;
-    const std::size_t vertices = std::min<std::size_t>(patch.vertexCount, patch.vertices.size() / 68);
-    if (vertices == 0 || patch.indices.size() < 3) {
-      why = "an empty patch";
-      return false;
-    }
     const auto inFolder = [this](const std::string& file) {
       if (file.empty() || file.front() == '/') {
         return file;
       }
       return mMeshMap.dir + (mMeshMap.dir.empty() || mMeshMap.dir.back() == '/' ? "" : "/") + file;
     };
-    // The material's textures (Studio's slot order: diffuse a, b, light masks 0..2, normal a, b, specular a, b).
     const edmesh::Material* material =
-      patch.material >= 0 && static_cast<std::size_t>(patch.material) < mMeshMap.materials.size()
-      ? &mMeshMap.materials[static_cast<std::size_t>(patch.material)]
+      materialIndex >= 0 && static_cast<std::size_t>(materialIndex) < mMeshMap.materials.size()
+      ? &mMeshMap.materials[static_cast<std::size_t>(materialIndex)]
       : nullptr;
-    MeshTexture slot[9];
-    bool have[9] = {};
-    for (int k = 0; k < 9 && material != nullptr; ++k) {
-      have[k] = LoadMeshTexture(inFolder(material->files[k]), slot[k]);
-    }
-    if (!have[0]) {
-      // No ground texture: the map's lowest layer (and its normal map).
+    const std::string tag = "mat" + std::to_string(materialIndex);
+    const auto write = [&](const std::string& name, const TexImage& image, const DdsKind kind) -> std::string {
+      std::vector<std::uint8_t> dds;
+      if (!EncodeDds(image, kind, dds, why)) {
+        return {};
+      }
+      std::ofstream(folder / name, std::ios::binary | std::ios::trunc)
+        .write(reinterpret_cast<const char*>(dds.data()), static_cast<std::streamsize>(dds.size()));
+      return vfs + "/" + name;
+    };
+    const auto solid = [&](const std::string& name, const float r, const float g, const float b, const float a) {
+      TexImage image;
+      image.Reset(4, 4);
+      for (int y = 0; y < 4; ++y) {
+        for (int x = 0; x < 4; ++x) {
+          float* const d = image.Pixel(x, y);
+          d[0] = r;
+          d[1] = g;
+          d[2] = b;
+          d[3] = a;
+        }
+      }
+      return write(name, image, DdsKind::Bgra);
+    };
+    const auto exists = [&](const std::string& path) {
+      std::string bytes;
+      return !path.empty() && ReadGameFile(path, bytes);
+    };
+    // The layers and layer A's normal map as they are (Studio's slots: diffuse a, b, light masks 0..2, normal a, b,
+    // specular a, b); the map's lowest layer for a material with no ground texture.
+    out = MeshMaterialView{};
+    if (material != nullptr && exists(inFolder(material->files[0]))) {
+      out.albedo = inFolder(material->files[0]);
+      out.normals = exists(inFolder(material->files[5])) ? inFolder(material->files[5]) : std::string();
+    } else {
       for (const EdTools::LayerSlot& layer : LayerSlots()) {
-        if (!layer.albedo.empty() && LoadMeshTexture(layer.albedo, slot[0])) {
-          have[0] = true;
-          have[5] = LoadMeshTexture(layer.normals, slot[5]);
+        if (!layer.albedo.empty()) {
+          out.albedo = layer.albedo;
+          out.normals = layer.normals;
           break;
         }
       }
     }
-    if (!have[0]) {
-      why = "no texture to bake";
+    if (out.albedo.empty()) {
+      why = "no ground texture";
       return false;
     }
-    const bool masks = have[2] || have[3] || have[4];
-    MeshTexture ramp;
-    const bool haveRamp = LoadMeshTexture(mDocument.WaterNow().textures[1], ramp);
-    // The sun for a material without baked light (an OBJ just imported): the manifest's, else the map's.
-    float sunDir[3] = {s.sunDirection[0], s.sunDirection[1], s.sunDirection[2]};
-    float sunColour[3] = {s.sunColor[0], s.sunColor[1], s.sunColor[2]};
-    if (sunColour[0] + sunColour[1] + sunColour[2] <= 0.0f) {
-      const LightingState light = mDocument.LightingNow();
-      for (int k = 0; k < 3; ++k) {
-        sunDir[k] = light.sunDirection[k];
-        sunColour[k] = light.sunColor[k];
-      }
+    out.secondary =
+      material != nullptr && exists(inFolder(material->files[1])) ? inFolder(material->files[1]) : out.albedo;
+    if (out.normals.empty()) {
+      out.normals = solid(tag + "_flatnormal.dds", 0.5f, 0.5f, 1.0f, 1.0f);
     }
-    {
-      const float l = std::sqrt(sunDir[0] * sunDir[0] + sunDir[1] * sunDir[1] + sunDir[2] * sunDir[2]);
-      for (float& c : sunDir) {
-        c = l > 0.0f ? c / l : 0.0f;
-      }
+    out.alphaTest = material != nullptr && material->alphaTest >= 0.0f;
+    // The light masks for the surface's own normal and the layers' blend, over the second coordinates.
+    MeshTexture masks[3];
+    bool haveMask[3] = {};
+    int size = 0;
+    for (int k = 0; k < 3 && material != nullptr; ++k) {
+      haveMask[k] = LoadMeshTexture(inFolder(material->files[2 + k]), masks[k]);
+      size = std::max(size, haveMask[k] ? std::max(masks[k].w, masks[k].h) : 0);
     }
-    // The patch seen from above: about 4 texels a unit, 256 to 2048 across.
-    const float minX = patch.boundsMin[0];
-    const float minZ = patch.boundsMin[2];
-    const float spanX = std::max(1.0f, patch.boundsMax[0] - minX);
-    const float spanZ = std::max(1.0f, patch.boundsMax[2] - minZ);
-    int n = 256;
-    while (n < 2048 && static_cast<float>(n) < std::max(spanX, spanZ) * 4.0f) {
-      n *= 2;
-    }
-    struct Texel
-    {
-      float y = -1.0e30f;
-      float uv[2] = {0, 0};
-      float uv2[2] = {0, 0};
-      float normal[3] = {0, 1, 0};
-      float tangent[3] = {1, 0, 0};
-      float binormal[3] = {0, 0, 1};
-    };
-    std::vector<Texel> grid(static_cast<std::size_t>(n) * static_cast<std::size_t>(n));
-    const auto field = [&](const std::size_t v, const std::size_t offset, const int count, float* out) {
-      std::memcpy(out, patch.vertices.data() + v * 68 + offset, static_cast<std::size_t>(count) * 4);
-    };
-    for (std::size_t t = 0; t + 2 < patch.indices.size(); t += 3) {
-      std::size_t idx[3];
-      float pos[3][3];
-      float sx[3];
-      float sz[3];
-      bool ok = true;
-      for (int k = 0; k < 3; ++k) {
-        idx[k] = patch.indices[t + static_cast<std::size_t>(k)];
-        if (idx[k] >= vertices) {
-          ok = false;
-          break;
-        }
-        field(idx[k], 0, 3, pos[k]);
-        sx[k] = (pos[k][0] - minX) / spanX * static_cast<float>(n);
-        sz[k] = (pos[k][2] - minZ) / spanZ * static_cast<float>(n);
-      }
-      if (!ok) {
-        continue;
-      }
-      const float area = (sx[1] - sx[0]) * (sz[2] - sz[0]) - (sx[2] - sx[0]) * (sz[1] - sz[0]);
-      if (std::fabs(area) < 1e-8f) {
-        continue; // seen edge-on from above (a vertical wall)
-      }
-      const int x0 = std::max(0, static_cast<int>(std::floor(std::min({sx[0], sx[1], sx[2]}))));
-      const int x1 = std::min(n - 1, static_cast<int>(std::ceil(std::max({sx[0], sx[1], sx[2]}))));
-      const int z0 = std::max(0, static_cast<int>(std::floor(std::min({sz[0], sz[1], sz[2]}))));
-      const int z1 = std::min(n - 1, static_cast<int>(std::ceil(std::max({sz[0], sz[1], sz[2]}))));
-      for (int z = z0; z <= z1; ++z) {
-        for (int x = x0; x <= x1; ++x) {
-          const float px = static_cast<float>(x) + 0.5f;
-          const float pz = static_cast<float>(z) + 0.5f;
-          const float w0 = ((sx[1] - px) * (sz[2] - pz) - (sx[2] - px) * (sz[1] - pz)) / area;
-          const float w1 = ((sx[2] - px) * (sz[0] - pz) - (sx[0] - px) * (sz[2] - pz)) / area;
-          const float w2 = 1.0f - w0 - w1;
-          if (w0 < -1e-4f || w1 < -1e-4f || w2 < -1e-4f) {
-            continue;
-          }
-          const float y = w0 * pos[0][1] + w1 * pos[1][1] + w2 * pos[2][1];
-          Texel& texel = grid[static_cast<std::size_t>(z) * static_cast<std::size_t>(n) + static_cast<std::size_t>(x)];
-          if (y <= texel.y) {
-            continue; // the top surface wins
-          }
-          texel.y = y;
-          const float w[3] = {w0, w1, w2};
-          float sum[2] = {0, 0}, sum2[2] = {0, 0}, nrm[3] = {0, 0, 0}, tan[3] = {0, 0, 0}, bin[3] = {0, 0, 0};
+    out.lightMasks = haveMask[0] || haveMask[1] || haveMask[2];
+    if (out.lightMasks) {
+      size = std::clamp(size, 64, 1024);
+      TexImage light;
+      light.Reset(size, 4);
+      for (int y = 0; y < size; ++y) {
+        for (int x = 0; x < size; ++x) {
+          const float u = (static_cast<float>(x) + 0.5f) / static_cast<float>(size);
+          const float v = (static_cast<float>(y) + 0.5f) / static_cast<float>(size);
+          float sum[3] = {0, 0, 0};
+          float blend = 0.0f;
           for (int k = 0; k < 3; ++k) {
-            float a[3], b[3], c[3], uv[2], uv2[2];
-            field(idx[k], 12, 3, a);
-            field(idx[k], 24, 3, b);
-            field(idx[k], 36, 3, c);
-            field(idx[k], 48, 2, uv);
-            field(idx[k], 56, 2, uv2);
-            for (int q = 0; q < 3; ++q) {
-              nrm[q] += a[q] * w[k];
-              tan[q] += b[q] * w[k];
-              bin[q] += c[q] * w[k];
+            float c[4] = {1, 1, 1, 1};
+            if (haveMask[k]) {
+              masks[k].Sample(u, v, c);
             }
-            for (int q = 0; q < 2; ++q) {
-              sum[q] += uv[q] * w[k];
-              sum2[q] += uv2[q] * w[k];
+            for (int q = 0; q < 3; ++q) {
+              sum[q] += 0.57735027f * LinearOf(c[q]);
+            }
+            if (k == 1) {
+              blend = c[3];
             }
           }
-          const auto unit = [](float (&v)[3], const float (&fallback)[3]) {
-            const float l = std::sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
-            for (int q = 0; q < 3; ++q) {
-              v[q] = l > 1e-6f ? v[q] / l : fallback[q];
-            }
-          };
-          unit(nrm, {0.0f, 1.0f, 0.0f});
-          unit(tan, {1.0f, 0.0f, 0.0f});
-          unit(bin, {0.0f, 0.0f, 1.0f});
-          std::memcpy(texel.normal, nrm, sizeof nrm);
-          std::memcpy(texel.tangent, tan, sizeof tan);
-          std::memcpy(texel.binormal, bin, sizeof bin);
-          std::memcpy(texel.uv, sum, sizeof sum);
-          std::memcpy(texel.uv2, sum2, sizeof sum2);
+          float* const d = light.Pixel(x, y);
+          for (int q = 0; q < 3; ++q) {
+            d[q] = std::pow(std::clamp(sum[q] * 0.5f, 0.0f, 1.0f), 1.0f / 2.2f);
+          }
+          d[3] = material->blending ? blend : 0.0f;
         }
       }
+      out.specular = write(tag + "_light.dds", light, DdsKind::Bc3);
+    } else {
+      out.specular = solid(tag + "_light.dds", 1.0f, 1.0f, 1.0f, 0.0f);
     }
-    // Studio's pixel shader at each texel (EdMeshDraw.cpp's PS, the sun shadow as lit and no highlight).
-    TexImage out;
-    out.Reset(n, 4);
-    const bool hasWater = s.water > -9000.0f;
-    const bool hazeOn = !hasWater && s.haveVoid && s.haze > -9000.0f;
-    const float depthScale = 1.0f / std::max(1.0f, s.water - s.waterAbyss);
-    static constexpr float kBasis[3][3] = {
-      {0.81649658f, 0.0f, 0.57735027f}, {-0.40824829f, 0.70710678f, 0.57735027f}, {-0.40824829f, -0.70710678f, 0.57735027f}
-    };
-    const auto sample = [&](const int k, const float u, const float v, float (&c)[4], const float fallback) {
-      if (have[k]) {
-        slot[k].Sample(u, v, c);
-      } else {
-        c[0] = c[1] = c[2] = c[3] = fallback;
+    // The mask, with only what the material uses (glow: green, sun highlight: blue).
+    MeshTexture mask;
+    if (
+      material != nullptr && (material->glow || material->highlight) &&
+      LoadMeshTexture(inFolder(material->files[7]), mask)
+    ) {
+      const int side = std::clamp(std::max(mask.w, mask.h), 4, 1024);
+      TexImage image;
+      image.Reset(side, 4);
+      for (int y = 0; y < side; ++y) {
+        for (int x = 0; x < side; ++x) {
+          float c[4];
+          mask.Sample(
+            (static_cast<float>(x) + 0.5f) / static_cast<float>(side),
+            (static_cast<float>(y) + 0.5f) / static_cast<float>(side),
+            c
+          );
+          float* const d = image.Pixel(x, y);
+          d[0] = 0.0f;
+          d[1] = material->glow ? c[1] : 0.0f;
+          d[2] = material->highlight ? c[2] : 0.0f;
+          d[3] = 1.0f;
+        }
       }
-    };
-    for (int z = 0; z < n; ++z) {
-      for (int x = 0; x < n; ++x) {
-        const Texel& t = grid[static_cast<std::size_t>(z) * static_cast<std::size_t>(n) + static_cast<std::size_t>(x)];
-        float* const d = out.Pixel(x, z);
-        if (t.y < -1.0e29f) {
-          d[0] = d[1] = d[2] = 0.0f;
-          d[3] = 0.0f; // no surface: the alpha test drops it
-          continue;
-        }
-        float l0[4], l1[4], l2[4];
-        sample(2, t.uv2[0], t.uv2[1], l0, 1.0f);
-        sample(3, t.uv2[0], t.uv2[1], l1, 1.0f);
-        sample(4, t.uv2[0], t.uv2[1], l2, 1.0f);
-        const float blend = material != nullptr && material->blending ? l1[3] : 0.0f;
-        float a[4], b[4];
-        sample(0, t.uv[0], t.uv[1], a, 1.0f);
-        if (have[1]) {
-          slot[1].Sample(t.uv[0], t.uv[1], b);
-        } else {
-          std::memcpy(b, a, sizeof a);
-        }
-        float diffuse[4];
-        for (int q = 0; q < 4; ++q) {
-          diffuse[q] = a[q] + (b[q] - a[q]) * blend;
-        }
-        const bool kept = material == nullptr || material->alphaTest < 0.0f || diffuse[3] * 255.0f > material->alphaTest;
-        float na[4], nb[4];
-        sample(5, t.uv[0], t.uv[1], na, 0.5f);
-        if (!have[5]) {
-          na[2] = 1.0f;
-        }
-        if (have[6]) {
-          slot[6].Sample(t.uv[0], t.uv[1], nb);
-        } else {
-          std::memcpy(nb, na, sizeof na);
-        }
-        float nn[3];
-        for (int q = 0; q < 3; ++q) {
-          nn[q] = (na[q] + (nb[q] - na[q]) * blend) * 2.0f - 1.0f;
-        }
-        {
-          const float l = std::sqrt(nn[0] * nn[0] + nn[1] * nn[1] + nn[2] * nn[2]);
-          for (float& c : nn) {
-            c = l > 1e-6f ? c / l : 0.0f;
-          }
-        }
-        float light[3] = {0, 0, 0};
-        if (masks) {
-          const float* const maskRgb[3] = {l0, l1, l2};
-          for (int k = 0; k < 3; ++k) {
-            const float dp = std::clamp(nn[0] * kBasis[k][0] + nn[1] * kBasis[k][1] + nn[2] * kBasis[k][2], 0.0f, 1.0f);
-            for (int q = 0; q < 3; ++q) {
-              light[q] += dp * LinearOf(maskRgb[k][q]);
-            }
-          }
-        } else {
-          // No baked light: the sun on the surface's normal (its normal map turned into the world), and a fill.
-          float world[3];
-          for (int q = 0; q < 3; ++q) {
-            world[q] = nn[0] * t.tangent[q] + nn[1] * t.binormal[q] + nn[2] * t.normal[q];
-          }
-          const float lambert = std::max(0.0f, world[0] * sunDir[0] + world[1] * sunDir[1] + world[2] * sunDir[2]);
-          for (int q = 0; q < 3; ++q) {
-            light[q] = LinearOf(std::clamp(sunColour[q], 0.0f, 2.0f)) * lambert + LinearOf(s.shadowColor[q]) * 0.6f;
-          }
-        }
-        float ma[4], mb[4];
-        sample(7, t.uv[0], t.uv[1], ma, 0.0f);
-        if (have[8]) {
-          slot[8].Sample(t.uv[0], t.uv[1], mb);
-        } else {
-          std::memcpy(mb, ma, sizeof ma);
-        }
-        const float glow = material != nullptr && material->glow ? ma[1] + (mb[1] - ma[1]) * blend : 0.0f;
-        float colour[3];
-        for (int q = 0; q < 3; ++q) {
-          const float lit = light[q] + (1.0f - light[q]) * glow;
-          float c = std::pow(std::max(0.0f, LinearOf(diffuse[q]) * lit), 1.0f / 2.2f);
-          c = std::min(c, 0.7f) + 0.3f * (1.0f - std::exp(std::max(c - 0.7f, 0.0f) / -0.3f));
-          colour[q] = c;
-        }
-        if (hasWater && t.y <= s.water && haveRamp) {
-          float water[4];
-          ramp.Sample(std::clamp((s.water - t.y) * depthScale, 0.0f, 1.0f), 0.5f, water);
-          for (int q = 0; q < 3; ++q) {
-            colour[q] += (water[q] - colour[q]) * water[3] * s.waterTint;
-          }
-        }
-        if (hazeOn) {
-          const float haze = std::clamp((s.haze - t.y) / s.hazeSpan, 0.0f, 1.0f);
-          for (int q = 0; q < 3; ++q) {
-            colour[q] += (s.voidColor[q] - colour[q]) * haze;
-          }
-        }
-        d[0] = colour[0];
-        d[1] = colour[1];
-        d[2] = colour[2];
-        d[3] = kept ? 1.0f : 0.0f;
-      }
+      out.lookup = write(tag + "_mask.dds", image, DdsKind::Bc3);
+    } else {
+      out.lookup = solid(tag + "_mask.dds", 0.0f, 0.0f, 0.0f, 1.0f);
     }
-    // The files: the baked texture and the patch whose first texture coordinates span it.
-    std::string bytes;
-    if (!ReadGameFile(inFolder(patch.file), bytes) || bytes.size() < 48) {
-      why = "the patch file can't be read";
-      return false;
-    }
-    std::uint32_t vertexOffset = 0;
-    std::uint32_t vertexCount = 0;
-    std::memcpy(&vertexOffset, bytes.data() + 16, 4);
-    std::memcpy(&vertexCount, bytes.data() + 24, 4);
-    if (static_cast<std::uint64_t>(vertexOffset) + vertexCount * 68ull > bytes.size()) {
-      why = "the patch file's vertices are outside it";
-      return false;
-    }
-    for (std::uint32_t v = 0; v < vertexCount; ++v) {
-      char* const at = bytes.data() + vertexOffset + static_cast<std::size_t>(v) * 68;
-      float position[3];
-      std::memcpy(position, at, 12);
-      const float uv[2] = {(position[0] - minX) / spanX, (position[2] - minZ) / spanZ};
-      std::memcpy(at + 48, uv, 8);
-    }
-    std::vector<std::uint8_t> dds;
-    if (!EncodeDds(out, DdsKind::Bc3, dds, why)) {
-      return false;
-    }
-    const std::string name = mDocument.FolderName() + "_" + std::to_string(generation);
-    const std::filesystem::path folder = mMeshViewCache / name;
-    std::error_code ec;
-    std::filesystem::create_directories(folder, ec);
-    const std::string base = "patch" + std::to_string(index);
-    std::ofstream(folder / (base + ".scm"), std::ios::binary | std::ios::trunc).write(bytes.data(), static_cast<std::streamsize>(bytes.size()));
-    std::ofstream(folder / (base + "_albedo.dds"), std::ios::binary | std::ios::trunc)
-      .write(reinterpret_cast<const char*>(dds.data()), static_cast<std::streamsize>(dds.size()));
-    meshPath = "/editor_meshview/" + name + "/" + base + ".scm";
-    albedoPath = "/editor_meshview/" + name + "/" + base + "_albedo.dds";
-    return true;
+    return !out.specular.empty() && !out.lookup.empty() && !out.normals.empty();
   }
 
   void EdMapScene::DeleteMeshInstances()
@@ -466,6 +291,12 @@ namespace faf::editor
       }
     }
     mMeshPatchInstances.clear();
+    mMeshPatchKinds.clear();
+    if (mMeshSetsShadowRange) {
+      moho::ren_ShadowExtraMinY = 1.0f; // (empty: the shadow map fitted to the height field alone again)
+      moho::ren_ShadowExtraMaxY = 0.0f;
+      mMeshSetsShadowRange = false;
+    }
     for (moho::RMeshBlueprint* const blueprint : mMeshPatchBlueprints) {
       delete blueprint;
     }
@@ -482,9 +313,6 @@ namespace faf::editor
       mMeshInstancesTried = false; // again once they are up
       return;
     }
-    static constexpr int kDiffuse = 0;
-    static constexpr int kNormal = 5;
-    static constexpr int kSpecular = 7;
     const auto inFolder = [this](const std::string& file) {
       if (file.empty() || file.front() == '/') {
         return file;
@@ -507,97 +335,174 @@ namespace faf::editor
         }
       }
     }
-    std::vector<std::pair<std::string, std::string>> baked(mMeshMap.patches.size());
-    int bakedCount = 0;
+    // Each material once, into this load's cache folder (mounted when its files are written).
+    const std::string name = mDocument.FolderName() + "_" + std::to_string(generation);
+    const std::filesystem::path folder = mMeshViewCache / name;
+    const std::string vfs = "/editor_meshview/" + name;
+    std::error_code ec;
+    std::filesystem::create_directories(folder, ec);
+    std::map<int, MeshMaterialView> views;
     std::string bakeWhy;
-    for (std::size_t i = 0; i < mMeshMap.patches.size(); ++i) {
-      if (!mMeshMap.patches[i].sky && BakeMeshPatch(i, generation, baked[i].first, baked[i].second, bakeWhy)) {
-        ++bakedCount;
-      } else {
-        baked[i] = {};
+    int masked = 0;
+    for (const edmesh::Patch& patch : mMeshMap.patches) {
+      if (views.count(patch.material) == 0) {
+        MeshMaterialView view;
+        if (!mMeshViewCache.empty() && BakeMeshMaterial(patch.material, folder, vfs, view, bakeWhy)) {
+          masked += view.lightMasks ? 1 : 0;
+          views[patch.material] = view;
+        } else {
+          views[patch.material] = MeshMaterialView{};
+        }
       }
     }
-    if (bakedCount > 0) {
-      const std::string name = mDocument.FolderName() + "_" + std::to_string(generation);
-      if (!moho::DISK_MountDirectoryNow(mMeshViewCache / name, ("/editor_meshview/" + name).c_str())) {
-        gpg::Warnf("editor: mesh terrain: the baked patches' folder couldn't be mounted");
-        baked.assign(baked.size(), {});
-        bakedCount = 0;
+    // The fill to the horizon past the mesh: at the water (its deep colour) or below the mesh (the void's colour).
+    const edmesh::Settings& settings = mMeshMap.settings;
+    std::string fillMesh;
+    std::string fillTexture;
+    if (!mMeshViewCache.empty()) {
+      const bool water = settings.water > -9000.0f;
+      float y = water ? settings.water : settings.groundLow;
+      if (!water && settings.groundLow <= -9000.0f) {
+        y = 1.0e9f;
+        for (const edmesh::Patch& patch : mMeshMap.patches) {
+          y = std::min(y, patch.boundsMin[1]);
+        }
+        y -= 1.0f;
       }
+      float colour[3] = {settings.voidColor[0], settings.voidColor[1], settings.voidColor[2]};
+      MeshTexture ramp;
+      if (water && LoadMeshTexture(mDocument.WaterNow().textures[1], ramp)) {
+        float c[4];
+        ramp.Sample(0.97f, 0.5f, c);
+        colour[0] = c[0];
+        colour[1] = c[1];
+        colour[2] = c[2];
+      }
+      TexImage image;
+      image.Reset(4, 4);
+      for (int k = 0; k < 16; ++k) {
+        float* const d = image.Pixel(k % 4, k / 4);
+        d[0] = colour[0];
+        d[1] = colour[1];
+        d[2] = colour[2];
+        d[3] = 1.0f;
+      }
+      std::vector<std::uint8_t> dds;
+      ObjMesh quad;
+      const float c = settings.size * 0.5f;
+      const float r = std::max(settings.size, 1024.0f) * 20.0f;
+      quad.positions = {{c - r, y, c - r}, {c + r, y, c - r}, {c + r, y, c + r}, {c - r, y, c + r}};
+      quad.uvs = {{0, 0}, {1, 0}, {1, 1}, {0, 1}};
+      quad.normals = {{0, 1, 0}};
+      quad.triangles = {
+        {ObjMesh::Corner{0, 0, 0}, ObjMesh::Corner{2, 2, 0}, ObjMesh::Corner{1, 1, 0}},
+        {ObjMesh::Corner{0, 0, 0}, ObjMesh::Corner{3, 3, 0}, ObjMesh::Corner{2, 2, 0}},
+      };
+      std::string scmWhy;
+      const std::vector<std::uint8_t> scm = ScmFromObj(quad, "fill", 1.0f, "the mesh view's fill", scmWhy);
+      if (!scm.empty() && EncodeDds(image, DdsKind::Bgra, dds, scmWhy)) {
+        std::ofstream(folder / "fill.scm", std::ios::binary | std::ios::trunc)
+          .write(reinterpret_cast<const char*>(scm.data()), static_cast<std::streamsize>(scm.size()));
+        std::ofstream(folder / "fill.dds", std::ios::binary | std::ios::trunc)
+          .write(reinterpret_cast<const char*>(dds.data()), static_cast<std::streamsize>(dds.size()));
+        fillMesh = vfs + "/fill.scm";
+        fillTexture = vfs + "/fill.dds";
+      }
+    }
+    if (!mMeshViewCache.empty() && !moho::DISK_MountDirectoryNow(folder, vfs.c_str())) {
+      gpg::Warnf("editor: mesh terrain: the cache folder couldn't be mounted");
+      views.clear();
+      fillMesh.clear();
     }
     gpg::Logf(
-      "editor: mesh terrain: %d of %zu patches baked with their materials in %.2f s%s%s",
-      bakedCount,
-      mMeshMap.patches.size(),
+      "editor: mesh terrain: %zu materials made ready (%d with light masks) in %.2f s%s%s",
+      views.size(),
+      masked,
       std::chrono::duration<double>(std::chrono::steady_clock::now() - bakeStarted).count(),
-      bakeWhy.empty() ? "" : "; not baked: ",
+      bakeWhy.empty() ? "" : "; ",
       bakeWhy.c_str()
     );
     int made = 0;
-    for (std::size_t i = 0; i < mMeshMap.patches.size(); ++i) {
-      const edmesh::Patch& patch = mMeshMap.patches[i];
-      if (patch.sky) {
-        continue;
-      }
-      moho::RResId id{};
-      id.name.assign(("/editor/meshterrain/patch" + std::to_string(i) + "_mesh").c_str());
-      auto* const blueprint = new moho::RMeshBlueprint(rules, id);
+    int skies = 0;
+    const auto add = [&](
+                       const std::string& id,
+                       const std::string& mesh,
+                       const MeshMaterialView& view,
+                       const std::string& shader,
+                       const int kind
+                     ) {
+      moho::RResId rid{};
+      rid.name.assign(id.c_str());
+      auto* const blueprint = new moho::RMeshBlueprint(rules, rid);
       moho::RMeshBlueprintLOD lod;
-      lod.mMeshName.assign(inFolder(patch.file).c_str());
-      if (patch.material >= 0 && static_cast<std::size_t>(patch.material) < mMeshMap.materials.size()) {
-        const edmesh::Material& material = mMeshMap.materials[static_cast<std::size_t>(patch.material)];
-        lod.mAlbedoName.assign(inFolder(material.files[kDiffuse]).c_str());
-        lod.mNormalsName.assign(inFolder(material.files[kNormal]).c_str());
-        lod.mSpecularName.assign(inFolder(material.files[kSpecular]).c_str());
-      }
-      // A material without textures takes the map's lowest layer's (its ground), not black.
-      if (lod.mAlbedoName.empty() || lod.mAlbedoName[0] == '\0') {
-        const std::vector<EdTools::LayerSlot> slots = LayerSlots();
-        for (const EdTools::LayerSlot& slot : slots) {
-          if (!slot.albedo.empty()) {
-            lod.mAlbedoName.assign(slot.albedo.c_str());
-            lod.mNormalsName.assign(slot.normals.c_str());
-            break;
-          }
-        }
-      }
-      lod.mShaderName.assign("NormalMappedTerrain");
-      if (!baked[i].first.empty()) {
-        // The baked material: unlit (Flat: the colour times the texture), its light baked in.
-        lod.mMeshName.assign(baked[i].first.c_str());
-        lod.mAlbedoName.assign(baked[i].second.c_str());
-        lod.mNormalsName.assign("");
-        lod.mSpecularName.assign("");
-        lod.mShaderName.assign("Flat");
-      }
+      lod.mMeshName.assign(mesh.c_str());
+      lod.mAlbedoName.assign(view.albedo.c_str());
+      lod.mSecondaryName.assign(view.secondary.c_str());
+      lod.mNormalsName.assign(view.normals.c_str());
+      lod.mSpecularName.assign(view.specular.c_str());
+      lod.mLookupName.assign(view.lookup.c_str());
+      lod.mShaderName.assign(shader.c_str());
       lod.mLodCutoff = 1.0e6f; // drawn at any distance, as ground
       blueprint->mLods.push_back(lod);
       mMeshPatchBlueprints.push_back(blueprint);
-      if (i == 0) {
-        gpg::Logf(
-          "editor: mesh terrain: patch 0 model %s (%s), albedo %s, normals %s",
-          blueprint->GetMesh() != nullptr ? "loads" : "doesn't load",
-          lod.mMeshName.c_str(),
-          lod.mAlbedoName.c_str(),
-          lod.mNormalsName.c_str()
-        );
-      }
       moho::MeshInstance* const instance = renderer->CreateMeshInstance(
         0, -1, blueprint, Wm3::Vec3f{1.0f, 1.0f, 1.0f}, false, std::shared_ptr<moho::MeshMaterial>()
       );
       if (instance == nullptr) {
-        continue;
+        return false;
       }
-      // The patches are in map units already: at the origin, unturned.
       moho::VTransform at{};
       at.orient_ = Wm3::Quatf(1.0f, 0.0f, 0.0f, 0.0f);
       at.pos_ = Wm3::Vec3f{0.0f, 0.0f, 0.0f};
       instance->SetStance(at, at);
       instance->isHidden = mMeshMode == 0 ? 1 : 0;
       mMeshPatchInstances.push_back(instance);
-      ++made;
+      mMeshPatchKinds.push_back(kind);
+      return true;
+    };
+    for (std::size_t i = 0; i < mMeshMap.patches.size(); ++i) {
+      const edmesh::Patch& patch = mMeshMap.patches[i];
+      const MeshMaterialView& view = views[patch.material];
+      if (view.albedo.empty()) {
+        continue; // (no cache, no texture: not drawn)
+      }
+      const edmesh::Material* material =
+        patch.material >= 0 && static_cast<std::size_t>(patch.material) < mMeshMap.materials.size()
+        ? &mMeshMap.materials[static_cast<std::size_t>(patch.material)]
+        : nullptr;
+      std::string shader;
+      if (patch.sky) {
+        shader = material != nullptr && material->additive ? "EditorMeshSkyAdd" : "EditorMeshSky";
+      } else {
+        shader =
+          std::string(view.lightMasks ? "EditorMeshTerrain" : "EditorMeshTerrainSun") + (view.alphaTest ? "Alpha" : "");
+      }
+      if (
+        add(
+          "/editor/meshterrain/patch" + std::to_string(i) + "_mesh",
+          inFolder(patch.file),
+          view,
+          shader,
+          patch.sky ? 1 : 0
+        )
+      ) {
+        ++made;
+        skies += patch.sky ? 1 : 0;
+      }
     }
-    gpg::Logf("editor: mesh terrain: %d of %zu patches drawn as models", made, mMeshMap.patches.size());
+    if (!fillMesh.empty()) {
+      MeshMaterialView fill;
+      fill.albedo = fill.secondary = fillTexture;
+      fill.normals = fill.specular = fill.lookup = fillTexture;
+      (void)add("/editor/meshterrain/fill_mesh", fillMesh, fill, "EditorMeshFill", 2);
+    }
+    gpg::Logf(
+      "editor: mesh terrain: %d of %zu patches drawn by the mesh technique (%d sky)%s",
+      made,
+      mMeshMap.patches.size(),
+      skies,
+      fillMesh.empty() ? "" : ", the fill to the horizon"
+    );
   }
 
   void EdMapScene::SyncMeshView()
@@ -611,18 +516,47 @@ namespace faf::editor
     // origin, unturned, is where a new instance already "is", so it never would), and a model still loading has none
     // to publish yet; without bounds the renderer's spatial database never hands the instance over, and it isn't drawn.
     // A nudge and back is a change each time.
-    for (moho::MeshInstance* const instance : mMeshPatchInstances) {
-      instance->isHidden = mMeshMode == 0 ? 1 : 0;
-      const moho::VTransform at = instance->endTransform;
+    const float middle = mMeshMap.settings.size * 0.5f;
+    const Wm3::Vec3f eye =
+      mCamera != nullptr ? mCamera->CameraGetView().tranform.pos_ : Wm3::Vec3f{middle, 0.0f, middle};
+    for (std::size_t i = 0; i < mMeshPatchInstances.size(); ++i) {
+      moho::MeshInstance* const instance = mMeshPatchInstances[i];
+      const int kind = i < mMeshPatchKinds.size() ? mMeshPatchKinds[i] : 0;
+      instance->isHidden = mMeshMode == 0 || (kind == 2 && mMeshMode != 1) ? 1 : 0;
+      moho::VTransform at = instance->endTransform;
+      if (kind == 1) {
+        // Studio's sky: its pieces about the map's middle, carried along with the camera.
+        at.pos_ = Wm3::Vec3f{eye.x - middle, eye.y, eye.z - middle};
+      }
       moho::VTransform nudged = at;
       nudged.pos_.y += 0.001f;
       instance->SetStance(nudged, nudged);
       instance->SetStance(at, at);
     }
+    // The shadow map fitted to the mesh's heights too (fitted to the height field alone, a mesh below or above it is
+    // past the light camera's depth range and all in shadow). Sky pieces left out: they follow the camera.
+    // Only the scene showing a mesh sets it, and clears only what it set (other scenes run this too).
+    if (mMeshMode != 0 && !mMeshPatchInstances.empty()) {
+      float shadowLow = 1.0e9f;
+      float shadowHigh = -1.0e9f;
+      for (const edmesh::Patch& patch : mMeshMap.patches) {
+        if (!patch.sky) {
+          shadowLow = std::min(shadowLow, patch.boundsMin[1]);
+          shadowHigh = std::max(shadowHigh, patch.boundsMax[1]);
+        }
+      }
+      moho::ren_ShadowExtraMinY = shadowLow;
+      moho::ren_ShadowExtraMaxY = shadowHigh;
+      mMeshSetsShadowRange = true;
+    } else if (mMeshSetsShadowRange) {
+      moho::ren_ShadowExtraMinY = 1.0f;
+      moho::ren_ShadowExtraMaxY = 0.0f;
+      mMeshSetsShadowRange = false;
+    }
     const bool hide = mMeshMode == 1 && mMeshMap.Loaded() && !mMeshPatchInstances.empty();
     if (hide != mMeshHidesTerrain) {
       mMeshHidesTerrain = hide;
-      moho::ren_Terrain = !hide;
+      moho::ren_TerrainSurface = !hide;
     }
   }
 

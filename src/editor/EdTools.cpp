@@ -1365,11 +1365,11 @@ namespace faf::editor
     if (values.empty()) {
       values = ErosionDefaults(*solver);
     }
-    if (
-      ImGui::BeginChild(
-        "##erosionsettings", ImVec2(0.0f, -ImGui::GetFrameHeightWithSpacing() * 8.4f), ImGuiChildFlags_Borders
-      )
-    ) {
+    // The rest of the window less the masks and buttons below, but never fewer than five settings: a short window
+    // left the list no height at all (the window scrolls instead).
+    const float row = ImGui::GetFrameHeightWithSpacing();
+    const float settingsHeight = std::max(ImGui::GetContentRegionAvail().y - row * 8.4f, row * 5.0f);
+    if (ImGui::BeginChild("##erosionsettings", ImVec2(0.0f, settingsHeight), ImGuiChildFlags_Borders)) {
       for (const ErosionParam& param : solver->params) {
         float value = static_cast<float>(values[param.key]);
         char format[96];

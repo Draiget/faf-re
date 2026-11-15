@@ -722,6 +722,12 @@ namespace faf::editor
     {
       return mMeshShown;
     }
+    void SetMeshShown(
+      const bool shown
+    ) noexcept
+    {
+      mMeshShown = shown;
+    }
     [[nodiscard]] EdModHost& ModHost() noexcept
     {
       return mModHost;

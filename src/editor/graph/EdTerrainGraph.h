@@ -327,7 +327,8 @@ namespace faf::editor
     }
   };
 
-  /** A graph file of FAF Studio (`graphpresets/*.lua`, `Graph = { ... }`) read into `graph` with its node ids. */
+  /** A graph file of FAF Studio (a `.lua` file in `graphpresets`, `Graph = { ... }`) read into `graph` with its node
+   * ids. */
   struct StudioGraphFacts
   {
     std::string name;

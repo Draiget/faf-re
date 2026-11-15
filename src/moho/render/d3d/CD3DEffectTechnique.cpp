@@ -518,6 +518,213 @@ technique EditorPropOverSway_LowFidelity
     }
 }
 
+
+// ---- FAF Studio's mesh terrain, as the map editor draws a mesh map (editor/view/EdMapSceneMesh.cpp): the patch's own
+// texture coordinates, xy the layers' (they tile), zw its second set (the light masks'). albedo / secondary: the two
+// layers; normals: layer A's normal map (rgb, as Studio reads it); specular: the material's three light masks for the
+// surface's own normal (rgb: the light / 2 in gamma 2.2) and the layers' blend (a) over the second coordinates; lookup:
+// the material's mask (g glow, b sun highlight; black where the material uses neither).
+
+float3 EditorMeshLinear( float3 c)
+{
+    return pow( max( c, 0.0001), 2.2);
+}
+
+float4 EditorMeshTerrainPS( NORMALMAPPED_VERTEX vertex, uniform bool lightMasks, uniform bool alphaTest) : COLOR0
+{
+    if ( 1 == mirrored ) clip( vertex.depth.x);
+    float2 uv = vertex.texcoord0.xy;
+    float4 baked = tex2D( specularSampler, vertex.texcoord0.zw);
+    float blend = lightMasks ? baked.a : 0;
+    float4 diffuse = lerp( tex2D( albedoSampler, uv), tex2D( secondarySampler, uv), blend);
+    if ( alphaTest ) clip( diffuse.a - 0.5);
+    float3 n = normalize( tex2D( normalsSampler, uv).rgb * 2 - 1);
+    float3 world = normalize( n.x * vertex.tangent + n.y * vertex.binormal + n.z * vertex.normal);
+    // Lit where the shadow map holds nothing for this point: zoomed out past ren_ShadowLOD the light camera isn't
+    // fitted (the map cleared, its matrix the last one or none), and the whole map would fail the depth test.
+    float3 shadowAt = float3( vertex.shadow.xy / vertex.shadow.w, vertex.shadow.z);
+    float shadow = all( shadowAt == saturate( shadowAt)) ? ComputeShadow( vertex.shadow, true) : 1.0;
+    float4 mask = tex2D( lookupSampler, uv);
+    float3 color;
+    if ( lightMasks ) {
+        // Studio's radiosity normal mapping: the three masks' light weighted by the normal map over the three basis
+        // directions (the bake holds them for the flat normal), its fill in the sun's shadow, the glow and highlight.
+        float3 dp = saturate( float3( dot( n, float3( 0.81649658, 0.0, 0.57735027)),
+                                      dot( n, float3( -0.40824829, 0.70710678, 0.57735027)),
+                                      dot( n, float3( -0.40824829, -0.70710678, 0.57735027))));
+        float3 light = EditorMeshLinear( baked.rgb) * 2 * ( dp.x + dp.y + dp.z) / 1.7320508;
+        float3 shade = min( shadowFill, light * 0.4);
+        light = lerp( light, shade, ( 1 - shadow) * 0.8);
+        light = lerp( light, 1.0, mask.g);
+        float3 view = normalize( vertex.viewDirection);
+        float3 reflection = -reflect( view, world);
+        float3 highlight = sunDiffuse * mask.b * pow( max( 0.000001, dot( sunDirection, reflection)), 20.0) * shadow;
+        color = pow( EditorMeshLinear( diffuse.rgb) * light + highlight, 1.0 / 2.2);
+        color = min( color, 0.7) + 0.3 * ( 1.0 - exp( max( color - 0.7, 0.0) / -0.3));
+    } else {
+        // No baked light (an OBJ just imported): the sun as the game's models take it, the glow.
+        float3 light = ComputeLight( dot( sunDirection, world), shadow);
+        color = lerp( light * diffuse.rgb, diffuse.rgb, mask.g);
+    }
+    color = ApplyWaterColor( vertex.depth.x, vertex.viewDirection, color);
+    return FINISH_PIXEL( float4( color, 0.4 * mask.g), vertex);
+}
+
+// Sky pieces (SC2's): they follow the camera (their instance placed at the camera less the map's middle each frame),
+// just in front of the far plane, unlit, blended over what is behind.
+NORMALMAPPED_VERTEX EditorMeshSkyVS(
+    float3 position : POSITION0,
+    float3 normal : NORMAL0,
+    float3 tangent : TANGENT0,
+    float3 binormal : BINORMAL0,
+    float4 texcoord0 : TEXCOORD0,
+    int boneIndex[4] : BLENDINDICES,
+    float3 row0 : TEXCOORD1,
+    float3 row1 : TEXCOORD2,
+    float3 row2 : TEXCOORD3,
+    float3 row3 : TEXCOORD4,
+    anim_t anim : TEXCOORD5,
+    float4 material : TEXCOORD6,
+    float4 color : COLOR0,
+    float1 colorLookup : TEXCOORD7
+)
+{
+    NORMALMAPPED_VERTEX vertex = NormalMappedVS( position, normal, tangent, binormal, texcoord0, boneIndex, row0, row1,
+                                                 row2, row3, anim, material, color, colorLookup);
+    vertex.position.z = vertex.position.w * 0.99999;
+    return vertex;
+}
+
+float4 EditorMeshSkyPS( NORMALMAPPED_VERTEX vertex) : COLOR0
+{
+    return FINISH_PIXEL( tex2D( albedoSampler, vertex.texcoord0.xy), vertex);
+}
+
+// The fill to the horizon past the mesh (Studio's): the deep water's colour, or the void's, unlit.
+float4 EditorMeshFillPS( NORMALMAPPED_VERTEX vertex) : COLOR0
+{
+    return FINISH_PIXEL( float4( tex2D( albedoSampler, vertex.texcoord0.xy).rgb, 0), vertex);
+}
+
+technique EditorMeshTerrain
+<
+    string depthTechnique = "Depth";
+    string cartographicTechnique = "CartographicFeature";
+    int renderStage = STAGE_DEPTH + STAGE_REFLECTION + STAGE_PREWATER + STAGE_PREEFFECT;
+    int parameter = PARAM_UNUSED;
+>
+{
+    pass P0
+    {
+        AlphaState( AlphaBlend_Disable_Write_RGBA )
+        RasterizerState( Rasterizer_Cull_CW )
+        DepthState( Depth_Enable_Less )
+        VertexShader = compile vs_1_1 NormalMappedVS();
+        PixelShader = compile ps_3_0 EditorMeshTerrainPS(true, false);
+    }
+}
+
+technique EditorMeshTerrainAlpha
+<
+    string depthTechnique = "Depth";
+    string cartographicTechnique = "CartographicFeature";
+    int renderStage = STAGE_DEPTH + STAGE_REFLECTION + STAGE_PREWATER + STAGE_PREEFFECT;
+    int parameter = PARAM_UNUSED;
+>
+{
+    pass P0
+    {
+        AlphaState( AlphaBlend_Disable_Write_RGBA )
+        RasterizerState( Rasterizer_Cull_CW )
+        DepthState( Depth_Enable_Less )
+        VertexShader = compile vs_1_1 NormalMappedVS();
+        PixelShader = compile ps_3_0 EditorMeshTerrainPS(true, true);
+    }
+}
+
+technique EditorMeshTerrainSun
+<
+    string depthTechnique = "Depth";
+    string cartographicTechnique = "CartographicFeature";
+    int renderStage = STAGE_DEPTH + STAGE_REFLECTION + STAGE_PREWATER + STAGE_PREEFFECT;
+    int parameter = PARAM_UNUSED;
+>
+{
+    pass P0
+    {
+        AlphaState( AlphaBlend_Disable_Write_RGBA )
+        RasterizerState( Rasterizer_Cull_CW )
+        DepthState( Depth_Enable_Less )
+        VertexShader = compile vs_1_1 NormalMappedVS();
+        PixelShader = compile ps_3_0 EditorMeshTerrainPS(false, false);
+    }
+}
+
+technique EditorMeshTerrainSunAlpha
+<
+    string depthTechnique = "Depth";
+    string cartographicTechnique = "CartographicFeature";
+    int renderStage = STAGE_DEPTH + STAGE_REFLECTION + STAGE_PREWATER + STAGE_PREEFFECT;
+    int parameter = PARAM_UNUSED;
+>
+{
+    pass P0
+    {
+        AlphaState( AlphaBlend_Disable_Write_RGBA )
+        RasterizerState( Rasterizer_Cull_CW )
+        DepthState( Depth_Enable_Less )
+        VertexShader = compile vs_1_1 NormalMappedVS();
+        PixelShader = compile ps_3_0 EditorMeshTerrainPS(false, true);
+    }
+}
+
+technique EditorMeshSky
+<
+    int renderStage = STAGE_PREWATER + STAGE_PREEFFECT;
+    int parameter = PARAM_UNUSED;
+>
+{
+    pass P0
+    {
+        AlphaState( AlphaBlend_SrcAlpha_InvSrcAlpha_Write_RGB )
+        RasterizerState( Rasterizer_Cull_None )
+        DepthState( Depth_Enable_LessEqual_Write_None )
+        VertexShader = compile vs_1_1 EditorMeshSkyVS();
+        PixelShader = compile ps_2_0 EditorMeshSkyPS();
+    }
+}
+
+technique EditorMeshSkyAdd
+<
+    int renderStage = STAGE_PREWATER + STAGE_PREEFFECT;
+    int parameter = PARAM_UNUSED;
+>
+{
+    pass P0
+    {
+        AlphaState( AlphaBlend_SrcAlpha_One_Write_RGB )
+        RasterizerState( Rasterizer_Cull_None )
+        DepthState( Depth_Enable_LessEqual_Write_None )
+        VertexShader = compile vs_1_1 EditorMeshSkyVS();
+        PixelShader = compile ps_2_0 EditorMeshSkyPS();
+    }
+}
+
+technique EditorMeshFill
+<
+    int renderStage = STAGE_PREWATER + STAGE_PREEFFECT;
+    int parameter = PARAM_UNUSED;
+>
+{
+    pass P0
+    {
+        AlphaState( AlphaBlend_Disable_Write_RGB )
+        RasterizerState( Rasterizer_Cull_None )
+        DepthState( Depth_Enable_Less )
+        VertexShader = compile vs_1_1 NormalMappedVS();
+        PixelShader = compile ps_2_0 EditorMeshFillPS();
+    }
+}
 )fx";
 
     [[nodiscard]] gpg::MemBuffer<char> AppendSource(
@@ -1147,7 +1354,14 @@ technique EditorPropOverSway_LowFidelity
                 "EditorOutlineAlphaSway_LowFidelity",
                 "EditorPropOverSway_HighFidelity",
                 "EditorPropOverSway_MedFidelity",
-                "EditorPropOverSway_LowFidelity"}) {
+                "EditorPropOverSway_LowFidelity",
+                "EditorMeshTerrain",
+                "EditorMeshTerrainAlpha",
+                "EditorMeshTerrainSun",
+                "EditorMeshTerrainSunAlpha",
+                "EditorMeshSky",
+                "EditorMeshSkyAdd",
+                "EditorMeshFill"}) {
             if (program == nullptr || !program->TechniqueCompiles(name)) {
               throw std::runtime_error(
                 std::string("technique ") + name + " did not compile (see the shader messages above)"

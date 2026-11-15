@@ -73,7 +73,7 @@ namespace moho
 
 namespace moho
 {
-  extern bool ren_Terrain; // the height field drawn (RuntimeTuningGlobals.cpp)
+  extern bool ren_TerrainSurface; // the height field's surface drawn (WRenViewport.cpp)
 } // namespace moho
 
 namespace faf::editor
@@ -246,7 +246,9 @@ namespace faf::editor
     }
     [[nodiscard]] float CameraGetTargetZoom() override
     {
-      return mInner.CameraGetTargetZoom();
+      // The editor camera's distance, as the game camera's zoom is (the simple view says 0): the shadow map reaches
+      // ren_ShadowCoeff times it and is drawn up to ren_ShadowLOD; at 0 its volume is empty and nothing has shadows.
+      return mScene.GetCameraPose().distance;
     }
     [[nodiscard]] float GetMaxZoom() override
     {
@@ -4841,7 +4843,7 @@ namespace faf::editor
       SyncMeshView();
     } else if (mMeshHidesTerrain) {
       mMeshHidesTerrain = false;
-      moho::ren_Terrain = true;
+      moho::ren_TerrainSurface = true;
     }
     // The editor's map shows between plays, and in front of a running play when its view is asked for (user ask
     // 2026-11-11: switch between the editor's view and the game's while it plays).
@@ -14940,7 +14942,7 @@ namespace faf::editor
     DeleteMeshInstances();
     if (mMeshHidesTerrain) {
       mMeshHidesTerrain = false;
-      moho::ren_Terrain = true;
+      moho::ren_TerrainSurface = true;
     }
     if (moho::MeshRenderer::GetInstance() != nullptr) {
       for (moho::MeshInstance* const instance : mProps) {

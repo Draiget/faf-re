@@ -654,22 +654,37 @@ namespace faf::editor
     /**
      * The mesh terrain drawn as the game draws models (FAF Studio's mesh view): each patch a model instance with its
      * material's textures (the NormalMappedTerrain shader: lit, shadowed), the height field hidden in Mesh only
-     * (ren_Terrain), the patches hidden in Terrain only. Made once the rules are up; again on each load.
+     * (ren_TerrainSurface), the patches hidden in Terrain only. Made once the rules are up; again on each load.
      */
     std::vector<moho::MeshInstance*> mMeshPatchInstances;
+    std::vector<int> mMeshPatchKinds; // 0 ground, 1 sky (follows the camera), 2 the fill to the horizon
     std::vector<moho::RMeshBlueprint*> mMeshPatchBlueprints;
     bool mMeshInstancesTried = false;
     bool mMeshHidesTerrain = false;
     void BuildMeshInstances();
     /**
-     * FAF Studio's mesh material baked for one patch (its shader minus the view-dependent sun highlight and the dynamic
-     * shadow): the two layers blended by light mask 1's alpha, the three baked light masks through the blended normal
-     * map, glow, alpha test, the water ramp below the water level, haze into the void colour; one texture over the
-     * patch seen from above, with a copy of the patch whose first texture coordinates span it, both in the editor's
-     * cache (mounted at /editor_meshview). False (and `why`) when it can't be made; the patch is drawn lit instead.
+     * A mesh material as the editor's mesh technique reads it (FAF Studio's material on the game's model path): the
+     * two layers and layer A's normal map as they are, its three light masks baked for the surface's own normal with
+     * the layers' blend (one texture over the patches' second coordinates), its mask with only the glow and highlight
+     * it uses; small stand-ins where it has none. In the editor's cache, mounted at /editor_meshview.
      */
-    bool
-    BakeMeshPatch(std::size_t index, int generation, std::string& meshPath, std::string& albedoPath, std::string& why);
+    struct MeshMaterialView
+    {
+      std::string albedo;
+      std::string secondary;
+      std::string normals;
+      std::string specular; // the baked light and blend
+      std::string lookup;   // the mask
+      bool lightMasks = false;
+      bool alphaTest = false;
+    };
+    bool BakeMeshMaterial(
+      int material,
+      const std::filesystem::path& folder,
+      const std::string& vfs,
+      MeshMaterialView& out,
+      std::string& why
+    );
     /** Where the baked patches go (the app's cache folder; empty: no bake). */
     void SetMeshViewCache(
       std::filesystem::path folder
@@ -679,6 +694,7 @@ namespace faf::editor
     }
     std::filesystem::path mMeshViewCache;
     int mMeshBakeGeneration = 0;
+    bool mMeshSetsShadowRange = false; // this scene set the shadow map's extra height range (ren_ShadowExtraMinY)
     void DeleteMeshInstances();
     void SyncMeshView();
     /** Test runs: the cursor the view would show with the pointer at `at` (view pixels). */

@@ -149,7 +149,7 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg
 
 namespace moho
 {
-  extern bool ren_Terrain; // the height field drawn (RuntimeTuningGlobals.cpp)
+  extern bool ren_TerrainSurface; // the height field's surface drawn (WRenViewport.cpp)
 } // namespace moho
 
 namespace faf::editor
@@ -8573,7 +8573,7 @@ namespace faf::editor
             "editor: /r10test: mesh only: %zu patch models, height field drawn %s; the pointer at the hill's "
             "middle (256, 256 on the height field) meets the mesh at %.1f, %.1f (%s); placement height there %.2f",
             mScene.MeshPatchModels(),
-            moho::ren_Terrain ? "yes" : "no",
+            moho::ren_TerrainSurface ? "yes" : "no",
             static_cast<double>(gx),
             static_cast<double>(gz),
             hit ? "hit" : "missed",
@@ -8584,7 +8584,7 @@ namespace faf::editor
         }
         case 14:
           if (mScene.MeshMapRef().Loaded()) {
-            gpg::Logf("editor: /r10test: terrain only: height field drawn %s", moho::ren_Terrain ? "yes" : "no");
+            gpg::Logf("editor: /r10test: terrain only: height field drawn %s", moho::ren_TerrainSurface ? "yes" : "no");
             mShell->mMeshMode = 1;
           }
           break;
@@ -13590,6 +13590,14 @@ namespace faf::editor
         if (!taken) {
           taken = true;
           mShell->mMeshMode = std::clamp(std::atoi(mode[0].c_str()), 0, 2);
+        }
+      }
+      // `/meshwire 0` (test runs): the imported mesh's wire not drawn over the map (Mesh import's "Show over the map").
+      if (fa::vector<fa::string> wire; moho::CFG_GetArgOption("/meshwire", 1, &wire) && !wire.empty()) {
+        static bool taken = false;
+        if (!taken) {
+          taken = true;
+          mShell->SetMeshShown(std::atoi(wire[0].c_str()) != 0);
         }
       }
       if (static bool cacheSet = false; !cacheSet && !EditorSettingsFolder().empty()) {

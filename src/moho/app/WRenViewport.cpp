@@ -91,6 +91,9 @@ namespace moho
 {
   extern bool ren_Fx;
   extern bool ren_Terrain;
+  // Engine addition (the map editor's mesh terrain): false skips only the height field's surface. ren_Terrain off
+  // skips the whole terrain block, the shadow map with it, so ground drawn as models would have no shadows.
+  bool ren_TerrainSurface = true;
   extern bool ren_ShowSkeletons;
   extern bool ren_Water;
   extern bool ren_Reflection;
@@ -2034,7 +2037,7 @@ void moho::WRenViewport::RenderWorldView(
     }
 
     FogOn(worldView->mView->CameraGetZoom());
-    {
+    if (moho::ren_TerrainSurface) {
       const gpg::gal::RenderProfileScope profileTerrain("Terrain");
       RenderCompositeTerrain(terrain);
     }
