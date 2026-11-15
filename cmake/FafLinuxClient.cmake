@@ -246,6 +246,14 @@ endforeach()
 target_include_directories(faf_ffmpeg SYSTEM INTERFACE "${_faf_ffmpeg_prefix}/include")
 target_link_libraries(faf_ffmpeg INTERFACE m)
 
+# What a failed call a Vulkan frame stands on leads to (VulkanFrameFailure.h), as Windows runs it
+# (tests/vulkan): header-only, on the Vulkan headers alone.
+add_executable(faf_vulkan_frame_failure_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/vulkan/FrameFailureTests.cpp")
+target_include_directories(faf_vulkan_frame_failure_tests PRIVATE
+  "${PROJECT_SOURCE_DIR}/src" "${FAF_DEPENDENCIES_DIR}/vulkan/include")
+target_link_libraries(faf_vulkan_frame_failure_tests PRIVATE gtest_main)
+add_test(NAME vulkan_frame_failure COMMAND faf_vulkan_frame_failure_tests)
+
 add_library(faf_client_objs OBJECT ${_faf_client_files})
 add_dependencies(faf_client_objs faf_client_dxc faf_client_imaging faf_ffmpeg_build)
 target_link_libraries(faf_client_objs PUBLIC faf_sim_settings Wm3Headers zlib123 faf_monocypher faf_zstd

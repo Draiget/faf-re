@@ -16,6 +16,16 @@ set_target_properties(faf_vulkan_allocator_tests PROPERTIES FOLDER "Tests/Vulkan
 add_test(NAME vulkan_allocator COMMAND faf_vulkan_allocator_tests)
 set_tests_properties(vulkan_allocator PROPERTIES LABELS "Vulkan" TIMEOUT 120)
 
+# What a failed call a frame stands on leads to (VulkanFrameFailure.h): header-only, SDK structs only.
+add_executable(faf_vulkan_frame_failure_tests EXCLUDE_FROM_ALL FrameFailureTests.cpp)
+target_include_directories(faf_vulkan_frame_failure_tests PRIVATE
+  ${CMAKE_CURRENT_LIST_DIR}/../../src
+  ${FAF_DEPENDENCIES_DIR}/vulkan/include)
+target_link_libraries(faf_vulkan_frame_failure_tests PRIVATE gtest_main)
+set_target_properties(faf_vulkan_frame_failure_tests PROPERTIES FOLDER "Tests/Vulkan")
+add_test(NAME vulkan_frame_failure COMMAND faf_vulkan_frame_failure_tests)
+set_tests_properties(vulkan_frame_failure PROPERTIES LABELS "Vulkan" TIMEOUT 120)
+
 # Attachment barriers between dynamic-rendering instances: header-only, SDK structs only.
 add_executable(faf_vulkan_attachment_tests EXCLUDE_FROM_ALL AttachmentBarrierTests.cpp)
 target_include_directories(faf_vulkan_attachment_tests PRIVATE
