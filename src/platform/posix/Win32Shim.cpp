@@ -21,6 +21,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <ctime>
 #include <filesystem>
 #include <fstream>
 #include <memory>
@@ -2262,18 +2263,237 @@ HRESULT SHGetFolderPathW(
   return S_OK;
 }
 
+namespace
+{
+  /// A path as a `file://` URL's path: every byte but unreserved characters and '/' as %XX.
+  [[nodiscard]] std::string TrashInfoPath(
+    const std::string& path
+  )
+  {
+    static constexpr char kHex[] = "0123456789ABCDEF";
+    std::string out;
+    for (const char c : path) {
+      const auto byte = static_cast<unsigned char>(c);
+      if (std::isalnum(byte) != 0 || c == '/' || c == '-' || c == '_' || c == '.' || c == '~') {
+        out.push_back(c);
+      } else {
+        out.push_back('%');
+        out.push_back(kHex[byte >> 4]);
+        out.push_back(kHex[byte & 0x0Fu]);
+      }
+    }
+    return out;
+  }
+
+  /**
+   * FOF_ALLOWUNDO's recycle bin on a desktop: the home trash of the freedesktop.org Trash
+   * specification ($XDG_DATA_HOME/Trash, else ~/.local/share/Trash), where file managers list and
+   * restore it. The entry goes to Trash/files under a free name, with Trash/info/<name>.trashinfo
+   * naming where it came from. False when it cannot move there (no home, another file system), and
+   * the caller deletes it then, as Windows does on a drive with no recycle bin.
+   */
+  [[nodiscard]] bool MoveToHomeTrash(
+    const std::string& path
+  )
+  {
+    const char* const home = std::getenv("HOME");
+    const char* const dataHome = std::getenv("XDG_DATA_HOME");
+    std::string trash;
+    if (dataHome != nullptr && dataHome[0] == '/') {
+      trash = std::string(dataHome) + "/Trash";
+    } else if (home != nullptr && home[0] == '/') {
+      trash = std::string(home) + "/.local/share/Trash";
+    } else {
+      return false;
+    }
+    std::error_code error;
+    std::filesystem::create_directories(trash + "/files", error);
+    std::filesystem::create_directories(trash + "/info", error);
+    std::filesystem::permissions(trash, std::filesystem::perms::owner_all, error);
+
+    std::string absolute = path;
+    if (absolute.empty() || absolute[0] != '/') {
+      absolute = std::filesystem::absolute(path, error).string();
+    }
+    while (absolute.size() > 1 && absolute.back() == '/') {
+      absolute.pop_back();
+    }
+    const std::string leaf = absolute.substr(absolute.rfind('/') + 1);
+    if (leaf.empty()) {
+      return false;
+    }
+
+    char deletedAt[32]{};
+    const std::time_t now = std::time(nullptr);
+    std::tm local{};
+    (void)::localtime_r(&now, &local);
+    (void)std::strftime(deletedAt, sizeof(deletedAt), "%Y-%m-%dT%H:%M:%S", &local);
+    const std::string info = "[Trash Info]\nPath=" + TrashInfoPath(absolute) + "\nDeletionDate=" + deletedAt + "\n";
+
+    for (int attempt = 1; attempt < 10000; ++attempt) {
+      const std::string name = attempt == 1 ? leaf : leaf + "." + std::to_string(attempt);
+      const std::string infoPath = trash + "/info/" + name + ".trashinfo";
+      // The info file is made first and exclusively: it claims the name (the specification's order).
+      const int fd = ::open(infoPath.c_str(), O_WRONLY | O_CREAT | O_EXCL, 0600);
+      if (fd < 0) {
+        if (errno == EEXIST) {
+          continue;
+        }
+        return false;
+      }
+      const bool written = ::write(fd, info.data(), info.size()) == static_cast<ssize_t>(info.size());
+      (void)::close(fd);
+      if (!written) {
+        (void)::unlink(infoPath.c_str());
+        return false;
+      }
+      const std::string target = trash + "/files/" + name;
+      if (::access(target.c_str(), F_OK) == 0) {
+        // A file left there with no info file: the name stays taken.
+        (void)::unlink(infoPath.c_str());
+        continue;
+      }
+      if (::rename(absolute.c_str(), target.c_str()) == 0) {
+        return true;
+      }
+      (void)::unlink(infoPath.c_str());
+      return false;
+    }
+    return false;
+  }
+
+  /// One FO_DELETE source (a file or a folder with all it holds), as found on disk.
+  [[nodiscard]] DWORD ShellDeleteOne(
+    const std::string& path,
+    const bool allowUndo
+  )
+  {
+    struct stat info{};
+    if (::lstat(path.c_str(), &info) != 0) {
+      return ERROR_FILE_NOT_FOUND;
+    }
+    if (allowUndo && MoveToHomeTrash(path)) {
+      return 0;
+    }
+    std::error_code error;
+    (void)std::filesystem::remove_all(path, error);
+    return error ? ErrnoToWin32(error.value()) : 0;
+  }
+
+  /**
+   * SHFileOperation's FO_DELETE (engine addition, issue #255): the save, replay and profile deletes
+   * (DISK_Recycle) and the cache purge (USER_PurgeAppCacheDir) on POSIX. `sources` are the
+   * double-null list's paths, '/' for '\' already; each is looked up as NTFS would find it, and a
+   * last component with '*' or '?' deletes every name in its folder that matches. With
+   * FOF_ALLOWUNDO an entry goes to the desktop's trash instead. 0 when every source went, else the
+   * first failure's code, as Windows 10 answers them: 2 for a source that isn't there, 0x7C for a
+   * pattern in a folder that isn't there, and 0 for a pattern that matches nothing.
+   */
+  [[nodiscard]] int ShellDelete(
+    const std::vector<std::string>& sources,
+    const WORD flags
+  )
+  {
+    const bool allowUndo = (flags & FOF_ALLOWUNDO) != 0;
+    DWORD result = 0;
+    const auto note = [&result](const DWORD error) {
+      if (result == 0) {
+        result = error;
+      }
+    };
+    for (const std::string& source : sources) {
+      const std::size_t slash = source.rfind('/');
+      const std::string leaf = slash == std::string::npos ? source : source.substr(slash + 1);
+      if (leaf.find_first_of("*?") == std::string::npos) {
+        note(ShellDeleteOne(ResolveCase(source), allowUndo));
+        continue;
+      }
+      const std::string folder = slash == std::string::npos
+        ? std::string(".")
+        : ResolveCase(slash == 0 ? std::string("/") : source.substr(0, slash));
+      DIR* const dir = ::opendir(folder.c_str());
+      if (dir == nullptr) {
+        // What Windows 10 answers for a pattern in a folder that isn't there (DE_INVALIDFILES).
+        note(0x7Cu);
+        continue;
+      }
+      // Matched as _findfirst64 and FindFirstFile here match, so a folder's listing and its delete
+      // take the same names: case-insensitive, "*.*" for every name.
+      const std::string pattern = leaf == "*.*" ? std::string("*") : leaf;
+      std::vector<std::string> matches;
+      while (const dirent* const entry = ::readdir(dir)) {
+        const std::string name = entry->d_name;
+        if (name != "." && name != ".." && ::fnmatch(pattern.c_str(), name.c_str(), FNM_CASEFOLD) == 0) {
+          matches.push_back(folder == "/" ? "/" + name : folder + "/" + name);
+        }
+      }
+      (void)::closedir(dir);
+      for (const std::string& match : matches) {
+        note(ShellDeleteOne(match, allowUndo));
+      }
+    }
+    return static_cast<int>(result);
+  }
+
+  /// The paths of a double-null-terminated SHFileOperation list.
+  template <class Char, class Narrow>
+  [[nodiscard]] std::vector<std::string> ShellSources(
+    const Char* list,
+    Narrow narrow
+  )
+  {
+    std::vector<std::string> sources;
+    while (list != nullptr && *list != 0) {
+      sources.push_back(narrow(list));
+      while (*list != 0) {
+        ++list;
+      }
+      ++list;
+    }
+    return sources;
+  }
+} // namespace
+
+// Engine addition (issue #255): FO_DELETE deletes as Windows' shell does (above); the other
+// operations, which the engine does not use, stay unsupported and touch nothing.
 int SHFileOperationA(
-  SHFILEOPSTRUCTA*
+  SHFILEOPSTRUCTA* const operation
 )
 {
-  return static_cast<int>(ERROR_NOT_SUPPORTED);
+  if (operation == nullptr || operation->wFunc != FO_DELETE) {
+    return static_cast<int>(ERROR_NOT_SUPPORTED);
+  }
+  operation->fAnyOperationsAborted = FALSE;
+  return ShellDelete(
+    ShellSources(
+      operation->pFrom,
+      [](const char* const path) {
+    std::string out = path;
+    std::replace(out.begin(), out.end(), '\\', '/');
+    return out;
+  }
+    ),
+    operation->fFlags
+  );
 }
 
 int SHFileOperationW(
-  SHFILEOPSTRUCTW*
+  SHFILEOPSTRUCTW* const operation
 )
 {
-  return static_cast<int>(ERROR_NOT_SUPPORTED);
+  if (operation == nullptr || operation->wFunc != FO_DELETE) {
+    return static_cast<int>(ERROR_NOT_SUPPORTED);
+  }
+  operation->fAnyOperationsAborted = FALSE;
+  return ShellDelete(
+    ShellSources(
+      operation->pFrom,
+      [](const wchar_t* const path) {
+    return NarrowPath(path);
+  }
+    ),
+    operation->fFlags
+  );
 }
 
 BOOL DosDateTimeToFileTime(

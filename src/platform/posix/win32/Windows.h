@@ -608,8 +608,9 @@ BOOL SetProcessAffinityMask(HANDLE process, DWORD_PTR processMask);
 #define CSIDL_FLAG_CREATE 0x8000
 HRESULT SHGetFolderPathW(HWND owner, int folder, HANDLE token, DWORD flags, wchar_t* path);
 
-// Shell file operations are not available: SHFileOperation fails with ERROR_NOT_SUPPORTED and
-// touches nothing.
+// Shell file operations: FO_DELETE deletes files and folders (a '*'/'?' last component matches
+// names in its folder; FOF_ALLOWUNDO moves them to the desktop's trash). The other operations fail
+// with ERROR_NOT_SUPPORTED and touch nothing.
 #define FO_MOVE 0x0001u
 #define FO_COPY 0x0002u
 #define FO_DELETE 0x0003u

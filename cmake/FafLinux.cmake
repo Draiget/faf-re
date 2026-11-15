@@ -424,10 +424,11 @@ add_executable(faf_lobby_wire_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/test
 target_link_libraries(faf_lobby_wire_tests PRIVATE faf_sim gtest_main)
 target_link_options(faf_lobby_wire_tests PRIVATE -Wl,--error-limit=0)
 add_test(NAME lobby_wire COMMAND faf_lobby_wire_tests)
-# The Win32 shim's handles when one thread closes what another still uses, and its shell folders
-# (Windows' behaviour).
+# The Win32 shim's handles when one thread closes what another still uses, its shell folders and
+# its shell deletes (Windows' behaviour).
 add_executable(faf_win32_shim_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/linux/Win32ShimHandleTests.cpp"
-  "${PROJECT_SOURCE_DIR}/tests/linux/Win32ShimFolderTests.cpp")
+  "${PROJECT_SOURCE_DIR}/tests/linux/Win32ShimFolderTests.cpp"
+  "${PROJECT_SOURCE_DIR}/tests/linux/Win32ShimFileOperationTests.cpp")
 target_link_libraries(faf_win32_shim_tests PRIVATE faf_sim gtest_main)
 target_link_options(faf_win32_shim_tests PRIVATE -Wl,--error-limit=0)
 add_test(NAME win32_shim_handles COMMAND faf_win32_shim_tests)
