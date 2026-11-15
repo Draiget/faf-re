@@ -1480,6 +1480,9 @@ int main(
   // --rate-every: where the current interval started (time and view bytes so far) and when it ends.
   double rateFromAt = 0.0;
   std::uint64_t rateFromBytes = 0;
+  // The live channel's datagram bytes in and out at the interval's start (a new channel after a reconnect starts at 0).
+  std::uint64_t rateFromWireIn = 0;
+  std::uint64_t rateFromWireOut = 0;
   double rateNextAt = options.rateEvery;
   for (;;) {
     const double elapsed = std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
@@ -1492,13 +1495,22 @@ int main(
     if (options.rateEvery > 0.0 && elapsed >= rateNextAt) {
       const double span = elapsed - rateFromAt;
       const faf::remote::net::ChannelStats* const channel = link.LiveChannelStats();
-      // The channel's RTT (RFC 6298 smoothing over acked datagrams) and the share of its last 256 datagrams lost.
+      const std::uint64_t wireIn = channel != nullptr ? channel->bytesReceived : 0u;
+      const std::uint64_t wireOut = channel != nullptr ? channel->bytesSent : 0u;
+      const auto wireRate = [span](const std::uint64_t now, const std::uint64_t from) {
+        return span > 0.0 && now >= from ? static_cast<double>(now - from) / 1024.0 / span : 0.0;
+      };
+      // View bytes as decoded, the channel's datagram bytes in and out, its RTT (RFC 6298 smoothing over acked
+      // datagrams) and the share of its last 256 datagrams lost.
       std::printf(
-        "probe %d: rate %.0f-%.0f s: %.1f KB/s, rtt latest %.1f smoothed %.1f min %.1f var %.1f ms, loss %.1f%%\n",
+        "probe %d: rate %.0f-%.0f s: %.1f KB/s, wire in %.1f out %.1f KB/s, rtt latest %.1f smoothed %.1f min %.1f var "
+        "%.1f ms, loss %.1f%%\n",
         options.uid,
         rateFromAt,
         elapsed,
         span > 0.0 && views.views > 0 ? static_cast<double>(views.bytes - rateFromBytes) / 1024.0 / span : 0.0,
+        wireRate(wireIn, rateFromWireIn),
+        wireRate(wireOut, rateFromWireOut),
         channel != nullptr ? static_cast<double>(channel->rttLatestUs) / 1000.0 : -1.0,
         channel != nullptr ? static_cast<double>(channel->rttSmoothedUs) / 1000.0 : -1.0,
         channel != nullptr ? static_cast<double>(channel->rttMinUs) / 1000.0 : -1.0,
@@ -1507,6 +1519,8 @@ int main(
       );
       rateFromAt = elapsed;
       rateFromBytes = views.bytes;
+      rateFromWireIn = wireIn;
+      rateFromWireOut = wireOut;
       rateNextAt = elapsed + options.rateEvery;
     }
 
