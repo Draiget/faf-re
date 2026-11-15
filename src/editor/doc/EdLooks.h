@@ -24,6 +24,10 @@ namespace faf::editor
     bool hasSky = false; // maps before format 0x3A keep no sky
     /** The environment cube lookups (name, cube texture), as the map lists them. */
     std::vector<std::pair<std::string, std::string>> cubes;
+    /** The strata (maps of format 54 and later): albedo and its tile for base .. Upper, normal and its tile for base ..
+     * layer 8; empty for older maps. */
+    std::vector<std::pair<std::string, float>> strataAlbedo;
+    std::vector<std::pair<std::string, float>> strataNormal;
   };
 
   /** What of a look is put on the map. */

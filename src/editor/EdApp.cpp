@@ -103,6 +103,7 @@
 #include "editor/ui/EdSelfTests.h"
 #include "editor/tools/EdMissionImport.h"
 #include "editor/tools/EdUnitWizard.h"
+#include "editor/doc/EdStrataThemes.h"
 #include "editor/tools/EdMarkers.h"
 #include "editor/ui/EdFramePacing.h"
 #include "editor/doc/EdUserFiles.h"
@@ -233,7 +234,10 @@ namespace faf::editor
         "/resourcecheck",   "/viewstage",
         "/layoutsave",      "/unittestgame",
         "/reseattest",      "/exportpreview512",
-        "/lookthumbtest",
+        "/lookthumbtest",   "/toolsfile",
+        "/watermasks",      "/imagestest",
+        "/themesfile",      "/themelib",
+        "/r6test",
       };
       for (const char* const option : kOptions) {
         if (moho::CFG_GetArgOption(option, 0, nullptr)) {
@@ -1048,6 +1052,50 @@ namespace faf::editor
         }
       }
       std::string mViewStateFor;
+      /** The tools' working state (tools.ini in the settings folder; `/toolsfile <file>` in test runs). */
+      std::filesystem::path mToolStateFile;
+      std::string mToolStateSaved;
+      double mToolStateCheckAt = 0.0;
+      bool mToolStateRead = false;
+      void KeepToolState()
+      {
+        EdTools& tools = mShell->Tools();
+        const double now = std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
+        if (!mToolStateRead) {
+          mToolStateRead = true;
+          if (fa::vector<fa::string> file; moho::CFG_GetArgOption("/toolsfile", 1, &file) && !file.empty()) {
+            mToolStateFile = file[0].c_str();
+          } else if (!gTestRun) {
+            const std::filesystem::path folder = EditorSettingsFolder();
+            mToolStateFile = folder.empty() ? std::filesystem::path{} : folder / "tools.ini";
+          }
+          if (mToolStateFile.empty()) {
+            return;
+          }
+          if (std::ifstream in(mToolStateFile, std::ios::binary); in) {
+            std::stringstream text;
+            text << in.rdbuf();
+            tools.LoadToolState(text.str());
+            gpg::Logf("editor: the tools' state read from %s", mToolStateFile.string().c_str());
+          }
+          mToolStateSaved = tools.SaveToolState();
+          mToolStateCheckAt = now + 2.0;
+          return;
+        }
+        if (mToolStateFile.empty() || now < mToolStateCheckAt) {
+          return;
+        }
+        mToolStateCheckAt = now + 2.0;
+        const std::string state = tools.SaveToolState();
+        if (state == mToolStateSaved) {
+          return;
+        }
+        mToolStateSaved = state;
+        if (std::ofstream out(mToolStateFile, std::ios::binary | std::ios::trunc); out) {
+          out << state;
+          gpg::Logf("editor: the tools' state kept in %s", mToolStateFile.string().c_str());
+        }
+      }
       double mViewStateCheckAt = 0.0;
       ViewState mViewStateSaved;
       /** The style at the screen's DPI, before the user's UI scale; the scale in use on it. */
@@ -6532,6 +6580,53 @@ namespace faf::editor
        * folder; once the new map is open, FinishResize puts it all on it, saves it and opens it again.
        */
       void StartResize(const EdShell::ResizeRequest& request);
+      /** The view menu's place-here, focus, snap, set-army and move-to-group entries, at its point. */
+      void RunViewMenuAction(
+        const EdShell::ViewMenuPoint& at,
+        const EdShell::ViewMenuAction& action
+      )
+      {
+        using Kind = EdShell::ViewMenuAction::Kind;
+        EdTools& tools = mShell->Tools();
+        switch (action.kind) {
+        case Kind::PlaceMarker:
+          tools.SetMarkerTool(action.arg);
+          mScene.PlaceMarkers(at.x, at.z);
+          break;
+        case Kind::AddArea:
+          tools.SetMarkerTool(tools.PlaceMarkerType().type);
+          tools.AskAddAreaAt(at.x, at.z);
+          break;
+        case Kind::PlaceUnit:
+          mScene.PlaceUnitHere(at.x, at.z);
+          break;
+        case Kind::PlaceProp:
+          mScene.PlacePropHere(at.x, at.z);
+          break;
+        case Kind::FocusHere:
+          mScene.FramePoint(at.x, at.z);
+          break;
+        case Kind::SnapToGrid:
+          (void)mScene.SnapMarkerToGrid(action.arg);
+          break;
+        case Kind::SetArmy:
+          gpg::Logf("editor: view menu: %d units to %s", mScene.GiveSelectionTo(action.arg), action.arg.c_str());
+          break;
+        case Kind::MoveToGroup:
+          (void)mScene.MoveUnitsToGroup(action.arg, {at.unitName}, action.path);
+          break;
+        default:
+          break;
+        }
+        gpg::Logf(
+          "editor: view menu action %d at %.1f, %.1f%s%s",
+          static_cast<int>(action.kind),
+          static_cast<double>(at.x),
+          static_cast<double>(at.z),
+          action.arg.empty() ? "" : ": ",
+          action.arg.c_str()
+        );
+      }
       /** Map > Regenerate preview: the lobby picture drawn anew from the heights, the sea and the markers. */
       bool RegeneratePreview(std::string& message);
       /** The lobby preview painted at `side` (FAF Studio's preview.lua look): layers' colours, the map's sun, dots. */
@@ -6597,6 +6692,565 @@ namespace faf::editor
       void MaskGenUpdate();
       /** The rules' context: the heights (and the paint when a rule reads it). False with `error`. */
       bool MaskGenContextOf(const std::vector<MaskGenRule>& rules, MaskGenContext& context, std::string& error);
+      /** The Images panel's previews: one a frame for the rows on screen, all dropped when the map was edited. */
+      std::uint64_t mImageThumbEdits = ~0ULL;
+      void ImagesPanelThumbs()
+      {
+        if (!mScene.Attached()) {
+          if (mImageThumbEdits != ~0ULL) {
+            mShell->ClearImageThumbs();
+            mImageThumbEdits = ~0ULL;
+          }
+          return;
+        }
+        if (mDocument.EditCount() != mImageThumbEdits) {
+          mShell->ClearImageThumbs();
+          mImageThumbEdits = mDocument.EditCount();
+          return;
+        }
+        std::string what;
+        if (!mShell->TakeImageThumbWanted(what)) {
+          return;
+        }
+        constexpr int kSide = 64;
+        std::vector<std::uint32_t> pixels(static_cast<std::size_t>(kSide) * kSide, 0xFF202020u);
+        const auto grey = [](const float v) {
+          const auto g = static_cast<std::uint32_t>(std::clamp(v, 0.0f, 1.0f) * 255.0f + 0.5f);
+          return 0xFF000000u | (g << 16) | (g << 8) | g;
+        };
+        bool made = false;
+        if (what == "heights") {
+          if (
+            const std::shared_ptr<TerrainSource> terrain = mScene.TerrainHeights();
+            terrain != nullptr && terrain->width > 1
+          ) {
+            const auto [low, high] = std::minmax_element(terrain->heights.begin(), terrain->heights.end());
+            const float span = std::max(*high - *low, 0.001f);
+            for (int y = 0; y < kSide; ++y) {
+              for (int x = 0; x < kSide; ++x) {
+                const int sx = x * (terrain->width - 1) / (kSide - 1);
+                const int sz = y * (terrain->height - 1) / (kSide - 1);
+                pixels[static_cast<std::size_t>(y) * kSide + x] =
+                  grey((terrain->heights[static_cast<std::size_t>(sz) * terrain->width + sx] - *low) / span);
+              }
+            }
+            made = true;
+          }
+        } else if (what.rfind("mask", 0) == 0) {
+          const int byte = std::clamp(std::atoi(what.c_str() + 4), 1, 8) - 1;
+          const EdDocument::MaskGrid& masks = mScene.ReadMasks();
+          if (!masks.texels.empty()) {
+            const bool range = (RemappedStrata(mScene.TerrainShader()) & (1U << byte)) != 0;
+            for (int y = 0; y < kSide; ++y) {
+              for (int x = 0; x < kSide; ++x) {
+                const std::uint64_t texel =
+                  masks.texels
+                    [static_cast<std::size_t>(y * (masks.height - 1) / (kSide - 1)) * masks.width +
+                     x * (masks.width - 1) / (kSide - 1)];
+                pixels[static_cast<std::size_t>(y) * kSide + x] =
+                  grey(MaskWeight(MaskByte(texel, byte), range) / 255.0f);
+              }
+            }
+            made = true;
+          }
+        } else if (what.rfind("water", 0) == 0) {
+          int width = 0;
+          int height = 0;
+          if (
+            const std::uint8_t* const cells = mDocument.WaterMaskCells(
+              static_cast<WaterMask>(std::clamp(std::atoi(what.c_str() + 5), 0, 2)), width, height
+            );
+            cells != nullptr && width > 1 && height > 1
+          ) {
+            for (int y = 0; y < kSide; ++y) {
+              for (int x = 0; x < kSide; ++x) {
+                pixels[static_cast<std::size_t>(y) * kSide + x] =
+                  grey(cells[(y * (height - 1) / (kSide - 1)) * width + x * (width - 1) / (kSide - 1)] / 255.0f);
+              }
+            }
+            made = true;
+          }
+        } else if (what == "types") {
+          int width = 0;
+          int height = 0;
+          if (
+            const std::uint8_t* const cells = mDocument.TerrainTypeCells(width, height);
+            cells != nullptr && width > 1 && height > 1
+          ) {
+            for (int y = 0; y < kSide; ++y) {
+              for (int x = 0; x < kSide; ++x) {
+                const std::uint32_t id =
+                  cells[(y * (height - 1) / (kSide - 1)) * width + x * (width - 1) / (kSide - 1)];
+                // Each id its own colour (a hash), so neighbouring types stand apart.
+                const std::uint32_t h = id * 2654435761u;
+                pixels[static_cast<std::size_t>(y) * kSide + x] = 0xFF000000u | (h & 0x00C0C0C0u) | 0x00303030u;
+              }
+            }
+            made = true;
+          }
+        }
+        const std::uint64_t image = made ? EdImGuiRenderer::CreateImage(kSide, kSide, pixels.data()) : 0U;
+        mShell->SetImageThumb(what, image);
+        if (moho::CFG_GetArgOption("/imagestest", 0, nullptr)) {
+          gpg::Logf("editor: images: preview of %s %s", what.c_str(), image != 0U ? "made" : "not made");
+        }
+      }
+      /** Layers > Theme library: the shipped themes (read once) and the user's (themes.lua in the settings folder). */
+      std::vector<StrataTheme> mStrataThemes;
+      bool mStrataThemesRead = false;
+      std::filesystem::path StrataThemesFile() const
+      {
+        if (fa::vector<fa::string> file; moho::CFG_GetArgOption("/themesfile", 1, &file) && !file.empty()) {
+          return std::filesystem::path(file[0].c_str());
+        }
+        if (gTestRun) {
+          return {};
+        }
+        const std::filesystem::path folder = EditorSettingsFolder();
+        return folder.empty() ? std::filesystem::path{} : folder / "themes.lua";
+      }
+      void StrataThemesUpdate(
+        const std::vector<EdTools::LayerSlot>& slots
+      )
+      {
+        EdTools& tools = mShell->Tools();
+        const auto publish = [&] {
+          std::vector<std::string> labels;
+          std::vector<bool> user;
+          for (const StrataTheme& theme : mStrataThemes) {
+            labels.push_back((theme.user ? std::string("My themes") : theme.group) + ": " + theme.name);
+            user.push_back(theme.user);
+          }
+          tools.SetStrataThemeList(std::move(labels), std::move(user));
+        };
+        const auto saveUser = [&] {
+          std::vector<StrataTheme> mine;
+          for (const StrataTheme& theme : mStrataThemes) {
+            if (theme.user) {
+              mine.push_back(theme);
+            }
+          }
+          if (const std::filesystem::path file = StrataThemesFile(); !file.empty()) {
+            std::ofstream out(file, std::ios::binary | std::ios::trunc);
+            out << WriteStrataThemes(mine);
+          }
+        };
+        if (!mStrataThemesRead) {
+          mStrataThemesRead = true;
+          std::string error;
+          if (const std::filesystem::path file = StrataThemesFile(); !file.empty()) {
+            if (std::ifstream in(file, std::ios::binary); in) {
+              std::stringstream text;
+              text << in.rdbuf();
+              std::vector<StrataTheme> mine;
+              if (ParseStrataThemes(text.str(), "UserThemes", mine, error)) {
+                for (StrataTheme& theme : mine) {
+                  theme.user = true;
+                  mStrataThemes.push_back(std::move(theme));
+                }
+              } else {
+                gpg::Warnf("editor: %s: %s", file.string().c_str(), error.c_str());
+              }
+            }
+          }
+          std::vector<StrataTheme> shipped;
+          if (!ParseStrataThemes(EmbeddedEditorData("envlib_themes.lua"), "Themes", shipped, error)) {
+            gpg::Warnf("editor: the theme library: %s", error.c_str());
+          }
+          mStrataThemes.insert(mStrataThemes.end(), shipped.begin(), shipped.end());
+          gpg::Logf("editor: theme library: %zu themes (%zu shipped)", mStrataThemes.size(), shipped.size());
+          publish();
+        }
+        EdTools::StrataThemeAsk ask;
+        if (!tools.TakeStrataThemeAsk(ask) || !mScene.Attached()) {
+          return;
+        }
+        using Op = EdTools::StrataThemeAsk::Op;
+        const auto addUser = [&](StrataTheme theme) {
+          theme.user = true;
+          theme.group = "My themes";
+          mStrataThemes.erase(
+            std::remove_if(
+              mStrataThemes.begin(),
+              mStrataThemes.end(),
+              [&](const StrataTheme& t) {
+            return t.user && t.id == theme.id;
+          }
+            ),
+            mStrataThemes.end()
+          );
+          mStrataThemes.insert(mStrataThemes.begin(), std::move(theme));
+          saveUser();
+          publish();
+        };
+        std::string status;
+        switch (ask.op) {
+        case Op::Try:
+        case Op::Apply: {
+          if (ask.index < 0 || ask.index >= static_cast<int>(mStrataThemes.size())) {
+            break;
+          }
+          const StrataTheme& theme = mStrataThemes[static_cast<std::size_t>(ask.index)];
+          std::vector<std::pair<int, LayerSettings>> layers;
+          std::vector<std::pair<int, LayerSettings>> before;
+          for (const auto& [slot, layer] : theme.layers) {
+            layers.push_back({slot, LayerSettings{layer.albedo, layer.normal, layer.size, layer.nsize}});
+            if (static_cast<std::size_t>(slot) < slots.size()) {
+              const EdTools::LayerSlot& now = slots[static_cast<std::size_t>(slot)];
+              before.push_back({slot, LayerSettings{now.albedo, now.normals, now.albedoSize, now.normalsSize}});
+            }
+          }
+          const int changed = mScene.ApplyLayerSettings({}, layers);
+          int cleared = 0;
+          if (ask.op == Op::Try) {
+            mThemeBefore = std::move(before);
+            mThemeTrying = changed > 0;
+          } else if (ask.clearUnused) {
+            for (int slot = 1; slot <= 8; ++slot) {
+              if (
+                theme.layers.count(slot) == 0 && static_cast<std::size_t>(slot) < slots.size() &&
+                !slots[static_cast<std::size_t>(slot)].albedo.empty() && tools.RunLayerMenuItem(slot, "remove")
+              ) {
+                ++cleared;
+              }
+            }
+          }
+          status = "Theme " + theme.name + ": " + std::to_string(changed) + " layers" +
+            (cleared > 0 ? ", " + std::to_string(cleared) + " unused layers cleared" : std::string());
+          break;
+        }
+        case Op::Save: {
+          StrataTheme theme;
+          theme.name = ask.arg;
+          theme.id = StrataThemeId(ask.arg);
+          theme.desc = "Saved from " + mDocument.Facts().name;
+          for (std::size_t slot = 0; slot < slots.size() && slot < 10; ++slot) {
+            if (!slots[slot].albedo.empty()) {
+              theme.layers[static_cast<int>(slot)] = StrataThemeLayer{
+                slots[slot].albedo, slots[slot].normals, slots[slot].albedoSize, slots[slot].normalsSize
+              };
+            }
+          }
+          status = "Saved the theme " + theme.name + " (" + std::to_string(theme.layers.size()) + " layers)";
+          addUser(std::move(theme));
+          break;
+        }
+        case Op::Import: {
+          // The map by its folder, as the Looks list names maps: its .scmap's strata.
+          std::string wanted = ask.arg;
+          std::transform(wanted.begin(), wanted.end(), wanted.begin(), [](const unsigned char c) {
+            return static_cast<char>(std::tolower(c));
+          });
+          std::string scenario;
+          for (const std::string& map : mPlay.Maps()) {
+            std::string folder = MapDisplayName(map);
+            std::transform(folder.begin(), folder.end(), folder.begin(), [](const unsigned char c) {
+              return static_cast<char>(std::tolower(c));
+            });
+            if (folder == wanted) {
+              scenario = map;
+              break;
+            }
+          }
+          std::string text;
+          std::string bytes;
+          std::smatch path;
+          Look look;
+          std::string error;
+          if (scenario.empty()) {
+            status = "No map " + ask.arg + " among the game's maps";
+          } else if (
+            !ReadGameFile(scenario, text) ||
+            !std::regex_search(text, path, std::regex(R"(\bmap\s*=\s*['"]([^'"]+\.scmap)['"])")) ||
+            !ReadGameFile(path[1].str(), bytes) || !LookFromScmap(bytes, look, error)
+          ) {
+            status = "Can't read " + ask.arg + "'s map file" + (error.empty() ? std::string() : ": " + error);
+          } else if (look.strataAlbedo.empty()) {
+            status = ask.arg + "'s map file is older than format 54: its layers aren't read";
+          } else {
+            StrataTheme theme;
+            theme.name = MapDisplayName(scenario);
+            theme.id = StrataThemeId(theme.name);
+            theme.desc = "Imported from " + theme.name;
+            for (std::size_t slot = 0; slot < look.strataAlbedo.size(); ++slot) {
+              if (look.strataAlbedo[slot].first.empty()) {
+                continue;
+              }
+              StrataThemeLayer layer;
+              layer.albedo = look.strataAlbedo[slot].first;
+              layer.size = look.strataAlbedo[slot].second;
+              if (slot < look.strataNormal.size()) {
+                layer.normal = look.strataNormal[slot].first;
+                layer.nsize = look.strataNormal[slot].second;
+              }
+              theme.layers[static_cast<int>(slot)] = layer;
+            }
+            status = "Imported " + theme.name + "'s layers as a theme (" + std::to_string(theme.layers.size()) + ")";
+            addUser(std::move(theme));
+          }
+          break;
+        }
+        case Op::Delete:
+          if (
+            ask.index >= 0 && ask.index < static_cast<int>(mStrataThemes.size()) &&
+            mStrataThemes[static_cast<std::size_t>(ask.index)].user
+          ) {
+            status = "Deleted the theme " + mStrataThemes[static_cast<std::size_t>(ask.index)].name;
+            mStrataThemes.erase(mStrataThemes.begin() + ask.index);
+            saveUser();
+            publish();
+          }
+          break;
+        default:
+          break;
+        }
+        if (!status.empty()) {
+          tools.SetStrataThemeStatus(status);
+          PostStatusMessage(status);
+          gpg::Logf("editor: theme library: %s", status.c_str());
+        }
+      }
+      /**
+       * `/r6test <folder>` (test runs): the fourth comparison's features driven one a step, each logged: the chain of
+       * the selected marker, marker models, a camera marker set from the view and looked through, the view menu's
+       * point and a marker placed there, a unit line, a marker's height check and its fix, a resource snapped to the
+       * grid, the army's groups, an imported mask, the theme library (apply, save, import), the Images panel.
+       */
+      int mR6Stage = 0;
+      int mR6Frames = 0;
+      std::string mR6Marker;
+      void DriveRoundSixTest()
+      {
+        fa::vector<fa::string> arg;
+        if (
+          mR6Stage >= 14 || !mScene.Attached() || !mScene.UnitsReady() || !moho::CFG_GetArgOption("/r6test", 1, &arg) ||
+          arg.empty() || ++mR6Frames % 90 != 0
+        ) {
+          return;
+        }
+        const std::filesystem::path folder(arg[0].c_str());
+        EdTools& tools = mShell->Tools();
+        const float c = static_cast<float>(std::max(mDocument.Facts().fieldWidth - 1, 2)) * 0.5f;
+        std::vector<SaveEntry>& markers = mDocument.SaveData().Markers();
+        const auto count = [&](const char* type) {
+          return std::count_if(markers.begin(), markers.end(), [type](const SaveEntry& m) {
+            return MarkerTypeOf(m) == type;
+          });
+        };
+        switch (mR6Stage++) {
+        case 0: {
+          // The tools' state: brush mode 0 set to 33 / 0.4 / 0.7 and a 45 degree step (/toolsfile keeps it).
+          tools.LoadToolState("brushMode=0\nbrush.0=33,0.4,0.7\nturnStep=45\n");
+          // The first chain's first marker selected under the Markers tool.
+          tools.SetMarkerTool("Blank Marker");
+          const std::vector<MarkerChain>& chains = mDocument.SaveData().Chains();
+          for (const MarkerChain& chain : chains) {
+            if (!chain.markers.empty()) {
+              mScene.SelectMarkers({chain.markers.front()}, false);
+              mR6Marker = chain.name;
+              break;
+            }
+          }
+          gpg::Logf("editor: /r6test: %zu chains; selected the first marker of %s", chains.size(), mR6Marker.c_str());
+          break;
+        }
+        case 1:
+          gpg::Logf(
+            "editor: /r6test: the current chain is %s (wanted %s); %zu marker models drawn for %zu markers",
+            tools.ChainName().c_str(),
+            mR6Marker.c_str(),
+            mScene.MarkerModelCount(),
+            markers.size()
+          );
+          break;
+        case 2: {
+          // A camera marker: placed at the middle, set from the view, the camera moved away, then looked through.
+          tools.SetMarkerTool("Camera Info");
+          mScene.PlaceMarkers(c, c);
+          const std::string camera = mScene.SelectedCameraMarker();
+          mScene.FramePoint(c, c, 220.0f);
+          const EdMapScene::CameraPose set = mScene.GetCameraPose();
+          (void)mScene.SetCameraMarkerFromView(camera);
+          mScene.FramePoint(c * 0.5f, c * 0.5f, 90.0f);
+          (void)mScene.LookThroughCamera(camera);
+          const EdMapScene::CameraPose back = mScene.GetCameraPose();
+          gpg::Logf(
+            "editor: /r6test: camera %s: set at %.1f, %.1f distance %.1f; looked through: %.1f, %.1f distance %.1f",
+            camera.c_str(),
+            static_cast<double>(set.targetX),
+            static_cast<double>(set.targetZ),
+            static_cast<double>(set.distance),
+            static_cast<double>(back.targetX),
+            static_cast<double>(back.targetZ),
+            static_cast<double>(back.distance)
+          );
+          break;
+        }
+        case 3: {
+          // The view menu at the middle of the view, and a start position placed at its point.
+          mScene.AskContextMenu();
+          const long before = static_cast<long>(count("Blank Marker"));
+          const EdMapScene::ContextPoint& here = mScene.ContextPointNow();
+          EdShell::ViewMenuPoint point;
+          point.valid = here.valid;
+          point.x = here.x;
+          point.z = here.z;
+          EdShell::ViewMenuAction action;
+          action.kind = EdShell::ViewMenuAction::Kind::PlaceMarker;
+          action.arg = "Blank Marker";
+          RunViewMenuAction(point, action);
+          gpg::Logf(
+            "editor: /r6test: view menu point %s %.1f, %.1f (%s); start positions %ld -> %ld",
+            here.valid ? "at" : "missing",
+            static_cast<double>(here.x),
+            static_cast<double>(here.z),
+            here.what.empty() ? "nothing under it" : here.what.c_str(),
+            before,
+            static_cast<long>(count("Blank Marker"))
+          );
+          (void)mScene.Undo();
+          break;
+        }
+        case 4:
+          // A line of tanks 60 long (one undo step), then undone.
+          tools.SetUnitTool("uel0201", "ARMY_1", false);
+          mScene.PlaceUnitLineHere(c - 30.0f, c + 40.0f, c + 30.0f, c + 40.0f);
+          gpg::Logf(
+            "editor: /r6test: the unit line's undo step: %s",
+            mDocument.UndoStepName() != nullptr ? mDocument.UndoStepName() : "-"
+          );
+          (void)mScene.Undo();
+          break;
+        case 5: {
+          // A path node lifted 10 above the ground: the check's note and its fix.
+          for (SaveEntry& marker : markers) {
+            float x = 0.0f, y = 0.0f, z = 0.0f;
+            const std::string type = MarkerTypeOf(marker);
+            if (type == "Mass" || type == "Hydrocarbon" || type == "Blank Marker" || !MarkerPosition(marker, x, y, z)) {
+              continue;
+            }
+            mScene.EditMarker(marker.name, "position", Vector3Value(x, mScene.GroundHeightAt(x, z) + 10.0f, z));
+            mR6Marker = marker.name;
+            break;
+          }
+          const auto issues = [&] {
+            MarkerCheckInput input;
+            input.markers = &markers;
+            input.groundAt = [](const void* scene, const float x, const float z) {
+              return static_cast<const EdMapScene*>(scene)->GroundHeightAt(x, z);
+            };
+            input.groundContext = &mScene;
+            input.width = mDocument.Facts().fieldWidth;
+            input.height = mDocument.Facts().fieldHeight;
+            int n = 0;
+            for (const CheckIssue& issue : CheckMarkers(input)) {
+              if (issue.fix == CheckIssue::Fix::ToGround && issue.marker == mR6Marker) {
+                gpg::Logf("editor: /r6test: check: %s %s", issue.marker.c_str(), issue.text.c_str());
+                ++n;
+              }
+            }
+            return n;
+          };
+          const int found = issues();
+          // The fix as the Check panel runs it: the marker's height set to the ground's.
+          for (const SaveEntry& marker : markers) {
+            float x = 0.0f, y = 0.0f, z = 0.0f;
+            if (marker.name == mR6Marker && MarkerPosition(marker, x, y, z)) {
+              mScene.EditMarker(
+                marker.name,
+                "position",
+                Vector3Value(
+                  x,
+                  mDocument.Map()->mTerrainRes->GetHeightAt(
+                    static_cast<std::int32_t>(std::lround(x)), static_cast<std::int32_t>(std::lround(z))
+                  ),
+                  z
+                )
+              );
+              break;
+            }
+          }
+          gpg::Logf(
+            "editor: /r6test: %s off the ground: %d notes before the fix, %d after", mR6Marker.c_str(), found, issues()
+          );
+          break;
+        }
+        case 6: {
+          // A mass point moved off its grid cell's middle, then snapped back.
+          for (const SaveEntry& marker : markers) {
+            float x = 0.0f, y = 0.0f, z = 0.0f;
+            if (MarkerTypeOf(marker) == "Mass" && MarkerPosition(marker, x, y, z)) {
+              mScene.EditMarker(marker.name, "position", Vector3Value(x + 0.3, y, z - 0.2));
+              (void)mScene.SnapMarkerToGrid(marker.name);
+              break;
+            }
+          }
+          gpg::Logf("editor: /r6test: ARMY_1 has %zu group paths", mScene.GroupPathsOf("ARMY_1").size());
+          break;
+        }
+        case 7: {
+          // An imported mask: the heights and layer 1's mask written beside each other; slot 1 read by a rule.
+          std::error_code ec;
+          std::filesystem::create_directories(folder, ec);
+          std::string message;
+          (void)mScene.ExportHeights(folder / "r6_heights.png", 0, 1.0f, message);
+          (void)mScene.ExportMaskLayer(0, folder / "r6_wear.png", message);
+          tools.SetInteropFile(false, (folder / "r6_heights.png").string());
+          MaskGenRule rule = NewMaskRule("named");
+          rule.v["slot"] = 1;
+          MaskGenContext context;
+          field::Grid mask;
+          std::string error;
+          const bool ok = MaskGenContextOf({rule}, context, error) && EvaluateMaskRules(context, {rule}, mask, error);
+          double sum = 0.0;
+          for (const float v : mask.v) {
+            sum += v;
+          }
+          gpg::Logf(
+            "editor: /r6test: imported mask slot 1: %s, mean %.3f over %zu samples%s%s",
+            ok ? "read" : "failed",
+            mask.v.empty() ? 0.0 : sum / static_cast<double>(mask.v.size()),
+            mask.v.size(),
+            error.empty() ? "" : ": ",
+            error.c_str()
+          );
+          break;
+        }
+        case 8:
+          tools.AskStrataTheme({EdTools::StrataThemeAsk::Op::Apply, 0, {}, true});
+          break;
+        case 9:
+          tools.AskStrataTheme({EdTools::StrataThemeAsk::Op::Save, 0, "r6 saved", false});
+          break;
+        case 10:
+          tools.AskStrataTheme({EdTools::StrataThemeAsk::Op::Import, 0, "scmp_012", false});
+          break;
+        case 11:
+          if (bool* const shown = mShell->PanelShown("Images"); shown != nullptr) {
+            *shown = true;
+          }
+          break;
+        case 13:
+          gpg::Logf("editor: /r6test: done");
+          break;
+        default:
+          break;
+        }
+      }
+      /** SC tools > Water: the asks, and Live's re-apply when the water level moved. */
+      void WaterMasksUpdate();
+      struct WaterApplied
+      {
+        int layer = 0;
+        float level = 0.0f;
+        std::vector<std::uint8_t> base;
+        std::vector<std::uint8_t> last;
+      };
+      std::map<int, WaterApplied> mWaterApplied;
+      int mWaterLiveFrames = 0;
+      int mWaterTestStage = 0;
+      int mWaterTestFrames = 0;
+      int mWaterTestId = 0;
       int mMaskGenEvaluated = -1;
       int mMaskGenWait = 0;
       std::uint64_t mMaskGenImage = 0;
@@ -7431,6 +8085,15 @@ namespace faf::editor
       add("edit.duplicate", "Duplicate beside", "Edit", "Ctrl+D", [this] {
         mScene.CtrlKey('D');
       }, canEdit, {}, "A copy of the selection 8 units beside it");
+      const auto cameraMarker = [this]() {
+        return mScene.SelectedCameraMarker().empty() ? std::string("select a Camera Info marker") : std::string();
+      };
+      add("marker.viewthrough", "View through this camera", "Edit", "", [this] {
+        (void)mScene.LookThroughCamera(mScene.SelectedCameraMarker());
+      }, cameraMarker, {}, "The editor's camera goes to the view the selected Camera Info marker keeps");
+      add("marker.fromview", "Set the camera marker from the view", "Edit", "", [this] {
+        (void)mScene.SetCameraMarkerFromView(mScene.SelectedCameraMarker());
+      }, cameraMarker, {}, "The selected Camera Info marker keeps the editor camera's view (one undo step)");
       add("edit.mirror", "Mirror the selection", "Edit", "", [this] {
         const int made = mScene.MirrorSelection();
         PostStatusMessage(
@@ -8790,6 +9453,7 @@ namespace faf::editor
         );
       }
       KeepViewState();
+      KeepToolState();
       KeepSoundToFocus();
       mShell->Tools().SetModelsLoading(mScene.ModelsPending());
 
@@ -9777,7 +10441,195 @@ namespace faf::editor
           );
         }
       }
+      // Imported masks: the slots the rules name, read from the files beside the Import / Export heightmap.
+      const std::vector<std::string> imported = ImportedMaskFiles(mShell->Tools().InteropFile(false));
+      for (const MaskGenRule& rule : rules) {
+        const int slot = static_cast<int>(std::lround(rule.Value("slot")));
+        if (
+          !rule.enabled || rule.type != "named" || slot < 1 || slot > static_cast<int>(imported.size()) ||
+          context.imported.count(slot) != 0
+        ) {
+          continue;
+        }
+        HeightImage image;
+        std::string readError;
+        if (!ReadHeightImage(imported[static_cast<std::size_t>(slot - 1)], 0, 0, image, readError)) {
+          error = imported[static_cast<std::size_t>(slot - 1)] + ": " + readError;
+          return false;
+        }
+        auto grid = std::make_shared<field::Grid>(
+          image.width,
+          image.height,
+          static_cast<float>(terrain->width - 1) / static_cast<float>(std::max(image.width - 1, 1)),
+          0.0f,
+          0.0f
+        );
+        for (std::size_t k = 0; k < image.words.size() && k < grid->v.size(); ++k) {
+          grid->v[k] = static_cast<float>(image.words[k]) / 65535.0f;
+        }
+        context.imported[slot] = grid;
+        gpg::Logf(
+          "editor: mask generator: imported mask %d is %s (%d x %d)",
+          slot,
+          imported[static_cast<std::size_t>(slot - 1)].c_str(),
+          image.width,
+          image.height
+        );
+      }
       return true;
+    }
+
+    void EditorApp::WaterMasksUpdate()
+    {
+      EdTools& tools = mShell->Tools();
+      if (!mScene.Attached()) {
+        mWaterApplied.clear();
+        return;
+      }
+      using Ask = EdTools::WaterMaskAsk;
+      std::vector<EdTools::WaterMaskDef>& defs = tools.WaterMaskDefs();
+      const auto find = [&defs](const int id) -> EdTools::WaterMaskDef* {
+        for (EdTools::WaterMaskDef& def : defs) {
+          if (def.id == id) {
+            return &def;
+          }
+        }
+        return nullptr;
+      };
+      const auto evaluate = [this](const EdTools::WaterMaskDef& def, field::Grid& mask, std::string& error) {
+        const std::vector<MaskGenRule> rules = WaterMaskRules(def.kind, def.width, def.depth, def.soft, def.slope);
+        MaskGenContext context;
+        return MaskGenContextOf(rules, context, error) && EvaluateMaskRules(context, rules, mask, error);
+      };
+      const auto apply = [&](EdTools::WaterMaskDef& def, const bool remove) {
+        WaterApplied& kept = mWaterApplied[def.id];
+        if (kept.layer != 0 && kept.layer != def.layer && !kept.base.empty()) {
+          // Moved to another layer: the old layer gets its own paint back first.
+          std::string message;
+          (void)mScene.WriteWaterLinkedMask(nullptr, kept.layer, 1.0f, kept.base, kept.last, message);
+        }
+        kept.layer = def.layer;
+        field::Grid mask;
+        std::string message;
+        if (!remove && !evaluate(def, mask, message)) {
+          PostStatusMessage("The water mask wasn't made: " + message);
+          return;
+        }
+        const int changed =
+          mScene.WriteWaterLinkedMask(remove ? nullptr : &mask, def.layer, def.strength, kept.base, kept.last, message);
+        def.applied = !remove && changed >= 0;
+        kept.level = mDocument.WaterNow().elevation;
+        PostStatusMessage(message);
+        gpg::Logf(
+          "editor: water mask %s (L%d) at water level %.2f: %s",
+          WaterMaskKindName(def.kind),
+          def.layer,
+          static_cast<double>(kept.level),
+          message.c_str()
+        );
+      };
+      Ask ask = Ask::None;
+      int id = 0;
+      if (tools.TakeWaterMaskAsk(ask, id)) {
+        if (EdTools::WaterMaskDef* const def = find(id); def != nullptr) {
+          switch (ask) {
+          case Ask::Preview: {
+            field::Grid mask;
+            std::string error;
+            if (!mDocument.WaterNow().enabled) {
+              def->cover = "The map has no water.";
+            } else if (evaluate(*def, mask, error)) {
+              double sum = 0.0;
+              for (const float v : mask.v) {
+                sum += std::clamp(v, 0.0f, 1.0f);
+              }
+              char text[96];
+              (void)std::snprintf(
+                text,
+                sizeof(text),
+                "Covers %.1f%% of the map at the water level %.1f",
+                100.0 * sum / static_cast<double>(std::max<std::size_t>(mask.v.size(), 1)),
+                static_cast<double>(mDocument.WaterNow().elevation)
+              );
+              def->cover = text;
+            } else {
+              def->cover = error;
+            }
+            gpg::Logf("editor: water mask %s preview: %s", WaterMaskKindName(def->kind), def->cover.c_str());
+            break;
+          }
+          case Ask::Apply:
+            if (!mDocument.WaterNow().enabled) {
+              PostStatusMessage("The map has no water (turn it on in the Water tool).");
+            } else {
+              apply(*def, false);
+            }
+            break;
+          case Ask::Remove:
+            apply(*def, true);
+            break;
+          case Ask::Delete:
+            if (def->applied) {
+              apply(*def, true);
+            }
+            mWaterApplied.erase(id);
+            defs.erase(
+              std::remove_if(
+                defs.begin(),
+                defs.end(),
+                [id](const EdTools::WaterMaskDef& d) {
+              return d.id == id;
+            }
+              ),
+              defs.end()
+            );
+            break;
+          default:
+            break;
+          }
+        }
+      }
+      // Live: a new water level applies every applied mask again (each its own undo step).
+      if (tools.WaterMasksLive() && ++mWaterLiveFrames % 30 == 0 && mDocument.WaterNow().enabled) {
+        const float level = mDocument.WaterNow().elevation;
+        for (EdTools::WaterMaskDef& def : defs) {
+          const auto kept = mWaterApplied.find(def.id);
+          if (def.applied && kept != mWaterApplied.end() && std::fabs(kept->second.level - level) > 0.01f) {
+            apply(def, false);
+          }
+        }
+      }
+      // `/watermasks <kind>,<layer>` (test runs): a mask added, previewed, applied; the water raised by 2, applied
+      // again by Live; then removed.
+      if (
+        fa::vector<fa::string> arg; mWaterTestStage < 6 && moho::CFG_GetArgOption("/watermasks", 1, &arg) &&
+        !arg.empty() && ++mWaterTestFrames % 60 == 0
+      ) {
+        const std::string text = arg[0].c_str();
+        switch (mWaterTestStage++) {
+        case 0:
+          mWaterTestId = tools.AddWaterMask(std::atoi(text.c_str()), std::atoi(text.c_str() + text.find(',') + 1));
+          tools.AskWaterMask(Ask::Preview, mWaterTestId);
+          break;
+        case 1:
+          tools.AskWaterMask(Ask::Apply, mWaterTestId);
+          break;
+        case 2: {
+          const WaterState before = mDocument.WaterNow();
+          WaterState water = before;
+          water.elevation += 2.0f;
+          mDocument.ApplyWater(water);
+          mDocument.WaterEdited(before);
+          gpg::Logf("editor: /watermasks: the water raised to %.2f", static_cast<double>(water.elevation));
+          break;
+        }
+        case 4:
+          tools.AskWaterMask(Ask::Remove, mWaterTestId);
+          break;
+        default:
+          break;
+        }
+      }
     }
 
     void EditorApp::MaskGenUpdate()
@@ -10060,6 +10912,7 @@ namespace faf::editor
           return TexturePixels(path);
         });
       };
+      StrataThemesUpdate(slots);
       const EdTools::ThemeOp op = tools.TakeThemeOp();
       switch (op) {
       case EdTools::ThemeOp::Try:
@@ -10726,6 +11579,7 @@ namespace faf::editor
         mShell->SetMeshFindings(mScene.CheckMeshTerrain());
       }
       const HWND owner = HandleOf(mGame.supcomFrame);
+      ImagesPanelThumbs();
       for (EdShell::ImageAsk ask; mShell->TakeImageAsk(ask);) {
         if (!mScene.Attached()) {
           break;
@@ -10786,6 +11640,47 @@ namespace faf::editor
             const int kind = std::clamp(std::atoi(what.c_str() + 5), 0, 2);
             return exportIt ? waterExport(kind, file) : waterImport(kind, file);
           }
+          if (what == "types") {
+            // The terrain types: each cell's id as its grey (id x 257); an import must have the map's size (types
+            // can't be blended).
+            int width = 0;
+            int height = 0;
+            if (mDocument.TerrainTypeCells(width, height) == nullptr) {
+              message = "the map has no terrain types";
+              return false;
+            }
+            std::vector<std::uint8_t> cells = mDocument.TerrainTypesNow();
+            std::string error;
+            if (exportIt) {
+              HeightImage image;
+              image.width = width;
+              image.height = height;
+              for (const std::uint8_t id : cells) {
+                image.words.push_back(static_cast<std::uint16_t>(id * 257));
+              }
+              const bool ok = WriteHeightImage(file, image, error);
+              message = ok ? "written to " + file.string() : error;
+              return ok;
+            }
+            HeightImage image;
+            if (!ReadHeightImage(file, 0, 0, image, error)) {
+              message = error;
+              return false;
+            }
+            if (image.width != width || image.height != height) {
+              message = "the terrain types are " + std::to_string(width) + " x " + std::to_string(height) +
+                "; the image is " + std::to_string(image.width) + " x " + std::to_string(image.height);
+              return false;
+            }
+            const std::vector<std::uint8_t> before = cells;
+            for (std::size_t i = 0; i < cells.size() && i < image.words.size(); ++i) {
+              cells[i] = static_cast<std::uint8_t>((image.words[i] + 128) / 257);
+            }
+            mDocument.ApplyTerrainTypes(cells);
+            mDocument.TerrainTypesEdited(before);
+            message = "read from " + file.string() + " (one undo step)";
+            return true;
+          }
           message = "nothing called " + what;
           return false;
         };
@@ -10800,7 +11695,7 @@ namespace faf::editor
           std::filesystem::create_directories(folder, made);
           int written = 0;
           std::vector<std::pair<std::string, std::string>> all = {
-            {"heights", "heights.png"}, {"preview", "preview.png"}
+            {"heights", "heights.png"}, {"preview", "preview.png"}, {"types", "terrain_types.png"}
           };
           for (int layer = 1; layer <= 8; ++layer) {
             all.emplace_back("mask" + std::to_string(layer), "mask" + std::to_string(layer) + ".png");
@@ -11528,6 +12423,8 @@ namespace faf::editor
         tools.SetLayerSlots(mScene.LayerSlots());
         MapTexturesUpdate();
         MaskGenUpdate();
+        WaterMasksUpdate();
+        DriveRoundSixTest();
         RecipesUpdate();
         TexturesUpdate();
         DriveMaterialEditor();
@@ -11579,7 +12476,39 @@ namespace faf::editor
           gpg::Logf("editor: map info test: redo: name %s", mDocument.Facts().name.c_str());
         }
         if (bool selection = false; mScene.TakeContextMenuAsk(selection)) {
-          mShell->OpenViewMenu(selection);
+          const EdMapScene::ContextPoint& here = mScene.ContextPointNow();
+          EdShell::ViewMenuPoint point;
+          point.valid = here.valid;
+          point.x = here.x;
+          point.z = here.z;
+          point.height = here.height;
+          point.what = here.what;
+          point.marker = here.marker;
+          point.markerType = here.markerType;
+          point.unitArmy = here.unitArmy;
+          point.unitName = here.unitName;
+          point.armies = mDocument.Armies();
+          if (!here.unitArmy.empty()) {
+            point.groups = mScene.GroupPathsOf(here.unitArmy);
+          }
+          point.unitToPlace = mShell->Tools().UnitType();
+          point.propToPlace = mShell->Tools().PropBlueprint();
+          gpg::Logf(
+            "editor: view menu at %.1f, %.1f (height %.2f)%s%s",
+            static_cast<double>(point.x),
+            static_cast<double>(point.z),
+            static_cast<double>(point.height),
+            point.what.empty() ? "" : ": ",
+            point.what.c_str()
+          );
+          mShell->OpenViewMenu(selection || !here.what.empty(), std::move(point));
+        }
+        // The view menu's entries that act at its point (place, focus, snap, give, group).
+        if (EdShell::ViewMenuPoint at; mScene.Attached()) {
+          EdShell::ViewMenuAction action;
+          if (mShell->TakeViewMenuAction(at, action)) {
+            RunViewMenuAction(at, action);
+          }
         }
         // `/viewmenu` (test runs): the menu as a right click would open it, once the map is shown.
         if (
@@ -13469,6 +14398,30 @@ namespace faf::editor
         }
         if (parts.size() >= 6) {
           settings.sizeZ = std::atoi(parts[5].c_str()); // a depth of its own (the size list's index)
+        }
+        // Any size: "7.5km" for the width (and the depth), the terrain the one that holds it (NewMapPlayable).
+        const auto km = [](const std::string& part) {
+          return part.size() > 2 && part.compare(part.size() - 2, 2, "km") == 0
+            ? static_cast<float>(std::atof(part.c_str()))
+            : 0.0f;
+        };
+        if (parts.size() >= 2 && km(parts[1]) > 0.0f) {
+          settings.widthKm = km(parts[1]);
+          settings.depthKm = parts.size() >= 6 && km(parts[5]) > 0.0f ? km(parts[5]) : settings.widthKm;
+          settings.sizeZ = -1;
+          if (const std::optional<std::array<int, 4>> area = NewMapPlayable(settings)) {
+            gpg::Logf(
+              "editor: /newmap: %.1f x %.1f km: terrain %d x %d, playable area %d, %d to %d, %d",
+              static_cast<double>(settings.widthKm),
+              static_cast<double>(settings.depthKm),
+              NewMapWidth(settings),
+              NewMapDepth(settings),
+              (*area)[0],
+              (*area)[1],
+              (*area)[2],
+              (*area)[3]
+            );
+          }
         }
         mNewMapSpec.clear();
         std::string message;

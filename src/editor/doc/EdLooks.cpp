@@ -342,10 +342,14 @@ namespace faf::editor
         return noSky();
       }
     } else {
+      // 10 albedo (base .. Upper), then 9 normal (base .. layer 8): each a texture and its tile.
       for (int layer = 0; layer < 19; ++layer) {
-        if (!in.SkipString() || !in.Skip(4u)) {
+        std::string texture;
+        float tile = 0.0f;
+        if (!in.String(texture) || !in.Take(tile)) {
           return noSky();
         }
+        (layer < 10 ? look.strataAlbedo : look.strataNormal).emplace_back(texture, tile);
       }
     }
     std::int32_t decals = 0;

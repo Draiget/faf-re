@@ -862,6 +862,49 @@ namespace faf::editor
     if (mCommands == nullptr || !ImGui::BeginPopup("##viewmenu")) {
       return;
     }
+    using Kind = ViewMenuAction::Kind;
+    const ViewMenuPoint& at = mViewMenuPoint;
+    const auto act = [this](const Kind kind, std::string arg = {}, std::vector<std::string> path = {}) {
+      mViewMenuAction = {kind, std::move(arg), std::move(path)};
+    };
+    // The header (FAF Studio's menus.lua): where, how high, and what stands there.
+    if (at.valid) {
+      ImGui::TextDisabled(
+        "%.1f, %.1f  height %.2f", static_cast<double>(at.x), static_cast<double>(at.z), static_cast<double>(at.height)
+      );
+      if (!at.what.empty()) {
+        ImGui::TextUnformatted(at.what.c_str());
+      }
+      ImGui::Separator();
+    }
+    // Its own entries: a resource to its build grid; a unit to another army or group.
+    if (at.markerType == "Mass" || at.markerType == "Hydrocarbon") {
+      if (ImGui::MenuItem("Snap to the build grid")) {
+        act(Kind::SnapToGrid, at.marker);
+      }
+    }
+    if (!at.unitName.empty()) {
+      if (ImGui::BeginMenu("Set army")) {
+        for (const std::string& army : at.armies) {
+          if (ImGui::MenuItem(army.c_str(), nullptr, army == at.unitArmy, army != at.unitArmy)) {
+            act(Kind::SetArmy, army);
+          }
+        }
+        ImGui::EndMenu();
+      }
+      if (ImGui::BeginMenu("Move to group")) {
+        for (const std::vector<std::string>& path : at.groups) {
+          std::string label;
+          for (const std::string& part : path) {
+            label += (label.empty() ? "" : " / ") + part;
+          }
+          if (ImGui::MenuItem(label.empty() ? "(the army's root)" : label.c_str())) {
+            act(Kind::MoveToGroup, at.unitArmy, path);
+          }
+        }
+        ImGui::EndMenu();
+      }
+    }
     for (const std::string& id : ViewMenuCommands(mViewMenuSelection)) {
       if (id.empty()) {
         ImGui::Separator();
@@ -877,6 +920,42 @@ namespace faf::editor
       }
       if (!why.empty() && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
         EdSetTooltip("%s", why.c_str());
+      }
+    }
+    // Things put at the point.
+    if (at.valid && mDocument.GetState() == EdDocument::State::Open) {
+      ImGui::Separator();
+      if (ImGui::BeginMenu("Place marker here")) {
+        std::string group;
+        for (const MarkerType& type : MarkerTypes()) {
+          if (group != type.group) {
+            group = type.group;
+            ImGui::SeparatorText(group.c_str());
+          }
+          if (ImGui::MenuItem(type.type)) {
+            act(Kind::PlaceMarker, type.type);
+          }
+        }
+        ImGui::EndMenu();
+      }
+      if (ImGui::MenuItem("Add start position here")) {
+        act(Kind::PlaceMarker, "Blank Marker");
+      }
+      if (ImGui::MenuItem("Add area here")) {
+        act(Kind::AddArea);
+      }
+      if (!at.unitToPlace.empty() && ImGui::MenuItem(("Place " + at.unitToPlace + " here").c_str())) {
+        act(Kind::PlaceUnit);
+      }
+      if (!at.propToPlace.empty()) {
+        const std::size_t slash = at.propToPlace.find_last_of('/');
+        const std::string name = slash == std::string::npos ? at.propToPlace : at.propToPlace.substr(slash + 1);
+        if (ImGui::MenuItem(("Place " + name + " here").c_str())) {
+          act(Kind::PlaceProp);
+        }
+      }
+      if (ImGui::MenuItem("Focus the camera here")) {
+        act(Kind::FocusHere);
       }
     }
     ImGui::EndPopup();
@@ -2808,6 +2887,50 @@ namespace faf::editor
     if (ImGui::RadioButton("Campaign", mNewMap.campaign)) {
       mNewMap.campaign = true;
     }
+    // Any size (FAF Studio's custom map): a playable area of any km in the terrain that holds it.
+    bool anySize = mNewMap.widthKm > 0.0f;
+    ImGui::TextUnformatted("Any size");
+    ImGui::SameLine(Em(110.0f));
+    if (ImGui::Checkbox("##anysize", &anySize)) {
+      mNewMap.widthKm = anySize ? 7.5f : 0.0f;
+      mNewMap.depthKm = anySize ? 7.5f : 0.0f;
+    }
+    if (anySize) {
+      ImGui::SameLine();
+      ImGui::SetNextItemWidth(Em(70.0f));
+      FillDragFloat("##widthkm", &mNewMap.widthKm, 0.1f, 1.0f, 80.0f, "%.1f km");
+      ImGui::SameLine();
+      ImGui::TextUnformatted("x");
+      ImGui::SameLine();
+      ImGui::SetNextItemWidth(Em(70.0f));
+      FillDragFloat("##depthkm", &mNewMap.depthKm, 0.1f, 1.0f, 80.0f, "%.1f km");
+      for (const float preset : {7.5f, 15.0f, 30.0f}) {
+        ImGui::SameLine();
+        char label[16];
+        (void)std::snprintf(label, sizeof(label), "%g", static_cast<double>(preset));
+        if (ImGui::SmallButton(label)) {
+          mNewMap.widthKm = mNewMap.depthKm = preset;
+        }
+      }
+      const std::optional<std::array<int, 4>> area = NewMapPlayable(mNewMap);
+      const int tw = NewMapWidth(mNewMap);
+      const int td = NewMapDepth(mNewMap);
+      if (area) {
+        const int w = (*area)[2] - (*area)[0];
+        const int d = (*area)[3] - (*area)[1];
+        ImGui::TextDisabled(
+          "Terrain %d x %d; the playable area %d x %d in its middle (%d%% of it); starts inside the area.",
+          tw,
+          td,
+          w,
+          d,
+          static_cast<int>(100.0 * w * d / (static_cast<double>(tw) * td))
+        );
+      } else {
+        ImGui::TextDisabled("Terrain %d x %d, all of it playable.", tw, td);
+      }
+    }
+    ImGui::BeginDisabled(anySize);
     ImGui::TextUnformatted("Size");
     ImGui::SameLine(Em(110.0f));
     for (int i = 0; i < kNewMapSizeCount; ++i) {
@@ -2832,6 +2955,7 @@ namespace faf::editor
       }
       ImGui::PopID();
     }
+    ImGui::EndDisabled();
     ImGui::SetNextItemWidth(kWidth);
     FillSliderInt("Players", &mNewMap.players, 1, kNewMapMaxPlayers);
     ImGui::SetNextItemWidth(kWidth);

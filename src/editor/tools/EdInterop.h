@@ -2,6 +2,7 @@
 
 #include "editor/tools/EdHeightFile.h"
 
+#include <array>
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -97,6 +98,30 @@ namespace faf::editor
    * ignored, with a height image's extension. Empty when none.
    */
   [[nodiscard]] std::string FindNamedMask(const std::vector<std::string>& files, const std::string& name);
+  /**
+   * The imported masks' slots (FAF Studio's interop Named, the mask generator's Imported mask): the height images
+   * beside `heightmap`, the heightmap itself left out, sorted by name; slot 1 is the first.
+   */
+  [[nodiscard]] std::vector<std::string> ImportedMaskFiles(const std::string& heightmap);
+
+  /**
+   * What the reference maps look like (FAF Studio's mapsets.lua Stats, 342 maps): for a map size (0 all), the 5th,
+   * 25th, 50th, 75th and 95th percentiles of the relief (highest - lowest), the land's span, the mean slope (degrees)
+   * and the share steeper than 30 degrees.
+   */
+  struct ReferenceMapStats
+  {
+    int size = 0;
+    int n = 0;
+    std::array<float, 5> relief{};
+    std::array<float, 5> span{};
+    std::array<float, 5> slope{};
+    std::array<float, 5> steep{};
+  };
+  /** The numbers for a map `size` units across: the nearest size with 8 maps or more (up to 1024), else all maps. */
+  [[nodiscard]] const ReferenceMapStats& ReferenceStatsFor(int size);
+  /** A line comparing an import's relief and mean slope with the reference maps of its size (FAF Studio's Advice). */
+  [[nodiscard]] std::string ReferenceAdvice(int size, float relief, float meanSlope);
 
   /** A file's stamp for the live link: its size and its last write (0 for none). */
   struct FileStamp

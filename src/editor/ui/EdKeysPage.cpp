@@ -315,6 +315,48 @@ namespace faf::editor
       ImGui::PopID();
     }
     ImGui::EndTable();
+
+    // The camera's mouse gestures (FAF Studio's camera.lua): a button and the keys held with it, for each.
+    ImGui::Spacing();
+    ImGui::SeparatorText("Camera mouse");
+    static constexpr const char* kButtons[] = {"None", "Right", "Middle"};
+    for (int g = 0; g < static_cast<int>(CameraGesture::Count); ++g) {
+      const CameraGesture gesture = static_cast<CameraGesture>(g);
+      MouseChord& chord = ActiveCameraGestures()[static_cast<std::size_t>(g)];
+      const MouseChord before = chord;
+      ImGui::PushID(CameraGestureId(gesture));
+      ImGui::AlignTextToFramePadding();
+      ImGui::TextUnformatted(CameraGestureTitle(gesture));
+      ImGui::SameLine(Em(190.0f));
+      ImGui::SetNextItemWidth(Em(90.0f));
+      (void)ImGui::Combo("##button", &chord.button, kButtons, 3);
+      ImGui::SameLine();
+      ImGui::Checkbox("Ctrl", &chord.ctrl);
+      ImGui::SameLine();
+      ImGui::Checkbox("Shift", &chord.shift);
+      ImGui::SameLine();
+      ImGui::Checkbox("Alt", &chord.alt);
+      if (!(chord == DefaultCameraGestures()[static_cast<std::size_t>(g)])) {
+        ImGui::SameLine();
+        if (ImGui::SmallButton("Default")) {
+          chord = DefaultCameraGestures()[static_cast<std::size_t>(g)];
+        }
+      }
+      if (!(chord == before)) {
+        gpg::Logf(
+          "editor: keys: %s %s -> %s",
+          CameraGestureId(gesture),
+          MouseChordText(before).empty() ? "(none)" : MouseChordText(before).c_str(),
+          MouseChordText(chord).empty() ? "(none)" : MouseChordText(chord).c_str()
+        );
+        changed = true;
+      }
+      ImGui::PopID();
+    }
+    ImGui::TextDisabled(
+      "A press takes the gesture bound to that button with exactly those keys, else the one bound to the button alone. "
+      "Shift + right drag stays the selection box; a right click without a drag opens the view's menu."
+    );
     return changed;
   }
 } // namespace faf::editor

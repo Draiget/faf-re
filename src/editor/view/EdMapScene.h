@@ -400,6 +400,19 @@ namespace faf::editor
      * Writes a generated mask (0..1 on any grid over the map) into layer `layer` (1..8) as one undo step, made
      * symmetric as the Tools panel's symmetry asks. Returns the texels changed, or -1 with `message`.
      */
+    /**
+     * A water-linked mask (SC tools > Water) into `layer`: base + (1 - base) x mask x strength, `base` the layer as it
+     * was before the first apply; texels the user painted since the last apply (they differ from `last`) stay. With
+     * `remove`, the layer goes back to `base` (the user's paint stays). One undo step; returns the texels changed.
+     */
+    int WriteWaterLinkedMask(
+      const field::Grid* mask,
+      int layer,
+      float strength,
+      std::vector<std::uint8_t>& base,
+      std::vector<std::uint8_t>& last,
+      std::string& message
+    );
     int WriteGeneratedMask(
       const field::Grid& mask,
       int layer,
@@ -484,6 +497,12 @@ namespace faf::editor
     );
     /** Changes a property of a marker ("name" renames it), as one undo step. */
     void EditMarker(const std::string& marker, const std::string& key, const std::string& value);
+    /** The first selected Camera Info marker's name, or "". */
+    [[nodiscard]] std::string SelectedCameraMarker() const;
+    /** The editor camera to the view a Camera Info marker keeps (its focus, orientation and zoom). */
+    bool LookThroughCamera(const std::string& marker);
+    /** The Camera Info marker takes the editor camera's view (focus on the ground, heading, pitch, zoom): one step. */
+    bool SetCameraMarkerFromView(const std::string& marker);
     /** An air path node grid `count` a side over the playable area (or the map), as one undo step; `replace` removes
      * the air nodes there were. */
     void FillAirGrid(int count, bool replace);
@@ -647,11 +666,67 @@ namespace faf::editor
         !mSelection.empty() || !mMarkerSelection.empty() || !mDecalSelection.empty() || !mUnitSelection.empty();
       return true;
     }
-    /** Test runs: as a right click would. */
-    void AskContextMenu() noexcept
+    /** Test runs: as a right click at the view's middle would. */
+    void AskContextMenu();
+    /**
+     * Where the view's menu was asked (FAF Studio's menus.lua): the ground point and its height, and what stands
+     * there (it is selected when it wasn't): the menu's header, and its entries for that thing.
+     */
+    struct ContextPoint
     {
-      mContextAsk = true;
+      bool valid = false;
+      float x = 0.0f;
+      float z = 0.0f;
+      float height = 0.0f;
+      std::string what;       // "marker Mass 03 (Mass)", "unit UNIT_4 of ARMY_1", "prop ...", "decal"
+      std::string marker;     // the marker's name
+      std::string markerType; // its type
+      std::string unitArmy;   // the unit's army and name
+      std::string unitName;
+    };
+    [[nodiscard]] const ContextPoint& ContextPointNow() const noexcept
+    {
+      return mContextPoint;
     }
+    /** An army's group paths (each a list of names from under its root; the root is the empty path). */
+    [[nodiscard]] std::vector<std::vector<std::string>> GroupPathsOf(const std::string& army) const;
+    /** The view menu's place-here entries: the Units tool's unit, the Props tool's prop at (x, z); a give. */
+    void PlaceUnitHere(
+      const float x,
+      const float z
+    )
+    {
+      PlaceUnits(x, z);
+    }
+    void PlacePropHere(
+      const float x,
+      const float z
+    )
+    {
+      PlaceProps(x, z);
+    }
+    int GiveSelectionTo(
+      const std::string& army
+    )
+    {
+      return GiveSelectedUnits(army);
+    }
+    /** Test runs: a unit line as a drag would place it; how many marker models are drawn. */
+    void PlaceUnitLineHere(
+      const float x0,
+      const float z0,
+      const float x1,
+      const float z1
+    )
+    {
+      PlaceUnitLine(x0, z0, x1, z1);
+    }
+    [[nodiscard]] std::size_t MarkerModelCount() const noexcept
+    {
+      return mMarkerModels.size();
+    }
+    /** A mass or hydrocarbon marker to the middle of its build grid cell (x.5, z.5): one undo step. */
+    bool SnapMarkerToGrid(const std::string& marker);
     /** The view to the point (x, z) of the map, from no farther than `distance`. */
     void FramePoint(float x, float z, float distance = 80.0f);
     /** Test runs (`/selectunit <army>,<unit>`): that unit selected and the view on it. */
@@ -763,6 +838,10 @@ namespace faf::editor
     std::map<std::string, moho::MeshInstance*> mDeposits;
     void UpdateDeposits();
     void DeleteDeposits();
+    /** The markers' prop models (Markers tool > Draw markers as their models), by marker name and prop. */
+    std::map<std::string, std::pair<std::string, moho::MeshInstance*>> mMarkerModels;
+    void UpdateMarkerModels();
+    void DeleteMarkerModels();
     bool mPropsDone = false;
     /** The armies' units from `_save.lua` (every group's), drawn as the game places them, and which unit each is. */
     struct UnitRef
@@ -1133,6 +1212,9 @@ namespace faf::editor
     /** Where a pick sits and how big its ring is, for the hover ring. */
     [[nodiscard]] bool PickPlace(const PickHit& hit, float& x, float& z, float& radius) const;
     PickKind mSelectKind = PickKind::None;
+    ContextPoint mContextPoint;
+    /** The ground point under `at` and what stands there (selected when it wasn't), for the view's menu. */
+    void TakeContextPick(POINT at);
     /** The stroke under way was started with the right button: the brush's opposite (Raise/Lower, Paint/Erase). */
     bool mPaintInverted = false;
     float mStrokeStartHeight = 0.0f;
@@ -1313,6 +1395,17 @@ namespace faf::editor
     /** The scatter or erase brush at (x, z) during its drag. */
     void DecalBrushAt(float x, float z);
     bool mDecalBrushing = false;
+    // The Units tool's line (FAF Studio's placer.lua): a drag places units a footprint apart from where it began.
+    bool mUnitLining = false;
+    float mUnitLineFrom[2] = {0.0f, 0.0f};
+    // The last line's end (units or props): Ctrl+click goes on from it, a corner at a time.
+    bool mLineEndKept = false;
+    float mLineEnd[2] = {0.0f, 0.0f};
+    // PlaceUnits called for a line: the units gathered into the line's one undo step.
+    bool mUnitBatch = false;
+    std::vector<std::pair<std::string, std::string>> mUnitBatchPlaced;
+    /** Units of the Units tool's type from (x0, z0) to (x1, z1), a footprint apart (with their copies): one step. */
+    void PlaceUnitLine(float x0, float z0, float x1, float z1);
     // The Props tool's Line: where the drag began.
     bool mPropLine = false;
     float mPropLineFromX = 0.0f;
@@ -1579,6 +1672,7 @@ namespace faf::editor
       None,
       Orbit,
       Pan,
+      Zoom,
     };
     Drag mDrag = Drag::None;
     POINT mDragFrom{};

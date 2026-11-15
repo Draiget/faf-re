@@ -71,6 +71,8 @@ namespace faf::editor
     float water = 0.0f;
     /** Layer k's weight 0..1 (as the shader reads it) at [k - 1], on the mask grid; null when not given. */
     std::array<std::shared_ptr<field::Grid>, 8> layers{};
+    /** The imported masks by slot (1..16), 0..1 on any grid (resampled): the Imported mask rule reads them. */
+    std::map<int, std::shared_ptr<field::Grid>> imported;
     std::map<std::string, std::shared_ptr<field::Grid>> cache;
   };
 
@@ -102,6 +104,15 @@ namespace faf::editor
     const char* id;
     const char* name;
   };
+  /**
+   * The SC tools' water-linked masks (FAF Studio's sctools.lua Water): 0 beach (the land strip `width` above the
+   * water, on ground gentler than `slope` degrees), 1 shore line (a band `width` about the waterline), 2 shallows
+   * (water down to `depth`), 3 underwater, 4 deep water (below `depth`). Each as mask rules on the map's water level.
+   */
+  inline constexpr int kWaterMaskKinds = 5;
+  [[nodiscard]] const char* WaterMaskKindName(int kind) noexcept;
+  [[nodiscard]] std::vector<MaskGenRule> WaterMaskRules(int kind, float width, float depth, float soft, float slope);
+
   /** The starting points (cliffs, beach, snow caps ...). */
   [[nodiscard]] const std::vector<MaskPreset>& MaskPresets();
   /** The rules of a preset; `heightLow` / `heightHigh` are the map's lowest and highest ground (snow caps). Empty when

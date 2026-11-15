@@ -510,6 +510,19 @@ namespace faf::editor
       {"layered", "Layered (soft wide blends)", kNoSnow},
       {"erosion", "Erosion paint (rock, sediment and channels from the water)", kNoSnow, false, false, false, true},
       {"coast", "Coast and wetland (wide beach, wet ground)", kNoSnow},
+      // Measured on the reference maps of each environment (FAF Studio's mapsets.lua Styles).
+      {"m_ancient_earth", "Environment: Ancient earth", kNoSnow, false, false, false},
+      {"m_crystalline", "Environment: Crystalline", kNoSnow, false, false, false},
+      {"m_desert", "Environment: Desert", kNoSnow, false, false, false},
+      {"m_evergreen", "Environment: Evergreen", 0, false, false, false},
+      {"m_evergreen2", "Environment: Evergreen 2", kNoSnow, false, false, false},
+      {"m_geothermal", "Environment: Geothermal", kNoSnow, false, false, false},
+      {"m_lava", "Environment: Lava", kNoSnow, false, false, true},
+      {"m_paradise", "Environment: Paradise", kNoSnow, false, false, false},
+      {"m_red_barrens", "Environment: Red barrens", kNoSnow, false, false, false},
+      {"m_swamp", "Environment: Swamp", kNoSnow, false, false, false},
+      {"m_tropical", "Environment: Tropical", kNoSnow, false, false, false},
+      {"m_tundra", "Environment: Tundra", 0, true, false, false},
     };
     return styles;
   }
@@ -540,6 +553,42 @@ namespace faf::editor
       k.soft = 0, k.edge = 0.012f, k.wear = 0.12f, k.sed = 0.22f, k.chan = 0.07f, k.rock = 26, k.cliff = 44, k.snow = 0;
     } else if (id == "coast") {
       k.beach = 6, k.wet = 3, k.dirt = 0.36f, k.snow = 0, k.rock = 38, k.cliff = 56, k.crisp = 0.3f;
+    } else if (id == "m_ancient_earth") {
+      k.beach = 12.0f, k.cliff = 35.0f, k.crisp = 0.37f, k.dark = 0.37f, k.dirt = 0.66f, k.high = 0.7f, k.rock = 21.0f,
+      k.snow = 0.0f, k.wet = 0.0f;
+    } else if (id == "m_crystalline") {
+      k.beach = 1.5f, k.cliff = 20.0f, k.crisp = 0.48f, k.dark = 1.0f, k.dirt = 0.13f, k.high = 0.52f, k.rock = 12.0f,
+      k.snow = 0.0f, k.wet = 8.0f;
+    } else if (id == "m_desert") {
+      k.beach = 12.0f, k.cliff = 28.5f, k.crisp = 0.49f, k.dark = 0.0f, k.dirt = 0.28f, k.high = 0.6f, k.rock = 13.0f,
+      k.snow = 0.0f, k.wet = 0.0f;
+    } else if (id == "m_evergreen") {
+      k.beach = 2.0f, k.cliff = 43.0f, k.crisp = 0.47f, k.dark = 0.0f, k.dirt = 0.12f, k.high = 0.62f, k.rock = 16.0f,
+      k.snow = 0.0f, k.wet = 0.0f;
+    } else if (id == "m_evergreen2") {
+      k.beach = 3.2f, k.cliff = 28.0f, k.crisp = 0.51f, k.dark = 0.0f, k.dirt = 0.38f, k.high = 0.65f, k.rock = 14.0f,
+      k.snow = 0.0f, k.wet = 0.0f;
+    } else if (id == "m_geothermal") {
+      k.beach = 2.0f, k.cliff = 22.0f, k.crisp = 0.34f, k.dark = 0.22f, k.dirt = 0.27f, k.high = 0.7f, k.rock = 12.0f,
+      k.snow = 0.0f, k.wet = 0.0f;
+    } else if (id == "m_lava") {
+      k.beach = 2.0f, k.cliff = 26.0f, k.crisp = 0.42f, k.dark = 0.72f, k.dirt = 0.24f, k.high = 0.62f, k.rock = 12.0f,
+      k.snow = 0.0f, k.wet = 0.0f;
+    } else if (id == "m_paradise") {
+      k.beach = 6.4f, k.cliff = 29.0f, k.crisp = 0.34f, k.dark = 0.0f, k.dirt = 0.29f, k.high = 0.64f, k.rock = 12.0f,
+      k.snow = 0.0f, k.wet = 0.0f;
+    } else if (id == "m_red_barrens") {
+      k.beach = 8.3f, k.cliff = 20.0f, k.crisp = 0.33f, k.dark = 0.47f, k.dirt = 0.47f, k.high = 0.65f, k.rock = 12.0f,
+      k.snow = 0.0f, k.wet = 0.0f;
+    } else if (id == "m_swamp") {
+      k.beach = 2.0f, k.cliff = 37.0f, k.crisp = 0.33f, k.dark = 0.0f, k.dirt = 0.44f, k.high = 0.72f, k.rock = 22.0f,
+      k.snow = 0.0f, k.wet = 0.0f;
+    } else if (id == "m_tropical") {
+      k.beach = 11.35f, k.cliff = 35.0f, k.crisp = 0.47f, k.dark = 0.0f, k.dirt = 0.1f, k.high = 0.56f, k.rock = 19.0f,
+      k.snow = 0.0f, k.wet = 0.0f;
+    } else if (id == "m_tundra") {
+      k.beach = 9.5f, k.cliff = 35.0f, k.crisp = 0.56f, k.dark = 0.4f, k.dirt = 0.06f, k.rock = 12.0f, k.snow = 0.45f,
+      k.wet = 1.4f;
     }
     return k;
   }

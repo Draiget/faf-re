@@ -234,6 +234,183 @@ namespace faf::editor
     }
     return {};
   }
+  void EdMapScene::PlaceUnitLine(
+    const float x0,
+    const float z0,
+    const float x1,
+    const float z1
+  )
+  {
+    if (mTools == nullptr || mTools->UnitType().empty()) {
+      return;
+    }
+    int sizeX = 1;
+    int sizeZ = 1;
+    (void)UnitFitAt(mTools->UnitType(), x0, z0, sizeX, sizeZ);
+    const float spacing = static_cast<float>(std::max({sizeX, sizeZ, 1}));
+    const float dx = x1 - x0;
+    const float dz = z1 - z0;
+    const float length = std::hypot(dx, dz);
+    const int count = static_cast<int>(length / spacing) + 1;
+    EdDocument::SaveSnapshot before = mDocument.SaveDataNow();
+    mUnitBatch = true;
+    mUnitBatchPlaced.clear();
+    for (int i = 0; i < count; ++i) {
+      const float t = length > 0.0f ? static_cast<float>(i) * spacing / length : 0.0f;
+      PlaceUnits(x0 + dx * t, z0 + dz * t);
+    }
+    mUnitBatch = false;
+    mLineEnd[0] = x1;
+    mLineEnd[1] = z1;
+    mLineEndKept = true;
+    if (mUnitBatchPlaced.empty()) {
+      return;
+    }
+    mDocument.SaveDataEdited(std::move(before));
+    ReloadUnits();
+    mUnitSelection = mUnitBatchPlaced;
+    gpg::Logf(
+      "editor: %zu %s units along a line of %.1f, %.0f apart (one undo step)",
+      mUnitBatchPlaced.size(),
+      mTools->UnitType().c_str(),
+      static_cast<double>(length),
+      static_cast<double>(spacing)
+    );
+    mUnitBatchPlaced.clear();
+  }
+
+  void EdMapScene::AskContextMenu()
+  {
+    TakeContextPick({mWidth / 2, mHeight / 2});
+    mContextAsk = true;
+  }
+
+  void EdMapScene::TakeContextPick(
+    const POINT at
+  )
+  {
+    mContextPoint = {};
+    float x = 0.0f;
+    float z = 0.0f;
+    if (mMap == nullptr || !GroundAt(static_cast<float>(at.x), static_cast<float>(at.y), x, z)) {
+      return;
+    }
+    mContextPoint.valid = true;
+    mContextPoint.x = x;
+    mContextPoint.z = z;
+    mContextPoint.height = GroundHeightAt(x, z);
+    const PickHit hit = PickAnything(at);
+    if (hit.kind == PickKind::None) {
+      return;
+    }
+    // What is under the pointer becomes the selection (unless it is part of it already), so the menu acts on it.
+    bool already = false;
+    switch (hit.kind) {
+    case PickKind::Prop:
+      already = std::find(mSelection.begin(), mSelection.end(), hit.index) != mSelection.end();
+      mContextPoint.what = "a prop";
+      break;
+    case PickKind::Marker: {
+      const SaveEntry& marker = mDocument.SaveData().Markers()[static_cast<std::size_t>(hit.index)];
+      already = std::find(mMarkerSelection.begin(), mMarkerSelection.end(), marker.name) != mMarkerSelection.end();
+      mContextPoint.marker = marker.name;
+      mContextPoint.markerType = MarkerTypeOf(marker);
+      mContextPoint.what = "marker " + marker.name + " (" + mContextPoint.markerType + ")";
+      break;
+    }
+    case PickKind::Unit: {
+      const auto& ref = mUnitRefs[static_cast<std::size_t>(hit.index)];
+      const std::pair<std::string, std::string> key{ref.army, ref.name};
+      already = std::find(mUnitSelection.begin(), mUnitSelection.end(), key) != mUnitSelection.end();
+      mContextPoint.unitArmy = ref.army;
+      mContextPoint.unitName = ref.name;
+      mContextPoint.what = "unit " + ref.name + " of " + ref.army;
+      break;
+    }
+    case PickKind::Decal:
+      already = std::find(mDecalSelection.begin(), mDecalSelection.end(), hit.index) != mDecalSelection.end();
+      mContextPoint.what = "a decal";
+      break;
+    default:
+      break;
+    }
+    if (already && hit.kind == SelectedKind()) {
+      return;
+    }
+    ClearAllSelections();
+    mSelectKind = hit.kind;
+    switch (hit.kind) {
+    case PickKind::Prop:
+      mSelection.push_back(hit.index);
+      break;
+    case PickKind::Marker:
+      mMarkerSelection.push_back(mContextPoint.marker);
+      break;
+    case PickKind::Unit:
+      mUnitSelection.emplace_back(mContextPoint.unitArmy, mContextPoint.unitName);
+      break;
+    case PickKind::Decal:
+      mDecalSelection.push_back(hit.index);
+      break;
+    default:
+      break;
+    }
+  }
+
+  std::vector<std::vector<std::string>> EdMapScene::GroupPathsOf(
+    const std::string& army
+  ) const
+  {
+    std::vector<std::vector<std::string>> paths;
+    for (const SaveEntry& entry : mDocument.SaveData().Armies()) {
+      UnitGroup root;
+      std::string error;
+      if (entry.name != army || !ParseUnitGroup(entry.Get("Units"), root, error)) {
+        continue;
+      }
+      paths.push_back({});
+      std::vector<std::pair<const UnitGroup*, std::vector<std::string>>> open{{&root, {}}};
+      while (!open.empty()) {
+        auto [group, path] = open.back();
+        open.pop_back();
+        for (auto child = group->groups.rbegin(); child != group->groups.rend(); ++child) {
+          std::vector<std::string> next = path;
+          next.push_back(child->name);
+          open.emplace_back(&*child, next);
+        }
+        if (!path.empty()) {
+          paths.push_back(path);
+        }
+      }
+    }
+    return paths;
+  }
+
+  bool EdMapScene::SnapMarkerToGrid(
+    const std::string& name
+  )
+  {
+    for (const SaveEntry& marker : mDocument.SaveData().Markers()) {
+      float x = 0.0f, y = 0.0f, z = 0.0f;
+      if (marker.name != name || !MarkerPosition(marker, x, y, z)) {
+        continue;
+      }
+      const float gx = std::floor(x) + 0.5f;
+      const float gz = std::floor(z) + 0.5f;
+      EditMarker(name, "position", Vector3Value(gx, GroundHeightAt(gx, gz), gz));
+      gpg::Logf(
+        "editor: %s snapped to the build grid: %.2f, %.2f -> %.1f, %.1f",
+        name.c_str(),
+        static_cast<double>(x),
+        static_cast<double>(z),
+        static_cast<double>(gx),
+        static_cast<double>(gz)
+      );
+      return true;
+    }
+    return false;
+  }
+
   std::string EdMapScene::RulerText() const
   {
     const float segment = std::hypot(mRulerTo[0] - mRulerFrom[0], mRulerTo[1] - mRulerFrom[1]);

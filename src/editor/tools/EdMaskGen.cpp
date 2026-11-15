@@ -346,6 +346,13 @@ namespace faf::editor
         if (type == "const") {
           return Const(v("value"));
         }
+        if (type == "named") {
+          // An imported mask (FAF Studio's maskgen named source): an empty slot masks nothing.
+          const auto found = c.imported.find(static_cast<int>(std::lround(v("slot"))));
+          return found == c.imported.end() || found->second == nullptr
+            ? Const(0.0f)
+            : Op("resample", {{"a", found->second}, {"like", c.heights}});
+        }
         throw OpFailed("unknown rule " + type);
       }
 
@@ -561,6 +568,10 @@ namespace faf::editor
         P("distance", "Distance (units)", 0, 300, 1, "%.0f", 12),
         P("soft", "Soft edge (units)", 0, 100, 1, "%.0f", 4)}},
       {"const", "Constant", false, {P("value", "Value", 0, 1, 0.05f, "%.2f", 1)}},
+      {"named",
+       "Imported mask",
+       false,
+       {P("slot", "Slot of the imported mask (the files beside Import / Export's heightmap)", 1, 16, 1, "%.0f", 1)}},
       {"not", "Not (invert)", true, {}},
       {"blur", "Blur", true, {P("radius", "Sigma (units)", 0.5f, 100, 0.5f, "%.1f", 6)}},
       {"grow",
@@ -780,6 +791,53 @@ namespace faf::editor
       {"edge", "Map edge band"},
     };
     return presets;
+  }
+
+  const char* WaterMaskKindName(
+    const int kind
+  ) noexcept
+  {
+    static constexpr const char* kNames[kWaterMaskKinds] = {
+      "Beach", "Shore line", "Shallows", "Underwater", "Deep water"
+    };
+    return kind >= 0 && kind < kWaterMaskKinds ? kNames[kind] : "";
+  }
+
+  std::vector<MaskGenRule> WaterMaskRules(
+    const int kind,
+    const float width,
+    const float depth,
+    const float soft,
+    const float slope
+  )
+  {
+    const auto water = [soft](const float mode, const float offset, const float band = 0.0f) {
+      MaskGenRule rule = NewMaskRule("water");
+      rule.v["mode"] = mode;
+      rule.v["offset"] = offset;
+      rule.v["width"] = band;
+      rule.v["soft"] = soft;
+      return rule;
+    };
+    switch (kind) {
+    case 0: { // beach: above the water, below water + width, on gentle ground
+      MaskGenRule gentle = NewMaskRule("slope");
+      gentle.v["lo"] = 0.0f;
+      gentle.v["hi"] = slope;
+      gentle.v["soft"] = 6.0f;
+      return {water(1, 0), water(2, width), gentle};
+    }
+    case 1: // shore line
+      return {water(3, 0, width)};
+    case 2: // shallows: under the water, above water - depth
+      return {water(2, 0), water(1, -depth)};
+    case 3: // underwater
+      return {water(2, 0)};
+    case 4: // deep water
+      return {water(2, -depth)};
+    default:
+      return {};
+    }
   }
 
   std::vector<MaskGenRule> MaskPresetRules(

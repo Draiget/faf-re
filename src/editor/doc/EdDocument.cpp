@@ -337,7 +337,9 @@ namespace faf::editor
         !WriteMapFile(*map, records, load.createFolder / (base + ".scmap"), error) ||
         !WriteText(load.createFolder / (base + "_scenario.lua"), NewMapScenarioText(settings, base), error) ||
         !WriteText(load.createFolder / (base + "_save.lua"), NewMapSaveText(settings), error) ||
-        !WriteText(load.createFolder / (base + "_script.lua"), NewMapScriptText(), error)
+        !WriteText(
+          load.createFolder / (base + "_script.lua"), NewMapScriptText(NewMapPlayable(settings).has_value()), error
+        )
       ) {
         load.error = error;
         return;

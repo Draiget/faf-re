@@ -157,6 +157,7 @@ set(FAF_EDITOR_SOURCES
   terrain/gpu/EdGpuGen.cpp
   terrain/gpu/EdGpuGenFilt.cpp
   doc/EdLuaTable.cpp
+  doc/EdStrataThemes.cpp
   tools/EdUnitWizard.cpp
   ui/EdUnitWizardPanel.cpp
   tools/EdScaAnim.cpp

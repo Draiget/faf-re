@@ -3,6 +3,10 @@
 // fields only).
 
 #include "editor/EdShell.h"
+#include "editor/EdTools.h"
+#include "editor/ui/EdImGuiRenderer.h"
+#include "editor/ui/EdThemeColors.h"
+#include "editor/tools/EdTextureLibrary.h"
 #include "editor/doc/EdDocument.h"
 #include "editor/ui/EdControls.h"
 #include "editor/ui/EdHelp.h"
@@ -10,10 +14,22 @@
 #include "editor/ui/EdWorkspaces.h"
 #include "imgui.h"
 
+#include <cmath>
 #include <cstdio>
 
 namespace faf::editor
 {
+  void EdShell::ClearImageThumbs()
+  {
+    for (const auto& [what, image] : mImageThumbs) {
+      if (image != 0U) {
+        EdImGuiRenderer::DestroyImage(image);
+      }
+    }
+    mImageThumbs.clear();
+    mImageThumbWanted.clear();
+  }
+
   void EdShell::DrawImagesPanel()
   {
     ImGui::SetNextWindowSize(ImVec2(Em(380.0f), Em(460.0f)), ImGuiCond_FirstUseEver);
@@ -26,14 +42,39 @@ namespace faf::editor
       ImGui::End();
       return;
     }
-    const auto row = [this](const char* label, const std::string& what, const bool canImport, const char* tip) {
+    // Each row: its preview (FAF Studio's 96 px; made one a frame for the rows on screen, again after edits), its
+    // name, Export... and Import....
+    mImageThumbWanted.clear();
+    const float thumb = std::floor(ImGui::GetFrameHeight() * 1.6f);
+    const auto picture = [this, thumb](const std::string& what) {
+      const ImVec2 at = ImGui::GetCursorScreenPos();
+      const auto found = mImageThumbs.find(what);
+      if (found != mImageThumbs.end() && found->second != 0U) {
+        ImGui::Image(static_cast<ImTextureID>(found->second), ImVec2(thumb, thumb));
+      } else {
+        ImGui::Dummy(ImVec2(thumb, thumb));
+        ImGui::GetWindowDrawList()->AddRectFilled(at, ImVec2(at.x + thumb, at.y + thumb), ChipU32(), 3.0f);
+        if (found == mImageThumbs.end() && ImGui::IsItemVisible()) {
+          mImageThumbWanted.push_back(what);
+        }
+      }
+      ImGui::SameLine();
+    };
+    const auto row = [this,
+                      &picture](const char* label, const std::string& what, const bool canImport, const char* tip) {
       ImGui::PushID(what.c_str());
+      if (what != "preview") {
+        picture(what);
+      } else {
+        ImGui::Dummy(ImVec2(std::floor(ImGui::GetFrameHeight() * 1.6f), 1.0f));
+        ImGui::SameLine();
+      }
       ImGui::AlignTextToFramePadding();
       ImGui::TextUnformatted(label);
       if (tip != nullptr && ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) {
         EdSetTooltip("%s", tip);
       }
-      ImGui::SameLine(Em(170.0f));
+      ImGui::SameLine(Em(210.0f));
       if (ImGui::SmallButton("Export...")) {
         mImageAsks.push_back(ImageAsk{what, true});
       }
@@ -46,6 +87,12 @@ namespace faf::editor
       ImGui::PopID();
     };
     row("Height map", "heights", true, "16-bit grey, the map's size; an import is one undo step");
+    row(
+      "Terrain types",
+      "types",
+      true,
+      "The terrain type of each cell (its id as the grey value); an import of the same size is one undo step"
+    );
     row("Lobby picture", "preview", false, "The picture the lobby shows (Map > Regenerate preview draws it anew)");
     for (int layer = 1; layer <= 8; ++layer) {
       char label[32];
@@ -55,6 +102,67 @@ namespace faf::editor
     row("Water foam", "water0", true, "The water's foam mask, a cell every 2 units");
     row("Water flatness", "water1", true, "The water's flatness mask");
     row("Water depth bias", "water2", true, "The water's depth bias mask");
+    // The map-wide textures (the Layers panel's): export and import each the shader reads.
+    {
+      static constexpr const char* kKinds[4] = {"Normal map", "Lighting map", "Specular map", "Macrotexture"};
+      bool any = false;
+      for (int kind = 0; kind < 4; ++kind) {
+        const EdTools::MapTextureRow& state = mTools.MapTextureState(kind);
+        if (!state.available) {
+          continue;
+        }
+        if (!any) {
+          ImGui::SeparatorText("Map-wide textures");
+          any = true;
+        }
+        ImGui::PushID(1000 + kind);
+        ImGui::AlignTextToFramePadding();
+        ImGui::TextUnformatted(kKinds[kind]);
+        if (!state.state.empty() && ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) {
+          EdSetTooltip("%s", state.state.c_str());
+        }
+        ImGui::SameLine(Em(210.0f));
+        ImGui::BeginDisabled(!state.present);
+        if (ImGui::SmallButton("Export...")) {
+          mTools.AskMapTexture(kind, EdTools::MapTextureOp::Export);
+        }
+        ImGui::EndDisabled();
+        ImGui::SameLine();
+        if (ImGui::SmallButton("Import...")) {
+          mTools.AskMapTexture(kind, EdTools::MapTextureOp::Import);
+        }
+        ImGui::PopID();
+      }
+    }
+    // The layers' textures (game files: shown, not exported).
+    {
+      const MapFacts& facts = mDocument.Facts();
+      if (!facts.layers.empty()) {
+        ImGui::SeparatorText("Layer textures");
+        EdTextureLibrary& library = mTools.Library();
+        library.Pump(2);
+        const float side = std::floor(ImGui::GetFrameHeight() * 1.6f);
+        int shown = 0;
+        for (std::size_t i = 0; i < facts.layers.size(); ++i) {
+          if (facts.layers[i].empty()) {
+            continue;
+          }
+          if (shown++ > 0) {
+            SameLineIfFits(side);
+          }
+          const ImVec2 at = ImGui::GetCursorScreenPos();
+          if (const std::uint64_t image = library.Thumbnail(facts.layers[i]); image != 0U) {
+            ImGui::Image(static_cast<ImTextureID>(image), ImVec2(side, side));
+          } else {
+            ImGui::Dummy(ImVec2(side, side));
+            ImGui::GetWindowDrawList()->AddRectFilled(at, ImVec2(at.x + side, at.y + side), ChipU32(), 3.0f);
+          }
+          if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) {
+            EdSetTooltip("%s", facts.layers[i].c_str());
+          }
+        }
+      }
+    }
     ImGui::Separator();
     if (ImGui::Button("Export all into the map's images folder")) {
       mImageAsks.push_back(ImageAsk{"all", true});

@@ -389,6 +389,7 @@ add_executable(faf_editor_field_tests EXCLUDE_FROM_ALL editor/FieldTests.cpp edi
   editor/GroundKindTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdGroundKind.cpp
   editor/MaskGenTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdMaskGen.cpp
   editor/RecipeTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdRecipes.cpp
+  editor/RoundSixFieldTests.cpp
   editor/TextureSetsTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdTexScale.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdTextureSets.cpp
   editor/SlopeRulesTests.cpp
   editor/ErosionSuiteTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdErosionSuite.cpp
@@ -481,6 +482,7 @@ add_executable(faf_editor_brush_tests EXCLUDE_FROM_ALL editor/HeightBrushTests.c
   editor/FafApiTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdFafApi.cpp
   editor/CommandsTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/ui/EdCommands.cpp ${CMAKE_SOURCE_DIR}/src/editor/ui/EdWindowChrome.cpp
   editor/KeymapTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/ui/EdKeymap.cpp
+  editor/RoundSixTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdStrataThemes.cpp
   editor/WorkspacesTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/ui/EdWorkspaces.cpp
   editor/StatusTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/ui/EdStatus.cpp
   editor/SettingsTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/ui/EdSettings.cpp
@@ -511,7 +513,8 @@ add_executable(faf_editor_brush_tests EXCLUDE_FROM_ALL editor/HeightBrushTests.c
   ${CMAKE_SOURCE_DIR}/src/editor/tools/EdHeightFile.cpp
   ${CMAKE_SOURCE_DIR}/src/editor/undo/EdHeightHistory.cpp)
 target_include_directories(faf_editor_brush_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
-target_compile_definitions(faf_editor_brush_tests PRIVATE FAF_UNITWIZ_DATA="${CMAKE_SOURCE_DIR}/src/editor/tools/data/unitwizdata.lua")
+target_compile_definitions(faf_editor_brush_tests PRIVATE FAF_UNITWIZ_DATA="${CMAKE_SOURCE_DIR}/src/editor/tools/data/unitwizdata.lua"
+  FAF_THEMES_DATA="${CMAKE_SOURCE_DIR}/src/editor/tools/data/envlib_themes.lua")
 # The terrain library (Water erode, Rain and Deposit) turns running out of memory into an op error.
 target_compile_options(faf_editor_brush_tests PRIVATE /EHsc)
 # The zlib the engine links: 1.2.3 on both architectures (src/CMakeLists.txt).

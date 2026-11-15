@@ -619,6 +619,27 @@ namespace faf::editor
       mImageAsks.erase(mImageAsks.begin());
       return true;
     }
+    /** The Images panel's previews (an ImTextureID each, 0 = none): the rows on screen ask, the app makes them. */
+    void SetImageThumb(
+      const std::string& what,
+      const std::uint64_t image
+    )
+    {
+      mImageThumbs[what] = image;
+    }
+    [[nodiscard]] bool TakeImageThumbWanted(
+      std::string& what
+    )
+    {
+      if (mImageThumbWanted.empty()) {
+        return false;
+      }
+      what = mImageThumbWanted.front();
+      mImageThumbWanted.erase(mImageThumbWanted.begin());
+      return true;
+    }
+    /** Lets every preview go (the map changed under them). */
+    void ClearImageThumbs();
     void SetImageStatus(
       std::string status
     )
@@ -701,13 +722,68 @@ namespace faf::editor
     {
       mShowUnitViewer = true;
     }
+    /** Where the view's menu was opened, and what stands there (the app fills it from the view). */
+    struct ViewMenuPoint
+    {
+      bool valid = false;
+      float x = 0.0f;
+      float z = 0.0f;
+      float height = 0.0f;
+      std::string what;
+      std::string marker;
+      std::string markerType;
+      std::string unitArmy;
+      std::string unitName;
+      std::vector<std::string> armies;              // for Set army
+      std::vector<std::vector<std::string>> groups; // the unit's army's groups, for Move to group
+      std::string unitToPlace;                      // the Units tool's unit
+      std::string propToPlace;                      // the Props tool's prop
+    };
+    /** An entry of the menu that acts at its point (the app runs it). */
+    struct ViewMenuAction
+    {
+      enum class Kind
+      {
+        None,
+        PlaceMarker, // arg: the type
+        AddArea,
+        PlaceUnit,
+        PlaceProp,
+        FocusHere,
+        SnapToGrid,
+        SetArmy, // arg: the army
+        MoveToGroup,
+      } kind = Kind::None;
+      std::string arg;
+      std::vector<std::string> path;
+    };
     /** The view's context menu, at the mouse, the next frame (ViewMenuCommands). */
     void OpenViewMenu(
       const bool selection
+    )
+    {
+      OpenViewMenu(selection, ViewMenuPoint());
+    }
+    void OpenViewMenu(
+      const bool selection,
+      ViewMenuPoint point
     ) noexcept
     {
       mViewMenuAsk = true;
       mViewMenuSelection = selection;
+      mViewMenuPoint = std::move(point);
+    }
+    [[nodiscard]] bool TakeViewMenuAction(
+      ViewMenuPoint& point,
+      ViewMenuAction& action
+    )
+    {
+      if (mViewMenuAction.kind == ViewMenuAction::Kind::None) {
+        return false;
+      }
+      point = mViewMenuPoint;
+      action = std::exchange(mViewMenuAction, {});
+      return true;
     }
 
   private:
@@ -795,8 +871,12 @@ namespace faf::editor
     bool mMeshShown = true;
     std::string mMeshStatus;
     std::string mImageStatus;
+    std::map<std::string, std::uint64_t> mImageThumbs;
+    std::vector<std::string> mImageThumbWanted;
     EdFieldsPanel mFieldsPanel;
     bool mViewMenuAsk = false;
+    ViewMenuPoint mViewMenuPoint;
+    ViewMenuAction mViewMenuAction;
     char mSaveAsParent[512] = {};
     /** Map info's fields being typed in: key -> text (the scenario's value otherwise). */
     std::map<std::string, std::string> mInfoEdits;

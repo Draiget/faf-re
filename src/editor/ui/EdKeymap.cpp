@@ -80,6 +80,27 @@ namespace faf::editor
       }
       const std::string id(Trim(line.substr(0, equals)));
       const std::string_view keys = Trim(line.substr(equals + 1));
+      // A camera gesture (`mouse.orbit=Shift+Middle`).
+      if (id.rfind("mouse.", 0) == 0) {
+        bool known = false;
+        for (int g = 0; g < static_cast<int>(CameraGesture::Count); ++g) {
+          if (id == CameraGestureId(static_cast<CameraGesture>(g))) {
+            known = true;
+            MouseChord chord;
+            if (ParseMouseChord(keys, chord)) {
+              ActiveCameraGestures()[static_cast<std::size_t>(g)] = chord;
+            } else {
+              problems.push_back(
+                "line " + std::to_string(lineNumber) + ": can't read the mouse chord \"" + std::string(keys) + "\""
+              );
+            }
+          }
+        }
+        if (!known) {
+          problems.push_back("line " + std::to_string(lineNumber) + ": no camera gesture " + id);
+        }
+        continue;
+      }
       if (commands.Find(id) == nullptr) {
         problems.push_back("line " + std::to_string(lineNumber) + ": no command " + id);
         continue;
@@ -119,7 +140,139 @@ namespace faf::editor
         out += command.id + "=" + command.keys + "\n";
       }
     }
+    for (int g = 0; g < static_cast<int>(CameraGesture::Count); ++g) {
+      const MouseChord& now = ActiveCameraGestures()[static_cast<std::size_t>(g)];
+      if (!(now == DefaultCameraGestures()[static_cast<std::size_t>(g)])) {
+        out += std::string(CameraGestureId(static_cast<CameraGesture>(g))) + "=" + MouseChordText(now) + "\n";
+      }
+    }
     return out;
+  }
+
+  const CameraGestures& DefaultCameraGestures()
+  {
+    static const CameraGestures defaults = {
+      MouseChord{2, false, false, false}, // orbit: middle
+      MouseChord{1, false, false, false}, // pan: right
+      MouseChord{2, false, true, false},  // pan2: Shift + middle
+      MouseChord{0, false, false, false}, // zoom: none
+    };
+    return defaults;
+  }
+
+  CameraGestures& ActiveCameraGestures()
+  {
+    static CameraGestures gestures = DefaultCameraGestures();
+    return gestures;
+  }
+
+  const char* CameraGestureId(
+    const CameraGesture gesture
+  )
+  {
+    switch (gesture) {
+    case CameraGesture::Orbit:
+      return "mouse.orbit";
+    case CameraGesture::Pan:
+      return "mouse.pan";
+    case CameraGesture::Pan2:
+      return "mouse.pan2";
+    case CameraGesture::Zoom:
+      return "mouse.zoom";
+    default:
+      return "";
+    }
+  }
+
+  const char* CameraGestureTitle(
+    const CameraGesture gesture
+  )
+  {
+    switch (gesture) {
+    case CameraGesture::Orbit:
+      return "Orbit the camera";
+    case CameraGesture::Pan:
+      return "Pan the camera";
+    case CameraGesture::Pan2:
+      return "Pan the camera (second)";
+    case CameraGesture::Zoom:
+      return "Zoom by dragging";
+    default:
+      return "";
+    }
+  }
+
+  std::string MouseChordText(
+    const MouseChord& chord
+  )
+  {
+    if (chord.button == 0) {
+      return {};
+    }
+    std::string text;
+    text += chord.ctrl ? "Ctrl+" : "";
+    text += chord.shift ? "Shift+" : "";
+    text += chord.alt ? "Alt+" : "";
+    text += chord.button == 1 ? "Right" : "Middle";
+    return text;
+  }
+
+  bool ParseMouseChord(
+    std::string_view text,
+    MouseChord& chord
+  )
+  {
+    chord = {};
+    text = Trim(text);
+    if (text.empty()) {
+      return true; // none
+    }
+    while (!text.empty()) {
+      const std::size_t plus = text.find('+');
+      const std::string_view part = Trim(text.substr(0, plus));
+      text = plus == std::string_view::npos ? std::string_view{} : text.substr(plus + 1);
+      if (part == "Ctrl") {
+        chord.ctrl = true;
+      } else if (part == "Shift") {
+        chord.shift = true;
+      } else if (part == "Alt") {
+        chord.alt = true;
+      } else if (part == "Right" && text.empty()) {
+        chord.button = 1;
+      } else if (part == "Middle" && text.empty()) {
+        chord.button = 2;
+      } else {
+        chord = {};
+        return false;
+      }
+    }
+    return chord.button != 0;
+  }
+
+  bool CameraGestureFor(
+    const int button,
+    const bool ctrl,
+    const bool shift,
+    const bool alt,
+    CameraGesture& gesture
+  )
+  {
+    const CameraGestures& gestures = ActiveCameraGestures();
+    const MouseChord exact{button, ctrl, shift, alt};
+    for (std::size_t g = 0; g < gestures.size(); ++g) {
+      if (gestures[g].button != 0 && gestures[g] == exact) {
+        gesture = static_cast<CameraGesture>(g);
+        return true;
+      }
+    }
+    const MouseChord plain{button, false, false, false};
+    for (std::size_t g = 0; g < gestures.size(); ++g) {
+      if (gestures[g].button != 0 && gestures[g] == plain) {
+        gesture = static_cast<CameraGesture>(g);
+        return true;
+      }
+    }
+    return false;
   }
 
   std::string KeySlot(

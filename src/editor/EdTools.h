@@ -37,6 +37,7 @@
 #include <functional>
 #include <cmath>
 #include <array>
+#include <map>
 #include <filesystem>
 #include <memory>
 #include <optional>
@@ -1320,6 +1321,29 @@ namespace faf::editor
     {
       return MarkersToolActive() && mDrawChain;
     }
+    /**
+     * The working state kept between runs (FAF Studio's persist.lua and toolopts.lua): each brush mode's radius,
+     * strength and falloff, the brush's mode, shape and symmetry, the turn step, the props, mask, unit and decal
+     * modes and spacings, as `key=value` lines. The map's own view switches and tool are kept per map (ViewState).
+     */
+    [[nodiscard]] std::string SaveToolState();
+    void LoadToolState(const std::string& text);
+    /** FAF Studio's markervis: markers drawn as their template's prop model (Markers and Select tools). */
+    [[nodiscard]] bool MarkerModels() const noexcept
+    {
+      return mMarkerModels;
+    }
+    /** FAF Studio's "Selected chain only": the view draws just the current chain (with any tool). */
+    [[nodiscard]] bool ChainOnly() const noexcept
+    {
+      return mChainOnly;
+    }
+    void SetChainOnly(
+      const bool only
+    ) noexcept
+    {
+      mChainOnly = only;
+    }
     /** Export the heights at 8 bits (Import / Export > 8-bit). */
     [[nodiscard]] bool ExportEightBit() const noexcept
     {
@@ -1869,6 +1893,71 @@ namespace faf::editor
       mErosionPreviewShown = previewShown;
     }
     void DrawErosionWindow();
+    /** SC tools > Water (FAF Studio's water-linked masks): each mask's settings, and what the window asks. */
+    struct WaterMaskDef
+    {
+      int id = 0;
+      int kind = 0; // WaterMaskKindName
+      int layer = 1;
+      float strength = 1.0f;
+      float soft = 1.0f;
+      float width = 3.0f;
+      float depth = 4.0f;
+      float slope = 30.0f;
+      bool applied = false;
+      std::string cover; // Preview's answer
+    };
+    enum class WaterMaskAsk
+    {
+      None,
+      Preview,
+      Apply,
+      Remove,
+      Delete,
+    };
+    [[nodiscard]] std::vector<WaterMaskDef>& WaterMaskDefs() noexcept
+    {
+      return mWaterDefs;
+    }
+    [[nodiscard]] bool WaterMasksLive() const noexcept
+    {
+      return mWaterLive;
+    }
+    [[nodiscard]] bool TakeWaterMaskAsk(
+      WaterMaskAsk& ask,
+      int& id
+    ) noexcept
+    {
+      if (mWaterAsk == WaterMaskAsk::None) {
+        return false;
+      }
+      ask = std::exchange(mWaterAsk, WaterMaskAsk::None);
+      id = mWaterAskId;
+      return true;
+    }
+    /** A mask of `kind` into `layer` (the window's + buttons; `/watermasks` in test runs). */
+    int AddWaterMask(
+      const int kind,
+      const int layer
+    )
+    {
+      WaterMaskDef def;
+      def.id = ++mWaterNextId;
+      def.kind = kind;
+      def.layer = layer;
+      mWaterDefs.push_back(def);
+      mWaterSel = def.id;
+      return def.id;
+    }
+    void AskWaterMask(
+      const WaterMaskAsk ask,
+      const int id
+    ) noexcept
+    {
+      mScToolsOpen = true;
+      mWaterAsk = ask;
+      mWaterAskId = id;
+    }
     /** The SC tools window: open it, what it asks the view, and what the view says back. */
     enum class ScAsk
     {
@@ -2552,6 +2641,53 @@ namespace faf::editor
       mOptimalTiles = tiles;
     }
     /** The Texture sets section: the theme picked, what it would give, and what the panel asks. */
+    /** Layers > Theme library (FAF Studio's themes): the list the app gives, and what the section asks. */
+    struct StrataThemeAsk
+    {
+      enum class Op
+      {
+        None,
+        Try,
+        Apply,
+        Save,   // arg: the name
+        Import, // arg: the map's folder
+        Delete,
+      } op = Op::None;
+      int index = 0;
+      std::string arg;
+      bool clearUnused = false;
+    };
+    void SetStrataThemeList(
+      std::vector<std::string> labels,
+      std::vector<bool> user
+    )
+    {
+      mStrataLabels = std::move(labels);
+      mStrataUser = std::move(user);
+    }
+    [[nodiscard]] bool TakeStrataThemeAsk(
+      StrataThemeAsk& ask
+    ) noexcept
+    {
+      if (mStrataAsk.op == StrataThemeAsk::Op::None) {
+        return false;
+      }
+      ask = std::exchange(mStrataAsk, {});
+      return true;
+    }
+    /** Test runs (`/themelib`): an ask as the section's buttons make it. */
+    void AskStrataTheme(
+      StrataThemeAsk ask
+    )
+    {
+      mStrataAsk = std::move(ask);
+    }
+    void SetStrataThemeStatus(
+      std::string status
+    )
+    {
+      mStrataStatus = std::move(status);
+    }
     enum class ThemeOp : std::uint8_t
     {
       None,
@@ -3032,6 +3168,7 @@ namespace faf::editor
     void DrawFalloffCurve();
     void DrawArrange();
     void DrawBrush(bool withModes);
+    void DrawStrataThemes();
     void DrawSymmetry(bool withCheck = true);
     void DrawLimits();
 
@@ -3048,6 +3185,11 @@ namespace faf::editor
     float mRadius = 14.0f;
     float mStrength = 0.5f;
     float mFalloff = 0.6f;
+    /** Each brush mode's radius, strength and falloff (FAF Studio's persist.lua keeps them per brush kind). */
+    std::map<int, std::array<float, 3>> mBrushByMode;
+    int mBrushModeSeen = 0;
+    /** Switches mode's radius, strength and falloff when the brush mode changed since last looked. */
+    void FollowBrushMode();
     int mSymmetry = 6; // both axes
     int mNWay = 3;
     ViewFrame mViewFrame;
@@ -3310,6 +3452,7 @@ namespace faf::editor
     std::string mSelectHover;
     std::vector<SaveEntry> mMarkerSelection;
     bool mConnectNodes = false;
+    bool mMarkerModels = true;
     std::vector<CheckPin> mCheckPins;
     std::vector<PathQuad> mPathQuads;
     bool mShowPathing = false;
@@ -3368,8 +3511,23 @@ namespace faf::editor
     char mUnitFilter[64]{};
     int mUnitSelectionCount = 0;
     bool mShowRangeRings = true;
+    std::vector<WaterMaskDef> mWaterDefs;
+    bool mWaterLive = true;
+    int mWaterNextId = 0;
+    int mWaterSel = 0;
+    WaterMaskAsk mWaterAsk = WaterMaskAsk::None;
+    int mWaterAskId = 0;
+    std::vector<std::string> mStrataLabels;
+    std::vector<bool> mStrataUser;
+    int mStrataIndex = 0;
+    bool mStrataClearUnused = false;
+    char mStrataName[64] = "";
+    char mStrataMap[96] = "";
+    StrataThemeAsk mStrataAsk;
+    std::string mStrataStatus;
     bool mDrawChain = false;
     char mChainName[64] = "Chain_01";
+    bool mChainOnly = false;
     bool mShowBrushWeight = false;
     bool mExportEightBit = false;
     /** The symmetry's centre as an offset from the map's middle (samples). */

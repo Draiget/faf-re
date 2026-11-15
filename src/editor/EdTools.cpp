@@ -860,10 +860,123 @@ namespace faf::editor
     ImGui::EndDisabled();
   }
 
+  void EdTools::FollowBrushMode()
+  {
+    if (mBrushMode == mBrushModeSeen) {
+      return;
+    }
+    mBrushByMode[mBrushModeSeen] = {mRadius, mStrength, mFalloff};
+    if (const auto kept = mBrushByMode.find(mBrushMode); kept != mBrushByMode.end()) {
+      mRadius = kept->second[0];
+      mStrength = kept->second[1];
+      mFalloff = kept->second[2];
+    }
+    mBrushModeSeen = mBrushMode;
+  }
+
+  std::string EdTools::SaveToolState()
+  {
+    FollowBrushMode();
+    mBrushByMode[mBrushMode] = {mRadius, mStrength, mFalloff};
+    std::string text;
+    char line[160];
+    const auto put = [&](const char* key, const double value) {
+      (void)std::snprintf(line, sizeof(line), "%s=%g\n", key, value);
+      text += line;
+    };
+    put("brushMode", mBrushMode);
+    for (const auto& [mode, values] : mBrushByMode) {
+      (void)std::snprintf(
+        line,
+        sizeof(line),
+        "brush.%d=%g,%g,%g\n",
+        mode,
+        static_cast<double>(values[0]),
+        static_cast<double>(values[1]),
+        static_cast<double>(values[2])
+      );
+      text += line;
+    }
+    put("brushShape", mBrushShape);
+    put("symmetry", mSymmetry);
+    put("nway", mNWay);
+    put("turnStep", mTurnStepDegrees);
+    put("propMode", mPropMode);
+    put("propSpacing", mPropSpacing);
+    put("propDensity", mPropDensity);
+    put("propLineSpacing", mPropLineSpacing);
+    put("maskMode", mMaskMode);
+    put("unitMode", mUnitMode);
+    put("decalMode", mDecalMode);
+    put("airbrush", mAirbrush ? 1 : 0);
+    return text;
+  }
+
+  void EdTools::LoadToolState(
+    const std::string& text
+  )
+  {
+    std::size_t at = 0;
+    while (at < text.size()) {
+      const std::size_t end = std::min(text.find('\n', at), text.size());
+      const std::string line = text.substr(at, end - at);
+      at = end + 1;
+      const std::size_t equals = line.find('=');
+      if (equals == std::string::npos) {
+        continue;
+      }
+      const std::string key = line.substr(0, equals);
+      const char* const value = line.c_str() + equals + 1;
+      const float number = static_cast<float>(std::atof(value));
+      const int whole = std::atoi(value);
+      if (key.rfind("brush.", 0) == 0) {
+        float r = 0.0f, s = 0.0f, f = 0.0f;
+        if (std::sscanf(value, "%f,%f,%f", &r, &s, &f) == 3) {
+          mBrushByMode[std::atoi(key.c_str() + 6)] = {
+            std::clamp(r, 1.0f, 512.0f), std::clamp(s, 0.0f, 1.0f), std::clamp(f, 0.0f, 1.0f)
+          };
+        }
+      } else if (key == "brushMode") {
+        mBrushMode = std::max(whole, 0);
+      } else if (key == "brushShape") {
+        mBrushShape = whole >= 0 && whole < kBrushShapeCount ? whole : 0;
+      } else if (key == "symmetry") {
+        mSymmetry = std::max(whole, 0);
+      } else if (key == "nway") {
+        mNWay = std::clamp(whole, 2, 16);
+      } else if (key == "turnStep" && number > 0.0f) {
+        mTurnStepDegrees = number;
+      } else if (key == "propMode") {
+        mPropMode = std::max(whole, 0);
+      } else if (key == "propSpacing" && number > 0.0f) {
+        mPropSpacing = number;
+      } else if (key == "propDensity" && number > 0.0f) {
+        mPropDensity = number;
+      } else if (key == "propLineSpacing" && number > 0.0f) {
+        mPropLineSpacing = number;
+      } else if (key == "maskMode") {
+        mMaskMode = std::max(whole, 0);
+      } else if (key == "unitMode") {
+        mUnitMode = std::max(whole, 0);
+      } else if (key == "decalMode") {
+        mDecalMode = std::max(whole, 0);
+      } else if (key == "airbrush") {
+        mAirbrush = whole != 0;
+      }
+    }
+    if (const auto kept = mBrushByMode.find(mBrushMode); kept != mBrushByMode.end()) {
+      mRadius = kept->second[0];
+      mStrength = kept->second[1];
+      mFalloff = kept->second[2];
+    }
+    mBrushModeSeen = mBrushMode;
+  }
+
   void EdTools::DrawBrush(
     const bool withModes
   )
   {
+    FollowBrushMode();
     if (Section("Brush")) {
       if (withModes) {
         // Rows of up to three; each entry is its HeightBrushMode.
@@ -1384,6 +1497,82 @@ namespace faf::editor
         ImGui::PopTextWrapPos();
       }
     }
+    if (Section("Water", false)) {
+      // FAF Studio's water-linked masks: texture masks that follow the water level.
+      for (int kind = 0; kind < kWaterMaskKinds; ++kind) {
+        if (kind > 0) {
+          SameLineIfFits(ImGui::CalcTextSize(WaterMaskKindName(kind)).x + Em(24.0f));
+        }
+        ImGui::PushID(kind);
+        if (ImGui::SmallButton((std::string("+ ") + WaterMaskKindName(kind)).c_str())) {
+          (void)AddWaterMask(kind, std::min(8, static_cast<int>(mWaterDefs.size()) + 1));
+        }
+        ImGui::PopID();
+      }
+      ImGui::Checkbox("Live (applied again when the water level changes)", &mWaterLive);
+      WaterMaskDef* selected = nullptr;
+      for (WaterMaskDef& def : mWaterDefs) {
+        ImGui::PushID(def.id);
+        const std::string label =
+          std::string(WaterMaskKindName(def.kind)) + " > L" + std::to_string(def.layer) + (def.applied ? " (on)" : "");
+        SameLineIfFits(ImGui::CalcTextSize(label.c_str()).x + Em(20.0f));
+        if (ImGui::Selectable(label.c_str(), def.id == mWaterSel, 0, ImGui::CalcTextSize(label.c_str()))) {
+          mWaterSel = def.id;
+        }
+        if (def.id == mWaterSel) {
+          selected = &def;
+        }
+        ImGui::PopID();
+      }
+      if (selected != nullptr) {
+        WaterMaskDef& d = *selected;
+        ImGui::PushID(d.id);
+        ImGui::SetNextItemWidth(-1.0f);
+        FillSliderInt("##layer", &d.layer, 1, 8, "Texture layer %d");
+        ImGui::SetNextItemWidth(-1.0f);
+        FillSliderFloat("##strength", &d.strength, 0.0f, 1.0f, "Strength %.2f");
+        ImGui::SetNextItemWidth(-1.0f);
+        FillSliderFloat("##soft", &d.soft, 0.0f, 10.0f, "Edge softness %.2f");
+        if (d.kind == 0 || d.kind == 1) {
+          ImGui::SetNextItemWidth(-1.0f);
+          FillSliderFloat("##width", &d.width, 0.5f, 20.0f, "Width %.1f");
+        }
+        if (d.kind == 0) {
+          ImGui::SetNextItemWidth(-1.0f);
+          FillSliderFloat("##slope", &d.slope, 5.0f, 60.0f, "Steepest beach %.0f degrees");
+        }
+        if (d.kind == 2 || d.kind == 4) {
+          ImGui::SetNextItemWidth(-1.0f);
+          FillSliderFloat("##depth", &d.depth, 0.5f, 30.0f, "Depth %.1f");
+        }
+        if (ImGui::Button("Preview")) {
+          AskWaterMask(WaterMaskAsk::Preview, d.id);
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Apply")) {
+          AskWaterMask(WaterMaskAsk::Apply, d.id);
+        }
+        EdSetItemTooltip("Into its layer as one undo step; again after a change replaces its own last result");
+        ImGui::SameLine();
+        ImGui::BeginDisabled(!d.applied);
+        if (ImGui::Button("Remove result")) {
+          AskWaterMask(WaterMaskAsk::Remove, d.id);
+        }
+        ImGui::EndDisabled();
+        ImGui::SameLine();
+        if (ImGui::Button("Delete")) {
+          AskWaterMask(WaterMaskAsk::Delete, d.id);
+        }
+        if (!d.cover.empty()) {
+          ImGui::TextDisabled("%s", d.cover.c_str());
+        }
+        ImGui::PopID();
+      }
+      Note(
+        "Beach, shore line, shallows, underwater and deep water as texture masks from the water level. The paint "
+        "you add over a result stays when it is applied again or removed."
+      );
+    }
     if (Section("Ramp check")) {
       if (ImGui::Button("Check the ruler's route", ImVec2(-1.0f, 0.0f))) {
         mScAsk = ScAsk::Ramp;
@@ -1448,6 +1637,32 @@ namespace faf::editor
         FillSliderFloat("##interoplow", &s.low, 0.0f, 256.0f, "Darkest at %.1f");
         ImGui::SetNextItemWidth(-1.0f);
         FillSliderFloat("##interophigh", &s.high, 0.0f, 512.0f, "Brightest at %.1f");
+        // FAF Studio's interop Suggest: the relief of the reference maps of this size.
+        const ReferenceMapStats& ref = ReferenceStatsFor(static_cast<int>(mMapSizeUnits));
+        ImGui::TextDisabled(
+          "Reference maps%s (%d): relief %.0f (%.0f to %.0f), mean slope %.1f deg. Brightest for the relief of:",
+          ref.size == 0 ? "" : " of this size",
+          ref.n,
+          static_cast<double>(ref.relief[2]),
+          static_cast<double>(ref.relief[1]),
+          static_cast<double>(ref.relief[3]),
+          static_cast<double>(ref.slope[2])
+        );
+        for (const auto& [label, which] :
+             {std::pair<const char*, int>{"A calm map", 1}, {"The median map", 2}, {"A tall map", 3}}) {
+          if (which > 1) {
+            ImGui::SameLine();
+          }
+          if (ImGui::SmallButton(label)) {
+            s.high = s.low + ref.relief[static_cast<std::size_t>(which)];
+            gpg::Logf(
+              "editor: interop: brightest at %.1f (%s, relief %.1f)",
+              static_cast<double>(s.high),
+              label,
+              static_cast<double>(ref.relief[static_cast<std::size_t>(which)])
+            );
+          }
+        }
       } else {
         ImGui::SetNextItemWidth(-1.0f);
         FillSliderFloat("##interopscale", &s.scale, 0.05f, 4.0f, "Heights times %.2f");
@@ -3128,6 +3343,78 @@ namespace faf::editor
       }
       EdSetItemTooltip("Put the set on the layers\nOne undo step.");
     }
+    DrawStrataThemes();
+  }
+
+  void EdTools::DrawStrataThemes()
+  {
+    if (!Section("Theme library", false)) {
+      return;
+    }
+    Note(
+      "The textures and tile sizes of every layer, from the game's maps and hand picked sets (FAF Studio's themes), or "
+      "your own: saved from this map or taken from another map's file. The paint stays."
+    );
+    if (mStrataLabels.empty()) {
+      ImGui::TextDisabled("No themes.");
+    } else {
+      mStrataIndex = std::clamp(mStrataIndex, 0, static_cast<int>(mStrataLabels.size()) - 1);
+      std::vector<const char*> names;
+      for (const std::string& label : mStrataLabels) {
+        names.push_back(label.c_str());
+      }
+      ImGui::BeginDisabled(mThemeTrying);
+      ImGui::SetNextItemWidth(-1.0f);
+      (void)EdCombo("##strata", &mStrataIndex, names.data(), static_cast<int>(names.size()));
+      ImGui::EndDisabled();
+      if (mThemeTrying) {
+        if (PrimaryButton("Keep it##strata")) {
+          mThemeOp = ThemeOp::Keep;
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Back to before##strata")) {
+          mThemeOp = ThemeOp::Back;
+        }
+      } else {
+        if (ImGui::Button("Try##strata")) {
+          mStrataAsk = {StrataThemeAsk::Op::Try, mStrataIndex, {}, false};
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Apply##strata")) {
+          mStrataAsk = {StrataThemeAsk::Op::Apply, mStrataIndex, {}, mStrataClearUnused};
+        }
+        EdSetItemTooltip("Its textures on the layers, one undo step");
+        if (static_cast<std::size_t>(mStrataIndex) < mStrataUser.size() && mStrataUser[mStrataIndex]) {
+          ImGui::SameLine();
+          if (ImGui::Button("Delete##strata")) {
+            mStrataAsk = {StrataThemeAsk::Op::Delete, mStrataIndex, {}, false};
+          }
+        }
+        ImGui::Checkbox("Clear unused layers (on Apply)", &mStrataClearUnused);
+        EdSetItemTooltip("Painted layers the theme leaves empty lose their texture and their paint");
+      }
+    }
+    ImGui::SetNextItemWidth(Em(160.0f));
+    ImGui::InputTextWithHint("##strataname", "name", mStrataName, sizeof(mStrataName));
+    ImGui::SameLine();
+    ImGui::BeginDisabled(mStrataName[0] == '\0');
+    if (ImGui::Button("Save this map's as a theme")) {
+      mStrataAsk = {StrataThemeAsk::Op::Save, 0, mStrataName, false};
+    }
+    ImGui::EndDisabled();
+    ImGui::SetNextItemWidth(Em(160.0f));
+    ImGui::InputTextWithHint("##stratamap", "map folder (scmp_009)", mStrataMap, sizeof(mStrataMap));
+    ImGui::SameLine();
+    ImGui::BeginDisabled(mStrataMap[0] == '\0');
+    if (ImGui::Button("Import from that map")) {
+      mStrataAsk = {StrataThemeAsk::Op::Import, 0, mStrataMap, false};
+    }
+    ImGui::EndDisabled();
+    if (!mStrataStatus.empty()) {
+      ImGui::PushTextWrapPos(0.0f);
+      ImGui::TextDisabled("%s", mStrataStatus.c_str());
+      ImGui::PopTextWrapPos();
+    }
   }
 
   void EdTools::DrawRecipes()
@@ -3302,6 +3589,28 @@ namespace faf::editor
             }
             rule.v[param.key] = value;
             changed = true;
+          }
+        }
+        if (rule.type == "named") {
+          // Which file the slot reads.
+          const std::vector<std::string> files = ImportedMaskFiles(InteropFile(false));
+          const int slot = static_cast<int>(std::lround(rule.Value("slot")));
+          if (files.empty()) {
+            Note(
+              "No imported masks: choose a heightmap in Terrain > Import / Export; the images beside it are the "
+              "slots."
+            );
+          } else if (slot >= 1 && slot <= static_cast<int>(files.size())) {
+            const std::string& file = files[static_cast<std::size_t>(slot - 1)];
+            const std::size_t cut = file.find_last_of("/\\");
+            ImGui::TextDisabled(
+              "Slot %d: %s (of %zu)",
+              slot,
+              cut == std::string::npos ? file.c_str() : file.c_str() + cut + 1,
+              files.size()
+            );
+          } else {
+            ImGui::TextDisabled("Slot %d is empty (%zu imported): the rule masks nothing", slot, files.size());
           }
         }
         ImGui::TreePop();
@@ -4742,6 +5051,12 @@ namespace faf::editor
       ImGui::Checkbox("Draw a chain", &mDrawChain);
       ImGui::SetNextItemWidth(-1.0f);
       ImGui::InputTextWithHint("##chainname", "chain name", mChainName, sizeof(mChainName));
+      ImGui::Checkbox("Selected chain only", &mChainOnly);
+      EdSetItemTooltip("The view draws only the current chain (the selected marker's, or the one named here)");
+      Note(
+        "Selecting a marker makes its chain the current one: drawn in yellow with a ring on each member, and named "
+        "here so Draw a chain goes on with it."
+      );
       Note(
         "Each marker placed joins this chain at its end (a route for scripts and the AI); its symmetric copies join "
         "<name>_m1, _m2... Ctrl+click on the ground starts the next chain. Chains are saved in the map's save file."
@@ -4770,6 +5085,11 @@ namespace faf::editor
         "Shift+click or Delete removes. Start positions are named ARMY_1, ARMY_2... (the scenario's army list is "
         "edited "
         "with the armies)."
+      );
+      ImGui::Checkbox("Draw markers as their models", &mMarkerModels);
+      EdSetItemTooltip(
+        "Each marker as its template's prop (as FAF Studio and the game's editor show them); mass "
+        "and hydrocarbon show their deposits either way"
       );
       ImGui::Checkbox("Connect path nodes", &mConnectNodes);
       Note(

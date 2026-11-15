@@ -209,6 +209,38 @@ namespace faf::editor
         }
       }
     }
+    // Every marker's stored height against the ground under it (FAF Studio's markercheck.lua, 3 units of slack).
+    if (input.groundAt != nullptr && input.width > 1 && input.height > 1) {
+      constexpr float kSlack = 3.0f;
+      for (const SaveEntry& marker : *input.markers) {
+        float x = 0.0f, y = 0.0f, z = 0.0f;
+        if (
+          !MarkerPosition(marker, x, y, z) || x < 0.0f || z < 0.0f || x > static_cast<float>(input.width - 1) ||
+          z > static_cast<float>(input.height - 1)
+        ) {
+          continue;
+        }
+        const float ground = input.groundAt(input.groundContext, x, z);
+        const float off = y - ground;
+        if (std::fabs(off) <= kSlack) {
+          continue;
+        }
+        char text[160];
+        (void)std::snprintf(
+          text,
+          sizeof(text),
+          "stands %.1f %s the ground (stored height %.1f, the ground %.1f)",
+          static_cast<double>(std::fabs(off)),
+          off > 0.0f ? "above" : "below",
+          static_cast<double>(y),
+          static_cast<double>(ground)
+        );
+        issues.push_back({CheckIssue::Level::Note, marker.name, text, x, z, std::string(), 0});
+        issues.back().fix = CheckIssue::Fix::ToGround;
+        issues.back().fixX = x;
+        issues.back().fixZ = z;
+      }
+    }
     return issues;
   }
   std::vector<CheckIssue> CheckMapBasics(
@@ -485,6 +517,8 @@ namespace faf::editor
       return "Pull inside";
     case CheckIssue::Fix::SnapToGrid:
       return "Snap to grid";
+    case CheckIssue::Fix::ToGround:
+      return "To ground";
     default:
       return "";
     }

@@ -37,6 +37,7 @@ namespace faf::editor
       None,
       PullInside,
       SnapToGrid,
+      ToGround, // its stored height set to the ground's (the marker stays where it is)
     };
     Fix fix = Fix::None;
     float fixX = 0.0f;
@@ -74,6 +75,8 @@ namespace faf::editor
    * Checks the start positions and the mass and hydrocarbon points: off the playable area or the map (error), a start
    * under water (warning), a resource under water (note: naval maps have them), without a marker of its type at each
    * of its symmetric copies within 2 units (warning), and two resources whose 2 x 2 extractors would overlap (error).
+   * Every marker on the map whose stored height is more than 3 above or below the ground (FAF Studio's markercheck:
+   * the AI and the game read that height) gets a note with the To ground fix.
    */
   std::vector<CheckIssue> CheckMarkers(const MarkerCheckInput& input);
 
