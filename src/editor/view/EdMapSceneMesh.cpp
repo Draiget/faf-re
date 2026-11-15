@@ -557,8 +557,8 @@ namespace faf::editor
     for (std::size_t i = 0; i < mMeshMap.patches.size(); ++i) {
       const edmesh::Patch& patch = mMeshMap.patches[i];
       const MeshMaterialView& view = views[patch.material];
-      if (view.albedo.empty()) {
-        continue; // (no cache, no texture: not drawn)
+      if (view.albedo.empty() || patch.vertexCount == 0) {
+        continue; // (no cache, no texture, or its file couldn't be read: not drawn)
       }
       const edmesh::Material* material =
         patch.material >= 0 && static_cast<std::size_t>(patch.material) < mMeshMap.materials.size()
@@ -752,6 +752,11 @@ namespace faf::editor
       drawn < mMeshMap.TotalTriangles() ? " (the view draws the first 1.5 million)" : ""
     );
     gpg::Logf("editor: %s", text);
+    if (!mMeshMap.error.empty()) {
+      // Patches whose files are missing or broken: their entries stay (Save writes them back), they aren't drawn.
+      gpg::Warnf("editor: mesh terrain: patches not read: %s", mMeshMap.error.c_str());
+      return std::string(text) + "; not read (kept in the manifest, Check names them): " + mMeshMap.error;
+    }
     return text;
   }
 

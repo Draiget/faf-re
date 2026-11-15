@@ -8,6 +8,7 @@
 #include "editor/ui/EdThemeColors.h"
 #include "editor/tools/EdTextureLibrary.h"
 #include "editor/doc/EdDocument.h"
+#include "editor/doc/EdScenarioInfo.h"
 #include "editor/ui/EdControls.h"
 #include "editor/ui/EdHelp.h"
 #include "editor/ui/EdUiScale.h"
@@ -449,15 +450,19 @@ namespace faf::editor
       if (ImGui::Button("Load (read it again)")) {
         mMeshAskMore = 1;
       }
-      ImGui::SameLine();
-      if (ImGui::Button("Unset")) {
-        mMeshAskMore = 4;
+    }
+    // FAF Studio's "Mesh map in scenario" and New, whatever the panel holds: the scenario's TerrainSystem names the
+    // mesh (its ground the patches) or not (the height field), one undo step either way.
+    if (mDocument.Map() != nullptr) {
+      std::string system;
+      bool meshMap = ReadScenarioField(mDocument.Scenario(), "TerrainSystem", system) && system == "mesh";
+      if (ImGui::Checkbox("Mesh map in scenario (the map's terrain/terrain.lua is its ground)", &meshMap)) {
+        mMeshAskMore = meshMap ? 5 : 4;
       }
-      EdSetItemTooltip("The scenario no longer names the mesh: the height field is the ground (one undo step)");
-    } else if (mDocument.Map() != nullptr) {
-      if (ImGui::Button("Set: the map's terrain/terrain.lua is its ground")) {
-        mMeshAskMore = 5;
-      }
+      EdSetItemTooltip(
+        "On: the scenario says TerrainSystem = 'mesh' and names terrain/terrain.lua; off: the height field is the "
+        "ground (one undo step)"
+      );
       if (ImGui::Button("New manifest from the map")) {
         mMeshAskMore = 7;
       }

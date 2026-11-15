@@ -606,19 +606,21 @@ namespace faf::editor
         patches.clear();
         return false;
       }
+      // Every entry stays (FAF Studio keeps them and names each bad file in its check): a patch whose file is missing
+      // or broken has no geometry and isn't drawn, and Save writes its line back.
       for (Patch& p : patches) {
         const std::vector<std::uint8_t> scm = ReadVfs(dir + "/" + p.file);
         std::string why;
         if (scm.empty()) {
-          error = "patch file missing: " + p.file;
-          patches.clear();
-          return false;
+          why = "missing";
+        } else if (ParseScm(scm.data(), scm.size(), p, why)) {
+          continue;
         }
-        if (!ParseScm(scm.data(), scm.size(), p, why)) {
-          error = p.file + ": " + why;
-          patches.clear();
-          return false;
-        }
+        p.vertices.clear();
+        p.indices.clear();
+        p.vertexCount = 0;
+        p.triangleCount = 0;
+        error += (error.empty() ? "" : "; ") + p.file + ": " + why;
       }
       BuildGrid();
       return true;
