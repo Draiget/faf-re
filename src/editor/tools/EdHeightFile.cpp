@@ -451,6 +451,97 @@ namespace faf::editor
     return WritePng(file, image, error, eightBit);
   }
 
+  bool WriteFloatImage(
+    const std::filesystem::path& file,
+    const int width,
+    const int height,
+    const std::vector<float>& values,
+    std::string& error
+  )
+  {
+    if (
+      width < 1 || height < 1 || values.size() != static_cast<std::size_t>(width) * static_cast<std::size_t>(height)
+    ) {
+      error = "no values to write";
+      return false;
+    }
+    const std::string extension = Lower(file.extension().string());
+    if (extension == ".r32") {
+      std::ofstream out(file, std::ios::binary);
+      out.write(reinterpret_cast<const char*>(values.data()), static_cast<std::streamsize>(values.size() * 4));
+      if (!out) {
+        error = "can't write " + file.string();
+        return false;
+      }
+      return true;
+    }
+    if (extension != ".tif" && extension != ".tiff") {
+      error = "32-bit floats are written as .tif or .r32";
+      return false;
+    }
+    // A baseline TIFF written by hand (the Windows TIFF encoder offers no float grey): little-endian, one uncompressed
+    // strip of 32-bit floats (SampleFormat 3), grey with black at zero.
+    std::vector<std::uint8_t> out;
+    const auto put16 = [&](const std::uint32_t v) {
+      out.push_back(static_cast<std::uint8_t>(v & 0xFFu));
+      out.push_back(static_cast<std::uint8_t>((v >> 8) & 0xFFu));
+    };
+    const auto put32 = [&](const std::uint32_t v) {
+      put16(v & 0xFFFFu);
+      put16(v >> 16);
+    };
+    const std::uint32_t bytes = static_cast<std::uint32_t>(values.size() * 4);
+    const std::uint32_t dataAt = 8;
+    const std::uint32_t ifdAt = dataAt + bytes + (bytes & 1u);
+    out.insert(out.end(), {'I', 'I', 42, 0});
+    put32(ifdAt);
+    const std::size_t data = out.size();
+    out.resize(data + bytes);
+    std::memcpy(out.data() + data, values.data(), bytes);
+    if ((bytes & 1u) != 0u) {
+      out.push_back(0);
+    }
+    struct Tag
+    {
+      std::uint16_t id;
+      std::uint16_t type; // 3 SHORT, 4 LONG
+      std::uint32_t value;
+    };
+    const Tag tags[] = {
+      {256, 4, static_cast<std::uint32_t>(width)},  // ImageWidth
+      {257, 4, static_cast<std::uint32_t>(height)}, // ImageLength
+      {258, 3, 32},                                 // BitsPerSample
+      {259, 3, 1},                                  // Compression: none
+      {262, 3, 1},                                  // PhotometricInterpretation: black is zero
+      {273, 4, dataAt},                             // StripOffsets
+      {277, 3, 1},                                  // SamplesPerPixel
+      {278, 4, static_cast<std::uint32_t>(height)}, // RowsPerStrip
+      {279, 4, bytes},                              // StripByteCounts
+      {284, 3, 1},                                  // PlanarConfiguration: chunky
+      {339, 3, 3},                                  // SampleFormat: IEEE float
+    };
+    put16(static_cast<std::uint32_t>(std::size(tags)));
+    for (const Tag& tag : tags) {
+      put16(tag.id);
+      put16(tag.type);
+      put32(1);
+      if (tag.type == 3) {
+        put16(tag.value);
+        put16(0);
+      } else {
+        put32(tag.value);
+      }
+    }
+    put32(0); // no next IFD
+    std::ofstream stream(file, std::ios::binary | std::ios::trunc);
+    stream.write(reinterpret_cast<const char*>(out.data()), static_cast<std::streamsize>(out.size()));
+    if (!stream) {
+      error = "can't write " + file.string();
+      return false;
+    }
+    return true;
+  }
+
   const char* ResampleFilterName(
     const ResampleFilter filter
   ) noexcept

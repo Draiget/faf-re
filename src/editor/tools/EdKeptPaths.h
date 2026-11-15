@@ -215,6 +215,8 @@ namespace faf::editor
     float over = 0.0f;                        // share of the length above the limit
     std::vector<std::pair<int, int>> flagged; // sample ranges above the limit
     std::vector<float> ys;
+    float worstX = 0.0f; // where the steepest grade starts
+    float worstZ = 0.0f;
   };
   [[nodiscard]] KeptPathReport
   ReportKeptPath(const KeptPath& path, const std::function<float(float, float)>& ground, float water);

@@ -13,6 +13,7 @@
 #include "editor/tools/EdMeshData.h"
 #include "editor/doc/EdAdaptiveModel.h"
 #include "editor/tools/EdChecks.h"
+#include "editor/tools/EdTerrainChecks.h"
 #include "editor/doc/EdLighting.h"
 #include "editor/doc/EdLooks.h"
 #include "editor/doc/EdNewMap.h"
@@ -413,6 +414,21 @@ namespace faf::editor
     {
       mShowCheck = true;
       mRunCheck = true;
+    }
+    /** The Check's settings panel's values (test runs: `/checksettings`). */
+    void SetCheckSettings(
+      const TerrainCheckSettings& settings,
+      const int unitClass,
+      const bool validators,
+      const bool symmetry,
+      const bool paths
+    ) noexcept
+    {
+      mTerrainCheck = settings;
+      mTerrainCheckClass = unitClass;
+      mCheckValidators = validators;
+      mCheckSymmetry = symmetry;
+      mCheckPaths = paths;
     }
     /** Test runs (`/unitspawn <group>`): the selected unit's Spawns choice set to that group, as a pick in its list. */
     void TestUnitSpawn(
@@ -1137,6 +1153,13 @@ namespace faf::editor
   private:
     /** The pathing part of the Check: what each start reaches by land, and the overlay. */
     void CheckPathing(const MarkerCheckInput& input);
+    /** The Check's settings (FAF Studio's terrain checks panel): the terrain checks' thresholds and which parts run. */
+    TerrainCheckSettings mTerrainCheck;
+    int mTerrainCheckClass = 2;   // 1 small .. 4 experimental: the footprint window 1, 2, 3, 5
+    bool mCheckValidators = true; // the resources through the game's build rules
+    bool mCheckSymmetry = true;   // markers and props without a partner at their symmetric copies
+    bool mCheckPaths = true;      // the kept paths steeper than their grade
+    void DrawCheckSettings();
     bool mShowCheck = true;
     std::vector<CheckIssue> mCheckIssues;
     bool mCheckRan = false;

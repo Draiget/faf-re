@@ -8712,11 +8712,32 @@ namespace faf::editor
       }
       /** Import / Export > Export package: the folder for Gaea / World Machine; the folder watch. */
       std::map<std::string, long long> mPackageStamps;
+      bool mPackageTestDone = false;
       double mPackageWatchAt = 0.0;
       void PackageUpdate()
       {
         EdTools& tools = mShell->Tools();
         EdTools::ExportPackage& p = tools.PackageSettings();
+        if (
+          fa::vector<fa::string> into; !mPackageTestDone && mScene.Attached() && !mScene.ModelsPending() &&
+          moho::CFG_GetArgOption("/exportpkg", 1, &into) && !into.empty()
+        ) {
+          // `/exportpkg <folder>` (test runs): the package with every item, 32-bit TIFF heights and TIFF masks.
+          mPackageTestDone = true;
+          std::snprintf(p.folder, sizeof(p.folder), "%s", into[0].c_str());
+          p.height = p.water = p.slope = p.flow = p.wear = p.layers = p.types = p.markers = p.playable = p.readme =
+            true;
+          p.format = 1;
+          p.float32 = true;
+          p.waterSoft = 4.0f;
+          p.markerRadius = 5.0f;
+          std::string plan;
+          for (const EdTools::PackageFile& file : EdTools::PackagePlan(p, tools.PackageStem())) {
+            plan += (plan.empty() ? "" : ", ") + file.file;
+          }
+          gpg::Logf("editor: export package plan: %s", plan.c_str());
+          tools.AskPackage();
+        }
         if (tools.TakePackageAsk() && mScene.Attached()) {
           const std::string status = ExportPackageNow(p);
           tools.SetInteropStatus(status);
@@ -8748,6 +8769,14 @@ namespace faf::editor
             continue; // the first look only notes the stamps
           }
           std::string message;
+          if (std::string own = tools.PackageStem() + "_"; true) {
+            for (char& c : own) {
+              c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+            }
+            if (name.rfind(own, 0) == 0) {
+              name = name.substr(own.size()); // <stem>_height.png -> height.png
+            }
+          }
           if (name.rfind("height", 0) == 0) {
             tools.SetInteropFile(false, item.path().string());
             tools.SetInteropStatus(mScene.InteropImportNow(true));
@@ -8764,6 +8793,7 @@ namespace faf::editor
         const EdTools::ExportPackage& p
       )
       {
+        // FAF Studio's interopexport.lua: every file named <stem>_<what>, the masks on the heights' sample grid.
         const std::shared_ptr<TerrainSource> terrain = mScene.TerrainHeights();
         if (terrain == nullptr || terrain->width < 2) {
           return "No terrain.";
@@ -8771,15 +8801,25 @@ namespace faf::editor
         const std::filesystem::path folder(p.folder);
         std::error_code ec;
         std::filesystem::create_directories(folder, ec);
+        const std::string stem = mShell->Tools().PackageStem();
         const int w = terrain->width;
         const int h = terrain->height;
         const auto [lowIt, highIt] = std::minmax_element(terrain->heights.begin(), terrain->heights.end());
-        const float low = p.fixedRange ? p.low : *lowIt;
-        const float high = p.fixedRange ? p.high : *highIt;
-        const std::string hext = p.float32 ? ".r32" : ".png";
+        const float lowest = *lowIt;
+        const float highest = *highIt;
+        float low = p.fixedRange ? p.low : lowest;
+        float high = p.fixedRange ? p.high : highest;
+        if (high - low < 0.01f) {
+          high = low + 0.01f;
+        }
+        const std::string hext = EdTools::PackageHeightExtension(p);
+        const std::string mext = p.format == 1 ? "tif" : "png";
+        const auto fileOf = [&](const std::string& suffix, const std::string& ext) {
+          return stem + suffix + "." + ext;
+        };
         std::vector<std::string> written;
         std::string error;
-        const auto writeGrid = [&](const std::string& name, const std::vector<float>& values, const bool mask) {
+        const auto writeMask = [&](const std::string& suffix, const std::vector<float>& values) {
           HeightImage image;
           image.width = w;
           image.height = h;
@@ -8787,74 +8827,130 @@ namespace faf::editor
           for (std::size_t i = 0; i < values.size(); ++i) {
             image.words[i] = static_cast<std::uint16_t>(std::clamp(std::lround(values[i] * 65535.0f), 0L, 65535L));
           }
-          if (WriteHeightImage(folder / name, image, error, mask && p.mask8)) {
+          const std::string name = fileOf(suffix, mext);
+          if (WriteHeightImage(folder / name, image, error, p.mask8)) {
             written.push_back(name);
           }
         };
         auto heights = std::make_shared<field::Grid>(w, h, 1.0f, 0.0f, 0.0f);
         heights->v = terrain->heights;
-        const auto run = [&](const char* op, field::OpArgs args) -> std::shared_ptr<field::Grid> {
-          args.in["a"] = heights;
-          auto out = std::make_shared<field::Grid>();
-          return field::RunOpCpu(op, args, *out, error) ? out : nullptr;
-        };
-        if (p.height) {
-          HeightImage image;
-          image.width = w;
-          image.height = h;
-          for (const float v : terrain->heights) {
-            const float word = p.normalised ? (v - low) / std::max(high - low, 0.001f) * 65535.0f : v * 128.0f;
-            image.words.push_back(static_cast<std::uint16_t>(std::clamp(std::lround(word), 0L, 65535L)));
+        const auto run = [&](const char* op, field::OpArgs args, const std::shared_ptr<field::Grid>& input) {
+          if (input != nullptr) {
+            args.in["a"] = input;
           }
-          if (WriteHeightImage(folder / ("height" + hext), image, error)) {
-            written.push_back("height" + hext);
+          auto out = std::make_shared<field::Grid>();
+          return field::RunOpCpu(op, args, *out, error) ? out : std::shared_ptr<field::Grid>();
+        };
+        const WaterState water = mDocument.WaterNow();
+        const float waterLevel = water.enabled ? water.elevation : 0.0f;
+        const std::string heightName = fileOf("_height", hext);
+        // The sidecar: the range, so the round trip is exact (the import reads it back).
+        if (p.height || p.readme) {
+          char json[1400];
+          (void)std::snprintf(
+            json,
+            sizeof(json),
+            "{\n  \"tool\": \"FAF map editor\",\n  \"file\": \"%s\",\n  \"mode\": \"%s\",\n  \"bits\": %d,\n"
+            "  \"float\": %d,\n  \"min\": %.9g,\n  \"max\": %.9g,\n  \"lowest\": %.9g,\n  \"highest\": %.9g,\n"
+            "  \"width\": %d,\n  \"height\": %d,\n  \"cells\": %d,\n  \"units_per_sample\": 1,\n"
+            "  \"water_elevation\": %.9g,\n"
+            "  \"note\": \"normalised: value 0..1 = min..max world units; absolute: 16-bit value / 128 (float: "
+            "units)\"\n}\n",
+            heightName.c_str(),
+            p.normalised ? "normalised" : "absolute",
+            p.float32 ? 32 : 16,
+            p.float32 ? 1 : 0,
+            static_cast<double>(p.normalised ? low : 0.0f),
+            static_cast<double>(p.normalised ? high : 65535.0f / 128.0f),
+            static_cast<double>(lowest),
+            static_cast<double>(highest),
+            w,
+            h,
+            w - 1,
+            static_cast<double>(waterLevel)
+          );
+          const std::string name = fileOf("_height", "json");
+          std::ofstream(folder / name, std::ios::binary) << json;
+          written.push_back(name);
+        }
+        if (p.height) {
+          if (p.float32) {
+            std::vector<float> values(terrain->heights.size());
+            for (std::size_t i = 0; i < values.size(); ++i) {
+              const float v = terrain->heights[i];
+              values[i] = p.normalised ? (v - low) / (high - low) : v;
+            }
+            if (WriteFloatImage(folder / heightName, w, h, values, error)) {
+              written.push_back(heightName);
+            }
+          } else {
+            HeightImage image;
+            image.width = w;
+            image.height = h;
+            for (const float v : terrain->heights) {
+              const float word = p.normalised ? (v - low) / (high - low) * 65535.0f : v * 128.0f;
+              image.words.push_back(static_cast<std::uint16_t>(std::clamp(std::lround(word), 0L, 65535L)));
+            }
+            if (WriteHeightImage(folder / heightName, image, error)) {
+              written.push_back(heightName);
+            }
           }
         }
-        const WaterState water = mDocument.WaterNow();
-        if (p.water && water.enabled) {
-          std::vector<float> depth(terrain->heights.size());
-          for (std::size_t i = 0; i < depth.size(); ++i) {
-            depth[i] = std::clamp((water.elevation - terrain->heights[i]) / 30.0f, 0.0f, 1.0f);
+        if (p.water) {
+          field::OpArgs a;
+          a.p.num["level"] = waterLevel;
+          a.p.num["soft"] = p.waterSoft;
+          if (const auto g = run("water_below", a, heights); g != nullptr) {
+            writeMask("_water", g->v);
           }
-          writeGrid("water.png", depth, true);
         }
         if (p.slope) {
           field::OpArgs a;
           a.p.num["radius"] = 1;
           a.p.str["mode"] = "degrees";
-          if (const auto g = run("slope", a); g != nullptr) {
+          if (const auto g = run("slope", a, heights); g != nullptr) {
             std::vector<float> v(g->v.size());
             for (std::size_t i = 0; i < v.size(); ++i) {
-              v[i] = g->v[i] / 90.0f;
+              v[i] = std::clamp(g->v[i] / 90.0f, 0.0f, 1.0f);
             }
-            writeGrid("slope.png", v, true);
+            writeMask("_slope", v);
           }
         }
         if (p.flow) {
           field::OpArgs a;
           a.p.num["range"] = 4000;
           a.p.str["mode"] = "log";
-          if (const auto g = run("flow", a); g != nullptr) {
-            writeGrid("flow.png", g->v, true);
+          if (const auto g = run("flow", a, heights); g != nullptr) {
+            writeMask("_flow", g->v);
           }
         }
         if (p.wear) {
-          field::OpArgs a;
-          a.p.str["output"] = "wear";
-          if (const auto g = run("erode_hydraulic", a); g != nullptr) {
-            const float top = std::max(1e-6f, *std::max_element(g->v.begin(), g->v.end()));
-            std::vector<float> v(g->v.size());
-            for (std::size_t i = 0; i < v.size(); ++i) {
-              v[i] = g->v[i] / top;
+          // Studio's: the curvature (radius 6, gain 25); wear where it is convex, deposit where it is concave.
+          field::OpArgs c;
+          c.p.num["radius"] = 6;
+          c.p.num["gain"] = 25;
+          if (const auto curvature = run("curvature", c, heights); curvature != nullptr) {
+            field::OpArgs edges;
+            edges.p.num["edge0"] = 0.5;
+            edges.p.num["edge1"] = 0.9;
+            if (const auto wear = run("smoothstep", edges, curvature); wear != nullptr) {
+              writeMask("_wear", wear->v);
             }
-            writeGrid("wear.png", v, true);
+            field::OpArgs flip;
+            flip.p.num["lo"] = 0;
+            flip.p.num["hi"] = 1;
+            if (const auto inverted = run("invert", flip, curvature); inverted != nullptr) {
+              if (const auto deposit = run("smoothstep", edges, inverted); deposit != nullptr) {
+                writeMask("_deposit", deposit->v);
+              }
+            }
           }
         }
         if (p.layers) {
           const ShaderProfile profile = ShaderProfileOf(mScene.TerrainShader());
           for (int layer = 0; layer < std::clamp(profile.painted, 1, 8); ++layer) {
             std::string message;
-            const std::string name = "layer" + std::to_string(layer + 1) + ".png";
+            const std::string name = fileOf("_layer" + std::to_string(layer + 1), mext);
             if (mScene.ExportMaskLayer(layer, folder / name, message)) {
               written.push_back(name);
             }
@@ -8870,35 +8966,62 @@ namespace faf::editor
             for (const std::uint8_t id : mDocument.TerrainTypesNow()) {
               image.words.push_back(static_cast<std::uint16_t>(id * 257));
             }
-            if (WriteHeightImage(folder / "types.png", image, error)) {
-              written.push_back("types.png");
+            const std::string name = fileOf("_terraintypes", "png");
+            if (WriteHeightImage(folder / name, image, error, true)) { // 8-bit: the type codes as they are
+              written.push_back(name);
             }
           }
         }
         if (p.markers) {
-          // Discs: starts 1.0, mass 0.66, hydrocarbon 0.33.
-          std::vector<float> discs(terrain->heights.size(), 0.0f);
+          // Every marker as a CSV row (by name), the starts (ARMY_n) and the resources as discs.
+          std::vector<const SaveEntry*> sorted;
           for (const SaveEntry& marker : mDocument.SaveData().Markers()) {
+            sorted.push_back(&marker);
+          }
+          std::sort(sorted.begin(), sorted.end(), [](const SaveEntry* a, const SaveEntry* b) {
+            return a->name < b->name;
+          });
+          std::string csv = "name,type,x,y,z\n";
+          std::vector<double> starts;
+          std::vector<double> resources;
+          static const std::regex army(R"(^ARMY_\d+$)");
+          for (const SaveEntry* marker : sorted) {
             float mx = 0.0f, my = 0.0f, mz = 0.0f;
-            const std::string type = MarkerTypeOf(marker);
-            const float value = type == "Blank Marker" ? 1.0f
-              : type == "Mass"                         ? 0.66f
-              : type == "Hydrocarbon"                  ? 0.33f
-                                                       : 0.0f;
-            if (value <= 0.0f || !MarkerPosition(marker, mx, my, mz)) {
+            if (!MarkerPosition(*marker, mx, my, mz)) {
               continue;
             }
-            const float r = p.markerRadius * (type == "Blank Marker" ? 2.0f : 1.0f);
-            for (int z = std::max(0, static_cast<int>(mz - r)); z <= std::min(h - 1, static_cast<int>(mz + r)); ++z) {
-              for (int x = std::max(0, static_cast<int>(mx - r)); x <= std::min(w - 1, static_cast<int>(mx + r)); ++x) {
-                if (std::hypot(static_cast<float>(x) - mx, static_cast<float>(z) - mz) <= r) {
-                  float& d = discs[static_cast<std::size_t>(z) * w + x];
-                  d = std::max(d, value);
-                }
-              }
+            const std::string type = MarkerTypeOf(*marker);
+            char row[400];
+            (void)std::snprintf(
+              row,
+              sizeof(row),
+              "%s,%s,%.3f,%.3f,%.3f\n",
+              marker->name.c_str(),
+              type.c_str(),
+              static_cast<double>(mx),
+              static_cast<double>(my),
+              static_cast<double>(mz)
+            );
+            csv += row;
+            std::vector<double>* into = std::regex_match(marker->name, army) ? &starts
+              : (type == "Mass" || type == "Hydrocarbon")                    ? &resources
+                                                                             : nullptr;
+            if (into != nullptr) {
+              into->insert(into->end(), {mx, mz, p.markerRadius, 1.0});
             }
           }
-          writeGrid("markers.png", discs, true);
+          const std::string csvName = fileOf("_markers", "csv");
+          std::ofstream(folder / csvName, std::ios::binary) << csv;
+          written.push_back(csvName);
+          for (const auto& [suffix, points] : {std::pair{"_starts", &starts}, std::pair{"_resources", &resources}}) {
+            field::OpArgs a;
+            a.in["like"] = heights;
+            a.p.arr["pts"] = *points;
+            a.p.num["feather"] = 0;
+            if (const auto g = run("points_mask", a, nullptr); g != nullptr) {
+              writeMask(suffix, g->v);
+            }
+          }
         }
         if (p.playable) {
           std::vector<float> area(terrain->heights.size(), 1.0f);
@@ -8910,38 +9033,47 @@ namespace faf::editor
               }
             }
           }
-          writeGrid("playable.png", area, true);
+          writeMask("_playable", area);
         }
         if (p.readme) {
-          char text[1600];
+          char text[2400];
           (void)std::snprintf(
             text,
             sizeof(text),
-            "Package of %s for Gaea / World Machine\n\n"
-            "Map: %d x %d samples (%.1f x %.1f km; a map unit is 19.53 m).\n"
-            "height%s: %s.\n"
-            "Masks are 0..1 over the whole map (%s): water = depth below the sea (%.1f) over 30 units; slope = degrees "
-            "/ "
-            "90; flow = drainage (log); wear = the erosion's wear; layer<n> = the paint of texture layer n; types = "
-            "terrain type ids (id x 257); markers = start positions 1.0, mass 0.66, hydrocarbon 0.33; playable = the "
-            "playable area.\n"
-            "Saved back into this folder with the editor watching it: height* comes in as the heights, layer<n>* / "
-            "mask<n>* as layer n's paint.\n",
+            "Terrain export of %s (FAF map editor)\n\n"
+            "Map size   : %d x %d world units (%.1f km), 1 sample = 1 world unit\n"
+            "Sample grid: %d x %d samples (N + 1; the files hold exactly these samples)\n"
+            "Heights    : %.3f to %.3f units on this map; the game holds 0 to 511.99 (16-bit words, 1/128 unit steps)\n"
+            "Water level: %.2f units\n\n"
+            "Heightmap file (%s)\n  %s\n\n"
+            "Masks (%s, %s): 0 = no, 1 = full. _water: 1 under the water surface, a soft edge of %.1f units; _slope: "
+            "degrees / 90; _flow: drainage; _wear / _deposit: convex ridges / concave basins; _layerN: the paint of "
+            "texture layer N; _terraintypes: the type codes (8-bit); _starts / _resources: discs of %.0f samples; "
+            "_markers.csv: every marker (name, type, x, y, z); _playable: the playable area.\n\n"
+            "Saved back into this folder with the editor watching it: <name>_height* comes in as the heights, "
+            "<name>_layer<n>* / mask<n>* as layer n's paint.\n",
             mDocument.Facts().name.c_str(),
+            w - 1,
+            h - 1,
+            (w - 1) / 51.2,
             w,
             h,
-            (w - 1) / 51.2,
-            (h - 1) / 51.2,
-            hext.c_str(),
-            p.normalised ? ("the map's heights " + std::to_string(low) + " .. " + std::to_string(high) +
-                            " stretched over the whole range")
+            static_cast<double>(lowest),
+            static_cast<double>(highest),
+            static_cast<double>(waterLevel),
+            heightName.c_str(),
+            p.normalised ? ("value 0..1 = " + std::to_string(low) + " .. " + std::to_string(high) +
+                            " units (see the .json: min / max). Importing back: normalised with that range.")
                              .c_str()
-                         : "a word is 1/128 of a map unit",
+                         : "absolute: 16-bit value / 128 = units (float files hold the units directly).",
+            mext.c_str(),
             p.mask8 ? "8-bit" : "16-bit",
-            static_cast<double>(water.elevation)
+            static_cast<double>(p.waterSoft),
+            static_cast<double>(p.markerRadius)
           );
-          std::ofstream(folder / "README.txt", std::ios::binary) << text;
-          written.push_back("README.txt");
+          const std::string name = fileOf("_README_scale", "txt");
+          std::ofstream(folder / name, std::ios::binary) << text;
+          written.push_back(name);
         }
         std::string list;
         for (const std::string& name : written) {
@@ -14962,6 +15094,34 @@ namespace faf::editor
           // `/breakscript` (test runs): a syntax error added to the script's end first.
           if (moho::CFG_GetArgOption("/breakscript", 0, nullptr)) {
             mDocument.Script() += "\nfunction Broken(\n";
+          }
+          // `/checksettings <base radius>,<blocked share>,<unit class>,<validators>,<symmetry>,<paths>` (test runs):
+          // the Check's settings before `/check` runs it.
+          if (fa::vector<fa::string> spec; moho::CFG_GetArgOption("/checksettings", 1, &spec) && !spec.empty()) {
+            TerrainCheckSettings settings;
+            int unitClass = 2, validators = 1, symmetry = 1, paths = 1;
+            (void)std::sscanf(
+              spec[0].c_str(),
+              "%f,%f,%d,%d,%d,%d",
+              &settings.startRadius,
+              &settings.blockedShare,
+              &unitClass,
+              &validators,
+              &symmetry,
+              &paths
+            );
+            mShell->SetCheckSettings(settings, unitClass, validators != 0, symmetry != 0, paths != 0);
+            gpg::Logf(
+              "editor: check settings: base radius %.0f, blocked share %.2f, unit class %d, validators %d, symmetry "
+              "%d, "
+              "paths %d",
+              static_cast<double>(settings.startRadius),
+              static_cast<double>(settings.blockedShare),
+              unitClass,
+              validators,
+              symmetry,
+              paths
+            );
           }
           if (moho::CFG_GetArgOption("/check", 0, nullptr)) {
             mShell->RequestCheck();

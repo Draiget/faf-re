@@ -695,6 +695,7 @@ namespace faf::editor
     std::filesystem::path mMeshViewCache;
     int mMeshBakeGeneration = 0;
     bool mMeshSetsShadowRange = false; // this scene set the shadow map's extra height range (ren_ShadowExtraMinY)
+    bool mMeshBuiltForBoth = false;    // the patches were made with the Both variants (pulled towards the camera)
     void DeleteMeshInstances();
     void SyncMeshView();
     /** Test runs: the cursor the view would show with the pointer at `at` (view pixels). */

@@ -1024,8 +1024,9 @@ namespace faf::editor
           resources.push_back({marker.name, x, z});
         }
       }
-      TerrainCheckSettings settings;
-      settings.limit = land.maxSlope > 0.0f ? land.maxSlope : settings.limit;
+      TerrainCheckSettings settings = mTerrainCheck;
+      static constexpr int kClassWindow[4] = {1, 2, 3, 5};
+      settings.window = kClassWindow[std::clamp(mTerrainCheckClass, 1, 4) - 1];
       std::size_t found = 0;
       for (CheckIssue& issue : CheckTerrainGround(heights, points, resources, settings)) {
         mCheckIssues.push_back(std::move(issue));
@@ -1263,6 +1264,58 @@ namespace faf::editor
     }
   }
 
+  void EdShell::DrawCheckSettings()
+  {
+    // FAF Studio's terrain checks panel: the thresholds of the terrain checks and which parts of the check run. A
+    // change runs the check again when it has run.
+    if (!ImGui::TreeNode("Check settings")) {
+      return;
+    }
+    bool changed = false;
+    changed |= ImGui::Checkbox("Marker validators", &mCheckValidators);
+    EdSetItemTooltip("Mass and hydrocarbon markers tested with their building's footprint by the game's build rules");
+    ImGui::SameLine();
+    changed |= ImGui::Checkbox("Symmetry", &mCheckSymmetry);
+    EdSetItemTooltip("Markers and props without a partner at their symmetric copies (the Tools panel's symmetry)");
+    ImGui::SameLine();
+    changed |= ImGui::Checkbox("Paths", &mCheckPaths);
+    EdSetItemTooltip("Kept paths with more than 2%% of their length steeper than their maximum grade");
+    ImGui::SetNextItemWidth(-1.0f);
+    changed |= FillSliderFloat("##tcLimit", &mTerrainCheck.limit, 0.2f, 1.5f, "Blocking slope (rise per run) %.2f");
+    EdSetItemTooltip("The slope rating that stops land units (the engine's rule: 0.75)");
+    ImGui::SetNextItemWidth(-1.0f);
+    static constexpr const char* kClasses[4] = {
+      "Land, small (1x1)", "Land, medium (2x2)", "Land, large (3x3)", "Experimental (5x5)"
+    };
+    char classFormat[96];
+    (void)std::snprintf(
+      classFormat, sizeof(classFormat), "Unit class %%d: %s", kClasses[std::clamp(mTerrainCheckClass, 1, 4) - 1]
+    );
+    changed |= FillSliderInt("##tcClass", &mTerrainCheckClass, 1, 4, classFormat);
+    EdSetItemTooltip("The footprint the slope rating is taken over: 1 small .. 4 experimental");
+    ImGui::SetNextItemWidth(-1.0f);
+    changed |= FillSliderFloat("##tcWade", &mTerrainCheck.wade, 0.0f, 3.0f, "Land units wade through water up to %.1f");
+    ImGui::SetNextItemWidth(-1.0f);
+    changed |= FillSliderFloat("##tcRadius", &mTerrainCheck.startRadius, 3.0f, 30.0f, "Base area radius (units) %.0f");
+    ImGui::SetNextItemWidth(-1.0f);
+    changed |=
+      FillSliderFloat("##tcShare", &mTerrainCheck.blockedShare, 0.0f, 0.5f, "Blocked share allowed in a base %.2f");
+    ImGui::SetNextItemWidth(-1.0f);
+    changed |= FillSliderFloat(
+      "##tcDetour", &mTerrainCheck.detour, 1.0f, 10.0f, "Route longer than %.1f x straight is reported"
+    );
+    if (ImGui::SmallButton("Defaults")) {
+      mTerrainCheck = TerrainCheckSettings{};
+      mTerrainCheckClass = 2;
+      mCheckValidators = mCheckSymmetry = mCheckPaths = true;
+      changed = true;
+    }
+    if (changed && mCheckRan) {
+      mRunCheck = true;
+    }
+    ImGui::TreePop();
+  }
+
   void EdShell::RunCheck()
   {
     mCheckIssues.clear();
@@ -1284,7 +1337,7 @@ namespace faf::editor
     input.groundAt = &CheckGround;
     input.groundContext = map->mTerrainRes;
     const HeightBrush brush = mTools.CurrentHeightBrush();
-    input.symmetry = brush.symmetry;
+    input.symmetry = mCheckSymmetry ? brush.symmetry : Symmetry::None;
     input.turns = brush.turns;
     input.width = facts.fieldWidth;
     input.height = facts.fieldHeight;
@@ -1311,7 +1364,7 @@ namespace faf::editor
       }
     }
     // The resources by the build rules: can an extractor or a hydrocarbon plant be built there?
-    if (resourceFit) {
+    if (resourceFit && mCheckValidators) {
       for (CheckIssue& issue : resourceFit()) {
         mCheckIssues.push_back(std::move(issue));
       }
@@ -1346,6 +1399,38 @@ namespace faf::editor
         !compiled.text.empty()
       ) {
         mCheckIssues.push_back(compiled);
+      }
+    }
+    // The kept paths whose grade can be limited: more than 2 % of the length steeper than their grade (Studio's
+    // terrainchecks.lua CheckPaths).
+    if (mCheckPaths) {
+      const auto ground = [map](const float x, const float z) {
+        return CheckGround(map->mTerrainRes, x, z);
+      };
+      const float water = facts.water ? facts.waterElevation : -1e9f;
+      for (const KeptPath& path : mDocument.PathsNow().set.paths) {
+        if (KeptPathOffsetMode(path.mode) || path.mode == KeptPathMode::River || path.points.size() < 2) {
+          continue;
+        }
+        const KeptPathReport report = ReportKeptPath(path, ground, water);
+        if (report.over > 0.02f && !report.flagged.empty()) {
+          char text[200];
+          (void)std::snprintf(
+            text,
+            sizeof(text),
+            "%.0f%% of its length is steeper than %.2f (worst %.2f)",
+            static_cast<double>(report.over * 100.0f),
+            static_cast<double>(path.grade),
+            static_cast<double>(report.max)
+          );
+          CheckIssue issue;
+          issue.level = CheckIssue::Level::Warning;
+          issue.marker = "path " + (path.name.empty() ? path.id : path.name);
+          issue.text = text;
+          issue.x = report.worstX;
+          issue.z = report.worstZ;
+          mCheckIssues.push_back(std::move(issue));
+        }
       }
     }
     // The props under the same symmetry: each one's partner of its blueprint at its copies, and the reclaim that isn't.
@@ -1565,6 +1650,7 @@ namespace faf::editor
     ImGui::RadioButton("Hover", &mTools.PathingLayer(), 2);
     ImGui::SameLine();
     ImGui::RadioButton("Amphibious", &mTools.PathingLayer(), 3);
+    DrawCheckSettings();
     HelpNote(
       "The scripts' syntax (_scenario.lua, _save.lua, _script.lua as edited), then start positions and mass and "
       "hydrocarbon points: off the playable area, under water, without a partner at their symmetric copies (the Tools "

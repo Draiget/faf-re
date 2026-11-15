@@ -167,35 +167,31 @@ namespace faf::editor
         .write(reinterpret_cast<const char*>(dds.data()), static_cast<std::streamsize>(dds.size()));
       return vfs + "/" + name;
     };
-    const auto solid = [&](const std::string& name, const float r, const float g, const float b, const float a) {
-      TexImage image;
-      image.Reset(4, 4);
-      for (int y = 0; y < 4; ++y) {
-        for (int x = 0; x < 4; ++x) {
-          float* const d = image.Pixel(x, y);
-          d[0] = r;
-          d[1] = g;
-          d[2] = b;
-          d[3] = a;
-        }
-      }
-      return write(name, image, DdsKind::Bgra);
-    };
     const auto exists = [&](const std::string& path) {
       std::string bytes;
       return !path.empty() && ReadGameFile(path, bytes);
     };
-    // The layers and layer A's normal map as they are (Studio's slots: diffuse a, b, light masks 0..2, normal a, b,
-    // specular a, b); the map's lowest layer for a material with no ground texture.
+    // FAF Studio's slots: diffuse a, b, light masks 0..2, normal a, b, mask a, b. The game's mesh technique has five
+    // samplers, so the editor's techniques read them packed (CD3DEffectTechnique.cpp, EditorMeshTerrainPS):
+    //   albedo / secondary: the layers as they are;
+    //   normals: layer A's normal x, y and layer B's (z made again in the shader);
+    //   lookup: layer A's mask green (glow) and blue (sun highlight, times Studio's 0.5), then layer B's;
+    //   specular: 2 x 2 tiles over the second coordinates, light masks 0, 1 (its alpha the layers' blend), 2, and a
+    //   tile of constants in four bands: the void colour and whether the ground fades into it; SC2's shadow fill colour
+    //   and how far a moving shadow pulls towards it; the fade's level and span; the alpha test's reference.
+    // The map's lowest layer for a material with no ground texture.
     out = MeshMaterialView{};
+    std::string normalsA;
+    std::string normalsB;
     if (material != nullptr && exists(inFolder(material->files[0]))) {
       out.albedo = inFolder(material->files[0]);
-      out.normals = exists(inFolder(material->files[5])) ? inFolder(material->files[5]) : std::string();
+      normalsA = inFolder(material->files[5]);
+      normalsB = inFolder(material->files[6]);
     } else {
       for (const EdTools::LayerSlot& layer : LayerSlots()) {
         if (!layer.albedo.empty()) {
           out.albedo = layer.albedo;
-          out.normals = layer.normals;
+          normalsA = layer.normals;
           break;
         }
       }
@@ -206,79 +202,141 @@ namespace faf::editor
     }
     out.secondary =
       material != nullptr && exists(inFolder(material->files[1])) ? inFolder(material->files[1]) : out.albedo;
-    if (out.normals.empty()) {
-      out.normals = solid(tag + "_flatnormal.dds", 0.5f, 0.5f, 1.0f, 1.0f);
-    }
     out.alphaTest = material != nullptr && material->alphaTest >= 0.0f;
-    // The light masks for the surface's own normal and the layers' blend, over the second coordinates.
-    MeshTexture masks[3];
-    bool haveMask[3] = {};
-    int size = 0;
-    for (int k = 0; k < 3 && material != nullptr; ++k) {
-      haveMask[k] = LoadMeshTexture(inFolder(material->files[2 + k]), masks[k]);
-      size = std::max(size, haveMask[k] ? std::max(masks[k].w, masks[k].h) : 0);
-    }
-    out.lightMasks = haveMask[0] || haveMask[1] || haveMask[2];
-    if (out.lightMasks) {
-      size = std::clamp(size, 64, 1024);
-      TexImage light;
-      light.Reset(size, 4);
-      for (int y = 0; y < size; ++y) {
-        for (int x = 0; x < size; ++x) {
-          const float u = (static_cast<float>(x) + 0.5f) / static_cast<float>(size);
-          const float v = (static_cast<float>(y) + 0.5f) / static_cast<float>(size);
-          float sum[3] = {0, 0, 0};
-          float blend = 0.0f;
-          for (int k = 0; k < 3; ++k) {
-            float c[4] = {1, 1, 1, 1};
-            if (haveMask[k]) {
-              masks[k].Sample(u, v, c);
-            }
-            for (int q = 0; q < 3; ++q) {
-              sum[q] += 0.57735027f * LinearOf(c[q]);
-            }
-            if (k == 1) {
-              blend = c[3];
-            }
-          }
-          float* const d = light.Pixel(x, y);
-          for (int q = 0; q < 3; ++q) {
-            d[q] = std::pow(std::clamp(sum[q] * 0.5f, 0.0f, 1.0f), 1.0f / 2.2f);
-          }
-          d[3] = material->blending ? blend : 0.0f;
-        }
-      }
-      out.specular = write(tag + "_light.dds", light, DdsKind::Bc3);
-    } else {
-      out.specular = solid(tag + "_light.dds", 1.0f, 1.0f, 1.0f, 0.0f);
-    }
-    // The mask, with only what the material uses (glow: green, sun highlight: blue).
-    MeshTexture mask;
-    if (
-      material != nullptr && (material->glow || material->highlight) &&
-      LoadMeshTexture(inFolder(material->files[7]), mask)
-    ) {
-      const int side = std::clamp(std::max(mask.w, mask.h), 4, 1024);
+    const auto square =
+      [](const MeshTexture& a, const MeshTexture& b, const bool haveA, const bool haveB, const int lo, const int hi) {
+      int side = 0;
+      side = std::max(side, haveA ? std::max(a.w, a.h) : 0);
+      side = std::max(side, haveB ? std::max(b.w, b.h) : 0);
+      return std::clamp(side, lo, hi);
+    };
+    // The normal maps, A's and B's (one layer only: B is A).
+    {
+      MeshTexture a;
+      MeshTexture b;
+      const bool haveA = LoadMeshTexture(normalsA, a);
+      const bool haveB = LoadMeshTexture(normalsB, b);
+      const int side = haveA || haveB ? square(a, b, haveA, haveB, 4, 1024) : 4;
       TexImage image;
       image.Reset(side, 4);
       for (int y = 0; y < side; ++y) {
         for (int x = 0; x < side; ++x) {
-          float c[4];
-          mask.Sample(
-            (static_cast<float>(x) + 0.5f) / static_cast<float>(side),
-            (static_cast<float>(y) + 0.5f) / static_cast<float>(side),
-            c
-          );
+          const float u = (static_cast<float>(x) + 0.5f) / static_cast<float>(side);
+          const float v = (static_cast<float>(y) + 0.5f) / static_cast<float>(side);
+          float ca[4] = {0.5f, 0.5f, 1.0f, 1.0f};
+          float cb[4] = {0.5f, 0.5f, 1.0f, 1.0f};
+          if (haveA) {
+            a.Sample(u, v, ca);
+          }
+          if (haveB) {
+            b.Sample(u, v, cb);
+          } else if (haveA) {
+            std::copy(std::begin(ca), std::end(ca), std::begin(cb));
+          }
           float* const d = image.Pixel(x, y);
-          d[0] = 0.0f;
-          d[1] = material->glow ? c[1] : 0.0f;
-          d[2] = material->highlight ? c[2] : 0.0f;
-          d[3] = 1.0f;
+          d[0] = ca[0];
+          d[1] = ca[1];
+          d[2] = cb[0];
+          d[3] = cb[1];
         }
       }
-      out.lookup = write(tag + "_mask.dds", image, DdsKind::Bc3);
-    } else {
-      out.lookup = solid(tag + "_mask.dds", 0.0f, 0.0f, 0.0f, 1.0f);
+      out.normals = write(tag + "_normals.dds", image, DdsKind::Bgra);
+    }
+    // The masks, with only what the material uses (Studio: no mask A, no glow, and a full highlight).
+    {
+      MeshTexture a;
+      MeshTexture b;
+      const bool haveA = material != nullptr && LoadMeshTexture(inFolder(material->files[7]), a);
+      const bool haveB = material != nullptr && LoadMeshTexture(inFolder(material->files[8]), b);
+      const bool glow = material != nullptr && material->glow && haveA;
+      const float highlight = material != nullptr && material->highlight ? 0.5f : 0.0f;
+      const int side = haveA || haveB ? square(a, b, haveA, haveB, 4, 1024) : 4;
+      TexImage image;
+      image.Reset(side, 4);
+      for (int y = 0; y < side; ++y) {
+        for (int x = 0; x < side; ++x) {
+          const float u = (static_cast<float>(x) + 0.5f) / static_cast<float>(side);
+          const float v = (static_cast<float>(y) + 0.5f) / static_cast<float>(side);
+          float ca[4] = {1.0f, 1.0f, 1.0f, 1.0f};
+          float cb[4] = {1.0f, 1.0f, 1.0f, 1.0f};
+          if (haveA) {
+            a.Sample(u, v, ca);
+          }
+          if (haveB) {
+            b.Sample(u, v, cb);
+          } else {
+            std::copy(std::begin(ca), std::end(ca), std::begin(cb));
+          }
+          float* const d = image.Pixel(x, y);
+          d[0] = glow ? ca[1] : 0.0f;
+          d[1] = ca[2] * highlight;
+          d[2] = glow ? cb[1] : 0.0f;
+          d[3] = cb[2] * highlight;
+        }
+      }
+      out.lookup = write(tag + "_mask.dds", image, DdsKind::Bgra);
+    }
+    // The light masks and the constants.
+    {
+      MeshTexture masks[3];
+      bool haveMask[3] = {};
+      int tile = 4;
+      for (int k = 0; k < 3 && material != nullptr; ++k) {
+        haveMask[k] = LoadMeshTexture(inFolder(material->files[2 + k]), masks[k]);
+        tile = std::max(tile, haveMask[k] ? std::max(masks[k].w, masks[k].h) : 0);
+      }
+      out.lightMasks = haveMask[0] || haveMask[1] || haveMask[2];
+      tile = std::clamp(tile, 4, 512);
+      const edmesh::Settings& settings = mMeshMap.settings;
+      const bool water = settings.water > -9000.0f;
+      const bool haze = !water && settings.haveVoid && settings.haze > -9000.0f;
+      // 16 bits over two channels: the level over -1024 .. 3072, the span over 0 .. 4096.
+      const auto split = [](const float value, const float lo, const float span, float& high, float& low) {
+        const int word = std::clamp(static_cast<int>(std::lround((value - lo) / span * 65535.0f)), 0, 65535);
+        high = static_cast<float>(word >> 8) / 255.0f;
+        low = static_cast<float>(word & 0xFF) / 255.0f;
+      };
+      float band[4][4] = {
+        {settings.voidColor[0], settings.voidColor[1], settings.voidColor[2], haze ? 1.0f : 0.0f},
+        {settings.shadowColor[0],
+         settings.shadowColor[1],
+         settings.shadowColor[2],
+         std::clamp(settings.shadowColor[3], 0.0f, 1.0f)},
+        {0, 0, 0, 0},
+        {material != nullptr && material->alphaTest >= 0.0f ? std::clamp(material->alphaTest, 0.0f, 255.0f) / 255.0f
+                                                            : 0.5f,
+         0,
+         0,
+         0},
+      };
+      split(settings.haze, -1024.0f, 4096.0f, band[2][0], band[2][1]);
+      split(std::max(settings.hazeSpan, 0.001f), 0.0f, 4096.0f, band[2][2], band[2][3]);
+      TexImage atlas;
+      atlas.Reset(tile * 2, 4);
+      for (int y = 0; y < tile * 2; ++y) {
+        for (int x = 0; x < tile * 2; ++x) {
+          float* const d = atlas.Pixel(x, y);
+          const int k = (y >= tile ? 2 : 0) + (x >= tile ? 1 : 0);
+          if (k == 3) {
+            const int b = std::clamp((y - tile) * 4 / tile, 0, 3);
+            std::copy(std::begin(band[b]), std::end(band[b]), d);
+            continue;
+          }
+          float c[4] = {0.5f, 0.5f, 0.5f, 0.5f}; // Studio's grey for a mask the material lacks
+          if (haveMask[k]) {
+            masks[k].Sample(
+              (static_cast<float>(x % tile) + 0.5f) / static_cast<float>(tile),
+              (static_cast<float>(y % tile) + 0.5f) / static_cast<float>(tile),
+              c
+            );
+          }
+          if (k == 1 && (material == nullptr || !material->blending || !haveMask[1])) {
+            c[3] = 0.0f; // the layers don't blend
+          }
+          std::copy(std::begin(c), std::end(c), d);
+        }
+      }
+      out.specular = write(tag + "_light.dds", atlas, DdsKind::Bgra);
     }
     return !out.specular.empty() && !out.lookup.empty() && !out.normals.empty();
   }
@@ -307,6 +365,7 @@ namespace faf::editor
   void EdMapScene::BuildMeshInstances()
   {
     mMeshInstancesTried = true;
+    mMeshBuiltForBoth = mMeshMode == 2;
     moho::RRuleGameRules* const rules = Rules();
     moho::MeshRenderer* const renderer = moho::MeshRenderer::GetInstance();
     if (rules == nullptr || renderer == nullptr || !mMeshMap.Loaded()) {
@@ -474,8 +533,9 @@ namespace faf::editor
       if (patch.sky) {
         shader = material != nullptr && material->additive ? "EditorMeshSkyAdd" : "EditorMeshSky";
       } else {
-        shader =
-          std::string(view.lightMasks ? "EditorMeshTerrain" : "EditorMeshTerrainSun") + (view.alphaTest ? "Alpha" : "");
+        // Both: the variants pulled towards the camera, so the height field shows only where it lies above the mesh.
+        shader = std::string(view.lightMasks ? "EditorMeshTerrain" : "EditorMeshTerrainSun") +
+          (view.alphaTest ? "Alpha" : "") + (mMeshMode == 2 ? "Both" : "");
       }
       if (
         add(
@@ -509,6 +569,11 @@ namespace faf::editor
   {
     // Each frame: the patches' models made once the rules are up, shown or hidden by the mode; the height field off
     // in Mesh only (back on whenever the mesh isn't shown alone).
+    if (
+      mMeshMap.Loaded() && mMeshInstancesTried && !mMeshPatchInstances.empty() && (mMeshMode == 2) != mMeshBuiltForBoth
+    ) {
+      DeleteMeshInstances(); // into or out of Both: the patches again with or without the pull towards the camera
+    }
     if (mMeshMap.Loaded() && !mMeshInstancesTried) {
       BuildMeshInstances();
     }

@@ -69,6 +69,17 @@ namespace faf::editor
     std::string& error,
     bool eightBit = false
   );
+  /**
+   * Writes floats as they are (FAF Studio's 32-bit float export): `.r32` as raw little-endian floats, `.tif` / `.tiff`
+   * as a 32-bit float grey TIFF. `values` row by row, `width` x `height`.
+   */
+  bool WriteFloatImage(
+    const std::filesystem::path& file,
+    int width,
+    int height,
+    const std::vector<float>& values,
+    std::string& error
+  );
 
   /** How ResampleHeights reads between samples (FAF Studio's img_resample filters). */
   enum class ResampleFilter

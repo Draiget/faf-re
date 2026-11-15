@@ -424,6 +424,80 @@ namespace faf::editor
     return picked;
   }
 
+  std::string EdTools::PackageHeightExtension(
+    const ExportPackage& p
+  )
+  {
+    if (p.format == 2) {
+      return p.float32 ? "r32" : "r16";
+    }
+    return p.format == 1 || p.float32 ? "tif" : "png";
+  }
+
+  std::string EdTools::PackageStem() const
+  {
+    if (mPackage.name[0] != '\0') {
+      return mPackage.name;
+    }
+    const std::size_t slash = mMapFolder.find_last_of("/\\");
+    const std::string folder = slash == std::string::npos ? mMapFolder : mMapFolder.substr(slash + 1);
+    return folder.empty() ? std::string("terrain") : folder;
+  }
+
+  std::vector<EdTools::PackageFile> EdTools::PackagePlan(
+    const ExportPackage& p,
+    const std::string& stem
+  )
+  {
+    std::vector<PackageFile> list;
+    const auto add = [&](const char* id, const std::string& suffix, const std::string& ext, const char* what) {
+      list.push_back({id, stem + suffix + "." + ext, what});
+    };
+    const std::string mext = p.format == 1 ? "tif" : "png";
+    if (p.height) {
+      add(
+        "height",
+        "_height",
+        PackageHeightExtension(p),
+        p.normalised ? "heightmap, 0..1 between the lowest and highest point" : "heightmap, absolute"
+      );
+    }
+    if (p.height || p.readme) {
+      add("json", "_height", "json", "range, size and scale of the heightmap");
+    }
+    if (p.water) {
+      add("water", "_water", mext, "water mask (1 under the water surface)");
+    }
+    if (p.slope) {
+      add("slope", "_slope", mext, "slope, 0..90 degrees as 0..1");
+    }
+    if (p.flow) {
+      add("flow", "_flow", mext, "drainage (where rivers run)");
+    }
+    if (p.wear) {
+      add("wear", "_wear", mext, "wear (convex ridges)");
+      add("deposit", "_deposit", mext, "deposit (concave basins)");
+    }
+    if (p.layers) {
+      add("layers", "_layerN", mext, "the painted texture layers, one image each");
+    }
+    if (p.types) {
+      add("types", "_terraintypes", "png", "terrain type codes (8-bit)");
+    }
+    if (p.markers) {
+      add("csv", "_markers", "csv", "all markers: name, type, x, y, z");
+      add("starts", "_starts", mext, "start positions as discs");
+      add("resources", "_resources", mext, "mass and hydrocarbon deposits as discs");
+    }
+    if (p.playable) {
+      add("playable", "_playable", mext, "the playable area");
+    }
+    if (p.readme) {
+      add("readme", "_README_scale", "txt", "the scale sheet for Gaea / World Machine");
+    }
+    return list;
+  }
+
   void EdTools::DrawSymmetryPicture(
     ImDrawList* const draw,
     const int mode,
@@ -2006,6 +2080,9 @@ namespace faf::editor
       ExportPackage& p = mPackage;
       ImGui::SetNextItemWidth(-1.0f);
       ImGui::InputTextWithHint("##pkgfolder", "folder for the package", p.folder, sizeof(p.folder));
+      ImGui::SetNextItemWidth(-1.0f);
+      ImGui::InputTextWithHint("##pkgname", "file name (empty = the map name)", p.name, sizeof(p.name));
+      EdSetItemTooltip("Every file starts with it: <name>_height.png, <name>_water.png, ...");
       ImGui::Checkbox("Heights##pkg", &p.height);
       ImGui::SameLine();
       ImGui::Checkbox("Water##pkg", &p.water);
@@ -2032,9 +2109,23 @@ namespace faf::editor
           ImGui::DragFloatRange2("##pkgrange", &p.low, &p.high, 0.5f, 0.0f, 512.0f, "%.0f", "%.0f");
         }
       }
-      ImGui::Checkbox("32-bit float heights (.r32)", &p.float32);
+      ImGui::TextUnformatted("Format");
+      ImGui::SameLine();
+      ImGui::RadioButton("PNG##pkgfmt", &p.format, 0);
+      ImGui::SameLine();
+      ImGui::RadioButton("TIFF##pkgfmt", &p.format, 1);
+      ImGui::SameLine();
+      ImGui::RadioButton("Raw##pkgfmt", &p.format, 2);
+      ImGui::Checkbox("32-bit float heights", &p.float32);
+      EdSetItemTooltip("A 32-bit float TIFF (or .r32 when raw) instead of 16-bit words");
       ImGui::SameLine();
       ImGui::Checkbox("8-bit masks", &p.mask8);
+      ImGui::SetNextItemWidth(-1.0f);
+      FillSliderFloat("##pkgwatersoft", &p.waterSoft, 0.0f, 20.0f, "Water mask soft edge (units) %.1f");
+      EdSetItemTooltip("The water mask goes from 0 to 1 over this height around the water level (0: a hard edge)");
+      ImGui::SetNextItemWidth(-1.0f);
+      FillSliderFloat("##pkgmarkerradius", &p.markerRadius, 0.0f, 20.0f, "Marker disc radius (samples) %.0f");
+      EdSetItemTooltip("The discs of the start positions and the resources");
       ImGui::BeginDisabled(p.folder[0] == '\0');
       if (PrimaryButton("Export the package")) {
         mPackageAsk = true;
@@ -2048,6 +2139,11 @@ namespace faf::editor
         ImGui::SameLine();
         ImGui::SetNextItemWidth(Em(100.0f));
         FillSliderFloat("##pkginterval", &p.interval, 0.5f, 30.0f, "every %.1f s");
+      }
+      ImGui::TextDisabled("Files that will be written:");
+      for (const PackageFile& file : PackagePlan(p, PackageStem())) {
+        ImGui::BulletText("%s", file.file.c_str());
+        EdSetItemTooltip("%s", file.what.c_str());
       }
     }
     if (!mInteropStatus.empty()) {

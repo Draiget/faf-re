@@ -776,7 +776,11 @@ namespace faf::editor
       }
       const float ds = S.s[j] - S.s[k];
       const float g = ds > 0.01f ? std::abs(rep.ys[j] - rep.ys[k]) / ds : 0.0f;
-      rep.max = std::max(rep.max, g);
+      if (g > rep.max) {
+        rep.max = g;
+        rep.worstX = S.x[k];
+        rep.worstZ = S.z[k];
+      }
       total += ds;
       if (g > limit + 0.0001f) {
         bad += ds;
