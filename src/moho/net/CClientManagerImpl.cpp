@@ -1702,7 +1702,10 @@ void CClientManagerImpl::RefreshNetworkWaitDiagnostics()
     return;
   }
   NetworkWaitState& state = found->second;
-  const bool active = state.demanded && mWeAreReady && mEveryoneIsReady && mDispatchedBeat > 0 &&
+  // The first 100 beats (10 s at speed +0) are the load-in, when every client is
+  // still catching up; nobody is blamed for them.
+  constexpr int kStartupBeats = 100;
+  const bool active = state.demanded && mWeAreReady && mEveryoneIsReady && mDispatchedBeat > kStartupBeats &&
     mClients.size() <= NetworkWaitTracker::kMaxPeers;
 
   std::uint64_t missing = 0;
@@ -1711,14 +1714,21 @@ void CClientManagerImpl::RefreshNetworkWaitDiagnostics()
     active && state.waiting && state.targetBeat > mAvailableBeat && state.targetBeat > mDispatchedBeat &&
     mLocalClient != nullptr && mLocalClient->mQueuedBeat >= static_cast<uint32_t>(state.targetBeat)
   ) {
+    std::uint64_t peers = 0;
     for (std::size_t i = 0; i < mClients.size(); ++i) {
       const CClientBase* const peer = mClients[i];
-      if (
-        peer != nullptr && peer != mLocalClient && !peer->mEjected && !peer->mEjectPending &&
-        (peer->mQueuedBeat < static_cast<uint32_t>(state.targetBeat) || !peer->IsReadyForBeat(state.targetBeat))
-      ) {
+      if (peer == nullptr || peer == mLocalClient || peer->mEjected || peer->mEjectPending) {
+        continue;
+      }
+      peers |= std::uint64_t{1} << i;
+      if (peer->mQueuedBeat < static_cast<uint32_t>(state.targetBeat) || !peer->IsReadyForBeat(state.targetBeat)) {
         missing |= std::uint64_t{1} << i;
       }
+    }
+    // With two or more peers, waiting on all of them at once is this client's own
+    // hold-up (its connection, a hitch, a pause on its side), not any one peer's.
+    if (missing == peers && (peers & (peers - 1)) != 0) {
+      missing = 0;
     }
   }
   state.tracker.Observe(NetworkWaitClockSeconds(), active, missing);

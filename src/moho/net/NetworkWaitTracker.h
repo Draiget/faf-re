@@ -18,8 +18,10 @@ namespace moho
     double longestMs = 0;       // longest unbroken wait on this peer in the window
     double gameSeconds = 0;     // active time over the whole session
     double gameWaitPercent = 0; // share of gameSeconds spent waiting on this peer
-    std::uint64_t gameWaitEpisodes = 0;
-    double gameAverageWaitMs = 0;
+    // A stall: the session had run out of beats (the net_Lag lead was used up) and this
+    // peer had not sent the next one. Its length is the time the game stood still.
+    std::uint64_t gameWaitEpisodes = 0; // stalls on this peer over the session
+    double gameAverageWaitMs = 0;       // their average length
   };
 
   /**
@@ -40,7 +42,7 @@ namespace moho
     void Observe(
       const double now,
       const bool active,
-      const std::uint64_t peers
+      const std::uint64_t waitingOn
     )
     {
       if (!mSpans.empty() && now < mSpans.back().end) {
@@ -48,32 +50,32 @@ namespace moho
         *this = NetworkWaitTracker{};
       }
 
-      if (mHaveSample && mLastActive) {
-        const double seconds = (std::max)(0.0, (std::min)(now - mLastTime, kMaxSampleGapSeconds));
-        mGameSeconds += seconds;
+      const double elapsed = mHaveSample ? (std::max)(0.0, (std::min)(now - mLastTime, kMaxSampleGapSeconds)) : 0.0;
+      if (mLastActive) {
+        mGameSeconds += elapsed;
         for (unsigned i = 0; i < kMaxPeers; ++i) {
           if (mLastPeers & (std::uint64_t{1} << i)) {
-            mPeerGameSeconds[i] += seconds;
+            mPeerGameSeconds[i] += elapsed;
+            mStallSeconds[i] += elapsed;
           }
         }
       }
+
+      const std::uint64_t peers = active ? waitingOn : 0;
+      // A peer's stall ends when it is no longer waited on; a stall shared with other
+      // peers is one stall for each of them, however the others come and go.
+      for (unsigned i = 0; i < kMaxPeers; ++i) {
+        if (!(peers & (std::uint64_t{1} << i)) && mStallSeconds[i] > 0) {
+          ++mEpisodeCounts[i];
+          mEpisodeSeconds[i] += mStallSeconds[i];
+          mStallSeconds[i] = 0;
+        }
+      }
+
       mHaveSample = true;
       mLastTime = now;
       mLastActive = active;
-      mLastPeers = active ? peers : 0;
-
-      // An episode counts once it has accumulated waiting time. Another peer
-      // joining or leaving a shared stall does not split this peer's episode.
-      if (!mSpans.empty() && mSpans.back().active && now > mSpans.back().end) {
-        const std::uint64_t newlyCounted = mSpans.back().peers & ~mCountedEpisodes;
-        for (unsigned i = 0; i < kMaxPeers; ++i) {
-          if (newlyCounted & (std::uint64_t{1} << i)) {
-            ++mEpisodeCounts[i];
-          }
-        }
-        mCountedEpisodes |= mSpans.back().peers;
-      }
-      mCountedEpisodes &= active ? peers : 0;
+      mLastPeers = peers;
 
       if (!mSpans.empty()) {
         mSpans.back().end = now;
@@ -115,7 +117,7 @@ namespace moho
           result.gameWaitPercent = mPeerGameSeconds[peer] * 100.0 / mGameSeconds;
         }
         if (mEpisodeCounts[peer] > 0) {
-          result.gameAverageWaitMs = mPeerGameSeconds[peer] * 1000.0 / static_cast<double>(mEpisodeCounts[peer]);
+          result.gameAverageWaitMs = mEpisodeSeconds[peer] * 1000.0 / static_cast<double>(mEpisodeCounts[peer]);
         }
       }
       return result;
@@ -132,7 +134,8 @@ namespace moho
 
     std::deque<Span> mSpans;
     std::uint64_t mEpisodeCounts[kMaxPeers]{};
-    std::uint64_t mCountedEpisodes = 0;
+    double mEpisodeSeconds[kMaxPeers]{}; // total length of the counted stalls
+    double mStallSeconds[kMaxPeers]{};   // length of the stall in progress
 
     double mGameSeconds = 0;
     double mPeerGameSeconds[kMaxPeers]{};
