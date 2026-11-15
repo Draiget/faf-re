@@ -3,6 +3,7 @@
 
 #include "moho/misc/StartupHelpers.h"
 #include "moho/misc/XFileError.h"
+#include "platform/PlatformDefines.h"
 
 #include <gtest/gtest.h>
 
@@ -218,6 +219,29 @@ TEST(
   EXPECT_EQ(Str(moho::FILE_DirPrefix("v1.2/plain")), "v1.2/plain");
   EXPECT_EQ(Str(moho::FILE_DirPrefix("init.lua")), "");
   EXPECT_THROW((void)moho::FILE_DirPrefix(""), moho::XFileError);
+}
+
+// The folder of a file named by its system path (0x00410C60), as InternalSaveGame makes its save's folder: a drive or
+// UNC path keeps its own, and a path of the game's own ('/' and no drive) is refused (0x00410D10). Engine addition: on
+// POSIX a system path starts with '/' and has no drive, as the Linux client's save path does (the documents folder,
+// then the folders USER_GetAppDocDir joins with backslashes).
+TEST(
+  StartupPath,
+  DirOfASystemPath
+)
+{
+#if FAFRE_PLATFORM_WINDOWS
+  EXPECT_EQ(Str(moho::FILE_Dir("C:\\games\\fa\\savegames\\a.SCFAsave")), "C:/games/fa/savegames");
+  EXPECT_EQ(Str(moho::FILE_Dir("//server/share/a.SCFAsave")), "//server/share");
+  EXPECT_THROW((void)moho::FILE_Dir("/maps/x/x_scenario.lua"), moho::XFileError);
+#else
+  EXPECT_EQ(Str(moho::FILE_Dir("/home/player/a.SCFAsave")), "/home/player");
+  EXPECT_EQ(
+    Str(moho::FILE_Dir("/home/player/Documents\\My Games\\Gas Powered Games\\savegames\\Player\\a.SCFAsave")),
+    "/home/player/Documents/My Games/Gas Powered Games/savegames/Player"
+  );
+#endif
+  EXPECT_THROW((void)moho::FILE_Dir(""), moho::XFileError);
 }
 
 // The errno texts (0x00411A20, byte table at 0x00411AC4).

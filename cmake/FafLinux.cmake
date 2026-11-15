@@ -552,6 +552,14 @@ target_link_libraries(faf_lua_tests PRIVATE faf_sim gtest_main)
 target_link_options(faf_lua_tests PRIVATE -Wl,--error-limit=0)
 add_test(NAME lua COMMAND faf_lua_tests)
 
+# The startup helpers' path tests (tests/startup), as Windows runs them: faf_sim compiles
+# moho/misc/StartupHelpers.cpp. StartupArgsTests.cpp swaps the MSVC CRT's __argc and __argv, which
+# only Windows' <cstdlib> declares.
+add_executable(faf_startup_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/startup/StartupPathTests.cpp")
+target_link_libraries(faf_startup_tests PRIVATE faf_sim gtest_main)
+target_link_options(faf_startup_tests PRIVATE -Wl,--error-limit=0)
+add_test(NAME startup COMMAND faf_startup_tests)
+
 # --- faf_tests --------------------------------------------------------------------------
 # Every GoogleTest executable of the Linux build (cmake/FafTests.cmake).
 include(FafTests)
