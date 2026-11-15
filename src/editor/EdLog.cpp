@@ -96,6 +96,12 @@ namespace faf::editor
       mMissionLive = message.c_str() + sizeof(kLive) - 1;
       return;
     }
+    // The Unit lab's Test in game: the unit under test, once a second.
+    static constexpr char kUnitTest[] = "EDUNITTEST live ";
+    if (std::strncmp(message.c_str(), kUnitTest, sizeof(kUnitTest) - 1) == 0) {
+      mUnitTestLive = message.c_str() + sizeof(kUnitTest) - 1;
+      return;
+    }
     mLines.push_back(Line{level, std::string(message.c_str()), seconds});
     if (mTimesFile != nullptr) {
       std::fprintf(mTimesFile, "%9.3f %s\n", seconds, message.c_str());
@@ -269,6 +275,19 @@ namespace faf::editor
     default:
       return mShowInfo;
     }
+  }
+
+  bool EdLog::TakeUnitTestLive(
+    std::string& out
+  )
+  {
+    const std::lock_guard<std::mutex> lock(mMutex);
+    if (mUnitTestLive.empty()) {
+      return false;
+    }
+    out.swap(mUnitTestLive);
+    mUnitTestLive.clear();
+    return true;
   }
 
   bool EdLog::TakeMissionLive(

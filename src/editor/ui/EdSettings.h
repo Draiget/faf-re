@@ -73,6 +73,8 @@ namespace faf::editor
     static constexpr const char* kGfxShadowDistance = "GfxShadowDistance";
     static constexpr const char* kGfxModelDetail = "GfxModelDetail";
     static constexpr const char* kGfxVsync = "GfxVsync";
+    /** Studio's shadow quality (`shadow_Fidelity` Off / Low / Medium / High). */
+    static constexpr const char* kGfxShadowQuality = "GfxShadowQuality";
     /** Studio's quality presets: "low", "medium", "high", "ultra" set the graphics settings together. */
     bool ApplyGraphicsPreset(const std::string& preset);
     /** The preset the graphics settings match now, or "custom". */

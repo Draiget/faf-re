@@ -969,7 +969,7 @@ namespace faf::editor
     )
     {
       const std::filesystem::path map = document.MapDiskFile();
-      return map.empty() ? std::filesystem::path{} : map.parent_path() / (map.stem().string() + "_mods.editor");
+      return map.empty() ? std::filesystem::path{} : map.parent_path() / (map.stem().string() + "_moddata.editor");
     }
 
     /** Tabs and line ends kept out of a stored field (they separate the fields and the lines). */

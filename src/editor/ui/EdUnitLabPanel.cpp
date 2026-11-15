@@ -309,12 +309,36 @@ namespace faf::editor
     if (ImGui::Button(ICON_PLAY " Test")) {
       mTestAsked = true;
     }
+    ImGui::SameLine();
+    ImGui::BeginDisabled(mUnit.empty());
+    if (ImGui::Button("Test in game")) {
+      mTestInGameAsked = true;
+    }
+    ImGui::EndDisabled();
     ImGui::EndDisabled();
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
       EdSetTooltip(
-        canPlay ? "Writes the project and plays the open map with its mod on"
+        canPlay ? "Plays the open map with the project's mod on; Test in game also puts the selected unit and dummy "
+                  "targets near the first start, with quick orders here"
                 : "Open a map to play it with the project's mod on"
       );
+    }
+    // The test running: the sim's state and the quick orders.
+    if (!testUnit.empty()) {
+      ImGui::SeparatorText(("Testing " + testUnit).c_str());
+      ImGui::TextWrapped("%s", testStatus.empty() ? "Waiting for the play..." : testStatus.c_str());
+      for (const char* order : {"Attack", "Move", "Patrol", "Stop", "Heal", "Kill", "Respawn", "End test"}) {
+        if (ImGui::SmallButton(order)) {
+          std::string key = order;
+          key = key == "End test" ? "end" : key;
+          for (char& c : key) {
+            c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+          }
+          mTestOrder = key;
+        }
+        ImGui::SameLine();
+      }
+      ImGui::NewLine();
     }
     if (mUnit.empty()) {
       ImGui::End();

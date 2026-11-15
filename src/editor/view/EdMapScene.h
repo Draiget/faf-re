@@ -52,6 +52,7 @@ namespace moho
   class CWldMap;
   class MeshInstance;
   class SimpleRenderWorldView;
+  struct RUnitBlueprint;
 } // namespace moho
 
 namespace faf::editor
@@ -855,6 +856,21 @@ namespace faf::editor
     std::string mPreviewLight = "Map";
     bool mPreviewHasMapLight = false; // mPreviewMapLight holds the map's own light (before the first preset)
     LightingState mPreviewMapLight;
+    /** A shot the unit in the view fired: its projectile's model flying (straight or on its weapon's arc). */
+    struct PreviewShot
+    {
+      moho::MeshInstance* mesh = nullptr;
+      float pos[3] = {0.0f, 0.0f, 0.0f};
+      float vel[3] = {0.0f, 0.0f, 0.0f};
+      float gravity = 0.0f;
+      float travelled = 0.0f;
+      float range = 0.0f;
+      float startX = 0.0f, startZ = 0.0f;
+    };
+    std::vector<PreviewShot> mPreviewShots;
+    void FirePreview(const moho::RUnitBlueprint& unit, UnitPreviewState& s);
+    void TickPreviewShots(float frameSeconds, UnitPreviewState* s);
+    void DropPreviewShots();
     void SetPreviewStage(bool on);
     void SetPreviewLight(const std::string& name);
     std::string mPreviewAnimPath;

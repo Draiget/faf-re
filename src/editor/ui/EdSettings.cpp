@@ -31,7 +31,7 @@ namespace faf::editor
         {EdSettings::kPopouts, "1", {}},
         {EdSettings::kIdleFps, "30", {"0", "10", "30", "60"}},
         {EdSettings::kGfxShadows, "auto", {"auto", "on", "off"}},
-        {EdSettings::kGfxShadowSize, "auto", {"auto", "1024", "2048", "4096"}},
+        {EdSettings::kGfxShadowSize, "auto", {"auto", "512", "1024", "1536", "2048", "4096"}},
         {EdSettings::kGfxBloom, "auto", {"auto", "on", "off"}},
         {EdSettings::kGfxFxaa, "auto", {"auto", "on", "off"}},
         {EdSettings::kGfxAo, "auto", {"auto", "on", "off"}},
@@ -41,6 +41,7 @@ namespace faf::editor
         {EdSettings::kGfxShadowDistance, "auto", {"auto", "short", "normal", "long", "longest"}},
         {EdSettings::kGfxModelDetail, "auto", {"auto", "low", "medium", "high"}},
         {EdSettings::kGfxVsync, "auto", {"auto", "on", "off"}},
+        {EdSettings::kGfxShadowQuality, "auto", {"auto", "off", "low", "medium", "high"}},
         {EdSettings::kGpuCompute, "1", {}},
         {EdSettings::kGpuMinCells, "65536", {"16384", "65536", "262144", "1048576"}},
       };
@@ -232,6 +233,15 @@ namespace faf::editor
       out.push_back(std::string("SC_CameraScaleLOD ") + m);
     }
     onOff(kGfxVsync, "SC_VerticalSync", "1", "0");
+    if (const std::string q = Get(kGfxShadowQuality); q == "off" || q == "low" || q == "medium" || q == "high") {
+      out.push_back(
+        std::string("shadow_Fidelity ") +
+        (q == "off"        ? "0"
+           : q == "low"    ? "1"
+           : q == "medium" ? "2"
+                           : "3")
+      );
+    }
     return out;
   }
 
@@ -244,16 +254,18 @@ namespace faf::editor
       const char* name;
       const char* fidelity;
       const char* shadows;
+      const char* shadowQuality;
       const char* shadowSize;
       const char* shadowDistance;
       const char* texture;
       const char* model;
     };
     constexpr GraphicsPresetRow kGraphicsPresets[] = {
-      {"low", "low", "off", "1024", "short", "low", "low"},
-      {"medium", "medium", "on", "1024", "normal", "medium", "medium"},
-      {"high", "high", "on", "2048", "long", "high", "high"},
-      {"ultra", "high", "on", "4096", "longest", "high", "high"},
+      // Studio's numbers: shadow quality 0..3 and the shadow map 512, 1024, 1536, 2048.
+      {"low", "low", "off", "off", "512", "short", "low", "low"},
+      {"medium", "medium", "on", "low", "1024", "normal", "medium", "medium"},
+      {"high", "high", "on", "medium", "1536", "long", "high", "high"},
+      {"ultra", "high", "on", "high", "2048", "longest", "high", "high"},
     };
   } // namespace
 
@@ -265,6 +277,7 @@ namespace faf::editor
       if (preset == p.name) {
         (void)Set(kGfxFidelity, p.fidelity);
         (void)Set(kGfxShadows, p.shadows);
+        (void)Set(kGfxShadowQuality, p.shadowQuality);
         (void)Set(kGfxShadowSize, p.shadowSize);
         (void)Set(kGfxShadowDistance, p.shadowDistance);
         (void)Set(kGfxTextureDetail, p.texture);
@@ -279,9 +292,9 @@ namespace faf::editor
   {
     for (const GraphicsPresetRow& p : kGraphicsPresets) {
       if (
-        Get(kGfxFidelity) == p.fidelity && Get(kGfxShadows) == p.shadows && Get(kGfxShadowSize) == p.shadowSize &&
-        Get(kGfxShadowDistance) == p.shadowDistance && Get(kGfxTextureDetail) == p.texture &&
-        Get(kGfxModelDetail) == p.model
+        Get(kGfxFidelity) == p.fidelity && Get(kGfxShadows) == p.shadows && Get(kGfxShadowQuality) == p.shadowQuality &&
+        Get(kGfxShadowSize) == p.shadowSize && Get(kGfxShadowDistance) == p.shadowDistance &&
+        Get(kGfxTextureDetail) == p.texture && Get(kGfxModelDetail) == p.model
       ) {
         return p.name;
       }

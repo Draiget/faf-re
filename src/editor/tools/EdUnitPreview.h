@@ -38,6 +38,21 @@ namespace faf::editor
     /** Studio's light presets for the map (one undo step each): Map (the map's own, back), Noon, Evening, Overcast,
      * Night, Icon. */
     std::string light = "Map";
+    /** Fire (Studio's Effects panel fires a projectile from the viewer's unit): the weapon whose projectile flies from
+     * the unit; `fire` asks for one shot (the view clears it). */
+    int fireWeapon = 0;
+    bool fire = false;
+    std::string fireStatus;
+    /** Studio's camera presets for the unit: iso, front, side, back, top, fit (asked; the view clears it). */
+    std::string frame;
+    /** Bone picking: the bones of the shown mesh (filled by the view) and the picked one (-1 none), whose axes are
+     * drawn. */
+    std::vector<std::string> boneNames;
+    int bone = -1;
+    /** A floor grid around the unit on the empty stage. */
+    bool grid = true;
+    /** Studio's named team colours: Army (the army colour slider), Red, Blue, Green, Yellow, White, Black. */
+    std::string colour = "Army";
     /** Filled by the view: the animations the blueprint names, the animation's length, what happened. */
     std::vector<std::string> animations;
     float duration = 0.0f;

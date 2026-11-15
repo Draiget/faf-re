@@ -153,7 +153,7 @@ namespace faf::editor
     std::function<std::string(const std::string& type, const std::string& army, float x, float z, std::string& name)>
       addUnit;
     /**
-     * A mod's own data kept with the open map (FAF Studio's sidecar): `<map>_mods.editor` beside the map's file, a
+     * A mod's own data kept with the open map (FAF Studio's sidecar): `<map>_moddata.editor` beside the map's file, a
      * `uid<TAB>key<TAB>value` line each; written at once (not part of the map's undo). Empty: none.
      */
     [[nodiscard]] std::string MapData(const std::string& uid, const std::string& key) const;

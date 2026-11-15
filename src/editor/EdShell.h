@@ -413,6 +413,8 @@ namespace faf::editor
      * the first time). The panels shown in the one left are kept for it.
      */
     void SwitchWorkspace(int workspace);
+    /** After a named layout is read: the active workspace shows the panels the layout lists for it. */
+    void ApplyShownPanels();
     /**
      * The start screen (design §8 Files) over the panels: `page` 0 Home, 1 On this computer, 2 FAF vault. File > Open
      * and every "Open a map..." show its pages; a map opening, a workspace tab or Continue put it away.

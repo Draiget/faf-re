@@ -4,6 +4,7 @@
 #define IMGUI_ENABLE_TEST_ENGINE
 #endif
 #include "editor/ui/EdUiQa.h"
+#include "editor/ui/EdUiScale.h"
 
 #include "faf_imgui_hooks.h"
 #include "gpg/core/utils/Logging.h"
@@ -202,7 +203,7 @@ namespace faf::editor
     mSkipped = 0;
     mReport.clear();
     mProblems.clear();
-    mScales = {1.0f, 1.25f, 1.5f, 2.0f};
+    mScales = {1.0f, 1.25f, 1.5f, kMaxUiScale};
     mScaleAt = 0;
     mScaleBefore = getScale ? getScale() : 1.0f;
     mSettle = 0;

@@ -17,6 +17,7 @@
 #include "moho/render/camera/VTransform.h"
 #include "moho/resource/RScmResource.h"
 #include "moho/resource/blueprints/RMeshBlueprint.h"
+#include "moho/resource/blueprints/RProjectileBlueprint.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/sim/CWldMap.h"
 #include "moho/sim/RRuleGameRules.h"
@@ -24,7 +25,9 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
 #include <cstring>
+#include <utility>
 
 namespace faf::editor
 {
@@ -48,6 +51,27 @@ namespace faf::editor
         0xFFFFD100u,
       };
       return kColours[std::clamp(army, 0, 7)];
+    }
+
+    /** The preview's colour: one of Studio's named team colours (0xAARRGGBB as ArmyColour), or the army's. */
+    std::uint32_t PreviewColour(
+      const UnitPreviewState& s
+    )
+    {
+      static const std::pair<const char*, std::uint32_t> kNamed[] = {
+        {"Red", 0xFFC82828u},
+        {"Blue", 0xFF325ADCu},
+        {"Green", 0xFF32B43Cu},
+        {"Yellow", 0xFFE6D232u},
+        {"White", 0xFFEBEBF0u},
+        {"Black", 0xFF19191Eu},
+      };
+      for (const auto& [name, colour] : kNamed) {
+        if (s.colour == name) {
+          return colour;
+        }
+      }
+      return ArmyColour(s.army);
     }
 
     moho::CD3DPrimBatcher::Vertex V(
@@ -164,8 +188,147 @@ namespace faf::editor
     gpg::Logf("editor: unit view: light %s (one undo step)", name.c_str());
   }
 
+  void EdMapScene::FirePreview(
+    const moho::RUnitBlueprint& unit,
+    UnitPreviewState& s
+  )
+  {
+    moho::RRuleGameRules* const rules = Rules();
+    moho::MeshRenderer* const renderer = moho::MeshRenderer::GetInstance();
+    const auto& weapons = unit.Weapons.WeaponBlueprints;
+    if (
+      rules == nullptr || renderer == nullptr || s.fireWeapon < 0 ||
+      static_cast<std::size_t>(s.fireWeapon) >= weapons.size()
+    ) {
+      s.fireStatus = "No such weapon.";
+      return;
+    }
+    const moho::RUnitBlueprintWeapon& weapon = weapons[static_cast<std::size_t>(s.fireWeapon)];
+    const moho::RProjectileBlueprint* const projectile = rules->GetProjectileBlueprint(weapon.ProjectileId);
+    const moho::RMeshBlueprint* const mesh =
+      projectile != nullptr ? rules->GetMeshBlueprint(projectile->Display.MeshBlueprint) : nullptr;
+    if (mesh == nullptr) {
+      s.fireStatus = std::string(weapon.Label.c_str()) +
+        ": its projectile has no model of its own (its effects draw it), or the weapon fires none.";
+      return;
+    }
+    const float scale = projectile->Display.UniformScale > 0.0f ? projectile->Display.UniformScale : 1.0f;
+    PreviewShot shot;
+    shot.mesh = renderer->CreateMeshInstance(
+      0,
+      static_cast<std::int32_t>(PreviewColour(s)),
+      mesh,
+      Wm3::Vec3f{scale, scale, scale},
+      false,
+      std::shared_ptr<moho::MeshMaterial>()
+    );
+    if (shot.mesh == nullptr) {
+      s.fireStatus = "The mesh renderer made no instance of the projectile.";
+      return;
+    }
+    // From the unit's middle, along its front (+Z: the preview stands unturned), at the muzzle velocity. A ballistic
+    // weapon (low or high arc) is launched at the angle that lands at its range under the sim's gravity (4.9).
+    const float speed = weapon.MuzzleVelocity > 0.0f ? weapon.MuzzleVelocity : 25.0f;
+    const float range = weapon.MaxRadius > 0.0f ? weapon.MaxRadius : 30.0f;
+    float angle = 0.0f;
+    if (weapon.BallisticArc != moho::RULEUBA_None) {
+      shot.gravity = 4.9f;
+      const float k = std::clamp(shot.gravity * range / (speed * speed), 0.0f, 1.0f);
+      const float low = 0.5f * std::asin(k);
+      angle = weapon.BallisticArc == moho::RULEUBA_HighArc ? 1.5707963f - low : low;
+    }
+    shot.pos[0] = mPreviewPos[0];
+    shot.pos[1] = mPreviewPos[1] + std::max(0.5f, unit.mSizeY * 0.6f);
+    shot.pos[2] = mPreviewPos[2];
+    shot.startX = shot.pos[0];
+    shot.startZ = shot.pos[2];
+    shot.vel[0] = 0.0f;
+    shot.vel[1] = speed * std::sin(angle);
+    shot.vel[2] = speed * std::cos(angle);
+    shot.range = range;
+    mPreviewShots.push_back(shot);
+    char text[200];
+    (void)std::snprintf(
+      text,
+      sizeof(text),
+      "%s fires %s at %.0f%s, range %.0f",
+      weapon.Label.c_str(),
+      weapon.ProjectileId.name.c_str(),
+      static_cast<double>(speed),
+      shot.gravity > 0.0f
+        ? (", " + std::to_string(static_cast<int>(std::lround(angle * 57.29578f))) + " degrees up").c_str()
+        : "",
+      static_cast<double>(range)
+    );
+    s.fireStatus = text;
+    gpg::Logf("editor: unit view: %s", text);
+  }
+
+  void EdMapScene::TickPreviewShots(
+    const float frameSeconds,
+    UnitPreviewState* s
+  )
+  {
+    for (auto it = mPreviewShots.begin(); it != mPreviewShots.end();) {
+      PreviewShot& shot = *it;
+      const float dt = std::min(frameSeconds, 0.1f);
+      const float before[2] = {shot.pos[0], shot.pos[2]};
+      shot.vel[1] -= shot.gravity * dt;
+      for (int i = 0; i < 3; ++i) {
+        shot.pos[i] += shot.vel[i] * dt;
+      }
+      shot.travelled += std::hypot(shot.pos[0] - before[0], shot.pos[2] - before[1]);
+      // Pointing along its flight: yaw from the ground direction, then the pitch of the climb or fall.
+      const float flat = std::hypot(shot.vel[0], shot.vel[2]);
+      const float yaw = std::atan2(shot.vel[0], shot.vel[2]);
+      const float pitch = std::atan2(shot.vel[1], std::max(flat, 1.0e-4f));
+      const Wm3::Quatf q = Wm3::Quatf(std::cos(yaw * 0.5f), 0.0f, std::sin(yaw * 0.5f), 0.0f) *
+        Wm3::Quatf(std::cos(-pitch * 0.5f), std::sin(-pitch * 0.5f), 0.0f, 0.0f);
+      moho::VTransform where{};
+      where.pos_ = Wm3::Vec3f{shot.pos[0], shot.pos[1], shot.pos[2]};
+      where.orient_ = q;
+      if (shot.mesh != nullptr) {
+        shot.mesh->SetStance(where, where);
+      }
+      const float ground = GroundHeightAt(shot.pos[0], shot.pos[2]);
+      const bool landed = shot.gravity > 0.0f && shot.vel[1] < 0.0f && shot.pos[1] <= ground;
+      if (landed || shot.travelled > shot.range * 1.2f + 5.0f) {
+        const float distance = std::hypot(shot.pos[0] - shot.startX, shot.pos[2] - shot.startZ);
+        gpg::Logf(
+          "editor: unit view: the shot %s %.1f units from the unit",
+          landed ? "landed" : "ran out",
+          static_cast<double>(distance)
+        );
+        if (s != nullptr) {
+          char text[96];
+          (void)std::snprintf(
+            text, sizeof(text), " (it %s at %.0f)", landed ? "landed" : "ran out", static_cast<double>(distance)
+          );
+          s->fireStatus += text;
+        }
+        if (shot.mesh != nullptr && moho::MeshRenderer::GetInstance() != nullptr) {
+          delete shot.mesh;
+        }
+        it = mPreviewShots.erase(it);
+        continue;
+      }
+      ++it;
+    }
+  }
+
+  void EdMapScene::DropPreviewShots()
+  {
+    if (moho::MeshRenderer::GetInstance() != nullptr) {
+      for (PreviewShot& shot : mPreviewShots) {
+        delete shot.mesh;
+      }
+    }
+    mPreviewShots.clear();
+  }
+
   void EdMapScene::DropUnitPreview()
   {
+    DropPreviewShots();
     if (mPreviewInstance != nullptr && moho::MeshRenderer::GetInstance() != nullptr) {
       delete mPreviewInstance;
     }
@@ -206,7 +369,7 @@ namespace faf::editor
       return;
     }
     // The instance: made again when the unit or the army colour changed.
-    const std::string key = s->unit + "|" + std::to_string(s->army);
+    const std::string key = s->unit + "|" + std::to_string(s->army) + "|" + s->colour;
     if (key != mPreviewKey) {
       DropUnitPreview();
       const moho::RMeshBlueprint* const mesh = rules->GetMeshBlueprint(bp->Display.MeshBlueprint);
@@ -217,7 +380,7 @@ namespace faf::editor
       const float scale = bp->Display.UniformScale;
       mPreviewInstance = renderer->CreateMeshInstance(
         0,
-        static_cast<std::int32_t>(ArmyColour(s->army)),
+        static_cast<std::int32_t>(PreviewColour(*s)),
         mesh,
         Wm3::Vec3f{scale, scale, scale},
         true,
@@ -308,10 +471,44 @@ namespace faf::editor
         );
       }
     }
+    // Studio's camera presets: iso (3/4 from the front left), front, side, back, top, fit (the distance to its size).
+    if (!s->frame.empty()) {
+      const std::string frame = std::exchange(s->frame, {});
+      const float size = std::max({bp->mSizeX, bp->mSizeY, bp->mSizeZ, 1.0f});
+      constexpr float kPi = 3.14159265f;
+      if (frame == "iso") {
+        mHeading = -kPi * 0.25f;
+        mPitch = 0.55f;
+      } else if (frame == "front") {
+        mHeading = 0.0f;
+        mPitch = 0.25f;
+      } else if (frame == "side") {
+        mHeading = kPi * 0.5f;
+        mPitch = 0.25f;
+      } else if (frame == "back") {
+        mHeading = kPi;
+        mPitch = 0.25f;
+      } else if (frame == "top") {
+        mPitch = kPi * 0.5f;
+      }
+      mDistance = std::max(size * 4.0f, 6.0f);
+      gpg::Logf(
+        "editor: unit view: camera %s (heading %.2f, pitch %.2f, distance %.1f)",
+        frame.c_str(),
+        static_cast<double>(mHeading),
+        static_cast<double>(mPitch),
+        static_cast<double>(mDistance)
+      );
+    }
     // Where it stands: the camera's target (the camera follows it while locked).
     mPreviewPos[0] = mTargetX;
     mPreviewPos[2] = mTargetZ;
     mPreviewPos[1] = GroundHeightAt(mTargetX, mTargetZ);
+    // A shot asked for, and the shots in flight.
+    if (std::exchange(s->fire, false)) {
+      FirePreview(*bp, *s);
+    }
+    TickPreviewShots(frameSeconds, s);
     // The time.
     if (s->playing && !s->scrubbed && s->duration > 0.0f) {
       s->time += frameSeconds * s->rate;
@@ -339,6 +536,11 @@ namespace faf::editor
     }
     if (mPreviewPose == nullptr) {
       mPreviewPose = std::make_shared<moho::CAniPose>(skeleton, bp->Display.UniformScale);
+      s->boneNames.clear();
+      for (const auto& bone : skeleton->mBones) {
+        s->boneNames.emplace_back(bone.mBoneName != nullptr ? bone.mBoneName : "");
+      }
+      s->bone = std::min(s->bone, static_cast<int>(s->boneNames.size()) - 1);
     }
     if (mPreviewBoneMap.size() != mPreviewAnim.bones.size()) {
       mPreviewBoneMap.assign(mPreviewAnim.bones.size(), -1);
@@ -407,6 +609,34 @@ namespace faf::editor
         }
         batcher.DrawLine(V(bx - 0.08f, by, bz, kBone), V(bx + 0.08f, by, bz, kBone));
         batcher.DrawLine(V(bx, by - 0.08f, bz, kBone), V(bx, by + 0.08f, bz, kBone));
+      }
+    }
+    // The picked bone's axes (Studio's bone list): x red, y green, z blue, from its composite transform.
+    if (mPreviewPose != nullptr && s->bone >= 0 && static_cast<std::size_t>(s->bone) < mPreviewPose->mBones.size()) {
+      const moho::VTransform& t = mPreviewPose->mBones[static_cast<std::size_t>(s->bone)].GetCompositeTransform();
+      const float qw = t.orient_.w, qx = t.orient_.x, qy = t.orient_.y, qz = t.orient_.z;
+      // v' = q v q* for the unit axes, written out.
+      const float axes[3][3] = {
+        {1.0f - 2.0f * (qy * qy + qz * qz), 2.0f * (qx * qy + qw * qz), 2.0f * (qx * qz - qw * qy)},
+        {2.0f * (qx * qy - qw * qz), 1.0f - 2.0f * (qx * qx + qz * qz), 2.0f * (qy * qz + qw * qx)},
+        {2.0f * (qx * qz + qw * qy), 2.0f * (qy * qz - qw * qx), 1.0f - 2.0f * (qx * qx + qy * qy)},
+      };
+      constexpr std::uint32_t kAxis[3] = {0xFFFF4040u, 0xFF40FF40u, 0xFF4080FFu};
+      const float len = std::max(0.4f, bp->mSizeY * 0.4f);
+      for (int a = 0; a < 3; ++a) {
+        batcher.DrawLine(
+          V(t.pos_.x, t.pos_.y, t.pos_.z, kAxis[a]),
+          V(t.pos_.x + axes[a][0] * len, t.pos_.y + axes[a][1] * len, t.pos_.z + axes[a][2] * len, kAxis[a])
+        );
+      }
+    }
+    // The empty stage's floor grid (Studio's stage grid): 2-unit cells, 24 units across, at the unit's feet.
+    if (s->stage && s->grid) {
+      constexpr std::uint32_t kGrid = 0x80A0A0A0u;
+      for (int i = -12; i <= 12; i += 2) {
+        const float d = static_cast<float>(i);
+        batcher.DrawLine(V(x - 12.0f, y + 0.02f, z + d, kGrid), V(x + 12.0f, y + 0.02f, z + d, kGrid));
+        batcher.DrawLine(V(x + d, y + 0.02f, z - 12.0f, kGrid), V(x + d, y + 0.02f, z + 12.0f, kGrid));
       }
     }
     // The collision box (SizeX / SizeY / SizeZ about the collision offset).

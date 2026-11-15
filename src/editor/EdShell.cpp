@@ -70,7 +70,7 @@ namespace faf::editor
   namespace
   {
     // The panels' scales the toolbar's - and + (and Ctrl+- / Ctrl+=) step between.
-    constexpr float kUiScaleSteps[] = {0.75f, 0.85f, 1.0f, 1.1f, 1.25f, 1.4f, 1.6f, 1.8f, 2.0f};
+    constexpr float kUiScaleSteps[] = {kMinUiScale, 0.85f, 1.0f, 1.1f, 1.25f, 1.4f, kMaxUiScale};
   } // namespace
 
   void EdShell::StepUiScale(
@@ -934,6 +934,17 @@ namespace faf::editor
   {
     for (const PanelFlag& flag : PanelFlags()) {
       this->*flag.shown = std::find(ids.begin(), ids.end(), PanelId(flag.window)) != ids.end();
+    }
+  }
+
+  void EdShell::ApplyShownPanels()
+  {
+    // A named layout was just read (ImGui's settings, the [FafEditor] Panels.<key> lines with them): the active
+    // workspace shows the panels it lists, before this frame's own list is kept over it.
+    const auto saved = ShownPanels().find(Workspaces()[static_cast<std::size_t>(ActiveWorkspace())].key);
+    if (saved != ShownPanels().end()) {
+      ShowPanels(saved->second);
+      gpg::Logf("editor: layout: %zu panels shown in this workspace", saved->second.size());
     }
   }
 

@@ -55,6 +55,8 @@ namespace faf::editor
     [[nodiscard]] std::vector<std::string> TakeMissionTrace();
     /** The newest `EDMISSION live ...` state line since the last take (false: none); those lines aren't shown. */
     bool TakeMissionLive(std::string& out);
+    /** The newest `EDUNITTEST live ...` line (the Unit lab's Test in game) since the last take; not shown. */
+    bool TakeUnitTestLive(std::string& out);
     /**
      * The console line under the lines (FAF Studio's console): what was typed and Entered, taken once a frame by the
      * app, which runs it (UI Lua; `=expr` prints its value; `sim <code>` in the sim; `con <command>` the engine's).
@@ -96,6 +98,7 @@ namespace faf::editor
     std::vector<std::string> mCaptured;
     std::vector<std::string> mMissionTrace;
     std::string mMissionLive;
+    std::string mUnitTestLive;
     bool mAutoScroll = true;
     bool mShowTimes = false;
     /** Whether a line passes the filter and the level toggles. */

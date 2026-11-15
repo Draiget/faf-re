@@ -231,7 +231,7 @@ namespace faf::editor
         "/layoutcheck",     "/selftests",
         "/meshtest",        "/gfxpreset",
         "/resourcecheck",   "/viewstage",
-        "/layoutsave",
+        "/layoutsave",      "/unittestgame",
       };
       for (const char* const option : kOptions) {
         if (moho::CFG_GetArgOption(option, 0, nullptr)) {
@@ -1285,7 +1285,7 @@ namespace faf::editor
             scale = static_cast<float>(std::atof(value[0].c_str()));
           }
         }
-        scale = std::clamp(scale, 0.5f, 3.0f);
+        scale = std::clamp(scale, kMinUiScale, kMaxUiScale);
         if (scale == mUiScaleApplied) {
           return;
         }
@@ -1724,7 +1724,16 @@ namespace faf::editor
             float& scale = mShell->UiScale();
             int percent = static_cast<int>(std::lround(scale * 100.0f));
             ImGui::SetNextItemWidth(Em(260.0f));
-            if (FillSliderInt("##uiscale", &percent, 75, 200, "%d %%", ImGuiSliderFlags_AlwaysClamp)) {
+            if (
+              FillSliderInt(
+                "##uiscale",
+                &percent,
+                static_cast<int>(std::lround(kMinUiScale * 100.0f)),
+                static_cast<int>(std::lround(kMaxUiScale * 100.0f)),
+                "%d %%",
+                ImGuiSliderFlags_AlwaysClamp
+              )
+            ) {
               scale = static_cast<float>(percent) / 100.0f;
             }
             ImGui::SameLine();
@@ -2639,6 +2648,228 @@ namespace faf::editor
       }
       std::set<std::string> mModMounted;
 
+      // Test in game (FAF Studio's unittest.lua): the unit under test and its dummy targets in the play, by SimLua
+      // lines (the editor's plays have cheats on); the sim reports the state once a second (EDUNITTEST live).
+      bool mUnitTestSpawned = false;
+      int mUnitTestFrames = 0;
+      int mUnitTestScript = 0; // `/unittestgame`: the step of the test run
+
+      /** One line of sim Lua (no line breaks: a console command). */
+      static void SimLine(
+        std::string lua
+      )
+      {
+        for (char& c : lua) {
+          if (c == '\n' || c == '\r') {
+            c = ' ';
+          }
+        }
+        moho::CON_Execute(("SimLua " + lua).c_str());
+      }
+
+      /** The unit and the targets for an enemy army near the first start, and the thread that reports them. */
+      static void SpawnUnitTest(
+        const std::string& unit
+      )
+      {
+        std::string id = unit;
+        for (char& c : id) {
+          c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+        }
+        SimLine(
+          "local b = ArmyBrains[1] local e = ArmyBrains[2] if b then "
+          "local x, z = b:GetArmyStartPos() x = x + 12 z = z + 12 "
+          "local u = CreateUnitHPR('" +
+          id +
+          "', b.Name, x, GetTerrainHeight(x, z), z, 0, 0, 0) "
+          "EdTest = { unit = u, id = '" +
+          id +
+          "', x = x, z = z, targets = {} } "
+          "if e then SetAlliance(b:GetArmyIndex(), e:GetArmyIndex(), 'Enemy') "
+          "local list = { { 'uel0106', -10, 25 }, { 'ueb2101', 0, 28 }, { 'uea0101', 10, 25 } } "
+          "local sx, sz = x + 20, z + 35 "
+          "if GetSurfaceHeight(sx, sz) > GetTerrainHeight(sx, sz) + 1 then table.insert(list, { 'ues0103', 20, 35 }) "
+          "end "
+          "for _, t in list do local tx, tz = x + t[2], z + t[3] "
+          "table.insert(EdTest.targets, CreateUnitHPR(t[1], e.Name, tx, GetTerrainHeight(tx, tz), tz, 0, 0, 0)) end "
+          "end "
+          "if not rawget(_G, 'EdTestThread') then EdTestThread = ForkThread(function() while true do "
+          "local T = rawget(_G, 'EdTest') if T then local u = T.unit local s "
+          "if u and not u:IsDead() then local p = u:GetPosition() "
+          "s = 'alive|' .. math.floor(u:GetHealth()) .. '|' .. math.floor(u:GetMaxHealth()) .. '|' .. math.floor(p[1]) "
+          ".. '|' .. math.floor(p[3]) .. '|' .. table.getn(u:GetCommandQueue()) "
+          "else s = 'dead|0|0|0|0|0' end "
+          "local th = '' for _, t in T.targets do if t and not t:IsDead() then "
+          "th = th .. math.floor(t:GetHealth()) .. '/' .. math.floor(t:GetMaxHealth()) .. ' ' else th = th .. 'dead ' "
+          "end end "
+          "LOG('EDUNITTEST live ' .. T.id .. '|' .. s .. '|' .. th) end WaitSeconds(1) end end) end end"
+        );
+        gpg::Logf("editor: test in game: %s and its targets asked for", id.c_str());
+      }
+
+      /** A quick order for the unit under test. */
+      static void UnitTestOrder(
+        const std::string& order
+      )
+      {
+        const std::string unit = "local T = rawget(_G, 'EdTest') local u = T and T.unit if u and not u:IsDead() then ";
+        const std::string first = "local t for _, v in T.targets do if v and not v:IsDead() then t = v break end end ";
+        const std::string there = "local x, z = T.x, T.z + 40 local p = { x, GetTerrainHeight(x, z), z } ";
+        if (order == "attack") {
+          SimLine(unit + first + "if t then IssueClearCommands({ u }) IssueAttack({ u }, t) end end");
+        } else if (order == "move") {
+          SimLine(unit + there + "IssueClearCommands({ u }) IssueMove({ u }, p) end");
+        } else if (order == "patrol") {
+          SimLine(unit + there + "IssueClearCommands({ u }) IssuePatrol({ u }, p) end");
+        } else if (order == "stop") {
+          SimLine(unit + "IssueClearCommands({ u }) end");
+        } else if (order == "heal") {
+          SimLine(unit + "u:SetHealth(u, u:GetMaxHealth()) end");
+        } else if (order == "kill") {
+          SimLine(unit + "u:Kill() end");
+        } else if (order == "respawn" || order == "end") {
+          SimLine(
+            "local T = rawget(_G, 'EdTest') if T then if T.unit and not T.unit:IsDead() then T.unit:Destroy() end "
+            "for _, t in T.targets do if t and not t:IsDead() then t:Destroy() end end "
+            "if '" +
+            order + "' == 'end' then rawset(_G, 'EdTest', false) end end"
+          );
+        }
+        gpg::Logf("editor: test in game: %s", order.c_str());
+      }
+
+      /**
+       * `/unittestgame` (test runs): a project EditorUnitTestGame, uel0201 selected, Test in game; once the unit and
+       * its targets report, Attack, then the state 15 s later (the targets' health), End test and Stop.
+       */
+      void TestUnitInGame()
+      {
+        if (
+          // The map view is detached during the play: only the first step waits for it.
+          // ... and the rules are lent to the play's session while it runs (RULE_PeekKept is null then).
+          mUnitTestScript >= 6 || (mUnitTestScript == 0 && (!mScene.Attached() || moho::RULE_PeekKept() == nullptr)) ||
+          !moho::CFG_GetArgOption("/unittestgame", 0, nullptr)
+        ) {
+          return;
+        }
+        static int frames = 0;
+        ++frames;
+        EdUnitLabPanel& lab = mShell->UnitLab();
+        switch (mUnitTestScript) {
+        case 0: {
+          if (frames < 120) {
+            return;
+          }
+          EdModPanel& panel = mShell->ModPanel();
+          std::string error;
+          if (!panel.Open("EditorUnitTestGame", error) && !panel.Create("EditorUnitTestGame", error)) {
+            gpg::Warnf("editor: /unittestgame: no project: %s", error.c_str());
+            mUnitTestScript = 6;
+            return;
+          }
+          lab.SelectUnit("uel0201");
+          lab.AskTestInGame();
+          gpg::Logf("editor: /unittestgame: Test in game asked for uel0201");
+          mUnitTestScript = 1;
+          frames = 0;
+          return;
+        }
+        case 1:
+          if (!lab.testStatus.empty()) {
+            gpg::Logf("editor: /unittestgame: first state: %s", lab.testStatus.c_str());
+            lab.AskTestOrder("attack");
+            mUnitTestScript = 2;
+            frames = 0;
+          } else if (frames > 60 * 90) {
+            gpg::Warnf("editor: /unittestgame: no state from the sim after 90 s");
+            mUnitTestScript = 5;
+          }
+          return;
+        case 2:
+          if (frames == 60 * 15) {
+            gpg::Logf("editor: /unittestgame: 15 s after Attack: %s", lab.testStatus.c_str());
+            lab.AskTestOrder("heal");
+            mUnitTestScript = 3;
+            frames = 0;
+          }
+          return;
+        case 3:
+          if (frames == 60 * 2) {
+            gpg::Logf("editor: /unittestgame: after Heal: %s", lab.testStatus.c_str());
+            lab.AskTestOrder("end");
+            mUnitTestScript = 4;
+            frames = 0;
+          }
+          return;
+        case 4:
+          if (frames == 60) {
+            mUnitTestScript = 5;
+          }
+          return;
+        case 5:
+          mPlay.Stop();
+          gpg::Logf("editor: /unittestgame: done");
+          mUnitTestScript = 6;
+          return;
+        default:
+          return;
+        }
+      }
+
+      /** Each frame: the asks of the Unit lab's Test in game, the spawn once the play runs, the state, the orders. */
+      void DriveUnitTest()
+      {
+        EdUnitLabPanel& lab = mShell->UnitLab();
+        if (lab.TakeTestInGameAsk() && !lab.Unit().empty()) {
+          if (PlayModProject()) {
+            lab.testUnit = lab.Unit();
+            lab.testStatus.clear();
+            mUnitTestSpawned = false;
+            mUnitTestFrames = 0;
+          } else {
+            PostStatusMessage("Test in game: the play couldn't start (a project, an open map, no play running)");
+          }
+        }
+        if (lab.testUnit.empty()) {
+          return;
+        }
+        ++mUnitTestFrames;
+        moho::CWldSession* const session = moho::WLD_GetActiveSession();
+        if (!mPlay.Active() && mUnitTestFrames > 600) {
+          lab.testUnit.clear(); // the play ended
+          return;
+        }
+        if (!mUnitTestSpawned && session != nullptr && session->mGameTick > 20) {
+          mUnitTestSpawned = true;
+          SpawnUnitTest(lab.testUnit);
+        }
+        if (std::string line; mLog.TakeUnitTestLive(line)) {
+          // id|alive|health|max|x|z|orders|targets...
+          std::vector<std::string> f;
+          std::size_t at = 0;
+          while (at <= line.size()) {
+            const std::size_t bar = std::min(line.find('|', at), line.size());
+            f.push_back(line.substr(at, bar - at));
+            at = bar + 1;
+          }
+          if (f.size() >= 8) {
+            lab.testStatus = f[0] +
+              (f[1] == "alive"
+                 ? ": " + f[2] + " / " + f[3] + " health at " + f[4] + ", " + f[5] + ", " + f[6] + " orders"
+                 : ": dead") +
+              "; targets: " + (f[7].empty() ? "none" : f[7]);
+          }
+        }
+        if (const std::string order = lab.TakeTestOrder(); !order.empty() && mUnitTestSpawned) {
+          UnitTestOrder(order);
+          if (order == "respawn") {
+            SpawnUnitTest(lab.testUnit);
+          } else if (order == "end") {
+            lab.testUnit.clear();
+          }
+        }
+      }
+
       /**
        * `/unitlabtest` (test runs): the unit lab on a project EditorUnitLabTest: a unit with a weapon (uel0201 when
        * the rules have it) gets mass +25 and its first weapon's damage x3 (two steps; undo and redo checked), Test
@@ -3299,6 +3530,13 @@ namespace faf::editor
           p.lod = p.lodCutoffs.size() > 1 ? 1 : 0;
           p.stage = true;
           p.light = "Evening";
+          // A shot of its first weapon (the log says where it landed).
+          p.fireWeapon = 0;
+          p.fire = true;
+          // Studio's camera preset, a picked bone, a named colour.
+          p.frame = "iso";
+          p.bone = p.boneNames.empty() ? -1 : 0;
+          p.colour = "Red";
           mPreviewLightBefore = mDocument.LightingNow().sunColor[1];
           break;
         }
@@ -3310,17 +3548,33 @@ namespace faf::editor
             static_cast<double>(mPreviewLightBefore),
             static_cast<double>(mDocument.LightingNow().sunColor[1])
           );
+          gpg::Logf(
+            "editor: unit view test: %zu bones, bone %d picked (%s), colour %s; fire: %s",
+            p.boneNames.size(),
+            p.bone,
+            p.bone >= 0 && static_cast<std::size_t>(p.bone) < p.boneNames.size()
+              ? p.boneNames[static_cast<std::size_t>(p.bone)].c_str()
+              : "none",
+            p.colour.c_str(),
+            p.fireStatus.c_str()
+          );
           p.light = "Map";
           p.stage = false;
           p.lod = -1;
-          p.active = false;
+          // A weapon whose projectile has a model of its own: dalk003's AA missile (aaserpentine).
+          mShell->UnitLab().SelectUnit("dalk003"); // the viewer shows the lab's unit
+          p.unit = "dalk003";
+          p.fireWeapon = 1;
+          p.fire = true;
           break;
         }
         case 13:
           gpg::Logf(
-            "editor: unit view test: light back to the map's: the sun's green %.2f",
-            static_cast<double>(mDocument.LightingNow().sunColor[1])
+            "editor: unit view test: light back to the map's: the sun's green %.2f; dalk003 fire: %s",
+            static_cast<double>(mDocument.LightingNow().sunColor[1]),
+            viewer.Preview().fireStatus.c_str()
           );
+          viewer.Preview().active = false;
           break;
         default:
           break;
@@ -3398,6 +3652,7 @@ namespace faf::editor
       char mLayoutName[64] = "";
       std::string mLayoutSaveFile; // `/layoutsave <file>`
       int mLayoutSaveFrames = 0;
+      std::vector<std::string> mLayoutSavedPanels;
       [[nodiscard]] static std::filesystem::path LayoutsFolder()
       {
         const std::filesystem::path settings = EditorSettingsFolder();
@@ -3408,7 +3663,10 @@ namespace faf::editor
       )
       {
         std::size_t size = 0;
+        // What is shown now, also in a test run (whose layout.ini writes back what it read, not what it showed).
+        const bool testRun = std::exchange(gTestRun, false);
         const char* const text = ImGui::SaveIniSettingsToMemory(&size);
+        gTestRun = testRun;
         std::error_code ec;
         std::filesystem::create_directories(file.parent_path(), ec);
         std::ofstream out(file, std::ios::binary | std::ios::trunc);
@@ -4782,6 +5040,9 @@ namespace faf::editor
           {EdSettings::kGfxVsync,
            "Vertical sync",
            "Wait for the monitor before showing a frame: no tearing, fewer frames"},
+          {EdSettings::kGfxShadowQuality,
+           "Shadow quality",
+           "Whether and how well objects cast shadows (Studio's four levels)"},
         };
         // Studio's quality presets: the settings above set together.
         ImGui::AlignTextToFramePadding();
@@ -8210,6 +8471,7 @@ namespace faf::editor
             PostStatusMessage("No layout in " + file.filename().string());
           } else {
             ImGui::LoadIniSettingsFromMemory(text.c_str(), text.size());
+            mShell->ApplyShownPanels();
             gpg::Logf("editor: layout loaded from %s (%zu bytes)", file.string().c_str(), text.size());
             PostStatusMessage("Layout " + file.stem().string() + " loaded");
           }
@@ -8348,15 +8610,34 @@ namespace faf::editor
         }
         DrawLayouts();
         // `/layoutsave <file>` (test runs): the panels saved there once the map is up, then loaded back from it.
-        if (!mLayoutSaveFile.empty() && mScene.Attached() && ++mLayoutSaveFrames == 200) {
-          const bool saved = SaveLayoutTo(mLayoutSaveFile);
-          std::error_code ec;
-          gpg::Logf(
-            "editor: /layoutsave: saved %s (%llu bytes)",
-            saved ? "yes" : "no",
-            static_cast<unsigned long long>(std::filesystem::file_size(mLayoutSaveFile, ec))
-          );
-          mLayoutToLoad = mLayoutSaveFile;
+        if (!mLayoutSaveFile.empty() && mScene.Attached()) {
+          ++mLayoutSaveFrames;
+          if (mLayoutSaveFrames == 200) {
+            // Saved, then one more panel opened (the Paths panel) so the load has something to put back.
+            const bool saved = SaveLayoutTo(mLayoutSaveFile);
+            std::error_code ec;
+            mLayoutSavedPanels = mShell->ShownPanelIds();
+            gpg::Logf(
+              "editor: /layoutsave: saved %s (%llu bytes), %zu panels open",
+              saved ? "yes" : "no",
+              static_cast<unsigned long long>(std::filesystem::file_size(mLayoutSaveFile, ec)),
+              mLayoutSavedPanels.size()
+            );
+            for (const std::string& window : mShell->PanelWindows()) {
+              if (window.find("###Paths") != std::string::npos) {
+                (void)mShell->ShowPanelWindow(window, true);
+              }
+            }
+          } else if (mLayoutSaveFrames == 230) {
+            gpg::Logf("editor: /layoutsave: %zu panels open before the load", mShell->ShownPanelIds().size());
+            mLayoutToLoad = mLayoutSaveFile;
+          } else if (mLayoutSaveFrames == 260) {
+            gpg::Logf(
+              "editor: /layoutsave: after the load %zu panels open, %s the saved ones",
+              mShell->ShownPanelIds().size(),
+              mShell->ShownPanelIds() == mLayoutSavedPanels ? "the same as" : "not"
+            );
+          }
         }
         DrawOverwriteAsk();
         DrawRecover();
@@ -11735,6 +12016,8 @@ namespace faf::editor
       if (mShell->UnitLab().TakeTestAsk()) {
         (void)PlayModProject();
       }
+      DriveUnitTest();
+      TestUnitInGame();
       if (std::string unit; mShell->UnitLab().TakeModelAsk(unit)) {
         const std::filesystem::path obj = AskFile(
           HandleOf(mGame.supcomFrame),

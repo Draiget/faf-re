@@ -22,6 +22,7 @@
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/sim/RRuleGameRules.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <cstring>
@@ -559,6 +560,52 @@ namespace faf::editor
       ImGui::SameLine();
       ImGui::Checkbox("Empty stage", &p.stage);
       EdSetItemTooltip("The map's terrain, sky, water and border aren't drawn while the unit is shown");
+      if (p.stage) {
+        ImGui::SameLine();
+        ImGui::Checkbox("Grid", &p.grid);
+      }
+      // Studio's camera presets.
+      for (const char* frame : {"Iso", "Front", "Side", "Back", "Top", "Fit"}) {
+        if (ImGui::SmallButton(frame)) {
+          std::string key = frame;
+          for (char& c : key) {
+            c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+          }
+          p.frame = key;
+        }
+        ImGui::SameLine();
+      }
+      ImGui::NewLine();
+      // A bone to look at: its axes drawn (x red, y green, z blue).
+      ImGui::SetNextItemWidth(Em(170.0f));
+      const std::string boneShown = p.bone < 0 || static_cast<std::size_t>(p.bone) >= p.boneNames.size()
+        ? std::string("Bone: none")
+        : "Bone: " + p.boneNames[static_cast<std::size_t>(p.bone)];
+      if (EdBeginCombo("##bone", boneShown.c_str())) {
+        if (ImGui::Selectable("None", p.bone < 0)) {
+          p.bone = -1;
+        }
+        for (std::size_t b = 0; b < p.boneNames.size(); ++b) {
+          ImGui::PushID(static_cast<int>(b));
+          if (ImGui::Selectable(p.boneNames[b].c_str(), p.bone == static_cast<int>(b))) {
+            p.bone = static_cast<int>(b);
+          }
+          ImGui::PopID();
+        }
+        ImGui::EndCombo();
+      }
+      EdSetItemTooltip("Picks a bone: its axes are drawn on the unit (x red, y green, z blue)");
+      ImGui::SameLine();
+      ImGui::SetNextItemWidth(Em(140.0f));
+      if (EdBeginCombo("##colour", ("Colour: " + p.colour).c_str())) {
+        for (const char* name : {"Army", "Red", "Blue", "Green", "Yellow", "White", "Black"}) {
+          if (ImGui::Selectable(name, p.colour == name)) {
+            p.colour = name;
+          }
+        }
+        ImGui::EndCombo();
+      }
+      EdSetItemTooltip("Studio's team colours; Army uses the army colour slider");
       ImGui::SetNextItemWidth(Em(170.0f));
       if (EdBeginCombo("##light", ("Light: " + p.light).c_str())) {
         for (const char* name : {"Map", "Noon", "Evening", "Overcast", "Night", "Icon"}) {
@@ -569,6 +616,35 @@ namespace faf::editor
         ImGui::EndCombo();
       }
       EdSetItemTooltip("A light for the map (one undo step); Map puts back the map's own");
+      // Fire (Studio's Effects panel): one of the unit's weapons sends its projectile from the unit.
+      moho::RRuleGameRules* const rules = moho::RULE_PeekKept();
+      moho::RResId id{};
+      id.name.assign(p.unit.c_str());
+      const moho::RUnitBlueprint* const bp = rules != nullptr ? rules->GetUnitBlueprint(id) : nullptr;
+      if (bp != nullptr && !bp->Weapons.WeaponBlueprints.empty()) {
+        const auto& weapons = bp->Weapons.WeaponBlueprints;
+        p.fireWeapon = std::clamp(p.fireWeapon, 0, static_cast<int>(weapons.size()) - 1);
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(Em(150.0f));
+        if (EdBeginCombo("##fireweapon", weapons[static_cast<std::size_t>(p.fireWeapon)].Label.c_str())) {
+          for (int i = 0; i < static_cast<int>(weapons.size()); ++i) {
+            ImGui::PushID(i);
+            if (ImGui::Selectable(weapons[static_cast<std::size_t>(i)].Label.c_str(), i == p.fireWeapon)) {
+              p.fireWeapon = i;
+            }
+            ImGui::PopID();
+          }
+          ImGui::EndCombo();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Fire")) {
+          p.fire = true;
+        }
+        EdSetItemTooltip("The weapon's projectile flies from the unit at its muzzle speed (on its arc) to its range");
+        if (!p.fireStatus.empty()) {
+          ImGui::TextDisabled("%s", p.fireStatus.c_str());
+        }
+      }
     }
     if (!p.status.empty()) {
       ImGui::TextDisabled("%s", p.status.c_str());
