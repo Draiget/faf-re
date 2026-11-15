@@ -700,7 +700,7 @@ int luaL_argerror(
     ar.name = "?";
   }
 
-  return luaL_error(state, "bad argument #%d to `%s' (%s)", narg, ar.name, extramsg);
+  luaL_error(state, "bad argument #%d to `%s' (%s)", narg, ar.name, extramsg);
 }
 
 /**

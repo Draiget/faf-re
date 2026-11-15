@@ -648,7 +648,7 @@ void luaD_callhook(
  * how a stack trace gets attached. Either way the result is thrown as a
  * lua_RuntimeError carrying the top-of-stack string.
  */
-void luaG_errormsg(
+[[noreturn]] void luaG_errormsg(
   lua_State* const state
 )
 {
@@ -1985,7 +1985,7 @@ TObject* luaV_execute(
  * than something the caller has to free. Only %%, %c, %d, %f and %s are
  * understood - anything else is dropped, as in the binary.
  */
-void luaG_errormsg(lua_State* L);
+[[noreturn]] void luaG_errormsg(lua_State* L);
 
 const char* luaO_pushvfstring(
   lua_State* const state,
@@ -2055,7 +2055,7 @@ const char* luaO_pushvfstring(
  * the chunk and line it came from, and hands it to the error machinery.
  * Never returns.
  */
-void luaG_runerror(
+[[noreturn]] void luaG_runerror(
   lua_State* const state,
   const char* const format,
   ...

@@ -247,7 +247,7 @@ extern "C" int luaL_error(
   va_end(arguments);
 
   lua_concat(state, 2);
-  return lua_error(state);
+  lua_error(state);
 }
 
 /**
@@ -962,7 +962,7 @@ namespace
   int luaO_str2d(const char* s, float* result);
   int luaV_tostring(lua_State* L, TObject* obj);
   const char* getobjname(int stackPos, CallInfo* callInfo, const char** nameOut);
-  void luaG_runerror(lua_State* L, const char* format, ...);
+  [[noreturn]] void luaG_runerror(lua_State* L, const char* format, ...);
   int luaZ_fill(ZIO* stream);
   size_t luaZ_read(ZIO* stream, void* buffer, size_t size);
   char* luaZ_openspace(lua_State* L, Mbuffer* buff, size_t n);
