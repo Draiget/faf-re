@@ -492,6 +492,15 @@ namespace faf::editor
         mPitch = kPi * 0.5f;
       }
       mDistance = std::max(size * 4.0f, 6.0f);
+      // Studio's 'range' frame: from above, far enough to see the longest weapon's ring.
+      if (frame == "range") {
+        float range = 0.0f;
+        for (const moho::RUnitBlueprintWeapon& w : bp->Weapons.WeaponBlueprints) {
+          range = std::max(range, w.MaxRadius);
+        }
+        mPitch = 1.1f;
+        mDistance = std::max(range * 2.4f, mDistance);
+      }
       gpg::Logf(
         "editor: unit view: camera %s (heading %.2f, pitch %.2f, distance %.1f)",
         frame.c_str(),

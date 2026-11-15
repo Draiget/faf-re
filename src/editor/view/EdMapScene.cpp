@@ -1198,6 +1198,22 @@ namespace faf::editor
     // The ruler: a line on the ground between its ends, with posts at them.
     if (mRulerShown) {
       constexpr std::uint32_t kRuler = 0xF0FFDC60u;
+      for (const std::array<float, 4>& seg : mRulerDone) {
+        const float segLength = std::hypot(seg[2] - seg[0], seg[3] - seg[1]);
+        const int segSteps = std::max(1, static_cast<int>(segLength / 2.0f));
+        for (int s = 0; s < segSteps; ++s) {
+          const float t0 = static_cast<float>(s) / static_cast<float>(segSteps);
+          const float t1 = static_cast<float>(s + 1) / static_cast<float>(segSteps);
+          batcher->DrawLine(
+            groundVertex(seg[0] + (seg[2] - seg[0]) * t0, seg[1] + (seg[3] - seg[1]) * t0, kRuler, 0.8f),
+            groundVertex(seg[0] + (seg[2] - seg[0]) * t1, seg[1] + (seg[3] - seg[1]) * t1, kRuler, 0.8f)
+          );
+        }
+        moho::CD3DPrimBatcher::Vertex bottom = groundVertex(seg[0], seg[1], kRuler, 0.0f);
+        moho::CD3DPrimBatcher::Vertex top = bottom;
+        top.mY += 6.0f;
+        batcher->DrawLine(bottom, top);
+      }
       const float length = std::hypot(mRulerTo[0] - mRulerFrom[0], mRulerTo[1] - mRulerFrom[1]);
       const int steps = std::max(1, static_cast<int>(length / 2.0f));
       for (int s = 0; s < steps; ++s) {
@@ -4492,6 +4508,8 @@ namespace faf::editor
       );
     }
     mMap->mTerrainRes->NotifyMapChanges(changed.data(), changed.size());
+    // What stands there follows the ground (Studio's Resnap).
+    ReseatOnGround(rects);
     // In front of a play: the same heights into it (its rendered terrain now, its sim at its next beat; WPE.40).
     if (mOverPlay && mSessionMap != nullptr) {
       std::vector<HeightRect> live;
@@ -4638,7 +4656,7 @@ namespace faf::editor
           if ((::GetKeyState(VK_LBUTTON) & 0x8000) != 0) {
             mRulerTo[0] = groundX;
             mRulerTo[1] = groundZ;
-            mTools->SetRulerText(DistanceText(std::hypot(mRulerTo[0] - mRulerFrom[0], mRulerTo[1] - mRulerFrom[1])));
+            mTools->SetRulerText(RulerText());
           } else {
             mRuling = false;
             ::ReleaseCapture();
@@ -5960,19 +5978,46 @@ namespace faf::editor
 
   bool EdMapScene::CanTurnSelectedProps() const
   {
-    return mMap != nullptr && mTools != nullptr && mTools->SelectToolActive() && !mSelection.empty() &&
-      SelectedKind() == PickKind::Prop;
+    // Any selection now (props, markers, units, decals), under the Select tool.
+    return mMap != nullptr && mTools != nullptr && mTools->SelectToolActive() &&
+      (!mSelection.empty() || !mMarkerSelection.empty() || !mUnitSelection.empty() || !mDecalSelection.empty());
   }
 
   bool EdMapScene::TurnSelectedProps(
-    const float radians
+    const float direction
   )
   {
     if (!CanTurnSelectedProps()) {
       return false;
     }
-    TurnSelection(radians);
-    return true;
+    // The command's sign, the Select tool's step.
+    const float step = mTools->TurnStepDegrees() * 0.017453293f;
+    return TurnEverySelected(direction < 0.0f ? -step : step);
+  }
+
+  void EdMapScene::ContinueRuler(
+    const float x,
+    const float z
+  )
+  {
+    if (!mRulerShown) {
+      SetRuler(x, z, x, z);
+      return;
+    }
+    mRulerDone.push_back({mRulerFrom[0], mRulerFrom[1], mRulerTo[0], mRulerTo[1]});
+    mRulerFrom[0] = mRulerTo[0];
+    mRulerFrom[1] = mRulerTo[1];
+    mRulerTo[0] = x;
+    mRulerTo[1] = z;
+    if (mTools != nullptr) {
+      mTools->SetRulerText(RulerText());
+      gpg::Logf(
+        "editor: ruler on to %.1f, %.1f: %s",
+        static_cast<double>(x),
+        static_cast<double>(z),
+        mTools->RulerText().c_str()
+      );
+    }
   }
 
   void EdMapScene::SetRuler(
@@ -5984,12 +6029,13 @@ namespace faf::editor
   {
     mRulerShown = true;
     mRuling = false;
+    mRulerDone.clear();
     mRulerFrom[0] = x0;
     mRulerFrom[1] = z0;
     mRulerTo[0] = x1;
     mRulerTo[1] = z1;
     if (mTools != nullptr) {
-      mTools->SetRulerText(DistanceText(std::hypot(x1 - x0, z1 - z0)));
+      mTools->SetRulerText(RulerText());
       gpg::Logf(
         "editor: ruler from %.1f, %.1f to %.1f, %.1f: %s",
         static_cast<double>(x0),
@@ -8406,6 +8452,19 @@ namespace faf::editor
     const SelectionProperties now = SelectionPropertiesNow();
     const float* const v = edit.values;
     const float radians = v[0] * kPi / 180.0f;
+    // A heading typed for a selection of several: every selected object turns by what the first one turned (Studio's
+    // gizmo turns the whole selection), not only the first.
+    if (edit.what == PropertyEdit::What::Heading && now.count > 1) {
+      float delta = v[0] - now.heading;
+      while (delta > 180.0f) {
+        delta -= 360.0f;
+      }
+      while (delta <= -180.0f) {
+        delta += 360.0f;
+      }
+      (void)TurnEverySelected(delta * kPi / 180.0f);
+      return;
+    }
     switch (now.kind) {
     case SelectionProperties::Kind::Marker:
       if (edit.what == PropertyEdit::What::Position) {
@@ -13339,12 +13398,23 @@ namespace faf::editor
         float groundX = 0.0f;
         float groundZ = 0.0f;
         if (GroundAt(static_cast<float>(at.x), static_cast<float>(at.y), groundX, groundZ)) {
+          // Alt+Shift: the path goes on from the last end (Studio's ruler); Alt alone starts a new one.
+          const bool more = (wParam & MK_SHIFT) != 0 && mRulerShown;
+          if (more) {
+            mRulerDone.push_back({mRulerFrom[0], mRulerFrom[1], mRulerTo[0], mRulerTo[1]});
+            mRulerFrom[0] = mRulerTo[0];
+            mRulerFrom[1] = mRulerTo[1];
+          } else {
+            mRulerDone.clear();
+            mRulerFrom[0] = groundX;
+            mRulerFrom[1] = groundZ;
+          }
           mRuling = true;
           mRulerShown = true;
-          mRulerFrom[0] = mRulerTo[0] = groundX;
-          mRulerFrom[1] = mRulerTo[1] = groundZ;
+          mRulerTo[0] = groundX;
+          mRulerTo[1] = groundZ;
           if (mTools != nullptr) {
-            mTools->SetRulerText(DistanceText(0.0f));
+            mTools->SetRulerText(RulerText());
           }
           ::SetCapture(window);
         }
@@ -13375,6 +13445,7 @@ namespace faf::editor
       if (mRulerShown && !mRuling) {
         // A click without Alt puts the ruler away.
         mRulerShown = false;
+        mRulerDone.clear();
         if (mTools != nullptr) {
           mTools->SetRulerText({});
         }
@@ -14670,8 +14741,14 @@ namespace faf::editor
           DeleteSelection();
           return true;
         }
-        if (wParam == 'Q' || wParam == 'E') {
-          TurnSelection(wParam == 'Q' ? -0.2617994f : 0.2617994f);
+      }
+      // Q / E turn whatever is selected (props, markers, units, decals) by the Select tool's turn step.
+      if (
+        down && (wParam == 'Q' || wParam == 'E') && mTools != nullptr && mTools->SelectToolActive() &&
+        (!mSelection.empty() || !mMarkerSelection.empty() || !mUnitSelection.empty() || !mDecalSelection.empty())
+      ) {
+        const float step = mTools->TurnStepDegrees() * 0.017453293f;
+        if (TurnEverySelected(wParam == 'Q' ? -step : step)) {
           return true;
         }
       }

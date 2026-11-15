@@ -357,6 +357,35 @@ namespace faf::editor
     {
       mLookSwatches[id] = swatch;
     }
+    /** A look's picture (this map painted under its light, FAF Studio's look thumbnails); 0 = it can't be drawn. */
+    void SetLookThumb(
+      const std::string& id,
+      const std::uint64_t image
+    )
+    {
+      mLookThumbs[id] = image;
+    }
+    /** The next look whose row is on screen without its picture. */
+    [[nodiscard]] bool TakeLookThumbWanted(
+      std::string& id
+    )
+    {
+      if (mLookThumbWanted.empty()) {
+        return false;
+      }
+      id = mLookThumbWanted.front();
+      mLookThumbWanted.erase(mLookThumbWanted.begin());
+      return true;
+    }
+    /** Redraw pictures was pressed (the map changed under them). */
+    [[nodiscard]] bool TakeLookThumbsRedraw() noexcept
+    {
+      const bool redraw = mLookThumbsRedraw;
+      mLookThumbsRedraw = false;
+      return redraw;
+    }
+    /** Lets every look picture go (another map, or a redraw). */
+    void ClearLookThumbs();
     [[nodiscard]] bool LookTrying() const noexcept
     {
       return !mLookTried.empty();
@@ -976,6 +1005,10 @@ namespace faf::editor
     std::string mLookStatus;
     std::vector<std::string> mMyLooks;
     std::map<std::string, LookSwatch> mLookSwatches;
+    std::map<std::string, std::uint64_t> mLookThumbs;
+    std::vector<std::string> mLookThumbWanted;
+    bool mLookThumbsShown = true;
+    bool mLookThumbsRedraw = false;
     char mLookSaveName[64]{};
     void DrawLooks();
     bool mSkyboxExport = false;

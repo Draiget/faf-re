@@ -576,6 +576,43 @@ namespace faf::editor
     return out + "}\n";
   }
 
+  bool ModProjectileId(
+    const std::string& id
+  )
+  {
+    // `/projectiles/<name>/<name>_proj.bp`, lower case (the game's blueprint id of a projectile).
+    if (id.rfind("/projectiles/", 0) != 0 || id.size() < 22 || id.compare(id.size() - 8, 8, "_proj.bp") != 0) {
+      return false;
+    }
+    return std::all_of(id.begin(), id.end(), [](const char c) {
+      return (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_' || c == '/' || c == '.';
+    });
+  }
+
+  std::string ModProjectileFile(
+    const std::string& id
+  )
+  {
+    return id.substr(1); // "projectiles/<name>/<name>_proj.bp" in the mod's folder
+  }
+
+  std::string ModMergeProjectile(
+    const std::string& id,
+    const std::map<std::string, double>& edits
+  )
+  {
+    // Studio's fxedit.lua: the projectile's changed numbers (Physics, Display, Economy, Defense ...) as a merge
+    // blueprint of the game's own (FAF's Blueprints.lua merges any blueprint kind by its BlueprintId).
+    const Tree root = DeltaTree(id, edits, ModWeaponIndex{}, nullptr);
+    if (root.children.empty()) {
+      return {};
+    }
+    std::string out = std::string(kModProjectMark) +
+      "\nProjectileBlueprint {\n    Merge = true,\n    BlueprintId = " + LuaQuote(id) + ",\n";
+    Dump(root, "    ", out);
+    return out + "}\n";
+  }
+
   bool AddModDerived(
     ModProject& project,
     const std::string& id,
@@ -828,6 +865,16 @@ namespace faf::editor
       if (project.derived.count(id) != 0) {
         continue; // (in the hook)
       }
+      // A projectile's changes: its own merge blueprint under projectiles/.
+      if (ModProjectileId(id)) {
+        const std::string text = ModMergeProjectile(id, keys);
+        if (!text.empty()) {
+          const std::string relative = ModProjectileFile(id);
+          kept.insert(relative);
+          write(relative, text, true);
+        }
+        continue;
+      }
       // A unit of the new unit wizard: its own blueprint carries the edits (the wizard writes it), no merge blueprint.
       if (ModWizardUnit(folder, id)) {
         kept.insert("units/" + id + "/" + id + "_unit.bp");
@@ -938,6 +985,9 @@ namespace faf::editor
     }
     for (const auto& [id, keys] : p.edits) {
       const bool derived = p.derived.count(id) != 0;
+      if (ModProjectileId(id)) {
+        continue; // a projectile's numbers (its merge blueprint under projectiles/)
+      }
       if (!ModUnitIdOk(id)) {
         add('E', "unit " + id + ": not a unit id (lower case letters and digits)");
         continue;

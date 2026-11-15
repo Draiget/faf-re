@@ -10,6 +10,7 @@
 #include "editor/EdLuaDebugger.h"
 #include "editor/ui/EdThemeColors.h"
 #include "editor/ui/EdUiScale.h"
+#include "editor/ui/EdImGuiRenderer.h"
 #include "editor/doc/EdAdaptiveTables.h"
 
 #include <algorithm>
@@ -2162,6 +2163,17 @@ namespace faf::editor
     }
   }
 
+  void EdShell::ClearLookThumbs()
+  {
+    for (const auto& [id, image] : mLookThumbs) {
+      if (image != 0U) {
+        EdImGuiRenderer::DestroyImage(image);
+      }
+    }
+    mLookThumbs.clear();
+    mLookThumbWanted.clear();
+  }
+
   void EdShell::DrawLooks()
   {
     if (!Section("Looks")) {
@@ -2208,6 +2220,16 @@ namespace faf::editor
       "How much of the look: 0 keeps the map's own, 1 is the look. Numbers mix; textures switch at 0.5."
     );
     ImGui::Checkbox("Try on click", &mLookTryOnClick);
+    ImGui::SameLine();
+    ImGui::Checkbox("Pictures", &mLookThumbsShown);
+    EdSetItemTooltip("Each look's picture: this map painted in its layers' colours under that look's sun.");
+    if (mLookThumbsShown) {
+      ImGui::SameLine();
+      if (ImGui::SmallButton("Redraw")) {
+        mLookThumbsRedraw = true;
+      }
+      EdSetItemTooltip("Paint the pictures again from the map as it is now");
+    }
     if (retry && !mLookTried.empty()) {
       request(LookRequest::What::Try, mLookTried);
     }
@@ -2220,18 +2242,37 @@ namespace faf::editor
       c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
     }
     const float swatch = ImGui::GetTextLineHeight();
+    const float picture = mLookThumbsShown ? std::floor(swatch * 2.5f) : 0.0f;
+    const float rowHeight = mLookThumbsShown ? picture : swatch;
+    // Rows on screen ask for their pictures anew each frame, so the ones in view are drawn first.
+    mLookThumbWanted.clear();
     const auto row = [&](const std::string& id, const std::string& title, const std::string& detail) {
       ImGui::PushID(id.c_str());
-      const ImVec2 at = ImGui::GetCursorScreenPos();
+      const ImVec2 corner = ImGui::GetCursorScreenPos();
       const bool chosen = id == mLookChosen || id == mLookTried;
-      if (ImGui::Selectable("##look", chosen, ImGuiSelectableFlags_AllowOverlap)) {
+      if (ImGui::Selectable("##look", chosen, ImGuiSelectableFlags_AllowOverlap, ImVec2(0.0f, rowHeight))) {
         mLookChosen = id;
         if (mLookTryOnClick) {
           request(LookRequest::What::Try, id);
         }
       }
-      // Its colours once read: sky horizon and zenith, sun, water.
       ImDrawList* const draw = ImGui::GetWindowDrawList();
+      ImVec2 at(corner.x, corner.y + (rowHeight - swatch) * 0.5f);
+      if (mLookThumbsShown) {
+        const auto thumb = mLookThumbs.find(id);
+        if (thumb != mLookThumbs.end() && thumb->second != 0U) {
+          draw->AddImage(
+            static_cast<ImTextureID>(thumb->second), corner, ImVec2(corner.x + picture, corner.y + picture)
+          );
+        } else {
+          draw->AddRectFilled(corner, ImVec2(corner.x + picture, corner.y + picture), ChipU32(), 3.0f);
+        }
+        if (thumb == mLookThumbs.end() && ImGui::IsItemVisible()) {
+          mLookThumbWanted.push_back(id);
+        }
+        at.x += picture + Em(6.0f);
+      }
+      // Its colours once read: sky horizon and zenith, sun, water.
       if (const auto known = mLookSwatches.find(id); known != mLookSwatches.end()) {
         for (int c = 0; c < 4; ++c) {
           const float* const rgb = known->second.colours[c];
@@ -2256,7 +2297,11 @@ namespace faf::editor
       ImGui::PopID();
     };
     if (
-      ImGui::BeginChild("##looks", ImVec2(0.0f, ImGui::GetTextLineHeightWithSpacing() * 9.0f), ImGuiChildFlags_Borders)
+      ImGui::BeginChild(
+        "##looks",
+        ImVec2(0.0f, (rowHeight + ImGui::GetStyle().ItemSpacing.y) * (mLookThumbsShown ? 5.0f : 9.0f)),
+        ImGuiChildFlags_Borders
+      )
     ) {
       // The shipped moods and biomes (FAF Studio's library), their thumbnails their colours: sky, sun, shade.
       for (const LookMood& mood : LookMoods()) {

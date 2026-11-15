@@ -232,6 +232,8 @@ namespace faf::editor
         "/meshtest",        "/gfxpreset",
         "/resourcecheck",   "/viewstage",
         "/layoutsave",      "/unittestgame",
+        "/reseattest",      "/exportpreview512",
+        "/lookthumbtest",
       };
       for (const char* const option : kOptions) {
         if (moho::CFG_GetArgOption(option, 0, nullptr)) {
@@ -2179,7 +2181,88 @@ namespace faf::editor
           if (mShell->LookTrying()) {
             mShell->SetLookState({}, {});
           }
+          if (mLookThumbGround.ready) {
+            mShell->ClearLookThumbs();
+            mLookThumbGround = {};
+          }
           return;
+        }
+        if (mShell->TakeLookThumbsRedraw()) {
+          mShell->ClearLookThumbs();
+          mLookThumbGround = {};
+        }
+        fa::vector<fa::string> thumbDir;
+        const bool thumbTest = moho::CFG_GetArgOption("/lookthumbtest", 1, &thumbDir) && !thumbDir.empty();
+        if (thumbTest && !mLookThumbTestQueued && mScene.Attached()) {
+          mLookThumbTestQueued = true;
+          mShell->ShowLighting() = true; // its Looks rows then ask for theirs (logged below as they come)
+          for (std::size_t i = 0; i < LookMoods().size() && i < 3; ++i) {
+            mLookThumbTest.push_back(std::string("mood:") + LookMoods()[i].id);
+          }
+        }
+        const auto takeThumb = [&](std::string& id) {
+          if (mLookThumbTest.empty()) {
+            const bool asked = mShell->TakeLookThumbWanted(id);
+            if (asked) {
+              ++mLookThumbsForRows;
+            } else if (mLookThumbsForRows > 0) {
+              gpg::Logf("editor: look pictures: %d made for the Looks rows on screen", mLookThumbsForRows);
+              mLookThumbsForRows = 0;
+            }
+            return asked;
+          }
+          id = mLookThumbTest.front();
+          mLookThumbTest.erase(mLookThumbTest.begin());
+          return true;
+        };
+        if (std::string wanted; mScene.Attached() && takeThumb(wanted)) {
+          // One look's picture a frame: this map in its layers' colours under the look's own sun.
+          constexpr int kLookThumbSide = 64;
+          std::uint64_t image = 0;
+          Look look;
+          std::string error;
+          if (LoadLook(wanted, look, error)) {
+            std::vector<std::uint32_t> pixels;
+            float width = 0.0f;
+            float depth = 0.0f;
+            std::size_t dots = 0;
+            if (PaintPreview(kLookThumbSide, pixels, width, depth, dots, error, &look.lighting, &mLookThumbGround)) {
+              image = EdImGuiRenderer::CreateImage(kLookThumbSide, kLookThumbSide, pixels.data());
+              if (thumbTest) {
+                double mean[3] = {0.0, 0.0, 0.0};
+                for (const std::uint32_t p : pixels) {
+                  mean[0] += (p >> 16) & 0xFFu;
+                  mean[1] += (p >> 8) & 0xFFu;
+                  mean[2] += p & 0xFFu;
+                }
+                const double n = std::max<double>(1.0, static_cast<double>(pixels.size()));
+                std::string name = wanted;
+                for (char& c : name) {
+                  if (std::isalnum(static_cast<unsigned char>(c)) == 0) {
+                    c = '_';
+                  }
+                }
+                std::string written;
+                const std::filesystem::path out = std::filesystem::path(thumbDir[0].c_str()) / (name + ".png");
+                (void)WriteColourPng(out, kLookThumbSide, kLookThumbSide, pixels, written);
+                gpg::Logf(
+                  "editor: look picture %s: %d x %d, mean colour %.0f %.0f %.0f, image %s, %s",
+                  wanted.c_str(),
+                  kLookThumbSide,
+                  kLookThumbSide,
+                  mean[0] / n,
+                  mean[1] / n,
+                  mean[2] / n,
+                  image != 0U ? "made" : "not made",
+                  written.empty() ? out.string().c_str() : written.c_str()
+                );
+              }
+            }
+          }
+          if (image == 0U) {
+            gpg::Logf("editor: look %s has no picture: %s", wanted.c_str(), error.c_str());
+          }
+          mShell->SetLookThumb(wanted, image);
         }
         EdShell::LookRequest ask;
         if (!mShell->TakeLookRequest(ask)) {
@@ -2651,6 +2734,7 @@ namespace faf::editor
       // Test in game (FAF Studio's unittest.lua): the unit under test and its dummy targets in the play, by SimLua
       // lines (the editor's plays have cheats on); the sim reports the state once a second (EDUNITTEST live).
       bool mUnitTestSpawned = false;
+      bool mUnitTestRestart = false; // Restart: the play stopped, played again once it has
       int mUnitTestFrames = 0;
       int mUnitTestScript = 0; // `/unittestgame`: the step of the test run
 
@@ -2684,15 +2768,16 @@ namespace faf::editor
           "', b.Name, x, GetTerrainHeight(x, z), z, 0, 0, 0) "
           "EdTest = { unit = u, id = '" +
           id +
-          "', x = x, z = z, targets = {} } "
+          "', x = x, z = z, targets = {}, maxes = {}, army = b } "
           "if e then SetAlliance(b:GetArmyIndex(), e:GetArmyIndex(), 'Enemy') "
           "local list = { { 'uel0106', -10, 25 }, { 'ueb2101', 0, 28 }, { 'uea0101', 10, 25 } } "
           "local sx, sz = x + 20, z + 35 "
           "if GetSurfaceHeight(sx, sz) > GetTerrainHeight(sx, sz) + 1 then table.insert(list, { 'ues0103', 20, 35 }) "
           "end "
           "for _, t in list do local tx, tz = x + t[2], z + t[3] "
-          "table.insert(EdTest.targets, CreateUnitHPR(t[1], e.Name, tx, GetTerrainHeight(tx, tz), tz, 0, 0, 0)) end "
-          "end "
+          "local tu = CreateUnitHPR(t[1], e.Name, tx, GetTerrainHeight(tx, tz), tz, 0, 0, 0) "
+          "table.insert(EdTest.targets, tu) table.insert(EdTest.maxes, tu and tu:GetMaxHealth() or 0) end "
+          "else LOG('EDUNITTEST note the map has no second army for the targets') end "
           "if not rawget(_G, 'EdTestThread') then EdTestThread = ForkThread(function() while true do "
           "local T = rawget(_G, 'EdTest') if T then local u = T.unit local s "
           "if u and not u:IsDead() then local p = u:GetPosition() "
@@ -2702,7 +2787,13 @@ namespace faf::editor
           "local th = '' for _, t in T.targets do if t and not t:IsDead() then "
           "th = th .. math.floor(t:GetHealth()) .. '/' .. math.floor(t:GetMaxHealth()) .. ' ' else th = th .. 'dead ' "
           "end end "
-          "LOG('EDUNITTEST live ' .. T.id .. '|' .. s .. '|' .. th) end WaitSeconds(1) end end) end end"
+          "local dealt = 0 for i, t in T.targets do local m = T.maxes[i] or 0 "
+          "if t and not t:IsDead() then dealt = dealt + m - t:GetHealth() else dealt = dealt + m end end "
+          "local built = 0 for _, e in T.army:GetListOfUnits(categories.ALLUNITS, false) do "
+          "if e ~= T.unit and e:GetBlueprint().BlueprintId == T.id and e:GetFractionComplete() >= 1 then "
+          "built = built + 1 end end "
+          "LOG('EDUNITTEST live ' .. T.id .. '|' .. s .. '|' .. th .. '|' .. math.floor(dealt) .. '|' .. built) end "
+          "WaitSeconds(1) end end) end end"
         );
         gpg::Logf("editor: test in game: %s and its targets asked for", id.c_str());
       }
@@ -2727,10 +2818,64 @@ namespace faf::editor
           SimLine(unit + "u:SetHealth(u, u:GetMaxHealth()) end");
         } else if (order == "kill") {
           SimLine(unit + "u:Kill() end");
+        } else if (order.rfind("fire:", 0) == 0 || order.rfind("effect:", 0) == 0) {
+          // fire:<projectile blueprint>:<speed> / effect:<EffectTemplates name>:<height>; the name goes into Lua, so
+          // only path characters pass.
+          const std::size_t a = order.find(':');
+          const std::size_t b = order.rfind(':');
+          std::string name = b > a ? order.substr(a + 1, b - a - 1) : std::string();
+          const double number = b > a ? std::atof(order.c_str() + b + 1) : 0.0;
+          const bool ok = !name.empty() && std::all_of(name.begin(), name.end(), [](const char c) {
+            return std::isalnum(static_cast<unsigned char>(c)) != 0 || c == '_' || c == '/' || c == '.' || c == '-';
+          });
+          if (!ok) {
+            gpg::Warnf("editor: test in game: %s isn't a blueprint or template name", name.c_str());
+            return;
+          }
+          char speed[32];
+          (void)std::snprintf(speed, sizeof(speed), "%.2f", number);
+          if (order[0] == 'f') {
+            SimLine(
+              unit + "local p = u:CreateProjectile('" + name + "', 0, 1.5, 0, 0, 0.3, 1) if p then p:SetVelocity(" +
+              speed + ") LOG('EDUNITTEST note fired " + name + "') end end"
+            );
+          } else {
+            SimLine(
+              unit + "local et = import('/lua/effecttemplates.lua') local list = et['" + name +
+              "'] "
+              "if list then for _, e in list do local em = CreateEmitterAtEntity(u, u:GetArmy(), e) "
+              "if em then em:OffsetEmitter(0, " +
+              speed + ", 0) end end LOG('EDUNITTEST note played " + name +
+              "') else LOG('EDUNITTEST note no effect template " + name + "') end end"
+            );
+          }
+        } else if (order == "build") {
+          // Studio's Build: a factory (mobile units) or an engineer (structures) of the game whose build menu has the
+          // unit, the tech 1 one first, made near the unit and ordered to build it (proves the build menu entry).
+          SimLine(
+            "local T = rawget(_G, 'EdTest') if T then local target = __blueprints[T.id] "
+            "local hash = target and target.CategoriesHash or {} local structure = hash.STRUCTURE local best "
+            "for bid, b in __blueprints do local c = b.CategoriesHash "
+            "if c and b.Economy and b.Economy.BuildableCategory and string.sub(bid, 1, 1) ~= 'z' then "
+            "local good if structure then good = c.ENGINEER and c.MOBILE and not c.COMMAND and not c.SUBCOMMAND "
+            "else good = c.FACTORY and c.STRUCTURE and not c.SUPPORTFACTORY end "
+            "if good then for _, cat in b.Economy.BuildableCategory do "
+            "local ok, pc = pcall(ParseEntityCategory, cat) "
+            "if ok and pc and EntityCategoryContains(pc, T.id) then "
+            "if not best or string.sub(bid, 4, 5) == '01' then best = bid end break end end end end end "
+            "if not best then LOG('EDUNITTEST note no factory or engineer of the game builds ' .. T.id) else "
+            "local x, z = T.x - 14, T.z - 6 "
+            "local bu = CreateUnitHPR(best, T.army.Name, x, GetTerrainHeight(x, z), z, 0, 0, 0) "
+            "if bu then IssueClearCommands({ bu }) if structure then "
+            "IssueBuildMobile({ bu }, Vector(T.x - 14, GetTerrainHeight(T.x - 14, T.z + 10), T.z + 10), T.id, {}) "
+            "else IssueBuildFactory({ bu }, T.id, 1) end T.builder = bu "
+            "LOG('EDUNITTEST note ' .. best .. ' builds ' .. T.id) end end end"
+          );
         } else if (order == "respawn" || order == "end") {
           SimLine(
             "local T = rawget(_G, 'EdTest') if T then if T.unit and not T.unit:IsDead() then T.unit:Destroy() end "
             "for _, t in T.targets do if t and not t:IsDead() then t:Destroy() end end "
+            "if T.builder and not T.builder:IsDead() then T.builder:Destroy() end "
             "if '" +
             order + "' == 'end' then rawset(_G, 'EdTest', false) end end"
           );
@@ -2747,7 +2892,7 @@ namespace faf::editor
         if (
           // The map view is detached during the play: only the first step waits for it.
           // ... and the rules are lent to the play's session while it runs (RULE_PeekKept is null then).
-          mUnitTestScript >= 6 || (mUnitTestScript == 0 && (!mScene.Attached() || moho::RULE_PeekKept() == nullptr)) ||
+          mUnitTestScript >= 10 || (mUnitTestScript == 0 && (!mScene.Attached() || moho::RULE_PeekKept() == nullptr)) ||
           !moho::CFG_GetArgOption("/unittestgame", 0, nullptr)
         ) {
           return;
@@ -2764,7 +2909,7 @@ namespace faf::editor
           std::string error;
           if (!panel.Open("EditorUnitTestGame", error) && !panel.Create("EditorUnitTestGame", error)) {
             gpg::Warnf("editor: /unittestgame: no project: %s", error.c_str());
-            mUnitTestScript = 6;
+            mUnitTestScript = 10;
             return;
           }
           lab.SelectUnit("uel0201");
@@ -2782,7 +2927,7 @@ namespace faf::editor
             frames = 0;
           } else if (frames > 60 * 90) {
             gpg::Warnf("editor: /unittestgame: no state from the sim after 90 s");
-            mUnitTestScript = 5;
+            mUnitTestScript = 9;
           }
           return;
         case 2:
@@ -2796,20 +2941,63 @@ namespace faf::editor
         case 3:
           if (frames == 60 * 2) {
             gpg::Logf("editor: /unittestgame: after Heal: %s", lab.testStatus.c_str());
-            lab.AskTestOrder("end");
+            lab.AskTestOrder("build"); // a factory of the game builds another uel0201
             mUnitTestScript = 4;
             frames = 0;
           }
           return;
         case 4:
-          if (frames == 60) {
+          if (frames == 60 * 25) {
+            gpg::Logf(
+              "editor: /unittestgame: 25 s after Build: %s; note: %s", lab.testStatus.c_str(), lab.testNote.c_str()
+            );
+            lab.AskTestOrder("respawn");
             mUnitTestScript = 5;
+            frames = 0;
           }
           return;
         case 5:
-          mPlay.Stop();
-          gpg::Logf("editor: /unittestgame: done");
-          mUnitTestScript = 6;
+          if (frames == 60 * 2) {
+            lab.AskTestOrder("fire:/projectiles/tdfgauss01/tdfgauss01_proj.bp:25.0");
+            mUnitTestScript = 6;
+            frames = 0;
+          }
+          return;
+        case 6:
+          if (frames == 60 * 2) {
+            gpg::Logf("editor: /unittestgame: after Fire: note: %s", lab.testNote.c_str());
+            lab.AskTestOrder("effect:ConcussionRingMed01:2.0");
+            mUnitTestScript = 7;
+            frames = 0;
+          }
+          return;
+        case 7:
+          if (frames == 60 * 2) {
+            gpg::Logf("editor: /unittestgame: after Play effect: note: %s", lab.testNote.c_str());
+            lab.AskTestOrder("restart");
+            mUnitTestScript = 8;
+            frames = 0;
+          }
+          return;
+        case 8:
+          // Restarted: a new state from the new play (not the "Restarting..." placeholder).
+          if (frames > 60 * 5 && !lab.testStatus.empty() && lab.testStatus != "Restarting..." && mPlay.Active()) {
+            gpg::Logf("editor: /unittestgame: after Restart: %s", lab.testStatus.c_str());
+            lab.AskTestOrder("end");
+            mUnitTestScript = 9;
+            frames = 0;
+          } else if (frames > 60 * 120) {
+            gpg::Warnf("editor: /unittestgame: no state after Restart in 120 s");
+            mUnitTestScript = 9;
+            frames = 0;
+          }
+          return;
+        case 9:
+          if (frames == 60) {
+            mPlay.Stop();
+            gpg::Logf("editor: /unittestgame: done");
+            mUnitTestScript = 10;
+          }
           return;
         default:
           return;
@@ -2821,6 +3009,16 @@ namespace faf::editor
       {
         EdUnitLabPanel& lab = mShell->UnitLab();
         if (lab.TakeTestInGameAsk() && !lab.Unit().empty()) {
+          // Every projectile of the game, for Fire (read now: the rules are lent to the play's session while it runs).
+          if (
+            moho::RRuleGameRules* const rules = moho::RULE_PeekKept(); rules != nullptr && lab.testProjectiles.empty()
+          ) {
+            for (const auto& [id, blueprint] : rules->GetProjectileBlueprints()) {
+              (void)blueprint;
+              lab.testProjectiles.emplace_back(id.c_str());
+            }
+            std::sort(lab.testProjectiles.begin(), lab.testProjectiles.end());
+          }
           if (PlayModProject()) {
             lab.testUnit = lab.Unit();
             lab.testStatus.clear();
@@ -2835,6 +3033,22 @@ namespace faf::editor
         }
         ++mUnitTestFrames;
         moho::CWldSession* const session = moho::WLD_GetActiveSession();
+        // Restart (Studio's): the play stopped; the project is written and played again.
+        if (mUnitTestRestart) {
+          if (!mPlay.Active() && mUnitTestFrames > 30) {
+            mUnitTestRestart = false;
+            mUnitTestSpawned = false;
+            mUnitTestFrames = 0;
+            lab.testStatus = "Restarting...";
+            if (!PlayModProject()) {
+              lab.testUnit.clear();
+              PostStatusMessage("Test in game: the play couldn't start again");
+            } else {
+              gpg::Logf("editor: test in game: restarted (the project written and played again)");
+            }
+          }
+          return;
+        }
         if (!mPlay.Active() && mUnitTestFrames > 600) {
           lab.testUnit.clear(); // the play ended
           return;
@@ -2857,10 +3071,19 @@ namespace faf::editor
               (f[1] == "alive"
                  ? ": " + f[2] + " / " + f[3] + " health at " + f[4] + ", " + f[5] + ", " + f[6] + " orders"
                  : ": dead") +
-              "; targets: " + (f[7].empty() ? "none" : f[7]);
+              "; targets: " + (f[7].empty() ? "none" : f[7]) +
+              (f.size() >= 10 ? "; damage dealt " + f[8] + ", built " + f[9] : std::string());
           }
         }
-        if (const std::string order = lab.TakeTestOrder(); !order.empty() && mUnitTestSpawned) {
+        if (std::string note; mLog.TakeUnitTestNote(note)) {
+          lab.testNote = note;
+        }
+        if (const std::string order = lab.TakeTestOrder(); order == "restart" && mUnitTestSpawned) {
+          UnitTestOrder("end");
+          mPlay.Stop();
+          mUnitTestRestart = true;
+          mUnitTestFrames = 0;
+        } else if (!order.empty() && mUnitTestSpawned) {
           UnitTestOrder(order);
           if (order == "respawn") {
             SpawnUnitTest(lab.testUnit);
@@ -3566,6 +3789,7 @@ namespace faf::editor
           p.unit = "dalk003";
           p.fireWeapon = 1;
           p.fire = true;
+          p.frame = "range"; // its largest weapon range in view: the distance is 2.4 x that range
           break;
         }
         case 13:
@@ -3646,6 +3870,34 @@ namespace faf::editor
       int mViewTestStage = 0;
       int mViewTestFrames = 0;
       int mMeshTestFrames = 0; // `/meshtest`: frames since the import was asked (0: none)
+      int mReseatTestFrames = 0; // `/reseattest`: frames since the ground was raised (0: none)
+      void DriveReseatTest()
+      {
+        if (mReseatTestFrames == 0 || ++mReseatTestFrames != 30) {
+          return;
+        }
+        mReseatTestFrames = 0;
+        const float c = static_cast<float>(std::max(mDocument.Facts().fieldWidth - 1, 2)) * 0.5f;
+        for (const EdMapScene::ModObject& p : mScene.ModProps()) {
+          if (std::fabs(p.x - (c + 20.0f)) < 1.0f && std::fabs(p.z - c) < 1.0f) {
+            gpg::Logf(
+              "editor: /reseattest: the prop stands at %.2f, the ground there %.2f",
+              static_cast<double>(p.y),
+              static_cast<double>(mScene.GroundHeightAt(p.x, p.z))
+            );
+          }
+        }
+        for (const EdMapScene::ModObject& u : mScene.ModUnits()) {
+          if (std::fabs(u.x - (c - 20.0f)) < 1.5f && std::fabs(u.z - c) < 1.5f) {
+            gpg::Logf(
+              "editor: /reseattest: unit %s stands at %.2f, the ground there %.2f",
+              u.name.c_str(),
+              static_cast<double>(u.y),
+              static_cast<double>(mScene.GroundHeightAt(u.x, u.z))
+            );
+          }
+        }
+      }
       // Named workspace layouts (FAF Studio's shell save / load layout): `layouts/<name>.ini` in the settings folder.
       std::filesystem::path mLayoutToLoad;
       bool mShowLayouts = false;
@@ -5617,6 +5869,10 @@ namespace faf::editor
       std::string mLookTriedName;
       std::map<std::string, Look> mLookCache;
       bool mLooksListed = false;
+      /** `/lookthumbtest <folder>`: the looks whose pictures are made and written there, then logged. */
+      std::vector<std::string> mLookThumbTest;
+      bool mLookThumbTestQueued = false;
+      int mLookThumbsForRows = 0; // pictures the Looks rows asked for since the queue last ran dry (logged then)
       std::string mLookTestArg; // `/looktest <map>,<sections>,<blend>,apply|revert|keep` (test runs)
       std::string mEnvTestArg;  // `/envtest cubes|sky` (test runs)
       std::string mWaterMaskTestArg; // `/watermasktest foam|flatness|bias,<value>,<radius>[,keep]` (test runs)
@@ -6024,6 +6280,34 @@ namespace faf::editor
           std::string error;
           return LoadUnitWizardData(EmbeddedEditorData("unitwizdata.lua"), data, error) ? std::string() : error;
         });
+        mSelfTests.Add("turn a selected marker, then undo", [this] {
+          const auto& markers = mDocument.SaveData().Markers();
+          if (markers.empty()) {
+            return std::string("skip: the map has no markers");
+          }
+          const std::string name = markers.front().name;
+          const auto heading = [this, &name]() {
+            for (const SaveEntry& m : mDocument.SaveData().Markers()) {
+              if (m.name == name) {
+                std::vector<double> o = ValueNumbers(m.Get("orientation"));
+                return o.size() >= 2 ? o[1] : 0.0;
+              }
+            }
+            return 0.0;
+          };
+          const double before = heading();
+          mScene.SelectMarkers({name}, false);
+          const bool turned = mScene.TurnEverySelected(0.7853982f);
+          const double after = heading();
+          (void)mScene.Undo();
+          const double back = heading();
+          mScene.SelectMarkers({}, false);
+          if (!turned || std::fabs(after - before - 0.7853982) > 1.0e-3) {
+            return "the marker didn't turn by 45 degrees (" + std::to_string(before) + " -> " + std::to_string(after) +
+              ")";
+          }
+          return std::fabs(back - before) < 1.0e-6 ? std::string() : std::string("undo didn't turn it back");
+        });
         mSelfTests.Add("undo and redo of a marker", [this] {
           const std::size_t before = mDocument.SaveData().Markers().size();
           const MarkerType* const type = FindMarkerType("Blank Marker");
@@ -6067,6 +6351,39 @@ namespace faf::editor
         if (fa::vector<fa::string> obj; moho::CFG_GetArgOption("/meshtest", 1, &obj) && !obj.empty()) {
           mShell->AskMeshImport(obj[0].c_str(), true);
           mMeshTestFrames = 1;
+        }
+        // `/reseattest` (test runs): a prop and a unit placed, the ground under both raised by 10, and 30 frames later
+        // their heights against the ground's (DriveReseatTest).
+        if (moho::CFG_GetArgOption("/reseattest", 0, nullptr)) {
+          const float w = static_cast<float>(std::max(mDocument.Facts().fieldWidth - 1, 2));
+          const float c = w * 0.5f;
+          std::string unitName;
+          const std::string prop = mScene.ModAddProp("/env/evergreen/props/rocks/rock01_prop.bp", c + 20.0f, c, 1.0f);
+          const std::string unit = mScene.ModAddUnit("uel0201", "ARMY_1", c - 20.0f, c, unitName);
+          gpg::Logf(
+            "editor: /reseattest: prop %s, unit %s",
+            prop.empty() ? "placed" : prop.c_str(),
+            unit.empty() ? unitName.c_str() : unit.c_str()
+          );
+          gpg::Logf(
+            "editor: /reseattest: the ground before: %.2f under the prop, %.2f under the unit; raising both by 10",
+            static_cast<double>(mScene.GroundHeightAt(c + 20.0f, c)),
+            static_cast<double>(mScene.GroundHeightAt(c - 20.0f, c))
+          );
+          for (const float x : {c + 20.0f, c - 20.0f}) {
+            const int x0 = static_cast<int>(x) - 6;
+            const int z0 = static_cast<int>(c) - 6;
+            std::vector<float> heights(13 * 13);
+            for (int dz = 0; dz < 13; ++dz) {
+              for (int dx = 0; dx < 13; ++dx) {
+                heights[static_cast<std::size_t>(dz) * 13 + dx] =
+                  mScene.GroundHeightAt(static_cast<float>(x0 + dx), static_cast<float>(z0 + dz)) + 10.0f;
+              }
+            }
+            std::string why;
+            (void)mScene.WriteHeightRect(x0, z0, 13, 13, heights, why);
+          }
+          mReseatTestFrames = 1;
         }
         // `/resourcecheck` (test runs): the resources by the build rules, logged one line a marker.
         if (moho::CFG_GetArgOption("/resourcecheck", 0, nullptr)) {
@@ -6123,6 +6440,12 @@ namespace faf::editor
         if (fa::vector<fa::string> file; moho::CFG_GetArgOption("/exportpreview", 1, &file) && !file.empty()) {
           std::string message;
           const bool ok = mDocument.ExportPreview(file[0].c_str(), message);
+          (ok ? gpg::Logf : gpg::Warnf)("editor: %s", message.c_str());
+        }
+        // `/exportpreview512 <file>` (test runs): the preview painted at 512 px (layers' colours, the map's sun).
+        if (fa::vector<fa::string> file; moho::CFG_GetArgOption("/exportpreview512", 1, &file) && !file.empty()) {
+          std::string message;
+          const bool ok = ExportPaintedPreview(file[0].c_str(), 512, message);
           (ok ? gpg::Logf : gpg::Warnf)("editor: %s", message.c_str());
         }
         // `/dropdefaultcube` (test runs): the map's <default> reflection cube taken away first (a save adds it back).
@@ -6211,6 +6534,30 @@ namespace faf::editor
       void StartResize(const EdShell::ResizeRequest& request);
       /** Map > Regenerate preview: the lobby picture drawn anew from the heights, the sea and the markers. */
       bool RegeneratePreview(std::string& message);
+      /** The lobby preview painted at `side` (FAF Studio's preview.lua look): layers' colours, the map's sun, dots. */
+      /** What every picture of this map shares (heights and layer colours), kept while the look pictures are made. */
+      struct PreviewGround
+      {
+        HeightImage heights;
+        std::array<std::array<float, 3>, 9> colours{};
+        bool ready = false;
+      };
+      PreviewGround mLookThumbGround;
+      /** `lighting` (null: the map's) lights it; `ground` (null: read now) keeps the heights and colours between calls.
+       */
+      bool PaintPreview(
+        int side,
+        std::vector<std::uint32_t>& pixels,
+        float& width,
+        float& depth,
+        std::size_t& dotCount,
+        std::string& message,
+        const LightingState* lighting = nullptr,
+        PreviewGround* ground = nullptr
+      );
+      std::array<std::array<float, 3>, 9> LayerColours();
+      /** File > Export the lobby preview at 512 px: painted afresh at that size, as a PNG. */
+      bool ExportPaintedPreview(const std::filesystem::path& file, int side, std::string& message);
       void FinishResize();
       struct PendingResize
       {
@@ -6922,6 +7269,21 @@ namespace faf::editor
           PostStatusMessage(message);
         }
       }, mapOpen, {}, "The map's preview picture, as the lobby shows it, as a PNG");
+      add("file.exportpreview512", "Export the lobby preview at 512 px (PNG)...", "File", "", [this] {
+        const std::filesystem::path path = AskFile(
+          HandleOf(mGame.supcomFrame),
+          true,
+          L"PNG picture (*.png)\0*.png\0",
+          L"png",
+          L"Export the lobby preview at 512 px"
+        );
+        if (!path.empty()) {
+          std::string message;
+          const bool ok = ExportPaintedPreview(path, 512, message);
+          (ok ? gpg::Logf : gpg::Warnf)("editor: %s", message.c_str());
+          PostStatusMessage(message);
+        }
+      }, mapOpen, {}, "The preview painted afresh at 512 x 512 (its layers' colours under the map's sun), as a PNG");
       add("file.saveas", "Save as new map folder...", "File", "Ctrl+Shift+S", [this] {
         mShell->OpenSaveAs();
       }, mapOpen);
@@ -7212,12 +7574,12 @@ namespace faf::editor
       add("object.turnleft", "Turn the selection left", "Object", "Q", [this] {
         (void)mScene.TurnSelectedProps(-0.2617994f);
       }, [this]() -> std::string {
-        return mScene.CanTurnSelectedProps() ? std::string() : "no props selected under the Select tool";
+        return mScene.CanTurnSelectedProps() ? std::string() : "nothing selected under the Select tool";
       });
       add("object.turnright", "Turn the selection right", "Object", "E", [this] {
         (void)mScene.TurnSelectedProps(0.2617994f);
       }, [this]() -> std::string {
-        return mScene.CanTurnSelectedProps() ? std::string() : "no props selected under the Select tool";
+        return mScene.CanTurnSelectedProps() ? std::string() : "nothing selected under the Select tool";
       });
       add("view.turnleft", "Turn the camera left", "View", "Q", [this] {
         mScene.StepCamera(-0.2617994f, 1.0f);
@@ -7625,6 +7987,7 @@ namespace faf::editor
            cmd("file.updatepreview"),
            cmd("file.package"),
            cmd("file.exportpreview"),
+           cmd("file.exportpreview512"),
            sep(),
            cmd("file.recover"),
            cmd("settings.open"),
@@ -10748,26 +11111,103 @@ namespace faf::editor
       std::string& message
     )
     {
+      std::vector<std::uint32_t> pixels;
+      float width = 0.0f;
+      float depth = 0.0f;
+      std::size_t dots = 0;
+      if (!PaintPreview(kPreviewSide, pixels, width, depth, dots, message)) {
+        return false;
+      }
+      mDocument.SetPreviewRecord(PreviewRecord(width, depth, pixels));
+      message = "Drew the lobby preview anew (" + std::to_string(dots) +
+        " start positions and resources on it, the ground in its layers' colours under the map's sun); saving the map "
+        "writes it";
+      return true;
+    }
+
+    std::array<std::array<float, 3>, 9> EditorApp::LayerColours()
+    {
+      // Each layer's albedo texture's average colour (8 x 8 decoded), base first: what the preview paints with.
+      std::array<std::array<float, 3>, 9> out{};
+      const std::vector<LayerSettings> layers = mScene.LayerSettingsNow();
+      gpg::gal::imaging::ImageCodec* const codec = gpg::gal::imaging::ImageCodec::Instance();
+      for (std::size_t i = 0; i < out.size(); ++i) {
+        out[i] = {128.0f, 128.0f, 128.0f};
+        std::string bytes;
+        if (
+          codec == nullptr || i >= layers.size() || layers[i].albedo.empty() || !ReadGameFile(layers[i].albedo, bytes)
+        ) {
+          continue;
+        }
+        gpg::gal::imaging::DecodeOptions options;
+        options.format = DXGI_FORMAT_B8G8R8A8_UNORM;
+        options.width = 8;
+        options.height = 8;
+        options.mipLevels = 1;
+        gpg::gal::imaging::Image image;
+        if (
+          FAILED(codec->Decode(bytes.data(), bytes.size(), options, image)) || image.subresources.empty() ||
+          image.format != DXGI_FORMAT_B8G8R8A8_UNORM
+        ) {
+          continue;
+        }
+        const auto& level = image.subresources.front();
+        double sum[3] = {0.0, 0.0, 0.0};
+        std::size_t n = 0;
+        for (std::uint32_t y = 0; y < level.height; ++y) {
+          const auto* row =
+            reinterpret_cast<const std::uint8_t*>(image.bytes.data()) + level.offset + y * level.rowPitch;
+          for (std::uint32_t x = 0; x < level.width; ++x, ++n) {
+            sum[0] += row[x * 4 + 2];
+            sum[1] += row[x * 4 + 1];
+            sum[2] += row[x * 4 + 0];
+          }
+        }
+        if (n > 0) {
+          out[i] = {static_cast<float>(sum[0] / n), static_cast<float>(sum[1] / n), static_cast<float>(sum[2] / n)};
+        }
+      }
+      return out;
+    }
+
+    bool EditorApp::PaintPreview(
+      const int side,
+      std::vector<std::uint32_t>& pixels,
+      float& width,
+      float& depth,
+      std::size_t& dotCount,
+      std::string& message,
+      const LightingState* const lighting,
+      PreviewGround* const ground
+    )
+    {
       if (mDocument.GetState() != EdDocument::State::Open || !mScene.Attached()) {
         message = "Open a map first.";
         return false;
       }
-      std::error_code ec;
-      const std::filesystem::path dir = std::filesystem::temp_directory_path(ec) / "FafEditor";
-      std::filesystem::create_directories(dir, ec);
-      const std::filesystem::path file = dir / "preview_heights.png";
-      HeightImage heights;
-      std::string error;
-      if (!mScene.ExportHeights(file, 0, 1.0f, message) || !ReadHeightImage(file, 0, 0, heights, error)) {
-        message = "The preview needs the heights: " + message + error;
-        return false;
+      PreviewGround fresh;
+      PreviewGround& use = ground != nullptr ? *ground : fresh;
+      if (!use.ready) {
+        std::error_code ec;
+        const std::filesystem::path dir = std::filesystem::temp_directory_path(ec) / "FafEditor";
+        std::filesystem::create_directories(dir, ec);
+        const std::filesystem::path file = dir / "preview_heights.png";
+        std::string error;
+        if (!mScene.ExportHeights(file, 0, 1.0f, message) || !ReadHeightImage(file, 0, 0, use.heights, error)) {
+          message = "The preview needs the heights: " + message + error;
+          return false;
+        }
+        use.colours = LayerColours();
+        use.ready = true;
       }
+      const HeightImage& heights = use.heights;
       PreviewOptions options;
       const EdDocument::LookEnvironment look = mDocument.LookEnvironmentNow();
       options.water = look.water.enabled;
       options.waterLevel = look.water.elevation;
-      // Resources first, start positions on top (as the lobby draws them).
-      for (int pass = 0; pass < 2; ++pass) {
+      // Resources first, start positions on top (as the lobby draws them). The dots are pixels wide, so a look's small
+      // picture (under 128 px) leaves them out: they'd cover the ground it shows.
+      for (int pass = 0; pass < (side >= 128 ? 2 : 0); ++pass) {
         for (const SaveEntry& marker : mDocument.SaveData().Markers()) {
           float x = 0.0f;
           float y = 0.0f;
@@ -10787,11 +11227,60 @@ namespace faf::editor
         }
       }
       const MapFacts& facts = mDocument.Facts();
-      const float width = static_cast<float>(facts.sizeX > 0 ? facts.sizeX : heights.width - 1);
-      const float depth = static_cast<float>(facts.sizeZ > 0 ? facts.sizeZ : heights.height - 1);
-      mDocument.SetPreviewRecord(PreviewRecord(width, depth, PreviewPixels(heights, width, depth, options)));
-      message = "Drew the lobby preview anew (" + std::to_string(options.dots.size()) +
-        " start positions and resources on it); saving the map writes it";
+      width = static_cast<float>(facts.sizeX > 0 ? facts.sizeX : heights.width - 1);
+      depth = static_cast<float>(facts.sizeZ > 0 ? facts.sizeZ : heights.height - 1);
+      // FAF Studio's preview.lua: the ground in its texture layers' colours (base, then layers 1..8 by their paint),
+      // lit by the map's sun and ambience.
+      options.side = side;
+      const std::array<std::array<float, 3>, 9>& colours = use.colours;
+      options.groundColour = [this, &colours](const float x, const float z, float (&rgb)[3]) {
+        for (int i = 0; i < 3; ++i) {
+          rgb[i] = colours[0][static_cast<std::size_t>(i)];
+        }
+        for (int layer = 1; layer <= 8; ++layer) {
+          const float w = mScene.LayerWeightAt(layer, x, z);
+          if (w > 0.0f) {
+            for (int i = 0; i < 3; ++i) {
+              rgb[i] +=
+                (colours[static_cast<std::size_t>(layer)][static_cast<std::size_t>(i)] - rgb[i]) * std::min(w, 1.0f);
+            }
+          }
+        }
+        return true;
+      };
+      const LightingState light = lighting != nullptr ? *lighting : mDocument.LightingNow();
+      options.sun = true;
+      for (int i = 0; i < 3; ++i) {
+        options.sunDirection[i] = light.sunDirection[i];
+        options.sunColour[i] = light.sunColor[i];
+        options.ambient[i] = light.sunAmbience[i];
+      }
+      options.multiplier = light.multiplier;
+      pixels = PreviewPixels(heights, width, depth, options);
+      dotCount = options.dots.size();
+      return true;
+    }
+
+    bool EditorApp::ExportPaintedPreview(
+      const std::filesystem::path& file,
+      const int side,
+      std::string& message
+    )
+    {
+      std::vector<std::uint32_t> pixels;
+      float width = 0.0f;
+      float depth = 0.0f;
+      std::size_t dots = 0;
+      if (!PaintPreview(side, pixels, width, depth, dots, message)) {
+        return false;
+      }
+      std::string error;
+      if (!WriteColourPng(file, side, side, pixels, error)) {
+        message = error;
+        return false;
+      }
+      message = "Exported the lobby preview painted at " + std::to_string(side) + " x " + std::to_string(side) +
+        " to " + file.filename().string();
       return true;
     }
 
@@ -12018,6 +12507,7 @@ namespace faf::editor
       }
       DriveUnitTest();
       TestUnitInGame();
+      DriveReseatTest();
       if (std::string unit; mShell->UnitLab().TakeModelAsk(unit)) {
         const std::filesystem::path obj = AskFile(
           HandleOf(mGame.supcomFrame),
@@ -12863,14 +13353,19 @@ namespace faf::editor
         tools.SetShowSlope(moho::CFG_GetArgOption("/slope", 0, nullptr) || tools.ShowSlope());
         tools.SetShowKmGrid(moho::CFG_GetArgOption("/kmgrid", 0, nullptr) || tools.ShowKmGrid());
         if (fa::vector<fa::string> value; moho::CFG_GetArgOption("/ruler", 1, &value) && !value.empty()) {
-          float ends[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+          // x0,z0,x1,z1[,x2,z2...]: every further point goes on from the last end (Alt+Shift+drag).
+          std::vector<float> ends;
           std::string list = value[0].c_str();
-          for (int i = 0; i < 4 && !list.empty(); ++i) {
-            ends[i] = static_cast<float>(std::atof(list.c_str()));
+          while (!list.empty()) {
+            ends.push_back(static_cast<float>(std::atof(list.c_str())));
             const std::size_t comma = list.find(',');
             list = comma == std::string::npos ? std::string() : list.substr(comma + 1);
           }
+          ends.resize(std::max<std::size_t>(ends.size() & ~std::size_t{1}, 4), 0.0f);
           mScene.SetRuler(ends[0], ends[1], ends[2], ends[3]);
+          for (std::size_t i = 4; i + 1 < ends.size(); i += 2) {
+            mScene.ContinueRuler(ends[i], ends[i + 1]);
+          }
         }
       }
       // `/unitgroup <add|rename|remove|move|select>,<a/b path>[,<name>]` (test runs), on the Units tool's army.

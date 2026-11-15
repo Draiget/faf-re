@@ -233,7 +233,7 @@ namespace faf::editor
         ImGui::TextUnformatted(now.name.c_str());
       }
       if (now.count > 1) {
-        ImGui::TextDisabled("and %d more selected (the first is edited)", now.count - 1);
+        ImGui::TextDisabled("and %d more selected (the first is edited; a heading turns them all)", now.count - 1);
       }
     }
 

@@ -797,6 +797,8 @@ namespace faf::editor
 
   void EdMapScene::TickPaths()
   {
+    // (Each frame, beside the paths: the units a height change left off the ground.)
+    ReseatUnitsNow();
     if (mPathEdit == nullptr || mMap == nullptr) {
       return;
     }

@@ -18,6 +18,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <map>
 
 namespace faf::editor
 {
@@ -233,6 +234,187 @@ namespace faf::editor
     }
     return {};
   }
+  std::string EdMapScene::RulerText() const
+  {
+    const float segment = std::hypot(mRulerTo[0] - mRulerFrom[0], mRulerTo[1] - mRulerFrom[1]);
+    if (mRulerDone.empty()) {
+      return DistanceText(segment);
+    }
+    float total = segment;
+    for (const std::array<float, 4>& seg : mRulerDone) {
+      total += std::hypot(seg[2] - seg[0], seg[3] - seg[1]);
+    }
+    return DistanceText(segment) + ", total " + DistanceText(total) + " over " + std::to_string(mRulerDone.size() + 1) +
+      " segments";
+  }
+
+  bool EdMapScene::TurnEverySelected(
+    const float radians
+  )
+  {
+    // Studio's gizmo turn of any selection: every selected prop, marker, unit and decal turns about its own middle.
+    bool any = false;
+    if (!mSelection.empty()) {
+      TurnSelection(radians); // props: their own undo step (with their mirrored copies)
+      any = true;
+    }
+    if (!mMarkerSelection.empty() || !mUnitSelection.empty()) {
+      EdDocument::SaveSnapshot before = mDocument.SaveDataNow();
+      bool changed = false;
+      for (SaveEntry& marker : mDocument.SaveData().Markers()) {
+        if (std::find(mMarkerSelection.begin(), mMarkerSelection.end(), marker.name) == mMarkerSelection.end()) {
+          continue;
+        }
+        std::vector<double> o = ValueNumbers(marker.Get("orientation"));
+        o.resize(3, 0.0);
+        o[1] += radians;
+        marker.Set("orientation", Vector3Value(o[0], o[1], o[2]));
+        changed = true;
+      }
+      std::map<std::string, std::vector<std::string>> byArmy;
+      for (const auto& [army, name] : mUnitSelection) {
+        byArmy[army].push_back(name);
+      }
+      for (const auto& [army, names] : byArmy) {
+        changed = EditArmyUnits(
+                    army,
+                    [&names, radians](UnitGroup& group) {
+          for (const std::string& name : names) {
+            if (SaveUnit* const u = FindUnit(group, name); u != nullptr) {
+              u->orientation[1] += radians;
+            }
+          }
+        }
+                  ) ||
+          changed;
+      }
+      if (changed) {
+        mDocument.SaveDataEdited(std::move(before));
+        if (!mUnitSelection.empty()) {
+          ReloadUnits();
+        }
+        any = true;
+      }
+    }
+    if (!mDecalSelection.empty()) {
+      EdDocument::DecalSnapshot before = mDocument.DecalsNow();
+      EdDocument::DecalSnapshot next = before;
+      for (const int index : mDecalSelection) {
+        if (index < 0 || static_cast<std::size_t>(index) >= next.size()) {
+          continue;
+        }
+        DecalState& d = next[static_cast<std::size_t>(index)];
+        DecalFootprint was;
+        was.x = d.position[0];
+        was.z = d.position[2];
+        was.sizeX = d.scale[0];
+        was.sizeZ = d.scale[2];
+        was.yaw = d.orientation[1];
+        float cx = 0.0f, cz = 0.0f;
+        DecalCentre(was, cx, cz);
+        const DecalFootprint now = DecalAround(cx, cz, was.sizeX, was.sizeZ, was.yaw + radians);
+        d.position[0] = now.x;
+        d.position[2] = now.z;
+        d.orientation[1] = was.yaw + radians;
+      }
+      if (!(next == before)) {
+        mDocument.RestoreDecals(next);
+        mDocument.DecalsEdited(std::move(before));
+        any = true;
+      }
+    }
+    if (any) {
+      mDocument.SetModified(true);
+    }
+    return any;
+  }
+
+  void EdMapScene::ReseatOnGround(
+    const std::vector<SampleRect>& rects
+  )
+  {
+    // FAF Studio's Resnap (sim.lua, after sculpting, ramps, stamps, generators and imports): what stands on changed
+    // ground is put back on it. Props now (cheap, the view shows it); units once no stroke is painting (their save
+    // text is rewritten), below.
+    if (mMap == nullptr || rects.empty()) {
+      return;
+    }
+    const auto inside = [&rects](const float x, const float z) {
+      for (const SampleRect& r : rects) {
+        if (
+          x >= static_cast<float>(r.x0) - 1.0f && x <= static_cast<float>(r.x1) + 1.0f &&
+          z >= static_cast<float>(r.z0) - 1.0f && z <= static_cast<float>(r.z1) + 1.0f
+        ) {
+          return true;
+        }
+      }
+      return false;
+    };
+    if (mMap->mProps != nullptr) {
+      auto& entries = mMap->mProps->mEntries;
+      bool moved = false;
+      for (std::size_t i = 0; i < entries.size(); ++i) {
+        moho::CWldPropEntry& entry = entries[i];
+        const float x = entry.mTransform.pos_.x;
+        const float z = entry.mTransform.pos_.z;
+        if (!inside(x, z)) {
+          continue;
+        }
+        const float y = PlacementHeight(x, z);
+        if (std::fabs(y - entry.mTransform.pos_.y) < 0.001f) {
+          continue;
+        }
+        entry.mTransform.pos_.y = y;
+        if (i < mProps.size() && mProps[i] != nullptr) {
+          mProps[i]->SetStance(entry.mTransform, entry.mTransform);
+        }
+        moved = true;
+      }
+      if (moved) {
+        mDocument.SetModified(true);
+      }
+    }
+    for (const UnitRef& unit : mUnitRefs) {
+      if (inside(unit.position.x, unit.position.z)) {
+        mReseatUnits = true;
+        break;
+      }
+    }
+  }
+
+  void EdMapScene::ReseatUnitsNow()
+  {
+    if (!mReseatUnits || mPainting || mMap == nullptr) {
+      return;
+    }
+    mReseatUnits = false;
+    // Per army, the units whose saved height is off the ground now.
+    std::map<std::string, std::vector<std::pair<std::string, float>>> lift;
+    for (const UnitRef& unit : mUnitRefs) {
+      const float y = UnitRestHeight(unit.position.x, unit.position.z);
+      if (std::fabs(y - unit.position.y) > 0.01f) {
+        lift[unit.army].emplace_back(unit.name, y);
+      }
+    }
+    if (lift.empty()) {
+      return;
+    }
+    std::size_t count = 0;
+    for (const auto& [army, units] : lift) {
+      (void)EditArmyUnits(army, [&units, &count](UnitGroup& group) {
+        for (const auto& [name, y] : units) {
+          if (SaveUnit* const u = FindUnit(group, name); u != nullptr) {
+            u->position[1] = y;
+            ++count;
+          }
+        }
+      });
+    }
+    ReloadUnits();
+    mDocument.SetModified(true);
+    gpg::Logf("editor: %zu units put back on the ground after the height change", count);
+  }
+
   std::vector<EdMapScene::ResourceFit> EdMapScene::ResourceFits(
     const std::string& extractor,
     const std::string& plant

@@ -565,7 +565,10 @@ namespace faf::editor
         ImGui::Checkbox("Grid", &p.grid);
       }
       // Studio's camera presets.
-      for (const char* frame : {"Iso", "Front", "Side", "Back", "Top", "Fit"}) {
+      for (const char* frame : {"Iso", "Front", "Side", "Back", "Top", "Fit", "Range"}) {
+        if (std::string(frame) != "Iso") {
+          SameLineIfFits(ImGui::CalcTextSize(frame).x + ImGui::GetStyle().FramePadding.x * 2.0f);
+        }
         if (ImGui::SmallButton(frame)) {
           std::string key = frame;
           for (char& c : key) {
@@ -573,9 +576,7 @@ namespace faf::editor
           }
           p.frame = key;
         }
-        ImGui::SameLine();
       }
-      ImGui::NewLine();
       // A bone to look at: its axes drawn (x red, y green, z blue).
       ImGui::SetNextItemWidth(Em(170.0f));
       const std::string boneShown = p.bone < 0 || static_cast<std::size_t>(p.bone) >= p.boneNames.size()

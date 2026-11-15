@@ -259,13 +259,14 @@ namespace faf::editor
       const char* shadowDistance;
       const char* texture;
       const char* model;
+      const char* bloom; // Studio's presets turn bloom off
     };
     constexpr GraphicsPresetRow kGraphicsPresets[] = {
       // Studio's numbers: shadow quality 0..3 and the shadow map 512, 1024, 1536, 2048.
-      {"low", "low", "off", "off", "512", "short", "low", "low"},
-      {"medium", "medium", "on", "low", "1024", "normal", "medium", "medium"},
-      {"high", "high", "on", "medium", "1536", "long", "high", "high"},
-      {"ultra", "high", "on", "high", "2048", "longest", "high", "high"},
+      {"low", "low", "off", "off", "512", "short", "low", "low", "off"},
+      {"medium", "medium", "on", "low", "1024", "normal", "medium", "medium", "off"},
+      {"high", "high", "on", "medium", "1536", "long", "high", "high", "off"},
+      {"ultra", "high", "on", "high", "2048", "longest", "high", "high", "off"},
     };
   } // namespace
 
@@ -282,6 +283,7 @@ namespace faf::editor
         (void)Set(kGfxShadowDistance, p.shadowDistance);
         (void)Set(kGfxTextureDetail, p.texture);
         (void)Set(kGfxModelDetail, p.model);
+        (void)Set(kGfxBloom, p.bloom);
         return true;
       }
     }
@@ -294,7 +296,7 @@ namespace faf::editor
       if (
         Get(kGfxFidelity) == p.fidelity && Get(kGfxShadows) == p.shadows && Get(kGfxShadowQuality) == p.shadowQuality &&
         Get(kGfxShadowSize) == p.shadowSize && Get(kGfxShadowDistance) == p.shadowDistance &&
-        Get(kGfxTextureDetail) == p.texture && Get(kGfxModelDetail) == p.model
+        Get(kGfxTextureDetail) == p.texture && Get(kGfxModelDetail) == p.model && Get(kGfxBloom) == p.bloom
       ) {
         return p.name;
       }

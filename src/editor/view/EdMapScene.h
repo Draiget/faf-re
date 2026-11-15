@@ -257,6 +257,13 @@ namespace faf::editor
       int props = 0;       // props inside the footprint (an engineer reclaims them first)
     };
     [[nodiscard]] std::vector<ResourceFit> ResourceFits(const std::string& extractor, const std::string& plant) const;
+    /** Q / E: every selected prop, marker, unit and decal turned by `radians` about its own middle (undo steps). */
+    bool TurnEverySelected(float radians);
+    /** After a height change (RefreshHeights): props in the rectangles back on the ground now, units soon. */
+    void ReseatOnGround(const std::vector<SampleRect>& rects);
+    /** Each frame: the units asked for, once no stroke is painting. */
+    void ReseatUnitsNow();
+    bool mReseatUnits = false;
     std::string ModAddUnit(const std::string& type, const std::string& army, float x, float z, std::string& name);
     /** How much texture layer `layer` (1..8) shows at a world point, 0..1 (-1 without masks or off the map). */
     [[nodiscard]] float LayerWeightAt(int layer, float x, float z);
@@ -1061,6 +1068,10 @@ namespace faf::editor
     bool mRulerShown = false;
     float mRulerFrom[2] = {0.0f, 0.0f};
     float mRulerTo[2] = {0.0f, 0.0f};
+    /** Studio's ruler path: the segments before the one being drawn (Alt+Shift+drag continues from the last end). */
+    std::vector<std::array<float, 4>> mRulerDone;
+    /** The ruler's text: the segment, and the total over the path when it has more than one. */
+    [[nodiscard]] std::string RulerText() const;
     std::vector<std::uint8_t> mTypesBefore;
     std::vector<TerrainTypeRun> mTypeRuns;
     int mTypeRunsRevision = -1;
@@ -1417,6 +1428,8 @@ namespace faf::editor
   public:
     /** The ruler between two points (test runs, `/ruler`). */
     void SetRuler(float x0, float z0, float x1, float z1);
+    /** The ruler path goes on from its last end to (x, z), as Alt+Shift+drag does. */
+    void ContinueRuler(float x, float z);
     /** Ctrl+C, Ctrl+V or Ctrl+D (`key` 'C', 'V' or 'D'), as the keyboard gives them and test runs (`/uiclicks ^D`). */
     /**
      * Edit > Mirror the selection (FAF Studio's mirror.lua): each selected marker, prop, unit and decal copied to its

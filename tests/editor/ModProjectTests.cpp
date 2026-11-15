@@ -399,4 +399,24 @@ namespace faf::editor
     ASSERT_TRUE(LoadModProject(SaveModProject(p), back, error)) << error;
     EXPECT_TRUE(back.derived["xel0202"].script);
   }
+
+  TEST(
+    ModProject,
+    ProjectileChangesAreMergeBlueprintsOfTheirOwn
+  )
+  {
+    // Studio's fxedit.lua: a projectile's numbers, kept under its blueprint id, written as a ProjectileBlueprint merge.
+    const std::string id = "/projectiles/tdfgauss01/tdfgauss01_proj.bp";
+    EXPECT_TRUE(ModProjectileId(id));
+    EXPECT_FALSE(ModProjectileId("uel0201"));
+    EXPECT_FALSE(ModProjectileId("/projectiles/TDFGauss01/TDFGauss01_proj.bp")) << "ids are lower case";
+    EXPECT_EQ(ModProjectileFile(id), "projectiles/tdfgauss01/tdfgauss01_proj.bp");
+    const std::string text = ModMergeProjectile(id, {{"Physics.MaxSpeed", 60.0}, {"Display.UniformScale", 0.2}});
+    EXPECT_NE(text.find("ProjectileBlueprint {"), std::string::npos) << text;
+    EXPECT_NE(text.find("Merge = true"), std::string::npos) << text;
+    EXPECT_NE(text.find(id), std::string::npos) << text;
+    EXPECT_NE(text.find("MaxSpeed = 60"), std::string::npos) << text;
+    EXPECT_NE(text.find("UniformScale = 0.2"), std::string::npos) << text;
+    EXPECT_TRUE(ModMergeProjectile(id, {}).empty());
+  }
 } // namespace faf::editor

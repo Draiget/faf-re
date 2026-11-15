@@ -90,8 +90,18 @@ namespace faf::editor
     /** The test running (the unit under test, empty when none) and the sim's last state line. */
     std::string testUnit;
     std::string testStatus;
+    std::string testNote; // the sim's last note (which builder builds it, ...)
+    /** Studio's Effects panel in the test play: every projectile of the game (read before the play), the one picked and
+     * its speed; an effect template (EffectTemplates.lua's name) and its height above the unit. */
+    std::vector<std::string> testProjectiles;
+    int testProjectile = 0;
+    float testProjectileSpeed = 15.0f;
+    char testEffect[96] = "ConcussionRingMed01";
+    float testEffectHeight = 1.0f;
 
   private:
+    /** The selected unit's weapons' projectiles: their numbers as project changes (Studio's fxedit.lua). */
+    void DrawProjectiles();
     bool mTestInGameAsked = false;
     std::string mTestOrder;
     EdModPanel& mProject;

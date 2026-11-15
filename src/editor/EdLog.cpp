@@ -102,6 +102,11 @@ namespace faf::editor
       mUnitTestLive = message.c_str() + sizeof(kUnitTest) - 1;
       return;
     }
+    // Its notes (which builder builds it, none does, no second army): kept for the panel and shown.
+    static constexpr char kUnitTestNote[] = "EDUNITTEST note ";
+    if (std::strncmp(message.c_str(), kUnitTestNote, sizeof(kUnitTestNote) - 1) == 0) {
+      mUnitTestNote = message.c_str() + sizeof(kUnitTestNote) - 1;
+    }
     mLines.push_back(Line{level, std::string(message.c_str()), seconds});
     if (mTimesFile != nullptr) {
       std::fprintf(mTimesFile, "%9.3f %s\n", seconds, message.c_str());
@@ -275,6 +280,19 @@ namespace faf::editor
     default:
       return mShowInfo;
     }
+  }
+
+  bool EdLog::TakeUnitTestNote(
+    std::string& out
+  )
+  {
+    const std::lock_guard<std::mutex> lock(mMutex);
+    if (mUnitTestNote.empty()) {
+      return false;
+    }
+    out.swap(mUnitTestNote);
+    mUnitTestNote.clear();
+    return true;
   }
 
   bool EdLog::TakeUnitTestLive(

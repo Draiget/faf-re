@@ -70,6 +70,12 @@ namespace faf::editor
     {
       return mTool == 0;
     }
+    /** What Q and E turn the selection by (Studio's steps: 15, 22.5, 45, 90 degrees). */
+    [[nodiscard]] float TurnStepDegrees() const noexcept
+    {
+      return mTurnStepDegrees;
+    }
+    float mTurnStepDegrees = 15.0f;
     [[nodiscard]] bool PropsToolActive() const noexcept
     {
       return mTool == 4;
