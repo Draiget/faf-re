@@ -805,11 +805,17 @@ namespace
       return connections.back();
     }
     bool FindNextAddress(
-      u_long&,
-      u_short&
+      u_long& address,
+      u_short& port
     ) override
     {
-      return false;
+      if (incoming.empty()) {
+        return false;
+      }
+      address = incoming.front().first;
+      port = incoming.front().second;
+      incoming.erase(incoming.begin());
+      return true;
     }
     INetConnection* Accept(
       const u_long address,
@@ -824,6 +830,8 @@ namespace
       u_short
     ) override
     {}
+    // Addresses that are trying to connect, for FindNextAddress.
+    std::vector<std::pair<u_long, u_short>> incoming;
     void Pull() override {}
     void Push() override {}
     void SelectEvent(
@@ -908,6 +916,33 @@ namespace
     // An ordinary command still queues.
     f->Receive(ECmdStreamOp::CMDST_DestroyEntity, Bytes{}.I32(1).data);
     EXPECT_TRUE(f->remote->mPipe.GetLength() > before);
+  }
+
+  // A rejoin candidate holds its manager, the seat it asks for and a link of the manager's connector. It goes with
+  // the manager, and lets go of the link before the connector's Destroy, after which the connector's thread deletes
+  // the link (REJOIN_ForgetManager). Left behind, a later manager made at the same address took it for its own.
+  void TestRejoinCandidateGoesWithItsManager()
+  {
+    constexpr u_long kSeatAddress = 0x0A000002u;
+    constexpr u_short kSeatPort = 7001;
+    // Left alive on purpose, as the client fixture's connection.
+    FakeConnector* const connector = new FakeConnector();
+    INetConnection* const seatLink = connector->Connect(kSeatAddress, kSeatPort);
+    CClientManagerImpl* const manager = CLIENT_CreateClientManager(2, connector, 0, true);
+    manager->CreateLocalClient("local", 0, 1, 0);
+    manager->CreateNetClient("remote", 1, 2, 1, seatLink);
+
+    // The seat's player comes back from its old address.
+    connector->incoming.emplace_back(kSeatAddress, kSeatPort);
+    REJOIN_ServeRestartedPeers(*manager);
+    ASSERT_EQ(connector->connections.size(), 2u);
+    FakeConnection* const candidateLink = connector->Last();
+    ASSERT_FALSE(candidateLink->mLinkages.empty());
+
+    delete manager;
+    EXPECT_EQ(connector->linkedAtDestroy, 0);
+    EXPECT_TRUE(candidateLink->mLinkages.empty());
+    EXPECT_EQ(candidateLink->destroyRequests, 1);
   }
 
   // --- Lobby -------------------------------------------------------------------------------
@@ -1840,6 +1875,13 @@ TEST(
 )
 {
   TestClientEndGameFromPeerIgnored();
+}
+TEST(
+  Rejoin,
+  CandidateGoesWithItsManager
+)
+{
+  TestRejoinCandidateGoesWithItsManager();
 }
 TEST(
   Existing_NetRobustness,

@@ -841,6 +841,8 @@ CClientManagerImpl::~CClientManagerImpl()
 {
   // It holds client pointers, and deleting a client can still route a message.
   mRejoinFeed.reset();
+  // Engine addition (issue #275): rejoin candidates hold this manager, its seats and links of its connector.
+  REJOIN_ForgetManager(*this);
 
   for (CClientBase*& client : mClients) {
     delete client;

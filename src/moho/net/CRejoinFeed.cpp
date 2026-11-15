@@ -1127,6 +1127,8 @@ namespace
   std::mutex sKeyframeLock;
   EKeyframeState sKeyframeState = EKeyframeState::None;
   std::vector<char> sKeyframeBytes; // an original size, then the save packed; empty if it failed
+  // Counts the games that have ended (REJOIN_ForgetManager): a save asked for in one finishes into nothing.
+  std::uint32_t sKeyframeGame = 0;
 
   /// Whether the save is done. The first call asks for one, which the main thread takes to the driver.
   [[nodiscard]] bool KeyframeReady()
@@ -1139,10 +1141,14 @@ namespace
   }
 
   void FinishKeyframe(
-    std::vector<char> bytes
+    std::vector<char> bytes,
+    const std::uint32_t game
   )
   {
     std::scoped_lock lock(sKeyframeLock);
+    if (game != sKeyframeGame) {
+      return;
+    }
     sKeyframeBytes = std::move(bytes);
     sKeyframeState = EKeyframeState::Ready;
   }
@@ -1155,10 +1161,12 @@ namespace
   class CRejoinKeyframeRequest final : public ISaveRequest
   {
   public:
-    explicit CRejoinKeyframeRequest(
-      const Sim& sim
+    CRejoinKeyframeRequest(
+      const Sim& sim,
+      const std::uint32_t game
     )
       : mSim(sim)
+      , mGame(game)
     {}
 
     gpg::WriteArchive* GetArchive() override
@@ -1193,7 +1201,7 @@ namespace
         packed = PackFile();
       }
       mFile.reset();
-      FinishKeyframe(std::move(packed));
+      FinishKeyframe(std::move(packed), mGame);
       delete this;
     }
 
@@ -1268,6 +1276,7 @@ namespace
     }
 
     const Sim& mSim;
+    std::uint32_t mGame;
     std::uint32_t mBeat = 0;
     std::chrono::steady_clock::time_point mStart{};
     std::shared_ptr<std::FILE> mFile;
@@ -1286,22 +1295,24 @@ void moho::REJOIN_MainFrame(
   ISTIDriver& driver
 )
 {
+  std::uint32_t game = 0;
   {
     std::scoped_lock lock(sKeyframeLock);
     if (sKeyframeState != EKeyframeState::Wanted) {
       return;
     }
     sKeyframeState = EKeyframeState::Saving;
+    game = sKeyframeGame;
   }
 
   const auto* const simDriver = dynamic_cast<CSimDriver*>(&driver);
   const Sim* const sim = simDriver != nullptr ? simDriver->GetSimForReplayCheck() : nullptr;
   if (sim == nullptr) {
     gpg::Warnf("REJOIN: this session cannot save its sim");
-    FinishKeyframe({});
+    FinishKeyframe({}, game);
     return;
   }
-  driver.RequestSaveGame(new CRejoinKeyframeRequest(*sim));
+  driver.RequestSaveGame(new CRejoinKeyframeRequest(*sim, game));
 }
 
 void moho::REJOIN_PrepareRestore(
@@ -1644,9 +1655,8 @@ namespace
     for (std::size_t index = 0; index < sCandidates.size();) {
       CRejoinCandidate& candidate = *sCandidates[index];
       if (&candidate.Manager() != &manager) {
-        // Left from a session that has ended, whose connector took the link with it.
-        (void)sCandidates[index].release();
-        sCandidates.erase(sCandidates.begin() + static_cast<std::ptrdiff_t>(index));
+        // Another manager's, which is alive: one that ends drops its own (REJOIN_ForgetManager).
+        ++index;
         continue;
       }
       // The vote came between its proof and now: the seat is no longer there to take.
@@ -1683,6 +1693,40 @@ namespace
     }
   }
 } // namespace
+
+void moho::REJOIN_ForgetManager(
+  CClientManagerImpl& manager
+)
+{
+  // Each candidate lets go of its link here, on this thread: from the connector's Destroy on, its thread deletes the
+  // links, and with them their linkages to the candidates, with no lock in common with this one.
+  for (std::size_t index = 0; index < sCandidates.size();) {
+    if (&sCandidates[index]->Manager() != &manager) {
+      ++index;
+      continue;
+    }
+    sCandidates[index]->Release()->ScheduleDestroy();
+    sCandidates.erase(sCandidates.begin() + static_cast<std::ptrdiff_t>(index));
+  }
+
+  std::erase_if(sPendingServes, [&manager](const SPendingServe& pending) {
+    return pending.peer->mManager == &manager;
+  });
+  // A game that ends while a recording goes out never hears the peer's report, which puts the rate back.
+  if (sPendingServes.empty() && sSavedSendRate != 0) {
+    net_MaxSendRate = sSavedSendRate;
+    sSavedSendRate = 0;
+    net_MaxBacklog = sSavedBacklog;
+    sSavedBacklog = 0;
+  }
+
+  // A save of this game, asked for or done, is no one's now: a Ready one would go to the next game's first
+  // rejoiner, and one left Saving, which its driver may never finish, would hold every later save back.
+  std::scoped_lock lock(sKeyframeLock);
+  ++sKeyframeGame;
+  sKeyframeState = EKeyframeState::None;
+  sKeyframeBytes.clear();
+}
 
 bool moho::REJOIN_BacklogPending(
   const CNetClient& seat

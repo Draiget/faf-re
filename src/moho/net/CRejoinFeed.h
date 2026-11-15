@@ -173,6 +173,15 @@ namespace moho
   void REJOIN_ServeRestartedPeers(CClientManagerImpl& manager);
 
   /**
+   * Engine addition (issue #275), as `manager` ends, before it deletes its clients and
+   * destroys its connector: its candidates let go of their links and go, its seats'
+   * pending serves go, the send rate a serve raised goes back, and a save of the game,
+   * asked for or done, goes. Nothing of a game outlives its manager, so a later manager
+   * made at the same address finds nothing of it.
+   */
+  void REJOIN_ForgetManager(CClientManagerImpl& manager);
+
+  /**
    * Engine addition (issue #275), with `mLock` held: `seat` has a new link and has not
    * had its backlog yet. The command stream stays off that link until then, as all of
    * it will be in the backlog, and would otherwise reach the client twice.
