@@ -59,8 +59,8 @@ namespace faf::editor
       std::string& error
     )
     {
-      if (!field::RunOpCpu(name, args, out, error)) {
-        error = std::string(name) + ": " + error;
+      if (const auto ran = field::RunOpCpu(name, args, out); !ran) {
+        error = std::string(name) + ": " + ran.error();
         return false;
       }
       return true;

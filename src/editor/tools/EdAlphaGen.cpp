@@ -146,9 +146,9 @@ namespace faf::editor
       args.in["dz"] = dz;
       args.p.num["periodic"] = 1.0;
       field::Grid h;
-      std::string why;
-      if (!field::RunOpCpu("height_from_gradient", args, h, why) || h.v.size() != kCount) {
-        error = "the normal map's relief: " + why;
+      const auto ran = field::RunOpCpu("height_from_gradient", args, h);
+      if (!ran || h.v.size() != kCount) {
+        error = "the normal map's relief: " + (ran ? std::string() : ran.error());
         return false;
       }
       relief = std::move(h.v);

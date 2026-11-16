@@ -68,7 +68,11 @@ namespace faf::editor
       std::string& error
     )
     {
-      return field::RunOpCpu(op, args, out, error);
+      if (const auto ran = field::RunOpCpu(op, args, out); !ran) {
+        error = ran.error();
+        return false;
+      }
+      return true;
     }
   } // namespace
 

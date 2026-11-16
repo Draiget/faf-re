@@ -1105,8 +1105,7 @@ namespace faf::editor
         args.p.str["kind"] = "reach";
         args.p.num["soft"] = 4.0;
         field::Grid mk;
-        std::string error;
-        if (field::RunOp("path_mask", args, mk, error)) {
+        if (field::RunOp("path_mask", args, mk)) {
           for (std::size_t k = 0; k < mask->v.size(); ++k) {
             mask->v[k] = std::max(mask->v[k], mk.v[k]);
           }
@@ -1125,9 +1124,9 @@ namespace faf::editor
       args.p.str["mode"] = "both";
       args.p.num["balance"] = 0.5;
       field::Grid out;
-      std::string error;
-      if (!field::RunOp("slope_limit", args, out, error) || out.v.size() != H->v.size()) {
-        padNote += " Smoothing: " + error + ".";
+      const auto ran = field::RunOp("slope_limit", args, out);
+      if (!ran || out.v.size() != H->v.size()) {
+        padNote += " Smoothing: " + (ran ? std::string() : ran.error()) + ".";
         return;
       }
       mDocument.Heights().BeforeWrite(field->data, whole);

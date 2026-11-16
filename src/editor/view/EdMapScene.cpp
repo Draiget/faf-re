@@ -7150,7 +7150,6 @@ namespace faf::editor
     const std::size_t count = static_cast<std::size_t>(width) * static_cast<std::size_t>(height);
     auto* const words = reinterpret_cast<std::uint16_t*>(field->data);
     std::vector<float> target;
-    std::string error;
     if (result.w == width && result.h == height) {
       target = result.v;
     } else {
@@ -7166,8 +7165,9 @@ namespace faf::editor
         down.in["a"] = fine;
         down.in["like"] = source;
         field::Grid coarseBase;
-        if (!field::RunOpCpu("resample", down, coarseBase, error) || !coarseBase.SameShape(result)) {
-          return "Preview: " + error;
+        const auto ran = field::RunOpCpu("resample", down, coarseBase);
+        if (!ran || !coarseBase.SameShape(result)) {
+          return "Preview: " + (ran ? std::string() : ran.error());
         }
         auto delta = std::make_shared<field::Grid>(result);
         for (std::size_t k = 0; k < delta->v.size(); ++k) {
@@ -7181,8 +7181,9 @@ namespace faf::editor
       field::Grid upsampled;
       // A finer result (after an Oversample node) is averaged down; a coarser one put up smoothly.
       const char* const op = result.w > width ? "downsample" : "upsample";
-      if (!field::RunOpCpu(op, up, upsampled, error) || upsampled.v.size() != count) {
-        return "Preview: " + error;
+      const auto ran = field::RunOpCpu(op, up, upsampled);
+      if (!ran || upsampled.v.size() != count) {
+        return "Preview: " + (ran ? std::string() : ran.error());
       }
       target = std::move(upsampled.v);
       if (!plain) {

@@ -155,10 +155,10 @@ namespace faf::editor::gpu
       Shape sh;
       if (!ShapeOf(a, sh) || !Fits(ex, sh.Count(), 1))
         return OpResult::Unsupported;
-      fractal::Setup s;
-      std::string why;
-      if (!fractal::Read(a, sh.cell, s, why))
+      const auto read = fractal::Read(a, sh.cell);
+      if (!read)
         return OpResult::Unsupported; // a bad option: the CPU op reports it
+      const fractal::Setup& s = *read;
       constexpr int kRecords = 19;
       std::vector<float> tab(static_cast<std::size_t>(kRecords) * 16u, 0.0f);
       std::vector<std::uint32_t> seeds(16u + 12u, 0u);

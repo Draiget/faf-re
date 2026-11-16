@@ -395,8 +395,10 @@ namespace faf::editor::gpu
         }
       }
       Grid result;
-      if (!ero::FinishHydroOp(a, *src, p, hs, result, err))
+      if (auto finished = ero::FinishHydroOp(a, *src, p, hs, result); !finished) {
+        err = finished.error();
         return OpResult::Failed;
+      }
       out = std::move(result);
       return OpResult::Done;
     }
@@ -778,8 +780,10 @@ namespace faf::editor::gpu
           return OpResult::Failed;
       }
       Grid result;
-      if (!ero::FinishDropletOp(a, *src, height, wear, deposit, flow, result, err))
+      if (auto finished = ero::FinishDropletOp(a, *src, height, wear, deposit, flow, result); !finished) {
+        err = finished.error();
         return OpResult::Failed;
+      }
       out = std::move(result);
       return OpResult::Done;
     }

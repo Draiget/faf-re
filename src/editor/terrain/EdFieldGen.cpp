@@ -53,14 +53,13 @@ namespace faf::editor::field
     // ---- musgrave
     // --------------------------------------------------------------------------------------------------------------------------------
 
-    bool OpMusgrave(
+    std::expected<void, std::string> OpMusgrave(
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
-      if (!MakeOut(a, out, err))
-        return false;
+      if (auto made = MakeOut(a, out); !made)
+        return made;
       const std::uint32_t seed = SeedOf(a);
       const double scale = std::max(1e-3, a.p.N("scale", 100.0));
       const int octaves = std::max(1, std::min(16, static_cast<int>(a.p.N("octaves", 6))));
@@ -71,8 +70,7 @@ namespace faf::editor::field
       const bool rotate = a.p.N("rotate", 0.0) >= 0.5;
       const std::string mode = a.p.S("mode", "ridged");
       if (mode != "ridged" && mode != "hybrid" && mode != "hetero") {
-        err = "musgrave: mode must be ridged, hybrid or hetero";
-        return false;
+        return std::unexpected("musgrave: mode must be ridged, hybrid or hetero");
       }
       const int kind = mode == "ridged" ? 0 : (mode == "hybrid" ? 1 : 2);
       std::vector<float> amps(static_cast<std::size_t>(octaves));
@@ -124,20 +122,19 @@ namespace faf::editor::field
           return Clamp01(result / (ampSum * std::max(1e-3f, offset * offset)));
         return Clamp01(result / (ampSum * std::max(1e-3f, offset + 1.0f)));
       });
-      return true;
+      return {};
     }
 
     // ---- fbm_damped
     // ------------------------------------------------------------------------------------------------------------------------------
 
-    bool OpFbmDamped(
+    std::expected<void, std::string> OpFbmDamped(
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
-      if (!MakeOut(a, out, err))
-        return false;
+      if (auto made = MakeOut(a, out); !made)
+        return made;
       const std::uint32_t seed = SeedOf(a);
       const double scale = std::max(1e-3, a.p.N("scale", 150.0));
       const int octaves = std::max(1, std::min(16, static_cast<int>(a.p.N("octaves", 8))));
@@ -173,7 +170,7 @@ namespace faf::editor::field
         }
         return Clamp01(0.5f + 0.5f * sum / norm * 1.6f);
       });
-      return true;
+      return {};
     }
 
     // ---- cells (Voronoi variants)
@@ -297,14 +294,13 @@ namespace faf::editor::field
       return best;
     }
 
-    bool OpCells(
+    std::expected<void, std::string> OpCells(
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
-      if (!MakeOut(a, out, err))
-        return false;
+      if (auto made = MakeOut(a, out); !made)
+        return made;
       CellSetup s;
       s.seed = SeedOf(a);
       s.jitter = Clamp01(static_cast<float>(a.p.N("jitter", 1.0)));
@@ -318,8 +314,7 @@ namespace faf::editor::field
       else if (metric == "minkowski")
         s.metric = 3;
       else {
-        err = "cells: metric must be euclid, manhattan, chebyshev or minkowski";
-        return false;
+        return std::unexpected("cells: metric must be euclid, manhattan, chebyshev or minkowski");
       }
       s.p = std::max(0.2f, static_cast<float>(a.p.N("p", 3.0)));
       s.k = std::max(0.5f, static_cast<float>(a.p.N("smooth", 8.0)));
@@ -333,8 +328,7 @@ namespace faf::editor::field
           m = i;
       }
       if (m < 0) {
-        err = "cells: unknown mode '" + mode + "'";
-        return false;
+        return std::unexpected("cells: unknown mode '" + mode + "'");
       }
       if (m == 7 || m == 8)
         s.metric = 0; // the border distance is a Euclidean construction
@@ -384,20 +378,19 @@ namespace faf::editor::field
         }
         }
       });
-      return true;
+      return {};
     }
 
     // ---- craters
     // ---------------------------------------------------------------------------------------------------------------------------------
 
-    bool OpCraters(
+    std::expected<void, std::string> OpCraters(
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
-      if (!MakeOut(a, out, err))
-        return false;
+      if (auto made = MakeOut(a, out); !made)
+        return made;
       const std::uint32_t seed = SeedOf(a);
       const double scale = std::max(1.0, a.p.N("scale", 120.0));
       const float density = Clamp01(static_cast<float>(a.p.N("density", 0.6)));
@@ -438,20 +431,19 @@ namespace faf::editor::field
         }
         return Clamp01(base + sum);
       });
-      return true;
+      return {};
     }
 
     // ---- dunes
     // -----------------------------------------------------------------------------------------------------------------------------------
 
-    bool OpDunes(
+    std::expected<void, std::string> OpDunes(
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
-      if (!MakeOut(a, out, err))
-        return false;
+      if (auto made = MakeOut(a, out); !made)
+        return made;
       const std::uint32_t seed = SeedOf(a);
       const double wl = std::max(1.0, a.p.N("wavelength", 60.0));
       const double ang = a.p.N("angle", 0.0) * kPiD / 180.0;
@@ -477,20 +469,19 @@ namespace faf::editor::field
         }
         return Clamp01(v);
       });
-      return true;
+      return {};
     }
 
     // ---- cracks
     // ----------------------------------------------------------------------------------------------------------------------------------
 
-    bool OpCracks(
+    std::expected<void, std::string> OpCracks(
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
-      if (!MakeOut(a, out, err))
-        return false;
+      if (auto made = MakeOut(a, out); !made)
+        return made;
       CellSetup s;
       s.seed = SeedOf(a);
       s.jitter = Clamp01(static_cast<float>(a.p.N("jitter", 0.9)));
@@ -535,24 +526,22 @@ namespace faf::editor::field
         }
         return Clamp01(best);
       });
-      return true;
+      return {};
     }
 
     // ---- island
     // ----------------------------------------------------------------------------------------------------------------------------------
 
-    bool OpIsland(
+    std::expected<void, std::string> OpIsland(
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
-      if (!MakeOut(a, out, err))
-        return false;
+      if (auto made = MakeOut(a, out); !made)
+        return made;
       const std::string output = a.p.S("output", "height");
       if (output != "height" && output != "mask" && output != "distance") {
-        err = "island: output must be height, mask or distance";
-        return false;
+        return std::unexpected("island: output must be height, mask or distance");
       }
       const Grid& g = out;
       const double cxw = a.p.Has("cx") ? a.p.N("cx", 0) : WorldX(g, 0) + 0.5 * (g.w - 1) * g.cell;
@@ -583,28 +572,29 @@ namespace faf::editor::field
         const float land = 1.0f - SmoothStep(1.0f - edge, 1.0f, q);
         return land * std::pow(Clamp01(1.0f - q * 0.9f), power);
       });
-      return true;
+      return {};
     }
 
     // ---- dwarp
     // -----------------------------------------------------------------------------------------------------------------------------------
 
-    bool OpDWarp(
+    std::expected<void, std::string> OpDWarp(
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
+      std::string err;
       const Grid* src = Need(a, "a", err);
-      if (src == nullptr || !MakeOut(a, out, err))
-        return false;
+      if (src == nullptr)
+        return std::unexpected(err);
+      if (auto made = MakeOut(a, out); !made)
+        return made;
       const Grid* mask = Get(a, "mask");
-      if (!SameOrNone(mask, *src, "mask", err))
-        return false;
+      if (auto same = SameOrNone(mask, *src, "mask"); !same)
+        return same;
       const std::string kind = a.p.S("kind", "fbm");
       if (kind != "fbm" && kind != "curl" && kind != "swirl" && kind != "ripple" && kind != "pinch") {
-        err = "dwarp: kind must be fbm, curl, swirl, ripple or pinch";
-        return false;
+        return std::unexpected("dwarp: kind must be fbm, curl, swirl, ripple or pinch");
       }
       const int k = kind == "fbm" ? 0 : (kind == "curl" ? 1 : (kind == "swirl" ? 2 : (kind == "ripple" ? 3 : 4)));
       const std::uint32_t seed = SeedOf(a);
@@ -671,7 +661,7 @@ namespace faf::editor::field
         const float warped = Bilinear(*src, static_cast<double>(x) + dx / cell, static_cast<double>(z) + dz / cell, e);
         return mask != nullptr ? Lerp(src->At(x, z), warped, Clamp01(mask->At(x, z))) : warped;
       });
-      return true;
+      return {};
     }
 
     struct GenOpRegistrar

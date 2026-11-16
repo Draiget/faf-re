@@ -102,9 +102,8 @@ namespace
     a.in = in;
     a.extra = extra;
     auto g = std::make_shared<Grid>();
-    std::string e;
-    if (!RunOp(op, a, *g, e)) {
-      std::println("op {}({}) failed: {}", op, params, e);
+    if (const auto ran = RunOp(op, a, *g); !ran) {
+      std::println("op {}({}) failed: {}", op, params, ran.error());
       return nullptr;
     }
     return g;

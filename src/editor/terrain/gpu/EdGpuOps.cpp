@@ -616,9 +616,8 @@ namespace faf::editor::gpu
             err = "the GPU op refused the self test input";
           break;
         }
-        std::string cpuErr;
-        if (!field::RunOpCpu("blur", args, cpuOut, cpuErr)) {
-          err = "CPU op failed: " + cpuErr;
+        if (const auto ran = field::RunOpCpu("blur", args, cpuOut); !ran) {
+          err = "CPU op failed: " + ran.error();
           break;
         }
         double worst = 0.0;

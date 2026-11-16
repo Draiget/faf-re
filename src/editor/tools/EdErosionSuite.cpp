@@ -527,7 +527,8 @@ namespace faf::editor
     std::map<std::string, field::Grid> extra;
     args.extra = &extra;
     field::Grid out;
-    if (!field::RunOpCpu(solver.op, args, out, error)) {
+    if (const auto ran = field::RunOpCpu(solver.op, args, out); !ran) {
+      error = ran.error();
       return false;
     }
     if (out.w != cw || out.h != ch) {

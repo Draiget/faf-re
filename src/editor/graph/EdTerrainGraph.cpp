@@ -137,9 +137,8 @@ namespace faf::editor
       }
       op.extra = extra;
       auto out = std::make_shared<field::Grid>();
-      std::string error;
-      if (!field::RunOp(name, op, *out, error)) {
-        Fail(name + ": " + error);
+      if (const auto ran = field::RunOp(name, op, *out); !ran) {
+        Fail(name + ": " + ran.error());
       }
       return out;
     }
@@ -257,9 +256,8 @@ namespace faf::editor
       args.in["a"] = full;
       args.in["like"] = mLike;
       auto coarse = std::make_shared<field::Grid>();
-      std::string error;
-      if (!field::RunOp("resample", args, *coarse, error)) {
-        terrain::Fail("resample: " + error);
+      if (const auto ran = field::RunOp("resample", args, *coarse); !ran) {
+        terrain::Fail("resample: " + ran.error());
       }
       mBase = coarse;
     }
@@ -481,8 +479,7 @@ namespace faf::editor
           args.in["a"] = value->grid;
           args.in["like"] = nodeLike;
           auto grid = std::make_shared<field::Grid>();
-          std::string error;
-          if (!field::RunOp(value->grid->w < nodeLike->w ? "upsample" : "downsample", args, *grid, error)) {
+          if (!field::RunOp(value->grid->w < nodeLike->w ? "upsample" : "downsample", args, *grid)) {
             continue;
           }
           auto copy = std::make_unique<TerrainValue>(*value);
@@ -557,10 +554,9 @@ namespace faf::editor
             args.in["like"] = fine;
             args.p.num["linear"] = src->type->inputs[p].type == PinType::Mask ? 1.0 : 0.0;
             auto grid = std::make_shared<field::Grid>();
-            std::string error;
-            if (!field::RunOp("upsample", args, *grid, error)) {
+            if (const auto ran = field::RunOp("upsample", args, *grid); !ran) {
               why = "the erosion's input " + src->type->inputs[p].name +
-                " couldn't be brought onto the fine grid: " + error;
+                " couldn't be brought onto the fine grid: " + ran.error();
               return false;
             }
             copy->grid = std::move(grid);

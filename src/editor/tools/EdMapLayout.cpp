@@ -40,10 +40,9 @@ namespace faf::editor
       )
       {
         auto out = std::make_shared<Grid>();
-        std::string why;
-        if (!field::RunOpCpu(name, args, *out, why)) {
+        if (const auto ran = field::RunOpCpu(name, args, *out); !ran) {
           if (error.empty()) {
-            error = std::string(name) + ": " + why;
+            error = std::string(name) + ": " + ran.error();
           }
           return nullptr;
         }

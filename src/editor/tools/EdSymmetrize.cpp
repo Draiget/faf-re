@@ -86,7 +86,8 @@ namespace faf::editor
       args.p.num["cz"] = options.centreZ >= 0.0f ? options.centreZ : 0.5 * (fieldHeight - 1);
       args.in["a"] = std::make_shared<const field::Grid>(grid);
       field::Grid out;
-      if (!field::RunOpCpu("symmetrize", args, out, error)) {
+      if (const auto ran = field::RunOpCpu("symmetrize", args, out); !ran) {
+        error = ran.error();
         return false;
       }
       if (!out.SameShape(grid)) {

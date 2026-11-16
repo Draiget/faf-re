@@ -6518,9 +6518,11 @@ namespace faf::editor
           args.p.num["radius"] = 4.0;
           field::Grid a;
           field::Grid b;
-          std::string error;
-          if (!field::RunOp("blur", args, a, error) || !field::RunOpCpu("blur", args, b, error)) {
-            return "the blur failed: " + error;
+          if (const auto ran = field::RunOp("blur", args, a); !ran) {
+            return "the blur failed: " + ran.error();
+          }
+          if (const auto ran = field::RunOpCpu("blur", args, b); !ran) {
+            return "the blur failed: " + ran.error();
           }
           for (std::size_t k = 0; k < a.v.size(); ++k) {
             if (std::abs(a.v[k] - b.v[k]) > 1e-3f) {
@@ -7464,7 +7466,11 @@ namespace faf::editor
         heights->v = terrain->heights;
         const auto run = [](const char* op, field::OpArgs args, std::string& error) -> std::shared_ptr<field::Grid> {
           auto out = std::make_shared<field::Grid>();
-          return field::RunOpCpu(op, args, *out, error) ? out : nullptr;
+          if (const auto ran = field::RunOpCpu(op, args, *out); !ran) {
+            error = ran.error();
+            return nullptr;
+          }
+          return out;
         };
         std::string error;
         // FAF Studio's presets (fieldgen.lua): each an op chain of the field library, then, with gullies, a brief
@@ -8855,7 +8861,11 @@ namespace faf::editor
             args.in["a"] = input;
           }
           auto out = std::make_shared<field::Grid>();
-          return field::RunOpCpu(op, args, *out, error) ? out : std::shared_ptr<field::Grid>();
+          if (const auto ran = field::RunOpCpu(op, args, *out); !ran) {
+            error = ran.error();
+            return std::shared_ptr<field::Grid>();
+          }
+          return out;
         };
         const WaterState water = mDocument.WaterNow();
         const float waterLevel = water.enabled ? water.elevation : 0.0f;
@@ -9571,10 +9581,16 @@ namespace faf::editor
           field::Grid cpuOut;
           std::string error;
           const auto t0 = std::chrono::steady_clock::now();
-          const bool ran = field::RunOp(op, args, gpuOut, error);
+          const auto ran = field::RunOp(op, args, gpuOut);
+          if (!ran) {
+            error = ran.error();
+          }
           const double runMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
           const auto t1 = std::chrono::steady_clock::now();
-          const bool cpu = field::RunOpCpu(op, args, cpuOut, error);
+          const auto cpu = field::RunOpCpu(op, args, cpuOut);
+          if (!cpu) {
+            error = cpu.error();
+          }
           const double cpuMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t1).count();
           double worst = 0.0;
           if (ran && cpu && gpuOut.v.size() == cpuOut.v.size()) {

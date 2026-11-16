@@ -230,8 +230,7 @@ namespace faf::editor
           args.p.num["scale"] = size;
           args.p.num["octaves"] = 5;
           field::Grid noise;
-          std::string error;
-          if (field::RunOpCpu("fractal", args, noise, error) && RecipePercentiles(noise.v, pct)) {
+          if (field::RunOpCpu("fractal", args, noise) && RecipePercentiles(noise.v, pct)) {
             found = noiseCache.emplace(key, pct).first;
           } else {
             for (int i = 0; i <= 100; ++i) {
@@ -837,8 +836,8 @@ namespace faf::editor
         args.p.str[key] = value;
       }
       field::Grid result;
-      if (!field::RunOpCpu(name, args, result, error)) {
-        error = std::string(name) + ": " + error;
+      if (const auto ran = field::RunOpCpu(name, args, result); !ran) {
+        error = std::string(name) + ": " + ran.error();
         return false;
       }
       out = std::move(result.v);
@@ -1191,8 +1190,10 @@ namespace faf::editor
         args.in["a"] = std::make_shared<field::Grid>(weight);
         args.p.num["radius"] = knobs.soft;
         field::Grid blurred;
-        if (field::RunOpCpu("blur", args, blurred, error)) {
+        if (const auto ran = field::RunOpCpu("blur", args, blurred)) {
           weight = std::move(blurred);
+        } else {
+          error = ran.error();
         }
       }
     }

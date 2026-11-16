@@ -64,7 +64,8 @@ namespace faf::editor
     args.in["a"] = top;
     args.in["like"] = top;
     field::Grid out;
-    if (!field::RunOp(op, args, out, error)) {
+    if (const auto ran = field::RunOp(op, args, out); !ran) {
+      error = ran.error();
       return false;
     }
     if (out.Count() == 0) {

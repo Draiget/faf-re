@@ -45,12 +45,11 @@ namespace
     a.p.str = strs;
     a.in = in;
     auto g = std::make_shared<Grid>();
-    std::string err;
-    if (!RunOp(op, a, *g, err)) {
+    if (const auto ran = RunOp(op, a, *g); !ran) {
       if (errOut != nullptr)
-        *errOut = err;
+        *errOut = ran.error();
       else
-        std::println("op {} failed: {}", op, err);
+        std::println("op {} failed: {}", op, ran.error());
       return nullptr;
     }
     return g;

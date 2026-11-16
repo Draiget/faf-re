@@ -47,11 +47,10 @@ namespace
     Grid& out
   )
   {
-    std::string err;
-    const bool ok = RunOp(op, args, out, err);
-    if (!ok)
-      std::println("op {}: {}", op, err);
-    return ok;
+    const auto ran = RunOp(op, args, out);
+    if (!ran)
+      std::println("op {}: {}", op, ran.error());
+    return ran.has_value();
   }
 
   static float Pattern(

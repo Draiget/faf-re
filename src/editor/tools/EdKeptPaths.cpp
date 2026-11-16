@@ -1012,7 +1012,8 @@ namespace faf::editor
       args.p.num["strength"] = Clamp(path.strength, 0.0f, 1.0f);
       args.in["a"] = cur;
       field::Grid out;
-      if (!field::RunOp("path_shape", args, out, error)) {
+      if (const auto ran = field::RunOp("path_shape", args, out); !ran) {
+        error = ran.error();
         return false;
       }
       cur = Shared(std::move(out));
@@ -1027,7 +1028,8 @@ namespace faf::editor
       args.in["a"] = d;
       args.p.num["radius"] = blend;
       field::Grid soft;
-      if (!field::RunOp("blur", args, soft, error)) {
+      if (const auto ran = field::RunOp("blur", args, soft); !ran) {
+        error = ran.error();
         return false;
       }
       auto next = std::make_shared<field::Grid>(base);
@@ -1053,7 +1055,11 @@ namespace faf::editor
       args.p.str["kind"] = kind;
       args.p.num["soft"] = soft;
       args.in["like"] = like;
-      return field::RunOp("path_mask", args, out, error);
+      if (const auto ran = field::RunOp("path_mask", args, out); !ran) {
+        error = ran.error();
+        return false;
+      }
+      return true;
     };
     if (path.erosion > 0) {
       // Bank erosion: thermal passes over the whole reach (cut walls slump to a natural talus).
@@ -1074,7 +1080,8 @@ namespace faf::editor
       args.p.num["talus"] = 0.5;
       args.p.num["rate"] = 0.5;
       field::Grid eroded;
-      if (!field::RunOp("thermal", args, eroded, error)) {
+      if (const auto ran = field::RunOp("thermal", args, eroded); !ran) {
+        error = ran.error();
         return false;
       }
       cur = Shared(std::move(eroded));

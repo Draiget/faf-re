@@ -120,12 +120,11 @@ namespace
     ParseParams(params, a.p);
     a.in = in;
     auto g = std::make_shared<Grid>();
-    std::string e;
-    if (!RunOp(op, a, *g, e)) {
+    if (const auto ran = RunOp(op, a, *g); !ran) {
       if (err)
-        *err = e;
+        *err = ran.error();
       else
-        std::println("op {}({}) failed: {}", op, params, e);
+        std::println("op {}({}) failed: {}", op, params, ran.error());
       return nullptr;
     }
     return g;

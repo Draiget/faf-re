@@ -61,9 +61,8 @@ namespace faf::editor
         args.p.str[s.name] = s.value;
       }
       auto out = std::make_shared<field::Grid>();
-      std::string error;
-      if (!field::RunOpCpu(name, args, *out, error)) {
-        throw OpFailed(std::string(name) + ": " + error);
+      if (const auto ran = field::RunOpCpu(name, args, *out); !ran) {
+        throw OpFailed(std::string(name) + ": " + ran.error());
       }
       return out;
     }
