@@ -384,11 +384,10 @@ namespace faf::editor
       if (facts.read) {
         const std::vector<std::uint8_t> bytes = facts.read(inFolder(patch.file));
         edmesh::Patch parsed;
-        std::string why;
         if (bytes.empty()) {
           add('E', "V1", patch.file + ": not found");
-        } else if (!edmesh::ParseScm(bytes.data(), bytes.size(), parsed, why)) {
-          add('E', "V1", patch.file + ": " + why);
+        } else if (const auto read = edmesh::ParseScm(bytes.data(), bytes.size(), parsed); !read) {
+          add('E', "V1", patch.file + ": " + read.error());
         } else {
           vertices += parsed.vertexCount;
         }

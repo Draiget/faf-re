@@ -376,16 +376,13 @@ namespace faf::editor
     return out + (waves.empty() ? "]\n}" : "\n    ]\n}");
   }
 
-  bool WavesFromScmwaves(
-    const std::string& text,
-    std::vector<WaveRecord>& waves,
-    std::string& error
+  std::expected<std::vector<WaveRecord>, std::string> WavesFromScmwaves(
+    const std::string& text
   )
   {
     std::string array;
     if (!JsonValue(text, "AllWaves", array) || array.empty() || array.front() != '[') {
-      error = "not a waves file (no AllWaves list)";
-      return false;
+      return std::unexpected("not a waves file (no AllWaves list)");
     }
     std::vector<WaveRecord> read;
     for (const std::string& object : JsonObjects(array)) {
@@ -409,8 +406,7 @@ namespace faf::editor
       (void)JsonFloat(object, "StripCount", wave.stripCount);
       read.push_back(std::move(wave));
     }
-    waves = std::move(read);
-    return true;
+    return read;
   }
 
   const std::vector<WavePattern>& BuiltInWavePatterns()
@@ -469,17 +465,14 @@ namespace faf::editor
     return patterns;
   }
 
-  bool ParseWavePatterns(
-    const std::string& lua,
-    std::vector<WavePattern>& patterns,
-    std::string& error
+  std::expected<std::vector<WavePattern>, std::string> ParseWavePatterns(
+    const std::string& lua
   )
   {
     LuaReader reader(lua);
     LuaValue root;
     if (!reader.Assignment("patterns", root) || !root.isTable) {
-      error = "no `patterns = { ... }` table";
-      return false;
+      return std::unexpected("no `patterns = { ... }` table");
     }
     std::vector<WavePattern> read;
     for (const auto& item : root.items) {
@@ -523,11 +516,9 @@ namespace faf::editor
       }
     }
     if (read.empty()) {
-      error = "the patterns table has no pattern with a texture";
-      return false;
+      return std::unexpected("the patterns table has no pattern with a texture");
     }
-    patterns = std::move(read);
-    return true;
+    return read;
   }
 
   std::vector<ShorePoint> FindShorePoints(

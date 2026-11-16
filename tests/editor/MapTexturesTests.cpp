@@ -121,24 +121,15 @@ namespace
     options.waterOn = false;
     MapPaintOptions paintOptions;
     paintOptions.contrast = 0.0f; // no patches: the plain colour
-    std::vector<float> rgba;
-    std::string error;
-    ASSERT_TRUE(MakePaintTexture(
-      heights,
-      kSide,
-      kSide,
-      paint,
-      MapTextureTargetOf("TTerrainXP", MapTextureKind::Macro),
-      options,
-      paintOptions,
-      32,
-      rgba,
-      error
-    )) << error;
+    auto made = MakePaintTexture(
+      heights, kSide, kSide, paint, MapTextureTargetOf("TTerrainXP", MapTextureKind::Macro), options, paintOptions, 32
+    );
+    ASSERT_TRUE(made) << made.error();
+    std::vector<float> rgba = std::move(*made);
     EXPECT_NEAR(Channel(rgba, 32, 4, 16, 0), 0.8f, 1e-3f) << "layer 1's colour on the left";
     EXPECT_NEAR(Channel(rgba, 32, 28, 16, 2), 0.6f, 1e-3f) << "the base's blue on the right";
     EXPECT_NEAR(Channel(rgba, 32, 28, 16, 3), paintOptions.opacity, 1e-6f);
-    ASSERT_TRUE(MakePaintTexture(
+    made = MakePaintTexture(
       heights,
       kSide,
       kSide,
@@ -146,17 +137,17 @@ namespace
       MapTextureTargetOf("Terrain001", MapTextureKind::Specular),
       options,
       paintOptions,
-      32,
-      rgba,
-      error
-    )) << error;
+      32
+    );
+    ASSERT_TRUE(made) << made.error();
+    rgba = std::move(*made);
     EXPECT_NEAR(Channel(rgba, 32, 4, 16, 0), 0.08f + paintOptions.strength, 1e-3f) << "wet ground shines";
     EXPECT_NEAR(Channel(rgba, 32, 28, 16, 0), 0.08f, 1e-3f) << "grass hardly";
     EXPECT_NEAR(Channel(rgba, 32, 4, 16, 3), 0.75f, 1e-3f) << "sharper where it shines";
     // The waterline shines too.
     options.waterOn = true;
     options.waterElevation = 41.0f;
-    ASSERT_TRUE(MakePaintTexture(
+    made = MakePaintTexture(
       heights,
       kSide,
       kSide,
@@ -164,10 +155,10 @@ namespace
       MapTextureTargetOf("Terrain001", MapTextureKind::Specular),
       options,
       paintOptions,
-      32,
-      rgba,
-      error
-    )) << error;
+      32
+    );
+    ASSERT_TRUE(made) << made.error();
+    rgba = std::move(*made);
     EXPECT_NEAR(Channel(rgba, 32, 28, 16, 0), 0.08f + 0.9f * paintOptions.strength, 1e-3f);
   }
 
@@ -196,16 +187,16 @@ namespace
     const std::vector<float> heights(static_cast<std::size_t>(kSide) * kSide, 40.0f);
     MapTextureOptions options;
     options.waterElevation = 20.0f;
-    std::vector<float> rgba;
-    std::string error;
-    ASSERT_TRUE(MakeMapTexture(
-      heights, kSide, kSide, MapTextureTargetOf("Terrain250", MapTextureKind::Normals), options, 32, rgba, error
-    )) << error;
+    auto made =
+      MakeMapTexture(heights, kSide, kSide, MapTextureTargetOf("Terrain250", MapTextureKind::Normals), options, 32);
+    ASSERT_TRUE(made) << made.error();
+    std::vector<float> rgba = std::move(*made);
     EXPECT_NEAR(Channel(rgba, 32, 16, 16, 0), 0.5f, 1e-3f) << "the normal's z: flat";
     EXPECT_NEAR(Channel(rgba, 32, 16, 16, 3), 0.5f, 1e-3f) << "the normal's x: flat";
-    ASSERT_TRUE(MakeMapTexture(
-      heights, kSide, kSide, MapTextureTargetOf("Terrain250", MapTextureKind::Lighting), options, 32, rgba, error
-    )) << error;
+    made =
+      MakeMapTexture(heights, kSide, kSide, MapTextureTargetOf("Terrain250", MapTextureKind::Lighting), options, 32);
+    ASSERT_TRUE(made) << made.error();
+    rgba = std::move(*made);
     EXPECT_FLOAT_EQ(Channel(rgba, 32, 16, 16, 0), 0.0f) << "no water over land";
     EXPECT_NEAR(Channel(rgba, 32, 16, 16, 1), 1.0f, 1e-3f) << "open sky";
     EXPECT_NEAR(Channel(rgba, 32, 16, 16, 3), 1.0f, 1e-3f) << "in the sun";
@@ -231,11 +222,10 @@ namespace
     options.quality = 1;
     options.occlusion = 0.0f;
     options.waterOn = false;
-    std::vector<float> rgba;
-    std::string error;
-    ASSERT_TRUE(MakeMapTexture(
-      heights, kSide, kSide, MapTextureTargetOf("Terrain250", MapTextureKind::Lighting), options, 64, rgba, error
-    )) << error;
+    const auto made =
+      MakeMapTexture(heights, kSide, kSide, MapTextureTargetOf("Terrain250", MapTextureKind::Lighting), options, 64);
+    ASSERT_TRUE(made) << made.error();
+    const std::vector<float>& rgba = *made;
     // Away from the sun (-x of the pillar) lies its shadow; towards it, sun.
     EXPECT_LT(Channel(rgba, 64, 22, 32, 3), 0.5f) << "in the pillar's shadow";
     EXPECT_GT(Channel(rgba, 64, 42, 32, 3), 0.5f) << "on the sun's side";

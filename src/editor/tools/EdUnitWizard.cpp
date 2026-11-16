@@ -318,21 +318,18 @@ namespace faf::editor
     return t != nullptr ? t->Str(faction, "") : std::string();
   }
 
-  bool LoadUnitWizardData(
+  std::expected<void, std::string> LoadUnitWizardData(
     const std::string& text,
-    UnitWizardData& out,
-    std::string& error
+    UnitWizardData& out
   )
   {
-    if (const auto read = ParseLuaAssignments(text, out.root); !read) {
-      error = read.error();
-      return false;
+    if (auto read = ParseLuaAssignments(text, out.root); !read) {
+      return read;
     }
     if (out.root.Get("Donors") == nullptr || out.root.Get("Map") == nullptr) {
-      error = "the wizard data has no Donors or Map";
-      return false;
+      return std::unexpected("the wizard data has no Donors or Map");
     }
-    return true;
+    return {};
   }
 
   const std::vector<UnitTemplate>& UnitTemplates()
@@ -453,21 +450,20 @@ namespace faf::editor
     return true;
   }
 
-  bool CheckUnitId(
+  std::expected<void, std::string> CheckUnitId(
     const std::string& id,
-    const std::function<bool(const std::string&)>& taken,
-    std::string& why
+    const std::function<bool(const std::string&)>& taken
   )
   {
     if (!ValidUnitId(id)) {
-      why = "a unit id is lower case letters and digits, a letter first, at least 6 characters (like zel0001)";
-      return false;
+      return std::unexpected(
+        "a unit id is lower case letters and digits, a letter first, at least 6 characters (like zel0001)"
+      );
     }
     if (taken && taken(id)) {
-      why = "the game or the project has a unit with the id " + id;
-      return false;
+      return std::unexpected("the game or the project has a unit with the id " + id);
     }
-    return true;
+    return {};
   }
 
   std::string SuggestUnitId(
@@ -483,8 +479,7 @@ namespace faf::editor
     for (int n = 1; n <= 9999; ++n) {
       char id[16];
       (void)std::snprintf(id, sizeof(id), "%s%04d", prefix.c_str(), n);
-      std::string why;
-      if (CheckUnitId(id, taken, why)) {
+      if (CheckUnitId(id, taken)) {
         return id;
       }
     }
@@ -541,27 +536,23 @@ namespace faf::editor
     return w;
   }
 
-  bool NewUnitSpec(
+  std::expected<UnitWizardSpec, std::string> NewUnitSpec(
     const UnitWizardData& data,
     const std::string& templateId,
     const std::string& faction,
-    const std::string& id,
-    UnitWizardSpec& spec,
-    std::string& error
+    const std::string& id
   )
   {
     const UnitTemplate* t = UnitTemplateOf(templateId);
     if (t == nullptr) {
-      error = "no such template";
-      return false;
+      return std::unexpected("no such template");
     }
     const std::string donorId = data.DonorOf(templateId, faction);
     const JsonTree* d = data.Donor(donorId);
     if (d == nullptr) {
-      error = "no donor for " + templateId + " / " + faction;
-      return false;
+      return std::unexpected("no donor for " + templateId + " / " + faction);
     }
-    spec = UnitWizardSpec{};
+    UnitWizardSpec spec;
     spec.id = id;
     spec.templateId = templateId;
     spec.faction = faction;
@@ -623,7 +614,7 @@ namespace faf::editor
       spec.footprintX = static_cast<int>(Num(p, "SkirtSizeX", 1.0));
       spec.footprintZ = static_cast<int>(Num(p, "SkirtSizeZ", 1.0));
     }
-    return true;
+    return spec;
   }
 
   std::vector<std::string> UnitCategories(
@@ -1359,29 +1350,28 @@ namespace faf::editor
     }
   } // namespace
 
-  std::vector<std::uint8_t> UnitMesh(
+  std::expected<std::vector<std::uint8_t>, std::string> UnitMesh(
     const UnitWizardData& data,
     const UnitWizardSpec& spec,
     const std::string& objText,
-    UnitMeshInfo& info,
-    std::string& error
+    UnitMeshInfo& info
   )
   {
     info = UnitMeshInfo{};
     const JsonTree* d = data.Donor(data.DonorOf(spec.templateId, spec.faction));
     if (d == nullptr) {
-      error = "no donor unit for the template";
-      return {};
+      return std::unexpected("no donor unit for the template");
     }
     const float us = d->Float("uniformScale", 0.1f);
     std::vector<ScmBone> bones;
     ObjMesh mesh;
     std::vector<int> positionBone;
     if (!objText.empty()) {
-      ObjMesh obj;
-      if (!ParseObj(objText, obj, error)) {
-        return {};
+      auto parsed = ParseObj(objText);
+      if (!parsed) {
+        return std::unexpected(parsed.error());
       }
+      ObjMesh& obj = *parsed;
       // Axis, yaw, mirror, winding, v.
       const float yaw = spec.mesh.yaw * 3.14159265f / 180.0f;
       const float cy = std::cos(yaw);
@@ -1424,8 +1414,7 @@ namespace faf::editor
       }
       const float side = std::max(x1 - x0, z1 - z0);
       if (side < 1e-9f) {
-        error = "the OBJ has no horizontal size";
-        return {};
+        return std::unexpected("the OBJ has no horizontal size");
       }
       const float length = spec.mesh.length > 0.0f ? spec.mesh.length : 1.0f;
       const float scale = (length / us) / side;
@@ -1546,10 +1535,9 @@ namespace faf::editor
       info.placeholder = true;
       info.warnings.push_back("no OBJ chosen: a placeholder mesh (box and turret) is written");
     }
-    std::vector<std::uint8_t> bytes =
-      ScmFromObjSkinned(mesh, bones, positionBone, 1.0f, "FAF map editor unit wizard: unit " + spec.id, error);
-    if (bytes.empty()) {
-      return {};
+    auto bytes = ScmFromObjSkinned(mesh, bones, positionBone, 1.0f, "FAF map editor unit wizard: unit " + spec.id);
+    if (!bytes) {
+      return bytes;
     }
     info.bones = static_cast<int>(bones.size());
     info.triangles = static_cast<int>(mesh.triangles.size());
@@ -1820,22 +1808,19 @@ namespace faf::editor
     return WriteJsonTree(root) + "\n";
   }
 
-  bool ReadUnitSpecs(
-    const std::string& text,
-    std::vector<UnitWizardSpec>& specs,
-    std::string& error
+  std::expected<std::vector<UnitWizardSpec>, std::string> ReadUnitSpecs(
+    const std::string& text
   )
   {
     const auto parsed = ParseJsonTree(text);
     if (!parsed) {
-      error = parsed.error();
-      return false;
+      return std::unexpected(parsed.error());
     }
     const JsonTree& root = *parsed;
-    specs.clear();
+    std::vector<UnitWizardSpec> specs;
     const JsonTree* list = root.Get("units");
     if (list == nullptr) {
-      return true;
+      return specs;
     }
     const auto strings = [](const JsonTree* a) {
       std::vector<std::string> v;
@@ -1908,7 +1893,7 @@ namespace faf::editor
       s.footprintZ = n.Int("footprintZ", 1);
       specs.push_back(std::move(s));
     }
-    return true;
+    return specs;
   }
 
   std::vector<UnitCheck> CheckWizardUnit(
@@ -2140,12 +2125,12 @@ namespace faf::editor
       report.push_back("the OBJ " + spec.mesh.source + " can't be read: a placeholder mesh instead");
     }
     UnitMeshInfo info;
-    std::string error;
-    const std::vector<std::uint8_t> scm = UnitMesh(data, spec, objText, info, error);
-    if (scm.empty()) {
-      report.push_back("the mesh wasn't made: " + error);
+    const auto made = UnitMesh(data, spec, objText, info);
+    if (!made) {
+      report.push_back("the mesh wasn't made: " + made.error());
       return false;
     }
+    const std::vector<std::uint8_t>& scm = *made;
     for (const std::string& w : info.warnings) {
       report.push_back("mesh: " + w);
     }
@@ -2199,9 +2184,8 @@ namespace faf::editor
     }
     // The quick icon from the mesh.
     if (spec.icon) {
-      ScmModel model;
-      if (ReadScm(scm, model, error)) {
-        const std::vector<std::uint8_t> icon = UnitQuickIcon(model.positions, model.indexes, spec.faction, 64);
+      if (const auto model = ReadScm(scm)) {
+        const std::vector<std::uint8_t> icon = UnitQuickIcon(model->positions, model->indexes, spec.faction, 64);
         const std::filesystem::path path =
           folder / "textures" / "ui" / "common" / "icons" / "units" / (spec.id + "_icon.dds");
         const std::vector<std::uint8_t> dds = DdsFromRgba(icon, 64, 64);

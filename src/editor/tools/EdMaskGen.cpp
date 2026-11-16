@@ -710,16 +710,14 @@ namespace faf::editor
     context.cache.clear();
   }
 
-  bool EvaluateMaskRules(
+  std::expected<void, std::string> EvaluateMaskRules(
     MaskGenContext& context,
     const std::vector<MaskGenRule>& rules,
-    field::Grid& out,
-    std::string& error
+    field::Grid& out
   )
   {
     if (context.heights == nullptr || context.heights->v.empty()) {
-      error = "no heights";
-      return false;
+      return std::unexpected("no heights");
     }
     try {
       Evaluator e{context};
@@ -745,31 +743,27 @@ namespace faf::editor
         acc = acc == nullptr ? r : e.Combine(acc, r, rule.op);
       }
       if (acc == nullptr) {
-        error = "no rule is switched on";
-        return false;
+        return std::unexpected("no rule is switched on");
       }
       out = *acc;
-      return true;
+      return {};
     } catch (const OpFailed& failed) {
-      error = failed.what();
-      return false;
+      return std::unexpected(failed.what());
     }
   }
 
-  bool FreeAboveLayer(
+  std::expected<void, std::string> FreeAboveLayer(
     MaskGenContext& context,
     const int layer,
-    field::Grid& out,
-    std::string& error
+    field::Grid& out
   )
   {
     try {
       Evaluator e{context};
       out = *e.FreeAbove(layer);
-      return true;
+      return {};
     } catch (const OpFailed& failed) {
-      error = failed.what();
-      return false;
+      return std::unexpected(failed.what());
     }
   }
 

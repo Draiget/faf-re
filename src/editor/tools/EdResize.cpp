@@ -161,17 +161,15 @@ namespace faf::editor
     }
   } // namespace
 
-  std::string ResizeSaveText(
+  std::expected<std::string, std::string> ResizeSaveText(
     const std::string& saveText,
     const ResizeGeometry& g,
-    ResizeReport& report,
-    std::string& error
+    ResizeReport& report
   )
   {
     SaveFile save;
     if (const auto parsed = save.Parse(saveText); !parsed) {
-      error = parsed.error();
-      return {};
+      return std::unexpected(parsed.error());
     }
     // Markers.
     std::set<std::string> dropped;

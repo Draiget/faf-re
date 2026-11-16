@@ -7,6 +7,7 @@
 #include "editor/tools/EdHeightBrush.h"
 #include "editor/tools/EdHeightFile.h"
 
+#include <expected>
 #include <filesystem>
 #include <string>
 #include <utility>
@@ -30,8 +31,8 @@ namespace faf::editor
   /** The images in `folder` the height image reader takes (PNG, TIFF, BMP, R16, RAW), by name. */
   [[nodiscard]] std::vector<BrushImage> ListBrushImages(const std::filesystem::path& folder);
 
-  /** An image read as grey (0..1) on an n x n grid; false with `error` when it can't be read. */
-  bool LoadBrushImage(const std::filesystem::path& file, int n, ShapeGrid& out, std::string& error);
+  /** An image read as grey (0..1) on an n x n grid; the error when it can't be read. */
+  [[nodiscard]] std::expected<ShapeGrid, std::string> LoadBrushImage(const std::filesystem::path& file, int n);
 
   /**
    * The brush images FAF Studio ships (its gen_brush_masks.py): canyon, crater, dunes, ridgeline and volcano as n x n

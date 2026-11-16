@@ -69,8 +69,8 @@ namespace
     facts.highest = 90.0f;
     ImportSettings settings;
     settings.invert = true;
-    std::string error;
-    ASSERT_TRUE(ImportFromSidecar(ExportSidecar(facts), settings, error)) << error;
+    const auto read = ImportFromSidecar(ExportSidecar(facts), settings);
+    ASSERT_TRUE(read) << read.error();
     EXPECT_EQ(settings.mapping, ImportSettings::Mapping::Absolute);
     EXPECT_FALSE(settings.invert);
     // A word read back is that height: words * scale / 128 = units.
@@ -83,7 +83,7 @@ namespace
     const std::vector<std::uint16_t> out = ImportedHeights(image, current, 2, 2, settings);
     ASSERT_EQ(out.size(), 4U);
     EXPECT_NEAR(out[0] / 128.0f, 42.0f, 0.1f) << "42 units exported, 42 units imported";
-    EXPECT_FALSE(ImportFromSidecar("{\"map\": \"x\"}", settings, error));
+    EXPECT_FALSE(ImportFromSidecar("{\"map\": \"x\"}", settings));
   }
 
   TEST(
@@ -133,9 +133,9 @@ namespace
     options.bigEndian = true;
     options.rawWidth = 3;
     options.rawHeight = 2;
-    HeightImage image;
-    std::string error;
-    ASSERT_TRUE(ReadHeightImageWith(TempFile("big.r16"), 0, 0, options, image, error)) << error;
+    auto read = ReadHeightImageWith(TempFile("big.r16"), 0, 0, options);
+    ASSERT_TRUE(read) << read.error();
+    HeightImage image = std::move(*read);
     ASSERT_EQ(image.width, 3);
     ASSERT_EQ(image.height, 2);
     for (int i = 0; i < 6; ++i) {
@@ -155,14 +155,16 @@ namespace
     floats.rawFloat = true;
     floats.rawWidth = 2;
     floats.rawHeight = 2;
-    ASSERT_TRUE(ReadHeightImageWith(TempFile("float.r32"), 0, 0, floats, image, error)) << error;
+    read = ReadHeightImageWith(TempFile("float.r32"), 0, 0, floats);
+    ASSERT_TRUE(read) << read.error();
+    image = std::move(*read);
     ASSERT_EQ(image.words.size(), 4U);
     EXPECT_LT(image.words[0], image.words[3]);
     EXPECT_LT(image.words[3], image.words[1]);
     EXPECT_LT(image.words[1], image.words[2]);
     // A size that doesn't match the file is refused.
     floats.rawWidth = 5;
-    EXPECT_FALSE(ReadHeightImageWith(TempFile("float.r32"), 0, 0, floats, image, error));
+    EXPECT_FALSE(ReadHeightImageWith(TempFile("float.r32"), 0, 0, floats));
   }
 
   TEST(
@@ -170,11 +172,10 @@ namespace
     TheObjImportOptions
   )
   {
-    ObjMesh mesh;
-    std::string error;
-    ASSERT_TRUE(ParseObj(
-      "o first\nv 0 0 0\nv 10 0 0\nv 0 5 0\nf 1 2 3\no second\nv 0 0 10\nv 10 0 10\nv 0 0 20\nf 4 5 6\n", mesh, error
-    )) << error;
+    const auto parsed =
+      ParseObj("o first\nv 0 0 0\nv 10 0 0\nv 0 5 0\nf 1 2 3\no second\nv 0 0 10\nv 10 0 10\nv 0 0 20\nf 4 5 6\n");
+    ASSERT_TRUE(parsed) << parsed.error();
+    const ObjMesh& mesh = *parsed;
     ASSERT_EQ(mesh.triangles.size(), 2U);
     MeshImportOptions options;
     options.zUp = true;

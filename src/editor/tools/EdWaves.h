@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <expected>
 #include <string>
 #include <vector>
 
@@ -37,7 +38,7 @@ namespace faf::editor
 
   /** FAForeverMapEditor's waves file (`.scmwaves`, JsonUtility's dump of its WaveData): game coordinates, radians. */
   std::string WavesToScmwaves(const std::vector<WaveRecord>& waves);
-  bool WavesFromScmwaves(const std::string& text, std::vector<WaveRecord>& waves, std::string& error);
+  [[nodiscard]] std::expected<std::vector<WaveRecord>, std::string> WavesFromScmwaves(const std::string& text);
 
   /** What a generator of a kind gets (the GPG editor's wave pattern, first parameter set): ranges are min, max. */
   struct WavePattern
@@ -63,7 +64,7 @@ namespace faf::editor
    * speedVariance, lifetime, lifetimeVariance, scale = { a, b }, scaleVariance, frameCount, frameRate,
    * frameRateVariance, stripCount } } } }`, as FAForeverMapEditor ships one): each pattern's first parameter set.
    */
-  bool ParseWavePatterns(const std::string& lua, std::vector<WavePattern>& patterns, std::string& error);
+  [[nodiscard]] std::expected<std::vector<WavePattern>, std::string> ParseWavePatterns(const std::string& lua);
 
   /** A place on the shore: where a wave starts and the way to the shore (radians, game x/z: 0 is +x, pi/2 is +z). */
   struct ShorePoint

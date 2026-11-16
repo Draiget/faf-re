@@ -758,10 +758,9 @@ namespace faf::editor
         Lines lines = SplitLines(code);
         // Code that ends its block (a trailing return) is wrapped in do ... end, so more can follow it in the stage.
         if (C.compiles != nullptr && *C.compiles) {
-          std::string error;
           if (
-            !(*C.compiles)("local function f()\n" + code + "\nlocal _ = 0\nend", error) &&
-            (*C.compiles)("local function f()\n" + code + "\nend", error)
+            !(*C.compiles)("local function f()\n" + code + "\nlocal _ = 0\nend") &&
+            (*C.compiles)("local function f()\n" + code + "\nend")
           ) {
             lines.insert(lines.begin(), "do");
             lines.push_back("end");
@@ -1058,9 +1057,8 @@ namespace faf::editor
           why = std::string("could not be generated (") + OneLine(error.what()) + ")";
         }
         if (why.empty() && (node.type == "raw" || C.strict) && C.compiles != nullptr && *C.compiles) {
-          std::string error;
-          if (!(*C.compiles)(Join(lines), error)) {
-            why = "does not compile (" + OneLine(error) + ")";
+          if (const auto compiled = (*C.compiles)(Join(lines)); !compiled) {
+            why = "does not compile (" + OneLine(compiled.error()) + ")";
           }
         }
         if (why.empty()) {
@@ -1440,8 +1438,7 @@ namespace faf::editor
     )
     {
       const std::string body = CompileMission(mission, options);
-      std::string error;
-      if (!options.compiles || options.compiles(body, error)) {
+      if (!options.compiles || options.compiles(body)) {
         return body;
       }
       std::string stub =
@@ -1840,8 +1837,7 @@ namespace faf::editor
       return fallback;
     }
     if (compiles != nullptr && *compiles) {
-      std::string error;
-      if (!(*compiles)("return (" + text + ")", error)) {
+      if (!(*compiles)("return (" + text + ")")) {
         return fallback;
       }
     }
@@ -2136,32 +2132,29 @@ namespace faf::editor
     }
   } // namespace
 
-  bool RegisterMissionNodeType(
-    MissionNodeType type,
-    std::string& error
+  std::expected<void, std::string> RegisterMissionNodeType(
+    MissionNodeType type
   )
   {
     if (type.id.empty() || type.title.empty() || !type.emit) {
-      error = "a node type needs an id, a title and code";
-      return false;
+      return std::unexpected("a node type needs an id, a title and code");
     }
     for (const MissionNodeType& t : MissionNodeTypes()) {
       if (t.id == type.id) {
-        error = "the editor has a node type " + type.id;
-        return false;
+        return std::unexpected("the editor has a node type " + type.id);
       }
     }
     for (MissionNodeType& t : ModTypes()) {
       if (t.id == type.id) {
         t = std::move(type); // a mod run again replaces its own
-        return true;
+        return {};
       }
     }
     if (type.family.empty()) {
       type.family = "action";
     }
     ModTypes().push_back(std::move(type));
-    return true;
+    return {};
   }
 
   std::vector<const MissionNodeType*> MissionModNodeTypes()
@@ -2579,12 +2572,11 @@ namespace faf::editor
       const int i = static_cast<int>(s) + 1;
       std::vector<MissionProblem> stageProblems;
       Lines lines = StageLines(m, i, m.stages[s], o, false, &stageProblems);
-      std::string error;
-      if (o.compiles && !o.compiles(Join(lines), error)) {
+      if (o.compiles && !o.compiles(Join(lines))) {
         // A node doesn't load: each checked on its own, the broken ones left out; as a last resort the whole stage.
         stageProblems.clear();
         lines = StageLines(m, i, m.stages[s], o, true, &stageProblems);
-        if (!o.compiles(Join(lines), error)) {
+        if (!o.compiles(Join(lines))) {
           stageProblems.push_back(
             {'E',
              "stage " + std::to_string(i) + " could not be generated: it starts the next stage and says so in the log",
@@ -3022,18 +3014,15 @@ namespace faf::editor
     return out;
   }
 
-  bool LoadMission(
-    const std::string& text,
-    Mission& mission,
-    std::string& error
+  std::expected<Mission, std::string> LoadMission(
+    const std::string& text
   )
   {
     const std::size_t open = text.find('{');
     const std::string root = open == std::string::npos ? std::string() : Balanced(text, open);
     const std::string stages = NestedOf(root, "stages");
     if (stages.empty()) {
-      error = "no stages";
-      return false;
+      return std::unexpected("no stages");
     }
     Mission m;
     std::string mode;
@@ -3195,7 +3184,6 @@ namespace faf::editor
       }
       m.orderQueues.push_back(std::move(q));
     }
-    mission = std::move(m);
-    return true;
+    return m;
   }
 } // namespace faf::editor

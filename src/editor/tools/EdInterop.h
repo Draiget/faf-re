@@ -5,6 +5,7 @@
 #include <array>
 #include "editor/tools/EdHeightFile.h"
 #include <cstdint>
+#include <expected>
 #include <string>
 #include <vector>
 
@@ -66,9 +67,9 @@ namespace faf::editor
   };
   /**
    * Reads back what an export wrote beside its image (`<file>.json`: heightPerWord, lowest, highest): the settings
-   * that put it back at the same heights (Absolute with that scale). False when the text isn't one.
+   * that put it back at the same heights (Absolute with that scale). The error when the text isn't one.
    */
-  bool ImportFromSidecar(const std::string& json, ImportSettings& settings, std::string& error);
+  [[nodiscard]] std::expected<void, std::string> ImportFromSidecar(const std::string& json, ImportSettings& settings);
 
   /** The image flipped and turned as the settings say. */
   [[nodiscard]] HeightImage OrientHeights(const HeightImage& image, bool flipX, bool flipZ, int turns);

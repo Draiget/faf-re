@@ -1,5 +1,6 @@
 #pragma once
 
+#include <expected>
 #include <string>
 #include <utility>
 #include <vector>
@@ -19,8 +20,8 @@ namespace faf::editor
     void Set(const std::string& key, const std::string& value);
   };
 
-  /** The builders of a `PlatoonBuilders` text; false with `error` when its Builders table can't be followed. */
-  bool ParseBuilders(const std::string& text, std::vector<MissionBuilder>& builders, std::string& error);
+  /** The builders of a `PlatoonBuilders` text; the error when its Builders table can't be followed. */
+  [[nodiscard]] std::expected<std::vector<MissionBuilder>, std::string> ParseBuilders(const std::string& text);
 
   /** The `PlatoonBuilders` text for these builders (as the saves lay the table out). */
   [[nodiscard]] std::string FormatBuilders(const std::vector<MissionBuilder>& builders);

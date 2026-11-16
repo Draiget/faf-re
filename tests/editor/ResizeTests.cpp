@@ -108,11 +108,11 @@ namespace faf::editor
     o.anchor = 0; // the top left kept
     const ResizeGeometry g = MakeResizeGeometry(o);
     ResizeReport report;
-    std::string error;
-    const std::string text = ResizeSaveText(kSave, g, report, error);
-    ASSERT_FALSE(text.empty()) << error;
+    const auto text = ResizeSaveText(kSave, g, report);
+    ASSERT_TRUE(text) << text.error();
+    ASSERT_FALSE(text->empty());
     SaveFile save;
-    auto parsed = save.Parse(text);
+    auto parsed = save.Parse(*text);
     ASSERT_TRUE(parsed) << parsed.error();
     ASSERT_EQ(save.Markers().size(), 1U);
     EXPECT_EQ(save.Markers()[0].name, "ARMY_1");
@@ -171,10 +171,10 @@ namespace faf::editor
     o.mode = ResizeMode::Scale;
     const ResizeGeometry g = MakeResizeGeometry(o);
     ResizeReport report;
-    std::string error;
-    const std::string text = ResizeSaveText(kSave, g, report, error);
+    const auto text = ResizeSaveText(kSave, g, report);
+    ASSERT_TRUE(text) << text.error();
     SaveFile save;
-    auto read = save.Parse(text);
+    auto read = save.Parse(*text);
     ASSERT_TRUE(read) << read.error();
     EXPECT_EQ(save.Markers().size(), 2U) << "nothing dropped";
     EXPECT_EQ(report.unitsKept, 2);

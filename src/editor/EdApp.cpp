@@ -2377,7 +2377,9 @@ namespace faf::editor
                 }
                 std::string written;
                 const std::filesystem::path out = std::filesystem::path(thumbDir[0].c_str()) / (name + ".png");
-                (void)WriteColourPng(out, kLookThumbSide, kLookThumbSide, pixels, written);
+                if (const auto wrote = WriteColourPng(out, kLookThumbSide, kLookThumbSide, pixels); !wrote) {
+                  written = wrote.error();
+                }
                 gpg::Logf(
                   "editor: look picture %s: %d x %d, mean colour %.0f %.0f %.0f, image %s, %s",
                   wanted.c_str(),
@@ -4287,11 +4289,10 @@ namespace faf::editor
         const MapFacts& facts = mDocument.Facts();
         const field::Grid like(facts.fieldWidth, facts.fieldHeight, 1.0f, 0.0f, 0.0f);
         field::Grid heights;
-        std::string error;
         LayoutBuildOptions buildOptions;
         buildOptions.weather = layout.weather;
-        if (!BuildLayout(layout, like, buildOptions, heights, nullptr, error)) {
-          panel.SetStatus("Generate terrain: " + error);
+        if (const auto built = BuildLayout(layout, like, buildOptions, heights, nullptr); !built) {
+          panel.SetStatus("Generate terrain: " + built.error());
           return;
         }
         if (brush.symmetry != Symmetry::None) {
@@ -4303,8 +4304,7 @@ namespace faf::editor
           options.symmetry = brush.symmetry;
           options.turns = brush.turns;
           options.seam = 12.0f;
-          std::string why;
-          if (SymmetrizeHeights(words.data(), heights.w, heights.h, options, why)) {
+          if (SymmetrizeHeights(words.data(), heights.w, heights.h, options)) {
             for (std::size_t k = 0; k < words.size(); ++k) {
               heights.v[k] = static_cast<float>(words[k]) / 128.0f;
             }
@@ -4805,21 +4805,12 @@ namespace faf::editor
             continue; // a texture the game can't read keeps the neutral tile
           }
           (void)decode(slot.normals, normal);
-          std::string error;
-          if (
-            MakeAtlasTile(
-              albedo,
-              normal,
-              kinds[static_cast<std::size_t>(layer)],
-              writes.atlasSettings,
-              made[static_cast<std::size_t>(layer)],
-              error
-            )
-          ) {
+          if (auto tile = MakeAtlasTile(albedo, normal, kinds[static_cast<std::size_t>(layer)], writes.atlasSettings)) {
+            made[static_cast<std::size_t>(layer)] = std::move(*tile);
             tiles[static_cast<std::size_t>(layer)] = &made[static_cast<std::size_t>(layer)];
             ++textured;
           } else {
-            gpg::Warnf("editor: atlas: layer %d: %s", layer, error.c_str());
+            gpg::Warnf("editor: atlas: layer %d: %s", layer, tile.error().c_str());
           }
         }
         std::vector<float> rgba;
@@ -5256,20 +5247,20 @@ namespace faf::editor
         );
         // Another tool's save: the linked file read, a square of it raised by 10 units, written back.
         const auto raiseInFile = [&] {
-          HeightImage image;
-          std::string error;
-          if (!ReadHeightImage(file, 0, 0, image, error)) {
-            gpg::Warnf("editor: interop test: can't read %s: %s", file.string().c_str(), error.c_str());
+          auto read = ReadHeightImage(file, 0, 0);
+          if (!read) {
+            gpg::Warnf("editor: interop test: can't read %s: %s", file.string().c_str(), read.error().c_str());
             return;
           }
+          HeightImage& image = *read;
           for (int z = 200; z < 300 && z < image.height; ++z) {
             for (int x = 200; x < 300 && x < image.width; ++x) {
               std::uint16_t& w = image.words[static_cast<std::size_t>(z) * image.width + x];
               w = static_cast<std::uint16_t>(std::min(65535, w + 1280));
             }
           }
-          if (!WriteHeightImage(file, image, error)) {
-            gpg::Warnf("editor: interop test: can't write %s: %s", file.string().c_str(), error.c_str());
+          if (const auto wrote = WriteHeightImage(file, image); !wrote) {
+            gpg::Warnf("editor: interop test: can't write %s: %s", file.string().c_str(), wrote.error().c_str());
             return;
           }
           gpg::Logf("editor: interop test: raised a square of %s by 10 units", file.filename().string().c_str());
@@ -6537,8 +6528,8 @@ namespace faf::editor
         });
         mSelfTests.Add("the unit wizard's template data loads", [] {
           UnitWizardData data;
-          std::string error;
-          return LoadUnitWizardData(EmbeddedEditorData("unitwizdata.lua"), data, error) ? std::string() : error;
+          const auto loaded = LoadUnitWizardData(EmbeddedEditorData("unitwizdata.lua"), data);
+          return loaded ? std::string() : loaded.error();
         });
         mSelfTests.Add("turn a selected marker, then undo", [this] {
           const auto& markers = mDocument.SaveData().Markers();
@@ -7413,7 +7404,12 @@ namespace faf::editor
           MaskGenContext context;
           field::Grid mask;
           std::string error;
-          const bool ok = MaskGenContextOf({rule}, context, error) && EvaluateMaskRules(context, {rule}, mask, error);
+          const auto made = MaskGenContextOf({rule}, context, error) ? EvaluateMaskRules(context, {rule}, mask)
+                                                                     : std::unexpected(error);
+          if (!made) {
+            error = made.error();
+          }
+          const bool ok = made.has_value();
           double sum = 0.0;
           for (const float v : mask.v) {
             sum += v;
@@ -8120,11 +8116,15 @@ namespace faf::editor
           std::string error;
           const int w = std::max(width, 2);
           const int h = std::max(height, 2);
-          const bool wrote =
-            WriteColourPng(
-              layer, w, h, std::vector<std::uint32_t>(static_cast<std::size_t>(w) * h, 0xFF808080u), error
-            ) &&
-            WriteColourPng(notes, 4, 4, std::vector<std::uint32_t>(16, 0xFFFFFFFFu), error);
+          const auto both =
+            WriteColourPng(layer, w, h, std::vector<std::uint32_t>(static_cast<std::size_t>(w) * h, 0xFF808080u))
+              .and_then([&] {
+            return WriteColourPng(notes, 4, 4, std::vector<std::uint32_t>(16, 0xFFFFFFFFu));
+          });
+          if (!both) {
+            error = both.error();
+          }
+          const bool wrote = both.has_value();
           EdTools::MaskImport& mi = tools.MaskImportSettings();
           mi.files.clear();
           mi.files.push_back(MaskImportFile{layer.string()});
@@ -8672,9 +8672,10 @@ namespace faf::editor
             for (int c = 0; c < 4 && f.layer + c <= 8; ++c) {
               HeightReadOptions read;
               read.channel = c + 1;
-              HeightImage image;
-              if (ReadHeightImageWith(f.path, w, h, read, image, error)) {
-                layers.emplace_back(f.layer + c, toGrid(image, f));
+              if (const auto image = ReadHeightImageWith(f.path, w, h, read)) {
+                layers.emplace_back(f.layer + c, toGrid(*image, f));
+              } else {
+                error = image.error();
               }
             }
             report +=
@@ -8683,12 +8684,13 @@ namespace faf::editor
           }
           HeightReadOptions read;
           read.channel = f.channel;
-          HeightImage image;
-          if (!ReadHeightImageWith(f.path, w, h, read, image, error)) {
+          const auto image = ReadHeightImageWith(f.path, w, h, read);
+          if (!image) {
+            error = image.error();
             report += name + ": " + error + "; ";
             continue;
           }
-          const field::Grid g = toGrid(image, f);
+          const field::Grid g = toGrid(*image, f);
           if (f.target == MaskImportFile::Target::Layer) {
             layers.emplace_back(std::clamp(f.layer, 1, 8), g);
             report += name + " -> layer " + std::to_string(f.layer) + "; ";
@@ -8850,8 +8852,10 @@ namespace faf::editor
             image.words[i] = static_cast<std::uint16_t>(std::clamp(std::lround(values[i] * 65535.0f), 0L, 65535L));
           }
           const std::string name = fileOf(suffix, mext);
-          if (WriteHeightImage(folder / name, image, error, p.mask8)) {
+          if (const auto wrote = WriteHeightImage(folder / name, image, p.mask8)) {
             written.push_back(name);
+          } else {
+            error = wrote.error();
           }
         };
         auto heights = std::make_shared<field::Grid>(w, h, 1.0f, 0.0f, 0.0f);
@@ -8906,8 +8910,10 @@ namespace faf::editor
               const float v = terrain->heights[i];
               values[i] = p.normalised ? (v - low) / (high - low) : v;
             }
-            if (WriteFloatImage(folder / heightName, w, h, values, error)) {
+            if (const auto wrote = WriteFloatImage(folder / heightName, w, h, values)) {
               written.push_back(heightName);
+            } else {
+              error = wrote.error();
             }
           } else {
             HeightImage image;
@@ -8917,8 +8923,10 @@ namespace faf::editor
               const float word = p.normalised ? (v - low) / (high - low) * 65535.0f : v * 128.0f;
               image.words.push_back(static_cast<std::uint16_t>(std::clamp(std::lround(word), 0L, 65535L)));
             }
-            if (WriteHeightImage(folder / heightName, image, error)) {
+            if (const auto wrote = WriteHeightImage(folder / heightName, image)) {
               written.push_back(heightName);
+            } else {
+              error = wrote.error();
             }
           }
         }
@@ -8993,8 +9001,10 @@ namespace faf::editor
               image.words.push_back(static_cast<std::uint16_t>(id * 257));
             }
             const std::string name = fileOf("_terraintypes", "png");
-            if (WriteHeightImage(folder / name, image, error, true)) { // 8-bit: the type codes as they are
+            if (const auto wrote = WriteHeightImage(folder / name, image, true)) { // 8-bit: the type codes as they are
               written.push_back(name);
+            } else {
+              error = wrote.error();
             }
           }
         }
@@ -12244,11 +12254,10 @@ namespace faf::editor
       const int size =
         mShell->Tools().MapTextureSize() > 0 ? mShell->Tools().MapTextureSize() : std::clamp(mapSize, 64, 1024);
       const auto started = std::chrono::steady_clock::now();
-      std::vector<float> rgba;
       std::string error;
       const bool fromPaint = target.pack == MapTexturePack::Specular || target.pack == MapTexturePack::Macro;
       std::string kinds;
-      bool made = false;
+      std::expected<std::vector<float>, std::string> made = std::unexpected(std::string());
       if (fromPaint) {
         // The paint: what each layer shows, its colour and its kind of ground.
         const EdDocument::MaskGrid& masks = mScene.ReadMasks();
@@ -12270,7 +12279,7 @@ namespace faf::editor
           kinds += (kinds.empty() ? "" : ", ") + std::to_string(layer) + " " + GroundKindName(entry.kind);
         }
         if (masks.texels.empty()) {
-          error = "the map's masks couldn't be read";
+          made = std::unexpected("the map's masks couldn't be read");
         } else {
           VisibleWeights(masks.texels.data(), masks.width, masks.height, profile.painted, profile.remapped, paint);
           made = MakePaintTexture(
@@ -12281,21 +12290,18 @@ namespace faf::editor
             target,
             options,
             mShell->Tools().MapPaintSettings(),
-            size,
-            rgba,
-            error
+            size
           );
         }
       } else {
-        made = faf::editor::MakeMapTexture(
-          terrain->heights, terrain->width, terrain->height, target, options, size, rgba, error
-        );
+        made = faf::editor::MakeMapTexture(terrain->heights, terrain->width, terrain->height, target, options, size);
       }
       if (!made) {
-        PostStatusMessage("The map-wide texture wasn't made: " + error);
-        gpg::Warnf("editor: map-wide texture: %s", error.c_str());
+        PostStatusMessage("The map-wide texture wasn't made: " + made.error());
+        gpg::Warnf("editor: map-wide texture: %s", made.error().c_str());
         return false;
       }
+      std::vector<float>& rgba = *made;
       // A small picture for the row: the texture's colour (its alpha as grey where the colour is empty).
       {
         constexpr int kPreview = 96;
@@ -12416,12 +12422,12 @@ namespace faf::editor
         ) {
           continue;
         }
-        HeightImage image;
-        std::string readError;
-        if (!ReadHeightImage(imported[static_cast<std::size_t>(slot - 1)], 0, 0, image, readError)) {
-          error = imported[static_cast<std::size_t>(slot - 1)] + ": " + readError;
+        const auto read = ReadHeightImage(imported[static_cast<std::size_t>(slot - 1)], 0, 0);
+        if (!read) {
+          error = imported[static_cast<std::size_t>(slot - 1)] + ": " + read.error();
           return false;
         }
+        const HeightImage& image = *read;
         auto grid = std::make_shared<field::Grid>(
           image.width,
           image.height,
@@ -12464,7 +12470,14 @@ namespace faf::editor
       const auto evaluate = [this](const EdTools::WaterMaskDef& def, field::Grid& mask, std::string& error) {
         const std::vector<MaskGenRule> rules = WaterMaskRules(def.kind, def.width, def.depth, def.soft, def.slope);
         MaskGenContext context;
-        return MaskGenContextOf(rules, context, error) && EvaluateMaskRules(context, rules, mask, error);
+        if (!MaskGenContextOf(rules, context, error)) {
+          return false;
+        }
+        if (const auto made = EvaluateMaskRules(context, rules, mask); !made) {
+          error = made.error();
+          return false;
+        }
+        return true;
       };
       const auto apply = [&](EdTools::WaterMaskDef& def, const bool remove) {
         WaterApplied& kept = mWaterApplied[def.id];
@@ -12625,10 +12638,11 @@ namespace faf::editor
         field::Grid mask;
         std::string error;
         const auto started = std::chrono::steady_clock::now();
-        if (
-          !MaskGenContextOf(tools.GenRules(), context, error) ||
-          !EvaluateMaskRules(context, tools.GenRules(), mask, error)
-        ) {
+        const auto made = MaskGenContextOf(tools.GenRules(), context, error)
+          ? EvaluateMaskRules(context, tools.GenRules(), mask)
+          : std::unexpected(error);
+        if (!made) {
+          error = made.error();
           PostStatusMessage("The mask wasn't made: " + error);
           gpg::Warnf("editor: mask generator: %s", error.c_str());
         } else if (target.toTypes) {
@@ -12726,11 +12740,12 @@ namespace faf::editor
       MaskGenContext context;
       field::Grid mask;
       std::string error;
-      if (
-        !MaskGenContextOf(tools.GenRules(), context, error) ||
-        !EvaluateMaskRules(context, tools.GenRules(), mask, error)
-      ) {
+      if (!MaskGenContextOf(tools.GenRules(), context, error)) {
         tools.SetGenPreview(0, 0.0f, error);
+        return;
+      }
+      if (const auto made = EvaluateMaskRules(context, tools.GenRules(), mask); !made) {
+        tools.SetGenPreview(0, 0.0f, made.error());
         return;
       }
       // On the map too when asked (FAF Studio draws the preview on the terrain).
@@ -13192,9 +13207,14 @@ namespace faf::editor
       std::string message;
       if (extra == EdTools::RecipeAsk::Show) {
         // Show: the layer's visible weight as the recipe resolves it, red over a dark map; nothing is painted.
+        auto madeRoles = RecipeRoles(context, plan, stats, tools.RecipeSettings(), tools.RecipeStyle());
+        if (madeRoles) {
+          roles = std::move(*madeRoles);
+        } else {
+          error = madeRoles.error();
+        }
         if (
-          !RecipeRoles(context, plan, stats, tools.RecipeSettings(), tools.RecipeStyle(), roles, error) ||
-          !ResolveRecipe(context, plan, roles, tools.RecipeSettings(), tools.RecipeStyle(), target, error)
+          !madeRoles || !ResolveRecipe(context, plan, roles, tools.RecipeSettings(), tools.RecipeStyle(), target, error)
         ) {
           tools.SetRecipeShow(0, "Can't show it: " + error);
           return;
@@ -13236,8 +13256,14 @@ namespace faf::editor
         gpg::Logf("editor: stratum recipe: show %s", text);
         return;
       }
+      auto madeRoles = RecipeRoles(context, plan, stats, tools.RecipeSettings(), tools.RecipeStyle());
+      if (madeRoles) {
+        roles = std::move(*madeRoles);
+      } else {
+        error = madeRoles.error();
+      }
       if (
-        !RecipeRoles(context, plan, stats, tools.RecipeSettings(), tools.RecipeStyle(), roles, error) ||
+        !madeRoles ||
         !ResolveRecipe(context, plan, roles, tools.RecipeSettings(), tools.RecipeStyle(), target, error) ||
         mScene.WriteRecipeMasks(target, textured, plan.cap, shares, message) < 0
       ) {
@@ -13310,12 +13336,12 @@ namespace faf::editor
       }
       std::ifstream in(obj, std::ios::binary);
       const std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
-      ObjMesh mesh;
-      std::string error;
-      if (!ParseObj(text, mesh, error)) {
-        message = obj.filename().string() + ": " + error;
+      const auto parsed = ParseObj(text);
+      if (!parsed) {
+        message = obj.filename().string() + ": " + parsed.error();
         return false;
       }
+      const ObjMesh& mesh = *parsed;
       // The OBJ in game units: the model is scaled by the blueprint's UniformScale when drawn, so divided by it here.
       float scale = 1.0f;
       if (moho::RRuleGameRules* const rules = moho::RULE_PeekKept(); rules != nullptr) {
@@ -13328,12 +13354,13 @@ namespace faf::editor
           scale = 1.0f / base->Display.UniformScale;
         }
       }
-      const std::vector<std::uint8_t> scm =
-        ScmFromObj(mesh, unit, scale, "made from " + obj.filename().string() + " by the FAF map editor", error);
-      if (scm.empty()) {
-        message = "No model: " + error;
+      const auto made =
+        ScmFromObj(mesh, unit, scale, "made from " + obj.filename().string() + " by the FAF map editor");
+      if (!made) {
+        message = "No model: " + made.error();
         return false;
       }
+      const std::vector<std::uint8_t>& scm = *made;
       if (
         const auto written =
           ModWriteBinary(*project, panel.Folder(), ModUnitModelFile(unit), std::string(scm.begin(), scm.end()));
@@ -13458,11 +13485,11 @@ namespace faf::editor
               static_cast<std::size_t>(level.width) * 4U
             );
           }
-          const bool ok =
-            WriteColourPng(file, static_cast<int>(level.width), static_cast<int>(level.height), pixels, error);
+          const auto wrote =
+            WriteColourPng(file, static_cast<int>(level.width), static_cast<int>(level.height), pixels);
           gpg::Logf("editor: map-wide texture %s exported as PNG to %s", current.c_str(), file.string().c_str());
           PostStatusMessage(
-            ok ? "Exported " + file.filename().string() : "Can't write " + file.string() + ": " + error
+            wrote ? "Exported " + file.filename().string() : "Can't write " + file.string() + ": " + wrote.error()
           );
           return;
         }
@@ -13892,22 +13919,24 @@ namespace faf::editor
           for (int i = 0; i < width * height; ++i) {
             image.words.push_back(static_cast<std::uint16_t>(cells[i] * 257));
           }
-          std::string error;
-          const bool ok = WriteHeightImage(file, image, error);
-          message = ok ? "written to " + file.string() : error;
-          return ok;
+          const auto wrote = WriteHeightImage(file, image);
+          message = wrote ? "written to " + file.string() : wrote.error();
+          return wrote.has_value();
         };
         const auto waterImport = [&](const int kind, const std::filesystem::path& file) {
           int width = 0;
           int height = 0;
           std::uint8_t* const cells = mDocument.WaterMaskCells(static_cast<WaterMask>(kind), width, height);
-          HeightImage image;
-          std::string error;
-          if (cells == nullptr || !ReadHeightImage(file, width, height, image, error)) {
-            message = cells == nullptr ? "the map has no water masks" : error;
+          if (cells == nullptr) {
+            message = "the map has no water masks";
             return false;
           }
-          image = ResampleHeights(image, width, height);
+          const auto read = ReadHeightImage(file, width, height);
+          if (!read) {
+            message = read.error();
+            return false;
+          }
+          const HeightImage image = ResampleHeights(*read, width, height);
           EdDocument::WaterMaskSnapshot before = mDocument.WaterMasksNow();
           for (int i = 0; i < width * height; ++i) {
             cells[i] = static_cast<std::uint8_t>(image.words[static_cast<std::size_t>(i)] >> 8);
@@ -13945,7 +13974,6 @@ namespace faf::editor
               return false;
             }
             std::vector<std::uint8_t> cells = mDocument.TerrainTypesNow();
-            std::string error;
             if (exportIt) {
               HeightImage image;
               image.width = width;
@@ -13953,15 +13981,16 @@ namespace faf::editor
               for (const std::uint8_t id : cells) {
                 image.words.push_back(static_cast<std::uint16_t>(id * 257));
               }
-              const bool ok = WriteHeightImage(file, image, error);
-              message = ok ? "written to " + file.string() : error;
-              return ok;
+              const auto wrote = WriteHeightImage(file, image);
+              message = wrote ? "written to " + file.string() : wrote.error();
+              return wrote.has_value();
             }
-            HeightImage image;
-            if (!ReadHeightImage(file, 0, 0, image, error)) {
-              message = error;
+            const auto read = ReadHeightImage(file, 0, 0);
+            if (!read) {
+              message = read.error();
               return false;
             }
+            const HeightImage& image = *read;
             if (image.width != width || image.height != height) {
               message = "the terrain types are " + std::to_string(width) + " x " + std::to_string(height) +
                 "; the image is " + std::to_string(image.width) + " x " + std::to_string(image.height);
@@ -14043,13 +14072,12 @@ namespace faf::editor
           std::ifstream in(ask.file, std::ios::binary);
           text.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
         }
-        ObjMesh mesh;
-        std::string error;
-        if (text.empty() || !ParseObj(text, mesh, error)) {
-          mShell->SetMeshStatus("Couldn't read " + ask.file + (error.empty() ? "" : ": " + error));
+        const auto mesh = text.empty() ? std::expected<ObjMesh, std::string>(std::unexpect) : ParseObj(text);
+        if (!mesh) {
+          mShell->SetMeshStatus("Couldn't read " + ask.file + (mesh.error().empty() ? "" : ": " + mesh.error()));
           continue;
         }
-        const ObjMesh placed = TransformMesh(mesh, ask.options);
+        const ObjMesh placed = TransformMesh(*mesh, ask.options);
         const std::filesystem::path map = mDocument.MapDiskFile();
         std::size_t tiles = 0;
         std::size_t failed = 0;
@@ -14131,13 +14159,12 @@ namespace faf::editor
               piece.uv2Size = ask.options.lightMaskUv == 0 ? size : 0.0f;
               char name[64];
               (void)std::snprintf(name, sizeof(name), "section%02d_%03d.scm", section, serial++);
-              std::string partError;
-              const std::vector<std::uint8_t> scm =
-                ScmFromObj(piece, "tile", 1.0f, "FAF map editor mesh terrain", partError);
-              if (scm.empty()) {
+              const auto made = ScmFromObj(piece, "tile", 1.0f, "FAF map editor mesh terrain");
+              if (!made) {
                 ++failed;
                 continue;
               }
+              const std::vector<std::uint8_t>& scm = *made;
               std::ofstream out(folder / name, std::ios::binary | std::ios::trunc);
               out.write(reinterpret_cast<const char*>(scm.data()), static_cast<std::streamsize>(scm.size()));
               for (const auto& triangle : piece.triangles) {
@@ -14270,35 +14297,38 @@ namespace faf::editor
       r.dir = std::filesystem::temp_directory_path(ec) / "FafEditor" / "resize";
       std::filesystem::create_directories(r.dir, ec);
       std::string message;
-      std::string error;
       // The heights: written, read, resized, written again for the new map to read.
-      HeightImage image;
-      if (
-        !mScene.ExportHeights(r.dir / "heights_old.png", 0, 1.0f, message) ||
-        !ReadHeightImage(r.dir / "heights_old.png", 0, 0, image, error)
-      ) {
-        fail("the heights couldn't be read: " + message + error);
+      if (!mScene.ExportHeights(r.dir / "heights_old.png", 0, 1.0f, message)) {
+        fail("the heights couldn't be read: " + message);
+        return;
+      }
+      const auto image = ReadHeightImage(r.dir / "heights_old.png", 0, 0);
+      if (!image) {
+        fail("the heights couldn't be read: " + message + image.error());
         return;
       }
       const auto pad = static_cast<std::uint16_t>(std::clamp(std::lround(o.padLevel * 128.0f), 0L, 65535L));
-      const HeightImage heights = ResizeImage(image, r.geometry, o.newWidth + 1, o.newDepth + 1, o.padEdge, pad);
-      if (!WriteHeightImage(r.dir / "heights.png", heights, error)) {
-        fail("the heights couldn't be written: " + error);
+      const HeightImage heights = ResizeImage(*image, r.geometry, o.newWidth + 1, o.newDepth + 1, o.padEdge, pad);
+      if (const auto wrote = WriteHeightImage(r.dir / "heights.png", heights); !wrote) {
+        fail("the heights couldn't be written: " + wrote.error());
         return;
       }
       // The eight strata's masks alike (the mask grid at its own scale, padded with the edge or nothing).
       for (int layer = 0; layer < 8; ++layer) {
         const std::filesystem::path old = r.dir / ("mask" + std::to_string(layer) + "_old.png");
-        HeightImage mask;
-        if (!mScene.ExportMaskLayer(layer, old, message) || !ReadHeightImage(old, 0, 0, mask, error)) {
+        if (!mScene.ExportMaskLayer(layer, old, message)) {
           continue; // (a map without masks yet)
         }
+        const auto mask = ReadHeightImage(old, 0, 0);
+        if (!mask) {
+          continue;
+        }
         r.maskWidth =
-          std::max(2, static_cast<int>(std::lround(static_cast<double>(mask.width) * o.newWidth / o.oldWidth)));
+          std::max(2, static_cast<int>(std::lround(static_cast<double>(mask->width) * o.newWidth / o.oldWidth)));
         r.maskHeight =
-          std::max(2, static_cast<int>(std::lround(static_cast<double>(mask.height) * o.newDepth / o.oldDepth)));
-        const HeightImage resized = ResizeImage(mask, r.geometry, r.maskWidth, r.maskHeight, o.padEdge, 0);
-        (void)WriteHeightImage(r.dir / ("mask" + std::to_string(layer) + ".png"), resized, error);
+          std::max(2, static_cast<int>(std::lround(static_cast<double>(mask->height) * o.newDepth / o.oldDepth)));
+        const HeightImage resized = ResizeImage(*mask, r.geometry, r.maskWidth, r.maskHeight, o.padEdge, 0);
+        (void)WriteHeightImage(r.dir / ("mask" + std::to_string(layer) + ".png"), resized);
       }
       r.shader = mScene.TerrainShader();
       r.layers = mScene.LayerSettingsNow();
@@ -14342,11 +14372,12 @@ namespace faf::editor
         r.decals.push_back(decal);
         ++r.report.decalsKept;
       }
-      r.save = ResizeSaveText(mDocument.SaveData().Text(), r.geometry, r.report, error);
-      if (r.save.empty()) {
-        fail("the save file couldn't be read: " + error);
+      auto save = ResizeSaveText(mDocument.SaveData().Text(), r.geometry, r.report);
+      if (!save || save->empty()) {
+        fail("the save file couldn't be read: " + (save ? std::string() : save.error()));
         return;
       }
+      r.save = std::move(*save);
       r.script = mDocument.Script();
       for (const ScenarioField& field : ScenarioFields()) {
         std::string value;
@@ -14465,11 +14496,16 @@ namespace faf::editor
         const std::filesystem::path dir = std::filesystem::temp_directory_path(ec) / "FafEditor";
         std::filesystem::create_directories(dir, ec);
         const std::filesystem::path file = dir / "preview_heights.png";
-        std::string error;
-        if (!mScene.ExportHeights(file, 0, 1.0f, message) || !ReadHeightImage(file, 0, 0, use.heights, error)) {
-          message = "The preview needs the heights: " + message + error;
+        if (!mScene.ExportHeights(file, 0, 1.0f, message)) {
+          message = "The preview needs the heights: " + message;
           return false;
         }
+        auto read = ReadHeightImage(file, 0, 0);
+        if (!read) {
+          message = "The preview needs the heights: " + message + read.error();
+          return false;
+        }
+        use.heights = std::move(*read);
         use.colours = LayerColours();
         use.ready = true;
       }
@@ -14547,9 +14583,8 @@ namespace faf::editor
       if (!PaintPreview(side, pixels, width, depth, dots, message)) {
         return false;
       }
-      std::string error;
-      if (!WriteColourPng(file, side, side, pixels, error)) {
-        message = error;
+      if (const auto wrote = WriteColourPng(file, side, side, pixels); !wrote) {
+        message = wrote.error();
         return false;
       }
       message = "Exported the lobby preview painted at " + std::to_string(side) + " x " + std::to_string(side) +
@@ -15713,16 +15748,14 @@ namespace faf::editor
         }
       }
       if (!mStampArg.empty()) {
-        HeightImage image;
-        std::string error;
-        if (ReadHeightImage(mStampArg, 0, 0, image, error)) {
+        if (auto image = ReadHeightImage(mStampArg, 0, 0)) {
           HeightStamp stamp;
-          stamp.width = image.width;
-          stamp.height = image.height;
-          stamp.words = std::move(image.words);
+          stamp.width = image->width;
+          stamp.height = image->height;
+          stamp.words = std::move(image->words);
           tools.SetStamp(std::move(stamp), std::filesystem::path(mStampArg).filename().string());
         } else {
-          gpg::Warnf("editor: /stamp: %s", error.c_str());
+          gpg::Warnf("editor: /stamp: %s", image.error().c_str());
         }
         mStampArg.clear();
       }
@@ -15778,17 +15811,15 @@ namespace faf::editor
       }
       if (tools.TakeStampRequest()) {
         if (const std::filesystem::path file = AskHeightFile(HandleOf(mGame.supcomFrame), false); !file.empty()) {
-          HeightImage image;
-          std::string error;
-          if (ReadHeightImage(file, 0, 0, image, error)) {
+          if (auto image = ReadHeightImage(file, 0, 0)) {
             HeightStamp stamp;
-            stamp.width = image.width;
-            stamp.height = image.height;
-            stamp.words = std::move(image.words);
+            stamp.width = image->width;
+            stamp.height = image->height;
+            stamp.words = std::move(image->words);
             gpg::Logf("editor: stamp image %s (%d x %d)", file.string().c_str(), stamp.width, stamp.height);
             tools.SetStamp(std::move(stamp), file.filename().string());
           } else {
-            gpg::Warnf("editor: the stamp image didn't load: %s", error.c_str());
+            gpg::Warnf("editor: the stamp image didn't load: %s", image.error().c_str());
           }
         }
       }
@@ -16567,28 +16598,29 @@ namespace faf::editor
             }
             std::ifstream in(path, std::ios::binary);
             const std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
-            std::string error;
             if (patterns) {
-              std::vector<WavePattern> read;
-              if (!in || !ParseWavePatterns(text, read, error)) {
-                gpg::Warnf("editor: %s: %s", path.string().c_str(), in ? error.c_str() : "can't read it");
+              const auto read =
+                in ? ParseWavePatterns(text) : std::expected<std::vector<WavePattern>, std::string>(std::unexpect);
+              if (!read) {
+                gpg::Warnf("editor: %s: %s", path.string().c_str(), in ? read.error().c_str() : "can't read it");
               } else {
-                tools.AddWavePatterns(read);
-                gpg::Logf("editor: %zu wave patterns from %s", read.size(), path.string().c_str());
+                tools.AddWavePatterns(*read);
+                gpg::Logf("editor: %zu wave patterns from %s", read->size(), path.string().c_str());
               }
               continue;
             }
-            std::vector<WaveRecord> waves;
-            if (!in || !WavesFromScmwaves(text, waves, error)) {
-              gpg::Warnf("editor: %s: %s", path.string().c_str(), in ? error.c_str() : "can't read it");
+            const auto waves =
+              in ? WavesFromScmwaves(text) : std::expected<std::vector<WaveRecord>, std::string>(std::unexpect);
+            if (!waves) {
+              gpg::Warnf("editor: %s: %s", path.string().c_str(), in ? waves.error().c_str() : "can't read it");
               continue;
             }
             std::vector<WaveRecord> before = mDocument.WavesNow();
-            mDocument.ApplyWaves(waves);
+            mDocument.ApplyWaves(*waves);
             mDocument.WavesEdited(std::move(before));
             gpg::Logf(
               "editor: %zu wave generators imported from %s (in place of the map's)",
-              waves.size(),
+              waves->size(),
               path.string().c_str()
             );
           } else if (what == EdTools::WaveAsk::Clear) {
@@ -17020,7 +17052,7 @@ namespace faf::editor
             MaskGenContext context;
             std::string error;
             return !rules.empty() && MaskGenContextOf(rules, context, error) &&
-              EvaluateMaskRules(context, rules, out, error);
+              EvaluateMaskRules(context, rules, out).has_value();
           });
         }
         if (EdFieldsPanel::QuickGenSettings q; mScene.Attached()) {

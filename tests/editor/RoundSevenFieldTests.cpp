@@ -51,9 +51,9 @@ namespace
     EXPECT_NE(script.find("cue = 'XGG_Brackman_001'"), std::string::npos);
     EXPECT_NE(script.find("vid = 'UEF_Commander.sfd'"), std::string::npos);
     EXPECT_NE(script.find("faction = 'UEF'"), std::string::npos);
-    Mission back;
-    std::string error;
-    ASSERT_TRUE(LoadMission(SaveMission(m), back, error)) << error;
+    const auto loaded = LoadMission(SaveMission(m));
+    ASSERT_TRUE(loaded) << loaded.error();
+    const Mission& back = *loaded;
     ASSERT_EQ(back.dialogues.size(), 1U);
     ASSERT_EQ(back.dialogues[0].lines.size(), 1U);
     EXPECT_EQ(back.dialogues[0].lines[0].cue, "XGG_Brackman_001");

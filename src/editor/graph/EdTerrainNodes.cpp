@@ -3055,15 +3055,14 @@ namespace faf::editor::terrain
         context.heights = std::make_shared<field::Grid>(*a);
         context.water = E.water;
         const RecipeStats stats = RecipeStatsOf(a->v, E.water, g.waterOn);
-        std::vector<RecipeRole> roles;
         std::array<std::vector<float>, 9> selection;
         std::map<std::pair<int, int>, std::vector<float>> variants;
-        std::string error;
-        if (
-          !RecipeRoles(context, g.plan, stats, knobs, style, roles, error) ||
-          !RecipeSelections(context, g.plan, roles, knobs, style, selection, variants, error)
-        ) {
-          Fail(error);
+        const auto selected =
+          RecipeRoles(context, g.plan, stats, knobs, style).and_then([&](const std::vector<RecipeRole>& roles) {
+          return RecipeSelections(context, g.plan, roles, knobs, style, selection, variants);
+        });
+        if (!selected) {
+          Fail(selected.error());
         }
         const auto grid = [&](std::vector<float> values) {
           auto out = std::make_shared<field::Grid>(*a);
@@ -3155,9 +3154,8 @@ namespace faf::editor::terrain
         context.heights = std::make_shared<field::Grid>(*a);
         context.water = E.water;
         auto out = std::make_shared<field::Grid>();
-        std::string error;
-        if (!EvaluateMaskRules(context, MaskPresetRules(v.S("preset"), s.min, s.max), *out, error)) {
-          Fail(error);
+        if (const auto made = EvaluateMaskRules(context, MaskPresetRules(v.S("preset"), s.min, s.max), *out); !made) {
+          Fail(made.error());
         }
         return One(out);
       }
@@ -4002,9 +4000,8 @@ namespace faf::editor::terrain
           options.cz = E.H * 0.5f;
         }
         auto out = std::make_shared<field::Grid>();
-        std::string error;
-        if (!BuildLayout(layout, *E.like, options, *out, nullptr, error)) {
-          Fail(error);
+        if (const auto built = BuildLayout(layout, *E.like, options, *out, nullptr); !built) {
+          Fail(built.error());
         }
         return One(out);
       }
@@ -4024,9 +4021,8 @@ namespace faf::editor::terrain
         const MapLayout& layout = layoutOf(E);
         const int index = static_cast<int>(std::lround(v.N("layer"))) - 1;
         auto out = std::make_shared<field::Grid>();
-        std::string error;
-        if (!LayoutLayerMask(layout, *E.like, index, v.B("soft"), *out, error)) {
-          Fail(error);
+        if (const auto made = LayoutLayerMask(layout, *E.like, index, v.B("soft"), *out); !made) {
+          Fail(made.error());
         }
         return One(out);
       }

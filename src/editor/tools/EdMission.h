@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <expected>
 #include <functional>
 #include <map>
 #include <string>
@@ -211,15 +212,15 @@ namespace faf::editor
   [[nodiscard]] const MissionNodeType* FindMissionNodeType(const std::string& id);
   /**
    * A node type from an editor mod (Studio's Mission.Register): its id may not be one of the editor's; a mod that runs
-   * again replaces its own. False with `error`. The palette lists them after the editor's own.
+   * again replaces its own. The error when it can't. The palette lists them after the editor's own.
    */
-  bool RegisterMissionNodeType(MissionNodeType type, std::string& error);
+  [[nodiscard]] std::expected<void, std::string> RegisterMissionNodeType(MissionNodeType type);
   [[nodiscard]] std::vector<const MissionNodeType*> MissionModNodeTypes();
   /** A new node of a type with its parameters at their defaults. */
   [[nodiscard]] MissionNode NewMissionNode(const std::string& type);
 
-  /** Whether code compiles (the editor's Lua; null in tests: the compile checks are skipped). */
-  using LuaCompiles = std::function<bool(const std::string& code, std::string& error)>;
+  /** Whether code compiles, or why not (the editor's Lua; null in tests: the compile checks are skipped). */
+  using LuaCompiles = std::function<std::expected<void, std::string>(const std::string& code)>;
 
   struct MissionProblem
   {
@@ -362,5 +363,5 @@ namespace faf::editor
 
   /** The mission as JSON (kept beside the map); empty for no stages and no dialogues. */
   [[nodiscard]] std::string SaveMission(const Mission& mission);
-  bool LoadMission(const std::string& text, Mission& mission, std::string& error);
+  [[nodiscard]] std::expected<Mission, std::string> LoadMission(const std::string& text);
 } // namespace faf::editor

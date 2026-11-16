@@ -3478,13 +3478,12 @@ namespace faf::editor
       message = "No map's masks to change.";
       return false;
     }
-    HeightImage image;
-    std::string error;
-    if (!ReadHeightImage(file, masks.width, masks.height, image, error)) {
-      message = "Mask import failed: " + error;
+    const auto read = ReadHeightImage(file, masks.width, masks.height);
+    if (!read) {
+      message = "Mask import failed: " + read.error();
       return false;
     }
-    image = ResampleHeights(image, masks.width, masks.height);
+    const HeightImage image = ResampleHeights(*read, masks.width, masks.height);
     const SampleRect whole{0, 0, masks.width - 1, masks.height - 1};
     mDocument.MaskUndo().BeginStroke();
     mDocument.MaskUndo().BeforeWrite(masks.texels.data(), whole);
@@ -3560,9 +3559,8 @@ namespace faf::editor
     for (std::size_t i = 0; i < masks.texels.size(); ++i) {
       image.words[i] = static_cast<std::uint16_t>(MaskWeight(MaskByte(masks.texels[i], layer), remappedLayer) * 257.0f);
     }
-    std::string error;
-    if (!WriteHeightImage(file, image, error)) {
-      message = "Mask export failed: " + error;
+    if (const auto wrote = WriteHeightImage(file, image); !wrote) {
+      message = "Mask export failed: " + wrote.error();
       return false;
     }
     message = "Exported the mask of layer " + std::to_string(layer + 1) + " to " + file.string();
@@ -4261,11 +4259,10 @@ namespace faf::editor
     const SampleRect whole{0, 0, field->width - 1, field->height - 1};
     mDocument.Heights().BeginStroke();
     mDocument.Heights().BeforeWrite(field->data, whole);
-    std::string error;
-    const bool made = SymmetrizeHeights(field->data, field->width, field->height, options, error);
+    const auto made = SymmetrizeHeights(field->data, field->width, field->height, options);
     mDocument.Heights().EndStroke(field->data);
     if (!made) {
-      gpg::Warnf("editor: make symmetric: %s", error.c_str());
+      gpg::Warnf("editor: make symmetric: %s", made.error().c_str());
       return;
     }
     mDocument.EditEnded(EdDocument::EditKind::Heights);
@@ -4288,12 +4285,14 @@ namespace faf::editor
       int typesHeight = 0;
       if (std::uint8_t* const cells = mDocument.TerrainTypeCells(typesWidth, typesHeight); cells != nullptr) {
         std::vector<std::uint8_t> before = mDocument.TerrainTypesNow();
-        if (SymmetrizeCells(cells, typesWidth, typesHeight, field->width, field->height, options, error)) {
+        if (
+          const auto cellsMade = SymmetrizeCells(cells, typesWidth, typesHeight, field->width, field->height, options)
+        ) {
           mDocument.TerrainTypesEdited(std::move(before));
           mDocument.TerrainTypesChanged();
           gpg::Logf("editor: made the terrain types symmetric (%d x %d cells)", typesWidth, typesHeight);
         } else {
-          gpg::Warnf("editor: make symmetric, terrain types: %s", error.c_str());
+          gpg::Warnf("editor: make symmetric, terrain types: %s", cellsMade.error().c_str());
         }
       }
     }
@@ -4313,12 +4312,11 @@ namespace faf::editor
     const SampleRect whole{0, 0, masks.width - 1, masks.height - 1};
     mDocument.MaskUndo().BeginStroke();
     mDocument.MaskUndo().BeforeWrite(masks.texels.data(), whole);
-    std::string error;
-    const bool made =
-      SymmetrizeMasks(masks.texels.data(), masks.width, masks.height, field->width, field->height, options, error);
+    const auto made =
+      SymmetrizeMasks(masks.texels.data(), masks.width, masks.height, field->width, field->height, options);
     WholeMaskChanged(whole);
     if (!made) {
-      gpg::Warnf("editor: make symmetric, masks: %s", error.c_str());
+      gpg::Warnf("editor: make symmetric, masks: %s", made.error().c_str());
       return false;
     }
     gpg::Logf("editor: made the texture masks symmetric (%d x %d texels)", masks.width, masks.height);
@@ -4336,12 +4334,12 @@ namespace faf::editor
       message = "No map is open in the view.";
       return false;
     }
-    HeightImage image;
-    std::string error;
-    if (!ReadHeightImage(file, field->width, field->height, image, error)) {
-      message = "Import failed: " + error;
+    auto read = ReadHeightImage(file, field->width, field->height);
+    if (!read) {
+      message = "Import failed: " + read.error();
       return false;
     }
+    HeightImage& image = *read;
     const int readWidth = image.width;
     const int readHeight = image.height;
     image = ResampleHeights(image, field->width, field->height);
@@ -4572,9 +4570,8 @@ namespace faf::editor
       image = ResampleHeights(image, width, height);
     }
     ScaleHeights(image, scale);
-    std::string error;
-    if (!WriteHeightImage(file, image, error, mTools != nullptr && mTools->ExportEightBit())) {
-      message = "Export failed: " + error;
+    if (const auto wrote = WriteHeightImage(file, image, mTools != nullptr && mTools->ExportEightBit()); !wrote) {
+      message = "Export failed: " + wrote.error();
       return false;
     }
     message = "Exported heights to " + file.string() + " (" + std::to_string(image.width) + " x " +
@@ -6544,7 +6541,12 @@ namespace faf::editor
       std::string error;
       const PadResult previous = mPadResult;
       const int changed = heightsStep(whole, [&] {
-        return ApplyPads(words, field->width, field->height, scale, pads, settings, previous, result, error);
+        const auto applied = ApplyPads(words, field->width, field->height, scale, pads, settings, previous, result);
+        if (!applied) {
+          error = applied.error();
+          return -1;
+        }
+        return *applied;
       });
       if (changed < 0) {
         return "Pads: " + error;
@@ -6587,7 +6589,12 @@ namespace faf::editor
       if (ask == EdTools::ScAsk::SlopeApply) {
         std::string error;
         const int changed = heightsStep(whole, [&] {
-          return LimitSlopes(words, field->width, field->height, scale, slope, error);
+          const auto limited = LimitSlopes(words, field->width, field->height, scale, slope);
+          if (!limited) {
+            error = limited.error();
+            return -1;
+          }
+          return *limited;
         });
         if (changed < 0) {
           return "Slope limit: " + error;
@@ -6816,16 +6823,16 @@ namespace faf::editor
           error = "no heightmap: choose one in Terrain > Import / Export, or type a file in the node";
           return false;
         }
-        HeightImage image;
-        if (!ReadHeightImage(path, width, height, image, error)) {
-          error = path + ": " + error;
+        const auto image = ReadHeightImage(path, width, height);
+        if (!image) {
+          error = path + ": " + image.error();
           return false;
         }
         ImportSettings settings = mapping;
         settings.blend = ImportSettings::Blend::Replace;
         settings.strength = 1.0f;
         const std::vector<std::uint16_t> words = ImportedHeights(
-          image, std::vector<std::uint16_t>(static_cast<std::size_t>(width) * height, 0), width, height, settings
+          *image, std::vector<std::uint16_t>(static_cast<std::size_t>(width) * height, 0), width, height, settings
         );
         grid = field::Grid(width, height, 1.0f, 0.0f, 0.0f);
         for (std::size_t k = 0; k < words.size(); ++k) {
@@ -6835,12 +6842,12 @@ namespace faf::editor
       };
       // A 16 bit image of any size, 0..1 (the Image node); resampled to the map's samples.
       out.loadImage = [width, height](const std::string& file, field::Grid& grid, std::string& error) {
-        HeightImage image;
-        if (!ReadHeightImage(file, 0, 0, image, error)) {
-          error = file + ": " + error;
+        const auto read = ReadHeightImage(file, 0, 0);
+        if (!read) {
+          error = file + ": " + read.error();
           return false;
         }
-        image = ResampleHeights(image, width, height);
+        const HeightImage image = ResampleHeights(*read, width, height);
         grid = field::Grid(width, height, 1.0f, 0.0f, 0.0f);
         for (std::size_t k = 0; k < image.words.size(); ++k) {
           grid.v[k] = static_cast<float>(image.words[k]) / 65535.0f;
@@ -6887,12 +6894,12 @@ namespace faf::editor
           error = "no mask named " + name + " beside " + std::filesystem::path(windowFile).filename().string();
           return false;
         }
-        HeightImage image;
-        if (!ReadHeightImage(found, 0, 0, image, error)) {
-          error = found + ": " + error;
+        const auto read = ReadHeightImage(found, 0, 0);
+        if (!read) {
+          error = found + ": " + read.error();
           return false;
         }
-        image = ResampleHeights(image, width, height);
+        const HeightImage image = ResampleHeights(*read, width, height);
         grid = field::Grid(width, height, 1.0f, 0.0f, 0.0f);
         for (std::size_t k = 0; k < image.words.size(); ++k) {
           grid.v[k] = static_cast<float>(image.words[k]) / 65535.0f;
@@ -7268,11 +7275,11 @@ namespace faf::editor
     }
     const std::string file = mTools->InteropFile(false);
     ImportSettings settings = mTools->InteropSettings();
-    HeightImage image;
-    std::string error;
-    if (!ReadHeightImageWith(file, field->width, field->height, settings.read, image, error)) {
-      return "Import failed: " + error;
+    auto read = ReadHeightImageWith(file, field->width, field->height, settings.read);
+    if (!read) {
+      return "Import failed: " + read.error();
     }
+    HeightImage& image = *read;
     // FAF Studio's further options: the playable area as the region, the pads' spots, the mask image, the sea.
     if (settings.regionPlayable) {
       if (const std::optional<EdDocument::PlayableRect> area = mDocument.PlayableArea(); area.has_value()) {
@@ -7293,11 +7300,11 @@ namespace faf::editor
       }
     }
     if (!settings.maskFile.empty()) {
-      HeightImage mask;
-      if (!ReadHeightImage(settings.maskFile, field->width, field->height, mask, error)) {
-        return "Import failed: the mask image: " + error;
+      const auto readMask = ReadHeightImage(settings.maskFile, field->width, field->height);
+      if (!readMask) {
+        return "Import failed: the mask image: " + readMask.error();
       }
-      mask = ResampleHeights(mask, field->width, field->height);
+      const HeightImage mask = ResampleHeights(*readMask, field->width, field->height);
       settings.maskWeights.resize(mask.words.size());
       for (std::size_t i = 0; i < mask.words.size(); ++i) {
         settings.maskWeights[i] = static_cast<float>(mask.words[i]) / 65535.0f;
@@ -7319,8 +7326,7 @@ namespace faf::editor
         SymmetrizeOptions options;
         options.symmetry = brush.symmetry;
         options.turns = brush.turns;
-        std::string why;
-        (void)SymmetrizeHeights(next.data(), field->width, field->height, options, why);
+        (void)SymmetrizeHeights(next.data(), field->width, field->height, options);
       }
     }
     std::size_t changed = 0;
@@ -7400,12 +7406,12 @@ namespace faf::editor
     switch (ask) {
     case EdTools::InteropAsk::Probe: {
       const std::string file = mTools->InteropFile(false);
-      HeightImage image;
-      std::string error;
-      if (!ReadHeightImage(file, field->width, field->height, image, error)) {
-        mTools->SetInteropProbe("Can't read it: " + error);
+      const auto read = ReadHeightImage(file, field->width, field->height);
+      if (!read) {
+        mTools->SetInteropProbe("Can't read it: " + read.error());
         return {};
       }
+      const HeightImage& image = *read;
       std::uint16_t darkest = 0, brightest = 0;
       HeightImageRange(image, darkest, brightest);
       const ImportSettings& s = mTools->InteropSettings();
@@ -7613,11 +7619,10 @@ namespace faf::editor
     const auto started = std::chrono::steady_clock::now();
     mDocument.Heights().BeginStroke();
     mDocument.Heights().BeforeWrite(field->data, whole);
-    std::string error;
     const EdTools::ErosionMaskChoice& choice = mTools->ErosionMasksChosen();
     const bool wantMasks = !preview && (choice.on[0] || choice.on[1] || choice.on[2] || choice.on[3]);
     ErosionMasks made_masks;
-    const bool made = ErodeHeights(
+    const auto made = ErodeHeights(
       reinterpret_cast<std::uint16_t*>(field->data),
       field->width,
       field->height,
@@ -7625,13 +7630,12 @@ namespace faf::editor
       *solver,
       values,
       step,
-      error,
       wantMasks ? &made_masks : nullptr
     );
     mDocument.Heights().EndStroke(field->data);
     if (!made) {
-      gpg::Warnf("editor: erosion: %s", error.c_str());
-      return "The solver stopped: " + error;
+      gpg::Warnf("editor: erosion: %s", made.error().c_str());
+      return "The solver stopped: " + made.error();
     }
     // The chosen masks into their layers, in the same undo step as the heights.
     int painted = 0;

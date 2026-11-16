@@ -388,12 +388,11 @@ namespace faf::editor
     return std::max(1, static_cast<int>(std::floor(c.per1000 * area / 1000.0 * density + 0.5)));
   }
 
-  bool DetailDensity(
+  std::expected<void, std::string> DetailDensity(
     MaskGenContext& context,
     const DetailClass& c,
     const int seed,
-    field::Grid& out,
-    std::string& error
+    field::Grid& out
   )
   {
     // The raw clustering noise first (0..1, monotone in the noise), then its top share kept: the value a share of the
@@ -408,8 +407,8 @@ namespace faf::editor
        {"to", 1.0f}}
     )};
     field::Grid noise;
-    if (!EvaluateMaskRules(context, raw, noise, error)) {
-      return false;
+    if (auto made = EvaluateMaskRules(context, raw, noise); !made) {
+      return made;
     }
     std::vector<float> sorted = noise.v;
     std::sort(sorted.begin(), sorted.end());
@@ -439,8 +438,8 @@ namespace faf::editor
         Rule("grow", {{"distance", 2.0f}, {"soft", 2.0f}}),
       };
       field::Grid channels;
-      if (!EvaluateMaskRules(context, flow, channels, error)) {
-        return false;
+      if (auto made = EvaluateMaskRules(context, flow, channels); !made) {
+        return made;
       }
       if (channels.v.size() == out.v.size()) {
         for (std::size_t k = 0; k < out.v.size(); ++k) {
@@ -448,7 +447,7 @@ namespace faf::editor
         }
       }
     }
-    return true;
+    return {};
   }
 
   std::vector<DetailMeasure> MeasureDetail(

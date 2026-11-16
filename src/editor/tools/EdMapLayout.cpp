@@ -1291,15 +1291,13 @@ namespace faf::editor
     return out;
   }
 
-  bool MapLayout::Load(
-    const std::string& text,
-    std::string& error
+  std::expected<void, std::string> MapLayout::Load(
+    const std::string& text
   )
   {
     std::string layersText;
     if (!JsonValue(text, "layers", layersText)) {
-      error = "no layers";
-      return false;
+      return std::unexpected("no layers");
     }
     float res = static_cast<float>(kDefaultRes);
     float rw = 0.0f;
@@ -1316,8 +1314,7 @@ namespace faf::editor
     (void)JsonFloat(head, "ox", ox);
     (void)JsonFloat(head, "oz", oz);
     if (rw < 1.0f || rh < 1.0f || cell <= 0.0f || rw * rh > 4.0e6f) {
-      error = "the drawing's grid is missing";
-      return false;
+      return std::unexpected("the drawing's grid is missing");
     }
     MapLayout loaded;
     loaded.mRes = std::clamp(static_cast<int>(res), kMinRes, kMaxRes);
@@ -1376,8 +1373,7 @@ namespace faf::editor
       loaded.mLayers.push_back(std::move(layer));
     }
     if (loaded.mLayers.empty()) {
-      error = "no layer of a known kind";
-      return false;
+      return std::unexpected("no layer of a known kind");
     }
     loaded.selected = std::clamp(static_cast<int>(sel), 0, static_cast<int>(loaded.mLayers.size()) - 1);
     std::string generatedText;
@@ -1394,7 +1390,7 @@ namespace faf::editor
     *this = std::move(loaded);
     mImages = std::move(images);
     revision = rev + 1;
-    return true;
+    return {};
   }
 
   bool LayoutLayerHas(
@@ -1407,20 +1403,19 @@ namespace faf::editor
     });
   }
 
-  bool LayoutLayerMask(
+  std::expected<void, std::string> LayoutLayerMask(
     const MapLayout& layout,
     const field::Grid& like,
     const int i,
     const bool soft,
-    field::Grid& out,
-    std::string& error
+    field::Grid& out
   )
   {
     const LayoutLayer* layer = layout.Layer(i);
     if (layer == nullptr) {
-      error = "the layout has no layer " + std::to_string(i + 1);
-      return false;
+      return std::unexpected("the layout has no layer " + std::to_string(i + 1));
     }
+    std::string error;
     Ops ops{error};
     const GridPtr likePtr = std::make_shared<Grid>(like);
     GridPtr mask = RawMask(ops, layout, likePtr, *layer);
@@ -1428,21 +1423,21 @@ namespace faf::editor
       mask = Soften(ops, layout, mask, SoftOf(*layer));
     }
     if (mask == nullptr) {
-      return false;
+      return std::unexpected(error);
     }
     out = *mask;
-    return true;
+    return {};
   }
 
-  bool BuildLayout(
+  std::expected<void, std::string> BuildLayout(
     const MapLayout& layout,
     const field::Grid& like,
     const LayoutBuildOptions& options,
     field::Grid& height,
-    std::vector<field::Grid>* masks,
-    std::string& error
+    std::vector<field::Grid>* masks
   )
   {
+    std::string error;
     Ops ops{error};
     const GridPtr likePtr = std::make_shared<Grid>(like);
     const float base = layout.base;
@@ -1455,7 +1450,7 @@ namespace faf::editor
       const int seed = layout.seed + static_cast<int>(i + 1) * 17;
       const GridPtr m = Soften(ops, layout, RawMask(ops, layout, likePtr, layer), SoftOf(layer));
       if (m == nullptr) {
-        return false;
+        return std::unexpected(error);
       }
       if (masks != nullptr) {
         masks->push_back(*m);
@@ -1559,7 +1554,7 @@ namespace faf::editor
       h = ops.Run("symmetrize", sym);
     }
     if (h == nullptr) {
-      return false;
+      return std::unexpected(error);
     }
     field::OpArgs clamp;
     clamp.in["a"] = h;
@@ -1567,9 +1562,9 @@ namespace faf::editor
     clamp.p.num["hi"] = 400.0;
     const GridPtr result = ops.Run("clamp", clamp);
     if (result == nullptr) {
-      return false;
+      return std::unexpected(error);
     }
     height = *result;
-    return true;
+    return {};
   }
 } // namespace faf::editor

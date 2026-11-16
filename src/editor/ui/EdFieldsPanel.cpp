@@ -117,14 +117,13 @@ namespace faf::editor
     ImGui::InputTextMultiline("##fieldsparams", mParams, sizeof(mParams), ImVec2(-1.0f, Em(70.0f)));
     ImGui::BeginDisabled(mStack.Empty() || names.empty());
     if (ImGui::Button("Apply")) {
-      std::string error;
       const std::string& op = names[static_cast<std::size_t>(mOp)];
-      if (mStack.Apply(op, ParseOpParams(mParams), error)) {
+      if (const auto applied = mStack.Apply(op, ParseOpParams(mParams))) {
         mStatus = op + " applied (" + std::to_string(mStack.Steps().size()) + " steps).";
         gpg::Logf("editor: fields: %s", mStack.Steps().back().c_str());
       } else {
-        mStatus = op + ": " + error;
-        gpg::Warnf("editor: fields: %s: %s", op.c_str(), error.c_str());
+        mStatus = op + ": " + applied.error();
+        gpg::Warnf("editor: fields: %s: %s", op.c_str(), applied.error().c_str());
       }
     }
     ImGui::SameLine();
@@ -155,11 +154,11 @@ namespace faf::editor
       } else if (mLiveDue > 0.0 && now >= mLiveDue) {
         mLiveDue = -1.0;
         const std::string& op = names[static_cast<std::size_t>(mOp)];
-        std::string error;
-        if (mStack.Back() && mStack.Apply(op, ParseOpParams(mParams), error)) {
+        const auto applied = mStack.Back() ? mStack.Apply(op, ParseOpParams(mParams)) : std::unexpected(std::string());
+        if (applied) {
           mStatus = op + " again with the new values (live).";
-        } else if (!error.empty()) {
-          mStatus = op + ": " + error;
+        } else if (!applied.error().empty()) {
+          mStatus = op + ": " + applied.error();
         }
       }
     } else {
@@ -355,9 +354,8 @@ namespace faf::editor
       return false;
     }
     mStack.Start(std::move(ground));
-    std::string error;
-    if (!mStack.Apply(op, ParseOpParams(params), error)) {
-      status = op + ": " + error;
+    if (const auto applied = mStack.Apply(op, ParseOpParams(params)); !applied) {
+      status = op + ": " + applied.error();
       return false;
     }
     mCommitAsked = true;

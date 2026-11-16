@@ -48,15 +48,13 @@ namespace faf::editor
     mGrids.push_back(std::move(base));
   }
 
-  bool FieldStack::Apply(
+  std::expected<void, std::string> FieldStack::Apply(
     const std::string& op,
-    const field::Params& params,
-    std::string& error
+    const field::Params& params
   )
   {
     if (mGrids.empty()) {
-      error = "start from the map's heights first";
-      return false;
+      return std::unexpected("start from the map's heights first");
     }
     field::OpArgs args;
     args.p = params;
@@ -64,18 +62,16 @@ namespace faf::editor
     args.in["a"] = top;
     args.in["like"] = top;
     field::Grid out;
-    if (const auto ran = field::RunOp(op, args, out); !ran) {
-      error = ran.error();
-      return false;
+    if (auto ran = field::RunOp(op, args, out); !ran) {
+      return ran;
     }
     if (out.Count() == 0) {
-      error = op + " gave no samples";
-      return false;
+      return std::unexpected(op + " gave no samples");
     }
     mGrids.push_back(std::move(out));
     const std::string text = ParamsText(params);
     mSteps.push_back(text.empty() ? op : op + " (" + text + ")");
-    return true;
+    return {};
   }
 
   bool FieldStack::Back()

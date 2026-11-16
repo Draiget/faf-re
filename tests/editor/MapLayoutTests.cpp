@@ -128,8 +128,8 @@ namespace faf::editor
     layout.seed = 7;
     const std::string text = layout.Save();
     MapLayout back;
-    std::string error;
-    ASSERT_TRUE(back.Load(text, error)) << error;
+    const auto loaded = back.Load(text);
+    ASSERT_TRUE(loaded) << loaded.error();
     ASSERT_EQ(back.Layers().size(), layout.Layers().size());
     EXPECT_EQ(back.Frame().rw, 64);
     EXPECT_FLOAT_EQ(back.base, 40.0f);
@@ -140,13 +140,14 @@ namespace faf::editor
     for (std::size_t k = 0; k < layout.Layers()[0].data.size(); ++k) {
       ASSERT_NEAR(back.Layers()[0].data[k], layout.Layers()[0].data[k], 0.5f / 255.0f) << k;
     }
-    EXPECT_FALSE(back.Load("{\"layers\": []}", error));
+    EXPECT_FALSE(back.Load("{\"layers\": []}"));
     // The generator's markers are kept with it (also when nothing is drawn).
     MapLayout markers;
     markers.New(64, 0.0f, 0.0f, 256.0f, 256.0f);
     markers.generated = {{"Mass 07", 12.5f, 40.5f}, {"Hydrocarbon 01", 30.5f, 60.5f}};
     MapLayout markersBack;
-    ASSERT_TRUE(markersBack.Load(markers.Save(), error)) << error;
+    const auto markersLoaded = markersBack.Load(markers.Save());
+    ASSERT_TRUE(markersLoaded) << markersLoaded.error();
     ASSERT_EQ(markersBack.generated.size(), 2U);
     EXPECT_EQ(markersBack.generated[0].name, "Mass 07");
     EXPECT_FLOAT_EQ(markersBack.generated[1].z, 60.5f);
@@ -185,8 +186,8 @@ namespace faf::editor
     const field::Grid like(257, 257, 1.0f, 0.0f, 0.0f);
     field::Grid h;
     std::vector<field::Grid> masks;
-    std::string error;
-    ASSERT_TRUE(BuildLayout(layout, like, LayoutBuildOptions{}, h, &masks, error)) << error;
+    auto built = BuildLayout(layout, like, LayoutBuildOptions{}, h, &masks);
+    ASSERT_TRUE(built) << built.error();
     EXPECT_EQ(masks.size(), layout.Layers().size());
     EXPECT_EQ(h.w, 257);
     EXPECT_NEAR(h.At(10, 240), layout.base, 0.01f) << "nothing drawn: the ground height";
@@ -201,13 +202,15 @@ namespace faf::editor
     turned.symmetry = "rot2";
     turned.cx = 128.0f;
     turned.cz = 128.0f;
-    ASSERT_TRUE(BuildLayout(layout, like, turned, h, nullptr, error)) << error;
+    built = BuildLayout(layout, like, turned, h, nullptr);
+    ASSERT_TRUE(built) << built.error();
     EXPECT_NEAR(h.At(64, 64), h.At(192, 192), 0.01f);
     // The plain mask of a layer.
     field::Grid mask;
-    ASSERT_TRUE(LayoutLayerMask(layout, like, base, false, mask, error)) << error;
+    built = LayoutLayerMask(layout, like, base, false, mask);
+    ASSERT_TRUE(built) << built.error();
     EXPECT_GT(mask.At(192, 64), 0.99f);
-    EXPECT_FALSE(LayoutLayerMask(layout, like, 40, false, mask, error));
+    EXPECT_FALSE(LayoutLayerMask(layout, like, 40, false, mask));
   }
 
   TEST(
@@ -288,12 +291,14 @@ namespace faf::editor
     field::Grid plain;
     field::Grid weathered;
     field::Grid again;
-    std::string error;
-    ASSERT_TRUE(BuildLayout(layout, like, LayoutBuildOptions{}, plain, nullptr, error)) << error;
+    auto built = BuildLayout(layout, like, LayoutBuildOptions{}, plain, nullptr);
+    ASSERT_TRUE(built) << built.error();
     LayoutBuildOptions weather;
     weather.weather = 0.6f;
-    ASSERT_TRUE(BuildLayout(layout, like, weather, weathered, nullptr, error)) << error;
-    ASSERT_TRUE(BuildLayout(layout, like, weather, again, nullptr, error)) << error;
+    built = BuildLayout(layout, like, weather, weathered, nullptr);
+    ASSERT_TRUE(built) << built.error();
+    built = BuildLayout(layout, like, weather, again, nullptr);
+    ASSERT_TRUE(built) << built.error();
     ASSERT_EQ(weathered.v.size(), plain.v.size());
     float changed = 0.0f;
     for (std::size_t k = 0; k < plain.v.size(); ++k) {

@@ -2550,9 +2550,11 @@ namespace faf::editor
         static_cast<std::size_t>(level.width) * 4U
       );
     }
-    std::string error;
-    if (!WriteColourPng(file, static_cast<int>(level.width), static_cast<int>(level.height), pixels, error)) {
-      return std::unexpected(error);
+    if (
+      const auto wrote = WriteColourPng(file, static_cast<int>(level.width), static_cast<int>(level.height), pixels);
+      !wrote
+    ) {
+      return std::unexpected(wrote.error());
     }
     return "Exported the lobby preview (" + std::to_string(level.width) + " x " + std::to_string(level.height) +
       ") to " + file.string();
@@ -2839,10 +2841,11 @@ namespace faf::editor
     }
     std::ifstream in(file, std::ios::binary);
     const std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
-    std::string error;
-    if (!text.empty() && !mLayout.Load(text, error)) {
-      gpg::Warnf("editor: %s: the layout couldn't be read (%s)", file.string().c_str(), error.c_str());
-      return;
+    if (!text.empty()) {
+      if (const auto loaded = mLayout.Load(text); !loaded) {
+        gpg::Warnf("editor: %s: the layout couldn't be read (%s)", file.string().c_str(), loaded.error().c_str());
+        return;
+      }
     }
     mLayoutRead = text;
     gpg::Logf("editor: layout read from %s: %zu layers", file.string().c_str(), mLayout.Layers().size());
@@ -3038,11 +3041,14 @@ namespace faf::editor
     }
     std::ifstream in(file, std::ios::binary);
     const std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
-    std::string error;
-    if (!text.empty() && !ReadKeptPaths(text, mPaths.set, error)) {
-      gpg::Warnf("editor: %s: the paths couldn't be read (%s)", file.string().c_str(), error.c_str());
-      mPaths = PathsState{};
-      return;
+    if (!text.empty()) {
+      auto read = ReadKeptPaths(text);
+      if (!read) {
+        gpg::Warnf("editor: %s: the paths couldn't be read (%s)", file.string().c_str(), read.error().c_str());
+        mPaths = PathsState{};
+        return;
+      }
+      mPaths.set = std::move(*read);
     }
     mPathsRead = text;
     gpg::Logf("editor: paths read from %s: %zu paths", file.string().c_str(), mPaths.set.paths.size());
@@ -3059,13 +3065,12 @@ namespace faf::editor
 
   LuaCompiles EdDocument::MissionCompiler() const
   {
-    return [this](const std::string& code, std::string& error) {
+    return [this](const std::string& code) -> std::expected<void, std::string> {
       const CheckIssue issue = CheckLuaText(code, "mission");
       if (issue.text.empty()) {
-        return true;
+        return {};
       }
-      error = issue.text;
-      return false;
+      return std::unexpected(issue.text);
     };
   }
 
@@ -3099,11 +3104,14 @@ namespace faf::editor
     }
     std::ifstream in(file, std::ios::binary);
     const std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
-    std::string error;
-    if (!text.empty() && !LoadMission(text, mMission, error)) {
-      gpg::Warnf("editor: %s: the mission couldn't be read (%s)", file.string().c_str(), error.c_str());
-      mMission = Mission{};
-      return;
+    if (!text.empty()) {
+      auto loaded = LoadMission(text);
+      if (!loaded) {
+        gpg::Warnf("editor: %s: the mission couldn't be read (%s)", file.string().c_str(), loaded.error().c_str());
+        mMission = Mission{};
+        return;
+      }
+      mMission = std::move(*loaded);
     }
     mMissionRead = text;
     gpg::Logf("editor: mission read from %s: %zu stages", file.string().c_str(), mMission.stages.size());

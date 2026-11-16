@@ -216,15 +216,13 @@ namespace faf::editor
     fields.emplace_back(key, value);
   }
 
-  bool ParseBuilders(
-    const std::string& text,
-    std::vector<MissionBuilder>& builders,
-    std::string& error
+  std::expected<std::vector<MissionBuilder>, std::string> ParseBuilders(
+    const std::string& text
   )
   {
-    builders.clear();
+    std::vector<MissionBuilder> builders;
     if (Trim(text).empty()) {
-      return true;
+      return builders;
     }
     std::size_t at = text.find("Builders");
     while (at != std::string::npos && at > 0 &&
@@ -232,17 +230,15 @@ namespace faf::editor
       at = text.find("Builders", at + 1);
     }
     if (at == std::string::npos) {
-      return true; // a table without builders
+      return builders; // a table without builders
     }
     const std::size_t open = text.find('{', at);
     if (open == std::string::npos) {
-      error = "the Builders table has no {";
-      return false;
+      return std::unexpected("the Builders table has no {");
     }
     const std::size_t close = MatchBrace(text, open);
     if (close >= text.size()) {
-      error = "the Builders table isn't closed";
-      return false;
+      return std::unexpected("the Builders table isn't closed");
     }
     for (const auto& [name, value] : Pairs(text, open + 1, close)) {
       if (value.empty() || value.front() != '{') {
@@ -254,7 +250,7 @@ namespace faf::editor
       builder.fields = Pairs(value, 1, inner);
       builders.push_back(std::move(builder));
     }
-    return true;
+    return builders;
   }
 
   std::string FormatBuilders(

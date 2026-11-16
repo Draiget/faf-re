@@ -379,9 +379,8 @@ namespace faf::editor
         }
         return lines;
       };
-      std::string error;
-      if (!RegisterMissionNodeType(std::move(type), error)) {
-        lua_pushstring(L, ("Editor.MissionNode: " + error).c_str());
+      if (const auto registered = RegisterMissionNodeType(std::move(type)); !registered) {
+        lua_pushstring(L, ("Editor.MissionNode: " + registered.error()).c_str());
         lua_error(L);
         return 0;
       }

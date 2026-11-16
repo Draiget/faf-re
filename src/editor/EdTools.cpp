@@ -722,15 +722,14 @@ namespace faf::editor
     if (image < 0 || image >= static_cast<int>(mBrushImages.size())) {
       return false;
     }
-    ShapeGrid grid;
-    std::string error;
-    if (!LoadBrushImage(mBrushImages[static_cast<std::size_t>(image)].path, kShapeGridSize, grid, error)) {
+    const auto grid = LoadBrushImage(mBrushImages[static_cast<std::size_t>(image)].path, kShapeGridSize);
+    if (!grid) {
       gpg::Warnf(
-        "editor: brush image %s: %s", mBrushImages[static_cast<std::size_t>(image)].name.c_str(), error.c_str()
+        "editor: brush image %s: %s", mBrushImages[static_cast<std::size_t>(image)].name.c_str(), grid.error().c_str()
       );
       return false;
     }
-    SetStamp(StampFromGrid(grid), mBrushImages[static_cast<std::size_t>(image)].name);
+    SetStamp(StampFromGrid(*grid), mBrushImages[static_cast<std::size_t>(image)].name);
     return true;
   }
 
@@ -741,15 +740,14 @@ namespace faf::editor
     if (index < 0 || index >= static_cast<int>(mBrushImages.size())) {
       return false;
     }
-    auto grid = std::make_shared<ShapeGrid>();
-    std::string error;
-    if (!LoadBrushImage(mBrushImages[static_cast<std::size_t>(index)].path, kShapeGridSize, *grid, error)) {
+    auto loaded = LoadBrushImage(mBrushImages[static_cast<std::size_t>(index)].path, kShapeGridSize);
+    if (!loaded) {
       gpg::Warnf(
-        "editor: brush image %s: %s", mBrushImages[static_cast<std::size_t>(index)].name.c_str(), error.c_str()
+        "editor: brush image %s: %s", mBrushImages[static_cast<std::size_t>(index)].name.c_str(), loaded.error().c_str()
       );
       return false;
     }
-    mShapeImage = std::move(grid);
+    mShapeImage = std::make_shared<ShapeGrid>(std::move(*loaded));
     mShapeImageName = mBrushImages[static_cast<std::size_t>(index)].name;
     mBrushShape = std::to_underlying(BrushShape::Image);
     return true;
@@ -1861,13 +1859,12 @@ namespace faf::editor
           const std::string sidecar = std::string(mInteropImportPath) + ".json";
           std::ifstream in(sidecar, std::ios::binary);
           const std::string json((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
-          std::string error;
           if (json.empty()) {
             mInteropStatus = "No " + sidecar + " beside the image.";
-          } else if (ImportFromSidecar(json, s, error)) {
+          } else if (const auto read = ImportFromSidecar(json, s)) {
             mInteropStatus = "Settings from the export's .json: heights as written (absolute).";
           } else {
-            mInteropStatus = "The .json: " + error;
+            mInteropStatus = "The .json: " + read.error();
           }
         }
         ImGui::TreePop();

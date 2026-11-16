@@ -4,6 +4,7 @@
 
 #include <array>
 #include <cstdint>
+#include <expected>
 #include <map>
 #include <string>
 #include <utility>
@@ -23,8 +24,8 @@ namespace faf::editor
     std::string info;
   };
 
-  /** Reads a `.scm` (FAF Studio's scm.lua, here in C++); false with `error` for a file that isn't one. */
-  bool ReadScm(const std::vector<std::uint8_t>& bytes, ScmModel& out, std::string& error);
+  /** Reads a `.scm` (FAF Studio's scm.lua, here in C++); the error for a file that isn't one. */
+  [[nodiscard]] std::expected<ScmModel, std::string> ReadScm(const std::vector<std::uint8_t>& bytes);
 
   /** The model as Wavefront OBJ text (texture v turned back over, as ScmFromObj turned it), positions divided by
    * `scale`. */

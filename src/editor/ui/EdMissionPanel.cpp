@@ -1773,7 +1773,6 @@ namespace faf::editor
     int builders = 0;
     for (const SaveEntry& army : mDocument.SaveData().Armies()) {
       UnitGroup root;
-      std::string error;
       if (ParseUnitGroup(army.Get("Units"), root)) {
         const auto walk = [&](auto&& self, const UnitGroup& g) -> void {
           groups += (templateKind ? g.platoon : g.orders) == name ? 1 : 0;
@@ -1787,9 +1786,8 @@ namespace faf::editor
         walk(walk, root);
       }
       if (templateKind) {
-        std::vector<MissionBuilder> list;
-        if (ParseBuilders(army.Get("PlatoonBuilders"), list, error)) {
-          for (const MissionBuilder& b : list) {
+        if (const auto list = ParseBuilders(army.Get("PlatoonBuilders"))) {
+          for (const MissionBuilder& b : *list) {
             builders +=
               b.Get("PlatoonTemplate") == "'" + name + "'" || b.Get("PlatoonTemplate") == "\"" + name + "\"" ? 1 : 0;
           }
@@ -1849,7 +1847,6 @@ namespace faf::editor
       int renamed = 0;
       for (SaveEntry& army : mDocument.SaveData().Armies()) {
         UnitGroup root;
-        std::string error;
         if (ParseUnitGroup(army.Get("Units"), root)) {
           int here = 0;
           const auto walk = [&](auto&& self, UnitGroup& g) -> void {
@@ -1875,17 +1872,20 @@ namespace faf::editor
             renamed += here;
           }
         }
-        std::vector<MissionBuilder> list;
-        if (templateKind && ParseBuilders(army.Get("PlatoonBuilders"), list, error)) {
+        if (
+          auto list = templateKind ? ParseBuilders(army.Get("PlatoonBuilders"))
+                                   : std::expected<std::vector<MissionBuilder>, std::string>(std::unexpect);
+          list
+        ) {
           int here = 0;
-          for (MissionBuilder& b : list) {
+          for (MissionBuilder& b : *list) {
             if (b.Get("PlatoonTemplate") == "'" + name + "'" || b.Get("PlatoonTemplate") == "\"" + name + "\"") {
               b.Set("PlatoonTemplate", "'" + to + "'");
               ++here;
             }
           }
           if (here > 0) {
-            army.Set("PlatoonBuilders", FormatBuilders(list));
+            army.Set("PlatoonBuilders", FormatBuilders(*list));
             renamed += here;
           }
         }
@@ -1993,12 +1993,12 @@ namespace faf::editor
       ImGui::EndCombo();
     }
     SaveEntry& army = armies[static_cast<std::size_t>(armyIndex)];
-    std::vector<MissionBuilder> builders;
-    std::string error;
-    if (!ParseBuilders(army.Get("PlatoonBuilders"), builders, error)) {
-      ImGui::TextColored(ImVec4(0.95f, 0.5f, 0.4f, 1.0f), "Its builders can't be read: %s", error.c_str());
+    auto parsed = ParseBuilders(army.Get("PlatoonBuilders"));
+    if (!parsed) {
+      ImGui::TextColored(ImVec4(0.95f, 0.5f, 0.4f, 1.0f), "Its builders can't be read: %s", parsed.error().c_str());
       return;
     }
+    std::vector<MissionBuilder>& builders = *parsed;
     const auto write = [&](const std::string& what) {
       EdDocument::SaveSnapshot before = mDocument.SaveDataNow();
       army.Set("PlatoonBuilders", FormatBuilders(builders));

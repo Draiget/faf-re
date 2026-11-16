@@ -492,10 +492,13 @@ namespace faf::editor
         {ObjMesh::Corner{0, 0, 0}, ObjMesh::Corner{3, 3, 0}, ObjMesh::Corner{2, 2, 0}},
       };
       std::string scmWhy;
-      const std::vector<std::uint8_t> scm = ScmFromObj(quad, "fill", 1.0f, "the mesh view's fill", scmWhy);
-      if (!scm.empty() && EncodeDds(image, DdsKind::Bgra, dds, scmWhy)) {
+      const auto scm = ScmFromObj(quad, "fill", 1.0f, "the mesh view's fill");
+      if (!scm) {
+        scmWhy = scm.error();
+      }
+      if (scm && EncodeDds(image, DdsKind::Bgra, dds, scmWhy)) {
         std::ofstream(folder / "fill.scm", std::ios::binary | std::ios::trunc)
-          .write(reinterpret_cast<const char*>(scm.data()), static_cast<std::streamsize>(scm.size()));
+          .write(reinterpret_cast<const char*>(scm->data()), static_cast<std::streamsize>(scm->size()));
         std::ofstream(folder / "fill.dds", std::ios::binary | std::ios::trunc)
           .write(reinterpret_cast<const char*>(dds.data()), static_cast<std::streamsize>(dds.size()));
         fillMesh = vfs + "/fill.scm";

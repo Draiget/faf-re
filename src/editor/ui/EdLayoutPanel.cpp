@@ -382,16 +382,10 @@ namespace faf::editor
     std::vector<std::uint8_t> rgba;
     const LayoutFrame& frame = layout.Frame();
     field::Grid heights;
-    std::string error;
     if (
       mViewHeights && frame.rw > 1 && frame.rh > 1 &&
       BuildLayout(
-        layout,
-        field::Grid(frame.rw, frame.rh, frame.cell, frame.ox, frame.oz),
-        LayoutBuildOptions{},
-        heights,
-        nullptr,
-        error
+        layout, field::Grid(frame.rw, frame.rh, frame.cell, frame.ox, frame.oz), LayoutBuildOptions{}, heights, nullptr
       )
     ) {
       // The heights the drawing makes: the sea blue by depth, the land green to brown to white.
@@ -829,13 +823,13 @@ namespace faf::editor
     if (path.empty()) {
       return "Type the picture's file first.";
     }
-    HeightImage image;
-    std::string error;
     HeightReadOptions read;
     read.channel = std::clamp(mPicture.channel, 0, 4);
-    if (!ReadHeightImageWith(std::filesystem::path(path), 0, 0, read, image, error)) {
-      return "The picture couldn't be read: " + error;
+    const auto picture = ReadHeightImageWith(std::filesystem::path(path), 0, 0, read);
+    if (!picture) {
+      return "The picture couldn't be read: " + picture.error();
     }
+    const HeightImage& image = *picture;
     std::vector<float> grey(image.words.size());
     for (std::size_t k = 0; k < grey.size(); ++k) {
       grey[k] = static_cast<float>(image.words[k]) / 65535.0f;

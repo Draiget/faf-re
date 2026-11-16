@@ -86,18 +86,15 @@ namespace faf::editor
 
     /** `.r32`: 32-bit little-endian floats, square or of the expected size (Gaea's and World Machine's float export).
      */
-    bool ReadFloats(
+    std::expected<HeightImage, std::string> ReadFloats(
       const std::filesystem::path& file,
       const int expectWidth,
-      const int expectHeight,
-      HeightImage& out,
-      std::string& error
+      const int expectHeight
     )
     {
       std::ifstream in(file, std::ios::binary | std::ios::ate);
       if (!in) {
-        error = "can't open " + file.string();
-        return false;
+        return std::unexpected("can't open " + file.string());
       }
       const auto bytes = static_cast<std::size_t>(in.tellg());
       const std::size_t count = bytes / 4;
@@ -112,9 +109,10 @@ namespace faf::editor
       } else {
         const auto side = static_cast<int>(std::lround(std::sqrt(static_cast<double>(count))));
         if (bytes % 4 != 0 || static_cast<std::size_t>(side) * static_cast<std::size_t>(side) != count || side < 2) {
-          error = file.filename().string() + " is " + std::to_string(bytes) +
-            " bytes: not a square of 32-bit heights, nor the map's size";
-          return false;
+          return std::unexpected(
+            file.filename().string() + " is " + std::to_string(bytes) +
+            " bytes: not a square of 32-bit heights, nor the map's size"
+          );
         }
         width = side;
         height = side;
@@ -123,14 +121,14 @@ namespace faf::editor
       in.seekg(0);
       in.read(reinterpret_cast<char*>(floats.data()), static_cast<std::streamsize>(count * 4));
       if (!in) {
-        error = "can't read " + file.string();
-        return false;
+        return std::unexpected("can't read " + file.string());
       }
       // 0..1 is the tools' normalised range; anything above 1 is read as game units (128 words a unit).
       bool normalised = true;
       for (const float value : floats) {
         normalised = normalised && value <= 1.0001f;
       }
+      HeightImage out;
       out.width = width;
       out.height = height;
       out.words.resize(count);
@@ -139,21 +137,18 @@ namespace faf::editor
         out.words[i] =
           static_cast<std::uint16_t>(std::lround(std::clamp(std::isfinite(word) ? word : 0.0, 0.0, 65535.0)));
       }
-      return true;
+      return out;
     }
 
-    bool ReadRaw(
+    std::expected<HeightImage, std::string> ReadRaw(
       const std::filesystem::path& file,
       const int expectWidth,
-      const int expectHeight,
-      HeightImage& out,
-      std::string& error
+      const int expectHeight
     )
     {
       std::ifstream in(file, std::ios::binary | std::ios::ate);
       if (!in) {
-        error = "can't open " + file.string();
-        return false;
+        return std::unexpected("can't open " + file.string());
       }
       const auto bytes = static_cast<std::size_t>(in.tellg());
       const std::size_t count = bytes / 2;
@@ -168,13 +163,15 @@ namespace faf::editor
       } else {
         const auto side = static_cast<int>(std::lround(std::sqrt(static_cast<double>(count))));
         if (bytes % 2 != 0 || static_cast<std::size_t>(side) * static_cast<std::size_t>(side) != count || side < 2) {
-          error = file.filename().string() + " is " + std::to_string(bytes) +
-            " bytes: not a square of 16-bit heights, nor the map's size";
-          return false;
+          return std::unexpected(
+            file.filename().string() + " is " + std::to_string(bytes) +
+            " bytes: not a square of 16-bit heights, nor the map's size"
+          );
         }
         width = side;
         height = side;
       }
+      HeightImage out;
       out.width = width;
       out.height = height;
       out.words.resize(count);
@@ -182,19 +179,16 @@ namespace faf::editor
       std::vector<unsigned char> raw(bytes);
       in.read(reinterpret_cast<char*>(raw.data()), static_cast<std::streamsize>(bytes));
       if (!in) {
-        error = "can't read " + file.string();
-        return false;
+        return std::unexpected("can't read " + file.string());
       }
       for (std::size_t i = 0; i < count; ++i) {
         out.words[i] = static_cast<std::uint16_t>(raw[i * 2] | (raw[i * 2 + 1] << 8));
       }
-      return true;
+      return out;
     }
 
-    bool ReadImage(
-      const std::filesystem::path& file,
-      HeightImage& out,
-      std::string& error
+    std::expected<HeightImage, std::string> ReadImage(
+      const std::filesystem::path& file
     )
     {
       const ComScope com;
@@ -225,9 +219,9 @@ namespace faf::editor
         hr = converter->GetSize(&width, &height);
       }
       if (FAILED(hr) || width < 2 || height < 2) {
-        error = "can't read " + file.filename().string() + " as an image (" + HResultText(hr) + ")";
-        return false;
+        return std::unexpected("can't read " + file.filename().string() + " as an image (" + HResultText(hr) + ")");
       }
+      HeightImage out;
       out.width = static_cast<int>(width);
       out.height = static_cast<int>(height);
       out.words.resize(static_cast<std::size_t>(width) * height);
@@ -235,16 +229,14 @@ namespace faf::editor
         nullptr, width * 2, static_cast<UINT>(out.words.size() * 2), reinterpret_cast<BYTE*>(out.words.data())
       );
       if (FAILED(hr)) {
-        error = "can't read the pixels of " + file.filename().string() + " (" + HResultText(hr) + ")";
-        return false;
+        return std::unexpected("can't read the pixels of " + file.filename().string() + " (" + HResultText(hr) + ")");
       }
-      return true;
+      return out;
     }
 
-    bool WritePng(
+    std::expected<void, std::string> WritePng(
       const std::filesystem::path& file,
       const HeightImage& image,
-      std::string& error,
       const bool eightBit = false
     )
     {
@@ -313,24 +305,21 @@ namespace faf::editor
         hr = encoder->Commit();
       }
       if (FAILED(hr)) {
-        error = "can't write " + file.string() + " (" + HResultText(hr) + ")";
-        return false;
+        return std::unexpected("can't write " + file.string() + " (" + HResultText(hr) + ")");
       }
-      return true;
+      return {};
     }
   } // namespace
 
-  bool WriteColourPng(
+  std::expected<void, std::string> WriteColourPng(
     const std::filesystem::path& file,
     const int width,
     const int height,
-    const std::vector<std::uint32_t>& bgra,
-    std::string& error
+    const std::vector<std::uint32_t>& bgra
   )
   {
     if (width <= 0 || height <= 0 || bgra.size() != static_cast<std::size_t>(width) * height) {
-      error = "no picture to write";
-      return false;
+      return std::unexpected("no picture to write");
     }
     const ComScope com;
     ComPtr<IWICImagingFactory> factory;
@@ -381,31 +370,26 @@ namespace faf::editor
       hr = encoder->Commit();
     }
     if (FAILED(hr)) {
-      error = "can't write " + file.string() + " (" + HResultText(hr) + ")";
-      return false;
+      return std::unexpected("can't write " + file.string() + " (" + HResultText(hr) + ")");
     }
-    return true;
+    return {};
   }
 
-  bool ReadHeightImage(
+  std::expected<HeightImage, std::string> ReadHeightImage(
     const std::filesystem::path& file,
     const int expectWidth,
-    const int expectHeight,
-    HeightImage& out,
-    std::string& error
+    const int expectHeight
   )
   {
-    out = {};
     if (Lower(file.extension().string()) == ".r32") {
-      return ReadFloats(file, expectWidth, expectHeight, out, error);
+      return ReadFloats(file, expectWidth, expectHeight);
     }
-    return IsRaw(file) ? ReadRaw(file, expectWidth, expectHeight, out, error) : ReadImage(file, out, error);
+    return IsRaw(file) ? ReadRaw(file, expectWidth, expectHeight) : ReadImage(file);
   }
 
-  bool WriteHeightImage(
+  std::expected<void, std::string> WriteHeightImage(
     const std::filesystem::path& file,
     const HeightImage& image,
-    std::string& error,
     const bool eightBit
   )
   {
@@ -413,8 +397,7 @@ namespace faf::editor
       image.width < 1 || image.height < 1 ||
       image.words.size() != static_cast<std::size_t>(image.width) * static_cast<std::size_t>(image.height)
     ) {
-      error = "no heights to write";
-      return false;
+      return std::unexpected("no heights to write");
     }
     if (IsRaw(file)) {
       std::vector<unsigned char> raw(image.words.size() * 2);
@@ -425,10 +408,9 @@ namespace faf::editor
       std::ofstream out(file, std::ios::binary);
       out.write(reinterpret_cast<const char*>(raw.data()), static_cast<std::streamsize>(raw.size()));
       if (!out) {
-        error = "can't write " + file.string();
-        return false;
+        return std::unexpected("can't write " + file.string());
       }
-      return true;
+      return {};
     }
     const std::string extension = Lower(file.extension().string());
     if (extension == ".r32") {
@@ -439,45 +421,39 @@ namespace faf::editor
       std::ofstream out(file, std::ios::binary);
       out.write(reinterpret_cast<const char*>(floats.data()), static_cast<std::streamsize>(floats.size() * 4));
       if (!out) {
-        error = "can't write " + file.string();
-        return false;
+        return std::unexpected("can't write " + file.string());
       }
-      return true;
+      return {};
     }
     if (extension != ".png" && extension != ".tif" && extension != ".tiff") {
-      error = "heights are written as .png, .tif, .raw, .r16 or .r32";
-      return false;
+      return std::unexpected("heights are written as .png, .tif, .raw, .r16 or .r32");
     }
-    return WritePng(file, image, error, eightBit);
+    return WritePng(file, image, eightBit);
   }
 
-  bool WriteFloatImage(
+  std::expected<void, std::string> WriteFloatImage(
     const std::filesystem::path& file,
     const int width,
     const int height,
-    const std::vector<float>& values,
-    std::string& error
+    const std::vector<float>& values
   )
   {
     if (
       width < 1 || height < 1 || values.size() != static_cast<std::size_t>(width) * static_cast<std::size_t>(height)
     ) {
-      error = "no values to write";
-      return false;
+      return std::unexpected("no values to write");
     }
     const std::string extension = Lower(file.extension().string());
     if (extension == ".r32") {
       std::ofstream out(file, std::ios::binary);
       out.write(reinterpret_cast<const char*>(values.data()), static_cast<std::streamsize>(values.size() * 4));
       if (!out) {
-        error = "can't write " + file.string();
-        return false;
+        return std::unexpected("can't write " + file.string());
       }
-      return true;
+      return {};
     }
     if (extension != ".tif" && extension != ".tiff") {
-      error = "32-bit floats are written as .tif or .r32";
-      return false;
+      return std::unexpected("32-bit floats are written as .tif or .r32");
     }
     // A baseline TIFF written by hand (the Windows TIFF encoder offers no float grey): little-endian, one uncompressed
     // strip of 32-bit floats (SampleFormat 3), grey with black at zero.
@@ -536,10 +512,9 @@ namespace faf::editor
     std::ofstream stream(file, std::ios::binary | std::ios::trunc);
     stream.write(reinterpret_cast<const char*>(out.data()), static_cast<std::streamsize>(out.size()));
     if (!stream) {
-      error = "can't write " + file.string();
-      return false;
+      return std::unexpected("can't write " + file.string());
     }
-    return true;
+    return {};
   }
 
   const char* ResampleFilterName(
@@ -673,13 +648,11 @@ namespace faf::editor
     }
   }
 
-  bool ReadHeightImageWith(
+  std::expected<HeightImage, std::string> ReadHeightImageWith(
     const std::filesystem::path& file,
     const int expectWidth,
     const int expectHeight,
-    const HeightReadOptions& options,
-    HeightImage& out,
-    std::string& error
+    const HeightReadOptions& options
   )
   {
     const std::string extension = Lower(file.extension().string());
@@ -690,8 +663,7 @@ namespace faf::editor
       // A raw file laid out as asked: samples of rawBits, whole or float, in either byte order.
       std::ifstream in(file, std::ios::binary | std::ios::ate);
       if (!in) {
-        error = "can't open " + file.string();
-        return false;
+        return std::unexpected("can't open " + file.string());
       }
       const auto bytes = static_cast<std::size_t>(in.tellg());
       in.seekg(0);
@@ -712,10 +684,12 @@ namespace faf::editor
         }
       }
       if (width < 2 || height < 2 || static_cast<std::size_t>(width) * static_cast<std::size_t>(height) > count) {
-        error = file.filename().string() + " holds " + std::to_string(count) + " samples, not " +
-          std::to_string(width) + " x " + std::to_string(height);
-        return false;
+        return std::unexpected(
+          file.filename().string() + " holds " + std::to_string(count) + " samples, not " + std::to_string(width) +
+          " x " + std::to_string(height)
+        );
       }
+      HeightImage out;
       out.width = width;
       out.height = height;
       out.words.resize(static_cast<std::size_t>(width) * static_cast<std::size_t>(height));
@@ -735,10 +709,10 @@ namespace faf::editor
         }
         out.words[i] = static_cast<std::uint16_t>(std::clamp(std::lround(word), 0L, 65535L));
       }
-      return true;
+      return out;
     }
     if (options.channel <= 0 || rawFile) {
-      return ReadHeightImage(file, expectWidth, expectHeight, out, error);
+      return ReadHeightImage(file, expectWidth, expectHeight);
     }
     // One channel of a colour picture (a splat's red, a mask in the alpha).
     const ComScope com;
@@ -769,17 +743,16 @@ namespace faf::editor
       hr = converter->GetSize(&width, &height);
     }
     if (FAILED(hr) || width < 2 || height < 2) {
-      error = "can't read " + file.filename().string() + " as a colour image (" + HResultText(hr) + ")";
-      return false;
+      return std::unexpected("can't read " + file.filename().string() + " as a colour image (" + HResultText(hr) + ")");
     }
     std::vector<std::uint16_t> rgba(static_cast<std::size_t>(width) * height * 4);
     hr = converter->CopyPixels(
       nullptr, width * 8, static_cast<UINT>(rgba.size() * 2), reinterpret_cast<BYTE*>(rgba.data())
     );
     if (FAILED(hr)) {
-      error = "can't read the pixels of " + file.filename().string() + " (" + HResultText(hr) + ")";
-      return false;
+      return std::unexpected("can't read the pixels of " + file.filename().string() + " (" + HResultText(hr) + ")");
     }
+    HeightImage out;
     out.width = static_cast<int>(width);
     out.height = static_cast<int>(height);
     out.words.resize(static_cast<std::size_t>(width) * height);
@@ -787,6 +760,6 @@ namespace faf::editor
     for (std::size_t i = 0; i < out.words.size(); ++i) {
       out.words[i] = rgba[i * 4 + static_cast<std::size_t>(c)];
     }
-    return true;
+    return out;
   }
 } // namespace faf::editor

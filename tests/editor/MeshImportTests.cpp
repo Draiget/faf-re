@@ -12,16 +12,13 @@ namespace faf::editor
   {
     [[nodiscard]] ObjMesh Quad()
     {
-      ObjMesh mesh;
-      std::string error;
-      EXPECT_TRUE(ParseObj(
+      auto mesh = ParseObj(
         "v 0 0 0\nv 10 0 0\nv 10 0 10\nv 0 0 10\nv 300 0 0\nv 310 0 0\nv 310 0 10\n"
         "vt 0 0\nvt 1 0\nvt 1 1\nvt 0 1\n"
-        "f 1/1 2/2 3/3\nf 1/1 3/3 4/4\nf 5/1 6/2 7/3\n",
-        mesh,
-        error
-      )) << error;
-      return mesh;
+        "f 1/1 2/2 3/3\nf 1/1 3/3 4/4\nf 5/1 6/2 7/3\n"
+      );
+      EXPECT_TRUE(mesh) << mesh.error();
+      return mesh.value_or(ObjMesh{});
     }
   } // namespace
 
@@ -31,11 +28,12 @@ namespace faf::editor
   )
   {
     const ObjMesh mesh = Quad();
-    std::string error;
-    const std::vector<std::uint8_t> bytes = ScmFromObj(mesh, "root", 2.0f, "a test", error);
-    ASSERT_FALSE(bytes.empty()) << error;
-    ScmModel model;
-    ASSERT_TRUE(ReadScm(bytes, model, error)) << error;
+    const auto made = ScmFromObj(mesh, "root", 2.0f, "a test");
+    ASSERT_TRUE(made) << made.error();
+    const std::vector<std::uint8_t>& bytes = *made;
+    const auto read = ReadScm(bytes);
+    ASSERT_TRUE(read) << read.error();
+    const ScmModel& model = *read;
     EXPECT_EQ(model.version, 5);
     EXPECT_EQ(model.bones, 1);
     EXPECT_EQ(model.indexes.size(), 9U);
@@ -46,13 +44,13 @@ namespace faf::editor
     }
     EXPECT_TRUE(found);
     // Back to OBJ and in again: the same triangles.
-    ObjMesh again;
-    ASSERT_TRUE(ParseObj(ObjFromScm(model, 2.0f), again, error)) << error;
-    EXPECT_EQ(again.triangles.size(), 3U);
-    EXPECT_FLOAT_EQ(again.positions[model.indexes[0]][0], model.positions[model.indexes[0]][0] / 2.0f);
+    const auto again = ParseObj(ObjFromScm(model, 2.0f));
+    ASSERT_TRUE(again) << again.error();
+    EXPECT_EQ(again->triangles.size(), 3U);
+    EXPECT_FLOAT_EQ(again->positions[model.indexes[0]][0], model.positions[model.indexes[0]][0] / 2.0f);
     std::vector<std::uint8_t> bad = bytes;
     bad[0] = 'X';
-    EXPECT_FALSE(ReadScm(bad, model, error));
+    EXPECT_FALSE(ReadScm(bad));
   }
 
   TEST(
@@ -87,14 +85,12 @@ namespace faf::editor
   )
   {
     // FAF Studio's import options: a part a usemtl material, smooth or flat normals, light masks over the map.
-    ObjMesh mesh;
-    std::string error;
-    ASSERT_TRUE(ParseObj(
+    const auto parsed = ParseObj(
       "v 0 0 0\nv 10 0 0\nv 10 5 10\nv 0 5 10\n"
-      "usemtl rock\nf 1 2 3\nusemtl grass\nf 1 3 4\n",
-      mesh,
-      error
-    )) << error;
+      "usemtl rock\nf 1 2 3\nusemtl grass\nf 1 3 4\n"
+    );
+    ASSERT_TRUE(parsed) << parsed.error();
+    const ObjMesh& mesh = *parsed;
     ASSERT_EQ(mesh.materials.size(), 2U);
     const auto byMaterial = SplitByMaterial(mesh, 0);
     ASSERT_EQ(byMaterial.size(), 2U);
@@ -115,8 +111,9 @@ namespace faf::editor
     // The second coordinates over the map: a vertex at x 10, z 10 on a 20-unit map reads 0.5, 0.5.
     ObjMesh placed = TransformMesh(mesh, MeshImportOptions{});
     placed.uv2Size = 20.0f;
-    const std::vector<std::uint8_t> scm = ScmFromObj(placed, "tile", 1.0f, "test", error);
-    ASSERT_FALSE(scm.empty()) << error;
+    const auto made = ScmFromObj(placed, "tile", 1.0f, "test");
+    ASSERT_TRUE(made) << made.error();
+    const std::vector<std::uint8_t>& scm = *made;
     std::uint32_t at = 0;
     std::uint32_t count = 0;
     std::memcpy(&at, scm.data() + 0x10, 4);
