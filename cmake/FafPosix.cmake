@@ -599,7 +599,8 @@ target_link_libraries(faf_core_tests PRIVATE faf_sim gtest_main)
 target_link_options(faf_core_tests PRIVATE ${FAF_LINK_ALL_ERRORS})
 add_test(NAME core COMMAND faf_core_tests)
 
-add_executable(faf_netcore_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/netcore/NetCoreTests.cpp")
+add_executable(faf_netcore_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/netcore/NetCoreTests.cpp"
+  "${PROJECT_SOURCE_DIR}/tests/netcore/NetStampTests.cpp")
 target_link_libraries(faf_netcore_tests PRIVATE faf_sim gtest_main)
 target_link_options(faf_netcore_tests PRIVATE ${FAF_LINK_ALL_ERRORS})
 add_test(NAME netcore COMMAND faf_netcore_tests /rejoinkeyfile "${CMAKE_CURRENT_BINARY_DIR}/rejoin_test_seat.key")
