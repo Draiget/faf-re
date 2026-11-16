@@ -343,9 +343,13 @@ namespace faf::headless
     if (liveRejoin) {
       // Issue #275: as `CScApp` does for /rejoin, without a window to wait in.
       fa::string reason;
-      bool failed = !moho::REJOIN_BeginSetup(
-        options.rejoinPeers.c_str(), options.rejoinSource, static_cast<unsigned short>(options.rejoinPort), &reason
+      const auto begun = moho::REJOIN_BeginSetup(
+        options.rejoinPeers.c_str(), options.rejoinSource, static_cast<unsigned short>(options.rejoinPort)
       );
+      bool failed = !begun;
+      if (!begun) {
+        reason = begun.error();
+      }
       while (!failed && sessionInfo.get() == nullptr) {
         fa::auto_ptr<moho::SWldSessionInfo> polled = moho::REJOIN_PollSetup(&reason, &failed);
         if (polled.get() != nullptr) {

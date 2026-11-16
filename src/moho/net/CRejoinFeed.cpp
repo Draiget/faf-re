@@ -1931,18 +1931,14 @@ namespace
   std::unique_ptr<SSetup> sSetup;
 } // namespace
 
-bool moho::REJOIN_BeginSetup(
+std::expected<void, fa::string> moho::REJOIN_BeginSetup(
   const char* const peers,
   const int localSource,
-  const unsigned short localPort,
-  fa::string* const failureReason
+  const unsigned short localPort
 )
 {
-  const auto refuse = [failureReason](const char* const reason) {
-    if (failureReason != nullptr) {
-      *failureReason = reason;
-    }
-    return false;
+  const auto refuse = [](const char* const reason) {
+    return std::unexpected(fa::string(reason));
   };
 
   if (!REJOIN_LoadKey()) {
@@ -2011,7 +2007,7 @@ bool moho::REJOIN_BeginSetup(
   constexpr std::chrono::seconds kWait{90};
   setup->deadline = std::chrono::steady_clock::now() + kWait;
   sSetup = std::move(setup);
-  return true;
+  return {};
 }
 
 bool moho::REJOIN_SetupPending()

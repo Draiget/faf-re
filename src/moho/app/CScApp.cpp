@@ -553,15 +553,10 @@ namespace
     fa::vector<fa::string>& args
   )
   {
-    fa::string failureReason;
-    if (
-      moho::REJOIN_BeginSetup(
-        args[0].c_str(),
-        std::atoi(args[1].c_str()),
-        static_cast<unsigned short>(std::atoi(args[2].c_str())),
-        &failureReason
-      )
-    ) {
+    const auto begun = moho::REJOIN_BeginSetup(
+      args[0].c_str(), std::atoi(args[1].c_str()), static_cast<unsigned short>(std::atoi(args[2].c_str()))
+    );
+    if (begun) {
       // The launcher, if there is one, still wants this game's results.
       if (moho::CFG_GetArgOption("/gpgnet", 1, &args) && !args.empty()) {
         u_long address = 0;
@@ -577,6 +572,7 @@ namespace
       (void)moho::UI_StartRejoinScreen();
       return;
     }
+    const fa::string& failureReason = begun.error();
     gpg::Warnf("REJOIN: refused: %s", failureReason.c_str());
     moho::WIN_OkBox("Ack!", gpg::STR_Printf("Unable to rejoin the game.\n\n%s", failureReason.c_str()).c_str());
     (void)moho::UI_StartSplashScreens();
