@@ -68,11 +68,11 @@ Prefer the C++23 spelling where it fits:
 - `std::to_underlying(e)` for an enum's integer value, `std::byteswap` for a byte swap, `0uz` for a `std::size_t` literal, `#elifdef` / `#elifndef`.
 - `static` call operators on function objects without state (hashers, comparators, deleters).
 - An explicit object parameter (`template <class Self> auto& Get(this Self& self)`) instead of a const and a mutable copy of the same method, or a CRTP base.
-- `std::expected<T, E>` for a new function that returns a value or an error, rather than a `bool` and an error out-parameter. `std::optional`'s `and_then`, `transform` and `or_else`. `std::ranges::to`. `if consteval`.
+- A function that can fail returns `std::expected<T, std::string>` (`std::expected<void, std::string>` when there is no value), not a `bool` and an error out-parameter: the engine's own code does this throughout. Success text that the old message parameter also carried goes in the value (`std::expected<std::string, std::string>`). `std::optional`'s `and_then`, `transform` and `or_else`. `std::ranges::to`. `if consteval`.
 
 libc++ 18 lacks `std::flat_map`, `std::move_only_function`, `std::generator`, `std::stacktrace`, `std::out_ptr`, `std::bind_back`, `std::spanstream`, `std::ranges::contains`, `std::ranges::fold_left`, and `views::zip`, `views::enumerate`, `views::chunk` and `views::stride`. clang 18 lacks `[[assume]]`. clang 18 does support explicit object parameters but leaves `__cpp_explicit_this_parameter` undefined, so don't test that macro.
 
-Recovered functions keep one function per binary address: don't turn one into a template, which an explicit object parameter does. Keep `GPG_UNREACHABLE`, which reports an error as the binary does, rather than `std::unreachable()`, which makes reaching that line undefined behaviour.
+Recovered functions keep one function per binary address: don't turn one into a template, which an explicit object parameter does. Keep `GPG_UNREACHABLE`, which reports an error and carries on as the binary does. For a point no input can reach, such as the end of a switch that returns for every value of an enum the engine itself produces, use `FAF_UNREACHABLE()` (`gpg/core/utils/Unreachable.h`): `std::unreachable()` in release builds, a report and an abort otherwise. Never use it where the value can come from a replay, the network, Lua or a file.
 
 ### Platform guards
 
