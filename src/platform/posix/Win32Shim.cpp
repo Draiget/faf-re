@@ -2309,12 +2309,21 @@ HRESULT SHGetFolderPathW(
   const int kind = folder & ~CSIDL_FLAG_CREATE;
   std::string resolved;
   switch (kind) {
+#if FAFRE_PLATFORM_MACOS // ~/Library/Application Support: macOS has no XDG folders
+  case CSIDL_LOCAL_APPDATA:
+  case CSIDL_APPDATA:
+    // Both of Windows' application data folders are the one macOS has; the caches go to
+    // ~/Library/Caches instead (platform/CacheFolder.h).
+    resolved = std::string(home) + "/Library/Application Support";
+    break;
+#else
   case CSIDL_LOCAL_APPDATA:
     resolved = fromEnvironment("XDG_DATA_HOME", "/.local/share");
     break;
   case CSIDL_APPDATA:
     resolved = fromEnvironment("XDG_CONFIG_HOME", "/.config");
     break;
+#endif
   case CSIDL_PERSONAL:
     resolved = userDirectory("XDG_DOCUMENTS_DIR", "/Documents");
     break;

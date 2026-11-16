@@ -28,6 +28,10 @@ namespace platform::window::sdl
   void OnDisplaysChanged();
   // A Windows virtual-key code (or VK_LBUTTON, VK_MBUTTON, VK_RBUTTON) went down or up.
   void OnKey(int virtualKey, bool down);
+  // A key going down with these SDL modifiers (SDL_Keymod) is the system's or the app's shortcut, not
+  // game input: on macOS anything pressed with Command (Cmd+Q, Cmd+H, Cmd+M, Cmd+Tab, ...), as Windows
+  // keeps Windows-key combinations from the game. Its release still reaches the game. False elsewhere.
+  [[nodiscard]] bool IsSystemShortcut(int virtualKey, unsigned int sdlModifiers);
   // The cursor moved to this screen position.
   void OnCursorMoved(int screenX, int screenY);
   // A child window (platform::window::CreateChild), or null where the system has none. Its

@@ -105,6 +105,10 @@ func PrefsDir() string {
 		if base == "" {
 			base = filepath.Join(os.Getenv("USERPROFILE"), "AppData", "Local")
 		}
+	} else if runtime.GOOS == "darwin" {
+		// The macOS client's application data folder (src/platform/posix/Win32Shim.cpp).
+		home, _ := os.UserHomeDir()
+		base = filepath.Join(home, "Library", "Application Support")
 	} else {
 		// The Linux and macOS clients' local application data folder: $XDG_DATA_HOME, else
 		// ~/.local/share (src/platform/posix/Win32Shim.cpp, CSIDL_LOCAL_APPDATA).

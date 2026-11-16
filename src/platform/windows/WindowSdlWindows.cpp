@@ -193,6 +193,18 @@ namespace platform::window::sdl
     (void)down;
   }
 
+  bool IsSystemShortcut(
+    const int virtualKey,
+    const unsigned int sdlModifiers
+  )
+  {
+    // Windows keeps its Windows-key combinations from the game itself (and WinApp's keyboard hook
+    // the Windows key alone).
+    (void)virtualKey;
+    (void)sdlModifiers;
+    return false;
+  }
+
   void OnCursorMoved(
     const int screenX,
     const int screenY

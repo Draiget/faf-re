@@ -452,6 +452,9 @@ namespace
       if (virtualKey == 0) {
         return false;
       }
+      if (down && system::IsSystemShortcut(virtualKey, source.key.mod)) {
+        return false;
+      }
       system::OnKey(virtualKey, down);
       out.type = down ? EventType::KeyDown : EventType::KeyUp;
       out.window = SDL_GetWindowFromID(source.key.windowID);
