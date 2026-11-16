@@ -77,7 +77,7 @@ lu_mem LuaX86PayloadSize(
   if (type == nullptr) {
     return 0u;
   }
-#if defined(_M_IX86)
+#if FAFRE_ARCH_X86
   return static_cast<lu_mem>(type->size_);
 #else
   return LookupX86PayloadSize(type);

@@ -98,7 +98,7 @@ namespace moho
     ~CPrfTimeLogItem();
   };
 
-#if defined(_M_IX86)
+#if FAFRE_ARCH_X86
   static_assert(sizeof(CPrfTimeLogItem) == 0x18, "CPrfTimeLogItem size must be 0x18");
 #endif
 } // namespace moho

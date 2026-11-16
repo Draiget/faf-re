@@ -82,7 +82,7 @@ const LuaObject* LuaState::GetThreadObject() const
 
 // The two bridges below are x86 register/stack adapters written in inline
 // assembly; x64 has neither inline asm nor those conventions.
-#if defined(_M_IX86)
+#if FAFRE_ARCH_X86
 /**
  * Address: 0x004CCA70 (FUN_004CCA70)
  *

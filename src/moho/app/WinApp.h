@@ -41,7 +41,7 @@ namespace moho
     [[nodiscard]] fa::string FormatResolvedLine() const;
   };
 
-#if FAFRE_PLATFORM_WINDOWS && defined(_M_X64)
+#if FAFRE_PLATFORM_WINDOWS && FAFRE_ARCH_64BIT
   static_assert(offsetof(SPlatSymbolInfo, addr) == 0x00, "SPlatSymbolInfo::addr offset must be 0x00");
   static_assert(offsetof(SPlatSymbolInfo, symbol) == 0x08, "SPlatSymbolInfo::symbol offset must be 0x08");
   static_assert(offsetof(SPlatSymbolInfo, symDis) == 0x28, "SPlatSymbolInfo::symDis offset must be 0x28");

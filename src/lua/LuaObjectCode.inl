@@ -473,7 +473,7 @@ int setarrayvector(
   lua_State* const state
 )
 {
-#if defined(_M_X64) || defined(__x86_64__)
+#if FAFRE_ARCH_64BIT
   // The binary's array is `size * 8` bytes (0x00927248), and realloc_0 moves it to a new block when it grows
   // past the old one or shrinks to half of it. Landing in the 896-byte class it takes the block the next
   // formation would have reused; ours is twice as big and doesn't come from that list (26910291 at tick 68348,

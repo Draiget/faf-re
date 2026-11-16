@@ -102,7 +102,7 @@ namespace gpg::diag
       std::uintptr_t* const frames
     )
     {
-#if defined(_M_X64)
+#if FAFRE_ARCH_X64
       std::uint32_t depth = 0;
       while (depth < kMaxDepth && context.Rip != 0) {
         frames[depth++] = static_cast<std::uintptr_t>(context.Rip);

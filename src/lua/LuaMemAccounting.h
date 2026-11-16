@@ -306,7 +306,7 @@ void luaM_growvector(
   }
 }
 
-#if defined(_M_IX86)
+#if FAFRE_ARCH_X86
 // On x86 every accounted size is the real size, so x86 behaviour cannot drift.
 static_assert(kLuaX86Size<LuaPlus::TObject> == sizeof(LuaPlus::TObject));
 static_assert(kLuaX86Size<Node> == sizeof(Node));

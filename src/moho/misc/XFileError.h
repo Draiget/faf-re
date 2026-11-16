@@ -43,7 +43,7 @@ namespace moho
   };
 
 #if defined(_MSC_VER) && _ITERATOR_DEBUG_LEVEL == 0
-#if FAFRE_PLATFORM_WINDOWS && defined(_M_X64)
+#if FAFRE_PLATFORM_WINDOWS && FAFRE_ARCH_64BIT
   static_assert(sizeof(XFileError) == 0x140, "XFileError size must be 0x140");
 #else
   static_assert(sizeof(XFileError) == 0xA8, "XFileError size must be 0xA8");

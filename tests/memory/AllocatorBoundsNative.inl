@@ -2,7 +2,7 @@
 // No copied allocator bodies, OS stubs, live-state reset, or fake addresses.
 #include "platform/PlatformDefines.h"
 
-#if !FAFRE_PLATFORM_WINDOWS || defined(_M_X64) || defined(__x86_64__)
+#if !FAFRE_PLATFORM_WINDOWS || FAFRE_ARCH_64BIT
 #error Allocator boundary acceptance requires native Windows x86
 #endif
 #include <cstdio>

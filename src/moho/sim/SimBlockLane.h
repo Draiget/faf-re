@@ -1,6 +1,6 @@
 #pragma once
 
-#if defined(_M_X64) || defined(__x86_64__)
+#if FAFRE_ARCH_64BIT
 
 #include <cstddef>
 #include <cstdint>
