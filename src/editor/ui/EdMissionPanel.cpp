@@ -132,11 +132,10 @@ namespace faf::editor
     }
   } // namespace
 
-  bool EdMissionPanel::DefineBaseFromArea(
+  std::expected<void, std::string> EdMissionPanel::DefineBaseFromArea(
     const std::string& name,
     const std::string& army,
-    const std::string& area,
-    std::string& why
+    const std::string& area
   )
   {
     Mission& m = mDocument.EditMission();
@@ -146,14 +145,12 @@ namespace faf::editor
       return std::isalnum(static_cast<unsigned char>(c)) == 0 && c != '_';
     })
     ) {
-      why = "a base name takes letters, digits and _ and starts with a letter";
-      return false;
+      return std::unexpected("a base name takes letters, digits and _ and starts with a letter");
     }
     if (std::any_of(m.bases.begin(), m.bases.end(), [&](const MissionBase& b) {
       return b.name == name;
     })) {
-      why = "there is already a base " + name;
-      return false;
+      return std::unexpected("there is already a base " + name);
     }
     const SaveFile& save = mDocument.SaveData();
     std::vector<double> rect;
@@ -163,8 +160,7 @@ namespace faf::editor
       }
     }
     if (rect.size() < 4) {
-      why = "there is no area " + area;
-      return false;
+      return std::unexpected("there is no area " + area);
     }
     const double x0 = std::min(rect[0], rect[2]);
     const double x1 = std::max(rect[0], rect[2]);
@@ -200,7 +196,7 @@ namespace faf::editor
     mBase = static_cast<int>(m.bases.size()) - 1;
     Edited(std::move(before));
     mDefineAsk = std::move(ask);
-    return true;
+    return {};
   }
 
   MissionFacts MissionFactsOf(
@@ -1130,14 +1126,15 @@ namespace faf::editor
       ImGui::SetNextItemWidth(Em(120.0f));
       (void)EdCombo("Army##definebase", &mDefineArmy, armies.data(), static_cast<int>(armies.size()));
       if (ImGui::Button("Define the base")) {
-        std::string why;
-        if (!DefineBaseFromArea(
-              mDefineName,
-              facts.armies[static_cast<std::size_t>(mDefineArmy)],
-              facts.areas[static_cast<std::size_t>(mDefineArea)],
-              why
-            )) {
-          gpg::Warnf("editor: define base: %s", why.c_str());
+        if (
+          const auto defined = DefineBaseFromArea(
+            mDefineName,
+            facts.armies[static_cast<std::size_t>(mDefineArmy)],
+            facts.areas[static_cast<std::size_t>(mDefineArea)]
+          );
+          !defined
+        ) {
+          gpg::Warnf("editor: define base: %s", defined.error().c_str());
         }
       }
       EdSetItemTooltip(

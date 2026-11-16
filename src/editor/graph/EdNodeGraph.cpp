@@ -511,21 +511,18 @@ namespace faf::editor
     return out;
   }
 
-  bool NodeGraph::Load(
-    const std::string& text,
-    std::string& error
+  std::expected<void, std::string> NodeGraph::Load(
+    const std::string& text
   )
   {
     std::string kind;
     if (!JsonValue(text, "graph", kind) || kind != "fafgraph") {
-      error = "not a graph file";
-      return false;
+      return std::unexpected("not a graph file");
     }
     std::string nodes;
     std::string links;
     if (!JsonValue(text, "nodes", nodes)) {
-      error = "no nodes";
-      return false;
+      return std::unexpected("no nodes");
     }
     (void)JsonValue(text, "links", links);
     Clear();
@@ -603,19 +600,18 @@ namespace faf::editor
       (void)Link(fromNode->id, PinIndex(fromNode->type->outputs, out), toNode->id, PinIndex(toNode->type->inputs, in));
     }
     mChanges = 0;
-    return true;
+    return {};
   }
 
-  std::vector<int> NodeGraph::Paste(
+  std::expected<std::vector<int>, std::string> NodeGraph::Paste(
     const std::string& text,
     const float x,
-    const float y,
-    std::string& error
+    const float y
   )
   {
     NodeGraph copied(*mRegistry);
-    if (!copied.Load(text, error)) {
-      return {};
+    if (auto loaded = copied.Load(text); !loaded) {
+      return std::unexpected(std::move(loaded.error()));
     }
     float minX = 1e9f;
     float minY = 1e9f;
@@ -651,22 +647,21 @@ namespace faf::editor
       Touch(id);
     }
     if (added.empty()) {
-      error = "nothing to paste";
+      return std::unexpected("nothing to paste");
     }
     return added;
   }
 
-  bool NodeGraph::Restore(
-    const std::string& text,
-    std::string& error
+  std::expected<void, std::string> NodeGraph::Restore(
+    const std::string& text
   )
   {
     const std::uint64_t before = mChanges;
-    if (!Load(text, error)) {
-      return false;
+    if (auto loaded = Load(text); !loaded) {
+      return loaded;
     }
     mChanges = before + 1;
-    return true;
+    return {};
   }
 
   void NodeGraph::Clear()

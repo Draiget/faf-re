@@ -2,6 +2,7 @@
 
 #include <array>
 #include <cstdint>
+#include <expected>
 #include <memory>
 #include <set>
 #include <string>
@@ -203,17 +204,17 @@ namespace faf::editor
     [[nodiscard]] std::string Save() const;
     /** Reads a graph file; unknown node types and parameters are dropped, missing parameters take their initial value.
      */
-    bool Load(const std::string& text, std::string& error);
+    [[nodiscard]] std::expected<void, std::string> Load(const std::string& text);
     void Clear();
     /** The nodes given and the links among them, as a graph file's text (copy). */
     [[nodiscard]] std::string SaveSome(const std::set<int>& ids) const;
     /**
      * Adds a graph file's nodes (with new ids) and their links, the group's top left corner at (x, y) (paste); the new
-     * ids. An output node is left out when the graph has one.
+     * ids, never none (the error when nothing was pasted). An output node is left out when the graph has one.
      */
-    std::vector<int> Paste(const std::string& text, float x, float y, std::string& error);
+    [[nodiscard]] std::expected<std::vector<int>, std::string> Paste(const std::string& text, float x, float y);
     /** Load for undo and redo: the change count goes on (so whatever saved or ran against it sees a change). */
-    bool Restore(const std::string& text, std::string& error);
+    [[nodiscard]] std::expected<void, std::string> Restore(const std::string& text);
 
   private:
     void Touch(int id);

@@ -68,8 +68,8 @@ namespace
     c.graph.SetBypass(c.range, true);
     EXPECT_GT(c.graph.Find(c.out)->revision, revision) << "bypass runs what is downstream again";
     NodeGraph loaded(TerrainNodeTypes());
-    std::string error;
-    ASSERT_TRUE(loaded.Load(c.graph.Save(), error)) << error;
+    const auto read = loaded.Load(c.graph.Save());
+    ASSERT_TRUE(read) << read.error();
     ASSERT_NE(loaded.Find(c.range), nullptr);
     EXPECT_EQ(loaded.Find(c.range)->name, "Hill \"heights\"");
     EXPECT_TRUE(loaded.Find(c.range)->bypass);
@@ -92,9 +92,10 @@ namespace
     c.graph.SetParam(c.range, lo, value);
     const std::string copied = c.graph.SaveSome({c.noise, c.range});
     EXPECT_EQ(copied.find("out_height"), std::string::npos) << "only the nodes copied";
-    std::string error;
-    const std::vector<int> pasted = c.graph.Paste(copied, 1000.0f, 500.0f, error);
-    ASSERT_EQ(pasted.size(), 2U) << error;
+    const auto pastedOk = c.graph.Paste(copied, 1000.0f, 500.0f);
+    ASSERT_TRUE(pastedOk) << pastedOk.error();
+    const std::vector<int>& pasted = *pastedOk;
+    ASSERT_EQ(pasted.size(), 2U);
     EXPECT_EQ(c.graph.Nodes().size(), 5U);
     const GraphNode* noise = c.graph.Find(pasted[0]);
     const GraphNode* range = c.graph.Find(pasted[1]);
@@ -110,10 +111,11 @@ namespace
     EXPECT_EQ(c.graph.InputLink(range->id, 0)->fromNode, noise->id);
     EXPECT_EQ(c.graph.Links().size(), 3U) << "nothing linked to the old nodes";
     // The whole graph pasted again: every node (height outputs too: a graph folds several together).
-    const std::vector<int> again = c.graph.Paste(c.graph.Save(), 0.0f, 2000.0f, error);
-    EXPECT_EQ(again.size(), 5U);
+    const auto again = c.graph.Paste(c.graph.Save(), 0.0f, 2000.0f);
+    ASSERT_TRUE(again) << again.error();
+    EXPECT_EQ(again->size(), 5U);
     EXPECT_EQ(c.graph.Links().size(), 6U) << "the three links again";
-    EXPECT_TRUE(c.graph.Paste("not a graph", 0.0f, 0.0f, error).empty());
+    EXPECT_FALSE(c.graph.Paste("not a graph", 0.0f, 0.0f));
   }
 
   TEST(
@@ -126,8 +128,8 @@ namespace
     (void)c.graph.RemoveNode(c.noise);
     ASSERT_EQ(c.graph.Nodes().size(), 2U);
     const std::uint64_t changes = c.graph.Changes();
-    std::string error;
-    ASSERT_TRUE(c.graph.Restore(before, error)) << error;
+    const auto restored = c.graph.Restore(before);
+    ASSERT_TRUE(restored) << restored.error();
     EXPECT_EQ(c.graph.Nodes().size(), 3U);
     EXPECT_EQ(c.graph.Save(), before) << "the same graph";
     EXPECT_GT(c.graph.Changes(), changes) << "a restore is a change (the preview runs again)";

@@ -514,10 +514,8 @@ namespace faf::editor
       }
       if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_V)) {
         if (const char* const text = ImGui::GetClipboardText(); text != nullptr && *text != '\0') {
-          std::string error;
-          const std::vector<int> pasted = graph.Paste(text, std::round(mouseGX), std::round(mouseGY), error);
-          if (!pasted.empty()) {
-            mSelection = std::set<int>(pasted.begin(), pasted.end());
+          if (const auto pasted = graph.Paste(text, std::round(mouseGX), std::round(mouseGY)); pasted) {
+            mSelection = std::set<int>(pasted->begin(), pasted->end());
           }
         }
       }

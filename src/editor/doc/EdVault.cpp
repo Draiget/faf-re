@@ -46,10 +46,9 @@ namespace faf::editor
     }
 
     /** `url` (https) into `body`; false with `error`. `received` follows the bytes as they come. */
-    bool HttpGet(
+    std::expected<void, std::string> HttpGet(
       const std::string& url,
       std::string& body,
-      std::string& error,
       std::atomic<std::uint64_t>& received,
       std::atomic<std::uint64_t>& total
     )
@@ -58,14 +57,14 @@ namespace faf::editor
       call.url = url;
       long status = 0;
       if (const auto sent = HttpRequest(call, status, body, &received, &total); !sent) {
-        error = sent.error();
-        return false;
+        return std::unexpected(sent.error());
       }
       if (status != 200) {
-        error = status == 404 ? "the vault has no map by that name" : "the vault answered " + std::to_string(status);
-        return false;
+        return std::unexpected(
+          status == 404 ? "the vault has no map by that name" : "the vault answered " + std::to_string(status)
+        );
       }
-      return true;
+      return {};
     }
   } // namespace
 
@@ -310,9 +309,8 @@ namespace faf::editor
   void EdVaultDownload::Run()
   {
     std::string zip;
-    std::string error;
-    if (!HttpGet(mMap.url, zip, error, mReceived, mTotal)) {
-      SetMessage(error);
+    if (const auto got = HttpGet(mMap.url, zip, mReceived, mTotal); !got) {
+      SetMessage(got.error());
       mState = State::Failed;
       return;
     }

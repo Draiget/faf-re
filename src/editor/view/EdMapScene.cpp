@@ -3377,16 +3377,14 @@ namespace faf::editor
     mLayerDragJoin = false;
   }
 
-  bool EdMapScene::ClearMaskLayer(
-    const int layer,
-    std::string& message
+  std::expected<std::string, std::string> EdMapScene::ClearMaskLayer(
+    const int layer
   )
   {
     LoadMasks();
     EdDocument::MaskGrid& masks = mDocument.Masks();
     if (masks.texels.empty() || mPaintingMask) {
-      message = "No map's masks to change.";
-      return false;
+      return std::unexpected("No map's masks to change.");
     }
     const SampleRect whole{0, 0, masks.width - 1, masks.height - 1};
     mDocument.MaskUndo().BeginStroke();
@@ -3395,8 +3393,7 @@ namespace faf::editor
       texel = WithMaskByte(texel, layer, 0);
     }
     WholeMaskChanged(whole);
-    message = "Cleared the mask of layer " + std::to_string(layer + 1);
-    return true;
+    return "Cleared the mask of layer " + std::to_string(layer + 1);
   }
 
   int EdMapScene::TerrainTypesFromTextures(
@@ -3443,16 +3440,14 @@ namespace faf::editor
     return static_cast<int>(changed);
   }
 
-  bool EdMapScene::FillMaskLayer(
-    const int layer,
-    std::string& message
+  std::expected<std::string, std::string> EdMapScene::FillMaskLayer(
+    const int layer
   )
   {
     LoadMasks();
     EdDocument::MaskGrid& masks = mDocument.Masks();
     if (masks.texels.empty() || mPaintingMask) {
-      message = "No map's masks to change.";
-      return false;
+      return std::unexpected("No map's masks to change.");
     }
     const SampleRect whole{0, 0, masks.width - 1, masks.height - 1};
     mDocument.MaskUndo().BeginStroke();
@@ -3462,26 +3457,22 @@ namespace faf::editor
       texel = WithMaskByte(texel, layer, 255);
     }
     WholeMaskChanged(whole);
-    message = "Filled the paint of layer " + std::to_string(layer + 1);
-    return true;
+    return "Filled the paint of layer " + std::to_string(layer + 1);
   }
 
-  bool EdMapScene::ImportMaskLayer(
+  std::expected<std::string, std::string> EdMapScene::ImportMaskLayer(
     const int layer,
-    const std::filesystem::path& file,
-    std::string& message
+    const std::filesystem::path& file
   )
   {
     LoadMasks();
     EdDocument::MaskGrid& masks = mDocument.Masks();
     if (masks.texels.empty() || mPaintingMask) {
-      message = "No map's masks to change.";
-      return false;
+      return std::unexpected("No map's masks to change.");
     }
     const auto read = ReadHeightImage(file, masks.width, masks.height);
     if (!read) {
-      message = "Mask import failed: " + read.error();
-      return false;
+      return std::unexpected("Mask import failed: " + read.error());
     }
     const HeightImage image = ResampleHeights(*read, masks.width, masks.height);
     const SampleRect whole{0, 0, masks.width - 1, masks.height - 1};
@@ -3497,21 +3488,18 @@ namespace faf::editor
       );
     }
     WholeMaskChanged(whole);
-    message = "Imported the mask of layer " + std::to_string(layer + 1) + " from " + file.string();
-    return true;
+    return "Imported the mask of layer " + std::to_string(layer + 1) + " from " + file.string();
   }
 
-  bool EdMapScene::SetMaskLayer(
+  std::expected<std::string, std::string> EdMapScene::SetMaskLayer(
     const int layer,
-    const TexImage& image,
-    std::string& message
+    const TexImage& image
   )
   {
     LoadMasks();
     EdDocument::MaskGrid& masks = mDocument.Masks();
     if (masks.texels.empty() || mPaintingMask || layer < 0 || layer > 7 || image.size <= 0) {
-      message = "No map's masks to change.";
-      return false;
+      return std::unexpected("No map's masks to change.");
     }
     const SampleRect whole{0, 0, masks.width - 1, masks.height - 1};
     mDocument.MaskUndo().BeginStroke();
@@ -3534,21 +3522,18 @@ namespace faf::editor
       }
     }
     WholeMaskChanged(whole);
-    message = "Set the mask of stratum " + std::to_string(layer + 1) + " from the material graph";
-    return true;
+    return "Set the mask of stratum " + std::to_string(layer + 1) + " from the material graph";
   }
 
-  bool EdMapScene::ExportMaskLayer(
+  std::expected<std::string, std::string> EdMapScene::ExportMaskLayer(
     const int layer,
-    const std::filesystem::path& file,
-    std::string& message
+    const std::filesystem::path& file
   )
   {
     LoadMasks();
     const EdDocument::MaskGrid& masks = mDocument.Masks();
     if (masks.texels.empty()) {
-      message = "No map's masks to export.";
-      return false;
+      return std::unexpected("No map's masks to export.");
     }
     HeightImage image;
     image.width = masks.width;
@@ -3560,11 +3545,9 @@ namespace faf::editor
       image.words[i] = static_cast<std::uint16_t>(MaskWeight(MaskByte(masks.texels[i], layer), remappedLayer) * 257.0f);
     }
     if (const auto wrote = WriteHeightImage(file, image); !wrote) {
-      message = "Mask export failed: " + wrote.error();
-      return false;
+      return std::unexpected("Mask export failed: " + wrote.error());
     }
-    message = "Exported the mask of layer " + std::to_string(layer + 1) + " to " + file.string();
-    return true;
+    return "Exported the mask of layer " + std::to_string(layer + 1) + " to " + file.string();
   }
 
   std::vector<std::string> EdMapScene::TerrainShaders()
@@ -4323,21 +4306,18 @@ namespace faf::editor
     return true;
   }
 
-  bool EdMapScene::ImportHeights(
+  std::expected<std::string, std::string> EdMapScene::ImportHeights(
     const std::filesystem::path& file,
-    const float scale,
-    std::string& message
+    const float scale
   )
   {
     moho::CHeightField* const field = mMap != nullptr ? mMap->mTerrainRes->GetHeightField() : nullptr;
     if (field == nullptr || mPainting) {
-      message = "No map is open in the view.";
-      return false;
+      return std::unexpected("No map is open in the view.");
     }
     auto read = ReadHeightImage(file, field->width, field->height);
     if (!read) {
-      message = "Import failed: " + read.error();
-      return false;
+      return std::unexpected("Import failed: " + read.error());
     }
     HeightImage& image = *read;
     const int readWidth = image.width;
@@ -4355,21 +4335,18 @@ namespace faf::editor
     if (mCheckDone) {
       RunSymmetryCheck();
     }
-    message = "Imported heights from " + file.string() + " (" + std::to_string(readWidth) + " x " +
+    return "Imported heights from " + file.string() + " (" + std::to_string(readWidth) + " x " +
       std::to_string(readHeight) + (readWidth != field->width || readHeight != field->height ? ", resampled" : "") +
       ")";
-    return true;
   }
 
-  bool EdMapScene::FlattenWhole(
-    const float height,
-    std::string& message
+  std::expected<std::string, std::string> EdMapScene::FlattenWhole(
+    const float height
   )
   {
     moho::CHeightField* const field = mMap != nullptr ? mMap->mTerrainRes->GetHeightField() : nullptr;
     if (field == nullptr || mPainting) {
-      message = "No map is open in the view.";
-      return false;
+      return std::unexpected("No map is open in the view.");
     }
     // Heights are stored in 1/128 units in 16 bits.
     const auto word = static_cast<std::uint16_t>(std::clamp(std::lround(height * 128.0f), 0L, 65535L));
@@ -4386,35 +4363,30 @@ namespace faf::editor
     }
     char text[96];
     (void)std::snprintf(text, sizeof(text), "Flattened the map to height %.2f", static_cast<float>(word) / 128.0f);
-    message = text;
     gpg::Logf("editor: %s", text);
-    return true;
+    return text;
   }
 
-  bool EdMapScene::WriteHeightRect(
+  std::expected<void, std::string> EdMapScene::WriteHeightRect(
     const int x0,
     const int z0,
     const int w,
     const int h,
-    const std::vector<float>& heights,
-    std::string& message
+    const std::vector<float>& heights
   )
   {
     moho::CHeightField* const field = mMap != nullptr ? mMap->mTerrainRes->GetHeightField() : nullptr;
     if (field == nullptr || mPainting) {
-      message = "no map is open in the view";
-      return false;
+      return std::unexpected("no map is open in the view");
     }
     if (w <= 0 || h <= 0 || heights.size() < static_cast<std::size_t>(w) * static_cast<std::size_t>(h)) {
-      message = "the list has fewer than w x h heights";
-      return false;
+      return std::unexpected("the list has fewer than w x h heights");
     }
     const SampleRect rect{
       std::max(0, x0), std::max(0, z0), std::min(field->width - 1, x0 + w - 1), std::min(field->height - 1, z0 + h - 1)
     };
     if (rect.x0 > rect.x1 || rect.z0 > rect.z1) {
-      message = "the rectangle is off the map";
-      return false;
+      return std::unexpected("the rectangle is off the map");
     }
     mDocument.Heights().BeginStroke();
     mDocument.Heights().BeforeWrite(field->data, rect);
@@ -4429,39 +4401,34 @@ namespace faf::editor
     mDocument.EditEnded(EdDocument::EditKind::Heights);
     RefreshHeights({rect});
     mDocument.SetModified(true);
-    return true;
+    return {};
   }
 
-  bool EdMapScene::WriteMaskRect(
+  std::expected<void, std::string> EdMapScene::WriteMaskRect(
     const int layer,
     const int x0,
     const int z0,
     const int w,
     const int h,
-    const std::vector<float>& weights,
-    std::string& message
+    const std::vector<float>& weights
   )
   {
     LoadMasks();
     EdDocument::MaskGrid& masks = mDocument.Masks();
     if (masks.texels.empty() || mPaintingMask) {
-      message = "no map's paint to change";
-      return false;
+      return std::unexpected("no map's paint to change");
     }
     if (layer < 1 || layer > 8) {
-      message = "layer is 1 to 8";
-      return false;
+      return std::unexpected("layer is 1 to 8");
     }
     if (w <= 0 || h <= 0 || weights.size() < static_cast<std::size_t>(w) * static_cast<std::size_t>(h)) {
-      message = "the list has fewer than w x h weights";
-      return false;
+      return std::unexpected("the list has fewer than w x h weights");
     }
     const SampleRect rect{
       std::max(0, x0), std::max(0, z0), std::min(masks.width - 1, x0 + w - 1), std::min(masks.height - 1, z0 + h - 1)
     };
     if (rect.x0 > rect.x1 || rect.z0 > rect.z1) {
-      message = "the rectangle is off the paint";
-      return false;
+      return std::unexpected("the rectangle is off the paint");
     }
     const int slot = layer - 1;
     const bool remapped = (RemappedStrata(TerrainShader()) & (1U << slot)) != 0;
@@ -4477,7 +4444,7 @@ namespace faf::editor
       }
     }
     WholeMaskChanged(rect);
-    return true;
+    return {};
   }
 
   bool EdMapScene::MaskSize(
@@ -4544,17 +4511,15 @@ namespace faf::editor
     return true;
   }
 
-  bool EdMapScene::ExportHeights(
+  std::expected<std::string, std::string> EdMapScene::ExportHeights(
     const std::filesystem::path& file,
     const int width,
-    const float scale,
-    std::string& message
+    const float scale
   )
   {
     const moho::CHeightField* const field = mMap != nullptr ? mMap->mTerrainRes->GetHeightField() : nullptr;
     if (field == nullptr) {
-      message = "No map is open in the view.";
-      return false;
+      return std::unexpected("No map is open in the view.");
     }
     HeightImage image;
     image.width = field->width;
@@ -4571,12 +4536,10 @@ namespace faf::editor
     }
     ScaleHeights(image, scale);
     if (const auto wrote = WriteHeightImage(file, image, mTools != nullptr && mTools->ExportEightBit()); !wrote) {
-      message = "Export failed: " + wrote.error();
-      return false;
+      return std::unexpected("Export failed: " + wrote.error());
     }
-    message = "Exported heights to " + file.string() + " (" + std::to_string(image.width) + " x " +
+    return "Exported heights to " + file.string() + " (" + std::to_string(image.width) + " x " +
       std::to_string(image.height) + ")";
-    return true;
   }
 
   std::shared_ptr<TerrainSource> EdMapScene::TerrainHeights()
@@ -6816,17 +6779,16 @@ namespace faf::editor
         std::to_string(mDocument.Layout().revision) + "|" + out.layoutSymmetry + "|" + std::to_string(brush.turns);
       const int width = field->width;
       const int height = field->height;
-      out.loadExternal =
-        [windowFile, mapping, width, height](const std::string& file, field::Grid& grid, std::string& error) {
+      out.loadExternal = [windowFile, mapping, width, height](
+                           const std::string& file, field::Grid& grid
+                         ) -> std::expected<void, std::string> {
         const std::string path = file.empty() ? windowFile : file;
         if (path.empty()) {
-          error = "no heightmap: choose one in Terrain > Import / Export, or type a file in the node";
-          return false;
+          return std::unexpected("no heightmap: choose one in Terrain > Import / Export, or type a file in the node");
         }
         const auto image = ReadHeightImage(path, width, height);
         if (!image) {
-          error = path + ": " + image.error();
-          return false;
+          return std::unexpected(path + ": " + image.error());
         }
         ImportSettings settings = mapping;
         settings.blend = ImportSettings::Blend::Replace;
@@ -6838,34 +6800,31 @@ namespace faf::editor
         for (std::size_t k = 0; k < words.size(); ++k) {
           grid.v[k] = static_cast<float>(words[k]) / 128.0f;
         }
-        return true;
+        return {};
       };
       // A 16 bit image of any size, 0..1 (the Image node); resampled to the map's samples.
-      out.loadImage = [width, height](const std::string& file, field::Grid& grid, std::string& error) {
+      out.loadImage = [width, height](const std::string& file, field::Grid& grid) -> std::expected<void, std::string> {
         const auto read = ReadHeightImage(file, 0, 0);
         if (!read) {
-          error = file + ": " + read.error();
-          return false;
+          return std::unexpected(file + ": " + read.error());
         }
         const HeightImage image = ResampleHeights(*read, width, height);
         grid = field::Grid(width, height, 1.0f, 0.0f, 0.0f);
         for (std::size_t k = 0; k < image.words.size(); ++k) {
           grid.v[k] = static_cast<float>(image.words[k]) / 65535.0f;
         }
-        return true;
+        return {};
       };
       // A layer's paint as the map shows it (the Texture layer node), read when the node runs (on this thread).
       out.paintKey = std::to_string(MasksHash());
-      out.layerMask = [this, width](const int layer, field::Grid& grid, std::string& error) {
+      out.layerMask = [this, width](const int layer, field::Grid& grid) -> std::expected<void, std::string> {
         if (layer < 1 || layer > 8) {
-          error = "layers are 1 to 8";
-          return false;
+          return std::unexpected("layers are 1 to 8");
         }
         LoadMasks();
         const EdDocument::MaskGrid& masks = mDocument.Masks();
         if (masks.texels.empty() || masks.width < 2 || masks.height < 2) {
-          error = "the map has no paint masks";
-          return false;
+          return std::unexpected("the map has no paint masks");
         }
         const bool remapped = (RemappedStrata(TerrainShader()) & (1U << (layer - 1))) != 0;
         // Each texel covers its share of the map: its sample in the middle of that square.
@@ -6874,14 +6833,13 @@ namespace faf::editor
         for (std::size_t i = 0; i < masks.texels.size(); ++i) {
           grid.v[i] = MaskWeight(MaskByte(masks.texels[i], layer - 1), remapped) / 255.0f;
         }
-        return true;
+        return {};
       };
       // Named masks: files beside the window's heightmap, by name (FAF Studio's adopted files).
       out.loadExternalMask =
-        [windowFile, width, height](const std::string& name, field::Grid& grid, std::string& error) {
+        [windowFile, width, height](const std::string& name, field::Grid& grid) -> std::expected<void, std::string> {
         if (windowFile.empty()) {
-          error = "no heightmap chosen in Terrain > Import / Export: named masks are found beside it";
-          return false;
+          return std::unexpected("no heightmap chosen in Terrain > Import / Export: named masks are found beside it");
         }
         std::vector<std::string> files;
         std::error_code ignored;
@@ -6891,20 +6849,20 @@ namespace faf::editor
         }
         const std::string found = FindNamedMask(files, name);
         if (found.empty()) {
-          error = "no mask named " + name + " beside " + std::filesystem::path(windowFile).filename().string();
-          return false;
+          return std::unexpected(
+            "no mask named " + name + " beside " + std::filesystem::path(windowFile).filename().string()
+          );
         }
         const auto read = ReadHeightImage(found, 0, 0);
         if (!read) {
-          error = found + ": " + read.error();
-          return false;
+          return std::unexpected(found + ": " + read.error());
         }
         const HeightImage image = ResampleHeights(*read, width, height);
         grid = field::Grid(width, height, 1.0f, 0.0f, 0.0f);
         for (std::size_t k = 0; k < image.words.size(); ++k) {
           grid.v[k] = static_cast<float>(image.words[k]) / 65535.0f;
         }
-        return true;
+        return {};
       };
     }
     // The map's light.
@@ -7459,11 +7417,12 @@ namespace faf::editor
     case EdTools::InteropAsk::Export:
     case EdTools::InteropAsk::SendAndWatch: {
       const std::string file = mTools->InteropFile(true);
-      std::string message;
       const float scale = mTools->InteropExportScale();
-      if (!ExportHeights(file, mTools->InteropExportWidth(), scale, message)) {
-        return message;
+      const auto exported = ExportHeights(file, mTools->InteropExportWidth(), scale);
+      if (!exported) {
+        return exported.error();
       }
+      std::string message = *exported;
       if (mTools->InteropSidecar()) {
         ExportFacts facts;
         facts.map = mDocument.FolderName();
@@ -10062,17 +10021,15 @@ namespace faf::editor
     gpg::Warnf("editor: /selectunit: no unit %s in %s", name.c_str(), army.c_str());
   }
 
-  bool EdMapScene::ImportMarkerFile(
-    const std::string& text,
-    MarkerImport& result,
-    std::string& error
+  std::expected<MarkerImport, std::string> EdMapScene::ImportMarkerFile(
+    const std::string& text
   )
   {
     EdDocument::SaveSnapshot before = mDocument.SaveDataNow();
     std::vector<SaveEntry> markers = mDocument.SaveData().Markers();
+    MarkerImport result;
     if (const auto read = MarkersFromFafmapmarkers(text, markers, result, mDocument.ArmyNamesInUse()); !read) {
-      error = read.error();
-      return false;
+      return std::unexpected(read.error());
     }
     if (!result.names.empty()) {
       // A start position is an army, as when one is placed: the scenario's list and the save's Armies get it.
@@ -10089,7 +10046,7 @@ namespace faf::editor
       mMarkerSelection = result.names;
       mOutsideStale = true;
     }
-    return true;
+    return result;
   }
 
   std::vector<SaveEntry> EdMapScene::SelectedMarkers() const
@@ -14644,28 +14601,24 @@ namespace faf::editor
     return units;
   }
 
-  bool EdMapScene::ImportUnitFile(
+  std::expected<void, std::string> EdMapScene::ImportUnitFile(
     const std::string& text,
     const std::string& army,
     std::vector<std::string>& names,
-    bool& moved,
-    std::string& error
+    bool& moved
   )
   {
     const moho::CHeightField* const field = mMap != nullptr ? mMap->mTerrainRes->GetHeightField() : nullptr;
     if (field == nullptr) {
-      error = "no map shown";
-      return false;
+      return std::unexpected("no map shown");
     }
     std::vector<SaveUnit> units;
     float centre[3];
     if (const auto read = UnitsFromScunits(text, units, centre); !read) {
-      error = read.error();
-      return false;
+      return std::unexpected(read.error());
     }
     if (units.empty()) {
-      error = "the file has no units";
-      return false;
+      return std::unexpected("the file has no units");
     }
     const float width = static_cast<float>(field->width - 1);
     const float height = static_cast<float>(field->height - 1);
@@ -14692,9 +14645,8 @@ namespace faf::editor
       }
     });
     if (!added) {
-      error = "the army's units can't be changed";
       names.clear();
-      return false;
+      return std::unexpected("the army's units can't be changed");
     }
     mDocument.SaveDataEdited(std::move(before));
     ReloadUnits();
@@ -14702,7 +14654,7 @@ namespace faf::editor
     for (const std::string& name : names) {
       mUnitSelection.emplace_back(army, name);
     }
-    return true;
+    return {};
   }
 
   void EdMapScene::DeleteSelectedUnits()

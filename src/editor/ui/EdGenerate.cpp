@@ -146,13 +146,13 @@ namespace faf::editor
   {
     if (!text.empty()) {
       auto graph = std::make_unique<NodeGraph>(TerrainNodeTypes());
-      std::string error;
       if (studio) {
-        StudioGraphFacts facts;
-        if (!ReadStudioGraph(text, *graph, facts, error)) {
-          mStatus = "Can't read " + name + ": " + error;
+        const auto read = ReadStudioGraph(text, *graph);
+        if (!read) {
+          mStatus = "Can't read " + name + ": " + read.error();
           return;
         }
+        const StudioGraphFacts& facts = *read;
         mSeed = facts.seed;
         mSymmetry = facts.symmetry;
         mLoadNote.clear();
@@ -165,8 +165,8 @@ namespace faf::editor
         }
       } else {
         std::string savedName;
-        if (!LoadTerrainGraph(text, *graph, mSeed, savedName, error, &mSymmetry)) {
-          mStatus = "Can't read " + name + ": " + error;
+        if (const auto loaded = LoadTerrainGraph(text, *graph, mSeed, savedName, &mSymmetry); !loaded) {
+          mStatus = "Can't read " + name + ": " + loaded.error();
           return;
         }
         mLoadNote.clear();
@@ -412,8 +412,14 @@ namespace faf::editor
       TerrainBuildWrites writes;
       std::string paintError;
       const field::Grid shape = hasHeights ? heights : field::Grid(ground.width, ground.height, 1.0f, 0.0f, 0.0f);
-      const bool collected =
-        report.errors.empty() && ground.hasPaint && full.BuildWrites(*mGraph, ground, shape, writes, paintError);
+      bool collected = false;
+      if (report.errors.empty() && ground.hasPaint) {
+        const auto built = full.BuildWrites(*mGraph, ground, shape, writes);
+        collected = built.has_value();
+        if (!built) {
+          paintError = built.error();
+        }
+      }
       const bool hasPaint = collected && !writes.Empty();
       if (!report.errors.empty()) {
         mStatus = "Build stopped: " + std::to_string(report.errors.size()) + " node(s) have errors (" +
@@ -727,8 +733,7 @@ namespace faf::editor
     mRedo.push_back(std::move(mUndoTop));
     mUndoTop = std::move(mUndo.back());
     mUndo.pop_back();
-    std::string error;
-    (void)mGraph->Restore(mUndoTop, error);
+    (void)mGraph->Restore(mUndoTop);
     mUndoChanges = mGraph->Changes();
     gpg::Logf("editor: generate: undo (%zu left)", mUndo.size());
   }
@@ -741,8 +746,7 @@ namespace faf::editor
     mUndo.push_back(std::move(mUndoTop));
     mUndoTop = std::move(mRedo.back());
     mRedo.pop_back();
-    std::string error;
-    (void)mGraph->Restore(mUndoTop, error);
+    (void)mGraph->Restore(mUndoTop);
     mUndoChanges = mGraph->Changes();
     gpg::Logf("editor: generate: redo (%zu left)", mRedo.size());
   }

@@ -272,19 +272,17 @@ namespace faf::editor
       return lua;
     }
 
-    bool WriteText(
+    std::expected<void, std::string> WriteText(
       const std::filesystem::path& file,
-      const std::string& text,
-      std::string& error
+      const std::string& text
     )
     {
       std::ofstream out(file, std::ios::binary);
       out.write(text.data(), static_cast<std::streamsize>(text.size()));
       if (!out) {
-        error = "can't write " + file.string();
-        return false;
+        return std::unexpected("can't write " + file.string());
       }
-      return true;
+      return {};
     }
 
     /** The folder name without FAF's version suffix (`seton.v0003` -> `seton`). */
@@ -333,20 +331,19 @@ namespace faf::editor
       records.preview = NewMapPreviewRecord(settings);
 
       const std::string base = BaseOfFolder(settings.folder);
-      std::string error;
-      const auto written = WriteMapFile(*map, records, load.createFolder / (base + ".scmap"));
+      const auto written = WriteMapFile(*map, records, load.createFolder / (base + ".scmap"))
+                             .and_then([&] {
+        return WriteText(load.createFolder / (base + "_scenario.lua"), NewMapScenarioText(settings, base));
+      })
+                             .and_then([&] {
+        return WriteText(load.createFolder / (base + "_save.lua"), NewMapSaveText(settings));
+      }).and_then([&] {
+        return WriteText(
+          load.createFolder / (base + "_script.lua"), NewMapScriptText(NewMapPlayable(settings).has_value())
+        );
+      });
       if (!written) {
-        error = written.error();
-      }
-      if (
-        !written ||
-        !WriteText(load.createFolder / (base + "_scenario.lua"), NewMapScenarioText(settings, base), error) ||
-        !WriteText(load.createFolder / (base + "_save.lua"), NewMapSaveText(settings), error) ||
-        !WriteText(
-          load.createFolder / (base + "_script.lua"), NewMapScriptText(NewMapPlayable(settings).has_value()), error
-        )
-      ) {
-        load.error = error;
+        load.error = written.error();
         return;
       }
       load.createdScenario = "/maps/" + settings.folder + "/" + base + "_scenario.lua";

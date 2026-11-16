@@ -526,9 +526,8 @@ end
     PrepareRules();
   }
 
-  bool EdPlay::WriteCoopShim(
-    const std::filesystem::path& modsFolder,
-    std::string& error
+  std::expected<void, std::string> EdPlay::WriteCoopShim(
+    const std::filesystem::path& modsFolder
   )
   {
     static constexpr char kModInfo[] = R"lua(name = "Editor coop shim"
@@ -629,10 +628,9 @@ end
       !write(folder / "hook" / "lua" / "ScenarioFramework.lua", kFramework) ||
       !write(folder / "hook" / "lua" / "sim" / "ScenarioUtilities.lua", kUtilities)
     ) {
-      error = "couldn't write " + folder.string();
-      return false;
+      return std::unexpected("couldn't write " + folder.string());
     }
-    return true;
+    return {};
   }
 
   std::vector<std::string> EdPlay::PlayedMods() const

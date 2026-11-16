@@ -278,12 +278,19 @@ namespace faf::editor
     const TexImagePtr normals = doc.eval->Result("Normal");
     LiveImage live;
     live.slot = mLiveSlot;
-    std::string error;
-    if (albedo != nullptr && !EncodeDds(*albedo, DdsKind::Bgra, live.albedo, error)) {
-      mStatus = "Live: " + error;
+    if (albedo != nullptr) {
+      if (auto dds = EncodeDds(*albedo, DdsKind::Bgra); dds) {
+        live.albedo = std::move(*dds);
+      } else {
+        mStatus = "Live: " + dds.error();
+      }
     }
-    if (normals != nullptr && mLiveSlot < 9 && !EncodeDds(*normals, DdsKind::Bgra, live.normals, error)) {
-      mStatus = "Live: " + error;
+    if (normals != nullptr && mLiveSlot < 9) {
+      if (auto dds = EncodeDds(*normals, DdsKind::Bgra); dds) {
+        live.normals = std::move(*dds);
+      } else {
+        mStatus = "Live: " + dds.error();
+      }
     }
     mLiveOut = std::move(live);
     mLiveReady = true;
@@ -303,22 +310,24 @@ namespace faf::editor
     Bake out;
     out.slot = mTargetSlot;
     out.name = doc.name;
-    std::string error;
     const TexImagePtr albedo = bake.Result("Albedo");
     if (albedo == nullptr) {
       mStatus = "Apply: link something to the output's Albedo first.";
       return;
     }
-    if (!EncodeDds(*albedo, DdsKind::Bc3, out.albedo, error)) {
-      mStatus = "Apply: " + error;
+    auto albedoDds = EncodeDds(*albedo, DdsKind::Bc3);
+    if (!albedoDds) {
+      mStatus = "Apply: " + albedoDds.error();
       return;
     }
-    if (
-      const TexImagePtr normals = bake.Result("Normal");
-      normals != nullptr && mTargetSlot < 9 && !EncodeDds(*normals, DdsKind::Bc1, out.normals, error)
-    ) {
-      mStatus = "Apply: " + error;
-      return;
+    out.albedo = std::move(*albedoDds);
+    if (const TexImagePtr normals = bake.Result("Normal"); normals != nullptr && mTargetSlot < 9) {
+      auto dds = EncodeDds(*normals, DdsKind::Bc1);
+      if (!dds) {
+        mStatus = "Apply: " + dds.error();
+        return;
+      }
+      out.normals = std::move(*dds);
     }
     if (mTargetSlot >= 1 && mTargetSlot <= 8 && mApplyMask) {
       out.mask = bake.Result("Mask");
@@ -438,9 +447,8 @@ namespace faf::editor
     std::stringstream text;
     text << in.rdbuf();
     Doc& doc = Make(NameOf(file));
-    std::string error;
-    if (!doc.graph->Load(text.str(), error)) {
-      mStatus = file.filename().string() + ": " + error;
+    if (const auto loaded = doc.graph->Load(text.str()); !loaded) {
+      mStatus = file.filename().string() + ": " + loaded.error();
       mDocs.pop_back();
       mActive = static_cast<int>(mDocs.size()) - 1;
       return false;
@@ -510,8 +518,7 @@ namespace faf::editor
       return;
     }
     doc.undoAt = redo ? doc.undoAt + 1 : doc.undoAt - 1;
-    std::string error;
-    (void)doc.graph->Load(doc.undo[doc.undoAt], error);
+    (void)doc.graph->Load(doc.undo[doc.undoAt]);
     doc.snapChanges = doc.graph->Changes();
     doc.savedChanges = ~std::uint64_t{0};
     mPreviewStale = true;

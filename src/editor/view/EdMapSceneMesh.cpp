@@ -132,14 +132,13 @@ namespace faf::editor
     }
   } // namespace
 
-  bool EdMapScene::BakeMeshMaterial(
+  std::expected<EdMapScene::MeshMaterialView, std::string> EdMapScene::BakeMeshMaterial(
     const int materialIndex,
     const std::filesystem::path& folder,
-    const std::string& vfs,
-    MeshMaterialView& out,
-    std::string& why
+    const std::string& vfs
   )
   {
+    std::string why;
     const auto inFolder = [this](const std::string& file) {
       if (file.empty() || file.front() == '/') {
         return file;
@@ -152,12 +151,13 @@ namespace faf::editor
       : nullptr;
     const std::string tag = "mat" + std::to_string(materialIndex);
     const auto write = [&](const std::string& name, const TexImage& image, const DdsKind kind) -> std::string {
-      std::vector<std::uint8_t> dds;
-      if (!EncodeDds(image, kind, dds, why)) {
+      const auto dds = EncodeDds(image, kind);
+      if (!dds) {
+        why = dds.error();
         return {};
       }
       std::ofstream(folder / name, std::ios::binary | std::ios::trunc)
-        .write(reinterpret_cast<const char*>(dds.data()), static_cast<std::streamsize>(dds.size()));
+        .write(reinterpret_cast<const char*>(dds->data()), static_cast<std::streamsize>(dds->size()));
       return vfs + "/" + name;
     };
     const auto exists = [&](const std::string& path) {
@@ -173,7 +173,7 @@ namespace faf::editor
     //   tile of constants in four bands: the void colour and whether the ground fades into it; SC2's shadow fill colour
     //   and how far a moving shadow pulls towards it; the fade's level and span; the alpha test's reference.
     // The map's lowest layer for a material with no ground texture.
-    out = MeshMaterialView{};
+    MeshMaterialView out;
     std::string normalsA;
     std::string normalsB;
     if (material != nullptr && exists(inFolder(material->files[0]))) {
@@ -190,8 +190,7 @@ namespace faf::editor
       }
     }
     if (out.albedo.empty()) {
-      why = "no ground texture";
-      return false;
+      return std::unexpected("no ground texture");
     }
     out.secondary =
       material != nullptr && exists(inFolder(material->files[1])) ? inFolder(material->files[1]) : out.albedo;
@@ -331,7 +330,10 @@ namespace faf::editor
       }
       out.specular = write(tag + "_light.dds", atlas, DdsKind::Bgra);
     }
-    return !out.specular.empty() && !out.lookup.empty() && !out.normals.empty();
+    if (out.specular.empty() || out.lookup.empty() || out.normals.empty()) {
+      return std::unexpected(why);
+    }
+    return out;
   }
 
   void EdMapScene::DeleteMeshInstances()
@@ -398,11 +400,14 @@ namespace faf::editor
     int masked = 0;
     for (const edmesh::Patch& patch : mMeshMap.patches) {
       if (!views.contains(patch.material)) {
-        MeshMaterialView view;
-        if (!mMeshViewCache.empty() && BakeMeshMaterial(patch.material, folder, vfs, view, bakeWhy)) {
-          masked += view.lightMasks ? 1 : 0;
-          views[patch.material] = view;
+        const auto view = mMeshViewCache.empty()
+          ? std::expected<MeshMaterialView, std::string>(std::unexpected(bakeWhy))
+          : BakeMeshMaterial(patch.material, folder, vfs);
+        if (view) {
+          masked += view->lightMasks ? 1 : 0;
+          views[patch.material] = *view;
         } else {
+          bakeWhy = view.error();
           views[patch.material] = MeshMaterialView{};
         }
       }
@@ -496,13 +501,18 @@ namespace faf::editor
       if (!scm) {
         scmWhy = scm.error();
       }
-      if (scm && EncodeDds(image, DdsKind::Bgra, dds, scmWhy)) {
-        std::ofstream(folder / "fill.scm", std::ios::binary | std::ios::trunc)
-          .write(reinterpret_cast<const char*>(scm->data()), static_cast<std::streamsize>(scm->size()));
-        std::ofstream(folder / "fill.dds", std::ios::binary | std::ios::trunc)
-          .write(reinterpret_cast<const char*>(dds.data()), static_cast<std::streamsize>(dds.size()));
-        fillMesh = vfs + "/fill.scm";
-        fillTexture = vfs + "/fill.dds";
+      if (scm) {
+        if (auto encoded = EncodeDds(image, DdsKind::Bgra); !encoded) {
+          scmWhy = encoded.error();
+        } else {
+          dds = std::move(*encoded);
+          std::ofstream(folder / "fill.scm", std::ios::binary | std::ios::trunc)
+            .write(reinterpret_cast<const char*>(scm->data()), static_cast<std::streamsize>(scm->size()));
+          std::ofstream(folder / "fill.dds", std::ios::binary | std::ios::trunc)
+            .write(reinterpret_cast<const char*>(dds.data()), static_cast<std::streamsize>(dds.size()));
+          fillMesh = vfs + "/fill.scm";
+          fillTexture = vfs + "/fill.dds";
+        }
       }
     }
     if (!mMeshViewCache.empty() && !moho::DISK_MountDirectoryNow(folder, vfs.c_str())) {

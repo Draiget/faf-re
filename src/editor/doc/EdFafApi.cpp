@@ -294,12 +294,11 @@ namespace faf::editor
     }
 
     /** A POST to Hydra's token or device endpoint. */
-    bool PostForm(
+    std::expected<void, std::string> PostForm(
       const std::string& path,
       const std::vector<std::pair<std::string, std::string>>& fields,
       long& status,
-      JsonNode& answer,
-      std::string& error
+      JsonNode& answer
     )
     {
       HttpCall call;
@@ -309,16 +308,14 @@ namespace faf::editor
       call.body = Form(fields);
       std::string body;
       if (const auto sent = HttpRequest(call, status, body); !sent) {
-        error = sent.error();
-        return false;
+        return std::unexpected(sent.error());
       }
       auto parsed = ParseJson(body);
       if (!parsed) {
-        error = "FAF's login answered " + std::to_string(status) + " with text that isn't JSON";
-        return false;
+        return std::unexpected("FAF's login answered " + std::to_string(status) + " with text that isn't JSON");
       }
       answer = std::move(*parsed);
-      return true;
+      return {};
     }
   } // namespace
 
@@ -800,15 +797,16 @@ namespace faf::editor
     }
     long status = 0;
     JsonNode answer;
-    std::string error;
-    if (!PostForm(
-          "/oauth2/token",
-          {{"grant_type", "refresh_token"}, {"refresh_token", refresh}, {"client_id", kFafClientId}},
-          status,
-          answer,
-          error
-        )) {
-      return std::unexpected(std::move(error));
+    if (
+      auto posted = PostForm(
+        "/oauth2/token",
+        {{"grant_type", "refresh_token"}, {"refresh_token", refresh}, {"client_id", kFafClientId}},
+        status,
+        answer
+      );
+      !posted
+    ) {
+      return std::unexpected(std::move(posted.error()));
     }
     if (status != 200 || answer.String("access_token").empty()) {
       std::lock_guard<std::mutex> lock(mLock);
@@ -860,13 +858,13 @@ namespace faf::editor
     Run([this] {
       long status = 0;
       JsonNode device;
-      std::string error;
-      if (
-        !PostForm("/oauth2/device/auth", {{"client_id", kFafClientId}, {"scope", kFafScopes}}, status, device, error) ||
-        status != 200
-      ) {
+      const auto posted =
+        PostForm("/oauth2/device/auth", {{"client_id", kFafClientId}, {"scope", kFafScopes}}, status, device);
+      if (!posted || status != 200) {
         mState = State::LoggedOut;
-        SetMessage(error.empty() ? "FAF's login answered " + std::to_string(status) : error);
+        SetMessage(
+          posted || posted.error().empty() ? "FAF's login answered " + std::to_string(status) : posted.error()
+        );
         return;
       }
       const std::string deviceCode = device.String("device_code");
@@ -896,17 +894,16 @@ namespace faf::editor
           break;
         }
         JsonNode token;
-        const bool answered = PostForm(
+        const auto answered = PostForm(
           "/oauth2/token",
           {{"grant_type", "urn:ietf:params:oauth:grant-type:device_code"},
            {"device_code", deviceCode},
            {"client_id", kFafClientId}},
           status,
-          token,
-          error
+          token
         );
         // Each new kind of answer once in the log, so a login that never ends says why.
-        const std::string poll = std::to_string(status) + " " + (answered ? token.String("error") : error);
+        const std::string poll = std::to_string(status) + " " + (answered ? token.String("error") : answered.error());
         if (poll != lastPoll) {
           FafLog("editor: FAF: waiting for approval, the token endpoint answers %s", poll.c_str());
           lastPoll = poll;

@@ -183,8 +183,9 @@ namespace faf::editor
       return;
     }
     mGraphBuilt = mGraph->Changes();
-    std::string error;
-    if (!GraphEmitters(*mGraph, mFxEmitters, error)) {
+    if (auto emitters = GraphEmitters(*mGraph); emitters) {
+      mFxEmitters = std::move(*emitters);
+    } else {
       mFxEmitters.clear();
     }
     // A preview per emitter: kept (with its particles' age) while the count stays, the new settings taken.
@@ -309,8 +310,7 @@ namespace faf::editor
       return;
     }
     mGraphUndoAt = redo ? mGraphUndoAt + 1 : mGraphUndoAt - 1;
-    std::string error;
-    (void)mGraph->Load(mGraphUndo[mGraphUndoAt], error);
+    (void)mGraph->Load(mGraphUndo[mGraphUndoAt]);
     mGraphSnap = mGraph->Changes();
     mGraphClean = ~std::uint64_t{0};
   }

@@ -3,6 +3,7 @@
 #include "editor/tools/EdMission.h"
 #include "editor/tools/EdMissionImport.h"
 
+#include <expected>
 #include <optional>
 #include <string>
 #include <vector>
@@ -65,8 +66,8 @@ namespace faf::editor
       return true;
     }
     /** Test runs (`/definebase <name>,<army>,<area>`): as the section's button. */
-    bool
-    DefineBaseFromArea(const std::string& name, const std::string& army, const std::string& area, std::string& why);
+    [[nodiscard]] std::expected<void, std::string>
+    DefineBaseFromArea(const std::string& name, const std::string& army, const std::string& area);
     /** Play from a stage was pressed (the shell starts the open map). */
     [[nodiscard]] bool TakePlayAsk() noexcept
     {

@@ -141,12 +141,11 @@ namespace faf::editor
     }
 
     /** The entries `['name'] = { ['key'] = value, ... },` between `open` ('{') and `close`. */
-    bool ParseEntries(
+    std::expected<void, std::string> ParseEntries(
       const std::string& text,
       const std::size_t open,
       const std::size_t close,
       std::vector<SaveEntry>& out,
-      std::string& error,
       std::vector<SaveEntrySpan>* spans = nullptr
     )
     {
@@ -159,30 +158,26 @@ namespace faf::editor
         const std::size_t lead = at;
         at = SkipSpace(text, at);
         if (at >= close) {
-          return true;
+          return {};
         }
         SaveEntrySpan span;
         span.lead = lead;
         span.start = at;
         SaveEntry entry;
         if (!ReadKey(text, at, entry.name)) {
-          error = "an entry without a name at offset " + std::to_string(at);
-          return false;
+          return std::unexpected("an entry without a name at offset " + std::to_string(at));
         }
         at = SkipSpace(text, at);
         if (at >= text.size() || text[at] != '=') {
-          error = "'" + entry.name + "' has no '='";
-          return false;
+          return std::unexpected("'" + entry.name + "' has no '='");
         }
         at = SkipSpace(text, at + 1);
         if (at >= text.size() || text[at] != '{') {
-          error = "'" + entry.name + "' is not a table";
-          return false;
+          return std::unexpected("'" + entry.name + "' is not a table");
         }
         const std::size_t entryClose = MatchBracket(text, at);
         if (entryClose == std::string::npos || entryClose > close) {
-          error = "'" + entry.name + "' is not closed";
-          return false;
+          return std::unexpected("'" + entry.name + "' is not closed");
         }
         std::size_t inner = at + 1;
         for (;;) {
@@ -192,13 +187,11 @@ namespace faf::editor
           }
           std::string key;
           if (!ReadKey(text, inner, key)) {
-            error = "a property of '" + entry.name + "' without a key";
-            return false;
+            return std::unexpected("a property of '" + entry.name + "' without a key");
           }
           inner = SkipSpace(text, inner);
           if (inner >= text.size() || text[inner] != '=') {
-            error = "property '" + key + "' of '" + entry.name + "' has no '='";
-            return false;
+            return std::unexpected("property '" + key + "' of '" + entry.name + "' has no '='");
           }
           ++inner;
           const std::size_t valueStart = SkipSpace(text, inner);
@@ -388,7 +381,6 @@ namespace faf::editor
     std::string text
   )
   {
-    std::string error;
     mText = std::move(text);
     mMarkerBlock = {};
     mAreaBlock = {};
@@ -407,20 +399,23 @@ namespace faf::editor
       )
     ) {
       mMarkerBlock.found = true;
-      if (!ParseEntries(mText, mMarkerBlock.open, mMarkerBlock.close, mMarkers, error, &mMarkerBlock.spans)) {
-        return std::unexpected("markers: " + error);
+      if (
+        const auto read = ParseEntries(mText, mMarkerBlock.open, mMarkerBlock.close, mMarkers, &mMarkerBlock.spans);
+        !read
+      ) {
+        return std::unexpected("markers: " + read.error());
       }
     }
     if (FindBlock(mText, std::regex(R"(Areas\s*=\s*\{)"), 0, mAreaBlock.open, mAreaBlock.close, mAreaBlock.indent)) {
       mAreaBlock.found = true;
-      if (!ParseEntries(mText, mAreaBlock.open, mAreaBlock.close, mAreas, error, &mAreaBlock.spans)) {
-        return std::unexpected("areas: " + error);
+      if (const auto read = ParseEntries(mText, mAreaBlock.open, mAreaBlock.close, mAreas, &mAreaBlock.spans); !read) {
+        return std::unexpected("areas: " + read.error());
       }
     }
     if (FindBlock(mText, std::regex(R"(\bArmies\s*=\s*\{)"), 0, mArmyBlock.open, mArmyBlock.close, mArmyBlock.indent)) {
       mArmyBlock.found = true;
-      if (!ParseEntries(mText, mArmyBlock.open, mArmyBlock.close, mArmies, error, &mArmyBlock.spans)) {
-        return std::unexpected("armies: " + error);
+      if (const auto read = ParseEntries(mText, mArmyBlock.open, mArmyBlock.close, mArmies, &mArmyBlock.spans); !read) {
+        return std::unexpected("armies: " + read.error());
       }
     }
     // The chains: `['name'] = { Markers = { "a", "b", }, },` each.

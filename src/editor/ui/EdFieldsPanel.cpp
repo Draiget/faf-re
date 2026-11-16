@@ -342,24 +342,20 @@ namespace faf::editor
     return true;
   }
 
-  bool EdFieldsPanel::RunForTest(
+  std::expected<std::string, std::string> EdFieldsPanel::RunForTest(
     const std::string& op,
-    const std::string& params,
-    std::string& status
+    const std::string& params
   )
   {
     field::Grid ground;
     if (!mGround || !mGround(ground)) {
-      status = "no heights yet";
-      return false;
+      return std::unexpected("no heights yet");
     }
     mStack.Start(std::move(ground));
     if (const auto applied = mStack.Apply(op, ParseOpParams(params)); !applied) {
-      status = op + ": " + applied.error();
-      return false;
+      return std::unexpected(op + ": " + applied.error());
     }
     mCommitAsked = true;
-    status = mStack.Steps().back();
-    return true;
+    return mStack.Steps().back();
   }
 } // namespace faf::editor

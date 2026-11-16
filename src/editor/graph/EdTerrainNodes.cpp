@@ -3857,15 +3857,14 @@ namespace faf::editor::terrain
           }
           return One(up);
         }
-        Outputs out;
-        std::string why;
-        if (!E.rerunUpstream("a", k, up, out, why)) {
+        auto out = E.rerunUpstream("a", k, up);
+        if (!out) {
           if (wantMasks) {
-            Fail(why);
+            Fail(out.error());
           }
           return One(up); // not after an erosion node: the height on the fine grid alone
         }
-        return out;
+        return std::move(*out);
       }
       );
     }
@@ -3885,9 +3884,8 @@ namespace faf::editor::terrain
           Fail("no map's paint to read");
         }
         auto mask = std::make_shared<field::Grid>();
-        std::string error;
-        if (!E.ground->layerMask(static_cast<int>(std::lround(v.N("layer"))), *mask, error)) {
-          Fail(error);
+        if (const auto read = E.ground->layerMask(static_cast<int>(std::lround(v.N("layer"))), *mask); !read) {
+          Fail(read.error());
         }
         return One(E.Op("resample", {{"a", field::GridPtr(mask)}, {"like", E.like}}));
       }
@@ -3911,9 +3909,8 @@ namespace faf::editor::terrain
           Fail("no map to stretch the image over");
         }
         auto image = std::make_shared<field::Grid>();
-        std::string error;
-        if (!E.ground->loadImage(v.S("path"), *image, error)) {
-          Fail(error);
+        if (const auto read = E.ground->loadImage(v.S("path"), *image); !read) {
+          Fail(read.error());
         }
         const field::GridPtr r = E.Op("resample", {{"a", field::GridPtr(image)}, {"like", E.like}});
         return One(E.Op("affine", {{"a", r}, {"mul", v.N("hi") - v.N("lo")}, {"add", v.N("lo")}}));
@@ -3940,9 +3937,8 @@ namespace faf::editor::terrain
           Fail("no map to import onto");
         }
         auto full = std::make_shared<field::Grid>();
-        std::string error;
-        if (!E.ground->loadExternal(v.S("file"), *full, error)) {
-          Fail(error);
+        if (const auto read = E.ground->loadExternal(v.S("file"), *full); !read) {
+          Fail(read.error());
         }
         return One(E.Op("resample", {{"a", field::GridPtr(full)}, {"like", E.like}}));
       }
@@ -3960,10 +3956,12 @@ namespace faf::editor::terrain
         [](const Env& E, const Values& v, const Inputs&) {
         auto mask = std::make_shared<field::Grid>();
         std::string error;
-        if (
-          E.ground != nullptr && E.ground->loadExternalMask && E.ground->loadExternalMask(v.S("name"), *mask, error)
-        ) {
-          return One(E.Op("resample", {{"a", field::GridPtr(mask)}, {"like", E.like}}));
+        if (E.ground != nullptr && E.ground->loadExternalMask) {
+          const auto read = E.ground->loadExternalMask(v.S("name"), *mask);
+          if (read) {
+            return One(E.Op("resample", {{"a", field::GridPtr(mask)}, {"like", E.like}}));
+          }
+          error = read.error();
         }
         if (!v.B("optional")) {
           Fail(error.empty() ? "no mask named " + v.S("name") : error);

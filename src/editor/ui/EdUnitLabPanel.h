@@ -3,6 +3,7 @@
 #include "editor/tools/EdUnitLab.h"
 #include "editor/ui/EdUnitCatalog.h"
 
+#include <expected>
 #include <string>
 #include <utility>
 #include <vector>
@@ -28,8 +29,9 @@ namespace faf::editor
     [[nodiscard]] static UnitLabSource ReadUnit(const std::string& id);
     /** Whether the game's rules have the unit. */
     [[nodiscard]] static bool GameHasUnit(const std::string& id);
-    /** Makes a derived unit of the selected one (an undo step) and selects it; false with `error`. */
-    bool Derive(const std::string& id, const std::string& name, const std::string& description, std::string& error);
+    /** Makes a derived unit of the selected one (an undo step) and selects it; or the error. */
+    [[nodiscard]] std::expected<void, std::string>
+    Derive(const std::string& id, const std::string& name, const std::string& description);
     void SelectUnit(
       const std::string& id
     )
