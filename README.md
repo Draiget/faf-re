@@ -7,6 +7,7 @@
 [![Replay parity](https://img.shields.io/badge/replay%20parity-96.7%25-brightgreen)](docs/RETAIL_REPLAY_PARITY.md)
 [![x64 vs retail](https://img.shields.io/badge/x64%20vs%20retail-41%25%20less%20time-blue)](docs/PERFORMANCE.md)
 [![Windows](https://img.shields.io/badge/Windows-x64%20%7C%20x86-0078D6?logo=windows&logoColor=white)](#build)
+[![Linux](https://img.shields.io/badge/Linux-x64-FCC624?logo=linux&logoColor=black)](#linux)
 [![macOS](https://img.shields.io/badge/macOS-Apple%20silicon-000000?logo=apple&logoColor=white)](#macos-apple-silicon)
 [![Line coverage](https://img.shields.io/badge/line%20coverage-71.3%25-yellowgreen)](tests/README.md#coverage)
 
@@ -138,6 +139,19 @@ cmake --build --preset clang-x64-release   # build/clang-x64-release/src/main_x6
 ### Dependencies
 
 Configuring brings `dependencies/` up to date: it clones missing submodules, fetches missing downloads pinned by commit or SHA256, and applies the FAF patches in `dependencies/patches/`. The full list is in [Libraries the engine uses](#libraries-the-engine-uses). `cmake -P cmake/FafDependencies.cmake` does the same without configuring.
+
+### Linux
+
+An x86-64 build with the pinned toolchain: clang, lld and libc++ of LLVM 18.1.8, CMake 3.28.3 and Ninja, installed on Ubuntu 22.04 by `tools/linux/toolchain.sh` (or the image in `tools/linux/Dockerfile`). The simulation must match the Windows builds bit for bit, so configuring refuses another clang or glibc release (`cmake/toolchains/linux-clang-pins.cmake`). The programs run on glibc 2.34 or newer: Ubuntu 22.04, Debian 12, Mint 21, RHEL 9 and later. It builds the headless simulation and its tests, the dedicated server, and the game client (in progress, #270).
+
+```sh
+cmake --preset linux-clang-x64-release
+cmake --build --preset linux-clang-x64-release --target headless server
+
+# The game client, in a build tree of its own (`tools/linux/toolchain.sh --client` adds the headers SDL3 builds against).
+cmake --preset linux-clang-x64-release -B build/linux-client -DFAF_POSIX_CLIENT=ON
+cmake --build build/linux-client --target faf_client
+```
 
 ### macOS (Apple silicon)
 
