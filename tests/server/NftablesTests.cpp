@@ -19,7 +19,7 @@ namespace
     const std::string& part
   )
   {
-    return text.find(part) != std::string::npos;
+    return text.contains(part);
   }
 
   using faf::remote::net::IpAddress;

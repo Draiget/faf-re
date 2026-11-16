@@ -551,7 +551,7 @@ BOOL IsIconic(
   }
   WindowState& state = State();
   const std::lock_guard<std::mutex> lock(state.mutex);
-  return state.minimized.count(window) != 0 ? TRUE : FALSE;
+  return state.minimized.contains(window) ? TRUE : FALSE;
 }
 
 HWND GetAncestor(
@@ -695,7 +695,7 @@ BOOL IsWindowVisible(
   }
   WindowState& state = State();
   const std::lock_guard<std::mutex> lock(state.mutex);
-  return state.hidden.count(window) == 0 ? TRUE : FALSE;
+  return !state.hidden.contains(window) ? TRUE : FALSE;
 }
 
 BOOL SetWindowPos(

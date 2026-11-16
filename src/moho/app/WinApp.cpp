@@ -160,11 +160,15 @@ namespace
     return tmp;
   }
 
+  // The registry, dxdiag, the Windows-key hook, the crash dialog and the structured-exception
+  // filter are Windows' (the Linux client, issue #255).
+#if FAFRE_PLATFORM_WINDOWS
   /**
    * Address: 0x004A1E10 (FUN_004A1E10, j__strrchr)
    *
    * What it does:
    * Forwards one C-string reverse-character search to CRT `strrchr`.
+   * Only the registry path parser below calls it.
    */
   char* FindLastCharacterInCString(
     char* const text,
@@ -174,9 +178,6 @@ namespace
     return std::strrchr(text, character);
   }
 
-  // The registry, dxdiag, the Windows-key hook, the crash dialog and the structured-exception
-  // filter are Windows' (the Linux client, issue #255).
-#if FAFRE_PLATFORM_WINDOWS
   struct ParsedRegistryPath
   {
     HKEY rootKey = HKEY_CURRENT_USER;

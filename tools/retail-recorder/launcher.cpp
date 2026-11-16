@@ -45,7 +45,7 @@ namespace
     ReadFile(f, text.data(), static_cast<DWORD>(tail), &read, nullptr);
     CloseHandle(f);
     // The parity hook's heartbeat writes Lua's boolean: "over=true".
-    return text.find("over=true") != std::string::npos || text.find("over=True") != std::string::npos;
+    return text.contains("over=true") || text.contains("over=True");
   }
 } // namespace
 

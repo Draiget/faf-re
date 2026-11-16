@@ -250,7 +250,7 @@ int main(
       std::printf("control: %s\n", text.c_str());
       if (!answered && text.starts_with("{\"id\":1,")) {
         answered = true;
-        exitCode = text.find("\"ok\":true") != std::string::npos ? 0 : 1;
+        exitCode = text.contains("\"ok\":true") ? 0 : 1;
       }
     }
     std::fflush(stdout);
