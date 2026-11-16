@@ -42,17 +42,17 @@ namespace faf::editor
     ParsesAndWritesBack
   )
   {
-    JsonTree root;
-    std::string error;
-    ASSERT_TRUE(ParseJsonTree(R"({"a": [1, 2.5, "x\ny"], "b": {"c": true, "d": null}})", root, error)) << error;
+    const auto parsed = ParseJsonTree(R"({"a": [1, 2.5, "x\ny"], "b": {"c": true, "d": null}})");
+    ASSERT_TRUE(parsed) << parsed.error();
+    const JsonTree& root = *parsed;
     EXPECT_EQ(root.Get("a")->items.size(), 3U);
     EXPECT_DOUBLE_EQ(root.Get("a")->items[1].n, 2.5);
     EXPECT_EQ(root.Get("a")->items[2].s, "x\ny");
     EXPECT_TRUE(root.Get("b")->Bool("c", false));
-    JsonTree again;
-    ASSERT_TRUE(ParseJsonTree(WriteJsonTree(root), again, error)) << error;
-    EXPECT_EQ(WriteJsonTree(again), WriteJsonTree(root));
-    EXPECT_FALSE(ParseJsonTree("{\"a\": }", again, error));
+    const auto again = ParseJsonTree(WriteJsonTree(root));
+    ASSERT_TRUE(again) << again.error();
+    EXPECT_EQ(WriteJsonTree(*again), WriteJsonTree(root));
+    EXPECT_FALSE(ParseJsonTree("{\"a\": }"));
   }
 
   TEST(

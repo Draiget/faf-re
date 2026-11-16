@@ -111,8 +111,8 @@ namespace
       faf::editor::NewMarker(*faf::editor::FindMarkerType("Mass"), "Mass 00", 1.0f, 2.0f, 3.0f)
     };
     faf::editor::MarkerImport result;
-    std::string error;
-    ASSERT_TRUE(faf::editor::MarkersFromFafmapmarkers(kFafme, markers, result, error)) << error;
+    auto read = faf::editor::MarkersFromFafmapmarkers(kFafme, markers, result);
+    ASSERT_TRUE(read) << read.error();
     ASSERT_EQ(result.names.size(), 4u);
     EXPECT_EQ(result.skipped, 1);
     EXPECT_EQ(result.links, 1);
@@ -136,8 +136,8 @@ namespace
   {
     std::vector<SaveEntry> markers;
     faf::editor::MarkerImport result;
-    std::string error;
-    ASSERT_TRUE(faf::editor::MarkersFromFafmapmarkers(kFafme, markers, result, error)) << error;
+    auto read = faf::editor::MarkersFromFafmapmarkers(kFafme, markers, result);
+    ASSERT_TRUE(read) << read.error();
     // A path node outside the export keeps its link out of the file.
     markers.push_back(
       faf::editor::NewMarker(*faf::editor::FindMarkerType("Land Path Node"), "Outside", 0.0f, 0.0f, 0.0f)
@@ -146,7 +146,8 @@ namespace
     const std::string text = faf::editor::MarkersToFafmapmarkers(markers, result.names, 1024, 1024);
     std::vector<SaveEntry> again;
     faf::editor::MarkerImport second;
-    ASSERT_TRUE(faf::editor::MarkersFromFafmapmarkers(text, again, second, error)) << error;
+    read = faf::editor::MarkersFromFafmapmarkers(text, again, second);
+    ASSERT_TRUE(read) << read.error();
     ASSERT_EQ(again.size(), markers.size() - 1);
     EXPECT_EQ(second.links, 1);
     EXPECT_EQ(second.skipped, 0);
@@ -161,7 +162,7 @@ namespace
       EXPECT_NEAR(az, bz, 1e-3f);
     }
     EXPECT_EQ(faf::editor::MarkerLinks(again[1]).size(), 1u);
-    EXPECT_FALSE(faf::editor::MarkersFromFafmapmarkers("{ \"LightingMultiplier\": 1 }", again, second, error));
+    EXPECT_FALSE(faf::editor::MarkersFromFafmapmarkers("{ \"LightingMultiplier\": 1 }", again, second));
   }
 
   TEST(
@@ -175,9 +176,8 @@ namespace
       faf::editor::NewMarker(*faf::editor::FindMarkerType("Blank Marker"), "ARMY_1", 0.0f, 0.0f, 0.0f)
     };
     faf::editor::MarkerImport result;
-    std::string error;
-    ASSERT_TRUE(faf::editor::MarkersFromFafmapmarkers(start, markers, result, error, {"ARMY_1", "ARMY_2", "ARMY_9"}))
-      << error;
+    auto read = faf::editor::MarkersFromFafmapmarkers(start, markers, result, {"ARMY_1", "ARMY_2", "ARMY_9"});
+    ASSERT_TRUE(read) << read.error();
     ASSERT_EQ(result.names.size(), 1u);
     EXPECT_EQ(result.names[0], "ARMY_3");
   }
@@ -217,8 +217,8 @@ namespace
     const std::string text = faf::editor::MarkersToFafmapmarkers(markers, {}, 512, 512);
     std::vector<SaveEntry> again;
     faf::editor::MarkerImport result;
-    std::string error;
-    ASSERT_TRUE(faf::editor::MarkersFromFafmapmarkers(text, again, result, error)) << error;
+    auto read = faf::editor::MarkersFromFafmapmarkers(text, again, result);
+    ASSERT_TRUE(read) << read.error();
     ASSERT_EQ(again.size(), 1u);
     const std::vector<double> orientation = faf::editor::ValueNumbers(again[0].Get("orientation"));
     ASSERT_EQ(orientation.size(), 3u);

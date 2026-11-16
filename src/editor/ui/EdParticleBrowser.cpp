@@ -94,21 +94,18 @@ namespace faf::editor
     if (!ReadGameFile(info.path, text)) {
       return;
     }
-    EmitterBlueprint emitter;
-    std::string error;
-    if (ParseEmitter(text, emitter, error)) {
+    if (const auto emitter = ParseEmitter(text)) {
       info.type = 1;
-      info.texture = emitter.texture;
-      info.ramp = emitter.rampTexture;
-      info.blendMode = static_cast<int>(emitter.blendMode);
+      info.texture = emitter->texture;
+      info.ramp = emitter->rampTexture;
+      info.blendMode = static_cast<int>(emitter->blendMode);
       return;
     }
-    FlatBlueprint flat;
-    if (ParseFlatBlueprint(text, flat, error)) {
-      const bool beam = flat.kind == "BeamBlueprint";
+    if (const auto flat = ParseFlatBlueprint(text)) {
+      const bool beam = flat->kind == "BeamBlueprint";
       info.type = beam ? 2 : 3;
-      info.texture = flat.Text(beam ? "TextureName" : "RepeatTexture");
-      info.ramp = beam ? std::string() : flat.Text("RampTexture");
+      info.texture = flat->Text(beam ? "TextureName" : "RepeatTexture");
+      info.ramp = beam ? std::string() : flat->Text("RampTexture");
     }
   }
 

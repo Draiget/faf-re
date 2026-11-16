@@ -1,5 +1,6 @@
 #pragma once
 
+#include <expected>
 #include <string>
 #include <vector>
 
@@ -32,14 +33,13 @@ namespace faf::editor
   );
   /**
    * Adds a `.fafmapmarkers` file's markers to `markers` under new names (the type's next free one, also clear of
-   * `reserved`: the scenario's armies, which a start position is named after), with their links; false with `error`
-   * when the text isn't such a file.
+   * `reserved`: the scenario's armies, which a start position is named after), with their links; the error when the
+   * text isn't such a file.
    */
-  bool MarkersFromFafmapmarkers(
+  [[nodiscard]] std::expected<void, std::string> MarkersFromFafmapmarkers(
     const std::string& text,
     std::vector<SaveEntry>& markers,
     MarkerImport& result,
-    std::string& error,
     const std::vector<std::string>& reserved = {}
   );
 

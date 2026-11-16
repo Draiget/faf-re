@@ -250,10 +250,12 @@ namespace faf::editor
     std::string& error
   )
   {
-    JsonTree root;
-    if (!ParseJsonTree(json, root, error)) {
+    const auto parsed = ParseJsonTree(json);
+    if (!parsed) {
+      error = parsed.error();
       return false;
     }
+    const JsonTree& root = *parsed;
     const double perWord = root.Num("heightPerWord", 0.0);
     if (perWord <= 0.0) {
       error = "it has no heightPerWord (not one of the editor's exports)";

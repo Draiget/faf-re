@@ -2042,9 +2042,8 @@ namespace faf::editor
         mLastAutosave = now;
         const auto started = std::chrono::steady_clock::now();
         const std::filesystem::path folder = mAutosaveRoot / mDocument.FolderName();
-        std::string error;
-        if (!mDocument.WriteSnapshot(folder, error)) {
-          gpg::Warnf("editor: autosave of %s failed: %s", mDocument.FolderName().c_str(), error.c_str());
+        if (const auto written = mDocument.WriteSnapshot(folder); !written) {
+          gpg::Warnf("editor: autosave of %s failed: %s", mDocument.FolderName().c_str(), written.error().c_str());
           return;
         }
         EdAutosaveEntry entry;
@@ -2082,18 +2081,17 @@ namespace faf::editor
           mGuardAsk = true;
           return;
         }
-        std::filesystem::path backup;
-        std::string error;
-        if (!RestoreAutosave(entry, mBackupRoot, std::max(3, mSettings.GetInt(EdSettings::kBackups)), backup, error)) {
-          gpg::Warnf("editor: recover %s: %s", entry.title.c_str(), error.c_str());
-          PostStatusMessage("Recover failed: " + error);
+        const auto restored = RestoreAutosave(entry, mBackupRoot, std::max(3, mSettings.GetInt(EdSettings::kBackups)));
+        if (!restored) {
+          gpg::Warnf("editor: recover %s: %s", entry.title.c_str(), restored.error().c_str());
+          PostStatusMessage("Recover failed: " + restored.error());
           return;
         }
         gpg::Logf(
           "editor: recovered %s from %s (its files before are in %s)",
           entry.title.c_str(),
           entry.folder.string().c_str(),
-          backup.string().c_str()
+          restored->string().c_str()
         );
         RemoveAutosave(entry.folder);
         mRecoverable = ListAutosaves(mAutosaveRoot);
@@ -2246,12 +2244,12 @@ namespace faf::editor
             error = "no look named " + name;
             return false;
           }
-          (void)LightingFromScmlighting(text, look.lighting, error);
+          (void)LightingFromScmlighting(text, look.lighting);
           if (read(std::filesystem::path(base).replace_extension(".scmwtr"), text)) {
-            (void)WaterFromScmwtr(text, look.water, error);
+            (void)WaterFromScmwtr(text, look.water);
           }
           if (read(std::filesystem::path(base).replace_extension(".scmskybox"), text)) {
-            look.hasSky = SkyboxFromScmskybox(text, look.sky, error);
+            look.hasSky = SkyboxFromScmskybox(text, look.sky).has_value();
           }
           error.clear();
         } else {
@@ -2269,10 +2267,12 @@ namespace faf::editor
             error = "can't read " + path[1].str();
             return false;
           }
-          if (!LookFromScmap(bytes, look, error)) {
-            error = path[1].str() + ": " + error;
+          auto read = LookFromScmap(bytes);
+          if (!read) {
+            error = path[1].str() + ": " + read.error();
             return false;
           }
+          look = std::move(*read);
           look.name = MapDisplayName(id);
           gpg::Logf(
             "editor: look %s read: multiplier %.2f, water colour %.2f %.2f %.2f, %s (horizon %.2f %.2f %.2f, %zu "
@@ -2549,14 +2549,16 @@ namespace faf::editor
               return selected;
             }
             std::string scenario;
-            std::string message;
-            if (!mDocument.WritePlayCopy(scenario, message)) {
+            const auto copied = mDocument.WritePlayCopy(scenario);
+            if (!copied) {
               gpg::Warnf(
-                "editor: play: the unsaved edits couldn't be copied (%s); playing the map as saved", message.c_str()
+                "editor: play: the unsaved edits couldn't be copied (%s); playing the map as saved",
+                copied.error().c_str()
               );
-              PostStatusMessage("Playing the map as saved: " + message);
+              PostStatusMessage("Playing the map as saved: " + copied.error());
               return selected;
             }
+            const std::string& message = *copied;
             // A folder made while the editor runs is mounted at /maps/<folder> as the game's init mounts the vault's
             // (once a session: the mount stays while the copy is written again for the next play).
             if (mPlayCopyMounted.insert(mDocument.PlayCopy()).second) {
@@ -2771,22 +2773,20 @@ namespace faf::editor
             gpg::Logf("editor: mod test: bp | %s", line.c_str());
           }
           in.close(); // (Windows won't write over an open file)
-          ModProject back;
-          std::string reopenError;
-          const bool reopened = OpenModProject(panel.Folder(), back, reopenError);
+          const auto reopened = OpenModProject(panel.Folder());
+          const ModProject back = reopened.value_or(ModProject{});
           gpg::Logf(
             "editor: mod test: reopened %s, uid %s, %zu units changed",
-            reopened ? "fine" : reopenError.c_str(),
+            reopened ? "fine" : reopened.error().c_str(),
             back.uid == p.uid ? "kept" : "changed",
             back.edits.size()
           );
           // The checks, with a derived unit (no icon of its own) and a broken change, then the release.
-          std::string error;
           (void)AddModDerived(p, "xaa0206", id, "", "", [&](const std::string& unit) {
             moho::RResId res{};
             res.name.assign(unit.c_str());
             return rules->GetUnitBlueprint(res) != nullptr;
-          }, error);
+          });
           (void)SetModEdit(p, id, "Defense.MaxHealth", 0.0, 1.0);
           for (const ModIssue& issue : panel.Check()) {
             gpg::Logf("editor: mod test: check %c %s", issue.level, issue.text.c_str());
@@ -3449,11 +3449,14 @@ namespace faf::editor
                 "/effects/emitters/a3_end_nis_01_emit.bp",
                 "/effects/emitters/a3_end_nis_02_emit.bp"}) {
             std::string text;
-            EmitterBlueprint cut;
-            std::string error;
-            if (!ReadGameFile(other, text) || !ParseEmitter(text, cut, error)) {
+            if (!ReadGameFile(other, text)) {
               continue;
             }
+            auto parsed = ParseEmitter(text);
+            if (!parsed) {
+              continue;
+            }
+            EmitterBlueprint& cut = *parsed;
             const auto many = std::find_if(cut.curves.begin(), cut.curves.end(), [](const EmitterCurve& c) {
               return c.keys.size() >= 2;
             });
@@ -6693,8 +6696,9 @@ namespace faf::editor
         }
         // `/exportpreview <file>` (test runs): the lobby preview written there.
         if (fa::vector<fa::string> file; moho::CFG_GetArgOption("/exportpreview", 1, &file) && !file.empty()) {
-          std::string message;
-          const bool ok = mDocument.ExportPreview(file[0].c_str(), message);
+          const auto exported = mDocument.ExportPreview(file[0].c_str());
+          const bool ok = exported.has_value();
+          const std::string& message = ok ? *exported : exported.error();
           (ok ? gpg::Logf : gpg::Warnf)("editor: %s", message.c_str());
         }
         // `/exportpreview512 <file>` (test runs): the preview painted at 512 px (layers' colours, the map's sun).
@@ -7044,25 +7048,24 @@ namespace faf::editor
         };
         if (!mStrataThemesRead) {
           mStrataThemesRead = true;
-          std::string error;
           if (const std::filesystem::path file = StrataThemesFile(); !file.empty()) {
             if (std::ifstream in(file, std::ios::binary); in) {
               std::stringstream text;
               text << in.rdbuf();
               std::vector<StrataTheme> mine;
-              if (ParseStrataThemes(text.str(), "UserThemes", mine, error)) {
+              if (const auto read = ParseStrataThemes(text.str(), "UserThemes", mine)) {
                 for (StrataTheme& theme : mine) {
                   theme.user = true;
                   mStrataThemes.push_back(std::move(theme));
                 }
               } else {
-                gpg::Warnf("editor: %s: %s", file.string().c_str(), error.c_str());
+                gpg::Warnf("editor: %s: %s", file.string().c_str(), read.error().c_str());
               }
             }
           }
           std::vector<StrataTheme> shipped;
-          if (!ParseStrataThemes(EmbeddedEditorData("envlib_themes.lua"), "Themes", shipped, error)) {
-            gpg::Warnf("editor: the theme library: %s", error.c_str());
+          if (const auto read = ParseStrataThemes(EmbeddedEditorData("envlib_themes.lua"), "Themes", shipped); !read) {
+            gpg::Warnf("editor: the theme library: %s", read.error().c_str());
           }
           mStrataThemes.insert(mStrataThemes.end(), shipped.begin(), shipped.end());
           gpg::Logf("editor: theme library: %zu themes (%zu shipped)", mStrataThemes.size(), shipped.size());
@@ -7162,33 +7165,33 @@ namespace faf::editor
           std::string text;
           std::string bytes;
           std::smatch path;
-          Look look;
-          std::string error;
+          std::expected<Look, std::string> look = std::unexpected(std::string());
           if (scenario.empty()) {
             status = "No map " + ask.arg + " among the game's maps";
           } else if (
             !ReadGameFile(scenario, text) ||
             !std::regex_search(text, path, std::regex(R"(\bmap\s*=\s*['"]([^'"]+\.scmap)['"])")) ||
-            !ReadGameFile(path[1].str(), bytes) || !LookFromScmap(bytes, look, error)
+            !ReadGameFile(path[1].str(), bytes) || !(look = LookFromScmap(bytes))
           ) {
-            status = "Can't read " + ask.arg + "'s map file" + (error.empty() ? std::string() : ": " + error);
-          } else if (look.strataAlbedo.empty()) {
+            status =
+              "Can't read " + ask.arg + "'s map file" + (look.error().empty() ? std::string() : ": " + look.error());
+          } else if (look->strataAlbedo.empty()) {
             status = ask.arg + "'s map file is older than format 54: its layers aren't read";
           } else {
             StrataTheme theme;
             theme.name = MapDisplayName(scenario);
             theme.id = StrataThemeId(theme.name);
             theme.desc = "Imported from " + theme.name;
-            for (std::size_t slot = 0; slot < look.strataAlbedo.size(); ++slot) {
-              if (look.strataAlbedo[slot].first.empty()) {
+            for (std::size_t slot = 0; slot < look->strataAlbedo.size(); ++slot) {
+              if (look->strataAlbedo[slot].first.empty()) {
                 continue;
               }
               StrataThemeLayer layer;
-              layer.albedo = look.strataAlbedo[slot].first;
-              layer.size = look.strataAlbedo[slot].second;
-              if (slot < look.strataNormal.size()) {
-                layer.normal = look.strataNormal[slot].first;
-                layer.nsize = look.strataNormal[slot].second;
+              layer.albedo = look->strataAlbedo[slot].first;
+              layer.size = look->strataAlbedo[slot].second;
+              if (slot < look->strataNormal.size()) {
+                layer.normal = look->strataNormal[slot].first;
+                layer.nsize = look->strataNormal[slot].second;
               }
               theme.layers[static_cast<int>(slot)] = layer;
             }
@@ -7812,8 +7815,7 @@ namespace faf::editor
           std::size_t n = 0;
           for (const SaveEntry& army : mDocument.SaveData().Armies()) {
             UnitGroup root;
-            std::string error;
-            if (ParseUnitGroup(army.Get("Units"), root, error)) {
+            if (ParseUnitGroup(army.Get("Units"), root)) {
               std::vector<const SaveUnit*> units;
               CollectUnits(root, units);
               n += units.size();
@@ -7876,9 +7878,8 @@ namespace faf::editor
           float ux = 0.0f, uz = 0.0f;
           for (const SaveEntry& entry : mDocument.SaveData().Armies()) {
             UnitGroup root;
-            std::string error;
             std::vector<const SaveUnit*> units;
-            if (ParseUnitGroup(entry.Get("Units"), root, error)) {
+            if (ParseUnitGroup(entry.Get("Units"), root)) {
               CollectUnits(root, units);
             }
             if (!units.empty()) {
@@ -9780,8 +9781,9 @@ namespace faf::editor
         dialog.lpstrTitle = L"Export the lobby preview";
         dialog.Flags = OFN_OVERWRITEPROMPT | OFN_PATHMUSTEXIST | OFN_NOCHANGEDIR;
         if (!gNoFileDialogs && ::GetSaveFileNameW(&dialog) != FALSE) {
-          std::string message;
-          const bool ok = mDocument.ExportPreview(path, message);
+          const auto exported = mDocument.ExportPreview(path);
+          const bool ok = exported.has_value();
+          const std::string& message = ok ? *exported : exported.error();
           (ok ? gpg::Logf : gpg::Warnf)("editor: %s", message.c_str());
           PostStatusMessage(message);
         }
@@ -13312,11 +13314,16 @@ namespace faf::editor
       }
       const std::vector<std::uint8_t> scm =
         ScmFromObj(mesh, unit, scale, "made from " + obj.filename().string() + " by the FAF map editor", error);
-      if (
-        scm.empty() ||
-        !ModWriteBinary(*project, panel.Folder(), ModUnitModelFile(unit), std::string(scm.begin(), scm.end()), error)
-      ) {
+      if (scm.empty()) {
         message = "No model: " + error;
+        return false;
+      }
+      if (
+        const auto written =
+          ModWriteBinary(*project, panel.Folder(), ModUnitModelFile(unit), std::string(scm.begin(), scm.end()));
+        !written
+      ) {
+        message = "No model: " + written.error();
         return false;
       }
       const ModChanges before = ModChangesOf(*project);
@@ -13641,7 +13648,9 @@ namespace faf::editor
         mDocument.ApplyLookEnvironment(*mLookOriginal);
         gpg::Logf("editor: saving without the look being tried (%s)", mLookTriedName.c_str());
       }
-      const bool saved = mDocument.Save(message);
+      const auto result = mDocument.Save();
+      const bool saved = result.has_value();
+      message = saved ? *result : result.error();
       if (tried.has_value()) {
         mDocument.ApplyLookEnvironment(*tried);
       }
@@ -13897,7 +13906,9 @@ namespace faf::editor
             return exportIt ? mScene.ExportHeights(file, 0, 1.0f, message) : mScene.ImportHeights(file, 1.0f, message);
           }
           if (what == "preview") {
-            return mDocument.ExportPreview(file, message);
+            const auto exported = mDocument.ExportPreview(file);
+            message = exported ? *exported : exported.error();
+            return exported.has_value();
           }
           if (what.starts_with("mask")) {
             const int layer = std::clamp(std::atoi(what.c_str() + 4), 1, 8) - 1;
@@ -14337,8 +14348,8 @@ namespace faf::editor
       settings.size = request.widthIndex;
       settings.sizeZ = request.depthIndex == request.widthIndex ? -1 : request.depthIndex;
       settings.players = std::clamp(static_cast<int>(mDocument.Armies().size()), 1, 16);
-      if (!mDocument.CreateNew(settings, message)) {
-        fail(message);
+      if (const auto created = mDocument.CreateNew(settings); !created) {
+        fail(created.error());
         return;
       }
       gpg::Logf(
@@ -14957,9 +14968,8 @@ namespace faf::editor
             const std::string marker = text.substr(0, comma);
             const int army = comma == std::string::npos ? 0 : std::atoi(text.c_str() + comma + 1);
             AdaptiveTables tables;
-            std::string error;
             if (mDocument.Adaptive()) {
-              (void)ParseAdaptiveTables(mDocument.TablesText(), tables, error);
+              (void)ParseAdaptiveTables(mDocument.TablesText(), tables);
             }
             const std::vector<ScenarioTeam> teams = mDocument.Teams();
             const int slots = teams.empty() ? 1 : static_cast<int>(teams.front().armies.size());
@@ -15281,9 +15291,9 @@ namespace faf::editor
               gpg::Logf("editor: package warning: %s", warning.c_str());
             }
             std::filesystem::path written;
-            std::string message;
-            const bool ok = mDocument.WritePackage(plan, written, message);
-            (ok ? gpg::Logf : gpg::Warnf)("editor: %s", message.c_str());
+            const auto packaged = mDocument.WritePackage(plan, written);
+            const bool ok = packaged.has_value();
+            (ok ? gpg::Logf : gpg::Warnf)("editor: %s", (ok ? *packaged : packaged.error()).c_str());
           }
           if (fa::vector<fa::string> layer; moho::CFG_GetArgOption("/pathing", 1, &layer)) {
             mShell->Tools().ShowPathing() = true;
@@ -15802,9 +15812,9 @@ namespace faf::editor
           const std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
           const WaterState before = mDocument.WaterNow();
           WaterState water = before;
-          std::string error;
-          if (!in || !WaterFromScmwtr(text, water, error)) {
-            gpg::Warnf("editor: %s: %s", importFile.string().c_str(), in ? error.c_str() : "can't read it");
+          std::expected<void, std::string> read;
+          if (!in || !(read = WaterFromScmwtr(text, water))) {
+            gpg::Warnf("editor: %s: %s", importFile.string().c_str(), in ? read.error().c_str() : "can't read it");
           } else {
             // The map keeps its own sea: on or off and its levels, as FAForeverMapEditor's import keeps them.
             water.enabled = before.enabled;
@@ -15993,28 +16003,31 @@ namespace faf::editor
           std::string text;
           std::string bytes;
           std::smatch path;
-          LightingState lighting = mDocument.LightingNow();
-          std::string error;
+          std::expected<LightingState, std::string> lighting = std::unexpected(std::string());
           if (
             !ReadGameFile(scenario, text) ||
             !std::regex_search(text, path, std::regex(R"(\bmap\s*=\s*['"]([^'"]+\.scmap)['"])"))
           ) {
             gpg::Warnf("editor: %s names no map file", scenario.c_str());
-          } else if (!ReadGameFile(path[1].str(), bytes) || !LightingFromScmap(bytes, lighting, error)) {
-            gpg::Warnf("editor: %s: %s", path[1].str().c_str(), error.empty() ? "can't read it" : error.c_str());
+          } else if (!ReadGameFile(path[1].str(), bytes) || !(lighting = LightingFromScmap(bytes))) {
+            gpg::Warnf(
+              "editor: %s: %s",
+              path[1].str().c_str(),
+              lighting.error().empty() ? "can't read it" : lighting.error().c_str()
+            );
           } else {
             const LightingState before = mDocument.LightingNow();
-            mDocument.ApplyLighting(lighting);
+            mDocument.ApplyLighting(*lighting);
             mDocument.LightingEdited(before);
             gpg::Logf(
               "editor: lighting from %s: multiplier %.2f, sun colour %.2f %.2f %.2f, fog %.0f to %.0f",
               path[1].str().c_str(),
-              static_cast<double>(lighting.multiplier),
-              static_cast<double>(lighting.sunColor[0]),
-              static_cast<double>(lighting.sunColor[1]),
-              static_cast<double>(lighting.sunColor[2]),
-              static_cast<double>(lighting.fogStart),
-              static_cast<double>(lighting.fogEnd)
+              static_cast<double>(lighting->multiplier),
+              static_cast<double>(lighting->sunColor[0]),
+              static_cast<double>(lighting->sunColor[1]),
+              static_cast<double>(lighting->sunColor[2]),
+              static_cast<double>(lighting->fogStart),
+              static_cast<double>(lighting->fogEnd)
             );
           }
         }
@@ -16055,9 +16068,9 @@ namespace faf::editor
           const std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
           const LightingState before = mDocument.LightingNow();
           LightingState lighting = before;
-          std::string error;
-          if (!in || !LightingFromScmlighting(text, lighting, error)) {
-            gpg::Warnf("editor: %s: %s", importFile.string().c_str(), in ? error.c_str() : "can't read it");
+          std::expected<void, std::string> read;
+          if (!in || !(read = LightingFromScmlighting(text, lighting))) {
+            gpg::Warnf("editor: %s: %s", importFile.string().c_str(), in ? read.error().c_str() : "can't read it");
           } else {
             mDocument.ApplyLighting(lighting);
             mDocument.LightingEdited(before);
@@ -16288,13 +16301,21 @@ namespace faf::editor
             bool read = static_cast<bool>(in);
             if (read && set) {
               std::vector<LayerSettings> layers;
-              read = LayersFromScmst(text, shader, layers, error);
+              const auto layersRead = LayersFromScmst(text, shader, layers);
+              read = layersRead.has_value();
+              if (!read) {
+                error = layersRead.error();
+              }
               for (int i = 0; read && i < 10; ++i) {
                 changes.emplace_back(i, layers[static_cast<std::size_t>(i)]);
               }
             } else if (read) {
               LayerSettings layer;
-              read = LayerFromScmsl(text, layer, error);
+              const auto layerRead = LayerFromScmsl(text, layer);
+              read = layerRead.has_value();
+              if (!read) {
+                error = layerRead.error();
+              }
               changes.emplace_back(slot, layer);
             }
             if (!read) {
@@ -16346,11 +16367,11 @@ namespace faf::editor
         if (!importFile.empty()) {
           std::ifstream in(importFile, std::ios::binary);
           const std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
-          std::vector<PropPaintEntry> entries;
-          std::string error;
-          if (!in || !PaintSetFromProppaintset(text, entries, error)) {
-            gpg::Warnf("editor: %s: %s", importFile.string().c_str(), in ? error.c_str() : "can't read it");
+          std::expected<std::vector<PropPaintEntry>, std::string> read = std::unexpected(std::string());
+          if (!in || !(read = PaintSetFromProppaintset(text))) {
+            gpg::Warnf("editor: %s: %s", importFile.string().c_str(), in ? read.error().c_str() : "can't read it");
           } else {
+            std::vector<PropPaintEntry>& entries = *read;
             int unknown = 0;
             for (PropPaintEntry& entry : entries) {
               if (const std::string known = tools.PropBlueprintNamed(entry.blueprint); !known.empty()) {
@@ -16423,9 +16444,9 @@ namespace faf::editor
           std::ifstream in(importFile, std::ios::binary);
           const std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
           SkyboxState sky;
-          std::string error;
-          if (!in || !SkyboxFromScmskybox(text, sky, error)) {
-            gpg::Warnf("editor: %s: %s", importFile.string().c_str(), in ? error.c_str() : "can't read it");
+          std::expected<void, std::string> read;
+          if (!in || !(read = SkyboxFromScmskybox(text, sky))) {
+            gpg::Warnf("editor: %s: %s", importFile.string().c_str(), in ? read.error().c_str() : "can't read it");
           } else {
             // Made for another map: fitted to this one's size.
             const float ratio = RescaleSkybox(
@@ -16660,8 +16681,7 @@ namespace faf::editor
       if (tools.UnitsToolActive() && ++mUnitTreeFrames % 30 == 1) {
         for (const SaveEntry& entry : mDocument.SaveData().Armies()) {
           UnitGroup root;
-          std::string error;
-          if (entry.name == tools.UnitArmy() && ParseUnitGroup(entry.Get("Units"), root, error)) {
+          if (entry.name == tools.UnitArmy() && ParseUnitGroup(entry.Get("Units"), root)) {
             tools.SetUnitTree(entry.name, std::move(root));
           }
         }
@@ -16844,11 +16864,10 @@ namespace faf::editor
           }
         }
         mNewMapSpec.clear();
-        std::string message;
-        if (mDocument.CreateNew(settings, message)) {
-          gpg::Logf("editor: %s", message.c_str());
+        if (const auto created = mDocument.CreateNew(settings)) {
+          gpg::Logf("editor: %s", created->c_str());
         } else {
-          gpg::Warnf("editor: %s", message.c_str());
+          gpg::Warnf("editor: %s", created.error().c_str());
         }
       }
       const bool finished = mDocument.Poll();
@@ -17120,12 +17139,10 @@ namespace faf::editor
         }
       }
       if (!mSaveAsFolder.empty() && mScene.Attached() && ++mRoundTripFrames == mRoundTripAfter) {
-        std::string message;
-        const bool saved = mDocument.SaveAsNewFolder(mSaveAsFolder, message);
-        if (saved) {
-          gpg::Logf("editor: %s", message.c_str());
+        if (const auto saved = mDocument.SaveAsNewFolder(mSaveAsFolder)) {
+          gpg::Logf("editor: %s", saved->c_str());
         } else {
-          gpg::Warnf("editor: %s", message.c_str());
+          gpg::Warnf("editor: %s", saved.error().c_str());
         }
         mShell->RequestExit();
       }

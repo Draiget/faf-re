@@ -94,9 +94,8 @@ namespace faf::editor
       decals = mDocument.Decals() != nullptr ? mDocument.Decals()->GetDecalCount() : 0;
       for (const SaveEntry& army : mDocument.SaveData().Armies()) {
         UnitGroup group;
-        std::string error;
         std::vector<const SaveUnit*> units;
-        if (ParseUnitGroup(army.Get("Units"), group, error)) {
+        if (ParseUnitGroup(army.Get("Units"), group)) {
           CollectUnits(group, units);
         }
         armies.emplace_back(army.name, static_cast<int>(units.size()));

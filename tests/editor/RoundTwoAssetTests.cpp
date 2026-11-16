@@ -46,8 +46,7 @@ namespace faf::editor
   )
   {
     JsonTree root;
-    std::string error;
-    ASSERT_TRUE(ParseLuaAssignments(
+    const auto read = ParseLuaAssignments(
       R"(-- a comment
 A = { x = 1, 'two', ['k k'] = { 3, 4 }, s = "q\"t", b = true, n = nil }
 B = Sound { Bank = 'X', Cue = 'Y' }
@@ -55,9 +54,9 @@ B = Sound { Bank = 'X', Cue = 'Y' }
 comment ]]
 C = [[long text]]
 )",
-      root,
-      error
-    )) << error;
+      root
+    );
+    ASSERT_TRUE(read) << read.error();
     const JsonTree* a = root.Get("A");
     ASSERT_NE(a, nullptr);
     EXPECT_DOUBLE_EQ(a->Num("x", 0), 1.0);
@@ -96,7 +95,8 @@ C = [[long text]]
     EXPECT_NE(bp.find("Sound {"), std::string::npos);
     // The blueprint reads back as a table.
     JsonTree parsed;
-    ASSERT_TRUE(ParseLuaAssignments(bp, parsed, error)) << error;
+    const auto read = ParseLuaAssignments(bp, parsed);
+    ASSERT_TRUE(read) << read.error();
     EXPECT_NE(parsed.Get("UnitBlueprint"), nullptr);
     const std::string script = UnitScriptText(data, spec);
     EXPECT_NE(script.find("MainGun = ClassWeapon("), std::string::npos);

@@ -141,11 +141,15 @@ namespace
     for (const auto& entry : std::filesystem::directory_iterator(folder)) {
       std::ifstream in(entry.path(), std::ios::binary);
       const std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
-      EmitterBlueprint e;
-      std::string error;
-      if (!text.starts_with("EmitterBlueprint") || !ParseEmitter(text, e, error)) {
+      if (!text.starts_with("EmitterBlueprint")) {
         continue;
       }
+      const auto parsed = ParseEmitter(text);
+      if (!parsed) {
+        continue;
+      }
+      const EmitterBlueprint& e = *parsed;
+      std::string error;
       // Curves with no keys stay empty only through a Curve node; the file's own have keys (or none: kept as none).
       NodeGraph graph(EffectNodeTypes());
       BuildEffectGraph(graph, "t", {{"e", e}});

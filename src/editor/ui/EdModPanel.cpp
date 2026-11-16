@@ -119,12 +119,13 @@ namespace faf::editor
     std::string& error
   )
   {
-    ModProject p;
     bool fromBackup = false;
-    if (!OpenModProject(Root() / name, p, error, &fromBackup)) {
+    auto p = OpenModProject(Root() / name, &fromBackup);
+    if (!p) {
+      error = p.error();
       return false;
     }
-    mProject = std::move(p);
+    mProject = std::move(*p);
     mFolder = Root() / name;
     mHistory.Clear();
     mDirty = fromBackup;

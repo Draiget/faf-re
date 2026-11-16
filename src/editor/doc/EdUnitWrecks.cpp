@@ -104,8 +104,7 @@ namespace faf::editor
     UnitWreckTotals totals;
     for (const SaveEntry& army : document.SaveData().Armies()) {
       UnitGroup root;
-      std::string error;
-      if (!ParseUnitGroup(army.Get("Units"), root, error)) {
+      if (!ParseUnitGroup(army.Get("Units"), root)) {
         continue;
       }
       std::vector<std::pair<const SaveUnit*, std::vector<std::string>>> units;

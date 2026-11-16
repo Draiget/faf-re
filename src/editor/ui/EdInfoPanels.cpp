@@ -1484,8 +1484,7 @@ namespace faf::editor
         int noFootprint = 0;
         for (const SaveEntry& army : mDocument.SaveData().Armies()) {
           UnitGroup group;
-          std::string error;
-          if (!ParseUnitGroup(army.Get("Units"), group, error)) {
+          if (!ParseUnitGroup(army.Get("Units"), group)) {
             continue;
           }
           std::vector<const SaveUnit*> units;
@@ -1880,9 +1879,8 @@ namespace faf::editor
       // The tables must also read as the Adaptive tool reads them.
       if (issue.text.empty() && mScriptFile == 2) {
         AdaptiveTables tables;
-        std::string error;
-        if (!ParseAdaptiveTables(mScriptBuffer, tables, error)) {
-          mScriptMessage = "compiles, but the Adaptive tool can't read it: " + error;
+        if (const auto read = ParseAdaptiveTables(mScriptBuffer, tables); !read) {
+          mScriptMessage = "compiles, but the Adaptive tool can't read it: " + read.error();
         }
       }
       gpg::Logf("editor: %s check: %s", fileName.c_str(), mScriptMessage.c_str());

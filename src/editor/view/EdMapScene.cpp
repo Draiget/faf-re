@@ -850,8 +850,7 @@ namespace faf::editor
     if (mDocument.Adaptive() && (mTools->MarkersToolActive() || mTools->SelectToolActive())) {
       if (mAdaptiveText != mDocument.TablesText()) {
         mAdaptiveText = mDocument.TablesText();
-        std::string error;
-        if (!ParseAdaptiveTables(mAdaptiveText, mAdaptive, error)) {
+        if (!ParseAdaptiveTables(mAdaptiveText, mAdaptive)) {
           mAdaptive = AdaptiveTables{};
         }
       }
@@ -2238,8 +2237,7 @@ namespace faf::editor
       int highest = 0;
       for (const SaveEntry& entry : mDocument.SaveData().Armies()) {
         UnitGroup group;
-        std::string error;
-        if (ParseUnitGroup(entry.Get("Units"), group, error)) {
+        if (ParseUnitGroup(entry.Get("Units"), group)) {
           highest = std::max(highest, HighestUnitNumber(group));
         }
       }
@@ -5324,10 +5322,9 @@ namespace faf::editor
     int wrecks = 0;
     for (const SaveEntry& army : mDocument.SaveData().Armies()) {
       UnitGroup group;
-      std::string error;
-      if (!ParseUnitGroup(army.Get("Units"), group, error)) {
+      if (const auto read = ParseUnitGroup(army.Get("Units"), group); !read) {
         ++unreadable;
-        gpg::Warnf("editor: %s's units unreadable: %s", army.name.c_str(), error.c_str());
+        gpg::Warnf("editor: %s's units unreadable: %s", army.name.c_str(), read.error().c_str());
         continue;
       }
       std::vector<const SaveUnit*> units;
@@ -5521,8 +5518,7 @@ namespace faf::editor
     if (ask == EdTools::GroupAsk::Select) {
       for (const SaveEntry& entry : mDocument.SaveData().Armies()) {
         UnitGroup root;
-        std::string error;
-        if (entry.name != army || !ParseUnitGroup(entry.Get("Units"), root, error)) {
+        if (entry.name != army || !ParseUnitGroup(entry.Get("Units"), root)) {
           continue;
         }
         mUnitSelection.clear();
@@ -5717,8 +5713,7 @@ namespace faf::editor
       copied.kind = Clipboard::Kind::Units;
       for (const SaveEntry& entry : mDocument.SaveData().Armies()) {
         UnitGroup group;
-        std::string error;
-        if (!ParseUnitGroup(entry.Get("Units"), group, error)) {
+        if (!ParseUnitGroup(entry.Get("Units"), group)) {
           continue;
         }
         std::vector<const SaveUnit*> all;
@@ -5912,8 +5907,7 @@ namespace faf::editor
         int highest = 0;
         for (const SaveEntry& entry : mDocument.SaveData().Armies()) {
           UnitGroup group;
-          std::string error;
-          if (ParseUnitGroup(entry.Get("Units"), group, error)) {
+          if (ParseUnitGroup(entry.Get("Units"), group)) {
             highest = std::max(highest, HighestUnitNumber(group));
           }
         }
@@ -8801,8 +8795,7 @@ namespace faf::editor
       out.heading = ref.orientation[1] * 180.0f / kPi;
       for (const SaveEntry& entry : mDocument.SaveData().Armies()) {
         UnitGroup group;
-        std::string error;
-        if (entry.name == ref.army && ParseUnitGroup(entry.Get("Units"), group, error)) {
+        if (entry.name == ref.army && ParseUnitGroup(entry.Get("Units"), group)) {
           if (const SaveUnit* const unit = FindUnit(group, ref.name); unit != nullptr) {
             out.type = unit->type;
           }
@@ -10072,7 +10065,8 @@ namespace faf::editor
   {
     EdDocument::SaveSnapshot before = mDocument.SaveDataNow();
     std::vector<SaveEntry> markers = mDocument.SaveData().Markers();
-    if (!MarkersFromFafmapmarkers(text, markers, result, error, mDocument.ArmyNamesInUse())) {
+    if (const auto read = MarkersFromFafmapmarkers(text, markers, result, mDocument.ArmyNamesInUse()); !read) {
+      error = read.error();
       return false;
     }
     if (!result.names.empty()) {
@@ -10546,17 +10540,14 @@ namespace faf::editor
             effect.substr(at, semicolon == std::string::npos ? std::string::npos : semicolon - at);
           at = semicolon == std::string::npos ? effect.size() : semicolon + 1;
           std::string text;
-          EmitterBlueprint emitter;
-          FlatBlueprint flat;
-          std::string error;
           if (path.empty() || !ReadGameFile(path, text)) {
             continue;
           }
           auto preview = std::make_unique<EdParticlePreview>();
-          if (ParseEmitter(text, emitter, error)) {
-            preview->SetEmitter(emitter);
-          } else if (ParseFlatBlueprint(text, flat, error)) {
-            preview->SetFlat(flat);
+          if (const auto emitter = ParseEmitter(text)) {
+            preview->SetEmitter(*emitter);
+          } else if (const auto flat = ParseFlatBlueprint(text)) {
+            preview->SetFlat(*flat);
           } else {
             continue;
           }
@@ -14467,9 +14458,8 @@ namespace faf::editor
         continue;
       }
       UnitGroup group;
-      std::string error;
-      if (!ParseUnitGroup(entry.Get("Units"), group, error)) {
-        gpg::Warnf("editor: %s's units unreadable, not changed: %s", army.c_str(), error.c_str());
+      if (const auto read = ParseUnitGroup(entry.Get("Units"), group); !read) {
+        gpg::Warnf("editor: %s's units unreadable, not changed: %s", army.c_str(), read.error().c_str());
         return false;
       }
       change(group);
@@ -14516,8 +14506,7 @@ namespace faf::editor
     int highest = 0;
     for (const SaveEntry& entry : mDocument.SaveData().Armies()) {
       UnitGroup group;
-      std::string error;
-      if (ParseUnitGroup(entry.Get("Units"), group, error)) {
+      if (ParseUnitGroup(entry.Get("Units"), group)) {
         highest = std::max(highest, HighestUnitNumber(group));
       }
     }
@@ -14632,8 +14621,7 @@ namespace faf::editor
     std::vector<SaveUnit> units;
     for (const SaveEntry& entry : mDocument.SaveData().Armies()) {
       UnitGroup group;
-      std::string error;
-      if (!ParseUnitGroup(entry.Get("Units"), group, error)) {
+      if (!ParseUnitGroup(entry.Get("Units"), group)) {
         continue;
       }
       std::vector<const SaveUnit*> all;
@@ -14666,7 +14654,8 @@ namespace faf::editor
     }
     std::vector<SaveUnit> units;
     float centre[3];
-    if (!UnitsFromScunits(text, units, centre, error)) {
+    if (const auto read = UnitsFromScunits(text, units, centre); !read) {
+      error = read.error();
       return false;
     }
     if (units.empty()) {
@@ -14680,8 +14669,7 @@ namespace faf::editor
     int highest = 0;
     for (const SaveEntry& entry : mDocument.SaveData().Armies()) {
       UnitGroup group;
-      std::string parseError;
-      if (ParseUnitGroup(entry.Get("Units"), group, parseError)) {
+      if (ParseUnitGroup(entry.Get("Units"), group)) {
         highest = std::max(highest, HighestUnitNumber(group));
       }
     }

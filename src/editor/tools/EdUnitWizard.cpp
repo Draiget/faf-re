@@ -324,7 +324,8 @@ namespace faf::editor
     std::string& error
   )
   {
-    if (!ParseLuaAssignments(text, out.root, error)) {
+    if (const auto read = ParseLuaAssignments(text, out.root); !read) {
+      error = read.error();
       return false;
     }
     if (out.root.Get("Donors") == nullptr || out.root.Get("Map") == nullptr) {
@@ -1825,10 +1826,12 @@ namespace faf::editor
     std::string& error
   )
   {
-    JsonTree root;
-    if (!ParseJsonTree(text, root, error)) {
+    const auto parsed = ParseJsonTree(text);
+    if (!parsed) {
+      error = parsed.error();
       return false;
     }
+    const JsonTree& root = *parsed;
     specs.clear();
     const JsonTree* list = root.Get("units");
     if (list == nullptr) {

@@ -334,8 +334,12 @@ namespace faf::editor
 
       const std::string base = BaseOfFolder(settings.folder);
       std::string error;
+      const auto written = WriteMapFile(*map, records, load.createFolder / (base + ".scmap"));
+      if (!written) {
+        error = written.error();
+      }
       if (
-        !WriteMapFile(*map, records, load.createFolder / (base + ".scmap"), error) ||
+        !written ||
         !WriteText(load.createFolder / (base + "_scenario.lua"), NewMapScenarioText(settings, base), error) ||
         !WriteText(load.createFolder / (base + "_save.lua"), NewMapSaveText(settings), error) ||
         !WriteText(
@@ -389,9 +393,8 @@ namespace faf::editor
 
       // The save's and script's text, for the markers, areas and playable area the editor changes.
       if (std::string text; !facts.savePath.empty() && ReadGameFile(facts.savePath, text)) {
-        std::string error;
-        if (!load.save.Parse(std::move(text), error)) {
-          gpg::Warnf("editor: %s: %s", facts.savePath.c_str(), error.c_str());
+        if (const auto parsed = load.save.Parse(std::move(text)); !parsed) {
+          gpg::Warnf("editor: %s: %s", facts.savePath.c_str(), parsed.error().c_str());
         }
       }
       if (!facts.scriptPath.empty()) {
@@ -479,30 +482,26 @@ namespace faf::editor
     });
   }
 
-  bool EdDocument::WriteSnapshot(
-    const std::filesystem::path& folder,
-    std::string& error
+  std::expected<void, std::string> EdDocument::WriteSnapshot(
+    const std::filesystem::path& folder
   )
   {
     if (mState != State::Open || mMap == nullptr) {
-      error = "no map is open";
-      return false;
+      return std::unexpected("no map is open");
     }
     if (mMap->mTerrainRes == nullptr || !mMap->mTerrainRes->GetBool()) {
-      error = "the terrain is still being prepared";
-      return false;
+      return std::unexpected("the terrain is still being prepared");
     }
     std::error_code code;
     std::filesystem::create_directories(folder, code);
     if (code) {
-      error = "can't make " + folder.string() + ": " + code.message();
-      return false;
+      return std::unexpected("can't make " + folder.string() + ": " + code.message());
     }
     const std::filesystem::path disk = MapDiskFile();
     const std::string scmapName = disk.empty() ? FolderName() + ".scmap" : disk.filename().string();
     MarkKeptImages();
-    if (!WriteMapFile(*mMap, mFileRecords, folder / scmapName, error)) {
-      return false;
+    if (const auto written = WriteMapFile(*mMap, mFileRecords, folder / scmapName); !written) {
+      return written;
     }
     // Every Lua file as Save would write it, the "as saved" texts untouched.
     SyncEffectScript();
@@ -525,11 +524,10 @@ namespace faf::editor
       std::ofstream out(file, std::ios::binary | std::ios::trunc);
       out.write(text.data(), static_cast<std::streamsize>(text.size()));
       if (!out) {
-        error = "can't write " + file.string();
-        return false;
+        return std::unexpected("can't write " + file.string());
       }
     }
-    return true;
+    return {};
   }
 
   bool EdDocument::Open(
@@ -555,43 +553,35 @@ namespace faf::editor
     return true;
   }
 
-  bool EdDocument::CreateNew(
-    const NewMapSettings& settings,
-    std::string& message
+  std::expected<std::string, std::string> EdDocument::CreateNew(
+    const NewMapSettings& settings
   )
   {
     if (mState == State::Loading) {
-      message = "A map is still opening.";
-      return false;
+      return std::unexpected("A map is still opening.");
     }
     if (Guarded([this, settings] {
-      std::string ignored;
-      (void)CreateNew(settings, ignored);
+      (void)CreateNew(settings);
     })) {
-      message = "The open map has unsaved changes: answer the question first.";
-      return false;
+      return std::unexpected("The open map has unsaved changes: answer the question first.");
     }
     if (
       settings.folder.empty() || settings.folder.find_first_of("\\/:*?\"<>|") != std::string::npos ||
       settings.folder[0] == '.'
     ) {
-      message = "\"" + settings.folder + "\" can't be a folder name.";
-      return false;
+      return std::unexpected("\"" + settings.folder + "\" can't be a folder name.");
     }
     if (mVault.empty()) {
-      message = "There is no vault folder to make the map in.";
-      return false;
+      return std::unexpected("There is no vault folder to make the map in.");
     }
     const std::filesystem::path target = mVault / "maps" / settings.folder;
     std::error_code error;
     if (std::filesystem::exists(target, error)) {
-      message = target.string() + " already exists; pick another name.";
-      return false;
+      return std::unexpected(target.string() + " already exists; pick another name.");
     }
     std::filesystem::create_directories(target, error);
     if (error) {
-      message = "Can't make " + target.string() + ": " + error.message();
-      return false;
+      return std::unexpected("Can't make " + target.string() + ": " + error.message());
     }
     Close();
     mPath.clear();
@@ -603,8 +593,7 @@ namespace faf::editor
     mThread = std::thread([load = mLoad.get()] {
       Run(*load);
     });
-    message = "Making " + target.string();
-    return true;
+    return "Making " + target.string();
   }
 
   std::optional<EdDocument::PlayableRect> EdDocument::PlayableArea() const
@@ -866,43 +855,41 @@ namespace faf::editor
     mScript = WithScriptEffects(mScript, effects);
   }
 
-  bool EdDocument::WriteLuaFiles(
-    const std::filesystem::path& folder,
-    std::string& error
+  std::expected<void, std::string> EdDocument::WriteLuaFiles(
+    const std::filesystem::path& folder
   )
   {
-    const auto write = [&](const std::string& gamePath, const std::string& text) {
+    const auto write = [&](const std::string& gamePath, const std::string& text) -> std::expected<void, std::string> {
       const std::filesystem::path file = folder / gamePath.substr(gamePath.find_last_of('/') + 1);
       std::ofstream out(file, std::ios::binary);
       out.write(text.data(), static_cast<std::streamsize>(text.size()));
       if (!out) {
-        error = "can't write " + file.string();
-        return false;
+        return std::unexpected("can't write " + file.string());
       }
-      return true;
+      return {};
     };
     SyncEffectScript();
     if (mSave.Loaded() && mSave.Changed()) {
-      if (!write(mFacts.savePath, mSave.Text())) {
-        return false;
+      if (auto written = write(mFacts.savePath, mSave.Text()); !written) {
+        return written;
       }
       mSave.MarkSaved();
     }
     if (mScript != mScriptRead && !mFacts.scriptPath.empty()) {
-      if (!write(mFacts.scriptPath, mScript)) {
-        return false;
+      if (auto written = write(mFacts.scriptPath, mScript); !written) {
+        return written;
       }
       mScriptRead = mScript;
     }
     if (mTables != mTablesRead && !mFacts.tablesPath.empty()) {
-      if (!write(mFacts.tablesPath, mTables)) {
-        return false;
+      if (auto written = write(mFacts.tablesPath, mTables); !written) {
+        return written;
       }
       mTablesRead = mTables;
     }
     if (mOptions != mOptionsRead && !mFacts.optionsPath.empty()) {
-      if (!write(mFacts.optionsPath, mOptions)) {
-        return false;
+      if (auto written = write(mFacts.optionsPath, mOptions); !written) {
+        return written;
       }
       mOptionsRead = mOptions;
     }
@@ -911,12 +898,12 @@ namespace faf::editor
       mScenario = WithScenarioReclaim(mScenario, reclaim.mass, reclaim.energy);
     }
     if (mScenario != mScenarioRead && !mFacts.scenarioPath.empty()) {
-      if (!write(mFacts.scenarioPath, mScenario)) {
-        return false;
+      if (auto written = write(mFacts.scenarioPath, mScenario); !written) {
+        return written;
       }
       mScenarioRead = mScenario;
     }
-    return true;
+    return {};
   }
 
   EdDocument::PropSnapshot EdDocument::PropsNow() const
@@ -2173,11 +2160,10 @@ namespace faf::editor
     return base + suffix;
   }
 
-  bool EdDocument::WriteFolderCopy(
+  std::expected<void, std::string> EdDocument::WriteFolderCopy(
     const std::string& folder,
     std::filesystem::path& newMapFile,
-    int& copied,
-    std::string& message
+    int& copied
   )
   {
     const std::filesystem::path target = (mCopyParent.empty() ? mVault / "maps" : mCopyParent) / folder;
@@ -2222,8 +2208,7 @@ namespace faf::editor
       }
     }
     if (files.empty()) {
-      message = "The map's folder " + oldPrefix + " lists no files.";
-      return false;
+      return std::unexpected("The map's folder " + oldPrefix + " lists no files.");
     }
     // Tables made in the editor and not saved yet are copied too.
     if (
@@ -2244,8 +2229,7 @@ namespace faf::editor
     }
     std::filesystem::create_directories(target, error);
     if (error) {
-      message = "Can't make " + target.string() + ": " + error.message();
-      return false;
+      return std::unexpected("Can't make " + target.string() + ": " + error.message());
     }
 
     copied = 0;
@@ -2282,8 +2266,7 @@ namespace faf::editor
       } else if (Lower(source) == Lower(mFacts.scenarioPath) && mScenario != mScenarioRead) {
         bytes = mScenario; // the edited army list (its paths are moved below, as the copy's)
       } else if (!ReadGameFile(source, bytes)) {
-        message = "Can't read " + source;
-        return false;
+        return std::unexpected("Can't read " + source);
       }
       if (Lower(destination.extension().string()) == ".lua") {
         // Paths into the old folder point into the new one, with the new base name.
@@ -2303,41 +2286,33 @@ namespace faf::editor
       std::ofstream out(destination, std::ios::binary);
       out.write(bytes.data(), static_cast<std::streamsize>(bytes.size()));
       if (!out) {
-        message = "Can't write " + destination.string();
-        return false;
+        return std::unexpected("Can't write " + destination.string());
       }
       ++copied;
     }
     if (newMapFile.empty()) {
-      message = "The map file " + mFacts.mapPath + " isn't in its folder " + oldPrefix;
-      return false;
+      return std::unexpected("The map file " + mFacts.mapPath + " isn't in its folder " + oldPrefix);
     }
-    std::string failure;
     MarkKeptImages();
-    if (!WriteMapFile(*mMap, mFileRecords, newMapFile, failure)) {
-      message = "Saving " + newMapFile.string() + " failed: " + failure;
-      return false;
+    if (const auto written = WriteMapFile(*mMap, mFileRecords, newMapFile); !written) {
+      return std::unexpected("Saving " + newMapFile.string() + " failed: " + written.error());
     }
-    return true;
+    return {};
   }
 
-  bool EdDocument::WritePlayCopy(
-    std::string& scenario,
-    std::string& message
+  std::expected<std::string, std::string> EdDocument::WritePlayCopy(
+    std::string& scenario
   )
   {
     if (mState != State::Open || mMap == nullptr) {
-      message = "No map is open.";
-      return false;
+      return std::unexpected("No map is open.");
     }
     SyncEffectScript();
     if (mMap->mTerrainRes == nullptr || !mMap->mTerrainRes->GetBool()) {
-      message = "The map isn't ready yet (its terrain is still being prepared).";
-      return false;
+      return std::unexpected("The map isn't ready yet (its terrain is still being prepared).");
     }
     if (mVault.empty()) {
-      message = "There is no vault folder to write the play copy into.";
-      return false;
+      return std::unexpected("There is no vault folder to write the play copy into.");
     }
     // One copy per map, written again for every play: the last one goes first.
     const std::string folder = WithoutVersion(FolderName()) + kPlayCopySuffix;
@@ -2345,17 +2320,16 @@ namespace faf::editor
     std::filesystem::path newMapFile;
     int copied = 0;
     mCopyTestMission = true;
-    const bool written = WriteFolderCopy(folder, newMapFile, copied, message);
+    const auto written = WriteFolderCopy(folder, newMapFile, copied);
     mCopyTestMission = false;
     if (!written) {
-      return false;
+      return std::unexpected(written.error());
     }
     mPlayCopy = folder;
     moho::DISK_InvalidateFileLookups();
     scenario = "/maps/" + folder + "/" + folder + "_scenario.lua";
-    message = "the open map with its unsaved edits copied to " + (mVault / "maps" / folder).string() + " (" +
+    return "the open map with its unsaved edits copied to " + (mVault / "maps" / folder).string() + " (" +
       std::to_string(copied + 1) + " files)";
-    return true;
   }
 
   void EdDocument::RemovePlayCopy(
@@ -2393,63 +2367,55 @@ namespace faf::editor
     }
   }
 
-  bool EdDocument::SaveAsNewFolderIn(
+  std::expected<std::string, std::string> EdDocument::SaveAsNewFolderIn(
     const std::filesystem::path& parent,
-    const std::string& folder,
-    std::string& message
+    const std::string& folder
   )
   {
     std::error_code error;
     if (!parent.empty() && !std::filesystem::is_directory(parent, error)) {
-      message = parent.string() + " isn't a folder.";
-      return false;
+      return std::unexpected(parent.string() + " isn't a folder.");
     }
     const std::filesystem::path vaultMaps = std::filesystem::weakly_canonical(mVault / "maps", error);
     const bool outside = !parent.empty() && std::filesystem::weakly_canonical(parent, error) != vaultMaps;
     mCopyParent = outside ? parent : std::filesystem::path();
-    const bool saved = SaveAsNewFolder(folder, message);
+    std::expected<std::string, std::string> saved = SaveAsNewFolder(folder);
     mCopyParent.clear();
     if (saved) {
       mSaveOutsideVault = outside;
       if (outside) {
-        message += " (outside the vault: the game doesn't see it there)";
+        *saved += " (outside the vault: the game doesn't see it there)";
       }
     }
     return saved;
   }
 
-  bool EdDocument::SaveAsNewFolder(
-    const std::string& folder,
-    std::string& message
+  std::expected<std::string, std::string> EdDocument::SaveAsNewFolder(
+    const std::string& folder
   )
   {
     if (mState != State::Open || mMap == nullptr) {
-      message = "No map is open.";
-      return false;
+      return std::unexpected("No map is open.");
     }
     SyncEffectScript();
     if (mMap->mTerrainRes == nullptr || !mMap->mTerrainRes->GetBool()) {
-      message = "The map isn't ready yet (its terrain is still being prepared); save again in a moment.";
-      return false;
+      return std::unexpected("The map isn't ready yet (its terrain is still being prepared); save again in a moment.");
     }
     if (folder.empty() || folder.find_first_of("\\/:*?\"<>|") != std::string::npos) {
-      message = "\"" + folder + "\" can't be a folder name.";
-      return false;
+      return std::unexpected("\"" + folder + "\" can't be a folder name.");
     }
     if (mVault.empty()) {
-      message = "There is no vault folder to save into.";
-      return false;
+      return std::unexpected("There is no vault folder to save into.");
     }
     const std::filesystem::path target = (mCopyParent.empty() ? mVault / "maps" : mCopyParent) / folder;
     std::error_code error;
     if (std::filesystem::exists(target, error)) {
-      message = target.string() + " already exists; pick another name.";
-      return false;
+      return std::unexpected(target.string() + " already exists; pick another name.");
     }
     std::filesystem::path newMapFile;
     int copied = 0;
-    if (!WriteFolderCopy(folder, newMapFile, copied, message)) {
-      return false;
+    if (const auto written = WriteFolderCopy(folder, newMapFile, copied); !written) {
+      return std::unexpected(written.error());
     }
     const std::string oldFolder = FolderName();
     std::string oldBase = mFacts.scenarioPath.substr(mFacts.scenarioPath.find_last_of('/') + 1);
@@ -2475,9 +2441,8 @@ namespace faf::editor
           &mFacts.optionsPath}) {
       *path = ReplaceNoCase(ReplaceNoCase(*path, oldPrefix + oldBase, newPrefix + newBase), oldPrefix, newPrefix);
     }
-    message = "Saved as " + target.string() + " (" + std::to_string(copied + 1) +
+    return "Saved as " + target.string() + " (" + std::to_string(copied + 1) +
       " files); the game lists it from its next start";
-    return true;
   }
 
   std::filesystem::path EdDocument::MapDiskFile() const
@@ -2511,24 +2476,21 @@ namespace faf::editor
     return plan;
   }
 
-  bool EdDocument::WritePackage(
+  std::expected<std::string, std::string> EdDocument::WritePackage(
     const PackagePlan& plan,
-    std::filesystem::path& written,
-    std::string& message
+    std::filesystem::path& written
   ) const
   {
     const std::filesystem::path file = MapDiskFile();
     if (file.empty() || !plan.errors.empty()) {
-      message = plan.errors.empty() ? "no folder to package" : plan.errors.front();
-      return false;
+      return std::unexpected(plan.errors.empty() ? "no folder to package" : plan.errors.front());
     }
     const std::filesystem::path folder = file.parent_path();
     std::vector<ZipEntry> entries;
     for (const std::string& name : plan.files) {
       std::ifstream in(folder / name, std::ios::binary);
       if (!in) {
-        message = "can't read " + (folder / name).string();
-        return false;
+        return std::unexpected("can't read " + (folder / name).string());
       }
       entries.push_back(
         {plan.folder + "/" + name, std::string(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>())}
@@ -2542,17 +2504,14 @@ namespace faf::editor
     std::ofstream out(written, std::ios::binary | std::ios::trunc);
     out.write(zip.data(), static_cast<std::streamsize>(zip.size()));
     if (!out) {
-      message = "can't write " + written.string();
-      return false;
+      return std::unexpected("can't write " + written.string());
     }
-    message = "packaged " + std::to_string(entries.size()) + " files, " + std::to_string(zip.size()) + " bytes, as " +
+    return "packaged " + std::to_string(entries.size()) + " files, " + std::to_string(zip.size()) + " bytes, as " +
       written.string();
-    return true;
   }
 
-  bool EdDocument::ExportPreview(
-    const std::filesystem::path& file,
-    std::string& message
+  std::expected<std::string, std::string> EdDocument::ExportPreview(
+    const std::filesystem::path& file
   ) const
   {
     // The DDS inside the preview chunk the map was read with.
@@ -2565,8 +2524,7 @@ namespace faf::editor
       }
     }
     if (at == std::string::npos || chunk.size() < at + 128) {
-      message = "The map has no preview picture in its file (a new map gets one when it is saved).";
-      return false;
+      return std::unexpected("The map has no preview picture in its file (a new map gets one when it is saved).");
     }
     std::uint32_t size[2] = {};
     std::memcpy(size, chunk.data() + at + 12, sizeof(size)); // the DDS header's height, then width
@@ -2581,8 +2539,7 @@ namespace faf::editor
       codec == nullptr || FAILED(codec->Decode(chunk.data() + at, chunk.size() - at, options, image)) ||
       image.subresources.empty() || image.format != DXGI_FORMAT_B8G8R8A8_UNORM
     ) {
-      message = "The preview picture couldn't be decoded.";
-      return false;
+      return std::unexpected("The preview picture couldn't be decoded.");
     }
     const auto& level = image.subresources.front();
     std::vector<std::uint32_t> pixels(static_cast<std::size_t>(level.width) * level.height);
@@ -2595,27 +2552,22 @@ namespace faf::editor
     }
     std::string error;
     if (!WriteColourPng(file, static_cast<int>(level.width), static_cast<int>(level.height), pixels, error)) {
-      message = error;
-      return false;
+      return std::unexpected(error);
     }
-    message = "Exported the lobby preview (" + std::to_string(level.width) + " x " + std::to_string(level.height) +
+    return "Exported the lobby preview (" + std::to_string(level.width) + " x " + std::to_string(level.height) +
       ") to " + file.string();
-    return true;
   }
 
-  bool EdDocument::Save(
-    std::string& message
-  )
+  std::expected<std::string, std::string> EdDocument::Save()
   {
     if (mState != State::Open || mMap == nullptr) {
-      message = "No map is open.";
-      return false;
+      return std::unexpected("No map is open.");
     }
     const std::filesystem::path file = MapDiskFile();
     if (file.empty()) {
-      message =
-        "This map is inside the game's archives and has no file of its own to save over; save it as a new map folder.";
-      return false;
+      return std::unexpected(
+        "This map is inside the game's archives and has no file of its own to save over; save it as a new map folder."
+      );
     }
     // Only a map in the vault's maps folder is written over; the game's own maps stay as installed.
     std::error_code ignored;
@@ -2626,24 +2578,22 @@ namespace faf::editor
     const bool picked =
       (mSaveOutsideVault && file == mSaveTarget) || (!mOverwriteFile.empty() && file == mOverwriteFile);
     if (!picked && (mVault.empty() || relative.empty() || relative.native().starts_with(L".."))) {
-      message = "This map isn't in your vault (" + (mVault / "maps").string() + "); save it as a new map folder there.";
-      return false;
+      return std::unexpected(
+        "This map isn't in your vault (" + (mVault / "maps").string() + "); save it as a new map folder there."
+      );
     }
     // Until the terrain is ready for drawing (Finalize builds its normal map, which the file carries) the
     // writer would write leftover memory there.
     if (mMap->mTerrainRes == nullptr || !mMap->mTerrainRes->GetBool()) {
-      message = "The map isn't ready yet (its terrain is still being prepared); save again in a moment.";
-      return false;
+      return std::unexpected("The map isn't ready yet (its terrain is still being prepared); save again in a moment.");
     }
     // Before the session's first save: the map's files (all five) backed up outside the maps folder.
     if (!mBackedUp && !mBackupRoot.empty() && mBackupKeep > 0) {
-      std::filesystem::path made;
-      std::string failure;
-      if (!BackupMapFolder(file.parent_path(), mBackupRoot, mBackupKeep, made, failure)) {
-        message = "The backup failed (" + failure + "); nothing was saved.";
-        return false;
+      const auto made = BackupMapFolder(file.parent_path(), mBackupRoot, mBackupKeep);
+      if (!made) {
+        return std::unexpected("The backup failed (" + made.error() + "); nothing was saved.");
       }
-      gpg::Logf("editor: the map's files backed up to %s", made.string().c_str());
+      gpg::Logf("editor: the map's files backed up to %s", made->string().c_str());
       mBackedUp = true;
     }
     // A map without a <default> reflection cube gets the game's (units without one of their own reflect nothing
@@ -2662,11 +2612,9 @@ namespace faf::editor
         gpg::Logf("editor: save: the map had no <default> reflection cube: the game's added");
       }
     }
-    std::string failure;
     MarkKeptImages();
-    if (!WriteMapFile(*mMap, mFileRecords, file, failure)) {
-      message = "Saving " + file.string() + " failed: " + failure;
-      return false;
+    if (const auto written = WriteMapFile(*mMap, mFileRecords, file); !written) {
+      return std::unexpected("Saving " + file.string() + " failed: " + written.error());
     }
     if (!mMission.Empty()) {
       MissionPatch patch = MissionPatch::None;
@@ -2679,17 +2627,16 @@ namespace faf::editor
         );
       }
     }
-    if (!WriteLuaFiles(file.parent_path(), failure)) {
-      message = "Saved " + file.string() + ", but " + failure;
-      return false;
+    if (const auto written = WriteLuaFiles(file.parent_path()); !written) {
+      return std::unexpected("Saved " + file.string() + ", but " + written.error());
     }
     if (const std::string mission = SaveMission(mMission); mission != mMissionRead && !MissionFile().empty()) {
       std::ofstream out(MissionFile(), std::ios::binary | std::ios::trunc);
       out.write(mission.data(), static_cast<std::streamsize>(mission.size()));
       if (!out) {
-        message =
-          "Saved " + file.string() + ", but the mission file " + MissionFile().string() + " couldn't be written";
-        return false;
+        return std::unexpected(
+          "Saved " + file.string() + ", but the mission file " + MissionFile().string() + " couldn't be written"
+        );
       }
       mMissionRead = mission;
     }
@@ -2702,8 +2649,9 @@ namespace faf::editor
       std::ofstream out(PathsFile(), std::ios::binary | std::ios::trunc);
       out.write(paths.data(), static_cast<std::streamsize>(paths.size()));
       if (!out) {
-        message = "Saved " + file.string() + ", but the paths file " + PathsFile().string() + " couldn't be written";
-        return false;
+        return std::unexpected(
+          "Saved " + file.string() + ", but the paths file " + PathsFile().string() + " couldn't be written"
+        );
       }
       mPathsRead = paths;
     }
@@ -2712,14 +2660,14 @@ namespace faf::editor
       std::ofstream out(LayoutFile(), std::ios::binary | std::ios::trunc);
       out.write(layout.data(), static_cast<std::streamsize>(layout.size()));
       if (!out) {
-        message = "Saved " + file.string() + ", but the layout file " + LayoutFile().string() + " couldn't be written";
-        return false;
+        return std::unexpected(
+          "Saved " + file.string() + ", but the layout file " + LayoutFile().string() + " couldn't be written"
+        );
       }
       mLayoutRead = layout;
     }
     mModified = false;
-    message = "Saved " + file.string() + note;
-    return true;
+    return "Saved " + file.string() + note;
   }
 
   void EdDocument::Close()

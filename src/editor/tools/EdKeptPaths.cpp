@@ -1366,10 +1366,12 @@ namespace faf::editor
     std::string& error
   )
   {
-    JsonTree root;
-    if (!ParseJsonTree(text, root, error)) {
+    const auto parsed = ParseJsonTree(text);
+    if (!parsed) {
+      error = parsed.error();
       return false;
     }
+    const JsonTree& root = *parsed;
     if (root.kind != JsonTree::Kind::Object) {
       error = "not a paths file";
       return false;

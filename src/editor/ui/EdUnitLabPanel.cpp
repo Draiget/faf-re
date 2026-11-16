@@ -125,7 +125,8 @@ namespace faf::editor
     }
     const std::string base = ModSourceUnit(*p, mUnit);
     const ModChanges before = ModChangesOf(*p);
-    if (!AddModDerived(*p, id, base, name, description, &EdUnitLabPanel::GameHasUnit, error)) {
+    if (const auto added = AddModDerived(*p, id, base, name, description, &EdUnitLabPanel::GameHasUnit); !added) {
+      error = added.error();
       return false;
     }
     (void)mProject.History().Record("derive " + id + " from " + base, before, ModChangesOf(*p), "", ImGui::GetTime());

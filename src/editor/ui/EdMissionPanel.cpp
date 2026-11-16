@@ -177,8 +177,7 @@ namespace faf::editor
     ask.z = static_cast<float>((z0 + z1) * 0.5);
     for (const SaveEntry& entry : save.Armies()) {
       UnitGroup root;
-      std::string error;
-      if (entry.name != army || !ParseUnitGroup(entry.Get("Units"), root, error)) {
+      if (entry.name != army || !ParseUnitGroup(entry.Get("Units"), root)) {
         continue;
       }
       std::vector<const SaveUnit*> units;
@@ -225,8 +224,7 @@ namespace faf::editor
     }
     for (const SaveEntry& army : save.Armies()) {
       UnitGroup root;
-      std::string error;
-      if (ParseUnitGroup(army.Get("Units"), root, error)) {
+      if (ParseUnitGroup(army.Get("Units"), root)) {
         CollectGroups(root, facts.groups[army.name]);
       }
       facts.builders[army.name] = MissionBuilderNames(army.Get("PlatoonBuilders"));
@@ -1537,8 +1535,7 @@ namespace faf::editor
       std::map<std::string, int> counts;
       for (const SaveEntry& army : mDocument.SaveData().Armies()) {
         UnitGroup root;
-        std::string error;
-        if (army.name == mFromArmy && ParseUnitGroup(army.Get("Units"), root, error)) {
+        if (army.name == mFromArmy && ParseUnitGroup(army.Get("Units"), root)) {
           (void)CountGroup(root, mFromGroup, counts);
         }
       }
@@ -1777,7 +1774,7 @@ namespace faf::editor
     for (const SaveEntry& army : mDocument.SaveData().Armies()) {
       UnitGroup root;
       std::string error;
-      if (ParseUnitGroup(army.Get("Units"), root, error)) {
+      if (ParseUnitGroup(army.Get("Units"), root)) {
         const auto walk = [&](auto&& self, const UnitGroup& g) -> void {
           groups += (templateKind ? g.platoon : g.orders) == name ? 1 : 0;
           for (const SaveUnit& u : g.units) {
@@ -1853,7 +1850,7 @@ namespace faf::editor
       for (SaveEntry& army : mDocument.SaveData().Armies()) {
         UnitGroup root;
         std::string error;
-        if (ParseUnitGroup(army.Get("Units"), root, error)) {
+        if (ParseUnitGroup(army.Get("Units"), root)) {
           int here = 0;
           const auto walk = [&](auto&& self, UnitGroup& g) -> void {
             std::string& own = templateKind ? g.platoon : g.orders;
@@ -1941,8 +1938,7 @@ namespace faf::editor
         EdDocument::SaveSnapshot before = mDocument.SaveDataNow();
         for (SaveEntry& army : mDocument.SaveData().Armies()) {
           UnitGroup root;
-          std::string error;
-          if (army.name != mAssignArmy || !ParseUnitGroup(army.Get("Units"), root, error)) {
+          if (army.name != mAssignArmy || !ParseUnitGroup(army.Get("Units"), root)) {
             continue;
           }
           bool done = false;

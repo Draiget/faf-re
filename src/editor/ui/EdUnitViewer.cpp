@@ -368,13 +368,17 @@ namespace faf::editor
     std::vector<std::uint8_t> dds;
     std::string error;
     ModProject* const project = mProject.Project();
-    if (
-      project == nullptr || !EncodeDds(image, DdsKind::Bc3, dds, error) ||
-      !ModWriteBinary(
-        *project, mProject.Folder(), ModUnitIconFile(mIconUnit), std::string(dds.begin(), dds.end()), error
-      )
-    ) {
+    if (project == nullptr || !EncodeDds(image, DdsKind::Bc3, dds, error)) {
       mStatus = "no icon: " + (error.empty() ? std::string("no project") : error);
+      gpg::Warnf("editor: unit viewer: %s", mStatus.c_str());
+      return;
+    }
+    if (
+      const auto written =
+        ModWriteBinary(*project, mProject.Folder(), ModUnitIconFile(mIconUnit), std::string(dds.begin(), dds.end()));
+      !written
+    ) {
+      mStatus = "no icon: " + (written.error().empty() ? std::string("no project") : written.error());
       gpg::Warnf("editor: unit viewer: %s", mStatus.c_str());
       return;
     }

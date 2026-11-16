@@ -536,17 +536,16 @@ namespace faf::editor
     return kind == "BeamBlueprint" ? kBeamFields : kTrailFields;
   }
 
-  bool ParseFlatBlueprint(
-    const std::string& text,
-    FlatBlueprint& out,
-    std::string& error
+  std::expected<FlatBlueprint, std::string> ParseFlatBlueprint(
+    const std::string& text
   )
   {
     Value root;
     Reader reader(text);
     std::string kind;
+    std::string error;
     if (!reader.Parse(root, error, {"BeamBlueprint", "TrailEmitterBlueprint"}, &kind)) {
-      return false;
+      return std::unexpected(std::move(error));
     }
     FlatBlueprint made;
     made.kind = kind;
@@ -589,8 +588,7 @@ namespace faf::editor
       }
       made.fields.emplace_back(field.key, std::move(flat));
     }
-    out = std::move(made);
-    return true;
+    return made;
   }
 
   std::string WriteFlatBlueprint(
@@ -723,16 +721,15 @@ namespace faf::editor
     return emitter;
   }
 
-  bool ParseEmitter(
-    const std::string& text,
-    EmitterBlueprint& out,
-    std::string& error
+  std::expected<EmitterBlueprint, std::string> ParseEmitter(
+    const std::string& text
   )
   {
     Value root;
     Reader reader(text);
+    std::string error;
     if (!reader.Parse(root, error)) {
-      return false;
+      return std::unexpected(std::move(error));
     }
     EmitterBlueprint emitter;
     for (EmitterCurve& curve : emitter.curves) {
@@ -810,8 +807,7 @@ namespace faf::editor
         emitter.extra.emplace_back(key, text.substr(value.begin, value.end - value.begin));
       }
     }
-    out = std::move(emitter);
-    return true;
+    return emitter;
   }
 
   float EmitterCurveValue(

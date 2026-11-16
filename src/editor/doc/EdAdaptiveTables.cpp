@@ -732,15 +732,14 @@ namespace faf::editor
     return prefix + (number > 9 ? std::to_string(number) : "0" + std::to_string(number));
   }
 
-  bool ParseAdaptiveTables(
+  std::expected<void, std::string> ParseAdaptiveTables(
     const std::string& text,
-    AdaptiveTables& tables,
-    std::string& error
+    AdaptiveTables& tables
   )
   {
     std::vector<Assignment> assignments;
-    if (!ReadAssignments(text, assignments, error)) {
-      return false;
+    if (std::string error; !ReadAssignments(text, assignments, error)) {
+      return std::unexpected(std::move(error));
     }
     tables = AdaptiveTables{};
     for (const Assignment& assignment : assignments) {
@@ -763,7 +762,7 @@ namespace faf::editor
         }
       }
     }
-    return true;
+    return {};
   }
 
   std::string WithAdaptiveTables(
@@ -810,7 +809,7 @@ namespace faf::editor
     }
     // Only the tables whose meaning changed are written (an untouched one keeps its layout and comments).
     AdaptiveTables before;
-    (void)ParseAdaptiveTables(text, before, error);
+    (void)ParseAdaptiveTables(text, before);
     const auto groupsOf = [](const AdaptiveTables& from, const std::string& name) {
       for (const auto& [option, groups] : from.options) {
         if (option == name) {

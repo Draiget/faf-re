@@ -58,8 +58,7 @@ namespace faf::editor
         }
         card.settings = ReadArmySettings(entry);
         UnitGroup root;
-        std::string error;
-        if (ParseUnitGroup(entry.Get("Units"), root, error)) {
+        if (ParseUnitGroup(entry.Get("Units"), root)) {
           card.units = static_cast<int>(UnitNamesIn(root).size());
           for (const UnitGroup& group : root.groups) {
             char text[96];

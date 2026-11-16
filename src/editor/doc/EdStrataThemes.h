@@ -5,6 +5,7 @@
 // user's own (saved from a map or imported from another map's file).
 
 #include <map>
+#include <expected>
 #include <string>
 #include <vector>
 
@@ -28,9 +29,9 @@ namespace faf::editor
     bool user = false;
   };
 
-  /** The themes of a `Themes = { ... }` (or `UserThemes = { ... }`) table; false with `error`. */
-  bool
-  ParseStrataThemes(const std::string& text, const char* tableName, std::vector<StrataTheme>& out, std::string& error);
+  /** The themes of a `Themes = { ... }` (or `UserThemes = { ... }`) table; the error otherwise. */
+  [[nodiscard]] std::expected<void, std::string>
+  ParseStrataThemes(const std::string& text, const char* tableName, std::vector<StrataTheme>& out);
   /** The user's themes as a `UserThemes = { ... }` table that ParseStrataThemes reads back. */
   [[nodiscard]] std::string WriteStrataThemes(const std::vector<StrataTheme>& themes);
   /** An id from a name: `user_` and its letters and digits, lower case, others as `_`. */

@@ -169,7 +169,8 @@ namespace faf::editor
   )
   {
     SaveFile save;
-    if (!save.Parse(saveText, error)) {
+    if (const auto parsed = save.Parse(saveText); !parsed) {
+      error = parsed.error();
       return {};
     }
     // Markers.
@@ -241,8 +242,7 @@ namespace faf::editor
         continue;
       }
       UnitGroup root;
-      std::string why;
-      if (!ParseUnitGroup(units, root, why)) {
+      if (!ParseUnitGroup(units, root)) {
         continue; // (left as it was: the editor can't read it)
       }
       ResizeGroup(root, g, report);

@@ -4,6 +4,7 @@
 #include "editor/doc/EdSkybox.h"
 #include "editor/doc/EdWater.h"
 
+#include <expected>
 #include <string>
 #include <utility>
 #include <vector>
@@ -49,8 +50,8 @@ namespace faf::editor
   /**
    * A map's look from its `.scmap` bytes, read as CWldTerrainRes::Load and the headless loader walk the file: the
    * environment lookups, lighting, water (CWaterShaderProperties::Load 0x008A03C0), and past the waves, texturing,
-   * masks and terrain types, the sky (SkyDome::Load 0x00815FA0, from version 0x3A). False with `error` for a file it
-   * can't follow; a file that ends before the sky gives the rest with `hasSky` false.
+   * masks and terrain types, the sky (SkyDome::Load 0x00815FA0, from version 0x3A). The error for a file it can't
+   * follow; a file that ends before the sky gives the rest with `hasSky` false.
    */
-  bool LookFromScmap(const std::string& bytes, Look& look, std::string& error);
+  [[nodiscard]] std::expected<Look, std::string> LookFromScmap(const std::string& bytes);
 } // namespace faf::editor

@@ -613,30 +613,26 @@ namespace faf::editor
     return out + "}\n";
   }
 
-  bool AddModDerived(
+  std::expected<void, std::string> AddModDerived(
     ModProject& project,
     const std::string& id,
     const std::string& base,
     const std::string& name,
     const std::string& description,
-    const std::function<bool(const std::string&)>& gameHas,
-    std::string& error
+    const std::function<bool(const std::string&)>& gameHas
   )
   {
     if (!ModUnitIdOk(id) || id.size() < 6) {
-      error = "a unit id is lower case letters and digits, at least 6 (like xel0201)";
-      return false;
+      return std::unexpected("a unit id is lower case letters and digits, at least 6 (like xel0201)");
     }
     if (project.derived.contains(id) || (gameHas && gameHas(id))) {
-      error = "there is a unit " + id + " already";
-      return false;
+      return std::unexpected("there is a unit " + id + " already");
     }
     if (!gameHas || !gameHas(base)) {
-      error = "the game has no unit " + base + " to derive from";
-      return false;
+      return std::unexpected("the game has no unit " + base + " to derive from");
     }
     project.derived[id] = {base, name, description};
-    return true;
+    return {};
   }
 
   std::string ModSourceUnit(
@@ -752,16 +748,13 @@ namespace faf::editor
     return out;
   }
 
-  bool LoadModProject(
-    const std::string& text,
-    ModProject& project,
-    std::string& error
+  std::expected<ModProject, std::string> LoadModProject(
+    const std::string& text
   )
   {
     std::map<std::string, std::pair<std::string, bool>> root;
     if (!ReadObject(text, root) || !root.contains("editorModProject")) {
-      error = "not an editor mod project file";
-      return false;
+      return std::unexpected("not an editor mod project file");
     }
     ModProject p;
     const auto str = [&](const char* key, std::string& out) {
@@ -780,14 +773,12 @@ namespace faf::editor
       for (const std::string& object : ReadArray(it->second.first)) {
         std::map<std::string, std::pair<std::string, bool>> e;
         if (!ReadObject(object, e) || !e.contains("id") || !e.contains("key") || !e.contains("value")) {
-          error = "an edit without its unit, key or value";
-          return false;
+          return std::unexpected("an edit without its unit, key or value");
         }
         char* end = nullptr;
         const double value = std::strtod(e["value"].first.c_str(), &end);
         if (end == e["value"].first.c_str() || !std::isfinite(value)) {
-          error = "an edit's value isn't a number: " + e["value"].first;
-          return false;
+          return std::unexpected("an edit's value isn't a number: " + e["value"].first);
         }
         p.edits[e["id"].first][e["key"].first] = value;
       }
@@ -804,8 +795,7 @@ namespace faf::editor
       for (const std::string& object : ReadArray(it->second.first)) {
         std::map<std::string, std::pair<std::string, bool>> d;
         if (!ReadObject(object, d) || !d.contains("id") || !d.contains("base")) {
-          error = "a derived unit without its id or base";
-          return false;
+          return std::unexpected("a derived unit without its id or base");
         }
         p.derived[d["id"].first] = {
           d["base"].first,
@@ -817,8 +807,7 @@ namespace faf::editor
         };
       }
     }
-    project = std::move(p);
-    return true;
+    return p;
   }
 
   ModWriteReport WriteModProject(
@@ -852,9 +841,7 @@ namespace faf::editor
     const std::filesystem::path editsFile = folder / "editor_project.json";
     std::string previous;
     if (ReadFile(editsFile, previous)) {
-      ModProject check;
-      std::string error;
-      if (LoadModProject(previous, check, error)) {
+      if (LoadModProject(previous)) {
         (void)WriteFile(folder / "editor_project.json.bak", previous);
       }
     }
@@ -1099,58 +1086,48 @@ namespace faf::editor
     return "icons/units/" + id + "_icon.dds";
   }
 
-  bool ModWriteGenerated(
+  std::expected<void, std::string> ModWriteGenerated(
     const std::filesystem::path& folder,
     const std::string& relative,
-    const std::string& text,
-    std::string& error
+    const std::string& text
   )
   {
     if (relative.empty() || relative.contains("..") || relative.front() == '/') {
-      error = relative + ": not a path inside the project";
-      return false;
+      return std::unexpected(relative + ": not a path inside the project");
     }
     const std::filesystem::path path = folder / relative;
     if (!OursOrMissing(path)) {
-      error = relative + ": not written (the file isn't one the project made)";
-      return false;
+      return std::unexpected(relative + ": not written (the file isn't one the project made)");
     }
     if (!WriteFile(path, text)) {
-      error = relative + ": couldn't be written";
-      return false;
+      return std::unexpected(relative + ": couldn't be written");
     }
-    return true;
+    return {};
   }
 
-  bool ModWriteBinary(
+  std::expected<void, std::string> ModWriteBinary(
     ModProject& project,
     const std::filesystem::path& folder,
     const std::string& relative,
-    const std::string& bytes,
-    std::string& error
+    const std::string& bytes
   )
   {
     if (relative.empty() || relative.contains("..") || relative.front() == '/') {
-      error = relative + ": not a path inside the project";
-      return false;
+      return std::unexpected(relative + ": not a path inside the project");
     }
     std::error_code ec;
     if (!project.files.contains(relative) && std::filesystem::exists(folder / relative, ec)) {
-      error = relative + ": not written (the file isn't one the project made)";
-      return false;
+      return std::unexpected(relative + ": not written (the file isn't one the project made)");
     }
     if (!WriteFile(folder / relative, bytes)) {
-      error = relative + ": couldn't be written";
-      return false;
+      return std::unexpected(relative + ": couldn't be written");
     }
     project.files.insert(relative);
-    return true;
+    return {};
   }
 
-  bool OpenModProject(
+  std::expected<ModProject, std::string> OpenModProject(
     const std::filesystem::path& folder,
-    ModProject& project,
-    std::string& error,
     bool* fromBackup
   )
   {
@@ -1159,19 +1136,25 @@ namespace faf::editor
     }
     std::string text;
     std::string why;
-    bool ok = ReadFile(folder / "editor_project.json", text) && LoadModProject(text, project, why);
-    if (!ok) {
-      std::string backupWhy;
-      if (ReadFile(folder / "editor_project.json.bak", text) && LoadModProject(text, project, backupWhy)) {
-        ok = true;
-        if (fromBackup != nullptr) {
-          *fromBackup = true;
-        }
-      } else {
-        error = why.empty() ? "no editor_project.json" : why;
-        return false;
+    std::expected<ModProject, std::string> loaded = std::unexpected(std::string());
+    if (ReadFile(folder / "editor_project.json", text)) {
+      loaded = LoadModProject(text);
+      if (!loaded) {
+        why = loaded.error();
       }
     }
+    if (!loaded) {
+      if (ReadFile(folder / "editor_project.json.bak", text)) {
+        loaded = LoadModProject(text);
+      }
+      if (!loaded) {
+        return std::unexpected(why.empty() ? "no editor_project.json" : why);
+      }
+      if (fromBackup != nullptr) {
+        *fromBackup = true;
+      }
+    }
+    ModProject project = std::move(*loaded);
     std::string info;
     if (ReadFile(folder / "mod_info.lua", info)) {
       project.uid = ModInfoUid(info);
@@ -1182,7 +1165,7 @@ namespace faf::editor
     if (project.name.empty()) {
       project.name = folder.filename().string();
     }
-    return true;
+    return project;
   }
 
   std::vector<std::string> ModProjectsIn(

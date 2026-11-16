@@ -52,17 +52,15 @@ namespace faf::editor
     return LayerObject(layer, "");
   }
 
-  bool LayerFromScmsl(
+  std::expected<void, std::string> LayerFromScmsl(
     const std::string& text,
-    LayerSettings& layer,
-    std::string& error
+    LayerSettings& layer
   )
   {
     if (!ReadLayer(text, layer)) {
-      error = "not a layer settings file (no AlbedoPath or AlbedoScale)";
-      return false;
+      return std::unexpected("not a layer settings file (no AlbedoPath or AlbedoScale)");
     }
-    return true;
+    return {};
   }
 
   std::string LayersToScmst(
@@ -78,25 +76,23 @@ namespace faf::editor
     return out + "\n}";
   }
 
-  bool LayersFromScmst(
+  std::expected<void, std::string> LayersFromScmst(
     const std::string& text,
     std::string& shader,
-    std::vector<LayerSettings>& layers,
-    std::string& error
+    std::vector<LayerSettings>& layers
   )
   {
     std::vector<LayerSettings> read(10);
     for (std::size_t i = 0; i < 10; ++i) {
       std::string object;
       if (!JsonValue(text, "Stratum" + std::to_string(i), object) || !ReadLayer(object, read[i])) {
-        error = "not a layer set file (no Stratum" + std::to_string(i) + ")";
-        return false;
+        return std::unexpected("not a layer set file (no Stratum" + std::to_string(i) + ")");
       }
     }
     std::string name;
     (void)JsonValue(text, "ShaderName", name);
     shader = name;
     layers = std::move(read);
-    return true;
+    return {};
   }
 } // namespace faf::editor

@@ -241,21 +241,22 @@ namespace faf::editor
     return IsNumber() ? std::strtod(atom.c_str(), nullptr) : fallback;
   }
 
-  bool ReadLuaValue(
+  std::expected<LuaText, std::string> ReadLuaValue(
     const std::string& text,
-    std::size_t at,
-    LuaText& value,
-    std::string& error
+    std::size_t at
   )
   {
-    return ReadValue(text, at, value, error, 0);
+    LuaText value;
+    std::string error;
+    if (!ReadValue(text, at, value, error, 0)) {
+      return std::unexpected(std::move(error));
+    }
+    return value;
   }
 
-  bool ReadLuaAssignment(
+  std::expected<LuaText, std::string> ReadLuaAssignment(
     const std::string& text,
-    const std::string& name,
-    LuaText& value,
-    std::string& error
+    const std::string& name
   )
   {
     // The assignment at the top level: braces and strings outside it are skipped.
@@ -294,15 +295,19 @@ namespace faf::editor
           text[equals] == '='
         ) {
           at = equals + 1;
-          return ReadValue(text, at, value, error, 0);
+          LuaText value;
+          std::string error;
+          if (!ReadValue(text, at, value, error, 0)) {
+            return std::unexpected(std::move(error));
+          }
+          return value;
         }
         at = end;
         continue;
       }
       ++at;
     }
-    error = "no " + name + " = ...";
-    return false;
+    return std::unexpected("no " + name + " = ...");
   }
 
   std::string LuaNumber(

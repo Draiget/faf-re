@@ -241,8 +241,7 @@ namespace faf::editor
     UnitGroup root;
     std::vector<std::string> path;
     for (const SaveEntry& army : mDocument.SaveData().Armies()) {
-      std::string error;
-      if (army.name == unit.owner && ParseUnitGroup(army.Get("Units"), root, error)) {
+      if (army.name == unit.owner && ParseUnitGroup(army.Get("Units"), root)) {
         path = UnitGroupPath(root, unit.name);
       }
     }

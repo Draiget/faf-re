@@ -308,13 +308,16 @@ namespace faf::editor
       call.headers = "Content-Type: application/x-www-form-urlencoded\r\nAccept: application/json\r\n";
       call.body = Form(fields);
       std::string body;
-      if (!HttpRequest(call, status, body, error)) {
+      if (const auto sent = HttpRequest(call, status, body); !sent) {
+        error = sent.error();
         return false;
       }
-      if (!ParseJson(body, answer, error)) {
+      auto parsed = ParseJson(body);
+      if (!parsed) {
         error = "FAF's login answered " + std::to_string(status) + " with text that isn't JSON";
         return false;
       }
+      answer = std::move(*parsed);
       return true;
     }
   } // namespace
@@ -370,24 +373,20 @@ namespace faf::editor
     return value != nullptr && value->kind == Kind::Bool && value->boolean;
   }
 
-  bool ParseJson(
-    const std::string& text,
-    JsonNode& out,
-    std::string& error
+  std::expected<JsonNode, std::string> ParseJson(
+    const std::string& text
   )
   {
     JsonReader reader{text, 0, {}};
-    out = JsonNode{};
+    JsonNode out;
     if (!reader.Value(out, 0)) {
-      error = reader.error;
-      return false;
+      return std::unexpected(reader.error);
     }
     reader.Space();
     if (reader.at != text.size()) {
-      error = "text after the value";
-      return false;
+      return std::unexpected("text after the value");
     }
-    return true;
+    return out;
   }
 
   namespace
@@ -577,28 +576,27 @@ namespace faf::editor
     return any;
   }
 
-  bool ParseVaultSearch(
+  std::expected<void, std::string> ParseVaultSearch(
     const std::string& json,
     std::vector<VaultMap>& maps,
-    int& pages,
-    std::string& error
+    int& pages
   )
   {
-    JsonNode root;
-    if (!ParseJson(json, root, error)) {
-      return false;
+    const auto parsed = ParseJson(json);
+    if (!parsed) {
+      return std::unexpected(parsed.error());
     }
+    const JsonNode& root = *parsed;
     if (const JsonNode* const errors = root.Get("errors"); errors != nullptr && !errors->items.empty()) {
-      error = errors->items.front().String("detail");
+      std::string error = errors->items.front().String("detail");
       if (error.empty()) {
         error = errors->items.front().String("title");
       }
-      return false;
+      return std::unexpected(std::move(error));
     }
     const JsonNode* const data = root.Get("data");
     if (data == nullptr || data->kind != JsonNode::Kind::Array) {
-      error = "the answer has no maps";
-      return false;
+      return std::unexpected("the answer has no maps");
     }
     for (const JsonNode& item : data->items) {
       const JsonNode* const attributes = item.Get("attributes");
@@ -643,7 +641,7 @@ namespace faf::editor
         pages = std::max(1, static_cast<int>(page->Number("totalPages", 1.0)));
       }
     }
-    return true;
+    return {};
   }
 
   EdFafSession::~EdFafSession()
@@ -704,13 +702,21 @@ namespace faf::editor
     long status = 0;
     std::string body;
     std::string error;
-    JsonNode me;
-    if (!HttpRequest(call, status, body, error) || status != 200 || !ParseJson(body, me, error)) {
+    std::expected<JsonNode, std::string> me = std::unexpected(std::string());
+    if (const auto sent = HttpRequest(call, status, body); !sent) {
+      error = sent.error();
+    } else if (status == 200) {
+      me = ParseJson(body);
+      if (!me) {
+        error = me.error();
+      }
+    }
+    if (!me) {
       FafLog("editor: FAF: /me answered %ld%s%s", status, error.empty() ? "" : ": ", error.c_str());
       return;
     }
     std::string name;
-    if (const JsonNode* const data = me.Get("data")) {
+    if (const JsonNode* const data = me->Get("data")) {
       if (const JsonNode* const attributes = data->Get("attributes")) {
         name = attributes->String("userName");
         if (name.empty()) {
@@ -782,9 +788,7 @@ namespace faf::editor
     }
   }
 
-  bool EdFafSession::RefreshAccess(
-    std::string& error
-  )
+  std::expected<void, std::string> EdFafSession::RefreshAccess()
   {
     std::string refresh;
     {
@@ -792,11 +796,11 @@ namespace faf::editor
       refresh = mRefreshToken;
     }
     if (refresh.empty()) {
-      error = "not logged in";
-      return false;
+      return std::unexpected("not logged in");
     }
     long status = 0;
     JsonNode answer;
+    std::string error;
     if (!PostForm(
           "/oauth2/token",
           {{"grant_type", "refresh_token"}, {"refresh_token", refresh}, {"client_id", kFafClientId}},
@@ -804,13 +808,12 @@ namespace faf::editor
           answer,
           error
         )) {
-      return false;
+      return std::unexpected(std::move(error));
     }
     if (status != 200 || answer.String("access_token").empty()) {
-      error = "FAF's login refused the kept login (" + answer.String("error") + "); log in again";
       std::lock_guard<std::mutex> lock(mLock);
       mRefreshToken.clear();
-      return false;
+      return std::unexpected("FAF's login refused the kept login (" + answer.String("error") + "); log in again");
     }
     {
       std::lock_guard<std::mutex> lock(mLock);
@@ -820,7 +823,7 @@ namespace faf::editor
       }
     }
     SaveRefreshToken();
-    return true;
+    return {};
   }
 
   void EdFafSession::Resume()
@@ -834,14 +837,13 @@ namespace faf::editor
     mState = State::Working;
     SetMessage("Logging in to FAF...");
     Run([this] {
-      std::string error;
-      if (RefreshAccess(error)) {
+      if (const auto refreshed = RefreshAccess()) {
         FetchUserName();
         mState = State::LoggedIn;
         SetMessage("Logged in to FAF");
       } else {
         mState = State::LoggedOut;
-        SetMessage(error);
+        SetMessage(refreshed.error());
         SaveRefreshToken();
       }
     });
@@ -1028,27 +1030,27 @@ namespace faf::editor
           call.body = MapUploadBody(boundary, zip.filename().string(), bytes, ranked);
           long status = 0;
           std::string body;
-          std::string error;
-          if (!HttpRequest(call, status, body, error)) {
-            result.message = "The upload didn't reach FAF: " + error;
+          if (const auto sent = HttpRequest(call, status, body); !sent) {
+            result.message = "The upload didn't reach FAF: " + sent.error();
             break;
           }
-          if (status == 401 && attempt == 0 && RefreshAccess(error)) {
+          if (status == 401 && attempt == 0 && RefreshAccess()) {
             continue;
           }
           if (status >= 200 && status < 300) {
             result.ok = true;
             result.message = "Uploaded to the FAF vault: " + zip.filename().string();
           } else {
-            JsonNode answer;
             std::string detail;
-            if (ParseJson(body, answer, detail)) {
-              if (const JsonNode* const errors = answer.Get("errors"); errors != nullptr && !errors->items.empty()) {
+            if (const auto answer = ParseJson(body)) {
+              if (const JsonNode* const errors = answer->Get("errors"); errors != nullptr && !errors->items.empty()) {
                 detail = errors->items.front().String("detail");
                 if (detail.empty()) {
                   detail = errors->items.front().String("title");
                 }
               }
+            } else {
+              detail = answer.error();
             }
             result.message = "FAF's vault answered " + std::to_string(status) + (detail.empty() ? "" : ": " + detail);
           }
@@ -1072,7 +1074,9 @@ namespace faf::editor
       std::string error;
       std::vector<VaultMap> maps;
       int pages = 0;
-      (void)FetchMaps(query, page, maps, pages, error);
+      if (const auto fetched = FetchMaps(query, page, maps, pages); !fetched) {
+        error = fetched.error();
+      }
       {
         std::lock_guard<std::mutex> lock(mLock);
         mResults = std::move(maps);
@@ -1099,7 +1103,9 @@ namespace faf::editor
     Run([this, name, query] {
       Named result;
       int pages = 0;
-      (void)FetchMaps(query, 1, result.maps, pages, result.error);
+      if (const auto fetched = FetchMaps(query, 1, result.maps, pages); !fetched) {
+        result.error = fetched.error();
+      }
       result.done = true;
       std::lock_guard<std::mutex> lock(mLock);
       mNamed[name] = std::move(result);
@@ -1130,14 +1136,14 @@ namespace faf::editor
     return mNamed.contains(name);
   }
 
-  bool EdFafSession::FetchMaps(
+  std::expected<void, std::string> EdFafSession::FetchMaps(
     const VaultQuery& query,
     const int page,
     std::vector<VaultMap>& maps,
-    int& pages,
-    std::string& error
+    int& pages
   )
   {
+    std::string error;
     {
       for (int attempt = 0; attempt < 2; ++attempt) {
         HttpCall call;
@@ -1148,12 +1154,14 @@ namespace faf::editor
         }
         long status = 0;
         std::string body;
-        if (!HttpRequest(call, status, body, error)) {
+        if (const auto sent = HttpRequest(call, status, body); !sent) {
+          error = sent.error();
           break;
         }
         if (status == 401 && attempt == 0) {
           // The access token lasts an hour: a new one from the refresh token, then the search again.
-          if (!RefreshAccess(error)) {
+          if (const auto refreshed = RefreshAccess(); !refreshed) {
+            error = refreshed.error();
             mState = State::LoggedOut;
             break;
           }
@@ -1161,24 +1169,29 @@ namespace faf::editor
         }
         if (status != 200) {
           // The API says what it didn't take (a filter or an order it doesn't know).
-          JsonNode answer;
           std::string detail;
-          if (ParseJson(body, answer, detail)) {
-            if (const JsonNode* const errors = answer.Get("errors"); errors != nullptr && !errors->items.empty()) {
+          if (const auto answer = ParseJson(body)) {
+            if (const JsonNode* const errors = answer->Get("errors"); errors != nullptr && !errors->items.empty()) {
               detail = errors->items.front().String("detail");
             }
+          } else {
+            detail = answer.error();
           }
           error = "FAF's map API answered " + std::to_string(status) + (detail.empty() ? "" : ": " + detail);
           break;
         }
-        if (!ParseVaultSearch(body, maps, pages, error)) {
+        if (const auto read = ParseVaultSearch(body, maps, pages); !read) {
+          error = read.error();
           break;
         }
         error.clear();
         break;
       }
     }
-    return error.empty();
+    if (!error.empty()) {
+      return std::unexpected(std::move(error));
+    }
+    return {};
   }
 
   bool EdFafSession::TakeResults(
@@ -1244,8 +1257,7 @@ namespace faf::editor
             HttpCall call;
             call.url = next;
             long status = 0;
-            std::string error;
-            ok = HttpRequest(call, status, body, error) && status == 200 && !body.empty();
+            ok = HttpRequest(call, status, body) && status == 200 && !body.empty();
             if (ok && !own.empty()) {
               std::error_code code;
               std::filesystem::create_directories(own.parent_path(), code);

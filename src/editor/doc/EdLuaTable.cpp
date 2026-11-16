@@ -297,10 +297,9 @@ namespace faf::editor
     };
   } // namespace
 
-  bool ParseLuaAssignments(
+  std::expected<void, std::string> ParseLuaAssignments(
     const std::string& text,
-    JsonTree& out,
-    std::string& error
+    JsonTree& out
   )
   {
     Reader r{text, 0, {}};
@@ -308,7 +307,7 @@ namespace faf::editor
     for (;;) {
       r.Space();
       if (r.at >= text.size()) {
-        return true;
+        return {};
       }
       std::string name;
       if (text.compare(r.at, 6, "local ") == 0) {
@@ -316,8 +315,7 @@ namespace faf::editor
         r.Space();
       }
       if (!r.Name(name)) {
-        error = "a name expected at offset " + std::to_string(r.at);
-        return false;
+        return std::unexpected("a name expected at offset " + std::to_string(r.at));
       }
       r.Space();
       if (r.at >= text.size() || text[r.at] != '=') {
@@ -325,37 +323,32 @@ namespace faf::editor
         JsonTree value;
         if (r.at < text.size() && text[r.at] == '{') {
           if (!r.Table(value, 0)) {
-            error = r.error;
-            return false;
+            return std::unexpected(r.error);
           }
           value.Set("__call", JsonTree::Text(name));
           out.fields.emplace_back(name, std::move(value));
           continue;
         }
-        error = "'=' expected after " + name + " at offset " + std::to_string(r.at);
-        return false;
+        return std::unexpected("'=' expected after " + name + " at offset " + std::to_string(r.at));
       }
       ++r.at;
       JsonTree value;
       if (!r.Value(value, 0)) {
-        error = r.error;
-        return false;
+        return std::unexpected(r.error);
       }
       out.fields.emplace_back(name, std::move(value));
     }
   }
 
-  bool ParseLuaValue(
-    const std::string& text,
-    JsonTree& out,
-    std::string& error
+  std::expected<JsonTree, std::string> ParseLuaValue(
+    const std::string& text
   )
   {
     Reader r{text, 0, {}};
+    JsonTree out;
     if (!r.Value(out, 0)) {
-      error = r.error;
-      return false;
+      return std::unexpected(r.error);
     }
-    return true;
+    return out;
   }
 } // namespace faf::editor

@@ -384,11 +384,11 @@ namespace faf::editor
     return value ? "BOOLEAN( true )" : "BOOLEAN( false )";
   }
 
-  bool SaveFile::Parse(
-    std::string text,
-    std::string& error
+  std::expected<void, std::string> SaveFile::Parse(
+    std::string text
   )
   {
+    std::string error;
     mText = std::move(text);
     mMarkerBlock = {};
     mAreaBlock = {};
@@ -408,22 +408,19 @@ namespace faf::editor
     ) {
       mMarkerBlock.found = true;
       if (!ParseEntries(mText, mMarkerBlock.open, mMarkerBlock.close, mMarkers, error, &mMarkerBlock.spans)) {
-        error = "markers: " + error;
-        return false;
+        return std::unexpected("markers: " + error);
       }
     }
     if (FindBlock(mText, std::regex(R"(Areas\s*=\s*\{)"), 0, mAreaBlock.open, mAreaBlock.close, mAreaBlock.indent)) {
       mAreaBlock.found = true;
       if (!ParseEntries(mText, mAreaBlock.open, mAreaBlock.close, mAreas, error, &mAreaBlock.spans)) {
-        error = "areas: " + error;
-        return false;
+        return std::unexpected("areas: " + error);
       }
     }
     if (FindBlock(mText, std::regex(R"(\bArmies\s*=\s*\{)"), 0, mArmyBlock.open, mArmyBlock.close, mArmyBlock.indent)) {
       mArmyBlock.found = true;
       if (!ParseEntries(mText, mArmyBlock.open, mArmyBlock.close, mArmies, error, &mArmyBlock.spans)) {
-        error = "armies: " + error;
-        return false;
+        return std::unexpected("armies: " + error);
       }
     }
     // The chains: `['name'] = { Markers = { "a", "b", }, },` each.
@@ -448,7 +445,7 @@ namespace faf::editor
     mAreasRead = mAreas;
     mArmiesRead = mArmies;
     mChainsRead = mChains;
-    return true;
+    return {};
   }
 
   std::string SaveFile::ChainsText(
@@ -481,8 +478,7 @@ namespace faf::editor
 
   void SaveFile::MarkSaved()
   {
-    std::string error;
-    (void)Parse(Text(), error);
+    (void)Parse(Text());
   }
 
   bool SaveFile::Changed() const

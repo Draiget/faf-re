@@ -1,5 +1,6 @@
 #pragma once
 
+#include <expected>
 #include <filesystem>
 #include <functional>
 #include <map>
@@ -112,16 +113,15 @@ namespace faf::editor
 
   /**
    * Adds a derived unit: `id` lower case letters and digits, at least 6, not a unit the game has (`gameHas`) or the
-   * project derived already; `base` one the game has. False with `error`.
+   * project derived already; `base` one the game has. The error otherwise.
    */
-  bool AddModDerived(
+  [[nodiscard]] std::expected<void, std::string> AddModDerived(
     ModProject& project,
     const std::string& id,
     const std::string& base,
     const std::string& name,
     const std::string& description,
-    const std::function<bool(const std::string&)>& gameHas,
-    std::string& error
+    const std::function<bool(const std::string&)>& gameHas
   );
   /** The unit whose blueprint a unit's fields and weapons come from: a derived unit's base, else itself. */
   [[nodiscard]] std::string ModSourceUnit(const ModProject& project, const std::string& id);
@@ -175,7 +175,7 @@ namespace faf::editor
   extern const char* const kModHookFile;
 
   [[nodiscard]] std::string SaveModProject(const ModProject& project);
-  bool LoadModProject(const std::string& text, ModProject& project, std::string& error);
+  [[nodiscard]] std::expected<ModProject, std::string> LoadModProject(const std::string& text);
 
   /** Whether a text compiles as Lua (the editor's Lua; empty: it does). */
   using ModLuaCheck = std::function<std::string(const std::string& text, const std::string& name)>;
@@ -199,24 +199,19 @@ namespace faf::editor
   );
   /**
    * Writes one generated file into a project folder (through a temporary file), unless a file is there the project
-   * didn't make (no mark on its first line); false with `error`.
+   * didn't make (no mark on its first line); the error otherwise.
    */
-  bool ModWriteGenerated(
-    const std::filesystem::path& folder,
-    const std::string& relative,
-    const std::string& text,
-    std::string& error
-  );
+  [[nodiscard]] std::expected<void, std::string>
+  ModWriteGenerated(const std::filesystem::path& folder, const std::string& relative, const std::string& text);
   /**
    * Writes a binary file into the project (an icon), over one there only when the project wrote it (its `files`
-   * list), and adds it to that list; false with `error`.
+   * list), and adds it to that list; the error otherwise.
    */
-  bool ModWriteBinary(
+  [[nodiscard]] std::expected<void, std::string> ModWriteBinary(
     ModProject& project,
     const std::filesystem::path& folder,
     const std::string& relative,
-    const std::string& bytes,
-    std::string& error
+    const std::string& bytes
   );
   /** What the checks know about the game and the disk. */
   struct ModCheckFacts
@@ -253,12 +248,8 @@ namespace faf::editor
   [[nodiscard]] ModRelease PlanModRelease(const ModProject& project, const std::vector<std::string>& files);
 
   /** Reads a project folder: editor_project.json, else its .bak (`fromBackup`); the uid from mod_info.lua. */
-  bool OpenModProject(
-    const std::filesystem::path& folder,
-    ModProject& project,
-    std::string& error,
-    bool* fromBackup = nullptr
-  );
+  [[nodiscard]] std::expected<ModProject, std::string>
+  OpenModProject(const std::filesystem::path& folder, bool* fromBackup = nullptr);
   /** The projects in a mods folder (folders with an editor_project.json), sorted. */
   [[nodiscard]] std::vector<std::string> ModProjectsIn(const std::filesystem::path& mods);
 } // namespace faf::editor
