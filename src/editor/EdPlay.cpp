@@ -5,6 +5,8 @@
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
+#include "gpg/core/utils/Global.h"
+
 #include <Windows.h>
 #include <psapi.h>
 
@@ -1261,9 +1263,8 @@ end
       return "Playing";
     case moho::EWldFrameAction::Exit:
       return "Ending";
-    default:
-      return "";
     }
+    FAF_UNREACHABLE();
   }
 
   void EdPlay::ReadCommandLine()

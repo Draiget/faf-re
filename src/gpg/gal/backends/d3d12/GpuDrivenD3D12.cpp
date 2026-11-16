@@ -5,6 +5,8 @@
 
 #include "GpuDrivenD3D12.h"
 
+#include "gpg/core/utils/Global.h"
+
 #include <algorithm>
 #include <cstring>
 #include <string>
@@ -74,9 +76,9 @@ namespace gpg::gal
       case GpuStencilOp::Decrement:
         return D3D12_STENCIL_OP_DECR;
       case GpuStencilOp::Keep:
-      default:
         return D3D12_STENCIL_OP_KEEP;
       }
+      FAF_UNREACHABLE();
     }
 
     [[nodiscard]] D3D12_DEPTH_STENCILOP_DESC ToD3D12(
