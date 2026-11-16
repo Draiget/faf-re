@@ -15,7 +15,7 @@
 #define NOMINMAX
 #endif
 // clang-format off
-#include <windows.h>
+#include <Windows.h>
 #include <bcrypt.h>
 // clang-format on
 #else

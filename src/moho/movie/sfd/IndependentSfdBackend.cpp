@@ -15,7 +15,7 @@
 #include <set>
 #include <stdexcept>
 #include <thread>
-#include <windows.h>
+#include <Windows.h>
 #if FAFRE_PLATFORM_POSIX
 #include "platform/posix/NativePath.h"
 #endif

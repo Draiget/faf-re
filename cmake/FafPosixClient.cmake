@@ -271,6 +271,12 @@ target_include_directories(faf_ffmpeg SYSTEM INTERFACE "${_faf_ffmpeg_prefix}/in
 target_link_libraries(faf_ffmpeg INTERFACE m)
 
 add_library(faf_client_objs OBJECT ${_faf_client_files})
+if(FAFRE_PLATFORM_MACOS) # APFS is case-insensitive: <windows.h> finds the stand-in Windows.h
+  # gpg/gal/backends/common/ImageCodec.h spells <windows.h> for faf_client_imaging, where DirectX-Headers'
+  # adapter is that lowercase file; here it meets platform/posix/win32/Windows.h. Linux's case-sensitive
+  # build still turns a wrong spelling into an error.
+  target_compile_options(faf_client_objs PRIVATE -Wno-nonportable-include-path)
+endif()
 # The application shell's event tables cast their handlers as the 2.4 window library's did; the
 # same per-source exception as the Windows build (cmake/FafWarnings.cmake, src/CMakeLists.txt).
 foreach(_src IN LISTS FAF_SHELL_EVENT_TABLE_SOURCES)
@@ -305,6 +311,13 @@ target_sources(faf_client PRIVATE "${PROJECT_SOURCE_DIR}/src/headless/GameEntry.
 # headless links faf_sim alone.
 target_link_libraries(faf_client PRIVATE faf_sim faf_client_objs faf_client_dxc faf_client_imaging faf_directxtex_linux)
 target_link_options(faf_client PRIVATE ${FAF_LINK_ALL_ERRORS})
+# The engine's own Lua hooks and effects, which the engine mounts from the `fafengine` folder next to
+# the executable at /fafengine, replaced on every build as the Windows build does (src/CMakeLists.txt).
+add_custom_command(TARGET faf_client POST_BUILD
+  COMMAND "${CMAKE_COMMAND}" -E rm -rf "$<TARGET_FILE_DIR:faf_client>/fafengine"
+  COMMAND "${CMAKE_COMMAND}" -E copy_directory "${PROJECT_SOURCE_DIR}/data/fafengine"
+          "$<TARGET_FILE_DIR:faf_client>/fafengine"
+  VERBATIM)
 if(FAFRE_PLATFORM_MACOS) # MoltenVK and a source-built DXC: neither ships for macOS
   # The shader compiler: DXC v1.9.2609 (cmake/FafDependencies.cmake, dxc-source) built with DXC's own
   # settings (cmake/caches/PredefinedParams.cmake: SPIR-V on, no LLVM targets), the dxcompiler library

@@ -9,7 +9,7 @@
 
 // DirectSound requires the multimedia types even with WIN32_LEAN_AND_MEAN.
 // clang-format off
-#include <windows.h>
+#include <Windows.h>
 #include <mmsystem.h>
 #include <dsound.h>
 // clang-format on

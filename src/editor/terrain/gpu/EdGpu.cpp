@@ -408,7 +408,7 @@ namespace faf::editor::gpu
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
-#include <windows.h>
+#include <Windows.h>
 
 #include <d3d11.h>
 #include <dxgi.h>

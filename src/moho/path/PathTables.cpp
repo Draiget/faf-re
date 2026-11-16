@@ -37,7 +37,7 @@
 #include "moho/sim/STIMap.h"
 
 #if FAFRE_PLATFORM_WINDOWS
-#include <windows.h>
+#include <Windows.h>
 #endif
 #include "gpg/core/reflection/StaticInitPhase.h"
 

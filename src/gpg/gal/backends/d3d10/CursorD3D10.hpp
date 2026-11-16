@@ -2,7 +2,7 @@
 
 #include <cstddef>
 
-#include <windows.h>
+#include <Windows.h>
 
 namespace gpg::gal
 {

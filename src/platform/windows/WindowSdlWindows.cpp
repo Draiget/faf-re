@@ -11,7 +11,7 @@
 
 #include <SDL3/SDL.h>
 
-#include <windows.h>
+#include <Windows.h>
 #include <commctrl.h>
 
 #include "platform/Window.h"

@@ -18,7 +18,7 @@
 #include <system_error>
 #include <thread>
 #include <vector>
-#include <windows.h>
+#include <Windows.h>
 #include <mmreg.h>
 #include <mmsystem.h>
 #include <dsound.h>
