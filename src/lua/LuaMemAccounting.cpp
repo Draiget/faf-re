@@ -8,6 +8,8 @@
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/utils/Logging.h"
 
+lua::ProfiledAllocations lua::gProfiledAllocations{};
+
 namespace
 {
   /// x86 payload sizes of the reflected value types FAF scripts wrap as

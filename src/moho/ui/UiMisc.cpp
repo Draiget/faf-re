@@ -1,5 +1,6 @@
 #include "moho/ui/UiPrivate.h"
 
+#include "gpg/gal/RenderProfiler.h"
 #include "lua/LuaIncrementalGc.h"
 #include <utility>
 
@@ -1193,6 +1194,7 @@ LuaPlus::LuaObject* moho::CreateLuaEventObject(
   LuaPlus::LuaState* const state
 )
 {
+  FAF_PROFILE_COUNT("ui.event.tables", 1); // FAF instrumentation
   LuaPlus::LuaObject modifiers;
   modifiers.AssignNewTable(state, 6, 0);
 

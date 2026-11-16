@@ -1,5 +1,7 @@
 #include "moho/ui/UiPrivate.h"
 
+#include "gpg/gal/RenderProfiler.h"
+
 extern "C" const LuaPlus::TObject* luaH_getnum(Table* t, int key);
 
 /**
@@ -63,6 +65,7 @@ float moho::CScriptLazyVar_float::GetValue(
   if (lazyVarObject.m_state == nullptr) {
     return 0.0f;
   }
+  FAF_PROFILE_COUNT("ui.lazyvar.reads", 1); // FAF instrumentation
 
   // Engine change: what GetByIndex finds first when slot 1 holds a number, without linking a LuaObject
   // into the state's used list and out again. Each UI control reads several of these each frame.
@@ -75,6 +78,7 @@ float moho::CScriptLazyVar_float::GetValue(
 
   LuaPlus::LuaObject resolvedValue = lazyVarObject.GetByIndex(1);
   if (resolvedValue.IsNil()) {
+    FAF_PROFILE_COUNT("ui.lazyvar.evals", 1); // FAF instrumentation
     LuaPlus::LuaState* const activeState = lazyVarObject.GetActiveState();
     if (activeState == nullptr || activeState->m_state == nullptr) {
       return 0.0f;

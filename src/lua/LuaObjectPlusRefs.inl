@@ -1739,6 +1739,11 @@ void* luaM_realloc(
   if (state != nullptr) {
     state->l_G->nblocks -= accountedOldSize;
     state->l_G->nblocks += accountedSize;
+    // FAF instrumentation (FAF_GPU_PROFILE), not in the binary: the UI state's allocations.
+    if (state->l_G == lua::gProfiledAllocations.state && size > oldsize) {
+      lua::gProfiledAllocations.blocks += block == nullptr ? 1U : 0U;
+      lua::gProfiledAllocations.bytes += size - oldsize;
+    }
     // x64 port test mode (plan 4.1a), not in the binary: FAF_LUAGC_LOG.
     lua::GcEventLogCountRealloc(state->l_G);
   }
