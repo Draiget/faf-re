@@ -23,6 +23,9 @@
 //   - vs_4_0/ps_4_0 become 4.1 on feature level 10.1+ (32 vertex inputs);
 //   - techniques that use a D3D9 fixed-function vertex shader the effect
 //     never defines (FIXED_FUNC_VS) are dropped;
+//   - the D3D10 fixed-function vertex shaders an effect does define, which
+//     add D3D10's half pixel themselves, are moved back by the backends'
+//     D3D9 pixel-centre viewport shift so it is not applied twice;
 //   - D3D9 behaviour the D3D10 dialect loses is restored: depth clipping
 //     and D3D9-scaled depth biases, alpha blended with the colour factors,
 //     sqrt/rsqrt/pow on |x|, and each pass's alpha test (applied in its

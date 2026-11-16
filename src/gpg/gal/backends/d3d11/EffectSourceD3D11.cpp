@@ -366,6 +366,7 @@ namespace gpg::gal::d3d11
         CollectStateObjects();
         DropUndefinedFixedFunctionTechniques();
         CollectStructsAndFunctions();
+        CancelViewportShiftInEffectFixedFunction();
         DisableAlphaTestD3D10();
         RewritePasses();
         RestoreD3D9RasterizerSemantics();
@@ -1118,6 +1119,122 @@ namespace gpg::gal::d3d11
           "#define rsqrt(x) rsqrt(abs(x))\n"
           "#define pow(x, y) (pow(abs(x), (y)) * (((x) < 0 && frac((y) * 0.5) == 0.5) ? -1 : 1))\n"
         );
+      }
+
+      /**
+       * Where `name` is defined: the index of the name in its head and of the
+       * body's opening brace. False when the effect does not define it.
+       */
+      bool FindFunctionDefinition(
+        const std::string_view name,
+        std::size_t& namePosition,
+        std::size_t& open
+      ) const
+      {
+        for (std::size_t at = mText.find(name); at != std::string::npos; at = mText.find(name, at + 1U)) {
+          const std::size_t end = at + name.size();
+          if ((at != 0U && IsIdentifierChar(mText[at - 1U])) || (end < mText.size() && IsIdentifierChar(mText[end]))) {
+            continue;
+          }
+          std::size_t before = at;
+          while (before > 0U && std::isspace(static_cast<unsigned char>(mText[before - 1U])) != 0) {
+            --before;
+          }
+          if (before == at || before == 0U || !IsIdentifierChar(mText[before - 1U])) {
+            continue;
+          }
+          std::size_t paren = end;
+          while (paren < mText.size() && std::isspace(static_cast<unsigned char>(mText[paren])) != 0) {
+            ++paren;
+          }
+          if (paren >= mText.size() || mText[paren] != '(') {
+            continue;
+          }
+          const std::size_t brace = mText.find_first_of(";{", paren + 1U);
+          if (brace == std::string::npos || mText[brace] != '{') {
+            continue;
+          }
+          namePosition = at;
+          open = brace;
+          return true;
+        }
+        return false;
+      }
+
+      /**
+       * GPG's D3D10 fixed-function vertex shaders that an effect defines itself
+       * (frame.fx's FixedFuncVS and FixedFuncBloomVS, terrain.fx's FixedFuncVS)
+       * already add D3D10's half pixel to the pre-transformed position. The
+       * backends also move every viewport origin by that half pixel
+       * (DeviceD3D11::SetViewport, Direct3D9PixelCentreShift), so these passes
+       * drew half a pixel right of and below where D3D9 puts them. The bloom
+       * passes each copy the previous pass's output, so the glow drifted down
+       * and right by half a texel per pass: (1 + 2 * ren_BloomBlurCount) half
+       * texels of the half-size target, plus half a pixel for the composite.
+       *
+       * The effect's function is renamed and called through a wrapper of the
+       * old name that moves the position back by the viewport's shift, read
+       * from faf_ViewportSize (the origin is a whole pixel plus the shift).
+       */
+      void CancelViewportShiftInEffectFixedFunction()
+      {
+        for (const char* const function : {"FixedFuncVS", "FixedFuncBloomVS"}) {
+          const auto found = mFunctions.find(function);
+          if (found == mFunctions.end()) {
+            continue;
+          }
+          std::size_t namePosition = 0U;
+          std::size_t open = 0U;
+          if (!FindFunctionDefinition(function, namePosition, open)) {
+            continue;
+          }
+          const std::size_t close = MatchingBrace(mText, open);
+          const std::size_t paren = mText.find('(', namePosition);
+          const std::size_t parenClose = mText.find(')', paren);
+          if (close == std::string::npos || parenClose == std::string::npos || parenClose > open) {
+            continue;
+          }
+
+          const Function& definition = found->second;
+          std::string position;
+          if (definition.returnSemantic.empty()) {
+            const auto members = mStructs.find(definition.returnType);
+            if (members != mStructs.end()) {
+              for (const Variable& member : members->second) {
+                if (member.semantic == "POSITION") {
+                  position = "faf_out." + member.name;
+                  break;
+                }
+              }
+            }
+          } else if (NormaliseSemantic(definition.returnSemantic) == "POSITION") {
+            position = "faf_out";
+          }
+          if (position.empty()) {
+            mNotes.push_back(std::string(function) + " left as is: no POSITION output found");
+            continue;
+          }
+
+          std::string arguments;
+          for (const Variable& parameter : definition.parameters) {
+            arguments += (arguments.empty() ? "" : ", ") + parameter.name;
+          }
+          const std::string renamed = std::string("faf_D3D10Centred") + function;
+          const std::string semantic =
+            definition.returnSemantic.empty() ? std::string() : " : " + definition.returnSemantic;
+          const std::string wrapper = "\n" + definition.returnType + " " + function + "(" +
+            mText.substr(paren + 1U, parenClose - paren - 1U) + ")" + semantic + "\n{\n    " + definition.returnType +
+            " faf_out = " + renamed + "(" + arguments + ");\n    " + position +
+            ".xy += float2(-2.0, 2.0) * frac(faf_ViewportSize.xy) * faf_ViewportSize.zw * " + position + ".w;\n" +
+            "    return faf_out;\n}\n";
+
+          mText.insert(close + 1U, wrapper);
+          mText.replace(namePosition, std::string_view(function).size(), renamed);
+          if (mText.find("faf_ViewportSize;") == std::string::npos) {
+            mText.insert(0U, "float4 faf_ViewportSize; // (left, top, 1/width, 1/height), set by the backend\n");
+          }
+          mNotes.push_back(std::string(function) + " moved back by the viewport's D3D9 pixel-centre shift");
+        }
       }
 
       void DropUndefinedFixedFunctionTechniques()
