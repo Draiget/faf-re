@@ -172,9 +172,9 @@ do
                 custom = {
                     states = {
                         { text = 'Original', key = 0 },
-                        { text = 'Enhanced (about 4x)', key = 1 },
-                        { text = 'Very high (about 10x)', key = 2 },
-                        { text = 'Extreme (about 20x)', key = 3 },
+                        { text = 'High', key = 1 },
+                        { text = 'Very high', key = 2 },
+                        { text = 'Highest', key = 3 },
                     },
                 },
             })

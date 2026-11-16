@@ -68,9 +68,10 @@ namespace
     gpg::core::FastVectorN<Vertex, N> vertices;
     const auto* inlineData = vertices.Data();
     constexpr std::size_t inlineQuads = N / 4;
-    const std::size_t caps[] = {inlineQuads - 1, N, N * 5 / 2, N * 5};
+    const std::size_t caps[] = {inlineQuads - 1, N * 2, N * 5, N * 20};
     ASSERT_EQ(sizeof(Vertex), 28u);
-    for (const int tier : {0, 1, 2, 3, -1, 4, std::numeric_limits<int>::min(), std::numeric_limits<int>::max()}) {
+    for (const int tier :
+         {0, 1, 2, 3, -1, 4, 5, 6, 7, std::numeric_limits<int>::min(), std::numeric_limits<int>::max()}) {
       SCOPED_TRACE(::testing::Message() << "inline capacity=" << N << ", tier=" << tier);
       vertices.ResetStorageToInline();
       auto budget = moho::PrepareSplatOutput(vertices, tier);
@@ -102,7 +103,7 @@ namespace
       EXPECT_TRUE(vertices.Empty());
       EXPECT_EQ(vertices.Data(), allocated);
       EXPECT_EQ(vertices.Capacity(), capacity);
-      if (tier == 3) {
+      if (tier >= 3) {
         budget = moho::PrepareSplatOutput(vertices, 1);
         EXPECT_EQ(vertices.Data(), inlineData);
         EXPECT_EQ(vertices.Capacity(), N);
@@ -126,7 +127,8 @@ namespace
     const ScopedBackoff isolate;
     constexpr std::size_t inlineQuads = N / 4;
     for (const int tier : {0, 1, 2, 3}) {
-      const auto limit = tier == 0 ? inlineQuads - 1 : inlineQuads * (tier == 1 ? 4 : tier == 2 ? 10 : 20);
+      constexpr std::size_t factors[] = {0, 8, 20, 80};
+      const auto limit = tier == 0 ? inlineQuads - 1 : inlineQuads * factors[tier];
       for (const std::size_t beforeRestart :
            {std::size_t(1),
             inlineQuads - 1,
@@ -135,7 +137,9 @@ namespace
             inlineQuads * 2 + 1,
             inlineQuads * 4 + 1,
             inlineQuads * 8 + 1,
-            inlineQuads * 16 + 1}) {
+            inlineQuads * 16 + 1,
+            inlineQuads * 32 + 1,
+            inlineQuads * 64 + 1}) {
         if (beforeRestart > limit) {
           continue;
         }
@@ -287,6 +291,29 @@ TEST(
 
 TEST(
   SplatBudget,
+  HighestBudgetFitsSignedByteAndChunkCounts
+)
+{
+  const ScopedBackoff isolate;
+  gpg::core::FastVectorN<Vertex, 10000> vertices;
+  const auto budget = moho::PrepareSplatOutput(vertices, 3);
+  ASSERT_EQ(budget.limit, 200000u);
+  // Check against the 32-bit bound even when this target is built for x64.
+  ASSERT_LE(budget.limit, 2147483647u / (4 * sizeof(Vertex)));
+  const auto vertexCount = budget.limit * 4;
+  std::size_t draws = 0;
+  for (std::size_t offset = 0; offset < vertexCount;) {
+    const auto count = std::min(vertexCount - offset, std::size_t(10000));
+    EXPECT_LE(count, 10000u);
+    EXPECT_LE((count / 4) * 6, 15000u);
+    offset += count;
+    ++draws;
+  }
+  EXPECT_EQ(draws, 80u);
+}
+
+TEST(
+  SplatBudget,
   AllocationBackoff
 )
 {
@@ -319,7 +346,7 @@ TEST(
   const ScopedBackoff isolate;
   auto& state = moho::splat_detail::Backoff();
   state.Failed(123456);
-  for (const int tier : {0, -1, 4, std::numeric_limits<int>::min(), std::numeric_limits<int>::max()}) {
+  for (const int tier : {0, -1, 4, 5, 6, 7, std::numeric_limits<int>::min(), std::numeric_limits<int>::max()}) {
     gpg::core::FastVectorN<Vertex, 1000> vertices;
     const auto* inlineStorage = vertices.Data();
     auto budget = moho::PrepareSplatOutput(vertices, tier);
@@ -342,7 +369,7 @@ TEST(
   preference = 0;
   vertices.Clear();
   ASSERT_TRUE(moho::TryGrowSplatOutput(vertices, budget));
-  EXPECT_EQ(budget.limit, 1000u);
+  EXPECT_EQ(budget.limit, 2000u);
   EXPECT_EQ(budget.available, 500u);
   const auto next = moho::PrepareSplatOutput(vertices, preference);
   EXPECT_EQ(next.limit, 249u);
