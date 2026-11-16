@@ -1044,7 +1044,7 @@ namespace fa
       }
     }
 
-    [[nodiscard]] allocator_type get_allocator() const noexcept
+    [[nodiscard]] const allocator_type& get_allocator() const noexcept
     {
       return tree_.get_allocator();
     }

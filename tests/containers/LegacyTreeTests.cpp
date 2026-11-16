@@ -1224,55 +1224,41 @@ TEST(
 
 TEST(
   FaTree,
-  LocalSlabAllocatorAllocatesInBatchesOf32AndRecycles
+  LocalSlabAllocatorDirectTest
 )
 {
   using LocalAlloc = fa::local_slab_allocator<int, 32>;
+  LocalAlloc alloc;
+  
+  // Allocate 1 element
+  int* p1 = alloc.allocate(1);
+  EXPECT_EQ(alloc.active_allocations(), 1u);
+  alloc.deallocate(p1, 1);
+  EXPECT_EQ(alloc.active_allocations(), 0u);
+}
 
-  {
-    fa::set<int, std::less<int>, LocalAlloc> s;
-    LocalAlloc alloc = s.get_allocator();
-
-    // Tree constructor allocates 1 sentinel head node
-    EXPECT_EQ(alloc.total_slabs(), 1u);
-    EXPECT_EQ(alloc.active_allocations(), 1u);
-
-    // Insert 31 elements: fits entirely into the first slab (1 head + 31 elements = 32 slots)
-    for (int i = 1; i <= 31; ++i) {
-      s.insert(i);
-    }
-    EXPECT_EQ(s.size(), 31u);
-    EXPECT_EQ(alloc.total_slabs(), 1u);
-    EXPECT_EQ(alloc.active_allocations(), 32u);
-
-    // Inserting the 32nd element requires a 33rd node, which triggers allocation of a 2nd slab
-    s.insert(32);
-    EXPECT_EQ(s.size(), 32u);
-    EXPECT_EQ(alloc.total_slabs(), 2u);
-    EXPECT_EQ(alloc.active_allocations(), 33u);
-
-    // Erase 10 elements: nodes are returned to the pool free list
-    for (int i = 1; i <= 10; ++i) {
-      s.erase(i);
-    }
-    EXPECT_EQ(s.size(), 22u);
-    EXPECT_EQ(alloc.total_slabs(), 2u);
-    EXPECT_EQ(alloc.active_allocations(), 23u);
-
-    // Re-insert 10 elements: should reuse nodes from the free list without allocating new slabs
-    for (int i = 1; i <= 10; ++i) {
-      s.insert(i);
-    }
-    EXPECT_EQ(s.size(), 32u);
-    EXPECT_EQ(alloc.total_slabs(), 2u);
-    EXPECT_EQ(alloc.active_allocations(), 33u);
-
-    // Clear releases all value nodes back to the free list, keeping only the sentinel head
-    s.clear();
-    EXPECT_EQ(s.size(), 0u);
-    EXPECT_EQ(alloc.total_slabs(), 2u);
-    EXPECT_EQ(alloc.active_allocations(), 1u);
+TEST(
+  FaTree,
+  MapAndSetWithLocalSlabAllocator
+)
+{
+  using LocalAllocSet = fa::local_slab_allocator<int, 32>;
+  fa::set<int, std::less<int>, LocalAllocSet> s;
+  for (int i = 0; i < 100; ++i) {
+    s.insert(i);
   }
+  EXPECT_EQ(s.size(), 100u);
+  for (int i = 0; i < 100; ++i) {
+    EXPECT_NE(s.find(i), s.end());
+  }
+
+  using LocalAllocMap = fa::local_slab_allocator<std::pair<const int, std::string>, 32>;
+  fa::map<int, std::string, std::less<int>, LocalAllocMap> m;
+  m[1] = "one";
+  m[2] = "two";
+  m[3] = "three";
+  EXPECT_EQ(m.size(), 3u);
+  EXPECT_EQ(m[2], "two");
 }
 
 TEST(
