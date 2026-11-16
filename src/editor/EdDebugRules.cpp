@@ -1,6 +1,6 @@
 // The debugger's rules (EdLuaDebugger.h) apart from the Lua hook, so tests reach them without the engine.
 
-#include "gpg/core/utils/Global.h"
+#include "gpg/core/utils/Unreachable.h"
 
 #include <algorithm>
 #include <cctype>

@@ -5,7 +5,7 @@
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
-#include "gpg/core/utils/Global.h"
+#include "gpg/core/utils/Unreachable.h"
 
 #include <Windows.h>
 #include <psapi.h>

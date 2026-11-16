@@ -5,7 +5,7 @@
 
 #include "GpuDrivenD3D12.h"
 
-#include "gpg/core/utils/Global.h"
+#include "gpg/core/utils/Unreachable.h"
 
 #include <algorithm>
 #include <cstring>

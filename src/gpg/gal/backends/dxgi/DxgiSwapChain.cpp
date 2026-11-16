@@ -1,7 +1,7 @@
 #include "DxgiSwapChain.h"
 
 #include "DxgiFactory.h"
-#include "gpg/core/utils/Global.h"
+#include "gpg/core/utils/Unreachable.h"
 
 namespace gpg::gal::dxgi
 {

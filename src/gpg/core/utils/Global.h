@@ -2,16 +2,7 @@
 
 #define GPG_ERROR(msg) gpg::HandleAssertFailure(msg, __LINE__, __FILE__);
 #define GPG_UNREACHABLE(...) GPG_ERROR("Reached the supposably unreachable.");
-// Engine addition: the C++23 counterpart of GPG_UNREACHABLE, for a point no input can reach, such as the end
-// of a switch that returns for every value of an enum the engine produces itself. GPG_UNREACHABLE reports and
-// carries on, as the binary does (the die handler may return); this one tells the compiler the point is never
-// reached (std::unreachable), so release builds drop the dead path. Builds without NDEBUG report and stop.
-// Never use it where the value can come from a replay, the network, Lua or a file.
-#if defined(NDEBUG)
-#define FAF_UNREACHABLE(...) std::unreachable()
-#else
-#define FAF_UNREACHABLE(...) (gpg::HandleAssertFailure("Reached the unreachable.", __LINE__, __FILE__), std::abort())
-#endif
+#include "gpg/core/utils/Unreachable.h" // FAF_UNREACHABLE
 #define GPG_ASSERT(x)                                                                                                  \
   do {                                                                                                                 \
     if (!(x)) {                                                                                                        \
@@ -31,9 +22,7 @@
 
 #include <cstddef>
 #include <cstdint>
-#include <cstdlib>
 #include <limits>
-#include <utility>
 
 namespace gpg
 {
