@@ -104,6 +104,7 @@ Every performance change has a switch that brings back the original path, and bo
 | `ui_ParallelMark` | 1 | `/con` | live (next collection) | Mark UI Lua objects across CUserWorkerPool worker threads; 0 runs mark serially on main thread |
 | `ui_ParallelSweep` | 1 | `/con` | live (next collection) | Sweep UI Lua objects across CUserWorkerPool worker threads; 0 runs sweep serially on main thread |
 | `ui_IdleGC` | 1 | `/con` | live | Move periodic UI Lua GC execution to post-present idle/slack window after device refresh; 0 runs synchronously during UpdateFrameRate (retail) |
+| `ren_MovieUploadOnce` | 1 | `/con` | live | A movie's picture is copied into its texture once, when the movie shows a new one or the texture is made again after a reset or a resize, instead of on every frame drawn (7.1 MiB a frame for the main menu's 1824x1024 movie). Same pictures on screen. 0 copies on every frame, as before |
 | `wld_ParallelSync` | 1 | `/con` | live | Beat sync apply: pose and data copies on user workers |
 | `wld_FrameClock` | 1 | `/con` | live | Replays and single player: game clock from the mean frame time (0: the original median, 2: each frame's own time) |
 | `wld_FrameClockNetwork` | 0 | `/con` | live | Network sessions: 1 applies `wld_FrameClock`, 0 keeps the original median frame time. Off by default, see [Frame clock in network sessions](#frame-clock-in-network-sessions) |
