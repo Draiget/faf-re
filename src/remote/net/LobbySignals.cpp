@@ -1,6 +1,7 @@
 #include "remote/net/LobbySignals.h"
 
 #include "remote/net/Datagram.h"
+#include <utility>
 
 // Engine addition, server mode: see LobbySignals.h.
 
@@ -42,7 +43,7 @@ namespace faf::remote::net
   {
     std::vector<std::uint8_t> message;
     ByteWriter writer(message);
-    writer.Byte(static_cast<std::uint8_t>(signal.kind));
+    writer.Byte(std::to_underlying(signal.kind));
     writer.Byte(signal.flags);
     writer.Varint(static_cast<std::uint64_t>(signal.uid < 0 ? 0 : signal.uid));
     WriteText(
@@ -64,8 +65,8 @@ namespace faf::remote::net
     out.flags = reader.Byte();
     const std::uint64_t uid = reader.Varint();
     if (
-      !reader.Ok() || kind < static_cast<std::uint8_t>(ELobbySignal::Host) ||
-      kind > static_cast<std::uint8_t>(ELobbySignal::Launching) || uid > 0x7FFFFFFFu
+      !reader.Ok() || kind < std::to_underlying(ELobbySignal::Host) ||
+      kind > std::to_underlying(ELobbySignal::Launching) || uid > 0x7FFFFFFFu
     ) {
       return false;
     }

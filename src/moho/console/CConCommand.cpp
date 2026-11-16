@@ -439,10 +439,10 @@ namespace
   struct ConsoleCommandNameLess
   {
     [[nodiscard]]
-    bool operator()(
+    static bool operator()(
       const std::string& lhs,
       const std::string& rhs
-    ) const noexcept
+    ) noexcept
     {
       return _stricmp(lhs.c_str(), rhs.c_str()) < 0;
     }

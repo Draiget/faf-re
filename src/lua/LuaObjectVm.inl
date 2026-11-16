@@ -4210,7 +4210,7 @@ LuaObject::~LuaObject()
 LuaState::LuaState(
   const StandardLibraries initStandardLibrary
 )
-  : LuaState(initStandardLibrary, static_cast<int>(moho::lua_incremental::ELuaVmRole::Baseline))
+  : LuaState(initStandardLibrary, std::to_underlying(moho::lua_incremental::ELuaVmRole::Baseline))
 {}
 
 LuaState::LuaState(
@@ -4231,7 +4231,7 @@ LuaState::LuaState(
   lua_setusergcfunction(m_state, &LuaPlusGCFunction);
   lua_setstateuserdata(m_state, this);
 
-  if (collectorRole != static_cast<int>(moho::lua_incremental::ELuaVmRole::Baseline)) {
+  if (collectorRole != std::to_underlying(moho::lua_incremental::ELuaVmRole::Baseline)) {
     faf_lua51_gc_register_vm(m_state, collectorRole);
   }
 

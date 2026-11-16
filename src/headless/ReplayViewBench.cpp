@@ -886,7 +886,7 @@ namespace faf::headless
           "most by %llu; first at beat %u: %llu only the client holds, %llu only the routes count), last difference "
           "%lld",
           army,
-          view.applier ? view.applier->Live() : std::size_t{0},
+          view.applier ? view.applier->Live() : 0uz,
           mEffectRoutes->HeldBy(army),
           static_cast<double>(view.routesHeldSum) / static_cast<double>(view.beats),
           static_cast<unsigned long long>(view.beatsDiffering),

@@ -113,10 +113,10 @@ namespace faf::editor
     /** Name order: numeric indices first by value, then names. */
     struct PartLess
     {
-      bool operator()(
+      static bool operator()(
         const std::string& a,
         const std::string& b
-      ) const
+      )
       {
         const bool na = !a.empty() && a.front() == '[';
         const bool nb = !b.empty() && b.front() == '[';

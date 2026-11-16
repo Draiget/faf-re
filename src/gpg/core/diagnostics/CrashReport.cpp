@@ -164,7 +164,7 @@ namespace gpg::diag
     {
 #if defined(_M_IX86)
       ReportLine(sink, "Arch      : x86");
-#elif defined(_M_X64)
+#elifdef _M_X64
       ReportLine(sink, "Arch      : x64");
 #else
       ReportLine(sink, "Arch      : unknown");
@@ -477,7 +477,7 @@ namespace gpg::diag
       ReportLine(sink, "EAX=%08lX EBX=%08lX ECX=%08lX EDX=%08lX", c->Eax, c->Ebx, c->Ecx, c->Edx);
       ReportLine(sink, "ESI=%08lX EDI=%08lX EBP=%08lX ESP=%08lX", c->Esi, c->Edi, c->Ebp, c->Esp);
       ReportLine(sink, "EIP=%08lX EFLAGS=%08lX", c->Eip, c->EFlags);
-#elif defined(_M_X64)
+#elifdef _M_X64
       const CONTEXT* const c = context.exceptionInfo->ContextRecord;
       ReportLine(sink, "RAX=%016llX RBX=%016llX RCX=%016llX RDX=%016llX", c->Rax, c->Rbx, c->Rcx, c->Rdx);
       ReportLine(sink, "RSI=%016llX RDI=%016llX RBP=%016llX RSP=%016llX", c->Rsi, c->Rdi, c->Rbp, c->Rsp);
@@ -506,7 +506,7 @@ namespace gpg::diag
       frame.AddrPC.Offset = context.Eip;
       frame.AddrStack.Offset = context.Esp;
       frame.AddrFrame.Offset = context.Ebp;
-#elif defined(_M_X64)
+#elifdef _M_X64
       const DWORD machine = IMAGE_FILE_MACHINE_AMD64;
       frame.AddrPC.Offset = context.Rip;
       frame.AddrStack.Offset = context.Rsp;
@@ -957,7 +957,7 @@ namespace gpg::diag
       record.ExceptionCode = 0xE0000001; // synthetic: engine fatal
 #if defined(_M_IX86)
       record.ExceptionAddress = reinterpret_cast<PVOID>(context.Eip);
-#elif defined(_M_X64)
+#elifdef _M_X64
       record.ExceptionAddress = reinterpret_cast<PVOID>(context.Rip);
 #else
       record.ExceptionAddress = nullptr;

@@ -1,5 +1,6 @@
 // The Problems panel (View > Problems, the status bar's count): EdShell's members.
 
+#include <utility>
 #include <string>
 #include "editor/ui/EdControls.h"
 #include <vector>
@@ -136,7 +137,7 @@ namespace faf::editor
       dl->AddCircleFilled(
         ImVec2(at.x + line * 0.4f, at.y + line * 0.5f),
         line * 0.28f,
-        ImGui::GetColorU32(kColors[static_cast<int>(row.level)])
+        ImGui::GetColorU32(kColors[std::to_underlying(row.level)])
       );
       std::string title = row.title;
       if (row.count > 1) {

@@ -224,7 +224,7 @@ namespace moho
 
   void SFileStarCloser::operator()(
     std::FILE* const file
-  ) const noexcept
+  ) noexcept
   {
     if (file) {
       std::fclose(file);

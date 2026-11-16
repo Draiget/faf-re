@@ -1,5 +1,6 @@
 #include "RUnitBlueprint.h"
 
+#include <utility>
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -78,7 +79,7 @@ namespace moho
       const ERuleBPUnitMovementType motionType
     ) noexcept
     {
-      const auto rawValue = static_cast<std::int32_t>(motionType);
+      const auto rawValue = std::to_underlying(motionType);
       if (rawValue < 0 || rawValue >= static_cast<std::int32_t>(kFootprintOccupancyCapsByMotion.size())) {
         return 0;
       }
@@ -248,7 +249,7 @@ namespace moho
     , BackUpDistance(-1.0f)
     , LayerChangeOffsetHeight(-0.1f)
     , LayerTransitionDuration(0.0f)
-    , BuildOnLayerCapsMask(static_cast<std::int32_t>(LAYER_Land))
+    , BuildOnLayerCapsMask(std::to_underlying(LAYER_Land))
     , BuildRestriction(RULEUBR_None)
     , ResolvedFootprint(nullptr)
     , ResolvedAltFootprint(nullptr)
@@ -468,7 +469,7 @@ namespace moho
       ownerEntity.mFootprint.mOccupancyCaps = occupancyCaps;
       ownerEntity.mFootprint.mFlags = LookupFootprintFlags(MotionType);
 
-      if ((static_cast<std::uint8_t>(occupancyCaps) & kGroundOccupancyMask) != 0U) {
+      if ((std::to_underlying(occupancyCaps) & kGroundOccupancyMask) != 0U) {
         const SNamedFootprint* const resolvedNamed = gameRules->FindFootprint(ownerEntity.mFootprint, blueprintName);
         ResolvedFootprint = resolvedNamed;
         if (ResolvedFootprint != nullptr) {
@@ -481,7 +482,7 @@ namespace moho
         ownerEntity.mAltFootprint.mFlags = LookupFootprintFlags(AltMotionType);
 
         const bool hasGroundFootprint =
-          (static_cast<std::uint8_t>(ownerEntity.mFootprint.mOccupancyCaps) & kGroundOccupancyMask) != 0U;
+          (std::to_underlying(ownerEntity.mFootprint.mOccupancyCaps) & kGroundOccupancyMask) != 0U;
         if (hasGroundFootprint) {
           const SNamedFootprint* const resolvedAltNamed =
             gameRules->FindFootprint(ownerEntity.mAltFootprint, blueprintName);

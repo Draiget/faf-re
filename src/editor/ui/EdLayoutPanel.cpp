@@ -12,6 +12,7 @@
 #include "gpg/core/utils/Logging.h"
 #include "imgui.h"
 
+#include <utility>
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
@@ -720,7 +721,7 @@ namespace faf::editor
     };
     const auto shapeCombo = [&](const char* id, LayoutShape* shape) {
       static const char* const kNames[] = {"Ring", "Arc", "Cluster", "Line", "Pairs"};
-      int index = static_cast<int>(*shape);
+      int index = std::to_underlying(*shape);
       RowLabel("Shape");
       ImGui::SetNextItemWidth(-1.0f);
       if (EdCombo(id, &index, kNames, 5)) {
@@ -730,7 +731,7 @@ namespace faf::editor
     };
     if (Section("Starts")) {
       static const char* const kFrom[] = {"The map's start markers", "The bases drawn", "A pattern"};
-      int from = static_cast<int>(s.starts);
+      int from = std::to_underlying(s.starts);
       RowLabel("From");
       ImGui::SetNextItemWidth(-1.0f);
       if (EdCombo("##startsfrom", &from, kFrom, 3)) {
@@ -739,7 +740,7 @@ namespace faf::editor
       }
       if (s.starts == LayoutStartMode::Pattern) {
         static const char* const kPatterns[] = {"Ring", "Corners", "Two sides", "Line"};
-        int pattern = static_cast<int>(s.pattern);
+        int pattern = std::to_underlying(s.pattern);
         RowLabel("Pattern");
         ImGui::SetNextItemWidth(-1.0f);
         if (EdCombo("##startspattern", &pattern, kPatterns, 4)) {

@@ -182,7 +182,7 @@ namespace faf::editor
   class ErosionStroke;
   struct ErosionStrokeDelete
   {
-    void operator()(ErosionStroke* stroke) const noexcept;
+    static void operator()(ErosionStroke* stroke) noexcept;
   };
   using ErosionStrokePtr = std::unique_ptr<ErosionStroke, ErosionStrokeDelete>;
   [[nodiscard]] ErosionStrokePtr MakeErosionStroke();

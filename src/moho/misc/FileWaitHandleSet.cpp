@@ -81,9 +81,9 @@ namespace
   /** Deletes a thread's error string, when the thread ends or the slot is released (0x0045C110). */
   struct DiskThreadStateStringDeleter
   {
-    void operator()(
+    static void operator()(
       fa::string* const value
-    ) const noexcept
+    ) noexcept
     {
       DestroyDiskThreadStateString(value);
     }

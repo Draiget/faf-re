@@ -1,5 +1,6 @@
 #include "moho/serialization/typeinfo/ECompareTypeTypeInfo.h"
 
+#include <utility>
 #include <cstdlib>
 #include <cstdint>
 #include <new>
@@ -62,10 +63,10 @@ namespace moho
   void ECompareTypeTypeInfo::AddEnums()
   {
     mPrefix = "COMPARE_";
-    AddEnum(StripPrefix("COMPARE_Closest"), static_cast<std::int32_t>(COMPARE_Closest));
-    AddEnum(StripPrefix("COMPARE_Furthest"), static_cast<std::int32_t>(COMPARE_Furthest));
-    AddEnum(StripPrefix("COMPARE_HighestValue"), static_cast<std::int32_t>(COMPARE_HighestValue));
-    AddEnum(StripPrefix("COMPARE_LeastDefended"), static_cast<std::int32_t>(COMPARE_LeastDefended));
+    AddEnum(StripPrefix("COMPARE_Closest"), std::to_underlying(COMPARE_Closest));
+    AddEnum(StripPrefix("COMPARE_Furthest"), std::to_underlying(COMPARE_Furthest));
+    AddEnum(StripPrefix("COMPARE_HighestValue"), std::to_underlying(COMPARE_HighestValue));
+    AddEnum(StripPrefix("COMPARE_LeastDefended"), std::to_underlying(COMPARE_LeastDefended));
   }
 
   /**

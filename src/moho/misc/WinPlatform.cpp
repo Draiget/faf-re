@@ -416,7 +416,7 @@ std::uint32_t moho::PLAT_GetCallStack(
   }
 
   return frameCount;
-#elif defined(_M_X64)
+#elifdef _M_X64
   CONTEXT context{};
   if (contextRecord != nullptr) {
     context = *static_cast<const CONTEXT*>(contextRecord);

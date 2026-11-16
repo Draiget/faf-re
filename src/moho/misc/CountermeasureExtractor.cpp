@@ -1,5 +1,6 @@
 #include "moho/misc/CountermeasureExtractor.h"
 
+#include <utility>
 #include <cstdint>
 
 #include "moho/entity/UserEntity.h"
@@ -10,7 +11,7 @@
 
 namespace
 {
-  constexpr std::int32_t kCountermeasureRangeCategory = static_cast<std::int32_t>(moho::UWRC_Countermeasure);
+  constexpr std::int32_t kCountermeasureRangeCategory = std::to_underlying(moho::UWRC_Countermeasure);
 
   /// 0x00E4F724, the multiplier applied to `Defense.Shield.ShieldSize`.
   constexpr float kShieldDiameterToRadius = 0.5f;

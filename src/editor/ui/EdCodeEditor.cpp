@@ -156,7 +156,7 @@ namespace faf::editor
     struct Cache
     {
       std::size_t hash = 0;
-      std::size_t size = ~std::size_t{0};
+      std::size_t size = ~0uz;
       std::vector<LuaSpan> spans;
       std::vector<std::size_t> lineStarts;
     };

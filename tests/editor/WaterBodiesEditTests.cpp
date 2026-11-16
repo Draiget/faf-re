@@ -135,7 +135,7 @@ string]],
     EXPECT_NE(read.bodies[1].unreadable.find("Colour"), std::string::npos);
     EXPECT_EQ(faf::editor::WaterBodyText(read.bodies[1]), "{ Elevation = 10, Seed = { 3, 4 }, Colour = 'blue' }");
     // Written back unchanged; previewed as not readable.
-    EXPECT_EQ(faf::editor::WithWaterBodies(scenario, read.bodies).find("Colour = 'blue'") != std::string::npos, true);
+    EXPECT_TRUE(faf::editor::WithWaterBodies(scenario, read.bodies).contains("Colour = 'blue'"));
     std::vector<std::string> log;
     const auto descs = faf::editor::WaterBodyDescs({read.bodies[1]}, 2.5f, 15.0f, log);
     EXPECT_TRUE(descs.empty());

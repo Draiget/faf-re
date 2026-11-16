@@ -13,6 +13,7 @@
 #include "editor/ui/EdImGuiRenderer.h"
 #include "editor/doc/EdAdaptiveTables.h"
 
+#include <utility>
 #include <algorithm>
 #include <array>
 #include <set>
@@ -394,7 +395,7 @@ namespace faf::editor
         (void)std::snprintf(text, sizeof(text), "%d-way turn", facts.symmetry.turns);
         chips.emplace_back(text);
       } else {
-        chips.emplace_back(kSymmetryNames[static_cast<int>(facts.symmetry.symmetry)]);
+        chips.emplace_back(kSymmetryNames[std::to_underlying(facts.symmetry.symmetry)]);
       }
       Chips(chips);
     }
@@ -902,7 +903,7 @@ namespace faf::editor
           blueprint != nullptr && blueprint->Physics.ResolvedFootprint != nullptr
         ) {
           const moho::SFootprint& footprint = *blueprint->Physics.ResolvedFootprint;
-          fallback.caps = static_cast<std::uint8_t>(footprint.mOccupancyCaps);
+          fallback.caps = std::to_underlying(footprint.mOccupancyCaps);
           fallback.maxSlope = footprint.mMaxSlope;
           fallback.minWaterDepth = footprint.mMinWaterDepth;
           fallback.maxWaterDepth = footprint.mMaxWaterDepth;
@@ -1565,9 +1566,9 @@ namespace faf::editor
     int counts[3] = {0, 0, 0};
     for (const CheckIssue& issue : mCheckIssues) {
       if (issue.file.empty()) {
-        pins.push_back({issue.x, issue.z, static_cast<int>(issue.level)});
+        pins.push_back({issue.x, issue.z, std::to_underlying(issue.level)});
       }
-      ++counts[static_cast<int>(issue.level)];
+      ++counts[std::to_underlying(issue.level)];
     }
     mTools.SetCheckPins(std::move(pins));
     gpg::Logf("editor: check: %d errors, %d warnings, %d notes", counts[0], counts[1], counts[2]);
@@ -1680,7 +1681,7 @@ namespace faf::editor
     };
     int counts[3] = {0, 0, 0};
     for (const CheckIssue& issue : mCheckIssues) {
-      ++counts[static_cast<int>(issue.level)];
+      ++counts[std::to_underlying(issue.level)];
     }
     ImGui::Text("%d errors, %d warnings, %d notes", counts[0], counts[1], counts[2]);
     {
@@ -1730,7 +1731,7 @@ namespace faf::editor
       draw->AddCircleFilled(
         ImVec2(row.x + line * 0.4f, row.y + line * 0.5f),
         line * 0.28f,
-        ImGui::GetColorU32(kColors[static_cast<int>(issue.level)])
+        ImGui::GetColorU32(kColors[std::to_underlying(issue.level)])
       );
       const std::string title = issue.file.empty() ? issue.marker : issue.file + " line " + std::to_string(issue.line);
       draw->AddText(ImVec2(row.x + line * 1.1f, row.y), ImGui::GetColorU32(ImGuiCol_Text), title.c_str());
@@ -2290,7 +2291,7 @@ namespace faf::editor
       first = false;
       bool on = (mLookSections & bit) != 0u;
       if (ImGui::Checkbox(label, &on)) {
-        mLookSections = on ? (mLookSections | bit) : (mLookSections & ~static_cast<unsigned>(bit));
+        mLookSections = on ? (mLookSections | bit) : (mLookSections & ~std::to_underlying(bit));
         retry = true;
       }
     };

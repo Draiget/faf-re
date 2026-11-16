@@ -2374,7 +2374,7 @@ int32_t LuaObject::GetN() const
   const_cast<LuaObject*>(this)->PushStack(lstate);
 #if defined(lua_rawlen)
   const int32_t count = static_cast<int32_t>(lua_rawlen(lstate, -1));
-#elif defined(lua_objlen)
+#elifdef lua_objlen
   const int32_t count = static_cast<int32_t>(lua_objlen(lstate, -1));
 #else
   const int32_t count = luaL_getn(lstate, -1);

@@ -8,6 +8,7 @@
 #include "editor/doc/EdAdaptiveTables.h"
 #include "editor/view/EdLiveTerrain.h"
 
+#include <utility>
 #include <algorithm>
 #include <atomic>
 #include <map>
@@ -2069,7 +2070,7 @@ namespace faf::editor
       );
       gpg::Logf(
         "editor: symmetry from the heights: mode %d, %d turns (%.1f%% of points match)",
-        static_cast<int>(mFacts.symmetry.symmetry),
+        std::to_underlying(mFacts.symmetry.symmetry),
         mFacts.symmetry.turns,
         static_cast<double>(mFacts.symmetry.matched) * 100.0
       );

@@ -80,7 +80,7 @@ namespace
         for (int i = 0; i < images; ++i) {
           b.insert({ix[i], iz[i]});
         }
-        EXPECT_EQ(a, b) << "mode " << static_cast<int>(symmetry) << " at " << x << "," << z;
+        EXPECT_EQ(a, b) << "mode " << std::to_underlying(symmetry) << " at " << x << "," << z;
       }
     }
   }
@@ -193,7 +193,7 @@ namespace
         ASSERT_TRUE(faf::editor::SymmetrizeHeights(heights.data(), kSize, kSize, options, error)) << error;
         const faf::editor::SymmetryReport report =
           faf::editor::CheckSymmetry(heights.data(), kSize, kSize, symmetry, 3);
-        EXPECT_EQ(report.differing, 0) << "mode " << static_cast<int>(symmetry) << " part " << part;
+        EXPECT_EQ(report.differing, 0) << "mode " << std::to_underlying(symmetry) << " part " << part;
       }
     }
   }

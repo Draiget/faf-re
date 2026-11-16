@@ -430,7 +430,7 @@ HMONITOR MonitorFromPoint(
   if (flags == MONITOR_DEFAULTTONEAREST) {
     return reinterpret_cast<HMONITOR>(nearest + 1);
   }
-  return flags == MONITOR_DEFAULTTOPRIMARY ? reinterpret_cast<HMONITOR>(std::size_t{1}) : nullptr;
+  return flags == MONITOR_DEFAULTTOPRIMARY ? reinterpret_cast<HMONITOR>(1uz) : nullptr;
 }
 
 BOOL GetMonitorInfoW(

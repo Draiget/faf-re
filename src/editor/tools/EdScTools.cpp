@@ -134,7 +134,7 @@ namespace faf::editor
     }
     if (settings.cluster) {
       std::vector<std::size_t> parent(free.size());
-      std::iota(parent.begin(), parent.end(), std::size_t{0});
+      std::iota(parent.begin(), parent.end(), 0uz);
       const auto find = [&](std::size_t i) {
         while (parent[i] != i) {
           parent[i] = parent[parent[i]];

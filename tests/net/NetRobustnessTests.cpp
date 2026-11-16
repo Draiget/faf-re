@@ -1635,7 +1635,7 @@ namespace
     lua_AllowPrecompiledChunks = true;
     const std::string allowed = RunLua(state, load);
     lua_AllowPrecompiledChunks = previous;
-    EXPECT_TRUE(refused.find("compiled Lua chunks are not loaded") != std::string::npos);
+    EXPECT_TRUE(refused.contains("compiled Lua chunks are not loaded"));
     EXPECT_EQ(allowed.find("compiled Lua chunks are not loaded"), std::string::npos);
     EXPECT_TRUE(allowed != "nil");
   }

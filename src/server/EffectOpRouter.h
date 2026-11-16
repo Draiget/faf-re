@@ -49,7 +49,7 @@ namespace faf::server
   class CEffectRoutes
   {
   public:
-    static constexpr std::size_t kMaxKept = std::size_t{1} << 16;
+    static constexpr std::size_t kMaxKept = 1uz << 16;
 
     /** One op kept of a live effect: its bytes in `SLive::bytes`. */
     struct SPart

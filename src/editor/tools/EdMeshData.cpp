@@ -332,7 +332,7 @@ namespace faf::editor
         char text[64];
         (void)std::snprintf(text, sizeof(text), "%.6f", static_cast<double>(value));
         std::string out = text;
-        if (out.find('.') != std::string::npos) {
+        if (out.contains('.')) {
           while (!out.empty() && out.back() == '0') {
             out.pop_back();
           }
@@ -452,11 +452,11 @@ namespace faf::editor
       const std::string& key
     )
     {
-      if (s.given.count(key) != 0) {
+      if (s.given.contains(key)) {
         return true;
       }
       // The values a manifest writes without being told (the editor's own import and sync set them so).
-      if (key == "size" || key.rfind("playable_", 0) == 0) {
+      if (key == "size" || key.starts_with("playable_")) {
         return true;
       }
       if (key == "water" || key == "water_abyss") {
@@ -477,7 +477,7 @@ namespace faf::editor
       if (key == "mesh_high") {
         return s.meshHigh > -9999.0f;
       }
-      if (key.rfind("void_", 0) == 0) {
+      if (key.starts_with("void_")) {
         return s.haveVoid;
       }
       Settings& editable = const_cast<Settings&>(s);
@@ -510,7 +510,7 @@ namespace faf::editor
             }
           }
         }
-        if (key.rfind("void_", 0) == 0) {
+        if (key.starts_with("void_")) {
           s.haveVoid = true;
         }
         return;
@@ -522,7 +522,7 @@ namespace faf::editor
       if (float* value = SettingNumber(s, key)) {
         *value = *SettingNumber(defaults, key);
       }
-      if (key.rfind("void_", 0) == 0) {
+      if (key.starts_with("void_")) {
         s.haveVoid = s.given.count("void_r") + s.given.count("void_g") + s.given.count("void_b") != 0;
       }
     }

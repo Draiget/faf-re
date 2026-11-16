@@ -583,11 +583,9 @@ namespace moho
       const SOCellPos cellPos{static_cast<std::int16_t>(x0), static_cast<std::int16_t>(z0)};
       EOccupancyCaps caps = OCCUPY_MobileCheck(footprint, *sim.mMapData, cellPos);
       if (blocker.mVarDat.mLayerMask == LAYER_Water) {
-        caps = static_cast<EOccupancyCaps>(
-          static_cast<std::uint8_t>(caps) & ~static_cast<std::uint8_t>(EOccupancyCaps::OC_SUB)
-        );
+        caps = static_cast<EOccupancyCaps>(std::to_underlying(caps) & ~std::to_underlying(EOccupancyCaps::OC_SUB));
       }
-      if (static_cast<std::uint8_t>(OCCUPY_FootprintFits(oGrid, cellPos, footprint, caps)) == 0) {
+      if (std::to_underlying(OCCUPY_FootprintFits(oGrid, cellPos, footprint, caps)) == 0) {
         return false;
       }
       if (!blocker.CanReserveOgridRect(rect)) {

@@ -1,6 +1,7 @@
 #include "moho/ui/UiPrivate.h"
 
 #include "lua/LuaIncrementalGc.h"
+#include <utility>
 
 namespace moho
 {
@@ -1255,7 +1256,7 @@ LuaPlus::LuaState* moho::USER_GetLuaState()
   }
 
   static LuaPlus::LuaState sLuaState(
-    LuaPlus::LuaState::LIB_BASE, static_cast<int>(moho::lua_incremental::ELuaVmRole::FrontendUi)
+    LuaPlus::LuaState::LIB_BASE, std::to_underlying(moho::lua_incremental::ELuaVmRole::FrontendUi)
   );
   static CTaskStage sStage;
 

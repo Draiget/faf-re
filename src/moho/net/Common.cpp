@@ -1,5 +1,6 @@
 #include "Common.h"
 
+#include <utility>
 #include <algorithm>
 #include <cmath>
 #include <cstring>
@@ -177,7 +178,7 @@ void moho::ENetworkPlayerStateToStr(
 )
 {
   if (state >= ENetworkPlayerState::_Last) {
-    out = gpg::STR_Printf("%d", static_cast<int32_t>(state));
+    out = gpg::STR_Printf("%d", std::to_underlying(state));
     return;
   }
 
@@ -240,7 +241,7 @@ void moho::NetPacketTypeToStr(
     out = "NATTRAVERSAL";
     return;
   default:
-    out = gpg::STR_Printf("%02x", static_cast<uint8_t>(state));
+    out = gpg::STR_Printf("%02x", std::to_underlying(state));
   }
 }
 
@@ -1089,7 +1090,7 @@ fa::string moho::NET_GetProtocolName(
     break;
   }
 
-  const fa::string msg = gpg::STR_Printf("invalid protocol (%d)", static_cast<int32_t>(protocol));
+  const fa::string msg = gpg::STR_Printf("invalid protocol (%d)", std::to_underlying(protocol));
   throw std::domain_error(msg.c_str());
 }
 

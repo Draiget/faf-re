@@ -14,6 +14,7 @@
 #include "editor/tools/EdSymmetryFollow.h"
 #include "editor/doc/EdUnitFate.h"
 
+#include <utility>
 #include <algorithm>
 #include <chrono>
 #include <random>
@@ -1414,12 +1415,12 @@ namespace faf::editor
       const std::uint8_t* const cells = mDocument.WaterMaskCells(mask, width, height);
       if (
         cells != nullptr &&
-        (mWaterMaskRunsRevision != mDocument.WaterMaskRevision() || mWaterMaskRunsKind != static_cast<int>(mask))
+        (mWaterMaskRunsRevision != mDocument.WaterMaskRevision() || mWaterMaskRunsKind != std::to_underlying(mask))
       ) {
         const std::vector<std::uint8_t> bands = WaterMaskBands(cells, width, height, mask);
         mWaterMaskRuns = TerrainTypeRuns(bands.data(), width, height, 0);
         mWaterMaskRunsRevision = mDocument.WaterMaskRevision();
-        mWaterMaskRunsKind = static_cast<int>(mask);
+        mWaterMaskRunsKind = std::to_underlying(mask);
       }
       // Foam white, flatness blue, depth bias amber; the higher the value, the stronger.
       const std::uint32_t tint = mask == WaterMask::Foam ? 0x00FFFFFFu
@@ -1660,7 +1661,7 @@ namespace faf::editor
         const char* const kinds[] = {"nothing", "prop", "marker", "unit", "decal"};
         gpg::Logf(
           "editor: /hovermarker: a click would pick %s%s%s",
-          kinds[static_cast<int>(hit.kind)],
+          kinds[std::to_underlying(hit.kind)],
           hit.kind == PickKind::Marker ? " " : "",
           hit.kind == PickKind::Marker && hit.index >= 0 && static_cast<std::size_t>(hit.index) < markers.size()
             ? markers[static_cast<std::size_t>(hit.index)].name.c_str()
@@ -1945,7 +1946,7 @@ namespace faf::editor
       gpg::Logf(
         "editor: symmetry found: mode %d (%d turns), %.1f%% of points, %d starts and %d resource markers fit, centre "
         "%.1f,%.1f (middle %.1f,%.1f)",
-        static_cast<int>(found.symmetry),
+        std::to_underlying(found.symmetry),
         found.turns,
         static_cast<double>(found.matched) * 100.0,
         found.startsMatched,
@@ -3197,7 +3198,7 @@ namespace faf::editor
         "editor: masks: %d painted texels of layer%s %s show nothing under %s (all bytes 1-127, which its "
         "saturate(2m-1) hides: painted for a shader that reads masks as they are)",
         range.Total(),
-        strata.find(',') == std::string::npos ? "" : "s",
+        !strata.contains(',') ? "" : "s",
         strata.c_str(),
         TerrainShader().c_str()
       );
@@ -4208,7 +4209,7 @@ namespace faf::editor
       mTools->SetCheckResult(report.checked, report.differing, report.largest, mCheckedWith, true);
       gpg::Logf(
         "editor: mask symmetry check (mode %d): %d of %d texels differ, by up to %d of 255",
-        static_cast<int>(mCheckedWith.symmetry),
+        std::to_underlying(mCheckedWith.symmetry),
         report.differing,
         report.checked,
         report.largest
@@ -4222,7 +4223,7 @@ namespace faf::editor
     mTools->SetCheckResult(report.checked, report.differing, report.largest, mCheckedWith);
     gpg::Logf(
       "editor: symmetry check (mode %d, %d turns): %d of %d vertices differ, by up to %d words; %zu blocks marked",
-      static_cast<int>(mCheckedWith.symmetry),
+      std::to_underlying(mCheckedWith.symmetry),
       mCheckedWith.turns,
       report.differing,
       report.checked,
@@ -4274,9 +4275,9 @@ namespace faf::editor
     mDocument.SetModified(true);
     gpg::Logf(
       "editor: made the heights symmetric (mode %d, part %d, combine %d, seam %.0f, centre %.1f,%.1f)",
-      static_cast<int>(options.symmetry),
+      std::to_underlying(options.symmetry),
       options.part + 1,
-      static_cast<int>(options.combine),
+      std::to_underlying(options.combine),
       static_cast<double>(options.seam),
       static_cast<double>(options.centreX),
       static_cast<double>(options.centreZ)
@@ -4715,11 +4716,11 @@ namespace faf::editor
       gpg::Logf(
         "editor: brush test: mode %d at %.0f,%.0f, radius %.0f, symmetry %d: %zu samples changed, ground %+.1f units, "
         "farthest change %.1f from a centre",
-        static_cast<int>(mode),
+        std::to_underlying(mode),
         static_cast<double>(x),
         static_cast<double>(z),
         static_cast<double>(brush.radius),
-        static_cast<int>(brush.symmetry),
+        std::to_underlying(brush.symmetry),
         changed,
         static_cast<double>(words) / 128.0,
         static_cast<double>(farthest)
@@ -5190,7 +5191,7 @@ namespace faf::editor
         for (std::size_t i = 0; i < mUnits.size() && i < mUnitRefs.size(); ++i) {
           if (mUnits[i] != nullptr) {
             const bool byPreview =
-              !previewHidden.empty() && previewHidden.count({mUnitRefs[i].army, mUnitRefs[i].name}) != 0;
+              !previewHidden.empty() && previewHidden.contains({mUnitRefs[i].army, mUnitRefs[i].name});
             previewed += byPreview ? 1 : 0;
             mUnits[i]->Cull(hideUnits || byPreview);
           }
@@ -6774,13 +6775,13 @@ namespace faf::editor
       }
     }
     out.painted = profile.painted;
-    out.biplanar = profile.summary.find("biplanar") != std::string::npos;
+    out.biplanar = profile.summary.contains("biplanar");
     out.plan = PlanRecipe(kinds, out.textured, profile.painted, out.biplanar);
     out.hasPaint = true;
     out.pbr = profile.family == ShaderFamily::Pbr || profile.family == ShaderFamily::Splat;
     out.splat = profile.family == ShaderFamily::Splat;
-    out.macro = profile.summary.find("macro") != std::string::npos;
-    out.specular = profile.summary.find("specular") != std::string::npos;
+    out.macro = profile.summary.contains("macro");
+    out.specular = profile.summary.contains("specular");
     out.roughness = out.pbr && profile.painted == 7;
     // Heights from another tool: the Import / Export window's file (or a node's own) mapped as that window says.
     {
@@ -6795,7 +6796,7 @@ namespace faf::editor
         windowFile.c_str(),
         static_cast<unsigned long long>(stamp.size),
         stamp.written,
-        static_cast<int>(mapping.mapping),
+        std::to_underlying(mapping.mapping),
         static_cast<double>(mapping.low),
         static_cast<double>(mapping.high),
         static_cast<double>(mapping.scale),
@@ -8518,7 +8519,7 @@ namespace faf::editor
     for (std::size_t i = 0; i < mUnitRefs.size() && pickable.units && (mTools == nullptr || mTools->ShowUnits()); ++i) {
       if (
         mTools != nullptr && !mTools->PreviewHiddenUnits().empty() &&
-        mTools->PreviewHiddenUnits().count({mUnitRefs[i].army, mUnitRefs[i].name}) != 0
+        mTools->PreviewHiddenUnits().contains({mUnitRefs[i].army, mUnitRefs[i].name})
       ) {
         continue; // hidden by the lobby preview
       }
@@ -9049,7 +9050,7 @@ namespace faf::editor
     const std::set<std::string>& hidden = mTools->HiddenMarkerTypes();
     for (const SaveEntry& marker : mDocument.SaveData().Markers()) {
       const std::string type = MarkerTypeOf(marker);
-      if ((type != "Mass" && type != "Hydrocarbon") || hidden.count(type) != 0) {
+      if ((type != "Mass" && type != "Hydrocarbon") || hidden.contains(type)) {
         continue;
       }
       float x = 0.0f, y = 0.0f, z = 0.0f;
@@ -9092,7 +9093,7 @@ namespace faf::editor
       }
       const bool offGrid = std::fabs(SnapFootprint(mark.x, mark.sizeX) - mark.x) > 0.01f ||
         std::fabs(SnapFootprint(mark.z, mark.sizeZ) - mark.z) > 0.01f;
-      mark.state = mResourceProblems.count(mark.marker) != 0 ? 1 : stacked ? 2 : offGrid ? 3 : 0;
+      mark.state = mResourceProblems.contains(mark.marker) ? 1 : stacked ? 2 : offGrid ? 3 : 0;
     }
     return out;
   }
@@ -9898,7 +9899,7 @@ namespace faf::editor
       const bool selected =
         std::find(mMarkerSelection.begin(), mMarkerSelection.end(), marker.name) != mMarkerSelection.end();
       const bool hovered = marker.name == mHoverMarker;
-      if (!selected && !hovered && (!close || hidden.count(MarkerTypeOf(marker)) != 0)) {
+      if (!selected && !hovered && (!close || hidden.contains(MarkerTypeOf(marker)))) {
         continue;
       }
       float x = 0.0f, y = 0.0f, z = 0.0f;
@@ -9989,8 +9990,8 @@ namespace faf::editor
       return false;
     }
     // By type (the Markers panel), or by name (a resource a previewed lobby setting doesn't spawn).
-    return (!mTools->HiddenMarkerTypes().empty() && mTools->HiddenMarkerTypes().count(MarkerTypeOf(marker)) != 0) ||
-      (!mTools->PreviewHiddenMarkers().empty() && mTools->PreviewHiddenMarkers().count(marker.name) != 0);
+    return (!mTools->HiddenMarkerTypes().empty() && mTools->HiddenMarkerTypes().contains(MarkerTypeOf(marker))) ||
+      (!mTools->PreviewHiddenMarkers().empty() && mTools->PreviewHiddenMarkers().contains(marker.name));
   }
 
   void EdMapScene::SelectMarkers(
@@ -10286,7 +10287,7 @@ namespace faf::editor
     for (const std::string& selected : mMarkerSelection) {
       float sourceX = 0.0f, sourceZ = 0.0f;
       std::string sourceType;
-      if (selected == target || covered.count(selected) != 0 || !position(selected, sourceX, sourceZ, sourceType)) {
+      if (selected == target || covered.contains(selected) || !position(selected, sourceX, sourceZ, sourceType)) {
         continue;
       }
       std::string source = selected;
@@ -10492,7 +10493,7 @@ namespace faf::editor
             return chain.markers.size();
           }
         }
-        return std::size_t{0};
+        return 0uz;
       }());
     }
     if (!mMarkerSelection.empty()) {
@@ -10573,7 +10574,7 @@ namespace faf::editor
       }
     }
     for (auto it = mEffects.begin(); it != mEffects.end();) {
-      it = seen.count(it->first) == 0 ? mEffects.erase(it) : std::next(it);
+      it = !seen.contains(it->first) ? mEffects.erase(it) : std::next(it);
     }
   }
 
@@ -11101,10 +11102,7 @@ namespace faf::editor
         continue;
       }
       float x = 0.0f, y = 0.0f, z = 0.0f;
-      if (
-        marker.Get("resource").find("true") == std::string::npos || MarkerHidden(marker) ||
-        !ShownMarkerPosition(marker, x, y, z)
-      ) {
+      if (!marker.Get("resource").contains("true") || MarkerHidden(marker) || !ShownMarkerPosition(marker, x, y, z)) {
         continue;
       }
       const Deposit* const deposit = type == "Mass" ? &mass : &hydro;
@@ -11113,7 +11111,7 @@ namespace faf::editor
       }
     }
     for (auto it = mDeposits.begin(); it != mDeposits.end();) {
-      if (wanted.count(it->first) == 0) {
+      if (!wanted.contains(it->first)) {
         delete it->second;
         it = mDeposits.erase(it);
       } else {
@@ -11586,7 +11584,7 @@ namespace faf::editor
       std::vector<SaveEntry> kept;
       int next = 1;
       for (const SaveEntry& a : areas) {
-        if (a.name.rfind("AREA_", 0) == 0) {
+        if (a.name.starts_with("AREA_")) {
           next = std::max(next, std::atoi(a.name.c_str() + 5) + 1);
         }
       }
@@ -12698,7 +12696,7 @@ namespace faf::editor
       return;
     }
     FindKind kind = FindKind::Count;
-    for (int k = 0; k < static_cast<int>(FindKind::Count); ++k) {
+    for (int k = 0; k < std::to_underlying(FindKind::Count); ++k) {
       if (
         parts[0] == FindKindName(static_cast<FindKind>(k)) ||
         parts[0] == std::string(FindKindName(static_cast<FindKind>(k))) + "s"
@@ -12710,9 +12708,7 @@ namespace faf::editor
     int group = -1;
     const auto pick = [&](const std::string& part, const std::string& not_) -> std::string {
       for (const FindTypeCount& t : types) {
-        if (
-          t.kind == kind && t.type != not_ && t.type.find(part) != std::string::npos && (group < 0 || t.group == group)
-        ) {
+        if (t.kind == kind && t.type != not_ && t.type.contains(part) && (group < 0 || t.group == group)) {
           group = t.group;
           return t.type;
         }
@@ -14168,7 +14164,7 @@ namespace faf::editor
     if (const std::size_t comma = spec.find(','); comma != std::string::npos) {
       fill.spacing = std::strtof(spec.c_str() + comma + 1, nullptr);
     }
-    const bool keep = spec.find("keep") != std::string::npos;
+    const bool keep = spec.contains("keep");
     std::string blueprint;
     for (const FindTypeCount& t : CountFindTypes(FindObjects())) {
       if (t.kind == FindKind::Prop) {
@@ -14885,8 +14881,8 @@ namespace faf::editor
       // A swaying prop (UndulatingNormalMappedAlpha: the trees) gets the swaying shell and redraw, so they move with
       // it; its shell a hairline (each leaf card gets a rim; a wide rim on every card painted a tree group amber).
       const std::string shader = lod->mShaderName.c_str();
-      const bool alphaTested = shader.find("Alpha") != std::string::npos;
-      const bool sways = shader.find("Undulating") != std::string::npos;
+      const bool alphaTested = shader.contains("Alpha");
+      const bool sways = shader.contains("Undulating");
       const char* const shellTechnique = sways ? "EditorOutlineAlphaSway"
         : alphaTested                          ? "EditorOutlineAlpha"
                                                : "EditorOutline";

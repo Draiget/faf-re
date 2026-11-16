@@ -6,6 +6,7 @@
 // Build: cmake --build --preset clang-x64-release --target faf_netchannel_tests
 // Run:   build\clang-x64-release\tests\remote\faf_netchannel_tests.exe
 
+#include <utility>
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
@@ -723,7 +724,7 @@ namespace
     for (std::size_t i = 0; i < kKeySize; ++i) {
       key[i] = static_cast<std::uint8_t>(rng());
     }
-    for (const std::size_t payloadSize : {std::size_t{0}, std::size_t{1}, std::size_t{100}, std::size_t{1168}}) {
+    for (const std::size_t payloadSize : {0uz, 1uz, 100uz, 1168uz}) {
       const Bytes payload = RandomBytes(rng, payloadSize);
       Bytes datagram(kHeaderSize + payloadSize + kTagSize);
       DatagramHeader header;
@@ -1167,7 +1168,7 @@ namespace
         "    fuzz (%s): 200000 datagrams, %llu accepted, state %d\n",
         keyed ? "keys set" : "no keys",
         static_cast<unsigned long long>(accepted),
-        static_cast<int>(target.State())
+        std::to_underlying(target.State())
       );
       if (keyed) {
         EXPECT_EQ(accepted, 0); // nothing forged or mutated gets past the tag

@@ -35,7 +35,7 @@ namespace
     const int x
   )
   {
-    return f.v[static_cast<std::size_t>(32) * static_cast<std::size_t>(f.w) + static_cast<std::size_t>(x)];
+    return f.v[32uz * static_cast<std::size_t>(f.w) + static_cast<std::size_t>(x)];
   }
 
   TEST(

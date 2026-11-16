@@ -1,5 +1,6 @@
 #include "editor/tools/EdArrange.h"
 
+#include <utility>
 #include <algorithm>
 #include <cmath>
 #include <numeric>
@@ -38,7 +39,7 @@ namespace faf::editor
     )
     {
       std::vector<std::size_t> order(along.size());
-      std::iota(order.begin(), order.end(), std::size_t{0});
+      std::iota(order.begin(), order.end(), 0uz);
       std::stable_sort(order.begin(), order.end(), [&](const std::size_t a, const std::size_t b) {
         return along[a] < along[b];
       });
@@ -84,21 +85,21 @@ namespace faf::editor
     const ArrangeOp op
   ) noexcept
   {
-    return op < ArrangeOp::Count ? kOps[static_cast<int>(op)].title : "";
+    return op < ArrangeOp::Count ? kOps[std::to_underlying(op)].title : "";
   }
 
   const char* ArrangeId(
     const ArrangeOp op
   ) noexcept
   {
-    return op < ArrangeOp::Count ? kOps[static_cast<int>(op)].id : "";
+    return op < ArrangeOp::Count ? kOps[std::to_underlying(op)].id : "";
   }
 
   ArrangeOp ArrangeFromId(
     const std::string& id
   ) noexcept
   {
-    for (int i = 0; i < static_cast<int>(ArrangeOp::Count); ++i) {
+    for (int i = 0; i < std::to_underlying(ArrangeOp::Count); ++i) {
       if (id == kOps[i].id) {
         return static_cast<ArrangeOp>(i);
       }
@@ -163,7 +164,7 @@ namespace faf::editor
         radius = 4.0f; // all in one place: a small ring
       }
       std::vector<std::size_t> order(n);
-      std::iota(order.begin(), order.end(), std::size_t{0});
+      std::iota(order.begin(), order.end(), 0uz);
       std::stable_sort(order.begin(), order.end(), [&](const std::size_t a, const std::size_t b) {
         return angle[a] < angle[b];
       });

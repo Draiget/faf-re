@@ -3,6 +3,7 @@
 #include "moho/sim/SimArchiveMode.h"
 #include "legacy/math/X87Math.h"
 
+#include <utility>
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
@@ -286,7 +287,7 @@ namespace moho
       const EUnitMotionState state
     ) noexcept
     {
-      const auto stateIndex = static_cast<std::int32_t>(state);
+      const auto stateIndex = std::to_underlying(state);
       if (stateIndex < 0) {
         return "";
       }
@@ -302,7 +303,7 @@ namespace moho
       const EUnitMotionHorzEvent event
     ) noexcept
     {
-      const auto eventIndex = static_cast<std::int32_t>(event);
+      const auto eventIndex = std::to_underlying(event);
       if (eventIndex < 0) {
         return "";
       }
@@ -318,7 +319,7 @@ namespace moho
       const EUnitMotionVertEvent event
     ) noexcept
     {
-      const auto eventIndex = static_cast<std::int32_t>(event);
+      const auto eventIndex = std::to_underlying(event);
       if (eventIndex < 0) {
         return "";
       }
@@ -2153,9 +2154,8 @@ namespace moho
         COGrid* const oGrid = unit->SimulationRef->mOGrid;
         EOccupancyCaps mobileCaps = OCCUPY_MobileCheck(footprint, *mapData, cellPos);
         if (unit->mVarDat.mLayerMask == LAYER_Water) {
-          mobileCaps = static_cast<EOccupancyCaps>(
-            static_cast<std::uint8_t>(mobileCaps) & ~static_cast<std::uint8_t>(EOccupancyCaps::OC_SUB)
-          );
+          mobileCaps =
+            static_cast<EOccupancyCaps>(std::to_underlying(mobileCaps) & ~std::to_underlying(EOccupancyCaps::OC_SUB));
         }
         const EOccupancyCaps fitCaps = OCCUPY_FootprintFits(*oGrid, cellPos, footprint, mobileCaps);
 
@@ -2512,10 +2512,7 @@ namespace moho
     // Land-capable footprints sit on top of shallow water rather than in it,
     // so their effective surface is raised by the blueprint's layer-change
     // offset.
-    if (
-      (static_cast<std::uint8_t>(unit->GetFootprint().mOccupancyCaps) &
-       static_cast<std::uint8_t>(EOccupancyCaps::OC_LAND)) != 0
-    ) {
+    if ((std::to_underlying(unit->GetFootprint().mOccupancyCaps) & std::to_underlying(EOccupancyCaps::OC_LAND)) != 0) {
       waterSurface += physics.LayerChangeOffsetHeight;
     }
 
@@ -2925,7 +2922,7 @@ namespace moho
     }
 
     const float desiredOwnerElevation =
-      (static_cast<std::int32_t>(mCombatState) == 1) ? ownerPhysics.AttackElevation : ownerPhysics.Elevation;
+      (std::to_underlying(mCombatState) == 1) ? ownerPhysics.AttackElevation : ownerPhysics.Elevation;
     return (sampledElevation + desiredOwnerElevation) - ownerUnit->GetPosition().y;
   }
 
@@ -2956,7 +2953,7 @@ namespace moho
     const RUnitBlueprintPhysics& physics = blueprint->Physics;
     const RUnitBlueprintAir& air = blueprint->Air;
     const VTransform& transform = unit->GetTransform();
-    const std::int32_t combatState = static_cast<std::int32_t>(mCombatState);
+    const std::int32_t combatState = std::to_underlying(mCombatState);
 
     // m11 - the Y component of the local up axis. The previous spelling used a
     // `w*w` diagonal term, which no matrix expansion in this binary computes.

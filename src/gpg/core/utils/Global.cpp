@@ -445,7 +445,7 @@ namespace
     constexpr std::size_t kMaxPooledBytes = 4096u;
     constexpr std::size_t kSpanBytes = 64u * 1024u;
     constexpr std::size_t kCommitChunkBytes = 1024u * 1024u;
-    constexpr std::size_t kReserveBytes = std::size_t{64} << 30;
+    constexpr std::size_t kReserveBytes = 64uz << 30;
     constexpr std::size_t kSpanCount = kReserveBytes / kSpanBytes;
     constexpr std::uint32_t kClassCount = 48u;
 
@@ -535,7 +535,7 @@ namespace
     {
 #if defined(__SANITIZE_ADDRESS__)
       return true;
-#elif defined(__has_feature)
+#elifdef __has_feature
 #if __has_feature(address_sanitizer)
       return true;
 #endif

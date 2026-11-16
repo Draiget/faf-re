@@ -1,5 +1,6 @@
 #include "CNetClient.h"
 
+#include <utility>
 #include <mutex>
 
 #include "CClientManagerImpl.h"
@@ -84,7 +85,7 @@ void CNetClient::Process(
   }
 
   // Engine addition (issue #275): the backlog this client is about to get holds this.
-  if (msg.GetType().raw() < static_cast<uint8_t>(EClientMsg::CLIMSG_Ack) && REJOIN_BacklogPending(*this)) {
+  if (msg.GetType().raw() < std::to_underlying(EClientMsg::CLIMSG_Ack) && REJOIN_BacklogPending(*this)) {
     return;
   }
 
@@ -97,8 +98,8 @@ void CNetClient::Process(
   // everyone else gets, which is what a player sending different orders to
   // different players looks like to CommandStreamCheck.
   if (
-    net_DebugAlterOrdersTo == mIndex &&
-    msg.GetType().raw() == static_cast<uint8_t>(ECmdStreamOp::CMDST_VerifyChecksum) && msg.GetMessageSize() > 0
+    net_DebugAlterOrdersTo == mIndex && msg.GetType().raw() == std::to_underlying(ECmdStreamOp::CMDST_VerifyChecksum) &&
+    msg.GetMessageSize() > 0
   ) {
     CMessage altered = msg;
     altered.mBuff[3] = static_cast<char>(altered.mBuff[3] ^ 0x01); // first checksum byte
@@ -165,7 +166,7 @@ void CNetClient::ReceiveMessage(
   // from the wire it went through `UpdateState` into every sim, where
   // `Sim::EndGame` froze the game for all players and `CDecoder` closed the
   // replay recording. It is dropped here, on every receiver alike.
-  if (message->GetType().raw() == static_cast<uint8_t>(ECmdStreamOp::CMDST_EndGame)) {
+  if (message->GetType().raw() == std::to_underlying(ECmdStreamOp::CMDST_EndGame)) {
     static DiagnosticBudget sEndGameWarnings;
     if (sEndGameWarnings.Take(20)) {
       gpg::Warnf("Ignoring end-game command from client %d:%s.", mIndex, mNickname.c_str());
@@ -180,7 +181,7 @@ void CNetClient::ReceiveMessage(
   }
 
   // Engine addition (issue #285).
-  if (message->GetType().raw() == static_cast<uint8_t>(EClientMsg::CLIMSG_PeerFeatures)) {
+  if (message->GetType().raw() == std::to_underlying(EClientMsg::CLIMSG_PeerFeatures)) {
     mManager->mPeerFeatures->Receive(*mManager, *this, *message);
     return;
   }
@@ -191,7 +192,7 @@ void CNetClient::ReceiveMessage(
   if (mManager->mPeerFeatures->EveryoneSupports(*mManager, EPeerFeature::Rejoin)) {
     // A player who quits says goodbye, and that link ends cleanly (`LOBMSG_ConnLostEof`): they
     // left, as in any game. Only a link that was lost keeps the seat for them.
-    if (message->GetType().raw() == static_cast<std::uint8_t>(ELobbyMsg::LOBMSG_ConnLostErrored)) {
+    if (message->GetType().raw() == std::to_underlying(ELobbyMsg::LOBMSG_ConnLostErrored)) {
       mManager->mPeerFeatures->NoteRejoinLost(mIndex);
       gpg::Logf("REJOIN: link to client %d:%s lost, seat held", mIndex, mNickname.c_str());
       return;

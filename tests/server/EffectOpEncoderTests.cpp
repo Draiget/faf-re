@@ -37,7 +37,7 @@ namespace
     const EEffectOp op
   )
   {
-    return static_cast<std::uint8_t>(op);
+    return std::to_underlying(op);
   }
 
   Bytes Varint(

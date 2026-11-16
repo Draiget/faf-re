@@ -247,11 +247,11 @@ namespace faf::editor
           mTestRunIssues.push_back(std::move(issue));
         }
         std::stable_sort(mTestRunIssues.begin(), mTestRunIssues.end(), [](const CheckIssue& a, const CheckIssue& b) {
-          return static_cast<int>(a.level) < static_cast<int>(b.level);
+          return std::to_underlying(a.level) < std::to_underlying(b.level);
         });
         int counts[3] = {0, 0, 0};
         for (const CheckIssue& issue : mTestRunIssues) {
-          ++counts[static_cast<int>(issue.level)];
+          ++counts[std::to_underlying(issue.level)];
         }
         gpg::Logf(
           "editor: test run done: %d errors (the map's files), %d warnings (other Lua), %d notes",
@@ -2374,7 +2374,7 @@ namespace faf::editor
         ImGui::AlignTextToFramePadding();
         ImGui::TextDisabled("%zu", i + 1);
         ImGui::SameLine(ImGui::GetFontSize() * 1.6f);
-        int role = static_cast<int>(slot.role);
+        int role = std::to_underlying(slot.role);
         ImGui::SetNextItemWidth(roleWidth);
         if (EdCombo("##role", &role, kRoles, 3)) {
           slot.role = static_cast<PlaySlot::Role>(role);

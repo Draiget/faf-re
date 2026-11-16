@@ -1,6 +1,7 @@
 #include "moho/ai/CAiFormationInstance.h"
 #include "legacy/math/X87Math.h"
 
+#include <utility>
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>
@@ -1404,7 +1405,7 @@ namespace
   )
   {
     moho::COGrid* const grid = formation.mSim->mOGrid;
-    if (static_cast<std::uint8_t>(footprint.FitsAt(position, *grid)) == 0u) {
+    if (std::to_underlying(footprint.FitsAt(position, *grid)) == 0u) {
       return false;
     }
     if (!UnitCanMoveAt(unit, position, grid)) {

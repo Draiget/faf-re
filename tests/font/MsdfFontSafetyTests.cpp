@@ -78,7 +78,7 @@ namespace
     EXPECT_FALSE(passed) << what + ": passed the structure check";
     if (!passed) {
       std::printf("  refused, %s: %s\n", what.c_str(), reason.c_str());
-      EXPECT_TRUE(reason.find(expected) != std::string::npos) << what + ": wrong reason: " + reason;
+      EXPECT_TRUE(reason.contains(expected)) << what + ": wrong reason: " + reason;
     }
   }
 
@@ -421,8 +421,7 @@ namespace
       const bool cooked = moho::MSDF_CookFont(font.data(), font.size(), tight, out, reason);
       EXPECT_FALSE(cooked) << std::string(what) + " didn't hold";
       std::printf("  %s: %s\n", what, reason.c_str());
-      EXPECT_TRUE(cooked || reason.find(expected) != std::string::npos)
-        << std::string(what) + ": wrong reason: " + reason;
+      EXPECT_TRUE(cooked || reason.contains(expected)) << std::string(what) + ": wrong reason: " + reason;
     };
 
     // How close a real font comes to the limits, to within a factor of two. Short of memory, FreeType drops

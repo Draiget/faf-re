@@ -271,7 +271,7 @@ namespace gpg::diag
       RestoreInt3(probe.address, probe.originalByte);
 #if defined(_M_IX86)
       context.Eip = static_cast<DWORD>(probe.address);
-#elif defined(_M_X64)
+#elifdef _M_X64
       context.Rip = probe.address;
 #endif
       context.EFlags |= 0x100; // TF
@@ -318,7 +318,7 @@ namespace gpg::diag
           {"esp", context.Esp},
           {"ebp", context.Ebp},
         };
-#elif defined(_M_X64)
+#elifdef _M_X64
         struct
         {
           const char* name;
@@ -447,7 +447,7 @@ namespace gpg::diag
 
 #if defined(_M_IX86)
       const std::uintptr_t pc = context.Eip;
-#elif defined(_M_X64)
+#elifdef _M_X64
       const std::uintptr_t pc = context.Rip;
 #else
       const std::uintptr_t pc = 0;
@@ -537,7 +537,7 @@ namespace gpg::diag
       if (code == EXCEPTION_BREAKPOINT) {
 #if defined(_M_IX86)
         const std::uintptr_t site = context.Eip - 1;
-#elif defined(_M_X64)
+#elifdef _M_X64
         const std::uintptr_t site = context.Rip - 1;
 #else
         const std::uintptr_t site = 0;

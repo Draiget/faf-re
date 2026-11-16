@@ -1002,7 +1002,7 @@ namespace
       return scenarioFile.GetString();
     }
     std::string text = name.GetString();
-    if (text.rfind("<LOC", 0) == 0) {
+    if (text.starts_with("<LOC")) {
       const std::size_t close = text.find('>');
       if (close != std::string::npos) {
         text.erase(0, close + 1);

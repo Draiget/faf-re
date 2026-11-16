@@ -527,7 +527,7 @@ int LuaDebugListLocals(
   const std::size_t value
 )
 {
-  return (value + 7u) & ~static_cast<std::size_t>(7u);
+  return (value + 7u) & ~7uz;
 }
 
 void LuaDebugAppendGcObject(

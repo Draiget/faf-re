@@ -332,10 +332,10 @@ namespace gpg
    */
   struct CStrLess
   {
-    bool operator()(
+    static bool operator()(
       const char* a,
       const char* b
-    ) const noexcept
+    ) noexcept
     {
       if (a == b)
         return false;
@@ -353,10 +353,10 @@ namespace gpg
    */
   struct TypeInfoLess
   {
-    bool operator()(
+    static bool operator()(
       const std::type_info* a,
       const std::type_info* b
-    ) const noexcept
+    ) noexcept
     {
       if (a == b)
         return false;

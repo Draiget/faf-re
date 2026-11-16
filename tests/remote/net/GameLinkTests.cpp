@@ -5,6 +5,7 @@
 // Build: cmake --build --preset linux-clang-x64-release-plain --target faf_gamelink_tests
 // Run:   build/linux-clang-x64-release-plain/faf_gamelink_tests
 
+#include <utility>
 #include <algorithm>
 #include <array>
 #include <cstdint>
@@ -166,7 +167,7 @@ namespace
     hello[2] = 0xFFu;
     const auto version = AnswerHello(hello.data(), hello.size(), jar, kAddress, kNow);
     Check(
-      version.size() == kRejectSize && version[2] == static_cast<std::uint8_t>(EHandshakeRefusal::Version),
+      version.size() == kRejectSize && version[2] == std::to_underlying(EHandshakeRefusal::Version),
       "another version is told so"
     );
   }
@@ -675,7 +676,7 @@ namespace
     for (std::uint8_t& byte : message) {
       byte = static_cast<std::uint8_t>(random() % 23u);
     }
-    message[0] = static_cast<std::uint8_t>(ESeatMessage::View);
+    message[0] = std::to_underlying(ESeatMessage::View);
     message[size / 2u] = static_cast<std::uint8_t>(seed);
     return message;
   }
@@ -728,7 +729,7 @@ namespace
     std::vector<std::vector<std::uint8_t>> sent;
     for (std::uint32_t i = 0; i < 400u; ++i) {
       sent.push_back(
-        i % 9u == 4u ? std::vector<std::uint8_t>{static_cast<std::uint8_t>(ESeatMessage::Beat), 1u, 2u}
+        i % 9u == 4u ? std::vector<std::uint8_t>{std::to_underlying(ESeatMessage::Beat), 1u, 2u}
                      : ViewLike(1500u + (i % 5u) * 300u, i)
       );
     }

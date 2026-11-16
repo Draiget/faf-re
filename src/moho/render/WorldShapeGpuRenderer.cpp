@@ -2,6 +2,7 @@
 
 #include "WorldShapeGpuRenderer.h"
 
+#include <utility>
 #include <algorithm>
 #include <cmath>
 
@@ -240,7 +241,7 @@ namespace moho
         ++runEnd;
       }
       constants.baseRecord = static_cast<std::uint32_t>(runStart);
-      constants.kind = static_cast<std::uint32_t>(kind);
+      constants.kind = std::to_underlying(kind);
       call.bindings.constants = &constants;
       call.bindings.constantBytes = sizeof(constants);
       call.vertexCountPerInstance = WorldShapeQuadCount(kind) * 6U;

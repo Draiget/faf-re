@@ -1,6 +1,7 @@
 #include "platform/PlatformDefines.h"
 #include "remote/net/Handshake.h"
 
+#include <utility>
 #include <algorithm>
 #include <cstring>
 
@@ -176,7 +177,7 @@ namespace faf::remote::net
   {
     std::vector<std::uint8_t> out(kHelloSize, 0u);
     out[0] = kHandshakeTag;
-    out[1] = static_cast<std::uint8_t>(EHandshakeType::Hello);
+    out[1] = std::to_underlying(EHandshakeType::Hello);
     WriteU16(out.data() + 2, kHandshakeVersion);
     return out;
   }
@@ -187,8 +188,8 @@ namespace faf::remote::net
   ) noexcept
   {
     if (
-      size < 2u || data[0] != kHandshakeTag || data[1] < static_cast<std::uint8_t>(EHandshakeType::Hello) ||
-      data[1] > static_cast<std::uint8_t>(EHandshakeType::Reject)
+      size < 2u || data[0] != kHandshakeTag || data[1] < std::to_underlying(EHandshakeType::Hello) ||
+      data[1] > std::to_underlying(EHandshakeType::Reject)
     ) {
       return std::nullopt;
     }
@@ -264,7 +265,7 @@ namespace faf::remote::net
     }
     std::vector<std::uint8_t> out(kChallengeSize);
     out[0] = kHandshakeTag;
-    out[1] = static_cast<std::uint8_t>(EHandshakeType::Challenge);
+    out[1] = std::to_underlying(EHandshakeType::Challenge);
     const Cookie cookie = jar.Make(addressKey, nowUs);
     std::memcpy(out.data() + 2, cookie.data(), kCookieSize);
     return out;
@@ -323,7 +324,7 @@ namespace faf::remote::net
       hasher.Hash(kLabelServerKey, session.keys.send.data(), kKeySize);
       session.accept.resize(kAcceptSize);
       session.accept[0] = kHandshakeTag;
-      session.accept[1] = static_cast<std::uint8_t>(EHandshakeType::Accept);
+      session.accept[1] = std::to_underlying(EHandshakeType::Accept);
       std::memcpy(session.accept.data() + 2, serverPublic.data(), kPublicKeySize);
       hasher.Hash(kLabelAccept, session.accept.data() + 2 + kPublicKeySize, kProofSize);
     }
@@ -335,7 +336,7 @@ namespace faf::remote::net
     const EHandshakeRefusal why
   )
   {
-    return {kHandshakeTag, static_cast<std::uint8_t>(EHandshakeType::Reject), static_cast<std::uint8_t>(why)};
+    return {kHandshakeTag, std::to_underlying(EHandshakeType::Reject), std::to_underlying(why)};
   }
 
   CClientHandshake::CClientHandshake(
@@ -372,7 +373,7 @@ namespace faf::remote::net
 
     std::vector<std::uint8_t> out(kConnectSize);
     out[0] = kHandshakeTag;
-    out[1] = static_cast<std::uint8_t>(EHandshakeType::Connect);
+    out[1] = std::to_underlying(EHandshakeType::Connect);
     WriteU16(out.data() + 2, kHandshakeVersion);
     std::uint8_t* cursor = out.data() + 4;
     std::memcpy(cursor, cookie.data(), kCookieSize);

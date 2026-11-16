@@ -493,7 +493,7 @@ namespace
     EXPECT_TRUE(writes.scatters[0].decals);
     EXPECT_EQ(writes.scatters[0].entries.size(), 2U);
     EXPECT_TRUE(std::none_of(writes.notes.begin(), writes.notes.end(), [](const std::string& n) {
-      return n.find("decals") != std::string::npos;
+      return n.contains("decals");
     }));
     set(scatter, "kind", 0); // props again for what follows
 
@@ -513,7 +513,7 @@ namespace
         writes.notes.begin(),
         writes.notes.end(),
         [](const std::string& note) {
-      return note.find("atlas") != std::string::npos;
+      return note.contains("atlas");
     }
       ),
       1

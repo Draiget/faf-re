@@ -53,7 +53,7 @@ namespace
     return "windows-x64";
 #elif FAFRE_PLATFORM_WINDOWS
     return "windows-x86";
-#elif defined(__x86_64__)
+#elifdef __x86_64__
     return "linux-x64";
 #else
     return "unknown";

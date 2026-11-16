@@ -87,7 +87,7 @@ namespace moho
    */
   struct MeshBatchKeyLess
   {
-    [[nodiscard]] bool operator()(const MeshBatchKey& lhs, const MeshBatchKey& rhs) const noexcept;
+    [[nodiscard]] static bool operator()(const MeshBatchKey& lhs, const MeshBatchKey& rhs) noexcept;
   };
 
   /**

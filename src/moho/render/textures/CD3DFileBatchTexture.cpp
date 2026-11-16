@@ -123,10 +123,10 @@ namespace moho
 
     struct TextureLookupLess
     {
-      [[nodiscard]] bool operator()(
+      [[nodiscard]] static bool operator()(
         const TextureLookup& lhs,
         const TextureLookup& rhs
-      ) const
+      )
       {
         return IsTextureLookupLess(lhs, rhs);
       }

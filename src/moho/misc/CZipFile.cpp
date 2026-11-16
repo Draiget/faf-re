@@ -118,9 +118,9 @@ namespace
 
   struct ZipFileEntrySharedDeleter
   {
-    void operator()(
+    static void operator()(
       moho::CZipFileEntry* const entry
-    ) const noexcept
+    ) noexcept
     {
       if (entry != nullptr) {
         entry->mName.tidy(true, 0U);

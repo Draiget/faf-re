@@ -1,5 +1,6 @@
 #include "moho/ui/EUIStateTypeInfo.h"
 
+#include <utility>
 #include <cstdint>
 #include <cstdlib>
 #include <new>
@@ -52,11 +53,11 @@ namespace moho
   {
     mPrefix = "UIS_";
 
-    AddEnum(StripPrefix("UIS_none"), static_cast<std::int32_t>(UIS_none));
-    AddEnum(StripPrefix("UIS_splash"), static_cast<std::int32_t>(UIS_splash));
-    AddEnum(StripPrefix("UIS_frontend"), static_cast<std::int32_t>(UIS_frontend));
-    AddEnum(StripPrefix("UIS_game"), static_cast<std::int32_t>(UIS_game));
-    AddEnum(StripPrefix("UIS_lobby"), static_cast<std::int32_t>(UIS_lobby));
+    AddEnum(StripPrefix("UIS_none"), std::to_underlying(UIS_none));
+    AddEnum(StripPrefix("UIS_splash"), std::to_underlying(UIS_splash));
+    AddEnum(StripPrefix("UIS_frontend"), std::to_underlying(UIS_frontend));
+    AddEnum(StripPrefix("UIS_game"), std::to_underlying(UIS_game));
+    AddEnum(StripPrefix("UIS_lobby"), std::to_underlying(UIS_lobby));
   }
 
   /**

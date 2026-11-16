@@ -2339,7 +2339,7 @@ namespace
       if (value.size() >= 2 && value.front() == '"' && value.back() == '"') {
         value = value.substr(1, value.size() - 2);
       }
-      if (value.rfind("$HOME", 0) == 0 && (value.size() == 5 || value[5] == '/')) {
+      if (value.starts_with("$HOME") && (value.size() == 5 || value[5] == '/')) {
         found = home + value.substr(5);
       } else if (!value.empty() && value[0] == '/') {
         found = value;

@@ -1,5 +1,6 @@
 #include "gpg/core/containers/ArchiveTokenTypeInfo.h"
 
+#include <utility>
 #include <cstdlib>
 #include <new>
 #include <typeinfo>
@@ -69,11 +70,11 @@ namespace gpg
    */
   void ArchiveTokenTypeInfo::AddEnums()
   {
-    AddEnum(StripPrefix("OBJECT_TERMINATOR"), static_cast<int>(ArchiveToken::ObjectTerminator));
-    AddEnum(StripPrefix("NEW_OBJECT_TOKEN"), static_cast<int>(ArchiveToken::NewObjectToken));
-    AddEnum(StripPrefix("NULL_POINTER_TOKEN"), static_cast<int>(ArchiveToken::NullPointerToken));
-    AddEnum(StripPrefix("EXISTING_POINTER_TOKEN"), static_cast<int>(ArchiveToken::ExistingPointerToken));
-    AddEnum(StripPrefix("OBJECT_START"), static_cast<int>(ArchiveToken::ObjectStart));
+    AddEnum(StripPrefix("OBJECT_TERMINATOR"), std::to_underlying(ArchiveToken::ObjectTerminator));
+    AddEnum(StripPrefix("NEW_OBJECT_TOKEN"), std::to_underlying(ArchiveToken::NewObjectToken));
+    AddEnum(StripPrefix("NULL_POINTER_TOKEN"), std::to_underlying(ArchiveToken::NullPointerToken));
+    AddEnum(StripPrefix("EXISTING_POINTER_TOKEN"), std::to_underlying(ArchiveToken::ExistingPointerToken));
+    AddEnum(StripPrefix("OBJECT_START"), std::to_underlying(ArchiveToken::ObjectStart));
   }
 
   /**

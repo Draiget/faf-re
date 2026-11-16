@@ -1,5 +1,6 @@
 #include "moho/sim/CSquad.h"
 #include "moho/console/CConCommand.h"
+#include <utility>
 #include <cmath>
 
 #include <cstddef>
@@ -45,9 +46,7 @@ namespace moho
         return caps;
       }
 
-      return static_cast<EOccupancyCaps>(
-        static_cast<std::uint8_t>(caps) & ~static_cast<std::uint8_t>(EOccupancyCaps::OC_SUB)
-      );
+      return static_cast<EOccupancyCaps>(std::to_underlying(caps) & ~std::to_underlying(EOccupancyCaps::OC_SUB));
     }
   } // namespace
 
@@ -504,7 +503,7 @@ namespace moho
         EOccupancyCaps occupancyCaps = OCCUPY_MobileCheck(footprint, *occupancyGrid->sim->mMapData, cellPos);
         occupancyCaps = ClearSubCapsForWaterLayer(occupancyCaps, unit->mVarDat.mLayerMask);
         const EOccupancyCaps fitCaps = OCCUPY_FootprintFits(*occupancyGrid, cellPos, footprint, occupancyCaps);
-        if ((static_cast<std::uint8_t>(fitCaps) & static_cast<std::uint8_t>(EOccupancyCaps::OC_LAND)) == 0u) {
+        if ((std::to_underlying(fitCaps) & std::to_underlying(EOccupancyCaps::OC_LAND)) == 0u) {
           return false;
         }
         break;
@@ -515,7 +514,7 @@ namespace moho
         EOccupancyCaps occupancyCaps = OCCUPY_MobileCheck(footprint, *occupancyGrid->sim->mMapData, cellPos);
         occupancyCaps = ClearSubCapsForWaterLayer(occupancyCaps, unit->mVarDat.mLayerMask);
         const EOccupancyCaps fitCaps = OCCUPY_FootprintFits(*occupancyGrid, cellPos, footprint, occupancyCaps);
-        if ((static_cast<std::uint8_t>(fitCaps) & static_cast<std::uint8_t>(EOccupancyCaps::OC_WATER)) == 0u) {
+        if ((std::to_underlying(fitCaps) & std::to_underlying(EOccupancyCaps::OC_WATER)) == 0u) {
           return false;
         }
         break;
@@ -530,7 +529,7 @@ namespace moho
           footprint,
           static_cast<EOccupancyCaps>(static_cast<std::uint8_t>(unit->mVarDat.mLayerMask))
         );
-        if (static_cast<std::uint8_t>(fitCaps) == 0u) {
+        if (std::to_underlying(fitCaps) == 0u) {
           return false;
         }
         break;

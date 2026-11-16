@@ -3,6 +3,7 @@
 #include "gpg/core/utils/Logging.h"
 #include "moho/sim/COGrid.h"
 
+#include <utility>
 #include <algorithm>
 #include <bit>
 #include <cassert>
@@ -952,7 +953,7 @@ namespace moho
         if (xCount > 0) {
           int position = currentRowBase;
           int remainingX = xCount;
-          const std::uint32_t flagBits = static_cast<std::uint32_t>(flags);
+          const std::uint32_t flagBits = std::to_underlying(flags);
           const bool includeUnits = (flagBits & ENTITYTYPE_Unit) != 0u;
           const bool includeProps = (flagBits & ENTITYTYPE_Prop) != 0u;
           const bool includeDynamic = (flagBits & (ENTITYTYPE_Projectile | ENTITYTYPE_Entity)) != 0u;
@@ -1087,8 +1088,8 @@ namespace moho
     // actually tests the low three OC_* bits (land/seabed/sub) together as
     // the "terrain" occupancy bucket. Expose the mask explicitly so recovered
     // behavior code can keep using named bits instead of raw hex.
-    constexpr std::uint8_t kTerrainOccupancyMask = static_cast<std::uint8_t>(EOccupancyCaps::OC_LAND) |
-      static_cast<std::uint8_t>(EOccupancyCaps::OC_SEABED) | static_cast<std::uint8_t>(EOccupancyCaps::OC_SUB);
+    constexpr std::uint8_t kTerrainOccupancyMask = std::to_underlying(EOccupancyCaps::OC_LAND) |
+      std::to_underlying(EOccupancyCaps::OC_SEABED) | std::to_underlying(EOccupancyCaps::OC_SUB);
   } // namespace
 
   /**
@@ -1111,14 +1112,14 @@ namespace moho
     const gpg::Rect2i& rect
   )
   {
-    const std::uint8_t capsBits = static_cast<std::uint8_t>(caps);
+    const std::uint8_t capsBits = std::to_underlying(caps);
     const int rectWidth = rect.x1 - rect.x0;
     const int rectHeight = rect.z1 - rect.z0;
 
     if ((capsBits & kTerrainOccupancyMask) != 0u) {
       terrainOccupation.FillRect(rect.x0, rect.z0, rectWidth, rectHeight, true);
     }
-    if ((capsBits & static_cast<std::uint8_t>(EOccupancyCaps::OC_WATER)) != 0u) {
+    if ((capsBits & std::to_underlying(EOccupancyCaps::OC_WATER)) != 0u) {
       waterOccupation.FillRect(rect.x0, rect.z0, rectWidth, rectHeight, true);
     }
     sim->mPathTables->DirtyClusters(rect);
@@ -1140,14 +1141,14 @@ namespace moho
     const gpg::Rect2i& rect
   )
   {
-    const std::uint8_t capsBits = static_cast<std::uint8_t>(caps);
+    const std::uint8_t capsBits = std::to_underlying(caps);
     const int rectWidth = rect.x1 - rect.x0;
     const int rectHeight = rect.z1 - rect.z0;
 
     if ((capsBits & kTerrainOccupancyMask) != 0u) {
       terrainOccupation.FillRect(rect.x0, rect.z0, rectWidth, rectHeight, false);
     }
-    if ((capsBits & static_cast<std::uint8_t>(EOccupancyCaps::OC_WATER)) != 0u) {
+    if ((capsBits & std::to_underlying(EOccupancyCaps::OC_WATER)) != 0u) {
       waterOccupation.FillRect(rect.x0, rect.z0, rectWidth, rectHeight, false);
     }
     sim->mPathTables->DirtyClusters(rect);

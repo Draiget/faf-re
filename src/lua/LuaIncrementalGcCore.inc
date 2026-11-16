@@ -1069,11 +1069,10 @@ extern "C" void faf_lua51_gc_register_vm(lua_State* const L, const int role)
 	if (L == nullptr || L->l_G == nullptr) {
 		return;
 	}
-	if (role != static_cast<int>(ELuaVmRole::FrontendUi) &&
-		role != static_cast<int>(ELuaVmRole::SessionUi)) {
-		return;
-	}
-	// Only a non-sim root may use the incremental collector. In particular,
+  if (role != std::to_underlying(ELuaVmRole::FrontendUi) && role != std::to_underlying(ELuaVmRole::SessionUi)) {
+    return;
+  }
+  // Only a non-sim root may use the incremental collector. In particular,
 	// never let a state that has installed a Sim* in globalUserData enter here.
 	if (L->l_G->globalUserData != nullptr) {
 		return;

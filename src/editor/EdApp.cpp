@@ -5,6 +5,7 @@
 #include "editor/EdPath.h"
 #include "editor/view/EdPropThumbnails.h"
 #include "editor/doc/EdAdaptiveTables.h"
+#include <utility>
 #include <iterator>
 #include <fstream>
 #include <sstream>
@@ -4241,7 +4242,7 @@ namespace faf::editor
         }
         std::string symmetryName;
         if (panel.TakeSymmetryAsk(symmetryName)) {
-          mShell->Tools().PickSymmetry(static_cast<int>(SymmetryOfOp(symmetryName)));
+          mShell->Tools().PickSymmetry(std::to_underlying(SymmetryOfOp(symmetryName)));
         }
         const HeightBrush brush = mShell->Tools().CurrentHeightBrush();
         layout.SetImages(LayoutImagesOf(brush.symmetry, brush.turns));
@@ -5110,7 +5111,7 @@ namespace faf::editor
                 {"rotn6", {Symmetry::NWay, 6}},
               };
               if (const auto found = kGraphSymmetry.find(generate.Symmetry()); found != kGraphSymmetry.end()) {
-                symTools.SetSymmetryOnly(static_cast<int>(found->second.first), found->second.second);
+                symTools.SetSymmetryOnly(std::to_underlying(found->second.first), found->second.second);
               }
             }
             std::string status = mScene.ApplyGraphBuild(ask.result, ask.plain, ask.writes);
@@ -6826,7 +6827,7 @@ namespace faf::editor
         }
         gpg::Logf(
           "editor: view menu action %d at %.1f, %.1f%s%s",
-          static_cast<int>(action.kind),
+          std::to_underlying(action.kind),
           static_cast<double>(at.x),
           static_cast<double>(at.z),
           action.arg.empty() ? "" : ": ",
@@ -7822,7 +7823,7 @@ namespace faf::editor
         };
         switch (mR7Stage++) {
         case 0: {
-          tools.SetSymmetry(static_cast<int>(Symmetry::LeftRight), 3);
+          tools.SetSymmetry(std::to_underlying(Symmetry::LeftRight), 3);
           EdMapScene::MirrorHalfOptions o;
           o.source = 1;
           o.units = true;
@@ -8419,7 +8420,7 @@ namespace faf::editor
             {HeightBrushMode::Stamp, "stamp"},
           };
           for (const auto& [mode, name] : kModes) {
-            tools.SetBrushMode(static_cast<int>(mode));
+            tools.SetBrushMode(std::to_underlying(mode));
             cursors += std::string(name) + " " + std::to_string(mScene.ViewCursorAt(middle)) + ", ";
           }
           tools.SetTool(6);
@@ -9963,7 +9964,7 @@ namespace faf::editor
                    : "Nothing to mirror: select objects, and set a symmetry in the brushes"
         );
       }, canEdit, {}, "Each selected marker, prop, unit and decal copied to its places in the map's symmetry");
-      for (int i = 0; i < static_cast<int>(ArrangeOp::Count); ++i) {
+      for (int i = 0; i < std::to_underlying(ArrangeOp::Count); ++i) {
         const ArrangeOp op = static_cast<ArrangeOp>(i);
         add((std::string("arrange.") + ArrangeId(op)).c_str(), ArrangeTitle(op), "Edit", "", [this, op] {
           mShell->Tools().RequestArrange(op);
@@ -10448,7 +10449,7 @@ namespace faf::editor
       arrange.label = "&Arrange";
       arrange.provider = [] {
         std::vector<EdMenuItem> items;
-        for (int i = 0; i < static_cast<int>(ArrangeOp::Count); ++i) {
+        for (int i = 0; i < std::to_underlying(ArrangeOp::Count); ++i) {
           const ArrangeOp op = static_cast<ArrangeOp>(i);
           if (op == ArrangeOp::DistributeX || op == ArrangeOp::Snap || op == ArrangeOp::MirrorX) {
             EdMenuItem line;
@@ -16711,7 +16712,7 @@ namespace faf::editor
             const std::size_t comma = list.find(',');
             list = comma == std::string::npos ? std::string() : list.substr(comma + 1);
           }
-          ends.resize(std::max<std::size_t>(ends.size() & ~std::size_t{1}, 4), 0.0f);
+          ends.resize(std::max<std::size_t>(ends.size() & ~1uz, 4), 0.0f);
           mScene.SetRuler(ends[0], ends[1], ends[2], ends[3]);
           for (std::size_t i = 4; i + 1 < ends.size(); i += 2) {
             mScene.ContinueRuler(ends[i], ends[i + 1]);

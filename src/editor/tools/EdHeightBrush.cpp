@@ -1028,7 +1028,7 @@ namespace faf::editor
     if (shape == BrushShape::Image) {
       return "Image";
     }
-    const int i = static_cast<int>(shape);
+    const int i = std::to_underlying(shape);
     return i >= 0 && i < kBrushShapeCount ? kNames[i] : "Round";
   }
 
@@ -1078,7 +1078,7 @@ namespace faf::editor
 
   void ErosionStrokeDelete::operator()(
     ErosionStroke* const stroke
-  ) const noexcept
+  ) noexcept
   {
     delete stroke;
   }

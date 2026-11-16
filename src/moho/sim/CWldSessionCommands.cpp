@@ -1,4 +1,5 @@
 #include "moho/sim/CWldSessionPrivate.h"
+#include <utility>
 
 namespace moho
 {
@@ -2652,7 +2653,7 @@ namespace moho
     LuaPlus::LuaObject targetTable;
     targetTable.AssignNewTable(state, 0, 0);
 
-    ESTITargetType targetType = static_cast<ESTITargetType>(static_cast<std::int32_t>(commandIssueData.mTarget.mType));
+    ESTITargetType targetType = static_cast<ESTITargetType>(std::to_underlying(commandIssueData.mTarget.mType));
     gpg::RRef targetTypeRef{};
     targetTypeRef = gpg::MakeRRef<moho::ESTITargetType>(&targetType);
     const fa::string targetTypeLexical = targetTypeRef.GetLexical();
@@ -2875,12 +2876,12 @@ namespace moho
     const EMauiEventModifier modifiers
   )
   {
-    constexpr std::uint32_t kShiftMask = static_cast<std::uint32_t>(MEM_Shift);
-    constexpr std::uint32_t kCtrlMask = static_cast<std::uint32_t>(MEM_Ctrl);
-    constexpr std::uint32_t kAltMask = static_cast<std::uint32_t>(MEM_Alt);
+    constexpr std::uint32_t kShiftMask = std::to_underlying(MEM_Shift);
+    constexpr std::uint32_t kCtrlMask = std::to_underlying(MEM_Ctrl);
+    constexpr std::uint32_t kAltMask = std::to_underlying(MEM_Alt);
     constexpr std::uint32_t kShiftCtrlMask = kShiftMask | kCtrlMask;
 
-    const std::uint32_t modifierBits = static_cast<std::uint32_t>(modifiers);
+    const std::uint32_t modifierBits = std::to_underlying(modifiers);
     fa::vector<UserUnit*> nextSelection{};
 
     UserEntity* const hoveredEntity = this->GetHoveredUserEntity();

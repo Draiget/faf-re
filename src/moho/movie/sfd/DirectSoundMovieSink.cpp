@@ -30,9 +30,9 @@ namespace moho::sfd
     }
     struct BufferDelete
     {
-      void operator()(
+      static void operator()(
         IDirectSoundBuffer* p
-      ) const
+      )
       {
         if (p)
           p->Release();

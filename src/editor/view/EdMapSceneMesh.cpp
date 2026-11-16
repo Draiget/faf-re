@@ -425,7 +425,7 @@ namespace faf::editor
         };
         const std::size_t vertices = word(0x10);
         const std::size_t count = word(0x18);
-        if (bytes.compare(0, 4, "MODL") != 0 || vertices + count * 68 > bytes.size()) {
+        if (!bytes.starts_with("MODL") || vertices + count * 68 > bytes.size()) {
           continue;
         }
         const float middle[3] = {

@@ -25,8 +25,8 @@ namespace
   constexpr std::size_t kCommitChunkBytes = 1024u * 1024u;
   // Far above any game seen: Lua holds 117 MB live on a 6v6 game on a server. The range only reserves.
   // Windows keeps a page just below 2 GB in every process, so nothing larger is free below 4 GB.
-  constexpr std::size_t kMaxReserveBytes = std::size_t{2} << 30;
-  constexpr std::size_t kMinReserveBytes = std::size_t{1} << 29;
+  constexpr std::size_t kMaxReserveBytes = 2uz << 30;
+  constexpr std::size_t kMinReserveBytes = 1uz << 29;
   constexpr std::uintptr_t kAddressStep = std::uintptr_t{1} << 24;
   constexpr std::uintptr_t kAddressLimit = std::uintptr_t{1} << 32;
   constexpr std::size_t kSpanCount = kMaxReserveBytes / kSpanBytes;

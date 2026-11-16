@@ -53,7 +53,7 @@ namespace faf::remote::net
 
   struct IpAddressHash
   {
-    [[nodiscard]] std::size_t operator()(const IpAddress& address) const noexcept;
+    [[nodiscard]] static std::size_t operator()(const IpAddress& address) noexcept;
   };
 
   struct SEndpoint
@@ -100,7 +100,7 @@ namespace faf::remote::net
 
   struct SEndpointHash
   {
-    [[nodiscard]] std::size_t operator()(const SEndpoint& endpoint) const noexcept;
+    [[nodiscard]] static std::size_t operator()(const SEndpoint& endpoint) noexcept;
   };
 
   /** "a.b.c.d:port" or "[ipv6]:port"; false for anything else, a port of 0 included. */

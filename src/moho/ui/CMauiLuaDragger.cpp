@@ -1,4 +1,5 @@
 #include "moho/ui/UiPrivate.h"
+#include <utility>
 
 namespace
 {
@@ -535,7 +536,7 @@ int moho::cfunc_PostDraggerL(
     EMauiKeyCode keyCodeEnum{};
     gpg::RRef keyCodeEnumRef = gpg::MakeRRef<moho::EMauiKeyCode>(&keyCodeEnum);
     SCR_GetEnum(state, keyCodeName, keyCodeEnumRef);
-    keyCode = static_cast<std::int32_t>(keyCodeEnum);
+    keyCode = std::to_underlying(keyCodeEnum);
   }
 
   keyCode = NormalizePostDraggerKeycode(keyCode);

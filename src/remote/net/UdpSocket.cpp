@@ -218,7 +218,7 @@ namespace faf::remote::net
       for (;;) {
         const std::size_t colon = text.find(':');
         const std::string_view piece = text.substr(0, colon);
-        if (colon == std::string_view::npos && ipv4Tail && piece.find('.') != std::string_view::npos) {
+        if (colon == std::string_view::npos && ipv4Tail && piece.contains('.')) {
           std::uint32_t ip = 0;
           if (count > 6 || !ParseIpv4(piece, ip)) {
             return false;
@@ -250,7 +250,7 @@ namespace faf::remote::net
       if (text.size() >= 2u && text.front() == '[' && text.back() == ']') {
         text = text.substr(1, text.size() - 2u);
       }
-      if (text.empty() || text.find('%') != std::string_view::npos) {
+      if (text.empty() || text.contains('%')) {
         return false;
       }
       std::array<std::uint16_t, 8> head{};
@@ -396,7 +396,7 @@ namespace faf::remote::net
     IpAddress& out
   )
   {
-    if (text.find(':') != std::string_view::npos || text.find('[') != std::string_view::npos) {
+    if (text.contains(':') || text.contains('[')) {
       return ParseIpv6(text, out);
     }
     std::uint32_t ip = 0;
@@ -409,14 +409,14 @@ namespace faf::remote::net
 
   std::size_t IpAddressHash::operator()(
     const IpAddress& address
-  ) const noexcept
+  ) noexcept
   {
     return static_cast<std::size_t>(Fnv1a(address.data(), address.size()));
   }
 
   std::size_t SEndpointHash::operator()(
     const SEndpoint& endpoint
-  ) const noexcept
+  ) noexcept
   {
     const std::array<std::uint8_t, 18> key = endpoint.Key();
     return static_cast<std::size_t>(Fnv1a(key.data(), key.size()));

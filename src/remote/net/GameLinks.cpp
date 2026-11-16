@@ -343,7 +343,7 @@ namespace faf::remote::net
         continue;
       }
       while (player.channel && player.channel->TakeReliable(mMessage)) {
-        if (!mMessage.empty() && mMessage[0] == static_cast<std::uint8_t>(ESeatMessage::CompressOffer)) {
+        if (!mMessage.empty() && mMessage[0] == std::to_underlying(ESeatMessage::CompressOffer)) {
           TakeCompressOffer(uid, player, mMessage); // the links' own (plan WP10.13)
           continue;
         }
@@ -616,7 +616,7 @@ namespace faf::remote::net
     if (!mChannel || !mChannel->TakeReliable(out)) {
       return false;
     }
-    if (out.empty() || out[0] != static_cast<std::uint8_t>(ESeatMessage::Compressed)) {
+    if (out.empty() || out[0] != std::to_underlying(ESeatMessage::Compressed)) {
       return true;
     }
     // Plan WP10.13: the stream hands the pieces out in the order they were compressed, so each decodes now.

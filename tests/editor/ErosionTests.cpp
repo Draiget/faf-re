@@ -520,8 +520,8 @@ namespace
       const double before = Sum(H->v), after = Sum(r->v);
       CHECK(std::fabs(before - after) / before < 2e-3, "hydraulic closed: mass changed %g -> %g", before, after);
       CHECK(
-        extra.count("wear") && extra.count("deposit") && extra.count("flow") && extra.count("water") &&
-          extra.count("sediment"),
+        extra.contains("wear") && extra.contains("deposit") && extra.contains("flow") && extra.contains("water") &&
+          extra.contains("sediment"),
         "extra outputs missing"
       );
       const Stats w = Measure(extra["wear"]), d = Measure(extra["deposit"]);

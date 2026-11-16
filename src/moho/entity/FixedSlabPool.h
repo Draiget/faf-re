@@ -33,7 +33,7 @@ namespace moho
   namespace slab_region
   {
 #if FAFRE_PLATFORM_WINDOWS && defined(_M_X64)
-    constexpr std::size_t kReserveBytes = std::size_t{2} << 30; // 2 GB virtual address space
+    constexpr std::size_t kReserveBytes = 2uz << 30; // 2 GB virtual address space
 #else
     constexpr std::size_t kReserveBytes = 128u * 1024u * 1024u; // 128 MB virtual address space
 #endif

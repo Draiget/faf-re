@@ -1,5 +1,6 @@
 #include "moho/unit/tasks/CUnitUpgradeTask.h"
 
+#include <utility>
 #include <cstdint>
 #include <cstdlib>
 #include <new>
@@ -286,7 +287,7 @@ namespace moho
     mUnit->mUnitVarDat.mUnitStates |= kUpgradeOwnerHighMask;
 
     SUnitConstructionParams params(
-      static_cast<std::int32_t>(mUnit->mVarDat.mLayerMask),
+      std::to_underlying(mUnit->mVarDat.mLayerMask),
       mUnit->GetPosition(),
       mUnit->ArmyRef,
       mToBlueprint,

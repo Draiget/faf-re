@@ -267,7 +267,7 @@ namespace faf::editor
     }
     const bool given = [&] {
       for (const char* key : {"size"}) {
-        if (s.given.count(key) != 0) {
+        if (s.given.contains(key)) {
           return true;
         }
       }
@@ -326,7 +326,7 @@ namespace faf::editor
         );
         add('E', "V12", line);
       }
-      if (s.given.count("water_abyss") != 0 && s.waterAbyss >= s.water) {
+      if (s.given.contains("water_abyss") && s.waterAbyss >= s.water) {
         add('E', "V12", "water_abyss must be below water");
       }
     } else if (facts.water) {
