@@ -9,7 +9,7 @@
 [![Windows](https://img.shields.io/badge/Windows-x64%20%7C%20x86-0078D6?logo=windows&logoColor=white)](#build)
 [![Linux](https://img.shields.io/badge/Linux-x64-FCC624?logo=linux&logoColor=black)](#linux)
 [![macOS](https://img.shields.io/badge/macOS-Apple%20silicon-000000?logo=apple&logoColor=white)](#macos-apple-silicon)
-[![Line coverage](https://img.shields.io/badge/line%20coverage-71.3%25-yellowgreen)](tests/README.md#coverage)
+[![Line coverage](https://img.shields.io/badge/line%20coverage-73.2%25-yellowgreen)](tests/README.md#coverage)
 
 [Build](#build) · [Map editor](#map-editor) · [Retail parity](#retail-parity) · [Performance](#performance) · [Contributing](CONTRIBUTING.md)
 
