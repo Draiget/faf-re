@@ -21,6 +21,8 @@
 // Build: cmake --build --preset clang-x64-release --target faf_fast_retransmit_tests
 // Run:   build\clang-x64-release\tests\faf_fast_retransmit_tests.exe   (exit code = failures)
 
+#include "NetTestSupport.h"
+
 #include "moho/net/CMessage.h"
 #include "moho/net/CNetUDPConnector.h"
 #include "moho/net/Common.h"
@@ -222,11 +224,8 @@ namespace
     }
 
     ba->RemoveReceiver(kMessageType, kMessageType + 1, &atB);
-    ab->Close();
-    ba->Close();
-    a->Destroy();
-    b->Destroy();
-    std::this_thread::sleep_for(std::chrono::milliseconds(200));
+    // Both gone before the next run, whose connectors may take their memory, which these pipes deliver to.
+    Check(net_test::EndConnected(a, ab, b, ba), "both connectors gone before the next run");
     return r;
   }
 

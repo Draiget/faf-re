@@ -7,6 +7,8 @@
 // NET_DeliverFromPeerTransport and none could have used the network. Both
 // pairs exchange the same messages in both directions, in order.
 
+#include "NetTestSupport.h"
+
 #include "moho/net/CMessage.h"
 #include "moho/net/CNetUDPConnector.h"
 #include "moho/net/Common.h"
@@ -91,8 +93,8 @@ namespace
     return std::string(side) + " message " + std::to_string(i) + std::string(static_cast<std::size_t>(i % 200), 'x');
   }
 
-  // Connects a (Connect) and b (Accept) at the given addresses and sends
-  // kMessages each way.
+  // Connects a (Connect) and b (Accept) at the given addresses, sends
+  // kMessages each way, and ends both connectors.
   bool Exchange(
     CNetUDPConnector* a,
     CNetUDPConnector* b,
@@ -107,6 +109,8 @@ namespace
     INetConnection* ba = b->Accept(aAddr, aPort);
     if (ab == nullptr || ba == nullptr) {
       Check(false, label);
+      a->Destroy();
+      b->Destroy();
       return false;
     }
     Collector atA;
@@ -144,8 +148,7 @@ namespace
     Check(inOrder, label);
     ab->RemoveReceiver(kMessageType, kMessageType + 1, &atA);
     ba->RemoveReceiver(kMessageType, kMessageType + 1, &atB);
-    ab->Close();
-    ba->Close();
+    Check(net_test::EndConnected(a, ab, b, ba), "both connectors gone");
     return inOrder;
   }
 } // namespace
@@ -163,8 +166,6 @@ TEST(
   Exchange(
     a, b, gSocketHost, b->GetLocalPort(), gSocketHost, a->GetLocalPort(), "socket path, both directions in order"
   );
-  a->Destroy();
-  b->Destroy();
 }
 
 TEST(
@@ -191,9 +192,6 @@ TEST(
   Exchange(a, b, kAddrB, 2, kAddrA, 1, "transport path, both directions in order");
   std::printf("  datagrams through the transports: %d to b, %d to a\n", toB->datagrams, toA->datagrams);
   Check(toB->datagrams > 0 && toA->datagrams > 0, "every datagram went through a transport");
-  a->Destroy();
-  b->Destroy();
-  std::this_thread::sleep_for(std::chrono::milliseconds(200));
 }
 
 int main(

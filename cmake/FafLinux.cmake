@@ -443,6 +443,12 @@ add_executable(faf_fast_retransmit_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}
 target_link_libraries(faf_fast_retransmit_tests PRIVATE faf_sim gtest_main)
 target_link_options(faf_fast_retransmit_tests PRIVATE -Wl,--error-limit=0)
 add_test(NAME net_fast_retransmit COMMAND faf_fast_retransmit_tests)
+# The end of a UDP connector (Destroy, the goodbyes, the connector deleted), as Windows runs it.
+add_executable(faf_udp_connector_lifetime_tests EXCLUDE_FROM_ALL
+  "${PROJECT_SOURCE_DIR}/tests/net/UdpConnectorLifetimeTests.cpp")
+target_link_libraries(faf_udp_connector_lifetime_tests PRIVATE faf_sim gtest_main)
+target_link_options(faf_udp_connector_lifetime_tests PRIVATE -Wl,--error-limit=0)
+add_test(NAME net_udp_connector_lifetime COMMAND faf_udp_connector_lifetime_tests)
 
 # The libm gate (plan WPL.13): the faf_sim objects call no host libm transcendental outside
 # tests/linux/libm_allowlist.txt; headless is not built while one does.
