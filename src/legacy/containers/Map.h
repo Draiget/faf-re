@@ -58,6 +58,8 @@ namespace fa
     using iterator = detail::rb_iterator<traits, false>;
     using const_iterator = detail::rb_iterator<traits, true>;
 
+
+
     // ---- ctor / dtor ------------------------------------------------------
 
     map() noexcept {}
@@ -153,11 +155,6 @@ namespace fa
       : tree_(comp, alloc)
     {
       insert(init.begin(), init.end());
-    }
-
-    [[nodiscard]] allocator_type get_allocator() const noexcept
-    {
-      return tree_.get_allocator();
     }
 
     // ---- observers --------------------------------------------------------
@@ -965,6 +962,8 @@ namespace fa
     using iterator = detail::rb_iterator<traits, false>;
     using const_iterator = detail::rb_iterator<traits, true>;
 
+
+
     multimap() noexcept {}
     explicit multimap(
       const key_compare& comp,
@@ -1042,11 +1041,6 @@ namespace fa
       for (const auto& item : init) {
         insert(item);
       }
-    }
-
-    [[nodiscard]] const allocator_type& get_allocator() const noexcept
-    {
-      return tree_.get_allocator();
     }
 
     [[nodiscard]] iterator begin() noexcept

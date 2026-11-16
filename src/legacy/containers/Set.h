@@ -50,6 +50,8 @@ namespace fa
     using const_iterator = detail::rb_iterator<traits, true>;
     using iterator = const_iterator;
 
+
+
     // -------- ctor/dtor --------
     set() MSVC8_SET_NOEXCEPT {}
     explicit set(
@@ -152,11 +154,6 @@ namespace fa
     {
       tree_ = std::move(o.tree_);
       return *this;
-    }
-
-    [[nodiscard]] const allocator_type& get_allocator() const noexcept
-    {
-      return tree_.get_allocator();
     }
 
     // -------- iterators --------
@@ -446,6 +443,8 @@ namespace fa
     using iterator = detail::rb_iterator<traits, false>;
     using const_iterator = detail::rb_iterator<traits, true>;
 
+
+
     multiset() {}
     explicit multiset(
       const key_compare& comp,
@@ -524,11 +523,6 @@ namespace fa
     {
       tree_ = std::move(o.tree_);
       return *this;
-    }
-
-    [[nodiscard]] const allocator_type& get_allocator() const noexcept
-    {
-      return tree_.get_allocator();
     }
 
     /**

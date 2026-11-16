@@ -3403,10 +3403,6 @@ namespace fa
         return count != 0u ? count : 1u;
       }
 
-      [[nodiscard]] const allocator_type& get_allocator() const noexcept
-      {
-        return this->alloc();
-      }
 
       // ---- lookup ------------------------------------------------------
 
