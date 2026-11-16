@@ -8,6 +8,7 @@
 
 #include <cstdio>
 #include <fstream>
+#include <print>
 #include <sstream>
 
 namespace
@@ -210,7 +211,7 @@ crazyrushOneMexes = {}
     }
     EXPECT_EQ(differ, 1);
     EXPECT_EQ(text.size() - out.size(), 3u); // ",07" gone
-    std::printf("%d lines, %d changed\n", lines, differ);
+    std::println("{} lines, {} changed", lines, differ);
   }
 
   TEST(

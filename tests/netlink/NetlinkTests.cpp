@@ -27,6 +27,7 @@
 #include <functional>
 #include <memory>
 #include <mutex>
+#include <print>
 #include <string>
 #include <thread>
 #include <vector>
@@ -166,10 +167,10 @@ namespace
         self.received.push_back(seq);
       };
       cb.onState = [name](const LinkState s) {
-        std::printf("  %s: %s\n", name, LinkStateName(s));
+        std::println("  {}: {}", name, LinkStateName(s));
       };
       cb.onLog = [name](const std::string& t) {
-        std::printf("  %s: %s\n", name, t.c_str());
+        std::println("  {}: {}", name, t);
       };
       return cb;
     };
@@ -222,17 +223,15 @@ namespace
     ticker.join();
     const LinkStats sa = a.link->GetStats();
     const LinkStats sb = b.link->GetStats();
-    std::printf(
-      "  offerer: sent %llu, received %zu, echoes %llu/%llu, rtt %.3f ms\n",
+    std::println(
+      "  offerer: sent {}, received {}, echoes {}/{}, rtt {:.3f} ms",
       static_cast<unsigned long long>(sa.dataSent),
       a.received.size(),
       static_cast<unsigned long long>(sa.echoesAnswered),
       static_cast<unsigned long long>(sa.echoesSent),
       sa.lastRttMs
     );
-    std::printf(
-      "  answerer: sent %llu, received %zu\n", static_cast<unsigned long long>(sb.dataSent), b.received.size()
-    );
+    std::println("  answerer: sent {}, received {}", static_cast<unsigned long long>(sb.dataSent), b.received.size());
     Check(
       a.received.size() == static_cast<std::size_t>(count) && b.received.size() == static_cast<std::size_t>(count),
       "every datagram arrived on both sides"
@@ -276,7 +275,7 @@ namespace
         self.received.push_back(seq);
       };
       cb.onLog = [name, &laneOn](const std::string& t) {
-        std::printf("  %s: %s\n", name, t.c_str());
+        std::println("  {}: {}", name, t);
         if (t.contains("redundant lane")) {
           ++laneOn;
         }
@@ -337,9 +336,9 @@ namespace
     };
     const std::size_t da = distinct(a);
     const std::size_t db = distinct(b);
-    std::printf(
-      "  lane, 10%% of lane datagrams dropped each way: offerer got %zu of %d, answerer %zu of %d; "
-      "repeats %llu, run out unacked %llu\n",
+    std::println(
+      "  lane, 10% of lane datagrams dropped each way: offerer got {} of {}, answerer {} of {}; repeats {}, run out "
+      "unacked {}",
       da,
       count,
       db,
@@ -500,7 +499,7 @@ namespace
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
       }
       if (!finished) {
-        std::printf("FAIL links froze while setting up WebRTC with the lane on (deadlock)\n");
+        std::println("FAIL links froze while setting up WebRTC with the lane on (deadlock)");
         std::fflush(stdout);
         std::_Exit(1);
       }
@@ -664,8 +663,8 @@ namespace
     const PairResult r = RunPair(o, o, 500, [](Link&, Link&) {
       return true;
     });
-    std::printf(
-      "  duplicates: offerer sent %llu with %llu copies; answerer got %zu (%zu distinct)\n",
+    std::println(
+      "  duplicates: offerer sent {} with {} copies; answerer got {} ({} distinct)",
       static_cast<unsigned long long>(r.a.dataSent),
       static_cast<unsigned long long>(r.a.duplicatesSent),
       r.atB.size(),
@@ -696,8 +695,8 @@ namespace
     const PairResult r = RunPair(o, o, 1000, [](Link& a, Link& b) {
       return a.GetStats().onWebRtc && b.GetStats().onWebRtc;
     });
-    std::printf(
-      "  webrtc: offerer sent %llu, %llu on the data channel; got %zu\n",
+    std::println(
+      "  webrtc: offerer sent {}, {} on the data channel; got {}",
       static_cast<unsigned long long>(r.a.dataSent),
       static_cast<unsigned long long>(r.a.webRtcSent),
       r.atA.size()
@@ -765,8 +764,8 @@ namespace
     const PairResult r = RunPair(o, o, 1000, [](Link& a, Link& b) {
       return a.GetStats().laneEncrypted && b.GetStats().laneEncrypted;
     });
-    std::printf(
-      "  encrypted lane: offerer got %zu, answerer %zu; unauthenticated dropped %llu / %llu\n",
+    std::println(
+      "  encrypted lane: offerer got {}, answerer {}; unauthenticated dropped {} / {}",
       r.atA.size(),
       r.atB.size(),
       static_cast<unsigned long long>(r.a.laneUnauthenticated),
@@ -819,7 +818,7 @@ namespace
         other->OnSignal(*CandidatesMessageFromJson(ToJson(m)));
       };
       cb.onLog = [name, &offers](const std::string& text) {
-        std::printf("    %s: %s\n", name, text.c_str());
+        std::println("    {}: {}", name, text);
         if (text.starts_with("initiating ICE as offerer")) {
           ++offers;
         }
@@ -881,7 +880,7 @@ namespace
     const double seconds = waitFor(20, [&] {
       return answererDropped.load() && offers.load() > before;
     });
-    std::printf("  reconnect on the %s: dropped and offer %d made after %.1f s\n", side, offers.load(), seconds);
+    std::println("  reconnect on the {}: dropped and offer {} made after {:.1f} s", side, offers.load(), seconds);
     Check(
       answererDropped.load() && offers.load() > before,
       (std::string("reconnect on the ") + side + ": the connection drops and the offerer starts a new attempt").c_str()
@@ -895,13 +894,13 @@ namespace
       a->Reconnect(direct);
       const double back = waitFor(20, sealedUp);
       const LinkStats s = a->GetStats();
-      std::printf(
-        "  reconnect with 'no relay': connected %d after %.1f s, path %s/%s, picked %s\n",
+      std::println(
+        "  reconnect with 'no relay': connected {:d} after {:.1f} s, path {}/{}, picked {}",
         sealedUp(),
         back,
-        s.localType.c_str(),
-        s.remoteType.c_str(),
-        PathChoiceText(s.choice).c_str()
+        s.localType,
+        s.remoteType,
+        PathChoiceText(s.choice)
       );
       Check(
         sealedUp() && s.choice == direct && s.localType == "host",
@@ -971,7 +970,7 @@ namespace
       std::this_thread::sleep_for(std::chrono::milliseconds(20));
     }
     const double seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
-    std::printf("  empty answer: attempt ended after %.1f s\n", seconds);
+    std::println("  empty answer: attempt ended after {:.1f} s", seconds);
     Check(said("no usable candidates in the answer"), "an answer with nothing usable ends the attempt");
     Check(seconds < 8.0, "and well before the 15 s of checks");
     stop = true;
@@ -1002,7 +1001,7 @@ namespace
       LinkCallbacks cb;
       cb.onSignal = [&other, name](const CandidatesMessage& m) {
         const std::string json = ToJson(m);
-        std::printf("  %s signals: %s\n", name, json.c_str());
+        std::println("  {} signals: {}", name, json);
         other.link->OnSignal(*CandidatesMessageFromJson(json));
       };
       cb.onData = [&self](const std::uint8_t* data, const std::size_t size) {
@@ -1052,8 +1051,8 @@ namespace
     ticker.join();
     const LinkStats sa = a.link->GetStats();
     const LinkStats sb = b.link->GetStats();
-    std::printf(
-      "marker run %s: lane %d/%d, sealed %d/%d, received %d / %d of %d\n",
+    std::println(
+      "marker run {}: lane {:d}/{:d}, sealed {:d}/{:d}, received {} / {} of {}",
       sealed ? "sealed" : "plain",
       sa.onLane,
       sb.onLane,

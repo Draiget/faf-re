@@ -10,6 +10,7 @@
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
+#include <print>
 
 namespace
 {
@@ -158,7 +159,7 @@ EmitterBlueprint {
       ASSERT_TRUE(ParseEmitter(written, again, error)) << entry.path().filename().string() << ": " << error;
       EXPECT_TRUE(Same(read, again)) << entry.path().filename().string();
     }
-    std::printf("emitters %d (others %d), written byte for byte as the file: %d\n", emitters, others, identical);
+    std::println("emitters {} (others {}), written byte for byte as the file: {}", emitters, others, identical);
     EXPECT_GT(emitters, 2000);
   }
   TEST(
@@ -303,7 +304,7 @@ EmitterBlueprint {
         << entry.path().filename().string() << ": " << error;
       EXPECT_TRUE(SameFlat(read, again)) << entry.path().filename().string();
     }
-    std::printf("beams %d, trails %d\n", beams, trails);
+    std::println("beams {}, trails {}", beams, trails);
     EXPECT_GT(beams, 50);
     EXPECT_GT(trails, 100);
   }

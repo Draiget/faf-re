@@ -13,6 +13,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iterator>
+#include <print>
 
 namespace
 {
@@ -101,7 +102,7 @@ namespace
       generators += waves.size();
     }
     EXPECT_GT(maps, 0);
-    std::printf("[ waves    ] %d retail maps, %zu wave generators round-tripped\n", maps, generators);
+    std::println("[ waves    ] {} retail maps, {} wave generators round-tripped", maps, generators);
   }
 
   TEST(

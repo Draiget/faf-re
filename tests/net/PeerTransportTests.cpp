@@ -23,6 +23,7 @@
 #include <cstdio>
 #include <cstring>
 #include <memory>
+#include <print>
 #include <string>
 #include <thread>
 #include <vector>
@@ -41,7 +42,7 @@ namespace
   )
   {
     EXPECT_TRUE(ok) << what;
-    std::printf("%s %s\n", ok ? "ok  " : "FAIL", what);
+    std::println("{} {}", ok ? "ok  " : "FAIL", what);
   }
 
   // Any type outside 200..209: those are connection events the receiving
@@ -144,7 +145,7 @@ namespace
       inOrder = atA.got[static_cast<std::size_t>(i)] == Payload("b", i) &&
         atB.got[static_cast<std::size_t>(i)] == Payload("a", i);
     }
-    std::printf("  %s: a got %zu, b got %zu\n", label, atA.got.size(), atB.got.size());
+    std::println("  {}: a got {}, b got {}", label, atA.got.size(), atB.got.size());
     Check(inOrder, label);
     ab->RemoveReceiver(kMessageType, kMessageType + 1, &atA);
     ba->RemoveReceiver(kMessageType, kMessageType + 1, &atB);
@@ -190,7 +191,7 @@ TEST(
   NET_SetPeerTransport(b, kAddrA, 1, toA);
   Check(NET_PeerTransportsActive(), "two transports registered");
   Exchange(a, b, kAddrB, 2, kAddrA, 1, "transport path, both directions in order");
-  std::printf("  datagrams through the transports: %d to b, %d to a\n", toB->datagrams, toA->datagrams);
+  std::println("  datagrams through the transports: {} to b, {} to a", toB->datagrams, toA->datagrams);
   Check(toB->datagrams > 0 && toA->datagrams > 0, "every datagram went through a transport");
 }
 
@@ -204,7 +205,7 @@ int main(
     if (std::strcmp(argv[i], "--host") == 0) {
       in_addr address{};
       if (::inet_pton(AF_INET, argv[i + 1], &address) != 1) {
-        std::fprintf(stderr, "--host %s is not an IPv4 address\n", argv[i + 1]);
+        std::println(stderr, "--host {} is not an IPv4 address", argv[i + 1]);
         return 2;
       }
       gSocketHost = ::ntohl(address.s_addr);

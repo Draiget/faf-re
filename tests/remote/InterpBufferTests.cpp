@@ -8,6 +8,7 @@
 #include <cstdio>
 #include <functional>
 #include <map>
+#include <print>
 #include <vector>
 
 #include <gtest/gtest.h>
@@ -106,7 +107,7 @@ namespace
   )
   {
     const SDisplayRun run = RunDisplayModel(arrivals, policy, config);
-    std::printf("MODEL %s\n", DescribeDisplayRun(label, run).c_str());
+    std::println("MODEL {}", DescribeDisplayRun(label, run));
     return run;
   }
 

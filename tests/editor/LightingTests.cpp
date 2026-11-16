@@ -10,6 +10,7 @@
 #include <filesystem>
 #include <cstdlib>
 #include <cmath>
+#include <print>
 
 namespace
 {
@@ -123,6 +124,6 @@ namespace
       ++maps;
     }
     EXPECT_GT(maps, 0);
-    std::printf("[ lighting ] %d retail maps' lighting read\n", maps);
+    std::println("[ lighting ] {} retail maps' lighting read", maps);
   }
 } // namespace

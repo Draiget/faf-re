@@ -12,6 +12,7 @@
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
+#include <print>
 #include <sstream>
 #include <string>
 #include <gtest/gtest.h>
@@ -25,7 +26,7 @@ namespace
     const gpg::diag::CrashSectionInfo& info
   )
   {
-    std::fprintf(sink, "early section, access target %p\n", info.accessTarget);
+    std::println(sink, "early section, access target {}", info.accessTarget);
   }
 
   void LateSection(
@@ -33,7 +34,7 @@ namespace
     const gpg::diag::CrashSectionInfo&
   )
   {
-    std::fprintf(sink, "late section text\n");
+    std::println(sink, "late section text");
   }
 
   std::string ReadAll(

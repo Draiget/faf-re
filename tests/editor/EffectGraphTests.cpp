@@ -10,6 +10,7 @@
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
+#include <print>
 
 namespace
 {
@@ -169,7 +170,7 @@ namespace
       }
       ++checked;
     }
-    std::printf("emitters through a graph and back: %d\n", checked);
+    std::println("emitters through a graph and back: {}", checked);
     EXPECT_GT(checked, 2000);
     // FAF's templates file, when it is beside the emitters (tmp: lua/EffectTemplates.lua copied there).
     std::ifstream lua(std::filesystem::path(folder) / ".." / "EffectTemplates.lua", std::ios::binary);
@@ -180,7 +181,7 @@ namespace
       for (const EffectTemplate& t : templates) {
         paths += t.paths.size();
       }
-      std::printf("effect templates read: %zu, %zu emitter paths\n", templates.size(), paths);
+      std::println("effect templates read: {}, {} emitter paths", templates.size(), paths);
       EXPECT_GT(templates.size(), 600U);
     }
   }

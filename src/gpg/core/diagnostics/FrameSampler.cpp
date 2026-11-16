@@ -26,6 +26,7 @@ void gpg::diag::FrameSamplerMark() {}
 #include <cstring>
 #include <deque>
 #include <mutex>
+#include <print>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -322,7 +323,7 @@ namespace gpg::diag
       std::FILE* file = nullptr;
       if (::fopen_s(&file, path.c_str(), "ab") == 0 && file != nullptr) {
         for (const auto& [stack, count] : state.folded) {
-          std::fprintf(file, "%s %u\n", stack.c_str(), count);
+          std::println(file, "{} {}", stack, count);
         }
         std::fclose(file);
       }

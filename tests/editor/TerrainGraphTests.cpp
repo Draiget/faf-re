@@ -11,6 +11,7 @@
 #include <cmath>
 #include <cstdio>
 #include <fstream>
+#include <print>
 #include <set>
 #include <sstream>
 #include <string>
@@ -247,8 +248,8 @@ namespace
     for (const std::string& type : missing) {
       list += " " + type;
     }
-    std::printf(
-      "[ shipped  ] %d of %zu graphs read whole; node types still to come:%s\n", complete, shipped.size(), list.c_str()
+    std::println(
+      "[ shipped  ] {} of {} graphs read whole; node types still to come:{}", complete, shipped.size(), list
     );
   }
 

@@ -5,6 +5,7 @@
 // Build: cmake --build --preset clang-x64-release --target faf_netchannel_tests
 // Run:   build\clang-x64-release\tests\remote\faf_netchannel_tests.exe --gtest_filter=*StreamCompression*
 
+#include <print>
 #include <utility>
 #include <cstdint>
 #include <cstdio>
@@ -118,8 +119,8 @@ TEST(
       packed += piece.size();
     }
     EXPECT_LT(packed, raw * 7u / 10u) << "level " << level << " leaves " << packed << " of " << raw;
-    std::printf(
-      "level %d: %llu of %llu bytes (%.1f %%), compressor %zu KB, decompressor %zu KB\n",
+    std::println(
+      "level {}: {} of {} bytes ({:.1f} %), compressor {} KB, decompressor {} KB",
       level,
       static_cast<unsigned long long>(packed),
       static_cast<unsigned long long>(raw),

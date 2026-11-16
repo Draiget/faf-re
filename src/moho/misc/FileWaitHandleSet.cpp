@@ -15,6 +15,7 @@
 #include <memory>
 #include <mutex>
 #include <new>
+#include <print>
 #include <stdexcept>
 #include <string_view>
 
@@ -935,7 +936,7 @@ void moho::DISK_TraceAccess(
   }
   std::lock_guard<std::mutex> guard(sAccessTraceLock);
   if (std::FILE* const file = sAccessTrace.load(std::memory_order_relaxed)) {
-    std::fprintf(file, "%s %s\n", kind, path != nullptr ? path : "");
+    std::println(file, "{} {}", kind, path != nullptr ? path : "");
   }
 }
 

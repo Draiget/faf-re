@@ -13,6 +13,7 @@
 #include <cstring>
 #include <fstream>
 #include <iterator>
+#include <print>
 #include <string>
 #include <vector>
 
@@ -134,7 +135,7 @@ namespace
     EXPECT_TRUE(
       !moho::MSDF_LoadAtlas(damaged.data(), damaged.size(), refused) || refused.mPixels.size() == atlas.mPixels.size()
     ) << "damaged data is refused, or at least stays in bounds";
-    std::printf("cache: %zu bytes packed from %zu\n", saved.size(), atlas.mPixels.size());
+    std::println("cache: {} bytes packed from {}", saved.size(), atlas.mPixels.size());
   }
 
   void CheckBadFiles(
@@ -157,7 +158,7 @@ namespace
     for (const std::size_t divisor : {2u, 3u, 7u, 50u, 1000u}) {
       (void)moho::MSDF_CookFont(font.data(), font.size() / divisor, options, atlas, error);
     }
-    std::printf("cut-short files: no crash\n");
+    std::println("cut-short files: no crash");
 
     moho::SMsdfCookOptions small = options;
     small.mMaxAtlasHeight = 256;
@@ -198,7 +199,7 @@ TEST(
   }
 
   for (const std::string& name : moho::MSDF_ReadFontNames(font.data(), font.size())) {
-    std::printf("name: %s\n", name.c_str());
+    std::println("name: {}", name);
   }
 
   moho::SMsdfCookOptions options;
@@ -218,9 +219,9 @@ TEST(
   const auto fourMs =
     std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count();
 
-  std::printf(
-    "%s: %zu glyphs, %u missing, atlas %dx%d, %lld ms on 1 thread, %lld ms on 4\n",
-    gFontPath.c_str(),
+  std::println(
+    "{}: {} glyphs, {} missing, atlas {}x{}, {} ms on 1 thread, {} ms on 4",
+    gFontPath,
     oneThread.mGlyphs.size(),
     oneThread.mMissing,
     oneThread.mWidth,

@@ -7,6 +7,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <map>
+#include <print>
 #include <string>
 #include <vector>
 
@@ -49,7 +50,7 @@ namespace
       if (errOut != nullptr)
         *errOut = err;
       else
-        std::printf("op %s failed: %s\n", op.c_str(), err.c_str());
+        std::println("op {} failed: {}", op, err);
       return nullptr;
     }
     return g;

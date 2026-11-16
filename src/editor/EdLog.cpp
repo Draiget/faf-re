@@ -7,6 +7,7 @@
 #include <algorithm>
 
 #include <cstdio>
+#include <print>
 
 #include "imgui.h"
 
@@ -109,7 +110,7 @@ namespace faf::editor
     }
     mLines.push_back(Line{level, std::string(message.c_str()), seconds});
     if (mTimesFile != nullptr) {
-      std::fprintf(mTimesFile, "%9.3f %s\n", seconds, message.c_str());
+      std::println(mTimesFile, "{:9.3f} {}", seconds, message.c_str());
       std::fflush(mTimesFile);
     }
     if (mLines.size() > kMaxLines) {

@@ -11,6 +11,7 @@
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
+#include <print>
 #include <sstream>
 
 namespace
@@ -167,7 +168,7 @@ namespace
       }
     }
     EXPECT_GT(armies, 0);
-    std::printf("retail: %d armies, %d units round-tripped\n", armies, units);
+    std::println("retail: {} armies, {} units round-tripped", armies, units);
   }
   TEST(
     Units,

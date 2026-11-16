@@ -15,6 +15,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iterator>
+#include <print>
 #include <string>
 #include <vector>
 
@@ -77,7 +78,7 @@ namespace
     const bool passed = moho::MSDF_CheckFontStructure(bytes.data(), bytes.size(), reason);
     EXPECT_FALSE(passed) << what + ": passed the structure check";
     if (!passed) {
-      std::printf("  refused, %s: %s\n", what.c_str(), reason.c_str());
+      std::println("  refused, {}: {}", what, reason);
       EXPECT_TRUE(reason.contains(expected)) << what + ": wrong reason: " + reason;
     }
   }
@@ -210,7 +211,7 @@ namespace
         << entry.path().string() + " was refused: " + reason;
       ++checked;
     }
-    std::printf("%d fonts in %s checked\n", checked, folder.string().c_str());
+    std::println("{} fonts in {} checked", checked, folder.string());
   }
 
   void TestPaths()
@@ -258,8 +259,8 @@ namespace
       for (const std::uint8_t value : strike.mCoverage) {
         inked += value > 127u ? 1 : 0;
       }
-      std::printf(
-        "  %d px: %zu glyphs, %zu bytes, %d inked\n",
+      std::println(
+        "  {} px: {} glyphs, {} bytes, {} inked",
         strike.mPixelSize,
         strike.mGlyphs.size(),
         strike.mCoverage.size(),
@@ -314,13 +315,13 @@ namespace
     fewEdges.mMaxEdgesPerGlyph = 2;
     EXPECT_FALSE(moho::MSDF_CookFont(font.data(), font.size(), fewEdges, atlas, error))
       << "the edges-per-glyph limit didn't hold";
-    std::printf("  refused: %s\n", error.c_str());
+    std::println("  refused: {}", error);
 
     moho::SMsdfCookOptions fewTotal = options;
     fewTotal.mMaxEdgesPerFont = 5;
     EXPECT_FALSE(moho::MSDF_CookFont(font.data(), font.size(), fewTotal, atlas, error))
       << "the edges-per-font limit didn't hold";
-    std::printf("  refused: %s\n", error.c_str());
+    std::println("  refused: {}", error);
 
     // A box wider than the atlas behind a narrow first one: unplaced, it would be written past the atlas.
     moho::SMsdfCookOptions narrowAtlas = options;
@@ -328,13 +329,13 @@ namespace
     narrowAtlas.mAtlasWidth = 40;
     EXPECT_FALSE(moho::MSDF_CookFont(font.data(), font.size(), narrowAtlas, atlas, error))
       << "a glyph wider than the atlas, not the first, wasn't refused";
-    std::printf("  refused: %s\n", error.c_str());
+    std::println("  refused: {}", error);
 
     moho::SMsdfCookOptions fewGlyphs = options;
     fewGlyphs.mMaxFontGlyphs = 10;
     EXPECT_FALSE(moho::MSDF_CookFont(font.data(), font.size(), fewGlyphs, atlas, error))
       << "the glyphs-per-font limit didn't hold";
-    std::printf("  refused: %s\n", error.c_str());
+    std::println("  refused: {}", error);
   }
 
   void TestCookedAtlasCheck(
@@ -380,7 +381,7 @@ namespace
       std::string reason;
       (moho::MSDF_CookFont(font.data(), font.size(), probe, out, reason) ? cooked : refused) += 1;
     }
-    std::printf("  out of memory sweep: %d cooked, %d refused, none crashed\n", cooked, refused);
+    std::println("  out of memory sweep: {} cooked, {} refused, none crashed", cooked, refused);
     EXPECT_TRUE(cooked > 0) << "no limit in the sweep let the font cook";
   }
 
@@ -399,8 +400,8 @@ namespace
     const auto start = std::chrono::steady_clock::now();
     EXPECT_TRUE(moho::MSDF_CookFont(font.data(), font.size(), options, atlas, error))
       << "a real font didn't cook under a mod's limits: " + error;
-    std::printf(
-      "cooked under a mod's limits: %zu glyphs, %d ms\n",
+    std::println(
+      "cooked under a mod's limits: {} glyphs, {} ms",
       atlas.mGlyphs.size(),
       static_cast<int>(
         std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count()
@@ -420,7 +421,7 @@ namespace
       std::string reason;
       const bool cooked = moho::MSDF_CookFont(font.data(), font.size(), tight, out, reason);
       EXPECT_FALSE(cooked) << std::string(what) + " didn't hold";
-      std::printf("  %s: %s\n", what, reason.c_str());
+      std::println("  {}: {}", what, reason);
       EXPECT_TRUE(cooked || reason.contains(expected)) << std::string(what) + ": wrong reason: " + reason;
     };
 
@@ -449,8 +450,8 @@ namespace
       }
       return std::uint64_t{0};
     };
-    std::printf(
-      "  this font needs: FreeType memory %llu, font work %llu, glyph work %llu (limits %zu, %llu, %llu)\n",
+    std::println(
+      "  this font needs: FreeType memory {}, font work {}, glyph work {} (limits {}, {}, {})",
       static_cast<unsigned long long>(smallestPassing([](moho::SMsdfCookOptions& o, const std::uint64_t v) {
       o.mMaxFreeTypeBytes = static_cast<std::size_t>(v);
     })),
@@ -513,7 +514,7 @@ namespace
       const int ms = static_cast<int>(
         std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - slowStart).count()
       );
-      std::printf("  a large cook with half a second: %d ms, %s\n", ms, generated ? "finished" : reason.c_str());
+      std::println("  a large cook with half a second: {} ms, {}", ms, generated ? "finished" : reason.c_str());
       EXPECT_TRUE(!generated && plan.TimedOut()) << "the time limit didn't stop a cook making fields";
       EXPECT_TRUE(ms < 5000) << "the time limit stopped the cook late";
     }

@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <memory>
+#include <print>
 #include <string>
 #include <vector>
 
@@ -49,7 +50,7 @@ namespace
     std::string err;
     const bool ok = RunOp(op, args, out, err);
     if (!ok)
-      std::printf("op %s: %s\n", op, err.c_str());
+      std::println("op {}: {}", op, err);
     return ok;
   }
 
