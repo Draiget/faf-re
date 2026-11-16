@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.25)
 project(FafSfdDiagnostics LANGUAGES C CXX)
 enable_testing()
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 if(NOT WIN32)
   message(FATAL_ERROR "The player diagnostics require Windows DirectSound")
