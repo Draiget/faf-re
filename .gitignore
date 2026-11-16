@@ -38,6 +38,7 @@ dependencies/msdfgen/
 dependencies/googletest/
 dependencies/DirectXTex/
 dependencies/imgui/
+dependencies/SDL3/
 dependencies/*.7z
 *.7z
 *.pdb
