@@ -795,8 +795,8 @@ INetConnector* moho::NET_MakeUDPConnector(
   }
   sockaddr_in name;
   name.sin_family = AF_INET;
-  name.sin_port = ::htons(port);
-  name.sin_addr.s_addr = ::htonl(0);
+  name.sin_port = htons(port);
+  name.sin_addr.s_addr = htonl(0);
   if (platform::net::Bind(sock, name) == platform::net::kSocketError) {
     gpg::Logf("NET_MakeUDPConnector: bind(%d) failed: %s", port, NET_GetWinsockErrorString());
     platform::net::CloseSocket(sock);
@@ -848,8 +848,8 @@ INetConnector* moho::NET_MakeTCPConnector(
 
   sockaddr_in name{};
   name.sin_family = AF_INET;
-  name.sin_port = ::htons(port);
-  name.sin_addr.s_addr = ::htonl(0);
+  name.sin_port = htons(port);
+  name.sin_addr.s_addr = htonl(0);
   if (platform::net::Bind(sock, name) == platform::net::kSocketError) {
     gpg::Logf("NET_MakeConnector: bind(%d) failed: %s", port, NET_GetWinsockErrorString());
     platform::net::CloseSocket(sock);

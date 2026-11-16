@@ -1,7 +1,7 @@
 // The crash report writer (src/gpg/core/diagnostics/CrashReport.cpp) without a crash: one report from a made-up access
 // violation, written beside this test program (<exe dir>\faf_crash_<time>.txt, mirrored to faf_crash_latest.txt),
 // with one registered section before the thread stacks and one after, then the minidump. Windows only: the Linux
-// build leaves CrashReport.cpp out (cmake/FafLinux.cmake). The writer runs once per process (a second report while
+// build leaves CrashReport.cpp out (cmake/FafPosix.cmake). The writer runs once per process (a second report while
 // one is written is refused, and the flag stays set), so everything is one test.
 
 #include "platform/PlatformDefines.h"

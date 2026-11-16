@@ -20,6 +20,7 @@
 // clang-format on
 #else
 #include <sys/random.h>
+#include <unistd.h>
 #endif
 
 namespace faf::remote::net
@@ -150,15 +151,16 @@ namespace faf::remote::net
              nullptr, static_cast<PUCHAR>(out), static_cast<ULONG>(size), BCRYPT_USE_SYSTEM_PREFERRED_RNG
            ) == 0;
 #else
+    // getentropy (Linux and macOS): the kernel's random source, at most 256 bytes a call.
     auto* cursor = static_cast<std::uint8_t*>(out);
     std::size_t left = size;
     while (left != 0u) {
-      const ssize_t got = getrandom(cursor, left, 0);
-      if (got <= 0) {
+      const std::size_t chunk = std::min<std::size_t>(left, 256u);
+      if (getentropy(cursor, chunk) != 0) {
         return false;
       }
-      cursor += got;
-      left -= static_cast<std::size_t>(got);
+      cursor += chunk;
+      left -= chunk;
     }
     return true;
 #endif

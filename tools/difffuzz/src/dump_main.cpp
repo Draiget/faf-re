@@ -50,12 +50,14 @@ namespace
 
   const char* PlatformName()
   {
-#if FAFRE_PLATFORM_WINDOWS && defined(_M_X64)
+#if FAFRE_PLATFORM_WINDOWS && FAFRE_ARCH_X64
     return "windows-x64";
-#elif FAFRE_PLATFORM_WINDOWS
+#elif FAFRE_PLATFORM_WINDOWS && FAFRE_ARCH_X86
     return "windows-x86";
-#elifdef __x86_64__
+#elif FAFRE_PLATFORM_LINUX && FAFRE_ARCH_X64 // the platform's own name, for its known_*.txt
     return "linux-x64";
+#elif FAFRE_PLATFORM_MACOS_ARM64             // the platform's own name, for its known_*.txt
+    return "macos-arm64";
 #else
     return "unknown";
 #endif

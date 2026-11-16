@@ -20,7 +20,7 @@
 #     extracted from Microsoft's installer (see faf_dependency_dxsdk).
 #
 # FAF_DEPENDENCIES_ONLY, a list of names (dxsdk for the DirectX SDK), limits a run to those;
-# the Linux build (cmake/FafLinux.cmake) needs three:
+# the Linux build (cmake/FafPosix.cmake) needs three:
 #   cmake -DFAF_DEPENDENCIES_ONLY="WildMagic3p8;zlib-1.2.3" -P cmake/FafDependencies.cmake
 #
 # FFmpeg (dependencies/ffmpeg, Draiget/ffmpeg-mirror) is the unmodified 7.1.3 source
@@ -262,14 +262,14 @@ set(_faf_download_DirectX-Headers
 
 # SDL 3.4.18 (zlib): the client's window, input, dialogs and developer-window renderer on every
 # platform (issues #256, #407), the Linux client's audio output and FAudio's platform layer. The
-# release archive; cmake/deps/sdl3 (Windows) and cmake/FafLinuxClient.cmake build it static.
+# release archive; cmake/deps/sdl3 (Windows) and cmake/FafPosixClient.cmake build it static.
 set(_faf_download_SDL3
     "https://github.com/libsdl-org/SDL/releases/download/release-3.4.18/SDL3-3.4.18.tar.gz"
     "9c75cf16330322c217dedd2e0609f1124f1b54b8633e763467b4684d0f4334a3"
     "SDL3-3.4.18")
 # FAudio 26.10 (zlib): XACT3 (FACT) and X3DAudio (F3DAudio) for the Linux client's sound (issue
 # #258), the same reimplementation Wine's XACT uses. The tag's source archive;
-# cmake/FafLinuxClient.cmake builds it static over SDL3. Linux only.
+# cmake/FafPosixClient.cmake builds it static over SDL3. Linux only.
 set(_faf_download_FAudio
     "https://github.com/FNA-XNA/FAudio/archive/refs/tags/26.10.tar.gz"
     "c508f297ec8d065b456b2d9d74bab89ffc84ac3afbcb428bd54e40f09f8b901e"
@@ -473,7 +473,8 @@ if(NOT DEFINED ENV{FAF_GTEST_DIR} AND NOT (FAF_GTEST_DIR AND EXISTS "${FAF_GTEST
 endif()
 
 faf_dependency_patches(WildMagic3p8 submodule
-  wildmagic3p8_faf_required.patch)
+  wildmagic3p8_faf_required.patch
+  wildmagic3p8_faf_apple_endian.patch)
 faf_dependency_patches(zlib-1.2.3 submodule
   zlib_1_2_3_faf_required.patch)
 faf_dependency_patches(libjuice download

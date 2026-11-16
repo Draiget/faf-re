@@ -1208,9 +1208,9 @@ namespace
       constexpr std::size_t kPrefetchDistance = 8u;
       if (at + kPrefetchDistance < dead.size()) {
         const DeadRecord& ahead = dead[at + kPrefetchDistance];
-        _mm_prefetch(reinterpret_cast<const char*>(static_cast<GCObject*>(ahead.object)), _MM_HINT_T0);
+        __builtin_prefetch(static_cast<GCObject*>(ahead.object), 0, 3);
         if (ahead.lastLive != nullptr) {
-          _mm_prefetch(reinterpret_cast<const char*>(static_cast<GCObject*>(ahead.lastLive)), _MM_HINT_T0);
+          __builtin_prefetch(static_cast<GCObject*>(ahead.lastLive), 0, 3);
         }
       }
     }
@@ -1606,8 +1606,10 @@ namespace
 // never throws and warns (C4297) when one does. The assumption is wrong for
 // these three; switching the project to /EHs would express that globally, so
 // the suppression is scoped to this block rather than papered over per-call.
+#ifdef _MSC_VER
 #pragma warning(push)
 #pragma warning(disable : 4297)
+#endif
 extern "C" {
 // Both hooks reach the engine's small-block allocator, which is what the
 // binary does: FUN_00923F20 tail-calls realloc at FUN_00957B00 and

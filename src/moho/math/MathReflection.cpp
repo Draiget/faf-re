@@ -11,8 +11,6 @@
 #include <limits>
 #include <typeinfo>
 
-#include <xmmintrin.h>
-
 #include <Windows.h>
 
 #include "gpg/gal/Matrix.h"

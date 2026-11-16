@@ -156,6 +156,22 @@ namespace
 
   void Reserve() noexcept
   {
+#if FAFRE_PLATFORM_MACOS // __PAGEZERO covers the low 4 GB: the range lies anywhere, read back with a bias
+    // Every span's offset plus 16 MB reads back from 32 bits (lua::PointerBits).
+    for (std::size_t bytes = kMaxReserveBytes; bytes >= kMinReserveBytes && gBase == 0; bytes /= 2u) {
+      void* const mapped = ::mmap(nullptr, bytes, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE, -1, 0);
+      if (mapped != MAP_FAILED) {
+        gBase = reinterpret_cast<std::uintptr_t>(mapped);
+        gReserveBytes = bytes;
+        lua::gArenaBias = gBase - kAddressStep;
+      }
+    }
+    if (gBase == 0) {
+      std::fputs("Lua arena: no free address range\n", stderr);
+      std::abort();
+    }
+    return;
+#endif
     // Every span of the range has to read back from 32 bits, so it ends below 4 GB. A crowded process
     // (overlays, injected DLLs) gets a smaller range before it gets none.
     for (std::size_t bytes = kMaxReserveBytes; bytes >= kMinReserveBytes && gBase == 0; bytes /= 2u) {

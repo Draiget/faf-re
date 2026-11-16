@@ -34,7 +34,9 @@
 #define MOHO_FORCEINLINE __forceinline
 #define MOHO_RESTRICT __restrict
 #else
+#if FAFRE_ARCH_X86 || FAFRE_ARCH_X64
 #include <immintrin.h>
+#endif
 #define MOHO_FORCEINLINE inline __attribute__((always_inline))
 #define MOHO_RESTRICT __restrict__
 #endif

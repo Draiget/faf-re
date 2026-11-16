@@ -56,8 +56,10 @@
 #include "platform/posix/Win32WindowPosix.h" // the window system's clipboard (issue #256)
 #endif
 
+#ifdef _MSC_VER
 #pragma warning(push)
 #pragma warning(disable : 4996)
+#endif
 
 /**
  * wx builds the application object through this: wxCreateApp (0x004F1E90)
@@ -1491,4 +1493,6 @@ void moho::WINX_ExitSplash()
   platform::window::HideSplash();
 }
 
+#ifdef _MSC_VER
 #pragma warning(pop)
+#endif

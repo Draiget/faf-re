@@ -2,7 +2,7 @@
 # message boxes, file and folder pickers (platform/Window.h, src/platform/sdl) and the renderer
 # the developer windows draw Dear ImGui with (src/platform/sdl/ToolWindow.cpp). dependencies/SDL3
 # is the release archive, pinned by SHA256 in cmake/FafDependencies.cmake. The Linux client
-# builds the same tree with its audio, for FAudio (cmake/FafLinuxClient.cmake).
+# builds the same tree with its audio, for FAudio (cmake/FafPosixClient.cmake).
 
 set(_sdl "${FAF_DEPENDENCIES_DIR}/SDL3")
 if(NOT EXISTS "${_sdl}/CMakeLists.txt")

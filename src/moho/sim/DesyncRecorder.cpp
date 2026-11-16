@@ -965,18 +965,19 @@ namespace moho
       mZip->AddText("header.json", header);
       mZip->AddText("hashes.csv", hashes);
 
-      std::string beats = "beat,raw_bytes,stored_bytes,x87_control,mxcsr,sim_workers,commands\n";
+      std::string beats = "beat,raw_bytes,stored_bytes,x87_control,mxcsr,sim_workers,commands,fpcr\n";
       const auto addBeat = [this, &beats](const SBeatRecord& record) {
         mZip->AddDeflated(Printf("beats/beat%05d.log", record.mBeat), record.mDeflated, record.mCrc, record.mRawSize);
         beats += Printf(
-          "%d,%u,%u,0x%04x,0x%08x,%u,%u\n",
+          "%d,%u,%u,0x%04x,0x%08x,%u,%u,0x%08llx\n",
           record.mBeat,
           record.mRawSize,
           static_cast<unsigned>(record.mDeflated.size()),
           record.mFpu.mX87ControlWord,
           record.mFpu.mMxcsr,
           record.mWorkers,
-          record.mCommands
+          record.mCommands,
+          static_cast<unsigned long long>(record.mFpu.mFpcr)
         );
       };
       if (mHaveBeatZero) {
@@ -1604,18 +1605,21 @@ namespace moho
     }
     header += "]},\n";
 
-    // The x87 control word reads 0 on x64 builds, which do no x87 arithmetic (SFpuControlState).
+    // The x87 control word reads 0 on x64 builds, which do no x87 arithmetic, and the x87 word and
+    // MXCSR read 0 on ARM64, whose control register is FPCR (SFpuControlState).
     header += Printf(
       "  \"settings\": {\"sim_ChecksumPeriod\": %d, \"sim_workers_in_use\": %u, \"sse2\": %s, "
       "\"x87_control\": \"0x%04x\", \"mxcsr\": \"0x%08x\", \"x87_control_at_start\": \"0x%04x\", "
-      "\"mxcsr_at_start\": \"0x%08x\", \"switches\": ",
+      "\"mxcsr_at_start\": \"0x%08x\", \"fpcr\": \"0x%08llx\", \"fpcr_at_start\": \"0x%08llx\", \"switches\": ",
       SIM_GetChecksumPeriod(sim),
       SimWorkerCount(),
       CFG_GetArgOption("/sse2", 0u, nullptr) ? "true" : "false",
       fpuNow.mX87ControlWord,
       fpuNow.mMxcsr,
       impl.mStartFpu.mX87ControlWord,
-      impl.mStartFpu.mMxcsr
+      impl.mStartFpu.mMxcsr,
+      static_cast<unsigned long long>(fpuNow.mFpcr),
+      static_cast<unsigned long long>(impl.mStartFpu.mFpcr)
     );
     header += TELEMETRY_JsonString(ConsoleSwitches()) + "},\n";
 
@@ -1804,6 +1808,7 @@ namespace moho
     common.Add("faf.desync.players_reported", static_cast<std::int64_t>(entry.mReports.size()));
     common.Add("faf.fpu.x87_control", Printf("0x%04x", impl.mBeatFpu.mX87ControlWord));
     common.Add("faf.fpu.mxcsr", Printf("0x%08x", impl.mBeatFpu.mMxcsr));
+    common.Add("faf.fpu.fpcr", Printf("0x%08llx", static_cast<unsigned long long>(impl.mBeatFpu.mFpcr)));
 
     std::vector<CTelemetryAttributes> records;
     for (const SChecksumReport& report : entry.mReports) {

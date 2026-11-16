@@ -1,7 +1,7 @@
 #pragma once
 
 // Engine addition (dedicated-server plan WPL.5): the subset of <Windows.h> (and of the
-// MSVC CRT) that the shared simulation code uses, for the Linux build. cmake/FafLinux.cmake
+// MSVC CRT) that the shared simulation code uses, for the Linux build. cmake/FafPosix.cmake
 // puts this directory on the include path and platform/PosixCompat.h includes it in every
 // translation unit; Windows builds never see it. Types and constants have their Windows
 // sizes and values. The functions are implemented on POSIX in src/platform/posix/Win32Shim.cpp

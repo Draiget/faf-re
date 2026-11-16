@@ -21,7 +21,17 @@ powf moho::CSimDriver::GetSyncData(moho::SSyncData*&)
 tanf moho::GeomCamera3::ViewInitPerspective(float, float, float, float)
 tanf moho::VEC_D3DProjectionMatrixFOV(float, float, float, float, float)
 
-# Effects and decals: visual state, not in the sim checksum.
+# Effects and decals: visual state, not in the sim checksum. The sinf/cosf pairs were one sincosf
+# call each until math functions kept errno semantics (cmake/FafCodegen.cmake), which the gate
+# did not list.
+cosf moho::cfunc_CreateDecalL(LuaPlus::LuaState*)
+sinf moho::cfunc_CreateDecalL(LuaPlus::LuaState*)
+cosf moho::cfunc_CreateSplatL(LuaPlus::LuaState*)
+sinf moho::cfunc_CreateSplatL(LuaPlus::LuaState*)
+cosf moho::CDecalBuffer::IsDecalVisibleForArmy(moho::CArmyImpl const*, moho::SDecalInfo const&, moho::CArmyImpl*) const
+sinf moho::CDecalBuffer::IsDecalVisibleForArmy(moho::CArmyImpl const*, moho::SDecalInfo const&, moho::CArmyImpl*) const
+cosf moho::CDecalBuffer::ProjectDecalToBoundsXZ(moho::SDecalInfo const&, Wm3::Vector2<float>&, Wm3::Vector2<float>&)
+sinf moho::CDecalBuffer::ProjectDecalToBoundsXZ(moho::SDecalInfo const&, Wm3::Vector2<float>&, Wm3::Vector2<float>&)
 atan2f moho::CEfxEmitter::Tick(int)
 atan2f (anonymous namespace)::CreateDecalFromTransform(moho::VTransform const&, Wm3::Vector3<float> const&, moho::Sim*, float, fa::string const&, fa::string const&, float, bool, fa::string const&, unsigned int, unsigned int)
 
@@ -37,3 +47,15 @@ acos faf::remote::client::CSyncRebuilder::ApplyFrame(faf::remote::wire::SViewFra
 pow faf::remote::client::CBeatClock::ExpectedBeatsPerSecond() const
 # The client's display model (DisplayModel.h): `WLD_GetSimRate`'s skew factor, for tests and the probe's report.
 pow faf::remote::client::RunDisplayModel(std::__1::span<faf::remote::client::SViewArrival const, 18446744073709551615ul>, faf::remote::client::EDisplayPolicy, faf::remote::client::SInterpConfig const&, double)
+
+# Render matrices (gpg::gal::Math without D3DX) and the weapon debug overlay: drawing only.
+cosf gpg::gal::Math::rotationAxis(moho::VMatrix4*, Wm3::Vector3<float> const*, float)
+sinf gpg::gal::Math::rotationAxis(moho::VMatrix4*, Wm3::Vector3<float> const*, float)
+cosf gpg::gal::Math::rotationAxisX(moho::VMatrix4*, float)
+sinf gpg::gal::Math::rotationAxisX(moho::VMatrix4*, float)
+cosf gpg::gal::Math::rotationAxisY(moho::VMatrix4*, float)
+sinf gpg::gal::Math::rotationAxisY(moho::VMatrix4*, float)
+cosf gpg::gal::Math::rotationAxisZ(moho::VMatrix4*, float)
+sinf gpg::gal::Math::rotationAxisZ(moho::VMatrix4*, float)
+cosf moho::RDebugWeapons::Tick(moho::Sim*)
+sinf moho::RDebugWeapons::Tick(moho::Sim*)

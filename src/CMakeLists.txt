@@ -305,7 +305,7 @@ add_custom_command(TARGET faf_main POST_BUILD
 
 # --- faf_sim: the simulation ------------------------------------------------------------
 # faf_sim (plan WPR.11) is the simulation as programs without the client link it
-# (headless here, headless and the game server on Linux, cmake/FafLinux.cmake): the
+# (headless here, headless and the game server on Linux, cmake/FafPosix.cmake): the
 # objects of the translation units in sim_sources.cmake, gpg::gal::Math without D3DX
 # (gpg/gal/MatrixPortable.cpp, which faf_main links too), and what linking them takes,
 # with no window-library, Direct3D, D3DX, XACT, DirectSound or FFmpeg library.
@@ -369,7 +369,7 @@ if(NOT _faf_client_regex STREQUAL "")
   set(_faf_sim_objects "$<FILTER:${_faf_sim_objects},EXCLUDE,${_faf_client_regex}>")
 endif()
 
-# faf_engine's compile settings, without its libraries (as cmake/FafLinux.cmake's).
+# faf_engine's compile settings, without its libraries (as cmake/FafPosix.cmake's).
 add_library(faf_sim_settings INTERFACE)
 target_compile_definitions(faf_sim_settings INTERFACE
   $<TARGET_PROPERTY:faf_engine,INTERFACE_COMPILE_DEFINITIONS>)

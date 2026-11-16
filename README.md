@@ -138,6 +138,17 @@ cmake --build --preset clang-x64-release   # build/clang-x64-release/src/main_x6
 
 Configuring brings `dependencies/` up to date: it clones missing submodules, fetches missing downloads pinned by commit or SHA256, and applies the FAF patches in `dependencies/patches/`. The full list is in [Libraries the engine uses](#libraries-the-engine-uses). `cmake -P cmake/FafDependencies.cmake` does the same without configuring.
 
+### macOS (Apple silicon)
+
+A native arm64 build with Apple clang (Xcode 16.4 or its Command Line Tools: Apple clang 17.0.0), CMake 3.25+ and Ninja, for macOS 14 or later. It builds the headless simulation and its tests so far; the game client is in progress (#273).
+
+```sh
+cmake --preset macos-clang-arm64-release
+cmake --build --preset macos-clang-arm64-release --target headless   # build/macos-clang-arm64-release/headless
+```
+
+Apple silicon has no x87 unit, so the simulation's x87 routines run in software there (`src/legacy/math/X87Soft.cpp`), checked against the x87 unit on x86-64 by `tools/x87-oracle`. A NaN made by an invalid operation has a positive sign on ARM and a negative one on x86; `tests/sim_math/known_macos-arm64.txt` lists the golden cases where that is the only difference.
+
 ### IDEs
 
 - **Visual Studio 2022:** File → Open → Folder, then pick a preset.
@@ -178,7 +189,7 @@ CMake configure fetches all of them at the exact version below and applies the p
 | Library | Version | Source | FAF patch |
 |---|---|---|---|
 | Wild Magic | 3.8 (original 2006 release) | [Draiget/wild-magic-3-8](https://github.com/Draiget/wild-magic-3-8) (submodule) | `wildmagic3p8_faf_required` |
-| SDL | 3.4.18 (zlib) | [release archive](https://github.com/libsdl-org/SDL/releases/download/release-3.4.18/SDL3-3.4.18.tar.gz) | none; built static by `cmake/deps/sdl3` (Windows) and `cmake/FafLinuxClient.cmake`: the client's windows, input, clipboard, message boxes, pickers and the developer windows' renderer |
+| SDL | 3.4.18 (zlib) | [release archive](https://github.com/libsdl-org/SDL/releases/download/release-3.4.18/SDL3-3.4.18.tar.gz) | none; built static by `cmake/deps/sdl3` (Windows) and `cmake/FafPosixClient.cmake`: the client's windows, input, clipboard, message boxes, pickers and the developer windows' renderer |
 | Dear ImGui | 1.92.4, docking branch (MIT) | [v1.92.4-docking source archive](https://github.com/ocornut/imgui/archive/refs/tags/v1.92.4-docking.tar.gz) | none; the map editor's panels and the developer windows (log window, Lua debugger, emitter and reference editors) |
 | zlib | 1.2.3 | [madler/zlib](https://github.com/madler/zlib/tree/v1.2.3) (submodule) | `zlib_1_2_3_faf_required` |
 | FFmpeg | 7.1.3 (LGPL) | [Draiget/ffmpeg-mirror](https://github.com/Draiget/ffmpeg-mirror) (submodule) | none; linked statically, for SFD movies in place of CRI Sofdec/ADX. Configuration and licence: [SFD compatibility](docs/FAF_SFD_COMPATIBILITY.md#ffmpeg-dependency-and-build) |

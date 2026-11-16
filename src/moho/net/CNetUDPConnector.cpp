@@ -1088,8 +1088,8 @@ int32_t CNetUDPConnector::SendData()
 
     sockaddr_in name;
     name.sin_family = AF_INET;
-    name.sin_port = ::htons(packet.mPort);
-    name.sin_addr.s_addr = ::htonl(packet.mAddr);
+    name.sin_port = htons(packet.mPort);
+    name.sin_addr.s_addr = htonl(packet.mAddr);
 
     const auto payload = packet.mPacket->GetPayload();
     const auto payloadSize = packet.mPacket->GetPayloadSize();

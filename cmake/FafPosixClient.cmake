@@ -1,6 +1,6 @@
 # Engine addition (issue #255, milestone "Linux client"): the game client on Linux.
 #
-# Included by cmake/FafLinux.cmake when FAF_LINUX_CLIENT is ON (default OFF while the client
+# Included by cmake/FafPosix.cmake when FAF_LINUX_CLIENT is ON (default OFF while the client
 # doesn't build yet; the headless and server targets are unchanged either way):
 #
 #   cmake --preset linux-clang-x64-release-plain -DFAF_LINUX_CLIENT=ON
@@ -20,7 +20,7 @@ set(_faf_client_windows_only
   "^gpg/core/diagnostics/CrashReportDialog\\.cpp$"
   # The Windows half of the SDL3 window layer; platform/posix/WindowSdlPosix.cpp is this one.
   "^platform/windows/"
-  # faf_sim compiles its own copy (cmake/FafLinux.cmake).
+  # faf_sim compiles its own copy (cmake/FafPosix.cmake).
   "^gpg/gal/MatrixPortable\\.cpp$"
   # The Windows entry point (src/platform/posix/ClientMainPosix.cpp takes its place, issue #256).
   # WinApp (the main loop), the app windows, the main frame, the viewports, CScApp and the
@@ -108,7 +108,7 @@ add_subdirectory("${FAF_DEPENDENCIES_DIR}/FAudio" "${CMAKE_BINARY_DIR}/deps/FAud
 target_compile_options(FAudio-static PRIVATE -w)
 
 # Lowercase spellings of POSIX stand-in headers the client includes (the file system is
-# case-sensitive here, and a Windows checkout can't hold both spellings), as FafLinux.cmake writes
+# case-sensitive here, and a Windows checkout can't hold both spellings), as FafPosix.cmake writes
 # <windows.h>.
 file(WRITE "${CMAKE_BINARY_DIR}/win32-alias/shlobj.h" "#pragma once\n#include <ShlObj.h>\n")
 
@@ -274,4 +274,4 @@ target_sources(faf_client PRIVATE "${PROJECT_SOURCE_DIR}/src/headless/GameEntry.
 # SBatchTextureData, whose type info faf_sim registers). The sim's never need the client's, as
 # headless links faf_sim alone.
 target_link_libraries(faf_client PRIVATE faf_sim faf_client_objs faf_client_dxc faf_client_imaging faf_directxtex_linux)
-target_link_options(faf_client PRIVATE -Wl,--error-limit=0)
+target_link_options(faf_client PRIVATE ${FAF_LINK_ALL_ERRORS})
