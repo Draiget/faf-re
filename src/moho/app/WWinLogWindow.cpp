@@ -375,6 +375,17 @@ moho::WWinLogWindow::WWinLogWindow()
   // log window draws nothing (SDL's software renderer drew the whole window every game frame).
   SetIdleRefreshMs(0u);
 
+  // wxDialog's constructor (0x004F3F8A) got no parent, so the 2.4.2 window library's dialog
+  // creation made the app's top window (the main frame) its owner: the log window stayed above
+  // the game and had no taskbar or Alt+Tab entry. Hovering the game still focuses it
+  // (WRenViewport::OnMouseEnter), which activates the frame but no longer lifts it over the log.
+  if (sMainWindow != nullptr) {
+    SetOwner(sMainWindow->GetPlatformWindow());
+  }
+  // Its style, 0x20000840 (caption, system menu, resize border), had no minimize or maximize box.
+  // A minimized owned window has no taskbar button and would sit as a bare title bar on the desktop.
+  SetDialogFrame();
+
   RebuildVisibleLinesFromControls();
 }
 

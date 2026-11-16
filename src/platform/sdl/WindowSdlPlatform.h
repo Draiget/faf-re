@@ -46,6 +46,9 @@ namespace platform::window::sdl
   // After SDL_DestroyWindow: the native window of a child, which SDL leaves to its maker.
   void DestroyChildNative(void* native);
   void SetKeyboardFocus(SDL_Window* window);
+  // A dialog's frame: no minimize or maximize box, only the close button (ToolWindow::SetDialogFrame).
+  // SDL rewrites the style only when the border, resizability or full screen changes.
+  void SetDialogFrame(SDL_Window* window);
   // platform::window::NativeHandle and AddSystemMenuItem.
   [[nodiscard]] void* NativeHandleOf(SDL_Window* window);
   void AddSystemMenuItem(SDL_Window* window, int command, const char* utf8Label);

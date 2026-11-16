@@ -764,6 +764,19 @@ namespace platform::window
     for (auto it = gQueued.begin(); it != gQueued.end();) {
       it = it->window == window ? gQueued.erase(it) : it + 1;
     }
+    // SDL destroys the windows it owns with it, but a tool window's maker destroys it
+    // (ToolWindow::SetOwner): they are let go and hidden, as Windows takes owned windows down
+    // with their owner.
+    int count = 0;
+    if (SDL_Window** const windows = SDL_GetWindows(&count); windows != nullptr) {
+      for (int index = 0; index < count; ++index) {
+        if (SDL_GetWindowParent(windows[index]) == AsWindow(window)) {
+          (void)SDL_HideWindow(windows[index]);
+          (void)SDL_SetWindowParent(windows[index], nullptr);
+        }
+      }
+      SDL_free(windows);
+    }
     sdl::OnWindowDestroyed(AsWindow(window));
     SDL_DestroyWindow(AsWindow(window));
     if (native != nullptr) {

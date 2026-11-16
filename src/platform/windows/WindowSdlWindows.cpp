@@ -364,6 +364,24 @@ namespace platform::window::sdl
     }
   }
 
+  void SetDialogFrame(
+    SDL_Window* const window
+  )
+  {
+    HWND const hwnd = HwndOf(window);
+    if (hwnd == nullptr || IsChildHwnd(hwnd)) {
+      return;
+    }
+    const LONG_PTR style = ::GetWindowLongPtrW(hwnd, GWL_STYLE);
+    const LONG_PTR wanted = style & ~static_cast<LONG_PTR>(WS_MINIMIZEBOX | WS_MAXIMIZEBOX);
+    if (wanted != style) {
+      (void)::SetWindowLongPtrW(hwnd, GWL_STYLE, wanted);
+      (void)::SetWindowPos(
+        hwnd, nullptr, 0, 0, 0, 0, SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE
+      );
+    }
+  }
+
   bool SetChildBounds(
     SDL_Window* const window,
     const int x,
