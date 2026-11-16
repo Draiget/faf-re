@@ -225,10 +225,16 @@ CDecalHandle* CDecalBuffer::CreateHandle(
     sourceArmy = armiesBegin[handle->mInfo.mArmy];
   }
 
+  // 0x00779509..0x00779566: a splat (a tread mark, `CreateSplat`, `CreateSplatOnBone`) starts out seen by the
+  // source's allies, and by everyone only while the source army plays without fog of war (its recon database's
+  // slot 0x44, `ReconGetFogOfWar`). Anyone else sees it only if they detect it in its first ten ticks
+  // (`CleanupTick`), so tracks made under the fog stay hidden.
   if (sourceArmy != nullptr && handle->mInfo.mIsSplat != 0u) {
-    const bool sourceIsCivilian = sourceArmy->mConstDat.mIsCivilian != 0u;
     for (std::size_t i = 0; i < armyCount; ++i) {
-      if (sourceArmy->mVarDat.mAllies.Contains(static_cast<std::uint32_t>(i)) || !sourceIsCivilian) {
+      if (
+        sourceArmy->mVarDat.mAllies.Contains(static_cast<std::uint32_t>(i)) ||
+        !sourceArmy->GetReconDB()->ReconGetFogOfWar()
+      ) {
         SetArmyVisibilityFlag(*handle, i);
       }
     }
