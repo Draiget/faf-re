@@ -3,6 +3,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <expected>
 #include <functional>
 #include <map>
 #include <memory>
@@ -234,7 +235,7 @@ namespace faf::remote::net
 
     explicit CServerLinks(const ChannelConfig& channel = {});
 
-    [[nodiscard]] bool Open(const SEndpoint& local, std::string& error);
+    [[nodiscard]] std::expected<void, std::string> Open(const SEndpoint& local);
     [[nodiscard]] SEndpoint Local() const noexcept
     {
       return mSocket.Local();
@@ -388,7 +389,7 @@ namespace faf::remote::net
 
     CClientLink(std::int32_t uid, const Token& token, const SEndpoint& server, const ChannelConfig& channel = {});
 
-    [[nodiscard]] bool Open(std::string& error);
+    [[nodiscard]] std::expected<void, std::string> Open();
     /** Starts a new session with new keys, as after a lost link or a restart. */
     void Reconnect();
 

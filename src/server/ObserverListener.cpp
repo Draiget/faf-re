@@ -59,19 +59,16 @@ namespace faf::server
     Stop();
   }
 
-  bool CObserverListener::Start(
-    const remote::net::SEndpoint& at,
-    std::string& error
+  std::expected<void, std::string> CObserverListener::Start(
+    const remote::net::SEndpoint& at
   )
   {
     if (!at.IsIpv4()) {
-      error = "observers: an IPv4 address only, not " + at.Text();
-      return false;
+      return std::unexpected("observers: an IPv4 address only, not " + at.Text());
     }
     mListenSocket = ::socket(AF_INET, SOCK_STREAM | SOCK_CLOEXEC | SOCK_NONBLOCK, 0);
     if (mListenSocket < 0) {
-      error = "observe: no TCP socket";
-      return false;
+      return std::unexpected("observe: no TCP socket");
     }
     const int yes = 1;
     (void)::setsockopt(mListenSocket, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes));
@@ -83,15 +80,14 @@ namespace faf::server
       ::bind(mListenSocket, reinterpret_cast<const sockaddr*>(&address), sizeof(address)) != 0 ||
       ::listen(mListenSocket, 16) != 0
     ) {
-      error = "observe: can't listen on " + at.Text();
       ::close(mListenSocket);
       mListenSocket = -1;
-      return false;
+      return std::unexpected("observe: can't listen on " + at.Text());
     }
     mThread = std::thread([this] {
       Run();
     });
-    return true;
+    return {};
   }
 
   void CObserverListener::Stop()

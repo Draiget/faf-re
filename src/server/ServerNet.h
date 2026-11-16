@@ -3,6 +3,7 @@
 #include <atomic>
 #include <cstdint>
 #include <deque>
+#include <expected>
 #include <functional>
 #include <map>
 #include <mutex>
@@ -98,7 +99,7 @@ namespace faf::server
     }
 
     /** Binds the socket and starts the thread. */
-    [[nodiscard]] bool Start(std::string& error);
+    [[nodiscard]] std::expected<void, std::string> Start();
     /** Stops the thread; no seat is touched after this returns. */
     void Stop();
 

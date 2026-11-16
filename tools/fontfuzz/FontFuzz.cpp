@@ -133,8 +133,7 @@ namespace
   )
   {
     ++counts.mInputs;
-    std::string reason;
-    if (!moho::MSDF_CheckFontStructure(input.data(), input.size(), reason)) {
+    if (!moho::MSDF_CheckFontStructure(input.data(), input.size())) {
       ++counts.mStructureRefused;
       return;
     }
@@ -143,7 +142,7 @@ namespace
 
     moho::SMsdfFontAtlas atlas;
     const auto start = std::chrono::steady_clock::now();
-    const bool cooked = moho::MSDF_CookFont(input.data(), input.size(), options, atlas, reason);
+    const bool cooked = moho::MSDF_CookFont(input.data(), input.size(), options, atlas).has_value();
     counts.mSlowestMs =
       (std::max)(counts.mSlowestMs,
                  static_cast<int>(
@@ -166,10 +165,7 @@ namespace
       packed[random() % packed.size()] = InterestingByte(random);
     }
     moho::SMsdfFontAtlas loaded;
-    if (
-      !moho::MSDF_LoadAtlas(packed.data(), packed.size(), loaded) ||
-      !moho::MSDF_CheckCookedAtlas(loaded, options, reason)
-    ) {
+    if (!moho::MSDF_LoadAtlas(packed.data(), packed.size(), loaded) || !moho::MSDF_CheckCookedAtlas(loaded, options)) {
       ++counts.mAtlasRefused;
     }
   }
@@ -205,11 +201,10 @@ int main(
   for (const auto& entry : std::filesystem::directory_iterator(argv[1])) {
     std::ifstream in(entry.path(), std::ios::binary);
     Bytes bytes{std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
-    std::string reason;
-    if (moho::MSDF_CheckFontStructure(bytes.data(), bytes.size(), reason)) {
+    if (auto checked = moho::MSDF_CheckFontStructure(bytes.data(), bytes.size())) {
       fonts.push_back(std::move(bytes));
     } else {
-      std::println("skipped {}: {}", entry.path().string(), reason);
+      std::println("skipped {}: {}", entry.path().string(), checked.error());
     }
   }
   if (fonts.empty()) {

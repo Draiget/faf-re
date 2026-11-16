@@ -3,6 +3,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <expected>
 #include <string>
 #include <string_view>
 
@@ -115,7 +116,7 @@ namespace faf::remote::net
     CUdpSocket& operator=(const CUdpSocket&) = delete;
 
     /** Binds to `local`; a port of 0 takes any free one, which `Local` then names. */
-    [[nodiscard]] bool Open(const SEndpoint& local, std::string& error);
+    [[nodiscard]] std::expected<void, std::string> Open(const SEndpoint& local);
     void Close() noexcept;
 
     /**

@@ -367,10 +367,9 @@ namespace faf::netbridge
       }
       const std::string text = mRpcIn.substr(start, end - start + 1);
       mRpcIn.erase(0, end + 1);
-      std::string error;
-      const std::optional<JsonValue> msg = netlink::ParseJson(text, &error);
+      const std::expected<JsonValue, std::string> msg = netlink::ParseJson(text);
       if (!msg || !msg->IsObject()) {
-        Log("bad RPC message (" + error + "): " + text);
+        Log("bad RPC message (" + (msg ? std::string() : msg.error()) + "): " + text);
         continue;
       }
       HandleRpc(*msg);
@@ -561,10 +560,9 @@ namespace faf::netbridge
       it->second->link->OnSignalText(text); // issue #239
       return;
     }
-    std::string error;
-    const std::optional<netlink::CandidatesMessage> m = netlink::CandidatesMessageFromJson(text, &error);
+    const std::expected<netlink::CandidatesMessage, std::string> m = netlink::CandidatesMessageFromJson(text);
     if (!m) {
-      Log("failed to parse iceMsg (" + error + "): " + text);
+      Log("failed to parse iceMsg (" + m.error() + "): " + text);
       return;
     }
     it->second->link->OnSignal(*m);

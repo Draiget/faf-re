@@ -75,24 +75,20 @@ namespace faf::netlink
     return WriteJson(o);
   }
 
-  std::optional<CandidatesMessage> CandidatesMessageFromJson(
-    const std::string_view text,
-    std::string* error
+  std::expected<CandidatesMessage, std::string> CandidatesMessageFromJson(
+    const std::string_view text
   )
   {
-    const std::optional<JsonValue> doc = ParseJson(text, error);
-    if (!doc || !doc->IsObject()) {
-      if (error != nullptr && doc) {
-        *error = "not an object";
-      }
-      return std::nullopt;
+    const std::expected<JsonValue, std::string> doc = ParseJson(text);
+    if (!doc) {
+      return std::unexpected(doc.error());
+    }
+    if (!doc->IsObject()) {
+      return std::unexpected("not an object");
     }
     const JsonValue& list = doc->Get("candidates");
     if (!list.IsArray()) {
-      if (error != nullptr) {
-        *error = "candidates missing";
-      }
-      return std::nullopt;
+      return std::unexpected("candidates missing");
     }
     CandidatesMessage msg;
     msg.srcId = doc->Get("srcId").AsInt();
@@ -111,10 +107,7 @@ namespace faf::netlink
       c.port = static_cast<int>(o.Get("port").AsInt());
       const std::optional<CandidateType> type = ParseCandidateType(o.Get("type").AsString());
       if (!type) {
-        if (error != nullptr) {
-          *error = "unknown candidate type " + o.Get("type").AsString();
-        }
-        return std::nullopt;
+        return std::unexpected("unknown candidate type " + o.Get("type").AsString());
       }
       c.type = *type;
       c.generation = static_cast<int>(o.Get("generation").AsInt());

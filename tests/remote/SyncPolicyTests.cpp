@@ -42,21 +42,18 @@ TEST(
   ReadsKeysRoutesAndVersion
 )
 {
-  SSyncPolicy policy;
-  std::string error;
-  ASSERT_TRUE(ParseSyncPolicy(
+  const auto policy = ParseSyncPolicy(
     "# a comment\r\n# game-version: 3840\nUnitData\tEntityOwner\tgenerated\t7\n\nScore\tScore\tspecial\t0\tnote\n"
-    "Ping\tObservers\n",
-    policy,
-    error
-  )) << error;
-  EXPECT_EQ(policy.gameVersion, 3840);
-  ASSERT_EQ(policy.routes.size(), 3u);
-  EXPECT_EQ(policy.routes[0].first, "Ping"); // sorted
-  EXPECT_EQ(policy.routes[0].second, ESyncRoute::Observers);
-  EXPECT_EQ(policy.routes[1].first, "Score");
-  EXPECT_EQ(policy.routes[1].second, ESyncRoute::Score);
-  EXPECT_EQ(policy.routes[2].second, ESyncRoute::EntityOwner);
+    "Ping\tObservers\n"
+  );
+  ASSERT_TRUE(policy) << policy.error();
+  EXPECT_EQ(policy->gameVersion, 3840);
+  ASSERT_EQ(policy->routes.size(), 3u);
+  EXPECT_EQ(policy->routes[0].first, "Ping"); // sorted
+  EXPECT_EQ(policy->routes[0].second, ESyncRoute::Observers);
+  EXPECT_EQ(policy->routes[1].first, "Score");
+  EXPECT_EQ(policy->routes[1].second, ESyncRoute::Score);
+  EXPECT_EQ(policy->routes[2].second, ESyncRoute::EntityOwner);
 }
 
 TEST(
@@ -64,13 +61,11 @@ TEST(
   RefusesBadFiles
 )
 {
-  SSyncPolicy policy;
-  std::string error;
-  EXPECT_FALSE(ParseSyncPolicy("UnitData\tEntityOwner\n", policy, error)); // no version
-  EXPECT_FALSE(ParseSyncPolicy("# game-version: 3840\nUnitData\tNoSuchRoute\n", policy, error));
-  EXPECT_FALSE(ParseSyncPolicy("# game-version: 3840\nUnitData\n", policy, error));
-  EXPECT_FALSE(ParseSyncPolicy("# game-version: 3840\nA\tEveryone\nA\tObservers\n", policy, error));
-  EXPECT_FALSE(ParseSyncPolicy("# game-version: x\nA\tEveryone\n", policy, error));
+  EXPECT_FALSE(ParseSyncPolicy("UnitData\tEntityOwner\n")); // no version
+  EXPECT_FALSE(ParseSyncPolicy("# game-version: 3840\nUnitData\tNoSuchRoute\n"));
+  EXPECT_FALSE(ParseSyncPolicy("# game-version: 3840\nUnitData\n"));
+  EXPECT_FALSE(ParseSyncPolicy("# game-version: 3840\nA\tEveryone\nA\tObservers\n"));
+  EXPECT_FALSE(ParseSyncPolicy("# game-version: x\nA\tEveryone\n"));
 }
 
 TEST(
@@ -107,15 +102,14 @@ TEST(
     if (text.empty()) {
       continue; // a version validated before policy files: the compiled table alone
     }
-    SSyncPolicy policy;
-    std::string error;
-    ASSERT_TRUE(ParseSyncPolicy(text, policy, error)) << path << ": " << error;
-    EXPECT_EQ(policy.gameVersion, version);
+    const auto policy = ParseSyncPolicy(text);
+    ASSERT_TRUE(policy) << path << ": " << policy.error();
+    EXPECT_EQ(policy->gameVersion, version);
     const auto compiled = faf::remote::CompiledSyncKeyRoutes();
-    ASSERT_EQ(policy.routes.size(), compiled.size()) << path;
+    ASSERT_EQ(policy->routes.size(), compiled.size()) << path;
     for (std::size_t index = 0; index < compiled.size(); ++index) {
-      EXPECT_EQ(policy.routes[index].first, compiled[index].key) << path;
-      EXPECT_EQ(policy.routes[index].second, compiled[index].route) << path << " " << policy.routes[index].first;
+      EXPECT_EQ(policy->routes[index].first, compiled[index].key) << path;
+      EXPECT_EQ(policy->routes[index].second, compiled[index].route) << path << " " << policy->routes[index].first;
     }
   }
 }
@@ -164,11 +158,10 @@ TEST(
   LoadedPolicyAnswersLookups
 )
 {
-  SSyncPolicy policy;
-  std::string error;
-  ASSERT_TRUE(ParseSyncPolicy("# game-version: 3999\nZeta\tEntityAllies\nAlpha\tEveryone\n", policy, error));
+  const auto policy = ParseSyncPolicy("# game-version: 3999\nZeta\tEntityAllies\nAlpha\tEveryone\n");
+  ASSERT_TRUE(policy);
   const std::size_t compiledCount = faf::remote::CompiledSyncKeyRoutes().size();
-  faf::remote::UseSyncPolicy(policy);
+  faf::remote::UseSyncPolicy(*policy);
   bool known = false;
   EXPECT_EQ(faf::remote::RouteOfSyncKey("Zeta", known), ESyncRoute::EntityAllies);
   EXPECT_TRUE(known);

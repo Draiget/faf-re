@@ -557,9 +557,8 @@ int HEADLESS_Main(
   // `--sync-policy <file>`: the Lua routing answers from a policy file (tools/sync-routing/policy_gen.py) instead of
   // the compiled table, so a generated policy runs through the spy without a rebuild.
   if (std::string policyPath; ReadOption("--sync-policy", policyPath)) {
-    std::string error;
-    if (!faf::remote::UseSyncPolicyFile(policyPath, error)) {
-      std::printf("[%s] --sync-policy: %s\n", gLabel.c_str(), error.c_str());
+    if (auto used = faf::remote::UseSyncPolicyFile(policyPath); !used) {
+      std::printf("[%s] --sync-policy: %s\n", gLabel.c_str(), used.error().c_str());
       return kExitBadInput;
     }
     std::printf(

@@ -71,12 +71,10 @@ namespace faf::probe
   CProbeRebuild::CProbeRebuild() = default;
   CProbeRebuild::~CProbeRebuild() = default;
 
-  bool CProbeRebuild::Start(
-    std::string& error
-  )
+  std::expected<void, std::string> CProbeRebuild::Start()
   {
     if (mState) {
-      return true;
+      return {};
     }
     // `WinMain` / `CScApp::Init` without a window, as the server does.
     moho::APP_InitializeIdentity();
@@ -84,21 +82,19 @@ namespace faf::probe
     (void)SetSse2Mode(0);
     mState = std::make_unique<SState>();
     if (!mState->app.Init()) {
-      error = "the engine's services didn't start";
-      return false;
+      return std::unexpected("the engine's services didn't start");
     }
     moho::USER_LoadPreferences(fa::string("Game.prefs"));
-    return true;
+    return {};
   }
 
-  bool CProbeRebuild::OnLaunchInfo(
+  std::expected<void, std::string> CProbeRebuild::OnLaunchInfo(
     const std::span<const std::uint8_t> configuration,
-    const int uid,
-    std::string& error
+    const int uid
   )
   {
     if (!mState || mState->rules) {
-      return true; // not asked to rebuild from it, or the rules are loaded already (a reconnect sends it again)
+      return {}; // not asked to rebuild from it, or the rules are loaded already (a reconnect sends it again)
     }
     // As `CLobby::OnScriptData` reads script data: the lobby's Lua byte form.
     LuaPlus::LuaState* const state = faf::headless::ReplayLuaState();
@@ -111,28 +107,25 @@ namespace faf::probe
       LuaPlus::LuaObject codec = state->GetGlobals();
       codec.SCR_FromByteStream(config, state, &reader);
     } catch (const std::exception& exception) {
-      error = std::string("the launch info doesn't read: ") + exception.what();
-      return false;
+      return std::unexpected(std::string("the launch info doesn't read: ") + exception.what());
     }
     if (!config.IsTable()) {
-      error = "the launch info isn't a table";
-      return false;
+      return std::unexpected("the launch info isn't a table");
     }
     // A client with no sim needs only the rules from it: the server's own observer entry (uid 0) is left out.
     LuaPlus::LuaObject noObservers;
     noObservers.AssignNewTable(state, 0, 0u);
     config.SetObject("Observers", noObservers);
-    return LoadRules(config, uid, error);
+    return LoadRules(config, uid);
   }
 
-  bool CProbeRebuild::Load(
+  std::expected<void, std::string> CProbeRebuild::Load(
     const std::string& matchPath,
-    const int uid,
-    std::string& error
+    const int uid
   )
   {
-    if (!Start(error)) {
-      return false;
+    if (auto started = Start(); !started) {
+      return started;
     }
 
     // The match, as the server reads it (`MatchConfig`, `MatchSeed`); a client will get it from the server (WPR.55).
@@ -141,21 +134,18 @@ namespace faf::probe
     std::stringstream text;
     text << file.rdbuf();
     if (!file || !moho::SCR_LuaDoString(text.str().c_str(), state)) {
-      error = "cannot run " + matchPath;
-      return false;
+      return std::unexpected("cannot run " + matchPath);
     }
     LuaPlus::LuaObject config = state->GetGlobal("MatchConfig");
     if (!config.IsTable()) {
-      error = matchPath + " sets no MatchConfig";
-      return false;
+      return std::unexpected(matchPath + " sets no MatchConfig");
     }
-    return LoadRules(config, uid, error);
+    return LoadRules(config, uid);
   }
 
-  bool CProbeRebuild::LoadRules(
+  std::expected<void, std::string> CProbeRebuild::LoadRules(
     LuaPlus::LuaObject& config,
-    const int uid,
-    std::string& error
+    const int uid
   )
   {
     LuaPlus::LuaState* const state = faf::headless::ReplayLuaState();
@@ -164,16 +154,15 @@ namespace faf::probe
     // The seed is the sim's; a client with no sim needs none.
     moho::SLaunchBuild build = moho::BuildLaunchInfo(config, roster, 1, true, state);
     if (build.failure != nullptr) {
-      error = std::string("the match can't launch: ") + build.failure;
-      return false;
+      return std::unexpected(std::string("the match can't launch: ") + build.failure);
     }
     moho::SWldSessionInfo sessionInfo{}; // value-initialised: `LoadSessionScenario` beats a non-null client manager
     sessionInfo.mClientManager = nullptr;
     sessionInfo.mMapName = build.mapName;
     sessionInfo.mLaunchInfo = std::static_pointer_cast<moho::LaunchInfoBase>(build.launchInfo);
     moho::SWldGameData gameData{};
-    if (!faf::headless::LoadSessionScenario(sessionInfo, gameData, error)) {
-      return false;
+    if (auto loaded = faf::headless::LoadSessionScenario(sessionInfo, gameData); !loaded) {
+      return loaded;
     }
     moho::FAF_BeginSession(false);
     mState->sessionState.reset(gameData.mState);
@@ -181,7 +170,7 @@ namespace faf::probe
     mState->map.reset(gameData.mWldMap);
     mState->gameMods.assign(build.launchInfo->mGameMods.c_str(), build.launchInfo->mGameMods.size());
     gameData = moho::SWldGameData{};
-    return true;
+    return {};
   }
 
   bool CProbeRebuild::Content(

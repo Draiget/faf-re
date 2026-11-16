@@ -19,6 +19,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <deque>
+#include <expected>
 #include <map>
 #include <optional>
 #include <random>
@@ -110,11 +111,10 @@ namespace
       }
     }
 
-    [[nodiscard]] bool Start(
+    [[nodiscard]] std::expected<void, std::string> Start(
       const SEndpoint& server,
       const SConfig& config,
-      const std::uint32_t seed,
-      std::string& error
+      const std::uint32_t seed
     )
     {
       mServer = server;
@@ -122,14 +122,19 @@ namespace
       mRandom.seed(seed);
       // The player's side on loopback; the server's side on any address of the server's family, so the relay
       // reaches a server elsewhere, IPv6 included.
-      if (!mPlayerSide.Open(SEndpoint(0x7F000001u, 0u), error) || !mServerSide.Open(SEndpoint{}, error)) {
-        return false;
+      if (
+        auto opened = mPlayerSide.Open(SEndpoint(0x7F000001u, 0u)).and_then([this] {
+        return mServerSide.Open(SEndpoint{});
+      });
+        !opened
+      ) {
+        return opened;
       }
       mStartUs = SteadyUs();
       mThread = std::thread([this] {
         Run();
       });
-      return true;
+      return {};
     }
 
     [[nodiscard]] SEndpoint PlayerSide() const noexcept
@@ -840,8 +845,8 @@ namespace
     if (message[0] == static_cast<std::uint8_t>(ESeatMessage::LaunchInfo)) {
       ++out.launchInfos;
       if (out.rebuild != nullptr && !out.rebuild->HasRules()) {
-        std::string error;
-        if (out.rebuild->OnLaunchInfo(std::span<const std::uint8_t>(message).subspan(1), out.uid, error)) {
+        const auto loaded = out.rebuild->OnLaunchInfo(std::span<const std::uint8_t>(message).subspan(1), out.uid);
+        if (loaded) {
           std::printf(
             "probe %d: %.1f s: rebuild: rules from the server's launch info (%zu bytes)\n",
             out.uid,
@@ -849,7 +854,7 @@ namespace
             message.size() - 1u
           );
         } else {
-          std::printf("probe %d: %.1f s: rebuild: %s\n", out.uid, elapsed, error.c_str());
+          std::printf("probe %d: %.1f s: rebuild: %s\n", out.uid, elapsed, loaded.error().c_str());
         }
       }
       return;
@@ -1384,18 +1389,17 @@ int main(
     return 3;
   }
 
-  std::string error;
   faf::probe::CProbeRebuild rebuild;
   rebuild.SetHostEffects(options.hostEffects);
   if (options.rebuild == "server") {
     // Plan WPR.55: no match file; the rules come with the server's LaunchInfo.
-    if (!rebuild.Start(error)) {
-      std::printf("probe %d: rebuild: %s\n", options.uid, error.c_str());
+    if (auto started = rebuild.Start(); !started) {
+      std::printf("probe %d: rebuild: %s\n", options.uid, started.error().c_str());
       return 3;
     }
   } else if (!options.rebuild.empty()) {
-    if (!rebuild.Load(options.rebuild, options.uid, error)) {
-      std::printf("probe %d: rebuild: %s\n", options.uid, error.c_str());
+    if (auto loaded = rebuild.Load(options.rebuild, options.uid); !loaded) {
+      std::printf("probe %d: rebuild: %s\n", options.uid, loaded.error().c_str());
       return 3;
     }
     std::printf("probe %d: rebuild: rules of %s loaded\n", options.uid, options.rebuild.c_str());
@@ -1403,16 +1407,18 @@ int main(
   CImpairedPath path;
   SEndpoint server = options.server;
   if (options.path.Any()) {
-    if (!path.Start(options.server, options.path, static_cast<std::uint32_t>(options.uid) + 1u, error)) {
-      std::printf("probe %d: %s\n", options.uid, error.c_str());
+    if (
+      auto started = path.Start(options.server, options.path, static_cast<std::uint32_t>(options.uid) + 1u); !started
+    ) {
+      std::printf("probe %d: %s\n", options.uid, started.error().c_str());
       return 3;
     }
     server = path.PlayerSide();
   }
   CClientLink link(options.uid, MakeToken(options.token), server);
   link.SetCompressionOffer(!options.noViewCompression);
-  if (!link.Open(error)) {
-    std::printf("probe %d: %s\n", options.uid, error.c_str());
+  if (auto opened = link.Open(); !opened) {
+    std::printf("probe %d: %s\n", options.uid, opened.error().c_str());
     return 3;
   }
 

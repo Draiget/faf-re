@@ -510,9 +510,8 @@ int main(
   }
 
   difffuzz::RetailImage image;
-  std::string error;
-  if (!image.Load(opt.image, error)) {
-    std::fprintf(stderr, "difffuzz: cannot map %s: %s\n", opt.image.c_str(), error.c_str());
+  if (auto loaded = image.Load(opt.image); !loaded) {
+    std::fprintf(stderr, "difffuzz: cannot map %s: %s\n", opt.image.c_str(), loaded.error().c_str());
     return 3;
   }
   image.PokeDword(kRetailGlobalModeSse2, gGlobalModeSse2);

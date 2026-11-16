@@ -61,7 +61,8 @@ namespace
     // JSON round trip, escapes for the Java reader.
     {
       // \x5c is a backslash: the input holds escapes, a surrogate pair among them.
-      std::optional<JsonValue> v = ParseJson("{\"a\":[1,-2,3.5,true,null,\"x\x5cu00e9\x5cud83d\x5cude00{\"]}");
+      std::expected<JsonValue, std::string> v =
+        ParseJson("{\"a\":[1,-2,3.5,true,null,\"x\x5cu00e9\x5cud83d\x5cude00{\"]}");
       Check(v && v->IsObject(), "json parses an object");
       const JsonValue& a = v->Get("a");
       Check(a.Size() == 6 && a[0].AsInt() == 1 && a[1].AsInt() == -2 && a[2].AsDouble() == 3.5, "json numbers");
@@ -77,7 +78,7 @@ namespace
     }
     // CandidatesMessage as Jackson writes and reads it.
     {
-      std::optional<CandidatesMessage> m = CandidatesMessageFromJson(kJavaMessage);
+      std::expected<CandidatesMessage, std::string> m = CandidatesMessageFromJson(kJavaMessage);
       Check(m && m->srcId == 101 && m->destId == 102 && m->candidates.size() == 1, "reads the Java adapter's message");
       Check(
         m && m->candidates[0].type == CandidateType::Host && !m->candidates[0].relAddr,
@@ -113,7 +114,7 @@ namespace
     }
     // setIceServers.
     {
-      std::optional<JsonValue> list = ParseJson(
+      std::expected<JsonValue, std::string> list = ParseJson(
         R"([{"urls":["turn://h1:3478?transport=udp","turn:h1:3479?transport=tcp","stun:h1:3478","turns:h1:5349"],)"
         R"("username":"u","credential":"c"},{"url":"stun:[::1]:19302"}])"
       );

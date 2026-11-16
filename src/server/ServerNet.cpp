@@ -177,18 +177,16 @@ namespace faf::server
     mLobby.AddParticipant(uid);
   }
 
-  bool CServerNet::Start(
-    std::string& error
-  )
+  std::expected<void, std::string> CServerNet::Start()
   {
-    if (!mLinks.Open(mConfig.listen, error)) {
-      return false;
+    if (auto opened = mLinks.Open(mConfig.listen); !opened) {
+      return opened;
     }
     mStartUs = NowUs();
     mThread = std::thread([this] {
       Run();
     });
-    return true;
+    return {};
   }
 
   void CServerNet::Stop()

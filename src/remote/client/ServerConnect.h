@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <expected>
 #include <span>
 #include <string>
 #include <string_view>
@@ -49,15 +50,14 @@ namespace faf::remote
   /**
    * Plan WP12.2: one connection string's parts, as a launcher hands them over (the switches, or GPGNet's
    * `JoinServer address token uid`), checked as the switches are: an IPv4 `a.b.c.d:port` or an IPv6 `[address]:port`, a
-   * token of 1 to 1024 printable characters without spaces, a uid above 0. False with `error` saying what is wrong; the
-   * token never appears in it.
+   * token of 1 to 1024 printable characters without spaces, a uid above 0. The error says what is wrong; the token
+   * never appears in it.
    */
-  [[nodiscard]] bool MakeServerConnectRequest(
+  [[nodiscard]] std::expected<void, std::string> MakeServerConnectRequest(
     std::string_view endpoint,
     std::string_view token,
     std::int32_t uid,
-    SServerConnectRequest& request,
-    std::string& error
+    SServerConnectRequest& request
   );
 
   /**

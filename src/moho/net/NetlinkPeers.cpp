@@ -131,10 +131,9 @@ namespace moho
         const std::string& json
       )
       {
-        std::string error;
-        const std::optional<nl::JsonValue> config = nl::ParseJson(json, &error);
+        const std::expected<nl::JsonValue, std::string> config = nl::ParseJson(json);
         if (!config || !config->IsObject()) {
-          gpg::Logf("NETLINK: bad NetlinkConfig (%s)", error.c_str());
+          gpg::Logf("NETLINK: bad NetlinkConfig (%s)", config ? "" : config.error().c_str());
           return;
         }
         std::lock_guard lock(mMutex);
@@ -275,10 +274,9 @@ namespace moho
         const std::string& json
       )
       {
-        std::string error;
-        const std::optional<nl::JsonValue> parsed = nl::ParseJson(json, &error);
+        const std::expected<nl::JsonValue, std::string> parsed = nl::ParseJson(json);
         if (!parsed) {
-          gpg::Logf("NETLINK: bad IceServers (%s)", error.c_str());
+          gpg::Logf("NETLINK: bad IceServers (%s)", parsed.error().c_str());
           return;
         }
         const nl::JsonValue* list = &*parsed;
@@ -412,10 +410,9 @@ namespace moho
           link->OnSignalText(json); // issue #239
           return;
         }
-        std::string error;
-        const std::optional<nl::CandidatesMessage> m = nl::CandidatesMessageFromJson(json, &error);
+        const std::expected<nl::CandidatesMessage, std::string> m = nl::CandidatesMessageFromJson(json);
         if (!m) {
-          gpg::Logf("NETLINK: bad ICE message from peer %lld (%s)", static_cast<long long>(id), error.c_str());
+          gpg::Logf("NETLINK: bad ICE message from peer %lld (%s)", static_cast<long long>(id), m.error().c_str());
           return;
         }
         link->OnSignal(*m);

@@ -438,9 +438,8 @@ namespace faf::headless
           seat->GetIndex(), seat->GetNickname().c_str(), "seat-" + std::to_string(seat->GetIndex()), *seat
         );
       }
-      std::string netError;
-      if (!seatNet->Start(netError)) {
-        result.error = netError;
+      if (auto started = seatNet->Start(); !started) {
+        result.error = started.error();
         return result;
       }
     }
@@ -457,7 +456,8 @@ namespace faf::headless
     );
 
     moho::SWldGameData gameData{};
-    if (!LoadSessionScenario(*sessionInfo, gameData, result.error)) {
+    if (auto loaded = LoadSessionScenario(*sessionInfo, gameData); !loaded) {
+      result.error = loaded.error();
       moho::ReleaseWldGameDataHandles(&gameData);
       return result;
     }
@@ -937,7 +937,8 @@ namespace faf::headless
       }
     }
     CReplayEffectOps effectOps; // plan WP9.1
-    if (!effectOps.Open(options.effectOpsPath, options.effectRecordPath, result.error)) {
+    if (auto opened = effectOps.Open(options.effectOpsPath, options.effectRecordPath); !opened) {
+      result.error = opened.error();
       return result;
     }
 #if FAF_SERVER_MODE

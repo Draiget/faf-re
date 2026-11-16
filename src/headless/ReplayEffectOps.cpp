@@ -49,20 +49,18 @@ namespace faf::headless
 
   CReplayEffectOps::CReplayEffectOps() = default;
 
-  bool CReplayEffectOps::Open(
+  std::expected<void, std::string> CReplayEffectOps::Open(
     const std::string& countsPath,
-    const std::string& recordPath,
-    std::string& error
+    const std::string& recordPath
   )
   {
     if (countsPath.empty() && recordPath.empty()) {
-      return true;
+      return {};
     }
     if (!countsPath.empty()) {
       mFile = std::fopen(countsPath.c_str(), "w");
       if (mFile == nullptr) {
-        error = "cannot write " + countsPath;
-        return false;
+        return std::unexpected("cannot write " + countsPath);
       }
       std::print(mFile, "beat total");
       for (std::size_t op = 0; op < kOps; ++op) {
@@ -73,8 +71,7 @@ namespace faf::headless
     if (!recordPath.empty()) {
       mRecordFile = std::fopen(recordPath.c_str(), "w");
       if (mRecordFile == nullptr) {
-        error = "cannot write " + recordPath;
-        return false;
+        return std::unexpected("cannot write " + recordPath);
       }
       std::println(mRecordFile, "beat ops bytes");
       mRecorder = std::make_unique<server::CEffectOpRecorder>();
@@ -86,7 +83,7 @@ namespace faf::headless
       count.store(0u, std::memory_order_relaxed);
     }
     moho::gEffectOpHook = &CountOp;
-    return true;
+    return {};
   }
 
   std::pair<std::uint32_t, std::uint32_t> CReplayEffectOps::TakeLane()

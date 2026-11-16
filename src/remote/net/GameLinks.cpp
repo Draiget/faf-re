@@ -24,16 +24,14 @@ namespace faf::remote::net
     : mChannelConfig(channel)
   {}
 
-  bool CServerLinks::Open(
-    const SEndpoint& local,
-    std::string& error
+  std::expected<void, std::string> CServerLinks::Open(
+    const SEndpoint& local
   )
   {
     if (!mCookies.Init() || !FillRandom(&mAddressSalt, sizeof(mAddressSalt))) {
-      error = "the system gave no random secret for the handshake";
-      return false;
+      return std::unexpected("the system gave no random secret for the handshake");
     }
-    return mSocket.Open(local, error);
+    return mSocket.Open(local);
   }
 
   void CServerLinks::AllowAddress(
@@ -493,11 +491,9 @@ namespace faf::remote::net
     , mHandshake(std::make_unique<CClientHandshake>(uid, token))
   {}
 
-  bool CClientLink::Open(
-    std::string& error
-  )
+  std::expected<void, std::string> CClientLink::Open()
   {
-    return mSocket.Open(SEndpoint{}, error);
+    return mSocket.Open(SEndpoint{});
   }
 
   void CClientLink::Reconnect()

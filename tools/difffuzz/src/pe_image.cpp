@@ -72,20 +72,17 @@ namespace difffuzz
     }
   } // namespace
 
-  bool RetailImage::Load(
-    const std::string& path,
-    std::string& error
+  std::expected<void, std::string> RetailImage::Load(
+    const std::string& path
   )
   {
     std::ifstream file(path, std::ios::binary);
     if (!file) {
-      error = "cannot open " + path;
-      return false;
+      return std::unexpected("cannot open " + path);
     }
     const std::vector<std::uint8_t> bytes((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
     if (bytes.size() < sizeof(IMAGE_DOS_HEADER)) {
-      error = "file too small";
-      return false;
+      return std::unexpected("file too small");
     }
 
     const auto* const dos = reinterpret_cast<const IMAGE_DOS_HEADER*>(bytes.data());
@@ -93,21 +90,18 @@ namespace difffuzz
       dos->e_magic != IMAGE_DOS_SIGNATURE ||
       static_cast<std::size_t>(dos->e_lfanew) + sizeof(IMAGE_NT_HEADERS32) > bytes.size()
     ) {
-      error = "not an MZ image";
-      return false;
+      return std::unexpected("not an MZ image");
     }
     const auto* const nt = reinterpret_cast<const IMAGE_NT_HEADERS32*>(bytes.data() + dos->e_lfanew);
     if (
       nt->Signature != IMAGE_NT_SIGNATURE || nt->FileHeader.Machine != IMAGE_FILE_MACHINE_I386 ||
       nt->OptionalHeader.Magic != IMAGE_NT_OPTIONAL_HDR32_MAGIC
     ) {
-      error = "not a PE32 i386 image";
-      return false;
+      return std::unexpected("not a PE32 i386 image");
     }
     const IMAGE_OPTIONAL_HEADER32& opt = nt->OptionalHeader;
     if (opt.ImageBase != kExpectedBase) {
-      error = "unexpected ImageBase (this loader does not relocate)";
-      return false;
+      return std::unexpected("unexpected ImageBase (this loader does not relocate)");
     }
 
     // MEM_RESERVE|MEM_COMMIT at exactly the preferred base; the image has no
@@ -135,9 +129,9 @@ namespace difffuzz
         opt.SizeOfImage,
         GetLastError()
       );
-      error = buf;
+      std::string error = buf;
       DescribeRegion(opt.ImageBase, error);
-      return false;
+      return std::unexpected(std::move(error));
     }
     auto* const base = static_cast<std::uint8_t*>(mapped);
     mBase = opt.ImageBase;
@@ -151,8 +145,7 @@ namespace difffuzz
         s.SizeOfRawData < s.Misc.VirtualSize || s.Misc.VirtualSize == 0 ? s.SizeOfRawData : s.Misc.VirtualSize;
       if (rawCopy != 0) {
         if (static_cast<std::size_t>(s.PointerToRawData) + rawCopy > bytes.size()) {
-          error = "section raw data past end of file";
-          return false;
+          return std::unexpected("section raw data past end of file");
         }
         std::memcpy(base + s.VirtualAddress, bytes.data() + s.PointerToRawData, rawCopy);
       }
@@ -188,8 +181,7 @@ namespace difffuzz
         VirtualAlloc(nullptr, slots.size() * kStubSize + 16, MEM_RESERVE | MEM_COMMIT, PAGE_EXECUTE_READWRITE)
       );
       if (stubs == nullptr) {
-        error = "cannot allocate import trap stubs";
-        return false;
+        return std::unexpected("cannot allocate import trap stubs");
       }
       const auto trap = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(&ImportTrap));
       for (std::size_t i = 0; i < slots.size(); ++i) {
@@ -220,12 +212,11 @@ namespace difffuzz
       if (
         size != 0 && !VirtualProtect(base + s.VirtualAddress, size, SectionProtection(s.Characteristics), &oldProtect)
       ) {
-        error = "VirtualProtect failed for a section";
-        return false;
+        return std::unexpected("VirtualProtect failed for a section");
       }
     }
     FlushInstructionCache(GetCurrentProcess(), base, opt.SizeOfImage);
-    return true;
+    return {};
   }
 
   bool ReadImageExtent(

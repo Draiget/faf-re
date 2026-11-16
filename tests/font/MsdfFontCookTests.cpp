@@ -145,25 +145,23 @@ namespace
     moho::SMsdfCookOptions options;
     options.mCodepoints = moho::MSDF_DefaultCodepoints();
     moho::SMsdfFontAtlas atlas;
-    std::string error;
 
     const char notAFont[] = "MZ this is a program, not a font";
-    EXPECT_FALSE(moho::MSDF_CookFont(notAFont, sizeof(notAFont), options, atlas, error))
+    EXPECT_FALSE(moho::MSDF_CookFont(notAFont, sizeof(notAFont), options, atlas))
       << "a file that isn't a font is refused";
     EXPECT_TRUE(moho::MSDF_ReadFontNames(notAFont, sizeof(notAFont)).empty())
       << "a file that isn't a font has no names";
-    EXPECT_FALSE(moho::MSDF_CookFont(nullptr, 0u, options, atlas, error)) << "no bytes are refused";
+    EXPECT_FALSE(moho::MSDF_CookFont(nullptr, 0u, options, atlas)) << "no bytes are refused";
 
     // Cut short at several points: refused or cooked, but never a crash.
     for (const std::size_t divisor : {2u, 3u, 7u, 50u, 1000u}) {
-      (void)moho::MSDF_CookFont(font.data(), font.size() / divisor, options, atlas, error);
+      (void)moho::MSDF_CookFont(font.data(), font.size() / divisor, options, atlas);
     }
     std::println("cut-short files: no crash");
 
     moho::SMsdfCookOptions small = options;
     small.mMaxAtlasHeight = 256;
-    EXPECT_FALSE(moho::MSDF_CookFont(font.data(), font.size(), small, atlas, error))
-      << "glyphs that don't fit are refused";
+    EXPECT_FALSE(moho::MSDF_CookFont(font.data(), font.size(), small, atlas)) << "glyphs that don't fit are refused";
   }
 
   void Dump(
@@ -204,18 +202,19 @@ TEST(
 
   moho::SMsdfCookOptions options;
   options.mCodepoints = moho::MSDF_DefaultCodepoints();
-  std::string error;
 
   moho::SMsdfFontAtlas oneThread;
   auto start = std::chrono::steady_clock::now();
-  EXPECT_TRUE(moho::MSDF_CookFont(font.data(), font.size(), options, oneThread, error)) << error.c_str();
+  auto cooked = moho::MSDF_CookFont(font.data(), font.size(), options, oneThread);
+  EXPECT_TRUE(cooked) << cooked.error().c_str();
   const auto oneMs =
     std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count();
 
   options.mThreads = 4;
   moho::SMsdfFontAtlas fourThreads;
   start = std::chrono::steady_clock::now();
-  EXPECT_TRUE(moho::MSDF_CookFont(font.data(), font.size(), options, fourThreads, error)) << error.c_str();
+  cooked = moho::MSDF_CookFont(font.data(), font.size(), options, fourThreads);
+  EXPECT_TRUE(cooked) << cooked.error().c_str();
   const auto fourMs =
     std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count();
 

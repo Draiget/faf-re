@@ -479,15 +479,13 @@ namespace faf::remote::net
     Close();
   }
 
-  bool CUdpSocket::Open(
-    const SEndpoint& local,
-    std::string& error
+  std::expected<void, std::string> CUdpSocket::Open(
+    const SEndpoint& local
   )
   {
     Close();
     if (!StartSockets()) {
-      error = "the socket library didn't start";
-      return false;
+      return std::unexpected("the socket library didn't start");
     }
     const bool any = IsAnyAddress(local.address);
     bool dualStack = !local.IsIpv4();
@@ -498,8 +496,7 @@ namespace faf::remote::net
       handle = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
     }
     if (handle == INVALID_SOCKET) {
-      error = "no socket: error " + std::to_string(LastError());
-      return false;
+      return std::unexpected("no socket: error " + std::to_string(LastError()));
     }
     if (dualStack) {
       // IPv4 peers too, as ::ffff:a.b.c.d (the default differs: IPv6 only on Windows, a sysctl on Linux). A socket that
@@ -514,8 +511,7 @@ namespace faf::remote::net
           handle = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
         }
         if (handle == INVALID_SOCKET) {
-          error = "no dual-stack socket: error " + std::to_string(failure);
-          return false;
+          return std::unexpected("no dual-stack socket: error " + std::to_string(failure));
         }
       }
     }
@@ -529,14 +525,14 @@ namespace faf::remote::net
       !ToAddress(bindAt, dualStack, address, addressLength) ||
       bind(handle, reinterpret_cast<const sockaddr*>(&address), addressLength) != 0
     ) {
-      error = "can't bind " + local.Text() + ": error " + std::to_string(LastError());
+      std::string error = "can't bind " + local.Text() + ": error " + std::to_string(LastError());
       CloseSocket(handle);
-      return false;
+      return std::unexpected(std::move(error));
     }
     if (!MakeNonBlocking(handle)) {
-      error = "can't make the socket non-blocking: error " + std::to_string(LastError());
+      std::string error = "can't make the socket non-blocking: error " + std::to_string(LastError());
       CloseSocket(handle);
-      return false;
+      return std::unexpected(std::move(error));
     }
     // A game's burst shouldn't overflow the system's queue between two passes. Best effort.
     (void)setsockopt(handle, SOL_SOCKET, SO_RCVBUF, reinterpret_cast<const char*>(&kBufferBytes), sizeof(kBufferBytes));
@@ -570,7 +566,7 @@ namespace faf::remote::net
     }
     mDualStack = dualStack;
     mSocket = static_cast<std::intptr_t>(handle);
-    return true;
+    return {};
   }
 
   void CUdpSocket::Close() noexcept

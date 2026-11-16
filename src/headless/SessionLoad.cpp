@@ -20,17 +20,15 @@
 
 namespace faf::headless
 {
-  bool LoadSessionScenario(
+  std::expected<void, std::string> LoadSessionScenario(
     moho::SWldSessionInfo& sessionInfo,
-    moho::SWldGameData& gameData,
-    std::string& error
+    moho::SWldGameData& gameData
   )
   {
     moho::CWldSessionLoaderImpl* const loader = moho::GetWldSessionLoader();
     moho::LaunchInfoBase* const launchInfo = sessionInfo.mLaunchInfo.get();
     if (loader == nullptr || launchInfo == nullptr) {
-      error = "no session loader or launch info";
-      return false;
+      return std::unexpected("no session loader or launch info");
     }
 
     (void)loader->GetScenarioInfo(sessionInfo.mMapName.raw_data_unsafe(), &launchInfo->mGameMods, true);
@@ -48,10 +46,9 @@ namespace faf::headless
 
     (void)loader->LoadGameData(&gameData);
     if (gameData.mGameRules == nullptr || gameData.mWldMap == nullptr || gameData.mState == nullptr) {
-      error = "map " + std::string(sessionInfo.mMapName.c_str()) + " failed to load";
-      return false;
+      return std::unexpected("map " + std::string(sessionInfo.mMapName.c_str()) + " failed to load");
     }
-    return true;
+    return {};
   }
 
   moho::STIMap* CompleteSessionLaunchInfo(
