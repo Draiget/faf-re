@@ -121,8 +121,7 @@ namespace faf::editor::gpu
       )
       {
         FAF_GPU_TRY(MakeField(ex, w, h, f));
-        if (std::string fillErr; !FillBuffer(ex, f.R(), 0u, fillErr))
-          return std::unexpected(std::move(fillErr));
+        FAF_GPU_TRY(FillBuffer(ex, f.R(), 0u));
         return {};
       }
       std::expected<void, std::string> Zero(
@@ -131,16 +130,14 @@ namespace faf::editor::gpu
       )
       {
         FAF_GPU_TRY(MakeBuffer(ex, count, r));
-        if (std::string fillErr; !FillBuffer(ex, *r, 0u, fillErr))
-          return std::unexpected(std::move(fillErr));
+        FAF_GPU_TRY(FillBuffer(ex, *r, 0u));
         return {};
       }
       std::expected<void, std::string> Dummies()
       {
         for (auto& d : dummy) {
           FAF_GPU_TRY(MakeBuffer(ex, 1, d));
-          if (std::string fillErr; !FillBuffer(ex, *d, 0u, fillErr))
-            return std::unexpected(std::move(fillErr));
+          FAF_GPU_TRY(FillBuffer(ex, *d, 0u));
         }
         return {};
       }

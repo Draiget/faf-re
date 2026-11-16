@@ -60,8 +60,7 @@ namespace faf::editor::gpu
       FAF_GPU_TRY(MakeBuffer(ex, 1, changed));
       FAF_GPU_TRY(MakeField(ex, w, h, pp.f[0]));
       FAF_GPU_TRY(MakeField(ex, w, h, pp.f[1]));
-      if (std::string fillErr; !FillBuffer(ex, pp.f[0].R(), 0u, fillErr))
-        return std::unexpected(std::move(fillErr));
+      FAF_GPU_TRY(FillBuffer(ex, pp.f[0].R(), 0u));
       {
         Bindings b;
         b.Srv(0, hgt.R()).Uav(0, inv.R());
@@ -88,8 +87,7 @@ namespace faf::editor::gpu
       constexpr int kMaxSweeps = 6000;
       bool converged = false;
       for (int done = 0; done < kMaxSweeps && !converged; done += kBatch) {
-        if (std::string fillErr; !FillBuffer(ex, *changed, 0u, fillErr))
-          return std::unexpected(std::move(fillErr));
+        FAF_GPU_TRY(FillBuffer(ex, *changed, 0u));
         for (int s = 0; s < kBatch; ++s) {
           Bindings b;
           b.Srv(0, hgt.R()).Srv(1, inv.R()).Srv(2, *order).Srv(3, pp.Src().R()).Uav(0, pp.Dst().R()).Uav(1, *changed);

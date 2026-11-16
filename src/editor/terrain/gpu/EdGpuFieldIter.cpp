@@ -65,8 +65,7 @@ namespace faf::editor::gpu
       FAF_GPU_TRY(UploadGrid(ex, *src, pp.f[0]));
       FAF_GPU_TRY(MakeField(ex, src->w, src->h, pp.f[1]));
       FAF_GPU_TRY(MakeField(ex, src->w, src->h, dep));
-      if (std::string fillErr; !FillBuffer(ex, dep.R(), 0u, fillErr))
-        return std::unexpected(std::move(fillErr));
+      FAF_GPU_TRY(FillBuffer(ex, dep.R(), 0u));
       FAF_GPU_TRY(BindMask(ex, a, mb));
       p.hasMask = mb.has ? 1u : 0u;
       const auto ok =
@@ -224,10 +223,8 @@ namespace faf::editor::gpu
       if (needSums) {
         FAF_GPU_TRY(MakeField(ex, w, h, gain));
         FAF_GPU_TRY(MakeField(ex, w, h, lost));
-        if (std::string fillErr; !FillBuffer(ex, gain.R(), 0u, fillErr))
-          return std::unexpected(std::move(fillErr));
-        if (std::string fillErr; !FillBuffer(ex, lost.R(), 0u, fillErr))
-          return std::unexpected(std::move(fillErr));
+        FAF_GPU_TRY(FillBuffer(ex, gain.R(), 0u));
+        FAF_GPU_TRY(FillBuffer(ex, lost.R(), 0u));
         sl.gain = &gain.R();
         sl.lost = &lost.R();
         sl.p.hasGain = 1;
@@ -358,8 +355,7 @@ namespace faf::editor::gpu
       FAF_GPU_TRY(UploadField(ex, soil.f[0], soilV.data()));
       FAF_GPU_TRY(UploadField(ex, rock.f[0], rockV.data()));
       FAF_GPU_TRY(MakeField(ex, w, h, lost));
-      if (std::string fillErr; !FillBuffer(ex, lost.R(), 0u, fillErr))
-        return std::unexpected(std::move(fillErr));
+      FAF_GPU_TRY(FillBuffer(ex, lost.R(), 0u));
       Slider onSoil, onRock; // the soil slides over the rock (surface = rock + soil, capped by the soil), the rock as a
                              // layer of its own
       FAF_GPU_TRY(onSoil.Init(ex, w, h));
@@ -460,8 +456,7 @@ namespace faf::editor::gpu
       FAF_GPU_TRY(MakeField(ex, w, h, snow.f[0]));
       FAF_GPU_TRY(MakeField(ex, w, h, snow.f[1]));
       FAF_GPU_TRY(MakeField(ex, w, h, lost));
-      if (std::string fillErr; !FillBuffer(ex, lost.R(), 0u, fillErr))
-        return std::unexpected(std::move(fillErr));
+      FAF_GPU_TRY(FillBuffer(ex, lost.R(), 0u));
       FAF_GPU_TRY(BindMask(ex, a, mb));
       ip.hasMask = mb.has ? 1u : 0u;
       Bindings bi;
@@ -560,8 +555,7 @@ namespace faf::editor::gpu
       FAF_GPU_TRY(UploadField(ex, sand.f[0], sandV.data()));
       FAF_GPU_TRY(UploadField(ex, rock, rockV.data()));
       FAF_GPU_TRY(MakeField(ex, w, h, wear));
-      if (std::string fillErr; !FillBuffer(ex, wear.R(), 0u, fillErr))
-        return std::unexpected(std::move(fillErr));
+      FAF_GPU_TRY(FillBuffer(ex, wear.R(), 0u));
       FAF_GPU_TRY(MakeField(ex, w, h, take));
       FAF_GPU_TRY(MakeField(ex, w, h, vel));
       Slider sl; // the sand slides at the angle of repose on the rock, always at rate 0.5 (as the CPU op)
@@ -663,19 +657,15 @@ namespace faf::editor::gpu
       FAF_GPU_TRY(UploadGrid(ex, *src, bed));
       FAF_GPU_TRY(MakeField(ex, w, h, ice.f[0]));
       FAF_GPU_TRY(MakeField(ex, w, h, ice.f[1]));
-      if (std::string fillErr; !FillBuffer(ex, ice.f[0].R(), 0u, fillErr))
-        return std::unexpected(std::move(fillErr));
+      FAF_GPU_TRY(FillBuffer(ex, ice.f[0].R(), 0u));
       FAF_GPU_TRY(MakeField(ex, w, h, dif));
       FAF_GPU_TRY(MakeField(ex, w, h, gsl));
       FAF_GPU_TRY(MakeField(ex, w, h, cut));
-      if (std::string fillErr; !FillBuffer(ex, cut.R(), 0u, fillErr))
-        return std::unexpected(std::move(fillErr));
+      FAF_GPU_TRY(FillBuffer(ex, cut.R(), 0u));
       FAF_GPU_TRY(MakeBuffer(ex, 1, dmaxA));
       FAF_GPU_TRY(MakeBuffer(ex, 1, dmaxB));
-      if (std::string fillErr; !FillBuffer(ex, *dmaxA, 0u, fillErr))
-        return std::unexpected(std::move(fillErr));
-      if (std::string fillErr; !FillBuffer(ex, *dmaxB, 0u, fillErr))
-        return std::unexpected(std::move(fillErr));
+      FAF_GPU_TRY(FillBuffer(ex, *dmaxA, 0u));
+      FAF_GPU_TRY(FillBuffer(ex, *dmaxB, 0u));
       FAF_GPU_TRY(MakeBuffer(ex, 1, dummy));
       FAF_GPU_TRY(UploadBuffer(ex, *dummy, &zero, 4));
       if (accMask != nullptr) {

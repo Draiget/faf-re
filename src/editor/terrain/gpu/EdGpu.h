@@ -296,7 +296,7 @@ namespace faf::editor::gpu
   UploadBuffer(Executor& ex, Resource& r, const void* data, std::size_t bytes);
   /** Sets every 4 byte word of a buffer to `pattern` (0 = zero floats / zero counters; uploads a host array: for set-up
    * between iterations, not for use inside a loop). */
-  [[nodiscard]] bool FillBuffer(Executor& ex, Resource& r, u32 pattern, std::string& err);
+  [[nodiscard]] std::expected<void, std::string> FillBuffer(Executor& ex, Resource& r, u32 pattern);
   /** An R32_FLOAT texture holding a field (copied on the device with the buf_to_tex kernel). */
   [[nodiscard]] std::expected<void, std::string>
   MakeTextureFromField(Executor& ex, const Field& f, std::unique_ptr<Resource>& tex);

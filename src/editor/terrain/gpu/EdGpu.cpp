@@ -120,23 +120,17 @@ namespace faf::editor::gpu
     return ex.Upload(r, data, bytes);
   }
 
-  bool FillBuffer(
+  std::expected<void, std::string> FillBuffer(
     Executor& ex,
     Resource& r,
-    const u32 pattern,
-    std::string& err
+    const u32 pattern
   )
   {
     if (r.kind != Resource::Kind::Buffer || r.stride != 4 || r.count == 0) {
-      err = "FillBuffer needs a buffer of 4 byte elements";
-      return false;
+      return std::unexpected(std::string("FillBuffer needs a buffer of 4 byte elements"));
     }
     const std::vector<u32> words(r.count, pattern);
-    if (auto uploaded = ex.Upload(r, words.data(), words.size() * 4); !uploaded) {
-      err = std::move(uploaded.error());
-      return false;
-    }
-    return true;
+    return ex.Upload(r, words.data(), words.size() * 4);
   }
 
   std::expected<void, std::string> MakeField(
