@@ -60,7 +60,7 @@ The parser scans at most the first 64 KiB (including, but not limited to, bases 
 | mwPlyStartFname | Player::Open, including complete restart |
 | mwPlyGetStat | Player status: 1 preparing, 2 ready/playing, 3 ended, 4 failed |
 | mwPlyPause / mwPlyIsPause | freeze/resume/query player and audio clocks |
-| mwPlyGetCurFrm / mwPlyRelCurFrm | borrow/release retained independent BGRA frame |
+| mwPlyGetCurFrm / mwPlyRelCurFrm | borrow/release retained independent BGRA frame, none while the texture has it (mwPlyFxCnvFrmARGB8888 copied it, and no `ForgetUploadedMovieFrame` since) |
 | mwPlyFxGetCompoMode | parsed composition mode |
 | mwPlyFxSetOutBufSize / mwPlyFxCnvFrmARGB8888 | checked pitch/height and row copy |
 | mwPlyGetSubtitle | empty output until a timed format is verified |
@@ -125,7 +125,7 @@ The CMake/CTest suites passed 7/7 in Debug/Win32 and Release/x64, covering:
 
 - Exact signature, relocated headers, truncated descriptors, invalid counts, malformed fields, effect mapping and 20,000 deterministic fuzz cases.
 - Complete MPEG video decoding and opaque BGRA validation; complete embedded ADX decode and resampler drain.
-- Texture copying with padded destination pitch and canaries.
+- Texture copying with padded destination pitch and canaries; an unchanged frame is not handed out for copying again, until `ForgetUploadedMovieFrame` says the texture was made again.
 - First frame while paused, timed playback, pause freeze, resume and volume.
 - Ring-buffer wrap, restart, EOF (including embedded audio drain), repeated reopen/dispose, missing-file rejection and idempotent shutdown.
 - Embedded-audio file with no sound device (steady-clock playback).
