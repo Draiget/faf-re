@@ -201,6 +201,12 @@ function Apply(scale)
     end
     LOG('UI scale: ' .. tostring(LayoutHelpers.GetPixelScaleFactor()) .. ' -> ' .. tostring(scale))
     LayoutHelpers.SetPixelScaleFactor(scale)
+    -- A display scale can arrive while the game starts, before the UI layer exists (a Retina display reports 2.0
+    -- then): GetNumRootFrames raises until it does. The interface built later reads the layout factor set above,
+    -- and effecthelpers.lua, which needs a root frame to load, reads the profile's ui_scale when it first does.
+    if not pcall(GetNumRootFrames) then
+        return
+    end
     local EffectHelpers = import('/lua/maui/effecthelpers.lua')
     if rawget(EffectHelpers, 'SetPixelScaleFactor') then
         EffectHelpers.SetPixelScaleFactor(scale)

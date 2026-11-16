@@ -28,6 +28,9 @@ namespace
     {"EntityCategory", 0x28u}, // EntityCategorySet, EntityCategoryReflection.h
     {"CPrefetchSet", 0x10u},   // CPrefetchSet.h
     {"WrapFile", 0x08u},       // LuaObject.cpp (io library file handle)
+    // A live game's NAT traversal provider, which the user state holds (not met by the replay above):
+    // its x86 size assert, moho/net/INetNATTraversalProviderWeakPtrReflection.cpp.
+    {"weak_ptr<INetNATTraversalProvider>", 0x08u},
   };
 
   [[nodiscard]] lu_mem LookupX86PayloadSize(
