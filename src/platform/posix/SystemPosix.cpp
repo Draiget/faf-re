@@ -6,6 +6,8 @@
 
 #include <algorithm>
 #include <climits>
+#include <csignal>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -16,13 +18,15 @@
 #include <sched.h>
 #include <unistd.h>
 
-#if FAFRE_PLATFORM_LINUX // /proc, malloc_usable_size, sched_*affinity, gettid
+#if FAFRE_PLATFORM_LINUX // /proc, malloc_usable_size, sched_*affinity, gettid, prctl
 #include <malloc.h>
+#include <sys/prctl.h>
 #include <sys/syscall.h>
 
 extern "C" char __executable_start; // the GNU linkers' symbol for the image's first byte
-#elif FAFRE_PLATFORM_MACOS          // Mach, the dyld and malloc zone APIs, getmntinfo
+#elif FAFRE_PLATFORM_MACOS          // Mach, the dyld and malloc zone APIs, getmntinfo, kqueue
 #include <crt_externs.h>
+#include <sys/event.h>
 #include <mach-o/dyld.h>
 #include <mach-o/ldsyms.h>
 #include <mach/mach.h>
@@ -303,6 +307,21 @@ namespace platform::posix
     }
     return points;
   }
+
+  char** Environment() noexcept
+  {
+    return environ;
+  }
+
+  void ExitWithParent(
+    const int parent
+  ) noexcept
+  {
+    (void)::prctl(PR_SET_PDEATHSIG, SIGKILL);
+    if (::getppid() != parent) {
+      ::_exit(0); // the parent ended before the signal was armed
+    }
+  }
 #elif FAFRE_PLATFORM_MACOS // Mach threads and VM regions, dyld, the malloc zone, BSD mount table
   namespace
   {
@@ -497,6 +516,33 @@ namespace platform::posix
       points.emplace_back(mounts[i].f_mntonname);
     }
     return points;
+  }
+
+  char** Environment() noexcept
+  {
+    return *::_NSGetEnviron();
+  }
+
+  void ExitWithParent(
+    const int parent
+  ) noexcept
+  {
+    const int queue = ::kqueue();
+    struct kevent watch{};
+    EV_SET(&watch, static_cast<uintptr_t>(parent), EVFILT_PROC, EV_ADD | EV_ONESHOT, NOTE_EXIT, 0, nullptr);
+    // ESRCH: the parent is gone already. Checked after arming, so an exit between the two isn't missed.
+    if (queue < 0 || ::kevent(queue, &watch, 1, nullptr, 0, nullptr) != 0 || ::getppid() != parent) {
+      ::_exit(0);
+    }
+    pthread_t watcher{};
+    if (::pthread_create(&watcher, nullptr, [](void* const context) -> void* {
+      struct kevent fired{};
+      while (::kevent(static_cast<int>(reinterpret_cast<std::intptr_t>(context)), nullptr, 0, &fired, 1, nullptr) < 0) {
+      }
+      ::_exit(0);
+    }, reinterpret_cast<void*>(static_cast<std::intptr_t>(queue))) == 0) {
+      (void)::pthread_detach(watcher);
+    }
   }
 #endif
 } // namespace platform::posix

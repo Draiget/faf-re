@@ -115,7 +115,10 @@ namespace
   std::uintptr_t gBase = 0;
   std::size_t gReserveBytes = 0;
   std::once_flag gReserveOnce;
-  std::mutex gSpanLock;
+  // The arena's locks are never destroyed: Lua states that other statics own (the preferences,
+  // CUserPrefs) are closed during static destruction, after this file's objects would be, and
+  // libc++ on macOS throws when a destroyed mutex is locked (std::terminate in a noexcept path).
+  [[clang::no_destroy]] std::mutex gSpanLock;
   std::size_t gNextSpan = 0;
   std::size_t gCommittedBytes = 0;
   std::uint8_t gSpanClass[kSpanCount];
@@ -127,7 +130,7 @@ namespace
   std::uint32_t gAdjacentSpans[kSpanCount]{};
   std::size_t gLargestAdjacentRun = 0;
   bool gFreeRunsChanged = true;
-  GlobalClassLists gGlobal[kClassCount];
+  [[clang::no_destroy]] GlobalClassLists gGlobal[kClassCount];
   constinit thread_local ThreadLists tLists{};
 
   [[nodiscard]] std::uintptr_t TryReserve(

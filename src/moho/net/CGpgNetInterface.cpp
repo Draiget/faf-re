@@ -13,7 +13,8 @@
 #include <vector>
 #if !FAFRE_PLATFORM_WINDOWS
 #include <spawn.h>
-#include <unistd.h> // environ
+
+#include "platform/posix/SystemPosix.h" // Environment
 #endif
 
 #include "Common.h"
@@ -52,7 +53,7 @@
 #include <float.h>
 #include <shellapi.h>
 #include <wchar.h>
-#include <windows.h>
+#include <Windows.h>
 #include "legacy/thread/Mutex.h"
 #include "legacy/thread/Thread.h"
 
@@ -1837,7 +1838,7 @@ void CGpgNetInterface::ConnectThread(
     std::vector<char> commandLine(launchCommand.c_str(), launchCommand.c_str() + launchCommand.size() + 1u);
     char* const argv[] = {shell, dashC, commandLine.data(), nullptr};
     pid_t child = 0;
-    const int spawnError = ::posix_spawn(&child, "/bin/sh", nullptr, nullptr, argv, environ);
+    const int spawnError = ::posix_spawn(&child, "/bin/sh", nullptr, nullptr, argv, platform::posix::Environment());
     if (spawnError != 0) {
       gpg::Logf("CreateProcess() failed: %s", std::strerror(spawnError));
       EnqueueCommand0("LaunchFailed", kNetStateTimedOut);

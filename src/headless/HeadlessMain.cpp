@@ -12,6 +12,8 @@
 #else
 #include <csignal>
 #include <execinfo.h>
+
+#include "platform/posix/SystemPosix.h"
 #endif
 
 #include <algorithm>
@@ -395,6 +397,13 @@ int HEADLESS_Main(
   }
   options.keyframeKeep = moho::CFG_GetArgOption("--keyframe-keep", 0, nullptr);
   options.keyframePrepare = moho::CFG_GetArgOption("--keyframe-prepare", 0, nullptr);
+#if !FAFRE_PLATFORM_WINDOWS
+  // The replay viewer's preparer (moho/sim/ReplayTimeline.cpp) ends with the game that started it;
+  // on Windows the game's job object does that.
+  if (int parent = 0; ReadIntOption("--keyframe-parent", parent, bad)) {
+    platform::posix::ExitWithParent(parent);
+  }
+#endif
   (void)ReadOption("--resume-from", options.resumeFrom);
   std::vector<int> seekPlan;
   {

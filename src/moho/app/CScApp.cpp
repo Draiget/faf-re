@@ -1732,8 +1732,13 @@ namespace
       return moho::gAppRenderers;
     }
     const auto explicitApi = [](const DeviceApi api) {
+#if FAFRE_PLATFORM_POSIX
+      // Vulkan is the POSIX clients' only renderer (cmake/FafPosixClient.cmake): no Direct3D 9 to fall back to.
+      return std::vector<DeviceApi>{api};
+#else
       return (api == DeviceApi::Direct3D9) ? std::vector<DeviceApi>{api}
                                            : std::vector<DeviceApi>{api, DeviceApi::Direct3D9};
+#endif
     };
     if (moho::CFG_GetArgOption("/D3D10", 0, nullptr)) {
       return {DeviceApi::Direct3D10};
@@ -1768,7 +1773,10 @@ namespace
         return explicitApi(api);
       }
     }
-#if FAFRE_ARCH_X86
+#if FAFRE_PLATFORM_POSIX
+    // The Linux and macOS clients build the Vulkan renderer alone (cmake/FafPosixClient.cmake).
+    return {DeviceApi::Vulkan};
+#elif FAFRE_ARCH_X86
     // The 32-bit build starts Direct3D 11 first: Direct3D 12 there faults the
     // GPU (an SM MMU fault, "device hung") on NVIDIA's 32-bit driver after
     // minutes of play, which the x64 build of the same code does not. It

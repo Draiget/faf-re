@@ -140,12 +140,18 @@ Configuring brings `dependencies/` up to date: it clones missing submodules, fet
 
 ### macOS (Apple silicon)
 
-A native arm64 build with Apple clang (Xcode 16.4 or its Command Line Tools: Apple clang 17.0.0), CMake 3.25+ and Ninja, for macOS 14 or later. It builds the headless simulation and its tests so far; the game client is in progress (#273).
+A native arm64 build with Apple clang (Xcode 16.4 or its Command Line Tools: Apple clang 17.0.0), CMake 3.25+ and Ninja, for macOS 14 or later: the headless simulation and its tests, and the game client (in progress, #273).
 
 ```sh
 cmake --preset macos-clang-arm64-release
 cmake --build --preset macos-clang-arm64-release --target headless   # build/macos-clang-arm64-release/headless
+
+# The game client, in a build tree of its own: Vulkan through MoltenVK, shaders through DXC built from source.
+cmake --preset macos-clang-arm64-release -B build/macos-client -DFAF_POSIX_CLIENT=ON
+cmake --build build/macos-client --target faf_client   # faf_client, libMoltenVK.dylib, libdxcompiler.dylib
 ```
+
+The client runs on the game's files (Forged Alliance's `gamedata`, `fonts`, `sounds`, `movies` and `maps`, and FAF's data folder with `bin/init_faf.lua` and a `fa_path.lua` naming the game folder): `faf_client /init <FAF data>/bin/init_faf.lua /windowed 2048 1280`. Window sizes are in pixels, as on Windows: on a Retina display, 2048×1280 is a 1024×640 window.
 
 Apple silicon has no x87 unit, so the simulation's x87 routines run in software there (`src/legacy/math/X87Soft.cpp`), checked against the x87 unit on x86-64 by `tools/x87-oracle`. A NaN made by an invalid operation has a positive sign on ARM and a negative one on x86; `tests/sim_math/known_macos-arm64.txt` lists the golden cases where that is the only difference.
 

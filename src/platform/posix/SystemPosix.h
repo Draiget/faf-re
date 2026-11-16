@@ -76,6 +76,19 @@ namespace platform::posix
 
   /// The file system mount points, bind mounts included (Linux); empty when the system won't say.
   [[nodiscard]] std::vector<std::string> MountPoints();
+
+  /// The process's environment, as `environ` (which macOS doesn't declare for executables) holds it,
+  /// for posix_spawn.
+  [[nodiscard]] char** Environment() noexcept;
+
+  /**
+   * Ends this process, without cleanup, once the process `parent` has exited, and at once when it
+   * already has or is not this process's parent. For a helper the game starts and doesn't wait for
+   * (the replay viewer's keyframe preparer, moho/sim/ReplayTimeline.cpp), so it can't outlive the
+   * game. Linux arms PR_SET_PDEATHSIG; macOS, which has no such call, watches the parent with kqueue
+   * on a thread of its own.
+   */
+  void ExitWithParent(int parent) noexcept;
 } // namespace platform::posix
 
 #endif

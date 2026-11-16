@@ -56,4 +56,8 @@ namespace platform::window::sdl
   void QueueEvent(const Event& event);
   // The handler platform::window::SetCursorRequestHandler set, or null.
   [[nodiscard]] bool CallCursorRequestHandler(SDL_Window* window);
+  // A size the engine gives in pixels (as GetBounds reports it) in SDL's window units, which are
+  // points on a display with more than one pixel per point (a Retina display's 2.0), for
+  // SDL_SetWindowSize. The same number where pixels and window units match (Windows).
+  [[nodiscard]] int PixelsToWindowUnits(SDL_Window* window, int pixels);
 } // namespace platform::window::sdl

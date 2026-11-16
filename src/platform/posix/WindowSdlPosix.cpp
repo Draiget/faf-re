@@ -88,7 +88,11 @@ namespace
       (void)SDL_SetWindowPosition(AsWindow(window), x, y);
     }
     if ((flags & SWP_NOSIZE) == 0u) {
-      (void)SDL_SetWindowSize(AsWindow(window), width, height);
+      (void)SDL_SetWindowSize(
+        AsWindow(window),
+        platform::window::sdl::PixelsToWindowUnits(AsWindow(window), width),
+        platform::window::sdl::PixelsToWindowUnits(AsWindow(window), height)
+      );
     }
   }
 

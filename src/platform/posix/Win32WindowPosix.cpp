@@ -21,9 +21,10 @@
 
 #include <execinfo.h>
 #include <spawn.h>
-#include <unistd.h> // environ
 
 #include <Windows.h>
+
+#include "platform/posix/SystemPosix.h" // Environment
 
 namespace
 {
@@ -148,7 +149,7 @@ namespace platform::posix
     std::string url = utf8Url;
     char* const arguments[] = {program, url.data(), nullptr};
     pid_t child = 0;
-    if (::posix_spawnp(&child, program, nullptr, nullptr, arguments, environ) != 0) {
+    if (::posix_spawnp(&child, program, nullptr, nullptr, arguments, platform::posix::Environment()) != 0) {
       std::fprintf(stderr, "OpenUrl: could not start xdg-open\n");
     }
     // The child is not waited for; SIGCHLD's default disposition leaves a zombie until exit,
