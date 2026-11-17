@@ -49,7 +49,7 @@ namespace moho
     const EEntityIdBitMask rhs
   ) noexcept
   {
-    return static_cast<EEntityIdBitMask>(static_cast<std::uint32_t>(lhs) | static_cast<std::uint32_t>(rhs));
+    return static_cast<EEntityIdBitMask>(std::to_underlying(lhs) | std::to_underlying(rhs));
   }
 
   [[nodiscard]] constexpr EEntityIdBitMask operator&(
@@ -57,7 +57,7 @@ namespace moho
     const EEntityIdBitMask rhs
   ) noexcept
   {
-    return static_cast<EEntityIdBitMask>(static_cast<std::uint32_t>(lhs) & static_cast<std::uint32_t>(rhs));
+    return static_cast<EEntityIdBitMask>(std::to_underlying(lhs) & std::to_underlying(rhs));
   }
 
   constexpr std::uint32_t kEntityIdFamilyShift = 28u;
