@@ -279,6 +279,14 @@ endforeach()
 target_include_directories(faf_ffmpeg SYSTEM INTERFACE "${_faf_ffmpeg_prefix}/include")
 target_link_libraries(faf_ffmpeg INTERFACE m)
 
+# What a failed call a Vulkan frame stands on leads to (VulkanFrameFailure.h), as Windows runs it
+# (tests/vulkan): header-only, on the Vulkan headers alone.
+add_executable(faf_vulkan_frame_failure_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/vulkan/FrameFailureTests.cpp")
+target_include_directories(faf_vulkan_frame_failure_tests PRIVATE
+  "${PROJECT_SOURCE_DIR}/src" "${FAF_DEPENDENCIES_DIR}/vulkan/include")
+target_link_libraries(faf_vulkan_frame_failure_tests PRIVATE gtest_main)
+add_test(NAME vulkan_frame_failure COMMAND faf_vulkan_frame_failure_tests)
+
 add_library(faf_client_objs OBJECT ${_faf_client_files})
 if(FAFRE_PLATFORM_MACOS) # APFS is case-insensitive: <windows.h> finds the stand-in Windows.h
   # gpg/gal/backends/common/ImageCodec.h spells <windows.h> for faf_client_imaging, where DirectX-Headers'

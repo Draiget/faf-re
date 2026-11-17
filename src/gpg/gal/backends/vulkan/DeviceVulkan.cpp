@@ -48,6 +48,7 @@
 #include "gpg/gal/RenderTargetContext.hpp"
 #include "gpg/gal/TextureContext.h"
 #include "gpg/gal/VertexBufferContext.hpp"
+#include "VulkanFrameFailure.h"
 #include "VulkanAttachmentBarrier.h"
 #include "VulkanLimits.h"
 #include "VulkanSurface.h"
@@ -1525,6 +1526,7 @@ namespace gpg::gal
     if (GetRuntimeInfo(runtimeInfo)) {
       common::LogRuntimeInfo("Vulkan", runtimeInfo);
     }
+    mSetUp = true;
   }
 
   bool DeviceVulkan::GetRuntimeInfo(
@@ -1601,6 +1603,23 @@ namespace gpg::gal
   // ---------------------------------------------------------------------------
   // Submission
 
+  void DeviceVulkan::CheckFrame(
+    const int line,
+    const VkResult result,
+    const char* const during
+  )
+  {
+    switch (vulkan::JudgeFrameResult(result, mSetUp)) {
+    case vulkan::FrameFailure::None:
+      return;
+    case vulkan::FrameFailure::Throw:
+      CheckVk("DeviceVulkan.cpp", line, result);
+      return;
+    case vulkan::FrameFailure::End:
+      gpg::Die("%s", vulkan::FrameEndMessage(result, vulkan::ResultName(result), during, line).c_str());
+    }
+  }
+
   void DeviceVulkan::BeginCommandBuffer()
   {
     Frame& frame = mFrames[mFrameIndex];
@@ -1611,14 +1630,14 @@ namespace gpg::gal
       info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
       info.commandBufferCount = 1U;
       VkCommandBuffer buffer = VK_NULL_HANDLE;
-      CheckVk("DeviceVulkan.cpp", __LINE__, Vk().vkAllocateCommandBuffers(mDevice, &info, &buffer));
+      CheckFrame(__LINE__, Vk().vkAllocateCommandBuffers(mDevice, &info, &buffer), "allocating a command buffer");
       frame.buffers.push_back(buffer);
     }
     mCommands = frame.buffers[frame.used++];
     VkCommandBufferBeginInfo begin{};
     begin.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
     begin.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-    CheckVk("DeviceVulkan.cpp", __LINE__, Vk().vkBeginCommandBuffer(mCommands, &begin));
+    CheckFrame(__LINE__, Vk().vkBeginCommandBuffer(mCommands, &begin), "beginning a command buffer");
     mViewportDirty = true;
   }
 
@@ -1628,7 +1647,7 @@ namespace gpg::gal
   )
   {
     EndRendering();
-    CheckVk("DeviceVulkan.cpp", __LINE__, Vk().vkEndCommandBuffer(mCommands));
+    CheckFrame(__LINE__, Vk().vkEndCommandBuffer(mCommands), "ending a command buffer");
 
     std::vector<VkSemaphoreSubmitInfo> waits;
     std::vector<VkSemaphoreSubmitInfo> signals;
@@ -1670,7 +1689,7 @@ namespace gpg::gal
     submit.pCommandBufferInfos = &commands;
     submit.signalSemaphoreInfoCount = static_cast<std::uint32_t>(signals.size());
     submit.pSignalSemaphoreInfos = signals.data();
-    CheckVk("DeviceVulkan.cpp", __LINE__, Vk().vkQueueSubmit2(mQueue, 1U, &submit, VK_NULL_HANDLE));
+    CheckFrame(__LINE__, Vk().vkQueueSubmit2(mQueue, 1U, &submit, VK_NULL_HANDLE), "submitting");
     frame.serial = serial;
     // Waited once; later submissions of the frame need not wait again.
     for (SwapChain& swapChain : mSwapChains) {
@@ -1684,8 +1703,22 @@ namespace gpg::gal
       mDynamicConstants = gVulkanDynamicConstants;
     }
     // A submission in the middle of a pass (an upload between BeginPass and
-    // the draw) leaves the pass's draws for the next command buffer.
-    CarryBoundPass();
+    // the draw) leaves the pass's draws for the next command buffer. Its upload memory and set are taken before
+    // that one is begun: once the device is set up, a failure there ends the program, as the next frame would
+    // record into the command buffer just submitted (CheckFrame).
+    try {
+      CarryBoundPass();
+    } catch (const Error& error) {
+      if (!mSetUp) {
+        throw;
+      }
+      gpg::Die(
+        "Vulkan: %s while carrying a pass into the next command buffer (%s(%d)), so the game cannot continue.",
+        error.what(),
+        error.GetFile(),
+        error.GetLine()
+      );
+    }
     CollectCompleted();
     if (!present) {
       BeginCommandBuffer();
@@ -1704,7 +1737,7 @@ namespace gpg::gal
     info.semaphoreCount = 1U;
     info.pSemaphores = &mTimeline;
     info.pValues = &serial;
-    CheckVk("DeviceVulkan.cpp", __LINE__, Vk().vkWaitSemaphores(mDevice, &info, ~0ULL));
+    CheckFrame(__LINE__, Vk().vkWaitSemaphores(mDevice, &info, ~0ULL), "waiting for a submission");
   }
 
   void DeviceVulkan::CollectCompleted()
@@ -1776,6 +1809,8 @@ namespace gpg::gal
         }
       } else if (result == VK_ERROR_OUT_OF_DATE_KHR && swapChain.scaled) {
         swapChain.stale = true;
+      } else if (result == VK_ERROR_DEVICE_LOST) {
+        CheckFrame(__LINE__, result, "acquiring a swap-chain image");
       } else {
         gpg::Warnf(
           "Vulkan: acquiring head %u's image failed (%s)", static_cast<unsigned>(index), vulkan::ResultName(result)
@@ -3299,7 +3334,7 @@ namespace gpg::gal
       present.pImageIndices = &swapChain.acquired;
       const VkResult result = Vk().vkQueuePresentKHR(mQueue, &present);
       if (result == VK_ERROR_DEVICE_LOST) {
-        CheckVk("DeviceVulkan.cpp", __LINE__, result);
+        CheckFrame(__LINE__, result, "presenting");
       } else if (swapChain.scaled && (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR)) {
         swapChain.stale =
           swapChain.stale || result == VK_ERROR_OUT_OF_DATE_KHR || SuboptimalSwapChainIsStale(swapChain);
@@ -3318,7 +3353,7 @@ namespace gpg::gal
     Frame& frame = mFrames[mFrameIndex];
     WaitForSerial(frame.serial);
     CollectCompleted();
-    CheckVk("DeviceVulkan.cpp", __LINE__, Vk().vkResetCommandPool(mDevice, frame.pool, 0U));
+    CheckFrame(__LINE__, Vk().vkResetCommandPool(mDevice, frame.pool, 0U), "resetting a command pool");
     frame.used = 0U;
     for (VkDescriptorPool pool : frame.descriptorPools) {
       Vk().vkResetDescriptorPool(mDevice, pool, 0U);

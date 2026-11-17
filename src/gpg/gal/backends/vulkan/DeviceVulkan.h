@@ -370,6 +370,13 @@ namespace gpg::gal
     void Shutdown() noexcept;
     void ResetState();
 
+    /**
+     * The result of a call the frame stands on: getting, beginning, ending, submitting or waiting for a command
+     * buffer, and VK_ERROR_DEVICE_LOST from an acquire or a present. Once the device is set up a failure ends the
+     * program with the cause, through the engine's crash report; during Setup it throws, as CheckVk does
+     * (VulkanFrameFailure.h).
+     */
+    void CheckFrame(int line, VkResult result, const char* during);
     void BeginCommandBuffer();
     void Submit(bool wait, bool present);
     void WaitForSerial(std::uint64_t serial);
@@ -458,6 +465,7 @@ namespace gpg::gal
     bool mTessellationSupported = false; // engine addition: tessellated passes draw only with it
     bool mDepthBiasClamp = false;        // the depthBiasClamp feature: pipelines keep the rasterizer state's clamp
     bool mMemoryBudget = false;          // VK_EXT_memory_budget enabled
+    bool mSetUp = false;                 // Setup is done: a failed frame ends the program (CheckFrame)
     std::string mDriverName;             // VkPhysicalDeviceDriverProperties driverName + driverInfo
     VkFormat mDepthStencilFormat = VK_FORMAT_D24_UNORM_S8_UINT;
 
