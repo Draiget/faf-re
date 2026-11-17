@@ -63,4 +63,6 @@ namespace moho
   [[nodiscard]] ShaderVar& GetWater2WaterElevationTShorelineShaderVar();
   /** Engine addition (ren_WaterDetail): `water2/WaterHdEnabled`, 1 draws water_hd.fx's water (where it is appended). */
   [[nodiscard]] ShaderVar& GetWater2WaterHdEnabledShaderVar();
+  /** Engine addition (ren_WaterDetail): `water2/WaterHdNoise`, the random-value texture water_hd.fx reads. */
+  [[nodiscard]] ShaderVar& GetWater2WaterHdNoiseShaderVar();
 } // namespace moho

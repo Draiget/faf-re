@@ -148,6 +148,63 @@ namespace moho
       return lookupTexture;
     }
 
+    // Engine addition (ren_WaterDetail): water_hd.fx's noise texture (`WaterHdNoise`), 256x256 8-bit RGBA, the
+    // format the terrain's noise fill uses. One per process, released with the Fresnel lookup texture in Destroy().
+    constexpr int kWaterHdNoiseTextureSize = 256;
+    constexpr int kWaterHdNoiseTextureFormat = 2;
+    std::shared_ptr<ID3DTextureSheet> sWaterHdNoiseTexture{};
+
+    /** A 32-bit integer hash (Chris Wellons' lowbias32): every input bit changes about half the output bits. */
+    [[nodiscard]] constexpr std::uint32_t WaterHdNoiseHash(
+      std::uint32_t value
+    ) noexcept
+    {
+      value ^= value >> 16U;
+      value *= 0x7FEB352DU;
+      value ^= value >> 15U;
+      value *= 0x846CA68BU;
+      value ^= value >> 16U;
+      return value;
+    }
+
+    /**
+     * Engine addition (ren_WaterDetail): fills the tiling noise texture water_hd.fx reads for its caustics,
+     * sparkles and foam, four independent random bytes per texel from a fixed hash of the texel's index (the same
+     * pattern on every machine). The shader reads it with filtering at a smoothstep-remapped position, which gives
+     * the smooth value noise that hashing four lattice corners per pixel gave, for one texture read.
+     */
+    [[nodiscard]] std::shared_ptr<ID3DTextureSheet> BuildWaterHdNoiseTexture()
+    {
+      ID3DDeviceResources::DynamicTextureSheetHandle noiseTexture{};
+      ID3DDeviceResources* const resources = D3D_GetDevice()->GetResources();
+      (void)resources->CreateDynamicTextureSheet2(
+        noiseTexture, kWaterHdNoiseTextureSize, kWaterHdNoiseTextureSize, kWaterHdNoiseTextureFormat
+      );
+
+      std::uint32_t pitchBytes = 0U;
+      void* lockBits = nullptr;
+      if (!noiseTexture || !noiseTexture->Lock(&pitchBytes, &lockBits)) {
+        return {};
+      }
+
+      auto* row = static_cast<std::uint8_t*>(lockBits);
+      for (int rowIndex = 0; rowIndex < kWaterHdNoiseTextureSize; ++rowIndex) {
+        for (int columnIndex = 0; columnIndex < kWaterHdNoiseTextureSize; ++columnIndex) {
+          const auto texel = static_cast<std::uint32_t>(rowIndex * kWaterHdNoiseTextureSize + columnIndex);
+          const std::uint32_t random = WaterHdNoiseHash(texel * 0x9E3779B9U + 0x5BD1E995U);
+          std::uint8_t* const write = row + static_cast<std::size_t>(columnIndex) * 4U;
+          write[0] = static_cast<std::uint8_t>(random);
+          write[1] = static_cast<std::uint8_t>(random >> 8U);
+          write[2] = static_cast<std::uint8_t>(random >> 16U);
+          write[3] = static_cast<std::uint8_t>(random >> 24U);
+        }
+        row += pitchBytes;
+      }
+
+      noiseTexture->Unlock();
+      return std::static_pointer_cast<ID3DTextureSheet>(noiseTexture);
+    }
+
     /**
      * Address: 0x00810EA0 (sub_810EA0)
      *
@@ -250,6 +307,8 @@ namespace moho
   void HighFidelityWater::Destroy()
   {
     mFresnelLookupTexture.reset();
+    // Engine addition (ren_WaterDetail): rebuilt on the next detailed-water draw.
+    sWaterHdNoiseTexture.reset();
     DeleteOwned(mVertexSheet);
     DeleteOwned(mIndexSheet);
     mWaterMapTexture.reset();
@@ -380,6 +439,12 @@ namespace moho
     // Engine addition (ren_WaterDetail): which water the pass draws; the effect has the switch only where
     // water_hd.fx is appended (Direct3D 12 and Vulkan), elsewhere this does nothing.
     GetWater2WaterHdEnabledShaderVar().SetFloat(ren_WaterDetail ? 1.0f : 0.0f);
+    if (ren_WaterDetail && GetWater2WaterHdNoiseShaderVar().Exists()) {
+      if (!sWaterHdNoiseTexture) {
+        sWaterHdNoiseTexture = BuildWaterHdNoiseTexture();
+      }
+      BindTextureShaderVar(GetWater2WaterHdNoiseShaderVar(), sWaterHdNoiseTexture);
+    }
 
     // 0x00810D6C: `mov eax, [sWldMap]`, the map the renderer draws (a session's, or the map editor's).
     IWldTerrainRes* const terrainRes = REN_GetTerrainRes();

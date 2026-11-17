@@ -196,6 +196,11 @@ namespace moho
     GetWater2WaterHdEnabledShaderVar,
     "WaterHdEnabled"
   )
+  // Engine addition (ren_WaterDetail): water_hd.fx's noise texture.
+  DEFINE_WATER2_SHADER_VAR_GETTER(
+    GetWater2WaterHdNoiseShaderVar,
+    "WaterHdNoise"
+  )
 } // namespace moho
 
 #undef DEFINE_WATER2_SHADER_VAR_GETTER
