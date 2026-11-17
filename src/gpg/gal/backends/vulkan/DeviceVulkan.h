@@ -427,6 +427,7 @@ namespace gpg::gal
     VkSemaphore mTimeline = VK_NULL_HANDLE;
     std::uint64_t mSubmittedSerial = 0;
     bool mAnisotropy = false;
+    bool mBlockCompression = false; // BC textures; without, BC1 to BC3 decode on the CPU (CreateTexture)
     bool mWireframeSupported = false;
     bool mTessellationSupported = false; // engine addition: tessellated passes draw only with it
     bool mDepthBiasClamp = false;        // the depthBiasClamp feature: pipelines keep the rasterizer state's clamp

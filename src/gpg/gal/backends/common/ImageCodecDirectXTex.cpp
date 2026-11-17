@@ -566,4 +566,46 @@ namespace gpg::gal::imaging
     return S_OK;
 #endif
   }
+
+  HRESULT EncodeBc123WithDirectXTex(
+    const DXGI_FORMAT format,
+    const std::uint8_t* const rgba,
+    const std::uint32_t width,
+    const std::uint32_t height,
+    void* const blocks,
+    const std::size_t rowPitch
+  )
+  {
+    // The bytes as they are: the UNORM forms, so an sRGB format is not converted on the way.
+    DXGI_FORMAT plain = DXGI_FORMAT_BC1_UNORM;
+    if (format >= DXGI_FORMAT_BC2_TYPELESS && format <= DXGI_FORMAT_BC2_UNORM_SRGB) {
+      plain = DXGI_FORMAT_BC2_UNORM;
+    } else if (format >= DXGI_FORMAT_BC3_TYPELESS && format <= DXGI_FORMAT_BC3_UNORM_SRGB) {
+      plain = DXGI_FORMAT_BC3_UNORM;
+    } else if (format < DXGI_FORMAT_BC1_TYPELESS || format > DXGI_FORMAT_BC1_UNORM_SRGB) {
+      return E_INVALIDARG;
+    }
+    DirectX::Image level{};
+    level.width = width;
+    level.height = height;
+    level.format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    level.rowPitch = static_cast<std::size_t>(width) * 4U;
+    level.slicePitch = level.rowPitch * height;
+    level.pixels = const_cast<std::uint8_t*>(rgba);
+    DirectX::ScratchImage compressed;
+    const HRESULT result =
+      DirectX::Compress(level, plain, DirectX::TEX_COMPRESS_DEFAULT, DirectX::TEX_THRESHOLD_DEFAULT, compressed);
+    if (FAILED(result)) {
+      return result;
+    }
+    const DirectX::Image& out = *compressed.GetImage(0U, 0U, 0U);
+    for (std::size_t row = 0U; row * 4U < height; ++row) {
+      std::memcpy(
+        static_cast<std::uint8_t*>(blocks) + row * rowPitch,
+        out.pixels + row * out.rowPitch,
+        std::min(rowPitch, out.rowPitch)
+      );
+    }
+    return S_OK;
+  }
 } // namespace gpg::gal::imaging
