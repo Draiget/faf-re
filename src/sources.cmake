@@ -48,6 +48,7 @@ set(FAF_ENGINE_SOURCES
   gpg/gal/backends/d3d9/StateManagerD3D9.cpp
   legacy/containers/Map.cpp
   legacy/containers/Set.cpp
+  legacy/containers/SlabAllocator.cpp
   legacy/containers/String.cpp
   legacy/exceptions/StdExcept.cpp
   legacy/math/Libm.cpp

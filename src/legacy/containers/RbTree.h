@@ -13,6 +13,18 @@
 #include "legacy/containers/Layout.h"
 #include "legacy/containers/SlabAllocator.h"
 
+// rb_tree has two empty bases (comparator and allocator). The MSVC ABI gives every empty base after the
+// first its own storage unless the class is marked empty_bases, which would add 4 bytes to every set and
+// map on 32-bit Windows; the Itanium ABI (Linux, macOS) lays both out at offset 0 without it.
+#if defined(__has_declspec_attribute)
+#if __has_declspec_attribute(empty_bases)
+#define FA_RB_TREE_EMPTY_BASES __declspec(empty_bases)
+#endif
+#endif
+#ifndef FA_RB_TREE_EMPTY_BASES
+#define FA_RB_TREE_EMPTY_BASES
+#endif
+
 /**
  * \file RbTree.h
  * \brief Shared owning red-black tree used by `fa::set` and `fa::map`.
@@ -2016,11 +2028,14 @@ namespace fa
      * `fa::set` and `fa::map`.
      *
      * Layout (x86): `{_Container_proxy*, _Node*, size_type}` = 12 bytes, with
-     * the comparator empty-base-optimised away.
+     * the comparator and the (empty) `std::allocator` empty-base-optimised away.
+     * 64-bit trees also carry a 32-byte `local_slab_allocator` (SlabAllocator.h) as a base.
      */
     template <class Traits, class Allocator = typename Traits::allocator_type>
-    class rb_tree : private rb_compare_carrier<typename Traits::key_compare>,
-                    private rb_alloc_carrier<typename std::allocator_traits<Allocator>::template rebind_alloc<rb_node<typename Traits::value_type>>>
+    class FA_RB_TREE_EMPTY_BASES rb_tree :
+      private rb_compare_carrier<typename Traits::key_compare>,
+      private rb_alloc_carrier<
+        typename std::allocator_traits<Allocator>::template rebind_alloc<rb_node<typename Traits::value_type>>>
     {
       using carrier = rb_compare_carrier<typename Traits::key_compare>;
 
