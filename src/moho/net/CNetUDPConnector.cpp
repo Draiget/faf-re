@@ -1,6 +1,7 @@
 #include "CNetUDPConnector.h"
 
 #include "moho/net/NetPeerTransport.h"
+#include "remote/net/Datagram.h"
 #include "gpg/core/profiling/Profiler.h"
 
 #include <atomic>
@@ -568,6 +569,20 @@ void CNetUDPConnector::ReceiveData()
     std::vector<SNetDeliveredDatagram> delivered;
     NET_TakeDeliveredDatagrams(this, delivered);
     for (const SNetDeliveredDatagram& d : delivered) {
+      // Engine addition (net_GameChannel): a game channel datagram goes to its connection whole, not through a
+      // shipped packet's 512 bytes.
+      if (!d.bytes.empty() && d.bytes[0] == faf::remote::net::kDatagramTag) {
+        for (auto* connection : mConnections.owners()) {
+          if (
+            connection->GetAddr() == d.addrHost && connection->GetPort() == d.portHost &&
+            connection->IsBeforeErroredState()
+          ) {
+            connection->ProcessGameChannelDatagram(d.bytes.data(), d.bytes.size());
+            break;
+          }
+        }
+        continue;
+      }
       SNetPacket* packet = NewPacket();
       if (!packet) {
         break;

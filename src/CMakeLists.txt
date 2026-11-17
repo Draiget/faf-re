@@ -387,6 +387,8 @@ target_sources(faf_sim INTERFACE ${_faf_sim_objects} "${CMAKE_CURRENT_SOURCE_DIR
 add_dependencies(faf_sim faf_engine)
 target_link_libraries(faf_sim INTERFACE
   faf_sim_settings
+  # The game channel (moho/net/NetGameChannel.cpp) carries connections on the net channel.
+  faf_netchannel
   faf_monocypher
   faf_zstd
   ws2_32 legacy_stdio_definitions legacy_stdio_wide_specifiers

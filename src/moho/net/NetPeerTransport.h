@@ -17,6 +17,8 @@
 #include <memory>
 #include <vector>
 
+#include "remote/net/DatagramCipher.h"
+
 namespace moho
 {
   class CNetUDPConnector;
@@ -28,6 +30,18 @@ namespace moho
     // One datagram the game addressed to this transport's peer. Called on
     // the connector's thread with the connector's lock held; must not block.
     virtual void SendDatagram(const void* data, std::size_t size) = 0;
+
+    // Game channel (net_GameChannel): whether this transport's peer runs our engine and offered the game channel too,
+    // so connections to it carry their stream on a net channel instead of the shipped DATA packets. Both ends answer
+    // the same from the same facts. `keys` receives the channel's keys and `keyed` whether there are any.
+    [[nodiscard]] virtual bool OffersGameChannel(
+      faf::remote::net::ChannelKeys& /*keys*/,
+      bool& keyed
+    ) const
+    {
+      keyed = false;
+      return false;
+    }
   };
 
   // Number of transports registered in all connectors (the fast-path check).
@@ -57,6 +71,16 @@ namespace moho
     std::uint16_t portHost,
     const void* data,
     std::size_t size
+  );
+
+  // Game channel: what OffersGameChannel says for the transport this connector uses for addrHost:portHost; false when
+  // there is none.
+  bool NET_PeerTransportOffersGameChannel(
+    const CNetUDPConnector* connector,
+    std::uint32_t addrHost,
+    std::uint16_t portHost,
+    faf::remote::net::ChannelKeys& keys,
+    bool& keyed
   );
 
   // A transport received a datagram from its peer: queue it for the

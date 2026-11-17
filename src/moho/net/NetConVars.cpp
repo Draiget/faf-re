@@ -19,8 +19,11 @@ namespace moho
   int32_t net_SendDelay = 25;                      // 0x00F58DE4
   int32_t net_MinResendDelay = 100;                // 0x00F58DE8
   int32_t net_MaxResendDelay = 1000;               // 0x00F58DEC
-  int32_t net_MaxSendRate = 2048;                  // 0x00F58DF0
-  int32_t net_MaxBacklog = 2048;                   // 0x00F58DF4
+  // Engine change: 65536 each, not the binary's 2048. At 2048 a large order (44,891 deflated bytes in replay
+  // 27039808) held every later beat for about 21 s (issue #236, docs/NETWORK_MEASUREMENTS.md). Only how fast this side
+  // sends changes, so retail peers are unaffected.
+  int32_t net_MaxSendRate = 65536;                 // 0x00F58DF0 (binary: 2048)
+  int32_t net_MaxBacklog = 65536;                  // 0x00F58DF4 (binary: 2048)
   int32_t net_CompressionMethod = NETCOMP_Deflate; // 0x00F58DF8
   float net_ResendPingMultiplier = 1.0f;           // 0x00F58DFC
   int32_t net_ResendDelayBias = 25;                // 0x00F58E00
@@ -59,8 +62,9 @@ namespace moho
   int32_t net_InEngineLinks = 0;
   // Issue #237: 1 resends a packet early once the peer has 3 later ones
   // (CNetUDPConnection::FastRetransmitFromMask); 0 waits for the resend
-  // timer, as the binary does. Live.
-  int32_t net_FastRetransmit = 0;
+  // timer, as the binary does. Live. On by default: a lost packet comes back about a third sooner
+  // (docs/NETWORK_MEASUREMENTS.md); only this side's timing changes, so retail peers are unaffected.
+  int32_t net_FastRetransmit = 1;
   // Issue #237: with net_FastRetransmit, a packet's first resend is due this
   // many round trips after its send, under net_MinResendDelay and
   // net_ResendDelayBias. The game sends too few packets for acknowledgements to
@@ -99,6 +103,19 @@ namespace moho
   // Above 0: a pause this player sees raises their net_Lag a step, up to this many ms, and a
   // long quiet spell lowers it again; 0 keeps net_Lag as set. Live.
   int32_t net_AdaptiveLagMax = 0;
+  // 1: a beat leaves as soon as the issue thread has written it; 0: it waits net_SendDelay like any other data, as
+  // shipped. Live.
+  int32_t net_FlushBeats = 1;
+  // net_LagAuto (off by default): the order delay from the round trip (LagControl.cpp), within [net_LagMin,
+  // net_LagMax] ms, never past the shipped 500 ms. Live.
+  int32_t net_LagAuto = 0;
+  // The game channel (NetGameChannel.h): offered on native links, with this many repeats of each new range.
+  int32_t net_GameChannel = 1;
+  int32_t net_GameChannelRepeats = 5;
+  int32_t net_GameChannelRepeatMs = 30;
+  int32_t net_GameChannelRepeatHoldMs = 0;
+  int32_t net_LagMin = 100;
+  int32_t net_LagMax = 500;
   NetTrafficTotals gNetTraffic;
   void (*gNetLinkTrafficLog)(int beat) = nullptr;
   // Issue #236, test only: once beat net_TestBurstBeat is available, this game
@@ -113,7 +130,7 @@ namespace moho
     TConVar<int32_t> gTConVar_net_FastRetransmit(
       "net_FastRetransmit",
       "1: resend a packet once the peer has received 3 later ones or after net_FastResendPings round trips, and "
-      "acknowledge within net_FastAckDelay; 0 (default) is as shipped.",
+      "acknowledge within net_FastAckDelay (default); 0 is as shipped.",
       &net_FastRetransmit
     );
 
@@ -155,6 +172,57 @@ namespace moho
       "Above 0: pauses raise this player's net_Lag up to this many ms, and quiet spells lower it again; 0 (default) "
       "keeps net_Lag as set.",
       &net_AdaptiveLagMax
+    );
+
+    TConVar<int32_t> gTConVar_net_FlushBeats(
+      "net_FlushBeats",
+      "1 (default): a beat is sent to the other players as soon as it is written; 0: it waits net_SendDelay first, as "
+      "shipped.",
+      &net_FlushBeats
+    );
+
+    TConVar<int32_t> gTConVar_net_GameChannel(
+      "net_GameChannel",
+      "1 (default): native links offer the game channel, and with a peer that offers it too a connection's stream "
+      "goes on a net channel instead of the shipped packets; 0: shipped packets (on the redundant lane).",
+      &net_GameChannel
+    );
+
+    TConVar<int32_t> gTConVar_net_GameChannelRepeats(
+      "net_GameChannelRepeats",
+      "Game channel: how many times each new range of the stream goes again while unacked, the gap doubling each time "
+      "(default 5).",
+      &net_GameChannelRepeats
+    );
+
+    TConVar<int32_t> gTConVar_net_GameChannelRepeatMs(
+      "net_GameChannelRepeatMs",
+      "Game channel: the first repeat of an unacked range goes this many ms after it was sent; each later one after "
+      "twice "
+      "the gap before (default 30).",
+      &net_GameChannelRepeatMs
+    );
+
+    TConVar<int32_t> gTConVar_net_GameChannelRepeatHoldMs(
+      "net_GameChannelRepeatHoldMs",
+      "Game channel: above 0, repeats only for this many ms after the start and after each loss; 0 (default): always.",
+      &net_GameChannelRepeatHoldMs
+    );
+
+    TConVar<int32_t> gTConVar_net_LagAuto(
+      "net_LagAuto",
+      "1: the order delay follows the round trip to the slowest peer, between net_LagMin and net_LagMax; 0 (default): "
+      "net_Lag as set.",
+      &net_LagAuto
+    );
+
+    TConVar<int32_t>
+      gTConVar_net_LagMin("net_LagMin", "With net_LagAuto: the shortest order delay in ms (default 100).", &net_LagMin);
+
+    TConVar<int32_t> gTConVar_net_LagMax(
+      "net_LagMax",
+      "With net_LagAuto: the longest order delay in ms (default 500, the shipped delay).",
+      &net_LagMax
     );
 
     TConVar<int32_t> gTConVar_net_LogShownBeatMs(

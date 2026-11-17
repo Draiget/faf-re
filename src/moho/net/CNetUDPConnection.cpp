@@ -18,6 +18,7 @@
 #include "gpg/core/utils/Logging.h"
 #include "NetConVars.h"
 #include "NetMessageRanges.h"
+#include "NetGameChannel.h"
 #include "NetPeerTransport.h"
 #include "legacy/thread/Mutex.h"
 using namespace moho;
@@ -410,6 +411,8 @@ CNetUDPConnection::~CNetUDPConnection()
     gReadyCarriers.end()
   );
 
+  NET_ForgetGameChannel(this); // engine addition (net_GameChannel)
+
   constexpr int poolCap = 0x14u;
 
   auto recyclePacket = [this](SNetPacket* p) noexcept {
@@ -468,6 +471,9 @@ void CNetUDPConnection::CreateFilterStream()
 
   CMessage msg(ELobbyMsg::LOBMSG_ConnMade);
   mInputBuffer.Write(msg.mBuff.Data(), msg.mBuff.Size());
+
+  // Engine addition (net_GameChannel): from here on the stream may travel on the game channel.
+  (void)StartGameChannel();
 
   if (mReceivedCompressionMethod == NETCOMP_None) {
     gpg::Logf("NET: using no compression for receives from %s", ToString().c_str());
@@ -1206,6 +1212,9 @@ int CNetUDPConnection::SendData()
         );
       }
       mState = kNetStateTimedOut;
+    } else if (InGameChannel()) {
+      // Engine addition (net_GameChannel): the stream goes on the game channel.
+      return GameChannelSendData(curTime);
     } else {
       SNetPacket* packet = nullptr;
       if (!mUnAckedPayloads.empty() && curTime >= mUnAckedPayloads.ListGetNext()->mSentTime) {
@@ -2000,52 +2009,9 @@ void CNetUDPConnection::ConsumePacketHeaderData(
   const uint16_t payloadLen = packet->header.mPayloadLength;
 
   if (payloadLen != 0) {
-    const auto payload = reinterpret_cast<const char*>(&packet->data[0]);
-
-    // Stats
-    mTotalBytesReceived += payloadLen;
-    mTotalBytesReceivedMD5.Update(payload, payloadLen);
-
-    // Write through filter if present
-    try {
-      if (mFilterStream) {
-        mFilterStream->Write(payload, payloadLen);
-      } else {
-        mInputBuffer.Write(payload, payloadLen);
-      }
-    } catch (const std::exception& e) {
-      // 0x0048710B: the peer's deflate data is corrupt.
-      gpg::Logf("Error decompressing data from %s: %s", ToString().c_str(), e.what());
-      AbortInput();
-    }
-
-    // The game thread has fallen this far behind, or a small deflate stream
-    // has expanded this far: either way the peer is not playing.
-    if (!mReceivedEndOfInput && mInputBuffer.GetLength() > kMaxBufferedInputBytes) {
-      gpg::Logf(
-        "CNetUDPConnection<%u,%s>: over %u bytes received and not yet dispatched, dropping input.",
-        mConnector->GetLocalPort(),
-        ToString().c_str(),
-        static_cast<unsigned>(kMaxBufferedInputBytes)
-      );
-      AbortInput();
-    }
+    ConsumeInputBytes(reinterpret_cast<const char*>(&packet->data[0]), payloadLen);
   } else {
-    // End-of-input marker
-    if (mFilterStream) {
-      try {
-        mFilterStream->Close(gpg::Stream::ModeBoth);
-      } catch (const std::exception& e) {
-        // 0x004871E9: end of input before the deflate stream ended.
-        gpg::Logf("Error decompressing data from %s: %s", ToString().c_str(), e.what());
-        mState = kNetStateErrored;
-      }
-      const auto* z = mFilterStream;
-      mFilterStream = nullptr;
-      delete z;
-    }
-    mInputBuffer.Close(gpg::Stream::ModeBoth);
-    mReceivedEndOfInput = true;
+    ConsumeEndOfInput();
   }
 
   // Advance expected sequence
@@ -2055,6 +2021,59 @@ void CNetUDPConnection::ConsumePacketHeaderData(
   if (mConnector) {
     mConnector->AddPacket(packet);
   }
+}
+
+void CNetUDPConnection::ConsumeInputBytes(
+  const char* const payload,
+  const std::size_t size
+)
+{
+  // Stats
+  mTotalBytesReceived += static_cast<std::int64_t>(size);
+  mTotalBytesReceivedMD5.Update(payload, size);
+
+  // Write through filter if present
+  try {
+    if (mFilterStream) {
+      mFilterStream->Write(payload, size);
+    } else {
+      mInputBuffer.Write(payload, size);
+    }
+  } catch (const std::exception& e) {
+    // 0x0048710B: the peer's deflate data is corrupt.
+    gpg::Logf("Error decompressing data from %s: %s", ToString().c_str(), e.what());
+    AbortInput();
+  }
+
+  // The game thread has fallen this far behind, or a small deflate stream
+  // has expanded this far: either way the peer is not playing.
+  if (!mReceivedEndOfInput && mInputBuffer.GetLength() > kMaxBufferedInputBytes) {
+    gpg::Logf(
+      "CNetUDPConnection<%u,%s>: over %u bytes received and not yet dispatched, dropping input.",
+      mConnector->GetLocalPort(),
+      ToString().c_str(),
+      static_cast<unsigned>(kMaxBufferedInputBytes)
+    );
+    AbortInput();
+  }
+}
+
+void CNetUDPConnection::ConsumeEndOfInput()
+{
+  if (mFilterStream) {
+    try {
+      mFilterStream->Close(gpg::Stream::ModeBoth);
+    } catch (const std::exception& e) {
+      // 0x004871E9: end of input before the deflate stream ended.
+      gpg::Logf("Error decompressing data from %s: %s", ToString().c_str(), e.what());
+      mState = kNetStateErrored;
+    }
+    const auto* z = mFilterStream;
+    mFilterStream = nullptr;
+    delete z;
+  }
+  mInputBuffer.Close(gpg::Stream::ModeBoth);
+  mReceivedEndOfInput = true;
 }
 
 /**

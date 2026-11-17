@@ -39,6 +39,7 @@ namespace faf::remote::net
     mStats.rtoUs = Rto();
     mStats.reorderThreshold = mConfig.lossThreshold;
     mNextSequence = std::max<std::uint32_t>(mConfig.firstSequence, 1);
+    mSender.SetRepeats(mConfig.reliableRepeats, mConfig.redundantRepeatUs, mConfig.reliableRepeatMaxInFlight);
   }
 
   NetChannel::~NetChannel()
@@ -342,6 +343,9 @@ namespace faf::remote::net
         --mStats.inboundMissing;
       }
     }
+    // The path is back after a silence: resend what is in flight now rather than when its doubled timer runs out.
+    const bool afterSilence = mConfig.resendAfterSilenceUs != 0 && mStats.datagramsReceived != 0 &&
+      nowUs - mLastReceivedUs >= mConfig.resendAfterSilenceUs;
     mLastReceivedUs = nowUs;
     ++mStats.datagramsReceived;
     mStats.bytesReceived += size;
@@ -350,6 +354,16 @@ namespace faf::remote::net
     }
 
     ProcessAcks(header, ackBlocks, nowUs);
+    if (afterSilence) {
+      ++mStats.silenceRecoveries;
+      for (SentDatagram& sent : mSent) {
+        if (!sent.acked && !sent.lost && sent.reliableBytes != 0) {
+          Resolve(sent, false);
+        }
+      }
+      mBackoff = 0;
+      DropSettled(nowUs);
+    }
 
     for (const ParsedChunk& chunk : chunks) {
       if (chunk.type == kChunkReliable) {
@@ -590,6 +604,21 @@ namespace faf::remote::net
     }
 
     DetectLoss(nowUs);
+    mSender.SetNow(nowUs);
+    if (mConfig.reliableRepeats > 0 && mConfig.reliableRepeatHoldUs != 0) {
+      // Repeats while losing: on for the hold after the start and after each loss, off on a clean link.
+      if (mRepeatsUntilUs == 0 || mStats.datagramsLost != mLostSeen) {
+        mRepeatsUntilUs = nowUs + mConfig.reliableRepeatHoldUs;
+        mLostSeen = mStats.datagramsLost;
+      }
+      const bool active = nowUs < mRepeatsUntilUs;
+      if (active != mStats.reliableRepeatsActive) {
+        mSender.SetRepeatsActive(active);
+      }
+      mStats.reliableRepeatsActive = active;
+    } else {
+      mStats.reliableRepeatsActive = mConfig.reliableRepeats > 0;
+    }
 
     const std::size_t budget = PayloadBudget();
     std::vector<std::uint8_t> payload;
@@ -606,7 +635,8 @@ namespace faf::remote::net
         return !m.sent;
       });
       const bool fresh = laneNew || !mUnreliableOut.empty() || mSender.HasPending();
-      const bool repeatDue = HasLaneRepeats() && nowUs - mLastLaneRepeatUs >= mConfig.redundantRepeatUs;
+      const bool repeatDue =
+        (HasLaneRepeats() && nowUs - mLastLaneRepeatUs >= mConfig.redundantRepeatUs) || mSender.RepeatDue(nowUs);
       if (!fresh && !(repeatDue && produced == 0)) {
         break;
       }
@@ -642,6 +672,14 @@ namespace faf::remote::net
       if (budget > writer.Size()) {
         mSender.Write(writer, budget - writer.Size(), reliable);
       }
+      // Repeats of reliable ranges still unacked ride in the room left, or go alone once the repeat interval passed.
+      if (mConfig.reliableRepeats > 0 && budget > writer.Size()) {
+        const std::uint64_t repeatedBefore = mSender.BytesRepeated();
+        mSender.WriteRepeats(writer, budget - writer.Size(), reliable, nowUs);
+        if (mSender.BytesRepeated() != repeatedBefore) {
+          mLastLaneRepeatUs = nowUs;
+        }
+      }
       if (payload.size() == dataStart) {
         break;
       }
@@ -664,6 +702,7 @@ namespace faf::remote::net
       }
     }
     mStats.reliableBytesResent = mSender.BytesResent();
+    mStats.reliableBytesRepeated = mSender.BytesRepeated();
   }
 
   void NetChannel::Emit(
@@ -771,5 +810,6 @@ namespace faf::remote::net
     mRecentNext = (mRecentNext + 1) % kRecentWindow;
     mStats.lossRecent = static_cast<double>(mRecentLost) / static_cast<double>(mRecentCount);
     mStats.reliableBytesResent = mSender.BytesResent();
+    mStats.reliableBytesRepeated = mSender.BytesRepeated();
   }
 } // namespace faf::remote::net

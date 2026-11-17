@@ -454,6 +454,12 @@ namespace moho
     virtual void ProcessClients(CMessage& msg);
 
     /**
+     * Engine addition (net_FlushBeats): sends what the connections hold now, without waiting for net_SendDelay. The
+     * marshaller calls it once a beat's orders and its end are written, so the beat leaves whole and at once.
+     */
+    void FlushConnections();
+
+    /**
      * Address: 0x0053EA30
      * Slot: 18
      */

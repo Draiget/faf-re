@@ -172,8 +172,70 @@ namespace faf::remote::net
       const std::uint64_t size = std::min<std::uint64_t>(limit - mNextNew, budget - header);
       WriteChunk(out, mNextNew, &mBuffer[static_cast<std::size_t>(mNextNew - mBase)], static_cast<std::size_t>(size));
       sent.push_back({mNextNew, mNextNew + size});
+      if (mRepeats > 0 && mRepeatsActive && InFlight() + size <= mRepeatMaxInFlight) {
+        mRepeatQueue.push_back({mNextNew, mNextNew + size, mRepeats, mNowUs + mRepeatFirstGapUs, mRepeatFirstGapUs});
+      }
       mNextNew += size;
       budget -= header + static_cast<std::size_t>(size);
+    }
+  }
+
+  bool ReliableSender::RepeatDue(
+    const std::uint64_t nowUs
+  ) const noexcept
+  {
+    if (InFlight() > mRepeatMaxInFlight) {
+      return false;
+    }
+    const std::uint64_t prefix = mAcked.PrefixEnd();
+    return std::any_of(mRepeatQueue.begin(), mRepeatQueue.end(), [&](const Repeat& r) {
+      return r.left > 0 && r.end > prefix && nowUs >= r.dueUs;
+    });
+  }
+
+  void ReliableSender::WriteRepeats(
+    ByteWriter& out,
+    std::size_t budget,
+    std::vector<StreamRange>& sent,
+    const std::uint64_t nowUs
+  )
+  {
+    if (InFlight() > mRepeatMaxInFlight) {
+      mRepeatQueue.clear(); // bulk data on the way: loss detection repairs it, repeats would only crowd the uplink
+      return;
+    }
+    std::vector<StreamRange> missing;
+    for (auto it = mRepeatQueue.begin(); it != mRepeatQueue.end();) {
+      missing.clear();
+      mAcked.Missing(it->begin, it->end, missing);
+      if (missing.empty() || it->left == 0) {
+        it = mRepeatQueue.erase(it);
+        continue;
+      }
+      if (nowUs < it->dueUs) {
+        ++it;
+        continue;
+      }
+      std::size_t need = 0;
+      for (const StreamRange& part : missing) {
+        need += 1 + VarintSize(part.begin) + VarintSize(part.end - part.begin) +
+          static_cast<std::size_t>(part.end - part.begin);
+      }
+      if (need > budget) {
+        ++it; // whole ranges only: this one goes in a later datagram, the smaller ones behind it may fit now
+        continue;
+      }
+      for (const StreamRange& part : missing) {
+        const auto size = static_cast<std::size_t>(part.end - part.begin);
+        WriteChunk(out, part.begin, &mBuffer[static_cast<std::size_t>(part.begin - mBase)], size);
+        sent.push_back(part);
+        mBytesRepeated += size;
+      }
+      budget -= need;
+      --it->left;
+      it->gapUs *= 2;
+      it->dueUs = nowUs + it->gapUs;
+      ++it;
     }
   }
 

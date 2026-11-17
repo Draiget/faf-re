@@ -123,7 +123,8 @@ namespace faf::netlink
       return std::nullopt;
     }
     ufrag.remove_prefix(prefix.size());
-    for (const std::string_view mark : {std::string_view("w+"), std::string_view("c+")}) {
+    // "s+" (the game channel, net_GameChannel) comes after "c+".
+    for (const std::string_view mark : {std::string_view("w+"), std::string_view("c+"), std::string_view("s+")}) {
       if (ufrag.starts_with(mark)) {
         ufrag.remove_prefix(mark.size());
       }

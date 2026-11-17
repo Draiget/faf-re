@@ -196,7 +196,13 @@ namespace moho
         );
         out += "peer " + PeerName(p) + ": " + p.state + ", attempts " + std::to_string(p.attempts) + ", " +
           NETPANEL_PathText(p) + " (picked: " + faf::netlink::PathChoiceText(p.choice) + "), round trip " + RttText(p) +
-          ", lane " + (p.onLane ? (p.laneEncrypted ? "encrypted" : "plain") : "off") + ", " + counts + "\r\n";
+          ", lane " +
+          std::string(
+                 p.gameChannel ? (p.gameChannelEncrypted ? "game channel, encrypted" : "game channel")
+                   : p.onLane  ? (p.laneEncrypted ? "encrypted" : "plain")
+                               : "off"
+          ) +
+          ", " + counts + "\r\n";
       }
       if (!view.log.empty()) {
         out += "latest network log lines:\r\n";

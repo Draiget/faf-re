@@ -427,7 +427,9 @@ namespace moho
           p.rttMs >= 0 ? Format("%.1f ms", p.rttMs) : "-",
           p.received > 0 ? Format("%.2f %%", p.lossPercent) : "-",
           std::to_string(p.resends),
-          p.onLane ? (p.laneEncrypted ? "encrypted" : "plain") : "off",
+          p.gameChannel ? (p.gameChannelEncrypted ? "channel, encrypted" : "channel")
+            : p.onLane  ? (p.laneEncrypted ? "encrypted" : "plain")
+                        : "off",
           nl::PathChoiceText(p.choice),
         });
       }

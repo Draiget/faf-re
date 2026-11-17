@@ -31,6 +31,8 @@ namespace moho
     double rttMs = -1;          // the offerer's echo, else the lane's RTT; -1 when neither has a sample
     bool onLane = false;        // the redundant lane (#240)
     bool laneEncrypted = false; // #289
+    bool gameChannel = false;   // net_GameChannel: connections to this peer use the game channel
+    bool gameChannelEncrypted = false;
     std::uint32_t attempts = 0;
     faf::netlink::PathChoice choice; // the path picked in the panel (#322)
     // The game protocol's own counts on this link (netlink/GameCounters.h).

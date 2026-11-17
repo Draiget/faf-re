@@ -4,7 +4,7 @@
 // agreed per connection attempt. Engine addition, not recovered code.
 //
 // Each attempt makes a new X25519 key pair. Its public key goes in the ICE
-// ufrag, after the other marks: "fnl+" ["w+"] "c+" "k+" <64 lowercase hex>.
+// ufrag, after the other marks: "fnl+" ["w+"] "c+" ["s+"] "k+" <64 lowercase hex>.
 // The ufrag already travels in the CandidatesMessage through iceMsg, so no new
 // message is needed and nothing secret is sent. Both lane keys come from
 // BLAKE2b over the X25519 result and both public keys, one per direction.
@@ -63,7 +63,7 @@ namespace faf::netlink
   // "k+" and the key as 64 lowercase hex digits.
   std::string KeyMarkFor(const LinkPublicKey& key);
 
-  // The key a marked ufrag offers: `prefix`, then "w+" and "c+" if present,
+  // The key a marked ufrag offers: `prefix`, then "w+", "c+" and "s+" if present,
   // then "k+" and exactly 64 lowercase hex digits to the end. None otherwise,
   // which is how a Java adapter's, an older build's or a garbled ufrag reads.
   std::optional<LinkPublicKey> KeyFromUfrag(std::string_view ufrag, std::string_view prefix);

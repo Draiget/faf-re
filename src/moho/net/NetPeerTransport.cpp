@@ -89,6 +89,35 @@ namespace moho
     }
   }
 
+  bool NET_PeerTransportOffersGameChannel(
+    const CNetUDPConnector* connector,
+    const std::uint32_t addrHost,
+    const std::uint16_t portHost,
+    faf::remote::net::ChannelKeys& keys,
+    bool& keyed
+  )
+  {
+    keyed = false;
+    std::shared_ptr<INetPeerTransport> transport;
+    {
+      TransportTable& table = Table();
+      std::lock_guard lock(table.lock);
+      const AddressKey key = std::make_pair(addrHost, portHost);
+      for (const CNetUDPConnector* owner : {connector, static_cast<const CNetUDPConnector*>(nullptr)}) {
+        const auto c = table.connectors.find(owner);
+        if (c == table.connectors.end()) {
+          continue;
+        }
+        const auto it = c->second.transports.find(key);
+        if (it != c->second.transports.end()) {
+          transport = it->second;
+          break;
+        }
+      }
+    }
+    return transport && transport->OffersGameChannel(keys, keyed);
+  }
+
   bool NET_SendThroughPeerTransport(
     const CNetUDPConnector* connector,
     const std::uint32_t addrHost,

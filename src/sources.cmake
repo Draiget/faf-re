@@ -239,6 +239,8 @@ set(FAF_ENGINE_SOURCES
   moho/net/Common.cpp
   platform/windows/NetWindows.cpp
   moho/net/NetConVars.cpp
+  moho/net/LagControl.cpp
+  moho/net/NetGameChannel.cpp
   moho/net/NetPeerTransport.cpp
   moho/net/NetlinkPeers.cpp
   moho/net/IClient.cpp

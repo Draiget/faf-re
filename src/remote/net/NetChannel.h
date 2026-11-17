@@ -66,8 +66,26 @@ namespace faf::remote::net
     std::uint32_t firstSequence = 1;
     /** SendRedundant: how many later datagrams repeat each message (0: none). */
     std::uint32_t redundancy = 2;
-    /** With nothing new to send, unacked redundant messages go again this often. */
+    /** With nothing new to send, unacked redundant messages (and reliable repeats) go again this often. */
     std::uint64_t redundantRepeatUs = 30'000;
+    /**
+     * SendReliable: how many times each newly sent range goes again while it is unacked, redundantRepeatUs after it
+     * was sent, then twice that later, four times and so on (0: none, the stream relies on loss detection alone).
+     */
+    std::uint32_t reliableRepeats = 0;
+    /** Reliable repeats only while at most this many reliable bytes are in flight (a beat is tens of bytes). */
+    std::uint64_t reliableRepeatMaxInFlight = 4096;
+    /**
+     * Reliable repeats only for this long after the channel starts and after each datagram counted lost, so a clean
+     * link sends no copies and a lossy one repeats while it loses. 0: always.
+     */
+    std::uint64_t reliableRepeatHoldUs = 0;
+    /**
+     * A datagram after this long without one means the path is back (an outage, a route change): whatever is in
+     * flight is resent at once and the timeout backoff starts over, instead of waiting out a timer that doubled
+     * through the outage. 0: off.
+     */
+    std::uint64_t resendAfterSilenceUs = 0;
     std::uint64_t ackDelayUs = 10'000;
     /** The most ack delay a peer's report may take off an RTT sample; added to the RTO. */
     std::uint64_t maxAckDelayUs = 25'000;
@@ -145,6 +163,12 @@ namespace faf::remote::net
     std::uint64_t redundantReceived = 0;
     std::uint64_t redundantDuplicates = 0;
     std::uint64_t reliableBytesResent = 0;
+    /** Reliable bytes sent again as repeats (ChannelConfig::reliableRepeats). */
+    std::uint64_t reliableBytesRepeated = 0;
+    /** Times a datagram ended a silence of resendAfterSilenceUs and everything in flight went again. */
+    std::uint64_t silenceRecoveries = 0;
+    /** Whether reliable repeats are on now (reliableRepeatHoldUs). */
+    bool reliableRepeatsActive = false;
     /** Lost share of the last 256 ack-eliciting datagrams resolved (acked or counted lost;
      * a later spurious ack does not change it). */
     double lossRecent = 0.0;
@@ -325,6 +349,8 @@ namespace faf::remote::net
     std::size_t mRecentLost = 0;
     std::deque<LaneMessage> mLaneOut; // by lane sequence
     std::uint32_t mNextLaneSequence = 1;
+    std::uint64_t mRepeatsUntilUs = 0; // reliableRepeatHoldUs: repeats on until then (0: not started)
+    std::uint64_t mLostSeen = 0;       // datagramsLost when Poll last looked
     std::uint64_t mLastLaneRepeatUs = 0;
 
     // Receiving.

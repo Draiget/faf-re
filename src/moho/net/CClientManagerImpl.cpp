@@ -4,7 +4,9 @@
 #include "CMessageStream.h"
 #include "CNetClient.h"
 #include "CNetUDPConnection.h"
+#include "CNetUDPConnector.h"
 #include "CNullClient.h"
+#include "LagControl.h"
 #include "CReplayClient.h"
 #include "EClientMsg.h"
 #include "ECmdStreamOp.h"
@@ -724,6 +726,22 @@ void CMarshaller::AdvanceBeat(
   CMessageStream stream{message};
   stream.Write(beatDelta);
   mClientManager->ProcessClients(message);
+  // Engine addition (net_FlushBeats): the beat is complete, so it leaves now rather than net_SendDelay (25 ms) later.
+  // Only when it is sent changes; the bytes and their order are the same.
+  if (net_FlushBeats != 0) {
+    mClientManager->FlushConnections();
+  }
+}
+
+void CClientManagerImpl::FlushConnections()
+{
+  std::scoped_lock lock(mLock);
+  // Only the UDP connector: its Push flushes under its own lock and wakes its thread. A game on the TCP protocol
+  // keeps the shipped timing; CNetTCPConnector::Push walks its connections without a lock and may delete one, and
+  // nothing called it during a game before.
+  if (auto* const udp = dynamic_cast<CNetUDPConnector*>(mConnector); udp != nullptr) {
+    udp->Push();
+  }
 }
 
 /**
@@ -1348,6 +1366,17 @@ void CClientManagerImpl::DoBeat()
     CMessageStream stream{message};
     stream.Write(mAvailableBeat);
     ProcessClients(message);
+  }
+  // Engine addition (net_LagAuto): the slowest round trip to a peer, once per new beat, for the order delay
+  // (LagControl.h).
+  if (mAvailableBeat > availableBefore) {
+    float maxPingMs = 0.0f;
+    for (CClientBase* const client : mClients) {
+      if (auto* const net = dynamic_cast<CNetClient*>(client); net != nullptr && net->mConnection != nullptr) {
+        maxPingMs = std::max(maxPingMs, net->mConnection->GetPing());
+      }
+    }
+    NET_LagNotePing(maxPingMs);
   }
   // Engine additions (issue #236), off by default.
   NoteAvailableBeat(availableBefore, mAvailableBeat);

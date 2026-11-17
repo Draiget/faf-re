@@ -56,6 +56,7 @@
 #include "lua/LuaTableIterator.h"
 #include "gpg/core/streams/BinaryReader.h"
 #include "moho/net/CMessage.h"
+#include "moho/net/NetConVars.h"
 #include "moho/net/CMessageStream.h"
 #include "moho/net/ELobbyMsg.h"
 #include "remote/net/LobbySignals.h"
@@ -2540,6 +2541,7 @@ namespace
     // game's pace is when beats are taken: a client's frames, or this program's loop below.
     moho::sim_LocalLead = 0;
     moho::net_Lag = leadMs;
+    moho::net_LagAuto = 0; // the lead is this program's pacing, not an order delay to adapt
     moho::SIM_SetSessionPacing(moho::ESimSessionPacing::Local);
     moho::SIM_SetIssueWhilePaused(true);
     moho::IClientManager* const clientManager = sessionInfo->mClientManager;

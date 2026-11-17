@@ -58,6 +58,15 @@ namespace moho
         }
         link->Send(data, size);
       }
+
+      // Game channel (net_GameChannel): the link says whether both ends offered it.
+      [[nodiscard]] bool OffersGameChannel(
+        faf::remote::net::ChannelKeys& keys,
+        bool& keyed
+      ) const override
+      {
+        return link->GameChannelOffer(keys, keyed);
+      }
     };
 
     struct EnginePeer
@@ -225,6 +234,8 @@ namespace moho
           info.rttMs = stats.lastRttMs >= 0 ? stats.lastRttMs : stats.onLane ? stats.laneRttMs : -1;
           info.onLane = stats.onLane;
           info.laneEncrypted = stats.laneEncrypted;
+          info.gameChannel = stats.gameChannel;
+          info.gameChannelEncrypted = stats.gameChannelEncrypted;
           info.attempts = stats.attempts;
           info.choice = stats.choice;
           {
@@ -329,6 +340,8 @@ namespace moho
           options.redundancy = mRedundancy;
           options.encrypt = mEncrypt;
           options.testDropPercent = mTestDropPercent;
+          // Game channel: only where this game ends the link itself (native mode), read per link.
+          options.gameChannel = mNative && net_GameChannel != 0;
         }
         options.remoteId = id;
         options.offerer = offerer;

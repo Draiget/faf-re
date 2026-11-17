@@ -35,6 +35,7 @@
 #include "moho/misc/TimeBar.h"
 #include "moho/misc/CDecoder.h"
 #include "moho/net/CClientManagerImpl.h"
+#include "moho/net/LagControl.h"
 #include "moho/net/NetConVars.h"
 #include "moho/render/CDecalTypes.h"
 #include "moho/sim/SSTIArmyConstantData.h"
@@ -1530,6 +1531,7 @@ void CSimDriver::ThreadRun()
 
   sAdaptiveLagExtraMs = 0.0f;
   sAdaptiveLastBeat = -1;
+  NET_LagReset(); // engine addition (net_LagAuto)
 
   while (!mStopSimThread) {
     mClientManager->DoBeat();
@@ -1615,8 +1617,11 @@ void CSimDriver::ThreadRun()
         // path feeding `IncreaseGameSpeed`; nothing in this file needs changing.
         const float simRateScale = fa::pow(10.0f, static_cast<float>(mClientManager->GetSimRate()) * 0.1f);
         const float millisecondsPerBeat = (0.1f / simRateScale) * 1000.0f;
+        // Engine addition: with net_LagAuto (off by default) the delay follows the round trip (LagControl.h);
+        // otherwise net_Lag, plus what net_AdaptiveLagMax added.
+        const float lagMilliseconds = net_LagAuto != 0 ? NET_LagCurrentMs() : net_Lag + sAdaptiveLagExtraMs;
         const float leadMilliseconds =
-          static_cast<float>(mNextIssueBeat - pacedBeat) * millisecondsPerBeat - net_Lag - sAdaptiveLagExtraMs;
+          static_cast<float>(mNextIssueBeat - pacedBeat) * millisecondsPerBeat - lagMilliseconds;
         const std::int64_t dueAt = mLastSyncCycleTime + gpg::time::MillisecondsToCycles(leadMilliseconds);
 
         if (dueAt >= now) {

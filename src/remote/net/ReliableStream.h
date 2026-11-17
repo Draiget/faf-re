@@ -108,8 +108,69 @@ namespace faf::remote::net
       return mBytesResent;
     }
 
+    /**
+     * Repeats (game links between players): each range Write sends for the first time goes out again while some of it
+     * is unacked, `firstGapUs` after it was sent, then after twice that, four times and so on, `count` times at most,
+     * so a lost datagram's bytes arrive within a gap instead of after loss detection, and a burst that swallows the
+     * first repeats still meets a later one. 0 (the default) repeats nothing. Only while at most `maxInFlight`
+     * reliable bytes are in flight: a beat is tens of bytes, a large order or a save is left to loss detection.
+     */
+    void SetRepeats(
+      const std::uint32_t count,
+      const std::uint64_t firstGapUs,
+      const std::uint64_t maxInFlight
+    ) noexcept
+    {
+      mRepeats = count;
+      mRepeatFirstGapUs = firstGapUs;
+      mRepeatMaxInFlight = maxInFlight;
+    }
+    /** Repeats on or off for now (ChannelConfig::reliableRepeatHoldUs); off forgets the ranges waiting for one. */
+    void SetRepeatsActive(
+      const bool active
+    ) noexcept
+    {
+      mRepeatsActive = active;
+      if (!active) {
+        mRepeatQueue.clear();
+      }
+    }
+    /** The time Write stamps on new ranges (the channel's Poll sets it first). */
+    void SetNow(
+      const std::uint64_t nowUs
+    ) noexcept
+    {
+      mNowUs = nowUs;
+    }
+    /** Some range is due for a repeat at `nowUs`. */
+    [[nodiscard]] bool RepeatDue(std::uint64_t nowUs) const noexcept;
+    /** Appends the repeats due at `nowUs`, oldest first, until `budget` is used; `sent` receives the ranges written. */
+    void WriteRepeats(ByteWriter& out, std::size_t budget, std::vector<StreamRange>& sent, std::uint64_t nowUs);
+    [[nodiscard]] std::uint64_t BytesRepeated() const noexcept
+    {
+      return mBytesRepeated;
+    }
+
   private:
     void Compact();
+
+    struct Repeat
+    {
+      std::uint64_t begin = 0;
+      std::uint64_t end = 0;
+      std::uint32_t left = 0;
+      std::uint64_t dueUs = 0;
+      std::uint64_t gapUs = 0;
+    };
+    std::uint32_t mRepeats = 0;
+    std::uint64_t mRepeatFirstGapUs = 30'000;
+    std::uint64_t mNowUs = 0;
+    bool mRepeatsActive = true;
+    // Repeats only while this little is in flight: game beats are tens of bytes; a large order or a save would be
+    // sent several times over on an uplink it already fills.
+    std::uint64_t mRepeatMaxInFlight = 0;
+    std::deque<Repeat> mRepeatQueue;
+    std::uint64_t mBytesRepeated = 0;
 
     std::size_t mMaxInFlight;
     std::uint64_t mCongestionWindow =

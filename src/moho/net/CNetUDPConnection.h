@@ -309,7 +309,27 @@ namespace moho
      */
     void Debug();
 
+    /**
+     * Engine addition, game channel (net_GameChannel, NetGameChannel.cpp): with a peer transport that offers it
+     * (NetPeerTransport.h), the stream travels on a net channel once the handshake is done instead of in DATA
+     * packets: one layer of acks, losses repaired by repeats in the next datagrams, no 32-packet window. The handshake
+     * and the goodbye stay as shipped. The channel lives in a table beside the connection, whose layout stays the
+     * binary's. Caller holds the connector lock.
+     */
+    [[nodiscard]] bool InGameChannel() const;
+    /** One game channel datagram from this connection's peer. Caller holds the connector lock. */
+    void ProcessGameChannelDatagram(const std::uint8_t* data, std::size_t size);
+
   private:
+    /** Game channel: starts it when the transport offers it; whether the stream now goes on it. */
+    bool StartGameChannel();
+    /** Game channel: SendData's established state; the next wake in ms. */
+    int GameChannelSendData(std::int64_t nowUs);
+    /** Stream bytes from the peer, in order (a DATA packet's payload, or the game channel's). */
+    void ConsumeInputBytes(const char* data, std::size_t size);
+    /** The peer's end of stream (an empty DATA packet, or the game channel's end marker). */
+    void ConsumeEndOfInput();
+
     /**
      * Address: 0x00488220
      */

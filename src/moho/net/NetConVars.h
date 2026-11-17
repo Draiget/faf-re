@@ -39,6 +39,23 @@ namespace moho
   extern int32_t net_LogTraffic;
   extern int32_t net_LogShownBeatMs;
   extern int32_t net_AdaptiveLagMax;
+  // 1: a beat is sent as soon as it is written, not net_SendDelay later (CMarshaller::AdvanceBeat). Live.
+  extern int32_t net_FlushBeats;
+  // 1: offer the game channel on native links (NetGameChannel.h); with a peer that offers it too, connections carry
+  // their stream on a net channel. Next link.
+  extern int32_t net_GameChannel;
+  // Game channel: how many times each new range goes again while it is unacked, the gap doubling. Next connection.
+  extern int32_t net_GameChannelRepeats;
+  // Game channel: the first repeat's gap after the send (ms); each later one twice the gap before. Next connection.
+  extern int32_t net_GameChannelRepeatMs;
+  // Game channel: above 0, repeats only for this long after the start and after each loss (ms); 0: always. Next
+  // connection.
+  extern int32_t net_GameChannelRepeatHoldMs;
+  // 1: the order delay (net_Lag) follows the round trip to the slowest peer (LagControl.h), between net_LagMin and
+  // net_LagMax; 0 (default): net_Lag as set. Live.
+  extern int32_t net_LagAuto;
+  extern int32_t net_LagMin;
+  extern int32_t net_LagMax;
 
   // Totals of every UDP connection in this process, for net_LogTraffic.
   struct NetTrafficTotals

@@ -106,6 +106,12 @@ namespace faf::netlink
     // with a peer that offers one too, the lane's datagrams are sealed with
     // XChaCha20-Poly1305 both ways. Without the lane nothing is encrypted.
     bool encrypt = true;
+    // Game channel (net_GameChannel, moho/net/NetGameChannel.h): the game on this end carries its connection's stream
+    // on a net channel with a peer that offers it too. The ufrag then carries "s+" after "c+" (and "w+"); with a peer
+    // that carries it as well, the lane stays off (the channel repairs losses itself) and the channel takes the keys
+    // the lane would have had. Only where the game itself ends the link (native mode), never for a bridge relaying a
+    // retail game.
+    bool gameChannel = false;
   };
 
   // The prefix faf-netbridge and the engine use.
@@ -157,6 +163,8 @@ namespace faf::netlink
     std::string localType;
     std::string remoteType;
     bool laneEncrypted = false;            // issue #289: the lane is on and sealed
+    bool gameChannel = false;              // net_GameChannel: both ends offered it (the lane stays off)
+    bool gameChannelEncrypted = false;     // and the channel has keys
     std::uint64_t laneUnauthenticated = 0; // lane datagrams dropped: not sealed with the agreed key
     double laneRttMs = -1;                 // issue #322: the lane's smoothed RTT, both ends; -1 before a sample
     PathChoice choice;                     // issue #322: the path the player picked
@@ -213,6 +221,8 @@ namespace faf::netlink
       return mOurPeer.load();
     }
     LinkStats GetStats() const;
+    // Game channel: both ufrags carry "s+"; `keys` receives this connection's keys when both offered one.
+    [[nodiscard]] bool GameChannelOffer(remote::net::ChannelKeys& keys, bool& keyed) const;
     const LinkOptions& GetOptions() const
     {
       return mOptions;
@@ -296,6 +306,7 @@ namespace faf::netlink
     std::atomic<std::uint64_t> mWebRtcSent{0};
     // Issue #240.
     bool mRemoteLane = false;
+    std::atomic<bool> mGameChannelAgreed{false}; // both ufrags carry the game channel's mark
     std::atomic<bool> mLaneActive{false};
     std::atomic<bool> mLaneReset{false}; // a new connection: the next use starts a new lane
     mutable std::mutex mLaneMutex;

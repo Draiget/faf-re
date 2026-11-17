@@ -63,6 +63,10 @@ namespace faf::netlink
       if (rest.starts_with("w+")) {
         rest.remove_prefix(2);
       }
+      // The game channel's "s+" comes after "c+".
+      if (tag == "s+" && rest.starts_with("c+")) {
+        rest.remove_prefix(2);
+      }
       return rest.starts_with(tag);
     }
 
@@ -527,7 +531,7 @@ namespace faf::netlink
       }
     };
     auto onData = [this](const std::uint8_t* data, const std::size_t size) {
-      if (size > 0 && data[0] == remote::net::kDatagramTag && mOptions.redundancy > 0) {
+      if (size > 0 && data[0] == remote::net::kDatagramTag && mOptions.redundancy > 0 && !mGameChannelAgreed.load()) {
         LaneDeliver(data, size); // issue #240
         return;
       }
@@ -600,6 +604,8 @@ namespace faf::netlink
       }
     }
     s.laneEncrypted = s.onLane && mLaneKeyed;
+    s.gameChannel = mGameChannelAgreed.load();
+    s.gameChannelEncrypted = s.gameChannel && mLaneKeyed;
     s.localType = mLocalType;
     s.remoteType = mRemoteType;
     s.choice = mChoice;
@@ -719,9 +725,17 @@ namespace faf::netlink
     mRemoteMarked = !mOptions.ufragPrefix.empty() && mRemoteUfrag.starts_with(mOptions.ufragPrefix);
     mRemoteWebRtc = mRemoteMarked && mRemoteUfrag.starts_with(mOptions.ufragPrefix + "w+");
     mRemoteLane = mRemoteMarked && OffersAfterPrefix(mRemoteUfrag, mOptions.ufragPrefix, "c+");
+    const bool remoteOffersChannel = mRemoteMarked && OffersAfterPrefix(mRemoteUfrag, mOptions.ufragPrefix, "s+");
+    mGameChannelAgreed = mOptions.gameChannel && remoteOffersChannel;
     // Issue #289: both sides decide the same way, each from the other's ufrag
-    // and its own, so the lane is sealed on both or on neither.
-    if (!mKeyPair.IsSet() || !mRemoteLane) {
+    // and its own, so the lane (or the game channel) is sealed on both or on neither.
+    if (!mKeyPair.IsSet() || !(mRemoteLane || mGameChannelAgreed.load())) {
+      return;
+    }
+    // A build from before the game channel can't read the key behind "s+", so it leaves the lane unsealed: when one
+    // ufrag carries "s+" and the other doesn't, neither side seals (a build with the channel switched off reads both).
+    if (mOptions.gameChannel != remoteOffersChannel) {
+      Log(out, "one side offers the game channel and the other doesn't; the lane stays unencrypted");
       return;
     }
     const std::optional<LinkPublicKey> peerKey = KeyFromUfrag(mRemoteUfrag, mOptions.ufragPrefix);
@@ -841,14 +855,14 @@ namespace faf::netlink
       // Issue #239: "w+" after the prefix offers WebRTC, and issue #240: "c+"
       // after that the redundant lane. A random token never holds '+', so
       // only a peer that offers them starts that way.
-      const std::string mark =
-        mOptions.ufragPrefix + (mOptions.webrtc ? "w+" : "") + (mOptions.redundancy > 0 ? "c+" : "");
+      const std::string mark = mOptions.ufragPrefix + (mOptions.webrtc ? "w+" : "") +
+        (mOptions.redundancy > 0 ? "c+" : "") + (mOptions.gameChannel ? "s+" : "");
       const std::size_t prefix = mark.size();
       std::string ufrag = mark + RandomToken(prefix + 4 < 14 ? 14 - prefix : 4);
       // Issue #289: a new key pair per attempt; its public key ends the ufrag
       // in place of the random token. Hex digits hold no '+', so the marks
       // before it read as they always have.
-      if (mOptions.encrypt && mOptions.redundancy > 0) {
+      if (mOptions.encrypt && (mOptions.redundancy > 0 || mOptions.gameChannel)) {
         if (mKeyPair.Generate()) {
           ufrag = mark + KeyMarkFor(mKeyPair.Public());
         } else {
@@ -1238,8 +1252,8 @@ namespace faf::netlink
       // Issue #240: with a peer that is ours and offers it, game datagrams
       // move onto the redundant lane.
       if (
-        mState == LinkState::Connected && mOptions.redundancy > 0 && mRemoteLane && mOurPeer.load() &&
-        !mLaneActive.load()
+        mState == LinkState::Connected && mOptions.redundancy > 0 && mRemoteLane && !mGameChannelAgreed.load() &&
+        mOurPeer.load() && !mLaneActive.load()
       ) {
         mLaneActive = true;
         Log(
@@ -1336,6 +1350,23 @@ namespace faf::netlink
     ++mStats.dataSent;
     if (mOptions.duplicateGapMs >= 0) {
       ++mStats.duplicatesSent;
+    }
+    return true;
+  }
+
+  bool Link::GameChannelOffer(
+    remote::net::ChannelKeys& keys,
+    bool& keyed
+  ) const
+  {
+    keyed = false;
+    if (!mGameChannelAgreed.load()) {
+      return false;
+    }
+    std::lock_guard laneLock(mLaneMutex);
+    if (mLaneKeys) {
+      keys = *mLaneKeys;
+      keyed = true;
     }
     return true;
   }
