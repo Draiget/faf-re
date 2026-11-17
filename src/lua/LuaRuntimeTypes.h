@@ -6,24 +6,18 @@
 
 #include "lua/LuaPrimitives.h"
 
-typedef unsigned __int8 lu_byte;
-typedef int ls_nstr;
-typedef size_t lu_mem;
-typedef unsigned int lu_hash;
-typedef int ls_hash;
-typedef unsigned int Instruction;
-typedef __int64 type_ptrdiff_t;
-typedef int(__cdecl* CFunction)(lua_State* L);
-typedef void(__cdecl* Hook)(lua_State* L, lua_Debug* ar);
-typedef void*(__cdecl* ReallocFunction)(
-  void* ptr,
-  int oldsize,
-  int size,
-  void* data,
-  const char* allocName,
-  unsigned int flags
-);
-typedef void(__cdecl* FreeFunction)(void* ptr, int oldsize, void* data);
+using lu_byte = unsigned __int8;
+using ls_nstr = int;
+using lu_mem = size_t;
+using lu_hash = unsigned int;
+using ls_hash = int;
+using Instruction = unsigned int;
+using type_ptrdiff_t = __int64;
+using CFunction = int(__cdecl*)(lua_State* L);
+using Hook = void(__cdecl*)(lua_State* L, lua_Debug* ar);
+using ReallocFunction =
+  void*(__cdecl*)(void* ptr, int oldsize, int size, void* data, const char* allocName, unsigned int flags);
+using FreeFunction = void(__cdecl*)(void* ptr, int oldsize, void* data);
 
 struct type_lua_longjmp;
 

@@ -14,7 +14,7 @@
 // it (platform::window::NativeHandle: the HWND on Windows, the SDL_Window* elsewhere). A top-level
 // window has its own; a child window shares its top-level window's, which it fills. An integer, as
 // The 2.4.2 window library's native handle is: the engine casts it with static_cast<uintptr_t>.
-typedef std::uintptr_t ShellNativeHandle;
+using ShellNativeHandle = std::uintptr_t;
 
 class ShellWindow : public ShellEvtHandler
 {

@@ -371,7 +371,7 @@ TEST(
 {
   Generated generated = Generate(R"fx(
 struct Vertex { float4 position : POSITION0; float4 colour : COLOR0; };
-typedef Vertex Pixel;
+using Pixel = Vertex;
 struct PSOut { float4 c0 : COLOR0; float4 c1 : COLOR1; float d : DEPTH; };
 struct Both { float4 p : POSITION; };
 struct Unused { float4 p : POSITION; };

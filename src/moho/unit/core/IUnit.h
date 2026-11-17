@@ -71,7 +71,7 @@ namespace moho
     UNITSTATE_SiloBuildingAmmo = 45,
   };
   enum ELayer : std::int32_t;
-  typedef std::int32_t EntId;
+  using EntId = std::int32_t;
   class IUnit;
   struct RUnitBlueprint;
   class STIMap;

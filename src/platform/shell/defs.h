@@ -19,11 +19,11 @@
 #define FALSE 0
 #endif
 
-typedef int ShellCoord;
-typedef std::uint32_t ShellUint32;
-typedef wchar_t ShellChar;
-typedef int ShellEventType;
-typedef int ShellWindowID;
+using ShellCoord = int;
+using ShellUint32 = std::uint32_t;
+using ShellChar = wchar_t;
+using ShellEventType = int;
+using ShellWindowID = int;
 
 // The retail engine built its window library and itself with UNICODE.
 #define SHELL_T(x) L##x

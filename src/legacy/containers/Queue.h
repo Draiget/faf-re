@@ -19,11 +19,11 @@ namespace fa
   class queue
   {
   public:
-    typedef Container container_type;
-    typedef typename Container::value_type value_type;
-    typedef typename Container::size_type size_type;
-    typedef typename Container::reference reference;
-    typedef typename Container::const_reference const_reference;
+    using container_type = Container;
+    using value_type = typename Container::value_type;
+    using size_type = typename Container::size_type;
+    using reference = typename Container::reference;
+    using const_reference = typename Container::const_reference;
 
   protected:
     // Single data member, like in MSVC8: underlying container

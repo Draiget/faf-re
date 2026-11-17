@@ -472,16 +472,16 @@ public:
   bool m_active = true;
 };
 
-typedef void (ShellObject::*ShellObjectEventFunction)(ShellEvent&);
-typedef void (ShellEvtHandler::*ShellEventFunction)(ShellEvent&);
-typedef void (ShellEvtHandler::*ShellCharEventFunction)(ShellKeyEvent&);
-typedef void (ShellEvtHandler::*ShellMouseEventFunction)(ShellMouseEvent&);
-typedef void (ShellEvtHandler::*ShellPaintEventFunction)(ShellPaintEvent&);
-typedef void (ShellEvtHandler::*ShellEraseEventFunction)(ShellEraseEvent&);
-typedef void (ShellEvtHandler::*ShellSizeEventFunction)(ShellSizeEvent&);
-typedef void (ShellEvtHandler::*ShellMoveEventFunction)(ShellMoveEvent&);
-typedef void (ShellEvtHandler::*ShellCloseEventFunction)(ShellCloseEvent&);
-typedef void (ShellEvtHandler::*ShellActivateEventFunction)(ShellActivateEvent&);
+using ShellObjectEventFunction = void (ShellObject::*)(ShellEvent&);
+using ShellEventFunction = void (ShellEvtHandler::*)(ShellEvent&);
+using ShellCharEventFunction = void (ShellEvtHandler::*)(ShellKeyEvent&);
+using ShellMouseEventFunction = void (ShellEvtHandler::*)(ShellMouseEvent&);
+using ShellPaintEventFunction = void (ShellEvtHandler::*)(ShellPaintEvent&);
+using ShellEraseEventFunction = void (ShellEvtHandler::*)(ShellEraseEvent&);
+using ShellSizeEventFunction = void (ShellEvtHandler::*)(ShellSizeEvent&);
+using ShellMoveEventFunction = void (ShellEvtHandler::*)(ShellMoveEvent&);
+using ShellCloseEventFunction = void (ShellEvtHandler::*)(ShellCloseEvent&);
+using ShellActivateEventFunction = void (ShellEvtHandler::*)(ShellActivateEvent&);
 
 struct ShellEventTableEntry
 {

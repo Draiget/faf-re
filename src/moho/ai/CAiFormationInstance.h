@@ -39,7 +39,7 @@ namespace moho
   /// `Moho::EntId` is the 32-bit entity id `Entity.h` defines; restated here so
   /// the map keys below do not drag the whole entity header into every
   /// formation consumer.
-  typedef std::int32_t EntId;
+  using EntId = std::int32_t;
 
   /**
    * RTTI: `.?AUSUnitOffsetInfo@Moho@@` (dumps/rtti_dump_all.hpp).

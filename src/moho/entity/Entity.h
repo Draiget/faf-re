@@ -45,7 +45,7 @@ namespace gpg
 
 namespace moho
 {
-  typedef int32_t EntId;
+  using EntId = int32_t;
 
   /**
    * The universe of an entity-id `BVSet` (mangled `UEntIdUniverse@Moho@@`, a

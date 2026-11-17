@@ -30,7 +30,7 @@ namespace moho
 
   static constexpr std::size_t kPacketMaxSize = 512;
 
-  typedef uint32_t EarlyPayloadMask;
+  using EarlyPayloadMask = uint32_t;
 
   /**
    * Base constraint for typed packet bodies on the wire
