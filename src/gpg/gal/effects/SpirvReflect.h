@@ -63,4 +63,20 @@ namespace gpg::gal::effects
     const std::vector<std::uint8_t>& code,
     const std::map<std::uint32_t, std::uint32_t>& locations
   );
+
+  /**
+   * The locations for PatchSpirvInputLocations that link a pixel shader to a vertex shader, by input id:
+   * each input takes the location of the vertex output with its semantic, as Direct3D links stages. An
+   * input no output writes, which Direct3D reads as an undefined value, is invalid in Vulkan wherever it
+   * lands (VUID-RuntimeSpirv-OpEntryPoint-08743); it takes locations of its own, so that they at least are
+   * the device's: in the pixel shader's order, the highest that are free for all it takes (an array or a
+   * matrix takes one per element or column), at most `lastLocation`, the device's last fragment input
+   * location (VkPhysicalDeviceLimits::maxFragmentInputComponents, four components each). One that finds no
+   * such locations (more inputs than the device has locations) is left out and keeps its own.
+   */
+  [[nodiscard]] std::map<std::uint32_t, std::uint32_t>
+  LinkPixelInputLocations(const SpirvInterface& vertex, const SpirvInterface& pixel, std::uint32_t lastLocation);
+
+  /** The work group size a compute module declares (OpExecutionMode LocalSize); false without one or on bad code. */
+  [[nodiscard]] bool ReflectSpirvComputeGroupSize(const std::vector<std::uint8_t>& code, std::uint32_t (&size)[3]);
 } // namespace gpg::gal::effects
