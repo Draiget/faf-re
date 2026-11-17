@@ -1,5 +1,7 @@
 #pragma once
 
+#include "../PlatformDefines.h"
+
 // Engine addition (Android port): the calling thread's return addresses, for the crash
 // diagnostics and moho::PLAT_GetCallStack on POSIX. Linux and macOS take backtrace(3) and
 // backtrace_symbols_fd(3) from their C library; bionic declares them only from Android 13

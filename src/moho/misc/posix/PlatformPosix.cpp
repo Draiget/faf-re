@@ -2,8 +2,9 @@
 // moho/misc/WinPlatform.cpp for the Linux build, which leaves that file out (it is built on
 // dbghelp, message boxes and the crash-report attachment list).
 //
-// Call stacks come from backtrace(3) and are symbolised with dladdr(3); a message box is a
-// line on stderr; the error-report attachments are kept as on Windows but nothing sends them.
+// Call stacks come from platform/posix/Backtrace.h (backtrace(3); the unwinder on Android) and are
+// symbolised with dladdr(3); a message box is a line on stderr; the error-report attachments are
+// kept as on Windows but nothing sends them.
 
 #if !FAFRE_PLATFORM_WINDOWS
 
@@ -19,9 +20,9 @@
 
 #include <cxxabi.h>
 #include <dlfcn.h>
-#include "platform/posix/Backtrace.h"
 
 #include "gpg/core/containers/String.h"
+#include "platform/posix/Backtrace.h"
 
 // Declared in WinApp.h; the client's TUs set them (none on Linux).
 moho::OkBoxPresenterHook moho::sOkBoxPresenter = nullptr;

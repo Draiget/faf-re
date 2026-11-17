@@ -15,6 +15,7 @@
 #include "gpg/core/diagnostics/CrashHooks.h"
 #include "gpg/core/diagnostics/CrashReport.h"
 #include "gpg/core/diagnostics/ProbeWatch.h"
+#include "platform/posix/Backtrace.h"
 
 #include <algorithm>
 #include <array>
@@ -29,7 +30,6 @@
 
 #include <csignal>
 #include <dlfcn.h>
-#include "platform/posix/Backtrace.h"
 #include <fcntl.h>
 #include <sys/utsname.h>
 #include <unistd.h>
