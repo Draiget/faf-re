@@ -182,18 +182,16 @@ namespace faf::editor
     return out + "}";
   }
 
-  bool MarkersFromFafmapmarkers(
+  std::expected<void, std::string> MarkersFromFafmapmarkers(
     const std::string& text,
     std::vector<SaveEntry>& markers,
     MarkerImport& result,
-    std::string& error,
     const std::vector<std::string>& reserved
   )
   {
     std::string array;
     if (!JsonValue(text, "Markers", array) || array.empty() || array.front() != '[') {
-      error = "not a marker file (no Markers list)";
-      return false;
+      return std::unexpected("not a marker file (no Markers list)");
     }
     // Each file marker's new name, or empty when it was left out.
     std::vector<std::string> made;
@@ -241,6 +239,6 @@ namespace faf::editor
         }
       }
     }
-    return true;
+    return {};
   }
 } // namespace faf::editor

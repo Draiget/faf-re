@@ -203,46 +203,46 @@ namespace faf::editor::field
       return 0.5f + 0.5f * x / (1.0f + std::fabs(x));
     }
 
-    bool OpFractal(
+    std::expected<void, std::string> OpFractal(
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
-      if (!MakeOut(a, out, err))
-        return false;
-      FractalSetup s;
-      if (!fractal::Read(a, out.cell, s, err))
-        return false;
+      if (auto made = MakeOut(a, out); !made)
+        return made;
+      const auto read = fractal::Read(a, out.cell);
+      if (!read)
+        return std::unexpected(read.error());
+      const FractalSetup& s = *read;
       const Grid& g = out;
       Cells(out, [&](const int x, const int z) {
         return FractalAt(s, WorldX(g, x), WorldZ(g, z));
       });
-      return true;
+      return {};
     }
 
     // ---- amplitude
     // -------------------------------------------------------------------------------------------------------------------------------
 
-    bool OpAmplitude(
+    std::expected<void, std::string> OpAmplitude(
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
+      std::string err;
       const Grid* src = Need(a, "a", err);
-      if (src == nullptr || !MakeOut(a, out, err))
-        return false;
+      if (src == nullptr)
+        return std::unexpected(err);
+      if (auto made = MakeOut(a, out); !made)
+        return made;
       const double amp = a.p.N("amplitude", 10.0);
       const std::string mode = a.p.S("mode", "peak");
       const std::string centre = a.p.S("centre", "mean");
       if (mode != "peak" && mode != "range" && mode != "sd") {
-        err = "amplitude: mode must be peak, range or sd";
-        return false;
+        return std::unexpected("amplitude: mode must be peak, range or sd");
       }
       if (centre != "mean" && centre != "min") {
-        err = "amplitude: centre must be mean or min";
-        return false;
+        return std::unexpected("amplitude: centre must be mean or min");
       }
       // fixed order statistics in double: the same bits for any thread count
       double sum = 0.0;
@@ -272,33 +272,33 @@ namespace faf::editor::field
       Cells(out, [&](const int x, const int z) {
         return static_cast<float>((static_cast<double>(src->At(x, z)) - base) * k);
       });
-      return true;
+      return {};
     }
 
     // ---- terrain_mix
     // -----------------------------------------------------------------------------------------------------------------------------
 
-    bool OpTerrainMix(
+    std::expected<void, std::string> OpTerrainMix(
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
+      std::string err;
       const Grid* ter = Need(a, "a", err);
       const Grid* rel = Need(a, "b", err);
-      if (ter == nullptr || rel == nullptr || !MakeOut(a, out, err))
-        return false;
+      if (ter == nullptr || rel == nullptr)
+        return std::unexpected(err);
+      if (auto made = MakeOut(a, out); !made)
+        return made;
       if (!rel->SameShape(*ter)) {
-        err = "terrain_mix: the relief differs in size from the terrain";
-        return false;
+        return std::unexpected("terrain_mix: the relief differs in size from the terrain");
       }
       const Grid* mask = Get(a, "mask");
-      if (!SameOrNone(mask, *ter, "mask", err))
-        return false;
+      if (auto same = SameOrNone(mask, *ter, "mask"); !same)
+        return same;
       const std::string mode = a.p.S("mode", "add");
       if (mode != "add" && mode != "multiply" && mode != "max" && mode != "min" && mode != "replace") {
-        err = "terrain_mix: mode must be add, multiply, max, min or replace";
-        return false;
+        return std::unexpected("terrain_mix: mode must be add, multiply, max, min or replace");
       }
       const float strength = Clamp01(static_cast<float>(a.p.N("strength", 1.0)));
       double sum = 0.0;
@@ -329,7 +329,7 @@ namespace faf::editor::field
           target = mean + d;
         return h + (target - h) * t;
       });
-      return true;
+      return {};
     }
 
     // ---- keep_side
@@ -349,19 +349,20 @@ namespace faf::editor::field
       return m + h * h * k * 0.25f;
     }
 
-    bool OpKeepSide(
+    std::expected<void, std::string> OpKeepSide(
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
+      std::string err;
       const Grid* res = Need(a, "a", err);
       const Grid* before = Need(a, "b", err);
-      if (res == nullptr || before == nullptr || !MakeOut(a, out, err))
-        return false;
+      if (res == nullptr || before == nullptr)
+        return std::unexpected(err);
+      if (auto made = MakeOut(a, out); !made)
+        return made;
       if (!before->SameShape(*res)) {
-        err = "keep_side: the two terrains differ in size";
-        return false;
+        return std::unexpected("keep_side: the two terrains differ in size");
       }
       const float level = static_cast<float>(a.p.N("level", 25.0));
       const float margin = std::max(0.0f, static_cast<float>(a.p.N("margin", 0.25)));
@@ -381,7 +382,7 @@ namespace faf::editor::field
         const float ceilH = level - std::min(margin, level - h);
         return std::max(h, -SoftMax(-r, -ceilH, soft));
       });
-      return true;
+      return {};
     }
 
     struct LandOpRegistrar

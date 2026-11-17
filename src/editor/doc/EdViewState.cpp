@@ -97,7 +97,7 @@ namespace faf::editor
       }
     }
     // A file that names no hidden types hides none.
-    if (!hiddenSeen && text.find("tool=") != std::string::npos) {
+    if (!hiddenSeen && text.contains("tool=")) {
       s.hiddenMarkerTypes.clear();
     }
     if (s.gridStep <= 0.0f) {

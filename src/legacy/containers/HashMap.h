@@ -150,9 +150,9 @@ namespace fa
     struct hash_map_key
     {
       template <class Pair>
-      [[nodiscard]] const auto& operator()(
+      [[nodiscard]] static const auto& operator()(
         const Pair& value
-      ) const noexcept
+      ) noexcept
       {
         return value.first;
       }
@@ -162,9 +162,9 @@ namespace fa
     struct hash_set_key
     {
       template <class Key>
-      [[nodiscard]] const Key& operator()(
+      [[nodiscard]] static const Key& operator()(
         const Key& value
-      ) const noexcept
+      ) noexcept
       {
         return value;
       }

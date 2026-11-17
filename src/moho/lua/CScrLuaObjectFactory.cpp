@@ -438,7 +438,7 @@ namespace
         return true;
       }
     }
-    if (path.find("//") != std::string::npos || path.find("/.") != std::string::npos) {
+    if (path.contains("//") || path.contains("/.")) {
       return true;
     }
 
@@ -475,7 +475,7 @@ namespace
       }
       listing = sListings.emplace(listingKey, std::move(names)).first;
     }
-    return listing->second.count(path) != 0U;
+    return listing->second.contains(path);
   }
 
   void TryAppendHookScriptPath(

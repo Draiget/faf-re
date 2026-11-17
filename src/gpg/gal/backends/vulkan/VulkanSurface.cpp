@@ -5,7 +5,7 @@
 #include <thread>
 
 #if FAFRE_PLATFORM_WINDOWS
-#include <windows.h>
+#include <Windows.h>
 
 #define VK_USE_PLATFORM_WIN32_KHR
 #include "VulkanSurface.h"

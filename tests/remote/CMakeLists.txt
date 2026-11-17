@@ -16,7 +16,7 @@ if(TARGET faf_netchannel)
   add_test(NAME remote_netchannel COMMAND faf_netchannel_tests)
   set_tests_properties(remote_netchannel PROPERTIES LABELS "Existing")
 
-  # The server's player links over real UDP sockets on loopback (plan WP10.1); Linux builds it in cmake/FafLinux.cmake.
+  # The server's player links over real UDP sockets on loopback (plan WP10.1); Linux builds it in cmake/FafPosix.cmake.
   if(WIN32)
     add_executable(faf_gamelink_tests EXCLUDE_FROM_ALL net/GameLinkTests.cpp)
     target_link_libraries(faf_gamelink_tests PRIVATE faf_netchannel faf_monocypher gtest_main)

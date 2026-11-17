@@ -14,6 +14,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -98,9 +99,24 @@ func CheckNoFullscreen(where string, args []string) error {
 // PrefsDir is the folder the engine resolves /prefs names in
 // (USER_LoadPreferences; the default name is Game.prefs).
 func PrefsDir() string {
-	base := os.Getenv("LOCALAPPDATA")
-	if base == "" {
-		base = filepath.Join(os.Getenv("USERPROFILE"), "AppData", "Local")
+	var base string
+	if runtime.GOOS == "windows" {
+		base = os.Getenv("LOCALAPPDATA")
+		if base == "" {
+			base = filepath.Join(os.Getenv("USERPROFILE"), "AppData", "Local")
+		}
+	} else if runtime.GOOS == "darwin" {
+		// The macOS client's application data folder (src/platform/posix/Win32Shim.cpp).
+		home, _ := os.UserHomeDir()
+		base = filepath.Join(home, "Library", "Application Support")
+	} else {
+		// The Linux and macOS clients' local application data folder: $XDG_DATA_HOME, else
+		// ~/.local/share (src/platform/posix/Win32Shim.cpp, CSIDL_LOCAL_APPDATA).
+		base = os.Getenv("XDG_DATA_HOME")
+		if base == "" {
+			home, _ := os.UserHomeDir()
+			base = filepath.Join(home, ".local", "share")
+		}
 	}
 	return filepath.Join(base, "Gas Powered Games", "Supreme Commander Forged Alliance")
 }

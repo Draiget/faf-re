@@ -71,6 +71,7 @@ namespace faf::editor
       std::vector<std::uint8_t> albedo;  // BC3
       std::vector<std::uint8_t> normals; // BC1, empty for the upper slot or an unlinked Normal
       TexImagePtr mask;                  // the Mask output over the whole map, null when unlinked
+      float tile = 0.0f;                 // the layer's tile size (game units); 0 keeps the layer's own
     };
     [[nodiscard]] bool TakeApply(Bake& out);
     /** Test runs (`/materiallive <slot>`, `/materialapply <slot>`): Live Update into the slot on, or Apply into it. */
@@ -217,6 +218,8 @@ namespace faf::editor
     bool mLiveStale = true;
     double mLiveSentAt = 0.0;
     int mBakeSize = 1024;
+    float mApplyTile = 0.0f; // Apply: the layer's tile size, 0 keeps its own (FAF Studio)
+    bool mApplyMask = true;  // Apply: paint the layer's mask from Mask
     LiveImage mLiveOut;
     bool mLiveReady = false;
     std::vector<int> mRestore;

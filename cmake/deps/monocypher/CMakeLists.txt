@@ -12,7 +12,7 @@ endif()
 
 add_library(faf_monocypher STATIC "${_monocypher_src}/monocypher.c")
 target_include_directories(faf_monocypher SYSTEM PUBLIC "${_monocypher_src}")
-if(FAF_LINUX)
+if(FAFRE_PLATFORM_POSIX)
   target_compile_options(faf_monocypher PRIVATE -w)
 else()
   target_compile_options(faf_monocypher PRIVATE /W0)

@@ -52,7 +52,7 @@ namespace
     StackWalkSeedRegisters* const outRegisters
   )
   {
-#if defined(_M_IX86)
+#if FAFRE_ARCH_X86
     if (outRegisters == nullptr) {
       return;
     }
@@ -357,7 +357,7 @@ std::uint32_t moho::PLAT_GetCallStack(
     return 0;
   }
 
-#if defined(_M_IX86)
+#if FAFRE_ARCH_X86
   STACKFRAME stackFrame{};
   stackFrame.AddrFrame.Mode = AddrModeFlat;
   stackFrame.AddrPC.Mode = AddrModeFlat;
@@ -416,7 +416,7 @@ std::uint32_t moho::PLAT_GetCallStack(
   }
 
   return frameCount;
-#elif defined(_M_X64)
+#elif FAFRE_ARCH_X64
   CONTEXT context{};
   if (contextRecord != nullptr) {
     context = *static_cast<const CONTEXT*>(contextRecord);

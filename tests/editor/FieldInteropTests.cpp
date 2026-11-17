@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <memory>
+#include <print>
 #include <string>
 #include <vector>
 
@@ -46,11 +47,10 @@ namespace
     Grid& out
   )
   {
-    std::string err;
-    const bool ok = RunOp(op, args, out, err);
-    if (!ok)
-      std::printf("op %s: %s\n", op, err.c_str());
-    return ok;
+    const auto ran = RunOp(op, args, out);
+    if (!ran)
+      std::println("op {}: {}", op, ran.error());
+    return ran.has_value();
   }
 
   static float Pattern(

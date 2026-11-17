@@ -1125,10 +1125,10 @@ namespace gpg::HaStar
 
     struct SubclusterCellLess
     {
-      [[nodiscard]] bool operator()(
+      [[nodiscard]] static bool operator()(
         const SubclusterCell& lhs,
         const SubclusterCell& rhs
-      ) const noexcept
+      ) noexcept
       {
         return PackedSubclusterNodeKey(lhs.mNode) < PackedSubclusterNodeKey(rhs.mNode);
       }

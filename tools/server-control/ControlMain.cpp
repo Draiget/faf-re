@@ -165,7 +165,7 @@ int main(
   sockaddr_in address{};
   address.sin_family = AF_INET;
   address.sin_port = htons(at.port);
-  address.sin_addr.s_addr = htonl(at.ip);
+  address.sin_addr.s_addr = htonl(at.Ipv4());
   if (socket < 0 || ::connect(socket, reinterpret_cast<const sockaddr*>(&address), sizeof(address)) != 0) {
     std::printf("control: no connection to %s\n", server.c_str());
     return 2;
@@ -248,9 +248,9 @@ int main(
     while (channel.Take(message)) {
       const std::string text(message.begin(), message.end());
       std::printf("control: %s\n", text.c_str());
-      if (!answered && text.rfind("{\"id\":1,", 0) == 0) {
+      if (!answered && text.starts_with("{\"id\":1,")) {
         answered = true;
-        exitCode = text.find("\"ok\":true") != std::string::npos ? 0 : 1;
+        exitCode = text.contains("\"ok\":true") ? 0 : 1;
       }
     }
     std::fflush(stdout);

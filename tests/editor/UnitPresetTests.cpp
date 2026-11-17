@@ -61,8 +61,8 @@ namespace
   {
     std::vector<SaveUnit> units;
     float centre[3];
-    std::string error;
-    ASSERT_TRUE(faf::editor::UnitsFromScunits(kFafme, units, centre, error)) << error;
+    auto read = faf::editor::UnitsFromScunits(kFafme, units, centre);
+    ASSERT_TRUE(read) << read.error();
     ASSERT_EQ(units.size(), 2u);
     EXPECT_EQ(units[0].type, "ueb0101");
     EXPECT_FLOAT_EQ(units[0].position[0], 250.0f);
@@ -82,12 +82,13 @@ namespace
   {
     std::vector<SaveUnit> units;
     float centre[3];
-    std::string error;
-    ASSERT_TRUE(faf::editor::UnitsFromScunits(kFafme, units, centre, error)) << error;
+    auto read = faf::editor::UnitsFromScunits(kFafme, units, centre);
+    ASSERT_TRUE(read) << read.error();
     units[1].orders = "it's \"quoted\"";
     std::vector<SaveUnit> again;
     float centreAgain[3];
-    ASSERT_TRUE(faf::editor::UnitsFromScunits(faf::editor::UnitsToScunits(units), again, centreAgain, error)) << error;
+    read = faf::editor::UnitsFromScunits(faf::editor::UnitsToScunits(units), again, centreAgain);
+    ASSERT_TRUE(read) << read.error();
     ASSERT_EQ(again.size(), units.size());
     for (std::size_t i = 0; i < units.size(); ++i) {
       EXPECT_EQ(again[i].type, units[i].type);
@@ -99,7 +100,7 @@ namespace
       }
     }
     EXPECT_NEAR(centreAgain[0], 260.0f, 1e-3f);
-    EXPECT_FALSE(faf::editor::UnitsFromScunits("{ \"Markers\": [] }", again, centreAgain, error));
+    EXPECT_FALSE(faf::editor::UnitsFromScunits("{ \"Markers\": [] }", again, centreAgain));
   }
 
   TEST(
@@ -109,8 +110,8 @@ namespace
   {
     std::vector<SaveUnit> units;
     float centre[3];
-    std::string error;
-    ASSERT_TRUE(faf::editor::UnitsFromScunits(kFafme, units, centre, error)) << error;
+    auto read = faf::editor::UnitsFromScunits(kFafme, units, centre);
+    ASSERT_TRUE(read) << read.error();
     // On a 1024 map they fit and stay.
     EXPECT_FALSE(faf::editor::FitUnitsOnMap(units, centre, 1024.0f, 1024.0f));
     // On a 256 map the factory (250, 300) is off: both move by the same offset, their centre to the map's.

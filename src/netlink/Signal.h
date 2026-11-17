@@ -8,6 +8,7 @@
 #include "netlink/Json.h"
 
 #include <cstdint>
+#include <expected>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -60,7 +61,7 @@ namespace faf::netlink
   // else (the Java side rejects unknown fields).
   std::string ToJson(const CandidatesMessage& msg);
   // Accepts what Jackson accepts and ignores unknown fields.
-  std::optional<CandidatesMessage> CandidatesMessageFromJson(std::string_view text, std::string* error = nullptr);
+  [[nodiscard]] std::expected<CandidatesMessage, std::string> CandidatesMessageFromJson(std::string_view text);
 
   // libjuice's "a=candidate:<foundation> <component> <transport> <priority>
   // <ip> <port> typ <type> [raddr <ip> rport <port>]" line, with or without

@@ -87,9 +87,9 @@ namespace
 
   struct SChunkKeyHash
   {
-    std::size_t operator()(
+    static std::size_t operator()(
       const SChunkKey& key
-    ) const noexcept
+    ) noexcept
     {
       return static_cast<std::size_t>(key.first);
     }
@@ -282,7 +282,7 @@ namespace
     )
     {
       const std::lock_guard<std::mutex> lock(mMutex);
-      return mChunks.find(key) != mChunks.end();
+      return mChunks.contains(key);
     }
 
     /// `used`: kept by the batch's loader, not ahead of it by a helper (which may compile a chunk the

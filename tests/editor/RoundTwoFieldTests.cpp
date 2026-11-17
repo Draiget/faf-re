@@ -42,17 +42,17 @@ namespace faf::editor
     ParsesAndWritesBack
   )
   {
-    JsonTree root;
-    std::string error;
-    ASSERT_TRUE(ParseJsonTree(R"({"a": [1, 2.5, "x\ny"], "b": {"c": true, "d": null}})", root, error)) << error;
+    const auto parsed = ParseJsonTree(R"({"a": [1, 2.5, "x\ny"], "b": {"c": true, "d": null}})");
+    ASSERT_TRUE(parsed) << parsed.error();
+    const JsonTree& root = *parsed;
     EXPECT_EQ(root.Get("a")->items.size(), 3U);
     EXPECT_DOUBLE_EQ(root.Get("a")->items[1].n, 2.5);
     EXPECT_EQ(root.Get("a")->items[2].s, "x\ny");
     EXPECT_TRUE(root.Get("b")->Bool("c", false));
-    JsonTree again;
-    ASSERT_TRUE(ParseJsonTree(WriteJsonTree(root), again, error)) << error;
-    EXPECT_EQ(WriteJsonTree(again), WriteJsonTree(root));
-    EXPECT_FALSE(ParseJsonTree("{\"a\": }", again, error));
+    const auto again = ParseJsonTree(WriteJsonTree(root));
+    ASSERT_TRUE(again) << again.error();
+    EXPECT_EQ(WriteJsonTree(*again), WriteJsonTree(root));
+    EXPECT_FALSE(ParseJsonTree("{\"a\": }"));
   }
 
   TEST(
@@ -113,9 +113,9 @@ namespace faf::editor
     ground.words = words.data();
     ground.width = kSide;
     ground.height = kSide;
-    KeptPathPlan plan;
-    std::string error;
-    ASSERT_TRUE(BuildKeptPath(path, ground, nullptr, false, plan, error)) << error;
+    const auto built = BuildKeptPath(path, ground, nullptr, false);
+    ASSERT_TRUE(built) << built.error();
+    const KeptPathPlan& plan = *built;
     EXPECT_LT(plan.lowest, -4.0f);
     EXPECT_GT(plan.changed, 100U);
     // Written in, kept as the result; the same build on top of it with the result taken off gives the same words.
@@ -132,9 +132,9 @@ namespace faf::editor
     result.x1 = plan.x1;
     result.z1 = plan.z1;
     result.heightDelta = plan.delta;
-    KeptPathPlan again;
-    ASSERT_TRUE(BuildKeptPath(path, ground, &result, false, again, error)) << error;
-    EXPECT_EQ(again.words, plan.words);
+    const auto again = BuildKeptPath(path, ground, &result, false);
+    ASSERT_TRUE(again) << again.error();
+    EXPECT_EQ(again->words, plan.words);
   }
 
   TEST(
@@ -153,9 +153,9 @@ namespace faf::editor
     path.props.what = "/env/evergreen/props/rocks/rock01_prop.bp";
     path.skeleton = true;
     set.paths.push_back(path);
-    KeptPathSet back;
-    std::string error;
-    ASSERT_TRUE(ReadKeptPaths(KeptPathsText(set), back, error)) << error;
+    const auto read = ReadKeptPaths(KeptPathsText(set));
+    ASSERT_TRUE(read) << read.error();
+    const KeptPathSet& back = *read;
     ASSERT_EQ(back.paths.size(), 1U);
     EXPECT_EQ(KeptPathsText(back), KeptPathsText(set));
     EXPECT_TRUE(back.paths[0].bezier);
@@ -224,7 +224,7 @@ namespace faf::editor
       DetailClasses("evergreen", [&blueprints](const std::string& group, const std::string& name) {
       return FindEnvironmentProp(blueprints, group, name);
     }, [](const std::string& path) {
-      return path.find("eg_cliff01") != std::string::npos;
+      return path.contains("eg_cliff01");
     });
     // small and stones (fieldstone01), big (rock03), cliff (one decal); crack and ground have nothing.
     ASSERT_EQ(classes.size(), 4U);

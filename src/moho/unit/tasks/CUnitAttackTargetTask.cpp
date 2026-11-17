@@ -1,6 +1,7 @@
 #include "moho/unit/tasks/CUnitAttackTargetTask.h"
 #include "moho/unit/tasks/TaskThreadWake.h"
 
+#include <utility>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -678,7 +679,7 @@ namespace moho
         mTargetPosition = COORDS_ToWorldPos(
           unit->SimulationRef->mMapData,
           adjustedPosition,
-          static_cast<ELayer>(static_cast<std::uint8_t>(footprint.mOccupancyCaps)),
+          static_cast<ELayer>(std::to_underlying(footprint.mOccupancyCaps)),
           static_cast<int>(footprint.mSizeX),
           static_cast<int>(footprint.mSizeZ)
         );
@@ -792,7 +793,7 @@ namespace moho
     }
 
     if (mTarget.HasTarget()) {
-      switch (static_cast<std::int32_t>(event)) {
+      switch (std::to_underlying(event)) {
       case 1:
         commandTask->mTaskState = TASKSTATE_Complete;
         break;

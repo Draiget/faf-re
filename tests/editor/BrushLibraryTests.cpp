@@ -79,8 +79,10 @@ namespace
     const TempFolder source("source");
     const TempFolder library("library");
     std::string error;
-    ASSERT_TRUE(faf::editor::WriteHeightImage(source.path / "ramp.png", RampImage(33), error)) << error;
-    ASSERT_TRUE(faf::editor::WriteHeightImage(source.path / "Another.png", RampImage(17), error)) << error;
+    const auto wroteRamp = faf::editor::WriteHeightImage(source.path / "ramp.png", RampImage(33));
+    ASSERT_TRUE(wroteRamp) << wroteRamp.error();
+    const auto wroteAnother = faf::editor::WriteHeightImage(source.path / "Another.png", RampImage(17));
+    ASSERT_TRUE(wroteAnother) << wroteAnother.error();
     std::ofstream(source.path / "notes.txt") << "not an image";
 
     EXPECT_EQ(
@@ -92,13 +94,14 @@ namespace
     EXPECT_EQ(images[1].name, "ramp");
     EXPECT_EQ(faf::editor::ListBrushImages(source.path).size(), 2u) << "the text file isn't an image";
 
-    ShapeGrid grid;
-    ASSERT_TRUE(faf::editor::LoadBrushImage(images[1].path, 65, grid, error)) << error;
+    const auto loaded = faf::editor::LoadBrushImage(images[1].path, 65);
+    ASSERT_TRUE(loaded) << loaded.error();
+    const ShapeGrid& grid = *loaded;
     EXPECT_EQ(grid.n, 65);
     EXPECT_NEAR(grid.Sample(-1.0f, 0.0f), 0.0f, 0.01f) << "black on the left";
     EXPECT_NEAR(grid.Sample(1.0f, 0.0f), 1.0f, 0.01f) << "white on the right";
     EXPECT_NEAR(grid.Sample(0.0f, 0.5f), 0.5f, 0.02f);
-    EXPECT_FALSE(faf::editor::LoadBrushImage(source.path / "missing.png", 65, grid, error));
+    EXPECT_FALSE(faf::editor::LoadBrushImage(source.path / "missing.png", 65));
   }
 
   TEST(

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdio>
+#include <functional>
 #include <map>
 #include <string>
 #include <utility>
@@ -9,8 +10,10 @@
 #include "editor/ui/EdFieldsPanel.h"
 #include "editor/doc/EdLuaApi.h"
 #include "editor/EdTools.h"
+#include "editor/tools/EdMeshData.h"
 #include "editor/doc/EdAdaptiveModel.h"
 #include "editor/tools/EdChecks.h"
+#include "editor/tools/EdTerrainChecks.h"
 #include "editor/doc/EdLighting.h"
 #include "editor/doc/EdLooks.h"
 #include "editor/doc/EdNewMap.h"
@@ -356,6 +359,35 @@ namespace faf::editor
     {
       mLookSwatches[id] = swatch;
     }
+    /** A look's picture (this map painted under its light, FAF Studio's look thumbnails); 0 = it can't be drawn. */
+    void SetLookThumb(
+      const std::string& id,
+      const std::uint64_t image
+    )
+    {
+      mLookThumbs[id] = image;
+    }
+    /** The next look whose row is on screen without its picture. */
+    [[nodiscard]] bool TakeLookThumbWanted(
+      std::string& id
+    )
+    {
+      if (mLookThumbWanted.empty()) {
+        return false;
+      }
+      id = mLookThumbWanted.front();
+      mLookThumbWanted.erase(mLookThumbWanted.begin());
+      return true;
+    }
+    /** Redraw pictures was pressed (the map changed under them). */
+    [[nodiscard]] bool TakeLookThumbsRedraw() noexcept
+    {
+      const bool redraw = mLookThumbsRedraw;
+      mLookThumbsRedraw = false;
+      return redraw;
+    }
+    /** Lets every look picture go (another map, or a redraw). */
+    void ClearLookThumbs();
     [[nodiscard]] bool LookTrying() const noexcept
     {
       return !mLookTried.empty();
@@ -382,6 +414,21 @@ namespace faf::editor
     {
       mShowCheck = true;
       mRunCheck = true;
+    }
+    /** The Check's settings panel's values (test runs: `/checksettings`). */
+    void SetCheckSettings(
+      const TerrainCheckSettings& settings,
+      const int unitClass,
+      const bool validators,
+      const bool symmetry,
+      const bool paths
+    ) noexcept
+    {
+      mTerrainCheck = settings;
+      mTerrainCheckClass = unitClass;
+      mCheckValidators = validators;
+      mCheckSymmetry = symmetry;
+      mCheckPaths = paths;
     }
     /** Test runs (`/unitspawn <group>`): the selected unit's Spawns choice set to that group, as a pick in its list. */
     void TestUnitSpawn(
@@ -412,6 +459,8 @@ namespace faf::editor
      * the first time). The panels shown in the one left are kept for it.
      */
     void SwitchWorkspace(int workspace);
+    /** After a named layout is read: the active workspace shows the panels the layout lists for it. */
+    void ApplyShownPanels();
     /**
      * The start screen (design §8 Files) over the panels: `page` 0 Home, 1 On this computer, 2 FAF vault. File > Open
      * and every "Open a map..." show its pages; a map opening, a workspace tab or Continue put it away.
@@ -587,6 +636,27 @@ namespace faf::editor
       mImageAsks.erase(mImageAsks.begin());
       return true;
     }
+    /** The Images panel's previews (an ImTextureID each, 0 = none): the rows on screen ask, the app makes them. */
+    void SetImageThumb(
+      const std::string& what,
+      const std::uint64_t image
+    )
+    {
+      mImageThumbs[what] = image;
+    }
+    [[nodiscard]] bool TakeImageThumbWanted(
+      std::string& what
+    )
+    {
+      if (mImageThumbWanted.empty()) {
+        return false;
+      }
+      what = mImageThumbWanted.front();
+      mImageThumbWanted.erase(mImageThumbWanted.begin());
+      return true;
+    }
+    /** Lets every preview go (the map changed under them). */
+    void ClearImageThumbs();
     void SetImageStatus(
       std::string status
     )
@@ -605,7 +675,16 @@ namespace faf::editor
     /** The mesh terrain view's mode (0 the height field, 1 the mesh, 2 both) and its other asks. */
     int mMeshMode = 1;
     bool mMeshMakeMap = true;
-    int mMeshAskMore = 0; // 1 load again, 2 check
+    int mMeshAskMore = 0; // 1 load again, 2 check, 3 save the manifest, 4 unset, 5 set, 6 sync map, 7 new
+    int mMeshSetting = 0; // the settings list's chosen row (edmesh::SettingKeys)
+    edmesh::MeshMap* mMeshMapView = nullptr;
+    int mMeshMaterial = 0;
+    void SetMeshMapView(
+      edmesh::MeshMap* mesh
+    ) noexcept
+    {
+      mMeshMapView = mesh;
+    }
     std::vector<std::string> mMeshFindings;
     [[nodiscard]] int MeshMode() const noexcept
     {
@@ -614,6 +693,13 @@ namespace faf::editor
     [[nodiscard]] int TakeMeshMore() noexcept
     {
       return std::exchange(mMeshAskMore, 0);
+    }
+    /** Test runs: the panel's Load / Check / Save / Unset / Set (1..5). */
+    void AskMeshMore(
+      const int ask
+    ) noexcept
+    {
+      mMeshAskMore = ask;
     }
     void SetMeshFindings(
       std::vector<std::string> findings
@@ -653,6 +739,12 @@ namespace faf::editor
     {
       return mMeshShown;
     }
+    void SetMeshShown(
+      const bool shown
+    ) noexcept
+    {
+      mMeshShown = shown;
+    }
     [[nodiscard]] EdModHost& ModHost() noexcept
     {
       return mModHost;
@@ -669,13 +761,68 @@ namespace faf::editor
     {
       mShowUnitViewer = true;
     }
+    /** Where the view's menu was opened, and what stands there (the app fills it from the view). */
+    struct ViewMenuPoint
+    {
+      bool valid = false;
+      float x = 0.0f;
+      float z = 0.0f;
+      float height = 0.0f;
+      std::string what;
+      std::string marker;
+      std::string markerType;
+      std::string unitArmy;
+      std::string unitName;
+      std::vector<std::string> armies;              // for Set army
+      std::vector<std::vector<std::string>> groups; // the unit's army's groups, for Move to group
+      std::string unitToPlace;                      // the Units tool's unit
+      std::string propToPlace;                      // the Props tool's prop
+    };
+    /** An entry of the menu that acts at its point (the app runs it). */
+    struct ViewMenuAction
+    {
+      enum class Kind
+      {
+        None,
+        PlaceMarker, // arg: the type
+        AddArea,
+        PlaceUnit,
+        PlaceProp,
+        FocusHere,
+        SnapToGrid,
+        SetArmy, // arg: the army
+        MoveToGroup,
+      } kind = Kind::None;
+      std::string arg;
+      std::vector<std::string> path;
+    };
     /** The view's context menu, at the mouse, the next frame (ViewMenuCommands). */
     void OpenViewMenu(
       const bool selection
+    )
+    {
+      OpenViewMenu(selection, ViewMenuPoint());
+    }
+    void OpenViewMenu(
+      const bool selection,
+      ViewMenuPoint point
     ) noexcept
     {
       mViewMenuAsk = true;
       mViewMenuSelection = selection;
+      mViewMenuPoint = std::move(point);
+    }
+    [[nodiscard]] bool TakeViewMenuAction(
+      ViewMenuPoint& point,
+      ViewMenuAction& action
+    )
+    {
+      if (mViewMenuAction.kind == ViewMenuAction::Kind::None) {
+        return false;
+      }
+      point = mViewMenuPoint;
+      action = std::exchange(mViewMenuAction, {});
+      return true;
     }
 
   private:
@@ -763,8 +910,12 @@ namespace faf::editor
     bool mMeshShown = true;
     std::string mMeshStatus;
     std::string mImageStatus;
+    std::map<std::string, std::uint64_t> mImageThumbs;
+    std::vector<std::string> mImageThumbWanted;
     EdFieldsPanel mFieldsPanel;
     bool mViewMenuAsk = false;
+    ViewMenuPoint mViewMenuPoint;
+    ViewMenuAction mViewMenuAction;
     char mSaveAsParent[512] = {};
     /** Map info's fields being typed in: key -> text (the scenario's value otherwise). */
     std::map<std::string, std::string> mInfoEdits;
@@ -792,6 +943,8 @@ namespace faf::editor
     int mTourStep = -1;
     bool mShowHome = false;
     bool mHomeFocusSearch = false;
+    /** The start screen's tip (FAF Studio's tips.lua): its number, -1 until the first is picked by the clock. */
+    int mHomeTip = -1;
     bool mHomeFront = false;
     int mHomePage = 0;
     char mHomeSearch[128] = {};
@@ -973,6 +1126,10 @@ namespace faf::editor
     std::string mLookStatus;
     std::vector<std::string> mMyLooks;
     std::map<std::string, LookSwatch> mLookSwatches;
+    std::map<std::string, std::uint64_t> mLookThumbs;
+    std::vector<std::string> mLookThumbWanted;
+    bool mLookThumbsShown = true;
+    bool mLookThumbsRedraw = false;
     char mLookSaveName[64]{};
     void DrawLooks();
     bool mSkyboxExport = false;
@@ -985,8 +1142,25 @@ namespace faf::editor
     std::string mScriptMessage;
     int mScriptErrorLine = 0;
     void RunCheck();
+
+  public:
+    /**
+     * The Check's resource part through the game's build rules (FAF Studio's validate.lua "blocked"): each mass and
+     * hydrocarbon marker tested with its building's footprint (slope, water, playable area, units, props). Set by the
+     * app (the view's unit fit).
+     */
+    std::function<std::vector<CheckIssue>()> resourceFit;
+
+  private:
     /** The pathing part of the Check: what each start reaches by land, and the overlay. */
     void CheckPathing(const MarkerCheckInput& input);
+    /** The Check's settings (FAF Studio's terrain checks panel): the terrain checks' thresholds and which parts run. */
+    TerrainCheckSettings mTerrainCheck;
+    int mTerrainCheckClass = 2;   // 1 small .. 4 experimental: the footprint window 1, 2, 3, 5
+    bool mCheckValidators = true; // the resources through the game's build rules
+    bool mCheckSymmetry = true;   // markers and props without a partner at their symmetric copies
+    bool mCheckPaths = true;      // the kept paths steeper than their grade
+    void DrawCheckSettings();
     bool mShowCheck = true;
     std::vector<CheckIssue> mCheckIssues;
     bool mCheckRan = false;

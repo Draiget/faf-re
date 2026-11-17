@@ -1,6 +1,7 @@
 #include "legacy/algorithms/Sort.h"
 #include "CInfluenceMap.h"
 
+#include <utility>
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
@@ -1790,10 +1791,10 @@ namespace moho
    */
   struct ThreatDescending
   {
-    [[nodiscard]] bool operator()(
+    [[nodiscard]] static bool operator()(
       const SPositionThreat& lhs,
       const SPositionThreat& rhs
-    ) const noexcept
+    ) noexcept
     {
       return rhs.threat < lhs.threat;
     }
@@ -1943,7 +1944,7 @@ namespace moho
           Entity* const entity = sim->mEntityDB->FindEntityById(static_cast<std::uint32_t>(entry.entityId));
           if (entity) {
             blip = entity->IsReconBlip();
-            entry.sourceLayer = static_cast<std::int32_t>(entity->mVarDat.mLayerMask);
+            entry.sourceLayer = std::to_underlying(entity->mVarDat.mLayerMask);
           }
         }
 

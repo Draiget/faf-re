@@ -49,17 +49,15 @@ namespace faf::editor
     return out + "}";
   }
 
-  bool UnitsFromScunits(
+  std::expected<void, std::string> UnitsFromScunits(
     const std::string& text,
     std::vector<SaveUnit>& units,
-    float (&centre)[3],
-    std::string& error
+    float (&centre)[3]
   )
   {
     std::string array;
     if (!JsonValue(text, "Units", array) || array.empty() || array.front() != '[') {
-      error = "not a units file (no Units list)";
-      return false;
+      return std::unexpected("not a units file (no Units list)");
     }
     for (const std::string& object : JsonObjects(array)) {
       SaveUnit unit;
@@ -84,7 +82,7 @@ namespace faf::editor
     float fafme[3] = {0.0f, 0.0f, 0.0f};
     JsonVector(text, "Center", fafme, 3);
     FafmeToGame(fafme, centre);
-    return true;
+    return {};
   }
 
   bool FitUnitsOnMap(

@@ -571,6 +571,12 @@ ShellTopLevelWindow::ShellTopLevelWindow(
   }
   SetTopLevel(native);
   sNativeWindows[native] = this;
+  // The full-screen frame (0x200800) doesn't clip its children either. Direct3D 9 draws a full-screen
+  // picture into the frame, not into the viewport inside it; where the frame clips the viewport's
+  // area, DXVK's picture of it stays black (#418).
+  platform::window::SetFrameStyle(
+    native, (style & SHELL_NO_BORDER) == 0, (style & SHELL_RESIZE_BORDER) != 0, (style & SHELL_CLIP_CHILDREN) != 0
+  );
   int screenX = 0;
   int screenY = 0;
   int clientWidth = 0;
@@ -586,7 +592,10 @@ void ShellTopLevelWindow::SetWindowStyleFlag(
   m_windowStyle = style;
   if (GetPlatformWindow() != nullptr) {
     platform::window::SetFrameStyle(
-      GetPlatformWindow(), (style & SHELL_NO_BORDER) == 0, (style & SHELL_RESIZE_BORDER) != 0
+      GetPlatformWindow(),
+      (style & SHELL_NO_BORDER) == 0,
+      (style & SHELL_RESIZE_BORDER) != 0,
+      (style & SHELL_CLIP_CHILDREN) != 0
     );
   }
 }

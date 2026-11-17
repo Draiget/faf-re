@@ -4,16 +4,14 @@
 #include <fstream>
 namespace moho::sfd
 {
-  bool ReadMetadata(
+  std::expected<void, std::string> ReadMetadata(
     const char* filename,
-    Metadata& result,
-    std::string& error
+    Metadata& result
   )
   {
     result = {};
     if (!filename || !*filename) {
-      error = "Empty movie path";
-      return false;
+      return std::unexpected("Empty movie path");
     }
     const auto* utf8 = reinterpret_cast<const char8_t*>(filename);
     std::ifstream file(std::filesystem::path(std::u8string_view(utf8)), std::ios::binary);
@@ -21,8 +19,7 @@ namespace moho::sfd
     file.read(reinterpret_cast<char*>(bytes.data()), bytes.size());
     const std::span<const std::byte> data(bytes.data(), static_cast<std::size_t>(file.gcount()));
     if (!ParseSfdHeader(data, result.header)) {
-      error = "Missing, malformed or unsupported FAF SFD header";
-      return false;
+      return std::unexpected("Missing, malformed or unsupported FAF SFD header");
     }
     // Diagnostic only: inspect bounded private_stream_2 packet candidates, never
     // demux media or interpret unconfirmed CRITAGS/AINF/subtitle layouts here.
@@ -40,6 +37,6 @@ namespace moho::sfd
         i += 5 + length;
       }
     }
-    return true;
+    return {};
   }
 } // namespace moho::sfd

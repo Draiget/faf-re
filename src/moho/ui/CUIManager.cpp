@@ -10,13 +10,17 @@
 
 #include "gpg/core/utils/Global.h"
 #include "gpg/core/utils/Logging.h"
+#include "gpg/gal/RenderProfiler.h"
+#include "lua/LuaMemAccounting.h"
 #include "lua/LuaObject.h"
 #include "lua/LuaIncrementalGc.h"
 #include "moho/misc/StatItem.h"
 #include "moho/misc/Stats.h"
 #include "moho/render/d3d/CD3DPrimBatcher.h"
 #include "moho/console/TConVarbool.h"
+#include "moho/lua/CScrLuaInitForm.h"
 #include "moho/app/UserWorkerPool.h"
+#include "moho/ui/UiDisplayScale.h"
 
 namespace moho
 {
@@ -246,10 +250,108 @@ namespace
     // Built before the globals lookup, as the binary does: the serializer takes
     // the stat tree's lock and can run script-visible allocation.
     LuaPlus::LuaObject engineStatsTable{};
-    moho::STAT_GetLuaTable(state, moho::GetEngineStats()->mItem.get(), engineStatsTable);
+    {
+      const gpg::gal::CpuProfileScope profileStats("UiStatsBuild"); // FAF instrumentation
+      moho::STAT_GetLuaTable(state, moho::GetEngineStats()->mItem.get(), engineStatsTable);
+    }
 
     LuaPlus::LuaObject globals = state->GetGlobals();
     globals.SetObject("__EngineStats", engineStatsTable);
+  }
+
+  /*
+   * Engine addition (ui_EngineStatsOnDemand), not in the binary: `__EngineStats` is a fixed, empty proxy table whose
+   * `__index` builds the statistics tree the first time a UI frame reads it and answers every read of that frame from
+   * the same table. The original rebuilds the tree every frame whether or not any script looks at it, which was about
+   * 0.14 ms and 264 of the UI's 302 Lua allocations a frame (issue 455's profile). Every reader in FAF's Lua reads a
+   * field (`__EngineStats.Children`), so each still sees a whole tree built this frame; a script that keeps the
+   * global in a local (`performance.lua`) now sees live values instead of the table of the frame it ran first.
+   */
+  bool ui_EngineStatsOnDemand = true;
+  moho::TConVar<bool> gTConVar_ui_EngineStatsOnDemand(
+    "ui_EngineStatsOnDemand",
+    "Build the engine statistics table __EngineStats only when UI script reads it, once a frame at most (1, the "
+    "default); 0 rebuilds it every frame as the original does.",
+    &ui_EngineStatsOnDemand
+  );
+
+  /// Counts UI frames from 1, so a stamp of 0 (a light userdata of null) never matches.
+  std::uintptr_t sEngineStatsFrame = 1U;
+  /// The UI state whose `__EngineStats` is the proxy; null while the plain table is published.
+  LuaPlus::LuaState* sEngineStatsProxyState = nullptr;
+
+  int EngineStatsProxyIndex(
+    lua_State* const L
+  )
+  {
+    // 1: the proxy, 2: the key.
+    if (lua_getmetatable(L, 1) == 0) {
+      return 0;
+    }
+    const int metatable = lua_gettop(L);
+    lua_pushstring(L, "__frame");
+    lua_rawget(L, metatable);
+    const bool fresh = lua_touserdata(L, -1) == reinterpret_cast<void*>(sEngineStatsFrame);
+    lua_pop(L, 1);
+    if (!fresh) {
+      LuaPlus::LuaState* const state = moho::SCR_ResolveBindingState(L);
+      LuaPlus::LuaObject engineStatsTable{};
+      {
+        const gpg::gal::CpuProfileScope profileStats("UiStatsBuild"); // FAF instrumentation
+        moho::STAT_GetLuaTable(state, moho::GetEngineStats()->mItem.get(), engineStatsTable);
+      }
+      lua_pushstring(L, "__cache");
+      engineStatsTable.PushStack(state);
+      lua_rawset(L, metatable);
+      lua_pushstring(L, "__frame");
+      lua_pushlightuserdata(L, reinterpret_cast<void*>(sEngineStatsFrame));
+      lua_rawset(L, metatable);
+    }
+    lua_pushstring(L, "__cache");
+    lua_rawget(L, metatable);
+    lua_pushvalue(L, 2);
+    lua_gettable(L, -2);
+    return 1;
+  }
+
+  void InstallEngineStatsProxy(
+    LuaPlus::LuaState* const state
+  )
+  {
+    lua_State* const L = state->m_state;
+    const int top = lua_gettop(L);
+    lua_pushstring(L, "__EngineStats");
+    lua_newtable(L);
+    lua_newtable(L);
+    lua_pushstring(L, "__index");
+    lua_pushcfunction(L, &EngineStatsProxyIndex);
+    lua_rawset(L, -3);
+    (void)lua_setmetatable(L, -2);
+    lua_rawset(L, LUA_GLOBALSINDEX);
+    lua_settop(L, top);
+  }
+
+  /** Once a UI frame: the proxy when ui_EngineStatsOnDemand is on, else the whole tree as the original does. */
+  void UpdateEngineStatsForLua(
+    LuaPlus::LuaState* const state
+  )
+  {
+    if (state == nullptr || state->m_state == nullptr) {
+      return;
+    }
+    ++sEngineStatsFrame;
+    if (sEngineStatsFrame == 0U) {
+      sEngineStatsFrame = 1U;
+    }
+    if (ui_EngineStatsOnDemand) {
+      if (sEngineStatsProxyState != state) {
+        InstallEngineStatsProxy(state);
+        sEngineStatsProxyState = state;
+      }
+      return;
+    }
+    sEngineStatsProxyState = nullptr;
+    PublishEngineStatsToLua(state);
   }
 } // namespace
 
@@ -378,6 +480,12 @@ bool moho::CUIManager::SetNewLuaState(
   delete GetCursor();
   mLuaState = state;
 
+  // FAF instrumentation (FAF_GPU_PROFILE): the profiler counts this state's Lua allocations.
+  if (gpg::gal::RenderProfiler::Enabled()) {
+    lua::gProfiledAllocations.state =
+      mLuaState != nullptr && mLuaState->m_state != nullptr ? mLuaState->m_state->l_G : nullptr;
+  }
+
   if (mLuaState == nullptr) {
     return true;
   }
@@ -387,6 +495,8 @@ bool moho::CUIManager::SetNewLuaState(
   // the stat tree before any frame exists.
   LuaPlus::LuaObject globals = mLuaState->GetGlobals();
   (void)globals.CreateTable("__EngineStats", 0, 0);
+  // A new state may reuse the old one's address; its placeholder still needs the proxy (ui_EngineStatsOnDemand).
+  sEngineStatsProxyState = nullptr;
 
   for (std::size_t head = 0; head < mInputWindows.Size(); ++head) {
     std::shared_ptr<CMauiFrame> frame = CMauiFrame::Create(mLuaState);
@@ -480,23 +590,33 @@ void moho::CUIManager::UpdateFrameRate(
 )
 {
   FAF_PROFILE_ZONE_NAMED("UI");
+  // FAF instrumentation (FAF_GPU_PROFILE): the tick's time, and the UI Lua state's
+  // allocations and size, for the whole frame and for its OnFrame callbacks apart.
+  const gpg::gal::CpuProfileScope profileTick("UiTick");
   ReleaseRetiredFrames();
 
   {
     FAF_PROFILE_ZONE_NAMED("UI::FrameWindows");
+    const gpg::gal::CpuProfileScope profileOnFrame("UiOnFrame");
+    const lua::ProfiledAllocationsSince onFrameAllocations;
     for (std::size_t index = 0; index < mFrames.Size(); ++index) {
       if (mFrames[index]) {
         mFrames[index]->Frame(deltaSeconds);
       }
     }
+    FAF_PROFILE_COUNT("ui.lua.allocs.onframe", onFrameAllocations.Blocks());
+    FAF_PROFILE_COUNT("ui.lua.allocbytes.onframe", onFrameAllocations.Bytes());
   }
 
   if (CMauiCursor* const cursor = GetCursor()) {
     MAUI_UpdateCursor(cursor);
   }
 
+  // Engine addition (UI scaling and DPI): tells the UI when the window's display scale changed.
+  UI_NoteDisplayScale(mLuaState);
+
   if (mLuaState != nullptr) {
-    PublishEngineStatsToLua(mLuaState);
+    UpdateEngineStatsForLua(mLuaState);
 
     mGCTime += deltaSeconds;
 
@@ -527,6 +647,7 @@ void moho::CUIManager::UpdateFrameRate(
       } else if (ui_IdleGC) {
         sPendingUiGc = true;
       } else if (mLuaState->m_state != nullptr) {
+        const gpg::gal::CpuProfileScope profileGc("UiGc"); // FAF instrumentation
         lua_setgcthreshold(mLuaState->m_state, 0);
       }
     }
@@ -534,6 +655,17 @@ void moho::CUIManager::UpdateFrameRate(
 
   STAT_Frame();
   UI_UpdateCommandFeedbackBlips(deltaSeconds);
+
+  if (gpg::gal::RenderProfiler::Enabled()) {
+    // Everything the UI state allocated since the last tick: events, beats and selection changes included.
+    static lua::ProfiledAllocationsSince sSinceLastTick;
+    FAF_PROFILE_COUNT("ui.lua.allocs", sSinceLastTick.Blocks());
+    FAF_PROFILE_COUNT("ui.lua.allocbytes", sSinceLastTick.Bytes());
+    sSinceLastTick = lua::ProfiledAllocationsSince{};
+    if (mLuaState != nullptr && mLuaState->m_state != nullptr) {
+      FAF_PROFILE_COUNT("ui.lua.heapkb", mLuaState->m_state->l_G->nblocks / 1024U);
+    }
+  }
 }
 
 void moho::UI_ProcessIdleGC()
@@ -542,6 +674,7 @@ void moho::UI_ProcessIdleGC()
     if (CUIManager* const uiMgr = static_cast<CUIManager*>(UI_GetManager())) {
       if (uiMgr->mLuaState != nullptr && uiMgr->mLuaState->m_state != nullptr) {
         FAF_PROFILE_ZONE_NAMED("UI::LuaGCStep");
+        const gpg::gal::CpuProfileScope profileGc("UiGc"); // FAF instrumentation
         // Work units are 5.1 singlestep costs (bytes of mark traversal), not
         // milliseconds. The budget scales with the current heap size and the
         // allocation debt so that one cycle fits into the five-second window
@@ -567,6 +700,7 @@ void moho::UI_ProcessIdleGC()
   sPendingUiGc = false;
   if (CUIManager* const uiMgr = static_cast<CUIManager*>(UI_GetManager())) {
     if (uiMgr->mLuaState != nullptr && uiMgr->mLuaState->m_state != nullptr) {
+      const gpg::gal::CpuProfileScope profileGc("UiGc"); // FAF instrumentation
       lua_setgcthreshold(uiMgr->mLuaState->m_state, 0);
     }
   }
@@ -578,6 +712,7 @@ void moho::UI_ProcessIdleGC()
 bool moho::CUIManager::DoBeat()
 {
   FAF_PROFILE_ZONE_NAMED("UI::Beat");
+  const gpg::gal::CpuProfileScope profileBeat("UiBeat"); // FAF instrumentation
   UI_FactoryCommandQueueHandlerBeat();
   return UI_LuaBeat();
 }
@@ -690,6 +825,7 @@ void moho::CUIManager::ValidateFrame(
 
   std::shared_ptr<CMauiFrame>& frame = mFrames[static_cast<std::size_t>(frameIdx)];
   if (frame) {
+    const gpg::gal::CpuProfileScope profileDepth("UiDepth"); // FAF instrumentation
     frame->Render();
   }
 }

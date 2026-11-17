@@ -1,5 +1,6 @@
 #include "moho/unit/core/UnitLuaPrivate.h"
 #include "moho/effects/rendering/EffectOps.h"
+#include <utility>
 
 namespace
 {
@@ -557,7 +558,7 @@ int moho::cfunc_UnitMeleeWarpAdjacentToTargetL(
     const Wm3::Vec3f worldPosition = COORDS_ToWorldPos(
       mapData,
       cell,
-      static_cast<ELayer>(static_cast<std::uint8_t>(meleeFootprint.mOccupancyCaps)),
+      static_cast<ELayer>(std::to_underlying(meleeFootprint.mOccupancyCaps)),
       meleeFootprint.mSizeX,
       meleeFootprint.mSizeZ
     );
@@ -1851,7 +1852,7 @@ namespace moho
     // The binary sets the payload fields inline (an inlined SUnitConstructionParams
     // ctor) then forces mFixElevation = 0; the ctor call below yields the identical
     // final payload (mUseLayerOverride = 1 comes from the ctor, elevation is cleared).
-    SUnitConstructionParams params(static_cast<std::int32_t>(layer), transform, army, blueprint, nullptr, true);
+    SUnitConstructionParams params(std::to_underlying(layer), transform, army, blueprint, nullptr, true);
     params.mFixElevation = 0;
 
     Unit* const unit = sim->CreateUnitForScript(params, true);
@@ -2008,7 +2009,7 @@ namespace moho
         layerArg.TypeError("string");
         layerText = "";
       }
-      layer = static_cast<std::int32_t>(COORDS_StringToLayer(layerText));
+      layer = std::to_underlying(COORDS_StringToLayer(layerText));
     }
 
     CArmyImpl* const army = sim->mArmiesList[armyIndex - 1];

@@ -4,6 +4,7 @@
 #include "gpg/gal/D3D9Utils.h"
 #include "gpg/gal/Device.hpp"
 #include "gpg/gal/Error.hpp"
+#include <utility>
 // The Direct3D 9 backend is Windows-only (the Linux client, issue #255).
 #if FAFRE_PLATFORM_WINDOWS
 #include "gpg/gal/backends/d3d9/DeviceD3D9.hpp"
@@ -93,10 +94,10 @@ namespace moho
 
     std::uint32_t lockFlags = 0;
     if (readOnly) {
-      lockFlags = static_cast<std::uint32_t>(gpg::gal::MohoD3DLockFlags::NoOverwrite);
+      lockFlags = std::to_underlying(gpg::gal::MohoD3DLockFlags::NoOverwrite);
     }
     if (discard) {
-      lockFlags |= static_cast<std::uint32_t>(gpg::gal::MohoD3DLockFlags::Discard);
+      lockFlags |= std::to_underlying(gpg::gal::MohoD3DLockFlags::Discard);
     }
 
     const int byteOffset = startVertex * static_cast<int>(strideBytes);

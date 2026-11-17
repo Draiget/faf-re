@@ -17,7 +17,7 @@ namespace faf::editor
       while (!line.empty() && std::isspace(static_cast<unsigned char>(line.front())) != 0) {
         line.remove_prefix(1);
       }
-      if (line.size() > 6 && (line.substr(0, 6) == "Format" || line.substr(0, 6) == "format")) {
+      if (line.size() > 6 && (line.starts_with("Format") || line.starts_with("format"))) {
         line.remove_prefix(6);
         while (!line.empty() && (line.front() == ' ' || line.front() == '\t')) {
           line.remove_prefix(1);

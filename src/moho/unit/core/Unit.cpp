@@ -276,12 +276,11 @@ namespace moho
 
     EOccupancyCaps occupancyCaps = OCCUPY_MobileCheck(footprint, mapData, cellPos);
     if (unit->mVarDat.mLayerMask == LAYER_Water) {
-      occupancyCaps = static_cast<EOccupancyCaps>(
-        static_cast<std::uint8_t>(occupancyCaps) & ~static_cast<std::uint8_t>(EOccupancyCaps::OC_SUB)
-      );
+      occupancyCaps =
+        static_cast<EOccupancyCaps>(std::to_underlying(occupancyCaps) & ~std::to_underlying(EOccupancyCaps::OC_SUB));
     }
 
-    return static_cast<std::uint8_t>(OCCUPY_FootprintFits(*sim.mOGrid, cellPos, footprint, occupancyCaps)) == 0u;
+    return std::to_underlying(OCCUPY_FootprintFits(*sim.mOGrid, cellPos, footprint, occupancyCaps)) == 0u;
   }
 }
 
@@ -850,3 +849,4 @@ namespace moho
 #include "UnitEconomy.inl"
 
 #include "UnitInterface.inl"
+#include <utility>

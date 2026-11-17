@@ -226,7 +226,7 @@ namespace gpg::gal
       };
       lower(commandLine);
       lower(needle);
-      return commandLine.find(needle) != std::string::npos;
+      return commandLine.contains(needle);
     }
 
     // FNV-1a, 64-bit: keys the compiled-effect cache.

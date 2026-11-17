@@ -157,7 +157,7 @@ namespace faf::editor
     if (brace == std::string::npos) {
       return scenario;
     }
-    const std::string newline = scenario.find("\r\n") != std::string::npos ? "\r\n" : "\n";
+    const std::string newline = scenario.contains("\r\n") ? "\r\n" : "\n";
     return scenario.substr(0, brace + 1) + newline + "    " + key + " = " + written + "," + scenario.substr(brace + 1);
   }
 
@@ -362,7 +362,7 @@ namespace faf::editor
     const std::string& text
   )
   {
-    if (text.rfind("<LOC", 0) == 0) {
+    if (text.starts_with("<LOC")) {
       const std::size_t close = text.find('>');
       return close == std::string::npos ? std::string() : text.substr(close + 1);
     }

@@ -1,7 +1,7 @@
 name: AddressSanitizer
 
 # The Linux tests built with AddressSanitizer (the linux-clang-x64-asan preset, FAF_ASAN in
-# cmake/FafLinux.cmake): every out-of-bounds access, use after free or double free a test reaches
+# cmake/FafPosix.cmake): every out-of-bounds access, use after free or double free a test reaches
 # stops it with a report naming the access, where the block was allocated and where it was freed.
 # The x64 small-block pool is off in this build by itself (src/gpg/core/utils/Global.cpp), so ASan
 # sees every block. Leak reports are off: the engine keeps some objects for the whole run on purpose.

@@ -3,6 +3,7 @@
 
 #include "moho/misc/StatItem.h"
 
+#include <utility>
 #include <gtest/gtest.h>
 
 #include <cstdint>
@@ -111,9 +112,9 @@ TEST(
     const std::int32_t seven = 7;
     (void)stat->SetInt(&seven);
   }
-  (void)perTick->Release(static_cast<std::int32_t>(moho::EPulseMode::kTick)); // Release sets the pulse mode
+  (void)perTick->Release(std::to_underlying(moho::EPulseMode::kTick)); // Release sets the pulse mode
 
-  root.ClearChildren(static_cast<std::int32_t>(moho::EPulseMode::kTick));
+  root.ClearChildren(std::to_underlying(moho::EPulseMode::kTick));
   EXPECT_EQ(perTick->GetInt(true), 7);
   EXPECT_EQ(perTick->GetInt(false), 0);
   EXPECT_EQ(kept->GetInt(false), 7);

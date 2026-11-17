@@ -7,6 +7,10 @@ A preprocessor test (#if, #elif, #ifdef, #ifndef, #elifdef, #elifndef) is refuse
      __unix. Use FAFRE_PLATFORM_WINDOWS, FAFRE_PLATFORM_POSIX, FAFRE_PLATFORM_LINUX or
      FAFRE_PLATFORM_MACOS: `#ifdef _WIN32` is `#if FAFRE_PLATFORM_WINDOWS`, `#ifndef _WIN32` is
      `#if !FAFRE_PLATFORM_WINDOWS`.
+  1a. a compiler's processor macro: _M_IX86, __i386__, _M_X64, _M_AMD64, __x86_64__, _M_ARM64,
+     __aarch64__, __arm64__. Use FAFRE_ARCH_X86, FAFRE_ARCH_X64, FAFRE_ARCH_ARM64, FAFRE_ARCH_64BIT
+     (8-byte pointers: the 64-bit layouts, the sim block list) or FAFRE_ARCH_X87; most code that
+     named _M_X64 means FAFRE_ARCH_64BIT, which ARM64 shares.
   2. FAFRE_PLATFORM_LINUX or FAFRE_PLATFORM_MACOS with no comment on the same line. Code every POSIX
      system shares (the SDL window layer, the Win32 stand-ins, sockets, pthreads) tests
      FAFRE_PLATFORM_POSIX. Code for something only one system has says what on the line:
@@ -37,6 +41,7 @@ SKIPPED = (
 
 _DIRECTIVE = re.compile(r"^\s*#\s*(if|elif|ifdef|ifndef|elifdef|elifndef)\b(?P<rest>.*)$")
 _COMPILER = re.compile(r"\b(_WIN32|_WIN64|__linux__|__linux|__APPLE__|__MACH__|__unix__|__unix)\b")
+_COMPILER_ARCH = re.compile(r"\b(_M_IX86|__i386__|_M_X64|_M_AMD64|__x86_64__|_M_ARM64|__aarch64__|__arm64__)\b")
 _ONE_POSIX = re.compile(r"\bFAFRE_PLATFORM_(LINUX|MACOS)\b")
 _COMMENT = re.compile(r"(//|/\*)\s*\S")
 
@@ -60,6 +65,10 @@ def check_line(line):
     found = _COMPILER.search(condition)
     if found:
         return ("tests the compiler macro %s; use FAFRE_PLATFORM_WINDOWS / _POSIX / _LINUX / _MACOS "
+                "(src/platform/PlatformDefines.h)" % found.group(1))
+    found = _COMPILER_ARCH.search(condition)
+    if found:
+        return ("tests the compiler macro %s; use FAFRE_ARCH_X86 / _X64 / _ARM64 / _64BIT / _X87 "
                 "(src/platform/PlatformDefines.h)" % found.group(1))
     found = _ONE_POSIX.search(condition)
     if found and comment is None:

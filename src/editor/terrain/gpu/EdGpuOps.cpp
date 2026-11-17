@@ -12,6 +12,7 @@
 #include <atomic>
 #include <chrono>
 #include <exception>
+#include <expected>
 #include <memory>
 #include <string>
 #include <vector>
@@ -217,27 +218,24 @@ namespace faf::editor::gpu
       }
       const auto t0 = std::chrono::steady_clock::now();
       Grid result;
-      std::string err;
-      OpResult r = OpResult::Failed;
+      std::expected<OpResult, std::string> r = std::unexpected(std::string());
       try {
-        r = fn(*lease, args, result, err);
+        r = fn(*lease, args, result);
       } catch (const std::exception& e) {
-        r = OpResult::Failed;
-        err = std::string("exception: ") + e.what();
+        r = std::unexpected(std::string("exception: ") + e.what());
       } catch (...) {
-        r = OpResult::Failed;
-        err = "exception";
+        r = std::unexpected("exception");
       }
-      if (r == OpResult::Done) {
+      if (r && *r == OpResult::Done) {
         out = std::move(result);
         field::NoteOpGpu(name, MsSince(t0));
         return true;
       }
-      if (r == OpResult::Failed) {
+      if (!r) {
         field::NoteOpFallback(name);
-        SetLastOpError(name + ": " + err);
+        SetLastOpError(name + ": " + r.error());
         if (lease->DeviceLost()) {
-          lease.Fail(err);
+          lease.Fail(r.error());
         }
       }
       return false;
@@ -297,31 +295,25 @@ namespace faf::editor::gpu
     return r <= 8192 && work <= 3.0e10; // one dispatch this long could hit the 2 second driver reset
   }
 
-  bool BlurDevice(
+  std::expected<void, std::string> BlurDevice(
     Executor& ex,
     const Resource& src,
     Resource& tmp,
     Resource& dst,
     const int w,
     const int h,
-    const double sigma,
-    std::string& err
+    const double sigma
   )
   {
     const KernelInfo* kernel = FindKernel("blur_pass");
     if (kernel == nullptr) {
-      err = "kernel blur_pass is missing";
-      return false;
+      return std::unexpected("kernel blur_pass is missing");
     }
     int r = 0;
     const std::vector<float> weights = MakeKernel(true, sigma, r);
     std::unique_ptr<Resource> kbuf;
-    if (
-      !MakeBuffer(ex, static_cast<u32>(weights.size()), kbuf, err) ||
-      !UploadBuffer(ex, *kbuf, weights.data(), weights.size() * 4, err)
-    ) {
-      return false;
-    }
+    FAF_GPU_TRY(MakeBuffer(ex, static_cast<u32>(weights.size()), kbuf));
+    FAF_GPU_TRY(UploadBuffer(ex, *kbuf, weights.data(), weights.size() * 4));
     hk::BlurParams params{};
     params.w = static_cast<std::uint32_t>(w);
     params.h = static_cast<std::uint32_t>(h);
@@ -329,13 +321,11 @@ namespace faf::editor::gpu
     params.vertical = 0;
     Bindings b0;
     b0.Srv(0, src).Srv(1, *kbuf).Uav(0, tmp);
-    if (!DispatchGrid(ex, *kernel, params.w, params.h, params, b0, err)) {
-      return false;
-    }
+    FAF_GPU_TRY(DispatchGrid(ex, *kernel, params.w, params.h, params, b0));
     params.vertical = 1;
     Bindings b1;
     b1.Srv(0, tmp).Srv(1, *kbuf).Uav(0, dst);
-    return DispatchGrid(ex, *kernel, params.w, params.h, params, b1, err);
+    return DispatchGrid(ex, *kernel, params.w, params.h, params, b1);
   }
 
   namespace
@@ -349,12 +339,11 @@ namespace faf::editor::gpu
       return it != a.in.end() ? it->second.get() : nullptr;
     }
 
-    OpResult OpBlurGpu(
+    std::expected<OpResult, std::string> OpBlurGpu(
       Executor& ex,
       const OpArgs& a,
       const bool gauss,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
       // 1. what the GPU version does not handle goes back to the CPU op (which also reports bad inputs with its own
@@ -388,20 +377,16 @@ namespace faf::editor::gpu
       }
       const KernelInfo* kernel = FindKernel("blur_pass");
       if (kernel == nullptr) {
-        err = "kernel blur_pass is missing";
-        return OpResult::Failed;
+        return std::unexpected("kernel blur_pass is missing");
       }
 
       // 2. upload, two passes (x then z) over a ping-pong pair, download into a local grid
       PingPong pp;
       std::unique_ptr<Resource> kbuf;
-      if (
-        !UploadGrid(ex, *src, pp.f[0], err) || !MakeField(ex, src->w, src->h, pp.f[1], err) ||
-        !MakeBuffer(ex, static_cast<u32>(weights.size()), kbuf, err) ||
-        !UploadBuffer(ex, *kbuf, weights.data(), weights.size() * 4, err)
-      ) {
-        return OpResult::Failed;
-      }
+      FAF_GPU_TRY(UploadGrid(ex, *src, pp.f[0]));
+      FAF_GPU_TRY(MakeField(ex, src->w, src->h, pp.f[1]));
+      FAF_GPU_TRY(MakeBuffer(ex, static_cast<u32>(weights.size()), kbuf));
+      FAF_GPU_TRY(UploadBuffer(ex, *kbuf, weights.data(), weights.size() * 4));
       hk::BlurParams params{};
       params.w = static_cast<std::uint32_t>(src->w);
       params.h = static_cast<std::uint32_t>(src->h);
@@ -410,9 +395,7 @@ namespace faf::editor::gpu
         params.vertical = pass;
         Bindings b;
         b.Srv(0, pp.Src().R()).Srv(1, *kbuf).Uav(0, pp.Dst().R());
-        if (!DispatchGrid(ex, *kernel, params.w, params.h, params, b, err)) {
-          return OpResult::Failed;
-        }
+        FAF_GPU_TRY(DispatchGrid(ex, *kernel, params.w, params.h, params, b));
         pp.Flip();
       }
       Field* resultField = &pp.Src();
@@ -422,50 +405,40 @@ namespace faf::editor::gpu
         const KernelInfo* lerpKernel = FindKernel("filt_lerpmask");
         Field orig, mfield;
         if (lerpKernel == nullptr) {
-          err = "kernel filt_lerpmask is missing";
-          return OpResult::Failed;
+          return std::unexpected("kernel filt_lerpmask is missing");
         }
-        if (
-          !UploadGrid(ex, *src, orig, err) || !UploadGrid(ex, *mask, mfield, err) ||
-          !MakeField(ex, src->w, src->h, blended, err)
-        ) {
-          return OpResult::Failed;
-        }
+        FAF_GPU_TRY(UploadGrid(ex, *src, orig));
+        FAF_GPU_TRY(UploadGrid(ex, *mask, mfield));
+        FAF_GPU_TRY(MakeField(ex, src->w, src->h, blended));
         hk::LerpMaskParams lp{};
         lp.w = params.w;
         lp.h = params.h;
         Bindings lb;
         lb.Srv(0, orig.R()).Srv(1, pp.Src().R()).Srv(2, mfield.R()).Uav(0, blended.R());
-        if (!DispatchGrid(ex, *lerpKernel, lp.w, lp.h, lp, lb, err)) {
-          return OpResult::Failed;
-        }
+        FAF_GPU_TRY(DispatchGrid(ex, *lerpKernel, lp.w, lp.h, lp, lb));
         resultField = &blended;
       }
       Grid result(src->w, src->h, src->cell, src->ox, src->oz);
-      if (!DownloadGrid(ex, *resultField, result, err)) {
-        return OpResult::Failed;
-      }
+      FAF_GPU_TRY(DownloadGrid(ex, *resultField, result));
       out = std::move(result);
       return OpResult::Done;
     }
 
-    OpResult OpBlurGaussGpu(
+    std::expected<OpResult, std::string> OpBlurGaussGpu(
       Executor& ex,
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
-      return OpBlurGpu(ex, a, true, out, err);
+      return OpBlurGpu(ex, a, true, out);
     }
-    OpResult OpBlurBoxGpu(
+    std::expected<OpResult, std::string> OpBlurBoxGpu(
       Executor& ex,
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
-      return OpBlurGpu(ex, a, false, out, err);
+      return OpBlurGpu(ex, a, false, out);
     }
 
     struct BuiltinOps
@@ -503,38 +476,36 @@ namespace faf::editor::gpu
       SelfTestPart part;
       part.name = "scale + offset (64 x 64)";
       const auto t0 = std::chrono::steady_clock::now();
-      std::string err;
-      do {
+      const auto tested = [&]() -> std::expected<void, std::string> {
         const KernelInfo* k = FindKernel("scale_offset");
         if (k == nullptr) {
-          err = "kernel scale_offset is missing";
-          break;
+          return std::unexpected("kernel scale_offset is missing");
         }
         const std::uint32_t n = 64 * 64;
         std::vector<float> in(n), res(n);
         for (std::uint32_t i = 0; i < n; ++i)
           in[i] = static_cast<float>(i % 97) * 0.25f - 3.0f;
         std::unique_ptr<Resource> a, b;
-        if (!MakeBuffer(ex, n, a, err) || !MakeBuffer(ex, n, b, err) || !UploadBuffer(ex, *a, in.data(), n * 4, err))
-          break;
+        FAF_GPU_TRY(MakeBuffer(ex, n, a));
+        FAF_GPU_TRY(MakeBuffer(ex, n, b));
+        FAF_GPU_TRY(UploadBuffer(ex, *a, in.data(), n * 4));
         hk::ScaleParams p{};
         p.count = n;
         p.scale = 1.5f;
         p.offset = -0.75f;
         Bindings bind;
         bind.Srv(0, *a).Uav(0, *b);
-        if (!DispatchGrid(ex, *k, n, 1, p, bind, err))
-          break;
-        if (!ex.Download(*b, res.data(), n * 4, err))
-          break;
+        FAF_GPU_TRY(DispatchGrid(ex, *k, n, 1, p, bind));
+        FAF_GPU_TRY(ex.Download(*b, res.data(), n * 4));
         double worst = 0.0;
         for (std::uint32_t i = 0; i < n; ++i)
           worst = std::max(worst, static_cast<double>(std::fabs(res[i] - (in[i] * 1.5f - 0.75f))));
         part.ok = worst <= 1e-5;
         part.detail = Fmt("largest difference %g", worst);
-      } while (false);
-      if (!err.empty())
-        part.detail = err;
+        return {};
+      }();
+      if (!tested)
+        part.detail = tested.error();
       part.ms = MsSince(t0);
       return part;
     }
@@ -546,12 +517,10 @@ namespace faf::editor::gpu
       SelfTestPart part;
       part.name = "group shared memory reduction (10000 values)";
       const auto t0 = std::chrono::steady_clock::now();
-      std::string err;
-      do {
+      const auto tested = [&]() -> std::expected<void, std::string> {
         const KernelInfo* k = FindKernel("reduce_sum");
         if (k == nullptr) {
-          err = "kernel reduce_sum is missing";
-          break;
+          return std::unexpected("kernel reduce_sum is missing");
         }
         const std::uint32_t n = 10000;
         const std::uint32_t groups = (n + 255) / 256;
@@ -559,20 +528,17 @@ namespace faf::editor::gpu
         for (std::uint32_t i = 0; i < n; ++i)
           in[i] = static_cast<float>(i % 7); // small integers: exact sums in any order
         std::unique_ptr<Resource> a, b;
-        if (
-          !MakeBuffer(ex, n, a, err) || !MakeBuffer(ex, groups, b, err) || !UploadBuffer(ex, *a, in.data(), n * 4, err)
-        )
-          break;
+        FAF_GPU_TRY(MakeBuffer(ex, n, a));
+        FAF_GPU_TRY(MakeBuffer(ex, groups, b));
+        FAF_GPU_TRY(UploadBuffer(ex, *a, in.data(), n * 4));
         hk::ReduceParams p{};
         p.count = n;
         Bindings bind;
         bind.Srv(0, *a).Uav(0, *b);
         Groups g;
         g.x = groups;
-        if (!ex.Dispatch(*k, g, &p, static_cast<u32>(sizeof(p)), bind, err))
-          break;
-        if (!ex.Download(*b, res.data(), groups * 4, err))
-          break;
+        FAF_GPU_TRY(ex.Dispatch(*k, g, &p, static_cast<u32>(sizeof(p)), bind));
+        FAF_GPU_TRY(ex.Download(*b, res.data(), groups * 4));
         std::uint32_t wrong = 0;
         for (std::uint32_t gi = 0; gi < groups; ++gi) {
           float expect = 0.0f;
@@ -583,9 +549,10 @@ namespace faf::editor::gpu
         }
         part.ok = wrong == 0;
         part.detail = wrong == 0 ? std::string("all sums equal") : Fmt("%g of %g sums differ", wrong, groups);
-      } while (false);
-      if (!err.empty())
-        part.detail = err;
+        return {};
+      }();
+      if (!tested)
+        part.detail = tested.error();
       part.ms = MsSince(t0);
       return part;
     }
@@ -597,8 +564,7 @@ namespace faf::editor::gpu
       SelfTestPart part;
       part.name = "gaussian blur (96 x 80) against the CPU op";
       const auto t0 = std::chrono::steady_clock::now();
-      std::string err;
-      do {
+      const auto tested = [&]() -> std::expected<void, std::string> {
         auto in = std::make_shared<Grid>(96, 80, 2.0f, 10.0f, -4.0f);
         for (std::size_t i = 0; i < in->v.size(); ++i) {
           std::uint32_t h = static_cast<std::uint32_t>(i) * 2654435761u;
@@ -611,24 +577,23 @@ namespace faf::editor::gpu
         args.in["a"] = in;
         args.p.num["radius"] = 6.0;
         Grid gpuOut, cpuOut;
-        if (OpBlurGpu(ex, args, true, gpuOut, err) != OpResult::Done) {
-          if (err.empty())
-            err = "the GPU op refused the self test input";
-          break;
+        if (const auto gpu = OpBlurGpu(ex, args, true, gpuOut); !gpu || *gpu != OpResult::Done) {
+          return std::unexpected(
+            !gpu && !gpu.error().empty() ? gpu.error() : std::string("the GPU op refused the self test input")
+          );
         }
-        std::string cpuErr;
-        if (!field::RunOpCpu("blur", args, cpuOut, cpuErr)) {
-          err = "CPU op failed: " + cpuErr;
-          break;
+        if (const auto ran = field::RunOpCpu("blur", args, cpuOut); !ran) {
+          return std::unexpected("CPU op failed: " + ran.error());
         }
         double worst = 0.0;
         for (std::size_t i = 0; i < cpuOut.v.size(); ++i)
           worst = std::max(worst, static_cast<double>(std::fabs(gpuOut.v[i] - cpuOut.v[i])));
         part.ok = gpuOut.SameShape(cpuOut) && worst <= 1e-3; // values are up to 100: a few float32 steps
         part.detail = Fmt("largest difference %g (values up to 100)", worst);
-      } while (false);
-      if (!err.empty())
-        part.detail = err;
+        return {};
+      }();
+      if (!tested)
+        part.detail = tested.error();
       part.ms = MsSince(t0);
       return part;
     }
@@ -640,16 +605,13 @@ namespace faf::editor::gpu
       SelfTestPart part;
       part.name = "texture sampling (32 x 24 to 64 x 48)";
       const auto t0 = std::chrono::steady_clock::now();
-      std::string err;
-      do {
+      const auto tested = [&]() -> std::expected<void, std::string> {
         if (!ex.SupportsTextures()) {
-          err = "textures are not supported by this device";
-          break;
+          return std::unexpected("textures are not supported by this device");
         }
         const KernelInfo* k = FindKernel("tex_resample");
         if (k == nullptr) {
-          err = "kernel tex_resample is missing";
-          break;
+          return std::unexpected("kernel tex_resample is missing");
         }
         const int sw = 32, sh = 24, dw = 64, dh = 48;
         std::vector<float> in(static_cast<std::size_t>(sw) * sh);
@@ -658,14 +620,11 @@ namespace faf::editor::gpu
             in[static_cast<std::size_t>(z) * sw + x] = static_cast<float>((x * 7 + z * 13) % 31) / 31.0f;
         Field f;
         std::unique_ptr<Resource> tex;
-        if (
-          !MakeField(ex, sw, sh, f, err) || !UploadField(ex, f, in.data(), err) ||
-          !MakeTextureFromField(ex, f, tex, err)
-        )
-          break;
+        FAF_GPU_TRY(MakeField(ex, sw, sh, f));
+        FAF_GPU_TRY(UploadField(ex, f, in.data()));
+        FAF_GPU_TRY(MakeTextureFromField(ex, f, tex));
         Field out;
-        if (!MakeField(ex, dw, dh, out, err))
-          break;
+        FAF_GPU_TRY(MakeField(ex, dw, dh, out));
         hk::FieldParams p{};
         p.w = dw;
         p.h = dh;
@@ -673,11 +632,9 @@ namespace faf::editor::gpu
         p.srcH = sh;
         Bindings bind;
         bind.Srv(0, *tex).Uav(0, out.R());
-        if (!DispatchGrid(ex, *k, dw, dh, p, bind, err))
-          break;
+        FAF_GPU_TRY(DispatchGrid(ex, *k, dw, dh, p, bind));
         std::vector<float> res(static_cast<std::size_t>(dw) * dh);
-        if (!DownloadField(ex, out, res.data(), err))
-          break;
+        FAF_GPU_TRY(DownloadField(ex, out, res.data()));
         double worst = 0.0;
         const auto texel = [&](int x, int z) {
           return in
@@ -700,9 +657,10 @@ namespace faf::editor::gpu
         }
         part.ok = worst <= 0.01; // hardware filtering uses 8 bit weights: up to ~0.004 for values in 0..1
         part.detail = Fmt("largest difference %g (values 0..1, hardware filtering allows ~0.004)", worst);
-      } while (false);
-      if (!err.empty())
-        part.detail = err;
+        return {};
+      }();
+      if (!tested)
+        part.detail = tested.error();
       part.ms = MsSince(t0);
       return part;
     }
@@ -724,10 +682,9 @@ namespace faf::editor::gpu
     } catch (...) {
       rep.error = "exception";
     }
-    std::string syncErr;
     double dummy = 0.0;
-    if (!ex.Sync(&dummy, syncErr) && rep.error.empty()) {
-      rep.error = syncErr;
+    if (const auto synced = ex.Sync(&dummy); !synced && rep.error.empty()) {
+      rep.error = synced.error();
     }
     rep.ok = rep.error.empty() && rep.parts.size() == 4 && rep.parts[0].ok && rep.parts[1].ok && rep.parts[2].ok;
     rep.texturesOk = rep.parts.size() == 4 && rep.parts[3].ok;

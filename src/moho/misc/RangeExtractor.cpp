@@ -1,5 +1,6 @@
 #include "moho/misc/RangeExtractor.h"
 
+#include <utility>
 #include <cstddef>
 #include <cstdint>
 #include <map>
@@ -58,7 +59,7 @@ namespace
   )
   {
     auto* const extractor = new moho::WeaponExtractor();
-    extractor->mRangeCategory = static_cast<std::int32_t>(rangeCategory);
+    extractor->mRangeCategory = std::to_underlying(rangeCategory);
     return extractor;
   }
 

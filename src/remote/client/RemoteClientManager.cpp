@@ -38,9 +38,7 @@ namespace faf::remote::client
         &manager,
         entry.name.c_str(),
         entry.ownerId,
-        [](moho::BVIntSet&& sources) -> moho::BVIntSet& {
-          return sources;
-        }(SourcesOf(entry)), // copied by the base,
+        SourcesOf(entry), // copied by the base
         FirstSource(entry)
       )
     , mOwner(manager)

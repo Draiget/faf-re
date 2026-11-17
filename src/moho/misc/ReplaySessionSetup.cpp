@@ -4,6 +4,7 @@
 // headless and the game server set up replay sessions without a user side.
 #include "moho/misc/SessionStartup.h"
 
+#include <utility>
 #include <Windows.h>
 
 #include <array>
@@ -314,7 +315,7 @@ namespace moho
       CMessage message;
       while (message.Read(&stream)) {
         if (
-          message.GetType().raw() == static_cast<std::uint8_t>(ECmdStreamOp::CMDST_Advance) &&
+          message.GetType().raw() == std::to_underlying(ECmdStreamOp::CMDST_Advance) &&
           message.GetMessageSize() >= static_cast<int>(sizeof(std::int32_t))
         ) {
           CMessageStream input(message, CMessageStream::Access::kReadOnly);

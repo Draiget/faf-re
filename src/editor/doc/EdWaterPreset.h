@@ -1,5 +1,6 @@
 #pragma once
 
+#include <expected>
 #include <string>
 
 #include "editor/doc/EdWater.h"
@@ -15,8 +16,9 @@ namespace faf::editor
    */
   std::string WaterToScmwtr(const WaterState& water);
 
-  /** Reads a `.scmwtr` into `water` (every field it has, the levels and texture names included); false with `error`. */
-  bool WaterFromScmwtr(const std::string& text, WaterState& water, std::string& error);
+  /** Reads a `.scmwtr` into `water` (every field it has, the levels and texture names included); the error otherwise.
+   */
+  [[nodiscard]] std::expected<void, std::string> WaterFromScmwtr(const std::string& text, WaterState& water);
 
   /** The water-motion presets (FAF Studio's): the normal maps' repeat and movement, the rest of the water kept. */
   inline constexpr int kWaterMotionPresetCount = 4;

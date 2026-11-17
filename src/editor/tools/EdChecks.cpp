@@ -209,6 +209,38 @@ namespace faf::editor
         }
       }
     }
+    // Every marker's stored height against the ground under it (FAF Studio's markercheck.lua, 3 units of slack).
+    if (input.groundAt != nullptr && input.width > 1 && input.height > 1) {
+      constexpr float kSlack = 3.0f;
+      for (const SaveEntry& marker : *input.markers) {
+        float x = 0.0f, y = 0.0f, z = 0.0f;
+        if (
+          !MarkerPosition(marker, x, y, z) || x < 0.0f || z < 0.0f || x > static_cast<float>(input.width - 1) ||
+          z > static_cast<float>(input.height - 1)
+        ) {
+          continue;
+        }
+        const float ground = input.groundAt(input.groundContext, x, z);
+        const float off = y - ground;
+        if (std::fabs(off) <= kSlack) {
+          continue;
+        }
+        char text[160];
+        (void)std::snprintf(
+          text,
+          sizeof(text),
+          "stands %.1f %s the ground (stored height %.1f, the ground %.1f)",
+          static_cast<double>(std::fabs(off)),
+          off > 0.0f ? "above" : "below",
+          static_cast<double>(y),
+          static_cast<double>(ground)
+        );
+        issues.push_back({CheckIssue::Level::Note, marker.name, text, x, z, std::string(), 0});
+        issues.back().fix = CheckIssue::Fix::ToGround;
+        issues.back().fixX = x;
+        issues.back().fixZ = z;
+      }
+    }
     return issues;
   }
   std::vector<CheckIssue> CheckMapBasics(
@@ -235,7 +267,7 @@ namespace faf::editor
           add(CheckIssue::Level::Error, marker.name, "has a broken position (none, not a number or huge)", 0.0f, 0.0f);
           continue;
         }
-        if (type == "Blank Marker" && marker.name.rfind("ARMY_", 0) == 0) {
+        if (type == "Blank Marker" && marker.name.starts_with("ARMY_")) {
           starts.push_back({marker.name, {x, z}});
         }
         if (type == "Mass") {
@@ -315,7 +347,7 @@ namespace faf::editor
       for (const MarkerChain& chain : *in.chains) {
         std::vector<std::string> missing;
         for (const std::string& name : chain.markers) {
-          if (names.count(name) == 0) {
+          if (!names.contains(name)) {
             missing.push_back(name);
           }
         }
@@ -485,6 +517,8 @@ namespace faf::editor
       return "Pull inside";
     case CheckIssue::Fix::SnapToGrid:
       return "Snap to grid";
+    case CheckIssue::Fix::ToGround:
+      return "To ground";
     default:
       return "";
     }

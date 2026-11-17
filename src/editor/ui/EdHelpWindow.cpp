@@ -35,7 +35,7 @@ namespace faf::editor
     if (hovered != nullptr && hovered->RootWindow != nullptr) {
       name = hovered->RootWindow->Name;
     }
-    if (name.rfind("##EditorDockHost", 0) == 0 || name.rfind("##Toolbar", 0) == 0) {
+    if (name.starts_with("##EditorDockHost") || name.starts_with("##Toolbar")) {
       name.clear();
     }
     return HelpTopicForWindow(name, mTools.Tool());

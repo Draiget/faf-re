@@ -125,10 +125,9 @@ namespace faf::editor
     return out + "    }\n}";
   }
 
-  bool SkyboxFromScmskybox(
+  std::expected<void, std::string> SkyboxFromScmskybox(
     const std::string& text,
-    SkyboxState& sky,
-    std::string& error
+    SkyboxState& sky
   )
   {
     std::string data;
@@ -137,8 +136,7 @@ namespace faf::editor
       !JsonValue(text, "Data", data) || !JsonValue(data, "SubdivisionsAxis", probe) ||
       !JsonValue(data, "CirrusTexture", probe)
     ) {
-      error = "not a sky file (no Data with SubdivisionsAxis and CirrusTexture)";
-      return false;
+      return std::unexpected("not a sky file (no Data with SubdivisionsAxis and CirrusTexture)");
     }
     SkyboxState read;
     // The planets' and layers' own keys (Position, Scale) also name the sky's: read the arrays first, then the rest
@@ -190,7 +188,7 @@ namespace faf::editor
       JsonVector(object, "Direction", layer.direction, 2);
     }
     sky = std::move(read);
-    return true;
+    return {};
   }
 
   float RescaleSkybox(

@@ -27,23 +27,23 @@ namespace faf::editor::gpu
      * drains into it) in `area`. `d8` = every sample gives all it collected to its steepest lower neighbour (op flow),
      * else it shares it among all lower neighbours in proportion to (drop / distance)^pf (op wetness).
      */
-    bool FlowAccumulate(
+    std::expected<void, std::string> FlowAccumulate(
       Executor& ex,
       const Field& hgt,
       Field& area,
       const int w,
       const int h,
       const bool d8,
-      const float pf,
-      std::string& err
+      const float pf
     )
     {
       const KernelInfo* kprep = FindKernel(d8 ? "field_flowprep" : "field_wetprep");
       const KernelInfo* krank = FindKernel("field_wetrank");
       const KernelInfo* ksweep = FindKernel(d8 ? "field_flowsweep" : "field_wetsweep");
       if (kprep == nullptr || krank == nullptr || ksweep == nullptr) {
-        err = "kernel field_wetprep / field_wetrank / field_wetsweep (field_flowprep / field_flowsweep) is missing";
-        return false;
+        return std::unexpected(
+          "kernel field_wetprep / field_wetrank / field_wetsweep (field_flowprep / field_flowsweep) is missing"
+        );
       }
       hk::WetParams p{};
       p.w = static_cast<std::uint32_t>(w);
@@ -55,18 +55,16 @@ namespace faf::editor::gpu
       Field inv; // wetness: 1 / sum of the weights, flow: the target index (a 4 byte element either way)
       PingPong pp;
       std::unique_ptr<Resource> order, changed;
-      if (
-        !MakeField(ex, w, h, inv, err) || !MakeBuffer(ex, tiles * 1024u, order, err) ||
-        !MakeBuffer(ex, 1, changed, err) || !MakeField(ex, w, h, pp.f[0], err) || !MakeField(ex, w, h, pp.f[1], err) ||
-        !FillBuffer(ex, pp.f[0].R(), 0u, err)
-      ) {
-        return false;
-      }
+      FAF_GPU_TRY(MakeField(ex, w, h, inv));
+      FAF_GPU_TRY(MakeBuffer(ex, tiles * 1024u, order));
+      FAF_GPU_TRY(MakeBuffer(ex, 1, changed));
+      FAF_GPU_TRY(MakeField(ex, w, h, pp.f[0]));
+      FAF_GPU_TRY(MakeField(ex, w, h, pp.f[1]));
+      FAF_GPU_TRY(FillBuffer(ex, pp.f[0].R(), 0u));
       {
         Bindings b;
         b.Srv(0, hgt.R()).Uav(0, inv.R());
-        if (!DispatchGrid(ex, *kprep, p.w, p.h, p, b, err))
-          return false;
+        FAF_GPU_TRY(DispatchGrid(ex, *kprep, p.w, p.h, p, b));
       }
       {
         // the rank sort: 1M comparisons per tile, in bands of 512 tiles per submission
@@ -74,48 +72,43 @@ namespace faf::editor::gpu
         const std::uint32_t bands = (tiles + kBand - 1) / kBand;
         Bindings b;
         b.Srv(0, hgt.R()).Uav(0, *order);
-        const bool ok = RunIterations(ex, bands, 60.0, [&](const u32 bi, std::string& e) {
+        const auto ok = RunIterations(ex, bands, 60.0, [&](const u32 bi) -> std::expected<void, std::string> {
           hk::WetParams q = p;
           q.tile0 = bi * kBand;
           Groups g;
           g.x = std::min(kBand, tiles - q.tile0);
-          return ex.Dispatch(*krank, g, &q, static_cast<u32>(sizeof(q)), b, e);
-        }, err);
+          return ex.Dispatch(*krank, g, &q, static_cast<u32>(sizeof(q)), b);
+        });
         if (!ok)
-          return false;
+          return std::unexpected(ok.error());
       }
       // sweeps until nothing changes (batches of 6 between two looks at the flag)
       constexpr int kBatch = 6;
       constexpr int kMaxSweeps = 6000;
       bool converged = false;
       for (int done = 0; done < kMaxSweeps && !converged; done += kBatch) {
-        if (!FillBuffer(ex, *changed, 0u, err))
-          return false;
+        FAF_GPU_TRY(FillBuffer(ex, *changed, 0u));
         for (int s = 0; s < kBatch; ++s) {
           Bindings b;
           b.Srv(0, hgt.R()).Srv(1, inv.R()).Srv(2, *order).Srv(3, pp.Src().R()).Uav(0, pp.Dst().R()).Uav(1, *changed);
-          if (!DispatchGrid(ex, *ksweep, tiles, 1, p, b, err))
-            return false;
+          FAF_GPU_TRY(DispatchGrid(ex, *ksweep, tiles, 1, p, b));
           pp.Flip();
         }
         std::uint32_t flag = 1;
-        if (!ex.Download(*changed, &flag, 4, err))
-          return false;
+        FAF_GPU_TRY(ex.Download(*changed, &flag, 4));
         converged = flag == 0;
       }
       if (!converged) {
-        err = "wetness: the flow accumulation did not settle";
-        return false;
+        return std::unexpected("wetness: the flow accumulation did not settle");
       }
       area = std::move(pp.Src());
-      return true;
+      return {};
     }
 
-    OpResult OpWetnessGpu(
+    std::expected<OpResult, std::string> OpWetnessGpu(
       Executor& ex,
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
       const Grid* src = Source(a);
@@ -130,8 +123,7 @@ namespace faf::editor::gpu
         return OpResult::Unsupported;
       const KernelInfo* kfin = FindKernel("field_wetfinal");
       if (kfin == nullptr) {
-        err = "kernel field_wetfinal is missing";
-        return OpResult::Failed;
+        return std::unexpected("kernel field_wetfinal is missing");
       }
       const int w = src->w, h = src->h;
       const float pf = static_cast<float>(std::max(0.5, std::min(8.0, a.p.N("p", 1.1))));
@@ -140,10 +132,8 @@ namespace faf::editor::gpu
       if (smooth && !BlurAffordable(w, h, sm))
         return OpResult::Unsupported;
       Field hgt, area, twi, tmp, sg, res;
-      if (!UploadGrid(ex, *src, hgt, err))
-        return OpResult::Failed;
-      if (!FlowAccumulate(ex, hgt, area, w, h, false, pf, err))
-        return OpResult::Failed;
+      FAF_GPU_TRY(UploadGrid(ex, *src, hgt));
+      FAF_GPU_TRY(FlowAccumulate(ex, hgt, area, w, h, false, pf));
       hk::WetParams p{};
       p.w = static_cast<std::uint32_t>(w);
       p.h = static_cast<std::uint32_t>(h);
@@ -151,43 +141,37 @@ namespace faf::editor::gpu
       p.lo = static_cast<float>(a.p.N("lo", 3.0));
       p.hi = static_cast<float>(a.p.N("hi", 11.0));
       p.mode = mode == "twi" ? 1u : (mode == "area" ? 2u : 0u);
-      if (!MakeField(ex, w, h, twi, err) || !MakeField(ex, w, h, res, err))
-        return OpResult::Failed;
+      FAF_GPU_TRY(MakeField(ex, w, h, twi));
+      FAF_GPU_TRY(MakeField(ex, w, h, res));
       p.stage = 0;
       {
         Bindings b;
         b.Srv(0, hgt.R()).Srv(1, area.R()).Srv(2, hgt.R()).Uav(0, twi.R());
-        if (!DispatchGrid(ex, *kfin, p.w, p.h, p, b, err))
-          return OpResult::Failed;
+        FAF_GPU_TRY(DispatchGrid(ex, *kfin, p.w, p.h, p, b));
       }
       const Field* t = &twi;
       if (smooth) {
-        if (
-          !MakeField(ex, w, h, tmp, err) || !MakeField(ex, w, h, sg, err) ||
-          !BlurDevice(ex, twi.R(), tmp.R(), sg.R(), w, h, sm, err)
-        )
-          return OpResult::Failed;
+        FAF_GPU_TRY(MakeField(ex, w, h, tmp));
+        FAF_GPU_TRY(MakeField(ex, w, h, sg));
+        FAF_GPU_TRY(BlurDevice(ex, twi.R(), tmp.R(), sg.R(), w, h, sm));
         t = &sg;
       }
       p.stage = 1;
       {
         Bindings b;
         b.Srv(0, hgt.R()).Srv(1, area.R()).Srv(2, t->R()).Uav(0, res.R());
-        if (!DispatchGrid(ex, *kfin, p.w, p.h, p, b, err))
-          return OpResult::Failed;
+        FAF_GPU_TRY(DispatchGrid(ex, *kfin, p.w, p.h, p, b));
       }
       Grid g = NewGrid(shape);
-      if (!DownloadGrid(ex, res, g, err))
-        return OpResult::Failed;
+      FAF_GPU_TRY(DownloadGrid(ex, res, g));
       out = std::move(g);
       return OpResult::Done;
     }
 
-    OpResult OpFlowGpu(
+    std::expected<OpResult, std::string> OpFlowGpu(
       Executor& ex,
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
       const Grid* src = Source(a);
@@ -202,16 +186,13 @@ namespace faf::editor::gpu
         return OpResult::Unsupported;
       const KernelInfo* kfin = FindKernel("field_flowfinal");
       if (kfin == nullptr) {
-        err = "kernel field_flowfinal is missing";
-        return OpResult::Failed;
+        return std::unexpected("kernel field_flowfinal is missing");
       }
       const int w = src->w, h = src->h;
       Field hgt, cells, res;
-      if (
-        !UploadGrid(ex, *src, hgt, err) || !FlowAccumulate(ex, hgt, cells, w, h, true, 1.0f, err) ||
-        !MakeField(ex, w, h, res, err)
-      )
-        return OpResult::Failed;
+      FAF_GPU_TRY(UploadGrid(ex, *src, hgt));
+      FAF_GPU_TRY(FlowAccumulate(ex, hgt, cells, w, h, true, 1.0f));
+      FAF_GPU_TRY(MakeField(ex, w, h, res));
       hk::WetParams p{};
       p.w = static_cast<std::uint32_t>(w);
       p.h = static_cast<std::uint32_t>(h);
@@ -221,11 +202,9 @@ namespace faf::editor::gpu
       p.lo = static_cast<float>(1.0 / std::log(range));
       Bindings b;
       b.Srv(0, cells.R()).Uav(0, res.R());
-      if (!DispatchGrid(ex, *kfin, p.w, p.h, p, b, err))
-        return OpResult::Failed;
+      FAF_GPU_TRY(DispatchGrid(ex, *kfin, p.w, p.h, p, b));
       Grid g = NewGrid(shape);
-      if (!DownloadGrid(ex, res, g, err))
-        return OpResult::Failed;
+      FAF_GPU_TRY(DownloadGrid(ex, res, g));
       out = std::move(g);
       return OpResult::Done;
     }

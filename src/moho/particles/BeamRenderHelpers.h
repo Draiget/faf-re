@@ -122,7 +122,7 @@ namespace moho
    */
   struct BeamBucketKeyLess
   {
-    [[nodiscard]] bool operator()(const SBeamBucketKey& lhs, const SBeamBucketKey& rhs) const noexcept;
+    [[nodiscard]] static bool operator()(const SBeamBucketKey& lhs, const SBeamBucketKey& rhs) noexcept;
   };
 
   // Binary-facing layout: the MSVC8 tree header is 0x0C bytes, which `std::map`

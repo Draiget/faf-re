@@ -706,7 +706,7 @@ namespace LuaPlus
      * What it does:
      * Raises one typed-operation error for this object value.
      */
-    void TypeError(const char* operation) const;
+    [[noreturn]] void TypeError(const char* operation) const;
 
     /**
      * Address: 0x009076D0 (FUN_009076D0, LuaPlus::LuaObject::Type)
@@ -976,8 +976,8 @@ namespace LuaPlus
      * What it does:
      * Raises a Lua argument type error for the current stack slot.
      */
-    void TypeError(const char* expectedType) const;
-    void TypeError(const char* expectedType, int32_t) const;
+    [[noreturn]] void TypeError(const char* expectedType) const;
+    [[noreturn]] void TypeError(const char* expectedType, int32_t) const;
     static void TypeError(LuaStackObject* self, const char* expectedType);
 
     /**
@@ -1249,7 +1249,7 @@ namespace LuaPlus
      * What it does:
      * Formats one Lua error message and raises it through `lua_error`.
      */
-    static void Error(LuaState* state, const char* format, ...);
+    [[noreturn]] static void Error(LuaState* state, const char* format, ...);
 
   private:
     /**

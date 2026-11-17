@@ -1,7 +1,9 @@
 #pragma once
 
 #include <cstdint>
+#include <expected>
 #include <functional>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -59,7 +61,32 @@ namespace faf::editor
       float waterOuterMin = 0.0f, waterOuterSpan = 0.0f;
       float waterBeyondTriangles = -1.0f, waterInsideTriangles = -1.0f;
       std::string waterMap, waterMapOuter, waterBeyond, waterInside;
+      /** The keys the manifest gives (read from it, or set in the panel); Unset takes one out. */
+      std::set<std::string> given;
     };
+
+    /** One manifest setting (FAF Studio's meshmap.lua Keys): its decimals (-1 whole, -2 a file name), range, meaning.
+     */
+    struct SettingKey
+    {
+      const char* key;
+      int decimals;
+      float min;
+      float max;
+      const char* help;
+    };
+    /** Every manifest setting in the file's order. */
+    [[nodiscard]] const std::vector<SettingKey>& SettingKeys();
+    /** The number or file name a key holds (null for the other kind or an unknown key). */
+    [[nodiscard]] float* SettingNumber(Settings& s, const std::string& key);
+    [[nodiscard]] std::string* SettingText(Settings& s, const std::string& key);
+    /** Whether the manifest writes the key (given, or a value away from its "none"). */
+    [[nodiscard]] bool SettingSet(const Settings& s, const std::string& key);
+    /**
+     * Set: the key is given (a number at its "none" takes its lowest value, a file name Studio's default name).
+     * Unset: it goes, back to the value a manifest without it has.
+     */
+    void SetSettingGiven(Settings& s, const std::string& key, bool given);
 
     struct RayHit
     {
@@ -79,11 +106,14 @@ namespace faf::editor
       Settings settings;
       std::vector<Material> materials;
       std::vector<Patch> patches;
-      std::string error; // why the last Load failed
+      std::string error;                 // why the last Load failed
+      std::vector<std::string> warnings; // lines the reader didn't understand (Studio's V18)
 
       /// Reads the manifest and every patch through the engine's virtual file system. False (and `error`) when it names
       /// no patch or a file is unusable.
       bool Load(const std::string& manifestVfsPath);
+      /** The manifest as text (what Load reads back): the settings, one line a material, one line a patch. */
+      [[nodiscard]] std::string ManifestText() const;
       void Clear();
       bool Loaded() const
       {
@@ -119,8 +149,8 @@ namespace faf::editor
       bool TriangleAt(int patch, int tri, float v[3][3]) const;
     };
 
-    /// Parses the SCM v5 file `bytes` into `out` (vertices, indices, bounds). False and `why` when it is not usable.
-    bool ParseScm(const std::uint8_t* bytes, std::size_t size, Patch& out, std::string& why);
+    /// Parses the SCM v5 file `bytes` into `out` (vertices, indices, bounds). Why not when it is not usable.
+    [[nodiscard]] std::expected<void, std::string> ParseScm(const std::uint8_t* bytes, std::size_t size, Patch& out);
 
     /// Reads a file through the reader the app set (the game's virtual file system); empty when it is missing.
     std::vector<std::uint8_t> ReadVfs(const std::string& path);

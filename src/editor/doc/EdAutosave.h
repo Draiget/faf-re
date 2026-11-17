@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <expected>
 #include <filesystem>
 #include <string>
 #include <string_view>
@@ -42,15 +43,10 @@ namespace faf::editor
 
   /**
    * Copies a map folder's files into `<root>/<folder name>/<YYYYMMDD-HHMMSS>/` and keeps the newest `keep` of that
-   * map's backups (older ones removed; 0 keeps all). `made` is the new backup's folder.
+   * map's backups (older ones removed; 0 keeps all). The new backup's folder, or the error.
    */
-  bool BackupMapFolder(
-    const std::filesystem::path& folder,
-    const std::filesystem::path& root,
-    int keep,
-    std::filesystem::path& made,
-    std::string& error
-  );
+  [[nodiscard]] std::expected<std::filesystem::path, std::string>
+  BackupMapFolder(const std::filesystem::path& folder, const std::filesystem::path& root, int keep);
 
   /** The backups beyond the newest `keep` of `backups` (names sort by time): the ones to remove. */
   [[nodiscard]] std::vector<std::filesystem::path>
@@ -58,15 +54,10 @@ namespace faf::editor
 
   /**
    * Recover: the map's current files backed up (BackupMapFolder into `backupRoot`, so this can be undone), then
-   * the autosave's files copied over them. False with `error`, nothing changed, when the backup fails.
+   * the autosave's files copied over them. The backup's folder; the error, nothing changed, when the backup fails.
    */
-  bool RestoreAutosave(
-    const EdAutosaveEntry& entry,
-    const std::filesystem::path& backupRoot,
-    int keep,
-    std::filesystem::path& backup,
-    std::string& error
-  );
+  [[nodiscard]] std::expected<std::filesystem::path, std::string>
+  RestoreAutosave(const EdAutosaveEntry& entry, const std::filesystem::path& backupRoot, int keep);
 
   /** Removes an autosave's folder (after a save, "Don't save", or Discard). */
   void RemoveAutosave(const std::filesystem::path& folder);

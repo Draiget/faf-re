@@ -1,5 +1,6 @@
 #include "moho/ai/EAiAttackerEventTypeInfo.h"
 
+#include <utility>
 #include <cstdint>
 #include <cstdlib>
 #include <new>
@@ -82,11 +83,9 @@ const char* EAiAttackerEventTypeInfo::GetName() const
 void EAiAttackerEventTypeInfo::AddEnums()
 {
   mPrefix = "AIATTACKEVENT_";
-  AddEnum(
-    StripPrefix("AIATTACKEVENT_AcquiredDesiredTarget"), static_cast<std::int32_t>(AIATTACKEVENT_AcquiredDesiredTarget)
-  );
-  AddEnum(StripPrefix("AIATTACKEVENT_OutOfRange"), static_cast<std::int32_t>(AIATTACKEVENT_OutOfRange));
-  AddEnum(StripPrefix("AIATTACKEVENT_Success"), static_cast<std::int32_t>(AIATTACKEVENT_Success));
+  AddEnum(StripPrefix("AIATTACKEVENT_AcquiredDesiredTarget"), std::to_underlying(AIATTACKEVENT_AcquiredDesiredTarget));
+  AddEnum(StripPrefix("AIATTACKEVENT_OutOfRange"), std::to_underlying(AIATTACKEVENT_OutOfRange));
+  AddEnum(StripPrefix("AIATTACKEVENT_Success"), std::to_underlying(AIATTACKEVENT_Success));
 }
 
 /**

@@ -1,5 +1,6 @@
 #include "moho/sim/EImpactTypeTypeInfo.h"
 
+#include <utility>
 #include <cstdlib>
 #include <cstdint>
 #include <new>
@@ -212,18 +213,18 @@ namespace moho
   void EImpactTypeTypeInfo::AddEnums()
   {
     mPrefix = "IMPACT_";
-    AddEnum(StripPrefix("IMPACT_Invalid"), static_cast<std::int32_t>(IMPACT_Invalid));
-    AddEnum(StripPrefix("IMPACT_Terrain"), static_cast<std::int32_t>(IMPACT_Terrain));
-    AddEnum(StripPrefix("IMPACT_Water"), static_cast<std::int32_t>(IMPACT_Water));
-    AddEnum(StripPrefix("IMPACT_Air"), static_cast<std::int32_t>(IMPACT_Air));
-    AddEnum(StripPrefix("IMPACT_Underwater"), static_cast<std::int32_t>(IMPACT_Underwater));
-    AddEnum(StripPrefix("IMPACT_Projectile"), static_cast<std::int32_t>(IMPACT_Projectile));
-    AddEnum(StripPrefix("IMPACT_ProjectileUnderwater"), static_cast<std::int32_t>(IMPACT_ProjectileUnderwater));
-    AddEnum(StripPrefix("IMPACT_Prop"), static_cast<std::int32_t>(IMPACT_Prop));
-    AddEnum(StripPrefix("IMPACT_Shield"), static_cast<std::int32_t>(IMPACT_Shield));
-    AddEnum(StripPrefix("IMPACT_Unit"), static_cast<std::int32_t>(IMPACT_Unit));
-    AddEnum(StripPrefix("IMPACT_UnitAir"), static_cast<std::int32_t>(IMPACT_UnitAir));
-    AddEnum(StripPrefix("IMPACT_UnitUnderwater"), static_cast<std::int32_t>(IMPACT_UnitUnderwater));
+    AddEnum(StripPrefix("IMPACT_Invalid"), std::to_underlying(IMPACT_Invalid));
+    AddEnum(StripPrefix("IMPACT_Terrain"), std::to_underlying(IMPACT_Terrain));
+    AddEnum(StripPrefix("IMPACT_Water"), std::to_underlying(IMPACT_Water));
+    AddEnum(StripPrefix("IMPACT_Air"), std::to_underlying(IMPACT_Air));
+    AddEnum(StripPrefix("IMPACT_Underwater"), std::to_underlying(IMPACT_Underwater));
+    AddEnum(StripPrefix("IMPACT_Projectile"), std::to_underlying(IMPACT_Projectile));
+    AddEnum(StripPrefix("IMPACT_ProjectileUnderwater"), std::to_underlying(IMPACT_ProjectileUnderwater));
+    AddEnum(StripPrefix("IMPACT_Prop"), std::to_underlying(IMPACT_Prop));
+    AddEnum(StripPrefix("IMPACT_Shield"), std::to_underlying(IMPACT_Shield));
+    AddEnum(StripPrefix("IMPACT_Unit"), std::to_underlying(IMPACT_Unit));
+    AddEnum(StripPrefix("IMPACT_UnitAir"), std::to_underlying(IMPACT_UnitAir));
+    AddEnum(StripPrefix("IMPACT_UnitUnderwater"), std::to_underlying(IMPACT_UnitUnderwater));
   }
 
   /**

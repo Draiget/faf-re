@@ -114,9 +114,8 @@ namespace faf::editor
         continue;
       }
       TerrainBuildWrites::Scatter s;
-      std::string error;
-      if (!DetailDensity(context, c, 700 + index * 31 + run.seed, s.density, error)) {
-        text += c.label + ": " + error + ". ";
+      if (const auto made = DetailDensity(context, c, 700 + index * 31 + run.seed, s.density); !made) {
+        text += c.label + ": " + made.error() + ". ";
         continue;
       }
       for (const std::string& entry : c.entries) {

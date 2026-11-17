@@ -10,6 +10,7 @@
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
+#include <print>
 
 namespace
 {
@@ -65,9 +66,9 @@ namespace
   {
     const EmitterBlueprint made = NewEmitter();
     const std::string text = WriteEmitter(made);
-    EmitterBlueprint read;
-    std::string error;
-    ASSERT_TRUE(ParseEmitter(text, read, error)) << error;
+    const auto parsed = ParseEmitter(text);
+    ASSERT_TRUE(parsed) << parsed.error();
+    const EmitterBlueprint& read = *parsed;
     EXPECT_TRUE(Same(made, read));
     EXPECT_EQ(WriteEmitter(read), text);
     // Retail's layout: the header first, the curves in the file's order.
@@ -90,9 +91,9 @@ EmitterBlueprint {
     SizeCurve = { XRange = 2, Keys = { { x = 0, y = 1.5, z = 0.25 }, { 1, 2, 3 } } },
 }
 )";
-    EmitterBlueprint read;
-    std::string error;
-    ASSERT_TRUE(ParseEmitter(text, read, error)) << error;
+    const auto parsed = ParseEmitter(text);
+    ASSERT_TRUE(parsed) << parsed.error();
+    const EmitterBlueprint& read = *parsed;
     EXPECT_EQ(read.blueprintId, "hand");
     EXPECT_FLOAT_EQ(read.blendMode, 3.0f);
     EXPECT_TRUE(read.flags[kGravity]);
@@ -105,9 +106,9 @@ EmitterBlueprint {
     EXPECT_EQ(read.extra[0].first, "Note");
     EXPECT_EQ(read.extra[0].second, "{ 'kept', 1 }");
     // Written and read again: the same emitter.
-    EmitterBlueprint again;
-    ASSERT_TRUE(ParseEmitter(WriteEmitter(read), again, error)) << error;
-    EXPECT_TRUE(Same(read, again));
+    const auto again = ParseEmitter(WriteEmitter(read));
+    ASSERT_TRUE(again) << again.error();
+    EXPECT_TRUE(Same(read, *again));
   }
 
   TEST(
@@ -115,12 +116,12 @@ EmitterBlueprint {
     NotAnEmitterSaysWhere
   )
   {
-    EmitterBlueprint read;
-    std::string error;
-    EXPECT_FALSE(ParseEmitter("BeamBlueprint { Length = 1 }", read, error));
-    EXPECT_NE(error.find("not an EmitterBlueprint"), std::string::npos);
-    EXPECT_FALSE(ParseEmitter("EmitterBlueprint {\n  Lifetime = ,\n}", read, error));
-    EXPECT_EQ(error.rfind("line 2", 0), 0U) << error;
+    const auto beam = ParseEmitter("BeamBlueprint { Length = 1 }");
+    ASSERT_FALSE(beam);
+    EXPECT_NE(beam.error().find("not an EmitterBlueprint"), std::string::npos);
+    const auto broken = ParseEmitter("EmitterBlueprint {\n  Lifetime = ,\n}");
+    ASSERT_FALSE(broken);
+    EXPECT_EQ(broken.error().rfind("line 2", 0), 0U) << broken.error();
   }
 
   TEST(
@@ -144,21 +145,20 @@ EmitterBlueprint {
           unix += c;
         }
       }
-      if (unix.rfind("EmitterBlueprint", 0) != 0) {
+      if (!unix.starts_with("EmitterBlueprint")) {
         ++others; // TrailEmitterBlueprint, BeamBlueprint
         continue;
       }
       ++emitters;
-      EmitterBlueprint read;
-      std::string error;
-      ASSERT_TRUE(ParseEmitter(unix, read, error)) << entry.path().filename().string() << ": " << error;
-      const std::string written = WriteEmitter(read);
+      const auto read = ParseEmitter(unix);
+      ASSERT_TRUE(read) << entry.path().filename().string() << ": " << read.error();
+      const std::string written = WriteEmitter(*read);
       identical += written == unix ? 1 : 0;
-      EmitterBlueprint again;
-      ASSERT_TRUE(ParseEmitter(written, again, error)) << entry.path().filename().string() << ": " << error;
-      EXPECT_TRUE(Same(read, again)) << entry.path().filename().string();
+      const auto again = ParseEmitter(written);
+      ASSERT_TRUE(again) << entry.path().filename().string() << ": " << again.error();
+      EXPECT_TRUE(Same(*read, *again)) << entry.path().filename().string();
     }
-    std::printf("emitters %d (others %d), written byte for byte as the file: %d\n", emitters, others, identical);
+    std::println("emitters {} (others {}), written byte for byte as the file: {}", emitters, others, identical);
     EXPECT_GT(emitters, 2000);
   }
   TEST(
@@ -261,19 +261,19 @@ EmitterBlueprint {
     const std::string text =
       "BeamBlueprint {\n    Lifetime = 3.0,\n    TextureName = '/textures/particles/beam_white_03.dds',\n"
       "    Thickness = 0.0175,\n    StartColor = {x=0,y=0.5,z=1,w=0}, # R,G,B,A\n}\n";
-    FlatBlueprint beam;
-    std::string error;
-    ASSERT_TRUE(ParseFlatBlueprint(text, beam, error)) << error;
+    const auto parsed = ParseFlatBlueprint(text);
+    ASSERT_TRUE(parsed) << parsed.error();
+    const FlatBlueprint& beam = *parsed;
     EXPECT_EQ(beam.kind, "BeamBlueprint");
     ASSERT_EQ(beam.fields.size(), 4U);
     EXPECT_FLOAT_EQ(beam.Number("Thickness", 1.0f), 0.0175f);
     EXPECT_FLOAT_EQ(beam.Number("Length", 10.0f), 10.0f); // missing: the engine's default
     EXPECT_FLOAT_EQ(beam.Color("StartColor", {}).at(1), 0.5f);
     EXPECT_EQ(beam.Text("TextureName"), "/textures/particles/beam_white_03.dds");
-    FlatBlueprint again;
-    ASSERT_TRUE(ParseFlatBlueprint(WriteFlatBlueprint(beam), again, error)) << error;
-    EXPECT_TRUE(SameFlat(beam, again));
-    EXPECT_FALSE(ParseFlatBlueprint("EmitterBlueprint { }", again, error));
+    const auto again = ParseFlatBlueprint(WriteFlatBlueprint(beam));
+    ASSERT_TRUE(again) << again.error();
+    EXPECT_TRUE(SameFlat(beam, *again));
+    EXPECT_FALSE(ParseFlatBlueprint("EmitterBlueprint { }"));
   }
 
   TEST(
@@ -290,20 +290,18 @@ EmitterBlueprint {
     for (const auto& entry : std::filesystem::directory_iterator(folder)) {
       std::ifstream in(entry.path(), std::ios::binary);
       const std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
-      const bool beam = text.rfind("BeamBlueprint", 0) == 0;
-      if (!beam && text.rfind("TrailEmitterBlueprint", 0) != 0) {
+      const bool beam = text.starts_with("BeamBlueprint");
+      if (!beam && !text.starts_with("TrailEmitterBlueprint")) {
         continue;
       }
       (beam ? beams : trails) += 1;
-      FlatBlueprint read;
-      std::string error;
-      ASSERT_TRUE(ParseFlatBlueprint(text, read, error)) << entry.path().filename().string() << ": " << error;
-      FlatBlueprint again;
-      ASSERT_TRUE(ParseFlatBlueprint(WriteFlatBlueprint(read), again, error))
-        << entry.path().filename().string() << ": " << error;
-      EXPECT_TRUE(SameFlat(read, again)) << entry.path().filename().string();
+      const auto read = ParseFlatBlueprint(text);
+      ASSERT_TRUE(read) << entry.path().filename().string() << ": " << read.error();
+      const auto again = ParseFlatBlueprint(WriteFlatBlueprint(*read));
+      ASSERT_TRUE(again) << entry.path().filename().string() << ": " << again.error();
+      EXPECT_TRUE(SameFlat(*read, *again)) << entry.path().filename().string();
     }
-    std::printf("beams %d, trails %d\n", beams, trails);
+    std::println("beams {}, trails {}", beams, trails);
     EXPECT_GT(beams, 50);
     EXPECT_GT(trails, 100);
   }

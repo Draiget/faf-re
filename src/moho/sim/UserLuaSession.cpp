@@ -1,6 +1,7 @@
 #include "moho/lua/CScrLuaInitForm.h"
 #include "moho/sim/UserLuaPrivate.h"
 #include "gpg/core/diagnostics/BuildInfo.h"
+#include "moho/ui/UiDisplayScale.h"
 
 namespace
 {
@@ -2248,8 +2249,30 @@ namespace
     return 1;
   }
 
+  /**
+   * Engine addition (UI scaling and DPI): `GetDisplayScale()` - the system's scale of the display
+   * the game window is on (1.5 at Windows' 150 %). The UI's "match the display" option sets
+   * `ui_scale` from it; uimain.lua's `OnDisplayScaleChanged(scale)` hears when it changes.
+   */
+  int GetDisplayScaleBody(
+    lua_State* const rawState
+  )
+  {
+    lua_pushnumber(rawState, static_cast<lua_Number>(moho::UI_GetDisplayScale()));
+    return 1;
+  }
+
   void RegisterReplayTimelineBindings()
   {
+    static CScrLuaBinder displayScale(
+      moho::SCR_UserLuaInitSet(),
+      "GetDisplayScale",
+      &ReplayTimelineBinding<&GetDisplayScaleBody>,
+      nullptr,
+      "<global>",
+      "number GetDisplayScale() - the system's scale of the display the game window is on: 1.0 at 100 %, 1.5 at "
+      "150 %. Absent on the original executable."
+    );
     static CScrLuaBinder engineInfo(
       moho::SCR_UserLuaInitSet(),
       "GetEngineInfo",

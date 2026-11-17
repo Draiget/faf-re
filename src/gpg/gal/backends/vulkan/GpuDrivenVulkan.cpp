@@ -5,6 +5,8 @@
 
 #include "GpuDrivenVulkan.h"
 
+#include "gpg/core/utils/Unreachable.h"
+
 #include <algorithm>
 #include <cstring>
 #include <string>
@@ -78,9 +80,9 @@ namespace gpg::gal
       case GpuStencilOp::Decrement:
         return VK_STENCIL_OP_DECREMENT_AND_WRAP;
       case GpuStencilOp::Keep:
-      default:
         return VK_STENCIL_OP_KEEP;
       }
+      FAF_UNREACHABLE();
     }
 
     [[nodiscard]] VkStencilOpState ToVulkan(
@@ -138,9 +140,8 @@ namespace gpg::gal
         L"-spirv",
         L"-fvk-use-dx-layout",
         // Engine addition (ren_RayTracedShadows): ray queries need Vulkan 1.2's SPIR-V.
-        (std::string_view(desc.source, desc.sourceBytes).find("RayQuery<") != std::string_view::npos)
-          ? L"-fspv-target-env=vulkan1.2"
-          : L"-fspv-target-env=vulkan1.1",
+        (std::string_view(desc.source, desc.sourceBytes).contains("RayQuery<")) ? L"-fspv-target-env=vulkan1.2"
+                                                                                : L"-fspv-target-env=vulkan1.1",
         L"-fvk-b-shift",
         L"0",
         L"0",
@@ -461,6 +462,7 @@ namespace gpg::gal
     Vk().vkCmdCopyBuffer(
       mCommands, static_cast<GpuBufferVulkan&>(buffer).Buffer().buffer, readback.buffer, 1U, &region
     );
+    HostReadBarrier();
     Submit(true, false);
     std::memcpy(out, readback.memory.mapped, static_cast<std::size_t>(bytes));
     Vk().vkDestroyBuffer(mDevice, readback.buffer, nullptr);

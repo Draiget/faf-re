@@ -3,6 +3,7 @@
 #include "moho/render/camera/CameraImpl.h"
 #include "legacy/math/X87Math.h"
 
+#include <utility>
 #include <Windows.h>
 
 #include <algorithm>
@@ -1037,7 +1038,7 @@ void moho::CameraImpl::SetTimeSource(
   const ECamTimeSource timeSource
 )
 {
-  mTimeSource = static_cast<std::int32_t>(timeSource);
+  mTimeSource = std::to_underlying(timeSource);
 }
 
 /**

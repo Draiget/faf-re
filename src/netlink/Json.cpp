@@ -65,24 +65,16 @@ namespace faf::netlink
       : mText(text)
     {}
 
-    std::optional<JsonValue> ParseDocument(
-      std::string* error
-    )
+    std::expected<JsonValue, std::string> ParseDocument()
     {
       JsonValue v;
       SkipSpace();
       if (!ParseValue(v, 0)) {
-        if (error != nullptr) {
-          *error = mError + " at offset " + std::to_string(mPos);
-        }
-        return std::nullopt;
+        return std::unexpected(mError + " at offset " + std::to_string(mPos));
       }
       SkipSpace();
       if (mPos != mText.size()) {
-        if (error != nullptr) {
-          *error = "trailing characters at offset " + std::to_string(mPos);
-        }
-        return std::nullopt;
+        return std::unexpected("trailing characters at offset " + std::to_string(mPos));
       }
       return v;
     }
@@ -401,12 +393,11 @@ namespace faf::netlink
     std::string mError;
   };
 
-  std::optional<JsonValue> ParseJson(
-    const std::string_view text,
-    std::string* error
+  std::expected<JsonValue, std::string> ParseJson(
+    const std::string_view text
   )
   {
-    return JsonReader(text).ParseDocument(error);
+    return JsonReader(text).ParseDocument();
   }
 
   namespace

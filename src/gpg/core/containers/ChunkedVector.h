@@ -19,7 +19,7 @@ namespace gpg::core
   class ChunkedVector
   {
   public:
-    static constexpr std::size_t kChunkSize = std::size_t{1} << kChunkLog2;
+    static constexpr std::size_t kChunkSize = 1uz << kChunkLog2;
 
     [[nodiscard]] std::size_t size() const noexcept
     {

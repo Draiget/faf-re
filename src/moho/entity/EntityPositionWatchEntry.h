@@ -55,7 +55,7 @@ namespace moho
     std::uint8_t mPad19[3];
   };
 
-#if defined(_M_IX86)
+#if FAFRE_ARCH_X86
   static_assert(sizeof(EntityPositionWatchEntry) == 0x1C, "EntityPositionWatchEntry size must be 0x1C");
   static_assert(
     offsetof(EntityPositionWatchEntry, mLastPos) == 0x04,

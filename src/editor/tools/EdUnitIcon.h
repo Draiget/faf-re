@@ -80,6 +80,18 @@ namespace faf::editor
   };
   /** The colours of RGBA bytes times the gains (alpha kept). */
   void ApplyIconTone(std::vector<std::uint8_t>& rgba, const float (&gains)[3]);
+  /**
+   * The shipped icons' light edge (FAF Studio's Glow): a white halo round the silhouette, `solid` pixels at `peak`,
+   * then fading out over `soft` pixels, the unit over it; pixels it doesn't reach become clear white. `rgba` is
+   * `side` x `side` RGBA floats 0..1 (IconPixels'). Nothing when solid and soft are 0.
+   */
+  void IconLightEdge(std::vector<float>& rgba, int side, float solid, float soft = 3.5f, float peak = 0.65f);
+  /**
+   * Two icons' silhouettes (alpha from 128) as a picture (FAF Studio's DiffImage): green where both are, red only the
+   * first (made), blue only the second (the game's), dark grey neither. RGBA bytes in, BGRA words out.
+   */
+  [[nodiscard]] std::vector<std::uint32_t>
+  IconDifference(const std::uint8_t* made, const std::uint8_t* shipped, int side);
   /** A unit id's faction by its letters (uel / uea / ues / ueb: UEF, ua*: Aeon, ur*: Cybran, xs*: Seraphim); "" none.
    */
   [[nodiscard]] std::string IconFactionOf(const std::string& id);

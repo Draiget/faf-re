@@ -5,6 +5,8 @@
 
 #include "GpuDrivenD3D12.h"
 
+#include "gpg/core/utils/Unreachable.h"
+
 #include <algorithm>
 #include <cstring>
 #include <string>
@@ -74,9 +76,9 @@ namespace gpg::gal
       case GpuStencilOp::Decrement:
         return D3D12_STENCIL_OP_DECR;
       case GpuStencilOp::Keep:
-      default:
         return D3D12_STENCIL_OP_KEEP;
       }
+      FAF_UNREACHABLE();
     }
 
     [[nodiscard]] D3D12_DEPTH_STENCILOP_DESC ToD3D12(
@@ -99,7 +101,7 @@ namespace gpg::gal
       // Engine addition (ren_RayTracedShadows): a program with inline ray queries needs shader model 6.5.
       const std::string_view source(desc.source, desc.sourceBytes);
       std::wstring rayProfile = profile;
-      if (source.find("RayQuery<") != std::string_view::npos) {
+      if (source.contains("RayQuery<")) {
         rayProfile.back() = L'5';
       }
       const effects::CompiledShader compiled =

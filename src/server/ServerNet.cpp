@@ -21,7 +21,7 @@
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
-#include <windows.h>
+#include <Windows.h>
 #else
 #include <time.h>
 #endif
@@ -177,18 +177,16 @@ namespace faf::server
     mLobby.AddParticipant(uid);
   }
 
-  bool CServerNet::Start(
-    std::string& error
-  )
+  std::expected<void, std::string> CServerNet::Start()
   {
-    if (!mLinks.Open(mConfig.listen, error)) {
-      return false;
+    if (auto opened = mLinks.Open(mConfig.listen); !opened) {
+      return opened;
     }
     mStartUs = NowUs();
     mThread = std::thread([this] {
       Run();
     });
-    return true;
+    return {};
   }
 
   void CServerNet::Stop()
@@ -632,12 +630,12 @@ namespace faf::server
   }
 
   void CServerNet::RequestAddress(
-    const std::uint32_t ip,
+    const remote::net::IpAddress& address,
     const bool allow
   )
   {
     const std::scoped_lock lock(mNewsLock);
-    mAddressChanges.emplace_back(ip, allow);
+    mAddressChanges.emplace_back(address, allow);
   }
 
   void CServerNet::Tick(
@@ -648,7 +646,7 @@ namespace faf::server
 
     // Plan WP17.2: the organiser's ejects and allowlist changes, and the seats as the control API reports them.
     std::vector<std::pair<std::int32_t, std::string>> ejects;
-    std::vector<std::pair<std::uint32_t, bool>> addresses;
+    std::vector<std::pair<remote::net::IpAddress, bool>> addresses;
     std::vector<SSubstitute> substitutes;
     {
       const std::scoped_lock lock(mNewsLock);
@@ -680,11 +678,11 @@ namespace faf::server
         "): " + std::to_string(static_cast<int>(mConfig.reconnectSeconds)) + " s to join"
       );
     }
-    for (const auto& [ip, allow] : addresses) {
+    for (const auto& [address, allow] : addresses) {
       if (allow) {
-        mLinks.AllowAddress(ip);
+        mLinks.AllowAddress(address);
       } else {
-        mLinks.DisallowAddress(ip);
+        mLinks.DisallowAddress(address);
       }
     }
     for (const auto& [uid, reason] : ejects) {

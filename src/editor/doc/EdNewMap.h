@@ -1,5 +1,7 @@
 #pragma once
 
+#include <array>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -24,6 +26,12 @@ namespace faf::editor
     bool sea = false;
     /** The sea's level, in game units; its deep and abyss levels are 2.5 and 15 below it. */
     float seaLevel = 17.5f;
+    /**
+     * Any size (FAF Studio's maps.lua CustomPlan): the playable width and depth in km (51.2 units a km); 0 uses the
+     * size list. The terrain is the next size of the list that holds it, the playable area (AREA_1) centred in it.
+     */
+    float widthKm = 0.0f;
+    float depthKm = 0.0f;
   };
 
   /** The sizes offered: kilometres (as the game's lobby names them) and game units (heights are one more). */
@@ -44,9 +52,16 @@ namespace faf::editor
     float z;
   };
 
-  /** The map's width and depth in game units. */
+  /** The map's width and depth in game units (the terrain's). */
   [[nodiscard]] int NewMapWidth(const NewMapSettings& settings);
   [[nodiscard]] int NewMapDepth(const NewMapSettings& settings);
+  /** The units in a km of a map's side (a 10 km map is 512 units). */
+  inline constexpr float kUnitsPerKmSide = 51.2f;
+  /**
+   * An any-size map's playable area (x0, z0, x1, z1, edges on multiples of 4 as FAF's SetPlayableArea keeps them),
+   * centred in the terrain; none when the size fills the terrain or the size list is used.
+   */
+  [[nodiscard]] std::optional<std::array<int, 4>> NewMapPlayable(const NewMapSettings& settings);
   /**
    * The start positions: one in the middle, or a ring around it (an ellipse on a map that isn't square) at 35% of each
    * side, the first at the top.
@@ -60,7 +75,7 @@ namespace faf::editor
   std::string NewMapSaveText(const NewMapSettings& settings);
 
   /** `<base>_script.lua`: the armies set up, as the game's own maps do. */
-  std::string NewMapScriptText();
+  std::string NewMapScriptText(bool playableArea = false);
 
   /**
    * The `.scmap` preview chunk (RWldMapPreviewChunk's layout, version 2): the map's size, no name or tags,

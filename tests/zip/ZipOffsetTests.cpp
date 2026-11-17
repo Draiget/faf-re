@@ -129,7 +129,7 @@ namespace
     void TearDown() override
     {
       // Back to the build's default (CZipFile.cpp: x86 keeps the bytes, as the binary does; x64 doesn't).
-#if defined(_M_IX86)
+#if FAFRE_ARCH_X86
       moho::CZipFile::SetKeepEntryData(true);
 #else
       moho::CZipFile::SetKeepEntryData(false);

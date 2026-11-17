@@ -2,6 +2,7 @@
 
 #include "ResourcesVulkan.h"
 
+#include <utility>
 #include <algorithm>
 #include <cstring>
 
@@ -50,7 +51,7 @@ namespace gpg::gal
       const MohoD3DLockFlags flag
     ) noexcept
     {
-      return (flags & static_cast<std::uint32_t>(flag)) != 0U;
+      return (flags & std::to_underlying(flag)) != 0U;
     }
 
     void RetireImage(
@@ -345,7 +346,7 @@ namespace gpg::gal
     }
     mLockOffset = offset;
     mLockSize = (size == 0U || offset + size > mByteWidth) ? (mByteWidth - offset) : size;
-    mLockFlags = static_cast<std::uint32_t>(flags);
+    mLockFlags = std::to_underlying(flags);
     mLocked = true;
     if (!HasFlag(mLockFlags, MohoD3DLockFlags::ReadOnly)) {
       const std::uint32_t end = mLockOffset + mLockSize;

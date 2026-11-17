@@ -3,7 +3,11 @@
 #if FAFRE_PLATFORM_WINDOWS
 #include <Windows.h>
 #include <TlHelp32.h>
-#else
+#elif FAFRE_PLATFORM_MACOS // Mach thread state
+#include <string>
+
+#include <mach/mach.h>
+#elif FAFRE_PLATFORM_LINUX // real-time signals, tgkill, /proc/self/task
 #include <atomic>
 #include <cstdlib>
 #include <cstring>
@@ -18,7 +22,9 @@
 #endif
 
 #include <algorithm>
+#include <cstdint>
 #include <cstdio>
+#include <ctime>
 #include <map>
 #include <utility>
 #include <vector>
@@ -26,9 +32,10 @@
 // Engine addition, server mode: see ReplayFpuReport.h. Windows suspends each thread and reads
 // its context; Linux (plan WPL.9) sends each thread a real-time signal and reads the x87
 // control word and MXCSR the kernel saved in the signal frame (the handler's own registers
-// are reset, the interrupted thread's are in ucontext's fpregs).
+// are reset, the interrupted thread's are in ucontext's fpregs); macOS suspends each thread
+// through Mach and reads its FPCR from the thread's NEON state, as Windows reads its context.
 
-#if !FAFRE_PLATFORM_WINDOWS
+#if FAFRE_PLATFORM_LINUX // real-time signals, tgkill, /proc/self/task
 namespace faf::headless
 {
   namespace
@@ -157,6 +164,91 @@ namespace faf::headless
     return text;
   }
 } // namespace faf::headless
+#elif FAFRE_PLATFORM_MACOS // Mach: task_threads, thread_suspend, thread_get_state
+namespace faf::headless
+{
+  namespace
+  {
+    struct SThreadSamples
+    {
+      std::uint64_t id = 0;
+      std::map<std::uint64_t, int> values; // FPCR -> count
+      double userSeconds = 0.0;
+    };
+  } // namespace
+
+  std::string ReportThreadFloatingPointState(
+    const int samples,
+    const int intervalMs
+  )
+  {
+    const mach_port_t task = ::mach_task_self();
+    const thread_act_t self = ::mach_thread_self();
+    std::map<std::uint64_t, SThreadSamples> threads;
+    for (int round = 0; round < samples; ++round) {
+      thread_act_array_t list = nullptr;
+      mach_msg_type_number_t count = 0;
+      if (::task_threads(task, &list, &count) == KERN_SUCCESS) {
+        for (mach_msg_type_number_t i = 0; i < count; ++i) {
+          const thread_act_t thread = list[i];
+          thread_identifier_info_data_t identity{};
+          mach_msg_type_number_t identityCount = THREAD_IDENTIFIER_INFO_COUNT;
+          if (
+            thread != self &&
+            ::thread_info(thread, THREAD_IDENTIFIER_INFO, reinterpret_cast<thread_info_t>(&identity), &identityCount) ==
+              KERN_SUCCESS &&
+            ::thread_suspend(thread) == KERN_SUCCESS
+          ) {
+            // Suspended, the saved NEON state is the thread's own; nothing allocates until resumed.
+            arm_neon_state64_t neon{};
+            mach_msg_type_number_t neonCount = ARM_NEON_STATE64_COUNT;
+            const kern_return_t read =
+              ::thread_get_state(thread, ARM_NEON_STATE64, reinterpret_cast<thread_state_t>(&neon), &neonCount);
+            (void)::thread_resume(thread);
+            if (read == KERN_SUCCESS) {
+              SThreadSamples& entry = threads[identity.thread_id];
+              entry.id = identity.thread_id;
+              ++entry.values[neon.__fpcr];
+              thread_basic_info_data_t basic{};
+              mach_msg_type_number_t basicCount = THREAD_BASIC_INFO_COUNT;
+              if (
+                ::thread_info(thread, THREAD_BASIC_INFO, reinterpret_cast<thread_info_t>(&basic), &basicCount) ==
+                KERN_SUCCESS
+              ) {
+                entry.userSeconds = basic.user_time.seconds + basic.user_time.microseconds * 1e-6;
+              }
+            }
+          }
+          (void)::mach_port_deallocate(task, thread);
+        }
+        (void)::vm_deallocate(task, reinterpret_cast<vm_address_t>(list), count * sizeof(thread_act_t));
+      }
+      const timespec interval{intervalMs / 1000, static_cast<long>(intervalMs % 1000) * 1000000L};
+      (void)::nanosleep(&interval, nullptr);
+    }
+    (void)::mach_port_deallocate(task, self);
+
+    std::vector<SThreadSamples> sorted;
+    for (auto& [id, entry] : threads) {
+      sorted.push_back(std::move(entry));
+    }
+    std::ranges::sort(sorted, std::ranges::greater{}, &SThreadSamples::userSeconds);
+    std::string text;
+    char line[256];
+    for (const SThreadSamples& entry : sorted) {
+      std::snprintf(
+        line, sizeof(line), "thread %llu user cpu %.2fs:", static_cast<unsigned long long>(entry.id), entry.userSeconds
+      );
+      text += line;
+      for (const auto& [fpcr, count] : entry.values) {
+        std::snprintf(line, sizeof(line), " fpcr=0x%08llX x%d", static_cast<unsigned long long>(fpcr), count);
+        text += line;
+      }
+      text += "\n";
+    }
+    return text;
+  }
+} // namespace faf::headless
 #else
 namespace faf::headless
 {
@@ -206,7 +298,7 @@ namespace faf::headless
       if (!ok) {
         return false;
       }
-#if defined(_M_X64)
+#if FAFRE_ARCH_X64
       controlWord = context.FltSave.ControlWord;
       mxcsr = context.MxCsr;
 #else

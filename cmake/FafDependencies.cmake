@@ -20,7 +20,7 @@
 #     extracted from Microsoft's installer (see faf_dependency_dxsdk).
 #
 # FAF_DEPENDENCIES_ONLY, a list of names (dxsdk for the DirectX SDK), limits a run to those;
-# the Linux build (cmake/FafLinux.cmake) needs three:
+# the Linux build (cmake/FafPosix.cmake) needs three:
 #   cmake -DFAF_DEPENDENCIES_ONLY="WildMagic3p8;zlib-1.2.3" -P cmake/FafDependencies.cmake
 #
 # FFmpeg (dependencies/ffmpeg, Draiget/ffmpeg-mirror) is the unmodified 7.1.3 source
@@ -262,14 +262,14 @@ set(_faf_download_DirectX-Headers
 
 # SDL 3.4.18 (zlib): the client's window, input, dialogs and developer-window renderer on every
 # platform (issues #256, #407), the Linux client's audio output and FAudio's platform layer. The
-# release archive; cmake/deps/sdl3 (Windows) and cmake/FafLinuxClient.cmake build it static.
+# release archive; cmake/deps/sdl3 (Windows) and cmake/FafPosixClient.cmake build it static.
 set(_faf_download_SDL3
     "https://github.com/libsdl-org/SDL/releases/download/release-3.4.18/SDL3-3.4.18.tar.gz"
     "9c75cf16330322c217dedd2e0609f1124f1b54b8633e763467b4684d0f4334a3"
     "SDL3-3.4.18")
 # FAudio 26.10 (zlib): XACT3 (FACT) and X3DAudio (F3DAudio) for the Linux client's sound (issue
 # #258), the same reimplementation Wine's XACT uses. The tag's source archive;
-# cmake/FafLinuxClient.cmake builds it static over SDL3. Linux only.
+# cmake/FafPosixClient.cmake builds it static over SDL3. Linux only.
 set(_faf_download_FAudio
     "https://github.com/FNA-XNA/FAudio/archive/refs/tags/26.10.tar.gz"
     "c508f297ec8d065b456b2d9d74bab89ffc84ac3afbcb428bd54e40f09f8b901e"
@@ -308,6 +308,43 @@ set(_faf_download_imgui
     "c5e2053afc707c70385431ed85c500b108b521784a3f6a7a31ea17583aab89a2"
     "imgui-1.92.4-docking"
     "imgui-v1.92.4-docking.tar.gz")
+
+# MoltenVK 1.4.2 (Apache-2.0): Vulkan over Metal for the macOS client (issue #263), the release's
+# prebuilt macOS dylib (MoltenVK/MoltenVK/dynamic/dylib/macOS/libMoltenVK.dylib), copied next to
+# faf_client and loaded directly, with no Vulkan loader (gpg/gal/backends/vulkan/VulkanLoader.cpp).
+# macOS only.
+set(_faf_download_MoltenVK
+    "https://github.com/KhronosGroup/MoltenVK/releases/download/v1.4.2/MoltenVK-macos.tar"
+    "f95765a6229cb7b915990a2890ce12ebe36a730b021545d3d52ae69ce4c4024e"
+    "MoltenVK"
+    "MoltenVK-1.4.2-macos.tar")
+
+# DXC v1.9.2609 from source (University of Illinois/NCSA and Apache-2.0 with LLVM exception) for the
+# macOS client's shader compiler: Microsoft ships no macOS build, and the same release as the Windows
+# (dxc) and Linux (dxc-linux) entries compiles the same SPIR-V everywhere. The tag's source archive
+# leaves out DXC's submodules, so the three it needs for SPIR-V and reflection are their own entries,
+# at the commits the tag pins (external/ in the tag). cmake/FafPosixClient.cmake builds dxcompiler.
+# macOS only.
+set(_faf_download_dxc-source
+    "https://github.com/microsoft/DirectXShaderCompiler/archive/refs/tags/v1.9.2609.tar.gz"
+    "05b8e9622f9b147156998e6aab38d71997ec8391038e7302c703e9ca2448dfed"
+    "DirectXShaderCompiler-1.9.2609"
+    "DirectXShaderCompiler-1.9.2609.tar.gz")
+set(_faf_download_dxc-spirv-headers
+    "https://github.com/KhronosGroup/SPIRV-Headers/archive/496543121ce6419f23d6fa5d7194ba66c36212d2.tar.gz"
+    "a9bb9c48713245eacf97cc539b6f1d45405a92d8813f8b82e635f0a085ee9898"
+    "SPIRV-Headers-496543121ce6419f23d6fa5d7194ba66c36212d2"
+    "SPIRV-Headers-49654312.tar.gz")
+set(_faf_download_dxc-spirv-tools
+    "https://github.com/KhronosGroup/SPIRV-Tools/archive/ef96ed763b43b59b33b31b362f09a02b729fa1c9.tar.gz"
+    "82c62146083fd558735a3171cf97cfc47903ca7d368482e87f94bd44883c0f00"
+    "SPIRV-Tools-ef96ed763b43b59b33b31b362f09a02b729fa1c9"
+    "SPIRV-Tools-ef96ed76.tar.gz")
+set(_faf_download_dxc-directx-headers
+    "https://github.com/microsoft/DirectX-Headers/archive/980971e835876dc0cde415e8f9bc646e64667bf7.tar.gz"
+    "b5a4b6d8806ff7f29f19879f83d015dbe8740676d4ca0b48647a789cc7773c4e"
+    "DirectX-Headers-980971e835876dc0cde415e8f9bc646e64667bf7"
+    "DirectX-Headers-980971e8.tar.gz")
 
 function(_faf_download_tree name)
   list(GET _faf_download_${name} 0 _url)
@@ -458,6 +495,12 @@ if(FAF_DEPENDENCIES_ONLY)
   faf_dependency_download(dxc-linux)
   faf_dependency_download(DirectXMath)
   faf_dependency_download(stb)
+  # macOS only.
+  faf_dependency_download(MoltenVK)
+  faf_dependency_download(dxc-source)
+  faf_dependency_download(dxc-spirv-headers)
+  faf_dependency_download(dxc-spirv-tools)
+  faf_dependency_download(dxc-directx-headers)
 endif()
 if(NOT FAF_FREETYPE_DIR AND NOT DEFINED ENV{FAF_FREETYPE_DIR})
   faf_dependency_download(freetype)
@@ -473,7 +516,8 @@ if(NOT DEFINED ENV{FAF_GTEST_DIR} AND NOT (FAF_GTEST_DIR AND EXISTS "${FAF_GTEST
 endif()
 
 faf_dependency_patches(WildMagic3p8 submodule
-  wildmagic3p8_faf_required.patch)
+  wildmagic3p8_faf_required.patch
+  wildmagic3p8_faf_apple_endian.patch)
 faf_dependency_patches(zlib-1.2.3 submodule
   zlib_1_2_3_faf_required.patch)
 faf_dependency_patches(libjuice download

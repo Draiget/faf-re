@@ -91,8 +91,8 @@ Scenario = {
   )
   {
     SaveFile save;
-    std::string error;
-    ASSERT_TRUE(save.Parse(kSave, error)) << error;
+    auto read = save.Parse(kSave);
+    ASSERT_TRUE(read) << read.error();
     ASSERT_EQ(save.Markers().size(), 2u);
     EXPECT_EQ(save.Markers()[1].name, "Mass 01");
     EXPECT_EQ(faf::editor::ValueString(save.Markers()[1].Get("type")), "Mass");
@@ -111,8 +111,8 @@ Scenario = {
   )
   {
     SaveFile save;
-    std::string error;
-    ASSERT_TRUE(save.Parse(kSave, error)) << error;
+    auto read = save.Parse(kSave);
+    ASSERT_TRUE(read) << read.error();
     save.Markers()[1].Set("position", faf::editor::Vector3Value(300.5, 22.25, 400.5));
     faf::editor::SaveEntry hydro;
     hydro.name = "Hydrocarbon 00";
@@ -125,7 +125,8 @@ Scenario = {
     EXPECT_NE(text.find("['rectangle'] = RECTANGLE( 0, 0, 512, 512 ),"), std::string::npos);
     EXPECT_NE(text.find("\"Naval Link 00\","), std::string::npos);
     SaveFile again;
-    ASSERT_TRUE(again.Parse(text, error)) << error;
+    read = again.Parse(text);
+    ASSERT_TRUE(read) << read.error();
     ASSERT_EQ(again.Markers().size(), 3u);
     EXPECT_EQ(again.Markers()[0], save.Markers()[0]);
     EXPECT_EQ(faf::editor::ValueNumbers(again.Markers()[1].Get("position"))[0], 300.5);
@@ -139,14 +140,15 @@ Scenario = {
   )
   {
     SaveFile save;
-    std::string error;
-    ASSERT_TRUE(save.Parse(kSave, error)) << error;
+    auto read = save.Parse(kSave);
+    ASSERT_TRUE(read) << read.error();
     save.Areas()[0].Set("rectangle", faf::editor::RectangleValue(16, 32, 496, 480));
     const std::string text = save.Text();
     EXPECT_NE(text.find("RECTANGLE( 16, 32, 496, 480 )"), std::string::npos);
     EXPECT_NE(text.find("['position'] = VECTOR3( 672.5, 18.6797, 346.5 ),"), std::string::npos);
     SaveFile again;
-    ASSERT_TRUE(again.Parse(text, error)) << error;
+    read = again.Parse(text);
+    ASSERT_TRUE(read) << read.error();
     EXPECT_EQ(again.Markers(), save.Markers());
   }
 
@@ -156,15 +158,16 @@ Scenario = {
   )
   {
     SaveFile save;
-    std::string error;
-    ASSERT_TRUE(save.Parse(kSave, error)) << error;
+    auto read = save.Parse(kSave);
+    ASSERT_TRUE(read) << read.error();
     ASSERT_EQ(save.Armies().size(), 1u);
     EXPECT_EQ(save.Armies()[0].name, "ARMY_1");
     EXPECT_EQ(save.Armies()[0].Get("plans"), "''");
     EXPECT_EQ(save.Text(), kSave);
     save.Armies().push_back(faf::editor::NewArmyEntry("ARMY_2"));
     SaveFile again;
-    ASSERT_TRUE(again.Parse(save.Text(), error)) << error;
+    read = again.Parse(save.Text());
+    ASSERT_TRUE(read) << read.error();
     ASSERT_EQ(again.Armies().size(), 2u);
     EXPECT_EQ(again.Armies()[1].name, "ARMY_2");
     EXPECT_EQ(again.Markers(), save.Markers());
@@ -208,8 +211,8 @@ Scenario = {
       "                    ['position'] = VECTOR3( 4, 5, 6 ),\r\n                },\r\n"
       "            },\r\n        },\r\n    },\r\n}\r\n";
     SaveFile save;
-    std::string error;
-    ASSERT_TRUE(save.Parse(text, error)) << error;
+    auto read = save.Parse(text);
+    ASSERT_TRUE(read) << read.error();
     ASSERT_EQ(save.Markers().size(), 2u);
     // B moves: only its position's text changes.
     save.Markers()[1].Set("position", "VECTOR3( 7, 8, 9 )");
@@ -324,8 +327,8 @@ Scenario = {
                                "    },\r\n";
     const std::string text = "Scenario = {\r\n" + chains + "    next_queue_id = '1',\r\n}\r\n";
     faf::editor::SaveFile save;
-    std::string error;
-    ASSERT_TRUE(save.Parse(text, error)) << error;
+    auto read = save.Parse(text);
+    ASSERT_TRUE(read) << read.error();
     ASSERT_EQ(save.Chains().size(), 2u);
     EXPECT_EQ(save.Chains()[0].name, "Naval_Chain_Left");
     EXPECT_EQ(save.Chains()[0].markers, (std::vector<std::string>{"Naval Link 00", "Naval Link 01"}));
@@ -338,7 +341,8 @@ Scenario = {
     save.Chains().push_back({"Patrol", {}});
     EXPECT_TRUE(save.Changed());
     faf::editor::SaveFile again;
-    ASSERT_TRUE(again.Parse(save.Text(), error)) << error;
+    read = again.Parse(save.Text());
+    ASSERT_TRUE(read) << read.error();
     ASSERT_EQ(again.Chains().size(), 3u);
     EXPECT_EQ(again.Chains()[1].markers.back(), "Naval Link 06");
     EXPECT_TRUE(again.Chains()[2].markers.empty());
@@ -369,8 +373,8 @@ Scenario = {
                              "    },\r\n"
                              "}\r\n";
     faf::editor::SaveFile save;
-    std::string error;
-    ASSERT_TRUE(save.Parse(text, error)) << error;
+    auto read = save.Parse(text);
+    ASSERT_TRUE(read) << read.error();
     ASSERT_EQ(save.Armies().size(), 1u);
     faf::editor::ArmySettings settings = faf::editor::ReadArmySettings(save.Armies()[0]);
     EXPECT_EQ(settings.alliances, (std::vector<std::pair<std::string, std::string>>{{"ARMY_2", "Enemy"}}));
@@ -400,7 +404,8 @@ Scenario = {
       std::string::npos
     ) << save.Text();
     faf::editor::SaveFile again;
-    ASSERT_TRUE(again.Parse(save.Text(), error)) << error;
+    read = again.Parse(save.Text());
+    ASSERT_TRUE(read) << read.error();
     EXPECT_TRUE(faf::editor::ReadArmySettings(again.Armies()[0]) == settings);
   }
   TEST(

@@ -5,7 +5,7 @@
 // Direct3D 12 and Vulkan backends. The engine takes it for every API but
 // Direct3D 9 (moho::d3d_WindowsCursor).
 
-#include <windows.h>
+#include <Windows.h>
 
 namespace gpg::gal
 {

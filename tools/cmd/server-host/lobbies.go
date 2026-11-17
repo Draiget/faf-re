@@ -130,10 +130,13 @@ type config struct {
 	engineArgs []string
 	runsDir    string
 	publicHost string
-	listenIP   string
-	portFirst  int
-	portLast   int
-	maxLobbies int
+	// observeHost is publicHost for the observers' watch lines, an IPv4 address: the engine's live replay path
+	// (gpgnet://) is IPv4 only, while players may join the game server over IPv6.
+	observeHost string
+	listenIP    string
+	portFirst   int
+	portLast    int
+	maxLobbies  int
 }
 
 type manager struct {
@@ -759,12 +762,12 @@ func (m *manager) start(req CreateRequest, o startOpts) (*Lobby, int, string, er
 		l.Observers = []Observer{}
 	}
 	for i := range l.Observers {
-		l.Observers[i].Watch = fmt.Sprintf("/replay gpgnet://%s:%d/%s", m.cfg.publicHost, observePort, l.Observers[i].token)
+		l.Observers[i].Watch = fmt.Sprintf("/replay gpgnet://%s/%s", net.JoinHostPort(m.cfg.observeHost, strconv.Itoa(observePort)), l.Observers[i].token)
 	}
 	l.Dir = filepath.Join(m.cfg.runsDir, id+"-"+now.Format("20060102-150405"))
 	for i := range l.Seats {
 		if s := &l.Seats[i]; s.Kind == "human" {
-			s.Join = fmt.Sprintf("/connectserver %s:%d /servertoken %s /serveruid %d", m.cfg.publicHost, port, s.token, s.UID)
+			s.Join = fmt.Sprintf("/connectserver %s /servertoken %s /serveruid %d", net.JoinHostPort(m.cfg.publicHost, strconv.Itoa(port)), s.token, s.UID)
 		}
 	}
 	if err := os.MkdirAll(filepath.Join(l.Dir, "out"), 0o755); err != nil {
@@ -783,7 +786,7 @@ func (m *manager) start(req CreateRequest, o startOpts) (*Lobby, int, string, er
 		"--lobby-seconds", strconv.Itoa(int(req.LobbyMinutes * 60)),
 		"--rest", "127.0.0.1:" + strconv.Itoa(restPort), "--rest-token-file", tokenPath, "--cpus", cpuArg(cpuList)}
 	if observePort != 0 {
-		args = append(args, "--observe", net.JoinHostPort(m.cfg.listenIP, strconv.Itoa(observePort)))
+		args = append(args, "--observe", net.JoinHostPort(observeListenIP(m.cfg.listenIP), strconv.Itoa(observePort)))
 	}
 	if req.StartWhenReady > 0 {
 		args = append(args, "--start-when-ready", strconv.FormatFloat(req.StartWhenReady, 'f', -1, 64))

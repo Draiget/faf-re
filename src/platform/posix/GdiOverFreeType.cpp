@@ -12,6 +12,7 @@
 // GDI's do. One lock covers everything: FreeType faces are not shared between threads.
 
 #include <algorithm>
+#include <bit>
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
@@ -797,8 +798,7 @@ DWORD GetFontData(
     return GDI_ERROR;
   }
   // GDI takes the tag as its bytes in file order read little-endian; FreeType as a big-endian number.
-  const FT_ULong tag =
-    table == 0u ? 0u : ((table & 0xFFu) << 24) | ((table & 0xFF00u) << 8) | ((table >> 8) & 0xFF00u) | (table >> 24);
+  const FT_ULong tag = std::byteswap(table);
   FT_ULong length = 0;
   if (FT_Load_Sfnt_Table(dc->mFont->mFace, tag, 0, nullptr, &length) != 0 || offset > length) {
     return GDI_ERROR;

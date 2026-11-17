@@ -121,7 +121,9 @@ namespace moho
     CMessage msg(ELobbyMsg::LOBMSG_NewPeer);
     CMessageStream stream(msg, CMessageStream::Access::kReadWrite);
     stream.Write(playerName);
-    stream.Write(address);
+    // 4 bytes (0x007C81CD), the Windows game's u_long. LP64 POSIX's has 8, and a receiver that reads the binary's 4
+    // would take their upper half for the port.
+    stream.Write(static_cast<std::uint32_t>(address));
     stream.Write(port);
     stream.Write(uid);
     connection->Write(msg);

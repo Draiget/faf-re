@@ -16,6 +16,7 @@
 //    FACT can leave its prepared bit set too.
 
 #include "platform/posix/XactOverFact.h"
+#include "platform/posix/FactCategoryVolumes.h"
 
 #include <atomic>
 #include <cstdint>
@@ -536,7 +537,12 @@ namespace
         mRendererId.push_back(0);
         fact.pRendererID = mRendererId.data();
       }
-      return static_cast<std::int32_t>(FACTAudioEngine_Initialize(mEngine, &fact));
+      const std::uint32_t result = FACTAudioEngine_Initialize(mEngine, &fact);
+      if (result == 0u) {
+        const std::lock_guard<std::mutex> guard(mVolumeLock);
+        mCategoryVolumes.Reset(params->pGlobalSettingsBuffer, params->globalSettingsBufferSize);
+      }
+      return static_cast<std::int32_t>(result);
     }
 
     void __stdcall ShutDown() override
@@ -677,12 +683,18 @@ namespace
       (void)FACTAudioEngine_Stop(mEngine, category, static_cast<std::uint32_t>(flags));
     }
 
+    // XACT's volume chain; FACT's own call compounds the categories below (FactCategoryVolumes.h).
     std::int32_t __stdcall SetVolume(
       const std::uint16_t category,
       const float volume
     ) override
     {
-      return static_cast<std::int32_t>(FACTAudioEngine_SetVolume(mEngine, category, volume));
+      const std::lock_guard<std::mutex> guard(mVolumeLock);
+      return static_cast<std::int32_t>(
+        mCategoryVolumes.Set(category, volume, [this](const std::uint16_t index, const float value) {
+        return FACTAudioEngine_SetVolume(mEngine, index, value);
+      })
+      );
     }
 
     std::int32_t __stdcall Pause(
@@ -718,6 +730,8 @@ namespace
 
   private:
     FACTAudioEngine* const mEngine;
+    std::mutex mVolumeLock;
+    platform::posix::FactCategoryVolumes mCategoryVolumes;
     std::atomic<std::uint32_t> mReferences{1u};
     std::vector<std::int16_t> mRendererId;
   };

@@ -1394,13 +1394,13 @@ namespace moho
   ) const
   {
     (void)name;
-    const std::uint8_t targetOccupancy = static_cast<std::uint8_t>(footprint.mOccupancyCaps);
+    const std::uint8_t targetOccupancy = std::to_underlying(footprint.mOccupancyCaps);
     int bestDistance = std::numeric_limits<std::int16_t>::max();
     const SNamedFootprint* bestFootprint = nullptr;
 
     // 0x0052AAE3: the walk reads `mFootprints`' head straight off `this`.
     for (const SNamedFootprint& candidate : mFootprints.mFootprints) {
-      const std::uint8_t candidateOccupancy = static_cast<std::uint8_t>(candidate.mOccupancyCaps);
+      const std::uint8_t candidateOccupancy = std::to_underlying(candidate.mOccupancyCaps);
       if (candidateOccupancy != targetOccupancy) {
         continue;
       }
@@ -1672,9 +1672,9 @@ namespace moho
     struct BlueprintNameHash
     {
       using is_transparent = void;
-      [[nodiscard]] std::size_t operator()(
+      [[nodiscard]] static std::size_t operator()(
         const std::string_view name
-      ) const noexcept
+      ) noexcept
       {
         return std::hash<std::string_view>{}(name);
       }

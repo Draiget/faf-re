@@ -80,10 +80,10 @@ namespace moho
    */
   struct ParticleBucketKeyLess
   {
-    [[nodiscard]] bool operator()(
+    [[nodiscard]] static bool operator()(
       const SParticleBucketKey& lhs,
       const SParticleBucketKey& rhs
-    ) const noexcept
+    ) noexcept
     {
       return IsParticleBucketKeyRhsLessThanLhs(rhs, lhs);
     }
@@ -102,10 +102,10 @@ namespace moho
   /** Same ordering for the trail buckets (comparator 0x00492520). */
   struct TrailBucketKeyLess
   {
-    [[nodiscard]] bool operator()(
+    [[nodiscard]] static bool operator()(
       const STrailBucketKey& lhs,
       const STrailBucketKey& rhs
-    ) const noexcept
+    ) noexcept
     {
       return IsTrailBucketKeyRhsLessThanLhs(rhs, lhs);
     }

@@ -109,6 +109,7 @@ set(FAF_EDITOR_SOURCES
   ui/EdWindowChrome.cpp
   ui/EdTitleBar.cpp
   ui/EdPalette.cpp
+  ui/EdPerf.cpp
   ui/EdTheme.cpp
   ui/EdThemeStyle.cpp
   ui/EdIcons.cpp
@@ -142,6 +143,7 @@ set(FAF_EDITOR_SOURCES
   tools/EdSkeleton.cpp
   doc/EdJsonTree.cpp
   view/EdMapScenePaths.cpp
+  view/EdMapSceneMods.cpp
   ui/EdPathsPanel.cpp
   tools/EdDetailPass.cpp
   view/EdMapSceneDetail.cpp
@@ -156,6 +158,7 @@ set(FAF_EDITOR_SOURCES
   terrain/gpu/EdGpuGen.cpp
   terrain/gpu/EdGpuGenFilt.cpp
   doc/EdLuaTable.cpp
+  doc/EdStrataThemes.cpp
   tools/EdUnitWizard.cpp
   ui/EdUnitWizardPanel.cpp
   tools/EdScaAnim.cpp

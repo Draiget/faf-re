@@ -3,6 +3,7 @@
 #include <atomic>
 #include <cstddef>
 #include <cstdint>
+#include <expected>
 #include <memory>
 #include <string>
 #include <vector>
@@ -140,12 +141,12 @@ namespace moho
     MsdfCookPlan(const MsdfCookPlan&) = delete;
     MsdfCookPlan& operator=(const MsdfCookPlan&) = delete;
 
-    /** False with `error` set for a font the options refuse; `TimedOut` then says whether it ran out of time. */
-    [[nodiscard]] bool
-    Prepare(const void* fontBytes, std::size_t byteCount, const SMsdfCookOptions& options, std::string& error);
+    /** The error for a font the options refuse; `TimedOut` then says whether it ran out of time. */
+    [[nodiscard]] std::expected<void, std::string>
+    Prepare(const void* fontBytes, std::size_t byteCount, const SMsdfCookOptions& options);
 
-    /** False with `error` set when the cook ran out of time or was cancelled; the plan is then of no use. */
-    [[nodiscard]] bool GenerateOnCpu(std::string& error);
+    /** The error when the cook ran out of time or was cancelled; the plan is then of no use. */
+    [[nodiscard]] std::expected<void, std::string> GenerateOnCpu();
 
     /** The last failure came from `mMaxSeconds` or `mCancel`, not from the font, so the font may cook another time. */
     [[nodiscard]] bool TimedOut() const;
@@ -183,16 +184,11 @@ namespace moho
   /**
    * Turns a TrueType or OpenType file in memory into an atlas, on the CPU, so it works the same under
    * every renderer. Outlines load unhinted, so a font's hinting programs don't run. Characters the font
-   * lacks stay out and are counted in `mMissing`. Returns false with `error` set for a file that isn't
-   * a font, glyphs that don't fit, a font past the options' limits, or a cook out of time.
+   * lacks stay out and are counted in `mMissing`. Returns the error for a file that isn't a font, glyphs
+   * that don't fit, a font past the options' limits, or a cook out of time.
    */
-  [[nodiscard]] bool MSDF_CookFont(
-    const void* fontBytes,
-    std::size_t byteCount,
-    const SMsdfCookOptions& options,
-    SMsdfFontAtlas& out,
-    std::string& error
-  );
+  [[nodiscard]] std::expected<void, std::string>
+  MSDF_CookFont(const void* fontBytes, std::size_t byteCount, const SMsdfCookOptions& options, SMsdfFontAtlas& out);
 
   /**
    * The names a font answers to, in every language it lists: the full name (`Arial Bold`,

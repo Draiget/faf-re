@@ -11,7 +11,7 @@
 #endif
 #include <vulkan/vulkan.h>
 
-#include <windows.h>
+#include <Windows.h>
 
 // Exported by the loader; resolved first.
 #define FAF_VK_GLOBAL_FUNCTIONS(X)                                                                                     \

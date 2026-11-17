@@ -45,7 +45,7 @@ namespace faf::editor
         if (std::isalnum(static_cast<unsigned char>(c)) != 0) {
           return std::string(1, static_cast<char>(std::toupper(static_cast<unsigned char>(c))));
         }
-        if (std::string_view("=-[];',./`\\").find(c) != std::string_view::npos) {
+        if (std::string_view("=-[];',./`\\").contains(c)) {
           return std::string(1, c);
         }
         return {};
@@ -350,9 +350,9 @@ namespace faf::editor
       last = found;
       at = found + 1;
     }
-    if (t.rfind(q, 0) == 0) {
+    if (t.starts_with(q)) {
       score += 20;
-    } else if (t.find(q) != std::string::npos) {
+    } else if (t.contains(q)) {
       score += 10;
     }
     return score;

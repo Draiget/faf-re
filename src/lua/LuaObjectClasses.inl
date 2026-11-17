@@ -82,7 +82,7 @@ const LuaObject* LuaState::GetThreadObject() const
 
 // The two bridges below are x86 register/stack adapters written in inline
 // assembly; x64 has neither inline asm nor those conventions.
-#if defined(_M_IX86)
+#if FAFRE_ARCH_X86
 /**
  * Address: 0x004CCA70 (FUN_004CCA70)
  *
@@ -2374,7 +2374,7 @@ int32_t LuaObject::GetN() const
   const_cast<LuaObject*>(this)->PushStack(lstate);
 #if defined(lua_rawlen)
   const int32_t count = static_cast<int32_t>(lua_rawlen(lstate, -1));
-#elif defined(lua_objlen)
+#elifdef lua_objlen
   const int32_t count = static_cast<int32_t>(lua_objlen(lstate, -1));
 #else
   const int32_t count = luaL_getn(lstate, -1);

@@ -25,9 +25,10 @@
 
 namespace lua
 {
-  /// sprintf(out, form, value) for one floating conversion, with Windows' NaN text.
+  /// snprintf(out, capacity, form, value) for one floating conversion, with Windows' NaN text.
   inline int FormatNumberLikeWindowsCrt(
     char* const out,
+    const std::size_t capacity,
     const char* const form,
     const double value
   )
@@ -56,10 +57,10 @@ namespace lua
         }
       }
       const bool upper = *cursor == 'E' || *cursor == 'F' || *cursor == 'G';
-      return std::sprintf(out, leftAlign ? "%-*s" : "%*s", width, upper ? "-NAN(IND)" : "-nan(ind)");
+      return std::snprintf(out, capacity, leftAlign ? "%-*s" : "%*s", width, upper ? "-NAN(IND)" : "-nan(ind)");
     }
 #endif
-    return std::sprintf(out, form, value);
+    return std::snprintf(out, capacity, form, value);
   }
 
   /// strtod(text, end), with Windows' NaN spellings and values.

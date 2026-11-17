@@ -49,19 +49,17 @@ namespace faf::editor::field
     const int kDz[8] = {0, 0, -1, 1, -1, -1, 1, 1};
 
     /** Puts the chosen result into `out` and the others into the extra outputs. */
-    bool Emit(
+    std::expected<void, std::string> Emit(
       const OpArgs& a,
       Grid& out,
       std::map<std::string, Grid>& all,
-      const char* const fallback,
-      std::string& err
+      const char* const fallback
     )
     {
       const std::string want = a.p.S("output", fallback);
       const auto it = all.find(want);
       if (it == all.end()) {
-        err = "unknown output '" + want + "'";
-        return false;
+        return std::unexpected("unknown output '" + want + "'");
       }
       for (auto& kv : all) {
         if (kv.first == want)
@@ -70,7 +68,7 @@ namespace faf::editor::field
           (*a.extra)[kv.first] = std::move(kv.second);
       }
       out = std::move(it->second);
-      return true;
+      return {};
     }
 
     Grid Like(
@@ -307,19 +305,23 @@ namespace faf::editor::field
     // ---- thermal_map
     // -----------------------------------------------------------------------------------------------------------------------------
 
-    bool OpThermalMap(
+    std::expected<void, std::string> OpThermalMap(
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
+      std::string err;
       const Grid* src = Need(a, "a", err);
-      if (src == nullptr || !MakeOut(a, out, err))
-        return false;
+      if (src == nullptr)
+        return std::unexpected(err);
+      if (auto made = MakeOut(a, out); !made)
+        return made;
       const Grid* tmap = Get(a, "b");
       const Grid* mask = Get(a, "mask");
-      if (!SameOrNone(tmap, *src, "b", err) || !SameOrNone(mask, *src, "mask", err))
-        return false;
+      if (auto same = SameOrNone(tmap, *src, "b"); !same)
+        return same;
+      if (auto same = SameOrNone(mask, *src, "mask"); !same)
+        return same;
       const int w = src->w, h = src->h;
       const std::size_t n = src->Count();
       std::vector<float> talus(n, static_cast<float>(a.p.N("talus", 0.6)));
@@ -356,24 +358,26 @@ namespace faf::editor::field
         all["scree"].v[i] = Clamp01(gain[i] / sc);
         all["moved"].v[i] = Clamp01(lost[i] / sc);
       }
-      return Emit(a, out, all, "height", err);
+      return Emit(a, out, all, "height");
     }
 
     // ---- erode_rocksoil
     // --------------------------------------------------------------------------------------------------------------------------
 
-    bool OpRockSoil(
+    std::expected<void, std::string> OpRockSoil(
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
+      std::string err;
       const Grid* src = Need(a, "a", err);
-      if (src == nullptr || !MakeOut(a, out, err))
-        return false;
+      if (src == nullptr)
+        return std::unexpected(err);
+      if (auto made = MakeOut(a, out); !made)
+        return made;
       const Grid* soil0 = Get(a, "b");
-      if (!SameOrNone(soil0, *src, "b", err))
-        return false;
+      if (auto same = SameOrNone(soil0, *src, "b"); !same)
+        return same;
       const int w = src->w, h = src->h;
       const std::size_t n = src->Count();
       const float weather = std::max(0.0f, static_cast<float>(a.p.N("weather", 0.01)));
@@ -421,24 +425,26 @@ namespace faf::editor::field
         all["rock"].v[i] = 1.0f - SmoothStep(0.0f, vis, soil[i]);
         all["moved"].v[i] = Clamp01(lost[i]);
       }
-      return Emit(a, out, all, "height", err);
+      return Emit(a, out, all, "height");
     }
 
     // ---- erode_snow
     // ------------------------------------------------------------------------------------------------------------------------------
 
-    bool OpSnow(
+    std::expected<void, std::string> OpSnow(
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
+      std::string err;
       const Grid* src = Need(a, "a", err);
-      if (src == nullptr || !MakeOut(a, out, err))
-        return false;
+      if (src == nullptr)
+        return std::unexpected(err);
+      if (auto made = MakeOut(a, out); !made)
+        return made;
       const Grid* acc = Get(a, "mask");
-      if (!SameOrNone(acc, *src, "mask", err))
-        return false;
+      if (auto same = SameOrNone(acc, *src, "mask"); !same)
+        return same;
       const int w = src->w, h = src->h;
       const std::size_t n = src->Count();
       const float line = static_cast<float>(a.p.N("snowline", 40.0));
@@ -475,24 +481,26 @@ namespace faf::editor::field
         all["cover"].v[i] = SmoothStep(0.0f, coverDepth, snow[i]);
         all["moved"].v[i] = Clamp01(lost[i]);
       }
-      return Emit(a, out, all, "height", err);
+      return Emit(a, out, all, "height");
     }
 
     // ---- erode_wind
     // ------------------------------------------------------------------------------------------------------------------------------
 
-    bool OpWind(
+    std::expected<void, std::string> OpWind(
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
+      std::string err;
       const Grid* src = Need(a, "a", err);
-      if (src == nullptr || !MakeOut(a, out, err))
-        return false;
+      if (src == nullptr)
+        return std::unexpected(err);
+      if (auto made = MakeOut(a, out); !made)
+        return made;
       const Grid* sand0 = Get(a, "b");
-      if (!SameOrNone(sand0, *src, "b", err))
-        return false;
+      if (auto same = SameOrNone(sand0, *src, "b"); !same)
+        return same;
       const int w = src->w, h = src->h;
       const std::size_t n = src->Count();
       const double az = a.p.N("azimuth", 0.0) * kPiD / 180.0;
@@ -586,24 +594,26 @@ namespace faf::editor::field
         all["sand"].v[i] = sand[i];
         all["abrasion"].v[i] = Clamp01(wear[i]);
       }
-      return Emit(a, out, all, "height", err);
+      return Emit(a, out, all, "height");
     }
 
     // ---- erode_glacier
     // ---------------------------------------------------------------------------------------------------------------------------
 
-    bool OpGlacier(
+    std::expected<void, std::string> OpGlacier(
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
+      std::string err;
       const Grid* src = Need(a, "a", err);
-      if (src == nullptr || !MakeOut(a, out, err))
-        return false;
+      if (src == nullptr)
+        return std::unexpected(err);
+      if (auto made = MakeOut(a, out); !made)
+        return made;
       const Grid* accMask = Get(a, "b");
-      if (!SameOrNone(accMask, *src, "b", err))
-        return false;
+      if (auto same = SameOrNone(accMask, *src, "b"); !same)
+        return same;
       const int w = src->w, h = src->h;
       const std::size_t n = src->Count();
       const float cell = src->cell;
@@ -704,24 +714,26 @@ namespace faf::editor::field
         all["cover"].v[i] = SmoothStep(0.0f, 2.0f, ice[i]);
         all["carve"].v[i] = cut[i];
       }
-      return Emit(a, out, all, "height", err);
+      return Emit(a, out, all, "height");
     }
 
     // ---- settle
     // ----------------------------------------------------------------------------------------------------------------------------------
 
-    bool OpSettle(
+    std::expected<void, std::string> OpSettle(
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
+      std::string err;
       const Grid* src = Need(a, "a", err);
-      if (src == nullptr || !MakeOut(a, out, err))
-        return false;
+      if (src == nullptr)
+        return std::unexpected(err);
+      if (auto made = MakeOut(a, out); !made)
+        return made;
       const Grid* mask = Get(a, "mask");
-      if (!SameOrNone(mask, *src, "mask", err))
-        return false;
+      if (auto same = SameOrNone(mask, *src, "mask"); !same)
+        return same;
       const int w = src->w, h = src->h;
       const std::size_t n = src->Count();
       const float rate = std::max(0.0f, std::min(1.0f, static_cast<float>(a.p.N("rate", 0.4))));
@@ -768,7 +780,7 @@ namespace faf::editor::field
       const float sc = std::max(1e-4f, static_cast<float>(a.p.N("deposit_scale", 1.0)));
       for (std::size_t i = 0; i < n; ++i)
         all["deposit"].v[i] = Clamp01(dep[i] / sc);
-      return Emit(a, out, all, "height", err);
+      return Emit(a, out, all, "height");
     }
 
     struct Ero2OpRegistrar

@@ -88,16 +88,16 @@ namespace
       return x * 0.5f; // 0..32 units, a slope of 26.6 degrees
     });
     field::Grid out;
-    std::string error;
-    ASSERT_TRUE(EvaluateMaskRules(context, {Make("height", {{"lo", 10}, {"hi", 20}, {"soft", 1}})}, out, error))
-      << error;
+    auto made = EvaluateMaskRules(context, {Make("height", {{"lo", 10}, {"hi", 20}, {"soft", 1}})}, out);
+    ASSERT_TRUE(made) << made.error();
     EXPECT_NEAR(At(out, 30, 32), 1.0f, 1e-4f) << "height 15";
     EXPECT_NEAR(At(out, 50, 32), 0.0f, 1e-4f) << "height 25";
     EXPECT_NEAR(At(out, 4, 32), 0.0f, 1e-4f) << "height 2";
-    ASSERT_TRUE(EvaluateMaskRules(context, {Make("slope", {{"lo", 20}, {"hi", 35}, {"soft", 1}})}, out, error))
-      << error;
+    made = EvaluateMaskRules(context, {Make("slope", {{"lo", 20}, {"hi", 35}, {"soft", 1}})}, out);
+    ASSERT_TRUE(made) << made.error();
     EXPECT_NEAR(At(out, 32, 32), 1.0f, 1e-3f) << "26.6 degrees is in 20..35";
-    ASSERT_TRUE(EvaluateMaskRules(context, {Make("slope", {{"lo", 0}, {"hi", 15}, {"soft", 1}})}, out, error)) << error;
+    made = EvaluateMaskRules(context, {Make("slope", {{"lo", 0}, {"hi", 15}, {"soft", 1}})}, out);
+    ASSERT_TRUE(made) << made.error();
     EXPECT_NEAR(At(out, 32, 32), 0.0f, 1e-3f);
   }
 
@@ -113,31 +113,35 @@ namespace
     const MaskGenRule low = Make("height", {{"lo", -10}, {"hi", 12}, {"soft", 1}});  // x below 24
     const MaskGenRule middle = Make("height", {{"lo", 8}, {"hi", 20}, {"soft", 1}}); // x 16..40
     field::Grid out;
-    std::string error;
     MaskGenRule both = middle;
     both.op = MaskCombine::And;
-    ASSERT_TRUE(EvaluateMaskRules(context, {low, both}, out, error)) << error;
+    auto made = EvaluateMaskRules(context, {low, both}, out);
+    ASSERT_TRUE(made) << made.error();
     EXPECT_NEAR(At(out, 20, 5), 1.0f, 1e-4f) << "in both";
     EXPECT_NEAR(At(out, 30, 5), 0.0f, 1e-4f) << "only in the middle band";
     MaskGenRule either = middle;
     either.op = MaskCombine::Or;
-    ASSERT_TRUE(EvaluateMaskRules(context, {low, either}, out, error)) << error;
+    made = EvaluateMaskRules(context, {low, either}, out);
+    ASSERT_TRUE(made) << made.error();
     EXPECT_NEAR(At(out, 30, 5), 1.0f, 1e-4f);
     EXPECT_NEAR(At(out, 60, 5), 0.0f, 1e-4f);
     MaskGenRule minus = middle;
     minus.op = MaskCombine::Sub;
-    ASSERT_TRUE(EvaluateMaskRules(context, {low, minus}, out, error)) << error;
+    made = EvaluateMaskRules(context, {low, minus}, out);
+    ASSERT_TRUE(made) << made.error();
     EXPECT_NEAR(At(out, 4, 5), 1.0f, 1e-4f) << "low, not in the middle band";
     EXPECT_NEAR(At(out, 20, 5), 0.0f, 1e-4f) << "taken away";
     MaskGenRule inverted = low;
     inverted.invert = true;
-    ASSERT_TRUE(EvaluateMaskRules(context, {inverted}, out, error)) << error;
+    made = EvaluateMaskRules(context, {inverted}, out);
+    ASSERT_TRUE(made) << made.error();
     EXPECT_NEAR(At(out, 60, 5), 1.0f, 1e-4f);
-    ASSERT_TRUE(EvaluateMaskRules(context, {low, NewMaskRule("not")}, out, error)) << error;
+    made = EvaluateMaskRules(context, {low, NewMaskRule("not")}, out);
+    ASSERT_TRUE(made) << made.error();
     EXPECT_NEAR(At(out, 4, 5), 0.0f, 1e-4f) << "Not inverts the result so far";
     MaskGenRule off = low;
     off.enabled = false;
-    EXPECT_FALSE(EvaluateMaskRules(context, {off}, out, error)) << "nothing switched on";
+    EXPECT_FALSE(EvaluateMaskRules(context, {off}, out)) << "nothing switched on";
   }
 
   TEST(
@@ -153,10 +157,10 @@ namespace
     context.water = 20.0f;
     for (const auto& preset : MaskPresets()) {
       field::Grid out;
-      std::string error;
       const std::vector<MaskGenRule> rules = MaskPresetRules(preset.id, 0.0f, 60.0f);
       ASSERT_FALSE(rules.empty()) << preset.id;
-      ASSERT_TRUE(EvaluateMaskRules(context, rules, out, error)) << preset.id << ": " << error;
+      const auto made = EvaluateMaskRules(context, rules, out);
+      ASSERT_TRUE(made) << preset.id << ": " << made.error();
       ASSERT_EQ(out.v.size(), static_cast<std::size_t>(kSide) * kSide) << preset.id;
       for (const float v : out.v) {
         ASSERT_TRUE(v >= -1e-4f && v <= 1.0f + 1e-4f) << preset.id << " gave " << v;
@@ -213,11 +217,12 @@ namespace
     const std::uint64_t texels[4] = {0xFF, 0, 0xFF, std::uint64_t{0xFF} << 8};
     MaskLayerFields(texels, 2, 2, 64.0f, 0, context);
     field::Grid out;
-    std::string error;
-    ASSERT_TRUE(EvaluateMaskRules(context, {Make("layer", {{"layer", 1}})}, out, error)) << error;
+    auto made = EvaluateMaskRules(context, {Make("layer", {{"layer", 1}})}, out);
+    ASSERT_TRUE(made) << made.error();
     EXPECT_NEAR(At(out, 8, 8), 1.0f, 1e-3f);
     EXPECT_NEAR(At(out, 56, 8), 0.0f, 1e-3f);
-    ASSERT_TRUE(EvaluateMaskRules(context, {Make("free_above", {{"layer", 1}})}, out, error)) << error;
+    made = EvaluateMaskRules(context, {Make("free_above", {{"layer", 1}})}, out);
+    ASSERT_TRUE(made) << made.error();
     EXPECT_NEAR(At(out, 56, 56), 0.0f, 1e-3f) << "layer 2 covers the bottom right";
     EXPECT_NEAR(At(out, 56, 8), 1.0f, 1e-3f);
   }

@@ -349,7 +349,7 @@ namespace gpg::core
 #pragma pack(pop)
 
   static_assert(sizeof(Mutex) == 8, "Mutex must be 8 bytes on x86");
-#if FAFRE_PLATFORM_WINDOWS && defined(_M_X64)
+#if FAFRE_PLATFORM_WINDOWS && FAFRE_ARCH_64BIT
   static_assert(sizeof(void*) == 8, "Audit layout for x64 sites.");
 #endif
 

@@ -10,6 +10,7 @@
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
+#include <print>
 
 namespace
 {
@@ -59,16 +60,19 @@ namespace
     e.flags[kGravity] = true;
     NodeGraph graph(EffectNodeTypes());
     BuildEffectGraph(graph, "test", {{"my_emit", e}});
-    std::vector<std::pair<std::string, EmitterBlueprint>> out;
-    std::string error;
-    ASSERT_TRUE(GraphEmitters(graph, out, error)) << error;
+    auto emitters = GraphEmitters(graph);
+    ASSERT_TRUE(emitters) << emitters.error();
+    std::vector<std::pair<std::string, EmitterBlueprint>> out = std::move(*emitters);
     ASSERT_EQ(out.size(), 1U);
     EXPECT_EQ(out[0].first, "my_emit");
     EXPECT_TRUE(SameEmitter(out[0].second, e));
     // Through the graph file too.
     NodeGraph read(EffectNodeTypes());
-    ASSERT_TRUE(read.Load(graph.Save(), error)) << error;
-    ASSERT_TRUE(GraphEmitters(read, out, error)) << error;
+    const auto loaded = read.Load(graph.Save());
+    ASSERT_TRUE(loaded) << loaded.error();
+    emitters = GraphEmitters(read);
+    ASSERT_TRUE(emitters) << emitters.error();
+    out = std::move(*emitters);
     EXPECT_TRUE(SameEmitter(out[0].second, e));
   }
 
@@ -91,9 +95,9 @@ namespace
     // A texture into a curve pin, an emitter into a curve pin: refused.
     EXPECT_EQ(graph.Link(texture, 0, emitter, kLifetime), LinkResult::WrongType);
     EXPECT_EQ(graph.Link(emitter, 0, emitter, kLifetime), LinkResult::SameNode);
-    std::vector<std::pair<std::string, EmitterBlueprint>> out;
-    std::string error;
-    ASSERT_TRUE(GraphEmitters(graph, out, error)) << error;
+    const auto emitters = GraphEmitters(graph);
+    ASSERT_TRUE(emitters) << emitters.error();
+    const std::vector<std::pair<std::string, EmitterBlueprint>>& out = *emitters;
     const EmitterCurve& size = out[0].second.curves[kStartSize];
     ASSERT_EQ(size.keys.size(), 2U);
     EXPECT_FLOAT_EQ(size.keys[1].x, out[0].second.repeatTime);
@@ -140,18 +144,23 @@ namespace
     for (const auto& entry : std::filesystem::directory_iterator(folder)) {
       std::ifstream in(entry.path(), std::ios::binary);
       const std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
-      EmitterBlueprint e;
-      std::string error;
-      if (text.rfind("EmitterBlueprint", 0) != 0 || !ParseEmitter(text, e, error)) {
+      if (!text.starts_with("EmitterBlueprint")) {
         continue;
       }
+      const auto parsed = ParseEmitter(text);
+      if (!parsed) {
+        continue;
+      }
+      const EmitterBlueprint& e = *parsed;
       // Curves with no keys stay empty only through a Curve node; the file's own have keys (or none: kept as none).
       NodeGraph graph(EffectNodeTypes());
       BuildEffectGraph(graph, "t", {{"e", e}});
-      std::vector<std::pair<std::string, EmitterBlueprint>> out;
       NodeGraph read(EffectNodeTypes());
-      ASSERT_TRUE(read.Load(graph.Save(), error)) << error;
-      ASSERT_TRUE(GraphEmitters(read, out, error)) << entry.path().filename().string() << ": " << error;
+      const auto loaded = read.Load(graph.Save());
+      ASSERT_TRUE(loaded) << loaded.error();
+      const auto emitters = GraphEmitters(read);
+      ASSERT_TRUE(emitters) << entry.path().filename().string() << ": " << emitters.error();
+      const std::vector<std::pair<std::string, EmitterBlueprint>>& out = *emitters;
       if (!SameEmitter(out[0].second, e)) {
         // What differs, for the failure's message.
         std::string diff;
@@ -169,7 +178,7 @@ namespace
       }
       ++checked;
     }
-    std::printf("emitters through a graph and back: %d\n", checked);
+    std::println("emitters through a graph and back: {}", checked);
     EXPECT_GT(checked, 2000);
     // FAF's templates file, when it is beside the emitters (tmp: lua/EffectTemplates.lua copied there).
     std::ifstream lua(std::filesystem::path(folder) / ".." / "EffectTemplates.lua", std::ios::binary);
@@ -180,7 +189,7 @@ namespace
       for (const EffectTemplate& t : templates) {
         paths += t.paths.size();
       }
-      std::printf("effect templates read: %zu, %zu emitter paths\n", templates.size(), paths);
+      std::println("effect templates read: {}, {} emitter paths", templates.size(), paths);
       EXPECT_GT(templates.size(), 600U);
     }
   }

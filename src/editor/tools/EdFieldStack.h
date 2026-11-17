@@ -2,6 +2,7 @@
 
 #include "editor/terrain/EdFieldCore.h"
 
+#include <expected>
 #include <string>
 #include <vector>
 
@@ -18,7 +19,7 @@ namespace faf::editor
     /** A new stack on `base` (the map's heights, in map units). */
     void Start(field::Grid base);
     /** `op` with `params` on the top (its input `a`, and `like` for ops that size their output by it). */
-    bool Apply(const std::string& op, const field::Params& params, std::string& error);
+    [[nodiscard]] std::expected<void, std::string> Apply(const std::string& op, const field::Params& params);
     /** The last op undone; false when only the base is left. */
     bool Back();
     void Clear();

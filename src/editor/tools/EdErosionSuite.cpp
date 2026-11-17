@@ -98,6 +98,57 @@ namespace faf::editor
            {"smooth", "Cell noise filter", 0, 1, 0.05, "%.2f", 1, nullptr},
            {"smooth_passes", "Filter passes", 0, 4, 1, "%.0f", 1, nullptr},
            {"seed", "Seed", 0, 9999, 1, "%.0f", 1, "The random seed of the hardness and rain variation."},
+           // The graphics card's solver only (FAF Studio's erosion.lua; the CPU solver ignores these).
+           {"flux_damp",
+            "Water friction (GPU)",
+            0,
+            0.9,
+            0.05,
+            "%.2f",
+            0.3,
+            "Graphics card only. Friction on the water flow: the water runs at a speed that follows the slope instead "
+            "of "
+            "racing off at full speed everywhere, so only concentrated flow erodes. 0 = frictionless pipes (the CPU "
+            "solver)."},
+           {"depth_gain",
+            "Channel deepening (GPU)",
+            1,
+            16,
+            0.5,
+            "%.1f",
+            4,
+            "Graphics card only. Deeper water digs harder, up to this many times the depth limit: channels that "
+            "collect "
+            "water cut faster and branching gullies form on smooth slopes. 1 = the CPU solver."},
+           {"erode_spread",
+            "Groove width (GPU)",
+            0,
+            1,
+            0.05,
+            "%.2f",
+            0.7,
+            "Graphics card only. Share of the dug and settled ground spread over the 3 x 3 cells around: gullies 2 to "
+            "3 "
+            "cells wide instead of one cell wide combs. 0 = every cell digs for itself."},
+           {"slope_cap",
+            "Steep slope limit (GPU)",
+            0.05,
+            1,
+            0.05,
+            "%.2f",
+            0.4,
+            "Graphics card only. The sine of the slope above which the capacity stops growing and then falls off: low "
+            "keeps cliffs' edges, high lets gullies cut into steep faces too."},
+           {"rain_noise",
+            "Rain noise (GPU)",
+            0,
+            1,
+            0.05,
+            "%.2f",
+            0.2,
+            "Graphics card only. Cell to cell randomness of the rain: breaks the symmetry so flow doesn't run in "
+            "perfect "
+            "straight lines."},
          }},
         {"droplet",
          "erode_droplet",
@@ -441,7 +492,7 @@ namespace faf::editor
     return out;
   }
 
-  bool ErodeHeights(
+  std::expected<void, std::string> ErodeHeights(
     std::uint16_t* const heights,
     const int width,
     const int height,
@@ -449,13 +500,11 @@ namespace faf::editor
     const ErosionSolver& solver,
     const ErosionValues& values,
     int step,
-    std::string& error,
     ErosionMasks* const masks
   )
   {
     if (heights == nullptr || width < 3 || height < 3 || !(scale > 0.0f)) {
-      error = "no heights";
-      return false;
+      return std::unexpected("no heights");
     }
     step = std::max(1, step);
     const int cw = (width - 1) / step + 1;
@@ -476,12 +525,11 @@ namespace faf::editor
     std::map<std::string, field::Grid> extra;
     args.extra = &extra;
     field::Grid out;
-    if (!field::RunOpCpu(solver.op, args, out, error)) {
-      return false;
+    if (auto ran = field::RunOpCpu(solver.op, args, out); !ran) {
+      return ran;
     }
     if (out.w != cw || out.h != ch) {
-      error = "the solver gave a grid of another size";
-      return false;
+      return std::unexpected("the solver gave a grid of another size");
     }
     const auto toWord = [scale](const float units) {
       return static_cast<std::uint16_t>(std::clamp(std::lround(units / scale), 0L, 65535L));
@@ -508,7 +556,7 @@ namespace faf::editor
           masks->accum = *accum;
         }
       }
-      return true;
+      return {};
     }
     // A coarse run: its change, upsampled (bilinear), on top of the full heights.
     for (int z = 0; z < height; ++z) {
@@ -528,6 +576,6 @@ namespace faf::editor
         word = toWord(static_cast<float>(word) * scale + change);
       }
     }
-    return true;
+    return {};
   }
 } // namespace faf::editor

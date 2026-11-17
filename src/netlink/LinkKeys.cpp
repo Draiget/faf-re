@@ -119,17 +119,17 @@ namespace faf::netlink
     const std::string_view prefix
   )
   {
-    if (prefix.empty() || ufrag.substr(0, prefix.size()) != prefix) {
+    if (prefix.empty() || !ufrag.starts_with(prefix)) {
       return std::nullopt;
     }
     ufrag.remove_prefix(prefix.size());
     for (const std::string_view mark : {std::string_view("w+"), std::string_view("c+")}) {
-      if (ufrag.substr(0, mark.size()) == mark) {
+      if (ufrag.starts_with(mark)) {
         ufrag.remove_prefix(mark.size());
       }
     }
     const std::string_view keyMark(kKeyMark);
-    if (ufrag.substr(0, keyMark.size()) != keyMark) {
+    if (!ufrag.starts_with(keyMark)) {
       return std::nullopt;
     }
     ufrag.remove_prefix(keyMark.size());

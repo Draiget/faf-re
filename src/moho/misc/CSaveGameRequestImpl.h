@@ -26,7 +26,7 @@ namespace moho
    */
   struct SFileStarCloser
   {
-    void operator()(std::FILE* file) const noexcept;
+    static void operator()(std::FILE* file) noexcept;
   };
 
   /**

@@ -46,7 +46,7 @@ namespace moho
    */
   struct SReconKeyLess
   {
-    [[nodiscard]] bool operator()(const SReconKey& lhs, const SReconKey& rhs) const noexcept;
+    [[nodiscard]] static bool operator()(const SReconKey& lhs, const SReconKey& rhs) noexcept;
   };
 
   // Node 0x20: the 0x0C key at node+0x0C, the blip pointer at node+0x18 and

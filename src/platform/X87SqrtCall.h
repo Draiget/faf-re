@@ -22,7 +22,7 @@
  * optimizer then keeps call results on the x87 stack and rounds follow-on
  * arithmetic to 24 bits, which broke log/log10 parity in the same test.
  */
-#if defined(_M_IX86)
+#if FAFRE_ARCH_X86
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wignored-pragma-intrinsic"
 #pragma function(sqrt)

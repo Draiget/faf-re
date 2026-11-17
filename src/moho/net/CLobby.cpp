@@ -577,6 +577,11 @@ CLobby::~CLobby()
         peer->peerConnection = nullptr;
       }
     }
+    // Engine addition: the lobby lets go of its connections here, not in ~IMessageReceiver (0x0047C4F0) after this
+    // body. From Destroy on, the UDP connector's thread deletes the connections, and each dispatcher's destructor its
+    // linkages to this receiver (0x0047C280), with no lock in common with this thread; until Destroy only Pull, on this
+    // thread, deletes a connection.
+    RemoveAllLinkages();
     connector->Push();
     connector->Destroy();
     connector = nullptr;
@@ -972,7 +977,7 @@ void CLobby::OnNewPeer(
   const gpg::BinaryReader br{&s};
 
   fa::string name{};
-  u_long host{0};
+  std::uint32_t host{0}; // 4 bytes (0x007C70C2), as SPeer::SendInfoTo writes them, whatever this build's u_long is
   u_short port{0};
   int32_t uid{0};
 

@@ -142,7 +142,7 @@ namespace faf::editor
       }
     }
     for (const auto& [index, decal] : current) {
-      if (wanted.count(index) == 0) {
+      if (!wanted.contains(index)) {
         manager.DestroyDecal(decal);
       }
     }
@@ -257,7 +257,7 @@ namespace faf::editor
     for (const fa::string& file : found) {
       const std::string path = file.c_str();
       const std::string lower = Lower(path);
-      if (lower.find("/decals/") == std::string::npos || !seen.insert(lower).second) {
+      if (!lower.contains("/decals/") || !seen.insert(lower).second) {
         continue;
       }
       DecalTexture texture;
@@ -280,7 +280,7 @@ namespace faf::editor
     for (DecalTexture& texture : textures) {
       const std::string lower = Lower(texture.path);
       const std::string from = "_albedo.dds";
-      if (lower.size() > from.size() && lower.compare(lower.size() - from.size(), from.size(), from) == 0) {
+      if (lower.size() > from.size() && lower.ends_with(from)) {
         const auto partner = byLower.find(lower.substr(0, lower.size() - from.size()) + "_spec.dds");
         if (partner != byLower.end()) {
           texture.pair = partner->second;

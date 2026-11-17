@@ -67,6 +67,14 @@ namespace faf::editor
       return mSelection;
     }
     void Select(int id);
+    void SetSelection(
+      std::set<int> ids
+    )
+    {
+      mSelection = std::move(ids);
+    }
+    /** What a move of `selection` drags: it and the nodes inside the frames in it. */
+    [[nodiscard]] std::set<int> MoveSetFor(const NodeGraph& graph, const std::set<int>& selection) const;
     /** Adds a node of the type at the canvas's centre (the palette panel's double-click or drop). */
     int AddAtCentre(NodeGraph& graph, const std::string& type);
     /** Frames everything at the next frame (a graph opened), and fits again on resizes until moved. */
@@ -123,6 +131,8 @@ namespace faf::editor
     float mDragStartX = 0.0f;
     float mDragStartY = 0.0f;
     bool mRightMoved = false;
+    /** What a move drags: the selection and the nodes inside the frames in it. */
+    std::set<int> mMoving;
     PinHit mLinkFrom;
     // The palette popup: where it opened (graph units) and the pin a new node links to.
     float mPopupX = 0.0f;

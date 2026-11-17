@@ -103,6 +103,18 @@ namespace moho
      */
     ~IMessageReceiver();
 
+    /**
+     * Engine addition, not in the binary: the body of `~IMessageReceiver` (0x0047C4F0), which calls
+     * it, under a name.
+     *
+     * What it does:
+     * Removes every linkage still routing to this receiver, through the dispatcher that owns it.
+     * An owner calls it before `INetConnector::Destroy`: from then on the connector's thread deletes
+     * the connections, and each dispatcher's destructor its linkages, with no lock in common with
+     * the owner's thread.
+     */
+    void RemoveAllLinkages();
+
   public:
     gpg::DList<SMsgReceiverLinkage, IMessageReceiver> mLinkages; // +0x04
   };
