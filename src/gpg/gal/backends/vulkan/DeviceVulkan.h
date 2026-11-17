@@ -275,6 +275,7 @@ namespace gpg::gal
       VkFormat format = VK_FORMAT_UNDEFINED;
       VkExtent2D extent{};
       VkPresentModeKHR presentMode = VK_PRESENT_MODE_FIFO_KHR;
+      VkSurfaceTransformFlagBitsKHR preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR; // SwapChainPreTransform's
       std::vector<VkImage> images;
       std::vector<VkSemaphore> renderFinished; // one per image
       std::uint32_t acquired = 0;
@@ -286,7 +287,8 @@ namespace gpg::gal
       bool scaled = false;
       std::uint32_t headWidth = 0; // the size the engine draws the head at
       std::uint32_t headHeight = 0;
-      // Out of date or suboptimal for the window: made again at the window's size before the next acquire.
+      // Out of date for the window, or suboptimal where SuboptimalSwapChainIsStale says so: made again at the
+      // window's size before the next acquire.
       bool stale = false;
       // The surface went (VK_ERROR_SURFACE_LOST_KHR from an acquire, a present or a surface query), or no swap
       // chain could be made again for it: TestCooperativeLevel lets go of it and takes the next. It goes with the
@@ -343,6 +345,11 @@ namespace gpg::gal
     bool RecreateStaleSwapChain(SwapChain& swapChain);
     /** Copies a scaled head's image into its acquired swap-chain image and leaves that ready to present. */
     void CopyHeadToSwapChain(vulkan::TrackedImage& head, SwapChain& swapChain);
+    /**
+     * Whether a scaled head's swap chain that an acquire or a present answered VK_SUBOPTIMAL_KHR is made again
+     * (VulkanSwapChain.h's RemakeSuboptimalSwapChain); also when its surface does not say what it supports.
+     */
+    [[nodiscard]] bool SuboptimalSwapChainIsStale(const SwapChain& swapChain);
     /** A device-local colour image with a view, usable as a target, a texture and a copy source or destination. */
     RenderTargetVulkan::Buffer CreateColorTargetImage(VkFormat format, std::uint32_t width, std::uint32_t height);
     void CreateRenderTargets();
