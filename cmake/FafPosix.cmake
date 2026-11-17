@@ -566,6 +566,8 @@ _faf_linux_portable_test(faf_spirv_reflect_tests spirv_reflect
   tests/gal/SpirvReflectTests.cpp src/gpg/gal/effects/SpirvReflect.cpp)
 _faf_linux_portable_test(faf_sfd_parser_tests sfd_header_parser
   tests/movie/SfdHeaderParserTests.cpp src/moho/movie/sfd/SfdHeaderParser.cpp)
+_faf_linux_portable_test(faf_vulkan_surface_lifecycle_tests vulkan_surface_lifecycle
+  tests/vulkan/SurfaceLifecycleTests.cpp)
 
 # The software x87 (legacy/math/X87Soft.cpp, #262): its double fast path against its exact model,
 # the x87's special values and known retail results, on every target.

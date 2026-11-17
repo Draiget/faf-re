@@ -837,6 +837,10 @@ namespace gpg::gal
       return;
     }
     const std::lock_guard<std::recursive_mutex> lock(mMutex);
+    // Into a back buffer whose head has no image, nothing is drawn (PrepareDraw).
+    if (TargetIsImagelessBackBuffer()) {
+      return;
+    }
     mPreparingDraw = true;
     const VkDescriptorSet set = PrepareGpuBindings(call.bindings, program->mDesc.sampler, false);
     VkBuffer indexBuffer = VK_NULL_HANDLE;

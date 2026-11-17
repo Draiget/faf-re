@@ -28,3 +28,7 @@ The 42 tests cover four split shapes, persistent host-allocation failures, repea
 Standard `new`/`delete` replacements are confined to this executable. Failure injection is disarmed before GoogleTest assertions and before cleanup by the test allocator. `Free()` is never called with injection enabled: its pre-existing potentially allocating `noexcept` behavior is outside this fix.
 
 Native memory sizes are accounting values. Successful maps share one host buffer for address checks, not independent resource payloads. Logging, production error formatting, real driver behavior, GPU execution, rendered output, and performance are not validated by these tests.
+
+## Surface lifecycle
+
+`faf_vulkan_surface_lifecycle_tests` checks `src/gpg/gal/backends/vulkan/VulkanSurfaceLifecycle.h`, when `DeviceVulkan::TestCooperativeLevel` lets go of a head's window surface and takes the next, and what it answers the engine: a surface that went or is no longer the window's is let go of; the answer is 2 while a head has none, 1 once when a head that draws into its swap chain's images came back at a new size (also after another head's wait), else 0; a surface that refuses warns once and ends the program after 5 s, each head on its own clock, while a window without a surface or a minimised one is waited for without end. It needs no Vulkan headers.
