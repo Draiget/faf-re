@@ -14,6 +14,7 @@
 #include <cstdio>
 #include <cstring>
 #include <mutex>
+#include <print>
 #include <string>
 #include <vector>
 
@@ -168,7 +169,7 @@ void moho::WIN_OkBox(
   const gpg::StrArg text
 )
 {
-  std::fprintf(stderr, "[%s] %s\n", caption != nullptr ? caption : "", text != nullptr ? text : "");
+  std::println(stderr, "[{}] {}", caption != nullptr ? caption : "", text != nullptr ? text : "");
   std::fflush(stderr);
 }
 

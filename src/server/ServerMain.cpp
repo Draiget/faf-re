@@ -32,6 +32,7 @@
 #include <map>
 #include <memory>
 #include <optional>
+#include <print>
 #include <set>
 #include <span>
 #include <sstream>
@@ -194,7 +195,7 @@ namespace
     (void)localtime_r(&now, &local);
     char stamp[32];
     (void)std::strftime(stamp, sizeof(stamp), "%Y-%m-%d %H:%M:%S", &local);
-    std::printf("[%s] %s\n", stamp, text);
+    std::println("[{}] {}", stamp, text);
     gpg::Logf("server: %s", text);
     if (gControl != nullptr) {
       gControl->Event("log", "\"text\":" + faf::server::JsonString(text));
@@ -1129,7 +1130,7 @@ namespace
     (void)moho::SCR_LuaDoString("GetPreference = function(_, default) return default end", state);
     for (const char* const script : {"/lua/system/import.lua", "/lua/system/utils.lua"}) {
       if (!moho::SCR_LuaDoScript(state, script, nullptr)) {
-        std::printf("--describe-settings: %s didn't run (is the game's data mounted? /init)\n", script);
+        std::println("--describe-settings: {} didn't run (is the game's data mounted? /init)", script);
         return kExitBadInput;
       }
     }
@@ -1189,10 +1190,10 @@ namespace
     std::ofstream out(outPath, std::ios::binary | std::ios::trunc);
     out << json;
     if (!out) {
-      std::printf("--describe-settings: cannot write %s\n", outPath.c_str());
+      std::println("--describe-settings: cannot write {}", outPath);
       return kExitBadInput;
     }
-    std::printf("Settings: %zu bytes of JSON in %s\n", json.size(), outPath.c_str());
+    std::println("Settings: {} bytes of JSON in {}", json.size(), outPath);
     return 0;
   }
 
@@ -3114,7 +3115,7 @@ namespace
             const gpg::MD5Digest& digest = sim->mSimHashes[static_cast<std::uint32_t>(packet->mCurBeat) & 0x7Fu];
             if (!IsZeroDigest(digest)) {
               if (digestFile) {
-                std::fprintf(digestFile.get(), "%d %s\n", packet->mCurBeat, digest.ToString().c_str());
+                std::println(digestFile.get(), "{} {}", packet->mCurBeat, digest.ToString().c_str());
                 ++digestsWritten;
               }
               if (checksumEvents) {
@@ -3127,9 +3128,9 @@ namespace
           }
         }
         if (stateDigestFile) {
-          std::fprintf(
+          std::println(
             stateDigestFile.get(),
-            "%d %016llx\n",
+            "{} {:016x}",
             packet->mCurBeat,
             static_cast<unsigned long long>(faf::headless::DigestPublishedState(*packet))
           );
@@ -3404,7 +3405,7 @@ int main(
     }
   }
   if (!describe && (!ReadOption("--match", matchPath) || !ReadOption("--out", outDir))) {
-    std::printf("%s", kUsage);
+    std::print("{}", kUsage);
     return kExitBadInput;
   }
   // Plan WP0.7: `--data <dir>`, the game data a deployment ships in one folder (fa/, faf/, vault/, as the server's
@@ -3415,7 +3416,7 @@ int main(
     const std::filesystem::path init = std::filesystem::path(dataDir) / "faf" / "bin" / "init_replay.lua";
     std::error_code initError;
     if (!std::filesystem::is_regular_file(init, initError)) {
-      std::printf("--data %s: no %s\n", dataDir.c_str(), init.string().c_str());
+      std::println("--data {}: no {}", dataDir, init.string());
       return kExitBadInput;
     }
     static std::vector<std::string> sDataArgs{"/init", init.string()};
@@ -3436,7 +3437,7 @@ int main(
   {
     std::string cpuList;
     if (ReadOption("--cpus", cpuList) && !moho::AssignProcessCpus(cpuList.c_str())) {
-      std::printf("--cpus %s: not CPUs this process may run on\n", cpuList.c_str());
+      std::println("--cpus {}: not CPUs this process may run on", cpuList);
       return kExitBadInput;
     }
     moho::LockAssignedProcessCpus();
@@ -3444,8 +3445,8 @@ int main(
       DWORD_PTR processMask = 0;
       DWORD_PTR systemMask = 0;
       (void)::GetProcessAffinityMask(::GetCurrentProcess(), &processMask, &systemMask);
-      std::printf(
-        "CPUs: mask %llx of %llx, kept (scripts can't change it)\n",
+      std::println(
+        "CPUs: mask {:x} of {:x}, kept (scripts can't change it)",
         static_cast<unsigned long long>(processMask),
         static_cast<unsigned long long>(systemMask)
       );
@@ -3486,7 +3487,7 @@ int main(
     try {
       describeCode = DescribeSettings(describePath, mapScenario, mapOptions);
     } catch (const std::exception& error) {
-      std::printf("--describe-settings: %s\n", error.what());
+      std::println("--describe-settings: {}", error.what());
     }
     // Nothing of a game was made: leave without the engine's teardown, which expects a session.
     std::fflush(stdout);

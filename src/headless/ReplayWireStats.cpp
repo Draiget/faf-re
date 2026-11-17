@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <array>
 #include <bit>
+#include <print>
 
 #include "moho/sim/SimDriver.h"
 #include "moho/sim/STIMap.h"
@@ -80,8 +81,8 @@ namespace faf::headless
       mFile = nullptr;
       return;
     }
-    std::fprintf(
-      mFile, "beat,entities,created,removed,changed,delta_bytes,full_bytes,delta_bytes_no_yaw,delta_bytes_no_units\n"
+    std::println(
+      mFile, "beat,entities,created,removed,changed,delta_bytes,full_bytes,delta_bytes_no_yaw,delta_bytes_no_units"
     );
   }
 
@@ -181,9 +182,9 @@ namespace faf::headless
     mEntitySum += frame.entities.size();
     mMaxEntities = std::max(mMaxEntities, static_cast<std::uint32_t>(frame.entities.size()));
     if (mFile != nullptr) {
-      std::fprintf(
+      std::println(
         mFile,
-        "%u,%zu,%zu,%zu,%zu,%u,%u,%u,%u\n",
+        "{},{},{},{},{},{},{},{},{}",
         beat,
         frame.entities.size(),
         delta.created.size(),

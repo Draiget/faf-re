@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <print>
 #include <utility>
 
 #include "moho/animation/CAniPose.h"
@@ -112,10 +113,10 @@ namespace faf::headless
   {
     mBeatsFile = std::fopen((mPrefix + ".beats.csv").c_str(), "w");
     if (mBeatsFile != nullptr) {
-      std::fprintf(
+      std::println(
         mBeatsFile,
-        "beat,both,lockstep_only,client_only,posed,over_world,over_bones,over_blend,same_pose_only_client,"
-        "max_entity,max_drawn,max_drawn_deg,max_world,max_local\n"
+        "beat,both,lockstep_only,client_only,posed,over_world,over_bones,over_blend,same_pose_only_client,max_entity,"
+        "max_drawn,max_drawn_deg,max_world,max_local"
       );
     }
   }
@@ -540,9 +541,9 @@ namespace faf::headless
     t.maxWorldError = std::max(t.maxWorldError, maxWorld);
     t.maxLocalError = std::max(t.maxLocalError, maxLocal);
     if (mBeatsFile != nullptr) {
-      std::fprintf(
+      std::println(
         mBeatsFile,
-        "%u,%llu,%llu,%llu,%llu,%llu,%llu,%llu,%llu,%.4f,%.4f,%.3f,%.4f,%.4f\n",
+        "{},{},{},{},{},{},{},{},{},{:.4f},{:.4f},{:.3f},{:.4f},{:.4f}",
         beat,
         static_cast<unsigned long long>(both),
         static_cast<unsigned long long>(lockstepOnly),
@@ -762,11 +763,11 @@ namespace faf::headless
       std::sort(sorted.begin(), sorted.end(), [](const SWorst& a, const SWorst& b) {
         return a.error > b.error;
       });
-      std::fprintf(worst, "beat,id,blueprint,bone,sample,error,deg,world,local,same_pose_client,same_pose_lockstep\n");
+      std::println(worst, "beat,id,blueprint,bone,sample,error,deg,world,local,same_pose_client,same_pose_lockstep");
       for (const SWorst& w : sorted) {
-        std::fprintf(
+        std::println(
           worst,
-          "%u,0x%08x,%s,%u,%u,%.4f,%.2f,%.4f,%.4f,%d,%d\n",
+          "{},0x{:08x},{},{},{},{:.4f},{:.2f},{:.4f},{:.4f},{},{}",
           w.beat,
           w.id,
           w.blueprint != nullptr ? w.blueprint : "?",

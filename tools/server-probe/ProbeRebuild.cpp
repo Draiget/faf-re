@@ -2,6 +2,7 @@
 
 #include <cstdio>
 #include <fstream>
+#include <print>
 #include <sstream>
 #include <vector>
 
@@ -276,7 +277,7 @@ namespace faf::probe
   ) const
   {
     if (!mState || !mState->client) {
-      std::printf("probe %d: rebuild: never started (no rules or no game info)\n", uid);
+      std::println("probe {}: rebuild: never started (no rules or no game info)", uid);
       return;
     }
     const remote::client::CServerViewClient& client = *mState->client;
@@ -285,10 +286,10 @@ namespace faf::probe
     {
       // Plan WP5.14: the command-records lane as the game client's view client applied it.
       const remote::wire::SCommandLaneCounts& c = client.Commands().Counts();
-      std::printf(
-        "probe %d: rebuild: commands: %llu lanes (%llu didn't decode), %llu descriptors (%llu naming a blueprint not "
-        "held), %llu updates, %llu removals, %llu releases; dropped %llu updates and %llu removals of commands not "
-        "sent; %zu held at the end\n",
+      std::println(
+        "probe {}: rebuild: commands: {} lanes ({} didn't decode), {} descriptors ({} naming a blueprint not held), {} "
+        "updates, {} removals, {} releases; dropped {} updates and {} removals of commands not sent; {} held at the "
+        "end",
         uid,
         static_cast<unsigned long long>(c.lanes),
         static_cast<unsigned long long>(c.failures),
@@ -306,11 +307,10 @@ namespace faf::probe
       // Plan WP9.3: the effects lane as the game client's view client applied it.
       using remote::client::EEffectSkip;
       const remote::client::SEffectApplyCounts& e = client.Effects().Total();
-      std::printf(
-        "probe %d: rebuild: effects: %llu ops, %llu applied (%llu created, %llu replacing one held, %llu setters, %llu "
-        "lights, %llu destroyed by script), dropped %llu with their entity, %llu at a whole view, %llu aged out; "
-        "skipped: entity not held %llu, unknown effect %llu, name not sent %llu, blueprint not held %llu; %llu lanes "
-        "didn't decode; %zu held at the end\n",
+      std::println(
+        "probe {}: rebuild: effects: {} ops, {} applied ({} created, {} replacing one held, {} setters, {} lights, {} "
+        "destroyed by script), dropped {} with their entity, {} at a whole view, {} aged out; skipped: entity not held "
+        "{}, unknown effect {}, name not sent {}, blueprint not held {}; {} lanes didn't decode; {} held at the end",
         uid,
         static_cast<unsigned long long>(e.ops),
         static_cast<unsigned long long>(e.applied),
@@ -332,10 +332,10 @@ namespace faf::probe
       if (const remote::client::CClientEffects* const hosted = client.Hosted(); hosted != nullptr) {
         // Plan WP9.3: what the hosted effects drew under the camera that sees everything.
         const remote::client::SHostedEffectCounts& h = hosted->Counts();
-        std::printf(
-          "probe %d: rebuild: hosted effects: %llu beats, %llu made (%llu not), %llu ended by themselves, %zu alive at "
-          "the end (most %llu), %zu entities followed (most %llu); drawn: %llu particles (%llu beats with any, most "
-          "%llu in one), %llu trail segments, %llu beams, %llu lights\n",
+        std::println(
+          "probe {}: rebuild: hosted effects: {} beats, {} made ({} not), {} ended by themselves, {} alive at the end "
+          "(most {}), {} entities followed (most {}); drawn: {} particles ({} beats with any, most {} in one), {} "
+          "trail segments, {} beams, {} lights",
           uid,
           static_cast<unsigned long long>(h.beats),
           static_cast<unsigned long long>(h.created),
@@ -359,9 +359,8 @@ namespace faf::probe
       slots += " army " + std::to_string(slot.army) + (slot.kind == 0 ? " vision " : " water ") +
         std::to_string(slot.bits.width) + "x" + std::to_string(slot.bits.height);
     }
-    std::printf(
-      "probe %d: rebuild: army lanes %llu (%llu failed), %zu armies held; grid lanes %llu (%llu failed), %zu grids "
-      "held:%s\n",
+    std::println(
+      "probe {}: rebuild: army lanes {} ({} failed), {} armies held; grid lanes {} ({} failed), {} grids held:{}",
       uid,
       static_cast<unsigned long long>(v.armyLanes),
       static_cast<unsigned long long>(v.armyFailures),
@@ -369,7 +368,7 @@ namespace faf::probe
       static_cast<unsigned long long>(v.gridLanes),
       static_cast<unsigned long long>(v.gridFailures),
       client.Grids().size(),
-      slots.c_str()
+      slots
     );
     std::uint64_t records = 0;
     std::uint64_t units = 0;
@@ -381,18 +380,17 @@ namespace faf::probe
         orphaned += (record.flags & remote::kEntityFlagOrphaned) != 0u ? 1u : 0u;
       }
     }
-    std::printf(
-      "probe %d: rebuild: last frame %llu records: %llu units, %llu orphaned; %llu own blips left out\n",
+    std::println(
+      "probe {}: rebuild: last frame {} records: {} units, {} orphaned; {} own blips left out",
       uid,
       static_cast<unsigned long long>(records),
       static_cast<unsigned long long>(units),
       static_cast<unsigned long long>(orphaned),
       static_cast<unsigned long long>(client.BlipsLeftOut())
     );
-    std::printf(
-      "probe %d: rebuild: %llu frames, %llu applied, %llu failed; %llu blueprints known; created %llu, updates %llu, "
-      "erased %llu, "
-      "deleted %llu; no blueprint %llu, unknown table ids %llu, unit updates %llu\n",
+    std::println(
+      "probe {}: rebuild: {} frames, {} applied, {} failed; {} blueprints known; created {}, updates {}, erased {}, "
+      "deleted {}; no blueprint {}, unknown table ids {}, unit updates {}",
       uid,
       static_cast<unsigned long long>(v.views),
       static_cast<unsigned long long>(v.applied),
@@ -407,10 +405,9 @@ namespace faf::probe
       static_cast<unsigned long long>(s.unitUpdates)
     );
     const remote::wire::CSessionTableReaders& tables = client.Tables();
-    std::printf(
-      "probe %d: rebuild: session tables %llu records (%llu bad, %llu resets): %u sounds, %u names, %zu deposits, %llu "
-      "terrain edits "
-      "(%s); unit stat items applied %llu\n",
+    std::println(
+      "probe {}: rebuild: session tables {} records ({} bad, {} resets): {} sounds, {} names, {} deposits, {} terrain "
+      "edits ({}); unit stat items applied {}",
       uid,
       static_cast<unsigned long long>(v.tableRecords),
       static_cast<unsigned long long>(v.tableFailures + mState->tablesBad),
@@ -422,10 +419,9 @@ namespace faf::probe
       mState->seeded ? "applied to the map's heights" : "counted, no heights",
       static_cast<unsigned long long>(s.statsApplied)
     );
-    std::printf(
-      "probe %d: rebuild: poses: %llu lanes (%llu bad, %llu KB), %llu poses made, %llu unit-beats with bones, %llu "
-      "bones applied, "
-      "%llu bad, %llu without a mesh\n",
+    std::println(
+      "probe {}: rebuild: poses: {} lanes ({} bad, {} KB), {} poses made, {} unit-beats with bones, {} bones applied, "
+      "{} bad, {} without a mesh",
       uid,
       static_cast<unsigned long long>(v.poseLanes),
       static_cast<unsigned long long>(v.poseFailures),

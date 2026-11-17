@@ -18,6 +18,7 @@
 #include <cstring>
 #include <cwchar>
 #include <mutex>
+#include <print>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -630,7 +631,7 @@ void moho::WIN_OkBox(
     sOkBoxPresenter(caption, text);
     return;
   }
-  std::fprintf(stderr, "[%s] %s\n", caption != nullptr ? caption : "", text != nullptr ? text : "");
+  std::println(stderr, "[{}] {}", caption != nullptr ? caption : "", text != nullptr ? text : "");
   std::fflush(stderr);
 }
 

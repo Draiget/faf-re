@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstring>
+#include <print>
 #include <vector>
 #include <ranges>
 
@@ -307,9 +308,9 @@ namespace faf::headless
       if (mEntries != nullptr && sampled) {
         CDigest own;
         addRecord(own);
-        std::fprintf(
+        std::println(
           mEntries,
-          "%u %c %08x %016llx\n",
+          "{} {} {:08x} {:016x}",
           beat,
           lane,
           static_cast<std::uint32_t>(id),
@@ -375,9 +376,9 @@ namespace faf::headless
     idEntries('d', packet.mDeleteIds);
     idEntries('x', packet.mEraseIds);
 
-    std::fprintf(
+    std::println(
       mFile,
-      "%u %zu %zu %zu %zu %zu %zu %016llx %016llx %016llx %016llx %016llx %016llx %016llx\n",
+      "{} {} {} {} {} {} {} {:016x} {:016x} {:016x} {:016x} {:016x} {:016x} {:016x}",
       beat,
       static_cast<std::size_t>(packet.mNewEntities.size()),
       static_cast<std::size_t>(packet.mNewUnits.size()),

@@ -4,6 +4,7 @@
 #include <array>
 #include <cstdlib>
 #include <iterator>
+#include <print>
 #include <ranges>
 
 #include "headless/ReplayEffectDump.h"
@@ -88,7 +89,7 @@ namespace faf::headless
       mFile = nullptr;
       return;
     }
-    std::fprintf(mFile, "beat,build_ms,send_ms,interval_ms,entities,bytes\n");
+    std::println(mFile, "beat,build_ms,send_ms,interval_ms,entities,bytes");
   }
 
   CReplayViewBench::~CReplayViewBench()
@@ -588,9 +589,9 @@ namespace faf::headless
     }
     mHaveLastFrames = true;
     if (mFile != nullptr) {
-      std::fprintf(
+      std::println(
         mFile,
-        "%u,%.3f,%.3f,%.3f,%llu,%llu\n",
+        "{},{:.3f},{:.3f},{:.3f},{},{}",
         ViewBeat(),
         mBeat.buildMs,
         mBeat.sendMs,

@@ -4,6 +4,7 @@
 #include <atomic>
 #include <cmath>
 #include <map>
+#include <print>
 #include <utility>
 
 #include "moho/effects/rendering/IEffect.h"
@@ -638,22 +639,22 @@ namespace faf::headless
     if (fopen_s(&file, path.c_str(), "w") != 0 || file == nullptr) {
       return;
     }
-    std::fprintf(
+    std::println(
       file,
-      "id,op,blueprint,army,entity,bone,created,ended,end,made,incarnations,ticks,hidden,particles,trails,beams,"
-      "first_emit,last_emit,x,y,z,per_beat\n"
+      "id,op,blueprint,army,entity,bone,created,ended,end,made,incarnations,ticks,hidden,particles,trails,beams,first_"
+      "emit,last_emit,x,y,z,per_beat"
     );
     std::map<std::uint32_t, const SRecord*> ordered;
     for (const auto& [id, record] : side.records) {
       ordered.emplace(id, &record);
     }
     for (const auto& [id, record] : ordered) {
-      std::fprintf(
+      std::println(
         file,
-        "%u,%s,%s,%d,%d,%d,%u,%d,%s,%d,%u,%u,%u,%llu,%llu,%llu,%u,%u,%.2f,%.2f,%.2f,%s\n",
+        "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{:.2f},{:.2f},{:.2f},{}",
         id,
         moho::EffectOpName(record->op),
-        mNames[record->blueprint].c_str(),
+        mNames[record->blueprint],
         record->army,
         record->entity,
         record->bone,
@@ -672,7 +673,7 @@ namespace faf::headless
         record->position[0],
         record->position[1],
         record->position[2],
-        RunLength(record->perBeat).c_str()
+        RunLength(record->perBeat)
       );
     }
     std::fclose(file);

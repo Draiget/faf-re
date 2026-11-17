@@ -5,6 +5,7 @@
 #include <cstdio>
 #include <map>
 #include <mutex>
+#include <print>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -57,7 +58,7 @@ namespace faf::remote::client
       )
         : mFile(file)
       {
-        std::fprintf(mFile, "# beat focus compared agree oracle-only client-only orphan-client no-mesh live-grid\n");
+        std::println(mFile, "# beat focus compared agree oracle-only client-only orphan-client no-mesh live-grid");
       }
 
       void OnSyncWalkDone(
@@ -239,9 +240,9 @@ namespace faf::remote::client
         mTotalOrphanClient += orphanClient;
         mTotalLiveGrid += liveGrid;
         ++mComparedBeats;
-        std::fprintf(
+        std::println(
           mFile,
-          "%d %d %llu %llu %llu %llu %llu %llu %llu\n",
+          "{} {} {} {} {} {} {} {} {}",
           beat,
           oracle.focusArmy,
           static_cast<unsigned long long>(compared),

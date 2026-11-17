@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <functional>
+#include <print>
 #include <unordered_set>
 #include <utility>
 
@@ -51,7 +52,7 @@ namespace faf::headless
       mFile = nullptr;
       return;
     }
-    std::fprintf(mFile, "beat,army,entities,withheld,delta_bytes,grid_bytes,reckoned_bytes\n");
+    std::println(mFile, "beat,army,entities,withheld,delta_bytes,grid_bytes,reckoned_bytes");
   }
 
   CReplayViewFrameStats::~CReplayViewFrameStats()
@@ -148,9 +149,9 @@ namespace faf::headless
       mEntities[army] += frame.entities.size();
       mGridBytes[army] += gridBytes;
       if (mFile != nullptr) {
-        std::fprintf(
+        std::println(
           mFile,
-          "%u,%zu,%zu,%u,%u,%u,%u\n",
+          "{},{},{},{},{},{},{}",
           sim.mCurBeat,
           army,
           frame.entities.size(),

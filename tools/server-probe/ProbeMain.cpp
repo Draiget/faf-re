@@ -22,6 +22,7 @@
 #include <expected>
 #include <map>
 #include <optional>
+#include <print>
 #include <random>
 #include <fstream>
 #include <span>
@@ -520,7 +521,7 @@ namespace
           std::sscanf(value, "%f,%f,%f", &out.cameraX, &out.cameraZ, &out.cameraHalfWidth) != 3 ||
           out.cameraHalfWidth <= 0.0f
         ) {
-          std::fprintf(stderr, "--camera-at takes x,z,half-width (world units), not %s\n", value);
+          std::println(stderr, "--camera-at takes x,z,half-width (world units), not {}", value);
           return false;
         }
       } else if (name == "--speed-limit") {
@@ -847,14 +848,14 @@ namespace
       if (out.rebuild != nullptr && !out.rebuild->HasRules()) {
         const auto loaded = out.rebuild->OnLaunchInfo(std::span<const std::uint8_t>(message).subspan(1), out.uid);
         if (loaded) {
-          std::printf(
-            "probe %d: %.1f s: rebuild: rules from the server's launch info (%zu bytes)\n",
+          std::println(
+            "probe {}: {:.1f} s: rebuild: rules from the server's launch info ({} bytes)",
             out.uid,
             elapsed,
             message.size() - 1u
           );
         } else {
-          std::printf("probe %d: %.1f s: rebuild: %s\n", out.uid, elapsed, loaded.error().c_str());
+          std::println("probe {}: {:.1f} s: rebuild: {}", out.uid, elapsed, loaded.error());
         }
       }
       return;
@@ -932,8 +933,8 @@ namespace
       const std::uint64_t failedBefore = out.commands.Counts().failures;
       (void)out.commands.Apply(commandLane, out.commandBeat);
       if (out.commands.Counts().failures != failedBefore && out.commands.Counts().failures <= 3u) {
-        std::printf(
-          "probe: %.1f s: the command-records lane of beat %llu didn't decode (%zu bytes)\n",
+        std::println(
+          "probe: {:.1f} s: the command-records lane of beat {} didn't decode ({} bytes)",
           elapsed,
           static_cast<unsigned long long>(beat),
           commandLane.size()
@@ -951,8 +952,8 @@ namespace
         }
       } else {
         if (out.effectFailed < 3u) {
-          std::printf(
-            "probe: %.1f s: the effects lane of beat %llu didn't decode (%zu bytes, %zu ops before the fault)\n",
+          std::println(
+            "probe: {:.1f} s: the effects lane of beat {} didn't decode ({} bytes, {} ops before the fault)",
             elapsed,
             static_cast<unsigned long long>(beat),
             effectLane.size(),
@@ -971,8 +972,8 @@ namespace
         faf::remote::wire::kNoBaseline
     ) {
       ++out.whole;
-      std::printf(
-        "probe: %.1f s: a whole view at beat %llu, %llu + %llu entities\n",
+      std::println(
+        "probe: {:.1f} s: a whole view at beat {}, {} + {} entities",
         elapsed,
         static_cast<unsigned long long>(beat),
         static_cast<unsigned long long>(entities),
@@ -1017,9 +1018,9 @@ namespace
           (void)header.ReadBits(16);
           return header.ReadBits(32);
         };
-        std::printf(
-          "probe: %.1f s: team frame %u on base %u, the last team frame decoded %u; own frame %u on base %u, the last "
-          "own %u\n",
+        std::println(
+          "probe: {:.1f} s: team frame {} on base {}, the last team frame decoded {}; own frame {} on base {}, the "
+          "last own {}",
           elapsed,
           frameIdOf(team, teamSize),
           teamSize != 0u ? faf::remote::wire::PeekFrameBaseline(std::span<const std::uint8_t>(team, teamSize)) : 0u,
@@ -1028,9 +1029,8 @@ namespace
           faf::remote::wire::PeekFrameBaseline(std::span<const std::uint8_t>(frame, frameSize)),
           out.frame.frameId
         );
-        std::printf(
-          "probe: %.1f s: the view of beat %llu didn't decode: %s (own %zu of %llu, team %zu of %llu, %llu + %llu "
-          "bytes)\n",
+        std::println(
+          "probe: {:.1f} s: the view of beat {} didn't decode: {} (own {} of {}, team {} of {}, {} + {} bytes)",
           elapsed,
           static_cast<unsigned long long>(beat),
           why != nullptr ? why : "?",
@@ -1076,8 +1076,8 @@ namespace
       !ok && why != nullptr && out.failed < 3u &&
       (std::string_view(why) == "lanes" || std::string_view(why) == "bytes after the lanes")
     ) {
-      std::printf(
-        "probe: %.1f s: the view of beat %llu didn't decode: %s\n", elapsed, static_cast<unsigned long long>(beat), why
+      std::println(
+        "probe: {:.1f} s: the view of beat {} didn't decode: {}", elapsed, static_cast<unsigned long long>(beat), why
       );
     }
     out.failed += ok ? 0u : 1u;
@@ -1185,50 +1185,48 @@ namespace
       ++seen.messages;
       faf::remote::net::SLobbySignal signal;
       if (!faf::remote::net::DecodeLobbySignal(std::span<const std::uint8_t>(frame).subspan(at), signal)) {
-        std::printf("probe %d: %.1f s: a malformed lobby signal\n", uid, elapsed);
+        std::println("probe {}: {:.1f} s: a malformed lobby signal", uid, elapsed);
         return;
       }
       using faf::remote::net::ELobbySignal;
       switch (signal.kind) {
       case ELobbySignal::Host:
         seen.role = "host";
-        std::printf(
-          "probe %d: %.1f s: lobby: host it as \"%s\", map %s\n", uid, elapsed, signal.name.c_str(), signal.text.c_str()
-        );
+        std::println("probe {}: {:.1f} s: lobby: host it as \"{}\", map {}", uid, elapsed, signal.name, signal.text);
         break;
       case ELobbySignal::Join:
         seen.role = "join";
         seen.hostUid = signal.uid;
-        std::printf(
-          "probe %d: %.1f s: lobby: join host \"%s\" (uid %d) as \"%s\"\n",
+        std::println(
+          "probe {}: {:.1f} s: lobby: join host \"{}\" (uid {}) as \"{}\"",
           uid,
           elapsed,
-          signal.text.c_str(),
+          signal.text,
           signal.uid,
-          signal.name.c_str()
+          signal.name
         );
         break;
       case ELobbySignal::ConnectToPeer:
         seen.peers.push_back(signal.uid);
-        std::printf(
-          "probe %d: %.1f s: lobby: connect to peer \"%s\" (uid %d)\n", uid, elapsed, signal.name.c_str(), signal.uid
+        std::println(
+          "probe {}: {:.1f} s: lobby: connect to peer \"{}\" (uid {})", uid, elapsed, signal.name, signal.uid
         );
         break;
       case ELobbySignal::DisconnectFromPeer:
         seen.deleted.push_back(signal.uid);
-        std::printf("probe %d: %.1f s: lobby: peer %d left\n", uid, elapsed, signal.uid);
+        std::println("probe {}: {:.1f} s: lobby: peer {} left", uid, elapsed, signal.uid);
         break;
       case ELobbySignal::LaunchRefused:
-        std::printf("probe %d: %.1f s: lobby: launch refused: %s\n", uid, elapsed, signal.text.c_str());
+        std::println("probe {}: {:.1f} s: lobby: launch refused: {}", uid, elapsed, signal.text);
         break;
       case ELobbySignal::Launching:
-        std::printf("probe %d: %.1f s: lobby: the server is starting the match\n", uid, elapsed);
+        std::println("probe {}: {:.1f} s: lobby: the server is starting the match", uid, elapsed);
         break;
       }
       return;
     }
     if (!reader.Ok() || at + 3u > frame.size()) {
-      std::printf("probe %d: %.1f s: a malformed lobby frame\n", uid, elapsed);
+      std::println("probe {}: {:.1f} s: a malformed lobby frame", uid, elapsed);
       return;
     }
     ++seen.messages;
@@ -1258,21 +1256,21 @@ namespace
       const std::string name = string();
       seen.hostedTime = int32();
       seen.welcomed = assigned == uid;
-      std::printf(
-        "probe %d: %.1f s: lobby: welcome from host \"%s\" (uid %d): uid %d, name \"%s\", seed %d\n",
+      std::println(
+        "probe {}: {:.1f} s: lobby: welcome from host \"{}\" (uid {}): uid {}, name \"{}\", seed {}",
         uid,
         elapsed,
-        hostName.c_str(),
+        hostName,
         hostUid,
         assigned,
-        name.c_str(),
+        name,
         seen.hostedTime
       );
       break;
     }
     case 101:
       seen.rejected = true;
-      std::printf("probe %d: %.1f s: lobby: rejected, %s\n", uid, elapsed, string().c_str());
+      std::println("probe {}: {:.1f} s: lobby: rejected, {}", uid, elapsed, string());
       break;
     case 103: { // NewPeer
       const std::string name = string();
@@ -1281,11 +1279,11 @@ namespace
       at += 2u;
       const std::int32_t peer = int32();
       seen.peers.push_back(peer);
-      std::printf(
-        "probe %d: %.1f s: lobby: new peer \"%s\" uid %d at %u.%u.%u.%u:%u\n",
+      std::println(
+        "probe {}: {:.1f} s: lobby: new peer \"{}\" uid {} at {}.{}.{}.{}:{}",
         uid,
         elapsed,
-        name.c_str(),
+        name,
         peer,
         address >> 24,
         (address >> 16) & 0xFFu,
@@ -1297,7 +1295,7 @@ namespace
     }
     case 104:
       seen.deleted.push_back(int32());
-      std::printf("probe %d: %.1f s: lobby: peer %d left\n", uid, elapsed, seen.deleted.back());
+      std::println("probe {}: {:.1f} s: lobby: peer {} left", uid, elapsed, seen.deleted.back());
       break;
     case 105: { // EstablishedPeers
       seen.established.clear();
@@ -1308,7 +1306,7 @@ namespace
       for (const std::int32_t peer : seen.established) {
         list += (list.empty() ? "" : " ") + std::to_string(peer);
       }
-      std::printf("probe %d: %.1f s: lobby: established %s\n", uid, elapsed, list.c_str());
+      std::println("probe {}: {:.1f} s: lobby: established {}", uid, elapsed, list);
       break;
     }
     case 106:
@@ -1336,13 +1334,13 @@ namespace
           }
         }
       }
-      std::printf(
-        "probe %d: %.1f s: lobby: script data from uid %d, %zu bytes%s\n", uid, elapsed, from, end - at, options.c_str()
+      std::println(
+        "probe {}: {:.1f} s: lobby: script data from uid {}, {} bytes{}", uid, elapsed, from, end - at, options
       );
       break;
     }
     default:
-      std::printf("probe %d: %.1f s: lobby: message %u from uid %d\n", uid, elapsed, type, from);
+      std::println("probe {}: {:.1f} s: lobby: message {} from uid {}", uid, elapsed, type, from);
       break;
     }
   }
@@ -1368,23 +1366,21 @@ int main(
 {
   SOptions options;
   if (!ReadOptions(argc, argv, options)) {
-    std::printf(
+    std::println(
       "usage: faf_server_probe --server <ip:port> --uid <n> --token <t> [--seconds <s>] [--no-load] [--pause-at <s> "
-      "[--pause-every <s>]] [--resume-at <s>] [--forge-at <s>] "
-      "[--vanish-at <s> [--vanish-for <s>]] [--leave-at <s>] [--rate-every <s>] [--order-at <s> [--order-every <s>]] "
-      "[--attack-blip-at "
-      "<s>] [--forge-id-at <s>] [--attack-hidden-at <s> --hidden-id <id>] [--fuzz-at <s> [--fuzz-count <n>]] "
-      "[--flood-at <s>] [--break-alliance-at <s> --break-with <army>] [--save-views <file>] [--no-view-compression] "
-      "[--damage-at <s>] "
+      "[--pause-every <s>]] [--resume-at <s>] [--forge-at <s>] [--vanish-at <s> [--vanish-for <s>]] [--leave-at <s>] "
+      "[--rate-every <s>] [--order-at <s> [--order-every <s>]] [--attack-blip-at <s>] [--forge-id-at <s>] "
+      "[--attack-hidden-at <s> --hidden-id <id>] [--fuzz-at <s> [--fuzz-count <n>]] [--flood-at <s>] "
+      "[--break-alliance-at <s> --break-with <army>] [--save-views <file>] [--no-view-compression] [--damage-at <s>] "
       "[--lobby-name <name> [--lobby-say-to <uid> --lobby-say-at <s>] [--lobby-launch <match.lua> --lobby-launch-at "
       "<s>] [--lobby-options <key=value,...> --lobby-options-at <s>] [--lobby-player-options <key=value,...> "
       "--lobby-player-options-at <s>] [--lobby-request <Type> --lobby-request-at <s>] [--lobby-assign-slot <n> "
       "--lobby-assign-at <s>] [--lobby-eject-at <s>] [--lobby-established-at <s>]] [--speed-limit <step> "
       "--speed-limit-at <s>] [--focus-army <army> --focus-army-at <s>] [--cameras-every <s> [--camera-at "
-      "<x,z,half-width>]] [--content-report rules|wrong] [--ui-mods <uid,...>|none] [--beat-ms <ms>] "
-      "[--display-model <arrivals file>] [--loss "
-      "<percent>] [--latency-ms <ms>] [--jitter-ms <ms>] [--partition-at <s> --partition-for <s>] [--lua-keys] "
-      "[--bandwidth-kbps <kbit/s> [--buffer-ms <ms>]] [--rebuild <match.lua> /init <init.lua> [--host-effects]]\n"
+      "<x,z,half-width>]] [--content-report rules|wrong] [--ui-mods <uid,...>|none] [--beat-ms <ms>] [--display-model "
+      "<arrivals file>] [--loss <percent>] [--latency-ms <ms>] [--jitter-ms <ms>] [--partition-at <s> --partition-for "
+      "<s>] [--lua-keys] [--bandwidth-kbps <kbit/s> [--buffer-ms <ms>]] [--rebuild <match.lua> /init <init.lua> "
+      "[--host-effects]]"
     );
     return 3;
   }
@@ -1394,15 +1390,15 @@ int main(
   if (options.rebuild == "server") {
     // Plan WPR.55: no match file; the rules come with the server's LaunchInfo.
     if (auto started = rebuild.Start(); !started) {
-      std::printf("probe %d: rebuild: %s\n", options.uid, started.error().c_str());
+      std::println("probe {}: rebuild: {}", options.uid, started.error());
       return 3;
     }
   } else if (!options.rebuild.empty()) {
     if (auto loaded = rebuild.Load(options.rebuild, options.uid); !loaded) {
-      std::printf("probe %d: rebuild: %s\n", options.uid, loaded.error().c_str());
+      std::println("probe {}: rebuild: {}", options.uid, loaded.error());
       return 3;
     }
-    std::printf("probe %d: rebuild: rules of %s loaded\n", options.uid, options.rebuild.c_str());
+    std::println("probe {}: rebuild: rules of {} loaded", options.uid, options.rebuild);
   }
   CImpairedPath path;
   SEndpoint server = options.server;
@@ -1410,7 +1406,7 @@ int main(
     if (
       auto started = path.Start(options.server, options.path, static_cast<std::uint32_t>(options.uid) + 1u); !started
     ) {
-      std::printf("probe %d: %s\n", options.uid, started.error().c_str());
+      std::println("probe {}: {}", options.uid, started.error());
       return 3;
     }
     server = path.PlayerSide();
@@ -1418,7 +1414,7 @@ int main(
   CClientLink link(options.uid, MakeToken(options.token), server);
   link.SetCompressionOffer(!options.noViewCompression);
   if (auto opened = link.Open(); !opened) {
-    std::printf("probe %d: %s\n", options.uid, opened.error().c_str());
+    std::println("probe {}: {}", options.uid, opened.error());
     return 3;
   }
 
@@ -1509,9 +1505,9 @@ int main(
       // View bytes as decoded, the channel's datagram bytes in and out, its RTT (RFC 6298 smoothing over acked
       // datagrams) and the share of its last 256 sent datagrams counted lost; then, so far on this channel, the
       // server's datagrams received, those skipped and not (yet) filled by a late arrival, and those that came late.
-      std::printf(
-        "probe %d: rate %.0f-%.0f s: %.1f KB/s, wire in %.1f out %.1f KB/s, rtt latest %.1f smoothed %.1f min %.1f var "
-        "%.1f ms, loss %.1f%%, in datagrams %llu missing %llu reordered %llu\n",
+      std::println(
+        "probe {}: rate {:.0f}-{:.0f} s: {:.1f} KB/s, wire in {:.1f} out {:.1f} KB/s, rtt latest {:.1f} smoothed "
+        "{:.1f} min {:.1f} var {:.1f} ms, loss {:.1f}%, in datagrams {} missing {} reordered {}",
         options.uid,
         rateFromAt,
         elapsed,
@@ -1537,7 +1533,7 @@ int main(
     if (Due(returnAt, elapsed)) {
       vanished = false;
       link.Reconnect();
-      std::printf("probe %d: %.1f s: coming back\n", options.uid, elapsed);
+      std::println("probe {}: {:.1f} s: coming back", options.uid, elapsed);
     }
     if (vanished) {
       std::this_thread::sleep_for(std::chrono::milliseconds(20));
@@ -1548,8 +1544,8 @@ int main(
     link.Pump(nowUs);
 
     if (link.State() == CClientLink::EState::Refused) {
-      std::printf(
-        "probe %d: %.1f s: refused, reason %d\n",
+      std::println(
+        "probe {}: {:.1f} s: refused, reason {}",
         options.uid,
         elapsed,
         link.Refusal() ? static_cast<int>(*link.Refusal()) : 0
@@ -1558,25 +1554,25 @@ int main(
       break;
     }
     if (link.State() == CClientLink::EState::Lost) {
-      std::printf("probe %d: %.1f s: the link is lost\n", options.uid, elapsed);
+      std::println("probe {}: {:.1f} s: the link is lost", options.uid, elapsed);
       break;
     }
     if (link.State() == CClientLink::EState::Connected && !joined) {
       joined = true;
       ++joins;
-      std::printf("probe %d: %.1f s: connected\n", options.uid, elapsed);
+      std::println("probe {}: {:.1f} s: connected", options.uid, elapsed);
       if (!options.contentReport.empty() && joins == 1u) {
         faf::remote::SContentReport report{0x1234u, 0x5678u};
         const bool fromRules = options.contentReport == "rules";
         if (fromRules && !rebuild.Content(report)) {
-          std::printf(
-            "probe %d: %.1f s: no rules to report the content of (--rebuild <match.lua>)\n", options.uid, elapsed
+          std::println(
+            "probe {}: {:.1f} s: no rules to report the content of (--rebuild <match.lua>)", options.uid, elapsed
           );
         } else {
           const std::vector<std::uint8_t> content = faf::remote::EncodeContentReport(report);
           (void)link.SendReliable(content.data(), content.size());
-          std::printf(
-            "probe %d: %.1f s: content reported (%s): blueprints %016llx, mods %016llx\n",
+          std::println(
+            "probe {}: {:.1f} s: content reported ({}): blueprints {:016x}, mods {:016x}",
             options.uid,
             elapsed,
             fromRules ? "rules" : "made up",
@@ -1594,8 +1590,8 @@ int main(
         }
         const std::vector<std::uint8_t> report = faf::remote::EncodeModReport(mods);
         (void)link.SendReliable(report.data(), report.size());
-        std::printf(
-          "probe %d: %.1f s: mods reported: %zu UI (%s)\n", options.uid, elapsed, mods.size(), options.uiMods.c_str()
+        std::println(
+          "probe {}: {:.1f} s: mods reported: {} UI ({})", options.uid, elapsed, mods.size(), options.uiMods
         );
       }
       if (!options.noLoad && joins == 1u) {
@@ -1619,8 +1615,8 @@ int main(
         encoded = config.ToByteStream(stream);
       }
       if (!encoded) {
-        std::printf(
-          "probe %d: %.1f s: lobby: no MatchConfig in %s to launch\n", options.uid, elapsed, options.lobbyLaunch.c_str()
+        std::println(
+          "probe {}: {:.1f} s: lobby: no MatchConfig in {} to launch", options.uid, elapsed, options.lobbyLaunch
         );
       } else {
         const auto* const bytes = reinterpret_cast<const std::uint8_t*>(request.mBuff.start_) + 3;
@@ -1633,12 +1629,8 @@ int main(
         writer.Varint(0u);
         writer.Bytes(message.data(), message.size());
         (void)link.SendReliable(frame.data(), frame.size());
-        std::printf(
-          "probe %d: %.1f s: lobby: launch sent from %s, %zu bytes\n",
-          options.uid,
-          elapsed,
-          options.lobbyLaunch.c_str(),
-          size
+        std::println(
+          "probe {}: {:.1f} s: lobby: launch sent from {}, {} bytes", options.uid, elapsed, options.lobbyLaunch, size
         );
       }
     }
@@ -1673,12 +1665,12 @@ int main(
         writer.Varint(static_cast<std::uint64_t>(options.lobbySayTo));
         writer.Bytes(reinterpret_cast<const std::uint8_t*>(script.mBuff.start_), script.mBuff.Size());
         (void)link.SendReliable(frame.data(), frame.size());
-        std::printf(
-          "probe %d: %.1f s: lobby: game options to uid %d: %s\n",
+        std::println(
+          "probe {}: {:.1f} s: lobby: game options to uid {}: {}",
           options.uid,
           elapsed,
           options.lobbySayTo,
-          options.lobbyOptions.c_str()
+          options.lobbyOptions
         );
       }
     }
@@ -1697,7 +1689,7 @@ int main(
         writer.Varint(static_cast<std::uint64_t>(options.lobbySayTo));
         writer.Bytes(reinterpret_cast<const std::uint8_t*>(script.mBuff.start_), script.mBuff.Size());
         (void)link.SendReliable(frame.data(), frame.size());
-        std::printf("probe %d: %.1f s: lobby: %s to uid %d\n", options.uid, elapsed, what, options.lobbySayTo);
+        std::println("probe {}: {:.1f} s: lobby: {} to uid {}", options.uid, elapsed, what, options.lobbySayTo);
       }
     };
     if (Due(options.lobbyPlayerOptionsAt, elapsed) && options.lobbySayTo != 0) {
@@ -1765,8 +1757,8 @@ int main(
       writer.Byte(static_cast<std::uint8_t>(size >> 8));
       writer.Bytes(reinterpret_cast<const std::uint8_t*>(uids), sizeof(uids));
       (void)link.SendReliable(frame.data(), frame.size());
-      std::printf(
-        "probe %d: %.1f s: lobby: established connection to uid %d announced\n",
+      std::println(
+        "probe {}: {:.1f} s: lobby: established connection to uid {} announced",
         options.uid,
         elapsed,
         options.lobbySayTo
@@ -1785,7 +1777,7 @@ int main(
       writer.Byte(static_cast<std::uint8_t>(size >> 8));
       writer.Bytes(reinterpret_cast<const std::uint8_t*>(reason.c_str()), reason.size() + 1u);
       (void)link.SendReliable(frame.data(), frame.size());
-      std::printf("probe %d: %.1f s: lobby: eject of uid %d sent\n", options.uid, elapsed, options.lobbySayTo);
+      std::println("probe {}: {:.1f} s: lobby: eject of uid {} sent", options.uid, elapsed, options.lobbySayTo);
     }
     if (Due(options.lobbySayAt, elapsed) && options.lobbySayTo != 0) {
       // A direct script message (`LOBMSG_DirectScriptData`, 107) through the relay; its bytes needn't be a Lua value
@@ -1801,12 +1793,12 @@ int main(
       writer.Byte(static_cast<std::uint8_t>(size >> 8));
       writer.Bytes(reinterpret_cast<const std::uint8_t*>(text.data()), text.size());
       (void)link.SendReliable(frame.data(), frame.size());
-      std::printf("probe %d: %.1f s: lobby: script data to uid %d\n", options.uid, elapsed, options.lobbySayTo);
+      std::println("probe {}: {:.1f} s: lobby: script data to uid {}", options.uid, elapsed, options.lobbySayTo);
     }
     if (Due(options.focusArmyAt, elapsed)) {
       const std::vector<std::uint8_t> focus = faf::remote::EncodeFocusArmy(options.focusArmy);
       (void)link.SendReliable(focus.data(), focus.size());
-      std::printf("probe %d: %.1f s: focus on army %d asked\n", options.uid, elapsed, options.focusArmy);
+      std::println("probe {}: {:.1f} s: focus on army {} asked", options.uid, elapsed, options.focusArmy);
     }
     if (options.camerasEvery > 0.0 && elapsed >= nextCameraAt) {
       nextCameraAt = elapsed + options.camerasEvery;
@@ -1831,7 +1823,7 @@ int main(
       // Plan WP10.7: as a server-mode game reports what it keeps up with.
       const std::vector<std::uint8_t> limit = faf::remote::EncodeSpeedLimit(options.speedLimit);
       (void)link.SendReliable(limit.data(), limit.size());
-      std::printf("probe %d: %.1f s: speed limit %+d sent\n", options.uid, elapsed, options.speedLimit);
+      std::println("probe {}: {:.1f} s: speed limit {:+} sent", options.uid, elapsed, options.speedLimit);
     }
     if (options.chatAt >= 0.0 && !rosterSeen.chatted && elapsed >= options.chatAt && rosterSeen.connected > 1u) {
       rosterSeen.chatted = true;
@@ -1843,8 +1835,8 @@ int main(
         const std::vector<std::uint8_t> chat = faf::remote::EncodeChatMessage(entry.index, line);
         rosterSeen.chatSent += link.SendReliable(chat.data(), chat.size()) ? 1u : 0u;
       }
-      std::printf(
-        "probe %d: %.1f s: chat sent to %llu clients\n",
+      std::println(
+        "probe {}: {:.1f} s: chat sent to {} clients",
         options.uid,
         elapsed,
         static_cast<unsigned long long>(rosterSeen.chatSent)
@@ -1874,8 +1866,8 @@ int main(
           faf::remote::wire::BitReader lane(std::span<const std::uint8_t>(bytes, static_cast<std::size_t>(size)));
           const bool decoded = faf::remote::wire::DecodeLuaSyncLane(lane, table, prints) && !table.empty();
           if (!decoded && !table.empty()) {
-            std::printf(
-              "probe %d: %.1f s: lua lane at beat %llu not decoded\n",
+            std::println(
+              "probe {}: {:.1f} s: lua lane at beat {} not decoded",
               options.uid,
               elapsed,
               static_cast<unsigned long long>(beat)
@@ -1897,8 +1889,8 @@ int main(
                 named += (named.empty() ? "" : ", ") + std::string(key);
               }
             }
-            std::printf(
-              "probe %d: %.1f s: lua table at beat %llu (%zu bytes) not read; it names: %s\n",
+            std::println(
+              "probe {}: {:.1f} s: lua table at beat {} ({} bytes) not read; it names: {}",
               options.uid,
               elapsed,
               static_cast<unsigned long long>(beat),
@@ -1917,13 +1909,13 @@ int main(
               }
             }
             if (!fresh.empty()) {
-              std::printf(
-                "probe %d: %.1f s: lua keys first%s at beat %llu: %s\n",
+              std::println(
+                "probe {}: {:.1f} s: lua keys first{} at beat {}: {}",
                 options.uid,
                 elapsed,
                 luaKeysAfterPartition ? " after the partition" : "",
                 static_cast<unsigned long long>(beat),
-                fresh.c_str()
+                fresh
               );
             }
           }
@@ -1932,7 +1924,7 @@ int main(
       }
       if (!message.empty() && message[0] == static_cast<std::uint8_t>(ESeatMessage::FocusArmy)) {
         if (const std::optional<int> granted = faf::remote::DecodeFocusArmy(message); granted) {
-          std::printf("probe %d: %.1f s: focus granted on army %d\n", options.uid, elapsed, *granted);
+          std::println("probe {}: {:.1f} s: focus granted on army {}", options.uid, elapsed, *granted);
         }
         continue;
       }
@@ -1947,8 +1939,8 @@ int main(
             asked.pop_front();
           }
           if (what != nullptr) {
-            std::printf(
-              "probe %d: %.1f s: the %s: %s, beat %llu\n",
+            std::println(
+              "probe {}: {:.1f} s: the {}: {}, beat {}",
               options.uid,
               elapsed,
               what,
@@ -1987,8 +1979,8 @@ int main(
               views.askedWhole = true;
               const auto kind = static_cast<std::uint8_t>(ESeatMessage::ViewMismatch);
               (void)link.SendReliable(&kind, 1u);
-              std::printf(
-                "probe %d: %.1f s: its frames don't match the server's check at beat %llu; asked for them whole\n",
+              std::println(
+                "probe {}: {:.1f} s: its frames don't match the server's check at beat {}; asked for them whole",
                 options.uid,
                 elapsed,
                 static_cast<unsigned long long>(beat)
@@ -1996,8 +1988,8 @@ int main(
             }
           } else if (views.askedWhole) {
             views.askedWhole = false;
-            std::printf(
-              "probe %d: %.1f s: its frames match the server's check again at beat %llu, %.2f s after the damage\n",
+            std::println(
+              "probe {}: {:.1f} s: its frames match the server's check again at beat {}, {:.2f} s after the damage",
               options.uid,
               elapsed,
               static_cast<unsigned long long>(beat),
@@ -2024,8 +2016,8 @@ int main(
             rosterSeen.localListed || (entry.index == roster->localIndex && entry.ownerId == options.uid);
         }
         if (rosterSeen.messages == 1u) {
-          std::printf(
-            "probe %d: %.1f s: roster: %zu clients, this one %d\n",
+          std::println(
+            "probe {}: {:.1f} s: roster: {} clients, this one {}",
             options.uid,
             elapsed,
             roster->entries.size(),
@@ -2043,7 +2035,7 @@ int main(
           continue;
         }
         ++rosterSeen.chatReceived;
-        std::printf("probe %d: %.1f s: chat from client %d, %zu bytes\n", options.uid, elapsed, sender, payload.size());
+        std::println("probe {}: {:.1f} s: chat from client {}, {} bytes", options.uid, elapsed, sender, payload.size());
         continue;
       }
       if (saved != nullptr) {
@@ -2068,8 +2060,8 @@ int main(
           std::find(commands.begin(), commands.end(), static_cast<std::int32_t>(watch.commandId)) != commands.end()
         ) {
           watch.queued = true;
-          std::printf(
-            "probe %d: %.1f s: the order is on unit 0x%08x's queue at beat %u\n",
+          std::println(
+            "probe {}: {:.1f} s: the order is on unit 0x{:08x}'s queue at beat {}",
             options.uid,
             elapsed,
             watch.unit,
@@ -2077,10 +2069,9 @@ int main(
           );
           // Plan WPR.13: issue time to the first beat whose published commands hold the order (the beat the server's
           // answer names), and to the first view this player got of a beat that holds it.
-          std::printf(
-            "probe %d: order latency: sent at view beat %u; the server ran it at beat %llu (%lld beats on), its answer "
-            "after %.0f ms; first view "
-            "holding it, beat %u, after %.0f ms\n",
+          std::println(
+            "probe {}: order latency: sent at view beat {}; the server ran it at beat {} ({} beats on), its answer "
+            "after {:.0f} ms; first view holding it, beat {}, after {:.0f} ms",
             options.uid,
             watch.sentBeat,
             static_cast<unsigned long long>(watch.answerBeat),
@@ -2099,8 +2090,8 @@ int main(
         }
         if (!watch.moved && !(record->position == watch.from)) {
           watch.moved = true;
-          std::printf(
-            "probe %d: %.1f s: unit 0x%08x has moved at beat %u\n", options.uid, elapsed, watch.unit, views.frame.beat
+          std::println(
+            "probe {}: {:.1f} s: unit 0x{:08x} has moved at beat {}", options.uid, elapsed, watch.unit, views.frame.beat
           );
         }
       }
@@ -2118,8 +2109,8 @@ int main(
 
     if (Due(options.pauseAt, elapsed)) {
       SendCommand(link, kOpRequestPause);
-      std::printf(
-        "probe %d: %.1f s: asked to pause, at beat %llu\n",
+      std::println(
+        "probe {}: {:.1f} s: asked to pause, at beat {}",
         options.uid,
         elapsed,
         static_cast<unsigned long long>(lastBeat)
@@ -2131,8 +2122,8 @@ int main(
     }
     if (Due(options.resumeAt, elapsed)) {
       SendCommand(link, kOpResume);
-      std::printf(
-        "probe %d: %.1f s: asked to resume, at beat %llu\n",
+      std::println(
+        "probe {}: {:.1f} s: asked to resume, at beat {}",
         options.uid,
         elapsed,
         static_cast<unsigned long long>(lastBeat)
@@ -2149,8 +2140,8 @@ int main(
           ++views.frame.entities[0].tickCreated;
         }
         views.damagedAt = elapsed;
-        std::printf(
-          "probe %d: %.1f s: damaged entity 0x%08x of its own frame\n", options.uid, elapsed, kept->entities[0].id
+        std::println(
+          "probe {}: {:.1f} s: damaged entity 0x{:08x} of its own frame", options.uid, elapsed, kept->entities[0].id
         );
       }
     }
@@ -2160,8 +2151,8 @@ int main(
         static_cast<std::uint8_t>(moho::ECmdStreamOp::CMDST_LuaSimCallback),
         BreakAlliancePayload(views.army, options.breakWith)
       );
-      std::printf(
-        "probe %d: %.1f s: broke the alliance of army %d with army %d, at beat %llu\n",
+      std::println(
+        "probe {}: {:.1f} s: broke the alliance of army {} with army {}, at beat {}",
         options.uid,
         elapsed,
         views.army,
@@ -2173,7 +2164,7 @@ int main(
       const std::vector<std::uint8_t> manyBeats = {0xA0, 0x86, 0x01, 0x00};
       SendCommand(link, kOpAdvance, manyBeats);
       SendCommand(link, kOpEndGame);
-      std::printf("probe %d: %.1f s: sent forged beats and a forged end of game\n", options.uid, elapsed);
+      std::println("probe {}: {:.1f} s: sent forged beats and a forged end of game", options.uid, elapsed);
     }
     orderWanted = Due(options.orderAt, elapsed) || orderWanted;
     if (options.orderEvery > 0.0 && nextOrderAt >= 0.0 && elapsed >= nextOrderAt) {
@@ -2212,8 +2203,8 @@ int main(
         if (repeat) {
           nextOrderAt = elapsed + options.orderEvery;
         }
-        std::printf(
-          "probe %d: %.1f s: ordered unit 0x%08x to %s, command 0x%08x, at view beat %u\n",
+        std::println(
+          "probe {}: {:.1f} s: ordered unit 0x{:08x} to {}, command 0x{:08x}, at view beat {}",
           options.uid,
           elapsed,
           watch.unit,
@@ -2248,8 +2239,8 @@ int main(
           )
         );
         asked.push_back("attack on a blip");
-        std::printf(
-          "probe %d: %.1f s: ordered unit 0x%08x to attack blip 0x%08x, as this view numbers it, at view beat %u\n",
+        std::println(
+          "probe {}: {:.1f} s: ordered unit 0x{:08x} to attack blip 0x{:08x}, as this view numbers it, at view beat {}",
           options.uid,
           elapsed,
           unit->id,
@@ -2275,8 +2266,8 @@ int main(
           )
         );
         asked.push_back("attack on a blip it was never shown");
-        std::printf(
-          "probe %d: %.1f s: ordered an attack on blip 0x%08x, which its view never had\n",
+        std::println(
+          "probe {}: {:.1f} s: ordered an attack on blip 0x{:08x}, which its view never had",
           options.uid,
           elapsed,
           kForgedBlipId
@@ -2299,8 +2290,8 @@ int main(
           )
         );
         asked.push_back("attack on a unit it can't see");
-        std::printf(
-          "probe %d: %.1f s: ordered unit 0x%08x to attack unit 0x%08x, which its view %s, at view beat %u\n",
+        std::println(
+          "probe {}: {:.1f} s: ordered unit 0x{:08x} to attack unit 0x{:08x}, which its view {}, at view beat {}",
           options.uid,
           elapsed,
           unit->id,
@@ -2312,7 +2303,7 @@ int main(
     }
     if (Due(options.fuzzAt, elapsed)) {
       fuzzLeft = options.fuzzCount;
-      std::printf("probe %d: %.1f s: sending %d commands of random bytes\n", options.uid, elapsed, options.fuzzCount);
+      std::println("probe {}: {:.1f} s: sending {} commands of random bytes", options.uid, elapsed, options.fuzzCount);
     }
     for (int burst = 0; burst < 8 && fuzzLeft > 0; ++burst, --fuzzLeft) {
       std::vector<std::uint8_t> payload(fuzzRandom() % 400u);
@@ -2324,7 +2315,7 @@ int main(
     }
     if (Due(options.floodAt, elapsed)) {
       flooding = true;
-      std::printf("probe %d: %.1f s: flooding the server with commands\n", options.uid, elapsed);
+      std::println("probe {}: {:.1f} s: flooding the server with commands", options.uid, elapsed);
     }
     if (flooding) {
       for (int burst = 0; burst < 200; ++burst, ++floodSent) {
@@ -2333,8 +2324,8 @@ int main(
     }
 
     if (Due(options.vanishAt, elapsed)) {
-      std::printf(
-        "probe %d: %.1f s: vanishing, at beat %llu\n", options.uid, elapsed, static_cast<unsigned long long>(lastBeat)
+      std::println(
+        "probe {}: {:.1f} s: vanishing, at beat {}", options.uid, elapsed, static_cast<unsigned long long>(lastBeat)
       );
       vanished = true;
       joined = false;
@@ -2349,15 +2340,15 @@ int main(
       link.Pump(nowUs);
       std::this_thread::sleep_for(std::chrono::milliseconds(200));
       link.Pump(nowUs + 200000u);
-      std::printf("probe %d: %.1f s: left\n", options.uid, elapsed);
+      std::println("probe {}: {:.1f} s: left", options.uid, elapsed);
       break;
     }
 
     link.Wait(5);
   }
 
-  std::printf(
-    "probe %d: joined %llu times, %llu beat messages, last beat %llu\n",
+  std::println(
+    "probe {}: joined {} times, {} beat messages, last beat {}",
     options.uid,
     static_cast<unsigned long long>(joins),
     static_cast<unsigned long long>(beatMessages),
@@ -2366,9 +2357,8 @@ int main(
   {
     // Plan WP10.13: what came compressed (`--no-view-compression`: nothing was offered).
     const CClientLink::SCompressionStats& compression = link.CompressionStats();
-    std::printf(
-      "probe %d: compression: %s, %llu messages came compressed, %llu bytes from %llu (%.1f %%), %llu failed, "
-      "decoder %llu KB\n",
+    std::println(
+      "probe {}: compression: {}, {} messages came compressed, {} bytes from {} ({:.1f} %), {} failed, decoder {} KB",
       options.uid,
       options.noViewCompression ? "not offered" : "offered",
       static_cast<unsigned long long>(compression.messages),
@@ -2382,10 +2372,10 @@ int main(
     );
   }
   const double viewSeconds = views.lastAt - views.firstAt;
-  std::printf(
-    "probe %d: %llu views, %llu didn't decode, %llu whole after the first, %llu game infos, %llu launch infos, %llu "
-    "session-table messages, %llu checks (%llu didn't match), last at beat %llu with %llu entities, %.1f KB/s (frames "
-    "%.1f, poses %.1f), largest %llu bytes\n",
+  std::println(
+    "probe {}: {} views, {} didn't decode, {} whole after the first, {} game infos, {} launch infos, {} session-table "
+    "messages, {} checks ({} didn't match), last at beat {} with {} entities, {:.1f} KB/s (frames {:.1f}, poses "
+    "{:.1f}), largest {} bytes",
     options.uid,
     static_cast<unsigned long long>(views.views),
     static_cast<unsigned long long>(views.failed),
@@ -2414,14 +2404,13 @@ int main(
           std::to_string(views.effectOpsByKind[kind]);
       }
     }
-    std::printf(
-      "probe %d: effects: %llu ops in %llu of %llu views (%.1f a view), %llu bytes (%.1f a view, the most %llu), %.2f "
-      "KB/s, %.2f KB/s at 10 beats a second, %llu names taken, %llu references to names not held, %llu lanes didn't "
-      "decode, %llu later lanes skipped, %llu ops on unknown effects, %llu effects created again; %s\n"
-      "probe %d: effects applied: %llu created, %llu setters, %llu lights, %llu destroyed by script, %llu dropped with "
-      "their entity, %llu at a whole view, %llu aged out; skipped: %llu creates or attaches on an entity not held, "
-      "%llu ops on an "
-      "unknown effect, %llu names not sent; %zu held at the end\n",
+    std::println(
+      "probe {}: effects: {} ops in {} of {} views ({:.1f} a view), {} bytes ({:.1f} a view, the most {}), {:.2f} "
+      "KB/s, {:.2f} KB/s at 10 beats a second, {} names taken, {} references to names not held, {} lanes didn't "
+      "decode, {} later lanes skipped, {} ops on unknown effects, {} effects created again; {}\nprobe {}: effects "
+      "applied: {} created, {} setters, {} lights, {} destroyed by script, {} dropped with their entity, {} at a whole "
+      "view, {} aged out; skipped: {} creates or attaches on an entity not held, {} ops on an unknown effect, {} names "
+      "not sent; {} held at the end",
       options.uid,
       static_cast<unsigned long long>(views.effectOpCount),
       static_cast<unsigned long long>(views.effectLanes),
@@ -2457,11 +2446,11 @@ int main(
     // Plan WP5.14: what the command-records lanes carried, and what applying them did.
     const faf::remote::wire::SCommandLaneCounts& commands = views.commands.Counts();
     const double perView = views.views != 0u ? 1.0 / static_cast<double>(views.views) : 0.0;
-    std::printf(
-      "probe %d: commands: %llu of %llu views with the lane, %llu bytes (%.1f a view, the most %llu), %.2f KB/s at 10 "
-      "beats a second; %llu lanes with records, %llu didn't decode, %llu whole; %llu descriptors, %llu updates, %llu "
-      "removals, %llu releases, %llu forgotten at a whole lane; dropped: %llu updates and %llu removals of commands "
-      "not sent; %zu held at the end\n",
+    std::println(
+      "probe {}: commands: {} of {} views with the lane, {} bytes ({:.1f} a view, the most {}), {:.2f} KB/s at 10 "
+      "beats a second; {} lanes with records, {} didn't decode, {} whole; {} descriptors, {} updates, {} removals, {} "
+      "releases, {} forgotten at a whole lane; dropped: {} updates and {} removals of commands not sent; {} held at "
+      "the end",
       options.uid,
       static_cast<unsigned long long>(views.commandLaneViews),
       static_cast<unsigned long long>(views.views),
@@ -2482,17 +2471,17 @@ int main(
       views.commands.Held()
     );
   }
-  std::printf(
-    "probe %d: answers: %llu applied, %llu refused, %llu dropped%s\n",
+  std::println(
+    "probe {}: answers: {} applied, {} refused, {} dropped{}",
     options.uid,
     static_cast<unsigned long long>(answers[0]),
     static_cast<unsigned long long>(answers[1]),
     static_cast<unsigned long long>(answers[2]),
     flooding ? (" (flooded)") : ""
   );
-  std::printf(
-    "probe %d: roster: %llu messages (%llu bad), %zu clients (%zu connected), this one %d (%s); chat: %llu sent, %llu "
-    "received, %llu bad\n",
+  std::println(
+    "probe {}: roster: {} messages ({} bad), {} clients ({} connected), this one {} ({}); chat: {} sent, {} received, "
+    "{} bad",
     options.uid,
     static_cast<unsigned long long>(rosterSeen.messages),
     static_cast<unsigned long long>(rosterSeen.bad),
@@ -2515,19 +2504,19 @@ int main(
       }
       return text.empty() ? std::string("none") : text;
     };
-    std::printf(
-      "probe %d: lobby: %llu messages, role %s, host %d, peers %s, script data from %s, left %s\n",
+    std::println(
+      "probe {}: lobby: {} messages, role {}, host {}, peers {}, script data from {}, left {}",
       options.uid,
       static_cast<unsigned long long>(lobby.messages),
-      lobby.role.c_str(),
+      lobby.role,
       lobby.hostUid,
-      list(lobby.peers).c_str(),
-      list(lobby.scriptFrom).c_str(),
-      list(lobby.deleted).c_str()
+      list(lobby.peers),
+      list(lobby.scriptFrom),
+      list(lobby.deleted)
     );
   }
   if (options.camerasEvery > 0.0) {
-    std::printf("probe %d: %llu camera updates sent\n", options.uid, static_cast<unsigned long long>(camerasSent));
+    std::println("probe {}: {} camera updates sent", options.uid, static_cast<unsigned long long>(camerasSent));
   }
   if (!views.lateMs.empty()) {
     std::sort(views.lateMs.begin(), views.lateMs.end());
@@ -2536,8 +2525,8 @@ int main(
         views.lateMs.size() - 1u, static_cast<std::size_t>(static_cast<double>(views.lateMs.size()) * share)
       )];
     };
-    std::printf(
-      "probe %d: views late by: median %.0f ms, 90%% %.0f ms, 99%% %.0f ms, worst %.0f ms\n",
+    std::println(
+      "probe {}: views late by: median {:.0f} ms, 90% {:.0f} ms, 99% {:.0f} ms, worst {:.0f} ms",
       options.uid,
       at(0.5),
       at(0.9),
@@ -2549,9 +2538,9 @@ int main(
     // Plan WP10.9, WPR.14: the game client's display played over the arrivals measured here, before the view buffer
     // and with it; and how far off a made-up beat would have shown the moving entities.
     if (FILE* const file = std::fopen(options.displayModel.c_str(), "w"); file != nullptr) {
-      std::fprintf(file, "# beat server_seconds local_seconds\n");
+      std::println(file, "# beat server_seconds local_seconds");
       for (const faf::remote::client::SViewArrival& arrival : views.arrivals) {
-        std::fprintf(file, "%d %.4f %.4f\n", arrival.beat, arrival.serverSeconds, arrival.localSeconds);
+        std::println(file, "{} {:.4f} {:.4f}", arrival.beat, arrival.serverSeconds, arrival.localSeconds);
       }
       std::fclose(file);
     }
@@ -2559,7 +2548,7 @@ int main(
     using faf::remote::client::SInterpConfig;
     const auto show = [&](const char* label, const EDisplayPolicy policy, const SInterpConfig& config) {
       const faf::remote::client::SDisplayRun run = faf::remote::client::RunDisplayModel(views.arrivals, policy, config);
-      std::printf("probe %d: %s\n", options.uid, faf::remote::client::DescribeDisplayRun(label, run).c_str());
+      std::println("probe {}: {}", options.uid, faf::remote::client::DescribeDisplayRun(label, run));
     };
     SInterpConfig off;
     off.enabled = false;
@@ -2584,9 +2573,9 @@ int main(
           errors.size() - 1u, static_cast<std::size_t>(static_cast<double>(errors.size()) * share)
         )];
       };
-      std::printf(
-        "probe %d: synthesis %zu beat%s past the last view: moving entities off by median %.3f, 95%% %.3f, 99%% %.3f, "
-        "worst %.3f world units (%zu entity-beats)\n",
+      std::println(
+        "probe {}: synthesis {} beat{} past the last view: moving entities off by median {:.3f}, 95% {:.3f}, 99% "
+        "{:.3f}, worst {:.3f} world units ({} entity-beats)",
         options.uid,
         ahead + 1u,
         ahead == 0u ? "" : "s",
@@ -2599,8 +2588,8 @@ int main(
     }
   }
   if (options.path.Any()) {
-    std::printf(
-      "probe %d: network: loss %.1f%%, latency %.0f ms, jitter %.0f ms: %llu of %llu datagrams lost\n",
+    std::println(
+      "probe {}: network: loss {:.1f}%, latency {:.0f} ms, jitter {:.0f} ms: {} of {} datagrams lost",
       options.uid,
       options.path.lossPercent,
       options.path.latencyMs,
@@ -2626,16 +2615,16 @@ int main(
       );
       return std::string(text);
     };
-    std::printf(
-      "probe %d: orders: %llu sent, %zu seen in a view, %llu not seen before the next; beats on: %s; answer ms: %s; "
-      "first view ms: %s\n",
+    std::println(
+      "probe {}: orders: {} sent, {} seen in a view, {} not seen before the next; beats on: {}; answer ms: {}; first "
+      "view ms: {}",
       options.uid,
       static_cast<unsigned long long>(ordersSent),
       orderViewMs.size(),
       static_cast<unsigned long long>(ordersUnseen),
-      describe(orderBeatsOn).c_str(),
-      describe(orderAnswerMs).c_str(),
-      describe(orderViewMs).c_str()
+      describe(orderBeatsOn),
+      describe(orderAnswerMs),
+      describe(orderViewMs)
     );
   }
   if (refused) {

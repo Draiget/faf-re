@@ -17,6 +17,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <print>
 #include <span>
 #include <cstdio>
 #include <cstdlib>
@@ -108,7 +109,7 @@ int main(
       continue;
     }
     if (i + 1 >= argc) {
-      std::fprintf(stderr, "%s needs a value\n", name.c_str());
+      std::println(stderr, "{} needs a value", name);
       return 4;
     }
     const std::string value = argv[++i];
@@ -137,7 +138,7 @@ int main(
     } else if (name == "--watch") {
       watch = std::atof(value.c_str());
     } else {
-      std::fprintf(stderr, "unknown option %s\n", name.c_str());
+      std::println(stderr, "unknown option {}", name);
       return 4;
     }
   }
@@ -150,10 +151,10 @@ int main(
     op.empty() || !faf::remote::net::ParseEndpoint(server, at) || !keyFile ||
     !faf::server::ReadControlKey(keyText.str(), key)
   ) {
-    std::fprintf(
+    std::println(
       stderr,
       "usage: faf_server_control --server <ip:port> --key <file> --op <op> [--uid n] [--reason text] [--watch s] "
-      "[--wrong-key]\n"
+      "[--wrong-key]"
     );
     return 4;
   }
@@ -167,7 +168,7 @@ int main(
   address.sin_port = htons(at.port);
   address.sin_addr.s_addr = htonl(at.Ipv4());
   if (socket < 0 || ::connect(socket, reinterpret_cast<const sockaddr*>(&address), sizeof(address)) != 0) {
-    std::printf("control: no connection to %s\n", server.c_str());
+    std::println("control: no connection to {}", server);
     return 2;
   }
   faf::server::ControlNonce nonce{};
@@ -176,16 +177,16 @@ int main(
   faf::server::ControlNonce serverNonce{};
   faf::server::ControlProof serverProof{};
   if (!SendAll(socket, nonce.data(), nonce.size()) || !ReadExactly(socket, serverNonce.data(), serverNonce.size())) {
-    std::printf("control: the server closed the connection before its nonce\n");
+    std::println("control: the server closed the connection before its nonce");
     return 2;
   }
   const faf::server::ControlProof proof = channel.Proof(serverNonce);
   if (!SendAll(socket, proof.data(), proof.size()) || !ReadExactly(socket, serverProof.data(), serverProof.size())) {
-    std::printf("control: the server closed the connection during the handshake\n");
+    std::println("control: the server closed the connection during the handshake");
     return 2;
   }
   if (!channel.CheckPeerProof(serverProof)) {
-    std::printf("control: the server's proof doesn't match this key: refused\n");
+    std::println("control: the server's proof doesn't match this key: refused");
     return 2;
   }
   std::string request = "{\"id\":1,\"op\":" + Quote(op);
@@ -217,7 +218,7 @@ int main(
   const std::vector<std::uint8_t> frame =
     channel.Seal(std::span<const std::uint8_t>(reinterpret_cast<const std::uint8_t*>(request.data()), request.size()));
   if (!SendAll(socket, frame.data(), frame.size())) {
-    std::printf("control: the request didn't go\n");
+    std::println("control: the request didn't go");
     return 2;
   }
 
@@ -237,17 +238,17 @@ int main(
     }
     const ssize_t got = ::recv(socket, buffer, sizeof(buffer), 0);
     if (got <= 0) {
-      std::printf("control: the server closed the connection\n");
+      std::println("control: the server closed the connection");
       break;
     }
     if (!channel.Feed(std::span<const std::uint8_t>(buffer, static_cast<std::size_t>(got)))) {
-      std::printf("control: a frame from the server didn't open\n");
+      std::println("control: a frame from the server didn't open");
       break;
     }
     std::vector<std::uint8_t> message;
     while (channel.Take(message)) {
       const std::string text(message.begin(), message.end());
-      std::printf("control: %s\n", text.c_str());
+      std::println("control: {}", text);
       if (!answered && text.starts_with("{\"id\":1,")) {
         answered = true;
         exitCode = text.contains("\"ok\":true") ? 0 : 1;

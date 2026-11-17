@@ -11,6 +11,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
+#include <print>
 #include <string>
 #include <thread>
 #include <vector>
@@ -118,10 +119,8 @@ int main(
     : (std::thread::hardware_concurrency() != 0 ? std::thread::hardware_concurrency() : 4);
   constexpr std::uint64_t kAll = 1ull << 32;
   const auto unary = [&](const char* name, auto f) {
-    std::printf(
-      "%-26s %016llx\n",
-      name,
-      static_cast<unsigned long long>(Run(kAll, threads, [&](const std::uint64_t i, Digest& d) {
+    std::println(
+      "{:26} {:016x}", name, static_cast<unsigned long long>(Run(kAll, threads, [&](const std::uint64_t i, Digest& d) {
       d.Add(Bits(f(std::bit_cast<float>(static_cast<std::uint32_t>(i)))));
     }))
     );
@@ -156,7 +155,7 @@ int main(
   });
 
   const auto random = [&](const char* name, auto body) {
-    std::printf("%-26s %016llx\n", name, static_cast<unsigned long long>(Run(randomCases, threads, body)));
+    std::println("{:26} {:016x}", name, static_cast<unsigned long long>(Run(randomCases, threads, body)));
     std::fflush(stdout);
   };
   random("atan2f", [](std::uint64_t i, Digest& d) {

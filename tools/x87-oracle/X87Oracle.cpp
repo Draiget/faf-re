@@ -21,6 +21,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <mutex>
+#include <print>
 #include <string>
 #include <thread>
 #include <type_traits>
@@ -392,7 +393,7 @@ namespace
       const float lanes[3] = {a, b, c};
       Compare(r, "vector_length_zyx", abc, msvc8_x87_vector_length_zyx(lanes), fa::x87::VectorLengthZYX(lanes));
     } else {
-      std::fprintf(stderr, "unknown routine %s\n", routine.c_str());
+      std::println(stderr, "unknown routine {}", routine);
       std::exit(2);
     }
   }
@@ -425,9 +426,9 @@ namespace
   )
   {
     for (const std::string& line : report.first) {
-      std::printf("  %s\n", line.c_str());
+      std::println("  {}", line);
     }
-    std::printf("%s: %" PRIu64 " checked, %" PRIu64 " differ\n", what, report.checked.load(), report.mismatches.load());
+    std::println("{}: {} checked, {} differ", what, report.checked.load(), report.mismatches.load());
     return report.mismatches.load() == 0 ? 0 : 1;
   }
 
@@ -492,7 +493,7 @@ int main(
         return Exhaustive(routine, threadsArg(3));
       }
     }
-    std::fprintf(stderr, "unknown one-argument routine %s\n", argv[2]);
+    std::println(stderr, "unknown one-argument routine {}", argv[2]);
     return 2;
   }
   if (mode == "random" && argc > 3) {
@@ -510,9 +511,9 @@ int main(
     }
     return failed;
   }
-  std::fprintf(
+  std::println(
     stderr,
-    "usage: %s all [threads] | exhaustive <routine> [threads] | random <routine> <count> [seed] [threads]\n",
+    "usage: {} all [threads] | exhaustive <routine> [threads] | random <routine> <count> [seed] [threads]",
     argv[0]
   );
   return 2;

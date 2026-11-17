@@ -28,6 +28,7 @@
 #include <exception>
 
 #include <csignal>
+#include <print>
 #include <dlfcn.h>
 #include <execinfo.h>
 #include <fcntl.h>
@@ -107,7 +108,7 @@ namespace
     for (int index = skipFrames; index < count; ++index) {
       char line[1024]{};
       gpg::diag::DiagDescribeAddress(frames[index], line, sizeof(line));
-      std::fprintf(sink, "  #%02d %p %s\n", index - skipFrames, frames[index], line);
+      std::println(sink, "  #{:02} {} {}", index - skipFrames, frames[index], line);
     }
   }
 
@@ -376,21 +377,21 @@ namespace gpg::diag
     std::setvbuf(sink, nullptr, _IOLBF, 0);
 
     const std::time_t now = std::time(nullptr);
-    std::fprintf(sink, "FAF crash report (POSIX)\n");
-    std::fprintf(sink, "time: %s", std::ctime(&now));
-    std::fprintf(sink, "process: %d\n", static_cast<int>(::getpid()));
-    std::fprintf(sink, "reason: %s\n", context.reason != nullptr ? context.reason : "(unknown)");
+    std::println(sink, "FAF crash report (POSIX)");
+    std::print(sink, "time: {}", std::ctime(&now));
+    std::println(sink, "process: {}", static_cast<int>(::getpid()));
+    std::println(sink, "reason: {}", context.reason != nullptr ? context.reason : "(unknown)");
 
     const CrashSectionInfo info{};
     int section = 0;
     for (; section < gSectionCount && gSections[section].priority < kAfterModulesPriority; ++section) {
-      std::fprintf(sink, "\n== %s ==\n", gSections[section].name);
+      std::println(sink, "\n== {} ==", gSections[section].name);
       gSections[section].writer(sink, info);
     }
-    std::fprintf(sink, "\n== Stack ==\n");
+    std::println(sink, "\n== Stack ==");
     WriteStack(sink, 1);
     for (; section < gSectionCount; ++section) {
-      std::fprintf(sink, "\n== %s ==\n", gSections[section].name);
+      std::println(sink, "\n== {} ==", gSections[section].name);
       gSections[section].writer(sink, info);
     }
     std::fclose(sink);
@@ -415,10 +416,10 @@ namespace gpg::diag
     std::FILE* const sink
   )
   {
-    std::fprintf(sink, "Commit    : %s\n", BuildIdentity());
+    std::println(sink, "Commit    : {}", BuildIdentity());
     char exe[kPathBytes]{};
     const ssize_t exeLength = ::readlink("/proc/self/exe", exe, sizeof(exe) - 1);
-    std::fprintf(sink, "exe       : %s\n", exeLength > 0 ? exe : "(unknown)");
+    std::println(sink, "exe       : {}", exeLength > 0 ? exe : "(unknown)");
     if (std::FILE* const cmdline = std::fopen("/proc/self/cmdline", "rb")) {
       char args[kPathBytes]{};
       const std::size_t got = std::fread(args, 1, sizeof(args) - 1, cmdline);
@@ -428,23 +429,23 @@ namespace gpg::diag
           args[i] = ' ';
         }
       }
-      std::fprintf(sink, "cmdline   : %s\n", args);
+      std::println(sink, "cmdline   : {}", args);
     }
     utsname system{};
     if (::uname(&system) == 0) {
-      std::fprintf(sink, "OS        : %s %s %s\n", system.sysname, system.release, system.machine);
+      std::println(sink, "OS        : {} {} {}", system.sysname, system.release, system.machine);
     }
-    std::fprintf(sink, "CPUs      : %ld logical\n", ::sysconf(_SC_NPROCESSORS_ONLN));
+    std::println(sink, "CPUs      : {} logical", ::sysconf(_SC_NPROCESSORS_ONLN));
     if (std::FILE* const cpuinfo = std::fopen("/proc/cpuinfo", "r")) {
       char line[4096];
       bool model = false;
       bool flags = false;
       while ((!model || !flags) && std::fgets(line, sizeof(line), cpuinfo) != nullptr) {
         if (!model && std::strncmp(line, "model name", 10) == 0) {
-          std::fprintf(sink, "CPU model : %s", std::strchr(line, ':') != nullptr ? std::strchr(line, ':') + 2 : line);
+          std::print(sink, "CPU model : {}", std::strchr(line, ':') != nullptr ? std::strchr(line, ':') + 2 : line);
           model = true;
         } else if (!flags && std::strncmp(line, "flags", 5) == 0) {
-          std::fprintf(sink, "CPU flags : %s", std::strchr(line, ':') != nullptr ? std::strchr(line, ':') + 2 : line);
+          std::print(sink, "CPU flags : {}", std::strchr(line, ':') != nullptr ? std::strchr(line, ':') + 2 : line);
           flags = true;
         }
       }
@@ -453,7 +454,7 @@ namespace gpg::diag
     const long pages = ::sysconf(_SC_PHYS_PAGES);
     const long pageSize = ::sysconf(_SC_PAGESIZE);
     if (pages > 0 && pageSize > 0) {
-      std::fprintf(sink, "RAM       : %lld MB total\n", static_cast<long long>(pages) * pageSize / (1024LL * 1024LL));
+      std::println(sink, "RAM       : {} MB total", static_cast<long long>(pages) * pageSize / (1024LL * 1024LL));
     }
   }
 
@@ -507,7 +508,7 @@ namespace gpg::diag
     const char* const reportPath
   )
   {
-    std::fprintf(stderr, "FAF crashed; report: %s\n", reportPath != nullptr ? reportPath : "(none)");
+    std::println(stderr, "FAF crashed; report: {}", reportPath != nullptr ? reportPath : "(none)");
   }
 
   bool ParseWatchSpec(
@@ -542,7 +543,7 @@ namespace gpg::diag
   )
   {
     (void)info;
-    std::fprintf(sink, "(memory watches and code probes are not available on this platform)\n");
+    std::println(sink, "(memory watches and code probes are not available on this platform)");
   }
 
   void ProbeWatchSelfTest() {}

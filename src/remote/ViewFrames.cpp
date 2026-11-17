@@ -6,6 +6,7 @@
 #include <cmath>
 #include <cstdio>
 #include <iterator>
+#include <print>
 #include <unordered_set>
 #include <utility>
 
@@ -550,7 +551,7 @@ namespace faf::remote
     SHeldView& held = mHeld[army];
     const auto report = [&held, army, &sim](const char* const what, const std::uint32_t id) {
       if (++held.mismatches <= 5u) {
-        std::fprintf(stderr, "view frames check: view %zu beat %u: %s (id %08x)\n", army, sim.mCurBeat, what, id);
+        std::println(stderr, "view frames check: view {} beat {}: {} (id {:08x})", army, sim.mCurBeat, what, id);
       }
     };
     builder.ForEachRecord([&](const std::uint32_t id, const std::uint32_t slot) {
@@ -879,9 +880,10 @@ namespace faf::remote
             ++propCount;
           } else if ((id >> 28u) == 3u) {
             // A blip's fields too, to tell which of them a difference is in.
-            std::fprintf(
+            std::println(
               mViewDump,
-              "%u %zu %08x %016llx mesh=%x vision=%x radar=%x flags=%x health=%08x max=%08x built=%08x x=%x z=%x\n",
+              "{} {} {:08x} {:016x} mesh={:x} vision={:x} radar={:x} flags={:x} health={:08x} max={:08x} built={:08x} "
+              "x={:x} z={:x}",
               mViewBeat,
               army,
               id,
@@ -897,9 +899,7 @@ namespace faf::remote
               record.position[2]
             );
           } else {
-            std::fprintf(
-              mViewDump, "%u %zu %08x %016llx\n", mViewBeat, army, id, static_cast<unsigned long long>(hash)
-            );
+            std::println(mViewDump, "{} {} {:08x} {:016x}", mViewBeat, army, id, static_cast<unsigned long long>(hash));
           }
         });
       };
@@ -907,9 +907,9 @@ namespace faf::remote
       if (TeamSlotOf(army) != army && !CutFromTeam(army)) {
         dump(TeamSlotOf(army), true);
       }
-      std::fprintf(
+      std::println(
         mViewDump,
-        "%u %zu props %llu %016llx\n",
+        "{} {} props {} {:016x}",
         mViewBeat,
         army,
         static_cast<unsigned long long>(propCount),
@@ -1082,9 +1082,9 @@ namespace faf::remote
             mEntityPointers[entry] != entity
           ) {
             if (++mEntityIndexMismatches <= 5u) {
-              std::fprintf(
+              std::println(
                 stderr,
-                "view frames check: beat %u: the entity index differs from the sim's at id %08x\n",
+                "view frames check: beat {}: the entity index differs from the sim's at id {:08x}",
                 sim.mCurBeat,
                 static_cast<std::uint32_t>(id)
               );
@@ -1097,9 +1097,9 @@ namespace faf::remote
       for (std::size_t i = 0; i < mEntityIndex.size(); ++i) {
         const SEntityFacts facts = ReadEntityFacts(*mEntityPointers[i]);
         if (ViewsKeeping(sim, facts) != mEntityIndex[i].views && ++mEntityIndexMismatches <= 5u) {
-          std::fprintf(
+          std::println(
             stderr,
-            "view frames check: beat %u: entity %08x kept views %08x, a read says %08x (kind %d)\n",
+            "view frames check: beat {}: entity {:08x} kept views {:08x}, a read says {:08x} (kind {})",
             sim.mCurBeat,
             mEntityIndex[i].id,
             mEntityIndex[i].views,

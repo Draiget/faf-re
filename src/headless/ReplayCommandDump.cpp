@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cstring>
 #include <functional>
+#include <print>
 
 // Engine addition, server mode: see ReplayCommandDump.h.
 
@@ -30,7 +31,7 @@ namespace faf::headless
   {
     mFile = std::fopen(path.c_str(), "w");
     if (mFile != nullptr) {
-      std::fprintf(mFile, "# %s army %d\n", lockstep ? "lockstep" : "server-mode", static_cast<int>(army));
+      std::println(mFile, "# {} army {}", lockstep ? "lockstep" : "server-mode", static_cast<int>(army));
     }
   }
 
@@ -158,7 +159,7 @@ namespace faf::headless
     }
     it->second = hash;
     if (mFile != nullptr) {
-      std::fprintf(mFile, "%u %u %s\n", beat, unit, text.c_str());
+      std::println(mFile, "{} {} {}", beat, unit, text);
       ++mLines;
     }
   }
@@ -174,7 +175,7 @@ namespace faf::headless
         continue;
       }
       if (mFile != nullptr) {
-        std::fprintf(mFile, "%u %u gone\n", beat, it->first);
+        std::println(mFile, "{} {} gone", beat, it->first);
         ++mLines;
       }
       mUnitHash.erase(it->first);

@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstdio>
+#include <print>
 
 #include "moho/entity/Entity.h"
 #include "moho/entity/EntityDb.h"
@@ -212,8 +213,8 @@ namespace faf::headless
           (static_cast<std::uint32_t>(view.mode) << 8)
         );
       }
-      std::fprintf(
-        mDigests, "%u %d %u %u %016llx\n", sim.mCurBeat, army, entities, visible, static_cast<unsigned long long>(hash)
+      std::println(
+        mDigests, "{} {} {} {} {:016x}", sim.mCurBeat, army, entities, visible, static_cast<unsigned long long>(hash)
       );
     }
   }

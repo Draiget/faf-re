@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstdio>
+#include <print>
 
 #include "gpg/core/streams/Stream.h"
 #include "lua/LuaObject.h"
@@ -223,11 +224,11 @@ namespace faf::headless
       ++mKeyOrderOnly[opcode];
     } else {
       if (mDiffering[opcode]++ < kLoggedDifferences) {
-        std::printf(
-          "command check: opcode %u differs: replay %s, round trip %s%s\n",
+        std::println(
+          "command check: opcode {} differs: replay {}, round trip {}{}",
           static_cast<unsigned>(opcode),
-          Hex(original).c_str(),
-          Hex(mCaptured.front()).c_str(),
+          Hex(original),
+          Hex(mCaptured.front()),
           mCaptured.size() > 1u ? " (and more)" : ""
         );
       }
