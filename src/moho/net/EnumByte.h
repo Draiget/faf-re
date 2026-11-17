@@ -7,23 +7,11 @@
 namespace moho
 {
   /**
-   * Accept only enums with uint8_t underlying type.
-   * SFINAE-safe for non-enum probes.
+   * Accept only enums with uint8_t underlying type. The conjunction stops at a non-enum, so
+   * `underlying_type_t` is never asked of one.
    */
-  template <class E, class = void>
-  struct IsU8Enum : std::false_type
-  {};
-
   template <class E>
-  struct IsU8Enum<E, std::enable_if_t<std::is_enum_v<E>>> :
-    std::bool_constant<std::is_same_v<std::underlying_type_t<E>, std::uint8_t>>
-  {};
-
-  template <class E>
-  inline constexpr bool IsU8EnumV = IsU8Enum<E>::value;
-
-  template <class E>
-  concept U8Enum = IsU8EnumV<E>;
+  concept U8Enum = std::is_enum_v<E> && std::is_same_v<std::underlying_type_t<E>, std::uint8_t>;
 
   /**
    * Generic one-byte enum wrapper used by binary-facing headers.

@@ -431,24 +431,34 @@ namespace fa
   // Plan WPL.11: no generic forward to the host's libm. Any other argument type is an error
   // here instead of a host call (or a silent conversion to the float overloads above); the
   // caller picks the engine function or, outside the sim, `std::` by name.
-  template <class T, std::enable_if_t<!std::is_same_v<T, float>, int> = 0>
+  template <class T>
+    requires(!std::is_same_v<T, float>)
   float sin(T x) = delete;
-  template <class T, std::enable_if_t<!std::is_same_v<T, float>, int> = 0>
+  template <class T>
+    requires(!std::is_same_v<T, float>)
   float cos(T x) = delete;
-  template <class T, std::enable_if_t<!std::is_same_v<T, float>, int> = 0>
+  template <class T>
+    requires(!std::is_same_v<T, float>)
   float tan(T x) = delete;
-  template <class T, std::enable_if_t<!std::is_same_v<T, float>, int> = 0>
+  template <class T>
+    requires(!std::is_same_v<T, float>)
   float atan(T x) = delete;
-  template <class T, std::enable_if_t<!std::is_same_v<T, float> && !std::is_same_v<T, double>, int> = 0>
+  template <class T>
+    requires(!std::is_same_v<T, float> && !std::is_same_v<T, double>)
   float asin(T x) = delete;
-  template <class T, std::enable_if_t<!std::is_same_v<T, float> && !std::is_same_v<T, double>, int> = 0>
+  template <class T>
+    requires(!std::is_same_v<T, float> && !std::is_same_v<T, double>)
   float acos(T x) = delete;
-  template <class T, std::enable_if_t<!std::is_same_v<T, float>, int> = 0>
+  template <class T>
+    requires(!std::is_same_v<T, float>)
   float exp(T x) = delete;
-  template <class T, std::enable_if_t<!std::is_same_v<T, float>, int> = 0>
+  template <class T>
+    requires(!std::is_same_v<T, float>)
   float log(T x) = delete;
-  template <class Y, class X, std::enable_if_t<!(std::is_same_v<Y, float> && std::is_same_v<X, float>), int> = 0>
+  template <class Y, class X>
+    requires(!(std::is_same_v<Y, float> && std::is_same_v<X, float>))
   float atan2(Y y, X x) = delete;
-  template <class B, class E, std::enable_if_t<!(std::is_same_v<B, float> && std::is_same_v<E, float>), int> = 0>
+  template <class B, class E>
+    requires(!(std::is_same_v<B, float> && std::is_same_v<E, float>))
   float pow(B base, E exponent) = delete;
 } // namespace fa

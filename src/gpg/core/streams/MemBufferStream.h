@@ -65,7 +65,8 @@ namespace gpg
     ~MemBuffer() noexcept = default;
 
     /** Converting copy ctor (e.g. MemBuffer<char> -> MemBuffer<const char>). */
-    template <class U, std::enable_if_t<std::is_convertible_v<U*, type*>, int> = 0>
+    template <class U>
+      requires std::is_convertible_v<U*, type*>
     MemBuffer(
       const MemBuffer<U>& cpy
     ) noexcept
@@ -212,7 +213,8 @@ namespace gpg
     }
 
     /** Converting assignment (e.g. MemBuffer<char> -> MemBuffer<const char>). */
-    template <class U, std::enable_if_t<std::is_convertible_v<U*, type*>, int> = 0>
+    template <class U>
+      requires std::is_convertible_v<U*, type*>
     MemBuffer& operator=(
       const MemBuffer<U>& rhs
     ) noexcept

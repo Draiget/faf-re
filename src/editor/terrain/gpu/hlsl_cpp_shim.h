@@ -353,7 +353,8 @@ using uint4 = emu::Vec4<uint>;
 // Scalars come from <cmath> (using-declarations above) or are defined here; vectors work per component.
 
 template <class T>
-inline std::enable_if_t<std::is_arithmetic_v<T>, T> min(
+  requires std::is_arithmetic_v<T>
+inline T min(
   T a,
   T b
 )
@@ -361,7 +362,8 @@ inline std::enable_if_t<std::is_arithmetic_v<T>, T> min(
   return b < a ? b : a;
 }
 template <class T>
-inline std::enable_if_t<std::is_arithmetic_v<T>, T> max(
+  requires std::is_arithmetic_v<T>
+inline T max(
   T a,
   T b
 )
@@ -369,7 +371,8 @@ inline std::enable_if_t<std::is_arithmetic_v<T>, T> max(
   return a < b ? b : a;
 }
 template <class T>
-inline std::enable_if_t<std::is_arithmetic_v<T>, T> clamp(
+  requires std::is_arithmetic_v<T>
+inline T clamp(
   T v,
   T lo,
   T hi
@@ -378,7 +381,8 @@ inline std::enable_if_t<std::is_arithmetic_v<T>, T> clamp(
   return v < lo ? lo : (v > hi ? hi : v);
 }
 template <class T>
-inline std::enable_if_t<std::is_floating_point_v<T>, T> lerp(
+  requires std::is_floating_point_v<T>
+inline T lerp(
   T a,
   T b,
   T t
@@ -387,7 +391,8 @@ inline std::enable_if_t<std::is_floating_point_v<T>, T> lerp(
   return a + (b - a) * t;
 }
 template <class T>
-inline std::enable_if_t<std::is_floating_point_v<T>, T> mad(
+  requires std::is_floating_point_v<T>
+inline T mad(
   T a,
   T b,
   T c

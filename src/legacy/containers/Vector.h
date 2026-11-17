@@ -2163,7 +2163,8 @@ namespace fa
      * `vector(InputIt,InputIt)` vs. `vector(size_type,const T&)`
      * overload-resolution pitfall).
      */
-    template <class InputIt, class = std::enable_if_t<!std::is_integral_v<InputIt>>>
+    template <class InputIt>
+      requires(!std::is_integral_v<InputIt>)
     vector(
       InputIt first,
       InputIt last

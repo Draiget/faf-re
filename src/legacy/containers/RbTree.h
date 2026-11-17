@@ -1534,7 +1534,8 @@ namespace fa
       {}
 
       /** Implicit non-const to const conversion, as in the standard containers. */
-      template <bool OtherConst, class = std::enable_if_t<IsConst && !OtherConst>>
+      template <bool OtherConst>
+        requires(IsConst && !OtherConst)
       rb_iterator(
         const rb_iterator<Traits, OtherConst>& other
       ) noexcept

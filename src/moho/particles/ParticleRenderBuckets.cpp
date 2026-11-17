@@ -359,16 +359,18 @@ namespace moho
       // The legacy Vector3<float> assignment is three float assignments but
       // lacks noexcept. Audit that body if the vector implementation changes;
       // the whole-particle noexcept trait cannot express this source fact.
-      // A type requirement, unlike the retail-layout static_assert macro,
-      // also checks the owning members in normal x64 builds.
-      using SafeOwnedMembers = std::enable_if_t<
+      // Unlike the retail-layout static_assert macro (x86 only), this also
+      // checks the owning members in normal x64 builds.
+      static_assert(
         std::is_nothrow_move_assignable_v<decltype(SWorldParticle::mTexture)> &&
-        std::is_nothrow_move_assignable_v<decltype(SWorldParticle::mRampTexture)> &&
-        std::is_nothrow_move_assignable_v<decltype(SWorldParticle::mTypeTag)> &&
-        std::is_nothrow_destructible_v<SWorldParticle> &&
-        std::is_same_v<decltype(SWorldParticle::mPos), Wm3::Vector3<float>> &&
-        std::is_same_v<decltype(SWorldParticle::mDir), Wm3::Vector3<float>> &&
-        std::is_same_v<decltype(SWorldParticle::mAccel), Wm3::Vector3<float>>>;
+          std::is_nothrow_move_assignable_v<decltype(SWorldParticle::mRampTexture)> &&
+          std::is_nothrow_move_assignable_v<decltype(SWorldParticle::mTypeTag)> &&
+          std::is_nothrow_destructible_v<SWorldParticle> &&
+          std::is_same_v<decltype(SWorldParticle::mPos), Wm3::Vector3<float>> &&
+          std::is_same_v<decltype(SWorldParticle::mDir), Wm3::Vector3<float>> &&
+          std::is_same_v<decltype(SWorldParticle::mAccel), Wm3::Vector3<float>>,
+        "a particle member's move or destructor can throw, or a vector member changed type"
+      );
 
       ~ParticlePendingCursor() noexcept
       {

@@ -54,7 +54,8 @@ namespace gpg
      * Writes one trivially-copyable scalar by raw bytes.
      */
     template <class TValue>
-    std::enable_if_t<std::is_trivially_copyable_v<TValue>, void> Write(
+      requires std::is_trivially_copyable_v<TValue>
+    void Write(
       const TValue& value
     ) const
     {
