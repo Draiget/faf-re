@@ -1,4 +1,5 @@
 #include "CUnitCommand.h"
+#include <utility>
 #include <algorithm>
 #include <cmath>
 
@@ -541,7 +542,7 @@ CUnitCommand::CUnitCommand(
 
   sim->Logf("Creating command 0x%08x, type=%d\n", mConstDat.cmd, static_cast<int>(mVarDat.mCmdType));
   sim->mContext.Update(&mConstDat.cmd, sizeof(mConstDat.cmd));
-  const std::int32_t commandTypeValue = static_cast<std::int32_t>(mVarDat.mCmdType);
+  const std::int32_t commandTypeValue = std::to_underlying(mVarDat.mCmdType);
   sim->mContext.Update(&commandTypeValue, sizeof(commandTypeValue));
 
   if (!sim->mCommandDB || issueData.unk04 == -1) {
@@ -1467,7 +1468,7 @@ void moho::SimGetCommandQueueInsert(
 )
 {
   LuaPlus::LuaObject& row = command.mLuaObj;
-  row.SetInteger("commandType", static_cast<std::int32_t>(command.mVarDat.mCmdType));
+  row.SetInteger("commandType", std::to_underlying(command.mVarDat.mCmdType));
   row.SetNumber("x", command.mVarDat.mTarget1.mPos.x);
   row.SetNumber("y", command.mVarDat.mTarget1.mPos.y);
   row.SetNumber("z", command.mVarDat.mTarget1.mPos.z);

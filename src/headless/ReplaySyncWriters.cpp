@@ -5,6 +5,7 @@
 #include <cstring>
 #include <map>
 #include <mutex>
+#include <print>
 #include <set>
 #include <string>
 
@@ -200,12 +201,12 @@ end
     if (fopen_s(&file, path.c_str(), "w") != 0 || file == nullptr) {
       return "sync writers: cannot write " + path;
     }
-    std::fprintf(file, "# key\twrites\tcall site (headless --sync-writers)\n");
+    std::println(file, "# key\twrites\tcall site (headless --sync-writers)");
     std::size_t sites = 0;
     std::uint64_t writes = 0;
     for (const auto& [key, bySite] : gWrites) {
       for (const auto& [site, count] : bySite) {
-        std::fprintf(file, "%s\t%llu\t%s\n", key.c_str(), static_cast<unsigned long long>(count), site.c_str());
+        std::println(file, "{}\t{}\t{}", key, static_cast<unsigned long long>(count), site);
         ++sites;
         writes += count;
       }

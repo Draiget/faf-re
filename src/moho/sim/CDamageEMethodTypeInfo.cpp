@@ -1,5 +1,6 @@
 #include "moho/sim/CDamageEMethodTypeInfo.h"
 
+#include <utility>
 #include <cstdlib>
 #include <cstdint>
 #include <new>
@@ -54,11 +55,9 @@ namespace moho
   )
   {
     typeInfo->mPrefix = "CDamage::";
-    typeInfo->AddEnum(
-      typeInfo->StripPrefix("CDamage::SINGLE_TARGET"), static_cast<std::int32_t>(CDamage_SINGLE_TARGET)
-    );
-    typeInfo->AddEnum(typeInfo->StripPrefix("CDamage::AREA_EFFECT"), static_cast<std::int32_t>(CDamage_AREA_EFFECT));
-    typeInfo->AddEnum(typeInfo->StripPrefix("CDamage::RING_EFFECT"), static_cast<std::int32_t>(CDamage_RING_EFFECT));
+    typeInfo->AddEnum(typeInfo->StripPrefix("CDamage::SINGLE_TARGET"), std::to_underlying(CDamage_SINGLE_TARGET));
+    typeInfo->AddEnum(typeInfo->StripPrefix("CDamage::AREA_EFFECT"), std::to_underlying(CDamage_AREA_EFFECT));
+    typeInfo->AddEnum(typeInfo->StripPrefix("CDamage::RING_EFFECT"), std::to_underlying(CDamage_RING_EFFECT));
   }
 
   /**

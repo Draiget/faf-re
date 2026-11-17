@@ -1,4 +1,5 @@
 #pragma once
+#include <utility>
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -26,9 +27,9 @@ namespace gpg
     Warn = 2,
   };
 
-  inline constexpr int kDebug = static_cast<int>(LogSeverity::Debug);
-  inline constexpr int kInfo = static_cast<int>(LogSeverity::Info);
-  inline constexpr int kWarn = static_cast<int>(LogSeverity::Warn);
+  inline constexpr int kDebug = std::to_underlying(LogSeverity::Debug);
+  inline constexpr int kInfo = std::to_underlying(LogSeverity::Info);
+  inline constexpr int kWarn = std::to_underlying(LogSeverity::Warn);
 
   class LogTarget;
 

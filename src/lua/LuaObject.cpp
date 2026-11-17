@@ -8,7 +8,6 @@
 #include <thread>
 #include <mutex>
 #include <atomic>
-#include <xmmintrin.h>
 #include <bit>
 #include <algorithm>
 #include <cerrno>
@@ -20,6 +19,7 @@
 #include <cstdarg>
 #include <cstdint>
 #include <cstdlib>
+#include <span>
 #include <cstring>
 #include <ctime>
 #include <io.h>

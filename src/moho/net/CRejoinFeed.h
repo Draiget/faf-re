@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <cstdint>
+#include <expected>
 #include <memory>
 #include <vector>
 
@@ -219,8 +220,8 @@ namespace moho
    * first one for the game's recording. Client indices are the command sources, as
    * `BuildLaunchInfo` assigns them. `REJOIN_PollSetup` does the rest, once a frame.
    */
-  [[nodiscard]] bool
-  REJOIN_BeginSetup(const char* peers, int localSource, unsigned short localPort, fa::string* failureReason);
+  [[nodiscard]] std::expected<void, fa::string>
+  REJOIN_BeginSetup(const char* peers, int localSource, unsigned short localPort);
 
   /// Whether `REJOIN_BeginSetup` has started something `REJOIN_PollSetup` hasn't finished.
   [[nodiscard]] bool REJOIN_SetupPending();

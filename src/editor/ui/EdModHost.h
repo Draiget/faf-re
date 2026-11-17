@@ -2,6 +2,7 @@
 
 #include "editor/doc/EdEditorMods.h"
 
+#include <expected>
 #include <filesystem>
 #include <functional>
 #include <memory>
@@ -128,11 +129,11 @@ namespace faf::editor
       mActiveTool.clear();
     }
     /** What the mods' map writes and reads go through (the view's; set by the app). */
-    std::function<bool(int x0, int z0, int w, int h, const std::vector<float>& heights, std::string& message)>
+    std::function<std::expected<void, std::string>(int x0, int z0, int w, int h, const std::vector<float>& heights)>
       writeHeights;
     std::function<float(int layer, float x, float z)> layerAt;
     std::function<
-      bool(int layer, int x0, int z0, int w, int h, const std::vector<float>& weights, std::string& message)>
+      std::expected<void, std::string>(int layer, int x0, int z0, int w, int h, const std::vector<float>& weights)>
       writeLayer;
     std::function<bool(int& width, int& height)> paintSize;
     /** A prop, decal or unit as the mods see it. */
@@ -157,8 +158,8 @@ namespace faf::editor
      * `uid<TAB>key<TAB>value` line each; written at once (not part of the map's undo). Empty: none.
      */
     [[nodiscard]] std::string MapData(const std::string& uid, const std::string& key) const;
-    bool
-    SetMapData(const std::string& uid, const std::string& key, const std::string& value, bool remove, std::string& why);
+    [[nodiscard]] std::expected<void, std::string>
+    SetMapData(const std::string& uid, const std::string& key, const std::string& value, bool remove);
     /** Each frame: the shown panels of the running mods. */
     void DrawPanels();
     /** The menu entries the running mods asked for, and their panels' show commands. */

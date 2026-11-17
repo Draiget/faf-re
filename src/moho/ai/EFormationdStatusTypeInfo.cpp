@@ -1,5 +1,6 @@
 #include "moho/ai/EFormationdStatusTypeInfo.h"
 
+#include <utility>
 #include <cstdlib>
 #include <cstdint>
 #include <new>
@@ -86,10 +87,8 @@ namespace moho
   {
     mPrefix = "FORMATIONSTATUS_";
 
-    AddEnum(
-      StripPrefix("FORMATIONSTATUS_FormationUpdated"), static_cast<std::int32_t>(FORMATIONSTATUS_FormationUpdated)
-    );
-    AddEnum(StripPrefix("FORMATIONSTATUS_FormationAtGoal"), static_cast<std::int32_t>(FORMATIONSTATUS_FormationAtGoal));
+    AddEnum(StripPrefix("FORMATIONSTATUS_FormationUpdated"), std::to_underlying(FORMATIONSTATUS_FormationUpdated));
+    AddEnum(StripPrefix("FORMATIONSTATUS_FormationAtGoal"), std::to_underlying(FORMATIONSTATUS_FormationAtGoal));
   }
 } // namespace moho
 

@@ -5,6 +5,8 @@
 // Build: cmake --build --preset clang-x64-release --target faf_netchannel_tests
 // Run:   build\clang-x64-release\tests\remote\faf_netchannel_tests.exe --gtest_filter=*StreamCompression*
 
+#include <print>
+#include <utility>
 #include <cstdint>
 #include <cstdio>
 #include <random>
@@ -40,7 +42,7 @@ namespace
     for (int beat = 0; beat < count; ++beat) {
       std::vector<std::uint8_t> message;
       ByteWriter writer(message);
-      writer.Byte(static_cast<std::uint8_t>(beat % 7 == 3 ? ESeatMessage::LuaSync : ESeatMessage::View));
+      writer.Byte(std::to_underlying(beat % 7 == 3 ? ESeatMessage::LuaSync : ESeatMessage::View));
       writer.Varint(static_cast<std::uint64_t>(beat));
       if (beat % 11 == 5) {
         writer.Byte(0u); // tiny: under kCompressMinBytes
@@ -69,7 +71,7 @@ TEST(
 {
   const std::vector<std::uint8_t> offer = WriteCompressOffer(17);
   ASSERT_FALSE(offer.empty());
-  EXPECT_EQ(offer[0], static_cast<std::uint8_t>(ESeatMessage::CompressOffer));
+  EXPECT_EQ(offer[0], std::to_underlying(ESeatMessage::CompressOffer));
   EXPECT_EQ(ReadCompressOffer(offer.data(), offer.size()), std::optional<int>(17));
   EXPECT_EQ(ReadCompressOffer(WriteCompressOffer().data(), 3u), std::optional<int>(kDecompressionWindowLogMax));
 
@@ -81,7 +83,7 @@ TEST(
   const std::vector<std::uint8_t> tiny = WriteCompressOffer(9);
   EXPECT_FALSE(ReadCompressOffer(tiny.data(), tiny.size()).has_value());
   std::vector<std::uint8_t> other = offer;
-  other[0] = static_cast<std::uint8_t>(ESeatMessage::Chat);
+  other[0] = std::to_underlying(ESeatMessage::Chat);
   EXPECT_FALSE(ReadCompressOffer(other.data(), other.size()).has_value());
 
   // Fields after the ones this end knows are left alone.
@@ -110,15 +112,15 @@ TEST(
       }
       ASSERT_TRUE(compressor.Compress(message.data(), message.size(), piece));
       ASSERT_FALSE(piece.empty());
-      EXPECT_EQ(piece[0], static_cast<std::uint8_t>(ESeatMessage::Compressed));
+      EXPECT_EQ(piece[0], std::to_underlying(ESeatMessage::Compressed));
       ASSERT_TRUE(decompressor.Decompress(piece.data(), piece.size(), kMaxMessage, back)) << "level " << level;
       ASSERT_EQ(back, message);
       raw += message.size();
       packed += piece.size();
     }
     EXPECT_LT(packed, raw * 7u / 10u) << "level " << level << " leaves " << packed << " of " << raw;
-    std::printf(
-      "level %d: %llu of %llu bytes (%.1f %%), compressor %zu KB, decompressor %zu KB\n",
+    std::println(
+      "level {}: {} of {} bytes ({:.1f} %), compressor {} KB, decompressor {} KB",
       level,
       static_cast<unsigned long long>(packed),
       static_cast<unsigned long long>(raw),
@@ -146,12 +148,12 @@ TEST(
   std::vector<std::uint8_t> piece;
   std::vector<std::uint8_t> back;
   // Past the window (a whole view after a reconnect), noise that grows under zstd, and a message after each.
-  for (const std::size_t size : {std::size_t{3u << 20}, std::size_t{1u << 20}, std::size_t{70000u}, std::size_t{40u}}) {
+  for (const std::size_t size : {std::size_t{3u << 20}, std::size_t{1u << 20}, 70000uz, 40uz}) {
     std::vector<std::uint8_t> message(size);
     for (std::size_t i = 0; i < size; ++i) {
       message[i] = static_cast<std::uint8_t>(size == (1u << 20) ? random() : (i % 251u) ^ (i >> 12));
     }
-    message[0] = static_cast<std::uint8_t>(ESeatMessage::View);
+    message[0] = std::to_underlying(ESeatMessage::View);
     ASSERT_TRUE(compressor.Compress(message.data(), message.size(), piece));
     ASSERT_TRUE(decompressor.Decompress(piece.data(), piece.size(), kMaxMessage, back)) << size;
     ASSERT_EQ(back, message) << size;
@@ -182,7 +184,7 @@ TEST(
   {
     CStreamDecompressor decompressor;
     std::vector<std::uint8_t> wrong = pieces[0];
-    wrong[0] = static_cast<std::uint8_t>(ESeatMessage::View);
+    wrong[0] = std::to_underlying(ESeatMessage::View);
     EXPECT_FALSE(decompressor.Decompress(wrong.data(), wrong.size(), kMaxMessage, back));
   }
   // Says it is larger than the channel takes: refused before anything is made.
@@ -198,7 +200,7 @@ TEST(
     const std::uint64_t size = reader.Varint();
     std::vector<std::uint8_t> lying;
     ByteWriter writer(lying);
-    writer.Byte(static_cast<std::uint8_t>(ESeatMessage::Compressed));
+    writer.Byte(std::to_underlying(ESeatMessage::Compressed));
     writer.Varint(static_cast<std::uint64_t>(static_cast<std::int64_t>(size) + delta));
     const std::size_t at = pieces[0].size() - reader.Remaining();
     writer.Bytes(pieces[0].data() + at, pieces[0].size() - at);

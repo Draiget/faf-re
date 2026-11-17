@@ -724,7 +724,7 @@ int LuaIoToString(
 
   char description[128]{};
   if (wrapFile->stream != nullptr) {
-    std::sprintf(description, "%p", static_cast<void*>(wrapFile));
+    std::snprintf(description, sizeof(description), "%p", static_cast<void*>(wrapFile));
   } else {
     std::strcpy(description, "closed");
   }
@@ -943,10 +943,22 @@ int io_tmpname(
   lua_State* const state
 )
 {
-  char tempName[16]{};
+#if FAFRE_PLATFORM_WINDOWS
+  char tempName[L_tmpnam]{};
   if (std::tmpnam(tempName) != tempName) {
     return luaL_error(state, "unable to generate a unique filename in `tmpname'");
   }
+#else
+  // POSIX names a temporary file with mkstemp, which also creates it so no other process can take
+  // the name first (Lua 5.1's POSIX build does the same); tmpnam is deprecated there, and its name
+  // didn't fit the binary's 16 bytes on macOS (L_tmpnam is 1024).
+  char tempName[] = "/tmp/lua_XXXXXX";
+  const int descriptor = ::mkstemp(tempName);
+  if (descriptor == -1) {
+    return luaL_error(state, "unable to generate a unique filename in `tmpname'");
+  }
+  (void)::close(descriptor);
+#endif
 
   lua_pushstring(state, tempName);
   return 1;
@@ -1026,7 +1038,7 @@ int LuaWriteToFile(
         const double value = lua_tonumber(state, firstArgumentIndex);
         // Plan WPL.17: the Windows CRT's NaN text (LuaNumberText.h).
         char rendered[64];
-        (void)lua::FormatNumberLikeWindowsCrt(rendered, "%.14g", value);
+        (void)lua::FormatNumberLikeWindowsCrt(rendered, sizeof(rendered), "%.14g", value);
         writeSucceeded = std::fputs(rendered, stream) >= 0 ? 1 : 0;
       }
     } else if (lua_type(state, firstArgumentIndex) == LUA_TSTRING) {

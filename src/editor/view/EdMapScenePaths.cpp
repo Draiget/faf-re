@@ -200,14 +200,13 @@ namespace faf::editor
         continue;
       }
       const auto it = mDocument.PathsNow().results.find(id);
-      KeptPathPlan plan;
-      std::string error;
-      if (!BuildKeptPath(
-            *path, ground, it != mDocument.PathsNow().results.end() ? it->second.get() : nullptr, false, plan, error
-          )) {
+      const auto built =
+        BuildKeptPath(*path, ground, it != mDocument.PathsNow().results.end() ? it->second.get() : nullptr, false);
+      if (!built) {
         mDocument.Heights().EndStroke(field->data);
-        return "Preview: " + error;
+        return "Preview: " + built.error();
       }
+      const KeptPathPlan& plan = *built;
       const SampleRect rect{plan.x0, plan.z0, plan.x1, plan.z1};
       mDocument.Heights().BeforeWrite(field->data, rect);
       const int w = plan.x1 - plan.x0 + 1;
@@ -374,12 +373,13 @@ namespace faf::editor
         continue;
       }
       const auto it = mDocument.PathsNow().results.find(id);
-      KeptPathPlan plan;
-      if (!BuildKeptPath(
-            *path, ground, it != mDocument.PathsNow().results.end() ? it->second.get() : nullptr, true, plan, error
-          )) {
+      auto built =
+        BuildKeptPath(*path, ground, it != mDocument.PathsNow().results.end() ? it->second.get() : nullptr, true);
+      if (!built) {
+        error = built.error();
         break;
       }
+      KeptPathPlan& plan = *built;
       const SampleRect rect{plan.x0, plan.z0, plan.x1, plan.z1};
       mDocument.Heights().BeforeWrite(field->data, rect);
       const int w = plan.x1 - plan.x0 + 1;
@@ -978,8 +978,7 @@ namespace faf::editor
     const std::vector<Pad> pads = SkeletonPads(starts, settings, padSettings, groundOf);
     if (!pads.empty()) {
       PadResult unused;
-      std::string error;
-      (void)ApplyPads(copy.data(), width, height, 1.0f / 128.0f, pads, padSettings, PadResult{}, unused, error);
+      (void)ApplyPads(copy.data(), width, height, 1.0f / 128.0f, pads, padSettings, PadResult{}, unused);
     }
     EdDocument::PathsState before = mDocument.PathsNow();
     EdDocument::PathsState& state = mDocument.EditPaths();
@@ -1055,26 +1054,17 @@ namespace faf::editor
       }
       mDocument.Heights().BeforeWrite(field->data, whole);
       PadResult result;
-      std::string error;
       if (list.empty()) {
         (void)RemovePads(words, width, height, 1.0f / 128.0f, *padsNow);
         padsNow = nullptr;
       } else if (
-        ApplyPads(
-          words,
-          width,
-          height,
-          1.0f / 128.0f,
-          list,
-          padSettings,
-          padsNow != nullptr ? *padsNow : PadResult{},
-          result,
-          error
-        ) >= 0
+        const auto applied = ApplyPads(
+          words, width, height, 1.0f / 128.0f, list, padSettings, padsNow != nullptr ? *padsNow : PadResult{}, result
+        )
       ) {
         padsNow = std::make_shared<const PadResult>(std::move(result));
       } else {
-        padNote = " Pads: " + error + ".";
+        padNote = " Pads: " + applied.error() + ".";
       }
       rects.push_back(whole);
     };
@@ -1105,8 +1095,7 @@ namespace faf::editor
         args.p.str["kind"] = "reach";
         args.p.num["soft"] = 4.0;
         field::Grid mk;
-        std::string error;
-        if (field::RunOp("path_mask", args, mk, error)) {
+        if (field::RunOp("path_mask", args, mk)) {
           for (std::size_t k = 0; k < mask->v.size(); ++k) {
             mask->v[k] = std::max(mask->v[k], mk.v[k]);
           }
@@ -1125,9 +1114,9 @@ namespace faf::editor
       args.p.str["mode"] = "both";
       args.p.num["balance"] = 0.5;
       field::Grid out;
-      std::string error;
-      if (!field::RunOp("slope_limit", args, out, error) || out.v.size() != H->v.size()) {
-        padNote += " Smoothing: " + error + ".";
+      const auto ran = field::RunOp("slope_limit", args, out);
+      if (!ran || out.v.size() != H->v.size()) {
+        padNote += " Smoothing: " + (ran ? std::string() : ran.error()) + ".";
         return;
       }
       mDocument.Heights().BeforeWrite(field->data, whole);

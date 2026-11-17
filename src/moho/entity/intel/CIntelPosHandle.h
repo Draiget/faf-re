@@ -151,7 +151,7 @@ namespace moho
     std::shared_ptr<CIntelGrid> mGrid; // +0x1C (px, pi)
   };
 
-#if defined(_M_IX86)
+#if FAFRE_ARCH_X86
   static_assert(sizeof(CIntelPosHandle) == 0x24, "CIntelPosHandle size must be 0x24");
   static_assert(offsetof(CIntelPosHandle, mGrid) == 0x1C, "CIntelPosHandle::mGrid offset must be 0x1C");
 #endif

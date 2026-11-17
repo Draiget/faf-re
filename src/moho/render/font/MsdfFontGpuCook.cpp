@@ -578,9 +578,8 @@ void CookFontCS(uint3 id : SV_DispatchThreadID)
     );
   }
 
-  bool MSDF_CookOnGpu(
-    MsdfCookPlan& plan,
-    std::string& error
+  std::expected<void, std::string> MSDF_CookOnGpu(
+    MsdfCookPlan& plan
   )
   {
     Job job;
@@ -592,8 +591,7 @@ void CookFontCS(uint3 id : SV_DispatchThreadID)
     {
       std::unique_lock<std::mutex> lock(cooker.mMutex);
       if (cooker.mCancelled) {
-        error = "shutting down";
-        return false;
+        return std::unexpected("shutting down");
       }
       cooker.mJob = &job;
       cooker.mHasJob.store(true, std::memory_order_release);
@@ -603,13 +601,11 @@ void CookFontCS(uint3 id : SV_DispatchThreadID)
       cooker.mJob = nullptr;
       cooker.mHasJob.store(false, std::memory_order_release);
       if (!finished || !job.mDone) {
-        error = "no frames came to run it on";
-        return false;
+        return std::unexpected("no frames came to run it on");
       }
     }
     if (job.mFailed) {
-      error = job.mError;
-      return false;
+      return std::unexpected(job.mError);
     }
 
     // The error correction stays on this thread: it compares neighbouring texels, and it's the slow part left.
@@ -618,7 +614,7 @@ void CookFontCS(uint3 id : SV_DispatchThreadID)
         plan.StoreGlyphField(i, job.mFields[i]);
       }
     }
-    return true;
+    return {};
   }
 
   void MSDF_TickGpuCook()

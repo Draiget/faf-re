@@ -8,6 +8,7 @@
 
 #include <array>
 #include <cstdint>
+#include <expected>
 #include <functional>
 #include <map>
 #include <memory>
@@ -95,24 +96,24 @@ namespace faf::editor
     std::array<float, 3> shadowFill{0.0f, 0.0f, 0.0f};
     /**
      * Heights from another tool over the whole map, in map units (`file` empty: the Import / Export window's file),
-     * mapped as that window says; false with `error` when there is none or it can't be read. `externalKey` changes when
-     * the window's file, its stamp or the mapping does.
+     * mapped as that window says; the error when there is none or it can't be read. `externalKey` changes when the
+     * window's file, its stamp or the mapping does.
      */
-    std::function<bool(const std::string& file, field::Grid& out, std::string& error)> loadExternal;
+    std::function<std::expected<void, std::string>(const std::string& file, field::Grid& out)> loadExternal;
     /**
      * A named mask another tool exported beside the Import / Export window's heightmap (flow, wear, deposit...), 0..1
-     * over the whole map; false with `error` when there is none.
+     * over the whole map; the error when there is none.
      */
-    std::function<bool(const std::string& name, field::Grid& out, std::string& error)> loadExternalMask;
+    std::function<std::expected<void, std::string>(const std::string& name, field::Grid& out)> loadExternalMask;
     std::string externalKey;
     /**
      * What texture layer `layer` (1..8) covers now, 0..1 at the masks' size (FAF Studio's Texture layer source), and a
-     * key that changes with the paint; false with `error` without a map.
+     * key that changes with the paint; the error without a map.
      */
-    std::function<bool(int layer, field::Grid& out, std::string& error)> layerMask;
+    std::function<std::expected<void, std::string>(int layer, field::Grid& out)> layerMask;
     std::string paintKey;
-    /** A 16 bit grey image over the whole map, 0..1 (FAF Studio's Image source); false with `error`. */
-    std::function<bool(const std::string& file, field::Grid& out, std::string& error)> loadImage;
+    /** A 16 bit grey image over the whole map, 0..1 (FAF Studio's Image source); or the error. */
+    std::function<std::expected<void, std::string>(const std::string& file, field::Grid& out)> loadImage;
     /**
      * The Layout workspace's drawing (null: none) for the Map layout nodes, a key that changes with it and the editor's
      * symmetry, and that symmetry as the symmetrize op's mode ("" none) about the map's middle.
@@ -211,14 +212,13 @@ namespace faf::editor
      * (layer -> field on this run's grid, `heights` its shape), overlaps settled by the kinds' priority, the base layer
      * what is left, the layers of a kind with no link cleared. False (and `error` empty) when the graph has none.
      */
-    /** Everything a Build writes besides the heights (`heights`: the run's grid, for the kinds' resolution). False with
-     * `error` when the ground kinds can't be resolved. */
-    bool BuildWrites(
+    /** Everything a Build writes besides the heights (`heights`: the run's grid, for the kinds' resolution). The error
+     * when the ground kinds can't be resolved. */
+    [[nodiscard]] std::expected<void, std::string> BuildWrites(
       const NodeGraph& graph,
       const TerrainGround& ground,
       const field::Grid& heights,
-      TerrainBuildWrites& writes,
-      std::string& error
+      TerrainBuildWrites& writes
     ) const;
     bool KindsPaint(
       const NodeGraph& graph,
@@ -337,7 +337,7 @@ namespace faf::editor
     std::vector<std::string> unknownTypes; // node types this editor doesn't have (those nodes are left out)
     int droppedLinks = 0;                  // links to or from left-out nodes or unknown pins
   };
-  bool ReadStudioGraph(const std::string& text, NodeGraph& graph, StudioGraphFacts& facts, std::string& error);
+  [[nodiscard]] std::expected<StudioGraphFacts, std::string> ReadStudioGraph(const std::string& text, NodeGraph& graph);
 
   /** The graphs the editor ships (Studio's graphpresets with their index): id, title, what it makes, the file. */
   struct ShippedGraph
@@ -356,12 +356,11 @@ namespace faf::editor
   [[nodiscard]] std::string
   SaveTerrainGraph(const NodeGraph& graph, int seed, const std::string& name, const std::string& symmetry = "map");
   /** `symmetry` (when given) gets the saved setting, "map" for a file without one. */
-  bool LoadTerrainGraph(
+  [[nodiscard]] std::expected<void, std::string> LoadTerrainGraph(
     const std::string& text,
     NodeGraph& graph,
     int& seed,
     std::string& name,
-    std::string& error,
     std::string* symmetry = nullptr
   );
 

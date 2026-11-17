@@ -11,7 +11,7 @@
 
 #include <SDL3/SDL.h>
 
-#include <windows.h>
+#include <Windows.h>
 #include <commctrl.h>
 
 #include "platform/Window.h"
@@ -191,6 +191,18 @@ namespace platform::window::sdl
     // GetKeyState reads Windows' own keyboard state.
     (void)virtualKey;
     (void)down;
+  }
+
+  bool IsSystemShortcut(
+    const int virtualKey,
+    const unsigned int sdlModifiers
+  )
+  {
+    // Windows keeps its Windows-key combinations from the game itself (and WinApp's keyboard hook
+    // the Windows key alone).
+    (void)virtualKey;
+    (void)sdlModifiers;
+    return false;
   }
 
   void OnCursorMoved(

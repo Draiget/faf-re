@@ -8,7 +8,7 @@
 #include <cwchar>
 #include <mutex>
 #include <span>
-#include <windows.h>
+#include <Windows.h>
 #if FAFRE_PLATFORM_WINDOWS
 #include <objbase.h>
 #endif

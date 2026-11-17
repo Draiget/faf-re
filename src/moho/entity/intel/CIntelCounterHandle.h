@@ -133,7 +133,7 @@ namespace moho
     EIntelCounter mType;  // +0x2C
   };
 
-#if defined(_M_IX86)
+#if FAFRE_ARCH_X86
   static_assert(sizeof(CIntelCounterHandle) == 0x30, "CIntelCounterHandle size must be 0x30");
   static_assert(offsetof(CIntelCounterHandle, mSim) == 0x24, "CIntelCounterHandle::mSim offset must be 0x24");
   static_assert(offsetof(CIntelCounterHandle, mReconDB) == 0x28, "CIntelCounterHandle::mReconDB offset must be 0x28");

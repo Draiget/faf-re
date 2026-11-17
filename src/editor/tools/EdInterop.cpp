@@ -244,20 +244,19 @@ namespace faf::editor
     return f;
   }
 
-  bool ImportFromSidecar(
+  std::expected<void, std::string> ImportFromSidecar(
     const std::string& json,
-    ImportSettings& settings,
-    std::string& error
+    ImportSettings& settings
   )
   {
-    JsonTree root;
-    if (!ParseJsonTree(json, root, error)) {
-      return false;
+    const auto parsed = ParseJsonTree(json);
+    if (!parsed) {
+      return std::unexpected(parsed.error());
     }
+    const JsonTree& root = *parsed;
     const double perWord = root.Num("heightPerWord", 0.0);
     if (perWord <= 0.0) {
-      error = "it has no heightPerWord (not one of the editor's exports)";
-      return false;
+      return std::unexpected("it has no heightPerWord (not one of the editor's exports)");
     }
     settings.mapping = ImportSettings::Mapping::Absolute;
     settings.scale = static_cast<float>(perWord * 128.0);
@@ -265,7 +264,7 @@ namespace faf::editor
     settings.seaPin = false;
     settings.low = static_cast<float>(root.Num("lowest", settings.low));
     settings.high = static_cast<float>(root.Num("highest", settings.high));
-    return true;
+    return {};
   }
 
   std::string ExportSheet(

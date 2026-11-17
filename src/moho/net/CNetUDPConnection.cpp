@@ -1,5 +1,6 @@
 ﻿// ReSharper disable CppTooWideScope
 #include "CNetUDPConnection.h"
+#include <utility>
 #include <algorithm>
 #include <bit>
 #include <cstddef>
@@ -165,7 +166,7 @@ void CNetUDPConnection::Write(
 
   // Engine addition (wld_PreciseSharedStart): the ready message is timed when it leaves (SendPacket).
   if (
-    len != 0 && begin[0] == static_cast<uint8_t>(EClientMsg::CLIMSG_Ready) &&
+    len != 0 && begin[0] == std::to_underlying(EClientMsg::CLIMSG_Ready) &&
     std::find(gReadyAwaitingDeparture.begin(), gReadyAwaitingDeparture.end(), this) == gReadyAwaitingDeparture.end()
   ) {
     gReadyAwaitingDeparture.push_back(this);
@@ -1677,7 +1678,7 @@ void CNetUDPConnection::DispatchFromInput()
 
   while (mMessage.Read(&mInputBuffer)) {
     const ELobbyMsg streamMsg = mMessage.GetType();
-    const auto msgType = static_cast<uint8_t>(streamMsg);
+    const auto msgType = std::to_underlying(streamMsg);
 
     // Types 200..209 are connection events this side makes up; no peer sends
     // them. The only genuine one in the stream is the ConnMade that

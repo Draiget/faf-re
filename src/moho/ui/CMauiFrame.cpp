@@ -1,7 +1,149 @@
 #include "moho/ui/UiPrivate.h"
 
+#include <unordered_map>
+
+#include "gpg/gal/RenderProfiler.h"
+
 namespace
 {
+  /*
+   * FAF instrumentation (FAF_GPU_PROFILE), not in the binary: time spent in controls'
+   * Frame callbacks, totalled per Lua function prototype and engine control class, so
+   * every closure made by one line of script (one per map marker, say) adds to one entry
+   * named by its source line, and controls whose engine Frame does the work behind an
+   * empty script OnFrame (maui's default) are told apart by class. The 15 costliest are
+   * logged with each profile block.
+   */
+  struct OnFrameSite
+  {
+    std::string name;
+    std::int64_t ticks = 0;
+    std::uint64_t calls = 0U;
+  };
+
+  struct OnFrameSiteKey
+  {
+    const void* function = nullptr;
+    const void* controlClass = nullptr;
+
+    bool operator==(const OnFrameSiteKey&) const = default;
+  };
+
+  struct OnFrameSiteKeyHash
+  {
+    std::size_t operator()(
+      const OnFrameSiteKey& key
+    ) const noexcept
+    {
+      return std::hash<const void*>{}(key.function) * 31U ^ std::hash<const void*>{}(key.controlClass);
+    }
+  };
+
+  std::unordered_map<OnFrameSiteKey, OnFrameSite, OnFrameSiteKeyHash>& OnFrameSites()
+  {
+    static std::unordered_map<OnFrameSiteKey, OnFrameSite, OnFrameSiteKeyHash> sSites;
+    return sSites;
+  }
+
+  void LogOnFrameSites(
+    const double frames
+  )
+  {
+    std::vector<OnFrameSite*> sorted;
+    for (auto& entry : OnFrameSites()) {
+      if (entry.second.calls != 0U) {
+        sorted.push_back(&entry.second);
+      }
+    }
+    std::sort(sorted.begin(), sorted.end(), [](const OnFrameSite* a, const OnFrameSite* b) {
+      return a->ticks > b->ticks;
+    });
+    constexpr std::size_t kLogged = 15U;
+    for (std::size_t index = 0; index < sorted.size() && index < kLogged; ++index) {
+      const OnFrameSite& site = *sorted[index];
+      gpg::Logf(
+        "  onframe %-72s %7.2f calls %8.4f ms per frame",
+        site.name.c_str(),
+        static_cast<double>(site.calls) / frames,
+        gpg::gal::RenderProfiler::TicksToMilliseconds(site.ticks) / frames
+      );
+    }
+    for (OnFrameSite* const site : sorted) {
+      site->ticks = 0;
+      site->calls = 0U;
+    }
+  }
+
+  /** The key and name of the script function `control` runs as OnFrame. */
+  OnFrameSite& FindOnFrameSite(
+    moho::CMauiControl* const control
+  )
+  {
+    LuaPlus::LuaObject function{};
+    control->FindScript(&function, "OnFrame");
+    const std::type_info& controlClass = typeid(*control);
+    OnFrameSiteKey key{nullptr, &controlClass};
+    if (function.IsFunction()) {
+      const auto* const closure = static_cast<const Closure*>(function.m_object.value.p);
+      key.function =
+        closure->c.isC != 0U ? reinterpret_cast<const void*>(closure->c.f) : static_cast<const void*>(closure->l.p);
+    }
+    auto& sites = OnFrameSites();
+    auto found = sites.find(key);
+    if (found != sites.end()) {
+      return found->second;
+    }
+    OnFrameSite site;
+    site.name = "<no script OnFrame>";
+    if (key.function != nullptr) {
+      site.name = "<C function>";
+      LuaPlus::LuaState* const state = function.GetActiveState();
+      if (state != nullptr && state->m_state != nullptr) {
+        function.PushStack(state);
+        lua_Debug info{};
+        if (lua_getinfo(state->m_state, ">S", &info) != 0 && info.linedefined > 0 && info.source != nullptr) {
+          // The path inside the game's archive ("lua\ui\game\unitview.lua"); a loose file (a mod, a hook
+          // folder) keeps its last 70 characters, which hold the mod's folder.
+          std::string source = info.source[0] == '@' ? info.source + 1 : info.source;
+          for (const char* const archive : {".nx2\\", ".nx2/", ".scd\\", ".scd/"}) {
+            if (const std::size_t at = source.rfind(archive); at != std::string::npos) {
+              source.erase(0, at + std::strlen(archive));
+              break;
+            }
+          }
+          if (source.size() > 70U) {
+            source = "..." + source.substr(source.size() - 67U);
+          }
+          site.name = source + ":" + std::to_string(info.linedefined);
+        }
+      }
+    }
+    // "class moho::CMauiBitmap" -> " CMauiBitmap"
+    std::string className = controlClass.name();
+    if (const std::size_t colon = className.rfind(':'); colon != std::string::npos) {
+      className.erase(0, colon + 1U);
+    } else if (const std::size_t space = className.rfind(' '); space != std::string::npos) {
+      className.erase(0, space + 1U);
+    }
+    site.name += " " + className;
+    if (sites.empty()) {
+      gpg::gal::RenderProfiler::Get().AddReportHook(&LogOnFrameSites);
+    }
+    return sites.emplace(key, std::move(site)).first->second;
+  }
+
+  void ProfiledControlFrame(
+    moho::CMauiControl* const control,
+    const float deltaSeconds
+  )
+  {
+    OnFrameSite& site = FindOnFrameSite(control);
+    const std::int64_t start = gpg::gal::RenderProfiler::NowTicks();
+    control->Frame(deltaSeconds);
+    site.ticks += gpg::gal::RenderProfiler::NowTicks() - start;
+    ++site.calls;
+  }
+
   constexpr const char* kCMauiFrameGetTopmostDepthHelpText = "float GetTopmostDepth()";
   constexpr const char* kCMauiFrameGetTargetHeadHelpText = "int GetTargetHead()";
   constexpr const char* kCMauiFrameSetTargetHeadHelpText = "CMauiFrame:SetTargetHead(targetHead)";
@@ -317,6 +459,7 @@ void moho::CMauiFrame::RenderChildControls(
       continue;
     }
 
+    FAF_PROFILE_COUNT("ui.rendered", 1);
     childControl->DoRender(primBatcher, drawMask);
   }
 }
@@ -483,79 +626,35 @@ void moho::CMauiFrame::Frame(
   // cannot tear down the root while they're still iterating.
   std::shared_ptr<CMauiFrame> selfLock(mSelfWeak);
 
-  static int sProbeCalls = 0;
-  static int sProbeBudget = 0;
-  int probeVisited = 0;
-  int probeTicked = 0;
-  int probeInvisible = 0;
+  // FAF instrumentation (FAF_GPU_PROFILE), not in the binary: the walk's size and
+  // each OnFrame callback's time by the source line that defines it.
+  const bool profiling = gpg::gal::RenderProfiler::Enabled();
+  std::uint32_t visited = 0U;
+  std::uint32_t invisible = 0U;
+  std::uint32_t ticked = 0U;
 
   CMauiControl* nextControl = DepthFirstSuccessor(this);
   while (nextControl != nullptr) {
     CMauiControl* const currentControl = nextControl;
     nextControl = currentControl->DepthFirstSuccessor(this);
 
-    ++probeVisited;
+    ++visited;
     if (currentControl->mInvisible) {
-      ++probeInvisible;
+      ++invisible;
     }
     if (!currentControl->mInvisible && currentControl->mNeedsFrameUpdate) {
-      ++probeTicked;
-      currentControl->Frame(deltaSeconds);
-    }
-  }
-
-  // Report the peak tree size seen since the last report too, so a large
-  // in-game UI on a sibling frame cannot hide behind sampling aliasing.
-  static int sProbePeakVisited = 0;
-  if (probeVisited > sProbePeakVisited) {
-    sProbePeakVisited = probeVisited;
-  }
-
-  if (probeVisited > 100) {
-    static bool sDumpedTree = false;
-    if (!sDumpedTree) {
-      sDumpedTree = true;
-      int dumped = 0;
-      for (CMauiControl* cursor = DepthFirstSuccessor(this); cursor != nullptr && dumped < 40;
-           cursor = cursor->DepthFirstSuccessor(this)) {
-        const fa::string name = cursor->GetDebugName();
-        char line[224];
-        sprintf_s(
-          line,
-          sizeof(line),
-          "[TREEDUMP] %02d name=%.50s pass=%d alpha=%d/1000 hidden=%d invis=%d depth=%d rendered=%d\n",
-          dumped,
-          name.c_str(),
-          cursor->mRenderPass,
-          static_cast<int>(cursor->mAlpha * 1000.0f),
-          cursor->mIsHidden ? 1 : 0,
-          cursor->mInvisible ? 1 : 0,
-          static_cast<int>(cursor->mDepth),
-          static_cast<int>(cursor->mRenderedChildren.size())
-        );
-        ::OutputDebugStringA(line);
-        ++dumped;
+      ++ticked;
+      if (profiling) {
+        ProfiledControlFrame(currentControl, deltaSeconds);
+      } else {
+        currentControl->Frame(deltaSeconds);
       }
     }
   }
 
-  if ((++sProbeCalls % 601) == 0 && sProbeBudget < 60) {
-    ++sProbeBudget;
-    char probeBuf[224];
-    sprintf_s(
-      probeBuf,
-      sizeof(probeBuf),
-      "[FRAMEDIAG] call=%d frame=%p visited=%d peak=%d ticked=%d invisible=%d delta=%d us\n",
-      sProbeCalls,
-      static_cast<const void*>(this),
-      probeVisited,
-      sProbePeakVisited,
-      probeTicked,
-      probeInvisible,
-      static_cast<int>(deltaSeconds * 1000000.0f)
-    );
-    ::OutputDebugStringA(probeBuf);
-  }
+  FAF_PROFILE_COUNT("ui.controls", visited);
+  FAF_PROFILE_COUNT("ui.controls.invisible", invisible);
+  FAF_PROFILE_COUNT("ui.onframe.calls", ticked);
 
   PurgeDeleted();
   // selfLock dtor releases the pin here.

@@ -27,6 +27,39 @@ namespace gpg
  * the x86 sizes come from the binary's allocation constants, cited per type.
  */
 
+namespace lua
+{
+  /**
+   * FAF instrumentation (FAF_GPU_PROFILE), not in the binary: new blocks and grown
+   * bytes of one chosen Lua state (the UI's), counted in luaM_realloc on that state's
+   * thread. `state` stays null unless the profiler is on, so without it the allocator
+   * pays one pointer compare.
+   */
+  struct ProfiledAllocations
+  {
+    const global_State* state = nullptr;
+    std::uint64_t blocks = 0U;
+    std::uint64_t bytes = 0U;
+  };
+  extern ProfiledAllocations gProfiledAllocations;
+
+  /** What `gProfiledAllocations` counted since this was made. */
+  struct ProfiledAllocationsSince
+  {
+    std::uint64_t blocks = gProfiledAllocations.blocks;
+    std::uint64_t bytes = gProfiledAllocations.bytes;
+
+    [[nodiscard]] std::uint64_t Blocks() const noexcept
+    {
+      return gProfiledAllocations.blocks - blocks;
+    }
+    [[nodiscard]] std::uint64_t Bytes() const noexcept
+    {
+      return gProfiledAllocations.bytes - bytes;
+    }
+  };
+} // namespace lua
+
 /// x86 byte size of one T as the 2007 binary allocates it. Every type the VM
 /// allocates is listed, so a new one cannot silently fall back to its x64 size.
 template <class T>
@@ -273,7 +306,7 @@ void luaM_growvector(
   }
 }
 
-#if defined(_M_IX86)
+#if FAFRE_ARCH_X86
 // On x86 every accounted size is the real size, so x86 behaviour cannot drift.
 static_assert(kLuaX86Size<LuaPlus::TObject> == sizeof(LuaPlus::TObject));
 static_assert(kLuaX86Size<Node> == sizeof(Node));

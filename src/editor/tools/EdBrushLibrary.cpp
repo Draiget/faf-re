@@ -63,24 +63,23 @@ namespace faf::editor
     return images;
   }
 
-  bool LoadBrushImage(
+  std::expected<ShapeGrid, std::string> LoadBrushImage(
     const std::filesystem::path& file,
-    const int n,
-    ShapeGrid& out,
-    std::string& error
+    const int n
   )
   {
-    HeightImage image;
-    if (!ReadHeightImage(file, 0, 0, image, error)) {
-      return false;
+    const auto image = ReadHeightImage(file, 0, 0);
+    if (!image) {
+      return std::unexpected(image.error());
     }
-    const HeightImage grid = ResampleHeights(image, std::max(2, n), std::max(2, n));
+    const HeightImage grid = ResampleHeights(*image, std::max(2, n), std::max(2, n));
+    ShapeGrid out;
     out.n = grid.width;
     out.values.resize(grid.words.size());
     for (std::size_t i = 0; i < grid.words.size(); ++i) {
       out.values[i] = static_cast<float>(grid.words[i]) / 65535.0f;
     }
-    return true;
+    return out;
   }
 
   namespace
@@ -199,8 +198,10 @@ namespace faf::editor
       if (std::filesystem::exists(file, ec)) {
         continue;
       }
-      if (WriteHeightImage(file, image, error)) {
+      if (const auto wrote = WriteHeightImage(file, image)) {
         ++written;
+      } else {
+        error = wrote.error();
       }
     }
     std::ofstream(folder / ".shipped", std::ios::binary | std::ios::trunc)

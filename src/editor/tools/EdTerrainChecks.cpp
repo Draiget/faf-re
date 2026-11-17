@@ -15,8 +15,7 @@ namespace faf::editor
       field::Grid& out
     )
     {
-      std::string error;
-      return field::RunOpCpu(name, args, out, error);
+      return field::RunOpCpu(name, args, out).has_value();
     }
 
     field::GridPtr Shared(

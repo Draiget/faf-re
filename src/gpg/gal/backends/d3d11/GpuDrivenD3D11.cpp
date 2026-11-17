@@ -2,6 +2,8 @@
 
 #include "GpuDrivenD3D11.h"
 
+#include "gpg/core/utils/Unreachable.h"
+
 #include <algorithm>
 #include <cstring>
 #include <string>
@@ -87,9 +89,9 @@ namespace gpg::gal
       case GpuStencilOp::Decrement:
         return D3D11_STENCIL_OP_DECR;
       case GpuStencilOp::Keep:
-      default:
         return D3D11_STENCIL_OP_KEEP;
       }
+      FAF_UNREACHABLE();
     }
 
     [[nodiscard]] D3D11_DEPTH_STENCILOP_DESC ToD3D11(

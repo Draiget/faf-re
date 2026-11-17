@@ -1,5 +1,6 @@
 #pragma once
 
+#include <expected>
 #include <string>
 #include <vector>
 
@@ -43,10 +44,10 @@ namespace faf::editor
   };
 
   /**
-   * Reads an army's `Units` value (`GROUP { ... }` as the save holds it). False, with `error`, for text it can't
-   * read; the caller then leaves the army's text alone.
+   * Reads an army's `Units` value (`GROUP { ... }` as the save holds it). The error for text it can't read; the
+   * caller then leaves the army's text alone.
    */
-  bool ParseUnitGroup(const std::string& text, UnitGroup& group, std::string& error);
+  [[nodiscard]] std::expected<void, std::string> ParseUnitGroup(const std::string& text, UnitGroup& group);
 
   /**
    * Writes a group as the game's saves write it, its closing brace at `indent` spaces (the army's properties sit at

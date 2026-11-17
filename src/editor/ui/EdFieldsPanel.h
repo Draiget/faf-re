@@ -4,6 +4,7 @@
 #include "editor/tools/EdFieldStack.h"
 
 #include <algorithm>
+#include <expected>
 #include <functional>
 #include <vector>
 #include <string>
@@ -108,8 +109,8 @@ namespace faf::editor
       mQuick.gullies = p.gullies;
       mQuickAsk = 2;
     }
-    /** Test runs: start from the map, apply `op` with `params`; the status says how it went. */
-    bool RunForTest(const std::string& op, const std::string& params, std::string& status);
+    /** Test runs: start from the map, apply `op` with `params`; the status says how it went, or the error. */
+    [[nodiscard]] std::expected<std::string, std::string> RunForTest(const std::string& op, const std::string& params);
     [[nodiscard]] const FieldStack& Stack() const noexcept
     {
       return mStack;

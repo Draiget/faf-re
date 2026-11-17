@@ -14,20 +14,30 @@
 //   helpers for fields (w * h floats) and double buffering; DispatchGrid for a kernel over a 2D grid; RunIterations for
 //   long loops in time-limited submissions.
 //
-// Rules for everything that runs on an Executor (the full text is in the document): bool results with `err` set, never
-// an exception through the API, never a wait without a limit, resources must not outlive the Lease they were made
-// under, and an op that fails leaves its output untouched so the CPU op can run instead.
+// Rules for everything that runs on an Executor (the full text is in the document): std::expected results whose error
+// says what failed, never an exception through the API, never a wait without a limit, resources must not outlive the
+// Lease they were made under, and an op that fails leaves its output untouched so the CPU op can run instead.
 #pragma once
 
 #include <cstddef>
 #include <cstdint>
+#include <expected>
 #include <functional>
 #include <memory>
 #include <string>
 #include <type_traits>
+#include <utility>
 #include <vector>
 
 #include "editor/terrain/EdFieldCore.h"
+
+/** Returns the error of `expr` (a std::expected) from the enclosing function, which returns a std::expected too: a row
+ * of device calls stops at the first one that fails, with its message. */
+#define FAF_GPU_TRY(...)                                                                                               \
+  do {                                                                                                                 \
+    if (auto fafGpuTry = (__VA_ARGS__); !fafGpuTry)                                                                    \
+      return std::unexpected(std::move(fafGpuTry.error()));                                                            \
+  } while (false)
 
 namespace faf::editor::gpu
 {
@@ -121,9 +131,9 @@ namespace faf::editor::gpu
   };
 
   /**
-   * Runs kernels. All calls come from the thread that holds the Lease. Every method returns false with `err` set
-   * instead of throwing. Resource contents are undefined after CreateBuffer / CreateTexture (a recycled buffer is not
-   * cleared): Upload or write them before reading.
+   * Runs kernels. All calls come from the thread that holds the Lease. Every method returns the error instead of
+   * throwing. Resource contents are undefined after CreateBuffer / CreateTexture (a recycled buffer is not cleared):
+   * Upload or write them before reading.
    */
   class Executor
   {
@@ -131,18 +141,18 @@ namespace faf::editor::gpu
     virtual ~Executor() = default;
     [[nodiscard]] virtual const char* Name() const = 0;
     /** A structured buffer of `count` elements of `stride` bytes (a multiple of 4). */
-    virtual std::unique_ptr<Resource> CreateBuffer(u32 count, u32 stride, std::string& err) = 0;
+    virtual std::expected<std::unique_ptr<Resource>, std::string> CreateBuffer(u32 count, u32 stride) = 0;
     /** An R32_FLOAT texture, shader resource and unordered access. */
-    virtual std::unique_ptr<Resource> CreateTexture(u32 w, u32 h, std::string& err) = 0;
-    virtual bool Upload(Resource& r, const void* data, std::size_t bytes, std::string& err) = 0;
+    virtual std::expected<std::unique_ptr<Resource>, std::string> CreateTexture(u32 w, u32 h) = 0;
+    virtual std::expected<void, std::string> Upload(Resource& r, const void* data, std::size_t bytes) = 0;
     /** Waits for the device (with a time limit) and copies the resource into `data` (bytes <= r.Bytes()). */
-    virtual bool Download(Resource& r, void* data, std::size_t bytes, std::string& err) = 0;
+    virtual std::expected<void, std::string> Download(Resource& r, void* data, std::size_t bytes) = 0;
     /** `cb`/`cbBytes`: the constant buffer b0 (bytes a multiple of 16, at most 4096; null when the kernel has none). */
-    virtual bool
-    Dispatch(const KernelInfo& k, Groups groups, const void* cb, u32 cbBytes, const Bindings& b, std::string& err) = 0;
+    virtual std::expected<void, std::string>
+    Dispatch(const KernelInfo& k, Groups groups, const void* cb, u32 cbBytes, const Bindings& b) = 0;
     /** Submits everything queued and waits for it (with a time limit). `gpuMs` (may be null) = device time of the work
      * since the last Sync, or the wall time when unknown. */
-    virtual bool Sync(double* gpuMs, std::string& err) = 0;
+    virtual std::expected<void, std::string> Sync(double* gpuMs) = 0;
     /** Largest total size of resources one op may hold (a fraction of the video memory). */
     [[nodiscard]] virtual u64 MaxBytes() const = 0;
     [[nodiscard]] virtual bool SupportsTextures() const
@@ -272,37 +282,38 @@ namespace faf::editor::gpu
     }
   };
 
-  [[nodiscard]] bool MakeField(Executor& ex, int w, int h, Field& out, std::string& err);
+  [[nodiscard]] std::expected<void, std::string> MakeField(Executor& ex, int w, int h, Field& out);
   /** Uploads w * h floats. */
-  [[nodiscard]] bool UploadField(Executor& ex, Field& f, const float* data, std::string& err);
-  [[nodiscard]] bool DownloadField(Executor& ex, Field& f, float* data, std::string& err);
+  [[nodiscard]] std::expected<void, std::string> UploadField(Executor& ex, Field& f, const float* data);
+  [[nodiscard]] std::expected<void, std::string> DownloadField(Executor& ex, Field& f, float* data);
   /** MakeField + UploadField of a grid. */
-  [[nodiscard]] bool UploadGrid(Executor& ex, const field::Grid& g, Field& out, std::string& err);
+  [[nodiscard]] std::expected<void, std::string> UploadGrid(Executor& ex, const field::Grid& g, Field& out);
   /** Downloads into `g`, which must have the field's size. */
-  [[nodiscard]] bool DownloadGrid(Executor& ex, Field& f, field::Grid& g, std::string& err);
+  [[nodiscard]] std::expected<void, std::string> DownloadGrid(Executor& ex, Field& f, field::Grid& g);
   /** A buffer of floats / uints (weights, counters): count elements of 4 bytes. */
-  [[nodiscard]] bool MakeBuffer(Executor& ex, u32 count, std::unique_ptr<Resource>& out, std::string& err);
-  [[nodiscard]] bool UploadBuffer(Executor& ex, Resource& r, const void* data, std::size_t bytes, std::string& err);
+  [[nodiscard]] std::expected<void, std::string> MakeBuffer(Executor& ex, u32 count, std::unique_ptr<Resource>& out);
+  [[nodiscard]] std::expected<void, std::string>
+  UploadBuffer(Executor& ex, Resource& r, const void* data, std::size_t bytes);
   /** Sets every 4 byte word of a buffer to `pattern` (0 = zero floats / zero counters; uploads a host array: for set-up
    * between iterations, not for use inside a loop). */
-  [[nodiscard]] bool FillBuffer(Executor& ex, Resource& r, u32 pattern, std::string& err);
+  [[nodiscard]] std::expected<void, std::string> FillBuffer(Executor& ex, Resource& r, u32 pattern);
   /** An R32_FLOAT texture holding a field (copied on the device with the buf_to_tex kernel). */
-  [[nodiscard]] bool
-  MakeTextureFromField(Executor& ex, const Field& f, std::unique_ptr<Resource>& tex, std::string& err);
+  [[nodiscard]] std::expected<void, std::string>
+  MakeTextureFromField(Executor& ex, const Field& f, std::unique_ptr<Resource>& tex);
 
   /** Two fields of one size; kernels read Src() and write Dst(), Flip() swaps them. */
   struct PingPong
   {
     Field f[2];
     int cur = 0; // f[cur] is the source
-    [[nodiscard]] bool Make(
+    [[nodiscard]] std::expected<void, std::string> Make(
       Executor& ex,
       int w,
-      int h,
-      std::string& err
+      int h
     )
     {
-      return MakeField(ex, w, h, f[0], err) && MakeField(ex, w, h, f[1], err);
+      FAF_GPU_TRY(MakeField(ex, w, h, f[0]));
+      return MakeField(ex, w, h, f[1]);
     }
     [[nodiscard]] Field& Src()
     {
@@ -318,32 +329,33 @@ namespace faf::editor::gpu
     }
   };
 
-  /** Groups needed to cover w x h (x, y) threads with kernel k; false when that is more than the hardware's group
+  /** Groups needed to cover w x h (x, y) threads with kernel k; the error when that is more than the hardware's group
    * count. */
-  [[nodiscard]] bool GroupsFor(const KernelInfo& k, u32 w, u32 h, Groups& g, std::string& err);
+  [[nodiscard]] std::expected<Groups, std::string> GroupsFor(const KernelInfo& k, u32 w, u32 h);
 
   /** Dispatches kernel k over a w x h grid with the constant buffer `params` (a struct of 4 byte members, size a
    * multiple of 16). */
   template <class T>
-  [[nodiscard]] bool DispatchGrid(
+  [[nodiscard]] std::expected<void, std::string> DispatchGrid(
     Executor& ex,
     const KernelInfo& k,
     u32 w,
     u32 h,
     const T& params,
-    const Bindings& b,
-    std::string& err
+    const Bindings& b
   )
   {
     static_assert(sizeof(T) % 16 == 0, "constant buffer structs are padded to 16 bytes");
     static_assert(std::is_trivially_copyable_v<T>, "constant buffer structs are plain data");
-    Groups g;
-    return GroupsFor(k, w, h, g, err) && ex.Dispatch(k, g, &params, static_cast<u32>(sizeof(T)), b, err);
+    const auto g = GroupsFor(k, w, h);
+    if (!g)
+      return std::unexpected(g.error());
+    return ex.Dispatch(k, *g, &params, static_cast<u32>(sizeof(T)), b);
   }
 
   /** A dispatch of a kernel without a constant buffer. */
-  [[nodiscard]] bool
-  DispatchGridNoCb(Executor& ex, const KernelInfo& k, u32 w, u32 h, const Bindings& b, std::string& err);
+  [[nodiscard]] std::expected<void, std::string>
+  DispatchGridNoCb(Executor& ex, const KernelInfo& k, u32 w, u32 h, const Bindings& b);
 
   struct IterStats
   {
@@ -359,15 +371,14 @@ namespace faf::editor::gpu
    * `targetMs` each (0 = 60): after every batch the work is submitted and waited for (Sync), the time it took sets the
    * size of the next batch. This keeps one submission far below the 2 second limit after which Windows resets the
    * driver (TDR). The first batch is one iteration. If one iteration alone is slower than the target it still runs as
-   * one batch (it cannot be split); `stats->maxSubmitMs` shows it. false when a step or a Sync fails (`err` set); the
+   * one batch (it cannot be split); `stats->maxSubmitMs` shows it. The error of the step or the Sync that failed; the
    * iterations done are in stats.
    */
-  [[nodiscard]] bool RunIterations(
+  [[nodiscard]] std::expected<void, std::string> RunIterations(
     Executor& ex,
     u32 count,
     double targetMs,
-    const std::function<bool(u32 iteration, std::string& err)>& step,
-    std::string& err,
+    const std::function<std::expected<void, std::string>(u32 iteration)>& step,
     IterStats* stats = nullptr
   );
 

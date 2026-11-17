@@ -25,6 +25,7 @@
 #include <ctime>
 #include <charconv>
 #include <exception>
+#include <expected>
 #include <filesystem>
 #include <cstdint>
 #include <fstream>
@@ -320,29 +321,25 @@ namespace
   };
 
   /** The match file: Lua that sets `MatchConfig`, the table `CLobby.LaunchGame` takes, `MatchSeed` and `MatchName`. */
-  [[nodiscard]] bool LoadMatch(
+  [[nodiscard]] std::expected<void, std::string> LoadMatch(
     LuaPlus::LuaState* const state,
     const std::string& path,
     LuaPlus::LuaObject& config,
-    std::int32_t& seed,
-    std::string& error
+    std::int32_t& seed
   )
   {
     std::ifstream file(path, std::ios::binary);
     if (!file) {
-      error = "cannot read " + path;
-      return false;
+      return std::unexpected("cannot read " + path);
     }
     std::stringstream text;
     text << file.rdbuf();
     if (!moho::SCR_LuaDoString(text.str().c_str(), state)) {
-      error = path + " doesn't run";
-      return false;
+      return std::unexpected(path + " doesn't run");
     }
     config = state->GetGlobal("MatchConfig");
     if (!config.IsTable()) {
-      error = path + " sets no MatchConfig";
-      return false;
+      return std::unexpected(path + " sets no MatchConfig");
     }
     const LuaPlus::LuaObject seedObject = state->GetGlobal("MatchSeed");
     seed = seedObject.IsNumber() ? static_cast<std::int32_t>(seedObject.GetNumber()) : 1;
@@ -358,7 +355,7 @@ namespace
     self.SetString("OwnerID", "0"); // `kServerUid`, as a lobby writes ids
     self.SetString("PlayerName", kServerName);
     observers.SetObject(observers.GetN() + 1, self);
-    return true;
+    return {};
   }
 
   /** `MatchTokens`, by `OwnerID`: outside `MatchConfig`, as what's in there goes in the replay and to every player. */
@@ -383,19 +380,19 @@ namespace
 
   /**
    * Plan WPR.45: `MatchAddresses`, by `OwnerID`, each an IPv4 or IPv6 address or a list of them, outside `MatchConfig`
-   * as the tokens are. The addresses FAF knows its players by; an IPv6 one lists its /64 (`AddressPrefix`). False with
-   * `error` for one that doesn't parse.
+   * as the tokens are. The addresses FAF knows its players by; an IPv6 one lists its /64 (`AddressPrefix`). The error
+   * for one that doesn't parse.
    */
-  [[nodiscard]] bool ReadAddresses(
+  [[nodiscard]] std::expected<void, std::string> ReadAddresses(
     LuaPlus::LuaState* const state,
-    std::vector<faf::remote::net::IpAddress>& addresses,
-    std::string& error
+    std::vector<faf::remote::net::IpAddress>& addresses
   )
   {
     LuaPlus::LuaObject table = state->GetGlobal("MatchAddresses");
     if (!table.IsTable()) {
-      return true;
+      return {};
     }
+    std::string error;
     const auto add = [&](const LuaPlus::LuaObject& value) {
       faf::remote::net::IpAddress address{};
       if (
@@ -414,14 +411,14 @@ namespace
       if (value.IsTable()) {
         for (LuaPlus::LuaTableIterator one(&value, 1); !one.m_isDone; one.Next()) {
           if (!add(one.GetValue())) {
-            return false;
+            return std::unexpected(error);
           }
         }
       } else if (!add(value)) {
-        return false;
+        return std::unexpected(error);
       }
     }
-    return true;
+    return {};
   }
 
   /** Plan WPR.42: the sim mods a match names. FAF's lobby puts only sim mods in `GameMods` (`Mods.GetGameMods`). */
@@ -616,55 +613,48 @@ namespace
   }
 
   /** Plan WP2.6: the match file's `MatchContentCheck` ("off", "warn", "refuse"); "warn" without one. */
-  [[nodiscard]] bool ReadContentCheck(
-    LuaPlus::LuaState* const state,
-    faf::remote::EContentCheck& mode,
-    std::string& error
+  [[nodiscard]] std::expected<faf::remote::EContentCheck, std::string> ReadContentCheck(
+    LuaPlus::LuaState* const state
   )
   {
     const LuaPlus::LuaObject text = state->GetGlobal("MatchContentCheck");
-    mode = faf::remote::EContentCheck::Warn;
     if (text.IsNil()) {
-      return true;
+      return faf::remote::EContentCheck::Warn;
     }
     const std::optional<faf::remote::EContentCheck> read =
       text.IsString() ? faf::remote::ReadContentCheck(text.GetString()) : std::nullopt;
     if (!read) {
-      error = "MatchContentCheck is \"off\", \"warn\" or \"refuse\"";
-      return false;
+      return std::unexpected("MatchContentCheck is \"off\", \"warn\" or \"refuse\"");
     }
-    mode = *read;
-    return true;
+    return *read;
   }
 
   /** Plan WP17.8: the match file's `MatchUiMods`, the UI mods a player may run (`{}`: none); nothing when it isn't set.
    */
-  [[nodiscard]] bool ReadUiMods(
+  [[nodiscard]] std::expected<void, std::string> ReadUiMods(
     LuaPlus::LuaState* const state,
-    std::optional<std::vector<std::string>>& allowed,
-    std::string& error
+    std::optional<std::vector<std::string>>& allowed
   )
   {
     LuaPlus::LuaObject table = state->GetGlobal("MatchUiMods");
     if (table.IsNil()) {
-      return true;
+      return {};
     }
     if (!table.IsTable()) {
-      error = "MatchUiMods is a table of mod uids ({} for none)";
-      return false;
+      return std::unexpected("MatchUiMods is a table of mod uids ({} for none)");
     }
     allowed.emplace();
     for (LuaPlus::LuaTableIterator it(&table, 1); !it.m_isDone; it.Next()) {
       const LuaPlus::LuaObject value = it.GetValue();
       const std::size_t size = value.IsString() ? std::strlen(value.GetString()) : 0u;
       if (size == 0u || size > faf::remote::kMaxModText) {
-        error =
-          "MatchUiMods holds mod uids: strings of 1 to " + std::to_string(faf::remote::kMaxModText) + " characters";
-        return false;
+        return std::unexpected(
+          "MatchUiMods holds mod uids: strings of 1 to " + std::to_string(faf::remote::kMaxModText) + " characters"
+        );
       }
       allowed->emplace_back(value.GetString());
     }
-    return true;
+    return {};
   }
 
   /** Plan WP15.1: a tournament's rules, the match file's `MatchRules` table; each unset unless the match sets it. */
@@ -684,20 +674,19 @@ namespace
     std::optional<double> minConnectionKBps;
   };
 
-  [[nodiscard]] bool ReadMatchRules(
+  [[nodiscard]] std::expected<void, std::string> ReadMatchRules(
     LuaPlus::LuaState* const state,
-    SMatchRules& matchRules,
-    std::string& error
+    SMatchRules& matchRules
   )
   {
     const LuaPlus::LuaObject table = state->GetGlobal("MatchRules");
     if (table.IsNil()) {
-      return true;
+      return {};
     }
     if (!table.IsTable()) {
-      error = "MatchRules is a table";
-      return false;
+      return std::unexpected("MatchRules is a table");
     }
+    std::string error;
     const auto seconds = [&](const char* const key, std::optional<double>& out) {
       const LuaPlus::LuaObject value = table[key];
       if (value.IsNil()) {
@@ -728,12 +717,11 @@ namespace
           seconds("ObserverDelaySeconds", matchRules.observerDelaySeconds) &&
           seconds("StartWhenReadySeconds", matchRules.startWhenReadySeconds) &&
           flag("FixedSpeed", matchRules.fixedSpeed) && flag("NoCheats", matchRules.noCheats))) {
-      return false;
+      return std::unexpected(error);
     }
     if (const LuaPlus::LuaObject value = table["MinConnectionKBps"]; !value.IsNil()) {
       if (!value.IsNumber() || value.GetNumber() <= 0.0 || value.GetNumber() > 1000000.0) {
-        error = "MatchRules.MinConnectionKBps is the download each player needs, KB/s, above 0";
-        return false;
+        return std::unexpected("MatchRules.MinConnectionKBps is the download each player needs, KB/s, above 0");
       }
       matchRules.minConnectionKBps = value.GetNumber();
     }
@@ -742,70 +730,60 @@ namespace
       const double number =
         version.IsNumber() ? version.GetNumber() : (version.IsString() ? std::atof(version.GetString()) : 0.0);
       if (number < 1.0 || number > 1000000.0 || number != static_cast<double>(static_cast<int>(number))) {
-        error = "MatchRules.GameVersion is FAF's game version, a whole number such as 3839";
-        return false;
+        return std::unexpected("MatchRules.GameVersion is FAF's game version, a whole number such as 3839");
       }
       matchRules.gameVersion = static_cast<int>(number);
     }
     if (const LuaPlus::LuaObject view = table["DefeatedPlayerView"]; !view.IsNil()) {
       const std::string text = view.IsString() ? view.GetString() : "";
       if (text != "observe" && text != "disconnect") {
-        error = "MatchRules.DefeatedPlayerView is \"observe\" or \"disconnect\"";
-        return false;
+        return std::unexpected("MatchRules.DefeatedPlayerView is \"observe\" or \"disconnect\"");
       }
       matchRules.defeatedPlayerView = text;
     }
-    return true;
+    return {};
   }
 
   /** Plan WP13.1: the match file's `MatchObservers`, the tokens observers may watch with (a list, or uid = token). */
-  [[nodiscard]] bool ReadMatchObservers(
+  [[nodiscard]] std::expected<void, std::string> ReadMatchObservers(
     LuaPlus::LuaState* const state,
     std::vector<std::string>& tokens,
-    std::string& error,
     const char* const name = "MatchObservers"
   )
   {
     LuaPlus::LuaObject table = state->GetGlobal(name);
     if (table.IsNil()) {
-      return true;
+      return {};
     }
     if (!table.IsTable()) {
-      error = std::string(name) + " is a table of tokens";
-      return false;
+      return std::unexpected(std::string(name) + " is a table of tokens");
     }
     for (LuaPlus::LuaTableIterator it(&table, 1); !it.m_isDone; it.Next()) {
       const LuaPlus::LuaObject value = it.GetValue();
       const std::size_t size = value.IsString() ? std::strlen(value.GetString()) : 0u;
       if (size == 0u || size > 1000u) {
-        error = std::string(name) + " holds tokens: strings of 1 to 1000 characters";
-        return false;
+        return std::unexpected(std::string(name) + " holds tokens: strings of 1 to 1000 characters");
       }
       tokens.emplace_back(value.GetString());
     }
-    return true;
+    return {};
   }
 
   /** Plan WP17.1: the match file's `MatchLobbyControl` ("organiser", "player"); "organiser" without one. */
-  [[nodiscard]] bool ReadLobbyControl(
-    LuaPlus::LuaState* const state,
-    faf::server::ELobbyControl& control,
-    std::string& error
+  [[nodiscard]] std::expected<faf::server::ELobbyControl, std::string> ReadLobbyControl(
+    LuaPlus::LuaState* const state
   )
   {
     const LuaPlus::LuaObject text = state->GetGlobal("MatchLobbyControl");
-    control = faf::server::ELobbyControl::Organiser;
     if (text.IsNil()) {
-      return true;
+      return faf::server::ELobbyControl::Organiser;
     }
     const std::optional<faf::server::ELobbyControl> read =
       text.IsString() ? faf::server::ReadLobbyControl(text.GetString()) : std::nullopt;
     if (!read) {
-      error = "MatchLobbyControl is \"organiser\" or \"player\"";
-      return false;
+      return std::unexpected("MatchLobbyControl is \"organiser\" or \"player\"");
     }
-    control = *read;
-    return true;
+    return *read;
   }
 
   /** Plan WP17.1: a game option's value as the console shows it. */
@@ -1002,7 +980,7 @@ namespace
       return scenarioFile.GetString();
     }
     std::string text = name.GetString();
-    if (text.rfind("<LOC", 0) == 0) {
+    if (text.starts_with("<LOC")) {
       const std::size_t close = text.find('>');
       if (close != std::string::npos) {
         text.erase(0, close + 1);
@@ -1352,13 +1330,15 @@ namespace
     LuaPlus::LuaState* const state = faf::headless::ReplayLuaState();
     LuaPlus::LuaObject config;
     std::int32_t seed = 1;
-    if (!LoadMatch(state, matchPath, config, seed, end.error)) {
+    if (auto loaded = LoadMatch(state, matchPath, config, seed); !loaded) {
+      end.error = loaded.error();
       Say("Can't host: %s", end.error.c_str());
       return kExitBadInput;
     }
     // Plan WP15.1: the tournament's rules from the match file; a command-line flag given still wins.
     SMatchRules matchRules;
-    if (!ReadMatchRules(state, matchRules, end.error)) {
+    if (auto read = ReadMatchRules(state, matchRules); !read) {
+      end.error = read.error();
       Say("Can't host: %s", end.error.c_str());
       return kExitBadInput;
     }
@@ -1429,7 +1409,8 @@ namespace
       return kExitBadInput;
     }
     std::vector<faf::remote::net::IpAddress> allowedAddresses;
-    if (!ReadAddresses(state, allowedAddresses, end.error)) {
+    if (auto read = ReadAddresses(state, allowedAddresses); !read) {
+      end.error = read.error();
       Say("Can't host: %s", end.error.c_str());
       return kExitBadInput;
     }
@@ -1479,7 +1460,16 @@ namespace
       }
     }
     faf::remote::EContentCheck contentCheck = faf::remote::EContentCheck::Warn;
-    if (!ReadContentCheck(state, contentCheck, end.error) || !ReadUiMods(state, netConfig.uiModsAllowed, end.error)) {
+    if (
+      auto read = ReadContentCheck(state)
+                    .transform([&contentCheck](const faf::remote::EContentCheck mode) {
+      contentCheck = mode;
+    }).and_then([&] {
+      return ReadUiMods(state, netConfig.uiModsAllowed);
+    });
+      !read
+    ) {
+      end.error = read.error();
       Say("Can't host: %s", end.error.c_str());
       return kExitBadInput;
     }
@@ -1494,7 +1484,10 @@ namespace
     } else if (matchRules.lobbyAwaySeconds) {
       netConfig.lobbyAwaySeconds = *matchRules.lobbyAwaySeconds;
     }
-    if (!ReadLobbyControl(state, netConfig.lobbyControl, end.error)) {
+    if (auto lobbyControl = ReadLobbyControl(state); lobbyControl) {
+      netConfig.lobbyControl = *lobbyControl;
+    } else {
+      end.error = lobbyControl.error();
       Say("Can't host: %s", end.error.c_str());
       return kExitBadInput;
     }
@@ -1605,7 +1598,8 @@ namespace
       }
       if (controlError.empty()) {
         control = std::make_unique<faf::server::CControlListener>();
-        if (!control->Open(controlAt, controlKey, controlError)) {
+        if (auto opened = control->Open(controlAt, controlKey); !opened) {
+          controlError = opened.error();
           control.reset();
         }
       }
@@ -1647,7 +1641,8 @@ namespace
         if (!control) {
           control = std::make_unique<faf::server::CControlListener>();
         }
-        if (!control->OpenRest(restAt, std::move(token), corsOrigin, restError)) {
+        if (auto opened = control->OpenRest(restAt, std::move(token), corsOrigin); !opened) {
+          restError = opened.error();
           control.reset();
         }
       }
@@ -1807,9 +1802,8 @@ namespace
         lobbyPins = pinned;
         net->PinLobbyOptions(std::move(pinned));
       }
-      std::string netError;
-      if (!net->Start(netError)) {
-        end.error = netError;
+      if (auto started = net->Start(); !started) {
+        end.error = started.error();
         Say("Can't host: %s", end.error.c_str());
         return kExitBadInput;
       }
@@ -2271,7 +2265,8 @@ namespace
     Say("Loading the map");
     const Clock::time_point loadStart = Clock::now();
     moho::SWldGameData gameData{};
-    if (!faf::headless::LoadSessionScenario(*sessionInfo, gameData, end.error)) {
+    if (auto loaded = faf::headless::LoadSessionScenario(*sessionInfo, gameData); !loaded) {
+      end.error = loaded.error();
       Say("Can't host: %s", end.error.c_str());
       WriteResult(resultPath, end);
       return kExitBadInput;
@@ -2295,9 +2290,8 @@ namespace
     if (
       fa::vector<fa::string> policyArgs; moho::CFG_GetArgOption("--sync-policy", 1, &policyArgs) && !policyArgs.empty()
     ) {
-      std::string policyError;
-      if (!faf::remote::UseSyncPolicyFile(policyArgs[0].c_str(), policyError)) {
-        end.error = "the Sync routing policy can't be used: " + policyError;
+      if (auto used = faf::remote::UseSyncPolicyFile(policyArgs[0].c_str()); !used) {
+        end.error = "the Sync routing policy can't be used: " + used.error();
         Say("Can't host: %s", end.error.c_str());
         WriteResult(resultPath, end);
         return kExitBadInput;
@@ -2502,10 +2496,12 @@ namespace
       if (!faf::remote::net::ParseEndpoint(text, observeAt)) {
         end.error = "--observe takes <ip:port>, not " + text;
       } else if (
-        !ReadMatchObservers(state, tokens, end.error) ||
-        !ReadMatchObservers(state, referees, end.error, "MatchReferees")
+        auto read = ReadMatchObservers(state, tokens).and_then([&] {
+        return ReadMatchObservers(state, referees, "MatchReferees");
+      });
+        !read
       ) {
-        // `end.error` says why
+        end.error = read.error();
       } else {
         observers = std::make_unique<faf::server::CObserverListener>(
           replayLog, &ControlNowUs, matchRules.observerDelaySeconds.value_or(0.0)
@@ -2519,7 +2515,9 @@ namespace
         for (const std::string& token : referees) {
           observers->AllowReferee(token);
         }
-        if (observers->Start(observeAt, end.error)) {
+        if (auto started = observers->Start(observeAt); !started) {
+          end.error = started.error();
+        } else {
           Say(
             "Observers on %s: %d tokens, %.0f s behind the game; %d referees, no delay",
             observeAt.Text().c_str(),

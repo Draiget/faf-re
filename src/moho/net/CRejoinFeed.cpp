@@ -93,9 +93,9 @@ namespace
     const EPeerMessageKind kind
   )
   {
-    return message.GetType().raw() == static_cast<std::uint8_t>(EClientMsg::CLIMSG_PeerFeatures) &&
+    return message.GetType().raw() == std::to_underlying(EClientMsg::CLIMSG_PeerFeatures) &&
       message.GetMessageSize() >= static_cast<int>(kKindBytes) &&
-      static_cast<std::uint8_t>(message.mBuff.start_[3]) == static_cast<std::uint8_t>(kind);
+      static_cast<std::uint8_t>(message.mBuff.start_[3]) == std::to_underlying(kind);
   }
 
   /// The answer to a peer's challenge: this seat's key signs it for that peer.
@@ -108,7 +108,7 @@ namespace
     const SRejoinSignature signature = REJOIN_SignChallenge(nonce, source, peerIndex);
     CMessage proof(EClientMsg::CLIMSG_PeerFeatures);
     CMessageStream stream(proof);
-    stream.Write(static_cast<std::uint8_t>(EPeerMessageKind::RejoinProof));
+    stream.Write(std::to_underlying(EPeerMessageKind::RejoinProof));
     stream.Write(signature.data(), signature.size());
     return proof;
   }
@@ -130,8 +130,8 @@ namespace
   {
     CMessage message(EClientMsg::CLIMSG_PeerFeatures);
     CMessageStream stream(message);
-    stream.Write(static_cast<std::uint8_t>(EPeerMessageKind::RejoinProgress));
-    stream.Write(static_cast<std::uint8_t>(stage));
+    stream.Write(std::to_underlying(EPeerMessageKind::RejoinProgress));
+    stream.Write(std::to_underlying(stage));
     stream.Write(progress);
     return message;
   }
@@ -198,16 +198,16 @@ void CRejoinFeed::SkipRecordedBeats(
   while (mReadBeat < beats && mMessage.Read(mRecording.get())) {
     const std::uint8_t type = mMessage.GetType().raw();
     sReplayHistory.push_back(mMessage);
-    if (type == static_cast<std::uint8_t>(ECmdStreamOp::CMDST_SetCommandSource)) {
+    if (type == std::to_underlying(ECmdStreamOp::CMDST_SetCommandSource)) {
       const std::uint8_t source = ReadSourcePayload(mMessage);
       mRecordedSource = source < mManager.mClients.size() ? mManager.mClients[source] : nullptr;
-    } else if (type == static_cast<std::uint8_t>(ECmdStreamOp::CMDST_CommandSourceTerminated)) {
+    } else if (type == std::to_underlying(ECmdStreamOp::CMDST_CommandSourceTerminated)) {
       // As `CClientBase::UpdateState` would have left a client that was ejected.
       if (mRecordedSource != nullptr) {
         mRecordedSource->mValidCommandSources = BVIntSet{};
         mRecordedSource->mCommandSourceId = kInvalidCommandSource;
       }
-    } else if (type == static_cast<std::uint8_t>(ECmdStreamOp::CMDST_Advance)) {
+    } else if (type == std::to_underlying(ECmdStreamOp::CMDST_Advance)) {
       mReadBeat += ReadInt32Payload(mMessage);
     }
     mMessage.Clear();
@@ -336,7 +336,7 @@ bool CRejoinFeed::Route(
 
   if (mCatchingUp) {
     // What the driver or the UI says about beats the recording already holds.
-    if (type < static_cast<std::uint8_t>(EClientMsg::CLIMSG_Ack)) {
+    if (type < std::to_underlying(EClientMsg::CLIMSG_Ack)) {
       return true;
     }
     // Nobody is told yet; the local client keeps its books.
@@ -344,7 +344,7 @@ bool CRejoinFeed::Route(
     return true;
   }
 
-  if (!mLive && type == static_cast<std::uint8_t>(ECmdStreamOp::CMDST_Advance)) {
+  if (!mLive && type == std::to_underlying(ECmdStreamOp::CMDST_Advance)) {
     DeliverLocalBeats(ReadInt32Payload(msg));
     return true;
   }
@@ -453,7 +453,7 @@ void CRejoinFeed::NotePeerReport(
 
   CMessage cutMessage(EClientMsg::CLIMSG_PeerFeatures);
   CMessageStream cutStream(cutMessage);
-  cutStream.Write(static_cast<std::uint8_t>(EPeerMessageKind::RejoinInfo));
+  cutStream.Write(std::to_underlying(EPeerMessageKind::RejoinInfo));
   cutStream.Write(cut);
   for (CClientBase* const client : mManager.mClients) {
     if (dynamic_cast<CNetClient*>(client) != nullptr) {
@@ -477,7 +477,7 @@ int32_t CRejoinFeed::QueueBacklog(
     if (!message.ReadMessage(&backlog)) {
       break;
     }
-    const bool endsBeat = message.GetType().raw() == static_cast<std::uint8_t>(ECmdStreamOp::CMDST_Advance);
+    const bool endsBeat = message.GetType().raw() == std::to_underlying(ECmdStreamOp::CMDST_Advance);
     const std::int32_t delta = endsBeat ? ReadInt32Payload(message) : 0;
     if (beat >= skipThrough) {
       client.CClientBase::Process(message);
@@ -584,8 +584,8 @@ void CRejoinFeed::FinishCatchUp()
     const auto index = static_cast<std::size_t>(client->GetIndex());
     std::int32_t beat = ownCopyEnd[index];
     for (CMessage& message : mHeldIncoming[index]) {
-      if (beat >= 0 && message.GetType().raw() < static_cast<std::uint8_t>(EClientMsg::CLIMSG_Ack)) {
-        const bool endsBeat = message.GetType().raw() == static_cast<std::uint8_t>(ECmdStreamOp::CMDST_Advance);
+      if (beat >= 0 && message.GetType().raw() < std::to_underlying(EClientMsg::CLIMSG_Ack)) {
+        const bool endsBeat = message.GetType().raw() == std::to_underlying(ECmdStreamOp::CMDST_Advance);
         const std::int32_t delta = endsBeat ? ReadInt32Payload(message) : 0;
         const bool covered = beat < recordingQueued[index];
         beat += delta;
@@ -618,11 +618,11 @@ bool CRejoinFeed::ReadRecordedBeat()
   while (mMessage.Read(mRecording.get())) {
     const std::uint8_t type = mMessage.GetType().raw();
 
-    if (type == static_cast<std::uint8_t>(ECmdStreamOp::CMDST_SetCommandSource)) {
+    if (type == std::to_underlying(ECmdStreamOp::CMDST_SetCommandSource)) {
       // Not passed on: `UpdateState` writes each client's source itself.
       const std::uint8_t source = ReadSourcePayload(mMessage);
       mRecordedSource = source < mManager.mClients.size() ? mManager.mClients[source] : nullptr;
-    } else if (type == static_cast<std::uint8_t>(ECmdStreamOp::CMDST_Advance)) {
+    } else if (type == std::to_underlying(ECmdStreamOp::CMDST_Advance)) {
       const std::int32_t beatDelta = ReadInt32Payload(mMessage);
       mReadBeat += beatDelta;
       for (CClientBase* const client : mManager.mClients) {
@@ -637,7 +637,7 @@ bool CRejoinFeed::ReadRecordedBeat()
       return true;
     } else if (mRecordedSource == mLocal) {
       // From the handover the driver reports this client's checksums itself.
-      const bool driverSaysThis = !mCatchingUp && type == static_cast<std::uint8_t>(ECmdStreamOp::CMDST_VerifyChecksum);
+      const bool driverSaysThis = !mCatchingUp && type == std::to_underlying(ECmdStreamOp::CMDST_VerifyChecksum);
       if (!driverSaysThis) {
         mHeld.VirtWrite(mMessage.mBuff.start_, mMessage.mBuff.Size());
       }
@@ -658,7 +658,7 @@ void CRejoinFeed::DeliverLocalBeat()
     if (!message.ReadMessage(&mHeld)) {
       return;
     }
-    const bool endsBeat = message.GetType().raw() == static_cast<std::uint8_t>(ECmdStreamOp::CMDST_Advance);
+    const bool endsBeat = message.GetType().raw() == std::to_underlying(ECmdStreamOp::CMDST_Advance);
     mLocal->CClientBase::Process(message);
     if (endsBeat) {
       --mHeldBeats;
@@ -838,7 +838,7 @@ namespace
     constexpr size_t kAdvanceBytes = 3u + sizeof(std::int32_t);
     if (
       mSealed && size >= kAdvanceBytes &&
-      static_cast<std::uint8_t>(data[0]) == static_cast<std::uint8_t>(ECmdStreamOp::CMDST_Advance)
+      static_cast<std::uint8_t>(data[0]) == std::to_underlying(ECmdStreamOp::CMDST_Advance)
     ) {
       std::int32_t delta = 0;
       std::memcpy(&delta, data + 3, sizeof(delta));
@@ -1055,7 +1055,7 @@ namespace
         break;
       }
       if (beat < cutBeat) {
-        if (message.GetType().raw() == static_cast<std::uint8_t>(ECmdStreamOp::CMDST_Advance)) {
+        if (message.GetType().raw() == std::to_underlying(ECmdStreamOp::CMDST_Advance)) {
           beat += ReadInt32Payload(message);
         }
         kept.push_back(message);
@@ -1385,7 +1385,7 @@ namespace
       const std::size_t piece = std::min(kChunkBytes, size - sent);
       CMessage backlog(EClientMsg::CLIMSG_PeerFeatures);
       CMessageStream stream(backlog);
-      stream.Write(static_cast<std::uint8_t>(EPeerMessageKind::RejoinBacklog));
+      stream.Write(std::to_underlying(EPeerMessageKind::RejoinBacklog));
       stream.Write(index);
       stream.Write(bytes + sent, piece);
       peer.Process(backlog);
@@ -1415,7 +1415,7 @@ namespace
         if (!message.ReadMessage(&client->mPipe)) {
           break;
         }
-        const bool endsBeat = message.GetType().raw() == static_cast<std::uint8_t>(ECmdStreamOp::CMDST_Advance);
+        const bool endsBeat = message.GetType().raw() == std::to_underlying(ECmdStreamOp::CMDST_Advance);
         queued.push_back(message);
         if (endsBeat) {
           whole = queued.size();
@@ -1439,7 +1439,7 @@ namespace
 
     CMessage info(EClientMsg::CLIMSG_PeerFeatures);
     CMessageStream infoStream(info);
-    infoStream.Write(static_cast<std::uint8_t>(EPeerMessageKind::RejoinInfo));
+    infoStream.Write(std::to_underlying(EPeerMessageKind::RejoinInfo));
     infoStream.Write(static_cast<std::int32_t>(manager.mDispatchedBeat));
     for (CClientBase* const client : manager.mClients) {
       infoStream.Write(static_cast<std::int32_t>(client->mQueuedBeat));
@@ -1471,8 +1471,8 @@ namespace
   {
     CMessage refusal(EClientMsg::CLIMSG_PeerFeatures);
     CMessageStream stream(refusal);
-    stream.Write(static_cast<std::uint8_t>(EPeerMessageKind::RejoinRefused));
-    stream.Write(static_cast<std::uint8_t>(why));
+    stream.Write(std::to_underlying(EPeerMessageKind::RejoinRefused));
+    stream.Write(std::to_underlying(why));
     NetDataSpan span{
       reinterpret_cast<std::uint8_t*>(refusal.mBuff.start_),
       reinterpret_cast<std::uint8_t*>(refusal.mBuff.end_),
@@ -1608,7 +1608,7 @@ namespace
       const SRejoinNonce nonce = features.StartRejoinChallenge(mSeat.GetIndex());
       CMessage challenge(EClientMsg::CLIMSG_PeerFeatures);
       CMessageStream stream(challenge);
-      stream.Write(static_cast<std::uint8_t>(EPeerMessageKind::RejoinChallenge));
+      stream.Write(std::to_underlying(EPeerMessageKind::RejoinChallenge));
       stream.Write(nonce.data(), nonce.size());
       NetDataSpan span{
         reinterpret_cast<std::uint8_t*>(challenge.mBuff.start_),
@@ -1841,7 +1841,7 @@ void moho::REJOIN_ServeRestartedPeers(
         }
         CMessage size(EClientMsg::CLIMSG_PeerFeatures);
         CMessageStream sizeStream(size);
-        sizeStream.Write(static_cast<std::uint8_t>(EPeerMessageKind::RejoinRecordingSize));
+        sizeStream.Write(std::to_underlying(EPeerMessageKind::RejoinRecordingSize));
         sizeStream.Write(static_cast<std::int32_t>(bytes.size() + keyframe.size()));
         pending.peer->Process(size);
         SendBacklogBytes(*pending.peer, kRecordingBacklog, bytes.data(), bytes.size());
@@ -1931,18 +1931,14 @@ namespace
   std::unique_ptr<SSetup> sSetup;
 } // namespace
 
-bool moho::REJOIN_BeginSetup(
+std::expected<void, fa::string> moho::REJOIN_BeginSetup(
   const char* const peers,
   const int localSource,
-  const unsigned short localPort,
-  fa::string* const failureReason
+  const unsigned short localPort
 )
 {
-  const auto refuse = [failureReason](const char* const reason) {
-    if (failureReason != nullptr) {
-      *failureReason = reason;
-    }
-    return false;
+  const auto refuse = [](const char* const reason) {
+    return std::unexpected(fa::string(reason));
   };
 
   if (!REJOIN_LoadKey()) {
@@ -1997,7 +1993,7 @@ bool moho::REJOIN_BeginSetup(
 
     CMessage request(EClientMsg::CLIMSG_PeerFeatures);
     CMessageStream stream(request);
-    stream.Write(static_cast<std::uint8_t>(EPeerMessageKind::RejoinInfo));
+    stream.Write(std::to_underlying(EPeerMessageKind::RejoinInfo));
     stream.Write(index == 0 ? kRequestWithRecording : kRequestWithoutRecording);
     const std::string buildId = net_RejoinKeyframes != 0 ? KeyframeBuildId() : std::string{};
     stream.Write(buildId.c_str(), buildId.size() + 1u);
@@ -2011,7 +2007,7 @@ bool moho::REJOIN_BeginSetup(
   constexpr std::chrono::seconds kWait{90};
   setup->deadline = std::chrono::steady_clock::now() + kWait;
   sSetup = std::move(setup);
-  return true;
+  return {};
 }
 
 bool moho::REJOIN_SetupPending()

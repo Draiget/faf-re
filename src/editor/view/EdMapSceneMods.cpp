@@ -155,8 +155,7 @@ namespace faf::editor
     std::vector<ModObject> out;
     for (const SaveEntry& army : mDocument.SaveData().Armies()) {
       UnitGroup group;
-      std::string error;
-      if (!ParseUnitGroup(army.Get("Units"), group, error)) {
+      if (!ParseUnitGroup(army.Get("Units"), group)) {
         continue;
       }
       std::vector<const SaveUnit*> units;
@@ -202,8 +201,7 @@ namespace faf::editor
     int highest = 0;
     for (const SaveEntry& entry : armies) {
       UnitGroup group;
-      std::string error;
-      if (ParseUnitGroup(entry.Get("Units"), group, error)) {
+      if (ParseUnitGroup(entry.Get("Units"), group)) {
         highest = std::max(highest, HighestUnitNumber(group));
       }
     }
@@ -364,8 +362,7 @@ namespace faf::editor
     std::vector<std::vector<std::string>> paths;
     for (const SaveEntry& entry : mDocument.SaveData().Armies()) {
       UnitGroup root;
-      std::string error;
-      if (entry.name != army || !ParseUnitGroup(entry.Get("Units"), root, error)) {
+      if (entry.name != army || !ParseUnitGroup(entry.Get("Units"), root)) {
         continue;
       }
       paths.push_back({});

@@ -333,11 +333,14 @@ namespace faf::editor
       details.where = kWhereNames[4];
     }
     std::string text;
-    LuaText info;
-    std::string error;
-    if (!ReadGameFile(scenario, text) || !ReadLuaAssignment(text, "ScenarioInfo", info, error)) {
+    if (!ReadGameFile(scenario, text)) {
       return;
     }
+    const auto assigned = ReadLuaAssignment(text, "ScenarioInfo");
+    if (!assigned) {
+      return;
+    }
+    const LuaText& info = *assigned;
     if (const LuaText* const name = info.Field("name")) {
       details.title = Unquote(name->atom);
     }
@@ -462,11 +465,9 @@ namespace faf::editor
       std::ifstream in(scenarioFile, std::ios::binary);
       text.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
     }
-    LuaText info;
-    std::string error;
     std::string mount;
-    if (ReadLuaAssignment(text, "ScenarioInfo", info, error)) {
-      if (const LuaText* const map = info.Field("map")) {
+    if (const auto info = ReadLuaAssignment(text, "ScenarioInfo")) {
+      if (const LuaText* const map = info->Field("map")) {
         const std::string path = Lower(Unquote(map->atom));
         if (path.starts_with("/maps/") && path.find('/', 6) != std::string::npos) {
           mount = path.substr(6, path.find('/', 6) - 6);
@@ -531,13 +532,13 @@ namespace faf::editor
     const std::string& name
   )
   {
-    VaultMapName map;
-    std::string error;
-    if (!ParseVaultMapName(name, map, error)) {
-      mStatus = error;
-      gpg::Warnf("editor: vault: %s", error.c_str());
+    const auto parsed = ParseVaultMapName(name);
+    if (!parsed) {
+      mStatus = parsed.error();
+      gpg::Warnf("editor: vault: %s", parsed.error().c_str());
       return;
     }
+    const VaultMapName& map = *parsed;
     // Already listed: open it. On disk but not mounted (downloaded earlier, the game not restarted): mount it.
     if (const std::string listed = ListedScenario(map.folder); !listed.empty()) {
       mStatus = map.folder + " is already here; opened";

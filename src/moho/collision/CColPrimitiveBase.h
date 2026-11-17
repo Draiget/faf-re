@@ -453,7 +453,7 @@ namespace moho
     Wm3::Vec3f mLocalCenter; // +0x14
   };
 
-#if defined(_M_IX86) || defined(__i386__)
+#if FAFRE_ARCH_X86
   static_assert(sizeof(CColPrimitiveBase) == 0x04, "CColPrimitiveBase size must be 0x04");
 
   static_assert(

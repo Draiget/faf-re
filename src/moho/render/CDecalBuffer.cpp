@@ -37,7 +37,7 @@ namespace
     const SDecalInfo& decalInfo
   )
   {
-#if defined(_M_X64) || defined(__x86_64__)
+#if FAFRE_ARCH_64BIT
     // 6 entries of 0x90 bytes land in the binary's 896-byte class (0x0077ACC0).
     const void* const oldStorage = visibleDecals.begin();
     visibleDecals.push_back(decalInfo);
@@ -225,10 +225,16 @@ CDecalHandle* CDecalBuffer::CreateHandle(
     sourceArmy = armiesBegin[handle->mInfo.mArmy];
   }
 
+  // 0x00779509..0x00779566: a splat (a tread mark, `CreateSplat`, `CreateSplatOnBone`) starts out seen by the
+  // source's allies, and by everyone only while the source army plays without fog of war (its recon database's
+  // slot 0x44, `ReconGetFogOfWar`). Anyone else sees it only if they detect it in its first ten ticks
+  // (`CleanupTick`), so tracks made under the fog stay hidden.
   if (sourceArmy != nullptr && handle->mInfo.mIsSplat != 0u) {
-    const bool sourceIsCivilian = sourceArmy->mConstDat.mIsCivilian != 0u;
     for (std::size_t i = 0; i < armyCount; ++i) {
-      if (sourceArmy->mVarDat.mAllies.Contains(static_cast<std::uint32_t>(i)) || !sourceIsCivilian) {
+      if (
+        sourceArmy->mVarDat.mAllies.Contains(static_cast<std::uint32_t>(i)) ||
+        !sourceArmy->GetReconDB()->ReconGetFogOfWar()
+      ) {
         SetArmyVisibilityFlag(*handle, i);
       }
     }
@@ -435,7 +441,7 @@ void CDecalBuffer::CleanupTick()
     CDecalBucketSet expired;
     expired.swap(first->second);
     mStartTickBuckets.erase(first);
-#if defined(_M_X64) || defined(__x86_64__)
+#if FAFRE_ARCH_64BIT
     // The set is sorted by pointer, and each release can grow the id set's words, whose storage takes blocks
     // (`SimBlockLane`). Retail's heap gives this order nearly always: 26992801, ticks 4155 to 4157, has 2 of 204 ids
     // out of it, and it takes the same blocks retail does at all three.

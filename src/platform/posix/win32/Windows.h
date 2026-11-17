@@ -1,7 +1,7 @@
 #pragma once
 
 // Engine addition (dedicated-server plan WPL.5): the subset of <Windows.h> (and of the
-// MSVC CRT) that the shared simulation code uses, for the Linux build. cmake/FafLinux.cmake
+// MSVC CRT) that the shared simulation code uses, for the Linux build. cmake/FafPosix.cmake
 // puts this directory on the include path and platform/PosixCompat.h includes it in every
 // translation unit; Windows builds never see it. Types and constants have their Windows
 // sizes and values. The functions are implemented on POSIX in src/platform/posix/Win32Shim.cpp
@@ -595,7 +595,8 @@ DWORD GetModuleFileNameW(HMODULE module, wchar_t* fileName, DWORD size);
 BOOL SetProcessAffinityMask(HANDLE process, DWORD_PTR processMask);
 
 // The shell folders, as the XDG directories: CSIDL_LOCAL_APPDATA is $XDG_DATA_HOME
-// (~/.local/share), CSIDL_APPDATA $XDG_CONFIG_HOME (~/.config), CSIDL_PERSONAL and
+// (~/.local/share), CSIDL_APPDATA $XDG_CONFIG_HOME (~/.config); on macOS both are
+// ~/Library/Application Support (caches: platform/CacheFolder.h). CSIDL_PERSONAL and
 // CSIDL_DESKTOPDIRECTORY the user's XDG_DOCUMENTS_DIR and XDG_DESKTOP_DIR (user-dirs.dirs, then the
 // environment; ~/Documents and ~/Desktop without them); other folders fail with E_FAIL. The data
 // and documents folders are created when missing, as Windows' always exist; the desktop only with

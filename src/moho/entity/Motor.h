@@ -76,7 +76,7 @@ namespace moho
     {}
   };
 
-#if defined(_M_IX86)
+#if FAFRE_ARCH_X86
   static_assert(sizeof(Motor) == 0x04, "Motor size must be 0x04");
 #endif
 } // namespace moho

@@ -442,13 +442,14 @@ namespace
       return;
     }
     faf::remote::SServerConnectRequest request;
-    std::string error;
-    if (!faf::remote::MakeServerConnectRequest(
-          args[0].mStr.view(), args[1].mStr.view(), args[2].mNum, request, error
-        )) {
-      gpg::Logf("GPGNET: JoinServer refused: %s", error.c_str());
-      TellLauncher(faf::remote::kServerSessionCommand, {"refused", error.c_str()});
-      moho::WIN_OkBox("Ack!", error.c_str());
+    if (
+      auto made =
+        faf::remote::MakeServerConnectRequest(args[0].mStr.view(), args[1].mStr.view(), args[2].mNum, request);
+      !made
+    ) {
+      gpg::Logf("GPGNET: JoinServer refused: %s", made.error().c_str());
+      TellLauncher(faf::remote::kServerSessionCommand, {"refused", made.error().c_str()});
+      moho::WIN_OkBox("Ack!", made.error().c_str());
       return;
     }
     // The token stays out of the log, as on the command-line path.
@@ -457,6 +458,7 @@ namespace
       request.endpoint.c_str(),
       request.uid
     );
+    std::string error;
     if (
       faf::remote::StartServerSession(request, &StartServerLobbyTask, error) !=
       faf::remote::EServerSessionStart::Started

@@ -269,9 +269,9 @@ namespace gpg::diag
     {
       // Restore the original byte, rewind to the instruction, trap after it.
       RestoreInt3(probe.address, probe.originalByte);
-#if defined(_M_IX86)
+#if FAFRE_ARCH_X86
       context.Eip = static_cast<DWORD>(probe.address);
-#elif defined(_M_X64)
+#elif FAFRE_ARCH_X64
       context.Rip = probe.address;
 #endif
       context.EFlags |= 0x100; // TF
@@ -303,7 +303,7 @@ namespace gpg::diag
       buffer[length] = '\0';
 
       auto regValue = [&](const char* const name, std::uintptr_t& value) -> bool {
-#if defined(_M_IX86)
+#if FAFRE_ARCH_X86
         struct
         {
           const char* name;
@@ -318,7 +318,7 @@ namespace gpg::diag
           {"esp", context.Esp},
           {"ebp", context.Ebp},
         };
-#elif defined(_M_X64)
+#elif FAFRE_ARCH_X64
         struct
         {
           const char* name;
@@ -445,9 +445,9 @@ namespace gpg::diag
         writtenValue = *reinterpret_cast<std::uintptr_t*>(watch.address);
       }
 
-#if defined(_M_IX86)
+#if FAFRE_ARCH_X86
       const std::uintptr_t pc = context.Eip;
-#elif defined(_M_X64)
+#elif FAFRE_ARCH_X64
       const std::uintptr_t pc = context.Rip;
 #else
       const std::uintptr_t pc = 0;
@@ -535,9 +535,9 @@ namespace gpg::diag
       }
 
       if (code == EXCEPTION_BREAKPOINT) {
-#if defined(_M_IX86)
+#if FAFRE_ARCH_X86
         const std::uintptr_t site = context.Eip - 1;
-#elif defined(_M_X64)
+#elif FAFRE_ARCH_X64
         const std::uintptr_t site = context.Rip - 1;
 #else
         const std::uintptr_t site = 0;

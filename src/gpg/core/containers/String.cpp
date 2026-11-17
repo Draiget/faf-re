@@ -1,5 +1,6 @@
 #include "String.h"
 
+#include <utility>
 #include <cstdarg>
 #include <string_view>
 using namespace gpg;
@@ -770,7 +771,7 @@ namespace
   {
     WildcardMatchStepResult result = AdvanceWildcardLiteralLane(text, pattern);
     if (result != WildcardMatchStepResult::Star) {
-      return static_cast<int>(result);
+      return std::to_underlying(result);
     }
 
     while (true) {
@@ -788,7 +789,7 @@ namespace
               }
             }
             if (scanChar == '\0') {
-              return static_cast<int>(WildcardMatchStepResult::PrefixExhausted);
+              return std::to_underlying(WildcardMatchStepResult::PrefixExhausted);
             }
           }
         }
@@ -799,7 +800,7 @@ namespace
             break;
           }
           if (result != WildcardMatchStepResult::PatternExhausted) {
-            return static_cast<int>(result);
+            return std::to_underlying(result);
           }
         }
       }
@@ -832,7 +833,7 @@ bool gpg::STR_MatchWildcard(
   }
 
   if (caseSensitive) {
-    return MatchWildcardPatternLane(text, pattern) == static_cast<int>(WildcardMatchStepResult::Match);
+    return MatchWildcardPatternLane(text, pattern) == std::to_underlying(WildcardMatchStepResult::Match);
   }
 
   const char* starPattern = nullptr;
@@ -894,8 +895,8 @@ bool gpg::STR_WildcardValidPrefix(
 
   if (caseSensitive) {
     const int result = MatchWildcardPatternLane(prefix, pattern);
-    return result == static_cast<int>(WildcardMatchStepResult::Match) ||
-      result == static_cast<int>(WildcardMatchStepResult::PrefixExhausted);
+    return result == std::to_underlying(WildcardMatchStepResult::Match) ||
+      result == std::to_underlying(WildcardMatchStepResult::PrefixExhausted);
   }
 
   const char* starPattern = nullptr;

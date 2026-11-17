@@ -437,11 +437,12 @@ namespace faf::editor
       s->time = 0.0f;
       if (!s->animation.empty()) {
         std::string bytes;
-        std::string error;
         if (!readGameFile || !readGameFile(s->animation, bytes)) {
           s->status = "The game has no file " + s->animation + ".";
-        } else if (!ReadSca(std::vector<std::uint8_t>(bytes.begin(), bytes.end()), mPreviewAnim, error)) {
-          s->status = s->animation + ": " + error;
+        } else if (
+          const auto read = ReadSca(std::vector<std::uint8_t>(bytes.begin(), bytes.end()), mPreviewAnim); !read
+        ) {
+          s->status = s->animation + ": " + read.error();
         } else {
           s->duration = mPreviewAnim.duration;
           s->status = s->animation + ": " + std::to_string(mPreviewAnim.frames.size()) + " frames, " +

@@ -3,6 +3,7 @@
 #include "editor/graph/EdTextureGraph.h"
 
 #include <cstdint>
+#include <expected>
 #include <string>
 #include <vector>
 
@@ -19,9 +20,9 @@ namespace faf::editor
   /**
    * An image as a DDS file with a full mip chain (each level the box average of the one above, wrapping, as the image
    * tiles), with the classic header the game's Direct3D 9 decoder reads (ImageCodec::WriteDds). Grey images are
-   * written as grey RGB. False with `error` when the encoder fails.
+   * written as grey RGB. The error when the encoder fails.
    */
-  bool EncodeDds(const TexImage& image, DdsKind kind, std::vector<std::uint8_t>& out, std::string& error);
+  [[nodiscard]] std::expected<std::vector<std::uint8_t>, std::string> EncodeDds(const TexImage& image, DdsKind kind);
 
   /**
    * The size in bytes of the file EncodeDds writes for a `size` x `size` image: the 128-byte header and every mip

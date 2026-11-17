@@ -2,6 +2,7 @@
 
 #include <atomic>
 #include <cstdint>
+#include <expected>
 #include <filesystem>
 #include <mutex>
 #include <string>
@@ -24,12 +25,12 @@ namespace faf::editor
 
   /**
    * A map named as a user would paste it: its folder name (`dualgap_adaptive.v0012`, with or without `.zip`), or the
-   * archive's link (`https://content.faforever.com/maps/dualgap_adaptive.v0012.zip`). False with `error` otherwise.
+   * archive's link (`https://content.faforever.com/maps/dualgap_adaptive.v0012.zip`). The error otherwise.
    */
-  bool ParseVaultMapName(const std::string& text, VaultMapName& out, std::string& error);
+  [[nodiscard]] std::expected<VaultMapName, std::string> ParseVaultMapName(const std::string& text);
 
   /** The entries of a zip archive in memory (stored or deflated; sizes from the central directory). */
-  bool ReadZip(const std::string& zip, std::vector<ZipEntry>& entries, std::string& error);
+  [[nodiscard]] std::expected<std::vector<ZipEntry>, std::string> ReadZip(const std::string& zip);
 
   /**
    * Where a zip entry goes inside the map's folder: its path below the archive's top folder, which must be `folder`
@@ -38,15 +39,11 @@ namespace faf::editor
   std::string MapEntryPath(const std::string& entry, const std::string& folder);
 
   /**
-   * A map archive's files written into `mapsFolder/<folder>/`; false with `error` when the archive isn't that map's
-   * (no `_scenario.lua`, an entry outside its folder) or a file can't be written.
+   * A map archive's files written into `mapsFolder/<folder>/`; the error when the archive isn't that map's (no
+   * `_scenario.lua`, an entry outside its folder) or a file can't be written.
    */
-  bool InstallMapZip(
-    const std::string& zip,
-    const std::string& folder,
-    const std::filesystem::path& mapsFolder,
-    std::string& error
-  );
+  [[nodiscard]] std::expected<void, std::string>
+  InstallMapZip(const std::string& zip, const std::string& folder, const std::filesystem::path& mapsFolder);
 
   /** One map download from the vault, on its own thread: download, then install into the vault's maps folder. */
   class EdVaultDownload

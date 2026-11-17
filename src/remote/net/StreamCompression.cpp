@@ -1,5 +1,6 @@
 #include "remote/net/StreamCompression.h"
 
+#include <utility>
 #include <algorithm>
 
 // For `ZSTD_getCParams`: the library is linked in, at the version cmake/FafDependencies.cmake pins.
@@ -28,7 +29,7 @@ namespace faf::remote::net
   {
     std::vector<std::uint8_t> out;
     ByteWriter writer(out);
-    writer.Byte(static_cast<std::uint8_t>(ESeatMessage::CompressOffer));
+    writer.Byte(std::to_underlying(ESeatMessage::CompressOffer));
     writer.Varint(kCompressionFormat);
     writer.Byte(static_cast<std::uint8_t>(maxWindowLog));
     return out;
@@ -39,7 +40,7 @@ namespace faf::remote::net
     const std::size_t size
   ) noexcept
   {
-    if (size < 1u || data[0] != static_cast<std::uint8_t>(ESeatMessage::CompressOffer)) {
+    if (size < 1u || data[0] != std::to_underlying(ESeatMessage::CompressOffer)) {
       return std::nullopt;
     }
     ByteReader reader(data + 1, size - 1u);
@@ -97,7 +98,7 @@ namespace faf::remote::net
       return false;
     }
     ByteWriter writer(out);
-    writer.Byte(static_cast<std::uint8_t>(ESeatMessage::Compressed));
+    writer.Byte(std::to_underlying(ESeatMessage::Compressed));
     writer.Varint(size);
     const std::size_t head = out.size();
     // A flush ends the block: the bound for this input, plus a frame header (the first time) and a block header.
@@ -155,7 +156,7 @@ namespace faf::remote::net
   )
   {
     out.clear();
-    if (mContext == nullptr || size < 1u || data[0] != static_cast<std::uint8_t>(ESeatMessage::Compressed)) {
+    if (mContext == nullptr || size < 1u || data[0] != std::to_underlying(ESeatMessage::Compressed)) {
       return false;
     }
     ByteReader reader(data + 1, size - 1u);

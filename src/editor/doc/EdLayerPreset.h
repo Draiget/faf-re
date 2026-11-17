@@ -1,5 +1,6 @@
 #pragma once
 
+#include <expected>
 #include <string>
 #include <vector>
 
@@ -27,13 +28,13 @@ namespace faf::editor
    * scales, with its Unity-only fields (the loaded textures, written as instance id 0, and a tiling of 1, 1).
    */
   std::string LayerToScmsl(const LayerSettings& layer);
-  bool LayerFromScmsl(const std::string& text, LayerSettings& layer, std::string& error);
+  [[nodiscard]] std::expected<void, std::string> LayerFromScmsl(const std::string& text, LayerSettings& layer);
 
   /**
    * FAFME's layer set (`.scmst`, its StratumTemplate): the terrain shader's name and the ten layers, Stratum0 the lower
    * one to Stratum9 the upper one. Reading needs all ten.
    */
   std::string LayersToScmst(const std::string& shader, const std::vector<LayerSettings>& layers);
-  bool
-  LayersFromScmst(const std::string& text, std::string& shader, std::vector<LayerSettings>& layers, std::string& error);
+  [[nodiscard]] std::expected<void, std::string>
+  LayersFromScmst(const std::string& text, std::string& shader, std::vector<LayerSettings>& layers);
 } // namespace faf::editor

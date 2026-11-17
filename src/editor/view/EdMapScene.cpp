@@ -14,6 +14,7 @@
 #include "editor/tools/EdSymmetryFollow.h"
 #include "editor/doc/EdUnitFate.h"
 
+#include <utility>
 #include <algorithm>
 #include <chrono>
 #include <random>
@@ -849,8 +850,7 @@ namespace faf::editor
     if (mDocument.Adaptive() && (mTools->MarkersToolActive() || mTools->SelectToolActive())) {
       if (mAdaptiveText != mDocument.TablesText()) {
         mAdaptiveText = mDocument.TablesText();
-        std::string error;
-        if (!ParseAdaptiveTables(mAdaptiveText, mAdaptive, error)) {
+        if (!ParseAdaptiveTables(mAdaptiveText, mAdaptive)) {
           mAdaptive = AdaptiveTables{};
         }
       }
@@ -1414,12 +1414,12 @@ namespace faf::editor
       const std::uint8_t* const cells = mDocument.WaterMaskCells(mask, width, height);
       if (
         cells != nullptr &&
-        (mWaterMaskRunsRevision != mDocument.WaterMaskRevision() || mWaterMaskRunsKind != static_cast<int>(mask))
+        (mWaterMaskRunsRevision != mDocument.WaterMaskRevision() || mWaterMaskRunsKind != std::to_underlying(mask))
       ) {
         const std::vector<std::uint8_t> bands = WaterMaskBands(cells, width, height, mask);
         mWaterMaskRuns = TerrainTypeRuns(bands.data(), width, height, 0);
         mWaterMaskRunsRevision = mDocument.WaterMaskRevision();
-        mWaterMaskRunsKind = static_cast<int>(mask);
+        mWaterMaskRunsKind = std::to_underlying(mask);
       }
       // Foam white, flatness blue, depth bias amber; the higher the value, the stronger.
       const std::uint32_t tint = mask == WaterMask::Foam ? 0x00FFFFFFu
@@ -1660,7 +1660,7 @@ namespace faf::editor
         const char* const kinds[] = {"nothing", "prop", "marker", "unit", "decal"};
         gpg::Logf(
           "editor: /hovermarker: a click would pick %s%s%s",
-          kinds[static_cast<int>(hit.kind)],
+          kinds[std::to_underlying(hit.kind)],
           hit.kind == PickKind::Marker ? " " : "",
           hit.kind == PickKind::Marker && hit.index >= 0 && static_cast<std::size_t>(hit.index) < markers.size()
             ? markers[static_cast<std::size_t>(hit.index)].name.c_str()
@@ -1945,7 +1945,7 @@ namespace faf::editor
       gpg::Logf(
         "editor: symmetry found: mode %d (%d turns), %.1f%% of points, %d starts and %d resource markers fit, centre "
         "%.1f,%.1f (middle %.1f,%.1f)",
-        static_cast<int>(found.symmetry),
+        std::to_underlying(found.symmetry),
         found.turns,
         static_cast<double>(found.matched) * 100.0,
         found.startsMatched,
@@ -2237,8 +2237,7 @@ namespace faf::editor
       int highest = 0;
       for (const SaveEntry& entry : mDocument.SaveData().Armies()) {
         UnitGroup group;
-        std::string error;
-        if (ParseUnitGroup(entry.Get("Units"), group, error)) {
+        if (ParseUnitGroup(entry.Get("Units"), group)) {
           highest = std::max(highest, HighestUnitNumber(group));
         }
       }
@@ -3197,7 +3196,7 @@ namespace faf::editor
         "editor: masks: %d painted texels of layer%s %s show nothing under %s (all bytes 1-127, which its "
         "saturate(2m-1) hides: painted for a shader that reads masks as they are)",
         range.Total(),
-        strata.find(',') == std::string::npos ? "" : "s",
+        !strata.contains(',') ? "" : "s",
         strata.c_str(),
         TerrainShader().c_str()
       );
@@ -3378,16 +3377,14 @@ namespace faf::editor
     mLayerDragJoin = false;
   }
 
-  bool EdMapScene::ClearMaskLayer(
-    const int layer,
-    std::string& message
+  std::expected<std::string, std::string> EdMapScene::ClearMaskLayer(
+    const int layer
   )
   {
     LoadMasks();
     EdDocument::MaskGrid& masks = mDocument.Masks();
     if (masks.texels.empty() || mPaintingMask) {
-      message = "No map's masks to change.";
-      return false;
+      return std::unexpected("No map's masks to change.");
     }
     const SampleRect whole{0, 0, masks.width - 1, masks.height - 1};
     mDocument.MaskUndo().BeginStroke();
@@ -3396,8 +3393,7 @@ namespace faf::editor
       texel = WithMaskByte(texel, layer, 0);
     }
     WholeMaskChanged(whole);
-    message = "Cleared the mask of layer " + std::to_string(layer + 1);
-    return true;
+    return "Cleared the mask of layer " + std::to_string(layer + 1);
   }
 
   int EdMapScene::TerrainTypesFromTextures(
@@ -3444,16 +3440,14 @@ namespace faf::editor
     return static_cast<int>(changed);
   }
 
-  bool EdMapScene::FillMaskLayer(
-    const int layer,
-    std::string& message
+  std::expected<std::string, std::string> EdMapScene::FillMaskLayer(
+    const int layer
   )
   {
     LoadMasks();
     EdDocument::MaskGrid& masks = mDocument.Masks();
     if (masks.texels.empty() || mPaintingMask) {
-      message = "No map's masks to change.";
-      return false;
+      return std::unexpected("No map's masks to change.");
     }
     const SampleRect whole{0, 0, masks.width - 1, masks.height - 1};
     mDocument.MaskUndo().BeginStroke();
@@ -3463,29 +3457,24 @@ namespace faf::editor
       texel = WithMaskByte(texel, layer, 255);
     }
     WholeMaskChanged(whole);
-    message = "Filled the paint of layer " + std::to_string(layer + 1);
-    return true;
+    return "Filled the paint of layer " + std::to_string(layer + 1);
   }
 
-  bool EdMapScene::ImportMaskLayer(
+  std::expected<std::string, std::string> EdMapScene::ImportMaskLayer(
     const int layer,
-    const std::filesystem::path& file,
-    std::string& message
+    const std::filesystem::path& file
   )
   {
     LoadMasks();
     EdDocument::MaskGrid& masks = mDocument.Masks();
     if (masks.texels.empty() || mPaintingMask) {
-      message = "No map's masks to change.";
-      return false;
+      return std::unexpected("No map's masks to change.");
     }
-    HeightImage image;
-    std::string error;
-    if (!ReadHeightImage(file, masks.width, masks.height, image, error)) {
-      message = "Mask import failed: " + error;
-      return false;
+    const auto read = ReadHeightImage(file, masks.width, masks.height);
+    if (!read) {
+      return std::unexpected("Mask import failed: " + read.error());
     }
-    image = ResampleHeights(image, masks.width, masks.height);
+    const HeightImage image = ResampleHeights(*read, masks.width, masks.height);
     const SampleRect whole{0, 0, masks.width - 1, masks.height - 1};
     mDocument.MaskUndo().BeginStroke();
     mDocument.MaskUndo().BeforeWrite(masks.texels.data(), whole);
@@ -3499,21 +3488,18 @@ namespace faf::editor
       );
     }
     WholeMaskChanged(whole);
-    message = "Imported the mask of layer " + std::to_string(layer + 1) + " from " + file.string();
-    return true;
+    return "Imported the mask of layer " + std::to_string(layer + 1) + " from " + file.string();
   }
 
-  bool EdMapScene::SetMaskLayer(
+  std::expected<std::string, std::string> EdMapScene::SetMaskLayer(
     const int layer,
-    const TexImage& image,
-    std::string& message
+    const TexImage& image
   )
   {
     LoadMasks();
     EdDocument::MaskGrid& masks = mDocument.Masks();
     if (masks.texels.empty() || mPaintingMask || layer < 0 || layer > 7 || image.size <= 0) {
-      message = "No map's masks to change.";
-      return false;
+      return std::unexpected("No map's masks to change.");
     }
     const SampleRect whole{0, 0, masks.width - 1, masks.height - 1};
     mDocument.MaskUndo().BeginStroke();
@@ -3536,21 +3522,18 @@ namespace faf::editor
       }
     }
     WholeMaskChanged(whole);
-    message = "Set the mask of stratum " + std::to_string(layer + 1) + " from the material graph";
-    return true;
+    return "Set the mask of stratum " + std::to_string(layer + 1) + " from the material graph";
   }
 
-  bool EdMapScene::ExportMaskLayer(
+  std::expected<std::string, std::string> EdMapScene::ExportMaskLayer(
     const int layer,
-    const std::filesystem::path& file,
-    std::string& message
+    const std::filesystem::path& file
   )
   {
     LoadMasks();
     const EdDocument::MaskGrid& masks = mDocument.Masks();
     if (masks.texels.empty()) {
-      message = "No map's masks to export.";
-      return false;
+      return std::unexpected("No map's masks to export.");
     }
     HeightImage image;
     image.width = masks.width;
@@ -3561,13 +3544,10 @@ namespace faf::editor
     for (std::size_t i = 0; i < masks.texels.size(); ++i) {
       image.words[i] = static_cast<std::uint16_t>(MaskWeight(MaskByte(masks.texels[i], layer), remappedLayer) * 257.0f);
     }
-    std::string error;
-    if (!WriteHeightImage(file, image, error)) {
-      message = "Mask export failed: " + error;
-      return false;
+    if (const auto wrote = WriteHeightImage(file, image); !wrote) {
+      return std::unexpected("Mask export failed: " + wrote.error());
     }
-    message = "Exported the mask of layer " + std::to_string(layer + 1) + " to " + file.string();
-    return true;
+    return "Exported the mask of layer " + std::to_string(layer + 1) + " to " + file.string();
   }
 
   std::vector<std::string> EdMapScene::TerrainShaders()
@@ -4208,7 +4188,7 @@ namespace faf::editor
       mTools->SetCheckResult(report.checked, report.differing, report.largest, mCheckedWith, true);
       gpg::Logf(
         "editor: mask symmetry check (mode %d): %d of %d texels differ, by up to %d of 255",
-        static_cast<int>(mCheckedWith.symmetry),
+        std::to_underlying(mCheckedWith.symmetry),
         report.differing,
         report.checked,
         report.largest
@@ -4222,7 +4202,7 @@ namespace faf::editor
     mTools->SetCheckResult(report.checked, report.differing, report.largest, mCheckedWith);
     gpg::Logf(
       "editor: symmetry check (mode %d, %d turns): %d of %d vertices differ, by up to %d words; %zu blocks marked",
-      static_cast<int>(mCheckedWith.symmetry),
+      std::to_underlying(mCheckedWith.symmetry),
       mCheckedWith.turns,
       report.differing,
       report.checked,
@@ -4262,11 +4242,10 @@ namespace faf::editor
     const SampleRect whole{0, 0, field->width - 1, field->height - 1};
     mDocument.Heights().BeginStroke();
     mDocument.Heights().BeforeWrite(field->data, whole);
-    std::string error;
-    const bool made = SymmetrizeHeights(field->data, field->width, field->height, options, error);
+    const auto made = SymmetrizeHeights(field->data, field->width, field->height, options);
     mDocument.Heights().EndStroke(field->data);
     if (!made) {
-      gpg::Warnf("editor: make symmetric: %s", error.c_str());
+      gpg::Warnf("editor: make symmetric: %s", made.error().c_str());
       return;
     }
     mDocument.EditEnded(EdDocument::EditKind::Heights);
@@ -4274,9 +4253,9 @@ namespace faf::editor
     mDocument.SetModified(true);
     gpg::Logf(
       "editor: made the heights symmetric (mode %d, part %d, combine %d, seam %.0f, centre %.1f,%.1f)",
-      static_cast<int>(options.symmetry),
+      std::to_underlying(options.symmetry),
       options.part + 1,
-      static_cast<int>(options.combine),
+      std::to_underlying(options.combine),
       static_cast<double>(options.seam),
       static_cast<double>(options.centreX),
       static_cast<double>(options.centreZ)
@@ -4289,12 +4268,14 @@ namespace faf::editor
       int typesHeight = 0;
       if (std::uint8_t* const cells = mDocument.TerrainTypeCells(typesWidth, typesHeight); cells != nullptr) {
         std::vector<std::uint8_t> before = mDocument.TerrainTypesNow();
-        if (SymmetrizeCells(cells, typesWidth, typesHeight, field->width, field->height, options, error)) {
+        if (
+          const auto cellsMade = SymmetrizeCells(cells, typesWidth, typesHeight, field->width, field->height, options)
+        ) {
           mDocument.TerrainTypesEdited(std::move(before));
           mDocument.TerrainTypesChanged();
           gpg::Logf("editor: made the terrain types symmetric (%d x %d cells)", typesWidth, typesHeight);
         } else {
-          gpg::Warnf("editor: make symmetric, terrain types: %s", error.c_str());
+          gpg::Warnf("editor: make symmetric, terrain types: %s", cellsMade.error().c_str());
         }
       }
     }
@@ -4314,35 +4295,31 @@ namespace faf::editor
     const SampleRect whole{0, 0, masks.width - 1, masks.height - 1};
     mDocument.MaskUndo().BeginStroke();
     mDocument.MaskUndo().BeforeWrite(masks.texels.data(), whole);
-    std::string error;
-    const bool made =
-      SymmetrizeMasks(masks.texels.data(), masks.width, masks.height, field->width, field->height, options, error);
+    const auto made =
+      SymmetrizeMasks(masks.texels.data(), masks.width, masks.height, field->width, field->height, options);
     WholeMaskChanged(whole);
     if (!made) {
-      gpg::Warnf("editor: make symmetric, masks: %s", error.c_str());
+      gpg::Warnf("editor: make symmetric, masks: %s", made.error().c_str());
       return false;
     }
     gpg::Logf("editor: made the texture masks symmetric (%d x %d texels)", masks.width, masks.height);
     return true;
   }
 
-  bool EdMapScene::ImportHeights(
+  std::expected<std::string, std::string> EdMapScene::ImportHeights(
     const std::filesystem::path& file,
-    const float scale,
-    std::string& message
+    const float scale
   )
   {
     moho::CHeightField* const field = mMap != nullptr ? mMap->mTerrainRes->GetHeightField() : nullptr;
     if (field == nullptr || mPainting) {
-      message = "No map is open in the view.";
-      return false;
+      return std::unexpected("No map is open in the view.");
     }
-    HeightImage image;
-    std::string error;
-    if (!ReadHeightImage(file, field->width, field->height, image, error)) {
-      message = "Import failed: " + error;
-      return false;
+    auto read = ReadHeightImage(file, field->width, field->height);
+    if (!read) {
+      return std::unexpected("Import failed: " + read.error());
     }
+    HeightImage& image = *read;
     const int readWidth = image.width;
     const int readHeight = image.height;
     image = ResampleHeights(image, field->width, field->height);
@@ -4358,21 +4335,18 @@ namespace faf::editor
     if (mCheckDone) {
       RunSymmetryCheck();
     }
-    message = "Imported heights from " + file.string() + " (" + std::to_string(readWidth) + " x " +
+    return "Imported heights from " + file.string() + " (" + std::to_string(readWidth) + " x " +
       std::to_string(readHeight) + (readWidth != field->width || readHeight != field->height ? ", resampled" : "") +
       ")";
-    return true;
   }
 
-  bool EdMapScene::FlattenWhole(
-    const float height,
-    std::string& message
+  std::expected<std::string, std::string> EdMapScene::FlattenWhole(
+    const float height
   )
   {
     moho::CHeightField* const field = mMap != nullptr ? mMap->mTerrainRes->GetHeightField() : nullptr;
     if (field == nullptr || mPainting) {
-      message = "No map is open in the view.";
-      return false;
+      return std::unexpected("No map is open in the view.");
     }
     // Heights are stored in 1/128 units in 16 bits.
     const auto word = static_cast<std::uint16_t>(std::clamp(std::lround(height * 128.0f), 0L, 65535L));
@@ -4389,35 +4363,30 @@ namespace faf::editor
     }
     char text[96];
     (void)std::snprintf(text, sizeof(text), "Flattened the map to height %.2f", static_cast<float>(word) / 128.0f);
-    message = text;
     gpg::Logf("editor: %s", text);
-    return true;
+    return text;
   }
 
-  bool EdMapScene::WriteHeightRect(
+  std::expected<void, std::string> EdMapScene::WriteHeightRect(
     const int x0,
     const int z0,
     const int w,
     const int h,
-    const std::vector<float>& heights,
-    std::string& message
+    const std::vector<float>& heights
   )
   {
     moho::CHeightField* const field = mMap != nullptr ? mMap->mTerrainRes->GetHeightField() : nullptr;
     if (field == nullptr || mPainting) {
-      message = "no map is open in the view";
-      return false;
+      return std::unexpected("no map is open in the view");
     }
     if (w <= 0 || h <= 0 || heights.size() < static_cast<std::size_t>(w) * static_cast<std::size_t>(h)) {
-      message = "the list has fewer than w x h heights";
-      return false;
+      return std::unexpected("the list has fewer than w x h heights");
     }
     const SampleRect rect{
       std::max(0, x0), std::max(0, z0), std::min(field->width - 1, x0 + w - 1), std::min(field->height - 1, z0 + h - 1)
     };
     if (rect.x0 > rect.x1 || rect.z0 > rect.z1) {
-      message = "the rectangle is off the map";
-      return false;
+      return std::unexpected("the rectangle is off the map");
     }
     mDocument.Heights().BeginStroke();
     mDocument.Heights().BeforeWrite(field->data, rect);
@@ -4432,39 +4401,34 @@ namespace faf::editor
     mDocument.EditEnded(EdDocument::EditKind::Heights);
     RefreshHeights({rect});
     mDocument.SetModified(true);
-    return true;
+    return {};
   }
 
-  bool EdMapScene::WriteMaskRect(
+  std::expected<void, std::string> EdMapScene::WriteMaskRect(
     const int layer,
     const int x0,
     const int z0,
     const int w,
     const int h,
-    const std::vector<float>& weights,
-    std::string& message
+    const std::vector<float>& weights
   )
   {
     LoadMasks();
     EdDocument::MaskGrid& masks = mDocument.Masks();
     if (masks.texels.empty() || mPaintingMask) {
-      message = "no map's paint to change";
-      return false;
+      return std::unexpected("no map's paint to change");
     }
     if (layer < 1 || layer > 8) {
-      message = "layer is 1 to 8";
-      return false;
+      return std::unexpected("layer is 1 to 8");
     }
     if (w <= 0 || h <= 0 || weights.size() < static_cast<std::size_t>(w) * static_cast<std::size_t>(h)) {
-      message = "the list has fewer than w x h weights";
-      return false;
+      return std::unexpected("the list has fewer than w x h weights");
     }
     const SampleRect rect{
       std::max(0, x0), std::max(0, z0), std::min(masks.width - 1, x0 + w - 1), std::min(masks.height - 1, z0 + h - 1)
     };
     if (rect.x0 > rect.x1 || rect.z0 > rect.z1) {
-      message = "the rectangle is off the paint";
-      return false;
+      return std::unexpected("the rectangle is off the paint");
     }
     const int slot = layer - 1;
     const bool remapped = (RemappedStrata(TerrainShader()) & (1U << slot)) != 0;
@@ -4480,7 +4444,7 @@ namespace faf::editor
       }
     }
     WholeMaskChanged(rect);
-    return true;
+    return {};
   }
 
   bool EdMapScene::MaskSize(
@@ -4547,17 +4511,15 @@ namespace faf::editor
     return true;
   }
 
-  bool EdMapScene::ExportHeights(
+  std::expected<std::string, std::string> EdMapScene::ExportHeights(
     const std::filesystem::path& file,
     const int width,
-    const float scale,
-    std::string& message
+    const float scale
   )
   {
     const moho::CHeightField* const field = mMap != nullptr ? mMap->mTerrainRes->GetHeightField() : nullptr;
     if (field == nullptr) {
-      message = "No map is open in the view.";
-      return false;
+      return std::unexpected("No map is open in the view.");
     }
     HeightImage image;
     image.width = field->width;
@@ -4573,14 +4535,11 @@ namespace faf::editor
       image = ResampleHeights(image, width, height);
     }
     ScaleHeights(image, scale);
-    std::string error;
-    if (!WriteHeightImage(file, image, error, mTools != nullptr && mTools->ExportEightBit())) {
-      message = "Export failed: " + error;
-      return false;
+    if (const auto wrote = WriteHeightImage(file, image, mTools != nullptr && mTools->ExportEightBit()); !wrote) {
+      return std::unexpected("Export failed: " + wrote.error());
     }
-    message = "Exported heights to " + file.string() + " (" + std::to_string(image.width) + " x " +
+    return "Exported heights to " + file.string() + " (" + std::to_string(image.width) + " x " +
       std::to_string(image.height) + ")";
-    return true;
   }
 
   std::shared_ptr<TerrainSource> EdMapScene::TerrainHeights()
@@ -4715,11 +4674,11 @@ namespace faf::editor
       gpg::Logf(
         "editor: brush test: mode %d at %.0f,%.0f, radius %.0f, symmetry %d: %zu samples changed, ground %+.1f units, "
         "farthest change %.1f from a centre",
-        static_cast<int>(mode),
+        std::to_underlying(mode),
         static_cast<double>(x),
         static_cast<double>(z),
         static_cast<double>(brush.radius),
-        static_cast<int>(brush.symmetry),
+        std::to_underlying(brush.symmetry),
         changed,
         static_cast<double>(words) / 128.0,
         static_cast<double>(farthest)
@@ -5190,7 +5149,7 @@ namespace faf::editor
         for (std::size_t i = 0; i < mUnits.size() && i < mUnitRefs.size(); ++i) {
           if (mUnits[i] != nullptr) {
             const bool byPreview =
-              !previewHidden.empty() && previewHidden.count({mUnitRefs[i].army, mUnitRefs[i].name}) != 0;
+              !previewHidden.empty() && previewHidden.contains({mUnitRefs[i].army, mUnitRefs[i].name});
             previewed += byPreview ? 1 : 0;
             mUnits[i]->Cull(hideUnits || byPreview);
           }
@@ -5323,10 +5282,9 @@ namespace faf::editor
     int wrecks = 0;
     for (const SaveEntry& army : mDocument.SaveData().Armies()) {
       UnitGroup group;
-      std::string error;
-      if (!ParseUnitGroup(army.Get("Units"), group, error)) {
+      if (const auto read = ParseUnitGroup(army.Get("Units"), group); !read) {
         ++unreadable;
-        gpg::Warnf("editor: %s's units unreadable: %s", army.name.c_str(), error.c_str());
+        gpg::Warnf("editor: %s's units unreadable: %s", army.name.c_str(), read.error().c_str());
         continue;
       }
       std::vector<const SaveUnit*> units;
@@ -5520,8 +5478,7 @@ namespace faf::editor
     if (ask == EdTools::GroupAsk::Select) {
       for (const SaveEntry& entry : mDocument.SaveData().Armies()) {
         UnitGroup root;
-        std::string error;
-        if (entry.name != army || !ParseUnitGroup(entry.Get("Units"), root, error)) {
+        if (entry.name != army || !ParseUnitGroup(entry.Get("Units"), root)) {
           continue;
         }
         mUnitSelection.clear();
@@ -5716,8 +5673,7 @@ namespace faf::editor
       copied.kind = Clipboard::Kind::Units;
       for (const SaveEntry& entry : mDocument.SaveData().Armies()) {
         UnitGroup group;
-        std::string error;
-        if (!ParseUnitGroup(entry.Get("Units"), group, error)) {
+        if (!ParseUnitGroup(entry.Get("Units"), group)) {
           continue;
         }
         std::vector<const SaveUnit*> all;
@@ -5911,8 +5867,7 @@ namespace faf::editor
         int highest = 0;
         for (const SaveEntry& entry : mDocument.SaveData().Armies()) {
           UnitGroup group;
-          std::string error;
-          if (ParseUnitGroup(entry.Get("Units"), group, error)) {
+          if (ParseUnitGroup(entry.Get("Units"), group)) {
             highest = std::max(highest, HighestUnitNumber(group));
           }
         }
@@ -6549,7 +6504,12 @@ namespace faf::editor
       std::string error;
       const PadResult previous = mPadResult;
       const int changed = heightsStep(whole, [&] {
-        return ApplyPads(words, field->width, field->height, scale, pads, settings, previous, result, error);
+        const auto applied = ApplyPads(words, field->width, field->height, scale, pads, settings, previous, result);
+        if (!applied) {
+          error = applied.error();
+          return -1;
+        }
+        return *applied;
       });
       if (changed < 0) {
         return "Pads: " + error;
@@ -6592,7 +6552,12 @@ namespace faf::editor
       if (ask == EdTools::ScAsk::SlopeApply) {
         std::string error;
         const int changed = heightsStep(whole, [&] {
-          return LimitSlopes(words, field->width, field->height, scale, slope, error);
+          const auto limited = LimitSlopes(words, field->width, field->height, scale, slope);
+          if (!limited) {
+            error = limited.error();
+            return -1;
+          }
+          return *limited;
         });
         if (changed < 0) {
           return "Slope limit: " + error;
@@ -6774,13 +6739,13 @@ namespace faf::editor
       }
     }
     out.painted = profile.painted;
-    out.biplanar = profile.summary.find("biplanar") != std::string::npos;
+    out.biplanar = profile.summary.contains("biplanar");
     out.plan = PlanRecipe(kinds, out.textured, profile.painted, out.biplanar);
     out.hasPaint = true;
     out.pbr = profile.family == ShaderFamily::Pbr || profile.family == ShaderFamily::Splat;
     out.splat = profile.family == ShaderFamily::Splat;
-    out.macro = profile.summary.find("macro") != std::string::npos;
-    out.specular = profile.summary.find("specular") != std::string::npos;
+    out.macro = profile.summary.contains("macro");
+    out.specular = profile.summary.contains("specular");
     out.roughness = out.pbr && profile.painted == 7;
     // Heights from another tool: the Import / Export window's file (or a node's own) mapped as that window says.
     {
@@ -6795,7 +6760,7 @@ namespace faf::editor
         windowFile.c_str(),
         static_cast<unsigned long long>(stamp.size),
         stamp.written,
-        static_cast<int>(mapping.mapping),
+        std::to_underlying(mapping.mapping),
         static_cast<double>(mapping.low),
         static_cast<double>(mapping.high),
         static_cast<double>(mapping.scale),
@@ -6814,56 +6779,52 @@ namespace faf::editor
         std::to_string(mDocument.Layout().revision) + "|" + out.layoutSymmetry + "|" + std::to_string(brush.turns);
       const int width = field->width;
       const int height = field->height;
-      out.loadExternal =
-        [windowFile, mapping, width, height](const std::string& file, field::Grid& grid, std::string& error) {
+      out.loadExternal = [windowFile, mapping, width, height](
+                           const std::string& file, field::Grid& grid
+                         ) -> std::expected<void, std::string> {
         const std::string path = file.empty() ? windowFile : file;
         if (path.empty()) {
-          error = "no heightmap: choose one in Terrain > Import / Export, or type a file in the node";
-          return false;
+          return std::unexpected("no heightmap: choose one in Terrain > Import / Export, or type a file in the node");
         }
-        HeightImage image;
-        if (!ReadHeightImage(path, width, height, image, error)) {
-          error = path + ": " + error;
-          return false;
+        const auto image = ReadHeightImage(path, width, height);
+        if (!image) {
+          return std::unexpected(path + ": " + image.error());
         }
         ImportSettings settings = mapping;
         settings.blend = ImportSettings::Blend::Replace;
         settings.strength = 1.0f;
         const std::vector<std::uint16_t> words = ImportedHeights(
-          image, std::vector<std::uint16_t>(static_cast<std::size_t>(width) * height, 0), width, height, settings
+          *image, std::vector<std::uint16_t>(static_cast<std::size_t>(width) * height, 0), width, height, settings
         );
         grid = field::Grid(width, height, 1.0f, 0.0f, 0.0f);
         for (std::size_t k = 0; k < words.size(); ++k) {
           grid.v[k] = static_cast<float>(words[k]) / 128.0f;
         }
-        return true;
+        return {};
       };
       // A 16 bit image of any size, 0..1 (the Image node); resampled to the map's samples.
-      out.loadImage = [width, height](const std::string& file, field::Grid& grid, std::string& error) {
-        HeightImage image;
-        if (!ReadHeightImage(file, 0, 0, image, error)) {
-          error = file + ": " + error;
-          return false;
+      out.loadImage = [width, height](const std::string& file, field::Grid& grid) -> std::expected<void, std::string> {
+        const auto read = ReadHeightImage(file, 0, 0);
+        if (!read) {
+          return std::unexpected(file + ": " + read.error());
         }
-        image = ResampleHeights(image, width, height);
+        const HeightImage image = ResampleHeights(*read, width, height);
         grid = field::Grid(width, height, 1.0f, 0.0f, 0.0f);
         for (std::size_t k = 0; k < image.words.size(); ++k) {
           grid.v[k] = static_cast<float>(image.words[k]) / 65535.0f;
         }
-        return true;
+        return {};
       };
       // A layer's paint as the map shows it (the Texture layer node), read when the node runs (on this thread).
       out.paintKey = std::to_string(MasksHash());
-      out.layerMask = [this, width](const int layer, field::Grid& grid, std::string& error) {
+      out.layerMask = [this, width](const int layer, field::Grid& grid) -> std::expected<void, std::string> {
         if (layer < 1 || layer > 8) {
-          error = "layers are 1 to 8";
-          return false;
+          return std::unexpected("layers are 1 to 8");
         }
         LoadMasks();
         const EdDocument::MaskGrid& masks = mDocument.Masks();
         if (masks.texels.empty() || masks.width < 2 || masks.height < 2) {
-          error = "the map has no paint masks";
-          return false;
+          return std::unexpected("the map has no paint masks");
         }
         const bool remapped = (RemappedStrata(TerrainShader()) & (1U << (layer - 1))) != 0;
         // Each texel covers its share of the map: its sample in the middle of that square.
@@ -6872,14 +6833,13 @@ namespace faf::editor
         for (std::size_t i = 0; i < masks.texels.size(); ++i) {
           grid.v[i] = MaskWeight(MaskByte(masks.texels[i], layer - 1), remapped) / 255.0f;
         }
-        return true;
+        return {};
       };
       // Named masks: files beside the window's heightmap, by name (FAF Studio's adopted files).
       out.loadExternalMask =
-        [windowFile, width, height](const std::string& name, field::Grid& grid, std::string& error) {
+        [windowFile, width, height](const std::string& name, field::Grid& grid) -> std::expected<void, std::string> {
         if (windowFile.empty()) {
-          error = "no heightmap chosen in Terrain > Import / Export: named masks are found beside it";
-          return false;
+          return std::unexpected("no heightmap chosen in Terrain > Import / Export: named masks are found beside it");
         }
         std::vector<std::string> files;
         std::error_code ignored;
@@ -6889,20 +6849,20 @@ namespace faf::editor
         }
         const std::string found = FindNamedMask(files, name);
         if (found.empty()) {
-          error = "no mask named " + name + " beside " + std::filesystem::path(windowFile).filename().string();
-          return false;
+          return std::unexpected(
+            "no mask named " + name + " beside " + std::filesystem::path(windowFile).filename().string()
+          );
         }
-        HeightImage image;
-        if (!ReadHeightImage(found, 0, 0, image, error)) {
-          error = found + ": " + error;
-          return false;
+        const auto read = ReadHeightImage(found, 0, 0);
+        if (!read) {
+          return std::unexpected(found + ": " + read.error());
         }
-        image = ResampleHeights(image, width, height);
+        const HeightImage image = ResampleHeights(*read, width, height);
         grid = field::Grid(width, height, 1.0f, 0.0f, 0.0f);
         for (std::size_t k = 0; k < image.words.size(); ++k) {
           grid.v[k] = static_cast<float>(image.words[k]) / 65535.0f;
         }
-        return true;
+        return {};
       };
     }
     // The map's light.
@@ -7155,7 +7115,6 @@ namespace faf::editor
     const std::size_t count = static_cast<std::size_t>(width) * static_cast<std::size_t>(height);
     auto* const words = reinterpret_cast<std::uint16_t*>(field->data);
     std::vector<float> target;
-    std::string error;
     if (result.w == width && result.h == height) {
       target = result.v;
     } else {
@@ -7171,8 +7130,9 @@ namespace faf::editor
         down.in["a"] = fine;
         down.in["like"] = source;
         field::Grid coarseBase;
-        if (!field::RunOpCpu("resample", down, coarseBase, error) || !coarseBase.SameShape(result)) {
-          return "Preview: " + error;
+        const auto ran = field::RunOpCpu("resample", down, coarseBase);
+        if (!ran || !coarseBase.SameShape(result)) {
+          return "Preview: " + (ran ? std::string() : ran.error());
         }
         auto delta = std::make_shared<field::Grid>(result);
         for (std::size_t k = 0; k < delta->v.size(); ++k) {
@@ -7186,8 +7146,9 @@ namespace faf::editor
       field::Grid upsampled;
       // A finer result (after an Oversample node) is averaged down; a coarser one put up smoothly.
       const char* const op = result.w > width ? "downsample" : "upsample";
-      if (!field::RunOpCpu(op, up, upsampled, error) || upsampled.v.size() != count) {
-        return "Preview: " + error;
+      const auto ran = field::RunOpCpu(op, up, upsampled);
+      if (!ran || upsampled.v.size() != count) {
+        return "Preview: " + (ran ? std::string() : ran.error());
       }
       target = std::move(upsampled.v);
       if (!plain) {
@@ -7272,11 +7233,11 @@ namespace faf::editor
     }
     const std::string file = mTools->InteropFile(false);
     ImportSettings settings = mTools->InteropSettings();
-    HeightImage image;
-    std::string error;
-    if (!ReadHeightImageWith(file, field->width, field->height, settings.read, image, error)) {
-      return "Import failed: " + error;
+    auto read = ReadHeightImageWith(file, field->width, field->height, settings.read);
+    if (!read) {
+      return "Import failed: " + read.error();
     }
+    HeightImage& image = *read;
     // FAF Studio's further options: the playable area as the region, the pads' spots, the mask image, the sea.
     if (settings.regionPlayable) {
       if (const std::optional<EdDocument::PlayableRect> area = mDocument.PlayableArea(); area.has_value()) {
@@ -7297,11 +7258,11 @@ namespace faf::editor
       }
     }
     if (!settings.maskFile.empty()) {
-      HeightImage mask;
-      if (!ReadHeightImage(settings.maskFile, field->width, field->height, mask, error)) {
-        return "Import failed: the mask image: " + error;
+      const auto readMask = ReadHeightImage(settings.maskFile, field->width, field->height);
+      if (!readMask) {
+        return "Import failed: the mask image: " + readMask.error();
       }
-      mask = ResampleHeights(mask, field->width, field->height);
+      const HeightImage mask = ResampleHeights(*readMask, field->width, field->height);
       settings.maskWeights.resize(mask.words.size());
       for (std::size_t i = 0; i < mask.words.size(); ++i) {
         settings.maskWeights[i] = static_cast<float>(mask.words[i]) / 65535.0f;
@@ -7323,8 +7284,7 @@ namespace faf::editor
         SymmetrizeOptions options;
         options.symmetry = brush.symmetry;
         options.turns = brush.turns;
-        std::string why;
-        (void)SymmetrizeHeights(next.data(), field->width, field->height, options, why);
+        (void)SymmetrizeHeights(next.data(), field->width, field->height, options);
       }
     }
     std::size_t changed = 0;
@@ -7404,12 +7364,12 @@ namespace faf::editor
     switch (ask) {
     case EdTools::InteropAsk::Probe: {
       const std::string file = mTools->InteropFile(false);
-      HeightImage image;
-      std::string error;
-      if (!ReadHeightImage(file, field->width, field->height, image, error)) {
-        mTools->SetInteropProbe("Can't read it: " + error);
+      const auto read = ReadHeightImage(file, field->width, field->height);
+      if (!read) {
+        mTools->SetInteropProbe("Can't read it: " + read.error());
         return {};
       }
+      const HeightImage& image = *read;
       std::uint16_t darkest = 0, brightest = 0;
       HeightImageRange(image, darkest, brightest);
       const ImportSettings& s = mTools->InteropSettings();
@@ -7457,11 +7417,12 @@ namespace faf::editor
     case EdTools::InteropAsk::Export:
     case EdTools::InteropAsk::SendAndWatch: {
       const std::string file = mTools->InteropFile(true);
-      std::string message;
       const float scale = mTools->InteropExportScale();
-      if (!ExportHeights(file, mTools->InteropExportWidth(), scale, message)) {
-        return message;
+      const auto exported = ExportHeights(file, mTools->InteropExportWidth(), scale);
+      if (!exported) {
+        return exported.error();
       }
+      std::string message = *exported;
       if (mTools->InteropSidecar()) {
         ExportFacts facts;
         facts.map = mDocument.FolderName();
@@ -7617,11 +7578,10 @@ namespace faf::editor
     const auto started = std::chrono::steady_clock::now();
     mDocument.Heights().BeginStroke();
     mDocument.Heights().BeforeWrite(field->data, whole);
-    std::string error;
     const EdTools::ErosionMaskChoice& choice = mTools->ErosionMasksChosen();
     const bool wantMasks = !preview && (choice.on[0] || choice.on[1] || choice.on[2] || choice.on[3]);
     ErosionMasks made_masks;
-    const bool made = ErodeHeights(
+    const auto made = ErodeHeights(
       reinterpret_cast<std::uint16_t*>(field->data),
       field->width,
       field->height,
@@ -7629,13 +7589,12 @@ namespace faf::editor
       *solver,
       values,
       step,
-      error,
       wantMasks ? &made_masks : nullptr
     );
     mDocument.Heights().EndStroke(field->data);
     if (!made) {
-      gpg::Warnf("editor: erosion: %s", error.c_str());
-      return "The solver stopped: " + error;
+      gpg::Warnf("editor: erosion: %s", made.error().c_str());
+      return "The solver stopped: " + made.error();
     }
     // The chosen masks into their layers, in the same undo step as the heights.
     int painted = 0;
@@ -8518,7 +8477,7 @@ namespace faf::editor
     for (std::size_t i = 0; i < mUnitRefs.size() && pickable.units && (mTools == nullptr || mTools->ShowUnits()); ++i) {
       if (
         mTools != nullptr && !mTools->PreviewHiddenUnits().empty() &&
-        mTools->PreviewHiddenUnits().count({mUnitRefs[i].army, mUnitRefs[i].name}) != 0
+        mTools->PreviewHiddenUnits().contains({mUnitRefs[i].army, mUnitRefs[i].name})
       ) {
         continue; // hidden by the lobby preview
       }
@@ -8800,8 +8759,7 @@ namespace faf::editor
       out.heading = ref.orientation[1] * 180.0f / kPi;
       for (const SaveEntry& entry : mDocument.SaveData().Armies()) {
         UnitGroup group;
-        std::string error;
-        if (entry.name == ref.army && ParseUnitGroup(entry.Get("Units"), group, error)) {
+        if (entry.name == ref.army && ParseUnitGroup(entry.Get("Units"), group)) {
           if (const SaveUnit* const unit = FindUnit(group, ref.name); unit != nullptr) {
             out.type = unit->type;
           }
@@ -9049,7 +9007,7 @@ namespace faf::editor
     const std::set<std::string>& hidden = mTools->HiddenMarkerTypes();
     for (const SaveEntry& marker : mDocument.SaveData().Markers()) {
       const std::string type = MarkerTypeOf(marker);
-      if ((type != "Mass" && type != "Hydrocarbon") || hidden.count(type) != 0) {
+      if ((type != "Mass" && type != "Hydrocarbon") || hidden.contains(type)) {
         continue;
       }
       float x = 0.0f, y = 0.0f, z = 0.0f;
@@ -9092,7 +9050,7 @@ namespace faf::editor
       }
       const bool offGrid = std::fabs(SnapFootprint(mark.x, mark.sizeX) - mark.x) > 0.01f ||
         std::fabs(SnapFootprint(mark.z, mark.sizeZ) - mark.z) > 0.01f;
-      mark.state = mResourceProblems.count(mark.marker) != 0 ? 1 : stacked ? 2 : offGrid ? 3 : 0;
+      mark.state = mResourceProblems.contains(mark.marker) ? 1 : stacked ? 2 : offGrid ? 3 : 0;
     }
     return out;
   }
@@ -9898,7 +9856,7 @@ namespace faf::editor
       const bool selected =
         std::find(mMarkerSelection.begin(), mMarkerSelection.end(), marker.name) != mMarkerSelection.end();
       const bool hovered = marker.name == mHoverMarker;
-      if (!selected && !hovered && (!close || hidden.count(MarkerTypeOf(marker)) != 0)) {
+      if (!selected && !hovered && (!close || hidden.contains(MarkerTypeOf(marker)))) {
         continue;
       }
       float x = 0.0f, y = 0.0f, z = 0.0f;
@@ -9989,8 +9947,8 @@ namespace faf::editor
       return false;
     }
     // By type (the Markers panel), or by name (a resource a previewed lobby setting doesn't spawn).
-    return (!mTools->HiddenMarkerTypes().empty() && mTools->HiddenMarkerTypes().count(MarkerTypeOf(marker)) != 0) ||
-      (!mTools->PreviewHiddenMarkers().empty() && mTools->PreviewHiddenMarkers().count(marker.name) != 0);
+    return (!mTools->HiddenMarkerTypes().empty() && mTools->HiddenMarkerTypes().contains(MarkerTypeOf(marker))) ||
+      (!mTools->PreviewHiddenMarkers().empty() && mTools->PreviewHiddenMarkers().contains(marker.name));
   }
 
   void EdMapScene::SelectMarkers(
@@ -10063,16 +10021,15 @@ namespace faf::editor
     gpg::Warnf("editor: /selectunit: no unit %s in %s", name.c_str(), army.c_str());
   }
 
-  bool EdMapScene::ImportMarkerFile(
-    const std::string& text,
-    MarkerImport& result,
-    std::string& error
+  std::expected<MarkerImport, std::string> EdMapScene::ImportMarkerFile(
+    const std::string& text
   )
   {
     EdDocument::SaveSnapshot before = mDocument.SaveDataNow();
     std::vector<SaveEntry> markers = mDocument.SaveData().Markers();
-    if (!MarkersFromFafmapmarkers(text, markers, result, error, mDocument.ArmyNamesInUse())) {
-      return false;
+    MarkerImport result;
+    if (const auto read = MarkersFromFafmapmarkers(text, markers, result, mDocument.ArmyNamesInUse()); !read) {
+      return std::unexpected(read.error());
     }
     if (!result.names.empty()) {
       // A start position is an army, as when one is placed: the scenario's list and the save's Armies get it.
@@ -10089,7 +10046,7 @@ namespace faf::editor
       mMarkerSelection = result.names;
       mOutsideStale = true;
     }
-    return true;
+    return result;
   }
 
   std::vector<SaveEntry> EdMapScene::SelectedMarkers() const
@@ -10286,7 +10243,7 @@ namespace faf::editor
     for (const std::string& selected : mMarkerSelection) {
       float sourceX = 0.0f, sourceZ = 0.0f;
       std::string sourceType;
-      if (selected == target || covered.count(selected) != 0 || !position(selected, sourceX, sourceZ, sourceType)) {
+      if (selected == target || covered.contains(selected) || !position(selected, sourceX, sourceZ, sourceType)) {
         continue;
       }
       std::string source = selected;
@@ -10492,7 +10449,7 @@ namespace faf::editor
             return chain.markers.size();
           }
         }
-        return std::size_t{0};
+        return 0uz;
       }());
     }
     if (!mMarkerSelection.empty()) {
@@ -10545,17 +10502,14 @@ namespace faf::editor
             effect.substr(at, semicolon == std::string::npos ? std::string::npos : semicolon - at);
           at = semicolon == std::string::npos ? effect.size() : semicolon + 1;
           std::string text;
-          EmitterBlueprint emitter;
-          FlatBlueprint flat;
-          std::string error;
           if (path.empty() || !ReadGameFile(path, text)) {
             continue;
           }
           auto preview = std::make_unique<EdParticlePreview>();
-          if (ParseEmitter(text, emitter, error)) {
-            preview->SetEmitter(emitter);
-          } else if (ParseFlatBlueprint(text, flat, error)) {
-            preview->SetFlat(flat);
+          if (const auto emitter = ParseEmitter(text)) {
+            preview->SetEmitter(*emitter);
+          } else if (const auto flat = ParseFlatBlueprint(text)) {
+            preview->SetFlat(*flat);
           } else {
             continue;
           }
@@ -10573,7 +10527,7 @@ namespace faf::editor
       }
     }
     for (auto it = mEffects.begin(); it != mEffects.end();) {
-      it = seen.count(it->first) == 0 ? mEffects.erase(it) : std::next(it);
+      it = !seen.contains(it->first) ? mEffects.erase(it) : std::next(it);
     }
   }
 
@@ -11101,10 +11055,7 @@ namespace faf::editor
         continue;
       }
       float x = 0.0f, y = 0.0f, z = 0.0f;
-      if (
-        marker.Get("resource").find("true") == std::string::npos || MarkerHidden(marker) ||
-        !ShownMarkerPosition(marker, x, y, z)
-      ) {
+      if (!marker.Get("resource").contains("true") || MarkerHidden(marker) || !ShownMarkerPosition(marker, x, y, z)) {
         continue;
       }
       const Deposit* const deposit = type == "Mass" ? &mass : &hydro;
@@ -11113,7 +11064,7 @@ namespace faf::editor
       }
     }
     for (auto it = mDeposits.begin(); it != mDeposits.end();) {
-      if (wanted.count(it->first) == 0) {
+      if (!wanted.contains(it->first)) {
         delete it->second;
         it = mDeposits.erase(it);
       } else {
@@ -11586,7 +11537,7 @@ namespace faf::editor
       std::vector<SaveEntry> kept;
       int next = 1;
       for (const SaveEntry& a : areas) {
-        if (a.name.rfind("AREA_", 0) == 0) {
+        if (a.name.starts_with("AREA_")) {
           next = std::max(next, std::atoi(a.name.c_str() + 5) + 1);
         }
       }
@@ -12698,7 +12649,7 @@ namespace faf::editor
       return;
     }
     FindKind kind = FindKind::Count;
-    for (int k = 0; k < static_cast<int>(FindKind::Count); ++k) {
+    for (int k = 0; k < std::to_underlying(FindKind::Count); ++k) {
       if (
         parts[0] == FindKindName(static_cast<FindKind>(k)) ||
         parts[0] == std::string(FindKindName(static_cast<FindKind>(k))) + "s"
@@ -12710,9 +12661,7 @@ namespace faf::editor
     int group = -1;
     const auto pick = [&](const std::string& part, const std::string& not_) -> std::string {
       for (const FindTypeCount& t : types) {
-        if (
-          t.kind == kind && t.type != not_ && t.type.find(part) != std::string::npos && (group < 0 || t.group == group)
-        ) {
+        if (t.kind == kind && t.type != not_ && t.type.contains(part) && (group < 0 || t.group == group)) {
           group = t.group;
           return t.type;
         }
@@ -14168,7 +14117,7 @@ namespace faf::editor
     if (const std::size_t comma = spec.find(','); comma != std::string::npos) {
       fill.spacing = std::strtof(spec.c_str() + comma + 1, nullptr);
     }
-    const bool keep = spec.find("keep") != std::string::npos;
+    const bool keep = spec.contains("keep");
     std::string blueprint;
     for (const FindTypeCount& t : CountFindTypes(FindObjects())) {
       if (t.kind == FindKind::Prop) {
@@ -14471,9 +14420,8 @@ namespace faf::editor
         continue;
       }
       UnitGroup group;
-      std::string error;
-      if (!ParseUnitGroup(entry.Get("Units"), group, error)) {
-        gpg::Warnf("editor: %s's units unreadable, not changed: %s", army.c_str(), error.c_str());
+      if (const auto read = ParseUnitGroup(entry.Get("Units"), group); !read) {
+        gpg::Warnf("editor: %s's units unreadable, not changed: %s", army.c_str(), read.error().c_str());
         return false;
       }
       change(group);
@@ -14520,8 +14468,7 @@ namespace faf::editor
     int highest = 0;
     for (const SaveEntry& entry : mDocument.SaveData().Armies()) {
       UnitGroup group;
-      std::string error;
-      if (ParseUnitGroup(entry.Get("Units"), group, error)) {
+      if (ParseUnitGroup(entry.Get("Units"), group)) {
         highest = std::max(highest, HighestUnitNumber(group));
       }
     }
@@ -14636,8 +14583,7 @@ namespace faf::editor
     std::vector<SaveUnit> units;
     for (const SaveEntry& entry : mDocument.SaveData().Armies()) {
       UnitGroup group;
-      std::string error;
-      if (!ParseUnitGroup(entry.Get("Units"), group, error)) {
+      if (!ParseUnitGroup(entry.Get("Units"), group)) {
         continue;
       }
       std::vector<const SaveUnit*> all;
@@ -14655,27 +14601,24 @@ namespace faf::editor
     return units;
   }
 
-  bool EdMapScene::ImportUnitFile(
+  std::expected<void, std::string> EdMapScene::ImportUnitFile(
     const std::string& text,
     const std::string& army,
     std::vector<std::string>& names,
-    bool& moved,
-    std::string& error
+    bool& moved
   )
   {
     const moho::CHeightField* const field = mMap != nullptr ? mMap->mTerrainRes->GetHeightField() : nullptr;
     if (field == nullptr) {
-      error = "no map shown";
-      return false;
+      return std::unexpected("no map shown");
     }
     std::vector<SaveUnit> units;
     float centre[3];
-    if (!UnitsFromScunits(text, units, centre, error)) {
-      return false;
+    if (const auto read = UnitsFromScunits(text, units, centre); !read) {
+      return std::unexpected(read.error());
     }
     if (units.empty()) {
-      error = "the file has no units";
-      return false;
+      return std::unexpected("the file has no units");
     }
     const float width = static_cast<float>(field->width - 1);
     const float height = static_cast<float>(field->height - 1);
@@ -14684,8 +14627,7 @@ namespace faf::editor
     int highest = 0;
     for (const SaveEntry& entry : mDocument.SaveData().Armies()) {
       UnitGroup group;
-      std::string parseError;
-      if (ParseUnitGroup(entry.Get("Units"), group, parseError)) {
+      if (ParseUnitGroup(entry.Get("Units"), group)) {
         highest = std::max(highest, HighestUnitNumber(group));
       }
     }
@@ -14703,9 +14645,8 @@ namespace faf::editor
       }
     });
     if (!added) {
-      error = "the army's units can't be changed";
       names.clear();
-      return false;
+      return std::unexpected("the army's units can't be changed");
     }
     mDocument.SaveDataEdited(std::move(before));
     ReloadUnits();
@@ -14713,7 +14654,7 @@ namespace faf::editor
     for (const std::string& name : names) {
       mUnitSelection.emplace_back(army, name);
     }
-    return true;
+    return {};
   }
 
   void EdMapScene::DeleteSelectedUnits()
@@ -14885,8 +14826,8 @@ namespace faf::editor
       // A swaying prop (UndulatingNormalMappedAlpha: the trees) gets the swaying shell and redraw, so they move with
       // it; its shell a hairline (each leaf card gets a rim; a wide rim on every card painted a tree group amber).
       const std::string shader = lod->mShaderName.c_str();
-      const bool alphaTested = shader.find("Alpha") != std::string::npos;
-      const bool sways = shader.find("Undulating") != std::string::npos;
+      const bool alphaTested = shader.contains("Alpha");
+      const bool sways = shader.contains("Undulating");
       const char* const shellTechnique = sways ? "EditorOutlineAlphaSway"
         : alphaTested                          ? "EditorOutlineAlpha"
                                                : "EditorOutline";

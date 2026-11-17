@@ -358,7 +358,7 @@ namespace faf::headless
     record->destroyed = true;
     record->ended = side.beat;
     if (!record->endingSeen) {
-      const bool script = client ? mViewScript.count(id) != 0u : mScriptDestroyed.count(id) != 0u;
+      const bool script = client ? mViewScript.contains(id) : mScriptDestroyed.contains(id);
       record->end = script ? EEnd::Script : EEnd::Other;
     }
     side.released.push_back(&effect);
@@ -794,8 +794,7 @@ namespace faf::headless
       ++endPairs[static_cast<std::size_t>(lock.end)][static_cast<std::size_t>(client.end)];
       onCollisionBeamBone1 += lock.onCollisionBeam && lock.bone == 1 ? 1u : 0u;
       if (lock.hashed && client.hashed && client.incarnations == 1u && client.created == lock.created) {
-        const std::string what =
-          lock.op == moho::EEffectOp::CreateBeam && mNames[lock.blueprint].rfind("params:", 0) == 0
+        const std::string what = lock.op == moho::EEffectOp::CreateBeam && mNames[lock.blueprint].starts_with("params:")
           ? "CreateBeam from parameters"
           : moho::EffectOpName(lock.op);
         auto& entry = paramsBy[what];
@@ -880,7 +879,7 @@ namespace faf::headless
     for (const auto& [id, client] : mClient.records) {
       clientEmitted += Emitted(client);
       clientParticles += client.particles;
-      clientOnly += mLockstep.records.count(id) == 0u ? 1u : 0u;
+      clientOnly += !mLockstep.records.contains(id) ? 1u : 0u;
     }
 
     std::string out;

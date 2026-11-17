@@ -7,6 +7,7 @@
 
 #include <array>
 #include <cstdint>
+#include <expected>
 #include <string>
 #include <vector>
 
@@ -35,8 +36,8 @@ namespace faf::editor
     std::vector<Frame> frames;
   };
 
-  /** Reads a `.sca`; false with `error` for a file that isn't one. */
-  bool ReadSca(const std::vector<std::uint8_t>& bytes, ScaAnimation& out, std::string& error);
+  /** Reads a `.sca`; the error for a file that isn't one. */
+  [[nodiscard]] std::expected<void, std::string> ReadSca(const std::vector<std::uint8_t>& bytes, ScaAnimation& out);
 
   /**
    * The bones' keys at `time` (seconds): between the two frames around it, positions blended straight, rotations along

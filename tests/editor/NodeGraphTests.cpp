@@ -141,8 +141,8 @@ namespace
     const std::string text = graph.Save();
 
     NodeGraph read(registry);
-    std::string error;
-    ASSERT_TRUE(read.Load(text, error)) << error;
+    const auto loaded = read.Load(text);
+    ASSERT_TRUE(loaded) << loaded.error();
     EXPECT_EQ(read.Save(), text);
     EXPECT_EQ(read.Find(s)->params[0].text, path.text);
     EXPECT_FLOAT_EQ(read.Find(s)->params[1].value[1], 0.25f);
@@ -173,11 +173,11 @@ namespace
   ]
 })";
     NodeGraph graph(registry);
-    std::string error;
-    ASSERT_TRUE(graph.Load(text, error)) << error;
+    const auto loaded = graph.Load(text);
+    ASSERT_TRUE(loaded) << loaded.error();
     EXPECT_EQ(graph.Nodes().size(), 2U);
     EXPECT_FLOAT_EQ(graph.Find(3)->params[0].value[0], 0.5f); // the initial value
     EXPECT_EQ(graph.Links().size(), 1U);
-    EXPECT_FALSE(graph.Load("{}", error));
+    EXPECT_FALSE(graph.Load("{}"));
   }
 } // namespace

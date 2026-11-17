@@ -46,7 +46,7 @@ target_include_directories(faf_freetype SYSTEM PUBLIC
 target_compile_definitions(faf_freetype
   PUBLIC "FT_CONFIG_OPTIONS_H=<faf_ftoption.h>" "FT_CONFIG_MODULES_H=<faf_ftmodule.h>"
   PRIVATE FT2_BUILD_LIBRARY)
-if(FAF_LINUX)
+if(FAFRE_PLATFORM_POSIX)
   target_compile_options(faf_freetype PRIVATE -w)
 else()
   target_compile_options(faf_freetype PRIVATE /W0)

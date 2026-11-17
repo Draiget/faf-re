@@ -508,8 +508,7 @@ namespace
   )
   {
     return key.sortScalar == particle.mReserved54 && key.dragEnabled == particle.mDragEnabled &&
-      key.blendMode == static_cast<std::int32_t>(particle.mBlendMode) &&
-      key.zMode == static_cast<std::int32_t>(particle.mZMode) &&
+      key.blendMode == std::to_underlying(particle.mBlendMode) && key.zMode == std::to_underlying(particle.mZMode) &&
       ParticleTextureMatchesKey(particle.mTexture.tex, key.texture0) &&
       ParticleTextureMatchesKey(particle.mRampTexture.tex, key.texture1) && key.tag == particle.mTypeTag;
   }
@@ -543,8 +542,8 @@ namespace
     key->texture1 = texture1;
 
     key->tag.assign(particle.mTypeTag, 0U, fa::string::npos);
-    key->blendMode = static_cast<std::int32_t>(particle.mBlendMode);
-    key->zMode = static_cast<std::int32_t>(particle.mZMode);
+    key->blendMode = std::to_underlying(particle.mBlendMode);
+    key->zMode = std::to_underlying(particle.mZMode);
     return key;
   }
 
@@ -789,8 +788,8 @@ namespace moho
     // Engine addition: the cached bucket's key matches without building a new key (see
     // ParticleMatchesBucketKey); the path below would land in the same bucket.
     if (
-      ren_ParticleKeyShortcut && static_cast<std::int32_t>(particle.mBlendMode) != 5 &&
-      mCachedParticleBucket != nullptr && ParticleMatchesBucketKey(mParticleBucketLookupKey, particle)
+      ren_ParticleKeyShortcut && std::to_underlying(particle.mBlendMode) != 5 && mCachedParticleBucket != nullptr &&
+      ParticleMatchesBucketKey(mParticleBucketLookupKey, particle)
     ) {
       mCachedParticleBucket->pendingParticles.push_back(particle);
       return;
@@ -799,7 +798,7 @@ namespace moho
     SParticleBucketKey lookupKey{};
     (void)InitializeParticleBucketKeyFromWorldParticle(&lookupKey, particle);
 
-    if (static_cast<std::int32_t>(particle.mBlendMode) == 5) {
+    if (std::to_underlying(particle.mBlendMode) == 5) {
       auto bucketEntry = mRefractingParticleBuckets.find(lookupKey);
       if (bucketEntry == mRefractingParticleBuckets.end()) {
         // Must be constructed, not just allocated: the bucket owns two

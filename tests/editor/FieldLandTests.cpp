@@ -7,6 +7,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <map>
+#include <print>
 #include <string>
 #include <vector>
 
@@ -44,12 +45,11 @@ namespace
     a.p.str = strs;
     a.in = in;
     auto g = std::make_shared<Grid>();
-    std::string err;
-    if (!RunOp(op, a, *g, err)) {
+    if (const auto ran = RunOp(op, a, *g); !ran) {
       if (errOut != nullptr)
-        *errOut = err;
+        *errOut = ran.error();
       else
-        std::printf("op %s failed: %s\n", op.c_str(), err.c_str());
+        std::println("op {} failed: {}", op, ran.error());
       return nullptr;
     }
     return g;

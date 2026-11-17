@@ -51,7 +51,7 @@ namespace moho
     static void DestroyHeapNode(Host* host) noexcept;
   };
 
-#if FAFRE_PLATFORM_WINDOWS && (defined(_M_IX86) || defined(__i386__))
+#if FAFRE_PLATFORM_WINDOWS && FAFRE_ARCH_X86
   static_assert(sizeof(Host) == 0x28, "Host size must be 0x28");
 #endif
 

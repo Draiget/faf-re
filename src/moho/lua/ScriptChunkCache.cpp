@@ -87,9 +87,9 @@ namespace
 
   struct SChunkKeyHash
   {
-    std::size_t operator()(
+    static std::size_t operator()(
       const SChunkKey& key
-    ) const noexcept
+    ) noexcept
     {
       return static_cast<std::size_t>(key.first);
     }

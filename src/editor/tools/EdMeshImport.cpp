@@ -31,21 +31,17 @@ namespace faf::editor
     }
   } // namespace
 
-  bool ReadScm(
-    const std::vector<std::uint8_t>& bytes,
-    ScmModel& out,
-    std::string& error
+  std::expected<ScmModel, std::string> ReadScm(
+    const std::vector<std::uint8_t>& bytes
   )
   {
-    out = ScmModel{};
+    ScmModel out;
     if (bytes.size() < 0x30 || std::memcmp(bytes.data(), "MODL", 4) != 0) {
-      error = "not an .scm file (no MODL header)";
-      return false;
+      return std::unexpected("not an .scm file (no MODL header)");
     }
     out.version = static_cast<int>(U32(bytes, 0x04));
     if (out.version != 5) {
-      error = "an .scm of version " + std::to_string(out.version) + " (the game's are 5)";
-      return false;
+      return std::unexpected("an .scm of version " + std::to_string(out.version) + " (the game's are 5)");
     }
     out.bones = static_cast<int>(U32(bytes, 0x2C));
     const std::uint32_t vertexAt = U32(bytes, 0x10);
@@ -59,8 +55,7 @@ namespace faf::editor
       static_cast<std::uint64_t>(vertexAt) + static_cast<std::uint64_t>(vertexCount) * kVertex > bytes.size() ||
       static_cast<std::uint64_t>(indexAt) + static_cast<std::uint64_t>(indexCount) * 2U > bytes.size()
     ) {
-      error = "the file is shorter than its header says";
-      return false;
+      return std::unexpected("the file is shorter than its header says");
     }
     for (std::uint32_t v = 0; v < vertexCount; ++v) {
       const std::size_t at = vertexAt + v * kVertex;
@@ -73,8 +68,9 @@ namespace faf::editor
       const std::uint32_t index =
         static_cast<std::uint32_t>(bytes[at]) | (static_cast<std::uint32_t>(bytes[at + 1]) << 8);
       if (index >= vertexCount) {
-        error = "a triangle names vertex " + std::to_string(index) + " of " + std::to_string(vertexCount);
-        return false;
+        return std::unexpected(
+          "a triangle names vertex " + std::to_string(index) + " of " + std::to_string(vertexCount)
+        );
       }
       out.indexes.push_back(index);
     }
@@ -84,7 +80,7 @@ namespace faf::editor
         out.info.pop_back();
       }
     }
-    return true;
+    return out;
   }
 
   std::string ObjFromScm(

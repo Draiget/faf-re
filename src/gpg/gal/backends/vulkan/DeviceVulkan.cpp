@@ -503,6 +503,21 @@ namespace gpg::gal
     }
 
     std::vector<const char*> extensions{VK_KHR_SURFACE_EXTENSION_NAME, vulkan::PlatformSurfaceExtension()};
+    // A Vulkan loader lists portability drivers (MoltenVK on macOS) only to an instance that asks for
+    // them. MoltenVK loaded directly doesn't offer the extension and lists itself anyway.
+    VkInstanceCreateFlags instanceFlags = 0;
+    {
+      std::uint32_t count = 0U;
+      Vk().vkEnumerateInstanceExtensionProperties(nullptr, &count, nullptr);
+      std::vector<VkExtensionProperties> available(count);
+      Vk().vkEnumerateInstanceExtensionProperties(nullptr, &count, available.data());
+      for (const VkExtensionProperties& extension : available) {
+        if (std::strcmp(extension.extensionName, VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME) == 0) {
+          extensions.push_back(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
+          instanceFlags |= VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
+        }
+      }
+    }
     std::vector<const char*> layers;
     const bool debug = CommandLineHas("/vulkandebug");
     if (debug) {
@@ -528,6 +543,7 @@ namespace gpg::gal
     application.apiVersion = VK_API_VERSION_1_3;
     VkInstanceCreateInfo info{};
     info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
+    info.flags = instanceFlags;
     info.pApplicationInfo = &application;
     info.enabledExtensionCount = static_cast<std::uint32_t>(extensions.size());
     info.ppEnabledExtensionNames = extensions.data();
@@ -710,6 +726,11 @@ namespace gpg::gal
       }
       );
     };
+    // A device that implements Vulkan only in part (MoltenVK) names its gaps through this extension,
+    // which the specification requires an application to enable when the device offers it.
+    if (hasExtension("VK_KHR_portability_subset")) {
+      extensions.push_back("VK_KHR_portability_subset");
+    }
     VkPhysicalDeviceRayQueryFeaturesKHR rayQueryFeatures{};
     rayQueryFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_QUERY_FEATURES_KHR;
     rayQueryFeatures.rayQuery = VK_TRUE;

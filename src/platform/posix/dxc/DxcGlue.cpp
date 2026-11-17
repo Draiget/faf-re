@@ -125,6 +125,17 @@ namespace
   }
 } // namespace
 
+namespace
+{
+#if FAFRE_PLATFORM_MACOS // Mach-O dynamic libraries end in .dylib
+  constexpr const char* kSignerFile = "libdxil.dylib";
+  constexpr const char* kCompilerFile = "libdxcompiler.dylib";
+#else
+  constexpr const char* kSignerFile = "libdxil.so";
+  constexpr const char* kCompilerFile = "libdxcompiler.so";
+#endif
+} // namespace
+
 std::string platform::posix::dxc::Load(
   const std::vector<std::string>& directories,
   std::string& version
@@ -143,9 +154,10 @@ std::string platform::posix::dxc::Load(
   }
   candidates.emplace_back(); // the system's library path
   for (const std::string& directory : candidates) {
-    // The signer first, by path, so libdxcompiler's own dlopen("libdxil.so") finds it.
-    gLibrary.signer = ::dlopen((directory + "libdxil.so").c_str(), RTLD_NOW | RTLD_GLOBAL);
-    gLibrary.compiler = ::dlopen((directory + "libdxcompiler.so").c_str(), RTLD_NOW);
+    // The signer first, by path, so libdxcompiler's own dlopen of libdxil finds it. A macOS build
+    // without the signer is fine: the Vulkan backend compiles to SPIR-V, which isn't signed.
+    gLibrary.signer = ::dlopen((directory + kSignerFile).c_str(), RTLD_NOW | RTLD_GLOBAL);
+    gLibrary.compiler = ::dlopen((directory + kCompilerFile).c_str(), RTLD_NOW);
     if (gLibrary.compiler != nullptr) {
       break;
     }
@@ -155,7 +167,7 @@ std::string platform::posix::dxc::Load(
     }
   }
   if (gLibrary.compiler == nullptr) {
-    return "libdxcompiler.so not found next to the executable, in FAF_DXC_DIR or on the library path";
+    return std::string(kCompilerFile) + " not found next to the executable, in FAF_DXC_DIR or on the library path";
   }
   const auto create = reinterpret_cast<DxcCreateInstanceProc>(::dlsym(gLibrary.compiler, "DxcCreateInstance"));
   CComPtr<IDxcCompiler3> probe;
@@ -166,7 +178,7 @@ std::string platform::posix::dxc::Load(
       ::dlclose(gLibrary.signer);
       gLibrary.signer = nullptr;
     }
-    return "libdxcompiler.so does not provide IDxcCompiler3";
+    return std::string(kCompilerFile) + " does not provide IDxcCompiler3";
   }
   CComPtr<IDxcVersionInfo> versionInfo;
   UINT32 major = 0U;

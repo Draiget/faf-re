@@ -15,7 +15,7 @@
 #include <set>
 #include <stdexcept>
 #include <thread>
-#include <windows.h>
+#include <Windows.h>
 #if FAFRE_PLATFORM_POSIX
 #include "platform/posix/NativePath.h"
 #endif
@@ -286,9 +286,8 @@ namespace moho::sfd
     s.endTime = 0;
     s.anchor = Clock::now();
     try {
-      std::string error;
-      if (!ReadMetadata(filename, s.metadata, error))
-        throw std::runtime_error(error);
+      if (auto read = ReadMetadata(filename, s.metadata); !read)
+        throw std::runtime_error(read.error());
       const auto& h = s.metadata.header;
       if (h.videos[0].effect != 0 || h.videos[0].colourType != 0 || h.videos[0].pictureType != 0) {
         throw std::runtime_error(

@@ -1,5 +1,6 @@
 #include "moho/sim/CInfluenceMapTypeInfo.h"
 
+#include <utility>
 #include <typeinfo>
 
 #include "moho/sim/CInfluenceMap.h"
@@ -153,21 +154,21 @@ namespace moho
   void EThreatTypeTypeInfo::AddEnums()
   {
     mPrefix = "THREATTYPE_";
-    AddEnum(StripPrefix("THREATTYPE_Overall"), static_cast<std::int32_t>(THREATTYPE_Overall));
-    AddEnum(StripPrefix("THREATTYPE_OverallNotAssigned"), static_cast<std::int32_t>(THREATTYPE_OverallNotAssigned));
-    AddEnum(StripPrefix("THREATTYPE_StructuresNotMex"), static_cast<std::int32_t>(THREATTYPE_StructuresNotMex));
-    AddEnum(StripPrefix("THREATTYPE_Structures"), static_cast<std::int32_t>(THREATTYPE_Structures));
-    AddEnum(StripPrefix("THREATTYPE_Naval"), static_cast<std::int32_t>(THREATTYPE_Naval));
-    AddEnum(StripPrefix("THREATTYPE_Air"), static_cast<std::int32_t>(THREATTYPE_Air));
-    AddEnum(StripPrefix("THREATTYPE_Land"), static_cast<std::int32_t>(THREATTYPE_Land));
-    AddEnum(StripPrefix("THREATTYPE_Experimental"), static_cast<std::int32_t>(THREATTYPE_Experimental));
-    AddEnum(StripPrefix("THREATTYPE_Commander"), static_cast<std::int32_t>(THREATTYPE_Commander));
-    AddEnum(StripPrefix("THREATTYPE_Artillery"), static_cast<std::int32_t>(THREATTYPE_Artillery));
-    AddEnum(StripPrefix("THREATTYPE_AntiAir"), static_cast<std::int32_t>(THREATTYPE_AntiAir));
-    AddEnum(StripPrefix("THREATTYPE_AntiSurface"), static_cast<std::int32_t>(THREATTYPE_AntiSurface));
-    AddEnum(StripPrefix("THREATTYPE_AntiSub"), static_cast<std::int32_t>(THREATTYPE_AntiSub));
-    AddEnum(StripPrefix("THREATTYPE_Economy"), static_cast<std::int32_t>(THREATTYPE_Economy));
-    AddEnum(StripPrefix("THREATTYPE_Unknown"), static_cast<std::int32_t>(THREATTYPE_Unknown));
+    AddEnum(StripPrefix("THREATTYPE_Overall"), std::to_underlying(THREATTYPE_Overall));
+    AddEnum(StripPrefix("THREATTYPE_OverallNotAssigned"), std::to_underlying(THREATTYPE_OverallNotAssigned));
+    AddEnum(StripPrefix("THREATTYPE_StructuresNotMex"), std::to_underlying(THREATTYPE_StructuresNotMex));
+    AddEnum(StripPrefix("THREATTYPE_Structures"), std::to_underlying(THREATTYPE_Structures));
+    AddEnum(StripPrefix("THREATTYPE_Naval"), std::to_underlying(THREATTYPE_Naval));
+    AddEnum(StripPrefix("THREATTYPE_Air"), std::to_underlying(THREATTYPE_Air));
+    AddEnum(StripPrefix("THREATTYPE_Land"), std::to_underlying(THREATTYPE_Land));
+    AddEnum(StripPrefix("THREATTYPE_Experimental"), std::to_underlying(THREATTYPE_Experimental));
+    AddEnum(StripPrefix("THREATTYPE_Commander"), std::to_underlying(THREATTYPE_Commander));
+    AddEnum(StripPrefix("THREATTYPE_Artillery"), std::to_underlying(THREATTYPE_Artillery));
+    AddEnum(StripPrefix("THREATTYPE_AntiAir"), std::to_underlying(THREATTYPE_AntiAir));
+    AddEnum(StripPrefix("THREATTYPE_AntiSurface"), std::to_underlying(THREATTYPE_AntiSurface));
+    AddEnum(StripPrefix("THREATTYPE_AntiSub"), std::to_underlying(THREATTYPE_AntiSub));
+    AddEnum(StripPrefix("THREATTYPE_Economy"), std::to_underlying(THREATTYPE_Economy));
+    AddEnum(StripPrefix("THREATTYPE_Unknown"), std::to_underlying(THREATTYPE_Unknown));
   }
 } // namespace moho
 

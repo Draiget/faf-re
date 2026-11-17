@@ -24,6 +24,7 @@
 
 #include <array>
 #include <cstdint>
+#include <expected>
 #include <functional>
 #include <map>
 #include <string>
@@ -42,7 +43,7 @@ namespace faf::editor
     /** The donor unit of a template and faction. */
     [[nodiscard]] std::string DonorOf(const std::string& templateId, const std::string& faction) const;
   };
-  bool LoadUnitWizardData(const std::string& text, UnitWizardData& out, std::string& error);
+  [[nodiscard]] std::expected<void, std::string> LoadUnitWizardData(const std::string& text, UnitWizardData& out);
 
   struct UnitTemplate
   {
@@ -129,8 +130,9 @@ namespace faf::editor
 
   /** A unit id: lower case letters and digits, a letter first, at least 6 characters. */
   [[nodiscard]] bool ValidUnitId(const std::string& id);
-  /** True, or false with why (`taken(id)`: the game or the project has it). */
-  bool CheckUnitId(const std::string& id, const std::function<bool(const std::string&)>& taken, std::string& why);
+  /** Nothing, or why not (`taken(id)`: the game or the project has it). */
+  [[nodiscard]] std::expected<void, std::string>
+  CheckUnitId(const std::string& id, const std::function<bool(const std::string&)>& taken);
   /** A free id: z + faction letter + type letter + four digits (zel0001 ...). */
   [[nodiscard]] std::string SuggestUnitId(
     const std::string& templateId,
@@ -139,14 +141,12 @@ namespace faf::editor
   );
   [[nodiscard]] std::vector<std::string> DefaultBuildBy(const UnitTemplate& t, int tech);
 
-  /** A new spec of a template and faction, its numbers starting at the donor's. False with `error`. */
-  bool NewUnitSpec(
+  /** A new spec of a template and faction, its numbers starting at the donor's. */
+  [[nodiscard]] std::expected<UnitWizardSpec, std::string> NewUnitSpec(
     const UnitWizardData& data,
     const std::string& templateId,
     const std::string& faction,
-    const std::string& id,
-    UnitWizardSpec& out,
-    std::string& error
+    const std::string& id
   );
   /** A weapon of `kind` with the donor's numbers for the spec's faction. */
   [[nodiscard]] UnitWizardWeapon NewUnitWeapon(
@@ -197,14 +197,9 @@ namespace faf::editor
     std::vector<std::string> warnings;
     bool placeholder = false;
   };
-  /** The unit's `.scm`: from the OBJ text when there is one, else the placeholder. Empty with `error`. */
-  [[nodiscard]] std::vector<std::uint8_t> UnitMesh(
-    const UnitWizardData& data,
-    const UnitWizardSpec& spec,
-    const std::string& objText,
-    UnitMeshInfo& info,
-    std::string& error
-  );
+  /** The unit's `.scm`: from the OBJ text when there is one, else the placeholder. */
+  [[nodiscard]] std::expected<std::vector<std::uint8_t>, std::string>
+  UnitMesh(const UnitWizardData& data, const UnitWizardSpec& spec, const std::string& objText, UnitMeshInfo& info);
 
   /** A placeholder texture (albedo, normal, spec) as RGBA rows, 64 x 64. */
   [[nodiscard]] std::vector<std::uint8_t> UnitPlaceholderPixels(const std::string& kind, const std::string& faction);
@@ -220,7 +215,7 @@ namespace faf::editor
 
   /** The spec file of a project (`editor_newunits.json`) and back. */
   [[nodiscard]] std::string UnitSpecsText(const std::vector<UnitWizardSpec>& specs);
-  bool ReadUnitSpecs(const std::string& text, std::vector<UnitWizardSpec>& specs, std::string& error);
+  [[nodiscard]] std::expected<std::vector<UnitWizardSpec>, std::string> ReadUnitSpecs(const std::string& text);
 
   /** A validator's finding (Studio's unitcheck.lua): E error, W warning, I information. */
   struct UnitCheck

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <expected>
 #include <functional>
 #include <set>
 #include <string>
@@ -148,8 +149,8 @@ namespace faf::editor
       bool TriangleAt(int patch, int tri, float v[3][3]) const;
     };
 
-    /// Parses the SCM v5 file `bytes` into `out` (vertices, indices, bounds). False and `why` when it is not usable.
-    bool ParseScm(const std::uint8_t* bytes, std::size_t size, Patch& out, std::string& why);
+    /// Parses the SCM v5 file `bytes` into `out` (vertices, indices, bounds). Why not when it is not usable.
+    [[nodiscard]] std::expected<void, std::string> ParseScm(const std::uint8_t* bytes, std::size_t size, Patch& out);
 
     /// Reads a file through the reader the app set (the game's virtual file system); empty when it is missing.
     std::vector<std::uint8_t> ReadVfs(const std::string& path);

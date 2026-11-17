@@ -4,6 +4,7 @@
 
 #include <array>
 #include <cstdint>
+#include <expected>
 #include <map>
 #include <memory>
 #include <string>
@@ -86,18 +87,14 @@ namespace faf::editor
     MaskGenContext& context
   );
 
-  /** Evaluates the rules top to bottom into `out` (on the heights' grid). False with `error` when none is on or an op
+  /** Evaluates the rules top to bottom into `out` (on the heights' grid). The error when none is on or an op
    * fails. */
-  bool EvaluateMaskRules(
-    MaskGenContext& context,
-    const std::vector<MaskGenRule>& rules,
-    field::Grid& out,
-    std::string& error
-  );
+  [[nodiscard]] std::expected<void, std::string>
+  EvaluateMaskRules(MaskGenContext& context, const std::vector<MaskGenRule>& rules, field::Grid& out);
 
   /** How much the layers above `layer` leave free (1 - mask, multiplied over layers layer + 1 .. 8), on the heights'
    * grid. */
-  bool FreeAboveLayer(MaskGenContext& context, int layer, field::Grid& out, std::string& error);
+  [[nodiscard]] std::expected<void, std::string> FreeAboveLayer(MaskGenContext& context, int layer, field::Grid& out);
 
   struct MaskPreset
   {

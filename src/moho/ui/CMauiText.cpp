@@ -966,12 +966,11 @@ int moho::cfunc_LoadFontL(
     return 0;
   }
 
-  std::string reason;
   std::string family;
   if (!ren_ModFonts) {
     gpg::Warnf("MSDF: mod font %s refused: ren_ModFonts is off", path);
-  } else if (!MSDF_IsAllowedModFontPath(path, reason)) {
-    gpg::Warnf("MSDF: mod font %s refused: %s", path, reason.c_str());
+  } else if (auto allowed = MSDF_IsAllowedModFontPath(path); !allowed) {
+    gpg::Warnf("MSDF: mod font %s refused: %s", path, allowed.error().c_str());
   } else {
     FILE_EnsureWaitHandleSet();
     FWaitHandleSet* const waitHandleSet = FILE_GetWaitHandleSet();

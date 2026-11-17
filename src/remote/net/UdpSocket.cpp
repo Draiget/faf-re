@@ -218,7 +218,7 @@ namespace faf::remote::net
       for (;;) {
         const std::size_t colon = text.find(':');
         const std::string_view piece = text.substr(0, colon);
-        if (colon == std::string_view::npos && ipv4Tail && piece.find('.') != std::string_view::npos) {
+        if (colon == std::string_view::npos && ipv4Tail && piece.contains('.')) {
           std::uint32_t ip = 0;
           if (count > 6 || !ParseIpv4(piece, ip)) {
             return false;
@@ -250,7 +250,7 @@ namespace faf::remote::net
       if (text.size() >= 2u && text.front() == '[' && text.back() == ']') {
         text = text.substr(1, text.size() - 2u);
       }
-      if (text.empty() || text.find('%') != std::string_view::npos) {
+      if (text.empty() || text.contains('%')) {
         return false;
       }
       std::array<std::uint16_t, 8> head{};
@@ -396,7 +396,7 @@ namespace faf::remote::net
     IpAddress& out
   )
   {
-    if (text.find(':') != std::string_view::npos || text.find('[') != std::string_view::npos) {
+    if (text.contains(':') || text.contains('[')) {
       return ParseIpv6(text, out);
     }
     std::uint32_t ip = 0;
@@ -409,14 +409,14 @@ namespace faf::remote::net
 
   std::size_t IpAddressHash::operator()(
     const IpAddress& address
-  ) const noexcept
+  ) noexcept
   {
     return static_cast<std::size_t>(Fnv1a(address.data(), address.size()));
   }
 
   std::size_t SEndpointHash::operator()(
     const SEndpoint& endpoint
-  ) const noexcept
+  ) noexcept
   {
     const std::array<std::uint8_t, 18> key = endpoint.Key();
     return static_cast<std::size_t>(Fnv1a(key.data(), key.size()));
@@ -479,15 +479,13 @@ namespace faf::remote::net
     Close();
   }
 
-  bool CUdpSocket::Open(
-    const SEndpoint& local,
-    std::string& error
+  std::expected<void, std::string> CUdpSocket::Open(
+    const SEndpoint& local
   )
   {
     Close();
     if (!StartSockets()) {
-      error = "the socket library didn't start";
-      return false;
+      return std::unexpected("the socket library didn't start");
     }
     const bool any = IsAnyAddress(local.address);
     bool dualStack = !local.IsIpv4();
@@ -498,8 +496,7 @@ namespace faf::remote::net
       handle = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
     }
     if (handle == INVALID_SOCKET) {
-      error = "no socket: error " + std::to_string(LastError());
-      return false;
+      return std::unexpected("no socket: error " + std::to_string(LastError()));
     }
     if (dualStack) {
       // IPv4 peers too, as ::ffff:a.b.c.d (the default differs: IPv6 only on Windows, a sysctl on Linux). A socket that
@@ -514,8 +511,7 @@ namespace faf::remote::net
           handle = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
         }
         if (handle == INVALID_SOCKET) {
-          error = "no dual-stack socket: error " + std::to_string(failure);
-          return false;
+          return std::unexpected("no dual-stack socket: error " + std::to_string(failure));
         }
       }
     }
@@ -529,14 +525,14 @@ namespace faf::remote::net
       !ToAddress(bindAt, dualStack, address, addressLength) ||
       bind(handle, reinterpret_cast<const sockaddr*>(&address), addressLength) != 0
     ) {
-      error = "can't bind " + local.Text() + ": error " + std::to_string(LastError());
+      std::string error = "can't bind " + local.Text() + ": error " + std::to_string(LastError());
       CloseSocket(handle);
-      return false;
+      return std::unexpected(std::move(error));
     }
     if (!MakeNonBlocking(handle)) {
-      error = "can't make the socket non-blocking: error " + std::to_string(LastError());
+      std::string error = "can't make the socket non-blocking: error " + std::to_string(LastError());
       CloseSocket(handle);
-      return false;
+      return std::unexpected(std::move(error));
     }
     // A game's burst shouldn't overflow the system's queue between two passes. Best effort.
     (void)setsockopt(handle, SOL_SOCKET, SO_RCVBUF, reinterpret_cast<const char*>(&kBufferBytes), sizeof(kBufferBytes));
@@ -570,7 +566,7 @@ namespace faf::remote::net
     }
     mDualStack = dualStack;
     mSocket = static_cast<std::intptr_t>(handle);
-    return true;
+    return {};
   }
 
   void CUdpSocket::Close() noexcept

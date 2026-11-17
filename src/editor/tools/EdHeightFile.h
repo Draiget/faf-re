@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <expected>
 #include <filesystem>
 #include <string>
 #include <vector>
@@ -21,13 +22,8 @@ namespace faf::editor
    * units when any is above 1); anything else (PNG, BMP, TIFF, ...) is read
    * through the Windows imaging component as 16-bit grey (an 8-bit image's values spread over 16 bits).
    */
-  bool ReadHeightImage(
-    const std::filesystem::path& file,
-    int expectWidth,
-    int expectHeight,
-    HeightImage& out,
-    std::string& error
-  );
+  [[nodiscard]] std::expected<HeightImage, std::string>
+  ReadHeightImage(const std::filesystem::path& file, int expectWidth, int expectHeight);
 
   /** How an import reads its file (FAF Studio's import options): an image's channel, a raw file's layout. */
   struct HeightReadOptions
@@ -41,45 +37,29 @@ namespace faf::editor
     int rawHeight = 0;
   };
   /** ReadHeightImage with those options (the defaults read as ReadHeightImage does). */
-  bool ReadHeightImageWith(
+  [[nodiscard]] std::expected<HeightImage, std::string> ReadHeightImageWith(
     const std::filesystem::path& file,
     int expectWidth,
     int expectHeight,
-    const HeightReadOptions& options,
-    HeightImage& out,
-    std::string& error
+    const HeightReadOptions& options
   );
 
-  /** Writes a 32-bit BGRA picture (B in the low byte) as a PNG; false with `error`. */
-  bool WriteColourPng(
-    const std::filesystem::path& file,
-    int width,
-    int height,
-    const std::vector<std::uint32_t>& bgra,
-    std::string& error
-  );
+  /** Writes a 32-bit BGRA picture (B in the low byte) as a PNG; the error when it can't. */
+  [[nodiscard]] std::expected<void, std::string>
+  WriteColourPng(const std::filesystem::path& file, int width, int height, const std::vector<std::uint32_t>& bgra);
   /**
    * Writes a height image by its extension: `.raw` / `.r16` as 16-bit little-endian words, `.r32` as 32-bit floats
    * (0..1, as Gaea and World Machine read them), `.png` and `.tif` / `.tiff` as 16-bit grey, or 8-bit grey with
    * `eightBit` (FAF Studio's PNG 8 for tools that take only 8 bits).
    */
-  bool WriteHeightImage(
-    const std::filesystem::path& file,
-    const HeightImage& image,
-    std::string& error,
-    bool eightBit = false
-  );
+  [[nodiscard]] std::expected<void, std::string>
+  WriteHeightImage(const std::filesystem::path& file, const HeightImage& image, bool eightBit = false);
   /**
    * Writes floats as they are (FAF Studio's 32-bit float export): `.r32` as raw little-endian floats, `.tif` / `.tiff`
    * as a 32-bit float grey TIFF. `values` row by row, `width` x `height`.
    */
-  bool WriteFloatImage(
-    const std::filesystem::path& file,
-    int width,
-    int height,
-    const std::vector<float>& values,
-    std::string& error
-  );
+  [[nodiscard]] std::expected<void, std::string>
+  WriteFloatImage(const std::filesystem::path& file, int width, int height, const std::vector<float>& values);
 
   /** How ResampleHeights reads between samples (FAF Studio's img_resample filters). */
   enum class ResampleFilter

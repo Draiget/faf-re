@@ -261,17 +261,15 @@ namespace faf::editor
       mStatus = "Can't read " + path;
       return false;
     }
-    EmitterBlueprint read;
-    std::string error;
-    if (!ParseEmitter(text, read, error)) {
-      FlatBlueprint flat;
-      std::string flatError;
-      if (!ParseFlatBlueprint(text, flat, flatError)) {
-        mStatus = path + ": " + error;
+    const auto read = ParseEmitter(text);
+    if (!read) {
+      auto flat = ParseFlatBlueprint(text);
+      if (!flat) {
+        mStatus = path + ": " + read.error();
         return false;
       }
       ClearGraph();
-      mFlat = std::move(flat);
+      mFlat = std::move(*flat);
       mFlatMode = true;
       mGamePath = path;
       mName = BaseName(path);
@@ -286,7 +284,7 @@ namespace faf::editor
     mGamePath = path;
     mName = BaseName(path);
     mPath.clear(); // the game's own: Save writes a copy into the map's folder
-    SetGraph(BaseName(path), {{BaseName(path), read}}, path);
+    SetGraph(BaseName(path), {{BaseName(path), *read}}, path);
     mStatus = "Opened " + path;
     return true;
   }

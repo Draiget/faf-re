@@ -241,8 +241,7 @@ namespace faf::editor
     }
     for (const SaveEntry& army : mDocument.SaveData().Armies()) {
       UnitGroup root;
-      std::string error;
-      if (!ParseUnitGroup(army.Get("Units"), root, error)) {
+      if (!ParseUnitGroup(army.Get("Units"), root)) {
         continue;
       }
       for (const std::string& name : names) {
@@ -307,9 +306,8 @@ namespace faf::editor
       return;
     }
     AdaptiveTables tables;
-    std::string error;
-    if (!ParseAdaptiveTables(mDocument.TablesText(), tables, error)) {
-      ImGui::TextColored(kWarn, "_tables.lua doesn't read: %s", error.c_str());
+    if (const auto read = ParseAdaptiveTables(mDocument.TablesText(), tables); !read) {
+      ImGui::TextColored(kWarn, "_tables.lua doesn't read: %s", read.error().c_str());
       if (ImGui::Button("Open it in the Script Editor")) {
         ShowLuaFile(2);
       }
@@ -345,9 +343,8 @@ namespace faf::editor
     const auto armyTree = [&](const std::string& army) {
       UnitGroup root;
       for (const SaveEntry& entry : mDocument.SaveData().Armies()) {
-        std::string parseError;
         if (entry.name == army) {
-          (void)ParseUnitGroup(entry.Get("Units"), root, parseError);
+          (void)ParseUnitGroup(entry.Get("Units"), root);
         }
       }
       return root;

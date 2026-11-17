@@ -123,17 +123,15 @@ namespace faf::editor
     p.edits["uel0201"]["Economy.BuildCostMass"] = 60.0;
     p.edits["uel0201"]["Weapon:Main Gun.Damage"] = 12.25;
     p.edits["ura0203"]["Physics.MaxSpeed"] = 9.5;
-    ModProject back;
-    std::string error;
-    ASSERT_TRUE(LoadModProject(SaveModProject(p), back, error)) << error;
+    const auto loaded = LoadModProject(SaveModProject(p));
+    ASSERT_TRUE(loaded) << loaded.error();
+    const ModProject& back = *loaded;
     EXPECT_EQ(back.name, p.name);
     EXPECT_EQ(back.description, p.description);
     EXPECT_EQ(back.version, 3);
     EXPECT_EQ(back.edits, p.edits);
-    EXPECT_FALSE(LoadModProject("{\"name\": \"x\"}", back, error));
-    EXPECT_FALSE(
-      LoadModProject("{\"editorModProject\": 1, \"edits\": [{\"id\": \"a\", \"key\": \"b\"}]}", back, error)
-    );
+    EXPECT_FALSE(LoadModProject("{\"name\": \"x\"}"));
+    EXPECT_FALSE(LoadModProject("{\"editorModProject\": 1, \"edits\": [{\"id\": \"a\", \"key\": \"b\"}]}"));
     const std::string info = ModInfoText(p);
     EXPECT_TRUE(Has(info, "name = 'Balance \"test\"'\n"));
     EXPECT_TRUE(Has(info, "description = 'line one\\nline \\'two\\''\n"));
@@ -163,13 +161,12 @@ namespace faf::editor
     ASSERT_EQ(report.problems.size(), 1U);
     EXPECT_TRUE(Has(report.problems[0], "isn't one the project made"));
     // Reopened: the same uid and changes.
-    ModProject back;
-    std::string error;
     bool fromBackup = true;
-    ASSERT_TRUE(OpenModProject(folder, back, error, &fromBackup)) << error;
+    auto opened = OpenModProject(folder, &fromBackup);
+    ASSERT_TRUE(opened) << opened.error();
     EXPECT_FALSE(fromBackup);
-    EXPECT_EQ(back.uid, p.uid);
-    EXPECT_EQ(back.edits, p.edits);
+    EXPECT_EQ(opened->uid, p.uid);
+    EXPECT_EQ(opened->edits, p.edits);
     const std::vector<std::string> listed = ModProjectsIn(folder.parent_path());
     EXPECT_NE(std::find(listed.begin(), listed.end(), "write"), listed.end())
       << "(other tests keep their folders beside it)";
@@ -193,9 +190,10 @@ namespace faf::editor
     );
     // A damaged project file: the copy before it.
     std::ofstream(folder / "editor_project.json", std::ios::binary | std::ios::trunc) << "{ broken";
-    ASSERT_TRUE(OpenModProject(folder, back, error, &fromBackup)) << error;
+    opened = OpenModProject(folder, &fromBackup);
+    ASSERT_TRUE(opened) << opened.error();
     EXPECT_TRUE(fromBackup);
-    EXPECT_EQ(back.edits.count("uel0201"), 1U) << "the .bak holds the project before the last write";
+    EXPECT_EQ(opened->edits.count("uel0201"), 1U) << "the .bak holds the project before the last write";
   }
 
   TEST(
@@ -207,12 +205,12 @@ namespace faf::editor
       return id == "uel0201" || id == "ura0203";
     };
     ModProject p;
-    std::string error;
-    EXPECT_FALSE(AddModDerived(p, "xel01", "uel0201", "", "", gameHas, error)) << "too short";
-    EXPECT_FALSE(AddModDerived(p, "ura0203", "uel0201", "", "", gameHas, error)) << "the game has it";
-    EXPECT_FALSE(AddModDerived(p, "xel0201", "nope0001", "", "", gameHas, error)) << "no base";
-    ASSERT_TRUE(AddModDerived(p, "xel0201", "uel0201", "Lab 'Tank'", "Heavier", gameHas, error)) << error;
-    EXPECT_FALSE(AddModDerived(p, "xel0201", "uel0201", "", "", gameHas, error)) << "derived already";
+    EXPECT_FALSE(AddModDerived(p, "xel01", "uel0201", "", "", gameHas)) << "too short";
+    EXPECT_FALSE(AddModDerived(p, "ura0203", "uel0201", "", "", gameHas)) << "the game has it";
+    EXPECT_FALSE(AddModDerived(p, "xel0201", "nope0001", "", "", gameHas)) << "no base";
+    const auto added = AddModDerived(p, "xel0201", "uel0201", "Lab 'Tank'", "Heavier", gameHas);
+    ASSERT_TRUE(added) << added.error();
+    EXPECT_FALSE(AddModDerived(p, "xel0201", "uel0201", "", "", gameHas)) << "derived already";
     EXPECT_EQ(ModSourceUnit(p, "xel0201"), "uel0201");
     EXPECT_EQ(ModSourceUnit(p, "uel0201"), "uel0201");
     p.edits["xel0201"]["Economy.BuildCostMass"] = 156.0;
@@ -232,10 +230,10 @@ namespace faf::editor
     )) << hook;
     EXPECT_FALSE(Has(hook, "BuildCostMass = 81")) << "the base unit's own change is its merge blueprint's";
     // Saved and read back.
-    ModProject back;
-    ASSERT_TRUE(LoadModProject(SaveModProject(p), back, error)) << error;
-    EXPECT_EQ(back.derived, p.derived);
-    EXPECT_EQ(back.edits, p.edits);
+    const auto back = LoadModProject(SaveModProject(p));
+    ASSERT_TRUE(back) << back.error();
+    EXPECT_EQ(back->derived, p.derived);
+    EXPECT_EQ(back->edits, p.edits);
     // Written: the hook, a merge blueprint for uel0201 only; without derived units the hook goes.
     const std::filesystem::path folder = Fresh("derived");
     ModWriteReport report = WriteModProject(folder, p, Weapons, {});
@@ -297,10 +295,9 @@ namespace faf::editor
     );
     EXPECT_NE(ModDerivedHook(p, Weapons).find("bp.Display.IconName = id"), std::string::npos);
     EXPECT_EQ(ModUnitIconFile("xel0201"), "icons/units/xel0201_icon.dds");
-    ModProject back;
-    std::string error;
-    ASSERT_TRUE(LoadModProject(SaveModProject(p), back, error));
-    EXPECT_TRUE(back.derived.at("xel0201").icon);
+    const auto back = LoadModProject(SaveModProject(p));
+    ASSERT_TRUE(back);
+    EXPECT_TRUE(back->derived.at("xel0201").icon);
     EXPECT_EQ(count(issues, "derived unit ura0203: the game has a unit with that id"), 1);
     EXPECT_EQ(count(issues, "the game has no unit nope0001"), 1);
     EXPECT_EQ(count(issues, "another uid"), 1);
@@ -351,19 +348,19 @@ namespace faf::editor
     const std::filesystem::path folder = Fresh("binary");
     ModProject p;
     p.name = "Binary";
-    std::string error;
     std::filesystem::create_directories(folder / "icons" / "units");
     std::ofstream(folder / "icons" / "units" / "other_icon.dds", std::ios::binary) << "someone else's";
-    EXPECT_FALSE(ModWriteBinary(p, folder, "icons/units/other_icon.dds", "DDS ", error));
-    EXPECT_NE(error.find("isn't one the project made"), std::string::npos);
-    ASSERT_TRUE(ModWriteBinary(p, folder, "icons/units/xel0301_icon.dds", std::string("DDS \0\1", 6), error)) << error;
-    ASSERT_TRUE(ModWriteBinary(p, folder, "icons/units/xel0301_icon.dds", "DDS again", error))
-      << "its own: written over";
+    const auto other = ModWriteBinary(p, folder, "icons/units/other_icon.dds", "DDS ");
+    ASSERT_FALSE(other);
+    EXPECT_NE(other.error().find("isn't one the project made"), std::string::npos);
+    const auto first = ModWriteBinary(p, folder, "icons/units/xel0301_icon.dds", std::string("DDS \0\1", 6));
+    ASSERT_TRUE(first) << first.error();
+    ASSERT_TRUE(ModWriteBinary(p, folder, "icons/units/xel0301_icon.dds", "DDS again")) << "its own: written over";
     EXPECT_EQ(Read(folder / "icons" / "units" / "xel0301_icon.dds"), "DDS again");
-    EXPECT_FALSE(ModWriteBinary(p, folder, "../escape.dds", "x", error));
-    ModProject back;
-    ASSERT_TRUE(LoadModProject(SaveModProject(p), back, error)) << error;
-    EXPECT_EQ(back.files, (std::set<std::string>{"icons/units/xel0301_icon.dds"}));
+    EXPECT_FALSE(ModWriteBinary(p, folder, "../escape.dds", "x"));
+    const auto back = LoadModProject(SaveModProject(p));
+    ASSERT_TRUE(back) << back.error();
+    EXPECT_EQ(back->files, (std::set<std::string>{"icons/units/xel0301_icon.dds"}));
   }
 
   TEST(
@@ -394,10 +391,9 @@ namespace faf::editor
     }
     (void)WriteModProject(folder, p, Weapons, {});
     EXPECT_EQ(Read(script), "-- the modder's own\n") << "not written over";
-    ModProject back;
-    std::string error;
-    ASSERT_TRUE(LoadModProject(SaveModProject(p), back, error)) << error;
-    EXPECT_TRUE(back.derived["xel0202"].script);
+    auto back = LoadModProject(SaveModProject(p));
+    ASSERT_TRUE(back) << back.error();
+    EXPECT_TRUE(back->derived["xel0202"].script);
   }
 
   TEST(

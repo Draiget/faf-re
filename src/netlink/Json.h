@@ -6,6 +6,7 @@
 // recovered code.
 
 #include <cstdint>
+#include <expected>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -193,8 +194,8 @@ namespace faf::netlink
     std::vector<std::pair<std::string, JsonValue>> mMembers;
   };
 
-  // Parses one JSON text; leading and trailing whitespace is allowed.
-  std::optional<JsonValue> ParseJson(std::string_view text, std::string* error = nullptr);
+  // Parses one JSON text; leading and trailing whitespace is allowed. The error says what is wrong and where.
+  [[nodiscard]] std::expected<JsonValue, std::string> ParseJson(std::string_view text);
 
   // Writes compact JSON. Every character outside printable ASCII, and '{' and
   // '}' inside strings, are written as \u escapes: the JJsonRpc reader on the

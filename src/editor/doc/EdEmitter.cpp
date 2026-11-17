@@ -102,17 +102,15 @@ namespace faf::editor
         : mText(text)
       {}
 
-      bool Parse(
-        Value& out,
-        std::string& error
+      std::expected<void, std::string> Parse(
+        Value& out
       )
       {
-        return Parse(out, error, {"EmitterBlueprint"}, nullptr);
+        return Parse(out, {"EmitterBlueprint"}, nullptr);
       }
 
-      bool Parse(
+      std::expected<void, std::string> Parse(
         Value& out,
-        std::string& error,
         const std::vector<std::string>& names,
         std::string* found
       )
@@ -125,9 +123,7 @@ namespace faf::editor
         }
         const std::string name = mText.substr(nameStart, mAt - nameStart);
         if (std::find(names.begin(), names.end(), name) == names.end()) {
-          return Fail(
-            "not a" + std::string(names.size() == 1 ? "n " + names.front() : " beam or trail") + " file", error
-          );
+          return Fail("not a" + std::string(names.size() == 1 ? "n " + names.front() : " beam or trail") + " file");
         }
         if (found != nullptr) {
           *found = name;
@@ -136,27 +132,25 @@ namespace faf::editor
         const bool paren = Eat('(');
         Skip();
         if (!ParseValue(out) || out.kind != Value::Kind::Table) {
-          return Fail(mError.empty() ? "expected a table" : mError, error);
+          return Fail(mError.empty() ? "expected a table" : mError);
         }
         Skip();
         if (paren && !Eat(')')) {
-          return Fail("expected )", error);
+          return Fail("expected )");
         }
-        return true;
+        return {};
       }
 
     private:
-      bool Fail(
-        const std::string& what,
-        std::string& error
+      std::unexpected<std::string> Fail(
+        const std::string& what
       )
       {
         int line = 1;
         for (std::size_t i = 0; i < mAt && i < mText.size(); ++i) {
           line += mText[i] == '\n' ? 1 : 0;
         }
-        error = "line " + std::to_string(line) + ": " + what;
-        return false;
+        return std::unexpected("line " + std::to_string(line) + ": " + what);
       }
 
       bool Eat(
@@ -536,17 +530,15 @@ namespace faf::editor
     return kind == "BeamBlueprint" ? kBeamFields : kTrailFields;
   }
 
-  bool ParseFlatBlueprint(
-    const std::string& text,
-    FlatBlueprint& out,
-    std::string& error
+  std::expected<FlatBlueprint, std::string> ParseFlatBlueprint(
+    const std::string& text
   )
   {
     Value root;
     Reader reader(text);
     std::string kind;
-    if (!reader.Parse(root, error, {"BeamBlueprint", "TrailEmitterBlueprint"}, &kind)) {
-      return false;
+    if (auto parsed = reader.Parse(root, {"BeamBlueprint", "TrailEmitterBlueprint"}, &kind); !parsed) {
+      return std::unexpected(std::move(parsed.error()));
     }
     FlatBlueprint made;
     made.kind = kind;
@@ -589,8 +581,7 @@ namespace faf::editor
       }
       made.fields.emplace_back(field.key, std::move(flat));
     }
-    out = std::move(made);
-    return true;
+    return made;
   }
 
   std::string WriteFlatBlueprint(
@@ -723,16 +714,14 @@ namespace faf::editor
     return emitter;
   }
 
-  bool ParseEmitter(
-    const std::string& text,
-    EmitterBlueprint& out,
-    std::string& error
+  std::expected<EmitterBlueprint, std::string> ParseEmitter(
+    const std::string& text
   )
   {
     Value root;
     Reader reader(text);
-    if (!reader.Parse(root, error)) {
-      return false;
+    if (auto parsed = reader.Parse(root); !parsed) {
+      return std::unexpected(std::move(parsed.error()));
     }
     EmitterBlueprint emitter;
     for (EmitterCurve& curve : emitter.curves) {
@@ -810,8 +799,7 @@ namespace faf::editor
         emitter.extra.emplace_back(key, text.substr(value.begin, value.end - value.begin));
       }
     }
-    out = std::move(emitter);
-    return true;
+    return emitter;
   }
 
   float EmitterCurveValue(

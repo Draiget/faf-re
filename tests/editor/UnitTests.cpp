@@ -11,6 +11,7 @@
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
+#include <print>
 #include <sstream>
 
 namespace
@@ -55,8 +56,8 @@ namespace
   )
   {
     faf::editor::UnitGroup group;
-    std::string error;
-    ASSERT_TRUE(faf::editor::ParseUnitGroup(kGroup, group, error)) << error;
+    auto read = faf::editor::ParseUnitGroup(kGroup, group);
+    ASSERT_TRUE(read) << read.error();
     std::vector<const faf::editor::SaveUnit*> units;
     faf::editor::CollectUnits(group, units);
     ASSERT_EQ(units.size(), 2u);
@@ -74,8 +75,8 @@ namespace
   )
   {
     faf::editor::UnitGroup group;
-    std::string error;
-    ASSERT_TRUE(faf::editor::ParseUnitGroup(kGroup, group, error)) << error;
+    auto read = faf::editor::ParseUnitGroup(kGroup, group);
+    ASSERT_TRUE(read) << read.error();
     faf::editor::SaveUnit tank;
     tank.name = "UNIT_335";
     tank.type = "uel0201";
@@ -88,7 +89,8 @@ namespace
     ASSERT_TRUE(faf::editor::RemoveUnit(group, "UNIT_328"));
     EXPECT_FALSE(faf::editor::RemoveUnit(group, "UNIT_328"));
     faf::editor::UnitGroup back;
-    ASSERT_TRUE(faf::editor::ParseUnitGroup(faf::editor::FormatUnitGroup(group, 12), back, error)) << error;
+    read = faf::editor::ParseUnitGroup(faf::editor::FormatUnitGroup(group, 12), back);
+    ASSERT_TRUE(read) << read.error();
     std::vector<const faf::editor::SaveUnit*> units;
     faf::editor::CollectUnits(back, units);
     ASSERT_EQ(units.size(), 2u);
@@ -99,7 +101,8 @@ namespace
     ASSERT_NE(faf::editor::FindUnit(back, "UNIT_335"), nullptr);
     // An army without INITIAL gets one.
     faf::editor::UnitGroup empty;
-    ASSERT_TRUE(faf::editor::ParseUnitGroup("GROUP { orders = '', platoon = '', Units = { } }", empty, error)) << error;
+    read = faf::editor::ParseUnitGroup("GROUP { orders = '', platoon = '', Units = { } }", empty);
+    ASSERT_TRUE(read) << read.error();
     faf::editor::AddUnit(empty, tank);
     ASSERT_EQ(empty.groups.size(), 1u);
     EXPECT_EQ(empty.groups[0].name, "INITIAL");
@@ -112,11 +115,12 @@ namespace
   )
   {
     faf::editor::UnitGroup group;
-    std::string error;
-    ASSERT_TRUE(faf::editor::ParseUnitGroup("GROUP { orders = '', platoon = '', Units = { } }", group, error)) << error;
+    auto read = faf::editor::ParseUnitGroup("GROUP { orders = '', platoon = '', Units = { } }", group);
+    ASSERT_TRUE(read) << read.error();
     EXPECT_TRUE(group.order.empty());
-    EXPECT_FALSE(faf::editor::ParseUnitGroup("GROUP { weather = 'rain' }", group, error));
-    EXPECT_FALSE(error.empty());
+    read = faf::editor::ParseUnitGroup("GROUP { weather = 'rain' }", group);
+    ASSERT_FALSE(read);
+    EXPECT_FALSE(read.error().empty());
   }
 
   TEST(
@@ -141,13 +145,13 @@ namespace
         std::stringstream text;
         text << in.rdbuf();
         faf::editor::SaveFile save;
-        std::string error;
-        ASSERT_TRUE(save.Parse(text.str(), error)) << file.path() << ": " << error;
+        auto status = save.Parse(text.str());
+        ASSERT_TRUE(status) << file.path() << ": " << status.error();
         for (const faf::editor::SaveEntry& army : save.Armies()) {
           const std::string value = army.Get("Units");
           faf::editor::UnitGroup group;
-          ASSERT_TRUE(faf::editor::ParseUnitGroup(value, group, error))
-            << file.path() << " " << army.name << ": " << error;
+          auto parsed = faf::editor::ParseUnitGroup(value, group);
+          ASSERT_TRUE(parsed) << file.path() << " " << army.name << ": " << parsed.error();
           const std::string written = faf::editor::FormatUnitGroup(group, 12);
           if (written != value) {
             // Where they part, with a little around it.
@@ -167,7 +171,7 @@ namespace
       }
     }
     EXPECT_GT(armies, 0);
-    std::printf("retail: %d armies, %d units round-tripped\n", armies, units);
+    std::println("retail: {} armies, {} units round-tripped", armies, units);
   }
   TEST(
     Units,
@@ -175,8 +179,8 @@ namespace
   )
   {
     faf::editor::UnitGroup root;
-    std::string error;
-    ASSERT_TRUE(faf::editor::ParseUnitGroup(kGroup, root, error)) << error;
+    auto parsed = faf::editor::ParseUnitGroup(kGroup, root);
+    ASSERT_TRUE(parsed) << parsed.error();
     // A group beside GROUP_1 in INITIAL; a name taken there is refused.
     ASSERT_TRUE(faf::editor::AddGroup(root, {"INITIAL"}, "Defense"));
     EXPECT_FALSE(faf::editor::AddGroup(root, {"INITIAL"}, "Defense"));
@@ -196,7 +200,8 @@ namespace
     EXPECT_FALSE(faf::editor::RenameGroup(root, {"INITIAL", "Defenses"}, "GROUP_1"));
     // Written and read again, the tree is the same.
     faf::editor::UnitGroup again;
-    ASSERT_TRUE(faf::editor::ParseUnitGroup(faf::editor::FormatUnitGroup(root, 12), again, error)) << error;
+    parsed = faf::editor::ParseUnitGroup(faf::editor::FormatUnitGroup(root, 12), again);
+    ASSERT_TRUE(parsed) << parsed.error();
     EXPECT_TRUE(again == root);
     // GROUP_1 removed: its unit goes up into INITIAL, in GROUP_1's place (before Defenses).
     ASSERT_TRUE(faf::editor::RemoveGroup(root, {"INITIAL", "GROUP_1"}));
@@ -208,7 +213,8 @@ namespace
     EXPECT_EQ(initial.groups[0].name, "Defenses");
     EXPECT_EQ(faf::editor::UnitNamesIn(root), (std::vector<std::string>{"UNIT_328", "UNIT_334"}));
     EXPECT_FALSE(faf::editor::RemoveGroup(root, {}));
-    ASSERT_TRUE(faf::editor::ParseUnitGroup(faf::editor::FormatUnitGroup(root, 12), again, error)) << error;
+    parsed = faf::editor::ParseUnitGroup(faf::editor::FormatUnitGroup(root, 12), again);
+    ASSERT_TRUE(parsed) << parsed.error();
     EXPECT_TRUE(again == root);
   }
 } // namespace

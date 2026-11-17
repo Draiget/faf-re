@@ -248,31 +248,29 @@ namespace faf::editor
     // ---- SCM v5
     // ---------------------------------------------------------------------------------------------------------------------
 
-    bool ParseScm(
+    std::expected<void, std::string> ParseScm(
       const std::uint8_t* bytes,
       const std::size_t size,
-      Patch& out,
-      std::string& why
+      Patch& out
     )
     {
       if (size < 48 || std::memcmp(bytes, "MODL", 4) != 0) {
-        why = "not an SCM file";
-        return false;
+        return std::unexpected("not an SCM file");
       }
       const std::uint32_t version = ReadU32(bytes + 4);
       const std::uint32_t vertexOffset = ReadU32(bytes + 16), vertexCount = ReadU32(bytes + 24);
       const std::uint32_t indexOffset = ReadU32(bytes + 28), indexCount = ReadU32(bytes + 32);
       if (version != 5) {
-        why = "SCM version " + std::to_string(version) + " (the mesh terrain reads version 5)";
-        return false;
+        return std::unexpected("SCM version " + std::to_string(version) + " (the mesh terrain reads version 5)");
       }
       if (
         vertexCount == 0 || vertexCount > 65535 || indexCount % 3 != 0 ||
         static_cast<std::uint64_t>(vertexOffset) + vertexCount * 68ull > size ||
         static_cast<std::uint64_t>(indexOffset) + indexCount * 2ull > size
       ) {
-        why = "unusable SCM header (vertex or index block outside the file, or more than 65,535 vertices)";
-        return false;
+        return std::unexpected(
+          "unusable SCM header (vertex or index block outside the file, or more than 65,535 vertices)"
+        );
       }
       out.vertexCount = vertexCount;
       out.triangleCount = indexCount / 3;
@@ -281,8 +279,7 @@ namespace faf::editor
       std::memcpy(out.indices.data(), bytes + indexOffset, indexCount * 2ull);
       for (std::uint16_t i : out.indices) {
         if (i >= vertexCount) {
-          why = "an index points past the last vertex";
-          return false;
+          return std::unexpected("an index points past the last vertex");
         }
       }
       float lo[3] = {1e30f, 1e30f, 1e30f}, hi[3] = {-1e30f, -1e30f, -1e30f};
@@ -302,7 +299,7 @@ namespace faf::editor
         out.boundsMin[k] = lo[k];
         out.boundsMax[k] = hi[k];
       }
-      return true;
+      return {};
     }
 
     // ---- MeshMap
@@ -332,7 +329,7 @@ namespace faf::editor
         char text[64];
         (void)std::snprintf(text, sizeof(text), "%.6f", static_cast<double>(value));
         std::string out = text;
-        if (out.find('.') != std::string::npos) {
+        if (out.contains('.')) {
           while (!out.empty() && out.back() == '0') {
             out.pop_back();
           }
@@ -452,11 +449,11 @@ namespace faf::editor
       const std::string& key
     )
     {
-      if (s.given.count(key) != 0) {
+      if (s.given.contains(key)) {
         return true;
       }
       // The values a manifest writes without being told (the editor's own import and sync set them so).
-      if (key == "size" || key.rfind("playable_", 0) == 0) {
+      if (key == "size" || key.starts_with("playable_")) {
         return true;
       }
       if (key == "water" || key == "water_abyss") {
@@ -477,7 +474,7 @@ namespace faf::editor
       if (key == "mesh_high") {
         return s.meshHigh > -9999.0f;
       }
-      if (key.rfind("void_", 0) == 0) {
+      if (key.starts_with("void_")) {
         return s.haveVoid;
       }
       Settings& editable = const_cast<Settings&>(s);
@@ -510,7 +507,7 @@ namespace faf::editor
             }
           }
         }
-        if (key.rfind("void_", 0) == 0) {
+        if (key.starts_with("void_")) {
           s.haveVoid = true;
         }
         return;
@@ -522,7 +519,7 @@ namespace faf::editor
       if (float* value = SettingNumber(s, key)) {
         *value = *SettingNumber(defaults, key);
       }
-      if (key.rfind("void_", 0) == 0) {
+      if (key.starts_with("void_")) {
         s.haveVoid = s.given.count("void_r") + s.given.count("void_g") + s.given.count("void_b") != 0;
       }
     }
@@ -613,8 +610,10 @@ namespace faf::editor
         std::string why;
         if (scm.empty()) {
           why = "missing";
-        } else if (ParseScm(scm.data(), scm.size(), p, why)) {
+        } else if (const auto parsed = ParseScm(scm.data(), scm.size(), p)) {
           continue;
+        } else {
+          why = parsed.error();
         }
         p.vertices.clear();
         p.indices.clear();

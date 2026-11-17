@@ -469,10 +469,8 @@ namespace faf::editor
     const std::string& text
   )
   {
-    EmitterBlueprint emitter;
-    std::string error;
-    if (ParseEmitter(text, emitter, error) && !emitter.texture.empty()) {
-      return emitter.texture;
+    if (const auto emitter = ParseEmitter(text); emitter && !emitter->texture.empty()) {
+      return emitter->texture;
     }
     // A beam's or a trail's: the first texture it names.
     static const std::regex kTexture(R"((\w*Texture\w*)\s*=\s*['"]([^'"]+\.dds)['"])", std::regex::icase);

@@ -1,5 +1,6 @@
 #include "moho/render/ETrailParamTypeInfo.h"
 
+#include <utility>
 #include <cstdint>
 #include <typeinfo>
 
@@ -67,14 +68,14 @@ const char* ETrailParamTypeInfo::GetName() const
 void ETrailParamTypeInfo::AddEnums()
 {
   mPrefix = "TRAIL_";
-  AddEnum(StripPrefix("TRAIL_POSITION"), static_cast<std::int32_t>(TRAIL_POSITION));
-  AddEnum(StripPrefix("TRAIL_POSITION_X"), static_cast<std::int32_t>(TRAIL_POSITION_X));
-  AddEnum(StripPrefix("TRAIL_POSITION_Y"), static_cast<std::int32_t>(TRAIL_POSITION_Y));
-  AddEnum(StripPrefix("TRAIL_POSITION_Z"), static_cast<std::int32_t>(TRAIL_POSITION_Z));
-  AddEnum(StripPrefix("TRAIL_LIFETIME"), static_cast<std::int32_t>(TRAIL_LIFETIME));
-  AddEnum(StripPrefix("TRAIL_LENGTH"), static_cast<std::int32_t>(TRAIL_LENGTH));
-  AddEnum(StripPrefix("TRAIL_SCALE"), static_cast<std::int32_t>(TRAIL_SCALE));
-  AddEnum(StripPrefix("TRAIL_LASTPARAM"), static_cast<std::int32_t>(TRAIL_LASTPARAM));
+  AddEnum(StripPrefix("TRAIL_POSITION"), std::to_underlying(TRAIL_POSITION));
+  AddEnum(StripPrefix("TRAIL_POSITION_X"), std::to_underlying(TRAIL_POSITION_X));
+  AddEnum(StripPrefix("TRAIL_POSITION_Y"), std::to_underlying(TRAIL_POSITION_Y));
+  AddEnum(StripPrefix("TRAIL_POSITION_Z"), std::to_underlying(TRAIL_POSITION_Z));
+  AddEnum(StripPrefix("TRAIL_LIFETIME"), std::to_underlying(TRAIL_LIFETIME));
+  AddEnum(StripPrefix("TRAIL_LENGTH"), std::to_underlying(TRAIL_LENGTH));
+  AddEnum(StripPrefix("TRAIL_SCALE"), std::to_underlying(TRAIL_SCALE));
+  AddEnum(StripPrefix("TRAIL_LASTPARAM"), std::to_underlying(TRAIL_LASTPARAM));
 }
 
 /**

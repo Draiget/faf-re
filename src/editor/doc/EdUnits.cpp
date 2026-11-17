@@ -354,20 +354,18 @@ namespace faf::editor
     }
   } // namespace
 
-  bool ParseUnitGroup(
+  std::expected<void, std::string> ParseUnitGroup(
     const std::string& text,
-    UnitGroup& group,
-    std::string& error
+    UnitGroup& group
   )
   {
     Reader reader{text, 0, {}};
     group = UnitGroup{};
     if (!ReadGroup(reader, group)) {
-      error = reader.error;
-      return false;
+      return std::unexpected(reader.error);
     }
     group.newline = text.contains("\r\n") ? "\r\n" : "\n";
-    return true;
+    return {};
   }
 
   std::string FormatUnitGroup(

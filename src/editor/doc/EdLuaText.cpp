@@ -72,24 +72,20 @@ namespace faf::editor
       return at;
     }
 
-    bool ReadValue(
+    std::expected<LuaText, std::string> ReadValue(
       const std::string& text,
       std::size_t& at,
-      LuaText& value,
-      std::string& error,
       const int depth
     )
     {
       if (depth > 64) {
-        error = "tables nested too deep";
-        return false;
+        return std::unexpected("tables nested too deep");
       }
       at = SkipSpace(text, at);
       if (at >= text.size()) {
-        error = "the text ends inside a value";
-        return false;
+        return std::unexpected("the text ends inside a value");
       }
-      value = LuaText{};
+      LuaText value;
       value.start = at;
       const char c = text[at];
       if (c == '{') {
@@ -98,13 +94,12 @@ namespace faf::editor
         for (;;) {
           at = SkipSpace(text, at);
           if (at >= text.size()) {
-            error = "a table doesn't end";
-            return false;
+            return std::unexpected("a table doesn't end");
           }
           if (text[at] == '}') {
             ++at;
             value.end = at;
-            return true;
+            return value;
           }
           // `name = value`, `['name'] = value`, or a list item.
           std::string key;
@@ -132,14 +127,14 @@ namespace faf::editor
               at = equals + 1;
             }
           }
-          LuaText item;
-          if (!ReadValue(text, at, item, error, depth + 1)) {
-            return false;
+          auto item = ReadValue(text, at, depth + 1);
+          if (!item) {
+            return item;
           }
           if (key.empty()) {
-            value.items.push_back(std::move(item));
+            value.items.push_back(std::move(*item));
           } else {
-            value.fields.emplace_back(key, std::move(item));
+            value.fields.emplace_back(key, std::move(*item));
           }
           at = SkipSpace(text, at);
           if (at < text.size() && (text[at] == ',' || text[at] == ';')) {
@@ -150,32 +145,29 @@ namespace faf::editor
       if (c == '\'' || c == '"') {
         const std::size_t end = StringEnd(text, at);
         if (end == std::string::npos) {
-          error = "a string doesn't end";
-          return false;
+          return std::unexpected("a string doesn't end");
         }
         value.atom = text.substr(at, end - at);
         at = end;
         value.end = at;
-        return true;
+        return value;
       }
       if (c == '[' && at + 1 < text.size() && (text[at + 1] == '[' || text[at + 1] == '=')) {
         const std::size_t end = LongStringEnd(text, at);
         if (end == std::string::npos) {
-          error = "a long string doesn't end";
-          return false;
+          return std::unexpected("a long string doesn't end");
         }
         value.atom = text.substr(at, end - at);
         at = end;
         value.end = at;
-        return true;
+        return value;
       }
       const std::size_t start = at;
       while (at < text.size() && (IsNameChar(text[at]) || text[at] == '.' || text[at] == '-' || text[at] == '+')) {
         ++at;
       }
       if (at == start) {
-        error = std::string("unexpected '") + c + "'";
-        return false;
+        return std::unexpected(std::string("unexpected '") + c + "'");
       }
       // A call, as the map files write their typed values: STRING( 'ARMY_9' ), VECTOR3( 1, 2, 3 ). Kept as its text.
       if (
@@ -201,14 +193,13 @@ namespace faf::editor
           ++end;
         }
         if (end == std::string::npos || depth != 0) {
-          error = "a call doesn't end";
-          return false;
+          return std::unexpected("a call doesn't end");
         }
         at = end;
       }
       value.atom = text.substr(start, at - start);
       value.end = at;
-      return true;
+      return value;
     }
   } // namespace
 
@@ -241,21 +232,17 @@ namespace faf::editor
     return IsNumber() ? std::strtod(atom.c_str(), nullptr) : fallback;
   }
 
-  bool ReadLuaValue(
+  std::expected<LuaText, std::string> ReadLuaValue(
     const std::string& text,
-    std::size_t at,
-    LuaText& value,
-    std::string& error
+    std::size_t at
   )
   {
-    return ReadValue(text, at, value, error, 0);
+    return ReadValue(text, at, 0);
   }
 
-  bool ReadLuaAssignment(
+  std::expected<LuaText, std::string> ReadLuaAssignment(
     const std::string& text,
-    const std::string& name,
-    LuaText& value,
-    std::string& error
+    const std::string& name
   )
   {
     // The assignment at the top level: braces and strings outside it are skipped.
@@ -294,15 +281,14 @@ namespace faf::editor
           text[equals] == '='
         ) {
           at = equals + 1;
-          return ReadValue(text, at, value, error, 0);
+          return ReadValue(text, at, 0);
         }
         at = end;
         continue;
       }
       ++at;
     }
-    error = "no " + name + " = ...";
-    return false;
+    return std::unexpected("no " + name + " = ...");
   }
 
   std::string LuaNumber(

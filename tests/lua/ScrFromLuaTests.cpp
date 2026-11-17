@@ -4,7 +4,7 @@
 // (Did you call with '.' instead of ':'?)" (the text at the converters' first luaL_error, for example
 // SCR_FromLua_Unit 0x005936C0 and SCR_FromLua_CScriptEvent 0x004CBA60). Game runs only ever hand them real
 // objects, so these branches ran in no test or game before. Windows only: the list includes the UI types, which the
-// Linux build doesn't compile (cmake/FafLinux.cmake builds tests/lua/Lua*.cpp only).
+// Linux build doesn't compile (cmake/FafPosix.cmake builds tests/lua/Lua*.cpp only).
 
 #include <string>
 #include <type_traits>

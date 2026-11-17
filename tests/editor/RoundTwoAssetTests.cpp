@@ -46,8 +46,7 @@ namespace faf::editor
   )
   {
     JsonTree root;
-    std::string error;
-    ASSERT_TRUE(ParseLuaAssignments(
+    const auto read = ParseLuaAssignments(
       R"(-- a comment
 A = { x = 1, 'two', ['k k'] = { 3, 4 }, s = "q\"t", b = true, n = nil }
 B = Sound { Bank = 'X', Cue = 'Y' }
@@ -55,9 +54,9 @@ B = Sound { Bank = 'X', Cue = 'Y' }
 comment ]]
 C = [[long text]]
 )",
-      root,
-      error
-    )) << error;
+      root
+    );
+    ASSERT_TRUE(read) << read.error();
     const JsonTree* a = root.Get("A");
     ASSERT_NE(a, nullptr);
     EXPECT_DOUBLE_EQ(a->Num("x", 0), 1.0);
@@ -75,14 +74,15 @@ C = [[long text]]
   )
   {
     UnitWizardData data;
-    std::string error;
-    ASSERT_TRUE(LoadUnitWizardData(ReadFile(FAF_UNITWIZ_DATA), data, error)) << error;
-    UnitWizardSpec spec;
+    const auto loaded = LoadUnitWizardData(ReadFile(FAF_UNITWIZ_DATA), data);
+    ASSERT_TRUE(loaded) << loaded.error();
     const std::string id = SuggestUnitId("bot", "UEF", [](const std::string& i) {
       return i == "zel0001";
     });
     EXPECT_EQ(id, "zel0002");
-    ASSERT_TRUE(NewUnitSpec(data, "bot", "UEF", id, spec, error)) << error;
+    const auto made = NewUnitSpec(data, "bot", "UEF", id);
+    ASSERT_TRUE(made) << made.error();
+    const UnitWizardSpec& spec = *made;
     ASSERT_EQ(spec.weapons.size(), 1U);
     const std::vector<std::string> cats = UnitCategories(data, spec);
     EXPECT_NE(std::find(cats.begin(), cats.end(), "UEF"), cats.end());
@@ -96,25 +96,26 @@ C = [[long text]]
     EXPECT_NE(bp.find("Sound {"), std::string::npos);
     // The blueprint reads back as a table.
     JsonTree parsed;
-    ASSERT_TRUE(ParseLuaAssignments(bp, parsed, error)) << error;
+    const auto read = ParseLuaAssignments(bp, parsed);
+    ASSERT_TRUE(read) << read.error();
     EXPECT_NE(parsed.Get("UnitBlueprint"), nullptr);
     const std::string script = UnitScriptText(data, spec);
     EXPECT_NE(script.find("MainGun = ClassWeapon("), std::string::npos);
     EXPECT_NE(script.find("TypeClass = ZEL0002"), std::string::npos);
     // The placeholder mesh in the donor's skeleton.
     UnitMeshInfo info;
-    const std::vector<std::uint8_t> scm = UnitMesh(data, spec, "", info, error);
-    ASSERT_FALSE(scm.empty()) << error;
+    const auto scm = UnitMesh(data, spec, "", info);
+    ASSERT_TRUE(scm) << scm.error();
     EXPECT_TRUE(info.placeholder);
     EXPECT_GT(info.bones, 1);
-    ScmModel model;
-    ASSERT_TRUE(ReadScm(scm, model, error)) << error;
-    EXPECT_EQ(model.bones, info.bones);
+    const auto model = ReadScm(*scm);
+    ASSERT_TRUE(model) << model.error();
+    EXPECT_EQ(model->bones, info.bones);
     // The spec file reads back.
-    std::vector<UnitWizardSpec> back;
-    ASSERT_TRUE(ReadUnitSpecs(UnitSpecsText({spec}), back, error)) << error;
-    ASSERT_EQ(back.size(), 1U);
-    EXPECT_EQ(UnitSpecsText(back), UnitSpecsText({spec}));
+    const auto back = ReadUnitSpecs(UnitSpecsText({spec}));
+    ASSERT_TRUE(back) << back.error();
+    ASSERT_EQ(back->size(), 1U);
+    EXPECT_EQ(UnitSpecsText(*back), UnitSpecsText({spec}));
   }
 
   TEST(
@@ -122,11 +123,10 @@ C = [[long text]]
     SkinnedModelKeepsItsBones
   )
   {
-    ObjMesh mesh;
-    std::string error;
-    ASSERT_TRUE(ParseObj(
-      "o body\nv 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\ng turret\nv 0 2 0\nv 1 2 0\nv 0 3 0\nf 4 5 6\n", mesh, error
-    )) << error;
+    const auto parsed =
+      ParseObj("o body\nv 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\ng turret\nv 0 2 0\nv 1 2 0\nv 0 3 0\nf 4 5 6\n");
+    ASSERT_TRUE(parsed) << parsed.error();
+    const ObjMesh& mesh = *parsed;
     ASSERT_EQ(mesh.groups.size(), 2U);
     ASSERT_EQ(mesh.triangleGroup.size(), 2U);
     EXPECT_EQ(mesh.triangleGroup[1], 1);
@@ -135,11 +135,11 @@ C = [[long text]]
     bones[1].name = "Turret";
     bones[1].parent = 0;
     bones[1].pos = {0.0f, 2.0f, 0.0f};
-    const std::vector<std::uint8_t> scm = ScmFromObjSkinned(mesh, bones, {0, 0, 0, 1, 1, 1}, 1.0f, "test", error);
-    ASSERT_FALSE(scm.empty()) << error;
-    ScmModel model;
-    ASSERT_TRUE(ReadScm(scm, model, error)) << error;
-    EXPECT_EQ(model.bones, 2);
+    const auto scm = ScmFromObjSkinned(mesh, bones, {0, 0, 0, 1, 1, 1}, 1.0f, "test");
+    ASSERT_TRUE(scm) << scm.error();
+    const auto model = ReadScm(*scm);
+    ASSERT_TRUE(model) << model.error();
+    EXPECT_EQ(model->bones, 2);
     const std::vector<std::array<float, 3>> at = ScmBonePositions(bones);
     EXPECT_NEAR(at[1][1], 2.0f, 1e-5f);
   }
@@ -186,8 +186,8 @@ C = [[long text]]
       }
     }
     ScaAnimation anim;
-    std::string error;
-    ASSERT_TRUE(ReadSca(b, anim, error)) << error;
+    const auto read = ReadSca(b, anim);
+    ASSERT_TRUE(read) << read.error();
     ASSERT_EQ(anim.bones.size(), 2U);
     EXPECT_EQ(anim.bones[1], "arm");
     EXPECT_EQ(anim.parents[1], 0);
@@ -204,11 +204,11 @@ C = [[long text]]
   )
   {
     // One patch: two triangles over a 64 x 64 square at height 5, written as the import writes it.
-    ObjMesh mesh;
-    std::string error;
-    ASSERT_TRUE(ParseObj("v 0 5 0\nv 64 5 0\nv 64 5 64\nv 0 5 64\nf 1 3 2\nf 1 4 3\n", mesh, error)) << error;
-    const std::vector<std::uint8_t> scm = ScmFromObj(mesh, "tile", 1.0f, "test", error);
-    ASSERT_FALSE(scm.empty()) << error;
+    const auto mesh = ParseObj("v 0 5 0\nv 64 5 0\nv 64 5 64\nv 0 5 64\nf 1 3 2\nf 1 4 3\n");
+    ASSERT_TRUE(mesh) << mesh.error();
+    const auto made = ScmFromObj(*mesh, "tile", 1.0f, "test");
+    ASSERT_TRUE(made) << made.error();
+    const std::vector<std::uint8_t>& scm = *made;
     std::map<std::pair<int, int>, std::string> files{{{0, 0}, "tile_0_0.scm"}};
     const std::string manifest = MeshTerrainManifest(files, 64.0f, 5.0f);
     std::map<std::string, std::vector<std::uint8_t>> disk{

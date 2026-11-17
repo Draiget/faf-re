@@ -1,5 +1,6 @@
 #include "editor/ui/EdKeymap.h"
 
+#include <utility>
 #include <algorithm>
 #include <cctype>
 
@@ -83,7 +84,7 @@ namespace faf::editor
       // A camera gesture (`mouse.orbit=Shift+Middle`).
       if (id.starts_with("mouse.")) {
         bool known = false;
-        for (int g = 0; g < static_cast<int>(CameraGesture::Count); ++g) {
+        for (int g = 0; g < std::to_underlying(CameraGesture::Count); ++g) {
           if (id == CameraGestureId(static_cast<CameraGesture>(g))) {
             known = true;
             MouseChord chord;
@@ -140,7 +141,7 @@ namespace faf::editor
         out += command.id + "=" + command.keys + "\n";
       }
     }
-    for (int g = 0; g < static_cast<int>(CameraGesture::Count); ++g) {
+    for (int g = 0; g < std::to_underlying(CameraGesture::Count); ++g) {
       const MouseChord& now = ActiveCameraGestures()[static_cast<std::size_t>(g)];
       if (!(now == DefaultCameraGestures()[static_cast<std::size_t>(g)])) {
         out += std::string(CameraGestureId(static_cast<CameraGesture>(g))) + "=" + MouseChordText(now) + "\n";

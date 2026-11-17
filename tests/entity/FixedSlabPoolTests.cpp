@@ -1,6 +1,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
+#include <print>
 #include <thread>
 #include <vector>
 
@@ -26,7 +27,7 @@
 
 static void TestBasicAllocation()
 {
-  printf("Running TestBasicAllocation...\n");
+  std::println("Running TestBasicAllocation...");
   moho::FixedSlabPool pool(sizeof(moho::Projectile), 16);
 
   void* ptr1 = pool.Allocate();
@@ -49,12 +50,12 @@ static void TestBasicAllocation()
   pool.Deallocate(ptr3);
 
   TEST_ASSERT(pool.GetAllocatedCount() == 0);
-  printf("TestBasicAllocation passed.\n");
+  std::println("TestBasicAllocation passed.");
 }
 
 static void TestSlabReclamation()
 {
-  printf("Running TestSlabReclamation...\n");
+  std::println("Running TestSlabReclamation...");
   moho::FixedSlabPool pool(sizeof(moho::Unit), 16);
 
   std::vector<void*> objects;
@@ -80,12 +81,12 @@ static void TestSlabReclamation()
   // Unused slabs should have been reclaimed to OS, keeping at most kMaxCachedEmptySlabs (2)
   TEST_ASSERT(pool.GetCachedEmptySlabCount() <= moho::FixedSlabPool::kMaxCachedEmptySlabs);
   TEST_ASSERT(pool.GetActiveSlabCount() == 0);
-  printf("TestSlabReclamation passed.\n");
+  std::println("TestSlabReclamation passed.");
 }
 
 static void TestConcurrentAllocation()
 {
-  printf("Running TestConcurrentAllocation...\n");
+  std::println("Running TestConcurrentAllocation...");
   moho::FixedSlabPool pool(sizeof(moho::Shield), 16);
 
   constexpr int kThreads = 8;
@@ -111,12 +112,12 @@ static void TestConcurrentAllocation()
   }
 
   TEST_ASSERT(pool.GetAllocatedCount() == 0);
-  printf("TestConcurrentAllocation passed.\n");
+  std::println("TestConcurrentAllocation passed.");
 }
 
 static void TestEntityMemoryManagerRouting()
 {
-  printf("Running TestEntityMemoryManagerRouting...\n");
+  std::println("Running TestEntityMemoryManagerRouting...");
   moho::EntityMemoryManager& mgr = moho::EntityMemoryManager::Instance();
 
   // Verify known sizes resolve dynamically to pools via sizeof
@@ -147,12 +148,12 @@ static void TestEntityMemoryManagerRouting()
   mgr.Deallocate(fallbackPtr, 12345);
 
   TEST_ASSERT(mgr.GetTotalAllocatedCount() == 0);
-  printf("TestEntityMemoryManagerRouting passed.\n");
+  std::println("TestEntityMemoryManagerRouting passed.");
 }
 
 static void TestHeapPointerRangeCheckSafety()
 {
-  printf("Running TestHeapPointerRangeCheckSafety...\n");
+  std::println("Running TestHeapPointerRangeCheckSafety...");
   moho::EntityMemoryManager& mgr = moho::EntityMemoryManager::Instance();
 
   // Pointer from heap
@@ -162,12 +163,12 @@ static void TestHeapPointerRangeCheckSafety()
 
   // Range check must safely bypass any slab header dereferencing and delete via global operator delete
   mgr.Deallocate(heapPtr, 1024);
-  printf("TestHeapPointerRangeCheckSafety passed.\n");
+  std::println("TestHeapPointerRangeCheckSafety passed.");
 }
 
 static void TestClearWithLiveBlocksSafety()
 {
-  printf("Running TestClearWithLiveBlocksSafety...\n");
+  std::println("Running TestClearWithLiveBlocksSafety...");
   moho::FixedSlabPool pool(sizeof(moho::Unit), 16);
 
   void* p1 = pool.Allocate();
@@ -187,12 +188,12 @@ static void TestClearWithLiveBlocksSafety()
   pool.Clear();
   TEST_ASSERT(pool.GetActiveSlabCount() == 0);
   TEST_ASSERT(pool.GetCachedEmptySlabCount() == 0);
-  printf("TestClearWithLiveBlocksSafety passed.\n");
+  std::println("TestClearWithLiveBlocksSafety passed.");
 }
 
 static void TestSwitchAndHybridSafety()
 {
-  printf("Running TestSwitchAndHybridSafety...\n");
+  std::println("Running TestSwitchAndHybridSafety...");
   moho::EntityMemoryManager& mgr = moho::EntityMemoryManager::Instance();
 
   moho::sim_EntityPools = true;
@@ -218,7 +219,7 @@ static void TestSwitchAndHybridSafety()
 
   // Default is false until replays are checked
   moho::sim_EntityPools = false;
-  printf("TestSwitchAndHybridSafety passed.\n");
+  std::println("TestSwitchAndHybridSafety passed.");
 }
 
 // The checks abort on failure (TEST_ASSERT), worker threads included, which fails the run.

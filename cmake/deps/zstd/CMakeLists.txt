@@ -16,7 +16,7 @@ file(GLOB _zstd_sources CONFIGURE_DEPENDS
 add_library(faf_zstd STATIC ${_zstd_sources})
 target_include_directories(faf_zstd SYSTEM PUBLIC "${FAF_ZSTD_DIR}/lib")
 target_compile_definitions(faf_zstd PRIVATE ZSTD_DISABLE_ASM=1 ZSTD_LEGACY_SUPPORT=0)
-if(FAF_LINUX)
+if(FAFRE_PLATFORM_POSIX)
   target_compile_options(faf_zstd PRIVATE -w)
 else()
   target_compile_options(faf_zstd PRIVATE /W0)

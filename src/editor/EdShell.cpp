@@ -247,11 +247,11 @@ namespace faf::editor
           mTestRunIssues.push_back(std::move(issue));
         }
         std::stable_sort(mTestRunIssues.begin(), mTestRunIssues.end(), [](const CheckIssue& a, const CheckIssue& b) {
-          return static_cast<int>(a.level) < static_cast<int>(b.level);
+          return std::to_underlying(a.level) < std::to_underlying(b.level);
         });
         int counts[3] = {0, 0, 0};
         for (const CheckIssue& issue : mTestRunIssues) {
-          ++counts[static_cast<int>(issue.level)];
+          ++counts[std::to_underlying(issue.level)];
         }
         gpg::Logf(
           "editor: test run done: %d errors (the map's files), %d warnings (other Lua), %d notes",
@@ -2374,7 +2374,7 @@ namespace faf::editor
         ImGui::AlignTextToFramePadding();
         ImGui::TextDisabled("%zu", i + 1);
         ImGui::SameLine(ImGui::GetFontSize() * 1.6f);
-        int role = static_cast<int>(slot.role);
+        int role = std::to_underlying(slot.role);
         ImGui::SetNextItemWidth(roleWidth);
         if (EdCombo("##role", &role, kRoles, 3)) {
           slot.role = static_cast<PlaySlot::Role>(role);
@@ -2702,12 +2702,11 @@ namespace faf::editor
       ImGui::InputText("Folder", mSaveAsName, sizeof(mSaveAsName), ImGuiInputTextFlags_EnterReturnsTrue);
     ImGui::TextDisabled("FAF names map folders name.vNNNN; the files take the name without the version.");
     if (ImGui::Button("Save", ImVec2(Em(120.0f), 0.0f)) || enter) {
-      std::string message;
-      if (mDocument.SaveAsNewFolderIn(mSaveAsParent, mSaveAsName, message)) {
-        gpg::Logf("editor: %s", message.c_str());
+      if (const auto saved = mDocument.SaveAsNewFolderIn(mSaveAsParent, mSaveAsName)) {
+        gpg::Logf("editor: %s", saved->c_str());
         ImGui::CloseCurrentPopup();
       } else {
-        gpg::Warnf("editor: %s", message.c_str());
+        gpg::Warnf("editor: %s", saved.error().c_str());
       }
     }
     ImGui::SameLine();
@@ -2971,12 +2970,11 @@ namespace faf::editor
     if (ImGui::Button("Create", ImVec2(Em(120.0f), 0.0f))) {
       mNewMap.title = mNewMapTitle;
       mNewMap.folder = mNewMapFolder;
-      std::string message;
-      if (mDocument.CreateNew(mNewMap, message)) {
-        gpg::Logf("editor: %s", message.c_str());
+      if (const auto created = mDocument.CreateNew(mNewMap)) {
+        gpg::Logf("editor: %s", created->c_str());
         ImGui::CloseCurrentPopup();
       } else {
-        gpg::Warnf("editor: %s", message.c_str());
+        gpg::Warnf("editor: %s", created.error().c_str());
       }
     }
     ImGui::SameLine();
@@ -3050,7 +3048,9 @@ namespace faf::editor
     ImGui::BeginDisabled(!mPackagePlan.errors.empty());
     if (ImGui::Button("Package", ImVec2(Em(120.0f), 0.0f))) {
       std::filesystem::path written;
-      const bool ok = mDocument.WritePackage(mPackagePlan, written, mPackageMessage);
+      const auto packaged = mDocument.WritePackage(mPackagePlan, written);
+      const bool ok = packaged.has_value();
+      mPackageMessage = ok ? *packaged : packaged.error();
       (ok ? gpg::Logf : gpg::Warnf)("editor: %s", mPackageMessage.c_str());
     }
     ImGui::EndDisabled();

@@ -9,21 +9,19 @@
 
 namespace faf::editor
 {
-  bool ParseStrataThemes(
+  std::expected<void, std::string> ParseStrataThemes(
     const std::string& text,
     const char* const tableName,
-    std::vector<StrataTheme>& out,
-    std::string& error
+    std::vector<StrataTheme>& out
   )
   {
     JsonTree root;
-    if (!ParseLuaAssignments(text, root, error)) {
-      return false;
+    if (const auto read = ParseLuaAssignments(text, root); !read) {
+      return std::unexpected(read.error());
     }
     const JsonTree* const list = root.Get(tableName);
     if (list == nullptr) {
-      error = std::string("no ") + tableName + " table";
-      return false;
+      return std::unexpected(std::string("no ") + tableName + " table");
     }
     for (const JsonTree& entry : list->items) {
       StrataTheme theme;
@@ -61,7 +59,7 @@ namespace faf::editor
         out.push_back(std::move(theme));
       }
     }
-    return true;
+    return {};
   }
 
   std::string WriteStrataThemes(

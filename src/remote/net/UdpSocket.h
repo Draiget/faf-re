@@ -3,6 +3,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <expected>
 #include <string>
 #include <string_view>
 
@@ -53,7 +54,7 @@ namespace faf::remote::net
 
   struct IpAddressHash
   {
-    [[nodiscard]] std::size_t operator()(const IpAddress& address) const noexcept;
+    [[nodiscard]] static std::size_t operator()(const IpAddress& address) noexcept;
   };
 
   struct SEndpoint
@@ -100,7 +101,7 @@ namespace faf::remote::net
 
   struct SEndpointHash
   {
-    [[nodiscard]] std::size_t operator()(const SEndpoint& endpoint) const noexcept;
+    [[nodiscard]] static std::size_t operator()(const SEndpoint& endpoint) noexcept;
   };
 
   /** "a.b.c.d:port" or "[ipv6]:port"; false for anything else, a port of 0 included. */
@@ -115,7 +116,7 @@ namespace faf::remote::net
     CUdpSocket& operator=(const CUdpSocket&) = delete;
 
     /** Binds to `local`; a port of 0 takes any free one, which `Local` then names. */
-    [[nodiscard]] bool Open(const SEndpoint& local, std::string& error);
+    [[nodiscard]] std::expected<void, std::string> Open(const SEndpoint& local);
     void Close() noexcept;
 
     /**

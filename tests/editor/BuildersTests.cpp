@@ -22,9 +22,9 @@ namespace faf::editor
                         Second = { PlatoonTemplate = "Air, wings", InstanceCount = 2 },
                     },
                 })lua";
-    std::vector<MissionBuilder> builders;
-    std::string error;
-    ASSERT_TRUE(ParseBuilders(text, builders, error)) << error;
+    auto parsed = ParseBuilders(text);
+    ASSERT_TRUE(parsed) << parsed.error();
+    std::vector<MissionBuilder>& builders = *parsed;
     ASSERT_EQ(builders.size(), 2U);
     EXPECT_EQ(builders[0].name, "M1_Attack");
     EXPECT_EQ(builders[0].Get("PlatoonTemplate"), "'M1_Tanks'");
@@ -33,13 +33,15 @@ namespace faf::editor
     EXPECT_EQ(builders[1].Get("InstanceCount"), "2");
     builders[0].Set("Priority", "250");
     builders.push_back(NewBuilder("Third", "T", "MAIN"));
-    std::vector<MissionBuilder> again;
-    ASSERT_TRUE(ParseBuilders(FormatBuilders(builders), again, error)) << error;
+    const auto reparsed = ParseBuilders(FormatBuilders(builders));
+    ASSERT_TRUE(reparsed) << reparsed.error();
+    const std::vector<MissionBuilder>& again = *reparsed;
     ASSERT_EQ(again.size(), 3U);
     EXPECT_EQ(again[0].Get("Priority"), "250");
     EXPECT_EQ(again[0].Get("BuildConditions"), builders[0].Get("BuildConditions"));
     EXPECT_EQ(again[2].Get("LocationType"), "'MAIN'");
-    EXPECT_TRUE(ParseBuilders("", again, error));
-    EXPECT_TRUE(again.empty());
+    const auto none = ParseBuilders("");
+    EXPECT_TRUE(none);
+    EXPECT_TRUE(none->empty());
   }
 } // namespace faf::editor

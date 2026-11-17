@@ -111,27 +111,25 @@ namespace faf::editor
     return rules->GetUnitBlueprint(resId) != nullptr;
   }
 
-  bool EdUnitLabPanel::Derive(
+  std::expected<void, std::string> EdUnitLabPanel::Derive(
     const std::string& id,
     const std::string& name,
-    const std::string& description,
-    std::string& error
+    const std::string& description
   )
   {
     ModProject* const p = mProject.Project();
     if (p == nullptr || mUnit.empty()) {
-      error = "no project or unit";
-      return false;
+      return std::unexpected("no project or unit");
     }
     const std::string base = ModSourceUnit(*p, mUnit);
     const ModChanges before = ModChangesOf(*p);
-    if (!AddModDerived(*p, id, base, name, description, &EdUnitLabPanel::GameHasUnit, error)) {
-      return false;
+    if (const auto added = AddModDerived(*p, id, base, name, description, &EdUnitLabPanel::GameHasUnit); !added) {
+      return std::unexpected(added.error());
     }
     (void)mProject.History().Record("derive " + id + " from " + base, before, ModChangesOf(*p), "", ImGui::GetTime());
     mProject.Touch();
     mUnit = id;
-    return true;
+    return {};
   }
 
   bool EdUnitLabPanel::SetField(
@@ -271,13 +269,15 @@ namespace faf::editor
       ImGui::Checkbox("With a script of its own", &mDeriveScript);
       EdSetItemTooltip("units/<id>/<id>_script.lua: a class built on the base unit's, written once for you to change");
       if (ImGui::Button("Derive")) {
-        if (Derive(mDeriveId, mDeriveName, mDeriveDescription, mDeriveError)) {
+        if (const auto derived = Derive(mDeriveId, mDeriveName, mDeriveDescription); derived) {
           if (mDeriveScript) {
             if (const auto made = p->derived.find(mDeriveId); made != p->derived.end()) {
               made->second.script = true;
             }
           }
           ImGui::CloseCurrentPopup();
+        } else {
+          mDeriveError = derived.error();
         }
       }
       if (!mDeriveError.empty()) {

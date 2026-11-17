@@ -492,7 +492,7 @@ namespace faf::editor
     return out;
   }
 
-  bool ErodeHeights(
+  std::expected<void, std::string> ErodeHeights(
     std::uint16_t* const heights,
     const int width,
     const int height,
@@ -500,13 +500,11 @@ namespace faf::editor
     const ErosionSolver& solver,
     const ErosionValues& values,
     int step,
-    std::string& error,
     ErosionMasks* const masks
   )
   {
     if (heights == nullptr || width < 3 || height < 3 || !(scale > 0.0f)) {
-      error = "no heights";
-      return false;
+      return std::unexpected("no heights");
     }
     step = std::max(1, step);
     const int cw = (width - 1) / step + 1;
@@ -527,12 +525,11 @@ namespace faf::editor
     std::map<std::string, field::Grid> extra;
     args.extra = &extra;
     field::Grid out;
-    if (!field::RunOpCpu(solver.op, args, out, error)) {
-      return false;
+    if (auto ran = field::RunOpCpu(solver.op, args, out); !ran) {
+      return ran;
     }
     if (out.w != cw || out.h != ch) {
-      error = "the solver gave a grid of another size";
-      return false;
+      return std::unexpected("the solver gave a grid of another size");
     }
     const auto toWord = [scale](const float units) {
       return static_cast<std::uint16_t>(std::clamp(std::lround(units / scale), 0L, 65535L));
@@ -559,7 +556,7 @@ namespace faf::editor
           masks->accum = *accum;
         }
       }
-      return true;
+      return {};
     }
     // A coarse run: its change, upsampled (bilinear), on top of the full heights.
     for (int z = 0; z < height; ++z) {
@@ -579,6 +576,6 @@ namespace faf::editor
         word = toWord(static_cast<float>(word) * scale + change);
       }
     }
-    return true;
+    return {};
   }
 } // namespace faf::editor

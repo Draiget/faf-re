@@ -6,8 +6,10 @@
 
 [![Replay parity](https://img.shields.io/badge/replay%20parity-96.7%25-brightgreen)](docs/RETAIL_REPLAY_PARITY.md)
 [![x64 vs retail](https://img.shields.io/badge/x64%20vs%20retail-41%25%20less%20time-blue)](docs/PERFORMANCE.md)
-[![Platforms](https://img.shields.io/badge/platforms-Windows%20x64%20%7C%20x86-blue)](#build)
-[![Line coverage](https://img.shields.io/badge/line%20coverage-71.3%25-yellowgreen)](tests/README.md#coverage)
+[![Windows](https://img.shields.io/badge/Windows-x64%20%7C%20x86-0078D6?logo=windows&logoColor=white)](#build)
+[![Linux](https://img.shields.io/badge/Linux-x64-FCC624?logo=linux&logoColor=black)](#linux)
+[![macOS](https://img.shields.io/badge/macOS-Apple%20silicon-000000?logo=apple&logoColor=white)](#macos-apple-silicon)
+[![Line coverage](https://img.shields.io/badge/line%20coverage-73.2%25-yellowgreen)](tests/README.md#coverage)
 
 [Build](#build) · [Map editor](#map-editor) · [Retail parity](#retail-parity) · [Performance](#performance) · [Contributing](CONTRIBUTING.md)
 
@@ -138,6 +140,36 @@ cmake --build --preset clang-x64-release   # build/clang-x64-release/src/main_x6
 
 Configuring brings `dependencies/` up to date: it clones missing submodules, fetches missing downloads pinned by commit or SHA256, and applies the FAF patches in `dependencies/patches/`. The full list is in [Libraries the engine uses](#libraries-the-engine-uses). `cmake -P cmake/FafDependencies.cmake` does the same without configuring.
 
+### Linux
+
+An x86-64 build with the pinned toolchain: clang, lld and libc++ of LLVM 18.1.8, CMake 3.28.3 and Ninja, installed on Ubuntu 22.04 by `tools/linux/toolchain.sh` (or the image in `tools/linux/Dockerfile`). The simulation must match the Windows builds bit for bit, so configuring refuses another clang or glibc release (`cmake/toolchains/linux-clang-pins.cmake`). The programs run on glibc 2.34 or newer: Ubuntu 22.04, Debian 12, Mint 21, RHEL 9 and later. It builds the headless simulation and its tests, the dedicated server, and the game client (in progress, #270).
+
+```sh
+cmake --preset linux-clang-x64-release
+cmake --build --preset linux-clang-x64-release --target headless server
+
+# The game client, in a build tree of its own (`tools/linux/toolchain.sh --client` adds the headers SDL3 builds against).
+cmake --preset linux-clang-x64-release -B build/linux-client -DFAF_POSIX_CLIENT=ON
+cmake --build build/linux-client --target faf_client
+```
+
+### macOS (Apple silicon)
+
+A native arm64 build with Apple clang (Xcode 16.4 or its Command Line Tools: Apple clang 17.0.0), CMake 3.25+ and Ninja, for macOS 14 or later: the headless simulation and its tests, and the game client (in progress, #273).
+
+```sh
+cmake --preset macos-clang-arm64-release
+cmake --build --preset macos-clang-arm64-release --target headless   # build/macos-clang-arm64-release/headless
+
+# The game client, in a build tree of its own: Vulkan through MoltenVK, shaders through DXC built from source.
+cmake --preset macos-clang-arm64-release -B build/macos-client -DFAF_POSIX_CLIENT=ON
+cmake --build build/macos-client --target faf_client   # faf_client, libMoltenVK.dylib, libdxcompiler.dylib
+```
+
+The client runs on the game's files (Forged Alliance's `gamedata`, `fonts`, `sounds`, `movies` and `maps`, and FAF's data folder with `bin/init_faf.lua` and a `fa_path.lua` naming the game folder): `faf_client /init <FAF data>/bin/init_faf.lua /windowed 2048 1280`. Window sizes are in pixels, as on Windows: on a Retina display, 2048×1280 is a 1024×640 window.
+
+Apple silicon has no x87 unit, so the simulation's x87 routines run in software there (`src/legacy/math/X87Soft.cpp`), checked against the x87 unit on x86-64 by `tools/x87-oracle`. A NaN made by an invalid operation has a positive sign on ARM and a negative one on x86; `tests/sim_math/known_macos-arm64.txt` lists the golden cases where that is the only difference.
+
 ### IDEs
 
 - **Visual Studio 2022:** File → Open → Folder, then pick a preset.
@@ -178,7 +210,7 @@ CMake configure fetches all of them at the exact version below and applies the p
 | Library | Version | Source | FAF patch |
 |---|---|---|---|
 | Wild Magic | 3.8 (original 2006 release) | [Draiget/wild-magic-3-8](https://github.com/Draiget/wild-magic-3-8) (submodule) | `wildmagic3p8_faf_required` |
-| SDL | 3.4.18 (zlib) | [release archive](https://github.com/libsdl-org/SDL/releases/download/release-3.4.18/SDL3-3.4.18.tar.gz) | none; built static by `cmake/deps/sdl3` (Windows) and `cmake/FafLinuxClient.cmake`: the client's windows, input, clipboard, message boxes, pickers and the developer windows' renderer |
+| SDL | 3.4.18 (zlib) | [release archive](https://github.com/libsdl-org/SDL/releases/download/release-3.4.18/SDL3-3.4.18.tar.gz) | none; built static by `cmake/deps/sdl3` (Windows) and `cmake/FafPosixClient.cmake`: the client's windows, input, clipboard, message boxes, pickers and the developer windows' renderer |
 | Dear ImGui | 1.92.4, docking branch (MIT) | [v1.92.4-docking source archive](https://github.com/ocornut/imgui/archive/refs/tags/v1.92.4-docking.tar.gz) | none; the map editor's panels and the developer windows (log window, Lua debugger, emitter and reference editors) |
 | zlib | 1.2.3 | [madler/zlib](https://github.com/madler/zlib/tree/v1.2.3) (submodule) | `zlib_1_2_3_faf_required` |
 | FFmpeg | 7.1.3 (LGPL) | [Draiget/ffmpeg-mirror](https://github.com/Draiget/ffmpeg-mirror) (submodule) | none; linked statically, for SFD movies in place of CRI Sofdec/ADX. Configuration and licence: [SFD compatibility](docs/FAF_SFD_COMPATIBILITY.md#ffmpeg-dependency-and-build) |

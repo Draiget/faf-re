@@ -1,6 +1,7 @@
 #pragma once
 
 #include <atomic>
+#include <expected>
 #include <functional>
 #include <filesystem>
 #include <map>
@@ -51,8 +52,8 @@ namespace faf::editor
     [[nodiscard]] bool Bool(const std::string& key) const;
   };
 
-  /** `text` read as JSON (strings with their \u escapes as UTF-8); false with `error`. */
-  bool ParseJson(const std::string& text, JsonNode& out, std::string& error);
+  /** `text` read as JSON (strings with their \u escapes as UTF-8); the error otherwise. */
+  [[nodiscard]] std::expected<JsonNode, std::string> ParseJson(const std::string& text);
 
   /** One map in the vault, as a search finds it (its latest version). */
   struct VaultMap
@@ -129,8 +130,9 @@ namespace faf::editor
   std::string VaultQueryText(const VaultQuery& query);
   bool VaultQueryFromText(const std::string& text, VaultQuery& out);
 
-  /** A map API answer (`data` maps, `included` versions and players) as maps; false with `error`. */
-  bool ParseVaultSearch(const std::string& json, std::vector<VaultMap>& maps, int& pages, std::string& error);
+  /** A map API answer (`data` maps, `included` versions and players) as maps; the error otherwise. */
+  [[nodiscard]] std::expected<void, std::string>
+  ParseVaultSearch(const std::string& json, std::vector<VaultMap>& maps, int& pages);
 
   /**
    * The body FAF's API takes at `/maps/upload` (as the FAF client sends it, MapUploadTask): a multipart form with the
@@ -228,11 +230,12 @@ namespace faf::editor
   private:
     void Run(std::function<void()> job);
     void SetMessage(std::string text);
-    bool RefreshAccess(std::string& error);
+    [[nodiscard]] std::expected<void, std::string> RefreshAccess();
     void SaveRefreshToken() const;
     void FetchUserName();
-    /** One page of a search (a new access token and again when the old one ran out); false with `error`. */
-    bool FetchMaps(const VaultQuery& query, int page, std::vector<VaultMap>& maps, int& pages, std::string& error);
+    /** One page of a search (a new access token and again when the old one ran out); the error otherwise. */
+    [[nodiscard]] std::expected<void, std::string>
+    FetchMaps(const VaultQuery& query, int page, std::vector<VaultMap>& maps, int& pages);
     struct Named
     {
       bool done = false;

@@ -1,6 +1,7 @@
 #include "editor/ui/EdKeysPage.h"
 #include "editor/ui/EdControls.h"
 
+#include <utility>
 #include <algorithm>
 #include <cstdio>
 #include <vector>
@@ -320,7 +321,7 @@ namespace faf::editor
     ImGui::Spacing();
     ImGui::SeparatorText("Camera mouse");
     static constexpr const char* kButtons[] = {"None", "Right", "Middle"};
-    for (int g = 0; g < static_cast<int>(CameraGesture::Count); ++g) {
+    for (int g = 0; g < std::to_underlying(CameraGesture::Count); ++g) {
       const CameraGesture gesture = static_cast<CameraGesture>(g);
       MouseChord& chord = ActiveCameraGestures()[static_cast<std::size_t>(g)];
       const MouseChord before = chord;

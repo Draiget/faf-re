@@ -2,6 +2,12 @@
 
 #include "VulkanLoader.h"
 
+#if FAFRE_PLATFORM_MACOS // MoltenVK's path beside the executable
+#include <filesystem>
+
+#include "platform/posix/SystemPosix.h"
+#endif
+
 namespace gpg::gal::vulkan
 {
   Functions& Vk()
@@ -17,6 +23,15 @@ namespace gpg::gal::vulkan
     }
 #if FAFRE_PLATFORM_WINDOWS
     module = ::LoadLibraryA("vulkan-1.dll");
+#elif FAFRE_PLATFORM_MACOS // MoltenVK, Vulkan over Metal: macOS has no system Vulkan
+    // The macOS client (issue #263): MoltenVK beside the executable is the whole Vulkan API, with no
+    // loader in between; a system loader (the Vulkan SDK's or Homebrew's) when it isn't there.
+    // LoadLibraryA is dlopen here.
+    const std::filesystem::path beside = std::filesystem::path(platform::posix::ExecutablePath()).parent_path();
+    module = ::LoadLibraryA((beside / "libMoltenVK.dylib").c_str());
+    if (module == nullptr) {
+      module = ::LoadLibraryA("libvulkan.1.dylib");
+    }
 #else
     // The Linux client (issue #255): the Vulkan loader's soname; LoadLibraryA is dlopen there.
     module = ::LoadLibraryA("libvulkan.so.1");

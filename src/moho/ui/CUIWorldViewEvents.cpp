@@ -1,6 +1,7 @@
 #include "moho/ui/UiPrivate.h"
 #include "moho/console/CConCommand.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
+#include <utility>
 
 #if FAFRE_PLATFORM_POSIX
 #include "platform/Window.h"
@@ -2895,7 +2896,7 @@ void moho::CUIWorldView::UpdateSelection(
           hit.mMouseWorldPos = COORDS_ToWorldPos(
             mWldSession->GetSTIMap(),
             snappedCell,
-            static_cast<ELayer>(static_cast<std::uint8_t>(buildBlueprint->mFootprint.mOccupancyCaps)),
+            static_cast<ELayer>(std::to_underlying(buildBlueprint->mFootprint.mOccupancyCaps)),
             1,
             1
           );
@@ -3382,7 +3383,7 @@ bool moho::CUIWorldView::HandleEvent(
   // --- right-button release (0x00870FF7) ----------------------------------
   if (eventData.mEventType == MET_ButtonRelease && eventData.mKeyCode == kPostDraggerRightButton) {
     const bool overHoveredCommand = HasHoveredCommand(cursorInfo);
-    const auto modifiers = static_cast<std::uint32_t>(eventData.mModifiers);
+    const auto modifiers = std::to_underlying(eventData.mModifiers);
 
     if (
       overHoveredCommand && (modifiers & MEM_Shift) != 0u && (modifiers & MEM_Ctrl) != 0u && !mWldSession->IsObserver()

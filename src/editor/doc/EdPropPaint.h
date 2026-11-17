@@ -1,5 +1,6 @@
 #pragma once
 
+#include <expected>
 #include <string>
 #include <vector>
 
@@ -34,7 +35,8 @@ namespace faf::editor
    * values for all, and its scale minimum as the maximum).
    */
   std::string PaintSetToProppaintset(const std::vector<PropPaintEntry>& entries);
-  bool PaintSetFromProppaintset(const std::string& text, std::vector<PropPaintEntry>& entries, std::string& error);
+  [[nodiscard]] std::expected<std::vector<PropPaintEntry>, std::string>
+  PaintSetFromProppaintset(const std::string& text);
 
   /** FAFME's GetRandomProp: the entry `roll` (0 to 1) falls on, each as wide as its chance; -1 when none has one. */
   int PickPaintEntry(const std::vector<PropPaintEntry>& entries, float roll);

@@ -13,7 +13,9 @@
 #include <vector>
 
 #include <Windows.h>
-#include <xmmintrin.h>
+
+#include "platform/FpControl.h"
+#include "platform/SpinPause.h"
 
 #include "gpg/core/utils/Global.h"
 #include "gpg/core/utils/Logging.h"
@@ -27,10 +29,6 @@ namespace moho
 
   namespace
   {
-    // MXCSR bits 0-5 are sticky exception *flags* (status, not control); a job inherits only the
-    // control half: exception masks, rounding, flush-to-zero, denormals-are-zero.
-    constexpr std::uint32_t kMxcsrControlMask = 0xFFC0u;
-
     // More workers than usable CPUs only adds contention.
     constexpr unsigned int kMaxWorkers = 64u;
 
@@ -108,22 +106,34 @@ namespace moho
   SFpuControlState SFpuControlState::Capture() noexcept
   {
     SFpuControlState state{};
-#if defined(_M_IX86)
+#if FAFRE_ARCH_X86
     std::uint16_t controlWord = 0;
     __asm { fnstcw controlWord }
     state.mX87ControlWord = controlWord;
 #endif
-    state.mMxcsr = _mm_getcsr() & kMxcsrControlMask;
+#if FAFRE_ARCH_X86 || FAFRE_ARCH_X64
+    state.mMxcsr = platform::ReadMxcsr() & platform::kMxcsrControlMask;
+#endif
+#if FAFRE_ARCH_ARM64
+    state.mFpcr = platform::ReadFpcr();
+#endif
     return state;
   }
 
   void SFpuControlState::Apply() const noexcept
   {
-#if defined(_M_IX86)
+#if FAFRE_ARCH_X86
     std::uint16_t controlWord = static_cast<std::uint16_t>(mX87ControlWord);
     __asm { fldcw controlWord }
 #endif
-    _mm_setcsr((_mm_getcsr() & ~kMxcsrControlMask) | (mMxcsr & kMxcsrControlMask));
+#if FAFRE_ARCH_X86 || FAFRE_ARCH_X64
+    platform::WriteMxcsr(
+      (platform::ReadMxcsr() & ~platform::kMxcsrControlMask) | (mMxcsr & platform::kMxcsrControlMask)
+    );
+#endif
+#if FAFRE_ARCH_ARM64
+    platform::WriteFpcr(mFpcr);
+#endif
   }
 
   struct CSimWorkerPool::Impl
@@ -168,7 +178,7 @@ namespace moho
           LARGE_INTEGER now{};
           ::QueryPerformanceCounter(&start);
           do {
-            _mm_pause();
+            platform::SpinPause();
             ::QueryPerformanceCounter(&now);
           } while (now.QuadPart - start.QuadPart < workerDelayTicks);
         }

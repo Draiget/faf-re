@@ -1,4 +1,5 @@
 #include "moho/sim/SimLuaPrivate.h"
+#include <utility>
 
 namespace
 {
@@ -96,7 +97,7 @@ namespace
     const moho::EIntel intelType
   ) noexcept
   {
-    return static_cast<moho::EEntityAttribute>(static_cast<std::int32_t>(intelType) - 1);
+    return static_cast<moho::EEntityAttribute>(std::to_underlying(intelType) - 1);
   }
 
   [[nodiscard]] constexpr bool IsIntelAttributeLane(
@@ -3447,12 +3448,10 @@ int moho::cfunc_EntityInitIntelL(
   Sim* const sim = ResolveGlobalSim(rawState);
   CIntel* intelManager = entity->mIntelManager;
   if (intelManager != nullptr) {
-    intelManager->InitIntel(static_cast<std::int32_t>(intelType), static_cast<std::uint32_t>(radius), reconDb, sim);
+    intelManager->InitIntel(std::to_underlying(intelType), static_cast<std::uint32_t>(radius), reconDb, sim);
   } else {
     auto* const createdIntelManager = new CIntel();
-    createdIntelManager->InitIntel(
-      static_cast<std::int32_t>(intelType), static_cast<std::uint32_t>(radius), reconDb, sim
-    );
+    createdIntelManager->InitIntel(std::to_underlying(intelType), static_cast<std::uint32_t>(radius), reconDb, sim);
     entity->mIntelManager = createdIntelManager;
     intelManager = createdIntelManager;
   }

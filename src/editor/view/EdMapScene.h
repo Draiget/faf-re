@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <expected>
 #include <filesystem>
 #include <functional>
 #include <memory>
@@ -216,17 +217,18 @@ namespace faf::editor
     void TestKeptPath(const std::string& spec);
 
     /** Replaces the map's heights from a height image, resampled to the map's size, as one undo step. */
-    bool ImportHeights(const std::filesystem::path& file, float scale, std::string& message);
+    [[nodiscard]] std::expected<std::string, std::string> ImportHeights(const std::filesystem::path& file, float scale);
     /** Sets the whole map to one height (Terrain > Flatten map), as one undo step. */
-    bool FlattenWhole(float height, std::string& message);
+    [[nodiscard]] std::expected<std::string, std::string> FlattenWhole(float height);
     /**
      * Writes `w` x `h` height samples from (x0, z0), row by row (an editor mod's Editor.SetHeights), as one undo step;
-     * the part off the map is left out. False with `message` when nothing could be written.
+     * the part off the map is left out. The error when nothing could be written.
      */
-    bool WriteHeightRect(int x0, int z0, int w, int h, const std::vector<float>& heights, std::string& message);
+    [[nodiscard]] std::expected<void, std::string>
+    WriteHeightRect(int x0, int z0, int w, int h, const std::vector<float>& heights);
     /** Editor mods: a texture layer's (1..8) weights 0..1 over [x0, x0+w) x [z0, z0+h) of the paint, one undo step. */
-    bool
-    WriteMaskRect(int layer, int x0, int z0, int w, int h, const std::vector<float>& weights, std::string& message);
+    [[nodiscard]] std::expected<void, std::string>
+    WriteMaskRect(int layer, int x0, int z0, int w, int h, const std::vector<float>& weights);
     /** The paint's size in texels (false without a map's paint). */
     bool MaskSize(int& width, int& height);
     /** Editor mods (view/EdMapSceneMods.cpp): the map's props, decals and units, and changes to them, one undo step
@@ -277,7 +279,8 @@ namespace faf::editor
     /** The lowest, highest and mean ground height of the map (false without one). */
     bool HeightRange(float& low, float& high, float& mean) const;
     /** Writes the map's heights as a height image, `width` samples wide (0: the map's own size). */
-    bool ExportHeights(const std::filesystem::path& file, int width, float scale, std::string& message);
+    [[nodiscard]] std::expected<std::string, std::string>
+    ExportHeights(const std::filesystem::path& file, int width, float scale);
     /** The point the orbit camera looks at (on the ground): where the particle editor's preview emits. */
     void ViewTarget(
       float& x,
@@ -295,7 +298,7 @@ namespace faf::editor
     /** The open map's ten texture slots (lower, strata 1-8, upper) as the terrain has them. */
     [[nodiscard]] std::vector<EdTools::LayerSlot> LayerSlots() const;
     /** The paint layer's mask cleared, or read from / written to a grey image (PNG, RAW: 0-255 as 0-65535). */
-    bool ClearMaskLayer(int layer, std::string& message);
+    [[nodiscard]] std::expected<std::string, std::string> ClearMaskLayer(int layer);
     /** `/followtest props|markers` (test runs): an object with a mirrored copy moved, then deleted, both followed. */
     void TestFollow(const std::string& kind);
     /**
@@ -401,9 +404,9 @@ namespace faf::editor
      */
     int TerrainTypesFromTextures(const std::array<int, 9>& types, bool onlyDefault, std::string& message);
     /** Stratum `layer`'s (0-7) mask full over the whole map, as one undo step. */
-    bool FillMaskLayer(int layer, std::string& message);
-    bool ImportMaskLayer(int layer, const std::filesystem::path& file, std::string& message);
-    bool ExportMaskLayer(int layer, const std::filesystem::path& file, std::string& message);
+    [[nodiscard]] std::expected<std::string, std::string> FillMaskLayer(int layer);
+    [[nodiscard]] std::expected<std::string, std::string> ImportMaskLayer(int layer, const std::filesystem::path& file);
+    [[nodiscard]] std::expected<std::string, std::string> ExportMaskLayer(int layer, const std::filesystem::path& file);
     /** Each stratum's share of the map, once the masks are read. */
     [[nodiscard]] bool MaskCoverage(float (&coverage)[8]) const;
     /**
@@ -478,7 +481,7 @@ namespace faf::editor
     );
     void RestoreLayerSlot(int slot);
     /** Stratum `layer`'s (0-7) mask from a grey image over the whole map, as one undo step. */
-    bool SetMaskLayer(int layer, const TexImage& image, std::string& message);
+    [[nodiscard]] std::expected<std::string, std::string> SetMaskLayer(int layer, const TexImage& image);
 
     /** Changes one slot as the Tools panel asked, as one undo step. */
     void ChangeLayerSlot(int slot, const EdTools::LayerSlot& value);
@@ -497,21 +500,16 @@ namespace faf::editor
     {
       return mMarkerSelection;
     }
-    /** Adds a `.fafmapmarkers` file's markers as one undo step and selects them; false with `error`. */
-    bool ImportMarkerFile(const std::string& text, MarkerImport& result, std::string& error);
+    /** Adds a `.fafmapmarkers` file's markers as one undo step and selects them; what it added, or the error. */
+    [[nodiscard]] std::expected<MarkerImport, std::string> ImportMarkerFile(const std::string& text);
     /** The units an export writes: the selected ones, or every unit of `army` when none is selected. */
     [[nodiscard]] std::vector<SaveUnit> UnitsToExport(const std::string& army) const;
     /**
      * Adds a `.scunits` file's units to `army` (its INITIAL group) under new UNIT_n names, on the ground, as one undo
-     * step, and selects them; `moved` when they came from off this map. False with `error`.
+     * step, and selects them; `moved` when they came from off this map. Or the error.
      */
-    bool ImportUnitFile(
-      const std::string& text,
-      const std::string& army,
-      std::vector<std::string>& names,
-      bool& moved,
-      std::string& error
-    );
+    [[nodiscard]] std::expected<void, std::string>
+    ImportUnitFile(const std::string& text, const std::string& army, std::vector<std::string>& names, bool& moved);
     /** Changes a property of a marker ("name" renames it), as one undo step. */
     void EditMarker(const std::string& marker, const std::string& key, const std::string& value);
     /** The first selected Camera Info marker's name, or "". */
@@ -678,13 +676,8 @@ namespace faf::editor
       bool lightMasks = false;
       bool alphaTest = false;
     };
-    bool BakeMeshMaterial(
-      int material,
-      const std::filesystem::path& folder,
-      const std::string& vfs,
-      MeshMaterialView& out,
-      std::string& why
-    );
+    [[nodiscard]] std::expected<MeshMaterialView, std::string>
+    BakeMeshMaterial(int material, const std::filesystem::path& folder, const std::string& vfs);
     /** Where the baked patches go (the app's cache folder; empty: no bake). */
     void SetMeshViewCache(
       std::filesystem::path folder

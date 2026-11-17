@@ -5,6 +5,7 @@
 // Build: cmake --build --preset linux-clang-x64-release-plain --target faf_gamelink_tests
 // Run:   build/linux-clang-x64-release-plain/faf_gamelink_tests
 
+#include <utility>
 #include <algorithm>
 #include <array>
 #include <cstdint>
@@ -166,7 +167,7 @@ namespace
     hello[2] = 0xFFu;
     const auto version = AnswerHello(hello.data(), hello.size(), jar, kAddress, kNow);
     Check(
-      version.size() == kRejectSize && version[2] == static_cast<std::uint8_t>(EHandshakeRefusal::Version),
+      version.size() == kRejectSize && version[2] == std::to_underlying(EHandshakeRefusal::Version),
       "another version is told so"
     );
   }
@@ -259,8 +260,7 @@ namespace
   void OverRealSockets()
   {
     CServerLinks server;
-    std::string error;
-    Check(server.Open(kLoopbackAnyPort, error), "the server binds");
+    Check(server.Open(kLoopbackAnyPort).has_value(), "the server binds");
     Check(server.Local().port != 0u, "and knows its port");
     server.AddPlayer(1, MakeToken("one"));
     server.AddPlayer(2, MakeToken("two"));
@@ -269,7 +269,7 @@ namespace
 
     CClientLink one(1, MakeToken("one"), server.Local());
     CClientLink two(2, MakeToken("two"), server.Local());
-    Check(one.Open(error) && two.Open(error), "the clients open");
+    Check(one.Open() && two.Open(), "the clients open");
     Check(
       RunUntil(
         server,
@@ -322,7 +322,7 @@ namespace
     // The wrong token, an unknown uid.
     CClientLink wrong(1, MakeToken("guess"), server.Local());
     CClientLink stranger(99, MakeToken("one"), server.Local());
-    Check(wrong.Open(error) && stranger.Open(error), "more clients open");
+    Check(wrong.Open() && stranger.Open(), "more clients open");
     Check(
       RunUntil(
         server,
@@ -341,7 +341,7 @@ namespace
 
     // Noise, from a socket with no channel: nothing happens, and it's counted.
     CUdpSocket noise;
-    Check(noise.Open(kLoopbackAnyPort, error), "a noise socket opens");
+    Check(noise.Open(kLoopbackAnyPort).has_value(), "a noise socket opens");
     std::minstd_rand random(1234u);
     std::array<std::uint8_t, 1400> junk{};
     const std::uint64_t strangersBefore = server.Stats().strangersDropped;
@@ -382,7 +382,7 @@ namespace
 
     // A Connect from an earlier session, sent again, can't take the channel over.
     CUdpSocket raw;
-    Check(raw.Open(kLoopbackAnyPort, error), "a raw socket opens");
+    Check(raw.Open(kLoopbackAnyPort).has_value(), "a raw socket opens");
     CClientHandshake earlier(1, MakeToken("one"));
     const auto hello = WriteHello();
     (void)raw.SendTo(hello.data(), hello.size(), server.Local());
@@ -481,14 +481,13 @@ namespace
     ChannelConfig quick;
     quick.timeoutUs = 200'000u;
     CServerLinks server(quick);
-    std::string error;
-    Check(server.Open(kLoopbackAnyPort, error), "the server binds");
+    Check(server.Open(kLoopbackAnyPort).has_value(), "the server binds");
     server.AddPlayer(1, MakeToken("one"));
     CEvents events;
     std::uint64_t nowUs = 1000u;
 
     CClientLink one(1, MakeToken("one"), server.Local());
-    Check(one.Open(error), "a client opens");
+    Check(one.Open().has_value(), "a client opens");
     Check(
       RunUntil(
         server,
@@ -546,7 +545,7 @@ namespace
 
     // A burst of Hellos in one instant: past the budget they get nothing.
     CUdpSocket flood;
-    Check(flood.Open(kLoopbackAnyPort, error), "a flood socket opens");
+    Check(flood.Open(kLoopbackAnyPort).has_value(), "a flood socket opens");
     const auto hello = WriteHello();
     for (int i = 0; i < 1000; ++i) {
       (void)flood.SendTo(hello.data(), hello.size(), server.Local());
@@ -590,8 +589,7 @@ namespace
   void AllowlistAndAddressLimits()
   {
     CServerLinks server;
-    std::string error;
-    Check(server.Open(kLoopbackAnyPort, error), "the server binds");
+    Check(server.Open(kLoopbackAnyPort).has_value(), "the server binds");
     server.AddPlayer(1, MakeToken("one"));
     server.AllowAddress(MapIpv4(0x7F000002u)); // 127.0.0.2: the match's player address
     CEvents events;
@@ -600,9 +598,9 @@ namespace
     CUdpSocket listed;
     CUdpSocket flood;
     CUdpSocket other;
-    Check(listed.Open(SEndpoint{0x7F000002u, 0u}, error), "a socket on the listed address opens");
-    Check(flood.Open(SEndpoint{0x7F000003u, 0u}, error), "a flood socket on an unlisted address opens");
-    Check(other.Open(SEndpoint{0x7F000004u, 0u}, error), "another unlisted socket opens");
+    Check(listed.Open(SEndpoint{0x7F000002u, 0u}).has_value(), "a socket on the listed address opens");
+    Check(flood.Open(SEndpoint{0x7F000003u, 0u}).has_value(), "a flood socket on an unlisted address opens");
+    Check(other.Open(SEndpoint{0x7F000004u, 0u}).has_value(), "another unlisted socket opens");
 
     // Unlisted Hellos share a small budget: past it they get nothing, and nothing is kept for them.
     const auto hello = WriteHello();
@@ -628,7 +626,7 @@ namespace
     // A player whose address the match didn't know (a VPN) gets in with the token, once the shared budget refills.
     nowUs += 2'000'000u;
     CClientLink vpn(1, MakeToken("one"), server.Local());
-    Check(vpn.Open(error), "a client on 127.0.0.1, which isn't listed, opens");
+    Check(vpn.Open().has_value(), "a client on 127.0.0.1, which isn't listed, opens");
     Check(
       RunUntil(
         server,
@@ -675,7 +673,7 @@ namespace
     for (std::uint8_t& byte : message) {
       byte = static_cast<std::uint8_t>(random() % 23u);
     }
-    message[0] = static_cast<std::uint8_t>(ESeatMessage::View);
+    message[0] = std::to_underlying(ESeatMessage::View);
     message[size / 2u] = static_cast<std::uint8_t>(seed);
     return message;
   }
@@ -696,8 +694,7 @@ namespace
   {
     CServerLinks server;
     server.SetCompression(3);
-    std::string error;
-    Check(server.Open(kLoopbackAnyPort, error), "the server binds");
+    Check(server.Open(kLoopbackAnyPort).has_value(), "the server binds");
     server.AddPlayer(1, MakeToken("one"));
     server.AddPlayer(2, MakeToken("two"));
     CEvents events;
@@ -706,7 +703,7 @@ namespace
     CClientLink one(1, MakeToken("one"), server.Local());
     CClientLink two(2, MakeToken("two"), server.Local());
     two.SetCompressionOffer(false); // as a client from before compression
-    Check(one.Open(error) && two.Open(error), "the clients open");
+    Check(one.Open() && two.Open(), "the clients open");
     Check(
       RunUntil(
         server,
@@ -728,7 +725,7 @@ namespace
     std::vector<std::vector<std::uint8_t>> sent;
     for (std::uint32_t i = 0; i < 400u; ++i) {
       sent.push_back(
-        i % 9u == 4u ? std::vector<std::uint8_t>{static_cast<std::uint8_t>(ESeatMessage::Beat), 1u, 2u}
+        i % 9u == 4u ? std::vector<std::uint8_t>{std::to_underlying(ESeatMessage::Beat), 1u, 2u}
                      : ViewLike(1500u + (i % 5u) * 300u, i)
       );
     }
@@ -823,13 +820,12 @@ namespace
   {
     // A server with compression off (or one from before it): the offer is counted and nothing is compressed.
     CServerLinks server;
-    std::string error;
-    Check(server.Open(kLoopbackAnyPort, error), "the server binds");
+    Check(server.Open(kLoopbackAnyPort).has_value(), "the server binds");
     server.AddPlayer(1, MakeToken("one"));
     CEvents events;
     std::uint64_t nowUs = 1000u;
     CClientLink one(1, MakeToken("one"), server.Local());
-    Check(one.Open(error), "the client opens");
+    Check(one.Open().has_value(), "the client opens");
     Check(
       RunUntil(
         server,
@@ -986,9 +982,9 @@ namespace
     server.AddPlayer(1, MakeToken("one"));
     CEvents events;
     std::uint64_t nowUs = 1000u;
-    std::string error;
     CClientLink one(1, MakeToken("one"), serverAt);
-    ASSERT_TRUE(one.Open(error)) << error;
+    const auto opened = one.Open();
+    ASSERT_TRUE(opened) << opened.error();
     ASSERT_TRUE(RunUntil(
       server,
       events,
@@ -1021,10 +1017,9 @@ namespace
   [[nodiscard]] bool HasIpv6Loopback()
   {
     CUdpSocket probe;
-    std::string error;
     IpAddress loopback{};
     loopback[15] = 1;
-    return probe.Open(SEndpoint(loopback, 0u), error) && probe.DualStack();
+    return probe.Open(SEndpoint(loopback, 0u)) && probe.DualStack();
   }
 
   void OverIpv6Loopback()
@@ -1035,8 +1030,8 @@ namespace
     IpAddress loopback{};
     loopback[15] = 1;
     CServerLinks server;
-    std::string error;
-    ASSERT_TRUE(server.Open(SEndpoint(loopback, 0u), error)) << error;
+    const auto opened = server.Open(SEndpoint(loopback, 0u));
+    ASSERT_TRUE(opened) << opened.error();
     SEndpoint from;
     JoinAndTalk(server, SEndpoint(loopback, server.Local().port), from);
     EXPECT_EQ(AddressText(from.address), "::1");
@@ -1046,8 +1041,8 @@ namespace
   void DualStackTakesIpv4()
   {
     CServerLinks server;
-    std::string error;
-    ASSERT_TRUE(server.Open(SEndpoint{}, error)) << error;
+    const auto opened = server.Open(SEndpoint{});
+    ASSERT_TRUE(opened) << opened.error();
     SEndpoint from;
     JoinAndTalk(server, SEndpoint(0x7F000001u, server.Local().port), from);
     EXPECT_TRUE(from.IsIpv4()) << from.Text();
@@ -1067,14 +1062,13 @@ namespace
 #else
     {
       CUdpSocket check;
-      std::string error;
-      if (!check.Open(SEndpoint(0x7F000003u, 0u), error)) {
-        GTEST_SKIP() << "127.0.0.3 isn't this machine's (" << error << ")";
+      if (auto opened = check.Open(SEndpoint(0x7F000003u, 0u)); !opened) {
+        GTEST_SKIP() << "127.0.0.3 isn't this machine's (" << opened.error() << ")";
       }
     }
     CServerLinks server;
-    std::string error;
-    ASSERT_TRUE(server.Open(listen, error)) << error;
+    const auto opened = server.Open(listen);
+    ASSERT_TRUE(opened) << opened.error();
     SEndpoint from;
     JoinAndTalk(server, SEndpoint(0x7F000003u, server.Local().port), from);
 #endif

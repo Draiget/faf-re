@@ -1,5 +1,6 @@
 #include "editor/tools/EdFindReplace.h"
 
+#include <utility>
 #include <algorithm>
 #include <cmath>
 #include <map>
@@ -12,7 +13,7 @@ namespace faf::editor
   {
     std::map<std::pair<int, std::string>, std::pair<int, int>> counts; // count, group
     for (const FindObject& object : objects) {
-      auto& [count, group] = counts[{static_cast<int>(object.kind), object.type}];
+      auto& [count, group] = counts[{std::to_underlying(object.kind), object.type}];
       ++count;
       group = object.group;
     }

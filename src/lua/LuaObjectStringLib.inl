@@ -497,7 +497,7 @@ void luaI_addquotedbinary(
         *buffer->p++ = *source;
       } else {
         char hexEscape[12]{};
-        std::sprintf(hexEscape, "\\x%02x", static_cast<unsigned char>(*source));
+        std::snprintf(hexEscape, sizeof(hexEscape), "\\x%02x", static_cast<unsigned char>(*source));
         luaL_addstring(buffer, hexEscape);
       }
       break;
@@ -649,15 +649,18 @@ int str_format_helper(
     case 'c':
     case 'd':
     case 'i':
-      std::sprintf(item, form, static_cast<int>(luaL_checknumber(state, argumentIndex)));
+      std::snprintf(item, sizeof(item), form, static_cast<int>(luaL_checknumber(state, argumentIndex)));
       break;
 
     case 'o':
     case 'u':
     case 'x':
     case 'X':
-      std::sprintf(
-        item, form, static_cast<unsigned int>(static_cast<std::int64_t>(luaL_checknumber(state, argumentIndex)))
+      std::snprintf(
+        item,
+        sizeof(item),
+        form,
+        static_cast<unsigned int>(static_cast<std::int64_t>(luaL_checknumber(state, argumentIndex)))
       );
       break;
 
@@ -667,7 +670,9 @@ int str_format_helper(
     case 'g':
     case 'G':
       // Plan WPL.17: the Windows CRT's NaN text (LuaNumberText.h).
-      (void)lua::FormatNumberLikeWindowsCrt(item, form, static_cast<double>(luaL_checknumber(state, argumentIndex)));
+      (void)lua::FormatNumberLikeWindowsCrt(
+        item, sizeof(item), form, static_cast<double>(luaL_checknumber(state, argumentIndex))
+      );
       break;
 
     case 'q':
@@ -748,7 +753,7 @@ int str_format_helper(
         continue;
       }
 
-      std::sprintf(item, form, text);
+      std::snprintf(item, sizeof(item), form, text);
       break;
     }
 

@@ -599,12 +599,15 @@ namespace faf::editor
     }
     ImGui::SameLine();
     if (ImGui::Button("Paste")) {
-      KeptPathSet pasted;
       std::string error;
       const char* const text = ImGui::GetClipboardText();
-      if (text != nullptr && ReadKeptPaths(text, pasted, error) && !pasted.paths.empty()) {
+      auto pasted = text != nullptr ? ReadKeptPaths(text) : std::expected<KeptPathSet, std::string>(std::unexpect);
+      if (!pasted) {
+        error = pasted.error();
+      }
+      if (pasted && !pasted->paths.empty()) {
         EdDocument::PathsState before = mDocument.PathsNow();
-        for (KeptPath& p : pasted.paths) {
+        for (KeptPath& p : pasted->paths) {
           p.id = mDocument.EditPaths().set.TakeId();
           p.name += " (pasted)";
           p.skeleton = false;
@@ -613,7 +616,7 @@ namespace faf::editor
         }
         mDocument.PathsEdited(std::move(before));
         mFrameStart = mDocument.PathsNow();
-        gpg::Logf("editor: paths: %zu pasted", pasted.paths.size());
+        gpg::Logf("editor: paths: %zu pasted", pasted->paths.size());
         return;
       }
       gpg::Warnf("editor: paths: the clipboard holds no path%s%s", error.empty() ? "" : ": ", error.c_str());

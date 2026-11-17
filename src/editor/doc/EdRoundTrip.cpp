@@ -176,8 +176,8 @@ namespace faf::editor
 
     std::string error;
     document.MarkKeptImages();
-    if (!WriteMapFile(*map, document.FileRecords(), first, error)) {
-      result.differences = "save: " + error;
+    if (const auto written = WriteMapFile(*map, document.FileRecords(), first); !written) {
+      result.differences = "save: " + written.error();
       return result;
     }
     MapFileRecords rereadRecords;
@@ -190,8 +190,8 @@ namespace faf::editor
     // Saving the same map again gives the same bytes. (The re-read map is compared by its data: its terrain
     // isn't drawn, so it has no normal map to write, while the drawn map writes its tiles, as the game's
     // own files have them.)
-    if (!WriteMapFile(*map, document.FileRecords(), second, error)) {
-      Note(result.differences, "second save: " + error);
+    if (const auto written = WriteMapFile(*map, document.FileRecords(), second); !written) {
+      Note(result.differences, "second save: " + written.error());
       return result;
     }
     const std::vector<char> firstBytes = FileBytes(first);

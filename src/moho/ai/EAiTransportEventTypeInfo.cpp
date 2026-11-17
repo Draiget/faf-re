@@ -1,5 +1,6 @@
 #include "moho/ai/EAiTransportEventTypeInfo.h"
 
+#include <utility>
 #include <cstdint>
 #include <cstdlib>
 #include <new>
@@ -101,9 +102,9 @@ const char* EAiTransportEventTypeInfo::GetName() const
 void EAiTransportEventTypeInfo::AddEnums()
 {
   mPrefix = "AITRANSPORTEVENT_";
-  AddEnum(StripPrefix("AITRANSPORTEVENT_LoadFailed"), static_cast<std::int32_t>(AITRANSPORTEVENT_LoadFailed));
-  AddEnum(StripPrefix("AITRANSPORTEVENT_Load"), static_cast<std::int32_t>(AITRANSPORTEVENT_Load));
-  AddEnum(StripPrefix("AITRANSPORTEVENT_Unload"), static_cast<std::int32_t>(AITRANSPORTEVENT_Unload));
+  AddEnum(StripPrefix("AITRANSPORTEVENT_LoadFailed"), std::to_underlying(AITRANSPORTEVENT_LoadFailed));
+  AddEnum(StripPrefix("AITRANSPORTEVENT_Load"), std::to_underlying(AITRANSPORTEVENT_Load));
+  AddEnum(StripPrefix("AITRANSPORTEVENT_Unload"), std::to_underlying(AITRANSPORTEVENT_Unload));
 }
 
 /**

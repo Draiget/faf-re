@@ -5,6 +5,8 @@
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
+#include "gpg/core/utils/Unreachable.h"
+
 #include <Windows.h>
 #include <psapi.h>
 
@@ -524,9 +526,8 @@ end
     PrepareRules();
   }
 
-  bool EdPlay::WriteCoopShim(
-    const std::filesystem::path& modsFolder,
-    std::string& error
+  std::expected<void, std::string> EdPlay::WriteCoopShim(
+    const std::filesystem::path& modsFolder
   )
   {
     static constexpr char kModInfo[] = R"lua(name = "Editor coop shim"
@@ -627,10 +628,9 @@ end
       !write(folder / "hook" / "lua" / "ScenarioFramework.lua", kFramework) ||
       !write(folder / "hook" / "lua" / "sim" / "ScenarioUtilities.lua", kUtilities)
     ) {
-      error = "couldn't write " + folder.string();
-      return false;
+      return std::unexpected("couldn't write " + folder.string());
     }
-    return true;
+    return {};
   }
 
   std::vector<std::string> EdPlay::PlayedMods() const
@@ -1261,9 +1261,8 @@ end
       return "Playing";
     case moho::EWldFrameAction::Exit:
       return "Ending";
-    default:
-      return "";
     }
+    FAF_UNREACHABLE();
   }
 
   void EdPlay::ReadCommandLine()

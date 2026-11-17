@@ -71,7 +71,7 @@ namespace moho
 
   void IntelHandleDeleter::operator()(
     CIntelPosHandle* const handle
-  ) const noexcept
+  ) noexcept
   {
     handle->Destroy(1);
   }

@@ -45,8 +45,8 @@ namespace
     std::filesystem::remove(folder / "dunes.png", ec);
     EXPECT_EQ(WriteShippedBrushImages(folder, error), 0) << "not again";
     EXPECT_EQ(ListBrushImages(folder).size(), 4U);
-    ShapeGrid grid;
-    EXPECT_TRUE(LoadBrushImage(folder / "crater.png", 33, grid, error)) << error;
+    const auto grid = LoadBrushImage(folder / "crater.png", 33);
+    EXPECT_TRUE(grid) << grid.error();
   }
 
   TEST(

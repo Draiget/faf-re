@@ -5,6 +5,8 @@
 #include <exception>
 
 #include "gpg/core/utils/Logging.h"
+#include "gpg/gal/RenderProfiler.h"
+#include "lua/LuaMemAccounting.h"
 #include "lua/LuaObject.h"
 #include "moho/entity/UserEntity.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
@@ -111,6 +113,9 @@ namespace moho
     if (luaState == nullptr) {
       return;
     }
+    // FAF instrumentation (FAF_GPU_PROFILE): a selection change's UI script, per call, with its allocations.
+    const gpg::gal::CpuProfileScope profileSelection("UiSelection");
+    const lua::ProfiledAllocationsSince selectionAllocations;
 
     LuaPlus::LuaObject previousSelectionTable(luaState);
     previousSelectionTable.AssignNewTable(luaState, 0, 0);
@@ -147,6 +152,8 @@ namespace moho
     } catch (...) {
       gpg::Warnf("Error running '/lua/ui/game/gamemain.lua:OnSelectionChanged': %s", "<unknown>");
     }
+    FAF_PROFILE_COUNT("ui.lua.allocs.selection", selectionAllocations.Blocks());
+    FAF_PROFILE_COUNT("ui.lua.allocbytes.selection", selectionAllocations.Bytes());
   }
 
   namespace

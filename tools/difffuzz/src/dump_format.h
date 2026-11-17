@@ -7,6 +7,7 @@
 
 #include <cstdint>
 #include <cstdio>
+#include <print>
 
 namespace difffuzz
 {
@@ -63,9 +64,9 @@ namespace difffuzz
       inHash = Mix(inHash, in, inWords);
       outHash = Mix(outHash, outWords, outCount);
       if ((done + 1) % kDumpBlock == 0 || done + 1 == iters) {
-        std::fprintf(
+        std::println(
           out,
-          "%s %llu %016llx %016llx\n",
+          "{} {} {:016x} {:016x}",
           name,
           done / kDumpBlock,
           static_cast<unsigned long long>(inHash),
@@ -92,15 +93,15 @@ namespace difffuzz
     const int outCount
   )
   {
-    std::fprintf(out, "%s %llu", name, iteration);
+    std::print(out, "{} {}", name, iteration);
     for (int i = 0; i < inWords; ++i) {
-      std::fprintf(out, " %08X", in[i]);
+      std::print(out, " {:08X}", in[i]);
     }
-    std::fprintf(out, " ->");
+    std::print(out, " ->");
     for (int i = 0; i < outCount; ++i) {
-      std::fprintf(out, " %08X", outWords[i]);
+      std::print(out, " {:08X}", outWords[i]);
     }
-    std::fprintf(out, "\n");
+    std::println(out, "");
   }
 
   /// A word worth a recorded case: a float NaN, infinity, denormal or -0, or

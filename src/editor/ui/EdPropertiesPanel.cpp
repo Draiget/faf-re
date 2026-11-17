@@ -448,10 +448,10 @@ namespace faf::editor
         const std::vector<ScenarioTeam> teams = mDocument.Teams();
         const int slots = teams.empty() ? 0 : static_cast<int>(teams.front().armies.size());
         AdaptiveTables tables;
-        std::string error;
+        std::expected<void, std::string> read;
         const bool adaptive = mDocument.Adaptive();
-        if (adaptive && !ParseAdaptiveTables(mDocument.TablesText(), tables, error)) {
-          ImGui::TextColored(ImVec4(0.95f, 0.45f, 0.35f, 1.0f), "_tables.lua doesn't read: %s", error.c_str());
+        if (adaptive && !(read = ParseAdaptiveTables(mDocument.TablesText(), tables))) {
+          ImGui::TextColored(ImVec4(0.95f, 0.45f, 0.35f, 1.0f), "_tables.lua doesn't read: %s", read.error().c_str());
         } else if (!adaptive) {
           HelpNote(
             "Not an adaptive map. Adaptive maps (FAF's \"Ultimate maps\" script by CookieNoob and KeyBlue) spawn each "

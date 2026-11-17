@@ -741,7 +741,7 @@ int luaV_tostring(
 
   char rendered[32];
   // Plan WPL.17: the Windows CRT's NaN text (LuaNumberText.h).
-  (void)lua::FormatNumberLikeWindowsCrt(rendered, "%.14g", static_cast<double>(object->value.n));
+  (void)lua::FormatNumberLikeWindowsCrt(rendered, sizeof(rendered), "%.14g", static_cast<double>(object->value.n));
 
   TString* const interned = luaS_newlstr(state, rendered, std::strlen(rendered));
   object->value.p = interned;
@@ -3748,7 +3748,9 @@ void lua_close(
   close_state(mainThread);
 }
 }
+#ifdef _MSC_VER
 #pragma warning(pop)
+#endif
 
 void moho::LUA_SetCallGate(
   const LuaCallGate gate
@@ -4210,7 +4212,7 @@ LuaObject::~LuaObject()
 LuaState::LuaState(
   const StandardLibraries initStandardLibrary
 )
-  : LuaState(initStandardLibrary, static_cast<int>(moho::lua_incremental::ELuaVmRole::Baseline))
+  : LuaState(initStandardLibrary, std::to_underlying(moho::lua_incremental::ELuaVmRole::Baseline))
 {}
 
 LuaState::LuaState(
@@ -4231,7 +4233,7 @@ LuaState::LuaState(
   lua_setusergcfunction(m_state, &LuaPlusGCFunction);
   lua_setstateuserdata(m_state, this);
 
-  if (collectorRole != static_cast<int>(moho::lua_incremental::ELuaVmRole::Baseline)) {
+  if (collectorRole != std::to_underlying(moho::lua_incremental::ELuaVmRole::Baseline)) {
     faf_lua51_gc_register_vm(m_state, collectorRole);
   }
 

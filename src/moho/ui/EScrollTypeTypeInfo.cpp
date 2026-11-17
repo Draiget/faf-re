@@ -1,5 +1,6 @@
 #include "moho/ui/EScrollTypeTypeInfo.h"
 
+#include <utility>
 #include <cstdint>
 #include <typeinfo>
 
@@ -69,10 +70,10 @@ namespace moho
   {
     mPrefix = "SCROLLTYPE_";
 
-    AddEnum(StripPrefix("SCROLLTYPE_None"), static_cast<std::int32_t>(SCROLLTYPE_None));
-    AddEnum(StripPrefix("SCROLLTYPE_PingPong"), static_cast<std::int32_t>(SCROLLTYPE_PingPong));
-    AddEnum(StripPrefix("SCROLLTYPE_Manual"), static_cast<std::int32_t>(SCROLLTYPE_Manual));
-    AddEnum(StripPrefix("SCROLLTYPE_MotionDerived"), static_cast<std::int32_t>(SCROLLTYPE_MotionDerived));
+    AddEnum(StripPrefix("SCROLLTYPE_None"), std::to_underlying(SCROLLTYPE_None));
+    AddEnum(StripPrefix("SCROLLTYPE_PingPong"), std::to_underlying(SCROLLTYPE_PingPong));
+    AddEnum(StripPrefix("SCROLLTYPE_Manual"), std::to_underlying(SCROLLTYPE_Manual));
+    AddEnum(StripPrefix("SCROLLTYPE_MotionDerived"), std::to_underlying(SCROLLTYPE_MotionDerived));
   }
 } // namespace moho
 

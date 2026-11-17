@@ -1,5 +1,5 @@
 # Unit tests for the startup helpers (moho/misc/StartupHelpers.h): path splitting, joining and collapsing, map
-# scenario names and the command-line resolution triple. Linux builds the path tests on faf_sim (cmake/FafLinux.cmake).
+# scenario names and the command-line resolution triple. Linux builds the path tests on faf_sim (cmake/FafPosix.cmake).
 #
 #   cmake --build --preset clang-x64-release --target faf_startup_tests
 #   ctest --test-dir build/clang-x64-release -L Startup --output-on-failure

@@ -33,18 +33,64 @@
 #include <typeinfo>
 #include <vector>
 
+#include "platform/FpControl.h"
+#include "platform/posix/SystemPosix.h"
+
 #include <dirent.h>
 #include <dlfcn.h>
 #include <fcntl.h>
-#include <malloc.h>
 #include <pthread.h>
 #include <sched.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
-#include <sys/syscall.h>
 #include <sys/time.h>
 #include <time.h>
 #include <unistd.h>
+
+namespace
+{
+  // A file's times as Windows names them. macOS records when a file was created (its birth time);
+  // Linux's stat has no such field, and the inode change time stands in for it.
+#if FAFRE_PLATFORM_MACOS // struct stat's st_*timespec fields and st_birthtimespec
+  [[nodiscard]] const timespec& StatCreationTime(
+    const struct stat& status
+  ) noexcept
+  {
+    return status.st_birthtimespec;
+  }
+  [[nodiscard]] const timespec& StatAccessTime(
+    const struct stat& status
+  ) noexcept
+  {
+    return status.st_atimespec;
+  }
+  [[nodiscard]] const timespec& StatWriteTime(
+    const struct stat& status
+  ) noexcept
+  {
+    return status.st_mtimespec;
+  }
+#else
+  [[nodiscard]] const timespec& StatCreationTime(
+    const struct stat& status
+  ) noexcept
+  {
+    return status.st_ctim;
+  }
+  [[nodiscard]] const timespec& StatAccessTime(
+    const struct stat& status
+  ) noexcept
+  {
+    return status.st_atim;
+  }
+  [[nodiscard]] const timespec& StatWriteTime(
+    const struct stat& status
+  ) noexcept
+  {
+    return status.st_mtim;
+  }
+#endif
+} // namespace
 
 namespace
 {
@@ -562,7 +608,7 @@ namespace
   {
     thread_local CurrentThreadApcQueue current;
     if (current.queue == nullptr) {
-      current.threadId = static_cast<DWORD>(::syscall(SYS_gettid));
+      current.threadId = static_cast<DWORD>(platform::posix::CurrentThreadId());
       current.queue = ApcQueueOf(current.threadId);
     }
     return *current.queue;
@@ -1019,7 +1065,7 @@ void DeleteCriticalSection(
 
 DWORD GetCurrentThreadId()
 {
-  return static_cast<DWORD>(::syscall(SYS_gettid));
+  return static_cast<DWORD>(platform::posix::CurrentThreadId());
 }
 
 HANDLE GetCurrentThread()
@@ -1078,9 +1124,7 @@ HANDLE OpenThread(
   const DWORD threadId
 )
 {
-  char taskPath[64]{};
-  std::snprintf(taskPath, sizeof(taskPath), "/proc/self/task/%u", static_cast<unsigned>(threadId));
-  if (::access(taskPath, F_OK) != 0) {
+  if (!platform::posix::ThreadExists(threadId)) {
     tLastError = ERROR_INVALID_PARAMETER;
     return nullptr;
   }
@@ -1099,7 +1143,7 @@ DWORD QueueUserAPC(
   const std::shared_ptr<ShimHandle> object = AsShimHandle(threadHandle);
   std::shared_ptr<ApcQueue> queue;
   if (threadHandle == kCurrentThreadPseudoHandle) {
-    queue = ApcQueueOf(static_cast<DWORD>(::syscall(SYS_gettid)));
+    queue = ApcQueueOf(static_cast<DWORD>(platform::posix::CurrentThreadId()));
   } else if (object != nullptr && object->kind == ShimHandle::Kind::Thread) {
     queue = static_cast<ThreadObject*>(object.get())->queue;
   }
@@ -1131,8 +1175,7 @@ HMODULE GetModuleHandleW(
 )
 {
   if (moduleName == nullptr) {
-    extern char __executable_start;
-    return &__executable_start;
+    return static_cast<HMODULE>(platform::posix::ExecutableImageBase());
   }
   return GetModuleHandleA(NarrowPath(moduleName).c_str());
 }
@@ -1166,15 +1209,10 @@ const wchar_t* GetCommandLineW()
   static wchar_t sCommandLine[8192];
   static INIT_ONCE sOnce = INIT_ONCE_STATIC_INIT;
   (void)InitOnceExecuteOnce(&sOnce, [](PINIT_ONCE, PVOID, PVOID*) -> BOOL {
-    const int fd = ::open("/proc/self/cmdline", O_RDONLY | O_CLOEXEC);
-    if (fd < 0) {
-      return TRUE;
-    }
     char raw[8192];
-    const ssize_t got = ::read(fd, raw, sizeof(raw) - 1);
-    (void)::close(fd);
+    const std::size_t got = platform::posix::ReadArguments(raw, sizeof(raw) - 1);
     std::size_t out = 0;
-    for (ssize_t at = 0; at < got && out + 1 < sizeof(sCommandLine) / sizeof(sCommandLine[0]); ++at) {
+    for (std::size_t at = 0; at < got && out + 1 < sizeof(sCommandLine) / sizeof(sCommandLine[0]); ++at) {
       // Arguments are NUL-separated; the trailing NUL ends the line.
       if (raw[at] == '\0') {
         if (at + 1 < got) {
@@ -1196,15 +1234,10 @@ const char* GetCommandLineA()
   static char sCommandLine[8192];
   static INIT_ONCE sOnce = INIT_ONCE_STATIC_INIT;
   (void)InitOnceExecuteOnce(&sOnce, [](PINIT_ONCE, PVOID, PVOID*) -> BOOL {
-    const int fd = ::open("/proc/self/cmdline", O_RDONLY | O_CLOEXEC);
-    if (fd < 0) {
-      return TRUE;
-    }
     char raw[8192];
-    const ssize_t got = ::read(fd, raw, sizeof(raw) - 1);
-    (void)::close(fd);
+    const std::size_t got = platform::posix::ReadArguments(raw, sizeof(raw) - 1);
     std::size_t out = 0;
-    for (ssize_t at = 0; at < got && out + 1 < sizeof(sCommandLine); ++at) {
+    for (std::size_t at = 0; at < got && out + 1 < sizeof(sCommandLine); ++at) {
       if (raw[at] == '\0') {
         if (at + 1 < got) {
           sCommandLine[out++] = ' ';
@@ -1264,7 +1297,7 @@ SIZE_T HeapSize(
   const void* const memory
 )
 {
-  return memory != nullptr ? ::malloc_usable_size(const_cast<void*>(memory)) : static_cast<SIZE_T>(-1);
+  return memory != nullptr ? platform::posix::AllocationSize(memory) : static_cast<SIZE_T>(-1);
 }
 
 HMODULE LoadLibraryA(
@@ -1382,75 +1415,17 @@ void SetLastError(
 }
 
 /// A kernel CPU list such as "0-7,16-23" from a sysfs file; CPUs above 63 are left out, and an unreadable file is 0.
-[[nodiscard]] static DWORD_PTR ReadCpuListFile(
-  const char* const path
-)
-{
-  std::ifstream file(path);
-  std::string list;
-  if (!file || !std::getline(file, list)) {
-    return 0;
-  }
-  DWORD_PTR mask = 0;
-  const char* cursor = list.c_str();
-  while (*cursor != '\0') {
-    char* end = nullptr;
-    const unsigned long first = std::strtoul(cursor, &end, 10);
-    if (end == cursor) {
-      break;
-    }
-    unsigned long last = first;
-    cursor = end;
-    if (*cursor == '-') {
-      last = std::strtoul(cursor + 1, &end, 10);
-      cursor = end;
-    }
-    for (unsigned long cpu = first; cpu <= last && cpu < sizeof(DWORD_PTR) * 8; ++cpu) {
-      mask |= DWORD_PTR{1} << cpu;
-    }
-    if (*cursor != ',') {
-      break;
-    }
-    ++cursor;
-  }
-  return mask;
-}
-
-/// The process's CPU set. Linux keeps a set per thread, so a pinned thread must not change what this reports:
-/// it is read before main starts, and only `SetProcessAffinityMask` changes it.
-[[nodiscard]] static cpu_set_t& ProcessCpuSet()
-{
-  static cpu_set_t set = [] {
-    cpu_set_t initial;
-    CPU_ZERO(&initial);
-    (void)::sched_getaffinity(0, sizeof(initial), &initial);
-    return initial;
-  }();
-  return set;
-}
-[[maybe_unused]] static const bool sProcessCpuSetRead = (static_cast<void>(ProcessCpuSet()), true);
-
 BOOL GetProcessAffinityMask(
   HANDLE,
   DWORD_PTR* const processMask,
   DWORD_PTR* const systemMask
 )
 {
-  const cpu_set_t& set = ProcessCpuSet();
-  DWORD_PTR mask = 0;
-  for (unsigned cpu = 0; cpu < sizeof(DWORD_PTR) * 8; ++cpu) {
-    if (CPU_ISSET(cpu, &set)) {
-      mask |= DWORD_PTR{1} << cpu;
-    }
-  }
   if (processMask != nullptr) {
-    *processMask = mask;
+    *processMask = static_cast<DWORD_PTR>(platform::posix::ProcessCpuMask());
   }
   if (systemMask != nullptr) {
-    // Every online CPU, as on Windows, so a process given fewer can tell. A process cannot run outside
-    // this set, so the process mask is what remains when the file can't be read.
-    const DWORD_PTR online = ReadCpuListFile("/sys/devices/system/cpu/online");
-    *systemMask = online != 0 ? online | mask : mask;
+    *systemMask = static_cast<DWORD_PTR>(platform::posix::OnlineCpuMask());
   }
   return TRUE;
 }
@@ -1510,27 +1485,12 @@ DWORD_PTR SetThreadAffinityMask(
     tLastError = ERROR_INVALID_PARAMETER;
     return 0;
   }
-  cpu_set_t previous;
-  CPU_ZERO(&previous);
-  (void)::pthread_getaffinity_np(::pthread_self(), sizeof(previous), &previous);
-  cpu_set_t wanted;
-  CPU_ZERO(&wanted);
-  for (unsigned cpu = 0; cpu < sizeof(DWORD_PTR) * 8; ++cpu) {
-    if ((mask & (DWORD_PTR{1} << cpu)) != 0) {
-      CPU_SET(cpu, &wanted);
-    }
-  }
-  if (::pthread_setaffinity_np(::pthread_self(), sizeof(wanted), &wanted) != 0) {
+  const std::uint64_t previous = platform::posix::SetThreadCpuMask(mask);
+  if (previous == 0) {
     tLastError = ERROR_INVALID_PARAMETER;
     return 0;
   }
-  DWORD_PTR previousMask = 0;
-  for (unsigned cpu = 0; cpu < sizeof(DWORD_PTR) * 8; ++cpu) {
-    if (CPU_ISSET(cpu, &previous)) {
-      previousMask |= DWORD_PTR{1} << cpu;
-    }
-  }
-  return previousMask != 0 ? previousMask : 1u;
+  return static_cast<DWORD_PTR>(previous);
 }
 
 BOOL GetLogicalProcessorInformationEx(
@@ -1560,25 +1520,14 @@ BOOL GetLogicalProcessorInformationEx(
     records.push_back(record);
   };
   if (relation == RelationProcessorCore) {
-    const DWORD_PTR online = ReadCpuListFile("/sys/devices/system/cpu/online");
-    DWORD_PTR seen = 0;
-    for (unsigned cpu = 0; cpu < sizeof(DWORD_PTR) * 8; ++cpu) {
-      const DWORD_PTR bit = DWORD_PTR{1} << cpu;
-      if ((online & bit) == 0 || (seen & bit) != 0) {
-        continue;
-      }
-      const std::string path = "/sys/devices/system/cpu/cpu" + std::to_string(cpu) + "/topology/thread_siblings_list";
-      const DWORD_PTR siblings = ReadCpuListFile(path.c_str());
-      const DWORD_PTR core = (siblings != 0 ? siblings : bit) & online;
-      seen |= core;
-      addRecord(core, 0);
+    for (const std::uint64_t core : platform::posix::CoreCpuMasks()) {
+      addRecord(static_cast<DWORD_PTR>(core), 0);
     }
   } else if (relation == RelationNumaNode) {
-    for (DWORD node = 0; node < 64; ++node) {
-      const std::string path = "/sys/devices/system/node/node" + std::to_string(node) + "/cpulist";
-      const DWORD_PTR cpus = ReadCpuListFile(path.c_str());
-      if (cpus != 0) {
-        addRecord(cpus, node);
+    const std::vector<std::uint64_t> nodes = platform::posix::NumaNodeCpuMasks();
+    for (DWORD node = 0; node < nodes.size(); ++node) {
+      if (nodes[node] != 0) {
+        addRecord(static_cast<DWORD_PTR>(nodes[node]), node);
       }
     }
   }
@@ -1646,29 +1595,15 @@ SIZE_T VirtualQuery(
   if (info == nullptr || length < sizeof(MEMORY_BASIC_INFORMATION)) {
     return 0;
   }
-  const std::uintptr_t target = reinterpret_cast<std::uintptr_t>(address);
-  std::ifstream maps("/proc/self/maps");
-  std::string line;
-  while (std::getline(maps, line)) {
-    unsigned long begin = 0;
-    unsigned long end = 0;
-    char permissions[5] = {};
-    if (std::sscanf(line.c_str(), "%lx-%lx %4s", &begin, &end, permissions) != 3) {
-      continue;
-    }
-    if (target < begin || target >= end) {
-      continue;
-    }
+  if (const auto region = platform::posix::FindMemoryRegion(reinterpret_cast<std::uintptr_t>(address))) {
     *info = MEMORY_BASIC_INFORMATION{};
-    info->BaseAddress = reinterpret_cast<LPVOID>(begin);
-    info->AllocationBase = reinterpret_cast<LPVOID>(begin);
-    info->RegionSize = end - begin;
-    const bool readable = permissions[0] == 'r';
-    const bool writable = permissions[1] == 'w';
-    info->State = readable ? MEM_COMMIT : MEM_RESERVE;
-    info->Protect = !readable ? PAGE_NOACCESS : writable ? PAGE_READWRITE : PAGE_READONLY;
+    info->BaseAddress = reinterpret_cast<LPVOID>(region->begin);
+    info->AllocationBase = reinterpret_cast<LPVOID>(region->begin);
+    info->RegionSize = region->end - region->begin;
+    info->State = region->readable ? MEM_COMMIT : MEM_RESERVE;
+    info->Protect = !region->readable ? PAGE_NOACCESS : region->writable ? PAGE_READWRITE : PAGE_READONLY;
     info->AllocationProtect = info->Protect;
-    info->Type = permissions[3] == 'p' ? MEM_PRIVATE : 0u;
+    info->Type = region->isPrivate ? MEM_PRIVATE : 0u;
     return sizeof(MEMORY_BASIC_INFORMATION);
   }
   *info = MEMORY_BASIC_INFORMATION{};
@@ -2265,13 +2200,12 @@ DWORD GetModuleFileNameW(
     tLastError = ERROR_INVALID_PARAMETER;
     return 0;
   }
-  char exe[4096]{};
-  const ssize_t length = ::readlink("/proc/self/exe", exe, sizeof(exe) - 1);
-  if (length <= 0) {
+  const std::string exe = platform::posix::ExecutablePath();
+  if (exe.empty()) {
     SetErrnoError();
     return 0;
   }
-  const std::wstring wide = WidenUtf8(std::string(exe, static_cast<std::size_t>(length)));
+  const std::wstring wide = WidenUtf8(exe);
   if (wide.size() >= size) {
     // Windows truncates and reports the buffer as too small.
     std::wmemcpy(fileName, wide.c_str(), size - 1);
@@ -2293,19 +2227,10 @@ BOOL SetProcessAffinityMask(
     tLastError = ERROR_INVALID_PARAMETER;
     return FALSE;
   }
-  cpu_set_t wanted;
-  CPU_ZERO(&wanted);
-  for (unsigned cpu = 0; cpu < sizeof(DWORD_PTR) * 8; ++cpu) {
-    if ((processMask & (DWORD_PTR{1} << cpu)) != 0) {
-      CPU_SET(cpu, &wanted);
-    }
-  }
-  if (::sched_setaffinity(0, sizeof(wanted), &wanted) != 0) {
+  if (!platform::posix::SetProcessCpuMask(processMask)) {
     SetErrnoError();
     return FALSE;
   }
-  // What the kernel kept: a CPU outside the container's set drops out.
-  (void)::sched_getaffinity(0, sizeof(ProcessCpuSet()), &ProcessCpuSet());
   return TRUE;
 }
 
@@ -2339,7 +2264,7 @@ namespace
       if (value.size() >= 2 && value.front() == '"' && value.back() == '"') {
         value = value.substr(1, value.size() - 2);
       }
-      if (value.rfind("$HOME", 0) == 0 && (value.size() == 5 || value[5] == '/')) {
+      if (value.starts_with("$HOME") && (value.size() == 5 || value[5] == '/')) {
         found = home + value.substr(5);
       } else if (!value.empty() && value[0] == '/') {
         found = value;
@@ -2384,12 +2309,21 @@ HRESULT SHGetFolderPathW(
   const int kind = folder & ~CSIDL_FLAG_CREATE;
   std::string resolved;
   switch (kind) {
+#if FAFRE_PLATFORM_MACOS // ~/Library/Application Support: macOS has no XDG folders
+  case CSIDL_LOCAL_APPDATA:
+  case CSIDL_APPDATA:
+    // Both of Windows' application data folders are the one macOS has; the caches go to
+    // ~/Library/Caches instead (platform/CacheFolder.h).
+    resolved = std::string(home) + "/Library/Application Support";
+    break;
+#else
   case CSIDL_LOCAL_APPDATA:
     resolved = fromEnvironment("XDG_DATA_HOME", "/.local/share");
     break;
   case CSIDL_APPDATA:
     resolved = fromEnvironment("XDG_CONFIG_HOME", "/.config");
     break;
+#endif
   case CSIDL_PERSONAL:
     resolved = userDirectory("XDG_DOCUMENTS_DIR", "/Documents");
     break;
@@ -2554,39 +2488,7 @@ namespace
    */
   [[nodiscard]] std::vector<std::string> MountPoints()
   {
-    std::vector<std::string> points;
-    std::ifstream table("/proc/self/mountinfo");
-    for (std::string line; std::getline(table, line);) {
-      // "<id> <parent> <major:minor> <root> <mount point> ...", spaces in it as \040.
-      std::size_t at = 0;
-      for (int field = 0; field < 4 && at != std::string::npos; ++field) {
-        at = line.find(' ', at);
-        if (at != std::string::npos) {
-          ++at;
-        }
-      }
-      if (at == std::string::npos) {
-        continue;
-      }
-      const std::size_t end = line.find(' ', at);
-      const std::string escaped = line.substr(at, end == std::string::npos ? std::string::npos : end - at);
-      std::string point;
-      for (std::size_t k = 0; k < escaped.size(); ++k) {
-        if (
-          escaped[k] == '\\' && k + 3 < escaped.size() && escaped[k + 1] >= '0' && escaped[k + 1] <= '3' &&
-          escaped[k + 2] >= '0' && escaped[k + 2] <= '7' && escaped[k + 3] >= '0' && escaped[k + 3] <= '7'
-        ) {
-          point.push_back(
-            static_cast<char>((escaped[k + 1] - '0') * 64 + (escaped[k + 2] - '0') * 8 + (escaped[k + 3] - '0'))
-          );
-          k += 3;
-        } else {
-          point.push_back(escaped[k]);
-        }
-      }
-      points.push_back(std::move(point));
-    }
-    return points;
+    return platform::posix::MountPoints();
   }
 
   /// Whether `folder` is `point`'s folder or `point` itself is below `folder`.
@@ -3164,21 +3066,32 @@ unsigned int _controlfp(
 ) noexcept
 {
   // Windows x64: the rounding and exception-mask fields apply to the x87 control word and to
-  // MXCSR; the precision field is not supported (ignored). Only the rounding field and the
-  // exception masks are mapped; the engine passes _MCW_PC only, which is ignored as on x64.
+  // MXCSR; the precision field is not supported (ignored). Only the rounding field is mapped; the
+  // engine passes _MCW_PC only, which is ignored as on x64.
+#if FAFRE_ARCH_X64
   std::uint16_t x87 = 0;
   __asm__ volatile("fnstcw %0" : "=m"(x87));
-  std::uint32_t mxcsr = 0;
-  __asm__ volatile("stmxcsr %0" : "=m"(mxcsr));
+  std::uint32_t mxcsr = platform::ReadMxcsr();
   if ((mask & _MCW_RC) != 0) {
     const unsigned int rc = (newValue & _MCW_RC) >> 8; // CRT 0..3 = near, down, up, chop
     x87 = static_cast<std::uint16_t>((x87 & ~0x0C00u) | (rc << 10));
     mxcsr = (mxcsr & ~0x6000u) | (rc << 13);
     __asm__ volatile("fldcw %0" ::"m"(x87));
-    __asm__ volatile("ldmxcsr %0" ::"m"(mxcsr));
+    platform::WriteMxcsr(mxcsr);
   }
-  const unsigned int rcBits = ((mxcsr >> 13) & 3u) << 8;
-  return rcBits;
+  return ((mxcsr >> 13) & 3u) << 8;
+#else
+  // ARM64: FPCR.RMode (bits 22-23) is 0 nearest, 1 up, 2 down, 3 toward zero; the CRT's field is
+  // 0 nearest, 1 down, 2 up, 3 chop. Swapping up and down maps either way.
+  constexpr unsigned int kSwapUpDown[4] = {0u, 2u, 1u, 3u};
+  std::uint64_t fpcr = platform::ReadFpcr();
+  if ((mask & _MCW_RC) != 0) {
+    const unsigned int rc = (newValue & _MCW_RC) >> 8;
+    fpcr = (fpcr & ~(3ull << 22)) | (static_cast<std::uint64_t>(kSwapUpDown[rc & 3u]) << 22);
+    platform::WriteFpcr(fpcr);
+  }
+  return kSwapUpDown[(fpcr >> 22) & 3u] << 8;
+#endif
 }
 
 // --- More of the same --------------------------------------------------------------------
@@ -3308,9 +3221,9 @@ BOOL GetFileAttributesExA(
     return kFileTimeUnixEpoch + static_cast<std::uint64_t>(time.tv_sec) * 10000000ull +
       static_cast<std::uint64_t>(time.tv_nsec) / 100u;
   };
-  ToFileTime(toTicks(status.st_ctim), &data->ftCreationTime);
-  ToFileTime(toTicks(status.st_atim), &data->ftLastAccessTime);
-  ToFileTime(toTicks(status.st_mtim), &data->ftLastWriteTime);
+  ToFileTime(toTicks(StatCreationTime(status)), &data->ftCreationTime);
+  ToFileTime(toTicks(StatAccessTime(status)), &data->ftLastAccessTime);
+  ToFileTime(toTicks(StatWriteTime(status)), &data->ftLastWriteTime);
   const std::uint64_t size = static_cast<std::uint64_t>(status.st_size);
   data->nFileSizeHigh = static_cast<DWORD>(size >> 32);
   data->nFileSizeLow = static_cast<DWORD>(size & 0xFFFFFFFFu);
@@ -3482,9 +3395,8 @@ void GetCurrentProcessorNumberEx(
   PROCESSOR_NUMBER* const number
 )
 {
-  const int cpu = ::sched_getcpu();
   number->Group = 0;
-  number->Number = static_cast<BYTE>(cpu >= 0 ? cpu : 0);
+  number->Number = static_cast<BYTE>(platform::posix::CurrentProcessorNumber());
   number->Reserved = 0;
 }
 
@@ -3661,9 +3573,9 @@ std::intptr_t _findfirst64(
       if ((status.st_mode & S_IWUSR) == 0) {
         match.attrib |= _A_RDONLY;
       }
-      match.time_create = ToTime64(status.st_ctim);
-      match.time_access = ToTime64(status.st_atim);
-      match.time_write = ToTime64(status.st_mtim);
+      match.time_create = ToTime64(StatCreationTime(status));
+      match.time_access = ToTime64(StatAccessTime(status));
+      match.time_write = ToTime64(StatWriteTime(status));
       match.size = S_ISDIR(status.st_mode) ? 0 : static_cast<std::int64_t>(status.st_size);
     }
     search->matches.push_back(match);

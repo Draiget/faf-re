@@ -452,6 +452,9 @@ namespace
       if (virtualKey == 0) {
         return false;
       }
+      if (down && system::IsSystemShortcut(virtualKey, source.key.mod)) {
+        return false;
+      }
       system::OnKey(virtualKey, down);
       out.type = down ? EventType::KeyDown : EventType::KeyUp;
       out.window = SDL_GetWindowFromID(source.key.windowID);
@@ -557,6 +560,15 @@ namespace platform::window::sdl
   )
   {
     return gCursorRequestHandler != nullptr && gCursorRequestHandler(window);
+  }
+
+  int PixelsToWindowUnits(
+    SDL_Window* const window,
+    const int pixels
+  )
+  {
+    const float density = window != nullptr ? SDL_GetWindowPixelDensity(window) : 1.0f;
+    return density > 0.0f ? static_cast<int>(std::lround(static_cast<float>(pixels) / density)) : pixels;
   }
 
   bool KeyOfVirtualKey(
@@ -881,7 +893,9 @@ namespace platform::window
       int currentHeight = 0;
       (void)SDL_GetWindowSize(AsWindow(window), &currentWidth, &currentHeight);
       (void)SDL_SetWindowSize(
-        AsWindow(window), width != -1 ? width : currentWidth, height != -1 ? height : currentHeight
+        AsWindow(window),
+        width != -1 ? sdl::PixelsToWindowUnits(AsWindow(window), width) : currentWidth,
+        height != -1 ? sdl::PixelsToWindowUnits(AsWindow(window), height) : currentHeight
       );
     }
     (void)SDL_SyncWindow(AsWindow(window));

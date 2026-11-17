@@ -34,8 +34,8 @@ namespace gpg::core
     explicit FlatGenerationMap(
       const unsigned capacityLog2 = kDefaultCapacityLog2
     )
-      : mSlots(std::size_t{1} << capacityLog2)
-      , mMask((std::size_t{1} << capacityLog2) - 1)
+      : mSlots(1uz << capacityLog2)
+      , mMask((1uz << capacityLog2) - 1)
       , mShift(kHashBits - capacityLog2)
     {
       assert(capacityLog2 >= 1 && capacityLog2 <= kMaxCapacityLog2);

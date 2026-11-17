@@ -153,11 +153,9 @@ namespace faf::editor
     return true;
   }
 
-  bool EdUnitViewer::AskIcon(
-    std::string& error
-  )
+  std::expected<void, std::string> EdUnitViewer::AskIcon()
   {
-    return AskIconFor(mLab.Unit(), error);
+    return AskIconFor(mLab.Unit());
   }
 
   void EdUnitViewer::AskBatch()
@@ -180,29 +178,26 @@ namespace faf::editor
     mStatus = "making " + std::to_string(mBatchTotal) + " icons...";
   }
 
-  bool EdUnitViewer::AskIconFor(
-    const std::string& unit,
-    std::string& error
+  std::expected<void, std::string> EdUnitViewer::AskIconFor(
+    const std::string& unit
   )
   {
     ModProject* const project = mProject.Project();
     if (project == nullptr || unit.empty()) {
-      error = "open a mod project and pick a unit in the unit lab";
-      return false;
+      return std::unexpected("open a mod project and pick a unit in the unit lab");
     }
     mIconRequest = true;
     const bool asked = Request(mIconSheet, kIconRender, ModSourceUnit(*project, unit));
     mIconRequest = false;
     if (!asked) {
-      error = "the game's rules or the renderer aren't ready, or the unit has no model";
-      return false;
+      return std::unexpected("the game's rules or the renderer aren't ready, or the unit has no model");
     }
     mIconUnit = unit;
     mIconFrames = 0;
     mIconPass = 0;
     moho::ren_ThumbnailClearColor = 0xFF000000u;
     mStatus = "drawing the icon of " + unit + "...";
-    return true;
+    return {};
   }
 
   void EdUnitViewer::SetIconPicture(
@@ -242,9 +237,8 @@ namespace faf::editor
     if (mIconFrames < 0 && !mBatch.empty()) {
       const std::string next = mBatch.front();
       mBatch.erase(mBatch.begin());
-      std::string error;
-      if (!AskIconFor(next, error)) {
-        gpg::Warnf("editor: unit viewer: batch: %s: %s", next.c_str(), error.c_str());
+      if (const auto asked = AskIconFor(next); !asked) {
+        gpg::Warnf("editor: unit viewer: batch: %s: %s", next.c_str(), asked.error().c_str());
       }
       return;
     }
@@ -365,16 +359,22 @@ namespace faf::editor
     TexImage image;
     image.Reset(kIconSide, 4);
     std::memcpy(image.data.data(), icon.data(), icon.size() * sizeof(float));
-    std::vector<std::uint8_t> dds;
-    std::string error;
     ModProject* const project = mProject.Project();
+    const auto encoded =
+      project != nullptr ? EncodeDds(image, DdsKind::Bc3) : std::expected<std::vector<std::uint8_t>, std::string>();
+    if (project == nullptr || !encoded) {
+      mStatus =
+        "no icon: " + (project == nullptr || encoded.error().empty() ? std::string("no project") : encoded.error());
+      gpg::Warnf("editor: unit viewer: %s", mStatus.c_str());
+      return;
+    }
+    const std::vector<std::uint8_t>& dds = *encoded;
     if (
-      project == nullptr || !EncodeDds(image, DdsKind::Bc3, dds, error) ||
-      !ModWriteBinary(
-        *project, mProject.Folder(), ModUnitIconFile(mIconUnit), std::string(dds.begin(), dds.end()), error
-      )
+      const auto written =
+        ModWriteBinary(*project, mProject.Folder(), ModUnitIconFile(mIconUnit), std::string(dds.begin(), dds.end()));
+      !written
     ) {
-      mStatus = "no icon: " + (error.empty() ? std::string("no project") : error);
+      mStatus = "no icon: " + (written.error().empty() ? std::string("no project") : written.error());
       gpg::Warnf("editor: unit viewer: %s", mStatus.c_str());
       return;
     }
@@ -488,9 +488,8 @@ namespace faf::editor
     }
     ImGui::BeginDisabled(project == nullptr || mIconFrames >= 0);
     if (ImGui::Button(ICON_IMAGE " Make icon")) {
-      std::string error;
-      if (!AskIcon(error)) {
-        mStatus = "no icon: " + error;
+      if (const auto asked = AskIcon(); !asked) {
+        mStatus = "no icon: " + asked.error();
       }
     }
     ImGui::EndDisabled();

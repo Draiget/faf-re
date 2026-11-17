@@ -25,7 +25,7 @@ faf-launch finds Forged Alliance (FAF's fa_path.lua, then Steam's library folder
 doesn't find them. It writes its own fa_path.lua into ~/.local/share/faf-re/init and leaves FAF's files
 alone.
 
-From a FAF client that starts the rebuilt engine (the test build of FAForever/downlords-faf-client#3590),
+From a FAF client that starts the rebuilt engine (a test build of FAForever/downlords-faf-client#3599, or #3590 for returning after a crash),
 put ForgedAlliance in the client's bin folder as ForgedAlliance.exe, with the three .so files and
 fafengine next to it.
 

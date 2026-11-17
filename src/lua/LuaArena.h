@@ -1,5 +1,7 @@
 #pragma once
 
+#include "platform/PlatformDefines.h"
+
 #include <cstddef>
 #include <cstdint>
 
@@ -16,6 +18,36 @@
 #if INTPTR_MAX != INT32_MAX
 namespace lua
 {
+  /**
+   * A Lua object's pointer as the 32 bits a value holds, and back; null is 0 both ways.
+   *
+   * Windows and Linux reserve the range below 4 GB, so the bits are the address. macOS never maps
+   * the low 4 GB (the __PAGEZERO segment), so its range lies anywhere and the bits are the offset
+   * into it plus 16 MB - the address the other builds' range normally starts at - so a pointer's
+   * bits, and with them the hash a pointer key takes in a table, are the same as theirs.
+   */
+#if FAFRE_PLATFORM_MACOS // __PAGEZERO covers the low 4 GB
+  /// The range's base less 16 MB, set once before any Lua object exists (ArenaReserve).
+  inline std::uintptr_t gArenaBias = 0;
+#else
+  inline constexpr std::uintptr_t gArenaBias = 0;
+#endif
+
+  [[nodiscard]] inline std::uint32_t PointerBits(
+    const void* const pointer
+  ) noexcept
+  {
+    const auto address = reinterpret_cast<std::uintptr_t>(pointer);
+    return static_cast<std::uint32_t>(address != 0 ? address - gArenaBias : 0);
+  }
+
+  [[nodiscard]] inline void* PointerFromBits(
+    const std::uint32_t bits
+  ) noexcept
+  {
+    return reinterpret_cast<void*>(bits != 0 ? gArenaBias + bits : 0);
+  }
+
   /** Reserves the range, once. Allocating does it too; FAF_HIGHMEM has to do it before it takes the rest. */
   void ArenaReserve() noexcept;
 

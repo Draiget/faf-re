@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <expected>
 #include <map>
 #include <string>
 #include <vector>
@@ -85,7 +86,7 @@ namespace faf::editor
   /** Raw amounts as a 0..1 mask: over their mean plus three deviations, clamped, then to the power `gamma`. */
   [[nodiscard]] std::vector<float> ErosionNormalised(const std::vector<float>& raw, float gamma);
 
-  bool ErodeHeights(
+  [[nodiscard]] std::expected<void, std::string> ErodeHeights(
     std::uint16_t* heights,
     int width,
     int height,
@@ -93,7 +94,6 @@ namespace faf::editor
     const ErosionSolver& solver,
     const ErosionValues& values,
     int step,
-    std::string& error,
     ErosionMasks* masks = nullptr
   );
 } // namespace faf::editor

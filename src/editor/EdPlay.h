@@ -1,5 +1,6 @@
 #pragma once
 
+#include <expected>
 #include <functional>
 #include <chrono>
 #include <map>
@@ -228,9 +229,9 @@ namespace faf::editor
      * The coop shim (FAF Studio's coopshim.lua): a small sim mod in the vault's mods folder, played with coop maps in
      * place of FAF's coop mod. It hooks ScenarioFramework (shared unit cap, restrictions for all humans, an on-screen
      * announcement, a commander's spawn) and fills ScenarioInfo.HumanPlayers before the armies are made. Written (or
-     * rewritten) by the editor; false with `error` when the folder can't be written.
+     * rewritten) by the editor; the error when the folder can't be written.
      */
-    static bool WriteCoopShim(const std::filesystem::path& modsFolder, std::string& error);
+    [[nodiscard]] static std::expected<void, std::string> WriteCoopShim(const std::filesystem::path& modsFolder);
     /** The command line's runs are over and asked for the editor to close. */
     [[nodiscard]] bool QuitRequested() const noexcept
     {

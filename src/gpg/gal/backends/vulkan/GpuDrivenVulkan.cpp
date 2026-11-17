@@ -5,6 +5,8 @@
 
 #include "GpuDrivenVulkan.h"
 
+#include "gpg/core/utils/Unreachable.h"
+
 #include <algorithm>
 #include <cstring>
 #include <string>
@@ -78,9 +80,9 @@ namespace gpg::gal
       case GpuStencilOp::Decrement:
         return VK_STENCIL_OP_DECREMENT_AND_WRAP;
       case GpuStencilOp::Keep:
-      default:
         return VK_STENCIL_OP_KEEP;
       }
+      FAF_UNREACHABLE();
     }
 
     [[nodiscard]] VkStencilOpState ToVulkan(

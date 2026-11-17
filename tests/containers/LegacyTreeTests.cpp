@@ -33,9 +33,9 @@ namespace
 
   struct SetKey
   {
-    [[nodiscard]] const int& operator()(
+    [[nodiscard]] static const int& operator()(
       const int& v
-    ) const noexcept
+    ) noexcept
     {
       return v;
     }
@@ -44,9 +44,9 @@ namespace
   struct MapKey
   {
     template <class Pair>
-    [[nodiscard]] const int& operator()(
+    [[nodiscard]] static const int& operator()(
       const Pair& v
-    ) const noexcept
+    ) noexcept
     {
       return v.first;
     }
@@ -246,7 +246,7 @@ namespace
         break;
       case 5: {
         const auto it = s.find(key);
-        ASSERT_EQ(it == s.end(), ref.find(key) == ref.end());
+        ASSERT_EQ(it == s.end(), !ref.contains(key));
         if (it != s.end()) {
           const auto next = s.erase(it);
           const auto refNext = ref.erase(ref.find(key));
@@ -649,7 +649,7 @@ TEST(
         break;
       case 6: {
         const auto it = m.find(key);
-        ASSERT_EQ(it == m.end(), ref.find(key) == ref.end());
+        ASSERT_EQ(it == m.end(), !ref.contains(key));
         if (it != m.end()) {
           const auto next = m.erase(it);
           const auto refNext = ref.erase(ref.find(key));
@@ -802,7 +802,7 @@ TEST(
         break;
       case 4: {
         const auto it = m.find(key);
-        ASSERT_EQ(it == m.end(), ref.find(key) == ref.end());
+        ASSERT_EQ(it == m.end(), !ref.contains(key));
         if (it != m.end()) {
           ASSERT_EQ(it->first, key);
           ASSERT_EQ(Offset(m.begin(), it, m.end()), Offset(ref.begin(), ref.lower_bound(key), ref.end()));
@@ -983,9 +983,9 @@ namespace
   struct RecordingDeleter
   {
     static inline std::vector<fa::NodeBase*> handed;
-    void operator()(
+    static void operator()(
       fa::NodeBase* const n
-    ) const
+    )
     {
       handed.push_back(n);
     }
@@ -1000,9 +1000,9 @@ namespace
 
   struct FreeingDeleter
   {
-    void operator()(
+    static void operator()(
       fa::NodeBase* const n
-    ) const noexcept
+    ) noexcept
     {
       delete static_cast<KeyNode*>(n);
     }

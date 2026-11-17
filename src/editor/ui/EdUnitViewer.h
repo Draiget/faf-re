@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <expected>
 #include <string>
 #include <vector>
 
@@ -34,7 +35,7 @@ namespace faf::editor
 
     void Draw(bool& open);
     /** Draws the icon of the lab's unit into the project (done a few frames later, when the renderer has drawn it). */
-    bool AskIcon(std::string& error);
+    [[nodiscard]] std::expected<void, std::string> AskIcon();
     /** Called once a frame (also while the panel is hidden): finishes an icon asked for. */
     void Frame();
     [[nodiscard]] int DrawnPixels() const noexcept
@@ -76,7 +77,7 @@ namespace faf::editor
     std::function<bool(const std::string&, int, std::vector<std::uint8_t>&)> loadGameIcon;
     /** Icons for every unit the project edits or derives, one after another. */
     void AskBatch();
-    bool AskIconFor(const std::string& unit, std::string& error);
+    [[nodiscard]] std::expected<void, std::string> AskIconFor(const std::string& unit);
     /** Test runs (`/iconrecipe`): the icon's recipe; how many of its three pictures the last icon made. */
     void SetIconRecipe(
       const float heading,

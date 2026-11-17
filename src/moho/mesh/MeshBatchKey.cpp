@@ -56,7 +56,7 @@ namespace moho
   bool MeshBatchKeyLess::operator()(
     const MeshBatchKey& lhs,
     const MeshBatchKey& rhs
-  ) const noexcept
+  ) noexcept
   {
     if (lhs.mSortKey != rhs.mSortKey) {
       return lhs.mSortKey < rhs.mSortKey;

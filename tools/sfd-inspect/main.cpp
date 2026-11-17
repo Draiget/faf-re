@@ -44,8 +44,8 @@ namespace
   )
   {
     Metadata metadata;
-    std::string error;
-    Require(ReadMetadata(filename, metadata, error), error.c_str());
+    const auto read = ReadMetadata(filename, metadata);
+    Require(read.has_value(), read ? "" : read.error().c_str());
     const auto& h = metadata.header;
     std::cout << filename << "\n  " << h.width << 'x' << h.height << " fps=" << h.fpsMilli / 1000.0
               << " frames=" << h.frameCount << " audio=" << unsigned(h.audioStreams)
@@ -196,8 +196,7 @@ namespace
       mwPlyRelCurFrm(p);
       // Short portrait/video-only fixture also checks final-frame duration and EOF.
       Metadata metadata;
-      std::string error;
-      ReadMetadata(filename, metadata, error);
+      (void)ReadMetadata(filename, metadata);
       const double duration = metadata.header.frameCount * 1000.0 / metadata.header.fpsMilli;
       if (duration < 15) {
         const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(20);

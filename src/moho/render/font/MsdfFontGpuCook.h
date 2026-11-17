@@ -1,5 +1,6 @@
 #pragma once
 
+#include <expected>
 #include <string>
 
 #include "moho/render/font/MsdfFontCook.h"
@@ -28,10 +29,10 @@ namespace moho
 
   /**
    * Fills every glyph of a prepared plan from the GPU, on the thread that calls `MSDF_TickGpuCook`. Blocks a
-   * background thread until that's done. False, with `error` set and the plan as it was, when the GPU can't do
-   * it: no program, a lost device, a glyph too large for a batch, or no frames arriving.
+   * background thread until that's done. The error, with the plan as it was, when the GPU can't do it: no
+   * program, a lost device, a glyph too large for a batch, or no frames arriving.
    */
-  [[nodiscard]] bool MSDF_CookOnGpu(MsdfCookPlan& plan, std::string& error);
+  [[nodiscard]] std::expected<void, std::string> MSDF_CookOnGpu(MsdfCookPlan& plan);
 
   /** Runs one short batch of a waiting cook. Called once a frame; costs one load when there's none. */
   void MSDF_TickGpuCook();

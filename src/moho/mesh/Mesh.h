@@ -448,10 +448,10 @@ namespace moho
    */
   struct MeshKeyLess
   {
-    [[nodiscard]] bool operator()(
+    [[nodiscard]] static bool operator()(
       const MeshKey& lhs,
       const MeshKey& rhs
-    ) const noexcept
+    ) noexcept
     {
       return lhs.LessThan(rhs);
     }

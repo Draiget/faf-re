@@ -3,6 +3,7 @@
 #include "moho/path/PathTables.h"
 #include "moho/sim/SimConVarAccess.h"
 
+#include <utility>
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
@@ -551,7 +552,7 @@ void CAiPathFinder::SetUnit(
   if (blueprint) {
     mFootprint = blueprint->Physics.ResolvedFootprint;
     mAltFootprint = blueprint->Physics.ResolvedAltFootprint;
-    mPathLayerSelector = static_cast<std::int32_t>(blueprint->Physics.MotionType);
+    mPathLayerSelector = std::to_underlying(blueprint->Physics.MotionType);
   }
 
   if (const SFootprint* const footprint = GetFootprint()) {
@@ -605,11 +606,9 @@ void CAiPathFinder::SetGoal(
       };
       EOccupancyCaps caps = OCCUPY_MobileCheck(footprint, *mOGrid->sim->mMapData, cell);
       if (mUnit->mVarDat.mLayerMask == LAYER_Water) {
-        caps = static_cast<EOccupancyCaps>(
-          static_cast<std::uint8_t>(caps) & ~static_cast<std::uint8_t>(EOccupancyCaps::OC_SUB)
-        );
+        caps = static_cast<EOccupancyCaps>(std::to_underlying(caps) & ~std::to_underlying(EOccupancyCaps::OC_SUB));
       }
-      if (static_cast<std::uint8_t>(OCCUPY_FootprintFits(*mOGrid, cell, footprint, caps)) != 0u) {
+      if (std::to_underlying(OCCUPY_FootprintFits(*mOGrid, cell, footprint, caps)) != 0u) {
         mGoalBoundaryFits = 1;
         return;
       }
@@ -674,7 +673,7 @@ void CAiPathFinder::QueueSearch()
   anchorCell.z =
     static_cast<std::int16_t>(static_cast<int>(std::lrintf(position.z - static_cast<float>(footprint.mSizeZ) * 0.5f)));
   const EOccupancyCaps anchorFitCaps = OCCUPY_FootprintFits(*mOGrid, anchorCell, footprint, EOccupancyCaps::OC_ANY);
-  mHasOccupancyMask = (static_cast<std::uint8_t>(anchorFitCaps) != 0u) ? 1u : 0u;
+  mHasOccupancyMask = (std::to_underlying(anchorFitCaps) != 0u) ? 1u : 0u;
 
   if (mSearchType == AIPATHSEARCH_None) {
     ClearRectHistory();
@@ -733,11 +732,9 @@ bool CAiPathFinder::CanTraverseCell(
       const SFootprint& footprint = mUnit->GetFootprint();
       EOccupancyCaps caps = OCCUPY_MobileCheck(footprint, *mOGrid->sim->mMapData, cell);
       if (mUnit->mVarDat.mLayerMask == LAYER_Water) {
-        caps = static_cast<EOccupancyCaps>(
-          static_cast<std::uint8_t>(caps) & ~static_cast<std::uint8_t>(EOccupancyCaps::OC_SUB)
-        );
+        caps = static_cast<EOccupancyCaps>(std::to_underlying(caps) & ~std::to_underlying(EOccupancyCaps::OC_SUB));
       }
-      if (static_cast<std::uint8_t>(OCCUPY_FootprintFits(*mOGrid, cell, footprint, caps)) == 0u) {
+      if (std::to_underlying(OCCUPY_FootprintFits(*mOGrid, cell, footprint, caps)) == 0u) {
         return false;
       }
     }
@@ -761,10 +758,9 @@ bool CAiPathFinder::CanTraverseCell(
 
   EOccupancyCaps caps = OCCUPY_MobileCheck(probeFootprint, *mOGrid->sim->mMapData, cell);
   if (mUnit->mVarDat.mLayerMask == LAYER_Water) {
-    caps =
-      static_cast<EOccupancyCaps>(static_cast<std::uint8_t>(caps) & ~static_cast<std::uint8_t>(EOccupancyCaps::OC_SUB));
+    caps = static_cast<EOccupancyCaps>(std::to_underlying(caps) & ~std::to_underlying(EOccupancyCaps::OC_SUB));
   }
-  return static_cast<std::uint8_t>(OCCUPY_FootprintFits(*mOGrid, cell, probeFootprint, caps)) != 0u;
+  return std::to_underlying(OCCUPY_FootprintFits(*mOGrid, cell, probeFootprint, caps)) != 0u;
 }
 
 /**
@@ -1062,7 +1058,7 @@ void CAiPathFinder::MemberDeserialize(
   if (gpg::RType* const searchType = gpg::RTypeOf<ESearchType>()) {
     ESearchType search = static_cast<ESearchType>(AIPATHSEARCH_None);
     archive->Read(searchType, &search, owner);
-    (void)SetPathFinderSearchModeRaw(this, static_cast<std::int32_t>(search));
+    (void)SetPathFinderSearchModeRaw(this, std::to_underlying(search));
   }
 
   archive->ReadBool(&boolValue);
@@ -1077,7 +1073,7 @@ void CAiPathFinder::MemberDeserialize(
   if (gpg::RType* const motionType = gpg::RTypeOf<ERuleBPUnitMovementType>()) {
     ERuleBPUnitMovementType movementType = RULEUMT_None;
     archive->Read(motionType, &movementType, owner);
-    mPathLayerSelector = static_cast<std::int32_t>(movementType);
+    mPathLayerSelector = std::to_underlying(movementType);
   }
 
   if (mUnit) {

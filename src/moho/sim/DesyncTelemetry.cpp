@@ -17,7 +17,7 @@
 #include <vector>
 
 #if FAFRE_PLATFORM_WINDOWS
-#include <windows.h>
+#include <Windows.h>
 #include <winhttp.h>
 #else
 #include <cerrno>

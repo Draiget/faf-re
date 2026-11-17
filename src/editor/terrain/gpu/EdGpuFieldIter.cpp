@@ -29,11 +29,10 @@ namespace faf::editor::gpu
     // ---- settle
     // -------------------------------------------------------------------------------------------------------------------------------------
 
-    OpResult OpSettleGpu(
+    std::expected<OpResult, std::string> OpSettleGpu(
       Executor& ex,
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
       const Grid* src = Source(a);
@@ -50,8 +49,7 @@ namespace faf::editor::gpu
         return OpResult::Unsupported;
       const KernelInfo* k = FindKernel("field_settle");
       if (k == nullptr) {
-        err = "kernel field_settle is missing";
-        return OpResult::Failed;
+        return std::unexpected("kernel field_settle is missing");
       }
       hk::SettleParams p{};
       p.w = static_cast<std::uint32_t>(src->w);
@@ -64,32 +62,29 @@ namespace faf::editor::gpu
       PingPong pp;
       Field dep;
       MaskBind mb;
-      if (
-        !UploadGrid(ex, *src, pp.f[0], err) || !MakeField(ex, src->w, src->h, pp.f[1], err) ||
-        !MakeField(ex, src->w, src->h, dep, err) || !FillBuffer(ex, dep.R(), 0u, err) || !BindMask(ex, a, mb, err)
-      ) {
-        return OpResult::Failed;
-      }
+      FAF_GPU_TRY(UploadGrid(ex, *src, pp.f[0]));
+      FAF_GPU_TRY(MakeField(ex, src->w, src->h, pp.f[1]));
+      FAF_GPU_TRY(MakeField(ex, src->w, src->h, dep));
+      FAF_GPU_TRY(FillBuffer(ex, dep.R(), 0u));
+      FAF_GPU_TRY(BindMask(ex, a, mb));
       p.hasMask = mb.has ? 1u : 0u;
-      const bool ok = RunIterations(ex, static_cast<u32>(iterations), 60.0, [&](const u32, std::string& e) {
+      const auto ok =
+        RunIterations(ex, static_cast<u32>(iterations), 60.0, [&](const u32) -> std::expected<void, std::string> {
         Bindings b;
         b.Srv(0, pp.Src().R()).Srv(1, mb.R()).Uav(0, pp.Dst().R()).Uav(1, dep.R());
-        if (!DispatchGrid(ex, *k, p.w, p.h, p, b, e))
-          return false;
+        FAF_GPU_TRY(DispatchGrid(ex, *k, p.w, p.h, p, b));
         pp.Flip();
-        return true;
-      }, err);
+        return {};
+      });
       if (!ok)
-        return OpResult::Failed;
+        return std::unexpected(ok.error());
       std::map<std::string, Grid> all;
       all["height"] = Grid(src->w, src->h, src->cell, src->ox, src->oz);
       all["deposit"] = Grid(src->w, src->h, src->cell, src->ox, src->oz);
-      if (!DownloadGrid(ex, pp.Src(), all["height"], err))
-        return OpResult::Failed;
+      FAF_GPU_TRY(DownloadGrid(ex, pp.Src(), all["height"]));
       if (want == "deposit" || a.extra != nullptr) {
         Grid sum(src->w, src->h, src->cell, src->ox, src->oz);
-        if (!DownloadGrid(ex, dep, sum, err))
-          return OpResult::Failed;
+        FAF_GPU_TRY(DownloadGrid(ex, dep, sum));
         const float sc = std::max(1e-4f, static_cast<float>(a.p.N("deposit_scale", 1.0)));
         for (std::size_t i = 0; i < sum.v.size(); ++i)
           all["deposit"].v[i] = Clamp01(sum.v[i] / sc);
@@ -124,26 +119,28 @@ namespace faf::editor::gpu
       const Resource* gain = nullptr;
       const Resource* lost = nullptr;
 
-      bool Init(
+      std::expected<void, std::string> Init(
         Executor& ex,
         const int w,
-        const int h,
-        std::string& err
+        const int h
       )
       {
         ka = FindKernel("field_slide_a");
         kb = FindKernel("field_slide_b");
         if (ka == nullptr || kb == nullptr) {
-          err = "kernel field_slide_a / field_slide_b is missing";
-          return false;
+          return std::unexpected("kernel field_slide_a / field_slide_b is missing");
         }
         p.w = static_cast<std::uint32_t>(w);
         p.h = static_cast<std::uint32_t>(h);
         const float zero = 0.0f;
-        return MakeField(ex, w, h, share, err) && MakeField(ex, w, h, moved, err) && MakeBuffer(ex, 1, dummy, err) &&
-          UploadBuffer(ex, *dummy, &zero, 4, err) && MakeBuffer(ex, 1, dummyW1, err) &&
-          UploadBuffer(ex, *dummyW1, &zero, 4, err) && MakeBuffer(ex, 1, dummyW2, err) &&
-          UploadBuffer(ex, *dummyW2, &zero, 4, err);
+        FAF_GPU_TRY(MakeField(ex, w, h, share));
+        FAF_GPU_TRY(MakeField(ex, w, h, moved));
+        FAF_GPU_TRY(MakeBuffer(ex, 1, dummy));
+        FAF_GPU_TRY(UploadBuffer(ex, *dummy, &zero, 4));
+        FAF_GPU_TRY(MakeBuffer(ex, 1, dummyW1));
+        FAF_GPU_TRY(UploadBuffer(ex, *dummyW1, &zero, 4));
+        FAF_GPU_TRY(MakeBuffer(ex, 1, dummyW2));
+        return UploadBuffer(ex, *dummyW2, &zero, 4);
       }
 
       const Resource& Or(
@@ -154,17 +151,15 @@ namespace faf::editor::gpu
       }
 
       /** One slide step: `loose` -> `next`. */
-      bool Step(
+      std::expected<void, std::string> Step(
         Executor& ex,
         const Resource& loose,
-        Resource& next,
-        std::string& err
+        Resource& next
       )
       {
         Bindings a;
         a.Srv(0, loose).Srv(1, Or(rock)).Srv(2, Or(tmap)).Srv(3, Or(rmask)).Uav(0, share.R()).Uav(1, moved.R());
-        if (!DispatchGrid(ex, *ka, p.w, p.h, p, a, err))
-          return false;
+        FAF_GPU_TRY(DispatchGrid(ex, *ka, p.w, p.h, p, a));
         Bindings b;
         b.Srv(0, loose)
           .Srv(1, Or(rock))
@@ -174,15 +169,14 @@ namespace faf::editor::gpu
           .Uav(0, next)
           .Uav(1, gain != nullptr ? *gain : *dummyW1)
           .Uav(2, lost != nullptr ? *lost : *dummyW2);
-        return DispatchGrid(ex, *kb, p.w, p.h, p, b, err);
+        return DispatchGrid(ex, *kb, p.w, p.h, p, b);
       }
     };
 
-    OpResult OpThermalMapGpu(
+    std::expected<OpResult, std::string> OpThermalMapGpu(
       Executor& ex,
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
       const Grid* src = Source(a);
@@ -200,16 +194,15 @@ namespace faf::editor::gpu
       if (!Fits(ex, src->Count(), 10))
         return OpResult::Unsupported;
       Slider sl;
-      if (!sl.Init(ex, w, h, err))
-        return OpResult::Failed;
+      FAF_GPU_TRY(sl.Init(ex, w, h));
       sl.p.cell = src->cell;
       sl.p.rate = std::max(0.0f, std::min(1.0f, static_cast<float>(a.p.N("rate", 0.5))));
       sl.p.talus = static_cast<float>(a.p.N("talus", 0.6));
       const bool needSums = want != "height" || a.extra != nullptr;
       PingPong pp;
       Field tm, rm, gain, lost;
-      if (!UploadGrid(ex, *src, pp.f[0], err) || !MakeField(ex, w, h, pp.f[1], err))
-        return OpResult::Failed;
+      FAF_GPU_TRY(UploadGrid(ex, *src, pp.f[0]));
+      FAF_GPU_TRY(MakeField(ex, w, h, pp.f[1]));
       if (tmap != nullptr) {
         // the talus of each cell: lo + (hi - lo) * map, as the CPU op forms it
         const float lo = std::max(0.0f, static_cast<float>(a.p.N("talus_lo", 0.35))),
@@ -217,46 +210,43 @@ namespace faf::editor::gpu
         std::vector<float> talus(src->Count());
         for (std::size_t i = 0; i < talus.size(); ++i)
           talus[i] = lo + (hi - lo) * Clamp01(tmap->v[i]);
-        if (!MakeField(ex, w, h, tm, err) || !UploadField(ex, tm, talus.data(), err))
-          return OpResult::Failed;
+        FAF_GPU_TRY(MakeField(ex, w, h, tm));
+        FAF_GPU_TRY(UploadField(ex, tm, talus.data()));
         sl.tmap = &tm.R();
         sl.p.hasMap = 1;
       }
       if (mask != nullptr) {
-        if (!UploadGrid(ex, *mask, rm, err))
-          return OpResult::Failed;
+        FAF_GPU_TRY(UploadGrid(ex, *mask, rm));
         sl.rmask = &rm.R();
         sl.p.hasMask = 1;
       }
       if (needSums) {
-        if (
-          !MakeField(ex, w, h, gain, err) || !MakeField(ex, w, h, lost, err) || !FillBuffer(ex, gain.R(), 0u, err) ||
-          !FillBuffer(ex, lost.R(), 0u, err)
-        )
-          return OpResult::Failed;
+        FAF_GPU_TRY(MakeField(ex, w, h, gain));
+        FAF_GPU_TRY(MakeField(ex, w, h, lost));
+        FAF_GPU_TRY(FillBuffer(ex, gain.R(), 0u));
+        FAF_GPU_TRY(FillBuffer(ex, lost.R(), 0u));
         sl.gain = &gain.R();
         sl.lost = &lost.R();
         sl.p.hasGain = 1;
         sl.p.hasLost = 1;
       }
-      const bool ok = RunIterations(ex, static_cast<u32>(iterations), 60.0, [&](const u32, std::string& e) {
-        if (!sl.Step(ex, pp.Src().R(), pp.Dst().R(), e))
-          return false;
+      const auto ok =
+        RunIterations(ex, static_cast<u32>(iterations), 60.0, [&](const u32) -> std::expected<void, std::string> {
+        FAF_GPU_TRY(sl.Step(ex, pp.Src().R(), pp.Dst().R()));
         pp.Flip();
-        return true;
-      }, err);
+        return {};
+      });
       if (!ok)
-        return OpResult::Failed;
+        return std::unexpected(ok.error());
       std::map<std::string, Grid> all;
       all["height"] = Grid(w, h, src->cell, src->ox, src->oz);
       all["scree"] = Grid(w, h, src->cell, src->ox, src->oz);
       all["moved"] = Grid(w, h, src->cell, src->ox, src->oz);
-      if (!DownloadGrid(ex, pp.Src(), all["height"], err))
-        return OpResult::Failed;
+      FAF_GPU_TRY(DownloadGrid(ex, pp.Src(), all["height"]));
       if (needSums) {
         Grid g(w, h, src->cell, src->ox, src->oz), l(w, h, src->cell, src->ox, src->oz);
-        if (!DownloadGrid(ex, gain, g, err) || !DownloadGrid(ex, lost, l, err))
-          return OpResult::Failed;
+        FAF_GPU_TRY(DownloadGrid(ex, gain, g));
+        FAF_GPU_TRY(DownloadGrid(ex, lost, l));
         const float sc = std::max(1e-4f, static_cast<float>(a.p.N("scree_scale", 1.0)));
         for (std::size_t i = 0; i < g.v.size(); ++i) {
           all["scree"].v[i] = Clamp01(g.v[i] / sc);
@@ -273,11 +263,10 @@ namespace faf::editor::gpu
     // ---- thermal (EdFieldCore.cpp OpThermal: the same slides with one talus for the whole field)
     // ------------------------------------------------------
 
-    OpResult OpThermalGpu(
+    std::expected<OpResult, std::string> OpThermalGpu(
       Executor& ex,
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
       const Grid* src = Source(a);
@@ -290,32 +279,29 @@ namespace faf::editor::gpu
         return OpResult::Unsupported;
       const int w = src->w, h = src->h;
       Slider sl;
-      if (!sl.Init(ex, w, h, err))
-        return OpResult::Failed;
+      FAF_GPU_TRY(sl.Init(ex, w, h));
       sl.p.cell = src->cell;
       sl.p.rate = std::max(0.0f, std::min(1.0f, static_cast<float>(a.p.N("rate", 0.5))));
       sl.p.talus = std::max(0.0f, static_cast<float>(a.p.N("talus", 0.6)));
       PingPong pp;
       Field rm;
-      if (!UploadGrid(ex, *src, pp.f[0], err) || !MakeField(ex, w, h, pp.f[1], err))
-        return OpResult::Failed;
+      FAF_GPU_TRY(UploadGrid(ex, *src, pp.f[0]));
+      FAF_GPU_TRY(MakeField(ex, w, h, pp.f[1]));
       if (mask != nullptr) {
-        if (!UploadGrid(ex, *mask, rm, err))
-          return OpResult::Failed;
+        FAF_GPU_TRY(UploadGrid(ex, *mask, rm));
         sl.rmask = &rm.R();
         sl.p.hasMask = 1;
       }
-      const bool ok = RunIterations(ex, static_cast<u32>(iterations), 60.0, [&](const u32, std::string& e) {
-        if (!sl.Step(ex, pp.Src().R(), pp.Dst().R(), e))
-          return false;
+      const auto ok =
+        RunIterations(ex, static_cast<u32>(iterations), 60.0, [&](const u32) -> std::expected<void, std::string> {
+        FAF_GPU_TRY(sl.Step(ex, pp.Src().R(), pp.Dst().R()));
         pp.Flip();
-        return true;
-      }, err);
+        return {};
+      });
       if (!ok)
-        return OpResult::Failed;
+        return std::unexpected(ok.error());
       Grid g = NewGrid(shape);
-      if (!DownloadGrid(ex, pp.Src(), g, err))
-        return OpResult::Failed;
+      FAF_GPU_TRY(DownloadGrid(ex, pp.Src(), g));
       out = std::move(g);
       return OpResult::Done;
     }
@@ -323,11 +309,10 @@ namespace faf::editor::gpu
     // ---- erode_rocksoil
     // -----------------------------------------------------------------------------------------------------------------------------
 
-    OpResult OpRockSoilGpu(
+    std::expected<OpResult, std::string> OpRockSoilGpu(
       Executor& ex,
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
       const Grid* src = Source(a);
@@ -346,8 +331,7 @@ namespace faf::editor::gpu
         return OpResult::Unsupported;
       const KernelInfo* kw = FindKernel("field_weather");
       if (kw == nullptr) {
-        err = "kernel field_weather is missing";
-        return OpResult::Failed;
+        return std::unexpected("kernel field_weather is missing");
       }
       const float weather = std::max(0.0f, static_cast<float>(a.p.N("weather", 0.01)));
       const float depth0 = std::max(1e-3f, static_cast<float>(a.p.N("depth0", 1.0)));
@@ -364,18 +348,18 @@ namespace faf::editor::gpu
       }
       PingPong soil, rock;
       Field lost;
-      if (
-        !MakeField(ex, w, h, soil.f[0], err) || !MakeField(ex, w, h, soil.f[1], err) ||
-        !MakeField(ex, w, h, rock.f[0], err) || !MakeField(ex, w, h, rock.f[1], err) ||
-        !UploadField(ex, soil.f[0], soilV.data(), err) || !UploadField(ex, rock.f[0], rockV.data(), err) ||
-        !MakeField(ex, w, h, lost, err) || !FillBuffer(ex, lost.R(), 0u, err)
-      ) {
-        return OpResult::Failed;
-      }
+      FAF_GPU_TRY(MakeField(ex, w, h, soil.f[0]));
+      FAF_GPU_TRY(MakeField(ex, w, h, soil.f[1]));
+      FAF_GPU_TRY(MakeField(ex, w, h, rock.f[0]));
+      FAF_GPU_TRY(MakeField(ex, w, h, rock.f[1]));
+      FAF_GPU_TRY(UploadField(ex, soil.f[0], soilV.data()));
+      FAF_GPU_TRY(UploadField(ex, rock.f[0], rockV.data()));
+      FAF_GPU_TRY(MakeField(ex, w, h, lost));
+      FAF_GPU_TRY(FillBuffer(ex, lost.R(), 0u));
       Slider onSoil, onRock; // the soil slides over the rock (surface = rock + soil, capped by the soil), the rock as a
                              // layer of its own
-      if (!onSoil.Init(ex, w, h, err) || !onRock.Init(ex, w, h, err))
-        return OpResult::Failed;
+      FAF_GPU_TRY(onSoil.Init(ex, w, h));
+      FAF_GPU_TRY(onRock.Init(ex, w, h));
       onSoil.p.cell = onRock.p.cell = src->cell;
       onSoil.p.rate = onRock.p.rate = rate;
       onSoil.p.talus = soilTalus;
@@ -388,30 +372,26 @@ namespace faf::editor::gpu
       wp.h = static_cast<std::uint32_t>(h);
       wp.weather = weather;
       wp.depth0 = depth0;
-      const bool ok = RunIterations(ex, static_cast<u32>(iterations), 60.0, [&](const u32 it, std::string& e) {
+      const auto ok =
+        RunIterations(ex, static_cast<u32>(iterations), 60.0, [&](const u32 it) -> std::expected<void, std::string> {
         Bindings b;
         b.Uav(0, rock.Src().R()).Uav(1, soil.Src().R());
-        if (!DispatchGrid(ex, *kw, wp.w, wp.h, wp, b, e))
-          return false;
+        FAF_GPU_TRY(DispatchGrid(ex, *kw, wp.w, wp.h, wp, b));
         onSoil.rock = &rock.Src().R();
-        if (!onSoil.Step(ex, soil.Src().R(), soil.Dst().R(), e))
-          return false;
+        FAF_GPU_TRY(onSoil.Step(ex, soil.Src().R(), soil.Dst().R()));
         soil.Flip();
         if (rockTalus > 0.0f && (it % static_cast<u32>(rockEvery)) == static_cast<u32>(rockEvery) - 1u) {
-          if (!onRock.Step(ex, rock.Src().R(), rock.Dst().R(), e))
-            return false;
+          FAF_GPU_TRY(onRock.Step(ex, rock.Src().R(), rock.Dst().R()));
           rock.Flip();
         }
-        return true;
-      }, err);
+        return {};
+      });
       if (!ok)
-        return OpResult::Failed;
+        return std::unexpected(ok.error());
       Grid gSoil = LikeOf(*src), gRock = LikeOf(*src), gLost = LikeOf(*src);
-      if (
-        !DownloadGrid(ex, soil.Src(), gSoil, err) || !DownloadGrid(ex, rock.Src(), gRock, err) ||
-        !DownloadGrid(ex, lost, gLost, err)
-      )
-        return OpResult::Failed;
+      FAF_GPU_TRY(DownloadGrid(ex, soil.Src(), gSoil));
+      FAF_GPU_TRY(DownloadGrid(ex, rock.Src(), gRock));
+      FAF_GPU_TRY(DownloadGrid(ex, lost, gLost));
       std::map<std::string, Grid> all;
       all["height"] = LikeOf(*src);
       all["soil"] = LikeOf(*src);
@@ -433,11 +413,10 @@ namespace faf::editor::gpu
     // ---- erode_snow
     // ---------------------------------------------------------------------------------------------------------------------------------
 
-    OpResult OpSnowGpu(
+    std::expected<OpResult, std::string> OpSnowGpu(
       Executor& ex,
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
       const Grid* src = Source(a);
@@ -456,8 +435,7 @@ namespace faf::editor::gpu
         return OpResult::Unsupported;
       const KernelInfo* ki = FindKernel("field_snowinit");
       if (ki == nullptr) {
-        err = "kernel field_snowinit is missing";
-        return OpResult::Failed;
+        return std::unexpected("kernel field_snowinit is missing");
       }
       const float line = static_cast<float>(a.p.N("snowline", 40.0));
       const float band = std::max(1e-3f, static_cast<float>(a.p.N("band", 10.0)));
@@ -474,21 +452,18 @@ namespace faf::editor::gpu
       Field ground, lost;
       PingPong snow;
       MaskBind mb;
-      if (
-        !UploadGrid(ex, *src, ground, err) || !MakeField(ex, w, h, snow.f[0], err) ||
-        !MakeField(ex, w, h, snow.f[1], err) || !MakeField(ex, w, h, lost, err) || !FillBuffer(ex, lost.R(), 0u, err) ||
-        !BindMask(ex, a, mb, err)
-      ) {
-        return OpResult::Failed;
-      }
+      FAF_GPU_TRY(UploadGrid(ex, *src, ground));
+      FAF_GPU_TRY(MakeField(ex, w, h, snow.f[0]));
+      FAF_GPU_TRY(MakeField(ex, w, h, snow.f[1]));
+      FAF_GPU_TRY(MakeField(ex, w, h, lost));
+      FAF_GPU_TRY(FillBuffer(ex, lost.R(), 0u));
+      FAF_GPU_TRY(BindMask(ex, a, mb));
       ip.hasMask = mb.has ? 1u : 0u;
       Bindings bi;
       bi.Srv(0, ground.R()).Srv(1, mb.R()).Uav(0, snow.f[0].R());
-      if (!DispatchGrid(ex, *ki, ip.w, ip.h, ip, bi, err))
-        return OpResult::Failed;
+      FAF_GPU_TRY(DispatchGrid(ex, *ki, ip.w, ip.h, ip, bi));
       Slider sl;
-      if (!sl.Init(ex, w, h, err))
-        return OpResult::Failed;
+      FAF_GPU_TRY(sl.Init(ex, w, h));
       sl.p.cell = src->cell;
       sl.p.rate = std::max(0.0f, std::min(1.0f, static_cast<float>(a.p.N("rate", 0.5))));
       sl.p.talus = std::max(0.0f, static_cast<float>(a.p.N("snow_talus", 0.9)));
@@ -496,17 +471,17 @@ namespace faf::editor::gpu
       sl.p.hasLost = 1;
       sl.rock = &ground.R();
       sl.lost = &lost.R();
-      const bool ok = RunIterations(ex, static_cast<u32>(iterations), 60.0, [&](const u32, std::string& e) {
-        if (!sl.Step(ex, snow.Src().R(), snow.Dst().R(), e))
-          return false;
+      const auto ok =
+        RunIterations(ex, static_cast<u32>(iterations), 60.0, [&](const u32) -> std::expected<void, std::string> {
+        FAF_GPU_TRY(sl.Step(ex, snow.Src().R(), snow.Dst().R()));
         snow.Flip();
-        return true;
-      }, err);
+        return {};
+      });
       if (!ok)
-        return OpResult::Failed;
+        return std::unexpected(ok.error());
       Grid gSnow = LikeOf(*src), gLost = LikeOf(*src);
-      if (!DownloadGrid(ex, snow.Src(), gSnow, err) || !DownloadGrid(ex, lost, gLost, err))
-        return OpResult::Failed;
+      FAF_GPU_TRY(DownloadGrid(ex, snow.Src(), gSnow));
+      FAF_GPU_TRY(DownloadGrid(ex, lost, gLost));
       std::map<std::string, Grid> all;
       all["height"] = LikeOf(*src);
       all["snow"] = LikeOf(*src);
@@ -528,11 +503,10 @@ namespace faf::editor::gpu
     // ---- erode_wind
     // ---------------------------------------------------------------------------------------------------------------------------------
 
-    OpResult OpWindGpu(
+    std::expected<OpResult, std::string> OpWindGpu(
       Executor& ex,
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
       const Grid* src = Source(a);
@@ -552,8 +526,7 @@ namespace faf::editor::gpu
       const KernelInfo* ka = FindKernel("field_wind_a");
       const KernelInfo* kb = FindKernel("field_wind_b");
       if (ka == nullptr || kb == nullptr) {
-        err = "kernel field_wind_a / field_wind_b is missing";
-        return OpResult::Failed;
+        return std::unexpected("kernel field_wind_a / field_wind_b is missing");
       }
       const double az = a.p.N("azimuth", 0.0) * field::t7::kPiD / 180.0;
       hk::WindParams p{};
@@ -576,27 +549,27 @@ namespace faf::editor::gpu
       }
       PingPong sand;
       Field rock, wear, take, vel;
-      if (
-        !MakeField(ex, w, h, sand.f[0], err) || !MakeField(ex, w, h, sand.f[1], err) ||
-        !MakeField(ex, w, h, rock, err) || !UploadField(ex, sand.f[0], sandV.data(), err) ||
-        !UploadField(ex, rock, rockV.data(), err) || !MakeField(ex, w, h, wear, err) ||
-        !FillBuffer(ex, wear.R(), 0u, err) || !MakeField(ex, w, h, take, err) || !MakeField(ex, w, h, vel, err)
-      ) {
-        return OpResult::Failed;
-      }
+      FAF_GPU_TRY(MakeField(ex, w, h, sand.f[0]));
+      FAF_GPU_TRY(MakeField(ex, w, h, sand.f[1]));
+      FAF_GPU_TRY(MakeField(ex, w, h, rock));
+      FAF_GPU_TRY(UploadField(ex, sand.f[0], sandV.data()));
+      FAF_GPU_TRY(UploadField(ex, rock, rockV.data()));
+      FAF_GPU_TRY(MakeField(ex, w, h, wear));
+      FAF_GPU_TRY(FillBuffer(ex, wear.R(), 0u));
+      FAF_GPU_TRY(MakeField(ex, w, h, take));
+      FAF_GPU_TRY(MakeField(ex, w, h, vel));
       Slider sl; // the sand slides at the angle of repose on the rock, always at rate 0.5 (as the CPU op)
-      if (!sl.Init(ex, w, h, err))
-        return OpResult::Failed;
+      FAF_GPU_TRY(sl.Init(ex, w, h));
       sl.p.cell = src->cell;
       sl.p.rate = 0.5f;
       sl.p.talus = repose;
       sl.p.hasRock = 1;
       sl.rock = &rock.R();
-      const bool ok = RunIterations(ex, static_cast<u32>(iterations), 60.0, [&](const u32, std::string& e) {
+      const auto ok =
+        RunIterations(ex, static_cast<u32>(iterations), 60.0, [&](const u32) -> std::expected<void, std::string> {
         Bindings ba;
         ba.Srv(0, rock.R()).Srv(1, sand.Src().R()).Uav(0, take.R()).Uav(1, vel.R());
-        if (!DispatchGrid(ex, *ka, p.w, p.h, p, ba, e))
-          return false;
+        FAF_GPU_TRY(DispatchGrid(ex, *ka, p.w, p.h, p, ba));
         Bindings bb;
         bb.Srv(0, sand.Src().R())
           .Srv(1, take.R())
@@ -604,22 +577,18 @@ namespace faf::editor::gpu
           .Uav(0, sand.Dst().R())
           .Uav(1, rock.R())
           .Uav(2, wear.R());
-        if (!DispatchGrid(ex, *kb, p.w, p.h, p, bb, e))
-          return false;
+        FAF_GPU_TRY(DispatchGrid(ex, *kb, p.w, p.h, p, bb));
         sand.Flip();
-        if (!sl.Step(ex, sand.Src().R(), sand.Dst().R(), e))
-          return false;
+        FAF_GPU_TRY(sl.Step(ex, sand.Src().R(), sand.Dst().R()));
         sand.Flip();
-        return true;
-      }, err);
+        return {};
+      });
       if (!ok)
-        return OpResult::Failed;
+        return std::unexpected(ok.error());
       Grid gSand = LikeOf(*src), gRock = LikeOf(*src), gWear = LikeOf(*src);
-      if (
-        !DownloadGrid(ex, sand.Src(), gSand, err) || !DownloadGrid(ex, rock, gRock, err) ||
-        !DownloadGrid(ex, wear, gWear, err)
-      )
-        return OpResult::Failed;
+      FAF_GPU_TRY(DownloadGrid(ex, sand.Src(), gSand));
+      FAF_GPU_TRY(DownloadGrid(ex, rock, gRock));
+      FAF_GPU_TRY(DownloadGrid(ex, wear, gWear));
       std::map<std::string, Grid> all;
       all["height"] = LikeOf(*src);
       all["sand"] = LikeOf(*src);
@@ -639,11 +608,10 @@ namespace faf::editor::gpu
     // ---- erode_glacier
     // ------------------------------------------------------------------------------------------------------------------------------
 
-    OpResult OpGlacierGpu(
+    std::expected<OpResult, std::string> OpGlacierGpu(
       Executor& ex,
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
       const Grid* src = Source(a);
@@ -663,8 +631,7 @@ namespace faf::editor::gpu
       const KernelInfo* ka = FindKernel("field_glacier_a");
       const KernelInfo* kb = FindKernel("field_glacier_b");
       if (ka == nullptr || kb == nullptr) {
-        err = "kernel field_glacier_a / field_glacier_b is missing";
-        return OpResult::Failed;
+        return std::unexpected("kernel field_glacier_a / field_glacier_b is missing");
       }
       hk::GlacierParams p{};
       p.w = static_cast<std::uint32_t>(w);
@@ -687,25 +654,31 @@ namespace faf::editor::gpu
       PingPong ice;
       std::unique_ptr<Resource> dmaxA, dmaxB, dummy;
       const float zero = 0.0f;
-      if (
-        !UploadGrid(ex, *src, bed, err) || !MakeField(ex, w, h, ice.f[0], err) || !MakeField(ex, w, h, ice.f[1], err) ||
-        !FillBuffer(ex, ice.f[0].R(), 0u, err) || !MakeField(ex, w, h, dif, err) || !MakeField(ex, w, h, gsl, err) ||
-        !MakeField(ex, w, h, cut, err) || !FillBuffer(ex, cut.R(), 0u, err) || !MakeBuffer(ex, 1, dmaxA, err) ||
-        !MakeBuffer(ex, 1, dmaxB, err) || !FillBuffer(ex, *dmaxA, 0u, err) || !FillBuffer(ex, *dmaxB, 0u, err) ||
-        !MakeBuffer(ex, 1, dummy, err) || !UploadBuffer(ex, *dummy, &zero, 4, err)
-      ) {
-        return OpResult::Failed;
+      FAF_GPU_TRY(UploadGrid(ex, *src, bed));
+      FAF_GPU_TRY(MakeField(ex, w, h, ice.f[0]));
+      FAF_GPU_TRY(MakeField(ex, w, h, ice.f[1]));
+      FAF_GPU_TRY(FillBuffer(ex, ice.f[0].R(), 0u));
+      FAF_GPU_TRY(MakeField(ex, w, h, dif));
+      FAF_GPU_TRY(MakeField(ex, w, h, gsl));
+      FAF_GPU_TRY(MakeField(ex, w, h, cut));
+      FAF_GPU_TRY(FillBuffer(ex, cut.R(), 0u));
+      FAF_GPU_TRY(MakeBuffer(ex, 1, dmaxA));
+      FAF_GPU_TRY(MakeBuffer(ex, 1, dmaxB));
+      FAF_GPU_TRY(FillBuffer(ex, *dmaxA, 0u));
+      FAF_GPU_TRY(FillBuffer(ex, *dmaxB, 0u));
+      FAF_GPU_TRY(MakeBuffer(ex, 1, dummy));
+      FAF_GPU_TRY(UploadBuffer(ex, *dummy, &zero, 4));
+      if (accMask != nullptr) {
+        FAF_GPU_TRY(UploadGrid(ex, *accMask, acc));
       }
-      if (accMask != nullptr && !UploadGrid(ex, *accMask, acc, err))
-        return OpResult::Failed;
       const Resource& accR = accMask != nullptr ? acc.R() : *dummy;
-      const bool ok = RunIterations(ex, static_cast<u32>(iterations), 60.0, [&](const u32 it, std::string& e) {
+      const auto ok =
+        RunIterations(ex, static_cast<u32>(iterations), 60.0, [&](const u32 it) -> std::expected<void, std::string> {
         Resource& cur = (it & 1u) != 0u ? *dmaxB : *dmaxA;
         Resource& nxt = (it & 1u) != 0u ? *dmaxA : *dmaxB;
         Bindings ba;
         ba.Srv(0, bed.R()).Srv(1, ice.Src().R()).Uav(0, dif.R()).Uav(1, gsl.R()).Uav(2, cur).Uav(3, nxt);
-        if (!DispatchGrid(ex, *ka, p.w, p.h, p, ba, e))
-          return false;
+        FAF_GPU_TRY(DispatchGrid(ex, *ka, p.w, p.h, p, ba));
         Bindings bb;
         bb.Srv(0, bed.R())
           .Srv(1, ice.Src().R())
@@ -715,16 +688,15 @@ namespace faf::editor::gpu
           .Srv(5, cur)
           .Uav(0, ice.Dst().R())
           .Uav(1, cut.R());
-        if (!DispatchGrid(ex, *kb, p.w, p.h, p, bb, e))
-          return false;
+        FAF_GPU_TRY(DispatchGrid(ex, *kb, p.w, p.h, p, bb));
         ice.Flip();
-        return true;
-      }, err);
+        return {};
+      });
       if (!ok)
-        return OpResult::Failed;
+        return std::unexpected(ok.error());
       Grid gIce = LikeOf(*src), gCut = LikeOf(*src);
-      if (!DownloadGrid(ex, ice.Src(), gIce, err) || !DownloadGrid(ex, cut, gCut, err))
-        return OpResult::Failed;
+      FAF_GPU_TRY(DownloadGrid(ex, ice.Src(), gIce));
+      FAF_GPU_TRY(DownloadGrid(ex, cut, gCut));
       std::map<std::string, Grid> all;
       all["height"] = LikeOf(*src);
       all["ice"] = LikeOf(*src);

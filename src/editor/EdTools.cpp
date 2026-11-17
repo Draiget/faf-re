@@ -15,6 +15,7 @@
 #include "editor/ui/EdHelp.h"
 #include "gpg/core/utils/Logging.h"
 
+#include <utility>
 #include <fstream>
 #include <iterator>
 #include <cmath>
@@ -721,15 +722,14 @@ namespace faf::editor
     if (image < 0 || image >= static_cast<int>(mBrushImages.size())) {
       return false;
     }
-    ShapeGrid grid;
-    std::string error;
-    if (!LoadBrushImage(mBrushImages[static_cast<std::size_t>(image)].path, kShapeGridSize, grid, error)) {
+    const auto grid = LoadBrushImage(mBrushImages[static_cast<std::size_t>(image)].path, kShapeGridSize);
+    if (!grid) {
       gpg::Warnf(
-        "editor: brush image %s: %s", mBrushImages[static_cast<std::size_t>(image)].name.c_str(), error.c_str()
+        "editor: brush image %s: %s", mBrushImages[static_cast<std::size_t>(image)].name.c_str(), grid.error().c_str()
       );
       return false;
     }
-    SetStamp(StampFromGrid(grid), mBrushImages[static_cast<std::size_t>(image)].name);
+    SetStamp(StampFromGrid(*grid), mBrushImages[static_cast<std::size_t>(image)].name);
     return true;
   }
 
@@ -740,17 +740,16 @@ namespace faf::editor
     if (index < 0 || index >= static_cast<int>(mBrushImages.size())) {
       return false;
     }
-    auto grid = std::make_shared<ShapeGrid>();
-    std::string error;
-    if (!LoadBrushImage(mBrushImages[static_cast<std::size_t>(index)].path, kShapeGridSize, *grid, error)) {
+    auto loaded = LoadBrushImage(mBrushImages[static_cast<std::size_t>(index)].path, kShapeGridSize);
+    if (!loaded) {
       gpg::Warnf(
-        "editor: brush image %s: %s", mBrushImages[static_cast<std::size_t>(index)].name.c_str(), error.c_str()
+        "editor: brush image %s: %s", mBrushImages[static_cast<std::size_t>(index)].name.c_str(), loaded.error().c_str()
       );
       return false;
     }
-    mShapeImage = std::move(grid);
+    mShapeImage = std::make_shared<ShapeGrid>(std::move(*loaded));
     mShapeImageName = mBrushImages[static_cast<std::size_t>(index)].name;
-    mBrushShape = static_cast<int>(BrushShape::Image);
+    mBrushShape = std::to_underlying(BrushShape::Image);
     return true;
   }
 
@@ -864,7 +863,7 @@ namespace faf::editor
         }
         if (!mConvertPlan.lost.empty()) {
           static const char* const kLost[] = {"Move to a free layer", "Merge into a layer", "Drop"};
-          int lost = static_cast<int>(mConvertOptions.lost);
+          int lost = std::to_underlying(mConvertOptions.lost);
           ImGui::SetNextItemWidth(Em(240.0f));
           if (EdCombo("Paint it can't draw", &lost, kLost, 3)) {
             mConvertOptions.lost = static_cast<LostLayers>(lost);
@@ -909,7 +908,7 @@ namespace faf::editor
   {
     const float half = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) * 0.5f;
     ImGui::SetNextItemWidth(half);
-    const bool image = mBrushShape == static_cast<int>(BrushShape::Image);
+    const bool image = mBrushShape == std::to_underlying(BrushShape::Image);
     if (
       EdBeginCombo(
         "##brushshape", image ? mShapeImageName.c_str() : BrushShapeName(static_cast<BrushShape>(mBrushShape))
@@ -1765,7 +1764,7 @@ namespace faf::editor
       static constexpr const char* kMappings[] = {
         "Values: stretched over a height range", "Values: heights (1/128 unit a step)"
       };
-      int mapping = static_cast<int>(s.mapping);
+      int mapping = std::to_underlying(s.mapping);
       ImGui::SetNextItemWidth(-1.0f);
       if (EdCombo("##interopmapping", &mapping, kMappings, IM_ARRAYSIZE(kMappings))) {
         s.mapping = static_cast<ImportSettings::Mapping>(mapping);
@@ -1860,13 +1859,12 @@ namespace faf::editor
           const std::string sidecar = std::string(mInteropImportPath) + ".json";
           std::ifstream in(sidecar, std::ios::binary);
           const std::string json((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
-          std::string error;
           if (json.empty()) {
             mInteropStatus = "No " + sidecar + " beside the image.";
-          } else if (ImportFromSidecar(json, s, error)) {
+          } else if (const auto read = ImportFromSidecar(json, s)) {
             mInteropStatus = "Settings from the export's .json: heights as written (absolute).";
           } else {
-            mInteropStatus = "The .json: " + error;
+            mInteropStatus = "The .json: " + read.error();
           }
         }
         ImGui::TreePop();
@@ -1882,7 +1880,7 @@ namespace faf::editor
       static constexpr const char* kBlends[] = {
         "Replace the heights", "Add to the heights", "Keep the higher", "Keep the lower"
       };
-      int blend = static_cast<int>(s.blend);
+      int blend = std::to_underlying(s.blend);
       ImGui::SetNextItemWidth(-1.0f);
       if (EdCombo("##interopblend", &blend, kBlends, IM_ARRAYSIZE(kBlends))) {
         s.blend = static_cast<ImportSettings::Blend>(blend);
@@ -1893,7 +1891,7 @@ namespace faf::editor
         static constexpr const char* kFilters[] = {
           "Read between samples: bilinear", "Nearest sample", "Bicubic (sharper)", "Lanczos 3 (sharpest)"
         };
-        int filter = static_cast<int>(s.filter);
+        int filter = std::to_underlying(s.filter);
         ImGui::SetNextItemWidth(-1.0f);
         if (EdCombo("##interopfilter", &filter, kFilters, IM_ARRAYSIZE(kFilters))) {
           s.filter = static_cast<ResampleFilter>(filter);
@@ -2026,7 +2024,7 @@ namespace faf::editor
         MaskImportFile& f = mi.files[i];
         ImGui::PushID(static_cast<int>(i));
         ImGui::TextUnformatted(std::filesystem::path(f.path).filename().string().c_str());
-        int target = static_cast<int>(f.target);
+        int target = std::to_underlying(f.target);
         ImGui::SetNextItemWidth(Em(150.0f));
         if (EdCombo("##target", &target, kTargets, 4)) {
           f.target = static_cast<MaskImportFile::Target>(target);

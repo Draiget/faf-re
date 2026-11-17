@@ -62,25 +62,23 @@ namespace faf::editor::gpu
       return m == nullptr || m->SameShape(*j.src);
     }
 
-    bool Upload(
+    std::expected<void, std::string> Upload(
       Executor& ex,
-      Job& j,
-      std::string& err
+      Job& j
     )
     {
-      return UploadGrid(ex, *j.src, j.in, err) && MakeField(ex, j.shape.w, j.shape.h, j.res, err);
+      FAF_GPU_TRY(UploadGrid(ex, *j.src, j.in));
+      return MakeField(ex, j.shape.w, j.shape.h, j.res);
     }
 
-    OpResult Finish(
+    std::expected<OpResult, std::string> Finish(
       Executor& ex,
       Job& j,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
       Grid result = NewGrid(j.shape);
-      if (!DownloadGrid(ex, j.res, result, err))
-        return OpResult::Failed;
+      FAF_GPU_TRY(DownloadGrid(ex, j.res, result));
       out = std::move(result);
       return OpResult::Done;
     }
@@ -88,11 +86,10 @@ namespace faf::editor::gpu
     // ---- occlusion
     // --------------------------------------------------------------------------------------------------------------------------------
 
-    OpResult OpOcclusionGpu(
+    std::expected<OpResult, std::string> OpOcclusionGpu(
       Executor& ex,
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
       Job j;
@@ -119,12 +116,11 @@ namespace faf::editor::gpu
       }
       const KernelInfo* k = FindKernel("filt_occlusion");
       if (k == nullptr) {
-        err = "kernel filt_occlusion is missing";
-        return OpResult::Failed;
+        return std::unexpected("kernel filt_occlusion is missing");
       }
       std::unique_ptr<Resource> rayBuf;
-      if (!Upload(ex, j, err) || !UploadVec(ex, ray, rayBuf, err))
-        return OpResult::Failed;
+      FAF_GPU_TRY(Upload(ex, j));
+      FAF_GPU_TRY(UploadVec(ex, ray, rayBuf));
       hk::OcclusionParams p{};
       p.w = static_cast<std::uint32_t>(src.w);
       p.h = static_cast<std::uint32_t>(src.h);
@@ -135,19 +131,17 @@ namespace faf::editor::gpu
       p.gain = gain;
       Bindings b;
       b.Srv(1, *rayBuf).Srv(2, j.in.R()).Uav(0, j.res.R());
-      if (!DispatchBands(ex, *k, p.w, p.h, static_cast<double>(dirs) * static_cast<double>(steps) * 0.12, p, b, err))
-        return OpResult::Failed;
-      return Finish(ex, j, out, err);
+      FAF_GPU_TRY(DispatchBands(ex, *k, p.w, p.h, static_cast<double>(dirs) * static_cast<double>(steps) * 0.12, p, b));
+      return Finish(ex, j, out);
     }
 
     // ---- bilateral
     // ----------------------------------------------------------------------------------------------------------------------------------
 
-    OpResult OpBilateralGpu(
+    std::expected<OpResult, std::string> OpBilateralGpu(
       Executor& ex,
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
       Job j;
@@ -166,13 +160,13 @@ namespace faf::editor::gpu
       }
       const KernelInfo* k = FindKernel("filt_bilateral");
       if (k == nullptr) {
-        err = "kernel filt_bilateral is missing";
-        return OpResult::Failed;
+        return std::unexpected("kernel filt_bilateral is missing");
       }
       std::unique_ptr<Resource> wsBuf;
       MaskBind mask;
-      if (!Upload(ex, j, err) || !UploadVec(ex, ws, wsBuf, err) || !BindMask(ex, a, mask, err))
-        return OpResult::Failed;
+      FAF_GPU_TRY(Upload(ex, j));
+      FAF_GPU_TRY(UploadVec(ex, ws, wsBuf));
+      FAF_GPU_TRY(BindMask(ex, a, mask));
       hk::BilateralParams p{};
       p.w = static_cast<std::uint32_t>(src.w);
       p.h = static_cast<std::uint32_t>(src.h);
@@ -181,19 +175,17 @@ namespace faf::editor::gpu
       p.inv = 1.0f / (sr * sr);
       Bindings b;
       b.Srv(1, *wsBuf).Srv(2, j.in.R()).Srv(3, mask.R()).Uav(0, j.res.R());
-      if (!DispatchBands(ex, *k, p.w, p.h, static_cast<double>((2 * r + 1) * (2 * r + 1)) * 0.1, p, b, err))
-        return OpResult::Failed;
-      return Finish(ex, j, out, err);
+      FAF_GPU_TRY(DispatchBands(ex, *k, p.w, p.h, static_cast<double>((2 * r + 1) * (2 * r + 1)) * 0.1, p, b));
+      return Finish(ex, j, out);
     }
 
     // ---- diffuse (iterated)
     // -------------------------------------------------------------------------------------------------------------------------
 
-    OpResult OpDiffuseGpu(
+    std::expected<OpResult, std::string> OpDiffuseGpu(
       Executor& ex,
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
       Job j;
@@ -207,15 +199,13 @@ namespace faf::editor::gpu
       const float rate = std::max(0.0f, std::min(0.25f, static_cast<float>(a.p.N("rate", 0.2))));
       const KernelInfo* k = FindKernel("filt_diffuse");
       if (k == nullptr) {
-        err = "kernel filt_diffuse is missing";
-        return OpResult::Failed;
+        return std::unexpected("kernel filt_diffuse is missing");
       }
       PingPong pp;
       MaskBind mask;
-      if (
-        !UploadGrid(ex, src, pp.f[0], err) || !MakeField(ex, src.w, src.h, pp.f[1], err) || !BindMask(ex, a, mask, err)
-      )
-        return OpResult::Failed;
+      FAF_GPU_TRY(UploadGrid(ex, src, pp.f[0]));
+      FAF_GPU_TRY(MakeField(ex, src.w, src.h, pp.f[1]));
+      FAF_GPU_TRY(BindMask(ex, a, mask));
       hk::DiffuseParams p{};
       p.w = static_cast<std::uint32_t>(src.w);
       p.h = static_cast<std::uint32_t>(src.h);
@@ -225,19 +215,18 @@ namespace faf::editor::gpu
       p.invK2 = 1.0f / (kappa * kappa);
       p.invCell = 1.0f / src.cell;
       p.rate = rate;
-      const bool ok = RunIterations(ex, static_cast<u32>(iterations), 60.0, [&](const u32, std::string& e) {
+      const auto ok =
+        RunIterations(ex, static_cast<u32>(iterations), 60.0, [&](const u32) -> std::expected<void, std::string> {
         Bindings b;
         b.Srv(1, pp.Src().R()).Srv(2, mask.R()).Uav(0, pp.Dst().R());
-        if (!DispatchGrid(ex, *k, p.w, p.h, p, b, e))
-          return false;
+        FAF_GPU_TRY(DispatchGrid(ex, *k, p.w, p.h, p, b));
         pp.Flip();
-        return true;
-      }, err);
+        return {};
+      });
       if (!ok)
-        return OpResult::Failed;
+        return std::unexpected(ok.error());
       Grid result = NewGrid(j.shape);
-      if (!DownloadGrid(ex, pp.Src(), result, err))
-        return OpResult::Failed;
+      FAF_GPU_TRY(DownloadGrid(ex, pp.Src(), result));
       out = std::move(result);
       return OpResult::Done;
     }
@@ -245,11 +234,10 @@ namespace faf::editor::gpu
     // ---- blur_dir
     // ---------------------------------------------------------------------------------------------------------------------------------
 
-    OpResult OpBlurDirGpu(
+    std::expected<OpResult, std::string> OpBlurDirGpu(
       Executor& ex,
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
       Job j;
@@ -277,13 +265,13 @@ namespace faf::editor::gpu
       }
       const KernelInfo* k = FindKernel("filt_blurdir");
       if (k == nullptr) {
-        err = "kernel filt_blurdir is missing";
-        return OpResult::Failed;
+        return std::unexpected("kernel filt_blurdir is missing");
       }
       std::unique_ptr<Resource> wtBuf;
       MaskBind mask;
-      if (!Upload(ex, j, err) || !UploadVec(ex, wt, wtBuf, err) || !BindMask(ex, a, mask, err))
-        return OpResult::Failed;
+      FAF_GPU_TRY(Upload(ex, j));
+      FAF_GPU_TRY(UploadVec(ex, wt, wtBuf));
+      FAF_GPU_TRY(BindMask(ex, a, mask));
       hk::BlurDirParams p{};
       p.w = static_cast<std::uint32_t>(src.w);
       p.h = static_cast<std::uint32_t>(src.h);
@@ -294,19 +282,17 @@ namespace faf::editor::gpu
       p.wsum = wsum;
       Bindings b;
       b.Srv(1, *wtBuf).Srv(2, j.in.R()).Srv(3, mask.R()).Uav(0, j.res.R());
-      if (!DispatchBands(ex, *k, p.w, p.h, static_cast<double>(2 * half + 1) * 0.08, p, b, err))
-        return OpResult::Failed;
-      return Finish(ex, j, out, err);
+      FAF_GPU_TRY(DispatchBands(ex, *k, p.w, p.h, static_cast<double>(2 * half + 1) * 0.08, p, b));
+      return Finish(ex, j, out);
     }
 
     // ---- dwarp
     // --------------------------------------------------------------------------------------------------------------------------------------
 
-    OpResult OpDWarpGpu(
+    std::expected<OpResult, std::string> OpDWarpGpu(
       Executor& ex,
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
       Job j;
@@ -359,20 +345,19 @@ namespace faf::editor::gpu
         return OpResult::Unsupported;
       const KernelInfo* ki = FindKernel("filt_dwarp");
       if (ki == nullptr) {
-        err = "kernel filt_dwarp is missing";
-        return OpResult::Failed;
+        return std::unexpected("kernel filt_dwarp is missing");
       }
       std::unique_ptr<Resource> octBuf;
       MaskBind mask;
-      if (!Upload(ex, j, err) || !UploadVec(ex, tab, octBuf, err) || !BindMask(ex, a, mask, err))
-        return OpResult::Failed;
+      FAF_GPU_TRY(Upload(ex, j));
+      FAF_GPU_TRY(UploadVec(ex, tab, octBuf));
+      FAF_GPU_TRY(BindMask(ex, a, mask));
       p.hasMask = mask.has ? 1u : 0u;
       Bindings b;
       b.Srv(1, *octBuf).Srv(2, j.in.R()).Srv(3, mask.R()).Uav(0, j.res.R());
       const double units = k == 0 ? 2.0 * p.iters * p.octaves : (k == 1 ? static_cast<double>(p.octaves) : 1.0);
-      if (!DispatchBands(ex, *ki, p.w, p.h, units, p, b, err))
-        return OpResult::Failed;
-      return Finish(ex, j, out, err);
+      FAF_GPU_TRY(DispatchBands(ex, *ki, p.w, p.h, units, p, b));
+      return Finish(ex, j, out);
     }
 
     // ---- slope, curvature, aspect, hillshade, normal_map (cheap stencils)
@@ -387,37 +372,32 @@ namespace faf::editor::gpu
       return CellsOf(a) >= static_cast<double>(GetPolicy().minCells) * 16.0;
     }
 
-    OpResult RunTerrain(
+    std::expected<OpResult, std::string> RunTerrain(
       Executor& ex,
       Job& j,
       hk::TerrainParams p,
       const double units,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
       const KernelInfo* k = FindKernel("filt_terrain");
       if (k == nullptr) {
-        err = "kernel filt_terrain is missing";
-        return OpResult::Failed;
+        return std::unexpected("kernel filt_terrain is missing");
       }
-      if (!Upload(ex, j, err))
-        return OpResult::Failed;
+      FAF_GPU_TRY(Upload(ex, j));
       p.w = static_cast<std::uint32_t>(j.src->w);
       p.h = static_cast<std::uint32_t>(j.src->h);
       p.cell = j.src->cell;
       Bindings b;
       b.Srv(1, j.in.R()).Uav(0, j.res.R());
-      if (!DispatchBands(ex, *k, p.w, p.h, units, p, b, err))
-        return OpResult::Failed;
-      return Finish(ex, j, out, err);
+      FAF_GPU_TRY(DispatchBands(ex, *k, p.w, p.h, units, p, b));
+      return Finish(ex, j, out);
     }
 
-    OpResult OpSlopeGpu(
+    std::expected<OpResult, std::string> OpSlopeGpu(
       Executor& ex,
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
       Job j;
@@ -431,14 +411,13 @@ namespace faf::editor::gpu
       p.n = static_cast<std::uint32_t>(std::max(1, std::min(16, static_cast<int>(a.p.N("radius", 1)))));
       p.mode = mode == "degrees" ? 0u : 1u;
       p.degK = 180.0f / kPi;
-      return RunTerrain(ex, j, p, 0.05, out, err);
+      return RunTerrain(ex, j, p, 0.05, out);
     }
 
-    OpResult OpCurvatureGpu(
+    std::expected<OpResult, std::string> OpCurvatureGpu(
       Executor& ex,
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
       Job j;
@@ -451,14 +430,13 @@ namespace faf::editor::gpu
       p.gain = static_cast<float>(a.p.N("gain", 10.0));
       p.mode = a.p.N("raw", 0) != 0 ? 1u : 0u;
       p.d2 = static_cast<float>(n) * static_cast<float>(n) * j.src->cell * j.src->cell;
-      return RunTerrain(ex, j, p, 0.05, out, err);
+      return RunTerrain(ex, j, p, 0.05, out);
     }
 
-    OpResult OpAspectGpu(
+    std::expected<OpResult, std::string> OpAspectGpu(
       Executor& ex,
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
       Job j;
@@ -476,14 +454,13 @@ namespace faf::editor::gpu
       p.dirz = static_cast<float>(std::sin(ang));
       p.flatK = std::max(1e-6f, static_cast<float>(a.p.N("flat", 0.05)));
       p.degK = 180.0f / kPi;
-      return RunTerrain(ex, j, p, 0.06, out, err);
+      return RunTerrain(ex, j, p, 0.06, out);
     }
 
-    OpResult OpHillshadeGpu(
+    std::expected<OpResult, std::string> OpHillshadeGpu(
       Executor& ex,
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
       Job j;
@@ -510,14 +487,13 @@ namespace faf::editor::gpu
       p.dirx = static_cast<float>(std::cos(az));
       p.dirz = static_cast<float>(std::sin(az));
       p.tanAlt = static_cast<float>(std::tan(alt));
-      return RunTerrain(ex, j, p, p.shadows != 0 ? 0.6 : 0.08, out, err);
+      return RunTerrain(ex, j, p, p.shadows != 0 ? 0.6 : 0.08, out);
     }
 
-    OpResult OpNormalMapGpu(
+    std::expected<OpResult, std::string> OpNormalMapGpu(
       Executor& ex,
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
       Job j;
@@ -537,26 +513,23 @@ namespace faf::editor::gpu
       p.cell = src.cell;
       const KernelInfo* k = FindKernel("filt_normal");
       if (k == nullptr) {
-        err = "kernel filt_normal is missing";
-        return OpResult::Failed;
+        return std::unexpected("kernel filt_normal is missing");
       }
       Field fy, fz;
-      if (!Upload(ex, j, err) || !MakeField(ex, src.w, src.h, fy, err) || !MakeField(ex, src.w, src.h, fz, err))
-        return OpResult::Failed;
+      FAF_GPU_TRY(Upload(ex, j));
+      FAF_GPU_TRY(MakeField(ex, src.w, src.h, fy));
+      FAF_GPU_TRY(MakeField(ex, src.w, src.h, fz));
       Bindings b;
       b.Srv(1, j.in.R()).Uav(0, j.res.R()).Uav(1, fy.R()).Uav(2, fz.R());
-      if (!DispatchBands(ex, *k, p.w, p.h, 0.25, p, b, err))
-        return OpResult::Failed;
+      FAF_GPU_TRY(DispatchBands(ex, *k, p.w, p.h, 0.25, p, b));
       Grid gx = NewGrid(j.shape);
       gx.ox = src.ox + shiftUnits; // the result lies where it was computed (as on the CPU)
       gx.oz = src.oz + shiftUnits;
       Grid gy(gx.w, gx.h, gx.cell, gx.ox, gx.oz), gz = gy;
-      if (
-        !DownloadGrid(ex, j.res, gx, err) ||
-        (a.extra != nullptr && (!DownloadGrid(ex, fy, gy, err) || !DownloadGrid(ex, fz, gz, err)))
-      )
-        return OpResult::Failed;
+      FAF_GPU_TRY(DownloadGrid(ex, j.res, gx));
       if (a.extra != nullptr) {
+        FAF_GPU_TRY(DownloadGrid(ex, fy, gy));
+        FAF_GPU_TRY(DownloadGrid(ex, fz, gz));
         (*a.extra)["y"] = std::move(gy);
         (*a.extra)["z"] = std::move(gz);
       }

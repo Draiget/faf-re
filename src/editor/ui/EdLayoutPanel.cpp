@@ -12,6 +12,7 @@
 #include "gpg/core/utils/Logging.h"
 #include "imgui.h"
 
+#include <utility>
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
@@ -381,16 +382,10 @@ namespace faf::editor
     std::vector<std::uint8_t> rgba;
     const LayoutFrame& frame = layout.Frame();
     field::Grid heights;
-    std::string error;
     if (
       mViewHeights && frame.rw > 1 && frame.rh > 1 &&
       BuildLayout(
-        layout,
-        field::Grid(frame.rw, frame.rh, frame.cell, frame.ox, frame.oz),
-        LayoutBuildOptions{},
-        heights,
-        nullptr,
-        error
+        layout, field::Grid(frame.rw, frame.rh, frame.cell, frame.ox, frame.oz), LayoutBuildOptions{}, heights, nullptr
       )
     ) {
       // The heights the drawing makes: the sea blue by depth, the land green to brown to white.
@@ -720,7 +715,7 @@ namespace faf::editor
     };
     const auto shapeCombo = [&](const char* id, LayoutShape* shape) {
       static const char* const kNames[] = {"Ring", "Arc", "Cluster", "Line", "Pairs"};
-      int index = static_cast<int>(*shape);
+      int index = std::to_underlying(*shape);
       RowLabel("Shape");
       ImGui::SetNextItemWidth(-1.0f);
       if (EdCombo(id, &index, kNames, 5)) {
@@ -730,7 +725,7 @@ namespace faf::editor
     };
     if (Section("Starts")) {
       static const char* const kFrom[] = {"The map's start markers", "The bases drawn", "A pattern"};
-      int from = static_cast<int>(s.starts);
+      int from = std::to_underlying(s.starts);
       RowLabel("From");
       ImGui::SetNextItemWidth(-1.0f);
       if (EdCombo("##startsfrom", &from, kFrom, 3)) {
@@ -739,7 +734,7 @@ namespace faf::editor
       }
       if (s.starts == LayoutStartMode::Pattern) {
         static const char* const kPatterns[] = {"Ring", "Corners", "Two sides", "Line"};
-        int pattern = static_cast<int>(s.pattern);
+        int pattern = std::to_underlying(s.pattern);
         RowLabel("Pattern");
         ImGui::SetNextItemWidth(-1.0f);
         if (EdCombo("##startspattern", &pattern, kPatterns, 4)) {
@@ -828,13 +823,13 @@ namespace faf::editor
     if (path.empty()) {
       return "Type the picture's file first.";
     }
-    HeightImage image;
-    std::string error;
     HeightReadOptions read;
     read.channel = std::clamp(mPicture.channel, 0, 4);
-    if (!ReadHeightImageWith(std::filesystem::path(path), 0, 0, read, image, error)) {
-      return "The picture couldn't be read: " + error;
+    const auto picture = ReadHeightImageWith(std::filesystem::path(path), 0, 0, read);
+    if (!picture) {
+      return "The picture couldn't be read: " + picture.error();
     }
+    const HeightImage& image = *picture;
     std::vector<float> grey(image.words.size());
     for (std::size_t k = 0; k < grey.size(); ++k) {
       grey[k] = static_cast<float>(image.words[k]) / 65535.0f;

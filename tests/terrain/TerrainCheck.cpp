@@ -25,6 +25,7 @@
 #include <cstdlib>
 #include <fstream>
 #include <memory>
+#include <print>
 #include <string>
 
 #include "gpg/core/containers/String.h"
@@ -171,7 +172,7 @@ namespace
     const char* const message
   )
   {
-    std::printf("TERRAINCHECK FATAL %s\n", message != nullptr ? message : "engine Die()");
+    std::println("TERRAINCHECK FATAL {}", message != nullptr ? message : "engine Die()");
     EndProcess(kExitFatal);
   }
 
@@ -252,17 +253,17 @@ TEST(
       verdict = diffs.empty() ? "same" : "DIFF" + diffs;
       differences += diffs.empty() ? 0 : 1;
     }
-    std::printf(
-      "TERRAINCHECK %s %ux%u terrain-end=%llu/%llu %s\n",
-      verdict.c_str(),
+    std::println(
+      "TERRAINCHECK {} {}x{} terrain-end={}/{} {}",
+      verdict,
       client.width,
       client.height,
       static_cast<unsigned long long>(client.terrainEnd),
       static_cast<unsigned long long>(headless.terrainEnd),
-      path.c_str()
+      path
     );
   }
-  std::printf("TERRAINCHECK maps=%d differences=%d\n", maps, differences);
+  std::println("TERRAINCHECK maps={} differences={}", maps, differences);
   EXPECT_GT(maps, 0) << "the list names no map";
 }
 
@@ -278,7 +279,7 @@ int main(
   fa::vector<fa::string> mapsArgs;
   if (moho::CFG_GetArgOption("--maps", 1, &mapsArgs) && !mapsArgs.empty()) {
     if (!moho::CFG_GetArgOption("/init", 1, nullptr)) {
-      std::printf("usage: faf_terrain_check --maps <list> /init <init.lua> [/log <file>]\n");
+      std::println("usage: faf_terrain_check --maps <list> /init <init.lua> [/log <file>]");
       return 2;
     }
     gMapList = mapsArgs[0].c_str();
@@ -289,7 +290,7 @@ int main(
     moho::PLAT_Init();
     static TerrainCheckApp app;
     if (!app.Init()) {
-      std::printf("TERRAINCHECK FATAL app init\n");
+      std::println("TERRAINCHECK FATAL app init");
       EndProcess(kExitFatal);
     }
     platform::SetX87PrecisionControl(_PC_24);

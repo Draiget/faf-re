@@ -36,7 +36,11 @@
 #include <cstdint>
 #include <limits>
 
+#include "platform/PlatformDefines.h"
+
+#if FAFRE_ARCH_X86 || FAFRE_ARCH_X64
 #include <emmintrin.h>
+#endif
 
 namespace fa::libm
 {
@@ -55,23 +59,31 @@ namespace fa::libm
       return std::bit_cast<std::uint64_t>(value);
     }
 
-    /// The correctly rounded square root (`sqrtsd`): a library sqrt on x86 can be an x87
-    /// `fsqrt` that rounds under the caller's precision control.
+    /// The correctly rounded square root (`sqrtsd`; ARM64's `fsqrt d` is IEEE's too): a
+    /// library sqrt on x86 can be an x87 `fsqrt` that rounds under the caller's precision
+    /// control.
     [[nodiscard]] double Sqrt(
       const double value
     ) noexcept
     {
+#if FAFRE_ARCH_X86 || FAFRE_ARCH_X64
       return _mm_cvtsd_f64(_mm_sqrt_sd(_mm_setzero_pd(), _mm_set_sd(value)));
+#else
+      return __builtin_sqrt(value);
+#endif
     }
 
-    /// The quiet NaN `(x - x) / (x - x)` gives: `x` itself for a NaN, the hardware's default
-    /// NaN otherwise (musl's __math_invalid).
+    /// The quiet NaN `(x - x) / (x - x)` gives on x86: `x` itself (quieted) for a NaN, x86's
+    /// default NaN (negative, 0xFFF8000000000000) otherwise (musl's __math_invalid). ARM64's
+    /// default NaN is positive, so the x86 one is spelled out.
     [[nodiscard]] double Invalid(
       const double x
     ) noexcept
     {
-      const double difference = x - x;
-      return difference / difference;
+      if (x != x) {
+        return x + x;
+      }
+      return AsDouble(0xFFF8000000000000ull);
     }
 
     constexpr int kExpTableBits = 7;

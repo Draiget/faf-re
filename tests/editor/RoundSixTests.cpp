@@ -149,8 +149,8 @@ namespace
                                 "  { id = 'empty', name = 'No layers', layers = { } },\n"
                                 "}\n";
     std::vector<StrataTheme> themes;
-    std::string error;
-    ASSERT_TRUE(ParseStrataThemes(shipped, "Themes", themes, error)) << error;
+    auto read = ParseStrataThemes(shipped, "Themes", themes);
+    ASSERT_TRUE(read) << read.error();
     ASSERT_EQ(themes.size(), 1U) << "a theme without layers is left out";
     EXPECT_EQ(themes[0].layers.size(), 2U);
     EXPECT_EQ(themes[0].layers.at(4).normal, "/env/b_normal.dds");
@@ -158,7 +158,8 @@ namespace
     themes[0].id = StrataThemeId("My Theme 2");
     EXPECT_EQ(themes[0].id, "user_my_theme_2");
     std::vector<StrataTheme> back;
-    ASSERT_TRUE(ParseStrataThemes(WriteStrataThemes(themes), "UserThemes", back, error)) << error;
+    read = ParseStrataThemes(WriteStrataThemes(themes), "UserThemes", back);
+    ASSERT_TRUE(read) << read.error();
     ASSERT_EQ(back.size(), 1U);
     EXPECT_EQ(back[0].id, "user_my_theme_2");
     EXPECT_EQ(back[0].layers.at(4).albedo, "/env/b_albedo.dds");
@@ -180,8 +181,8 @@ namespace
     }
     std::fclose(file);
     std::vector<StrataTheme> themes;
-    std::string error;
-    ASSERT_TRUE(ParseStrataThemes(text, "Themes", themes, error)) << error;
+    auto read = ParseStrataThemes(text, "Themes", themes);
+    ASSERT_TRUE(read) << read.error();
     EXPECT_EQ(themes.size(), 70U);
 #else
     GTEST_SKIP() << "no data path";

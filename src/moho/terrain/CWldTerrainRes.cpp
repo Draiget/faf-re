@@ -1345,7 +1345,7 @@ namespace moho
     }
 
     gpg::MemBuffer<char> encodedTexture{};
-    fa::string imageFormatName{"", std::size_t{0}};
+    fa::string imageFormatName{"", 0uz};
 
     // 0x00890B21: the return value is discarded - the call only forces the D3D
     // device online before the GAL singleton is queried.

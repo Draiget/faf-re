@@ -118,9 +118,9 @@ namespace
 
   struct ZipFileEntrySharedDeleter
   {
-    void operator()(
+    static void operator()(
       moho::CZipFileEntry* const entry
-    ) const noexcept
+    ) noexcept
     {
       if (entry != nullptr) {
         entry->mName.tidy(true, 0U);
@@ -636,7 +636,7 @@ namespace moho
     // Engine addition: the binary keeps every file it decompressed for the whole session, so a texture's
     // bytes stay after its upload and a mesh file's after its geometry is built. On x64 a second read
     // decompresses again; x86 keeps the original behaviour.
-#if defined(_M_IX86)
+#if FAFRE_ARCH_X86
     bool gKeepEntryData = true;
 #else
     bool gKeepEntryData = false;

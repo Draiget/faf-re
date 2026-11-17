@@ -8,6 +8,7 @@
 
 #include <cstdio>
 #include <fstream>
+#include <print>
 #include <sstream>
 
 namespace
@@ -62,8 +63,8 @@ crazyrushOneMexes = {}
   )
   {
     AdaptiveTables tables;
-    std::string error;
-    ASSERT_TRUE(faf::editor::ParseAdaptiveTables(kSample, tables, error)) << error;
+    auto read = faf::editor::ParseAdaptiveTables(kSample, tables);
+    ASSERT_TRUE(read) << read.error();
     EXPECT_EQ(tables.maxPlayers, 4);
     ASSERT_EQ(tables.mexArmy.size(), 4U);
     EXPECT_EQ(tables.mexArmy[0], (std::vector<std::string>{"Mass 01", "Mass 02", "Mass 03"}));
@@ -84,13 +85,13 @@ crazyrushOneMexes = {}
   )
   {
     AdaptiveTables tables;
-    std::string error;
-    ASSERT_TRUE(faf::editor::ParseAdaptiveTables(kSample, tables, error));
+    ASSERT_TRUE(faf::editor::ParseAdaptiveTables(kSample, tables));
     // Every table the script reads is there or appended; those already there stay as written.
     const std::string out = faf::editor::WithAdaptiveTables(kSample, tables);
     EXPECT_EQ(out.substr(0, std::string(kSample).size()), kSample);
     AdaptiveTables back;
-    ASSERT_TRUE(faf::editor::ParseAdaptiveTables(out, back, error)) << error;
+    auto read = faf::editor::ParseAdaptiveTables(out, back);
+    ASSERT_TRUE(read) << read.error();
     EXPECT_EQ(back.mexArmy, tables.mexArmy);
     EXPECT_EQ(back.forwardCrazyrush, tables.forwardCrazyrush);
   }
@@ -101,8 +102,7 @@ crazyrushOneMexes = {}
   )
   {
     AdaptiveTables tables;
-    std::string error;
-    ASSERT_TRUE(faf::editor::ParseAdaptiveTables(kSample, tables, error));
+    ASSERT_TRUE(faf::editor::ParseAdaptiveTables(kSample, tables));
     tables.mexArmy[2] = {"Mass 11", "Mass 5"};
     const std::string out = faf::editor::WithAdaptiveTables(kSample, tables);
     EXPECT_NE(out.find("{11,'5'}"), std::string::npos);
@@ -110,7 +110,8 @@ crazyrushOneMexes = {}
     EXPECT_NE(out.find("myOwnTable = { 'keep', 'me' } -- the mapper's own"), std::string::npos);
     EXPECT_NE(out.find("middleMexes = {{7,8},{9},{'9b'}}"), std::string::npos);
     AdaptiveTables back;
-    ASSERT_TRUE(faf::editor::ParseAdaptiveTables(out, back, error)) << error;
+    auto read = faf::editor::ParseAdaptiveTables(out, back);
+    ASSERT_TRUE(read) << read.error();
     EXPECT_EQ(back.mexArmy, tables.mexArmy);
     EXPECT_EQ(back.hydroArmy, tables.hydroArmy);
   }
@@ -134,8 +135,8 @@ crazyrushOneMexes = {}
   )
   {
     AdaptiveTables tables;
-    std::string error;
-    ASSERT_TRUE(faf::editor::ParseAdaptiveTables(kGenerated, tables, error)) << error;
+    auto read = faf::editor::ParseAdaptiveTables(kGenerated, tables);
+    ASSERT_TRUE(read) << read.error();
     // One army changed: only its row is written; the header, the alignment, the comment and `00` stay as they are.
     tables.mexArmy[0] = {"Mass 16", "Mass 18"};
     const std::string out = faf::editor::WithAdaptiveTables(kGenerated, tables);
@@ -158,18 +159,19 @@ crazyrushOneMexes = {}
   )
   {
     AdaptiveTables tables;
-    std::string error;
-    ASSERT_TRUE(faf::editor::ParseAdaptiveTables(kGenerated, tables, error)) << error;
+    auto read = faf::editor::ParseAdaptiveTables(kGenerated, tables);
+    ASSERT_TRUE(read) << read.error();
     // A fourth army: its row aligned as the last one is.
     tables.maxPlayers = 4;
     tables.mexArmy.push_back({"Mass 30"});
     const std::string added = faf::editor::WithAdaptiveTables(kGenerated, tables);
     EXPECT_NE(added.find("                    {00,01},\n                    {30}}\n"), std::string::npos) << added;
     AdaptiveTables back;
-    ASSERT_TRUE(faf::editor::ParseAdaptiveTables(added, back, error)) << error;
+    read = faf::editor::ParseAdaptiveTables(added, back);
+    ASSERT_TRUE(read) << read.error();
     EXPECT_EQ(back.mexArmy, tables.mexArmy);
     // Down to two armies: the third row and its separator go.
-    ASSERT_TRUE(faf::editor::ParseAdaptiveTables(kGenerated, tables, error));
+    ASSERT_TRUE(faf::editor::ParseAdaptiveTables(kGenerated, tables));
     tables.maxPlayers = 2;
     tables.mexArmy.resize(2);
     const std::string dropped = faf::editor::WithAdaptiveTables(kGenerated, tables);
@@ -192,8 +194,8 @@ crazyrushOneMexes = {}
     read << in.rdbuf();
     const std::string text = read.str();
     AdaptiveTables tables;
-    std::string error;
-    ASSERT_TRUE(faf::editor::ParseAdaptiveTables(text, tables, error)) << error;
+    auto parsed = faf::editor::ParseAdaptiveTables(text, tables);
+    ASSERT_TRUE(parsed) << parsed.error();
     EXPECT_EQ(faf::editor::WithAdaptiveTables(text, tables), text); // nothing changed: the same bytes
     tables.mexArmy[2].pop_back();
     const std::string out = faf::editor::WithAdaptiveTables(text, tables);
@@ -210,7 +212,7 @@ crazyrushOneMexes = {}
     }
     EXPECT_EQ(differ, 1);
     EXPECT_EQ(text.size() - out.size(), 3u); // ",07" gone
-    std::printf("%d lines, %d changed\n", lines, differ);
+    std::println("{} lines, {} changed", lines, differ);
   }
 
   TEST(
@@ -225,8 +227,8 @@ crazyrushOneMexes = {}
     tables.options = {{"coreMexes", {{"Mass 03"}, {"Mass 04"}}}};
     const std::string out = faf::editor::WithAdaptiveTables("", tables);
     AdaptiveTables back;
-    std::string error;
-    ASSERT_TRUE(faf::editor::ParseAdaptiveTables(out, back, error)) << error;
+    auto read = faf::editor::ParseAdaptiveTables(out, back);
+    ASSERT_TRUE(read) << read.error();
     EXPECT_EQ(back.maxPlayers, 2);
     EXPECT_EQ(back.mexArmy, tables.mexArmy);
     // Every option table the script reads is written; the untouched ones as one empty group.
@@ -273,8 +275,8 @@ crazyrushOneMexes = {}
     tables.mexArmy = {{"Mass 08"}};
     const std::string out = faf::editor::WithAdaptiveTables("", tables);
     AdaptiveTables back;
-    std::string error;
-    ASSERT_TRUE(faf::editor::ParseAdaptiveTables(out, back, error)) << error;
+    auto read = faf::editor::ParseAdaptiveTables(out, back);
+    ASSERT_TRUE(read) << read.error();
     ASSERT_EQ(back.mexArmy.size(), 4U);
     EXPECT_EQ(back.mexArmy[0], (std::vector<std::string>{"Mass 08"}));
     EXPECT_EQ(back.hydroArmy.size(), 4U);
@@ -286,9 +288,9 @@ crazyrushOneMexes = {}
   )
   {
     AdaptiveTables tables;
-    std::string error;
-    EXPECT_FALSE(faf::editor::ParseAdaptiveTables("spwnMexArmy = {{1,2}", tables, error));
-    EXPECT_FALSE(error.empty());
+    auto read = faf::editor::ParseAdaptiveTables("spwnMexArmy = {{1,2}", tables);
+    ASSERT_FALSE(read);
+    EXPECT_FALSE(read.error().empty());
   }
 
   // An `_options.lua` in the shape FAF's adaptive maps have: a comment, an option with a brace in its help, ours after

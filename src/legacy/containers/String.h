@@ -500,7 +500,7 @@ namespace fa
       const char ch
     ) noexcept
     {
-      return append(std::size_t{1}, ch);
+      return append(1uz, ch);
     }
 
     /**

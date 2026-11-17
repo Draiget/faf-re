@@ -1,5 +1,6 @@
 ﻿#include "moho/unit/core/EFireStateTypeInfo.h"
 
+#include <utility>
 #include <cstdint>
 #include <typeinfo>
 
@@ -106,10 +107,10 @@ namespace moho
   {
     mPrefix = "FIRESTATE_";
 
-    AddEnum(StripPrefix("FIRESTATE_Mix"), static_cast<std::int32_t>(FIRESTATE_Mix));
-    AddEnum(StripPrefix("FIRESTATE_ReturnFire"), static_cast<std::int32_t>(FIRESTATE_ReturnFire));
-    AddEnum(StripPrefix("FIRESTATE_HoldFire"), static_cast<std::int32_t>(FIRESTATE_HoldFire));
-    AddEnum(StripPrefix("FIRESTATE_HoldGround"), static_cast<std::int32_t>(FIRESTATE_HoldGround));
+    AddEnum(StripPrefix("FIRESTATE_Mix"), std::to_underlying(FIRESTATE_Mix));
+    AddEnum(StripPrefix("FIRESTATE_ReturnFire"), std::to_underlying(FIRESTATE_ReturnFire));
+    AddEnum(StripPrefix("FIRESTATE_HoldFire"), std::to_underlying(FIRESTATE_HoldFire));
+    AddEnum(StripPrefix("FIRESTATE_HoldGround"), std::to_underlying(FIRESTATE_HoldGround));
   }
 
 } // namespace moho

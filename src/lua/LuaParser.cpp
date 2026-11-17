@@ -511,8 +511,10 @@ namespace
   // combination under /EHc even though the throw is exactly what the binary
   // does.
   // ---------------------------------------------------------------------
+#ifdef _MSC_VER
 #pragma warning(push)
 #pragma warning(disable : 4297) // function assumed not to throw but does
+#endif
 
   /**
    * Address: 0x00918120 (FUN_00918120, luaX_token2str)
@@ -617,7 +619,9 @@ namespace
     }
   }
 
+#ifdef _MSC_VER
 #pragma warning(pop)
+#endif
 
   /**
    * What it does:

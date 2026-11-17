@@ -20,6 +20,7 @@
 #include <fstream>
 #include <iterator>
 #include <map>
+#include <print>
 #include <sstream>
 #include <string>
 #include <utility>
@@ -186,7 +187,7 @@ namespace
       " /init " + Quoted(replay.init) + " /nobugreport /nosound /log " + Quoted(LogFolder() / (label + ".log")) +
       extraArguments;
     const SRun run = Play(command);
-    std::printf("%s%s", run.beats.c_str(), run.verdict.c_str());
+    std::print("{}{}", run.beats, run.verdict);
     return run;
   }
 

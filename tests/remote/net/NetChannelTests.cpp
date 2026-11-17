@@ -6,6 +6,8 @@
 // Build: cmake --build --preset clang-x64-release --target faf_netchannel_tests
 // Run:   build\clang-x64-release\tests\remote\faf_netchannel_tests.exe
 
+#include <print>
+#include <utility>
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
@@ -436,9 +438,7 @@ namespace
         return toB.inOrder && toA.inOrder;
       }
     }
-    std::printf(
-      "    stalled: %zu/%zu to B, %zu/%zu to A\n", toB.received, toB.sent.size(), toA.received, toA.sent.size()
-    );
+    std::println("    stalled: {}/{} to B, {}/{} to A", toB.received, toB.sent.size(), toA.received, toA.sent.size());
     return false;
   }
 
@@ -472,10 +472,10 @@ namespace
       const bool ok = RunReliable(pair, 300, 300'000, &doneMs);
       EXPECT_TRUE(ok);
       const ChannelStats& s = pair.a.Stats();
-      std::printf(
-        "    latency %llu ms, jitter %llu, loss %.0f%%, dup %.0f%%: done in %llu ms, %llu datagrams, %llu lost, "
-        "%llu bytes resent (%llu spurious losses, reorder allowance %u datagrams, %u/8 RTT), srtt %.1f ms, "
-        "B dropped %llu duplicates\n",
+      std::println(
+        "    latency {} ms, jitter {}, loss {:.0f}%, dup {:.0f}%: done in {} ms, {} datagrams, {} lost, {} bytes "
+        "resent ({} spurious losses, reorder allowance {} datagrams, {}/8 RTT), srtt {:.1f} ms, B dropped {} "
+        "duplicates",
         static_cast<unsigned long long>(c.latencyMs),
         static_cast<unsigned long long>(c.jitterMs),
         c.loss * 100,
@@ -649,8 +649,8 @@ namespace
     }
     EXPECT_TRUE(intact);
     const double share = static_cast<double>(got.size()) / static_cast<double>(sent.size());
-    std::printf(
-      "    %zu of %zu unreliable messages arrived (%.1f%%) at 20%% loss\n", got.size(), sent.size(), share * 100
+    std::println(
+      "    {} of {} unreliable messages arrived ({:.1f}%) at 20% loss", got.size(), sent.size(), share * 100
     );
     EXPECT_TRUE(share > 0.7 && share < 0.9);
   }
@@ -702,9 +702,9 @@ namespace
     std::uint64_t repeats2 = 0;
     const double plain = LaneDelivery(0, &repeats0);
     const double redundant = LaneDelivery(2, &repeats2);
-    std::printf(
-      "    20%% loss each way, a message every 33 ms: %.1f%% arrive with no repeats, %.2f%% with redundancy 2 "
-      "(%llu repeats)\n",
+    std::println(
+      "    20% loss each way, a message every 33 ms: {:.1f}% arrive with no repeats, {:.2f}% with redundancy 2 ({} "
+      "repeats)",
       plain * 100,
       redundant * 100,
       static_cast<unsigned long long>(repeats2)
@@ -723,7 +723,7 @@ namespace
     for (std::size_t i = 0; i < kKeySize; ++i) {
       key[i] = static_cast<std::uint8_t>(rng());
     }
-    for (const std::size_t payloadSize : {std::size_t{0}, std::size_t{1}, std::size_t{100}, std::size_t{1168}}) {
+    for (const std::size_t payloadSize : {0uz, 1uz, 100uz, 1168uz}) {
       const Bytes payload = RandomBytes(rng, payloadSize);
       Bytes datagram(kHeaderSize + payloadSize + kTagSize);
       DatagramHeader header;
@@ -862,9 +862,9 @@ namespace
       Bytes drop;
       while (pair.b.TakeUnreliable(drop)) {}
     }
-    std::printf(
-      "    keys set at 2.000 s (A) and 2.080 s (B): %zu/%zu and %zu/%zu messages in order, B refused %llu "
-      "unauthenticated, A dropped %llu unreliable that no longer fit\n",
+    std::println(
+      "    keys set at 2.000 s (A) and 2.080 s (B): {}/{} and {}/{} messages in order, B refused {} unauthenticated, A "
+      "dropped {} unreliable that no longer fit",
       toB.received,
       toB.sent.size(),
       toA.received,
@@ -973,9 +973,9 @@ namespace
       pair.Step();
     }
     const ChannelStats& s = pair.a.Stats();
-    std::printf(
-      "    idle 20 s at 80-88 ms RTT: %llu keepalives, %llu ack-only, %llu RTT samples, srtt %.1f ms, var %.1f, min "
-      "%.1f\n",
+    std::println(
+      "    idle 20 s at 80-88 ms RTT: {} keepalives, {} ack-only, {} RTT samples, srtt {:.1f} ms, var {:.1f}, min "
+      "{:.1f}",
       static_cast<unsigned long long>(s.keepalivesSent),
       static_cast<unsigned long long>(s.ackOnlySent),
       static_cast<unsigned long long>(s.rttSamples),
@@ -1013,9 +1013,9 @@ namespace
     const double lost = static_cast<double>(s.datagramsLost) / static_cast<double>(s.datagramsLost + s.datagramsAcked);
     const double inbound = static_cast<double>(pair.b.Stats().inboundMissing) /
       static_cast<double>(pair.b.Stats().inboundMissing + pair.b.Stats().datagramsReceived);
-    std::printf(
-      "    10%% loss each way, 60 s: A counted %.1f%% of its datagrams lost (recent %.1f%%), B saw %.1f%% of A's "
-      "sequences missing, srtt %.1f ms\n",
+    std::println(
+      "    10% loss each way, 60 s: A counted {:.1f}% of its datagrams lost (recent {:.1f}%), B saw {:.1f}% of A's "
+      "sequences missing, srtt {:.1f} ms",
       lost * 100,
       s.lossRecent * 100,
       inbound * 100,
@@ -1064,8 +1064,8 @@ namespace
         );
       }
     }
-    std::printf(
-      "    12 s partition from 1 s: A timed out at %.3f s, B at %.3f s\n", timedOutAtA / 1e6, timedOutAtB / 1e6
+    std::println(
+      "    12 s partition from 1 s: A timed out at {:.3f} s, B at {:.3f} s", timedOutAtA / 1e6, timedOutAtB / 1e6
     );
     // The last arrival is the last keepalive exchange before the cut, at most 250 ms + RTT before it.
     EXPECT_TRUE(timedOutAtA >= 10'700'000 && timedOutAtA <= 11'031'000);
@@ -1095,7 +1095,7 @@ namespace
       }
     }
     const std::uint64_t duringCut = pair.carried - carriedAtCut;
-    std::printf("    8 s partition: %llu bytes sent into it\n", static_cast<unsigned long long>(duringCut));
+    std::println("    8 s partition: {} bytes sent into it", static_cast<unsigned long long>(duringCut));
     // The whole message is in flight at most a handful of times, not once per 50 ms.
     EXPECT_TRUE(duringCut < 12 * big.size());
     Bytes got;
@@ -1163,11 +1163,11 @@ namespace
         while (target.TakeUnreliable(drop)) {}
         EXPECT_TRUE(target.ReliableHeld() <= ChannelConfig{}.receiveWindow);
       }
-      std::printf(
-        "    fuzz (%s): 200000 datagrams, %llu accepted, state %d\n",
+      std::println(
+        "    fuzz ({}): 200000 datagrams, {} accepted, state {}",
         keyed ? "keys set" : "no keys",
         static_cast<unsigned long long>(accepted),
-        static_cast<int>(target.State())
+        std::to_underlying(target.State())
       );
       if (keyed) {
         EXPECT_EQ(accepted, 0); // nothing forged or mutated gets past the tag

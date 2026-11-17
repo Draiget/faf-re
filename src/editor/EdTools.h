@@ -399,7 +399,7 @@ namespace faf::editor
     {
       mTool = 3;
       mWaterMaskPaint = true;
-      mWaterMaskKind = static_cast<int>(mask);
+      mWaterMaskKind = std::to_underlying(mask);
       mWaterMaskValue = value;
       mWaterMaskBrush.radius = radius;
       mWaterMaskBrush.strength = 1.0f;
@@ -2626,7 +2626,7 @@ namespace faf::editor
       LayerConvertOptions& options
     )
     {
-      const std::string key = mBrowsedShader + "|" + std::to_string(static_cast<int>(mConvertOptions.lost)) + "|" +
+      const std::string key = mBrowsedShader + "|" + std::to_string(std::to_underlying(mConvertOptions.lost)) + "|" +
         std::to_string(mConvertOptions.mergeInto) + "|" + (mConvertOptions.arrange ? "1" : "0");
       if (!mShaderBrowserOpen || mBrowsedShader.empty() || key == mConvertPlanKey) {
         return false;
@@ -3206,7 +3206,7 @@ namespace faf::editor
       const float offsetZ
     ) noexcept
     {
-      const int index = found.symmetry == Symmetry::None ? -1 : static_cast<int>(found.symmetry);
+      const int index = found.symmetry == Symmetry::None ? -1 : std::to_underlying(found.symmetry);
       const int turns = found.turns;
       mDetectedSymmetry = index;
       mDetectedMatch = found.matched;
@@ -3398,7 +3398,7 @@ namespace faf::editor
       mChecked = checked;
       mDiffering = differing;
       mLargest = largestWords;
-      mCheckedSymmetry = static_cast<int>(checkedWith.symmetry);
+      mCheckedSymmetry = std::to_underlying(checkedWith.symmetry);
       mCheckedTurns = checkedWith.turns;
     }
 
@@ -3477,7 +3477,7 @@ namespace faf::editor
     float mNoiseRoughness = 0.5f;
     float mPlanePointX[3]{};
     std::vector<TerrainPathPoint> mPathPoints;
-    int mPathMode = static_cast<int>(PathMode::Ramp);
+    int mPathMode = std::to_underlying(PathMode::Ramp);
     float mPathDepth = 4.0f;
     bool mPathClosed = false;
     bool mPathApply = false;

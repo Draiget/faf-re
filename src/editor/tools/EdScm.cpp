@@ -10,13 +10,11 @@
 
 namespace faf::editor
 {
-  bool ParseObj(
-    const std::string& text,
-    ObjMesh& out,
-    std::string& error
+  std::expected<ObjMesh, std::string> ParseObj(
+    const std::string& text
   )
   {
-    out = ObjMesh{};
+    ObjMesh out;
     std::istringstream lines(text);
     std::string line;
     int number = 0;
@@ -84,8 +82,7 @@ namespace faf::editor
             corner.normal = index(word.substr(b + 1), out.normals.size());
           }
           if (corner.position < 0 || corner.position >= static_cast<int>(out.positions.size())) {
-            error = "line " + std::to_string(number) + ": a face names a vertex the file hasn't got";
-            return false;
+            return std::unexpected("line " + std::to_string(number) + ": a face names a vertex the file hasn't got");
           }
           polygon.push_back(corner);
         }
@@ -97,10 +94,9 @@ namespace faf::editor
       }
     }
     if (out.triangles.empty()) {
-      error = "the file has no faces";
-      return false;
+      return std::unexpected("the file has no faces");
     }
-    return true;
+    return out;
   }
 
   namespace
@@ -240,33 +236,30 @@ namespace faf::editor
     return out;
   }
 
-  std::vector<std::uint8_t> ScmFromObj(
+  std::expected<std::vector<std::uint8_t>, std::string> ScmFromObj(
     const ObjMesh& mesh,
     const std::string& boneName,
     const float scale,
-    const std::string& info,
-    std::string& error
+    const std::string& info
   )
   {
     ScmBone root;
     root.name = boneName;
     root.rest = {1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0};
     root.hasRest = true;
-    return ScmFromObjSkinned(mesh, {root}, {}, scale, info, error);
+    return ScmFromObjSkinned(mesh, {root}, {}, scale, info);
   }
 
-  std::vector<std::uint8_t> ScmFromObjSkinned(
+  std::expected<std::vector<std::uint8_t>, std::string> ScmFromObjSkinned(
     const ObjMesh& mesh,
     const std::vector<ScmBone>& bonesIn,
     const std::vector<int>& positionBone,
     const float scale,
-    const std::string& info,
-    std::string& error
+    const std::string& info
   )
   {
     if (bonesIn.empty()) {
-      error = "a model needs a bone";
-      return {};
+      return std::unexpected("a model needs a bone");
     }
     std::vector<ScmBone> bones = bonesIn;
     ScmBindPose(bones);
@@ -318,12 +311,12 @@ namespace faf::editor
       }
     }
     if (vertices.size() > 65535) {
-      error = "the model has " + std::to_string(vertices.size()) + " vertices; a model takes 65535 at most";
-      return {};
+      return std::unexpected(
+        "the model has " + std::to_string(vertices.size()) + " vertices; a model takes 65535 at most"
+      );
     }
     if (indexes.empty()) {
-      error = "the model has no triangles";
-      return {};
+      return std::unexpected("the model has no triangles");
     }
     // Tangents and binormals from the texture coordinates (summed over the faces, then made square to the normal).
     std::vector<std::array<float, 3>> tangents(vertices.size(), std::array<float, 3>{0, 0, 0});

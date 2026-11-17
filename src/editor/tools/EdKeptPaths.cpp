@@ -909,23 +909,19 @@ namespace faf::editor
     return c;
   }
 
-  bool BuildKeptPath(
+  std::expected<KeptPathPlan, std::string> BuildKeptPath(
     const KeptPath& path,
     const KeptPathGround& G,
     const KeptPathResult* old,
-    const bool wantMasks,
-    KeptPathPlan& plan,
-    std::string& error
+    const bool wantMasks
   )
   {
-    plan = KeptPathPlan{};
+    KeptPathPlan plan;
     if (G.words == nullptr || G.width < 2 || G.height < 2) {
-      error = "no map";
-      return false;
+      return std::unexpected("no map");
     }
     if (path.points.empty()) {
-      error = "the path has no points";
-      return false;
+      return std::unexpected("the path has no points");
     }
     // The path and its symmetry images, sampled.
     std::vector<KeptPath> set{path};
@@ -963,8 +959,7 @@ namespace faf::editor
     const int x1 = std::clamp(static_cast<int>(std::ceil(bx1)), 0, G.width - 1);
     const int z1 = std::clamp(static_cast<int>(std::ceil(bz1)), 0, G.height - 1);
     if (x1 <= x0 || z1 <= z0) {
-      error = "the path lies outside the map";
-      return false;
+      return std::unexpected("the path lies outside the map");
     }
     const int w = x1 - x0 + 1;
     const int h = z1 - z0 + 1;
@@ -1012,8 +1007,8 @@ namespace faf::editor
       args.p.num["strength"] = Clamp(path.strength, 0.0f, 1.0f);
       args.in["a"] = cur;
       field::Grid out;
-      if (!field::RunOp("path_shape", args, out, error)) {
-        return false;
+      if (const auto ran = field::RunOp("path_shape", args, out); !ran) {
+        return std::unexpected(ran.error());
       }
       cur = Shared(std::move(out));
     }
@@ -1027,8 +1022,8 @@ namespace faf::editor
       args.in["a"] = d;
       args.p.num["radius"] = blend;
       field::Grid soft;
-      if (!field::RunOp("blur", args, soft, error)) {
-        return false;
+      if (const auto ran = field::RunOp("blur", args, soft); !ran) {
+        return std::unexpected(ran.error());
       }
       auto next = std::make_shared<field::Grid>(base);
       for (std::size_t k = 0; k < next->v.size(); ++k) {
@@ -1053,15 +1048,15 @@ namespace faf::editor
       args.p.str["kind"] = kind;
       args.p.num["soft"] = soft;
       args.in["like"] = like;
-      return field::RunOp("path_mask", args, out, error);
+      return field::RunOp("path_mask", args, out);
     };
     if (path.erosion > 0) {
       // Bank erosion: thermal passes over the whole reach (cut walls slump to a natural talus).
       auto reach = std::make_shared<field::Grid>(w, h, 1.0f, static_cast<float>(x0), static_cast<float>(z0));
       for (std::size_t i = 0; i < set.size(); ++i) {
         field::Grid mk;
-        if (!reachMask(set[i], samples[i], "reach", 3.0f, baseShared, mk)) {
-          return false;
+        if (const auto made = reachMask(set[i], samples[i], "reach", 3.0f, baseShared, mk); !made) {
+          return std::unexpected(made.error());
         }
         for (std::size_t k = 0; k < reach->v.size(); ++k) {
           reach->v[k] = std::max(reach->v[k], mk.v[k]);
@@ -1074,8 +1069,8 @@ namespace faf::editor
       args.p.num["talus"] = 0.5;
       args.p.num["rate"] = 0.5;
       field::Grid eroded;
-      if (!field::RunOp("thermal", args, eroded, error)) {
-        return false;
+      if (const auto ran = field::RunOp("thermal", args, eroded); !ran) {
+        return std::unexpected(ran.error());
       }
       cur = Shared(std::move(eroded));
     }
@@ -1111,8 +1106,10 @@ namespace faf::editor
         field::Grid mask(G.width, G.height, 1.0f, 0.0f, 0.0f);
         for (std::size_t i = 0; i < set.size(); ++i) {
           field::Grid mk;
-          if (!reachMask(set[i], samples[i], kKinds[static_cast<int>(e.kind)], 1.0f, like, mk)) {
-            return false;
+          if (
+            const auto made = reachMask(set[i], samples[i], kKinds[static_cast<int>(e.kind)], 1.0f, like, mk); !made
+          ) {
+            return std::unexpected(made.error());
           }
           for (std::size_t k = 0; k < mask.v.size(); ++k) {
             mask.v[k] = std::max(mask.v[k], mk.v[k]);
@@ -1121,7 +1118,7 @@ namespace faf::editor
         plan.masks.emplace_back(e, std::move(mask));
       }
     }
-    return true;
+    return plan;
   }
 
   std::map<int, std::vector<float>> ApplyKeptPathMasks(
@@ -1360,19 +1357,17 @@ namespace faf::editor
     return WriteJsonTree(root) + "\n";
   }
 
-  bool ReadKeptPaths(
-    const std::string& text,
-    KeptPathSet& set,
-    std::string& error
+  std::expected<KeptPathSet, std::string> ReadKeptPaths(
+    const std::string& text
   )
   {
-    JsonTree root;
-    if (!ParseJsonTree(text, root, error)) {
-      return false;
+    const auto parsed = ParseJsonTree(text);
+    if (!parsed) {
+      return std::unexpected(parsed.error());
     }
+    const JsonTree& root = *parsed;
     if (root.kind != JsonTree::Kind::Object) {
-      error = "not a paths file";
-      return false;
+      return std::unexpected("not a paths file");
     }
     KeptPathSet out;
     out.nextId = std::max(1, root.Int("nextId", 1));
@@ -1448,7 +1443,6 @@ namespace faf::editor
         out.paths.push_back(std::move(p));
       }
     }
-    set = std::move(out);
-    return true;
+    return out;
   }
 } // namespace faf::editor

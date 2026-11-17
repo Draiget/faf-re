@@ -21,7 +21,7 @@
 #                      (apt.llvm.org, llvm-toolchain-jammy-18), "Ubuntu clang
 #                      version 18.1.8"; libc++ and libc++abi linked statically
 #                      (plan D9); llvm-ar and llvm-ranlib for the profile-guided
-#                      preset (cmake/FafLinux.cmake); the profile runtime for
+#                      preset (cmake/FafPosix.cmake); the profile runtime for
 #                      tools/pgo/record.sh, the sanitizer runtime for the
 #                      linux-clang-x64-asan preset
 #   cmake              3.28.3 (Kitware's release; 22.04 has 3.22)
