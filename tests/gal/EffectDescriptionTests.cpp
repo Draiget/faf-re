@@ -72,7 +72,7 @@ vector Direction;
 float Sum( float a, float b );
 struct CirrusLayer { float2 scroll; float4 colour : COLOR0; float weights[3]; };
 CirrusLayer aCirrus;
-using CirrusAlias = CirrusLayer;
+typedef CirrusLayer CirrusAlias;
 CirrusAlias bCirrus;
 )fx";
 } // namespace
