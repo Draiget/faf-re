@@ -25,6 +25,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iterator>
+#include <ranges>
 
 namespace faf::editor
 {
@@ -1111,14 +1112,14 @@ namespace faf::editor
     if (!facts.areas.empty() && !facts.armies.empty() && ImGui::TreeNode("Define from area")) {
       mDefineArea = std::clamp(mDefineArea, 0, static_cast<int>(facts.areas.size()) - 1);
       mDefineArmy = std::clamp(mDefineArmy, 0, static_cast<int>(facts.armies.size()) - 1);
-      std::vector<const char*> areas;
-      for (const std::string& a : facts.areas) {
-        areas.push_back(a.c_str());
-      }
-      std::vector<const char*> armies;
-      for (const std::string& a : facts.armies) {
-        armies.push_back(a.c_str());
-      }
+      auto areas = facts.areas | std::views::transform([&](const std::string& a) {
+        return a.c_str();
+      }) |
+        std::ranges::to<std::vector<const char*>>();
+      auto armies = facts.armies | std::views::transform([&](const std::string& a) {
+        return a.c_str();
+      }) |
+        std::ranges::to<std::vector<const char*>>();
       ImGui::SetNextItemWidth(Em(120.0f));
       ImGui::InputText("Name##definebase", mDefineName, sizeof(mDefineName));
       ImGui::SetNextItemWidth(Em(120.0f));

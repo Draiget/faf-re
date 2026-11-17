@@ -4,6 +4,7 @@
 #include <array>
 #include <cstdlib>
 #include <iterator>
+#include <ranges>
 
 #include "headless/ReplayEffectDump.h"
 #include "headless/ReplayPoseDump.h"
@@ -663,11 +664,10 @@ namespace faf::headless
         if (mPoseLaneBytes[army].empty()) {
           continue;
         }
-        std::vector<double> lane;
-        lane.reserve(mPoseLaneBytes[army].size());
-        for (const std::uint32_t bytes : mPoseLaneBytes[army]) {
-          lane.push_back(static_cast<double>(bytes) * 10.0 / 1024.0);
-        }
+        auto lane = mPoseLaneBytes[army] | std::views::transform([&](const std::uint32_t bytes) {
+          return static_cast<double>(bytes) * 10.0 / 1024.0;
+        }) |
+          std::ranges::to<std::vector<double>>();
         summary += "\n  pose lane view " + std::to_string(army) + ": " + Distribution(lane, "KB/s");
       }
     }

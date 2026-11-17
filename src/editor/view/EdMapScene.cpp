@@ -26,6 +26,7 @@
 #include <cstring>
 
 #include <windowsx.h>
+#include <ranges>
 
 #include "editor/EdTools.h"
 #include "moho/misc/StartupHelpers.h"
@@ -4780,11 +4781,10 @@ namespace faf::editor
     ReseatOnGround(rects);
     // In front of a play: the same heights into it (its rendered terrain now, its sim at its next beat; WPE.40).
     if (mOverPlay && mSessionMap != nullptr) {
-      std::vector<HeightRect> live;
-      live.reserve(rects.size());
-      for (const SampleRect& rect : rects) {
-        live.push_back({rect.x0, rect.z0, rect.x1, rect.z1});
-      }
+      auto live = rects | std::views::transform([&](const SampleRect& rect) {
+        return HeightRect{rect.x0, rect.z0, rect.x1, rect.z1};
+      }) |
+        std::ranges::to<std::vector<HeightRect>>();
       LiveHeights(*mSessionMap, *field, live);
     }
   }

@@ -38,6 +38,7 @@
 #include "gpg/core/utils/Logging.h"
 #include "moho/sim/CWldMap.h"
 #include <cmath>
+#include <ranges>
 #include "editor/doc/EdDocument.h"
 #include "editor/tools/EdMarkers.h"
 #include "imgui.h"
@@ -651,10 +652,10 @@ namespace faf::editor
           );
           // A click on the type's name selects all its markers.
           if (ImGui::IsItemClicked() && !ImGui::IsItemToggledOpen()) {
-            std::vector<std::string> names;
-            for (const std::size_t i : list) {
-              names.push_back(markers[i].name);
-            }
+            auto names = list | std::views::transform([&](const std::size_t i) {
+              return markers[i].name;
+            }) |
+              std::ranges::to<std::vector<std::string>>();
             mTools.AskMarkerSelect(std::move(names), io.KeyCtrl);
           }
           if (typeOpen) {

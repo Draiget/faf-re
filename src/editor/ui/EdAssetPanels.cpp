@@ -17,6 +17,7 @@
 
 #include <cmath>
 #include <cstdio>
+#include <ranges>
 
 namespace faf::editor
 {
@@ -343,10 +344,10 @@ namespace faf::editor
       }
       if (Section("Patches", false)) {
         int remove = -1;
-        std::vector<std::string> names;
-        for (const edmesh::Material& material : mesh->materials) {
-          names.push_back(material.name);
-        }
+        auto names = mesh->materials | std::views::transform([&](const edmesh::Material& material) {
+          return material.name;
+        }) |
+          std::ranges::to<std::vector<std::string>>();
         for (std::size_t p = 0; p < mesh->patches.size(); ++p) {
           edmesh::Patch& patch = mesh->patches[p];
           ImGui::PushID(static_cast<int>(p));

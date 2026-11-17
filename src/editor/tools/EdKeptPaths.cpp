@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <cmath>
 #include <memory>
+#include <ranges>
 
 namespace faf::editor
 {
@@ -930,10 +931,10 @@ namespace faf::editor
         set.push_back(KeptPathImageOf(path, image));
       }
     }
-    std::vector<KeptPathSamples> samples;
-    for (const KeptPath& p : set) {
-      samples.push_back(SampleKeptPath(p, kStep));
-    }
+    auto samples = set | std::views::transform([&](const KeptPath& p) {
+      return SampleKeptPath(p, kStep);
+    }) |
+      std::ranges::to<std::vector<KeptPathSamples>>();
     const float blend = Clamp(path.blend, 0.0f, 80.0f);
     float bx0 = 1e9f;
     float bz0 = 1e9f;

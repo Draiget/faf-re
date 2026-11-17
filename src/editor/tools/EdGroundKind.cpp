@@ -6,6 +6,7 @@
 #include <cmath>
 #include <string>
 #include <vector>
+#include <ranges>
 
 namespace faf::editor
 {
@@ -161,10 +162,10 @@ namespace faf::editor
     const std::vector<const Token*>& SortedTokens()
     {
       static const std::vector<const Token*> sorted = [] {
-        std::vector<const Token*> list;
-        for (const Token& token : kTokens) {
-          list.push_back(&token);
-        }
+        auto list = kTokens | std::views::transform([&](const Token& token) {
+          return &token;
+        }) |
+          std::ranges::to<std::vector<const Token*>>();
         std::stable_sort(list.begin(), list.end(), [](const Token* a, const Token* b) {
           return std::char_traits<char>::length(a->text) > std::char_traits<char>::length(b->text);
         });

@@ -23,6 +23,7 @@
 #include <cctype>
 #include <algorithm>
 #include <cstdio>
+#include <ranges>
 
 #include "imgui.h"
 
@@ -3922,10 +3923,10 @@ namespace faf::editor
       ImGui::TextDisabled("No themes.");
     } else {
       mStrataIndex = std::clamp(mStrataIndex, 0, static_cast<int>(mStrataLabels.size()) - 1);
-      std::vector<const char*> names;
-      for (const std::string& label : mStrataLabels) {
-        names.push_back(label.c_str());
-      }
+      auto names = mStrataLabels | std::views::transform([&](const std::string& label) {
+        return label.c_str();
+      }) |
+        std::ranges::to<std::vector<const char*>>();
       ImGui::BeginDisabled(mThemeTrying);
       ImGui::SetNextItemWidth(-1.0f);
       (void)EdCombo("##strata", &mStrataIndex, names.data(), static_cast<int>(names.size()));

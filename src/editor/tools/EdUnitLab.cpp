@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <ranges>
 
 namespace faf::editor
 {
@@ -71,19 +72,19 @@ namespace faf::editor
 
   std::vector<std::string> UnitLabPaths()
   {
-    std::vector<std::string> out;
-    for (const FieldDef& f : kUnitFields) {
-      out.emplace_back(f.key);
-    }
+    auto out = kUnitFields | std::views::transform([&](const FieldDef& f) {
+      return std::string(f.key);
+    }) |
+      std::ranges::to<std::vector<std::string>>();
     return out;
   }
 
   std::vector<std::string> UnitLabWeaponFields()
   {
-    std::vector<std::string> out;
-    for (const FieldDef& f : kWeaponFields) {
-      out.emplace_back(f.key);
-    }
+    auto out = kWeaponFields | std::views::transform([&](const FieldDef& f) {
+      return std::string(f.key);
+    }) |
+      std::ranges::to<std::vector<std::string>>();
     return out;
   }
 

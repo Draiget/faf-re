@@ -4,6 +4,7 @@
 #include <cctype>
 #include <cstdlib>
 #include <optional>
+#include <ranges>
 
 namespace faf::editor
 {
@@ -177,12 +178,10 @@ namespace faf::editor
       const bool hydro
     )
     {
-      std::vector<std::vector<std::string>> groups;
-      for (const Value& item : table.items) {
-        groups.push_back(
-          item.isTable ? Names(item, hydro) : std::vector<std::string>{AdaptiveMarkerName(item.atom, hydro)}
-        );
-      }
+      auto groups = table.items | std::views::transform([&](const Value& item) {
+        return item.isTable ? Names(item, hydro) : std::vector<std::string>{AdaptiveMarkerName(item.atom, hydro)};
+      }) |
+        std::ranges::to<std::vector<std::vector<std::string>>>();
       return groups;
     }
 

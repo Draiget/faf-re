@@ -41,6 +41,7 @@
 #include <vector>
 
 #include <memory>
+#include <ranges>
 #include "gpg/core/containers/String.h"
 #include "gpg/core/diagnostics/BuildInfo.h"
 #include "gpg/core/utils/Logging.h"
@@ -2584,10 +2585,10 @@ namespace
     std::int32_t pausedBy = -1;
     faf::server::CArmyBoard armyBoard; // plan WP17.15: each army's state for `armies`
     const auto boardPlayers = [&end]() {
-      std::vector<faf::server::CArmyBoard::SPlayer> players;
-      for (const SMatchPlayer& player : end.players) {
-        players.push_back({player.name, player.team, player.human, player.uid, player.result});
-      }
+      auto players = end.players | std::views::transform([&](const SMatchPlayer& player) {
+        return faf::server::CArmyBoard::SPlayer{player.name, player.team, player.human, player.uid, player.result};
+      }) |
+        std::ranges::to<std::vector<faf::server::CArmyBoard::SPlayer>>();
       return players;
     };
     // The operator's (SIGUSR1, control API) pause or resume asked of the driver, until the game is so: a beat or more.

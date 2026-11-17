@@ -19,6 +19,7 @@
 #include <cstdio>
 #include <fstream>
 #include <sstream>
+#include <ranges>
 
 namespace faf::editor
 {
@@ -340,10 +341,10 @@ namespace faf::editor
       }
       lua_pushvalue(L, 4);
       const int ref = luaL_ref(L, LUA_REGISTRYINDEX);
-      std::vector<std::string> keys;
-      for (const MissionParam& p : type.params) {
-        keys.push_back(p.key);
-      }
+      auto keys = type.params | std::views::transform([&](const MissionParam& p) {
+        return p.key;
+      }) |
+        std::ranges::to<std::vector<std::string>>();
       const std::string title = type.title;
       Mod* const owner = mod;
       type.emit = [owner, ref, keys, title](const MissionValues& values, const MissionEmit&) {

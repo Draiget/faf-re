@@ -9,6 +9,7 @@
 
 #include <algorithm>
 #include <cstdio>
+#include <ranges>
 
 namespace faf::editor
 {
@@ -368,10 +369,10 @@ namespace faf::editor
           current = static_cast<int>(i);
         }
       }
-      std::vector<const char*> labels;
-      for (const auto& p : presets) {
-        labels.push_back(p.label);
-      }
+      auto labels = presets | std::views::transform([&](const auto& p) {
+        return p.label;
+      }) |
+        std::ranges::to<std::vector<const char*>>();
       RowLabel("Preset");
       ImGui::SetNextItemWidth(-1.0f);
       const bool changed = EdCombo("##preset", &current, labels.data(), static_cast<int>(labels.size()));

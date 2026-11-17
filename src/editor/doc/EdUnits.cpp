@@ -6,6 +6,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <ranges>
 
 namespace faf::editor
 {
@@ -642,10 +643,10 @@ namespace faf::editor
   {
     std::vector<const SaveUnit*> units;
     CollectUnits(group, units);
-    std::vector<std::string> names;
-    for (const SaveUnit* const unit : units) {
-      names.push_back(unit->name);
-    }
+    auto names = units | std::views::transform([&](const SaveUnit* const unit) {
+      return unit->name;
+    }) |
+      std::ranges::to<std::vector<std::string>>();
     return names;
   }
 } // namespace faf::editor

@@ -144,6 +144,7 @@
 #include "moho/terrain/splat/CWldSplat.h"
 #include "moho/ui/IUIManager.h"
 #include <cstring>
+#include <ranges>
 
 // imgui_impl_win32.h leaves this declaration to the application.
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
@@ -9517,11 +9518,10 @@ namespace faf::editor
         const std::vector<EdMapScene::ModObject> found = kind == "props" ? mScene.ModProps()
           : kind == "decals"                                             ? mScene.ModDecals()
                                                                          : mScene.ModUnits();
-        std::vector<EdModHost::MapObject> out;
-        out.reserve(found.size());
-        for (const EdMapScene::ModObject& o : found) {
-          out.push_back({o.what, o.name, o.army, o.x, o.y, o.z, o.size});
-        }
+        auto out = found | std::views::transform([&](const EdMapScene::ModObject& o) {
+          return EdModHost::MapObject{o.what, o.name, o.army, o.x, o.y, o.z, o.size};
+        }) |
+          std::ranges::to<std::vector<EdModHost::MapObject>>();
         return out;
       };
       host.addProp = [this](const std::string& blueprint, const float x, const float z, const float scale) {

@@ -4,6 +4,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <ranges>
 
 namespace faf::editor
 {
@@ -213,10 +214,10 @@ namespace faf::editor
     cx /= static_cast<float>(starts.size());
     cz /= static_cast<float>(starts.size());
     hub = SkeletonNode{"hub", cx, cz, true};
-    std::vector<SkeletonNode> sorted;
-    for (const SkeletonStart& s : starts) {
-      sorted.push_back({s.name, s.x, s.z, false});
-    }
+    auto sorted = starts | std::views::transform([&](const SkeletonStart& s) {
+      return SkeletonNode{s.name, s.x, s.z, false};
+    }) |
+      std::ranges::to<std::vector<SkeletonNode>>();
     std::stable_sort(sorted.begin(), sorted.end(), [&](const SkeletonNode& a, const SkeletonNode& b) {
       return std::atan2(a.z - cz, a.x - cx) < std::atan2(b.z - cz, b.x - cx);
     });

@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <ctime>
 #include <regex>
+#include <ranges>
 
 #include "zlib.h"
 
@@ -183,10 +184,10 @@ namespace faf::editor
       plan.warnings.push_back("the scenario has no description");
     }
     // The files it names: inside /maps/<folder>/, and there.
-    std::vector<std::string> lowerFiles;
-    for (const std::string& file : files) {
-      lowerFiles.push_back(Lower(file));
-    }
+    auto lowerFiles = files | std::views::transform([&](const std::string& file) {
+      return Lower(file);
+    }) |
+      std::ranges::to<std::vector<std::string>>();
     const std::string prefix = "/maps/" + Lower(folder) + "/";
     for (const char* const key : {"map", "save", "script"}) {
       const std::string path = field(key);

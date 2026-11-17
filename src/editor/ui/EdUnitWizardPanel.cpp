@@ -14,6 +14,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iterator>
+#include <ranges>
 
 namespace faf::editor
 {
@@ -588,10 +589,10 @@ namespace faf::editor
         mDirty = true;
       }
       if (const UnitTemplate* t = UnitTemplateOf(spec.templateId); t != nullptr && !t->kinds.empty()) {
-        std::vector<const char*> names;
-        for (const char* k : t->kinds) {
-          names.push_back(UnitWeaponKindName(k));
-        }
+        auto names = t->kinds | std::views::transform([&](const char* k) {
+          return UnitWeaponKindName(k);
+        }) |
+          std::ranges::to<std::vector<const char*>>();
         mNewWeaponKind = std::clamp(mNewWeaponKind, 0, static_cast<int>(names.size()) - 1);
         ImGui::SetNextItemWidth(Em(160.0f));
         (void)EdCombo("##newweapon", &mNewWeaponKind, names.data(), static_cast<int>(names.size()));

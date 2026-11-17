@@ -10,6 +10,7 @@
 #include "imgui.h"
 
 #include <algorithm>
+#include <ranges>
 
 namespace faf::editor
 {
@@ -37,10 +38,10 @@ namespace faf::editor
         current = static_cast<int>(i);
       }
     }
-    std::vector<const char*> labels;
-    for (const DetailEnvironment& e : envs) {
-      labels.push_back(e.label);
-    }
+    auto labels = envs | std::views::transform([&](const DetailEnvironment& e) {
+      return e.label;
+    }) |
+      std::ranges::to<std::vector<const char*>>();
     RowLabel("Environment");
     ImGui::SetNextItemWidth(-1.0f);
     if (EdCombo("##env", &current, labels.data(), static_cast<int>(labels.size()))) {

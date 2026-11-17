@@ -32,6 +32,7 @@
 #include <zstd.h>
 
 #include <memory>
+#include <ranges>
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/utils/SharedPtrUtils.h"
@@ -1040,11 +1041,7 @@ namespace moho
 
   std::vector<std::int32_t> REPLAY_KeyframeTicks()
   {
-    std::vector<std::int32_t> ticks;
-    ticks.reserve(sKeyframes.size());
-    for (const auto& keyframe : sKeyframes) {
-      ticks.push_back(keyframe.first);
-    }
+    auto ticks = sKeyframes | std::views::keys | std::ranges::to<std::vector<std::int32_t>>();
     return ticks;
   }
 

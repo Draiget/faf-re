@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cstring>
 #include <vector>
+#include <ranges>
 
 #include "moho/entity/Entity.h"
 #include "moho/resource/blueprints/RMeshBlueprint.h"
@@ -213,10 +214,10 @@ namespace faf::headless
       const fa::vector<moho::EntId>& ids
     )
     {
-      std::vector<std::uint32_t> sorted;
-      for (const moho::EntId id : ids) {
-        sorted.push_back(static_cast<std::uint32_t>(id));
-      }
+      auto sorted = ids | std::views::transform([&](const moho::EntId id) {
+        return static_cast<std::uint32_t>(id);
+      }) |
+        std::ranges::to<std::vector<std::uint32_t>>();
       std::sort(sorted.begin(), sorted.end());
       CDigest digest;
       for (const std::uint32_t id : sorted) {
@@ -360,10 +361,10 @@ namespace faf::headless
     }
     // In id order, as their lane digests take them (`IdsDigest`).
     const auto idEntries = [&](const char lane, const fa::vector<moho::EntId>& ids) {
-      std::vector<std::uint32_t> sorted;
-      for (const moho::EntId id : ids) {
-        sorted.push_back(static_cast<std::uint32_t>(id));
-      }
+      auto sorted = ids | std::views::transform([&](const moho::EntId id) {
+        return static_cast<std::uint32_t>(id);
+      }) |
+        std::ranges::to<std::vector<std::uint32_t>>();
       std::sort(sorted.begin(), sorted.end());
       for (const std::uint32_t id : sorted) {
         entry(lane, static_cast<moho::EntId>(id), [id](CDigest& digest) {

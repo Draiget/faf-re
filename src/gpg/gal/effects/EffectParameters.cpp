@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstring>
+#include <ranges>
 
 #include "gpg/gal/RenderTarget.hpp"
 #include "gpg/gal/Texture.hpp"
@@ -56,10 +57,10 @@ namespace gpg::gal::effects
         continue;
       }
       if (parameter.parameterClass == ParameterClass::Struct) {
-        std::vector<std::uint32_t> words;
-        for (const float value : parameter.defaults) {
-          words.push_back(FloatBits(value));
-        }
+        auto words = parameter.defaults | std::views::transform([&](const float value) {
+          return FloatBits(value);
+        }) |
+          std::ranges::to<std::vector<std::uint32_t>>();
         SetPacked(index, words.data(), static_cast<std::uint32_t>(words.size() * 4U));
       } else {
         SetFloats(index, parameter.defaults.data(), static_cast<std::uint32_t>(parameter.defaults.size()));
