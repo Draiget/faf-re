@@ -11,9 +11,10 @@
 #   statically, ANDROID_STL=c++_static), lld. Installed with
 #   `sdkmanager "ndk;29.0.14206865"`.
 #
-# The API level is the app's minSdk: Android 8.0. A higher one lets the code
-# call newer bionic functions without a runtime check; raise it only with the
-# app's minSdk.
+# API level 26 (Android 8.0): the programs call no bionic function newer than
+# that. A higher level would let the code call the ones it goes without now
+# (platform/posix/Backtrace.h, SystemPosix.cpp's thread affinity,
+# remote/net/Handshake.cpp's random bytes).
 
 set(FAF_ANDROID_PINNED_NDK_REVISION "29.0.14206865")
 set(FAF_ANDROID_API_LEVEL 26)

@@ -353,8 +353,9 @@ set(_faf_sim_math_args "${PROJECT_SOURCE_DIR}/tests/sim_math/golden.txt")
 if(EXISTS "${_faf_sim_math_known}")
   list(APPEND _faf_sim_math_args --known "${_faf_sim_math_known}")
 endif()
-# An Android build runs its tests where the target runs: a device, the emulator, a Linux host of
-# its architecture (CI, FAF_ANDROID_STATIC_EXECUTABLES), or CMAKE_CROSSCOMPILING_EMULATOR.
+# An Android build checks after the build only with a CMAKE_CROSSCOMPILING_EMULATOR. Otherwise its
+# tests run where the target runs: a device, the emulator, or a Linux host of its architecture
+# with FAF_ANDROID_STATIC_EXECUTABLES, as CI runs them.
 if(NOT FAFRE_PLATFORM_ANDROID OR CMAKE_CROSSCOMPILING_EMULATOR)
   add_custom_command(TARGET faf_sim_math_tests POST_BUILD
     COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} "$<TARGET_FILE:faf_sim_math_tests>" ${_faf_sim_math_args}
@@ -536,21 +537,33 @@ target_link_options(faf_udp_connector_lifetime_tests PRIVATE ${FAF_LINK_ALL_ERRO
 add_test(NAME net_udp_connector_lifetime COMMAND faf_udp_connector_lifetime_tests)
 
 # The libm gate (plan WPL.13): the faf_sim objects call no host libm transcendental outside
-# tests/linux/libm_allowlist.txt; headless is not built while one does. Android reads the
-# objects with the NDK's llvm-nm and llvm-objdump (AArch64 objects, and a Windows host has no nm
-# or objdump); the other builds with nm and objdump from PATH. The object list goes in a
-# response file: on a Windows host it is longer than a command line may be.
-find_package(Python3 REQUIRED COMPONENTS Interpreter)
-file(GENERATE OUTPUT "${CMAKE_BINARY_DIR}/faf_sim_objects.rsp" CONTENT "$<JOIN:$<TARGET_OBJECTS:faf_sim>,\n>\n")
-set(_faf_libm_gate_tools "")
+# tests/linux/libm_allowlist.txt; headless is not built while one does. Linux and macOS run it with
+# python3, nm and objdump from PATH. Android runs it with the NDK's llvm-nm and llvm-objdump, which
+# read its objects (AArch64's, and a Windows host has no nm or objdump), so a failure of either
+# fails the gate (LibmGate.py), and with the Python sync_policy_gen runs; the object list goes in
+# a response file, as on a Windows host it is longer than a command line may be.
 if(FAFRE_PLATFORM_ANDROID)
-  set(_faf_libm_gate_tools "FAF_NM=${CMAKE_NM}" "FAF_OBJDUMP=${CMAKE_OBJDUMP}")
+  if(NOT CMAKE_NM OR NOT CMAKE_OBJDUMP OR NOT FAF_PYTHON3)
+    message(FATAL_ERROR "The libm gate needs the NDK's llvm-nm and llvm-objdump and Python 3 (CMAKE_NM "
+                        "'${CMAKE_NM}', CMAKE_OBJDUMP '${CMAKE_OBJDUMP}', FAF_PYTHON3 '${FAF_PYTHON3}').")
+  endif()
+  # One file per configuration, for the multi-configuration generators, without the precompiled
+  # header, which TARGET_OBJECTS lists and no nm reads.
+  set(_faf_libm_gate_list "${CMAKE_BINARY_DIR}/faf_sim_objects-$<CONFIG>.rsp")
+  file(GENERATE OUTPUT "${_faf_libm_gate_list}"
+       CONTENT "$<JOIN:$<FILTER:$<TARGET_OBJECTS:faf_sim>,EXCLUDE,\\.pch$>,\n>\n")
+  set(_faf_libm_gate_command "${CMAKE_COMMAND}" -E env "FAF_NM=${CMAKE_NM}" "FAF_OBJDUMP=${CMAKE_OBJDUMP}"
+      "${FAF_PYTHON3}")
+  set(_faf_libm_gate_objects "@${_faf_libm_gate_list}")
+else()
+  set(_faf_libm_gate_command python3)
+  set(_faf_libm_gate_objects "$<TARGET_OBJECTS:faf_sim>")
 endif()
 add_custom_target(faf_sim_libm_gate
-  COMMAND "${CMAKE_COMMAND}" -E env ${_faf_libm_gate_tools}
-          "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/tests/linux/LibmGate.py"
-          "${PROJECT_SOURCE_DIR}/tests/linux/libm_allowlist.txt" "@${CMAKE_BINARY_DIR}/faf_sim_objects.rsp"
+  COMMAND ${_faf_libm_gate_command} "${PROJECT_SOURCE_DIR}/tests/linux/LibmGate.py"
+          "${PROJECT_SOURCE_DIR}/tests/linux/libm_allowlist.txt" "${_faf_libm_gate_objects}"
   DEPENDS faf_sim
+  COMMAND_EXPAND_LISTS
   COMMENT "Checking faf_sim's libm transcendental calls against tests/linux/libm_allowlist.txt"
   VERBATIM)
 add_dependencies(headless faf_sim_libm_gate)

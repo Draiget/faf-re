@@ -13,7 +13,10 @@ QuaternionMath.h, whose float results are millions of ulps from any rounding bou
 Usage: LibmGate.py <allowlist> <object>|@<file with one object per line>...
 
 FAF_NM and FAF_OBJDUMP name the tools (default nm and objdump); the Android build passes the
-NDK's llvm-nm and llvm-objdump (cmake/FafPosix.cmake), which read its AArch64 objects.
+NDK's llvm-nm and llvm-objdump (cmake/FafPosix.cmake), which read its AArch64 objects. A tool
+named so must read every object it is given: its failure fails the gate. nm and objdump from
+PATH are not held to that: the PGO preset's objects are ThinLTO bitcode, which objdump cannot
+disassemble (it exits 1), so the gate reads no call from them.
 """
 import os
 import re
@@ -22,6 +25,7 @@ import sys
 
 NM = os.environ.get("FAF_NM") or "nm"
 OBJDUMP = os.environ.get("FAF_OBJDUMP") or "objdump"
+NAMED_TOOLS = {tool for tool in (os.environ.get("FAF_NM"), os.environ.get("FAF_OBJDUMP")) if tool}
 
 TRANSCENDENTALS = {
     "sin", "cos", "tan", "asin", "acos", "atan", "atan2", "exp", "exp2", "expm1", "log", "log2",
@@ -55,10 +59,18 @@ def is_mach_o(obj):
         return f.read(4) in (b"\xcf\xfa\xed\xfe", b"\xce\xfa\xed\xfe")
 
 
+def output(command):
+    """The standard output of a tool run; the gate fails when a tool in NAMED_TOOLS fails."""
+    result = subprocess.run(command, capture_output=True, text=True)
+    if result.returncode != 0 and command[0] in NAMED_TOOLS:
+        sys.exit(f"libm gate: {' '.join(command)} exited with {result.returncode}: {result.stderr.strip()}")
+    return result.stdout
+
+
 def mach_o_names(obj):
     """{address: demangled name} of an object's defined symbols, without the assembler's ltmp labels."""
     names = {}
-    listing = subprocess.run([NM, "-n", "--defined-only", "-C", obj], capture_output=True, text=True).stdout
+    listing = output([NM, "-n", "--defined-only", "-C", obj])
     for line in listing.splitlines():
         parts = line.split(" ", 2)
         if len(parts) == 3 and not parts[2].startswith("ltmp"):
@@ -69,12 +81,12 @@ def mach_o_names(obj):
 def calls(obj):
     """(symbol, demangled caller) for every transcendental this object calls."""
     mach_o = is_mach_o(obj)
-    undefined = subprocess.run([NM, "-u", obj], capture_output=True, text=True).stdout.split()
+    undefined = output([NM, "-u", obj]).split()
     if mach_o:
         undefined = [name[1:] if name.startswith("_") else name for name in undefined]
     if not TRANSCENDENTALS.intersection(undefined):
         return set()
-    listing = subprocess.run([OBJDUMP, "-dr", "--no-show-raw-insn", "-C", obj], capture_output=True, text=True).stdout
+    listing = output([OBJDUMP, "-dr", "--no-show-raw-insn", "-C", obj])
     names = mach_o_names(obj) if mach_o else {}
     found, function, section = set(), "?", ""
     for line in listing.splitlines():
