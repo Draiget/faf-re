@@ -24,11 +24,7 @@ namespace fa
    * Layout is the shipped 12-byte `{proxy, _Myhead, _Mysize}` triplet with the
    * comparator empty-base-optimised away.
    */
-  template <
-    class Key,
-    class Less = std::less<Key>,
-    class Alloc = default_rb_allocator<Key>
-  >
+  template <class Key, class Less = std::less<Key>, class Alloc = default_rb_allocator<Key>>
   class set
   {
     using traits = detail::rb_set_traits<Key, Less, Alloc>;
@@ -49,8 +45,6 @@ namespace fa
     /** Set elements are immutable, so both cursors are the const iterator. */
     using const_iterator = detail::rb_iterator<traits, true>;
     using iterator = const_iterator;
-
-
 
     // -------- ctor/dtor --------
     set() MSVC8_SET_NOEXCEPT {}
@@ -142,11 +136,8 @@ namespace fa
     set(
       set&& o,
       const allocator_type& alloc
-    ) :
-      tree_(
-        std::move(o.tree_),
-        alloc
-      )
+    )
+      : tree_(std::move(o.tree_), alloc)
     {}
     set& operator=(
       set&& o
@@ -419,11 +410,7 @@ namespace fa
    * `moho::SpatialMap<T>` (moho/mesh/SpatialDb.h) is the instantiation this
    * models; its emissions are cited on these members and on `rb_tree`.
    */
-  template <
-    class Key,
-    class Less = std::less<Key>,
-    class Alloc = default_rb_allocator<Key>
-  >
+  template <class Key, class Less = std::less<Key>, class Alloc = default_rb_allocator<Key>>
   class multiset
   {
     using traits = detail::rb_set_traits<Key, Less, Alloc>;
@@ -442,8 +429,6 @@ namespace fa
 
     using iterator = detail::rb_iterator<traits, false>;
     using const_iterator = detail::rb_iterator<traits, true>;
-
-
 
     multiset() {}
     explicit multiset(
@@ -511,11 +496,8 @@ namespace fa
     multiset(
       multiset&& o,
       const allocator_type& alloc
-    ) :
-      tree_(
-        std::move(o.tree_),
-        alloc
-      )
+    )
+      : tree_(std::move(o.tree_), alloc)
     {}
     multiset& operator=(
       multiset&& o

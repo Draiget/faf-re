@@ -2347,7 +2347,9 @@ namespace fa
         const rb_tree& other
       )
         : carrier(static_cast<const carrier&>(other))
-        , alloc_carrier(std::allocator_traits<node_allocator_type>::select_on_container_copy_construction(other.alloc()))
+        , alloc_carrier(
+            std::allocator_traits<node_allocator_type>::select_on_container_copy_construction(other.alloc())
+          )
         , head_(buy_head())
         , size_(0)
       {
@@ -3417,7 +3419,6 @@ namespace fa
         constexpr std::uint32_t count = 0xFFFFFFFFu / sizeof(value_type);
         return count != 0u ? count : 1u;
       }
-
 
       // ---- lookup ------------------------------------------------------
 

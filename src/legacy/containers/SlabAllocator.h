@@ -77,7 +77,9 @@ namespace fa
     {}
 
     template <class U>
-    local_slab_allocator(const local_slab_allocator<U, SlabSize>&) noexcept
+    local_slab_allocator(
+      const local_slab_allocator<U, SlabSize>&
+    ) noexcept
       : local_slab_allocator()
     {}
 
@@ -95,7 +97,9 @@ namespace fa
       return *this;
     }
 
-    local_slab_allocator& operator=(local_slab_allocator&& other) noexcept
+    local_slab_allocator& operator=(
+      local_slab_allocator&& other
+    ) noexcept
     {
       if (this != &other) {
         purge();

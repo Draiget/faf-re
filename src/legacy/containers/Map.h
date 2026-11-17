@@ -36,8 +36,7 @@ namespace fa
     class Key,
     class T,
     class Less = std::less<Key>,
-    class Alloc = default_rb_allocator<std::pair<const Key, T>>
-  >
+    class Alloc = default_rb_allocator<std::pair<const Key, T>>>
   class map
   {
     using traits = detail::rb_map_traits<Key, T, Less, Alloc>;
@@ -57,8 +56,6 @@ namespace fa
 
     using iterator = detail::rb_iterator<traits, false>;
     using const_iterator = detail::rb_iterator<traits, true>;
-
-
 
     // ---- ctor / dtor ------------------------------------------------------
 
@@ -940,8 +937,7 @@ namespace fa
     class Key,
     class T,
     class Less = std::less<Key>,
-    class Alloc = default_rb_allocator<std::pair<const Key, T>>
-  >
+    class Alloc = default_rb_allocator<std::pair<const Key, T>>>
   class multimap
   {
     using traits = detail::rb_map_traits<Key, T, Less, Alloc>;
@@ -961,8 +957,6 @@ namespace fa
 
     using iterator = detail::rb_iterator<traits, false>;
     using const_iterator = detail::rb_iterator<traits, true>;
-
-
 
     multimap() noexcept {}
     explicit multimap(
