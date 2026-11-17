@@ -159,6 +159,7 @@ Both are optional; without them the game falls back to Direct3D 9.
 | `FAF_GAL_DUMP_DIR`, `FAF_GAL_DUMP_SECONDS` | Writes the back buffer as BMP every N seconds |
 | `FAF_GAL_TRACE_START`, `FAF_GAL_TRACE_FRAMES` | Logs every gal call of those frames |
 | `FAF_GAL_TRACE_FILE` | Direct3D 12: traces the frame after that file appears |
+| `FAF_GAL_NO_BGRA=1` | Vulkan: the window surface's B8G8R8A8 format is left out and the swap chain takes R8G8B8A8, the route Android's window surfaces take: copies between the back buffer and B8G8R8A8 images blit, readbacks swap red and blue |
 | `FAF_GAL_SKIP_TECHNIQUES=";A;B;"` | Draws the named techniques with no passes |
 | `FAF_GAL_SOLID_PS=1` | Direct3D 12: every pass in magenta (geometry check) |
 | `FAF_GAL_CLEAR_TEST=1` | Direct3D 12: clears in green (present-path check) |

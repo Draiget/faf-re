@@ -46,6 +46,7 @@
 #include "gpg/gal/VertexBufferContext.hpp"
 #include "VulkanAttachmentBarrier.h"
 #include "VulkanSurface.h"
+#include "VulkanSwapChain.h"
 
 namespace gpg::gal
 {
@@ -980,16 +981,30 @@ namespace gpg::gal
     Vk().vkGetPhysicalDeviceSurfaceFormatsKHR(mPhysical, swapChain.surface, &count, nullptr);
     std::vector<VkSurfaceFormatKHR> formats(count);
     Vk().vkGetPhysicalDeviceSurfaceFormatsKHR(mPhysical, swapChain.surface, &count, formats.data());
-    VkSurfaceFormatKHR chosen = formats.empty()
-      ? VkSurfaceFormatKHR{VK_FORMAT_B8G8R8A8_UNORM, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR}
-      : formats.front();
-    for (const VkSurfaceFormatKHR& format : formats) {
-      if (format.format == VK_FORMAT_B8G8R8A8_UNORM && format.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
-        chosen = format;
-      }
+    // Android's window surfaces have R8G8B8A8 where desktop ones have B8G8R8A8. Diagnostics: FAF_GAL_NO_BGRA=1
+    // leaves B8G8R8A8 out, which takes Android's route on a desktop surface that has both.
+    static const bool noBgra = [] {
+      const char* const value = std::getenv("FAF_GAL_NO_BGRA");
+      return value != nullptr && value[0] == '1';
+    }();
+    const VkSurfaceFormatKHR chosen = vulkan::ChooseSurfaceFormat(formats, !noBgra);
+    if (chosen.format == VK_FORMAT_UNDEFINED) {
+      ThrowError(
+        "DeviceVulkan.cpp",
+        __LINE__,
+        noBgra ? "the window surface has no R8G8B8A8_UNORM format, and FAF_GAL_NO_BGRA leaves B8G8R8A8_UNORM out"
+               : "the window surface has neither B8G8R8A8_UNORM nor R8G8B8A8_UNORM"
+      );
     }
-    if (chosen.format != VK_FORMAT_B8G8R8A8_UNORM) {
-      ThrowError("DeviceVulkan.cpp", __LINE__, "the window surface has no B8G8R8A8_UNORM format");
+    // A swap chain may ask only for usage its surface supports; the engine draws into, copies from and into, and
+    // samples a back buffer.
+    const VkImageUsageFlags missingUsage = vulkan::MissingSwapChainUsage(capabilities);
+    if (missingUsage != 0U) {
+      char message[128]{};
+      std::snprintf(
+        message, sizeof(message), "the window surface lacks image usage 0x%X, which the back buffer needs", missingUsage
+      );
+      ThrowError("DeviceVulkan.cpp", __LINE__, message);
     }
     Vk().vkGetPhysicalDeviceSurfacePresentModesKHR(mPhysical, swapChain.surface, &count, nullptr);
     std::vector<VkPresentModeKHR> modes(count);
@@ -1010,14 +1025,7 @@ namespace gpg::gal
                                                        : "immediate";
     };
 
-    VkExtent2D extent{width, height};
-    if (capabilities.currentExtent.width != 0xFFFFFFFFU) {
-      extent = capabilities.currentExtent;
-    }
-    extent.width =
-      std::clamp(extent.width, capabilities.minImageExtent.width, std::max(capabilities.maxImageExtent.width, 1U));
-    extent.height =
-      std::clamp(extent.height, capabilities.minImageExtent.height, std::max(capabilities.maxImageExtent.height, 1U));
+    const VkExtent2D extent = vulkan::SwapChainExtent(capabilities, width, height);
 
     VkSwapchainCreateInfoKHR info{};
     info.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
@@ -1030,11 +1038,10 @@ namespace gpg::gal
     info.imageColorSpace = chosen.colorSpace;
     info.imageExtent = extent;
     info.imageArrayLayers = 1U;
-    info.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
-      VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+    info.imageUsage = vulkan::kSwapChainUsage;
     info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    info.preTransform = capabilities.currentTransform;
-    info.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+    info.preTransform = vulkan::SwapChainPreTransform(capabilities);
+    info.compositeAlpha = vulkan::SwapChainCompositeAlpha(capabilities);
     info.clipped = VK_TRUE;
     info.oldSwapchain = swapChain.swapchain;
     VkSwapchainKHR created = VK_NULL_HANDLE;
@@ -1062,6 +1069,7 @@ namespace gpg::gal
     swapChain.format = chosen.format;
     swapChain.extent = extent;
     swapChain.presentMode = mode;
+    swapChain.preTransform = info.preTransform;
     Vk().vkGetSwapchainImagesKHR(mDevice, created, &count, nullptr);
     swapChain.images.resize(count);
     Vk().vkGetSwapchainImagesKHR(mDevice, created, &count, swapChain.images.data());
@@ -1076,7 +1084,14 @@ namespace gpg::gal
     }
     swapChain.hasImage = false;
     swapChain.stale = false;
-    gpg::Logf("Vulkan: swap chain %ux%u, %u images, %s", extent.width, extent.height, count, modeName(mode));
+    gpg::Logf(
+      "Vulkan: swap chain %ux%u, %u images, %s, %s",
+      extent.width,
+      extent.height,
+      count,
+      (chosen.format == VK_FORMAT_B8G8R8A8_UNORM) ? "B8G8R8A8" : "R8G8B8A8",
+      modeName(mode)
+    );
   }
 
   void DeviceVulkan::DestroySwapChain(
@@ -1155,6 +1170,15 @@ namespace gpg::gal
       swapChain.headHeight
     );
     return true;
+  }
+
+  bool DeviceVulkan::SuboptimalSwapChainIsStale(
+    const SwapChain& swapChain
+  )
+  {
+    VkSurfaceCapabilitiesKHR capabilities{};
+    return Vk().vkGetPhysicalDeviceSurfaceCapabilitiesKHR(mPhysical, swapChain.surface, &capabilities) != VK_SUCCESS ||
+      vulkan::RemakeSuboptimalSwapChain(capabilities, swapChain.preTransform, swapChain.extent);
   }
 
   void DeviceVulkan::CopyHeadToSwapChain(
@@ -1657,9 +1681,11 @@ namespace gpg::gal
       if (result == VK_SUCCESS || result == VK_SUBOPTIMAL_KHR) {
         swapChain.hasImage = true;
         swapChain.acquireWaitPending = true;
-        // Suboptimal still presents this image; the swap chain is made again before the next acquire.
+        // Suboptimal still presents this image. The swap chain is made again before the next acquire, unless a new
+        // one would take its size and pre-transform again and that pre-transform is not the surface's current
+        // transform (RemakeSuboptimalSwapChain).
         if (result == VK_SUBOPTIMAL_KHR && swapChain.scaled) {
-          swapChain.stale = true;
+          swapChain.stale = swapChain.stale || SuboptimalSwapChainIsStale(swapChain);
         }
       } else if (result == VK_ERROR_OUT_OF_DATE_KHR && swapChain.scaled) {
         swapChain.stale = true;
@@ -1993,6 +2019,12 @@ namespace gpg::gal
           bytes.data(),
           std::min<std::size_t>(bytes.size(), subresource.slicePitch)
         );
+      }
+    }
+    // A back buffer of an R8G8B8A8 swap chain (CreateSwapChain), read as the engine's B8G8R8A8.
+    if (vulkan::OtherChannelOrder(source.format, vulkan::ToVulkanTexture(format).format)) {
+      for (std::size_t pixel = 0U; pixel + 3U < image.bytes.size(); pixel += 4U) {
+        std::swap(image.bytes[pixel], image.bytes[pixel + 2U]);
       }
     }
   }
@@ -2544,15 +2576,45 @@ namespace gpg::gal
         region.dstOffset = {destinationRect->left, destinationRect->top, 0};
       }
       region.extent = {width, height, 1U};
-      Vk().vkCmdCopyImage(
-        mCommands,
-        source.image,
-        VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-        destination.image,
-        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-        1U,
-        &region
-      );
+      if (vulkan::OtherChannelOrder(source.format, destination.format)) {
+        // A back buffer of an R8G8B8A8 swap chain (CreateSwapChain) and a B8G8R8A8 image: vkCmdCopyImage would
+        // copy the bits, a blit of the same size puts the channels in order.
+        VkImageBlit blit{};
+        blit.srcSubresource = region.srcSubresource;
+        blit.dstSubresource = region.dstSubresource;
+        blit.srcOffsets[0] = region.srcOffset;
+        blit.srcOffsets[1] = {
+          region.srcOffset.x + static_cast<std::int32_t>(width),
+          region.srcOffset.y + static_cast<std::int32_t>(height),
+          1
+        };
+        blit.dstOffsets[0] = region.dstOffset;
+        blit.dstOffsets[1] = {
+          region.dstOffset.x + static_cast<std::int32_t>(width),
+          region.dstOffset.y + static_cast<std::int32_t>(height),
+          1
+        };
+        Vk().vkCmdBlitImage(
+          mCommands,
+          source.image,
+          VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+          destination.image,
+          VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+          1U,
+          &blit,
+          VK_FILTER_NEAREST
+        );
+      } else {
+        Vk().vkCmdCopyImage(
+          mCommands,
+          source.image,
+          VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+          destination.image,
+          VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+          1U,
+          &region
+        );
+      }
     } else {
       // A stretch of the source rect over the destination rect, linear
       // filtered; a null rect is the whole image.
@@ -2960,7 +3022,8 @@ namespace gpg::gal
       if (result == VK_ERROR_DEVICE_LOST) {
         CheckVk("DeviceVulkan.cpp", __LINE__, result);
       } else if (swapChain.scaled && (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR)) {
-        swapChain.stale = true;
+        swapChain.stale =
+          swapChain.stale || result == VK_ERROR_OUT_OF_DATE_KHR || SuboptimalSwapChainIsStale(swapChain);
       } else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
         static int logged = 0;
         if (logged++ < 8) {
