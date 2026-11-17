@@ -294,7 +294,7 @@ namespace moho
     mNeedsNavigatorGoalUpdate = true;
     mPlanted = false;
 
-    CCommandTask* const commandTask = const_cast<CCommandTask*>(static_cast<const CCommandTask*>(this));
+    CCommandTask* const commandTask = static_cast<CCommandTask*>(this);
     Unit* const unit = commandTask->mUnit;
     if (unit != nullptr) {
       unit->mUnitVarDat.mUnitStates |= (1ull << UNITSTATE_Attacking);
@@ -351,7 +351,7 @@ namespace moho
    */
   CUnitMeleeAttackTargetTask::~CUnitMeleeAttackTargetTask()
   {
-    CCommandTask* const commandTask = const_cast<CCommandTask*>(static_cast<const CCommandTask*>(this));
+    CCommandTask* const commandTask = static_cast<CCommandTask*>(this);
     Unit* const unit = commandTask->mUnit;
 
     if (mPlanted && unit != nullptr) {
@@ -772,7 +772,7 @@ namespace moho
    */
   void CUnitMeleeAttackTargetTask::RefreshMeleeNavigationGoal()
   {
-    CCommandTask* const commandTask = const_cast<CCommandTask*>(static_cast<const CCommandTask*>(this));
+    CCommandTask* const commandTask = static_cast<CCommandTask*>(this);
     Unit* const unit = commandTask->mUnit;
 
     // Clear desired target while unpacking so attacker lanes do not hold stale target payload.
@@ -852,7 +852,7 @@ namespace moho
       return;
     }
 
-    CCommandTask* const commandTask = const_cast<CCommandTask*>(static_cast<const CCommandTask*>(this));
+    CCommandTask* const commandTask = static_cast<CCommandTask*>(this);
     mTarget = mCommand->mTarget;
     commandTask->mTaskState = TASKSTATE_Starting;
     WakeOwnerThreadForImmediateTick(commandTask);
@@ -870,7 +870,7 @@ namespace moho
     const EAiAttackerEvent event
   )
   {
-    CCommandTask* const commandTask = const_cast<CCommandTask*>(static_cast<const CCommandTask*>(this));
+    CCommandTask* const commandTask = static_cast<CCommandTask*>(this);
     Unit* const unit = commandTask->mUnit;
 
     if (!mTarget.HasTarget()) {
@@ -950,7 +950,7 @@ namespace moho
       *outHasImmediateMeleeSpace = false;
     }
 
-    CCommandTask* const commandTask = const_cast<CCommandTask*>(static_cast<const CCommandTask*>(this));
+    CCommandTask* const commandTask = static_cast<CCommandTask*>(this);
     Unit* const ownerUnit = commandTask->mUnit;
     if (ownerUnit == nullptr || ownerUnit->SimulationRef == nullptr || ownerUnit->SimulationRef->mOGrid == nullptr) {
       return nullptr;
@@ -1089,7 +1089,7 @@ namespace moho
    */
   int CUnitMeleeAttackTargetTask::TaskTick()
   {
-    CCommandTask* const commandTask = const_cast<CCommandTask*>(static_cast<const CCommandTask*>(this));
+    CCommandTask* const commandTask = static_cast<CCommandTask*>(this);
     Unit* const unit = commandTask->mUnit;
     if (unit == nullptr) {
       return -1;
@@ -1287,7 +1287,7 @@ namespace moho
       return;
     }
 
-    CCommandTask* const commandTask = const_cast<CCommandTask*>(static_cast<const CCommandTask*>(this));
+    CCommandTask* const commandTask = static_cast<CCommandTask*>(this);
     const gpg::RRef ownerRef{};
 
     archive->Read(gpg::RTypeOf<moho::CCommandTask>(), commandTask, ownerRef);

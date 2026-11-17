@@ -275,7 +275,7 @@ namespace moho
     mIsGrounded = 1u;
     mPad008F = 0u;
 
-    CCommandTask* const commandTask = const_cast<CCommandTask*>(static_cast<const CCommandTask*>(this));
+    CCommandTask* const commandTask = static_cast<CCommandTask*>(this);
     Unit* const unit = commandTask->mUnit;
     if (unit == nullptr) {
       commandTask->mTaskState = TASKSTATE_Preparing;
@@ -378,7 +378,7 @@ namespace moho
    */
   CUnitAttackTargetTask::~CUnitAttackTargetTask()
   {
-    CCommandTask* const commandTask = const_cast<CCommandTask*>(static_cast<const CCommandTask*>(this));
+    CCommandTask* const commandTask = static_cast<CCommandTask*>(this);
     Unit* const unit = commandTask->mUnit;
 
     if (unit != nullptr) {
@@ -641,7 +641,7 @@ namespace moho
    */
   void CUnitAttackTargetTask::Update()
   {
-    CCommandTask* const commandTask = const_cast<CCommandTask*>(static_cast<const CCommandTask*>(this));
+    CCommandTask* const commandTask = static_cast<CCommandTask*>(this);
     Unit* const unit = commandTask->mUnit;
     if (unit == nullptr) {
       return;
@@ -787,7 +787,7 @@ namespace moho
     const EAiAttackerEvent event
   )
   {
-    CCommandTask* const commandTask = const_cast<CCommandTask*>(static_cast<const CCommandTask*>(this));
+    CCommandTask* const commandTask = static_cast<CCommandTask*>(this);
     if (commandTask->mTaskState == TASKSTATE_5) {
       return;
     }
@@ -862,7 +862,7 @@ namespace moho
     const ECommandEvent
   )
   {
-    CCommandTask* const commandTask = const_cast<CCommandTask*>(static_cast<const CCommandTask*>(this));
+    CCommandTask* const commandTask = static_cast<CCommandTask*>(this);
     if (mCommand == nullptr) {
       commandTask->mTaskState = TASKSTATE_5;
       WakeOwnerThreadForImmediateTick(commandTask);
@@ -981,7 +981,7 @@ namespace moho
       return;
     }
 
-    CCommandTask* const commandTask = const_cast<CCommandTask*>(static_cast<const CCommandTask*>(this));
+    CCommandTask* const commandTask = static_cast<CCommandTask*>(this);
     const gpg::RRef ownerRef{};
 
     archive->Read(gpg::RTypeOf<moho::CCommandTask>(), commandTask, ownerRef);
@@ -1075,7 +1075,7 @@ namespace moho
    */
   int CUnitAttackTargetTask::TaskTick()
   {
-    CCommandTask* const commandTask = const_cast<CCommandTask*>(static_cast<const CCommandTask*>(this));
+    CCommandTask* const commandTask = static_cast<CCommandTask*>(this);
     Unit* const unit = commandTask->mUnit;
     if (unit == nullptr) {
       return -1;
