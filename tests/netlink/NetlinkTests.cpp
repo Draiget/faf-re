@@ -721,7 +721,8 @@ namespace
       "keys: the mark is k+ and 64 hex digits, no further '+'"
     );
     const std::string prefix = kOurUfragPrefix;
-    for (const std::string marks : {std::string(""), std::string("c+"), std::string("w+c+")}) {
+    for (const std::string marks :
+         {std::string(""), std::string("c+"), std::string("w+c+"), std::string("c+s+"), std::string("w+c+s+")}) {
       const std::optional<LinkPublicKey> back = KeyFromUfrag(prefix + marks + mark, prefix);
       Check(back && *back == a.Public(), ("keys: read back after \"" + prefix + marks + "\"").c_str());
     }
@@ -793,6 +794,28 @@ namespace
     });
     Check(n.connected && !n.a.onLane && !n.b.onLane, "with a peer without the lane: plain 'd' frames");
     Check(n.atA.size() == 500 && n.atB.size() == 500 && n.corrupt == 0, "and game datagrams still flow");
+
+    // The game channel (net_GameChannel): two links offering it agree on it, keep the lane off and hand the
+    // channel the keys; one offering it against one that doesn't (as a build from before it) keeps the lane and
+    // seals neither side, since the older build can't read the key behind "s+".
+    LinkOptions channel = o;
+    channel.gameChannel = true;
+    const PairResult c = RunPair(channel, channel, 500, [](Link& a, Link& b) {
+      return a.GetStats().gameChannel && b.GetStats().gameChannel;
+    });
+    Check(
+      c.ready && c.a.gameChannel && c.b.gameChannel && c.a.gameChannelEncrypted && c.b.gameChannelEncrypted,
+      "both offering the game channel: agreed, with keys on both sides"
+    );
+    Check(!c.a.onLane && !c.b.onLane, "and the lane stays off");
+    Check(c.atA.size() == 500 && c.atB.size() == 500 && c.corrupt == 0, "and game datagrams still flow");
+
+    const PairResult x = RunPair(channel, o, 1000, [](Link& a, Link& b) {
+      return a.GetStats().onLane && b.GetStats().onLane;
+    });
+    Check(x.ready && !x.a.gameChannel && !x.b.gameChannel, "one side offering the game channel: not agreed");
+    Check(!x.a.laneEncrypted && !x.b.laneEncrypted, "and the lane is sealed on neither side");
+    Check(Distinct(x.atA) == 1000 && Distinct(x.atB) == 1000 && x.corrupt == 0, "and game datagrams still flow");
   }
 
   // Issue #321: Reconnect on either end drops a sealed connection and the offerer

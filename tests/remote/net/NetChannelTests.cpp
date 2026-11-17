@@ -714,6 +714,122 @@ namespace
     EXPECT_TRUE(redundant > 0.985);
   }
 
+  // Reliable repeats (ChannelConfig::reliableRepeats, game links between players): a game beat every 100 ms over 5 %
+  // loss each way at 50 ms one way. Without repeats a lost beat waits for loss detection; with 2 it usually comes in
+  // the next datagram, at most 30 ms later. Every message arrives once, intact and in order either way. Returns the
+  // 99th percentile of the delivery times (ms) and the bytes A sent.
+  std::pair<double, std::uint64_t> ReliableRepeatDelivery(
+    const std::uint32_t repeats
+  )
+  {
+    ChannelConfig config;
+    config.reliableRepeats = repeats;
+    LinkConfig link;
+    link.latencyUs = 50'000;
+    link.loss = 0.05;
+    Pair pair(config, link, 41);
+    std::mt19937_64 rng(42);
+    std::vector<Bytes> sent;
+    std::vector<std::uint64_t> sentAt;
+    std::vector<double> delays;
+    std::size_t next = 0;
+    bool intact = true;
+    for (int ms = 0; ms < 120'000; ++ms) {
+      if (ms < 118'000 && ms % 100 == 0) {
+        Bytes m = RandomBytes(rng, 20 + rng() % 120);
+        m[0] = static_cast<std::uint8_t>(sent.size());
+        m[1] = static_cast<std::uint8_t>(sent.size() >> 8);
+        EXPECT_TRUE(pair.a.SendReliable(m.data(), m.size()));
+        sentAt.push_back(pair.now);
+        sent.push_back(std::move(m));
+      }
+      pair.Step();
+      Bytes got;
+      while (pair.b.TakeReliable(got)) {
+        intact = intact && next < sent.size() && sent[next] == got;
+        delays.push_back(static_cast<double>(pair.now - sentAt[next]) / 1000.0);
+        ++next;
+      }
+    }
+    EXPECT_TRUE(intact);
+    EXPECT_EQ(next, sent.size());
+    std::sort(delays.begin(), delays.end());
+    const double p99 = delays.empty() ? 0.0 : delays[delays.size() * 99 / 100];
+    return {p99, pair.a.Stats().bytesSent};
+  }
+
+  void TestReliableRepeats()
+  {
+    const auto [plainP99, plainBytes] = ReliableRepeatDelivery(0);
+    const auto [repeatP99, repeatBytes] = ReliableRepeatDelivery(2);
+    std::println(
+      "    5% loss each way, 50 ms one way, a beat every 100 ms: 99% of beats within {:.0f} ms without repeats ({} "
+      "bytes "
+      "sent), {:.0f} ms with 2 ({} bytes)",
+      plainP99,
+      static_cast<unsigned long long>(plainBytes),
+      repeatP99,
+      static_cast<unsigned long long>(repeatBytes)
+    );
+    EXPECT_TRUE(repeatP99 < plainP99);
+    EXPECT_TRUE(repeatP99 <= 100.0);
+  }
+
+  // After an outage (resendAfterSilenceUs): beats every 100 ms over a 25 ms link cut for 3 s. Without the option the
+  // beats written during the cut wait for a timeout that doubled through it; with it the peer's first datagram after
+  // the cut sends them again at once. Returns the longest delivery time (ms) of a beat written during the cut,
+  // counted from the end of the cut.
+  double AfterOutage(
+    const std::uint64_t resendAfterSilenceUs
+  )
+  {
+    ChannelConfig config;
+    config.reliableRepeats = 2;
+    config.keepaliveIntervalUs = 250'000;
+    config.resendAfterSilenceUs = resendAfterSilenceUs;
+    LinkConfig link;
+    link.latencyUs = 25'000;
+    link.partitions.push_back({10'000'000, 13'000'000});
+    Pair pair(config, link, 51);
+    std::vector<std::uint64_t> sentAt;
+    std::size_t next = 0;
+    double worst = 0.0;
+    for (int ms = 0; ms < 20'000; ++ms) {
+      if (ms % 100 == 0) {
+        const std::uint8_t beat[2] = {
+          static_cast<std::uint8_t>(sentAt.size()), static_cast<std::uint8_t>(sentAt.size() >> 8)
+        };
+        EXPECT_TRUE(pair.a.SendReliable(beat, sizeof(beat)));
+        sentAt.push_back(pair.now);
+      }
+      pair.Step();
+      Bytes got;
+      while (pair.b.TakeReliable(got)) {
+        if (sentAt[next] >= 10'000'000 && sentAt[next] < 13'000'000) {
+          worst = std::max(worst, static_cast<double>(pair.now - 13'000'000) / 1000.0);
+        }
+        ++next;
+      }
+    }
+    EXPECT_EQ(next, sentAt.size());
+    return worst;
+  }
+
+  void TestResendAfterSilence()
+  {
+    const double plain = AfterOutage(0);
+    const double recovering = AfterOutage(500'000);
+    std::println(
+      "    3 s cut, a beat every 100 ms: the last beat of the cut arrived {:.0f} ms after it without the option, "
+      "{:.0f} ms "
+      "with it",
+      plain,
+      recovering
+    );
+    EXPECT_TRUE(recovering < plain);
+    EXPECT_TRUE(recovering <= 400.0); // the next keepalive either way (250 ms) and a round trip
+  }
+
   // --- WP10.6: AEAD -----------------------------------------------------------------------
 
   void TestSealOpen()
@@ -1234,6 +1350,20 @@ TEST(
 )
 {
   TestCongestionWindow();
+}
+TEST(
+  NetChannel,
+  ReliableRepeats
+)
+{
+  TestReliableRepeats();
+}
+TEST(
+  NetChannel,
+  ResendAfterSilence
+)
+{
+  TestResendAfterSilence();
 }
 TEST(
   Existing_NetChannel,

@@ -45,6 +45,20 @@ set_target_properties(faf_fast_retransmit_tests PROPERTIES FOLDER "Tests/Existin
 add_test(NAME net_fast_retransmit COMMAND faf_fast_retransmit_tests)
 set_tests_properties(net_fast_retransmit PROPERTIES LABELS "Existing")
 
+# The game channel (net_GameChannel): two connectors whose transports offer it carry their streams on a net channel
+# over loss, in order, and close as shipped; with the switch off they use the shipped DATA packets.
+add_executable(faf_game_channel_tests EXCLUDE_FROM_ALL net/GameChannelTests.cpp)
+target_link_libraries(faf_game_channel_tests PRIVATE faf_engine gtest_main)
+set_target_properties(faf_game_channel_tests PROPERTIES FOLDER "Tests/Net")
+add_test(NAME net_game_channel COMMAND faf_game_channel_tests)
+set_tests_properties(net_game_channel PROPERTIES LABELS "Net")
+
+# Network measurements (docs/NETWORK_MEASUREMENTS.md): beat delivery between N players over an impaired in-process
+# network, per carrier and console variables; one JSON object per run for tools/netbench. Not a test.
+add_executable(faf_netbench EXCLUDE_FROM_ALL net/NetBench.cpp)
+target_link_libraries(faf_netbench PRIVATE faf_engine)
+set_target_properties(faf_netbench PROPERTIES FOLDER "Tools")
+
 # The end of a UDP connector: Destroy, its thread's goodbyes, then the connector deleted with its
 # socket and event; Linux runs the same file (cmake/FafPosix.cmake).
 add_executable(faf_udp_connector_lifetime_tests EXCLUDE_FROM_ALL net/UdpConnectorLifetimeTests.cpp)
@@ -341,6 +355,7 @@ set(_faf_existing_test_targets
   faf_net_tests
   faf_peer_transport_tests
   faf_fast_retransmit_tests
+  faf_game_channel_tests
   faf_netlink_tests
   faf_profiler_tests
   faf_effect_scan_tests
