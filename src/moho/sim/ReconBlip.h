@@ -370,21 +370,18 @@ namespace moho
 
     [[nodiscard]] Unit* GetSourceUnit() const noexcept;
     [[nodiscard]] bool IsFake() const noexcept;
-    [[nodiscard]] SPerArmyReconInfo* GetPerArmyReconInfo(
+    /** The army's recon block, const when the blip is: one body for both (engine addition). */
+    template <class Self>
+    [[nodiscard]] auto GetPerArmyReconInfo(
+      this Self& self,
       const std::int32_t armyIndex
-    ) noexcept
+    ) noexcept -> decltype(self.mReconDat.begin())
     {
-      return const_cast<SPerArmyReconInfo*>(static_cast<const ReconBlip*>(this)->GetPerArmyReconInfo(armyIndex));
-    }
-    [[nodiscard]] const SPerArmyReconInfo* GetPerArmyReconInfo(
-      const std::int32_t armyIndex
-    ) const noexcept
-    {
-      if (armyIndex < 0 || mReconDat.begin() == nullptr || mReconDat.end() == nullptr) {
+      if (armyIndex < 0 || self.mReconDat.begin() == nullptr || self.mReconDat.end() == nullptr) {
         return nullptr;
       }
-      const std::ptrdiff_t count = mReconDat.end() - mReconDat.begin();
-      return armyIndex < count ? mReconDat.begin() + armyIndex : nullptr;
+      const std::ptrdiff_t count = self.mReconDat.end() - self.mReconDat.begin();
+      return armyIndex < count ? self.mReconDat.begin() + armyIndex : nullptr;
     }
 
   public:
