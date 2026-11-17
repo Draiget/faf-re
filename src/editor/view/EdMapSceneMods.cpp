@@ -19,6 +19,7 @@
 #include <algorithm>
 #include <cmath>
 #include <map>
+#include <ranges>
 
 namespace faf::editor
 {
@@ -370,10 +371,10 @@ namespace faf::editor
       while (!open.empty()) {
         auto [group, path] = open.back();
         open.pop_back();
-        for (auto child = group->groups.rbegin(); child != group->groups.rend(); ++child) {
+        for (auto& child : group->groups | std::views::reverse) {
           std::vector<std::string> next = path;
-          next.push_back(child->name);
-          open.emplace_back(&*child, next);
+          next.push_back(child.name);
+          open.emplace_back(&child, next);
         }
         if (!path.empty()) {
           paths.push_back(path);

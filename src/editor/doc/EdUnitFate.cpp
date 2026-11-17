@@ -3,6 +3,7 @@
 #include <cctype>
 #include <cstdlib>
 #include <utility>
+#include <ranges>
 
 namespace faf::editor
 {
@@ -188,27 +189,27 @@ namespace faf::editor
       }
     }
     const std::vector<ScriptGroupCreation> made = ScriptGroupCreations(script);
-    for (auto group = path.rbegin(); group != path.rend(); ++group) {
+    for (auto& group : path | std::views::reverse) {
       // Every creation of this group: one script may make it as wrecks for one lobby option and as units for another.
       bool asWreck = false;
       bool asUnit = false;
       for (const ScriptGroupCreation& creation : made) {
-        if (creation.prefix ? group->starts_with(creation.name) : *group == creation.name) {
+        if (creation.prefix ? group.starts_with(creation.name) : group == creation.name) {
           (creation.wreck ? asWreck : asUnit) = true;
         }
       }
       if (!asWreck && !asUnit) {
         continue;
       }
-      fate.group = *group;
+      fate.group = group;
       if (asWreck && asUnit) {
         fate.kind = UnitFate::Kind::ScriptEither;
-        fate.text = "Only when the map's script creates the group " + *group +
+        fate.text = "Only when the map's script creates the group " + group +
           ": as wrecks or as live units, as a lobby option picks.";
       } else {
         fate.kind = asWreck ? UnitFate::Kind::ScriptWreck : UnitFate::Kind::ScriptUnit;
-        fate.text = "Only when the map's script creates the group " + *group +
-          (asWreck ? ", as wrecks" : ", as units") + " (a lobby option often decides it).";
+        fate.text = "Only when the map's script creates the group " + group + (asWreck ? ", as wrecks" : ", as units") +
+          " (a lobby option often decides it).";
       }
       return fate;
     }

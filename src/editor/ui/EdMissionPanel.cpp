@@ -853,9 +853,9 @@ namespace faf::editor
     Mission& m = mDocument.EditMission();
     // Where the play is: the last stage entered.
     int current = 0;
-    for (auto it = mTrace.rbegin(); it != mTrace.rend(); ++it) {
+    for (auto& entry : mTrace | std::views::reverse) {
       MissionTraceId id;
-      if (ParseMissionTrace(*it, id) && id.section.empty()) {
+      if (ParseMissionTrace(entry, id) && id.section.empty()) {
         current = id.stage;
         break;
       }

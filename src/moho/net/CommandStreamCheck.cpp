@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cstring>
 #include <utility>
+#include <ranges>
 
 #include "moho/net/CMessage.h"
 
@@ -139,11 +140,11 @@ namespace moho
 
     // Every boundary of the stream at that beat (an advance of zero beats
     // repeats one) is a match; a beat this stream never stopped at is not.
-    for (auto it = stream.boundaries.rbegin(); it != stream.boundaries.rend(); ++it) {
-      if (BeatBefore(it->beat, report.beat)) {
+    for (auto& entry : stream.boundaries | std::views::reverse) {
+      if (BeatBefore(entry.beat, report.beat)) {
         break;
       }
-      if (it->beat == report.beat && it->digest == report.digest) {
+      if (entry.beat == report.beat && entry.digest == report.digest) {
         return;
       }
     }

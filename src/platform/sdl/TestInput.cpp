@@ -42,6 +42,7 @@
 #include <vector>
 
 #include <SDL3/SDL.h>
+#include <ranges>
 
 #include "gpg/core/utils/Logging.h"
 #include "platform/sdl/WindowSdlPlatform.h"
@@ -330,9 +331,9 @@ namespace
     }
     PushKey(window, keycode, static_cast<SDL_Scancode>(scancode), held, true);
     PushKey(window, keycode, static_cast<SDL_Scancode>(scancode), held, false);
-    for (auto it = pressed.rbegin(); it != pressed.rend(); ++it) {
-      held = static_cast<SDL_Keymod>(held & ~(*it)->flag);
-      PushKey(window, (*it)->key, (*it)->scancode, held, false);
+    for (auto& entry : pressed | std::views::reverse) {
+      held = static_cast<SDL_Keymod>(held & ~entry->flag);
+      PushKey(window, entry->key, entry->scancode, held, false);
     }
   }
 

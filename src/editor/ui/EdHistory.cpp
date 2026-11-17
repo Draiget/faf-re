@@ -1,6 +1,7 @@
 #include "editor/ui/EdHistory.h"
 
 #include <map>
+#include <ranges>
 
 namespace faf::editor
 {
@@ -21,8 +22,8 @@ namespace faf::editor
       rows.push_back({label(name), ++position, true});
     }
     // The redo stack's last is the next Redo: from there backwards.
-    for (auto it = redo.rbegin(); it != redo.rend(); ++it) {
-      rows.push_back({label(*it), ++position, false});
+    for (auto& entry : redo | std::views::reverse) {
+      rows.push_back({label(entry), ++position, false});
     }
     return rows;
   }

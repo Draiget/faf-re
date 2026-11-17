@@ -1,4 +1,5 @@
 #include "moho/sim/CWldSessionPrivate.h"
+#include <ranges>
 
 /**
  * Session-global ghost list for the formation-placement preview.
@@ -3129,10 +3130,10 @@ namespace moho
             }
           }
           // The hovered slot: the last hovered candidate.
-          for (auto it = candidates.rbegin(); it != candidates.rend(); ++it) {
-            if (it->mRun == EStrategicIconRun::Hovered) {
+          for (auto& entry : candidates | std::views::reverse) {
+            if (entry.mRun == EStrategicIconRun::Hovered) {
               (void)BuildStrategicIconRecord(
-                *it, aux, PlaceUnitIcon(it->mData, aux), findSlot, expected.emplace_back()
+                entry, aux, PlaceUnitIcon(entry.mData, aux), findSlot, expected.emplace_back()
               );
               break;
             }

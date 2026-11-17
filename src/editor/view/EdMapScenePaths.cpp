@@ -19,6 +19,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <utility>
+#include <functional>
 
 namespace faf::editor
 {
@@ -758,7 +759,7 @@ namespace faf::editor
     if (key == VK_DELETE && path != nullptr && !mPathEdit->selected.empty()) {
       EdDocument::PathsState before = mDocument.PathsNow();
       std::vector<int> sel = mPathEdit->selected;
-      std::sort(sel.rbegin(), sel.rend());
+      std::ranges::sort(sel, std::ranges::greater{});
       for (const int i : sel) {
         if (i >= 0 && static_cast<std::size_t>(i) < path->points.size()) {
           path->points.erase(path->points.begin() + i);

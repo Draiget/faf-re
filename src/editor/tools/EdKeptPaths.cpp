@@ -902,8 +902,8 @@ namespace faf::editor
     }
     if (image.mirror && !c.profile.symmetric) {
       std::vector<std::array<float, 2>> flipped;
-      for (auto it = c.profile.points.rbegin(); it != c.profile.points.rend(); ++it) {
-        flipped.push_back({1.0f - (*it)[0], (*it)[1]});
+      for (auto& entry : c.profile.points | std::views::reverse) {
+        flipped.push_back({1.0f - entry[0], entry[1]});
       }
       c.profile.points = std::move(flipped);
     }

@@ -839,25 +839,25 @@ namespace faf::editor
         missing.emplace_back(name, value);
       }
     }
-    for (auto it = assignments.rbegin(); it != assignments.rend(); ++it) {
+    for (auto& entry : assignments | std::views::reverse) {
       for (const auto& [name, value] : wanted) {
-        if (it->name != name || unchanged(name)) {
+        if (entry.name != name || unchanged(name)) {
           continue;
         }
         // Tables of rows: only the rows that changed (the rest of the table's text kept).
         std::string written = value;
         if (name == "spwnMexArmy") {
-          written = RowsWithin(text, it->value, tables.mexArmy, false, value, ",\n    ");
+          written = RowsWithin(text, entry.value, tables.mexArmy, false, value, ",\n    ");
         } else if (name == "spwnHydroArmy") {
-          written = RowsWithin(text, it->value, tables.hydroArmy, true, value, ",\n    ");
+          written = RowsWithin(text, entry.value, tables.hydroArmy, true, value, ",\n    ");
         } else {
           for (const OptionTable& option : KnownOptionTables()) {
             if (name == option.name) {
-              written = RowsWithin(text, it->value, groupsOf(tables, name), option.hydro, value, ",");
+              written = RowsWithin(text, entry.value, groupsOf(tables, name), option.hydro, value, ",");
             }
           }
         }
-        out.replace(it->valueStart, it->valueEnd - it->valueStart, written);
+        out.replace(entry.valueStart, entry.valueEnd - entry.valueStart, written);
       }
     }
     for (const auto& [name, value] : missing) {

@@ -25,6 +25,7 @@
 #include <string>
 #include <utility>
 #include <vector>
+#include <ranges>
 
 namespace
 {
@@ -51,8 +52,8 @@ namespace
       } else {
         ::unsetenv("XDG_DATA_HOME");
       }
-      for (auto mount = mMounts.rbegin(); mount != mMounts.rend(); ++mount) {
-        (void)::umount2(mount->c_str(), MNT_DETACH);
+      for (auto& mount : mMounts | std::views::reverse) {
+        (void)::umount2(mount.c_str(), MNT_DETACH);
       }
       std::error_code ignored;
       fs::remove_all(mRoot, ignored);

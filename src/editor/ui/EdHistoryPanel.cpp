@@ -3,6 +3,7 @@
 #include <string>
 #include "editor/ui/EdControls.h"
 #include <vector>
+#include <ranges>
 
 #include "editor/EdShell.h"
 #include "editor/doc/EdDocument.h"
@@ -51,8 +52,8 @@ namespace faf::editor
     ImGui::BeginChild("##historyrows");
     int target = -1;
     // Newest at the top, as the steps pile up.
-    for (auto it = rows.rbegin(); it != rows.rend(); ++it) {
-      const EdHistoryRow& row = *it;
+    for (auto& entry : rows | std::views::reverse) {
+      const EdHistoryRow& row = entry;
       ImGui::PushID(row.position);
       const bool now = row.position == current;
       if (!row.done) {

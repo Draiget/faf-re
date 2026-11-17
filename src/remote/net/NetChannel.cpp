@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstring>
+#include <ranges>
 
 namespace faf::remote::net
 {
@@ -179,12 +180,12 @@ namespace faf::remote::net
       const auto writtenNow = [&](const std::uint32_t s) {
         return std::find(carried.begin() + static_cast<std::ptrdiff_t>(fresh), carried.end(), s) != carried.end();
       };
-      for (auto it = mLaneOut.rbegin(); it != mLaneOut.rend(); ++it) {
-        if (!it->sent || it->repeatsLeft == 0 || writtenNow(it->sequence) || !fits(*it)) {
+      for (auto& entry : mLaneOut | std::views::reverse) {
+        if (!entry.sent || entry.repeatsLeft == 0 || writtenNow(entry.sequence) || !fits(entry)) {
           continue;
         }
-        write(*it);
-        --it->repeatsLeft;
+        write(entry);
+        --entry.repeatsLeft;
         ++mStats.redundantRepeats;
       }
     }

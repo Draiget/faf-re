@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <cstdio>
 #include <ranges>
+#include <functional>
 
 namespace faf::editor
 {
@@ -344,7 +345,7 @@ namespace faf::editor
     if (ImGui::Button("Delete the chosen points")) {
       EdDocument::PathsState before = mDocument.PathsNow();
       std::vector<int> order = sel;
-      std::sort(order.rbegin(), order.rend());
+      std::ranges::sort(order, std::ranges::greater{});
       for (const int i : order) {
         path.points.erase(path.points.begin() + i);
       }
