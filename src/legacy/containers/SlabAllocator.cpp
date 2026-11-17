@@ -9,8 +9,16 @@
 namespace
 {
   /// `/treeslabs 0` on the command line or FAF_TREESLABS=0, as `/smallpool 0` is read.
+  /// An AddressSanitizer build never uses slabs: ASan can't see inside them (the small-block pool does the same).
   [[nodiscard]] bool TurnedOff() noexcept
   {
+#if defined(__SANITIZE_ADDRESS__)
+    return true;
+#elifdef __has_feature
+#if __has_feature(address_sanitizer)
+    return true;
+#endif
+#endif
     char value[4] = {};
     const DWORD written = ::GetEnvironmentVariableA("FAF_TREESLABS", value, static_cast<DWORD>(sizeof(value)));
     if (written == 1u && value[0] == '0') {
