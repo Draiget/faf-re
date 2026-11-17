@@ -1,6 +1,7 @@
 #include "server/EffectOpEncoder.h"
 #include "remote/wire/EffectLane.h"
 
+#include <utility>
 #include <algorithm>
 #include <cstring>
 
@@ -200,7 +201,7 @@ namespace faf::server
       entry.id = pending.id;
       entry.param = pending.param;
       entry.armies = pending.armies;
-      out.push_back(static_cast<std::uint8_t>(pending.op));
+      out.push_back(std::to_underlying(pending.op));
       if (pending.op != EEffectOp::CreateLightParticle) {
         AppendVarint(out, pending.id);
       }
@@ -493,7 +494,7 @@ namespace faf::server
     COpCopier copy(ops, out, toClient);
     while (copy.Ok() && !copy.AtEnd()) {
       const std::uint8_t kind = copy.Byte();
-      if (kind >= static_cast<std::uint8_t>(EEffectOp::Count)) {
+      if (kind >= std::to_underlying(EEffectOp::Count)) {
         break;
       }
       const auto op = static_cast<EEffectOp>(kind);

@@ -96,7 +96,7 @@ TEST(
   }
   const fa::string fromNull(static_cast<const char*>(nullptr));
   EXPECT_TRUE(fromNull.empty());
-  const fa::string fromNullRange(nullptr, static_cast<std::size_t>(5));
+  const fa::string fromNullRange(nullptr, 5uz);
   EXPECT_TRUE(fromNullRange.empty());
   const char* const text = "abc";
   const fa::string backwards(text + 2, text);

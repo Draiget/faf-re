@@ -38,6 +38,18 @@ dependencies/msdfgen/
 dependencies/googletest/
 dependencies/DirectXTex/
 dependencies/imgui/
+dependencies/SDL3/
+# The Linux and macOS clients' downloads (cmake/FafDependencies.cmake).
+dependencies/DirectX-Headers/
+dependencies/DirectXMath/
+dependencies/FAudio/
+dependencies/stb/
+dependencies/dxc-linux/
+dependencies/MoltenVK/
+dependencies/dxc-source/
+dependencies/dxc-spirv-headers/
+dependencies/dxc-spirv-tools/
+dependencies/dxc-directx-headers/
 dependencies/*.7z
 *.7z
 *.pdb

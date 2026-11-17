@@ -1009,7 +1009,7 @@ namespace gpg
     if (typeVec.size() < typeVec.capacity()) {
       typeVec.push_back(this);
     } else {
-      (void)typeVec.insert(typeVec.end(), static_cast<std::size_t>(1), this);
+      (void)typeVec.insert(typeVec.end(), 1uz, this);
     }
   }
 

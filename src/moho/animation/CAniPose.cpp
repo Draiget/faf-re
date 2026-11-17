@@ -9,6 +9,8 @@
 
 #include <intrin.h>
 
+#include "platform/SpinPause.h"
+
 #include "gpg/core/containers/ArchiveSerialization.h"
 #include "gpg/core/containers/FastVector.h"
 #include "gpg/core/reflection/Reflection.h"
@@ -304,7 +306,7 @@ namespace moho
         return self->mCompositeTransform;
       }
       if (observed == kCompositeBusy) {
-        _mm_pause();
+        platform::SpinPause();
         continue;
       }
       if (state.compare_exchange_weak(observed, kCompositeBusy, std::memory_order_acquire, std::memory_order_relaxed)) {

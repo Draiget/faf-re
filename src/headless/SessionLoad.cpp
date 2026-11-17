@@ -20,17 +20,15 @@
 
 namespace faf::headless
 {
-  bool LoadSessionScenario(
+  std::expected<void, std::string> LoadSessionScenario(
     moho::SWldSessionInfo& sessionInfo,
-    moho::SWldGameData& gameData,
-    std::string& error
+    moho::SWldGameData& gameData
   )
   {
     moho::CWldSessionLoaderImpl* const loader = moho::GetWldSessionLoader();
     moho::LaunchInfoBase* const launchInfo = sessionInfo.mLaunchInfo.get();
     if (loader == nullptr || launchInfo == nullptr) {
-      error = "no session loader or launch info";
-      return false;
+      return std::unexpected("no session loader or launch info");
     }
 
     (void)loader->GetScenarioInfo(sessionInfo.mMapName.raw_data_unsafe(), &launchInfo->mGameMods, true);
@@ -48,10 +46,9 @@ namespace faf::headless
 
     (void)loader->LoadGameData(&gameData);
     if (gameData.mGameRules == nullptr || gameData.mWldMap == nullptr || gameData.mState == nullptr) {
-      error = "map " + std::string(sessionInfo.mMapName.c_str()) + " failed to load";
-      return false;
+      return std::unexpected("map " + std::string(sessionInfo.mMapName.c_str()) + " failed to load");
     }
-    return true;
+    return {};
   }
 
   moho::STIMap* CompleteSessionLaunchInfo(
@@ -100,7 +97,7 @@ namespace faf::headless
     const std::string_view text
   )
   {
-    return ReadSyncBytes(packet).find(text) != std::string::npos;
+    return ReadSyncBytes(packet).contains(text);
   }
 
   bool ReadSyncNaming(
@@ -115,7 +112,7 @@ namespace faf::headless
     }
     const std::string bytes = ReadSyncBytes(packet);
     const bool named = std::any_of(names.begin(), names.end(), [&](const std::string_view name) {
-      return bytes.find(name) != std::string::npos;
+      return bytes.contains(name);
     });
     if (!named) {
       return false;

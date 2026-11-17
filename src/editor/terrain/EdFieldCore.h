@@ -12,6 +12,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <expected>
 #include <functional>
 #include <map>
 #include <memory>
@@ -85,7 +86,7 @@ namespace faf::editor::field
       const char* key
     ) const
     {
-      return num.count(key) != 0;
+      return num.contains(key);
     }
     [[nodiscard]] std::string S(const char* key, const char* fallback) const;
     [[nodiscard]] const std::vector<double>* A(const char* key) const;
@@ -101,25 +102,25 @@ namespace faf::editor::field
 
   /** Ops that live in their own files (EdErosion.cpp) register themselves here at start-up; RunOp / OpNames know them
    * like the built-in ones. */
-  using ExternalOpFn = bool (*)(const OpArgs&, Grid&, std::string&);
+  using ExternalOpFn = std::expected<void, std::string> (*)(const OpArgs&, Grid&);
   void RegisterOp(const char* name, ExternalOpFn fn);
 
   /**
    * An optional front door for ops (the GPU compute backend, EdGpuOps.cpp). RunOp asks the interceptor first: true = it
-   * made `out` (RunOp returns true at once), false = run the CPU op. The interceptor must leave `out` untouched when it
-   * returns false, must never throw, and must be thread safe (ops can run on worker threads). Null (the default) =
+   * made `out` (RunOp returns success at once), false = run the CPU op. The interceptor must leave `out` untouched when
+   * it returns false, must never throw, and must be thread safe (ops can run on worker threads). Null (the default) =
    * every op is a CPU op.
    */
   using OpInterceptor = bool (*)(const std::string& name, const OpArgs& args, Grid& out);
   void SetOpInterceptor(OpInterceptor fn);
 
-  /** Runs op `name`. false with `err` set on a bad op name, missing input or parameter. Consults the interceptor first.
+  /** Runs op `name` into `out`. The error on a bad op name, missing input or parameter. Consults the interceptor first.
    */
-  bool RunOp(const std::string& name, const OpArgs& args, Grid& out, std::string& err);
+  [[nodiscard]] std::expected<void, std::string> RunOp(const std::string& name, const OpArgs& args, Grid& out);
 
   /** RunOp without the interceptor and without statistics: always the CPU op (the GPU self test and the tests compare
    * against it). */
-  bool RunOpCpu(const std::string& name, const OpArgs& args, Grid& out, std::string& err);
+  [[nodiscard]] std::expected<void, std::string> RunOpCpu(const std::string& name, const OpArgs& args, Grid& out);
 
   // ---- per-op statistics (which backend ran how many ops, for the perf report)
   // -------------------------------------------------------------------------

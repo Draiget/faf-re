@@ -93,7 +93,7 @@ namespace
     RangeExtractionPayloadVector* edgePayloads;
   };
 
-#if defined(_M_IX86)
+#if FAFRE_ARCH_X86
   static_assert(sizeof(RangeRingGeometryBuildState) == 0x10, "RangeRingGeometryBuildState size must be 0x10");
 #endif
 

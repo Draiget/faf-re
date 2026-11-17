@@ -8,7 +8,6 @@
 #include <thread>
 #include <mutex>
 #include <atomic>
-#include <xmmintrin.h>
 #include <bit>
 #include <algorithm>
 #include <cerrno>
@@ -20,6 +19,7 @@
 #include <cstdarg>
 #include <cstdint>
 #include <cstdlib>
+#include <span>
 #include <cstring>
 #include <ctime>
 #include <io.h>
@@ -61,6 +61,12 @@
 #include "moho/sim/SimThreadRole.h"
 #include "moho/sim/SimWorkerPool.h"
 #include "moho/console/CConCommand.h"
+#if FAFRE_PLATFORM_POSIX
+#include "platform/posix/NativePath.h"
+
+#include <sys/stat.h>
+#include <unistd.h>
+#endif
 
 using namespace LuaPlus;
 
@@ -301,7 +307,7 @@ void luaD_growstack(lua_State* L, int n);
 void luaS_freeall(lua_State* L);
 const char* luaO_pushvfstring(lua_State* L, const char* fmt, va_list argp);
 int _errorfb(lua_State* L, int level);
-void luaG_runerror(lua_State* L, const char* format, ...);
+[[noreturn]] void luaG_runerror(lua_State* L, const char* format, ...);
 void luaV_concat(lua_State* L, int total, int last);
 int luaV_tostring(lua_State* L, TObject* obj);
 int luaV_equalval(lua_State* L, const TObject* left, const TObject* right);
@@ -339,7 +345,7 @@ Table* luaT_getmetatable(lua_State* L, const TObject* o);
 const TObject* luaV_tonumber(const TObject* obj, TObject* outNumber);
 int luaV_lessthan(lua_State* L, const TObject* l, const TObject* r);
 int luaH_next(lua_State* L, Table* table, TObject* key);
-void luaG_errormsg(lua_State* L);
+[[noreturn]] void luaG_errormsg(lua_State* L);
 
 /**
  * Address: 0x00D474D8 (luaT_typenames)

@@ -91,6 +91,9 @@ namespace moho
 {
   extern bool ren_Fx;
   extern bool ren_Terrain;
+  // Engine addition (the map editor's mesh terrain): false skips only the height field's surface. ren_Terrain off
+  // skips the whole terrain block, the shadow map with it, so ground drawn as models would have no shadows.
+  bool ren_TerrainSurface = true;
   extern bool ren_ShowSkeletons;
   extern bool ren_Water;
   extern bool ren_Reflection;
@@ -2034,7 +2037,7 @@ void moho::WRenViewport::RenderWorldView(
     }
 
     FogOn(worldView->mView->CameraGetZoom());
-    {
+    if (moho::ren_TerrainSurface) {
       const gpg::gal::RenderProfileScope profileTerrain("Terrain");
       RenderCompositeTerrain(terrain);
     }
@@ -2667,28 +2670,10 @@ void moho::WRenViewport::RenderCompositeTerrain(
   // worker is still building can wait a frame (gpg/gal/PipelineDefer.h); a decal or stratum shader first seen when
   // the camera moved stalled the frame 0.4 s on the driver.
   const gpg::gal::PipelineDeferScope deferPipelines;
-  const auto drewNormals = terrain->DrawNormals(
+  (void)terrain->DrawNormals(
     moho::REN_GetGameTick(), moho::REN_GetSimDeltaSeconds(), mPrimaryTargetLocks[mHead], shadowContext
   );
   terrain->DrawTerrainSkirt();
-
-  // (rectCacheCount=122..128) and the vertex upload runs, yet the viewport is
-  // flat -- so the failure is at or after this composite dispatch. Report
-  // whether this is even reached, what DrawNormals returned, and whether the
-  // primary target lock it draws into is bound.
-  {
-    static int sCompositeBudget = 0;
-    if (sCompositeBudget < 5) {
-      ++sCompositeBudget;
-      gpg::Warnf(
-        "[COMPDIAG] RenderCompositeTerrain head=%d drewNormals=%d target=%p shadowCtx=%p",
-        mHead,
-        static_cast<int>(drewNormals),
-        static_cast<const void*>(mPrimaryTargetLocks[mHead].get()),
-        static_cast<const void*>(shadowContext)
-      );
-    }
-  }
 }
 
 /**

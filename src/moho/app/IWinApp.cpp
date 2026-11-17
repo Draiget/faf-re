@@ -139,7 +139,7 @@ bool IWinApp::AppInitCommonServices()
   // first line, after the `/log` target exists so the line lands in the .sclog.
   gpg::Logf("Engine build: %s", gpg::diag::BuildIdentity());
 
-#if defined(_M_X64)
+#if FAFRE_ARCH_64BIT
   // x64 port test mode, not in the binary; see gpg::LogHighMemoryReservation.
   // After the `/log` target exists so the line lands in the .sclog.
   gpg::LogHighMemoryReservation();

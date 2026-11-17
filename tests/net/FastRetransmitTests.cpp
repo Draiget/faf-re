@@ -21,6 +21,8 @@
 // Build: cmake --build --preset clang-x64-release --target faf_fast_retransmit_tests
 // Run:   build\clang-x64-release\tests\faf_fast_retransmit_tests.exe   (exit code = failures)
 
+#include "NetTestSupport.h"
+
 #include "moho/net/CMessage.h"
 #include "moho/net/CNetUDPConnector.h"
 #include "moho/net/Common.h"
@@ -39,6 +41,7 @@
 #include <cstring>
 #include <memory>
 #include <mutex>
+#include <print>
 #include <string>
 #include <thread>
 #include <vector>
@@ -55,7 +58,7 @@ namespace
   )
   {
     EXPECT_TRUE(ok) << what;
-    std::printf("%s %s\n", ok ? "ok  " : "FAIL", what);
+    std::println("{} {}", ok ? "ok  " : "FAIL", what);
   }
 
   constexpr unsigned kMessageType = 100;
@@ -222,11 +225,8 @@ namespace
     }
 
     ba->RemoveReceiver(kMessageType, kMessageType + 1, &atB);
-    ab->Close();
-    ba->Close();
-    a->Destroy();
-    b->Destroy();
-    std::this_thread::sleep_for(std::chrono::milliseconds(200));
+    // Both gone before the next run, whose connectors may take their memory, which these pipes deliver to.
+    Check(net_test::EndConnected(a, ab, b, ba), "both connectors gone before the next run");
     return r;
   }
 
@@ -235,9 +235,9 @@ namespace
     const Result& r
   )
   {
-    std::printf(
-      "  %s: lost packet dropped %s, sent again %d time(s), first resend %.1f ms after the loss, longest wait %.1f "
-      "ms\n",
+    std::println(
+      "  {}: lost packet dropped {}, sent again {} time(s), first resend {:.1f} ms after the loss, longest wait {:.1f} "
+      "ms",
       label,
       r.dropped ? "yes" : "no",
       r.resends,
@@ -262,7 +262,7 @@ TEST(
       w = r.resendAfterMs;
     }
     std::sort(resends, resends + 3);
-    std::printf("  %s: median first resend %.1f ms after the loss\n", label, resends[1]);
+    std::println("  {}: median first resend {:.1f} ms after the loss", label, resends[1]);
     return resends[1];
   };
 
@@ -287,7 +287,7 @@ TEST(
       w = r.resendAfterMs;
     }
     std::sort(resends, resends + 3);
-    std::printf("  %s: median first resend %.1f ms after the loss\n", label, resends[1]);
+    std::println("  {}: median first resend {:.1f} ms after the loss", label, resends[1]);
     return resends[1];
   };
 

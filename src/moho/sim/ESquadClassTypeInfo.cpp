@@ -1,5 +1,6 @@
 #include "moho/sim/ESquadClassTypeInfo.h"
 
+#include <utility>
 #include <cstdint>
 #include <new>
 #include <typeinfo>
@@ -98,12 +99,12 @@ namespace moho
   void ESquadClassTypeInfo::AddEnums()
   {
     mPrefix = "SQUADCLASS_";
-    AddEnum(StripPrefix("SQUADCLASS_Unassigned"), static_cast<std::int32_t>(ESquadClass::Unassigned));
-    AddEnum(StripPrefix("SQUADCLASS_Attack"), static_cast<std::int32_t>(ESquadClass::Attack));
-    AddEnum(StripPrefix("SQUADCLASS_Artillery"), static_cast<std::int32_t>(ESquadClass::Artillery));
-    AddEnum(StripPrefix("SQUADCLASS_Guard"), static_cast<std::int32_t>(ESquadClass::Guard));
-    AddEnum(StripPrefix("SQUADCLASS_Support"), static_cast<std::int32_t>(ESquadClass::Support));
-    AddEnum(StripPrefix("SQUADCLASS_Scout"), static_cast<std::int32_t>(ESquadClass::Scout));
+    AddEnum(StripPrefix("SQUADCLASS_Unassigned"), std::to_underlying(ESquadClass::Unassigned));
+    AddEnum(StripPrefix("SQUADCLASS_Attack"), std::to_underlying(ESquadClass::Attack));
+    AddEnum(StripPrefix("SQUADCLASS_Artillery"), std::to_underlying(ESquadClass::Artillery));
+    AddEnum(StripPrefix("SQUADCLASS_Guard"), std::to_underlying(ESquadClass::Guard));
+    AddEnum(StripPrefix("SQUADCLASS_Support"), std::to_underlying(ESquadClass::Support));
+    AddEnum(StripPrefix("SQUADCLASS_Scout"), std::to_underlying(ESquadClass::Scout));
   }
 } // namespace moho
 

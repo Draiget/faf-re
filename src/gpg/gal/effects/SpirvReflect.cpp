@@ -145,7 +145,7 @@ namespace gpg::gal::effects
       }
       SpirvInterfaceVariable entry;
       entry.id = variable.id;
-      entry.builtIn = builtIns.count(variable.id) != 0U;
+      entry.builtIn = builtIns.contains(variable.id);
       const auto location = locations.find(variable.id);
       if (location == locations.end() && !entry.builtIn) {
         continue;
@@ -181,7 +181,7 @@ namespace gpg::gal::effects
       }
 
       // "TEXCOORD3" -> ("TEXCOORD", 3).
-      std::string semantic = semantics.count(variable.id) != 0U ? semantics[variable.id] : std::string();
+      std::string semantic = semantics.contains(variable.id) ? semantics[variable.id] : std::string();
       std::transform(semantic.begin(), semantic.end(), semantic.begin(), [](const unsigned char c) {
         return static_cast<char>(std::toupper(c));
       });
@@ -192,7 +192,7 @@ namespace gpg::gal::effects
       entry.semanticIndex =
         (digits < semantic.size()) ? static_cast<std::uint32_t>(std::stoul(semantic.substr(digits))) : 0U;
       entry.semantic = semantic.substr(0U, digits);
-      if (entry.semantic.rfind("SV_", 0U) == 0U) {
+      if (entry.semantic.starts_with("SV_")) {
         entry.builtIn = true;
       }
       (variable.storage == kStorageInput ? result.inputs : result.outputs).push_back(std::move(entry));

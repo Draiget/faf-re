@@ -8,6 +8,7 @@
 #include "editor/tools/EdHeightBrush.h"
 
 #include <cstdint>
+#include <expected>
 #include <string>
 
 namespace faf::editor
@@ -46,38 +47,31 @@ namespace faf::editor
   /** How many parts a symmetry splits a map into (1 for none). */
   [[nodiscard]] int SymmetryParts(Symmetry symmetry, int turns);
 
-  /** The heights (`width` x `height` words) made symmetric; false with `error` when the op refuses. */
-  bool SymmetrizeHeights(
-    std::uint16_t* heights,
-    int width,
-    int height,
-    const SymmetrizeOptions& options,
-    std::string& error
-  );
+  /** The heights (`width` x `height` words) made symmetric; the error when the op refuses. */
+  [[nodiscard]] std::expected<void, std::string>
+  SymmetrizeHeights(std::uint16_t* heights, int width, int height, const SymmetrizeOptions& options);
 
   /**
    * The eight strata masks (a 64-bit texel each, byte k stratum k + 1) made symmetric, each on its own. The masks
    * cover the map of `fieldWidth` x `fieldHeight` height samples; a texel's middle is where it lies.
    */
-  bool SymmetrizeMasks(
+  [[nodiscard]] std::expected<void, std::string> SymmetrizeMasks(
     std::uint64_t* texels,
     int maskWidth,
     int maskHeight,
     int fieldWidth,
     int fieldHeight,
-    const SymmetrizeOptions& options,
-    std::string& error
+    const SymmetrizeOptions& options
   );
 
   /** A grid of codes over the map (terrain types: a byte a cell) made symmetric: each takes a copy's code, never a
    * blend. */
-  bool SymmetrizeCells(
+  [[nodiscard]] std::expected<void, std::string> SymmetrizeCells(
     std::uint8_t* cells,
     int cellWidth,
     int cellHeight,
     int fieldWidth,
     int fieldHeight,
-    const SymmetrizeOptions& options,
-    std::string& error
+    const SymmetrizeOptions& options
   );
 } // namespace faf::editor

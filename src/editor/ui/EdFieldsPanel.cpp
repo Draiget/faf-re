@@ -30,7 +30,7 @@ namespace faf::editor
       for (char& c : b) {
         c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
       }
-      return a.find(b) != std::string::npos;
+      return a.contains(b);
     }
 
     /** The grid as grey cells (its lowest black, its highest white), filling `size` x `size` pixels. */
@@ -85,6 +85,8 @@ namespace faf::editor
       ImGui::End();
       return;
     }
+    DrawQuickGen();
+    ImGui::SeparatorText("Ops on a copy of the heights");
     if (ImGui::Button(mStack.Empty() ? "Start from the map's heights" : "Start again from the map")) {
       field::Grid ground;
       if (mGround && mGround(ground)) {
@@ -115,14 +117,13 @@ namespace faf::editor
     ImGui::InputTextMultiline("##fieldsparams", mParams, sizeof(mParams), ImVec2(-1.0f, Em(70.0f)));
     ImGui::BeginDisabled(mStack.Empty() || names.empty());
     if (ImGui::Button("Apply")) {
-      std::string error;
       const std::string& op = names[static_cast<std::size_t>(mOp)];
-      if (mStack.Apply(op, ParseOpParams(mParams), error)) {
+      if (const auto applied = mStack.Apply(op, ParseOpParams(mParams))) {
         mStatus = op + " applied (" + std::to_string(mStack.Steps().size()) + " steps).";
         gpg::Logf("editor: fields: %s", mStack.Steps().back().c_str());
       } else {
-        mStatus = op + ": " + error;
-        gpg::Warnf("editor: fields: %s: %s", op.c_str(), error.c_str());
+        mStatus = op + ": " + applied.error();
+        gpg::Warnf("editor: fields: %s: %s", op.c_str(), applied.error().c_str());
       }
     }
     ImGui::SameLine();
@@ -134,7 +135,35 @@ namespace faf::editor
       mCommitAsked = true;
     }
     EdSetItemTooltip("The top of the stack becomes the map's heights, as one undo step");
+    ImGui::SetNextItemWidth(Em(70.0f));
+    FillSliderInt("##commitlayer", &mCommitLayer, 1, 8, "layer %d");
+    ImGui::SameLine();
+    if (ImGui::Button("Commit to layer")) {
+      mLayerCommitAsked = true;
+    }
+    EdSetItemTooltip("The top of the stack (0..1) as that layer's paint, as one undo step");
+    ImGui::Checkbox("Live preview", &mLive);
+    EdSetItemTooltip("The last op is applied again half a second after its parameters change");
     ImGui::EndDisabled();
+    // Live: the parameters changed and the wait passed: the last op off and on again with them.
+    if (mLive && !mStack.Empty() && !mStack.Steps().empty() && !names.empty()) {
+      const double now = ImGui::GetTime();
+      if (mLiveParams != mParams) {
+        mLiveParams = mParams;
+        mLiveDue = now + 0.5;
+      } else if (mLiveDue > 0.0 && now >= mLiveDue) {
+        mLiveDue = -1.0;
+        const std::string& op = names[static_cast<std::size_t>(mOp)];
+        const auto applied = mStack.Back() ? mStack.Apply(op, ParseOpParams(mParams)) : std::unexpected(std::string());
+        if (applied) {
+          mStatus = op + " again with the new values (live).";
+        } else if (!applied.error().empty()) {
+          mStatus = op + ": " + applied.error();
+        }
+      }
+    } else {
+      mLiveParams = mParams;
+    }
     if (!mStatus.empty()) {
       ImGui::TextWrapped("%s", mStatus.c_str());
     }
@@ -147,6 +176,133 @@ namespace faf::editor
       }
     }
     ImGui::End();
+  }
+
+  const std::vector<EdFieldsPanel::QuickGenPreset>& EdFieldsPanel::QuickGenPresets()
+  {
+    // FAF Studio's fieldgen.lua presets: feature size, the relief's size, gullies, warp, detail (their op chains are
+    // in EdApp's RunQuickGen).
+    static const std::vector<QuickGenPreset> presets = {
+      {"Hills",
+       "Rolling hills: rounded hills and broad swells with a little warp; fine detail damped on the steep ground.",
+       140.0f,
+       18.0f,
+       0.0f,
+       0.5f,
+       0.5f},
+      {"Mountains",
+       "Mountain ranges: ridged crests over a broad massif, finer detail on the steep ground, weathered by gullies.",
+       240.0f,
+       60.0f,
+       0.5f,
+       0.4f,
+       0.6f},
+      {"Badlands", "Flat topped mesas with steep stepped sides and rough cliffs.", 200.0f, 35.0f, 0.3f, 0.4f, 0.5f},
+      {"Dunes",
+       "Sand dunes: long crests with a gentle windward and a steep lee side, some stretches flat.",
+       120.0f,
+       10.0f,
+       0.0f,
+       0.5f,
+       0.4f},
+      {"Plains",
+       "Small, soft relief for flat ground: gentle swells and a little roughness.",
+       90.0f,
+       4.0f,
+       0.0f,
+       0.3f,
+       0.8f},
+      {"Rocks", "Fields of boulders: rounded cells roughened by fractal noise.", 45.0f, 10.0f, 0.0f, 0.3f, 0.6f},
+    };
+    return presets;
+  }
+
+  void EdFieldsPanel::DrawQuickGen()
+  {
+    if (!ImGui::CollapsingHeader("Generate into the map", ImGuiTreeNodeFlags_DefaultOpen)) {
+      return;
+    }
+    QuickGenSettings& q = mQuick;
+    std::vector<const char*> names;
+    for (const QuickGenPreset& p : QuickGenPresets()) {
+      names.push_back(p.label);
+    }
+    ImGui::SetNextItemWidth(Em(140.0f));
+    if (EdCombo("##qgpreset", &q.preset, names.data(), static_cast<int>(names.size()))) {
+      const QuickGenPreset& p = QuickGenPresets()[static_cast<std::size_t>(q.preset)];
+      q.scale = p.scale;
+      q.amplitude = p.amplitude;
+      q.warp = p.warp;
+      q.detail = p.detail;
+      q.gullies = p.gullies;
+    }
+    EdSetItemTooltip("%s", QuickGenPresets()[static_cast<std::size_t>(std::clamp(q.preset, 0, 5))].tip);
+    ImGui::SameLine();
+    static constexpr const char* kBlends[] = {"Add", "Multiply", "Raise only", "Lower only", "Replace"};
+    ImGui::SetNextItemWidth(Em(120.0f));
+    (void)EdCombo("##qgblend", &q.blend, kBlends, 5);
+    EdSetItemTooltip(
+      "Add: on top of the ground. Multiply: more on higher ground. Raise only / Lower only. Replace: in "
+      "place of the ground (the mean height stays)"
+    );
+    ImGui::SetNextItemWidth(-1.0f);
+    FillSliderFloat("##qgamp", &q.amplitude, 0.5f, 150.0f, "Relief %.1f units");
+    ImGui::SetNextItemWidth(-1.0f);
+    FillSliderFloat("##qgstrength", &q.strength, 0.0f, 1.0f, "Strength %.2f");
+    ImGui::SetNextItemWidth(-1.0f);
+    FillSliderFloat("##qgscale", &q.scale, 10.0f, 800.0f, "Feature size %.0f units");
+    ImGui::SetNextItemWidth(Em(100.0f));
+    ImGui::InputInt("Seed##qg", &q.seed);
+    ImGui::SameLine();
+    if (ImGui::SmallButton("Random##qg")) {
+      q.seed = static_cast<int>(ImGui::GetFrameCount() * 2654435761u % 9999u) + 1;
+    }
+    ImGui::SetNextItemWidth(-1.0f);
+    FillSliderFloat("##qgdetail", &q.detail, 0.0f, 1.0f, "Detail %.2f");
+    ImGui::SetNextItemWidth(-1.0f);
+    FillSliderFloat("##qgwarp", &q.warp, 0.0f, 1.0f, "Warp %.2f");
+    ImGui::SetNextItemWidth(-1.0f);
+    FillSliderFloat("##qggullies", &q.gullies, 0.0f, 1.0f, q.gullies > 0.001f ? "Gullies %.2f" : "Gullies: off");
+    EdSetItemTooltip("A brief droplet erosion of the relief: gullies and drainage, more droplets the higher");
+    static constexpr const char* kMasks[] = {"Whole map", "Playable area", "An area"};
+    ImGui::SetNextItemWidth(Em(140.0f));
+    (void)EdCombo("##qgmask", &q.mask, kMasks, 3);
+    if (q.mask == 2) {
+      ImGui::SameLine();
+      ImGui::SetNextItemWidth(Em(120.0f));
+      if (EdBeginCombo("##qgarea", q.area.empty() ? "(choose)" : q.area.c_str())) {
+        for (const std::string& a : mAreas) {
+          if (ImGui::Selectable(a.c_str(), a == q.area)) {
+            q.area = a;
+          }
+        }
+        ImGui::EndCombo();
+      }
+    }
+    ImGui::SetNextItemWidth(-1.0f);
+    FillSliderFloat("##qgfeather", &q.feather, 0.0f, 120.0f, "Soft border %.0f units");
+    ImGui::Checkbox("Keep start and resource spots flat", &q.keepFlat);
+    if (q.keepFlat) {
+      ImGui::SameLine();
+      ImGui::SetNextItemWidth(Em(90.0f));
+      FillSliderFloat("##qgflat", &q.flatRadius, 4.0f, 80.0f, "%.0f units");
+    }
+    ImGui::Checkbox("Keep the water level", &q.keepWater);
+    EdSetItemTooltip("Dry ground stays above the water and the sea floor below it");
+    if (ImGui::Button("Preview##qg")) {
+      mQuickAsk = 1;
+    }
+    ImGui::SameLine();
+    if (PrimaryButton("Apply to terrain##qg")) {
+      mQuickAsk = 2;
+    }
+    EdSetItemTooltip("Mixed into the map's heights, one undo step");
+    if (!mQuickText.empty()) {
+      ImGui::TextWrapped("%s", mQuickText.c_str());
+    }
+    if (mQuickChange.w > 1) {
+      DrawGrid(mQuickChange, std::min(ImGui::GetContentRegionAvail().x, Em(200.0f)));
+    }
   }
 
   bool EdFieldsPanel::TakeCommit(
@@ -165,25 +321,41 @@ namespace faf::editor
     return true;
   }
 
-  bool EdFieldsPanel::RunForTest(
+  bool EdFieldsPanel::TakeLayerCommit(
+    field::Grid& out,
+    int& layer
+  )
+  {
+    if (!mLayerCommitAsked) {
+      return false;
+    }
+    mLayerCommitAsked = false;
+    if (mStack.Top() == nullptr) {
+      return false;
+    }
+    out = *mStack.Top();
+    for (float& v : out.v) {
+      v = std::clamp(v, 0.0f, 1.0f);
+    }
+    layer = mCommitLayer;
+    mStatus = "Put into layer " + std::to_string(layer) + " (one undo step).";
+    return true;
+  }
+
+  std::expected<std::string, std::string> EdFieldsPanel::RunForTest(
     const std::string& op,
-    const std::string& params,
-    std::string& status
+    const std::string& params
   )
   {
     field::Grid ground;
     if (!mGround || !mGround(ground)) {
-      status = "no heights yet";
-      return false;
+      return std::unexpected("no heights yet");
     }
     mStack.Start(std::move(ground));
-    std::string error;
-    if (!mStack.Apply(op, ParseOpParams(params), error)) {
-      status = op + ": " + error;
-      return false;
+    if (const auto applied = mStack.Apply(op, ParseOpParams(params)); !applied) {
+      return std::unexpected(op + ": " + applied.error());
     }
     mCommitAsked = true;
-    status = mStack.Steps().back();
-    return true;
+    return mStack.Steps().back();
   }
 } // namespace faf::editor

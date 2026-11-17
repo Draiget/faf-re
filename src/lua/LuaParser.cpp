@@ -495,7 +495,7 @@ namespace
   TString* luaS_newlstr(lua_State* L, const char* str, std::size_t len);
   TString* PushLuaStringAtStackSlot(lua_State* L, LuaPlus::StkId slot, const char* source);
   char* luaZ_openspace(lua_State* L, Mbuffer* buff, std::size_t n);
-  void luaG_runerror(lua_State* L, const char* format, ...);
+  [[noreturn]] void luaG_runerror(lua_State* L, const char* format, ...);
   int luaK_exp2anyreg(FuncState* fs, expdesc* e);
   void luaK_indexed(FuncState* fs, expdesc* t, expdesc* k);
   void luaK_prefix(FuncState* fs, std::int32_t op, expdesc* expression);
@@ -511,8 +511,10 @@ namespace
   // combination under /EHc even though the throw is exactly what the binary
   // does.
   // ---------------------------------------------------------------------
+#ifdef _MSC_VER
 #pragma warning(push)
 #pragma warning(disable : 4297) // function assumed not to throw but does
+#endif
 
   /**
    * Address: 0x00918120 (FUN_00918120, luaX_token2str)
@@ -617,7 +619,9 @@ namespace
     }
   }
 
+#ifdef _MSC_VER
 #pragma warning(pop)
+#endif
 
   /**
    * What it does:

@@ -1,5 +1,6 @@
 #include "moho/ai/CAiBuilderImpl.h"
 
+#include <utility>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -175,8 +176,8 @@ namespace
     const SFootprint& footprint
   ) noexcept
   {
-    const auto mask = static_cast<std::uint8_t>(footprint.mOccupancyCaps);
-    return (mask & static_cast<std::uint8_t>(EOccupancyCaps::OC_SEABED)) != 0u;
+    const auto mask = std::to_underlying(footprint.mOccupancyCaps);
+    return (mask & std::to_underlying(EOccupancyCaps::OC_SEABED)) != 0u;
   }
 
   [[nodiscard]] bool IsTransportTargetEntityAllowed(

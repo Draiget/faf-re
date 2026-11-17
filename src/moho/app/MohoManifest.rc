@@ -1,4 +1,6 @@
-// Application manifest of the engine (asInvoker, system DPI aware). The build
+// Application manifest of the engine (asInvoker, per-monitor DPI aware: SDL3 then
+// keeps the window's pixel size across displays and reports each display's scale,
+// which the UI follows; the retail exe declared none). The build
 // links with /MANIFEST:NO and embeds res/main.manifest from here, so the
 // result does not depend on the linker's manifest-merging support.
 //

@@ -823,3 +823,49 @@ do
         })
     end
 end
+
+-- The interface scale without a restart, and following the display (/fafengine/modules/lua/ui/uiscale.lua). FAF's UI
+-- Scale entry asked for a restart; here it applies at once. "Match display scale" after it sets UI Scale from the scale
+-- of the display the game window is on. Only on an engine that reports that scale (GetDisplayScale).
+do
+    if rawget(_G, 'GetDisplayScale') then
+        local UiScale = import('/fafengine/modules/lua/ui/uiscale.lua')
+        for _, tab in options do
+            local items = type(tab) == 'table' and tab.items
+            if items then
+                for index, item in items do
+                    if item.key == 'ui_scale' then
+                        item.restart = nil
+                        item.set = function(key, value, startup)
+                            if not startup and type(value) == 'number' then
+                                UiScale.OnChosen(value)
+                            end
+                        end
+                        if not HasOptionKey(items, 'ui_scale_auto') then
+                            table.insert(items, index + 1, {
+                                title = "Match display scale",
+                                key = 'ui_scale_auto',
+                                type = 'toggle',
+                                -- Reset to defaults follows the display; a profile without the setting yet gets
+                                -- it from uiscale.lua's StartupScale (on for UI Scale unset or 100 %).
+                                default = true,
+                                set = function(key, value, startup)
+                                    if not startup then
+                                        UiScale.OnFollowChosen(value == true)
+                                    end
+                                end,
+                                custom = {
+                                    states = {
+                                        { text = "<LOC _On>", key = true },
+                                        { text = "<LOC _Off>", key = false },
+                                    },
+                                },
+                            })
+                        end
+                        break
+                    end
+                end
+            end
+        end
+    end
+end

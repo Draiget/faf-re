@@ -15,6 +15,7 @@
 
 #include <algorithm>
 #include <cstdio>
+#include <print>
 #include <string>
 #include <vector>
 
@@ -32,7 +33,7 @@ int main(
   if (argc > 1) {
     out = std::fopen(argv[1], "w");
     if (out == nullptr) {
-      std::fprintf(stderr, "cannot write %s\n", argv[1]);
+      std::println(stderr, "cannot write {}", argv[1]);
       return 2;
     }
   }
@@ -40,12 +41,12 @@ int main(
   int sets = 0;
   int forms = 0;
   for (moho::CScrLuaInitFormSet* set = moho::CScrLuaInitFormSet::GetFirst(); set != nullptr; set = set->GetNext()) {
-    std::fprintf(out, "set %s\n", set->mSetName != nullptr ? set->mSetName : "(null)");
+    std::println(out, "set {}", set->mSetName != nullptr ? set->mSetName : "(null)");
     ++sets;
     for (const moho::CScrLuaInitForm* form = set->mForms; form != nullptr; form = form->mNextInSet) {
-      std::fprintf(
+      std::println(
         out,
-        "  form %s [%s]\n",
+        "  form {} [{}]",
         form->mName != nullptr ? form->mName : "(null)",
         form->mGroupName != nullptr ? form->mGroupName : "(null)"
       );
@@ -56,7 +57,7 @@ int main(
   // Types finalised during static init (LookupRType), in type-index order.
   int types = 0;
   for (const gpg::RType* const type : gpg::GetRTypeVec()) {
-    std::fprintf(out, "type %d %s\n", types, type != nullptr ? type->GetName() : "(null)");
+    std::println(out, "type {} {}", types, type != nullptr ? type->GetName() : "(null)");
     ++types;
   }
 
@@ -67,16 +68,16 @@ int main(
   }
   std::sort(preregistered.begin(), preregistered.end());
   for (const std::string& name : preregistered) {
-    std::fprintf(out, "pretype %s\n", name.c_str());
+    std::println(out, "pretype {}", name);
   }
 
   fa::string commands;
   moho::CON_GetCommandList(commands, false);
-  std::fprintf(out, "commands\n%s\n", commands.c_str());
+  std::println(out, "commands\n{}", commands.c_str());
 
-  std::fprintf(
+  std::println(
     stderr,
-    "%d Lua init sets, %d forms, %d reflection types, %zu pre-registered\n",
+    "{} Lua init sets, {} forms, {} reflection types, {} pre-registered",
     sets,
     forms,
     types,

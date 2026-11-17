@@ -516,7 +516,14 @@ namespace moho
     // taken verbatim from the store offsets in FUN_00817850.
     const auto loadTexture = [&](const fa::string& path, std::shared_ptr<gpg::gal::Texture>& lane) {
       ID3DDeviceResources::TextureResourceHandle textureResource;
-      resources->GetTexture(textureResource, path.c_str(), watcher, true);
+      // Engine change: a map whose sky names no texture gets the fallback texture straight away. Retail asks for the
+      // empty name, which the resource manager rejects with "GetResource: Invalid name" and "Can't find texture" before
+      // loading the same fallback (unwatched), so what is drawn is the same; only the two false warnings go.
+      if (path.empty()) {
+        resources->GetTexture(textureResource, "/textures/engine/b_fails_to_load.dds", nullptr, true);
+      } else {
+        resources->GetTexture(textureResource, path.c_str(), watcher, true);
+      }
       textureResource->GetTexture(lane);
     };
 

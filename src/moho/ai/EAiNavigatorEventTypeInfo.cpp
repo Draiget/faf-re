@@ -1,5 +1,6 @@
 #include "moho/ai/EAiNavigatorEventTypeInfo.h"
 
+#include <utility>
 #include <cstdint>
 #include <cstdlib>
 #include <new>
@@ -100,9 +101,9 @@ const char* EAiNavigatorEventTypeInfo::GetName() const
 void EAiNavigatorEventTypeInfo::AddEnums()
 {
   mPrefix = "AINAVEVENT_";
-  AddEnum(StripPrefix("AINAVEVENT_Failed"), static_cast<std::int32_t>(AINAVEVENT_Failed));
-  AddEnum(StripPrefix("AINAVEVENT_Aborted"), static_cast<std::int32_t>(AINAVEVENT_Aborted));
-  AddEnum(StripPrefix("AINAVEVENT_Succeeded"), static_cast<std::int32_t>(AINAVEVENT_Succeeded));
+  AddEnum(StripPrefix("AINAVEVENT_Failed"), std::to_underlying(AINAVEVENT_Failed));
+  AddEnum(StripPrefix("AINAVEVENT_Aborted"), std::to_underlying(AINAVEVENT_Aborted));
+  AddEnum(StripPrefix("AINAVEVENT_Succeeded"), std::to_underlying(AINAVEVENT_Succeeded));
 }
 
 /**

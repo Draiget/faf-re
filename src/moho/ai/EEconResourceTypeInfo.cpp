@@ -1,5 +1,6 @@
 #include "moho/ai/EEconResourceTypeInfo.h"
 
+#include <utility>
 #include <cstdint>
 #include <typeinfo>
 
@@ -99,8 +100,8 @@ namespace moho
   {
     mPrefix = "ECON_";
 
-    AddEnum(StripPrefix("ECON_ENERGY"), static_cast<std::int32_t>(ECON_ENERGY));
-    AddEnum(StripPrefix("ECON_MASS"), static_cast<std::int32_t>(ECON_MASS));
+    AddEnum(StripPrefix("ECON_ENERGY"), std::to_underlying(ECON_ENERGY));
+    AddEnum(StripPrefix("ECON_MASS"), std::to_underlying(ECON_MASS));
   }
 } // namespace moho
 

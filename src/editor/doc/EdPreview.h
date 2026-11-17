@@ -3,6 +3,7 @@
 #include "editor/tools/EdHeightFile.h"
 
 #include <cstdint>
+#include <functional>
 #include <vector>
 
 namespace faf::editor
@@ -26,6 +27,19 @@ namespace faf::editor
     /** The sea's level in game units. */
     float waterLevel = 0.0f;
     std::vector<PreviewDot> dots;
+    /** The picture's side (256: the map file's; 512 for an export, as FAF Studio's preview.lua). */
+    int side = kPreviewSide;
+    /**
+     * Studio's look: the ground's colour from the texture layers at a world point (0..255 each; false: the height
+     * tint), and the map's sun (direction towards it, its colour and the ambience, the lighting's multiplier) in place
+     * of the fixed light from the north-west.
+     */
+    std::function<bool(float x, float z, float (&rgb)[3])> groundColour;
+    bool sun = false;
+    float sunDirection[3] = {-0.5f, 0.75f, -0.5f};
+    float sunColour[3] = {1.0f, 1.0f, 1.0f};
+    float ambient[3] = {0.45f, 0.45f, 0.45f};
+    float multiplier = 1.0f;
   };
 
   /**
@@ -38,7 +52,7 @@ namespace faf::editor
     float offsetX = 0.0f;
     float offsetZ = 0.0f;
   };
-  [[nodiscard]] PreviewFrame PreviewFrameOf(float mapWidth, float mapDepth);
+  [[nodiscard]] PreviewFrame PreviewFrameOf(float mapWidth, float mapDepth, int side = kPreviewSide);
 
   /**
    * The preview picture, kPreviewSide squared, 0xAARRGGBB row by row from the north: the heights shaded (lit from

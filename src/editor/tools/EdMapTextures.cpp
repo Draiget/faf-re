@@ -18,7 +18,7 @@ namespace faf::editor
       const std::string& shader
     )
     {
-      if (shader.rfind("Terrain", 0) != 0 || shader.size() < 10) {
+      if (!shader.starts_with("Terrain") || shader.size() < 10) {
         return false;
       }
       for (std::size_t i = 7; i < 10; ++i) {
@@ -52,18 +52,16 @@ namespace faf::editor
       return top + (bottom - top) * fz;
     }
 
-    bool Op(
+    std::expected<void, std::string> Op(
       const char* const name,
       field::OpArgs& args,
-      field::Grid& out,
-      std::string& error
+      field::Grid& out
     )
     {
-      if (!field::RunOpCpu(name, args, out, error)) {
-        error = std::string(name) + ": " + error;
-        return false;
+      if (const auto ran = field::RunOpCpu(name, args, out); !ran) {
+        return std::unexpected(std::string(name) + ": " + ran.error());
       }
-      return true;
+      return {};
     }
   } // namespace
 
@@ -117,23 +115,20 @@ namespace faf::editor
     return std::clamp((options.waterElevation - ground) / range, 0.0f, 1.0f);
   }
 
-  bool MakeMapTexture(
+  std::expected<std::vector<float>, std::string> MakeMapTexture(
     const std::vector<float>& heights,
     const int width,
     const int height,
     const MapTextureTarget& target,
     const MapTextureOptions& options,
-    const int size,
-    std::vector<float>& rgba,
-    std::string& error
+    const int size
   )
   {
     if (
       !target.Valid() || width < 2 || height < 2 || size < 1 ||
       heights.size() != static_cast<std::size_t>(width) * static_cast<std::size_t>(height)
     ) {
-      error = "no heights or no map-wide slot for this shader";
-      return false;
+      return std::unexpected("no heights or no map-wide slot for this shader");
     }
     auto grid = std::make_shared<field::Grid>(width, height, 1.0f, 0.0f, 0.0f);
     grid->v = heights;
@@ -151,13 +146,12 @@ namespace faf::editor
       args.p.num["strength"] = options.normalStrength;
       args.p.num["shift"] = 0.5;
       args.extra = &extra;
-      if (!Op("normal_map", args, nx, error)) {
-        return false;
+      if (const auto ran = Op("normal_map", args, nx); !ran) {
+        return std::unexpected(ran.error());
       }
       const auto z = extra.find("z");
       if (z == extra.end()) {
-        error = "normal_map: no z";
-        return false;
+        return std::unexpected("normal_map: no z");
       }
       nz = std::move(z->second);
     }
@@ -186,8 +180,8 @@ namespace faf::editor
         args.p.num["altitude"] = alt;
         args.p.num["shadow_len"] = options.reach;
         field::Grid shadow;
-        if (!Op("hillshade", args, shadow, error)) {
-          return false;
+        if (const auto ran = Op("hillshade", args, shadow); !ran) {
+          return std::unexpected(ran.error());
         }
         if (lit.v.empty()) {
           lit = std::move(shadow);
@@ -208,8 +202,8 @@ namespace faf::editor
         args.p.num["radius"] = options.occlusionRadius;
         args.p.num["directions"] = 12;
         args.p.num["gain"] = 2;
-        if (!Op("occlusion", args, occlusion, error)) {
-          return false;
+        if (const auto ran = Op("occlusion", args, occlusion); !ran) {
+          return std::unexpected(ran.error());
         }
         for (float& v : occlusion.v) {
           v = 1.0f - options.occlusion * v;
@@ -218,7 +212,7 @@ namespace faf::editor
     }
 
     // Each pixel at the middle of its part of the map.
-    rgba.assign(static_cast<std::size_t>(size) * static_cast<std::size_t>(size) * 4U, 0.0f);
+    std::vector<float> rgba(static_cast<std::size_t>(size) * static_cast<std::size_t>(size) * 4U, 0.0f);
     const float spanX = static_cast<float>(width - 1);
     const float spanZ = static_cast<float>(height - 1);
     for (int y = 0; y < size; ++y) {
@@ -258,7 +252,7 @@ namespace faf::editor
         }
       }
     }
-    return true;
+    return rgba;
   }
 
   void VisibleWeights(
@@ -295,7 +289,7 @@ namespace faf::editor
     }
   }
 
-  bool MakePaintTexture(
+  std::expected<std::vector<float>, std::string> MakePaintTexture(
     const std::vector<float>& heights,
     const int width,
     const int height,
@@ -303,9 +297,7 @@ namespace faf::editor
     const MapTextureTarget& target,
     const MapTextureOptions& options,
     const MapPaintOptions& paintOptions,
-    const int size,
-    std::vector<float>& rgba,
-    std::string& error
+    const int size
   )
   {
     const bool macro = target.pack == MapTexturePack::Macro;
@@ -314,8 +306,7 @@ namespace faf::editor
       heights.size() != static_cast<std::size_t>(width) * static_cast<std::size_t>(height) || paint.width < 1 ||
       paint.height < 1
     ) {
-      error = "no heights, no masks or no slot for this kind";
-      return false;
+      return std::unexpected("no heights, no masks or no slot for this kind");
     }
     auto grid = std::make_shared<field::Grid>(width, height, 1.0f, 0.0f, 0.0f);
     grid->v = heights;
@@ -352,8 +343,8 @@ namespace faf::editor
       args.p.num["seed"] = paintOptions.seed;
       args.p.num["scale"] = paintOptions.scale;
       args.p.num["octaves"] = 5;
-      if (!Op("fractal", args, noise, error)) {
-        return false;
+      if (const auto ran = Op("fractal", args, noise); !ran) {
+        return std::unexpected(ran.error());
       }
       if (paintOptions.cavity > 0.0f) {
         field::OpArgs cavityArgs;
@@ -362,8 +353,8 @@ namespace faf::editor
         cavityArgs.p.num["radius"] = 30;
         cavityArgs.p.num["directions"] = 12;
         cavityArgs.p.num["gain"] = 2;
-        if (!Op("occlusion", cavityArgs, cavity, error)) {
-          return false;
+        if (const auto ran = Op("occlusion", cavityArgs, cavity); !ran) {
+          return std::unexpected(ran.error());
         }
       }
     } else {
@@ -393,7 +384,7 @@ namespace faf::editor
       shine = maskField(sum);
     }
 
-    rgba.assign(static_cast<std::size_t>(size) * static_cast<std::size_t>(size) * 4U, 0.0f);
+    std::vector<float> rgba(static_cast<std::size_t>(size) * static_cast<std::size_t>(size) * 4U, 0.0f);
     for (int y = 0; y < size; ++y) {
       for (int x = 0; x < size; ++x) {
         const float wx = (static_cast<float>(x) + 0.5f) / static_cast<float>(size) * spanX;
@@ -426,6 +417,6 @@ namespace faf::editor
         p[3] = std::clamp(0.3f + 0.45f * paintOptions.sharpness * s, 0.0f, 1.0f);
       }
     }
-    return true;
+    return rgba;
   }
 } // namespace faf::editor

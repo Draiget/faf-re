@@ -14,7 +14,7 @@ namespace faf::editor
       const std::string& part
     )
     {
-      return text.find(part) != std::string::npos;
+      return text.contains(part);
     }
 
     EmitterBlueprint Game()

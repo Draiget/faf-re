@@ -36,7 +36,7 @@ namespace gpg::gal::effects
     const SamplerDesc& sampler
   )
   {
-    return Lower(sampler.texture) == "shadowtexture" && Lower(sampler.name).find("blur") == std::string::npos;
+    return Lower(sampler.texture) == "shadowtexture" && !Lower(sampler.name).contains("blur");
   }
 
   std::string_view ShadowCascadeDeclaration() noexcept
@@ -463,7 +463,7 @@ float3 faf_ray_water(float3 surface, float3 direction, float4x4 worldToClip, flo
         const std::size_t statement = body.find_last_of(";{}", call);
         const std::size_t begin = (statement == std::string::npos) ? 0U : statement + 1U;
         const std::string head = body.substr(begin, call - begin);
-        if (head.find("float4") == std::string::npos || head.find('=') == std::string::npos) {
+        if (!head.contains("float4") || !head.contains('=')) {
           continue;
         }
         const std::string call_text = body.substr(call, semicolon - 1U - call);
@@ -840,10 +840,10 @@ float4 tex3Dlod(faf_sampler s, float4 uv) { return s.t3.SampleLevel(s.s, uv.xyz,
       // An untyped `sampler` takes the kind of the lookup that reads it: the
       // primitive batcher reads one sampler as 2D or cube per technique.
       std::vector<TextureDimension> dimensions{TextureDimension::Texture2D};
-      if (source.find("texCUBE") != std::string_view::npos) {
+      if (source.contains("texCUBE")) {
         dimensions.push_back(TextureDimension::TextureCube);
       }
-      if (source.find("tex3D") != std::string_view::npos) {
+      if (source.contains("tex3D")) {
         dimensions.push_back(TextureDimension::Texture3D);
       }
       return dimensions;
@@ -1027,7 +1027,7 @@ float4 tex3Dlod(faf_sampler s, float4 uv) { return s.t3.SampleLevel(s.s, uv.xyz,
       function.name = before.substr(space + 1U);
       function.returnType = Trim(before.substr(0U, space));
       for (const char* const modifier : {"inline ", "static "}) {
-        if (function.returnType.rfind(modifier, 0U) == 0U) {
+        if (function.returnType.starts_with(modifier)) {
           function.returnType = Trim(function.returnType.substr(std::char_traits<char>::length(modifier)));
         }
       }
@@ -1374,8 +1374,8 @@ float4 tex3Dlod(faf_sampler s, float4 uv) { return s.t3.SampleLevel(s.s, uv.xyz,
       for (const Item& item : items) {
         Function function;
         if (
-          item.braced && item.head.find('(') != std::string::npos && !HasTopLevelAssignment(item.head) &&
-          ParseFunctionHead(item.head, function) && functions.find(function.name) == functions.end()
+          item.braced && item.head.contains('(') && !HasTopLevelAssignment(item.head) &&
+          ParseFunctionHead(item.head, function) && !functions.contains(function.name)
         ) {
           functions[function.name] = function;
         }
@@ -1638,9 +1638,7 @@ float4 tex3Dlod(faf_sampler s, float4 uv) { return s.t3.SampleLevel(s.s, uv.xyz,
               body += declaration;
             }
           }
-        } else if (
-          numericParameters.count(parameter->name) != 0U || parameter->parameterClass == ParameterClass::Struct
-        ) {
+        } else if (numericParameters.contains(parameter->name) || parameter->parameterClass == ParameterClass::Struct) {
           body += GlobalDeclaration(*parameter) + "\n";
           if (rayWater && parameter->name == kRayShadowParameter) {
             body += kRayWaterHelpers;
@@ -1674,7 +1672,7 @@ float4 tex3Dlod(faf_sampler s, float4 uv) { return s.t3.SampleLevel(s.s, uv.xyz,
       }
 
       Function function;
-      if (head.find('(') != std::string::npos && !HasTopLevelAssignment(head) && ParseFunctionHead(head, function)) {
+      if (head.contains('(') && !HasTopLevelAssignment(head) && ParseFunctionHead(head, function)) {
         // A function: local copies of the parameters it writes.
         std::string functionBody = item.body;
         if (description.direct3D9PassStates && function.name == "AlphaTestD3D10") {

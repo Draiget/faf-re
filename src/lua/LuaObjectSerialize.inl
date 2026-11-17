@@ -628,7 +628,7 @@ void Table::MemberSerialize(
 
         const int keyType = slot.KeyTag();
         const bool keyReadable = slot.i_val.tt != LUA_TNIL || keyType == LUA_TBOOLEAN || keyType == LUA_TNUMBER ||
-          (keyType == LUA_TSTRING && tLiveStrings.count(slot.KeyValue().p) != 0u);
+          (keyType == LUA_TSTRING && tLiveStrings.contains(slot.KeyValue().p));
         if (!keyReadable) {
           archive->WriteUByte(2u); // a dead key: takes its slot, holds nothing
         } else {

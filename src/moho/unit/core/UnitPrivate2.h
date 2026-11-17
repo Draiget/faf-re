@@ -3,6 +3,7 @@
 // Private to moho/unit/core: helpers the pieces of the former Unit.cpp share.
 
 #include "moho/unit/core/UnitPrivate.h"
+#include <utility>
 
 namespace moho
 {
@@ -73,12 +74,11 @@ namespace
   {
     EOccupancyCaps occupancyCaps = OCCUPY_MobileCheck(moverFootprint, mapData, candidateCell);
     if (moveLayer == LAYER_Water) {
-      const std::uint8_t filteredCaps =
-        static_cast<std::uint8_t>(occupancyCaps) & ~static_cast<std::uint8_t>(EOccupancyCaps::OC_SUB);
+      const std::uint8_t filteredCaps = std::to_underlying(occupancyCaps) & ~std::to_underlying(EOccupancyCaps::OC_SUB);
       occupancyCaps = static_cast<EOccupancyCaps>(filteredCaps);
     }
 
-    if (static_cast<std::uint8_t>(OCCUPY_FootprintFits(ogrid, candidateCell, moverFootprint, occupancyCaps)) == 0u) {
+    if (std::to_underlying(OCCUPY_FootprintFits(ogrid, candidateCell, moverFootprint, occupancyCaps)) == 0u) {
       return false;
     }
 

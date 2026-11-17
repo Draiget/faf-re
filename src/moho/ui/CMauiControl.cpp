@@ -1,5 +1,7 @@
 #include "moho/ui/UiPrivate.h"
 
+#include "gpg/gal/RenderProfiler.h"
+
 namespace
 {
   constexpr const char* kCMauiControlDestroyHelpText = "Control:Destroy() -- destroy a control.\n";
@@ -2320,6 +2322,7 @@ void moho::CMauiControl::Render()
     return;
   }
 
+  FAF_PROFILE_COUNT("ui.depth.rebuilds", 1); // FAF instrumentation
   RebuildRenderedChildrenLane(this);
   SortRenderedChildrenByDepth(mRenderedChildren);
   mInvalidated = false;
@@ -2620,10 +2623,13 @@ moho::CMauiControl* moho::CMauiControl::GetTopmostControl(
   const float y
 )
 {
+  const gpg::gal::CpuProfileScope profileHitTest("UiHitTest"); // FAF instrumentation
+  std::uint32_t visited = 0U;
   CMauiControl* topmostControl = nullptr;
   float topmostDepth = gpg::nInf;
   for (CMauiControl* controlCursor = root; controlCursor != nullptr;
        controlCursor = controlCursor->DepthFirstSuccessor(root)) {
+    ++visited;
     if (controlCursor->IsHidden() || controlCursor->IsHitTestDisabled() || !controlCursor->HitTest(x, y)) {
       continue;
     }
@@ -2635,6 +2641,7 @@ moho::CMauiControl* moho::CMauiControl::GetTopmostControl(
     }
   }
 
+  FAF_PROFILE_COUNT("ui.hittest.visits", visited);
   return topmostControl;
 }
 

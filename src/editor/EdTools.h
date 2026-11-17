@@ -7,6 +7,7 @@
 #include "editor/tools/EdWaterMasks.h"
 #include "editor/tools/EdErosionSuite.h"
 #include "editor/tools/EdInterop.h"
+#include "editor/tools/EdMapTextures.h"
 #include "editor/tools/EdScTools.h"
 #include "editor/tools/EdHeightBrush.h"
 #include "editor/tools/EdBrushLibrary.h"
@@ -37,6 +38,7 @@
 #include <functional>
 #include <cmath>
 #include <array>
+#include <map>
 #include <filesystem>
 #include <memory>
 #include <optional>
@@ -70,6 +72,12 @@ namespace faf::editor
     {
       return mTool == 0;
     }
+    /** What Q and E turn the selection by (Studio's steps: 15, 22.5, 45, 90 degrees). */
+    [[nodiscard]] float TurnStepDegrees() const noexcept
+    {
+      return mTurnStepDegrees;
+    }
+    float mTurnStepDegrees = 15.0f;
     [[nodiscard]] bool PropsToolActive() const noexcept
     {
       return mTool == 4;
@@ -391,7 +399,7 @@ namespace faf::editor
     {
       mTool = 3;
       mWaterMaskPaint = true;
-      mWaterMaskKind = static_cast<int>(mask);
+      mWaterMaskKind = std::to_underlying(mask);
       mWaterMaskValue = value;
       mWaterMaskBrush.radius = radius;
       mWaterMaskBrush.strength = 1.0f;
@@ -960,6 +968,62 @@ namespace faf::editor
       mAreaAddAt[1] = z;
       mAreaAddAsked = true;
     }
+    /**
+     * The areas picked in the view or the Areas list (FAF Studio's area selection), by name; the view moves, resizes,
+     * deletes and copies them, the section edits the first.
+     */
+    [[nodiscard]] std::vector<std::string>& AreaSelection() noexcept
+    {
+      return mAreaSelection;
+    }
+    /** A drag in the view draws a new area (FAF Studio's Place area tool). */
+    [[nodiscard]] bool DrawingAreas() const noexcept
+    {
+      return mDrawingAreas;
+    }
+    void SetDrawingAreas(
+      const bool on
+    ) noexcept
+    {
+      mDrawingAreas = on;
+    }
+    /** Where areas are kept while drawn, moved, resized or typed: 0 anywhere, 1 the map, 2 the playable area. */
+    [[nodiscard]] int AreaLimit() const noexcept
+    {
+      return mAreaLimit;
+    }
+    void SetAreaLimit(
+      const int limit
+    ) noexcept
+    {
+      mAreaLimit = limit;
+    }
+    /** Test runs: the texture browser's stars, recent textures and list view (as tools.ini keeps them). */
+    [[nodiscard]] std::vector<std::string>& StarredTextures() noexcept
+    {
+      return mStarredTextures;
+    }
+    [[nodiscard]] std::vector<std::string>& RecentTextures() noexcept
+    {
+      return mRecentTextures;
+    }
+    void SetBrowseList(
+      const bool list
+    ) noexcept
+    {
+      mBrowseList = list;
+    }
+    [[nodiscard]] bool BrowseList() const noexcept
+    {
+      return mBrowseList;
+    }
+    /** The open map's folder in the game's files (`/maps/<folder>`): the texture browser lists its own textures. */
+    void SetMapFolder(
+      std::string folder
+    )
+    {
+      mMapFolder = std::move(folder);
+    }
     /** The Markers tool's type to place (an entry of MarkerTypes()). */
     [[nodiscard]] const MarkerType& PlaceMarkerType() const noexcept
     {
@@ -1314,6 +1378,40 @@ namespace faf::editor
     {
       return MarkersToolActive() && mDrawChain;
     }
+    /**
+     * The working state kept between runs (FAF Studio's persist.lua and toolopts.lua): each brush mode's radius,
+     * strength and falloff, the brush's mode, shape and symmetry, the turn step, the props, mask, unit and decal
+     * modes and spacings, as `key=value` lines. The map's own view switches and tool are kept per map (ViewState).
+     */
+    [[nodiscard]] std::string SaveToolState();
+    void LoadToolState(const std::string& text);
+    /** The symmetry's centre as an offset from the map's middle (the brushes' Centre X / Z, Layout's Centre symmetry).
+     */
+    void SetSymmetryCentre(
+      const float x,
+      const float z
+    ) noexcept
+    {
+      mSymmetryCentre[0] = x;
+      mSymmetryCentre[1] = z;
+      SetSymmetryCentreOffset(x, z);
+    }
+    /** FAF Studio's markervis: markers drawn as their template's prop model (Markers and Select tools). */
+    [[nodiscard]] bool MarkerModels() const noexcept
+    {
+      return mMarkerModels;
+    }
+    /** FAF Studio's "Selected chain only": the view draws just the current chain (with any tool). */
+    [[nodiscard]] bool ChainOnly() const noexcept
+    {
+      return mChainOnly;
+    }
+    void SetChainOnly(
+      const bool only
+    ) noexcept
+    {
+      mChainOnly = only;
+    }
     /** Export the heights at 8 bits (Import / Export > 8-bit). */
     [[nodiscard]] bool ExportEightBit() const noexcept
     {
@@ -1627,6 +1725,109 @@ namespace faf::editor
       op = std::exchange(mMapTextureOp, MapTextureOp::None);
       return op != MapTextureOp::None;
     }
+    /** The map-wide textures' settings (FAF Studio's maptextures panel): what Make reads besides the map's sun and sea.
+     */
+    [[nodiscard]] const MapTextureOptions& MapTextureSettings() const noexcept
+    {
+      return mMapTexOptions;
+    }
+    [[nodiscard]] const MapPaintOptions& MapPaintSettings() const noexcept
+    {
+      return mMapPaintOptions;
+    }
+    /** The textures' size in pixels; 0: the map's size (64 .. 1024). */
+    [[nodiscard]] int MapTextureSize() const noexcept
+    {
+      return mMapTexSize;
+    }
+    void SetMapTextureSize(
+      const int size
+    ) noexcept
+    {
+      mMapTexSize = size;
+    }
+    /** A made texture's small picture for its row (an ImTextureID, 0 none). */
+    void SetMapTexturePreview(
+      const int kind,
+      const std::uint64_t image
+    ) noexcept
+    {
+      mMapTexPreview[std::clamp(kind, 0, 3)] = image;
+    }
+    [[nodiscard]] std::uint64_t MapTexturePreview(
+      const int kind
+    ) const noexcept
+    {
+      return mMapTexPreview[std::clamp(kind, 0, 3)];
+    }
+    /** Import / Export > Export package (FAF Studio's interopexport.lua): one folder for Gaea or World Machine. */
+    struct ExportPackage
+    {
+      char folder[512] = "";
+      char name[128] = "";    // the files' first part (empty: the map's name)
+      bool normalised = true; // else absolute (a word is 1/128 unit)
+      bool fixedRange = false;
+      float low = 0.0f;
+      float high = 100.0f;
+      int format = 0;       // 0 PNG, 1 TIFF, 2 raw (.r16 / .r32)
+      bool float32 = false; // 32-bit float heights (a TIFF, or .r32 when raw)
+      bool mask8 = false;   // 8-bit masks
+      bool height = true, water = true, slope = true, flow = false, wear = false, layers = true, types = false,
+           markers = true, playable = true, readme = true;
+      float waterSoft = 0.5f;    // the water mask's soft edge (units)
+      float markerRadius = 3.0f; // the start and resource discs' radius (samples)
+      // The link watches the folder: new heights or masks by their names (height*, layer<n>*, mask<n>*).
+      bool watch = false;
+      float interval = 2.0f;
+    };
+    /** Import / Export > Masks: the files and what the whole import does. */
+    struct MaskImport
+    {
+      std::vector<MaskImportFile> files;
+      int mode = 0;          // 0 replace, 1 add, 2 subtract
+      bool takeAway = false; // higher layers take away from the ones below
+      char adding[512] = "";
+    };
+    [[nodiscard]] MaskImport& MaskImportSettings() noexcept
+    {
+      return mMaskImport;
+    }
+    /** 1: guess the files' uses again (the app knows the layers' kinds); 2: import. */
+    [[nodiscard]] int TakeMaskImportAsk() noexcept
+    {
+      return std::exchange(mMaskImportAsk, 0);
+    }
+    void AskMaskImport(
+      const int ask
+    ) noexcept
+    {
+      mMaskImportAsk = ask;
+    }
+    [[nodiscard]] ExportPackage& PackageSettings() noexcept
+    {
+      return mPackage;
+    }
+    /** One file the export package writes (FAF Studio's interopexport.lua Plan): its name and what it holds. */
+    struct PackageFile
+    {
+      std::string id;
+      std::string file;
+      std::string what;
+    };
+    /** The files of an export package with these settings, named `<stem>_<what>.<ext>`. */
+    [[nodiscard]] static std::vector<PackageFile> PackagePlan(const ExportPackage& p, const std::string& stem);
+    /** The heights' extension: raw .r16 / .r32, a TIFF for TIFF or 32-bit floats, else PNG. */
+    [[nodiscard]] static std::string PackageHeightExtension(const ExportPackage& p);
+    /** The files' first part: the package's name, else the open map's folder name. */
+    [[nodiscard]] std::string PackageStem() const;
+    [[nodiscard]] bool TakePackageAsk() noexcept
+    {
+      return std::exchange(mPackageAsk, false);
+    }
+    void AskPackage() noexcept
+    {
+      mPackageAsk = true;
+    }
     [[nodiscard]] MapTextureRow& MapTextureState(
       const int kind
     ) noexcept
@@ -1863,6 +2064,71 @@ namespace faf::editor
       mErosionPreviewShown = previewShown;
     }
     void DrawErosionWindow();
+    /** SC tools > Water (FAF Studio's water-linked masks): each mask's settings, and what the window asks. */
+    struct WaterMaskDef
+    {
+      int id = 0;
+      int kind = 0; // WaterMaskKindName
+      int layer = 1;
+      float strength = 1.0f;
+      float soft = 1.0f;
+      float width = 3.0f;
+      float depth = 4.0f;
+      float slope = 30.0f;
+      bool applied = false;
+      std::string cover; // Preview's answer
+    };
+    enum class WaterMaskAsk
+    {
+      None,
+      Preview,
+      Apply,
+      Remove,
+      Delete,
+    };
+    [[nodiscard]] std::vector<WaterMaskDef>& WaterMaskDefs() noexcept
+    {
+      return mWaterDefs;
+    }
+    [[nodiscard]] bool WaterMasksLive() const noexcept
+    {
+      return mWaterLive;
+    }
+    [[nodiscard]] bool TakeWaterMaskAsk(
+      WaterMaskAsk& ask,
+      int& id
+    ) noexcept
+    {
+      if (mWaterAsk == WaterMaskAsk::None) {
+        return false;
+      }
+      ask = std::exchange(mWaterAsk, WaterMaskAsk::None);
+      id = mWaterAskId;
+      return true;
+    }
+    /** A mask of `kind` into `layer` (the window's + buttons; `/watermasks` in test runs). */
+    int AddWaterMask(
+      const int kind,
+      const int layer
+    )
+    {
+      WaterMaskDef def;
+      def.id = ++mWaterNextId;
+      def.kind = kind;
+      def.layer = layer;
+      mWaterDefs.push_back(def);
+      mWaterSel = def.id;
+      return def.id;
+    }
+    void AskWaterMask(
+      const WaterMaskAsk ask,
+      const int id
+    ) noexcept
+    {
+      mScToolsOpen = true;
+      mWaterAsk = ask;
+      mWaterAskId = id;
+    }
     /** The SC tools window: open it, what it asks the view, and what the view says back. */
     enum class ScAsk
     {
@@ -2057,6 +2323,18 @@ namespace faf::editor
       float spacing = 6.0f;
       float maxSlope = 30.0f; // degrees
       bool dry = true;
+      // FAF Studio's scatter panel: a lowest slope, a height window, the margin from the edge, room round the props
+      // already there, the mask generator's rules as the density, decals instead, a dry run, a seed.
+      float minSlope = 0.0f;
+      bool heightWindow = false;
+      float heightLow = 0.0f;
+      float heightHigh = 200.0f;
+      float margin = 1.0f;
+      float keepAway = 0.0f; // units from the props there (0: none)
+      bool maskRules = false;
+      bool decals = false;
+      bool countOnly = false;
+      int seed = 0; // 0: a new one each time
     };
     [[nodiscard]] bool TakeFillRequest(
       FillOptions& options
@@ -2071,6 +2349,10 @@ namespace faf::editor
     {
       mFill = options;
       mFillRequest = true;
+    }
+    [[nodiscard]] const std::string& FillMessage() const noexcept
+    {
+      return mFillMessage;
     }
     void SetFillMessage(
       std::string message
@@ -2344,7 +2626,7 @@ namespace faf::editor
       LayerConvertOptions& options
     )
     {
-      const std::string key = mBrowsedShader + "|" + std::to_string(static_cast<int>(mConvertOptions.lost)) + "|" +
+      const std::string key = mBrowsedShader + "|" + std::to_string(std::to_underlying(mConvertOptions.lost)) + "|" +
         std::to_string(mConvertOptions.mergeInto) + "|" + (mConvertOptions.arrange ? "1" : "0");
       if (!mShaderBrowserOpen || mBrowsedShader.empty() || key == mConvertPlanKey) {
         return false;
@@ -2422,7 +2704,16 @@ namespace faf::editor
       bool takeAway = false; // only where the layers above leave the ground free
       /** -1: the layer; 0, 1, 2: the water's foam, flatness or depth bias (FAF Studio's "Apply to water mask"). */
       int water = -1;
+      /** A terrain type instead (FAF Studio's ApplyToTypes): `typeCode` where the mask is above `threshold`. */
+      bool toTypes = false;
+      int typeCode = 1;
+      float threshold = 0.5f;
     };
+    /** The mask generator's preview on the map too (FAF Studio draws it on the terrain). */
+    [[nodiscard]] bool GenShowOnMap() const noexcept
+    {
+      return mGenShowOnMap;
+    }
     [[nodiscard]] const std::vector<MaskGenRule>& GenRules() const noexcept
     {
       return mGenRules;
@@ -2469,6 +2760,50 @@ namespace faf::editor
       mGenApply = true;
     }
     /** The preview the app made: an image (0: none), its share of the map, or why there is none. */
+    /** Stratum recipes' extra asks (FAF Studio's recipes panel): Assign textures, Layered textures, Measure, Show. */
+    enum class RecipeAsk
+    {
+      None,
+      Assign,
+      Layered,
+      Measure,
+      Show, // mRecipeShowLayer
+    };
+    [[nodiscard]] bool RecipeAsked() const noexcept
+    {
+      return mRecipeAsk != RecipeAsk::None;
+    }
+    [[nodiscard]] RecipeAsk TakeRecipeAsk(
+      int& layer
+    ) noexcept
+    {
+      layer = mRecipeShowLayer;
+      return std::exchange(mRecipeAsk, RecipeAsk::None);
+    }
+    void AskRecipe(
+      const RecipeAsk ask,
+      const int layer = 0
+    ) noexcept
+    {
+      mRecipeAsk = ask;
+      mRecipeShowLayer = layer;
+    }
+    [[nodiscard]] bool RecipeTypesToo() const noexcept
+    {
+      return mRecipeTypes;
+    }
+    [[nodiscard]] bool RecipeRoughnessToo() const noexcept
+    {
+      return mRecipeRoughness;
+    }
+    void SetRecipeShow(
+      const std::uint64_t image,
+      std::string text
+    )
+    {
+      mRecipeShowImage = image;
+      mRecipeShowText = std::move(text);
+    }
     void SetGenPreview(
       const std::uint64_t image,
       const float coverage,
@@ -2546,6 +2881,53 @@ namespace faf::editor
       mOptimalTiles = tiles;
     }
     /** The Texture sets section: the theme picked, what it would give, and what the panel asks. */
+    /** Layers > Theme library (FAF Studio's themes): the list the app gives, and what the section asks. */
+    struct StrataThemeAsk
+    {
+      enum class Op
+      {
+        None,
+        Try,
+        Apply,
+        Save,   // arg: the name
+        Import, // arg: the map's folder
+        Delete,
+      } op = Op::None;
+      int index = 0;
+      std::string arg;
+      bool clearUnused = false;
+    };
+    void SetStrataThemeList(
+      std::vector<std::string> labels,
+      std::vector<bool> user
+    )
+    {
+      mStrataLabels = std::move(labels);
+      mStrataUser = std::move(user);
+    }
+    [[nodiscard]] bool TakeStrataThemeAsk(
+      StrataThemeAsk& ask
+    ) noexcept
+    {
+      if (mStrataAsk.op == StrataThemeAsk::Op::None) {
+        return false;
+      }
+      ask = std::exchange(mStrataAsk, {});
+      return true;
+    }
+    /** Test runs (`/themelib`): an ask as the section's buttons make it. */
+    void AskStrataTheme(
+      StrataThemeAsk ask
+    )
+    {
+      mStrataAsk = std::move(ask);
+    }
+    void SetStrataThemeStatus(
+      std::string status
+    )
+    {
+      mStrataStatus = std::move(status);
+    }
     enum class ThemeOp : std::uint8_t
     {
       None,
@@ -2636,6 +3018,7 @@ namespace faf::editor
       brush.setTo = mSetHeight * 128.0f;
       brush.terraceStep = mTerraceStep * 128.0f;
       brush.erodeTalus = mErodeTalus;
+      brush.ero = mEroBrush;
       brush.shape = static_cast<BrushShape>(mBrushShape);
       brush.shapeImage = mShapeImage.get();
       brush.stampMode = static_cast<StampMode>(mStampMode);
@@ -2791,6 +3174,19 @@ namespace faf::editor
     }
 
     /** Test runs (`/symcheck`): the Terrain tool with this symmetry (the panel's index), then Check or Copy. */
+    /** The symmetry alone (the tool stays): a graph build's own symmetry while it places its scatters. */
+    void SetSymmetryOnly(
+      const int index,
+      const int turns
+    ) noexcept
+    {
+      mSymmetry = index;
+      mNWay = turns;
+    }
+    [[nodiscard]] int NWayTurns() const noexcept
+    {
+      return mNWay;
+    }
     void SetSymmetry(
       const int index,
       const int turns
@@ -2810,7 +3206,7 @@ namespace faf::editor
       const float offsetZ
     ) noexcept
     {
-      const int index = found.symmetry == Symmetry::None ? -1 : static_cast<int>(found.symmetry);
+      const int index = found.symmetry == Symmetry::None ? -1 : std::to_underlying(found.symmetry);
       const int turns = found.turns;
       mDetectedSymmetry = index;
       mDetectedMatch = found.matched;
@@ -3002,7 +3398,7 @@ namespace faf::editor
       mChecked = checked;
       mDiffering = differing;
       mLargest = largestWords;
-      mCheckedSymmetry = static_cast<int>(checkedWith.symmetry);
+      mCheckedSymmetry = std::to_underlying(checkedWith.symmetry);
       mCheckedTurns = checkedWith.turns;
     }
 
@@ -3026,6 +3422,7 @@ namespace faf::editor
     void DrawFalloffCurve();
     void DrawArrange();
     void DrawBrush(bool withModes);
+    void DrawStrataThemes();
     void DrawSymmetry(bool withCheck = true);
     void DrawLimits();
 
@@ -3042,6 +3439,11 @@ namespace faf::editor
     float mRadius = 14.0f;
     float mStrength = 0.5f;
     float mFalloff = 0.6f;
+    /** Each brush mode's radius, strength and falloff (FAF Studio's persist.lua keeps them per brush kind). */
+    std::map<int, std::array<float, 3>> mBrushByMode;
+    int mBrushModeSeen = 0;
+    /** Switches mode's radius, strength and falloff when the brush mode changed since last looked. */
+    void FollowBrushMode();
     int mSymmetry = 6; // both axes
     int mNWay = 3;
     ViewFrame mViewFrame;
@@ -3065,6 +3467,9 @@ namespace faf::editor
     float mSetHeight = 20.0f;
     float mTerraceStep = 5.0f;
     float mErodeTalus = 0.6f;
+    ErosionBrushValues mEroBrush;
+    /** Water erode, Rain and Deposit: their settings (FAF Studio's Erosion panel's brush sliders). */
+    void DrawErosionBrushValues();
     int mBrushShape = 0; // BrushShape
     float mShapeAngle = 0.0f;
     float mNoiseScale = 8.0f;
@@ -3072,7 +3477,7 @@ namespace faf::editor
     float mNoiseRoughness = 0.5f;
     float mPlanePointX[3]{};
     std::vector<TerrainPathPoint> mPathPoints;
-    int mPathMode = static_cast<int>(PathMode::Ramp);
+    int mPathMode = std::to_underlying(PathMode::Ramp);
     float mPathDepth = 4.0f;
     bool mPathClosed = false;
     bool mPathApply = false;
@@ -3081,6 +3486,11 @@ namespace faf::editor
     std::string mPaintNote;
     bool mBrowseNormals = false; // the browser picks the normal map alone
     bool mBrowseRelief = true;   // normal maps shown as lit relief
+    bool mBrowseList = false;    // a list instead of the grid
+    std::string mMapFolder;      // the open map's folder in the game's files (/maps/<folder>)
+    std::vector<std::string> mStarredTextures;
+    std::vector<std::string> mRecentTextures; // the latest first, at most 12
+    char mBrowsePath[512]{};
     float mPlanePointH[3]{};
     float mPlanePointZ[3]{};
     int mPlanePoints = 0;
@@ -3233,6 +3643,11 @@ namespace faf::editor
     std::map<std::string, ErosionValues> mErosionValues;
     std::string mErosionStatus;
     bool mErosionPreviewShown = false;
+    /** Live (FAF Studio's erosion preview): a change of the solver or a setting runs Preview again, half a second
+     * after the last change. */
+    bool mErosionLive = false;
+    std::string mErosionLiveKey;
+    double mErosionLiveDue = -1.0;
     ErosionMaskChoice mErosionMasks;
     int mMapCounts[4] = {0, 0, 0, 0};
     FillOptions mFill;
@@ -3285,6 +3700,9 @@ namespace faf::editor
     bool mAreaAddAsked = false;
     float mAreaAddAt[2] = {0.0f, 0.0f};
     int mAreaChosen = -1;
+    std::vector<std::string> mAreaSelection;
+    bool mDrawingAreas = false;
+    int mAreaLimit = 0;
     char mAreaName[64] = {};
 
   public:
@@ -3304,6 +3722,7 @@ namespace faf::editor
     std::string mSelectHover;
     std::vector<SaveEntry> mMarkerSelection;
     bool mConnectNodes = false;
+    bool mMarkerModels = true;
     std::vector<CheckPin> mCheckPins;
     std::vector<PathQuad> mPathQuads;
     bool mShowPathing = false;
@@ -3362,8 +3781,38 @@ namespace faf::editor
     char mUnitFilter[64]{};
     int mUnitSelectionCount = 0;
     bool mShowRangeRings = true;
+    std::vector<WaterMaskDef> mWaterDefs;
+    bool mWaterLive = true;
+    int mWaterNextId = 0;
+    int mWaterSel = 0;
+    WaterMaskAsk mWaterAsk = WaterMaskAsk::None;
+    int mWaterAskId = 0;
+    std::vector<std::string> mStrataLabels;
+    std::vector<bool> mStrataUser;
+    int mStrataIndex = 0;
+    bool mStrataClearUnused = false;
+    char mStrataName[64] = "";
+    char mStrataMap[96] = "";
+    StrataThemeAsk mStrataAsk;
+    std::string mStrataStatus;
+    RecipeAsk mRecipeAsk = RecipeAsk::None;
+    int mRecipeShowLayer = 0;
+    bool mRecipeTypes = false;
+    bool mRecipeRoughness = false;
+    std::uint64_t mRecipeShowImage = 0;
+    std::string mRecipeShowText;
+    bool mGenShowOnMap = false;
+    MapTextureOptions mMapTexOptions;
+    MapPaintOptions mMapPaintOptions;
+    int mMapTexSize = 0;
+    std::uint64_t mMapTexPreview[4] = {0, 0, 0, 0};
+    ExportPackage mPackage;
+    MaskImport mMaskImport;
+    int mMaskImportAsk = 0;
+    bool mPackageAsk = false;
     bool mDrawChain = false;
     char mChainName[64] = "Chain_01";
+    bool mChainOnly = false;
     bool mShowBrushWeight = false;
     bool mExportEightBit = false;
     /** The symmetry's centre as an offset from the map's middle (samples). */

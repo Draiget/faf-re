@@ -1,6 +1,7 @@
 #include "CWldSessionLoaderImpl.h"
 #include "platform/X87Precision.h"
 
+#include <utility>
 #include <atomic>
 #include <cfloat>
 #include <chrono>
@@ -133,7 +134,7 @@ namespace moho
       }
 
       auto* const createdState = new LuaPlus::LuaState(
-        LuaPlus::LuaState::LIB_BASE, static_cast<int>(moho::lua_incremental::ELuaVmRole::SessionUi)
+        LuaPlus::LuaState::LIB_BASE, std::to_underlying(moho::lua_incremental::ELuaVmRole::SessionUi)
       );
       if (
         LuaPlus::LuaState* const previousState = scenario->mState;

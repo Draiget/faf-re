@@ -1,5 +1,6 @@
 #include "CClientBase.h"
 
+#include <utility>
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
@@ -64,20 +65,20 @@ namespace
   ) noexcept
   {
     switch (msgType) {
-    case static_cast<uint8_t>(ECmdStreamOp::CMDST_Advance):
+    case std::to_underlying(ECmdStreamOp::CMDST_Advance):
       return sizeof(int32_t);
-    case static_cast<uint8_t>(ECmdStreamOp::CMDST_SetCommandSource):
+    case std::to_underlying(ECmdStreamOp::CMDST_SetCommandSource):
       return sizeof(uint8_t);
-    case static_cast<uint8_t>(EClientMsg::CLIMSG_Ack):
-    case static_cast<uint8_t>(EClientMsg::CLIMSG_Eject):
+    case std::to_underlying(EClientMsg::CLIMSG_Ack):
+    case std::to_underlying(EClientMsg::CLIMSG_Eject):
       return sizeof(uint8_t) + sizeof(int32_t);
-    case static_cast<uint8_t>(EClientMsg::CLIMSG_Dispatched):
-    case static_cast<uint8_t>(EClientMsg::CLIMSG_Available):
-    case static_cast<uint8_t>(EClientMsg::CLIMSG_IntParam):
+    case std::to_underlying(EClientMsg::CLIMSG_Dispatched):
+    case std::to_underlying(EClientMsg::CLIMSG_Available):
+    case std::to_underlying(EClientMsg::CLIMSG_IntParam):
       return sizeof(int32_t);
-    case static_cast<uint8_t>(EClientMsg::CLIMSG_AdjustSimSpeed):
+    case std::to_underlying(EClientMsg::CLIMSG_AdjustSimSpeed):
       return 2 * sizeof(int32_t);
-    case static_cast<uint8_t>(EClientMsg::CLIMSG_ReceiveChat):
+    case std::to_underlying(EClientMsg::CLIMSG_ReceiveChat):
       // An empty chat payload reached the UI's Lua decode and threw there.
       return 1;
     default:
@@ -301,7 +302,7 @@ void CClientBase::Process(
     return;
   }
 
-  if (msgType < static_cast<uint8_t>(EClientMsg::CLIMSG_Ack)) {
+  if (msgType < std::to_underlying(EClientMsg::CLIMSG_Ack)) {
     // Engine addition: this client's stream as received here, for the
     // cross-check (CommandStreamCheck.h).
     CommandStreamCheck* const streamCheck = mManager->mStreamCheck.get();
@@ -309,7 +310,7 @@ void CClientBase::Process(
       streamCheck->Append(mIndex, msg);
     }
 
-    if (msgType == static_cast<uint8_t>(ECmdStreamOp::CMDST_Advance)) {
+    if (msgType == std::to_underlying(ECmdStreamOp::CMDST_Advance)) {
       int32_t beatDelta = 0;
       reader.ReadExact(beatDelta);
       mQueuedBeat += static_cast<uint32_t>(beatDelta);
@@ -358,7 +359,7 @@ void CClientBase::Process(
   }
 
   switch (msgType) {
-  case static_cast<uint8_t>(EClientMsg::CLIMSG_Ack): {
+  case std::to_underlying(EClientMsg::CLIMSG_Ack): {
     const auto ackClientIndex = reader.ReadExact<uint8_t>();
     int32_t ackBeat = 0;
     reader.ReadExact(ackBeat);
@@ -409,7 +410,7 @@ void CClientBase::Process(
     return;
   }
 
-  case static_cast<uint8_t>(EClientMsg::CLIMSG_Dispatched): {
+  case std::to_underlying(EClientMsg::CLIMSG_Dispatched): {
     int32_t remoteDispatchedBeat = 0;
     reader.ReadExact(remoteDispatchedBeat);
 
@@ -427,7 +428,7 @@ void CClientBase::Process(
     return;
   }
 
-  case static_cast<uint8_t>(EClientMsg::CLIMSG_Available): {
+  case std::to_underlying(EClientMsg::CLIMSG_Available): {
     int32_t remoteAvailableBeat = 0;
     reader.ReadExact(remoteAvailableBeat);
 
@@ -445,13 +446,13 @@ void CClientBase::Process(
     return;
   }
 
-  case static_cast<uint8_t>(EClientMsg::CLIMSG_Ready):
+  case std::to_underlying(EClientMsg::CLIMSG_Ready):
     mReady = true;
     // Engine addition (wld_PreciseSharedStart): note when this ready was handled, for the shared start.
     mManager->NoteClientReady(mIndex);
     return;
 
-  case static_cast<uint8_t>(EClientMsg::CLIMSG_Eject): {
+  case std::to_underlying(EClientMsg::CLIMSG_Eject): {
     const auto targetClientIndex = reader.ReadExact<uint8_t>();
     int32_t afterBeat = 0;
     reader.ReadExact(afterBeat);
@@ -459,14 +460,14 @@ void CClientBase::Process(
     return;
   }
 
-  case static_cast<uint8_t>(EClientMsg::CLIMSG_ReceiveChat): {
+  case std::to_underlying(EClientMsg::CLIMSG_ReceiveChat): {
     const auto payloadBytes = static_cast<size_t>(msg.GetMessageSize());
     const auto payload = gpg::CopyMemBuffer(msg.mBuff.start_ + kMessageHeaderSize, payloadBytes);
     mManager->mInterface->ReceiveChat(this, payload);
     return;
   }
 
-  case static_cast<uint8_t>(EClientMsg::CLIMSG_AdjustSimSpeed): {
+  case std::to_underlying(EClientMsg::CLIMSG_AdjustSimSpeed): {
     int32_t gameSpeedClock = 0;
     int32_t requestedSimRate = 0;
     reader.ReadExact(gameSpeedClock);
@@ -478,12 +479,12 @@ void CClientBase::Process(
     return;
   }
 
-  case static_cast<uint8_t>(EClientMsg::CLIMSG_IntParam):
+  case std::to_underlying(EClientMsg::CLIMSG_IntParam):
     reader.ReadExact(mSimRate);
     return;
 
-  case static_cast<uint8_t>(ELobbyMsg::LOBMSG_ConnLostErrored):
-  case static_cast<uint8_t>(ELobbyMsg::LOBMSG_ConnLostEof):
+  case std::to_underlying(ELobbyMsg::LOBMSG_ConnLostErrored):
+  case std::to_underlying(ELobbyMsg::LOBMSG_ConnLostEof):
     Eject();
     mManager->mInterface->NoteDisconnect(this);
     return;
@@ -935,7 +936,7 @@ CClientBase::CClientBase(
   CClientManagerImpl* manager,
   const char* name,
   const int32_t ownerId,
-  BVIntSet& commandSources,
+  const BVIntSet& commandSources,
   uint32_t sourceId
 )
   : IClient(name, clientIndex, ownerId)

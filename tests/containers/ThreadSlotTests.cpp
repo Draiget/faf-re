@@ -24,9 +24,9 @@ namespace
   template <int Tag>
   struct CountingDeleter
   {
-    void operator()(
+    static void operator()(
       Counted<Tag>* const value
-    ) const noexcept
+    ) noexcept
     {
       ++Counted<Tag>::sDeleted;
       delete value;

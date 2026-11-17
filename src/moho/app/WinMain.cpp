@@ -77,7 +77,7 @@ namespace
 // Nothing references the table entry by name, so whole-program optimization
 // discards it unless the linker is told to keep it (as `Global.cpp` does for
 // its TLS callback entry); without it the Release x86 frame clock froze at 0.
-#if defined(_M_IX86)
+#if FAFRE_ARCH_X86
 #pragma comment(linker, "/INCLUDE:_gQueryStartupInfoBeforeInitializers")
 #else // x64 C names carry no leading underscore
 #pragma comment(linker, "/INCLUDE:gQueryStartupInfoBeforeInitializers")

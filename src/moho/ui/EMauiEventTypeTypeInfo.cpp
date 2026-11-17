@@ -1,5 +1,6 @@
 #include "moho/ui/EMauiEventTypeTypeInfo.h"
 
+#include <utility>
 #include <cstdint>
 #include <cstdlib>
 #include <new>
@@ -52,17 +53,17 @@ namespace moho
   {
     mPrefix = "MET_";
 
-    AddEnum(StripPrefix("MET_MouseMotion"), static_cast<std::int32_t>(MET_MouseMotion));
-    AddEnum(StripPrefix("MET_MouseEnter"), static_cast<std::int32_t>(MET_MouseEnter));
-    AddEnum(StripPrefix("MET_MouseHover"), static_cast<std::int32_t>(MET_MouseHover));
-    AddEnum(StripPrefix("MET_MouseExit"), static_cast<std::int32_t>(MET_MouseExit));
-    AddEnum(StripPrefix("MET_ButtonPress"), static_cast<std::int32_t>(MET_ButtonPress));
-    AddEnum(StripPrefix("MET_ButtonDClick"), static_cast<std::int32_t>(MET_ButtonDClick));
-    AddEnum(StripPrefix("MET_ButtonRelease"), static_cast<std::int32_t>(MET_ButtonRelease));
-    AddEnum(StripPrefix("MET_WheelRotation"), static_cast<std::int32_t>(MET_WheelRotation));
-    AddEnum(StripPrefix("MET_KeyDown"), static_cast<std::int32_t>(MET_KeyDown));
-    AddEnum(StripPrefix("MET_KeyUp"), static_cast<std::int32_t>(MET_KeyUp));
-    AddEnum(StripPrefix("MET_Char"), static_cast<std::int32_t>(MET_Char));
+    AddEnum(StripPrefix("MET_MouseMotion"), std::to_underlying(MET_MouseMotion));
+    AddEnum(StripPrefix("MET_MouseEnter"), std::to_underlying(MET_MouseEnter));
+    AddEnum(StripPrefix("MET_MouseHover"), std::to_underlying(MET_MouseHover));
+    AddEnum(StripPrefix("MET_MouseExit"), std::to_underlying(MET_MouseExit));
+    AddEnum(StripPrefix("MET_ButtonPress"), std::to_underlying(MET_ButtonPress));
+    AddEnum(StripPrefix("MET_ButtonDClick"), std::to_underlying(MET_ButtonDClick));
+    AddEnum(StripPrefix("MET_ButtonRelease"), std::to_underlying(MET_ButtonRelease));
+    AddEnum(StripPrefix("MET_WheelRotation"), std::to_underlying(MET_WheelRotation));
+    AddEnum(StripPrefix("MET_KeyDown"), std::to_underlying(MET_KeyDown));
+    AddEnum(StripPrefix("MET_KeyUp"), std::to_underlying(MET_KeyUp));
+    AddEnum(StripPrefix("MET_Char"), std::to_underlying(MET_Char));
   }
 } // namespace moho
 

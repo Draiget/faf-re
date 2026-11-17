@@ -3,7 +3,7 @@
 // Engine addition (issue #255): the Linux client's DXC, behind plain C++ types. DXC's Linux headers
 // bring their own Win32 types (dxc/WinAdapter.h), which clash with the POSIX <Windows.h> every
 // other client file is compiled with, so DxcGlue.cpp is the one file that includes them and is
-// compiled without that header (cmake/FafLinuxClient.cmake). libdxcompiler.so is loaded at run time,
+// compiled without that header (cmake/FafPosixClient.cmake). libdxcompiler.so is loaded at run time,
 // as dxcompiler.dll is on Windows (gpg/gal/effects/ShaderCompiler.cpp).
 
 #include <string>

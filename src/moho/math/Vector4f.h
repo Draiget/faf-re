@@ -9,18 +9,14 @@
 #include "Vector3f.h"
 
 // --- Feature switches ---
+// SSE2 is the baseline of both x86 targets (/arch:SSE2 on x86). Elsewhere (ARM64) the scalar
+// kernels below run: the same IEEE multiplies and adds in the same order per lane, so the same
+// bits, which the compiler vectorizes itself.
 #ifndef MOHO_USE_SSE2
-#if defined(__SSE2__) || (defined(_M_IX86_FP) && _M_IX86_FP >= 2) || defined(_M_X64)
+#if FAFRE_ARCH_X86 || FAFRE_ARCH_X64
 #define MOHO_USE_SSE2 1
 #else
 #define MOHO_USE_SSE2 0
-#endif
-#endif
-
-// Optional: allow dp_ps on SSE4.1 for dot; we don't strictly need it in the chosen kernel.
-#ifndef MOHO_USE_SSE41
-#if defined(__SSE4_1__) || defined(_M_IX86_FP) || defined(_M_X64)
-#define MOHO_USE_SSE41 0
 #endif
 #endif
 

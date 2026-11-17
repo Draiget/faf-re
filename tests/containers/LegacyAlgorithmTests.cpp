@@ -101,7 +101,7 @@ TEST(
   std::mt19937 rng(1);
   for (const Pattern pattern : kPatterns) {
     for (const std::size_t n : kSizes) {
-      SCOPED_TRACE(::testing::Message() << "pattern " << static_cast<int>(pattern) << " n " << n);
+      SCOPED_TRACE(::testing::Message() << "pattern " << std::to_underlying(pattern) << " n " << n);
       std::vector<int> v = Make(pattern, n, rng);
       std::vector<int> expected = v;
       std::sort(expected.begin(), expected.end());

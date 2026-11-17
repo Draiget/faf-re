@@ -138,7 +138,7 @@ namespace
     const faf::editor::EdLuaApiEntry* chosen = nullptr;
     for (const faf::editor::EdLuaApiEntry& e : faf::editor::LuaApi()) {
       const std::string params = e.params;
-      if (std::string(e.owner) == "ScenarioUtils" && params.find("...") == std::string::npos && !params.empty()) {
+      if (std::string(e.owner) == "ScenarioUtils" && !params.contains("...") && !params.empty()) {
         chosen = &e;
         break;
       }

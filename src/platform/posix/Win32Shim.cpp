@@ -21,8 +21,10 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <ctime>
 #include <filesystem>
 #include <fstream>
+#include <iterator>
 #include <memory>
 #include <mutex>
 #include <shared_mutex>
@@ -31,19 +33,64 @@
 #include <typeinfo>
 #include <vector>
 
+#include "platform/FpControl.h"
+#include "platform/posix/SystemPosix.h"
+
 #include <dirent.h>
 #include <dlfcn.h>
 #include <fcntl.h>
-#include <malloc.h>
-#include <fnmatch.h>
 #include <pthread.h>
 #include <sched.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
-#include <sys/syscall.h>
 #include <sys/time.h>
 #include <time.h>
 #include <unistd.h>
+
+namespace
+{
+  // A file's times as Windows names them. macOS records when a file was created (its birth time);
+  // Linux's stat has no such field, and the inode change time stands in for it.
+#if FAFRE_PLATFORM_MACOS // struct stat's st_*timespec fields and st_birthtimespec
+  [[nodiscard]] const timespec& StatCreationTime(
+    const struct stat& status
+  ) noexcept
+  {
+    return status.st_birthtimespec;
+  }
+  [[nodiscard]] const timespec& StatAccessTime(
+    const struct stat& status
+  ) noexcept
+  {
+    return status.st_atimespec;
+  }
+  [[nodiscard]] const timespec& StatWriteTime(
+    const struct stat& status
+  ) noexcept
+  {
+    return status.st_mtimespec;
+  }
+#else
+  [[nodiscard]] const timespec& StatCreationTime(
+    const struct stat& status
+  ) noexcept
+  {
+    return status.st_ctim;
+  }
+  [[nodiscard]] const timespec& StatAccessTime(
+    const struct stat& status
+  ) noexcept
+  {
+    return status.st_atim;
+  }
+  [[nodiscard]] const timespec& StatWriteTime(
+    const struct stat& status
+  ) noexcept
+  {
+    return status.st_mtim;
+  }
+#endif
+} // namespace
 
 namespace
 {
@@ -138,17 +185,172 @@ namespace
     return out;
   }
 
+  /// Where NextCodePoint puts a byte that isn't UTF-8: past Unicode, so it folds to nothing and
+  /// matches only itself (a Latin-1 name on disk is no UTF-8 letter).
+  constexpr std::uint32_t kNotUtf8Byte = 0x110000u;
+
+  /**
+   * The code point well-formed UTF-8 has at `at`, which moves past it. A byte that doesn't start
+   * one (a stray continuation byte, an overlong form, a surrogate, a code point past U+10FFFF) is
+   * kNotUtf8Byte plus the byte, and `at` moves one byte: such a name matches only its own bytes.
+   */
+  [[nodiscard]] std::uint32_t NextCodePoint(
+    const char*& at
+  ) noexcept
+  {
+    const auto byte = [&at](const std::size_t k) {
+      return static_cast<unsigned char>(at[k]);
+    };
+    const unsigned char lead = byte(0);
+    if (lead < 0x80u) {
+      ++at;
+      return lead;
+    }
+    std::size_t extra = 0;
+    unsigned char low = 0x80u;  // the second byte's range, which rules out overlong forms,
+    unsigned char high = 0xBFu; // surrogates and code points past U+10FFFF
+    std::uint32_t c = 0;
+    if (lead >= 0xC2u && lead <= 0xDFu) {
+      extra = 1;
+      c = lead & 0x1Fu;
+    } else if (lead >= 0xE0u && lead <= 0xEFu) {
+      extra = 2;
+      c = lead & 0x0Fu;
+      low = lead == 0xE0u ? 0xA0u : 0x80u;
+      high = lead == 0xEDu ? 0x9Fu : 0xBFu;
+    } else if (lead >= 0xF0u && lead <= 0xF4u) {
+      extra = 3;
+      c = lead & 0x07u;
+      low = lead == 0xF0u ? 0x90u : 0x80u;
+      high = lead == 0xF4u ? 0x8Fu : 0xBFu;
+    }
+    bool wellFormed = extra != 0 && byte(1) >= low && byte(1) <= high;
+    for (std::size_t k = 2; wellFormed && k <= extra; ++k) {
+      wellFormed = (byte(k) & 0xC0u) == 0x80u;
+    }
+    if (!wellFormed) {
+      ++at;
+      return kNotUtf8Byte + lead;
+    }
+    for (std::size_t k = 1; k <= extra; ++k) {
+      c = (c << 6) | (byte(k) & 0x3Fu);
+    }
+    at += extra + 1;
+    return c;
+  }
+
+  struct NtfsCasePair
+  {
+    std::uint16_t letter;
+    std::uint16_t upper;
+  };
+
+  /// Windows' upper-case table, the one NTFS compares names by ($UpCase): every BMP letter from
+  /// U+0080 whose upper case differs (tools/linux/ntfs_upcase_table.py).
+  constexpr NtfsCasePair kNtfsUpcase[] = {
+#include "platform/posix/NtfsUpcaseTable.inc"
+  };
+
+  [[maybe_unused]] [[nodiscard]] constexpr bool SortedByLetter() noexcept
+  {
+    for (std::size_t k = 1; k < std::size(kNtfsUpcase); ++k) {
+      if (kNtfsUpcase[k - 1].letter >= kNtfsUpcase[k].letter) {
+        return false;
+      }
+    }
+    return true;
+  }
+  static_assert(SortedByLetter(), "NtfsUpcaseTable.inc must be sorted by letter (binary search)");
+
+  /**
+   * A letter as NTFS compares names, by its upper case: Windows' own table, which is narrower than
+   * Unicode's ('ı', 'ſ', 'µ', 'ς', 'ǅ', Georgian and Cherokee letters keep their own case there), and
+   * ASCII folded here, without the process's locale (Lua's os.setlocale can change that). Letters
+   * past U+FFFF, which NTFS compares as UTF-16 halves, don't fold.
+   */
+  [[nodiscard]] std::uint32_t NtfsUpcase(
+    const std::uint32_t c
+  ) noexcept
+  {
+    if (c < 0x80u) {
+      return c >= 'a' && c <= 'z' ? c - ('a' - 'A') : c;
+    }
+    if (c > 0xFFFFu) {
+      return c;
+    }
+    const auto* const end = std::end(kNtfsUpcase);
+    const auto* const found =
+      std::lower_bound(std::begin(kNtfsUpcase), end, c, [](const NtfsCasePair& pair, const std::uint32_t letter) {
+      return pair.letter < letter;
+    });
+    return found != end && found->letter == c ? found->upper : c;
+  }
+
+  /**
+   * Whether two names are one on NTFS (NtfsUpcase letter by letter): 'Игрок' and 'игрок', 'Ä' and 'ä'
+   * are one name there.
+   */
   [[nodiscard]] bool SameNameIgnoringCase(
     const char* a,
     const char* b
   ) noexcept
   {
-    for (; *a != '\0' && *b != '\0'; ++a, ++b) {
-      if (std::tolower(static_cast<unsigned char>(*a)) != std::tolower(static_cast<unsigned char>(*b))) {
+    while (*a != '\0' && *b != '\0') {
+      const std::uint32_t ca = NextCodePoint(a);
+      const std::uint32_t cb = NextCodePoint(b);
+      if (ca != cb && NtfsUpcase(ca) != NtfsUpcase(cb)) {
         return false;
       }
     }
     return *a == *b;
+  }
+
+  /**
+   * Windows' match of one name against a FindFirstFile wildcard: '*' any run of letters, '?' one,
+   * letters compared as NTFS compares names, and "*.*" every name, with or without a dot. ('[' is
+   * no wildcard there.)
+   */
+  [[nodiscard]] bool ShellNameMatches(
+    const char* const pattern,
+    const char* const name
+  ) noexcept
+  {
+    if (std::strcmp(pattern, "*.*") == 0) {
+      return true;
+    }
+    const char* p = pattern;
+    const char* n = name;
+    const char* starPattern = nullptr;
+    const char* starName = nullptr;
+    while (*n != '\0') {
+      if (*p == '*') {
+        starPattern = ++p;
+        starName = n;
+        continue;
+      }
+      if (*p != '\0') {
+        const char* nextP = p;
+        const char* nextN = n;
+        const std::uint32_t cp = NextCodePoint(nextP);
+        const std::uint32_t cn = NextCodePoint(nextN);
+        if (cp == '?' || cp == cn || NtfsUpcase(cp) == NtfsUpcase(cn)) {
+          p = nextP;
+          n = nextN;
+          continue;
+        }
+      }
+      if (starPattern == nullptr) {
+        return false;
+      }
+      // Let the last '*' take one more letter of the name.
+      p = starPattern;
+      (void)NextCodePoint(starName);
+      n = starName;
+    }
+    while (*p == '*') {
+      ++p;
+    }
+    return *p == '\0';
   }
 
   // Plan WPR.23: the `--path-spelling` file, and the pairs it already holds.
@@ -406,7 +608,7 @@ namespace
   {
     thread_local CurrentThreadApcQueue current;
     if (current.queue == nullptr) {
-      current.threadId = static_cast<DWORD>(::syscall(SYS_gettid));
+      current.threadId = static_cast<DWORD>(platform::posix::CurrentThreadId());
       current.queue = ApcQueueOf(current.threadId);
     }
     return *current.queue;
@@ -863,7 +1065,7 @@ void DeleteCriticalSection(
 
 DWORD GetCurrentThreadId()
 {
-  return static_cast<DWORD>(::syscall(SYS_gettid));
+  return static_cast<DWORD>(platform::posix::CurrentThreadId());
 }
 
 HANDLE GetCurrentThread()
@@ -922,9 +1124,7 @@ HANDLE OpenThread(
   const DWORD threadId
 )
 {
-  char taskPath[64]{};
-  std::snprintf(taskPath, sizeof(taskPath), "/proc/self/task/%u", static_cast<unsigned>(threadId));
-  if (::access(taskPath, F_OK) != 0) {
+  if (!platform::posix::ThreadExists(threadId)) {
     tLastError = ERROR_INVALID_PARAMETER;
     return nullptr;
   }
@@ -943,7 +1143,7 @@ DWORD QueueUserAPC(
   const std::shared_ptr<ShimHandle> object = AsShimHandle(threadHandle);
   std::shared_ptr<ApcQueue> queue;
   if (threadHandle == kCurrentThreadPseudoHandle) {
-    queue = ApcQueueOf(static_cast<DWORD>(::syscall(SYS_gettid)));
+    queue = ApcQueueOf(static_cast<DWORD>(platform::posix::CurrentThreadId()));
   } else if (object != nullptr && object->kind == ShimHandle::Kind::Thread) {
     queue = static_cast<ThreadObject*>(object.get())->queue;
   }
@@ -975,8 +1175,7 @@ HMODULE GetModuleHandleW(
 )
 {
   if (moduleName == nullptr) {
-    extern char __executable_start;
-    return &__executable_start;
+    return static_cast<HMODULE>(platform::posix::ExecutableImageBase());
   }
   return GetModuleHandleA(NarrowPath(moduleName).c_str());
 }
@@ -1010,15 +1209,10 @@ const wchar_t* GetCommandLineW()
   static wchar_t sCommandLine[8192];
   static INIT_ONCE sOnce = INIT_ONCE_STATIC_INIT;
   (void)InitOnceExecuteOnce(&sOnce, [](PINIT_ONCE, PVOID, PVOID*) -> BOOL {
-    const int fd = ::open("/proc/self/cmdline", O_RDONLY | O_CLOEXEC);
-    if (fd < 0) {
-      return TRUE;
-    }
     char raw[8192];
-    const ssize_t got = ::read(fd, raw, sizeof(raw) - 1);
-    (void)::close(fd);
+    const std::size_t got = platform::posix::ReadArguments(raw, sizeof(raw) - 1);
     std::size_t out = 0;
-    for (ssize_t at = 0; at < got && out + 1 < sizeof(sCommandLine) / sizeof(sCommandLine[0]); ++at) {
+    for (std::size_t at = 0; at < got && out + 1 < sizeof(sCommandLine) / sizeof(sCommandLine[0]); ++at) {
       // Arguments are NUL-separated; the trailing NUL ends the line.
       if (raw[at] == '\0') {
         if (at + 1 < got) {
@@ -1040,15 +1234,10 @@ const char* GetCommandLineA()
   static char sCommandLine[8192];
   static INIT_ONCE sOnce = INIT_ONCE_STATIC_INIT;
   (void)InitOnceExecuteOnce(&sOnce, [](PINIT_ONCE, PVOID, PVOID*) -> BOOL {
-    const int fd = ::open("/proc/self/cmdline", O_RDONLY | O_CLOEXEC);
-    if (fd < 0) {
-      return TRUE;
-    }
     char raw[8192];
-    const ssize_t got = ::read(fd, raw, sizeof(raw) - 1);
-    (void)::close(fd);
+    const std::size_t got = platform::posix::ReadArguments(raw, sizeof(raw) - 1);
     std::size_t out = 0;
-    for (ssize_t at = 0; at < got && out + 1 < sizeof(sCommandLine); ++at) {
+    for (std::size_t at = 0; at < got && out + 1 < sizeof(sCommandLine); ++at) {
       if (raw[at] == '\0') {
         if (at + 1 < got) {
           sCommandLine[out++] = ' ';
@@ -1108,7 +1297,7 @@ SIZE_T HeapSize(
   const void* const memory
 )
 {
-  return memory != nullptr ? ::malloc_usable_size(const_cast<void*>(memory)) : static_cast<SIZE_T>(-1);
+  return memory != nullptr ? platform::posix::AllocationSize(memory) : static_cast<SIZE_T>(-1);
 }
 
 HMODULE LoadLibraryA(
@@ -1226,75 +1415,17 @@ void SetLastError(
 }
 
 /// A kernel CPU list such as "0-7,16-23" from a sysfs file; CPUs above 63 are left out, and an unreadable file is 0.
-[[nodiscard]] static DWORD_PTR ReadCpuListFile(
-  const char* const path
-)
-{
-  std::ifstream file(path);
-  std::string list;
-  if (!file || !std::getline(file, list)) {
-    return 0;
-  }
-  DWORD_PTR mask = 0;
-  const char* cursor = list.c_str();
-  while (*cursor != '\0') {
-    char* end = nullptr;
-    const unsigned long first = std::strtoul(cursor, &end, 10);
-    if (end == cursor) {
-      break;
-    }
-    unsigned long last = first;
-    cursor = end;
-    if (*cursor == '-') {
-      last = std::strtoul(cursor + 1, &end, 10);
-      cursor = end;
-    }
-    for (unsigned long cpu = first; cpu <= last && cpu < sizeof(DWORD_PTR) * 8; ++cpu) {
-      mask |= DWORD_PTR{1} << cpu;
-    }
-    if (*cursor != ',') {
-      break;
-    }
-    ++cursor;
-  }
-  return mask;
-}
-
-/// The process's CPU set. Linux keeps a set per thread, so a pinned thread must not change what this reports:
-/// it is read before main starts, and only `SetProcessAffinityMask` changes it.
-[[nodiscard]] static cpu_set_t& ProcessCpuSet()
-{
-  static cpu_set_t set = [] {
-    cpu_set_t initial;
-    CPU_ZERO(&initial);
-    (void)::sched_getaffinity(0, sizeof(initial), &initial);
-    return initial;
-  }();
-  return set;
-}
-[[maybe_unused]] static const bool sProcessCpuSetRead = (static_cast<void>(ProcessCpuSet()), true);
-
 BOOL GetProcessAffinityMask(
   HANDLE,
   DWORD_PTR* const processMask,
   DWORD_PTR* const systemMask
 )
 {
-  const cpu_set_t& set = ProcessCpuSet();
-  DWORD_PTR mask = 0;
-  for (unsigned cpu = 0; cpu < sizeof(DWORD_PTR) * 8; ++cpu) {
-    if (CPU_ISSET(cpu, &set)) {
-      mask |= DWORD_PTR{1} << cpu;
-    }
-  }
   if (processMask != nullptr) {
-    *processMask = mask;
+    *processMask = static_cast<DWORD_PTR>(platform::posix::ProcessCpuMask());
   }
   if (systemMask != nullptr) {
-    // Every online CPU, as on Windows, so a process given fewer can tell. A process cannot run outside
-    // this set, so the process mask is what remains when the file can't be read.
-    const DWORD_PTR online = ReadCpuListFile("/sys/devices/system/cpu/online");
-    *systemMask = online != 0 ? online | mask : mask;
+    *systemMask = static_cast<DWORD_PTR>(platform::posix::OnlineCpuMask());
   }
   return TRUE;
 }
@@ -1354,27 +1485,12 @@ DWORD_PTR SetThreadAffinityMask(
     tLastError = ERROR_INVALID_PARAMETER;
     return 0;
   }
-  cpu_set_t previous;
-  CPU_ZERO(&previous);
-  (void)::pthread_getaffinity_np(::pthread_self(), sizeof(previous), &previous);
-  cpu_set_t wanted;
-  CPU_ZERO(&wanted);
-  for (unsigned cpu = 0; cpu < sizeof(DWORD_PTR) * 8; ++cpu) {
-    if ((mask & (DWORD_PTR{1} << cpu)) != 0) {
-      CPU_SET(cpu, &wanted);
-    }
-  }
-  if (::pthread_setaffinity_np(::pthread_self(), sizeof(wanted), &wanted) != 0) {
+  const std::uint64_t previous = platform::posix::SetThreadCpuMask(mask);
+  if (previous == 0) {
     tLastError = ERROR_INVALID_PARAMETER;
     return 0;
   }
-  DWORD_PTR previousMask = 0;
-  for (unsigned cpu = 0; cpu < sizeof(DWORD_PTR) * 8; ++cpu) {
-    if (CPU_ISSET(cpu, &previous)) {
-      previousMask |= DWORD_PTR{1} << cpu;
-    }
-  }
-  return previousMask != 0 ? previousMask : 1u;
+  return static_cast<DWORD_PTR>(previous);
 }
 
 BOOL GetLogicalProcessorInformationEx(
@@ -1404,25 +1520,14 @@ BOOL GetLogicalProcessorInformationEx(
     records.push_back(record);
   };
   if (relation == RelationProcessorCore) {
-    const DWORD_PTR online = ReadCpuListFile("/sys/devices/system/cpu/online");
-    DWORD_PTR seen = 0;
-    for (unsigned cpu = 0; cpu < sizeof(DWORD_PTR) * 8; ++cpu) {
-      const DWORD_PTR bit = DWORD_PTR{1} << cpu;
-      if ((online & bit) == 0 || (seen & bit) != 0) {
-        continue;
-      }
-      const std::string path = "/sys/devices/system/cpu/cpu" + std::to_string(cpu) + "/topology/thread_siblings_list";
-      const DWORD_PTR siblings = ReadCpuListFile(path.c_str());
-      const DWORD_PTR core = (siblings != 0 ? siblings : bit) & online;
-      seen |= core;
-      addRecord(core, 0);
+    for (const std::uint64_t core : platform::posix::CoreCpuMasks()) {
+      addRecord(static_cast<DWORD_PTR>(core), 0);
     }
   } else if (relation == RelationNumaNode) {
-    for (DWORD node = 0; node < 64; ++node) {
-      const std::string path = "/sys/devices/system/node/node" + std::to_string(node) + "/cpulist";
-      const DWORD_PTR cpus = ReadCpuListFile(path.c_str());
-      if (cpus != 0) {
-        addRecord(cpus, node);
+    const std::vector<std::uint64_t> nodes = platform::posix::NumaNodeCpuMasks();
+    for (DWORD node = 0; node < nodes.size(); ++node) {
+      if (nodes[node] != 0) {
+        addRecord(static_cast<DWORD_PTR>(nodes[node]), node);
       }
     }
   }
@@ -1490,29 +1595,15 @@ SIZE_T VirtualQuery(
   if (info == nullptr || length < sizeof(MEMORY_BASIC_INFORMATION)) {
     return 0;
   }
-  const std::uintptr_t target = reinterpret_cast<std::uintptr_t>(address);
-  std::ifstream maps("/proc/self/maps");
-  std::string line;
-  while (std::getline(maps, line)) {
-    unsigned long begin = 0;
-    unsigned long end = 0;
-    char permissions[5] = {};
-    if (std::sscanf(line.c_str(), "%lx-%lx %4s", &begin, &end, permissions) != 3) {
-      continue;
-    }
-    if (target < begin || target >= end) {
-      continue;
-    }
+  if (const auto region = platform::posix::FindMemoryRegion(reinterpret_cast<std::uintptr_t>(address))) {
     *info = MEMORY_BASIC_INFORMATION{};
-    info->BaseAddress = reinterpret_cast<LPVOID>(begin);
-    info->AllocationBase = reinterpret_cast<LPVOID>(begin);
-    info->RegionSize = end - begin;
-    const bool readable = permissions[0] == 'r';
-    const bool writable = permissions[1] == 'w';
-    info->State = readable ? MEM_COMMIT : MEM_RESERVE;
-    info->Protect = !readable ? PAGE_NOACCESS : writable ? PAGE_READWRITE : PAGE_READONLY;
+    info->BaseAddress = reinterpret_cast<LPVOID>(region->begin);
+    info->AllocationBase = reinterpret_cast<LPVOID>(region->begin);
+    info->RegionSize = region->end - region->begin;
+    info->State = region->readable ? MEM_COMMIT : MEM_RESERVE;
+    info->Protect = !region->readable ? PAGE_NOACCESS : region->writable ? PAGE_READWRITE : PAGE_READONLY;
     info->AllocationProtect = info->Protect;
-    info->Type = permissions[3] == 'p' ? MEM_PRIVATE : 0u;
+    info->Type = region->isPrivate ? MEM_PRIVATE : 0u;
     return sizeof(MEMORY_BASIC_INFORMATION);
   }
   *info = MEMORY_BASIC_INFORMATION{};
@@ -2109,13 +2200,12 @@ DWORD GetModuleFileNameW(
     tLastError = ERROR_INVALID_PARAMETER;
     return 0;
   }
-  char exe[4096]{};
-  const ssize_t length = ::readlink("/proc/self/exe", exe, sizeof(exe) - 1);
-  if (length <= 0) {
+  const std::string exe = platform::posix::ExecutablePath();
+  if (exe.empty()) {
     SetErrnoError();
     return 0;
   }
-  const std::wstring wide = WidenUtf8(std::string(exe, static_cast<std::size_t>(length)));
+  const std::wstring wide = WidenUtf8(exe);
   if (wide.size() >= size) {
     // Windows truncates and reports the buffer as too small.
     std::wmemcpy(fileName, wide.c_str(), size - 1);
@@ -2137,19 +2227,10 @@ BOOL SetProcessAffinityMask(
     tLastError = ERROR_INVALID_PARAMETER;
     return FALSE;
   }
-  cpu_set_t wanted;
-  CPU_ZERO(&wanted);
-  for (unsigned cpu = 0; cpu < sizeof(DWORD_PTR) * 8; ++cpu) {
-    if ((processMask & (DWORD_PTR{1} << cpu)) != 0) {
-      CPU_SET(cpu, &wanted);
-    }
-  }
-  if (::sched_setaffinity(0, sizeof(wanted), &wanted) != 0) {
+  if (!platform::posix::SetProcessCpuMask(processMask)) {
     SetErrnoError();
     return FALSE;
   }
-  // What the kernel kept: a CPU outside the container's set drops out.
-  (void)::sched_getaffinity(0, sizeof(ProcessCpuSet()), &ProcessCpuSet());
   return TRUE;
 }
 
@@ -2183,7 +2264,7 @@ namespace
       if (value.size() >= 2 && value.front() == '"' && value.back() == '"') {
         value = value.substr(1, value.size() - 2);
       }
-      if (value.rfind("$HOME", 0) == 0 && (value.size() == 5 || value[5] == '/')) {
+      if (value.starts_with("$HOME") && (value.size() == 5 || value[5] == '/')) {
         found = home + value.substr(5);
       } else if (!value.empty() && value[0] == '/') {
         found = value;
@@ -2228,12 +2309,21 @@ HRESULT SHGetFolderPathW(
   const int kind = folder & ~CSIDL_FLAG_CREATE;
   std::string resolved;
   switch (kind) {
+#if FAFRE_PLATFORM_MACOS // ~/Library/Application Support: macOS has no XDG folders
+  case CSIDL_LOCAL_APPDATA:
+  case CSIDL_APPDATA:
+    // Both of Windows' application data folders are the one macOS has; the caches go to
+    // ~/Library/Caches instead (platform/CacheFolder.h).
+    resolved = std::string(home) + "/Library/Application Support";
+    break;
+#else
   case CSIDL_LOCAL_APPDATA:
     resolved = fromEnvironment("XDG_DATA_HOME", "/.local/share");
     break;
   case CSIDL_APPDATA:
     resolved = fromEnvironment("XDG_CONFIG_HOME", "/.config");
     break;
+#endif
   case CSIDL_PERSONAL:
     resolved = userDirectory("XDG_DOCUMENTS_DIR", "/Documents");
     break;
@@ -2262,18 +2352,488 @@ HRESULT SHGetFolderPathW(
   return S_OK;
 }
 
+namespace
+{
+  /// A path as a `file://` URL's path: every byte but unreserved characters and '/' as %XX.
+  [[nodiscard]] std::string TrashInfoPath(
+    const std::string& path
+  )
+  {
+    static constexpr char kHex[] = "0123456789ABCDEF";
+    std::string out;
+    for (const char c : path) {
+      const auto byte = static_cast<unsigned char>(c);
+      if (std::isalnum(byte) != 0 || c == '/' || c == '-' || c == '_' || c == '.' || c == '~') {
+        out.push_back(c);
+      } else {
+        out.push_back('%');
+        out.push_back(kHex[byte >> 4]);
+        out.push_back(kHex[byte & 0x0Fu]);
+      }
+    }
+    return out;
+  }
+
+  enum class TrashMove
+  {
+    Moved,
+    OtherFileSystem, // the trash is on another file system than the entry
+    Failed,
+  };
+
+  /**
+   * Moves `absolute` into the trash folder `trash` of the freedesktop.org Trash specification: to
+   * <trash>/files under a free name, with <trash>/info/<name>.trashinfo holding `infoPath` (where it
+   * came from) and the time, which file managers restore it from. With `copyAcrossMounts`, an entry
+   * the rename can't move there (another mount of the same file system: a sandbox's or container's
+   * bind mount) is copied there and then removed.
+   */
+  [[nodiscard]] TrashMove MoveIntoTrash(
+    const std::string& trash,
+    const std::string& absolute,
+    const std::string& infoPath,
+    const bool copyAcrossMounts = false
+  )
+  {
+    std::error_code error;
+    std::filesystem::create_directories(trash + "/files", error);
+    std::filesystem::create_directories(trash + "/info", error);
+    const std::string leaf = absolute.substr(absolute.rfind('/') + 1);
+    if (leaf.empty()) {
+      return TrashMove::Failed;
+    }
+
+    char deletedAt[32]{};
+    const std::time_t now = std::time(nullptr);
+    std::tm local{};
+    (void)::localtime_r(&now, &local);
+    (void)std::strftime(deletedAt, sizeof(deletedAt), "%Y-%m-%dT%H:%M:%S", &local);
+    const std::string info = "[Trash Info]\nPath=" + TrashInfoPath(infoPath) + "\nDeletionDate=" + deletedAt + "\n";
+
+    for (int attempt = 1; attempt < 10000; ++attempt) {
+      const std::string name = attempt == 1 ? leaf : leaf + "." + std::to_string(attempt);
+      // The info file is made first and exclusively: it claims the name (the specification's order).
+      const std::string infoFile = trash + "/info/" + name + ".trashinfo";
+      const int fd = ::open(infoFile.c_str(), O_WRONLY | O_CREAT | O_EXCL, 0600);
+      if (fd < 0) {
+        if (errno == EEXIST) {
+          continue;
+        }
+        return TrashMove::Failed;
+      }
+      const bool written = ::write(fd, info.data(), info.size()) == static_cast<ssize_t>(info.size());
+      (void)::close(fd);
+      if (!written) {
+        (void)::unlink(infoFile.c_str());
+        return TrashMove::Failed;
+      }
+      const std::string target = trash + "/files/" + name;
+      if (::access(target.c_str(), F_OK) == 0) {
+        // A file left there with no info file: the name stays taken.
+        (void)::unlink(infoFile.c_str());
+        continue;
+      }
+      if (::rename(absolute.c_str(), target.c_str()) == 0) {
+        return TrashMove::Moved;
+      }
+      const int renameError = errno;
+      if (renameError == EXDEV && copyAcrossMounts) {
+        std::filesystem::copy(
+          absolute,
+          target,
+          std::filesystem::copy_options::recursive | std::filesystem::copy_options::copy_symlinks,
+          error
+        );
+        if (!error) {
+          // A copy gets new times; a restored save or replay keeps its own (the dialogs show them).
+          const std::filesystem::path from(absolute);
+          const std::filesystem::path to(target);
+          const auto keepTime = [](const std::filesystem::path& source, const std::filesystem::path& copy) {
+            std::error_code timeError;
+            if (!std::filesystem::is_symlink(source, timeError)) {
+              const auto time = std::filesystem::last_write_time(source, timeError);
+              if (!timeError) {
+                std::filesystem::last_write_time(copy, time, timeError);
+              }
+            }
+          };
+          std::error_code walkError;
+          if (std::filesystem::is_directory(from, walkError)) {
+            for (std::filesystem::recursive_directory_iterator walk(from, walkError), done; !walkError && walk != done;
+                 walk.increment(walkError)) {
+              keepTime(walk->path(), to / walk->path().lexically_relative(from));
+            }
+          }
+          keepTime(from, to);
+          (void)std::filesystem::remove_all(absolute, error);
+          if (!error) {
+            return TrashMove::Moved;
+          }
+          // Part of it couldn't be removed: the copy in the trash stays, and so does what's left.
+          return TrashMove::Failed;
+        }
+        std::error_code ignored;
+        (void)std::filesystem::remove_all(target, ignored);
+      }
+      (void)::unlink(infoFile.c_str());
+      return renameError == EXDEV ? TrashMove::OtherFileSystem : TrashMove::Failed;
+    }
+    return TrashMove::Failed;
+  }
+
+  /**
+   * The mount points of the process's mount table (/proc/self/mountinfo). A bind mount (a
+   * container's or a sandbox's home) is a mount point of its own there, though its files share the
+   * device of the file system it shows. Empty when there is no table (not Linux).
+   */
+  [[nodiscard]] std::vector<std::string> MountPoints()
+  {
+    return platform::posix::MountPoints();
+  }
+
+  /// Whether `folder` is `point`'s folder or `point` itself is below `folder`.
+  [[nodiscard]] bool IsBelow(
+    const std::string& point,
+    const std::string& folder
+  )
+  {
+    return folder == "/"
+      ? point != "/"
+      : point.size() > folder.size() && point.compare(0, folder.size(), folder) == 0 && point[folder.size()] == '/';
+  }
+
+  /// The mount point holding `absolute`: the longest one of the mount table that is a folder of it.
+  [[nodiscard]] std::string MountPointOf(
+    const std::string& absolute
+  )
+  {
+    std::string best;
+    for (const std::string& point : MountPoints()) {
+      if ((point == "/" || IsBelow(absolute, point)) && point.size() > best.size()) {
+        best = point;
+      }
+    }
+    return best;
+  }
+
+  /// Whether a file system is mounted at `real` (resolved, no trailing '/') or anywhere below it.
+  [[nodiscard]] bool HoldsAMount(
+    const std::string& real
+  )
+  {
+    for (const std::string& point : MountPoints()) {
+      if (point == real || IsBelow(point, real)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * The folder holding `absolute` that is the top of its device, found by walking up while the
+   * device stays the same: a btrfs subvolume that isn't mounted on its own has a device of its own
+   * inside its mount, and a rename only stays within it.
+   */
+  [[nodiscard]] std::string DeviceTopOf(
+    const std::string& absolute
+  )
+  {
+    struct stat entry{};
+    if (::lstat(absolute.c_str(), &entry) != 0) {
+      return {};
+    }
+    std::string folder = absolute.substr(0, absolute.rfind('/'));
+    if (folder.empty()) {
+      return "/";
+    }
+    struct stat at{};
+    if (::stat(folder.c_str(), &at) != 0 || at.st_dev != entry.st_dev) {
+      // The entry is a mount point itself; it has no trash of its own file system to go to.
+      return {};
+    }
+    while (!folder.empty()) {
+      const std::size_t slash = folder.rfind('/');
+      const std::string parent = slash == 0 ? std::string("/") : folder.substr(0, slash);
+      struct stat above{};
+      if (::stat(parent.c_str(), &above) != 0 || above.st_dev != entry.st_dev) {
+        return folder;
+      }
+      if (parent == "/") {
+        return parent;
+      }
+      folder = parent;
+    }
+    return "/";
+  }
+
+  /// A folder the user owns, made with mode 0700 when missing; false for a symbolic link or another's.
+  [[nodiscard]] bool OwnTrashFolder(
+    const std::string& folder
+  )
+  {
+    (void)::mkdir(folder.c_str(), 0700);
+    struct stat info{};
+    return ::lstat(folder.c_str(), &info) == 0 && S_ISDIR(info.st_mode) && info.st_uid == ::getuid();
+  }
+
+  /**
+   * The trash of the file system `top` is the top of, as the specification names it: $top/.Trash/$uid
+   * when $top/.Trash is a real folder with the sticky bit (an administrator's shared trash), else
+   * $top/.Trash-$uid. Empty when neither can be used (no write access, a link planted there).
+   */
+  [[nodiscard]] std::string TopDirectoryTrash(
+    const std::string& top
+  )
+  {
+    const std::string base = top == "/" ? std::string() : top;
+    const std::string uid = std::to_string(::getuid());
+    struct stat shared{};
+    if (
+      ::lstat((base + "/.Trash").c_str(), &shared) == 0 && S_ISDIR(shared.st_mode) && (shared.st_mode & S_ISVTX) != 0 &&
+      OwnTrashFolder(base + "/.Trash/" + uid)
+    ) {
+      return base + "/.Trash/" + uid;
+    }
+    if (OwnTrashFolder(base + "/.Trash-" + uid)) {
+      return base + "/.Trash-" + uid;
+    }
+    return {};
+  }
+
+  /**
+   * FOF_ALLOWUNDO's recycle bin on a desktop: the freedesktop.org Trash specification, where file
+   * managers list and restore it. An entry goes to the home trash ($XDG_DATA_HOME/Trash, else
+   * ~/.local/share/Trash) when that is on its file system, else to the trash at the top of its own
+   * file system (a second disk, a USB stick), which names it relative to that top. False when
+   * neither takes it, and the caller deletes it then, as Windows does on a drive with no recycle bin.
+   */
+  [[nodiscard]] bool MoveToTrash(
+    const std::string& path
+  )
+  {
+    std::string absolute = path;
+    std::error_code error;
+    if (absolute.empty() || absolute[0] != '/') {
+      absolute = std::filesystem::absolute(path, error).string();
+    }
+    while (absolute.size() > 1 && absolute.back() == '/') {
+      absolute.pop_back();
+    }
+    // The folder as it is on disk (links resolved), so the info file names where it really was.
+    const std::size_t slash = absolute.rfind('/');
+    const std::string folder = slash == 0 ? std::string("/") : absolute.substr(0, slash);
+    if (char* const real = ::realpath(folder.c_str(), nullptr)) {
+      const std::string realFolder = real;
+      std::free(real);
+      absolute = (realFolder == "/" ? std::string() : realFolder) + absolute.substr(slash);
+    }
+
+    const char* const home = std::getenv("HOME");
+    const char* const dataHome = std::getenv("XDG_DATA_HOME");
+    std::string homeTrash;
+    if (dataHome != nullptr && dataHome[0] == '/') {
+      homeTrash = std::string(dataHome) + "/Trash";
+    } else if (home != nullptr && home[0] == '/') {
+      homeTrash = std::string(home) + "/.local/share/Trash";
+    }
+    if (!homeTrash.empty()) {
+      std::filesystem::create_directories(homeTrash, error);
+      std::filesystem::permissions(homeTrash, std::filesystem::perms::owner_all, error);
+      // The home trash's file system is that of the nearest part of its path that exists.
+      std::string homeAt = homeTrash;
+      struct stat homeInfo{};
+      while (::stat(homeAt.c_str(), &homeInfo) != 0 && homeAt.size() > 1) {
+        const std::size_t up = homeAt.rfind('/');
+        homeAt = up == 0 || up == std::string::npos ? std::string("/") : homeAt.substr(0, up);
+      }
+      struct stat entryInfo{};
+      const bool sameFileSystem = ::lstat(absolute.c_str(), &entryInfo) == 0 &&
+        ::stat(homeAt.c_str(), &homeInfo) == 0 && homeInfo.st_dev == entryInfo.st_dev;
+      // An entry on the home trash's file system goes there even through another mount of it (a
+      // sandbox's bind mount), by a copy; a trash at the bind point would be hidden from the desktop.
+      const TrashMove moved = MoveIntoTrash(homeTrash, absolute, absolute, sameFileSystem);
+      if (moved == TrashMove::Moved) {
+        return true;
+      }
+      // A home trash that can't take it (read-only, full, not a folder) only ends here for an entry
+      // on its own file system; one on another disk still has that disk's trash.
+      if (sameFileSystem) {
+        return false;
+      }
+    }
+
+    // The trash at the top of its file system: its mount point, and where the rename can't reach
+    // that (a btrfs subvolume inside the mount), the top of its own device.
+    const std::string mountTop = MountPointOf(absolute);
+    const std::string deviceTop = DeviceTopOf(absolute);
+    const std::string tops[] = {mountTop, deviceTop == mountTop ? std::string() : deviceTop};
+    for (const std::string& top : tops) {
+      if (top.empty()) {
+        continue;
+      }
+      const std::string trash = TopDirectoryTrash(top);
+      if (trash.empty()) {
+        continue;
+      }
+      const std::string relative = absolute.substr(top == "/" ? 1 : top.size() + 1);
+      const TrashMove moved = MoveIntoTrash(trash, absolute, relative);
+      if (moved != TrashMove::OtherFileSystem) {
+        return moved == TrashMove::Moved;
+      }
+    }
+    return false;
+  }
+
+  /// One FO_DELETE source (a file or a folder with all it holds), as found on disk.
+  [[nodiscard]] DWORD ShellDeleteOne(
+    const std::string& path,
+    const bool allowUndo
+  )
+  {
+    struct stat info{};
+    if (::lstat(path.c_str(), &info) != 0) {
+      return ERROR_FILE_NOT_FOUND;
+    }
+    // A folder that is a mount point itself (another disk mounted there) is not deleted: neither
+    // trash can take it by a rename, and removing it would empty that whole disk.
+    if (S_ISDIR(info.st_mode)) {
+      const std::size_t slash = path.find_last_of('/', path.size() > 1 ? path.size() - 2 : 0);
+      const std::string parent = slash == std::string::npos ? std::string(".")
+        : slash == 0                                        ? std::string("/")
+                                                            : path.substr(0, slash);
+      struct stat above{};
+      std::string real = path;
+      if (char* const resolved = ::realpath(path.c_str(), nullptr)) {
+        real = resolved;
+        std::free(resolved);
+      }
+      // Nor one with another file system mounted anywhere below it: removing or copying it would walk
+      // into that one too.
+      if ((::stat(parent.c_str(), &above) == 0 && above.st_dev != info.st_dev) || HoldsAMount(real)) {
+        return ERROR_ACCESS_DENIED;
+      }
+    }
+    if (allowUndo && MoveToTrash(path)) {
+      return 0;
+    }
+    std::error_code error;
+    (void)std::filesystem::remove_all(path, error);
+    return error ? ErrnoToWin32(error.value()) : 0;
+  }
+
+  /**
+   * SHFileOperation's FO_DELETE (engine addition, issue #255): the save, replay and profile deletes
+   * (DISK_Recycle) and the cache purge (USER_PurgeAppCacheDir) on POSIX. `sources` are the
+   * double-null list's paths, '/' for '\' already; each is looked up as NTFS would find it, and a
+   * last component with '*' or '?' deletes every name in its folder that matches. With
+   * FOF_ALLOWUNDO an entry goes to the desktop's trash instead. 0 when every source went, else the
+   * first failure's code, as Windows 11 answers them: 2 for a source that isn't there, 0x7C for a
+   * pattern in a folder that isn't there, and 0 for a pattern that matches nothing.
+   */
+  [[nodiscard]] int ShellDelete(
+    const std::vector<std::string>& sources,
+    const WORD flags
+  )
+  {
+    const bool allowUndo = (flags & FOF_ALLOWUNDO) != 0;
+    DWORD result = 0;
+    const auto note = [&result](const DWORD error) {
+      if (result == 0) {
+        result = error;
+      }
+    };
+    for (const std::string& source : sources) {
+      const std::size_t slash = source.rfind('/');
+      const std::string leaf = slash == std::string::npos ? source : source.substr(slash + 1);
+      if (leaf.find_first_of("*?") == std::string::npos) {
+        note(ShellDeleteOne(ResolveCase(source), allowUndo));
+        continue;
+      }
+      const std::string folder = slash == std::string::npos
+        ? std::string(".")
+        : ResolveCase(slash == 0 ? std::string("/") : source.substr(0, slash));
+      DIR* const dir = ::opendir(folder.c_str());
+      if (dir == nullptr) {
+        // What Windows 11 answers for a pattern in a folder that isn't there (DE_INVALIDFILES).
+        note(0x7Cu);
+        continue;
+      }
+      // Matched as _findfirst64 and FindFirstFile here match (ShellNameMatches), so a folder's listing
+      // and its delete take the same names.
+      std::vector<std::string> matches;
+      while (const dirent* const entry = ::readdir(dir)) {
+        const std::string name = entry->d_name;
+        if (name != "." && name != ".." && ShellNameMatches(leaf.c_str(), name.c_str())) {
+          matches.push_back(folder == "/" ? "/" + name : folder + "/" + name);
+        }
+      }
+      (void)::closedir(dir);
+      for (const std::string& match : matches) {
+        note(ShellDeleteOne(match, allowUndo));
+      }
+    }
+    return static_cast<int>(result);
+  }
+
+  /// The paths of a double-null-terminated SHFileOperation list.
+  template <class Char, class Narrow>
+  [[nodiscard]] std::vector<std::string> ShellSources(
+    const Char* list,
+    Narrow narrow
+  )
+  {
+    std::vector<std::string> sources;
+    while (list != nullptr && *list != 0) {
+      sources.push_back(narrow(list));
+      while (*list != 0) {
+        ++list;
+      }
+      ++list;
+    }
+    return sources;
+  }
+} // namespace
+
+// Engine addition (issue #255): FO_DELETE deletes as Windows' shell does (above); the other
+// operations, which the engine does not use, stay unsupported and touch nothing.
 int SHFileOperationA(
-  SHFILEOPSTRUCTA*
+  SHFILEOPSTRUCTA* const operation
 )
 {
-  return static_cast<int>(ERROR_NOT_SUPPORTED);
+  if (operation == nullptr || operation->wFunc != FO_DELETE) {
+    return static_cast<int>(ERROR_NOT_SUPPORTED);
+  }
+  operation->fAnyOperationsAborted = FALSE;
+  return ShellDelete(
+    ShellSources(
+      operation->pFrom,
+      [](const char* const path) {
+    std::string out = path;
+    std::replace(out.begin(), out.end(), '\\', '/');
+    return out;
+  }
+    ),
+    operation->fFlags
+  );
 }
 
 int SHFileOperationW(
-  SHFILEOPSTRUCTW*
+  SHFILEOPSTRUCTW* const operation
 )
 {
-  return static_cast<int>(ERROR_NOT_SUPPORTED);
+  if (operation == nullptr || operation->wFunc != FO_DELETE) {
+    return static_cast<int>(ERROR_NOT_SUPPORTED);
+  }
+  operation->fAnyOperationsAborted = FALSE;
+  return ShellDelete(
+    ShellSources(
+      operation->pFrom,
+      [](const wchar_t* const path) {
+    return NarrowPath(path);
+  }
+    ),
+    operation->fFlags
+  );
 }
 
 BOOL DosDateTimeToFileTime(
@@ -2506,21 +3066,32 @@ unsigned int _controlfp(
 ) noexcept
 {
   // Windows x64: the rounding and exception-mask fields apply to the x87 control word and to
-  // MXCSR; the precision field is not supported (ignored). Only the rounding field and the
-  // exception masks are mapped; the engine passes _MCW_PC only, which is ignored as on x64.
+  // MXCSR; the precision field is not supported (ignored). Only the rounding field is mapped; the
+  // engine passes _MCW_PC only, which is ignored as on x64.
+#if FAFRE_ARCH_X64
   std::uint16_t x87 = 0;
   __asm__ volatile("fnstcw %0" : "=m"(x87));
-  std::uint32_t mxcsr = 0;
-  __asm__ volatile("stmxcsr %0" : "=m"(mxcsr));
+  std::uint32_t mxcsr = platform::ReadMxcsr();
   if ((mask & _MCW_RC) != 0) {
     const unsigned int rc = (newValue & _MCW_RC) >> 8; // CRT 0..3 = near, down, up, chop
     x87 = static_cast<std::uint16_t>((x87 & ~0x0C00u) | (rc << 10));
     mxcsr = (mxcsr & ~0x6000u) | (rc << 13);
     __asm__ volatile("fldcw %0" ::"m"(x87));
-    __asm__ volatile("ldmxcsr %0" ::"m"(mxcsr));
+    platform::WriteMxcsr(mxcsr);
   }
-  const unsigned int rcBits = ((mxcsr >> 13) & 3u) << 8;
-  return rcBits;
+  return ((mxcsr >> 13) & 3u) << 8;
+#else
+  // ARM64: FPCR.RMode (bits 22-23) is 0 nearest, 1 up, 2 down, 3 toward zero; the CRT's field is
+  // 0 nearest, 1 down, 2 up, 3 chop. Swapping up and down maps either way.
+  constexpr unsigned int kSwapUpDown[4] = {0u, 2u, 1u, 3u};
+  std::uint64_t fpcr = platform::ReadFpcr();
+  if ((mask & _MCW_RC) != 0) {
+    const unsigned int rc = (newValue & _MCW_RC) >> 8;
+    fpcr = (fpcr & ~(3ull << 22)) | (static_cast<std::uint64_t>(kSwapUpDown[rc & 3u]) << 22);
+    platform::WriteFpcr(fpcr);
+  }
+  return kSwapUpDown[(fpcr >> 22) & 3u] << 8;
+#endif
 }
 
 // --- More of the same --------------------------------------------------------------------
@@ -2650,9 +3221,9 @@ BOOL GetFileAttributesExA(
     return kFileTimeUnixEpoch + static_cast<std::uint64_t>(time.tv_sec) * 10000000ull +
       static_cast<std::uint64_t>(time.tv_nsec) / 100u;
   };
-  ToFileTime(toTicks(status.st_ctim), &data->ftCreationTime);
-  ToFileTime(toTicks(status.st_atim), &data->ftLastAccessTime);
-  ToFileTime(toTicks(status.st_mtim), &data->ftLastWriteTime);
+  ToFileTime(toTicks(StatCreationTime(status)), &data->ftCreationTime);
+  ToFileTime(toTicks(StatAccessTime(status)), &data->ftLastAccessTime);
+  ToFileTime(toTicks(StatWriteTime(status)), &data->ftLastWriteTime);
   const std::uint64_t size = static_cast<std::uint64_t>(status.st_size);
   data->nFileSizeHigh = static_cast<DWORD>(size >> 32);
   data->nFileSizeLow = static_cast<DWORD>(size & 0xFFFFFFFFu);
@@ -2685,7 +3256,7 @@ namespace
   )
   {
     while (dirent* const entry = ::readdir(search.directory)) {
-      if (::fnmatch(search.pattern.c_str(), entry->d_name, FNM_CASEFOLD) != 0) {
+      if (!ShellNameMatches(search.pattern.c_str(), entry->d_name)) {
         continue;
       }
       WIN32_FILE_ATTRIBUTE_DATA attributes{};
@@ -2824,9 +3395,8 @@ void GetCurrentProcessorNumberEx(
   PROCESSOR_NUMBER* const number
 )
 {
-  const int cpu = ::sched_getcpu();
   number->Group = 0;
-  number->Number = static_cast<BYTE>(cpu >= 0 ? cpu : 0);
+  number->Number = static_cast<BYTE>(platform::posix::CurrentProcessorNumber());
   number->Reserved = 0;
 }
 
@@ -2989,7 +3559,7 @@ std::intptr_t _findfirst64(
   }
   auto search = std::make_unique<FindSearch>();
   while (const dirent* const entry = ::readdir(dir)) {
-    if (::fnmatch(pattern.c_str(), entry->d_name, FNM_CASEFOLD) != 0) {
+    if (!ShellNameMatches(pattern.c_str(), entry->d_name)) {
       continue;
     }
     __finddata64_t match{};
@@ -3003,9 +3573,9 @@ std::intptr_t _findfirst64(
       if ((status.st_mode & S_IWUSR) == 0) {
         match.attrib |= _A_RDONLY;
       }
-      match.time_create = ToTime64(status.st_ctim);
-      match.time_access = ToTime64(status.st_atim);
-      match.time_write = ToTime64(status.st_mtim);
+      match.time_create = ToTime64(StatCreationTime(status));
+      match.time_access = ToTime64(StatAccessTime(status));
+      match.time_write = ToTime64(StatWriteTime(status));
       match.size = S_ISDIR(status.st_mode) ? 0 : static_cast<std::int64_t>(status.st_size);
     }
     search->matches.push_back(match);

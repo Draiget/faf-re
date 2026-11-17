@@ -52,44 +52,40 @@ namespace faf::editor
   )
   {
     const AtlasSettings settings;
-    std::string error;
     // A flat texture: the kind's height and roughness everywhere.
-    AtlasTile flat;
-    ASSERT_TRUE(MakeAtlasTile(
+    const auto madeFlat = MakeAtlasTile(
       Grey([](int, int) {
       return 120;
     }),
       {},
       GroundKind::Rock,
-      settings,
-      flat,
-      error
-    )) << error;
+      settings
+    );
+    ASSERT_TRUE(madeFlat) << madeFlat.error();
+    const AtlasTile& flat = *madeFlat;
     EXPECT_NEAR(flat.height[1000], 0.5f + 0.20f, 1e-5f) << "rock stands 0.2 up";
     EXPECT_NEAR(flat.rough[1000], 0.88f, 1e-5f);
     // A faint and a strong stripe pattern get the same height contrast (0.16); bright is rougher-less (smoother).
-    AtlasTile faint;
-    AtlasTile strong;
-    ASSERT_TRUE(MakeAtlasTile(
+    const auto madeFaint = MakeAtlasTile(
       Grey([](int x, int) {
       return 120 + (x % 8 < 4 ? 5 : -5);
     }),
       {},
       GroundKind::Grass,
-      settings,
-      faint,
-      error
-    ));
-    ASSERT_TRUE(MakeAtlasTile(
+      settings
+    );
+    ASSERT_TRUE(madeFaint);
+    const auto madeStrong = MakeAtlasTile(
       Grey([](int x, int) {
       return 120 + (x % 8 < 4 ? 80 : -80);
     }),
       {},
       GroundKind::Grass,
-      settings,
-      strong,
-      error
-    ));
+      settings
+    );
+    ASSERT_TRUE(madeStrong);
+    const AtlasTile& faint = *madeFaint;
+    const AtlasTile& strong = *madeStrong;
     EXPECT_NEAR(Sd(faint.height), 0.16f, 0.005f);
     EXPECT_NEAR(Sd(strong.height), 0.16f, 0.005f);
     EXPECT_LT(strong.rough[0], strong.rough[4]) << "a bright spot is smoother";
@@ -103,23 +99,22 @@ namespace faf::editor
           static_cast<std::uint8_t>(127.5f + slope * 60.0f);
       }
     }
-    AtlasTile relief;
     AtlasSettings onlyRelief;
     onlyRelief.cavity = 1.0f;
-    ASSERT_TRUE(MakeAtlasTile(
+    const auto madeRelief = MakeAtlasTile(
       Grey([](int, int) {
       return 120;
     }),
       normal,
       GroundKind::Unknown,
-      onlyRelief,
-      relief,
-      error
-    )) << error;
+      onlyRelief
+    );
+    ASSERT_TRUE(madeRelief) << madeRelief.error();
+    const AtlasTile& relief = *madeRelief;
     EXPECT_NEAR(Sd(relief.height), 0.16f, 0.01f);
     EXPECT_GT(std::fabs(relief.height[0] - relief.height[kAtlasTile / 2]), 0.3f)
       << "a hill and a valley half a tile apart";
-    EXPECT_FALSE(MakeAtlasTile(std::vector<std::uint8_t>(16), {}, GroundKind::Rock, settings, flat, error));
+    EXPECT_FALSE(MakeAtlasTile(std::vector<std::uint8_t>(16), {}, GroundKind::Rock, settings));
   }
 
   TEST(

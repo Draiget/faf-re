@@ -17,6 +17,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <mutex>
+#include <print>
 #include <thread>
 #include <vector>
 #include <gtest/gtest.h>
@@ -86,7 +87,7 @@ TEST(
       const int got = prefs->GetInteger(KeyOf(t, slot), -1);
       if (got != expected) {
         if (++wrong <= 5) {
-          std::printf("  thread %d slot %d: read %d, wrote %d last\n", t, slot, got, expected);
+          std::println("  thread {} slot {}: read {}, wrote {} last", t, slot, got, expected);
         }
       }
     }

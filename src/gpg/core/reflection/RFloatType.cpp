@@ -42,11 +42,11 @@ fa::string RFloatType::GetLexical(
 {
   const float value = *static_cast<const float*>(ref.mObj);
 
+  // "%f" of a large float runs past 30 characters (3.4e38 is 46): measure, then format.
+  const int n = std::snprintf(nullptr, 0, "%f", value);
   fa::string result;
-  result.resize(30, '\0');
-
-  const int n = std::sprintf(result.raw_data_mut_unsafe(), "%f", value);
-
+  result.resize(static_cast<std::size_t>(n) + 1u, '\0');
+  (void)std::snprintf(result.raw_data_mut_unsafe(), static_cast<std::size_t>(n) + 1u, "%f", value);
   result.resize(static_cast<std::size_t>(n));
   return result;
 }

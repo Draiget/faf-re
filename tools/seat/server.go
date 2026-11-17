@@ -30,7 +30,7 @@ const (
 // ServerJoin puts a seat's game on a game server. It carries this seat's token only: a director builds one per seat
 // and never hands a seat another's (plan WP2.9).
 type ServerJoin struct {
-	Address  string `json:"address"`  // the game server, IPv4 host:port
+	Address  string `json:"address"`  // the game server: a.b.c.d:port or [ipv6]:port
 	Token    string `json:"token"`    // this player's admission token
 	Delivery string `json:"delivery"` // DeliverGpgNet (default) or DeliverArgs
 }

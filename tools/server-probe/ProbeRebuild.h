@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <expected>
 #include <memory>
 #include <span>
 #include <string>
@@ -21,12 +22,12 @@ namespace faf::probe
     CProbeRebuild();
     ~CProbeRebuild();
 
-    /** The engine's services, then the match file's rules (as the server loads them). False with `error`. */
-    [[nodiscard]] bool Load(const std::string& matchPath, int uid, std::string& error);
+    /** The engine's services, then the match file's rules (as the server loads them). Or the error. */
+    [[nodiscard]] std::expected<void, std::string> Load(const std::string& matchPath, int uid);
     /** The engine's services alone: the rules come with the server's `LaunchInfo` (plan WPR.55). */
-    [[nodiscard]] bool Start(std::string& error);
-    /** `LaunchInfo`: the configuration the server launched, and its rules. False with `error`. */
-    [[nodiscard]] bool OnLaunchInfo(std::span<const std::uint8_t> configuration, int uid, std::string& error);
+    [[nodiscard]] std::expected<void, std::string> Start();
+    /** `LaunchInfo`: the configuration the server launched, and its rules. Or the error. */
+    [[nodiscard]] std::expected<void, std::string> OnLaunchInfo(std::span<const std::uint8_t> configuration, int uid);
 
     /**
      * Plan WP9.3: `--host-effects`, before `GameInfo`: the view client hosts the effects as the game client does
@@ -68,7 +69,7 @@ namespace faf::probe
     void Report(int uid) const;
 
   private:
-    [[nodiscard]] bool LoadRules(LuaPlus::LuaObject& config, int uid, std::string& error);
+    [[nodiscard]] std::expected<void, std::string> LoadRules(LuaPlus::LuaObject& config, int uid);
 
     struct SState;
     std::unique_ptr<SState> mState;

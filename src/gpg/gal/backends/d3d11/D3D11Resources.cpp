@@ -1,6 +1,7 @@
 // FAF addition, not in the shipped binary: textures, targets, buffers, vertex
 // formats, pipeline state and cursor of the Direct3D 11 gal backend.
 
+#include <utility>
 #include <algorithm>
 #include <cstring>
 
@@ -34,7 +35,7 @@ namespace gpg::gal
       const MohoD3DLockFlags flag
     ) noexcept
     {
-      return (static_cast<std::uint32_t>(flags) & static_cast<std::uint32_t>(flag)) != 0U;
+      return (static_cast<std::uint32_t>(flags) & std::to_underlying(flag)) != 0U;
     }
   } // namespace
 
@@ -405,15 +406,15 @@ namespace gpg::gal
 
     mLockOffset = offset;
     mLockSize = (size == 0U || offset + size > mByteWidth) ? (mByteWidth - offset) : size;
-    const auto rawFlags = static_cast<std::uint32_t>(flags);
-    mLockWrites = (rawFlags & static_cast<std::uint32_t>(MohoD3DLockFlags::ReadOnly)) == 0U;
+    const auto rawFlags = std::to_underlying(flags);
+    mLockWrites = (rawFlags & std::to_underlying(MohoD3DLockFlags::ReadOnly)) == 0U;
 
     std::uint8_t* data = nullptr;
     if (mDynamic) {
       D3D11_MAP mapType = D3D11_MAP_WRITE_NO_OVERWRITE;
-      if ((rawFlags & static_cast<std::uint32_t>(MohoD3DLockFlags::Discard)) != 0U) {
+      if ((rawFlags & std::to_underlying(MohoD3DLockFlags::Discard)) != 0U) {
         mapType = D3D11_MAP_WRITE_DISCARD;
-      } else if ((rawFlags & static_cast<std::uint32_t>(MohoD3DLockFlags::NoOverwrite)) == 0U && offset == 0U) {
+      } else if ((rawFlags & std::to_underlying(MohoD3DLockFlags::NoOverwrite)) == 0U && offset == 0U) {
         // A plain lock from the start: everything after it is being
         // rewritten too, which is what DISCARD promises.
         mapType = D3D11_MAP_WRITE_DISCARD;

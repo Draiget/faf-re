@@ -22,12 +22,13 @@ namespace moho
   struct SFpuControlState
   {
     std::uint32_t mX87ControlWord; // FNSTCW: precision, rounding, exception masks (0 on non-x86 targets)
-    std::uint32_t mMxcsr;          // SSE control bits only; the sticky exception flags are dropped
+    std::uint32_t mMxcsr;          // SSE control bits only, the sticky exception flags dropped (0 on ARM64)
+    std::uint64_t mFpcr;           // ARM64's FPCR: rounding, flush-to-zero, default NaN, traps (0 elsewhere)
 
-    /// Reads the calling thread's x87 control word and MXCSR.
+    /// Reads the calling thread's control registers (platform/FpControl.h).
     [[nodiscard]] static SFpuControlState Capture() noexcept;
 
-    /// Loads this state into the calling thread's FPU and SSE control registers.
+    /// Loads this state into the calling thread's floating-point control registers.
     void Apply() const noexcept;
 
     [[nodiscard]] friend bool operator==(const SFpuControlState&, const SFpuControlState&) noexcept = default;

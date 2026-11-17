@@ -2,6 +2,7 @@
 #include "moho/lua/CScrLuaInitForm.h"
 #include "platform/Interlocked.h"
 
+#include <utility>
 #include <atomic>
 #include <algorithm>
 #include <bit>
@@ -599,7 +600,7 @@ namespace
 
     const moho::EStatType type = item->mType;
     if (type != moho::EStatType::kNone && type != moho::EStatType::kString) {
-      const bool useRealtimeValue = (item->mUseRealtimeSlot == static_cast<std::int32_t>(moho::EPulseMode::kTick));
+      const bool useRealtimeValue = (item->mUseRealtimeSlot == std::to_underlying(moho::EPulseMode::kTick));
       const float sampleValue = item->GetFloat(useRealtimeValue);
       if (sampleValue != 0.0f) {
         AppendStatSample(item, frameIndex, sampleValue);
@@ -1590,7 +1591,7 @@ namespace moho
     EngineStats* const engineStats = GetEngineStats();
     StatItem* const rootItem = engineStats ? engineStats->mItem.get() : nullptr;
     if (rootItem) {
-      rootItem->ClearChildren(static_cast<std::int32_t>(EPulseMode::kFrame));
+      rootItem->ClearChildren(std::to_underlying(EPulseMode::kFrame));
     }
 
     if (engineStats && engineStats->mIsLogging != 0) {
@@ -1856,7 +1857,7 @@ namespace moho
   )
   {
     if (mUseRealtimeSlot == pulseMode) {
-      if (pulseMode == static_cast<std::int32_t>(EPulseMode::kTick) && mType != EStatType::kString) {
+      if (pulseMode == std::to_underlying(EPulseMode::kTick) && mType != EStatType::kString) {
         (void)SyncRealtimeValueBitsFromPrimary(this);
       }
       Clear(false);
@@ -2297,9 +2298,9 @@ namespace moho
   void EPulseModeTypeInfo::AddEnums()
   {
     mPrefix = "STAT_PULSE_";
-    AddEnum(StripPrefix("STAT_PULSE_NONE"), static_cast<std::int32_t>(EPulseMode::kNone));
-    AddEnum(StripPrefix("STAT_PULSE_TICK"), static_cast<std::int32_t>(EPulseMode::kTick));
-    AddEnum(StripPrefix("STAT_PULSE_FRAME"), static_cast<std::int32_t>(EPulseMode::kFrame));
+    AddEnum(StripPrefix("STAT_PULSE_NONE"), std::to_underlying(EPulseMode::kNone));
+    AddEnum(StripPrefix("STAT_PULSE_TICK"), std::to_underlying(EPulseMode::kTick));
+    AddEnum(StripPrefix("STAT_PULSE_FRAME"), std::to_underlying(EPulseMode::kFrame));
   }
 
   /**

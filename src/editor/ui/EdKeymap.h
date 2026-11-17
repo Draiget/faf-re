@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <map>
 #include <string>
 #include <string_view>
@@ -55,4 +56,45 @@ namespace faf::editor
    * F6's view switch. Everything else bound there stays the game's.
    */
   [[nodiscard]] bool RunsOverGame(std::string_view commandId);
+
+  // ---- The camera's mouse gestures (FAF Studio's camera.lua): a button and modifiers for each, in keys.ini ----
+
+  enum class CameraGesture
+  {
+    Orbit,
+    Pan,
+    Pan2, // a second pan (Shift + middle by default)
+    Zoom, // a drag up or down zooms (none by default)
+    Count,
+  };
+  /** A mouse button (0 none, 1 right, 2 middle) and the modifiers held with it. */
+  struct MouseChord
+  {
+    int button = 0;
+    bool ctrl = false;
+    bool shift = false;
+    bool alt = false;
+    bool operator==(
+      const MouseChord& other
+    ) const
+    {
+      return button == other.button && ctrl == other.ctrl && shift == other.shift && alt == other.alt;
+    }
+  };
+  using CameraGestures = std::array<MouseChord, static_cast<std::size_t>(CameraGesture::Count)>;
+  /** The defaults: Orbit middle, Pan right, Pan2 Shift + middle, Zoom none. */
+  [[nodiscard]] const CameraGestures& DefaultCameraGestures();
+  /** The gestures now (keys.ini's `mouse.<name>=` lines and Settings > Keys change them). */
+  [[nodiscard]] CameraGestures& ActiveCameraGestures();
+  [[nodiscard]] const char* CameraGestureId(CameraGesture gesture);    // "mouse.orbit"
+  [[nodiscard]] const char* CameraGestureTitle(CameraGesture gesture); // "Orbit the camera"
+  /** "Shift+Middle", "Right", "" for none. */
+  [[nodiscard]] std::string MouseChordText(const MouseChord& chord);
+  /** Reads what MouseChordText writes; false for text it can't read. */
+  bool ParseMouseChord(std::string_view text, MouseChord& chord);
+  /**
+   * The gesture a button press starts: the one bound to exactly that button and those modifiers, else the one bound
+   * to the button alone; false when none (the press is the tool's).
+   */
+  bool CameraGestureFor(int button, bool ctrl, bool shift, bool alt, CameraGesture& gesture);
 } // namespace faf::editor

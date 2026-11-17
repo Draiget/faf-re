@@ -23,13 +23,30 @@ namespace
   )
   {
     SServerConnectRequest request;
-    std::string error;
-    ASSERT_TRUE(MakeServerConnectRequest("203.0.113.7:27050", "token-of-seat-one", 1001, request, error)) << error;
+    const auto made = MakeServerConnectRequest("203.0.113.7:27050", "token-of-seat-one", 1001, request);
+    ASSERT_TRUE(made) << made.error();
     EXPECT_EQ(request.endpoint, "203.0.113.7:27050");
-    EXPECT_EQ(request.address, (203u << 24) | (0u << 16) | (113u << 8) | 7u);
+    EXPECT_EQ(request.address, faf::remote::net::MapIpv4((203u << 24) | (0u << 16) | (113u << 8) | 7u));
     EXPECT_EQ(request.port, 27050);
     EXPECT_EQ(request.token, "token-of-seat-one");
     EXPECT_EQ(request.uid, 1001);
+  }
+
+  // Issue #160: a game server on IPv6.
+  TEST(
+    LaunchPath,
+    Ipv6ConnectionStringIsTaken
+  )
+  {
+    SServerConnectRequest request;
+    const auto made = MakeServerConnectRequest("[2001:db8::7]:27050", "token-of-seat-one", 1001, request);
+    ASSERT_TRUE(made) << made.error();
+    EXPECT_EQ(request.endpoint, "[2001:db8::7]:27050");
+    EXPECT_EQ(faf::remote::net::AddressText(request.address), "2001:db8::7");
+    EXPECT_EQ(request.port, 27050);
+    SServerConnectRequest refused;
+    EXPECT_FALSE(MakeServerConnectRequest("2001:db8::7:27050", "token", 1001, refused))
+      << "an IPv6 address without brackets leaves the port unclear";
   }
 
   TEST(
@@ -41,9 +58,10 @@ namespace
            "", "203.0.113.7", "203.0.113.7:0", "203.0.113.7:70000", "server:27050", "1.2.3:27050", " 203.0.113.4:27050"
          }) {
       SServerConnectRequest request;
-      std::string error;
-      EXPECT_FALSE(MakeServerConnectRequest(endpoint, "token", 1001, request, error)) << endpoint;
-      EXPECT_NE(error.find("IPv4 address and port"), std::string::npos) << error;
+      const auto made = MakeServerConnectRequest(endpoint, "token", 1001, request);
+      ASSERT_FALSE(made) << endpoint;
+      EXPECT_NE(made.error().find("IPv4 address and port"), std::string::npos) << made.error();
+      EXPECT_NE(made.error().find("[address]:port"), std::string::npos) << made.error();
       EXPECT_TRUE(request.token.empty()) << "a refused request keeps nothing";
     }
   }
@@ -57,16 +75,16 @@ namespace
     for (const std::string& token :
          {std::string(), std::string("two words"), std::string("tab\there"), tooLong, std::string("caf\xC3\xA9")}) {
       SServerConnectRequest request;
-      std::string error;
-      EXPECT_FALSE(MakeServerConnectRequest("192.0.2.1:27050", token, 1001, request, error)) << token;
-      EXPECT_FALSE(error.empty());
+      const auto made = MakeServerConnectRequest("192.0.2.1:27050", token, 1001, request);
+      ASSERT_FALSE(made) << token;
+      EXPECT_FALSE(made.error().empty());
       if (!token.empty()) {
-        EXPECT_EQ(error.find(token), std::string::npos) << "the error must not repeat the token";
+        EXPECT_EQ(made.error().find(token), std::string::npos) << "the error must not repeat the token";
       }
     }
     SServerConnectRequest longest;
-    std::string error;
-    EXPECT_TRUE(MakeServerConnectRequest("192.0.2.1:27050", std::string(1024, 'a'), 1001, longest, error)) << error;
+    const auto made = MakeServerConnectRequest("192.0.2.1:27050", std::string(1024, 'a'), 1001, longest);
+    EXPECT_TRUE(made) << made.error();
   }
 
   TEST(
@@ -76,9 +94,9 @@ namespace
   {
     for (const std::int32_t uid : {0, -1, -1001}) {
       SServerConnectRequest request;
-      std::string error;
-      EXPECT_FALSE(MakeServerConnectRequest("192.0.2.1:27050", "token", uid, request, error)) << uid;
-      EXPECT_NE(error.find("above 0"), std::string::npos) << error;
+      const auto made = MakeServerConnectRequest("192.0.2.1:27050", "token", uid, request);
+      ASSERT_FALSE(made) << uid;
+      EXPECT_NE(made.error().find("above 0"), std::string::npos) << made.error();
     }
   }
 

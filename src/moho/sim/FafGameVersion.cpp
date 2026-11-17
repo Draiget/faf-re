@@ -234,7 +234,7 @@ namespace moho
   ) noexcept
   {
     constexpr std::string_view kPrefix = "Supreme Commander v1.50.";
-    if (header.substr(0, kPrefix.size()) != kPrefix) {
+    if (!header.starts_with(kPrefix)) {
       return 0;
     }
     header.remove_prefix(kPrefix.size());

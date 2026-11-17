@@ -10,17 +10,16 @@
 
 namespace faf::editor
 {
-  bool ParseObj(
-    const std::string& text,
-    ObjMesh& out,
-    std::string& error
+  std::expected<ObjMesh, std::string> ParseObj(
+    const std::string& text
   )
   {
-    out = ObjMesh{};
+    ObjMesh out;
     std::istringstream lines(text);
     std::string line;
     int number = 0;
-    int group = -1; // -1: before any `o` / `g` line
+    int group = -1;    // -1: before any `o` / `g` line
+    int material = -1; // -1: before any `usemtl` line
     const auto index = [](const std::string& part, const std::size_t count) {
       if (part.empty()) {
         return -1;
@@ -48,6 +47,14 @@ namespace faf::editor
         std::array<float, 3> n{};
         words >> n[0] >> n[1] >> n[2];
         out.normals.push_back(n);
+      } else if (kind == "usemtl") {
+        std::string name;
+        std::getline(words >> std::ws, name);
+        const auto found = std::find(out.materials.begin(), out.materials.end(), name);
+        material = static_cast<int>(found - out.materials.begin());
+        if (found == out.materials.end()) {
+          out.materials.push_back(name);
+        }
       } else if (kind == "o" || kind == "g") {
         std::string name;
         std::getline(words >> std::ws, name);
@@ -75,22 +82,21 @@ namespace faf::editor
             corner.normal = index(word.substr(b + 1), out.normals.size());
           }
           if (corner.position < 0 || corner.position >= static_cast<int>(out.positions.size())) {
-            error = "line " + std::to_string(number) + ": a face names a vertex the file hasn't got";
-            return false;
+            return std::unexpected("line " + std::to_string(number) + ": a face names a vertex the file hasn't got");
           }
           polygon.push_back(corner);
         }
         for (std::size_t k = 2; k < polygon.size(); ++k) {
           out.triangles.push_back({polygon[0], polygon[k - 1], polygon[k]});
           out.triangleGroup.push_back(group);
+          out.triangleMaterial.push_back(material);
         }
       }
     }
     if (out.triangles.empty()) {
-      error = "the file has no faces";
-      return false;
+      return std::unexpected("the file has no faces");
     }
-    return true;
+    return out;
   }
 
   namespace
@@ -230,33 +236,30 @@ namespace faf::editor
     return out;
   }
 
-  std::vector<std::uint8_t> ScmFromObj(
+  std::expected<std::vector<std::uint8_t>, std::string> ScmFromObj(
     const ObjMesh& mesh,
     const std::string& boneName,
     const float scale,
-    const std::string& info,
-    std::string& error
+    const std::string& info
   )
   {
     ScmBone root;
     root.name = boneName;
     root.rest = {1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0};
     root.hasRest = true;
-    return ScmFromObjSkinned(mesh, {root}, {}, scale, info, error);
+    return ScmFromObjSkinned(mesh, {root}, {}, scale, info);
   }
 
-  std::vector<std::uint8_t> ScmFromObjSkinned(
+  std::expected<std::vector<std::uint8_t>, std::string> ScmFromObjSkinned(
     const ObjMesh& mesh,
     const std::vector<ScmBone>& bonesIn,
     const std::vector<int>& positionBone,
     const float scale,
-    const std::string& info,
-    std::string& error
+    const std::string& info
   )
   {
     if (bonesIn.empty()) {
-      error = "a model needs a bone";
-      return {};
+      return std::unexpected("a model needs a bone");
     }
     std::vector<ScmBone> bones = bonesIn;
     ScmBindPose(bones);
@@ -308,12 +311,12 @@ namespace faf::editor
       }
     }
     if (vertices.size() > 65535) {
-      error = "the model has " + std::to_string(vertices.size()) + " vertices; a model takes 65535 at most";
-      return {};
+      return std::unexpected(
+        "the model has " + std::to_string(vertices.size()) + " vertices; a model takes 65535 at most"
+      );
     }
     if (indexes.empty()) {
-      error = "the model has no triangles";
-      return {};
+      return std::unexpected("the model has no triangles");
     }
     // Tangents and binormals from the texture coordinates (summed over the faces, then made square to the normal).
     std::vector<std::array<float, 3>> tangents(vertices.size(), std::array<float, 3>{0, 0, 0});
@@ -424,8 +427,14 @@ namespace faf::editor
       }
       PutFloat(out, v.uv[0]);
       PutFloat(out, v.uv[1]);
-      PutFloat(out, v.uv[0]); // the second set: the same
-      PutFloat(out, v.uv[1]);
+      if (mesh.uv2Size > 0.0f) {
+        // The second set over the map (FAF Studio's planar light mask coordinates).
+        PutFloat(out, std::clamp(v.position[0] / mesh.uv2Size, 0.0f, 1.0f));
+        PutFloat(out, std::clamp(v.position[2] / mesh.uv2Size, 0.0f, 1.0f));
+      } else {
+        PutFloat(out, v.uv[0]); // the second set: the same
+        PutFloat(out, v.uv[1]);
+      }
       Put32(out, static_cast<std::uint32_t>(v.bone)); // its bone (the first of four bytes)
     }
     Section(out, "TRIS");

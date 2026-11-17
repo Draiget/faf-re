@@ -1,5 +1,6 @@
 #include "UserArmy.h"
 
+#include <utility>
 #include <cstring>
 #include <string>
 
@@ -18,7 +19,7 @@ namespace moho
       const UserArmy::EReconGridMask flag
     )
     {
-      return (static_cast<std::uint8_t>(value) & static_cast<std::uint8_t>(flag)) != 0u;
+      return (std::to_underlying(value) & std::to_underlying(flag)) != 0u;
     }
 
     constexpr const char* kInvalidArmyMessage = "Invalid army %d";

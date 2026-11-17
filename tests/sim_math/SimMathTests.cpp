@@ -31,6 +31,7 @@
 #include <functional>
 #include <limits>
 #include <map>
+#include <print>
 #include <string>
 #include <vector>
 
@@ -610,12 +611,14 @@ namespace
 
   const char* PlatformName()
   {
-#if FAFRE_PLATFORM_WINDOWS && defined(_M_X64)
+#if FAFRE_PLATFORM_WINDOWS && FAFRE_ARCH_X64
     return "windows-x64";
-#elif FAFRE_PLATFORM_WINDOWS
+#elif FAFRE_PLATFORM_WINDOWS && FAFRE_ARCH_X86
     return "windows-x86";
-#elif defined(__x86_64__)
+#elif FAFRE_PLATFORM_LINUX && FAFRE_ARCH_X64 // the platform's own name, for its known_*.txt
     return "linux-x64";
+#elif FAFRE_PLATFORM_MACOS_ARM64             // the platform's own name, for its known_*.txt
+    return "macos-arm64";
 #else
     return "unknown";
 #endif
@@ -726,7 +729,7 @@ namespace
       }
     }
     if (fn == nullptr) {
-      std::fprintf(stderr, "unknown sweep function %s\n", name);
+      std::println(stderr, "unknown sweep function {}", name);
       return 2;
     }
     for (std::uint64_t block = 0; block < (1ull << 12); ++block) {
@@ -737,8 +740,8 @@ namespace
         hash = (hash ^ bits) * 1099511628211ull;
         hash = (hash ^ out) * 1099511628211ull;
       }
-      std::printf(
-        "%s %llu %016llx\n", name, static_cast<unsigned long long>(block), static_cast<unsigned long long>(hash)
+      std::println(
+        "{} {} {:016x}", name, static_cast<unsigned long long>(block), static_cast<unsigned long long>(hash)
       );
     }
     return 0;
@@ -795,11 +798,11 @@ namespace
 
     int total = 0;
     for (const auto& [name, count] : mismatchesByName) {
-      std::printf("FAIL %s: %d case(s) differ; first: %s\n", name.c_str(), count, firstMismatch[name].c_str());
+      std::println("FAIL {}: {} case(s) differ; first: {}", name, count, firstMismatch[name]);
       total += count;
     }
-    std::printf(
-      "faf_sim_math_tests (%s): %zu cases, %d differ, %d missing from %s (%d known platform difference(s) applied)\n",
+    std::println(
+      "faf_sim_math_tests ({}): {} cases, {} differ, {} missing from {} ({} known platform difference(s) applied)",
       PlatformName(),
       results.order.size(),
       total,
@@ -949,18 +952,18 @@ int main(
     const char* const path = argv[2];
     std::FILE* const out = std::fopen(path, "wb");
     if (out == nullptr) {
-      std::fprintf(stderr, "cannot write %s\n", path);
+      std::println(stderr, "cannot write {}", path);
       return 2;
     }
-    std::fprintf(
-      out, "# faf_sim_math_tests golden values (plan WPL.23), generated on %s. One line per case:\n", PlatformName()
+    std::println(
+      out, "# faf_sim_math_tests golden values (plan WPL.23), generated on {}. One line per case:", PlatformName()
     );
-    std::fprintf(out, "# name index inputs -> outputs (hex bit patterns; i/u prefixes for integers).\n");
+    std::println(out, "# name index inputs -> outputs (hex bit patterns; i/u prefixes for integers).");
     for (const std::string& key : results.order) {
-      std::fprintf(out, "%s %s\n", key.c_str(), results.lines[key].c_str());
+      std::println(out, "{} {}", key, results.lines[key]);
     }
     std::fclose(out);
-    std::printf("wrote %zu cases to %s\n", results.order.size(), path);
+    std::println("wrote {} cases to {}", results.order.size(), path);
     return 0;
   }
 
@@ -974,26 +977,26 @@ int main(
     const char* const path = argv[2];
     std::map<std::string, std::string> golden;
     if (!ReadCaseFile(path, golden)) {
-      std::fprintf(stderr, "cannot read %s\n", path);
+      std::println(stderr, "cannot read {}", path);
       return 2;
     }
     std::FILE* const out = std::fopen(argv[3], "wb");
     if (out == nullptr) {
-      std::fprintf(stderr, "cannot write %s\n", argv[3]);
+      std::println(stderr, "cannot write {}", argv[3]);
       return 2;
     }
-    std::fprintf(out, "# faf_sim_math_tests known differences on %s from %s (plan WPL.23).\n", PlatformName(), path);
-    std::fprintf(out, "# Reason: %s\n", argv[4]);
+    std::println(out, "# faf_sim_math_tests known differences on {} from {} (plan WPL.23).", PlatformName(), path);
+    std::println(out, "# Reason: {}", argv[4]);
     int written = 0;
     for (const std::string& key : results.order) {
       const auto it = golden.find(key);
       if (it != golden.end() && it->second != results.lines[key]) {
-        std::fprintf(out, "%s %s\n", key.c_str(), results.lines[key].c_str());
+        std::println(out, "{} {}", key, results.lines[key]);
         ++written;
       }
     }
     std::fclose(out);
-    std::printf("wrote %d known difference(s) to %s\n", written, argv[3]);
+    std::println("wrote {} known difference(s) to {}", written, argv[3]);
     return 0;
   }
 

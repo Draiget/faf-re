@@ -1,6 +1,7 @@
 #include "DxgiSwapChain.h"
 
 #include "DxgiFactory.h"
+#include "gpg/core/utils/Unreachable.h"
 
 namespace gpg::gal::dxgi
 {
@@ -16,9 +17,9 @@ namespace gpg::gal::dxgi
     case SwapModel::FlipSequential:
       return "flip-sequential";
     case SwapModel::BltDiscard:
-    default:
       return "discard (blt)";
     }
+    FAF_UNREACHABLE();
   }
 
   SwapChain::~SwapChain()

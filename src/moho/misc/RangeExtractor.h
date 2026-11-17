@@ -135,7 +135,7 @@ namespace moho
    */
   [[nodiscard]] RangeExtractor* GetRangeExtractor(const fa::string& extractorName);
 
-#if defined(_M_IX86)
+#if FAFRE_ARCH_X86
   static_assert(sizeof(RangeExtractor) == 0x04, "RangeExtractor size must be 0x04");
 #endif
 } // namespace moho

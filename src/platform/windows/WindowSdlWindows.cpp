@@ -11,7 +11,7 @@
 
 #include <SDL3/SDL.h>
 
-#include <windows.h>
+#include <Windows.h>
 #include <commctrl.h>
 
 #include "platform/Window.h"
@@ -193,6 +193,18 @@ namespace platform::window::sdl
     (void)down;
   }
 
+  bool IsSystemShortcut(
+    const int virtualKey,
+    const unsigned int sdlModifiers
+  )
+  {
+    // Windows keeps its Windows-key combinations from the game itself (and WinApp's keyboard hook
+    // the Windows key alone).
+    (void)virtualKey;
+    (void)sdlModifiers;
+    return false;
+  }
+
   void OnCursorMoved(
     const int screenX,
     const int screenY
@@ -269,6 +281,22 @@ namespace platform::window::sdl
   )
   {
     return IsChildHwnd(HwndOf(window));
+  }
+
+  void SetClipChildren(
+    SDL_Window* const window,
+    const bool clip
+  )
+  {
+    HWND const hwnd = HwndOf(window);
+    if (hwnd == nullptr || IsChildHwnd(hwnd)) {
+      return;
+    }
+    const LONG_PTR style = ::GetWindowLongPtrW(hwnd, GWL_STYLE);
+    const LONG_PTR wanted = clip ? (style | WS_CLIPCHILDREN) : (style & ~static_cast<LONG_PTR>(WS_CLIPCHILDREN));
+    if (wanted != style) {
+      (void)::SetWindowLongPtrW(hwnd, GWL_STYLE, wanted);
+    }
   }
 
   bool SetChildBounds(

@@ -37,7 +37,7 @@
 #include "moho/sim/STIMap.h"
 
 #if FAFRE_PLATFORM_WINDOWS
-#include <windows.h>
+#include <Windows.h>
 #endif
 #include "gpg/core/reflection/StaticInitPhase.h"
 
@@ -52,10 +52,10 @@ namespace
    */
   struct PathQueueCellLess
   {
-    [[nodiscard]] bool operator()(
+    [[nodiscard]] static bool operator()(
       const moho::SOCellPos& lhs,
       const moho::SOCellPos& rhs
-    ) const noexcept
+    ) noexcept
     {
       return PackCellKey(lhs) < PackCellKey(rhs);
     }
@@ -1247,7 +1247,7 @@ namespace moho
     mNodes.ForEach([archive](const node_type& node) {
       archive->WriteShort(node.mCell.x);
       archive->WriteShort(node.mCell.z);
-      archive->WriteInt(static_cast<std::int32_t>(node.mState));
+      archive->WriteInt(std::to_underlying(node.mState));
       archive->WriteBool(node.mParent != nullptr);
       if (node.mParent != nullptr) {
         archive->WriteShort(node.mParent->mCell.x);

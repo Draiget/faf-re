@@ -1,0 +1,63 @@
+<svg xmlns='http://www.w3.org/2000/svg' width='760' height='340' viewBox='0 0 760 340' role='img' aria-label='Order latency and late views under packet loss'>
+<rect width='760' height='340' rx='8' fill='#fcfcfb'/>
+<text x='16' y='26' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='15' font-weight='600' fill='#0b0b0b'>Order latency and late views under packet loss</text>
+<text x='16' y='45' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='12' fill='#52514e'>simulated 50 ms each way (RTT 100) with 5 ms jitter, plus loss in both directions</text>
+<line x1='64' x2='736' y1='288.0' y2='288.0' stroke='#e4e3df' stroke-width='1'/>
+<text x='56' y='292.0' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='11' fill='#52514e' text-anchor='end'>0</text>
+<line x1='64' x2='736' y1='247.6' y2='247.6' stroke='#e4e3df' stroke-width='1'/>
+<text x='56' y='251.6' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='11' fill='#52514e' text-anchor='end'>100</text>
+<line x1='64' x2='736' y1='207.2' y2='207.2' stroke='#e4e3df' stroke-width='1'/>
+<text x='56' y='211.2' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='11' fill='#52514e' text-anchor='end'>200</text>
+<line x1='64' x2='736' y1='166.8' y2='166.8' stroke='#e4e3df' stroke-width='1'/>
+<text x='56' y='170.8' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='11' fill='#52514e' text-anchor='end'>300</text>
+<line x1='64' x2='736' y1='126.4' y2='126.4' stroke='#e4e3df' stroke-width='1'/>
+<text x='56' y='130.4' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='11' fill='#52514e' text-anchor='end'>400</text>
+<line x1='64' x2='736' y1='86.0' y2='86.0' stroke='#e4e3df' stroke-width='1'/>
+<text x='56' y='90.0' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='11' fill='#52514e' text-anchor='end'>500</text>
+<text x='14' y='187.0' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='11' fill='#52514e' text-anchor='middle' transform='rotate(-90 14 187.0)'>milliseconds</text>
+<line x1='64' x2='736' y1='288' y2='288' stroke='#b9b8b2' stroke-width='1'/>
+<path d='M89.2,288.0 V225.7 Q89.2,221.7 93.2,221.7 H113.1 Q117.1,221.7 117.1,225.7 V288.0 Z' fill='#2a78d6'><title>answer, median, 0 % loss: 164</title></path>
+<text x='103.2' y='217.7' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='10' fill='#52514e' text-anchor='middle'>164</text>
+<path d='M119.1,288.0 V182.9 Q119.1,178.9 123.1,178.9 H143.0 Q147.0,178.9 147.0,182.9 V288.0 Z' fill='#eb6834'><title>first view, median, 0 % loss: 270</title></path>
+<text x='133.0' y='174.9' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='10' fill='#52514e' text-anchor='middle'>270</text>
+<path d='M149.0,288.0 V161.9 Q149.0,157.9 153.0,157.9 H172.9 Q176.9,157.9 176.9,161.9 V288.0 Z' fill='#1baf7a'><title>first view, 90th pct., 0 % loss: 322</title></path>
+<text x='162.9' y='153.9' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='10' fill='#52514e' text-anchor='middle'>322</text>
+<path d='M178.9,288.0 V253.2 Q178.9,249.2 182.9,249.2 H202.8 Q206.8,249.2 206.8,253.2 V288.0 Z' fill='#eda100'><title>views late, 99th pct., 0 % loss: 96</title></path>
+<text x='192.8' y='245.2' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='10' fill='#52514e' text-anchor='middle'>96</text>
+<text x='148.0' y='304' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='11' fill='#52514e' text-anchor='middle'>0 % loss</text>
+<path d='M257.2,288.0 V222.9 Q257.2,218.9 261.2,218.9 H281.1 Q285.1,218.9 285.1,222.9 V288.0 Z' fill='#2a78d6'><title>answer, median, 1 % loss: 171</title></path>
+<text x='271.1' y='214.9' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='10' fill='#52514e' text-anchor='middle'>171</text>
+<path d='M287.1,288.0 V179.7 Q287.1,175.7 291.1,175.7 H311.0 Q315.0,175.7 315.0,179.7 V288.0 Z' fill='#eb6834'><title>first view, median, 1 % loss: 278</title></path>
+<text x='301.0' y='171.7' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='10' fill='#52514e' text-anchor='middle'>278</text>
+<path d='M317.0,288.0 V159.5 Q317.0,155.5 321.0,155.5 H340.9 Q344.9,155.5 344.9,159.5 V288.0 Z' fill='#1baf7a'><title>first view, 90th pct., 1 % loss: 328</title></path>
+<text x='330.9' y='151.5' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='10' fill='#52514e' text-anchor='middle'>328</text>
+<path d='M346.9,288.0 V224.5 Q346.9,220.5 350.9,220.5 H370.8 Q374.8,220.5 374.8,224.5 V288.0 Z' fill='#eda100'><title>views late, 99th pct., 1 % loss: 167</title></path>
+<text x='360.8' y='216.5' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='10' fill='#52514e' text-anchor='middle'>167</text>
+<text x='316.0' y='304' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='11' fill='#52514e' text-anchor='middle'>1 % loss</text>
+<path d='M425.2,288.0 V226.1 Q425.2,222.1 429.2,222.1 H449.1 Q453.1,222.1 453.1,226.1 V288.0 Z' fill='#2a78d6'><title>answer, median, 3 % loss: 163</title></path>
+<text x='439.1' y='218.1' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='10' fill='#52514e' text-anchor='middle'>163</text>
+<path d='M455.1,288.0 V182.9 Q455.1,178.9 459.1,178.9 H479.0 Q483.0,178.9 483.0,182.9 V288.0 Z' fill='#eb6834'><title>first view, median, 3 % loss: 270</title></path>
+<text x='469.0' y='174.9' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='10' fill='#52514e' text-anchor='middle'>270</text>
+<path d='M485.0,288.0 V137.7 Q485.0,133.7 489.0,133.7 H508.9 Q512.9,133.7 512.9,137.7 V288.0 Z' fill='#1baf7a'><title>first view, 90th pct., 3 % loss: 382</title></path>
+<text x='498.9' y='129.7' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='10' fill='#52514e' text-anchor='middle'>382</text>
+<path d='M514.9,288.0 V210.8 Q514.9,206.8 518.9,206.8 H538.8 Q542.8,206.8 542.8,210.8 V288.0 Z' fill='#eda100'><title>views late, 99th pct., 3 % loss: 201</title></path>
+<text x='528.9' y='202.8' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='10' fill='#52514e' text-anchor='middle'>201</text>
+<text x='484.0' y='304' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='11' fill='#52514e' text-anchor='middle'>3 % loss</text>
+<path d='M593.2,288.0 V218.9 Q593.2,214.9 597.2,214.9 H617.1 Q621.1,214.9 621.1,218.9 V288.0 Z' fill='#2a78d6'><title>answer, median, 5 % loss: 181</title></path>
+<text x='607.2' y='210.9' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='10' fill='#52514e' text-anchor='middle'>181</text>
+<path d='M623.1,288.0 V172.0 Q623.1,168.0 627.1,168.0 H647.0 Q651.0,168.0 651.0,172.0 V288.0 Z' fill='#eb6834'><title>first view, median, 5 % loss: 297</title></path>
+<text x='637.1' y='164.0' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='10' fill='#52514e' text-anchor='middle'>297</text>
+<path d='M653.0,288.0 V137.3 Q653.0,133.3 657.0,133.3 H676.9 Q680.9,133.3 680.9,137.3 V288.0 Z' fill='#1baf7a'><title>first view, 90th pct., 5 % loss: 383</title></path>
+<text x='667.0' y='129.3' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='10' fill='#52514e' text-anchor='middle'>383</text>
+<path d='M682.9,288.0 V203.5 Q682.9,199.5 686.9,199.5 H706.8 Q710.8,199.5 710.8,203.5 V288.0 Z' fill='#eda100'><title>views late, 99th pct., 5 % loss: 219</title></path>
+<text x='696.9' y='195.5' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='10' fill='#52514e' text-anchor='middle'>219</text>
+<text x='652.0' y='304' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='11' fill='#52514e' text-anchor='middle'>5 % loss</text>
+<line x1='64' x2='80' y1='66' y2='66' stroke='#2a78d6' stroke-width='3'/>
+<text x='85' y='70' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='11' fill='#0b0b0b'>answer, median</text>
+<line x1='195.39999999999998' x2='211.39999999999998' y1='66' y2='66' stroke='#eb6834' stroke-width='3'/>
+<text x='216.39999999999998' y='70' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='11' fill='#0b0b0b'>first view, median</text>
+<line x1='353.2' x2='369.2' y1='66' y2='66' stroke='#1baf7a' stroke-width='3'/>
+<text x='374.2' y='70' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='11' fill='#0b0b0b'>first view, 90th pct.</text>
+<line x1='530.8' x2='546.8' y1='66' y2='66' stroke='#eda100' stroke-width='3'/>
+<text x='551.8' y='70' font-family='system-ui, -apple-system, Segoe UI, sans-serif' font-size='11' fill='#0b0b0b'>views late, 99th pct.</text>
+</svg>

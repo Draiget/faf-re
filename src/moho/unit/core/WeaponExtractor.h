@@ -57,7 +57,7 @@ namespace moho
     ) noexcept;
   };
 
-#if defined(_M_IX86)
+#if FAFRE_ARCH_X86
   static_assert(
     offsetof(WeaponExtractor, mRangeCategory) == 0x04,
     "WeaponExtractor::mRangeCategory offset must be 0x04"

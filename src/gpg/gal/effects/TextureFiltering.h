@@ -34,7 +34,7 @@ namespace gpg::gal::effects
     });
     if (
       gTextureAnisotropy > 1 && desc.filter == kMinMagMipLinear && desc.addressU == kWrap && desc.addressV == kWrap &&
-      texture.find("lookup") == std::string::npos
+      !texture.contains("lookup")
     ) {
       desc.filter = kAnisotropic;
       desc.maxAnisotropy = static_cast<std::uint32_t>(std::min(gTextureAnisotropy, 16));

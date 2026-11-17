@@ -1,5 +1,6 @@
 #pragma once
 
+#include <expected>
 #include <optional>
 #include <string>
 #include <utility>
@@ -72,8 +73,8 @@ namespace faf::editor
   class SaveFile
   {
   public:
-    /** Parses the file's text; false (with `error`) when the blocks can't be found or read. */
-    bool Parse(std::string text, std::string& error);
+    /** Parses the file's text; the error when the blocks can't be found or read. */
+    [[nodiscard]] std::expected<void, std::string> Parse(std::string text);
 
     [[nodiscard]] std::vector<SaveEntry>& Markers() noexcept
     {

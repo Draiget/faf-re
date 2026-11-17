@@ -1,5 +1,6 @@
 #pragma once
 
+#include <utility>
 #include <cstdint>
 #include <type_traits>
 
@@ -43,7 +44,7 @@ namespace moho
     constexpr EnumByte(
       E e
     ) noexcept
-      : value(static_cast<std::uint8_t>(e))
+      : value(std::to_underlying(e))
     {}
 
     template <U8Enum E>
@@ -68,7 +69,7 @@ namespace moho
       E e
     ) noexcept
     {
-      return t.value == static_cast<std::uint8_t>(e);
+      return t.value == std::to_underlying(e);
     }
     template <U8Enum E>
     friend constexpr bool operator==(

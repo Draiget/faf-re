@@ -622,6 +622,55 @@ namespace faf::editor
     ImGui::PopStyleColor(2);
     DrawHomeVault(loggedIn);
     ImGui::EndChild();
+    // A tip at a time, Next tip for another (FAF Studio's start screen).
+    static constexpr const char* kTips[] = {
+      "Press F1 for help: search the topics, see every shortcut, read the step-by-step guides.",
+      "Ctrl+K (or Ctrl+Shift+P) opens the command palette: type a few letters of anything the editor can do and "
+      "press Enter.",
+      "Ctrl+Z / Ctrl+Y undo and redo. A brush stroke is one step, so a bad stroke is one Ctrl+Z away.",
+      "Drag a panel's tab out of the window to get a window of its own (a second screen works well). View > Save "
+      "layout keeps the panels as you set them.",
+      "Terrain > Generate makes a whole landscape from a graph of nodes; Build writes it as one undo step.",
+      "Symmetry on the toolbar mirrors brushes, markers, props and units, so a 1v1 map is half the work.",
+      "Grid shows the build grid and Slope where units can walk: check the expansions before you release.",
+      "Release (top right) checks the map (starts, script, resources) and writes a numbered version folder for the "
+      "vault.",
+      "The Mission workspace has stages, objectives and triggers: no scripting needed for a simple mission.",
+      "The Units workspace changes a unit's stats in the Unit lab; the changes are written as merge blueprints, not "
+      "copies.",
+      "Turn on autosave in Settings: after a crash the editor offers the autosaved map the next time it starts.",
+      "The - and + buttons at the top right change the size of the panels (up to 160 %).",
+      "Right-click in the view for place and paste commands, or on an object for its own menu.",
+      "Ctrl+C / Ctrl+V copy and paste markers, units, props and decals; Ctrl+D duplicates the selection beside it.",
+      "Help > Save diagnostics for a bug report writes the version, the log's end and your settings into one file.",
+    };
+    constexpr int kTipCount = static_cast<int>(sizeof(kTips) / sizeof(kTips[0]));
+    if (mHomeTip < 0) {
+      mHomeTip =
+        static_cast<int>(std::chrono::system_clock::now().time_since_epoch() / std::chrono::seconds(1) % kTipCount);
+    }
+    ImGui::Dummy(ImVec2(0.0f, Em(12.0f)));
+    ImGui::PushStyleColor(ImGuiCol_ChildBg, ImGui::GetStyleColorVec4(ImGuiCol_FrameBg));
+    ImGui::PushStyleColor(ImGuiCol_Border, ImGui::GetStyleColorVec4(ImGuiCol_TableBorderLight));
+    ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, Em(9.0f));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(Em(12.0f), Em(10.0f)));
+    ImGui::BeginChild(
+      "##hometip",
+      ImVec2(0.0f, 0.0f),
+      ImGuiChildFlags_Borders | ImGuiChildFlags_AlwaysUseWindowPadding | ImGuiChildFlags_AutoResizeY
+    );
+    ImGui::PopStyleVar(2);
+    ImGui::PopStyleColor(2);
+    ImGui::TextColored(ImGui::GetStyleColorVec4(ImGuiCol_CheckMark), "Tip");
+    const float next = ImGui::CalcTextSize("Next tip").x + ImGui::GetStyle().FramePadding.x * 2.0f;
+    ImGui::SameLine(std::max(ImGui::GetCursorPosX(), ImGui::GetContentRegionAvail().x + ImGui::GetCursorPosX() - next));
+    if (ImGui::SmallButton("Next tip")) {
+      mHomeTip = (mHomeTip + 1) % kTipCount;
+    }
+    ImGui::PushTextWrapPos(0.0f);
+    ImGui::TextUnformatted(kTips[mHomeTip % kTipCount]);
+    ImGui::PopTextWrapPos();
+    ImGui::EndChild();
     ImGui::EndGroup();
   }
 

@@ -15,7 +15,7 @@ namespace moho
   inline constexpr char kDynamicLightsShaderSource[] = R"hlsl(
 cbuffer LightConstants : register(b0)
 {
-    row_major float4x4 InverseViewProjection;
+    row_major float4x4 InverseViewProjection; // without the camera's position: world = p.xyz / p.w + Eye.xyz (EyeRelative.h)
     float4 ViewRect;   // origin and size of the view, in target pixels
     float4 BufferSize; // samples across and down, then their reciprocals
     float4 Eye;        // camera position, then the number of lights
@@ -34,7 +34,7 @@ float3 WorldPosition(int2 pixel, float depth)
 {
     const float2 local = (float2(pixel) + 0.5 - ViewRect.xy) / ViewRect.zw;
     const float4 world = mul(float4(local.x * 2.0 - 1.0, 1.0 - local.y * 2.0, depth, 1.0), InverseViewProjection);
-    return world.xyz / world.w;
+    return world.xyz / world.w + Eye.xyz;
 }
 
 float3 WorldPositionAt(int2 pixel)

@@ -7,6 +7,7 @@
 #include <cstring>
 #include <limits>
 #include <new>
+#include <print>
 #include <thread>
 #include <vector>
 
@@ -93,7 +94,7 @@ namespace
     const auto milliseconds =
       std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
     ASSERT_TRUE(lua::ArenaAllocate(16385) == blocks.back());
-    std::printf("1000 failed requests preserve next allocation; %.3f ms\n", milliseconds);
+    std::println("1000 failed requests preserve next allocation; {:.3f} ms", milliseconds);
   }
 
   TEST_F(

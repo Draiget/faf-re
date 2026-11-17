@@ -85,8 +85,8 @@ namespace
   )
   {
     faf::editor::WaterState water;
-    std::string error;
-    ASSERT_TRUE(faf::editor::WaterFromScmwtr(kFafme, water, error)) << error;
+    auto read = faf::editor::WaterFromScmwtr(kFafme, water);
+    ASSERT_TRUE(read) << read.error();
     EXPECT_TRUE(water.enabled);
     EXPECT_FLOAT_EQ(water.elevation, 17.5f);
     EXPECT_FLOAT_EQ(water.shader.mWaterColor[1], 0.7f);
@@ -105,15 +105,16 @@ namespace
   )
   {
     faf::editor::WaterState water;
-    std::string error;
-    ASSERT_TRUE(faf::editor::WaterFromScmwtr(kFafme, water, error)) << error;
+    auto read = faf::editor::WaterFromScmwtr(kFafme, water);
+    ASSERT_TRUE(read) << read.error();
     faf::editor::WaterState again;
-    ASSERT_TRUE(faf::editor::WaterFromScmwtr(faf::editor::WaterToScmwtr(water), again, error)) << error;
+    read = faf::editor::WaterFromScmwtr(faf::editor::WaterToScmwtr(water), again);
+    ASSERT_TRUE(read) << read.error();
     EXPECT_TRUE(again == water);
     for (int i = 0; i < 6; ++i) {
       EXPECT_EQ(again.textures[i], water.textures[i]) << i;
     }
-    EXPECT_FALSE(faf::editor::WaterFromScmwtr("{ \"Lighting\": 1 }", again, error));
+    EXPECT_FALSE(faf::editor::WaterFromScmwtr("{ \"Lighting\": 1 }", again));
   }
 
   TEST(

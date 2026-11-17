@@ -1,5 +1,6 @@
 #include "PeerFeatures.h"
 
+#include <utility>
 #include <algorithm>
 #include <cstring>
 
@@ -107,7 +108,7 @@ void CPeerFeatures::SendKeyTo(
   mPeers[index].keySent = true;
   CMessage message(EClientMsg::CLIMSG_PeerFeatures);
   CMessageStream stream(message);
-  stream.Write(static_cast<std::uint8_t>(EPeerMessageKind::RejoinKey));
+  stream.Write(std::to_underlying(EPeerMessageKind::RejoinKey));
   const SRejoinPublicKey& key = REJOIN_PublicKey();
   stream.Write(key.data(), key.size());
   peer.Process(message);

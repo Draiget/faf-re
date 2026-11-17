@@ -3,6 +3,7 @@
 #include "editor/doc/EdEmitter.h"
 #include "editor/graph/EdNodeGraph.h"
 
+#include <expected>
 #include <string>
 #include <utility>
 #include <vector>
@@ -46,10 +47,10 @@ namespace faf::editor
   /**
    * The emitters the graph makes, in the Effect output's pin order (name, blueprint): every curve pin evaluated
    * through its nodes to keys, an unlinked one given the curve's starting key (as retail's editor gives a new emitter).
-   * False with `error` when the graph has no output or nothing linked to it.
+   * The error when the graph has no output or nothing linked to it.
    */
-  bool
-  GraphEmitters(const NodeGraph& graph, std::vector<std::pair<std::string, EmitterBlueprint>>& out, std::string& error);
+  [[nodiscard]] std::expected<std::vector<std::pair<std::string, EmitterBlueprint>>, std::string>
+  GraphEmitters(const NodeGraph& graph);
 
   /** One effect template of FAF's lua/EffectTemplates.lua: its name and its emitter files' paths. */
   struct EffectTemplate

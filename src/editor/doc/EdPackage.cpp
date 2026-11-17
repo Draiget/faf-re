@@ -195,7 +195,7 @@ namespace faf::editor
         continue;
       }
       const std::string lower = Lower(path);
-      if (lower.rfind(prefix, 0) != 0) {
+      if (!lower.starts_with(prefix)) {
         plan.errors.push_back(std::string("the scenario's ") + key + " path " + path + " isn't in " + prefix);
         continue;
       }
@@ -209,10 +209,9 @@ namespace faf::editor
       const std::size_t slash = lower.find_last_of('/');
       const std::string name = slash == std::string::npos ? lower : lower.substr(slash + 1);
       if (
-        lower.rfind(".editor_backup/", 0) == 0 || lower.find("/.editor_backup/") != std::string::npos ||
-        name == "thumbs.db" || name == "desktop.ini" ||
-        (name.size() > 4 && name.compare(name.size() - 4, 4, ".bak") == 0) ||
-        (name.size() > 7 && name.compare(name.size() - 7, 7, ".editor") == 0) || (!name.empty() && name[0] == '.')
+        lower.starts_with(".editor_backup/") || lower.contains("/.editor_backup/") || name == "thumbs.db" ||
+        name == "desktop.ini" || (name.size() > 4 && name.ends_with(".bak")) ||
+        (name.size() > 7 && name.ends_with(".editor")) || (!name.empty() && name[0] == '.')
       ) {
         continue;
       }
@@ -220,7 +219,7 @@ namespace faf::editor
     }
     bool hasScenario = false;
     for (const std::string& file : plan.files) {
-      hasScenario = hasScenario || Lower(file).find("_scenario.lua") != std::string::npos;
+      hasScenario = hasScenario || Lower(file).contains("_scenario.lua");
     }
     if (!hasScenario) {
       plan.errors.push_back("the folder has no _scenario.lua");
@@ -252,7 +251,7 @@ namespace faf::editor
       return scenario;
     }
     const std::size_t at = static_cast<std::size_t>(open.position(0) + open.length(0));
-    const std::string nl = scenario.find("\r\n") != std::string::npos ? "\r\n" : "\n";
+    const std::string nl = scenario.contains("\r\n") ? "\r\n" : "\n";
     return scenario.substr(0, at) + "    map_version = " + std::to_string(version) + "," + nl + scenario.substr(at);
   }
 

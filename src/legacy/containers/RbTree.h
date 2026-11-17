@@ -11,6 +11,19 @@
 #include <utility>
 
 #include "legacy/containers/Layout.h"
+#include "legacy/containers/SlabAllocator.h"
+
+// rb_tree has two empty bases (comparator and allocator). The MSVC ABI gives every empty base after the
+// first its own storage unless the class is marked empty_bases, which would add 4 bytes to every set and
+// map on 32-bit Windows; the Itanium ABI (Linux, macOS) lays both out at offset 0 without it.
+#if defined(__has_declspec_attribute)
+#if __has_declspec_attribute(empty_bases)
+#define FA_RB_TREE_EMPTY_BASES __declspec(empty_bases)
+#endif
+#endif
+#ifndef FA_RB_TREE_EMPTY_BASES
+#define FA_RB_TREE_EMPTY_BASES
+#endif
 
 /**
  * \file RbTree.h
@@ -1349,6 +1362,69 @@ namespace fa
       Compare comp_{};
     };
 
+    /** Empty-base carrier for the tree node allocator. */
+    template <class Alloc, bool = std::is_empty_v<Alloc> && !std::is_final_v<Alloc>>
+    class rb_alloc_carrier;
+
+    template <class Alloc>
+    class rb_alloc_carrier<Alloc, true> : public Alloc
+    {
+    public:
+      rb_alloc_carrier() = default;
+      explicit rb_alloc_carrier(
+        const Alloc& a
+      )
+        : Alloc(a)
+      {}
+
+      [[nodiscard]] const Alloc& alloc() const noexcept
+      {
+        return *this;
+      }
+      [[nodiscard]] Alloc& alloc() noexcept
+      {
+        return *this;
+      }
+
+      void swap_alloc(
+        rb_alloc_carrier& other
+      ) noexcept
+      {
+        std::swap(static_cast<Alloc&>(*this), static_cast<Alloc&>(other));
+      }
+    };
+
+    template <class Alloc>
+    class rb_alloc_carrier<Alloc, false>
+    {
+    public:
+      rb_alloc_carrier() = default;
+      explicit rb_alloc_carrier(
+        const Alloc& a
+      )
+        : alloc_(a)
+      {}
+
+      [[nodiscard]] const Alloc& alloc() const noexcept
+      {
+        return alloc_;
+      }
+      [[nodiscard]] Alloc& alloc() noexcept
+      {
+        return alloc_;
+      }
+
+      void swap_alloc(
+        rb_alloc_carrier& other
+      ) noexcept
+      {
+        std::swap(alloc_, other.alloc_);
+      }
+
+    private:
+      Alloc alloc_{};
+    };
+
     /**
      * Bidirectional iterator over an MSVC8 tree.
      *
@@ -1909,12 +1985,13 @@ namespace fa
     };
 
     /** `fa::set` traits: the key is the stored value. */
-    template <class Key, class Less>
+    template <class Key, class Less = std::less<Key>, class Alloc = default_rb_allocator<Key>>
     struct rb_set_traits
     {
       using key_type = Key;
       using value_type = Key;
       using key_compare = Less;
+      using allocator_type = Alloc;
 
       [[nodiscard]] static const key_type& key_of(
         const value_type& v
@@ -1925,13 +2002,18 @@ namespace fa
     };
 
     /** `fa::map` traits: the key is `value_type::first`. */
-    template <class Key, class T, class Less>
+    template <
+      class Key,
+      class T,
+      class Less = std::less<Key>,
+      class Alloc = default_rb_allocator<std::pair<const Key, T>>>
     struct rb_map_traits
     {
       using key_type = Key;
       using mapped_type = T;
       using value_type = std::pair<const Key, T>;
       using key_compare = Less;
+      using allocator_type = Alloc;
 
       [[nodiscard]] static const key_type& key_of(
         const value_type& v
@@ -1946,10 +2028,14 @@ namespace fa
      * `fa::set` and `fa::map`.
      *
      * Layout (x86): `{_Container_proxy*, _Node*, size_type}` = 12 bytes, with
-     * the comparator empty-base-optimised away.
+     * the comparator and the (empty) `std::allocator` empty-base-optimised away.
+     * 64-bit trees also carry a 32-byte `local_slab_allocator` (SlabAllocator.h) as a base.
      */
-    template <class Traits>
-    class rb_tree : private rb_compare_carrier<typename Traits::key_compare>
+    template <class Traits, class Allocator = typename Traits::allocator_type>
+    class FA_RB_TREE_EMPTY_BASES rb_tree :
+      private rb_compare_carrier<typename Traits::key_compare>,
+      private rb_alloc_carrier<
+        typename std::allocator_traits<Allocator>::template rebind_alloc<rb_node<typename Traits::value_type>>>
     {
       using carrier = rb_compare_carrier<typename Traits::key_compare>;
 
@@ -1957,9 +2043,12 @@ namespace fa
       using key_type = typename Traits::key_type;
       using value_type = typename Traits::value_type;
       using key_compare = typename Traits::key_compare;
+      using allocator_type = Allocator;
       using size_type = std::uint32_t;
       using difference_type = std::ptrdiff_t;
       using node_type = rb_node<value_type>;
+      using node_allocator_type = typename std::allocator_traits<allocator_type>::template rebind_alloc<node_type>;
+      using alloc_carrier = rb_alloc_carrier<node_allocator_type>;
       using iterator = rb_iterator<Traits, false>;
       using const_iterator = rb_iterator<Traits, true>;
 
@@ -2091,6 +2180,24 @@ namespace fa
         const key_compare& comp
       )
         : carrier(comp)
+        , head_(buy_head())
+        , size_(0)
+      {}
+
+      explicit rb_tree(
+        const allocator_type& a
+      )
+        : alloc_carrier(node_allocator_type(a))
+        , head_(buy_head())
+        , size_(0)
+      {}
+
+      rb_tree(
+        const key_compare& comp,
+        const allocator_type& a
+      )
+        : carrier(comp)
+        , alloc_carrier(node_allocator_type(a))
         , head_(buy_head())
         , size_(0)
       {}
@@ -2240,6 +2347,29 @@ namespace fa
         const rb_tree& other
       )
         : carrier(static_cast<const carrier&>(other))
+        , alloc_carrier(
+            std::allocator_traits<node_allocator_type>::select_on_container_copy_construction(other.alloc())
+          )
+        , head_(buy_head())
+        , size_(0)
+      {
+        try {
+          copy_from(other);
+        } catch (...) {
+          erase_range(leftmost(), header());
+          free_raw(head_);
+          head_ = nullptr;
+          size_ = 0;
+          throw;
+        }
+      }
+
+      rb_tree(
+        const rb_tree& other,
+        const allocator_type& a
+      )
+        : carrier(static_cast<const carrier&>(other))
+        , alloc_carrier(node_allocator_type(a))
         , head_(buy_head())
         , size_(0)
       {
@@ -2268,6 +2398,13 @@ namespace fa
         if (this != &other) {
           clear();
           static_cast<carrier&>(*this) = static_cast<const carrier&>(other);
+          if constexpr (std::allocator_traits<node_allocator_type>::propagate_on_container_copy_assignment::value) {
+            if (this->alloc() != other.alloc()) {
+              free_raw(head_);
+              static_cast<alloc_carrier&>(*this) = static_cast<const alloc_carrier&>(other);
+              head_ = buy_head();
+            }
+          }
           copy_from(other);
         }
         return *this;
@@ -2277,10 +2414,29 @@ namespace fa
         rb_tree&& other
       ) noexcept
         : carrier(static_cast<carrier&&>(other))
+        , alloc_carrier(static_cast<alloc_carrier&&>(other))
         , head_(nullptr)
         , size_(0)
       {
         adopt_from(other);
+      }
+
+      rb_tree(
+        rb_tree&& other,
+        const allocator_type& a
+      )
+        : carrier(static_cast<carrier&&>(other))
+        , alloc_carrier(node_allocator_type(a))
+        , head_(nullptr)
+        , size_(0)
+      {
+        if (this->alloc() == other.alloc()) {
+          adopt_from(other);
+        } else {
+          head_ = buy_head();
+          copy_from(other);
+          other.clear();
+        }
       }
 
       rb_tree& operator=(
@@ -2291,6 +2447,9 @@ namespace fa
           clear();
           free_raw(head_);
           static_cast<carrier&>(*this) = static_cast<carrier&&>(other);
+          if constexpr (std::allocator_traits<node_allocator_type>::propagate_on_container_move_assignment::value) {
+            static_cast<alloc_carrier&>(*this) = static_cast<alloc_carrier&&>(other);
+          }
           adopt_from(other);
         }
         return *this;
@@ -6883,6 +7042,11 @@ namespace fa
           return;
         }
         std::swap(static_cast<carrier&>(*this), static_cast<carrier&>(other));
+        if constexpr (std::allocator_traits<node_allocator_type>::propagate_on_container_swap::value) {
+          this->swap_alloc(other);
+        } else if (this->alloc() != other.alloc()) {
+          this->swap_alloc(other);
+        }
         std::swap(head_, other.head_);
         std::swap(size_, other.size_);
       }
@@ -7221,9 +7385,9 @@ namespace fa
        * node+0x28, colour/nil at +0x2C/+0x2D); callers 0x00465060, 0x00465480, 0x004654E0; formerly hand-written in
        * moho/misc/CDiskWatch.cpp (RULE ONE), removed 2026-09-11.)
        */
-      [[nodiscard]] static node_type* alloc_raw()
+      [[nodiscard]] node_type* alloc_raw()
       {
-        return static_cast<node_type*>(::operator new(sizeof(node_type)));
+        return std::allocator_traits<node_allocator_type>::allocate(this->alloc(), 1);
       }
 
       /**
@@ -7285,11 +7449,11 @@ namespace fa
        * unexported instantiation) is not distinguishable from the body
        * alone. Owning field/class not pinned down.
        */
-      static void free_raw(
+      void free_raw(
         node_type* const n
       ) noexcept
       {
-        ::operator delete(n);
+        std::allocator_traits<node_allocator_type>::deallocate(this->alloc(), n, 1);
       }
 
       /**
@@ -7631,7 +7795,7 @@ namespace fa
        * `IdleUnitSelector`'s, the set range constructors.) Address: 0x007B3C60 (FUN_007B3C60 -- a `WeakSet` default
        * constructor emission: head bought through 0x007B4640, isNil=1, self-linked, count zero.)
        */
-      [[nodiscard]] static node_type* buy_head()
+      [[nodiscard]] node_type* buy_head()
       {
         node_type* const h = alloc_raw();
         h->left = h;
@@ -8355,7 +8519,7 @@ namespace fa
        * 0x00497800, 0x0049A104; formerly `DestroyBeamTextureBucketEntry` in moho/particles/BeamRenderHelpers.cpp (RULE
        * ONE), removed 2026-09-10.)
        */
-      static void free_node(
+      void free_node(
         node_type* const n
       ) noexcept
       {
@@ -9043,7 +9207,7 @@ namespace fa
       {
         head_ = other.head_;
         size_ = other.size_;
-        other.head_ = buy_head();
+        other.head_ = other.buy_head();
         other.size_ = 0;
       }
 

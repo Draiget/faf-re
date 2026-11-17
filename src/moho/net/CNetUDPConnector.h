@@ -102,6 +102,10 @@ namespace moho
      * 3) calls a "close/shutdown" on each connection
      * 4) sets a "stopping" flag and signals worker event
      *
+     * Once every connection has said goodbye and no `Pull` is running, the worker thread deletes the connector, so
+     * the caller must not use it after `Destroy` returns, as with the null and TCP connectors, whose `Destroy`
+     * deletes them.
+     *
      * Address: 0x00489D20
      * Address: 0x10083760 (sub_10083760)
      * Slot: 1

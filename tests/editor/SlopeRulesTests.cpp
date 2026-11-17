@@ -85,8 +85,8 @@ namespace
     // A 2-cell skirt at (5, 5): the ring is x 4..8 on rows 4 and 8, and columns 4 and 8 on rows 5..7. The ring is at
     // 10.0 units (1280 words) except one sample at 1400; the last one read (8, 7) is 1350.
     Field f{14, 14, std::vector<int>(14 * 14, 1280)};
-    f.v[static_cast<std::size_t>(4) * 14 + 6] = 1400;
-    f.v[static_cast<std::size_t>(7) * 14 + 8] = 1350;
+    f.v[4uz * 14 + 6] = 1400;
+    f.v[7uz * 14 + 8] = 1350;
     // ceil(10.0) = 10: max(1400 - 1280, 1280 - 1280) = 120 words. (Pivoting on the last sample, ceil(10.55) = 11, would
     // give max(1400 - 1408, 1408 - 1280) = 128.)
     EXPECT_EQ(sr::CellRating(sr::kKindRing, 2, 5, 5, f), 120);

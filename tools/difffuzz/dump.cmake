@@ -1,7 +1,7 @@
 # Engine addition (dedicated-server plan WPR.21): faf_math_dump, the difffuzz
 # targets' own side linked against the engine's objects (README.md,
 # "Cross-platform dump"). Included by tests/CMakeLists.txt (Windows, on
-# faf_engine) and cmake/FafLinux.cmake (Linux, on faf_sim), with
+# faf_engine) and cmake/FafPosix.cmake (Linux, on faf_sim), with
 # FAF_MATH_DUMP_ENGINE naming that target.
 #
 # Built with every build and checked right after it against

@@ -20,6 +20,7 @@
 #include <fstream>
 #include <iterator>
 #include <map>
+#include <print>
 #include <sstream>
 #include <string>
 #include <utility>
@@ -109,13 +110,13 @@ namespace
     char buffer[4096];
     while (std::fgets(buffer, sizeof(buffer), pipe) != nullptr) {
       std::string text(buffer);
-      if (text.find("VERDICT") != std::string::npos) {
+      if (text.contains("VERDICT")) {
         run.verdict = text;
-      } else if (text.find("] beats=") != std::string::npos) {
+      } else if (text.contains("] beats=")) {
         run.beats = text;
-      } else if (text.find("] keyframes: ") != std::string::npos) {
+      } else if (text.contains("] keyframes: ")) {
         run.keyframes.push_back(text);
-      } else if (text.find("] seek ") != std::string::npos && text.find(": at beat ") != std::string::npos) {
+      } else if (text.contains("] seek ") && text.contains(": at beat ")) {
         ++run.seeks;
       }
       run.output += text;
@@ -186,7 +187,7 @@ namespace
       " /init " + Quoted(replay.init) + " /nobugreport /nosound /log " + Quoted(LogFolder() / (label + ".log")) +
       extraArguments;
     const SRun run = Play(command);
-    std::printf("%s%s", run.beats.c_str(), run.verdict.c_str());
+    std::print("{}{}", run.beats, run.verdict);
     return run;
   }
 
@@ -723,7 +724,7 @@ TEST(
   SCOPED_TRACE("replay " + replay.id);
   std::error_code ignored;
   for (const auto& entry : std::filesystem::directory_iterator(LogFolder(), ignored)) {
-    if (entry.path().filename().string().rfind("desync_", 0) == 0) {
+    if (entry.path().filename().string().starts_with("desync_")) {
       std::filesystem::remove(entry.path(), ignored); // a dump from an earlier run would hide a missing one
     }
   }
@@ -736,7 +737,7 @@ TEST(
   bool dumped = false;
   for (const auto& entry : std::filesystem::directory_iterator(LogFolder(), ignored)) {
     const std::string name = entry.path().filename().string();
-    if (name.rfind("desync_", 0) == 0 && name.find("_beat1500_") != std::string::npos && entry.file_size(ignored) > 0) {
+    if (name.starts_with("desync_") && name.contains("_beat1500_") && entry.file_size(ignored) > 0) {
       dumped = true;
       std::filesystem::remove(entry.path(), ignored);
     }

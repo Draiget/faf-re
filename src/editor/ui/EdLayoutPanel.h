@@ -3,6 +3,7 @@
 #include "editor/tools/EdLayoutMarkers.h"
 #include "editor/tools/EdMapLayout.h"
 
+#include <utility>
 #include <cstdint>
 #include <functional>
 #include <optional>
@@ -113,6 +114,13 @@ namespace faf::editor
     bool ApplyTemplate(const std::string& id);
     /** A picture file onto the selected layer with the panel's options (one undo step); what happened. */
     std::string ImportPicture(const std::string& path);
+    /** What a picture import reads (test runs: `/layoutchannel`): 0 brightness, 1 red, 2 green, 3 blue, 4 alpha. */
+    void SetPictureChannel(
+      const int channel
+    ) noexcept
+    {
+      mPicture.channel = channel;
+    }
 
     enum class Tool : std::uint8_t
     {
@@ -138,6 +146,32 @@ namespace faf::editor
     float mHardness = 0.6f;
     float mStrength = 1.0f;
     bool mGenerateAsked = false;
+    // FAF Studio's canvas views: the heights the drawing makes, the map's own markers, only the selected layer.
+    bool mViewHeights = false;
+    bool mShowMapMarkers = false;
+    bool mSolo = false;
+    bool mImageHeights = false;
+    bool mImageSolo = false;
+    /** Generate's "Paint the ground too" (the stratum recipe after the heights) and "Centre symmetry". */
+    bool mPaintGround = false;
+    bool mCentreAsked = false;
+
+  public:
+    [[nodiscard]] bool PaintGroundToo() const noexcept
+    {
+      return mPaintGround;
+    }
+    [[nodiscard]] bool TakeCentreSymmetryAsk() noexcept
+    {
+      return std::exchange(mCentreAsked, false);
+    }
+    /** Test runs: Centre symmetry as its button asks it. */
+    void AskCentreSymmetry() noexcept
+    {
+      mCentreAsked = true;
+    }
+
+  private:
     std::string mSymmetryAsk;
     std::string mStatus;
     std::optional<MapLayout> mEditBefore; // a setting being dragged: the drawing before it

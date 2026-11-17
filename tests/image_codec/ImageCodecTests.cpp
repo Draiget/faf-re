@@ -10,6 +10,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <print>
 #include <vector>
 
 #include "gpg/gal/backends/common/ImageCodec.h"
@@ -29,7 +30,7 @@ namespace
   )
   {
     EXPECT_TRUE(condition) << what << (detail[0] != '\0' ? " - " : "") << detail;
-    std::printf("%s: %s%s%s\n", condition ? "PASS" : "FAIL", what, detail[0] != '\0' ? " - " : "", detail);
+    std::println("{}: {}{}{}", condition ? "PASS" : "FAIL", what, detail[0] != '\0' ? " - " : "", detail);
   }
 
   struct NamedFormat
@@ -145,8 +146,8 @@ namespace
       a.format != b.format || a.width != b.width || a.height != b.height || a.mipLevels != b.mipLevels ||
       a.subresources.size() != b.subresources.size()
     ) {
-      std::printf(
-        "  shape: format %d, then %d; %ux%u, then %ux%u; %u levels, then %u\n",
+      std::println(
+        "  shape: format {}, then {}; {}x{}, then {}x{}; {} levels, then {}",
         static_cast<int>(a.format),
         static_cast<int>(b.format),
         a.width,
@@ -171,8 +172,8 @@ namespace
           continue;
         }
         if (a.bytes[level.offset + at] != b.bytes[b.subresources[index].offset + at]) {
-          std::printf(
-            "  subresource %zu byte %u: %02X, then %02X\n",
+          std::println(
+            "  subresource {} byte {}: {:02X}, then {:02X}",
             index,
             at,
             a.bytes[level.offset + at],
@@ -210,7 +211,7 @@ namespace
       Image reloaded;
       const HRESULT read = SUCCEEDED(written) ? Reload(codec, file, entry.format, 16U, 16U, 5U, reloaded) : written;
       if (SUCCEEDED(written) && FAILED(read) && D3dxRefusesFormat(codec, source)) {
-        std::printf("SKIP: %s - this D3DX11 can't load it from its own file either\n", entry.name);
+        std::println("SKIP: {} - this D3DX11 can't load it from its own file either", entry.name);
         continue;
       }
       char detail[96]{};
@@ -542,7 +543,7 @@ namespace
       const HRESULT readOwn = Reload(codec, own, entry.format, 16U, 16U, 5U, fromOwn);
       const bool read = SUCCEEDED(readEncoded) && SUCCEEDED(readOwn);
       if (FAILED(readEncoded) && FAILED(readOwn) && SUCCEEDED(result) && encoded != own) {
-        std::printf("SKIP: %s - this D3DX11 can't load it from its own file either\n", entry.name);
+        std::println("SKIP: {} - this D3DX11 can't load it from its own file either", entry.name);
         continue;
       }
       char detail[128]{};

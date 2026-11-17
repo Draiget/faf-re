@@ -108,16 +108,16 @@ namespace
   {
     for (const auto& solver : ErosionSolvers()) {
       auto values = ErosionDefaults(solver);
-      if (values.count("iterations") != 0u) {
+      if (values.contains("iterations")) {
         values["iterations"] = std::min(values["iterations"], 20.0);
       }
-      if (values.count("rounds") != 0u) {
+      if (values.contains("rounds")) {
         values["rounds"] = 4;
       }
       const auto before = Cone();
       auto after = before;
-      std::string error;
-      ASSERT_TRUE(ErodeHeights(after.data(), 65, 65, kScale, solver, values, 1, error)) << solver.id << ": " << error;
+      const auto eroded = ErodeHeights(after.data(), 65, 65, kScale, solver, values, 1);
+      ASSERT_TRUE(eroded) << solver.id << ": " << eroded.error();
       EXPECT_GT(Changed(before, after), 100U) << solver.id << " changed the ground";
       // Keep height range (on by default): the top and bottom stay near the input's.
       const auto [lo, hi] = std::minmax_element(after.begin(), after.end());
@@ -137,8 +137,8 @@ namespace
     values["iterations"] = 40;
     const auto before = Cone();
     auto preview = before;
-    std::string error;
-    ASSERT_TRUE(ErodeHeights(preview.data(), 65, 65, kScale, hydraulic, values, 4, error)) << error;
+    const auto eroded = ErodeHeights(preview.data(), 65, 65, kScale, hydraulic, values, 4);
+    ASSERT_TRUE(eroded) << eroded.error();
     EXPECT_GT(Changed(before, preview), 100U) << "the coarse run's change reaches the full heights";
     // The ripple (0.8 units every ~9 samples) is finer than the 4-sample grid: it is still there.
     int ripples = 0;
@@ -171,8 +171,8 @@ namespace
     values["rounds"] = 4;
     auto words = Cone();
     ErosionMasks masks;
-    std::string error;
-    ASSERT_TRUE(ErodeHeights(words.data(), 65, 65, kScale, droplet, values, 1, error, &masks)) << error;
+    auto eroded = ErodeHeights(words.data(), 65, 65, kScale, droplet, values, 1, &masks);
+    ASSERT_TRUE(eroded) << eroded.error();
     for (const std::vector<float>* list : {&masks.wear, &masks.deposit, &masks.flow, &masks.accum}) {
       ASSERT_EQ(list->size(), words.size());
       for (const float v : *list) {
@@ -184,7 +184,8 @@ namespace
     // A preview makes none.
     ErosionMasks none;
     auto again = Cone();
-    ASSERT_TRUE(ErodeHeights(again.data(), 65, 65, kScale, droplet, values, 4, error, &none)) << error;
+    eroded = ErodeHeights(again.data(), 65, 65, kScale, droplet, values, 4, &none);
+    ASSERT_TRUE(eroded) << eroded.error();
     EXPECT_TRUE(none.wear.empty());
   }
 } // namespace

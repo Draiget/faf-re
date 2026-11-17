@@ -815,7 +815,7 @@ namespace faf::remote::client
       if (it != mHeld.end() && it->second.live) {
         deleteIds.push_back(static_cast<moho::EntId>(id));
         ++mStats.deleted;
-        mStats.deleteMismatches += packetDeleted.count(id) == 0u ? 1u : 0u;
+        mStats.deleteMismatches += !packetDeleted.contains(id) ? 1u : 0u;
         if (mKeepRemoved) {
           // Plan WP9.3: an effect placed at it in this same beat (an impact) still finds its last state.
           SRemoved& removed = mRemoved[id];
@@ -844,7 +844,7 @@ namespace faf::remote::client
           it->second.live = false;
           erasedNow.insert(change.record.id);
           ++mStats.erased;
-          mStats.eraseMismatches += packetErased.count(change.record.id) == 0u ? 1u : 0u;
+          mStats.eraseMismatches += !packetErased.contains(change.record.id) ? 1u : 0u;
         }
       } else if (!live) {
         create(change.record); // an id reused after an erase
@@ -855,7 +855,7 @@ namespace faf::remote::client
         std::find(eraseIds.begin(), eraseIds.end(), static_cast<moho::EntId>(id)) == eraseIds.end() ? 1u : 0u;
     }
     for (const std::uint32_t id : packetDeleted) {
-      const bool transient = packetEntities.count(id) != 0u || packetUnits.count(id) != 0u;
+      const bool transient = packetEntities.contains(id) || packetUnits.contains(id);
       if (
         !transient && std::find(deleteIds.begin(), deleteIds.end(), static_cast<moho::EntId>(id)) == deleteIds.end()
       ) {
@@ -863,10 +863,10 @@ namespace faf::remote::client
       }
     }
     for (const auto& [id, params] : packetEntities) {
-      mStats.packetCreatedNotRebuilt += createdNow.count(id) == 0u ? 1u : 0u;
+      mStats.packetCreatedNotRebuilt += !createdNow.contains(id) ? 1u : 0u;
     }
     for (const auto& [id, params] : packetUnits) {
-      mStats.packetCreatedNotRebuilt += createdNow.count(id) == 0u ? 1u : 0u;
+      mStats.packetCreatedNotRebuilt += !createdNow.contains(id) ? 1u : 0u;
     }
 
     // Entity updates: every live entity whose frame record changed, that the packet updates
@@ -874,7 +874,7 @@ namespace faf::remote::client
     // current one (the UI interpolates between them).
     const auto updatable = [&](const std::uint32_t id) {
       const auto it = mHeld.find(id);
-      return it != mHeld.end() && (it->second.live || erasedNow.count(id) != 0u);
+      return it != mHeld.end() && (it->second.live || erasedNow.contains(id));
     };
     fa::vector<moho::SEntityVariableUpdateEntry> entityUpdates;
     entityUpdates.reserve(packet.mEntityUpdates.size() + delta.changed.size() + delta.created.size());
@@ -886,11 +886,11 @@ namespace faf::remote::client
       }
       const bool changed = changeCursor != delta.changed.end() && changeCursor->record.id == record.id;
       const auto heldIt = mHeld.find(record.id);
-      if (heldIt == mHeld.end() || (!heldIt->second.live && erasedNow.count(record.id) == 0u)) {
+      if (heldIt == mHeld.end() || (!heldIt->second.live && !erasedNow.contains(record.id))) {
         continue;
       }
       SHeldEntity& held = heldIt->second;
-      const bool created = createdNow.count(record.id) != 0u;
+      const bool created = createdNow.contains(record.id);
       const auto packetIt = packetEntityUpdates.find(record.id);
       const bool fromPacket = packetIt != packetEntityUpdates.end();
       const bool moving = mCodec.deadReckoning &&
@@ -999,7 +999,7 @@ namespace faf::remote::client
         }
         const bool unitChanged = changeIt != delta.changed.end() && changeIt->record.id == record.id &&
           (changeIt->fields & wire::kUnitFields) != 0u;
-        const bool created = createdNow.count(record.id) != 0u;
+        const bool created = createdNow.contains(record.id);
         const auto packetIt = packetUnitUpdates.find(record.id);
         const bool fromPacket = packetIt != packetUnitUpdates.end();
         const wire::SUnitPose* bones = nullptr;
@@ -1064,7 +1064,7 @@ namespace faf::remote::client
         }
         const bool statsChanged = changeIt != delta.changed.end() && changeIt->record.id == record.id &&
           (changeIt->fields & wire::kFieldUnitStats) != 0u;
-        if (!record.isUnit || (!statsChanged && createdNow.count(record.id) == 0u)) {
+        if (!record.isUnit || (!statsChanged && !createdNow.contains(record.id))) {
           continue;
         }
         const auto heldIt = mHeld.find(record.id);

@@ -38,7 +38,7 @@ namespace
   {
     std::size_t n = 0;
     for (const CheckIssue& issue : issues) {
-      n += issue.marker == marker && issue.text.find(words) != std::string::npos ? 1 : 0;
+      n += issue.marker == marker && issue.text.contains(words) ? 1 : 0;
     }
     return n;
   }
@@ -116,11 +116,9 @@ namespace
     bool startWarned = false, massNoted = false;
     for (const CheckIssue& issue : issues) {
       startWarned = startWarned ||
-        (issue.marker == "ARMY_1" && issue.text.find("under water") != std::string::npos &&
-         issue.level == CheckIssue::Level::Warning);
+        (issue.marker == "ARMY_1" && issue.text.contains("under water") && issue.level == CheckIssue::Level::Warning);
       massNoted = massNoted ||
-        (issue.marker == "Mass 00" && issue.text.find("under water") != std::string::npos &&
-         issue.level == CheckIssue::Level::Note);
+        (issue.marker == "Mass 00" && issue.text.contains("under water") && issue.level == CheckIssue::Level::Note);
     }
     EXPECT_TRUE(startWarned);
     EXPECT_TRUE(massNoted);

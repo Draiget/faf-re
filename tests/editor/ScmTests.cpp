@@ -37,14 +37,14 @@ namespace faf::editor
     ObjFacesBecomeTriangles
   )
   {
-    ObjMesh mesh;
-    std::string error;
-    ASSERT_TRUE(ParseObj(kCube, mesh, error)) << error;
+    const auto parsed = ParseObj(kCube);
+    ASSERT_TRUE(parsed) << parsed.error();
+    const ObjMesh& mesh = *parsed;
     EXPECT_EQ(mesh.positions.size(), 8U);
     EXPECT_EQ(mesh.triangles.size(), 12U);
     EXPECT_EQ(mesh.triangles[10][0].position, 1) << "-7 of 8 is the second";
-    EXPECT_FALSE(ParseObj("v 0 0 0\nf 1 2 3\n", mesh, error)) << "a face with vertices the file hasn't got";
-    EXPECT_FALSE(ParseObj("v 0 0 0\n", mesh, error));
+    EXPECT_FALSE(ParseObj("v 0 0 0\nf 1 2 3\n")) << "a face with vertices the file hasn't got";
+    EXPECT_FALSE(ParseObj("v 0 0 0\n"));
   }
 
   TEST(
@@ -52,11 +52,11 @@ namespace faf::editor
     TheFileHasTheEnginesLayout
   )
   {
-    ObjMesh mesh;
-    std::string error;
-    ASSERT_TRUE(ParseObj(kCube, mesh, error)) << error;
-    const std::vector<std::uint8_t> scm = ScmFromObj(mesh, "Body", 2.0f, "made by a test", error);
-    ASSERT_FALSE(scm.empty()) << error;
+    const auto mesh = ParseObj(kCube);
+    ASSERT_TRUE(mesh) << mesh.error();
+    const auto made = ScmFromObj(*mesh, "Body", 2.0f, "made by a test");
+    ASSERT_TRUE(made) << made.error();
+    const std::vector<std::uint8_t>& scm = *made;
     EXPECT_EQ(std::memcmp(scm.data(), "MODL", 4), 0);
     EXPECT_EQ(U32(scm, 0x04), 5U);
     EXPECT_EQ(std::memcmp(scm.data() + 0x3C, "NAME", 4), 0);

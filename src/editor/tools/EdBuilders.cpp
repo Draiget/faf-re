@@ -119,6 +119,77 @@ namespace faf::editor
     }
   } // namespace
 
+  std::vector<std::string> LuaTableItems(
+    const std::string& table
+  )
+  {
+    std::vector<std::string> items;
+    const std::string text = Trim(table);
+    if (text.size() < 2 || text.front() != '{') {
+      return items;
+    }
+    const std::size_t close = MatchBrace(text, 0);
+    std::size_t start = 1;
+    int depth = 0;
+    for (std::size_t at = 1; at < close && at < text.size(); ++at) {
+      const char c = text[at];
+      if (c == '\'' || c == '"') {
+        for (++at; at < text.size() && text[at] != c; ++at) {
+          if (text[at] == '\\') {
+            ++at;
+          }
+        }
+        continue;
+      }
+      if (c == '{') {
+        ++depth;
+      } else if (c == '}') {
+        --depth;
+      } else if (c == ',' && depth == 0) {
+        if (const std::string item = Trim(text.substr(start, at - start)); !item.empty()) {
+          items.push_back(item);
+        }
+        start = at + 1;
+      }
+    }
+    if (close < text.size()) {
+      if (const std::string item = Trim(text.substr(start, close - start)); !item.empty()) {
+        items.push_back(item);
+      }
+    }
+    return items;
+  }
+
+  bool ParseBuilderCall(
+    const std::string& text,
+    BuilderCall& out
+  )
+  {
+    const std::vector<std::string> items = LuaTableItems(text);
+    const auto unquote = [](const std::string& s) {
+      return s.size() >= 2 && (s.front() == '\'' || s.front() == '"') && s.back() == s.front()
+        ? s.substr(1, s.size() - 2)
+        : std::string();
+    };
+    if (items.size() < 2 || unquote(items[0]).empty() && items[0] != "''") {
+      return false;
+    }
+    out.file = unquote(items[0]);
+    out.function = unquote(items[1]);
+    out.rest.clear();
+    for (std::size_t i = 2; i < items.size(); ++i) {
+      out.rest += (i > 2 ? ", " : "") + items[i];
+    }
+    return true;
+  }
+
+  std::string FormatBuilderCall(
+    const BuilderCall& call
+  )
+  {
+    return "{ " + Quoted(call.file) + ", " + Quoted(call.function) + (call.rest.empty() ? "" : ", " + call.rest) + " }";
+  }
+
   std::string MissionBuilder::Get(
     const std::string& key
   ) const
@@ -145,15 +216,13 @@ namespace faf::editor
     fields.emplace_back(key, value);
   }
 
-  bool ParseBuilders(
-    const std::string& text,
-    std::vector<MissionBuilder>& builders,
-    std::string& error
+  std::expected<std::vector<MissionBuilder>, std::string> ParseBuilders(
+    const std::string& text
   )
   {
-    builders.clear();
+    std::vector<MissionBuilder> builders;
     if (Trim(text).empty()) {
-      return true;
+      return builders;
     }
     std::size_t at = text.find("Builders");
     while (at != std::string::npos && at > 0 &&
@@ -161,17 +230,15 @@ namespace faf::editor
       at = text.find("Builders", at + 1);
     }
     if (at == std::string::npos) {
-      return true; // a table without builders
+      return builders; // a table without builders
     }
     const std::size_t open = text.find('{', at);
     if (open == std::string::npos) {
-      error = "the Builders table has no {";
-      return false;
+      return std::unexpected("the Builders table has no {");
     }
     const std::size_t close = MatchBrace(text, open);
     if (close >= text.size()) {
-      error = "the Builders table isn't closed";
-      return false;
+      return std::unexpected("the Builders table isn't closed");
     }
     for (const auto& [name, value] : Pairs(text, open + 1, close)) {
       if (value.empty() || value.front() != '{') {
@@ -183,7 +250,7 @@ namespace faf::editor
       builder.fields = Pairs(value, 1, inner);
       builders.push_back(std::move(builder));
     }
-    return true;
+    return builders;
   }
 
   std::string FormatBuilders(

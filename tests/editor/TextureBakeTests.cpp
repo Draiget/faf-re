@@ -82,9 +82,9 @@ namespace
   )
   {
     const TexImage image = Pattern(64);
-    std::vector<std::uint8_t> dds;
-    std::string error;
-    ASSERT_TRUE(EncodeDds(image, DdsKind::Bgra, dds, error)) << error;
+    const auto encoded = EncodeDds(image, DdsKind::Bgra);
+    ASSERT_TRUE(encoded) << encoded.error();
+    const std::vector<std::uint8_t>& dds = *encoded;
     ASSERT_GE(dds.size(), 128U);
     EXPECT_EQ(std::memcmp(dds.data(), "DDS ", 4), 0);
     std::uint32_t mips = 0;
@@ -100,9 +100,9 @@ namespace
   )
   {
     const TexImage image = Pattern(128);
-    std::vector<std::uint8_t> dds;
-    std::string error;
-    ASSERT_TRUE(EncodeDds(image, DdsKind::Bc3, dds, error)) << error;
+    const auto encoded = EncodeDds(image, DdsKind::Bc3);
+    ASSERT_TRUE(encoded) << encoded.error();
+    const std::vector<std::uint8_t>& dds = *encoded;
     // The classic header: the game's Direct3D 9 decoder reads DXT5 by its FourCC, not a DX10 extension.
     EXPECT_EQ(std::memcmp(dds.data() + 84, "DXT5", 4), 0);
     std::uint32_t mips = 0;
@@ -124,9 +124,9 @@ namespace
         image.Pixel(x, y)[3] = 1.0f;
       }
     }
-    std::vector<std::uint8_t> dds;
-    std::string error;
-    ASSERT_TRUE(EncodeDds(image, DdsKind::Bc1, dds, error)) << error;
+    const auto encoded = EncodeDds(image, DdsKind::Bc1);
+    ASSERT_TRUE(encoded) << encoded.error();
+    const std::vector<std::uint8_t>& dds = *encoded;
     EXPECT_EQ(std::memcmp(dds.data() + 84, "DXT1", 4), 0);
     std::uint32_t mips = 0;
     std::uint32_t width = 0;
@@ -146,9 +146,9 @@ namespace
       rgba.data[i] = rgba.data[i + 1] = rgba.data[i + 2] = 0.25f;
       rgba.data[i + 3] = 1.0f;
     }
-    std::vector<std::uint8_t> dds;
-    std::string error;
-    ASSERT_TRUE(EncodeDds(grey, DdsKind::Bgra, dds, error)) << error;
+    const auto encoded = EncodeDds(grey, DdsKind::Bgra);
+    ASSERT_TRUE(encoded) << encoded.error();
+    const std::vector<std::uint8_t>& dds = *encoded;
     std::uint32_t mips = 0;
     std::uint32_t width = 0;
     EXPECT_LE(Worst(dds, rgba, mips, width), 1.0f / 255.0f);

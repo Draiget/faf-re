@@ -4,6 +4,7 @@
 
 #include <array>
 #include <cstdint>
+#include <expected>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -48,16 +49,14 @@ namespace faf::editor
   [[nodiscard]] float KindHeightStep(GroundKind kind);
 
   /**
-   * A layer's tile from its albedo and (optional, empty) normal map, each kAtlasTile x kAtlasTile BGRA bytes. False
-   * with `error` when the albedo has the wrong size or the integration fails.
+   * A layer's tile from its albedo and (optional, empty) normal map, each kAtlasTile x kAtlasTile BGRA bytes. The
+   * error when the albedo has the wrong size or the integration fails.
    */
-  bool MakeAtlasTile(
+  [[nodiscard]] std::expected<AtlasTile, std::string> MakeAtlasTile(
     const std::vector<std::uint8_t>& albedo,
     const std::vector<std::uint8_t>& normal,
     GroundKind kind,
-    const AtlasSettings& settings,
-    AtlasTile& out,
-    std::string& error
+    const AtlasSettings& settings
   );
 
   /**

@@ -1,6 +1,7 @@
 #include "moho/ai/CAiSiloBuildImpl.h"
 #include "moho/misc/EconomyRequestRelease.h"
 
+#include <utility>
 #include <algorithm>
 #include <bit>
 #include <cstddef>
@@ -84,7 +85,7 @@ namespace
     const ESiloType type
   ) noexcept
   {
-    return static_cast<std::size_t>(static_cast<std::int32_t>(type));
+    return static_cast<std::size_t>(std::to_underlying(type));
   }
 
   void ReplaceEconomyRequestPointer(

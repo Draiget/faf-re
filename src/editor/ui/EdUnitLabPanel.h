@@ -3,7 +3,9 @@
 #include "editor/tools/EdUnitLab.h"
 #include "editor/ui/EdUnitCatalog.h"
 
+#include <expected>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace faf::editor
@@ -27,8 +29,9 @@ namespace faf::editor
     [[nodiscard]] static UnitLabSource ReadUnit(const std::string& id);
     /** Whether the game's rules have the unit. */
     [[nodiscard]] static bool GameHasUnit(const std::string& id);
-    /** Makes a derived unit of the selected one (an undo step) and selects it; false with `error`. */
-    bool Derive(const std::string& id, const std::string& name, const std::string& description, std::string& error);
+    /** Makes a derived unit of the selected one (an undo step) and selects it; or the error. */
+    [[nodiscard]] std::expected<void, std::string>
+    Derive(const std::string& id, const std::string& name, const std::string& description);
     void SelectUnit(
       const std::string& id
     )
@@ -61,7 +64,48 @@ namespace faf::editor
       return asked;
     }
 
+    /**
+     * Test in game (FAF Studio's unittest.lua): Test, then the selected unit and dummy targets (ground, structure,
+     * air, and a ship where there is water) placed for an enemy army near the first start, with quick orders and the
+     * sim's state once a second. The app drives it; the panel asks and shows.
+     */
+    [[nodiscard]] bool TakeTestInGameAsk() noexcept
+    {
+      return std::exchange(mTestInGameAsked, false);
+    }
+    /** As the panel's buttons do (`/unittestgame`). */
+    void AskTestInGame() noexcept
+    {
+      mTestInGameAsked = true;
+    }
+    void AskTestOrder(
+      const std::string& order
+    )
+    {
+      mTestOrder = order;
+    }
+    /** A quick order asked for: attack, move, patrol, stop, kill, heal, respawn, end ("" none). */
+    [[nodiscard]] std::string TakeTestOrder()
+    {
+      return std::exchange(mTestOrder, {});
+    }
+    /** The test running (the unit under test, empty when none) and the sim's last state line. */
+    std::string testUnit;
+    std::string testStatus;
+    std::string testNote; // the sim's last note (which builder builds it, ...)
+    /** Studio's Effects panel in the test play: every projectile of the game (read before the play), the one picked and
+     * its speed; an effect template (EffectTemplates.lua's name) and its height above the unit. */
+    std::vector<std::string> testProjectiles;
+    int testProjectile = 0;
+    float testProjectileSpeed = 15.0f;
+    char testEffect[96] = "ConcussionRingMed01";
+    float testEffectHeight = 1.0f;
+
   private:
+    /** The selected unit's weapons' projectiles: their numbers as project changes (Studio's fxedit.lua). */
+    void DrawProjectiles();
+    bool mTestInGameAsked = false;
+    std::string mTestOrder;
     EdModPanel& mProject;
     std::string mUnit;
     char mFilter[64] = {};

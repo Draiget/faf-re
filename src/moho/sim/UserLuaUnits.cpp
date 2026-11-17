@@ -1,5 +1,6 @@
 #include "moho/lua/ScrLuaUserData.h"
 #include "moho/sim/UserLuaPrivate.h"
+#include <utility>
 
 using EntId = std::int32_t;
 namespace
@@ -2005,7 +2006,7 @@ int moho::cfunc_GetHighlightCommand(
   const SSTITarget& target = command->mVariableData.mTarget1;
 
   lua_newtable(luaContext);
-  setNumber("commandType", static_cast<lua_Number>(static_cast<std::int32_t>(command->mVariableData.mCmdType)));
+  setNumber("commandType", static_cast<lua_Number>(std::to_underlying(command->mVariableData.mCmdType)));
   setNumber("x", static_cast<lua_Number>(target.mPos.x));
   setNumber("y", static_cast<lua_Number>(target.mPos.y));
   setNumber("z", static_cast<lua_Number>(target.mPos.z));

@@ -27,16 +27,14 @@ namespace faf::editor
     return out + "}";
   }
 
-  bool LightingFromScmlighting(
+  std::expected<void, std::string> LightingFromScmlighting(
     const std::string& text,
-    LightingState& lighting,
-    std::string& error
+    LightingState& lighting
   )
   {
     std::string probe;
     if (!JsonValue(text, "LightingMultiplier", probe) || !JsonValue(text, "SunDirection", probe)) {
-      error = "not a lighting settings file (no LightingMultiplier or SunDirection)";
-      return false;
+      return std::unexpected("not a lighting settings file (no LightingMultiplier or SunDirection)");
     }
     (void)JsonFloat(text, "LightingMultiplier", lighting.multiplier);
     JsonVector(text, "SunDirection", lighting.sunDirection, 3);
@@ -48,20 +46,17 @@ namespace faf::editor
     JsonVector(text, "FogColor", lighting.fogColor, 3);
     (void)JsonFloat(text, "FogStart", lighting.fogStart);
     (void)JsonFloat(text, "FogEnd", lighting.fogEnd);
-    return true;
+    return {};
   }
-  bool LightingFromScmap(
-    const std::string& bytes,
-    LightingState& lighting,
-    std::string& error
+  std::expected<LightingState, std::string> LightingFromScmap(
+    const std::string& bytes
   )
   {
     // One reader of a map's environment (EdLooks' walk of the .scmap); the lighting is its first part.
-    Look look;
-    if (!LookFromScmap(bytes, look, error)) {
-      return false;
+    const std::expected<Look, std::string> look = LookFromScmap(bytes);
+    if (!look) {
+      return std::unexpected(look.error());
     }
-    lighting = look.lighting;
-    return true;
+    return look->lighting;
   }
 } // namespace faf::editor

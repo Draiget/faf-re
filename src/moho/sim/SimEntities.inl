@@ -155,7 +155,7 @@ Unit* Sim::TransferUnit(
   const RUnitBlueprint* const sourceBlueprint = unit->GetBlueprint();
 
   SUnitConstructionParams params(
-    static_cast<std::int32_t>(sourceLayer), sourceTransform, newArmy, sourceBlueprint, nullptr, true
+    std::to_underlying(sourceLayer), sourceTransform, newArmy, sourceBlueprint, nullptr, true
   );
   // The transfer path forces fixed-elevation on unconditionally (the layer==0 gate
   // that the shared ctor applies is not present in the shipped transfer code).

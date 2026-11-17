@@ -230,8 +230,9 @@ namespace LuaPlus
 #if INTPTR_MAX == INT32_MAX
   using ValuePointer = void*;
 #else
-  // Engine change on x64: a Lua object's pointer in the 4 bytes the binary gives it, as every Lua
-  // object lives below 4 GB (LuaArena.h). It reads and assigns as the pointer it holds.
+  // Engine change on 64-bit targets: a Lua object's pointer in the 4 bytes the binary gives it, as
+  // every Lua object lives in one range of at most 4 GB (LuaArena.h). It reads and assigns as the
+  // pointer it holds.
   class ValuePointer
   {
   public:
@@ -247,7 +248,7 @@ namespace LuaPlus
       T* const pointer
     ) noexcept
     {
-      mBits = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(pointer));
+      mBits = lua::PointerBits(pointer);
       return *this;
     }
     ValuePointer& operator=(
@@ -261,7 +262,7 @@ namespace LuaPlus
     template <class T>
     [[nodiscard]] operator T*() const noexcept
     {
-      return reinterpret_cast<T*>(static_cast<std::uintptr_t>(mBits));
+      return static_cast<T*>(lua::PointerFromBits(mBits));
     }
 
     [[nodiscard]] std::uint32_t Bits() const noexcept
@@ -316,7 +317,7 @@ namespace LuaPlus
     ObjectPointer(
       T* const pointer
     ) noexcept
-      : mBits(static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(pointer)))
+      : mBits(lua::PointerBits(pointer))
     {}
 
     [[nodiscard]] operator T*() const noexcept
@@ -331,7 +332,7 @@ namespace LuaPlus
   private:
     [[nodiscard]] T* Get() const noexcept
     {
-      return reinterpret_cast<T*>(static_cast<std::uintptr_t>(mBits));
+      return static_cast<T*>(lua::PointerFromBits(mBits));
     }
 
     std::uint32_t mBits;

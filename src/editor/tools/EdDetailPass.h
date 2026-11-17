@@ -12,6 +12,7 @@
 #include "editor/terrain/EdFieldCore.h"
 #include "editor/tools/EdMaskGen.h"
 
+#include <expected>
 #include <functional>
 #include <string>
 #include <vector>
@@ -77,7 +78,8 @@ namespace faf::editor
   [[nodiscard]] int DetailCount(const DetailClass& c, double area, float density);
 
   /** The class's density mask on the heights' grid (the mask generator's noise, flow and grow rules). */
-  bool DetailDensity(MaskGenContext& context, const DetailClass& c, int seed, field::Grid& out, std::string& error);
+  [[nodiscard]] std::expected<void, std::string>
+  DetailDensity(MaskGenContext& context, const DetailClass& c, int seed, field::Grid& out);
 
   /** One thing on a map, for Measure: a prop (blueprint) or a decal (texture, size), where. */
   struct DetailThing

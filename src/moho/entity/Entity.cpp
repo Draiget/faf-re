@@ -3,6 +3,7 @@
 #include "moho/entity/EntityMemoryManager.h"
 #include "moho/entity/EntityPool.h"
 #include "moho/sim/SimConVarAccess.h"
+#include <utility>
 
 namespace moho
 {
@@ -505,17 +506,17 @@ namespace
   {
     switch (layer) {
     case moho::LAYER_Land:
-      return static_cast<std::uint8_t>(moho::EOccupancyCaps::OC_LAND);
+      return std::to_underlying(moho::EOccupancyCaps::OC_LAND);
     case moho::LAYER_Seabed:
-      return static_cast<std::uint8_t>(moho::EOccupancyCaps::OC_SEABED);
+      return std::to_underlying(moho::EOccupancyCaps::OC_SEABED);
     case moho::LAYER_Sub:
-      return static_cast<std::uint8_t>(moho::EOccupancyCaps::OC_SUB);
+      return std::to_underlying(moho::EOccupancyCaps::OC_SUB);
     case moho::LAYER_Water:
-      return static_cast<std::uint8_t>(moho::EOccupancyCaps::OC_WATER);
+      return std::to_underlying(moho::EOccupancyCaps::OC_WATER);
     case moho::LAYER_Air:
-      return static_cast<std::uint8_t>(moho::EOccupancyCaps::OC_AIR);
+      return std::to_underlying(moho::EOccupancyCaps::OC_AIR);
     case moho::LAYER_Orbit:
-      return static_cast<std::uint8_t>(moho::EOccupancyCaps::OC_ORBIT);
+      return std::to_underlying(moho::EOccupancyCaps::OC_ORBIT);
     default:
       return 0u;
     }
@@ -526,7 +527,7 @@ namespace
     const std::uint8_t bit
   ) noexcept
   {
-    return (static_cast<std::uint8_t>(caps) & bit) != 0u;
+    return (std::to_underlying(caps) & bit) != 0u;
   }
 
   void RefreshCollisionBoundsSnapshot(
@@ -1677,9 +1678,8 @@ namespace moho
     // footprint, -1)` -- the live occupancy test against the terrain/water
     // bit arrays, not the footprint's static caps.
     const SOCellPos originCell = footprint.ToCellPos(worldPos);
-    const std::uint8_t occupancyMask = static_cast<std::uint8_t>(
-      OCCUPY_FootprintFits(*SimulationRef->mOGrid, originCell, footprint, EOccupancyCaps::OC_ANY)
-    );
+    const std::uint8_t occupancyMask =
+      std::to_underlying(OCCUPY_FootprintFits(*SimulationRef->mOGrid, originCell, footprint, EOccupancyCaps::OC_ANY));
 
     const bool isExperimental = IsInCategory("EXPERIMENTAL");
     const bool isBeacon = IsInCategory("FERRYBEACON");
@@ -1689,7 +1689,7 @@ namespace moho
       return desiredLayer;
     }
 
-    if ((occupancyMask & static_cast<std::uint8_t>(EOccupancyCaps::OC_AIR)) != 0u) {
+    if ((occupancyMask & std::to_underlying(EOccupancyCaps::OC_AIR)) != 0u) {
       return isExperimental ? LAYER_Land : LAYER_Air;
     }
 
@@ -1704,13 +1704,11 @@ namespace moho
       return LAYER_Land;
     }
 
-    if (
-      HasOccupancyBit(footprint.mOccupancyCaps, static_cast<std::uint8_t>(EOccupancyCaps::OC_SUB)) && !isExperimental
-    ) {
+    if (HasOccupancyBit(footprint.mOccupancyCaps, std::to_underlying(EOccupancyCaps::OC_SUB)) && !isExperimental) {
       return LAYER_Sub;
     }
 
-    if (HasOccupancyBit(footprint.mOccupancyCaps, static_cast<std::uint8_t>(EOccupancyCaps::OC_WATER)) || isBeacon) {
+    if (HasOccupancyBit(footprint.mOccupancyCaps, std::to_underlying(EOccupancyCaps::OC_WATER)) || isBeacon) {
       return LAYER_Water;
     }
 
@@ -3633,7 +3631,7 @@ namespace moho
     const EVisibilityMode mode
   )
   {
-    mVizToFocusPlayer = static_cast<std::int32_t>(mode);
+    mVizToFocusPlayer = std::to_underlying(mode);
     UpdateVisibility();
     if (SimulationRef != nullptr && ListIsSingleton()) {
       ListLinkBefore(&SimulationRef->mCoordEntities);
@@ -3651,7 +3649,7 @@ namespace moho
     const EVisibilityMode mode
   )
   {
-    mVizToEnemies = static_cast<std::int32_t>(mode);
+    mVizToEnemies = std::to_underlying(mode);
     UpdateVisibility();
     if (SimulationRef != nullptr && ListIsSingleton()) {
       ListLinkBefore(&SimulationRef->mCoordEntities);
@@ -3669,7 +3667,7 @@ namespace moho
     const EVisibilityMode mode
   )
   {
-    mVizToAllies = static_cast<std::int32_t>(mode);
+    mVizToAllies = std::to_underlying(mode);
     UpdateVisibility();
     if (SimulationRef != nullptr && ListIsSingleton()) {
       ListLinkBefore(&SimulationRef->mCoordEntities);
@@ -3687,7 +3685,7 @@ namespace moho
     const EVisibilityMode mode
   )
   {
-    mVizToNeutrals = static_cast<std::int32_t>(mode);
+    mVizToNeutrals = std::to_underlying(mode);
     UpdateVisibility();
     if (SimulationRef != nullptr && ListIsSingleton()) {
       ListLinkBefore(&SimulationRef->mCoordEntities);
@@ -4063,7 +4061,7 @@ namespace moho
     const float terrainElevation = field->GetElevation(worldX, worldZ);
     // Engine addition (water bodies): the level at the cell's position; -10000 without water.
     const float waterElevation = map->GetWaterElevationAt(worldX, worldZ);
-    if ((static_cast<std::int32_t>(layer) & static_cast<std::int32_t>(LAYER_Seabed)) != 0) {
+    if ((std::to_underlying(layer) & std::to_underlying(LAYER_Seabed)) != 0) {
       outPos.y = terrainElevation;
     } else {
       outPos.y = (waterElevation > terrainElevation) ? waterElevation : terrainElevation;
@@ -4089,7 +4087,7 @@ namespace moho
     return COORDS_ToWorldPos(
       map,
       cellPos,
-      static_cast<ELayer>(static_cast<std::uint8_t>(footprint.mOccupancyCaps)),
+      static_cast<ELayer>(std::to_underlying(footprint.mOccupancyCaps)),
       static_cast<int>(footprint.mSizeX),
       static_cast<int>(footprint.mSizeZ)
     );
@@ -4116,7 +4114,7 @@ namespace moho
     const CHeightField* const field = map->mHeightField.get();
     const float terrainElevation = field->GetElevation(worldPos.x, worldPos.z);
     const bool seabedOnly =
-      (static_cast<std::uint8_t>(footprint.mOccupancyCaps) & static_cast<std::uint8_t>(LAYER_Seabed)) != 0u;
+      (std::to_underlying(footprint.mOccupancyCaps) & static_cast<std::uint8_t>(LAYER_Seabed)) != 0u;
     // Engine addition (water bodies): the level at the position; -10000 without water.
     const float waterElevation = map->GetWaterElevationAt(worldPos.x, worldPos.z);
     // No water at all keeps the terrain even when it is NaN, as the single-level test did.
@@ -4145,7 +4143,7 @@ namespace moho
   ) noexcept
   {
     if (layer == LAYER_None) {
-      layer = static_cast<ELayer>(static_cast<std::uint8_t>(footprint.mOccupancyCaps));
+      layer = static_cast<ELayer>(std::to_underlying(footprint.mOccupancyCaps));
     }
 
     SOCellPos cellPos{};

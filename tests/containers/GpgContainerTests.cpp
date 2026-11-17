@@ -627,7 +627,7 @@ namespace
       const unsigned op = rng() % 10u;
       SCOPED_TRACE(::testing::Message() << "seed " << seed << " step " << step << " op " << op << " key " << key);
       if (op < 5) {
-        if (ref.count(key) == 0) {
+        if (!ref.contains(key)) {
           int& stored = map.Insert(key, value);
           ASSERT_EQ(stored, value);
           ref[key] = value;
@@ -654,7 +654,7 @@ namespace
       }
       for (int probe = 0; probe < 4; ++probe) {
         const std::uint32_t absent = static_cast<std::uint32_t>(rng() % keyRange) * 2654435761u;
-        if (ref.count(absent) == 0) {
+        if (!ref.contains(absent)) {
           ASSERT_EQ(map.Find(absent), nullptr) << absent;
         }
       }

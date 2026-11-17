@@ -1,5 +1,6 @@
 #include "moho/unit/core/WeaponExtractor.h"
 
+#include <utility>
 #include <cstdint>
 #include <limits>
 
@@ -35,7 +36,7 @@ namespace moho
     float outerRadius = 0.0f;
     const auto& weaponBlueprints = unitBlueprint.Weapons.WeaponBlueprints;
     for (const auto& weaponBlueprint : weaponBlueprints) {
-      const std::int32_t weaponCategory = static_cast<std::int32_t>(weaponBlueprint.RangeCategory);
+      const std::int32_t weaponCategory = std::to_underlying(weaponBlueprint.RangeCategory);
       if (rangeCategoryFilter != kRangeCategoryAll && rangeCategoryFilter != weaponCategory) {
         continue;
       }

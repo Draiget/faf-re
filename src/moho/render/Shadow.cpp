@@ -598,6 +598,9 @@ namespace moho
    * casters standing above the terrain.
    */
   bool ren_ShadowVolumeCache = true;
+  float ren_ShadowExtraMinY = 1.0f;
+  float ren_ShadowExtraMaxY = 0.0f;
+  extern bool ren_TerrainSurface; // WRenViewport.cpp: the height field's surface drawn
   namespace
   {
     struct ShadowVolumeMemo
@@ -738,6 +741,11 @@ namespace moho
     }
     if (volume.Max.X() <= volume.Min.X()) {
       return false;
+    }
+    // Engine addition: ground drawn as models (the editor's mesh terrain) at heights the height field doesn't reach.
+    if (ren_ShadowExtraMinY <= ren_ShadowExtraMaxY) {
+      volume.Min.Y() = std::min(volume.Min.Y(), ren_ShadowExtraMinY);
+      volume.Max.Y() = std::max(volume.Max.Y(), ren_ShadowExtraMaxY);
     }
 
     // Lift the top so casters standing above the terrain still fit.
@@ -1060,7 +1068,9 @@ namespace moho
     // Rays can drop out here (the device couldn't build the scene), or leave the ground uncovered (a tile still
     // being built, or one whose geometry failed): then this tile draws its terrain depth after all, and so do the
     // rest.
-    bool terrainInMap = !rays;
+    // Engine addition: a height field whose surface isn't drawn (the editor's mesh terrain shown alone) casts
+    // nothing either; its depth would shadow the ground drawn as models over it.
+    bool terrainInMap = !rays && ren_TerrainSurface;
     const auto submitRays = [&](const GeomCamera3& tileCamera) {
       if (rays) {
         // The map's sun direction points towards the sun (PrepareLightCamera's light travels along its negative).
@@ -1069,7 +1079,7 @@ namespace moho
         rays = RayScene::Instance().Submit(
           *meshRenderer, meshRenderer->meshes, rayHeightField, mCamera, viewCamera, sunDirection
         );
-        if (!terrainInMap && (!rays || !RayScene::Instance().TerrainTraced())) {
+        if (!terrainInMap && ren_TerrainSurface && (!rays || !RayScene::Instance().TerrainTraced())) {
           terrain->DrawTerrainDepth(tileCamera);
           terrainInMap = true;
         }
