@@ -99,5 +99,5 @@
     -1,                                                                                                                \
     -1,                                                                                                                \
     (ShellObjectEventFunction)(ShellEventFunction)(moho::CLogAdditionEventFunction) & fn,                              \
-    (ShellObject*)NULL                                                                                                 \
+    nullptr                                                                                                            \
   ),
