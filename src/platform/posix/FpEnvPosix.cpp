@@ -116,12 +116,13 @@ extern "C" int __wrap_pthread_create(
 }
 #endif // FAFRE_ARCH_X64
 
-#if FAFRE_PLATFORM_MACOS // the default thread stack is 512 KB (platform/PosixCompat.h redirects here)
+#if FAFRE_PLATFORM_MACOS || FAFRE_PLATFORM_ANDROID // small default stacks (PosixCompat.h redirects here)
 #undef pthread_create
 extern "C" int pthread_create(pthread_t*, const pthread_attr_t*, void* (*)(void*), void*);
 
 /// pthread_create with Linux's 8 MB stack for a thread started without attributes (std::thread,
 /// the legacy threads); attributes a caller passes are its own choice and go through unchanged.
+/// On Android x86_64 the call below is the --wrap above, which sets the thread's x87 and SSE state.
 extern "C" int faf_pthread_create(
   pthread_t* const thread,
   const pthread_attr_t* const attributes,
