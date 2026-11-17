@@ -7,6 +7,7 @@
 
 #include "gpg/core/utils/Logging.h"
 #include "gpg/gal/backends/common/BackendErrors.h"
+#include "gpg/gal/backends/common/BlockCompression.h"
 #include "gpg/gal/PlacedResources.h"
 
 namespace gpg::gal::vulkan
@@ -215,6 +216,29 @@ namespace gpg::gal::vulkan
       break;
     }
     return result;
+  }
+
+  TextureFormat HeldTextureFormat(
+    const DXGI_FORMAT format,
+    const bool blockCompression
+  ) noexcept
+  {
+    TextureFormat held = ToVulkanTexture(format);
+    if (!blockCompression && held.format != VK_FORMAT_UNDEFINED && imaging::IsBc123(format)) {
+      const bool srgb = format == DXGI_FORMAT_BC1_UNORM_SRGB || format == DXGI_FORMAT_BC2_UNORM_SRGB ||
+        format == DXGI_FORMAT_BC3_UNORM_SRGB;
+      held.format = srgb ? VK_FORMAT_R8G8B8A8_SRGB : VK_FORMAT_R8G8B8A8_UNORM;
+    }
+    return held;
+  }
+
+  bool DecodedOnCpu(
+    const DXGI_FORMAT format,
+    const VkFormat imageFormat
+  ) noexcept
+  {
+    return imaging::IsBc123(format) &&
+      (imageFormat == VK_FORMAT_R8G8B8A8_UNORM || imageFormat == VK_FORMAT_R8G8B8A8_SRGB);
   }
 
   VkFormat ToVulkanVertex(

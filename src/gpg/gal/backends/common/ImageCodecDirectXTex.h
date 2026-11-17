@@ -20,4 +20,18 @@ namespace gpg::gal::imaging
 
   /** The image's first array slice as a file: DDS through ImageCodec::WriteDds, BMP, JPG and PNG through WIC. */
   HRESULT EncodeWithDirectXTex(const Image& image, FileFormat format, std::vector<std::uint8_t>& outBytes);
+
+  /**
+   * Encodes `rgba` (R8G8B8A8, `width` * 4 bytes per row) in BC1, BC2 or BC3 (`format`, any of its forms; the
+   * bytes go as they are) as whole 4x4 blocks with `rowPitch` bytes per row of blocks: the Vulkan backend's
+   * readback of a texture it decoded on the CPU (gpg/gal/backends/common/BlockCompression.h).
+   */
+  HRESULT EncodeBc123WithDirectXTex(
+    DXGI_FORMAT format,
+    const std::uint8_t* rgba,
+    std::uint32_t width,
+    std::uint32_t height,
+    void* blocks,
+    std::size_t rowPitch
+  );
 } // namespace gpg::gal::imaging

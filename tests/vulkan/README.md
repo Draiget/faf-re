@@ -7,6 +7,10 @@ cmake --build --preset clang-x64-release --target faf_vulkan_allocator_tests faf
 ctest --test-dir build/clang-x64-release -L Vulkan --output-on-failure
 ```
 
+## Limits
+
+`faf_vulkan_limits_tests` checks `src/gpg/gal/backends/vulkan/VulkanLimits.h`, what `DeviceVulkan` checks against a device's limits before it makes its pipeline layouts and GPU programs, with limits of its own: Vulkan 1.3's required minimums, which a phone's GPU may report, and a desktop GPU's. It counts the descriptors a stage sees and a layout holds as the limits count them, and checks hand-made copies of the layouts' sets (the GPU programs' and the effects' pipeline layouts, the ray-traced scene's set included), a compute work group's size, the last fragment input location and the depth bias clamp without its feature. It needs only the pinned Vulkan headers.
+
 ## Attachment barriers
 
 `faf_vulkan_attachment_tests` checks `AttachmentWriteBarrier` (`src/gpg/gal/backends/vulkan/VulkanAttachmentBarrier.h`), the barrier `DeviceVulkan::BeginRendering` records when a color or depth target starts a new dynamic-rendering instance in the layout it already has. Six tests cover color, depth and depth/stencil: stages, access masks, kept layout, image and the mip 0 / layer 0 range that render-target views use. It needs only the pinned Vulkan headers; no driver, device or engine.
