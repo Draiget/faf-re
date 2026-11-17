@@ -198,7 +198,7 @@ namespace faf::remote::client
             const auto last = mLastMesh.find(record.id);
             if (last == mLastMesh.end() || last->second != userEntity->mMeshInstance) {
               ++mTotalMeshNew;
-            } else if (visited.count(userEntity) == 0u) {
+            } else if (!visited.contains(userEntity)) {
               ++mTotalNotVisited;
             }
           }
@@ -209,11 +209,11 @@ namespace faf::remote::client
         for (const auto& [id, userEntity] : session.mEntities) {
           if (
             userEntity == nullptr || userEntity->mMeshInstance == nullptr ||
-            userEntity->mMeshInstance->isHidden != 0u || oracleIds.count(id) != 0u
+            userEntity->mMeshInstance->isHidden != 0u || oracleIds.contains(id)
           ) {
             continue;
           }
-          if (orphans.count(id) != 0u) {
+          if (orphans.contains(id)) {
             ++orphanClient;
           } else {
             ++clientOnly;

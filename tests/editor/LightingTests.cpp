@@ -10,6 +10,7 @@
 #include <filesystem>
 #include <cstdlib>
 #include <cmath>
+#include <print>
 
 namespace
 {
@@ -58,8 +59,8 @@ namespace
   )
   {
     faf::editor::LightingState lighting;
-    std::string error;
-    ASSERT_TRUE(faf::editor::LightingFromScmlighting(kFafme, lighting, error)) << error;
+    auto read = faf::editor::LightingFromScmlighting(kFafme, lighting);
+    ASSERT_TRUE(read) << read.error();
     EXPECT_FLOAT_EQ(lighting.multiplier, 1.5f);
     EXPECT_FLOAT_EQ(lighting.sunDirection[0], 0.70710683f);
     EXPECT_FLOAT_EQ(lighting.sunColor[0], 1.2f);
@@ -76,13 +77,13 @@ namespace
   )
   {
     faf::editor::LightingState lighting;
-    std::string error;
-    ASSERT_TRUE(faf::editor::LightingFromScmlighting(kFafme, lighting, error)) << error;
+    auto read = faf::editor::LightingFromScmlighting(kFafme, lighting);
+    ASSERT_TRUE(read) << read.error();
     faf::editor::LightingState again;
-    ASSERT_TRUE(faf::editor::LightingFromScmlighting(faf::editor::LightingToScmlighting(lighting), again, error))
-      << error;
+    read = faf::editor::LightingFromScmlighting(faf::editor::LightingToScmlighting(lighting), again);
+    ASSERT_TRUE(read) << read.error();
     EXPECT_TRUE(again == lighting);
-    EXPECT_FALSE(faf::editor::LightingFromScmlighting("{ \"SurfaceColor\": 1 }", again, error));
+    EXPECT_FALSE(faf::editor::LightingFromScmlighting("{ \"SurfaceColor\": 1 }", again));
   }
   TEST(
     Lighting,
@@ -102,9 +103,9 @@ namespace
         continue;
       }
       const std::string bytes((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
-      faf::editor::LightingState lighting;
-      std::string error;
-      ASSERT_TRUE(faf::editor::LightingFromScmap(bytes, lighting, error)) << file << ": " << error;
+      const auto read = faf::editor::LightingFromScmap(bytes);
+      ASSERT_TRUE(read) << file << ": " << read.error();
+      const faf::editor::LightingState& lighting = *read;
       // A unit sun direction and a multiplier in the game's range: the read landed on the block.
       const float length = std::sqrt(
         lighting.sunDirection[0] * lighting.sunDirection[0] + lighting.sunDirection[1] * lighting.sunDirection[1] +
@@ -123,6 +124,6 @@ namespace
       ++maps;
     }
     EXPECT_GT(maps, 0);
-    std::printf("[ lighting ] %d retail maps' lighting read\n", maps);
+    std::println("[ lighting ] {} retail maps' lighting read", maps);
   }
 } // namespace

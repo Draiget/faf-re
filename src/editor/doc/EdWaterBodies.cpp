@@ -139,10 +139,12 @@ namespace faf::editor
   )
   {
     WaterBodiesRead read;
-    LuaText info;
-    if (!ReadLuaAssignment(scenario, "ScenarioInfo", info, read.error)) {
+    const auto assigned = ReadLuaAssignment(scenario, "ScenarioInfo");
+    if (!assigned) {
+      read.error = assigned.error();
       return read;
     }
+    const LuaText& info = *assigned;
     if (!info.isTable) {
       read.error = "ScenarioInfo is not a table";
       return read;
@@ -213,11 +215,11 @@ namespace faf::editor
     const std::vector<WaterBody>& bodies
   )
   {
-    LuaText info;
-    std::string error;
-    if (!ReadLuaAssignment(scenario, "ScenarioInfo", info, error) || !info.isTable) {
+    const auto assigned = ReadLuaAssignment(scenario, "ScenarioInfo");
+    if (!assigned || !assigned->isTable) {
       return scenario;
     }
+    const LuaText& info = *assigned;
     std::string out = scenario;
     if (const LuaText* const list = info.Field("WaterBodies"); list != nullptr) {
       const std::size_t key = out.rfind("WaterBodies", list->start);

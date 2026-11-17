@@ -77,7 +77,7 @@ namespace faf::editor
     (void)std::snprintf(mGridFilter, sizeof(mGridFilter), "%s", search.c_str());
     const std::string filter = LowerText(search);
     for (const EffectInfo& info : mEffects) {
-      if (LowerText(info.name).find(filter) != std::string::npos && OpenGameEmitter(info.path)) {
+      if (LowerText(info.name).contains(filter) && OpenGameEmitter(info.path)) {
         mBrowserPick = info.path;
         return;
       }
@@ -94,21 +94,18 @@ namespace faf::editor
     if (!ReadGameFile(info.path, text)) {
       return;
     }
-    EmitterBlueprint emitter;
-    std::string error;
-    if (ParseEmitter(text, emitter, error)) {
+    if (const auto emitter = ParseEmitter(text)) {
       info.type = 1;
-      info.texture = emitter.texture;
-      info.ramp = emitter.rampTexture;
-      info.blendMode = static_cast<int>(emitter.blendMode);
+      info.texture = emitter->texture;
+      info.ramp = emitter->rampTexture;
+      info.blendMode = static_cast<int>(emitter->blendMode);
       return;
     }
-    FlatBlueprint flat;
-    if (ParseFlatBlueprint(text, flat, error)) {
-      const bool beam = flat.kind == "BeamBlueprint";
+    if (const auto flat = ParseFlatBlueprint(text)) {
+      const bool beam = flat->kind == "BeamBlueprint";
       info.type = beam ? 2 : 3;
-      info.texture = flat.Text(beam ? "TextureName" : "RepeatTexture");
-      info.ramp = beam ? std::string() : flat.Text("RampTexture");
+      info.texture = flat->Text(beam ? "TextureName" : "RepeatTexture");
+      info.ramp = beam ? std::string() : flat->Text("RampTexture");
     }
   }
 
@@ -197,7 +194,7 @@ namespace faf::editor
         if (
           (mBrowseFaction != 0 && info.faction != mBrowseFaction) || (mBrowseKind != 0 && info.kind != mBrowseKind) ||
           (mBrowseType != 0 && info.read && info.type != mBrowseType) ||
-          (!filter.empty() && LowerText(info.name).find(filter) == std::string::npos)
+          (!filter.empty() && !LowerText(info.name).contains(filter))
         ) {
           continue;
         }

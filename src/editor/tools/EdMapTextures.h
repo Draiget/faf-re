@@ -4,6 +4,7 @@
 
 #include <array>
 #include <cstdint>
+#include <expected>
 #include <string>
 #include <vector>
 
@@ -66,18 +67,16 @@ namespace faf::editor
 
   /**
    * Makes the texture a target packs from the map's heights (`width` x `height` samples in game units, rows along z),
-   * `size` pixels square over the whole map: `rgba` holds size * size * 4 values 0..1, rows along z. False with `error`
-   * when an op fails.
+   * `size` pixels square over the whole map: size * size * 4 values 0..1 (RGBA), rows along z. The error when an op
+   * fails.
    */
-  bool MakeMapTexture(
+  [[nodiscard]] std::expected<std::vector<float>, std::string> MakeMapTexture(
     const std::vector<float>& heights,
     int width,
     int height,
     const MapTextureTarget& target,
     const MapTextureOptions& options,
-    int size,
-    std::vector<float>& rgba,
-    std::string& error
+    int size
   );
 
   /** The water's depth over the ground, 0 on land to 1 at the abyss (the lighting texture's red). */
@@ -133,7 +132,7 @@ namespace faf::editor
    * (0.6), plain rock (0.12) and the waterline (0.9) shine; rgb = 0.08 + shine * strength, alpha = 0.3 + 0.45 *
    * sharpness * shine.
    */
-  bool MakePaintTexture(
+  [[nodiscard]] std::expected<std::vector<float>, std::string> MakePaintTexture(
     const std::vector<float>& heights,
     int width,
     int height,
@@ -141,8 +140,6 @@ namespace faf::editor
     const MapTextureTarget& target,
     const MapTextureOptions& options,
     const MapPaintOptions& paintOptions,
-    int size,
-    std::vector<float>& rgba,
-    std::string& error
+    int size
   );
 } // namespace faf::editor

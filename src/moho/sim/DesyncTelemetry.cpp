@@ -17,7 +17,7 @@
 #include <vector>
 
 #if FAFRE_PLATFORM_WINDOWS
-#include <windows.h>
+#include <Windows.h>
 #include <winhttp.h>
 #else
 #include <cerrno>
@@ -125,11 +125,11 @@ namespace moho
     )
     {
       std::string rest;
-      if (url.compare(0, 7, "http://") == 0) {
+      if (url.starts_with("http://")) {
         rest = url.substr(7);
         out.mHttps = false;
         out.mPort = 80;
-      } else if (url.compare(0, 8, "https://") == 0) {
+      } else if (url.starts_with("https://")) {
         rest = url.substr(8);
         out.mHttps = true;
         out.mPort = 443;

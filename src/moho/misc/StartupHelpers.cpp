@@ -51,6 +51,7 @@
 #include "moho/core/ThreadPlacement.h"
 #include "moho/task/CTaskThread.h"
 #include "lua/LuaCrashDump.h"
+#include "platform/CacheFolder.h"
 
 extern int __argc;
 extern char** __argv;
@@ -3223,6 +3224,14 @@ fa::string moho::FILE_Dir(
   if (filename == nullptr || filename[0] == '\0') {
     ThrowStartupFileError("Moho::FILE_Dir", "Null argument.");
   }
+#if FAFRE_PLATFORM_POSIX
+  // Engine addition: a system path here starts with '/' and has no drive. The check below (0x00410D10) would refuse
+  // every one, InternalSaveGame's save path among them, and the end of this function would put the current drive,
+  // which POSIX does not have (_getdrive() is 0), before it. The Linux client, issue #255.
+  if (filename[0] == '/') {
+    return FILE_DirPrefix(filename);
+  }
+#endif
   if (filename[0] == '/' && filename[1] != ':' && filename[1] != '/') {
     ThrowStartupFileError("Moho::FILE_Dir", "System path expected, got local.");
   }
@@ -3492,11 +3501,14 @@ fa::string moho::USER_GetAppCacheDir()
   if (CFG_GetArgOption("/cachedir", 1u, &cacheDirArgs) && !cacheDirArgs.empty()) {
     cachePath = std::filesystem::path(cacheDirArgs[0].c_str());
   } else {
-    const fa::string appLocalDir = USER_GetAppLocalDataDir();
-    if (appLocalDir.empty()) {
+    // Retail's <local application data>\Gas Powered Games\Supreme Commander Forged Alliance\cache, the
+    // same folder USER_GetAppLocalDataDir names, below the system's cache root (platform/CacheFolder.h):
+    // that local data folder itself on Windows and Linux, ~/Library/Caches on macOS (engine addition, #269).
+    const std::filesystem::path cacheRoot = platform::CacheFolder();
+    if (cacheRoot.empty()) {
       return outDir;
     }
-    cachePath = std::filesystem::path(appLocalDir.c_str()) / "cache";
+    cachePath = cacheRoot / "Gas Powered Games" / "Supreme Commander Forged Alliance" / "cache";
   }
 
   std::error_code createDirectoryError;

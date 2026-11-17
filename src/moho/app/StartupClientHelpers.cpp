@@ -151,10 +151,10 @@ namespace
    */
   struct ResolutionLess
   {
-    [[nodiscard]] bool operator()(
+    [[nodiscard]] static bool operator()(
       const moho::Resolution& lhs,
       const moho::Resolution& rhs
-    ) const noexcept
+    ) noexcept
     {
       if (lhs.width != rhs.width) {
         return lhs.width < rhs.width;

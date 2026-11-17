@@ -230,8 +230,7 @@ namespace faf::editor
           args.p.num["scale"] = size;
           args.p.num["octaves"] = 5;
           field::Grid noise;
-          std::string error;
-          if (field::RunOpCpu("fractal", args, noise, error) && RecipePercentiles(noise.v, pct)) {
+          if (field::RunOpCpu("fractal", args, noise) && RecipePercentiles(noise.v, pct)) {
             found = noiseCache.emplace(key, pct).first;
           } else {
             for (int i = 0; i <= 100; ++i) {
@@ -510,6 +509,19 @@ namespace faf::editor
       {"layered", "Layered (soft wide blends)", kNoSnow},
       {"erosion", "Erosion paint (rock, sediment and channels from the water)", kNoSnow, false, false, false, true},
       {"coast", "Coast and wetland (wide beach, wet ground)", kNoSnow},
+      // Measured on the reference maps of each environment (FAF Studio's mapsets.lua Styles).
+      {"m_ancient_earth", "Environment: Ancient earth", kNoSnow, false, false, false},
+      {"m_crystalline", "Environment: Crystalline", kNoSnow, false, false, false},
+      {"m_desert", "Environment: Desert", kNoSnow, false, false, false},
+      {"m_evergreen", "Environment: Evergreen", 0, false, false, false},
+      {"m_evergreen2", "Environment: Evergreen 2", kNoSnow, false, false, false},
+      {"m_geothermal", "Environment: Geothermal", kNoSnow, false, false, false},
+      {"m_lava", "Environment: Lava", kNoSnow, false, false, true},
+      {"m_paradise", "Environment: Paradise", kNoSnow, false, false, false},
+      {"m_red_barrens", "Environment: Red barrens", kNoSnow, false, false, false},
+      {"m_swamp", "Environment: Swamp", kNoSnow, false, false, false},
+      {"m_tropical", "Environment: Tropical", kNoSnow, false, false, false},
+      {"m_tundra", "Environment: Tundra", 0, true, false, false},
     };
     return styles;
   }
@@ -540,6 +552,42 @@ namespace faf::editor
       k.soft = 0, k.edge = 0.012f, k.wear = 0.12f, k.sed = 0.22f, k.chan = 0.07f, k.rock = 26, k.cliff = 44, k.snow = 0;
     } else if (id == "coast") {
       k.beach = 6, k.wet = 3, k.dirt = 0.36f, k.snow = 0, k.rock = 38, k.cliff = 56, k.crisp = 0.3f;
+    } else if (id == "m_ancient_earth") {
+      k.beach = 12.0f, k.cliff = 35.0f, k.crisp = 0.37f, k.dark = 0.37f, k.dirt = 0.66f, k.high = 0.7f, k.rock = 21.0f,
+      k.snow = 0.0f, k.wet = 0.0f;
+    } else if (id == "m_crystalline") {
+      k.beach = 1.5f, k.cliff = 20.0f, k.crisp = 0.48f, k.dark = 1.0f, k.dirt = 0.13f, k.high = 0.52f, k.rock = 12.0f,
+      k.snow = 0.0f, k.wet = 8.0f;
+    } else if (id == "m_desert") {
+      k.beach = 12.0f, k.cliff = 28.5f, k.crisp = 0.49f, k.dark = 0.0f, k.dirt = 0.28f, k.high = 0.6f, k.rock = 13.0f,
+      k.snow = 0.0f, k.wet = 0.0f;
+    } else if (id == "m_evergreen") {
+      k.beach = 2.0f, k.cliff = 43.0f, k.crisp = 0.47f, k.dark = 0.0f, k.dirt = 0.12f, k.high = 0.62f, k.rock = 16.0f,
+      k.snow = 0.0f, k.wet = 0.0f;
+    } else if (id == "m_evergreen2") {
+      k.beach = 3.2f, k.cliff = 28.0f, k.crisp = 0.51f, k.dark = 0.0f, k.dirt = 0.38f, k.high = 0.65f, k.rock = 14.0f,
+      k.snow = 0.0f, k.wet = 0.0f;
+    } else if (id == "m_geothermal") {
+      k.beach = 2.0f, k.cliff = 22.0f, k.crisp = 0.34f, k.dark = 0.22f, k.dirt = 0.27f, k.high = 0.7f, k.rock = 12.0f,
+      k.snow = 0.0f, k.wet = 0.0f;
+    } else if (id == "m_lava") {
+      k.beach = 2.0f, k.cliff = 26.0f, k.crisp = 0.42f, k.dark = 0.72f, k.dirt = 0.24f, k.high = 0.62f, k.rock = 12.0f,
+      k.snow = 0.0f, k.wet = 0.0f;
+    } else if (id == "m_paradise") {
+      k.beach = 6.4f, k.cliff = 29.0f, k.crisp = 0.34f, k.dark = 0.0f, k.dirt = 0.29f, k.high = 0.64f, k.rock = 12.0f,
+      k.snow = 0.0f, k.wet = 0.0f;
+    } else if (id == "m_red_barrens") {
+      k.beach = 8.3f, k.cliff = 20.0f, k.crisp = 0.33f, k.dark = 0.47f, k.dirt = 0.47f, k.high = 0.65f, k.rock = 12.0f,
+      k.snow = 0.0f, k.wet = 0.0f;
+    } else if (id == "m_swamp") {
+      k.beach = 2.0f, k.cliff = 37.0f, k.crisp = 0.33f, k.dark = 0.0f, k.dirt = 0.44f, k.high = 0.72f, k.rock = 22.0f,
+      k.snow = 0.0f, k.wet = 0.0f;
+    } else if (id == "m_tropical") {
+      k.beach = 11.35f, k.cliff = 35.0f, k.crisp = 0.47f, k.dark = 0.0f, k.dirt = 0.1f, k.high = 0.56f, k.rock = 19.0f,
+      k.snow = 0.0f, k.wet = 0.0f;
+    } else if (id == "m_tundra") {
+      k.beach = 9.5f, k.cliff = 35.0f, k.crisp = 0.56f, k.dark = 0.4f, k.dirt = 0.06f, k.rock = 12.0f, k.snow = 0.45f,
+      k.wet = 1.4f;
     }
     return k;
   }
@@ -708,19 +756,16 @@ namespace faf::editor
     return "Not used";
   }
 
-  bool RecipeRoles(
+  std::expected<std::vector<RecipeRole>, std::string> RecipeRoles(
     MaskGenContext& context,
     const RecipePlan& plan,
     const RecipeStats& stats,
     const RecipeKnobs& knobs,
-    const int style,
-    std::vector<RecipeRole>& roles,
-    std::string& error
+    const int style
   )
   {
     if (context.heights == nullptr) {
-      error = "no heights";
-      return false;
+      return std::unexpected("no heights");
     }
     static std::map<std::string, std::array<float, 101>> noiseCache;
     if (noiseCache.size() > 60) {
@@ -729,7 +774,7 @@ namespace faf::editor
     const RecipeStyle& look =
       RecipeStyles()[static_cast<std::size_t>(std::clamp(style, 0, static_cast<int>(RecipeStyles().size()) - 1))];
     Builder builder{context, plan, stats, knobs, look, noiseCache};
-    roles.clear();
+    std::vector<RecipeRole> roles;
     for (const GroundKind kind : RecipeOrder()) {
       RecipeRole role;
       role.kind = kind;
@@ -738,7 +783,7 @@ namespace faf::editor
       role.off = !role.base && (!on || (look.off & (1u << K(kind))) != 0);
       roles.push_back(std::move(role));
     }
-    return true;
+    return roles;
   }
 
   float RecipeValueAbove(
@@ -769,14 +814,13 @@ namespace faf::editor
       return t * t * (3.0f - 2.0f * t);
     }
 
-    /** One field op on the heights' grid; false with `error`. */
-    bool Run(
+    /** One field op on the heights' grid; the error when it fails. */
+    std::expected<void, std::string> Run(
       const char* const name,
       const std::shared_ptr<field::Grid>& a,
       std::initializer_list<std::pair<const char*, double>> numbers,
       std::initializer_list<std::pair<const char*, const char*>> strings,
-      std::vector<float>& out,
-      std::string& error
+      std::vector<float>& out
     )
     {
       field::OpArgs args;
@@ -788,12 +832,11 @@ namespace faf::editor
         args.p.str[key] = value;
       }
       field::Grid result;
-      if (!field::RunOpCpu(name, args, result, error)) {
-        error = std::string(name) + ": " + error;
-        return false;
+      if (const auto ran = field::RunOpCpu(name, args, result); !ran) {
+        return std::unexpected(std::string(name) + ": " + ran.error());
       }
       out = std::move(result.v);
-      return true;
+      return {};
     }
 
     void Normalize(
@@ -837,19 +880,17 @@ namespace faf::editor
     }
   } // namespace
 
-  bool RecipeErosionSelections(
+  std::expected<void, std::string> RecipeErosionSelections(
     MaskGenContext& context,
     const RecipePlan& plan,
     const RecipeKnobs& knobs,
     std::array<std::vector<float>, 9>& selection,
-    std::map<std::pair<int, int>, std::vector<float>>& variants,
-    std::string& error
+    std::map<std::pair<int, int>, std::vector<float>>& variants
   )
   {
     const std::shared_ptr<field::Grid>& h = context.heights;
     if (h == nullptr || h->v.empty()) {
-      error = "no heights";
-      return false;
+      return std::unexpected("no heights");
     }
     const std::size_t n = h->v.size();
     // The three masks from the heights.
@@ -858,11 +899,18 @@ namespace faf::editor
     std::vector<float> wetness;
     std::vector<float> slope;
     if (
-      !Run("flow", h, {}, {}, flow, error) || !Run("rockiness", h, {}, {}, wear, error) ||
-      !Run("wetness", h, {}, {}, wetness, error) ||
-      !Run("slope", h, {{"radius", 1}}, {{"mode", "degrees"}}, slope, error)
+      auto ran = Run("flow", h, {}, {}, flow)
+                   .and_then([&] {
+      return Run("rockiness", h, {}, {}, wear);
+    })
+                   .and_then([&] {
+      return Run("wetness", h, {}, {}, wetness);
+    }).and_then([&] {
+      return Run("slope", h, {{"radius", 1}}, {{"mode", "degrees"}}, slope);
+    });
+      !ran
     ) {
-      return false;
+      return ran;
     }
     Normalize(flow);
     Normalize(wear);
@@ -896,8 +944,8 @@ namespace faf::editor
       select(GroundKind::Rock, std::move(rock));
       variants[key(GroundKind::Rock, 1)] = BandAt(wear, knobs.wear * 0.35f, knobs.edge);
       std::vector<float> curvature;
-      if (!Run("curvature", h, {{"radius", 4}, {"gain", 25}}, {}, curvature, error)) {
-        return false;
+      if (auto ran = Run("curvature", h, {{"radius", 4}, {"gain", 25}}, {}, curvature); !ran) {
+        return ran;
       }
       std::vector<float> convex(n);
       for (std::size_t i = 0; i < n; ++i) {
@@ -922,15 +970,15 @@ namespace faf::editor
     }
     // The open ground's second texture: the ridge tops, higher than their surroundings.
     std::vector<float> blurred;
-    if (!Run("blur", h, {{"radius", 24}}, {}, blurred, error)) {
-      return false;
+    if (auto ran = Run("blur", h, {{"radius", 24}}, {}, blurred); !ran) {
+      return ran;
     }
     std::vector<float> relief(n);
     for (std::size_t i = 0; i < n; ++i) {
       relief[i] = h->v[i] - blurred[i];
     }
     variants[key(GroundKind::Grass, 1)] = BandAt(relief, 0.2f, knobs.edge);
-    return true;
+    return {};
   }
 
   const std::vector<const char*>& RecipeKnobKeys()
@@ -971,7 +1019,8 @@ namespace faf::editor
   {
     std::array<std::vector<float>, 9> selection;
     std::map<std::pair<int, int>, std::vector<float>> variants;
-    if (!RecipeSelections(context, plan, roles, knobs, style, selection, variants, error)) {
+    if (const auto selected = RecipeSelections(context, plan, roles, knobs, style, selection, variants); !selected) {
+      error = selected.error();
       return false;
     }
     std::array<bool, 9> cleared{};
@@ -981,15 +1030,14 @@ namespace faf::editor
     return ResolveSelections(context, plan, selection, variants, cleared, knobs, target, error);
   }
 
-  bool RecipeSelections(
+  std::expected<void, std::string> RecipeSelections(
     MaskGenContext& context,
     const RecipePlan& plan,
     const std::vector<RecipeRole>& roles,
     const RecipeKnobs& knobs,
     const int style,
     std::array<std::vector<float>, 9>& selection,
-    std::map<std::pair<int, int>, std::vector<float>>& variants,
-    std::string& error
+    std::map<std::pair<int, int>, std::vector<float>>& variants
   )
   {
     const bool erosion = style >= 0 && style < static_cast<int>(RecipeStyles().size()) &&
@@ -1004,28 +1052,29 @@ namespace faf::editor
         continue;
       }
       field::Grid mask;
-      if (!EvaluateMaskRules(context, role.rules, mask, error)) {
-        error = std::string(RecipeKindLabel(role.kind)) + ": " + error;
-        return false;
+      if (const auto made = EvaluateMaskRules(context, role.rules, mask); !made) {
+        return std::unexpected(std::string(RecipeKindLabel(role.kind)) + ": " + made.error());
       }
       // A kind on a layer the B shaders draw from the side (3, 4) only gets steep ground.
       if (plan.biplanar && std::any_of(layers.begin(), layers.end(), [](const int l) {
         return l == 3 || l == 4;
       })) {
         field::Grid gate;
-        if (!EvaluateMaskRules(
-              context,
-              {[] {
+        if (
+          auto made = EvaluateMaskRules(
+            context,
+            {[] {
           MaskGenRule r = NewMaskRule("slope");
           r.v["lo"] = 24;
           r.v["hi"] = 90;
           r.v["soft"] = 12;
           return r;
         }()},
-              gate,
-              error
-            )) {
-          return false;
+            gate
+          );
+          !made
+        ) {
+          return made;
         }
         for (std::size_t i = 0; i < n && i < mask.v.size(); ++i) {
           mask.v[i] *= gate.v[i];
@@ -1034,11 +1083,12 @@ namespace faf::editor
       selection[K(role.kind)] = std::move(mask.v);
     }
     // Erosion paint: rock, dirt and wet ground (and the bands of their second layers) from what the water did.
-    if (erosion && !RecipeErosionSelections(context, plan, knobs, selection, variants, error)) {
-      error = "erosion paint: " + error;
-      return false;
+    if (erosion) {
+      if (const auto eroded = RecipeErosionSelections(context, plan, knobs, selection, variants); !eroded) {
+        return std::unexpected("erosion paint: " + eroded.error());
+      }
     }
-    return true;
+    return {};
   }
 
   bool ResolveSelections(
@@ -1108,9 +1158,13 @@ namespace faf::editor
         RecipePlan noPlan;
         Builder b{context, noPlan, none, knobs, look, cache};
         field::Grid patch;
-        if (!EvaluateMaskRules(
-              context, {b.Mix(seed, size, 0.3f, 0.85f), Builder::AtMost(knobs.mix), Builder::Blur(3)}, patch, error
-            )) {
+        if (
+          const auto made = EvaluateMaskRules(
+            context, {b.Mix(seed, size, 0.3f, 0.85f), Builder::AtMost(knobs.mix), Builder::Blur(3)}, patch
+          );
+          !made
+        ) {
+          error = made.error();
           return false;
         }
         field::Grid t = empty();
@@ -1130,7 +1184,7 @@ namespace faf::editor
         continue;
       }
       for (const int layer : plan.byKind[K(kind)]) {
-        if (layer >= 1 && target.count(layer) == 0) {
+        if (layer >= 1 && !target.contains(layer)) {
           target[layer] = empty();
         }
       }
@@ -1142,8 +1196,10 @@ namespace faf::editor
         args.in["a"] = std::make_shared<field::Grid>(weight);
         args.p.num["radius"] = knobs.soft;
         field::Grid blurred;
-        if (field::RunOpCpu("blur", args, blurred, error)) {
+        if (const auto ran = field::RunOpCpu("blur", args, blurred)) {
           weight = std::move(blurred);
+        } else {
+          error = ran.error();
         }
       }
     }

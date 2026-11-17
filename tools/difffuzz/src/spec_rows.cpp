@@ -14,23 +14,20 @@ namespace difffuzz
   {
     using u32 = std::uint32_t;
 
-    bool ReadSpec(
-      const char* path,
-      File& out,
-      std::string& error
+    std::expected<File, std::string> ReadSpec(
+      const char* path
     )
     {
+      File out;
       std::FILE* f = std::fopen(path, "rb");
       if (f == nullptr) {
-        error = "cannot open the file";
-        return false;
+        return std::unexpected("cannot open the file");
       }
       char magic[4] = {};
       u32 count = 0;
       if (std::fread(magic, 1, 4, f) != 4 || std::memcmp(magic, "RRS1", 4) != 0 || std::fread(&count, 4, 1, f) != 1) {
         std::fclose(f);
-        error = "not an RRS1 file (run tools/retail-recorder/spec.py)";
-        return false;
+        return std::unexpected("not an RRS1 file (run tools/retail-recorder/spec.py)");
       }
       out.entries.resize(count);
       for (u32 i = 0; i < count; ++i) {
@@ -38,8 +35,7 @@ namespace difffuzz
         std::uint8_t rec[9];
         if (std::fread(rec, 1, 9, f) != 9) {
           std::fclose(f);
-          error = "truncated entry header";
-          return false;
+          return std::unexpected("truncated entry header");
         }
         std::memcpy(&e.va, rec, 4);
         std::memcpy(&e.pop, rec + 4, 2);
@@ -49,13 +45,12 @@ namespace difffuzz
         for (Arg& a : e.args) {
           if (std::fread(&a, 1, 4, f) != 4) {
             std::fclose(f);
-            error = "truncated argument record";
-            return false;
+            return std::unexpected("truncated argument record");
           }
         }
       }
       std::fclose(f);
-      return true;
+      return out;
     }
 
     void SelectValueRows(

@@ -1529,11 +1529,10 @@ namespace faf::editor::field::erosion
       return Grid(like.w, like.h, like.cell, like.ox, like.oz);
     }
 
-    bool Emit(
+    std::expected<void, std::string> Emit(
       const OpArgs& a,
       Results& r,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
       const std::string which = a.p.S("output", "height");
@@ -1568,26 +1567,22 @@ namespace faf::editor::field::erosion
       else if (which == "sediment")
         out = std::move(r.sediment);
       else {
-        err = "unknown output '" + which + "' (height wear deposit flow water sediment)";
-        return false;
+        return std::unexpected("unknown output '" + which + "' (height wear deposit flow water sediment)");
       }
-      return true;
+      return {};
     }
 
-    const Grid* NeedA(
-      const OpArgs& a,
-      std::string& err
+    std::expected<const Grid*, std::string> NeedA(
+      const OpArgs& a
     )
     {
       const auto it = a.in.find("a");
       if (it == a.in.end()) {
-        err = "missing input 'a'";
-        return nullptr;
+        return std::unexpected("missing input 'a'");
       }
       const auto m = a.in.find("mask");
       if (m != a.in.end() && !m->second->SameShape(*it->second)) {
-        err = "the mask differs in size";
-        return nullptr;
+        return std::unexpected("the mask differs in size");
       }
       return it->second.get();
     }
@@ -1793,15 +1788,15 @@ namespace faf::editor::field::erosion
       return p;
     }
 
-    bool OpHydraulic(
+    std::expected<void, std::string> OpHydraulic(
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
-      const Grid* src = NeedA(a, err);
-      if (src == nullptr)
-        return false;
+      const auto need = NeedA(a);
+      if (!need)
+        return std::unexpected(need.error());
+      const Grid* src = *need;
       const HydroParams p = HydroOf(a);
       HydroState st;
       st.Allocate(src->w, src->h, src->cell);
@@ -1840,18 +1835,18 @@ namespace faf::editor::field::erosion
       r.water.v = st.d;
       r.sediment = Shaped(*src);
       r.sediment.v = st.s;
-      return Emit(a, r, out, err);
+      return Emit(a, r, out);
     }
 
-    bool OpDroplet(
+    std::expected<void, std::string> OpDroplet(
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
-      const Grid* src = NeedA(a, err);
-      if (src == nullptr)
-        return false;
+      const auto need = NeedA(a);
+      if (!need)
+        return std::unexpected(need.error());
+      const Grid* src = *need;
       DropParams p = DropletParamsOf(a);
       Factors fac;
       BuildFactors(a, *src, fac);
@@ -1894,18 +1889,18 @@ namespace faf::editor::field::erosion
           );
       }
       PostProcess(a, src->v, r.height.v, &r.deposit.v, &r.wear.v);
-      return Emit(a, r, out, err);
+      return Emit(a, r, out);
     }
 
-    bool OpStream(
+    std::expected<void, std::string> OpStream(
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
-      const Grid* src = NeedA(a, err);
-      if (src == nullptr)
-        return false;
+      const auto need = NeedA(a);
+      if (!need)
+        return std::unexpected(need.error());
+      const Grid* src = *need;
       StreamParams p;
       p.iterations = std::max(0, std::min(1000, static_cast<int>(a.p.N("iterations", p.iterations))));
       p.k = static_cast<float>(a.p.N("k", p.k));
@@ -1947,7 +1942,7 @@ namespace faf::editor::field::erosion
       if (area.size() == r.flow.v.size())
         r.flow.v = area;
       PostProcess(a, src->v, r.height.v, &r.deposit.v, &r.wear.v);
-      return Emit(a, r, out, err);
+      return Emit(a, r, out);
     }
 
     /**
@@ -1956,16 +1951,14 @@ namespace faf::editor::field::erosion
      * lowest area, row 1 = mean S, row 2 = number of cells. Eroded terrain follows S ~ A^-theta with theta around 0.45
      * (Flint's law) in the channel range; noise terrain has theta near 0.
      */
-    bool OpSlopeArea(
+    std::expected<void, std::string> OpSlopeArea(
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
       const auto it = a.in.find("a");
       if (it == a.in.end()) {
-        err = "missing input 'a'";
-        return false;
+        return std::unexpected("missing input 'a'");
       }
       const Grid& src = *it->second;
       const int bins = std::max(2, std::min(24, static_cast<int>(a.p.N("bins", 12))));
@@ -1992,21 +1985,19 @@ namespace faf::editor::field::erosion
           : 0.0f;
         out.At(b, 2) = static_cast<float>(cnt[static_cast<std::size_t>(b)]);
       }
-      return true;
+      return {};
     }
 
     /** Depth of the closed depressions: the pit filled surface minus the terrain (0 on ground that drains). A quality
      * statistic and a mask source (lakes). */
-    bool OpBasinDepth(
+    std::expected<void, std::string> OpBasinDepth(
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
       const auto it = a.in.find("a");
       if (it == a.in.end()) {
-        err = "missing input 'a'";
-        return false;
+        return std::unexpected("missing input 'a'");
       }
       const Grid& src = *it->second;
       std::vector<float> fill;
@@ -2014,7 +2005,7 @@ namespace faf::editor::field::erosion
       out = Grid(src.w, src.h, src.cell, src.ox, src.oz);
       for (std::size_t i = 0; i < fill.size(); ++i)
         out.v[i] = fill[i] - src.v[i];
-      return true;
+      return {};
     }
 
     struct Registrar
@@ -2087,13 +2078,12 @@ namespace faf::editor::field::erosion
     out.accept = f.accept;
   }
 
-  bool FinishHydroOp(
+  std::expected<void, std::string> FinishHydroOp(
     const OpArgs& a,
     const Grid& src,
     const HydroParams& p,
     HydroState& st,
-    Grid& out,
-    std::string& err
+    Grid& out
   )
   {
     const std::size_t n = src.v.size();
@@ -2126,18 +2116,17 @@ namespace faf::editor::field::erosion
     r.water.v = st.d;
     r.sediment = Shaped(src);
     r.sediment.v = st.s;
-    return Emit(a, r, out, err);
+    return Emit(a, r, out);
   }
 
-  bool FinishDropletOp(
+  std::expected<void, std::string> FinishDropletOp(
     const OpArgs& a,
     const Grid& src,
     std::vector<float>& height,
     std::vector<float>& wear,
     std::vector<float>& deposit,
     std::vector<float>& flow,
-    Grid& out,
-    std::string& err
+    Grid& out
   )
   {
     const std::size_t n = src.v.size();
@@ -2157,7 +2146,7 @@ namespace faf::editor::field::erosion
     r.flow.v = flow;
     r.water = Shaped(src);
     r.sediment = Shaped(src);
-    return Emit(a, r, out, err);
+    return Emit(a, r, out);
   }
 
   void FillSteeringSurface(

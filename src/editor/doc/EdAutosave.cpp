@@ -141,21 +141,18 @@ namespace faf::editor
     return backups;
   }
 
-  bool BackupMapFolder(
+  std::expected<std::filesystem::path, std::string> BackupMapFolder(
     const std::filesystem::path& folder,
     const std::filesystem::path& root,
-    const int keep,
-    std::filesystem::path& made,
-    std::string& error
+    const int keep
   )
   {
     const std::vector<std::filesystem::path> files = MapFolderFiles(folder);
     if (files.empty()) {
-      error = "no map files in " + folder.string();
-      return false;
+      return std::unexpected("no map files in " + folder.string());
     }
     const std::filesystem::path mapRoot = root / folder.filename();
-    made = mapRoot / Stamp();
+    const std::filesystem::path made = mapRoot / Stamp();
     std::error_code code;
     std::filesystem::create_directories(made, code);
     for (const std::filesystem::path& file : files) {
@@ -166,8 +163,7 @@ namespace faf::editor
       }
     }
     if (code) {
-      error = "the backup into " + made.string() + " failed: " + code.message();
-      return false;
+      return std::unexpected("the backup into " + made.string() + " failed: " + code.message());
     }
     // The newest `keep` of this map's backups stay.
     std::vector<std::filesystem::path> backups;
@@ -180,34 +176,35 @@ namespace faf::editor
       std::error_code ignored;
       std::filesystem::remove_all(old, ignored);
     }
-    return true;
+    return made;
   }
 
-  bool RestoreAutosave(
+  std::expected<std::filesystem::path, std::string> RestoreAutosave(
     const EdAutosaveEntry& entry,
     const std::filesystem::path& backupRoot,
-    const int keep,
-    std::filesystem::path& backup,
-    std::string& error
+    const int keep
   )
   {
-    if (!BackupMapFolder(entry.disk, backupRoot, keep, backup, error)) {
-      return false;
+    const std::expected<std::filesystem::path, std::string> made = BackupMapFolder(entry.disk, backupRoot, keep);
+    if (!made) {
+      return made;
     }
+    const std::filesystem::path& backup = *made;
     std::error_code code;
     for (const std::filesystem::path& file : MapFolderFiles(entry.folder)) {
       std::filesystem::copy_file(
         file, entry.disk / file.filename(), std::filesystem::copy_options::overwrite_existing, code
       );
       if (code) {
-        error = "copying " + file.filename().string() + " back failed: " + code.message() +
+        return std::unexpected(
+          "copying " + file.filename().string() + " back failed: " + code.message() +
           " (the map's files before "
           "are in " +
-          backup.string() + ")";
-        return false;
+          backup.string() + ")"
+        );
       }
     }
-    return true;
+    return backup;
   }
 
   void RemoveAutosave(

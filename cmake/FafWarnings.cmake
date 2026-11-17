@@ -10,7 +10,7 @@
 # vtable the binary's layout fixes.
 #
 # Not -Wall here: clang-cl reads it as -Weverything. /W3 turns on the same set on
-# Windows, and cmake/FafLinux.cmake adds -Wall for the GNU driver.
+# Windows, and cmake/FafPosix.cmake adds -Wall for the GNU driver.
 
 set(FAF_WARNING_OPTIONS
   -Wextra

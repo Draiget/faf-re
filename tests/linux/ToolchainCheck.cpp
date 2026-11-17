@@ -1,57 +1,52 @@
-// Engine addition (dedicated-server plan WPL.2): checks that the Linux toolchain
-// builds code the way the engine's simulation needs, and prints the facts later
-// work depends on (data model, default floating-point environment). The Android
-// toolchains build it too; on arm64 the floating-point environment is FPCR.
+// Engine addition (dedicated-server plan WPL.2): checks that the Linux, macOS and Android
+// toolchains build code the way the engine's simulation needs, and prints the facts later work
+// depends on (data model, default floating-point environment).
 
 #include <gtest/gtest.h>
 
 #include <cfloat>
+#include <cmath>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <format>
+#include <limits>
+#include <print>
 #include <stdexcept>
 #include <string>
 #include <thread>
 #include <vector>
 
+#include "platform/FpControl.h"
+
 namespace
 {
-#if defined(__aarch64__)
-  std::uint64_t ReadFpcr()
-  {
-    std::uint64_t fpcr = 0;
-    __asm__ __volatile__("mrs %0, fpcr" : "=r"(fpcr));
-    return fpcr;
-  }
-
-  void PrintFloatingPointEnvironment(
-    const char* const thread
-  )
-  {
-    std::printf("%s fpcr=0x%08llX\n", thread, static_cast<unsigned long long>(ReadFpcr()));
-  }
-#else
+#if FAFRE_ARCH_X64
   std::uint16_t ReadX87ControlWord()
   {
     std::uint16_t cw = 0;
     __asm__ __volatile__("fnstcw %0" : "=m"(cw));
     return cw;
   }
+#endif
 
-  std::uint32_t ReadMxcsr()
+  // The thread's floating-point control state, printed.
+  std::string FloatingPointControl()
   {
-    std::uint32_t mxcsr = 0;
-    __asm__ __volatile__("stmxcsr %0" : "=m"(mxcsr));
-    return mxcsr;
+#if FAFRE_ARCH_X64
+    return std::format("fcw=0x{:04X} mxcsr=0x{:08X}", ReadX87ControlWord(), platform::ReadMxcsr());
+#else
+    return std::format("fpcr=0x{:08X}", platform::ReadFpcr());
+#endif
   }
 
-  void PrintFloatingPointEnvironment(
-    const char* const thread
+  // Out of line, so the conversion happens at run time on the value passed.
+  [[gnu::noinline]] int ToInt(
+    const float value
   )
   {
-    std::printf("%s fcw=0x%04X mxcsr=0x%08X\n", thread, ReadX87ControlWord(), ReadMxcsr());
+    return static_cast<int>(value);
   }
-#endif
 
   // Kept out of line so the compiler sees a*b+c as one expression it could
   // contract; with -ffp-contract=off it must round the product first.
@@ -124,7 +119,7 @@ TEST(
 {
   std::vector<std::string> fromThread;
   std::thread worker([&fromThread] {
-    PrintFloatingPointEnvironment("worker thread:");
+    std::println("worker thread: {}", FloatingPointControl());
     fromThread.emplace_back("worker");
   });
   worker.join();
@@ -136,11 +131,66 @@ TEST(
   NoFtzOrDazByDefault
 )
 {
-  PrintFloatingPointEnvironment("main thread:  ");
-#if defined(__aarch64__)
-  // FPCR.RMode (22-23) round to nearest, FZ (24) and DN (25) clear.
-  EXPECT_EQ(ReadFpcr() & 0x03C00000u, 0u);
+  std::println("main thread:   {}", FloatingPointControl());
+#if FAFRE_ARCH_X64
+  EXPECT_EQ(platform::ReadMxcsr() & 0x8040u, 0u);
 #else
-  EXPECT_EQ(ReadMxcsr() & 0x8040u, 0u);
+  EXPECT_EQ(platform::ReadFpcr(), platform::kSimFpcr);
 #endif
+}
+
+#if FAFRE_PLATFORM_MACOS_ARM64
+// A new thread starts at FPCR 0 even when its creator runs with flush-to-zero (FPCR.FZ, bit 24)
+// and default NaN (bit 25): the kernel gives it the default, not the creator's value. The engine
+// relies on it instead of wrapping thread creation (platform/FpControl.h).
+TEST(
+  LinuxToolchain,
+  NewThreadStartsAtDefaultFpcr
+)
+{
+  const std::uint64_t saved = platform::ReadFpcr();
+  platform::WriteFpcr(saved | (1ull << 24) | (1ull << 25));
+  std::uint64_t seen = ~0ull;
+  std::thread worker([&seen] {
+    seen = platform::ReadFpcr();
+  });
+  worker.join();
+  platform::WriteFpcr(saved);
+  EXPECT_EQ(seen, platform::kSimFpcr);
+}
+#elif FAFRE_ARCH_ARM64
+// Linux (Android) gives a new thread its creator's FPCR, as POSIX's pthread_create gives it the
+// creator's floating-point environment. The engine's threads start at 0 because the threads that
+// start them run at 0 (the main thread from platform/posix/FpEnvPosix.cpp), and every simulation
+// thread loads it again (platform/FpControl.h).
+TEST(
+  LinuxToolchain,
+  NewThreadInheritsFpcr
+)
+{
+  const std::uint64_t saved = platform::ReadFpcr();
+  const std::uint64_t creator = saved | (1ull << 24) | (1ull << 25);
+  platform::WriteFpcr(creator);
+  std::uint64_t seen = 0;
+  std::thread worker([&seen] {
+    seen = platform::ReadFpcr();
+  });
+  worker.join();
+  platform::WriteFpcr(saved);
+  EXPECT_EQ(seen, creator);
+}
+#endif
+
+// Float-to-int conversions that are out of range saturate, and NaN gives 0, with
+// -fno-strict-float-cast-overflow on every target (the x86-64 build's cvttss2si sequence and
+// ARM64's fcvtzs agree): code that needs the x87's 0x80000000 calls fa::TruncateToInt.
+TEST(
+  LinuxToolchain,
+  FloatToIntSaturates
+)
+{
+  EXPECT_EQ(ToInt(std::numeric_limits<float>::quiet_NaN()), 0);
+  EXPECT_EQ(ToInt(3.0e9f), std::numeric_limits<int>::max());
+  EXPECT_EQ(ToInt(-3.0e9f), std::numeric_limits<int>::min());
+  EXPECT_EQ(ToInt(-1.5f), -1);
 }

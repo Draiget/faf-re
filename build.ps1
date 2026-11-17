@@ -12,12 +12,17 @@
   its .pdb, the fafengine\ hook folder and the DXC DLLs (dxcompiler.dll, dxil.dll) that
   Direct3D 12 and Vulkan need. The build output stays in build\<preset>\src.
 
+  Test builds (-Name, or a Profile build) never go to <FafDir>: they go to <TestDir>\bin_x64
+  (or bin), a folder laid out like the FAF data folder (fa_path.lua, gamedata and user linked
+  to the real ones, init files and DLLs copied), so they run the same way. Each test copy
+  deletes test builds there older than -KeepDays days.
+
 .EXAMPLE
   .\build.ps1                       # x64 Release, copied to C:\ProgramData\FAForever\bin_x64
 .EXAMPLE
   .\build.ps1 -Arch both            # x64 and x86
 .EXAMPLE
-  .\build.ps1 -Arch x86 -Name main_test    # x86, copied to bin\ as main_test.exe
+  .\build.ps1 -Arch x86 -Name main_test    # x86, copied to <TestDir>\bin\ as main_test.exe
 .EXAMPLE
   .\build.ps1 -NoBuild              # copy the last build only
 .EXAMPLE
@@ -43,6 +48,14 @@ param(
 
   # FAF data folder that holds bin\ and bin_x64\.
   [string]$FafDir = 'C:\ProgramData\FAForever',
+
+  # Where test builds (-Name, Profile) go, never the FAF data folder: the system drive has no
+  # room for hundreds of exe/pdb pairs. Laid out like FafDir so init_faf.lua finds
+  # ../fa_path.lua, ../gamedata and ../user from it. Default: FAF_TESTBIN_DIR, else tmp\testbin.
+  [string]$TestDir = $(if ($env:FAF_TESTBIN_DIR) { $env:FAF_TESTBIN_DIR } else { Join-Path $PSScriptRoot 'tmp\testbin' }),
+
+  # Test builds (exe/pdb) in TestDir older than this many days are deleted at each test copy.
+  [int]$KeepDays = 3,
 
   # Also copy the build into out\<arch>\ (the test-build folder).
   [switch]$Out,
@@ -131,6 +144,54 @@ function Invoke-Build([hashtable]$t) {
   finally { Pop-Location }
 }
 
+function Test-IsTestBuild { return [bool]$Name -or $Configuration -eq 'Profile' }
+
+# The run folder for this build: FafDir for the playable exe, TestDir for test builds.
+function Get-RunDir([hashtable]$t) {
+  if (Test-IsTestBuild) { return Join-Path $TestDir $t.RunDir }
+  return Join-Path $FafDir $t.RunDir
+}
+
+# Lays out TestDir like FafDir: fa_path.lua (rewritten by the FAF client at every launch, so
+# copied each time), gamedata and user as junctions to the real ones, and the run folder's
+# init files, DLLs, fonts and texts. Then deletes test builds older than KeepDays.
+function Initialize-TestDir([hashtable]$t) {
+  $runDir = Join-Path $TestDir $t.RunDir
+  New-Item -ItemType Directory -Force -Path $runDir | Out-Null
+  $faPath = Join-Path $FafDir 'fa_path.lua'
+  if (Test-Path $faPath) { Copy-Item $faPath (Join-Path $TestDir 'fa_path.lua') -Force }
+  foreach ($sub in @('gamedata', 'user')) {
+    $link = Join-Path $TestDir $sub
+    $target = Join-Path $FafDir $sub
+    if ((Test-Path $target) -and -not (Test-Path $link)) {
+      New-Item -ItemType Junction -Path $link -Target $target | Out-Null
+    }
+  }
+  # A test x64 exe looks up featured-mod init files in the sibling bin folder (issue #379).
+  foreach ($rd in @($t.RunDir, 'bin') | Select-Object -Unique) {
+    $from = Join-Path $FafDir $rd
+    $to = Join-Path $TestDir $rd
+    if (-not (Test-Path $from)) { continue }
+    New-Item -ItemType Directory -Force -Path $to | Out-Null
+    Get-ChildItem $from -File -Force | Where-Object { $_.Extension -in '.lua', '.dll', '.ttf', '.txt', '.key' } |
+      ForEach-Object {
+        $dest = Join-Path $to $_.Name
+        if (-not (Test-Path $dest) -or (Get-Item $dest).LastWriteTimeUtc -lt $_.LastWriteTimeUtc) {
+          try { Copy-Item $_.FullName $dest -Force } catch { Write-Warning "$dest not replaced (in use?)." }
+        }
+      }
+  }
+  if ($KeepDays -gt 0) {
+    $cut = (Get-Date).AddDays(-$KeepDays)
+    $old = Get-ChildItem $runDir -File -Force | Where-Object { $_.Extension -in '.exe', '.pdb' -and $_.LastWriteTime -lt $cut }
+    foreach ($f in $old) {
+      try { Remove-Item -LiteralPath $f.FullName -Force -ErrorAction Stop; Write-Host "   pruned $($f.Name)" }
+      catch { Write-Warning "$($f.FullName) not deleted (in use?)." }
+    }
+  }
+  return $runDir
+}
+
 function Copy-Build([hashtable]$t, [string]$destDir, [string]$exeName) {
   $src = Join-Path $repo "build\$($t.Preset)\src"
   $exe = Join-Path $src "$($t.Exe).exe"
@@ -214,14 +275,16 @@ foreach ($a in $archs) {
   if (-not $NoBuild) { Invoke-Build $t }
   if ($NoCopy) { continue }
 
+  $runDir = if (Test-IsTestBuild) { Initialize-TestDir $t } else { Join-Path $FafDir $t.RunDir }
+
   if ($Editor) {
     if ($Name) { Write-Warning "-Name names the game's exe; -Editor copies only the editor, under its own name." }
-    Copy-Editor $t (Join-Path $FafDir $t.RunDir)
+    Copy-Editor $t $runDir
     if ($Out) { Copy-Editor $t (Join-Path $repo "out\$a") }
     continue
   }
 
-  Copy-Build $t (Join-Path $FafDir $t.RunDir) (Get-RunName $a $t)
+  Copy-Build $t $runDir (Get-RunName $a $t)
   if ($Out) { Copy-Build $t (Join-Path $repo "out\$a") $t.Exe }
 }
 
@@ -231,12 +294,12 @@ foreach ($a in $archs) {
   if ($NoCopy) { break }
   if ($Editor) {
     Write-Host "Run the map editor ($a):" -ForegroundColor Cyan
-    Write-Host "  cd $(Join-Path $FafDir $t.RunDir)"
+    Write-Host "  cd $(Get-RunDir $t)"
     Write-Host "  .\$($t.Editor).exe /init init_faf.lua /log $(Join-Path $FafDir "logs\$($t.Editor).log")"
     continue
   }
   $exeName = Get-RunName $a $t
   Write-Host "Run ($a):" -ForegroundColor Cyan
-  Write-Host "  cd $(Join-Path $FafDir $t.RunDir)"
+  Write-Host "  cd $(Get-RunDir $t)"
   Write-Host "  .\$exeName.exe /init init_faf.lua /nobugreport /log $(Join-Path $FafDir "logs\$exeName.log")"
 }

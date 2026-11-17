@@ -16,7 +16,7 @@ namespace faf::netlink
     const std::string& json
   )
   {
-    const std::optional<JsonValue> v = ParseJson(json);
+    const std::expected<JsonValue, std::string> v = ParseJson(json);
     return v && v->IsObject() && v->Find("webrtc") != nullptr;
   }
 
@@ -164,7 +164,7 @@ namespace faf::netlink
       std::lock_guard lock(in.mutex);
       pc = in.pc;
     }
-    const std::optional<JsonValue> v = ParseJson(json);
+    const std::expected<JsonValue, std::string> v = ParseJson(json);
     const JsonValue* body = v ? v->Find("webrtc") : nullptr;
     if (!pc || body == nullptr || !body->IsObject()) {
       return;

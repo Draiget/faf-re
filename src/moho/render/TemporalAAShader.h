@@ -22,13 +22,15 @@ namespace moho
   inline constexpr char kTemporalAAShaderSource[] = R"hlsl(
 cbuffer TaaConstants : register(b0)
 {
-    row_major float4x4 InverseViewProjection; // this frame's camera (unshifted: a still point maps to a pixel centre)
+    row_major float4x4 InverseViewProjection; // this frame's camera (unshifted: a still point maps to a pixel centre),
+                                              // without its position: world = p.xyz / p.w + Eye.xyz (EyeRelative.h)
     row_major float4x4 PrevViewProjection;    // the last frame's camera (unshifted)
     float4 ViewRect;  // origin and size of the view (the output), in target pixels
     float4 Params;    // history weight, 1 when the history is valid, 1 when alpha is written, unused
     float4 LowRect;   // origin and size of the area the world was drawn into (ren_RenderScale; the view at 1)
     float4 Jitter;    // this frame's offset in drawn pixels (x right, y down), 1 to drop history at another distance, unused
     float4 ViewW;     // this frame's view-projection w column (unshifted): a world point's distance along the view
+    float4 Eye;       // this frame's camera position, unused
 };
 
 RWStructuredBuffer<float4> HistoryOut : register(u0);
@@ -105,7 +107,7 @@ void TaaCS(uint3 id : SV_DispatchThreadID)
             m2 += s * s;
             const float2 at = (float2(neighbour) + 0.5) / LowRect.zw;
             const float4 around = mul(float4(at.x * 2.0 - 1.0, 1.0 - at.y * 2.0, saturate(SceneDepth.Load(int3(lowOrigin + neighbour, 0))), 1.0), InverseViewProjection);
-            const float before = mul(float4(around.xyz / around.w, 1.0), PrevViewProjection).w;
+            const float before = mul(float4(around.xyz / around.w + Eye.xyz, 1.0), PrevViewProjection).w;
             nearestBefore = min(nearestBefore, before);
             farthestBefore = max(farthestBefore, before);
         }
@@ -120,7 +122,7 @@ void TaaCS(uint3 id : SV_DispatchThreadID)
     // This pixel's point in the world, and its distance along this frame's view (kept for the next frame).
     const float2 local = (float2(id.xy) + 0.5) / ViewRect.zw;
     const float4 world = mul(float4(local.x * 2.0 - 1.0, 1.0 - local.y * 2.0, saturate(depth), 1.0), InverseViewProjection);
-    const float3 seen = world.xyz / world.w;
+    const float3 seen = world.xyz / world.w + Eye.xyz;
     const float distance = dot(float4(seen, 1.0), ViewW);
     if (Params.y > 0.0 && depth > 0.0) {
         // Where this pixel's point was in the last frame's view.

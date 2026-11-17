@@ -36,7 +36,11 @@
 #include <cstdint>
 #include <limits>
 
+#include "platform/PlatformDefines.h"
+
+#if FAFRE_ARCH_X86 || FAFRE_ARCH_X64
 #include <emmintrin.h>
+#endif
 
 namespace fa::libm
 {
@@ -55,27 +59,31 @@ namespace fa::libm
       return std::bit_cast<std::uint64_t>(value);
     }
 
-    /// The correctly rounded square root (`sqrtsd`): a library sqrt on x86 can be an x87
-    /// `fsqrt` that rounds under the caller's precision control.
+    /// The correctly rounded square root (`sqrtsd`; ARM64's `fsqrt d` is IEEE's too): a
+    /// library sqrt on x86 can be an x87 `fsqrt` that rounds under the caller's precision
+    /// control.
     [[nodiscard]] double Sqrt(
       const double value
     ) noexcept
     {
+#if FAFRE_ARCH_X86 || FAFRE_ARCH_X64
       return _mm_cvtsd_f64(_mm_sqrt_sd(_mm_setzero_pd(), _mm_set_sd(value)));
+#else
+      return __builtin_sqrt(value);
+#endif
     }
 
-    /// The quiet NaN `(x - x) / (x - x)` gives on x86: `x` itself for a NaN, otherwise the
-    /// default NaN, which is the negative x87/SSE indefinite there (musl's __math_invalid).
-    /// AArch64's default NaN is positive, so the indefinite is spelled out (Android port).
+    /// The quiet NaN `(x - x) / (x - x)` gives on x86: `x` itself (quieted) for a NaN, x86's
+    /// default NaN (negative, 0xFFF8000000000000) otherwise (musl's __math_invalid). ARM64's
+    /// default NaN is positive, so the x86 one is spelled out.
     [[nodiscard]] double Invalid(
       const double x
     ) noexcept
     {
-      if (!std::isnan(x)) {
-        return AsDouble(0xFFF8000000000000ull);
+      if (x != x) {
+        return x + x;
       }
-      const double difference = x - x;
-      return difference / difference;
+      return AsDouble(0xFFF8000000000000ull);
     }
 
     constexpr int kExpTableBits = 7;
@@ -701,7 +709,7 @@ namespace fa::libm
       if (((ix - 0x3ff00000u) | lx) == 0) {
         return x * kPio2Hi + 0x1p-120f; // asin(+-1) = +-pi/2, inexact
       }
-      return Invalid(x);
+      return 0.0 / (x - x);
     }
     if (ix < 0x3fe00000u) {
       // |x| < 0.5; 0x1p-1022 <= |x| < 0x1p-26 returns x (no underflow).

@@ -39,3 +39,18 @@ do
         end
     end
 end
+
+-- The interface scale applies without a restart and can follow the display (hook of /lua/options/options.lua): FAF's
+-- own text for UI Scale says it needs a restart, so it is replaced.
+do
+    Tooltips.options_ui_scale = {
+        title = "<LOC OPTIONS_0283>UI Scale",
+        description = "Changes the size of all UI elements. Applies at once. Picking a size other than the display's turns off Match display scale.",
+    }
+    if not Tooltips.options_ui_scale_auto then
+        Tooltips.options_ui_scale_auto = {
+            title = "Match display scale",
+            description = "UI Scale follows the scale Windows uses on the display the game is on (Settings, Display, Scale): 150 % there gives 150 % here. Moving the window to another display changes it.",
+        }
+    end
+end

@@ -34,7 +34,7 @@ struct GCheader
   lu_byte marked; // GC mark/color flags.
 };
 
-struct __declspec(align(4)) TString
+struct TString
 {
   GCObject* next;
   lu_byte tt;
@@ -724,7 +724,9 @@ struct global_State
   Hook hook;                               // +0x15C Active debug hook callback.
 };
 
-struct __declspec(align(8)) lua_State
+struct alignas(
+  8
+) lua_State
 {
   GCObject* next;
   lu_byte tt;

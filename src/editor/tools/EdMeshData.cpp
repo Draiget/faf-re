@@ -124,7 +124,9 @@ namespace faf::editor
           {"sun_g", &s.sunColor[1]},
           {"sun_b", &s.sunColor[2]},
         };
+        int lineNumber = 0;
         ForEachLine(file, [&](const std::string& line) {
+          ++lineNumber;
           std::string value;
           if (Field(line, "mesh", value)) {
             Patch p;
@@ -136,12 +138,16 @@ namespace faf::editor
             map.patches.push_back(std::move(p));
           } else if (Field(line, "water_map", value)) {
             s.waterMap = value;
+            s.given.insert("water_map");
           } else if (Field(line, "water_map_outer", value)) {
             s.waterMapOuter = value;
+            s.given.insert("water_map_outer");
           } else if (Field(line, "water_beyond", value)) {
             s.waterBeyond = value;
+            s.given.insert("water_beyond");
           } else if (Field(line, "water_inside", value)) {
             s.waterInside = value;
+            s.given.insert("water_inside");
           } else if (Field(line, "name", value)) {
             Material m;
             m.name = value;
@@ -159,13 +165,22 @@ namespace faf::editor
             }
             map.materials.push_back(std::move(m));
           } else {
+            bool understood = false;
             for (const Number& n : numbers) {
               if (Field(line, n.key, value)) {
                 *n.target = static_cast<float>(std::atof(value.c_str()));
-                if (n.target == &s.voidColor[0]) {
+                s.given.insert(n.key);
+                understood = true;
+                if (n.target == &s.voidColor[0] || n.target == &s.voidColor[1] || n.target == &s.voidColor[2]) {
                   s.haveVoid = true;
                 }
               }
+            }
+            const std::size_t first = line.find_first_not_of(" \t\r");
+            if (!understood && first != std::string::npos && line.compare(first, 2, "--") != 0) {
+              map.warnings.push_back(
+                "line " + std::to_string(lineNumber) + " not understood: " + line.substr(first, 60)
+              );
             }
           }
         });
@@ -233,31 +248,29 @@ namespace faf::editor
     // ---- SCM v5
     // ---------------------------------------------------------------------------------------------------------------------
 
-    bool ParseScm(
+    std::expected<void, std::string> ParseScm(
       const std::uint8_t* bytes,
       const std::size_t size,
-      Patch& out,
-      std::string& why
+      Patch& out
     )
     {
       if (size < 48 || std::memcmp(bytes, "MODL", 4) != 0) {
-        why = "not an SCM file";
-        return false;
+        return std::unexpected("not an SCM file");
       }
       const std::uint32_t version = ReadU32(bytes + 4);
       const std::uint32_t vertexOffset = ReadU32(bytes + 16), vertexCount = ReadU32(bytes + 24);
       const std::uint32_t indexOffset = ReadU32(bytes + 28), indexCount = ReadU32(bytes + 32);
       if (version != 5) {
-        why = "SCM version " + std::to_string(version) + " (the mesh terrain reads version 5)";
-        return false;
+        return std::unexpected("SCM version " + std::to_string(version) + " (the mesh terrain reads version 5)");
       }
       if (
         vertexCount == 0 || vertexCount > 65535 || indexCount % 3 != 0 ||
         static_cast<std::uint64_t>(vertexOffset) + vertexCount * 68ull > size ||
         static_cast<std::uint64_t>(indexOffset) + indexCount * 2ull > size
       ) {
-        why = "unusable SCM header (vertex or index block outside the file, or more than 65,535 vertices)";
-        return false;
+        return std::unexpected(
+          "unusable SCM header (vertex or index block outside the file, or more than 65,535 vertices)"
+        );
       }
       out.vertexCount = vertexCount;
       out.triangleCount = indexCount / 3;
@@ -266,8 +279,7 @@ namespace faf::editor
       std::memcpy(out.indices.data(), bytes + indexOffset, indexCount * 2ull);
       for (std::uint16_t i : out.indices) {
         if (i >= vertexCount) {
-          why = "an index points past the last vertex";
-          return false;
+          return std::unexpected("an index points past the last vertex");
         }
       }
       float lo[3] = {1e30f, 1e30f, 1e30f}, hi[3] = {-1e30f, -1e30f, -1e30f};
@@ -287,7 +299,7 @@ namespace faf::editor
         out.boundsMin[k] = lo[k];
         out.boundsMax[k] = hi[k];
       }
-      return true;
+      return {};
     }
 
     // ---- MeshMap
@@ -301,8 +313,276 @@ namespace faf::editor
       materials.clear();
       patches.clear();
       error.clear();
+      warnings.clear();
       grid_ = Grid();
       gridBuilt_ = false;
+    }
+
+    namespace
+    {
+      /** A number as the manifest's reader takes it: digits, a minus and a dot, never an exponent (6 decimals at most,
+       * trailing zeros dropped). */
+      std::string PlainNumber(
+        const float value
+      )
+      {
+        char text[64];
+        (void)std::snprintf(text, sizeof(text), "%.6f", static_cast<double>(value));
+        std::string out = text;
+        if (out.contains('.')) {
+          while (!out.empty() && out.back() == '0') {
+            out.pop_back();
+          }
+          if (!out.empty() && out.back() == '.') {
+            out.pop_back();
+          }
+        }
+        return out == "-0" ? "0" : out;
+      }
+    } // namespace
+
+    const std::vector<SettingKey>& SettingKeys()
+    {
+      static const std::vector<SettingKey> keys = {
+        {"size", -1, 64, 5120, "Map side in world units (the .scmap size)"},
+        {"playable_x0", 1, 0, 5120, "Playable rectangle"},
+        {"playable_z0", 1, 0, 5120, "Playable rectangle"},
+        {"playable_x1", 1, 0, 5120, "Playable rectangle"},
+        {"playable_z1", 1, 0, 5120, "Playable rectangle"},
+        {"water", 2, -100, 300, "Water level"},
+        {"water_abyss", 2, -200, 300, "Ground fully tinted below this (below the level by at least 1)"},
+        {"water_tint", -1, 0, 1, "0 = no ramp tint on the ground under water"},
+        {"water_map", -2, 0, 0, "Water depth / land texture over the map"},
+        {"water_map_outer", -2, 0, 0, "The same over the scenery square"},
+        {"water_outer_min", 1, -5000, 5000, "Corner of the scenery square"},
+        {"water_outer_span", 1, 0, 20000, "Side of the scenery square"},
+        {"water_beyond", -2, 0, 0, "Water triangles outside the map (x z float pairs)"},
+        {"water_beyond_triangles", -1, 0, 100000, "Triangle count of that file"},
+        {"water_inside", -2, 0, 0, "Water triangles inside the map"},
+        {"water_inside_triangles", -1, 0, 100000, "Triangle count of that file"},
+        {"haze", 2, -300, 300, "Below this the ground fades into the void colour"},
+        {"haze_span", 2, 0, 300, "Fade distance"},
+        {"ground_low", 2, -100, 300, "Lowest ground units can stand on"},
+        {"ground_high", 2, -100, 300, "Highest ground units can stand on"},
+        {"mesh_high", 2, -100, 3000, "Highest mesh vertex in the playable area + 32"},
+        {"shadow_r", 3, 0, 2, "Light the shadowed ground gets"},
+        {"shadow_g", 3, 0, 2, "Light the shadowed ground gets"},
+        {"shadow_b", 3, 0, 2, "Light the shadowed ground gets"},
+        {"shadow_a", 3, 0, 2, "How far a moving shadow pulls the light towards it"},
+        {"sun_x", 4, -1, 1, "Direction towards the sun (unit vector)"},
+        {"sun_y", 4, -1, 1, "Direction towards the sun (unit vector)"},
+        {"sun_z", 4, -1, 1, "Direction towards the sun (unit vector)"},
+        {"sun_r", 3, 0, 4, "Sun colour of the specular highlight"},
+        {"sun_g", 3, 0, 4, "Sun colour of the specular highlight"},
+        {"sun_b", 3, 0, 4, "Sun colour of the specular highlight"},
+        {"void_r", 3, 0, 1, "What is seen where there is no ground"},
+        {"void_g", 3, 0, 1, "What is seen where there is no ground"},
+        {"void_b", 3, 0, 1, "What is seen where there is no ground"},
+      };
+      return keys;
+    }
+
+    float* SettingNumber(
+      Settings& s,
+      const std::string& key
+    )
+    {
+      struct Slot
+      {
+        const char* key;
+        float* value;
+      };
+      const Slot slots[] = {
+        {"size", &s.size},
+        {"playable_x0", &s.playable[0]},
+        {"playable_z0", &s.playable[1]},
+        {"playable_x1", &s.playable[2]},
+        {"playable_z1", &s.playable[3]},
+        {"water", &s.water},
+        {"water_abyss", &s.waterAbyss},
+        {"water_tint", &s.waterTint},
+        {"water_outer_min", &s.waterOuterMin},
+        {"water_outer_span", &s.waterOuterSpan},
+        {"water_beyond_triangles", &s.waterBeyondTriangles},
+        {"water_inside_triangles", &s.waterInsideTriangles},
+        {"haze", &s.haze},
+        {"haze_span", &s.hazeSpan},
+        {"ground_low", &s.groundLow},
+        {"ground_high", &s.groundHigh},
+        {"mesh_high", &s.meshHigh},
+        {"shadow_r", &s.shadowColor[0]},
+        {"shadow_g", &s.shadowColor[1]},
+        {"shadow_b", &s.shadowColor[2]},
+        {"shadow_a", &s.shadowColor[3]},
+        {"sun_x", &s.sunDirection[0]},
+        {"sun_y", &s.sunDirection[1]},
+        {"sun_z", &s.sunDirection[2]},
+        {"sun_r", &s.sunColor[0]},
+        {"sun_g", &s.sunColor[1]},
+        {"sun_b", &s.sunColor[2]},
+        {"void_r", &s.voidColor[0]},
+        {"void_g", &s.voidColor[1]},
+        {"void_b", &s.voidColor[2]},
+      };
+      for (const Slot& slot : slots) {
+        if (key == slot.key) {
+          return slot.value;
+        }
+      }
+      return nullptr;
+    }
+
+    std::string* SettingText(
+      Settings& s,
+      const std::string& key
+    )
+    {
+      return key == "water_map"    ? &s.waterMap
+        : key == "water_map_outer" ? &s.waterMapOuter
+        : key == "water_beyond"    ? &s.waterBeyond
+        : key == "water_inside"    ? &s.waterInside
+                                   : nullptr;
+    }
+
+    bool SettingSet(
+      const Settings& s,
+      const std::string& key
+    )
+    {
+      if (s.given.contains(key)) {
+        return true;
+      }
+      // The values a manifest writes without being told (the editor's own import and sync set them so).
+      if (key == "size" || key.starts_with("playable_")) {
+        return true;
+      }
+      if (key == "water" || key == "water_abyss") {
+        return s.water > -9999.0f;
+      }
+      if (key == "water_tint") {
+        return s.waterTint != 1.0f;
+      }
+      if (key == "haze" || key == "haze_span") {
+        return s.haze > -9999.0f;
+      }
+      if (key == "ground_low") {
+        return s.groundLow > -9999.0f;
+      }
+      if (key == "ground_high") {
+        return s.groundHigh > -9999.0f;
+      }
+      if (key == "mesh_high") {
+        return s.meshHigh > -9999.0f;
+      }
+      if (key.starts_with("void_")) {
+        return s.haveVoid;
+      }
+      Settings& editable = const_cast<Settings&>(s);
+      if (const std::string* text = SettingText(editable, key)) {
+        return !text->empty();
+      }
+      return false;
+    }
+
+    void SetSettingGiven(
+      Settings& s,
+      const std::string& key,
+      const bool given
+    )
+    {
+      const Settings none;
+      Settings& defaults = const_cast<Settings&>(none);
+      if (given) {
+        s.given.insert(key);
+        if (std::string* text = SettingText(s, key); text != nullptr && text->empty()) {
+          *text = key == "water_map"   ? "watermap.dds"
+            : key == "water_map_outer" ? "watermap_outer.dds"
+            : key == "water_beyond"    ? "waterbeyond.bin"
+                                       : "waterinside.bin";
+        }
+        if (float* value = SettingNumber(s, key); value != nullptr && *value <= -9999.0f) {
+          for (const SettingKey& k : SettingKeys()) {
+            if (key == k.key) {
+              *value = k.min;
+            }
+          }
+        }
+        if (key.starts_with("void_")) {
+          s.haveVoid = true;
+        }
+        return;
+      }
+      s.given.erase(key);
+      if (std::string* text = SettingText(s, key)) {
+        text->clear();
+      }
+      if (float* value = SettingNumber(s, key)) {
+        *value = *SettingNumber(defaults, key);
+      }
+      if (key.starts_with("void_")) {
+        s.haveVoid = s.given.count("void_r") + s.given.count("void_g") + s.given.count("void_b") != 0;
+      }
+    }
+
+    std::string MeshMap::ManifestText() const
+    {
+      static const char* const kSlotNames[kSlots] = {
+        "diffuse_a",
+        "diffuse_b",
+        "light_mask_0",
+        "light_mask_1",
+        "light_mask_2",
+        "normal_a",
+        "normal_b",
+        "specular",
+        "specular_b"
+      };
+      const Settings& s = settings;
+      std::string out = "-- mesh terrain manifest (FAF map editor): one entry a line\n";
+      char line[256];
+      const auto number = [&](const char* key, const float value, const bool keep) {
+        if (keep) {
+          (void)std::snprintf(line, sizeof(line), "%s = %s\n", key, PlainNumber(value).c_str());
+          out += line;
+        }
+      };
+      const auto text = [&](const char* key, const std::string& value) {
+        if (!value.empty()) {
+          out += std::string(key) + " = '" + value + "'\n";
+        }
+      };
+      Settings& editable = const_cast<Settings&>(s); // (the slots are only read here)
+      for (const SettingKey& key : SettingKeys()) {
+        if (key.decimals == -2) {
+          if (const std::string* value = SettingText(editable, key.key)) {
+            text(key.key, *value);
+          }
+        } else if (const float* value = SettingNumber(editable, key.key)) {
+          number(key.key, *value, SettingSet(s, key.key));
+        }
+      }
+      for (const Material& m : materials) {
+        std::string entry = "name = '" + m.name + "'";
+        for (int k = 0; k < kSlots; ++k) {
+          if (!m.files[k].empty()) {
+            entry += std::string(", ") + kSlotNames[k] + " = '" + m.files[k] + "'";
+          }
+        }
+        entry += m.blending ? ", blending = 1" : "";
+        entry += m.glow ? ", glow = 1" : "";
+        entry += m.highlight ? ", highlight = 1" : "";
+        entry += m.additive ? ", additive = 1" : "";
+        if (m.alphaTest >= 0.0f) {
+          (void)std::snprintf(line, sizeof(line), ", alpha_test = %s", PlainNumber(m.alphaTest).c_str());
+          entry += line;
+        }
+        out += entry + "\n";
+      }
+      for (const Patch& patch : patches) {
+        out += "mesh = '" + patch.file + "', material = " + std::to_string(patch.material + 1) +
+          (patch.sky ? ", sky = 1" : "") + "\n";
+      }
+      return out;
     }
 
     bool MeshMap::Load(
@@ -323,19 +603,23 @@ namespace faf::editor
         patches.clear();
         return false;
       }
+      // Every entry stays (FAF Studio keeps them and names each bad file in its check): a patch whose file is missing
+      // or broken has no geometry and isn't drawn, and Save writes its line back.
       for (Patch& p : patches) {
         const std::vector<std::uint8_t> scm = ReadVfs(dir + "/" + p.file);
         std::string why;
         if (scm.empty()) {
-          error = "patch file missing: " + p.file;
-          patches.clear();
-          return false;
+          why = "missing";
+        } else if (const auto parsed = ParseScm(scm.data(), scm.size(), p)) {
+          continue;
+        } else {
+          why = parsed.error();
         }
-        if (!ParseScm(scm.data(), scm.size(), p, why)) {
-          error = p.file + ": " + why;
-          patches.clear();
-          return false;
-        }
+        p.vertices.clear();
+        p.indices.clear();
+        p.vertexCount = 0;
+        p.triangleCount = 0;
+        error += (error.empty() ? "" : "; ") + p.file + ": " + why;
       }
       BuildGrid();
       return true;

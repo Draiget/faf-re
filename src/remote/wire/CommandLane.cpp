@@ -457,7 +457,7 @@ namespace faf::remote::wire
       }
       std::vector<std::uint32_t> forgotten;
       for (const auto& [id, data] : mHeld) {
-        if (described.count(id) == 0u) {
+        if (!described.contains(id)) {
           forgotten.push_back(id);
         }
       }

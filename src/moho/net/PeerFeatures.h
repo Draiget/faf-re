@@ -1,5 +1,6 @@
 #pragma once
 
+#include <utility>
 #include <cstddef>
 #include <chrono>
 #include <cstdint>
@@ -52,7 +53,7 @@ namespace moho
     const EPeerFeature feature
   ) noexcept
   {
-    return std::uint64_t{1} << static_cast<std::uint8_t>(feature);
+    return std::uint64_t{1} << std::to_underlying(feature);
   }
 
   /// The features this build has whatever the session's switches (`ServerSession`), in every announcement.

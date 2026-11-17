@@ -1,5 +1,6 @@
 #pragma once
 
+#include <expected>
 #include <filesystem>
 #include <memory>
 #include <string>
@@ -76,14 +77,10 @@ namespace faf::editor
    * `CWldProps::Save` (0x00891D50) lays them out, each from its stored record while it is unchanged.
    * Unlike MapSave, which resolves the name through the virtual file system (so it can't write a map that
    * lives in the game's archives, or anywhere new), the path is the caller's. Terrain is written as
-   * version 60, which every game version reads. False with `error` set when it can't.
+   * version 60, which every game version reads. The error when it can't.
    */
-  bool WriteMapFile(
-    moho::CWldMap& map,
-    const MapFileRecords& records,
-    const std::filesystem::path& path,
-    std::string& error
-  );
+  [[nodiscard]] std::expected<void, std::string>
+  WriteMapFile(moho::CWldMap& map, const MapFileRecords& records, const std::filesystem::path& path);
 
   /**
    * Reads a `.scmap` file from `path` on disk into a new map, through the same chunk loaders as

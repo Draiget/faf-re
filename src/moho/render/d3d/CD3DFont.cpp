@@ -1461,7 +1461,7 @@ namespace moho
     }
 
     // A mod's family never reaches GDI; its name means nothing there anyway, and its file was never loaded there.
-    const bool isModFace = lookup.mFace.compare(0u, 4u, "mod:") == 0;
+    const bool isModFace = lookup.mFace.starts_with("mod:");
     const HFONT createdWin32Font = CreateFontA(
       -pointSize, 0, 0, 0, 0, 0, 0, 0, 1u, 0, 0, 4u, 0, isModFace ? kModFontFallbackFace : lookup.mFace.c_str()
     );

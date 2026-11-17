@@ -6,8 +6,9 @@
 #   cmake --preset android-arm64-release && cmake --build --preset android-arm64-release
 #
 # Android is Linux with another C library, so the top-level CMakeLists.txt
-# builds the Linux project (cmake/FafLinux.cmake) for it; FAF_ANDROID selects
-# what differs there (bionic, the ABI, tests that cannot run on the build host).
+# builds the Linux project (cmake/FafPosix.cmake) for it; FAFRE_PLATFORM_ANDROID
+# (cmake/FafPlatform.cmake, from the NDK's CMAKE_SYSTEM_NAME) selects what
+# differs there (bionic, the ABI, tests that cannot run on the build host).
 #
 #   FAF_ANDROID_NDK                 NDK root. Default: the pinned release
 #                                   (android-pins.cmake) under the SDK in
@@ -28,9 +29,6 @@ if(NOT DEFINED FAF_ANDROID_ABI)
 endif()
 
 include("${CMAKE_CURRENT_LIST_DIR}/android-pins.cmake")
-
-set(FAF_LINUX ON)
-set(FAF_ANDROID ON)
 
 # try_compile projects re-read this file; pass the settings on.
 list(APPEND CMAKE_TRY_COMPILE_PLATFORM_VARIABLES FAF_ANDROID_ABI FAF_ANDROID_NDK FAF_ANDROID_ALLOW_UNPINNED_NDK)

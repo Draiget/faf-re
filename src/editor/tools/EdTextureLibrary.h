@@ -37,7 +37,10 @@ namespace faf::editor
     void Refresh()
     {
       mListed = false;
+      mMapListedFor.clear();
     }
+    /** The `.dds` files under a map's folder (`/maps/<folder>`), its own textures, as the biome "This map". */
+    const std::vector<LayerTexture>& MapTextures(const std::string& folder);
 
     /**
      * The thumbnail of a texture for ImGui::Image, or 0 while it waits its turn; asks for it either way. Opaque by
@@ -65,6 +68,8 @@ namespace faf::editor
   private:
     std::vector<LayerTexture> mTextures;
     bool mListed = false;
+    std::vector<LayerTexture> mMapTextures;
+    std::string mMapListedFor;
     std::unordered_map<std::string, std::uint64_t> mThumbnails; // 0: asked, not decoded (or failed)
     std::deque<std::string> mWanted;
     std::set<std::string> mWithAlpha;

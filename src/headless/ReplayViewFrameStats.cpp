@@ -488,7 +488,7 @@ namespace faf::headless
         return; // the sim's "none"
       }
       ++mSpyReferences;
-      if (ids.count(named) == 0u) {
+      if (!ids.contains(named)) {
         ++mSpyUnheld[field];
         example(kSpyFields[field], owner, named);
       }

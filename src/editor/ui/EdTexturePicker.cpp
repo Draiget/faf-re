@@ -164,7 +164,7 @@ namespace faf::editor
       for (const std::string& choice : choices) {
         if (
           (!folder.empty() && FolderOf(choice) != folder) ||
-          (!search.empty() && Lower(NameOf(choice)).find(search) == std::string::npos)
+          (!search.empty() && !Lower(NameOf(choice)).contains(search))
         ) {
           continue;
         }

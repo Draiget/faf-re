@@ -137,9 +137,8 @@ namespace faf::editor
       }
       op.extra = extra;
       auto out = std::make_shared<field::Grid>();
-      std::string error;
-      if (!field::RunOp(name, op, *out, error)) {
-        Fail(name + ": " + error);
+      if (const auto ran = field::RunOp(name, op, *out); !ran) {
+        Fail(name + ": " + ran.error());
       }
       return out;
     }
@@ -257,9 +256,8 @@ namespace faf::editor
       args.in["a"] = full;
       args.in["like"] = mLike;
       auto coarse = std::make_shared<field::Grid>();
-      std::string error;
-      if (!field::RunOp("resample", args, *coarse, error)) {
-        terrain::Fail("resample: " + error);
+      if (const auto ran = field::RunOp("resample", args, *coarse); !ran) {
+        terrain::Fail("resample: " + ran.error());
       }
       mBase = coarse;
     }
@@ -290,7 +288,7 @@ namespace faf::editor
     std::set<int> seen;
     for (const int id : order) {
       seen.insert(id);
-      if (only != nullptr && only->count(id) == 0) {
+      if (only != nullptr && !only->contains(id)) {
         continue;
       }
       const GraphNode* node = graph.Find(id);
@@ -333,7 +331,7 @@ namespace faf::editor
           }
         }
         if (value == nullptr) {
-          if (only == nullptr || only->count(link->fromNode) != 0) {
+          if (only == nullptr || only->contains(link->fromNode)) {
             blocked = "input " + def.name + " has no value";
             if (up != mCache.end() && !up->second.error.empty()) {
               blocked += " (" + up->second.error + ")";
@@ -353,23 +351,49 @@ namespace faf::editor
         node->type->name != "out_roughness"
       ) {
         for (const PinDef& def : node->type->inputs) {
-          if (def.name == "a" && def.type != PinType::Number && ins.count("a") == 0) {
+          if (def.name == "a" && def.type != PinType::Number && !ins.contains("a")) {
             blocked = "input a is not linked";
           }
         }
       }
       if (
-        node->type->name == "height_from_gradient" && blocked.empty() && (ins.count("dx") == 0 || ins.count("dz") == 0)
+        node->type->name == "height_from_gradient" && blocked.empty() && (!ins.contains("dx") || !ins.contains("dz"))
       ) {
         blocked = "inputs dx and dz must both be linked";
       }
       if (node->type->name == "path_shape" || node->type->name == "path_mask" || node->type->name == "path_dist") {
-        if (ins.count("pts") == 0 && blocked.empty()) {
+        if (!ins.contains("pts") && blocked.empty()) {
           blocked = "input pts is not linked";
         }
       }
       if (!blocked.empty()) {
         failed(blocked, blockedUp);
+        continue;
+      }
+      if (node->bypass) {
+        // Bypassed (FAF Studio's bypass): the first input linked goes to every output unchanged.
+        const TerrainValue* through = nullptr;
+        for (const PinDef& def : node->type->inputs) {
+          if (const auto in = ins.find(def.name); in != ins.end() && through == nullptr) {
+            through = in->second;
+          }
+        }
+        if (through == nullptr) {
+          failed("bypassed, with no input to pass on", false);
+          continue;
+        }
+        key = "bypass|" + key;
+        if (entry.key == key && entry.error.empty()) {
+          ++report.cached;
+          continue;
+        }
+        entry = Entry{};
+        entry.key = key;
+        entry.version = ++mVersion;
+        for (const PinDef& out : node->type->outputs) {
+          entry.outs[out.name] = *through;
+        }
+        ++report.evaluated;
         continue;
       }
       terrain::Values values;
@@ -405,7 +429,7 @@ namespace faf::editor
       if (node->type->name == "pad_flatten") {
         key += "|pads" + ground.padSignature;
       }
-      if (node->type->name.rfind("layout_", 0) == 0) {
+      if (node->type->name.starts_with("layout_")) {
         // The drawing (its revision) and the editor's symmetry: a stroke on the canvas runs the node again.
         key += "|layout" + ground.layoutKey;
       }
@@ -455,8 +479,7 @@ namespace faf::editor
           args.in["a"] = value->grid;
           args.in["like"] = nodeLike;
           auto grid = std::make_shared<field::Grid>();
-          std::string error;
-          if (!field::RunOp(value->grid->w < nodeLike->w ? "upsample" : "downsample", args, *grid, error)) {
+          if (!field::RunOp(value->grid->w < nodeLike->w ? "upsample" : "downsample", args, *grid)) {
             continue;
           }
           auto copy = std::make_unique<TerrainValue>(*value);
@@ -483,10 +506,9 @@ namespace faf::editor
       env.base = [this, &ground] {
         return BaseHere(ground);
       };
-      env.rerunUpstream =
-        [this, &graph, &ground, &behaviours, node, id, seed](
-          const std::string& pin, const int factor, const field::GridPtr& fine, terrain::Outputs& out, std::string& why
-        ) {
+      env.rerunUpstream = [this, &graph, &ground, &behaviours, node, id, seed](
+                            const std::string& pin, const int factor, const field::GridPtr& fine
+                          ) -> std::expected<terrain::Outputs, std::string> {
         // The erosion node wired into `pin`, by its height.
         int pinIndex = -1;
         for (std::size_t p = 0; p < node->type->inputs.size(); ++p) {
@@ -497,17 +519,17 @@ namespace faf::editor
         const GraphLink* link = pinIndex >= 0 ? graph.InputLink(id, pinIndex) : nullptr;
         const GraphNode* src = link != nullptr ? graph.Find(link->fromNode) : nullptr;
         if (
-          src == nullptr || src->type->name.rfind("erode_", 0) != 0 ||
+          src == nullptr || !src->type->name.starts_with("erode_") ||
           src->type->outputs[static_cast<std::size_t>(link->fromPin)].name != "out"
         ) {
-          why = "the masks come from an erosion node: wire the height of Hydraulic, Droplet or Stream power erosion "
-                "into this node";
-          return false;
+          return std::unexpected(
+            "the masks come from an erosion node: wire the height of Hydraulic, Droplet or Stream power erosion "
+            "into this node"
+          );
         }
         const auto srcBehaviour = behaviours.find(src->type->name);
         if (srcBehaviour == behaviours.end()) {
-          why = "the erosion node is of an unknown type";
-          return false;
+          return std::unexpected("the erosion node is of an unknown type");
         }
         // Its inputs, brought onto the fine grid (masks straight, heights smooth).
         terrain::Inputs srcIns;
@@ -531,20 +553,19 @@ namespace faf::editor
             args.in["like"] = fine;
             args.p.num["linear"] = src->type->inputs[p].type == PinType::Mask ? 1.0 : 0.0;
             auto grid = std::make_shared<field::Grid>();
-            std::string error;
-            if (!field::RunOp("upsample", args, *grid, error)) {
-              why = "the erosion's input " + src->type->inputs[p].name +
-                " couldn't be brought onto the fine grid: " + error;
-              return false;
+            if (const auto ran = field::RunOp("upsample", args, *grid); !ran) {
+              return std::unexpected(
+                "the erosion's input " + src->type->inputs[p].name +
+                " couldn't be brought onto the fine grid: " + ran.error()
+              );
             }
             copy->grid = std::move(grid);
           }
           srcIns[src->type->inputs[p].name] = copy.get();
           kept.push_back(std::move(copy));
         }
-        if (srcIns.count("a") == 0) {
-          why = "the erosion node before this one has no input value";
-          return false;
+        if (!srcIns.contains("a")) {
+          return std::unexpected("the erosion node before this one has no input value");
         }
         // Its own settings (wired numbers applied), its own seed, every mask wanted.
         terrain::Values srcValues;
@@ -570,13 +591,13 @@ namespace faf::editor
         fineEnv.nodeId = src->id;
         fineEnv.wanted = {"out", "wear", "deposit", "flow", "accum"};
         fineEnv.ground = &ground;
+        terrain::Outputs out;
         try {
           out = srcBehaviour->second.eval(fineEnv, srcValues, srcIns);
         } catch (const std::exception& e) {
-          why = std::string("the erosion again on the fine grid: ") + e.what();
-          return false;
+          return std::unexpected(std::string("the erosion again on the fine grid: ") + e.what());
         }
-        return true;
+        return out;
       };
       const auto t0 = Clock::now();
       try {
@@ -593,7 +614,7 @@ namespace faf::editor
     }
     // Nodes no longer in the graph give their results back.
     for (auto it = mCache.begin(); it != mCache.end();) {
-      it = graph.Find(it->first) == nullptr || seen.count(it->first) == 0 ? mCache.erase(it) : std::next(it);
+      it = graph.Find(it->first) == nullptr || !seen.contains(it->first) ? mCache.erase(it) : std::next(it);
     }
     report.ms = std::chrono::duration<double, std::milli>(Clock::now() - started).count();
     return report;
@@ -683,7 +704,7 @@ namespace faf::editor
       turns = ground.layoutTurns;
       return !mode.empty();
     }
-    if (setting.rfind("rotn", 0) == 0) {
+    if (setting.starts_with("rotn")) {
       mode = "rotn";
       turns = std::clamp(std::atoi(setting.c_str() + 4), 2, 16);
       return true;
@@ -868,12 +889,11 @@ namespace faf::editor
     return false;
   }
 
-  bool TerrainRun::BuildWrites(
+  std::expected<void, std::string> TerrainRun::BuildWrites(
     const NodeGraph& graph,
     const TerrainGround& ground,
     const field::Grid& heights,
-    TerrainBuildWrites& writes,
-    std::string& error
+    TerrainBuildWrites& writes
   ) const
   {
     writes = TerrainBuildWrites{};
@@ -881,8 +901,7 @@ namespace faf::editor
     writes.cap = ground.painted;
     std::string kindsError;
     if (!KindsPaint(graph, ground, heights, writes.kinds, kindsError) && !kindsError.empty()) {
-      error = kindsError;
-      return false;
+      return std::unexpected(kindsError);
     }
     // Output: ground kinds' terrain types and, on a PBR shader with a roughness multiplier in layer 8, the roughness:
     // each kind's (wet ground and snow shiny, rock rough) by the visible weight of its layers, neutral where none
@@ -1115,7 +1134,7 @@ namespace faf::editor
     for (TerrainBuildWrites::Scatter& scatter : writes.scatters) {
       MakeSymmetric(scatter.density, ground);
     }
-    return true;
+    return {};
   }
 
   // ---- Studio's graph files ---------------------------------------------------------------------------------------
@@ -1372,20 +1391,17 @@ namespace faf::editor
     };
   } // namespace
 
-  bool ReadStudioGraph(
+  std::expected<StudioGraphFacts, std::string> ReadStudioGraph(
     const std::string& text,
-    NodeGraph& graph,
-    StudioGraphFacts& facts,
-    std::string& error
+    NodeGraph& graph
   )
   {
     LuaReader reader(text);
     LuaValue root;
     if (!reader.Assignment("Graph", root) || root.kind != LuaValue::Kind::Table) {
-      error = reader.Message().empty() ? "no Graph table" : reader.Message();
-      return false;
+      return std::unexpected(reader.Message().empty() ? "no Graph table" : reader.Message());
     }
-    facts = StudioGraphFacts{};
+    StudioGraphFacts facts;
     facts.name = root.Str("name");
     facts.seed = static_cast<int>(root.Num("seed", 1.0));
     // The symmetry setting: absent (follow the map), a mode, or { mode = 'rotn', n = 6 }.
@@ -1402,8 +1418,7 @@ namespace faf::editor
     }
     const LuaValue* nodes = root.Get("nodes");
     if (nodes == nullptr || nodes->kind != LuaValue::Kind::Table) {
-      error = "the graph has no nodes";
-      return false;
+      return std::unexpected("the graph has no nodes");
     }
     graph.Clear();
     std::set<int> present;
@@ -1493,7 +1508,7 @@ namespace faf::editor
         }
       }
     }
-    return true;
+    return facts;
   }
 
   const std::vector<ShippedGraph>& ShippedTerrainGraphs()
@@ -1556,17 +1571,16 @@ namespace faf::editor
     return text;
   }
 
-  bool LoadTerrainGraph(
+  std::expected<void, std::string> LoadTerrainGraph(
     const std::string& text,
     NodeGraph& graph,
     int& seed,
     std::string& name,
-    std::string& error,
     std::string* symmetry
   )
   {
-    if (!graph.Load(text, error)) {
-      return false;
+    if (auto loaded = graph.Load(text); !loaded) {
+      return loaded;
     }
     if (symmetry != nullptr && !JsonValue(text, "graphSymmetry", *symmetry)) {
       *symmetry = "map";
@@ -1576,6 +1590,6 @@ namespace faf::editor
     if (!JsonValue(text, "name", name)) {
       name.clear();
     }
-    return true;
+    return {};
   }
 } // namespace faf::editor

@@ -55,6 +55,10 @@ namespace faf::editor
       Blueprint,
       /** Props: every selected prop's scale in the file (values). */
       Scale,
+      /** A Camera Info marker: the editor's camera goes to the view it keeps (FAF Studio's markerprops LookThrough). */
+      CameraView,
+      /** A Camera Info marker takes the editor camera's view: focus, heading, pitch and zoom (one undo step). */
+      CameraFromView,
     };
     What what = What::None;
     float values[3] = {0.0f, 0.0f, 0.0f};

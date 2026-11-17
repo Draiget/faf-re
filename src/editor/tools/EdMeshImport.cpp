@@ -1,5 +1,6 @@
 #include "editor/tools/EdMeshImport.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <cstring>
@@ -30,21 +31,17 @@ namespace faf::editor
     }
   } // namespace
 
-  bool ReadScm(
-    const std::vector<std::uint8_t>& bytes,
-    ScmModel& out,
-    std::string& error
+  std::expected<ScmModel, std::string> ReadScm(
+    const std::vector<std::uint8_t>& bytes
   )
   {
-    out = ScmModel{};
+    ScmModel out;
     if (bytes.size() < 0x30 || std::memcmp(bytes.data(), "MODL", 4) != 0) {
-      error = "not an .scm file (no MODL header)";
-      return false;
+      return std::unexpected("not an .scm file (no MODL header)");
     }
     out.version = static_cast<int>(U32(bytes, 0x04));
     if (out.version != 5) {
-      error = "an .scm of version " + std::to_string(out.version) + " (the game's are 5)";
-      return false;
+      return std::unexpected("an .scm of version " + std::to_string(out.version) + " (the game's are 5)");
     }
     out.bones = static_cast<int>(U32(bytes, 0x2C));
     const std::uint32_t vertexAt = U32(bytes, 0x10);
@@ -58,8 +55,7 @@ namespace faf::editor
       static_cast<std::uint64_t>(vertexAt) + static_cast<std::uint64_t>(vertexCount) * kVertex > bytes.size() ||
       static_cast<std::uint64_t>(indexAt) + static_cast<std::uint64_t>(indexCount) * 2U > bytes.size()
     ) {
-      error = "the file is shorter than its header says";
-      return false;
+      return std::unexpected("the file is shorter than its header says");
     }
     for (std::uint32_t v = 0; v < vertexCount; ++v) {
       const std::size_t at = vertexAt + v * kVertex;
@@ -72,8 +68,9 @@ namespace faf::editor
       const std::uint32_t index =
         static_cast<std::uint32_t>(bytes[at]) | (static_cast<std::uint32_t>(bytes[at + 1]) << 8);
       if (index >= vertexCount) {
-        error = "a triangle names vertex " + std::to_string(index) + " of " + std::to_string(vertexCount);
-        return false;
+        return std::unexpected(
+          "a triangle names vertex " + std::to_string(index) + " of " + std::to_string(vertexCount)
+        );
       }
       out.indexes.push_back(index);
     }
@@ -83,7 +80,7 @@ namespace faf::editor
         out.info.pop_back();
       }
     }
-    return true;
+    return out;
   }
 
   std::string ObjFromScm(
@@ -122,20 +119,191 @@ namespace faf::editor
   )
   {
     ObjMesh out = mesh;
+    if (options.zUp) {
+      // Z up (Blender): (x, y, z) -> (x, z, -y), the same handedness.
+      for (auto& p : out.positions) {
+        p = {p[0], p[2], -p[1]};
+      }
+      for (auto& n : out.normals) {
+        n = {n[0], n[2], -n[1]};
+      }
+    }
     for (auto& p : out.positions) {
-      p[0] *= options.flipX ? -options.scale : options.scale;
-      p[1] *= options.scale;
-      p[2] *= options.flipZ ? -options.scale : options.scale;
+      p[0] = p[0] * (options.flipX ? -options.scale : options.scale) + options.offset[0];
+      p[1] = p[1] * options.scale + options.offset[1];
+      p[2] = p[2] * (options.flipZ ? -options.scale : options.scale) + options.offset[2];
     }
     for (auto& n : out.normals) {
       n[0] = options.flipX ? -n[0] : n[0];
       n[2] = options.flipZ ? -n[2] : n[2];
     }
-    // A single mirror turns the triangles inside out: their corners go the other way round.
-    if (options.flipX != options.flipZ) {
+    // A single mirror turns the triangles inside out: their corners go the other way round (and the asked flip too).
+    if ((options.flipX != options.flipZ) != options.flipWinding) {
       for (auto& triangle : out.triangles) {
         std::swap(triangle[1], triangle[2]);
       }
+    }
+    if (options.flipV) {
+      for (auto& uv : out.uvs) {
+        uv[1] = 1.0f - uv[1];
+      }
+    }
+    // Normals (FAF Studio's File / auto, Smooth, Flat): smooth ones are each position's faces' normals weighted by
+    // their area; auto keeps the file's and smooths only the corners without one; flat gives each triangle its own.
+    if (options.normals == 2) {
+      out.normals.clear();
+      for (auto& triangle : out.triangles) {
+        const auto& a = out.positions[static_cast<std::size_t>(triangle[0].position)];
+        const auto& b = out.positions[static_cast<std::size_t>(triangle[1].position)];
+        const auto& c = out.positions[static_cast<std::size_t>(triangle[2].position)];
+        const std::array<float, 3> e1{b[0] - a[0], b[1] - a[1], b[2] - a[2]};
+        const std::array<float, 3> e2{c[0] - a[0], c[1] - a[1], c[2] - a[2]};
+        out.normals.push_back(
+          {e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]}
+        );
+        for (ObjMesh::Corner& corner : triangle) {
+          corner.normal = static_cast<int>(out.normals.size()) - 1;
+        }
+      }
+    } else {
+      bool missing = options.normals == 1;
+      for (const auto& triangle : out.triangles) {
+        for (const ObjMesh::Corner& corner : triangle) {
+          missing = missing || corner.normal < 0 || corner.normal >= static_cast<int>(out.normals.size());
+        }
+      }
+      if (missing) {
+        std::vector<std::array<float, 3>> smooth(out.positions.size(), std::array<float, 3>{0, 0, 0});
+        for (const auto& triangle : out.triangles) {
+          const auto& a = out.positions[static_cast<std::size_t>(triangle[0].position)];
+          const auto& b = out.positions[static_cast<std::size_t>(triangle[1].position)];
+          const auto& c = out.positions[static_cast<std::size_t>(triangle[2].position)];
+          const std::array<float, 3> e1{b[0] - a[0], b[1] - a[1], b[2] - a[2]};
+          const std::array<float, 3> e2{c[0] - a[0], c[1] - a[1], c[2] - a[2]};
+          const std::array<float, 3> n{
+            e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]
+          };
+          for (const ObjMesh::Corner& corner : triangle) {
+            for (int k = 0; k < 3; ++k) {
+              smooth[static_cast<std::size_t>(corner.position)][static_cast<std::size_t>(k)] +=
+                n[static_cast<std::size_t>(k)];
+            }
+          }
+        }
+        const int base = static_cast<int>(out.normals.size());
+        out.normals.insert(out.normals.end(), smooth.begin(), smooth.end());
+        for (auto& triangle : out.triangles) {
+          for (ObjMesh::Corner& corner : triangle) {
+            if (options.normals == 1 || corner.normal < 0 || corner.normal >= base) {
+              corner.normal = base + corner.position;
+            }
+          }
+        }
+      }
+    }
+    if (out.uvs.empty() && options.uvRepeat > 0.0f) {
+      // Texture coordinates from the ground plan: one per position.
+      for (const auto& p : out.positions) {
+        out.uvs.push_back({p[0] / options.uvRepeat, p[2] / options.uvRepeat});
+      }
+      for (auto& triangle : out.triangles) {
+        for (ObjMesh::Corner& c : triangle) {
+          c.uv = c.position;
+        }
+      }
+    }
+    return out;
+  }
+
+  std::vector<std::pair<std::string, ObjMesh>> SplitByMaterial(
+    const ObjMesh& mesh,
+    const int materialsBy
+  )
+  {
+    // FAF Studio's "Materials by": the OBJ's usemtl names, its o / g groups, or one for all ("ground").
+    const std::vector<int>& of = materialsBy == 0 ? mesh.triangleMaterial : mesh.triangleGroup;
+    const std::vector<std::string>& names = materialsBy == 0 ? mesh.materials : mesh.groups;
+    std::vector<std::pair<std::string, ObjMesh>> parts;
+    std::map<int, std::size_t> partOf;
+    for (std::size_t t = 0; t < mesh.triangles.size(); ++t) {
+      const int which = materialsBy == 2 || t >= of.size() ? -1 : of[t];
+      auto found = partOf.find(which);
+      if (found == partOf.end()) {
+        ObjMesh part;
+        part.positions = mesh.positions;
+        part.uvs = mesh.uvs;
+        part.normals = mesh.normals;
+        part.groups = mesh.groups;
+        part.materials = mesh.materials;
+        part.uv2Size = mesh.uv2Size;
+        const std::string name =
+          which >= 0 && which < static_cast<int>(names.size()) ? names[static_cast<std::size_t>(which)] : "ground";
+        found = partOf.emplace(which, parts.size()).first;
+        parts.emplace_back(name, std::move(part));
+      }
+      ObjMesh& part = parts[found->second].second;
+      part.triangles.push_back(mesh.triangles[t]);
+      part.triangleGroup.push_back(t < mesh.triangleGroup.size() ? mesh.triangleGroup[t] : -1);
+      part.triangleMaterial.push_back(t < mesh.triangleMaterial.size() ? mesh.triangleMaterial[t] : -1);
+    }
+    return parts;
+  }
+
+  std::map<std::pair<int, int>, ObjMesh> SplitMesh(
+    const ObjMesh& mesh,
+    const MeshImportOptions& options
+  )
+  {
+    // Square tiles, or one part for each o / g group (key: group + 1, 0).
+    std::map<std::pair<int, int>, ObjMesh> parts;
+    if (options.byGroup && !mesh.triangleGroup.empty()) {
+      for (std::size_t t = 0; t < mesh.triangles.size(); ++t) {
+        const int group = t < mesh.triangleGroup.size() ? mesh.triangleGroup[t] : -1;
+        ObjMesh& part = parts[{group + 1, 0}];
+        if (part.positions.empty()) {
+          part.positions = mesh.positions;
+          part.uvs = mesh.uvs;
+          part.normals = mesh.normals;
+        }
+        part.triangles.push_back(mesh.triangles[t]);
+      }
+    } else {
+      parts = SplitByTile(mesh, options.tile);
+    }
+    // A part with more corners than the limit is cut into pieces (key second: the piece's number + 1000 a step).
+    const std::size_t limit = static_cast<std::size_t>(std::clamp(options.maxVertices, 3, 65535));
+    std::map<std::pair<int, int>, ObjMesh> out;
+    for (auto& [key, part] : parts) {
+      int piece = 0;
+      ObjMesh current;
+      std::set<int> used;
+      const auto flush = [&]() {
+        if (!current.triangles.empty()) {
+          out[{key.first, key.second + piece * 1000}] = std::move(current);
+          ++piece;
+        }
+        current = ObjMesh{};
+        used.clear();
+      };
+      for (const auto& triangle : part.triangles) {
+        std::size_t extra = 0;
+        for (const ObjMesh::Corner& c : triangle) {
+          extra += !used.contains(c.position) ? 1 : 0;
+        }
+        if (used.size() + extra > limit) {
+          flush();
+        }
+        if (current.positions.empty()) {
+          current.positions = part.positions;
+          current.uvs = part.uvs;
+          current.normals = part.normals;
+        }
+        for (const ObjMesh::Corner& c : triangle) {
+          used.insert(c.position);
+        }
+        current.triangles.push_back(triangle);
+      }
+      flush();
     }
     return out;
   }

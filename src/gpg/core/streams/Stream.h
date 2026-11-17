@@ -1,6 +1,7 @@
 #pragma once
 #include <cstdint>
 #include <stdexcept>
+#include <utility>
 
 #include "gpg/core/containers/FastVector.h"
 #include "gpg/core/containers/String.h"
@@ -284,9 +285,8 @@ namespace gpg
       const E value
     )
     {
-      using U = std::underlying_type_t<E>;
-      U tmp = static_cast<U>(value);
-      Write(&tmp, sizeof(U));
+      const auto tmp = std::to_underlying(value);
+      Write(&tmp, sizeof(tmp));
     }
 
     /**

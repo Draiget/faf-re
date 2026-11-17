@@ -142,7 +142,7 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
       };
       lower(commandLine);
       lower(needle);
-      return commandLine.find(needle) != std::string::npos;
+      return commandLine.contains(needle);
     }
 
     /// Engine addition (ren_PrepareDeviceEarly): the device D3D12_PrepareDeviceEarly is creating.
@@ -1538,7 +1538,7 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     sinceSubmit += mUpload.TakeAllocatedBytes();
     // Never in the middle of preparing a draw: buffers already prepared
     // must stay in the list they were prepared for.
-#if defined(_M_IX86)
+#if FAFRE_ARCH_X86
     constexpr std::uint64_t kDefaultSubmitAfter = 48ULL << 20U;
     constexpr std::uint64_t kWaitAbove = 128ULL << 20U;
 #else

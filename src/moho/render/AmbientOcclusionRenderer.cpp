@@ -1,9 +1,11 @@
 #include "moho/render/AmbientOcclusionRenderer.h"
+#include "moho/render/camera/EyeRelative.h"
 
 #include <algorithm>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <print>
 #include <string>
 #include <vector>
 
@@ -301,9 +303,9 @@ namespace moho
           std::fclose(out);
         }
         if (std::FILE* const out = std::fopen((base + "/terrain_meta.txt").c_str(), "w")) {
-          std::fprintf(
+          std::println(
             out,
-            "%d %d %u %u %u %.9g %.9g %.9g\n",
+            "{} {} {} {} {} {:.9g} {:.9g} {:.9g}",
             mFieldWidth,
             mFieldHeight,
             mShadowCellSize,
@@ -351,7 +353,7 @@ namespace moho
     }
 
     AoConstants constants{};
-    constants.inverseViewProjection = camera.inverseViewProjection;
+    constants.inverseViewProjection = EyeRelativeInverseViewProjection(camera);
     constants.viewRect[0] = static_cast<float>(x);
     constants.viewRect[1] = static_cast<float>(y);
     constants.viewRect[2] = static_cast<float>(width);

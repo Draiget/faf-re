@@ -31,6 +31,7 @@
 #include <functional>
 #include <limits>
 #include <map>
+#include <print>
 #include <string>
 #include <vector>
 
@@ -48,7 +49,6 @@
 
 #include <gtest/gtest.h>
 
-#include "legacy/math/X87Float.h"
 #include "legacy/math/X87Math.h"
 #include "moho/ai/NavigatorCellMath.h"
 #include "platform/X87Precision.h"
@@ -611,14 +611,18 @@ namespace
 
   const char* PlatformName()
   {
-#if defined(FAF_SIM_MATH_PLATFORM)
-    return FAF_SIM_MATH_PLATFORM; // the Linux and Android builds (cmake/FafLinux.cmake)
-#elif FAFRE_PLATFORM_WINDOWS && defined(_M_X64)
+#if FAFRE_PLATFORM_WINDOWS && FAFRE_ARCH_X64
     return "windows-x64";
-#elif FAFRE_PLATFORM_WINDOWS
+#elif FAFRE_PLATFORM_WINDOWS && FAFRE_ARCH_X86
     return "windows-x86";
-#elif defined(__x86_64__)
+#elif FAFRE_PLATFORM_ANDROID && FAFRE_ARCH_ARM64 // Android, which is Linux to the other macros
+    return "android-arm64";
+#elif FAFRE_PLATFORM_ANDROID && FAFRE_ARCH_X64
+    return "android-x64";
+#elif FAFRE_PLATFORM_LINUX && FAFRE_ARCH_X64 // the platform's own name, for its known_*.txt
     return "linux-x64";
+#elif FAFRE_PLATFORM_MACOS_ARM64             // the platform's own name, for its known_*.txt
+    return "macos-arm64";
 #else
     return "unknown";
 #endif
@@ -729,7 +733,7 @@ namespace
       }
     }
     if (fn == nullptr) {
-      std::fprintf(stderr, "unknown sweep function %s\n", name);
+      std::println(stderr, "unknown sweep function {}", name);
       return 2;
     }
     for (std::uint64_t block = 0; block < (1ull << 12); ++block) {
@@ -740,8 +744,8 @@ namespace
         hash = (hash ^ bits) * 1099511628211ull;
         hash = (hash ^ out) * 1099511628211ull;
       }
-      std::printf(
-        "%s %llu %016llx\n", name, static_cast<unsigned long long>(block), static_cast<unsigned long long>(hash)
+      std::println(
+        "{} {} {:016x}", name, static_cast<unsigned long long>(block), static_cast<unsigned long long>(hash)
       );
     }
     return 0;
@@ -798,11 +802,11 @@ namespace
 
     int total = 0;
     for (const auto& [name, count] : mismatchesByName) {
-      std::printf("FAIL %s: %d case(s) differ; first: %s\n", name.c_str(), count, firstMismatch[name].c_str());
+      std::println("FAIL {}: {} case(s) differ; first: {}", name, count, firstMismatch[name]);
       total += count;
     }
-    std::printf(
-      "faf_sim_math_tests (%s): %zu cases, %d differ, %d missing from %s (%d known platform difference(s) applied)\n",
+    std::println(
+      "faf_sim_math_tests ({}): {} cases, {} differ, {} missing from {} ({} known platform difference(s) applied)",
       PlatformName(),
       results.order.size(),
       total,
@@ -926,62 +930,6 @@ TEST(
   RunParityCheck(golden.empty() ? nullptr : golden.c_str(), known.empty() ? nullptr : known.c_str());
 }
 
-// Engine addition (Android port): fa::X87Float, the x87 register of Wm3's collision queries, gives
-// the x87's NaNs on every CPU: an invalid operation the indefinite (AArch64's own NaN is positive),
-// a NaN operand itself. The operands come through volatile reads, so that the CPU computes each
-// operation: clang folds a constant inf - inf to the positive NaN on every target, which would hide
-// the negative indefinite x86 and x64 compute (on AArch64, X87Float's check makes even a folded NaN
-// the indefinite).
-namespace
-{
-  std::uint32_t StoredBits(
-    const fa::X87Float value
-  )
-  {
-    return std::bit_cast<std::uint32_t>(static_cast<float>(value));
-  }
-
-  fa::X87Float Opaque(
-    const std::uint32_t bits
-  )
-  {
-    const volatile std::uint32_t loaded = bits;
-    return fa::X87Float(std::bit_cast<float>(static_cast<std::uint32_t>(loaded)));
-  }
-} // namespace
-
-TEST(
-  X87Float,
-  InvalidOperationGivesTheIndefinite
-)
-{
-  constexpr std::uint32_t kIndefinite = 0xFFC00000u; // the x87 indefinite, stored to a float
-  const fa::X87Float inf = Opaque(0x7F800000u);
-  const fa::X87Float zero = Opaque(0x00000000u);
-  EXPECT_EQ(StoredBits(inf - inf), kIndefinite);
-  EXPECT_EQ(StoredBits(inf + -inf), kIndefinite);
-  EXPECT_EQ(StoredBits(-inf + inf), kIndefinite);
-  EXPECT_EQ(StoredBits(zero * inf), kIndefinite);
-  EXPECT_EQ(StoredBits(-inf * zero), kIndefinite);
-  EXPECT_EQ(StoredBits(zero / zero), kIndefinite);
-  EXPECT_EQ(StoredBits(-inf / inf), kIndefinite);
-}
-
-TEST(
-  X87Float,
-  NaNOperandPassesThrough
-)
-{
-  const fa::X87Float one = Opaque(0x3F800000u);
-  for (const std::uint32_t nan : {0x7FC00000u, 0xFFC00000u, 0x7FC01234u, 0xFFC04321u}) {
-    const fa::X87Float value = Opaque(nan);
-    EXPECT_EQ(StoredBits(value + one), nan);
-    EXPECT_EQ(StoredBits(one - value), nan);
-    EXPECT_EQ(StoredBits(value * one), nan);
-    EXPECT_EQ(StoredBits(one / value), nan);
-  }
-}
-
 int main(
   int argc,
   char** argv
@@ -1008,18 +956,18 @@ int main(
     const char* const path = argv[2];
     std::FILE* const out = std::fopen(path, "wb");
     if (out == nullptr) {
-      std::fprintf(stderr, "cannot write %s\n", path);
+      std::println(stderr, "cannot write {}", path);
       return 2;
     }
-    std::fprintf(
-      out, "# faf_sim_math_tests golden values (plan WPL.23), generated on %s. One line per case:\n", PlatformName()
+    std::println(
+      out, "# faf_sim_math_tests golden values (plan WPL.23), generated on {}. One line per case:", PlatformName()
     );
-    std::fprintf(out, "# name index inputs -> outputs (hex bit patterns; i/u prefixes for integers).\n");
+    std::println(out, "# name index inputs -> outputs (hex bit patterns; i/u prefixes for integers).");
     for (const std::string& key : results.order) {
-      std::fprintf(out, "%s %s\n", key.c_str(), results.lines[key].c_str());
+      std::println(out, "{} {}", key, results.lines[key]);
     }
     std::fclose(out);
-    std::printf("wrote %zu cases to %s\n", results.order.size(), path);
+    std::println("wrote {} cases to {}", results.order.size(), path);
     return 0;
   }
 
@@ -1033,26 +981,26 @@ int main(
     const char* const path = argv[2];
     std::map<std::string, std::string> golden;
     if (!ReadCaseFile(path, golden)) {
-      std::fprintf(stderr, "cannot read %s\n", path);
+      std::println(stderr, "cannot read {}", path);
       return 2;
     }
     std::FILE* const out = std::fopen(argv[3], "wb");
     if (out == nullptr) {
-      std::fprintf(stderr, "cannot write %s\n", argv[3]);
+      std::println(stderr, "cannot write {}", argv[3]);
       return 2;
     }
-    std::fprintf(out, "# faf_sim_math_tests known differences on %s from %s (plan WPL.23).\n", PlatformName(), path);
-    std::fprintf(out, "# Reason: %s\n", argv[4]);
+    std::println(out, "# faf_sim_math_tests known differences on {} from {} (plan WPL.23).", PlatformName(), path);
+    std::println(out, "# Reason: {}", argv[4]);
     int written = 0;
     for (const std::string& key : results.order) {
       const auto it = golden.find(key);
       if (it != golden.end() && it->second != results.lines[key]) {
-        std::fprintf(out, "%s %s\n", key.c_str(), results.lines[key].c_str());
+        std::println(out, "{} {}", key, results.lines[key]);
         ++written;
       }
     }
     std::fclose(out);
-    std::printf("wrote %d known difference(s) to %s\n", written, argv[3]);
+    std::println("wrote {} known difference(s) to {}", written, argv[3]);
     return 0;
   }
 

@@ -9,6 +9,7 @@
 #include "EClientMsg.h"
 #include "ECmdStreamOp.h"
 
+#include <utility>
 #include <algorithm>
 #include <iterator>
 #include <cstddef>
@@ -613,7 +614,7 @@ void CMarshaller::SetCommandType(
   CMessage message{ECmdStreamOp::CMDST_SetCommandType};
   CMessageStream stream{message};
   stream.Write(cmdId);
-  const auto typeWord = static_cast<std::int32_t>(type);
+  const auto typeWord = std::to_underlying(type);
   stream.Write(typeWord);
   mClientManager->ProcessClients(message);
 }
@@ -801,13 +802,13 @@ void CMarshaller::WriteTarget(
   const SSTITarget& target
 )
 {
-  const auto targetTypeWord = static_cast<std::int32_t>(target.mType);
+  const auto targetTypeWord = std::to_underlying(target.mType);
   const auto targetTypeByte = static_cast<std::uint8_t>(targetTypeWord);
   stream.Write(targetTypeByte);
 
-  if (targetTypeWord == static_cast<std::int32_t>(EAiTargetType::AITARGET_Entity)) {
+  if (targetTypeWord == std::to_underlying(EAiTargetType::AITARGET_Entity)) {
     stream.Write(target.mEntityId);
-  } else if (targetTypeWord == static_cast<std::int32_t>(EAiTargetType::AITARGET_Ground)) {
+  } else if (targetTypeWord == std::to_underlying(EAiTargetType::AITARGET_Ground)) {
     stream.Write(&target.mPos, sizeof(target.mPos));
   }
 }
@@ -841,6 +842,8 @@ CClientManagerImpl::~CClientManagerImpl()
 {
   // It holds client pointers, and deleting a client can still route a message.
   mRejoinFeed.reset();
+  // Engine addition (issue #275): rejoin candidates hold this manager, its seats and links of its connector.
+  REJOIN_ForgetManager(*this);
 
   for (CClientBase*& client : mClients) {
     delete client;

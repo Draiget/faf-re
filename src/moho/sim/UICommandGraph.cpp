@@ -1,4 +1,5 @@
 #include "moho/sim/CWldSessionPrivate.h"
+#include <utility>
 
 // Defined at file scope (global namespace, external linkage) in
 // CrtRuntimeExportedHelpers.cpp - shared by every legacy VC8 "<container> too
@@ -289,7 +290,7 @@ namespace moho
 
   std::size_t UICommandGraph::EdgeKeyHashCompare::operator()(
     const DrawNodePair& key
-  ) const noexcept
+  ) noexcept
   {
     const auto fromAddress = reinterpret_cast<std::uintptr_t>(key.first);
     const auto toAddress = reinterpret_cast<std::uintptr_t>(key.second);
@@ -302,7 +303,7 @@ namespace moho
   bool UICommandGraph::EdgeKeyHashCompare::operator()(
     const DrawNodePair& lhs,
     const DrawNodePair& rhs
-  ) const noexcept
+  ) noexcept
   {
     const std::less<UICommandGraphDrawNode*> less;
     return less(lhs.first, rhs.first) || (!less(rhs.first, lhs.first) && less(lhs.second, rhs.second));
@@ -2875,7 +2876,7 @@ namespace moho
       }
 
       const auto commandType = ResolveCommandIssueHelperCommandType(*helper);
-      const std::uint64_t typeBit = std::uint64_t{1} << static_cast<std::int32_t>(commandType);
+      const std::uint64_t typeBit = std::uint64_t{1} << std::to_underlying(commandType);
       if ((typeBit & kExcludedCommandTypeMask) != 0u) {
         continue;
       }
@@ -2895,10 +2896,10 @@ namespace moho
       }
 
       currentNode->mIsChainBoundary = 0u;
-      if (previousCommandType != 0 && previousCommandType != static_cast<std::int32_t>(commandType)) {
+      if (previousCommandType != 0 && previousCommandType != std::to_underlying(commandType)) {
         previousNode->mIsChainBoundary = 1u;
       }
-      previousCommandType = static_cast<std::int32_t>(commandType);
+      previousCommandType = std::to_underlying(commandType);
 
       const float invWeight = 1.0f / previousNode->mWeight;
       currentNode->mPreviousCentroid.x = previousNode->mPositionSum.x * invWeight;

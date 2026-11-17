@@ -93,7 +93,7 @@ namespace faf::netbridge
       std::string name = argv[i];
       std::string value;
       bool hasValue = false;
-      if (const std::size_t eq = name.find('='); name.rfind("--", 0) == 0 && eq != std::string::npos) {
+      if (const std::size_t eq = name.find('='); name.starts_with("--") && eq != std::string::npos) {
         value = name.substr(eq + 1);
         name = name.substr(0, eq);
         hasValue = true;
@@ -367,10 +367,9 @@ namespace faf::netbridge
       }
       const std::string text = mRpcIn.substr(start, end - start + 1);
       mRpcIn.erase(0, end + 1);
-      std::string error;
-      const std::optional<JsonValue> msg = netlink::ParseJson(text, &error);
+      const std::expected<JsonValue, std::string> msg = netlink::ParseJson(text);
       if (!msg || !msg->IsObject()) {
-        Log("bad RPC message (" + error + "): " + text);
+        Log("bad RPC message (" + (msg ? std::string() : msg.error()) + "): " + text);
         continue;
       }
       HandleRpc(*msg);
@@ -546,7 +545,7 @@ namespace faf::netbridge
     const JsonValue& msg
   )
   {
-    if (mEnginePeers.count(remoteId) != 0) {
+    if (mEnginePeers.contains(remoteId)) {
       const std::string text = msg.IsString() ? msg.AsString() : netlink::WriteJson(msg);
       SendToGame({netlink::kCmdIceMsg, {GpgArg::Int(static_cast<std::int32_t>(remoteId)), GpgArg::Str(text)}});
       return;
@@ -561,10 +560,9 @@ namespace faf::netbridge
       it->second->link->OnSignalText(text); // issue #239
       return;
     }
-    std::string error;
-    const std::optional<netlink::CandidatesMessage> m = netlink::CandidatesMessageFromJson(text, &error);
+    const std::expected<netlink::CandidatesMessage, std::string> m = netlink::CandidatesMessageFromJson(text);
     if (!m) {
-      Log("failed to parse iceMsg (" + error + "): " + text);
+      Log("failed to parse iceMsg (" + m.error() + "): " + text);
       return;
     }
     it->second->link->OnSignal(*m);
@@ -734,7 +732,7 @@ namespace faf::netbridge
       }
       return true;
     }
-    return m.command.rfind("Netlink", 0) == 0;
+    return m.command.starts_with("Netlink");
   }
 
   std::uint16_t Bridge::AddPeer(

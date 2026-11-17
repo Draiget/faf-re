@@ -2,6 +2,7 @@
 #include "moho/ai/CAiAttackerImpl.h"
 #include "legacy/math/X87Math.h"
 
+#include <utility>
 #include <typeinfo>
 
 #include "gpg/core/reflection/Reflection.h"
@@ -1605,8 +1606,8 @@ void CAiAttackerImpl::SetState(
 )
 {
   auto* const view = this;
-  const auto stateValue = static_cast<std::int32_t>(state);
-  if (stateValue != static_cast<std::int32_t>(view->mReportingState)) {
+  const auto stateValue = std::to_underlying(state);
+  if (stateValue != std::to_underlying(view->mReportingState)) {
     view->mReportingState = static_cast<EAiAttackerEvent>(stateValue);
     BroadcastEvent(static_cast<EAiAttackerEvent>(stateValue));
   }

@@ -148,9 +148,9 @@ namespace faf::editor
         return;
       }
       const std::string name = Lower(entry.name);
-      if (name.rfind(prefix, 0) == 0) {
+      if (name.starts_with(prefix)) {
         starts.push_back(&entry);
-      } else if (!prefix.empty() && name.find(prefix) != std::string::npos) {
+      } else if (!prefix.empty() && name.contains(prefix)) {
         contains.push_back(&entry);
       }
     };
@@ -332,7 +332,7 @@ namespace faf::editor
       if (after >= text.size() || text[after] != '(' || word.size() < 4) {
         continue;
       }
-      if (defined.count(word) != 0 || LuaOwn().count(word) != 0 || LuaApiFind("", word) != nullptr) {
+      if (defined.contains(word) || LuaOwn().contains(word) || LuaApiFind("", word) != nullptr) {
         continue;
       }
       // The nearest known global, one or two letters off.
@@ -473,7 +473,7 @@ namespace faf::editor
       }
       const int given = any ? args + 1 : 0;
       const std::string params = entry->params;
-      if (params.find("...") != std::string::npos) {
+      if (params.contains("...")) {
         continue;
       }
       int takes = 0;

@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <expected>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -43,8 +44,8 @@ namespace faf::server
      * Listens at `at`. `token`: the admin token every request must carry (at least 16 characters); `corsOrigin`: the
      * one web origin a browser may call from (`Access-Control-Allow-Origin`), empty for none.
      */
-    [[nodiscard]] bool
-    Open(const remote::net::SEndpoint& at, std::string token, std::string corsOrigin, std::string& error);
+    [[nodiscard]] std::expected<void, std::string>
+    Open(const remote::net::SEndpoint& at, std::string token, std::string corsOrigin);
     /** Accepts, reads and writes what it can without waiting; the requests that came, in order. */
     void Poll(std::vector<SControlRequest>& requests, std::uint64_t nowUs);
     /** The answer to request `id` (negative), as `CControlListener::Reply`/`Refuse` make it. */

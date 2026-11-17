@@ -9,6 +9,7 @@
 #include "gpg/gal/backends/d3d9/DeviceD3D9.hpp"
 #endif
 #include "moho/render/d3d/CD3DDevice.h"
+#include <utility>
 
 namespace moho
 {
@@ -177,10 +178,10 @@ namespace moho
 
     std::uint32_t lockFlags = 0;
     if (readOnly) {
-      lockFlags = static_cast<std::uint32_t>(gpg::gal::MohoD3DLockFlags::NoOverwrite);
+      lockFlags = std::to_underlying(gpg::gal::MohoD3DLockFlags::NoOverwrite);
     }
     if (discard) {
-      lockFlags |= static_cast<std::uint32_t>(gpg::gal::MohoD3DLockFlags::Discard);
+      lockFlags |= std::to_underlying(gpg::gal::MohoD3DLockFlags::Discard);
     }
 
     try {

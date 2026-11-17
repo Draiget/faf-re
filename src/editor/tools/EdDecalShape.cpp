@@ -86,10 +86,10 @@ namespace faf::editor
     });
     const std::size_t slash = lower.find_last_of('/');
     const std::string file = slash == std::string::npos ? lower : lower.substr(slash + 1);
-    if (file.find("normal") != std::string::npos) {
+    if (file.contains("normal")) {
       return 2;
     }
-    if (file.find("glow") != std::string::npos) {
+    if (file.contains("glow")) {
       return 6;
     }
     return 1;

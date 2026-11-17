@@ -1,4 +1,5 @@
 #include "moho/unit/core/UnitPrivate2.h"
+#include <utility>
 
 namespace
 {
@@ -330,8 +331,8 @@ bool Unit::PrepareMove(
   const RUnitBlueprint* const blueprint = GetBlueprint();
   if (blueprint != nullptr && blueprint->Air.CanFly) {
     const std::uint8_t adjustedCaps = static_cast<std::uint8_t>(
-      (static_cast<std::uint8_t>(footprint.mOccupancyCaps) - static_cast<std::uint8_t>(EOccupancyCaps::OC_AIR)) |
-      static_cast<std::uint8_t>(EOccupancyCaps::OC_LAND)
+      (std::to_underlying(footprint.mOccupancyCaps) - std::to_underlying(EOccupancyCaps::OC_AIR)) |
+      std::to_underlying(EOccupancyCaps::OC_LAND)
     );
     footprint.mOccupancyCaps = static_cast<EOccupancyCaps>(adjustedCaps);
 
@@ -349,7 +350,7 @@ bool Unit::PrepareMove(
         mapData != nullptr ? mapData->GetWaterElevationAt(inOutPos->x, inOutPos->z) : -10000.0f; // engine addition
       if (waterElevation > terrainElevation) {
         const std::uint8_t withWaterCaps = static_cast<std::uint8_t>(
-          static_cast<std::uint8_t>(footprint.mOccupancyCaps) | static_cast<std::uint8_t>(EOccupancyCaps::OC_WATER)
+          std::to_underlying(footprint.mOccupancyCaps) | std::to_underlying(EOccupancyCaps::OC_WATER)
         );
         footprint.mOccupancyCaps = static_cast<EOccupancyCaps>(withWaterCaps);
       }

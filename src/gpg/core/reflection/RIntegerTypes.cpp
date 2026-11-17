@@ -485,7 +485,7 @@ fa::string RIntType<T>::GetLexical(
   const T value = *static_cast<const T*>(ref.mObj);
   fa::string result;
   result.resize(30, '\0');
-  const int n = std::sprintf(result.raw_data_mut_unsafe(), "%lld", static_cast<long long>(value));
+  const int n = std::snprintf(result.raw_data_mut_unsafe(), 30u, "%lld", static_cast<long long>(value));
   result.resize(static_cast<std::size_t>(n));
   return result;
 }

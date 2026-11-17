@@ -4,6 +4,7 @@
 #include "moho/entity/EntityMemoryManager.h"
 #include "moho/sim/SimBlockLane.h"
 
+#include <utility>
 #include <mutex>
 #include <thread>
 
@@ -97,7 +98,7 @@ namespace moho
     ~CPrfTimeLogItem();
   };
 
-#if defined(_M_IX86)
+#if FAFRE_ARCH_X86
   static_assert(sizeof(CPrfTimeLogItem) == 0x18, "CPrfTimeLogItem size must be 0x18");
 #endif
 } // namespace moho
@@ -800,7 +801,7 @@ namespace moho
     const SOCellPos& cellPos
   ) const
   {
-    return static_cast<std::uint8_t>(OCCUPY_FootprintFits(*mOGrid, cellPos, *mFootprint, EOccupancyCaps::OC_ANY)) != 0u;
+    return std::to_underlying(OCCUPY_FootprintFits(*mOGrid, cellPos, *mFootprint, EOccupancyCaps::OC_ANY)) != 0u;
   }
 
   // Address: 0x007647A0 (FUN_007647A0) -- always-in-bounds policy for preview traversal.
@@ -931,7 +932,7 @@ namespace moho
     // asm evidence (0x007648A9-0x007648B7): OCCUPY_FootprintFits is tested
     // against the just-assigned mStartCell, not mGoalCell.
     mStartCellIsTraversable =
-      static_cast<std::uint8_t>(OCCUPY_FootprintFits(*mOGrid, mStartCell, *footprint, EOccupancyCaps::OC_ANY)) != 0u;
+      std::to_underlying(OCCUPY_FootprintFits(*mOGrid, mStartCell, *footprint, EOccupancyCaps::OC_ANY)) != 0u;
 
     // `PathQueue::QueueTraveler`, inlined (0x007648BC..0x007648EF): unlink,
     // self-link, append before the queue's pending sentinel.

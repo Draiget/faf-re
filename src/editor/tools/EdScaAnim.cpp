@@ -117,16 +117,14 @@ namespace faf::editor
     }
   } // namespace
 
-  bool ReadSca(
+  std::expected<void, std::string> ReadSca(
     const std::vector<std::uint8_t>& b,
-    ScaAnimation& out,
-    std::string& error
+    ScaAnimation& out
   )
   {
     out = ScaAnimation{};
     if (b.size() < 0x24 || std::memcmp(b.data(), "ANIM", 4) != 0) {
-      error = "not an animation file (no ANIM header)";
-      return false;
+      return std::unexpected("not an animation file (no ANIM header)");
     }
     std::uint32_t version = 0, frames = 0, bones = 0, namesAt = 0, linksAt = 0, firstAt = 0, frameSize = 0;
     float duration = 0.0f;
@@ -139,8 +137,7 @@ namespace faf::editor
     (void)U32(b, 0x1C, firstAt);
     (void)U32(b, 0x20, frameSize);
     if (bones == 0 || bones > 1024 || frames > 100000) {
-      error = "the animation's bone or frame count is out of range";
-      return false;
+      return std::unexpected("the animation's bone or frame count is out of range");
     }
     out.version = static_cast<int>(version);
     out.duration = duration;
@@ -157,14 +154,12 @@ namespace faf::editor
     for (std::uint32_t i = 0; i < bones; ++i) {
       std::uint32_t parent = 0;
       if (!U32(b, linksAt + i * 4, parent)) {
-        error = "the bone links run past the end of the file";
-        return false;
+        return std::unexpected("the bone links run past the end of the file");
       }
       out.parents.push_back(parent == 0xFFFFFFFFu ? -1 : static_cast<int>(parent));
     }
     if (!Key(b, firstAt, out.version, out.rootStart)) {
-      error = "the first frame runs past the end of the file";
-      return false;
+      return std::unexpected("the first frame runs past the end of the file");
     }
     const std::size_t stride = frameSize != 0 ? frameSize : 8 + static_cast<std::size_t>(bones) * 28;
     const std::size_t framesAt = firstAt + 28;
@@ -172,14 +167,12 @@ namespace faf::editor
       const std::size_t fa = framesAt + static_cast<std::size_t>(f) * stride;
       ScaAnimation::Frame frame;
       if (!F32(b, fa, frame.time) || !U32(b, fa + 4, frame.flags)) {
-        error = "frame " + std::to_string(f) + " runs past the end of the file";
-        return false;
+        return std::unexpected("frame " + std::to_string(f) + " runs past the end of the file");
       }
       frame.keys.resize(bones);
       for (std::uint32_t k = 0; k < bones; ++k) {
         if (!Key(b, fa + 8 + static_cast<std::size_t>(k) * 28, out.version, frame.keys[k])) {
-          error = "frame " + std::to_string(f) + " runs past the end of the file";
-          return false;
+          return std::unexpected("frame " + std::to_string(f) + " runs past the end of the file");
         }
       }
       out.frames.push_back(std::move(frame));
@@ -187,7 +180,7 @@ namespace faf::editor
     if (out.duration <= 0.0f && !out.frames.empty()) {
       out.duration = out.frames.back().time;
     }
-    return true;
+    return {};
   }
 
   std::vector<ScaKey> SampleSca(

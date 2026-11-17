@@ -22,7 +22,7 @@ namespace faf::editor
     static constexpr int kTile = 32;
 
     /** Forgets everything; the field is `width` x `height` samples. */
-    void Reset(int width, int height, std::size_t budgetBytes = std::size_t{256} << 20);
+    void Reset(int width, int height, std::size_t budgetBytes = 256uz << 20);
 
     /** A stroke starts. */
     void BeginStroke();

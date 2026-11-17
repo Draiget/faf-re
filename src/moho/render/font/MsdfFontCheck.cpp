@@ -68,13 +68,11 @@ namespace moho
       return text;
     }
 
-    [[nodiscard]] bool Refuse(
-      std::string& reason,
+    [[nodiscard]] std::unexpected<std::string> Refuse(
       std::string text
     )
     {
-      reason = std::move(text);
-      return false;
+      return std::unexpected(std::move(text));
     }
 
     [[nodiscard]] bool AllZero(
@@ -88,34 +86,33 @@ namespace moho
     }
   } // namespace
 
-  bool MSDF_CheckFontStructure(
+  std::expected<void, std::string> MSDF_CheckFontStructure(
     const void* const bytes,
-    const std::size_t byteCount,
-    std::string& reason
+    const std::size_t byteCount
   )
   {
     if (bytes == nullptr || byteCount == 0u) {
-      return Refuse(reason, "the file is empty");
+      return Refuse("the file is empty");
     }
     if (byteCount > kMsdfMaxFontBytes) {
-      return Refuse(reason, "the file is over the size limit");
+      return Refuse("the file is over the size limit");
     }
     if (byteCount < kHeaderBytes) {
-      return Refuse(reason, "the file is too short to be a font");
+      return Refuse("the file is too short to be a font");
     }
     const auto* const data = static_cast<const std::uint8_t*>(bytes);
     const std::uint32_t signature = ReadU32(data);
     if (signature != 0x00010000u && signature != Tag("OTTO")) {
-      return Refuse(reason, "not a TrueType or OpenType file");
+      return Refuse("not a TrueType or OpenType file");
     }
 
     const std::size_t tableCount = (static_cast<std::size_t>(data[4]) << 8u) | data[5];
     if (tableCount == 0u || tableCount > kMaxTables) {
-      return Refuse(reason, "an unusable number of tables");
+      return Refuse("an unusable number of tables");
     }
     const std::size_t directoryEnd = kHeaderBytes + tableCount * kDirectoryEntryBytes;
     if (directoryEnd > byteCount) {
-      return Refuse(reason, "the table directory runs past the end of the file");
+      return Refuse("the table directory runs past the end of the file");
     }
 
     std::vector<std::pair<std::uint64_t, std::uint64_t>> spans;
@@ -131,20 +128,20 @@ namespace moho
       const std::uint64_t offset = ReadU32(entry + 8u);
       const std::uint64_t length = ReadU32(entry + 12u);
       if (i != 0u && tag <= previousTag) {
-        return Refuse(reason, "the table directory isn't sorted");
+        return Refuse("the table directory isn't sorted");
       }
       previousTag = tag;
       if (std::find(std::begin(kAllowedTables), std::end(kAllowedTables), tag) == std::end(kAllowedTables)) {
-        return Refuse(reason, "table '" + TagText(tag) + "' isn't on the allowed list");
+        return Refuse("table '" + TagText(tag) + "' isn't on the allowed list");
       }
       if (tag == Tag("FFTM") && length > kMaxTimestampTableBytes) {
-        return Refuse(reason, "table 'FFTM' is larger than a timestamp table can be");
+        return Refuse("table 'FFTM' is larger than a timestamp table can be");
       }
       if (offset % 4u != 0u) {
-        return Refuse(reason, "table '" + TagText(tag) + "' isn't aligned");
+        return Refuse("table '" + TagText(tag) + "' isn't aligned");
       }
       if (offset < directoryEnd || offset + length > byteCount) {
-        return Refuse(reason, "table '" + TagText(tag) + "' lies outside the file");
+        return Refuse("table '" + TagText(tag) + "' lies outside the file");
       }
       if (std::find(std::begin(kRequiredTables), std::end(kRequiredTables), tag) != std::end(kRequiredTables)) {
         ++requiredFound;
@@ -155,7 +152,7 @@ namespace moho
       spans.emplace_back(offset, offset + length);
     }
     if (requiredFound != std::size(kRequiredTables) || !((hasGlyf && hasLoca) || hasCff)) {
-      return Refuse(reason, "a table every font needs is missing");
+      return Refuse("a table every font needs is missing");
     }
 
     // Walk the file in order: only tables, each followed by nothing but the zeros that align the next.
@@ -163,42 +160,38 @@ namespace moho
     std::uint64_t position = directoryEnd;
     for (const auto& [first, last] : spans) {
       if (first < position) {
-        return Refuse(reason, "tables overlap");
+        return Refuse("tables overlap");
       }
       if (first - position > 3u || !AllZero(data + position, data + first)) {
-        return Refuse(reason, "bytes that belong to no table");
+        return Refuse("bytes that belong to no table");
       }
       position = last;
     }
     const std::uint64_t tail = byteCount - position;
     if (tail != 0u && (tail > 3u || byteCount % 4u != 0u || !AllZero(data + position, data + byteCount))) {
-      return Refuse(reason, "bytes after the last table");
+      return Refuse("bytes after the last table");
     }
-    return true;
+    return {};
   }
 
-  bool MSDF_IsAllowedModFontPath(
-    const char* const path,
-    std::string& reason
+  std::expected<void, std::string> MSDF_IsAllowedModFontPath(
+    const char* const path
   )
   {
     if (path == nullptr || *path == '\0') {
-      return Refuse(reason, "no path given");
+      return Refuse("no path given");
     }
     std::string lower(path);
     std::transform(lower.begin(), lower.end(), lower.begin(), [](const unsigned char c) {
       return static_cast<char>(std::tolower(c));
     });
-    if (
-      lower.find("..") != std::string::npos || lower.find('\\') != std::string::npos ||
-      lower.find(':') != std::string::npos
-    ) {
-      return Refuse(reason, "the path has parts a font path can't have");
+    if (lower.contains("..") || lower.contains('\\') || lower.contains(':')) {
+      return Refuse("the path has parts a font path can't have");
     }
     constexpr char kModsPrefix[] = "/mods/";
     constexpr std::size_t kModsPrefixBytes = sizeof(kModsPrefix) - 1u;
     if (lower.compare(0u, kModsPrefixBytes, kModsPrefix) != 0) {
-      return Refuse(reason, "the path isn't under /mods/<mod>/fonts/");
+      return Refuse("the path isn't under /mods/<mod>/fonts/");
     }
     const std::size_t modEnd = lower.find('/', kModsPrefixBytes);
     constexpr char kFontsFolder[] = "/fonts/";
@@ -207,7 +200,7 @@ namespace moho
       modEnd == std::string::npos || modEnd == kModsPrefixBytes ||
       lower.compare(modEnd, kFontsFolderBytes, kFontsFolder) != 0
     ) {
-      return Refuse(reason, "the path isn't under /mods/<mod>/fonts/");
+      return Refuse("the path isn't under /mods/<mod>/fonts/");
     }
     const std::size_t dot = lower.rfind('.');
     const std::size_t slash = lower.rfind('/');
@@ -215,41 +208,40 @@ namespace moho
       dot == std::string::npos || dot < slash || dot == slash + 1u ||
       (lower.compare(dot, std::string::npos, ".ttf") != 0 && lower.compare(dot, std::string::npos, ".otf") != 0)
     ) {
-      return Refuse(reason, "a font file has to be a .ttf or .otf");
+      return Refuse("a font file has to be a .ttf or .otf");
     }
-    return true;
+    return {};
   }
 
-  bool MSDF_CheckCookedAtlas(
+  std::expected<void, std::string> MSDF_CheckCookedAtlas(
     const SMsdfFontAtlas& atlas,
-    const SMsdfCookOptions& options,
-    std::string& reason
+    const SMsdfCookOptions& options
   )
   {
     if (atlas.mWidth != options.mAtlasWidth || atlas.mHeight <= 0 || atlas.mHeight > options.mMaxAtlasHeight) {
-      return Refuse(reason, "the atlas has the wrong size");
+      return Refuse("the atlas has the wrong size");
     }
     if (
       atlas.mEmPixels != static_cast<float>(options.mEmPixels) ||
       atlas.mDistanceRange != static_cast<float>(options.mDistanceRange)
     ) {
-      return Refuse(reason, "the atlas has the wrong scale");
+      return Refuse("the atlas has the wrong scale");
     }
     std::vector<std::uint32_t> asked = options.mCodepoints;
     std::sort(asked.begin(), asked.end());
     if (atlas.mGlyphs.size() > asked.size() || atlas.mMissing > asked.size()) {
-      return Refuse(reason, "the atlas has too many glyphs");
+      return Refuse("the atlas has too many glyphs");
     }
     for (const SMsdfGlyph& glyph : atlas.mGlyphs) {
       if (!std::binary_search(asked.begin(), asked.end(), glyph.mCodepoint)) {
-        return Refuse(reason, "the atlas has a character nobody asked for");
+        return Refuse("the atlas has a character nobody asked for");
       }
       const float metrics[] = {
         glyph.mAdvance, glyph.mPlaneLeft, glyph.mPlaneBottom, glyph.mPlaneRight, glyph.mPlaneTop
       };
       for (const float value : metrics) {
         if (!std::isfinite(value) || std::fabs(value) > kMaxQuadEm) {
-          return Refuse(reason, "a glyph's size is out of range");
+          return Refuse("a glyph's size is out of range");
         }
       }
     }
@@ -257,21 +249,21 @@ namespace moho
       std::fabs(atlas.mAscent) > kMaxQuadEm || std::fabs(atlas.mDescent) > kMaxQuadEm ||
       std::fabs(atlas.mLineGap) > kMaxQuadEm
     ) {
-      return Refuse(reason, "the font's line metrics are out of range");
+      return Refuse("the font's line metrics are out of range");
     }
     if (atlas.mStrikes.size() != options.mStrikeSizes.size()) {
-      return Refuse(reason, "the atlas has the wrong small sizes");
+      return Refuse("the atlas has the wrong small sizes");
     }
     for (std::size_t i = 0; i < atlas.mStrikes.size(); ++i) {
       if (atlas.mStrikes[i].mPixelSize != options.mStrikeSizes[i]) {
-        return Refuse(reason, "the atlas has the wrong small sizes");
+        return Refuse("the atlas has the wrong small sizes");
       }
       for (const SMsdfStrikeGlyph& glyph : atlas.mStrikes[i].mGlyphs) {
         if (!std::binary_search(asked.begin(), asked.end(), glyph.mCodepoint)) {
-          return Refuse(reason, "the atlas has a character nobody asked for");
+          return Refuse("the atlas has a character nobody asked for");
         }
       }
     }
-    return true;
+    return {};
   }
 } // namespace moho

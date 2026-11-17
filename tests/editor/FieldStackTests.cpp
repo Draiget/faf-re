@@ -12,18 +12,18 @@ namespace faf::editor
   )
   {
     FieldStack stack;
-    std::string error;
-    EXPECT_FALSE(stack.Apply("invert", {}, error));
+    EXPECT_FALSE(stack.Apply("invert", {}));
     field::Grid base(9, 9, 1.0f, 0.0f, 0.0f, 0.0f);
     base.At(4, 4) = 10.0f;
     stack.Start(base);
-    ASSERT_TRUE(stack.Apply("blur", ParseOpParams("radius = 2"), error)) << error;
+    const auto blurred = stack.Apply("blur", ParseOpParams("radius = 2"));
+    ASSERT_TRUE(blurred) << blurred.error();
     ASSERT_NE(stack.Top(), nullptr);
     EXPECT_LT(stack.Top()->At(4, 4), 10.0f); // the peak spread out
     EXPECT_GT(stack.Top()->At(5, 4), 0.0f);
     EXPECT_EQ(stack.Steps().size(), 1U);
     EXPECT_EQ(stack.Steps()[0], "blur (radius=2)");
-    EXPECT_FALSE(stack.Apply("no_such_op", {}, error));
+    EXPECT_FALSE(stack.Apply("no_such_op", {}));
     EXPECT_EQ(stack.Steps().size(), 1U);
     EXPECT_TRUE(stack.Back());
     EXPECT_FLOAT_EQ(stack.Top()->At(4, 4), 10.0f);

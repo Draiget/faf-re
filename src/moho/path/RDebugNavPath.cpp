@@ -1,5 +1,6 @@
 #include "moho/path/RDebugNavPath.h"
 
+#include <utility>
 #include <cstdint>
 #include <typeinfo>
 
@@ -29,8 +30,8 @@ namespace
     }
 
     float elevation = heightField->GetElevation(x, z);
-    const bool seabedOnly = (static_cast<std::uint8_t>(footprint.mOccupancyCaps) &
-                             static_cast<std::uint8_t>(moho::EOccupancyCaps::OC_SEABED)) != 0u;
+    const bool seabedOnly =
+      (std::to_underlying(footprint.mOccupancyCaps) & std::to_underlying(moho::EOccupancyCaps::OC_SEABED)) != 0u;
     const float waterElevation = map.GetWaterElevationAt(x, z); // engine addition: per position
     if (!seabedOnly && waterElevation > elevation) {
       elevation = waterElevation;

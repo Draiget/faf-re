@@ -76,6 +76,9 @@ namespace faf::remote::net
   /** The type of a handshake datagram; empty when it isn't one. */
   [[nodiscard]] std::optional<EHandshakeType> HandshakeTypeOf(const std::uint8_t* data, std::size_t size) noexcept;
 
+  /** What a cookie is bound to: the peer's address (16 bytes, IPv4 as ::ffff:a.b.c.d) and port (`SEndpoint::Key`). */
+  using AddressKey = std::array<std::uint8_t, 18>;
+
   /** The server's cookies. A cookie holds for 30 to 60 s. */
   class CCookieJar
   {
@@ -84,8 +87,8 @@ namespace faf::remote::net
 
     /** False when the system gave no random secret; then no cookie can be trusted. */
     [[nodiscard]] bool Init() noexcept;
-    [[nodiscard]] Cookie Make(std::uint64_t addressKey, std::uint64_t nowUs) const noexcept;
-    [[nodiscard]] bool Check(const Cookie& cookie, std::uint64_t addressKey, std::uint64_t nowUs) const noexcept;
+    [[nodiscard]] Cookie Make(const AddressKey& addressKey, std::uint64_t nowUs) const noexcept;
+    [[nodiscard]] bool Check(const Cookie& cookie, const AddressKey& addressKey, std::uint64_t nowUs) const noexcept;
 
   private:
     std::array<std::uint8_t, 32> mSecret{};
@@ -96,7 +99,7 @@ namespace faf::remote::net
     const std::uint8_t* data,
     std::size_t size,
     const CCookieJar& jar,
-    std::uint64_t addressKey,
+    const AddressKey& addressKey,
     std::uint64_t nowUs
   );
 

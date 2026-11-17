@@ -726,11 +726,10 @@ namespace moho
     return mImpl->mTimedOut;
   }
 
-  bool MsdfCookPlan::Prepare(
+  std::expected<void, std::string> MsdfCookPlan::Prepare(
     const void* const fontBytes,
     const std::size_t byteCount,
-    const SMsdfCookOptions& options,
-    std::string& error
+    const SMsdfCookOptions& options
   )
   {
     Impl& plan = *mImpl;
@@ -738,22 +737,18 @@ namespace moho
     plan.mStart = std::chrono::steady_clock::now();
     plan.mLibrary = std::make_unique<FreeTypeLibrary>(options.mMaxFreeTypeBytes);
     if (plan.mLibrary->mLibrary == nullptr) {
-      error = "FreeType didn't start";
-      return false;
+      return std::unexpected("FreeType didn't start");
     }
     plan.mFace = std::make_unique<FreeTypeFace>(plan.mLibrary->mLibrary, fontBytes, byteCount);
     const FT_Face face = plan.mFace->mFace;
     if (face == nullptr) {
-      error = "FreeType can't read this file as a font";
-      return false;
+      return std::unexpected("FreeType can't read this file as a font");
     }
     if ((face->face_flags & FT_FACE_FLAG_SCALABLE) == 0 || face->units_per_EM == 0) {
-      error = "not a scalable font";
-      return false;
+      return std::unexpected("not a scalable font");
     }
     if (face->num_glyphs > options.mMaxFontGlyphs) {
-      error = "the font has too many glyphs";
-      return false;
+      return std::unexpected("the font has too many glyphs");
     }
     plan.mFont = std::make_unique<FontHandleOwner>(face);
 
@@ -765,8 +760,8 @@ namespace moho
     std::uint64_t coloringSeed = 0;
     std::size_t edgesInFont = 0u;
     for (const std::uint32_t codepoint : plan.mCodepoints) {
-      if (plan.ShouldStop(error)) {
-        return false;
+      if (std::string reason; plan.ShouldStop(reason)) {
+        return std::unexpected(reason);
       }
       const unsigned glyphId = FT_Get_Char_Index(face, codepoint);
       if (glyphId == 0u) {
@@ -784,12 +779,10 @@ namespace moho
         const std::size_t edges = CountEdges(glyph.mShape);
         edgesInFont += edges;
         if (edges > static_cast<std::size_t>(options.mMaxEdgesPerGlyph)) {
-          error = "a glyph has too many edges";
-          return false;
+          return std::unexpected("a glyph has too many edges");
         }
         if (edgesInFont > static_cast<std::size_t>(options.mMaxEdgesPerFont)) {
-          error = "the font has too many edges";
-          return false;
+          return std::unexpected("the font has too many edges");
         }
         // Only now: this is the step whose cost grows with a glyph's edges.
         msdfgen::edgeColoringInkTrap(glyph.mShape, kCornerAngleThreshold, coloringSeed);
@@ -805,19 +798,16 @@ namespace moho
     std::uint64_t fontWork = 0u;
     for (SourceGlyph& glyph : plan.mGlyphs) {
       if (!WrapBox(glyph, plan.mScale, plan.mRangeUnits, options.mMiterLimit)) {
-        error = "a glyph is far too large";
-        return false;
+        return std::unexpected("a glyph is far too large");
       }
       const std::uint64_t work = static_cast<std::uint64_t>(glyph.mWidth) * static_cast<std::uint64_t>(glyph.mHeight) *
         static_cast<std::uint64_t>(CountEdges(glyph.mShape));
       fontWork += work;
       if (options.mMaxGlyphWork != 0u && work > options.mMaxGlyphWork) {
-        error = "a glyph would take too much work";
-        return false;
+        return std::unexpected("a glyph would take too much work");
       }
       if (options.mMaxFontWork != 0u && fontWork > options.mMaxFontWork) {
-        error = "the font would take too much work";
-        return false;
+        return std::unexpected("the font would take too much work");
       }
     }
 
@@ -827,8 +817,7 @@ namespace moho
     const std::int32_t step = (std::max)(options.mHeightStep, 1);
     const std::int32_t rows = (std::max)((rowsUsed + step - 1) / step, 1) * step;
     if (rowsUsed < 0 || rows > options.mMaxAtlasHeight) {
-      error = "the glyphs don't fit the atlas";
-      return false;
+      return std::unexpected("the glyphs don't fit the atlas");
     }
 
     SMsdfFontAtlas& atlas = plan.mAtlas;
@@ -840,12 +829,10 @@ namespace moho
     atlas.mDescent = static_cast<float>(-face->descender / plan.mUnitsPerEm);
     atlas.mLineGap = static_cast<float>((face->height - face->ascender + face->descender) / plan.mUnitsPerEm);
     atlas.mPixels.assign(static_cast<std::size_t>(atlas.mWidth) * static_cast<std::size_t>(atlas.mHeight) * 4u, 0u);
-    return true;
+    return {};
   }
 
-  bool MsdfCookPlan::GenerateOnCpu(
-    std::string& error
-  )
+  std::expected<void, std::string> MsdfCookPlan::GenerateOnCpu()
   {
     Impl& plan = *mImpl;
     // Boxes don't overlap, so threads write disjoint texels.
@@ -878,10 +865,9 @@ namespace moho
       thread.join();
     }
     if (stopped.load(std::memory_order_relaxed)) {
-      error = stopReason;
-      return false;
+      return std::unexpected(stopReason);
     }
-    return true;
+    return {};
   }
 
   void MsdfCookPlan::BuildGpuData()
@@ -1007,21 +993,25 @@ namespace moho
     out = std::move(atlas);
   }
 
-  bool MSDF_CookFont(
+  std::expected<void, std::string> MSDF_CookFont(
     const void* const fontBytes,
     const std::size_t byteCount,
     const SMsdfCookOptions& options,
-    SMsdfFontAtlas& out,
-    std::string& error
+    SMsdfFontAtlas& out
   )
   {
     out = SMsdfFontAtlas{};
     MsdfCookPlan plan;
-    if (!plan.Prepare(fontBytes, byteCount, options, error) || !plan.GenerateOnCpu(error)) {
-      return false;
+    if (
+      auto cooked = plan.Prepare(fontBytes, byteCount, options).and_then([&plan] {
+      return plan.GenerateOnCpu();
+    });
+      !cooked
+    ) {
+      return cooked;
     }
     plan.Finish(out);
-    return true;
+    return {};
   }
 
   std::vector<std::string> MSDF_ReadFontNames(

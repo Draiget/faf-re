@@ -244,7 +244,7 @@ namespace
     const fa::string& pathPattern
   )
   {
-    return pathPattern.find('*') != fa::string::npos || pathPattern.find('?') != fa::string::npos;
+    return pathPattern.contains('*') || pathPattern.contains('?');
   }
 
   [[nodiscard]] fa::string ParentDirectoryFromPattern(

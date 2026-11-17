@@ -1,6 +1,6 @@
 #pragma once
 
-#if defined(_M_X64) || defined(__x86_64__) || defined(__aarch64__)
+#if FAFRE_ARCH_64BIT
 
 #include <cstddef>
 #include <cstdint>
@@ -15,8 +15,8 @@
 namespace moho
 {
   /**
-   * x64 and arm64 only: the free list formations and projectiles share on the sim thread, the last freed block handed
-   * out first. 11-bone pose arrays, `unsigned int` storage and visible decal storage take blocks from it too.
+   * x64 only: the free list formations and projectiles share on the sim thread, the last freed block handed out
+   * first. 11-bone pose arrays, `unsigned int` storage and visible decal storage take blocks from it too.
    *
    * Units keep a raw formation pointer (`SInfoCache::mFormationLayer`), and `IsSameFormationLayerWith` (0x006A8D40)
    * compares pointers, so a stale pointer can equal a new formation at a reused address. In the binary these objects
@@ -198,7 +198,7 @@ namespace moho
     }
 
   private:
-    static constexpr std::size_t kHeldFilterSlots = std::size_t{1} << 16u;
+    static constexpr std::size_t kHeldFilterSlots = 1uz << 16u;
 
     /** Held entries per hash of their storage: zero means no entry has it, and a shared slot only costs a walk. Static,
      * as a heap allocation here would move what the sim gets next. */

@@ -167,9 +167,9 @@ namespace
     ReadsLightingWaterAndSkyFromAMap
   )
   {
-    Look look;
-    std::string error;
-    ASSERT_TRUE(LookFromScmap(SmallMap(true), look, error)) << error;
+    const auto read = LookFromScmap(SmallMap(true));
+    ASSERT_TRUE(read) << read.error();
+    const Look& look = *read;
     EXPECT_FLOAT_EQ(look.lighting.multiplier, 1.0f);
     EXPECT_FLOAT_EQ(look.lighting.sunColor[0], 8.0f) << "the eighth of the 23 lighting floats";
     EXPECT_FLOAT_EQ(look.lighting.fogEnd, 23.0f);
@@ -198,13 +198,13 @@ namespace
     AFileWithoutASkyKeepsTheRest
   )
   {
-    Look look;
-    std::string error;
-    ASSERT_TRUE(LookFromScmap(SmallMap(false), look, error)) << error;
+    const auto read = LookFromScmap(SmallMap(false));
+    ASSERT_TRUE(read) << read.error();
+    const Look& look = *read;
     EXPECT_FALSE(look.hasSky);
     EXPECT_FLOAT_EQ(look.water.shader.mSunGlow, 119.0f);
-    EXPECT_FALSE(LookFromScmap("Map\x1a", look, error));
-    EXPECT_FALSE(LookFromScmap("not a map", look, error));
+    EXPECT_FALSE(LookFromScmap("Map\x1a"));
+    EXPECT_FALSE(LookFromScmap("not a map"));
   }
 
   TEST(
@@ -213,9 +213,9 @@ namespace
   )
   {
     Look from;
-    Look to;
-    std::string error;
-    ASSERT_TRUE(LookFromScmap(SmallMap(true), to, error));
+    const auto read = LookFromScmap(SmallMap(true));
+    ASSERT_TRUE(read);
+    const Look& to = *read;
     from.lighting.multiplier = 3.0f;
     from.water.textures[1] = "/old/ramp.dds";
     from.water.elevation = 40.0f;
@@ -235,9 +235,9 @@ namespace
   )
   {
     Look from;
-    Look to;
-    std::string error;
-    ASSERT_TRUE(LookFromScmap(SmallMap(true), to, error));
+    const auto read = LookFromScmap(SmallMap(true));
+    ASSERT_TRUE(read);
+    const Look& to = *read;
     const Look light = BlendLook(from, to, 1.0f, kLookLighting);
     EXPECT_FLOAT_EQ(light.lighting.fogEnd, 23.0f);
     EXPECT_FLOAT_EQ(light.water.shader.mWaterColor[0], 0.0f) << "the water stays";

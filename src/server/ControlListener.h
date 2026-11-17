@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <expected>
 #include <memory>
 #include <optional>
 #include <string>
@@ -54,13 +55,13 @@ namespace faf::server
     CControlListener(const CControlListener&) = delete;
     CControlListener& operator=(const CControlListener&) = delete;
 
-    [[nodiscard]] bool Open(const remote::net::SEndpoint& at, const ControlKey& key, std::string& error);
+    [[nodiscard]] std::expected<void, std::string> Open(const remote::net::SEndpoint& at, const ControlKey& key);
     /**
      * Plan WP17.11: the same API over HTTP/JSON for a dashboard (RestListener.h), with `token` as the admin token;
      * its requests come out of `Poll` with negative ids, and `Reply`, `Refuse` and `Event` reach it too.
      */
-    [[nodiscard]] bool
-    OpenRest(const remote::net::SEndpoint& at, std::string token, std::string corsOrigin, std::string& error);
+    [[nodiscard]] std::expected<void, std::string>
+    OpenRest(const remote::net::SEndpoint& at, std::string token, std::string corsOrigin);
     /** Accepts, reads and writes what it can without waiting; the requests that came, in order. */
     void Poll(std::vector<SControlRequest>& requests, std::uint64_t nowUs);
     /**

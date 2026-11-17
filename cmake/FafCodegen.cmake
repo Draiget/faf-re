@@ -43,18 +43,25 @@ set(_faf_libm_calls
   exp exp2 expm1 log log10 log1p log2 logb pow cbrt hypot erf erfc tgamma lgamma)
 
 # Engine addition (dedicated-server plan WPL.2): the same rules for the Linux
-# build (clang with the GNU driver, cmake/toolchains/linux-clang-x64.cmake),
-# spelled for that driver, plus what the GNU driver defaults differently from
-# clang-cl:
+# and macOS builds (clang with the GNU driver, cmake/toolchains/linux-clang-x64.cmake
+# and macos-clang-arm64.cmake), spelled for that driver, plus what the GNU
+# driver defaults differently from clang-cl:
 #
-#  - -fno-math-errno: clang-cl's default. With errno semantics clang keeps
-#    sqrt as a call guarded for negative inputs where clang-cl inlines sqrtsd.
-#  - -fsigned-char: plain char signed, as with MSVC (the x86-64 Linux default
-#    too; spelled out so no target can differ).
-#  - Function and data sections, collected at link time: /Gy and /OPT:REF.
+#  - -fmath-errno: libc++ spells the float overloads std::sin(float),
+#    std::pow(float, float), ... as __builtin_sinf, __builtin_powf, which
+#    -fno-builtin-* doesn't reach. Without errno semantics clang treats them as
+#    pure: std::sin(0.5f) became a constant from the compiler's own libm and
+#    std::pow(x, 2.0f) became x*x (Apple clang 17, libc++). With errno they stay
+#    calls. The cost is a call guard on sqrt for negative inputs; the result is
+#    the same correctly rounded square root.
+#  - -fsigned-char: plain char signed, as with MSVC (the x86-64 Linux default,
+#    and Apple's arm64 one, but not Linux arm64's; spelled out so no target can
+#    differ).
+#  - Function and data sections, collected at link time: /Gy and /OPT:REF
+#    (--gc-sections with lld, -dead_strip with Apple's ld).
 #
 # Never -ffast-math or -Ofast: checked below.
-if(FAF_LINUX)
+if(FAFRE_PLATFORM_POSIX)
   set(_faf_no_builtin "")
   foreach(_fn IN LISTS _faf_libm_calls)
     list(APPEND _faf_no_builtin "-fno-builtin-${_fn}" "-fno-builtin-${_fn}f" "-fno-builtin-${_fn}l")
@@ -65,9 +72,14 @@ if(FAF_LINUX)
     endif()
   endforeach()
   target_compile_options(faf_codegen INTERFACE
-    "$<$<COMPILE_LANGUAGE:C,CXX>:-ffp-model=precise;-ffp-contract=off;-fno-math-errno;${_faf_no_builtin};-fno-strict-aliasing;-fwrapv;-fno-delete-null-pointer-checks;-fno-strict-float-cast-overflow;-fno-finite-loops;-fsigned-char;-ffunction-sections;-fdata-sections;-Wno-overriding-option>"
+    "$<$<COMPILE_LANGUAGE:C,CXX>:-ffp-model=precise;-ffp-contract=off;-fmath-errno;${_faf_no_builtin};-fno-strict-aliasing;-fwrapv;-fno-delete-null-pointer-checks;-fno-strict-float-cast-overflow;-fno-finite-loops;-fsigned-char;-ffunction-sections;-fdata-sections;-Wno-overriding-option>"
     $<$<COMPILE_LANGUAGE:CXX>:-fno-strict-return>)
-  target_link_options(faf_codegen INTERFACE -Wl,--gc-sections)
+  if(FAFRE_PLATFORM_MACOS)
+    # A library named both directly and through faf_sim's interface is one library, as with lld.
+    target_link_options(faf_codegen INTERFACE -Wl,-dead_strip -Wl,-no_warn_duplicate_libraries)
+  else()
+    target_link_options(faf_codegen INTERFACE -Wl,--gc-sections)
+  endif()
   return()
 endif()
 

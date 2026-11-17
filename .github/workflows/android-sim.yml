@@ -3,10 +3,9 @@ name: Android simulation
 # Builds the simulation for Android with the pinned NDK (the android-x64-release and
 # android-arm64-release presets, cmake/toolchains/android-*.cmake) and runs what runs without a
 # phone. A pull request gets what only this workflow can show: the arm64 build, whose toolchain
-# check and sim-math golden tests (tests/sim_math) run on an arm64 runner (its x87 helpers are the
-# software ones, legacy/math/X87MathSoft.cpp), and those software helpers compared with the x87 of
-# the x86_64 build machine (faf_x87_soft_check, a small Android x86_64 program). The whole x86_64
-# build and its golden tests run on master pushes and manual runs; on a pull request the Linux
+# check, sim-math golden tests (tests/sim_math) and software x87 tests (tests/x87_soft) run on an
+# arm64 runner, where the x87 routines are the software ones (legacy/math/X87Soft.cpp). The whole
+# x86_64 build and its tests run on master pushes and manual runs; on a pull request the Linux
 # client workflow already builds and tests the simulation for x86_64. The programs are linked
 # statically (FAF_ANDROID_STATIC_EXECUTABLES), as a Linux runner has no Android dynamic linker. The
 # NDK runs on x86_64 hosts only, so the arm64 programs are built there and run on the arm64 runner.
@@ -62,29 +61,23 @@ jobs:
           key: deps-${{ hashFiles('cmake/FafDependencies.cmake') }}
       - run: cmake -DFAF_DEPENDENCIES_ONLY="WildMagic3p8;zlib-1.2.3" -P cmake/FafDependencies.cmake
       - run: cmake --preset android-${{ matrix.abi }}-release -DFAF_ANDROID_STATIC_EXECUTABLES=ON
-      # The preset's targets: headless, faf_sim_math_tests, faf-sim-link, the toolchain check, and
-      # on x86_64 faf_x87_soft_check.
+      # The preset's targets: headless, faf_sim_math_tests, faf_x87_soft_tests, faf-sim-link and the
+      # toolchain check.
       - run: cmake --build --preset android-${{ matrix.abi }}-release
       - if: matrix.abi == 'x64'
         run: |
           build/android-x64-release/faf-linux-toolchain-check
           build/android-x64-release/faf_sim_math_tests tests/sim_math/golden.txt
-          build/android-x64-release/faf_x87_soft_check
+          build/android-x64-release/faf_x87_soft_tests
       - if: matrix.abi == 'arm64'
         uses: actions/upload-artifact@v7
         with:
           name: android-arm64-tests
           path: |
             build/android-arm64-release/faf_sim_math_tests
+            build/android-arm64-release/faf_x87_soft_tests
             build/android-arm64-release/faf-linux-toolchain-check
           retention-days: 7
-      # A pull request has no x86_64 leg: the software x87 against this machine's x87 here, built
-      # alone (a few files).
-      - if: matrix.abi == 'arm64' && github.event_name == 'pull_request'
-        run: |
-          cmake --preset android-x64-release -DFAF_ANDROID_STATIC_EXECUTABLES=ON
-          cmake --build --preset android-x64-release --target faf_x87_soft_check
-          build/android-x64-release/faf_x87_soft_check
 
   test-arm64:
     needs: build
@@ -103,3 +96,4 @@ jobs:
           chmod +x bin/*
           bin/faf-linux-toolchain-check
           bin/faf_sim_math_tests tests/sim_math/golden.txt --known tests/sim_math/known_android-arm64.txt
+          bin/faf_x87_soft_tests

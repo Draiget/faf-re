@@ -21,7 +21,7 @@ namespace platform
     const std::size_t x86Bytes
   ) noexcept
   {
-#if defined(_M_IX86)
+#if FAFRE_ARCH_X86
     return x86Bytes;
 #else
     if constexpr (std::is_void_v<T>) {

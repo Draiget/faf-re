@@ -183,8 +183,9 @@ namespace faf::editor
       return;
     }
     mGraphBuilt = mGraph->Changes();
-    std::string error;
-    if (!GraphEmitters(*mGraph, mFxEmitters, error)) {
+    if (auto emitters = GraphEmitters(*mGraph); emitters) {
+      mFxEmitters = std::move(*emitters);
+    } else {
       mFxEmitters.clear();
     }
     // A preview per emitter: kept (with its particles' age) while the count stays, the new settings taken.
@@ -210,12 +211,14 @@ namespace faf::editor
     std::string paths;
     for (const std::string& path : effect.paths) {
       std::string text;
-      EmitterBlueprint emitter;
-      std::string error;
-      if (!ReadGameFile(path, text) || !ParseEmitter(text, emitter, error)) {
+      if (!ReadGameFile(path, text)) {
         continue; // a beam or trail in the list, or a file FAF's data no longer has
       }
-      emitters.emplace_back(FileBase(path), std::move(emitter));
+      auto emitter = ParseEmitter(text);
+      if (!emitter) {
+        continue;
+      }
+      emitters.emplace_back(FileBase(path), std::move(*emitter));
       paths += (paths.empty() ? "" : ";") + path;
     }
     if (emitters.empty()) {
@@ -307,8 +310,7 @@ namespace faf::editor
       return;
     }
     mGraphUndoAt = redo ? mGraphUndoAt + 1 : mGraphUndoAt - 1;
-    std::string error;
-    (void)mGraph->Load(mGraphUndo[mGraphUndoAt], error);
+    (void)mGraph->Load(mGraphUndo[mGraphUndoAt]);
     mGraphSnap = mGraph->Changes();
     mGraphClean = ~std::uint64_t{0};
   }
@@ -321,19 +323,18 @@ namespace faf::editor
         return false;
       }
       std::string text;
-      FlatBlueprint game;
-      std::string error;
-      if (mGamePath.empty() || !ReadGameFile(mGamePath, text) || !ParseFlatBlueprint(text, game, error)) {
+      std::expected<FlatBlueprint, std::string> game;
+      if (mGamePath.empty() || !ReadGameFile(mGamePath, text) || !(game = ParseFlatBlueprint(text))) {
         mStatus = "Only a beam or trail of the game's goes into a mod project as a change";
         return false;
       }
-      const EffectModBlueprint bp = FlatModBlueprint(game, mFlat, mGamePath);
+      const EffectModBlueprint bp = FlatModBlueprint(*game, mFlat, mGamePath);
       if (bp.text.empty()) {
         mStatus = "Nothing changed from the game's " + mGamePath;
         return false;
       }
-      if (!ModWriteGenerated(mModFolder, EffectModFile(mGamePath), bp.text, error)) {
-        mStatus = "Can't: " + error;
+      if (const auto written = ModWriteGenerated(mModFolder, EffectModFile(mGamePath), bp.text); !written) {
+        mStatus = "Can't: " + written.error();
         return false;
       }
       mStatus = "Wrote " + EffectModFile(mGamePath) + " into the mod project " + mModName +
@@ -358,7 +359,7 @@ namespace faf::editor
     for (std::size_t start = 0; start < paths.size();) {
       const std::size_t end = paths.find(';', start);
       const std::string path = paths.substr(start, end == std::string::npos ? std::string::npos : end - start);
-      if (!path.empty() && path.rfind("/maps/", 0) != 0) {
+      if (!path.empty() && !path.starts_with("/maps/")) {
         sources.push_back(path);
       }
       if (end == std::string::npos) {
@@ -377,11 +378,10 @@ namespace faf::editor
       });
       std::string text;
       std::string relative;
-      EmitterBlueprint game;
-      std::string error;
+      std::expected<EmitterBlueprint, std::string> game;
       std::string gameText;
-      if (source != sources.end() && ReadGameFile(*source, gameText) && ParseEmitter(gameText, game, error)) {
-        const EffectModBlueprint bp = EmitterModBlueprint(game, emitter, *source);
+      if (source != sources.end() && ReadGameFile(*source, gameText) && (game = ParseEmitter(gameText))) {
+        const EffectModBlueprint bp = EmitterModBlueprint(*game, emitter, *source);
         if (bp.text.empty()) {
           ++same;
           continue;
@@ -398,8 +398,8 @@ namespace faf::editor
         relative = "effects/emitters/" + name + ".bp";
         ++own;
       }
-      if (!ModWriteGenerated(mModFolder, relative, text, error)) {
-        mStatus = "Can't: " + error;
+      if (const auto written = ModWriteGenerated(mModFolder, relative, text); !written) {
+        mStatus = "Can't: " + written.error();
         return false;
       }
     }
@@ -522,10 +522,7 @@ namespace faf::editor
     std::map<std::string, std::vector<const NodeType*>> byCategory;
     const std::string filter = LowerName(mPaletteFilter);
     for (const auto& type : mGraph->Registry().All()) {
-      if (
-        type->isOutput ||
-        (!filter.empty() && LowerName(type->title + " " + type->category).find(filter) == std::string::npos)
-      ) {
+      if (type->isOutput || (!filter.empty() && !LowerName(type->title + " " + type->category).contains(filter))) {
         continue;
       }
       byCategory[type->category].push_back(type.get());

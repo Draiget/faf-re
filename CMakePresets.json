@@ -134,6 +134,24 @@
       "cacheVariables": { "CMAKE_BUILD_TYPE": "Release", "FAF_PGO_GENERATE": "ON" }
     },
     {
+      "name": "macos-clang-arm64-release",
+      "displayName": "macOS clang arm64 Release (Apple silicon, native)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Darwin" },
+      "toolchainFile": "${sourceDir}/cmake/toolchains/macos-clang-arm64.cmake",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" }
+    },
+    {
+      "name": "macos-clang-arm64-debug",
+      "displayName": "macOS clang arm64 Debug (Apple silicon, native)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Darwin" },
+      "toolchainFile": "${sourceDir}/cmake/toolchains/macos-clang-arm64.cmake",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug" }
+    },
+    {
       "name": "android-base",
       "hidden": true,
       "generator": "Ninja",
@@ -168,10 +186,12 @@
     { "name": "linux-clang-x64-release", "configurePreset": "linux-clang-x64-release" },
     { "name": "linux-clang-x64-release-plain", "configurePreset": "linux-clang-x64-release-plain" },
     { "name": "linux-clang-x64-release-pgogen", "configurePreset": "linux-clang-x64-release-pgogen" },
+    { "name": "macos-clang-arm64-release", "configurePreset": "macos-clang-arm64-release" },
+    { "name": "macos-clang-arm64-debug", "configurePreset": "macos-clang-arm64-debug" },
     { "name": "linux-clang-x64-asan", "configurePreset": "linux-clang-x64-asan" },
     { "name": "clang-x64-release-coverage", "configurePreset": "clang-x64-release-coverage" },
     { "name": "linux-clang-x64-release-coverage", "configurePreset": "linux-clang-x64-release-coverage" },
-    { "name": "android-arm64-release", "configurePreset": "android-arm64-release", "targets": ["headless", "faf_sim_math_tests", "faf-linux-toolchain-check", "faf-sim-link"] },
-    { "name": "android-x64-release", "configurePreset": "android-x64-release", "targets": ["headless", "faf_sim_math_tests", "faf-linux-toolchain-check", "faf-sim-link", "faf_x87_soft_check"] }
+    { "name": "android-arm64-release", "configurePreset": "android-arm64-release", "targets": ["headless", "faf_sim_math_tests", "faf_x87_soft_tests", "faf-linux-toolchain-check", "faf-sim-link"] },
+    { "name": "android-x64-release", "configurePreset": "android-x64-release", "targets": ["headless", "faf_sim_math_tests", "faf_x87_soft_tests", "faf-linux-toolchain-check", "faf-sim-link"] }
   ]
 }

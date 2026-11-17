@@ -80,24 +80,20 @@ namespace faf::editor
     return 0;
   }
 
-  bool EdModPanel::Create(
-    const std::string& name,
-    std::string& error
+  std::expected<void, std::string> EdModPanel::Create(
+    const std::string& name
   )
   {
     if (Root().empty()) {
-      error = "no vault folder to keep mods in";
-      return false;
+      return std::unexpected("no vault folder to keep mods in");
     }
     if (!ModProjectNameOk(name)) {
-      error = "a project name takes letters, digits, spaces, _ and -";
-      return false;
+      return std::unexpected("a project name takes letters, digits, spaces, _ and -");
     }
     std::error_code ec;
     const std::filesystem::path folder = Root() / name;
     if (std::filesystem::exists(folder, ec)) {
-      error = "there is a mod folder " + name + " already";
-      return false;
+      return std::unexpected("there is a mod folder " + name + " already");
     }
     ModProject p;
     p.name = name;
@@ -108,23 +104,21 @@ namespace faf::editor
     mHistory.Clear();
     const ModWriteReport report = Write();
     if (!report.problems.empty()) {
-      error = report.problems.front();
-      return false;
+      return std::unexpected(report.problems.front());
     }
-    return true;
+    return {};
   }
 
-  bool EdModPanel::Open(
-    const std::string& name,
-    std::string& error
+  std::expected<void, std::string> EdModPanel::Open(
+    const std::string& name
   )
   {
-    ModProject p;
     bool fromBackup = false;
-    if (!OpenModProject(Root() / name, p, error, &fromBackup)) {
-      return false;
+    auto p = OpenModProject(Root() / name, &fromBackup);
+    if (!p) {
+      return std::unexpected(p.error());
     }
-    mProject = std::move(p);
+    mProject = std::move(*p);
     mFolder = Root() / name;
     mHistory.Clear();
     mDirty = fromBackup;
@@ -132,7 +126,7 @@ namespace faf::editor
     mMessage =
       fromBackup ? "its project file couldn't be read: opened the copy before it (write to keep it)" : "opened " + name;
     gpg::Logf("editor: mod project %s opened (%zu units changed)", name.c_str(), mProject->edits.size());
-    return true;
+    return {};
   }
 
   ModWriteReport EdModPanel::Write()
@@ -206,23 +200,18 @@ namespace faf::editor
     return CheckModProject(*mProject, facts);
   }
 
-  std::filesystem::path EdModPanel::Release(
-    std::string& error
-  )
+  std::expected<std::filesystem::path, std::string> EdModPanel::Release()
   {
     if (!mProject) {
-      error = "no project open";
-      return {};
+      return std::unexpected("no project open");
     }
     const ModWriteReport written = Write();
     if (!written.problems.empty()) {
-      error = "the project didn't write cleanly: " + written.problems.front();
-      return {};
+      return std::unexpected("the project didn't write cleanly: " + written.problems.front());
     }
     for (const ModIssue& issue : Check()) {
       if (issue.level == 'E') {
-        error = "fix it first: " + issue.text;
-        return {};
+        return std::unexpected("fix it first: " + issue.text);
       }
     }
     const ModRelease release = PlanModRelease(*mProject, FilesUnder(mFolder));
@@ -240,8 +229,7 @@ namespace faf::editor
     const std::string bytes = WriteZip(entries);
     zip.write(bytes.data(), static_cast<std::streamsize>(bytes.size()));
     if (!zip) {
-      error = "couldn't write " + out.string();
-      return {};
+      return std::unexpected("couldn't write " + out.string());
     }
     mMessage = "zipped " + std::to_string(entries.size()) + " files into " + out.string();
     gpg::Logf("editor: mod project %s: %s (%zu bytes)", mProject->name.c_str(), mMessage.c_str(), bytes.size());
@@ -274,9 +262,8 @@ namespace faf::editor
     ) {
       for (const std::string& name : projects) {
         if (ImGui::Selectable(name.c_str(), name == current)) {
-          std::string error;
-          if (!Open(name, error)) {
-            mMessage = "couldn't open " + name + ": " + error;
+          if (const auto opened = Open(name); !opened) {
+            mMessage = "couldn't open " + name + ": " + opened.error();
           }
         }
       }
@@ -286,11 +273,10 @@ namespace faf::editor
     ImGui::InputTextWithHint("##newname", "New project's name", mNewName, sizeof(mNewName));
     ImGui::SameLine();
     if (ImGui::Button(ICON_PLUS " New project")) {
-      std::string error;
-      if (Create(mNewName, error)) {
+      if (const auto made = Create(mNewName); made) {
         mNewName[0] = '\0';
       } else {
-        mMessage = error;
+        mMessage = made.error();
       }
     }
     if (ImGui::IsItemHovered()) {
@@ -406,9 +392,8 @@ namespace faf::editor
     }
     ImGui::SameLine();
     if (ImGui::Button(ICON_PACKAGE " Zip for the vault")) {
-      std::string error;
-      if (Release(error).empty()) {
-        mMessage = "No zip: " + error;
+      if (const auto zip = Release(); !zip) {
+        mMessage = "No zip: " + zip.error();
       }
     }
     if (ImGui::IsItemHovered()) {

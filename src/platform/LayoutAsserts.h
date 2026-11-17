@@ -1,8 +1,8 @@
 #pragma once
 
 // Force-included into every Windows engine translation unit (src/CMakeLists.txt)
-// and into the Linux and Android simulation (cmake/FafLinux.cmake: x86_64 and
-// arm64), and by nothing else.
+// and into the Linux and macOS builds (cmake/FafPosix.cmake), and by nothing
+// else.
 //
 // The recovered tree pins the Win32 layout of the 2007 binary with thousands of
 // `static_assert(sizeof(T) == 0xNN)` / `static_assert(offsetof(T, m) == 0xNN)`.
@@ -18,9 +18,9 @@
 // Code that must be checked everywhere (wire formats, file headers) cannot rely
 // on static_assert in this configuration; the retail-layout build still checks
 // it, and its layout carries no pointers or containers, so it is the same on all.
-#if defined(__cplusplus) &&                                                                                            \
-  (defined(_M_X64) || defined(__x86_64__) || defined(__aarch64__) ||                                                   \
-   (defined(FAF_RETAIL_LAYOUT) && FAF_RETAIL_LAYOUT == 0))
+#include "PlatformDefines.h"
+
+#if defined(__cplusplus) && (FAFRE_ARCH_64BIT || (defined(FAF_RETAIL_LAYOUT) && FAF_RETAIL_LAYOUT == 0))
 #define _ALLOW_KEYWORD_MACROS
 #define static_assert(...) static_assert(true, "x86 layout assert, not checked in this build")
 #endif

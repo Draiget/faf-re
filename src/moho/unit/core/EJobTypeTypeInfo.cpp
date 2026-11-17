@@ -1,5 +1,6 @@
 ﻿#include "moho/unit/core/EJobTypeTypeInfo.h"
 
+#include <utility>
 #include <cstdint>
 #include <typeinfo>
 
@@ -106,10 +107,10 @@ namespace moho
   {
     mPrefix = "JOB_";
 
-    AddEnum(StripPrefix("JOB_None"), static_cast<std::int32_t>(JOB_None));
-    AddEnum(StripPrefix("JOB_Build"), static_cast<std::int32_t>(JOB_Build));
-    AddEnum(StripPrefix("JOB_Repair"), static_cast<std::int32_t>(JOB_Repair));
-    AddEnum(StripPrefix("JOB_Reclaim"), static_cast<std::int32_t>(JOB_Reclaim));
+    AddEnum(StripPrefix("JOB_None"), std::to_underlying(JOB_None));
+    AddEnum(StripPrefix("JOB_Build"), std::to_underlying(JOB_Build));
+    AddEnum(StripPrefix("JOB_Repair"), std::to_underlying(JOB_Repair));
+    AddEnum(StripPrefix("JOB_Reclaim"), std::to_underlying(JOB_Reclaim));
   }
 
 } // namespace moho

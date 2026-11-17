@@ -1,5 +1,6 @@
 #include "moho/unit/tasks/CUnitAssistMoveTask.h"
 
+#include <utility>
 #include <cmath>
 #include <cstdint>
 #include <cstdlib>
@@ -121,7 +122,7 @@ namespace moho
     mMoveGoalWorldPosition = COORDS_ToWorldPos(
       mUnit->SimulationRef->mMapData,
       moveGoalCell,
-      static_cast<ELayer>(static_cast<std::uint8_t>(footprint.mOccupancyCaps)),
+      static_cast<ELayer>(std::to_underlying(footprint.mOccupancyCaps)),
       static_cast<int>(footprint.mSizeX),
       static_cast<int>(footprint.mSizeZ)
     );

@@ -1,4 +1,5 @@
 #include "moho/sim/CPlatoonPrivate.h"
+#include <utility>
 
 namespace moho
 {
@@ -585,8 +586,8 @@ namespace moho
     const EUnitState state
   )
   {
-    for (std::int32_t checkedClass = 1; checkedClass < static_cast<std::int32_t>(kAllSquadClasses); ++checkedClass) {
-      if (squadClass != kAllSquadClasses && static_cast<std::int32_t>(squadClass) != checkedClass) {
+    for (std::int32_t checkedClass = 1; checkedClass < std::to_underlying(kAllSquadClasses); ++checkedClass) {
+      if (squadClass != kAllSquadClasses && std::to_underlying(squadClass) != checkedClass) {
         continue;
       }
 
@@ -735,7 +736,7 @@ namespace moho
    */
   bool CPlatoon::AssignedSquadsAreIdle() const
   {
-    for (std::int32_t squadClass = 1; squadClass < static_cast<std::int32_t>(kAllSquadClasses); ++squadClass) {
+    for (std::int32_t squadClass = 1; squadClass < std::to_underlying(kAllSquadClasses); ++squadClass) {
       const CSquad* const squad = GetSquad(static_cast<ESquadClass>(squadClass));
       if (squad != nullptr && !squad->IsIdle()) {
         return false;
@@ -1216,7 +1217,7 @@ namespace moho
     if (mFormation.empty()) {
       // Per-squad attack: only the Attack (1) and Artillery (2) squad classes.
       for (std::int32_t squadClassIndex = 1; squadClassIndex <= 2; ++squadClassIndex) {
-        if (squadClass != kAllSquadClasses && static_cast<std::int32_t>(squadClass) != squadClassIndex) {
+        if (squadClass != kAllSquadClasses && std::to_underlying(squadClass) != squadClassIndex) {
           continue;
         }
 
@@ -1327,7 +1328,7 @@ namespace moho
           }
 
           // Only the requested classes' units join the move set.
-          if (squadClass == kAllSquadClasses || static_cast<std::int32_t>(squadClass) == squadClassIndex) {
+          if (squadClass == kAllSquadClasses || std::to_underlying(squadClass) == squadClassIndex) {
             moveSet.AddRange(squadUnits.mVec.begin(), squadUnits.mVec.end());
           }
         }
@@ -1345,7 +1346,7 @@ namespace moho
       IssuePlatoonMoveCommand(mSim, platoonUnits, target, formationScriptIndex, issuedCommands);
     } else {
       for (std::int32_t squadClassIndex = 1; squadClassIndex < 6; ++squadClassIndex) {
-        if (squadClass != kAllSquadClasses && static_cast<std::int32_t>(squadClass) != squadClassIndex) {
+        if (squadClass != kAllSquadClasses && std::to_underlying(squadClass) != squadClassIndex) {
           continue;
         }
 
@@ -1457,7 +1458,7 @@ namespace moho
             }
           }
 
-          if (squadClass == kAllSquadClasses || static_cast<std::int32_t>(squadClass) == squadClassIndex) {
+          if (squadClass == kAllSquadClasses || std::to_underlying(squadClass) == squadClassIndex) {
             moveSet.AddRange(squadUnits.mVec.begin(), squadUnits.mVec.end());
           }
         }
@@ -1475,7 +1476,7 @@ namespace moho
       IssuePlatoonMoveToLocationCommand(mSim, platoonUnits, pos, formationScriptIndex, issuedCommands);
     } else {
       for (std::int32_t squadClassIndex = 1; squadClassIndex < 6; ++squadClassIndex) {
-        if (squadClass != kAllSquadClasses && static_cast<std::int32_t>(squadClass) != squadClassIndex) {
+        if (squadClass != kAllSquadClasses && std::to_underlying(squadClass) != squadClassIndex) {
           continue;
         }
 
@@ -1560,7 +1561,7 @@ namespace moho
 
     if (mFormation.empty()) {
       for (std::int32_t squadClassIndex = 1; squadClassIndex < 6; ++squadClassIndex) {
-        if (squadClass != kAllSquadClasses && static_cast<std::int32_t>(squadClass) != squadClassIndex) {
+        if (squadClass != kAllSquadClasses && std::to_underlying(squadClass) != squadClassIndex) {
           continue;
         }
 
@@ -1833,7 +1834,7 @@ namespace moho
 
     // Per-squad-class patrol: each requested class patrols on its own.
     for (std::int32_t squadClassIndex = 1; squadClassIndex < 6; ++squadClassIndex) {
-      if (squadClass != kAllSquadClasses && static_cast<std::int32_t>(squadClass) != squadClassIndex) {
+      if (squadClass != kAllSquadClasses && std::to_underlying(squadClass) != squadClassIndex) {
         continue;
       }
 
@@ -1871,7 +1872,7 @@ namespace moho
 
     if (mFormation.empty()) {
       for (std::int32_t squadClassIndex = 1; squadClassIndex <= 2; ++squadClassIndex) {
-        if (squadClass != kAllSquadClasses && static_cast<std::int32_t>(squadClass) != squadClassIndex) {
+        if (squadClass != kAllSquadClasses && std::to_underlying(squadClass) != squadClassIndex) {
           continue;
         }
 
@@ -1898,9 +1899,8 @@ namespace moho
     mHasLuaList = false;
 
     EntitySetTemplate<Unit> doomedUnits{};
-    for (std::int32_t squadClassIndex = 1; squadClassIndex < static_cast<std::int32_t>(kAllSquadClasses);
-         ++squadClassIndex) {
-      if (squadClass != kAllSquadClasses && static_cast<std::int32_t>(squadClass) != squadClassIndex) {
+    for (std::int32_t squadClassIndex = 1; squadClassIndex < std::to_underlying(kAllSquadClasses); ++squadClassIndex) {
+      if (squadClass != kAllSquadClasses && std::to_underlying(squadClass) != squadClassIndex) {
         continue;
       }
 
@@ -2027,7 +2027,7 @@ namespace moho
 
     EntitySetTemplate<Unit> selectedUnits{};
     for (std::int32_t squadClassIndex = 1; squadClassIndex < 6; ++squadClassIndex) {
-      if (squadClass != kAllSquadClasses && static_cast<std::int32_t>(squadClass) != squadClassIndex) {
+      if (squadClass != kAllSquadClasses && std::to_underlying(squadClass) != squadClassIndex) {
         continue;
       }
 

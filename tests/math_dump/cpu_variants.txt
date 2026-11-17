@@ -16,12 +16,3 @@ acos 8 e0a86fda0999840a c01f6d325de37603 AuthenticAMD AMD EPYC 7763 64-Core Proc
 acos 10 ffe0ba9edc3b3d85 c1aa92da20101c63 AuthenticAMD AMD EPYC 7763 64-Core Processor: x87 fpatan rounds differently
 acos 12 b0a4da3437915dc3 8e5734c9366d0d2c AuthenticAMD AMD EPYC 7763 64-Core Processor: x87 fpatan rounds differently
 acos 13 c1db2fb3456110d5 0bde9fedbfa65362 AuthenticAMD AMD EPYC 7763 64-Core Processor: x87 fpatan rounds differently
-# The software x87 (legacy/math/X87MathSoft.cpp: arm64, and x86_64 builds with FAF_X87_SOFT) takes fpatan from the C
-# library's binary128 atan2l rounded to 64 bits. Its acos doubles differ from golden.txt's in 9 of the 1,000,000 inputs,
-# in the last bit, and all 9 round to the same float: blocks 0 to 4 below, and block 8, where it gives the EPYC 7763's
-# outputs listed above.
-acos 0 f80255785993ca27 a41dbc9aa3cb795f the software x87 (X87MathSoft.cpp): fpatan is atan2l rounded to 64 bits
-acos 1 ff54899e5ff37024 fdb6e53d5aca8a27 the software x87 (X87MathSoft.cpp): fpatan is atan2l rounded to 64 bits
-acos 2 e650c6c50f9f9dfa 667809000ab93fae the software x87 (X87MathSoft.cpp): fpatan is atan2l rounded to 64 bits
-acos 3 1ecc10d14ac73098 ba1555c092f451c3 the software x87 (X87MathSoft.cpp): fpatan is atan2l rounded to 64 bits
-acos 4 b86c43c3255c3b2f 77caf7a53a0e0e07 the software x87 (X87MathSoft.cpp): fpatan is atan2l rounded to 64 bits

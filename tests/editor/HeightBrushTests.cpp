@@ -4,6 +4,7 @@
 
 #include "editor/tools/EdHeightBrush.h"
 
+#include <utility>
 #include <gtest/gtest.h>
 
 #include <algorithm>
@@ -481,8 +482,8 @@ namespace
           field.words.data(), 65, 65, 29.0f + static_cast<float>(step % 7), 30.0f, brush, 1.0f / 60.0f, stroke.get()
         );
       }
-      EXPECT_TRUE(CopiesEqual(field, Symmetry::LeftRight)) << "mode " << static_cast<int>(mode);
-      EXPECT_NE(field.words, MirroredHills().words) << "mode " << static_cast<int>(mode) << " changed nothing";
+      EXPECT_TRUE(CopiesEqual(field, Symmetry::LeftRight)) << "mode " << std::to_underlying(mode);
+      EXPECT_NE(field.words, MirroredHills().words) << "mode " << std::to_underlying(mode) << " changed nothing";
     }
   }
 
@@ -511,7 +512,7 @@ namespace
             const bool inside = std::any_of(saved.begin(), saved.end(), [&](const SampleRect& r) {
               return sx >= r.x0 && sx <= r.x1 && z >= r.z0 && z <= r.z1;
             });
-            ASSERT_TRUE(inside) << "mode " << static_cast<int>(mode) << " wrote " << sx << "," << z << " unsaved";
+            ASSERT_TRUE(inside) << "mode " << std::to_underlying(mode) << " wrote " << sx << "," << z << " unsaved";
           }
         }
       }

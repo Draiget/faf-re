@@ -466,7 +466,7 @@ namespace
     {
       gpg::ZLibOutputFilterStream inflater(&pipe, gpg::FLOP_Inflate);
       WriteInPieces(inflater, compressed, {7u, 1500u, 1u, 300u});
-      if (std::string_view(zlibVersion()).substr(0, 4) == "1.1.") {
+      if (std::string_view(zlibVersion()).starts_with("1.1.")) {
         // zlib 1.1.x, which the x86 build links as the shipped exe does (cmake/deps/wxwindows), decodes the end
         // code with a 9-bit lookahead, so a raw stream whose end code and padding are shorter than that (this
         // one) reports its end only with a byte past it (zlib 1.2.3's ChangeLog: "Raw inflate no longer needs

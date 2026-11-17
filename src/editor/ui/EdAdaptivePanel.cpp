@@ -156,9 +156,8 @@ namespace faf::editor
       return;
     }
     AdaptiveTables tables;
-    std::string error;
-    if (!ParseAdaptiveTables(mDocument.TablesText(), tables, error)) {
-      Status(kBad, "_tables.lua doesn't read: " + error);
+    if (const auto read = ParseAdaptiveTables(mDocument.TablesText(), tables); !read) {
+      Status(kBad, "_tables.lua doesn't read: " + read.error());
       return;
     }
     HelpNote(

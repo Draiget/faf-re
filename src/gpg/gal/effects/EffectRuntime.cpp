@@ -2,8 +2,8 @@
 
 #include "EffectRuntime.h"
 
-#include <windows.h>
-#include <shlobj.h>
+#include <Windows.h>
+#include <ShlObj.h>
 
 #include <algorithm>
 #include <atomic>

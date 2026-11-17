@@ -176,34 +176,31 @@ namespace faf::editor::field
       return taps;
     }
 
-    bool OpImgResample(
+    std::expected<void, std::string> OpImgResample(
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
+      std::string err;
       const Grid* src = Need(a, "a", err);
       const Grid* like = Need(a, "like", err);
       if (src == nullptr || like == nullptr) {
-        return false;
+        return std::unexpected(err);
       }
       if (src->w < 1 || src->h < 1) {
-        err = "img_resample: empty image";
-        return false;
+        return std::unexpected("img_resample: empty image");
       }
       const int x0 = std::max(0, static_cast<int>(a.p.N("x0", 0)));
       const int z0 = std::max(0, static_cast<int>(a.p.N("z0", 0)));
       const int x1 = std::min(like->w - 1, static_cast<int>(a.p.N("x1", like->w - 1)));
       const int z1 = std::min(like->h - 1, static_cast<int>(a.p.N("z1", like->h - 1)));
       if (x1 - x0 < 1 || z1 - z0 < 1) {
-        err = "img_resample: the target rectangle is smaller than 2 x 2 samples";
-        return false;
+        return std::unexpected("img_resample: the target rectangle is smaller than 2 x 2 samples");
       }
       const std::string align = a.p.S("align", "cell");
       const bool cell = align != "corner";
       if (!cell && (src->w < 2 || src->h < 2)) {
-        err = "img_resample: corner alignment needs an image of at least 2 x 2";
-        return false;
+        return std::unexpected("img_resample: corner alignment needs an image of at least 2 x 2");
       }
       const std::string fname = a.p.S("filter", "bilinear");
       const Kind kind = fname == "nearest"
@@ -254,21 +251,21 @@ namespace faf::editor::field
           dst[i] = static_cast<float>(acc);
         }
       });
-      return true;
+      return {};
     }
 
     // ---- orientation
     // -------------------------------------------------------------------------------------------------------------------------
 
-    bool OpImgOrient(
+    std::expected<void, std::string> OpImgOrient(
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
+      std::string err;
       const Grid* src = Need(a, "a", err);
       if (src == nullptr) {
-        return false;
+        return std::unexpected(err);
       }
       const bool transpose = a.p.N("transpose", 0) > 0.5;
       const bool fx = a.p.N("flip_x", 0) > 0.5;
@@ -284,21 +281,21 @@ namespace faf::editor::field
           out.At(x, z) = transpose ? src->At(pz, px) : src->At(px, pz);
         }
       });
-      return true;
+      return {};
     }
 
     // ---- masks
     // -------------------------------------------------------------------------------------------------------------------------------
 
-    bool OpRectMask(
+    std::expected<void, std::string> OpRectMask(
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
+      std::string err;
       const Grid* like = Need(a, "like", err);
       if (like == nullptr) {
-        return false;
+        return std::unexpected(err);
       }
       const int x0 = static_cast<int>(a.p.N("x0", 0));
       const int z0 = static_cast<int>(a.p.N("z0", 0));
@@ -330,24 +327,24 @@ namespace faf::editor::field
           out.At(x, z) = static_cast<float>(t);
         }
       });
-      return true;
+      return {};
     }
 
-    bool OpPointsMask(
+    std::expected<void, std::string> OpPointsMask(
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
+      std::string err;
       const Grid* like = Need(a, "like", err);
       if (like == nullptr) {
-        return false;
+        return std::unexpected(err);
       }
       const std::vector<double>* pts = a.p.A("pts");
       const double feather = std::max(0.0, a.p.N("feather", 0.0));
       out = Grid(like->w, like->h, like->cell, like->ox, like->oz, 0.0f);
       if (pts == nullptr || pts->size() < 4) {
-        return true;
+        return {};
       }
       const std::size_t count = pts->size() / 4;
       ParallelFor(like->h, [&](const int z) {
@@ -380,7 +377,7 @@ namespace faf::editor::field
           out.At(x, z) = static_cast<float>(best);
         }
       });
-      return true;
+      return {};
     }
 
     struct Registrar

@@ -31,7 +31,7 @@ LUALIB_API void luaL_openlib (lua_State *L, const char *libname,
                                const luaL_reg *l, int nup);
 LUALIB_API int luaL_getmetafield (lua_State *L, int obj, const char *e);
 LUALIB_API int luaL_callmeta (lua_State *L, int obj, const char *e);
-LUALIB_API int luaL_argerror (lua_State *L, int numarg, const char *extramsg);
+[[noreturn]] LUALIB_API int luaL_argerror (lua_State *L, int numarg, const char *extramsg);
 LUALIB_API const char *luaL_checklstring (lua_State *L, int numArg, size_t *l);
 LUALIB_API const char *luaL_optlstring (lua_State *L, int numArg,
                                            const char *def, size_t *l);
@@ -47,7 +47,7 @@ LUALIB_API void  luaL_getmetatable (lua_State *L, const char *tname);
 LUALIB_API void *luaL_checkudata (lua_State *L, int ud, const char *tname);
 
 LUALIB_API void luaL_where (lua_State *L, int lvl);
-LUALIB_API int luaL_error (lua_State *L, const char *fmt, ...);
+[[noreturn]] LUALIB_API int luaL_error (lua_State *L, const char *fmt, ...);
 
 LUALIB_API int luaL_findstring (const char *st, const char *const lst[]);
 

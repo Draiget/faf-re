@@ -45,9 +45,9 @@ string]],
     LuaTextReadsFieldsItemsAndWhereTheyAre
   )
   {
-    faf::editor::LuaText info;
-    std::string error;
-    ASSERT_TRUE(faf::editor::ReadLuaAssignment(kScenario, "ScenarioInfo", info, error)) << error;
+    const auto assigned = faf::editor::ReadLuaAssignment(kScenario, "ScenarioInfo");
+    ASSERT_TRUE(assigned) << assigned.error();
+    const faf::editor::LuaText& info = *assigned;
     ASSERT_TRUE(info.isTable);
     const faf::editor::LuaText* const name = info.Field("name");
     ASSERT_NE(name, nullptr);
@@ -64,10 +64,10 @@ string]],
     ASSERT_NE(info.Field("preview"), nullptr);
     EXPECT_EQ(info.Field("preview")->atom, "[[a long\nstring]]");
     // `version = 3` is the first top-level assignment, not inside ScenarioInfo.
-    faf::editor::LuaText version;
-    ASSERT_TRUE(faf::editor::ReadLuaAssignment(kScenario, "version", version, error));
-    EXPECT_EQ(version.Number(), 3.0);
-    EXPECT_FALSE(faf::editor::ReadLuaAssignment(kScenario, "teams", version, error)) << "teams is not top-level";
+    const auto version = faf::editor::ReadLuaAssignment(kScenario, "version");
+    ASSERT_TRUE(version);
+    EXPECT_EQ(version->Number(), 3.0);
+    EXPECT_FALSE(faf::editor::ReadLuaAssignment(kScenario, "teams")) << "teams is not top-level";
     EXPECT_EQ(faf::editor::LuaNumber(2.5), "2.5");
     EXPECT_EQ(faf::editor::LuaNumber(30.0), "30");
     EXPECT_EQ(faf::editor::LuaNumber(-0.0001), "0");
@@ -135,7 +135,7 @@ string]],
     EXPECT_NE(read.bodies[1].unreadable.find("Colour"), std::string::npos);
     EXPECT_EQ(faf::editor::WaterBodyText(read.bodies[1]), "{ Elevation = 10, Seed = { 3, 4 }, Colour = 'blue' }");
     // Written back unchanged; previewed as not readable.
-    EXPECT_EQ(faf::editor::WithWaterBodies(scenario, read.bodies).find("Colour = 'blue'") != std::string::npos, true);
+    EXPECT_TRUE(faf::editor::WithWaterBodies(scenario, read.bodies).contains("Colour = 'blue'"));
     std::vector<std::string> log;
     const auto descs = faf::editor::WaterBodyDescs({read.bodies[1]}, 2.5f, 15.0f, log);
     EXPECT_TRUE(descs.empty());

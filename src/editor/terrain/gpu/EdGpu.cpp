@@ -15,6 +15,7 @@
 #include <chrono>
 #include <cstdio>
 #include <cstring>
+#include <expected>
 #include <map>
 #include <memory>
 #include <mutex>
@@ -92,191 +93,168 @@ namespace faf::editor::gpu
   // ---- helpers on top of an Executor
   // ---------------------------------------------------------------------------------------------------------
 
-  bool MakeBuffer(
+  std::expected<void, std::string> MakeBuffer(
     Executor& ex,
     const u32 count,
-    std::unique_ptr<Resource>& out,
-    std::string& err
+    std::unique_ptr<Resource>& out
   )
   {
     if (count == 0) {
-      err = "empty buffer";
-      return false;
+      return std::unexpected("empty buffer");
     }
-    out = ex.CreateBuffer(count, 4, err);
-    if (!out && err.empty()) {
-      err = "could not create a buffer";
+    auto made = ex.CreateBuffer(count, 4);
+    out = made ? std::move(*made) : nullptr;
+    if (!out) {
+      return std::unexpected(made || made.error().empty() ? std::string("could not create a buffer") : made.error());
     }
-    return out != nullptr;
+    return {};
   }
 
-  bool UploadBuffer(
+  std::expected<void, std::string> UploadBuffer(
     Executor& ex,
     Resource& r,
     const void* const data,
-    const std::size_t bytes,
-    std::string& err
+    const std::size_t bytes
   )
   {
-    return ex.Upload(r, data, bytes, err);
+    return ex.Upload(r, data, bytes);
   }
 
-  bool FillBuffer(
+  std::expected<void, std::string> FillBuffer(
     Executor& ex,
     Resource& r,
-    const u32 pattern,
-    std::string& err
+    const u32 pattern
   )
   {
     if (r.kind != Resource::Kind::Buffer || r.stride != 4 || r.count == 0) {
-      err = "FillBuffer needs a buffer of 4 byte elements";
-      return false;
+      return std::unexpected(std::string("FillBuffer needs a buffer of 4 byte elements"));
     }
     const std::vector<u32> words(r.count, pattern);
-    return ex.Upload(r, words.data(), words.size() * 4, err);
+    return ex.Upload(r, words.data(), words.size() * 4);
   }
 
-  bool MakeField(
+  std::expected<void, std::string> MakeField(
     Executor& ex,
     const int w,
     const int h,
-    Field& out,
-    std::string& err
+    Field& out
   )
   {
     if (w < 1 || h < 1 || static_cast<std::uint64_t>(w) * static_cast<std::uint64_t>(h) > (1ull << 27)) {
-      err = "field size out of range";
-      return false;
+      return std::unexpected("field size out of range");
     }
     if (static_cast<std::uint64_t>(w) * static_cast<std::uint64_t>(h) * 4ull > ex.MaxBytes()) {
-      err = "field larger than the memory the GPU backend may use";
-      return false;
+      return std::unexpected("field larger than the memory the GPU backend may use");
     }
-    out.buf = ex.CreateBuffer(static_cast<u32>(w) * static_cast<u32>(h), 4, err);
+    auto made = ex.CreateBuffer(static_cast<u32>(w) * static_cast<u32>(h), 4);
+    out.buf = made ? std::move(*made) : nullptr;
     out.w = w;
     out.h = h;
     if (!out.buf) {
-      if (err.empty()) {
-        err = "could not create a field";
-      }
-      return false;
+      return std::unexpected(made || made.error().empty() ? std::string("could not create a field") : made.error());
     }
-    return true;
+    return {};
   }
 
-  bool UploadField(
+  std::expected<void, std::string> UploadField(
     Executor& ex,
     Field& f,
-    const float* const data,
-    std::string& err
+    const float* const data
   )
   {
     if (!f.buf) {
-      err = "field not created";
-      return false;
+      return std::unexpected("field not created");
     }
-    return ex.Upload(*f.buf, data, f.buf->Bytes(), err);
+    return ex.Upload(*f.buf, data, f.buf->Bytes());
   }
 
-  bool DownloadField(
+  std::expected<void, std::string> DownloadField(
     Executor& ex,
     Field& f,
-    float* const data,
-    std::string& err
+    float* const data
   )
   {
     if (!f.buf) {
-      err = "field not created";
-      return false;
+      return std::unexpected("field not created");
     }
-    return ex.Download(*f.buf, data, f.buf->Bytes(), err);
+    return ex.Download(*f.buf, data, f.buf->Bytes());
   }
 
-  bool UploadGrid(
+  std::expected<void, std::string> UploadGrid(
     Executor& ex,
     const field::Grid& g,
-    Field& out,
-    std::string& err
+    Field& out
   )
   {
     if (g.v.size() != g.Count()) {
-      err = "grid size does not match its data";
-      return false;
+      return std::unexpected("grid size does not match its data");
     }
-    return MakeField(ex, g.w, g.h, out, err) && UploadField(ex, out, g.v.data(), err);
+    FAF_GPU_TRY(MakeField(ex, g.w, g.h, out));
+    return UploadField(ex, out, g.v.data());
   }
 
-  bool DownloadGrid(
+  std::expected<void, std::string> DownloadGrid(
     Executor& ex,
     Field& f,
-    field::Grid& g,
-    std::string& err
+    field::Grid& g
   )
   {
     if (g.w != f.w || g.h != f.h || g.v.size() != g.Count()) {
-      err = "grid and field differ in size";
-      return false;
+      return std::unexpected("grid and field differ in size");
     }
-    return DownloadField(ex, f, g.v.data(), err);
+    return DownloadField(ex, f, g.v.data());
   }
 
-  bool GroupsFor(
+  std::expected<Groups, std::string> GroupsFor(
     const KernelInfo& k,
     const u32 w,
-    const u32 h,
-    Groups& g,
-    std::string& err
+    const u32 h
   )
   {
     if (w == 0 || h == 0 || k.tx == 0 || k.ty == 0) {
-      err = "empty dispatch";
-      return false;
+      return std::unexpected("empty dispatch");
     }
+    Groups g;
     g.x = (w + k.tx - 1) / k.tx;
     g.y = (h + k.ty - 1) / k.ty;
     g.z = 1;
     if (g.x > kMaxGroups || g.y > kMaxGroups) {
-      err = "dispatch has more thread groups than the hardware allows";
-      return false;
+      return std::unexpected("dispatch has more thread groups than the hardware allows");
     }
-    return true;
+    return g;
   }
 
-  bool DispatchGridNoCb(
+  std::expected<void, std::string> DispatchGridNoCb(
     Executor& ex,
     const KernelInfo& k,
     const u32 w,
     const u32 h,
-    const Bindings& b,
-    std::string& err
+    const Bindings& b
   )
   {
-    Groups g;
-    return GroupsFor(k, w, h, g, err) && ex.Dispatch(k, g, nullptr, 0, b, err);
+    const auto g = GroupsFor(k, w, h);
+    if (!g)
+      return std::unexpected(g.error());
+    return ex.Dispatch(k, *g, nullptr, 0, b);
   }
 
-  bool MakeTextureFromField(
+  std::expected<void, std::string> MakeTextureFromField(
     Executor& ex,
     const Field& f,
-    std::unique_ptr<Resource>& tex,
-    std::string& err
+    std::unique_ptr<Resource>& tex
   )
   {
     if (!f.buf || !ex.SupportsTextures()) {
-      err = "no texture support";
-      return false;
+      return std::unexpected("no texture support");
     }
     const KernelInfo* k = FindKernel("buf_to_tex");
     if (k == nullptr) {
-      err = "kernel buf_to_tex is missing";
-      return false;
+      return std::unexpected("kernel buf_to_tex is missing");
     }
-    tex = ex.CreateTexture(static_cast<u32>(f.w), static_cast<u32>(f.h), err);
+    auto made = ex.CreateTexture(static_cast<u32>(f.w), static_cast<u32>(f.h));
+    tex = made ? std::move(*made) : nullptr;
     if (!tex) {
-      if (err.empty()) {
-        err = "could not create a texture";
-      }
-      return false;
+      return std::unexpected(made || made.error().empty() ? std::string("could not create a texture") : made.error());
     }
     hk::FieldParams p{};
     p.w = static_cast<std::uint32_t>(f.w);
@@ -285,7 +263,7 @@ namespace faf::editor::gpu
     p.srcH = p.h;
     Bindings b;
     b.Srv(0, *f.buf).Uav(0, *tex);
-    return DispatchGrid(ex, *k, p.w, p.h, p, b, err);
+    return DispatchGrid(ex, *k, p.w, p.h, p, b);
   }
 
   u32 NextBatch(
@@ -307,12 +285,11 @@ namespace faf::editor::gpu
     return std::min(whole, remaining);
   }
 
-  bool RunIterations(
+  std::expected<void, std::string> RunIterations(
     Executor& ex,
     const u32 count,
     const double targetMs,
-    const std::function<bool(u32, std::string&)>& step,
-    std::string& err,
+    const std::function<std::expected<void, std::string>(u32)>& step,
     IterStats* const stats
   )
   {
@@ -326,15 +303,15 @@ namespace faf::editor::gpu
       const u32 n = std::min(batch, count - done);
       const auto t0 = std::chrono::steady_clock::now();
       for (u32 i = 0; i < n; ++i) {
-        if (!step(done + i, err)) {
+        if (auto stepped = step(done + i); !stepped) {
           s.iterations = done + i;
-          return false;
+          return stepped;
         }
       }
       double gpuMs = 0.0;
-      if (!ex.Sync(&gpuMs, err)) {
+      if (auto synced = ex.Sync(&gpuMs); !synced) {
         s.iterations = done;
-        return false;
+        return synced;
       }
       const double ms = MsSince(t0); // wall time of the whole submission: the conservative number for the TDR limit
       done += n;
@@ -345,7 +322,7 @@ namespace faf::editor::gpu
       s.iterations = done;
       batch = NextBatch(n, ms, target, count - done);
     }
-    return true;
+    return {};
   }
 
   // ---- Lease and the process backend
@@ -431,7 +408,7 @@ namespace faf::editor::gpu
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
-#include <windows.h>
+#include <Windows.h>
 
 #include <d3d11.h>
 #include <dxgi.h>
@@ -692,15 +669,14 @@ namespace faf::editor::gpu
         return lost;
       }
 
-      bool Fail(
-        std::string& err,
+      std::unexpected<std::string> Fail(
         const std::string& what,
         const HRESULT hr
       )
       {
-        err = what + " (" + Hex(hr) + ")";
+        std::string err = what + " (" + Hex(hr) + ")";
         CheckRemoved(err);
-        return false;
+        return std::unexpected(std::move(err));
       }
 
       /** After any failure: a removed device marks the executor lost (the backend then stays off). */
@@ -727,19 +703,16 @@ namespace faf::editor::gpu
         lostWhy = why;
       }
 
-      std::unique_ptr<Resource> CreateBuffer(
+      std::expected<std::unique_ptr<Resource>, std::string> CreateBuffer(
         const u32 count,
-        const u32 stride,
-        std::string& err
+        const u32 stride
       ) override
       {
         if (lost) {
-          err = lostWhy;
-          return nullptr;
+          return std::unexpected(lostWhy);
         }
         if (count == 0 || stride == 0 || stride % 4 != 0 || static_cast<std::uint64_t>(count) * stride > maxBytes) {
-          err = "buffer size out of range";
-          return nullptr;
+          return std::unexpected("buffer size out of range");
         }
         auto r = std::make_unique<D3DResource>();
         r->kind = Resource::Kind::Buffer;
@@ -760,8 +733,7 @@ namespace faf::editor::gpu
         Com<ID3D11Buffer> buf;
         HRESULT hr = dev->CreateBuffer(&bd, nullptr, buf.Put());
         if (FAILED(hr)) {
-          Fail(err, "CreateBuffer of " + std::to_string(bd.ByteWidth) + " bytes failed", hr);
-          return nullptr;
+          return Fail("CreateBuffer of " + std::to_string(bd.ByteWidth) + " bytes failed", hr);
         }
         D3D11_SHADER_RESOURCE_VIEW_DESC sd = {};
         sd.Format = DXGI_FORMAT_UNKNOWN;
@@ -770,8 +742,7 @@ namespace faf::editor::gpu
         sd.Buffer.NumElements = count;
         hr = dev->CreateShaderResourceView(buf.Get(), &sd, r->entry.srv.Put());
         if (FAILED(hr)) {
-          Fail(err, "CreateShaderResourceView (buffer) failed", hr);
-          return nullptr;
+          return Fail("CreateShaderResourceView (buffer) failed", hr);
         }
         D3D11_UNORDERED_ACCESS_VIEW_DESC ud = {};
         ud.Format = DXGI_FORMAT_UNKNOWN;
@@ -781,8 +752,7 @@ namespace faf::editor::gpu
         ud.Buffer.Flags = 0;
         hr = dev->CreateUnorderedAccessView(buf.Get(), &ud, r->entry.uav.Put());
         if (FAILED(hr)) {
-          Fail(err, "CreateUnorderedAccessView (buffer) failed", hr);
-          return nullptr;
+          return Fail("CreateUnorderedAccessView (buffer) failed", hr);
         }
         r->entry.bytes = static_cast<std::uint64_t>(bd.ByteWidth);
         r->entry.res = Com<ID3D11Resource>(
@@ -791,23 +761,19 @@ namespace faf::editor::gpu
         return r;
       }
 
-      std::unique_ptr<Resource> CreateTexture(
+      std::expected<std::unique_ptr<Resource>, std::string> CreateTexture(
         const u32 w,
-        const u32 h,
-        std::string& err
+        const u32 h
       ) override
       {
         if (lost) {
-          err = lostWhy;
-          return nullptr;
+          return std::unexpected(lostWhy);
         }
         if (!textures) {
-          err = "textures are not supported by this device";
-          return nullptr;
+          return std::unexpected("textures are not supported by this device");
         }
         if (w == 0 || h == 0 || w > 16384 || h > 16384 || static_cast<std::uint64_t>(w) * h * 4ull > maxBytes) {
-          err = "texture size out of range";
-          return nullptr;
+          return std::unexpected("texture size out of range");
         }
         auto r = std::make_unique<D3DResource>();
         r->kind = Resource::Kind::Texture2D;
@@ -832,8 +798,7 @@ namespace faf::editor::gpu
         Com<ID3D11Texture2D> tex;
         HRESULT hr = dev->CreateTexture2D(&td, nullptr, tex.Put());
         if (FAILED(hr)) {
-          Fail(err, "CreateTexture2D failed", hr);
-          return nullptr;
+          return Fail("CreateTexture2D failed", hr);
         }
         D3D11_SHADER_RESOURCE_VIEW_DESC sd = {};
         sd.Format = DXGI_FORMAT_R32_FLOAT;
@@ -842,8 +807,7 @@ namespace faf::editor::gpu
         sd.Texture2D.MipLevels = 1;
         hr = dev->CreateShaderResourceView(tex.Get(), &sd, r->entry.srv.Put());
         if (FAILED(hr)) {
-          Fail(err, "CreateShaderResourceView (texture) failed", hr);
-          return nullptr;
+          return Fail("CreateShaderResourceView (texture) failed", hr);
         }
         D3D11_UNORDERED_ACCESS_VIEW_DESC ud = {};
         ud.Format = DXGI_FORMAT_R32_FLOAT;
@@ -851,50 +815,44 @@ namespace faf::editor::gpu
         ud.Texture2D.MipSlice = 0;
         hr = dev->CreateUnorderedAccessView(tex.Get(), &ud, r->entry.uav.Put());
         if (FAILED(hr)) {
-          Fail(err, "CreateUnorderedAccessView (texture) failed", hr);
-          return nullptr;
+          return Fail("CreateUnorderedAccessView (texture) failed", hr);
         }
         r->entry.bytes = static_cast<std::uint64_t>(w) * h * 4ull;
         r->entry.res = Com<ID3D11Resource>(tex.Detach());
         return r;
       }
 
-      D3DResource* Mine(
-        Resource& r,
-        std::string& err
+      std::expected<D3DResource*, std::string> Mine(
+        Resource& r
       )
       {
         auto* d = static_cast<D3DResource*>(&r);
         if (d->owner != this || !d->entry.res) {
-          err = "resource belongs to another executor";
-          return nullptr;
+          return std::unexpected("resource belongs to another executor");
         }
         return d;
       }
 
-      bool Upload(
+      std::expected<void, std::string> Upload(
         Resource& r,
         const void* const data,
-        const std::size_t bytes,
-        std::string& err
+        const std::size_t bytes
       ) override
       {
         if (lost) {
-          err = lostWhy;
-          return false;
+          return std::unexpected(lostWhy);
         }
-        D3DResource* d = Mine(r, err);
-        if (d == nullptr) {
-          return false;
+        const auto mine = Mine(r);
+        if (!mine) {
+          return std::unexpected(mine.error());
         }
+        D3DResource* d = *mine;
         if (data == nullptr || bytes == 0 || bytes > r.Bytes()) {
-          err = "upload size out of range";
-          return false;
+          return std::unexpected("upload size out of range");
         }
         if (r.kind == Resource::Kind::Texture2D) {
           if (bytes != r.Bytes()) {
-            err = "a texture is uploaded whole";
-            return false;
+            return std::unexpected("a texture is uploaded whole");
           }
           ctx->UpdateSubresource(d->entry.res.Get(), 0, nullptr, data, r.w * 4u, 0);
         } else if (bytes == r.Bytes()) {
@@ -909,14 +867,13 @@ namespace faf::editor::gpu
           box.back = 1;
           ctx->UpdateSubresource(d->entry.res.Get(), 0, &box, data, 0, 0);
         }
-        return true;
+        return {};
       }
 
-      bool WaitQuery(
+      std::expected<void, std::string> WaitQuery(
         ID3D11Query* const q,
         void* const data,
-        const UINT size,
-        std::string& err
+        const UINT size
       )
       {
         const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(kSyncTimeoutMs);
@@ -924,15 +881,14 @@ namespace faf::editor::gpu
         for (;;) {
           const HRESULT hr = ctx->GetData(q, data, size, 0);
           if (hr == S_OK) {
-            return true;
+            return {};
           }
           if (hr != S_FALSE) {
-            return Fail(err, "waiting for the GPU failed", hr);
+            return Fail("waiting for the GPU failed", hr);
           }
           if (std::chrono::steady_clock::now() > deadline) {
             MarkLost("the GPU did not finish within " + std::to_string(kSyncTimeoutMs) + " ms");
-            err = lostWhy;
-            return false;
+            return std::unexpected(lostWhy);
           }
           if (++spins < 200) {
             Sleep(0);
@@ -942,24 +898,22 @@ namespace faf::editor::gpu
         }
       }
 
-      bool Download(
+      std::expected<void, std::string> Download(
         Resource& r,
         void* const data,
-        const std::size_t bytes,
-        std::string& err
+        const std::size_t bytes
       ) override
       {
         if (lost) {
-          err = lostWhy;
-          return false;
+          return std::unexpected(lostWhy);
         }
-        D3DResource* d = Mine(r, err);
-        if (d == nullptr) {
-          return false;
+        const auto mine = Mine(r);
+        if (!mine) {
+          return std::unexpected(mine.error());
         }
+        D3DResource* d = *mine;
         if (data == nullptr || bytes == 0 || bytes > r.Bytes()) {
-          err = "download size out of range";
-          return false;
+          return std::unexpected("download size out of range");
         }
         const bool tex = r.kind == Resource::Kind::Texture2D;
         PoolEntry stage;
@@ -978,7 +932,7 @@ namespace faf::editor::gpu
             Com<ID3D11Texture2D> t;
             const HRESULT hr = dev->CreateTexture2D(&td, nullptr, t.Put());
             if (FAILED(hr)) {
-              return Fail(err, "CreateTexture2D (staging) failed", hr);
+              return Fail("CreateTexture2D (staging) failed", hr);
             }
             stage.res = Com<ID3D11Resource>(t.Detach());
           } else {
@@ -989,20 +943,20 @@ namespace faf::editor::gpu
             Com<ID3D11Buffer> b;
             const HRESULT hr = dev->CreateBuffer(&bd, nullptr, b.Put());
             if (FAILED(hr)) {
-              return Fail(err, "CreateBuffer (staging) failed", hr);
+              return Fail("CreateBuffer (staging) failed", hr);
             }
             stage.res = Com<ID3D11Resource>(b.Detach());
           }
           stage.bytes = r.Bytes();
         }
         ctx->CopyResource(stage.res.Get(), d->entry.res.Get());
-        if (!Sync(nullptr, err)) {
-          return false;
+        if (auto synced = Sync(nullptr); !synced) {
+          return synced;
         }
         D3D11_MAPPED_SUBRESOURCE m = {};
         const HRESULT hr = ctx->Map(stage.res.Get(), 0, D3D11_MAP_READ, 0, &m);
         if (FAILED(hr)) {
-          return Fail(err, "Map (staging) failed", hr);
+          return Fail("Map (staging) failed", hr);
         }
         if (tex) {
           const std::size_t rowBytes = static_cast<std::size_t>(r.w) * 4u;
@@ -1018,26 +972,22 @@ namespace faf::editor::gpu
         }
         ctx->Unmap(stage.res.Get(), 0);
         pool->Give(key, std::move(stage));
-        return true;
+        return {};
       }
 
       // ---- shaders
       // ---------------------------------------------------------------------------------------------------------------------------
 
-      bool GetShader(
-        const KernelInfo& k,
-        ID3D11ComputeShader*& out,
-        std::string& err
+      std::expected<ID3D11ComputeShader*, std::string> GetShader(
+        const KernelInfo& k
       )
       {
         const auto it = shaders.find(k.hash);
         if (it != shaders.end()) {
-          out = it->second.Get();
-          return true;
+          return it->second.Get();
         }
         if (compile == nullptr) {
-          err = "no shader compiler (d3dcompiler_47.dll / d3dcompiler_43.dll) found";
-          return false;
+          return std::unexpected("no shader compiler (d3dcompiler_47.dll / d3dcompiler_43.dll) found");
         }
         Com<ID3DBlob> code, errors;
         const auto t0 = std::chrono::steady_clock::now();
@@ -1061,51 +1011,49 @@ namespace faf::editor::gpu
           if (text.size() > 2000) {
             text.resize(2000);
           }
-          err = std::string("compiling kernel ") + k.name + " failed (" + Hex(hr) + "): " + text;
+          std::string err = std::string("compiling kernel ") + k.name + " failed (" + Hex(hr) + "): " + text;
           Log("GPU compute: " + err);
-          return false;
+          return std::unexpected(std::move(err));
         }
         Com<ID3D11ComputeShader> cs;
         const HRESULT hr2 =
           dev->CreateComputeShader(code->GetBufferPointer(), code->GetBufferSize(), nullptr, cs.Put());
         if (FAILED(hr2)) {
-          return Fail(err, std::string("CreateComputeShader ") + k.name + " failed", hr2);
+          return Fail(std::string("CreateComputeShader ") + k.name + " failed", hr2);
         }
         Log(
           std::string("GPU compute: compiled kernel ") + k.name + " in " +
           std::to_string(static_cast<int>(MsSince(t0))) + " ms"
         );
-        out = cs.Get();
+        ID3D11ComputeShader* const out = cs.Get();
         shaders[k.hash] = std::move(cs);
-        return true;
+        return out;
       }
 
-      bool Dispatch(
+      std::expected<void, std::string> Dispatch(
         const KernelInfo& k,
         const Groups groups,
         const void* const cb,
         const u32 cbBytes,
-        const Bindings& b,
-        std::string& err
+        const Bindings& b
       ) override
       {
         if (lost) {
-          err = lostWhy;
-          return false;
+          return std::unexpected(lostWhy);
         }
         if (
           groups.x == 0 || groups.y == 0 || groups.z == 0 || groups.x > kMaxGroups || groups.y > kMaxGroups ||
           groups.z > kMaxGroups
         ) {
-          err = "dispatch group count out of range";
-          return false;
+          return std::unexpected("dispatch group count out of range");
         }
         if (
           (k.hasCb != 0) != (cb != nullptr) ||
           (k.hasCb != 0 && (cbBytes == 0 || cbBytes % 16 != 0 || cbBytes > kConstantBufferBytes))
         ) {
-          err = std::string("kernel ") + k.name + ": constant buffer missing, unexpected or not a multiple of 16 bytes";
-          return false;
+          return std::unexpected(
+            std::string("kernel ") + k.name + ": constant buffer missing, unexpected or not a multiple of 16 bytes"
+          );
         }
         ID3D11ShaderResourceView* srvs[kMaxSrv] = {};
         ID3D11UnorderedAccessView* uavs[kMaxUav] = {};
@@ -1114,16 +1062,18 @@ namespace faf::editor::gpu
         for (u32 s = 0; s < kMaxSrv; ++s) {
           if (b.srv[s] == nullptr) {
             if ((k.srvMask >> s) & 1u) {
-              err = std::string("kernel ") + k.name + ": SRV slot " + std::to_string(s) + " is not bound";
-              return false;
+              return std::unexpected(
+                std::string("kernel ") + k.name + ": SRV slot " + std::to_string(s) + " is not bound"
+              );
             }
             continue;
           }
           auto* d = static_cast<D3DResource*>(const_cast<Resource*>(b.srv[s]));
           const bool wantTex = ((k.srvTexMask >> s) & 1u) != 0;
           if (d->owner != this || !d->entry.srv || (d->kind == Resource::Kind::Texture2D) != wantTex) {
-            err = std::string("kernel ") + k.name + ": SRV slot " + std::to_string(s) + " has the wrong resource";
-            return false;
+            return std::unexpected(
+              std::string("kernel ") + k.name + ": SRV slot " + std::to_string(s) + " has the wrong resource"
+            );
           }
           srvs[s] = d->entry.srv.Get();
           nSrv = s + 1;
@@ -1131,30 +1081,34 @@ namespace faf::editor::gpu
         for (u32 s = 0; s < kMaxUav; ++s) {
           if (b.uav[s] == nullptr) {
             if ((k.uavMask >> s) & 1u) {
-              err = std::string("kernel ") + k.name + ": UAV slot " + std::to_string(s) + " is not bound";
-              return false;
+              return std::unexpected(
+                std::string("kernel ") + k.name + ": UAV slot " + std::to_string(s) + " is not bound"
+              );
             }
             continue;
           }
           auto* d = static_cast<D3DResource*>(const_cast<Resource*>(b.uav[s]));
           const bool wantTex = ((k.uavTexMask >> s) & 1u) != 0;
           if (d->owner != this || !d->entry.uav || (d->kind == Resource::Kind::Texture2D) != wantTex) {
-            err = std::string("kernel ") + k.name + ": UAV slot " + std::to_string(s) + " has the wrong resource";
-            return false;
+            return std::unexpected(
+              std::string("kernel ") + k.name + ": UAV slot " + std::to_string(s) + " has the wrong resource"
+            );
           }
           for (u32 t = 0; t < kMaxSrv; ++t) {
             if (b.srv[t] == b.uav[s]) {
-              err = std::string("kernel ") + k.name + ": a resource is bound for reading and writing in one dispatch";
-              return false;
+              return std::unexpected(
+                std::string("kernel ") + k.name + ": a resource is bound for reading and writing in one dispatch"
+              );
             }
           }
           uavs[s] = d->entry.uav.Get();
           nUav = s + 1;
         }
-        ID3D11ComputeShader* cs = nullptr;
-        if (!GetShader(k, cs, err)) {
-          return false;
+        const auto shader = GetShader(k);
+        if (!shader) {
+          return std::unexpected(shader.error());
         }
+        ID3D11ComputeShader* const cs = *shader;
         if (!timingOpen) {
           ctx->Begin(qDisjoint.Get());
           ctx->End(qStart.Get());
@@ -1164,7 +1118,7 @@ namespace faf::editor::gpu
           D3D11_MAPPED_SUBRESOURCE m = {};
           const HRESULT hr = ctx->Map(cbuf.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &m);
           if (FAILED(hr)) {
-            return Fail(err, "Map (constant buffer) failed", hr);
+            return Fail("Map (constant buffer) failed", hr);
           }
           std::memcpy(m.pData, cb, cbBytes);
           ctx->Unmap(cbuf.Get(), 0);
@@ -1192,20 +1146,18 @@ namespace faf::editor::gpu
         if (nUav != 0) {
           ctx->CSSetUnorderedAccessViews(0, nUav, noUav, nullptr);
         }
-        return true;
+        return {};
       }
 
-      bool Sync(
-        double* const gpuMs,
-        std::string& err
+      std::expected<void, std::string> Sync(
+        double* const gpuMs
       ) override
       {
         if (gpuMs != nullptr) {
           *gpuMs = 0.0;
         }
         if (lost) {
-          err = lostWhy;
-          return false;
+          return std::unexpected(lostWhy);
         }
         const auto t0 = std::chrono::steady_clock::now();
         if (timingOpen) {
@@ -1214,29 +1166,28 @@ namespace faf::editor::gpu
           timingOpen = false;
           ctx->Flush();
           D3D11_QUERY_DATA_TIMESTAMP_DISJOINT dj = {};
-          if (!WaitQuery(qDisjoint.Get(), &dj, sizeof(dj), err)) {
-            return false;
+          if (auto waited = WaitQuery(qDisjoint.Get(), &dj, sizeof(dj)); !waited) {
+            return waited;
           }
           UINT64 t1 = 0;
           UINT64 t2 = 0;
-          if (
-            WaitQuery(qStart.Get(), &t1, sizeof(t1), err) && WaitQuery(qEnd.Get(), &t2, sizeof(t2), err) &&
-            !dj.Disjoint && dj.Frequency != 0 && t2 >= t1
-          ) {
+          auto stamps = WaitQuery(qStart.Get(), &t1, sizeof(t1));
+          if (stamps) {
+            stamps = WaitQuery(qEnd.Get(), &t2, sizeof(t2));
+          }
+          if (stamps && !dj.Disjoint && dj.Frequency != 0 && t2 >= t1) {
             if (gpuMs != nullptr) {
               *gpuMs = static_cast<double>(t2 - t1) * 1000.0 / static_cast<double>(dj.Frequency);
             }
           } else if (lost) {
-            return false;
-          } else {
-            err.clear();
+            return std::unexpected(stamps ? lostWhy : stamps.error());
           }
         } else {
           ctx->End(qEvent.Get());
           ctx->Flush();
           BOOL done = FALSE;
-          if (!WaitQuery(qEvent.Get(), &done, sizeof(done), err)) {
-            return false;
+          if (auto waited = WaitQuery(qEvent.Get(), &done, sizeof(done)); !waited) {
+            return waited;
           }
         }
         if (gpuMs != nullptr && *gpuMs <= 0.0) {
@@ -1245,10 +1196,9 @@ namespace faf::editor::gpu
         const HRESULT reason = dev->GetDeviceRemovedReason();
         if (reason != S_OK) {
           MarkLost("device removed (" + Hex(reason) + ")");
-          err = lostWhy;
-          return false;
+          return std::unexpected(lostWhy);
         }
-        return true;
+        return {};
       }
 
       /** Called by the backend at the start of a lease: gives back device objects idle for a long time. */
@@ -1259,9 +1209,8 @@ namespace faf::editor::gpu
 
       /** Creates what every dispatch needs (constant buffer, samplers, queries) and finds out whether R32_FLOAT
        * textures can be sampled and written. */
-      bool Prepare(
-        const PFN_D3DCompile_ compileFn,
-        std::string& err
+      std::expected<void, std::string> Prepare(
+        const PFN_D3DCompile_ compileFn
       )
       {
         compile = compileFn;
@@ -1272,7 +1221,7 @@ namespace faf::editor::gpu
         bd.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
         HRESULT hr = dev->CreateBuffer(&bd, nullptr, cbuf.Put());
         if (FAILED(hr)) {
-          return Fail(err, "creating the constant buffer failed", hr);
+          return Fail("creating the constant buffer failed", hr);
         }
         D3D11_SAMPLER_DESC sd = {};
         sd.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
@@ -1285,23 +1234,23 @@ namespace faf::editor::gpu
         sd.MaxLOD = D3D11_FLOAT32_MAX;
         hr = dev->CreateSamplerState(&sd, samplers[0].Put());
         if (FAILED(hr)) {
-          return Fail(err, "creating the linear sampler failed", hr);
+          return Fail("creating the linear sampler failed", hr);
         }
         sd.Filter = D3D11_FILTER_MIN_MAG_MIP_POINT;
         hr = dev->CreateSamplerState(&sd, samplers[1].Put());
         if (FAILED(hr)) {
-          return Fail(err, "creating the point sampler failed", hr);
+          return Fail("creating the point sampler failed", hr);
         }
         D3D11_QUERY_DESC qd = {};
         qd.Query = D3D11_QUERY_EVENT;
         hr = dev->CreateQuery(&qd, qEvent.Put());
         if (FAILED(hr)) {
-          return Fail(err, "creating the event query failed", hr);
+          return Fail("creating the event query failed", hr);
         }
         qd.Query = D3D11_QUERY_TIMESTAMP_DISJOINT;
         hr = dev->CreateQuery(&qd, qDisjoint.Put());
         if (FAILED(hr)) {
-          return Fail(err, "creating the timestamp query failed", hr);
+          return Fail("creating the timestamp query failed", hr);
         }
         qd.Query = D3D11_QUERY_TIMESTAMP;
         hr = dev->CreateQuery(&qd, qStart.Put());
@@ -1309,7 +1258,7 @@ namespace faf::editor::gpu
           hr = dev->CreateQuery(&qd, qEnd.Put());
         }
         if (FAILED(hr)) {
-          return Fail(err, "creating the timestamp query failed", hr);
+          return Fail("creating the timestamp query failed", hr);
         }
         UINT fs = 0;
         UINT tex2d = 0;
@@ -1322,7 +1271,7 @@ namespace faf::editor::gpu
         const bool store = SUCCEEDED(dev->CheckFeatureSupport(D3D11_FEATURE_FORMAT_SUPPORT2, &f2, sizeof(f2))) &&
           (f2.OutFormatSupport2 & D3D11_FORMAT_SUPPORT2_UAV_TYPED_STORE) != 0;
         textures = tex2d != 0 && sample && store;
-        return true;
+        return {};
       }
     };
 
@@ -1563,9 +1512,8 @@ namespace faf::editor::gpu
             lastFail = Narrow(c.desc.Description) + ": feature level below 11_0";
             continue;
           }
-          std::string err;
-          if (!ex->Prepare(compileFn, err)) {
-            lastFail = Narrow(c.desc.Description) + ": " + err;
+          if (auto prepared = ex->Prepare(compileFn); !prepared) {
+            lastFail = Narrow(c.desc.Description) + ": " + prepared.error();
             continue;
           }
           const std::uint64_t dedicated = static_cast<std::uint64_t>(c.desc.DedicatedVideoMemory);

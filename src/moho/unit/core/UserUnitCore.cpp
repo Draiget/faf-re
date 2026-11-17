@@ -1,6 +1,7 @@
 #include "moho/unit/core/UserUnitPrivate.h"
 
 #include "moho/resource/CSimResources.h"
+#include <utility>
 
 namespace
 {
@@ -1727,7 +1728,7 @@ bool UserUnit::FindWeaponBy(
     const auto& weaponBlueprint = weaponBlueprints[i];
     if (
       rangeCategoryFilter != kRangeCategoryAll &&
-      rangeCategoryFilter != static_cast<std::int32_t>(weaponBlueprint.RangeCategory)
+      rangeCategoryFilter != std::to_underlying(weaponBlueprint.RangeCategory)
     ) {
       continue;
     }

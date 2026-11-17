@@ -193,22 +193,19 @@ namespace faf::editor
     return records;
   }
 
-  bool WriteMapFile(
+  std::expected<void, std::string> WriteMapFile(
     moho::CWldMap& map,
     const MapFileRecords& records,
-    const std::filesystem::path& path,
-    std::string& error
+    const std::filesystem::path& path
   )
   {
     if (map.mMapPreviewChunk == nullptr || map.mTerrainRes == nullptr || map.mProps == nullptr) {
-      error = "the map is incomplete";
-      return false;
+      return std::unexpected("the map is incomplete");
     }
     try {
       fa::auto_ptr<gpg::Stream> stream = moho::DISK_OpenFileWrite(path.string().c_str());
       if (stream.get() == nullptr) {
-        error = "can't write " + path.string();
-        return false;
+        return std::unexpected("can't write " + path.string());
       }
       gpg::BinaryWriter writer(stream.get());
       writer.Write(kMapMagic);
@@ -291,13 +288,11 @@ namespace faf::editor
       }
       stream->VirtClose(gpg::Stream::ModeBoth);
       if (!preview || !terrain) {
-        error = std::string("writing the ") + (!preview ? "preview" : "terrain") + " failed";
-        return false;
+        return std::unexpected(std::string("writing the ") + (!preview ? "preview" : "terrain") + " failed");
       }
-      return true;
+      return {};
     } catch (const std::exception& exception) {
-      error = exception.what();
-      return false;
+      return std::unexpected(exception.what());
     }
   }
 

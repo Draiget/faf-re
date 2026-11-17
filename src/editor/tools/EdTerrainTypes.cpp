@@ -130,7 +130,7 @@ namespace faf::editor
       c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
     }
     for (const auto& [word, code] : kRules) {
-      if (name.find(word) != std::string::npos) {
+      if (name.contains(word)) {
         if (std::any_of(types.begin(), types.end(), [code = code](const TerrainTypeInfo& t) {
           return t.code == code;
         })) {

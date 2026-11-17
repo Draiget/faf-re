@@ -279,9 +279,7 @@ namespace moho
       const bool useGpu = MSDF_IsGpuCookAvailable();
       const bool compare = useGpu && ren_GpuFontCookCompare;
       std::string error;
-      if (
-        !compare && ReadCache(cachePath, *atlas) && (!file.mFromMod || MSDF_CheckCookedAtlas(*atlas, options, error))
-      ) {
+      if (!compare && ReadCache(cachePath, *atlas) && (!file.mFromMod || MSDF_CheckCookedAtlas(*atlas, options))) {
         gpg::Logf("MSDF: %s%s from the cache, %zu glyphs", kind, path, atlas->mGlyphs.size());
         return atlas;
       }
@@ -315,25 +313,31 @@ namespace moho
 
       const auto start = std::chrono::steady_clock::now();
       MsdfCookPlan plan;
-      if (!plan.Prepare(file.mBytes.data(), file.mBytes.size(), options, error)) {
+      if (auto prepared = plan.Prepare(file.mBytes.data(), file.mBytes.size(), options); !prepared) {
+        error = prepared.error();
         return finishWithout(plan);
       }
       bool cookedOnGpu = false;
       if (useGpu) {
-        cookedOnGpu = MSDF_CookOnGpu(plan, error);
+        const auto onGpu = MSDF_CookOnGpu(plan);
+        cookedOnGpu = onGpu.has_value();
         if (!cookedOnGpu) {
+          error = onGpu.error();
           gpg::Warnf("MSDF: %s%s cooks on the CPU instead of the GPU: %s", kind, path, error.c_str());
         }
       }
-      if (!cookedOnGpu && !plan.GenerateOnCpu(error)) {
-        return finishWithout(plan);
+      if (!cookedOnGpu) {
+        if (auto generated = plan.GenerateOnCpu(); !generated) {
+          error = generated.error();
+          return finishWithout(plan);
+        }
       }
       plan.Finish(*atlas);
       const auto elapsed = std::chrono::steady_clock::now() - start;
       if (compare && cookedOnGpu) {
         SMsdfFontAtlas onCpu;
         const auto cpuStart = std::chrono::steady_clock::now();
-        if (MSDF_CookFont(file.mBytes.data(), file.mBytes.size(), options, onCpu, error)) {
+        if (MSDF_CookFont(file.mBytes.data(), file.mBytes.size(), options, onCpu)) {
           const auto cpuElapsed = std::chrono::steady_clock::now() - cpuStart;
           MSDF_LogAtlasComparison(
             path,
@@ -447,9 +451,8 @@ namespace moho
       gpg::Warnf("MSDF: mod font %s refused: ren_ModFonts is off", shownPath);
       return {};
     }
-    std::string reason;
-    if (!MSDF_CheckFontStructure(fontBytes, byteCount, reason)) {
-      gpg::Warnf("MSDF: mod font %s refused: %s", shownPath, reason.c_str());
+    if (auto checked = MSDF_CheckFontStructure(fontBytes, byteCount); !checked) {
+      gpg::Warnf("MSDF: mod font %s refused: %s", shownPath, checked.error().c_str());
       return {};
     }
 
@@ -478,7 +481,7 @@ namespace moho
 
     Registry& registry = GetRegistry();
     const std::lock_guard<std::mutex> lock(registry.mMutex);
-    if (registry.mByName.count(family) != 0u) {
+    if (registry.mByName.contains(family)) {
       return family;
     }
     if (registry.mModFonts >= kMaxModFontsPerSession) {

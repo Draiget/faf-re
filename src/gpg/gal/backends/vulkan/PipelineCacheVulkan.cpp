@@ -100,10 +100,7 @@ namespace gpg::gal::vulkan
       for (std::filesystem::directory_iterator entry(file.parent_path(), error), end; !error && entry != end;
            entry.increment(error)) {
         const std::string name = entry->path().filename().string();
-        if (
-          name.size() <= prefix.size() + 4U || name.compare(0U, prefix.size(), prefix) != 0 ||
-          name.compare(name.size() - 4U, 4U, ".tmp") != 0
-        ) {
+        if (name.size() <= prefix.size() + 4U || !name.starts_with(prefix) || !name.ends_with(".tmp")) {
           continue;
         }
         std::error_code timeError;

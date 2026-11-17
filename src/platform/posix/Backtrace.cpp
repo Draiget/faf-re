@@ -1,7 +1,7 @@
 // Engine addition (Android port): platform/posix/Backtrace.h on the unwinder's
-// _Unwind_Backtrace, for every POSIX libc (glibc, bionic before API 33, musl).
+// _Unwind_Backtrace, for bionic, which declares backtrace(3) from API level 33 only.
 
-#if !FAFRE_PLATFORM_WINDOWS
+#if FAFRE_PLATFORM_ANDROID
 
 #include "platform/posix/Backtrace.h"
 
@@ -117,4 +117,4 @@ void platform::posix::BacktraceSymbolsFd(
   }
 }
 
-#endif // !FAFRE_PLATFORM_WINDOWS
+#endif // FAFRE_PLATFORM_ANDROID

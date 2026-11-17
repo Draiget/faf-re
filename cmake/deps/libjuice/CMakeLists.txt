@@ -27,7 +27,7 @@ target_compile_definitions(faf_juice PUBLIC JUICE_STATIC)
 target_compile_definitions(faf_juice PRIVATE JUICE_EXPORTS USE_NETTLE=0 NO_SERVER
   $<$<CONFIG:Release>:RELEASE=1>)
 set_target_properties(faf_juice PROPERTIES C_STANDARD 11 FOLDER "dependencies")
-if(FAF_LINUX)
+if(FAFRE_PLATFORM_POSIX)
   target_compile_options(faf_juice PRIVATE -w)
   find_package(Threads REQUIRED)
   target_link_libraries(faf_juice PRIVATE Threads::Threads)

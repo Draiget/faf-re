@@ -758,10 +758,9 @@ namespace faf::editor
         Lines lines = SplitLines(code);
         // Code that ends its block (a trailing return) is wrapped in do ... end, so more can follow it in the stage.
         if (C.compiles != nullptr && *C.compiles) {
-          std::string error;
           if (
-            !(*C.compiles)("local function f()\n" + code + "\nlocal _ = 0\nend", error) &&
-            (*C.compiles)("local function f()\n" + code + "\nend", error)
+            !(*C.compiles)("local function f()\n" + code + "\nlocal _ = 0\nend") &&
+            (*C.compiles)("local function f()\n" + code + "\nend")
           ) {
             lines.insert(lines.begin(), "do");
             lines.push_back("end");
@@ -1058,9 +1057,8 @@ namespace faf::editor
           why = std::string("could not be generated (") + OneLine(error.what()) + ")";
         }
         if (why.empty() && (node.type == "raw" || C.strict) && C.compiles != nullptr && *C.compiles) {
-          std::string error;
-          if (!(*C.compiles)(Join(lines), error)) {
-            why = "does not compile (" + OneLine(error) + ")";
+          if (const auto compiled = (*C.compiles)(Join(lines)); !compiled) {
+            why = "does not compile (" + OneLine(compiled.error()) + ")";
           }
         }
         if (why.empty()) {
@@ -1420,9 +1418,8 @@ namespace faf::editor
       for (std::size_t at = text.find("function"); at != std::string::npos; at = text.find("function", at + 1)) {
         ++functions;
       }
-      return functions <= 2 && text.find("function OnPopulate") != std::string::npos &&
-        text.find("function OnStart") != std::string::npos && text.find("ForkThread") == std::string::npos &&
-        text.size() < 600;
+      return functions <= 2 && text.contains("function OnPopulate") && text.contains("function OnStart") &&
+        !text.contains("ForkThread") && text.size() < 600;
     }
 
     std::string Region(
@@ -1441,8 +1438,7 @@ namespace faf::editor
     )
     {
       const std::string body = CompileMission(mission, options);
-      std::string error;
-      if (!options.compiles || options.compiles(body, error)) {
+      if (!options.compiles || options.compiles(body)) {
         return body;
       }
       std::string stub =
@@ -1788,7 +1784,7 @@ namespace faf::editor
     static const std::set<std::string> kKeywords = {"and", "break",    "do",     "else", "elseif", "end",   "false",
                                                     "for", "function", "if",     "in",   "local",  "nil",   "not",
                                                     "or",  "repeat",   "return", "then", "true",   "until", "while"};
-    if (s.empty() || s.size() > 64 || std::isdigit(static_cast<unsigned char>(s[0])) != 0 || kKeywords.count(s) != 0) {
+    if (s.empty() || s.size() > 64 || std::isdigit(static_cast<unsigned char>(s[0])) != 0 || kKeywords.contains(s)) {
       return false;
     }
     return std::all_of(s.begin(), s.end(), [](const char c) {
@@ -1813,7 +1809,7 @@ namespace faf::editor
       return fallback;
     }
     // The alphabet a category expression needs: nothing that opens a table, a long string, a comment or a statement.
-    if (text.size() > 300 || text.find("--") != std::string::npos) {
+    if (text.size() > 300 || text.contains("--")) {
       return fallback;
     }
     int depth = 0;
@@ -1841,8 +1837,7 @@ namespace faf::editor
       return fallback;
     }
     if (compiles != nullptr && *compiles) {
-      std::string error;
-      if (!(*compiles)("return (" + text + ")", error)) {
+      if (!(*compiles)("return (" + text + ")")) {
         return fallback;
       }
     }
@@ -2137,32 +2132,29 @@ namespace faf::editor
     }
   } // namespace
 
-  bool RegisterMissionNodeType(
-    MissionNodeType type,
-    std::string& error
+  std::expected<void, std::string> RegisterMissionNodeType(
+    MissionNodeType type
   )
   {
     if (type.id.empty() || type.title.empty() || !type.emit) {
-      error = "a node type needs an id, a title and code";
-      return false;
+      return std::unexpected("a node type needs an id, a title and code");
     }
     for (const MissionNodeType& t : MissionNodeTypes()) {
       if (t.id == type.id) {
-        error = "the editor has a node type " + type.id;
-        return false;
+        return std::unexpected("the editor has a node type " + type.id);
       }
     }
     for (MissionNodeType& t : ModTypes()) {
       if (t.id == type.id) {
         t = std::move(type); // a mod run again replaces its own
-        return true;
+        return {};
       }
     }
     if (type.family.empty()) {
       type.family = "action";
     }
     ModTypes().push_back(std::move(type));
-    return true;
+    return {};
   }
 
   std::vector<const MissionNodeType*> MissionModNodeTypes()
@@ -2273,6 +2265,9 @@ namespace faf::editor
         out.vars.emplace_back(rest.substr(0, rest.find('=')), rest.substr(rest.find('=') + 1));
       } else if (key == "obj" && eq != std::string::npos) {
         out.objectives.push_back({rest.substr(0, eq), rest.substr(eq + 1)});
+      } else if (key == "flag" && eq != std::string::npos && eq > 0) {
+        out.flags.emplace_back(rest.substr(0, eq), rest.substr(eq + 1) == "1");
+        std::sort(out.flags.begin(), out.flags.end());
       }
     }
     return any;
@@ -2288,6 +2283,8 @@ namespace faf::editor
            "for _, o in m.Objectives or {} do "
            "table.insert(t, 'obj ' .. c(o.Title or o.Tag or '?') .. '=' .. "
            "(o.Complete and 'done' or (o.Active and 'active' or 'off'))) end "
+           "for k, v in ScenarioInfo.VarTable or {} do if type(v) == 'boolean' then "
+           "table.insert(t, 'flag ' .. c(k) .. '=' .. (v and '1' or '0')) end end "
            "LOG('EDMISSION live ' .. table.concat(t, '|')) end";
   }
 
@@ -2310,6 +2307,25 @@ namespace faf::editor
     return true;
   }
 
+  bool MissionSetFlag(
+    const std::string& name,
+    const bool value,
+    std::string& command
+  )
+  {
+    if (name.empty()) {
+      return false;
+    }
+    for (const char c : name) {
+      if (std::isalnum(static_cast<unsigned char>(c)) == 0 && c != '_') {
+        return false;
+      }
+    }
+    command = "SimLua ScenarioInfo.VarTable = ScenarioInfo.VarTable or {} ScenarioInfo.VarTable['" + name +
+      "'] = " + (value ? "true" : "false");
+    return true;
+  }
+
   bool ParseMissionTrace(
     const std::string& id,
     MissionTraceId& out
@@ -2324,7 +2340,7 @@ namespace faf::editor
       out.mark = text.back();
       text.pop_back();
     }
-    if (text.rfind("stage.", 0) == 0) {
+    if (text.starts_with("stage.")) {
       out.stage = std::atoi(text.c_str() + 6);
       return out.stage > 0;
     }
@@ -2397,7 +2413,18 @@ namespace faf::editor
       add("    [" + Q(d.name) + "] = {");
       for (const MissionDialogueLine& l : d.lines) {
         const std::string text = l.speaker.empty() ? l.text : l.speaker + ": " + l.text;
-        add("        { text = " + Q(text) + ", delay = " + Num(l.seconds, 5) + " },");
+        // The voice-over, video and portrait when given (FAF Studio's mission.lua StringsLines).
+        std::string extra;
+        for (const auto& [key, value] :
+             {std::pair<const char*, const std::string*>{"bank", &l.bank},
+              {"cue", &l.cue},
+              {"vid", &l.vid},
+              {"faction", &l.faction}}) {
+          if (!value->empty()) {
+            extra += std::string(", ") + key + " = " + Q(*value);
+          }
+        }
+        add("        { text = " + Q(text) + ", delay = " + Num(l.seconds, 5) + extra + " },");
       }
       add("    },");
     }
@@ -2545,12 +2572,11 @@ namespace faf::editor
       const int i = static_cast<int>(s) + 1;
       std::vector<MissionProblem> stageProblems;
       Lines lines = StageLines(m, i, m.stages[s], o, false, &stageProblems);
-      std::string error;
-      if (o.compiles && !o.compiles(Join(lines), error)) {
+      if (o.compiles && !o.compiles(Join(lines))) {
         // A node doesn't load: each checked on its own, the broken ones left out; as a last resort the whole stage.
         stageProblems.clear();
         lines = StageLines(m, i, m.stages[s], o, true, &stageProblems);
-        if (!o.compiles(Join(lines), error)) {
+        if (!o.compiles(Join(lines))) {
           stageProblems.push_back(
             {'E',
              "stage " + std::to_string(i) + " could not be generated: it starts the next stage and says so in the log",
@@ -2614,15 +2640,13 @@ namespace faf::editor
       }
       const std::string outside = text.substr(0, s) + text.substr(e);
       MissionCompileOptions o = options;
-      o.withEntry = outside.find("function OnPopulate") == std::string::npos &&
-        outside.find("function OnStart") == std::string::npos;
+      o.withEntry = !outside.contains("function OnPopulate") && !outside.contains("function OnStart");
       status = MissionPatch::Written;
       return text.substr(0, s) + Region(SafeCompile(mission, o)) + text.substr(e);
     }
     const bool stub = IsStub(text);
     MissionCompileOptions o = options;
-    o.withEntry = stub ||
-      (text.find("function OnPopulate") == std::string::npos && text.find("function OnStart") == std::string::npos);
+    o.withEntry = stub || (!text.contains("function OnPopulate") && !text.contains("function OnStart"));
     const std::string region = Region(SafeCompile(mission, o)) + "\n";
     status = MissionPatch::Written;
     if (stub) {
@@ -2711,7 +2735,7 @@ namespace faf::editor
               problem('E', "no area " + value);
             } else if (p.kind == "marker" && !has(facts.markers, value)) {
               problem('E', "no marker " + value);
-            } else if (p.kind == "dialogue" && dialogues.count(value) == 0) {
+            } else if (p.kind == "dialogue" && !dialogues.contains(value)) {
               problem('E', "no dialogue " + value);
             } else if (
               p.kind == "platoon" && std::none_of(m.platoons.begin(), m.platoons.end(), [&](const MissionPlatoon& t) {
@@ -2740,7 +2764,7 @@ namespace faf::editor
                 problem('E', p.label + " is not a name (letters, digits and _)");
               } else if (p.defines) {
                 defined.insert(value);
-              } else if (defined.count(value) == 0) {
+              } else if (!defined.contains(value)) {
                 problem('W', "variable " + value + " is read before any node sets it");
               }
             }
@@ -2808,7 +2832,7 @@ namespace faf::editor
           }
         }
       }
-      if (started.count(b.name) == 0) {
+      if (!started.contains(b.name)) {
         add('W', "no stage starts it (add a Start a base node)");
       }
       std::set<std::string> attacks;
@@ -2978,7 +3002,11 @@ namespace faf::editor
       for (std::size_t l = 0; l < dl.lines.size(); ++l) {
         out += std::string(l > 0 ? ", " : "") + "{\"text\": " + JsonQuoted(dl.lines[l].text) +
           ", \"speaker\": " + JsonQuoted(dl.lines[l].speaker) +
-          ", \"seconds\": " + JsonNumber(static_cast<float>(dl.lines[l].seconds)) + "}";
+          ", \"seconds\": " + JsonNumber(static_cast<float>(dl.lines[l].seconds)) +
+          (dl.lines[l].bank.empty() ? std::string() : ", \"bank\": " + JsonQuoted(dl.lines[l].bank)) +
+          (dl.lines[l].cue.empty() ? std::string() : ", \"cue\": " + JsonQuoted(dl.lines[l].cue)) +
+          (dl.lines[l].vid.empty() ? std::string() : ", \"vid\": " + JsonQuoted(dl.lines[l].vid)) +
+          (dl.lines[l].faction.empty() ? std::string() : ", \"faction\": " + JsonQuoted(dl.lines[l].faction)) + "}";
       }
       out += "]}" + std::string(d + 1 < m.dialogues.size() ? ",\n" : "\n");
     }
@@ -2986,18 +3014,15 @@ namespace faf::editor
     return out;
   }
 
-  bool LoadMission(
-    const std::string& text,
-    Mission& mission,
-    std::string& error
+  std::expected<Mission, std::string> LoadMission(
+    const std::string& text
   )
   {
     const std::size_t open = text.find('{');
     const std::string root = open == std::string::npos ? std::string() : Balanced(text, open);
     const std::string stages = NestedOf(root, "stages");
     if (stages.empty()) {
-      error = "no stages";
-      return false;
+      return std::unexpected("no stages");
     }
     Mission m;
     std::string mode;
@@ -3032,6 +3057,10 @@ namespace faf::editor
         MissionDialogueLine line;
         (void)StringOf(l, "text", line.text);
         (void)StringOf(l, "speaker", line.speaker);
+        (void)StringOf(l, "bank", line.bank);
+        (void)StringOf(l, "cue", line.cue);
+        (void)StringOf(l, "vid", line.vid);
+        (void)StringOf(l, "faction", line.faction);
         double seconds = 5.0;
         if (NumberOf(l, "seconds", seconds)) {
           line.seconds = seconds;
@@ -3155,7 +3184,6 @@ namespace faf::editor
       }
       m.orderQueues.push_back(std::move(q));
     }
-    mission = std::move(m);
-    return true;
+    return m;
   }
 } // namespace faf::editor

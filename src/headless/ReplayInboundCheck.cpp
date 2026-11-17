@@ -406,7 +406,7 @@ namespace faf::headless
         static_cast<unsigned long long>(ids.blips),
         static_cast<unsigned long long>(ids.foreign),
         ids.example,
-        static_cast<unsigned long long>(mCallbacks.count(where.first) != 0u ? mCallbacks.at(where.first) : 0u)
+        static_cast<unsigned long long>(mCallbacks.contains(where.first) ? mCallbacks.at(where.first) : 0u)
       );
       summary += text;
     }

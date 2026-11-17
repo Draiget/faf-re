@@ -1,6 +1,7 @@
 #include "moho/ai/CAiFormationInstance.h"
 #include "legacy/math/X87Math.h"
 
+#include <utility>
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>
@@ -1404,7 +1405,7 @@ namespace
   )
   {
     moho::COGrid* const grid = formation.mSim->mOGrid;
-    if (static_cast<std::uint8_t>(footprint.FitsAt(position, *grid)) == 0u) {
+    if (std::to_underlying(footprint.FitsAt(position, *grid)) == 0u) {
       return false;
     }
     if (!UnitCanMoveAt(unit, position, grid)) {
@@ -2360,7 +2361,7 @@ namespace moho
     mScale = 0.0f;
   }
 
-#if defined(_M_X64) || defined(__x86_64__) || defined(__aarch64__)
+#if FAFRE_ARCH_64BIT
   static_assert(sizeof(CAiFormationInstance) <= SimBlockLane::kBlockBytes);
 #endif
 
@@ -2381,7 +2382,7 @@ namespace moho
   {
     // x86 runs the recovered binary allocator (malloc_0, 0x00958B20), whose per-thread 896-byte lane formations share
     // with projectiles and others; a list of our own would override that order (26916583 fails at beat 4900 with one).
-#if defined(_M_X64) || defined(__x86_64__) || defined(__aarch64__)
+#if FAFRE_ARCH_64BIT
     if (size == sizeof(CAiFormationInstance)) {
       return SimBlockLane::Allocate();
     }
@@ -2397,7 +2398,7 @@ namespace moho
     if (block == nullptr) {
       return;
     }
-#if defined(_M_X64) || defined(__x86_64__) || defined(__aarch64__)
+#if FAFRE_ARCH_64BIT
     if (size == sizeof(CAiFormationInstance)) {
       SimBlockLane::Free(block);
       return;

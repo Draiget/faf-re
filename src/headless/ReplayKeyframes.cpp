@@ -4,6 +4,7 @@
 #include <cstdio>
 #include <filesystem>
 #include <memory>
+#include <print>
 #include <stdexcept>
 #include <vector>
 
@@ -288,7 +289,7 @@ namespace faf::headless
     std::vector<unsigned char> bytes;
     if (!succeeded || !ReadWholeFile(path, bytes) || bytes.empty()) {
       ++mFailures;
-      std::printf("[%s] KEYFRAME-FAILED beat %u: %s\n", mLabel.c_str(), beat, succeeded ? "empty file" : error.c_str());
+      std::println("[{}] KEYFRAME-FAILED beat {}: {}", mLabel, beat, succeeded ? "empty file" : error.c_str());
       std::fflush(stdout);
       return;
     }
@@ -314,9 +315,9 @@ namespace faf::headless
     mTotalSave += saveSeconds;
     mTotalPack += packSeconds;
 
-    std::printf(
-      "[%s] keyframe beat %u: %zu bytes, zlib-1 %lu bytes in %.0f ms, saved within %.0f ms, md5 %s\n",
-      mLabel.c_str(),
+    std::println(
+      "[{}] keyframe beat {}: {} bytes, zlib-1 {} bytes in {:.0f} ms, saved within {:.0f} ms, md5 {}",
+      mLabel,
       beat,
       bytes.size(),
       packedOk ? static_cast<unsigned long>(packedSize) : 0ul,
@@ -345,7 +346,7 @@ namespace faf::headless
     ++mCount;
     mLongestSave = std::max(mLongestSave, saveSeconds);
     mTotalSave += saveSeconds;
-    std::printf("[%s] keyframe beat %u prepared in %.0f ms\n", mLabel.c_str(), beat, saveSeconds * 1000.0);
+    std::println("[{}] keyframe beat {} prepared in {:.0f} ms", mLabel, beat, saveSeconds * 1000.0);
     std::fflush(stdout);
   }
 

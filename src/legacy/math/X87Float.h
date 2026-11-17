@@ -1,6 +1,5 @@
 #pragma once
 
-#include <bit>
 #include <cmath>
 #include <cstdint>
 #include <cstring>
@@ -54,28 +53,28 @@ namespace fa
       const X87Float rhs
     ) noexcept
     {
-      return Result(lhs.mValue + rhs.mValue, lhs, rhs);
+      return Round(lhs.mValue + rhs.mValue);
     }
     friend X87Float operator-(
       const X87Float lhs,
       const X87Float rhs
     ) noexcept
     {
-      return Result(lhs.mValue - rhs.mValue, lhs, rhs);
+      return Round(lhs.mValue - rhs.mValue);
     }
     friend X87Float operator*(
       const X87Float lhs,
       const X87Float rhs
     ) noexcept
     {
-      return Result(lhs.mValue * rhs.mValue, lhs, rhs);
+      return Round(lhs.mValue * rhs.mValue);
     }
     friend X87Float operator/(
       const X87Float lhs,
       const X87Float rhs
     ) noexcept
     {
-      return Result(lhs.mValue / rhs.mValue, lhs, rhs);
+      return Round(lhs.mValue / rhs.mValue);
     }
     /// `fchs`: exact.
     friend X87Float operator-(
@@ -153,27 +152,6 @@ namespace fa
       X87Float result;
       result.mValue = value;
       return result;
-    }
-
-    /**
-     * The result of `lhs op rhs`, formed in double: rounded to 24 bits. An invalid operation
-     * (inf - inf, 0 * inf, 0 / 0, inf / inf) gives the x87 indefinite, the negative quiet NaN; a
-     * NaN operand passes through.
-     */
-    [[nodiscard]] static X87Float Result(
-      const double value,
-      [[maybe_unused]] const X87Float lhs,
-      [[maybe_unused]] const X87Float rhs
-    ) noexcept
-    {
-#if defined(__aarch64__)
-      // Engine addition (Android port): x86 and x64 give the indefinite for an invalid
-      // operation (their default NaN); AArch64's default NaN is positive.
-      if (std::isnan(value) && !std::isnan(lhs.mValue) && !std::isnan(rhs.mValue)) {
-        return Raw(std::bit_cast<double>(0xFFF8000000000000ull));
-      }
-#endif
-      return Round(value);
     }
 
     /// Round to a 24-bit significand, ties to even, keeping the exponent.

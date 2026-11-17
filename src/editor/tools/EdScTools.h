@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <expected>
 #include <string>
 #include <vector>
 
@@ -81,9 +82,9 @@ namespace faf::editor
 
   /**
    * The pads flattened into the height words (pad_flatten, quantised to a word), the previous result taken off first
-   * so the call replaces it. `result` is the new change; returns the samples changed, -1 with `error`.
+   * so the call replaces it. `result` is the new change; returns the samples changed, or the error.
    */
-  int ApplyPads(
+  [[nodiscard]] std::expected<int, std::string> ApplyPads(
     std::uint16_t* heights,
     int width,
     int height,
@@ -91,8 +92,7 @@ namespace faf::editor
     const std::vector<Pad>& pads,
     const PadSettings& settings,
     const PadResult& previous,
-    PadResult& result,
-    std::string& error
+    PadResult& result
   );
   /** A result taken off again; returns the samples changed. */
   int RemovePads(std::uint16_t* heights, int width, int height, float scale, const PadResult& result);
@@ -118,14 +118,8 @@ namespace faf::editor
     float strength = 1.0f;
   };
   /** The steepest neighbour difference clamped to the limit (slope_limit, quantised); returns the samples changed. */
-  int LimitSlopes(
-    std::uint16_t* heights,
-    int width,
-    int height,
-    float scale,
-    const SlopeLimitSettings& settings,
-    std::string& error
-  );
+  [[nodiscard]] std::expected<int, std::string>
+  LimitSlopes(std::uint16_t* heights, int width, int height, float scale, const SlopeLimitSettings& settings);
 
   /** The grade along a route: its length, steepest and mean grade, the share over the limit and where. */
   struct RampReport

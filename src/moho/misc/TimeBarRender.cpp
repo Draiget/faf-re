@@ -35,10 +35,10 @@ namespace moho
   {
     struct CaseInsensitiveCStringLess
     {
-      [[nodiscard]] bool operator()(
+      [[nodiscard]] static bool operator()(
         const char* lhs,
         const char* rhs
-      ) const noexcept
+      ) noexcept
       {
         if (lhs == rhs) {
           return false;

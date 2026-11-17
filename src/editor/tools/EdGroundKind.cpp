@@ -214,9 +214,9 @@ namespace faf::editor
       case Match::Word:
         return word == token.text;
       case Match::Prefix:
-        return word.rfind(token.text, 0) == 0;
+        return word.starts_with(token.text);
       case Match::Inside:
-        return word.find(token.text) != std::string::npos;
+        return word.contains(token.text);
       }
       return false;
     }

@@ -1,5 +1,6 @@
 #include "moho/particles/ParticleRenderBuckets.h"
 
+#include <utility>
 #include <algorithm>
 #include <cstddef>
 #include <cstdlib>
@@ -285,8 +286,8 @@ namespace moho
     bucket.texture1 = texture1;
 
     bucket.tag.assign(particle.mTypeTag, 0U, fa::string::npos);
-    bucket.blendMode = static_cast<std::int32_t>(particle.mBlendMode);
-    bucket.zMode = static_cast<std::int32_t>(particle.mZMode);
+    bucket.blendMode = std::to_underlying(particle.mBlendMode);
+    bucket.zMode = std::to_underlying(particle.mZMode);
     return &bucket;
   }
 

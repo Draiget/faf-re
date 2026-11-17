@@ -1,5 +1,6 @@
 #pragma once
 
+#include <expected>
 #include <string>
 #include <vector>
 
@@ -13,8 +14,9 @@ namespace faf::editor
    * Orientation with its second value negated, as Euler angles), orders and platoon, and the units' centre.
    */
   std::string UnitsToScunits(const std::vector<SaveUnit>& units);
-  /** A `.scunits` file's units (no names; game positions and Orientation) and their centre; false with `error`. */
-  bool UnitsFromScunits(const std::string& text, std::vector<SaveUnit>& units, float (&centre)[3], std::string& error);
+  /** A `.scunits` file's units (no names; game positions and Orientation) and their centre; the error otherwise. */
+  [[nodiscard]] std::expected<void, std::string>
+  UnitsFromScunits(const std::string& text, std::vector<SaveUnit>& units, float (&centre)[3]);
   /**
    * Units from another map moved onto this one (`width` x `height`): when one lies off it, all of them move so their
    * centre is the map's (FAFME moves only the ones off the map, which pulls a group apart). True when they moved.

@@ -688,7 +688,7 @@ namespace faf::editor
         if (std::find(s.keyOrder.begin(), s.keyOrder.end(), key) == s.keyOrder.end()) {
           s.keyOrder.push_back(key);
         }
-        if (i >= 2 && IsOp(t[i - 1], "=") && t[i - 2].k == Tok::K::Name && s.varKeys.count(t[i - 2].s) == 0) {
+        if (i >= 2 && IsOp(t[i - 1], "=") && t[i - 2].k == Tok::K::Name && !s.varKeys.contains(t[i - 2].s)) {
           s.varKeys[t[i - 2].s] = key;
           if (i + 6 < t.size() && IsName(t[i + 5], "or") && (t[i + 6].k == Tok::K::Num || t[i + 6].k == Tok::K::Str)) {
             s.varDefaults[t[i - 2].s] = {i + 6, i + 7};
@@ -779,7 +779,7 @@ namespace faf::editor
               break;
             }
           }
-          if (tok.s.rfind("CreateArmy", 0) == 0) {
+          if (tok.s.starts_with("CreateArmy")) {
             const std::vector<Range> args = SplitCommas(t, i + 2, close);
             if (args.size() >= 2) {
               Creation c;
@@ -923,7 +923,7 @@ namespace faf::editor
       Tri named = Tri::No;
       if (c.name.e == c.name.b + 1) {
         named = head == group ? Tri::Yes : Tri::No;
-      } else if (IsOp(t[c.name.b + 1], "..") && group.rfind(head, 0) == 0) {
+      } else if (IsOp(t[c.name.b + 1], "..") && group.starts_with(head)) {
         const std::string rest = group.substr(head.size());
         // `'Name_' .. w` with w a numeric for's variable: the turn w = the name's number.
         if (c.name.e == c.name.b + 3 && t[c.name.b + 2].k == Tok::K::Name) {
@@ -1103,7 +1103,7 @@ namespace faf::editor
         }
         const std::string& head = s.toks[c.name.b].s;
         const bool exact = c.name.e == c.name.b + 1;
-        if (exact ? head == group : IsOp(s.toks[c.name.b + 1], "..") && group.rfind(head, 0) == 0) {
+        if (exact ? head == group : IsOp(s.toks[c.name.b + 1], "..") && group.starts_with(head)) {
           naming.push_back(&c);
         }
       }
@@ -1120,7 +1120,7 @@ namespace faf::editor
       }
       rule.scriptNames = true;
       for (const std::string& key : s.keyOrder) {
-        if (touched.count(key) != 0) {
+        if (touched.contains(key)) {
           rule.keys.push_back(key);
         }
       }
@@ -1550,7 +1550,7 @@ namespace faf::editor
         if (!target.optionsWith.empty()) {
           shownOptions = ParseLobbyOptions(target.optionsWith);
           target.rule = RuleOf(s, shownOptions, name);
-        } else if (nexts.count(name) != 0) {
+        } else if (nexts.contains(name)) {
           continue; // a next level nothing can make spawn: not offered
         }
       }

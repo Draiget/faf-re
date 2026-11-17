@@ -44,13 +44,12 @@ namespace faf::editor::gpu
     // ---- perlin, simplex, ridged, billow
     // --------------------------------------------------------------------------------------------------------
 
-    OpResult OpNoiseGpu(
+    std::expected<OpResult, std::string> OpNoiseGpu(
       Executor& ex,
       const OpArgs& a,
       const int kind,
       const char* const defaultBasis,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
       Shape s;
@@ -91,8 +90,8 @@ namespace faf::editor::gpu
         freq *= static_cast<double>(lacunarity);
       }
       std::unique_ptr<Resource> octBuf, seedBuf;
-      if (!UploadVec(ex, tab, octBuf, err) || !UploadVec(ex, seeds, seedBuf, err))
-        return OpResult::Failed;
+      FAF_GPU_TRY(UploadVec(ex, tab, octBuf));
+      FAF_GPU_TRY(UploadVec(ex, seeds, seedBuf));
       hk::FbmParams p{};
       p.w = static_cast<std::uint32_t>(s.w);
       p.octaves = static_cast<std::uint32_t>(octaves);
@@ -102,63 +101,58 @@ namespace faf::editor::gpu
       p.norm = norm;
       Bindings b;
       b.Srv(1, *octBuf).Srv(2, *seedBuf);
-      return RunGenerator(ex, "gen_fbm", s, static_cast<double>(octaves) * (basis == 1 ? 0.7 : 1.0), p, b, out, err);
+      return RunGenerator(ex, "gen_fbm", s, static_cast<double>(octaves) * (basis == 1 ? 0.7 : 1.0), p, b, out);
     }
 
-    OpResult OpPerlinGpu(
+    std::expected<OpResult, std::string> OpPerlinGpu(
       Executor& ex,
       const OpArgs& a,
-      Grid& o,
-      std::string& e
+      Grid& o
     )
     {
-      return OpNoiseGpu(ex, a, 0, "perlin", o, e);
+      return OpNoiseGpu(ex, a, 0, "perlin", o);
     }
-    OpResult OpSimplexGpu(
+    std::expected<OpResult, std::string> OpSimplexGpu(
       Executor& ex,
       const OpArgs& a,
-      Grid& o,
-      std::string& e
+      Grid& o
     )
     {
-      return OpNoiseGpu(ex, a, 0, "simplex", o, e);
+      return OpNoiseGpu(ex, a, 0, "simplex", o);
     }
-    OpResult OpRidgedGpu(
+    std::expected<OpResult, std::string> OpRidgedGpu(
       Executor& ex,
       const OpArgs& a,
-      Grid& o,
-      std::string& e
+      Grid& o
     )
     {
-      return OpNoiseGpu(ex, a, 1, "perlin", o, e);
+      return OpNoiseGpu(ex, a, 1, "perlin", o);
     }
-    OpResult OpBillowGpu(
+    std::expected<OpResult, std::string> OpBillowGpu(
       Executor& ex,
       const OpArgs& a,
-      Grid& o,
-      std::string& e
+      Grid& o
     )
     {
-      return OpNoiseGpu(ex, a, 2, "perlin", o, e);
+      return OpNoiseGpu(ex, a, 2, "perlin", o);
     }
 
     // ---- fractal
     // ------------------------------------------------------------------------------------------------------------------------------------
 
-    OpResult OpFractalGpu(
+    std::expected<OpResult, std::string> OpFractalGpu(
       Executor& ex,
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
       Shape sh;
       if (!ShapeOf(a, sh) || !Fits(ex, sh.Count(), 1))
         return OpResult::Unsupported;
-      fractal::Setup s;
-      std::string why;
-      if (!fractal::Read(a, sh.cell, s, why))
+      const auto read = fractal::Read(a, sh.cell);
+      if (!read)
         return OpResult::Unsupported; // a bad option: the CPU op reports it
+      const fractal::Setup& s = *read;
       constexpr int kRecords = 19;
       std::vector<float> tab(static_cast<std::size_t>(kRecords) * 16u, 0.0f);
       std::vector<std::uint32_t> seeds(16u + 12u, 0u);
@@ -205,8 +199,8 @@ namespace faf::editor::gpu
         }
       }
       std::unique_ptr<Resource> octBuf, seedBuf;
-      if (!UploadVec(ex, tab, octBuf, err) || !UploadVec(ex, seeds, seedBuf, err))
-        return OpResult::Failed;
+      FAF_GPU_TRY(UploadVec(ex, tab, octBuf));
+      FAF_GPU_TRY(UploadVec(ex, seeds, seedBuf));
       hk::FractalParams p{};
       p.w = static_cast<std::uint32_t>(sh.w);
       p.octaves = static_cast<std::uint32_t>(s.octaves);
@@ -224,7 +218,7 @@ namespace faf::editor::gpu
       b.Srv(1, *octBuf).Srv(2, *seedBuf);
       const double units = static_cast<double>(s.octaves) * (s.style == fractal::kErosive ? 1.2 : 1.0) +
         (s.warp > 0.0 ? 6.0 * s.warpLevels : 0.0);
-      return RunGenerator(ex, "gen_fractal", sh, units, p, b, out, err);
+      return RunGenerator(ex, "gen_fractal", sh, units, p, b, out);
     }
 
     // ---- musgrave, fbm_damped
@@ -276,11 +270,10 @@ namespace faf::editor::gpu
       return true;
     }
 
-    OpResult OpMusgraveGpu(
+    std::expected<OpResult, std::string> OpMusgraveGpu(
       Executor& ex,
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
       Shape sh;
@@ -309,8 +302,8 @@ namespace faf::editor::gpu
         ampSum += amp;
       }
       std::unique_ptr<Resource> octBuf, seedBuf;
-      if (!UploadVec(ex, tab, octBuf, err) || !UploadVec(ex, seeds, seedBuf, err))
-        return OpResult::Failed;
+      FAF_GPU_TRY(UploadVec(ex, tab, octBuf));
+      FAF_GPU_TRY(UploadVec(ex, seeds, seedBuf));
       hk::MusgraveParams p{};
       p.w = static_cast<std::uint32_t>(sh.w);
       p.octaves = static_cast<std::uint32_t>(octaves);
@@ -321,14 +314,13 @@ namespace faf::editor::gpu
       p.divisor = kind == 0 ? ampSum * std::max(1e-3f, offset * offset) : ampSum * std::max(1e-3f, offset + 1.0f);
       Bindings b;
       b.Srv(1, *octBuf).Srv(2, *seedBuf);
-      return RunGenerator(ex, "gen_musgrave", sh, static_cast<double>(octaves), p, b, out, err);
+      return RunGenerator(ex, "gen_musgrave", sh, static_cast<double>(octaves), p, b, out);
     }
 
-    OpResult OpFbmDampedGpu(
+    std::expected<OpResult, std::string> OpFbmDampedGpu(
       Executor& ex,
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
       Shape sh;
@@ -346,8 +338,8 @@ namespace faf::editor::gpu
       if (!FillOctaves(tab, seeds, octaves, seed, scale, static_cast<double>(lac), rotate, sh))
         return OpResult::Unsupported;
       std::unique_ptr<Resource> octBuf, seedBuf;
-      if (!UploadVec(ex, tab, octBuf, err) || !UploadVec(ex, seeds, seedBuf, err))
-        return OpResult::Failed;
+      FAF_GPU_TRY(UploadVec(ex, tab, octBuf));
+      FAF_GPU_TRY(UploadVec(ex, seeds, seedBuf));
       hk::FbmdParams p{};
       p.w = static_cast<std::uint32_t>(sh.w);
       p.octaves = static_cast<std::uint32_t>(octaves);
@@ -356,7 +348,7 @@ namespace faf::editor::gpu
       p.damp = damp;
       Bindings b;
       b.Srv(1, *octBuf).Srv(2, *seedBuf);
-      return RunGenerator(ex, "gen_fbmd", sh, static_cast<double>(octaves) * 1.1, p, b, out, err);
+      return RunGenerator(ex, "gen_fbmd", sh, static_cast<double>(octaves) * 1.1, p, b, out);
     }
 
     // ---- voronoi, cells, cracks
@@ -396,30 +388,27 @@ namespace faf::editor::gpu
       return PutCellMap(tab, 3, sh, size, 0.0, 0.0) && PutCellMap(tab, 4, sh, size, sx, sz);
     }
 
-    OpResult RunCells(
+    std::expected<OpResult, std::string> RunCells(
       Executor& ex,
       const Shape& sh,
       hk::CellsParams p,
       const std::vector<float>& tab,
       const double units,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
       std::unique_ptr<Resource> octBuf;
-      if (!UploadVec(ex, tab, octBuf, err))
-        return OpResult::Failed;
+      FAF_GPU_TRY(UploadVec(ex, tab, octBuf));
       p.w = static_cast<std::uint32_t>(sh.w);
       Bindings b;
       b.Srv(1, *octBuf);
-      return RunGenerator(ex, "gen_cells", sh, units, p, b, out, err);
+      return RunGenerator(ex, "gen_cells", sh, units, p, b, out);
     }
 
-    OpResult OpVoronoiGpu(
+    std::expected<OpResult, std::string> OpVoronoiGpu(
       Executor& ex,
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
       Shape sh;
@@ -437,14 +426,13 @@ namespace faf::editor::gpu
       p.seed = static_cast<std::uint32_t>(static_cast<std::int64_t>(a.p.N("seed", 1)));
       p.jitter = jitter;
       p.width = std::max(1e-4f, static_cast<float>(a.p.N("thickness", 0.1)));
-      return RunCells(ex, sh, p, tab, 9.0, out, err);
+      return RunCells(ex, sh, p, tab, 9.0, out);
     }
 
-    OpResult OpCellsGpu(
+    std::expected<OpResult, std::string> OpCellsGpu(
       Executor& ex,
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
       Shape sh;
@@ -503,14 +491,13 @@ namespace faf::editor::gpu
         p.warpOct = 3;
       }
       const double cellsPerSample = (p.range == 2 ? 25.0 : 9.0) * (mi == 7 || mi == 8 ? 3.0 : 1.0) / 3.0;
-      return RunCells(ex, sh, p, tab, cellsPerSample + (warp != 0.0 ? 6.0 : 0.0), out, err);
+      return RunCells(ex, sh, p, tab, cellsPerSample + (warp != 0.0 ? 6.0 : 0.0), out);
     }
 
-    OpResult OpCracksGpu(
+    std::expected<OpResult, std::string> OpCracksGpu(
       Executor& ex,
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
       Shape sh;
@@ -549,17 +536,16 @@ namespace faf::editor::gpu
         p.seedB = p.seed + 5102U;
         p.warpOct = 3;
       }
-      return RunCells(ex, sh, p, tab, 4.0 * levels + (warp != 0.0 ? 6.0 : 0.0), out, err);
+      return RunCells(ex, sh, p, tab, 4.0 * levels + (warp != 0.0 ? 6.0 : 0.0), out);
     }
 
     // ---- craters, dunes, island
     // --------------------------------------------------------------------------------------------------------------------
 
-    OpResult OpCratersGpu(
+    std::expected<OpResult, std::string> OpCratersGpu(
       Executor& ex,
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
       Shape sh;
@@ -579,19 +565,17 @@ namespace faf::editor::gpu
       if (!PutCellMap(tab, 0, sh, scale, 0.0, 0.0))
         return OpResult::Unsupported;
       std::unique_ptr<Resource> octBuf;
-      if (!UploadVec(ex, tab, octBuf, err))
-        return OpResult::Failed;
+      FAF_GPU_TRY(UploadVec(ex, tab, octBuf));
       p.w = static_cast<std::uint32_t>(sh.w);
       Bindings b;
       b.Srv(1, *octBuf);
-      return RunGenerator(ex, "gen_craters", sh, 4.0, p, b, out, err);
+      return RunGenerator(ex, "gen_craters", sh, 4.0, p, b, out);
     }
 
-    OpResult OpDunesGpu(
+    std::expected<OpResult, std::string> OpDunesGpu(
       Executor& ex,
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
       Shape sh;
@@ -624,19 +608,17 @@ namespace faf::editor::gpu
       if (!PutCellMap(tab, 0, sh, warpSize, 0.0, 0.0) || !PutCellMap(tab, 1, sh, warpSize * 1.7, 0.0, 0.0))
         return OpResult::Unsupported;
       std::unique_ptr<Resource> octBuf;
-      if (!UploadVec(ex, tab, octBuf, err))
-        return OpResult::Failed;
+      FAF_GPU_TRY(UploadVec(ex, tab, octBuf));
       p.w = static_cast<std::uint32_t>(sh.w);
       Bindings b;
       b.Srv(1, *octBuf);
-      return RunGenerator(ex, "gen_dunes", sh, 5.0, p, b, out, err);
+      return RunGenerator(ex, "gen_dunes", sh, 5.0, p, b, out);
     }
 
-    OpResult OpIslandGpu(
+    std::expected<OpResult, std::string> OpIslandGpu(
       Executor& ex,
       const OpArgs& a,
-      Grid& out,
-      std::string& err
+      Grid& out
     )
     {
       Shape sh;
@@ -675,12 +657,11 @@ namespace faf::editor::gpu
       if (!PutCellMap(tab, 0, sh, nscale, 0.0, 0.0))
         return OpResult::Unsupported;
       std::unique_ptr<Resource> octBuf;
-      if (!UploadVec(ex, tab, octBuf, err))
-        return OpResult::Failed;
+      FAF_GPU_TRY(UploadVec(ex, tab, octBuf));
       p.w = static_cast<std::uint32_t>(sh.w);
       Bindings b;
       b.Srv(1, *octBuf);
-      return RunGenerator(ex, "gen_island", sh, 5.0, p, b, out, err);
+      return RunGenerator(ex, "gen_island", sh, 5.0, p, b, out);
     }
 
     struct Registrar

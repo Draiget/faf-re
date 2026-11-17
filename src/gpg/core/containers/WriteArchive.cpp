@@ -1,5 +1,6 @@
 #include "WriteArchive.h"
 
+#include <utility>
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
@@ -746,7 +747,7 @@ namespace
     }
 
   private:
-    static constexpr std::size_t kBufferBytes = std::size_t{4} * 1024u * 1024u;
+    static constexpr std::size_t kBufferBytes = 4uz * 1024u * 1024u;
 
     template <std::size_t Width, typename T>
     void Scalar(
@@ -1030,10 +1031,10 @@ void WriteArchive::Write(
     ));
   }
 
-  WriteMarker(static_cast<int>(ArchiveToken::ObjectStart));
+  WriteMarker(std::to_underlying(ArchiveToken::ObjectStart));
   WriteRefCounts(type);
   type->serSaveFunc_(this, const_cast<void*>(object), type->version_, const_cast<RRef*>(&ownerRef));
-  WriteMarker(static_cast<int>(ArchiveToken::ObjectTerminator));
+  WriteMarker(std::to_underlying(ArchiveToken::ObjectTerminator));
 }
 
 /**

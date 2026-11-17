@@ -161,9 +161,7 @@ namespace faf::remote::wire
     while (!cursor.AtEnd()) {
       SEffectLaneOp op;
       const std::uint8_t kind = cursor.Byte();
-      if (
-        kind >= static_cast<std::uint8_t>(EEffectOp::Count) || kind == static_cast<std::uint8_t>(EEffectOp::Destroy)
-      ) {
+      if (kind >= std::to_underlying(EEffectOp::Count) || kind == std::to_underlying(EEffectOp::Destroy)) {
         return false;
       }
       op.op = static_cast<EEffectOp>(kind);

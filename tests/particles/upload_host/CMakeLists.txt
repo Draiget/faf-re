@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.25)
 project(ParticleUploadHostTests LANGUAGES CXX)
 
 # Standalone on purpose: configure the host fixture without the engine/graphics SDKs.
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
 find_package(Threads REQUIRED)

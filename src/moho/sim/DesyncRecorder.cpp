@@ -591,10 +591,10 @@ namespace moho
         }
         return names;
       }();
-      if (name.compare(0, 10, "telemetry_") == 0) {
+      if (name.starts_with("telemetry_")) {
         return false;
       }
-      return name.compare(0, 4, "sim_") == 0 || name.compare(0, 4, "lua_") == 0 || sEngineSwitches.count(name) != 0;
+      return name.starts_with("sim_") || name.starts_with("lua_") || sEngineSwitches.contains(name);
     }
 
     /// `name=value` for every `ReportedSwitch`; text values only with `withText` (a text switch may
@@ -965,18 +965,19 @@ namespace moho
       mZip->AddText("header.json", header);
       mZip->AddText("hashes.csv", hashes);
 
-      std::string beats = "beat,raw_bytes,stored_bytes,x87_control,mxcsr,sim_workers,commands\n";
+      std::string beats = "beat,raw_bytes,stored_bytes,x87_control,mxcsr,sim_workers,commands,fpcr\n";
       const auto addBeat = [this, &beats](const SBeatRecord& record) {
         mZip->AddDeflated(Printf("beats/beat%05d.log", record.mBeat), record.mDeflated, record.mCrc, record.mRawSize);
         beats += Printf(
-          "%d,%u,%u,0x%04x,0x%08x,%u,%u\n",
+          "%d,%u,%u,0x%04x,0x%08x,%u,%u,0x%08llx\n",
           record.mBeat,
           record.mRawSize,
           static_cast<unsigned>(record.mDeflated.size()),
           record.mFpu.mX87ControlWord,
           record.mFpu.mMxcsr,
           record.mWorkers,
-          record.mCommands
+          record.mCommands,
+          static_cast<unsigned long long>(record.mFpu.mFpcr)
         );
       };
       if (mHaveBeatZero) {
@@ -1604,18 +1605,21 @@ namespace moho
     }
     header += "]},\n";
 
-    // The x87 control word reads 0 on x64 builds, which do no x87 arithmetic (SFpuControlState).
+    // The x87 control word reads 0 on x64 builds, which do no x87 arithmetic, and the x87 word and
+    // MXCSR read 0 on ARM64, whose control register is FPCR (SFpuControlState).
     header += Printf(
       "  \"settings\": {\"sim_ChecksumPeriod\": %d, \"sim_workers_in_use\": %u, \"sse2\": %s, "
       "\"x87_control\": \"0x%04x\", \"mxcsr\": \"0x%08x\", \"x87_control_at_start\": \"0x%04x\", "
-      "\"mxcsr_at_start\": \"0x%08x\", \"switches\": ",
+      "\"mxcsr_at_start\": \"0x%08x\", \"fpcr\": \"0x%08llx\", \"fpcr_at_start\": \"0x%08llx\", \"switches\": ",
       SIM_GetChecksumPeriod(sim),
       SimWorkerCount(),
       CFG_GetArgOption("/sse2", 0u, nullptr) ? "true" : "false",
       fpuNow.mX87ControlWord,
       fpuNow.mMxcsr,
       impl.mStartFpu.mX87ControlWord,
-      impl.mStartFpu.mMxcsr
+      impl.mStartFpu.mMxcsr,
+      static_cast<unsigned long long>(fpuNow.mFpcr),
+      static_cast<unsigned long long>(impl.mStartFpu.mFpcr)
     );
     header += TELEMETRY_JsonString(ConsoleSwitches()) + "},\n";
 
@@ -1747,7 +1751,7 @@ namespace moho
       }
       const std::string name = line.substr(0, eq);
       values += (values.empty() ? "" : ";") + line;
-      if (name.compare(0, 4, "sim_") == 0 || name.compare(0, 12, "lua_Parallel") == 0) {
+      if (name.starts_with("sim_") || name.starts_with("lua_Parallel")) {
         hashed += line + "\n";
       }
       // sim_Workers starts at -1 and the engine sets it from /simworkers when the sim starts:
@@ -1804,6 +1808,7 @@ namespace moho
     common.Add("faf.desync.players_reported", static_cast<std::int64_t>(entry.mReports.size()));
     common.Add("faf.fpu.x87_control", Printf("0x%04x", impl.mBeatFpu.mX87ControlWord));
     common.Add("faf.fpu.mxcsr", Printf("0x%08x", impl.mBeatFpu.mMxcsr));
+    common.Add("faf.fpu.fpcr", Printf("0x%08llx", static_cast<unsigned long long>(impl.mBeatFpu.mFpcr)));
 
     std::vector<CTelemetryAttributes> records;
     for (const SChecksumReport& report : entry.mReports) {
@@ -1824,7 +1829,7 @@ namespace moho
       record.Add("faf.army.remote", static_cast<std::int64_t>(army));
       record.Add("faf.source.remote", static_cast<std::int64_t>(report.mSource));
       record.Add("faf.hash.remote", std::string(report.mReported.ToString().c_str()));
-      record.AddBool("faf.orders_altered", altered.count(report.mSource) != 0);
+      record.AddBool("faf.orders_altered", altered.contains(report.mSource));
       records.push_back(std::move(record));
     }
 

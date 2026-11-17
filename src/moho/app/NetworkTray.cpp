@@ -22,7 +22,7 @@ namespace moho
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
 #endif
-#include <windows.h>
+#include <Windows.h>
 #include <objbase.h>
 #include <shellapi.h>
 #include <shlobj.h>
@@ -540,7 +540,7 @@ namespace moho
           gpg::Logf("NETLINK: tray: network panel %s", net_ShowPanel ? "shown" : "hidden");
         } else if (cmd == kCmdLogFolder) {
           const std::string result = OpenLogFolder(hwnd);
-          if (result.rfind("Log folder opened", 0) != 0) {
+          if (!result.starts_with("Log folder opened")) {
             Notify(hwnd, "Log folder", result); // the tray has no panel to say it in
           }
         } else if (cmd == kCmdDiagnostics) {

@@ -80,7 +80,7 @@ namespace
         for (int i = 0; i < images; ++i) {
           b.insert({ix[i], iz[i]});
         }
-        EXPECT_EQ(a, b) << "mode " << static_cast<int>(symmetry) << " at " << x << "," << z;
+        EXPECT_EQ(a, b) << "mode " << std::to_underlying(symmetry) << " at " << x << "," << z;
       }
     }
   }
@@ -124,10 +124,10 @@ namespace
     // Heights mirrored left / right, but the starts are mirrored top / bottom: the heights alone would say left /
     // right.
     std::vector<std::uint16_t> heights = Random(3);
-    std::string error;
     SymmetrizeOptions options;
     options.symmetry = Symmetry::LeftRight;
-    ASSERT_TRUE(faf::editor::SymmetrizeHeights(heights.data(), kSize, kSize, options, error)) << error;
+    auto made = faf::editor::SymmetrizeHeights(heights.data(), kSize, kSize, options);
+    ASSERT_TRUE(made) << made.error();
     EXPECT_EQ(DetectSymmetry(heights.data(), kSize, kSize).symmetry, Symmetry::LeftRight);
     const std::vector<SymmetryMarker> starts = {{10.0f, 12.0f, Kind::Start}, {10.0f, 52.0f, Kind::Start}};
     EXPECT_NE(DetectSymmetry(heights.data(), kSize, kSize, starts).symmetry, Symmetry::LeftRight);
@@ -142,8 +142,8 @@ namespace
     std::vector<std::uint16_t> heights = Random(5);
     SymmetrizeOptions options;
     options.symmetry = Symmetry::HalfTurn;
-    std::string error;
-    ASSERT_TRUE(faf::editor::SymmetrizeHeights(heights.data(), kSize, kSize, options, error)) << error;
+    auto made = faf::editor::SymmetrizeHeights(heights.data(), kSize, kSize, options);
+    ASSERT_TRUE(made) << made.error();
     std::vector<SymmetryMarker> markers = {{10.0f, 12.0f, Kind::Start}, {54.0f, 52.0f, Kind::Start}};
     for (int i = 0; i < 6; ++i) {
       const float x = 8.0f + 6.0f * static_cast<float>(i);
@@ -189,11 +189,11 @@ namespace
         SymmetrizeOptions options;
         options.symmetry = symmetry;
         options.part = part;
-        std::string error;
-        ASSERT_TRUE(faf::editor::SymmetrizeHeights(heights.data(), kSize, kSize, options, error)) << error;
+        auto made = faf::editor::SymmetrizeHeights(heights.data(), kSize, kSize, options);
+        ASSERT_TRUE(made) << made.error();
         const faf::editor::SymmetryReport report =
           faf::editor::CheckSymmetry(heights.data(), kSize, kSize, symmetry, 3);
-        EXPECT_EQ(report.differing, 0) << "mode " << static_cast<int>(symmetry) << " part " << part;
+        EXPECT_EQ(report.differing, 0) << "mode " << std::to_underlying(symmetry) << " part " << part;
       }
     }
   }
@@ -206,16 +206,17 @@ namespace
     const std::vector<std::uint16_t> start = Random(17);
     SymmetrizeOptions options;
     options.symmetry = Symmetry::LeftRight;
-    std::string error;
 
     // Part 0 keeps the left half, part 1 the right.
     std::vector<std::uint16_t> left = start;
-    ASSERT_TRUE(faf::editor::SymmetrizeHeights(left.data(), kSize, kSize, options, error)) << error;
+    auto made = faf::editor::SymmetrizeHeights(left.data(), kSize, kSize, options);
+    ASSERT_TRUE(made) << made.error();
     EXPECT_EQ(At(left, 5, 9), At(start, 5, 9));
     EXPECT_EQ(At(left, 59, 9), At(start, 5, 9));
     options.part = 1;
     std::vector<std::uint16_t> right = start;
-    ASSERT_TRUE(faf::editor::SymmetrizeHeights(right.data(), kSize, kSize, options, error)) << error;
+    made = faf::editor::SymmetrizeHeights(right.data(), kSize, kSize, options);
+    ASSERT_TRUE(made) << made.error();
     EXPECT_EQ(At(right, 59, 9), At(start, 59, 9));
     EXPECT_EQ(At(right, 5, 9), At(start, 59, 9));
 
@@ -223,7 +224,8 @@ namespace
     options.part = 0;
     options.combine = SymmetryCombine::Max;
     std::vector<std::uint16_t> highest = start;
-    ASSERT_TRUE(faf::editor::SymmetrizeHeights(highest.data(), kSize, kSize, options, error)) << error;
+    made = faf::editor::SymmetrizeHeights(highest.data(), kSize, kSize, options);
+    ASSERT_TRUE(made) << made.error();
     EXPECT_EQ(At(highest, 5, 9), std::max(At(start, 5, 9), At(start, 59, 9)));
     EXPECT_EQ(At(highest, 59, 9), At(highest, 5, 9));
 
@@ -238,7 +240,8 @@ namespace
     };
     std::vector<std::uint16_t> seamed = start;
     options.seam = 8.0f;
-    ASSERT_TRUE(faf::editor::SymmetrizeHeights(seamed.data(), kSize, kSize, options, error)) << error;
+    made = faf::editor::SymmetrizeHeights(seamed.data(), kSize, kSize, options);
+    ASSERT_TRUE(made) << made.error();
     EXPECT_LT(stepAtLine(seamed), stepAtLine(left));
     EXPECT_EQ(faf::editor::CheckSymmetry(seamed.data(), kSize, kSize, Symmetry::LeftRight, 3).differing, 0);
   }
@@ -256,8 +259,8 @@ namespace
     }
     SymmetrizeOptions options;
     options.symmetry = Symmetry::LeftRight;
-    std::string error;
-    ASSERT_TRUE(faf::editor::SymmetrizeMasks(texels.data(), 32, 32, kSize, kSize, options, error)) << error;
+    auto made = faf::editor::SymmetrizeMasks(texels.data(), 32, 32, kSize, kSize, options);
+    ASSERT_TRUE(made) << made.error();
     for (int z = 0; z < 32; ++z) {
       for (int x = 0; x < 32; ++x) {
         ASSERT_EQ(texels[static_cast<std::size_t>(z) * 32 + x], texels[static_cast<std::size_t>(z) * 32 + (31 - x)])
@@ -273,7 +276,8 @@ namespace
     }
     options.symmetry = Symmetry::HalfTurn;
     options.combine = SymmetryCombine::Average; // an average of codes: it copies instead
-    ASSERT_TRUE(faf::editor::SymmetrizeCells(cells.data(), 64, 64, kSize, kSize, options, error)) << error;
+    made = faf::editor::SymmetrizeCells(cells.data(), 64, 64, kSize, kSize, options);
+    ASSERT_TRUE(made) << made.error();
     for (int z = 0; z < 64; ++z) {
       for (int x = 0; x < 64; ++x) {
         const std::uint8_t c = cells[static_cast<std::size_t>(z) * 64 + x];
@@ -292,8 +296,8 @@ namespace
     SymmetrizeOptions options;
     options.symmetry = Symmetry::LeftRight;
     options.centreX = 28.0f;
-    std::string error;
-    ASSERT_TRUE(faf::editor::SymmetrizeHeights(heights.data(), kSize, kSize, options, error)) << error;
+    auto made = faf::editor::SymmetrizeHeights(heights.data(), kSize, kSize, options);
+    ASSERT_TRUE(made) << made.error();
     for (int z = 0; z < kSize; ++z) {
       for (int x = 0; x <= 56; ++x) {
         ASSERT_EQ(At(heights, x, z), At(heights, 56 - x, z)) << x << "," << z;

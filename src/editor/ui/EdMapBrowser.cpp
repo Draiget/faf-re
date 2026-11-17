@@ -323,24 +323,24 @@ namespace faf::editor
     }
     const std::string disk = Lower(details.disk);
     const std::string vault = Lower(mDocument.VaultFolder().generic_string());
-    if (disk.find("/programdata/faforever/") != std::string::npos) {
+    if (disk.contains("/programdata/faforever/")) {
       details.where = kWhereNames[2];
-    } else if (!vault.empty() && disk.rfind(vault, 0) == 0) {
+    } else if (!vault.empty() && disk.starts_with(vault)) {
       details.where = kWhereNames[3];
-    } else if (
-      disk.find("/supreme commander forged alliance/maps/") != std::string::npos ||
-      disk.find(".scd") != std::string::npos
-    ) {
+    } else if (disk.contains("/supreme commander forged alliance/maps/") || disk.contains(".scd")) {
       details.where = kWhereNames[1];
     } else {
       details.where = kWhereNames[4];
     }
     std::string text;
-    LuaText info;
-    std::string error;
-    if (!ReadGameFile(scenario, text) || !ReadLuaAssignment(text, "ScenarioInfo", info, error)) {
+    if (!ReadGameFile(scenario, text)) {
       return;
     }
+    const auto assigned = ReadLuaAssignment(text, "ScenarioInfo");
+    if (!assigned) {
+      return;
+    }
+    const LuaText& info = *assigned;
     if (const LuaText* const name = info.Field("name")) {
       details.title = Unquote(name->atom);
     }
@@ -415,7 +415,7 @@ namespace faf::editor
   {
     const std::string prefix = "/maps/" + Lower(folder) + "/";
     for (const std::string& scenario : mPlay.Maps()) {
-      if (Lower(scenario).rfind(prefix, 0) == 0) {
+      if (Lower(scenario).starts_with(prefix)) {
         return scenario;
       }
     }
@@ -465,13 +465,11 @@ namespace faf::editor
       std::ifstream in(scenarioFile, std::ios::binary);
       text.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
     }
-    LuaText info;
-    std::string error;
     std::string mount;
-    if (ReadLuaAssignment(text, "ScenarioInfo", info, error)) {
-      if (const LuaText* const map = info.Field("map")) {
+    if (const auto info = ReadLuaAssignment(text, "ScenarioInfo")) {
+      if (const LuaText* const map = info->Field("map")) {
         const std::string path = Lower(Unquote(map->atom));
-        if (path.rfind("/maps/", 0) == 0 && path.find('/', 6) != std::string::npos) {
+        if (path.starts_with("/maps/") && path.find('/', 6) != std::string::npos) {
           mount = path.substr(6, path.find('/', 6) - 6);
         }
       }
@@ -534,13 +532,13 @@ namespace faf::editor
     const std::string& name
   )
   {
-    VaultMapName map;
-    std::string error;
-    if (!ParseVaultMapName(name, map, error)) {
-      mStatus = error;
-      gpg::Warnf("editor: vault: %s", error.c_str());
+    const auto parsed = ParseVaultMapName(name);
+    if (!parsed) {
+      mStatus = parsed.error();
+      gpg::Warnf("editor: vault: %s", parsed.error().c_str());
       return;
     }
+    const VaultMapName& map = *parsed;
     // Already listed: open it. On disk but not mounted (downloaded earlier, the game not restarted): mount it.
     if (const std::string listed = ListedScenario(map.folder); !listed.empty()) {
       mStatus = map.folder + " is already here; opened";

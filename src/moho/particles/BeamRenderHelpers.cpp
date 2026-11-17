@@ -1,5 +1,6 @@
 #include "moho/particles/BeamRenderHelpers.h"
 
+#include <utility>
 #include <algorithm>
 #include <cstring>
 #include <cstdlib>
@@ -259,7 +260,7 @@ namespace moho
   bool BeamBucketKeyLess::operator()(
     const SBeamBucketKey& lhs,
     const SBeamBucketKey& rhs
-  ) const noexcept
+  ) noexcept
   {
     if (lhs.blendMode != rhs.blendMode) {
       return lhs.blendMode < rhs.blendMode;
@@ -324,7 +325,7 @@ namespace moho
       beam.mTexture2.tex->GetTexture(texture1);
     }
     bucketKey.texture1 = texture1;
-    bucketKey.blendMode = static_cast<std::int32_t>(beam.mBlendMode);
+    bucketKey.blendMode = std::to_underlying(beam.mBlendMode);
 
     buckets[bucketKey].push_back(beam);
   }

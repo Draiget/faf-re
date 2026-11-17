@@ -198,18 +198,15 @@ namespace faf::editor
     return out;
   }
 
-  bool LookFromScmap(
-    const std::string& bytes,
-    Look& look,
-    std::string& error
+  std::expected<Look, std::string> LookFromScmap(
+    const std::string& bytes
   )
   {
     Cursor in(bytes);
-    const auto fail = [&](const char* const what) {
-      error = what;
-      return false;
+    const auto fail = [](const char* const what) {
+      return std::unexpected<std::string>(what);
     };
-    if (bytes.compare(0, 4, "Map\x1a") != 0) {
+    if (!bytes.starts_with("Map\x1a")) {
       return fail("not a .scmap (no Map header)");
     }
     // Magic, major version, two words, width and height as floats, a float, a short; then the preview.
@@ -309,10 +306,10 @@ namespace faf::editor
       }
     }
     // Past the rest, to the sky; a file that can't be followed keeps what was read, without a sky.
-    look = read;
+    Look look = read;
     look.hasSky = false;
-    const auto noSky = [&]() {
-      return true;
+    const auto noSky = [&]() -> std::expected<Look, std::string> {
+      return look;
     };
     // Wave generators (WaveSystem::Load): two paths, 13 floats, 4 more after format 51.
     std::int32_t generators = 0;
@@ -342,10 +339,14 @@ namespace faf::editor
         return noSky();
       }
     } else {
+      // 10 albedo (base .. Upper), then 9 normal (base .. layer 8): each a texture and its tile.
       for (int layer = 0; layer < 19; ++layer) {
-        if (!in.SkipString() || !in.Skip(4u)) {
+        std::string texture;
+        float tile = 0.0f;
+        if (!in.String(texture) || !in.Take(tile)) {
           return noSky();
         }
+        (layer < 10 ? look.strataAlbedo : look.strataNormal).emplace_back(texture, tile);
       }
     }
     std::int32_t decals = 0;
@@ -460,6 +461,6 @@ namespace faf::editor
     }
     look.sky = std::move(sky);
     look.hasSky = true;
-    return true;
+    return look;
   }
 } // namespace faf::editor

@@ -11,7 +11,7 @@
 // rounding averages. Nothing here is compiled on x86, where the real
 // intrinsics are used.
 
-#if defined(_M_X64)
+#if FAFRE_ARCH_X64
 
 #include <mmintrin.h>
 

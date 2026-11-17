@@ -1,12 +1,14 @@
 #pragma once
 
 #include <cstdint>
+#include <expected>
 #include <span>
 #include <string>
 #include <string_view>
 #include <vector>
 
 #include "remote/net/LobbySignals.h"
+#include "remote/net/UdpSocket.h"
 
 namespace moho
 {
@@ -24,7 +26,7 @@ namespace faf::remote
   struct SServerConnectRequest
   {
     std::string endpoint;    // as given on the command line, for messages
-    std::uint32_t address{}; // IPv4, as NET_GetAddrInfo returns it
+    net::IpAddress address{}; // IPv6, or IPv4 as ::ffff:a.b.c.d (remote/net/UdpSocket.h)
     std::uint16_t port{};
     std::string token;
     std::int32_t uid{}; // `/serveruid`: the player the token was made for (the handshake names both)
@@ -47,15 +49,15 @@ namespace faf::remote
 
   /**
    * Plan WP12.2: one connection string's parts, as a launcher hands them over (the switches, or GPGNet's
-   * `JoinServer address token uid`), checked as the switches are: an IPv4 `host:port`, a token of 1 to 1024 printable
-   * characters without spaces, a uid above 0. False with `error` saying what is wrong; the token never appears in it.
+   * `JoinServer address token uid`), checked as the switches are: an IPv4 `a.b.c.d:port` or an IPv6 `[address]:port`, a
+   * token of 1 to 1024 printable characters without spaces, a uid above 0. The error says what is wrong; the token
+   * never appears in it.
    */
-  [[nodiscard]] bool MakeServerConnectRequest(
+  [[nodiscard]] std::expected<void, std::string> MakeServerConnectRequest(
     std::string_view endpoint,
     std::string_view token,
     std::int32_t uid,
-    SServerConnectRequest& request,
-    std::string& error
+    SServerConnectRequest& request
   );
 
   /**

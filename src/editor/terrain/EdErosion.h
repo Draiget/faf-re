@@ -37,6 +37,8 @@
 #pragma once
 
 #include <cstdint>
+#include <expected>
+#include <string>
 #include <vector>
 
 #include "editor/terrain/EdFieldCore.h"
@@ -176,19 +178,18 @@ namespace faf::editor::field::erosion
   /** erode_hydraulic after the solve: cell noise filter, edge consistency, PostProcess (conserve / keep_range /
    * max_change) and the outputs, exactly as the CPU op. `st` holds t (the new height) and, when the caller has them, d
    * s wear dep flow (empty arrays are emitted as zeros). */
-  bool
-  FinishHydroOp(const OpArgs& a, const Grid& src, const HydroParams& p, HydroState& st, Grid& out, std::string& err);
+  [[nodiscard]] std::expected<void, std::string>
+  FinishHydroOp(const OpArgs& a, const Grid& src, const HydroParams& p, HydroState& st, Grid& out);
   /** erode_droplet after the solve and the filters: PostProcess and the outputs. `height` is the new height (src
    * shape); the other arrays may be empty (zeros). */
-  bool FinishDropletOp(
+  [[nodiscard]] std::expected<void, std::string> FinishDropletOp(
     const OpArgs& a,
     const Grid& src,
     std::vector<float>& height,
     std::vector<float>& wear,
     std::vector<float>& deposit,
     std::vector<float>& flow,
-    Grid& out,
-    std::string& err
+    Grid& out
   );
   /** The pit filled steering surface (priority flood, Barnes 2014) the droplets steer on. */
   void FillSteeringSurface(const std::vector<float>& t, int w, int h, float eps, std::vector<float>& fill);

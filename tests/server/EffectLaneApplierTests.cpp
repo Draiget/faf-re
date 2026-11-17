@@ -3,6 +3,7 @@
 // target that records every call: each op kind reaches it with its arguments and names, under the server's effect id;
 // a repeated create replaces; an effect goes with its entity; what can't be applied is skipped and counted by reason.
 
+#include <utility>
 #include <gtest/gtest.h>
 
 #include <cstdint>
@@ -416,7 +417,7 @@ TEST(
   EXPECT_TRUE(late.calls.empty());
 
   // A lane that doesn't decode: counted; the ops before the fault still apply.
-  Bytes bad = {0u, 0u, static_cast<std::uint8_t>(EEffectOp::DestroyByScript), 4u, 0xFFu};
+  Bytes bad = {0u, 0u, std::to_underlying(EEffectOp::DestroyByScript), 4u, 0xFFu};
   EXPECT_FALSE(applier.Apply(bad, false));
   EXPECT_EQ(applier.Total().badLanes, 1u);
   EXPECT_EQ(applier.Total().destroyedByScript, 1u);

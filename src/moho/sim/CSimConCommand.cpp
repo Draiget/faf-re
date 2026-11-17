@@ -16,10 +16,10 @@ namespace
   struct SimConCommandNameLess
   {
     [[nodiscard]]
-    bool operator()(
+    static bool operator()(
       const fa::string& lhs,
       const fa::string& rhs
-    ) const noexcept
+    ) noexcept
     {
       return gpg::STR_CompareNoCase(lhs.c_str(), rhs.c_str()) < 0;
     }

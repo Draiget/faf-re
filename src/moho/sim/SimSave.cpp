@@ -637,8 +637,7 @@ void Sim::Load(
   // them on, for a scenario that names them, parses it here.
   if (
     FAF_IsSimFixActive(EFafSimFix::WaterBodies) &&
-    std::string_view(loadInfo->mScenarioInfo.c_str(), loadInfo->mScenarioInfo.size()).find("WaterBodies") !=
-      std::string_view::npos
+    std::string_view(loadInfo->mScenarioInfo.c_str(), loadInfo->mScenarioInfo.size()).contains("WaterBodies")
   ) {
     LuaPlus::LuaObject scenarioInfo{};
     (void)SCR_FromString(&scenarioInfo, loadInfo->mScenarioInfo, mLuaState);

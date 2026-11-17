@@ -447,17 +447,14 @@ namespace faf::editor
     }
   }
 
-  bool GraphEmitters(
-    const NodeGraph& graph,
-    std::vector<std::pair<std::string, EmitterBlueprint>>& out,
-    std::string& error
+  std::expected<std::vector<std::pair<std::string, EmitterBlueprint>>, std::string> GraphEmitters(
+    const NodeGraph& graph
   )
   {
-    out.clear();
+    std::vector<std::pair<std::string, EmitterBlueprint>> out;
     const int output = graph.OutputNode();
     if (output == 0) {
-      error = "the graph has no Effect output";
-      return false;
+      return std::unexpected("the graph has no Effect output");
     }
     const GraphNode* effect = graph.Find(output);
     for (std::size_t pin = 0; pin < effect->type->inputs.size(); ++pin) {
@@ -501,10 +498,9 @@ namespace faf::editor
       out.emplace_back(node->params[kName].text, std::move(e));
     }
     if (out.empty()) {
-      error = "no emitter is linked to the Effect output";
-      return false;
+      return std::unexpected("no emitter is linked to the Effect output");
     }
-    return true;
+    return out;
   }
 
   std::vector<EffectTemplate> ParseEffectTemplates(
@@ -566,7 +562,7 @@ namespace faf::editor
             const std::string body = text.substr(p + 1, close > p ? close - p - 1 : 0);
             EffectTemplate made;
             made.name = name;
-            bool plain = body.find('{') == std::string::npos;
+            bool plain = !body.contains('{');
             std::size_t q = 0;
             while (plain && q < body.size()) {
               const std::size_t comma = body.find(',', q);

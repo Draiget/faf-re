@@ -7,6 +7,7 @@
 #include <algorithm>
 
 #include <cstdio>
+#include <print>
 
 #include "imgui.h"
 
@@ -96,9 +97,20 @@ namespace faf::editor
       mMissionLive = message.c_str() + sizeof(kLive) - 1;
       return;
     }
+    // The Unit lab's Test in game: the unit under test, once a second.
+    static constexpr char kUnitTest[] = "EDUNITTEST live ";
+    if (std::strncmp(message.c_str(), kUnitTest, sizeof(kUnitTest) - 1) == 0) {
+      mUnitTestLive = message.c_str() + sizeof(kUnitTest) - 1;
+      return;
+    }
+    // Its notes (which builder builds it, none does, no second army): kept for the panel and shown.
+    static constexpr char kUnitTestNote[] = "EDUNITTEST note ";
+    if (std::strncmp(message.c_str(), kUnitTestNote, sizeof(kUnitTestNote) - 1) == 0) {
+      mUnitTestNote = message.c_str() + sizeof(kUnitTestNote) - 1;
+    }
     mLines.push_back(Line{level, std::string(message.c_str()), seconds});
     if (mTimesFile != nullptr) {
-      std::fprintf(mTimesFile, "%9.3f %s\n", seconds, message.c_str());
+      std::println(mTimesFile, "{:9.3f} {}", seconds, message.c_str());
       std::fflush(mTimesFile);
     }
     if (mLines.size() > kMaxLines) {
@@ -258,7 +270,7 @@ namespace faf::editor
     const Line& line
   ) const
   {
-    if (mFilter[0] != '\0' && line.text.find(mFilter) == std::string::npos) {
+    if (mFilter[0] != '\0' && !line.text.contains(mFilter)) {
       return false;
     }
     switch (line.level) {
@@ -269,6 +281,32 @@ namespace faf::editor
     default:
       return mShowInfo;
     }
+  }
+
+  bool EdLog::TakeUnitTestNote(
+    std::string& out
+  )
+  {
+    const std::lock_guard<std::mutex> lock(mMutex);
+    if (mUnitTestNote.empty()) {
+      return false;
+    }
+    out.swap(mUnitTestNote);
+    mUnitTestNote.clear();
+    return true;
+  }
+
+  bool EdLog::TakeUnitTestLive(
+    std::string& out
+  )
+  {
+    const std::lock_guard<std::mutex> lock(mMutex);
+    if (mUnitTestLive.empty()) {
+      return false;
+    }
+    out.swap(mUnitTestLive);
+    mUnitTestLive.clear();
+    return true;
   }
 
   bool EdLog::TakeMissionLive(

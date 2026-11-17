@@ -292,7 +292,7 @@ namespace faf::remote::client
       static_cast<unsigned long long>(views.tableRecords),
       static_cast<unsigned long long>(views.tableFailures + mTablesBad),
       static_cast<unsigned long long>(views.tableResets),
-      mViews ? mViews->Tables().Deposits().size() : std::size_t{0},
+      mViews ? mViews->Tables().Deposits().size() : 0uz,
       static_cast<unsigned long long>(mViews ? mViews->RebuildStats().terrainEdits : 0u),
       static_cast<unsigned long long>(mViews ? mViews->RebuildStats().unknownTableIds : 0u),
       static_cast<int>(mClock.ServerSimRate()),

@@ -1,17 +1,18 @@
-# Engine addition (dedicated-server plan, Phase D): the Linux build.
+# Engine addition (dedicated-server plan, Phase D; macOS milestone #271): the Linux and macOS
+# builds.
 #
-# Included by the top-level CMakeLists.txt, in place of the Windows project,
-# when the toolchain is cmake/toolchains/linux-clang-x64.cmake. Linux builds
-# the headless simulation only (plan D2, G6): no window, render device, audio,
-# movie, window-shell or Win32 code.
+# Included by the top-level CMakeLists.txt, in place of the Windows project, when the toolchain
+# is cmake/toolchains/linux-clang-x64.cmake or macos-clang-arm64.cmake. Without
+# FAF_POSIX_CLIENT they build the headless simulation only (plan D2, G6): no window, render
+# device, audio, movie, window-shell or Win32 code.
 #
 #   cmake --preset linux-clang-x64-release && cmake --build --preset linux-clang-x64-release
+#   cmake --preset macos-clang-arm64-release && cmake --build --preset macos-clang-arm64-release
 #
-# The Android toolchains (cmake/toolchains/android-*.cmake, FAF_ANDROID) build the
-# headless simulation with the NDK against bionic, for arm64-v8a and x86_64: the
-# targets their build presets name (headless, faf_sim_math_tests, faf-sim-link, the
-# toolchain check and, on x86_64, faf_x87_soft_check), not the x86 difffuzz dump
-# (faf_math_dump).
+# The Android toolchains (cmake/toolchains/android-*.cmake) build the Linux project with the NDK
+# against bionic, for arm64-v8a and x86_64: the targets their build presets name (headless,
+# faf_sim_math_tests, faf_x87_soft_tests, faf-sim-link and the toolchain check), not the
+# difffuzz dump (faf_math_dump), which reads x86's cpuid.
 #
 #   cmake --preset android-arm64-release && cmake --build --preset android-arm64-release
 
@@ -56,33 +57,31 @@ if(FAF_ASAN)
   add_link_options(-fsanitize=address)
 endif()
 
-if(NOT FAF_LINUX)
-  message(FATAL_ERROR "cmake/FafLinux.cmake needs cmake/toolchains/linux-clang-x64.cmake or android-*.cmake.")
+if(NOT FAFRE_PLATFORM_POSIX)
+  message(FATAL_ERROR "cmake/FafPosix.cmake needs a Linux, macOS or Android toolchain (cmake/toolchains/linux-clang-x64.cmake, macos-clang-arm64.cmake, android-*.cmake).")
 endif()
-if(NOT CMAKE_CXX_COMPILER_ID STREQUAL "Clang" OR NOT CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "GNU")
-  message(FATAL_ERROR "The Linux build expects clang with the GNU driver: use the linux-clang-x64-release preset.")
+if(NOT CMAKE_CXX_COMPILER_ID MATCHES "^(Apple)?Clang$" OR NOT CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "GNU")
+  message(FATAL_ERROR "The POSIX build expects clang with the GNU driver: use a linux-clang-* or macos-clang-* preset.")
 endif()
-if(NOT CMAKE_SIZEOF_VOID_P EQUAL 8)
-  message(FATAL_ERROR "The Linux build is 64-bit only.")
+# The combinations the build is made for. FAF_TARGET_ARCH comes from cmake/FafPlatform.cmake;
+# Android is Linux there, as in platform/PlatformDefines.h.
+if(NOT ((FAFRE_PLATFORM_LINUX AND FAFRE_ARCH_X64) OR FAFRE_PLATFORM_MACOS_ARM64 OR
+        (FAFRE_PLATFORM_ANDROID AND FAFRE_ARCH_ARM64)))
+  message(FATAL_ERROR "The POSIX build targets Linux x86_64, macOS arm64 and Android arm64 and x86_64 (this is ${CMAKE_SYSTEM_NAME} ${FAF_TARGET_ARCH}).")
 endif()
-if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64)$")
-  set(FAF_TARGET_ARCH arm64)
-elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|AMD64)$")
-  set(FAF_TARGET_ARCH x64)
+
+# Every executable links with its whole list of undefined symbols rather than the first few (lld);
+# Apple's ld always lists them all and has no such option.
+if(FAFRE_PLATFORM_LINUX)
+  set(FAF_LINK_ALL_ERRORS -Wl,--error-limit=0)
 else()
-  message(FATAL_ERROR "The Linux build targets x86_64 and arm64, not ${CMAKE_SYSTEM_PROCESSOR}.")
-endif()
-# The platform half of the names below (build info, the sim-math tests' known list).
-if(FAF_ANDROID)
-  set(FAF_LINUX_PLATFORM android)
-else()
-  set(FAF_LINUX_PLATFORM linux)
+  set(FAF_LINK_ALL_ERRORS "")
 endif()
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}")
 
 # --- Build-wide settings ------------------------------------------------------------
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_C_STANDARD 17)
@@ -95,7 +94,7 @@ foreach(_lang C CXX ASM)
   string(REPLACE "-O2 -DNDEBUG -O2 -DNDEBUG" "-O2 -DNDEBUG" CMAKE_${_lang}_FLAGS_RELEASE "${CMAKE_${_lang}_FLAGS_RELEASE}")
 endforeach()
 
-if(FAF_ANDROID)
+if(FAFRE_PLATFORM_ANDROID)
   # Android's executables link bionic dynamically, as every program on a device does (the
   # emulator's ARM translation runs no other kind). FAF_ANDROID_STATIC_EXECUTABLES links it
   # statically, so the same file also runs on a Linux host of its architecture, which has
@@ -122,6 +121,7 @@ include(FafWarnings)
 enable_testing()
 add_executable(faf-linux-toolchain-check "${PROJECT_SOURCE_DIR}/tests/linux/ToolchainCheck.cpp")
 target_link_libraries(faf-linux-toolchain-check PRIVATE faf_codegen gtest_main)
+target_include_directories(faf-linux-toolchain-check PRIVATE "${PROJECT_SOURCE_DIR}/src")
 add_test(NAME linux_toolchain COMMAND faf-linux-toolchain-check)
 
 # --- Language dialect ---------------------------------------------------------------------
@@ -134,7 +134,16 @@ add_test(NAME linux_toolchain COMMAND faf-linux-toolchain-check)
 # Code that relies on Microsoft lookup rules (unqualified names from dependent
 # bases) is fixed in the source instead. clang defines no _MSC_VER or _WIN32
 # here, so platform code takes its POSIX branches.
-set(FAF_LINUX_MS_DIALECT -fms-extensions -fms-volatile)
+#
+# macOS builds as plain native C++ without the Microsoft keywords: the shared code's
+# Microsoft spellings are defined in platform/PlatformDefines.h and PosixCompat.h instead.
+# -fms-volatile stays on both: a volatile access is acquire/release, as MSVC makes it, which
+# matters on ARM64's weaker memory ordering for code that publishes through volatile fields.
+if(FAFRE_PLATFORM_MACOS)
+  set(FAF_POSIX_MS_DIALECT -fms-volatile -DFAF_NATIVE_DIALECT=1)
+else()
+  set(FAF_POSIX_MS_DIALECT -fms-extensions -fms-volatile)
+endif()
 
 # --- Dependencies -----------------------------------------------------------------------
 # Wild Magic Foundation (the sim's math) and zlib 1.2.3, with the Windows
@@ -148,7 +157,9 @@ add_subdirectory("${PROJECT_SOURCE_DIR}/cmake/deps/zlib" "${CMAKE_BINARY_DIR}/de
 # simulation targets build as before.
 option(FAF_FETCH_DEPENDENCIES "Fetch the net channel's Monocypher download at configure time" ON)
 if(FAF_FETCH_DEPENDENCIES)
-  set(FAF_DEPENDENCIES_ONLY monocypher zstd googletest)
+  # Wild Magic and zlib with their patches (a Linux tree synced from elsewhere has them already;
+  # a fresh checkout, as on a Mac, needs them applied here).
+  set(FAF_DEPENDENCIES_ONLY WildMagic3p8 zlib-1.2.3 monocypher zstd googletest)
   include(FafDependencies)
 endif()
 add_subdirectory("${PROJECT_SOURCE_DIR}/cmake/deps/monocypher" "${CMAKE_BINARY_DIR}/deps/monocypher")
@@ -213,33 +224,39 @@ target_link_libraries(faf_sim PUBLIC faf_sim_settings)
 
 # The git commit for gpg/core/diagnostics/BuildInfo.cpp, read on every build.
 include(FafBuildInfo)
-faf_build_info(faf_sim ${FAF_TARGET_ARCH}-${FAF_LINUX_PLATFORM})
+if(FAFRE_PLATFORM_MACOS)
+  faf_build_info(faf_sim ${FAF_TARGET_ARCH}-macos)
+elseif(FAFRE_PLATFORM_ANDROID)
+  faf_build_info(faf_sim ${FAF_TARGET_ARCH}-android)
+else()
+  faf_build_info(faf_sim ${FAF_TARGET_ARCH}-linux)
+endif()
 
-# FAF_X87_SOFT puts the software x87 into an x86_64 build in place of X87Math64.S, where long
-# double is binary128 too (Android x86_64): the replays and the golden tests then run the
-# routines arm64 runs, on a machine whose x87 they can be compared with (faf_x87_soft_check).
-option(FAF_X87_SOFT "Software x87 helpers (legacy/math/X87MathSoft.cpp) on x86_64 as well" OFF)
-if(FAF_TARGET_ARCH STREQUAL "x64" AND NOT FAF_X87_SOFT)
-  # The x64 half of legacy/math/X87Math.cpp, in GNU syntax for System V (the
-  # Windows build assembles X87Math64.asm, plan WPL.10).
+# The 64-bit half of legacy/math/X87Math.cpp (the msvc8_x87_* routines, legacy/math/X87Routines.h):
+# on x86-64 the x87 unit runs them, in GNU syntax for System V (the Windows build assembles
+# X87Math64.asm, plan WPL.10); without one (ARM64) they are software, bit for bit the same
+# (legacy/math/X87Soft.cpp, #262). FAF_SOFT_X87 takes the software on x86-64 too, to compare.
+option(FAF_SOFT_X87 "Run legacy/math's x87 routines in software even where an x87 unit exists" OFF)
+if(FAFRE_ARCH_X87 AND NOT FAF_SOFT_X87)
   enable_language(ASM)
   target_sources(faf_sim PRIVATE "${PROJECT_SOURCE_DIR}/src/legacy/math/X87Math64.S")
 else()
-  # arm64 has no x87 unit: the same routines computed in software (legacy/math/X87MathSoft.cpp).
-  # Their arithmetic rounds as the x87 rounds it; the transcendental instructions come from the
-  # C library's binary128 functions rounded to 64 bits, which can differ from a CPU's x87 in the
-  # last of those bits, as two CPUs' x87 can (see the file).
-  target_sources(faf_sim PRIVATE "${PROJECT_SOURCE_DIR}/src/legacy/math/X87MathSoft.cpp")
+  target_sources(faf_sim PRIVATE "${PROJECT_SOURCE_DIR}/src/legacy/math/X87Soft.cpp")
+  target_compile_definitions(faf_sim_settings INTERFACE FAF_SOFT_X87=1)
 endif()
 # gpg::gal::Math without D3DX (plan WPR.12; Windows' faf_main links it too, #317).
 target_sources(faf_sim PRIVATE "${PROJECT_SOURCE_DIR}/src/gpg/gal/MatrixPortable.cpp")
 # The Win32 calls the shared code makes, on POSIX (plan WPL.5).
 target_sources(faf_sim PRIVATE "${PROJECT_SOURCE_DIR}/src/platform/posix/Win32Shim.cpp")
+# The system services the shim and the diagnostics read, per system (/proc on Linux, Mach on macOS).
+target_sources(faf_sim PRIVATE "${PROJECT_SOURCE_DIR}/src/platform/posix/SystemPosix.cpp")
 # platform::net (src/platform/Net.h) on BSD sockets, for moho/net's lockstep transport (issue #259).
 target_sources(faf_sim PRIVATE "${PROJECT_SOURCE_DIR}/src/platform/posix/NetPosix.cpp")
-# Stack walks for the diagnostics below, on any C library (bionic before API 33 has no
-# backtrace(3)).
-target_sources(faf_sim PRIVATE "${PROJECT_SOURCE_DIR}/src/platform/posix/Backtrace.cpp")
+# Android's stack walks for the diagnostics below: bionic declares backtrace(3) from API level 33
+# only (platform/posix/Backtrace.h).
+if(FAFRE_PLATFORM_ANDROID)
+  target_sources(faf_sim PRIVATE "${PROJECT_SOURCE_DIR}/src/platform/posix/Backtrace.cpp")
+endif()
 # The crash diagnostics' headers on POSIX (plan WPL.5).
 target_sources(faf_sim PRIVATE "${PROJECT_SOURCE_DIR}/src/gpg/core/diagnostics/posix/DiagnosticsPosix.cpp")
 # moho/misc/WinPlatform.cpp's platform services (call stacks, error text, message boxes) and
@@ -247,11 +264,16 @@ target_sources(faf_sim PRIVATE "${PROJECT_SOURCE_DIR}/src/gpg/core/diagnostics/p
 target_sources(faf_sim PRIVATE
   "${PROJECT_SOURCE_DIR}/src/moho/misc/posix/PlatformPosix.cpp"
   "${PROJECT_SOURCE_DIR}/src/platform/posix/ClientTypeInfoPosix.cpp")
-# Every thread's x87 control word and MXCSR as on Windows x64 (plan WPL.9): the main thread's
-# from a constructor, the others' from pthread_create, wrapped in every program that links the
-# sim.
+# Every thread's floating-point control state as on Windows x64 (plan WPL.9), the main thread's
+# from a constructor. On x86-64 every other thread's x87 control word and MXCSR from
+# pthread_create, wrapped in every program that links the sim (lld --wrap; Linux starts threads
+# at x87 precision 64). On ARM64 a new thread starts at FPCR 0, the simulation's value: macOS's
+# default, and on Linux (Android) its creator's, which is 0 for the engine's threads; every
+# simulation thread loads it again (platform/X87Precision.h).
 target_sources(faf_sim PRIVATE "${PROJECT_SOURCE_DIR}/src/platform/posix/FpEnvPosix.cpp")
-target_link_options(faf_sim_settings INTERFACE "-Wl,--wrap=pthread_create")
+if(FAFRE_ARCH_X64)
+  target_link_options(faf_sim_settings INTERFACE "-Wl,--wrap=pthread_create")
+endif()
 
 # The Windows build's engine definitions without the Win32 ones (WIN32,
 # _WINDOWS, WIN32_LEAN_AND_MEAN, NOMINMAX, UNICODE, _CRT_*).
@@ -260,11 +282,6 @@ target_compile_definitions(faf_sim_settings INTERFACE
   # The server-mode build, as Windows' faf_engine with FAF_SERVER_MODE (src/CMakeLists.txt):
   # the Linux programs are the server and the replay runner.
   FAF_SERVER_MODE=1)
-if(FAF_TARGET_ARCH STREQUAL "arm64")
-  # The x86 intrinsics the shared code names (<xmmintrin.h>, <emmintrin.h>, <immintrin.h>),
-  # defined for AArch64; ahead of the compiler's own headers, which are x86-only.
-  target_include_directories(faf_sim_settings BEFORE INTERFACE "${PROJECT_SOURCE_DIR}/src/platform/posix/arm64")
-endif()
 target_include_directories(faf_sim_settings INTERFACE
   "${PROJECT_SOURCE_DIR}/src"
   # <Windows.h> and <intrin.h> for the shared code (plan WPL.5), and <windows.h>, the
@@ -280,8 +297,10 @@ if(TARGET faf_netchannel)
   target_link_libraries(faf_sim PUBLIC faf_netchannel)
 endif()
 # dlopen/dlsym (Win32Shim's LoadLibrary) and dladdr (symbol names in call stacks): part of
-# glibc's libc since 2.34, libdl on bionic.
-target_link_libraries(faf_sim_settings INTERFACE ${CMAKE_DL_LIBS})
+# glibc's libc since 2.34 and of macOS's libSystem, libdl on bionic.
+if(FAFRE_PLATFORM_ANDROID)
+  target_link_libraries(faf_sim_settings INTERFACE ${CMAKE_DL_LIBS})
+endif()
 
 set(_faf_sim_options
   # The recovered tree's x86 layout asserts, off as on Windows x64 (see the
@@ -291,7 +310,7 @@ set(_faf_sim_options
   "SHELL:-include platform/PlatformDefines.h"
   # The Windows names the shared code uses (plan WPL.5).
   "SHELL:-include platform/PosixCompat.h"
-  ${FAF_LINUX_MS_DIALECT}
+  ${FAF_POSIX_MS_DIALECT}
   # std::thread and the pthread calls in src/legacy/thread.
   -pthread
   -Wall
@@ -303,10 +322,12 @@ target_compile_options(faf_sim_settings INTERFACE "$<$<COMPILE_LANGUAGE:C,CXX>:$
 include(FafPrecompiledHeaders)
 faf_precompile(faf_sim)
 
-# --- The game client (issue #255) ----------------------------------------------------------
-option(FAF_LINUX_CLIENT "Build the Linux game client (issue #255, not finished)" OFF)
-if(FAF_LINUX_CLIENT)
-  include(FafLinuxClient)
+# --- The game client (issue #255, macOS #273) ------------------------------------------------
+option(FAF_POSIX_CLIENT "Build the Linux / macOS game client" OFF)
+# The option's earlier name, which existing command lines and workflows pass.
+option(FAF_LINUX_CLIENT "Old name of FAF_POSIX_CLIENT" OFF)
+if(FAF_POSIX_CLIENT OR FAF_LINUX_CLIENT)
+  include(FafPosixClient)
 endif()
 
 # --- faf_sim_math_tests (plan WPL.23) ---------------------------------------------------
@@ -317,43 +338,30 @@ target_link_libraries(faf_sim_math_tests PRIVATE faf_sim gtest)
 target_compile_definitions(faf_sim_math_tests PRIVATE
   FAF_SIM_MATH_GOLDEN="${PROJECT_SOURCE_DIR}/tests/sim_math/golden.txt"
 )
-set(_faf_sim_math_args "${PROJECT_SOURCE_DIR}/tests/sim_math/golden.txt")
-# The platform the results are reported for, and whose known differences apply
-# (tests/sim_math/known_<platform>.txt): android-arm64, linux-x64, ...
-set(_faf_sim_math_platform "${FAF_LINUX_PLATFORM}-${FAF_TARGET_ARCH}")
-target_compile_definitions(faf_sim_math_tests PRIVATE FAF_SIM_MATH_PLATFORM="${_faf_sim_math_platform}")
-set(_faf_sim_math_known "${PROJECT_SOURCE_DIR}/tests/sim_math/known_${_faf_sim_math_platform}.txt")
+# The platform's recorded differences from the golden file, named as the test names the platform.
+if(FAFRE_PLATFORM_MACOS)
+  set(_faf_sim_math_known "${PROJECT_SOURCE_DIR}/tests/sim_math/known_macos-${FAF_TARGET_ARCH}.txt")
+elseif(FAFRE_PLATFORM_ANDROID)
+  set(_faf_sim_math_known "${PROJECT_SOURCE_DIR}/tests/sim_math/known_android-${FAF_TARGET_ARCH}.txt")
+else()
+  set(_faf_sim_math_known "${PROJECT_SOURCE_DIR}/tests/sim_math/known_linux-${FAF_TARGET_ARCH}.txt")
+endif()
 if(EXISTS "${_faf_sim_math_known}")
   target_compile_definitions(faf_sim_math_tests PRIVATE FAF_SIM_MATH_KNOWN="${_faf_sim_math_known}")
+endif()
+set(_faf_sim_math_args "${PROJECT_SOURCE_DIR}/tests/sim_math/golden.txt")
+if(EXISTS "${_faf_sim_math_known}")
   list(APPEND _faf_sim_math_args --known "${_faf_sim_math_known}")
 endif()
-# A cross build (Android) runs its tests where the target runs: a device, the emulator,
-# a host of its architecture (CI), or CMAKE_CROSSCOMPILING_EMULATOR.
-if(NOT CMAKE_CROSSCOMPILING OR CMAKE_CROSSCOMPILING_EMULATOR)
+# An Android build runs its tests where the target runs: a device, the emulator, a Linux host of
+# its architecture (CI, FAF_ANDROID_STATIC_EXECUTABLES), or CMAKE_CROSSCOMPILING_EMULATOR.
+if(NOT FAFRE_PLATFORM_ANDROID OR CMAKE_CROSSCOMPILING_EMULATOR)
   add_custom_command(TARGET faf_sim_math_tests POST_BUILD
     COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} "$<TARGET_FILE:faf_sim_math_tests>" ${_faf_sim_math_args}
     COMMENT "Checking the simulation's arithmetic against tests/sim_math/golden.txt"
     VERBATIM)
 endif()
 add_test(NAME sim_math COMMAND "$<TARGET_FILE:faf_sim_math_tests>" ${_faf_sim_math_args})
-
-# --- faf_x87_soft_check (Android x86_64) --------------------------------------------------
-# The software x87 (legacy/math/X87MathSoft.cpp) against the x87 (X87Math64.S), routine by
-# routine and bit for bit: Android x86_64 is the one target with both an x87 unit and the
-# binary128 long double the software x87 needs. Edge cases and seeded random inputs;
-# `--exhaustive [threads]` adds every float input of the routines that take one float
-# (tests/sim_math/X87SoftCheck.cpp).
-if(FAF_ANDROID AND FAF_TARGET_ARCH STREQUAL "x64")
-  enable_language(ASM)
-  add_executable(faf_x87_soft_check
-    "${PROJECT_SOURCE_DIR}/tests/sim_math/X87SoftCheck.cpp"
-    "${PROJECT_SOURCE_DIR}/src/legacy/math/X87Math64.S")
-  target_include_directories(faf_x87_soft_check PRIVATE "${PROJECT_SOURCE_DIR}/src")
-  target_link_libraries(faf_x87_soft_check PRIVATE faf_codegen gtest)
-  set_target_properties(faf_x87_soft_check PROPERTIES FOLDER "Tests/Sim")
-  add_test(NAME x87_soft_check COMMAND faf_x87_soft_check)
-  set_tests_properties(x87_soft_check PROPERTIES LABELS "Sim")
-endif()
 
 # --- faf_math_dump (plan WPR.21) --------------------------------------------------------
 # The difffuzz targets on every faf_sim object, as Windows builds them on faf_engine,
@@ -369,7 +377,7 @@ include("${PROJECT_SOURCE_DIR}/tools/difffuzz/dump.cmake")
 # empty.
 add_executable(faf-sim-link "${PROJECT_SOURCE_DIR}/tests/linux/SimLinkMain.cpp")
 target_link_libraries(faf-sim-link PRIVATE faf_sim)
-target_link_options(faf-sim-link PRIVATE -Wl,--error-limit=0)
+target_link_options(faf-sim-link PRIVATE ${FAF_LINK_ALL_ERRORS})
 
 # --- headless (plan WPL.7) --------------------------------------------------------------
 # The headless replay runner on Linux: headless/sources.cmake on every faf_sim object, as on
@@ -394,7 +402,7 @@ target_compile_definitions(headless PRIVATE FAF_HEADLESS_NET=1)
 target_link_libraries(headless PRIVATE faf_netchannel faf_monocypher)
 target_link_libraries(headless PRIVATE faf_sim)
 target_compile_definitions(headless PRIVATE FAF_SERVER_MODE=1)
-target_link_options(headless PRIVATE -Wl,--error-limit=0)
+target_link_options(headless PRIVATE ${FAF_LINK_ALL_ERRORS})
 
 # --- server (plan WP1.1) --------------------------------------------------------------------
 # The dedicated server, Linux only (plan D2): the sim, and what `headless` shares for loading a game.
@@ -422,12 +430,12 @@ add_executable(server
 )
 target_link_libraries(server PRIVATE faf_sim faf_netchannel faf_monocypher)
 target_compile_definitions(server PRIVATE FAF_SERVER_MODE=1)
-target_link_options(server PRIVATE -Wl,--error-limit=0)
+target_link_options(server PRIVATE ${FAF_LINK_ALL_ERRORS})
 
 add_executable(faf_server_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/server/SpeedWatchTests.cpp"
   "${PROJECT_SOURCE_DIR}/tests/server/NftablesTests.cpp")
 target_include_directories(faf_server_tests PRIVATE "${PROJECT_SOURCE_DIR}/src")
-target_link_libraries(faf_server_tests PRIVATE gtest_main)
+target_link_libraries(faf_server_tests PRIVATE faf_netchannel faf_monocypher gtest_main)
 add_test(NAME server_speed_watch COMMAND faf_server_tests)
 
 add_executable(faf_seat_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/server/SeatTests.cpp" "${PROJECT_SOURCE_DIR}/src/server/SeatIntake.cpp"
@@ -445,7 +453,7 @@ add_executable(faf_seat_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/serv
   "${PROJECT_SOURCE_DIR}/src/server/LobbySignaller.cpp")
 target_link_libraries(faf_seat_tests PRIVATE faf_sim faf_netchannel faf_monocypher gtest_main)
 target_compile_definitions(faf_seat_tests PRIVATE FAF_SERVER_MODE=1)
-target_link_options(faf_seat_tests PRIVATE -Wl,--error-limit=0)
+target_link_options(faf_seat_tests PRIVATE ${FAF_LINK_ALL_ERRORS})
 add_test(NAME server_seat COMMAND faf_seat_tests)
 
 # Plan WP17.2: a client of the control API, for operators and tests.
@@ -461,7 +469,7 @@ add_executable(faf_server_probe EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tools/se
   "${PROJECT_SOURCE_DIR}/src/headless/ReplayLuaState.cpp")
 target_link_libraries(faf_server_probe PRIVATE faf_sim faf_netchannel faf_monocypher)
 target_compile_definitions(faf_server_probe PRIVATE FAF_SERVER_MODE=1)
-target_link_options(faf_server_probe PRIVATE -Wl,--error-limit=0)
+target_link_options(faf_server_probe PRIVATE ${FAF_LINK_ALL_ERRORS})
 
 # --- faf_remote_tests -------------------------------------------------------------------
 # The wire format's tests (tests/remote/WireTests.cpp) on the Linux objects, as Windows'
@@ -481,7 +489,7 @@ add_executable(faf_remote_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/re
 target_link_libraries(faf_remote_tests PRIVATE faf_sim gtest_main)
 target_compile_definitions(faf_remote_tests PRIVATE FAF_SERVER_MODE=1
   FAF_SYNC_POLICY_DIR="${PROJECT_SOURCE_DIR}/tools/sync-routing/policy")
-target_link_options(faf_remote_tests PRIVATE -Wl,--error-limit=0)
+target_link_options(faf_remote_tests PRIVATE ${FAF_LINK_ALL_ERRORS})
 add_test(NAME remote_wire COMMAND faf_remote_tests)
 # The Sync routing policy generator (tools/sync-routing/policy_gen.py) and its acceptance rule.
 find_program(FAF_PYTHON3 NAMES python3 python)
@@ -493,36 +501,53 @@ endif()
 # lockstep transport waits on.
 add_executable(faf_platform_net_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/net/PlatformNetTests.cpp")
 target_link_libraries(faf_platform_net_tests PRIVATE faf_sim gtest_main)
-target_link_options(faf_platform_net_tests PRIVATE -Wl,--error-limit=0)
+target_link_options(faf_platform_net_tests PRIVATE ${FAF_LINK_ALL_ERRORS})
 add_test(NAME platform_net COMMAND faf_platform_net_tests)
-# The Win32 shim's handles when one thread closes what another still uses, and its shell folders
-# (Windows' behaviour).
+# What the lobby puts on the wire for another player (LOBMSG_NewPeer), as Windows runs it: the
+# Windows game's bytes, which an LP64 u_long does not have.
+add_executable(faf_lobby_wire_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/net/LobbyWireTests.cpp")
+target_link_libraries(faf_lobby_wire_tests PRIVATE faf_sim gtest_main)
+target_link_options(faf_lobby_wire_tests PRIVATE ${FAF_LINK_ALL_ERRORS})
+add_test(NAME lobby_wire COMMAND faf_lobby_wire_tests)
+# The Win32 shim's handles when one thread closes what another still uses, its shell folders and
+# its shell deletes (Windows' behaviour).
 add_executable(faf_win32_shim_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/linux/Win32ShimHandleTests.cpp"
-  "${PROJECT_SOURCE_DIR}/tests/linux/Win32ShimFolderTests.cpp")
+  "${PROJECT_SOURCE_DIR}/tests/linux/Win32ShimFolderTests.cpp"
+  "${PROJECT_SOURCE_DIR}/tests/linux/Win32ShimFileOperationTests.cpp")
 target_link_libraries(faf_win32_shim_tests PRIVATE faf_sim gtest_main)
-target_link_options(faf_win32_shim_tests PRIVATE -Wl,--error-limit=0)
+target_link_options(faf_win32_shim_tests PRIVATE ${FAF_LINK_ALL_ERRORS})
 add_test(NAME win32_shim_handles COMMAND faf_win32_shim_tests)
 # Two CNetUDPConnectors in one process over loopback sockets and through peer transports, as
 # Windows runs them (tests/CMakeLists.txt).
 add_executable(faf_peer_transport_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/net/PeerTransportTests.cpp")
 target_link_libraries(faf_peer_transport_tests PRIVATE faf_sim gtest)
-target_link_options(faf_peer_transport_tests PRIVATE -Wl,--error-limit=0)
+target_link_options(faf_peer_transport_tests PRIVATE ${FAF_LINK_ALL_ERRORS})
 add_test(NAME net_peer_transport COMMAND faf_peer_transport_tests)
 # A lost DATA packet's recovery over two connectors (issue #237), as Windows runs it.
 add_executable(faf_fast_retransmit_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/net/FastRetransmitTests.cpp")
 target_link_libraries(faf_fast_retransmit_tests PRIVATE faf_sim gtest_main)
-target_link_options(faf_fast_retransmit_tests PRIVATE -Wl,--error-limit=0)
+target_link_options(faf_fast_retransmit_tests PRIVATE ${FAF_LINK_ALL_ERRORS})
 add_test(NAME net_fast_retransmit COMMAND faf_fast_retransmit_tests)
+# The end of a UDP connector (Destroy, the goodbyes, the connector deleted), as Windows runs it.
+add_executable(faf_udp_connector_lifetime_tests EXCLUDE_FROM_ALL
+  "${PROJECT_SOURCE_DIR}/tests/net/UdpConnectorLifetimeTests.cpp")
+target_link_libraries(faf_udp_connector_lifetime_tests PRIVATE faf_sim gtest_main)
+target_link_options(faf_udp_connector_lifetime_tests PRIVATE ${FAF_LINK_ALL_ERRORS})
+add_test(NAME net_udp_connector_lifetime COMMAND faf_udp_connector_lifetime_tests)
 
 # The libm gate (plan WPL.13): the faf_sim objects call no host libm transcendental outside
-# tests/linux/libm_allowlist.txt; headless is not built while one does. It reads the objects
-# with the toolchain's nm and objdump (the NDK's llvm-nm and llvm-objdump for Android).
-# The object list goes in a response file: on a Windows host (Android builds) it is longer
-# than a command line may be.
+# tests/linux/libm_allowlist.txt; headless is not built while one does. Android reads the
+# objects with the NDK's llvm-nm and llvm-objdump (AArch64 objects, and a Windows host has no nm
+# or objdump); the other builds with nm and objdump from PATH. The object list goes in a
+# response file: on a Windows host it is longer than a command line may be.
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
 file(GENERATE OUTPUT "${CMAKE_BINARY_DIR}/faf_sim_objects.rsp" CONTENT "$<JOIN:$<TARGET_OBJECTS:faf_sim>,\n>\n")
+set(_faf_libm_gate_tools "")
+if(FAFRE_PLATFORM_ANDROID)
+  set(_faf_libm_gate_tools "FAF_NM=${CMAKE_NM}" "FAF_OBJDUMP=${CMAKE_OBJDUMP}")
+endif()
 add_custom_target(faf_sim_libm_gate
-  COMMAND "${CMAKE_COMMAND}" -E env "FAF_NM=${CMAKE_NM}" "FAF_OBJDUMP=${CMAKE_OBJDUMP}"
+  COMMAND "${CMAKE_COMMAND}" -E env ${_faf_libm_gate_tools}
           "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/tests/linux/LibmGate.py"
           "${PROJECT_SOURCE_DIR}/tests/linux/libm_allowlist.txt" "@${CMAKE_BINARY_DIR}/faf_sim_objects.rsp"
   DEPENDS faf_sim
@@ -544,12 +569,16 @@ add_test(NAME damage_callback_stack COMMAND faf_damage_callback_stack_tests)
 set_tests_properties(damage_callback_stack PROPERTIES LABELS "Sim")
 
 # Occupation manager lifecycle, plus a linker-wrap trace of which new/delete
-# overloads it calls; no game data required.
-add_executable(faf_occupation_manager_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/collision_allocator/OccupationManagerTests.cpp")
-target_link_libraries(faf_occupation_manager_tests PRIVATE faf_sim gtest_main)
-set_target_properties(faf_occupation_manager_tests PROPERTIES FOLDER "Tests/Sim")
-add_test(NAME occupation_manager COMMAND faf_occupation_manager_tests)
-set_tests_properties(occupation_manager PROPERTIES LABELS "Sim")
+# overloads it calls; no game data required. Linux only: Apple's ld has no --wrap.
+if(FAFRE_PLATFORM_LINUX)
+  add_executable(faf_occupation_manager_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/collision_allocator/OccupationManagerTests.cpp")
+  target_link_libraries(faf_occupation_manager_tests PRIVATE faf_sim gtest_main)
+  set_target_properties(faf_occupation_manager_tests PROPERTIES FOLDER "Tests/Sim")
+  add_test(NAME occupation_manager COMMAND faf_occupation_manager_tests)
+  set_tests_properties(occupation_manager PROPERTIES LABELS "Sim")
+  target_compile_definitions(faf_occupation_manager_tests PRIVATE FAF_OCCUPATION_DELETE_TRACE=1)
+  target_link_options(faf_occupation_manager_tests PRIVATE -Wl,--wrap=_Znwm -Wl,--wrap=_Znam -Wl,--wrap=_ZdlPv -Wl,--wrap=_ZdaPv)
+endif()
 
 # RScmResource::GetSkeleton from eight threads at once (#396); no game data required.
 add_executable(faf_skeleton_build_thread_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/resource/SkeletonBuildThreadTests.cpp")
@@ -557,8 +586,6 @@ target_link_libraries(faf_skeleton_build_thread_tests PRIVATE faf_sim gtest_main
 set_target_properties(faf_skeleton_build_thread_tests PROPERTIES FOLDER "Tests/Sim")
 add_test(NAME skeleton_build_threads COMMAND faf_skeleton_build_thread_tests)
 set_tests_properties(skeleton_build_threads PROPERTIES LABELS "Sim")
-target_compile_definitions(faf_occupation_manager_tests PRIVATE FAF_OCCUPATION_DELETE_TRACE=1)
-target_link_options(faf_occupation_manager_tests PRIVATE -Wl,--wrap=_Znwm -Wl,--wrap=_Znam -Wl,--wrap=_ZdlPv -Wl,--wrap=_ZdaPv)
 
 # --- Portable unit tests ------------------------------------------------------------------
 # The suites Windows builds that need no Windows API: header-only ones on their own, and the
@@ -586,27 +613,56 @@ _faf_linux_portable_test(faf_profiler_tests profiler_facade tests/profiling/Prof
 _faf_linux_portable_test(faf_sfd_parser_tests sfd_header_parser
   tests/movie/SfdHeaderParserTests.cpp src/moho/movie/sfd/SfdHeaderParser.cpp)
 
+# The software x87 (legacy/math/X87Soft.cpp, #262): its double fast path against its exact model,
+# the x87's special values and known retail results, on every target.
+add_executable(faf_x87_soft_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/x87_soft/X87SoftTests.cpp"
+  "${PROJECT_SOURCE_DIR}/src/legacy/math/X87Soft.cpp")
+target_include_directories(faf_x87_soft_tests PRIVATE "${PROJECT_SOURCE_DIR}/src")
+target_compile_options(faf_x87_soft_tests PRIVATE "SHELL:-include platform/PlatformDefines.h")
+target_link_libraries(faf_x87_soft_tests PRIVATE faf_codegen gtest_main)
+add_test(NAME x87_soft COMMAND faf_x87_soft_tests)
+set_target_properties(faf_x87_soft_tests PROPERTIES FOLDER "Tests/Sim")
+set_tests_properties(x87_soft PROPERTIES LABELS "Sim")
+# The tools that measure it (tools/x87-oracle): one hash per routine over every float input and a seeded corpus: equal on x86-64 and ARM64 means
+# the ARM64 build gives the bits the oracle below proves against the x87 unit.
+add_executable(faf_x87_soft_digest EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tools/x87-oracle/X87SoftDigest.cpp"
+  "${PROJECT_SOURCE_DIR}/src/legacy/math/X87Soft.cpp")
+target_include_directories(faf_x87_soft_digest PRIVATE "${PROJECT_SOURCE_DIR}/src")
+target_compile_options(faf_x87_soft_digest PRIVATE "SHELL:-include platform/PlatformDefines.h")
+target_link_libraries(faf_x87_soft_digest PRIVATE faf_codegen -pthread)
+# The same routines against the x87 unit itself (legacy/math/X87Math64.S), where there is one: all
+# 2^32 inputs of the one-argument routines and random corpora of the rest (tools/x87-oracle/X87Oracle.cpp).
+if(FAFRE_ARCH_X87)
+  enable_language(ASM)
+  add_executable(faf_x87_oracle EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tools/x87-oracle/X87Oracle.cpp"
+    "${PROJECT_SOURCE_DIR}/src/legacy/math/X87Soft.cpp" "${PROJECT_SOURCE_DIR}/src/legacy/math/X87Math64.S")
+  target_include_directories(faf_x87_oracle PRIVATE "${PROJECT_SOURCE_DIR}/src")
+  target_compile_options(faf_x87_oracle PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:SHELL:-include platform/PlatformDefines.h>")
+  target_link_libraries(faf_x87_oracle PRIVATE faf_codegen -pthread)
+endif()
+
 file(GLOB _faf_core_test_sources "${PROJECT_SOURCE_DIR}/tests/core/*.cpp")
 add_executable(faf_core_tests EXCLUDE_FROM_ALL ${_faf_core_test_sources})
 target_link_libraries(faf_core_tests PRIVATE faf_sim gtest_main)
-target_link_options(faf_core_tests PRIVATE -Wl,--error-limit=0)
+target_link_options(faf_core_tests PRIVATE ${FAF_LINK_ALL_ERRORS})
 add_test(NAME core COMMAND faf_core_tests)
 
-add_executable(faf_netcore_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/netcore/NetCoreTests.cpp")
+add_executable(faf_netcore_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/netcore/NetCoreTests.cpp"
+  "${PROJECT_SOURCE_DIR}/tests/netcore/NetStampTests.cpp")
 target_link_libraries(faf_netcore_tests PRIVATE faf_sim gtest_main)
-target_link_options(faf_netcore_tests PRIVATE -Wl,--error-limit=0)
+target_link_options(faf_netcore_tests PRIVATE ${FAF_LINK_ALL_ERRORS})
 add_test(NAME netcore COMMAND faf_netcore_tests /rejoinkeyfile "${CMAKE_CURRENT_BINARY_DIR}/rejoin_test_seat.key")
 
 file(GLOB _faf_container_test_sources "${PROJECT_SOURCE_DIR}/tests/containers/*.cpp")
 add_executable(faf_container_tests EXCLUDE_FROM_ALL ${_faf_container_test_sources})
 target_link_libraries(faf_container_tests PRIVATE faf_sim gtest_main)
-target_link_options(faf_container_tests PRIVATE -Wl,--error-limit=0)
+target_link_options(faf_container_tests PRIVATE ${FAF_LINK_ALL_ERRORS})
 add_test(NAME containers COMMAND faf_container_tests)
 
 file(GLOB _faf_reflection_test_sources "${PROJECT_SOURCE_DIR}/tests/reflection/*.cpp")
 add_executable(faf_reflection_tests EXCLUDE_FROM_ALL ${_faf_reflection_test_sources})
 target_link_libraries(faf_reflection_tests PRIVATE faf_sim gtest_main)
-target_link_options(faf_reflection_tests PRIVATE -Wl,--error-limit=0)
+target_link_options(faf_reflection_tests PRIVATE ${FAF_LINK_ALL_ERRORS})
 add_test(NAME reflection COMMAND faf_reflection_tests)
 
 # Recorded games played back by headless (tests/replay/ReplayPlaybackTests.cpp); skipped without FAF_REPLAY_DATA.
@@ -625,8 +681,16 @@ set_tests_properties(replay_playback PROPERTIES TIMEOUT 7200)
 file(GLOB _faf_lua_test_sources "${PROJECT_SOURCE_DIR}/tests/lua/Lua*.cpp")
 add_executable(faf_lua_tests EXCLUDE_FROM_ALL ${_faf_lua_test_sources})
 target_link_libraries(faf_lua_tests PRIVATE faf_sim gtest_main)
-target_link_options(faf_lua_tests PRIVATE -Wl,--error-limit=0)
+target_link_options(faf_lua_tests PRIVATE ${FAF_LINK_ALL_ERRORS})
 add_test(NAME lua COMMAND faf_lua_tests)
+
+# The startup helpers' path tests (tests/startup), as Windows runs them: faf_sim compiles
+# moho/misc/StartupHelpers.cpp. StartupArgsTests.cpp swaps the MSVC CRT's __argc and __argv, which
+# only Windows' <cstdlib> declares.
+add_executable(faf_startup_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/startup/StartupPathTests.cpp")
+target_link_libraries(faf_startup_tests PRIVATE faf_sim gtest_main)
+target_link_options(faf_startup_tests PRIVATE ${FAF_LINK_ALL_ERRORS})
+add_test(NAME startup COMMAND faf_startup_tests)
 
 # --- faf_tests --------------------------------------------------------------------------
 # Every GoogleTest executable of the Linux build (cmake/FafTests.cmake).

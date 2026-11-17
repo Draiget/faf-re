@@ -29,54 +29,54 @@ namespace moho::sfd
     }
     struct FormatDelete
     {
-      void operator()(
+      static void operator()(
         AVFormatContext* p
-      ) const
+      )
       {
         avformat_close_input(&p);
       }
     };
     struct CodecDelete
     {
-      void operator()(
+      static void operator()(
         AVCodecContext* p
-      ) const
+      )
       {
         avcodec_free_context(&p);
       }
     };
     struct FrameDelete
     {
-      void operator()(
+      static void operator()(
         AVFrame* p
-      ) const
+      )
       {
         av_frame_free(&p);
       }
     };
     struct PacketDelete
     {
-      void operator()(
+      static void operator()(
         AVPacket* p
-      ) const
+      )
       {
         av_packet_free(&p);
       }
     };
     struct ScaleDelete
     {
-      void operator()(
+      static void operator()(
         SwsContext* p
-      ) const
+      )
       {
         sws_freeContext(p);
       }
     };
     struct ResampleDelete
     {
-      void operator()(
+      static void operator()(
         SwrContext* p
-      ) const
+      )
       {
         swr_free(&p);
       }
