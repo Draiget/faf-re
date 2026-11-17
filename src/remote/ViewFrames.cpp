@@ -182,7 +182,7 @@ namespace faf::remote
     mGoneEntities.clear();
     std::size_t stay = 0;
     for (const std::uint32_t id : mLeavingEntities) {
-      if (entities.find(id) == entities.end()) {
+      if (!entities.contains(id)) {
         mGoneEntities.push_back(id);
       } else {
         mLeavingEntities[stay++] = id;

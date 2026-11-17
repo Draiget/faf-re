@@ -69,7 +69,7 @@ namespace
     ) const
     {
       for (const std::string& line : mLines) {
-        if (line.find(text) != std::string::npos) {
+        if (line.contains(text)) {
           return true;
         }
       }

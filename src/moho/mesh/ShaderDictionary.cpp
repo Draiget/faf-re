@@ -85,7 +85,7 @@ namespace moho
     const fa::string& shaderName
   ) const
   {
-    return mDeprecatedNames.find(shaderName) != mDeprecatedNames.end();
+    return mDeprecatedNames.contains(shaderName);
   }
 
   /**

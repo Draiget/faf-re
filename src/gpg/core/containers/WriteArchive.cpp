@@ -1053,8 +1053,7 @@ WriteArchive& WriteArchive::PreCreatedPtr(
     ThrowSerializationError("Error while creating archive: NULL pre-created pointers are not allowed.");
   }
 
-  const bool known =
-    mFastObjRefs != nullptr ? mFastObjRefs->Find(objectRef) != nullptr : mObjRefs.find(objectRef) != mObjRefs.end();
+  const bool known = mFastObjRefs != nullptr ? mFastObjRefs->Find(objectRef) != nullptr : mObjRefs.contains(objectRef);
   if (known) {
     ThrowSerializationError(
       "Error while creating archive: can't register pre-created pointer because it has already been serialized."

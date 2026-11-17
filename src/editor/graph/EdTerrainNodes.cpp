@@ -1188,8 +1188,8 @@ namespace faf::editor::terrain
         }
         values = ErosionOpValues(*s, values, E.fineStep > 0.0 ? E.fineStep : static_cast<double>(E.step));
         values["seed"] = E.Seed(v.N("seed"));
-        const bool masks =
-          E.wanted.count("wear") + E.wanted.count("deposit") + E.wanted.count("flow") + E.wanted.count("accum") > 0;
+        const bool masks = E.wanted.contains("wear") || E.wanted.contains("deposit") || E.wanted.contains("flow") ||
+          E.wanted.contains("accum");
         if (!masks) {
           values["masks"] = 0;
         }
@@ -3831,8 +3831,8 @@ namespace faf::editor::terrain
         [](const Env& E, const Values& v, const Inputs& ins) {
         const field::GridPtr a = In(ins, "a");
         const int k = std::clamp(static_cast<int>(std::lround(v.N("factor"))), 1, 8);
-        const bool wantMasks =
-          E.wanted.count("wear") + E.wanted.count("deposit") + E.wanted.count("flow") + E.wanted.count("accum") > 0;
+        const bool wantMasks = E.wanted.contains("wear") || E.wanted.contains("deposit") || E.wanted.contains("flow") ||
+          E.wanted.contains("accum");
         if (k == 1) {
           if (wantMasks) {
             Fail("the erosion masks need a factor above 1 and \"Run the erosion again\"");

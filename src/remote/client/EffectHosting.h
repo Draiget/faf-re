@@ -208,7 +208,7 @@ namespace faf::remote::client
       const std::uint32_t id
     ) const noexcept
     {
-      return mEffects.find(id) != mEffects.end();
+      return mEffects.contains(id);
     }
 
     // moho::IEffectHost

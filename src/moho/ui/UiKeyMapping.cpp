@@ -562,7 +562,7 @@ void moho::IN_DumpKeyBindings(
 {
   for (const auto& binding : gUiKeyActionMap) {
     const fa::scoped_string chord = IN_DescribeKeyBinding(binding.first);
-    const bool repeats = gUiKeyRepeatMap.find(binding.first) != gUiKeyRepeatMap.end();
+    const bool repeats = gUiKeyRepeatMap.contains(binding.first);
     CON_Printf("%s :: %s :: repeat = %s", chord.c_str(), binding.second.c_str(), repeats ? "true" : "false");
   }
 }
@@ -894,7 +894,7 @@ void moho::CUIKeyHandler::OnKeyDown(
     packedKeyMask |= 0x20000000u;
   }
 
-  const bool keyIsTrackedForRepeat = gUiKeyRepeatMap.find(packedKeyMask) != gUiKeyRepeatMap.end();
+  const bool keyIsTrackedForRepeat = gUiKeyRepeatMap.contains(packedKeyMask);
   if (!keyIsTrackedForRepeat && (keyEvent.m_rawFlags & kKeyEventRawFlagPreviouslyDown) != 0) {
     // Stray Win32 auto-repeat for a key this handler never saw go down
     // (e.g. focus changed mid-press): drop it rather than firing a binding.

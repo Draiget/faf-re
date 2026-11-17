@@ -403,6 +403,14 @@ namespace fa
       return tree_.count(k);
     }
 
+    /** C++20 membership test: the same node walk as `find(k) != end()`. */
+    [[nodiscard]] bool contains(
+      const key_type& k
+    ) const
+    {
+      return tree_.find_node(k) != tree_.header();
+    }
+
     /**
      * Address: 0x00423A00 (FUN_00423A00 -- the key comparison every descent makes, `fa::string::operator<` on the probe
      * and the node key for `fa::map<fa::string, moho::CAnimTexture*>` (`Moho::sAnimTextureMap` at 0x010A77F8; node
@@ -1084,6 +1092,14 @@ namespace fa
     ) const
     {
       return tree_.count(k);
+    }
+
+    /** C++20 membership test: the same node walk as `find(k) != end()`. */
+    [[nodiscard]] bool contains(
+      const key_type& k
+    ) const
+    {
+      return tree_.find_node(k) != tree_.header();
     }
 
     [[nodiscard]] iterator lower_bound(

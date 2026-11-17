@@ -277,7 +277,7 @@ namespace
         static_cast<std::int32_t>(adapterMode.height),
         static_cast<std::int32_t>(adapterMode.refreshRate)
       );
-      if (published.find(mode) != published.end()) {
+      if (published.contains(mode)) {
         continue;
       }
       (void)published.insert(mode);

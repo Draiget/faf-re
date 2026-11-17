@@ -41,7 +41,7 @@ namespace
     ) override
     {
       const std::string text = message.c_str();
-      if (text.find(kMarker) == std::string::npos) {
+      if (!text.contains(kMarker)) {
         return;
       }
       Seen seen{level, text, {}, previousDepth};

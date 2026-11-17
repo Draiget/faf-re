@@ -339,7 +339,7 @@ namespace
     const char* const last = first + moho::lob_IgnoreNames.size();
     const char* tokenStart = first;
     for (const char* it = first;; ++it) {
-      if (it == last || localSeparators.find(*it) != localSeparators.end()) {
+      if (it == last || localSeparators.contains(*it)) {
         ignoreNames.push_back(fa::string(tokenStart, static_cast<std::size_t>(it - tokenStart)));
         if (it == last) {
           break;

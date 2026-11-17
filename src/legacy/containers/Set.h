@@ -221,6 +221,14 @@ namespace fa
       return tree_.count(k);
     }
 
+    /** C++20 membership test: the same node walk as `find(k) != end()`. */
+    [[nodiscard]] bool contains(
+      const key_type& k
+    ) const
+    {
+      return tree_.find_node(k) != tree_.header();
+    }
+
     /**
      * Address: 0x004AD790 (FUN_004AD790 -- `lower_bound` for `fa::set<moho::ResourceRecord, moho::ResourceRecordLess>`
      * (`ResourceManager::mRecords`, node 0x50, value 0x40, isNil@+0x4D); callers 0x004AB780, 0x004AC9B0; formerly

@@ -2796,7 +2796,7 @@ namespace moho
   )
   {
     for (SOffsetInfo& info : mOffsetInfo[GetLayer(unit)]) {
-      if (info.mUnitOffsets.find(unit->GetEntityId()) != info.mUnitOffsets.end()) {
+      if (info.mUnitOffsets.contains(unit->GetEntityId())) {
         return &info;
       }
     }
@@ -3091,7 +3091,7 @@ namespace moho
 
       Unit* const bestUnit = bestIt->unit;
       const EntId entityId = bestUnit->GetEntityId();
-      if (group.mUnitOffsets.find(entityId) != group.mUnitOffsets.end()) {
+      if (group.mUnitOffsets.contains(entityId)) {
         gpg::Warnf(
           "HASH duplicated on %p in formation %p", static_cast<const void*>(bestUnit), static_cast<const void*>(this)
         );
@@ -3473,7 +3473,7 @@ namespace moho
     }
 
     for (const SOffsetInfo& info : mOffsetInfo[GetLayer(unit)]) {
-      if (info.mUnitOffsets.find(unit->GetEntityId()) != info.mUnitOffsets.end()) {
+      if (info.mUnitOffsets.contains(unit->GetEntityId())) {
         return true;
       }
     }

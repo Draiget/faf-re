@@ -143,7 +143,7 @@ namespace
       "operator>=", "operator!",  "operator&", "operator|",     "strlen",     "strcmp",    "wcslen",    "view",
       "to_std",     "Get",        "IsNil",     "operator bool",
     };
-    if (kPure.count(plain) != 0) {
+    if (kPure.contains(plain)) {
       return true;
     }
     (void)qualified;

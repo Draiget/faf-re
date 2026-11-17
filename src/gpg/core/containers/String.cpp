@@ -554,7 +554,7 @@ bool gpg::STR_ContainsNoCase(
 
   const fa::string haystackLower = STR_ToLower(str);
   const fa::string needleLower = STR_ToLower(needle);
-  return haystackLower.find(needleLower.data(), 0, needleLower.size()) != fa::string::npos;
+  return haystackLower.contains(std::string_view(needleLower.data(), needleLower.size()));
 }
 
 bool gpg::STR_EqualsNoCase(

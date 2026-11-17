@@ -414,7 +414,7 @@ namespace moho
     const int z
   )
   {
-    return mKeys.find(ClutterRegionKey(x, z)) != mKeys.end();
+    return mKeys.contains(ClutterRegionKey(x, z));
   }
 
   /**

@@ -520,7 +520,7 @@ namespace faf::editor
         *value = *SettingNumber(defaults, key);
       }
       if (key.starts_with("void_")) {
-        s.haveVoid = s.given.count("void_r") + s.given.count("void_g") + s.given.count("void_b") != 0;
+        s.haveVoid = s.given.contains("void_r") || s.given.contains("void_g") || s.given.contains("void_b");
       }
     }
 

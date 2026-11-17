@@ -72,7 +72,7 @@ namespace
   )
   {
     for (const std::string& line : lines) {
-      if (line.find(part) != std::string::npos) {
+      if (line.contains(part)) {
         return true;
       }
     }
