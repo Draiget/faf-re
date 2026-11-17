@@ -11,6 +11,10 @@ ctest --test-dir build/clang-x64-release -L Vulkan --output-on-failure
 
 `faf_vulkan_attachment_tests` checks `AttachmentWriteBarrier` (`src/gpg/gal/backends/vulkan/VulkanAttachmentBarrier.h`), the barrier `DeviceVulkan::BeginRendering` records when a color or depth target starts a new dynamic-rendering instance in the layout it already has. Six tests cover color, depth and depth/stencil: stages, access masks, kept layout, image and the mip 0 / layer 0 range that render-target views use. It needs only the pinned Vulkan headers; no driver, device or engine.
 
+## Swap chain
+
+`faf_vulkan_swapchain_tests` checks `src/gpg/gal/backends/vulkan/VulkanSwapChain.h`, what `DeviceVulkan::CreateSwapChain` makes a window's swap chain with from what its surface supports: the format (B8G8R8A8, else R8G8B8A8 as Android's surfaces have; R8G8B8A8 or none with `FAF_GAL_NO_BGRA`), the usage the back buffer needs and what of it a surface lacks, the composite alpha (opaque, else one the surface has, as Android's INHERIT), the pre-transform (the identity, which a phone's turned panel also allows), the extent (the surface's, within its bounds), when a scaled head's suboptimal swap chain is made again (an upright one on a turned panel only for a new size) and which formats differ only in the order of red and blue. Like the barrier tests, it needs only the pinned Vulkan headers.
+
 ## Allocator
 
 This GoogleTest executable compiles the same `VulkanMemoryAllocator.cpp` that `faf_engine` uses. It does not link the engine, load a Vulkan driver, or need a GPU. Vulkan types and callback signatures come from the repository's pinned Vulkan headers. Five callbacks supply fixed-capacity handle accounting; `CheckVk` and `backend::ThrowError` use test exception transport.
